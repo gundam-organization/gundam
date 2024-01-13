@@ -5,8 +5,9 @@
 #ifndef GUNDAM_PARAMETERSCANNER_H
 #define GUNDAM_PARAMETERSCANNER_H
 
-#include "JsonBaseClass.h"
+#include "LikelihoodInterface.h"
 #include "Parameter.h"
+#include "JsonBaseClass.h"
 
 #include "nlohmann/json.hpp"
 #include "TDirectory.h"
@@ -14,10 +15,10 @@
 
 #include <utility>
 
-class LikelihoodInterface;
 
 class ParameterScanner : public JsonBaseClass {
 
+private:
   struct ScanData;
   struct GraphEntry;
 
@@ -26,13 +27,12 @@ protected:
   void initializeImpl() override;
 
 public:
-  explicit ParameterScanner(LikelihoodInterface* owner_) : _owner_(owner_) { }
-
-  // Setters
+  // setters
   void setNbPoints(int nbPoints_){ _nbPoints_ = nbPoints_; }
   void setNbPointsLineScan(int nbPointsLineScan_){ _nbPointsLineScan_ = nbPointsLineScan_; }
+  void setLikelihoodInterfacePtr(LikelihoodInterface* likelihoodInterfacePtr_){ _likelihoodInterfacePtr_ = likelihoodInterfacePtr_; }
 
-  // Getters
+  // const getters
   [[nodiscard]] bool isUseParameterLimits() const{ return _useParameterLimits_; }
   [[nodiscard]] int getNbPoints() const{ return _nbPoints_; }
   [[nodiscard]] const std::pair<double, double> &getParameterSigmaRange() const{ return _parameterSigmaRange_; }
@@ -60,7 +60,7 @@ private:
   JsonType _varsConfig_{};
 
   // Internals
-  LikelihoodInterface* _owner_{nullptr};
+  LikelihoodInterface* _likelihoodInterfacePtr_{nullptr};
 
   struct ScanData{
     std::string folder{};

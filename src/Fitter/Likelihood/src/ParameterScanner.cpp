@@ -40,6 +40,8 @@ void ParameterScanner::readConfigImpl() {
 void ParameterScanner::initializeImpl() {
   LogInfo << "Initializing ParameterScanner..." << std::endl;
 
+  LogThrowIf(_likelihoodInterfacePtr_ == nullptr, "_likelihoodInterfacePtr_ not set.");
+
   _scanDataDict_.clear();
   if( GenericToolbox::Json::fetchValue(_varsConfig_, "llh", true) ){
     _scanDataDict_.emplace_back();
@@ -48,7 +50,7 @@ void ParameterScanner::initializeImpl() {
     scanEntry.folder = "llh";
     scanEntry.title = "Total Likelihood Scan";
     scanEntry.yTitle = "LLH value";
-    scanEntry.evalY = [this](){ return _owner_->getBuffer().totalLikelihood; };
+    scanEntry.evalY = [this](){ return _likelihoodInterfacePtr_->getBuffer().totalLikelihood; };
   }
   if( GenericToolbox::Json::fetchValue(_varsConfig_, "llhPenalty", true) ){
     _scanDataDict_.emplace_back();
@@ -58,7 +60,7 @@ void ParameterScanner::initializeImpl() {
     scanEntry.yPoints = std::vector<double>(_nbPoints_+1,0);
     scanEntry.title = "Penalty Likelihood Scan";
     scanEntry.yTitle = "Penalty LLH value";
-    scanEntry.evalY = [this](){ return _owner_->getBuffer().penaltyLikelihood; };
+    scanEntry.evalY = [this](){ return _likelihoodInterfacePtr_->getBuffer().penaltyLikelihood; };
   }
   if( GenericToolbox::Json::fetchValue(_varsConfig_, "llhStat", true) ){
     _scanDataDict_.emplace_back();
@@ -67,11 +69,11 @@ void ParameterScanner::initializeImpl() {
     scanEntry.folder = "llhStat";
     scanEntry.title = "Stat Likelihood Scan";
     scanEntry.yTitle = "Stat LLH value";
-    scanEntry.evalY = [this](){ return _owner_->getBuffer().statLikelihood; };
+    scanEntry.evalY = [this](){ return _likelihoodInterfacePtr_->getBuffer().statLikelihood; };
   }
   if( GenericToolbox::Json::fetchValue(_varsConfig_, "llhStatPerSample", false) ){
-    _scanDataDict_.reserve( _owner_->getPropagator().getSampleSet().getSampleList().size() );
-    for( auto& sample : _owner_->getPropagator().getSampleSet().getSampleList() ){
+    _scanDataDict_.reserve( _likelihoodInterfacePtr_->getPropagator().getSampleSet().getSampleList().size() );
+    for( auto& sample : _likelihoodInterfacePtr_->getPropagator().getSampleSet().getSampleList() ){
       _scanDataDict_.emplace_back();
       auto& scanEntry = _scanDataDict_.back();
       scanEntry.yPoints = std::vector<double>(_nbPoints_+1,0);
@@ -79,11 +81,11 @@ void ParameterScanner::initializeImpl() {
       scanEntry.title = Form("Stat Likelihood Scan of sample \"%s\"", sample.getName().c_str());
       scanEntry.yTitle = "Stat LLH value";
       auto* samplePtr = &sample;
-      scanEntry.evalY = [this, samplePtr](){ return _owner_->evalStatLikelihood( *samplePtr ); };
+      scanEntry.evalY = [this, samplePtr](){ return _likelihoodInterfacePtr_->evalStatLikelihood( *samplePtr ); };
     }
   }
   if( GenericToolbox::Json::fetchValue(_varsConfig_, "llhStatPerSamplePerBin", false) ){
-    for( auto& sample : _owner_->getPropagator().getSampleSet().getSampleList() ){
+    for( auto& sample : _likelihoodInterfacePtr_->getPropagator().getSampleSet().getSampleList() ){
       for( int iBin = 1 ; iBin <= sample.getMcContainer().histogram->GetNbinsX() ; iBin++ ){
         _scanDataDict_.emplace_back();
         auto& scanEntry = _scanDataDict_.back();
@@ -94,12 +96,12 @@ void ParameterScanner::initializeImpl() {
                                sample.getBinning().getBinList()[iBin-1].getSummary().c_str());
         scanEntry.yTitle = "Stat LLH value";
         auto* samplePtr = &sample;
-        scanEntry.evalY = [this, samplePtr, iBin](){ return _owner_->getJointProbabilityPtr()->eval( *samplePtr, iBin ); };
+        scanEntry.evalY = [this, samplePtr, iBin](){ return _likelihoodInterfacePtr_->getJointProbabilityPtr()->eval( *samplePtr, iBin ); };
       }
     }
   }
   if( GenericToolbox::Json::fetchValue(_varsConfig_, "weightPerSample", false) ){
-    for( auto& sample : _owner_->getPropagator().getSampleSet().getSampleList() ){
+    for( auto& sample : _likelihoodInterfacePtr_->getPropagator().getSampleSet().getSampleList() ){
       _scanDataDict_.emplace_back();
       auto& scanEntry = _scanDataDict_.back();
       scanEntry.yPoints = std::vector<double>(_nbPoints_+1,0);
@@ -111,7 +113,7 @@ void ParameterScanner::initializeImpl() {
     }
   }
   if( GenericToolbox::Json::fetchValue(_varsConfig_, "weightPerSamplePerBin", false) ){
-    for( auto& sample : _owner_->getPropagator().getSampleSet().getSampleList() ){
+    for( auto& sample : _likelihoodInterfacePtr_->getPropagator().getSampleSet().getSampleList() ){
       for( int iBin = 1 ; iBin <= sample.getMcContainer().histogram->GetNbinsX() ; iBin++ ){
         _scanDataDict_.emplace_back();
         auto& scanEntry = _scanDataDict_.back();
@@ -144,7 +146,7 @@ void ParameterScanner::scanFitParameter(Parameter& par_, TDirectory* saveDir_) {
 
   if( par_.getOwner()->useEigenDecomposition() and not par_.isEigen() ){
     // temporarily disable the automatic conversion Eigen -> Original
-    _owner_->getPropagator().setEnableEigenToOrigInPropagate( false );
+    _likelihoodInterfacePtr_->getPropagator().setEnableEigenToOrigInPropagate( false );
   }
 
   double origVal = par_.getParameterValue();
@@ -181,7 +183,7 @@ void ParameterScanner::scanFitParameter(Parameter& par_, TDirectory* saveDir_) {
 
     par_.setParameterValue(newVal);
 
-    _owner_->propagateAndEvalLikelihood();
+    _likelihoodInterfacePtr_->propagateAndEvalLikelihood();
     parPoints[iPt] = par_.getParameterValue();
 
     for( auto& scanEntry : _scanDataDict_ ){ scanEntry.yPoints[iPt] = scanEntry.evalY(); }
@@ -199,11 +201,11 @@ void ParameterScanner::scanFitParameter(Parameter& par_, TDirectory* saveDir_) {
 
 
   par_.setParameterValue(origVal);
-  _owner_->propagateAndEvalLikelihood();
+  _likelihoodInterfacePtr_->propagateAndEvalLikelihood();
 
   // Disable the auto conversion from Eigen to Original if the fit is set to use eigen decomp
   if( par_.getOwner()->useEigenDecomposition() and not par_.isEigen() ){
-    _owner_->getPropagator().setEnableEigenToOrigInPropagate( true );
+    _likelihoodInterfacePtr_->getPropagator().setEnableEigenToOrigInPropagate( true );
   }
 
   std::stringstream ss;
@@ -246,13 +248,13 @@ void ParameterScanner::scanSegment(TDirectory *saveDir_, const JsonType &end_, c
   int nTotalSteps = nSteps_+2;
 
   LogInfo << "Backup current position of the propagator..." << std::endl;
-  auto currentParState = _owner_->getPropagator().getParametersManager().exportParameterInjectorConfig();
+  auto currentParState = _likelihoodInterfacePtr_->getPropagator().getParametersManager().exportParameterInjectorConfig();
 
   LogInfo << "Reading start point parameter state..." << std::endl;
   std::vector<std::pair<Parameter*, double>> startPointParValList;
-  if( not start_.empty() ){ _owner_->getPropagator().getParametersManager().injectParameterValues(start_); }
-  else{ _owner_->getPropagator().getParametersManager().injectParameterValues(currentParState); }
-  for( auto& parSet : _owner_->getPropagator().getParametersManager().getParameterSetsList() ){
+  if( not start_.empty() ){ _likelihoodInterfacePtr_->getPropagator().getParametersManager().injectParameterValues(start_); }
+  else{ _likelihoodInterfacePtr_->getPropagator().getParametersManager().injectParameterValues(currentParState); }
+  for( auto& parSet : _likelihoodInterfacePtr_->getPropagator().getParametersManager().getParameterSetsList() ){
     if( not parSet.isEnabled() ){ continue; }
     for( auto& par : parSet.getParameterList() ){
       if( not par.isEnabled() ){ continue; }
@@ -262,7 +264,7 @@ void ParameterScanner::scanSegment(TDirectory *saveDir_, const JsonType &end_, c
 
   LogInfo << "Reading end point parameter state..." << std::endl;
   std::vector<std::pair<Parameter*, double>> endPointParValList;
-  _owner_->getPropagator().getParametersManager().injectParameterValues(end_);
+  _likelihoodInterfacePtr_->getPropagator().getParametersManager().injectParameterValues(end_);
   endPointParValList.reserve(startPointParValList.size());
   for( auto& parPair : startPointParValList ){
     endPointParValList.emplace_back(parPair.first, parPair.first->getParameterValue());
@@ -292,7 +294,7 @@ void ParameterScanner::scanSegment(TDirectory *saveDir_, const JsonType &end_, c
           );
     }
 
-    for( auto& parSet : _owner_->getPropagator().getParametersManager().getParameterSetsList() ){
+    for( auto& parSet : _likelihoodInterfacePtr_->getPropagator().getParametersManager().getParameterSetsList() ){
       if( not parSet.isEnabled() ){ continue; }
       if( parSet.useEigenDecomposition() ){
         // make sure the parameters don't get overwritten
@@ -300,7 +302,7 @@ void ParameterScanner::scanSegment(TDirectory *saveDir_, const JsonType &end_, c
       }
     }
 
-    _owner_->propagateAndEvalLikelihood();
+    _likelihoodInterfacePtr_->propagateAndEvalLikelihood();
 
     for( auto& graphEntry : _graphEntriesBuf_ ){
       graphEntry.graph.SetPointX(iStep, graphEntry.fitParPtr->getParameterValue());
@@ -315,17 +317,17 @@ void ParameterScanner::scanSegment(TDirectory *saveDir_, const JsonType &end_, c
   }
 
   LogInfo << "Restore position of the propagator..." << std::endl;
-  _owner_->getPropagator().getParametersManager().injectParameterValues( currentParState );
-  _owner_->propagateAndEvalLikelihood();
+  _likelihoodInterfacePtr_->getPropagator().getParametersManager().injectParameterValues( currentParState );
+  _likelihoodInterfacePtr_->propagateAndEvalLikelihood();
 }
 void ParameterScanner::generateOneSigmaPlots(TDirectory* saveDir_){
   LogThrowIf(not isInitialized());
   LogThrowIf(saveDir_ == nullptr, "saveDir_ not set.");
 
   // Build the histograms with the current parameters
-  _owner_->getPropagator().propagateParameters();
-  _owner_->getPropagator().getPlotGenerator().generateSamplePlots();
-  auto refHistList = _owner_->getPropagator().getPlotGenerator().getHistHolderList();
+  _likelihoodInterfacePtr_->getPropagator().propagateParameters();
+  _likelihoodInterfacePtr_->getPropagator().getPlotGenerator().generateSamplePlots();
+  auto refHistList = _likelihoodInterfacePtr_->getPropagator().getPlotGenerator().getHistHolderList();
 
   auto makeOneSigmaPlotFct = [&](Parameter& par_, TDirectory* parSavePath_){
     LogInfo << "Generating one sigma plots for \"" << par_.getFullTitle() << "\" -> " << par_.getParameterValue() << " + " << par_.getStdDevValue() << std::endl;
@@ -335,24 +337,24 @@ void ParameterScanner::generateOneSigmaPlots(TDirectory* saveDir_){
     par_.setParameterValue( currentParValue + par_.getStdDevValue() );
 
     // Propagate the parameters
-    _owner_->getPropagator().propagateParameters();
+    _likelihoodInterfacePtr_->getPropagator().propagateParameters();
 
     // put the saved histograms in slot 1 of the buffer
-    _owner_->getPropagator().getPlotGenerator().generateSampleHistograms(nullptr, 1);
+    _likelihoodInterfacePtr_->getPropagator().getPlotGenerator().generateSampleHistograms(nullptr, 1);
 
     // Compare with the
-    _owner_->getPropagator().getPlotGenerator().generateComparisonPlots(
-        _owner_->getPropagator().getPlotGenerator().getHistHolderList(1),
+    _likelihoodInterfacePtr_->getPropagator().getPlotGenerator().generateComparisonPlots(
+        _likelihoodInterfacePtr_->getPropagator().getPlotGenerator().getHistHolderList(1),
         refHistList, parSavePath_
     );
 
     // Come back to the original place
     par_.setParameterValue( currentParValue );
-    _owner_->getPropagator().propagateParameters();
+    _likelihoodInterfacePtr_->getPropagator().propagateParameters();
   };
 
   // +1 sigma
-  for( auto& parSet : _owner_->getPropagator().getParametersManager().getParameterSetsList() ){
+  for( auto& parSet : _likelihoodInterfacePtr_->getPropagator().getParametersManager().getParameterSetsList() ){
 
     if( not parSet.isEnabled() ) continue;
 
@@ -392,7 +394,7 @@ void ParameterScanner::varyEvenRates(const std::vector<double>& paramVariationLi
   GenericToolbox::ScopedGuard g(
       [&]{
         LogWarning << "Temporarily pulling back parameters at their prior before performing the event rate..." << std::endl;
-        for( auto& parSet : _owner_->getPropagator().getParametersManager().getParameterSetsList() ){
+        for( auto& parSet : _likelihoodInterfacePtr_->getPropagator().getParametersManager().getParameterSetsList() ){
           if( not parSet.isEnabled() ) { continue; }
           for( auto& par : parSet.getParameterList() ){
             if( not par.isEnabled() ) { continue; }
@@ -400,18 +402,18 @@ void ParameterScanner::varyEvenRates(const std::vector<double>& paramVariationLi
             par.setParameterValue( par.getPriorValue() );
           }
         }
-        _owner_->getPropagator().propagateParameters();
+        _likelihoodInterfacePtr_->getPropagator().propagateParameters();
       },
       [&]{
         LogWarning << "Restoring parameters to their original values..." << std::endl;
-        for( auto& parSet : _owner_->getPropagator().getParametersManager().getParameterSetsList() ){
+        for( auto& parSet : _likelihoodInterfacePtr_->getPropagator().getParametersManager().getParameterSetsList() ){
           if( not parSet.isEnabled() ) { continue; }
           for( auto& par : parSet.getParameterList() ){
             if( not par.isEnabled() ){ continue; }
             par.setParameterValue( parStateList[&par] );
           }
         }
-        _owner_->getPropagator().propagateParameters();
+        _likelihoodInterfacePtr_->getPropagator().propagateParameters();
       }
   );
 
@@ -419,14 +421,14 @@ void ParameterScanner::varyEvenRates(const std::vector<double>& paramVariationLi
     LogInfo << "Making varied event rates for " << par_.getFullTitle() << std::endl;
 
     // First make sure all params are at their prior <- is it necessary?
-    for( auto& parSet : _owner_->getPropagator().getParametersManager().getParameterSetsList() ){
+    for( auto& parSet : _likelihoodInterfacePtr_->getPropagator().getParametersManager().getParameterSetsList() ){
       if( not parSet.isEnabled() ) continue;
       for( auto& par : parSet.getParameterList() ){
         if( not par.isEnabled() ) continue;
         par.setParameterValue( par.getPriorValue() );
       }
     }
-    _owner_->getPropagator().propagateParameters();
+    _likelihoodInterfacePtr_->getPropagator().propagateParameters();
 
     saveSubDir_->cd();
 
@@ -451,15 +453,15 @@ void ParameterScanner::varyEvenRates(const std::vector<double>& paramVariationLi
       cappedParValue = std::max(cappedParValue, par_.getMinValue());
 
       par_.setParameterValue( cappedParValue );
-      _owner_->getPropagator().propagateParameters();
+      _likelihoodInterfacePtr_->getPropagator().propagateParameters();
 
-      for(auto & sample : _owner_->getPropagator().getSampleSet().getSampleList()){
+      for(auto & sample : _likelihoodInterfacePtr_->getPropagator().getSampleSet().getSampleList()){
         buffEvtRatesMap[iVar].emplace_back( sample.getMcContainer().getSumWeights() );
       }
 
       // back to the prior
       par_.setParameterValue( par_.getPriorValue() );
-      _owner_->getPropagator().propagateParameters();
+      _likelihoodInterfacePtr_->getPropagator().propagateParameters();
     }
 
 
@@ -477,7 +479,7 @@ void ParameterScanner::varyEvenRates(const std::vector<double>& paramVariationLi
 
     TVectorD* buffVariedEvtRates_TVectorD{nullptr};
 
-    for( size_t iSample = 0 ; iSample < _owner_->getPropagator().getSampleSet().getSampleList().size() ; iSample++ ){
+    for( size_t iSample = 0 ; iSample < _likelihoodInterfacePtr_->getPropagator().getSampleSet().getSampleList().size() ; iSample++ ){
 
       buffVariedEvtRates_TVectorD = new TVectorD(int(variationList_.size()));
 
@@ -487,7 +489,7 @@ void ParameterScanner::varyEvenRates(const std::vector<double>& paramVariationLi
 
       GenericToolbox::writeInTFile(
           saveSubDir_, buffVariedEvtRates_TVectorD,
-          _owner_->getPropagator().getSampleSet().getSampleList()[iSample].getName()
+          _likelihoodInterfacePtr_->getPropagator().getSampleSet().getSampleList()[iSample].getName()
       );
 
     }
@@ -497,7 +499,7 @@ void ParameterScanner::varyEvenRates(const std::vector<double>& paramVariationLi
 
   // vary parameters
 
-  for( auto& parSet : _owner_->getPropagator().getParametersManager().getParameterSetsList() ){
+  for( auto& parSet : _likelihoodInterfacePtr_->getPropagator().getParametersManager().getParameterSetsList() ){
 
     if( not parSet.isEnabled() ) continue;
     if( GenericToolbox::Json::fetchValue(parSet.getConfig(), "skipVariedEventRates", false) ){

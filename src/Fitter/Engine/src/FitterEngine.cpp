@@ -30,13 +30,10 @@ void FitterEngine::readConfigImpl(){
   LogInfo << "Reading FitterEngine config..." << std::endl;
   GenericToolbox::setT2kPalette();
 
+  // legacy
   GenericToolbox::Json::deprecatedAction(_config_, "propagatorConfig", [&]{
     LogAlert << "propagatorConfig should now be set within likelihoodInterfaceConfig" << std::endl;
     _likelihoodInterface_.getPropagator().setConfig( GenericToolbox::Json::fetchValue<JsonType>(_config_, "propagatorConfig") );
-  });
-  GenericToolbox::Json::deprecatedAction(_config_, "scanConfig", [&]{
-    LogAlert << "Forwarding the option to Propagator. Consider moving it into \"propagatorConfig:\"" << std::endl;
-    _likelihoodInterface_.getParameterScanner().readConfig(GenericToolbox::Json::fetchValue(_config_, "scanConfig", JsonType()) );
   });
 
   JsonType minimizerConfig{};
@@ -74,14 +71,16 @@ void FitterEngine::readConfigImpl(){
 
   this->_minimizer_->readConfig( minimizerConfig );
 
-  // legacy
-
   GenericToolbox::Json::deprecatedAction(_config_, "monitorRefreshRateInMs", [&]{
     LogAlert << "Forwarding the option to Propagator. Consider moving it into \"minimizerConfig:\"" << std::endl;
     _minimizer_->getMonitor().convergenceMonitor.setMaxRefreshRateInMs(GenericToolbox::Json::fetchValue<int>(_config_, "monitorRefreshRateInMs"));
   });
 
 
+  // nested
+  _parameterScanner_.readConfig( GenericToolbox::Json::fetchValue(_config_, "scanConfig", JsonType()) );
+
+  // members
   _enablePca_ = GenericToolbox::Json::fetchValue(_config_, std::vector<std::string>{"enablePca", "runPcaCheck"}, _enablePca_);
   _pcaDeltaChi2Threshold_ = GenericToolbox::Json::fetchValue(_config_, {{"ghostParameterDeltaChi2Threshold"}, {"pcaDeltaChi2Threshold"}}, _pcaDeltaChi2Threshold_);
 
@@ -101,19 +100,20 @@ void FitterEngine::readConfigImpl(){
   _throwGain_ = GenericToolbox::Json::fetchValue(_config_, "throwMcBeforeFitGain", _throwGain_);
   _savePostfitEventTrees_ = GenericToolbox::Json::fetchValue(_config_, "savePostfitEventTrees", _savePostfitEventTrees_);
 
-
-  LogInfo << "Convergence monitor will be refreshed every " << _likelihoodInterface_._monitor_.convergenceMonitor.getMaxRefreshRateInMs() << "ms." << std::endl;
+  LogInfo << "Convergence monitor will be refreshed every " << _minimizer_->getMonitor().convergenceMonitor.getMaxRefreshRateInMs() << "ms." << std::endl;
 }
 void FitterEngine::initializeImpl(){
   LogThrowIf(_config_.empty(), "Config is not set.");
   LogThrowIf(_saveDir_== nullptr);
 
   if( GundamGlobals::isLightOutputMode() ){
+    // TODO: should be more universal
     LogWarning << "Light mode enabled, wiping plot gen config..." << std::endl;
     _likelihoodInterface_.getPropagator().getPlotGenerator().readConfig(JsonType());
   }
 
-  _likelihoodInterface_.getPropagator().initialize();
+  _likelihoodInterface_.initialize();
+  _parameterScanner_.initialize();
 
   if( _likelihoodInterface_.getPropagator().isThrowAsimovToyParameters() ){
     LogInfo << "Writing throws in TTree..." << std::endl;
@@ -156,9 +156,6 @@ void FitterEngine::initializeImpl(){
     LogInfo << "Using parameter step scale: " << _parStepGain_ << std::endl;
     this->rescaleParametersStepSize();
   }
-
-  // The likelihood needs everything to be fully setup before it is initialized.
-  getLikelihood().initialize();
 
   // The minimizer needs all the parameters to be fully setup (i.e. PCA done
   // and other properties)
@@ -232,14 +229,11 @@ void FitterEngine::initializeImpl(){
   }
 
 
-  GenericToolbox::
-
-  if( dynamic_cast<const RootFactoryInterface*>( &this->getMinimizer() ) ){
-    dynamic_cast<const RootFactoryInterface*>( &this->getMinimizer() )->saveMinimizerSettings(GenericToolbox::mkdirTFile(_saveDir_, "fit/minimizer" ) );
+  if( _minimizerType_ == MinimizerType::RootFactory ){
+    dynamic_cast<const RootFactoryInterface*>( &this->getMinimizer() )->saveMinimizerSettings( GenericToolbox::mkdirTFile(_saveDir_, "fit/minimizer" ) );
   }
 
-  _likelihoodInterface_.getPropagator().propagateParameters();
-  _likelihoodInterface_.evalLikelihood();
+  _likelihoodInterface_.propagateAndEvalLikelihood();
 
   if( not GundamGlobals::isLightOutputMode() ){
     _likelihoodInterface_.getPropagator().getTreeWriter().writeSamples(GenericToolbox::mkdirTFile(_saveDir_, "preFit/events"));
@@ -307,12 +301,12 @@ void FitterEngine::fit(){
   // Moving parameters
   if( _generateOneSigmaPlots_ and not _likelihoodInterface_.getPropagator().getPlotGenerator().getConfig().empty() ){
     LogInfo << "Generating pre-fit one-sigma variation plots..." << std::endl;
-    _likelihoodInterface_.getParameterScanner().generateOneSigmaPlots(GenericToolbox::mkdirTFile(_saveDir_, "preFit/oneSigma"));
+    _parameterScanner_.generateOneSigmaPlots(GenericToolbox::mkdirTFile(_saveDir_, "preFit/oneSigma"));
     GenericToolbox::triggerTFileWrite(_saveDir_);
   }
   if( _doAllParamVariations_ ){
     LogInfo << "Running all parameter variation on pre-fit samples..." << std::endl;
-    _likelihoodInterface_.getParameterScanner().varyEvenRates(
+    _parameterScanner_.varyEvenRates(
         _allParamVariationsSigmas_,
         GenericToolbox::mkdirTFile(_saveDir_, "preFit/varyEventRates")
     );
@@ -320,7 +314,7 @@ void FitterEngine::fit(){
   }
   if( _enablePreFitScan_ ){
     LogInfo << "Scanning fit parameters before minimizing..." << std::endl;
-    getMinimizer().scanParameters( GenericToolbox::mkdirTFile(_saveDir_, "preFit/scan") );
+    _minimizer_->scanParameters( GenericToolbox::mkdirTFile(_saveDir_, "preFit/scan") );
     GenericToolbox::triggerTFileWrite(_saveDir_);
   }
   if( _throwMcBeforeFit_ ){
@@ -364,8 +358,8 @@ void FitterEngine::fit(){
 
 
     LogAlert << "Current LLH state:" << std::endl;
-    _likelihoodInterface_.getPropagator().propagateParameters();
-    _likelihoodInterface_.evalLikelihood();
+    _likelihoodInterface_.propagateAndEvalLikelihood();
+
     LogAlert << _likelihoodInterface_.getPropagator().getLlhBufferSummary() << std::endl;
   }
 
@@ -376,7 +370,7 @@ void FitterEngine::fit(){
   }
 
   LogInfo << "Minimizing LLH..." << std::endl;
-  this->getMinimizer().minimize();
+  this->_minimizer_->minimize();
 
   LogWarning << "Saving post-fit par state..." << std::endl;
   _postFitParState_ = _likelihoodInterface_.getPropagator().getParametersManager().exportParameterInjectorConfig();
@@ -405,28 +399,25 @@ void FitterEngine::fit(){
   }
   if( _enablePostFitScan_ ){
     LogInfo << "Scanning fit parameters around the minimum point..." << std::endl;
-    _minimizer_.scanParameters(GenericToolbox::mkdirTFile(_saveDir_, "postFit/scan"));
+    _minimizer_->scanParameters( GenericToolbox::mkdirTFile(_saveDir_, "postFit/scan") );
     GenericToolbox::triggerTFileWrite(_saveDir_);
   }
   if( _enablePreFitToPostFitLineScan_ ){
     if( not GundamGlobals::isLightOutputMode() ){
       LogInfo << "Scanning along the line from pre-fit to post-fit points..." << std::endl;
-      _likelihoodInterface_.getParameterScanner().scanSegment(GenericToolbox::mkdirTFile(_saveDir_, "postFit/scanConvergence"),
+      _parameterScanner_.scanSegment(GenericToolbox::mkdirTFile(_saveDir_, "postFit/scanConvergence"),
                                                   _postFitParState_, _preFitParState_);
       GenericToolbox::triggerTFileWrite(_saveDir_);
     }
   }
 
-  if( getMinimizer().isFitHasConverged() and getMinimizer().isEnablePostFitErrorEval() ){
-    LogInfo << "Computing post-fit errors..." << std::endl;
-    getMinimizer().calcErrors();
+  if( not _minimizer_->isFitHasConverged() ){
+    LogError << "Skipping post-fit error calculation since the minimizer did not converge." << std::endl;
   }
   else{
-    if( not getMinimizer().isFitHasConverged() ) {
-      LogError << "Skipping post-fit error calculation since the minimizer did not converge." << std::endl;
-    }
-    else{
-      LogAlert << "Skipping post-fit error calculation since the option is disabled." << std::endl;
+    if( _minimizer_->isErrorCalcEnabled() ){
+      LogInfo << "Computing post-fit errors..." << std::endl;
+      _minimizer_->calcErrors();
     }
   }
 
@@ -436,14 +427,13 @@ void FitterEngine::fit(){
 // protected
 void FitterEngine::runPcaCheck(){
 
-  _likelihoodInterface_.getPropagator().propagateParameters();
-  _likelihoodInterface_.evalLikelihood();
+  _likelihoodInterface_.propagateAndEvalLikelihood();
 
-  double baseChi2 = _likelihoodInterface_.getBuffer().totalLikelihood;
-  double baseChi2Stat = _likelihoodInterface_.getBuffer().statLikelihood;
-  double baseChi2Syst = _likelihoodInterface_.getBuffer().penaltyLikelihood;
+  double baseLlh = _likelihoodInterface_.getBuffer().totalLikelihood;
+  double baseLlhStat = _likelihoodInterface_.getBuffer().statLikelihood;
+  double baseLlhSyst = _likelihoodInterface_.getBuffer().penaltyLikelihood;
 
-  LogInfo << "Reference " << GUNDAM_CHI2 << "(stat) for PCA: " << baseChi2Stat << std::endl;
+  LogInfo << "Reference " << GUNDAM_CHI2 << "(stat) for PCA: " << baseLlhStat << std::endl;
 
   // +1 sigma
   int iFitPar = -1;
@@ -490,10 +480,9 @@ void FitterEngine::runPcaCheck(){
         ssPrint << " " << currentParValue << " -> " << par.getParameterValue();
         LogInfo << ssPrint.str() << "..." << std::endl;
 
-        _likelihoodInterface_.getPropagator().propagateParameters();
-        _likelihoodInterface_.evalLikelihood();
+        _likelihoodInterface_.propagateAndEvalLikelihood();
 
-        deltaChi2Stat = _likelihoodInterface_.getBuffer().statLikelihood - baseChi2Stat;
+        deltaChi2Stat = _likelihoodInterface_.getBuffer().statLikelihood - baseLlhStat;
 
         ssPrint << ": " << GUNDAM_DELTA << GUNDAM_CHI2 << " (stat) = " << deltaChi2Stat;
 
@@ -532,17 +521,15 @@ void FitterEngine::runPcaCheck(){
   }
 
   // comeback to old values
-  _likelihoodInterface_.getPropagator().propagateParameters();
-  _likelihoodInterface_.evalLikelihood();
+  _likelihoodInterface_.propagateAndEvalLikelihood();
 }
 
 void FitterEngine::rescaleParametersStepSize(){
   LogInfo << __METHOD_NAME__ << std::endl;
 
-  _likelihoodInterface_.getPropagator().propagateParameters();
-  _likelihoodInterface_.evalLikelihood();
-  double baseChi2Pull = _likelihoodInterface_.getBuffer().penaltyLikelihood;
-  double baseChi2 = _likelihoodInterface_.getBuffer().totalLikelihood;
+  _likelihoodInterface_.propagateAndEvalLikelihood();
+  double baseLlhPull = _likelihoodInterface_.getBuffer().penaltyLikelihood;
+  double baseLlh = _likelihoodInterface_.getBuffer().totalLikelihood;
 
   // +1 sigma
   for( auto& parSet : _likelihoodInterface_.getPropagator().getParametersManager().getParameterSetsList() ){
@@ -554,11 +541,10 @@ void FitterEngine::rescaleParametersStepSize(){
       double currentParValue = par.getParameterValue();
       par.setParameterValue( currentParValue + par.getStdDevValue() );
 
-      _likelihoodInterface_.getPropagator().propagateParameters();
-      _likelihoodInterface_.evalLikelihood();
+      _likelihoodInterface_.propagateAndEvalLikelihood();
 
-      double deltaChi2 = _likelihoodInterface_.getBuffer().totalLikelihood - baseChi2;
-      double deltaChi2Pulls = _likelihoodInterface_.getBuffer().penaltyLikelihood - baseChi2Pull;
+      double deltaChi2 = _likelihoodInterface_.getBuffer().totalLikelihood - baseLlh;
+      double deltaChi2Pulls = _likelihoodInterface_.getBuffer().penaltyLikelihood - baseLlhPull;
 
       // Consider a parabolic approx:
       // only rescale with X2 stat?
@@ -575,21 +561,14 @@ void FitterEngine::rescaleParametersStepSize(){
 
       par.setStepSize( stepSize );
       par.setParameterValue( currentParValue + stepSize );
-      _likelihoodInterface_.getPropagator().propagateParameters();
-      _likelihoodInterface_.evalLikelihood();
-      LogInfo << " -> Δχ²(step) = " << _likelihoodInterface_.getBuffer().totalLikelihood - baseChi2 << std::endl;
+      _likelihoodInterface_.propagateAndEvalLikelihood();
+      LogInfo << " -> Δχ²(step) = " << _likelihoodInterface_.getBuffer().totalLikelihood - baseLlh << std::endl;
       par.setParameterValue( currentParValue );
     }
 
   }
 
-  _likelihoodInterface_.getPropagator().propagateParameters();
-  _likelihoodInterface_.evalLikelihood();
-}
-void FitterEngine::scanMinimizerParameters(TDirectory* saveDir_){
-  LogThrowIf(not isInitialized());
-  LogInfo << "Performing scans of fit parameters..." << std::endl;
-  getMinimizer().scanParameters(saveDir_);
+  _likelihoodInterface_.propagateAndEvalLikelihood();
 }
 void FitterEngine::checkNumericalAccuracy(){
   LogWarning << __METHOD_NAME__ << std::endl;

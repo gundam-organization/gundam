@@ -24,6 +24,8 @@
 #define MCMC_ERROR LogError
 #include "TSimpleMCMC.H"
 
+class FitterEngine;
+
 /// Run generate an MCMC doing a Bayesian integration of the likelihood. The
 /// parameters are assumed to have a uniform metric, and the priors are
 /// defined as part of the propagator (i.e. included in the
@@ -35,10 +37,7 @@ protected:
   void initializeImpl() override;
 
 public:
-  SimpleMcmcInterface(): MinimizerBase() {}
-
-  /// Local RTTI
-  [[nodiscard]] std::string getMinimizerTypeName() const override { return "MCMCInterface"; };
+  explicit SimpleMcmcInterface(FitterEngine* owner_): MinimizerBase(owner_) {}
 
   /// An MCMC doesn't really converge in the sense meant here. This flags success.
   [[nodiscard]] virtual bool isFitHasConverged() const override  {return true;}

@@ -29,6 +29,12 @@ protected:
   void initializeImpl() override;
 
 public:
+  // overrides
+  void minimize() override;
+  void calcErrors() override;
+  void scanParameters( TDirectory* saveDir_ ) override;
+
+  // c-tor
   explicit RootFactoryInterface(FitterEngine* owner_): MinimizerBase(owner_) {}
 
   // setters
@@ -41,12 +47,8 @@ public:
   [[nodiscard]] double getTargetEdm() const;
   [[nodiscard]] const std::unique_ptr<ROOT::Math::Minimizer> &getMinimizer() const{ return _minimizer_; }
 
-  // override
-  void minimize() override;
-
-  void scanParameters(TDirectory* saveDir_);
-
-  // misc
+  // core
+  double evalFit( const double* parArray_ );
   void saveMinimizerSettings(TDirectory* saveDir_) const;
 
 protected:

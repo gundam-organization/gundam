@@ -59,7 +59,6 @@ public:
   [[nodiscard]] bool isMaskedForPropagation() const{ return _maskedForPropagation_; }
   [[nodiscard]] bool isUseOnlyOneParameterPerEvent() const{ return _useOnlyOneParameterPerEvent_; }
   [[nodiscard]] int getNbEnabledEigenParameters() const{ return _nbEnabledEigen_; }
-  [[nodiscard]] double getPenaltyChi2Buffer() const{ return _penaltyChi2Buffer_; }
   [[nodiscard]] size_t getNbParameters() const{ return _parameterList_.size(); }
   [[nodiscard]] const std::string &getName() const{ return _name_; }
   [[nodiscard]] const JsonType &getDialSetDefinitions() const{ return _dialSetDefinitions_; }
@@ -139,8 +138,6 @@ private:
   double _globalParameterMinValue_{std::nan("unset")};
   double _globalParameterMaxValue_{std::nan("unset")};
   std::pair<double, double> _eigenParBounds_{std::nan("unset"), std::nan("unset")};
-
-  double _penaltyChi2Buffer_{std::nan("unset")};
 
   std::vector<JsonType> _enableOnlyParameters_{};
   std::vector<JsonType> _disableParameters_{};

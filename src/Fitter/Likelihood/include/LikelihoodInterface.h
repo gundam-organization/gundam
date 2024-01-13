@@ -6,7 +6,6 @@
 #define GUNDAM_LIKELIHOOD_INTERFACE_H
 
 #include "JointProbability.h"
-#include "ParameterScanner.h"
 #include "ParameterSet.h"
 #include "Propagator.h"
 #include "JsonBaseClass.h"
@@ -42,15 +41,15 @@ public:
   [[nodiscard]] int getNbFitBins() const {return _nbFitBins_; }
   [[nodiscard]] const Buffer& getBuffer() const { return _buffer_; }
   [[nodiscard]] const Propagator& getPropagator() const { return _propagator_; }
-  [[nodiscard]] const ParameterScanner& getParameterScanner() const { return _parameterScanner_; }
   const JointProbability::JointProbability* getJointProbabilityPtr() const { return _jointProbabilityPtr_.get(); }
 
   // mutable getters
   Buffer& getBuffer() { return _buffer_; }
   Propagator& getPropagator(){ return _propagator_; }
-  ParameterScanner& getParameterScanner(){ return _parameterScanner_; }
 
   // core
+  void propagateAndEvalLikelihood();
+  void scanParameter(Parameter* parPtr_, TDirectory* saveDir_);
   [[nodiscard]] int getNbDof() const { return _nbFitBins_ - _nbFreePars_; }
   double evalLikelihood() const;
   double evalStatLikelihood() const;
@@ -59,7 +58,6 @@ public:
   [[nodiscard]] double evalPenaltyLikelihood(const ParameterSet& parSet_) const;
   [[nodiscard]] std::string getSummary() const;
 
-  void propagateAndEvalLikelihood();
 
   // mutable core
   void writeChi2History();
@@ -77,7 +75,7 @@ private:
   int _nbFitParameters_{0};
 
   Propagator _propagator_{};
-  ParameterScanner _parameterScanner_{this};
+
   std::shared_ptr<JointProbability::JointProbability> _jointProbabilityPtr_{nullptr};
 
   struct Buffer{

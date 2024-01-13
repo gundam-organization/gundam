@@ -22,15 +22,18 @@ class FitterEngine; // owner
 
 class MinimizerBase : public JsonBaseClass {
 
+protected:
   struct Monitor;
 
-protected:
   void readConfigImpl() override;
   void initializeImpl() override;
 
 public:
-  // pure virtual
+  // virtual
   virtual void minimize() = 0;
+  virtual void calcErrors(){}
+  virtual void scanParameters( TDirectory* saveDir_ );
+  virtual bool isErrorCalcEnabled(){ return false; }
 
   // c-tor
   explicit MinimizerBase(FitterEngine* owner_) : _owner_(owner_) {}
@@ -46,17 +49,11 @@ public:
   Propagator& getPropagator();
   LikelihoodInterface& getLikelihoodInterface();
 
-  // core
-  void scanParameters(TDirectory* saveDir_);
-
-
   [[nodiscard]] virtual bool isFitHasConverged() const = 0;
-  virtual double evalFit( const double* parArray_ );
+
 
 protected:
   void printParameters();
-
-protected:
 
   // config
   bool _throwOnBadLlh_{false};
@@ -94,6 +91,8 @@ protected:
       std::vector<GradientStepPoint> stepPointList{};
     };
     GradientDescentMonitor gradientDescentMonitor{};
+
+    void writeHistoryTree(TDirectory* saveDir_);
   };
   Monitor _monitor_{};
 

@@ -7,6 +7,7 @@
 
 
 #include "LikelihoodInterface.h"
+#include "ParameterScanner.h"
 #include "MinimizerBase.h"
 #include "JsonBaseClass.h"
 
@@ -94,6 +95,7 @@ private:
   // Internals
   TDirectory* _saveDir_{nullptr};
   LikelihoodInterface _likelihoodInterface_{};
+  ParameterScanner _parameterScanner_{};
   MinimizerType _minimizerType_{};
   std::unique_ptr<MinimizerBase> _minimizer_{}; // a virtual class in charge of driving the LikelihoodInterface
 

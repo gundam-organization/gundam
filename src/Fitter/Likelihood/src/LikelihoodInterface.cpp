@@ -15,7 +15,7 @@
 
 
 LoggerInit([]{
-  Logger::setUserHeaderStr("[Likelihood]");
+  Logger::setUserHeaderStr("[LikelihoodInterface]");
 });
 
 
@@ -30,7 +30,6 @@ void LikelihoodInterface::initializeImpl() {
   LogWarning << "Initializing LikelihoodInterface..." << std::endl;
 
   _propagator_.initialize();
-  _parameterScanner_.initialize();
 
   LogWarning << "Fetching the effective number of fit parameters..." << std::endl;
   _nbFreePars_ = 0;
@@ -154,6 +153,10 @@ void LikelihoodInterface::saveGradientSteps(){
 
 }
 
+
+void LikelihoodInterface::scanParameter(Parameter* parPtr_, TDirectory* saveDir_){
+  _parameterScanner_.scanFitParameter(*parPtr_, saveDir_);
+}
 double LikelihoodInterface::evalLikelihood() const {
   this->evalStatLikelihood();
   this->evalPenaltyLikelihood();
@@ -205,25 +208,29 @@ double LikelihoodInterface::evalPenaltyLikelihood(const ParameterSet& parSet_) c
 [[nodiscard]] std::string LikelihoodInterface::getSummary() const {
   std::stringstream ss;
 
-  Buffer localBuffer{};
-  ss << "Statistical likelihood:" << std::endl;
-  for( auto& sample : _propagator_.getSampleSet().getSampleList() ){
-    double sampleLlh = evalStatLikelihood( sample );
-    localBuffer.statLikelihood += sampleLlh;
-    ss << "  " << sample.getName() << " -> " << sampleLlh << std::endl;
-  }
-  ss << "Sum: " << localBuffer.statLikelihood << std::endl;
+  this->evalLikelihood(); // make sure the buffer is up-to-date
 
-  ss << "Penalty likelihood:" << std::endl;
-  for( auto& parSet : _propagator_.getParametersManager().getParameterSetsList() ){
-    double penaltyLlh = evalPenaltyLikelihood( parSet );
-    localBuffer.penaltyLikelihood += penaltyLlh;
-    ss << "  " << parSet.getName() << " -> " << penaltyLlh << std::endl;
-  }
-  ss << "Sum: " << localBuffer.penaltyLikelihood << std::endl;
-
-  localBuffer.updateTotal();
-  ss << "Total: " << localBuffer.totalLikelihood;
+  ss << "Total likelihood = " << _buffer_.totalLikelihood;
+  ss << std::endl << "Stat likelihood = " << _buffer_.statLikelihood;
+  ss << " = sum of: " << GenericToolbox::toString(
+      _propagator_.getSampleSet().getSampleList(), [&]( const Sample& sample_){
+        std::stringstream ssSub;
+        ssSub << sample_.getName() << ": ";
+        if( sample_.isEnabled() ){ ssSub << this->evalStatLikelihood( sample_ ); }
+        else                     { ssSub << "disabled."; }
+        return ssSub.str();
+      }
+  );
+  ss << std::endl << "Penalty likelihood = " << _buffer_.penaltyLikelihood;
+  ss << " = sum of: " << GenericToolbox::toString(
+      _propagator_.getParametersManager().getParameterSetsList(), [](const ParameterSet& parSet_){
+        std::stringstream ssSub;
+        ssSub << parSet_.getName() << ": ";
+        if( parSet_.isEnabled() ){ ssSub << parSet_.getPenaltyChi2Buffer(); }
+        else                     { ssSub << "disabled."; }
+        return ssSub.str();
+      }
+  );
   return ss.str();
 }
 

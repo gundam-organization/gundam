@@ -479,31 +479,6 @@ void Propagator::initializeImpl(){
 
 
 // Misc getters
-std::string Propagator::getLlhBufferSummary() const{
-  std::stringstream ss;
-  ss << "Total likelihood = " << getLlhBuffer();
-  ss << std::endl << "Stat likelihood = " << getLlhStatBuffer();
-  ss << " = sum of: " << GenericToolbox::toString(
-      _fitSampleSet_.getSampleList(), []( const Sample& sample_){
-        std::stringstream ssSub;
-        ssSub << sample_.getName() << ": ";
-        if( sample_.isEnabled() ){ ssSub << sample_.getLlhStatBuffer(); }
-        else                     { ssSub << "disabled."; }
-        return ssSub.str();
-      }
-  );
-  ss << std::endl << "Penalty likelihood = " << getLlhPenaltyBuffer();
-  ss << " = sum of: " << GenericToolbox::toString(
-      _parManager_.getParameterSetsList(), [](const ParameterSet& parSet_){
-        std::stringstream ssSub;
-        ssSub << parSet_.getName() << ": ";
-        if( parSet_.isEnabled() ){ ssSub << parSet_.getPenaltyChi2Buffer(); }
-        else                     { ssSub << "disabled."; }
-        return ssSub.str();
-      }
-  );
-  return ss.str();
-}
 
 DatasetLoader* Propagator::getDatasetLoaderPtr(const std::string& name_){
   for( auto& dataSet : _dataSetList_ ){
