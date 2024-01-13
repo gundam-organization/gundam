@@ -18,7 +18,7 @@
 
 class ParameterScanner : public JsonBaseClass {
 
-private:
+public:
   struct ScanData;
   struct GraphEntry;
 
@@ -51,6 +51,20 @@ public:
   static void unmuteLogger();
   static void writeGraphEntry(GraphEntry& entry_, TDirectory* saveDir_);
 
+  struct ScanData{
+    std::string folder{};
+    std::string title{};
+    std::string yTitle{};
+    std::vector<double> yPoints{};
+    std::function<double()> evalY{};
+  };
+
+  struct GraphEntry{
+    ScanData* scanDataPtr{nullptr};
+    Parameter* fitParPtr{nullptr};
+    TGraph graph{};
+  };
+
 private:
   // Config
   bool _useParameterLimits_{true};
@@ -62,20 +76,7 @@ private:
   // Internals
   LikelihoodInterface* _likelihoodInterfacePtr_{nullptr};
 
-  struct ScanData{
-    std::string folder{};
-    std::string title{};
-    std::string yTitle{};
-    std::vector<double> yPoints{};
-    std::function<double()> evalY{};
-  };
   std::vector<ScanData> _scanDataDict_;
-
-  struct GraphEntry{
-    ScanData* scanDataPtr{nullptr};
-    Parameter* fitParPtr{nullptr};
-    TGraph graph{};
-  };
   std::vector<GraphEntry> _graphEntriesBuf_;
 
 

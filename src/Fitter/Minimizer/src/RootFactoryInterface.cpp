@@ -179,7 +179,7 @@ void RootFactoryInterface::minimize(){
     GenericToolbox::writeInTFile(getOwner().getSaveDir(), _monitor_.historyTree.get());
   }
 
-  if( _monitor_.gradientDescentMonitor.isEnabled ){ getLikelihoodInterface().saveGradientSteps(); }
+  if( _monitor_.gradientDescentMonitor.isEnabled ){ saveGradientSteps(); }
 
   if( _fitHasConverged_ ){ LogInfo << "Minimization has converged!" << std::endl; }
   else{ LogError << "Minimization did not converged." << std::endl; }
@@ -192,7 +192,6 @@ void RootFactoryInterface::minimize(){
   double fitStatus = _rootMinimizer_->Status();
   double covStatus = _rootMinimizer_->CovMatrixStatus();
   double chi2MinFitter = _rootMinimizer_->MinValue();
-
   int nDof = getNbDegreeOfFreedom();
   int nbFitBins = getLikelihoodInterface().getNbSampleBins();
 
@@ -371,7 +370,7 @@ void RootFactoryInterface::scanParameters( TDirectory* saveDir_ ){
                  << " is fixed. Skipping..." << std::endl;
       continue;
     }
-    getLikelihoodInterface().scanParameter(_minimizerParameterPtrList_[iPar], saveDir_);
+    getOwner().getParameterScanner().scanParameter(*_minimizerParameterPtrList_[iPar], saveDir_);
   } // iPar
   for( auto& parSet : this->getPropagator().getParametersManager().getParameterSetsList() ){
     if( not parSet.isEnabled() ) continue;
@@ -379,7 +378,7 @@ void RootFactoryInterface::scanParameters( TDirectory* saveDir_ ){
       LogWarning << parSet.getName() << " is using eigen decomposition. Scanning original parameters..." << std::endl;
       for( auto& par : parSet.getParameterList() ){
         if( not par.isEnabled() ) continue;
-        getLikelihoodInterface().scanParameter(&par, saveDir_);
+        getOwner().getParameterScanner().scanParameter(par, saveDir_);
       }
     }
   }
@@ -464,7 +463,7 @@ double RootFactoryInterface::evalFit( const double* parArray_ ){
       ssHeader << std::endl << "RAM: " << GenericToolbox::parseSizeUnits(double(GenericToolbox::getProcessMemoryUsage()));
       double cpuPercent = GenericToolbox::getCpuUsageByProcess();
       ssHeader << " / CPU: " << cpuPercent << "% (" << cpuPercent / GundamGlobals::getParallelWorker().getNbThreads() << "% efficiency)";
-      ssHeader << std::endl << "Avg " << GUNDAM_CHI2 << " computation time: " << _monitor_.evalLlhTimer.calcAverage().count();
+      ssHeader << std::endl << "Avg " << GUNDAM_CHI2 << " computation time: " << _monitor_.evalLlhTimer;
       ssHeader << std::endl;
 
       GenericToolbox::TablePrinter t;
@@ -516,7 +515,7 @@ double RootFactoryInterface::evalFit( const double* parArray_ ){
 
       _monitor_.convergenceMonitor.setHeaderString(ssHeader.str());
       _monitor_.convergenceMonitor.getVariable("Total/dof").addQuantity(
-          getLikelihoodInterface().getBuffer().totalLikelihood / getLikelihoodInterface().getNbDof()
+          getLikelihoodInterface().getBuffer().totalLikelihood / getNbDegreeOfFreedom()
       );
       _monitor_.convergenceMonitor.getVariable("Total").addQuantity( getLikelihoodInterface().getBuffer().totalLikelihood );
       _monitor_.convergenceMonitor.getVariable("Stat").addQuantity( getLikelihoodInterface().getBuffer().statLikelihood );
@@ -1272,6 +1271,99 @@ void RootFactoryInterface::updateCacheToBestfitPoint(){
 
   LogWarning << "Updating propagator cache to the best fit point..." << std::endl;
   this->evalFit(_rootMinimizer_->X() );
+}
+void RootFactoryInterface::saveGradientSteps(){
+
+  if( GundamGlobals::isLightOutputMode() ){
+    LogAlert << "Skipping saveGradientSteps as light output mode is fired." << std::endl;
+    return;
+  }
+
+  LogInfo << "Saving " << _monitor_.gradientDescentMonitor.stepPointList.size() << " gradient steps..." << std::endl;
+
+  // make sure the parameter states get restored as we leave
+  auto currentParState = getPropagator().getParametersManager().exportParameterInjectorConfig();
+  GenericToolbox::ScopedGuard g{
+      [&](){
+        ParametersManager::muteLogger();
+        ParameterSet::muteLogger();
+        ParameterScanner::muteLogger();
+      },
+      [&](){
+        getPropagator().getParametersManager().injectParameterValues( currentParState );
+        ParametersManager::unmuteLogger();
+        ParameterSet::unmuteLogger();
+        ParameterScanner::unmuteLogger();
+      }
+  };
+
+  // load starting point
+  auto lastParStep{getOwner().getPreFitParState()};
+
+  std::vector<ParameterScanner::GraphEntry> globalGraphList;
+  for(size_t iGradStep = 0 ; iGradStep < _monitor_.gradientDescentMonitor.stepPointList.size() ; iGradStep++ ){
+    GenericToolbox::displayProgressBar(iGradStep, _monitor_.gradientDescentMonitor.stepPointList.size(), LogInfo.getPrefixString() + "Saving gradient steps...");
+
+    // why do we need to remute the logger at each loop??
+    ParameterSet::muteLogger(); Propagator::muteLogger(); ParametersManager::muteLogger();
+    getPropagator().getParametersManager().injectParameterValues(_monitor_.gradientDescentMonitor.stepPointList[iGradStep].parState );
+
+    getLikelihoodInterface().propagateAndEvalLikelihood();
+
+    if( not GundamGlobals::isLightOutputMode() ) {
+      auto outDir = GenericToolbox::mkdirTFile(getOwner().getSaveDir(), Form("fit/gradient/step_%i", int(iGradStep)));
+      GenericToolbox::writeInTFile(outDir, TNamed("parState", GenericToolbox::Json::toReadableString(_monitor_.gradientDescentMonitor.stepPointList[iGradStep].parState).c_str()));
+      GenericToolbox::writeInTFile(outDir, TNamed("llhState", getPropagator().getLlhBufferSummary().c_str()));
+    }
+
+    // line scan from previous point
+    getParameterScanner().scanSegment( nullptr, _monitor_.gradientDescentMonitor.stepPointList[iGradStep].parState, lastParStep, 8 );
+    lastParStep = _monitor_.gradientDescentMonitor.stepPointList[iGradStep].parState;
+
+    if( globalGraphList.empty() ){
+      // copy
+      globalGraphList = getParameterScanner().getGraphEntriesBuf();
+    }
+    else{
+      // current
+      auto& grEntries = getParameterScanner().getGraphEntriesBuf();
+
+      for( size_t iEntry = 0 ; iEntry < globalGraphList.size() ; iEntry++ ){
+        for(int iPt = 0 ; iPt < grEntries[iEntry].graph.GetN() ; iPt++ ){
+          globalGraphList[iEntry].graph.AddPoint( grEntries[iEntry].graph.GetX()[iPt], grEntries[iEntry].graph.GetY()[iPt] );
+        }
+      }
+
+    }
+  }
+
+  if( not globalGraphList.empty() ){
+    auto outDir = GenericToolbox::mkdirTFile(getOwner().getSaveDir(), "fit/gradient/global");
+    for( auto& gEntry : globalGraphList ){
+      gEntry.scanDataPtr->title = "Minimizer path to minimum";
+      ParameterScanner::writeGraphEntry(gEntry, outDir);
+    }
+    GenericToolbox::triggerTFileWrite(outDir);
+
+    outDir = GenericToolbox::mkdirTFile(getOwner().getSaveDir(), "fit/gradient/globalRelative");
+    for( auto& gEntry : globalGraphList ){
+      if( gEntry.graph.GetN() == 0 ){ continue; }
+
+      double minY{gEntry.graph.GetY()[gEntry.graph.GetN()-1]};
+      double maxY{gEntry.graph.GetY()[0]};
+      double delta{1E-6*std::abs( maxY - minY )};
+      // allow log scale
+      minY += delta;
+
+      for( int iPt = 0 ; iPt < gEntry.graph.GetN() ; iPt++ ){
+        gEntry.graph.GetY()[iPt] -= minY;
+      }
+      gEntry.scanDataPtr->title = "Minimizer path to minimum (difference)";
+      ParameterScanner::writeGraphEntry(gEntry, outDir);
+    }
+    GenericToolbox::triggerTFileWrite(outDir);
+  }
+
 }
 
 // Local Variables:

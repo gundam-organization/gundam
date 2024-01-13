@@ -48,7 +48,7 @@ public:
 
   // mutable core
   void propagateAndEvalLikelihood();
-  void saveGradientSteps();
+
 
   // core
   double evalLikelihood() const;

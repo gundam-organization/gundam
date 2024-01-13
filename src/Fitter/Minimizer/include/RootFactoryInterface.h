@@ -54,6 +54,7 @@ public:
 protected:
   void writePostFitData(TDirectory* saveDir_);
   void updateCacheToBestfitPoint();
+  void saveGradientSteps();
 
 private:
 

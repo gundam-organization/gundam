@@ -98,8 +98,6 @@ protected:
       std::vector<GradientStepPoint> stepPointList{};
     };
     GradientDescentMonitor gradientDescentMonitor{};
-
-    void writeHistoryTree(TDirectory* saveDir_);
   };
   Monitor _monitor_{};
 

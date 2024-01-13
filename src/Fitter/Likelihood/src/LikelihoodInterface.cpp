@@ -32,16 +32,9 @@ void LikelihoodInterface::initializeImpl() {
   _propagator_.initialize();
 
   LogWarning << "Fetching the effective number of fit parameters..." << std::endl;
-  _nbFreePars_ = 0;
   _nbParameters_ = 0;
   for( auto& parSet : _propagator_.getParametersManager().getParameterSetsList() ){
     _nbParameters_ += int( parSet.getNbParameters() );
-    for( auto& par : parSet.getEffectiveParameterList() ){
-      _nbParameters_++;
-      if( par.isEnabled() and not par.isFixed() ) {
-        if( par.isFree() ){ _nbFreePars_++; }
-      }
-    }
   }
 
   _nbSampleBins_ = 0;
@@ -52,98 +45,7 @@ void LikelihoodInterface::initializeImpl() {
   LogInfo << "LikelihoodInterface initialized." << std::endl;
 }
 
-void LikelihoodInterface::saveGradientSteps(){
 
-  if( GundamGlobals::isLightOutputMode() ){
-    LogAlert << "Skipping saveGradientSteps as light output mode is fired." << std::endl;
-    return;
-  }
-
-  LogInfo << "Saving " << _gradientMonitor_.size() << " gradient steps..." << std::endl;
-
-  // make sure the parameter states get restored as we leave
-  auto currentParState = _propagator_.getParametersManager().exportParameterInjectorConfig();
-  GenericToolbox::ScopedGuard g{
-    [&](){
-      ParametersManager::muteLogger();
-      ParameterSet::muteLogger();
-      ParameterScanner::muteLogger();
-    },
-    [&](){
-      _propagator_.getParametersManager().injectParameterValues( currentParState );
-      ParametersManager::unmuteLogger();
-      ParameterSet::unmuteLogger();
-      ParameterScanner::unmuteLogger();
-    }
-  };
-
-  // load starting point
-  auto lastParStep{_owner_->getPreFitParState()};
-
-  std::vector<GraphEntry> globalGraphList;
-  for(size_t iGradStep = 0 ; iGradStep < _gradientMonitor_.size() ; iGradStep++ ){
-    GenericToolbox::displayProgressBar(iGradStep, _gradientMonitor_.size(), LogInfo.getPrefixString() + "Saving gradient steps...");
-
-    // why do we need to remute the logger at each loop??
-    ParameterSet::muteLogger(); Propagator::muteLogger(); ParametersManager::muteLogger();
-    _propagator_.getParametersManager().injectParameterValues(_gradientMonitor_[iGradStep].parState );
-    _propagator_.updateLlhCache();
-
-    if( not GundamGlobals::isLightOutputMode() ) {
-      auto outDir = GenericToolbox::mkdirTFile(_owner_->getSaveDir(), Form("fit/gradient/step_%i", int(iGradStep)));
-      GenericToolbox::writeInTFile(outDir, TNamed("parState", GenericToolbox::Json::toReadableString(_gradientMonitor_[iGradStep].parState).c_str()));
-      GenericToolbox::writeInTFile(outDir, TNamed("llhState", _propagator_.getLlhBufferSummary().c_str()));
-    }
-
-    // line scan from previous point
-    _propagator_.getParameterScanner().scanSegment( nullptr, _gradientMonitor_[iGradStep].parState, lastParStep, 8 );
-    lastParStep = _gradientMonitor_[iGradStep].parState;
-
-    if( globalGraphList.empty() ){
-      // copy
-      globalGraphList = _propagator_.getParameterScanner().getGraphEntriesBuf();
-    }
-    else{
-      // current
-      auto& grEntries = _propagator_.getParameterScanner().getGraphEntriesBuf();
-
-      for( size_t iEntry = 0 ; iEntry < globalGraphList.size() ; iEntry++ ){
-        for(int iPt = 0 ; iPt < grEntries[iEntry].graph.GetN() ; iPt++ ){
-          globalGraphList[iEntry].graph.AddPoint( grEntries[iEntry].graph.GetX()[iPt], grEntries[iEntry].graph.GetY()[iPt] );
-        }
-      }
-
-    }
-  }
-
-  if( not globalGraphList.empty() ){
-    auto outDir = GenericToolbox::mkdirTFile(_owner_->getSaveDir(), "fit/gradient/global");
-    for( auto& gEntry : globalGraphList ){
-      gEntry.scanDataPtr->title = "Minimizer path to minimum";
-      ParameterScanner::writeGraphEntry(gEntry, outDir);
-    }
-    GenericToolbox::triggerTFileWrite(outDir);
-
-    outDir = GenericToolbox::mkdirTFile(_owner_->getSaveDir(), "fit/gradient/globalRelative");
-    for( auto& gEntry : globalGraphList ){
-      if( gEntry.graph.GetN() == 0 ){ continue; }
-
-      double minY{gEntry.graph.GetY()[gEntry.graph.GetN()-1]};
-      double maxY{gEntry.graph.GetY()[0]};
-      double delta{1E-6*std::abs( maxY - minY )};
-      // allow log scale
-      minY += delta;
-
-      for( int iPt = 0 ; iPt < gEntry.graph.GetN() ; iPt++ ){
-        gEntry.graph.GetY()[iPt] -= minY;
-      }
-      gEntry.scanDataPtr->title = "Minimizer path to minimum (difference)";
-      ParameterScanner::writeGraphEntry(gEntry, outDir);
-    }
-    GenericToolbox::triggerTFileWrite(outDir);
-  }
-
-}
 
 double LikelihoodInterface::evalLikelihood() const {
   this->evalStatLikelihood();
