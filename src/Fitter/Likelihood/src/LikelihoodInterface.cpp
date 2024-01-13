@@ -33,33 +33,25 @@ void LikelihoodInterface::initializeImpl() {
 
   LogWarning << "Fetching the effective number of fit parameters..." << std::endl;
   _nbFreePars_ = 0;
+  _nbParameters_ = 0;
   for( auto& parSet : _propagator_.getParametersManager().getParameterSetsList() ){
+    _nbParameters_ += int( parSet.getNbParameters() );
     for( auto& par : parSet.getEffectiveParameterList() ){
+      _nbParameters_++;
       if( par.isEnabled() and not par.isFixed() ) {
-        _nbFitParameters_++;
         if( par.isFree() ){ _nbFreePars_++; }
       }
     }
   }
 
-  LogInfo << "Building functor with " << _nbFitParameters_ << " parameters ..." << std::endl;
-//  _functor_ = std::make_unique<ROOT::Math::Functor>(this, &LikelihoodInterface::evalLikelihood, _nbFitParameters_);
-//  _validFunctor_ = std::make_unique<ROOT::Math::Functor>(this, &LikelihoodInterface::evalFitValid, _nbFitParameters_);
-
-  _nbFitBins_ = 0;
+  _nbSampleBins_ = 0;
   for( auto& sample : _propagator_.getSampleSet().getSampleList() ){
-    _nbFitBins_ += int( sample.getBinning().getBinList().size() );
+    _nbSampleBins_ += int(sample.getBinning().getBinList().size() );
   }
 
   LogInfo << "LikelihoodInterface initialized." << std::endl;
 }
 
-void LikelihoodInterface::writeChi2History() {
-  if( _saveDir_ == nullptr or _historyTree_ == nullptr ){ return; }
-
-  LogInfo << "Saving LLH history..." << std::endl;
-  GenericToolbox::writeInTFile(_saveDir_, _historyTree_.get());
-}
 void LikelihoodInterface::saveGradientSteps(){
 
   if( GundamGlobals::isLightOutputMode() ){
@@ -153,10 +145,6 @@ void LikelihoodInterface::saveGradientSteps(){
 
 }
 
-
-void LikelihoodInterface::scanParameter(Parameter* parPtr_, TDirectory* saveDir_){
-  _parameterScanner_.scanFitParameter(*parPtr_, saveDir_);
-}
 double LikelihoodInterface::evalLikelihood() const {
   this->evalStatLikelihood();
   this->evalPenaltyLikelihood();
@@ -223,10 +211,10 @@ double LikelihoodInterface::evalPenaltyLikelihood(const ParameterSet& parSet_) c
   );
   ss << std::endl << "Penalty likelihood = " << _buffer_.penaltyLikelihood;
   ss << " = sum of: " << GenericToolbox::toString(
-      _propagator_.getParametersManager().getParameterSetsList(), [](const ParameterSet& parSet_){
+      _propagator_.getParametersManager().getParameterSetsList(), [&](const ParameterSet& parSet_){
         std::stringstream ssSub;
         ssSub << parSet_.getName() << ": ";
-        if( parSet_.isEnabled() ){ ssSub << parSet_.getPenaltyChi2Buffer(); }
+        if( parSet_.isEnabled() ){ ssSub << this->evalPenaltyLikelihood( parSet_ ); }
         else                     { ssSub << "disabled."; }
         return ssSub.str();
       }

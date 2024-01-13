@@ -61,64 +61,52 @@ void RootFactoryInterface::initializeImpl(){
 
   LogWarning << "Initializing RootFactoryInterface..." << std::endl;
 
-  _minimizer_ = std::unique_ptr<ROOT::Math::Minimizer>(
+  _rootMinimizer_ = std::unique_ptr<ROOT::Math::Minimizer>(
       ROOT::Math::Factory::CreateMinimizer(_minimizerType_, _minimizerAlgo_)
   );
-  LogThrowIf(_minimizer_ == nullptr, "Could not create minimizer: " << _minimizerType_ << "/" << _minimizerAlgo_)
+  LogThrowIf(_rootMinimizer_ == nullptr, "Could not create minimizer: " << _minimizerType_ << "/" << _minimizerAlgo_)
   if( _minimizerAlgo_.empty() ){
-    _minimizerAlgo_ = _minimizer_->Options().MinimizerAlgorithm();
+    _minimizerAlgo_ = _rootMinimizer_->Options().MinimizerAlgorithm();
     LogWarning << "Using default minimizer algo: " << _minimizerAlgo_ << std::endl;
   }
   
-  _minimizer_->SetFunction( ROOT::Math::Functor(this, &RootFactoryInterface::evalFit, _minimizerParameterPtrList_.size()) );
-  _minimizer_->SetStrategy(_strategy_);
-  _minimizer_->SetPrintLevel(_printLevel_);
-  _minimizer_->SetTolerance(_tolerance_);
-  _minimizer_->SetMaxIterations(_maxIterations_);
-  _minimizer_->SetMaxFunctionCalls(_maxFcnCalls_);
+  _rootMinimizer_->SetFunction(ROOT::Math::Functor(this, &RootFactoryInterface::evalFit, _minimizerParameterPtrList_.size()) );
+  _rootMinimizer_->SetStrategy(_strategy_);
+  _rootMinimizer_->SetPrintLevel(_printLevel_);
+  _rootMinimizer_->SetTolerance(_tolerance_);
+  _rootMinimizer_->SetMaxIterations(_maxIterations_);
+  _rootMinimizer_->SetMaxFunctionCalls(_maxFcnCalls_);
 
   for( std::size_t iFitPar = 0 ; iFitPar < _minimizerParameterPtrList_.size() ; iFitPar++ ){
     auto& fitPar = *(_minimizerParameterPtrList_[iFitPar]);
 
     if( not _useNormalizedFitSpace_ ){
-      _minimizer_->SetVariable(iFitPar, fitPar.getFullTitle(),fitPar.getParameterValue(),fitPar.getStepSize()*_stepSizeScaling_);
-      if( not std::isnan( fitPar.getMinValue() ) ){ _minimizer_->SetVariableLowerLimit(iFitPar, fitPar.getMinValue()); }
-      if( not std::isnan( fitPar.getMaxValue() ) ){ _minimizer_->SetVariableUpperLimit(iFitPar, fitPar.getMaxValue()); }
+      _rootMinimizer_->SetVariable(iFitPar, fitPar.getFullTitle(), fitPar.getParameterValue(), fitPar.getStepSize() * _stepSizeScaling_);
+      if( not std::isnan( fitPar.getMinValue() ) ){ _rootMinimizer_->SetVariableLowerLimit(iFitPar, fitPar.getMinValue()); }
+      if( not std::isnan( fitPar.getMaxValue() ) ){ _rootMinimizer_->SetVariableUpperLimit(iFitPar, fitPar.getMaxValue()); }
       // Changing the boundaries, change the value/step size?
-      _minimizer_->SetVariableValue(iFitPar, fitPar.getParameterValue());
-      _minimizer_->SetVariableStepSize(iFitPar, fitPar.getStepSize()*_stepSizeScaling_);
+      _rootMinimizer_->SetVariableValue(iFitPar, fitPar.getParameterValue());
+      _rootMinimizer_->SetVariableStepSize(iFitPar, fitPar.getStepSize() * _stepSizeScaling_);
     }
     else{
-      _minimizer_->SetVariable(iFitPar, fitPar.getFullTitle(),
-                               ParameterSet::toNormalizedParValue(fitPar.getParameterValue(), fitPar),
-                               ParameterSet::toNormalizedParRange(fitPar.getStepSize() * _stepSizeScaling_, fitPar)
+      _rootMinimizer_->SetVariable(iFitPar, fitPar.getFullTitle(),
+                                   ParameterSet::toNormalizedParValue(fitPar.getParameterValue(), fitPar),
+                                   ParameterSet::toNormalizedParRange(fitPar.getStepSize() * _stepSizeScaling_, fitPar)
       );
-      if( not std::isnan( fitPar.getMinValue() ) ){ _minimizer_->SetVariableLowerLimit(iFitPar, ParameterSet::toNormalizedParValue(fitPar.getMinValue(), fitPar)); }
-      if( not std::isnan( fitPar.getMaxValue() ) ){ _minimizer_->SetVariableUpperLimit(iFitPar, ParameterSet::toNormalizedParValue(fitPar.getMaxValue(), fitPar)); }
+      if( not std::isnan( fitPar.getMinValue() ) ){ _rootMinimizer_->SetVariableLowerLimit(iFitPar, ParameterSet::toNormalizedParValue(fitPar.getMinValue(), fitPar)); }
+      if( not std::isnan( fitPar.getMaxValue() ) ){ _rootMinimizer_->SetVariableUpperLimit(iFitPar, ParameterSet::toNormalizedParValue(fitPar.getMaxValue(), fitPar)); }
       // Changing the boundaries, change the value/step size?
-      _minimizer_->SetVariableValue(iFitPar, ParameterSet::toNormalizedParValue(fitPar.getParameterValue(), fitPar));
-      _minimizer_->SetVariableStepSize(iFitPar, ParameterSet::toNormalizedParRange(fitPar.getStepSize() * _stepSizeScaling_, fitPar));
+      _rootMinimizer_->SetVariableValue(iFitPar, ParameterSet::toNormalizedParValue(fitPar.getParameterValue(), fitPar));
+      _rootMinimizer_->SetVariableStepSize(iFitPar, ParameterSet::toNormalizedParRange(fitPar.getStepSize() * _stepSizeScaling_, fitPar));
     }
   }
 
 }
 
 void RootFactoryInterface::minimize(){
-  LogThrowIf(not isInitialized(), "not initialized");
 
-  this->printParameters();
-
-  getPropagator().propagateParameters();
-  getLikelihoodInterface().evalStatLikelihood();
-
-  LogWarning << std::endl << GenericToolbox::addUpDownBars("Calling minimize...") << std::endl;
-  LogInfo << "Number of defined parameters: " << _minimizer_->NDim() << std::endl
-          << "Number of fit parameters   : " << _minimizer_->NFree() << std::endl
-          << "Number of free parameters : " << getLikelihoodInterface().getNbFreePars() << std::endl
-          << "Number of fixed parameters  : " << _minimizer_->NDim() - _minimizer_->NFree() << std::endl
-          << "Number of fit bins : " << getLikelihoodInterface().getNbFitBins() << std::endl
-          << "Chi2 # DoF : " << getLikelihoodInterface().getNbFitBins() - getLikelihoodInterface().getNbFreePars()
-          << std::endl;
+  // calling the common routine
+  this->MinimizerBase::minimize();
 
   int nbFitCallOffset = _monitor_.nbEvalLikelihoodCalls;
   LogInfo << "Fit call offset: " << nbFitCallOffset << std::endl;
@@ -127,18 +115,18 @@ void RootFactoryInterface::minimize(){
     LogWarning << "Running simplex algo before the minimizer" << std::endl;
     LogThrowIf(_minimizerType_ != "Minuit2", "Can't launch simplex with " << _minimizerType_);
 
-    std::string originalAlgo = _minimizer_->Options().MinimizerAlgorithm();
+    std::string originalAlgo = _rootMinimizer_->Options().MinimizerAlgorithm();
 
-    _minimizer_->Options().SetMinimizerAlgorithm("Simplex");
-    _minimizer_->SetMaxFunctionCalls(_simplexMaxFcnCalls_);
-    _minimizer_->SetTolerance( _tolerance_ * _simplexToleranceLoose_ );
-    _minimizer_->SetStrategy(0);
+    _rootMinimizer_->Options().SetMinimizerAlgorithm("Simplex");
+    _rootMinimizer_->SetMaxFunctionCalls(_simplexMaxFcnCalls_);
+    _rootMinimizer_->SetTolerance(_tolerance_ * _simplexToleranceLoose_ );
+    _rootMinimizer_->SetStrategy(0);
 
     _monitor_.stateTitleMonitor = "Running Simplex...";
 
     // SIMPLEX
     _monitor_.isEnabled = true;
-    _fitHasConverged_ = _minimizer_->Minimize();
+    _fitHasConverged_ = _rootMinimizer_->Minimize();
     _monitor_.isEnabled = false;
 
     // Make sure we are on the right spot
@@ -152,29 +140,29 @@ void RootFactoryInterface::minimize(){
     );
 
     // Back to original
-    _minimizer_->Options().SetMinimizerAlgorithm(originalAlgo.c_str());
-    _minimizer_->SetMaxFunctionCalls(_maxFcnCalls_);
-    _minimizer_->SetTolerance(_tolerance_);
-    _minimizer_->SetStrategy(_strategy_);
+    _rootMinimizer_->Options().SetMinimizerAlgorithm(originalAlgo.c_str());
+    _rootMinimizer_->SetMaxFunctionCalls(_maxFcnCalls_);
+    _rootMinimizer_->SetTolerance(_tolerance_);
+    _rootMinimizer_->SetStrategy(_strategy_);
 
     LogInfo << _monitor_.convergenceMonitor.generateMonitorString(); // lasting printout
     LogWarning << "Simplex ended after " << _monitor_.nbEvalLikelihoodCalls - nbFitCallOffset << " calls." << std::endl;
   }
 
-  _monitor_.stateTitleMonitor = "Running " + _minimizer_->Options().MinimizerAlgorithm() + "...";
+  _monitor_.stateTitleMonitor = "Running " + _rootMinimizer_->Options().MinimizerAlgorithm() + "...";
 
   _monitor_.isEnabled = true;
-  _fitHasConverged_ = _minimizer_->Minimize();
+  _fitHasConverged_ = _rootMinimizer_->Minimize();
   _monitor_.isEnabled = false;
 
   int nbMinimizeCalls = _monitor_.nbEvalLikelihoodCalls - nbFitCallOffset;
 
   LogInfo << _monitor_.convergenceMonitor.generateMonitorString(); // lasting printout
   LogInfo << "Minimization ended after " << nbMinimizeCalls << " calls." << std::endl;
-  if(_minimizerType_ == "Minuit" or _minimizerType_ == "Minuit2") LogWarning << "Status code: " << GundamUtils::minuitStatusCodeStr.at(_minimizer_->Status()) << std::endl;
-  else LogWarning << "Status code: " << _minimizer_->Status() << std::endl;
-  if(_minimizerType_ == "Minuit" or _minimizerType_ == "Minuit2") LogWarning << "Covariance matrix status code: " << GundamUtils::covMatrixStatusCodeStr.at(_minimizer_->CovMatrixStatus()) << std::endl;
-  else LogWarning << "Covariance matrix status code: " << _minimizer_->CovMatrixStatus() << std::endl;
+  if(_minimizerType_ == "Minuit" or _minimizerType_ == "Minuit2") LogWarning << "Status code: " << GundamUtils::minuitStatusCodeStr.at(_rootMinimizer_->Status()) << std::endl;
+  else LogWarning << "Status code: " << _rootMinimizer_->Status() << std::endl;
+  if(_minimizerType_ == "Minuit" or _minimizerType_ == "Minuit2") LogWarning << "Covariance matrix status code: " << GundamUtils::covMatrixStatusCodeStr.at(_rootMinimizer_->CovMatrixStatus()) << std::endl;
+  else LogWarning << "Covariance matrix status code: " << _rootMinimizer_->CovMatrixStatus() << std::endl;
 
   // Make sure we are on the right spot
   updateCacheToBestfitPoint();
@@ -186,7 +174,11 @@ void RootFactoryInterface::minimize(){
       TNamed("parameterStateAfterMinimize", GenericToolbox::Json::toReadableString( getPropagator().getParametersManager().exportParameterInjectorConfig() ).c_str() )
   );
 
-  getLikelihoodInterface().writeChi2History();
+  if( _monitor_.historyTree != nullptr ){
+    LogInfo << "Saving LLH history..." << std::endl;
+    GenericToolbox::writeInTFile(getOwner().getSaveDir(), _monitor_.historyTree.get());
+  }
+
   if( _monitor_.gradientDescentMonitor.isEnabled ){ getLikelihoodInterface().saveGradientSteps(); }
 
   if( _fitHasConverged_ ){ LogInfo << "Minimization has converged!" << std::endl; }
@@ -194,16 +186,15 @@ void RootFactoryInterface::minimize(){
 
   LogInfo << "Writing convergence stats..." << std::endl;
   int toyIndex = getPropagator().getIThrow();
-  int nIterations = int(_minimizer_->NIterations());
-  int nFitPars = int(_minimizer_->NFree());
-  double edmBestFit = _minimizer_->Edm();
-  double fitStatus = _minimizer_->Status();
-  double covStatus = _minimizer_->CovMatrixStatus();
-  double chi2MinFitter = _minimizer_->MinValue();
+  int nIterations = int(_rootMinimizer_->NIterations());
+  int nFitPars = int(_rootMinimizer_->NFree());
+  double edmBestFit = _rootMinimizer_->Edm();
+  double fitStatus = _rootMinimizer_->Status();
+  double covStatus = _rootMinimizer_->CovMatrixStatus();
+  double chi2MinFitter = _rootMinimizer_->MinValue();
 
-  int nDof = getLikelihoodInterface().getNbDof();
-  int nbFreePars = getLikelihoodInterface().getNbFreePars();
-  int nbFitBins = getLikelihoodInterface().getNbFitBins();
+  int nDof = getNbDegreeOfFreedom();
+  int nbFitBins = getLikelihoodInterface().getNbSampleBins();
 
   auto bestFitStats = std::make_unique<TTree>("bestFitStats", "bestFitStats");
   bestFitStats->SetDirectory( nullptr );
@@ -215,9 +206,9 @@ void RootFactoryInterface::minimize(){
   bestFitStats->Branch("chi2MinFitter", &chi2MinFitter);
   bestFitStats->Branch("toyIndex", &toyIndex);
   bestFitStats->Branch("nFitBins", &nbFitBins);
-  bestFitStats->Branch("nFreePars", &nbFreePars);
+  bestFitStats->Branch("nbFreeParameters", &_nbFreeParameters_);
   bestFitStats->Branch("nFitPars", &nFitPars);
-  bestFitStats->Branch("nDof", &nDof);
+  bestFitStats->Branch("nbDegreeOfFreedom", &nDof);
 
   bestFitStats->Branch("nCallsAtBestFit", &_monitor_.nbEvalLikelihoodCalls);
   bestFitStats->Branch("totalLikelihoodAtBestFit", &getLikelihoodInterface().getBuffer().totalLikelihood );
@@ -282,55 +273,49 @@ void RootFactoryInterface::minimize(){
 void RootFactoryInterface::calcErrors(){
   LogThrowIf(not isInitialized(), "not initialized");
 
-  int nbFitCallOffset = _monitor_.nbEvalLikelihoodCalls;
+  LogWarning << std::endl << GenericToolbox::addUpDownBars("Calling calcErrors()...") << std::endl;
 
-  LogWarning << std::endl << GenericToolbox::addUpDownBars("Calling HESSE...") << std::endl;
-  LogInfo << "Number of defined parameters: " << _minimizer_->NDim() << std::endl
-          << "Number of fit parameters   : " << _minimizer_->NFree() << std::endl
-          << "Number of free parameters : " << getLikelihoodInterface().getNbFreePars() << std::endl
-          << "Number of fixed parameters  : " << _minimizer_->NDim() - _minimizer_->NFree() << std::endl
-          << "Number of fit bins : " << getLikelihoodInterface().getNbFitBins() << std::endl
-          << "Chi2 # DoF : " << getLikelihoodInterface().getNbFitBins() - getLikelihoodInterface().getNbFreePars()  << std::endl
-          << "Fit call offset: " << nbFitCallOffset << std::endl;
+  int nbFitCallOffset = _monitor_.nbEvalLikelihoodCalls;
+  LogInfo << "Fit call offset: " << nbFitCallOffset << std::endl;
 
   if     ( _errorAlgo_ == "Minos" ){
     LogWarning << std::endl << GenericToolbox::addUpDownBars("Calling MINOS...") << std::endl;
 
     double errLow, errHigh;
-    _minimizer_->SetPrintLevel(0);
+    _rootMinimizer_->SetPrintLevel(0);
 
-    for( int iFitPar = 0 ; iFitPar < _minimizer_->NDim() ; iFitPar++ ){
-      LogInfo << "Evaluating: " << _minimizer_->VariableName(iFitPar) << "..." << std::endl;
+    for( int iFitPar = 0 ; iFitPar < _rootMinimizer_->NDim() ; iFitPar++ ){
+      LogInfo << "Evaluating: " << _rootMinimizer_->VariableName(iFitPar) << "..." << std::endl;
 
       _monitor_.isEnabled = true;
-      bool isOk = _minimizer_->GetMinosError(iFitPar, errLow, errHigh);
+      bool isOk = _rootMinimizer_->GetMinosError(iFitPar, errLow, errHigh);
       _monitor_.isEnabled = false;
 
 #if ROOT_VERSION_CODE >= ROOT_VERSION(6,23,02)
-      LogWarning << GundamUtils::minosStatusCodeStr.at(_minimizer_->MinosStatus()) << std::endl;
+      LogWarning << GundamUtils::minosStatusCodeStr.at(_rootMinimizer_->MinosStatus()) << std::endl;
 #endif
       if( isOk ){
-        LogInfo << _minimizer_->VariableName(iFitPar) << ": " << errLow << " <- " << _minimizer_->X()[iFitPar] << " -> +" << errHigh << std::endl;
+        LogInfo << _rootMinimizer_->VariableName(iFitPar) << ": " << errLow << " <- " << _rootMinimizer_->X()[iFitPar] << " -> +" << errHigh << std::endl;
       }
       else{
-        LogError << _minimizer_->VariableName(iFitPar) << ": " << errLow << " <- " << _minimizer_->X()[iFitPar] << " -> +" << errHigh
+        LogError << _rootMinimizer_->VariableName(iFitPar) << ": " << errLow << " <- " << _rootMinimizer_->X()[iFitPar] << " -> +" << errHigh
                  << " - MINOS returned an error." << std::endl;
       }
     }
 
     // Put back at minimum
-    for( int iFitPar = 0 ; iFitPar < _minimizer_->NDim() ; iFitPar++ ){
-      _minimizerParameterPtrList_[iFitPar]->setParameterValue(_minimizer_->X()[iFitPar]);
+    for( int iFitPar = 0 ; iFitPar < _rootMinimizer_->NDim() ; iFitPar++ ){
+      _minimizerParameterPtrList_[iFitPar]->setParameterValue(_rootMinimizer_->X()[iFitPar]);
     }
   } // Minos
   else if( _errorAlgo_ == "Hesse" ){
 
     if( _restoreStepSizeBeforeHesse_ ){
       LogWarning << "Restoring step size before HESSE..." << std::endl;
-      for( int iFitPar = 0 ; iFitPar < _minimizer_->NDim() ; iFitPar++ ){
+      for( int iFitPar = 0 ; iFitPar < _rootMinimizer_->NDim() ; iFitPar++ ){
         auto& par = *_minimizerParameterPtrList_[iFitPar];
-        if(not _useNormalizedFitSpace_){ _minimizer_->SetVariableStepSize(iFitPar, par.getStepSize()*_stepSizeScaling_); }
-        else{ _minimizer_->SetVariableStepSize(iFitPar, ParameterSet::toNormalizedParRange(par.getStepSize() * _stepSizeScaling_, par)); } // should be 1
+        if(not _useNormalizedFitSpace_){ _rootMinimizer_->SetVariableStepSize(iFitPar, par.getStepSize() * _stepSizeScaling_); }
+        else{ _rootMinimizer_->SetVariableStepSize(iFitPar, ParameterSet::toNormalizedParRange(par.getStepSize() * _stepSizeScaling_, par)); } // should be 1
       }
     }
 
@@ -340,12 +325,12 @@ void RootFactoryInterface::calcErrors(){
     _monitor_.stateTitleMonitor = "Running HESSE...";
 
     _monitor_.isEnabled = true;
-    _fitHasConverged_ = _minimizer_->Hesse();
+    _fitHasConverged_ = _rootMinimizer_->Hesse();
     _monitor_.isEnabled = false;
 
     LogInfo << "Hesse ended after " << _monitor_.nbEvalLikelihoodCalls - nbFitCallOffset << " calls." << std::endl;
-    LogWarning << "HESSE status code: " << GundamUtils::hesseStatusCodeStr.at(_minimizer_->Status()) << std::endl;
-    LogWarning << "Covariance matrix status code: " << GundamUtils::covMatrixStatusCodeStr.at(_minimizer_->CovMatrixStatus()) << std::endl;
+    LogWarning << "HESSE status code: " << GundamUtils::hesseStatusCodeStr.at(_rootMinimizer_->Status()) << std::endl;
+    LogWarning << "Covariance matrix status code: " << GundamUtils::covMatrixStatusCodeStr.at(_rootMinimizer_->CovMatrixStatus()) << std::endl;
 
     // Make sure we are on the right spot
     updateCacheToBestfitPoint();
@@ -359,7 +344,7 @@ void RootFactoryInterface::calcErrors(){
       LogInfo << _monitor_.convergenceMonitor.generateMonitorString(); // lasting printout
     }
 
-    int covStatus = _minimizer_->CovMatrixStatus();
+    int covStatus = _rootMinimizer_->CovMatrixStatus();
 
     auto hesseStats = std::make_unique<TTree>("hesseStats", "hesseStats");
     hesseStats->SetDirectory(nullptr);
@@ -597,8 +582,8 @@ void RootFactoryInterface::writePostFitData( TDirectory* saveDir_) {
   LogInfo << "Extracting post-fit covariance matrix" << std::endl;
   auto* matricesDir = GenericToolbox::mkdirTFile(saveDir_, "hessian");
 
-  TMatrixDSym postfitCovarianceMatrix(int(_minimizer_->NDim()));
-  _minimizer_->GetCovMatrix(postfitCovarianceMatrix.GetMatrixArray());
+  TMatrixDSym postfitCovarianceMatrix(int(_rootMinimizer_->NDim()));
+  _rootMinimizer_->GetCovMatrix(postfitCovarianceMatrix.GetMatrixArray());
 
   std::function<void(TDirectory*)> decomposeCovarianceMatrixFct = [&](TDirectory* outDir_){
 
@@ -611,9 +596,9 @@ void RootFactoryInterface::writePostFitData( TDirectory* saveDir_) {
       hist_->GetXaxis()->SetLabelSize(0.02);
     };
     std::function<void(TH1*)> applyBinLabels = [&](TH1* hist_){
-      for(int iPar = 0 ; iPar < _minimizer_->NDim() ; iPar++ ){
-        hist_->GetXaxis()->SetBinLabel(iPar+1, _minimizer_->VariableName(iPar).c_str());
-        if(hist_->GetDimension() >= 2) hist_->GetYaxis()->SetBinLabel(iPar+1, _minimizer_->VariableName(iPar).c_str());
+      for( int iPar = 0 ; iPar < _rootMinimizer_->NDim() ; iPar++ ){
+        hist_->GetXaxis()->SetBinLabel(iPar+1, _rootMinimizer_->VariableName(iPar).c_str());
+        if(hist_->GetDimension() >= 2) hist_->GetYaxis()->SetBinLabel(iPar+1, _rootMinimizer_->VariableName(iPar).c_str());
       }
       applyLooks(hist_);
     };
@@ -658,7 +643,7 @@ void RootFactoryInterface::writePostFitData( TDirectory* saveDir_) {
       auto invEigVectors = TMatrixD(decompCovMatrix.GetEigenVectors());
       invEigVectors.T();
 
-      TMatrixD hessianMatrix(int(_minimizer_->NDim()), int(_minimizer_->NDim())); hessianMatrix.Zero();
+      TMatrixD hessianMatrix(int(_rootMinimizer_->NDim()), int(_rootMinimizer_->NDim())); hessianMatrix.Zero();
       hessianMatrix += decompCovMatrix.GetEigenVectors();
       hessianMatrix *= (*diagonalMatrixInv);
       hessianMatrix *= invEigVectors;
@@ -672,7 +657,7 @@ void RootFactoryInterface::writePostFitData( TDirectory* saveDir_) {
       if( _generatedPostFitEigenBreakdown_ ){
         LogInfo << "Eigen breakdown..." << std::endl;
         TH1D eigenBreakdownHist("eigenBreakdownHist", "eigenBreakdownHist",
-                                int(_minimizer_->NDim()), -0.5, int(_minimizer_->NDim()) - 0.5);
+                                int(_rootMinimizer_->NDim()), -0.5, int(_rootMinimizer_->NDim()) - 0.5);
         std::vector<TH1D> eigenBreakdownAccum(decompCovMatrix.GetEigenValues().GetNrows(), eigenBreakdownHist);
         TH1D* lastAccumHist{nullptr};
         std::string progressTitle = LogWarning.getPrefixString() + "Accumulating eigen components...";
@@ -688,7 +673,7 @@ void RootFactoryInterface::writePostFitData( TDirectory* saveDir_) {
                                            decompCovMatrix.GetEigenValues()[iEigen]));
           eigenBreakdownHist.SetLineColor(GenericToolbox::defaultColorWheel[iEigen%int(GenericToolbox::defaultColorWheel.size())]);
           eigenBreakdownHist.SetLabelSize(0.02);
-          for (int iPar = int(_minimizer_->NDim())-1; iPar >= 0; iPar--) {
+          for ( int iPar = int(_rootMinimizer_->NDim()) - 1; iPar >= 0; iPar--) {
             eigenBreakdownHist.SetBinContent(iPar + 1,
                                              decompCovMatrix.GetEigenVectors()[iPar][iEigen] *
                                              decompCovMatrix.GetEigenVectors()[iPar][iEigen] *
@@ -761,9 +746,9 @@ void RootFactoryInterface::writePostFitData( TDirectory* saveDir_) {
         TH1D parBreakdownHist("parBreakdownHist", "parBreakdownHist",
                               decompCovMatrix.GetEigenValues().GetNrows(), -0.5,
                               decompCovMatrix.GetEigenValues().GetNrows() - 0.5);
-        std::vector<TH1D> parBreakdownAccum(_minimizer_->NDim());
+        std::vector<TH1D> parBreakdownAccum(_rootMinimizer_->NDim());
         TH1D* lastAccumHist{nullptr};
-        for (int iPar = int(_minimizer_->NDim())-1; iPar >= 0; iPar--){
+        for ( int iPar = int(_rootMinimizer_->NDim()) - 1; iPar >= 0; iPar--){
 
           if( lastAccumHist != nullptr ) parBreakdownAccum[iPar] = *lastAccumHist;
           else parBreakdownAccum[iPar] = parBreakdownHist;
@@ -771,7 +756,7 @@ void RootFactoryInterface::writePostFitData( TDirectory* saveDir_) {
 
           parBreakdownHist.SetLineColor(GenericToolbox::defaultColorWheel[iPar%int(GenericToolbox::defaultColorWheel.size())]);
 
-          parBreakdownHist.SetTitle(Form("Eigen breakdown for parameter #%i: %s", iPar, _minimizer_->VariableName(iPar).c_str()));
+          parBreakdownHist.SetTitle(Form("Eigen breakdown for parameter #%i: %s", iPar, _rootMinimizer_->VariableName(iPar).c_str()));
           for (int iEigen = decompCovMatrix.GetEigenValues().GetNrows() - 1; iEigen >= 0; iEigen--){
             parBreakdownHist.SetBinContent(
                 iPar+1,
@@ -1283,10 +1268,10 @@ void RootFactoryInterface::writePostFitData( TDirectory* saveDir_) {
   } // parSet
 }
 void RootFactoryInterface::updateCacheToBestfitPoint(){
-  LogThrowIf(_minimizer_->X() == nullptr, "No best fit point provided by the minimizer.");
+  LogThrowIf(_rootMinimizer_->X() == nullptr, "No best fit point provided by the minimizer.");
 
   LogWarning << "Updating propagator cache to the best fit point..." << std::endl;
-  this->evalFit( _minimizer_->X() );
+  this->evalFit(_rootMinimizer_->X() );
 }
 
 // Local Variables:

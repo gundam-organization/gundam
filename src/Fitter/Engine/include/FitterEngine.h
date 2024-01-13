@@ -55,11 +55,13 @@ public:
   const JsonType &getPreFitParState() const{ return _preFitParState_; }
   const JsonType &getPostFitParState() const{ return _postFitParState_; }
   [[nodiscard]] const Propagator& getPropagator() const{ return _likelihoodInterface_.getPropagator(); }
+  [[nodiscard]] const ParameterScanner& getParameterScanner() const{ return _parameterScanner_; }
   [[nodiscard]] const MinimizerBase& getMinimizer() const{ return *_minimizer_; }
   [[nodiscard]] const LikelihoodInterface& getLikelihoodInterface() const{ return _likelihoodInterface_; }
 
   // Getters (non-const)
   Propagator& getPropagator(){ return _likelihoodInterface_.getPropagator(); }
+  ParameterScanner& getParameterScanner(){ return _parameterScanner_; }
   MinimizerBase& getMinimizer(){ return *_minimizer_; }
   LikelihoodInterface& getLikelihoodInterface(){ return _likelihoodInterface_; }
   TDirectory* getSaveDir(){ return _saveDir_; }

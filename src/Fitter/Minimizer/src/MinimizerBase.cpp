@@ -30,10 +30,15 @@ void MinimizerBase::initializeImpl(){
   LogInfo << "Initializing the minimizer..." << std::endl;
   LogThrowIf(_owner_ == nullptr, "FitterEngine owner not set.");
 
+  _nbFreeParameters_ = 0;
   _minimizerParameterPtrList_.clear();
+  _minimizerParameterPtrList_.reserve( _owner_->getLikelihoodInterface().getNbParameters() );
   for( auto& parSet : _owner_->getPropagator().getParametersManager().getParameterSetsList() ){
     for( auto& par : parSet.getEffectiveParameterList() ){
-      if( par.isEnabled() and not par.isFixed() ) { _minimizerParameterPtrList_.emplace_back(&par); }
+      if( par.isEnabled() and not par.isFixed() ) {
+        _minimizerParameterPtrList_.emplace_back( &par );
+        if( par.isFree() ){ _nbFreeParameters_++; }
+      }
     }
   }
 
@@ -65,19 +70,37 @@ void MinimizerBase::initializeImpl(){
 // const getters
 const FitterEngine& MinimizerBase::getOwner() const { return *_owner_; }
 const Propagator& MinimizerBase::getPropagator() const{ return _owner_->getPropagator(); }
+const ParameterScanner& MinimizerBase::getParameterScanner() const { return _owner_->getParameterScanner(); }
 const LikelihoodInterface& MinimizerBase::getLikelihoodInterface() const{ return _owner_->getLikelihoodInterface(); }
 
 // mutable getters
 FitterEngine& MinimizerBase::getOwner(){ return *_owner_; }
 Propagator& MinimizerBase::getPropagator(){ return _owner_->getPropagator(); }
+ParameterScanner& MinimizerBase::getParameterScanner(){ return _owner_->getParameterScanner(); }
 LikelihoodInterface& MinimizerBase::getLikelihoodInterface(){ return _owner_->getLikelihoodInterface(); }
 
+void MinimizerBase::minimize(){
+  LogThrowIf(not isInitialized(), "not initialized");
+
+  this->printParameters();
+
+  getLikelihoodInterface().propagateAndEvalLikelihood();
+  LogInfo << "Initial likelihood state:" << getLikelihoodInterface().getSummary();
+
+  LogInfo << "Number of defined parameters: " << getLikelihoodInterface().getNbParameters() << std::endl
+  << "Number of fit parameters: " << _minimizerParameterPtrList_.size() << std::endl
+  << "Number of fixed parameters: " << getLikelihoodInterface().getNbParameters() - _minimizerParameterPtrList_.size() << std::endl
+  << "Number of free parameters: " << _nbFreeParameters_ << std::endl
+  << "Number of fit bins: " << getLikelihoodInterface().getNbSampleBins() << std::endl
+  << "Number of degree of freedom: " << getNbDegreeOfFreedom()
+  << std::endl;
+
+  LogWarning << std::endl << GenericToolbox::addUpDownBars("Calling minimize...") << std::endl;
+}
 void MinimizerBase::scanParameters(TDirectory* saveDir_){
   LogInfo << "Performing scans of fit parameters..." << std::endl;
   LogThrowIf( not isInitialized() );
-  for( auto& parPtr : _minimizerParameterPtrList_ ) {
-    getLikelihoodInterface().scanParameter( parPtr, saveDir_ );
-  }
+  for( auto& parPtr : _minimizerParameterPtrList_ ) { getParameterScanner().scanParameter( *parPtr, saveDir_ ); }
 }
 
 

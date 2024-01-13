@@ -10,7 +10,6 @@
 #include "GenericToolbox.Utils.h"
 #include "GenericToolbox.Json.h"
 #include "GenericToolbox.Root.h"
-#include "GenericToolbox.Misc.h"
 #include "Logger.h"
 
 #include <Math/Factory.h>
@@ -314,7 +313,7 @@ void FitterEngine::fit(){
   }
   if( _enablePreFitScan_ ){
     LogInfo << "Scanning fit parameters before minimizing..." << std::endl;
-    _minimizer_->scanParameters( GenericToolbox::mkdirTFile(_saveDir_, "preFit/scan") );
+    _minimizer_->scanParameterList( GenericToolbox::mkdirTFile(_saveDir_, "preFit/scan") );
     GenericToolbox::triggerTFileWrite(_saveDir_);
   }
   if( _throwMcBeforeFit_ ){
@@ -399,7 +398,7 @@ void FitterEngine::fit(){
   }
   if( _enablePostFitScan_ ){
     LogInfo << "Scanning fit parameters around the minimum point..." << std::endl;
-    _minimizer_->scanParameters( GenericToolbox::mkdirTFile(_saveDir_, "postFit/scan") );
+    _minimizer_->scanParameterList( GenericToolbox::mkdirTFile(_saveDir_, "postFit/scan") );
     GenericToolbox::triggerTFileWrite(_saveDir_);
   }
   if( _enablePreFitToPostFitLineScan_ ){

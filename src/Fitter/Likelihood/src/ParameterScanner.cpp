@@ -132,12 +132,12 @@ void ParameterScanner::initializeImpl() {
 
 }
 
-void ParameterScanner::scanFitParameters(std::vector<Parameter>& parList_, TDirectory* saveDir_){
+void ParameterScanner::scanParameterList( std::vector<Parameter>& par_, TDirectory* saveDir_){
   LogThrowIf(not isInitialized());
   LogThrowIf(saveDir_ == nullptr);
-  for( auto& par : parList_ ){ this->scanFitParameter(par, saveDir_); }
+  for( auto& par : par_ ){ this->scanParameter(par, saveDir_); }
 }
-void ParameterScanner::scanFitParameter(Parameter& par_, TDirectory* saveDir_) {
+void ParameterScanner::scanParameter(Parameter& par_, TDirectory* saveDir_) {
   LogThrowIf(not isInitialized());
   LogThrowIf(saveDir_ == nullptr);
   std::vector<double> parPoints(_nbPoints_+1,0);

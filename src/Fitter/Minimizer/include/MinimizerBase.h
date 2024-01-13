@@ -6,6 +6,7 @@
 #define GUNDAM_MINIMIZER_BASE_H
 
 #include "Propagator.h"
+#include "ParameterScanner.h"
 #include "LikelihoodInterface.h"
 #include "Parameter.h"
 #include "JsonBaseClass.h"
@@ -30,27 +31,31 @@ protected:
 
 public:
   // virtual
-  virtual void minimize() = 0;
+  virtual void minimize();
   virtual void calcErrors(){}
   virtual void scanParameters( TDirectory* saveDir_ );
   virtual bool isErrorCalcEnabled(){ return false; }
+  [[nodiscard]] virtual bool isFitHasConverged() const = 0;
 
   // c-tor
   explicit MinimizerBase(FitterEngine* owner_) : _owner_(owner_) {}
 
   // const getters
+  int getMinimizerStatus() const { return _minimizerStatus_; }
   const FitterEngine& getOwner() const;
   const Propagator& getPropagator() const;
+  const ParameterScanner& getParameterScanner() const;
   const LikelihoodInterface& getLikelihoodInterface() const;
 
   // mutable getters
   Monitor& getMonitor(){ return _monitor_; }
   FitterEngine& getOwner();
   Propagator& getPropagator();
+  ParameterScanner& getParameterScanner();
   LikelihoodInterface& getLikelihoodInterface();
 
-  [[nodiscard]] virtual bool isFitHasConverged() const = 0;
-
+  // core
+  int getNbDegreeOfFreedom(){ return getLikelihoodInterface().getNbSampleBins() - _nbFreeParameters_; }
 
 protected:
   void printParameters();
@@ -60,6 +65,8 @@ protected:
   bool _useNormalizedFitSpace_{true};
 
   // internals
+  int _minimizerStatus_{-1}; // -1: invalid, 0: success, >0: errors
+  int _nbFreeParameters_{0};
   std::vector<Parameter*> _minimizerParameterPtrList_{};
 
   // monitor

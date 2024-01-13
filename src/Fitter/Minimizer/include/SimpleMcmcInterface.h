@@ -37,17 +37,14 @@ protected:
   void initializeImpl() override;
 
 public:
+  void minimize() override; /// Generate a chain.
+
   explicit SimpleMcmcInterface(FitterEngine* owner_): MinimizerBase(owner_) {}
 
   /// An MCMC doesn't really converge in the sense meant here. This flags success.
   [[nodiscard]] virtual bool isFitHasConverged() const override  {return true;}
 
-  /// Generate a chain.
-  void minimize() override;
 
-  /// Don't do anything.  This could calculate the covariance of the chain,
-  /// but the concept doesn't really match the ideas of a Bayesian analysis.
-  void calcErrors() override;
 
   /// Scan the parameters.
   void scanParameters(TDirectory* saveDir_) override;

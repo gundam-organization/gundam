@@ -780,17 +780,12 @@ void SimpleMcmcInterface::setupAndRunSimpleStep( SimpleStepMCMC& mcmc) {
 }
 
 void SimpleMcmcInterface::minimize() {
-  LogThrowIf(not isInitialized(), "not initialized");
+  this->MinimizerBase::minimize();
 
-  printParameters();
+  GenericToolbox::mkdirTFile( getOwner().getSaveDir(), "fit" )->cd();
 
-  // Update to the current parameter settings and the likelihood cache.
-  getPropagator().updateLlhCache();
-
-  GenericToolbox::mkdirTFile(owner().getSaveDir(), "fit")->cd();
   // Create output tree in the existing file
-  LogInfo << "Adding MCMC information to file " << gFile->GetName()
-          << std::endl;
+  LogInfo << "Adding MCMC information to file " << gFile->GetName() << std::endl;
 
   // Store parameter names as a tree in the currentdirectory
   TTree *parameterSetsTree = new TTree("parameterSets",
@@ -912,14 +907,11 @@ void SimpleMcmcInterface::minimize() {
   if (outputTree) outputTree->Write();
 
 }
-void SimpleMcmcInterface::calcErrors() {
-    LogWarning << "Errors not calculated with MCMC" << std::endl;
-}
 void SimpleMcmcInterface::scanParameters( TDirectory* saveDir_) {
   LogThrowIf(not isInitialized());
   LogInfo << "Performing scans of fit parameters..." << std::endl;
   for(Parameter* par : getMinimizerFitParameterPtr()) {
-    getPropagator().getParameterScanner().scanFitParameter(*par, saveDir_);
+    getPropagator().getParameterScanner().scanParameter(*par, saveDir_);
   }
 }
 

@@ -45,16 +45,13 @@ public:
 
   // const getters
   [[nodiscard]] double getTargetEdm() const;
-  [[nodiscard]] const std::unique_ptr<ROOT::Math::Minimizer> &getMinimizer() const{ return _minimizer_; }
+  [[nodiscard]] const std::unique_ptr<ROOT::Math::Minimizer> &getMinimizer() const{ return _rootMinimizer_; }
 
   // core
   double evalFit( const double* parArray_ );
   void saveMinimizerSettings(TDirectory* saveDir_) const;
 
 protected:
-  void findMinimumLikelihood();
-  void calculateErrors();
-
   void writePostFitData(TDirectory* saveDir_);
   void updateCacheToBestfitPoint();
 
@@ -86,7 +83,7 @@ private:
   // internals
   bool _fitHasConverged_{false};
 
-  std::unique_ptr<ROOT::Math::Minimizer> _minimizer_{nullptr};
+  std::unique_ptr<ROOT::Math::Minimizer> _rootMinimizer_{nullptr};
 
 };
 #endif //GUNDAM_ROOTFACTORYINTERFACE_H

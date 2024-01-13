@@ -36,9 +36,8 @@ protected:
 
 public:
   // const getters
-  [[nodiscard]] int getNbFitParameters() const { return _nbFitParameters_; }
-  [[nodiscard]] int getNbFreePars() const {return _nbFreePars_; }
-  [[nodiscard]] int getNbFitBins() const {return _nbFitBins_; }
+  [[nodiscard]] int getNbParameters() const {return _nbParameters_; }
+  [[nodiscard]] int getNbSampleBins() const {return _nbSampleBins_; }
   [[nodiscard]] const Buffer& getBuffer() const { return _buffer_; }
   [[nodiscard]] const Propagator& getPropagator() const { return _propagator_; }
   const JointProbability::JointProbability* getJointProbabilityPtr() const { return _jointProbabilityPtr_.get(); }
@@ -47,21 +46,17 @@ public:
   Buffer& getBuffer() { return _buffer_; }
   Propagator& getPropagator(){ return _propagator_; }
 
-  // core
+  // mutable core
   void propagateAndEvalLikelihood();
-  void scanParameter(Parameter* parPtr_, TDirectory* saveDir_);
-  [[nodiscard]] int getNbDof() const { return _nbFitBins_ - _nbFreePars_; }
+  void saveGradientSteps();
+
+  // core
   double evalLikelihood() const;
   double evalStatLikelihood() const;
   double evalPenaltyLikelihood() const;
   [[nodiscard]] double evalStatLikelihood(const Sample& sample_) const;
   [[nodiscard]] double evalPenaltyLikelihood(const ParameterSet& parSet_) const;
   [[nodiscard]] std::string getSummary() const;
-
-
-  // mutable core
-  void writeChi2History();
-  void saveGradientSteps();
 
   // TODO: to relocate
   double evalFitValid(const double* parArray_);
@@ -70,12 +65,10 @@ public:
 
 private:
   // internals
-  int _nbFitBins_{0};
-  int _nbFreePars_{0};
-  int _nbFitParameters_{0};
+  int _nbParameters_{0};
+  int _nbSampleBins_{0};
 
   Propagator _propagator_{};
-
   std::shared_ptr<JointProbability::JointProbability> _jointProbabilityPtr_{nullptr};
 
   struct Buffer{

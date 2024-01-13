@@ -40,8 +40,8 @@ public:
   [[nodiscard]] const std::vector<GraphEntry> &getGraphEntriesBuf() const { return _graphEntriesBuf_; };
 
   // Core
-  void scanFitParameters(std::vector<Parameter>& par_, TDirectory* saveDir_);
-  void scanFitParameter(Parameter& par_, TDirectory* saveDir_);
+  void scanParameterList( std::vector<Parameter>& par_, TDirectory* saveDir_);
+  void scanParameter(Parameter& par_, TDirectory* saveDir_);
   void scanSegment(TDirectory *saveDir_, const JsonType &end_, const JsonType &start_ = JsonType(), int nSteps_=-1);
   void generateOneSigmaPlots(TDirectory* saveDir_);
   void varyEvenRates(const std::vector<double>& paramVariationList_, TDirectory* saveDir_);
