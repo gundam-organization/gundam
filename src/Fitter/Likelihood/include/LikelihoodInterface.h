@@ -36,9 +36,6 @@ protected:
   void initializeImpl() override;
 
 public:
-  LikelihoodInterface() = default;
-  ~LikelihoodInterface() override = default;
-
   // const getters
   [[nodiscard]] int getNbFitParameters() const { return _nbFitParameters_; }
   [[nodiscard]] int getNbFreePars() const {return _nbFreePars_; }
@@ -46,6 +43,7 @@ public:
   [[nodiscard]] const Buffer& getBuffer() const { return _buffer_; }
   [[nodiscard]] const Propagator& getPropagator() const { return _propagator_; }
   [[nodiscard]] const ParameterScanner& getParameterScanner() const { return _parameterScanner_; }
+  const JointProbability::JointProbability* getJointProbabilityPtr() const { return _jointProbabilityPtr_.get(); }
 
   // mutable getters
   Buffer& getBuffer() { return _buffer_; }
@@ -61,6 +59,8 @@ public:
   [[nodiscard]] double evalPenaltyLikelihood(const ParameterSet& parSet_) const;
   [[nodiscard]] std::string getSummary() const;
 
+  void propagateAndEvalLikelihood();
+
   // mutable core
   void writeChi2History();
   void saveGradientSteps();
@@ -69,7 +69,6 @@ public:
   double evalFitValid(const double* parArray_);
   void setParameterValidity(const std::string& validity);
   [[nodiscard]] bool hasValidParameterValues() const;
-
 
 private:
   // internals

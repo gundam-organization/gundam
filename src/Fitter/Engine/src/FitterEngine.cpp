@@ -10,6 +10,7 @@
 #include "GenericToolbox.Utils.h"
 #include "GenericToolbox.Json.h"
 #include "GenericToolbox.Root.h"
+#include "GenericToolbox.Misc.h"
 #include "Logger.h"
 
 #include <Math/Factory.h>
@@ -35,7 +36,7 @@ void FitterEngine::readConfigImpl(){
   });
   GenericToolbox::Json::deprecatedAction(_config_, "scanConfig", [&]{
     LogAlert << "Forwarding the option to Propagator. Consider moving it into \"propagatorConfig:\"" << std::endl;
-    _likelihoodInterface_.getPropagator().getParameterScanner().readConfig(GenericToolbox::Json::fetchValue(_config_, "scanConfig", JsonType()) );
+    _likelihoodInterface_.getParameterScanner().readConfig(GenericToolbox::Json::fetchValue(_config_, "scanConfig", JsonType()) );
   });
 
   JsonType minimizerConfig{};
@@ -62,10 +63,10 @@ void FitterEngine::readConfigImpl(){
   _minimizerType_ = MinimizerType::toEnum( minimizerTypeStr );
   switch( _minimizerType_.value ){
     case MinimizerType::RootFactory:
-      this->_minimizer_ = std::make_unique<RootFactoryInterface>();
+      this->_minimizer_ = std::make_unique<RootFactoryInterface>( this );
       break;
     case MinimizerType::SimpleMCMC:
-      this->_minimizer_ = std::make_unique<SimpleMcmcInterface>();
+      this->_minimizer_ = std::make_unique<SimpleMcmcInterface>( this );
       break;
     default:
       LogThrow("Unknown minimizer type selected: " << minimizerTypeStr << std::endl << "Available: " << MinimizerType::generateEnumFieldsAsString());
@@ -77,7 +78,7 @@ void FitterEngine::readConfigImpl(){
 
   GenericToolbox::Json::deprecatedAction(_config_, "monitorRefreshRateInMs", [&]{
     LogAlert << "Forwarding the option to Propagator. Consider moving it into \"minimizerConfig:\"" << std::endl;
-    getLikelihood().getConvergenceMonitor().setMaxRefreshRateInMs(GenericToolbox::Json::fetchValue<int>(_config_, "monitorRefreshRateInMs"));
+    _minimizer_->getMonitor().convergenceMonitor.setMaxRefreshRateInMs(GenericToolbox::Json::fetchValue<int>(_config_, "monitorRefreshRateInMs"));
   });
 
 
@@ -101,7 +102,7 @@ void FitterEngine::readConfigImpl(){
   _savePostfitEventTrees_ = GenericToolbox::Json::fetchValue(_config_, "savePostfitEventTrees", _savePostfitEventTrees_);
 
 
-  LogInfo << "Convergence monitor will be refreshed every " << _likelihoodInterface_.getConvergenceMonitor().getMaxRefreshRateInMs() << "ms." << std::endl;
+  LogInfo << "Convergence monitor will be refreshed every " << _likelihoodInterface_._monitor_.convergenceMonitor.getMaxRefreshRateInMs() << "ms." << std::endl;
 }
 void FitterEngine::initializeImpl(){
   LogThrowIf(_config_.empty(), "Config is not set.");
@@ -161,7 +162,7 @@ void FitterEngine::initializeImpl(){
 
   // The minimizer needs all the parameters to be fully setup (i.e. PCA done
   // and other properties)
-  getMinimizer().initialize();
+  _minimizer_->initialize();
 
   if( GundamGlobals::getVerboseLevel() >= VerboseLevel::MORE_PRINTOUT ){ checkNumericalAccuracy(); }
 
@@ -230,6 +231,9 @@ void FitterEngine::initializeImpl(){
     }
   }
 
+
+  GenericToolbox::
+
   if( dynamic_cast<const RootFactoryInterface*>( &this->getMinimizer() ) ){
     dynamic_cast<const RootFactoryInterface*>( &this->getMinimizer() )->saveMinimizerSettings(GenericToolbox::mkdirTFile(_saveDir_, "fit/minimizer" ) );
   }
@@ -266,7 +270,6 @@ void FitterEngine::initializeImpl(){
           dataRate, "sumWeights"
       );
     }
-
 
   }
 
@@ -309,12 +312,15 @@ void FitterEngine::fit(){
   }
   if( _doAllParamVariations_ ){
     LogInfo << "Running all parameter variation on pre-fit samples..." << std::endl;
-    _likelihoodInterface_.getPropagator().getParameterScanner().varyEvenRates(_allParamVariationsSigmas_, GenericToolbox::mkdirTFile(_saveDir_, "preFit/varyEventRates") );
+    _likelihoodInterface_.getParameterScanner().varyEvenRates(
+        _allParamVariationsSigmas_,
+        GenericToolbox::mkdirTFile(_saveDir_, "preFit/varyEventRates")
+    );
     GenericToolbox::triggerTFileWrite(_saveDir_);
   }
   if( _enablePreFitScan_ ){
     LogInfo << "Scanning fit parameters before minimizing..." << std::endl;
-    getMinimizer().scanParameters(GenericToolbox::mkdirTFile(_saveDir_, "preFit/scan"));
+    getMinimizer().scanParameters( GenericToolbox::mkdirTFile(_saveDir_, "preFit/scan") );
     GenericToolbox::triggerTFileWrite(_saveDir_);
   }
   if( _throwMcBeforeFit_ ){
@@ -399,13 +405,13 @@ void FitterEngine::fit(){
   }
   if( _enablePostFitScan_ ){
     LogInfo << "Scanning fit parameters around the minimum point..." << std::endl;
-    getMinimizer().scanParameters(GenericToolbox::mkdirTFile(_saveDir_, "postFit/scan"));
+    _minimizer_.scanParameters(GenericToolbox::mkdirTFile(_saveDir_, "postFit/scan"));
     GenericToolbox::triggerTFileWrite(_saveDir_);
   }
   if( _enablePreFitToPostFitLineScan_ ){
     if( not GundamGlobals::isLightOutputMode() ){
       LogInfo << "Scanning along the line from pre-fit to post-fit points..." << std::endl;
-      getPropagator().getParameterScanner().scanSegment(GenericToolbox::mkdirTFile(_saveDir_, "postFit/scanConvergence"),
+      _likelihoodInterface_.getParameterScanner().scanSegment(GenericToolbox::mkdirTFile(_saveDir_, "postFit/scanConvergence"),
                                                   _postFitParState_, _preFitParState_);
       GenericToolbox::triggerTFileWrite(_saveDir_);
     }

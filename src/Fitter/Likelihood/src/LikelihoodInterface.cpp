@@ -158,8 +158,6 @@ double LikelihoodInterface::evalLikelihood() const {
   this->evalStatLikelihood();
   this->evalPenaltyLikelihood();
 
-  _buffer_.regulariseLikelihood = 0; // unused
-
   _buffer_.updateTotal();
   return _buffer_.totalLikelihood;
 }
@@ -227,6 +225,11 @@ double LikelihoodInterface::evalPenaltyLikelihood(const ParameterSet& parSet_) c
   localBuffer.updateTotal();
   ss << "Total: " << localBuffer.totalLikelihood;
   return ss.str();
+}
+
+void LikelihoodInterface::propagateAndEvalLikelihood(){
+  _propagator_.propagateParameters();
+  this->evalLikelihood();
 }
 
 double LikelihoodInterface::evalFitValid(const double* parArray_) {

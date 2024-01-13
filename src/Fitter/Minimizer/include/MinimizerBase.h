@@ -6,6 +6,7 @@
 #define GUNDAM_MINIMIZER_BASE_H
 
 #include "Propagator.h"
+#include "LikelihoodInterface.h"
 #include "Parameter.h"
 #include "JsonBaseClass.h"
 
@@ -21,34 +22,47 @@ class FitterEngine; // owner
 
 class MinimizerBase : public JsonBaseClass {
 
+  struct Monitor;
+
 protected:
   void readConfigImpl() override;
   void initializeImpl() override;
 
 public:
+  // pure virtual
+  virtual void minimize() = 0;
+
+  // c-tor
   explicit MinimizerBase(FitterEngine* owner_) : _owner_(owner_) {}
 
-  virtual void minimize() = 0;
+  // const getters
+  const FitterEngine& getOwner() const;
+  const Propagator& getPropagator() const;
+  const LikelihoodInterface& getLikelihoodInterface() const;
+
+  // mutable getters
+  Monitor& getMonitor(){ return _monitor_; }
+  FitterEngine& getOwner();
+  Propagator& getPropagator();
+  LikelihoodInterface& getLikelihoodInterface();
+
+  // core
+  void scanParameters(TDirectory* saveDir_);
+
 
   [[nodiscard]] virtual bool isFitHasConverged() const = 0;
   virtual double evalFit( const double* parArray_ );
 
-  /// Set if the calcErrors method should be called by the FitterEngine.
-  void setEnablePostFitErrorEval(bool enablePostFitErrorEval_) {_enablePostFitErrorEval_ = enablePostFitErrorEval_;}
-  [[nodiscard]] bool isEnablePostFitErrorEval() const {return _enablePostFitErrorEval_;}
-
 protected:
-  void summarizeParameters();
+  void printParameters();
 
 protected:
 
   // config
   bool _throwOnBadLlh_{false};
   bool _useNormalizedFitSpace_{true};
-  bool _enablePostFitErrorEval_{true};
 
   // internals
-  FitterEngine* _owner_{nullptr};
   std::vector<Parameter*> _minimizerParameterPtrList_{};
 
   // monitor
@@ -80,12 +94,11 @@ protected:
       std::vector<GradientStepPoint> stepPointList{};
     };
     GradientDescentMonitor gradientDescentMonitor{};
-
   };
   Monitor _monitor_{};
 
-
-
+private:
+  FitterEngine* _owner_{nullptr};
 
 };
 

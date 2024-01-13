@@ -79,11 +79,11 @@ void ParameterScanner::initializeImpl() {
       scanEntry.title = Form("Stat Likelihood Scan of sample \"%s\"", sample.getName().c_str());
       scanEntry.yTitle = "Stat LLH value";
       auto* samplePtr = &sample;
-      scanEntry.evalY = [this, samplePtr](){ return _owner_->getJointProbabilityPtr()->eval(*samplePtr); };
+      scanEntry.evalY = [this, samplePtr](){ return _owner_->evalStatLikelihood( *samplePtr ); };
     }
   }
   if( GenericToolbox::Json::fetchValue(_varsConfig_, "llhStatPerSamplePerBin", false) ){
-    for( auto& sample : _owner_->getFitSampleSet().getSampleList() ){
+    for( auto& sample : _owner_->getPropagator().getSampleSet().getSampleList() ){
       for( int iBin = 1 ; iBin <= sample.getMcContainer().histogram->GetNbinsX() ; iBin++ ){
         _scanDataDict_.emplace_back();
         auto& scanEntry = _scanDataDict_.back();
@@ -94,12 +94,12 @@ void ParameterScanner::initializeImpl() {
                                sample.getBinning().getBinList()[iBin-1].getSummary().c_str());
         scanEntry.yTitle = "Stat LLH value";
         auto* samplePtr = &sample;
-        scanEntry.evalY = [this, samplePtr, iBin](){ return _owner_->getFitSampleSet().getJointProbabilityFct()->eval(*samplePtr, iBin); };
+        scanEntry.evalY = [this, samplePtr, iBin](){ return _owner_->getJointProbabilityPtr()->eval( *samplePtr, iBin ); };
       }
     }
   }
   if( GenericToolbox::Json::fetchValue(_varsConfig_, "weightPerSample", false) ){
-    for( auto& sample : _owner_->getFitSampleSet().getSampleList() ){
+    for( auto& sample : _owner_->getPropagator().getSampleSet().getSampleList() ){
       _scanDataDict_.emplace_back();
       auto& scanEntry = _scanDataDict_.back();
       scanEntry.yPoints = std::vector<double>(_nbPoints_+1,0);
@@ -111,7 +111,7 @@ void ParameterScanner::initializeImpl() {
     }
   }
   if( GenericToolbox::Json::fetchValue(_varsConfig_, "weightPerSamplePerBin", false) ){
-    for( auto& sample : _owner_->getFitSampleSet().getSampleList() ){
+    for( auto& sample : _owner_->getPropagator().getSampleSet().getSampleList() ){
       for( int iBin = 1 ; iBin <= sample.getMcContainer().histogram->GetNbinsX() ; iBin++ ){
         _scanDataDict_.emplace_back();
         auto& scanEntry = _scanDataDict_.back();
@@ -180,8 +180,8 @@ void ParameterScanner::scanFitParameter(Parameter& par_, TDirectory* saveDir_) {
         );
 
     par_.setParameterValue(newVal);
-    _owner_->getPropagator().propagateParameters();
-    _owner_->evalLikelihood();
+
+    _owner_->propagateAndEvalLikelihood();
     parPoints[iPt] = par_.getParameterValue();
 
     for( auto& scanEntry : _scanDataDict_ ){ scanEntry.yPoints[iPt] = scanEntry.evalY(); }
@@ -199,8 +199,7 @@ void ParameterScanner::scanFitParameter(Parameter& par_, TDirectory* saveDir_) {
 
 
   par_.setParameterValue(origVal);
-  _owner_->getPropagator().propagateParameters();
-    _owner_->evalLikelihood();
+  _owner_->propagateAndEvalLikelihood();
 
   // Disable the auto conversion from Eigen to Original if the fit is set to use eigen decomp
   if( par_.getOwner()->useEigenDecomposition() and not par_.isEigen() ){
@@ -301,8 +300,7 @@ void ParameterScanner::scanSegment(TDirectory *saveDir_, const JsonType &end_, c
       }
     }
 
-    _owner_->getPropagator().propagateParameters();
-    _owner_->evalLikelihood();
+    _owner_->propagateAndEvalLikelihood();
 
     for( auto& graphEntry : _graphEntriesBuf_ ){
       graphEntry.graph.SetPointX(iStep, graphEntry.fitParPtr->getParameterValue());
@@ -318,8 +316,7 @@ void ParameterScanner::scanSegment(TDirectory *saveDir_, const JsonType &end_, c
 
   LogInfo << "Restore position of the propagator..." << std::endl;
   _owner_->getPropagator().getParametersManager().injectParameterValues( currentParState );
-  _owner_->getPropagator().propagateParameters();
-    _owner_->evalLikelihood();
+  _owner_->propagateAndEvalLikelihood();
 }
 void ParameterScanner::generateOneSigmaPlots(TDirectory* saveDir_){
   LogThrowIf(not isInitialized());
@@ -454,15 +451,15 @@ void ParameterScanner::varyEvenRates(const std::vector<double>& paramVariationLi
       cappedParValue = std::max(cappedParValue, par_.getMinValue());
 
       par_.setParameterValue( cappedParValue );
-      _owner_->propagateParameters();
+      _owner_->getPropagator().propagateParameters();
 
-      for(auto & sample : _owner_->getFitSampleSet().getSampleList()){
+      for(auto & sample : _owner_->getPropagator().getSampleSet().getSampleList()){
         buffEvtRatesMap[iVar].emplace_back( sample.getMcContainer().getSumWeights() );
       }
 
       // back to the prior
       par_.setParameterValue( par_.getPriorValue() );
-      _owner_->propagateParameters();
+      _owner_->getPropagator().propagateParameters();
     }
 
 

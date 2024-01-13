@@ -782,7 +782,7 @@ void SimpleMcmcInterface::setupAndRunSimpleStep( SimpleStepMCMC& mcmc) {
 void SimpleMcmcInterface::minimize() {
   LogThrowIf(not isInitialized(), "not initialized");
 
-  summarizeParameters();
+  printParameters();
 
   // Update to the current parameter settings and the likelihood cache.
   getPropagator().updateLlhCache();
@@ -905,7 +905,7 @@ void SimpleMcmcInterface::minimize() {
   int nbMCMCCalls = getLikelihood().getNbFitCalls() - nbFitCallOffset;
 
  // lasting printout
-  LogInfo << getConvergenceMonitor().generateMonitorString();
+  LogInfo << _monitor_.convergenceMonitor.generateMonitorString();
   LogInfo << "MCMC ended after " << nbMCMCCalls << " calls." << std::endl;
 
   // Save the sampled points to the outputfile

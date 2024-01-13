@@ -36,16 +36,13 @@ public:
 
   // overridden getters
   [[nodiscard]] bool isFitHasConverged() const override{ return _fitHasConverged_; }
-  [[nodiscard]] std::string getMinimizerTypeName() const override { return "MinimizerInterface"; };
 
-  // getters
+  // const getters
   [[nodiscard]] double getTargetEdm() const;
   [[nodiscard]] const std::unique_ptr<ROOT::Math::Minimizer> &getMinimizer() const{ return _minimizer_; }
 
-  // core overrides
+  // override
   void minimize() override;
-
-  void calcErrors() override;
 
   void scanParameters(TDirectory* saveDir_);
 
@@ -54,6 +51,7 @@ public:
 
 protected:
   void findMinimumLikelihood();
+  void calculateErrors();
 
   void writePostFitData(TDirectory* saveDir_);
   void updateCacheToBestfitPoint();
@@ -62,7 +60,7 @@ private:
 
   // Parameters
   bool _preFitWithSimplex_{false};
-  // bool _enablePostFitErrorEval_{true};
+  bool _enablePostFitErrorEval_{true};
   bool _restoreStepSizeBeforeHesse_{false};
   bool _generatedPostFitParBreakdown_{false};
   bool _generatedPostFitEigenBreakdown_{false};

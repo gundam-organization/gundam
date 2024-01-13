@@ -23,7 +23,6 @@ void MinimizerBase::readConfigImpl(){
       * ( GenericToolbox::getTerminalWidth() != 0 ? 1 : 5 ) // slow down the refresh rate if in batch mode
   );
 
-  _enablePostFitErrorEval_ = GenericToolbox::Json::fetchValue(_config_, "enablePostFitErrorFit", _enablePostFitErrorEval_);
   _useNormalizedFitSpace_ = GenericToolbox::Json::fetchValue(_config_, "useNormalizedFitSpace", _useNormalizedFitSpace_);
 
 }
@@ -63,6 +62,19 @@ void MinimizerBase::initializeImpl(){
 
 }
 
+// const getters
+const FitterEngine& MinimizerBase::getOwner() const { return *_owner_; }
+const Propagator& MinimizerBase::getPropagator() const{ return _owner_->getPropagator(); }
+const LikelihoodInterface& MinimizerBase::getLikelihoodInterface() const{ return _owner_->getLikelihoodInterface(); }
+
+// mutable getters
+FitterEngine& MinimizerBase::getOwner(){ return *_owner_; }
+Propagator& MinimizerBase::getPropagator(){ return _owner_->getPropagator(); }
+LikelihoodInterface& MinimizerBase::getLikelihoodInterface(){ return _owner_->getLikelihoodInterface(); }
+
+void scanParameters(TDirectory* saveDir_){
+
+}
 
 double MinimizerBase::evalFit( const double* parArray_ ){
   _monitor_.externalTimer.stop();
@@ -78,10 +90,7 @@ double MinimizerBase::evalFit( const double* parArray_ ){
   }
 
   // Propagate the parameters
-  _owner_->getPropagator().propagateParameters();
-
-  // Evaluate the likelihood
-  _owner_->getLikelihoodInterface().evalLikelihood();
+  getLikelihoodInterface().propagateAndEvalLikelihood();
 
   // Monitor if enabled
   if( _monitor_.isEnabled ){
@@ -216,7 +225,7 @@ double MinimizerBase::evalFit( const double* parArray_ ){
   return _owner_->getLikelihoodInterface().getBuffer().totalLikelihood;
 }
 
-void MinimizerBase::summarizeParameters(){
+void MinimizerBase::printParameters(){
   // This prints the same set of parameters as are in the vector returned by
   // getMinimizerFitParameterPtr(), but does it by parameter set so that the
   // output is a little more clear.
