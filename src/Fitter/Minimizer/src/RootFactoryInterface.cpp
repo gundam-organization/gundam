@@ -24,8 +24,12 @@ LoggerInit([]{
 
 
 void RootFactoryInterface::readConfigImpl(){
+
   MinimizerBase::readConfigImpl();
+
   LogInfo << "Reading minimizer config..." << std::endl;
+
+  _monitor_.gradientDescentMonitor.isEnabled = GenericToolbox::Json::fetchValue( _config_, "monitorGradientDescent", _monitor_.gradientDescentMonitor.isEnabled );
 
   _minimizerType_ = GenericToolbox::Json::fetchValue(_config_, "minimizer", _minimizerType_);
   _minimizerAlgo_ = GenericToolbox::Json::fetchValue(_config_, "algorithm", _minimizerAlgo_);
@@ -48,11 +52,6 @@ void RootFactoryInterface::readConfigImpl(){
   _generatedPostFitEigenBreakdown_ = GenericToolbox::Json::fetchValue(_config_, "generatedPostFitEigenBreakdown", _generatedPostFitEigenBreakdown_);
 
   _stepSizeScaling_ = GenericToolbox::Json::fetchValue(_config_, "stepSizeScaling", _stepSizeScaling_);
-
-  if( GenericToolbox::Json::doKeyExist( _config_, "monitorGradientDescent" ) ){
-    LogInfo << "Will monitor the gradient descent." << std::endl;
-    getLikelihood().setMonitorGradientDescent(GenericToolbox::Json::fetchValue<bool>( _config_, "monitorGradientDescent" ));
-  }
 
 }
 void RootFactoryInterface::initializeImpl(){
@@ -123,9 +122,9 @@ double RootFactoryInterface::getTargetEdm() const{
 void RootFactoryInterface::minimize(){
   LogThrowIf(not isInitialized(), "not initialized");
 
-  printMinimizerFitParameters();
+  summarizeParameters();
 
-  getPropagator().updateLlhCache();
+  _owner_->getPropagator().updateLlhCache();
 
   LogWarning << std::endl << GenericToolbox::addUpDownBars("Calling minimize...") << std::endl;
   LogInfo << "Number of defined parameters: " << _minimizer_->NDim() << std::endl
@@ -164,7 +163,7 @@ void RootFactoryInterface::minimize(){
     LogInfo << "Writing " << _minimizerType_ << "/Simplex best fit parameters..." << std::endl;
     GenericToolbox::writeInTFile(
         GenericToolbox::mkdirTFile( owner().getSaveDir(), GenericToolbox::joinPath("postFit", _minimizerAlgo_) ),
-        TNamed("parameterStateAfterSimplex", GenericToolbox::Json::toReadableString( getPropagator().getParametersManager().exportParameterInjectorConfig() ).c_str() )
+        TNamed("parameterStateAfterSimplex", GenericToolbox::Json::toReadableString( _owner_->getPropagator().getParametersManager().exportParameterInjectorConfig() ).c_str() )
     );
 
     // Back to original
@@ -199,7 +198,7 @@ void RootFactoryInterface::minimize(){
   LogInfo << "Writing " << _minimizerType_ << "/" << _minimizerAlgo_ << " best fit parameters..." << std::endl;
   GenericToolbox::writeInTFile(
       GenericToolbox::mkdirTFile( owner().getSaveDir(), GenericToolbox::joinPath("postFit", _minimizerAlgo_) ),
-      TNamed("parameterStateAfterMinimize", GenericToolbox::Json::toReadableString( getPropagator().getParametersManager().exportParameterInjectorConfig() ).c_str() )
+      TNamed("parameterStateAfterMinimize", GenericToolbox::Json::toReadableString( _owner_->getPropagator().getParametersManager().exportParameterInjectorConfig() ).c_str() )
   );
 
   getLikelihood().writeChi2History();
@@ -208,22 +207,21 @@ void RootFactoryInterface::minimize(){
   if( _fitHasConverged_ ){ LogInfo << "Minimization has converged!" << std::endl; }
   else{ LogError << "Minimization did not converged." << std::endl; }
 
-
   LogInfo << "Writing convergence stats..." << std::endl;
-  int toyIndex = getPropagator().getIThrow();
+  int toyIndex = _owner_->getPropagator().getIThrow();
   int nIterations = int(_minimizer_->NIterations());
   int nFitPars = int(_minimizer_->NFree());
-  int nDof = getLikelihood().getNbFitBins() - getLikelihood().getNbFreePars();
   double edmBestFit = _minimizer_->Edm();
   double fitStatus = _minimizer_->Status();
   double covStatus = _minimizer_->CovMatrixStatus();
   double chi2MinFitter = _minimizer_->MinValue();
-  int nbFreePars = getLikelihood().getNbFreePars();
-  int nbFitCalls = getLikelihood().getNbFitCalls();
-  int nbFitBins = getLikelihood().getNbFitBins();
+
+  int nDof = _owner_->getLikelihoodInterface().getNbDof();
+  int nbFreePars = _owner_->getLikelihoodInterface().getNbFreePars();
+  int nbFitBins = _owner_->getLikelihoodInterface().getNbFitBins();
 
   auto bestFitStats = std::make_unique<TTree>("bestFitStats", "bestFitStats");
-  bestFitStats->SetDirectory(nullptr);
+  bestFitStats->SetDirectory( nullptr );
   bestFitStats->Branch("fitConverged", &_fitHasConverged_);
   bestFitStats->Branch("fitStatusCode", &fitStatus);
   bestFitStats->Branch("covStatusCode", &covStatus);
@@ -236,25 +234,25 @@ void RootFactoryInterface::minimize(){
   bestFitStats->Branch("nFreePars", &nbFreePars);
   bestFitStats->Branch("nFitPars", &nFitPars);
   bestFitStats->Branch("nDof", &nDof);
-  bestFitStats->Branch("chi2BestFit",      (double*) getPropagator().getLlhBufferPtr() ); // need non const ptr...
-  bestFitStats->Branch("chi2StatBestFit",  (double*) getPropagator().getLlhStatBufferPtr() );
-  bestFitStats->Branch("chi2PullsBestFit", (double*) getPropagator().getLlhPenaltyBufferPtr() );
+  bestFitStats->Branch("totalLikelihoodAtBestFit", &_owner_->getLikelihoodInterface().getBuffer().totalLikelihood );
+  bestFitStats->Branch("statLikelihoodAtBestFit",  &_owner_->getLikelihoodInterface().getBuffer().statLikelihood );
+  bestFitStats->Branch("penaltyLikelihoodAtBestFit",  &_owner_->getLikelihoodInterface().getBuffer().penaltyLikelihood );
 
-  std::vector<GenericToolbox::RawDataArray> samplesArrList(getPropagator().getFitSampleSet().getSampleList().size());
+  std::vector<GenericToolbox::RawDataArray> samplesArrList(_owner_->getPropagator().getSampleSet().getSampleList().size());
   int iSample{-1};
-  for( auto& sample : getPropagator().getFitSampleSet().getSampleList() ){
+  for( auto& sample : _owner_->getPropagator().getSampleSet().getSampleList() ){
     if( not sample.isEnabled() ) continue;
 
     std::vector<std::string> leavesDict;
     iSample++;
 
     leavesDict.emplace_back("llhSample/D");
-    samplesArrList[iSample].writeRawData(getPropagator().getFitSampleSet().getJointProbabilityFct()->eval(sample));
+    samplesArrList[iSample].writeRawData(_owner_->getPropagator().getSampleSet().getJointProbabilityFct()->eval(sample));
 
     int nBins = int(sample.getBinning().getBinList().size());
     for( int iBin = 1 ; iBin <= nBins ; iBin++ ){
       leavesDict.emplace_back("llhSample_bin" + std::to_string(iBin) + "/D");
-      samplesArrList[iSample].writeRawData(getPropagator().getFitSampleSet().getJointProbabilityFct()->eval(sample, iBin));
+      samplesArrList[iSample].writeRawData(_owner_->getPropagator().getSampleSet().getJointProbabilityFct()->eval(sample, iBin));
     }
 
     samplesArrList[iSample].lockArraySize();
@@ -265,9 +263,9 @@ void RootFactoryInterface::minimize(){
     );
   }
 
-  std::vector<GenericToolbox::RawDataArray> parameterSetArrList(getPropagator().getParametersManager().getParameterSetsList().size());
+  std::vector<GenericToolbox::RawDataArray> parameterSetArrList(_owner_->getPropagator().getParametersManager().getParameterSetsList().size());
   int iParSet{-1};
-  for( auto& parSet : getPropagator().getParametersManager().getParameterSetsList() ){
+  for( auto& parSet : _owner_->getPropagator().getParametersManager().getParameterSetsList() ){
     if( not parSet.isEnabled() ) continue;
 
     std::vector<std::string> leavesDict;
@@ -402,15 +400,15 @@ void RootFactoryInterface::scanParameters( TDirectory* saveDir_){
                  << " is fixed. Skipping..." << std::endl;
       continue;
     }
-    this->getPropagator().getParScanner().scanFitParameter(*getMinimizerFitParameterPtr()[iPar], saveDir_);
+    this->_owner_->getPropagator().getParameterScanner().scanFitParameter(*getMinimizerFitParameterPtr()[iPar], saveDir_);
   } // iPar
-  for( auto& parSet : this->getPropagator().getParametersManager().getParameterSetsList() ){
+  for( auto& parSet : this->_owner_->getPropagator().getParametersManager().getParameterSetsList() ){
     if( not parSet.isEnabled() ) continue;
-    if( parSet.isUseEigenDecompInFit() ){
+    if( parSet.useEigenDecomposition() ){
       LogWarning << parSet.getName() << " is using eigen decomposition. Scanning original parameters..." << std::endl;
       for( auto& par : parSet.getParameterList() ){
         if( not par.isEnabled() ) continue;
-        this->getPropagator().getParScanner().scanFitParameter(par, saveDir_);
+        this->_owner_->getPropagator().getParameterScanner().scanFitParameter(par, saveDir_);
       }
     }
   }
@@ -429,7 +427,7 @@ void RootFactoryInterface::saveMinimizerSettings( TDirectory* saveDir_) const {
   GenericToolbox::writeInTFile( saveDir_, TNamed("maxFcnCalls", std::to_string(_maxFcnCalls_).c_str()) );
   GenericToolbox::writeInTFile( saveDir_, TNamed("tolerance", std::to_string(_tolerance_).c_str()) );
   GenericToolbox::writeInTFile( saveDir_, TNamed("stepSizeScaling", std::to_string(_stepSizeScaling_).c_str()) );
-  GenericToolbox::writeInTFile( saveDir_, TNamed("useNormalizedFitSpace", std::to_string(getLikelihood().getUseNormalizedFitSpace()).c_str()) );
+  GenericToolbox::writeInTFile( saveDir_, TNamed("useNormalizedFitSpace", std::to_string(_useNormalizedFitSpace_).c_str()) );
 
   if( _preFitWithSimplex_ ){
     GenericToolbox::writeInTFile( saveDir_, TNamed("enableSimplexBeforeMinimize", std::to_string(_preFitWithSimplex_).c_str()) );
@@ -445,6 +443,10 @@ void RootFactoryInterface::saveMinimizerSettings( TDirectory* saveDir_) const {
 }
 
 // protected
+void RootFactoryInterface::findMinimumLikelihood(){
+
+}
+
 void RootFactoryInterface::writePostFitData( TDirectory* saveDir_) {
   LogInfo << __METHOD_NAME__ << std::endl;
   LogThrowIf(not isInitialized(), "not initialized");
@@ -675,21 +677,21 @@ void RootFactoryInterface::writePostFitData( TDirectory* saveDir_) {
       };
 
       int nGlobalPars{0};
-      for( const auto& parSet : getPropagator().getParametersManager().getParameterSetsList() ){ if( parSet.isEnabled() ) nGlobalPars += int(parSet.getNbParameters()); }
+      for( const auto& parSet : _owner_->getPropagator().getParametersManager().getParameterSetsList() ){ if( parSet.isEnabled() ) nGlobalPars += int(parSet.getNbParameters()); }
 
       // Reconstruct the global passage matrix
       std::vector<std::string> parameterLabels(nGlobalPars);
       auto globalPassageMatrix = std::make_unique<TMatrixD>(nGlobalPars, nGlobalPars);
       for(int i = 0 ; i < nGlobalPars; i++ ){ (*globalPassageMatrix)[i][i] = 1; }
       int blocOffset{0};
-      for( const auto& parSet : getPropagator().getParametersManager().getParameterSetsList() ){
+      for( const auto& parSet : _owner_->getPropagator().getParametersManager().getParameterSetsList() ){
         if( not parSet.isEnabled() ) continue;
 
         auto* parList = &parSet.getParameterList(); // we want the original names
         for( auto& par : *parList ){ parameterLabels[blocOffset + par.getParameterIndex()] = par.getFullTitle(); }
 
         parList = &parSet.getEffectiveParameterList();
-        if( parSet.isUseEigenDecompInFit() ){
+        if( parSet.useEigenDecomposition() ){
           int iParIdx{0};
           for( auto& iPar : *parList ){
             int jParIdx{0};
@@ -707,7 +709,7 @@ void RootFactoryInterface::writePostFitData( TDirectory* saveDir_) {
       // Reconstruct the global cov matrix (including eigen decomp parameters)
       auto unstrippedCovMatrix = std::make_unique<TMatrixD>(nGlobalPars, nGlobalPars);
       int iOffset{0};
-      for( const auto& iParSet : getPropagator().getParametersManager().getParameterSetsList() ){
+      for( const auto& iParSet : _owner_->getPropagator().getParametersManager().getParameterSetsList() ){
         if( not iParSet.isEnabled() ) continue;
 
         auto* iParList = &iParSet.getEffectiveParameterList();
@@ -715,7 +717,7 @@ void RootFactoryInterface::writePostFitData( TDirectory* saveDir_) {
           int iMinimizerIndex = GenericToolbox::findElementIndex((Parameter*) &iPar, getMinimizerFitParameterPtr());
 
           int jOffset{0};
-          for( const auto& jParSet : getPropagator().getParametersManager().getParameterSetsList() ){
+          for( const auto& jParSet : _owner_->getPropagator().getParametersManager().getParameterSetsList() ){
             if( not jParSet.isEnabled() ) continue;
 
             auto* jParList = &jParSet.getEffectiveParameterList();
@@ -729,7 +731,7 @@ void RootFactoryInterface::writePostFitData( TDirectory* saveDir_) {
               }
               else{
                 // Inherit from the prior in eigen -> only diagonal are non 0
-                if( &iParSet == &jParSet and iParSet.isUseEigenDecompInFit() ){
+                if( &iParSet == &jParSet and iParSet.useEigenDecomposition() ){
                   if( iPar.getParameterIndex() == jPar.getParameterIndex() ){
                     (*unstrippedCovMatrix)[iOffset + iPar.getParameterIndex()][jOffset + jPar.getParameterIndex()] = iPar.getStdDevValue()*iPar.getStdDevValue();
                   }
@@ -966,7 +968,7 @@ void RootFactoryInterface::writePostFitData( TDirectory* saveDir_) {
             } // norm
           } // par
 
-          if( getPropagator().isThrowAsimovToyParameters() ){
+          if( _owner_->getPropagator().isThrowAsimovToyParameters() ){
             bool draw{false};
 
             for( auto& par : parList_ ){
@@ -1080,7 +1082,7 @@ void RootFactoryInterface::writePostFitData( TDirectory* saveDir_) {
       }; // savePostFitObjFct
 
   LogInfo << "Extracting post-fit errors..." << std::endl;
-  for( const auto& parSet : getPropagator().getParametersManager().getParameterSetsList() ){
+  for( const auto& parSet : _owner_->getPropagator().getParametersManager().getParameterSetsList() ){
     if( not parSet.isEnabled() ){ continue; }
 
     LogInfo << "Extracting post-fit errors of parameter set: " << parSet.getName() << std::endl;
@@ -1100,7 +1102,7 @@ void RootFactoryInterface::writePostFitData( TDirectory* saveDir_) {
     }
 
     TDirectory* saveDir;
-    if( parSet.isUseEigenDecompInFit() ){
+    if( parSet.useEigenDecomposition() ){
       saveDir = GenericToolbox::mkdirTFile(parSetDir, "eigen");
       savePostFitObjFct(parSet, *parList, covMatrix.get(), saveDir);
 

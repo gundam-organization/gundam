@@ -43,8 +43,8 @@ void ParameterSet::readConfigImpl(){
     _globalParameterMaxValue_ = GenericToolbox::Json::fetchValue(parLimits, "maxValue", _globalParameterMaxValue_);
   }
 
-  _useEigenDecompInFit_ = GenericToolbox::Json::fetchValue(_config_ , "useEigenDecompInFit", false);
-  if( _useEigenDecompInFit_ ){
+  _useEigenDecomposition_ = GenericToolbox::Json::fetchValue(_config_ , {{"useEigenDecomposition"}, {"useEigenDecompInFit"}}, _useEigenDecomposition_);
+  if( _useEigenDecomposition_ ){
     LogWarning << "Using eigen decomposition in fit." << std::endl;
     LogScopeIndent;
 
@@ -69,7 +69,7 @@ void ParameterSet::readConfigImpl(){
 
   }
 
-  _enablePca_ = GenericToolbox::Json::fetchValue(_config_, std::vector<std::string>{"allowPca", "fixGhostFitParameters", "enablePca"}, _enablePca_);
+  _enablePca_ = GenericToolbox::Json::fetchValue(_config_, std::vector<std::string>{"allowPca", "runPcaCheck", "enablePca"}, _enablePca_);
   _enabledThrowToyParameters_ = GenericToolbox::Json::fetchValue(_config_, "enabledThrowToyParameters", _enabledThrowToyParameters_);
   _maskForToyGeneration_ = GenericToolbox::Json::fetchValue(_config_, "maskForToyGeneration", _maskForToyGeneration_);
   _customFitParThrow_ = GenericToolbox::Json::fetchValue(_config_, "customFitParThrow", std::vector<JsonType>());
@@ -167,11 +167,11 @@ void ParameterSet::processCovarianceMatrix(){
       (*_strippedCovarianceMatrix_)[iStrippedPar][jStrippedPar] = (*_priorCovarianceMatrix_)[iPar][jPar];
     }
   }
-  _deltaParameterList_ = std::make_shared<TVectorD>(_strippedCovarianceMatrix_->GetNrows());
+  _deltaVectorPtr_ = std::make_shared<TVectorD>(_strippedCovarianceMatrix_->GetNrows());
 
   LogThrowIf(not _strippedCovarianceMatrix_->IsSymmetric(), "Covariance matrix is not symmetric");
 
-  if( not _useEigenDecompInFit_ ){
+  if( not _useEigenDecomposition_ ){
     LogWarning << "Computing inverse of the stripped covariance matrix: "
                << _strippedCovarianceMatrix_->GetNcols() << "x"
                << _strippedCovarianceMatrix_->GetNrows() << std::endl;
@@ -299,47 +299,30 @@ void ParameterSet::processCovarianceMatrix(){
 
 // Getters
 const std::vector<Parameter>& ParameterSet::getEffectiveParameterList() const{
-  if( _useEigenDecompInFit_ ) return _eigenParameterList_;
+  if( _useEigenDecomposition_ ) return _eigenParameterList_;
   return _parameterList_;
 }
 
 // non const getters
 std::vector<Parameter>& ParameterSet::getEffectiveParameterList(){
-  if( _useEigenDecompInFit_ ) return _eigenParameterList_;
+  if( _useEigenDecomposition_ ) return _eigenParameterList_;
   return _parameterList_;
 }
 
-// Core
-double ParameterSet::getPenaltyChi2() {
-
-  if (not _isEnabled_) { return 0; }
-
-  _penaltyChi2Buffer_ = 0;
-
-  if( _priorCovarianceMatrix_ != nullptr ){
-    if( _useEigenDecompInFit_ ){
-      for( const auto& eigenPar : _eigenParameterList_ ){
-        if( eigenPar.isFixed() ) continue;
-        _penaltyChi2Buffer_ += TMath::Sq( (eigenPar.getParameterValue() - eigenPar.getPriorValue()) / eigenPar.getStdDevValue() ) ;
-      }
-    }
-    else{
-      // make delta vector
-      this->fillDeltaParameterList();
-
-      // compute penalty term with covariance
-      _penaltyChi2Buffer_ = (*_deltaParameterList_) * ( (*_inverseStrippedCovarianceMatrix_) * (*_deltaParameterList_) );
+// Parameter throw
+void ParameterSet::updateDeltaVector() const {
+  int iFit{0};
+  for( const auto& par : _parameterList_ ){
+    if( ParameterSet::isValidCorrelatedParameter(par) ){
+      (*_deltaVectorPtr_)[iFit++] = par.getParameterValue() - par.getPriorValue();
     }
   }
-
-  return _penaltyChi2Buffer_;
 }
 
-// Parameter throw
 void ParameterSet::moveFitParametersToPrior(){
   LogInfo << "Moving back fit parameters to their prior value in set: " << getName() << std::endl;
 
-  if( not _useEigenDecompInFit_ ){
+  if( not _useEigenDecomposition_ ){
     for( auto& par : _parameterList_ ){
       if( par.isFixed() or not par.isEnabled() ){ continue; }
       par.setParameterValue(par.getPriorValue());
@@ -380,7 +363,7 @@ void ParameterSet::throwFitParameters(bool rethrowIfNotInbounds_, double gain_){
               par.setParameterValue( par.getThrowValue() );
             }
           }
-          if( _useEigenDecompInFit_ ){
+          if( _useEigenDecomposition_ ){
             this->propagateOriginalToEigen();
             for( auto& eigenPar : _eigenParameterList_ ){
               eigenPar.setThrowValue( eigenPar.getParameterValue() );
@@ -421,7 +404,7 @@ void ParameterSet::throwFitParameters(bool rethrowIfNotInbounds_, double gain_){
               LogInfo << " → " << par.getParameterValue() << std::endl;
             }
           }
-          if( _useEigenDecompInFit_ ){
+          if( _useEigenDecomposition_ ){
             LogInfo << "Translated to eigen space:" << std::endl;
             for( auto& eigenPar : _eigenParameterList_ ){
               LogInfo << "Eigen par " << eigenPar.getTitle() << ": " << eigenPar.getPriorValue();
@@ -459,7 +442,7 @@ void ParameterSet::throwFitParameters(bool rethrowIfNotInbounds_, double gain_){
     throwParsFct( markScottThrowFct );
   }
   else{
-    if( _useEigenDecompForThrows_ and _useEigenDecompInFit_ ){
+    if( _useEigenDecompForThrows_ and _useEigenDecomposition_ ){
       LogInfo << "Throwing eigen parameters for " << _name_ << std::endl;
 
       int nTries{0};
@@ -720,7 +703,7 @@ void ParameterSet::injectParameterValues(const JsonType& config_){
     }
   }
 
-  if( this->isUseEigenDecompInFit() ){
+  if( this->useEigenDecomposition() ){
     LogInfo << "Propagating back to the eigen decomposed parameters for parSet: " << this->getName() << std::endl;
     this->propagateOriginalToEigen();
   }
@@ -959,13 +942,5 @@ void ParameterSet::defineParameters(){
   }
 }
 
-void ParameterSet::fillDeltaParameterList(){
-  int iFit{0};
-  for( const auto& par : _parameterList_ ){
-    if( ParameterSet::isValidCorrelatedParameter(par) ){
-      (*_deltaParameterList_)[iFit++] = par.getParameterValue() - par.getPriorValue();
-    }
-  }
-}
 
 

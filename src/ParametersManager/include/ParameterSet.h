@@ -53,7 +53,7 @@ public:
   // Getters
   [[nodiscard]] bool isEnabled() const{ return _isEnabled_; }
   [[nodiscard]] bool isEnablePca() const{ return _enablePca_; }
-  [[nodiscard]] bool isUseEigenDecompInFit() const{ return _useEigenDecompInFit_; }
+  [[nodiscard]] bool useEigenDecomposition() const{ return _useEigenDecomposition_; }
   [[nodiscard]] bool isEnabledThrowToyParameters() const{ return _enabledThrowToyParameters_; }
   [[nodiscard]] bool isMaskForToyGeneration() const { return _maskForToyGeneration_; }
   [[nodiscard]] bool isMaskedForPropagation() const{ return _maskedForPropagation_; }
@@ -65,9 +65,12 @@ public:
   [[nodiscard]] const JsonType &getDialSetDefinitions() const{ return _dialSetDefinitions_; }
   [[nodiscard]] const TMatrixD* getInvertedEigenVectors() const{ return _eigenVectorsInv_.get(); }
   [[nodiscard]] const TMatrixD* getEigenVectors() const{ return _eigenVectors_.get(); }
+  [[nodiscard]] const TMatrixD* getInverseStrippedCovarianceMatrix() const{ return _inverseStrippedCovarianceMatrix_.get(); }
+  [[nodiscard]] const TVectorD* getDeltaVectorPtr() const{ return _deltaVectorPtr_.get(); }
   [[nodiscard]] const std::vector<JsonType>& getCustomFitParThrow() const{ return _customFitParThrow_; }
   [[nodiscard]] const std::shared_ptr<TMatrixDSym> &getPriorCorrelationMatrix() const{ return _priorCorrelationMatrix_; }
   [[nodiscard]] const std::shared_ptr<TMatrixDSym> &getPriorCovarianceMatrix() const { return _priorCovarianceMatrix_; }
+  [[nodiscard]] const std::vector<Parameter> &getEigenParameterList() const{ return _eigenParameterList_; }
   [[nodiscard]] const std::vector<Parameter> &getParameterList() const{ return _parameterList_; }
   [[nodiscard]] const std::vector<Parameter>& getEffectiveParameterList() const;
 
@@ -77,7 +80,7 @@ public:
   std::vector<Parameter>& getEffectiveParameterList();
 
   // Core
-  double getPenaltyChi2();
+  void updateDeltaVector() const;
 
   // Throw / Shifts
   void moveFitParametersToPrior();
@@ -103,7 +106,6 @@ public:
 protected:
   void readParameterDefinitionFile();
   void defineParameters();
-  void fillDeltaParameterList();
 
 private:
   // Internals
@@ -147,7 +149,7 @@ private:
   // Eigen objects
   int _nbEnabledEigen_{0};
   bool _enablePca_{false};
-  bool _useEigenDecompInFit_{false};
+  bool _useEigenDecomposition_{false};
   bool _useOnlyOneParameterPerEvent_{false};
   std::vector<Parameter> _eigenParameterList_{};
   std::shared_ptr<TMatrixDSymEigen> _eigenDecomp_{nullptr};
@@ -176,7 +178,7 @@ private:
   std::shared_ptr<TVectorD>  _parameterUpperBoundsList_{nullptr};
   std::shared_ptr<TObjArray> _parameterNamesList_{nullptr};
 
-  std::shared_ptr<TVectorD>  _deltaParameterList_{nullptr}; // difference from prior
+  mutable std::shared_ptr<TVectorD> _deltaVectorPtr_{nullptr}; // difference from prior
 
   std::shared_ptr<TMatrixD> _choleskyMatrix_{nullptr};
   GenericToolbox::CorrelatedVariablesSampler _correlatedVariableThrower_{};

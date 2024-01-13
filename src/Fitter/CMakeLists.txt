@@ -10,6 +10,7 @@ set(SRCFILES
 
     ${CMAKE_CURRENT_SOURCE_DIR}/Likelihood/src/LikelihoodInterface.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/Likelihood/src/JointProbability.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/Likelihood/src/ParameterScanner.cpp
   )
 
 if( USE_STATIC_LINKS )

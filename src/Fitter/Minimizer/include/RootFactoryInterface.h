@@ -29,7 +29,7 @@ protected:
   void initializeImpl() override;
 
 public:
-  RootFactoryInterface(): MinimizerBase() {}
+  explicit RootFactoryInterface(FitterEngine* owner_): MinimizerBase(owner_) {}
 
   // setters
   void setEnableSimplexBeforeMinimize(bool enableSimplexBeforeMinimize_){ _preFitWithSimplex_ = enableSimplexBeforeMinimize_; }
@@ -44,13 +44,17 @@ public:
 
   // core overrides
   void minimize() override;
+
   void calcErrors() override;
-  void scanParameters(TDirectory* saveDir_) override;
+
+  void scanParameters(TDirectory* saveDir_);
 
   // misc
   void saveMinimizerSettings(TDirectory* saveDir_) const;
 
 protected:
+  void findMinimumLikelihood();
+
   void writePostFitData(TDirectory* saveDir_);
   void updateCacheToBestfitPoint();
 

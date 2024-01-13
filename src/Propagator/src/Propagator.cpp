@@ -92,7 +92,7 @@ void Propagator::readConfigImpl(){
     _dataSetList_.emplace_back(dataSetConfig, int(_dataSetList_.size()));
   }
 
-  LogInfo << "Reading ParScanner configuration..." << std::endl;
+  LogInfo << "Reading ParameterScanner configuration..." << std::endl;
   _parScanner_.readConfig( GenericToolbox::Json::fetchValue(_config_, "scanConfig", JsonType()) );
 
   LogInfo << "Reading DialCollection configurations..." << std::endl;
@@ -242,7 +242,7 @@ void Propagator::initializeImpl(){
     // At this point, MC events have been reweighted using their prior
     // but when using eigen decomp, the conversion eigen -> original has a small computational error
     for( auto& parSet: _parManager_.getParameterSetsList() ) {
-      if( parSet.isUseEigenDecompInFit() ) { parSet.propagateEigenToOriginal(); }
+      if( parSet.useEigenDecomposition() ) { parSet.propagateEigenToOriginal(); }
     }
 
     bool cacheManagerState = GundamGlobals::getEnableCacheManager();
@@ -317,7 +317,7 @@ void Propagator::initializeImpl(){
   // reweighting cache.  This must also be before the first use of
   // reweightMcEvents.
   if(GundamGlobals::getEnableCacheManager()) {
-    Cache::Manager::Build(getFitSampleSet(), getEventDialCache());
+    Cache::Manager::Build(getSampleSet(), getEventDialCache());
   }
 #endif
 
@@ -518,7 +518,7 @@ void Propagator::propagateParameters(){
   if( _enableEigenToOrigInPropagate_ ){
     // Only real parameters are propagated on the spectra -> need to convert the eigen to original
     for( auto& parSet : _parManager_.getParameterSetsList() ){
-      if( parSet.isUseEigenDecompInFit() ) parSet.propagateEigenToOriginal();
+      if( parSet.useEigenDecomposition() ) parSet.propagateEigenToOriginal();
     }
   }
 
@@ -537,7 +537,7 @@ void Propagator::reweightMcEvents() {
 #ifdef GUNDAM_USING_CACHE_MANAGER
   GenericToolbox::getElapsedTimeSinceLastCallInMicroSeconds(__METHOD_NAME__);
   if(GundamGlobals::getEnableCacheManager()) {
-    Cache::Manager::Update(getFitSampleSet(), getEventDialCache());
+    Cache::Manager::Update(getSampleSet(), getEventDialCache());
     usedGPU = Cache::Manager::Fill();
   }
 #endif

@@ -2,13 +2,12 @@
 // Created by Clark McGrew on 25/01/2023.
 //
 
-#ifndef GUNDAM_MinimizerBase_h
-#define GUNDAM_MinimizerBase_h
+#ifndef GUNDAM_MINIMIZER_BASE_H
+#define GUNDAM_MINIMIZER_BASE_H
 
 #include "Propagator.h"
 #include "Parameter.h"
 #include "JsonBaseClass.h"
-#include "LikelihoodInterface.h"
 
 #include "GenericToolbox.Utils.h"
 
@@ -18,6 +17,8 @@
 #include <string>
 
 
+class FitterEngine; // owner
+
 class MinimizerBase : public JsonBaseClass {
 
 protected:
@@ -25,44 +26,70 @@ protected:
   void initializeImpl() override;
 
 public:
-  MinimizerBase() = default;
-
-  /// Local RTTI
-  [[nodiscard]] virtual std::string getMinimizerTypeName() const { return "MinimizerBase"; };
-  [[nodiscard]] virtual bool isFitHasConverged() const = 0;
+  explicit MinimizerBase(FitterEngine* owner_) : _owner_(owner_) {}
 
   virtual void minimize() = 0;
-  virtual void calcErrors() = 0;
 
-  virtual void scanParameters(TDirectory* saveDir_);
+  [[nodiscard]] virtual bool isFitHasConverged() const = 0;
+  virtual double evalFit( const double* parArray_ );
 
   /// Set if the calcErrors method should be called by the FitterEngine.
   void setEnablePostFitErrorEval(bool enablePostFitErrorEval_) {_enablePostFitErrorEval_ = enablePostFitErrorEval_;}
   [[nodiscard]] bool isEnablePostFitErrorEval() const {return _enablePostFitErrorEval_;}
 
 protected:
+  void summarizeParameters();
 
-  [[nodiscard]] const LikelihoodInterface& getLikelihood() const;
+protected:
 
-  // Get the convergence monitor that is maintained by the likelihood
-  // interface.  A local convenience function to get the convergence monitor.
-  // The monitor actually lives in the likelihood).
-  GenericToolbox::VariablesMonitor &getConvergenceMonitor();
-
-  // Get the vector of parameters being fitted.  This is a local convenience
-  // function to get the vector of fit parameter pointers.  The actual vector
-  // lives in the likelihood.
-  std::vector<Parameter *> &getMinimizerFitParameterPtr();
-
-  // Print a table of the fitting parameters.
-  void printMinimizerFitParameters();
-
-private:
+  // config
+  bool _throwOnBadLlh_{false};
+  bool _useNormalizedFitSpace_{true};
   bool _enablePostFitErrorEval_{true};
+
+  // internals
+  FitterEngine* _owner_{nullptr};
+  std::vector<Parameter*> _minimizerParameterPtrList_{};
+
+  // monitor
+  struct Monitor{
+    bool isEnabled{false};
+    bool showParameters{false};
+    int maxNbParametersPerLine{15};
+    int nbEvalLikelihoodCalls{0};
+
+    std::string minimizerTitle{"unset"};
+    std::string stateTitleMonitor{};
+
+    GenericToolbox::Time::AveragedTimer<10> evalLlhTimer{};
+    GenericToolbox::Time::AveragedTimer<10> externalTimer{};
+    GenericToolbox::Time::CycleTimer itSpeed;
+    GenericToolbox::Time::CycleCounterClock itSpeedMon{"it"};
+
+    GenericToolbox::VariablesMonitor convergenceMonitor;
+
+    std::unique_ptr<TTree> historyTree{nullptr};
+
+    struct GradientDescentMonitor{
+      bool isEnabled{false};
+      int lastGradientFall{-2};
+      struct GradientStepPoint {
+        JsonType parState;
+        double llh;
+      };
+      std::vector<GradientStepPoint> stepPointList{};
+    };
+    GradientDescentMonitor gradientDescentMonitor{};
+
+  };
+  Monitor _monitor_{};
+
+
+
 
 };
 
-#endif //GUNDAM_MinimizerBase_h
+#endif // GUNDAM_MINIMIZER_BASE_H
 
 //  A Lesser GNU Public License
 

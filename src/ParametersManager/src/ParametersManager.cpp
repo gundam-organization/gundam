@@ -226,7 +226,7 @@ void ParametersManager::throwParametersFromGlobalCovariance(bool quietVerbose_){
     // Making sure eigen decomposed parameters get the conversion done
     for( auto& parSet : _parameterSetList_ ){
       if( not parSet.isEnabled() ) continue;
-      if( parSet.isUseEigenDecompInFit() ){
+      if( parSet.useEigenDecomposition() ){
         parSet.propagateOriginalToEigen();
 
         // also check the bounds of real parameter space
@@ -260,7 +260,7 @@ void ParametersManager::throwParametersFromGlobalCovariance(bool quietVerbose_){
             LogInfo << " → " << par.getParameterValue() << std::endl;
           }
         }
-        if( parSet.isUseEigenDecompInFit() ){
+        if( parSet.useEigenDecomposition() ){
           LogInfo << "Translated to eigen space:" << std::endl;
           for( auto& eigenPar : parSet.getEigenParameterList() ){
             LogScopeIndent;

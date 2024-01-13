@@ -231,8 +231,9 @@ int main(int argc, char** argv){
   // Configure:
   // --------------------------
   LogInfo << "FitterEngine setup..." << std::endl;
-  FitterEngine fitter{GenericToolbox::mkdirTFile(app.getOutfilePtr(), "FitterEngine")};
+  FitterEngine fitter{};
 
+  fitter.setSaveDir( GenericToolbox::mkdirTFile(app.getOutfilePtr(), "FitterEngine") );
   fitter.readConfig(GenericToolbox::Json::fetchSubEntry(configHandler.getConfig(), {"fitterEngineConfig"}));
 
   // -a
@@ -265,8 +266,8 @@ int main(int argc, char** argv){
   if( clParser.isOptionTriggered("scanParameters") ) {
     fitter.setEnablePreFitScan( true );
     fitter.setEnablePostFitScan( true );
-    fitter.getPropagator().getParScanner().setNbPoints(
-        clParser.getOptionVal("scanParameters", fitter.getPropagator().getParScanner().getNbPoints())
+    fitter.getPropagator().getParameterScanner().setNbPoints(
+        clParser.getOptionVal("scanParameters", fitter.getPropagator().getParameterScanner().getNbPoints())
         );
   }
 
@@ -340,7 +341,7 @@ int main(int argc, char** argv){
 
       GenericToolbox::writeInTFile( outDir, TNamed("endPoint", GenericToolbox::Json::toReadableString(endPoint).c_str()) );
 
-      fitter.getPropagator().getParScanner().scanSegment( outDir, endPoint );
+      fitter.getPropagator().getParameterScanner().scanSegment( outDir, endPoint );
     }
     else if( clParser.getNbValueSet("scanLine") == 2 ) {
       LogAlert << "Will scan the line from point A (" << clParser.getOptionVal<std::string>("scanLine", 0)
@@ -352,7 +353,7 @@ int main(int argc, char** argv){
       GenericToolbox::writeInTFile( outDir, TNamed("startPoint", GenericToolbox::Json::toReadableString(startPoint).c_str()) );
       GenericToolbox::writeInTFile( outDir, TNamed("endPoint", GenericToolbox::Json::toReadableString(endPoint).c_str()) );
 
-      fitter.getPropagator().getParScanner().scanSegment( outDir, endPoint, startPoint );
+      fitter.getPropagator().getParameterScanner().scanSegment( outDir, endPoint, startPoint );
     }
     else{
       LogThrow("");

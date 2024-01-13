@@ -10,12 +10,12 @@
 |----------------------------------------------------------|--------------|-------------------------------------------------------------------------------|---------|
 | [propagatorConfig](./Propagator.md)                      | json         | Propagator config                                                             |         |
 | [minimizerConfig](./RootFactoryInterface.md)               | json         | RootFactoryInterface config                                                     |         |
-| [scanConfig](./ParScanner.md)                            | json         | Scan config                                                                   |         |
+| [scanConfig](./ParameterScanner.md)                            | json         | Scan config                                                                   |         |
 | enablePreFitScan                                         | bool         | Run fit parameter scan right before the minimization                          | false   |
 | enablePostFitScan                                        | bool         | Run fit parameter scan right after the minimization                           | false   |
 | generateSamplePlots                                      | bool         | Draw sample histograms according to the PlotGenerator config                  | true    |
 | allParamVariations                                       | list(double) | List of points to perform individual parameter variation                      |         |
-| enablePca / fixGhostFitParameters                        | bool         | Fix parameter if the effect on stat LHH is lower than `pcaDeltaChi2Threshold` | false   |
+| enablePca / runPcaCheck                        | bool         | Fix parameter if the effect on stat LHH is lower than `pcaDeltaChi2Threshold` | false   |
 | pcaDeltaChi2Threshold / ghostParameterDeltaChi2Threshold | double       | LLH threshold for PCA                                                         | 1E-6    |
 | fixGhostEigenParametersAfterFirstRejected                | bool         | Fix all next parameters once PCA has been triggered (dev)                     | false   |
 | throwMcBeforeFit                                         | bool         | Push MC parameter away from their prior before fitting (dev)                  | false   |

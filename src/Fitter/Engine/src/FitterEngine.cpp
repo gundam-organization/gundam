@@ -29,27 +29,14 @@ void FitterEngine::readConfigImpl(){
   LogInfo << "Reading FitterEngine config..." << std::endl;
   GenericToolbox::setT2kPalette();
 
-  _enablePca_ = GenericToolbox::Json::fetchValue(_config_, std::vector<std::string>{"enablePca", "fixGhostFitParameters"}, _enablePca_);
-  _pcaDeltaChi2Threshold_ = GenericToolbox::Json::fetchValue(_config_, {{"ghostParameterDeltaChi2Threshold"}, {"pcaDeltaChi2Threshold"}}, _pcaDeltaChi2Threshold_);
-
-  _enablePreFitScan_ = GenericToolbox::Json::fetchValue(_config_, "enablePreFitScan", _enablePreFitScan_);
-  _enablePostFitScan_ = GenericToolbox::Json::fetchValue(_config_, "enablePostFitScan", _enablePostFitScan_);
-  _enablePreFitToPostFitLineScan_ = GenericToolbox::Json::fetchValue(_config_, "enablePreFitToPostFitLineScan", _enablePreFitToPostFitLineScan_);
-
-  _generateSamplePlots_ = GenericToolbox::Json::fetchValue(_config_, "generateSamplePlots", _generateSamplePlots_);
-  _generateOneSigmaPlots_ = GenericToolbox::Json::fetchValue(_config_, "generateOneSigmaPlots", _generateOneSigmaPlots_);
-  _doAllParamVariations_ = GenericToolbox::Json::doKeyExist(_config_, "allParamVariations");
-  _allParamVariationsSigmas_ = GenericToolbox::Json::fetchValue(_config_, "allParamVariations", _allParamVariationsSigmas_);
-
-  _scaleParStepWithChi2Response_ = GenericToolbox::Json::fetchValue(_config_, "scaleParStepWithChi2Response", _scaleParStepWithChi2Response_);
-  _parStepGain_ = GenericToolbox::Json::fetchValue(_config_, "parStepGain", _parStepGain_);
-
-  _throwMcBeforeFit_ = GenericToolbox::Json::fetchValue(_config_, "throwMcBeforeFit", _throwMcBeforeFit_);
-  _throwGain_ = GenericToolbox::Json::fetchValue(_config_, "throwMcBeforeFitGain", _throwGain_);
-
-  _likelihoodInterface_.getPropagator().readConfig(GenericToolbox::Json::fetchValue<JsonType>(_config_, "propagatorConfig") );
-  _savePostfitEventTrees_ = GenericToolbox::Json::fetchValue(_config_, "savePostfitEventTrees", _savePostfitEventTrees_);
-
+  GenericToolbox::Json::deprecatedAction(_config_, "propagatorConfig", [&]{
+    LogAlert << "propagatorConfig should now be set within likelihoodInterfaceConfig" << std::endl;
+    _likelihoodInterface_.getPropagator().setConfig( GenericToolbox::Json::fetchValue<JsonType>(_config_, "propagatorConfig") );
+  });
+  GenericToolbox::Json::deprecatedAction(_config_, "scanConfig", [&]{
+    LogAlert << "Forwarding the option to Propagator. Consider moving it into \"propagatorConfig:\"" << std::endl;
+    _likelihoodInterface_.getPropagator().getParameterScanner().readConfig(GenericToolbox::Json::fetchValue(_config_, "scanConfig", JsonType()) );
+  });
 
   JsonType minimizerConfig{};
   std::string minimizerTypeStr{"RootFactory"};
@@ -67,7 +54,6 @@ void FitterEngine::readConfigImpl(){
     if     ( minimizerTypeStr == "minimizer" ){ minimizerTypeStr = "RootFactory"; }
     else if( minimizerTypeStr == "mcmc" )     { minimizerTypeStr = "SimpleMCMC"; }
   });
-
 
   // new config format:
   minimizerConfig = GenericToolbox::Json::fetchValue( _config_, "minimizerConfig" , minimizerConfig );
@@ -88,15 +74,32 @@ void FitterEngine::readConfigImpl(){
   this->_minimizer_->readConfig( minimizerConfig );
 
   // legacy
-  GenericToolbox::Json::deprecatedAction(_config_, "scanConfig", [&]{
-    LogAlert << "Forwarding the option to Propagator. Consider moving it into \"propagatorConfig:\"" << std::endl;
-    _likelihoodInterface_.getPropagator().getParScanner().readConfig(GenericToolbox::Json::fetchValue(_config_, "scanConfig", JsonType()) );
-  });
 
   GenericToolbox::Json::deprecatedAction(_config_, "monitorRefreshRateInMs", [&]{
     LogAlert << "Forwarding the option to Propagator. Consider moving it into \"minimizerConfig:\"" << std::endl;
     getLikelihood().getConvergenceMonitor().setMaxRefreshRateInMs(GenericToolbox::Json::fetchValue<int>(_config_, "monitorRefreshRateInMs"));
   });
+
+
+  _enablePca_ = GenericToolbox::Json::fetchValue(_config_, std::vector<std::string>{"enablePca", "runPcaCheck"}, _enablePca_);
+  _pcaDeltaChi2Threshold_ = GenericToolbox::Json::fetchValue(_config_, {{"ghostParameterDeltaChi2Threshold"}, {"pcaDeltaChi2Threshold"}}, _pcaDeltaChi2Threshold_);
+
+  _enablePreFitScan_ = GenericToolbox::Json::fetchValue(_config_, "enablePreFitScan", _enablePreFitScan_);
+  _enablePostFitScan_ = GenericToolbox::Json::fetchValue(_config_, "enablePostFitScan", _enablePostFitScan_);
+  _enablePreFitToPostFitLineScan_ = GenericToolbox::Json::fetchValue(_config_, "enablePreFitToPostFitLineScan", _enablePreFitToPostFitLineScan_);
+
+  _generateSamplePlots_ = GenericToolbox::Json::fetchValue(_config_, "generateSamplePlots", _generateSamplePlots_);
+  _generateOneSigmaPlots_ = GenericToolbox::Json::fetchValue(_config_, "generateOneSigmaPlots", _generateOneSigmaPlots_);
+  _doAllParamVariations_ = GenericToolbox::Json::doKeyExist(_config_, "allParamVariations");
+  _allParamVariationsSigmas_ = GenericToolbox::Json::fetchValue(_config_, "allParamVariations", _allParamVariationsSigmas_);
+
+  _scaleParStepWithChi2Response_ = GenericToolbox::Json::fetchValue(_config_, "scaleParStepWithChi2Response", _scaleParStepWithChi2Response_);
+  _parStepGain_ = GenericToolbox::Json::fetchValue(_config_, "parStepGain", _parStepGain_);
+
+  _throwMcBeforeFit_ = GenericToolbox::Json::fetchValue(_config_, "throwMcBeforeFit", _throwMcBeforeFit_);
+  _throwGain_ = GenericToolbox::Json::fetchValue(_config_, "throwMcBeforeFitGain", _throwGain_);
+  _savePostfitEventTrees_ = GenericToolbox::Json::fetchValue(_config_, "savePostfitEventTrees", _savePostfitEventTrees_);
+
 
   LogInfo << "Convergence monitor will be refreshed every " << _likelihoodInterface_.getConvergenceMonitor().getMaxRefreshRateInMs() << "ms." << std::endl;
 }
@@ -144,7 +147,7 @@ void FitterEngine::initializeImpl(){
   // This moves the parameters
   if( _enablePca_ ) {
     LogWarning << "PCA is enabled. Polling parameters..." << std::endl;
-    this->fixGhostFitParameters();
+    this->runPcaCheck();
   }
 
   // This moves the parameters
@@ -207,7 +210,7 @@ void FitterEngine::initializeImpl(){
       GenericToolbox::writeInTFile( outDir, TNamed( "max", std::to_string( par.getMaxValue() ).c_str() ) );
     }
 
-    if( parSet.isUseEigenDecompInFit() ){
+    if( parSet.useEigenDecomposition() ){
       auto eigenSaveFolder = GenericToolbox::joinPath( saveFolder, "eigen" );
       for( auto& eigen : parSet.getEigenParameterList() ){
         auto eigenFolder = GenericToolbox::joinPath(eigenSaveFolder, GenericToolbox::generateCleanBranchName(eigen.getTitle()));
@@ -231,6 +234,7 @@ void FitterEngine::initializeImpl(){
     dynamic_cast<const RootFactoryInterface*>( &this->getMinimizer() )->saveMinimizerSettings(GenericToolbox::mkdirTFile(_saveDir_, "fit/minimizer" ) );
   }
 
+  _likelihoodInterface_.getPropagator().propagateParameters();
   _likelihoodInterface_.evalLikelihood();
 
   if( not GundamGlobals::isLightOutputMode() ){
@@ -239,7 +243,7 @@ void FitterEngine::initializeImpl(){
 
   // writing event rates
   LogInfo << "Writing event rates..." << std::endl;
-  for( auto& sample : _likelihoodInterface_.getPropagator().getFitSampleSet().getSampleList() ){
+  for( auto& sample : _likelihoodInterface_.getPropagator().getSampleSet().getSampleList() ){
     if( not sample.isEnabled() ){ continue; }
 
 
@@ -274,7 +278,7 @@ void FitterEngine::initializeImpl(){
 // Core
 void FitterEngine::fit(){
   LogWarning << __METHOD_NAME__ << std::endl;
-  LogThrowIf(not isInitialized());
+  LogThrowIf( not isInitialized() );
 
   LogWarning << "Pre-fit likelihood state:" << std::endl;
 
@@ -300,12 +304,12 @@ void FitterEngine::fit(){
   // Moving parameters
   if( _generateOneSigmaPlots_ and not _likelihoodInterface_.getPropagator().getPlotGenerator().getConfig().empty() ){
     LogInfo << "Generating pre-fit one-sigma variation plots..." << std::endl;
-    _likelihoodInterface_.getPropagator().getParScanner().generateOneSigmaPlots(GenericToolbox::mkdirTFile(_saveDir_, "preFit/oneSigma"));
+    _likelihoodInterface_.getParameterScanner().generateOneSigmaPlots(GenericToolbox::mkdirTFile(_saveDir_, "preFit/oneSigma"));
     GenericToolbox::triggerTFileWrite(_saveDir_);
   }
   if( _doAllParamVariations_ ){
     LogInfo << "Running all parameter variation on pre-fit samples..." << std::endl;
-    _likelihoodInterface_.getPropagator().getParScanner().varyEvenRates(_allParamVariationsSigmas_, GenericToolbox::mkdirTFile(_saveDir_, "preFit/varyEventRates") );
+    _likelihoodInterface_.getPropagator().getParameterScanner().varyEvenRates(_allParamVariationsSigmas_, GenericToolbox::mkdirTFile(_saveDir_, "preFit/varyEventRates") );
     GenericToolbox::triggerTFileWrite(_saveDir_);
   }
   if( _enablePreFitScan_ ){
@@ -339,7 +343,7 @@ void FitterEngine::fit(){
           LogWarning << "Pushing #" << parIndex << " to " << pushVal << std::endl;
           parList[parIndex].setParameterValue( pushVal );
 
-          if( parSet.isUseEigenDecompInFit() ){
+          if( parSet.useEigenDecomposition() ){
             parSet.propagateOriginalToEigen();
           }
 
@@ -354,6 +358,7 @@ void FitterEngine::fit(){
 
 
     LogAlert << "Current LLH state:" << std::endl;
+    _likelihoodInterface_.getPropagator().propagateParameters();
     _likelihoodInterface_.evalLikelihood();
     LogAlert << _likelihoodInterface_.getPropagator().getLlhBufferSummary() << std::endl;
   }
@@ -400,7 +405,7 @@ void FitterEngine::fit(){
   if( _enablePreFitToPostFitLineScan_ ){
     if( not GundamGlobals::isLightOutputMode() ){
       LogInfo << "Scanning along the line from pre-fit to post-fit points..." << std::endl;
-      getPropagator().getParScanner().scanSegment(GenericToolbox::mkdirTFile(_saveDir_, "postFit/scanConvergence"),
+      getPropagator().getParameterScanner().scanSegment(GenericToolbox::mkdirTFile(_saveDir_, "postFit/scanConvergence"),
                                                   _postFitParState_, _preFitParState_);
       GenericToolbox::triggerTFileWrite(_saveDir_);
     }
@@ -423,9 +428,11 @@ void FitterEngine::fit(){
 }
 
 // protected
-void FitterEngine::fixGhostFitParameters(){
+void FitterEngine::runPcaCheck(){
 
+  _likelihoodInterface_.getPropagator().propagateParameters();
   _likelihoodInterface_.evalLikelihood();
+
   double baseChi2 = _likelihoodInterface_.getBuffer().totalLikelihood;
   double baseChi2Stat = _likelihoodInterface_.getBuffer().statLikelihood;
   double baseChi2Syst = _likelihoodInterface_.getBuffer().penaltyLikelihood;
@@ -477,7 +484,9 @@ void FitterEngine::fixGhostFitParameters(){
         ssPrint << " " << currentParValue << " -> " << par.getParameterValue();
         LogInfo << ssPrint.str() << "..." << std::endl;
 
+        _likelihoodInterface_.getPropagator().propagateParameters();
         _likelihoodInterface_.evalLikelihood();
+
         deltaChi2Stat = _likelihoodInterface_.getBuffer().statLikelihood - baseChi2Stat;
 
         ssPrint << ": " << GUNDAM_DELTA << GUNDAM_CHI2 << " (stat) = " << deltaChi2Stat;
@@ -498,7 +507,7 @@ void FitterEngine::fixGhostFitParameters(){
 #endif
           LogInfo << red << ssPrint.str() << rst << std::endl;
 
-          if( parSet.isUseEigenDecompInFit() and GenericToolbox::Json::fetchValue(_config_, "fixGhostEigenParametersAfterFirstRejected", false) ){
+          if( parSet.useEigenDecomposition() and GenericToolbox::Json::fetchValue(_config_, "fixGhostEigenParametersAfterFirstRejected", false) ){
             fixNextEigenPars = true;
           }
         }
@@ -510,19 +519,21 @@ void FitterEngine::fixGhostFitParameters(){
 
     // Recompute inverse matrix for the fitter.  Note: Eigen decomposed parSet
     // don't need a new inversion since the matrix is diagonal
-    if( not parSet.isUseEigenDecompInFit() ){
+    if( not parSet.useEigenDecomposition() ){
       parSet.processCovarianceMatrix();
     }
 
   }
 
   // comeback to old values
+  _likelihoodInterface_.getPropagator().propagateParameters();
   _likelihoodInterface_.evalLikelihood();
 }
 
 void FitterEngine::rescaleParametersStepSize(){
   LogInfo << __METHOD_NAME__ << std::endl;
 
+  _likelihoodInterface_.getPropagator().propagateParameters();
   _likelihoodInterface_.evalLikelihood();
   double baseChi2Pull = _likelihoodInterface_.getBuffer().penaltyLikelihood;
   double baseChi2 = _likelihoodInterface_.getBuffer().totalLikelihood;
@@ -537,6 +548,7 @@ void FitterEngine::rescaleParametersStepSize(){
       double currentParValue = par.getParameterValue();
       par.setParameterValue( currentParValue + par.getStdDevValue() );
 
+      _likelihoodInterface_.getPropagator().propagateParameters();
       _likelihoodInterface_.evalLikelihood();
 
       double deltaChi2 = _likelihoodInterface_.getBuffer().totalLikelihood - baseChi2;
@@ -557,6 +569,7 @@ void FitterEngine::rescaleParametersStepSize(){
 
       par.setStepSize( stepSize );
       par.setParameterValue( currentParValue + stepSize );
+      _likelihoodInterface_.getPropagator().propagateParameters();
       _likelihoodInterface_.evalLikelihood();
       LogInfo << " -> Δχ²(step) = " << _likelihoodInterface_.getBuffer().totalLikelihood - baseChi2 << std::endl;
       par.setParameterValue( currentParValue );
@@ -564,6 +577,7 @@ void FitterEngine::rescaleParametersStepSize(){
 
   }
 
+  _likelihoodInterface_.getPropagator().propagateParameters();
   _likelihoodInterface_.evalLikelihood();
 }
 void FitterEngine::scanMinimizerParameters(TDirectory* saveDir_){
@@ -605,6 +619,7 @@ void FitterEngine::checkNumericalAccuracy(){
           parSet.getParameterList()[iPar].setParameterValue( throws[iThrow][iParSet][iPar] );
         }
       }
+      _likelihoodInterface_.getPropagator().propagateParameters();
       _likelihoodInterface_.evalLikelihood();
 
       if( responses[iThrow] == responses[iThrow] ){ // not nan

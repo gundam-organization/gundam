@@ -242,7 +242,7 @@ void SimpleMcmcInterface::fillPoint( bool fillModel) {
   _saveUncertainty_.clear();
   if (not fillModel) return;
   for (const Sample& sample
-         : getPropagator().getFitSampleSet().getSampleList()) {
+         : getPropagator().getSampleSet().getSampleList()) {
     std::shared_ptr<TH1D> hist = sample.getMcContainer().histogram;
     for (int i = 1; i < hist->GetNbinsX(); ++i) {
       _model_.push_back(hist->GetBinContent(i));
@@ -342,7 +342,7 @@ bool SimpleMcmcInterface::adaptiveDefaultProposalCovariance( AdaptiveStepMCMC& m
               << std::endl;
       continue;
     }
-    if (set1->isUseEigenDecompInFit()) {
+    if ( set1->useEigenDecomposition()) {
       continue;
     }
 
@@ -356,7 +356,7 @@ bool SimpleMcmcInterface::adaptiveDefaultProposalCovariance( AdaptiveStepMCMC& m
                 << std::endl;
         continue;
       }
-      if (set2->isUseEigenDecompInFit()) {
+      if ( set2->useEigenDecomposition()) {
         continue;
       }
 
@@ -782,7 +782,7 @@ void SimpleMcmcInterface::setupAndRunSimpleStep( SimpleStepMCMC& mcmc) {
 void SimpleMcmcInterface::minimize() {
   LogThrowIf(not isInitialized(), "not initialized");
 
-  printMinimizerFitParameters();
+  summarizeParameters();
 
   // Update to the current parameter settings and the likelihood cache.
   getPropagator().updateLlhCache();
@@ -858,7 +858,7 @@ void SimpleMcmcInterface::minimize() {
 
   parameterSampleData.clear();
   for (const Sample& sample
-         : getPropagator().getFitSampleSet().getSampleList()) {
+         : getPropagator().getSampleSet().getSampleList()) {
     parameterSampleNames.push_back(sample.getName());
     parameterSampleOffsets.push_back(parameterSampleData.size());
     std::shared_ptr<TH1D> hist = sample.getDataContainer().histogram;
@@ -919,7 +919,7 @@ void SimpleMcmcInterface::scanParameters( TDirectory* saveDir_) {
   LogThrowIf(not isInitialized());
   LogInfo << "Performing scans of fit parameters..." << std::endl;
   for(Parameter* par : getMinimizerFitParameterPtr()) {
-    getPropagator().getParScanner().scanFitParameter(*par, saveDir_);
+    getPropagator().getParameterScanner().scanFitParameter(*par, saveDir_);
   }
 }
 

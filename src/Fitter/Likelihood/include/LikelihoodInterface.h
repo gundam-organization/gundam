@@ -6,6 +6,7 @@
 #define GUNDAM_LIKELIHOOD_INTERFACE_H
 
 #include "JointProbability.h"
+#include "ParameterScanner.h"
 #include "ParameterSet.h"
 #include "Propagator.h"
 #include "JsonBaseClass.h"
@@ -14,6 +15,7 @@
 #include "GenericToolbox.Time.h"
 
 #include "Math/Functor.h"
+#include "TDirectory.h"
 
 #include <string>
 #include <vector>
@@ -26,7 +28,6 @@
 
 class LikelihoodInterface : public JsonBaseClass {
 
-  struct Monitor;
   struct Buffer;
 
 protected:
@@ -38,102 +39,67 @@ public:
   LikelihoodInterface() = default;
   ~LikelihoodInterface() override = default;
 
-  // setters
-  void setUseNormalizedFitSpace(bool useNormalizedFitSpace_) { _useNormalizedFitSpace_ = useNormalizedFitSpace_; }
-  void setMonitorGradientDescent(bool monitorGradientDescent_){ _monitorGradientDescent_ = monitorGradientDescent_; } // TODO: relocate?
-  void setParameterValidity(const std::string& validity);
-
   // const getters
-  [[nodiscard]] bool hasValidParameterValues() const;
-  [[nodiscard]] bool isMonitorGradientDescent() const { return _monitorGradientDescent_; }
-  [[nodiscard]] bool getUseNormalizedFitSpace() const { return _useNormalizedFitSpace_; }
-  [[nodiscard]] int getNbFitCalls() const {return _nbLlhEvals_; }
   [[nodiscard]] int getNbFitParameters() const { return _nbFitParameters_; }
   [[nodiscard]] int getNbFreePars() const {return _nbFreePars_; }
   [[nodiscard]] int getNbFitBins() const {return _nbFitBins_; }
-  const Propagator& getPropagator() const { return _propagator_; }
-  const Buffer& getBuffer() const { return _buffer_; }
+  [[nodiscard]] const Buffer& getBuffer() const { return _buffer_; }
+  [[nodiscard]] const Propagator& getPropagator() const { return _propagator_; }
+  [[nodiscard]] const ParameterScanner& getParameterScanner() const { return _parameterScanner_; }
 
   // mutable getters
+  Buffer& getBuffer() { return _buffer_; }
   Propagator& getPropagator(){ return _propagator_; }
-  Monitor& getFitMonitor(){ return _monitor_; }
-  std::vector<Parameter *> &getMinimizerFitParameterPtr(){ return _minimizerFitParameterPtr_; }
-  ROOT::Math::Functor* getFunctor() { return _functor_.get(); }
-  ROOT::Math::Functor* getValidFunctor() { return _validFunctor_.get(); }
-  GenericToolbox::VariablesMonitor& getConvergenceMonitor(){ return _convergenceMonitor_; } // TODO: relocate?
+  ParameterScanner& getParameterScanner(){ return _parameterScanner_; }
 
-  double evalLikelihood( const double* parArray_);
-  double evalFitValid(const double* parArray_);
+  // core
+  [[nodiscard]] int getNbDof() const { return _nbFitBins_ - _nbFreePars_; }
+  double evalLikelihood() const;
+  double evalStatLikelihood() const;
+  double evalPenaltyLikelihood() const;
+  [[nodiscard]] double evalStatLikelihood(const Sample& sample_) const;
+  [[nodiscard]] double evalPenaltyLikelihood(const ParameterSet& parSet_) const;
+  [[nodiscard]] std::string getSummary() const;
 
-  double evalLikelihood();
-  double evalStatLikelihood();
-
+  // mutable core
   void writeChi2History();
   void saveGradientSteps();
 
-private:
-  bool _throwOnBadLlh_{false};
-  bool _useNormalizedFitSpace_{true};
+  // TODO: to relocate
+  double evalFitValid(const double* parArray_);
+  void setParameterValidity(const std::string& validity);
+  [[nodiscard]] bool hasValidParameterValues() const;
 
+
+private:
+  // internals
   int _nbFitBins_{0};
-  int _nbLlhEvals_{0};
   int _nbFreePars_{0};
   int _nbFitParameters_{0};
 
   Propagator _propagator_{};
-  std::vector<Parameter*> _minimizerFitParameterPtr_{};
+  ParameterScanner _parameterScanner_{this};
   std::shared_ptr<JointProbability::JointProbability> _jointProbabilityPtr_{nullptr};
 
-  std::unique_ptr<ROOT::Math::Functor> _functor_{nullptr};
-  std::unique_ptr<ROOT::Math::Functor> _validFunctor_{nullptr};
-  std::unique_ptr<TTree> _chi2HistoryTree_{nullptr};
+  struct Buffer{
+    double totalLikelihood{0};
 
+    double statLikelihood{0};
+    double penaltyLikelihood{0};
+
+    void updateTotal(){ totalLikelihood = statLikelihood + penaltyLikelihood; }
+    [[nodiscard]] bool isValid() const { return not ( std::isnan(totalLikelihood) or std::isinf(totalLikelihood) ); }
+  };
+  mutable Buffer _buffer_{};
+
+
+  // TODO: relocate
   /// A set of flags used by the evalFitValid method to determine the function
   /// validity.  The flaggs are:
   /// "1" -- require valid parameters
   /// "2" -- require in the mirrored range
   /// "4" -- require in the physical range
   int _validFlags_{7}; // TODO: Use enum instead
-
-  struct Buffer{
-    double totalLikelihood{std::nan("unset")};
-    double statLikelihood{std::nan("unset")};
-    double penaltyLikelihood{std::nan("unset")};
-    double regulariseLikelihood{std::nan("unset")};
-
-    std::vector<double> statLikelihoodPerSample{};
-    std::vector<double> penaltyLikelihoodPerParSet{};
-  };
-  Buffer _buffer_{};
-
-  struct SpeedMonitor{
-    GenericToolbox::Time::CycleTimer _evalFitAvgTimer_;
-    GenericToolbox::Time::CycleTimer _outEvalFitAvgTimer_;
-    GenericToolbox::Time::CycleTimer _itSpeed_;
-    GenericToolbox::Time::CycleClock _itSpeedMon_{"it"};
-  };
-  SpeedMonitor _speedMonitor_{};
-
-  // Output monitors!
-  GenericToolbox::VariablesMonitor _convergenceMonitor_;
-
-
-  struct Monitor{
-    bool isEnabled{false};
-    bool showParameters{false};
-    int maxNbParametersPerLine{15};
-  };
-  Monitor _monitor_{};
-  /// Parameters to control how the monitor behaves.
-
-  // TODO: relocate too?
-  bool _monitorGradientDescent_{false};
-  int _lastGradientFall_{-2};
-  struct GradientStepPoint {
-    JsonType parState;
-    double llh;
-  };
-  std::vector<GradientStepPoint> _gradientMonitor_{};
 
 };
 

@@ -13,7 +13,6 @@
 #include "DatasetLoader.h"
 #include "PlotGenerator.h"
 #include "JsonBaseClass.h"
-#include "ParScanner.h"
 #include "SampleSet.h"
 
 #include "GenericToolbox.Time.h"
@@ -47,10 +46,10 @@ public:
   [[nodiscard]] const EventTreeWriter &getTreeWriter() const{ return _treeWriter_; }
   [[nodiscard]] const std::vector<DatasetLoader> &getDataSetList() const{ return _dataSetList_; }
   [[nodiscard]] const std::vector<DialCollection> &getDialCollections() const{ return _dialCollections_; }
+  [[nodiscard]] const SampleSet &getSampleSet() const { return _fitSampleSet_; }
 
   // Non-const getters
-  ParScanner& getParScanner(){ return _parScanner_; }
-  SampleSet &getFitSampleSet(){ return _fitSampleSet_; }
+  SampleSet &getSampleSet(){ return _fitSampleSet_; }
   ParametersManager &getParametersManager(){ return _parManager_; }
   PlotGenerator &getPlotGenerator(){ return _plotGenerator_; }
   EventDialCache& getEventDialCache(){ return _eventDialCache_; }
@@ -105,7 +104,6 @@ private:
   ParametersManager _parManager_;
   PlotGenerator _plotGenerator_;
   EventTreeWriter _treeWriter_;
-  ParScanner _parScanner_{this};
   std::vector<DatasetLoader> _dataSetList_;
 
   // Monitoring
