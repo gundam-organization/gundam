@@ -31,12 +31,10 @@ void ParametersManager::readConfigImpl(){
   _throwToyParametersWithGlobalCov_ = GenericToolbox::Json::fetchValue(_config_, "throwToyParametersWithGlobalCov", _throwToyParametersWithGlobalCov_);
 
   LogInfo << "Reading parameter configuration..." << std::endl;
-  auto parameterSetListConfig = ConfigUtils::getForwardedConfig(GenericToolbox::Json::fetchValue(_config_, "parameterSetListConfig", JsonType()));
   _parameterSetList_.reserve( _parameterSetListConfig_.size() );
-  for( const auto& parameterSetConfig : parameterSetListConfig ){
+  for( const auto& parameterSetConfig : _parameterSetListConfig_ ){
     _parameterSetList_.emplace_back();
-    _parameterSetList_.back().setConfig(parameterSetConfig);
-    _parameterSetList_.back().readConfig();
+    _parameterSetList_.back().readConfig( parameterSetConfig );
     LogInfo << _parameterSetList_.back().getSummary() << std::endl;
   }
   LogInfo << _parameterSetList_.size() << " parameter sets defined." << std::endl;
