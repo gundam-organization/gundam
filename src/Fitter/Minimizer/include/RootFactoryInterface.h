@@ -1,5 +1,5 @@
 //
-// Created by Adrien BLANCHET on 16/12/2021.
+// Created by Nadrino on 16/12/2021.
 //
 
 #ifndef GUNDAM_ROOTFACTORYINTERFACE_H

@@ -1,5 +1,5 @@
-#ifndef GraphDialBaseFactory_h_Seen
-#define GraphDialBaseFactory_h_Seen
+#ifndef GUNDAM_GRAPH_DIAL_FACTORY_H
+#define GUNDAM_GRAPH_DIAL_FACTORY_H
 
 #include <DialBase.h>
 

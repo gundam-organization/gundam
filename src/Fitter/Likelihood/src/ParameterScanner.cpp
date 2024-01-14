@@ -1,5 +1,5 @@
 //
-// Created by Adrien BLANCHET on 07/04/2022.
+// Created by Nadrino on 07/04/2022.
 //
 
 #include "ParameterScanner.h"

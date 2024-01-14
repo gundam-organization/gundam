@@ -1,5 +1,5 @@
 //
-// Created by Adrien BLANCHET on 23/06/2022.
+// Created by Nadrino on 23/06/2022.
 //
 
 #include "JointProbability.h"
@@ -8,6 +8,10 @@
 #include "GenericToolbox.Json.h"
 
 #include "TMath.h"
+
+#include <sstream>
+#include <memory>
+#include <dlfcn.h>
 
 
 LoggerInit([]{
@@ -481,6 +485,50 @@ namespace JointProbability{
       }
 
       return chisq;
+  }
+
+  JointProbability* makeJointProbability(const std::string& type_){
+    auto jType{JointProbabilityType::toEnum( type_ )};
+
+    if( jType == JointProbabilityType::EnumOverflow  ){
+      LogThrow( "Unknown JointProbabilityType: " << type_ );
+    }
+
+    return makeJointProbability( jType );
+  }
+  JointProbability* makeJointProbability(JointProbabilityType type_){
+    std::unique_ptr<JointProbability> out{nullptr};
+
+    switch( type_.value ){
+      case JointProbabilityType::Plugin:
+        out = std::make_unique<Plugin>();
+        break;
+      case JointProbabilityType::Chi2:
+        out = std::make_unique<Chi2>();
+        break;
+      case JointProbabilityType::PoissonLLH:
+        out = std::make_unique<PoissonLLH>();
+        break;
+      case JointProbabilityType::LeastSquaresLLH:
+        out = std::make_unique<LeastSquaresLLH>();
+        break;
+      case JointProbabilityType::BarlowLLH:
+        out = std::make_unique<BarlowLLH>();
+        break;
+      case JointProbabilityType::BarlowLLH_BANFF_OA2020:
+        out = std::make_unique<BarlowLLH_BANFF_OA2020>();
+        break;
+      case JointProbabilityType::BarlowLLH_BANFF_OA2021:
+        out = std::make_unique<BarlowLLH_BANFF_OA2021>();
+        break;
+      case JointProbabilityType::BarlowLLH_BANFF_OA2021_SFGD:
+        out = std::make_unique<BarlowLLH_BANFF_OA2021_SFGD>();
+        break;
+      default:
+        LogThrow( "Unknown JointProbabilityType: " << type_.toString() );
+    }
+
+    return out.release();
   }
 
 }

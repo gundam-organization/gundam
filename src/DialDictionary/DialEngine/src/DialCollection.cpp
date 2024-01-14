@@ -4,7 +4,6 @@
 
 #include "GundamGlobals.h"
 #include "DialCollection.h"
-#include "DialTypes.h"
 #include "DialBaseFactory.h"
 
 #include "GenericToolbox.Json.h"

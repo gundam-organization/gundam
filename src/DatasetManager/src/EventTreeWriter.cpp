@@ -1,5 +1,5 @@
 //
-// Created by Adrien BLANCHET on 19/11/2021.
+// Created by Nadrino on 19/11/2021.
 //
 
 #include "EventTreeWriter.h"

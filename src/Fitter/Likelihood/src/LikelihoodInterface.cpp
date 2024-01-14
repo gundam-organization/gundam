@@ -29,7 +29,7 @@ void LikelihoodInterface::readConfigImpl(){
 
   // placeholders
   JsonType configJointProbability;
-  std::string jointProbabilityTypeStr = _jointProbabilityType_.toString();
+  std::string jointProbabilityTypeStr;
 
   GenericToolbox::Json::deprecatedAction(_propagator_.getSampleSet().getConfig(), "llhStatFunction", [&]{
     LogAlert << R"("llhStatFunction" should now be set under "likelihoodInterfaceConfig/jointProbabilityConfig/type".)" << std::endl;
@@ -45,36 +45,7 @@ void LikelihoodInterface::readConfigImpl(){
   jointProbabilityTypeStr = GenericToolbox::Json::fetchValue(configJointProbability, "type", jointProbabilityTypeStr);
 
   LogInfo << "Using \"" << jointProbabilityTypeStr << "\" JointProbabilityType." << std::endl;
-  _jointProbabilityType_ = JointProbability::JointProbabilityType::toEnum( jointProbabilityTypeStr );
-  switch( _jointProbabilityType_.value ){
-    case JointProbability::JointProbabilityType::Plugin:
-      _jointProbabilityPtr_ = std::make_shared<JointProbability::Plugin>();
-      break;
-    case JointProbability::JointProbabilityType::Chi2:
-      _jointProbabilityPtr_ = std::make_shared<JointProbability::Chi2>();
-      break;
-    case JointProbability::JointProbabilityType::PoissonLLH:
-      _jointProbabilityPtr_ = std::make_shared<JointProbability::PoissonLLH>();
-      break;
-    case JointProbability::JointProbabilityType::LeastSquaresLLH:
-      _jointProbabilityPtr_ = std::make_shared<JointProbability::LeastSquaresLLH>();
-      break;
-    case JointProbability::JointProbabilityType::BarlowLLH:
-      _jointProbabilityPtr_ = std::make_shared<JointProbability::BarlowLLH>();
-      break;
-    case JointProbability::JointProbabilityType::BarlowLLH_BANFF_OA2020:
-      _jointProbabilityPtr_ = std::make_shared<JointProbability::BarlowLLH_BANFF_OA2020>();
-      break;
-    case JointProbability::JointProbabilityType::BarlowLLH_BANFF_OA2021:
-      _jointProbabilityPtr_ = std::make_shared<JointProbability::BarlowLLH_BANFF_OA2021>();
-      break;
-    case JointProbability::JointProbabilityType::BarlowLLH_BANFF_OA2021_SFGD:
-      _jointProbabilityPtr_ = std::make_shared<JointProbability::BarlowLLH_BANFF_OA2021_SFGD>();
-      break;
-    default:
-      LogThrow( "Unknown JointProbabilityType: " << jointProbabilityTypeStr );
-  }
-
+  _jointProbabilityPtr_ = std::shared_ptr<JointProbability::JointProbability>( JointProbability::makeJointProbability( jointProbabilityTypeStr ) );
   _jointProbabilityPtr_->readConfig( configJointProbability );
 
   LogWarning << "LikelihoodInterface configured." << std::endl;

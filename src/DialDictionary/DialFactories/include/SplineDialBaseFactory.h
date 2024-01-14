@@ -1,5 +1,5 @@
-#ifndef SplineDialBaseFactory_h_Seen
-#define SplineDialBaseFactory_h_Seen
+#ifndef GUNDAM_SPLINE_DIAL_FACTORY_H
+#define GUNDAM_SPLINE_DIAL_FACTORY_H
 
 #include <DialBase.h>
 

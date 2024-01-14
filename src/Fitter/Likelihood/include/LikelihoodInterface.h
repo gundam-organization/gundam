@@ -64,7 +64,6 @@ private:
   int _nbSampleBins_{0};
 
   Propagator _propagator_{};
-  JointProbability::JointProbabilityType _jointProbabilityType_{JointProbability::JointProbabilityType::Unset};
   std::shared_ptr<JointProbability::JointProbability> _jointProbabilityPtr_{nullptr};
 
   struct Buffer{

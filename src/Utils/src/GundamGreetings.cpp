@@ -1,5 +1,5 @@
 //
-// Created by Adrien BLANCHET on 15/12/2021.
+// Created by Nadrino on 15/12/2021.
 //
 
 #include "GundamGreetings.h"

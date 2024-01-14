@@ -1,5 +1,5 @@
 //
-// Created by Adrien BLANCHET on 21/11/2022.
+// Created by Nadrino on 21/11/2022.
 //
 
 #ifndef GUNDAM_LINKDEF_H

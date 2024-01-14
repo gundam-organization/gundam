@@ -1,5 +1,5 @@
-#ifndef NormDialBaseFactory_h_Seen
-#define NormDialBaseFactory_h_Seen
+#ifndef GUNDAM_NORM_DIAL_FACTORY_H
+#define GUNDAM_NORM_DIAL_FACTORY_H
 
 #include <DialBase.h>
 

@@ -1,5 +1,5 @@
 //
-// Created by Adrien BLANCHET on 14/05/2022.
+// Created by Nadrino on 14/05/2022.
 //
 
 #ifndef GUNDAM_DATADISPENSER_H
