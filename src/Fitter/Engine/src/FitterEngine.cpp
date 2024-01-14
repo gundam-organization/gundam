@@ -26,31 +26,38 @@ LoggerInit([]{
 
 
 void FitterEngine::readConfigImpl(){
-  LogInfo << "Reading FitterEngine config..." << std::endl;
+  LogWarning << "Configuring FitterEngine..." << std::endl;
   GenericToolbox::setT2kPalette();
-
-  // legacy
-  GenericToolbox::Json::deprecatedAction(_config_, "propagatorConfig", [&]{
-    LogAlert << "propagatorConfig should now be set within likelihoodInterfaceConfig" << std::endl;
-    _likelihoodInterface_.getPropagator().setConfig( GenericToolbox::Json::fetchValue<JsonType>(_config_, "propagatorConfig") );
-  });
 
   JsonType minimizerConfig{};
   std::string minimizerTypeStr{"RootFactory"};
 
   // legacy configs:
+  GenericToolbox::Json::deprecatedAction(_config_, "monitorRefreshRateInMs", [&]{
+    LogAlert << "Forwarding the option to Propagator. Consider moving it into \"minimizerConfig:\"" << std::endl;
+    _minimizer_->getMonitor().convergenceMonitor.setMaxRefreshRateInMs(GenericToolbox::Json::fetchValue<int>(_config_, "monitorRefreshRateInMs"));
+  });
+  GenericToolbox::Json::deprecatedAction(_config_, "propagatorConfig", [&]{
+    LogAlert << R"("propagatorConfig" should now be set within "likelihoodInterfaceConfig".)" << std::endl;
+    _likelihoodInterface_.getPropagator().setConfig( GenericToolbox::Json::fetchValue<JsonType>(_config_, "propagatorConfig") );
+  });
+  GenericToolbox::Json::deprecatedAction(_likelihoodInterface_.getPropagator().getConfig(), "scanConfig", [&]{
+    LogAlert << R"("scanConfig" should now be set within "fitterEngineConfig".)" << std::endl;
+    _parameterScanner_.setConfig( GenericToolbox::Json::fetchValue<JsonType>(_likelihoodInterface_.getPropagator().getConfig(), "scanConfig") );
+  });
   GenericToolbox::Json::deprecatedAction(_config_, "mcmcConfig", [&]{
     LogAlert << "mcmcConfig should now be set as minimizerConfig" << std::endl;
     minimizerConfig = GenericToolbox::Json::fetchValue( _config_, "mcmcConfig" , JsonType() );
   });
   GenericToolbox::Json::deprecatedAction(_config_, "engineType", [&]{
     LogAlert << "engineType should now be specified withing minimizerConfig/minimizerType" << std::endl;
-    minimizerTypeStr = GenericToolbox::Json::fetchValue( _config_, "engineType", "RootFactory" );
+    minimizerTypeStr = GenericToolbox::Json::fetchValue( _config_, "engineType", minimizerTypeStr );
 
     // handle deprecated types
     if     ( minimizerTypeStr == "minimizer" ){ minimizerTypeStr = "RootFactory"; }
     else if( minimizerTypeStr == "mcmc" )     { minimizerTypeStr = "SimpleMCMC"; }
   });
+
 
   // new config format:
   minimizerConfig = GenericToolbox::Json::fetchValue( _config_, "minimizerConfig" , minimizerConfig );
@@ -69,21 +76,6 @@ void FitterEngine::readConfigImpl(){
   }
 
   _minimizer_->readConfig( minimizerConfig );
-
-
-  GenericToolbox::Json::deprecatedAction(_config_, "monitorRefreshRateInMs", [&]{
-    LogAlert << "Forwarding the option to Propagator. Consider moving it into \"minimizerConfig:\"" << std::endl;
-    _minimizer_->getMonitor().convergenceMonitor.setMaxRefreshRateInMs(GenericToolbox::Json::fetchValue<int>(_config_, "monitorRefreshRateInMs"));
-  });
-  GenericToolbox::Json::deprecatedAction(_config_, "propagatorConfig", [&]{
-    LogAlert << R"("propagatorConfig" should now be set within "likelihoodInterfaceConfig".)" << std::endl;
-    _likelihoodInterface_.getPropagator().setConfig( GenericToolbox::Json::fetchValue<JsonType>(_config_, "propagatorConfig") );
-  });
-  GenericToolbox::Json::deprecatedAction(_likelihoodInterface_.getPropagator().getConfig(), "scanConfig", [&]{
-    LogAlert << R"("scanConfig" should now be set within "fitterEngineConfig".)" << std::endl;
-    _parameterScanner_.setConfig( GenericToolbox::Json::fetchValue<JsonType>(_likelihoodInterface_.getPropagator().getConfig(), "scanConfig") );
-  });
-
   _likelihoodInterface_.readConfig( GenericToolbox::Json::fetchValue(_config_, "likelihoodInterfaceConfig", _likelihoodInterface_.getConfig()) );
   _parameterScanner_.readConfig( GenericToolbox::Json::fetchValue(_config_, "scanConfig", _parameterScanner_.getConfig()) );
 
@@ -108,6 +100,8 @@ void FitterEngine::readConfigImpl(){
   _savePostfitEventTrees_ = GenericToolbox::Json::fetchValue(_config_, "savePostfitEventTrees", _savePostfitEventTrees_);
 
   LogInfo << "Convergence monitor will be refreshed every " << _minimizer_->getMonitor().convergenceMonitor.getMaxRefreshRateInMs() << "ms." << std::endl;
+
+  LogWarning << "FitterEngine configured." << std::endl;
 }
 void FitterEngine::initializeImpl(){
   LogThrowIf(_config_.empty(), "Config is not set.");
@@ -120,6 +114,8 @@ void FitterEngine::initializeImpl(){
   }
 
   _likelihoodInterface_.initialize();
+
+  _parameterScanner_.setLikelihoodInterfacePtr( &_likelihoodInterface_ );
   _parameterScanner_.initialize();
 
   if( _likelihoodInterface_.getPropagator().isThrowAsimovToyParameters() ){

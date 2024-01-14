@@ -87,7 +87,8 @@ void MinimizerBase::minimize(){
   this->printParameters();
 
   getLikelihoodInterface().propagateAndEvalLikelihood();
-  LogInfo << "Initial likelihood state:" << getLikelihoodInterface().getSummary();
+  LogInfo << "Initial likelihood state:" << std::endl;
+  LogInfo << getLikelihoodInterface().getSummary() << std::endl;
 
   LogInfo << "Number of defined parameters: " << getLikelihoodInterface().getNbParameters() << std::endl
   << "Number of fit parameters: " << _minimizerParameterPtrList_.size() << std::endl
