@@ -26,7 +26,6 @@ LoggerInit([]{
 
 
 void FitterEngine::readConfigImpl(){
-  ConfigUtils::forwardConfig( _config_ );
   LogWarning << "Configuring FitterEngine..." << std::endl;
 
   GenericToolbox::setT2kPalette();

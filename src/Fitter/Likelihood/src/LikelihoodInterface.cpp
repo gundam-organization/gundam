@@ -20,7 +20,6 @@ LoggerInit([]{
 
 
 void LikelihoodInterface::readConfigImpl(){
-  ConfigUtils::forwardConfig( _config_ );
   LogWarning << "Configuring LikelihoodInterface..." << std::endl;
 
   _propagator_.readConfig(

@@ -15,7 +15,6 @@ LoggerInit([]{
 
 void MinimizerBase::readConfigImpl(){
   LogReturnIf(_config_.empty(), __METHOD_NAME__ << " config is empty." );
-  ConfigUtils::forwardConfig( _config_ );
   LogWarning << "Configuring MinimizerBase..." << std::endl;
 
   // nested objects first

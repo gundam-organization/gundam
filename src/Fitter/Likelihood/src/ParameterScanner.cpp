@@ -26,7 +26,6 @@ void ParameterScanner::unmuteLogger(){ Logger::setIsMuted(false); }
 
 void ParameterScanner::readConfigImpl() {
   if( _config_.empty() ) return;
-  ConfigUtils::forwardConfig( _config_ );
   LogWarning << "Configuring ParameterScanner..." << std::endl;
 
   _useParameterLimits_ = GenericToolbox::Json::fetchValue(_config_, "useParameterLimits", _useParameterLimits_);

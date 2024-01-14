@@ -4,6 +4,7 @@
 
 #include "ParametersManager.h"
 #include "ConfigUtils.h"
+#include "ConfigUtils.h"
 
 #include "GenericToolbox.Utils.h"
 #include "GenericToolbox.Json.h"
@@ -23,9 +24,23 @@ void ParametersManager::unmuteLogger(){ Logger::setIsMuted( false ); }
 
 // config
 void ParametersManager::readConfigImpl(){
+  GUNDAM_JOINT_PROBABILITY_H
+
+  _parameterSetListConfig_ = GenericToolbox::Json::fetchValue(_config_, "parameterSetList", _parameterSetListConfig_);
 
   _reThrowParSetIfOutOfBounds_ = GenericToolbox::Json::fetchValue(_config_, "reThrowParSetIfOutOfBounds", _reThrowParSetIfOutOfBounds_);
   _throwToyParametersWithGlobalCov_ = GenericToolbox::Json::fetchValue(_config_, "throwToyParametersWithGlobalCov", _throwToyParametersWithGlobalCov_);
+
+
+  LogInfo << "Reading parameter configuration..." << std::endl;
+  auto parameterSetListConfig = ConfigUtils::getForwardedConfig(GenericToolbox::Json::fetchValue(_config_, "parameterSetListConfig", JsonType()));
+  _parameterSetList_.reserve( _parameterSetListConfig_.size() );
+  for( const auto& parameterSetConfig : parameterSetListConfig ){
+    _parameterSetList_.emplace_back();
+    _parameterSetList_.back().setConfig(parameterSetConfig);
+    _parameterSetList_.back().readConfig();
+    LogInfo << _parameterSetList_.back().getSummary() << std::endl;
+  }
 
 }
 void ParametersManager::initializeImpl(){

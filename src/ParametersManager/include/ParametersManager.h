@@ -22,9 +22,8 @@ protected:
   void initializeImpl() override;
 
 public:
-  ParametersManager() = default;
-
   // setters
+  void setParameterSetListConfig(const JsonType& parameterSetListConfig_){ _parameterSetListConfig_ = parameterSetListConfig_; }
   void setReThrowParSetIfOutOfBounds(bool reThrowParSetIfOutOfBounds_){ _reThrowParSetIfOutOfBounds_ = reThrowParSetIfOutOfBounds_; }
   void setThrowToyParametersWithGlobalCov(bool throwToyParametersWithGlobalCov_){ _throwToyParametersWithGlobalCov_ = throwToyParametersWithGlobalCov_; }
   void setGlobalCovarianceMatrix(const std::shared_ptr<TMatrixD> &globalCovarianceMatrix){ _globalCovarianceMatrix_ = globalCovarianceMatrix; }
@@ -58,6 +57,7 @@ private:
   // config
   bool _reThrowParSetIfOutOfBounds_{true};
   bool _throwToyParametersWithGlobalCov_{false};
+  JsonType _parameterSetListConfig_{};
 
   // internals
   std::vector<ParameterSet> _parameterSetList_{};

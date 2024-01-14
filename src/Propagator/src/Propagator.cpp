@@ -30,9 +30,12 @@ using namespace GenericToolbox::ColorCodes;
 void Propagator::readConfigImpl(){
   LogWarning << __METHOD_NAME__ << std::endl;
 
-  _parManager_.readConfig( GenericToolbox::Json::fetchValue(_config_, "parametersManagerConfig", JsonType()) );
-
   // legacy -- option within propagator -> should be defined elsewhere
+  GenericToolbox::Json::deprecatedAction(_config_, "parameterSetListConfig", [&]{
+    LogAlert << R"("parameterSetListConfig" should now be set under "parametersManagerConfig/parameterSetList".)" << std::endl;
+    auto parameterSetListConfig = GenericToolbox::Json::fetchValue<JsonType>(_config_, "parameterSetListConfig");
+    _parManager_.setParameterSetListConfig( ConfigUtils::getForwardedConfig(parameterSetListConfig) );
+  });
   GenericToolbox::Json::deprecatedAction(_config_, "reThrowParSetIfOutOfBounds", [&]{
     LogAlert << "Forwarding the option to ParametersManager. Consider moving it into \"parametersManagerConfig:\"" << std::endl;
     _parManager_.setReThrowParSetIfOutOfBounds(GenericToolbox::Json::fetchValue<bool>(_config_, "reThrowParSetIfOutOfBounds"));
@@ -41,6 +44,9 @@ void Propagator::readConfigImpl(){
     LogAlert << "Forwarding the option to ParametersManager. Consider moving it into \"parametersManagerConfig:\"" << std::endl;
     _parManager_.setThrowToyParametersWithGlobalCov(GenericToolbox::Json::fetchValue<bool>(_config_, "throwToyParametersWithGlobalCov"));
   });
+
+  // nested objects
+  _parManager_.readConfig( GenericToolbox::Json::fetchValue(_config_, "parametersManagerConfig", _parManager_.getConfig()) );
 
   // Monitoring parameters
   _showEventBreakdown_ = GenericToolbox::Json::fetchValue(_config_, "showEventBreakdown", _showEventBreakdown_);
@@ -58,16 +64,6 @@ void Propagator::readConfigImpl(){
 
   // EventDialCache parameters
   EventDialCache::globalEventReweightCap = GenericToolbox::Json::fetchValue(_config_, "globalEventReweightCap", EventDialCache::globalEventReweightCap);
-
-  LogInfo << "Reading parameter configuration..." << std::endl;
-  auto parameterSetListConfig = ConfigUtils::getForwardedConfig(GenericToolbox::Json::fetchValue(_config_, "parameterSetListConfig", JsonType()));
-  _parManager_.getParameterSetsList().reserve(parameterSetListConfig.size()); // make sure the objects aren't moved in RAM ( since FitParameter* will be used )
-  for( const auto& parameterSetConfig : parameterSetListConfig ){
-    _parManager_.getParameterSetsList().emplace_back();
-    _parManager_.getParameterSetsList().back().setConfig(parameterSetConfig);
-    _parManager_.getParameterSetsList().back().readConfig();
-    LogInfo << _parManager_.getParameterSetsList().back().getSummary() << std::endl;
-  }
 
   LogInfo << "Reading samples configuration..." << std::endl;
   auto fitSampleSetConfig = GenericToolbox::Json::fetchValue(_config_, "fitSampleSetConfig", JsonType());

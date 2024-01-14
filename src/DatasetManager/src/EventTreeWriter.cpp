@@ -18,7 +18,6 @@ LoggerInit([]{
 
 
 void EventTreeWriter::readConfigImpl() {
-  ConfigUtils::forwardConfig( _config_ );
 
   _writeDials_ = GenericToolbox::Json::fetchValue(_config_, "writeDials", _writeDials_);
   _nPointsPerDial_ = GenericToolbox::Json::fetchValue(_config_, "nPointsPerDial", _nPointsPerDial_);
