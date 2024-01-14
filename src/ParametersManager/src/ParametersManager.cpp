@@ -24,13 +24,11 @@ void ParametersManager::unmuteLogger(){ Logger::setIsMuted( false ); }
 
 // config
 void ParametersManager::readConfigImpl(){
-  GUNDAM_JOINT_PROBABILITY_H
 
   _parameterSetListConfig_ = GenericToolbox::Json::fetchValue(_config_, "parameterSetList", _parameterSetListConfig_);
 
   _reThrowParSetIfOutOfBounds_ = GenericToolbox::Json::fetchValue(_config_, "reThrowParSetIfOutOfBounds", _reThrowParSetIfOutOfBounds_);
   _throwToyParametersWithGlobalCov_ = GenericToolbox::Json::fetchValue(_config_, "throwToyParametersWithGlobalCov", _throwToyParametersWithGlobalCov_);
-
 
   LogInfo << "Reading parameter configuration..." << std::endl;
   auto parameterSetListConfig = ConfigUtils::getForwardedConfig(GenericToolbox::Json::fetchValue(_config_, "parameterSetListConfig", JsonType()));
@@ -41,6 +39,7 @@ void ParametersManager::readConfigImpl(){
     _parameterSetList_.back().readConfig();
     LogInfo << _parameterSetList_.back().getSummary() << std::endl;
   }
+  LogInfo << _parameterSetList_.size() << " parameter sets defined." << std::endl;
 
 }
 void ParametersManager::initializeImpl(){

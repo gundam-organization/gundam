@@ -34,7 +34,7 @@ void Propagator::readConfigImpl(){
   GenericToolbox::Json::deprecatedAction(_config_, "parameterSetListConfig", [&]{
     LogAlert << R"("parameterSetListConfig" should now be set under "parametersManagerConfig/parameterSetList".)" << std::endl;
     auto parameterSetListConfig = GenericToolbox::Json::fetchValue<JsonType>(_config_, "parameterSetListConfig");
-    _parManager_.setParameterSetListConfig( ConfigUtils::getForwardedConfig(parameterSetListConfig) );
+    _parManager_.setParameterSetListConfig( ConfigUtils::getForwardedConfig( parameterSetListConfig ) );
   });
   GenericToolbox::Json::deprecatedAction(_config_, "reThrowParSetIfOutOfBounds", [&]{
     LogAlert << "Forwarding the option to ParametersManager. Consider moving it into \"parametersManagerConfig:\"" << std::endl;
@@ -46,7 +46,7 @@ void Propagator::readConfigImpl(){
   });
 
   // nested objects
-  _parManager_.readConfig( GenericToolbox::Json::fetchValue(_config_, "parametersManagerConfig", _parManager_.getConfig()) );
+  _parManager_.readConfig( GenericToolbox::Json::fetchValue( _config_, "parametersManagerConfig", _parManager_.getConfig()) );
 
   // Monitoring parameters
   _showEventBreakdown_ = GenericToolbox::Json::fetchValue(_config_, "showEventBreakdown", _showEventBreakdown_);
