@@ -16,7 +16,7 @@ namespace JointProbability {
 #define ENUM_NAME JointProbabilityType
 #define ENUM_FIELDS \
   ENUM_FIELD( PoissonLLH, 0 ) \
-  ENUM_FIELD( LeastSquaresLLH ) \
+  ENUM_FIELD( LeastSquares ) \
   ENUM_FIELD( BarlowLLH ) \
   ENUM_FIELD( BarlowLLH_BANFF_OA2020 ) \
   ENUM_FIELD( BarlowLLH_BANFF_OA2021 ) \
@@ -44,7 +44,7 @@ namespace JointProbability {
     [[nodiscard]] JointProbabilityType getType() const override { return JointProbabilityType::PoissonLLH; }
     [[nodiscard]] double eval(const Sample& sample_, int bin_) const override;
   };
-  class LeastSquaresLLH : public JointProbability{
+  class LeastSquares : public JointProbability{
     /// Evaluate the Least Squares difference between the expected and observed.
     /// This is NOT a real LLH function, but is good for debugging since it has
     /// minimal numeric problems (doesn't use any functions like Log or Sqrt).
@@ -53,7 +53,7 @@ namespace JointProbability {
     void readConfigImpl() override;
 
   public:
-    [[nodiscard]] JointProbabilityType getType() const override { return JointProbabilityType::LeastSquaresLLH; }
+    [[nodiscard]] JointProbabilityType getType() const override { return JointProbabilityType::LeastSquares; }
     [[nodiscard]] double eval(const Sample& sample_, int bin_) const override;
 
     /// If true the use Poissonian approximation with the variance equal to

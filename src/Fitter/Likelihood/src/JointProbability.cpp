@@ -340,13 +340,13 @@ namespace JointProbability{
       return 2.0 * (predVal - dataVal + dataVal * TMath::Log(dataVal / predVal));
   }
 
-  // LeastSquaresLLH
-  void LeastSquaresLLH::readConfigImpl(){
+  // LeastSquares
+  void LeastSquares::readConfigImpl(){
     LogWarning << "Using LeastSquaresLLH: NOT A REAL LIKELIHOOD" << std::endl;
     lsqPoissonianApproximation = GenericToolbox::Json::fetchValue(_config_, "lsqPoissonianApproximation", lsqPoissonianApproximation);
     LogWarning << "Using Least Squares Poissonian Approximation" << std::endl;
   }
-  double LeastSquaresLLH::eval(const Sample& sample_, int bin_) const {
+  double LeastSquares::eval(const Sample& sample_, int bin_) const {
     double predVal = sample_.getMcContainer().histogram->GetBinContent(bin_);
     double dataVal = sample_.getDataContainer().histogram->GetBinContent(bin_);
     double v = dataVal - predVal;
@@ -509,8 +509,8 @@ namespace JointProbability{
       case JointProbabilityType::PoissonLLH:
         out = std::make_unique<PoissonLLH>();
         break;
-      case JointProbabilityType::LeastSquaresLLH:
-        out = std::make_unique<LeastSquaresLLH>();
+      case JointProbabilityType::LeastSquares:
+        out = std::make_unique<LeastSquares>();
         break;
       case JointProbabilityType::BarlowLLH:
         out = std::make_unique<BarlowLLH>();
