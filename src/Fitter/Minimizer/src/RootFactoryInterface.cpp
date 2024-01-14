@@ -66,8 +66,9 @@ void RootFactoryInterface::initializeImpl(){
     _minimizerAlgo_ = _rootMinimizer_->Options().MinimizerAlgorithm();
     LogWarning << "Using default minimizer algo: " << _minimizerAlgo_ << std::endl;
   }
-  
-  _rootMinimizer_->SetFunction(ROOT::Math::Functor(this, &RootFactoryInterface::evalFit, _minimizerParameterPtrList_.size()) );
+
+  _functor_ = ROOT::Math::Functor(this, &RootFactoryInterface::evalFit, _minimizerParameterPtrList_.size());
+  _rootMinimizer_->SetFunction( _functor_ );
   _rootMinimizer_->SetStrategy(_strategy_);
   _rootMinimizer_->SetPrintLevel(_printLevel_);
   _rootMinimizer_->SetTolerance(_tolerance_);

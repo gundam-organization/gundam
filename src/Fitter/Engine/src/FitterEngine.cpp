@@ -108,7 +108,7 @@ void FitterEngine::initializeImpl(){
   LogThrowIf(_saveDir_== nullptr);
 
   if( GundamGlobals::isLightOutputMode() ){
-    // TODO: should be more universal
+    // TODO: this check should be more universal
     LogWarning << "Light mode enabled, wiping plot gen config..." << std::endl;
     _likelihoodInterface_.getPropagator().getPlotGenerator().readConfig(JsonType());
   }

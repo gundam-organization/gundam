@@ -43,6 +43,7 @@ void MinimizerBase::initializeImpl(){
       }
     }
   }
+  LogInfo << "Nb minimizer parameters: " << _minimizerParameterPtrList_.size() << std::endl;
 
   if( not GundamGlobals::isLightOutputMode() ){
     _monitor_.historyTree = std::make_unique<TTree>( "chi2History", "chi2History");
@@ -123,6 +124,8 @@ double MinimizerBase::evalFit( const double* parArray_ ){
 
   // Monitor if enabled
   if( _monitor_.isEnabled ){
+    _monitor_.nbEvalLikelihoodCalls++;
+
     if( _monitor_.historyTree != nullptr ){ _monitor_.historyTree->Fill(); }
     if( _monitor_.gradientDescentMonitor.isEnabled ){
 

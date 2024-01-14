@@ -66,8 +66,6 @@ void LikelihoodInterface::initializeImpl() {
   LogInfo << "LikelihoodInterface initialized." << std::endl;
 }
 
-
-
 double LikelihoodInterface::evalLikelihood() const {
   this->evalStatLikelihood();
   this->evalPenaltyLikelihood();

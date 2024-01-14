@@ -84,6 +84,7 @@ private:
   // internals
   bool _fitHasConverged_{false};
 
+  ROOT::Math::Functor _functor_{};
   std::unique_ptr<ROOT::Math::Minimizer> _rootMinimizer_{nullptr};
 
 };

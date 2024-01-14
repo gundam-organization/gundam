@@ -26,8 +26,8 @@ void ParameterScanner::unmuteLogger(){ Logger::setIsMuted(false); }
 
 void ParameterScanner::readConfigImpl() {
   if( _config_.empty() ) return;
-
-  LogInfo << "Reading ParameterScanner configuration..." << std::endl;
+  ConfigUtils::forwardConfig( _config_ );
+  LogInfo << "Configuring ParameterScanner..." << std::endl;
 
   _useParameterLimits_ = GenericToolbox::Json::fetchValue(_config_, "useParameterLimits", _useParameterLimits_);
   _nbPoints_ = GenericToolbox::Json::fetchValue(_config_, "nbPoints", _nbPoints_);
@@ -36,6 +36,7 @@ void ParameterScanner::readConfigImpl() {
 
   _varsConfig_ = GenericToolbox::Json::fetchValue(_config_, "varsConfig", JsonType());
 
+  LogInfo << "ParameterScanner configured." << std::endl;
 }
 void ParameterScanner::initializeImpl() {
   LogInfo << "Initializing ParameterScanner..." << std::endl;
