@@ -260,14 +260,14 @@ int main(int argc, char** argv){
   }
 
   // --skip-hesse
-  fitter.getMinimizer().setEnablePostFitErrorEval(not clParser.isOptionTriggered("skipHesse"));
+  fitter.getMinimizer().setDisableCalcError( clParser.isOptionTriggered("skipHesse") );
 
   // --scan <N>
   if( clParser.isOptionTriggered("scanParameters") ) {
     fitter.setEnablePreFitScan( true );
     fitter.setEnablePostFitScan( true );
-    fitter.getPropagator().getParameterScanner().setNbPoints(
-        clParser.getOptionVal("scanParameters", fitter.getPropagator().getParameterScanner().getNbPoints())
+    fitter.getParameterScanner().setNbPoints(
+        clParser.getOptionVal("scanParameters", fitter.getParameterScanner().getNbPoints())
         );
   }
 
@@ -315,8 +315,8 @@ int main(int argc, char** argv){
 
   if( clParser.isOptionTriggered("skipSimplex") ){
     LogAlert << "Explicitly disabling SIMPLEX first pass" << std::endl;
-    LogThrowIf( fitter.getMinimizer().getMinimizerTypeName() != "MinimizerInterface", "invalid option --skip-simplex" );
-    ((RootFactoryInterface*) &fitter.getMinimizer())->setEnableSimplexBeforeMinimize(false );
+    LogThrowIf( fitter.getMinimizerType() != FitterEngine::MinimizerType::RootFactory, "invalid option --skip-simplex" );
+    ((RootFactoryInterface*) &fitter.getMinimizer())->setEnableSimplexBeforeMinimize( false );
   }
 
 
@@ -341,7 +341,7 @@ int main(int argc, char** argv){
 
       GenericToolbox::writeInTFile( outDir, TNamed("endPoint", GenericToolbox::Json::toReadableString(endPoint).c_str()) );
 
-      fitter.getPropagator().getParameterScanner().scanSegment( outDir, endPoint );
+      fitter.getParameterScanner().scanSegment( outDir, endPoint );
     }
     else if( clParser.getNbValueSet("scanLine") == 2 ) {
       LogAlert << "Will scan the line from point A (" << clParser.getOptionVal<std::string>("scanLine", 0)
@@ -353,7 +353,7 @@ int main(int argc, char** argv){
       GenericToolbox::writeInTFile( outDir, TNamed("startPoint", GenericToolbox::Json::toReadableString(startPoint).c_str()) );
       GenericToolbox::writeInTFile( outDir, TNamed("endPoint", GenericToolbox::Json::toReadableString(endPoint).c_str()) );
 
-      fitter.getPropagator().getParameterScanner().scanSegment( outDir, endPoint, startPoint );
+      fitter.getParameterScanner().scanSegment( outDir, endPoint, startPoint );
     }
     else{
       LogThrow("");

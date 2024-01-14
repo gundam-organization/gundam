@@ -35,13 +35,17 @@ public:
   virtual void calcErrors(){}
   virtual void scanParameters( TDirectory* saveDir_ );
   virtual double evalFit( const double* parArray_ );
-  virtual bool isErrorCalcEnabled(){ return false; }
+  virtual bool isErrorCalcEnabled() const { return false; }
   [[nodiscard]] virtual bool isFitHasConverged() const = 0;
 
   // c-tor
   explicit MinimizerBase(FitterEngine* owner_) : _owner_(owner_) {}
 
+  // setters
+  void setDisableCalcError(bool disableCalcError_){ _disableCalcError_ = disableCalcError_; }
+
   // const getters
+  bool disableCalcError() const{ return _disableCalcError_; }
   int getMinimizerStatus() const { return _minimizerStatus_; }
   const FitterEngine& getOwner() const;
   const Propagator& getPropagator() const;
@@ -66,6 +70,7 @@ protected:
   bool _useNormalizedFitSpace_{true};
 
   // internals
+  bool _disableCalcError_{false};
   int _minimizerStatus_{-1}; // -1: invalid, 0: success, >0: errors
   int _nbFreeParameters_{0};
   std::vector<Parameter*> _minimizerParameterPtrList_{};

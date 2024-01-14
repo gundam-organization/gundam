@@ -28,8 +28,6 @@ void RootFactoryInterface::readConfigImpl(){
 
   LogInfo << "Reading minimizer config..." << std::endl;
 
-  _enablePostFitErrorEval_ = GenericToolbox::Json::fetchValue(_config_, "enablePostFitErrorFit", _enablePostFitErrorEval_);
-
   _monitor_.gradientDescentMonitor.isEnabled = GenericToolbox::Json::fetchValue( _config_, "monitorGradientDescent", _monitor_.gradientDescentMonitor.isEnabled );
 
   _minimizerType_ = GenericToolbox::Json::fetchValue(_config_, "minimizer", _minimizerType_);
@@ -417,8 +415,8 @@ void RootFactoryInterface::saveMinimizerSettings( TDirectory* saveDir_) const {
     GenericToolbox::writeInTFile( saveDir_, TNamed("simplexStrategy", std::to_string(_simplexStrategy_).c_str()) );
   }
 
-  if( _enablePostFitErrorEval_ ){
-    GenericToolbox::writeInTFile( saveDir_, TNamed("enablePostFitErrorFit", std::to_string(_enablePostFitErrorEval_).c_str()) );
+  if( isErrorCalcEnabled() ){
+    GenericToolbox::writeInTFile( saveDir_, TNamed("enablePostFitErrorFit", std::to_string(isErrorCalcEnabled()).c_str()) );
     GenericToolbox::writeInTFile( saveDir_, TNamed("errorAlgo", _errorAlgo_.c_str()) );
   }
 }

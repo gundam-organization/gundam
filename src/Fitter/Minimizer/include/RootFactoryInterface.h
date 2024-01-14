@@ -33,6 +33,7 @@ public:
   void minimize() override;
   void calcErrors() override;
   void scanParameters( TDirectory* saveDir_ ) override;
+  bool isErrorCalcEnabled() const override { return not disableCalcError(); }
 
   // c-tor
   explicit RootFactoryInterface(FitterEngine* owner_): MinimizerBase(owner_) {}
@@ -60,7 +61,6 @@ private:
 
   // Parameters
   bool _preFitWithSimplex_{false};
-  bool _enablePostFitErrorEval_{true};
   bool _restoreStepSizeBeforeHesse_{false};
   bool _generatedPostFitParBreakdown_{false};
   bool _generatedPostFitEigenBreakdown_{false};

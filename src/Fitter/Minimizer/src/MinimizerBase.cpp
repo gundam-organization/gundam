@@ -16,6 +16,8 @@ LoggerInit([]{
 void MinimizerBase::readConfigImpl(){
   LogInfo << "Reading MinimizerBase config..." << std::endl;
 
+  _disableCalcError_ = not GenericToolbox::Json::fetchValue(_config_, "enablePostFitErrorFit", not _disableCalcError_);
+
   _monitor_.showParameters = GenericToolbox::Json::fetchValue(_config_, "showParametersOnFitMonitor", _monitor_.showParameters);
   _monitor_.maxNbParametersPerLine = GenericToolbox::Json::fetchValue(_config_, "maxNbParametersPerLineOnMonitor", _monitor_.maxNbParametersPerLine);
   _monitor_.convergenceMonitor.setMaxRefreshRateInMs(

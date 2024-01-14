@@ -24,6 +24,7 @@
 
 class FitterEngine : public JsonBaseClass {
 
+public:
 #define ENUM_NAME MinimizerType
 #define ENUM_FIELDS \
   ENUM_FIELD( RootFactory, 0 ) \
@@ -54,6 +55,7 @@ public:
   // Getters (const)
   const JsonType &getPreFitParState() const{ return _preFitParState_; }
   const JsonType &getPostFitParState() const{ return _postFitParState_; }
+  [[nodiscard]] MinimizerType getMinimizerType() const{ return _minimizerType_; }
   [[nodiscard]] const Propagator& getPropagator() const{ return _likelihoodInterface_.getPropagator(); }
   [[nodiscard]] const ParameterScanner& getParameterScanner() const{ return _parameterScanner_; }
   [[nodiscard]] const MinimizerBase& getMinimizer() const{ return *_minimizer_; }
