@@ -14,28 +14,33 @@ LoggerInit([]{
 
 
 void MinimizerBase::readConfigImpl(){
-  LogInfo << "Reading MinimizerBase config..." << std::endl;
+  LogReturnIf(_config_.empty(), __METHOD_NAME__ << " config is empty." );
+  ConfigUtils::forwardConfig( _config_ );
+  LogWarning << "Configuring MinimizerBase..." << std::endl;
 
-  _disableCalcError_ = not GenericToolbox::Json::fetchValue(_config_, "enablePostFitErrorFit", not _disableCalcError_);
-
+  // nested objects first
   _monitor_.showParameters = GenericToolbox::Json::fetchValue(_config_, "showParametersOnFitMonitor", _monitor_.showParameters);
   _monitor_.maxNbParametersPerLine = GenericToolbox::Json::fetchValue(_config_, "maxNbParametersPerLineOnMonitor", _monitor_.maxNbParametersPerLine);
   _monitor_.convergenceMonitor.setMaxRefreshRateInMs(
       GenericToolbox::Json::fetchValue( _config_, "monitorRefreshRateInMs", int(5000) )
-      * ( GenericToolbox::getTerminalWidth() != 0 ? 1 : 5 ) // slow down the refresh rate if in batch mode
+      * ( GenericToolbox::getTerminalWidth() != 0 ? 1 : 10 ) // slow down the refresh rate if in batch mode
   );
 
+  // members
+  _disableCalcError_ = not GenericToolbox::Json::fetchValue(_config_, "enablePostFitErrorFit", not _disableCalcError_);
   _useNormalizedFitSpace_ = GenericToolbox::Json::fetchValue(_config_, "useNormalizedFitSpace", _useNormalizedFitSpace_);
 
+  LogWarning << "MinimizerBase configured." << std::endl;
 }
 void MinimizerBase::initializeImpl(){
-  LogInfo << "Initializing the minimizer..." << std::endl;
+  LogWarning << "Initializing MinimizerBase..." << std::endl;
+
   LogThrowIf(_owner_ == nullptr, "FitterEngine owner not set.");
 
   _nbFreeParameters_ = 0;
   _minimizerParameterPtrList_.clear();
-  _minimizerParameterPtrList_.reserve( _owner_->getLikelihoodInterface().getNbParameters() );
-  for( auto& parSet : _owner_->getPropagator().getParametersManager().getParameterSetsList() ){
+  _minimizerParameterPtrList_.reserve( getLikelihoodInterface().getNbParameters() );
+  for( auto& parSet : getPropagator().getParametersManager().getParameterSetsList() ){
     for( auto& par : parSet.getEffectiveParameterList() ){
       if( par.isEnabled() and not par.isFixed() ) {
         _minimizerParameterPtrList_.emplace_back( &par );
@@ -49,9 +54,9 @@ void MinimizerBase::initializeImpl(){
     _monitor_.historyTree = std::make_unique<TTree>( "chi2History", "chi2History");
     _monitor_.historyTree->SetDirectory( nullptr ); // will be saved later
     _monitor_.historyTree->Branch("nbEvalLikelihoodCalls", &_monitor_.nbEvalLikelihoodCalls);
-    _monitor_.historyTree->Branch("totalLikelihood", &_owner_->getLikelihoodInterface().getBuffer().totalLikelihood);
-    _monitor_.historyTree->Branch("statLikelihood", &_owner_->getLikelihoodInterface().getBuffer().statLikelihood);
-    _monitor_.historyTree->Branch("penaltyLikelihood", &_owner_->getLikelihoodInterface().getBuffer().penaltyLikelihood);
+    _monitor_.historyTree->Branch("totalLikelihood", &getLikelihoodInterface().getBuffer().totalLikelihood);
+    _monitor_.historyTree->Branch("statLikelihood", &getLikelihoodInterface().getBuffer().statLikelihood);
+    _monitor_.historyTree->Branch("penaltyLikelihood", &getLikelihoodInterface().getBuffer().penaltyLikelihood);
     _monitor_.historyTree->Branch("iterationSpeed", _monitor_.itSpeedMon.getCountSpeedPtr());
   }
 
@@ -68,19 +73,8 @@ void MinimizerBase::initializeImpl(){
   _monitor_.convergenceMonitor.addVariable("Stat");
   _monitor_.convergenceMonitor.addVariable("Syst");
 
+  LogWarning << "MinimizerBase initialized." << std::endl;
 }
-
-// const getters
-const FitterEngine& MinimizerBase::getOwner() const { return *_owner_; }
-const Propagator& MinimizerBase::getPropagator() const{ return _owner_->getPropagator(); }
-const ParameterScanner& MinimizerBase::getParameterScanner() const { return _owner_->getParameterScanner(); }
-const LikelihoodInterface& MinimizerBase::getLikelihoodInterface() const{ return _owner_->getLikelihoodInterface(); }
-
-// mutable getters
-FitterEngine& MinimizerBase::getOwner(){ return *_owner_; }
-Propagator& MinimizerBase::getPropagator(){ return _owner_->getPropagator(); }
-ParameterScanner& MinimizerBase::getParameterScanner(){ return _owner_->getParameterScanner(); }
-LikelihoodInterface& MinimizerBase::getLikelihoodInterface(){ return _owner_->getLikelihoodInterface(); }
 
 void MinimizerBase::minimize(){
   LogThrowIf(not isInitialized(), "not initialized");
@@ -99,7 +93,7 @@ void MinimizerBase::minimize(){
   << "Number of degree of freedom: " << getNbDegreeOfFreedom()
   << std::endl;
 
-  LogWarning << std::endl << GenericToolbox::addUpDownBars("Calling minimize...") << std::endl;
+  LogWarning << std::endl << GenericToolbox::addUpDownBars("Calling minimize()...") << std::endl;
 }
 void MinimizerBase::scanParameters(TDirectory* saveDir_){
   LogInfo << "Performing scans of fit parameters..." << std::endl;
@@ -108,6 +102,7 @@ void MinimizerBase::scanParameters(TDirectory* saveDir_){
 }
 double MinimizerBase::evalFit( const double* parArray_ ){
   _monitor_.externalTimer.stop();
+  _monitor_.evalLlhTimer.start();
 
   // Update fit parameter values:
   int iFitPar{0};
@@ -121,6 +116,7 @@ double MinimizerBase::evalFit( const double* parArray_ ){
 
   // Propagate the parameters
   getLikelihoodInterface().propagateAndEvalLikelihood();
+  _monitor_.evalLlhTimer.stop();
 
   // Monitor if enabled
   if( _monitor_.isEnabled ){
@@ -256,14 +252,13 @@ double MinimizerBase::evalFit( const double* parArray_ ){
   return getLikelihoodInterface().getBuffer().totalLikelihood;
 }
 
-
 void MinimizerBase::printParameters(){
   // This prints the same set of parameters as are in the vector returned by
   // getMinimizerFitParameterPtr(), but does it by parameter set so that the
   // output is a little more clear.
 
   LogWarning << std::endl << GenericToolbox::addUpDownBars("Summary of the fit parameters:") << std::endl;
-  for( const auto& parSet : _owner_->getPropagator().getParametersManager().getParameterSetsList() ){
+  for( const auto& parSet : getPropagator().getParametersManager().getParameterSetsList() ){
 
     GenericToolbox::TablePrinter t;
     t.setColTitles({ {"Title"}, {"Starting"}, {"Prior"}, {"StdDev"}, {"Min"}, {"Max"}, {"Status"} });
@@ -301,6 +296,19 @@ void MinimizerBase::printParameters(){
     t.printTable();
   }
 }
+
+// protected
+// const getters
+const FitterEngine& MinimizerBase::getOwner() const { return *_owner_; }
+const Propagator& MinimizerBase::getPropagator() const{ return _owner_->getPropagator(); }
+const ParameterScanner& MinimizerBase::getParameterScanner() const { return _owner_->getParameterScanner(); }
+const LikelihoodInterface& MinimizerBase::getLikelihoodInterface() const{ return _owner_->getLikelihoodInterface(); }
+
+// mutable getters
+FitterEngine& MinimizerBase::getOwner(){ return *_owner_; }
+Propagator& MinimizerBase::getPropagator(){ return _owner_->getPropagator(); }
+ParameterScanner& MinimizerBase::getParameterScanner(){ return _owner_->getParameterScanner(); }
+LikelihoodInterface& MinimizerBase::getLikelihoodInterface(){ return _owner_->getLikelihoodInterface(); }
 
 //  A Lesser GNU Public License
 

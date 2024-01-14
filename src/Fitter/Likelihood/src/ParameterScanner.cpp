@@ -27,7 +27,7 @@ void ParameterScanner::unmuteLogger(){ Logger::setIsMuted(false); }
 void ParameterScanner::readConfigImpl() {
   if( _config_.empty() ) return;
   ConfigUtils::forwardConfig( _config_ );
-  LogInfo << "Configuring ParameterScanner..." << std::endl;
+  LogWarning << "Configuring ParameterScanner..." << std::endl;
 
   _useParameterLimits_ = GenericToolbox::Json::fetchValue(_config_, "useParameterLimits", _useParameterLimits_);
   _nbPoints_ = GenericToolbox::Json::fetchValue(_config_, "nbPoints", _nbPoints_);
@@ -36,10 +36,10 @@ void ParameterScanner::readConfigImpl() {
 
   _varsConfig_ = GenericToolbox::Json::fetchValue(_config_, "varsConfig", JsonType());
 
-  LogInfo << "ParameterScanner configured." << std::endl;
+  LogWarning << "ParameterScanner configured." << std::endl;
 }
 void ParameterScanner::initializeImpl() {
-  LogInfo << "Initializing ParameterScanner..." << std::endl;
+  LogWarning << "Initializing ParameterScanner..." << std::endl;
 
   LogThrowIf(_likelihoodInterfacePtr_ == nullptr, "_likelihoodInterfacePtr_ not set.");
 
@@ -131,6 +131,7 @@ void ParameterScanner::initializeImpl() {
     }
   }
 
+  LogWarning << "ParameterScanner initialized." << std::endl;
 }
 
 void ParameterScanner::scanParameterList( std::vector<Parameter>& par_, TDirectory* saveDir_){

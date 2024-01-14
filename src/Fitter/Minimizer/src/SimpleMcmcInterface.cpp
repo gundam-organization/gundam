@@ -19,6 +19,7 @@ LoggerInit([]{
 
 
 void SimpleMcmcInterface::readConfigImpl(){
+  LogReturnIf(_config_.empty(), __METHOD_NAME__ << " config is empty." );
   MinimizerBase::readConfigImpl();
   LogInfo << "Reading minimizer config..." << std::endl;
 
@@ -899,6 +900,8 @@ void SimpleMcmcInterface::minimize() {
   // Save the sampled points to the outputfile
   if (outputTree) outputTree->Write();
 
+  // success
+  _minimizerStatus_ = 0;
 }
 
 double SimpleMcmcInterface::evalFitValid(const double* parArray_) {

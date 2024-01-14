@@ -37,14 +37,14 @@ protected:
   void initializeImpl() override;
 
 public:
+  // overrides
   void minimize() override; /// Generate a chain.
 
+  // c-tor
   explicit SimpleMcmcInterface(FitterEngine* owner_): MinimizerBase(owner_) {}
 
-  /// An MCMC doesn't really converge in the sense meant here. This flags success.
-  [[nodiscard]] virtual bool isFitHasConverged() const override  {return true;}
-
-  double evalFitValid(const double* parArray_);
+  // core
+  double evalFitValid( const double* parArray_ );
   void setParameterValidity(const std::string& validity);
   [[nodiscard]] bool hasValidParameterValues() const;
 

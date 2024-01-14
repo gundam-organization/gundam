@@ -11,8 +11,8 @@
 #include "GenericToolbox.Time.h"
 #include "Logger.h"
 
-#include "nlohmann/json.hpp"
 #include <TTreeFormulaManager.h>
+#include "nlohmann/json.hpp"
 
 #include <memory>
 

@@ -7,7 +7,6 @@
 
 #include "Sample.h"
 #include "ParameterSet.h"
-#include "Likelihoods.hh"
 #include "JsonBaseClass.h"
 
 #include <string>

@@ -41,9 +41,6 @@ public:
   // setters
   void setEnableSimplexBeforeMinimize(bool enableSimplexBeforeMinimize_){ _preFitWithSimplex_ = enableSimplexBeforeMinimize_; }
 
-  // overridden getters
-  [[nodiscard]] bool isFitHasConverged() const override{ return _fitHasConverged_; }
-
   // const getters
   [[nodiscard]] double getTargetEdm() const;
   [[nodiscard]] const std::unique_ptr<ROOT::Math::Minimizer> &getMinimizer() const{ return _rootMinimizer_; }

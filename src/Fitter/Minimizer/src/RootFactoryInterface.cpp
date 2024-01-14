@@ -24,9 +24,9 @@ LoggerInit([]{
 
 
 void RootFactoryInterface::readConfigImpl(){
-  MinimizerBase::readConfigImpl();
-
-  LogInfo << "Reading minimizer config..." << std::endl;
+  LogReturnIf(_config_.empty(), __METHOD_NAME__ << " config is empty." );
+  this->MinimizerBase::readConfigImpl();
+  LogWarning << "Configuring RootFactoryInterface..." << std::endl;
 
   _monitor_.gradientDescentMonitor.isEnabled = GenericToolbox::Json::fetchValue( _config_, "monitorGradientDescent", _monitor_.gradientDescentMonitor.isEnabled );
 
@@ -52,6 +52,7 @@ void RootFactoryInterface::readConfigImpl(){
 
   _stepSizeScaling_ = GenericToolbox::Json::fetchValue(_config_, "stepSizeScaling", _stepSizeScaling_);
 
+  LogWarning << "RootFactoryInterface configured." << std::endl;
 }
 void RootFactoryInterface::initializeImpl(){
   MinimizerBase::initializeImpl();
@@ -115,11 +116,12 @@ void RootFactoryInterface::minimize(){
 
     std::string originalAlgo = _rootMinimizer_->Options().MinimizerAlgorithm();
 
-    _rootMinimizer_->Options().SetMinimizerAlgorithm("Simplex");
+    _rootMinimizer_->Options().SetMinimizerAlgorithm( "Simplex" );
     _rootMinimizer_->SetMaxFunctionCalls(_simplexMaxFcnCalls_);
     _rootMinimizer_->SetTolerance(_tolerance_ * _simplexToleranceLoose_ );
     _rootMinimizer_->SetStrategy(0);
 
+    _monitor_.minimizerTitle = _minimizerType_ + "/" + "Simplex";
     _monitor_.stateTitleMonitor = "Running Simplex...";
 
     // SIMPLEX
@@ -147,6 +149,7 @@ void RootFactoryInterface::minimize(){
     LogWarning << "Simplex ended after " << _monitor_.nbEvalLikelihoodCalls - nbFitCallOffset << " calls." << std::endl;
   }
 
+  _monitor_.minimizerTitle = _minimizerType_ + "/" + _minimizerAlgo_;
   _monitor_.stateTitleMonitor = "Running " + _rootMinimizer_->Options().MinimizerAlgorithm() + "...";
 
   _monitor_.isEnabled = true;
@@ -266,6 +269,9 @@ void RootFactoryInterface::minimize(){
   LogInfo << "Writing " << _minimizerType_ << "/" << _minimizerAlgo_ << " post-fit errors" << std::endl;
   this->writePostFitData(GenericToolbox::mkdirTFile(getOwner().getSaveDir(), GenericToolbox::joinPath("postFit", _minimizerAlgo_)));
   GenericToolbox::triggerTFileWrite(GenericToolbox::mkdirTFile(getOwner().getSaveDir(), GenericToolbox::joinPath("postFit", _minimizerAlgo_)));
+
+  if( _fitHasConverged_ ){ _minimizerStatus_ = 0; }
+  else{ _minimizerStatus_ = _rootMinimizer_->Status(); }
 }
 void RootFactoryInterface::calcErrors(){
   LogThrowIf(not isInitialized(), "not initialized");
@@ -319,6 +325,7 @@ void RootFactoryInterface::calcErrors(){
     // Make sure we are on the right spot
     updateCacheToBestfitPoint();
 
+    _monitor_.minimizerTitle = _minimizerType_ + "/" + _errorAlgo_;
     _monitor_.stateTitleMonitor = "Running HESSE...";
 
     _monitor_.isEnabled = true;
@@ -382,7 +389,7 @@ void RootFactoryInterface::scanParameters( TDirectory* saveDir_ ){
   }
 }
 
-// overridden getters
+// const getters
 double RootFactoryInterface::getTargetEdm() const{
   // Migrad: The default tolerance is 0.1, and the minimization will stop
   // when the estimated vertical distance to the minimum (EDM) is less

@@ -19,6 +19,19 @@
 
 namespace JointProbability {
 
+#define ENUM_NAME JointProbabilityType
+#define ENUM_FIELDS \
+  ENUM_FIELD( Unset, 0 ) \
+  ENUM_FIELD( Plugin ) \
+  ENUM_FIELD( Chi2 ) \
+  ENUM_FIELD( PoissonLLH ) \
+  ENUM_FIELD( LeastSquaresLLH ) \
+  ENUM_FIELD( BarlowLLH ) \
+  ENUM_FIELD( BarlowLLH_BANFF_OA2020 ) \
+  ENUM_FIELD( BarlowLLH_BANFF_OA2021 ) \
+  ENUM_FIELD( BarlowLLH_BANFF_OA2021_SFGD )
+#include "GenericToolbox.MakeEnum.h"
+
   class JointProbability : public JsonBaseClass {
   public:
     // two choices -> either override bin by bin llh or global eval function
@@ -31,7 +44,7 @@ namespace JointProbability {
     }
   };
 
-  class JointProbabilityPlugin : public JointProbability{
+  class Plugin : public JointProbability{
 
   public:
     [[nodiscard]] double eval(const Sample& sample_, int bin_) const override;

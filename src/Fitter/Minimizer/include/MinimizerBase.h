@@ -36,7 +36,6 @@ public:
   virtual void scanParameters( TDirectory* saveDir_ );
   virtual double evalFit( const double* parArray_ );
   virtual bool isErrorCalcEnabled() const { return false; }
-  [[nodiscard]] virtual bool isFitHasConverged() const = 0;
 
   // c-tor
   explicit MinimizerBase(FitterEngine* owner_) : _owner_(owner_) {}
@@ -47,23 +46,25 @@ public:
   // const getters
   bool disableCalcError() const{ return _disableCalcError_; }
   int getMinimizerStatus() const { return _minimizerStatus_; }
+
+  // mutable getters
+  Monitor& getMonitor(){ return _monitor_; }
+
+  // core
+  void printParameters();
+  int getNbDegreeOfFreedom(){ return getLikelihoodInterface().getNbSampleBins() - _nbFreeParameters_; }
+
+protected:
+
   const FitterEngine& getOwner() const;
   const Propagator& getPropagator() const;
   const ParameterScanner& getParameterScanner() const;
   const LikelihoodInterface& getLikelihoodInterface() const;
 
-  // mutable getters
-  Monitor& getMonitor(){ return _monitor_; }
   FitterEngine& getOwner();
   Propagator& getPropagator();
   ParameterScanner& getParameterScanner();
   LikelihoodInterface& getLikelihoodInterface();
-
-  // core
-  int getNbDegreeOfFreedom(){ return getLikelihoodInterface().getNbSampleBins() - _nbFreeParameters_; }
-
-protected:
-  void printParameters();
 
   // config
   bool _throwOnBadLlh_{false};
@@ -108,7 +109,7 @@ protected:
   Monitor _monitor_{};
 
 private:
-  FitterEngine* _owner_{nullptr};
+  FitterEngine* _owner_{nullptr}; // super private field
 
 };
 

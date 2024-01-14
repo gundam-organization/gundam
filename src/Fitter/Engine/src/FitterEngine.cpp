@@ -26,7 +26,9 @@ LoggerInit([]{
 
 
 void FitterEngine::readConfigImpl(){
+  ConfigUtils::forwardConfig( _config_ );
   LogWarning << "Configuring FitterEngine..." << std::endl;
+
   GenericToolbox::setT2kPalette();
 
   JsonType minimizerConfig{};
@@ -414,7 +416,9 @@ void FitterEngine::fit(){
     }
   }
 
-  if( not _minimizer_->isFitHasConverged() ){
+
+
+  if( _minimizer_->getMinimizerStatus() != 0 ){
     LogError << "Skipping post-fit error calculation since the minimizer did not converge." << std::endl;
   }
   else{
