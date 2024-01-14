@@ -57,7 +57,6 @@ void MinimizerBase::initializeImpl(){
     _monitor_.historyTree->Branch("totalLikelihood", &getLikelihoodInterface().getBuffer().totalLikelihood);
     _monitor_.historyTree->Branch("statLikelihood", &getLikelihoodInterface().getBuffer().statLikelihood);
     _monitor_.historyTree->Branch("penaltyLikelihood", &getLikelihoodInterface().getBuffer().penaltyLikelihood);
-    _monitor_.historyTree->Branch("iterationSpeed", _monitor_.itSpeedMon.getCountSpeedPtr());
   }
 
   _monitor_.convergenceMonitor.addDisplayedQuantity("VarName");
@@ -137,7 +136,7 @@ double MinimizerBase::evalFit( const double* parArray_ ){
       if( isGradientDescentStep ){
 
         if( gradient.lastGradientFall == _monitor_.nbEvalLikelihoodCalls - 1 ){
-          LogWarning << "Overriding last gradient descent entry (minimizer adjusting step size...): ";
+          LogWarning << "Minimizer is adjusting the step size: ";
         }
         else{
           gradient.stepPointList.emplace_back();
@@ -152,16 +151,7 @@ double MinimizerBase::evalFit( const double* parArray_ ){
     }
     if( _monitor_.convergenceMonitor.isGenerateMonitorStringOk() ){
 
-      _monitor_.itSpeedMon.cycle( _monitor_.nbEvalLikelihoodCalls - _monitor_.itSpeedMon.getCounts() );
-
-      if( _monitor_.itSpeed.counts != 0 ){
-        _monitor_.itSpeed.counts = _monitor_.nbEvalLikelihoodCalls - _monitor_.itSpeed.counts; // how many cycles since last print
-        _monitor_.itSpeed.cumulated = GenericToolbox::getElapsedTimeSinceLastCallInMicroSeconds("itSpeed"); // time since last print
-      }
-      else{
-        _monitor_.itSpeed.counts = _monitor_.nbEvalLikelihoodCalls;
-        GenericToolbox::getElapsedTimeSinceLastCallInMicroSeconds("itSpeed");
-      }
+      _monitor_.iterationCounterClock.count( _monitor_.nbEvalLikelihoodCalls );
 
       std::stringstream ssHeader;
       ssHeader << std::endl << __METHOD_NAME__ << ": call #" << _monitor_.nbEvalLikelihoodCalls;
@@ -182,10 +172,9 @@ double MinimizerBase::evalFit( const double* parArray_ ){
       t << _monitor_.minimizerTitle << GenericToolbox::TablePrinter::NextLine;
 
       t << "Speed" << GenericToolbox::TablePrinter::NextColumn;
-      t << _monitor_.itSpeedMon << GenericToolbox::TablePrinter::NextColumn;
-//    t << (double)_monitor_.itSpeed.counts / (double)_monitor_.itSpeed.cumulated * 1E6 << " it/s" << GenericToolbox::TablePrinter::NextColumn;
-      t << getPropagator().weightProp << GenericToolbox::TablePrinter::NextColumn;
-      t << getPropagator().fillProp << GenericToolbox::TablePrinter::NextColumn;
+      t << _monitor_.iterationCounterClock.calcCountSpeed() << " it/s" << GenericToolbox::TablePrinter::NextColumn;
+      t << getPropagator().reweightTimer << GenericToolbox::TablePrinter::NextColumn;
+      t << getPropagator().refillHistogramTimer << GenericToolbox::TablePrinter::NextColumn;
       t << _monitor_.externalTimer << GenericToolbox::TablePrinter::NextLine;
 
       ssHeader << t.generateTableString();
@@ -238,8 +227,6 @@ double MinimizerBase::evalFit( const double* parArray_ ){
             true // force generate
         );
       }
-
-      _monitor_.itSpeed.counts = _monitor_.nbEvalLikelihoodCalls;
     }
   }
 

@@ -49,7 +49,7 @@ void FitterEngine::readConfigImpl(){
   });
   GenericToolbox::Json::deprecatedAction(_config_, "mcmcConfig", [&]{
     LogAlert << "mcmcConfig should now be set as minimizerConfig" << std::endl;
-    minimizerConfig = GenericToolbox::Json::fetchValue( _config_, "mcmcConfig" , JsonType() );
+    minimizerConfig = GenericToolbox::Json::fetchValue( _config_, "mcmcConfig" , minimizerConfig );
   });
   GenericToolbox::Json::deprecatedAction(_config_, "engineType", [&]{
     LogAlert << "engineType should now be specified withing minimizerConfig/minimizerType" << std::endl;

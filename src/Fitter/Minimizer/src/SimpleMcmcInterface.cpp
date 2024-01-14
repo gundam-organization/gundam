@@ -869,13 +869,16 @@ void SimpleMcmcInterface::minimize() {
   LogInfo << "Parameters in likelihood: " << _point_.size() << std::endl;
 
   // Create the output tree for the accepted points.
-  TTree *outputTree = new TTree(_outTreeName_.c_str(),
+  auto *outputTree = new TTree(_outTreeName_.c_str(),
                                 "Tree of accepted points");
   outputTree->Branch("Points",&_point_);
   outputTree->Branch("LLHPenalty",&_llhPenalty_);
   outputTree->Branch("LLHStatistical",&_llhStatistical_);
   outputTree->Branch("Models",&_saveModel_);
   outputTree->Branch("ModelUncertainty",&_saveUncertainty_);
+
+  _monitor_.stateTitleMonitor = "Running MCMC chain...";
+  _monitor_.minimizerTitle = _algorithmName_ + "/" + _proposalName_;
 
   // Run a chain.
   int nbFitCallOffset = _monitor_.nbEvalLikelihoodCalls;
@@ -898,7 +901,7 @@ void SimpleMcmcInterface::minimize() {
   LogInfo << "MCMC ended after " << nbMCMCCalls << " calls." << std::endl;
 
   // Save the sampled points to the outputfile
-  if (outputTree) outputTree->Write();
+  outputTree->Write();
 
   // success
   _minimizerStatus_ = 0;

@@ -128,8 +128,4 @@ namespace JointProbability {
 }
 
 
-
-
-
-
-#endif //GUNDAM_JOINT_PROBABILITY_H
+#endif // GUNDAM_JOINT_PROBABILITY_H

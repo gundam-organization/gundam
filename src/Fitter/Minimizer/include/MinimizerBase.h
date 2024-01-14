@@ -35,7 +35,7 @@ public:
   virtual void calcErrors(){}
   virtual void scanParameters( TDirectory* saveDir_ );
   virtual double evalFit( const double* parArray_ );
-  virtual bool isErrorCalcEnabled() const { return false; }
+  [[nodiscard]] virtual bool isErrorCalcEnabled() const { return false; }
 
   // c-tor
   explicit MinimizerBase(FitterEngine* owner_) : _owner_(owner_) {}
@@ -44,8 +44,8 @@ public:
   void setDisableCalcError(bool disableCalcError_){ _disableCalcError_ = disableCalcError_; }
 
   // const getters
-  bool disableCalcError() const{ return _disableCalcError_; }
-  int getMinimizerStatus() const { return _minimizerStatus_; }
+  [[nodiscard]] bool disableCalcError() const{ return _disableCalcError_; }
+  [[nodiscard]] int getMinimizerStatus() const { return _minimizerStatus_; }
 
   // mutable getters
   Monitor& getMonitor(){ return _monitor_; }
@@ -55,11 +55,10 @@ public:
   int getNbDegreeOfFreedom(){ return getLikelihoodInterface().getNbSampleBins() - _nbFreeParameters_; }
 
 protected:
-
-  const FitterEngine& getOwner() const;
-  const Propagator& getPropagator() const;
-  const ParameterScanner& getParameterScanner() const;
-  const LikelihoodInterface& getLikelihoodInterface() const;
+  [[nodiscard]] const FitterEngine& getOwner() const;
+  [[nodiscard]] const Propagator& getPropagator() const;
+  [[nodiscard]] const ParameterScanner& getParameterScanner() const;
+  [[nodiscard]] const LikelihoodInterface& getLikelihoodInterface() const;
 
   FitterEngine& getOwner();
   Propagator& getPropagator();
@@ -88,8 +87,7 @@ protected:
 
     GenericToolbox::Time::AveragedTimer<10> evalLlhTimer{};
     GenericToolbox::Time::AveragedTimer<10> externalTimer{};
-    GenericToolbox::Time::CycleTimer itSpeed;
-    GenericToolbox::Time::CycleCounterClock itSpeedMon{"it"};
+    GenericToolbox::Time::AveragedTimer<1> iterationCounterClock{};
 
     GenericToolbox::VariablesMonitor convergenceMonitor;
 
