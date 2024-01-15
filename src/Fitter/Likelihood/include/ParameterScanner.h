@@ -2,8 +2,8 @@
 // Created by Nadrino on 07/04/2022.
 //
 
-#ifndef GUNDAM_PARAMETERSCANNER_H
-#define GUNDAM_PARAMETERSCANNER_H
+#ifndef GUNDAM_PARAMETER_SCANNER_H
+#define GUNDAM_PARAMETER_SCANNER_H
 
 #include "LikelihoodInterface.h"
 #include "Parameter.h"
@@ -14,6 +14,10 @@
 #include "TGraph.h"
 
 #include <utility>
+
+/*
+ The ParameterScanner job is to drive a LikelihoodInterface in order to scan the response of parameters.
+*/
 
 
 class ParameterScanner : public JsonBaseClass {
@@ -83,4 +87,4 @@ private:
 };
 
 
-#endif //GUNDAM_PARAMETERSCANNER_H
+#endif //GUNDAM_PARAMETER_SCANNER_H

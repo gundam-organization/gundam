@@ -2,8 +2,8 @@
 // Created by Nadrino on 11/06/2021.
 //
 
-#ifndef GUNDAM_FITTERENGINE_H
-#define GUNDAM_FITTERENGINE_H
+#ifndef GUNDAM_FITTER_ENGINE_H
+#define GUNDAM_FITTER_ENGINE_H
 
 
 #include "LikelihoodInterface.h"
@@ -104,4 +104,5 @@ private:
   std::unique_ptr<MinimizerBase> _minimizer_{}; // a virtual class in charge of driving the LikelihoodInterface
 
 };
-#endif //GUNDAM_FITTERENGINE_H
+
+#endif // GUNDAM_FITTER_ENGINE_H

@@ -8,7 +8,6 @@
 #include "GundamGlobals.h"
 
 #include "GenericToolbox.Json.h"
-#include "GenericToolbox.Time.h"
 #include "Logger.h"
 
 #include <TTreeFormulaManager.h>
@@ -23,6 +22,8 @@ LoggerInit([]{ Logger::setUserHeaderStr("[SampleSet]"); });
 void SampleSet::readConfigImpl(){
   LogWarning << __METHOD_NAME__ << std::endl;
   LogThrowIf(_config_.empty(), "_config_ is not set." << std::endl);
+
+  _showTimeStats_ = GenericToolbox::Json::fetchValue(_config_, "showTimeStats", _showTimeStats_);
 
   LogInfo << "Reading samples definition..." << std::endl;
   auto fitSampleListConfig = GenericToolbox::Json::fetchValue(_config_, "fitSampleList", JsonType());
@@ -99,17 +100,14 @@ void SampleSet::clearMcContainers(){
 }
 
 void SampleSet::updateSampleEventBinIndexes() const{
-  if( _showTimeStats_ ) GenericToolbox::getElapsedTimeSinceLastCallInMicroSeconds(__METHOD_NAME__);
   GundamGlobals::getParallelWorker().runJob("FitSampleSet::updateSampleEventBinIndexes");
-  if( _showTimeStats_ ) LogDebug << __METHOD_NAME__ << " took: " << GenericToolbox::getElapsedTimeSinceLastCallStr(__METHOD_NAME__) << std::endl;
+  LogDebugIf(_showTimeStats_) << __METHOD_NAME__ << " took: " << GundamGlobals::getParallelWorker().getLastJobTimer() << std::endl;
 }
 void SampleSet::updateSampleBinEventList() const{
-  if( _showTimeStats_ ) GenericToolbox::getElapsedTimeSinceLastCallInMicroSeconds(__METHOD_NAME__);
   GundamGlobals::getParallelWorker().runJob("FitSampleSet::updateSampleBinEventList");
-  if( _showTimeStats_ ) LogDebug << __METHOD_NAME__ << " took: " << GenericToolbox::getElapsedTimeSinceLastCallStr(__METHOD_NAME__) << std::endl;
+  LogDebugIf(_showTimeStats_) << __METHOD_NAME__ << " took: " << GundamGlobals::getParallelWorker().getLastJobTimer() << std::endl;
 }
 void SampleSet::updateSampleHistograms() const {
-  if( _showTimeStats_ ) GenericToolbox::getElapsedTimeSinceLastCallInMicroSeconds(__METHOD_NAME__);
   GundamGlobals::getParallelWorker().runJob("FitSampleSet::updateSampleHistograms");
-  if( _showTimeStats_ ) LogDebug << __METHOD_NAME__ << " took: " << GenericToolbox::getElapsedTimeSinceLastCallStr(__METHOD_NAME__) << std::endl;
+  LogDebugIf(_showTimeStats_) << __METHOD_NAME__ << " took: " << GundamGlobals::getParallelWorker().getLastJobTimer() << std::endl;
 }

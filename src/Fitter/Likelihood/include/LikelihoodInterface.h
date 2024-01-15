@@ -49,7 +49,6 @@ public:
   // mutable core
   void propagateAndEvalLikelihood();
 
-
   // core
   double evalLikelihood() const;
   double evalStatLikelihood() const;

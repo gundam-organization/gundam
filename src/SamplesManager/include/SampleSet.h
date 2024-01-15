@@ -2,12 +2,14 @@
 // Created by Nadrino on 22/07/2021.
 //
 
-#ifndef GUNDAM_SAMPLESET_H
-#define GUNDAM_SAMPLESET_H
+#ifndef GUNDAM_SAMPLE_SET_H
+#define GUNDAM_SAMPLE_SET_H
 
 #include "Sample.h"
 #include "ParameterSet.h"
 #include "JsonBaseClass.h"
+
+#include "GenericToolbox.Time.h"
 
 #include <string>
 #include <vector>
@@ -29,8 +31,8 @@ public:
   void clearMcContainers();
 
   // const getters
-  const std::vector<Sample> &getSampleList() const { return _sampleList_; }
-  const std::vector<std::string>& getAdditionalVariablesForStorage() const { return _additionalVariablesForStorage_; }
+  [[nodiscard]] const std::vector<Sample> &getSampleList() const { return _sampleList_; }
+  [[nodiscard]] const std::vector<std::string>& getAdditionalVariablesForStorage() const { return _additionalVariablesForStorage_; }
 
   // mutable getters
   std::vector<Sample> &getSampleList(){ return _sampleList_; }
@@ -45,13 +47,18 @@ public:
   void updateSampleHistograms() const;
 
 private:
+  // config
   bool _showTimeStats_{false};
   std::vector<Sample> _sampleList_;
 
+  // internals
   std::vector<std::string> _eventByEventDialLeafList_;
   std::vector<std::string> _additionalVariablesForStorage_;
+
+  // monitoring
+  mutable GenericToolbox::Time::Timer _timer_;
 
 };
 
 
-#endif //GUNDAM_SAMPLESET_H
+#endif //GUNDAM_SAMPLE_SET_H

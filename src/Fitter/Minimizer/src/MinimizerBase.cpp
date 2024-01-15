@@ -171,7 +171,7 @@ double MinimizerBase::evalFit( const double* parArray_ ){
       t << _monitor_.minimizerTitle << GenericToolbox::TablePrinter::NextLine;
 
       t << "Speed" << GenericToolbox::TablePrinter::NextColumn;
-      t << _monitor_.iterationCounterClock.calcCountSpeed() << " it/s" << GenericToolbox::TablePrinter::NextColumn;
+      t << _monitor_.iterationCounterClock.evalTickSpeed() << " it/s" << GenericToolbox::TablePrinter::NextColumn;
       t << getPropagator().reweightTimer << GenericToolbox::TablePrinter::NextColumn;
       t << getPropagator().refillHistogramTimer << GenericToolbox::TablePrinter::NextColumn;
       t << _monitor_.externalTimer << GenericToolbox::TablePrinter::NextLine;

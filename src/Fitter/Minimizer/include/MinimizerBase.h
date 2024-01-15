@@ -19,6 +19,8 @@
 #include <string>
 
 
+
+
 class FitterEngine; // owner
 
 class MinimizerBase : public JsonBaseClass {
