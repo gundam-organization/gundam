@@ -12,17 +12,18 @@
 #include <vector>
 #include <string>
 
+
+class ParameterSet;
+
+class Parameter : public JsonBaseClass {
+
+public:
 #define ENUM_NAME PriorType
 #define ENUM_FIELDS \
   ENUM_FIELD(Unset, -1) \
   ENUM_FIELD(Gaussian) \
   ENUM_FIELD(Flat)
 #include "GenericToolbox.MakeEnum.h"
-
-
-class ParameterSet;
-
-class Parameter : public JsonBaseClass {
 
 protected:
   // called through public JsonBaseClass::readConfig() and JsonBaseClass::initialize()

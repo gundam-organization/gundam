@@ -260,8 +260,8 @@ void MinimizerBase::printParameters(){
       if( not par.isEnabled() ) { statusStr = "Disabled"; colorStr = GenericToolbox::ColorCodes::yellowBackground; }
       else if( par.isFixed() )  { statusStr = "Fixed";    colorStr = GenericToolbox::ColorCodes::redBackground; }
       else                      {
-        statusStr = PriorType::toString(par.getPriorType()) + " Prior";
-        if(par.getPriorType()==PriorType::Flat) colorStr = GenericToolbox::ColorCodes::blueBackground;
+        statusStr = Parameter::PriorType::toString(par.getPriorType()) + " Prior";
+        if(par.getPriorType()==Parameter::PriorType::Flat) colorStr = GenericToolbox::ColorCodes::blueBackground;
       }
 
 #ifdef NOCOLOR
