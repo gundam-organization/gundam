@@ -1,5 +1,5 @@
 //
-// Created by Adrien Blanchet on 30/11/2022.
+// Created by Nadrino on 30/11/2022.
 //
 
 #include "Spline.h"

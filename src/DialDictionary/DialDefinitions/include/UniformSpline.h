@@ -1,5 +1,5 @@
 //
-// Created by Adrien Blanchet on 23/01/2023.
+// Created by Nadrino on 23/01/2023.
 //
 
 #ifndef GUNDAM_UNIFORMSPLINE_H

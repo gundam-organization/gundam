@@ -1,5 +1,5 @@
 //
-// Created by Adrien Blanchet on 13/10/2023.
+// Created by Nadrino on 13/10/2023.
 //
 
 #include "ParametersManager.h"

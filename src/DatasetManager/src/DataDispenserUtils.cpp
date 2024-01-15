@@ -1,5 +1,5 @@
 //
-// Created by Adrien Blanchet on 29/09/2023.
+// Created by Nadrino on 29/09/2023.
 //
 
 #include "DataDispenserUtils.h"

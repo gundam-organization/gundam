@@ -1,5 +1,5 @@
 //
-// Created by Adrien Blanchet on 17/05/2023.
+// Created by Nadrino on 17/05/2023.
 //
 
 #include "ConfigUtils.h"

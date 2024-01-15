@@ -1,5 +1,5 @@
 //
-// Created by Adrien Blanchet on 07/12/2022.
+// Created by Nadrino on 07/12/2022.
 //
 
 #ifndef GUNDAM_GRAPH_H

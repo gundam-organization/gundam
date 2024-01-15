@@ -69,7 +69,7 @@ void ParameterSet::readConfigImpl(){
 
   }
 
-  _enablePca_ = GenericToolbox::Json::fetchValue(_config_, std::vector<std::string>{"allowPca", "runPcaCheck", "enablePca"}, _enablePca_);
+  _enablePca_ = GenericToolbox::Json::fetchValue(_config_, {{"enablePca"}, {"allowPca"}}, _enablePca_);
   _enabledThrowToyParameters_ = GenericToolbox::Json::fetchValue(_config_, "enabledThrowToyParameters", _enabledThrowToyParameters_);
   _maskForToyGeneration_ = GenericToolbox::Json::fetchValue(_config_, "maskForToyGeneration", _maskForToyGeneration_);
   _customFitParThrow_ = GenericToolbox::Json::fetchValue(_config_, "customFitParThrow", std::vector<JsonType>());

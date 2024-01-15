@@ -1,5 +1,5 @@
 //
-// Created by Adrien Blanchet on 10/04/2023.
+// Created by Nadrino on 10/04/2023.
 //
 
 #ifndef GUNDAM_ROOTFORMULA_H

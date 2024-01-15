@@ -1,5 +1,5 @@
 //
-// Created by Adrien Blanchet on 21/05/2023.
+// Created by Nadrino on 21/05/2023.
 //
 
 #ifndef GUNDAM_GUNDAMUTILS_H

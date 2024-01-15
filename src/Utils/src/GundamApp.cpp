@@ -1,5 +1,5 @@
 //
-// Created by Adrien Blanchet on 30/05/2023.
+// Created by Nadrino on 30/05/2023.
 //
 
 #include "GundamApp.h"

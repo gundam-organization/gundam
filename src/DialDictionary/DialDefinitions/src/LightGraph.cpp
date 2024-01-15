@@ -1,5 +1,5 @@
 //
-// Created by Adrien Blanchet on 19/01/2023.
+// Created by Nadrino on 19/01/2023.
 //
 
 #include "LightGraph.h"

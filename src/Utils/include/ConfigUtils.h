@@ -1,5 +1,5 @@
 //
-// Created by Adrien Blanchet on 28/02/2023.
+// Created by Nadrino on 28/02/2023.
 //
 
 #ifndef GUNDAM_CONFIGUTILS_H

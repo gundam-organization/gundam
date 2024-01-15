@@ -1,5 +1,5 @@
 //
-// Created by Adrien Blanchet on 29/11/2022.
+// Created by Nadrino on 29/11/2022.
 //
 
 #include "DialInputBuffer.h"

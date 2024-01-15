@@ -1,17 +1,14 @@
 //
-// Created by Adrien Blanchet on 01/12/2022.
+// Created by Nadrino on 01/12/2022.
 //
 
-#ifndef GUNDAM_EVENTDIALCACHE_H
-#define GUNDAM_EVENTDIALCACHE_H
+#ifndef GUNDAM_EVENT_DIAL_CACHE_H
+#define GUNDAM_EVENT_DIAL_CACHE_H
 
 #include "SampleSet.h"
 #include "DialCollection.h"
 #include "PhysicsEvent.h"
 #include "DialInterface.h"
-
-
-// DEV
 #include "GundamGlobals.h"
 
 #include "GenericToolbox.Wrappers.h"
@@ -143,7 +140,7 @@ private:
 };
 
 
-#endif //GUNDAM_EVENTDIALCACHE_H
+#endif // GUNDAM_EVENT_DIAL_CACHE_H
 
 //  A Lesser GNU Public License
 

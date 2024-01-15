@@ -1,5 +1,5 @@
 //
-// Created by Adrien Blanchet on 23/01/2023.
+// Created by Nadrino on 23/01/2023.
 //
 
 #include "UniformSpline.h"

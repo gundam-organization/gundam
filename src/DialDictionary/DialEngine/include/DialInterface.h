@@ -1,9 +1,9 @@
 //
-// Created by Adrien Blanchet on 29/11/2022.
+// Created by Nadrino on 29/11/2022.
 //
 
-#ifndef GUNDAM_DIALINTERFACE_H
-#define GUNDAM_DIALINTERFACE_H
+#ifndef GUNDAM_DIAL_INTERFACE_H
+#define GUNDAM_DIAL_INTERFACE_H
 
 #include "DialBase.h"
 #include "DialInputBuffer.h"
@@ -62,4 +62,4 @@ public:
 };
 
 
-#endif //GUNDAM_DIALINTERFACE_H
+#endif //GUNDAM_DIAL_INTERFACE_H

@@ -1,9 +1,9 @@
 //
-// Created by Adrien Blanchet on 29/11/2022.
+// Created by Nadrino on 29/11/2022.
 //
 
-#ifndef GUNDAM_DIALINPUTBUFFER_H
-#define GUNDAM_DIALINPUTBUFFER_H
+#ifndef GUNDAM_DIAL_INPUT_BUFFER_H
+#define GUNDAM_DIAL_INPUT_BUFFER_H
 
 #include "ParameterSet.h"
 
@@ -133,4 +133,4 @@ private:
 };
 
 
-#endif //GUNDAM_DIALINPUTBUFFER_H
+#endif // GUNDAM_DIAL_INPUT_BUFFER_H

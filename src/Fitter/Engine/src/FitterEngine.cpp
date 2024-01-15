@@ -81,7 +81,7 @@ void FitterEngine::readConfigImpl(){
   _parameterScanner_.readConfig( GenericToolbox::Json::fetchValue(_config_, "scanConfig", _parameterScanner_.getConfig()) );
 
   // members
-  _enablePca_ = GenericToolbox::Json::fetchValue(_config_, std::vector<std::string>{"enablePca", "runPcaCheck"}, _enablePca_);
+  _enablePca_ = GenericToolbox::Json::fetchValue(_config_, {{"enablePca"}, {"runPcaCheck"}}, _enablePca_);
   _pcaDeltaChi2Threshold_ = GenericToolbox::Json::fetchValue(_config_, {{"ghostParameterDeltaChi2Threshold"}, {"pcaDeltaChi2Threshold"}}, _pcaDeltaChi2Threshold_);
 
   _enablePreFitScan_ = GenericToolbox::Json::fetchValue(_config_, "enablePreFitScan", _enablePreFitScan_);

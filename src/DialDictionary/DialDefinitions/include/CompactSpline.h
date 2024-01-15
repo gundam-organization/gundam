@@ -1,5 +1,5 @@
 //
-// Created by Adrien Blanchet on 22/01/2023.
+// Created by Nadrino on 22/01/2023.
 //
 
 #ifndef GUNDAM_COMPACTSPLINE_H

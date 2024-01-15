@@ -1,5 +1,5 @@
 //
-// Created by Adrien Blanchet on 08/04/2023.
+// Created by Nadrino on 08/04/2023.
 //
 
 #ifndef GUNDAM_CACHEDDIAL_IMPL_H
