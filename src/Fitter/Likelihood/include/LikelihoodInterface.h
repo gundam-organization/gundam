@@ -19,6 +19,10 @@
 /*
  The LikelihoodInterface job is to evaluate the Likelihood component of a given pair of data/MC.
  It contains a few buffers that are used externally to monitor the fit status.
+
+ The "likelihood" for GUNDAM is documented in the JointProbability class as the LLH
+ (Log Likelihood), but while it is proportional to the LLH, it's actually
+ more closely related to the chi-square (so -LLH/2) as it is treated in the penalty term.
 */
 
 class LikelihoodInterface : public JsonBaseClass {

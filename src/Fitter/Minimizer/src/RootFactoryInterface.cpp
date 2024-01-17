@@ -274,6 +274,7 @@ void RootFactoryInterface::minimize(){
   else{ _minimizerStatus_ = _rootMinimizer_->Status(); }
 }
 void RootFactoryInterface::calcErrors(){
+
   LogThrowIf(not isInitialized(), "not initialized");
 
   LogWarning << std::endl << GenericToolbox::addUpDownBars("Calling calcErrors()...") << std::endl;

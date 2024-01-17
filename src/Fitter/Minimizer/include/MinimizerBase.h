@@ -19,7 +19,18 @@
 #include <string>
 
 
+/*
+  The MinimizerBase is an abstract layer (purely virtual) that provides
+  several methods called by the FitterEngine to perform the fit.
+  It includes a few user parameters as well as a collection of monitoring
+  tools.
 
+  Classes derived from MinimizerBase are used to run different types of
+  fits (primarily a MINUIT based maximization of the likelihood the fits).
+  Classes need to implement two worker methods.  The minimize() method is
+  expected to find the minimim of the LLH function (or Chi-Squared), and the
+  calcErrors() is expected to calculate the covariance of the LLH function.
+*/
 
 class FitterEngine; // owner
 
@@ -34,7 +45,7 @@ protected:
 public:
   // virtual
   virtual void minimize();
-  virtual void calcErrors(){}
+  virtual void calcErrors();
   virtual void scanParameters( TDirectory* saveDir_ );
   virtual double evalFit( const double* parArray_ );
   [[nodiscard]] virtual bool isErrorCalcEnabled() const { return false; }

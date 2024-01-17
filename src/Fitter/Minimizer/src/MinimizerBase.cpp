@@ -75,6 +75,13 @@ void MinimizerBase::initializeImpl(){
 }
 
 void MinimizerBase::minimize(){
+  /// An almost pure virtual method that is called by the FitterEngine to find the
+  /// minimum of the likelihood, or, in the case of a Bayesian integration find
+  /// the posterior distribution.
+  ///
+  /// This base implementation can be called in derived class in order to print
+  /// the initial state of the fit.
+
   LogThrowIf(not isInitialized(), "not initialized");
 
   this->printParameters();
@@ -93,12 +100,20 @@ void MinimizerBase::minimize(){
 
   LogWarning << std::endl << GenericToolbox::addUpDownBars("Calling minimize()...") << std::endl;
 }
+void MinimizerBase::calcErrors(){
+  /// A virtual method that is called by the FiterEngine to calculate the
+  /// errors at best fit point. By default it does nothing.
+}
 void MinimizerBase::scanParameters(TDirectory* saveDir_){
   LogInfo << "Performing scans of fit parameters..." << std::endl;
   LogThrowIf( not isInitialized() );
   for( auto& parPtr : _minimizerParameterPtrList_ ) { getParameterScanner().scanParameter( *parPtr, saveDir_ ); }
 }
 double MinimizerBase::evalFit( const double* parArray_ ){
+/// The main access is through the evalFit method which takes an array of floating
+/// point values and returns the likelihood. The meaning of the parameters is
+/// defined by the vector of pointers to Parameter returned by the LikelihoodInterface.
+
   _monitor_.externalTimer.stop();
   _monitor_.evalLlhTimer.start();
 
