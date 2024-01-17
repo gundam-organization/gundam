@@ -435,9 +435,9 @@ void FitterEngine::runPcaCheck(){
 
   _likelihoodInterface_.propagateAndEvalLikelihood();
 
-  double baseLlh = _likelihoodInterface_.getBuffer().totalLikelihood;
-  double baseLlhStat = _likelihoodInterface_.getBuffer().statLikelihood;
-  double baseLlhSyst = _likelihoodInterface_.getBuffer().penaltyLikelihood;
+  double baseLlh = _likelihoodInterface_.getLastLikelihood();
+  double baseLlhStat = _likelihoodInterface_.getLastStatLikelihood();
+  double baseLlhSyst = _likelihoodInterface_.getLastPenaltyLikelihood();
 
   LogInfo << "Reference " << GUNDAM_CHI2 << "(stat) for PCA: " << baseLlhStat << std::endl;
 
@@ -488,7 +488,7 @@ void FitterEngine::runPcaCheck(){
 
         _likelihoodInterface_.propagateAndEvalLikelihood();
 
-        deltaChi2Stat = _likelihoodInterface_.getBuffer().statLikelihood - baseLlhStat;
+        deltaChi2Stat = _likelihoodInterface_.getLastStatLikelihood() - baseLlhStat;
 
         ssPrint << ": " << GUNDAM_DELTA << GUNDAM_CHI2 << " (stat) = " << deltaChi2Stat;
 
@@ -534,8 +534,8 @@ void FitterEngine::rescaleParametersStepSize(){
   LogInfo << __METHOD_NAME__ << std::endl;
 
   _likelihoodInterface_.propagateAndEvalLikelihood();
-  double baseLlhPull = _likelihoodInterface_.getBuffer().penaltyLikelihood;
-  double baseLlh = _likelihoodInterface_.getBuffer().totalLikelihood;
+  double baseLlhPull = _likelihoodInterface_.getLastPenaltyLikelihood();
+  double baseLlh = _likelihoodInterface_.getLastLikelihood();
 
   // +1 sigma
   for( auto& parSet : _likelihoodInterface_.getPropagator().getParametersManager().getParameterSetsList() ){
@@ -549,8 +549,8 @@ void FitterEngine::rescaleParametersStepSize(){
 
       _likelihoodInterface_.propagateAndEvalLikelihood();
 
-      double deltaChi2 = _likelihoodInterface_.getBuffer().totalLikelihood - baseLlh;
-      double deltaChi2Pulls = _likelihoodInterface_.getBuffer().penaltyLikelihood - baseLlhPull;
+      double deltaChi2 = _likelihoodInterface_.getLastLikelihood() - baseLlh;
+      double deltaChi2Pulls = _likelihoodInterface_.getLastPenaltyLikelihood() - baseLlhPull;
 
       // Consider a parabolic approx:
       // only rescale with X2 stat?
@@ -568,7 +568,7 @@ void FitterEngine::rescaleParametersStepSize(){
       par.setStepSize( stepSize );
       par.setParameterValue( currentParValue + stepSize );
       _likelihoodInterface_.propagateAndEvalLikelihood();
-      LogInfo << " -> Δχ²(step) = " << _likelihoodInterface_.getBuffer().totalLikelihood - baseLlh << std::endl;
+      LogInfo << " -> Δχ²(step) = " << _likelihoodInterface_.getLastLikelihood() - baseLlh << std::endl;
       par.setParameterValue( currentParValue );
     }
 
@@ -614,11 +614,11 @@ void FitterEngine::checkNumericalAccuracy(){
       _likelihoodInterface_.evalLikelihood();
 
       if( responses[iThrow] == responses[iThrow] ){ // not nan
-        LogThrowIf(_likelihoodInterface_.getBuffer().totalLikelihood != responses[iThrow], "Not accurate: " << _likelihoodInterface_.getBuffer().totalLikelihood - responses[iThrow] << " / "
-                                                                                                               << GET_VAR_NAME_VALUE(_likelihoodInterface_.getBuffer().totalLikelihood) << " <=> " << GET_VAR_NAME_VALUE(responses[iThrow])
+        LogThrowIf(_likelihoodInterface_.getLastLikelihood() != responses[iThrow], "Not accurate: " << _likelihoodInterface_.getLastLikelihood() - responses[iThrow] << " / "
+                                                                                                               << GET_VAR_NAME_VALUE(_likelihoodInterface_.getLastLikelihood()) << " <=> " << GET_VAR_NAME_VALUE(responses[iThrow])
         )
       }
-      responses[iThrow] = _likelihoodInterface_.getBuffer().totalLikelihood;
+      responses[iThrow] = _likelihoodInterface_.getLastLikelihood();
     }
     LogDebug << GenericToolbox::toString(responses) << std::endl;
   }

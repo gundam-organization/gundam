@@ -50,7 +50,7 @@ void ParameterScanner::initializeImpl() {
     scanEntry.folder = "llh";
     scanEntry.title = "Total Likelihood Scan";
     scanEntry.yTitle = "LLH value";
-    scanEntry.evalY = [this](){ return _likelihoodInterfacePtr_->getBuffer().totalLikelihood; };
+    scanEntry.evalY = [this](){ return _likelihoodInterfacePtr_->getLastLikelihood(); };
   }
   if( GenericToolbox::Json::fetchValue(_varsConfig_, "llhPenalty", true) ){
     _scanDataDict_.emplace_back();
@@ -60,7 +60,7 @@ void ParameterScanner::initializeImpl() {
     scanEntry.yPoints = std::vector<double>(_nbPoints_+1,0);
     scanEntry.title = "Penalty Likelihood Scan";
     scanEntry.yTitle = "Penalty LLH value";
-    scanEntry.evalY = [this](){ return _likelihoodInterfacePtr_->getBuffer().penaltyLikelihood; };
+    scanEntry.evalY = [this](){ return _likelihoodInterfacePtr_->getLastPenaltyLikelihood(); };
   }
   if( GenericToolbox::Json::fetchValue(_varsConfig_, "llhStat", true) ){
     _scanDataDict_.emplace_back();
@@ -69,7 +69,7 @@ void ParameterScanner::initializeImpl() {
     scanEntry.folder = "llhStat";
     scanEntry.title = "Stat Likelihood Scan";
     scanEntry.yTitle = "Stat LLH value";
-    scanEntry.evalY = [this](){ return _likelihoodInterfacePtr_->getBuffer().statLikelihood; };
+    scanEntry.evalY = [this](){ return _likelihoodInterfacePtr_->getLastStatLikelihood(); };
   }
   if( GenericToolbox::Json::fetchValue(_varsConfig_, "llhStatPerSample", false) ){
     _scanDataDict_.reserve( _likelihoodInterfacePtr_->getPropagator().getSampleSet().getSampleList().size() );

@@ -142,9 +142,9 @@ double MinimizerBase::evalFit( const double* parArray_ ){
           LogWarning << "Gradient step detected at iteration #" << _monitor_.nbEvalLikelihoodCalls << ": ";
         }
         LogWarningIf(gradient.stepPointList.size() >= 2) << gradient.stepPointList[gradient.stepPointList.size() - 2].llh << " -> ";
-        LogWarning << getLikelihoodInterface().getBuffer().totalLikelihood << std::endl;
+        LogWarning << getLikelihoodInterface().getLastLikelihood() << std::endl;
         gradient.stepPointList.back().parState = getPropagator().getParametersManager().exportParameterInjectorConfig();
-        gradient.stepPointList.back().llh = getLikelihoodInterface().getBuffer().totalLikelihood;
+        gradient.stepPointList.back().llh = getLikelihoodInterface().getLastLikelihood();
         gradient.lastGradientFall = _monitor_.nbEvalLikelihoodCalls;
       }
     }
@@ -210,11 +210,11 @@ double MinimizerBase::evalFit( const double* parArray_ ){
 
       _monitor_.convergenceMonitor.setHeaderString(ssHeader.str());
       _monitor_.convergenceMonitor.getVariable("Total/dof").addQuantity(
-          getLikelihoodInterface().getBuffer().totalLikelihood / getNbDegreeOfFreedom()
+          getLikelihoodInterface().getLastLikelihood() / getNbDegreeOfFreedom()
       );
-      _monitor_.convergenceMonitor.getVariable("Total").addQuantity( getLikelihoodInterface().getBuffer().totalLikelihood );
-      _monitor_.convergenceMonitor.getVariable("Stat").addQuantity( getLikelihoodInterface().getBuffer().statLikelihood );
-      _monitor_.convergenceMonitor.getVariable("Syst").addQuantity( getLikelihoodInterface().getBuffer().penaltyLikelihood );
+      _monitor_.convergenceMonitor.getVariable("Total").addQuantity( getLikelihoodInterface().getLastLikelihood() );
+      _monitor_.convergenceMonitor.getVariable("Stat").addQuantity( getLikelihoodInterface().getLastStatLikelihood() );
+      _monitor_.convergenceMonitor.getVariable("Syst").addQuantity( getLikelihoodInterface().getLastPenaltyLikelihood() );
 
       if( _monitor_.nbEvalLikelihoodCalls == 1 ){
         // don't erase these lines
@@ -235,7 +235,7 @@ double MinimizerBase::evalFit( const double* parArray_ ){
   }
 
   _monitor_.externalTimer.start();
-  return getLikelihoodInterface().getBuffer().totalLikelihood;
+  return getLikelihoodInterface().getLastLikelihood();
 }
 
 void MinimizerBase::printParameters(){

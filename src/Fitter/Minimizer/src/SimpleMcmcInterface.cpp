@@ -225,8 +225,8 @@ void SimpleMcmcInterface::fillPoint( bool fillModel) {
       _point_[count++] = iPar.getParameterValue();
     }
   }
-  _llhStatistical_ = getLikelihoodInterface().getBuffer().statLikelihood;
-  _llhPenalty_ = getLikelihoodInterface().getBuffer().penaltyLikelihood;
+  _llhStatistical_ = getLikelihoodInterface().getLastStatLikelihood();
+  _llhPenalty_ = getLikelihoodInterface().getLastPenaltyLikelihood();
   // Watch this next line for speed.  It DOES call the "float" destructor
   // which is trivial (i.e. a noop).  In gcc, all it does is reset the vector
   // "size".
@@ -908,6 +908,10 @@ void SimpleMcmcInterface::minimize() {
 }
 
 double SimpleMcmcInterface::evalFitValid(const double* parArray_) {
+  /// Same as `evalFit` but also check that all the parameters are within
+  /// the allowed ranges.  If a parameter is out of range, then return an
+  /// "infinite" likelihood.
+
   double value = this->evalFit( parArray_ );
   if (hasValidParameterValues()) return value;
   /// A "Really Big Number".  This is nominally just infinity, but is done as
@@ -946,6 +950,9 @@ void SimpleMcmcInterface::setParameterValidity(const std::string& validity) {
   LogWarning << "Set parameter validity to " << validity << " (" << _validFlags_ << ")" << std::endl;
 }
 bool SimpleMcmcInterface::hasValidParameterValues() const {
+  /// Check that the parameters for the last time the propagator was used are
+  /// all within the allowed ranges.
+
   int invalid = 0;
   for( auto& parSet: getPropagator().getParametersManager().getParameterSetsList() ){
     for( auto& par : parSet.getParameterList() ){

@@ -11,13 +11,9 @@
 #include "JsonBaseClass.h"
 
 #include "GenericToolbox.Utils.h"
-#include "GenericToolbox.Time.h"
 
-#include "Math/Functor.h"
-#include "TDirectory.h"
-
+#include <memory>
 #include <string>
-#include <vector>
 
 
 /*
@@ -38,7 +34,9 @@ public:
   // const getters
   [[nodiscard]] int getNbParameters() const {return _nbParameters_; }
   [[nodiscard]] int getNbSampleBins() const {return _nbSampleBins_; }
-  [[nodiscard]] const Buffer& getBuffer() const { return _buffer_; }
+  [[nodiscard]] double getLastLikelihood() const { return _buffer_.totalLikelihood; }
+  [[nodiscard]] double getLastStatLikelihood() const { return _buffer_.statLikelihood; }
+  [[nodiscard]] double getLastPenaltyLikelihood() const { return _buffer_.penaltyLikelihood; }
   [[nodiscard]] const Propagator& getPropagator() const { return _propagator_; }
   const JointProbability::JointProbability* getJointProbabilityPtr() const { return _jointProbabilityPtr_.get(); }
 

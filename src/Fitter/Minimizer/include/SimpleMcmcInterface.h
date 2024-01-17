@@ -12,6 +12,7 @@
 #include "GenericToolbox.Utils.h"
 #include "GenericToolbox.Time.h"
 
+#include "Math/Functor.h"
 #include "TDirectory.h"
 #include "nlohmann/json.hpp"
 
@@ -55,7 +56,7 @@ private:
   /// "1" -- require valid parameters
   /// "2" -- require in the mirrored range
   /// "4" -- require in the physical range
-  int _validFlags_{7}; // TODO: Use enum instead
+  int _validFlags_{7};
 
   std::string _algorithmName_{"metropolis"};
   std::string _proposalName_{"adaptive"};
