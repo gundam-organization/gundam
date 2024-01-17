@@ -48,7 +48,7 @@ public:
   virtual void calcErrors();
   virtual void scanParameters( TDirectory* saveDir_ );
   virtual double evalFit( const double* parArray_ );
-  [[nodiscard]] virtual bool isErrorCalcEnabled() const { return false; }
+  [[nodiscard]] virtual bool isErrorCalcEnabled() const { return false; } // default calcErrors() is not defined
 
   // c-tor
   explicit MinimizerBase(FitterEngine* owner_) : _owner_(owner_) {}

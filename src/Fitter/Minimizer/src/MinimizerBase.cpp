@@ -105,6 +105,10 @@ void MinimizerBase::calcErrors(){
   /// errors at best fit point. By default it does nothing.
 }
 void MinimizerBase::scanParameters(TDirectory* saveDir_){
+  /// A virtual method that by default scans the parameters used by the minimizer.
+  /// This provides a view of the parameters seen by the minimizer, which may
+  /// be different from the parameters used for the likelihood.
+
   LogInfo << "Performing scans of fit parameters..." << std::endl;
   LogThrowIf( not isInitialized() );
   for( auto& parPtr : _minimizerParameterPtrList_ ) { getParameterScanner().scanParameter( *parPtr, saveDir_ ); }
