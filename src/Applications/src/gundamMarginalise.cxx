@@ -512,7 +512,7 @@ int main(int argc, char** argv){
             }
         }
 
-           LogInfo<<"LLH: "<<LLH<<" gLLH: "<<gLLH<<std::endl;
+           LogInfo<<"LLH: "<<LLH<<" gLLH: "<<gLLH<<std::endl    ;
 
 
 //        LogDebugIf(gLLH<50)<<gLLH<<std::endl;
