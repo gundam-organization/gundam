@@ -60,9 +60,11 @@ int main(int argc, char** argv){
     clParser.addTriggerOption("usingGpu", {"--gpu"}, "Use GPU parallelization");
     clParser.addOption("parInject", {"--parameters-inject"}, "Input txt file for injecting params");
     clParser.addOption("pedestal", {"--pedestal"}, "Add pedestal to the sampling distribution (percents)");
+    clParser.addOption("weightCap", {"--weight-cap"}, "Cap the weight of the throws (default: 1.e8)", 1);
 
     clParser.addDummyOption("Trigger options:");
     clParser.addTriggerOption("dryRun", {"-d", "--dry-run"}, "Only overrides fitter config and print it.");
+
 
     // I probably don't need this
     //clParser.addTriggerOption("useBfAsXsec", {"--use-bf-as-xsec"}, "Use best-fit as x-sec value instead of mean of toys.");
@@ -175,6 +177,13 @@ int main(int argc, char** argv){
         LogInfo << "Using Gauss+pedestal sampling: "<< pedestalEntity*100 << "% of the throws will be drawn from a uniform distribution."<<std::endl;
         LogInfo <<"Using default pedestal interval: ["<<pedestalLeftEdge<<"sigma, "<<pedestalRightEdge<<"sigma]";
         LogInfo <<". User defined interval to be implemented"<<std::endl;
+    }
+    double weightCap = 1.e8;
+    if(clParser.isOptionTriggered("weightCap")){
+        weightCap = clParser.getOptionVal<double>("weightCap");
+        LogInfo << "Using weight cap: "<< weightCap << std::endl;
+    }else{
+        LogInfo << "Using default weight cap: "<< weightCap << std::endl;
     }
 
     auto configPropagator = GenericToolbox::Json::fetchValuePath<nlohmann::json>( cHandler.getConfig(), "fitterEngineConfig/propagatorConfig" );
@@ -292,6 +301,10 @@ int main(int argc, char** argv){
     LogInfo << "Creating throws tree" << std::endl;
     auto* margThrowTree = new TTree("margThrow", "margThrow");
     margThrowTree->SetDirectory( GenericToolbox::mkdirTFile(marginalisationDir, "throws") ); // temp saves will be done here
+    auto* ThrowsPThetaFormat = new TTree("PThetaThrows", "PThetaThrows");
+
+
+
     // make a TTree with the following branches, to be filled with the throws
     // 1. marginalised parameters drew: vector<double>
     // 2. non-marginalised parameters drew: vector<double>
@@ -299,6 +312,7 @@ int main(int argc, char** argv){
     // 4. "g" value: the chi square value as extracted from the covariance matrix: double
     // 5. value of the priors for the marginalised parameters: vector<double>
 
+    // branches for margThrowTree
     std::vector<double> parameters;
     std::vector<bool> margThis;
     std::vector<double> prior;
@@ -316,6 +330,12 @@ int main(int argc, char** argv){
     margThrowTree->Branch("priorSum", &priorSum);
     margThrowTree->Branch("weightsChiSquare", &weightsChiSquare);
     margThrowTree->Branch("dialResponse", &dialResponse);
+
+    // branches for ThrowsPThetaFormat
+    std::vector<double> survivingParameterValues;
+    double LhOverGauss;
+    ThrowsPThetaFormat->Branch("ParValues", &survivingParameterValues);
+    ThrowsPThetaFormat->Branch("weight", &LhOverGauss);
 
 
     int nToys{ clParser.getOptionVal<int>("nToys") };
@@ -418,10 +438,12 @@ int main(int argc, char** argv){
 
         // reset weights vector
         weightsChiSquare.clear();
-        // Do the throwing:
+        // Do the throwing
         if (usePedestal){
+            // if the pedestal option is enabled, a uniform distribution is added to the gaussian sampling distribution
             propagator.getParametersManager().throwParametersFromGlobalCovariance(weightsChiSquare, pedestalEntity, pedestalLeftEdge, pedestalRightEdge);
         }else {
+            // standard case: throw according to the covariance matrix
             propagator.getParametersManager().throwParametersFromGlobalCovariance(weightsChiSquare);
         }
 
@@ -476,9 +498,10 @@ int main(int argc, char** argv){
         propagator.updateLlhCache();
         LLH = propagator.getLlhBuffer();
         // make the LH a probability distribution (but still work with the log)
-        LLH /= 2.0;
-        //LLH -= bestFitLLH/2.0;
-        //LLH -= nParameters*log(1.0/2.0*TMath::Pi());
+        // This is an approximation, it works only in case of gaussian LH
+        LLH /= -2.0;
+        LLH += nParameters/2.*log(1.0/(2.0*TMath::Pi()));
+        LLH = -LLH;
 
         LLH_sum += LLH;
         if(iToy==0 and injectParamsManually){
@@ -494,7 +517,6 @@ int main(int argc, char** argv){
 
         parameters.clear();
         margThis.clear();
-        prior.clear();
         int iPar=0;
         for( auto& parSet : propagator.getParametersManager().getParameterSetsList() ) {
             if (not parSet.isEnabled()) { continue; }
@@ -511,18 +533,31 @@ int main(int argc, char** argv){
                 iPar++;
             }
         }
+        //debug
+        LogInfo<<"LLH: "<<LLH<<" gLLH: "<<gLLH<<std::endl    ;
 
-           LogInfo<<"LLH: "<<LLH<<" gLLH: "<<gLLH<<std::endl    ;
+        if ( LLH-gLLH > log(weightCap)){
+            LogInfo<<"Throw "<<iToy<<" rejected: LLH/gLLH = "<<LLH/gLLH<<std::endl;
+            iToy--;
+            continue;
+        }else{
+            // Fill the PThetaFormat tree
+            survivingParameterValues.clear();
+            for( auto& parSet : propagator.getParametersManager().getParameterSetsList() ) {
+                if (not parSet.isEnabled()) { continue; }
+                for (auto &par: parSet.getParameterList()) {
+                    if (not par.isEnabled()) { continue; }
+                    if (not par.isMarginalised()) {
+                        survivingParameterValues.push_back(par.getParameterValue());
+                    }
+                }
+            }
+        }
 
-
-//        LogDebugIf(gLLH<50)<<gLLH<<std::endl;
-//        // print the parameters
-//        for(int iPar=0;iPar<propagator.getParameterSetPtr().size();iPar++){
-//            propagator.getFitParameterSetPtr("all")->getParameterList().at(0).getParameterValue();
-//        }
-
-        // Write the branches
+        // Write the ttrees
         margThrowTree->Fill();
+        ThrowsPThetaFormat->Fill();
+
         //debug
 //        if(iToy==0 || iToy==1){
 //            LogInfo<<"DEBUG: Toy "<<iToy<<std::endl;
@@ -541,18 +576,19 @@ int main(int argc, char** argv){
     }
 
     margThrowTree->Write();
+    ThrowsPThetaFormat->Write();
 
-    double det = 1.0;
-    TMatrixD eigenVectors = (*propagator.getParametersManager().getGlobalCovarianceMatrix());
-    TVectorD eigenValues(parameters.size());
-    eigenVectors.EigenVectors(eigenValues);
-    //LogInfo<<"Eigenvalues: "<<std::endl;
-    for(int i=0;i<eigenValues.GetNrows();i++){
-        det *= pow(eigenValues[i],1./2);
-        //LogInfo<<eigenValues[i]<<" "<<det<<std::endl;
-    }
-    LogInfo<<"SQUARE ROOT OF the determinant of the covariance matrix: "<<det<<std::endl;
-
+    // Compute the determinant of the covariance matrix
+//    double det = 1.0;
+//    TMatrixD eigenVectors = (*propagator.getParametersManager().getGlobalCovarianceMatrix());
+//    TVectorD eigenValues(parameters.size());
+//    eigenVectors.EigenVectors(eigenValues);
+//    //LogInfo<<"Eigenvalues: "<<std::endl;
+//    for(int i=0;i<eigenValues.GetNrows();i++){
+//        det *= pow(eigenValues[i],1./2);
+//        //LogInfo<<eigenValues[i]<<" "<<det<<std::endl;
+//    }
+//    LogInfo<<"SQUARE ROOT OF the determinant of the covariance matrix: "<<det<<std::endl;
 
     //GundamGlobals::getParallelWorker().reset();
 }
