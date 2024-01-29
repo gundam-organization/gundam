@@ -517,6 +517,7 @@ int main(int argc, char** argv){
 
         parameters.clear();
         margThis.clear();
+        prior.clear();
         int iPar=0;
         for( auto& parSet : propagator.getParametersManager().getParameterSetsList() ) {
             if (not parSet.isEnabled()) { continue; }
