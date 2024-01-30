@@ -179,6 +179,7 @@ int main(int argc, char** argv){
         LogInfo <<". User defined interval to be implemented"<<std::endl;
     }
     double weightCap = 1.e8;
+    int countBigThrows = 0;
     if(clParser.isOptionTriggered("weightCap")){
         weightCap = clParser.getOptionVal<double>("weightCap");
         LogInfo << "Using weight cap: "<< weightCap << std::endl;
@@ -518,6 +519,7 @@ int main(int argc, char** argv){
         parameters.clear();
         margThis.clear();
         prior.clear();
+        survivingParameterValues.clear();
         int iPar=0;
         for( auto& parSet : propagator.getParametersManager().getParameterSetsList() ) {
             if (not parSet.isEnabled()) { continue; }
@@ -530,30 +532,20 @@ int main(int argc, char** argv){
                 prior.push_back(par.getDistanceFromNominal() * par.getDistanceFromNominal());
                 priorSum += prior.back();
                 gLLH += weightsChiSquare[iPar];
+                survivingParameterValues.push_back(par.getParameterValue());
+
                 //LogInfo<<iPar<<": "<<weightsChiSquare[iPar]<<std::endl;
                 iPar++;
             }
         }
+        LhOverGauss = exp(LLH-gLLH);
+        if ( LLH-gLLH > log(weightCap)) {
+            LogInfo << "Throw " << iToy << " rejected: LLH-gLLH = " << LLH - gLLH << std::endl;
+            countBigThrows++;
+        }
+
         //debug
         LogInfo<<"LLH: "<<LLH<<" gLLH: "<<gLLH<<std::endl    ;
-
-        if ( LLH-gLLH > log(weightCap)){
-            LogInfo<<"Throw "<<iToy<<" rejected: LLH/gLLH = "<<LLH/gLLH<<std::endl;
-            iToy--;
-            continue;
-        }else{
-            // Fill the PThetaFormat tree
-            survivingParameterValues.clear();
-            for( auto& parSet : propagator.getParametersManager().getParameterSetsList() ) {
-                if (not parSet.isEnabled()) { continue; }
-                for (auto &par: parSet.getParameterList()) {
-                    if (not par.isEnabled()) { continue; }
-                    if (not par.isMarginalised()) {
-                        survivingParameterValues.push_back(par.getParameterValue());
-                    }
-                }
-            }
-        }
 
         // Write the ttrees
         margThrowTree->Fill();
@@ -567,6 +559,9 @@ int main(int argc, char** argv){
 //            }
 //        }
     }// end of main throws loop
+
+    LogInfo<<"weight cap: "<<weightCap<<std::endl;
+    LogInfo<<"Number of throws rejected because LLH-gLLH > log(weightCap): "<<countBigThrows<<" - "<<(double)countBigThrows/nToys*100<<" % of total"<<std::endl;
 
     double averageLLH = LLH_sum/nToys;
     epsilonNormAverage /= nToys;
