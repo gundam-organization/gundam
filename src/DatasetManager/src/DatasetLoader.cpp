@@ -25,7 +25,7 @@ void DatasetLoader::readConfigImpl() {
   _name_ = GenericToolbox::Json::fetchValue<std::string>(_config_, "name");
   LogInfo << "Reading config for dataset: \"" << _name_ << "\"" << std::endl;
 
-  _isEnabled_ = GenericToolbox::Json::fetchValue(_config_, "isEnabled", true);
+  _isEnabled_ = GenericToolbox::Json::fetchValue(_config_, "isEnabled", bool(true));
   LogReturnIf(not _isEnabled_, "\"" << _name_ << "\" is disabled.");
 
   _selectedDataEntry_ = GenericToolbox::Json::fetchValue<std::string>(_config_, "selectedDataEntry", "Asimov");
@@ -46,7 +46,7 @@ void DatasetLoader::readConfigImpl() {
     LogThrowIf( GenericToolbox::doesKeyIsInMap(name, _dataDispenserDict_),
                 "\"" << name << "\" already taken, please use another name." )
 
-    if( GenericToolbox::Json::fetchValue(dataEntry, "fromMc", false) ){ _dataDispenserDict_.emplace(name, _mcDispenser_); }
+    if( GenericToolbox::Json::fetchValue(dataEntry, "fromMc", bool(false)) ){ _dataDispenserDict_.emplace(name, _mcDispenser_); }
     else{ _dataDispenserDict_.emplace(name, DataDispenser(this)); }
     _dataDispenserDict_.at(name).readConfig(dataEntry);
   }

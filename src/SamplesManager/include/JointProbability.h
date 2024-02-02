@@ -95,10 +95,10 @@ namespace JointProbability {
   public:
     double eval(const Sample& sample_, int bin_) override;
 
-    bool verbose{false};
-    bool allowZeroMcWhenZeroData{false};
+    int verboseLevel{0};
+    bool allowZeroMcWhenZeroData{true};
     bool usePoissonLikelihood{false};
-    bool BBNoUpdateWeights{false};
+    bool BBNoUpdateWeights{false}; // OA 2021 bug reimplementation
   };
 
   class BarlowLLH_BANFF_OA2021_SFGD : public JointProbability{

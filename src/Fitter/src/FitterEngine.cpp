@@ -236,7 +236,7 @@ void FitterEngine::initializeImpl(){
 
     {
       TVectorD dataRate(1);
-      dataRate[0] = sample.getMcContainer().getSumWeights();
+      dataRate[0] = sample.getDataContainer().getSumWeights();
       auto outDir = GenericToolbox::joinPath("preFit/rates", GenericToolbox::generateCleanBranchName(sample.getName()), "Data");
       GenericToolbox::writeInTFile(
           GenericToolbox::mkdirTFile(_saveDir_, outDir),

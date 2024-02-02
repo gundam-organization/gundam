@@ -16,7 +16,6 @@
 
 #include "GenericToolbox.Root.LeafCollection.h"
 #include "GenericToolbox.VariablesMonitor.h"
-#include "GenericToolbox.ZipIterator.h"
 #include "GenericToolbox.Root.h"
 #include "GenericToolbox.h"
 #include "Logger.h"
@@ -57,6 +56,8 @@ void DataDispenser::readConfigImpl(){
   _parameters_.dialIndexFormula = GenericToolbox::Json::fetchValue(_config_, "dialIndexFormula", _parameters_.dialIndexFormula);
   _parameters_.selectionCutFormulaStr = GenericToolbox::Json::buildFormula(_config_, "selectionCutFormula", "&&", _parameters_.selectionCutFormulaStr);
   _parameters_.nominalWeightFormulaStr = GenericToolbox::Json::buildFormula(_config_, "nominalWeightFormula", "*", _parameters_.nominalWeightFormulaStr);
+
+  _parameters_.debugNbMaxEventsToLoad = GenericToolbox::Json::fetchValue(_config_, "debugNbMaxEventsToLoad", _parameters_.debugNbMaxEventsToLoad);
 
   _parameters_.variableDict.clear();
   for( auto& entry : GenericToolbox::Json::fetchValue(_config_, {{"variableDict"}, {"overrideLeafDict"}}, nlohmann::json()) ){
@@ -199,6 +200,10 @@ void DataDispenser::parseStringParameters() {
   overrideLeavesNamesFct(_parameters_.nominalWeightFormulaStr);
   overrideLeavesNamesFct(_parameters_.selectionCutFormulaStr);
 
+  // add surrounding parenthesis to force the LeafForm to treat it as a TFormula
+  if(not _parameters_.dialIndexFormula.empty()){ _parameters_.dialIndexFormula = "(" + _parameters_.dialIndexFormula + ")"; }
+  if(not _parameters_.nominalWeightFormulaStr.empty()){ _parameters_.nominalWeightFormulaStr = "(" + _parameters_.nominalWeightFormulaStr + ")"; }
+  if(not _parameters_.selectionCutFormulaStr.empty()){ _parameters_.selectionCutFormulaStr = "(" + _parameters_.selectionCutFormulaStr + ")"; }
 }
 void DataDispenser::doEventSelection(){
   LogWarning << "Performing event selection..." << std::endl;
@@ -938,6 +943,10 @@ void DataDispenser::fillFunction(int iThread_){
     // printing legend
     LogInfo(Logger::Color::BG_BLUE)    << "      " << Logger::getColorEscapeCode(Logger::Color::RESET) << " -> Variables stored in RAM" << std::endl;
     LogInfo(Logger::Color::BG_MAGENTA) << "      " << Logger::getColorEscapeCode(Logger::Color::RESET) << " -> Dials stored in RAM" << std::endl;
+
+    if( _owner_->isDevSingleThreadEventLoaderAndIndexer() ){
+      LogAlert << "Loading data in single thread (devSingleThreadEventLoaderAndIndexer option set to true)" << std::endl;
+    }
   }
 
   // Try to read TTree the closest to sequentially possible
@@ -1037,8 +1046,21 @@ void DataDispenser::fillFunction(int iThread_){
       EventDialCache::IndexedEntry_t* eventDialCacheEntry{nullptr};
       {
         std::unique_lock<std::mutex> lock(GundamGlobals::getThreadMutex());
+        if(_eventDialCacheRef_ != nullptr){
+
+          if( _parameters_.debugNbMaxEventsToLoad != 0 ){
+            // check if the limit has been reached
+            if( _eventDialCacheRef_->getFillIndex() >= _parameters_.debugNbMaxEventsToLoad ){
+              LogAlertIf(iThread_==0) << std::endl << std::endl; // flush pBar
+              LogAlertIf(iThread_==0) << "debugNbMaxEventsToLoad: Event number cap reached (";
+              LogAlertIf(iThread_==0) << _parameters_.debugNbMaxEventsToLoad << ")" << std::endl;
+              return;
+            }
+          }
+
+          eventDialCacheEntry = _eventDialCacheRef_->fetchNextCacheEntry();
+        }
         sampleEventIndex = _cache_.sampleIndexOffsetList[iSample]++;
-        if(_eventDialCacheRef_ != nullptr){ eventDialCacheEntry = _eventDialCacheRef_->fetchNextCacheEntry(); }
       }
 
       // Get the next free event in our buffer
@@ -1124,7 +1146,7 @@ void DataDispenser::fillFunction(int iThread_){
                     dialCollectionRef->getGlobalDialType(),
                     dialCollectionRef->getGlobalDialSubType(),
                     dialObjectPtr,
-                    dialCollectionRef->useCachedDials()
+                    false
                 )
             );
 

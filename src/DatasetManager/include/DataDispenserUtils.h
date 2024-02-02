@@ -30,6 +30,7 @@ struct DataDispenserParameters{
   std::vector<std::string> additionalVarsStorage{};
   std::vector<std::string> dummyVariablesList;
   int iThrow{-1};
+  size_t debugNbMaxEventsToLoad{0};
 
   nlohmann::json fromHistContent{};
 
