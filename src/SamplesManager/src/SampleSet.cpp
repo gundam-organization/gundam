@@ -34,7 +34,7 @@ void SampleSet::readConfigImpl(){
     _fitSampleList_.back().readConfig();
   }
 
-  // To be moved elsewhere -> nothing to do in sample... -> this should belong to the fitter engine
+  // TODO: To be moved elsewhere -> nothing to do in sample... -> this should belong to the fitter engine
   std::string llhMethod = "PoissonLLH";
   llhMethod = GenericToolbox::Json::fetchValue(_config_, "llhStatFunction", llhMethod);
 
@@ -104,7 +104,7 @@ double SampleSet::evalLikelihood(){
   double llh = 0.;
   for( auto& sample : _fitSampleList_ ){
     llh += this->evalLikelihood(sample);
-    LogThrowIf(llh!=llh, sample.getName() << " LLH is NaN.");
+    LogThrowIf(std::isnan(llh) or std::isinf(llh), sample.getName() << ": reportde likelihood is invalid:" << llh);
   }
   return llh;
 }

@@ -232,7 +232,7 @@ double LikelihoodInterface::evalFit(const double* parArray_){
     }
   }
 
-  if(_enableFitMonitor_ && _convergenceMonitor_.isGenerateMonitorStringOk()){
+  if( _enableFitMonitor_ and _convergenceMonitor_.isGenerateMonitorStringOk() ){
 
     _itSpeedMon_.cycle( _nbFitCalls_ - _itSpeedMon_.getCounts() );
 
@@ -323,6 +323,17 @@ double LikelihoodInterface::evalFit(const double* parArray_){
   if( not GundamGlobals::isLightOutputMode() ){
     // Fill History
     _chi2HistoryTree_->Fill();
+  }
+
+  if( std::isnan(_owner_->getPropagator().getLlhBuffer()) ){
+    LogError << _owner_->getPropagator().getLlhBuffer() << ": invalid reported likelihood value." << std::endl;
+    LogError << GET_VAR_NAME_VALUE( _owner_->getPropagator().getLlhStatBuffer() ) << std::endl;
+    for( auto& sample : _owner_->getPropagator().getFitSampleSet().getFitSampleList() ){
+      LogScopeIndent;
+      LogError << sample.getName() << ": " << sample.getLlhStatBuffer() << std::endl;
+    }
+    LogError << GET_VAR_NAME_VALUE( _owner_->getPropagator().getLlhPenaltyBuffer() ) << std::endl;
+    LogThrow("Invalid total llh.");
   }
 
   GenericToolbox::getElapsedTimeSinceLastCallInMicroSeconds("out_evalFit");

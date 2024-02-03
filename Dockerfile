@@ -2,9 +2,8 @@ FROM rootproject/root as base
 
 SHELL ["/bin/bash", "-c"]
 
-RUN apt-get dist-upgrade -y 
-RUN apt-get update && apt-get upgrade -y
-RUN apt-get install git libyaml-cpp-dev nlohmann-json3-dev -y
+RUN apt-get install -y \
+    git libyaml-cpp-dev nlohmann-json3-dev
 
 ENV WORK_DIR /home/work
 ENV REPO_DIR $WORK_DIR/repo
@@ -34,7 +33,6 @@ RUN git submodule update --init --recursive
 WORKDIR $BUILD_DIR
 RUN cmake \
       -D CMAKE_INSTALL_PREFIX=$INSTALL_DIR \
-      -D ENABLE_CUDA=ON \
       $REPO_DIR
 RUN make -j3 install
 

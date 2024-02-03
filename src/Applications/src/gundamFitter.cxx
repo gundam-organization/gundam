@@ -209,7 +209,10 @@ int main(int argc, char** argv){
         not GundamUtils::isNewerOrEqualVersion(GenericToolbox::Json::fetchValue<std::string>(configHandler.getConfig(), "minGundamVersion")),
         "Version check FAILED: " << GundamUtils::getVersionStr() << " < " << GenericToolbox::Json::fetchValue<std::string>(configHandler.getConfig(), "minGundamVersion")
     );
-    LogInfo << "Version check passed: " << GundamUtils::getVersionStr() << " >= " << GenericToolbox::Json::fetchValue<std::string>(configHandler.getConfig(), "minGundamVersion") << std::endl;
+    LogInfo << "Version check passed: ";
+    LogInfo << GundamUtils::getVersionStr() << " >= ";
+    LogInfo << GenericToolbox::Json::fetchValue<std::string>(configHandler.getConfig(), "minGundamVersion");
+    LogInfo << std::endl;
   }
 
   // to write cmdLine info

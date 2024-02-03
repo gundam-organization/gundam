@@ -58,7 +58,7 @@ namespace JointProbability{
     allowZeroMcWhenZeroData = GenericToolbox::Json::fetchValue(_config_, "allowZeroMcWhenZeroData", allowZeroMcWhenZeroData);
     usePoissonLikelihood = GenericToolbox::Json::fetchValue(_config_, "usePoissonLikelihood", usePoissonLikelihood);
     BBNoUpdateWeights = GenericToolbox::Json::fetchValue(_config_, "BBNoUpdateWeights", BBNoUpdateWeights);
-    verbose = GenericToolbox::Json::fetchValue(_config_, "isVerbose", verbose);
+    verboseLevel = GenericToolbox::Json::fetchValue(_config_, {{"verboseLevel"}, {"isVerbose"}}, verboseLevel);
 
     LogInfo << "Using BarlowLLH_BANFF_OA2021 parameters:" << std::endl;
     {
@@ -66,7 +66,7 @@ namespace JointProbability{
       LogInfo << GET_VAR_NAME_VALUE(allowZeroMcWhenZeroData) << std::endl;
       LogInfo << GET_VAR_NAME_VALUE(usePoissonLikelihood) << std::endl;
       LogInfo << GET_VAR_NAME_VALUE(BBNoUpdateWeights) << std::endl;
-      LogInfo << GET_VAR_NAME_VALUE(verbose) << std::endl;
+      LogInfo << GET_VAR_NAME_VALUE(verboseLevel) << std::endl;
     }
   }
 
@@ -155,7 +155,7 @@ namespace JointProbability{
     else {
       // The mc predicted value is zero, and the data value is not zero.
       // Inconceivable!
-      LogErrorIf(verbose) << "Data and predicted value give infinite statistical LLH / "
+      LogErrorIf(verboseLevel>=1) << "Data and predicted value give infinite statistical LLH / "
                << "Data: " << dataVal
                << " / Barlow Beeston adjusted MC: " << newmc
                << std::endl;
@@ -172,7 +172,7 @@ namespace JointProbability{
         chisq += 2.0 * (stat + penalty);
       }
     }
-    else if (predVal > 0.0) {
+    else if( predVal > 0.0 ) {
       if (usePoissonLikelihood) [[unlikely]] {
         chisq += 2.0*predVal;
       }
@@ -181,13 +181,20 @@ namespace JointProbability{
         chisq += 2.0 * (stat + penalty);
       }
     }
-    else {
-      if( not allowZeroMcWhenZeroData or dataVal != 0 ){
-        chisq += 1E+20;
-        LogErrorIf(verbose) << "Data and predicted value give infinite statistical LLH / "
-                 << "Data: " << dataVal
-                 << " / MC: " << newmc
-                 << std::endl;
+    else { // predVal == 0
+      if( allowZeroMcWhenZeroData and dataVal == 0 ){
+        // need to warn the user something is wrong with the binning definition
+        // This might indicate that more MC stat would be needed
+        LogErrorOnce << "allowZeroMcWhenZeroData=true: MC bin(s) with 0 as predicted value. "
+          << "Data is also 0, null penalty is applied."
+          << "This is an ill conditioned problem. Please check your inputs."
+          << std::endl;
+        chisq = 0.;
+      }
+      else{
+        chisq = std::numeric_limits<double>::infinity();
+        LogErrorIf(verboseLevel) << "Data and predicted value give infinite statistical LLH / "
+           << "Data: " << dataVal << " / MC: " << newmc << std::endl;
       }
     }
 
@@ -205,6 +212,10 @@ namespace JointProbability{
                << GET_VAR_NAME_VALUE(predMC->GetBinError(bin_)) << std::endl
                << GET_VAR_NAME_VALUE(predMC->GetBinContent(bin_)) << std::endl;
       LogThrow("Bad chisq for bin");
+    }
+
+    if(verboseLevel>=3){
+      LogTrace << "Bin #" << bin_ << ": chisq(" << chisq << ") / predVal(" << predVal << ") / dataVal(" << dataVal << ")" << std::endl;
     }
 
     return chisq;

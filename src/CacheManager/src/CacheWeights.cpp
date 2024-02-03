@@ -17,13 +17,8 @@ LoggerInit([]{
 });
 
 // The constructor
-Cache::Weights::Weights(
-    Cache::Parameters::Values& parameters,
-    Cache::Parameters::Clamps& lowerClamp,
-    Cache::Parameters::Clamps& upperClamp,
-    std::size_t results)
-    : fParameters(parameters), fLowerClamp(lowerClamp), fUpperClamp(upperClamp),
-      fTotalBytes(0), fResultCount(results) {
+Cache::Weights::Weights(std::size_t results)
+    : fTotalBytes(0), fResultCount(results) {
     if (fResultCount<1) throw std::runtime_error("No results in weight cache");
 
     LogInfo << "Cached Weights -- output results reserved: "

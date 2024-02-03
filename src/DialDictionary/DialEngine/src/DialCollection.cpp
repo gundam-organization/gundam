@@ -44,25 +44,6 @@ void DialCollection::initializeImpl() {
 }
 
 // non-trivial getters
-bool DialCollection::useCachedDials() const{
-#ifdef USE_BREAKDOWN_CACHE
-  return false;
-#endif
-
-  if( _disableDialCache_ ) return false;
-
-  // only:
-  // and not "norm"
-  if( _globalDialType_ == "Norm" or _globalDialType_ == "Normalization" ) return false;
-  // binned dials -> NO! use cache: event by event dial cache is usefull since fitters don't move all parameters at once
-//  if( not _isBinned_ ) return false;
-  // and not eigen decomp (as the cache will never be triggered)
-  // NO ! fitters don't move all parameters at once
-//  if( _parameterSetListPtr_->at(_supervisedParameterSetIndex_).isUseEigenDecompInFit() ) return false;
-
-  // then ok:
-  return true;
-}
 bool DialCollection::isDatasetValid(const std::string& datasetName_) const{
   if( GenericToolbox::doesElementIsInVector(datasetName_, _dataSetNameList_) ){ return true; }
 
@@ -381,7 +362,7 @@ bool DialCollection::initializeNormDialsWithParBinning() {
 
   // By default use min dial response for norm dials
   _dialResponseSupervisorList_.resize( 1 );
-  _dialResponseSupervisorList_[0].setMinResponse( GenericToolbox::Json::fetchValue(_config_, {{"minDialResponse"}, {"minimumSplineResponse"}}, 0) );
+  _dialResponseSupervisorList_[0].setMinResponse( GenericToolbox::Json::fetchValue(_config_, {{"minDialResponse"}, {"minimumSplineResponse"}}, double(0.)) );
   _dialResponseSupervisorList_[0].setMaxResponse( GenericToolbox::Json::fetchValue(_config_, "maxDialResponse", _maxDialResponse_) );
 
   _dialBaseList_.reserve( _dialBinSet_.getBinList().size() );
@@ -465,7 +446,7 @@ bool DialCollection::initializeDialsWithDefinition() {
               getGlobalDialType(),
               getGlobalDialSubType(),
               binnedInitializer,
-              useCachedDials());
+              false);
           if (dialBase == nullptr) {
               LogAlert << "Invalid dial for " << getTitle() << " -> "
                        << _dialBinSet_.getBinList()[iBin].getSummary()
@@ -551,7 +532,7 @@ bool DialCollection::initializeDialsWithDefinition() {
               getGlobalDialType(),
               getGlobalDialSubType(),
               dialInitializer,
-              this->useCachedDials());
+              false);
           if (dialBase) _dialBaseList_.emplace_back(DialBaseObject(dialBase));
         } // iSpline (in TTree)
         dialsTFile->Close();
@@ -567,7 +548,7 @@ bool DialCollection::initializeDialsWithDefinition() {
 
   _dialResponseSupervisorList_.emplace_back();
   _dialResponseSupervisorList_.back().setMinResponse(
-      GenericToolbox::Json::fetchValue(_config_, {{"minDialResponse"}, {"minimumSplineResponse"}}, 0)
+      GenericToolbox::Json::fetchValue(_config_, {{"minDialResponse"}, {"minimumSplineResponse"}}, double(0.))
   );
   _dialResponseSupervisorList_.back().setMaxResponse(
       GenericToolbox::Json::fetchValue(_config_, "maxDialResponse", _maxDialResponse_)

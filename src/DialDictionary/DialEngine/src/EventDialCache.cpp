@@ -51,7 +51,9 @@ void EventDialCache::buildReferenceCache(SampleSet& sampleSet_, std::vector<Dial
 
       LogThrowIf(
           sampleIndexCacheList[iSample].size() != sample.getMcContainer().eventList.size(),
-          "MISMATCH cache and event list"
+          std::endl << "MISMATCH cache and event list for sample: #" << sample.getIndex() << " " << sample.getName()
+              << std::endl << GET_VAR_NAME_VALUE(sampleIndexCacheList[iSample].size())
+              << " <-> " << GET_VAR_NAME_VALUE(sample.getMcContainer().eventList.size())
       );
       nCacheSlots += sampleIndexCacheList[iSample].size();
 
@@ -101,18 +103,11 @@ void EventDialCache::buildReferenceCache(SampleSet& sampleSet_, std::vector<Dial
       cacheEntry.dials.reserve( countValidDials(indexCache.dials) );
       for( auto& dialIndex : indexCache.dials ){
         if( dialIndex.collectionIndex == size_t(-1) or dialIndex.interfaceIndex == size_t(-1) ){ continue; }
-#ifndef USE_BREAKDOWN_CACHE
-        cacheEntry.dials.emplace_back(
-          &dialCollectionList_.at(dialIndex.collectionIndex)
-          .getDialInterfaceList().at(dialIndex.interfaceIndex)
-      );
-#else
         cacheEntry.dials.emplace_back(
             &dialCollectionList_.at(dialIndex.collectionIndex)
                 .getDialInterfaceList().at(dialIndex.interfaceIndex),
             std::nan("unset")
         );
-#endif
       }
     }
   }
@@ -143,14 +138,6 @@ EventDialCache::IndexedEntry_t* EventDialCache::fetchNextCacheEntry(){
 }
 
 
-#ifndef USE_BREAKDOWN_CACHE
-void EventDialCache::reweightEntry(EventDialCache::CacheElem_t& entry_){
-  entry_.event->resetEventWeight();
-  std::for_each(entry_.dials.begin(), entry_.dials.end(), [&](DialInterface* dial_){
-    entry_.event->getEventWeightRef() *= dial_->evalResponse();
-  });
-}
-#else
 void EventDialCache::reweightEntry(EventDialCache::CacheElem_t& entry_){
   double tempReweight{1};
 
@@ -182,4 +169,3 @@ void EventDialCache::reweightEntry(EventDialCache::CacheElem_t& entry_){
   entry_.event->resetEventWeight(); // reset to the base weight
   entry_.event->getEventWeightRef() *= tempReweight; // apply the reweight factor
 }
-#endif
