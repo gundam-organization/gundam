@@ -25,6 +25,7 @@
 
 #include <string>
 #include <vector>
+#include <TObjString.h>
 
 
 LoggerInit([]{
@@ -349,6 +350,9 @@ int main(int argc, char** argv){
 
     LogInfo<<"Marginalised parameters: "<<GenericToolbox::parseVectorAsString(marginalisedParameters,true,true)<<std::endl;
     LogInfo<<"Marginalised parameter Sets: "<<GenericToolbox::parseVectorAsString(marginalisedParameterSets,true,true)<<std::endl;
+    // object array with the names of the parameters that "survive" the marginalisation
+    TObjArray *marg_param_list;
+    marg_param_list = new TObjArray();
     // loop over parameters and compare their titles with the ones in the marginalisedParameters string
     // if they match, set the corresponding margThis to true
     // Also display the prior information
@@ -397,6 +401,9 @@ int main(int argc, char** argv){
                 }
             }
             par.setMarginalised(matches or setMatches);
+            if (!par.isMarginalised()){
+                marg_param_list->Add(new TObjString(par.getFullTitle().c_str()));
+            }
             if(par.isMarginalised()){
                 LogInfo << "Parameter " << par.getFullTitle()
                 << " -> type: " << par.getPriorType() << " mu=" << par.getPriorValue()
@@ -413,6 +420,8 @@ int main(int argc, char** argv){
         }
     }
 
+    // write the list of parameters that will not be marginalised to the output file
+    app.getOutfilePtr()->WriteObject(marg_param_list, "marg_param_list");
 //    LogInfo << par.getFullTitle() << " -> type: " << par.getPriorType() << " mu=" << par.getPriorValue()
 //            << " sigma= " << par.getStdDevValue() << " limits: " << par.getMinValue() << " - "
 //            << par.getMaxValue() << " limits (phys): " << par.getMinPhysical() << " - "
@@ -532,7 +541,8 @@ int main(int argc, char** argv){
                 prior.push_back(par.getDistanceFromNominal() * par.getDistanceFromNominal());
                 priorSum += prior.back();
                 gLLH += weightsChiSquare[iPar];
-                survivingParameterValues.push_back(par.getParameterValue());
+                if(!par.isMarginalised())
+                    survivingParameterValues.push_back(par.getParameterValue());
 
                 //LogInfo<<iPar<<": "<<weightsChiSquare[iPar]<<std::endl;
                 iPar++;
