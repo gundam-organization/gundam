@@ -211,7 +211,7 @@ namespace JointProbability{
                << GET_VAR_NAME_VALUE(nomMC->GetBinError(bin_)) << std::endl
                << GET_VAR_NAME_VALUE(predMC->GetBinError(bin_)) << std::endl
                << GET_VAR_NAME_VALUE(predMC->GetBinContent(bin_)) << std::endl;
-      //LogThrow("Bad chisq for bin");
+      LogThrow("Bad chisq for bin");
     }
 
     if(verboseLevel>=3){
