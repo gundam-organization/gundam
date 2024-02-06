@@ -104,8 +104,7 @@ double SampleSet::evalLikelihood(){
   double llh = 0.;
   for( auto& sample : _fitSampleList_ ){
     llh += this->evalLikelihood(sample);
-    if(std::isnan(llh) or std::isinf(llh))
-        LogError(sample.getName() << ": reported likelihood is invalid:" << llh);
+    LogErrorIf(std::isnan(llh) or std::isinf(llh)) << sample.getName() << ": reported likelihood is invalid:" << llh;
 //  LogThrowIf(std::isnan(llh) or std::isinf(llh), sample.getName() << ": reported likelihood is invalid:" << llh);
   }
   return llh;
