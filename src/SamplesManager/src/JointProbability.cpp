@@ -199,7 +199,7 @@ namespace JointProbability{
     }
 
     if (not std::isfinite(chisq)) [[unlikely]] {
-      LogError << "Infinite chi2: " << chisq << std::endl
+      LogInfo << "Infinite chi2: " << chisq << std::endl
                << " bin " << bin_
                << GET_VAR_NAME_VALUE(predVal) << std::endl
                << GET_VAR_NAME_VALUE(dataVal) << std::endl
