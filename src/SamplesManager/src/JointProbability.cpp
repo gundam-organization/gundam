@@ -198,8 +198,8 @@ namespace JointProbability{
       }
     }
 
-    //if (not std::isfinite(chisq)) [[unlikely]] {
-      LogInfo << "Infinite chi2: " << chisq << std::endl
+    if (not std::isfinite(chisq)) [[unlikely]] {
+      LogError << "Infinite chi2: " << chisq << std::endl
                << " bin " << bin_
                << GET_VAR_NAME_VALUE(predVal) << std::endl
                << GET_VAR_NAME_VALUE(dataVal) << std::endl
@@ -212,7 +212,7 @@ namespace JointProbability{
                << GET_VAR_NAME_VALUE(predMC->GetBinError(bin_)) << std::endl
                << GET_VAR_NAME_VALUE(predMC->GetBinContent(bin_)) << std::endl;
       // LogThrow("Bad chisq for bin");
-    //}
+    }
 
     if(verboseLevel>=3){
       LogTrace << "Bin #" << bin_ << ": chisq(" << chisq << ") / predVal(" << predVal << ") / dataVal(" << dataVal << ")" << std::endl;

@@ -37,7 +37,6 @@ double getParameterValueFromTextFile(std::string fileName, std::string parameter
 
 int main(int argc, char** argv){
 
-    std::cout<<"Hello world 11.12.23"<<std::endl;
 
     GundamApp app{"contours marginalisation tool"};
 
@@ -534,7 +533,13 @@ int main(int argc, char** argv){
             if (not parSet.isEnabled()) { continue; }
 //            LogInfo<< parSet.getName()<<std::endl;
             for (auto &par: parSet.getParameterList()) {
-                if (not par.isEnabled()) { continue; }
+                if (not par.isEnabled()) {
+                    // throw according to the prior
+                    LogInfo<<"Throwing par "<< par.getName()<<" according to prior: "<<par.getPriorType()<<std::endl;
+                    double mu = par.getPriorValue();
+                    double sigma = par.getStdDevValue();
+                    parameters.push_back(gRandom->Gaus(mu,sigma));
+                }
 //                LogInfo<<"  "<<par.getTitle()<<" -> "<<par.getParameterValue()<<std::endl;
                 parameters.push_back(par.getParameterValue());
                 margThis.push_back(par.isMarginalised());
