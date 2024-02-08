@@ -383,7 +383,7 @@ int main(int argc, char** argv){
                 LogInfo << " will not be marginalized out.   \n";
             }
         }
-    // Do the same for single parameters
+        // Do the same for single parameters
         for (auto &par: parSet.getParameterList()) {
             if (not par.isEnabled()) {
                 LogInfo << "Parameter " << par.getName() << " is disabled" << std::endl;
@@ -416,6 +416,15 @@ int main(int argc, char** argv){
                         << par.getMaxValue()
                 <<" -> will NOT be marg. out\n";
             }
+        }
+    }
+    // now deal with xsec disabled parameters (unconstrained by the ND, thrown according to prior)
+    for( auto& parSet : propagator.getParametersManager().getParameterSetsList() ) {
+        if (parSet.getName().find("Cross-section") != std::string::npos) { continue; }
+        // I want to throw single parameters from the xsec systematics, I don't care about the rest
+        for (auto &par: parSet.getParameterList()) {
+            if (par.isEnabled()) continue;
+            marg_param_list->Add(new TObjString(par.getFullTitle().c_str()));
         }
     }
 
@@ -533,20 +542,14 @@ int main(int argc, char** argv){
             if (not parSet.isEnabled()) { continue; }
 //            LogInfo<< parSet.getName()<<std::endl;
             for (auto &par: parSet.getParameterList()) {
-                if (not par.isEnabled()) {
-                    // throw according to the prior
-                    LogInfo<<"Throwing par "<< par.getName()<<" according to prior: "<<par.getPriorType()<<std::endl;
-                    double mu = par.getPriorValue();
-                    double sigma = par.getStdDevValue();
-                    parameters.push_back(gRandom->Gaus(mu,sigma));
-                }
+                if (not par.isEnabled()) continue;
 //                LogInfo<<"  "<<par.getTitle()<<" -> "<<par.getParameterValue()<<std::endl;
                 parameters.push_back(par.getParameterValue());
                 margThis.push_back(par.isMarginalised());
                 prior.push_back(par.getDistanceFromNominal() * par.getDistanceFromNominal());
                 priorSum += prior.back();
                 gLLH += weightsChiSquare[iPar];
-                if(!par.isMarginalised())
+                if(not par.isMarginalised())
                     survivingParameterValues.push_back(par.getParameterValue());
 
                 //LogInfo<<iPar<<": "<<weightsChiSquare[iPar]<<std::endl;
@@ -558,10 +561,32 @@ int main(int argc, char** argv){
             LogInfo << "Throw " << iToy << " rejected: LLH-gLLH = " << LLH - gLLH << std::endl;
             countBigThrows++;
         }
-
         //debug
         LogInfo<<"LLH: "<<LLH<<" gLLH: "<<gLLH<<std::endl    ;
 
+        // now take care of the disable parameters
+        // throw according to the prior
+        for( auto& parSet : propagator.getParametersManager().getParameterSetsList() ) {
+            if (parSet.getName().find("Cross-section")!=std::string::npos ) { continue; }
+            // I want to throw single parameters from the xsec systematics, I don't care about the rest
+            for (auto &par: parSet.getParameterList()) {
+                if (par.isEnabled()) continue;
+                par.setMarginalised(false);
+//                LogInfo << "Throwing par " << par.getName() << " according to its prior." << std::endl;
+                double mu = par.getPriorValue();
+                double sigma = par.getStdDevValue();
+                double value = 0;
+                if (par.getPriorType() == 0) {
+                    value = gRandom->Gaus(mu, sigma);
+                } else {
+                    LogInfo << " -> I don't know this prior. Prior type: " << par.getPriorType() << std::endl;
+                }
+                margThis.push_back(par.isMarginalised());
+                parameters.push_back(value);
+                if(not par.isMarginalised())
+                    survivingParameterValues.push_back(value);
+            }
+        }
         // Write the ttrees
         margThrowTree->Fill();
         ThrowsPThetaFormat->Fill();
