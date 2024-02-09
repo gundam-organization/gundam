@@ -48,7 +48,7 @@ public:
   void throwParameters();
   void throwParametersFromParSetCovariance();
   void throwParametersFromGlobalCovariance(bool quietVerbose_ = true);
-  ParameterSet* getFitParameterSetPtr(const std::string& name_);
+  ParameterSet* fetchParameterSetPtr( const std::string& name_);
   
   // Logger related
   static void muteLogger();
@@ -56,6 +56,7 @@ public:
 
   // Deprecated
   [[deprecated("use fetchParameterSetPtr()")]] [[nodiscard]] const ParameterSet* getFitParameterSetPtr( const std::string& name_) const{ return fetchParameterSetPtr(name_); }
+  [[deprecated("use fetchParameterSetPtr()")]] ParameterSet* getFitParameterSetPtr( const std::string& name_) { return fetchParameterSetPtr(name_); }
 
 private:
   // config

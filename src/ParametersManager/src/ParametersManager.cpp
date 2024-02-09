@@ -290,13 +290,13 @@ void ParametersManager::injectParameterValues(const JsonType &config_) {
     auto parSetName = GenericToolbox::Json::fetchValue<std::string>(entryParSet, "name");
     LogInfo << "Reading injection parameters for parSet: " << parSetName << std::endl;
 
-    auto* selectedParSet = this->getFitParameterSetPtr(parSetName );
+    auto* selectedParSet = this->fetchParameterSetPtr(parSetName);
     LogThrowIf( selectedParSet == nullptr, "Could not find parSet: " << parSetName );
 
     selectedParSet->injectParameterValues(entryParSet);
   }
 }
-ParameterSet* ParametersManager::getFitParameterSetPtr(const std::string& name_){
+ParameterSet* ParametersManager::fetchParameterSetPtr( const std::string& name_){
   return const_cast<ParameterSet*>(const_cast<const ParametersManager *>(this)->fetchParameterSetPtr(name_));
 }
 
