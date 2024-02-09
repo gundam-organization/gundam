@@ -58,7 +58,7 @@ do
     echo "Checking out latest version: $LATEST_VERSION"
     git checkout $LATEST_VERSION
     git submodule sync
-     git submodule update --init --remote --recursive
+    git submodule update --init --remote --recursive
     exit 0;
   elif [ $arg == "--head" ]; then
     echo "Checking out main branch..."
