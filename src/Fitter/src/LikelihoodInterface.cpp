@@ -39,7 +39,6 @@ void LikelihoodInterface::initialize() {
     _chi2HistoryTree_->Branch("chi2Total", (double*) _owner_->getPropagator().getLlhBufferPtr());
     _chi2HistoryTree_->Branch("chi2Stat", (double*) _owner_->getPropagator().getLlhStatBufferPtr());
     _chi2HistoryTree_->Branch("chi2Pulls", (double*) _owner_->getPropagator().getLlhPenaltyBufferPtr());
-    _chi2HistoryTree_->Branch("itSpeed", _itSpeedMon_.getCountSpeedPtr());
   }
 
   LogWarning << "Fetching the effective number of fit parameters..." << std::endl;
@@ -184,11 +183,9 @@ void LikelihoodInterface::saveGradientSteps(){
 
 double LikelihoodInterface::evalFit(const double* parArray_){
   LogThrowIf(not _isInitialized_, "not initialized");
-  GenericToolbox::getElapsedTimeSinceLastCallInMicroSeconds(__METHOD_NAME__);
+  externalTimer.stop();
+  evalLlhTimer.start();
 
-  if(_nbFitCalls_ != 0){
-    _outEvalFitAvgTimer_.counts++ ; _outEvalFitAvgTimer_.cumulated += GenericToolbox::getElapsedTimeSinceLastCallInMicroSeconds("out_evalFit");
-  }
   ++_nbFitCalls_;
 
   // Update fit parameter values:
@@ -201,7 +198,7 @@ double LikelihoodInterface::evalFit(const double* parArray_){
   // Compute the Chi2
   _owner_->getPropagator().updateLlhCache();
 
-  _evalFitAvgTimer_.counts++; _evalFitAvgTimer_.cumulated += GenericToolbox::getElapsedTimeSinceLastCallInMicroSeconds(__METHOD_NAME__);
+  evalLlhTimer.stop();
 
   // Minuit based algo might want this
   if( _monitorGradientDescent_ ){
@@ -233,16 +230,7 @@ double LikelihoodInterface::evalFit(const double* parArray_){
 
   if( _enableFitMonitor_ and _convergenceMonitor_.isGenerateMonitorStringOk() ){
 
-    _itSpeedMon_.cycle( _nbFitCalls_ - _itSpeedMon_.getCounts() );
-
-    if( _itSpeed_.counts != 0 ){
-      _itSpeed_.counts = _nbFitCalls_ - _itSpeed_.counts; // how many cycles since last print
-      _itSpeed_.cumulated = GenericToolbox::getElapsedTimeSinceLastCallInMicroSeconds("itSpeed"); // time since last print
-    }
-    else{
-      _itSpeed_.counts = _nbFitCalls_;
-      GenericToolbox::getElapsedTimeSinceLastCallInMicroSeconds("itSpeed");
-    }
+    iterationCounterClock.count( _nbFitCalls_ );
 
     std::stringstream ssHeader;
     ssHeader << std::endl << __METHOD_NAME__ << ": call #" << _nbFitCalls_;
@@ -251,7 +239,7 @@ double LikelihoodInterface::evalFit(const double* parArray_){
     ssHeader << std::endl << "RAM: " << GenericToolbox::parseSizeUnits(double(GenericToolbox::getProcessMemoryUsage()));
     double cpuPercent = GenericToolbox::getCpuUsageByProcess();
     ssHeader << " / CPU: " << cpuPercent << "% (" << cpuPercent / GundamGlobals::getParallelWorker().getNbThreads() << "% efficiency)";
-    ssHeader << std::endl << "Avg " << GUNDAM_CHI2 << " computation time: " << _evalFitAvgTimer_;
+    ssHeader << std::endl << "Avg " << GUNDAM_CHI2 << " computation time: " << evalLlhTimer;
     ssHeader << std::endl;
 
     GenericToolbox::TablePrinter t;
@@ -263,11 +251,11 @@ double LikelihoodInterface::evalFit(const double* parArray_){
     t << _minimizerType_ << "/" << _minimizerAlgo_ << GenericToolbox::TablePrinter::NextLine;
 
     t << "Speed" << GenericToolbox::TablePrinter::NextColumn;
-    t << _itSpeedMon_ << GenericToolbox::TablePrinter::NextColumn;
+    t << iterationCounterClock << GenericToolbox::TablePrinter::NextColumn;
 //    t << (double)_itSpeed_.counts / (double)_itSpeed_.cumulated * 1E6 << " it/s" << GenericToolbox::TablePrinter::NextColumn;
-    t << _owner_->getPropagator().weightProp << GenericToolbox::TablePrinter::NextColumn;
-    t << _owner_->getPropagator().fillProp << GenericToolbox::TablePrinter::NextColumn;
-    t << _outEvalFitAvgTimer_ << GenericToolbox::TablePrinter::NextLine;
+    t << _owner_->getPropagator().reweightTimer << GenericToolbox::TablePrinter::NextColumn;
+    t << _owner_->getPropagator().refillHistogramTimer << GenericToolbox::TablePrinter::NextColumn;
+    t << externalTimer << GenericToolbox::TablePrinter::NextLine;
 
     ssHeader << t.generateTableString();
 
@@ -316,7 +304,6 @@ double LikelihoodInterface::evalFit(const double* parArray_){
       );
     }
 
-    _itSpeed_.counts = _nbFitCalls_;
   }
 
   if( not GundamGlobals::isLightOutputMode() ){
@@ -335,7 +322,7 @@ double LikelihoodInterface::evalFit(const double* parArray_){
     LogThrow("Invalid total llh.");
   }
 
-  GenericToolbox::getElapsedTimeSinceLastCallInMicroSeconds("out_evalFit");
+  externalTimer.start();
   return _owner_->getPropagator().getLlhBuffer();
 }
 

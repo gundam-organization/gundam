@@ -131,9 +131,8 @@ private:
   EventDialCache _eventDialCache_{};
 
 public:
-  GenericToolbox::Time::CycleTimer dialUpdate;
-  GenericToolbox::Time::CycleTimer weightProp;
-  GenericToolbox::Time::CycleTimer fillProp;
+  GenericToolbox::Time::AveragedTimer<10> reweightTimer{};
+  GenericToolbox::Time::AveragedTimer<10> refillHistogramTimer{};
 
 };
 #endif //GUNDAM_PROPAGATOR_H
