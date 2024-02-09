@@ -406,7 +406,7 @@ void MinimizerInterface::scanParameters(TDirectory* saveDir_){
   } // iPar
   for( auto& parSet : this->getPropagator().getParametersManager().getParameterSetsList() ){
     if( not parSet.isEnabled() ) continue;
-    if( parSet.isUseEigenDecompInFit() ){
+    if( parSet.isEnableEigenDecomp() ){
       LogWarning << parSet.getName() << " is using eigen decomposition. Scanning original parameters..." << std::endl;
       for( auto& par : parSet.getParameterList() ){
         if( not par.isEnabled() ) continue;
@@ -689,7 +689,7 @@ void MinimizerInterface::writePostFitData(TDirectory* saveDir_) {
         for( auto& par : *parList ){ parameterLabels[blocOffset + par.getParameterIndex()] = par.getFullTitle(); }
 
         parList = &parSet.getEffectiveParameterList();
-        if( parSet.isUseEigenDecompInFit() ){
+        if( parSet.isEnableEigenDecomp() ){
           int iParIdx{0};
           for( auto& iPar : *parList ){
             int jParIdx{0};
@@ -729,7 +729,7 @@ void MinimizerInterface::writePostFitData(TDirectory* saveDir_) {
               }
               else{
                 // Inherit from the prior in eigen -> only diagonal are non 0
-                if( &iParSet == &jParSet and iParSet.isUseEigenDecompInFit() ){
+                if( &iParSet == &jParSet and iParSet.isEnableEigenDecomp() ){
                   if( iPar.getParameterIndex() == jPar.getParameterIndex() ){
                     (*unstrippedCovMatrix)[iOffset + iPar.getParameterIndex()][jOffset + jPar.getParameterIndex()] = iPar.getStdDevValue()*iPar.getStdDevValue();
                   }
@@ -1100,7 +1100,7 @@ void MinimizerInterface::writePostFitData(TDirectory* saveDir_) {
     }
 
     TDirectory* saveDir;
-    if( parSet.isUseEigenDecompInFit() ){
+    if( parSet.isEnableEigenDecomp() ){
       saveDir = GenericToolbox::mkdirTFile(parSetDir, "eigen");
       savePostFitObjFct(parSet, *parList, covMatrix.get(), saveDir);
 

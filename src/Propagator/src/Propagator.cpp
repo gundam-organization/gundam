@@ -242,7 +242,7 @@ void Propagator::initializeImpl(){
     // At this point, MC events have been reweighted using their prior
     // but when using eigen decomp, the conversion eigen -> original has a small computational error
     for( auto& parSet: _parManager_.getParameterSetsList() ) {
-      if( parSet.isUseEigenDecompInFit() ) { parSet.propagateEigenToOriginal(); }
+      if( parSet.isEnableEigenDecomp() ) { parSet.propagateEigenToOriginal(); }
     }
 
     bool cacheManagerState = GundamGlobals::getEnableCacheManager();
@@ -549,7 +549,7 @@ void Propagator::propagateParametersOnSamples(){
   if( _enableEigenToOrigInPropagate_ ){
     // Only real parameters are propagated on the spectra -> need to convert the eigen to original
     for( auto& parSet : _parManager_.getParameterSetsList() ){
-      if( parSet.isUseEigenDecompInFit() ) parSet.propagateEigenToOriginal();
+      if( parSet.isEnableEigenDecomp() ) parSet.propagateEigenToOriginal();
     }
   }
 

@@ -53,7 +53,7 @@ public:
   // Getters
   [[nodiscard]] bool isEnabled() const{ return _isEnabled_; }
   [[nodiscard]] bool isEnablePca() const{ return _enablePca_; }
-  [[nodiscard]] bool isUseEigenDecompInFit() const{ return _useEigenDecomp_; }
+  [[nodiscard]] bool isEnableEigenDecomp() const{ return _enableEigenDecomp_; }
   [[nodiscard]] bool isEnabledThrowToyParameters() const{ return _enabledThrowToyParameters_; }
   [[nodiscard]] bool isMaskForToyGeneration() const { return _maskForToyGeneration_; }
   [[nodiscard]] bool isMaskedForPropagation() const{ return _maskedForPropagation_; }
@@ -65,7 +65,7 @@ public:
   [[nodiscard]] const JsonType &getDialSetDefinitions() const{ return _dialSetDefinitions_; }
   [[nodiscard]] const TMatrixD* getInvertedEigenVectors() const{ return _eigenVectorsInv_.get(); }
   [[nodiscard]] const TMatrixD* getEigenVectors() const{ return _eigenVectors_.get(); }
-  [[nodiscard]] const std::vector<JsonType>& getCustomFitParThrow() const{ return _customFitParThrow_; }
+  [[nodiscard]] const std::vector<JsonType>& getCustomParThrow() const{ return _customParThrow_; }
   [[nodiscard]] const std::shared_ptr<TMatrixDSym> &getPriorCorrelationMatrix() const{ return _priorCorrelationMatrix_; }
   [[nodiscard]] const std::shared_ptr<TMatrixDSym> &getPriorCovarianceMatrix() const { return _priorCovarianceMatrix_; }
   [[nodiscard]] const std::vector<Parameter> &getParameterList() const{ return _parameterList_; }
@@ -99,6 +99,10 @@ public:
   static double toRealParValue(double normParValue, const Parameter& par);
   static double toRealParRange(double normParRange, const Parameter& par);
   static bool isValidCorrelatedParameter(const Parameter& par_);
+
+  // Deprecated
+  [[deprecated("use getCustomParThrow()")]] [[nodiscard]] const std::vector<JsonType>& getCustomFitParThrow() const{ return getCustomParThrow(); }
+  [[deprecated("use isEnableEigenDecomp()")]] [[nodiscard]] bool isUseEigenDecompInFit() const{ return isEnableEigenDecomp(); }
 
 protected:
   void readParameterDefinitionFile();
@@ -142,12 +146,12 @@ private:
 
   std::vector<JsonType> _enableOnlyParameters_{};
   std::vector<JsonType> _disableParameters_{};
-  std::vector<JsonType> _customFitParThrow_{};
+  std::vector<JsonType> _customParThrow_{};
 
   // Eigen objects
   int _nbEnabledEigen_{0};
   bool _enablePca_{false};
-  bool _useEigenDecomp_{false};
+  bool _enableEigenDecomp_{false};
   bool _useOnlyOneParameterPerEvent_{false};
   std::vector<Parameter> _eigenParameterList_{};
   std::shared_ptr<TMatrixDSymEigen> _eigenDecomp_{nullptr};

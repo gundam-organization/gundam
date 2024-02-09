@@ -342,7 +342,7 @@ bool MCMCInterface::adaptiveDefaultProposalCovariance(AdaptiveStepMCMC& mcmc,
               << std::endl;
       continue;
     }
-    if (set1->isUseEigenDecompInFit()) {
+    if ( set1->isEnableEigenDecomp()) {
       continue;
     }
 
@@ -356,7 +356,7 @@ bool MCMCInterface::adaptiveDefaultProposalCovariance(AdaptiveStepMCMC& mcmc,
                 << std::endl;
         continue;
       }
-      if (set2->isUseEigenDecompInFit()) {
+      if ( set2->isEnableEigenDecomp()) {
         continue;
       }
 

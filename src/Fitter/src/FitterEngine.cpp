@@ -187,7 +187,7 @@ void FitterEngine::initializeImpl(){
       GenericToolbox::writeInTFile( outDir, TNamed( "max", std::to_string( par.getMaxValue() ).c_str() ) );
     }
 
-    if( parSet.isUseEigenDecompInFit() ){
+    if( parSet.isEnableEigenDecomp() ){
       auto eigenSaveFolder = GenericToolbox::joinPath( saveFolder, "eigen" );
       for( auto& eigen : parSet.getEigenParameterList() ){
         auto eigenFolder = GenericToolbox::joinPath(eigenSaveFolder, GenericToolbox::generateCleanBranchName(eigen.getTitle()));
@@ -319,7 +319,7 @@ void FitterEngine::fit(){
           LogWarning << "Pushing #" << parIndex << " to " << pushVal << std::endl;
           parList[parIndex].setParameterValue( pushVal );
 
-          if( parSet.isUseEigenDecompInFit() ){
+          if( parSet.isEnableEigenDecomp() ){
             parSet.propagateOriginalToEigen();
           }
 
@@ -478,7 +478,7 @@ void FitterEngine::fixGhostFitParameters(){
 #endif
           LogInfo << red << ssPrint.str() << rst << std::endl;
 
-          if( parSet.isUseEigenDecompInFit() and GenericToolbox::Json::fetchValue(_config_, "fixGhostEigenParametersAfterFirstRejected", false) ){
+          if( parSet.isEnableEigenDecomp() and GenericToolbox::Json::fetchValue(_config_, "fixGhostEigenParametersAfterFirstRejected", false) ){
             fixNextEigenPars = true;
           }
         }
@@ -490,7 +490,7 @@ void FitterEngine::fixGhostFitParameters(){
 
     // Recompute inverse matrix for the fitter.  Note: Eigen decomposed parSet
     // don't need a new inversion since the matrix is diagonal
-    if( not parSet.isUseEigenDecompInFit() ){
+    if( not parSet.isEnableEigenDecomp() ){
       parSet.processCovarianceMatrix();
     }
 

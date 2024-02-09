@@ -163,7 +163,7 @@ void ParScanner::scanFitParameter(Parameter& par_, TDirectory* saveDir_) {
 
   LogInfo << "Scanning: " << par_.getFullTitle() << " / " << _nbPoints_ << " steps..." << std::endl;
 
-  if( par_.getOwner()->isUseEigenDecompInFit() and not par_.isEigen() ){
+  if( par_.getOwner()->isEnableEigenDecomp() and not par_.isEigen() ){
     // temporarily disable the automatic conversion Eigen -> Original
     _owner_->setEnableEigenToOrigInPropagate( false );
   }
@@ -222,7 +222,7 @@ void ParScanner::scanFitParameter(Parameter& par_, TDirectory* saveDir_) {
   _owner_->updateLlhCache();
 
   // Disable the auto conversion from Eigen to Original if the fit is set to use eigen decomp
-  if( par_.getOwner()->isUseEigenDecompInFit() and not par_.isEigen() ){
+  if( par_.getOwner()->isEnableEigenDecomp() and not par_.isEigen() ){
     _owner_->setEnableEigenToOrigInPropagate( true );
   }
 
@@ -314,7 +314,7 @@ void ParScanner::scanSegment(TDirectory *saveDir_, const JsonType &end_, const J
 
     for( auto& parSet : _owner_->getParametersManager().getParameterSetsList() ){
       if( not parSet.isEnabled() ){ continue; }
-      if( parSet.isUseEigenDecompInFit() ){
+      if( parSet.isEnableEigenDecomp() ){
         // make sure the parameters don't get overwritten
         parSet.propagateOriginalToEigen();
       }
@@ -523,7 +523,7 @@ void ParScanner::varyEvenRates(const std::vector<double>& paramVariationList_, T
       continue;
     }
 
-    if( parSet.isUseEigenDecompInFit() ){
+    if( parSet.isEnableEigenDecomp() ){
       // TODO ?
       continue;
     }

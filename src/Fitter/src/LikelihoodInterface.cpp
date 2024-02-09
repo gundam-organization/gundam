@@ -269,7 +269,7 @@ double LikelihoodInterface::evalFit(const double* parArray_){
           if( not curParSet.empty() ) ssHeader << std::endl;
           curParSet = fitPar->getOwner()->getName();
           ssHeader << curParSet
-                   << (fitPar->getOwner()->isUseEigenDecompInFit()? " (eigen)": "")
+                   << (fitPar->getOwner()->isEnableEigenDecomp() ? " (eigen)" : "")
                    << ":" << std::endl;
           nParPerLine = 0;
         }
