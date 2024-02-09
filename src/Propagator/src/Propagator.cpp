@@ -317,7 +317,7 @@ void Propagator::initializeImpl(){
   // reweighting cache.  This must also be before the first use of
   // reweightMcEvents.
   if(GundamGlobals::getEnableCacheManager()) {
-    Cache::Manager::Build(getFitSampleSet(), getEventDialCache());
+    Cache::Manager::Build(getSampleSet(), getEventDialCache());
   }
 #endif
 
@@ -569,7 +569,7 @@ void Propagator::reweightMcEvents() {
   bool usedGPU{false};
 #ifdef GUNDAM_USING_CACHE_MANAGER
   if(GundamGlobals::getEnableCacheManager()) {
-    Cache::Manager::Update(getFitSampleSet(), getEventDialCache());
+    Cache::Manager::Update(getSampleSet(), getEventDialCache());
     usedGPU = Cache::Manager::Fill();
   }
 #endif

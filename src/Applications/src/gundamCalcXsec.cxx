@@ -144,7 +144,7 @@ int main(int argc, char** argv){
   propagator.setEnableEigenToOrigInPropagate( false );
 
   // Sample binning using parameterSetName
-  for( auto& sample : propagator.getFitSampleSet().getSampleList() ){
+  for( auto& sample : propagator.getSampleSet().getSampleList() ){
 
     if( clParser.isOptionTriggered("usePreFit") ){
       sample.setName( sample.getName() + " (pre-fit)" );
@@ -443,8 +443,8 @@ int main(int argc, char** argv){
   std::vector<CrossSectionData> crossSectionDataList{};
 
   LogInfo << "Initializing xsec samples..." << std::endl;
-  crossSectionDataList.reserve(propagator.getFitSampleSet().getSampleList().size() );
-  for( auto& sample : propagator.getFitSampleSet().getSampleList() ){
+  crossSectionDataList.reserve(propagator.getSampleSet().getSampleList().size() );
+  for( auto& sample : propagator.getSampleSet().getSampleList() ){
     crossSectionDataList.emplace_back();
     auto& xsecEntry = crossSectionDataList.back();
 
@@ -637,7 +637,7 @@ int main(int argc, char** argv){
   auto* globalCorMatrixHist = GenericToolbox::convertTMatrixDtoTH2D(GenericToolbox::convertToCorrelationMatrix(globalCovMatrix));
 
   std::vector<TH1D> binValues{};
-  binValues.reserve(propagator.getFitSampleSet().getSampleList().size() );
+  binValues.reserve(propagator.getSampleSet().getSampleList().size() );
   int iBinGlobal{-1};
 
   for( auto& xsec : crossSectionDataList ){

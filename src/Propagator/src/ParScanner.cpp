@@ -72,7 +72,7 @@ void ParScanner::initializeImpl() {
     scanEntry.evalY = [this](){ return _owner_->getLlhStatBuffer(); };
   }
   if( GenericToolbox::Json::fetchValue(_varsConfig_, "llhStatPerSample", false) ){
-    for( auto& sample : _owner_->getFitSampleSet().getSampleList() ){
+    for( auto& sample : _owner_->getSampleSet().getSampleList() ){
       _scanDataDict_.emplace_back();
       auto& scanEntry = _scanDataDict_.back();
       scanEntry.yPoints = std::vector<double>(_nbPoints_+1,0);
@@ -80,11 +80,11 @@ void ParScanner::initializeImpl() {
       scanEntry.title = Form("Stat Likelihood Scan of sample \"%s\"", sample.getName().c_str());
       scanEntry.yTitle = "Stat LLH value";
       auto* samplePtr = &sample;
-      scanEntry.evalY = [this, samplePtr](){ return _owner_->getFitSampleSet().evalLikelihood(*samplePtr); };
+      scanEntry.evalY = [this, samplePtr](){ return _owner_->getSampleSet().evalLikelihood(*samplePtr); };
     }
   }
   if( GenericToolbox::Json::fetchValue(_varsConfig_, "llhStatPerSamplePerBin", false) ){
-    for( auto& sample : _owner_->getFitSampleSet().getSampleList() ){
+    for( auto& sample : _owner_->getSampleSet().getSampleList() ){
       for( int iBin = 1 ; iBin <= sample.getMcContainer().histogram->GetNbinsX() ; iBin++ ){
         _scanDataDict_.emplace_back();
         auto& scanEntry = _scanDataDict_.back();
@@ -95,12 +95,12 @@ void ParScanner::initializeImpl() {
                                sample.getBinning().getBinList()[iBin-1].getSummary().c_str());
         scanEntry.yTitle = "Stat LLH value";
         auto* samplePtr = &sample;
-        scanEntry.evalY = [this, samplePtr, iBin](){ return _owner_->getFitSampleSet().getJointProbabilityFct()->eval(*samplePtr, iBin); };
+        scanEntry.evalY = [this, samplePtr, iBin](){ return _owner_->getSampleSet().getJointProbabilityFct()->eval(*samplePtr, iBin); };
       }
     }
   }
   if( GenericToolbox::Json::fetchValue(_varsConfig_, "weightPerSample", false) ){
-    for( auto& sample : _owner_->getFitSampleSet().getSampleList() ){
+    for( auto& sample : _owner_->getSampleSet().getSampleList() ){
       _scanDataDict_.emplace_back();
       auto& scanEntry = _scanDataDict_.back();
       scanEntry.yPoints = std::vector<double>(_nbPoints_+1,0);
@@ -112,7 +112,7 @@ void ParScanner::initializeImpl() {
     }
   }
   if( GenericToolbox::Json::fetchValue(_varsConfig_, "weightPerSamplePerBin", false) ){
-    for( auto& sample : _owner_->getFitSampleSet().getSampleList() ){
+    for( auto& sample : _owner_->getSampleSet().getSampleList() ){
       for( int iBin = 1 ; iBin <= sample.getMcContainer().histogram->GetNbinsX() ; iBin++ ){
         _scanDataDict_.emplace_back();
         auto& scanEntry = _scanDataDict_.back();
@@ -473,7 +473,7 @@ void ParScanner::varyEvenRates(const std::vector<double>& paramVariationList_, T
       par_.setParameterValue( cappedParValue );
       _owner_->propagateParametersOnSamples();
 
-      for(auto & sample : _owner_->getFitSampleSet().getSampleList()){
+      for(auto & sample : _owner_->getSampleSet().getSampleList()){
         buffEvtRatesMap[iVar].emplace_back( sample.getMcContainer().getSumWeights() );
       }
 
@@ -497,7 +497,7 @@ void ParScanner::varyEvenRates(const std::vector<double>& paramVariationList_, T
 
     TVectorD* buffVariedEvtRates_TVectorD{nullptr};
 
-    for( size_t iSample = 0 ; iSample < _owner_->getFitSampleSet().getSampleList().size() ; iSample++ ){
+    for( size_t iSample = 0 ; iSample < _owner_->getSampleSet().getSampleList().size() ; iSample++ ){
 
       buffVariedEvtRates_TVectorD = new TVectorD(int(variationList_.size()));
 
@@ -506,7 +506,7 @@ void ParScanner::varyEvenRates(const std::vector<double>& paramVariationList_, T
       }
 
       GenericToolbox::writeInTFile(saveSubDir_, buffVariedEvtRates_TVectorD,
-                                   _owner_->getFitSampleSet().getSampleList()[iSample].getName());
+                                   _owner_->getSampleSet().getSampleList()[iSample].getName());
 
     }
 

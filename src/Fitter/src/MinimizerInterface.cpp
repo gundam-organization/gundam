@@ -240,21 +240,21 @@ void MinimizerInterface::minimize(){
   bestFitStats->Branch("chi2StatBestFit",  (double*) getPropagator().getLlhStatBufferPtr() );
   bestFitStats->Branch("chi2PullsBestFit", (double*) getPropagator().getLlhPenaltyBufferPtr() );
 
-  std::vector<GenericToolbox::RawDataArray> samplesArrList(getPropagator().getFitSampleSet().getSampleList().size());
+  std::vector<GenericToolbox::RawDataArray> samplesArrList(getPropagator().getSampleSet().getSampleList().size());
   int iSample{-1};
-  for( auto& sample : getPropagator().getFitSampleSet().getSampleList() ){
+  for( auto& sample : getPropagator().getSampleSet().getSampleList() ){
     if( not sample.isEnabled() ) continue;
 
     std::vector<std::string> leavesDict;
     iSample++;
 
     leavesDict.emplace_back("llhSample/D");
-    samplesArrList[iSample].writeRawData(getPropagator().getFitSampleSet().getJointProbabilityFct()->eval(sample));
+    samplesArrList[iSample].writeRawData(getPropagator().getSampleSet().getJointProbabilityFct()->eval(sample));
 
     int nBins = int(sample.getBinning().getBinList().size());
     for( int iBin = 1 ; iBin <= nBins ; iBin++ ){
       leavesDict.emplace_back("llhSample_bin" + std::to_string(iBin) + "/D");
-      samplesArrList[iSample].writeRawData(getPropagator().getFitSampleSet().getJointProbabilityFct()->eval(sample, iBin));
+      samplesArrList[iSample].writeRawData(getPropagator().getSampleSet().getJointProbabilityFct()->eval(sample, iBin));
     }
 
     samplesArrList[iSample].lockArraySize();

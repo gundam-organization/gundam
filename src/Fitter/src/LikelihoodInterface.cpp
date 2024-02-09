@@ -59,7 +59,7 @@ void LikelihoodInterface::initialize() {
   _validFunctor_ = std::make_unique<ROOT::Math::Functor>(this, &LikelihoodInterface::evalFitValid, _nbFitParameters_);
 
   _nbFitBins_ = 0;
-  for( auto& sample : _owner_->getPropagator().getFitSampleSet().getSampleList() ){
+  for( auto& sample : _owner_->getPropagator().getSampleSet().getSampleList() ){
     _nbFitBins_ += int(sample.getBinning().getBinList().size());
   }
 
@@ -314,7 +314,7 @@ double LikelihoodInterface::evalFit(const double* parArray_){
   if( std::isnan(_owner_->getPropagator().getLlhBuffer()) and _throwOnBadLlh_ ){
     LogError << _owner_->getPropagator().getLlhBuffer() << ": invalid reported likelihood value." << std::endl;
     LogError << GET_VAR_NAME_VALUE( _owner_->getPropagator().getLlhStatBuffer() ) << std::endl;
-    for( auto& sample : _owner_->getPropagator().getFitSampleSet().getSampleList() ){
+    for( auto& sample : _owner_->getPropagator().getSampleSet().getSampleList() ){
       LogScopeIndent;
       LogError << sample.getName() << ": " << sample.getLlhStatBuffer() << std::endl;
     }

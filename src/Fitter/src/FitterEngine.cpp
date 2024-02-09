@@ -219,7 +219,7 @@ void FitterEngine::initializeImpl(){
 
   // writing event rates
   LogInfo << "Writing event rates..." << std::endl;
-  for( auto& sample : _propagator_.getFitSampleSet().getSampleList() ){
+  for( auto& sample : _propagator_.getSampleSet().getSampleList() ){
     if( not sample.isEnabled() ){ continue; }
 
 
