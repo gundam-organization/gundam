@@ -80,7 +80,7 @@ We assume
 
 ```bash
 cd $REPO_DIR
-git clone https://github.com/gundam-organization/gundam.git
+git clone --recurse-submodules https://github.com/gundam-organization/gundam.git
 cd gundam
 ```
 
