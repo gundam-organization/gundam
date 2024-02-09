@@ -219,10 +219,10 @@ private:
 
   // Output monitors!
   GenericToolbox::VariablesMonitor _convergenceMonitor_;
-  GenericToolbox::Time::CycleTimer _evalFitAvgTimer_;
-  GenericToolbox::Time::CycleTimer _outEvalFitAvgTimer_;
-  GenericToolbox::Time::CycleTimer _itSpeed_;
-  GenericToolbox::Time::CycleClock _itSpeedMon_{"it"};
+
+  GenericToolbox::Time::AveragedTimer<10> evalLlhTimer{};
+  GenericToolbox::Time::AveragedTimer<10> externalTimer{};
+  GenericToolbox::Time::AveragedTimer<1> iterationCounterClock{};
 
   /// Parameters to control how the monitor behaves.
   bool _enableFitMonitor_{false};
