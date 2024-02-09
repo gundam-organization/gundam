@@ -564,24 +564,25 @@ void Propagator::resetReweight(){
   });
 }
 void Propagator::reweightMcEvents() {
+  reweightTimer.start();
+
   bool usedGPU{false};
 #ifdef GUNDAM_USING_CACHE_MANAGER
-  GenericToolbox::getElapsedTimeSinceLastCallInMicroSeconds(__METHOD_NAME__);
   if(GundamGlobals::getEnableCacheManager()) {
     Cache::Manager::Update(getFitSampleSet(), getEventDialCache());
     usedGPU = Cache::Manager::Fill();
   }
 #endif
   if( not usedGPU ){
-    GenericToolbox::getElapsedTimeSinceLastCallInMicroSeconds(__METHOD_NAME__);
     if( not _devSingleThreadReweight_ ){ GundamGlobals::getParallelWorker().runJob("Propagator::reweightMcEvents"); }
     else{ this->reweightMcEvents(-1); }
   }
-  weightProp.counts++;
-  weightProp.cumulated += GenericToolbox::getElapsedTimeSinceLastCallInMicroSeconds(__METHOD_NAME__);
+
+  reweightTimer.stop();
 }
 void Propagator::refillSampleHistograms(){
-  GenericToolbox::getElapsedTimeSinceLastCallInMicroSeconds(__METHOD_NAME__);
+  refillHistogramTimer.start();
+
   if( not _devSingleThreadHistFill_ ){
     GundamGlobals::getParallelWorker().runJob("Propagator::refillSampleHistograms");
   }
@@ -589,7 +590,8 @@ void Propagator::refillSampleHistograms(){
     refillSampleHistogramsFct(-1);
     refillSampleHistogramsPostParallelFct();
   }
-  fillProp.counts++; fillProp.cumulated += GenericToolbox::getElapsedTimeSinceLastCallInMicroSeconds(__METHOD_NAME__);
+
+  refillHistogramTimer.stop();
 }
 
 // Misc
