@@ -22,7 +22,7 @@ LoggerInit([]{
 
 
 void ParameterSet::readConfigImpl(){
-  LogThrowIf(_config_.empty(), "FitParameterSet config not set.");
+  LogThrowIf(_config_.empty(), "ParameterSet config not set.");
 
   _name_ = GenericToolbox::Json::fetchValue<std::string>(_config_, "name");
   LogInfo << std::endl << "Initializing parameter set: " << _name_ << std::endl;
@@ -43,8 +43,8 @@ void ParameterSet::readConfigImpl(){
     _globalParameterMaxValue_ = GenericToolbox::Json::fetchValue(parLimits, "maxValue", _globalParameterMaxValue_);
   }
 
-  _useEigenDecompInFit_ = GenericToolbox::Json::fetchValue(_config_ , "useEigenDecompInFit", false);
-  if( _useEigenDecompInFit_ ){
+  _useEigenDecomp_ = GenericToolbox::Json::fetchValue(_config_ , {{"useEigenDecomp"}, {"useEigenDecompInFit"}}, false);
+  if( _useEigenDecomp_ ){
     LogWarning << "Using eigen decomposition in fit." << std::endl;
     LogScopeIndent;
 
@@ -171,7 +171,7 @@ void ParameterSet::processCovarianceMatrix(){
 
   LogThrowIf(not _strippedCovarianceMatrix_->IsSymmetric(), "Covariance matrix is not symmetric");
 
-  if( not _useEigenDecompInFit_ ){
+  if( not _useEigenDecomp_ ){
     LogWarning << "Computing inverse of the stripped covariance matrix: "
                << _strippedCovarianceMatrix_->GetNcols() << "x"
                << _strippedCovarianceMatrix_->GetNrows() << std::endl;
@@ -299,13 +299,13 @@ void ParameterSet::processCovarianceMatrix(){
 
 // Getters
 const std::vector<Parameter>& ParameterSet::getEffectiveParameterList() const{
-  if( _useEigenDecompInFit_ ) return _eigenParameterList_;
+  if( _useEigenDecomp_ ) return _eigenParameterList_;
   return _parameterList_;
 }
 
 // non const getters
 std::vector<Parameter>& ParameterSet::getEffectiveParameterList(){
-  if( _useEigenDecompInFit_ ) return _eigenParameterList_;
+  if( _useEigenDecomp_ ) return _eigenParameterList_;
   return _parameterList_;
 }
 
@@ -317,7 +317,7 @@ double ParameterSet::getPenaltyChi2() {
   _penaltyChi2Buffer_ = 0;
 
   if( _priorCovarianceMatrix_ != nullptr ){
-    if( _useEigenDecompInFit_ ){
+    if( _useEigenDecomp_ ){
       for( const auto& eigenPar : _eigenParameterList_ ){
         if( eigenPar.isFixed() ) continue;
         _penaltyChi2Buffer_ += TMath::Sq( (eigenPar.getParameterValue() - eigenPar.getPriorValue()) / eigenPar.getStdDevValue() ) ;
@@ -339,7 +339,7 @@ double ParameterSet::getPenaltyChi2() {
 void ParameterSet::moveFitParametersToPrior(){
   LogInfo << "Moving back fit parameters to their prior value in set: " << getName() << std::endl;
 
-  if( not _useEigenDecompInFit_ ){
+  if( not _useEigenDecomp_ ){
     for( auto& par : _parameterList_ ){
       if( par.isFixed() or not par.isEnabled() ){ continue; }
       par.setParameterValue(par.getPriorValue());
@@ -380,7 +380,7 @@ void ParameterSet::throwFitParameters(bool rethrowIfNotInbounds_, double gain_){
               par.setParameterValue( par.getThrowValue() );
             }
           }
-          if( _useEigenDecompInFit_ ){
+          if( _useEigenDecomp_ ){
             this->propagateOriginalToEigen();
             for( auto& eigenPar : _eigenParameterList_ ){
               eigenPar.setThrowValue( eigenPar.getParameterValue() );
@@ -421,7 +421,7 @@ void ParameterSet::throwFitParameters(bool rethrowIfNotInbounds_, double gain_){
               LogInfo << " → " << par.getParameterValue() << std::endl;
             }
           }
-          if( _useEigenDecompInFit_ ){
+          if( _useEigenDecomp_ ){
             LogInfo << "Translated to eigen space:" << std::endl;
             for( auto& eigenPar : _eigenParameterList_ ){
               LogInfo << "Eigen par " << eigenPar.getTitle() << ": " << eigenPar.getPriorValue();
@@ -459,7 +459,7 @@ void ParameterSet::throwFitParameters(bool rethrowIfNotInbounds_, double gain_){
     throwParsFct( markScottThrowFct );
   }
   else{
-    if( _useEigenDecompForThrows_ and _useEigenDecompInFit_ ){
+    if( _useEigenDecompForThrows_ and _useEigenDecomp_ ){
       LogInfo << "Throwing eigen parameters for " << _name_ << std::endl;
 
       int nTries{0};

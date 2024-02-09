@@ -53,7 +53,7 @@ public:
   // Getters
   [[nodiscard]] bool isEnabled() const{ return _isEnabled_; }
   [[nodiscard]] bool isEnablePca() const{ return _enablePca_; }
-  [[nodiscard]] bool isUseEigenDecompInFit() const{ return _useEigenDecompInFit_; }
+  [[nodiscard]] bool isUseEigenDecompInFit() const{ return _useEigenDecomp_; }
   [[nodiscard]] bool isEnabledThrowToyParameters() const{ return _enabledThrowToyParameters_; }
   [[nodiscard]] bool isMaskForToyGeneration() const { return _maskForToyGeneration_; }
   [[nodiscard]] bool isMaskedForPropagation() const{ return _maskedForPropagation_; }
@@ -147,7 +147,7 @@ private:
   // Eigen objects
   int _nbEnabledEigen_{0};
   bool _enablePca_{false};
-  bool _useEigenDecompInFit_{false};
+  bool _useEigenDecomp_{false};
   bool _useOnlyOneParameterPerEvent_{false};
   std::vector<Parameter> _eigenParameterList_{};
   std::shared_ptr<TMatrixDSymEigen> _eigenDecomp_{nullptr};
