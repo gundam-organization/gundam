@@ -123,7 +123,7 @@ void PlotGenerator::generateSampleHistograms(TDirectory *saveDir_, int cacheSlot
   }
 
   // Fill histograms
-  for( const auto& sample : _fitSampleSetPtr_->getFitSampleList() ){
+  for( const auto& sample : _fitSampleSetPtr_->getSampleList() ){
       // Datasets:
       for( bool isData : { false, true } ){
 
@@ -625,7 +625,7 @@ void PlotGenerator::defineHistogramHolders() {
     auto splitVars = GenericToolbox::Json::fetchValue(histConfig, "splitVars", std::vector<std::string>{""});
     for( auto& splitVar : splitVars ){
       if( not GenericToolbox::doesKeyIsInMap(splitVar, splitVarsDictionary) ){
-        for( const auto& sample : _fitSampleSetPtr_->getFitSampleList() ){
+        for( const auto& sample : _fitSampleSetPtr_->getSampleList() ){
           splitVarsDictionary[splitVar][&sample] = std::vector<int>();
           if( splitVar.empty() ) splitVarsDictionary[splitVar][&sample].emplace_back(0); // placeholder for no split var
         }
@@ -636,11 +636,11 @@ void PlotGenerator::defineHistogramHolders() {
   std::function<void(int)> fetchSplitVar = [&](int iThread_){
     auto bounds = GenericToolbox::ParallelWorker::getThreadBoundIndices(
         iThread_, GundamGlobals::getParallelWorker().getNbThreads(),
-        int(_fitSampleSetPtr_->getFitSampleList().size())
+        int(_fitSampleSetPtr_->getSampleList().size())
     );
 
     for( int iSample = bounds.first ; iSample < bounds.second ; iSample++ ){
-      const Sample& sample = _fitSampleSetPtr_->getFitSampleList()[iSample];
+      const Sample& sample = _fitSampleSetPtr_->getSampleList()[iSample];
       for( const auto& event : sample.getMcContainer().eventList ){
         for( auto& splitVarInstance: splitVarsDictionary ){
           if(splitVarInstance.first.empty()) continue;
@@ -659,7 +659,7 @@ void PlotGenerator::defineHistogramHolders() {
 
   int sampleCounter = -1;
   HistHolder histDefBase;
-  for( const auto& sample : _fitSampleSetPtr_->getFitSampleList() ){
+  for( const auto& sample : _fitSampleSetPtr_->getSampleList() ){
     LogScopeIndent;
     LogInfo << "Defining holders for sample: \"" << sample.getName() << "\"" << std::endl;
     sampleCounter++;
