@@ -41,7 +41,7 @@ public:
   // const core
   [[nodiscard]] std::string getParametersSummary( bool showEigen_ = true ) const;
   [[nodiscard]] JsonType exportParameterInjectorConfig() const;
-  [[nodiscard]] const ParameterSet* getFitParameterSetPtr(const std::string& name_) const;
+  [[nodiscard]] const ParameterSet* fetchParameterSetPtr( const std::string& name_) const;
 
   // core
   void injectParameterValues(const JsonType &config_);
@@ -53,6 +53,9 @@ public:
   // Logger related
   static void muteLogger();
   static void unmuteLogger();
+
+  // Deprecated
+  [[deprecated("use fetchParameterSetPtr()")]] [[nodiscard]] const ParameterSet* getFitParameterSetPtr( const std::string& name_) const{ return fetchParameterSetPtr(name_); }
 
 private:
   // config

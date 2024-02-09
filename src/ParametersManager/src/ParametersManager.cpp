@@ -116,7 +116,7 @@ JsonType ParametersManager::exportParameterInjectorConfig() const{
 
   return out;
 }
-const ParameterSet* ParametersManager::getFitParameterSetPtr(const std::string& name_) const{
+const ParameterSet* ParametersManager::fetchParameterSetPtr( const std::string& name_) const{
   for( auto& parSet : _parameterSetList_ ){
     if( parSet.getName() == name_ ) return &parSet;
   }
@@ -297,6 +297,6 @@ void ParametersManager::injectParameterValues(const JsonType &config_) {
   }
 }
 ParameterSet* ParametersManager::getFitParameterSetPtr(const std::string& name_){
-  return const_cast<ParameterSet*>(const_cast<const ParametersManager*>(this)->getFitParameterSetPtr(name_));
+  return const_cast<ParameterSet*>(const_cast<const ParametersManager *>(this)->fetchParameterSetPtr(name_));
 }
 

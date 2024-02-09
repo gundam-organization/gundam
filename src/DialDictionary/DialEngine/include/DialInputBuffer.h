@@ -45,10 +45,10 @@ public:
   [[nodiscard]] const double* getBuffer() const{ return _buffer_.data(); }
 
   /// Get a pointer to the FitParameter for a DialInputBuffer entry.
-  [[nodiscard]] const Parameter& getFitParameter(int i=0) const;
+  [[nodiscard]] const Parameter& getParameter( int i=0) const;
 
   /// Get a pointer to the FitParameterSet for the DialInputBuffer entry.
-  [[nodiscard]] const ParameterSet& getFitParameterSet(int i=0) const;
+  [[nodiscard]] const ParameterSet& getParameterSet( int i=0) const;
 
   /// Get the reference to the hash for the current cache.
   [[nodiscard]] const uint32_t& getCurrentHash() const{ return _currentHash_; }
@@ -83,6 +83,11 @@ public:
   /// Function that allow to tweak the buffer from the inside. Used for
   /// individual spline evaluation.
   std::vector<double>& getBufferVector() { return _buffer_; }
+
+
+  // Deprecated
+  [[deprecated("use getParameter()")]] [[nodiscard]] const Parameter& getFitParameter(int i=0) const { return getParameter(i); }
+  [[deprecated("use getParameterSet()")]] [[nodiscard]] const ParameterSet& getFitParameterSet(int i=0) const { return getParameterSet(i); }
 
 protected:
   uint32_t generateHash();
