@@ -2,8 +2,8 @@
 // Created by Adrien Blanchet on 29/11/2022.
 //
 
-#ifndef GUNDAM_DIALINPUTBUFFER_H
-#define GUNDAM_DIALINPUTBUFFER_H
+#ifndef GUNDAM_DIAL_INPUT_BUFFER_H
+#define GUNDAM_DIAL_INPUT_BUFFER_H
 
 #include "ParameterSet.h"
 
@@ -44,7 +44,7 @@ public:
   /// of parameter values that should be passed to the dial.
   [[nodiscard]] const double* getBuffer() const{ return _buffer_.data(); }
 
-  /// Get a pointer to the FitParameter for a DialInputBuffer entry.
+  /// Get a pointer to the Parameter for a DialInputBuffer entry.
   [[nodiscard]] const Parameter& getParameter( int i=0) const;
 
   /// Get a pointer to the FitParameterSet for the DialInputBuffer entry.
@@ -138,4 +138,4 @@ private:
 };
 
 
-#endif //GUNDAM_DIALINPUTBUFFER_H
+#endif //GUNDAM_DIAL_INPUT_BUFFER_H

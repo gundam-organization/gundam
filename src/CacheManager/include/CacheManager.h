@@ -49,7 +49,7 @@ public:
     static bool Update(SampleSet& sampleList, EventDialCache& eventDials);
 
     /// Flag that the Cache::Manager internal caches must be updated from the
-    /// FitSampleSet and EventDialCache before it can be used.
+    /// SampleSet and EventDialCache before it can be used.
     static void UpdateRequired();
 
     /// This returns the index of the parameter in the cache.  If the

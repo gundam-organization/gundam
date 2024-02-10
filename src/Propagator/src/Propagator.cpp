@@ -392,7 +392,7 @@ void Propagator::initializeImpl(){
   _plotGenerator_.initialize();
 
   LogInfo << std::endl << GenericToolbox::addUpDownBars("Initializing the tree writer") << std::endl;
-  _treeWriter_.setFitSampleSetPtr( &_fitSampleSet_ );
+  _treeWriter_.setSampleSetPtr(&_fitSampleSet_);
   _treeWriter_.setParSetListPtr( &_parManager_.getParameterSetsList() );
   _treeWriter_.setEventDialCachePtr( &_eventDialCache_ );
 

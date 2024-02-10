@@ -2,8 +2,8 @@
 // Created by Adrien BLANCHET on 19/11/2021.
 //
 
-#ifndef GUNDAM_EVENTTREEWRITER_H
-#define GUNDAM_EVENTTREEWRITER_H
+#ifndef GUNDAM_EVENT_TREE_WRITER_H
+#define GUNDAM_EVENT_TREE_WRITER_H
 
 #include "SampleSet.h"
 #include "ParameterSet.h"
@@ -22,7 +22,7 @@ class EventTreeWriter : public GenericToolbox::ConfigBaseClass<JsonType> {
 public:
   EventTreeWriter() = default;
 
-  void setFitSampleSetPtr(const SampleSet *fitSampleSetPtr){ _fitSampleSetPtr_ = fitSampleSetPtr; }
+  void setSampleSetPtr( const SampleSet *sampleSetPtr){ _sampleSetPtr_ = sampleSetPtr; }
   void setEventDialCachePtr(const EventDialCache *eventDialCachePtr_){ _eventDialCachePtr_ = eventDialCachePtr_; }
   void setParSetListPtr(const std::vector<ParameterSet> *parSetListPtr){ _parSetListPtr_ = parSetListPtr; }
 
@@ -49,7 +49,7 @@ private:
   int _nPointsPerDial_{3};
 
   // parameters
-  const SampleSet* _fitSampleSetPtr_{nullptr};
+  const SampleSet* _sampleSetPtr_{nullptr};
   const EventDialCache* _eventDialCachePtr_{nullptr};
   const std::vector<ParameterSet>* _parSetListPtr_{nullptr};
 
@@ -57,4 +57,4 @@ private:
 };
 
 
-#endif //GUNDAM_EVENTTREEWRITER_H
+#endif //GUNDAM_EVENT_TREE_WRITER_H
