@@ -47,7 +47,7 @@ public:
   /// Get a pointer to the Parameter for a DialInputBuffer entry.
   [[nodiscard]] const Parameter& getParameter( int i=0) const;
 
-  /// Get a pointer to the FitParameterSet for the DialInputBuffer entry.
+  /// Get a pointer to the ParameterSet for the DialInputBuffer entry.
   [[nodiscard]] const ParameterSet& getParameterSet( int i=0) const;
 
   /// Get the reference to the hash for the current cache.
@@ -58,7 +58,7 @@ public:
   /// mirroring to the parameter values.
   void updateBuffer();
 
-  /// Push the index of a FitParameterSet and FitParameter in the set onto the
+  /// Push the index of a ParameterSet and Parameter in the set onto the
   /// vector of parameters.  This must be used in the order that the dial will
   /// be expecting the parameters (e.g. for a 2D parameter,
   void addParameterIndices(const std::pair<size_t, size_t>& indices_);
@@ -120,10 +120,10 @@ private:
 
   /// Should be a struct with real names and documentation: For now,
   /// the pair is holding:
-  ///    * first  -- The index of the FitParameterSet in the *_parSetRef_
-  ///            vector.  This is the index of the FitParameterSet (e.g.
+  ///    * first  -- The index of the ParameterSet in the *_parSetRef_
+  ///            vector.  This is the index of the ParameterSet (e.g.
   ///            "Cross Section", "Cross Section (binned), "Flux", etc)
-  ///    * second -- The index of the parameter particular FitParameterSet.
+  ///    * second -- The index of the parameter particular ParameterSet.
   /// There is one entry per parameter used by the dial (e.g. a 1D parameter
   /// has one entry)
   std::vector<std::pair<size_t, size_t>> _inputParameterIndicesList_{};

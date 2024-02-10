@@ -151,12 +151,12 @@ bool ParScanner::isUseParameterLimits() const {
   return _useParameterLimits_;
 }
 
-void ParScanner::scanFitParameters(std::vector<Parameter>& parList_, TDirectory* saveDir_){
+void ParScanner::scanParameters( std::vector<Parameter>& par_, TDirectory* saveDir_){
   LogThrowIf(not isInitialized());
   LogThrowIf(saveDir_ == nullptr);
-  for( auto& par : parList_ ){ this->scanFitParameter(par, saveDir_); }
+  for( auto& par : par_ ){ this->scanParameter(par, saveDir_); }
 }
-void ParScanner::scanFitParameter(Parameter& par_, TDirectory* saveDir_) {
+void ParScanner::scanParameter( Parameter& par_, TDirectory* saveDir_) {
   LogThrowIf(not isInitialized());
   LogThrowIf(saveDir_ == nullptr);
   std::vector<double> parPoints(_nbPoints_+1,0);

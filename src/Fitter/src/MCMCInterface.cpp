@@ -919,7 +919,7 @@ void MCMCInterface::scanParameters(TDirectory* saveDir_) {
   LogThrowIf(not isInitialized());
   LogInfo << "Performing scans of fit parameters..." << std::endl;
   for(Parameter* par : getMinimizerFitParameterPtr()) {
-    getPropagator().getParScanner().scanFitParameter(*par, saveDir_);
+    getPropagator().getParScanner().scanParameter(*par, saveDir_);
   }
 }
 

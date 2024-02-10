@@ -64,21 +64,21 @@ public:
     std::size_t interfaceIndex {std::size_t(-1)};
   };
 
-  /// A pair of indices into the the vector of FitSamples in the FitSampleSet
+  /// A pair of indices into the the vector of Samples in the SampleSet
   /// vector of fit samples, and the index of the event eventList in the
   /// SampleElement returned by getMcContainer().
   struct EventIndexEntry_t {
     /// The index of the fit sample being referenced by this indexed cache
-    /// entry in the FitSampleSet vector of FitSample objects (returned by
+    /// entry in the SampleSet vector of Sample objects (returned by
     /// getSampleList().
     std::size_t sampleIndex {std::size_t(-1)};
     /// The index of the MC event being reference by this indexed cache entry
     /// in the SampleElement eveltList vector for the SampleElement returned
-    /// by FitSample::getMcContainer()
+    /// by Sample::getMcContainer()
     std::size_t eventIndex {std::size_t(-1)};
   };
 
-  /// A mapping between the event (in the FitSampleSet, and the dial (in the
+  /// A mapping between the event (in the SampleSet, and the dial (in the
   /// DialCollectionVector).  This will be used to build a fast lookup table
   /// between the PhysicsEvent* and the DialInterface* (i.e. a CacheElem_t
   /// returned by getCache().

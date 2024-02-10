@@ -2,8 +2,8 @@
 // Created by Adrien BLANCHET on 07/04/2022.
 //
 
-#ifndef GUNDAM_PARSCANNER_H
-#define GUNDAM_PARSCANNER_H
+#ifndef GUNDAM_PAR_SCANNER_H
+#define GUNDAM_PAR_SCANNER_H
 
 #include "JsonBaseClass.h"
 #include "Parameter.h"
@@ -49,8 +49,8 @@ public:
   [[nodiscard]] const std::vector<GraphEntry> &getGraphEntriesBuf() const { return _graphEntriesBuf_; };
 
   // Core
-  void scanFitParameters(std::vector<Parameter>& par_, TDirectory* saveDir_);
-  void scanFitParameter(Parameter& par_, TDirectory* saveDir_);
+  void scanParameters( std::vector<Parameter>& par_, TDirectory* saveDir_);
+  void scanParameter( Parameter& par_, TDirectory* saveDir_);
   void scanSegment(TDirectory *saveDir_, const JsonType &end_, const JsonType &start_ = JsonType(), int nSteps_=-1);
   void generateOneSigmaPlots(TDirectory* saveDir_);
   void varyEvenRates(const std::vector<double>& paramVariationList_, TDirectory* saveDir_);
@@ -60,6 +60,8 @@ public:
 
   static void writeGraphEntry(GraphEntry& entry_, TDirectory* saveDir_);
 
+  [[deprecated("use scanParameters")]] void scanFitParameters( std::vector<Parameter>& par_, TDirectory* saveDir_){ scanParameters(par_, saveDir_); }
+  [[deprecated("use scanParameter")]] void scanFitParameter( Parameter& par_, TDirectory* saveDir_){ scanParameter(par_, saveDir_); }
 
 protected:
   void readConfigImpl() override;
@@ -83,4 +85,4 @@ private:
 };
 
 
-#endif //GUNDAM_PARSCANNER_H
+#endif //GUNDAM_PAR_SCANNER_H
