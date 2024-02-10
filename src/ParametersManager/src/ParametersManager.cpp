@@ -150,7 +150,7 @@ void ParametersManager::throwParametersFromParSetCovariance(){
     if( parSet.getPriorCovarianceMatrix() != nullptr ){
       LogWarning << parSet.getName() << ": throwing correlated parameters..." << std::endl;
       LogScopeIndent;
-      parSet.throwFitParameters(_reThrowParSetIfOutOfBounds_);
+      parSet.throwParameters(_reThrowParSetIfOutOfBounds_);
     } // throw?
     else{
       LogAlert << "No correlation matrix defined for " << parSet.getName() << ". NOT THROWING. (dev: could throw only with sigmas?)" << std::endl;

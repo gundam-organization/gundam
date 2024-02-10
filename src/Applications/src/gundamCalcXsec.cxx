@@ -583,7 +583,7 @@ int main(int argc, char** argv){
 
   {
     LogWarning << "Calculating weight at best-fit" << std::endl;
-    for( auto& parSet : propagator.getParametersManager().getParameterSetsList() ){ parSet.moveFitParametersToPrior(); }
+    for( auto& parSet : propagator.getParametersManager().getParameterSetsList() ){ parSet.moveParametersToPrior(); }
     propagator.propagateParametersOnSamples();
     writeBinDataFct();
     xsecAtBestFitTree->Fill();

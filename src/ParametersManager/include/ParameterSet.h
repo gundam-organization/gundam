@@ -24,14 +24,6 @@
 #include <string>
 
 
-/*
- * \class FitParameterSet is a class which aims at handling a set of parameters bond together with a covariance matrix
- * User parameters:
- * - Covariance matrix (dim N)
- * - N Fit Parameters (handing dials)
- *
- * */
-
 class ParameterSet : public JsonBaseClass  {
 
 protected:
@@ -80,8 +72,8 @@ public:
   double getPenaltyChi2();
 
   // Throw / Shifts
-  void moveFitParametersToPrior();
-  void throwFitParameters(bool rethrowIfNotInbounds_ = true, double gain_ = 1);
+  void moveParametersToPrior();
+  void throwParameters( bool rethrowIfNotInbounds_ = true, double gain_ = 1);
 
   void propagateEigenToOriginal();
   void propagateOriginalToEigen();
@@ -103,6 +95,8 @@ public:
   // Deprecated
   [[deprecated("use getCustomParThrow()")]] [[nodiscard]] const std::vector<JsonType>& getCustomFitParThrow() const{ return getCustomParThrow(); }
   [[deprecated("use isEnableEigenDecomp()")]] [[nodiscard]] bool isUseEigenDecompInFit() const{ return isEnableEigenDecomp(); }
+  [[deprecated("use moveParametersToPrior()")]] void moveFitParametersToPrior(){ moveParametersToPrior(); }
+  [[deprecated("use throwParameters()")]] void throwFitParameters( bool rethrowIfNotInbounds_ = true, double gain_ = 1){ throwParameters(rethrowIfNotInbounds_, gain_); }
 
 protected:
   void readParameterDefinitionFile();

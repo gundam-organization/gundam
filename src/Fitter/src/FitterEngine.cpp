@@ -328,7 +328,7 @@ void FitterEngine::fit(){
       }
       else{
         LogAlert << "Throwing correlated parameters for " << parSet.getName() << std::endl;
-        parSet.throwFitParameters(true, _throwGain_);
+        parSet.throwParameters(true, _throwGain_);
       }
     } // parSet
 
@@ -563,12 +563,12 @@ void FitterEngine::checkNumericalAccuracy(){
     for( auto& parSet : _propagator_.getParametersManager().getParameterSetsList() ){
       if(not parSet.isEnabled()) continue;
       if( not parSet.isEnabledThrowToyParameters() ){ continue;}
-      parSet.throwFitParameters(true, gain);
+      parSet.throwParameters(true, gain);
       throwEntry.emplace_back(parSet.getParameterList().size(), 0);
       for( size_t iPar = 0 ; iPar < parSet.getParameterList().size() ; iPar++){
         throwEntry.back()[iPar] = parSet.getParameterList()[iPar].getParameterValue();
       }
-      parSet.moveFitParametersToPrior();
+      parSet.moveParametersToPrior();
     }
   }
 

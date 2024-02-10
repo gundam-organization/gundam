@@ -336,7 +336,7 @@ double ParameterSet::getPenaltyChi2() {
 }
 
 // Parameter throw
-void ParameterSet::moveFitParametersToPrior(){
+void ParameterSet::moveParametersToPrior(){
   LogInfo << "Moving back fit parameters to their prior value in set: " << getName() << std::endl;
 
   if( not _enableEigenDecomp_ ){
@@ -354,7 +354,7 @@ void ParameterSet::moveFitParametersToPrior(){
   }
 
 }
-void ParameterSet::throwFitParameters(bool rethrowIfNotInbounds_, double gain_){
+void ParameterSet::throwParameters( bool rethrowIfNotInbounds_, double gain_){
 
   LogThrowIf(_strippedCovarianceMatrix_==nullptr, "No covariance matrix provided");
 
