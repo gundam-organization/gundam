@@ -725,7 +725,7 @@ int main(int argc, char** argv){
 
     const CrossSectionData* xsecDataPtr{nullptr};
     for( auto& xsecData : crossSectionDataList ){
-      if( xsecData.samplePtr  == histHolder.fitSamplePtr){
+      if( xsecData.samplePtr  == histHolder.samplePtr){
         xsecDataPtr = &xsecData;
         break;
       }

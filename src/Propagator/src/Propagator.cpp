@@ -388,7 +388,7 @@ void Propagator::initializeImpl(){
 
   /// Initialise other tools
   LogInfo << std::endl << GenericToolbox::addUpDownBars("Initializing the plot generator") << std::endl;
-  _plotGenerator_.setFitSampleSetPtr(&_fitSampleSet_);
+  _plotGenerator_.setSampleSetPtr(&_fitSampleSet_);
   _plotGenerator_.initialize();
 
   LogInfo << std::endl << GenericToolbox::addUpDownBars("Initializing the tree writer") << std::endl;

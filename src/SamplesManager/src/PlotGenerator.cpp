@@ -37,14 +37,10 @@ void PlotGenerator::readConfigImpl(){
 }
 void PlotGenerator::initializeImpl() {
   LogWarning << __METHOD_NAME__ << std::endl;
-  LogThrowIf(_fitSampleSetPtr_ == nullptr);
+  LogThrowIf(_sampleSetPtr_ == nullptr);
   this->defineHistogramHolders();
 }
 
-// Setters
-void PlotGenerator::setFitSampleSetPtr(const SampleSet *fitSampleSetPtr) {
-  _fitSampleSetPtr_ = fitSampleSetPtr;
-}
 
 // Getters
 bool PlotGenerator::isEmpty() const{
@@ -96,10 +92,10 @@ void PlotGenerator::generateSampleHistograms(TDirectory *saveDir_, int cacheSlot
 
     if( histDef.histPtr == nullptr ){
       if( histDef.varToPlot == "Raw" ){
-        if( _fitSampleSetPtr_ != nullptr ){
+        if( _sampleSetPtr_ != nullptr ){
           TH1D* histBase{nullptr};
-          if( histDef.isData ) { histBase = histDef.fitSamplePtr->getDataContainer().histogram.get(); }
-          else { histBase = histDef.fitSamplePtr->getMcContainer().histogram.get(); }
+          if( histDef.isData ) { histBase = histDef.samplePtr->getDataContainer().histogram.get(); }
+          else { histBase = histDef.samplePtr->getMcContainer().histogram.get(); }
           histDef.histPtr = std::make_shared<TH1D>( *histBase );
         }
         else{
@@ -123,7 +119,7 @@ void PlotGenerator::generateSampleHistograms(TDirectory *saveDir_, int cacheSlot
   }
 
   // Fill histograms
-  for( const auto& sample : _fitSampleSetPtr_->getSampleList() ){
+  for( const auto& sample : _sampleSetPtr_->getSampleList() ){
       // Datasets:
       for( bool isData : { false, true } ){
 
@@ -135,7 +131,7 @@ void PlotGenerator::generateSampleHistograms(TDirectory *saveDir_, int cacheSlot
 
           // which hist should be filled?
           for( auto& histDef : _histHolderCacheList_[cacheSlot_] ){
-            if(histDef.isData and histDef.fitSamplePtr == &sample ){
+            if(histDef.isData and histDef.samplePtr == &sample ){
               histPtrToFillList.emplace_back( &histDef );
             }
           }
@@ -145,7 +141,7 @@ void PlotGenerator::generateSampleHistograms(TDirectory *saveDir_, int cacheSlot
 
           // which hist should be filled?
           for( auto& histDef : _histHolderCacheList_[cacheSlot_] ){
-            if(not histDef.isData and histDef.fitSamplePtr == &sample ){
+            if(not histDef.isData and histDef.samplePtr == &sample ){
               histPtrToFillList.emplace_back( &histDef );
             }
           }
@@ -189,12 +185,12 @@ void PlotGenerator::generateSampleHistograms(TDirectory *saveDir_, int cacheSlot
   // Post-processing (norm, color)
   for( auto& histHolderCached : _histHolderCacheList_[cacheSlot_] ){
 
-    if( _fitSampleSetPtr_ != nullptr ){
+    if( _sampleSetPtr_ != nullptr ){
       if( histHolderCached.isData ){
-        histHolderCached.histPtr->Scale(histHolderCached.fitSamplePtr->getDataContainer().histScale );
+        histHolderCached.histPtr->Scale(histHolderCached.samplePtr->getDataContainer().histScale );
       }
       else{
-        histHolderCached.histPtr->Scale(histHolderCached.fitSamplePtr->getMcContainer().histScale );
+        histHolderCached.histPtr->Scale(histHolderCached.samplePtr->getMcContainer().histScale );
       }
     }
     else{
@@ -261,10 +257,10 @@ void PlotGenerator::generateCanvas(const std::vector<HistHolder> &histHolderList
   int canvasNbXplots = GenericToolbox::Json::fetchValue(_canvasParameters_, "nbXplots", 3);
   int canvasNbYplots = GenericToolbox::Json::fetchValue(_canvasParameters_, "nbYplots", 2);
 
-  std::map<std::string, std::map<const Sample*, std::vector<const HistHolder*>>> histsToStackMap; // histsToStackMap[path][FitSample] = listOfTh1d
+  std::map<std::string, std::map<const Sample*, std::vector<const HistHolder*>>> histsToStackMap; // histsToStackMap[path][sample] = listOfTh1d
   for( auto& histHolder : histHolderList_ ){
     if( histHolder.isData ) continue; // data associated to each later
-    histsToStackMap[buildCanvasPath(&histHolder)][histHolder.fitSamplePtr].emplace_back(&histHolder );
+    histsToStackMap[buildCanvasPath(&histHolder)][histHolder.samplePtr].emplace_back(&histHolder );
   }
 
   // Now search for the associated data hist
@@ -281,7 +277,7 @@ void PlotGenerator::generateCanvas(const std::vector<HistHolder> &histHolderList
         if( not GenericToolbox::startsWith(canvasPath, buildCanvasPath(&histHolder)) ) continue;
 
         // same sample?
-        if( samplePtr != histHolder.fitSamplePtr ) continue;
+        if( samplePtr != histHolder.samplePtr ) continue;
 
         histsToStack.second.emplace_back( &histHolder );
         break; // no need to check for more
@@ -625,7 +621,7 @@ void PlotGenerator::defineHistogramHolders() {
     auto splitVars = GenericToolbox::Json::fetchValue(histConfig, "splitVars", std::vector<std::string>{""});
     for( auto& splitVar : splitVars ){
       if( not GenericToolbox::doesKeyIsInMap(splitVar, splitVarsDictionary) ){
-        for( const auto& sample : _fitSampleSetPtr_->getSampleList() ){
+        for( const auto& sample : _sampleSetPtr_->getSampleList() ){
           splitVarsDictionary[splitVar][&sample] = std::vector<int>();
           if( splitVar.empty() ) splitVarsDictionary[splitVar][&sample].emplace_back(0); // placeholder for no split var
         }
@@ -636,11 +632,11 @@ void PlotGenerator::defineHistogramHolders() {
   std::function<void(int)> fetchSplitVar = [&](int iThread_){
     auto bounds = GenericToolbox::ParallelWorker::getThreadBoundIndices(
         iThread_, GundamGlobals::getParallelWorker().getNbThreads(),
-        int(_fitSampleSetPtr_->getSampleList().size())
+        int(_sampleSetPtr_->getSampleList().size())
     );
 
     for( int iSample = bounds.first ; iSample < bounds.second ; iSample++ ){
-      const Sample& sample = _fitSampleSetPtr_->getSampleList()[iSample];
+      const Sample& sample = _sampleSetPtr_->getSampleList()[iSample];
       for( const auto& event : sample.getMcContainer().eventList ){
         for( auto& splitVarInstance: splitVarsDictionary ){
           if(splitVarInstance.first.empty()) continue;
@@ -659,11 +655,11 @@ void PlotGenerator::defineHistogramHolders() {
 
   int sampleCounter = -1;
   HistHolder histDefBase;
-  for( const auto& sample : _fitSampleSetPtr_->getSampleList() ){
+  for( const auto& sample : _sampleSetPtr_->getSampleList() ){
     LogScopeIndent;
     LogInfo << "Defining holders for sample: \"" << sample.getName() << "\"" << std::endl;
     sampleCounter++;
-    histDefBase.fitSamplePtr = &sample;
+    histDefBase.samplePtr = &sample;
     short unsetSplitValueColor = kGray; // will increment if needed
 
     // Definition of histograms
