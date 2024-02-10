@@ -149,13 +149,13 @@ void ParameterSet::processCovarianceMatrix(){
   if( _priorCovarianceMatrix_ == nullptr ){ return; } // nothing to do
 
   LogInfo << "Stripping the matrix from fixed/disabled parameters..." << std::endl;
-  int nbFitParameters{0};
+  int nbParameters{0};
   for( const auto& par : _parameterList_ ){
-    if( ParameterSet::isValidCorrelatedParameter(par) ) nbFitParameters++;
+    if( ParameterSet::isValidCorrelatedParameter(par) ) nbParameters++;
   }
-  LogInfo << nbFitParameters << " effective parameters were defined in set: " << getName() << std::endl;
+  LogInfo << nbParameters << " effective parameters were defined in set: " << getName() << std::endl;
 
-  _strippedCovarianceMatrix_ = std::make_shared<TMatrixDSym>(nbFitParameters);
+  _strippedCovarianceMatrix_ = std::make_shared<TMatrixDSym>(nbParameters);
   int iStrippedPar = -1;
   for( int iPar = 0 ; iPar < int(_parameterList_.size()) ; iPar++ ){
     if( not ParameterSet::isValidCorrelatedParameter(_parameterList_[iPar]) ) continue;
@@ -337,7 +337,7 @@ double ParameterSet::getPenaltyChi2() {
 
 // Parameter throw
 void ParameterSet::moveParametersToPrior(){
-  LogInfo << "Moving back fit parameters to their prior value in set: " << getName() << std::endl;
+  LogInfo << "Moving back parameters to their prior value in set: " << getName() << std::endl;
 
   if( not _enableEigenDecomp_ ){
     for( auto& par : _parameterList_ ){
@@ -372,11 +372,11 @@ void ParameterSet::throwParameters( bool rethrowIfNotInbounds_, double gain_){
           throwFct_();
 
           // throws with this function are always done in real space.
-          int iFit{-1};
+          int iPar{-1};
           for( auto& par : this->getParameterList() ){
             if( ParameterSet::isValidCorrelatedParameter(par) ){
-              iFit++;
-              par.setThrowValue( par.getPriorValue() + gain_ * throwsList[iFit] );
+              iPar++;
+              par.setThrowValue( par.getPriorValue() + gain_ * throwsList[iPar] );
               par.setParameterValue( par.getThrowValue() );
             }
           }
@@ -566,7 +566,7 @@ void ParameterSet::propagateEigenToOriginal(){
 std::string ParameterSet::getSummary() const {
   std::stringstream ss;
 
-  ss << "FitParameterSet summary: " << _name_ << " -> enabled=" << _isEnabled_;
+  ss << "ParameterSet summary: " << _name_ << " -> enabled=" << _isEnabled_;
 
   if(_isEnabled_){
 
@@ -585,7 +585,7 @@ std::string ParameterSet::getSummary() const {
         if( not par.isEnabled() ) { statusStr = "Disabled"; colorStr = GenericToolbox::ColorCodes::yellowBackground; }
         else if( par.isFixed() )  { statusStr = "Fixed";    colorStr = GenericToolbox::ColorCodes::redBackground; }
         else if( par.isFree() )   { statusStr = "Free";     colorStr = GenericToolbox::ColorCodes::blueBackground; }
-        else                      { statusStr = "Fit"; }
+        else                      { statusStr = "Enabled"; }
 
 #ifdef NOCOLOR
         colorStr = "";
@@ -960,10 +960,10 @@ void ParameterSet::defineParameters(){
 }
 
 void ParameterSet::fillDeltaParameterList(){
-  int iFit{0};
+  int iPar{0};
   for( const auto& par : _parameterList_ ){
     if( ParameterSet::isValidCorrelatedParameter(par) ){
-      (*_deltaParameterList_)[iFit++] = par.getParameterValue() - par.getPriorValue();
+      (*_deltaParameterList_)[iPar++] = par.getParameterValue() - par.getPriorValue();
     }
   }
 }

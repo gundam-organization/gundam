@@ -164,7 +164,7 @@ bool Cache::Manager::Build(SampleSet& sampleList,
             DialInterface* dialInterface = dialElem.interface;
             // This is depending behavior that is not guarranteed, but which
             // is probably valid because of the particular usage.
-            // Specifically, it depends on the vector of FitParameter objects
+            // Specifically, it depends on the vector of Parameter objects
             // not being moved.  This happens after the vectors are "closed",
             // so it is probably safe, but this isn't good.  The particular
             // usage is forced do to an API change.
