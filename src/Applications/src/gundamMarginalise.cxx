@@ -582,7 +582,6 @@ int main(int argc, char** argv){
                     LogInfo << " -> I don't know this prior. Prior type: " << par.getPriorType() << std::endl;
                 }
                 margThis.push_back(par.isMarginalised());
-                parameters.push_back(value);
                 if(not par.isMarginalised())
                     survivingParameterValues.push_back(value);
             }
