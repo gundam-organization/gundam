@@ -33,7 +33,6 @@ LoggerInit([]{
 });
 
 double getParameterValueFromTextFile(std::string fileName, std::string parameterName);
-bool isParUnconstrained(std::string parName, std::vector<std::string> unconstrainedParNames); // TODO: implement this as parameterManager method
 
 int main(int argc, char** argv){
 
@@ -146,12 +145,6 @@ int main(int argc, char** argv){
     }
     cHandler.override( margConfig );
     LogInfo << "Override done." << std::endl;
-
-
-        // read the parameters to include in the TTree
-
-    // read the parameters to marginalise over
-
 
     if( clParser.isOptionTriggered("dryRun") ){
         std::cout << cHandler.toString() << std::endl;
@@ -341,9 +334,6 @@ int main(int argc, char** argv){
 
     int nToys{ clParser.getOptionVal<int>("nToys") };
 
-    // Get unconstrained parameters (thrown as prior in the PThetaThrowsTree)
-    std::vector<std::string> unconstrainedParameters;
-        unconstrainedParameters = GenericToolbox::Json::fetchValue<std::vector<std::string>>(margConfig, "unconstrainedParameterList");
     // Get parameters to be marginalised
     std::vector<std::string> marginalisedParameters;
     std::vector<std::string> marginalisedParameterSets;
@@ -367,13 +357,11 @@ int main(int argc, char** argv){
         } else {
             LogInfo << "Set: " << parSet.getName().c_str();
             for (int i = 0; i < marginalisedParameterSets.size(); i++) {
-
                 if (0 == std::strcmp(parSet.getName().c_str(), marginalisedParameterSets[i].c_str())) {
                     setMatches = (true);
                     break;
                 } else {
                     setMatches = (false);
-
                 }
             }
             if (setMatches) {
@@ -418,15 +406,6 @@ int main(int argc, char** argv){
                         << " sigma= " << par.getStdDevValue() << " limits: " << par.getMinValue() << " - "
                         << par.getMaxValue()
                 <<" -> will NOT be marg. out\n";
-            }
-        }
-    }
-    // now deal with unconstrained parameters (unconstrained by the ND, thrown according to prior)
-    for( auto& parSet : propagator.getParametersManager().getParameterSetsList() ) {
-        for (auto &par: parSet.getParameterList()) {
-            if (par.isEnabled()) continue;
-            if (isParUnconstrained(par.getFullTitle(), unconstrainedParameters)) {
-                marg_param_list->Add(new TObjString(par.getFullTitle().c_str()));
             }
         }
     }
@@ -567,28 +546,7 @@ int main(int argc, char** argv){
         //debug
         LogInfo<<"LLH: "<<LLH<<" gLLH: "<<gLLH<<std::endl    ;
 
-        // now take care of the unconstrained parameters
-        // throw according to the prior
-        for( auto& parSet : propagator.getParametersManager().getParameterSetsList() ) {
-            for (auto &par: parSet.getParameterList()) {
-                if (par.isEnabled()) continue;
-                if (isParUnconstrained(par.getFullTitle(), unconstrainedParameters)) {
-                    par.setMarginalised(false);
-//                LogInfo << "Throwing par " << par.getName() << " according to its prior." << std::endl;
-                    double mu = par.getPriorValue();
-                    double sigma = par.getStdDevValue();
-                    double value = 0;
-                    if (par.getPriorType() == 0) {
-                        value = gRandom->Gaus(mu, sigma);
-                    } else {
-                        LogInfo << " -> I don't know this prior. Prior type: " << par.getPriorType() << std::endl;
-                    }
-                    margThis.push_back(par.isMarginalised());
-                    if (not par.isMarginalised())
-                        survivingParameterValues.push_back(value);
-                }
-            }
-        }
+
         // Write the ttrees
         margThrowTree->Fill();
         ThrowsPThetaFormat->Fill();
@@ -657,12 +615,3 @@ double getParameterValueFromTextFile(std::string fileName="LargeWeight_parVector
     return -999;
 }
 
-
-bool isParUnconstrained(std::string parName, std::vector<std::string> unconstrainedParNames){
-    for (auto &par: unconstrainedParNames){
-        if (parName == par){
-            return true;
-        }
-    }
-    return false;
-}
