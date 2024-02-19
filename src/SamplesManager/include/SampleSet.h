@@ -8,9 +8,9 @@
 #include "Sample.h"
 #include "ParameterSet.h"
 #include "Likelihoods.hh"
-#include "JointProbability.h"
 #include "JsonBaseClass.h"
 
+#include "GenericToolbox.Time.h"
 
 #include "nlohmann/json.hpp"
 
@@ -35,7 +35,6 @@ public:
 
   // const getters
   [[nodiscard]] const std::vector<Sample> &getSampleList() const { return _sampleList_; }
-  [[nodiscard]] const std::shared_ptr<JointProbability::JointProbability> &getJointProbabilityFct() const{ return _jointProbabilityPtr_; }
   [[nodiscard]] const std::vector<std::string>& getAdditionalVariablesForStorage() const { return _additionalVariablesForStorage_; }
 
   // non-const getters
@@ -59,12 +58,11 @@ public:
 private:
   // config
   bool _showTimeStats_{false};
-  std::shared_ptr<JointProbability::JointProbability> _jointProbabilityPtr_{nullptr};
-  std::vector<std::string> _eventByEventDialLeafList_;
-  std::vector<std::string> _additionalVariablesForStorage_;
+  std::vector<Sample> _sampleList_{};
 
   // internals
-  std::vector<Sample> _sampleList_{};
+  std::vector<std::string> _eventByEventDialLeafList_;
+  std::vector<std::string> _additionalVariablesForStorage_;
 
 };
 

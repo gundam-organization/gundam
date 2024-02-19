@@ -95,7 +95,6 @@ private:
 
   // Internals
   TDirectory* _saveDir_{nullptr};
-  Propagator _propagator_{};
   std::unique_ptr<MinimizerBase> _minimizer_{nullptr};
   LikelihoodInterface _likelihood_{this};
   JsonType _preFitParState_{};

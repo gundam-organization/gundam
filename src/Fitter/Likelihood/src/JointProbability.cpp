@@ -1,5 +1,5 @@
 //
-// Created by Adrien BLANCHET on 23/06/2022.
+// Created by Nadrino on 23/06/2022.
 //
 
 #include "JointProbability.h"
@@ -9,6 +9,10 @@
 
 #include "TMath.h"
 
+#include <sstream>
+#include <memory>
+#include <dlfcn.h>
+
 
 LoggerInit([]{
   Logger::setUserHeaderStr("[JointProbability]");
@@ -17,16 +21,16 @@ LoggerInit([]{
 namespace JointProbability{
 
   // JointProbabilityPlugin
-  void JointProbabilityPlugin::readConfigImpl() {
+  void Plugin::readConfigImpl() {
     llhPluginSrc = GenericToolbox::Json::fetchValue<std::string>(_config_, "llhPluginSrc");
     llhSharedLib = GenericToolbox::Json::fetchValue<std::string>(_config_, "llhSharedLib");
   }
-  void JointProbabilityPlugin::initializeImpl(){
+  void Plugin::initializeImpl(){
     if( not llhSharedLib.empty() ) this->load();
     else if( not llhPluginSrc.empty() ){ this->compile(); this->load(); }
     else{ LogThrow("Can't initialize JointProbabilityPlugin without llhSharedLib nor llhPluginSrc."); }
   }
-  double JointProbabilityPlugin::eval(const Sample& sample_, int bin_) {
+  double Plugin::eval(const Sample& sample_, int bin_) const {
     LogThrowIf(evalFcn == nullptr, "Library not loaded properly.");
     return reinterpret_cast<double(*)(double, double, double)>(evalFcn)(
         sample_.getDataContainer().histogram->GetBinContent(bin_),
@@ -34,7 +38,7 @@ namespace JointProbability{
         sample_.getMcContainer().histogram->GetBinError(bin_)
     );
   }
-  void JointProbabilityPlugin::compile(){
+  void Plugin::compile(){
     LogInfo << "Compiling: " << llhPluginSrc << std::endl;
     llhSharedLib = GenericToolbox::replaceExtension(llhPluginSrc, "so");
 
@@ -44,7 +48,7 @@ namespace JointProbability{
     ss << "$CXX -std=c++11 -shared " << llhPluginSrc << " -o " << llhSharedLib;
     LogThrowIf( system( ss.str().c_str() ) != 0, "Compile command failed." );
   }
-  void JointProbabilityPlugin::load(){
+  void Plugin::load(){
     LogInfo << "Loading shared lib: " << llhSharedLib << std::endl;
     fLib = dlopen( llhSharedLib.c_str(), RTLD_LAZY );
     LogThrowIf(fLib == nullptr, "Cannot open library: " << dlerror());
@@ -71,7 +75,7 @@ namespace JointProbability{
     }
   }
 
-  double BarlowLLH_BANFF_OA2021::eval(const Sample& sample_, int bin_) {
+  double BarlowLLH_BANFF_OA2021::eval(const Sample& sample_, int bin_) const {
     TH1D* data = sample_.getDataContainer().histogram.get();
     TH1D* predMC = sample_.getMcContainer().histogram.get();
     TH1D* nomMC = sample_.getMcContainer().histogramNominal.get();
@@ -221,7 +225,7 @@ namespace JointProbability{
   }
 
   // BarlowLLH_BANFF_OA2020
-  double BarlowLLH_BANFF_OA2020::eval(const Sample& sample_, int bin_){
+  double BarlowLLH_BANFF_OA2020::eval(const Sample& sample_, int bin_) const {
       // From BANFF: origin/OA2020 branch -> BANFFBinnedSample::CalcLLRContrib()
 
       //Loop over all the bins one by one using their unique bin index.
@@ -304,7 +308,7 @@ namespace JointProbability{
   }
 
   // Chi2
-  double Chi2::eval(const Sample& sample_, int bin_){
+  double Chi2::eval(const Sample& sample_, int bin_) const {
     double predVal = sample_.getMcContainer().histogram->GetBinContent(bin_);
     double dataVal = sample_.getDataContainer().histogram->GetBinContent(bin_);
     if( predVal == 0 ){
@@ -317,7 +321,7 @@ namespace JointProbability{
   }
 
   // PoissonLLH
-  double PoissonLLH::eval(const Sample& sample_, int bin_){
+  double PoissonLLH::eval(const Sample& sample_, int bin_) const {
       double predVal = sample_.getMcContainer().histogram->GetBinContent(bin_);
       double dataVal = sample_.getDataContainer().histogram->GetBinContent(bin_);
 
@@ -336,13 +340,13 @@ namespace JointProbability{
       return 2.0 * (predVal - dataVal + dataVal * TMath::Log(dataVal / predVal));
   }
 
-  // LeastSquaresLLH
-  void LeastSquaresLLH::readConfigImpl(){
+  // LeastSquares
+  void LeastSquares::readConfigImpl(){
     LogWarning << "Using LeastSquaresLLH: NOT A REAL LIKELIHOOD" << std::endl;
     lsqPoissonianApproximation = GenericToolbox::Json::fetchValue(_config_, "lsqPoissonianApproximation", lsqPoissonianApproximation);
     LogWarning << "Using Least Squares Poissonian Approximation" << std::endl;
   }
-  double LeastSquaresLLH::eval(const Sample& sample_, int bin_){
+  double LeastSquares::eval(const Sample& sample_, int bin_) const {
     double predVal = sample_.getMcContainer().histogram->GetBinContent(bin_);
     double dataVal = sample_.getDataContainer().histogram->GetBinContent(bin_);
     double v = dataVal - predVal;
@@ -352,34 +356,34 @@ namespace JointProbability{
   }
 
   // BarlowLLH
-  double BarlowLLH::eval(const Sample& sample_, int bin_){
-      rel_var = sample_.getMcContainer().histogram->GetBinError(bin_) / TMath::Sq(sample_.getMcContainer().histogram->GetBinContent(bin_));
-      b       = (sample_.getMcContainer().histogram->GetBinContent(bin_) * rel_var) - 1;
-      c       = 4 * sample_.getDataContainer().histogram->GetBinContent(bin_) * rel_var;
+  double BarlowLLH::eval(const Sample& sample_, int bin_) const {
+    _buf_.rel_var = sample_.getMcContainer().histogram->GetBinError(bin_) / TMath::Sq(sample_.getMcContainer().histogram->GetBinContent(bin_));
+    _buf_.b       = (sample_.getMcContainer().histogram->GetBinContent(bin_) * _buf_.rel_var) - 1;
+    _buf_.c       = 4 * sample_.getDataContainer().histogram->GetBinContent(bin_) * _buf_.rel_var;
 
-      beta   = (-b + std::sqrt(b * b + c)) / 2.0;
-      mc_hat = sample_.getMcContainer().histogram->GetBinContent(bin_) * beta;
+    _buf_.beta   = (-_buf_.b + std::sqrt(_buf_.b * _buf_.b + _buf_.c)) / 2.0;
+    _buf_.mc_hat = sample_.getMcContainer().histogram->GetBinContent(bin_) * _buf_.beta;
 
       // Calculate the following LLH:
       //-2lnL = 2 * beta*mc - data + data * ln(data / (beta*mc)) + (beta-1)^2 / sigma^2
       // where sigma^2 is the same as above.
-      chi2 = 0.0;
+    _buf_.chi2 = 0.0;
       if(sample_.getDataContainer().histogram->GetBinContent(bin_) <= 0.0) {
-          chi2 = 2 * mc_hat;
-          chi2 += (beta - 1) * (beta - 1) / rel_var;
+        _buf_.chi2 = 2 * _buf_.mc_hat;
+        _buf_.chi2 += (_buf_.beta - 1) * (_buf_.beta - 1) / _buf_.rel_var;
       }
       else{
-          chi2 = 2 * (mc_hat - sample_.getDataContainer().histogram->GetBinContent(bin_));
+        _buf_.chi2 = 2 * (_buf_.mc_hat - sample_.getDataContainer().histogram->GetBinContent(bin_));
           if(sample_.getDataContainer().histogram->GetBinContent(bin_) > 0.0) {
-              chi2 += 2 * sample_.getDataContainer().histogram->GetBinContent(bin_) *
-                  std::log(sample_.getDataContainer().histogram->GetBinContent(bin_) / mc_hat);
+            _buf_.chi2 += 2 * sample_.getDataContainer().histogram->GetBinContent(bin_) *
+                  std::log(sample_.getDataContainer().histogram->GetBinContent(bin_) / _buf_.mc_hat);
           }
-          chi2 += (beta - 1) * (beta - 1) / rel_var;
+        _buf_.chi2 += (_buf_.beta - 1) * (_buf_.beta - 1) / _buf_.rel_var;
       }
-      return chi2;
+    return _buf_.chi2;
   }
 
-  double BarlowLLH_BANFF_OA2021_SFGD::eval(const Sample& sample_, int bin_){
+  double BarlowLLH_BANFF_OA2021_SFGD::eval(const Sample& sample_, int bin_) const {
 
       double dataVal = sample_.getDataContainer().histogram->GetBinContent(bin_);
       double predVal = sample_.getMcContainer().histogram->GetBinContent(bin_);
@@ -481,6 +485,50 @@ namespace JointProbability{
       }
 
       return chisq;
+  }
+
+  JointProbability* makeJointProbability(const std::string& type_){
+    auto jType{JointProbabilityType::toEnum( type_ )};
+
+    if( jType == JointProbabilityType::EnumOverflow  ){
+      LogThrow( "Unknown JointProbabilityType: " << type_ );
+    }
+
+    return makeJointProbability( jType );
+  }
+  JointProbability* makeJointProbability(JointProbabilityType type_){
+    std::unique_ptr<JointProbability> out{nullptr};
+
+    switch( type_.value ){
+      case JointProbabilityType::Plugin:
+        out = std::make_unique<Plugin>();
+        break;
+      case JointProbabilityType::Chi2:
+        out = std::make_unique<Chi2>();
+        break;
+      case JointProbabilityType::PoissonLLH:
+        out = std::make_unique<PoissonLLH>();
+        break;
+      case JointProbabilityType::LeastSquares:
+        out = std::make_unique<LeastSquares>();
+        break;
+      case JointProbabilityType::BarlowLLH:
+        out = std::make_unique<BarlowLLH>();
+        break;
+      case JointProbabilityType::BarlowLLH_BANFF_OA2020:
+        out = std::make_unique<BarlowLLH_BANFF_OA2020>();
+        break;
+      case JointProbabilityType::BarlowLLH_BANFF_OA2021:
+        out = std::make_unique<BarlowLLH_BANFF_OA2021>();
+        break;
+      case JointProbabilityType::BarlowLLH_BANFF_OA2021_SFGD:
+        out = std::make_unique<BarlowLLH_BANFF_OA2021_SFGD>();
+        break;
+      default:
+        LogThrow( "Unknown JointProbabilityType: " << type_.toString() );
+    }
+
+    return out.release();
   }
 
 }

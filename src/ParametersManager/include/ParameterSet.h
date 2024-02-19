@@ -57,10 +57,13 @@ public:
   [[nodiscard]] const JsonType &getDialSetDefinitions() const{ return _dialSetDefinitions_; }
   [[nodiscard]] const TMatrixD* getInvertedEigenVectors() const{ return _eigenVectorsInv_.get(); }
   [[nodiscard]] const TMatrixD* getEigenVectors() const{ return _eigenVectors_.get(); }
+  [[nodiscard]] const TMatrixD* getInverseStrippedCovarianceMatrix() const{ return _inverseStrippedCovarianceMatrix_.get(); }
+  [[nodiscard]] const TVectorD* getDeltaVectorPtr() const{ return _deltaVectorPtr_.get(); }
   [[nodiscard]] const std::vector<JsonType>& getCustomParThrow() const{ return _customParThrow_; }
   [[nodiscard]] const std::shared_ptr<TMatrixDSym> &getPriorCorrelationMatrix() const{ return _priorCorrelationMatrix_; }
   [[nodiscard]] const std::shared_ptr<TMatrixDSym> &getPriorCovarianceMatrix() const { return _priorCovarianceMatrix_; }
   [[nodiscard]] const std::vector<Parameter> &getParameterList() const{ return _parameterList_; }
+  [[nodiscard]] const std::vector<Parameter> &getEigenParameterList() const{ return _eigenParameterList_; }
   [[nodiscard]] const std::vector<Parameter>& getEffectiveParameterList() const;
 
   // non-const Getters
@@ -69,7 +72,7 @@ public:
   std::vector<Parameter>& getEffectiveParameterList();
 
   // Core
-  double getPenaltyChi2();
+  void updateDeltaVector() const;
 
   // Throw / Shifts
   void moveParametersToPrior();
@@ -101,7 +104,6 @@ public:
 protected:
   void readParameterDefinitionFile();
   void defineParameters();
-  void fillDeltaParameterList();
 
 private:
   // Internals
@@ -174,7 +176,7 @@ private:
   std::shared_ptr<TVectorD>  _parameterUpperBoundsList_{nullptr};
   std::shared_ptr<TObjArray> _parameterNamesList_{nullptr};
 
-  std::shared_ptr<TVectorD>  _deltaParameterList_{nullptr}; // difference from prior
+  std::shared_ptr<TVectorD>  _deltaVectorPtr_{nullptr}; // difference from prior
 
   std::shared_ptr<TMatrixD> _choleskyMatrix_{nullptr};
   GenericToolbox::CorrelatedVariablesSampler _correlatedVariableThrower_{};

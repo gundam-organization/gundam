@@ -167,7 +167,7 @@ void ParameterSet::processCovarianceMatrix(){
       (*_strippedCovarianceMatrix_)[iStrippedPar][jStrippedPar] = (*_priorCovarianceMatrix_)[iPar][jPar];
     }
   }
-  _deltaParameterList_ = std::make_shared<TVectorD>(_strippedCovarianceMatrix_->GetNrows());
+  _deltaVectorPtr_ = std::make_shared<TVectorD>(_strippedCovarianceMatrix_->GetNrows());
 
   LogThrowIf(not _strippedCovarianceMatrix_->IsSymmetric(), "Covariance matrix is not symmetric");
 
@@ -310,6 +310,14 @@ std::vector<Parameter>& ParameterSet::getEffectiveParameterList(){
 }
 
 // Core
+void ParameterSet::updateDeltaVector() const{
+  int iFit{0};
+  for( const auto& par : _parameterList_ ){
+    if( ParameterSet::isValidCorrelatedParameter(par) ){
+      (*_deltaVectorPtr_)[iFit++] = par.getParameterValue() - par.getPriorValue();
+    }
+  }
+}
 double ParameterSet::getPenaltyChi2() {
 
   if (not _isEnabled_) { return 0; }
@@ -328,7 +336,7 @@ double ParameterSet::getPenaltyChi2() {
       this->fillDeltaParameterList();
 
       // compute penalty term with covariance
-      _penaltyChi2Buffer_ = (*_deltaParameterList_) * ( (*_inverseStrippedCovarianceMatrix_) * (*_deltaParameterList_) );
+      _penaltyChi2Buffer_ = (*_deltaVectorPtr_) * ( (*_inverseStrippedCovarianceMatrix_) * (*_deltaVectorPtr_) );
     }
   }
 
@@ -958,14 +966,4 @@ void ParameterSet::defineParameters(){
     par.readConfig();
   }
 }
-
-void ParameterSet::fillDeltaParameterList(){
-  int iPar{0};
-  for( const auto& par : _parameterList_ ){
-    if( ParameterSet::isValidCorrelatedParameter(par) ){
-      (*_deltaParameterList_)[iPar++] = par.getParameterValue() - par.getPriorValue();
-    }
-  }
-}
-
 

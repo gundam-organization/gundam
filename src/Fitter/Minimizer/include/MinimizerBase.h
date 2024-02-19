@@ -2,8 +2,8 @@
 // Created by Clark McGrew on 25/01/2023.
 //
 
-#ifndef GUNDAM_MinimizerBase_h
-#define GUNDAM_MinimizerBase_h
+#ifndef GUNDAM_MINIMIZER_BASE_H
+#define GUNDAM_MINIMIZER_BASE_H
 
 #include "Propagator.h"
 #include "Parameter.h"
@@ -103,7 +103,7 @@ private:
 
 };
 
-#endif //GUNDAM_MinimizerBase_h
+#endif //GUNDAM_MINIMIZER_BASE_H
 
 //  A Lesser GNU Public License
 

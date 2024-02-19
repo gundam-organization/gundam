@@ -2,52 +2,77 @@
 // Created by Clark McGrew 10/01/23
 //
 
-#ifndef GUNDAM_LikelihoodInterface_h
-#define GUNDAM_LikelihoodInterface_h
+#ifndef GUNDAM_LIKELIHOOD_INTERFACE_H
+#define GUNDAM_LIKELIHOOD_INTERFACE_H
 
 #include "ParameterSet.h"
+#include "JointProbability.h"
 
 #include "GenericToolbox.Utils.h"
 #include "GenericToolbox.Time.h"
 
-#include "Math/Functor.h"
+#include <memory>
+#include <string>
 
-class FitterEngine;
 
-/// Wrap the calculation of the "likelihood" using the propagator into a single
-/// place.  This provides an abstract interface that can is provided to the
-/// FitterEngine and can be accessed by any MinimizerInterface.  The main
-/// access is through the evalFit method which takes an array of floating
-/// point values and returns the likelihood.  The meaning of the parameters is
-/// defined by the vector of pointers to FitParameter returned by
-/// getMinimizerFitParameterPtr.
-///
-/// The "likelihood" for GUNDAM is documented in various places as the LLH
-/// (Log Likelihood), but while it is proportional to the LLH, it's actually
-/// more closely related to the chi-square (so -LLH/2).
+/*
+ The LikelihoodInterface job is to evaluate the Likelihood component of a given pair of data/MC.
+ It contains a few buffers that are used externally to monitor the fit status.
 
-class LikelihoodInterface {
+ The "likelihood" for GUNDAM is documented in the JointProbability class as the LLH
+ (Log Likelihood), but while it is proportional to the LLH, it's actually
+ more closely related to the chi-square (so -LLH/2) as it is treated in the penalty term.
+*/
+
+class LikelihoodInterface : public JsonBaseClass  {
 
 public:
-  /////////////////////////////////////////////////////////////////
-  // Getters and Setters are defined in this file so the compiler can inline
-  // the code very early in optimization.
-  /////////////////////////////////////////////////////////////////
 
-  explicit LikelihoodInterface(FitterEngine* owner_);
-  virtual ~LikelihoodInterface();
+  struct Buffer{
+    double totalLikelihood{0};
 
-  void setOwner(FitterEngine* owner_);
-  void setStateTitleMonitor(const std::string& stateTitleMonitor_);
+    double statLikelihood{0};
+    double penaltyLikelihood{0};
+
+    void updateTotal(){ totalLikelihood = statLikelihood + penaltyLikelihood; }
+    [[nodiscard]] bool isValid() const { return not ( std::isnan(totalLikelihood) or std::isinf(totalLikelihood) ); }
+  };
+
+protected:
+  // called through public JsonBaseClass::readConfig() and JsonBaseClass::initialize()
+  void readConfigImpl() override;
+  void initializeImpl() override;
+
+public:
+  // const getters
+  [[nodiscard]] int getNbParameters() const {return _nbParameters_; }
+  [[nodiscard]] int getNbSampleBins() const {return _nbSampleBins_; }
+  [[nodiscard]] double getLastLikelihood() const { return _buffer_.totalLikelihood; }
+  [[nodiscard]] double getLastStatLikelihood() const { return _buffer_.statLikelihood; }
+  [[nodiscard]] double getLastPenaltyLikelihood() const { return _buffer_.penaltyLikelihood; }
+  [[nodiscard]] const Propagator& getPropagator() const { return _propagator_; }
+  const JointProbability::JointProbability* getJointProbabilityPtr() const { return _jointProbabilityPtr_.get(); }
+
+  // mutable getters
+  Buffer& getBuffer() { return _buffer_; }
+  Propagator& getPropagator(){ return _propagator_; }
+
+  // mutable core
+  void propagateAndEvalLikelihood();
+
+  // core
+  double evalLikelihood() const;
+  double evalStatLikelihood() const;
+  double evalPenaltyLikelihood() const;
+  [[nodiscard]] double evalStatLikelihood(const Sample& sample_) const;
+  [[nodiscard]] double evalPenaltyLikelihood(const ParameterSet& parSet_) const;
+  [[nodiscard]] std::string getSummary() const;
+
 
   /// A vector of the parameters being used in the fit.  This provides
   /// the correspondence between an array of doubles (param[]) and the
   /// pointers to the parameters.
   std::vector<Parameter *> &getMinimizerFitParameterPtr(){ return _minimizerFitParameterPtr_; }
-
-  /// Initialize the likelihood interface.  Must be called after all of the
-  /// paramters are set, but before the first function evaluation.
-  void initialize();
 
   /// Calculate the likelihood based on an array of parameters.  Used
   /// to create a functor that can be used by MINIUT or TSimpleMCMC.
@@ -64,10 +89,6 @@ public:
 
   /// A pointer to a ROOT runctor that calls the evalFitValid method.
   ROOT::Math::Functor* evalFitValidFunctor() {return _validFunctor_.get();}
-
-  /// Return the last likelihood value that was calculated.  This is a
-  /// short cut to call the owner's getPropagator().getLlhBuffer() method.
-  [[nodiscard]] double getLastLikelihood() const;
 
   /// Return the statistical part of the last likelihood value that was
   /// calculated.  This is a short cut to call the owner's
@@ -158,14 +179,21 @@ public:
   void saveGradientSteps();
 
 private:
+  // internals
+  int _nbParameters_{0};
+  int _nbSampleBins_{0};
+  Propagator _propagator_{};
+  std::shared_ptr<JointProbability::JointProbability> _jointProbabilityPtr_{nullptr};
+
+
+  mutable Buffer _buffer_{};
+
+
   /// True as soon as this has been initialized.
   bool _isInitialized_{false};
 
   // stop the fitter if LLH = +inf
   bool _throwOnBadLlh_{false};
-
-    /// The fitter engion that owns this likelihood.
-  FitterEngine* _owner_{nullptr};
 
   /// A functor that can be called by Minuit or anybody else.  This wraps
   /// evalFit.
@@ -238,7 +266,7 @@ private:
   std::vector<GradientStepPoint> _gradientMonitor_{};
 };
 
-#endif //  GUNDAM_LikelihoodInterface_h
+#endif //  GUNDAM_LIKELIHOOD_INTERFACE_H
 
 // An MIT Style License
 
