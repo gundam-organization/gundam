@@ -37,7 +37,7 @@ void EventTreeWriter::readConfigImpl() {
 void EventTreeWriter::writeSamples(TDirectory* saveDir_) const{
   LogInfo << "Writing sample data in TTrees..." << std::endl;
 
-  for( const auto& sample : _fitSampleSetPtr_->getFitSampleList() ){
+  for( const auto& sample : _sampleSetPtr_->getSampleList() ){
     LogScopeIndent;
     LogInfo << "Writing sample: " << sample.getName() << std::endl;
 

@@ -22,7 +22,7 @@ LoggerInit([]{
 
 
 void ParameterSet::readConfigImpl(){
-  LogThrowIf(_config_.empty(), "FitParameterSet config not set.");
+  LogThrowIf(_config_.empty(), "ParameterSet config not set.");
 
   _name_ = GenericToolbox::Json::fetchValue<std::string>(_config_, "name");
   LogInfo << std::endl << "Initializing parameter set: " << _name_ << std::endl;
@@ -43,8 +43,8 @@ void ParameterSet::readConfigImpl(){
     _globalParameterMaxValue_ = GenericToolbox::Json::fetchValue(parLimits, "maxValue", _globalParameterMaxValue_);
   }
 
-  _useEigenDecompInFit_ = GenericToolbox::Json::fetchValue(_config_ , "useEigenDecompInFit", false);
-  if( _useEigenDecompInFit_ ){
+  _enableEigenDecomp_ = GenericToolbox::Json::fetchValue(_config_ , {{"enableEigenDecomp"}, {"useEigenDecompInFit"}}, false);
+  if( _enableEigenDecomp_ ){
     LogWarning << "Using eigen decomposition in fit." << std::endl;
     LogScopeIndent;
 
@@ -72,7 +72,7 @@ void ParameterSet::readConfigImpl(){
   _enablePca_ = GenericToolbox::Json::fetchValue(_config_, std::vector<std::string>{"allowPca", "fixGhostFitParameters", "enablePca"}, _enablePca_);
   _enabledThrowToyParameters_ = GenericToolbox::Json::fetchValue(_config_, "enabledThrowToyParameters", _enabledThrowToyParameters_);
   _maskForToyGeneration_ = GenericToolbox::Json::fetchValue(_config_, "maskForToyGeneration", _maskForToyGeneration_);
-  _customFitParThrow_ = GenericToolbox::Json::fetchValue(_config_, "customFitParThrow", std::vector<JsonType>());
+  _customParThrow_ = GenericToolbox::Json::fetchValue(_config_, {{"customParThrow"}, {"customFitParThrow"}}, std::vector<JsonType>());
   _releaseFixedParametersOnHesse_ = GenericToolbox::Json::fetchValue(_config_, "releaseFixedParametersOnHesse", _releaseFixedParametersOnHesse_);
 
   _parameterDefinitionFilePath_ = GenericToolbox::Json::fetchValue( _config_,
@@ -149,13 +149,13 @@ void ParameterSet::processCovarianceMatrix(){
   if( _priorCovarianceMatrix_ == nullptr ){ return; } // nothing to do
 
   LogInfo << "Stripping the matrix from fixed/disabled parameters..." << std::endl;
-  int nbFitParameters{0};
+  int nbParameters{0};
   for( const auto& par : _parameterList_ ){
-    if( ParameterSet::isValidCorrelatedParameter(par) ) nbFitParameters++;
+    if( ParameterSet::isValidCorrelatedParameter(par) ) nbParameters++;
   }
-  LogInfo << nbFitParameters << " effective parameters were defined in set: " << getName() << std::endl;
+  LogInfo << nbParameters << " effective parameters were defined in set: " << getName() << std::endl;
 
-  _strippedCovarianceMatrix_ = std::make_shared<TMatrixDSym>(nbFitParameters);
+  _strippedCovarianceMatrix_ = std::make_shared<TMatrixDSym>(nbParameters);
   int iStrippedPar = -1;
   for( int iPar = 0 ; iPar < int(_parameterList_.size()) ; iPar++ ){
     if( not ParameterSet::isValidCorrelatedParameter(_parameterList_[iPar]) ) continue;
@@ -171,7 +171,7 @@ void ParameterSet::processCovarianceMatrix(){
 
   LogThrowIf(not _strippedCovarianceMatrix_->IsSymmetric(), "Covariance matrix is not symmetric");
 
-  if( not _useEigenDecompInFit_ ){
+  if( not _enableEigenDecomp_ ){
     LogWarning << "Computing inverse of the stripped covariance matrix: "
                << _strippedCovarianceMatrix_->GetNcols() << "x"
                << _strippedCovarianceMatrix_->GetNrows() << std::endl;
@@ -299,13 +299,13 @@ void ParameterSet::processCovarianceMatrix(){
 
 // Getters
 const std::vector<Parameter>& ParameterSet::getEffectiveParameterList() const{
-  if( _useEigenDecompInFit_ ) return _eigenParameterList_;
+  if( _enableEigenDecomp_ ) return _eigenParameterList_;
   return _parameterList_;
 }
 
 // non const getters
 std::vector<Parameter>& ParameterSet::getEffectiveParameterList(){
-  if( _useEigenDecompInFit_ ) return _eigenParameterList_;
+  if( _enableEigenDecomp_ ) return _eigenParameterList_;
   return _parameterList_;
 }
 
@@ -317,7 +317,7 @@ double ParameterSet::getPenaltyChi2() {
   _penaltyChi2Buffer_ = 0;
 
   if( _priorCovarianceMatrix_ != nullptr ){
-    if( _useEigenDecompInFit_ ){
+    if( _enableEigenDecomp_ ){
       for( const auto& eigenPar : _eigenParameterList_ ){
         if( eigenPar.isFixed() ) continue;
         _penaltyChi2Buffer_ += TMath::Sq( (eigenPar.getParameterValue() - eigenPar.getPriorValue()) / eigenPar.getStdDevValue() ) ;
@@ -336,10 +336,10 @@ double ParameterSet::getPenaltyChi2() {
 }
 
 // Parameter throw
-void ParameterSet::moveFitParametersToPrior(){
-  LogInfo << "Moving back fit parameters to their prior value in set: " << getName() << std::endl;
+void ParameterSet::moveParametersToPrior(){
+  LogInfo << "Moving back parameters to their prior value in set: " << getName() << std::endl;
 
-  if( not _useEigenDecompInFit_ ){
+  if( not _enableEigenDecomp_ ){
     for( auto& par : _parameterList_ ){
       if( par.isFixed() or not par.isEnabled() ){ continue; }
       par.setParameterValue(par.getPriorValue());
@@ -354,7 +354,7 @@ void ParameterSet::moveFitParametersToPrior(){
   }
 
 }
-void ParameterSet::throwFitParameters(bool rethrowIfNotInbounds_, double gain_){
+void ParameterSet::throwParameters( bool rethrowIfNotInbounds_, double gain_){
 
   LogThrowIf(_strippedCovarianceMatrix_==nullptr, "No covariance matrix provided");
 
@@ -372,15 +372,15 @@ void ParameterSet::throwFitParameters(bool rethrowIfNotInbounds_, double gain_){
           throwFct_();
 
           // throws with this function are always done in real space.
-          int iFit{-1};
+          int iPar{-1};
           for( auto& par : this->getParameterList() ){
             if( ParameterSet::isValidCorrelatedParameter(par) ){
-              iFit++;
-              par.setThrowValue( par.getPriorValue() + gain_ * throwsList[iFit] );
+              iPar++;
+              par.setThrowValue( par.getPriorValue() + gain_ * throwsList[iPar] );
               par.setParameterValue( par.getThrowValue() );
             }
           }
-          if( _useEigenDecompInFit_ ){
+          if( _enableEigenDecomp_ ){
             this->propagateOriginalToEigen();
             for( auto& eigenPar : _eigenParameterList_ ){
               eigenPar.setThrowValue( eigenPar.getParameterValue() );
@@ -421,7 +421,7 @@ void ParameterSet::throwFitParameters(bool rethrowIfNotInbounds_, double gain_){
               LogInfo << " → " << par.getParameterValue() << std::endl;
             }
           }
-          if( _useEigenDecompInFit_ ){
+          if( _enableEigenDecomp_ ){
             LogInfo << "Translated to eigen space:" << std::endl;
             for( auto& eigenPar : _eigenParameterList_ ){
               LogInfo << "Eigen par " << eigenPar.getTitle() << ": " << eigenPar.getPriorValue();
@@ -459,7 +459,7 @@ void ParameterSet::throwFitParameters(bool rethrowIfNotInbounds_, double gain_){
     throwParsFct( markScottThrowFct );
   }
   else{
-    if( _useEigenDecompForThrows_ and _useEigenDecompInFit_ ){
+    if( _useEigenDecompForThrows_ and _enableEigenDecomp_ ){
       LogInfo << "Throwing eigen parameters for " << _name_ << std::endl;
 
       int nTries{0};
@@ -566,7 +566,7 @@ void ParameterSet::propagateEigenToOriginal(){
 std::string ParameterSet::getSummary() const {
   std::stringstream ss;
 
-  ss << "FitParameterSet summary: " << _name_ << " -> enabled=" << _isEnabled_;
+  ss << "ParameterSet summary: " << _name_ << " -> enabled=" << _isEnabled_;
 
   if(_isEnabled_){
 
@@ -585,7 +585,7 @@ std::string ParameterSet::getSummary() const {
         if( not par.isEnabled() ) { statusStr = "Disabled"; colorStr = GenericToolbox::ColorCodes::yellowBackground; }
         else if( par.isFixed() )  { statusStr = "Fixed";    colorStr = GenericToolbox::ColorCodes::redBackground; }
         else if( par.isFree() )   { statusStr = "Free";     colorStr = GenericToolbox::ColorCodes::blueBackground; }
-        else                      { statusStr = "Fit"; }
+        else                      { statusStr = "Enabled"; }
 
 #ifdef NOCOLOR
         colorStr = "";
@@ -720,7 +720,7 @@ void ParameterSet::injectParameterValues(const JsonType& config_){
     }
   }
 
-  if( this->isUseEigenDecompInFit() ){
+  if( this->isEnableEigenDecomp() ){
     LogInfo << "Propagating back to the eigen decomposed parameters for parSet: " << this->getName() << std::endl;
     this->propagateOriginalToEigen();
   }
@@ -960,10 +960,10 @@ void ParameterSet::defineParameters(){
 }
 
 void ParameterSet::fillDeltaParameterList(){
-  int iFit{0};
+  int iPar{0};
   for( const auto& par : _parameterList_ ){
     if( ParameterSet::isValidCorrelatedParameter(par) ){
-      (*_deltaParameterList_)[iFit++] = par.getParameterValue() - par.getPriorValue();
+      (*_deltaParameterList_)[iPar++] = par.getParameterValue() - par.getPriorValue();
     }
   }
 }

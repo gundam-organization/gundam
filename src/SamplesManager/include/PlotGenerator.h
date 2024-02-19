@@ -2,8 +2,8 @@
 // Created by Nadrino on 16/06/2021.
 //
 
-#ifndef GUNDAM_PLOTGENERATOR_H
-#define GUNDAM_PLOTGENERATOR_H
+#ifndef GUNDAM_PLOT_GENERATOR_H
+#define GUNDAM_PLOT_GENERATOR_H
 
 #include "SampleSet.h"
 #include "PhysicsEvent.h"
@@ -36,8 +36,8 @@ struct HistHolder{
 
   // Data
   bool isData{false};
-  const Sample* fitSamplePtr{nullptr};
-  std::function<void(TH1D*, const PhysicsEvent*)> fillFunctionFitSample;
+  const Sample* samplePtr{nullptr};
+  std::function<void(TH1D*, const PhysicsEvent*)> fillFunctionSample;
 
   // X axis
   std::string varToPlot;
@@ -81,7 +81,7 @@ class PlotGenerator : public JsonBaseClass {
 
 public:
   // Setters
-  void setFitSampleSetPtr(const SampleSet *fitSampleSetPtr);
+  void setSampleSetPtr(const SampleSet *sampleSetPtr_){ _sampleSetPtr_ = sampleSetPtr_; }
 
   // Getters
   [[nodiscard]] bool isEmpty() const;
@@ -104,6 +104,11 @@ public:
   std::vector<std::string> fetchListOfSplitVarNames();
 
   void defineHistogramHolders();
+
+  // Deprecated
+  [[deprecated("use setSampleSetPtr")]] void setFitSampleSetPtr(const SampleSet *sampleSetPtr_){ setSampleSetPtr(sampleSetPtr_); }
+
+
 protected:
   void readConfigImpl() override;
   void initializeImpl() override;
@@ -125,7 +130,7 @@ private:
   };
 
   // Internals
-  const SampleSet* _fitSampleSetPtr_{nullptr};
+  const SampleSet* _sampleSetPtr_{nullptr};
   std::vector<std::vector<HistHolder>> _histHolderCacheList_{};
   std::vector<HistHolder> _comparisonHistHolderList_;
   std::map<std::string, std::shared_ptr<TCanvas>> _bufferCanvasList_;
@@ -133,4 +138,4 @@ private:
 };
 
 
-#endif //GUNDAM_PLOTGENERATOR_H
+#endif //GUNDAM_PLOT_GENERATOR_H

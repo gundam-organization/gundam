@@ -54,7 +54,7 @@ public:
 
   // Non-const getters
   ParScanner& getParScanner(){ return _parScanner_; }
-  SampleSet &getFitSampleSet(){ return _fitSampleSet_; }
+  SampleSet &getSampleSet(){ return _fitSampleSet_; }
   ParametersManager &getParametersManager(){ return _parManager_; }
   PlotGenerator &getPlotGenerator(){ return _plotGenerator_; }
   EventDialCache& getEventDialCache(){ return _eventDialCache_; }
@@ -81,6 +81,9 @@ public:
   // Logger related
   static void muteLogger();
   static void unmuteLogger();
+
+  // Deprecated
+  [[deprecated("use getSampleSet()")]] SampleSet &getFitSampleSet(){ return _fitSampleSet_; }
 
 protected:
   void initializeThreads();

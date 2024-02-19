@@ -2,8 +2,8 @@
 // Created by Adrien Blanchet on 29/11/2022.
 //
 
-#ifndef GUNDAM_DIALINPUTBUFFER_H
-#define GUNDAM_DIALINPUTBUFFER_H
+#ifndef GUNDAM_DIAL_INPUT_BUFFER_H
+#define GUNDAM_DIAL_INPUT_BUFFER_H
 
 #include "ParameterSet.h"
 
@@ -44,11 +44,11 @@ public:
   /// of parameter values that should be passed to the dial.
   [[nodiscard]] const double* getBuffer() const{ return _buffer_.data(); }
 
-  /// Get a pointer to the FitParameter for a DialInputBuffer entry.
-  [[nodiscard]] const Parameter& getFitParameter(int i=0) const;
+  /// Get a pointer to the Parameter for a DialInputBuffer entry.
+  [[nodiscard]] const Parameter& getParameter( int i=0) const;
 
-  /// Get a pointer to the FitParameterSet for the DialInputBuffer entry.
-  [[nodiscard]] const ParameterSet& getFitParameterSet(int i=0) const;
+  /// Get a pointer to the ParameterSet for the DialInputBuffer entry.
+  [[nodiscard]] const ParameterSet& getParameterSet( int i=0) const;
 
   /// Get the reference to the hash for the current cache.
   [[nodiscard]] const uint32_t& getCurrentHash() const{ return _currentHash_; }
@@ -58,7 +58,7 @@ public:
   /// mirroring to the parameter values.
   void updateBuffer();
 
-  /// Push the index of a FitParameterSet and FitParameter in the set onto the
+  /// Push the index of a ParameterSet and Parameter in the set onto the
   /// vector of parameters.  This must be used in the order that the dial will
   /// be expecting the parameters (e.g. for a 2D parameter,
   void addParameterIndices(const std::pair<size_t, size_t>& indices_);
@@ -83,6 +83,11 @@ public:
   /// Function that allow to tweak the buffer from the inside. Used for
   /// individual spline evaluation.
   std::vector<double>& getBufferVector() { return _buffer_; }
+
+
+  // Deprecated
+  [[deprecated("use getParameter()")]] [[nodiscard]] const Parameter& getFitParameter(int i=0) const { return getParameter(i); }
+  [[deprecated("use getParameterSet()")]] [[nodiscard]] const ParameterSet& getFitParameterSet(int i=0) const { return getParameterSet(i); }
 
 protected:
   uint32_t generateHash();
@@ -115,10 +120,10 @@ private:
 
   /// Should be a struct with real names and documentation: For now,
   /// the pair is holding:
-  ///    * first  -- The index of the FitParameterSet in the *_parSetRef_
-  ///            vector.  This is the index of the FitParameterSet (e.g.
+  ///    * first  -- The index of the ParameterSet in the *_parSetRef_
+  ///            vector.  This is the index of the ParameterSet (e.g.
   ///            "Cross Section", "Cross Section (binned), "Flux", etc)
-  ///    * second -- The index of the parameter particular FitParameterSet.
+  ///    * second -- The index of the parameter particular ParameterSet.
   /// There is one entry per parameter used by the dial (e.g. a 1D parameter
   /// has one entry)
   std::vector<std::pair<size_t, size_t>> _inputParameterIndicesList_{};
@@ -133,4 +138,4 @@ private:
 };
 
 
-#endif //GUNDAM_DIALINPUTBUFFER_H
+#endif //GUNDAM_DIAL_INPUT_BUFFER_H

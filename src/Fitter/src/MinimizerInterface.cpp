@@ -240,21 +240,21 @@ void MinimizerInterface::minimize(){
   bestFitStats->Branch("chi2StatBestFit",  (double*) getPropagator().getLlhStatBufferPtr() );
   bestFitStats->Branch("chi2PullsBestFit", (double*) getPropagator().getLlhPenaltyBufferPtr() );
 
-  std::vector<GenericToolbox::RawDataArray> samplesArrList(getPropagator().getFitSampleSet().getFitSampleList().size());
+  std::vector<GenericToolbox::RawDataArray> samplesArrList(getPropagator().getSampleSet().getSampleList().size());
   int iSample{-1};
-  for( auto& sample : getPropagator().getFitSampleSet().getFitSampleList() ){
+  for( auto& sample : getPropagator().getSampleSet().getSampleList() ){
     if( not sample.isEnabled() ) continue;
 
     std::vector<std::string> leavesDict;
     iSample++;
 
     leavesDict.emplace_back("llhSample/D");
-    samplesArrList[iSample].writeRawData(getPropagator().getFitSampleSet().getJointProbabilityFct()->eval(sample));
+    samplesArrList[iSample].writeRawData(getPropagator().getSampleSet().getJointProbabilityFct()->eval(sample));
 
     int nBins = int(sample.getBinning().getBinList().size());
     for( int iBin = 1 ; iBin <= nBins ; iBin++ ){
       leavesDict.emplace_back("llhSample_bin" + std::to_string(iBin) + "/D");
-      samplesArrList[iSample].writeRawData(getPropagator().getFitSampleSet().getJointProbabilityFct()->eval(sample, iBin));
+      samplesArrList[iSample].writeRawData(getPropagator().getSampleSet().getJointProbabilityFct()->eval(sample, iBin));
     }
 
     samplesArrList[iSample].lockArraySize();
@@ -402,15 +402,15 @@ void MinimizerInterface::scanParameters(TDirectory* saveDir_){
                  << " is fixed. Skipping..." << std::endl;
       continue;
     }
-    this->getPropagator().getParScanner().scanFitParameter(*getMinimizerFitParameterPtr()[iPar], saveDir_);
+    this->getPropagator().getParScanner().scanParameter(*getMinimizerFitParameterPtr()[iPar], saveDir_);
   } // iPar
   for( auto& parSet : this->getPropagator().getParametersManager().getParameterSetsList() ){
     if( not parSet.isEnabled() ) continue;
-    if( parSet.isUseEigenDecompInFit() ){
+    if( parSet.isEnableEigenDecomp() ){
       LogWarning << parSet.getName() << " is using eigen decomposition. Scanning original parameters..." << std::endl;
       for( auto& par : parSet.getParameterList() ){
         if( not par.isEnabled() ) continue;
-        this->getPropagator().getParScanner().scanFitParameter(par, saveDir_);
+        this->getPropagator().getParScanner().scanParameter(par, saveDir_);
       }
     }
   }
@@ -689,7 +689,7 @@ void MinimizerInterface::writePostFitData(TDirectory* saveDir_) {
         for( auto& par : *parList ){ parameterLabels[blocOffset + par.getParameterIndex()] = par.getFullTitle(); }
 
         parList = &parSet.getEffectiveParameterList();
-        if( parSet.isUseEigenDecompInFit() ){
+        if( parSet.isEnableEigenDecomp() ){
           int iParIdx{0};
           for( auto& iPar : *parList ){
             int jParIdx{0};
@@ -729,7 +729,7 @@ void MinimizerInterface::writePostFitData(TDirectory* saveDir_) {
               }
               else{
                 // Inherit from the prior in eigen -> only diagonal are non 0
-                if( &iParSet == &jParSet and iParSet.isUseEigenDecompInFit() ){
+                if( &iParSet == &jParSet and iParSet.isEnableEigenDecomp() ){
                   if( iPar.getParameterIndex() == jPar.getParameterIndex() ){
                     (*unstrippedCovMatrix)[iOffset + iPar.getParameterIndex()][jOffset + jPar.getParameterIndex()] = iPar.getStdDevValue()*iPar.getStdDevValue();
                   }
@@ -1100,7 +1100,7 @@ void MinimizerInterface::writePostFitData(TDirectory* saveDir_) {
     }
 
     TDirectory* saveDir;
-    if( parSet.isUseEigenDecompInFit() ){
+    if( parSet.isEnableEigenDecomp() ){
       saveDir = GenericToolbox::mkdirTFile(parSetDir, "eigen");
       savePostFitObjFct(parSet, *parList, covMatrix.get(), saveDir);
 

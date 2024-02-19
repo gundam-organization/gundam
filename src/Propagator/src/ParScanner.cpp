@@ -72,7 +72,7 @@ void ParScanner::initializeImpl() {
     scanEntry.evalY = [this](){ return _owner_->getLlhStatBuffer(); };
   }
   if( GenericToolbox::Json::fetchValue(_varsConfig_, "llhStatPerSample", false) ){
-    for( auto& sample : _owner_->getFitSampleSet().getFitSampleList() ){
+    for( auto& sample : _owner_->getSampleSet().getSampleList() ){
       _scanDataDict_.emplace_back();
       auto& scanEntry = _scanDataDict_.back();
       scanEntry.yPoints = std::vector<double>(_nbPoints_+1,0);
@@ -80,11 +80,11 @@ void ParScanner::initializeImpl() {
       scanEntry.title = Form("Stat Likelihood Scan of sample \"%s\"", sample.getName().c_str());
       scanEntry.yTitle = "Stat LLH value";
       auto* samplePtr = &sample;
-      scanEntry.evalY = [this, samplePtr](){ return _owner_->getFitSampleSet().evalLikelihood(*samplePtr); };
+      scanEntry.evalY = [this, samplePtr](){ return _owner_->getSampleSet().evalLikelihood(*samplePtr); };
     }
   }
   if( GenericToolbox::Json::fetchValue(_varsConfig_, "llhStatPerSamplePerBin", false) ){
-    for( auto& sample : _owner_->getFitSampleSet().getFitSampleList() ){
+    for( auto& sample : _owner_->getSampleSet().getSampleList() ){
       for( int iBin = 1 ; iBin <= sample.getMcContainer().histogram->GetNbinsX() ; iBin++ ){
         _scanDataDict_.emplace_back();
         auto& scanEntry = _scanDataDict_.back();
@@ -95,12 +95,12 @@ void ParScanner::initializeImpl() {
                                sample.getBinning().getBinList()[iBin-1].getSummary().c_str());
         scanEntry.yTitle = "Stat LLH value";
         auto* samplePtr = &sample;
-        scanEntry.evalY = [this, samplePtr, iBin](){ return _owner_->getFitSampleSet().getJointProbabilityFct()->eval(*samplePtr, iBin); };
+        scanEntry.evalY = [this, samplePtr, iBin](){ return _owner_->getSampleSet().getJointProbabilityFct()->eval(*samplePtr, iBin); };
       }
     }
   }
   if( GenericToolbox::Json::fetchValue(_varsConfig_, "weightPerSample", false) ){
-    for( auto& sample : _owner_->getFitSampleSet().getFitSampleList() ){
+    for( auto& sample : _owner_->getSampleSet().getSampleList() ){
       _scanDataDict_.emplace_back();
       auto& scanEntry = _scanDataDict_.back();
       scanEntry.yPoints = std::vector<double>(_nbPoints_+1,0);
@@ -112,7 +112,7 @@ void ParScanner::initializeImpl() {
     }
   }
   if( GenericToolbox::Json::fetchValue(_varsConfig_, "weightPerSamplePerBin", false) ){
-    for( auto& sample : _owner_->getFitSampleSet().getFitSampleList() ){
+    for( auto& sample : _owner_->getSampleSet().getSampleList() ){
       for( int iBin = 1 ; iBin <= sample.getMcContainer().histogram->GetNbinsX() ; iBin++ ){
         _scanDataDict_.emplace_back();
         auto& scanEntry = _scanDataDict_.back();
@@ -151,19 +151,19 @@ bool ParScanner::isUseParameterLimits() const {
   return _useParameterLimits_;
 }
 
-void ParScanner::scanFitParameters(std::vector<Parameter>& parList_, TDirectory* saveDir_){
+void ParScanner::scanParameters( std::vector<Parameter>& par_, TDirectory* saveDir_){
   LogThrowIf(not isInitialized());
   LogThrowIf(saveDir_ == nullptr);
-  for( auto& par : parList_ ){ this->scanFitParameter(par, saveDir_); }
+  for( auto& par : par_ ){ this->scanParameter(par, saveDir_); }
 }
-void ParScanner::scanFitParameter(Parameter& par_, TDirectory* saveDir_) {
+void ParScanner::scanParameter( Parameter& par_, TDirectory* saveDir_) {
   LogThrowIf(not isInitialized());
   LogThrowIf(saveDir_ == nullptr);
   std::vector<double> parPoints(_nbPoints_+1,0);
 
   LogInfo << "Scanning: " << par_.getFullTitle() << " / " << _nbPoints_ << " steps..." << std::endl;
 
-  if( par_.getOwner()->isUseEigenDecompInFit() and not par_.isEigen() ){
+  if( par_.getOwner()->isEnableEigenDecomp() and not par_.isEigen() ){
     // temporarily disable the automatic conversion Eigen -> Original
     _owner_->setEnableEigenToOrigInPropagate( false );
   }
@@ -222,7 +222,7 @@ void ParScanner::scanFitParameter(Parameter& par_, TDirectory* saveDir_) {
   _owner_->updateLlhCache();
 
   // Disable the auto conversion from Eigen to Original if the fit is set to use eigen decomp
-  if( par_.getOwner()->isUseEigenDecompInFit() and not par_.isEigen() ){
+  if( par_.getOwner()->isEnableEigenDecomp() and not par_.isEigen() ){
     _owner_->setEnableEigenToOrigInPropagate( true );
   }
 
@@ -314,7 +314,7 @@ void ParScanner::scanSegment(TDirectory *saveDir_, const JsonType &end_, const J
 
     for( auto& parSet : _owner_->getParametersManager().getParameterSetsList() ){
       if( not parSet.isEnabled() ){ continue; }
-      if( parSet.isUseEigenDecompInFit() ){
+      if( parSet.isEnableEigenDecomp() ){
         // make sure the parameters don't get overwritten
         parSet.propagateOriginalToEigen();
       }
@@ -473,7 +473,7 @@ void ParScanner::varyEvenRates(const std::vector<double>& paramVariationList_, T
       par_.setParameterValue( cappedParValue );
       _owner_->propagateParametersOnSamples();
 
-      for(auto & sample : _owner_->getFitSampleSet().getFitSampleList()){
+      for(auto & sample : _owner_->getSampleSet().getSampleList()){
         buffEvtRatesMap[iVar].emplace_back( sample.getMcContainer().getSumWeights() );
       }
 
@@ -497,7 +497,7 @@ void ParScanner::varyEvenRates(const std::vector<double>& paramVariationList_, T
 
     TVectorD* buffVariedEvtRates_TVectorD{nullptr};
 
-    for( size_t iSample = 0 ; iSample < _owner_->getFitSampleSet().getFitSampleList().size() ; iSample++ ){
+    for( size_t iSample = 0 ; iSample < _owner_->getSampleSet().getSampleList().size() ; iSample++ ){
 
       buffVariedEvtRates_TVectorD = new TVectorD(int(variationList_.size()));
 
@@ -506,7 +506,7 @@ void ParScanner::varyEvenRates(const std::vector<double>& paramVariationList_, T
       }
 
       GenericToolbox::writeInTFile(saveSubDir_, buffVariedEvtRates_TVectorD,
-                                   _owner_->getFitSampleSet().getFitSampleList()[iSample].getName());
+                                   _owner_->getSampleSet().getSampleList()[iSample].getName());
 
     }
 
@@ -523,7 +523,7 @@ void ParScanner::varyEvenRates(const std::vector<double>& paramVariationList_, T
       continue;
     }
 
-    if( parSet.isUseEigenDecompInFit() ){
+    if( parSet.isEnableEigenDecomp() ){
       // TODO ?
       continue;
     }

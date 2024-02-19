@@ -144,7 +144,7 @@ int main(int argc, char** argv){
   propagator.setEnableEigenToOrigInPropagate( false );
 
   // Sample binning using parameterSetName
-  for( auto& sample : propagator.getFitSampleSet().getFitSampleList() ){
+  for( auto& sample : propagator.getSampleSet().getSampleList() ){
 
     if( clParser.isOptionTriggered("usePreFit") ){
       sample.setName( sample.getName() + " (pre-fit)" );
@@ -443,8 +443,8 @@ int main(int argc, char** argv){
   std::vector<CrossSectionData> crossSectionDataList{};
 
   LogInfo << "Initializing xsec samples..." << std::endl;
-  crossSectionDataList.reserve( propagator.getFitSampleSet().getFitSampleList().size() );
-  for( auto& sample : propagator.getFitSampleSet().getFitSampleList() ){
+  crossSectionDataList.reserve(propagator.getSampleSet().getSampleList().size() );
+  for( auto& sample : propagator.getSampleSet().getSampleList() ){
     crossSectionDataList.emplace_back();
     auto& xsecEntry = crossSectionDataList.back();
 
@@ -583,7 +583,7 @@ int main(int argc, char** argv){
 
   {
     LogWarning << "Calculating weight at best-fit" << std::endl;
-    for( auto& parSet : propagator.getParametersManager().getParameterSetsList() ){ parSet.moveFitParametersToPrior(); }
+    for( auto& parSet : propagator.getParametersManager().getParameterSetsList() ){ parSet.moveParametersToPrior(); }
     propagator.propagateParametersOnSamples();
     writeBinDataFct();
     xsecAtBestFitTree->Fill();
@@ -637,7 +637,7 @@ int main(int argc, char** argv){
   auto* globalCorMatrixHist = GenericToolbox::convertTMatrixDtoTH2D(GenericToolbox::convertToCorrelationMatrix(globalCovMatrix));
 
   std::vector<TH1D> binValues{};
-  binValues.reserve( propagator.getFitSampleSet().getFitSampleList().size() );
+  binValues.reserve(propagator.getSampleSet().getSampleList().size() );
   int iBinGlobal{-1};
 
   for( auto& xsec : crossSectionDataList ){
@@ -725,7 +725,7 @@ int main(int argc, char** argv){
 
     const CrossSectionData* xsecDataPtr{nullptr};
     for( auto& xsecData : crossSectionDataList ){
-      if( xsecData.samplePtr  == histHolder.fitSamplePtr){
+      if( xsecData.samplePtr  == histHolder.samplePtr){
         xsecDataPtr = &xsecData;
         break;
       }

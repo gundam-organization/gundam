@@ -116,7 +116,7 @@ JsonType ParametersManager::exportParameterInjectorConfig() const{
 
   return out;
 }
-const ParameterSet* ParametersManager::getFitParameterSetPtr(const std::string& name_) const{
+const ParameterSet* ParametersManager::fetchParameterSetPtr( const std::string& name_) const{
   for( auto& parSet : _parameterSetList_ ){
     if( parSet.getName() == name_ ) return &parSet;
   }
@@ -150,7 +150,7 @@ void ParametersManager::throwParametersFromParSetCovariance(){
     if( parSet.getPriorCovarianceMatrix() != nullptr ){
       LogWarning << parSet.getName() << ": throwing correlated parameters..." << std::endl;
       LogScopeIndent;
-      parSet.throwFitParameters(_reThrowParSetIfOutOfBounds_);
+      parSet.throwParameters(_reThrowParSetIfOutOfBounds_);
     } // throw?
     else{
       LogAlert << "No correlation matrix defined for " << parSet.getName() << ". NOT THROWING. (dev: could throw only with sigmas?)" << std::endl;
@@ -226,7 +226,7 @@ void ParametersManager::throwParametersFromGlobalCovariance(bool quietVerbose_){
     // Making sure eigen decomposed parameters get the conversion done
     for( auto& parSet : _parameterSetList_ ){
       if( not parSet.isEnabled() ) continue;
-      if( parSet.isUseEigenDecompInFit() ){
+      if( parSet.isEnableEigenDecomp() ){
         parSet.propagateOriginalToEigen();
 
         // also check the bounds of real parameter space
@@ -260,7 +260,7 @@ void ParametersManager::throwParametersFromGlobalCovariance(bool quietVerbose_){
             LogInfo << " → " << par.getParameterValue() << std::endl;
           }
         }
-        if( parSet.isUseEigenDecompInFit() ){
+        if( parSet.isEnableEigenDecomp() ){
           LogInfo << "Translated to eigen space:" << std::endl;
           for( auto& eigenPar : parSet.getEigenParameterList() ){
             LogScopeIndent;
@@ -290,13 +290,13 @@ void ParametersManager::injectParameterValues(const JsonType &config_) {
     auto parSetName = GenericToolbox::Json::fetchValue<std::string>(entryParSet, "name");
     LogInfo << "Reading injection parameters for parSet: " << parSetName << std::endl;
 
-    auto* selectedParSet = this->getFitParameterSetPtr(parSetName );
+    auto* selectedParSet = this->fetchParameterSetPtr(parSetName);
     LogThrowIf( selectedParSet == nullptr, "Could not find parSet: " << parSetName );
 
     selectedParSet->injectParameterValues(entryParSet);
   }
 }
-ParameterSet* ParametersManager::getFitParameterSetPtr(const std::string& name_){
-  return const_cast<ParameterSet*>(const_cast<const ParametersManager*>(this)->getFitParameterSetPtr(name_));
+ParameterSet* ParametersManager::fetchParameterSetPtr( const std::string& name_){
+  return const_cast<ParameterSet*>(const_cast<const ParametersManager *>(this)->fetchParameterSetPtr(name_));
 }
 

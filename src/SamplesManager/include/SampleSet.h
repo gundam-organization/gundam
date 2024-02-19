@@ -34,16 +34,16 @@ public:
   void clearMcContainers();
 
   // const getters
-  const std::vector<Sample> &getFitSampleList() const { return _fitSampleList_; }
-  const std::shared_ptr<JointProbability::JointProbability> &getJointProbabilityFct() const{ return _jointProbabilityPtr_; }
-  const std::vector<std::string>& getAdditionalVariablesForStorage() const { return _additionalVariablesForStorage_; }
+  [[nodiscard]] const std::vector<Sample> &getSampleList() const { return _sampleList_; }
+  [[nodiscard]] const std::shared_ptr<JointProbability::JointProbability> &getJointProbabilityFct() const{ return _jointProbabilityPtr_; }
+  [[nodiscard]] const std::vector<std::string>& getAdditionalVariablesForStorage() const { return _additionalVariablesForStorage_; }
 
   // non-const getters
-  std::vector<Sample> &getFitSampleList(){ return _fitSampleList_; }
+  std::vector<Sample> &getSampleList(){ return _sampleList_; }
   std::vector<std::string>& getAdditionalVariablesForStorage() { return _additionalVariablesForStorage_; }
 
   //Core
-  bool empty() const{ return _fitSampleList_.empty(); }
+  [[nodiscard]] bool empty() const{ return _sampleList_.empty(); }
   double evalLikelihood();
   double evalLikelihood(Sample& sample_);
 
@@ -52,12 +52,19 @@ public:
   void updateSampleBinEventList() const;
   void updateSampleHistograms() const;
 
+  // Deprecated
+  [[deprecated("use getSampleList()")]] std::vector<Sample> &getFitSampleList(){ return getSampleList(); }
+  [[deprecated("use getSampleList()")]] [[nodiscard]] const std::vector<Sample> &getFitSampleList() const { return getSampleList(); }
+
 private:
+  // config
   bool _showTimeStats_{false};
-  std::vector<Sample> _fitSampleList_;
   std::shared_ptr<JointProbability::JointProbability> _jointProbabilityPtr_{nullptr};
   std::vector<std::string> _eventByEventDialLeafList_;
   std::vector<std::string> _additionalVariablesForStorage_;
+
+  // internals
+  std::vector<Sample> _sampleList_{};
 
 };
 

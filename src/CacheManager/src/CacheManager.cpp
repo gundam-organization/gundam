@@ -164,11 +164,11 @@ bool Cache::Manager::Build(SampleSet& sampleList,
             DialInterface* dialInterface = dialElem.interface;
             // This is depending behavior that is not guarranteed, but which
             // is probably valid because of the particular usage.
-            // Specifically, it depends on the vector of FitParameter objects
+            // Specifically, it depends on the vector of Parameter objects
             // not being moved.  This happens after the vectors are "closed",
             // so it is probably safe, but this isn't good.  The particular
             // usage is forced do to an API change.
-            const Parameter* fp = &(dialInterface->getInputBufferRef()->getFitParameter());
+            const Parameter* fp = &(dialInterface->getInputBufferRef()->getParameter());
             usedParameters.insert(fp);
             ++useCount[fp->getFullTitle()];
 
@@ -211,7 +211,7 @@ bool Cache::Manager::Build(SampleSet& sampleList,
 
     // Count the total number of histogram cells.
     int histCells = 0;
-    for(const Sample& sample : sampleList.getFitSampleList() ){
+    for(const Sample& sample : sampleList.getSampleList() ){
         if (!sample.getMcContainer().histogram) continue;
         int cells = sample.getMcContainer().histogram->GetNcells();
         LogInfo  << "Add histogram for " << sample.getName()
@@ -389,7 +389,7 @@ bool Cache::Manager::Update(SampleSet& sampleList,
                 // parameter.  This only works for 1D dials.
                 const Parameter* fp
                     = &(dialInterface->getInputBufferRef()
-                        ->getFitParameter(i));
+                        ->getParameter(i));
                 auto parMapIt = Cache::Manager::ParameterMap.find(fp);
                 if (parMapIt == Cache::Manager::ParameterMap.end()) {
                     Cache::Manager::ParameterMap[fp]
@@ -400,7 +400,7 @@ bool Cache::Manager::Update(SampleSet& sampleList,
             // Apply the mirroring for the parameters
             if (dialInputs->useParameterMirroring()) {
                 for (std::size_t i = 0; i < dialInputs->getBufferSize(); ++i) {
-                    const Parameter* fp = &(dialInputs->getFitParameter(i));
+                    const Parameter* fp = &(dialInputs->getParameter(i));
                     const std::pair<double,double>& bounds =
                         dialInputs->getMirrorBounds(i);
                     int parIndex = Cache::Manager::ParameterMap[fp];
@@ -413,7 +413,7 @@ bool Cache::Manager::Update(SampleSet& sampleList,
 
             // Apply the clamps to the parameter range
             for (std::size_t i = 0; i < dialInputs->getBufferSize(); ++i) {
-                const Parameter* fp = &(dialInputs->getFitParameter(i));
+                const Parameter* fp = &(dialInputs->getParameter(i));
                 const DialResponseSupervisor* resp
                     = dialInterface->getResponseSupervisorRef();
                 int parIndex = Cache::Manager::ParameterMap[fp];
@@ -434,7 +434,7 @@ bool Cache::Manager::Update(SampleSet& sampleList,
             const Norm* normDial = dynamic_cast<const Norm*>(baseDial);
             if (normDial) {
                 ++dialUsed;
-                const Parameter* fp = &(dialInputs->getFitParameter(0));
+                const Parameter* fp = &(dialInputs->getParameter(0));
                 int parIndex = Cache::Manager::ParameterMap[fp];
                 Cache::Manager::Get()
                     ->fNormalizations
@@ -444,7 +444,7 @@ bool Cache::Manager::Update(SampleSet& sampleList,
                 = dynamic_cast<const CompactSpline*>(baseDial);
             if (compactSpline) {
                 ++dialUsed;
-                const Parameter* fp = &(dialInputs->getFitParameter(0));
+                const Parameter* fp = &(dialInputs->getParameter(0));
                 int parIndex = Cache::Manager::ParameterMap[fp];
                 Cache::Manager::Get()
                     ->fCompactSplines
@@ -455,7 +455,7 @@ bool Cache::Manager::Update(SampleSet& sampleList,
                 = dynamic_cast<const MonotonicSpline*>(baseDial);
             if (monotonicSpline) {
                 ++dialUsed;
-                const Parameter* fp = &(dialInputs->getFitParameter(0));
+                const Parameter* fp = &(dialInputs->getParameter(0));
                 int parIndex = Cache::Manager::ParameterMap[fp];
                 Cache::Manager::Get()
                     ->fMonotonicSplines
@@ -466,7 +466,7 @@ bool Cache::Manager::Update(SampleSet& sampleList,
                 = dynamic_cast<const UniformSpline*>(baseDial);
             if (uniformSpline) {
                 ++dialUsed;
-                const Parameter* fp = &(dialInputs->getFitParameter(0));
+                const Parameter* fp = &(dialInputs->getParameter(0));
                 int parIndex = Cache::Manager::ParameterMap[fp];
                 Cache::Manager::Get()
                     ->fUniformSplines
@@ -477,7 +477,7 @@ bool Cache::Manager::Update(SampleSet& sampleList,
                 = dynamic_cast<const GeneralSpline*>(baseDial);
             if (generalSpline) {
                 ++dialUsed;
-                const Parameter* fp = &(dialInputs->getFitParameter(0));
+                const Parameter* fp = &(dialInputs->getParameter(0));
                 int parIndex = Cache::Manager::ParameterMap[fp];
                 Cache::Manager::Get()
                     ->fGeneralSplines
@@ -488,7 +488,7 @@ bool Cache::Manager::Update(SampleSet& sampleList,
                 = dynamic_cast<const LightGraph*>(baseDial);
             if (lightGraph) {
                 ++dialUsed;
-                const Parameter* fp = &(dialInputs->getFitParameter(0));
+                const Parameter* fp = &(dialInputs->getParameter(0));
                 int parIndex = Cache::Manager::ParameterMap[fp];
                 Cache::Manager::Get()
                     ->fGraphs
@@ -536,7 +536,7 @@ bool Cache::Manager::Update(SampleSet& sampleList,
     // Add the histogram cells to the cache.  THIS CODE IS SUSPECT!!!!
     LogInfo << "Add this histogram cells to the cache." << std::endl;
     int nextHist = 0;
-    for(Sample& sample : sampleList.getFitSampleList() ) {
+    for(Sample& sample : sampleList.getSampleList() ) {
         LogInfo  << "Fill cache for " << sample.getName()
                 << " with " << sample.getMcContainer().eventList.size()
                 << " events" << std::endl;
