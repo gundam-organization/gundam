@@ -1,9 +1,9 @@
 //
-// Created by Adrien Blanchet on 13/10/2023.
+// Created by Nadrino on 13/10/2023.
 //
 
-#ifndef GUNDAM_PARAMETERSMANAGER_H
-#define GUNDAM_PARAMETERSMANAGER_H
+#ifndef GUNDAM_PARAMETERS_MANAGER_H
+#define GUNDAM_PARAMETERS_MANAGER_H
 
 #include "ParameterSet.h"
 #include "Parameter.h"
@@ -22,9 +22,8 @@ protected:
   void initializeImpl() override;
 
 public:
-  ParametersManager() = default;
-
   // setters
+  void setParameterSetListConfig(const JsonType& parameterSetListConfig_){ _parameterSetListConfig_ = parameterSetListConfig_; }
   void setReThrowParSetIfOutOfBounds(bool reThrowParSetIfOutOfBounds_){ _reThrowParSetIfOutOfBounds_ = reThrowParSetIfOutOfBounds_; }
   void setThrowToyParametersWithGlobalCov(bool throwToyParametersWithGlobalCov_){ _throwToyParametersWithGlobalCov_ = throwToyParametersWithGlobalCov_; }
   void setGlobalCovarianceMatrix(const std::shared_ptr<TMatrixD> &globalCovarianceMatrix){ _globalCovarianceMatrix_ = globalCovarianceMatrix; }
@@ -41,27 +40,24 @@ public:
   // const core
   [[nodiscard]] std::string getParametersSummary( bool showEigen_ = true ) const;
   [[nodiscard]] JsonType exportParameterInjectorConfig() const;
-  [[nodiscard]] const ParameterSet* fetchParameterSetPtr( const std::string& name_) const;
+  [[nodiscard]] const ParameterSet* getFitParameterSetPtr(const std::string& name_) const;
 
   // core
   void injectParameterValues(const JsonType &config_);
   void throwParameters();
   void throwParametersFromParSetCovariance();
   void throwParametersFromGlobalCovariance(bool quietVerbose_ = true);
-  ParameterSet* fetchParameterSetPtr( const std::string& name_);
-  
+  ParameterSet* getFitParameterSetPtr(const std::string& name_);
+
   // Logger related
   static void muteLogger();
   static void unmuteLogger();
-
-  // Deprecated
-  [[deprecated("use fetchParameterSetPtr()")]] [[nodiscard]] const ParameterSet* getFitParameterSetPtr( const std::string& name_) const{ return fetchParameterSetPtr(name_); }
-  [[deprecated("use fetchParameterSetPtr()")]] ParameterSet* getFitParameterSetPtr( const std::string& name_) { return fetchParameterSetPtr(name_); }
 
 private:
   // config
   bool _reThrowParSetIfOutOfBounds_{true};
   bool _throwToyParametersWithGlobalCov_{false};
+  JsonType _parameterSetListConfig_{};
 
   // internals
   std::vector<ParameterSet> _parameterSetList_{};
@@ -74,4 +70,4 @@ private:
 };
 
 
-#endif //GUNDAM_PARAMETERSMANAGER_H
+#endif //GUNDAM_PARAMETERS_MANAGER_H

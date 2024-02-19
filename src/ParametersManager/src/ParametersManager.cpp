@@ -1,5 +1,5 @@
 //
-// Created by Adrien Blanchet on 13/10/2023.
+// Created by Nadrino on 13/10/2023.
 //
 
 #include "ParametersManager.h"
@@ -24,8 +24,19 @@ void ParametersManager::unmuteLogger(){ Logger::setIsMuted( false ); }
 // config
 void ParametersManager::readConfigImpl(){
 
+  _parameterSetListConfig_ = GenericToolbox::Json::fetchValue(_config_, "parameterSetList", _parameterSetListConfig_);
+
   _reThrowParSetIfOutOfBounds_ = GenericToolbox::Json::fetchValue(_config_, "reThrowParSetIfOutOfBounds", _reThrowParSetIfOutOfBounds_);
   _throwToyParametersWithGlobalCov_ = GenericToolbox::Json::fetchValue(_config_, "throwToyParametersWithGlobalCov", _throwToyParametersWithGlobalCov_);
+
+  LogInfo << "Reading parameter configuration..." << std::endl;
+  _parameterSetList_.reserve( _parameterSetListConfig_.size() );
+  for( const auto& parameterSetConfig : _parameterSetListConfig_ ){
+    _parameterSetList_.emplace_back();
+    _parameterSetList_.back().readConfig( parameterSetConfig );
+    LogInfo << _parameterSetList_.back().getSummary() << std::endl;
+  }
+  LogInfo << _parameterSetList_.size() << " parameter sets defined." << std::endl;
 
 }
 void ParametersManager::initializeImpl(){
@@ -116,7 +127,7 @@ JsonType ParametersManager::exportParameterInjectorConfig() const{
 
   return out;
 }
-const ParameterSet* ParametersManager::fetchParameterSetPtr( const std::string& name_) const{
+const ParameterSet* ParametersManager::getFitParameterSetPtr(const std::string& name_) const{
   for( auto& parSet : _parameterSetList_ ){
     if( parSet.getName() == name_ ) return &parSet;
   }
@@ -290,13 +301,13 @@ void ParametersManager::injectParameterValues(const JsonType &config_) {
     auto parSetName = GenericToolbox::Json::fetchValue<std::string>(entryParSet, "name");
     LogInfo << "Reading injection parameters for parSet: " << parSetName << std::endl;
 
-    auto* selectedParSet = this->fetchParameterSetPtr(parSetName);
+    auto* selectedParSet = this->getFitParameterSetPtr(parSetName );
     LogThrowIf( selectedParSet == nullptr, "Could not find parSet: " << parSetName );
 
     selectedParSet->injectParameterValues(entryParSet);
   }
 }
-ParameterSet* ParametersManager::fetchParameterSetPtr( const std::string& name_){
-  return const_cast<ParameterSet*>(const_cast<const ParametersManager *>(this)->fetchParameterSetPtr(name_));
+ParameterSet* ParametersManager::getFitParameterSetPtr(const std::string& name_){
+  return const_cast<ParameterSet*>(const_cast<const ParametersManager*>(this)->getFitParameterSetPtr(name_));
 }
 

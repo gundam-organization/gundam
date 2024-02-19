@@ -8,11 +8,10 @@
 #include "GundamGlobals.h"
 
 #include "GenericToolbox.Json.h"
-#include "GenericToolbox.Time.h"
 #include "Logger.h"
 
-#include "nlohmann/json.hpp"
 #include <TTreeFormulaManager.h>
+#include "nlohmann/json.hpp"
 
 #include <memory>
 
@@ -24,6 +23,8 @@ void SampleSet::readConfigImpl(){
   LogWarning << __METHOD_NAME__ << std::endl;
   LogThrowIf(_config_.empty(), "_config_ is not set." << std::endl);
 
+  _showTimeStats_ = GenericToolbox::Json::fetchValue(_config_, "showTimeStats", _showTimeStats_);
+
   LogInfo << "Reading samples definition..." << std::endl;
   auto fitSampleListConfig = GenericToolbox::Json::fetchValue(_config_, "fitSampleList", JsonType());
   for( const auto& fitSampleConfig: fitSampleListConfig ){
@@ -33,28 +34,6 @@ void SampleSet::readConfigImpl(){
     _sampleList_.back().setConfig(fitSampleConfig);
     _sampleList_.back().readConfig();
   }
-
-  // TODO: To be moved elsewhere -> nothing to do in sample... -> this should belong to the fitter engine
-  std::string llhMethod = "PoissonLLH";
-  llhMethod = GenericToolbox::Json::fetchValue(_config_, "llhStatFunction", llhMethod);
-
-  // new config structure
-  auto configJointProbability = GenericToolbox::Json::fetchValue(_config_, {{"jointProbability"}, {"llhConfig"}}, JsonType());
-  llhMethod = GenericToolbox::Json::fetchValue(configJointProbability, "type", llhMethod);
-
-  LogInfo << "Using \"" << llhMethod << "\" LLH function." << std::endl;
-  if     ( llhMethod == "Chi2" ){                    _jointProbabilityPtr_ = std::make_shared<JointProbability::Chi2>(); }
-  else if( llhMethod == "PoissonLLH" ){              _jointProbabilityPtr_ = std::make_shared<JointProbability::PoissonLLH>(); }
-  else if( llhMethod == "BarlowLLH" ) {              _jointProbabilityPtr_ = std::make_shared<JointProbability::BarlowLLH>(); }
-  else if( llhMethod == "Plugin" ) {                 _jointProbabilityPtr_ = std::make_shared<JointProbability::JointProbabilityPlugin>(); }
-  else if( llhMethod == "BarlowLLH_BANFF_OA2020" ) { _jointProbabilityPtr_ = std::make_shared<JointProbability::BarlowLLH_BANFF_OA2020>(); }
-  else if( llhMethod == "BarlowLLH_BANFF_OA2021" ) { _jointProbabilityPtr_ = std::make_shared<JointProbability::BarlowLLH_BANFF_OA2021>(); }
-  else if( llhMethod == "LeastSquares" ) { _jointProbabilityPtr_ = std::make_shared<JointProbability::LeastSquaresLLH>(); }
-  else if( llhMethod == "BarlowLLH_BANFF_OA2021_SFGD" ) {  _jointProbabilityPtr_ = std::make_shared<JointProbability::BarlowLLH_BANFF_OA2021_SFGD>(); }
-  else{ LogThrow("Unknown LLH Method: " << llhMethod); }
-
-  _jointProbabilityPtr_->readConfig(configJointProbability);
-  _jointProbabilityPtr_->initialize();
 }
 void SampleSet::initializeImpl() {
   LogWarning << __METHOD_NAME__ << std::endl;
@@ -100,19 +79,6 @@ void SampleSet::initializeImpl() {
   GundamGlobals::getParallelWorker().setPostParallelJob("FitSampleSet::updateSampleHistograms", rescaleMcHistogramsFct);
 }
 
-double SampleSet::evalLikelihood(){
-  double llh = 0.;
-  for( auto& sample : _sampleList_ ){
-    llh += this->evalLikelihood(sample);
-    LogThrowIf(std::isnan(llh) or std::isinf(llh), sample.getName() << ": reportde likelihood is invalid:" << llh);
-  }
-  return llh;
-}
-double SampleSet::evalLikelihood(Sample& sample_){
-  sample_.setLlhStatBuffer(_jointProbabilityPtr_->eval(sample_));
-  return sample_.getLlhStatBuffer();
-}
-
 void SampleSet::copyMcEventListToDataContainer(){
   for( auto& sample : _sampleList_ ){
     LogInfo << "Copying MC events in sample \"" << sample.getName() << "\"" << std::endl;
@@ -134,17 +100,14 @@ void SampleSet::clearMcContainers(){
 }
 
 void SampleSet::updateSampleEventBinIndexes() const{
-  if( _showTimeStats_ ) GenericToolbox::getElapsedTimeSinceLastCallInMicroSeconds(__METHOD_NAME__);
   GundamGlobals::getParallelWorker().runJob("FitSampleSet::updateSampleEventBinIndexes");
-  if( _showTimeStats_ ) LogDebug << __METHOD_NAME__ << " took: " << GenericToolbox::getElapsedTimeSinceLastCallStr(__METHOD_NAME__) << std::endl;
+  LogDebugIf(_showTimeStats_) << __METHOD_NAME__ << " took: " << GundamGlobals::getParallelWorker().getLastJobTimer() << std::endl;
 }
 void SampleSet::updateSampleBinEventList() const{
-  if( _showTimeStats_ ) GenericToolbox::getElapsedTimeSinceLastCallInMicroSeconds(__METHOD_NAME__);
   GundamGlobals::getParallelWorker().runJob("FitSampleSet::updateSampleBinEventList");
-  if( _showTimeStats_ ) LogDebug << __METHOD_NAME__ << " took: " << GenericToolbox::getElapsedTimeSinceLastCallStr(__METHOD_NAME__) << std::endl;
+  LogDebugIf(_showTimeStats_) << __METHOD_NAME__ << " took: " << GundamGlobals::getParallelWorker().getLastJobTimer() << std::endl;
 }
 void SampleSet::updateSampleHistograms() const {
-  if( _showTimeStats_ ) GenericToolbox::getElapsedTimeSinceLastCallInMicroSeconds(__METHOD_NAME__);
   GundamGlobals::getParallelWorker().runJob("FitSampleSet::updateSampleHistograms");
-  if( _showTimeStats_ ) LogDebug << __METHOD_NAME__ << " took: " << GenericToolbox::getElapsedTimeSinceLastCallStr(__METHOD_NAME__) << std::endl;
+  LogDebugIf(_showTimeStats_) << __METHOD_NAME__ << " took: " << GundamGlobals::getParallelWorker().getLastJobTimer() << std::endl;
 }

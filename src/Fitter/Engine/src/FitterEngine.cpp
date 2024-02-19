@@ -5,7 +5,7 @@
 #include "FitterEngine.h"
 #include "GundamGlobals.h"
 #include "RootMinimizer.h"
-#include "MCMCInterface.h"
+#include "AdaptiveMcmc.h"
 
 #include "GenericToolbox.Utils.h"
 #include "GenericToolbox.Json.h"
@@ -66,10 +66,10 @@ void FitterEngine::readConfigImpl(){
   _minimizerType_ = MinimizerType::toEnum( minimizerTypeStr );
   switch( _minimizerType_.value ){
     case MinimizerType::RootMinimizer:
-      this->_minimizer_ = std::make_unique<RootMinimizerInterface>( this );
+      this->_minimizer_ = std::make_unique<RootMinimizer>( this );
       break;
     case MinimizerType::AdaptiveMCMC:
-      this->_minimizer_ = std::make_unique<AdaptiveMcmcInterface>( this );
+      this->_minimizer_ = std::make_unique<AdaptiveMcmc>( this );
       break;
     default:
       LogThrow("Unknown minimizer type selected: " << minimizerTypeStr << std::endl << "Available: " << MinimizerType::generateEnumFieldsAsString());
@@ -233,7 +233,7 @@ void FitterEngine::initializeImpl(){
 
 
   if( _minimizerType_ == MinimizerType::RootMinimizer ){
-    dynamic_cast<const RootMinimizerInterface*>( &this->getMinimizer() )->saveMinimizerSettings( GenericToolbox::mkdirTFile(_saveDir_, "fit/minimizer" ) );
+    dynamic_cast<const RootMinimizer*>( &this->getMinimizer() )->saveMinimizerSettings( GenericToolbox::mkdirTFile(_saveDir_, "fit/minimizer" ) );
   }
 
   _likelihoodInterface_.propagateAndEvalLikelihood();

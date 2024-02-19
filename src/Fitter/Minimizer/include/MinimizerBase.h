@@ -98,6 +98,9 @@ public:
   /// defined by the vector of pointers to Parameter returned by the LikelihoodInterface.
   virtual double evalFit( const double* parArray_ );
 
+  // default calcErrors() is not defined
+  [[nodiscard]] virtual bool isErrorCalcEnabled() const { return false; }
+
   // c-tor
   explicit MinimizerBase(FitterEngine* owner_): _owner_(owner_){}
 
