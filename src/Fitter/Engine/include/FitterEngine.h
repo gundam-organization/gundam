@@ -67,21 +67,13 @@ public:
 
   // Core
   void fit();
+  void runPcaCheck();
+  void rescaleParametersStepSize();
+  void checkNumericalAccuracy();
 
   // Deprecated
   [[deprecated("use getLikelihood().getPropagator()")]] [[nodiscard]] const Propagator& getPropagator() const{ return getLikelihood().getPropagator(); }
   [[deprecated("use getLikelihood().getPropagator()")]] Propagator& getPropagator(){ return getLikelihood().getPropagator(); }
-
-  void runPcaCheck();
-  void rescaleParametersStepSize();
-
-  void checkNumericalAccuracy();
-
-  // Scan the parameters as used by the minimizer (e.g. MINUIT).  This has
-  // been replaced by MinimizerBase::scanParameters() which can be accessed
-  // through the getMinimizer() method.  For example:
-  // "fitter.scanMinimizerParameters(dir)" should be replaced by "fitter.getMinimizer().scanParameters(dir)"
-
   [[deprecated("Use runPcaCheck()")]] void fixGhostFitParameters(){ runPcaCheck(); }
 
 
