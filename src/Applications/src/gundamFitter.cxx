@@ -2,7 +2,6 @@
 // Created by Nadrino on 01/06/2021.
 //
 
-#include "MinimizerInterface.h"
 #include "GundamGlobals.h"
 #include "FitterEngine.h"
 #include "ConfigUtils.h"

@@ -1,9 +1,9 @@
 //
-// Created by Adrien BLANCHET on 16/12/2021.
+// Created by Nadrino on 16/12/2021.
 //
 
-#ifndef GUNDAM_MINIMIZERINTERFACE_H
-#define GUNDAM_MINIMIZERINTERFACE_H
+#ifndef GUNDAM_ROOT_MINIMIZER_H
+#define GUNDAM_ROOT_MINIMIZER_H
 
 
 #include "ParameterSet.h"
@@ -21,65 +21,68 @@
 #include <memory>
 #include <vector>
 
-class FitterEngine;
 
-class MinimizerInterface : public MinimizerBase {
+class RootMinimizer : public MinimizerBase {
 
 protected:
   void readConfigImpl() override;
   void initializeImpl() override;
 
 public:
-  explicit MinimizerInterface(FitterEngine* owner_): MinimizerBase(owner_) {} // forwarding owner
-
-  // setters
-  void setEnableSimplexBeforeMinimize(bool enableSimplexBeforeMinimize_){ _enableSimplexBeforeMinimize_ = enableSimplexBeforeMinimize_; }
-
-  // overridden getters
-  [[nodiscard]] bool isFitHasConverged() const override{ return _fitHasConverged_; }
-  [[nodiscard]] std::string getMinimizerTypeName() const override { return "MinimizerInterface"; };
-
-  // getters
-  [[nodiscard]] double getTargetEdm() const;
-  [[nodiscard]] const std::unique_ptr<ROOT::Math::Minimizer> &getMinimizer() const{ return _minimizer_; }
-
-  // core overrides
+  // overrides
   void minimize() override;
   void calcErrors() override;
-  void scanParameters(TDirectory* saveDir_) override;
+  void scanParameters( TDirectory* saveDir_ ) override;
+  bool isErrorCalcEnabled() const override { return not disableCalcError(); }
 
-  // misc
+  // c-tor
+  explicit RootMinimizer(FitterEngine* owner_): MinimizerBase(owner_) {}
+
+  // setters
+  void setEnableSimplexBeforeMinimize(bool enableSimplexBeforeMinimize_){ _preFitWithSimplex_ = enableSimplexBeforeMinimize_; }
+
+  // const getters
+  [[nodiscard]] double getTargetEdm() const;
+  [[nodiscard]] const std::unique_ptr<ROOT::Math::Minimizer> &getMinimizer() const{ return _rootMinimizer_; }
+
+  // core
+
   void saveMinimizerSettings(TDirectory* saveDir_) const;
 
 protected:
   void writePostFitData(TDirectory* saveDir_);
   void updateCacheToBestfitPoint();
+  void saveGradientSteps();
 
 private:
 
   // Parameters
-  bool _enableSimplexBeforeMinimize_{false};
-  // bool _enablePostFitErrorEval_{true};
+  bool _preFitWithSimplex_{false};
   bool _restoreStepSizeBeforeHesse_{false};
   bool _generatedPostFitParBreakdown_{false};
   bool _generatedPostFitEigenBreakdown_{false};
+
   int _strategy_{1};
   int _printLevel_{2};
   int _simplexStrategy_{1};
+
   double _tolerance_{1E-4};
   double _stepSizeScaling_{1};
   double _simplexToleranceLoose_{1000.};
+
   unsigned int _maxIterations_{500};
   unsigned int _maxFcnCalls_{1000000000};
   unsigned int _simplexMaxFcnCalls_{1000};
+
   std::string _minimizerType_{"Minuit2"};
-  std::string _minimizerAlgo_{};
+  std::string _minimizerAlgo_{"Migrad"};
   std::string _errorAlgo_{"Hesse"};
 
   // internals
   bool _fitHasConverged_{false};
 
-  std::unique_ptr<ROOT::Math::Minimizer> _minimizer_{nullptr};
+  ROOT::Math::Functor _functor_{};
+  std::unique_ptr<ROOT::Math::Minimizer> _rootMinimizer_{nullptr};
 
 };
-#endif //GUNDAM_MINIMIZERINTERFACE_H
+#endif //GUNDAM_ROOT_MINIMIZER_H

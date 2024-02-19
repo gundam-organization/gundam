@@ -4,7 +4,7 @@
 
 #include "FitterEngine.h"
 #include "GundamGlobals.h"
-#include "MinimizerInterface.h"
+#include "RootMinimizer.h"
 #include "MCMCInterface.h"
 
 #include "GenericToolbox.Utils.h"
