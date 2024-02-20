@@ -211,7 +211,7 @@ void FitterEngine::initializeImpl(){
       GenericToolbox::writeInTFile( outDir, TNamed( "max", std::to_string( par.getMaxValue() ).c_str() ) );
     }
 
-    if( parSet.useEigenDecomposition() ){
+    if( parSet.isEnableEigenDecomp() ){
       auto eigenSaveFolder = GenericToolbox::joinPath( saveFolder, "eigen" );
       for( auto& eigen : parSet.getEigenParameterList() ){
         auto eigenFolder = GenericToolbox::joinPath(eigenSaveFolder, GenericToolbox::generateCleanBranchName(eigen.getTitle()));
@@ -346,7 +346,7 @@ void FitterEngine::fit(){
           LogWarning << "Pushing #" << parIndex << " to " << pushVal << std::endl;
           parList[parIndex].setParameterValue( pushVal );
 
-          if( parSet.useEigenDecomposition() ){
+          if( parSet.isEnableEigenDecomp() ){
             parSet.propagateOriginalToEigen();
           }
 
@@ -355,7 +355,7 @@ void FitterEngine::fit(){
       }
       else{
         LogAlert << "Throwing correlated parameters for " << parSet.getName() << std::endl;
-        parSet.throwFitParameters(true, _throwGain_);
+        parSet.throwParameters(true, _throwGain_);
       }
     } // parSet
 
@@ -507,7 +507,7 @@ void FitterEngine::runPcaCheck(){
 #endif
           LogInfo << red << ssPrint.str() << rst << std::endl;
 
-          if( parSet.useEigenDecomposition() and GenericToolbox::Json::fetchValue(_config_, "fixGhostEigenParametersAfterFirstRejected", false) ){
+          if( parSet.isEnableEigenDecomp() and GenericToolbox::Json::fetchValue(_config_, "fixGhostEigenParametersAfterFirstRejected", false) ){
             fixNextEigenPars = true;
           }
         }
@@ -519,7 +519,7 @@ void FitterEngine::runPcaCheck(){
 
     // Recompute inverse matrix for the fitter.  Note: Eigen decomposed parSet
     // don't need a new inversion since the matrix is diagonal
-    if( not parSet.useEigenDecomposition() ){
+    if( not parSet.isEnableEigenDecomp() ){
       parSet.processCovarianceMatrix();
     }
 
@@ -587,12 +587,12 @@ void FitterEngine::checkNumericalAccuracy(){
     for( auto& parSet : _likelihoodInterface_.getPropagator().getParametersManager().getParameterSetsList() ){
       if(not parSet.isEnabled()) continue;
       if( not parSet.isEnabledThrowToyParameters() ){ continue;}
-      parSet.throwFitParameters(true, gain);
+      parSet.throwParameters(true, gain);
       throwEntry.emplace_back(parSet.getParameterList().size(), 0);
       for( size_t iPar = 0 ; iPar < parSet.getParameterList().size() ; iPar++){
         throwEntry.back()[iPar] = parSet.getParameterList()[iPar].getParameterValue();
       }
-      parSet.moveFitParametersToPrior();
+      parSet.moveParametersToPrior();
     }
   }
 

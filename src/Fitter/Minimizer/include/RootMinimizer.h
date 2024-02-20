@@ -46,7 +46,6 @@ public:
   [[nodiscard]] const std::unique_ptr<ROOT::Math::Minimizer> &getMinimizer() const{ return _rootMinimizer_; }
 
   // core
-
   void saveMinimizerSettings(TDirectory* saveDir_) const;
 
 protected:

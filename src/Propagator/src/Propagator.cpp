@@ -262,7 +262,7 @@ void Propagator::initializeImpl(){
           parSet.setMaskedForPropagation( false );
         }
 
-        parSet.moveFitParametersToPrior();
+        parSet.moveParametersToPrior();
       }
     }
   }

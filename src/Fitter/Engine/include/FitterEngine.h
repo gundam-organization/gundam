@@ -57,12 +57,15 @@ public:
   // Getters (const)
   [[nodiscard]] const JsonType &getPreFitParState() const{ return _preFitParState_; }
   [[nodiscard]] const JsonType &getPostFitParState() const{ return _postFitParState_; }
+  [[nodiscard]] MinimizerType getMinimizerType() const{ return _minimizerType_; }
   [[nodiscard]] const MinimizerBase& getMinimizer() const{ return *_minimizer_; }
   [[nodiscard]] const LikelihoodInterface& getLikelihood() const{ return _likelihoodInterface_; }
+  [[nodiscard]] const ParameterScanner& getParameterScanner() const{ return _parameterScanner_; }
 
   // Getters (non-const)
   MinimizerBase& getMinimizer(){ return *_minimizer_; }
   LikelihoodInterface& getLikelihood(){ return _likelihoodInterface_; }
+  ParameterScanner& getParameterScanner(){ return _parameterScanner_; }
   TDirectory* getSaveDir(){ return _saveDir_; }
 
   // Core
