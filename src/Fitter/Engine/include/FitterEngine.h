@@ -2,8 +2,8 @@
 // Created by Nadrino on 11/06/2021.
 //
 
-#ifndef GUNDAM_FITTERENGINE_H
-#define GUNDAM_FITTERENGINE_H
+#ifndef GUNDAM_FITTER_ENGINE_H
+#define GUNDAM_FITTER_ENGINE_H
 
 
 #include "Propagator.h"
@@ -64,7 +64,7 @@ public:
 
   // Getters (non-const)
   MinimizerBase& getMinimizer(){ return *_minimizer_; }
-  LikelihoodInterface& getLikelihood(){ return _likelihoodInterface_; }
+  LikelihoodInterface& getLikelihoodInterface(){ return _likelihoodInterface_; }
   ParameterScanner& getParameterScanner(){ return _parameterScanner_; }
   TDirectory* getSaveDir(){ return _saveDir_; }
 
@@ -75,8 +75,8 @@ public:
   void checkNumericalAccuracy();
 
   // Deprecated
-  [[deprecated("use getLikelihood().getPropagator()")]] [[nodiscard]] const Propagator& getPropagator() const{ return getLikelihood().getPropagator(); }
-  [[deprecated("use getLikelihood().getPropagator()")]] Propagator& getPropagator(){ return getLikelihood().getPropagator(); }
+  [[deprecated("use getLikelihoodInterface().getPropagator()")]] [[nodiscard]] const Propagator& getPropagator() const{ return getLikelihood().getPropagator(); }
+  [[deprecated("use getLikelihoodInterface().getPropagator()")]] Propagator& getPropagator(){ return getLikelihoodInterface().getPropagator(); }
   [[deprecated("Use runPcaCheck()")]] void fixGhostFitParameters(){ runPcaCheck(); }
 
 
@@ -108,4 +108,4 @@ private:
   std::unique_ptr<MinimizerBase> _minimizer_{}; // a virtual class in charge of driving the LikelihoodInterface
 
 };
-#endif //GUNDAM_FITTERENGINE_H
+#endif //GUNDAM_FITTER_ENGINE_H

@@ -227,7 +227,7 @@ private:
   /// likelihood using the TSimpleMCMC<>::GetLogLikelihood() method.  For
   /// example:
   ///
-  /// mcmc.GetLogLikelihood().functor = getLikelihood().getFunctor()
+  /// mcmc.GetLogLikelihood().functor = getLikelihoodInterface().getFunctor()
   ///
   struct PrivateProxyLikelihood {
     /// A functor that can be called by Minuit or anybody else.  This wraps

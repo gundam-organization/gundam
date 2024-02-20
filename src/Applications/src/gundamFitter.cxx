@@ -236,14 +236,14 @@ int main(int argc, char** argv){
   fitter.readConfig(GenericToolbox::Json::fetchSubEntry(configHandler.getConfig(), {"fitterEngineConfig"}));
 
   // -a
-  fitter.getLikelihood().getPropagator().setLoadAsimovData( clParser.isOptionTriggered("asimov") );
+  fitter.getLikelihoodInterface().getPropagator().setLoadAsimovData(clParser.isOptionTriggered("asimov") );
 
   // --use-data-entry
   if( clParser.isOptionTriggered("useDataEntry") ){
     auto selectedDataEntry = clParser.getOptionVal<std::string>("useDataEntry", 0);
     // Do something better in case multiple datasets are defined
     bool isFound{false};
-    for( auto& dataSet : fitter.getLikelihood().getPropagator().getDataSetList() ){
+    for( auto& dataSet : fitter.getLikelihoodInterface().getPropagator().getDataSetList() ){
       if( GenericToolbox::doesKeyIsInMap( selectedDataEntry, dataSet.getDataDispenserDict() ) ){
         LogWarning << "Using data entry \"" << selectedDataEntry << "\" for dataset: " << dataSet.getName() << std::endl;
         dataSet.setSelectedDataEntry( selectedDataEntry );
@@ -275,8 +275,8 @@ int main(int argc, char** argv){
 
   // --toy <iToy>
   if( clParser.isOptionTriggered("toyFit") ){
-    fitter.getLikelihood().getPropagator().setThrowAsimovToyParameters(true);
-    fitter.getLikelihood().getPropagator().setIThrow(clParser.getOptionVal("toyFit", -1));
+    fitter.getLikelihoodInterface().getPropagator().setThrowAsimovToyParameters(true);
+    fitter.getLikelihoodInterface().getPropagator().setIThrow(clParser.getOptionVal("toyFit", -1));
   }
 
   // -d
@@ -291,7 +291,7 @@ int main(int argc, char** argv){
   // injectParameterPath
   if( not injectParameterPath.empty() ){
     auto injectConfig = ConfigUtils::readConfigFile( injectParameterPath ); ConfigUtils::forwardConfig( injectConfig );
-    fitter.getLikelihood().getPropagator().setParameterInjectorConfig(injectConfig);
+    fitter.getLikelihoodInterface().getPropagator().setParameterInjectorConfig(injectConfig);
   }
 
   // Also check app level config options
@@ -327,7 +327,7 @@ int main(int argc, char** argv){
   // show initial conditions
   if( clParser.isOptionTriggered("injectParameterConfig") ) {
     LogDebug << "Starting mc parameters that where injected:" << std::endl;
-    LogDebug << fitter.getLikelihood().getPropagator().getParametersManager().getParametersSummary( false ) << std::endl;
+    LogDebug << fitter.getLikelihoodInterface().getPropagator().getParametersManager().getParametersSummary(false ) << std::endl;
   }
 
   if( clParser.isOptionTriggered("scanLine") ){

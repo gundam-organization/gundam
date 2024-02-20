@@ -299,12 +299,12 @@ void MinimizerBase::printParameters(){
 }
 
 
-Propagator& MinimizerBase::getPropagator(){ return _owner_->getLikelihood().getPropagator(); }
-[[nodiscard]] const Propagator& MinimizerBase::getPropagator() const { return _owner_->getLikelihood().getPropagator(); }
+Propagator& MinimizerBase::getPropagator(){ return _owner_->getLikelihoodInterface().getPropagator(); }
+[[nodiscard]] const Propagator& MinimizerBase::getPropagator() const { return _owner_->getLikelihoodInterface().getPropagator(); }
 ParameterScanner& MinimizerBase::getParameterScanner(){ return _owner_->getParameterScanner(); }
 [[nodiscard]] const ParameterScanner& MinimizerBase::getParameterScanner() const { return _owner_->getParameterScanner(); }
-LikelihoodInterface& MinimizerBase::getLikelihoodInterface(){ return _owner_->getLikelihood(); }
-[[nodiscard]] const LikelihoodInterface& MinimizerBase::getLikelihoodInterface() const{ return _owner_->getLikelihood(); }
+LikelihoodInterface& MinimizerBase::getLikelihoodInterface(){ return _owner_->getLikelihoodInterface(); }
+[[nodiscard]] const LikelihoodInterface& MinimizerBase::getLikelihoodInterface() const{ return _owner_->getLikelihoodInterface(); }
 
 
 //  A Lesser GNU Public License
