@@ -45,8 +45,29 @@ public:
   explicit AdaptiveMcmc(FitterEngine* owner_): MinimizerBase(owner_) {}
 
   // core
+
+  /// Same as `evalFit` but also check that all the parameters are within
+  /// the allowed ranges.  If a parameter is out of range, then return an
+  /// "infinite" likelihood.
   double evalFitValid( const double* parArray_ );
+
+  /// Define the type of validity that needs to be required by
+  /// hasValidParameterValues.  This accepts a string with the possible values
+  /// being:
+  ///
+  ///  "range" (default) -- Between the parameter minimum and maximum values.
+  ///  "norange"         -- Do not require parameters in the valid range
+  ///  "mirror"          -- Between the mirrored values (if parameter has
+  ///                       mirroring).
+  ///  "nomirror"        -- Do not require parameters in the mirrored range
+  ///  "physical"        -- Only physically meaningful values.
+  ///  "nophysical"      -- Do not require parameters in the physical range.
+  ///
+  /// Example: setParameterValidity("range,mirror,physical")
   void setParameterValidity(const std::string& validity);
+
+  /// Check that the parameters for the last time the propagator was used are
+  /// all within the allowed ranges.
   [[nodiscard]] bool hasValidParameterValues() const;
 
 private:
@@ -209,6 +230,8 @@ private:
   /// mcmc.GetLogLikelihood().functor = getLikelihood().getFunctor()
   ///
   struct PrivateProxyLikelihood {
+    /// A functor that can be called by Minuit or anybody else.  This wraps
+    /// evalFit.
     std::unique_ptr<ROOT::Math::Functor> functor{};
     std::vector<double> x;
     double operator() (const Vector& point) {

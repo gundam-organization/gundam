@@ -126,17 +126,17 @@ protected:
 
   // Get the propagator being used to calculate the likelihood.  This is a
   // local convenience function to get the propagator from the owner.
-  Propagator& getPropagator(){ return _owner_->getPropagator(); }
-  [[nodiscard]] const Propagator& getPropagator() const{ return _owner_->getPropagator(); }
+  Propagator& getPropagator();
+  [[nodiscard]] const Propagator& getPropagator() const;
 
   // Get the parameter scanner object owned by the LikelihoodInterface.
-  ParameterScanner& MinimizerBase::getParameterScanner(){ return _owner_->getParameterScanner(); }
-  [[nodiscard]] const ParameterScanner& MinimizerBase::getParameterScanner() const { return _owner_->getParameterScanner(); }
+  ParameterScanner& getParameterScanner();
+  [[nodiscard]] const ParameterScanner& getParameterScanner() const;
 
   // Get the likelihood that should be used by the minimization.  This is a
   // local convenience function to get the likelihood from the owner.
-  LikelihoodInterface& getLikelihoodInterface(){ return _owner_->getLikelihoodInterface(); }
-  [[nodiscard]] const LikelihoodInterface& getLikelihoodInterface() const{ return _owner_->getLikelihoodInterface(); }
+  LikelihoodInterface& getLikelihoodInterface();
+  [[nodiscard]] const LikelihoodInterface& getLikelihoodInterface() const;
 
   // Get the vector of parameters being fitted.  This is a local convenience
   // function to get the vector of fit parameter pointers.  The actual vector

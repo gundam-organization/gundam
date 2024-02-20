@@ -908,9 +908,6 @@ void AdaptiveMcmc::minimize() {
 }
 
 double AdaptiveMcmc::evalFitValid(const double* parArray_) {
-  /// Same as `evalFit` but also check that all the parameters are within
-  /// the allowed ranges.  If a parameter is out of range, then return an
-  /// "infinite" likelihood.
 
   double value = this->evalFit( parArray_ );
   if (hasValidParameterValues()) return value;
@@ -922,19 +919,7 @@ double AdaptiveMcmc::evalFitValid(const double* parArray_) {
   return RBN;
 }
 void AdaptiveMcmc::setParameterValidity(const std::string& validity) {
-  /// Define the type of validity that needs to be required by
-  /// hasValidParameterValues.  This accepts a string with the possible values
-  /// being:
-  ///
-  ///  "range" (default) -- Between the parameter minimum and maximum values.
-  ///  "norange"         -- Do not require parameters in the valid range
-  ///  "mirror"          -- Between the mirrored values (if parameter has
-  ///                       mirroring).
-  ///  "nomirror"        -- Do not require parameters in the mirrored range
-  ///  "physical"        -- Only physically meaningful values.
-  ///  "nophysical"      -- Do not require parameters in the physical range.
-  ///
-  /// Example: setParameterValidity("range,mirror,physical")
+
 
   LogWarning << "Set parameter validity to " << validity << std::endl;
 
@@ -950,8 +935,7 @@ void AdaptiveMcmc::setParameterValidity(const std::string& validity) {
   LogWarning << "Set parameter validity to " << validity << " (" << _validFlags_ << ")" << std::endl;
 }
 bool AdaptiveMcmc::hasValidParameterValues() const {
-  /// Check that the parameters for the last time the propagator was used are
-  /// all within the allowed ranges.
+
 
   int invalid = 0;
   for( auto& parSet: getPropagator().getParametersManager().getParameterSetsList() ){

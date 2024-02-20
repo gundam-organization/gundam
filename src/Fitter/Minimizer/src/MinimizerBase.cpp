@@ -298,6 +298,15 @@ void MinimizerBase::printParameters(){
   }
 }
 
+
+Propagator& MinimizerBase::getPropagator(){ return _owner_->getLikelihood().getPropagator(); }
+[[nodiscard]] const Propagator& MinimizerBase::getPropagator() const { return _owner_->getLikelihood().getPropagator(); }
+ParameterScanner& MinimizerBase::getParameterScanner(){ return _owner_->getParameterScanner(); }
+[[nodiscard]] const ParameterScanner& MinimizerBase::getParameterScanner() const { return _owner_->getParameterScanner(); }
+LikelihoodInterface& MinimizerBase::getLikelihoodInterface(){ return _owner_->getLikelihood(); }
+[[nodiscard]] const LikelihoodInterface& MinimizerBase::getLikelihoodInterface() const{ return _owner_->getLikelihood(); }
+
+
 //  A Lesser GNU Public License
 
 //  Copyright (C) 2023 GUNDAM DEVELOPERS

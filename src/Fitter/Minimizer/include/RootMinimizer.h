@@ -81,6 +81,8 @@ private:
   // internals
   bool _fitHasConverged_{false};
 
+  /// A functor that can be called by Minuit or anybody else.  This wraps
+  /// evalFit.
   ROOT::Math::Functor _functor_{};
   std::unique_ptr<ROOT::Math::Minimizer> _rootMinimizer_{nullptr};
 
