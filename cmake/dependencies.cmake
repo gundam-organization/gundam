@@ -26,7 +26,7 @@ if( ROOT_FOUND )
   cmessage( STATUS "[ROOT]: ROOT include directory: ${ROOT_INCLUDE_DIRS}" )
   cmessage( STATUS "[ROOT]: ROOT C++ Flags: ${ROOT_CXX_FLAGS}" )
 
-  execute_process(COMMAND ${ROOT_INCLUDE_DIRS}/../bin/root-config --version
+  execute_process(COMMAND ${ROOT_root_CMD}-config --version
       OUTPUT_VARIABLE ROOT_VERSION
       OUTPUT_STRIP_TRAILING_WHITESPACE
   )
