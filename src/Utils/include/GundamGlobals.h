@@ -2,8 +2,8 @@
 // Created by Nadrino on 11/02/2021.
 //
 
-#ifndef GUNDAM_GUNDAMGLOBALS_H
-#define GUNDAM_GUNDAMGLOBALS_H
+#ifndef GUNDAM_GUNDAM_GLOBALS_H
+#define GUNDAM_GUNDAM_GLOBALS_H
 
 #include "GenericToolbox.Thread.h"
 
@@ -14,17 +14,6 @@
 #include <map>
 #include <mutex>
 #include <memory>
-
-#ifndef GUNDAM_BATCH
-#define GUNDAM_SIGMA "σ"
-#define GUNDAM_CHI2 "χ²"
-#define GUNDAM_DELTA "Δ"
-#else
-#define GUNDAM_SIGMA "sigma"
-#define GUNDAM_CHI2 "chi-squared"
-#define GUNDAM_DELTA "delta-"
-#endif
-
 
 #define ENUM_NAME VerboseLevel
 #define ENUM_FIELDS \
@@ -65,4 +54,4 @@ private:
 
 };
 
-#endif
+#endif // GUNDAM_GUNDAM_GLOBALS_H

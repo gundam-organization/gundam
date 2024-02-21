@@ -438,7 +438,7 @@ void FitterEngine::runPcaCheck(){
   double baseLlhStat = _likelihoodInterface_.getLastStatLikelihood();
   double baseLlhSyst = _likelihoodInterface_.getLastPenaltyLikelihood();
 
-  LogInfo << "Reference " << GUNDAM_CHI2 << "(stat) for PCA: " << baseLlhStat << std::endl;
+  LogInfo << "Reference stat log-likelihood for PCA: " << baseLlhStat << std::endl;
 
   // +1 sigma
   int iFitPar = -1;
@@ -463,7 +463,7 @@ void FitterEngine::runPcaCheck(){
       LogScopeIndent;
 
       ssPrint.str("");
-      ssPrint << "(" << par.getParameterIndex()+1 << "/" << parList.size() << ") +1" << GUNDAM_SIGMA << " on " << parSet.getName() + "/" + par.getTitle();
+      ssPrint << "(" << par.getParameterIndex()+1 << "/" << parList.size() << ") +1 std-dev on " << parSet.getName() + "/" + par.getTitle();
 
       if( fixNextEigenPars ){
         par.setIsFixed(true);
@@ -489,7 +489,7 @@ void FitterEngine::runPcaCheck(){
 
         deltaChi2Stat = _likelihoodInterface_.getLastStatLikelihood() - baseLlhStat;
 
-        ssPrint << ": " << GUNDAM_DELTA << GUNDAM_CHI2 << " (stat) = " << deltaChi2Stat;
+        ssPrint << ": diff. stat log-likelihood = " << deltaChi2Stat;
 
         LogInfo.moveTerminalCursorBack(1);
         LogInfo << ssPrint.str() << std::endl;
