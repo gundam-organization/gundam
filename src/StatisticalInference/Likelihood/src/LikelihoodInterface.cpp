@@ -40,7 +40,7 @@ void LikelihoodInterface::readConfigImpl(){
   jointProbabilityTypeStr = GenericToolbox::Json::fetchValue(configJointProbability, "type", jointProbabilityTypeStr);
 
   LogInfo << "Using \"" << jointProbabilityTypeStr << "\" JointProbabilityType." << std::endl;
-  _jointProbabilityPtr_ = std::shared_ptr<JointProbability::JointProbability>( JointProbability::makeJointProbability( jointProbabilityTypeStr ) );
+  _jointProbabilityPtr_ = std::shared_ptr<JointProbability::JointProbabilityBase>( JointProbability::makeJointProbability( jointProbabilityTypeStr ) );
   _jointProbabilityPtr_->readConfig( configJointProbability );
 
   LogWarning << "LikelihoodInterface configured." << std::endl;

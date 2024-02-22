@@ -1,11 +1,10 @@
-set( LIB_NAME GundamFitter )
+set( LIB_NAME GundamStatisticalInference )
 
 set(SRCFILES
-    ${CMAKE_CURRENT_SOURCE_DIR}/Engine/src/FitterEngine.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/JointProbability/src/JointProbability.cpp
 
-    ${CMAKE_CURRENT_SOURCE_DIR}/Minimizer/src/MinimizerBase.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/Minimizer/src/AdaptiveMcmc.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/Minimizer/src/RootMinimizer.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/Likelihood/src/LikelihoodInterface.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/Likelihood/src/ParameterScanner.cpp
   )
 
 if( USE_STATIC_LINKS )
@@ -16,13 +15,13 @@ endif()
 
 target_include_directories(
     ${LIB_NAME} PUBLIC
-    ${CMAKE_CURRENT_SOURCE_DIR}/Engine/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/Minimizer/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/JointProbability/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/Likelihood/include
 )
 
 target_link_libraries(
     ${LIB_NAME}
-    PUBLIC GundamStatisticalInference
+    PUBLIC GundamPropagator
 )
 
 #set_target_properties( ${LIB_NAME} PROPERTIES VERSION "${GUNDAM_VERSION_STRING}" )

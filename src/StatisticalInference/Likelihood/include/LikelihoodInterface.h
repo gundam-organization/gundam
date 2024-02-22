@@ -52,7 +52,7 @@ public:
   [[nodiscard]] double getLastStatLikelihood() const { return _buffer_.statLikelihood; }
   [[nodiscard]] double getLastPenaltyLikelihood() const { return _buffer_.penaltyLikelihood; }
   [[nodiscard]] const Propagator& getPropagator() const { return _propagator_; }
-  const JointProbability::JointProbability* getJointProbabilityPtr() const { return _jointProbabilityPtr_.get(); }
+  const JointProbability::JointProbabilityBase* getJointProbabilityPtr() const { return _jointProbabilityPtr_.get(); }
 
   // mutable getters
   Buffer& getBuffer() { return _buffer_; }
@@ -75,7 +75,7 @@ private:
   int _nbSampleBins_{0};
 
   Propagator _propagator_{};
-  std::shared_ptr<JointProbability::JointProbability> _jointProbabilityPtr_{nullptr};
+  std::shared_ptr<JointProbability::JointProbabilityBase> _jointProbabilityPtr_{nullptr};
 
   mutable Buffer _buffer_{};
 };
