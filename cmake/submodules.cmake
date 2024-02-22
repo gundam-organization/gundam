@@ -54,7 +54,7 @@ endif( ENABLE_BATCH_MODE )
 include_directories(submodules/simple-cpp-logger/include)
 add_definitions( -D LOGGER_MAX_LOG_LEVEL_PRINTED=6 )
 add_definitions( -D LOGGER_PREFIX_LEVEL=3 )
-add_definitions( -D LOGGER_TIME_FORMAT="\\\"%d/%m/%Y %H:%M:%S"\\\" )
+add_definitions( -D LOGGER_TIME_FORMAT="\\\"%Y.%m.%d %H:%M:%S"\\\" )
 
 if(${CMAKE_BUILD_TYPE} MATCHES Debug OR ${ENABLE_DEV_MODE})
   cmessage( STATUS "Logger set in dev mode." )
