@@ -2,13 +2,12 @@
 set( LIB_NAME GundamSamplesManager )
 
 set( SRCFILES
-        src/SampleElement.cpp
+    src/SampleElement.cpp
     src/SampleSet.cpp
     src/Sample.cpp
-        src/PhysicsEvent.cpp
-        src/PlotGenerator.cpp
-        src/JointProbability.cpp
-        )
+    src/PhysicsEvent.cpp
+    src/PlotGenerator.cpp
+)
 
 if( USE_STATIC_LINKS )
   add_library(${LIB_NAME} STATIC ${SRCFILES})

@@ -584,7 +584,7 @@ int main(int argc, char** argv){
   {
     LogWarning << "Calculating weight at best-fit" << std::endl;
     for( auto& parSet : propagator.getParametersManager().getParameterSetsList() ){ parSet.moveParametersToPrior(); }
-    propagator.propagateParametersOnSamples();
+    propagator.propagateParameters();
     writeBinDataFct();
     xsecAtBestFitTree->Fill();
     GenericToolbox::writeInTFile( GenericToolbox::mkdirTFile(calcXsecDir, "throws"), xsecAtBestFitTree );
@@ -604,7 +604,7 @@ int main(int argc, char** argv){
 
     // Do the throwing:
     propagator.getParametersManager().throwParametersFromGlobalCovariance();
-    propagator.propagateParametersOnSamples();
+    propagator.propagateParameters();
 
     if( enableStatThrowInToys ){
       for( auto& xsec : crossSectionDataList ){

@@ -2,17 +2,14 @@
 // Created by Nadrino on 22/07/2021.
 //
 
-#ifndef GUNDAM_SAMPLESET_H
-#define GUNDAM_SAMPLESET_H
+#ifndef GUNDAM_SAMPLE_SET_H
+#define GUNDAM_SAMPLE_SET_H
 
 #include "Sample.h"
 #include "ParameterSet.h"
-#include "Likelihoods.hh"
-#include "JointProbability.h"
 #include "JsonBaseClass.h"
 
-
-#include "nlohmann/json.hpp"
+#include "GenericToolbox.Time.h"
 
 #include <string>
 #include <vector>
@@ -35,17 +32,14 @@ public:
 
   // const getters
   [[nodiscard]] const std::vector<Sample> &getSampleList() const { return _sampleList_; }
-  [[nodiscard]] const std::shared_ptr<JointProbability::JointProbability> &getJointProbabilityFct() const{ return _jointProbabilityPtr_; }
   [[nodiscard]] const std::vector<std::string>& getAdditionalVariablesForStorage() const { return _additionalVariablesForStorage_; }
 
-  // non-const getters
+  // mutable getters
   std::vector<Sample> &getSampleList(){ return _sampleList_; }
   std::vector<std::string>& getAdditionalVariablesForStorage() { return _additionalVariablesForStorage_; }
 
   //Core
   [[nodiscard]] bool empty() const{ return _sampleList_.empty(); }
-  double evalLikelihood();
-  double evalLikelihood(Sample& sample_);
 
   // Parallel
   void updateSampleEventBinIndexes() const;
@@ -59,14 +53,13 @@ public:
 private:
   // config
   bool _showTimeStats_{false};
-  std::shared_ptr<JointProbability::JointProbability> _jointProbabilityPtr_{nullptr};
-  std::vector<std::string> _eventByEventDialLeafList_;
-  std::vector<std::string> _additionalVariablesForStorage_;
+  std::vector<Sample> _sampleList_;
 
   // internals
-  std::vector<Sample> _sampleList_{};
+  std::vector<std::string> _eventByEventDialLeafList_;
+  std::vector<std::string> _additionalVariablesForStorage_;
 
 };
 
 
-#endif //GUNDAM_SAMPLESET_H
+#endif //GUNDAM_SAMPLE_SET_H

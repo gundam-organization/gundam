@@ -30,9 +30,12 @@ using namespace GenericToolbox::ColorCodes;
 void Propagator::readConfigImpl(){
   LogWarning << __METHOD_NAME__ << std::endl;
 
-  _parManager_.readConfig( GenericToolbox::Json::fetchValue(_config_, "parametersManagerConfig", JsonType()) );
-
   // legacy -- option within propagator -> should be defined elsewhere
+  GenericToolbox::Json::deprecatedAction(_config_, "parameterSetListConfig", [&]{
+    LogAlert << R"("parameterSetListConfig" should now be set under "parametersManagerConfig/parameterSetList".)" << std::endl;
+    auto parameterSetListConfig = GenericToolbox::Json::fetchValue<JsonType>(_config_, "parameterSetListConfig");
+    _parManager_.setParameterSetListConfig( ConfigUtils::getForwardedConfig( parameterSetListConfig ) );
+  });
   GenericToolbox::Json::deprecatedAction(_config_, "reThrowParSetIfOutOfBounds", [&]{
     LogAlert << "Forwarding the option to ParametersManager. Consider moving it into \"parametersManagerConfig:\"" << std::endl;
     _parManager_.setReThrowParSetIfOutOfBounds(GenericToolbox::Json::fetchValue<bool>(_config_, "reThrowParSetIfOutOfBounds"));
@@ -41,6 +44,9 @@ void Propagator::readConfigImpl(){
     LogAlert << "Forwarding the option to ParametersManager. Consider moving it into \"parametersManagerConfig:\"" << std::endl;
     _parManager_.setThrowToyParametersWithGlobalCov(GenericToolbox::Json::fetchValue<bool>(_config_, "throwToyParametersWithGlobalCov"));
   });
+
+  // nested objects
+  _parManager_.readConfig( GenericToolbox::Json::fetchValue( _config_, "parametersManagerConfig", _parManager_.getConfig()) );
 
   // Monitoring parameters
   _showEventBreakdown_ = GenericToolbox::Json::fetchValue(_config_, "showEventBreakdown", _showEventBreakdown_);
@@ -58,16 +64,6 @@ void Propagator::readConfigImpl(){
 
   // EventDialCache parameters
   EventDialCache::globalEventReweightCap = GenericToolbox::Json::fetchValue(_config_, "globalEventReweightCap", EventDialCache::globalEventReweightCap);
-
-  LogInfo << "Reading parameter configuration..." << std::endl;
-  auto parameterSetListConfig = ConfigUtils::getForwardedConfig(GenericToolbox::Json::fetchValue(_config_, "parameterSetListConfig", JsonType()));
-  _parManager_.getParameterSetsList().reserve(parameterSetListConfig.size()); // make sure the objects aren't moved in RAM ( since FitParameter* will be used )
-  for( const auto& parameterSetConfig : parameterSetListConfig ){
-    _parManager_.getParameterSetsList().emplace_back();
-    _parManager_.getParameterSetsList().back().setConfig(parameterSetConfig);
-    _parManager_.getParameterSetsList().back().readConfig();
-    LogInfo << _parManager_.getParameterSetsList().back().getSummary() << std::endl;
-  }
 
   LogInfo << "Reading samples configuration..." << std::endl;
   auto fitSampleSetConfig = GenericToolbox::Json::fetchValue(_config_, "fitSampleSetConfig", JsonType());
@@ -91,9 +87,6 @@ void Propagator::readConfigImpl(){
   for( const auto& dataSetConfig : dataSetListConfig ){
     _dataSetList_.emplace_back(dataSetConfig, int(_dataSetList_.size()));
   }
-
-  LogInfo << "Reading ParScanner configuration..." << std::endl;
-  _parScanner_.readConfig( GenericToolbox::Json::fetchValue(_config_, "scanConfig", JsonType()) );
 
   LogInfo << "Reading DialCollection configurations..." << std::endl;
   for(size_t iParSet = 0 ; iParSet < _parManager_.getParameterSetsList().size() ; iParSet++ ){
@@ -392,12 +385,9 @@ void Propagator::initializeImpl(){
   _plotGenerator_.initialize();
 
   LogInfo << std::endl << GenericToolbox::addUpDownBars("Initializing the tree writer") << std::endl;
-  _treeWriter_.setSampleSetPtr(&_fitSampleSet_);
+  _treeWriter_.setSampleSetPtr( &_fitSampleSet_ );
   _treeWriter_.setParSetListPtr( &_parManager_.getParameterSetsList() );
   _treeWriter_.setEventDialCachePtr( &_eventDialCache_ );
-
-  LogInfo << std::endl << GenericToolbox::addUpDownBars("Initializing the par scanner") << std::endl;
-  _parScanner_.initialize();
 
   /// Printouts for quick monitoring
   if( _showEventBreakdown_ ){
@@ -479,31 +469,6 @@ void Propagator::initializeImpl(){
 
 
 // Misc getters
-std::string Propagator::getLlhBufferSummary() const{
-  std::stringstream ss;
-  ss << "Total likelihood = " << getLlhBuffer();
-  ss << std::endl << "Stat likelihood = " << getLlhStatBuffer();
-  ss << " = sum of: " << GenericToolbox::toString(
-      _fitSampleSet_.getSampleList(), []( const Sample& sample_){
-        std::stringstream ssSub;
-        ssSub << sample_.getName() << ": ";
-        if( sample_.isEnabled() ){ ssSub << sample_.getLlhStatBuffer(); }
-        else                     { ssSub << "disabled."; }
-        return ssSub.str();
-      }
-  );
-  ss << std::endl << "Penalty likelihood = " << getLlhPenaltyBuffer();
-  ss << " = sum of: " << GenericToolbox::toString(
-      _parManager_.getParameterSetsList(), [](const ParameterSet& parSet_){
-        std::stringstream ssSub;
-        ssSub << parSet_.getName() << ": ";
-        if( parSet_.isEnabled() ){ ssSub << parSet_.getPenaltyChi2Buffer(); }
-        else                     { ssSub << "disabled."; }
-        return ssSub.str();
-      }
-  );
-  return ss.str();
-}
 
 DatasetLoader* Propagator::getDatasetLoaderPtr(const std::string& name_){
   for( auto& dataSet : _dataSetList_ ){
@@ -513,38 +478,7 @@ DatasetLoader* Propagator::getDatasetLoaderPtr(const std::string& name_){
 }
 
 // Core
-void Propagator::updateLlhCache(){
-  double buffer;
-
-  // Propagate on histograms
-  this->propagateParametersOnSamples();
-
-  ////////////////////////////////
-  // Compute LLH stat
-  ////////////////////////////////
-  _llhStatBuffer_ = _fitSampleSet_.evalLikelihood();
-
-  ////////////////////////////////
-  // Compute the penalty terms
-  ////////////////////////////////
-  _llhPenaltyBuffer_ = 0;
-  for( auto& parSet : _parManager_.getParameterSetsList() ){
-    buffer = parSet.getPenaltyChi2();
-    LogThrowIf(std::isnan(buffer), parSet.getName() << " penalty chi2 is Nan");
-    _llhPenaltyBuffer_ += buffer;
-  }
-
-  ////////////////////////////////
-  // Compute the regularisation term
-  ////////////////////////////////
-  _llhRegBuffer_ = 0; // unused
-
-  ////////////////////////////////
-  // Total LLH
-  ////////////////////////////////
-  _llhBuffer_ = _llhStatBuffer_ + _llhPenaltyBuffer_ + _llhRegBuffer_;
-}
-void Propagator::propagateParametersOnSamples(){
+void Propagator::propagateParameters(){
 
   if( _enableEigenToOrigInPropagate_ ){
     // Only real parameters are propagated on the spectra -> need to convert the eigen to original
@@ -568,7 +502,7 @@ void Propagator::reweightMcEvents() {
 
   bool usedGPU{false};
 #ifdef GUNDAM_USING_CACHE_MANAGER
-  if(GundamGlobals::getEnableCacheManager()) {
+  if( GundamGlobals::getEnableCacheManager() ) {
     Cache::Manager::Update(getSampleSet(), getEventDialCache());
     usedGPU = Cache::Manager::Fill();
   }

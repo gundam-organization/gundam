@@ -5,6 +5,13 @@ PROJECT_NAME="GUNDAM"
 THIS_SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 builtin cd ${THIS_SCRIPT_DIR} || exit 1;
 
+function syncSubmodules(){
+  echo "Synchronising submodules..."
+  git submodule sync
+  echo "Updating submodules..."
+  git submodule update --init --recursive
+};
+
 
 for arg in "$@"
 do
@@ -20,16 +27,14 @@ do
   elif [ $arg == "--fix-submodules" ]; then
     echo "Re-initializing submodules..."
     git submodule deinit --all -f
-    git submodule sync
-    git submodule update --init --remote --recursive
+    syncSubmodules
     exit 0;
   elif [ $arg == "-v" ]; then
     shift
     if [[ -n $1 ]]; then
       echo "Updating to version: $1"
       git checkout $1
-      git submodule sync
-       git submodule update --init --remote --recursive
+      syncSubmodules
     else
       echo "You should provide a version after -v"
     fi
@@ -45,8 +50,7 @@ do
         git checkout "${1#"remotes/origin/"}"
       fi
       git pull
-      git submodule sync
-      git submodule update --init --remote --recursive
+      syncSubmodules
     else
       echo "You should provide a version after -b"
     fi
@@ -57,21 +61,18 @@ do
     LATEST_VERSION=$(git describe --tags `git rev-list --tags --max-count=1`)
     echo "Checking out latest version: $LATEST_VERSION"
     git checkout $LATEST_VERSION
-    git submodule sync
-    git submodule update --init --remote --recursive
+    syncSubmodules
     exit 0;
   elif [ $arg == "--head" ]; then
     echo "Checking out main branch..."
     git checkout main
     git pull origin main # updates repo
-    git submodule sync
-     git submodule update --init --remote --recursive
+    syncSubmodules
     exit 0;
   elif [ $arg == "--up" ]; then
     echo "Updating..."
     git pull
-    git submodule sync
-    git submodule update --init --remote --recursive
+    syncSubmodules
     exit 0;
   fi
 done

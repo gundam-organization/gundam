@@ -2,9 +2,9 @@
 // Created by Nadrino on 01/06/2021.
 //
 
-#include "MinimizerInterface.h"
 #include "GundamGlobals.h"
 #include "FitterEngine.h"
+#include "RootMinimizer.h"
 #include "ConfigUtils.h"
 #include "GundamUtils.h"
 #include "GundamApp.h"
@@ -236,14 +236,14 @@ int main(int argc, char** argv){
   fitter.readConfig(GenericToolbox::Json::fetchSubEntry(configHandler.getConfig(), {"fitterEngineConfig"}));
 
   // -a
-  fitter.getPropagator().setLoadAsimovData( clParser.isOptionTriggered("asimov") );
+  fitter.getLikelihoodInterface().getPropagator().setLoadAsimovData(clParser.isOptionTriggered("asimov") );
 
   // --use-data-entry
   if( clParser.isOptionTriggered("useDataEntry") ){
     auto selectedDataEntry = clParser.getOptionVal<std::string>("useDataEntry", 0);
     // Do something better in case multiple datasets are defined
     bool isFound{false};
-    for( auto& dataSet : fitter.getPropagator().getDataSetList() ){
+    for( auto& dataSet : fitter.getLikelihoodInterface().getPropagator().getDataSetList() ){
       if( GenericToolbox::doesKeyIsInMap( selectedDataEntry, dataSet.getDataDispenserDict() ) ){
         LogWarning << "Using data entry \"" << selectedDataEntry << "\" for dataset: " << dataSet.getName() << std::endl;
         dataSet.setSelectedDataEntry( selectedDataEntry );
@@ -259,15 +259,15 @@ int main(int argc, char** argv){
   }
 
   // --skip-hesse
-  fitter.getMinimizer().setEnablePostFitErrorEval(not clParser.isOptionTriggered("skipHesse"));
+  fitter.getMinimizer().setDisableCalcError( clParser.isOptionTriggered("skipHesse") );
 
   // --scan <N>
   if( clParser.isOptionTriggered("scanParameters") ) {
     fitter.setEnablePreFitScan( true );
     fitter.setEnablePostFitScan( true );
-    fitter.getPropagator().getParScanner().setNbPoints(
-        clParser.getOptionVal("scanParameters", fitter.getPropagator().getParScanner().getNbPoints())
-        );
+    fitter.getParameterScanner().setNbPoints(
+        clParser.getOptionVal("scanParameters", fitter.getParameterScanner().getNbPoints())
+    );
   }
 
   // --enable-pca
@@ -275,8 +275,8 @@ int main(int argc, char** argv){
 
   // --toy <iToy>
   if( clParser.isOptionTriggered("toyFit") ){
-    fitter.getPropagator().setThrowAsimovToyParameters(true);
-    fitter.getPropagator().setIThrow(clParser.getOptionVal("toyFit", -1));
+    fitter.getLikelihoodInterface().getPropagator().setThrowAsimovToyParameters(true);
+    fitter.getLikelihoodInterface().getPropagator().setIThrow(clParser.getOptionVal("toyFit", -1));
   }
 
   // -d
@@ -291,7 +291,7 @@ int main(int argc, char** argv){
   // injectParameterPath
   if( not injectParameterPath.empty() ){
     auto injectConfig = ConfigUtils::readConfigFile( injectParameterPath ); ConfigUtils::forwardConfig( injectConfig );
-    fitter.getPropagator().setParameterInjectorConfig(injectConfig);
+    fitter.getLikelihoodInterface().getPropagator().setParameterInjectorConfig(injectConfig);
   }
 
   // Also check app level config options
@@ -314,8 +314,8 @@ int main(int argc, char** argv){
 
   if( clParser.isOptionTriggered("skipSimplex") ){
     LogAlert << "Explicitly disabling SIMPLEX first pass" << std::endl;
-    LogThrowIf( fitter.getMinimizer().getMinimizerTypeName() != "MinimizerInterface", "invalid option --skip-simplex" );
-    ((MinimizerInterface*) &fitter.getMinimizer())->setEnableSimplexBeforeMinimize( false );
+    LogThrowIf( fitter.getMinimizerType() != FitterEngine::MinimizerType::RootMinimizer, "invalid option --skip-simplex" );
+    ((RootMinimizer*) &fitter.getMinimizer())->setEnableSimplexBeforeMinimize( false );
   }
 
 
@@ -327,7 +327,7 @@ int main(int argc, char** argv){
   // show initial conditions
   if( clParser.isOptionTriggered("injectParameterConfig") ) {
     LogDebug << "Starting mc parameters that where injected:" << std::endl;
-    LogDebug << fitter.getPropagator().getParametersManager().getParametersSummary( false ) << std::endl;
+    LogDebug << fitter.getLikelihoodInterface().getPropagator().getParametersManager().getParametersSummary(false ) << std::endl;
   }
 
   if( clParser.isOptionTriggered("scanLine") ){
@@ -340,7 +340,7 @@ int main(int argc, char** argv){
 
       GenericToolbox::writeInTFile( outDir, TNamed("endPoint", GenericToolbox::Json::toReadableString(endPoint).c_str()) );
 
-      fitter.getPropagator().getParScanner().scanSegment( outDir, endPoint );
+      fitter.getParameterScanner().scanSegment( outDir, endPoint );
     }
     else if( clParser.getNbValueSet("scanLine") == 2 ) {
       LogAlert << "Will scan the line from point A (" << clParser.getOptionVal<std::string>("scanLine", 0)
@@ -352,7 +352,7 @@ int main(int argc, char** argv){
       GenericToolbox::writeInTFile( outDir, TNamed("startPoint", GenericToolbox::Json::toReadableString(startPoint).c_str()) );
       GenericToolbox::writeInTFile( outDir, TNamed("endPoint", GenericToolbox::Json::toReadableString(endPoint).c_str()) );
 
-      fitter.getPropagator().getParScanner().scanSegment( outDir, endPoint, startPoint );
+      fitter.getParameterScanner().scanSegment( outDir, endPoint, startPoint );
     }
     else{
       LogThrow("");

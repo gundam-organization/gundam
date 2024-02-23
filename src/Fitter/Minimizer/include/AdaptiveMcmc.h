@@ -2,8 +2,8 @@
 // Created by Clark McGrew
 //
 
-#ifndef GUNDAM_MCMCInterface_h
-#define GUNDAM_MCMCInterface_h
+#ifndef GUNDAM_ADAPTIVE_MCMC_H
+#define GUNDAM_ADAPTIVE_MCMC_H
 
 #include "ParameterSet.h"
 #include "MinimizerBase.h"
@@ -12,6 +12,7 @@
 #include "GenericToolbox.Utils.h"
 #include "GenericToolbox.Time.h"
 
+#include "Math/Functor.h"
 #include "TDirectory.h"
 #include "nlohmann/json.hpp"
 
@@ -30,33 +31,54 @@ class FitterEngine;
 /// parameters are assumed to have a uniform metric, and the priors are
 /// defined as part of the propagator (i.e. included in the
 /// LikelihoodInterface).
-class MCMCInterface : public MinimizerBase {
+class AdaptiveMcmc : public MinimizerBase {
 
 protected:
   void readConfigImpl() override;
   void initializeImpl() override;
 
 public:
-  explicit MCMCInterface(FitterEngine* owner_): MinimizerBase(owner_){}
+  // overrides
+  void minimize() override; /// Generate a chain.
 
-  /// Local RTTI
-  [[nodiscard]] std::string getMinimizerTypeName() const override { return "MCMCInterface"; };
+  // c-tor
+  explicit AdaptiveMcmc(FitterEngine* owner_): MinimizerBase(owner_) {}
 
-  /// An MCMC doesn't really converge in the sense meant here. This flags success.
-  [[nodiscard]] virtual bool isFitHasConverged() const override  {return true;}
+  // core
 
-  /// Generate a chain.
-  void minimize() override;
+  /// Same as `evalFit` but also check that all the parameters are within
+  /// the allowed ranges.  If a parameter is out of range, then return an
+  /// "infinite" likelihood.
+  double evalFitValid( const double* parArray_ );
 
-  /// Don't do anything.  This could calculate the covariance of the chain,
-  /// but the concept doesn't really match the ideas of a Bayesian analysis.
-  void calcErrors() override;
+  /// Define the type of validity that needs to be required by
+  /// hasValidParameterValues.  This accepts a string with the possible values
+  /// being:
+  ///
+  ///  "range" (default) -- Between the parameter minimum and maximum values.
+  ///  "norange"         -- Do not require parameters in the valid range
+  ///  "mirror"          -- Between the mirrored values (if parameter has
+  ///                       mirroring).
+  ///  "nomirror"        -- Do not require parameters in the mirrored range
+  ///  "physical"        -- Only physically meaningful values.
+  ///  "nophysical"      -- Do not require parameters in the physical range.
+  ///
+  /// Example: setParameterValidity("range,mirror,physical")
+  void setParameterValidity(const std::string& validity);
 
-  /// Scan the parameters.
-  void scanParameters(TDirectory* saveDir_) override;
-
+  /// Check that the parameters for the last time the propagator was used are
+  /// all within the allowed ranges.
+  [[nodiscard]] bool hasValidParameterValues() const;
 
 private:
+
+  /// A set of flags used by the evalFitValid method to determine the function
+  /// validity.  The flaggs are:
+  /// "1" -- require valid parameters
+  /// "2" -- require in the mirrored range
+  /// "4" -- require in the physical range
+  int _validFlags_{7};
+
   std::string _algorithmName_{"metropolis"};
   std::string _proposalName_{"adaptive"};
   std::string _outTreeName_{"MCMC"};
@@ -205,10 +227,12 @@ private:
   /// likelihood using the TSimpleMCMC<>::GetLogLikelihood() method.  For
   /// example:
   ///
-  /// mcmc.GetLogLikelihood().functor = getLikelihood().evalFitFunctor()
+  /// mcmc.GetLogLikelihood().functor = getLikelihoodInterface().getFunctor()
   ///
   struct PrivateProxyLikelihood {
-    ROOT::Math::Functor* functor;
+    /// A functor that can be called by Minuit or anybody else.  This wraps
+    /// evalFit.
+    std::unique_ptr<ROOT::Math::Functor> functor{};
     std::vector<double> x;
     double operator() (const Vector& point) {
       LogThrowIf(functor == nullptr, "Functor is not initialized");
@@ -235,7 +259,7 @@ private:
   /// example of how to setup an alternate stepping proposal.
   typedef TSimpleMCMC<PrivateProxyLikelihood,TProposeSimpleStep> SimpleStepMCMC;
   void setupAndRunSimpleStep(
-    SimpleStepMCMC& mcmc);
+      SimpleStepMCMC& mcmc);
 
   /// The implementation when the adaptive step is used.  This is the default
   /// proposal for TSimpleMCMC, but is also dangerous for "unpleasant"
@@ -262,7 +286,7 @@ private:
   /// Set the default proposal based on the FitParameter values and steps.
   bool adaptiveDefaultProposalCovariance(AdaptiveStepMCMC& mcmc,Vector& prior);
 };
-#endif // GUNDAM_MCMCInterface_h
+#endif // GUNDAM_ADAPTIVE_MCMC_H
 
 //  A Lesser GNU Public License
 

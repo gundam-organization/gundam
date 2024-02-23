@@ -2,8 +2,8 @@
 // Created by Nadrino on 11/06/2021.
 //
 
-#ifndef GUNDAM_FITTERENGINE_H
-#define GUNDAM_FITTERENGINE_H
+#ifndef GUNDAM_FITTER_ENGINE_H
+#define GUNDAM_FITTER_ENGINE_H
 
 
 #include "Propagator.h"
@@ -27,6 +27,17 @@
 class FitterEngine : public JsonBaseClass {
 
 public:
+#define ENUM_NAME MinimizerType
+#define ENUM_FIELDS \
+  ENUM_FIELD( RootMinimizer, 0 ) \
+  ENUM_FIELD( AdaptiveMCMC )
+#include "GenericToolbox.MakeEnum.h"
+
+protected:
+  void readConfigImpl() override;
+  void initializeImpl() override;
+
+public:
   explicit FitterEngine(TDirectory *saveDir_) : _saveDir_(saveDir_) {};
 
   // Setters
@@ -44,35 +55,29 @@ public:
   void setThrowGain(double throwGain_){ _throwGain_ = throwGain_; }
 
   // Getters (const)
-  const JsonType &getPreFitParState() const{ return _preFitParState_; }
-  const JsonType &getPostFitParState() const{ return _postFitParState_; }
-  [[nodiscard]] const Propagator& getPropagator() const{ return _propagator_; }
+  [[nodiscard]] const JsonType &getPreFitParState() const{ return _preFitParState_; }
+  [[nodiscard]] const JsonType &getPostFitParState() const{ return _postFitParState_; }
+  [[nodiscard]] MinimizerType getMinimizerType() const{ return _minimizerType_; }
   [[nodiscard]] const MinimizerBase& getMinimizer() const{ return *_minimizer_; }
-  [[nodiscard]] const LikelihoodInterface& getLikelihood() const{ return _likelihood_; }
+  [[nodiscard]] const LikelihoodInterface& getLikelihood() const{ return _likelihoodInterface_; }
+  [[nodiscard]] const ParameterScanner& getParameterScanner() const{ return _parameterScanner_; }
 
   // Getters (non-const)
-  Propagator& getPropagator(){ return _propagator_; }
   MinimizerBase& getMinimizer(){ return *_minimizer_; }
-  LikelihoodInterface& getLikelihood(){ return _likelihood_; }
+  LikelihoodInterface& getLikelihoodInterface(){ return _likelihoodInterface_; }
+  ParameterScanner& getParameterScanner(){ return _parameterScanner_; }
   TDirectory* getSaveDir(){ return _saveDir_; }
 
   // Core
   void fit();
-
-protected:
-  void readConfigImpl() override;
-  void initializeImpl() override;
-
-  void fixGhostFitParameters();
+  void runPcaCheck();
   void rescaleParametersStepSize();
-
-  // Scan the parameters as used by the minimizer (e.g. MINUIT).  This has
-  // been replaced by MinimizerBase::scanParameters() which can be accessed
-  // through the getMinimizer() method.  For example:
-  // "fitter.scanMinimizerParameters(dir)" should be replaced by "fitter.getMinimizer().scanParameters(dir)"
-  [[deprecated("Use getMinimizer().scanParameters(dir) instead")]]
-       void scanMinimizerParameters(TDirectory* saveDir_);
   void checkNumericalAccuracy();
+
+  // Deprecated
+  [[deprecated("use getLikelihoodInterface().getPropagator()")]] [[nodiscard]] const Propagator& getPropagator() const{ return getLikelihood().getPropagator(); }
+  [[deprecated("use getLikelihoodInterface().getPropagator()")]] Propagator& getPropagator(){ return getLikelihoodInterface().getPropagator(); }
+  [[deprecated("Use runPcaCheck()")]] void fixGhostFitParameters(){ runPcaCheck(); }
 
 
 private:
@@ -92,14 +97,15 @@ private:
   double _pcaDeltaChi2Threshold_{1E-6};
   bool _savePostfitEventTrees_{false};
   std::vector<double> _allParamVariationsSigmas_{};
-
-  // Internals
-  TDirectory* _saveDir_{nullptr};
-  Propagator _propagator_{};
-  std::unique_ptr<MinimizerBase> _minimizer_{nullptr};
-  LikelihoodInterface _likelihood_{this};
   JsonType _preFitParState_{};
   JsonType _postFitParState_{};
 
+  // Internals
+  TDirectory* _saveDir_{nullptr};
+  LikelihoodInterface _likelihoodInterface_{};
+  ParameterScanner _parameterScanner_{};
+  MinimizerType _minimizerType_{};
+  std::unique_ptr<MinimizerBase> _minimizer_{}; // a virtual class in charge of driving the LikelihoodInterface
+
 };
-#endif //GUNDAM_FITTERENGINE_H
+#endif //GUNDAM_FITTER_ENGINE_H

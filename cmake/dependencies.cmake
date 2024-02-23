@@ -26,12 +26,18 @@ if( ROOT_FOUND )
   cmessage( STATUS "[ROOT]: ROOT include directory: ${ROOT_INCLUDE_DIRS}" )
   cmessage( STATUS "[ROOT]: ROOT C++ Flags: ${ROOT_CXX_FLAGS}" )
 
+  execute_process(COMMAND ${ROOT_root_CMD}-config --version
+      OUTPUT_VARIABLE ROOT_VERSION
+      OUTPUT_STRIP_TRAILING_WHITESPACE
+  )
+  cmessage( STATUS "[ROOT]: ROOT Version: ${ROOT_VERSION}" )
+
   # Grab functions such as generate dictionary
   include( ${ROOT_USE_FILE} )
 
   if (NOT ROOT_minuit2_FOUND)
     # Minuit2 wasn't found, but make really sure before giving up.
-    execute_process (COMMAND root-config --has-minuit2
+    execute_process (COMMAND ${ROOT_INCLUDE_DIRS}/../bin/root-config --has-minuit2
         OUTPUT_VARIABLE ROOT_minuit2_FOUND
         OUTPUT_STRIP_TRAILING_WHITESPACE)
   endif(NOT ROOT_minuit2_FOUND)

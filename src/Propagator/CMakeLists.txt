@@ -1,11 +1,9 @@
 set(SRCFILES
     src/Propagator.cpp
-    src/ParScanner.cpp
     )
 
 set(HEADERS
     include/Propagator.h
-    include/ParScanner.h
 )
 
 #ROOT_GENERATE_DICTIONARY(

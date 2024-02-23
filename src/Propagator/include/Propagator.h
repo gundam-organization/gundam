@@ -13,7 +13,6 @@
 #include "DatasetLoader.h"
 #include "PlotGenerator.h"
 #include "JsonBaseClass.h"
-#include "ParScanner.h"
 #include "SampleSet.h"
 
 #include "GenericToolbox.Time.h"
@@ -43,17 +42,13 @@ public:
   // Const getters
   [[nodiscard]] bool isThrowAsimovToyParameters() const { return _throwAsimovToyParameters_; }
   [[nodiscard]] int getIThrow() const { return _iThrow_; }
-  [[nodiscard]] double getLlhBuffer() const{ return _llhBuffer_; }
-  [[nodiscard]] double getLlhStatBuffer() const{ return _llhStatBuffer_; }
-  [[nodiscard]] double getLlhPenaltyBuffer() const{ return _llhPenaltyBuffer_; }
-  [[nodiscard]] double getLlhRegBuffer() const{ return _llhRegBuffer_; }
   [[nodiscard]] const ParametersManager &getParametersManager() const { return _parManager_; }
   [[nodiscard]] const EventTreeWriter &getTreeWriter() const{ return _treeWriter_; }
   [[nodiscard]] const std::vector<DatasetLoader> &getDataSetList() const{ return _dataSetList_; }
   [[nodiscard]] const std::vector<DialCollection> &getDialCollections() const{ return _dialCollections_; }
+  [[nodiscard]] const SampleSet &getSampleSet() const { return _fitSampleSet_; }
 
   // Non-const getters
-  ParScanner& getParScanner(){ return _parScanner_; }
   SampleSet &getSampleSet(){ return _fitSampleSet_; }
   ParametersManager &getParametersManager(){ return _parManager_; }
   PlotGenerator &getPlotGenerator(){ return _plotGenerator_; }
@@ -61,16 +56,10 @@ public:
   std::vector<DatasetLoader> &getDataSetList(){ return _dataSetList_; }
 
   // Misc getters
-  [[nodiscard]] const double* getLlhBufferPtr() const { return &_llhBuffer_; }
-  [[nodiscard]] const double* getLlhStatBufferPtr() const { return &_llhStatBuffer_; }
-  [[nodiscard]] const double* getLlhPenaltyBufferPtr() const { return &_llhPenaltyBuffer_; }
-  [[nodiscard]] const double* getLlhRegBufferPtr() const { return &_llhRegBuffer_; }
-  [[nodiscard]] std::string getLlhBufferSummary() const;
   [[nodiscard]] DatasetLoader* getDatasetLoaderPtr(const std::string& name_);
 
   // Core
-  void updateLlhCache();
-  void propagateParametersOnSamples();
+  void propagateParameters();
   void resetReweight();
   void reweightMcEvents();
   void refillSampleHistograms();
@@ -81,9 +70,6 @@ public:
   // Logger related
   static void muteLogger();
   static void unmuteLogger();
-
-  // Deprecated
-  [[deprecated("use getSampleSet()")]] SampleSet &getFitSampleSet(){ return _fitSampleSet_; }
 
 protected:
   void initializeThreads();
@@ -111,17 +97,12 @@ private:
   bool _enableEventMcThrow_{true};
   bool _enableEigenToOrigInPropagate_{true};
   int _iThrow_{-1};
-  double _llhBuffer_{0};
-  double _llhStatBuffer_{0};
-  double _llhPenaltyBuffer_{0};
-  double _llhRegBuffer_{0};
 
   // Sub-layers
   SampleSet _fitSampleSet_;
   ParametersManager _parManager_;
   PlotGenerator _plotGenerator_;
   EventTreeWriter _treeWriter_;
-  ParScanner _parScanner_{this};
   std::vector<DatasetLoader> _dataSetList_;
 
   // Monitoring
@@ -134,8 +115,8 @@ private:
   EventDialCache _eventDialCache_{};
 
 public:
-  GenericToolbox::Time::AveragedTimer<10> reweightTimer{};
-  GenericToolbox::Time::AveragedTimer<10> refillHistogramTimer{};
+  GenericToolbox::Time::AveragedTimer<10> reweightTimer;
+  GenericToolbox::Time::AveragedTimer<10> refillHistogramTimer;
 
 };
 #endif //GUNDAM_PROPAGATOR_H
