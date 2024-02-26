@@ -33,18 +33,6 @@ void FitterEngine::readConfigImpl(){
   std::string minimizerTypeStr{"RootMinimizer"};
 
   // legacy configs:
-  GenericToolbox::Json::deprecatedAction(_config_, "monitorRefreshRateInMs", [&]{
-    LogAlert << "Forwarding the option to Propagator. Consider moving it into \"minimizerConfig:\"" << std::endl;
-    _minimizer_->getMonitor().convergenceMonitor.setMaxRefreshRateInMs(GenericToolbox::Json::fetchValue<int>(_config_, "monitorRefreshRateInMs"));
-  });
-  GenericToolbox::Json::deprecatedAction(_config_, "propagatorConfig", [&]{
-    LogAlert << R"("propagatorConfig" should now be set within "likelihoodInterfaceConfig".)" << std::endl;
-    _likelihoodInterface_.getPropagator().setConfig( GenericToolbox::Json::fetchValue<JsonType>(_config_, "propagatorConfig") );
-  });
-  GenericToolbox::Json::deprecatedAction(_likelihoodInterface_.getPropagator().getConfig(), "scanConfig", [&]{
-    LogAlert << R"("scanConfig" should now be set within "fitterEngineConfig".)" << std::endl;
-    _parameterScanner_.setConfig( GenericToolbox::Json::fetchValue<JsonType>(_likelihoodInterface_.getPropagator().getConfig(), "scanConfig") );
-  });
   GenericToolbox::Json::deprecatedAction(_config_, "mcmcConfig", [&]{
     LogAlert << "mcmcConfig should now be set as minimizerConfig" << std::endl;
     minimizerConfig = GenericToolbox::Json::fetchValue( _config_, "mcmcConfig" , minimizerConfig );
@@ -57,7 +45,6 @@ void FitterEngine::readConfigImpl(){
     if     ( minimizerTypeStr == "minimizer" ){ minimizerTypeStr = "RootMinimizer"; }
     else if( minimizerTypeStr == "mcmc" )     { minimizerTypeStr = "AdaptiveMCMC"; }
   });
-
 
   // new config format:
   minimizerConfig = GenericToolbox::Json::fetchValue( _config_, "minimizerConfig" , minimizerConfig );
@@ -75,6 +62,20 @@ void FitterEngine::readConfigImpl(){
       LogThrow("Unknown minimizer type selected: " << minimizerTypeStr << std::endl << "Available: " << MinimizerType::generateEnumFieldsAsString());
   }
 
+  // now the minimizer is created, forward deprecated options
+  GenericToolbox::Json::deprecatedAction(_config_, "monitorRefreshRateInMs", [&]{
+    LogAlert << "Forwarding the option to Propagator. Consider moving it into \"minimizerConfig:\"" << std::endl;
+    _minimizer_->getMonitor().convergenceMonitor.setMaxRefreshRateInMs(GenericToolbox::Json::fetchValue<int>(_config_, "monitorRefreshRateInMs"));
+  });
+  GenericToolbox::Json::deprecatedAction(_config_, "propagatorConfig", [&]{
+    LogAlert << R"("propagatorConfig" should now be set within "likelihoodInterfaceConfig".)" << std::endl;
+    _likelihoodInterface_.getPropagator().setConfig( GenericToolbox::Json::fetchValue<JsonType>(_config_, "propagatorConfig") );
+  });
+  GenericToolbox::Json::deprecatedAction(_likelihoodInterface_.getPropagator().getConfig(), "scanConfig", [&]{
+    LogAlert << R"("scanConfig" should now be set within "fitterEngineConfig".)" << std::endl;
+    _parameterScanner_.setConfig( GenericToolbox::Json::fetchValue<JsonType>(_likelihoodInterface_.getPropagator().getConfig(), "scanConfig") );
+  });
+
   _minimizer_->readConfig( minimizerConfig );
   _likelihoodInterface_.readConfig( GenericToolbox::Json::fetchValue(_config_, "likelihoodInterfaceConfig", _likelihoodInterface_.getConfig()) );
   _parameterScanner_.readConfig( GenericToolbox::Json::fetchValue(_config_, "scanConfig", _parameterScanner_.getConfig()) );
@@ -91,7 +92,7 @@ void FitterEngine::readConfigImpl(){
 
   _generateSamplePlots_ = GenericToolbox::Json::fetchValue(_config_, "generateSamplePlots", _generateSamplePlots_);
   _generateOneSigmaPlots_ = GenericToolbox::Json::fetchValue(_config_, "generateOneSigmaPlots", _generateOneSigmaPlots_);
-  _doAllParamVariations_ = GenericToolbox::Json::doKeyExist(_config_, "allParamVariations");
+  _doAllParamVariations_ = GenericToolbox::Json::fetchValue(_config_, "allParamVariations", _doAllParamVariations_);
   _allParamVariationsSigmas_ = GenericToolbox::Json::fetchValue(_config_, "allParamVariations", _allParamVariationsSigmas_);
 
   _scaleParStepWithChi2Response_ = GenericToolbox::Json::fetchValue(_config_, "scaleParStepWithChi2Response", _scaleParStepWithChi2Response_);
