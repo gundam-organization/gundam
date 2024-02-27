@@ -14,7 +14,14 @@ LoggerInit([]{
 });
 
 void EventVarTransform::readConfigImpl(){
+  _isEnabled_ = GenericToolbox::Json::fetchValue(_config_, "isEnabled", _isEnabled_);
   _name_ = GenericToolbox::Json::fetchValue(_config_, {{"name"}, {"title"}}, _name_);
+
+  if( not _isEnabled_ ){
+    LogWarning << "EventVarTransform is disabled for: " << _name_ << std::endl;
+    return;
+  }
+
   _messageOnError_ = GenericToolbox::Json::fetchValue(_config_, "messageOnError", _messageOnError_);
   _outputVariableName_ = GenericToolbox::Json::fetchValue(_config_, "outputVariableName", _outputVariableName_);
   _inputFormulaStrList_ = GenericToolbox::Json::fetchValue(_config_, "inputList", _inputFormulaStrList_);

@@ -21,11 +21,13 @@ public:
   EventVarTransform() = default;
   explicit EventVarTransform(const JsonType& config_);
 
+  void setIsEnabled(bool isEnabled_){ _isEnabled_=isEnabled_; }
   void setIndex(int index_){ _index_ = index_; }
   void setUseCache(bool useCache_){ _useCache_ = useCache_; }
 
-  int getIndex() const { return _index_; }
+  bool isEnabled(){ return _isEnabled_; }
   bool useCache() const { return _useCache_; }
+  int getIndex() const { return _index_; }
   const std::string &getName() const { return _name_; }
   const std::string &getOutputVariableName() const { return _outputVariableName_; }
   const std::vector<std::string>& fetchRequestedVars() const;
@@ -44,6 +46,7 @@ protected:
   virtual double evalTransformation(const PhysicsEvent& event_, std::vector<double>& inputBuffer_) const;
 
   // config
+  bool _isEnabled_{true};
   std::string _name_;
   std::string _messageOnError_;
   std::string _outputVariableName_;
