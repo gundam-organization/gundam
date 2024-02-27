@@ -28,6 +28,7 @@ do
     echo "Re-initializing submodules..."
     git submodule deinit --all -f
     syncSubmodules
+    git status
     exit 0;
   elif [ $arg == "-v" ]; then
     shift
@@ -35,8 +36,9 @@ do
       echo "Updating to version: $1"
       git checkout $1
       syncSubmodules
+      git status
     else
-      echo "You should provide a version after -v"
+      echo "You have to provide a version after -v"
     fi
     exit 0;
   elif [ $arg == "-b" ]; then
@@ -51,8 +53,9 @@ do
       fi
       git pull
       syncSubmodules
+      git status
     else
-      echo "You should provide a version after -b"
+      echo "You have to provide a version after -b"
     fi
     exit 0;
   elif [ $arg == "--latest" ]; then
@@ -62,17 +65,20 @@ do
     echo "Checking out latest version: $LATEST_VERSION"
     git checkout $LATEST_VERSION
     syncSubmodules
+    git status
     exit 0;
   elif [ $arg == "--head" ]; then
     echo "Checking out main branch..."
     git checkout main
     git pull origin main # updates repo
     syncSubmodules
+    git status
     exit 0;
   elif [ $arg == "--up" ]; then
     echo "Updating..."
     git pull
     syncSubmodules
+    git status
     exit 0;
   fi
 done
