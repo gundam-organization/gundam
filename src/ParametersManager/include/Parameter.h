@@ -83,8 +83,8 @@ public:
   [[nodiscard]] PriorType getPriorType() const{ return _priorType_; }
 
   // Core
-  void setValueAtPrior();
-  void setCurrentValueAsPrior();
+  void setValueAtPrior(){ _parameterValue_ = _priorValue_; }
+  void setCurrentValueAsPrior(){ _priorValue_ = _parameterValue_; }
   [[nodiscard]] bool isValueWithinBounds() const;
   [[nodiscard]] double getDistanceFromNominal() const; // in unit of sigmas
   [[nodiscard]] std::string getSummary(bool shallow_=false) const;
