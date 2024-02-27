@@ -50,7 +50,7 @@ void FitterEngine::readConfigImpl(){
   minimizerConfig = GenericToolbox::Json::fetchValue( _config_, "minimizerConfig" , minimizerConfig );
   minimizerTypeStr = GenericToolbox::Json::fetchValue( minimizerConfig, "type", minimizerTypeStr );
 
-  _minimizerType_ = MinimizerType::toEnum( minimizerTypeStr );
+  _minimizerType_ = MinimizerType::toEnum( minimizerTypeStr, true );
   switch( _minimizerType_.value ){
     case MinimizerType::RootMinimizer:
       this->_minimizer_ = std::make_unique<RootMinimizer>( this );

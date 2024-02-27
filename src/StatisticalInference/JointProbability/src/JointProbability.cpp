@@ -29,7 +29,7 @@ namespace JointProbability{
 //    if(  ){ }
 
 
-    auto jType{JointProbabilityType::toEnum( type_ )};
+    auto jType{JointProbabilityType::toEnum( type_, true )};
 
     if( jType == JointProbabilityType::EnumOverflow  ){
       LogThrow( "Unknown JointProbabilityType: " << type_ );
