@@ -92,8 +92,9 @@ void FitterEngine::readConfigImpl(){
 
   _generateSamplePlots_ = GenericToolbox::Json::fetchValue(_config_, "generateSamplePlots", _generateSamplePlots_);
   _generateOneSigmaPlots_ = GenericToolbox::Json::fetchValue(_config_, "generateOneSigmaPlots", _generateOneSigmaPlots_);
-  _doAllParamVariations_ = GenericToolbox::Json::fetchValue(_config_, "allParamVariations", _doAllParamVariations_);
-  _allParamVariationsSigmas_ = GenericToolbox::Json::fetchValue(_config_, "allParamVariations", _allParamVariationsSigmas_);
+
+  _doAllParamVariations_ = GenericToolbox::Json::fetchValue(_config_, "enableParamVariations", _doAllParamVariations_);
+  _allParamVariationsSigmas_ = GenericToolbox::Json::fetchValue(_config_, {{"paramVariationsSigmas"}, {"allParamVariations"}}, _allParamVariationsSigmas_);
 
   _scaleParStepWithChi2Response_ = GenericToolbox::Json::fetchValue(_config_, "scaleParStepWithChi2Response", _scaleParStepWithChi2Response_);
   _parStepGain_ = GenericToolbox::Json::fetchValue(_config_, "parStepGain", _parStepGain_);
