@@ -177,6 +177,11 @@ void DataDispenser::parseStringParameters() {
     for( auto& varTransform : GenericToolbox::Json::fetchValue<std::vector<JsonType>>(_config_, "variablesTransform") ){
       _cache_.eventVarTransformList.emplace_back( varTransform );
       _cache_.eventVarTransformList.back().setIndex(index++);
+      _cache_.eventVarTransformList.back().readConfig();
+      if( not _cache_.eventVarTransformList.back().isEnabled() ){
+        _cache_.eventVarTransformList.pop_back();
+        continue;
+      }
       _cache_.eventVarTransformList.back().initialize();
     }
     // sort them according to their output
