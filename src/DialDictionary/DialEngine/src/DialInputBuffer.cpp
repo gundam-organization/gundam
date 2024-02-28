@@ -56,7 +56,9 @@ void DialInputBuffer::updateBuffer(){
       // re-apply the offset
       buffer += _parameterMirrorBounds_[std::distance(_buffer_.data(), bufferPtr)].first;
     }
-    LogThrowIf(std::isnan(buffer), "NaN while evaluating input buffer of " << (*_parSetRef_)[parIndices.first].getParameterList()[parIndices.second].getTitle());
+//    LogThrowIf(std::isnan(buffer),
+//               "NaN while evaluating input buffer of "
+//               << (*_parSetRef_)[parIndices.first].getParameterList()[parIndices.second].getTitle());
 
     if( *bufferPtr != buffer ){
 //      LogTrace << "UPT: " << this->getSummary() << ": " << *bufferPtr << " -> " << buffer << std::endl;

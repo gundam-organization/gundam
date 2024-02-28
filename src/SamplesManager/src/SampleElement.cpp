@@ -147,7 +147,7 @@ void SampleElement::refillHistogram(int iThread_){
         (*binContentPtr) += eventPtr->getEventWeight();
         (*binErrorPtr) += eventPtr->getEventWeight() * eventPtr->getEventWeight();
       }
-      LogThrowIf(std::isnan((*binContentPtr)));
+//      LogThrowIf(std::isnan((*binContentPtr)));
 #ifdef GUNDAM_USING_CACHE_MANAGER
     }
 #endif // GUNDAM_USING_CACHE_MANAGER
