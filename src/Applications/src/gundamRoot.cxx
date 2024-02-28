@@ -5,6 +5,8 @@
 #include "GundamUtils.h"
 
 #include "Logger.h"
+#include "GenericToolbox.Root.h"
+#include "GenericToolbox.Utils.h"
 
 #include "TRint.h"
 
@@ -44,7 +46,16 @@ int main(int argc, char **argv) {
   );
 
   LogInfo << "Enabling GenericToolbox lib..." << std::endl;
-  theApp->ProcessLine("{ GenericToolbox::Enabler e; }");
+//  theApp->ProcessLine("{ GenericToolbox::Enabler e; }");
+  gROOT->ProcessLine( Form(".include %s/submodules/cpp-generic-toolbox/include", GundamUtils::getSourceCodePath().c_str()) );
+
+  LogInfo << "Processing \"GenericToolbox.Utils.h\"..." << std::endl;
+  gROOT->ProcessLine("#include \"GenericToolbox.Utils.h\"");
+
+  // std::cout << "Processing \"GenericToolbox.h\"..." << std::endl;
+  // gROOT->ProcessLine("#include \"GenericToolbox.h\"");
+  LogInfo << "Processing \"GenericToolbox.Root.h\"..." << std::endl;
+  gROOT->ProcessLine("#include \"GenericToolbox.Root.h\"");
 
   theApp->SetPrompt("gundamRoot [%d] ");
 
