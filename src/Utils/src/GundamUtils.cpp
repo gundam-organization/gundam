@@ -4,6 +4,7 @@
 
 #include "GundamUtils.h"
 #include "VersionConfig.h" // the only place it is included
+#include "SourceConfig.h" // the only place it is included
 
 #include "Logger.h"
 #include "GenericToolbox.Root.h"
@@ -27,6 +28,9 @@ namespace GundamUtils {
       ss << "/" << GundamVersionConfig::getVersionBranch();
     }
     return ss.str();
+  }
+  std::string getSourceCodePath(){
+    return {SOURCE_CONFIG_H};
   }
   bool isNewerOrEqualVersion( const std::string& minVersion_ ){
     if( GundamUtils::getVersionStr() == "X.X.X" ){

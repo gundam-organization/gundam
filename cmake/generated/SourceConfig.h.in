@@ -1,0 +1,8 @@
+#ifndef SOURCE_CONFIG_H
+#define SOURCE_CONFIG_H
+
+#include <string>
+
+#define CMAKE_SOURCE_DIR "@CMAKE_SOURCE_DIR@"
+
+#endif // SOURCE_CONFIG_H
