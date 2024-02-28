@@ -59,7 +59,5 @@ int main(int argc, char **argv) {
   LogInfo << "Running interpreter..." << std::endl;
   theApp->Run();
 
-  delete theApp;
-
   return EXIT_SUCCESS;
 }
