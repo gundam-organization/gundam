@@ -88,7 +88,6 @@ void Parameter::setMaxMirror(double maxMirror) {
   _maxMirror_ = maxMirror;
 }
 void Parameter::setParameterValue(double parameterValue) {
-  LogThrowIf( std::isnan(parameterValue), "Attempting to set NaN value for par:" << std::endl << this->getSummary() );
   if( _parameterValue_ != parameterValue ){
     _gotUpdated_ = true;
     _parameterValue_ = parameterValue;
@@ -106,13 +105,6 @@ void Parameter::setDialSetConfig(const JsonType &jsonConfig_) {
 void Parameter::setParameterDefinitionConfig(const JsonType &config_){
   _parameterConfig_ = config_;
   ConfigUtils::forwardConfig(_parameterConfig_);
-}
-
-void Parameter::setValueAtPrior(){
-  _parameterValue_ = _priorValue_;
-}
-void Parameter::setCurrentValueAsPrior(){
-  _priorValue_ = _parameterValue_;
 }
 
 bool Parameter::isValueWithinBounds() const{
