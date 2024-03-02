@@ -24,7 +24,6 @@
 #include "Shift.h"
 
 #include <memory>
-#include <vector>
 #include <set>
 
 LoggerInit([]{
@@ -168,7 +167,7 @@ bool Cache::Manager::Build(SampleSet& sampleList,
             // not being moved.  This happens after the vectors are "closed",
             // so it is probably safe, but this isn't good.  The particular
             // usage is forced do to an API change.
-            const Parameter* fp = &(dialInterface->getInputBufferRef()->getParameter());
+            const Parameter* fp = &(dialInterface->getInputBufferRef()->getParameter(0));
             usedParameters.insert(fp);
             ++useCount[fp->getFullTitle()];
 
@@ -398,18 +397,16 @@ bool Cache::Manager::Update(SampleSet& sampleList,
             }
 
             // Apply the mirroring for the parameters
-            if (dialInputs->useParameterMirroring()) {
-                for (std::size_t i = 0; i < dialInputs->getBufferSize(); ++i) {
-                    const Parameter* fp = &(dialInputs->getParameter(i));
-                    const std::pair<double,double>& bounds =
-                        dialInputs->getMirrorBounds(i);
-                    int parIndex = Cache::Manager::ParameterMap[fp];
-                    Cache::Manager::Get()->GetParameterCache()
-                        .SetLowerMirror(parIndex,bounds.first);
-                    Cache::Manager::Get()->GetParameterCache()
-                        .SetUpperMirror(parIndex,bounds.first+bounds.second);
-                }
+          for (std::size_t i = 0; i < dialInputs->getBufferSize(); ++i) {
+            const Parameter* fp = &(dialInputs->getParameter(i));
+            auto& bounds = dialInputs->getMirrorEdges(i);
+            if( not std::isnan(bounds.minValue) ){
+              int parIndex = Cache::Manager::ParameterMap[fp];
+              Cache::Manager::Get()->GetParameterCache().SetLowerMirror(parIndex, bounds.minValue);
+              Cache::Manager::Get()->GetParameterCache().SetUpperMirror(parIndex, bounds.minValue+bounds.range);
             }
+
+          }
 
             // Apply the clamps to the parameter range
             for (std::size_t i = 0; i < dialInputs->getBufferSize(); ++i) {

@@ -225,12 +225,13 @@ template<typename T> void EventTreeWriter::writeEventsTemplate(TDirectory* saveD
 
         // fetch corresponding dial if it exists
         for( auto& dial : *dialElements ){
-          if( dial.interface->getInputBufferRef()->getInputParameterIndicesList()[0] == parIndexList[iGlobalPar] ){
+          if( dial.interface->getInputBufferRef()->getInputParameterIndicesList()[0].parSetIndex == parIndexList[iGlobalPar].first
+              and dial.interface->getInputBufferRef()->getInputParameterIndicesList()[0].parIndex == parIndexList[iGlobalPar].second ){
 
             DialInputBuffer inputBuf{*dial.interface->getInputBufferRef()};
             grPtr->RemovePoint(0); // remove the first and recreate the whole thing
             for( double xPoint : parameterXvalues[iGlobalPar] ){
-              inputBuf.getBufferVector()[0] = xPoint;
+              inputBuf.getInputBuffer()[0] = xPoint;
               grPtr->AddPoint(
                   xPoint,
                   DialInterface::evalResponse(

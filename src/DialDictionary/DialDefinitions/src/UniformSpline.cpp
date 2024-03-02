@@ -83,7 +83,7 @@ void UniformSpline::buildDial(const std::vector<double>& xPoints,
 }
 
 double UniformSpline::evalResponse(const DialInputBuffer& input_) const {
-  double dialInput{input_.getBuffer()[0]};
+  double dialInput{input_.getInputBuffer()[0]};
 
 #ifndef NDEBUG
   LogThrowIf(not std::isfinite(dialInput), "Invalid input for UniformSpline");

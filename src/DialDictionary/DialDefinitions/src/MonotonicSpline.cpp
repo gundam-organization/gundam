@@ -113,7 +113,7 @@ void MonotonicSpline::buildDial(const std::vector<double>& v1,
 }
 
 double MonotonicSpline::evalResponse(const DialInputBuffer& input_) const {
-  double dialInput{input_.getBuffer()[0]};
+  double dialInput{input_.getInputBuffer()[0]};
 
 #ifndef NDEBUG
   LogThrowIf(not std::isfinite(dialInput), "Invalid input for MonotonicSpline");

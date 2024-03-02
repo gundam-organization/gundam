@@ -53,7 +53,7 @@ void Spline::buildDial(const std::vector<double>& v1,
 const TSpline3 &Spline::getSpline() const {return _spline_;}
 
 double Spline::evalResponse(const DialInputBuffer& input_) const {
-  const double dialInput{input_.getBuffer()[0]};
+  const double dialInput{input_.getInputBuffer()[0]};
 
 #ifndef NDEBUG
   LogThrowIf(not std::isfinite(dialInput), "Invalid input for Spline");

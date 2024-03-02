@@ -144,22 +144,17 @@ void EventDialCache::reweightEntry(EventDialCache::CacheElem_t& entry_){
   // calculate the dial responses
   std::for_each(entry_.dials.begin(), entry_.dials.end(), [&](DialsElem_t& dial_){
     if( dial_.interface->getInputBufferRef()->isMasked() ){ return ; }
-    if(std::isnan(dial_.response) or dial_.interface->getInputBufferRef()->isDialUpdateRequested() ){
+
+    // evaluate the dial if the cache is empty or an update has been requested
+    if( std::isnan(dial_.response) or dial_.interface->getInputBufferRef()->isDialUpdateRequested() ){
       dial_.response = dial_.interface->evalResponse();
     }
 
-//    if( std::isnan( dial_.response ) ){
-//      LogError << "Invalid dial response:" << std::endl;
-//      LogError << dial_.interface->getSummary(false ) << std::endl;
-//      LogError << GET_VAR_NAME_VALUE( dial_.interface->evalResponse() ) << std::endl;
-//      LogThrow("Exception thrown because of invalid spline response.");
-//    }
-
-//    LogThrowIf(std::isnan(dial_.response), "Invalid dial response for " << dial_.interface->getSummary());
+    // multiply the weight in the temp buffer
     tempReweight *= dial_.response;
   });
 
-  // Applying event weight cap
+  // applying event weight cap if defined
   if( not std::isnan(EventDialCache::globalEventReweightCap) ){
     if( tempReweight > EventDialCache::globalEventReweightCap ){
       tempReweight = EventDialCache::globalEventReweightCap;
