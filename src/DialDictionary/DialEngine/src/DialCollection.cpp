@@ -117,7 +117,7 @@ void DialCollection::resizeContainers(){
 }
 void DialCollection::updateInputBuffers(){
   std::for_each(_dialInputBufferList_.begin(), _dialInputBufferList_.end(), [](DialInputBuffer& i_){
-    i_.updateBuffer();
+    i_.update();
   });
 }
 void DialCollection::setupDialInterfaceReferences(){

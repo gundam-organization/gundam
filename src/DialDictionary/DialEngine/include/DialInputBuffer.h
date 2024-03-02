@@ -72,7 +72,7 @@ public:
 
   /// Update the buffer to flag if any parameter has changed, and apply any
   /// mirroring to the parameter values.
-  void updateBuffer();
+  void update();
 
   // nested getters
   [[nodiscard]] const ParameterSet& getParameterSet(int iInput_) const{ return _inputParameterReferenceList_[iInput_].getParameterSet(_parSetListPtr_); }

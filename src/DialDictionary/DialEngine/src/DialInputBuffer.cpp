@@ -43,7 +43,7 @@ void DialInputBuffer::initialise(){
   _isInitialized_ = true;
 }
 
-void DialInputBuffer::updateBuffer(){
+void DialInputBuffer::update(){
   this->setIsMasked( false );
   double tempBuffer;
 

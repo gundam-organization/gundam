@@ -34,7 +34,6 @@ public:
   // we don't need the reference counting since we can only have one of each
   // object.  Also shared_ptr is a bit to memory hungry.
   typedef std::shared_ptr<DialBase> DialBaseObject;
-  // typedef GenericToolbox::PolymorphicObjectWrapper<DialBase> DialBaseObject;
 
   // setters
   void setIndex(int index){ _index_ = index; }
