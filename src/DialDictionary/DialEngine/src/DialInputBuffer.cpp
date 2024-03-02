@@ -15,113 +15,114 @@ LoggerInit([]{
 });
 
 
-const Parameter& DialInputBuffer::getParameter( int i) const {
-    return _parSetRef_->at(_inputParameterIndicesList_[i].first).getParameterList().at(_inputParameterIndicesList_[i].second);
-}
-const ParameterSet& DialInputBuffer::getParameterSet( int i) const {
-  return _parSetRef_->at(_inputParameterIndicesList_[i].first);
+void DialInputBuffer::initialise(){
+  LogThrowIf(_parSetListPtr_ == nullptr, "ParameterSet list pointer not set.");
+
+  // the size won't change anymore
+  _inputParameterReferenceList_.shrink_to_fit();
+
+  // this value shouldn't change anymore:
+  _inputArraySize_ = int(_inputParameterReferenceList_.size());
+
+  // set the buffer to the proper size
+  _inputBuffer_.resize(_inputArraySize_, std::nan("unset"));
+
+  // sanity checks
+  for( int iInput = 0 ; iInput < _inputArraySize_ ; iInput++ ){
+    LogThrowIf(_inputParameterReferenceList_[iInput].parSetIndex < 0,
+               "Parameter set index invalid: " << _inputParameterReferenceList_[iInput].parSetIndex);
+    LogThrowIf(_inputParameterReferenceList_[iInput].parSetIndex >= _parSetListPtr_->size(),
+               "Parameter set index invalid: " << _inputParameterReferenceList_[iInput].parSetIndex);
+
+    LogThrowIf(_inputParameterReferenceList_[iInput].parIndex < 0,
+               "Parameter index invalid: " << _inputParameterReferenceList_[iInput].parIndex);
+    LogThrowIf(_inputParameterReferenceList_[iInput].parIndex >= getParameterSet(iInput).getParameterList().size(),
+               "Parameter index invalid: " << _inputParameterReferenceList_[iInput].parIndex);
+  }
+
+  _isInitialized_ = true;
 }
 
-void DialInputBuffer::updateBuffer(){
-  LogThrowIf(_parSetRef_ == nullptr, "parSetRef is not set.");
-
+void DialInputBuffer::update(){
   this->setIsMasked( false );
-  double* bufferPtr{_buffer_.data()};
-  double buffer;
+  double tempBuffer;
 
   // will change if at least one parameter is updated
   _isDialUpdateRequested_ = false;
 
-  for( auto& parIndices : _inputParameterIndicesList_ ){
+  for( int iInput = 0 ; iInput < _inputArraySize_ ; iInput++ ){
 
-    if( (*_parSetRef_)[parIndices.first].isMaskedForPropagation() ){
+    if( getParameterSet(iInput).isMaskedForPropagation() ){
       // in that case, the DialInterface will always return 1.
       this->setIsMasked( true );
       return;
     }
 
-    buffer = (*_parSetRef_)[parIndices.first].getParameterList()[parIndices.second].getParameterValue();
-    if( _useParameterMirroring_ ){
-      buffer = std::abs(std::fmod(
-          buffer - _parameterMirrorBounds_[std::distance(_buffer_.data(), bufferPtr)].first,
-          2 * _parameterMirrorBounds_[std::distance(_buffer_.data(), bufferPtr)].second
+    // grab the value of the parameter
+    tempBuffer = getParameter(iInput).getParameterValue();
+
+    // find the actual parameter value if mirroring is applied
+    if( not std::isnan( getMirrorEdges(iInput).minValue ) ){
+      tempBuffer = std::abs(std::fmod(
+          tempBuffer - getMirrorEdges(iInput).minValue,
+          2 * getMirrorEdges(iInput).range
       ));
 
-      if(buffer > _parameterMirrorBounds_[std::distance(_buffer_.data(), bufferPtr)].second ){
+      if( tempBuffer > getMirrorEdges(iInput).range ){
         // odd pattern  -> mirrored -> decreasing effective X while increasing parameter
-        buffer -= 2 * _parameterMirrorBounds_[std::distance(_buffer_.data(), bufferPtr)].second;
-        buffer = -buffer;
+        tempBuffer -= 2 * getMirrorEdges(iInput).range;
+        tempBuffer = -tempBuffer;
       }
 
       // re-apply the offset
-      buffer += _parameterMirrorBounds_[std::distance(_buffer_.data(), bufferPtr)].first;
+      tempBuffer += getMirrorEdges(iInput).minValue;
     }
-//    LogThrowIf(std::isnan(buffer),
-//               "NaN while evaluating input buffer of "
-//               << (*_parSetRef_)[parIndices.first].getParameterList()[parIndices.second].getTitle());
 
-    if( *bufferPtr != buffer ){
-//      LogTrace << "UPT: " << this->getSummary() << ": " << *bufferPtr << " -> " << buffer << std::endl;
+    // has it been updated?
+    if( _inputBuffer_[iInput] != tempBuffer ){
       _isDialUpdateRequested_ = true;
+      _inputBuffer_[iInput] = tempBuffer;
     }
 
-    *bufferPtr = buffer;
-    bufferPtr++;
   }
-
-//  if( not _isDialUpdateRequested_ ){
-//    LogDebug << "CACHED: " << this->getSummary() << std::endl;
-//  }
 
   _currentHash_ = generateHash();
 }
-void DialInputBuffer::addParameterIndices(const std::pair<size_t, size_t>& indices_){
-  _inputParameterIndicesList_.emplace_back(indices_);
-  _buffer_.emplace_back(std::nan("unset"));
-}
-void DialInputBuffer::addMirrorBounds(const std::pair<double, double>& lowEdgeAndRange_){
-  const int p = _parameterMirrorBounds_.size();
-  // Overriding the const to allow the mirroring information to be stored
-  Parameter& par = const_cast<Parameter&>(getParameter(p));
-  par.setMinMirror(lowEdgeAndRange_.first);
-  par.setMaxMirror(lowEdgeAndRange_.first + lowEdgeAndRange_.second);
-  _parameterMirrorBounds_.emplace_back(lowEdgeAndRange_);
-}
-const std::pair<double,double>&
-DialInputBuffer::getMirrorBounds(int i) const {
-    return _parameterMirrorBounds_.at(i);
+void DialInputBuffer::addParameterReference( const ParameterReference& parReference_){
+  LogThrowIf(_isInitialized_, "Can't add parameter index while initialized.");
+  _inputParameterReferenceList_.emplace_back(parReference_);
 }
 std::string DialInputBuffer::getSummary() const{
   std::stringstream ss;
-  ss << GenericToolbox::toString(_inputParameterIndicesList_, [&](const std::pair<size_t, size_t>& idx_){
+  ss << GenericToolbox::toString(_inputParameterReferenceList_, [&]( const ParameterReference& parRef_){
     std::stringstream ss;
-    if( _parSetRef_ != nullptr ){
-      ss << (*_parSetRef_)[idx_.first].getParameterList()[idx_.second].getFullTitle() << "=";
-      ss << (*_parSetRef_)[idx_.first].getParameterList()[idx_.second].getParameterValue();
+    if( _parSetListPtr_ != nullptr ){
+      ss << parRef_.getParameter(_parSetListPtr_).getFullTitle() << "=";
+      ss << parRef_.getParameter(_parSetListPtr_).getParameterValue();
     }
     else{
-      ss << "{" << idx_.first << ", " << idx_.second << "}";
+      ss << "{" << parRef_.parSetIndex << ", " << parRef_.parIndex << "}";
     }
+
+    if( not std::isnan(parRef_.mirrorEdges.minValue) ){
+      ss << ", mirrorLow=" << parRef_.mirrorEdges.minValue;
+      ss << ", mirrorUp=" << parRef_.mirrorEdges.minValue + parRef_.mirrorEdges.range;
+    }
+
     return ss.str();
   }, false);
-  if( _useParameterMirroring_ ){
-    ss << ", " << GenericToolbox::toString(_parameterMirrorBounds_, [&](const std::pair<double, double>& bounds_){
-      std::stringstream ss;
-      ss << "mirrorLow=" << bounds_.first << ", mirrorUp=" << bounds_.first + bounds_.second;
-      return ss.str();
-    }, false);
-  }
+
   return ss.str();
 }
-uint32_t DialInputBuffer::generateHash(){
+
 #if USE_ZLIB
+uint32_t DialInputBuffer::generateHash(){
   uint32_t out = crc32(0L, Z_NULL, 0);
-  double* inputPtr = _buffer_.data();
-  while( inputPtr < _buffer_.data() + _buffer_.size() ){
+  double* inputPtr = _inputBuffer_.data();
+  while( inputPtr < _inputBuffer_.data() + _inputBuffer_.size() ){
     out = crc32( out, (const Bytef*) inputPtr, sizeof(double) );
     inputPtr++;
   }
   return out;
-#endif
-  return 0;
 }
+#endif

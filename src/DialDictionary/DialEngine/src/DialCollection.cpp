@@ -117,7 +117,7 @@ void DialCollection::resizeContainers(){
 }
 void DialCollection::updateInputBuffers(){
   std::for_each(_dialInputBufferList_.begin(), _dialInputBufferList_.end(), [](DialInputBuffer& i_){
-    i_.updateBuffer();
+    i_.update();
   });
 }
 void DialCollection::setupDialInterfaceReferences(){
@@ -134,14 +134,20 @@ void DialCollection::setupDialInterfaceReferences(){
                                                                                                    << std::endl << "is the defined dial binning matching the number of parameters?"
     );
     _dialInputBufferList_.resize(_dialBaseList_.size());
-    for( size_t iDial = 0 ; iDial < _dialBaseList_.size() ; iDial++ ){
-      _dialInputBufferList_[iDial].addParameterIndices({_supervisedParameterSetIndex_, iDial});
+    for( int iDial = 0 ; iDial < int(_dialBaseList_.size()) ; iDial++ ){
+      DialInputBuffer::ParameterReference p{};
+      p.parSetIndex = _supervisedParameterSetIndex_;
+      p.parIndex = iDial;
+      _dialInputBufferList_[iDial].addParameterReference(p);
     }
   }
   else{
     // one parameter for every dial of the collection
     _dialInputBufferList_.resize(1);
-    _dialInputBufferList_.back().addParameterIndices({_supervisedParameterSetIndex_, _supervisedParameterIndex_});
+    DialInputBuffer::ParameterReference p{};
+    p.parSetIndex = _supervisedParameterSetIndex_;
+    p.parIndex = _supervisedParameterIndex_;
+    _dialInputBufferList_.back().addParameterReference(p);
   }
 
   for( auto& inputBuffer : _dialInputBufferList_ ){
@@ -150,8 +156,10 @@ void DialCollection::setupDialInterfaceReferences(){
 
   if( _useMirrorDial_ ){
     for( auto& inputBuffer : _dialInputBufferList_ ){
-      inputBuffer.setUseParameterMirroring( _useMirrorDial_ );
-      inputBuffer.addMirrorBounds( {_mirrorLowEdge_, _mirrorRange_} );
+      for( auto & inputParRef : inputBuffer.getInputParameterIndicesList() ){
+        inputParRef.mirrorEdges.minValue = _mirrorLowEdge_;
+        inputParRef.mirrorEdges.range = _mirrorRange_;
+      }
     }
   }
 
@@ -209,6 +217,10 @@ void DialCollection::setupDialInterfaceReferences(){
       );
     }
   }
+
+  // initialize the input buffers
+  for( auto& inputBuffer : _dialInputBufferList_ ){ inputBuffer.initialise(); }
+
 }
 size_t DialCollection::getNextDialFreeSlot(){
   return _dialFreeSlot_++;

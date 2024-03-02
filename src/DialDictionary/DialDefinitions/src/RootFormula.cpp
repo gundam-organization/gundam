@@ -6,7 +6,7 @@
 
 
 double RootFormula::evalResponse(const DialInputBuffer& input_) const {
-  return _formula_.EvalPar(input_.getBuffer());
+  return _formula_.EvalPar(&input_.getInputBuffer()[0]);
 }
 
 
