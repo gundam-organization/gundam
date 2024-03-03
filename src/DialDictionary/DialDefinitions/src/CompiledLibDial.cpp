@@ -13,6 +13,10 @@ LoggerInit([]{
   Logger::getUserHeader() << "[CompiledLibDial]";
 });
 
+double CompiledLibDial::evalResponse( const DialInputBuffer &input_ ) const{
+  // Eval with dynamic function
+  return reinterpret_cast<double(*)(double*)>(_evalFct_)((double*) &input_.getInputBuffer()[0]);
+}
 
 bool CompiledLibDial::loadLibrary(const std::string& path_){
   LogInfo << "Loading shared lib: " << path_ << std::endl;
@@ -35,5 +39,7 @@ bool CompiledLibDial::loadLibrary(const std::string& path_){
 
   return true;
 }
+
+
 
 

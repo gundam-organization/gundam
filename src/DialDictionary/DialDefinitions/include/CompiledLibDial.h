@@ -15,7 +15,6 @@ public:
   [[nodiscard]] std::unique_ptr<DialBase> clone() const override { return std::make_unique<CompiledLibDial>(*this); }
   [[nodiscard]] std::string getDialTypeName() const override { return {"RootFormula"}; }
   [[nodiscard]] double evalResponse(const DialInputBuffer& input_) const override;
-  [[nodiscard]] std::string getSummary() const override;
 
   bool loadLibrary(const std::string& path_);
 
