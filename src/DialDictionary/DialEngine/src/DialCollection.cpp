@@ -437,7 +437,11 @@ bool DialCollection::initializeDialsWithDefinition() {
     _dialBaseList_.emplace_back(
       DialBaseObject(dialBaseFactory.makeDial(getTitle(),"Normalization","",nullptr,false)));
   }
-  else if( _globalDialType_ == "Formula" ){
+  else if( _globalDialType_ == "Formula" or _globalDialType_ == "RootFormula" ){
+    DialBaseFactory f;
+    _dialBaseList_.emplace_back( DialBaseObject( f.makeDial( dialsDefinition ) ) );
+  }
+  else if( _globalDialType_ == "CompiledLibDial" ){
     DialBaseFactory f;
     _dialBaseList_.emplace_back( DialBaseObject( f.makeDial( dialsDefinition ) ) );
   }

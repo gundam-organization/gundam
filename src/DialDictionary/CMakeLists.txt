@@ -20,6 +20,7 @@ set( SRCFILES
     DialDefinitions/src/CompactSpline.cpp
     DialDefinitions/src/MonotonicSpline.cpp
 
+    DialDefinitions/src/CompiledLibDial.cpp
     DialDefinitions/src/RootFormula.cpp
     DialDefinitions/src/Polynomial.cpp
 

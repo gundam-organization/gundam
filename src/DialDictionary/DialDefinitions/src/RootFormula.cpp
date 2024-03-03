@@ -14,3 +14,9 @@ void RootFormula::setFormulaStr(const std::string& formulaStr_){
   _formula_ = TFormula(formulaStr_.c_str(), formulaStr_.c_str());
   LogThrowIf(not _formula_.IsValid(), "\"" << formulaStr_ << "\": could not be parsed as formula expression.");
 }
+
+std::string RootFormula::getSummary() const {
+  std::stringstream ss;
+  ss << this->getDialTypeName() << ": formula: " << _formula_.GetExpFormula();
+  return ss.str();
+};

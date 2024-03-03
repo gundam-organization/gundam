@@ -4,6 +4,7 @@
 #include "SplineDialBaseFactory.h"
 
 #include "RootFormula.h"
+#include "CompiledLibDial.h"
 
 #include "Logger.h"
 
@@ -81,13 +82,24 @@ DialBase* DialBaseFactory::makeDial(const JsonType& config_){
 
   dialType = GenericToolbox::Json::fetchValue(config_, {{"dialType"}, {"dialsType"}}, dialType);
 
-  if( dialType == "Formula" ){
+  if( dialType == "Formula" or dialType == "RootFormula" ){
     dialBase = std::make_unique<RootFormula>();
     auto* rootFormulaPtr{(RootFormula*) dialBase.get()};
 
-    auto formulaConfig{GenericToolbox::Json::fetchValue<JsonType>(config_, "formulaConfig")};
+    auto formulaConfig{GenericToolbox::Json::fetchValue<JsonType>(config_, "dialConfig")};
 
     rootFormulaPtr->setFormulaStr( GenericToolbox::Json::fetchValue<std::string>(formulaConfig, "formulaStr") );
+  }
+  else if( dialType == "CompiledLibDial" ){
+    dialBase = std::make_unique<CompiledLibDial>();
+    auto* compiledLibDialPtr{(CompiledLibDial*) dialBase.get()};
+
+    auto formulaConfig{GenericToolbox::Json::fetchValue<JsonType>(config_, "dialConfig")};
+
+    compiledLibDialPtr->loadLibrary( GenericToolbox::Json::fetchValue<std::string>(formulaConfig, "libraryFile") );
+  }
+  else{
+    LogThrow("Unknown dial type: " << dialType);
   }
 
   return dialBase.release();

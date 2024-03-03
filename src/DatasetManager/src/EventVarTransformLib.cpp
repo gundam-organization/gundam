@@ -31,6 +31,7 @@ void EventVarTransformLib::reload(){
 
 void EventVarTransformLib::loadLibrary(){
   LogInfo << "Loading shared lib: " << _libraryFile_ << std::endl;
+  LogThrowIf(not GenericToolbox::isFile(_libraryFile_), "Could not find lib file: " << _libraryFile_ << std::endl << _messageOnError_);
   _loadedLibrary_ = dlopen(_libraryFile_.c_str(), RTLD_LAZY );
   LogThrowIf(_loadedLibrary_ == nullptr, "Cannot open library: " << dlerror() << std::endl << _messageOnError_);
   _evalVariable_ = (dlsym(_loadedLibrary_, "evalVariable"));
