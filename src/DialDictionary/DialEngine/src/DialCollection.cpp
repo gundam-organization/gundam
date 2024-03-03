@@ -36,6 +36,7 @@ void DialCollection::readConfigImpl() {
     _isEnabled_ = false;
   }
 
+  // if "dialInputList" is not present, it will be setup during the initialize sequence.
   if( GenericToolbox::Json::doKeyExist(_config_, "dialInputList") ){
     auto dialInputList = GenericToolbox::Json::fetchValue<JsonType>(_config_, "dialInputList");
 
@@ -155,9 +156,10 @@ void DialCollection::setupDialInterfaceReferences(){
     if( _supervisedParameterIndex_ == -1 ){
       // one dial interface per parameter
       LogThrowIf(_dialBaseList_.size() != _parameterSetListPtr_->at(_supervisedParameterSetIndex_).getParameterList().size(),
-                 "Nb of dial base don't match the number of parameters of the selected set: nDials=" << _dialBaseList_.size()
-                                                                                                     << " != " << "nPars=" << _parameterSetListPtr_->at(_supervisedParameterSetIndex_).getParameterList().size()
-                                                                                                     << std::endl << "is the defined dial binning matching the number of parameters?"
+                 "Nb of dial base don't match the number of parameters of the selected set: nDials="
+                 << _dialBaseList_.size() << " != " << "nPars="
+                 << _parameterSetListPtr_->at(_supervisedParameterSetIndex_).getParameterList().size()
+                 << std::endl << "is the defined dial binning matching the number of parameters?"
       );
       _dialInputBufferList_.resize(_dialBaseList_.size());
       for( int iDial = 0 ; iDial < int(_dialBaseList_.size()) ; iDial++ ){
