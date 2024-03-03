@@ -98,7 +98,7 @@ DialBase* DialBaseFactory::makeDial(const JsonType& config_){
 
     bool success = compiledLibDialPtr->loadLibrary( GenericToolbox::Json::fetchValue<std::string>(formulaConfig, "libraryFile") );
     if( not success ){
-      LogThrow("Could not load CompiledLibDial");
+      LogThrow("Could not load CompiledLibDial. " << GenericToolbox::Json::fetchValue(formulaConfig, "messageOnError", std::string("")) );
     }
   }
   else{
