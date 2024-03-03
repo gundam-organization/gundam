@@ -52,9 +52,9 @@ public:
   [[nodiscard]] bool isMasked() const{ return _isMasked_; }
   [[nodiscard]] bool isDialUpdateRequested() const{ return _isDialUpdateRequested_; }
   [[nodiscard]] int getBufferSize() const{ return _inputArraySize_; }
-  const std::vector<double>& getInputBuffer() const { return _inputBuffer_; }
+  [[nodiscard]] const std::vector<double>& getInputBuffer() const { return _inputBuffer_; }
   [[nodiscard]] const std::vector<ParameterReference> &getInputParameterIndicesList() const{ return _inputParameterReferenceList_; }
-#ifdef USE_ZLIB
+#if USE_ZLIB
   [[nodiscard]] const uint32_t& getCurrentHash() const{ return _currentHash_; }
 #endif
 

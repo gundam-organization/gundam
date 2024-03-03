@@ -25,8 +25,8 @@ template <typename T> bool CachedDial<T>::isCacheValid(const DialInputBuffer& in
 #else
   if( _cachedInputs_.size() != input_.getBufferSize() ) return false;
   return ( memcmp(
-             _cachedInputs_.data(), input_.getBuffer(),
-             input_.getBufferSize() * sizeof(*input_.getBuffer())) == 0 );
+             _cachedInputs_.data(), input_.getInputBuffer().data(),
+             input_.getBufferSize() * sizeof(*input_.getInputBuffer().data())) == 0 );
 #endif
 }
 template <typename T> void CachedDial<T>::updateInputCache(const DialInputBuffer& input_) const {
@@ -36,8 +36,8 @@ template <typename T> void CachedDial<T>::updateInputCache(const DialInputBuffer
   if( _cachedInputs_.size() != input_.getBufferSize() ){
     _cachedInputs_.resize(input_.getBufferSize(), std::nan("unset"));
   }
-  memcpy(_cachedInputs_.data(), input_.getBuffer(),
-         input_.getBufferSize() * sizeof(*input_.getBuffer()));
+  memcpy(_cachedInputs_.data(), input_.getInputBuffer().data(),
+         input_.getBufferSize() * sizeof(*input_.getInputBuffer().data()));
 #endif
 }
 
