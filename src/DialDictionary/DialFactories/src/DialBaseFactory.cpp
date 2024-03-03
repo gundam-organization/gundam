@@ -101,9 +101,7 @@ DialBase* DialBaseFactory::makeDial(const JsonType& config_){
       LogThrow("Could not load CompiledLibDial. " << GenericToolbox::Json::fetchValue(formulaConfig, "messageOnError", std::string("")) );
     }
   }
-  else{
-    LogThrow("Unknown dial type: " << dialType);
-  }
+  else{ LogThrow("Unknown dial type: " << dialType); }
 
   return dialBase.release();
 }
