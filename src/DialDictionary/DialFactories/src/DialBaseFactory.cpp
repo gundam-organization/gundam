@@ -96,7 +96,10 @@ DialBase* DialBaseFactory::makeDial(const JsonType& config_){
 
     auto formulaConfig{GenericToolbox::Json::fetchValue<JsonType>(config_, "dialConfig")};
 
-    compiledLibDialPtr->loadLibrary( GenericToolbox::Json::fetchValue<std::string>(formulaConfig, "libraryFile") );
+    bool success = compiledLibDialPtr->loadLibrary( GenericToolbox::Json::fetchValue<std::string>(formulaConfig, "libraryFile") );
+    if( not success ){
+      LogThrow("Could not load CompiledLibDial");
+    }
   }
   else{
     LogThrow("Unknown dial type: " << dialType);
