@@ -94,13 +94,10 @@ void Propagator::readConfigImpl(){
     // DEV / DialCollections
     if( not _parManager_.getParameterSetsList()[iParSet].getDialSetDefinitions().empty() ){
       for( auto& dialSetDef : _parManager_.getParameterSetsList()[iParSet].getDialSetDefinitions().get<std::vector<JsonType>>() ){
-        if( GenericToolbox::Json::doKeyExist(dialSetDef, "parametersBinningPath") ){
-          _dialCollections_.emplace_back(&_parManager_.getParameterSetsList());
-          _dialCollections_.back().setIndex(int(_dialCollections_.size())-1);
-          _dialCollections_.back().setSupervisedParameterSetIndex( int(iParSet) );
-          _dialCollections_.back().readConfig( dialSetDef );
-        }
-        else{ LogThrow("no parametersBinningPath option?"); }
+        _dialCollections_.emplace_back(&_parManager_.getParameterSetsList());
+        _dialCollections_.back().setIndex(int(_dialCollections_.size())-1);
+        _dialCollections_.back().setSupervisedParameterSetIndex( int(iParSet) );
+        _dialCollections_.back().readConfig( dialSetDef );
       }
     }
     else{

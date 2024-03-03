@@ -39,7 +39,6 @@ set( HEADERS
 
     # DialDefinitions
     DialDefinitions/include/DialBase.h
-    DialDefinitions/include/DialTypes.h
 
     DialDefinitions/include/Norm.h
     DialDefinitions/include/Shift.h

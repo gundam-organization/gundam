@@ -3,6 +3,8 @@
 #include "GraphDialBaseFactory.h"
 #include "SplineDialBaseFactory.h"
 
+#include "RootFormula.h"
+
 #include "Logger.h"
 
 LoggerInit([]{
@@ -71,6 +73,26 @@ DialBase* DialBaseFactory::makeDial(const std::string& dialTitle_,
   // Pass the ownership without any constraints!
   return dialBase.release();
 }
+
+
+DialBase* DialBaseFactory::makeDial(const JsonType& config_){
+  std::unique_ptr<DialBase> dialBase{nullptr};
+  std::string dialType{};
+
+  dialType = GenericToolbox::Json::fetchValue(config_, {{"dialType"}, {"dialsType"}}, dialType);
+
+  if( dialType == "Formula" ){
+    dialBase = std::make_unique<RootFormula>();
+    auto* rootFormulaPtr{(RootFormula*) dialBase.get()};
+
+    auto formulaConfig{GenericToolbox::Json::fetchValue<JsonType>(config_, "formulaConfig")};
+
+    rootFormulaPtr->setFormulaStr( GenericToolbox::Json::fetchValue<std::string>(formulaConfig, "formulaStr") );
+  }
+
+  return dialBase.release();
+}
+
 
 //  A Lesser GNU Public License
 
