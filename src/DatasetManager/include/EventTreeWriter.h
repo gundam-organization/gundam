@@ -40,8 +40,8 @@ protected:
   static const PhysicsEvent* getEventPtr(const PhysicsEvent& ev_){ return &ev_; }
   static const PhysicsEvent* getEventPtr(const EventDialCache::CacheElem_t* ev_){ return ev_->event; }
 
-  static const std::vector<EventDialCache::DialsElem_t>* getDialElementsPtr(const PhysicsEvent& ev_){ return nullptr; }
-  static const std::vector<EventDialCache::DialsElem_t>* getDialElementsPtr(const EventDialCache::CacheElem_t* ev_){ return &ev_->dials; }
+  static const std::vector<EventDialCache::DialResponseCache>* getDialElementsPtr( const PhysicsEvent& ev_){ return nullptr; }
+  static const std::vector<EventDialCache::DialResponseCache>* getDialElementsPtr( const EventDialCache::CacheElem_t* ev_){ return &ev_->dialResponseCacheList; }
 
 private:
   // config

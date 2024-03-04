@@ -79,7 +79,7 @@ template<typename T> void EventTreeWriter::writeEventsTemplate(TDirectory* saveD
 
   LogReturnIf(eventList_.empty(), "No event to be written. Leaving...");
 
-  const std::vector<EventDialCache::DialsElem_t>* dialElements{getDialElementsPtr(eventList_[0])};
+  const std::vector<EventDialCache::DialResponseCache>* dialElements{getDialElementsPtr(eventList_[0])};
   bool writeDials{dialElements != nullptr};
 
   LogInfo << "Writing " << eventList_.size() << " events " << (writeDials? "with response dials": "without response dials") << " in TTree " << treeName_ << std::endl;
@@ -225,10 +225,10 @@ template<typename T> void EventTreeWriter::writeEventsTemplate(TDirectory* saveD
 
         // fetch corresponding dial if it exists
         for( auto& dial : *dialElements ){
-          if( dial.interface->getInputBufferRef()->getInputParameterIndicesList()[0].parSetIndex == parIndexList[iGlobalPar].first
-              and dial.interface->getInputBufferRef()->getInputParameterIndicesList()[0].parIndex == parIndexList[iGlobalPar].second ){
+          if( dial.dialInterface.getInputBufferRef()->getInputParameterIndicesList()[0].parSetIndex == parIndexList[iGlobalPar].first
+              and dial.dialInterface.getInputBufferRef()->getInputParameterIndicesList()[0].parIndex == parIndexList[iGlobalPar].second ){
 
-            DialInputBuffer inputBuf{*dial.interface->getInputBufferRef()};
+            DialInputBuffer inputBuf{*dial.dialInterface.getInputBufferRef()};
             grPtr->RemovePoint(0); // remove the first and recreate the whole thing
             for( double xPoint : parameterXvalues[iGlobalPar] ){
               inputBuf.getInputBuffer()[0] = xPoint;
@@ -236,8 +236,8 @@ template<typename T> void EventTreeWriter::writeEventsTemplate(TDirectory* saveD
                   xPoint,
                   DialInterface::evalResponse(
                       &inputBuf,
-                      dial.interface->getDialBaseRef(),
-                      dial.interface->getResponseSupervisorRef()
+                      dial.dialInterface.getDialBaseRef(),
+                      dial.dialInterface.getResponseSupervisorRef()
                   )
               );
             }

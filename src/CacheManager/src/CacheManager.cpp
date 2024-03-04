@@ -159,19 +159,18 @@ bool Cache::Manager::Build(SampleSet& sampleList,
             throw std::runtime_error("Caching event that isn't used");
         }
         ++events;
-        for (EventDialCache::DialsElem_t& dialElem : elem.dials) {
-            DialInterface* dialInterface = dialElem.interface;
+        for( auto& dialResponseCache : elem.dialResponseCacheList) {
             // This is depending behavior that is not guarranteed, but which
             // is probably valid because of the particular usage.
             // Specifically, it depends on the vector of Parameter objects
             // not being moved.  This happens after the vectors are "closed",
             // so it is probably safe, but this isn't good.  The particular
             // usage is forced do to an API change.
-            const Parameter* fp = &(dialInterface->getInputBufferRef()->getParameter(0));
+            const Parameter* fp = &(dialResponseCache.dialInterface.getInputBufferRef()->getParameter(0));
             usedParameters.insert(fp);
             ++useCount[fp->getFullTitle()];
 
-            DialBase* dial = dialInterface->getDialBaseRef();
+            DialBase* dial = dialResponseCache.dialInterface.getDialBaseRef();
             std::string dialType = dial->getDialTypeName();
             if (dialType.find("Norm") == 0) {
                 ++norms;
@@ -374,9 +373,8 @@ bool Cache::Manager::Update(SampleSet& sampleList,
         double initialEventWeight = event.getBaseWeight();
 
         // Add each dial for the event to the GPU caches.
-        for (EventDialCache::DialsElem_t& dialElem : elem.dials) {
-            DialInterface* dialInterface = dialElem.interface;
-            DialInputBuffer* dialInputs = dialInterface->getInputBufferRef();
+        for( auto& dialElem : elem.dialResponseCacheList ){
+            DialInputBuffer* dialInputs = dialElem.dialInterface.getInputBufferRef();
 
             // Check if this dial is used at all.
             if (dialInputs->isMasked()){ continue; }
@@ -387,7 +385,7 @@ bool Cache::Manager::Update(SampleSet& sampleList,
                 // Find the index (or allocate a new one) for the dial
                 // parameter.  This only works for 1D dials.
                 const Parameter* fp
-                    = &(dialInterface->getInputBufferRef()
+                    = &(dialElem.dialInterface.getInputBufferRef()
                         ->getParameter(i));
                 auto parMapIt = Cache::Manager::ParameterMap.find(fp);
                 if (parMapIt == Cache::Manager::ParameterMap.end()) {
@@ -412,7 +410,7 @@ bool Cache::Manager::Update(SampleSet& sampleList,
             for (std::size_t i = 0; i < dialInputs->getBufferSize(); ++i) {
                 const Parameter* fp = &(dialInputs->getParameter(i));
                 const DialResponseSupervisor* resp
-                    = dialInterface->getResponseSupervisorRef();
+                    = dialElem.dialInterface.getResponseSupervisorRef();
                 int parIndex = Cache::Manager::ParameterMap[fp];
                 double minResponse = 0.0;
                 if (std::isfinite(resp->getMinResponse())) {
@@ -427,7 +425,7 @@ bool Cache::Manager::Update(SampleSet& sampleList,
 
             // Add the dial information to the appropriate caches
             int dialUsed = 0;
-            const DialBase* baseDial = dialInterface->getDialBaseRef();
+            const DialBase* baseDial = dialElem.dialInterface.getDialBaseRef();
             const Norm* normDial = dynamic_cast<const Norm*>(baseDial);
             if (normDial) {
                 ++dialUsed;
