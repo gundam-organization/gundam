@@ -68,12 +68,12 @@ void FitterEngine::readConfigImpl(){
     _minimizer_->getMonitor().convergenceMonitor.setMaxRefreshRateInMs(GenericToolbox::Json::fetchValue<int>(_config_, "monitorRefreshRateInMs"));
   });
   GenericToolbox::Json::deprecatedAction(_config_, "propagatorConfig", [&]{
-    LogAlert << R"("propagatorConfig" should now be set within "likelihoodInterfaceConfig".)" << std::endl;
-    _likelihoodInterface_.getPropagator().setConfig( GenericToolbox::Json::fetchValue<JsonType>(_config_, "propagatorConfig") );
+    LogAlert << R"("propagatorConfig" should now be set within "dataSetManagerConfig".)" << std::endl;
+    _likelihoodInterface_.getDataSetManager().getPropagator().setConfig( GenericToolbox::Json::fetchValue<JsonType>(_config_, "propagatorConfig") );
   });
-  GenericToolbox::Json::deprecatedAction(_likelihoodInterface_.getPropagator().getConfig(), "scanConfig", [&]{
+  GenericToolbox::Json::deprecatedAction(_likelihoodInterface_.getDataSetManager().getPropagator().getConfig(), "scanConfig", [&]{
     LogAlert << R"("scanConfig" should now be set within "fitterEngineConfig".)" << std::endl;
-    _parameterScanner_.setConfig( GenericToolbox::Json::fetchValue<JsonType>(_likelihoodInterface_.getPropagator().getConfig(), "scanConfig") );
+    _parameterScanner_.setConfig( GenericToolbox::Json::fetchValue<JsonType>(_likelihoodInterface_.getDataSetManager().getPropagator().getConfig(), "scanConfig") );
   });
 
   _minimizer_->readConfig( minimizerConfig );
@@ -112,7 +112,7 @@ void FitterEngine::initializeImpl(){
   if( GundamGlobals::isLightOutputMode() ){
     // TODO: this check should be more universal
     LogWarning << "Light mode enabled, wiping plot gen config..." << std::endl;
-    _likelihoodInterface_.getPropagator().getPlotGenerator().readConfig(JsonType());
+    _likelihoodInterface_.getDataSetManager().getPropagator().getPlotGenerator().readConfig(JsonType());
   }
 
   _likelihoodInterface_.initialize();
@@ -120,13 +120,13 @@ void FitterEngine::initializeImpl(){
   _parameterScanner_.setLikelihoodInterfacePtr( &_likelihoodInterface_ );
   _parameterScanner_.initialize();
 
-  if( _likelihoodInterface_.getPropagator().isThrowAsimovToyParameters() ){
+  if( _likelihoodInterface_.getDataSetManager().getPropagator().isThrowAsimovToyParameters() ){
     LogInfo << "Writing throws in TTree..." << std::endl;
     auto* throwsTree = new TTree("throws", "throws");
 
     std::vector<GenericToolbox::RawDataArray> thrownParameterValues{};
-    thrownParameterValues.reserve(_likelihoodInterface_.getPropagator().getParametersManager().getParameterSetsList().size());
-    for( auto& parSet : _likelihoodInterface_.getPropagator().getParametersManager().getParameterSetsList() ){
+    thrownParameterValues.reserve(_likelihoodInterface_.getDataSetManager().getPropagator().getParametersManager().getParameterSetsList().size());
+    for( auto& parSet : _likelihoodInterface_.getDataSetManager().getPropagator().getParametersManager().getParameterSetsList() ){
       if( not parSet.isEnabled() ) continue;
 
       std::vector<std::string> leavesList;
@@ -172,18 +172,18 @@ void FitterEngine::initializeImpl(){
   LogInfo << "Writing propagator objects..." << std::endl;
   GenericToolbox::writeInTFile(
       GenericToolbox::mkdirTFile(_saveDir_, "propagator"),
-      TNamed("initialParameterState", GenericToolbox::Json::toReadableString(_likelihoodInterface_.getPropagator().getParametersManager().exportParameterInjectorConfig()).c_str())
+      TNamed("initialParameterState", GenericToolbox::Json::toReadableString(_likelihoodInterface_.getDataSetManager().getPropagator().getParametersManager().exportParameterInjectorConfig()).c_str())
   );
 
   GenericToolbox::writeInTFile(
       GenericToolbox::mkdirTFile(_saveDir_, "propagator"),
-      _likelihoodInterface_.getPropagator().getParametersManager().getGlobalCovarianceMatrix().get(), "globalCovarianceMatrix"
+      _likelihoodInterface_.getDataSetManager().getPropagator().getParametersManager().getGlobalCovarianceMatrix().get(), "globalCovarianceMatrix"
   );
   GenericToolbox::writeInTFile(
       GenericToolbox::mkdirTFile(_saveDir_, "propagator"),
-      _likelihoodInterface_.getPropagator().getParametersManager().getStrippedCovarianceMatrix().get(), "strippedCovarianceMatrix"
+      _likelihoodInterface_.getDataSetManager().getPropagator().getParametersManager().getStrippedCovarianceMatrix().get(), "strippedCovarianceMatrix"
   );
-  for( auto& parSet : _likelihoodInterface_.getPropagator().getParametersManager().getParameterSetsList() ){
+  for( auto& parSet : _likelihoodInterface_.getDataSetManager().getPropagator().getParametersManager().getParameterSetsList() ){
     if(not parSet.isEnabled()) continue;
 
     auto saveFolder = GenericToolbox::joinPath( "propagator", parSet.getName() );
@@ -241,12 +241,12 @@ void FitterEngine::initializeImpl(){
   _likelihoodInterface_.propagateAndEvalLikelihood();
 
   if( not GundamGlobals::isLightOutputMode() ){
-    _likelihoodInterface_.getPropagator().getTreeWriter().writeSamples(GenericToolbox::mkdirTFile(_saveDir_, "preFit/events"));
+    _likelihoodInterface_.getDataSetManager().getTreeWriter().writeSamples(GenericToolbox::mkdirTFile(_saveDir_, "preFit/events"));
   }
 
   // writing event rates
   LogInfo << "Writing event rates..." << std::endl;
-  for( auto& sample : _likelihoodInterface_.getPropagator().getSampleSet().getSampleList() ){
+  for( auto& sample : _likelihoodInterface_.getDataSetManager().getPropagator().getSampleSet().getSampleList() ){
     if( not sample.isEnabled() ){ continue; }
 
 
@@ -290,21 +290,21 @@ void FitterEngine::fit(){
       GenericToolbox::mkdirTFile( _saveDir_, "preFit" ),
       TNamed("llhState", llhState.c_str())
   );
-  _preFitParState_ = _likelihoodInterface_.getPropagator().getParametersManager().exportParameterInjectorConfig();
+  _preFitParState_ = _likelihoodInterface_.getDataSetManager().getPropagator().getParametersManager().exportParameterInjectorConfig();
   GenericToolbox::writeInTFile(
       GenericToolbox::mkdirTFile( _saveDir_, "preFit" ),
       TNamed("parState", GenericToolbox::Json::toReadableString(_preFitParState_).c_str())
   );
 
   // Not moving parameters
-  if( _generateSamplePlots_ and not _likelihoodInterface_.getPropagator().getPlotGenerator().getConfig().empty() ){
+  if( _generateSamplePlots_ and not _likelihoodInterface_.getDataSetManager().getPropagator().getPlotGenerator().getConfig().empty() ){
     LogInfo << "Generating pre-fit sample plots..." << std::endl;
-    _likelihoodInterface_.getPropagator().getPlotGenerator().generateSamplePlots(GenericToolbox::mkdirTFile(_saveDir_, "preFit/samples"));
+    _likelihoodInterface_.getDataSetManager().getPropagator().getPlotGenerator().generateSamplePlots(GenericToolbox::mkdirTFile(_saveDir_, "preFit/samples"));
     GenericToolbox::triggerTFileWrite(_saveDir_);
   }
 
   // Moving parameters
-  if( _generateOneSigmaPlots_ and not _likelihoodInterface_.getPropagator().getPlotGenerator().getConfig().empty() ){
+  if( _generateOneSigmaPlots_ and not _likelihoodInterface_.getDataSetManager().getPropagator().getPlotGenerator().getConfig().empty() ){
     LogInfo << "Generating pre-fit one-sigma variation plots..." << std::endl;
     _parameterScanner_.generateOneSigmaPlots(GenericToolbox::mkdirTFile(_saveDir_, "preFit/oneSigma"));
     GenericToolbox::triggerTFileWrite(_saveDir_);
@@ -325,7 +325,7 @@ void FitterEngine::fit(){
   if( _throwMcBeforeFit_ ){
     LogAlert << "Throwing correlated parameters of MC away from their prior..." << std::endl;
     LogAlert << "Throw gain form MC push set to: " << _throwGain_ << std::endl;
-    for( auto& parSet : _likelihoodInterface_.getPropagator().getParametersManager().getParameterSetsList() ){
+    for( auto& parSet : _likelihoodInterface_.getDataSetManager().getPropagator().getParametersManager().getParameterSetsList() ){
       if(not parSet.isEnabled()) continue;
       if( not parSet.isEnabledThrowToyParameters() ){
         LogWarning << "\"" << parSet.getName() << "\" has marked disabled throwMcBeforeFit: skipping." << std::endl;
@@ -378,7 +378,7 @@ void FitterEngine::fit(){
   this->_minimizer_->minimize();
 
   LogWarning << "Saving post-fit par state..." << std::endl;
-  _postFitParState_ = _likelihoodInterface_.getPropagator().getParametersManager().exportParameterInjectorConfig();
+  _postFitParState_ = _likelihoodInterface_.getDataSetManager().getPropagator().getParametersManager().exportParameterInjectorConfig();
   GenericToolbox::writeInTFile(
       GenericToolbox::mkdirTFile( _saveDir_, "postFit" ),
       TNamed("parState", GenericToolbox::Json::toReadableString(_postFitParState_).c_str())
@@ -395,11 +395,11 @@ void FitterEngine::fit(){
 
   if (_savePostfitEventTrees_){
     LogInfo << "Saving PostFit event Trees" << std::endl;
-    _likelihoodInterface_.getPropagator().getTreeWriter().writeSamples(GenericToolbox::mkdirTFile(_saveDir_, "postFit/events"));
+    _likelihoodInterface_.getDataSetManager().getTreeWriter().writeSamples(GenericToolbox::mkdirTFile(_saveDir_, "postFit/events"));
   }
-  if( _generateSamplePlots_ and not _likelihoodInterface_.getPropagator().getPlotGenerator().getConfig().empty() ){
+  if( _generateSamplePlots_ and not _likelihoodInterface_.getDataSetManager().getPropagator().getPlotGenerator().getConfig().empty() ){
     LogInfo << "Generating post-fit sample plots..." << std::endl;
-    _likelihoodInterface_.getPropagator().getPlotGenerator().generateSamplePlots(GenericToolbox::mkdirTFile(_saveDir_, "postFit/samples"));
+    _likelihoodInterface_.getDataSetManager().getPropagator().getPlotGenerator().generateSamplePlots(GenericToolbox::mkdirTFile(_saveDir_, "postFit/samples"));
     GenericToolbox::triggerTFileWrite(_saveDir_);
   }
   if( _enablePostFitScan_ ){
@@ -447,7 +447,7 @@ void FitterEngine::runPcaCheck(){
   std::stringstream ssPrint;
   double deltaChi2Stat;
 
-  for( auto& parSet : _likelihoodInterface_.getPropagator().getParametersManager().getParameterSetsList() ){
+  for( auto& parSet : _likelihoodInterface_.getDataSetManager().getPropagator().getParametersManager().getParameterSetsList() ){
 
     if( not parSet.isEnabled() ){ continue; }
 
@@ -539,7 +539,7 @@ void FitterEngine::rescaleParametersStepSize(){
   double baseLlh = _likelihoodInterface_.getLastLikelihood();
 
   // +1 sigma
-  for( auto& parSet : _likelihoodInterface_.getPropagator().getParametersManager().getParameterSetsList() ){
+  for( auto& parSet : _likelihoodInterface_.getDataSetManager().getPropagator().getParametersManager().getParameterSetsList() ){
 
     for( auto& par : parSet.getEffectiveParameterList() ){
 
@@ -586,7 +586,7 @@ void FitterEngine::checkNumericalAccuracy(){
 
   LogInfo << "Throwing..." << std::endl;
   for(auto& throwEntry : throws ){
-    for( auto& parSet : _likelihoodInterface_.getPropagator().getParametersManager().getParameterSetsList() ){
+    for( auto& parSet : _likelihoodInterface_.getDataSetManager().getPropagator().getParametersManager().getParameterSetsList() ){
       if(not parSet.isEnabled()) continue;
       if( not parSet.isEnabledThrowToyParameters() ){ continue;}
       parSet.throwParameters(true, gain);
@@ -603,7 +603,7 @@ void FitterEngine::checkNumericalAccuracy(){
     GenericToolbox::displayProgressBar(iTest, nTest, "Testing computational accuracy...");
     for( size_t iThrow = 0 ; iThrow < throws.size() ; iThrow++ ){
       int iParSet{-1};
-      for( auto& parSet : _likelihoodInterface_.getPropagator().getParametersManager().getParameterSetsList() ){
+      for( auto& parSet : _likelihoodInterface_.getDataSetManager().getPropagator().getParametersManager().getParameterSetsList() ){
         if(not parSet.isEnabled()) continue;
         if( not parSet.isEnabledThrowToyParameters() ){ continue;}
         iParSet++;
@@ -611,7 +611,7 @@ void FitterEngine::checkNumericalAccuracy(){
           parSet.getParameterList()[iPar].setParameterValue( throws[iThrow][iParSet][iPar] );
         }
       }
-      _likelihoodInterface_.getPropagator().propagateParameters();
+      _likelihoodInterface_.getDataSetManager().getPropagator().propagateParameters();
       _likelihoodInterface_.evalLikelihood();
 
       if( responses[iThrow] == responses[iThrow] ){ // not nan

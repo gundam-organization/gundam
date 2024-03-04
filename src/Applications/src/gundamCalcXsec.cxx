@@ -2,7 +2,7 @@
 #include "GundamGlobals.h"
 #include "GundamApp.h"
 #include "GundamUtils.h"
-#include "Propagator.h"
+#include "FitterEngine.h"
 #include "ConfigUtils.h"
 
 #include "Logger.h"
@@ -128,64 +128,75 @@ int main(int argc, char** argv){
 
 
   LogInfo << "Fetching propagator config into fitter config..." << std::endl;
-  auto configPropagator = GenericToolbox::Json::fetchValuePath<JsonType>( cHandler.getConfig(), "fitterEngineConfig/propagatorConfig" );
+  DataSetManager dataSetManager{};
+  {
+    // it will handle all the deprecated config options and names properly
+    FitterEngine fitter{nullptr};
+    fitter.readConfig( GenericToolbox::Json::fetchValuePath<JsonType>( cHandler.getConfig(), "fitterEngineConfig" ) );
 
-  // Create a propagator object
-  Propagator propagator;
+    // grap the reference
+    DataSetManager& tempDataSetManager{fitter.getLikelihoodInterface().getDataSetManager()};
 
-  // Read the whole fitter config with the override parameters
-  LogWarning << std::endl << GenericToolbox::addUpDownBars("Reading propagator config...") << std::endl;
-  propagator.readConfig( configPropagator );
+    // We are only interested in our MC. Data has already been used to get the post-fit error/values
+    tempDataSetManager.getPropagator().setLoadAsimovData( true );
 
-  // We are only interested in our MC. Data has already been used to get the post-fit error/values
-  propagator.setLoadAsimovData( true );
+    // Disabling eigen decomposed parameters
+    tempDataSetManager.getPropagator().setEnableEigenToOrigInPropagate( false );
 
-  // Disabling eigen decomposed parameters
-  propagator.setEnableEigenToOrigInPropagate( false );
+    // Sample binning using parameterSetName
+    for( auto& sample : tempDataSetManager.getPropagator().getSampleSet().getSampleList() ){
 
-  // Sample binning using parameterSetName
-  for( auto& sample : propagator.getSampleSet().getSampleList() ){
+      if( clParser.isOptionTriggered("usePreFit") ){
+        sample.setName( sample.getName() + " (pre-fit)" );
+      }
 
-    if( clParser.isOptionTriggered("usePreFit") ){
-      sample.setName( sample.getName() + " (pre-fit)" );
+      // binning already set?
+      if( not sample.getBinningFilePath().empty() ){ continue; }
+
+      LogScopeIndent;
+      LogInfo << sample.getName() << ": binning not set, looking for parSetBinning..." << std::endl;
+      auto associatedParSet = GenericToolbox::Json::fetchValue(
+          sample.getConfig(),
+          {{"parSetBinning"}, {"parameterSetName"}},
+          std::string()
+      );
+
+      LogThrowIf(associatedParSet.empty(), "Could not find parSetBinning.");
+
+      // Looking for parSet
+      auto foundDialCollection = std::find_if(
+          tempDataSetManager.getPropagator().getDialCollectionList().begin(),
+          tempDataSetManager.getPropagator().getDialCollectionList().end(),
+          [&](const DialCollection& dialCollection_){
+            auto* parSetPtr{dialCollection_.getSupervisedParameterSet()};
+            if( parSetPtr == nullptr ){ return false; }
+            return ( parSetPtr->getName() == associatedParSet );
+          });
+      LogThrowIf(
+          foundDialCollection == tempDataSetManager.getPropagator().getDialCollectionList().end(),
+          "Could not find " << associatedParSet << " among fit dial collections: "
+                            << GenericToolbox::toString(tempDataSetManager.getPropagator().getDialCollectionList(),
+                                                        [](const DialCollection& dialCollection_){
+                                                          return dialCollection_.getTitle();
+                                                        }
+                            ));
+
+      LogThrowIf(foundDialCollection->getDialBinSet().getBinList().empty(), "Could not find binning");
+      sample.setBinningFilePath( foundDialCollection->getDialBinSet().getFilePath() );
+
     }
 
-    // binning already set?
-    if( not sample.getBinningFilePath().empty() ){ continue; }
+    // Load everything
+    tempDataSetManager.initialize();
 
-    LogScopeIndent;
-    LogInfo << sample.getName() << ": binning not set, looking for parSetBinning..." << std::endl;
-    auto associatedParSet = GenericToolbox::Json::fetchValue(
-        sample.getConfig(),
-        {{"parSetBinning"}, {"parameterSetName"}},
-        std::string()
-    );
+    // swap?
+    std::swap(tempDataSetManager, dataSetManager);
 
-    LogThrowIf(associatedParSet.empty(), "Could not find parSetBinning.");
-
-    // Looking for parSet
-    auto foundDialCollection = std::find_if(
-        propagator.getDialCollectionList().begin(), propagator.getDialCollectionList().end(),
-        [&](const DialCollection& dialCollection_){
-          auto* parSetPtr{dialCollection_.getSupervisedParameterSet()};
-          if( parSetPtr == nullptr ){ return false; }
-          return ( parSetPtr->getName() == associatedParSet );
-        });
-    LogThrowIf(
-        foundDialCollection == propagator.getDialCollectionList().end(),
-        "Could not find " << associatedParSet << " among fit dial collections: "
-                          << GenericToolbox::toString(propagator.getDialCollectionList(), [](const DialCollection& dialCollection_){
-                                                                return dialCollection_.getTitle();
-                                                              }
-                          ));
-
-    LogThrowIf(foundDialCollection->getDialBinSet().getBinList().empty(), "Could not find binning");
-    sample.setBinningFilePath( foundDialCollection->getDialBinSet().getFilePath() );
-
+    // fitter engine should be destroyed after this point
   }
 
-  // Load everything
-  propagator.initialize();
+  Propagator& propagator{dataSetManager.getPropagator()};
+
 
   if( clParser.isOptionTriggered("dryRun") ){
     std::cout << cHandler.toString() << std::endl;
@@ -751,6 +762,6 @@ int main(int argc, char** argv){
 
 
   LogInfo << "Writing event samples in TTrees..." << std::endl;
-  propagator.getTreeWriter().writeSamples( GenericToolbox::mkdirTFile(calcXsecDir, "events") );
+  dataSetManager.getTreeWriter().writeSamples( GenericToolbox::mkdirTFile(calcXsecDir, "events") );
 
 }
