@@ -45,6 +45,8 @@ void DataSetManager::initializeImpl(){
 
   for( auto& dataSet : _dataSetList_ ){ dataSet.initialize(); }
   _treeWriter_.initialize();
+
+  loadData();
 }
 
 void DataSetManager::loadData(){

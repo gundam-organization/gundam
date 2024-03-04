@@ -69,7 +69,8 @@ void FitterEngine::readConfigImpl(){
   });
   GenericToolbox::Json::deprecatedAction(_config_, "propagatorConfig", [&]{
     LogAlert << R"("propagatorConfig" should now be set within "dataSetManagerConfig".)" << std::endl;
-    _likelihoodInterface_.getDataSetManager().getPropagator().setConfig( GenericToolbox::Json::fetchValue<JsonType>(_config_, "propagatorConfig") );
+    // reading the config already since nested objects need to be filled up for handling further deprecation
+    _likelihoodInterface_.getDataSetManager().getPropagator().readConfig( GenericToolbox::Json::fetchValue<JsonType>(_config_, "propagatorConfig") );
   });
   GenericToolbox::Json::deprecatedAction(_likelihoodInterface_.getDataSetManager().getPropagator().getConfig(), "scanConfig", [&]{
     LogAlert << R"("scanConfig" should now be set within "fitterEngineConfig".)" << std::endl;

@@ -19,7 +19,20 @@ LoggerInit([]{
 void LikelihoodInterface::readConfigImpl(){
   LogWarning << "Configuring LikelihoodInterface..." << std::endl;
 
-  // placeholders
+  // First taking care of the DataSetManager
+  JsonType dataSetManagerConfig{};
+  GenericToolbox::Json::deprecatedAction(_dataSetManager_.getPropagator().getSampleSet().getConfig(), "dataSetList", [&]{
+    LogAlert << R"("dataSetList" should now be set under "likelihoodInterfaceConfig" instead of "fitSampleSet".)" << std::endl;
+    dataSetManagerConfig = _dataSetManager_.getPropagator().getSampleSet().getConfig(); // DataSetManager will look for "dataSetList"
+  });
+  GenericToolbox::Json::deprecatedAction(_dataSetManager_.getPropagator().getConfig(), "dataSetList", [&]{
+    LogAlert << R"("dataSetList" should now be set under "likelihoodInterfaceConfig" instead of "propagatorConfig".)" << std::endl;
+    dataSetManagerConfig = _dataSetManager_.getPropagator().getConfig();
+  });
+  dataSetManagerConfig = GenericToolbox::Json::fetchValue(_config_, "dataSetManagerConfig", dataSetManagerConfig);
+  _dataSetManager_.readConfig( dataSetManagerConfig );
+
+  //
   JsonType configJointProbability;
   std::string jointProbabilityTypeStr;
 
@@ -39,19 +52,6 @@ void LikelihoodInterface::readConfigImpl(){
   LogInfo << "Using \"" << jointProbabilityTypeStr << "\" JointProbabilityType." << std::endl;
   _jointProbabilityPtr_ = std::shared_ptr<JointProbability::JointProbabilityBase>( JointProbability::makeJointProbability( jointProbabilityTypeStr ) );
   _jointProbabilityPtr_->readConfig( configJointProbability );
-
-  // Now taking care of the DataSetManager
-  JsonType dataSetManagerConfig{};
-  GenericToolbox::Json::deprecatedAction(_dataSetManager_.getPropagator().getSampleSet().getConfig(), "dataSetList", [&]{
-    LogAlert << R"("dataSetList" should now be set under "likelihoodInterfaceConfig" instead of "fitSampleSet".)" << std::endl;
-    dataSetManagerConfig = _dataSetManager_.getPropagator().getSampleSet().getConfig(); // DataSetManager will look for "dataSetList"
-  });
-  GenericToolbox::Json::deprecatedAction(_dataSetManager_.getPropagator().getConfig(), "dataSetList", [&]{
-    LogAlert << R"("dataSetList" should now be set under "likelihoodInterfaceConfig" instead of "propagatorConfig".)" << std::endl;
-    dataSetManagerConfig = _dataSetManager_.getPropagator().getConfig();
-  });
-  dataSetManagerConfig = GenericToolbox::Json::fetchValue(_config_, "dataSetManagerConfig", dataSetManagerConfig);
-  _dataSetManager_.readConfig( dataSetManagerConfig );
 
   LogWarning << "LikelihoodInterface configured." << std::endl;
 }
