@@ -128,72 +128,64 @@ int main(int argc, char** argv){
 
 
   LogInfo << "Fetching propagator config into fitter config..." << std::endl;
-  DataSetManager dataSetManager{};
-  {
-    // it will handle all the deprecated config options and names properly
-    FitterEngine fitter{nullptr};
-    fitter.readConfig( GenericToolbox::Json::fetchValuePath<JsonType>( cHandler.getConfig(), "fitterEngineConfig" ) );
 
-    // grap the reference
-    DataSetManager& tempDataSetManager{fitter.getLikelihoodInterface().getDataSetManager()};
+  // it will handle all the deprecated config options and names properly
+  FitterEngine fitter{nullptr};
+  fitter.readConfig( GenericToolbox::Json::fetchValuePath<JsonType>( cHandler.getConfig(), "fitterEngineConfig" ) );
 
-    // We are only interested in our MC. Data has already been used to get the post-fit error/values
-    tempDataSetManager.getPropagator().setLoadAsimovData( true );
+  DataSetManager& dataSetManager{fitter.getLikelihoodInterface().getDataSetManager()};
 
-    // Disabling eigen decomposed parameters
-    tempDataSetManager.getPropagator().setEnableEigenToOrigInPropagate( false );
+  // We are only interested in our MC. Data has already been used to get the post-fit error/values
+  dataSetManager.getPropagator().setLoadAsimovData( true );
 
-    // Sample binning using parameterSetName
-    for( auto& sample : tempDataSetManager.getPropagator().getSampleSet().getSampleList() ){
+  // Disabling eigen decomposed parameters
+  dataSetManager.getPropagator().setEnableEigenToOrigInPropagate( false );
 
-      if( clParser.isOptionTriggered("usePreFit") ){
-        sample.setName( sample.getName() + " (pre-fit)" );
-      }
+  // Sample binning using parameterSetName
+  for( auto& sample : dataSetManager.getPropagator().getSampleSet().getSampleList() ){
 
-      // binning already set?
-      if( not sample.getBinningFilePath().empty() ){ continue; }
-
-      LogScopeIndent;
-      LogInfo << sample.getName() << ": binning not set, looking for parSetBinning..." << std::endl;
-      auto associatedParSet = GenericToolbox::Json::fetchValue(
-          sample.getConfig(),
-          {{"parSetBinning"}, {"parameterSetName"}},
-          std::string()
-      );
-
-      LogThrowIf(associatedParSet.empty(), "Could not find parSetBinning.");
-
-      // Looking for parSet
-      auto foundDialCollection = std::find_if(
-          tempDataSetManager.getPropagator().getDialCollectionList().begin(),
-          tempDataSetManager.getPropagator().getDialCollectionList().end(),
-          [&](const DialCollection& dialCollection_){
-            auto* parSetPtr{dialCollection_.getSupervisedParameterSet()};
-            if( parSetPtr == nullptr ){ return false; }
-            return ( parSetPtr->getName() == associatedParSet );
-          });
-      LogThrowIf(
-          foundDialCollection == tempDataSetManager.getPropagator().getDialCollectionList().end(),
-          "Could not find " << associatedParSet << " among fit dial collections: "
-                            << GenericToolbox::toString(tempDataSetManager.getPropagator().getDialCollectionList(),
-                                                        [](const DialCollection& dialCollection_){
-                                                          return dialCollection_.getTitle();
-                                                        }
-                            ));
-
-      LogThrowIf(foundDialCollection->getDialBinSet().getBinList().empty(), "Could not find binning");
-      sample.setBinningFilePath( foundDialCollection->getDialBinSet().getFilePath() );
-
+    if( clParser.isOptionTriggered("usePreFit") ){
+      sample.setName( sample.getName() + " (pre-fit)" );
     }
 
-    // Load everything
-    tempDataSetManager.initialize();
+    // binning already set?
+    if( not sample.getBinningFilePath().empty() ){ continue; }
 
-    // swap?
-    std::swap(tempDataSetManager, dataSetManager);
+    LogScopeIndent;
+    LogInfo << sample.getName() << ": binning not set, looking for parSetBinning..." << std::endl;
+    auto associatedParSet = GenericToolbox::Json::fetchValue(
+        sample.getConfig(),
+        {{"parSetBinning"}, {"parameterSetName"}},
+        std::string()
+    );
 
-    // fitter engine should be destroyed after this point
+    LogThrowIf(associatedParSet.empty(), "Could not find parSetBinning.");
+
+    // Looking for parSet
+    auto foundDialCollection = std::find_if(
+        dataSetManager.getPropagator().getDialCollectionList().begin(),
+        dataSetManager.getPropagator().getDialCollectionList().end(),
+        [&](const DialCollection& dialCollection_){
+          auto* parSetPtr{dialCollection_.getSupervisedParameterSet()};
+          if( parSetPtr == nullptr ){ return false; }
+          return ( parSetPtr->getName() == associatedParSet );
+        });
+    LogThrowIf(
+        foundDialCollection == dataSetManager.getPropagator().getDialCollectionList().end(),
+        "Could not find " << associatedParSet << " among fit dial collections: "
+                          << GenericToolbox::toString(dataSetManager.getPropagator().getDialCollectionList(),
+                                                      [](const DialCollection& dialCollection_){
+                                                        return dialCollection_.getTitle();
+                                                      }
+                          ));
+
+    LogThrowIf(foundDialCollection->getDialBinSet().getBinList().empty(), "Could not find binning");
+    sample.setBinningFilePath( foundDialCollection->getDialBinSet().getFilePath() );
+
   }
+
+  // Load everything
+  dataSetManager.initialize();
 
   Propagator& propagator{dataSetManager.getPropagator()};
 
