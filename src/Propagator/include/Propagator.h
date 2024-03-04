@@ -46,6 +46,7 @@ public:
   [[nodiscard]] bool isDebugPrintLoadedEvents() const { return _debugPrintLoadedEvents_; }
   [[nodiscard]] bool getDebugPrintLoadedEventsNbPerSample() const { return _debugPrintLoadedEventsNbPerSample_; }
   [[nodiscard]] int getIThrow() const { return _iThrow_; }
+  [[nodiscard]] const EventDialCache& getEventDialCache() const { return _eventDialCache_; }
   [[nodiscard]] const ParametersManager &getParametersManager() const { return _parManager_; }
   [[nodiscard]] const std::vector<DialCollection> &getDialCollectionList() const{ return _dialCollectionList_; }
   [[nodiscard]] const SampleSet &getSampleSet() const { return _sampleSet_; }

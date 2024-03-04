@@ -5,10 +5,7 @@
 #ifndef GUNDAM_EVENT_TREE_WRITER_H
 #define GUNDAM_EVENT_TREE_WRITER_H
 
-#include "SampleSet.h"
-#include "ParameterSet.h"
-#include "EventDialCache.h"
-#include "PhysicsEvent.h"
+#include "Propagator.h"
 
 #include "GenericToolbox.Utils.h"
 
@@ -22,11 +19,7 @@ class EventTreeWriter : public GenericToolbox::ConfigBaseClass<JsonType> {
 public:
   EventTreeWriter() = default;
 
-  void setSampleSetPtr( const SampleSet *sampleSetPtr){ _sampleSetPtr_ = sampleSetPtr; }
-  void setEventDialCachePtr(const EventDialCache *eventDialCachePtr_){ _eventDialCachePtr_ = eventDialCachePtr_; }
-  void setParSetListPtr(const std::vector<ParameterSet> *parSetListPtr){ _parSetListPtr_ = parSetListPtr; }
-
-  void writeSamples(TDirectory* saveDir_) const;
+  void writeSamples(TDirectory* saveDir_, const Propagator& propagator_) const;
 
   void writeEvents(TDirectory* saveDir_, const std::string& treeName_, const std::vector<PhysicsEvent> & eventList_) const;
   void writeEvents(TDirectory* saveDir_, const std::string& treeName_, const std::vector<const EventDialCache::CacheElem_t*>& cacheSampleList_) const;
@@ -48,11 +41,8 @@ private:
   bool _writeDials_{false};
   int _nPointsPerDial_{3};
 
-  // parameters
-  const SampleSet* _sampleSetPtr_{nullptr};
-  const EventDialCache* _eventDialCachePtr_{nullptr};
-  const std::vector<ParameterSet>* _parSetListPtr_{nullptr};
-
+  // cache
+  mutable const Propagator* propagatorPtr{nullptr};
 
 };
 

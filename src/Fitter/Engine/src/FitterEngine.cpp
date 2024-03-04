@@ -242,7 +242,10 @@ void FitterEngine::initializeImpl(){
   _likelihoodInterface_.propagateAndEvalLikelihood();
 
   if( not GundamGlobals::isLightOutputMode() ){
-    _likelihoodInterface_.getDataSetManager().getTreeWriter().writeSamples(GenericToolbox::mkdirTFile(_saveDir_, "preFit/events"));
+    _likelihoodInterface_.getDataSetManager().getTreeWriter().writeSamples(
+        GenericToolbox::mkdirTFile(_saveDir_, "preFit/events"),
+        _likelihoodInterface_.getDataSetManager().getPropagator()
+    );
   }
 
   // writing event rates
@@ -396,7 +399,10 @@ void FitterEngine::fit(){
 
   if (_savePostfitEventTrees_){
     LogInfo << "Saving PostFit event Trees" << std::endl;
-    _likelihoodInterface_.getDataSetManager().getTreeWriter().writeSamples(GenericToolbox::mkdirTFile(_saveDir_, "postFit/events"));
+    _likelihoodInterface_.getDataSetManager().getTreeWriter().writeSamples(
+        GenericToolbox::mkdirTFile(_saveDir_, "postFit/events"),
+        _likelihoodInterface_.getDataSetManager().getPropagator()
+    );
   }
   if( _generateSamplePlots_ and not _likelihoodInterface_.getDataSetManager().getPropagator().getPlotGenerator().getConfig().empty() ){
     LogInfo << "Generating post-fit sample plots..." << std::endl;

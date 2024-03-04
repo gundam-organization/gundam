@@ -3,7 +3,10 @@
 //
 
 #include "DataSetManager.h"
+
+#ifdef GUNDAM_USING_CACHE_MANAGER
 #include "CacheManager.h"
+#endif
 
 #include "Logger.h"
 
@@ -46,6 +49,9 @@ void DataSetManager::initializeImpl(){
   _propagator_.initialize();
   for( auto& dataSet : _dataSetList_ ){ dataSet.initialize(); }
   _treeWriter_.initialize();
+
+  _propagator_.getPlotGenerator().setSampleSetPtr(&_propagator_.getSampleSet());
+  _propagator_.getPlotGenerator().initialize();
 
   loadData();
 }
@@ -263,16 +269,8 @@ void DataSetManager::loadData(){
     sample.getMcContainer().saveAsHistogramNominal();
   }
 
-  /// Initialise other tools
-  LogInfo << std::endl << GenericToolbox::addUpDownBars("Initializing the plot generator") << std::endl;
-  _propagator_.getPlotGenerator().setSampleSetPtr(&_propagator_.getSampleSet());
-  _propagator_.getPlotGenerator().initialize(); // TODO: init before and only build the cache here
-
-
-  // TODO: _treeWriter_
-  _treeWriter_.setSampleSetPtr( &_propagator_.getSampleSet() );
-  _treeWriter_.setParSetListPtr( &_propagator_.getParametersManager().getParameterSetsList() );
-  _treeWriter_.setEventDialCachePtr( &_propagator_.getEventDialCache() );
+  /// Now caching the event for the plot generator
+  _propagator_.getPlotGenerator().defineHistogramHolders();
 
   /// Printouts for quick monitoring
   if( _propagator_.isShowEventBreakdown() ){

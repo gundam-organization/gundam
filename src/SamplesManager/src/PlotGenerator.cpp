@@ -38,7 +38,6 @@ void PlotGenerator::readConfigImpl(){
 void PlotGenerator::initializeImpl() {
   LogWarning << __METHOD_NAME__ << std::endl;
   LogThrowIf(_sampleSetPtr_ == nullptr);
-  this->defineHistogramHolders();
 }
 
 

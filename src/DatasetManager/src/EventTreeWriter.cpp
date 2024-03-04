@@ -35,10 +35,13 @@ void EventTreeWriter::readConfigImpl() {
 }
 
 
-void EventTreeWriter::writeSamples(TDirectory* saveDir_) const{
+void EventTreeWriter::writeSamples(TDirectory* saveDir_, const Propagator& propagator_) const{
   LogInfo << "Writing sample data in TTrees..." << std::endl;
 
-  for( const auto& sample : _sampleSetPtr_->getSampleList() ){
+  // for usage in other methods
+  propagatorPtr = &propagator_;
+
+  for( const auto& sample : propagator_.getSampleSet().getSampleList() ){
     LogScopeIndent;
     LogInfo << "Writing sample: " << sample.getName() << std::endl;
 
@@ -50,11 +53,9 @@ void EventTreeWriter::writeSamples(TDirectory* saveDir_) const{
         this->writeEvents(GenericToolbox::mkdirTFile(saveDir_, sample.getName()), (isData ? "Data" : "MC"), *evListPtr);
       }
       else{
-        LogThrowIf(_eventDialCachePtr_ == nullptr, "Can't write dials if event dial cache is not set.");
-
         std::vector<const EventDialCache::CacheElem_t*> cacheSampleList{};
-        cacheSampleList.reserve( _eventDialCachePtr_->getCache().size() );
-        for( auto& cacheEntry : _eventDialCachePtr_->getCache() ){
+        cacheSampleList.reserve( propagator_.getEventDialCache().getCache().size() );
+        for( auto& cacheEntry : propagator_.getEventDialCache().getCache() ){
           if( cacheEntry.event->getSampleIndex() == sample.getIndex() ){
             cacheSampleList.emplace_back( &cacheEntry );
           }
@@ -167,11 +168,9 @@ template<typename T> void EventTreeWriter::writeEventsTemplate(TDirectory* saveD
 
   if( writeDials ){
 
-    LogThrowIf(_parSetListPtr_ == nullptr, "Not parSet list provided.");
-
     // how many pars?
     size_t nPars = 0;
-    for( auto& parSet : *_parSetListPtr_ ){
+    for( auto& parSet : propagatorPtr->getParametersManager().getParameterSetsList() ){
       nPars += parSet.getNbParameters();
     }
 
@@ -182,7 +181,7 @@ template<typename T> void EventTreeWriter::writeEventsTemplate(TDirectory* saveD
 
     // create branches
     int iParSet{-1};
-    for( auto& parSet : *_parSetListPtr_ ){
+    for( auto& parSet : propagatorPtr->getParametersManager().getParameterSetsList() ){
       iParSet++;
       if( not parSet.isEnabled() ) continue;
       for( auto& par : parSet.getParameterList() ){

@@ -77,8 +77,6 @@ public:
 public:
   EventDialCache() = default;
 
-
-
   /// A pair of indices into the vector of dial collections, and then the
   /// index of the dial interfaces in the dial collection vector of dial
   /// interfaces.

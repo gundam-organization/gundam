@@ -762,6 +762,9 @@ int main(int argc, char** argv){
 
 
   LogInfo << "Writing event samples in TTrees..." << std::endl;
-  dataSetManager.getTreeWriter().writeSamples( GenericToolbox::mkdirTFile(calcXsecDir, "events") );
+  dataSetManager.getTreeWriter().writeSamples(
+      GenericToolbox::mkdirTFile(calcXsecDir, "events"),
+      dataSetManager.getPropagator()
+  );
 
 }
