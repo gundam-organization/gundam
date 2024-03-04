@@ -165,16 +165,16 @@ int main(int argc, char** argv){
 
     // Looking for parSet
     auto foundDialCollection = std::find_if(
-        propagator.getDialCollections().begin(), propagator.getDialCollections().end(),
+        propagator.getDialCollectionList().begin(), propagator.getDialCollectionList().end(),
         [&](const DialCollection& dialCollection_){
           auto* parSetPtr{dialCollection_.getSupervisedParameterSet()};
           if( parSetPtr == nullptr ){ return false; }
           return ( parSetPtr->getName() == associatedParSet );
         });
     LogThrowIf(
-        foundDialCollection == propagator.getDialCollections().end(),
+        foundDialCollection == propagator.getDialCollectionList().end(),
         "Could not find " << associatedParSet << " among fit dial collections: "
-                          << GenericToolbox::toString(propagator.getDialCollections(), [](const DialCollection& dialCollection_){
+                          << GenericToolbox::toString(propagator.getDialCollectionList(), [](const DialCollection& dialCollection_){
                                                                 return dialCollection_.getTitle();
                                                               }
                           ));
@@ -376,7 +376,7 @@ int main(int argc, char** argv){
         parSetNormList.emplace_back();
         parSetNormList.back().readConfig( parSetNormConfig );
 
-        for( auto& dialCollection : propagator.getDialCollections() ){
+        for( auto& dialCollection : propagator.getDialCollectionList() ){
           if( dialCollection.getSupervisedParameterSet() == &parSet ){
             parSetNormList.back().dialCollectionPtr = &dialCollection;
             break;

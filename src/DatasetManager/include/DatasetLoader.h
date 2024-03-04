@@ -10,6 +10,7 @@
 #include <SampleSet.h>
 #include "PlotGenerator.h"
 #include "JsonBaseClass.h"
+#include "Propagator.h"
 
 #include <TChain.h>
 #include "nlohmann/json.hpp"

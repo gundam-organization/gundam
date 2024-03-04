@@ -31,6 +31,8 @@ std::string DataDispenserParameters::getSummary() const{
 
 
 void DataDispenserCache::clear(){
+  propagatorPtr = nullptr;
+
   samplesToFillList.clear();
   sampleNbOfEvents.clear();
   eventIsInSamplesList.clear();

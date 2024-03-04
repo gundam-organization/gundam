@@ -25,8 +25,10 @@ else()
 endif()
 
 
-target_include_directories( GundamPropagator PUBLIC
-  ${CMAKE_CURRENT_SOURCE_DIR}/include)
+target_include_directories( GundamPropagator
+    PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+)
 
 if( WITH_CACHE_MANAGER )
   set(CACHE_MANAGER_LIBRARIES "GundamCache")
@@ -34,8 +36,8 @@ else()
   set(CACHE_MANAGER_LIBRARIES "")
 endif()
 
-target_link_libraries( GundamPropagator PUBLIC
-    GundamDatasetManager
+target_link_libraries( GundamPropagator
+    PUBLIC
     GundamDialDictionary
     ${CACHE_MANAGER_LIBRARIES}
 )

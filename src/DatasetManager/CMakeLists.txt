@@ -5,6 +5,7 @@
 set( LIB_NAME GundamDatasetManager )
 
 set( SRCFILES
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/DataSetManager.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/DatasetLoader.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/EventTreeWriter.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/DataDispenser.cpp
@@ -14,6 +15,7 @@ set( SRCFILES
     )
 
 set(HEADERS
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/DataSetManager.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/DatasetLoader.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/EventTreeWriter.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/DataDispenser.h
@@ -32,7 +34,8 @@ target_include_directories(${LIB_NAME} PUBLIC
   ${CMAKE_CURRENT_SOURCE_DIR}/include)
 
 target_link_libraries( ${LIB_NAME}
-    PUBLIC GundamParametersManager GundamSamplesManager GundamDialDictionary
+    PUBLIC
+    GundamPropagator
 )
 
 #set_target_properties(${LIB_NAME} PROPERTIES VERSION "${GUNDAM_VERSION_STRING}")

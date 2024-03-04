@@ -99,6 +99,22 @@ void SampleSet::clearMcContainers(){
   }
 }
 
+
+std::vector<std::string> SampleSet::fetchRequestedVariablesForStorage() const{
+  std::vector<std::string> out{_additionalVariablesForStorage_};
+  // other for storage?
+  return out;
+}
+std::vector<std::string> SampleSet::fetchRequestedVariablesForIndexing() const{
+  std::vector<std::string> out;
+  for (auto &sample: _sampleList_) {
+    for (auto &bin: sample.getBinning().getBinList()) {
+      for (auto &edges: bin.getEdgesList()) { GenericToolbox::addIfNotInVector(edges.varName, out); }
+    }
+  }
+  return out;
+}
+
 void SampleSet::updateSampleEventBinIndexes() const{
   GundamGlobals::getParallelWorker().runJob("FitSampleSet::updateSampleEventBinIndexes");
   LogDebugIf(_showTimeStats_) << __METHOD_NAME__ << " took: " << GundamGlobals::getParallelWorker().getLastJobTimer() << std::endl;

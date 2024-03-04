@@ -8,6 +8,7 @@
 #include "ParameterSet.h"
 #include "JointProbability.h"
 #include "Propagator.h"
+#include "DataSetManager.h"
 
 #include "GenericToolbox.Utils.h"
 #include "GenericToolbox.Time.h"
@@ -44,6 +45,8 @@ protected:
   void readConfigImpl() override;
   void initializeImpl() override;
 
+  void loadData();
+
 public:
   // const getters
   [[nodiscard]] int getNbParameters() const {return _nbParameters_; }
@@ -74,7 +77,13 @@ private:
   int _nbParameters_{0};
   int _nbSampleBins_{0};
 
+  /// Definition of data sets to use for filling the Propagator
+  DataSetManager _dataSetManager_{};
+
+  /// Propagator engine
   Propagator _propagator_{};
+
+  /// Statistical likelihood
   std::shared_ptr<JointProbability::JointProbabilityBase> _jointProbabilityPtr_{nullptr};
 
   mutable Buffer _buffer_{};

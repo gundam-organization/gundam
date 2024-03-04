@@ -7,7 +7,6 @@
 
 #include "EventVarTransform.h"
 #include "GundamGlobals.h"
-#include "DatasetLoader.h"
 #include "GenericToolbox.Json.h"
 #include "ConfigUtils.h"
 
@@ -71,32 +70,16 @@ void DataDispenser::initializeImpl(){
   LogWarning << "Initialized data dispenser: " << getTitle() << std::endl;
 }
 
-void DataDispenser::setSampleSetPtrToLoad(SampleSet *sampleSetPtrToLoad) {
-  _sampleSetPtrToLoad_ = sampleSetPtrToLoad;
-}
-void DataDispenser::setParSetPtrToLoad(std::vector<ParameterSet> *parSetListPtrToLoad_) {
-  _parSetListPtrToLoad_ = parSetListPtrToLoad_;
-}
-void DataDispenser::setDialCollectionListPtr(std::vector<DialCollection> *dialCollectionListPtr) {
-  _dialCollectionListPtr_ = dialCollectionListPtr;
-}
-void DataDispenser::setPlotGenPtr(PlotGenerator *plotGenPtr) {
-  _plotGenPtr_ = plotGenPtr;
-}
-void DataDispenser::setEventDialCache(EventDialCache* eventDialCache_) {
-  _eventDialCacheRef_ = eventDialCache_;
-}
-
-void DataDispenser::load(){
+void DataDispenser::load(Propagator& propagator_){
   LogWarning << "Loading dataset: " << getTitle() << std::endl;
   LogThrowIf(not this->isInitialized(), "Can't load while not initialized.");
-  LogThrowIf(_sampleSetPtrToLoad_==nullptr, "SampleSet not specified.");
 
   if(GundamGlobals::getVerboseLevel() >= VerboseLevel::MORE_PRINTOUT ){
     LogDebug << "Configuration: " << _parameters_.getSummary() << std::endl;
   }
 
   _cache_.clear();
+  _cache_.propagatorPtr = &propagator_;
 
   this->buildSampleToFillList();
 
@@ -122,6 +105,18 @@ void DataDispenser::load(){
   this->preAllocateMemory();
   this->readAndFill();
 
+  LogInfo << "Resizing dial containers..." << std::endl;
+  for( auto& dialCollection : _cache_.propagatorPtr->getDialCollectionList() ) {
+    if( not dialCollection.isBinned() ){ dialCollection.resizeContainers(); }
+  }
+
+  LogInfo << "Build reference cache..." << std::endl;
+  _cache_.propagatorPtr->getEventDialCache().shrinkIndexedCache();
+  _cache_.propagatorPtr->getEventDialCache().buildReferenceCache(
+      _cache_.propagatorPtr->getSampleSet(),
+      _cache_.propagatorPtr->getDialCollectionList()
+  );
+
   LogWarning << "Loaded " << getTitle() << std::endl;
 }
 std::string DataDispenser::getTitle(){
@@ -134,7 +129,7 @@ std::string DataDispenser::getTitle(){
 void DataDispenser::buildSampleToFillList(){
   LogWarning << "Fetching samples to fill..." << std::endl;
 
-  for( auto& sample : _sampleSetPtrToLoad_->getSampleList() ){
+  for( auto& sample : _cache_.propagatorPtr->getSampleSet().getSampleList() ){
     if( not sample.isEnabled() ) continue;
     if( sample.isDatasetValid(_owner_->getName()) ){
       _cache_.samplesToFillList.emplace_back(&sample);
@@ -150,8 +145,8 @@ void DataDispenser::parseStringParameters() {
 
   auto replaceToyIndexFct = [&](std::string& formula_){
     if( GenericToolbox::hasSubStr(formula_, "<I_TOY>") ){
-      LogThrowIf(_parameters_.iThrow==-1, "<I_TOY> not set.");
-      GenericToolbox::replaceSubstringInsideInputString(formula_, "<I_TOY>", std::to_string(_parameters_.iThrow));
+      LogThrowIf(_cache_.propagatorPtr->getIThrow()==-1, "<I_TOY> not set.");
+      GenericToolbox::replaceSubstringInsideInputString(formula_, "<I_TOY>", std::to_string(_cache_.propagatorPtr->getIThrow()));
     }
   };
   auto overrideLeavesNamesFct = [&](std::string& formula_){
@@ -282,9 +277,9 @@ void DataDispenser::doEventSelection(){
 void DataDispenser::fetchRequestedLeaves(){
   LogWarning << "Poll every objects for requested variables..." << std::endl;
 
-  if( _dialCollectionListPtr_ != nullptr ){
+  if( _parameters_.useMcContainer ){
     LogInfo << "Selecting dial collections..." << std::endl;
-    for( auto& dialCollection : *_dialCollectionListPtr_ ){
+    for( auto& dialCollection : _cache_.propagatorPtr->getDialCollectionList() ){
       if( not dialCollection.isEnabled() ){ continue; }
       if( not dialCollection.isDatasetValid( _owner_->getName() ) ){ continue; }
       _cache_.dialCollectionsRefList.emplace_back( &dialCollection );
@@ -312,55 +307,35 @@ void DataDispenser::fetchRequestedLeaves(){
     for( auto& var : indexRequests ){ _cache_.addVarRequestedForIndexing(var); }
   }
 
-  // sample binning
-  if( _sampleSetPtrToLoad_ != nullptr ){
-    std::vector<std::string> indexRequests;
-    for (auto &sample: _sampleSetPtrToLoad_->getSampleList()) {
-      for (auto &bin: sample.getBinning().getBinList()) {
-        for (auto &edges: bin.getEdgesList()) {
-          GenericToolbox::addIfNotInVector(edges.varName, indexRequests);
-        }
-      }
-    }
-    LogInfo << "Samples requests for indexing: " << GenericToolbox::toString(indexRequests) << std::endl;
-    for( auto& var : indexRequests ){ _cache_.addVarRequestedForIndexing(var); }
+  std::vector<std::string> varForStorageListBuffer{};
+
+  // sample binning -> indexing only
+  {
+    std::vector<std::string> varForIndexingListBuffer{};
+    varForIndexingListBuffer = _cache_.propagatorPtr->getSampleSet().fetchRequestedVariablesForIndexing();
+    LogInfo << "Samples variable request for indexing: " << GenericToolbox::toString(varForIndexingListBuffer) << std::endl;
+    for( auto &var: varForIndexingListBuffer ){ _cache_.addVarRequestedForIndexing(var); }
   }
 
-  // plotGen
-  if( _plotGenPtr_ != nullptr ){
-    std::vector<std::string> storeRequests;
-    for( auto& var : _plotGenPtr_->fetchListOfVarToPlot(not _parameters_.useMcContainer) ){
-      GenericToolbox::addIfNotInVector(var, storeRequests);
-    }
-
+  // plotGen -> for storage as we need those in prefit and postfit
+  {
+    std::vector<std::string> varForStorageListBuffer{};
+    varForStorageListBuffer = _cache_.propagatorPtr->getPlotGenerator().fetchListOfVarToPlot(not _parameters_.useMcContainer);
     if( _parameters_.useMcContainer ){
-      for( auto& var : _plotGenPtr_->fetchListOfSplitVarNames() ){
-        GenericToolbox::addIfNotInVector(var, storeRequests);
+      for( auto& var : _cache_.propagatorPtr->getPlotGenerator().fetchListOfSplitVarNames() ){
+        GenericToolbox::addIfNotInVector(var, varForStorageListBuffer);
       }
     }
-
-    LogInfo << "PlotGenerator requests for storage:" << GenericToolbox::toString(storeRequests) << std::endl;
-    for (auto &var: storeRequests) { _cache_.addVarRequestedForStorage(var); }
+    LogInfo << "PlotGenerator variable request for storage: " << GenericToolbox::toString(varForStorageListBuffer) << std::endl;
+    for( auto& var : varForStorageListBuffer ){ _cache_.addVarRequestedForStorage(var); }
   }
 
   // storage requested by user
   {
-    std::vector<std::string> storeRequests;
-    for (auto &additionalLeaf: _parameters_.additionalVarsStorage) {
-      GenericToolbox::addIfNotInVector(additionalLeaf, storeRequests);
-    }
-    LogInfo << "Dataset additional requests for storage:" << GenericToolbox::toString(storeRequests) << std::endl;
-    for (auto &var: storeRequests) { _cache_.addVarRequestedForStorage(var); }
-  }
-
-  // fit sample set storage requests
-  if( _sampleSetPtrToLoad_ != nullptr ){
-    std::vector<std::string> storeRequests;
-    for (auto &var: _sampleSetPtrToLoad_->getAdditionalVariablesForStorage()) {
-      GenericToolbox::addIfNotInVector(var, storeRequests);
-    }
-    LogInfo << "SampleSet additional request for storage:" << GenericToolbox::toString(storeRequests) << std::endl;
-    for (auto &var: storeRequests) { _cache_.addVarRequestedForStorage(var); }
+    std::vector<std::string> varForStorageListBuffer{};
+    varForStorageListBuffer = _parameters_.additionalVarsStorage;
+    LogInfo << "Additional var requests for storage:" << GenericToolbox::toString(varForStorageListBuffer) << std::endl;
+    for (auto &var: varForStorageListBuffer) { _cache_.addVarRequestedForStorage(var); }
   }
 
   // transforms inputs
@@ -480,8 +455,7 @@ void DataDispenser::preAllocateMemory(){
 
 
   size_t nEvents = treeChain.GetEntries();
-  if( _eventDialCacheRef_ != nullptr ){
-    // DEV
+  if( _parameters_.useMcContainer ){
     if( not _cache_.dialCollectionsRefList.empty() ){
       LogInfo << "Creating slots for event-by-event dials..." << std::endl;
       size_t nDialsMaxPerEvent{0};
@@ -509,11 +483,11 @@ void DataDispenser::preAllocateMemory(){
           LogThrow("DEV ERROR: not binned, not event-by-event?");
         }
       }
-      _eventDialCacheRef_->allocateCacheEntries(nEvents, nDialsMaxPerEvent);
+      _cache_.propagatorPtr->getEventDialCache().allocateCacheEntries(nEvents, nDialsMaxPerEvent);
     }
     else{
-      // all events should be referenced in the cache
-      _eventDialCacheRef_->allocateCacheEntries(nEvents, 0);
+      // all events should be referenced in the cache even with 0 dial
+      _cache_.propagatorPtr->getEventDialCache().allocateCacheEntries(nEvents, 0);
     }
   }
 }
@@ -1051,11 +1025,11 @@ void DataDispenser::fillFunction(int iThread_){
       EventDialCache::IndexedEntry_t* eventDialCacheEntry{nullptr};
       {
         std::unique_lock<std::mutex> lock(GundamGlobals::getThreadMutex());
-        if(_eventDialCacheRef_ != nullptr){
+        if( _parameters_.useMcContainer ){
 
           if( _parameters_.debugNbMaxEventsToLoad != 0 ){
             // check if the limit has been reached
-            if( _eventDialCacheRef_->getFillIndex() >= _parameters_.debugNbMaxEventsToLoad ){
+            if( _cache_.propagatorPtr->getEventDialCache().getFillIndex() >= _parameters_.debugNbMaxEventsToLoad ){
               LogAlertIf(iThread_==0) << std::endl << std::endl; // flush pBar
               LogAlertIf(iThread_==0) << "debugNbMaxEventsToLoad: Event number cap reached (";
               LogAlertIf(iThread_==0) << _parameters_.debugNbMaxEventsToLoad << ")" << std::endl;
@@ -1063,7 +1037,7 @@ void DataDispenser::fillFunction(int iThread_){
             }
           }
 
-          eventDialCacheEntry = _eventDialCacheRef_->fetchNextCacheEntry();
+          eventDialCacheEntry = _cache_.propagatorPtr->getEventDialCache().fetchNextCacheEntry();
         }
         sampleEventIndex = _cache_.sampleIndexOffsetList[iSample]++;
       }
