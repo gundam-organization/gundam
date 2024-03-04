@@ -45,8 +45,6 @@ protected:
   void readConfigImpl() override;
   void initializeImpl() override;
 
-  void loadData();
-
 public:
   // const getters
   [[nodiscard]] int getNbParameters() const {return _nbParameters_; }
@@ -54,12 +52,12 @@ public:
   [[nodiscard]] double getLastLikelihood() const { return _buffer_.totalLikelihood; }
   [[nodiscard]] double getLastStatLikelihood() const { return _buffer_.statLikelihood; }
   [[nodiscard]] double getLastPenaltyLikelihood() const { return _buffer_.penaltyLikelihood; }
-  [[nodiscard]] const Propagator& getPropagator() const { return _propagator_; }
+  [[nodiscard]] const DataSetManager& getDataSetManager() const { return _dataSetManager_; }
   const JointProbability::JointProbabilityBase* getJointProbabilityPtr() const { return _jointProbabilityPtr_.get(); }
 
   // mutable getters
   Buffer& getBuffer() { return _buffer_; }
-  Propagator& getPropagator(){ return _propagator_; }
+  DataSetManager& getDataSetManager(){ return _dataSetManager_; }
 
   // mutable core
   void propagateAndEvalLikelihood();
@@ -72,6 +70,10 @@ public:
   [[nodiscard]] double evalPenaltyLikelihood(const ParameterSet& parSet_) const;
   [[nodiscard]] std::string getSummary() const;
 
+  // dev deprecated
+  [[deprecated("use getDataSetManager().getPropagator()")]] [[nodiscard]] const Propagator& getPropagator() const { return _dataSetManager_.getPropagator(); }
+  [[deprecated("use getDataSetManager().getPropagator()")]] Propagator& getPropagator(){ return _dataSetManager_.getPropagator(); }
+
 private:
   // internals
   int _nbParameters_{0};
@@ -79,9 +81,6 @@ private:
 
   /// Definition of data sets to use for filling the Propagator
   DataSetManager _dataSetManager_{};
-
-  /// Propagator engine
-  Propagator _propagator_{};
 
   /// Statistical likelihood
   std::shared_ptr<JointProbability::JointProbabilityBase> _jointProbabilityPtr_{nullptr};

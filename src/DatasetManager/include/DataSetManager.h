@@ -6,6 +6,8 @@
 #define GUNDAM_DATASET_MANAGER_H
 
 #include "DatasetDefinition.h"
+#include "EventTreeWriter.h"
+#include "Propagator.h"
 #include "JsonBaseClass.h"
 
 
@@ -19,15 +21,21 @@ public:
   DataSetManager() = default;
 
   // const-getters
+  [[nodiscard]] const Propagator& getPropagator() const{ return _propagator_; }
   [[nodiscard]] const EventTreeWriter& getTreeWriter() const{ return _treeWriter_; }
   [[nodiscard]] const std::vector<DatasetDefinition>& getDataSetList() const{ return _dataSetList_; }
 
   // mutable-getters
+  Propagator& getPropagator(){ return _propagator_; }
   EventTreeWriter& getTreeWriter(){ return _treeWriter_; }
   std::vector<DatasetDefinition>& getDataSetList(){ return _dataSetList_; }
 
+protected:
+  void loadData();
+
 private:
   // internals
+  Propagator _propagator_{};
   EventTreeWriter _treeWriter_{};
   std::vector<DatasetDefinition> _dataSetList_{};
 

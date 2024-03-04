@@ -99,12 +99,6 @@ void SampleSet::clearMcContainers(){
   }
 }
 
-
-std::vector<std::string> SampleSet::fetchRequestedVariablesForStorage() const{
-  std::vector<std::string> out{_additionalVariablesForStorage_};
-  // other for storage?
-  return out;
-}
 std::vector<std::string> SampleSet::fetchRequestedVariablesForIndexing() const{
   std::vector<std::string> out;
   for (auto &sample: _sampleList_) {

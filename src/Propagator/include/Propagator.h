@@ -7,10 +7,8 @@
 
 
 #include "ParametersManager.h"
-#include "EventTreeWriter.h"
 #include "DialCollection.h"
 #include "EventDialCache.h"
-#include "DatasetDefinition.h"
 #include "PlotGenerator.h"
 #include "JsonBaseClass.h"
 #include "SampleSet.h"
@@ -41,6 +39,9 @@ public:
 
   // Const getters
   [[nodiscard]] bool isThrowAsimovToyParameters() const { return _throwAsimovToyParameters_; }
+  [[nodiscard]] bool isEnableStatThrowInToys() const { return _enableStatThrowInToys_; }
+  [[nodiscard]] bool isEnableEventMcThrow() const { return _enableEventMcThrow_; }
+  [[nodiscard]] bool isGaussStatThrowInToys() const { return _gaussStatThrowInToys_; }
   [[nodiscard]] bool isLoadAsimovData() const { return _loadAsimovData_; }
   [[nodiscard]] bool isShowEventBreakdown() const { return _showEventBreakdown_; }
   [[nodiscard]] bool isDebugPrintLoadedEvents() const { return _debugPrintLoadedEvents_; }

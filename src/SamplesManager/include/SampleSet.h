@@ -38,7 +38,6 @@ public:
 
   // core
   [[nodiscard]] bool empty() const{ return _sampleList_.empty(); }
-  [[nodiscard]] std::vector<std::string> fetchRequestedVariablesForStorage() const;
   [[nodiscard]] std::vector<std::string> fetchRequestedVariablesForIndexing() const;
 
   // parallel

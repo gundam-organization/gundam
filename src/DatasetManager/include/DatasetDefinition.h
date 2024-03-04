@@ -2,8 +2,8 @@
 // Created by Nadrino on 22/07/2021.
 //
 
-#ifndef GUNDAM_DATASETDEFINITION_H
-#define GUNDAM_DATASETDEFINITION_H
+#ifndef GUNDAM_DATASET_DEFINITION_H
+#define GUNDAM_DATASET_DEFINITION_H
 
 #include "DataDispenser.h"
 #include "ParameterSet.h"
@@ -68,4 +68,4 @@ private:
 };
 
 
-#endif //GUNDAM_DATASETDEFINITION_H
+#endif //GUNDAM_DATASET_DEFINITION_H

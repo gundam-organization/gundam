@@ -4,6 +4,7 @@
 
 
 #include "DataDispenser.h"
+#include "DatasetDefinition.h"
 
 #include "EventVarTransform.h"
 #include "GundamGlobals.h"
