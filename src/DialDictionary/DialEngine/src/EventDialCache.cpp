@@ -10,8 +10,6 @@ LoggerInit([]{
   Logger::setUserHeaderStr("[EventDialCache]");
 });
 
-double EventDialCache::globalEventReweightCap{std::nan("unset")};
-
 void EventDialCache::buildReferenceCache(SampleSet& sampleSet_, std::vector<DialCollection>& dialCollectionList_){
   LogInfo << "Building event dial cache..." << std::endl;
 
@@ -139,25 +137,25 @@ EventDialCache::IndexedEntry_t* EventDialCache::fetchNextCacheEntry(){
 
 
 void EventDialCache::reweightEntry(EventDialCache::CacheElem_t& entry_){
+  // storing the reweight factor in a temporary buffer
+  // this allows to perform capping of the value
   double tempReweight{1};
 
   // calculate the dial responses
-  std::for_each(entry_.dials.begin(), entry_.dials.end(), [&](DialsElem_t& dial_){
-    if( dial_.interface->getInputBufferRef()->isMasked() ){ return ; }
-
+  for( auto& dial : entry_.dials ){
     // evaluate the dial if the cache is empty or an update has been requested
-    if( std::isnan(dial_.response) or dial_.interface->getInputBufferRef()->isDialUpdateRequested() ){
-      dial_.response = dial_.interface->evalResponse();
+    if( dial.interface->getInputBufferRef()->isDialUpdateRequested() ){
+      dial.response = dial.interface->evalResponse();
     }
 
     // multiply the weight in the temp buffer
-    tempReweight *= dial_.response;
-  });
+    tempReweight *= dial.response;
+  }
 
   // applying event weight cap if defined
-  if( not std::isnan(EventDialCache::globalEventReweightCap) ){
-    if( tempReweight > EventDialCache::globalEventReweightCap ){
-      tempReweight = EventDialCache::globalEventReweightCap;
+  if( _globalEventReweightCap_.isEnabled ){
+    if( tempReweight > _globalEventReweightCap_.maxReweight ){
+      tempReweight = _globalEventReweightCap_.maxReweight;
     }
   }
 

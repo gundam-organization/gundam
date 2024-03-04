@@ -22,7 +22,10 @@
 class EventDialCache {
 
 public:
-  static double globalEventReweightCap;
+  struct GlobalEventReweightCap{
+    bool isEnabled{false};
+    double maxReweight{std::nan("unset")};
+  };
 
 public:
   EventDialCache() = default;
@@ -41,7 +44,7 @@ public:
     PhysicsEvent* event;
     std::vector<DialsElem_t> dials;
 
-    std::string getSummary() const {
+    [[nodiscard]] std::string getSummary() const {
       std::stringstream ss;
       ss << event->getSummary() << std::endl;
       ss << "dialCache = {";
@@ -100,6 +103,8 @@ public:
   std::vector<CacheElem_t> &getCache(){ return _cache_; }
   [[nodiscard]] const std::vector<CacheElem_t> &getCache() const{ return _cache_; }
 
+  GlobalEventReweightCap& getGlobalEventReweightCap(){ return _globalEventReweightCap_; }
+
   /// Allocate entries for events in the indexed cache.  The first parameter
   /// arethe number of events to allocate space for, and the second number is
   /// the total number of dials that might exist for each event.
@@ -120,7 +125,7 @@ public:
   /// Resize the cache vectors to remove entries with null events
   void shrinkIndexedCache();
 
-  static void reweightEntry(CacheElem_t& entry_);
+  void reweightEntry(CacheElem_t& entry_);
 
 
 private:
@@ -139,7 +144,10 @@ private:
 
   /// A cache of all of the valid PhysicsEvent* and DialInterface*
   /// associations for efficient use when reweighting the MC events.
-  std::vector<CacheElem_t> _cache_;
+  std::vector<CacheElem_t> _cache_{};
+
+  /// Global cap
+  GlobalEventReweightCap _globalEventReweightCap_{};
 };
 
 

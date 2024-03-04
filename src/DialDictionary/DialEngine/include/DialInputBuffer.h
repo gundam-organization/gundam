@@ -13,6 +13,13 @@
 
 class DialInputBuffer {
 
+  /// DialInputBuffer is in charge of keeping the "input" parameter values
+  /// for the evaluation of a collection of dials.
+
+  /// The buffer is updated in single thread before the evaluation of
+  /// individual dials is done. This means DialInputBuffer is only meant
+  /// to handle Parameters. Not Event variables.
+
 public:
   /// definition of data structs
   struct ParameterReference{

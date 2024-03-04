@@ -379,7 +379,7 @@ bool Cache::Manager::Update(SampleSet& sampleList,
             DialInputBuffer* dialInputs = dialInterface->getInputBufferRef();
 
             // Check if this dial is used at all.
-            if (dialInputs->isMasked()) continue;
+            if (dialInputs->isMasked()){ continue; }
 
             // Make sure all of the used parameters are in the parameter
             // map.
