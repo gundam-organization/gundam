@@ -21,7 +21,7 @@ void LikelihoodInterface::readConfigImpl(){
 
   // First taking care of the DataSetManager
   JsonType dataSetManagerConfig{};
-  GenericToolbox::Json::deprecatedAction(_dataSetManager_.getPropagator().getSampleSet().getConfig(), "dataSetList", [&]{
+  GenericToolbox::Json::deprecatedAction(_dataSetManager_.getPropagator().getConfig(), {{"fitSampleSetConfig"}, {"dataSetList"}}, [&]{
     LogAlert << R"("dataSetList" should now be set under "likelihoodInterfaceConfig" instead of "fitSampleSet".)" << std::endl;
     dataSetManagerConfig = _dataSetManager_.getPropagator().getSampleSet().getConfig(); // DataSetManager will look for "dataSetList"
   });

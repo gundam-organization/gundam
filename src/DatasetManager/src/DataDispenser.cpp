@@ -74,6 +74,7 @@ void DataDispenser::initializeImpl(){
 void DataDispenser::load(Propagator& propagator_){
   LogWarning << "Loading dataset: " << getTitle() << std::endl;
   LogThrowIf(not this->isInitialized(), "Can't load while not initialized.");
+  LogThrowIf(not propagator_.isInitialized(), "Can't load while propagator_ is not initialized.");
 
   if(GundamGlobals::getVerboseLevel() >= VerboseLevel::MORE_PRINTOUT ){
     LogDebug << "Configuration: " << _parameters_.getSummary() << std::endl;

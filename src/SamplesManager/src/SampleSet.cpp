@@ -26,6 +26,7 @@ void SampleSet::readConfigImpl(){
   _showTimeStats_ = GenericToolbox::Json::fetchValue(_config_, "showTimeStats", _showTimeStats_);
 
   LogInfo << "Reading samples definition..." << std::endl;
+  _sampleList_.clear(); // make sure we start from scratch in case readConfig is called twice
   auto fitSampleListConfig = GenericToolbox::Json::fetchValue(_config_, "fitSampleList", JsonType());
   for( const auto& fitSampleConfig: fitSampleListConfig ){
     if( not GenericToolbox::Json::fetchValue(fitSampleConfig, "isEnabled", true) ) continue;

@@ -70,9 +70,9 @@ void Propagator::readConfigImpl(){
 
 
   LogInfo << "Reading samples configuration..." << std::endl;
-  auto fitSampleSetConfig = GenericToolbox::Json::fetchValue(_config_, "fitSampleSetConfig", JsonType());
-  _fitSampleSet_.setConfig(fitSampleSetConfig);
-  _fitSampleSet_.readConfig();
+  auto fitSampleSetConfig = GenericToolbox::Json::fetchValue(_config_, {{"sampleSetConfig"}, {"fitSampleSetConfig"}}, JsonType());
+  _sampleSet_.setConfig(fitSampleSetConfig);
+  _sampleSet_.readConfig();
 
   LogInfo << "Reading PlotGenerator configuration..." << std::endl;
   auto plotGeneratorConfig = ConfigUtils::getForwardedConfig(GenericToolbox::Json::fetchValue(_config_, "plotGeneratorConfig", JsonType()));
@@ -80,6 +80,7 @@ void Propagator::readConfigImpl(){
   _plotGenerator_.readConfig();
 
   LogInfo << "Reading DialCollection configurations..." << std::endl;
+  _dialCollectionList_.clear(); // make sure it's empty in case readConfig() is called more than once
   for(size_t iParSet = 0 ; iParSet < _parManager_.getParameterSetsList().size() ; iParSet++ ){
     if( not _parManager_.getParameterSetsList()[iParSet].isEnabled() ) continue;
     // DEV / DialCollections
@@ -122,7 +123,7 @@ void Propagator::initializeImpl(){
   _parManager_.initialize();
 
   LogInfo << std::endl << GenericToolbox::addUpDownBars("Initializing samples...") << std::endl;
-  _fitSampleSet_.initialize();
+  _sampleSet_.initialize();
 
   LogInfo << std::endl << GenericToolbox::addUpDownBars("Initializing dials...") << std::endl;
   for( auto& dialCollection : _dialCollectionList_ ){ dialCollection.initialize(); }
@@ -195,7 +196,7 @@ std::string Propagator::getSampleBreakdownTableStr() const{
   t << "MC (weighted)" << GenericToolbox::TablePrinter::NextColumn;
   t << "Data (weighted)" << GenericToolbox::TablePrinter::NextLine;
 
-  for( auto& sample : _fitSampleSet_.getSampleList() ){
+  for( auto& sample : _sampleSet_.getSampleList() ){
     t << "\"" << sample.getName() << "\"" << GenericToolbox::TablePrinter::NextColumn;
     t << sample.getMcContainer().getNbBinnedEvents() << GenericToolbox::TablePrinter::NextColumn;
     t << sample.getDataContainer().getNbBinnedEvents() << GenericToolbox::TablePrinter::NextColumn;
@@ -247,13 +248,13 @@ void Propagator::reweightMcEvents(int iThread_) {
 
 }
 void Propagator::refillSampleHistogramsFct(int iThread_){
-  for( auto& sample : _fitSampleSet_.getSampleList() ){
+  for( auto& sample : _sampleSet_.getSampleList() ){
     sample.getMcContainer().refillHistogram(iThread_);
     sample.getDataContainer().refillHistogram(iThread_);
   }
 }
 void Propagator::refillSampleHistogramsPostParallelFct(){
-  for( auto& sample : _fitSampleSet_.getSampleList() ){
+  for( auto& sample : _sampleSet_.getSampleList() ){
     sample.getMcContainer().rescaleHistogram();
     sample.getDataContainer().rescaleHistogram();
   }

@@ -43,6 +43,7 @@ void DataSetManager::readConfigImpl(){
 void DataSetManager::initializeImpl(){
   LogInfo << "Initializing DataSetManager..." << std::endl;
 
+  _propagator_.initialize();
   for( auto& dataSet : _dataSetList_ ){ dataSet.initialize(); }
   _treeWriter_.initialize();
 
