@@ -10,7 +10,7 @@
 #include "EventTreeWriter.h"
 #include "DialCollection.h"
 #include "EventDialCache.h"
-#include "DatasetLoader.h"
+#include "DatasetDefinition.h"
 #include "PlotGenerator.h"
 #include "JsonBaseClass.h"
 #include "SampleSet.h"

@@ -5,7 +5,7 @@
 #ifndef GUNDAM_DATASET_MANAGER_H
 #define GUNDAM_DATASET_MANAGER_H
 
-#include "DatasetLoader.h"
+#include "DatasetDefinition.h"
 #include "JsonBaseClass.h"
 
 
@@ -20,16 +20,16 @@ public:
 
   // const-getters
   [[nodiscard]] const EventTreeWriter& getTreeWriter() const{ return _treeWriter_; }
-  [[nodiscard]] const std::vector<DatasetLoader>& getDataSetList() const{ return _dataSetList_; }
+  [[nodiscard]] const std::vector<DatasetDefinition>& getDataSetList() const{ return _dataSetList_; }
 
   // mutable-getters
   EventTreeWriter& getTreeWriter(){ return _treeWriter_; }
-  std::vector<DatasetLoader>& getDataSetList(){ return _dataSetList_; }
+  std::vector<DatasetDefinition>& getDataSetList(){ return _dataSetList_; }
 
 private:
   // internals
   EventTreeWriter _treeWriter_{};
-  std::vector<DatasetLoader> _dataSetList_{};
+  std::vector<DatasetDefinition> _dataSetList_{};
 
 };
 

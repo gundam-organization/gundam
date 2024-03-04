@@ -19,7 +19,7 @@
 #include <vector>
 
 
-class DatasetLoader; // owner
+class DatasetDefinition; // owner
 
 
 class DataDispenser : public JsonBaseClass {
@@ -30,10 +30,10 @@ protected:
 
 public:
   DataDispenser() = delete; // owner should be set
-  explicit DataDispenser(DatasetLoader* owner_): _owner_(owner_) {}
+  explicit DataDispenser( DatasetDefinition* owner_): _owner_(owner_) {}
 
   // setters
-  void setOwner(DatasetLoader* owner_){ _owner_ = owner_; }
+  void setOwner( DatasetDefinition* owner_){ _owner_ = owner_; }
 
   // const getters
   [[nodiscard]] const DataDispenserParameters &getParameters() const{ return _parameters_; }
@@ -69,7 +69,7 @@ private:
   DataDispenserParameters _parameters_;
 
   // internals
-  DatasetLoader* _owner_{nullptr};
+  DatasetDefinition* _owner_{nullptr};
   DataDispenserCache _cache_;
 
 };

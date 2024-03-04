@@ -2,8 +2,8 @@
 // Created by Nadrino on 22/07/2021.
 //
 
-#ifndef GUNDAM_DATASETLOADER_H
-#define GUNDAM_DATASETLOADER_H
+#ifndef GUNDAM_DATASETDEFINITION_H
+#define GUNDAM_DATASETDEFINITION_H
 
 #include "DataDispenser.h"
 #include "ParameterSet.h"
@@ -19,14 +19,14 @@
 #include <string>
 
 
-class DatasetLoader : public JsonBaseClass {
+class DatasetDefinition : public JsonBaseClass {
 
 protected:
   void readConfigImpl() override;
   void initializeImpl() override;
 
 public:
-  explicit DatasetLoader(const JsonType& config_, int datasetIndex_): _dataSetIndex_(datasetIndex_) { this->readConfig(config_); }
+  explicit DatasetDefinition( const JsonType& config_, int datasetIndex_): _dataSetIndex_(datasetIndex_) { this->readConfig(config_); }
 
   void setDataSetIndex(int dataSetIndex){ _dataSetIndex_ = dataSetIndex; }
   void setSelectedDataEntry(const std::string &selectedDataEntry){ _selectedDataEntry_ = selectedDataEntry; }
@@ -68,4 +68,4 @@ private:
 };
 
 
-#endif //GUNDAM_DATASETLOADER_H
+#endif //GUNDAM_DATASETDEFINITION_H

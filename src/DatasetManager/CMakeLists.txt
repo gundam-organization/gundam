@@ -16,7 +16,7 @@ set( SRCFILES
 
 set(HEADERS
     ${CMAKE_CURRENT_SOURCE_DIR}/include/DataSetManager.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/include/DatasetLoader.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/DatasetDefinition.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/EventTreeWriter.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/DataDispenser.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/DataDispenserUtils.h
