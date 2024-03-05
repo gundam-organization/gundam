@@ -16,8 +16,6 @@ void EventDialCache::buildReferenceCache( SampleSet& sampleSet_, std::vector<Dia
   LogInfo << "Indexed cache size: " << _indexedCache_.size() << std::endl;
   LogInfo << "Sorting events in sync with indexed cache..." << std::endl;
 
-  LogDebug << GET_VAR_NAME_VALUE(_fillIndex_) << std::endl;
-
   size_t nCacheSlots{0};
   std::vector<std::vector<IndexedCacheEntry>> sampleIndexCacheList{sampleSet_.getSampleList().size()};
 
