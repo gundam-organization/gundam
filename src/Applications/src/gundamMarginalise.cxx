@@ -418,9 +418,7 @@ int main(int argc, char** argv){
 //            << par.getMaxMirror() <<" --- marg? "<<par.isMarginalised() << std::endl;
 
     // print marg_param_list for debug
-    LogInfo<<"\n\n";
-    marg_param_list->Print();
-    LogInfo<<"\n\n";
+    LogInfo<<"Number of parameter in marg_param_list: "<<marg_param_list->GetEntries()<<std::endl;
 
     // initializing variables for "parametersInject" mode
     double LLH_sum{0};// needed when injecting parameters manually
