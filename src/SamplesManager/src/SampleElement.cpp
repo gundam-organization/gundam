@@ -13,9 +13,6 @@
 LoggerInit([]{ Logger::setUserHeaderStr("[SampleElement]"); });
 
 void SampleElement::reserveEventMemory(size_t dataSetIndex_, size_t nEvents, const PhysicsEvent &eventBuffer_) {
-  LogScopeIndent;
-  LogThrowIf(_isLocked_, "Can't " << __METHOD_NAME__ << " while locked");
-
   // adding one dataset:
   _loadedDatasetList_.emplace_back();
 
@@ -25,14 +22,14 @@ void SampleElement::reserveEventMemory(size_t dataSetIndex_, size_t nEvents, con
   datasetProperties.eventOffSet = _eventList_.size();
   datasetProperties.eventNb = nEvents;
 
+  LogScopeIndent;
   LogInfo << _name_ << ": creating " << nEvents << " events ("
           << GenericToolbox::parseSizeUnits( double(nEvents) * sizeof(eventBuffer_) )
           << ")" << std::endl;
+
   _eventList_.resize(datasetProperties.eventOffSet + datasetProperties.eventNb, eventBuffer_);
 }
 void SampleElement::shrinkEventList(size_t newTotalSize_){
-  LogScopeIndent;
-  LogThrowIf(_isLocked_, "Can't " << __METHOD_NAME__ << " while locked");
 
   if( _loadedDatasetList_.empty() and newTotalSize_ == 0 ){
     LogAlert << "Empty dataset list. Nothing to shrink." << std::endl;
@@ -46,6 +43,7 @@ void SampleElement::shrinkEventList(size_t newTotalSize_){
   LogThrowIf(not _loadedDatasetList_.empty() and _loadedDatasetList_.back().eventNb < (_eventList_.size() - newTotalSize_),
               "Can't shrink since eventList of the last dataSet is too small.");
 
+  LogScopeIndent;
   LogInfo << _name_ << ": shrinking event list from " << _eventList_.size() << " to " << newTotalSize_ << "..."
           << "(+" << GenericToolbox::parseSizeUnits(double(_eventList_.size() - newTotalSize_) * sizeof(_eventList_.back()) ) << ")" << std::endl;
 
@@ -54,7 +52,6 @@ void SampleElement::shrinkEventList(size_t newTotalSize_){
   _eventList_.shrink_to_fit();
 }
 void SampleElement::updateEventBinIndexes(int iThread_){
-  if( _isLocked_ ) return;
 
   int nThreads{GundamGlobals::getParallelWorker().getNbThreads()};
   if( iThread_ == -1 ){ iThread_ = 0; nThreads = 1; }
@@ -79,8 +76,6 @@ void SampleElement::updateEventBinIndexes(int iThread_){
   }
 }
 void SampleElement::updateBinEventList(int iThread_) {
-  if( _isLocked_ ) return;
-
   int nbThreads = GundamGlobals::getParallelWorker().getNbThreads();
   if( iThread_ == -1 ){ iThread_ = 0; nbThreads = 1; }
   if( iThread_ == 0 ){ LogScopeIndent; LogInfo << "Filling bin event cache for \"" << _name_ << "\"..." << std::endl; }
@@ -99,8 +94,6 @@ void SampleElement::updateBinEventList(int iThread_) {
   }
 }
 void SampleElement::refillHistogram(int iThread_){
-  if( _isLocked_ ) return;
-
   int nbThreads = GundamGlobals::getParallelWorker().getNbThreads();
   if( iThread_ == -1 ){ nbThreads = 1; iThread_ = 0; }
 

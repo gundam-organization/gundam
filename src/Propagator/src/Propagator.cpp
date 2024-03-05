@@ -147,7 +147,7 @@ void Propagator::propagateParameters(){
 
   this->resetReweight();
   this->reweightMcEvents();
-  this->refillSampleHistograms();
+  this->refillMcHistograms();
 
 }
 void Propagator::resetReweight(){
@@ -172,11 +172,11 @@ void Propagator::reweightMcEvents() {
 
   reweightTimer.stop();
 }
-void Propagator::refillSampleHistograms(){
+void Propagator::refillMcHistograms(){
   refillHistogramTimer.start();
 
-  if( not _devSingleThreadHistFill_ ){ GundamGlobals::getParallelWorker().runJob("Propagator::refillSampleHistograms"); }
-  else{ refillSampleHistogramsFct(-1); }
+  if( not _devSingleThreadHistFill_ ){ GundamGlobals::getParallelWorker().runJob("Propagator::refillMcHistograms"); }
+  else{ refillMcHistogramsFct(-1); }
 
   refillHistogramTimer.stop();
 }
@@ -213,8 +213,8 @@ void Propagator::initializeThreads() {
   );
 
   GundamGlobals::getParallelWorker().addJob(
-      "Propagator::refillSampleHistograms",
-      [this](int iThread){ this->refillSampleHistogramsFct(iThread); }
+      "Propagator::refillMcHistograms",
+      [this](int iThread){ this->refillMcHistogramsFct(iThread); }
   );
 
 }
@@ -237,10 +237,9 @@ void Propagator::reweightMcEvents(int iThread_) {
   );
 
 }
-void Propagator::refillSampleHistogramsFct(int iThread_){
+void Propagator::refillMcHistogramsFct( int iThread_){
   for( auto& sample : _sampleSet_.getSampleList() ){
     sample.getMcContainer().refillHistogram(iThread_);
-    sample.getDataContainer().refillHistogram(iThread_);
   }
 }
 

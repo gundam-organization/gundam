@@ -40,11 +40,6 @@ public:
   [[nodiscard]] bool empty() const{ return _sampleList_.empty(); }
   [[nodiscard]] std::vector<std::string> fetchRequestedVariablesForIndexing() const;
 
-  // parallel
-  void updateSampleEventBinIndexes() const;
-  void updateSampleBinEventList() const;
-  void updateSampleHistograms() const;
-
   // deprecated
   [[deprecated("use getSampleList()")]] std::vector<Sample> &getFitSampleList(){ return getSampleList(); }
   [[deprecated("use getSampleList()")]] [[nodiscard]] const std::vector<Sample> &getFitSampleList() const { return getSampleList(); }

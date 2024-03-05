@@ -24,23 +24,29 @@ public:
     size_t eventNb{0};
   };
 
+  struct Histogram{
+    struct Bin{
+      double content{0};
+      double error{0};
+      DataBin* dataBinPtr{nullptr};
+      std::vector<PhysicsEvent*> eventPtrList{};
+    };
+    std::vector<Bin> binList{};
+  };
+
 public:
   SampleElement() = default;
 
   // setters
-  void setIsLocked(bool isLocked_){ _isLocked_ = isLocked_; }
   void setName(const std::string& name_){ _name_ = name_; }
   void setBinning(const DataBinSet& binning_){ _binning_ = binning_; }
 
   // const-getters
-  [[nodiscard]] bool isLocked() const{ return _isLocked_; }
   [[nodiscard]] const std::string& getName() const{ return _name_; }
   [[nodiscard]] const DataBinSet& getBinning() const{ return _binning_; }
   [[nodiscard]] const TH1D* getHistogram() const{ return _histogram_.get(); }
   [[nodiscard]] const TH1D* getHistogramNominal() const{ return _histogramNominal_.get(); }
   [[nodiscard]] const std::vector<PhysicsEvent> &getEventList() const{ return _eventList_; }
-  [[nodiscard]] const std::vector<std::vector<PhysicsEvent *>> &getPerBinEventPtrList() const{ return _perBinEventPtrList_; }
-  [[nodiscard]] const std::vector<DatasetProperties> &getLoadedDatasetList() const{ return _loadedDatasetList_; }
 
   // mutable-getters
   TH1D* getHistogram(){ return _histogram_.get(); }
@@ -71,14 +77,16 @@ public:
   friend std::ostream& operator <<( std::ostream& o, const SampleElement& this_ );
 
 private:
-  bool _isLocked_{false};
   std::string _name_{};
+  Histogram _myhistogram_{};
+  std::vector<PhysicsEvent> _eventList_{};
+  std::vector<DatasetProperties> _loadedDatasetList_{};
+
+  // TODO: to get rid of these
   DataBinSet _binning_{};
   std::shared_ptr<TH1D> _histogram_{nullptr};
   std::shared_ptr<TH1D> _histogramNominal_{nullptr};
   std::vector<std::vector<PhysicsEvent*>> _perBinEventPtrList_{};
-  std::vector<PhysicsEvent> _eventList_{};
-  std::vector<DatasetProperties> _loadedDatasetList_{};
 
 #ifdef GUNDAM_USING_CACHE_MANAGER
 public:

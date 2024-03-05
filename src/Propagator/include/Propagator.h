@@ -63,7 +63,7 @@ public:
   void propagateParameters();
   void resetReweight();
   void reweightMcEvents();
-  void refillSampleHistograms();
+  void refillMcHistograms();
 
   // Misc
   [[nodiscard]] std::string getSampleBreakdownTableStr() const;
@@ -77,7 +77,7 @@ protected:
 
   // multithreading
   void reweightMcEvents(int iThread_);
-  void refillSampleHistogramsFct(int iThread_);
+  void refillMcHistogramsFct( int iThread_);
 
 private:
   // Parameters

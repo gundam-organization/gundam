@@ -208,10 +208,21 @@ void DataSetManager::loadData(){
   }
 
   LogInfo << "Filling up sample bin caches..." << std::endl;
-  _propagator_.getSampleSet().updateSampleBinEventList();
+  GundamGlobals::getParallelWorker().runJob([this](int iThread){
+    LogInfoIf(iThread <= 0) << "Updating sample per bin event lists..." << std::endl;
+    for( auto& sample : _propagator_.getSampleSet().getSampleList() ){
+      sample.getMcContainer().updateBinEventList(iThread);
+      sample.getDataContainer().updateBinEventList(iThread);
+    }
+  });
 
   LogInfo << "Filling up sample histograms..." << std::endl;
-  _propagator_.getSampleSet().updateSampleHistograms();
+  GundamGlobals::getParallelWorker().runJob([this](int iThread){
+    for( auto& sample : _propagator_.getSampleSet().getSampleList() ){
+      sample.getMcContainer().refillHistogram(iThread);
+      sample.getDataContainer().refillHistogram(iThread);
+    }
+  });
 
   // Throwing stat error on data -> BINNING SHOULD BE SET!!
   if( _propagator_.isThrowAsimovToyParameters() and _propagator_.isEnableStatThrowInToys() ){
@@ -236,12 +247,6 @@ void DataSetManager::loadData(){
       // Asimov bin content -> toy data
       sample.getDataContainer().throwStatError( _propagator_.isGaussStatThrowInToys() );
     }
-  }
-
-  LogInfo << "Locking data event containers..." << std::endl;
-  for( auto& sample : _propagator_.getSampleSet().getSampleList() ){
-    // Now the data won't be refilled each time
-    sample.getDataContainer().setIsLocked( true );
   }
 
   if( not _propagator_.getParameterInjectorMc().empty() ){
