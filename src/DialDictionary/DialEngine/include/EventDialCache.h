@@ -86,6 +86,15 @@ public:
     /// The index of the actual dial interface in the dial collection being
     /// associated with the event.
     std::size_t interfaceIndex {std::size_t(-1)};
+
+    [[nodiscard]] std::string getSummary() const{
+      std::stringstream ss;
+      ss << "collection: " << collectionIndex << ", interface: " << interfaceIndex;
+      return ss.str();
+    }
+    friend std::ostream& operator <<( std::ostream& o, const DialIndexEntry_t& this_ ){
+      o << this_.getSummary(); return o;
+    }
   };
 
   /// A pair of indices into the the vector of Samples in the SampleSet
@@ -100,6 +109,15 @@ public:
     /// in the SampleElement eveltList vector for the SampleElement returned
     /// by Sample::getMcContainer()
     std::size_t eventIndex {std::size_t(-1)};
+
+    [[nodiscard]] std::string getSummary() const{
+      std::stringstream ss;
+      ss << "sample: " << sampleIndex << ", idx: " << eventIndex;
+      return ss.str();
+    }
+    friend std::ostream& operator <<( std::ostream& o, const EventIndexEntry_t& this_ ){
+      o << this_.getSummary(); return o;
+    }
   };
 
   /// A mapping between the event (in the SampleSet, and the dial (in the
@@ -109,6 +127,13 @@ public:
   struct IndexedEntry_t{
     EventIndexEntry_t event;
     std::vector<DialIndexEntry_t> dials;
+
+    [[nodiscard]] std::string getSummary() const{
+      std::stringstream ss;
+      ss << "Event{" << event << "}";
+      ss << " -> Dials" << GenericToolbox::toString(dials);
+      return ss.str();
+    }
   };
 
   // returns the current index

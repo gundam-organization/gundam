@@ -16,6 +16,8 @@ void EventDialCache::buildReferenceCache(SampleSet& sampleSet_, std::vector<Dial
   LogInfo << "Indexed cache size: " << _indexedCache_.size() << std::endl;
   LogInfo << "Sorting events in sync with indexed cache..." << std::endl;
 
+  LogDebug << _indexedCache_[0] << std::endl;
+
   size_t nCacheSlots{0};
   std::vector<std::vector<IndexedEntry_t>> sampleIndexCacheList{sampleSet_.getSampleList().size()};
 
@@ -34,6 +36,8 @@ void EventDialCache::buildReferenceCache(SampleSet& sampleSet_, std::vector<Dial
         sampleIndexCacheList[entry.event.sampleIndex].back().dials.emplace_back(dial);
       }
     }
+
+    LogInfo << "Cleaning up the index cache..." << std::endl;
     _indexedCache_.clear();
 
     LogInfo << "Performing per sample sorting..." << std::endl;
