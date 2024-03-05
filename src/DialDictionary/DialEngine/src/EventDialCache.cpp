@@ -121,7 +121,7 @@ void EventDialCache::shrinkIndexedCache(){
 EventDialCache::IndexedCacheEntry* EventDialCache::fetchNextCacheEntry(){
   // Warning warning Will Robinson!
   // This only works IFF the indexed cache is not resized.
-  return &_indexedCache_.at(_fillIndex_++);
+  return &_indexedCache_[_fillIndex_++];
 }
 
 
