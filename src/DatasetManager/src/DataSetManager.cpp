@@ -73,6 +73,15 @@ void DataSetManager::loadData(){
     // loading in the propagator
     LogInfo << "Reading dataset: " << dataSet.getName() << "/" << dispenser->getParameters().name << std::endl;
     dispenser->load( _propagator_ );
+
+    LogInfo << "Resizing dial containers..." << std::endl;
+    for( auto& dialCollection : _propagator_.getDialCollectionList() ) {
+      if( not dialCollection.isBinned() ){ dialCollection.resizeContainers(); }
+    }
+
+    LogInfo << "Build reference cache..." << std::endl;
+    _propagator_.getEventDialCache().shrinkIndexedCache();
+    _propagator_.getEventDialCache().buildReferenceCache(_propagator_.getSampleSet(), _propagator_.getDialCollectionList());
   }
 
   // Copy to data container

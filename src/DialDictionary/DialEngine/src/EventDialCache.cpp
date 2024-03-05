@@ -78,7 +78,7 @@ void EventDialCache::buildReferenceCache( SampleSet& sampleSet_, std::vector<Dia
       });
   };
 
-  LogInfo << "Filling up the cache dial with references..." << std::endl;
+  LogInfo << "Filling up the " << nCacheSlots << " cache dial with references..." << std::endl;
   _cache_.reserve( nCacheSlots );
 
   for( auto& sampleIndexCache : sampleIndexCacheList ){
