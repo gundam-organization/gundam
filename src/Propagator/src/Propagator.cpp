@@ -243,7 +243,7 @@ void Propagator::reweightMcEvents(int iThread_) {
   std::for_each(
       _eventDialCache_.getCache().begin() + bounds.first,
       _eventDialCache_.getCache().begin() + bounds.second,
-      [this]( EventDialCache::CacheElem_t& cache_){ _eventDialCache_.reweightEntry(cache_); }
+      [this]( EventDialCache::CacheEntry& cache_){ _eventDialCache_.reweightEntry(cache_); }
   );
 
 }
