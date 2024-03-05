@@ -18,11 +18,15 @@ namespace JointProbability{
     [[nodiscard]] std::string getType() const override { return "BarlowBeestonBanff2022"; }
     [[nodiscard]] double eval(const Sample& sample_, int bin_) const override;
 
+    void createNominalMc(const Sample& sample_) const;
+
     int verboseLevel{0};
     bool throwIfInfLlh{false};
     bool allowZeroMcWhenZeroData{true};
     bool usePoissonLikelihood{false};
     bool BBNoUpdateWeights{false}; // OA 2021 bug reimplementation
+    mutable std::shared_ptr<TH1D> nomMC{nullptr}; // OA 2021 bug reimplementation
+    mutable GenericToolbox::NoCopyWrapper<std::mutex> _mutex_{}; // for creating the nomMC
   };
 
   void BarlowBeestonBanff2022::readConfigImpl(){
@@ -45,7 +49,9 @@ namespace JointProbability{
   double BarlowBeestonBanff2022::eval(const Sample& sample_, int bin_) const {
     const TH1D* data = sample_.getDataContainer().getHistogram();
     const TH1D* predMC = sample_.getMcContainer().getHistogram();
-    const TH1D* nomMC = sample_.getMcContainer().getHistogramNominal();
+
+    /// the first time we reach this point, we assume the predMC is at its nominal value
+    if( nomMC == nullptr ){ createNominalMc(sample_); }
 
     // From OA2021_Eb branch -> BANFFBinnedSample::CalcLLRContrib
     // https://github.com/t2k-software/BANFF/blob/OA2021_Eb/src/BANFFSample/BANFFBinnedSample.cxx
@@ -204,6 +210,13 @@ namespace JointProbability{
     }
 
     return chisq;
+  }
+  void BarlowBeestonBanff2022::createNominalMc(const Sample& sample_) const {
+    std::lock_guard<std::mutex> g(_mutex_);
+    // first recheck if another thread hasn't done this job:
+    if( nomMC != nullptr ){ return; }
+    LogAlert << "Creating nominal MC histogram now..." << std::endl;
+    nomMC = std::make_shared<TH1D>(*(sample_.getMcContainer().getHistogram()));
   }
 
 }

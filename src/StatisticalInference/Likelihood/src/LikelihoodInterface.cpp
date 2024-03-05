@@ -58,8 +58,8 @@ void LikelihoodInterface::readConfigImpl(){
 void LikelihoodInterface::initializeImpl() {
   LogWarning << "Initializing LikelihoodInterface..." << std::endl;
 
+  _dataSetManager_.initialize(); // parameter should be at their nominal value
   _jointProbabilityPtr_->initialize();
-  _dataSetManager_.initialize();
 
   LogInfo << "Fetching the effective number of fit parameters..." << std::endl;
   _nbParameters_ = 0;
@@ -72,6 +72,11 @@ void LikelihoodInterface::initializeImpl() {
   for( auto& sample : _dataSetManager_.getPropagator().getSampleSet().getSampleList() ){
     _nbSampleBins_ += int(sample.getBinning().getBinList().size() );
   }
+
+  /// some joint fit probability might need to save the value of the nominal histogram.
+  /// here we know every parameter is at its nominal value
+  LogInfo << "First evaluation of the LLH at the nominal value..." << std::endl;
+  this->propagateAndEvalLikelihood();
 
   LogInfo << "LikelihoodInterface initialized." << std::endl;
 }

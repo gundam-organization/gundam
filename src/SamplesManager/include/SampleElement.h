@@ -44,23 +44,20 @@ public:
   // const-getters
   [[nodiscard]] const std::string& getName() const{ return _name_; }
   [[nodiscard]] const TH1D* getHistogram() const{ return _histogram_.get(); }
-  [[nodiscard]] const TH1D* getHistogramNominal() const{ return _histogramNominal_.get(); }
+  [[nodiscard]] const std::shared_ptr<TH1D>& getHistogramSharedPtr() const{ return _histogram_; }
   [[nodiscard]] const std::vector<PhysicsEvent> &getEventList() const{ return _eventList_; }
 
   // mutable-getters
   TH1D* getHistogram(){ return _histogram_.get(); }
-  TH1D* getHistogramNominal(){ return _histogramNominal_.get(); }
   std::vector<PhysicsEvent> &getEventList(){ return _eventList_; }
   std::shared_ptr<TH1D>& getHistogramSharedPtr() { return _histogram_; }
 
   // core
   void buildHistogram(const DataBinSet& binning_);
-
   void reserveEventMemory(size_t dataSetIndex_, size_t nEvents, const PhysicsEvent &eventBuffer_);
   void shrinkEventList(size_t newTotalSize_);
   void updateBinEventList(int iThread_ = -1);
   void refillHistogram(int iThread_ = -1);
-  void saveAsHistogramNominal();
 
   // event by event poisson throw -> takes into account the finite amount of stat in MC
   void throwEventMcError();
@@ -83,7 +80,6 @@ private:
 
   // TODO: to get rid of these
   std::shared_ptr<TH1D> _histogram_{nullptr};
-  std::shared_ptr<TH1D> _histogramNominal_{nullptr};
 
 #ifdef GUNDAM_USING_CACHE_MANAGER
 public:

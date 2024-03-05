@@ -269,12 +269,6 @@ void DataSetManager::loadData(){
   // DON'T MOVE PARAMETERS FROM THIS POINT
   //////////////////////////////////////////
 
-  /// Copy the current state of MC as "nominal" histogram
-  LogInfo << "Copy the current state of MC as \"nominal\" histogram..." << std::endl;
-  for( auto& sample : _propagator_.getSampleSet().getSampleList() ){
-    sample.getMcContainer().saveAsHistogramNominal();
-  }
-
   /// Now caching the event for the plot generator
   _propagator_.getPlotGenerator().defineHistogramHolders();
 

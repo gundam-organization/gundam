@@ -150,9 +150,6 @@ void SampleElement::refillHistogram(int iThread_){
   }
 
 }
-void SampleElement::saveAsHistogramNominal(){
-  _histogramNominal_ = std::make_shared<TH1D>(*_histogram_);
-}
 
 void SampleElement::throwEventMcError(){
   /*
