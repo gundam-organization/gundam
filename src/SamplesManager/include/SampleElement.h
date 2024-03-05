@@ -49,7 +49,7 @@ public:
   std::vector<std::vector<PhysicsEvent *>> &getPerBinEventPtrList(){ return _perBinEventPtrList_; }
   std::shared_ptr<TH1D>& getHistogramSharedPtr() { return _histogram_; }
 
-  // Methods
+  // core
   void reserveEventMemory(size_t dataSetIndex_, size_t nEvents, const PhysicsEvent &eventBuffer_);
   void shrinkEventList(size_t newTotalSize_);
   void updateEventBinIndexes(int iThread_ = -1);
@@ -76,8 +76,8 @@ private:
   DataBinSet _binning_{};
   std::shared_ptr<TH1D> _histogram_{nullptr};
   std::shared_ptr<TH1D> _histogramNominal_{nullptr};
-  std::vector<std::vector<PhysicsEvent*>> _perBinEventPtrList_;
-  std::vector<PhysicsEvent> _eventList_;
+  std::vector<std::vector<PhysicsEvent*>> _perBinEventPtrList_{};
+  std::vector<PhysicsEvent> _eventList_{};
   std::vector<DatasetProperties> _loadedDatasetList_{};
 
 #ifdef GUNDAM_USING_CACHE_MANAGER
