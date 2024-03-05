@@ -379,7 +379,6 @@ int main(int argc, char** argv){
             if (not par.isEnabled()) {
                 LogInfo << "Parameter " << par.getName() << " is disabled" << std::endl;
                 continue;
-
             }
             bool matches = false;
             for (int i = 0; i < marginalisedParameters.size(); i++) {
@@ -418,6 +417,10 @@ int main(int argc, char** argv){
 //            << par.getMaxPhysical() << " limits (mirr): " << par.getMinMirror() << " - "
 //            << par.getMaxMirror() <<" --- marg? "<<par.isMarginalised() << std::endl;
 
+    // print marg_param_list for debug
+    LogInfo<<"\n\n";
+    marg_param_list->Print();
+    LogInfo<<"\n\n";
 
     // initializing variables for "parametersInject" mode
     double LLH_sum{0};// needed when injecting parameters manually
