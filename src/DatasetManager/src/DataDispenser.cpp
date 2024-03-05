@@ -106,18 +106,6 @@ void DataDispenser::load(Propagator& propagator_){
   this->preAllocateMemory();
   this->readAndFill();
 
-  LogInfo << "Resizing dial containers..." << std::endl;
-  for( auto& dialCollection : _cache_.propagatorPtr->getDialCollectionList() ) {
-    if( not dialCollection.isBinned() ){ dialCollection.resizeContainers(); }
-  }
-
-  LogInfo << "Build reference cache..." << std::endl;
-  _cache_.propagatorPtr->getEventDialCache().shrinkIndexedCache();
-  _cache_.propagatorPtr->getEventDialCache().buildReferenceCache(
-      _cache_.propagatorPtr->getSampleSet(),
-      _cache_.propagatorPtr->getDialCollectionList()
-  );
-
   LogWarning << "Loaded " << getTitle() << std::endl;
 }
 std::string DataDispenser::getTitle(){
