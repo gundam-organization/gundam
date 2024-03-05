@@ -60,21 +60,32 @@ namespace JointProbability{
     if (BBNoUpdateWeights) {
       mcuncert = nomMC->GetBinError(bin_) * nomMC->GetBinError(bin_);
       if (not std::isfinite(mcuncert) or mcuncert < 0.0) {
-        LogError << "BBNoUpdateWeights mcuncert is not valid "
-                 << mcuncert
-                 << std::endl;
-        LogError << "nomMC bin " << bin_
-                 << " error is " << nomMC->GetBinError(bin_);
-        LogThrow("The mc uncertainty is not a usable number");
+        if( throwIfInfLlh ){
+          LogError << "BBNoUpdateWeights mcuncert is not valid "
+                   << mcuncert
+                   << std::endl;
+          LogError << "nomMC bin " << bin_
+                   << " error is " << nomMC->GetBinError(bin_);
+          LogThrow("The mc uncertainty is not a usable number");
+        }
+        else{
+          return std::numeric_limits<double>::infinity();
+        }
       }
     }
     else {
       mcuncert = predMC->GetBinError(bin_) * predMC->GetBinError(bin_);
+
       if(not std::isfinite(mcuncert) or mcuncert < 0.0) {
-        LogError << "The mcuncert is not finite " << mcuncert << std::endl;
-        LogError << "predMC bin " << bin_
-                 << " error is " << predMC->GetBinError(bin_);
-        LogThrow("The mc uncertainty is not a usable number");
+        if( throwIfInfLlh ){
+          LogError << "The mcuncert is not finite " << mcuncert << std::endl;
+          LogError << "predMC bin " << bin_
+                   << " error is " << predMC->GetBinError(bin_);
+          LogThrow("The mc uncertainty is not a usable number");
+        }
+        else{
+          return std::numeric_limits<double>::infinity();
+        }
       }
     }
 
@@ -101,7 +112,11 @@ namespace JointProbability{
       double temp = predVal * fractional * fractional - 1;
       // b^2 - 4ac in quadratic equation
       double temp2 = temp * temp + 4 * dataVal * fractional * fractional;
-      LogThrowIf((temp2 < 0), "Negative square root in Barlow Beeston");
+      if(temp2 < 0){
+        if( throwIfInfLlh ){ LogThrow("Negative square root in Barlow Beeston"); }
+        else{ return std::numeric_limits<double>::infinity(); }
+      }
+
       // Solve for the positive beta
       double beta = (-1 * temp + sqrt(temp2)) / 2.;
       newmc = predVal * beta;
