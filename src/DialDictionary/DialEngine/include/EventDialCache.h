@@ -134,6 +134,9 @@ public:
       ss << " -> Dials" << GenericToolbox::toString(dials);
       return ss.str();
     }
+    friend std::ostream& operator <<( std::ostream& o, const IndexedEntry_t& this_ ){
+      o << this_.getSummary(); return o;
+    }
   };
 
   // returns the current index
