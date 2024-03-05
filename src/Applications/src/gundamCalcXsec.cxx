@@ -561,10 +561,8 @@ int main(int argc, char** argv){
           });
         }
 
-
-
         // bin volume
-        auto& bin = xsec.samplePtr->getMcContainer().getBinning().getBinList()[iBin];
+        auto& bin = xsec.samplePtr->getBinning().getBinList()[iBin];
         double binVolume{1};
 
         for( auto& edges : bin.getEdgesList() ){

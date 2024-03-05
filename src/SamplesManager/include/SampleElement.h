@@ -28,10 +28,11 @@ public:
     struct Bin{
       double content{0};
       double error{0};
-      DataBin* dataBinPtr{nullptr};
+      const DataBin* dataBinPtr{nullptr};
       std::vector<PhysicsEvent*> eventPtrList{};
     };
     std::vector<Bin> binList{};
+    int nBins{0};
   };
 
 public:
@@ -39,11 +40,9 @@ public:
 
   // setters
   void setName(const std::string& name_){ _name_ = name_; }
-  void setBinning(const DataBinSet& binning_){ _binning_ = binning_; }
 
   // const-getters
   [[nodiscard]] const std::string& getName() const{ return _name_; }
-  [[nodiscard]] const DataBinSet& getBinning() const{ return _binning_; }
   [[nodiscard]] const TH1D* getHistogram() const{ return _histogram_.get(); }
   [[nodiscard]] const TH1D* getHistogramNominal() const{ return _histogramNominal_.get(); }
   [[nodiscard]] const std::vector<PhysicsEvent> &getEventList() const{ return _eventList_; }
@@ -52,13 +51,13 @@ public:
   TH1D* getHistogram(){ return _histogram_.get(); }
   TH1D* getHistogramNominal(){ return _histogramNominal_.get(); }
   std::vector<PhysicsEvent> &getEventList(){ return _eventList_; }
-  std::vector<std::vector<PhysicsEvent *>> &getPerBinEventPtrList(){ return _perBinEventPtrList_; }
   std::shared_ptr<TH1D>& getHistogramSharedPtr() { return _histogram_; }
 
   // core
+  void buildHistogram(const DataBinSet& binning_);
+
   void reserveEventMemory(size_t dataSetIndex_, size_t nEvents, const PhysicsEvent &eventBuffer_);
   void shrinkEventList(size_t newTotalSize_);
-  void updateEventBinIndexes(int iThread_ = -1);
   void updateBinEventList(int iThread_ = -1);
   void refillHistogram(int iThread_ = -1);
   void saveAsHistogramNominal();
@@ -83,10 +82,8 @@ private:
   std::vector<DatasetProperties> _loadedDatasetList_{};
 
   // TODO: to get rid of these
-  DataBinSet _binning_{};
   std::shared_ptr<TH1D> _histogram_{nullptr};
   std::shared_ptr<TH1D> _histogramNominal_{nullptr};
-  std::vector<std::vector<PhysicsEvent*>> _perBinEventPtrList_{};
 
 #ifdef GUNDAM_USING_CACHE_MANAGER
 public:
