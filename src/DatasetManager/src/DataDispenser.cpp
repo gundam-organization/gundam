@@ -43,7 +43,6 @@ void DataDispenser::readConfigImpl(){
     LogWarning << "Dataset \"" << _parameters_.name << "\" will be defined with histogram data." << std::endl;
 
     _parameters_.fromHistContent = GenericToolbox::Json::fetchValue<JsonType>( _config_, "fromHistContent" );
-    ConfigUtils::forwardConfig( _parameters_.fromHistContent );
     return;
   }
 

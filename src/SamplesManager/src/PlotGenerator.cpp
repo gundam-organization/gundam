@@ -809,7 +809,6 @@ void PlotGenerator::defineHistogramHolders() {
                   // User defined color?
                   auto varDict = GenericToolbox::Json::fetchMatchingEntry(_varDictionary_, "name", splitVar); // does the cosmetic pars are configured?
                   auto dictEntries = varDict["dictionary"];
-                  ConfigUtils::forwardConfig(dictEntries);
 
                   if( not varDict.empty() ){
 

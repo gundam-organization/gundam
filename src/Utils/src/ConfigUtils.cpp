@@ -108,8 +108,10 @@ namespace ConfigUtils {
     return ConfigUtils::getForwardedConfig(GenericToolbox::Json::fetchValue<JsonType>(config_, keyName_));
   }
   void forwardConfig(JsonType& config_, const std::string& className_){
-    while( config_.is_string() ){
-//      LogDebug << "Forwarding " << (className_.empty()? "": className_ + " ") << "config: \"" << config_.get<std::string>() << "\"" << std::endl;
+    while( config_.is_string() and
+         ( GenericToolbox::endsWith(config_.get<std::string>(), ".yaml", true)
+        or GenericToolbox::endsWith(config_.get<std::string>(), ".json", true) )
+        ){
       auto name = config_.get<std::string>();
       std::string expand = GenericToolbox::expandEnvironmentVariables(name);
       config_ = ConfigUtils::readConfigFile(expand);

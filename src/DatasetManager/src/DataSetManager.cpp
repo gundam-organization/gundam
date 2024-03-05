@@ -18,9 +18,6 @@ LoggerInit([]{
 void DataSetManager::readConfigImpl(){
   LogInfo << "Reading DataSetManager configurations..." << std::endl;
 
-  // check if config is pointing to another file
-  GenericToolbox::Json::forwardConfig(_config_);
-
   // Propagator config is supposed to be set in the likelihood interface.
   // however in old GUNDAM versions it was set at the FitterEngine level.
   // In that case, the config has already been set, hence "_propagator_.getConfig()"
