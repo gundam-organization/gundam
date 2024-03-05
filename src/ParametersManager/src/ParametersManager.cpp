@@ -30,6 +30,7 @@ void ParametersManager::readConfigImpl(){
   _throwToyParametersWithGlobalCov_ = GenericToolbox::Json::fetchValue(_config_, "throwToyParametersWithGlobalCov", _throwToyParametersWithGlobalCov_);
 
   LogInfo << "Reading parameter configuration..." << std::endl;
+  _parameterSetList_.clear(); // make sure there nothing in case readConfig is called more than once
   _parameterSetList_.reserve( _parameterSetListConfig_.size() );
   for( const auto& parameterSetConfig : _parameterSetListConfig_ ){
     _parameterSetList_.emplace_back();

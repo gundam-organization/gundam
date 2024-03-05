@@ -63,44 +63,33 @@ void Propagator::readConfigImpl(){
   _devSingleThreadHistFill_ = GenericToolbox::Json::fetchValue(_config_, "devSingleThreadHistFill", _devSingleThreadHistFill_);
 
   // EventDialCache parameters
-  EventDialCache::globalEventReweightCap = GenericToolbox::Json::fetchValue(_config_, "globalEventReweightCap", EventDialCache::globalEventReweightCap);
+  if( GenericToolbox::Json::doKeyExist(_config_, "globalEventReweightCap") ){
+    _eventDialCache_.getGlobalEventReweightCap().isEnabled = true;
+    _eventDialCache_.getGlobalEventReweightCap().maxReweight = GenericToolbox::Json::fetchValue<double>(_config_, "globalEventReweightCap");
+  }
+
 
   LogInfo << "Reading samples configuration..." << std::endl;
-  auto fitSampleSetConfig = GenericToolbox::Json::fetchValue(_config_, "fitSampleSetConfig", JsonType());
-  _fitSampleSet_.setConfig(fitSampleSetConfig);
-  _fitSampleSet_.readConfig();
+  auto fitSampleSetConfig = GenericToolbox::Json::fetchValue(_config_, {{"sampleSetConfig"}, {"fitSampleSetConfig"}}, JsonType());
+  _sampleSet_.setConfig(fitSampleSetConfig);
+  _sampleSet_.readConfig();
 
   LogInfo << "Reading PlotGenerator configuration..." << std::endl;
   auto plotGeneratorConfig = ConfigUtils::getForwardedConfig(GenericToolbox::Json::fetchValue(_config_, "plotGeneratorConfig", JsonType()));
   _plotGenerator_.setConfig(plotGeneratorConfig);
   _plotGenerator_.readConfig();
 
-  LogInfo << "Reading datasets configuration..." << std::endl;
-  auto dataSetListConfig = ConfigUtils::getForwardedConfig(_config_, "dataSetList");
-  if( dataSetListConfig.empty() ){
-    // Old config files
-    dataSetListConfig = ConfigUtils::getForwardedConfig(_fitSampleSet_.getConfig(), "dataSetList");
-    LogAlert << "DEPRECATED CONFIG OPTION: " << "dataSetList should now be located in the Propagator config." << std::endl;
-  }
-  LogThrowIf(dataSetListConfig.empty(), "No dataSet specified." << std::endl);
-  _dataSetList_.reserve(dataSetListConfig.size());
-  for( const auto& dataSetConfig : dataSetListConfig ){
-    _dataSetList_.emplace_back(dataSetConfig, int(_dataSetList_.size()));
-  }
-
   LogInfo << "Reading DialCollection configurations..." << std::endl;
+  _dialCollectionList_.clear(); // make sure it's empty in case readConfig() is called more than once
   for(size_t iParSet = 0 ; iParSet < _parManager_.getParameterSetsList().size() ; iParSet++ ){
     if( not _parManager_.getParameterSetsList()[iParSet].isEnabled() ) continue;
     // DEV / DialCollections
     if( not _parManager_.getParameterSetsList()[iParSet].getDialSetDefinitions().empty() ){
       for( auto& dialSetDef : _parManager_.getParameterSetsList()[iParSet].getDialSetDefinitions().get<std::vector<JsonType>>() ){
-        if( GenericToolbox::Json::doKeyExist(dialSetDef, "parametersBinningPath") ){
-          _dialCollections_.emplace_back(&_parManager_.getParameterSetsList());
-          _dialCollections_.back().setIndex(int(_dialCollections_.size())-1);
-          _dialCollections_.back().setSupervisedParameterSetIndex( int(iParSet) );
-          _dialCollections_.back().readConfig( dialSetDef );
-        }
-        else{ LogThrow("no parametersBinningPath option?"); }
+        _dialCollectionList_.emplace_back(&_parManager_.getParameterSetsList());
+        _dialCollectionList_.back().setIndex(int(_dialCollectionList_.size()) - 1);
+        _dialCollectionList_.back().setSupervisedParameterSetIndex(int(iParSet) );
+        _dialCollectionList_.back().readConfig(dialSetDef );
       }
     }
     else{
@@ -115,18 +104,15 @@ void Propagator::readConfigImpl(){
         }
 
         for( const auto& dialDefinitionConfig : par.getDialDefinitionsList() ){
-          _dialCollections_.emplace_back(&_parManager_.getParameterSetsList());
-          _dialCollections_.back().setIndex(int(_dialCollections_.size())-1);
-          _dialCollections_.back().setSupervisedParameterSetIndex( int(iParSet) );
-          _dialCollections_.back().setSupervisedParameterIndex( par.getParameterIndex() );
-          _dialCollections_.back().readConfig( dialDefinitionConfig );
+          _dialCollectionList_.emplace_back(&_parManager_.getParameterSetsList());
+          _dialCollectionList_.back().setIndex(int(_dialCollectionList_.size()) - 1);
+          _dialCollectionList_.back().setSupervisedParameterSetIndex(int(iParSet) );
+          _dialCollectionList_.back().setSupervisedParameterIndex(par.getParameterIndex() );
+          _dialCollectionList_.back().readConfig(dialDefinitionConfig );
         }
       }
     }
   }
-
-  LogInfo << "Reading TreeWriter configurations..." << std::endl;
-  _treeWriter_.readConfig( GenericToolbox::Json::fetchValue(_config_, "eventTreeWriter", JsonType()) );
 
   LogInfo << "Reading config of the Propagator done." << std::endl;
 }
@@ -137,344 +123,16 @@ void Propagator::initializeImpl(){
   _parManager_.initialize();
 
   LogInfo << std::endl << GenericToolbox::addUpDownBars("Initializing samples...") << std::endl;
-  _fitSampleSet_.initialize();
-
-  LogInfo << std::endl << GenericToolbox::addUpDownBars("Initializing " + std::to_string(_dataSetList_.size()) + " datasets...") << std::endl;
-  for( auto& dataset : _dataSetList_ ){ dataset.initialize(); }
+  _sampleSet_.initialize();
 
   LogInfo << std::endl << GenericToolbox::addUpDownBars("Initializing dials...") << std::endl;
-  for( auto& dialCollection : _dialCollections_ ){ dialCollection.initialize(); }
+  for( auto& dialCollection : _dialCollectionList_ ){ dialCollection.initialize(); }
 
   LogInfo << "Initializing propagation threads..." << std::endl;
   initializeThreads();
+
+  // will set it off when the Propagator will be loaded
   GundamGlobals::getParallelWorker().setCpuTimeSaverIsEnabled(true);
-
-  // First start with the data:
-  bool usedMcContainer{false};
-  bool allAsimov{true};
-  for( auto& dataSet : _dataSetList_ ){
-    LogContinueIf(not dataSet.isEnabled(), "Dataset \"" << dataSet.getName() << "\" is disabled. Skipping");
-    DataDispenser& dispenser = dataSet.getSelectedDataDispenser();
-    if( _throwAsimovToyParameters_ ) { dispenser = dataSet.getToyDataDispenser(); }
-    if( _loadAsimovData_ ){ dispenser = dataSet.getDataDispenserDict().at("Asimov"); }
-
-    dispenser.getParameters().iThrow = _iThrow_;
-
-    if(dispenser.getParameters().name != "Asimov" ){ allAsimov = false; }
-    LogInfo << "Reading dataset: " << dataSet.getName() << "/" << dispenser.getParameters().name << std::endl;
-
-    dispenser.setSampleSetPtrToLoad(&_fitSampleSet_);
-    dispenser.setPlotGenPtr(&_plotGenerator_);
-    if(dispenser.getParameters().useMcContainer ){
-      usedMcContainer = true;
-      dispenser.setParSetPtrToLoad(&_parManager_.getParameterSetsList());
-      dispenser.setDialCollectionListPtr(&_dialCollections_);
-      dispenser.setEventDialCache(&_eventDialCache_);
-    }
-    dispenser.load();
-  }
-
-  LogInfo << "Resizing dial containers..." << std::endl;
-  for( auto& dialCollection : _dialCollections_ ) {
-    if( not dialCollection.isBinned() ){ dialCollection.resizeContainers(); }
-  }
-
-  LogInfo << "Build reference cache..." << std::endl;
-  _eventDialCache_.shrinkIndexedCache();
-  _eventDialCache_.buildReferenceCache(_fitSampleSet_, _dialCollections_);
-
-  // Copy to data container
-  if( usedMcContainer ){
-    if( _throwAsimovToyParameters_ ){
-      LogWarning << "Will throw toy parameters..." << std::endl;
-
-      if( _showEventBreakdown_ ){
-        LogInfo << "Propagating prior parameters on the initially loaded events..." << std::endl;
-        bool cacheManagerState = GundamGlobals::getEnableCacheManager();
-        GundamGlobals::setEnableCacheManager(false);
-        this->resetReweight();
-        this->reweightMcEvents();
-        GundamGlobals::setEnableCacheManager(cacheManagerState);
-
-        LogInfo << "Sample breakdown prior to the throwing:" << std::endl;
-        std::cout << getSampleBreakdownTableStr() << std::endl;
-
-        if( _debugPrintLoadedEvents_ ){
-          LogDebug << "Toy events:" << std::endl;
-          LogDebug << GET_VAR_NAME_VALUE(_debugPrintLoadedEventsNbPerSample_) << std::endl;
-          int iEvt{0};
-          for( auto& entry : _eventDialCache_.getCache() ) {
-            LogDebug << "Event #" << iEvt++ << "{" << std::endl;
-            {
-              LogScopeIndent;
-              LogDebug << entry.getSummary() << std::endl;
-            }
-            LogDebug << "}" << std::endl;
-            if( iEvt >= _debugPrintLoadedEventsNbPerSample_ ) break;
-          }
-        }
-      }
-
-      _parManager_.throwParameters();
-
-      // Handling possible masks
-      for( auto& parSet : _parManager_.getParameterSetsList() ){
-        if( not parSet.isEnabled() ) continue;
-
-        if( parSet.isMaskForToyGeneration() ){
-          LogWarning << parSet.getName() << " will be masked for the toy generation." << std::endl;
-          parSet.setMaskedForPropagation( true );
-        }
-      }
-
-    } // throw asimov?
-
-    LogInfo << "Propagating parameters on events..." << std::endl;
-
-    // Make sure before the copy to the data:
-    // At this point, MC events have been reweighted using their prior
-    // but when using eigen decomp, the conversion eigen -> original has a small computational error
-    for( auto& parSet: _parManager_.getParameterSetsList() ) {
-      if( parSet.isEnableEigenDecomp() ) { parSet.propagateEigenToOriginal(); }
-    }
-
-    bool cacheManagerState = GundamGlobals::getEnableCacheManager();
-    GundamGlobals::setEnableCacheManager(false);
-    this->resetReweight();
-    this->reweightMcEvents();
-    GundamGlobals::setEnableCacheManager(cacheManagerState);
-
-    // Copies MC events in data container for both Asimov and FakeData event types
-    LogWarning << "Copying loaded mc-like event to data container..." << std::endl;
-    _fitSampleSet_.copyMcEventListToDataContainer();
-
-    for( auto& sample : _fitSampleSet_.getSampleList() ){
-      sample.getDataContainer().histScale = sample.getMcContainer().histScale;
-    }
-
-    // back to prior
-    if( _throwAsimovToyParameters_ ){
-      for( auto& parSet : _parManager_.getParameterSetsList() ){
-
-        if( parSet.isMaskForToyGeneration() ){
-          // unmasking
-          LogWarning << "Unmasking parSet: " << parSet.getName() << std::endl;
-          parSet.setMaskedForPropagation( false );
-        }
-
-        parSet.moveParametersToPrior();
-      }
-    }
-  }
-
-  if( not allAsimov ){
-    // reload everything
-    // Filling the mc containers
-
-    // clearing events in MC containers
-    _fitSampleSet_.clearMcContainers();
-
-    // also wiping event-by-event dials...
-    LogInfo << "Wiping event-by-event dials..." << std::endl;
-    for( auto& dialCollection: _dialCollections_ ) {
-      if( not dialCollection.getGlobalDialLeafName().empty() ) {
-        dialCollection.clear();
-      }
-    }
-    _eventDialCache_ = EventDialCache();
-
-    for( auto& dataSet : _dataSetList_ ){
-      LogContinueIf(not dataSet.isEnabled(), "Dataset \"" << dataSet.getName() << "\" is disabled. Skipping");
-      auto& dispenser = dataSet.getMcDispenser();
-      dispenser.setSampleSetPtrToLoad(&_fitSampleSet_);
-      dispenser.setPlotGenPtr(&_plotGenerator_);
-      dispenser.setParSetPtrToLoad(&_parManager_.getParameterSetsList());
-      dispenser.setDialCollectionListPtr(&_dialCollections_);
-      dispenser.setEventDialCache(&_eventDialCache_);
-      dispenser.load();
-    }
-
-    LogInfo << "Resizing dial containers..." << std::endl;
-    for( auto& dialCollection : _dialCollections_ ) {
-      if( not dialCollection.isBinned() ){ dialCollection.resizeContainers(); }
-    }
-
-    LogInfo << "Build reference cache..." << std::endl;
-    _eventDialCache_.shrinkIndexedCache();
-    _eventDialCache_.buildReferenceCache(_fitSampleSet_, _dialCollections_);
-  }
-
-#ifdef GUNDAM_USING_CACHE_MANAGER
-  // After all the data has been loaded.  Specifically, this must be after
-  // the MC has been copied for the Asimov fit, or the "data" use the MC
-  // reweighting cache.  This must also be before the first use of
-  // reweightMcEvents.
-  if(GundamGlobals::getEnableCacheManager()) {
-    Cache::Manager::Build(getSampleSet(), getEventDialCache());
-  }
-#endif
-
-  LogInfo << "Propagating prior parameters on events..." << std::endl;
-  this->resetReweight();
-  this->reweightMcEvents();
-
-  LogInfo << "Set the current MC prior weights as nominal weight..." << std::endl;
-  for( auto& sample : _fitSampleSet_.getSampleList() ){
-    for( auto& event : sample.getMcContainer().eventList ){
-      event.setNominalWeight(event.getEventWeight());
-    }
-  }
-
-  LogInfo << "Filling up sample bin caches..." << std::endl;
-  _fitSampleSet_.updateSampleBinEventList();
-
-  LogInfo << "Filling up sample histograms..." << std::endl;
-  _fitSampleSet_.updateSampleHistograms();
-
-  // Throwing stat error on data -> BINNING SHOULD BE SET!!
-  if( _throwAsimovToyParameters_ and _enableStatThrowInToys_ ){
-    LogInfo << "Throwing statistical error for data container..." << std::endl;
-
-    if( _enableEventMcThrow_ ){
-      // Take into account the finite amount of event in MC
-      LogInfo << "enableEventMcThrow is enabled: throwing individual MC events" << std::endl;
-      for( auto& sample : _fitSampleSet_.getSampleList() ) {
-        sample.getDataContainer().throwEventMcError();
-      }
-    }
-    else{
-      LogWarning << "enableEventMcThrow is disabled. Not throwing individual MC events" << std::endl;
-    }
-
-    LogInfo << "Throwing statistical error on histograms..." << std::endl;
-    if( _gaussStatThrowInToys_ ) {
-      LogWarning << "Using gaussian statistical throws. (caveat: distribution truncated when the bins are close to zero)" << std::endl;
-    }
-    for( auto& sample : _fitSampleSet_.getSampleList() ){
-      // Asimov bin content -> toy data
-      sample.getDataContainer().throwStatError(_gaussStatThrowInToys_);
-    }
-  }
-
-  LogInfo << "Locking data event containers..." << std::endl;
-  for( auto& sample : _fitSampleSet_.getSampleList() ){
-    // Now the data won't be refilled each time
-    sample.getDataContainer().isLocked = true;
-  }
-
-  if( not _parameterInjectorMc_.empty() ){
-    LogWarning << "Injecting parameters on MC samples..." << std::endl;
-    _parManager_.injectParameterValues( ConfigUtils::getForwardedConfig(_parameterInjectorMc_) );
-    this->resetReweight();
-    this->reweightMcEvents();
-  }
-
-  //////////////////////////////////////////
-  // DON'T MOVE PARAMETERS FROM THIS POINT
-  //////////////////////////////////////////
-
-  /// Copy the current state of MC as "nominal" histogram
-  LogInfo << "Copy the current state of MC as \"nominal\" histogram..." << std::endl;
-  for( auto& sample : _fitSampleSet_.getSampleList() ){
-    sample.getMcContainer().saveAsHistogramNominal();
-  }
-
-  /// Initialise other tools
-  LogInfo << std::endl << GenericToolbox::addUpDownBars("Initializing the plot generator") << std::endl;
-  _plotGenerator_.setSampleSetPtr(&_fitSampleSet_);
-  _plotGenerator_.initialize();
-
-  LogInfo << std::endl << GenericToolbox::addUpDownBars("Initializing the tree writer") << std::endl;
-  _treeWriter_.setSampleSetPtr( &_fitSampleSet_ );
-  _treeWriter_.setParSetListPtr( &_parManager_.getParameterSetsList() );
-  _treeWriter_.setEventDialCachePtr( &_eventDialCache_ );
-
-  /// Printouts for quick monitoring
-  if( _showEventBreakdown_ ){
-
-    if(true){
-      // STAGED MASK
-      LogWarning << "Staged event breakdown:" << std::endl;
-      std::vector<std::vector<double>> stageBreakdownList(
-          _fitSampleSet_.getSampleList().size(),
-          std::vector<double>(_parManager_.getParameterSetsList().size() + 1, 0)
-      ); // [iSample][iStage]
-      std::vector<std::string> stageTitles;
-      stageTitles.emplace_back("Sample");
-      stageTitles.emplace_back("No reweight");
-      for( auto& parSet : _parManager_.getParameterSetsList() ){
-        if( not parSet.isEnabled() ){ continue; }
-        stageTitles.emplace_back("+ " + parSet.getName());
-      }
-
-      int iStage{0};
-      std::vector<ParameterSet*> maskedParSetList;
-      for( auto& parSet : _parManager_.getParameterSetsList() ){
-        if( not parSet.isEnabled() ){ continue; }
-        maskedParSetList.emplace_back( &parSet );
-        parSet.setMaskedForPropagation( true );
-      }
-
-      this->resetReweight();
-      this->reweightMcEvents();
-      for( size_t iSample = 0 ; iSample < _fitSampleSet_.getSampleList().size() ; iSample++ ){
-        stageBreakdownList[iSample][iStage] = _fitSampleSet_.getSampleList()[iSample].getMcContainer().getSumWeights();
-      }
-
-      for( auto* parSetPtr : maskedParSetList ){
-        parSetPtr->setMaskedForPropagation(false);
-        this->resetReweight();
-        this->reweightMcEvents();
-        iStage++;
-        for( size_t iSample = 0 ; iSample < _fitSampleSet_.getSampleList().size() ; iSample++ ){
-          stageBreakdownList[iSample][iStage] = _fitSampleSet_.getSampleList()[iSample].getMcContainer().getSumWeights();
-        }
-      }
-
-      GenericToolbox::TablePrinter t;
-      t.setColTitles(stageTitles);
-      for( size_t iSample = 0 ; iSample < _fitSampleSet_.getSampleList().size() ; iSample++ ) {
-        std::vector<std::string> tableLine;
-        tableLine.emplace_back("\"" + _fitSampleSet_.getSampleList()[iSample].getName() + "\"");
-        for( iStage = 0 ; iStage < stageBreakdownList[iSample].size() ; iStage++ ){
-          tableLine.emplace_back( std::to_string(stageBreakdownList[iSample][iStage]) );
-        }
-        t.addTableLine(tableLine);
-      }
-      t.printTable();
-    }
-
-    LogWarning << "Sample breakdown:" << std::endl;
-    std::cout << getSampleBreakdownTableStr() << std::endl;
-
-  }
-  if( _debugPrintLoadedEvents_ ){
-    LogDebug << GET_VAR_NAME_VALUE(_debugPrintLoadedEventsNbPerSample_) << std::endl;
-    int iEvt{0};
-    for( auto& entry : _eventDialCache_.getCache() ) {
-      LogDebug << "Event #" << iEvt++ << "{" << std::endl;
-      {
-        LogScopeIndent;
-        LogDebug << entry.getSummary() << std::endl;
-      }
-      LogDebug << "}" << std::endl;
-      if( iEvt >= _debugPrintLoadedEventsNbPerSample_ ) break;
-    }
-  }
-
-  /// Propagator needs to be responsive, let the workers wait for the signal
-  GundamGlobals::getParallelWorker().setCpuTimeSaverIsEnabled(false);
-}
-
-
-
-// Misc getters
-
-DatasetLoader* Propagator::getDatasetLoaderPtr(const std::string& name_){
-  for( auto& dataSet : _dataSetList_ ){
-    if( dataSet.getName() == name_ ){ return &dataSet; }
-  }
-  return nullptr;
 }
 
 // Core
@@ -493,7 +151,7 @@ void Propagator::propagateParameters(){
 
 }
 void Propagator::resetReweight(){
-  std::for_each(_dialCollections_.begin(), _dialCollections_.end(),[&](DialCollection& dc_){
+  std::for_each(_dialCollectionList_.begin(), _dialCollectionList_.end(), [&]( DialCollection& dc_){
     dc_.updateInputBuffers();
   });
 }
@@ -538,7 +196,7 @@ std::string Propagator::getSampleBreakdownTableStr() const{
   t << "MC (weighted)" << GenericToolbox::TablePrinter::NextColumn;
   t << "Data (weighted)" << GenericToolbox::TablePrinter::NextLine;
 
-  for( auto& sample : _fitSampleSet_.getSampleList() ){
+  for( auto& sample : _sampleSet_.getSampleList() ){
     t << "\"" << sample.getName() << "\"" << GenericToolbox::TablePrinter::NextColumn;
     t << sample.getMcContainer().getNbBinnedEvents() << GenericToolbox::TablePrinter::NextColumn;
     t << sample.getDataContainer().getNbBinnedEvents() << GenericToolbox::TablePrinter::NextColumn;
@@ -585,18 +243,18 @@ void Propagator::reweightMcEvents(int iThread_) {
   std::for_each(
       _eventDialCache_.getCache().begin() + bounds.first,
       _eventDialCache_.getCache().begin() + bounds.second,
-      &EventDialCache::reweightEntry
+      [this]( EventDialCache::CacheEntry& cache_){ _eventDialCache_.reweightEntry(cache_); }
   );
 
 }
 void Propagator::refillSampleHistogramsFct(int iThread_){
-  for( auto& sample : _fitSampleSet_.getSampleList() ){
+  for( auto& sample : _sampleSet_.getSampleList() ){
     sample.getMcContainer().refillHistogram(iThread_);
     sample.getDataContainer().refillHistogram(iThread_);
   }
 }
 void Propagator::refillSampleHistogramsPostParallelFct(){
-  for( auto& sample : _fitSampleSet_.getSampleList() ){
+  for( auto& sample : _sampleSet_.getSampleList() ){
     sample.getMcContainer().rescaleHistogram();
     sample.getDataContainer().rescaleHistogram();
   }

@@ -7,10 +7,8 @@
 
 
 #include "ParametersManager.h"
-#include "EventTreeWriter.h"
 #include "DialCollection.h"
 #include "EventDialCache.h"
-#include "DatasetLoader.h"
 #include "PlotGenerator.h"
 #include "JsonBaseClass.h"
 #include "SampleSet.h"
@@ -22,7 +20,6 @@
 #include <future>
 
 class Propagator : public JsonBaseClass {
-
 
 protected:
   void readConfigImpl() override;
@@ -41,22 +38,26 @@ public:
 
   // Const getters
   [[nodiscard]] bool isThrowAsimovToyParameters() const { return _throwAsimovToyParameters_; }
+  [[nodiscard]] bool isEnableStatThrowInToys() const { return _enableStatThrowInToys_; }
+  [[nodiscard]] bool isEnableEventMcThrow() const { return _enableEventMcThrow_; }
+  [[nodiscard]] bool isGaussStatThrowInToys() const { return _gaussStatThrowInToys_; }
+  [[nodiscard]] bool isLoadAsimovData() const { return _loadAsimovData_; }
+  [[nodiscard]] bool isShowEventBreakdown() const { return _showEventBreakdown_; }
+  [[nodiscard]] bool isDebugPrintLoadedEvents() const { return _debugPrintLoadedEvents_; }
+  [[nodiscard]] bool getDebugPrintLoadedEventsNbPerSample() const { return _debugPrintLoadedEventsNbPerSample_; }
   [[nodiscard]] int getIThrow() const { return _iThrow_; }
+  [[nodiscard]] const EventDialCache& getEventDialCache() const { return _eventDialCache_; }
   [[nodiscard]] const ParametersManager &getParametersManager() const { return _parManager_; }
-  [[nodiscard]] const EventTreeWriter &getTreeWriter() const{ return _treeWriter_; }
-  [[nodiscard]] const std::vector<DatasetLoader> &getDataSetList() const{ return _dataSetList_; }
-  [[nodiscard]] const std::vector<DialCollection> &getDialCollections() const{ return _dialCollections_; }
-  [[nodiscard]] const SampleSet &getSampleSet() const { return _fitSampleSet_; }
+  [[nodiscard]] const std::vector<DialCollection> &getDialCollectionList() const{ return _dialCollectionList_; }
+  [[nodiscard]] const SampleSet &getSampleSet() const { return _sampleSet_; }
+  [[nodiscard]] const JsonType &getParameterInjectorMc() const { return _parameterInjectorMc_;; }
 
   // Non-const getters
-  SampleSet &getSampleSet(){ return _fitSampleSet_; }
+  SampleSet &getSampleSet(){ return _sampleSet_; }
   ParametersManager &getParametersManager(){ return _parManager_; }
   PlotGenerator &getPlotGenerator(){ return _plotGenerator_; }
   EventDialCache& getEventDialCache(){ return _eventDialCache_; }
-  std::vector<DatasetLoader> &getDataSetList(){ return _dataSetList_; }
-
-  // Misc getters
-  [[nodiscard]] DatasetLoader* getDatasetLoaderPtr(const std::string& name_);
+  std::vector<DialCollection> &getDialCollectionList(){ return _dialCollectionList_; }
 
   // Core
   void propagateParameters();
@@ -95,24 +96,20 @@ private:
   bool _enableStatThrowInToys_{true};
   bool _gaussStatThrowInToys_{false};
   bool _enableEventMcThrow_{true};
+  bool _showEventBreakdown_{true};
   bool _enableEigenToOrigInPropagate_{true};
   int _iThrow_{-1};
 
   // Sub-layers
-  SampleSet _fitSampleSet_;
-  ParametersManager _parManager_;
-  PlotGenerator _plotGenerator_;
-  EventTreeWriter _treeWriter_;
-  std::vector<DatasetLoader> _dataSetList_;
-
-  // Monitoring
-  bool _showEventBreakdown_{true};
+  SampleSet _sampleSet_{};
+  PlotGenerator _plotGenerator_{};
+  EventDialCache _eventDialCache_{};
+  ParametersManager _parManager_{};
 
   // A vector of all the dial collections used by all the fit samples.
   // Once a dial collection has been added to this vector, it's index becomes
   // the immutable tag for that specific group of dials.
-  std::vector<DialCollection> _dialCollections_{};
-  EventDialCache _eventDialCache_{};
+  std::vector<DialCollection> _dialCollectionList_{};
 
 public:
   GenericToolbox::Time::AveragedTimer<10> reweightTimer;

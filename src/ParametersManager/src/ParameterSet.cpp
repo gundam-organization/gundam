@@ -76,7 +76,7 @@ void ParameterSet::readConfigImpl(){
   _releaseFixedParametersOnHesse_ = GenericToolbox::Json::fetchValue(_config_, "releaseFixedParametersOnHesse", _releaseFixedParametersOnHesse_);
 
   _parameterDefinitionFilePath_ = GenericToolbox::Json::fetchValue( _config_,
-    {{"parameterDefinitionFilePath"}, {"covarianceMatrixFilePath"} }, _parameterDefinitionFilePath_
+    { {"parameterDefinitionFilePath"}, {"covarianceMatrixFilePath"} }, _parameterDefinitionFilePath_
   );
   _covarianceMatrixTMatrixD_ = GenericToolbox::Json::fetchValue(_config_, "covarianceMatrixTMatrixD", _covarianceMatrixTMatrixD_);
   _parameterPriorTVectorD_ = GenericToolbox::Json::fetchValue(_config_, "parameterPriorTVectorD", _parameterPriorTVectorD_);
@@ -908,7 +908,6 @@ void ParameterSet::defineParameters(){
 
     if( not _parameterDefinitionConfig_.empty() ){
       // Alternative 1: define dials then parameters
-      ConfigUtils::forwardConfig(_parameterDefinitionConfig_);
       if (_parameterNamesList_ != nullptr) {
         // Find the parameter using the name from the vector of names for
         // the covariance.

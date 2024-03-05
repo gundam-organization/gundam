@@ -10,6 +10,7 @@
 #include "GenericToolbox.Json.h"
 #include "Logger.h"
 
+
 LoggerInit([]{
   Logger::setUserHeaderStr("[LikelihoodInterface]");
 });
@@ -18,21 +19,30 @@ LoggerInit([]{
 void LikelihoodInterface::readConfigImpl(){
   LogWarning << "Configuring LikelihoodInterface..." << std::endl;
 
-  _propagator_.readConfig(
-      GenericToolbox::Json::fetchValue( _config_, "propagatorConfig", _propagator_.getConfig() )
-  );
+  // First taking care of the DataSetManager
+  JsonType dataSetManagerConfig{};
+  GenericToolbox::Json::deprecatedAction(_dataSetManager_.getPropagator().getConfig(), {{"fitSampleSetConfig"}, {"dataSetList"}}, [&]{
+    LogAlert << R"("dataSetList" should now be set under "likelihoodInterfaceConfig" instead of "fitSampleSet".)" << std::endl;
+    dataSetManagerConfig = GenericToolbox::Json::fetchValue<JsonType>(_dataSetManager_.getPropagator().getConfig(), "fitSampleSetConfig"); // DataSetManager will look for "dataSetList"
+  });
+  GenericToolbox::Json::deprecatedAction(_dataSetManager_.getPropagator().getConfig(), "dataSetList", [&]{
+    LogAlert << R"("dataSetList" should now be set under "likelihoodInterfaceConfig" instead of "propagatorConfig".)" << std::endl;
+    dataSetManagerConfig = _dataSetManager_.getPropagator().getConfig();
+  });
+  dataSetManagerConfig = GenericToolbox::Json::fetchValue(_config_, "dataSetManagerConfig", dataSetManagerConfig);
+  _dataSetManager_.readConfig( dataSetManagerConfig );
 
-  // placeholders
+  //
   JsonType configJointProbability;
   std::string jointProbabilityTypeStr;
 
-  GenericToolbox::Json::deprecatedAction(_propagator_.getSampleSet().getConfig(), "llhStatFunction", [&]{
+  GenericToolbox::Json::deprecatedAction(_dataSetManager_.getPropagator().getSampleSet().getConfig(), "llhStatFunction", [&]{
     LogAlert << R"("llhStatFunction" should now be set under "likelihoodInterfaceConfig/jointProbabilityConfig/type".)" << std::endl;
-    jointProbabilityTypeStr = GenericToolbox::Json::fetchValue( _propagator_.getSampleSet().getConfig(), "llhStatFunction", jointProbabilityTypeStr );
+    jointProbabilityTypeStr = GenericToolbox::Json::fetchValue( _dataSetManager_.getPropagator().getSampleSet().getConfig(), "llhStatFunction", jointProbabilityTypeStr );
   });
-  GenericToolbox::Json::deprecatedAction(_propagator_.getSampleSet().getConfig(), "llhConfig", [&]{
+  GenericToolbox::Json::deprecatedAction(_dataSetManager_.getPropagator().getSampleSet().getConfig(), "llhConfig", [&]{
     LogAlert << R"("llhConfig" should now be set under "likelihoodInterfaceConfig/jointProbabilityConfig".)" << std::endl;
-    configJointProbability = GenericToolbox::Json::fetchValue( _propagator_.getSampleSet().getConfig(), "llhConfig", configJointProbability );
+    configJointProbability = GenericToolbox::Json::fetchValue( _dataSetManager_.getPropagator().getSampleSet().getConfig(), "llhConfig", configJointProbability );
   });
 
   // new config structure
@@ -48,17 +58,18 @@ void LikelihoodInterface::readConfigImpl(){
 void LikelihoodInterface::initializeImpl() {
   LogWarning << "Initializing LikelihoodInterface..." << std::endl;
 
-  _propagator_.initialize();
   _jointProbabilityPtr_->initialize();
+  _dataSetManager_.initialize();
 
-  LogWarning << "Fetching the effective number of fit parameters..." << std::endl;
+  LogInfo << "Fetching the effective number of fit parameters..." << std::endl;
   _nbParameters_ = 0;
-  for( auto& parSet : _propagator_.getParametersManager().getParameterSetsList() ){
+  for( auto& parSet : _dataSetManager_.getPropagator().getParametersManager().getParameterSetsList() ){
     _nbParameters_ += int( parSet.getNbParameters() );
   }
 
+  LogInfo << "Fetching the number of bins parameters..." << std::endl;
   _nbSampleBins_ = 0;
-  for( auto& sample : _propagator_.getSampleSet().getSampleList() ){
+  for( auto& sample : _dataSetManager_.getPropagator().getSampleSet().getSampleList() ){
     _nbSampleBins_ += int(sample.getBinning().getBinList().size() );
   }
 
@@ -66,7 +77,7 @@ void LikelihoodInterface::initializeImpl() {
 }
 
 void LikelihoodInterface::propagateAndEvalLikelihood(){
-  _propagator_.propagateParameters();
+  _dataSetManager_.getPropagator().propagateParameters();
   this->evalLikelihood();
 }
 
@@ -79,14 +90,14 @@ double LikelihoodInterface::evalLikelihood() const {
 }
 double LikelihoodInterface::evalStatLikelihood() const {
   _buffer_.statLikelihood = 0.;
-  for( auto &sample: _propagator_.getSampleSet().getSampleList()){
+  for( auto &sample: _dataSetManager_.getPropagator().getSampleSet().getSampleList()){
     _buffer_.statLikelihood += this->evalStatLikelihood( sample );
   }
   return _buffer_.statLikelihood;
 }
 double LikelihoodInterface::evalPenaltyLikelihood() const {
   _buffer_.penaltyLikelihood = 0;
-  for( auto& parSet : _propagator_.getParametersManager().getParameterSetsList() ){
+  for( auto& parSet : _dataSetManager_.getPropagator().getParametersManager().getParameterSetsList() ){
     _buffer_.penaltyLikelihood += this->evalPenaltyLikelihood( parSet );
   }
   return _buffer_.penaltyLikelihood;
@@ -127,7 +138,7 @@ double LikelihoodInterface::evalPenaltyLikelihood(const ParameterSet& parSet_) c
   ss << "Total likelihood = " << _buffer_.totalLikelihood;
   ss << std::endl << "Stat likelihood = " << _buffer_.statLikelihood;
   ss << " = sum of: " << GenericToolbox::toString(
-      _propagator_.getSampleSet().getSampleList(), [&]( const Sample& sample_){
+      _dataSetManager_.getPropagator().getSampleSet().getSampleList(), [&]( const Sample& sample_){
         std::stringstream ssSub;
         ssSub << sample_.getName() << ": ";
         if( sample_.isEnabled() ){ ssSub << this->evalStatLikelihood( sample_ ); }
@@ -137,7 +148,7 @@ double LikelihoodInterface::evalPenaltyLikelihood(const ParameterSet& parSet_) c
   );
   ss << std::endl << "Penalty likelihood = " << _buffer_.penaltyLikelihood;
   ss << " = sum of: " << GenericToolbox::toString(
-      _propagator_.getParametersManager().getParameterSetsList(), [&](const ParameterSet& parSet_){
+      _dataSetManager_.getPropagator().getParametersManager().getParameterSetsList(), [&](const ParameterSet& parSet_){
         std::stringstream ssSub;
         ssSub << parSet_.getName() << ": ";
         if( parSet_.isEnabled() ){ ssSub << this->evalPenaltyLikelihood( parSet_ ); }

@@ -25,12 +25,13 @@ std::string DataDispenserParameters::getSummary() const{
   ss << std::endl << "filePathList = " << GenericToolbox::toString(filePathList, true);
   ss << std::endl << "variableDict = " << GenericToolbox::toString(variableDict, true);
   ss << std::endl << "additionalVarsStorage = " << GenericToolbox::toString(additionalVarsStorage, true);
-  ss << std::endl << GET_VAR_NAME_VALUE(iThrow);
   return ss.str();
 }
 
 
 void DataDispenserCache::clear(){
+  propagatorPtr = nullptr;
+
   samplesToFillList.clear();
   sampleNbOfEvents.clear();
   eventIsInSamplesList.clear();

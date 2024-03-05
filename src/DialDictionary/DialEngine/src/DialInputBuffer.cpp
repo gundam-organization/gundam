@@ -86,7 +86,9 @@ void DialInputBuffer::update(){
 
   }
 
+#if USE_ZLIB
   _currentHash_ = generateHash();
+#endif
 }
 void DialInputBuffer::addParameterReference( const ParameterReference& parReference_){
   LogThrowIf(_isInitialized_, "Can't add parameter index while initialized.");

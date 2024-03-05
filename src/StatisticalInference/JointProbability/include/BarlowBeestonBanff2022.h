@@ -79,7 +79,7 @@ namespace JointProbability{
       if(not std::isfinite(mcuncert) or mcuncert < 0.0) {
         if( throwIfInfLlh ){
           LogError << "The mcuncert is not finite " << mcuncert << std::endl;
-          LogError << "nomMC bin " << bin_
+          LogError << "predMC bin " << bin_
                    << " error is " << predMC->GetBinError(bin_);
           LogThrow("The mc uncertainty is not a usable number");
         }

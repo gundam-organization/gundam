@@ -20,6 +20,7 @@ set( SRCFILES
     DialDefinitions/src/CompactSpline.cpp
     DialDefinitions/src/MonotonicSpline.cpp
 
+    DialDefinitions/src/CompiledLibDial.cpp
     DialDefinitions/src/RootFormula.cpp
     DialDefinitions/src/Polynomial.cpp
 
@@ -39,7 +40,6 @@ set( HEADERS
 
     # DialDefinitions
     DialDefinitions/include/DialBase.h
-    DialDefinitions/include/DialTypes.h
 
     DialDefinitions/include/Norm.h
     DialDefinitions/include/Shift.h
@@ -82,8 +82,8 @@ target_include_directories(
 #    ${ZLIB_INCLUDE_DIRS}
 #)
 
-target_link_libraries( ${LIB_NAME} PUBLIC
-    GundamParametersManager
+target_link_libraries( ${LIB_NAME}
+    PUBLIC
     GundamSamplesManager
 )
 

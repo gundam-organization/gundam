@@ -26,6 +26,7 @@ void SampleSet::readConfigImpl(){
   _showTimeStats_ = GenericToolbox::Json::fetchValue(_config_, "showTimeStats", _showTimeStats_);
 
   LogInfo << "Reading samples definition..." << std::endl;
+  _sampleList_.clear(); // make sure we start from scratch in case readConfig is called twice
   auto fitSampleListConfig = GenericToolbox::Json::fetchValue(_config_, "fitSampleList", JsonType());
   for( const auto& fitSampleConfig: fitSampleListConfig ){
     if( not GenericToolbox::Json::fetchValue(fitSampleConfig, "isEnabled", true) ) continue;
@@ -97,6 +98,16 @@ void SampleSet::clearMcContainers(){
     LogInfo << "Clearing event list for \"" << sample.getName() << "\"" << std::endl;
     sample.getMcContainer().eventList.clear();
   }
+}
+
+std::vector<std::string> SampleSet::fetchRequestedVariablesForIndexing() const{
+  std::vector<std::string> out;
+  for (auto &sample: _sampleList_) {
+    for (auto &bin: sample.getBinning().getBinList()) {
+      for (auto &edges: bin.getEdgesList()) { GenericToolbox::addIfNotInVector(edges.varName, out); }
+    }
+  }
+  return out;
 }
 
 void SampleSet::updateSampleEventBinIndexes() const{

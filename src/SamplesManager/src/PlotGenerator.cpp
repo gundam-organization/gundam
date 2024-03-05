@@ -38,7 +38,6 @@ void PlotGenerator::readConfigImpl(){
 void PlotGenerator::initializeImpl() {
   LogWarning << __METHOD_NAME__ << std::endl;
   LogThrowIf(_sampleSetPtr_ == nullptr);
-  this->defineHistogramHolders();
 }
 
 
@@ -810,7 +809,6 @@ void PlotGenerator::defineHistogramHolders() {
                   // User defined color?
                   auto varDict = GenericToolbox::Json::fetchMatchingEntry(_varDictionary_, "name", splitVar); // does the cosmetic pars are configured?
                   auto dictEntries = varDict["dictionary"];
-                  ConfigUtils::forwardConfig(dictEntries);
 
                   if( not varDict.empty() ){
 

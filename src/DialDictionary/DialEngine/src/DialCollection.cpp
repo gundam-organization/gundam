@@ -4,7 +4,6 @@
 
 #include "GundamGlobals.h"
 #include "DialCollection.h"
-#include "DialTypes.h"
 #include "DialBaseFactory.h"
 
 #include "GenericToolbox.Json.h"
@@ -24,17 +23,45 @@ void DialCollection::readConfigImpl() {
     _config_, "applyOnDataSets", std::vector<std::string>());
   if( _dataSetNameList_.empty() ){ _dataSetNameList_.emplace_back("*"); }
 
-  if( GundamGlobals::isDisableDialCache() ){
-    _disableDialCache_ = true;
-  }
+  _isEnabled_ = GenericToolbox::Json::fetchValue(_config_, "isEnabled", _isEnabled_);
+  if( not _isEnabled_ ){ return; }
+
+  if( GundamGlobals::isDisableDialCache() ){ _disableDialCache_ = true; }
 
   // Dials are directly defined with a binning file?
   if     ( initializeNormDialsWithParBinning() ){}
   else if( initializeDialsWithDefinition() ){}
   else {
-    LogWarning << std::endl << "Disabling dialSet." << std::endl;
+    LogAlert << std::endl << "No valid definition for DialCollection. Disabling." << std::endl;
     _isEnabled_ = false;
   }
+
+  // if "dialInputList" is not present, it will be setup during the initialize sequence.
+  if( GenericToolbox::Json::doKeyExist(_config_, "dialInputList") ){
+    auto dialInputList = GenericToolbox::Json::fetchValue<JsonType>(_config_, "dialInputList");
+
+    LogThrowIf(_supervisedParameterSetIndex_ == -1, "Can't initialize dialInputList with out setting _supervisedParameterSetIndex_");
+
+    _dialInputBufferList_.emplace_back();
+    _dialInputBufferList_.back().setParSetRef( _parameterSetListPtr_ );
+
+    // add the ref of each selected parameter
+    for( auto& dialInput : dialInputList ){
+      DialInputBuffer::ParameterReference p;
+      p.parSetIndex = _supervisedParameterSetIndex_;
+
+      if( GenericToolbox::Json::doKeyExist(dialInput, "name") ){
+        auto parName{GenericToolbox::Json::fetchValue<std::string>(dialInput, "name")};
+        auto* parPtr{_parameterSetListPtr_->at( _supervisedParameterSetIndex_ ).getParameterPtr( parName )};
+        LogThrowIf(parPtr == nullptr, "Could not find parameter: " << parName);
+        p.parIndex = parPtr->getParameterIndex();
+      }
+
+      _dialInputBufferList_.back().addParameterReference( p );
+    }
+
+  }
+
 }
 void DialCollection::initializeImpl() {
   LogInfo << "Initialising dial collection \"" << this->getTitle() << "\"" << std::endl;
@@ -124,35 +151,35 @@ void DialCollection::setupDialInterfaceReferences(){
   LogThrowIf(_supervisedParameterSetIndex_==-1, "par set index not set.");
   LogThrowIf(_supervisedParameterSetIndex_>_parameterSetListPtr_->size(), "invalid selected parset index: " << _supervisedParameterSetIndex_);
 
-  // Initializing dial input buffers:
-  _dialInputBufferList_.clear();
-  if( _supervisedParameterIndex_ == -1 ){
-    // one dial interface per parameter
-    LogThrowIf(_dialBaseList_.size() != _parameterSetListPtr_->at(_supervisedParameterSetIndex_).getParameterList().size(),
-               "Nb of dial base don't match the number of parameters of the selected set: nDials=" << _dialBaseList_.size()
-                                                                                                   << " != " << "nPars=" << _parameterSetListPtr_->at(_supervisedParameterSetIndex_).getParameterList().size()
-                                                                                                   << std::endl << "is the defined dial binning matching the number of parameters?"
-    );
-    _dialInputBufferList_.resize(_dialBaseList_.size());
-    for( int iDial = 0 ; iDial < int(_dialBaseList_.size()) ; iDial++ ){
+  // set it up is not already done
+  if( _dialInputBufferList_.empty() ){
+    if( _supervisedParameterIndex_ == -1 ){
+      // one dial interface per parameter
+      LogThrowIf(_dialBaseList_.size() != _parameterSetListPtr_->at(_supervisedParameterSetIndex_).getParameterList().size(),
+                 "Nb of dial base don't match the number of parameters of the selected set: nDials="
+                 << _dialBaseList_.size() << " != " << "nPars="
+                 << _parameterSetListPtr_->at(_supervisedParameterSetIndex_).getParameterList().size()
+                 << std::endl << "is the defined dial binning matching the number of parameters?"
+      );
+      _dialInputBufferList_.resize(_dialBaseList_.size());
+      for( int iDial = 0 ; iDial < int(_dialBaseList_.size()) ; iDial++ ){
+        DialInputBuffer::ParameterReference p{};
+        p.parSetIndex = _supervisedParameterSetIndex_;
+        p.parIndex = iDial;
+        _dialInputBufferList_[iDial].addParameterReference(p);
+      }
+    }
+    else{
+      // one parameter for every dial of the collection
+      _dialInputBufferList_.resize(1);
       DialInputBuffer::ParameterReference p{};
       p.parSetIndex = _supervisedParameterSetIndex_;
-      p.parIndex = iDial;
-      _dialInputBufferList_[iDial].addParameterReference(p);
+      p.parIndex = _supervisedParameterIndex_;
+      _dialInputBufferList_.back().addParameterReference(p);
     }
   }
-  else{
-    // one parameter for every dial of the collection
-    _dialInputBufferList_.resize(1);
-    DialInputBuffer::ParameterReference p{};
-    p.parSetIndex = _supervisedParameterSetIndex_;
-    p.parIndex = _supervisedParameterIndex_;
-    _dialInputBufferList_.back().addParameterReference(p);
-  }
 
-  for( auto& inputBuffer : _dialInputBufferList_ ){
-    inputBuffer.setParSetRef( _parameterSetListPtr_ );
-  }
+  for( auto& inputBuffer : _dialInputBufferList_ ){ inputBuffer.setParSetRef( _parameterSetListPtr_ ); }
 
   if( _useMirrorDial_ ){
     for( auto& inputBuffer : _dialInputBufferList_ ){
@@ -162,6 +189,9 @@ void DialCollection::setupDialInterfaceReferences(){
       }
     }
   }
+
+  // initialize the input buffers
+  for( auto& inputBuffer : _dialInputBufferList_ ){ inputBuffer.initialise(); }
 
   // Initializing dial interfaces:
   if( _dialInterfaceList_.size() != _dialBaseList_.size() ){
@@ -218,8 +248,6 @@ void DialCollection::setupDialInterfaceReferences(){
     }
   }
 
-  // initialize the input buffers
-  for( auto& inputBuffer : _dialInputBufferList_ ){ inputBuffer.initialise(); }
 
 }
 size_t DialCollection::getNextDialFreeSlot(){
@@ -232,7 +260,7 @@ void DialCollection::readGlobals(const JsonType &config_) {
   // globals for the dialSet
   _enableDialsSummary_ = GenericToolbox::Json::fetchValue<bool>(_config_, "printDialsSummary", _enableDialsSummary_);
 
-  _globalDialType_ = GenericToolbox::Json::fetchValue(config_, "dialsType", _globalDialType_);
+  _globalDialType_ = GenericToolbox::Json::fetchValue(config_, {{"dialsType"}, {"dialType"}}, _globalDialType_);
 
   _globalDialSubType_ =  GenericToolbox::Json::fetchValue<std::string>(config_, "dialSubType", _globalDialSubType_);
 
@@ -240,7 +268,8 @@ void DialCollection::readGlobals(const JsonType &config_) {
 
   if (GenericToolbox::Json::doKeyExist(config_, "applyCondition")) {
     _applyConditionStr_ = GenericToolbox::Json::fetchValue<std::string>(config_, "applyCondition");
-  } else if (GenericToolbox::Json::doKeyExist(config_, "applyConditions")) {
+  }
+  else if (GenericToolbox::Json::doKeyExist(config_, "applyConditions")) {
     std::vector<std::string> conditionsList;
 
     for (auto &condEntry: GenericToolbox::Json::fetchValue<std::vector<JsonType>>(config_, "applyConditions")) {
@@ -346,8 +375,7 @@ void DialCollection::readGlobals(const JsonType &config_) {
                "\"" << _applyConditionStr_ << "\": could not be parsed as formula expression.")
   }
 
-  _minDialResponse_ = GenericToolbox::Json::fetchValue(config_, {{"minDialResponse"},
-                                                                 {"minimumSplineResponse"}}, _minDialResponse_);
+  _minDialResponse_ = GenericToolbox::Json::fetchValue(config_, {{"minDialResponse"}, {"minimumSplineResponse"}}, _minDialResponse_);
   _maxDialResponse_ = GenericToolbox::Json::fetchValue(config_, "maxDialResponse", _maxDialResponse_);
 
   _useMirrorDial_ = GenericToolbox::Json::fetchValue(config_, "useMirrorDial", _useMirrorDial_);
@@ -409,6 +437,14 @@ bool DialCollection::initializeDialsWithDefinition() {
     _dialBaseList_.emplace_back(
       DialBaseObject(dialBaseFactory.makeDial(getTitle(),"Normalization","",nullptr,false)));
   }
+  else if( _globalDialType_ == "Formula" or _globalDialType_ == "RootFormula" ){
+    DialBaseFactory f;
+    _dialBaseList_.emplace_back( DialBaseObject( f.makeDial( dialsDefinition ) ) );
+  }
+  else if( _globalDialType_ == "CompiledLibDial" ){
+    DialBaseFactory f;
+    _dialBaseList_.emplace_back( DialBaseObject( f.makeDial( dialsDefinition ) ) );
+  }
   else {
     if     (not _globalDialLeafName_.empty()) {
       // The dialLeafName field has been provided, so this is an event by
@@ -416,8 +452,6 @@ bool DialCollection::initializeDialsWithDefinition() {
       // DataDispenser.
       _isBinned_ = false;
     }
-
-    ///////////////////////////////////////////////////////////////////////
     else if( GenericToolbox::Json::doKeyExist(dialsDefinition, "binningFilePath") ) {
       // A binning file has been provided, so this is a binned dial.  Create
       // the dials for each bin here.  The dials will be assigned to the
@@ -553,7 +587,7 @@ bool DialCollection::initializeDialsWithDefinition() {
         LogError << "Neither dialsTreePath nor dialsList are provided..." << std::endl;
       }
     }
-    else {
+    else{
       LogError << "The dial is neither event-by-event nor binned..." << std::endl;
     }
   }
