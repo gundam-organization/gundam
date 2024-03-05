@@ -13,6 +13,7 @@ LoggerInit([]{
 void EventDialCache::buildReferenceCache(SampleSet& sampleSet_, std::vector<DialCollection>& dialCollectionList_){
   LogInfo << "Building event dial cache..." << std::endl;
 
+  LogInfo << "Indexed cache size: " << _indexedCache_.size() << std::endl;
   LogInfo << "Sorting events in sync with indexed cache..." << std::endl;
 
   size_t nCacheSlots{0};
