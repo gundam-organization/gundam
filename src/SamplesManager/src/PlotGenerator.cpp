@@ -93,8 +93,8 @@ void PlotGenerator::generateSampleHistograms(TDirectory *saveDir_, int cacheSlot
       if( histDef.varToPlot == "Raw" ){
         if( _sampleSetPtr_ != nullptr ){
           TH1D* histBase{nullptr};
-          if( histDef.isData ) { histBase = histDef.samplePtr->getDataContainer().histogram.get(); }
-          else { histBase = histDef.samplePtr->getMcContainer().histogram.get(); }
+          if( histDef.isData ) { histBase = histDef.samplePtr->getDataContainer().getHistogram(); }
+          else { histBase = histDef.samplePtr->getMcContainer().getHistogram(); }
           histDef.histPtr = std::make_shared<TH1D>( *histBase );
         }
         else{
@@ -636,7 +636,7 @@ void PlotGenerator::defineHistogramHolders() {
 
     for( int iSample = bounds.first ; iSample < bounds.second ; iSample++ ){
       const Sample& sample = _sampleSetPtr_->getSampleList()[iSample];
-      for( const auto& event : sample.getMcContainer().eventList ){
+      for( auto& event : sample.getMcContainer().getEventList() ){
         for( auto& splitVarInstance: splitVarsDictionary ){
           if(splitVarInstance.first.empty()) continue;
           int splitValue = event.getVarValue<int>(splitVarInstance.first);

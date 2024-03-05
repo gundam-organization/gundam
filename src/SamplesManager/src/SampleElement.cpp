@@ -15,26 +15,41 @@ LoggerInit([]{ Logger::setUserHeaderStr("[SampleElement]"); });
 void SampleElement::reserveEventMemory(size_t dataSetIndex_, size_t nEvents, const PhysicsEvent &eventBuffer_) {
   LogScopeIndent;
   LogThrowIf(isLocked, "Can't " << __METHOD_NAME__ << " while locked");
-  if( nEvents == 0 ){ return; }
-  dataSetIndexList.emplace_back(dataSetIndex_);
-  eventOffSetList.emplace_back(eventList.size());
-  eventNbList.emplace_back(nEvents);
-  LogInfo << name << ": creating " << eventNbList.back() << " events ("
-  << GenericToolbox::parseSizeUnits( double(eventNbList.back()) * sizeof(eventBuffer_) )
+
+  // adding one dataset:
+  loadedDatasetList.emplace_back();
+
+  // filling up properties:
+  auto& datasetProperties{loadedDatasetList.back()};
+  datasetProperties.dataSetIndex = dataSetIndex_;
+  datasetProperties.eventOffSet = eventList.size();
+  datasetProperties.eventNb = nEvents;
+
+  LogInfo << name << ": creating " << nEvents << " events ("
+  << GenericToolbox::parseSizeUnits( double(nEvents) * sizeof(eventBuffer_) )
   << ")" << std::endl;
-  eventList.resize(eventOffSetList.back()+eventNbList.back(), eventBuffer_);
+  eventList.resize(datasetProperties.eventOffSet + datasetProperties.eventNb, eventBuffer_);
 }
 void SampleElement::shrinkEventList(size_t newTotalSize_){
   LogScopeIndent;
   LogThrowIf(isLocked, "Can't " << __METHOD_NAME__ << " while locked");
-  if( eventNbList.empty() and newTotalSize_ == 0 ) return;
+
+  if( loadedDatasetList.empty() and newTotalSize_ == 0 ){
+    LogAlert << "Empty dataset list. Nothing to shrink." << std::endl;
+    return;
+  }
+
   LogThrowIf(eventList.size() < newTotalSize_,
              "Can't shrink since eventList is too small: " << GET_VAR_NAME_VALUE(newTotalSize_)
              << " > " << GET_VAR_NAME_VALUE(eventList.size()));
-  LogThrowIf(not eventNbList.empty() and eventNbList.back() < (eventList.size() - newTotalSize_), "Can't shrink since eventList of the last dataSet is too small.");
+
+  LogThrowIf( not loadedDatasetList.empty() and loadedDatasetList.back().eventNb < (eventList.size() - newTotalSize_),
+              "Can't shrink since eventList of the last dataSet is too small.");
+
   LogInfo << name << ": shrinking event list from " << eventList.size() << " to " << newTotalSize_ << "..."
   << "(+" << GenericToolbox::parseSizeUnits( double(eventList.size() - newTotalSize_) * sizeof(eventList.back()) ) << ")" << std::endl;
-  eventNbList.back() -= (eventList.size() - newTotalSize_);
+
+  loadedDatasetList.back().eventNb -= (eventList.size() - newTotalSize_);
   eventList.resize(newTotalSize_);
   eventList.shrink_to_fit();
 }
@@ -219,11 +234,15 @@ size_t SampleElement::getNbBinnedEvents() const{
                          [](size_t sum_, const PhysicsEvent& ev_){ return sum_ + (ev_.getSampleBinIndex() != -1); });
 }
 
-void SampleElement::print() const{
-  LogInfo << "SampleElement: " << name << std::endl;
-  LogInfo << " - " << "Nb bins: " << binning.getBinList().size() << std::endl;
-  LogInfo << " - " << "Nb events: " << eventList.size() << std::endl;
-  LogInfo << " - " << "Hist rescale: " << histScale << std::endl;
+[[nodiscard]] std::string SampleElement::getSummary() const{
+  std::stringstream ss;
+  ss << "SampleElement: " << name << std::endl;
+  ss << " - " << "Nb bins: " << binning.getBinList().size() << std::endl;
+  ss << " - " << "Nb events: " << eventList.size();
+  return ss.str();
+}
+std::ostream& operator <<( std::ostream& o, const SampleElement& this_ ){
+  o << this_.getSummary(); return o;
 }
 
 //  A Lesser GNU Public License
