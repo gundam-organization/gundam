@@ -25,13 +25,12 @@ void DataSetManager::readConfigImpl(){
   _propagator_.readConfig();
 
   // dataSetList should be present
-  JsonType dataSetList{ GenericToolbox::Json::fetchValue<JsonType>(_config_, "dataSetList") };
+  JsonType dataSetList;
+  dataSetList = GenericToolbox::Json::fetchValue(_config_, "dataSetList", dataSetList);
 
   // creating the dataSets:
   _dataSetList_.reserve( dataSetList.size() );
-  for( const auto& dataSetConfig : dataSetList ){
-    _dataSetList_.emplace_back(dataSetConfig, int(_dataSetList_.size()));
-  }
+  for( const auto& dataSetConfig : dataSetList ){ _dataSetList_.emplace_back(dataSetConfig, int(_dataSetList_.size())); }
 
   // deprecated config files will already have filled up _treeWriter_.getConfig()
   GenericToolbox::Json::deprecatedAction(_propagator_.getConfig(), "eventTreeWriter", [&]{
