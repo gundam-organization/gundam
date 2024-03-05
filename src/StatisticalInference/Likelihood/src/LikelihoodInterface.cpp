@@ -23,11 +23,11 @@ void LikelihoodInterface::readConfigImpl(){
   JsonType dataSetManagerConfig{};
   GenericToolbox::Json::deprecatedAction(_dataSetManager_.getPropagator().getConfig(), {{"fitSampleSetConfig"}, {"dataSetList"}}, [&]{
     LogAlert << R"("dataSetList" should now be set under "likelihoodInterfaceConfig" instead of "fitSampleSet".)" << std::endl;
-    dataSetManagerConfig = GenericToolbox::Json::fetchValuePath<JsonType>(_dataSetManager_.getPropagator().getSampleSet().getConfig(), "fitSampleSetConfig/dataSetList"); // DataSetManager will look for "dataSetList"
+    dataSetManagerConfig = GenericToolbox::Json::fetchValue<JsonType>(_dataSetManager_.getPropagator().getConfig(), "fitSampleSetConfig"); // DataSetManager will look for "dataSetList"
   });
   GenericToolbox::Json::deprecatedAction(_dataSetManager_.getPropagator().getConfig(), "dataSetList", [&]{
     LogAlert << R"("dataSetList" should now be set under "likelihoodInterfaceConfig" instead of "propagatorConfig".)" << std::endl;
-    dataSetManagerConfig = GenericToolbox::Json::fetchValue<JsonType>(_dataSetManager_.getPropagator().getConfig(), "dataSetList");
+    dataSetManagerConfig = _dataSetManager_.getPropagator().getConfig();
   });
   dataSetManagerConfig = GenericToolbox::Json::fetchValue(_config_, "dataSetManagerConfig", dataSetManagerConfig);
   _dataSetManager_.readConfig( dataSetManagerConfig );
