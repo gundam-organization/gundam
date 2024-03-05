@@ -1023,7 +1023,7 @@ void DataDispenser::fillFunction(int iThread_){
       // OK, now we have a valid fit bin. Let's claim an index.
       // Shared index among threads
       size_t sampleEventIndex{};
-      EventDialCache::IndexedEntry_t* eventDialCacheEntry{nullptr};
+      EventDialCache::IndexedCacheEntry* eventDialCacheEntry{nullptr};
       {
         std::unique_lock<std::mutex> lock(GundamGlobals::getThreadMutex());
         if( _parameters_.useMcContainer ){

@@ -10,7 +10,7 @@ LoggerInit([]{
   Logger::setUserHeaderStr("[EventDialCache]");
 });
 
-void EventDialCache::buildReferenceCache(SampleSet& sampleSet_, std::vector<DialCollection>& dialCollectionList_){
+void EventDialCache::buildReferenceCache( SampleSet& sampleSet_, std::vector<DialCollection>& dialCollectionList_){
   LogInfo << "Building event dial cache..." << std::endl;
 
   LogInfo << "Indexed cache size: " << _indexedCache_.size() << std::endl;
@@ -19,7 +19,7 @@ void EventDialCache::buildReferenceCache(SampleSet& sampleSet_, std::vector<Dial
   LogDebug << GET_VAR_NAME_VALUE(_fillIndex_) << std::endl;
 
   size_t nCacheSlots{0};
-  std::vector<std::vector<IndexedEntry_t>> sampleIndexCacheList{sampleSet_.getSampleList().size()};
+  std::vector<std::vector<IndexedCacheEntry>> sampleIndexCacheList{sampleSet_.getSampleList().size()};
 
   {
     LogScopeIndent;
@@ -71,9 +71,9 @@ void EventDialCache::buildReferenceCache(SampleSet& sampleSet_, std::vector<Dial
 
   }
 
-  auto countValidDials = [](std::vector<DialIndexEntry_t>& dialIndices_){
+  auto countValidDials = [](std::vector<DialIndexCacheEntry>& dialIndices_){
     return std::count_if(dialIndices_.begin(), dialIndices_.end(),
-      [](DialIndexEntry_t& dialIndex_){
+      []( DialIndexCacheEntry& dialIndex_){
         if( dialIndex_.collectionIndex == size_t(-1) ){ return false; }
         if( dialIndex_.interfaceIndex == size_t(-1) ){ return false; }
         return true;
@@ -108,33 +108,26 @@ void EventDialCache::buildReferenceCache(SampleSet& sampleSet_, std::vector<Dial
     }
   }
 }
-void EventDialCache::allocateCacheEntries(size_t nEvent_, size_t nDialsMaxPerEvent_) {
+void EventDialCache::allocateCacheEntries( size_t nEvent_, size_t nDialsMaxPerEvent_) {
     _indexedCache_.resize(
         _indexedCache_.size() + nEvent_,
         {{std::size_t(-1),std::size_t(-1)},
-         std::vector<DialIndexEntry_t>(nDialsMaxPerEvent_,
-                                       {std::size_t(-1),std::size_t(-1)})} );
+         std::vector<DialIndexCacheEntry>(nDialsMaxPerEvent_,
+                                          {std::size_t(-1),std::size_t(-1)})} );
 }
 void EventDialCache::shrinkIndexedCache(){
   _indexedCache_.resize(_fillIndex_+1);
   _indexedCache_.shrink_to_fit();
 }
 
-EventDialCache::IndexedEntry_t* EventDialCache::fetchNextCacheEntry(){
-  // for debug, uncomment:
-//  LogThrowIf(
-//      _fillIndex_ >= _indexedCache_.size(),
-//      "out of range: " << GET_VAR_NAME_VALUE(_fillIndex_)
-//      << " while: " << GET_VAR_NAME_VALUE(_indexedCache_.size())
-//  );
-
+EventDialCache::IndexedCacheEntry* EventDialCache::fetchNextCacheEntry(){
   // Warning warning Will Robinson!
   // This only works IFF the indexed cache is not resized.
-  return &_indexedCache_[_fillIndex_++];
+  return &_indexedCache_.at(_fillIndex_++);
 }
 
 
-void EventDialCache::reweightEntry(EventDialCache::CacheElem_t& entry_){
+void EventDialCache::reweightEntry( EventDialCache::CacheEntry& entry_){
   // storing the reweight factor in a temporary buffer
   // this allows to perform capping of the value
   double tempReweight{1};

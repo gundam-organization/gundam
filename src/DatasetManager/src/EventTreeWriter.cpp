@@ -52,7 +52,7 @@ void EventTreeWriter::writeSamples(TDirectory* saveDir_, const Propagator& propa
         this->writeEvents(GenericToolbox::mkdirTFile(saveDir_, sample.getName()), (isData ? "Data" : "MC"), *evListPtr);
       }
       else{
-        std::vector<const EventDialCache::CacheElem_t*> cacheSampleList{};
+        std::vector<const EventDialCache::CacheEntry*> cacheSampleList{};
         cacheSampleList.reserve( propagator_.getEventDialCache().getCache().size() );
         for( auto& cacheEntry : propagator_.getEventDialCache().getCache() ){
           if( cacheEntry.event->getSampleIndex() == sample.getIndex() ){
@@ -70,7 +70,7 @@ void EventTreeWriter::writeSamples(TDirectory* saveDir_, const Propagator& propa
 void EventTreeWriter::writeEvents(TDirectory *saveDir_, const std::string& treeName_, const std::vector<PhysicsEvent> & eventList_) const {
   this->writeEventsTemplate(saveDir_, treeName_, eventList_);
 }
-void EventTreeWriter::writeEvents(TDirectory* saveDir_, const std::string& treeName_, const std::vector<const EventDialCache::CacheElem_t*>& cacheSampleList_) const{
+void EventTreeWriter::writeEvents(TDirectory* saveDir_, const std::string& treeName_, const std::vector<const EventDialCache::CacheEntry*>& cacheSampleList_) const{
   this->writeEventsTemplate(saveDir_, treeName_, cacheSampleList_);
 }
 

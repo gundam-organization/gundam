@@ -2,8 +2,8 @@
 // Created by Adrien Blanchet on 01/12/2022.
 //
 
-#ifndef GUNDAM_EVENTDIALCACHE_H
-#define GUNDAM_EVENTDIALCACHE_H
+#ifndef GUNDAM_EVENT_DIAL_CACHE_H
+#define GUNDAM_EVENT_DIAL_CACHE_H
 
 #include "SampleSet.h"
 #include "DialCollection.h"
@@ -58,7 +58,7 @@ public:
 
   /// The cache element associating a PhysicsEvent to the appropriate
   /// DialInterface.
-  struct CacheElem_t {
+  struct CacheEntry {
     PhysicsEvent* event;
     std::vector<DialResponseCache> dialResponseCacheList{};
 
@@ -74,13 +74,10 @@ public:
     }
   };
 
-public:
-  EventDialCache() = default;
-
   /// A pair of indices into the vector of dial collections, and then the
   /// index of the dial interfaces in the dial collection vector of dial
   /// interfaces.
-  struct DialIndexEntry_t {
+  struct DialIndexCacheEntry {
     /// The index in the dial collection being associated with the event.
     std::size_t collectionIndex {std::size_t(-1)};
     /// The index of the actual dial interface in the dial collection being
@@ -92,7 +89,7 @@ public:
       ss << "collection: " << collectionIndex << ", interface: " << interfaceIndex;
       return ss.str();
     }
-    friend std::ostream& operator <<( std::ostream& o, const DialIndexEntry_t& this_ ){
+    friend std::ostream& operator <<( std::ostream& o, const DialIndexCacheEntry& this_ ){
       o << this_.getSummary(); return o;
     }
   };
@@ -100,7 +97,7 @@ public:
   /// A pair of indices into the the vector of Samples in the SampleSet
   /// vector of fit samples, and the index of the event eventList in the
   /// SampleElement returned by getMcContainer().
-  struct EventIndexEntry_t {
+  struct EventIndexCacheEntry {
     /// The index of the fit sample being referenced by this indexed cache
     /// entry in the SampleSet vector of Sample objects (returned by
     /// getSampleList().
@@ -115,7 +112,7 @@ public:
       ss << "sample: " << sampleIndex << ", idx: " << eventIndex;
       return ss.str();
     }
-    friend std::ostream& operator <<( std::ostream& o, const EventIndexEntry_t& this_ ){
+    friend std::ostream& operator <<( std::ostream& o, const EventIndexCacheEntry& this_ ){
       o << this_.getSummary(); return o;
     }
   };
@@ -124,9 +121,9 @@ public:
   /// DialCollectionVector).  This will be used to build a fast lookup table
   /// between the PhysicsEvent* and the DialInterface* (i.e. a CacheElem_t
   /// returned by getCache().
-  struct IndexedEntry_t{
-    EventIndexEntry_t event;
-    std::vector<DialIndexEntry_t> dials;
+  struct IndexedCacheEntry{
+    EventIndexCacheEntry event;
+    std::vector<DialIndexCacheEntry> dials;
 
     [[nodiscard]] std::string getSummary() const{
       std::stringstream ss;
@@ -134,10 +131,13 @@ public:
       ss << " -> Dials" << GenericToolbox::toString(dials);
       return ss.str();
     }
-    friend std::ostream& operator <<( std::ostream& o, const IndexedEntry_t& this_ ){
+    friend std::ostream& operator <<( std::ostream& o, const IndexedCacheEntry& this_ ){
       o << this_.getSummary(); return o;
     }
   };
+
+public:
+  EventDialCache() = default;
 
   // returns the current index
   [[nodiscard]] size_t getFillIndex() const { return _fillIndex_; }
@@ -149,8 +149,8 @@ public:
   /// PhysicsEvent will probably be in the cache multiple times (for different
   /// DialInterface objects), and each DialInterface object could be in the
   /// cache multiple times (but for different Physics event objects).
-  std::vector<CacheElem_t> &getCache(){ return _cache_; }
-  [[nodiscard]] const std::vector<CacheElem_t> &getCache() const{ return _cache_; }
+  std::vector<CacheEntry> &getCache(){ return _cache_; }
+  [[nodiscard]] const std::vector<CacheEntry> &getCache() const{ return _cache_; }
 
   GlobalEventReweightCap& getGlobalEventReweightCap(){ return _globalEventReweightCap_; }
 
@@ -163,7 +163,7 @@ public:
   /// bare pointer but it is referencing an element of a vector and can be
   /// invalidated if the values get added to the indexed cache.  The ownership
   /// of the pointer is not passed to the caller.
-  IndexedEntry_t* fetchNextCacheEntry();
+  IndexedCacheEntry* fetchNextCacheEntry();
 
   /// Build the association between pointers to PhysicsEvent objects and the
   /// pointers to DialInterface objects.  This must be done before the event
@@ -174,7 +174,7 @@ public:
   /// Resize the cache vectors to remove entries with null events
   void shrinkIndexedCache();
 
-  void reweightEntry(CacheElem_t& entry_);
+  void reweightEntry( CacheEntry& entry_);
 
 
 private:
@@ -186,18 +186,18 @@ private:
   // can have dials that get skipped.  The indexedCache will be used to build
   // the main vector of CacheElem_t which will only have valid pairs of events
   // and dials.
-  std::vector<IndexedEntry_t> _indexedCache_{};
+  std::vector<IndexedCacheEntry> _indexedCache_{};
 
   /// A cache of all of the valid PhysicsEvent* and DialInterface*
   /// associations for efficient use when reweighting the MC events.
-  std::vector<CacheElem_t> _cache_{};
+  std::vector<CacheEntry> _cache_{};
 
   /// Global cap
   GlobalEventReweightCap _globalEventReweightCap_{};
 };
 
 
-#endif //GUNDAM_EVENTDIALCACHE_H
+#endif //GUNDAM_EVENT_DIAL_CACHE_H
 
 //  A Lesser GNU Public License
 
