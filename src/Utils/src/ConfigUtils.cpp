@@ -43,6 +43,9 @@ namespace ConfigUtils {
       output = GenericToolbox::Json::readConfigFile(configFilePath_);
     }
 
+    // resolve sub-references to other config files
+    ConfigUtils::unfoldConfig( output );
+
     return output;
   }
 

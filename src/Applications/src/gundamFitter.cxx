@@ -291,7 +291,7 @@ int main(int argc, char** argv){
 
   // injectParameterPath
   if( not injectParameterPath.empty() ){
-    auto injectConfig = ConfigUtils::readConfigFile( injectParameterPath ); ConfigUtils::forwardConfig( injectConfig );
+    auto injectConfig = ConfigUtils::readConfigFile( injectParameterPath );
     fitter.getLikelihoodInterface().getDataSetManager().getPropagator().setParameterInjectorConfig(injectConfig);
   }
 
