@@ -30,7 +30,7 @@ public:
     double maxReweight{std::nan("unset")};
 
     /// apply the cap if enabled
-    void process(double& reweightValue_){
+    void process(double& reweightValue_) const{
       if( not isEnabled ){ return; }
       if( reweightValue_ > maxReweight ){ reweightValue_ = maxReweight; }
     }
