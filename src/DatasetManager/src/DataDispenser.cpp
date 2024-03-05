@@ -692,14 +692,14 @@ void DataDispenser::eventSelectionFunction(int iThread_){
   auto bounds = GenericToolbox::ParallelWorker::getThreadBoundIndices( iThread_, nThreads, nEvents );
 
   // Load the branches
-  treeChain->LoadTree( bounds.first );
+  treeChain->LoadTree( bounds.beginIndex );
 
   // for each event, which sample is active?
   std::string progressTitle = "Performing event selection on " + this->getTitle() + "...";
   std::stringstream ssProgressTitle;
   TFile *lastFilePtr{nullptr};
 
-  for ( Long64_t iEntry = bounds.first ; iEntry < bounds.second ; iEntry++ ) {
+  for ( Long64_t iEntry = bounds.beginIndex ; iEntry < bounds.endIndex ; iEntry++ ) {
     if( iThread_ == 0 ){
       readSpeed.addQuantity(treeChain->GetEntry(iEntry)*nThreads);
       if (GenericToolbox::showProgressBar(iGlobal, nEvents)) {
@@ -923,7 +923,7 @@ void DataDispenser::fillFunction(int iThread_){
   auto bounds = GenericToolbox::ParallelWorker::getThreadBoundIndices( iThread_, nThreads, nEvents );
 
   // Load the branches
-  treeChain->LoadTree(bounds.first);
+  treeChain->LoadTree(bounds.beginIndex);
 
   // IO speed monitor
   GenericToolbox::VariableMonitor readSpeed("bytes");
@@ -931,7 +931,7 @@ void DataDispenser::fillFunction(int iThread_){
   std::string progressTitle = "Loading and indexing...";
   std::stringstream ssProgressBar;
 
-  for( Long64_t iEntry = bounds.first ; iEntry < bounds.second; iEntry++ ){
+  for( Long64_t iEntry = bounds.beginIndex ; iEntry < bounds.endIndex; iEntry++ ){
 
     if( iThread_ == 0 ){
       if( GenericToolbox::showProgressBar(iEntry*nThreads, nEvents) ){

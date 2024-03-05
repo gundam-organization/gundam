@@ -505,15 +505,11 @@ int main(int argc, char** argv){
     }
   }
 
-
-
-
   bool enableEventMcThrow{true};
   bool enableStatThrowInToys{true};
   auto xsecCalcConfig   = GenericToolbox::Json::fetchValue( cHandler.getConfig(), "xsecCalcConfig", JsonType() );
   enableStatThrowInToys = GenericToolbox::Json::fetchValue( xsecCalcConfig, "enableStatThrowInToys", enableStatThrowInToys);
   enableEventMcThrow    = GenericToolbox::Json::fetchValue( xsecCalcConfig, "enableEventMcThrow", enableEventMcThrow);
-
 
   auto writeBinDataFct = std::function<void()>([&]{
     for( auto& xsec : crossSectionDataList ){

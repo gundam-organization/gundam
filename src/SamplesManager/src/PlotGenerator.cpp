@@ -165,7 +165,7 @@ void PlotGenerator::generateSampleHistograms(TDirectory *saveDir_, int cacheSlot
                 hist->histPtr->GetNbinsX()
             );
 
-            for( int iBin = bounds.first+1 ; iBin <= bounds.second ; iBin++ ){
+            for( int iBin = bounds.beginIndex+1 ; iBin <= bounds.endIndex ; iBin++ ){
               hist->histPtr->SetBinContent(iBin, 0);
               for( auto* evtPtr : hist->_binEventPtrList_[iBin-1] ){
                 hist->histPtr->AddBinContent(iBin, evtPtr->getEventWeight());
@@ -624,7 +624,7 @@ void PlotGenerator::defineHistogramHolders() {
         int(_sampleSetPtr_->getSampleList().size())
     );
 
-    for( int iSample = bounds.first ; iSample < bounds.second ; iSample++ ){
+    for( int iSample = bounds.beginIndex ; iSample < bounds.endIndex ; iSample++ ){
       const Sample& sample = _sampleSetPtr_->getSampleList()[iSample];
       for( auto& event : sample.getMcContainer().getEventList() ){
         for( auto& splitVarInstance: splitVarsDictionary ){
@@ -871,7 +871,7 @@ void PlotGenerator::buildEventBinCache(const std::vector<HistHolder *> &histPtrT
     );
 
     HistHolder* histPtr{nullptr};
-    for( int iHist = bounds.first ; iHist < bounds.second ; iHist++ ){
+    for( int iHist = bounds.beginIndex ; iHist < bounds.endIndex ; iHist++ ){
       histPtr = histPtrToFillList[iHist];
 
       if( not histPtr->isBinCacheBuilt ){

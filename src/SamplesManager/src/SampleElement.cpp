@@ -87,10 +87,10 @@ void SampleElement::refillHistogram(int iThread_){
 
 #ifdef GUNDAM_USING_CACHE_MANAGER
   if (_CacheManagerValid_ and not (*_CacheManagerValid_)) {
-      // This is can be slowish when data must be copied from the device, but
+      // This can be slowish when data must be copied from the device, but
       // it makes sure that the results are copied from the device when they
       // have changed. The values pointed to by _CacheManagerValue_ and
-      // _CacheManagerValid_ are inside of the summed index cache (a bit of
+      // _CacheManagerValid_ are inside the summed index cache (a bit of
       // evil coding here), and are updated by the cache.  The update is
       // triggered by (*_CacheManagerUpdate_)().
       if (_CacheManagerUpdate_) (*_CacheManagerUpdate_)();
