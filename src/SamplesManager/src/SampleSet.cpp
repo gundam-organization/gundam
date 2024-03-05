@@ -76,20 +76,20 @@ void SampleSet::initializeImpl() {
 void SampleSet::copyMcEventListToDataContainer(){
   for( auto& sample : _sampleList_ ){
     LogInfo << "Copying MC events in sample \"" << sample.getName() << "\"" << std::endl;
-    sample.getDataContainer().eventList.clear();
-    sample.getDataContainer().eventList.reserve(sample.getMcContainer().eventList.size());
-//    sample.getDataContainer().eventList = sample.getMcContainer().eventList;
-    sample.getDataContainer().eventList.insert(
-        sample.getDataContainer().eventList.begin(),
-        std::begin(sample.getMcContainer().eventList),
-        std::end(sample.getMcContainer().eventList)
+    sample.getDataContainer().getEventList().clear();
+    sample.getDataContainer().getEventList().reserve(sample.getMcContainer().getEventList().size());
+//    sample.getDataContainer().getEventList() = sample.getMcContainer().getEventList();
+    sample.getDataContainer().getEventList().insert(
+        sample.getDataContainer().getEventList().begin(),
+        std::begin(sample.getMcContainer().getEventList()),
+        std::end(sample.getMcContainer().getEventList())
     );
   }
 }
 void SampleSet::clearMcContainers(){
   for( auto& sample : _sampleList_ ){
     LogInfo << "Clearing event list for \"" << sample.getName() << "\"" << std::endl;
-    sample.getMcContainer().eventList.clear();
+    sample.getMcContainer().getEventList().clear();
   }
 }
 

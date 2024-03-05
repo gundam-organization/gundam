@@ -210,8 +210,8 @@ bool Cache::Manager::Build( SampleSet& sampleList,
     // Count the total number of histogram cells.
     int histCells = 0;
     for(const Sample& sample : sampleList.getSampleList() ){
-        if (!sample.getMcContainer().histogram) continue;
-        int cells = sample.getMcContainer().histogram->GetNcells();
+        if( sample.getMcContainer().getHistogram() == nullptr ){ continue; }
+        int cells = sample.getMcContainer().getHistogram()->GetNcells();
         LogInfo  << "Add histogram for " << sample.getName()
                 << " with " << cells
                 << " cells (includes under/over-flows)" << std::endl;
@@ -533,9 +533,9 @@ bool Cache::Manager::Update( SampleSet& sampleList,
     int nextHist = 0;
     for(Sample& sample : sampleList.getSampleList() ) {
         LogInfo  << "Fill cache for " << sample.getName()
-                << " with " << sample.getMcContainer().eventList.size()
+                << " with " << sample.getMcContainer().getEventList().size()
                 << " events" << std::endl;
-        std::shared_ptr<TH1> hist(sample.getMcContainer().histogram);
+        std::shared_ptr<TH1> hist(sample.getMcContainer().getHistogramSharedPtr());
         if (!hist) {
             throw std::runtime_error("missing sample histogram");
         }
@@ -559,7 +559,7 @@ bool Cache::Manager::Update( SampleSet& sampleList,
         nextHist += cells;
         /// ARE ALL OF THE EVENTS HANDLED?
         for (PhysicsEvent& event
-                 : sample.getMcContainer().eventList) {
+                 : sample.getMcContainer().getEventList()) {
             int eventIndex = event.getCacheManagerIndex();
             int cellIndex = event.getSampleBinIndex();
             if (cellIndex < 0 || cells <= cellIndex) {

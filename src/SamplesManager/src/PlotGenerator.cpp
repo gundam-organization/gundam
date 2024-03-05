@@ -92,7 +92,7 @@ void PlotGenerator::generateSampleHistograms(TDirectory *saveDir_, int cacheSlot
     if( histDef.histPtr == nullptr ){
       if( histDef.varToPlot == "Raw" ){
         if( _sampleSetPtr_ != nullptr ){
-          TH1D* histBase{nullptr};
+          const TH1D* histBase{nullptr};
           if( histDef.isData ) { histBase = histDef.samplePtr->getDataContainer().getHistogram(); }
           else { histBase = histDef.samplePtr->getMcContainer().getHistogram(); }
           histDef.histPtr = std::make_shared<TH1D>( *histBase );
@@ -126,7 +126,7 @@ void PlotGenerator::generateSampleHistograms(TDirectory *saveDir_, int cacheSlot
         std::vector<HistHolder*> histPtrToFillList;
 
         if( isData ){
-          eventListPtr = &sample.getDataContainer().eventList;
+          eventListPtr = &sample.getDataContainer().getEventList();
 
           // which hist should be filled?
           for( auto& histDef : _histHolderCacheList_[cacheSlot_] ){
@@ -136,7 +136,7 @@ void PlotGenerator::generateSampleHistograms(TDirectory *saveDir_, int cacheSlot
           }
         }
         else{
-          eventListPtr = &sample.getMcContainer().eventList;
+          eventListPtr = &sample.getMcContainer().getEventList();
 
           // which hist should be filled?
           for( auto& histDef : _histHolderCacheList_[cacheSlot_] ){
@@ -184,17 +184,7 @@ void PlotGenerator::generateSampleHistograms(TDirectory *saveDir_, int cacheSlot
   // Post-processing (norm, color)
   for( auto& histHolderCached : _histHolderCacheList_[cacheSlot_] ){
 
-    if( _sampleSetPtr_ != nullptr ){
-      if( histHolderCached.isData ){
-        histHolderCached.histPtr->Scale(histHolderCached.samplePtr->getDataContainer().histScale );
-      }
-      else{
-        histHolderCached.histPtr->Scale(histHolderCached.samplePtr->getMcContainer().histScale );
-      }
-    }
-    else{
-      LogThrow("Samples not set.")
-    }
+    LogThrowIf( _sampleSetPtr_ == nullptr, "Samples not set.");
 
     for(int iBin = 0 ; iBin <= histHolderCached.histPtr->GetNbinsX() + 1 ; iBin++ ){
       double binContent = histHolderCached.histPtr->GetBinContent(iBin); // this is the real number of counts

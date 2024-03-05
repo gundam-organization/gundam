@@ -140,10 +140,6 @@ void DataSetManager::loadData(){
     LogWarning << "Copying loaded mc-like event to data container..." << std::endl;
     _propagator_.getSampleSet().copyMcEventListToDataContainer();
 
-    for( auto& sample : _propagator_.getSampleSet().getSampleList() ){
-      sample.getDataContainer().histScale = sample.getMcContainer().histScale;
-    }
-
     // back to prior
     if( _propagator_.isThrowAsimovToyParameters() ){
       for( auto& parSet : _propagator_.getParametersManager().getParameterSetsList() ){
@@ -206,7 +202,7 @@ void DataSetManager::loadData(){
 
   LogInfo << "Set the current MC prior weights as nominal weight..." << std::endl;
   for( auto& sample : _propagator_.getSampleSet().getSampleList() ){
-    for( auto& event : sample.getMcContainer().eventList ){
+    for( auto& event : sample.getMcContainer().getEventList() ){
       event.setNominalWeight(event.getEventWeight());
     }
   }
@@ -245,7 +241,7 @@ void DataSetManager::loadData(){
   LogInfo << "Locking data event containers..." << std::endl;
   for( auto& sample : _propagator_.getSampleSet().getSampleList() ){
     // Now the data won't be refilled each time
-    sample.getDataContainer().isLocked = true;
+    sample.getDataContainer().setIsLocked( true );
   }
 
   if( not _propagator_.getParameterInjectorMc().empty() ){

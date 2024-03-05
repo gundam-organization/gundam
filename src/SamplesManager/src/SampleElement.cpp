@@ -14,7 +14,7 @@ LoggerInit([]{ Logger::setUserHeaderStr("[SampleElement]"); });
 
 void SampleElement::reserveEventMemory(size_t dataSetIndex_, size_t nEvents, const PhysicsEvent &eventBuffer_) {
   LogScopeIndent;
-  LogThrowIf(isLocked, "Can't " << __METHOD_NAME__ << " while locked");
+  LogThrowIf(_isLocked_, "Can't " << __METHOD_NAME__ << " while locked");
 
   // adding one dataset:
   loadedDatasetList.emplace_back();
@@ -32,7 +32,7 @@ void SampleElement::reserveEventMemory(size_t dataSetIndex_, size_t nEvents, con
 }
 void SampleElement::shrinkEventList(size_t newTotalSize_){
   LogScopeIndent;
-  LogThrowIf(isLocked, "Can't " << __METHOD_NAME__ << " while locked");
+  LogThrowIf(_isLocked_, "Can't " << __METHOD_NAME__ << " while locked");
 
   if( loadedDatasetList.empty() and newTotalSize_ == 0 ){
     LogAlert << "Empty dataset list. Nothing to shrink." << std::endl;
@@ -54,7 +54,7 @@ void SampleElement::shrinkEventList(size_t newTotalSize_){
   eventList.shrink_to_fit();
 }
 void SampleElement::updateEventBinIndexes(int iThread_){
-  if( isLocked ) return;
+  if( _isLocked_ ) return;
 
   int nThreads{GundamGlobals::getParallelWorker().getNbThreads()};
   if( iThread_ == -1 ){ iThread_ = 0; nThreads = 1; }
@@ -79,7 +79,7 @@ void SampleElement::updateEventBinIndexes(int iThread_){
   }
 }
 void SampleElement::updateBinEventList(int iThread_) {
-  if( isLocked ) return;
+  if( _isLocked_ ) return;
 
   int nbThreads = GundamGlobals::getParallelWorker().getNbThreads();
   if( iThread_ == -1 ){ iThread_ = 0; nbThreads = 1; }
@@ -99,7 +99,7 @@ void SampleElement::updateBinEventList(int iThread_) {
   }
 }
 void SampleElement::refillHistogram(int iThread_){
-  if( isLocked ) return;
+  if( _isLocked_ ) return;
 
   int nbThreads = GundamGlobals::getParallelWorker().getNbThreads();
   if( iThread_ == -1 ){ nbThreads = 1; iThread_ = 0; }

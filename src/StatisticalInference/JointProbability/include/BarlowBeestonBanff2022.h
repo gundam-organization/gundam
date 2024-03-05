@@ -43,9 +43,9 @@ namespace JointProbability{
     }
   }
   double BarlowBeestonBanff2022::eval(const Sample& sample_, int bin_) const {
-    TH1D* data = sample_.getDataContainer().histogram.get();
-    TH1D* predMC = sample_.getMcContainer().histogram.get();
-    TH1D* nomMC = sample_.getMcContainer().histogramNominal.get();
+    const TH1D* data = sample_.getDataContainer().getHistogram();
+    const TH1D* predMC = sample_.getMcContainer().getHistogram();
+    const TH1D* nomMC = sample_.getMcContainer().getHistogramNominal();
 
     // From OA2021_Eb branch -> BANFFBinnedSample::CalcLLRContrib
     // https://github.com/t2k-software/BANFF/blob/OA2021_Eb/src/BANFFSample/BANFFBinnedSample.cxx

@@ -86,7 +86,7 @@ void ParameterScanner::initializeImpl() {
   }
   if( GenericToolbox::Json::fetchValue(_varsConfig_, "llhStatPerSamplePerBin", false) ){
     for( auto& sample : _likelihoodInterfacePtr_->getDataSetManager().getPropagator().getSampleSet().getSampleList() ){
-      for( int iBin = 1 ; iBin <= sample.getMcContainer().histogram->GetNbinsX() ; iBin++ ){
+      for( int iBin = 1 ; iBin <= sample.getMcContainer().getHistogram()->GetNbinsX() ; iBin++ ){
         _scanDataDict_.emplace_back();
         auto& scanEntry = _scanDataDict_.back();
         scanEntry.yPoints = std::vector<double>(_nbPoints_+1,0);
@@ -114,7 +114,7 @@ void ParameterScanner::initializeImpl() {
   }
   if( GenericToolbox::Json::fetchValue(_varsConfig_, "weightPerSamplePerBin", false) ){
     for( auto& sample : _likelihoodInterfacePtr_->getDataSetManager().getPropagator().getSampleSet().getSampleList() ){
-      for( int iBin = 1 ; iBin <= sample.getMcContainer().histogram->GetNbinsX() ; iBin++ ){
+      for( int iBin = 1 ; iBin <= sample.getMcContainer().getHistogram()->GetNbinsX() ; iBin++ ){
         _scanDataDict_.emplace_back();
         auto& scanEntry = _scanDataDict_.back();
         scanEntry.yPoints = std::vector<double>(_nbPoints_+1,0);
@@ -125,7 +125,7 @@ void ParameterScanner::initializeImpl() {
                                sample.getBinning().getBinList()[iBin-1].getSummary().c_str());
         scanEntry.yTitle = "Total MC event weight";
         auto* samplePtr = &sample;
-        scanEntry.evalY = [samplePtr, iBin](){ return samplePtr->getMcContainer().histogram->GetBinContent(iBin); };
+        scanEntry.evalY = [samplePtr, iBin](){ return samplePtr->getMcContainer().getHistogram()->GetBinContent(iBin); };
       }
     }
   }

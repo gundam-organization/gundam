@@ -45,23 +45,24 @@ void Sample::initializeImpl() {
 
   TH1::SetDefaultSumw2(true);
 
-  _mcContainer_.name = "MC_" + _name_;
-  _mcContainer_.binning = _binning_;
-  _mcContainer_.perBinEventPtrList.resize(_binning_.getBinList().size());
-  _mcContainer_.histogram = std::make_shared<TH1D>(
+
+  _mcContainer_.setName("MC_" + _name_);
+  _mcContainer_.setBinning(_binning_);
+  _mcContainer_.getPerBinEventPtrList().resize(_binning_.getBinList().size());
+  _mcContainer_.getHistogramSharedPtr() = std::make_shared<TH1D>(
       Form("%s_MC_bins", _name_.c_str()), Form("%s_MC_bins", _name_.c_str()),
       int(_binning_.getBinList().size()), 0, int(_binning_.getBinList().size())
   );
-  _mcContainer_.histogram->SetDirectory(nullptr);
+  _mcContainer_.getHistogramSharedPtr()->SetDirectory(nullptr);
 
-  _dataContainer_.name = "Data_" + _name_;
-  _dataContainer_.binning = _binning_;
-  _dataContainer_.perBinEventPtrList.resize(_binning_.getBinList().size());
-  _dataContainer_.histogram = std::make_shared<TH1D>(
+  _dataContainer_.setName("Data_" + _name_);
+  _dataContainer_.setBinning(_binning_);
+  _dataContainer_.getPerBinEventPtrList().resize(_binning_.getBinList().size());
+  _dataContainer_.getHistogramSharedPtr() = std::make_shared<TH1D>(
       Form("%s_Data_bins", _name_.c_str()), Form("%s_Data_bins", _name_.c_str()),
       int(_binning_.getBinList().size()), 0, int(_binning_.getBinList().size())
   );
-  _dataContainer_.histogram->SetDirectory(nullptr);
+  _dataContainer_.getHistogramSharedPtr()->SetDirectory(nullptr);
 }
 
 bool Sample::isDatasetValid(const std::string& datasetName_){

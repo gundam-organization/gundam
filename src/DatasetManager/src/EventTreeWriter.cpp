@@ -45,7 +45,7 @@ void EventTreeWriter::writeSamples(TDirectory* saveDir_, const Propagator& propa
     LogInfo << "Writing sample: " << sample.getName() << std::endl;
 
     for( bool isData : {false, true} ) {
-      const auto *evListPtr = (isData ? &sample.getDataContainer().eventList : &sample.getMcContainer().eventList);
+      const auto *evListPtr = (isData ? &sample.getDataContainer().getEventList() : &sample.getMcContainer().getEventList());
       if (evListPtr->empty()) continue;
 
       if( not _writeDials_ or isData ){

@@ -237,7 +237,7 @@ void AdaptiveMcmc::fillPoint( bool fillModel) {
   if (not fillModel) return;
   for (const Sample& sample
       : getPropagator().getSampleSet().getSampleList()) {
-    std::shared_ptr<TH1D> hist = sample.getMcContainer().histogram;
+    auto* hist = sample.getMcContainer().getHistogram();
     for (int i = 1; i < hist->GetNbinsX(); ++i) {
       _model_.push_back(hist->GetBinContent(i));
       _uncertainty_.push_back(hist->GetBinError(i));
@@ -850,7 +850,7 @@ void AdaptiveMcmc::minimize() {
       : getPropagator().getSampleSet().getSampleList()) {
     parameterSampleNames.push_back(sample.getName());
     parameterSampleOffsets.push_back(parameterSampleData.size());
-    std::shared_ptr<TH1D> hist = sample.getDataContainer().histogram;
+    auto* hist = sample.getDataContainer().getHistogram();
     for (int i = 1; i < hist->GetNbinsX(); ++i) {
       parameterSampleData.push_back(hist->GetBinContent(i));
     }
