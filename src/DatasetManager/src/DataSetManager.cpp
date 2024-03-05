@@ -27,6 +27,9 @@ void DataSetManager::readConfigImpl(){
   // dataSetList should be present
   JsonType dataSetList{ GenericToolbox::Json::fetchValue<JsonType>(_config_, "dataSetList") };
 
+
+  LogDebug << GenericToolbox::Json::toReadableString(dataSetList) << std::endl;
+
   // creating the dataSets:
   _dataSetList_.reserve( dataSetList.size() );
   for( const auto& dataSetConfig : dataSetList ){
