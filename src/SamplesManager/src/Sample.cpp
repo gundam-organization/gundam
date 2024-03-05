@@ -34,8 +34,6 @@ void Sample::readConfigImpl(){
 
   _selectionCutStr_ = GenericToolbox::Json::fetchValue(_config_, {{"selectionCutStr"}, {"selectionCuts"}}, _selectionCutStr_);
   _enabledDatasetList_ = GenericToolbox::Json::fetchValue(_config_, std::vector<std::string>{"datasets", "dataSets"}, _enabledDatasetList_);
-  _mcNorm_ = GenericToolbox::Json::fetchValue(_config_, "mcNorm", _mcNorm_);
-  _dataNorm_ = GenericToolbox::Json::fetchValue(_config_, "dataNorm", _dataNorm_);
 }
 void Sample::initializeImpl() {
   if( not _isEnabled_ ) return;
@@ -49,7 +47,6 @@ void Sample::initializeImpl() {
 
   _mcContainer_.name = "MC_" + _name_;
   _mcContainer_.binning = _binning_;
-  _mcContainer_.histScale = _dataNorm_/_mcNorm_;
   _mcContainer_.perBinEventPtrList.resize(_binning_.getBinList().size());
   _mcContainer_.histogram = std::make_shared<TH1D>(
       Form("%s_MC_bins", _name_.c_str()), Form("%s_MC_bins", _name_.c_str()),

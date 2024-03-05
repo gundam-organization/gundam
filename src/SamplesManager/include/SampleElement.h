@@ -46,7 +46,6 @@ public:
   void updateEventBinIndexes(int iThread_ = -1);
   void updateBinEventList(int iThread_ = -1);
   void refillHistogram(int iThread_ = -1);
-  void rescaleHistogram();
   void saveAsHistogramNominal();
 
   // event by event poisson throw -> takes into account the finite amount of stat in MC

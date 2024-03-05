@@ -70,14 +70,7 @@ void SampleSet::initializeImpl() {
       sample.getDataContainer().refillHistogram(iThread);
     }
   };
-  std::function<void()> rescaleMcHistogramsFct = [this](){
-    for( auto& sample : _sampleList_ ){
-      sample.getMcContainer().rescaleHistogram();
-      sample.getDataContainer().rescaleHistogram();
-    }
-  };
   GundamGlobals::getParallelWorker().addJob("FitSampleSet::updateSampleHistograms", refillMcHistogramsFct);
-  GundamGlobals::getParallelWorker().setPostParallelJob("FitSampleSet::updateSampleHistograms", rescaleMcHistogramsFct);
 }
 
 void SampleSet::copyMcEventListToDataContainer(){

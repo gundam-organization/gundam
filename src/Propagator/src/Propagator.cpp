@@ -175,13 +175,8 @@ void Propagator::reweightMcEvents() {
 void Propagator::refillSampleHistograms(){
   refillHistogramTimer.start();
 
-  if( not _devSingleThreadHistFill_ ){
-    GundamGlobals::getParallelWorker().runJob("Propagator::refillSampleHistograms");
-  }
-  else{
-    refillSampleHistogramsFct(-1);
-    refillSampleHistogramsPostParallelFct();
-  }
+  if( not _devSingleThreadHistFill_ ){ GundamGlobals::getParallelWorker().runJob("Propagator::refillSampleHistograms"); }
+  else{ refillSampleHistogramsFct(-1); }
 
   refillHistogramTimer.stop();
 }
@@ -222,11 +217,6 @@ void Propagator::initializeThreads() {
       [this](int iThread){ this->refillSampleHistogramsFct(iThread); }
   );
 
-  GundamGlobals::getParallelWorker().setPostParallelJob(
-      "Propagator::refillSampleHistograms",
-      [this](){ this->refillSampleHistogramsPostParallelFct(); }
-  );
-
 }
 
 // multithreading
@@ -251,12 +241,6 @@ void Propagator::refillSampleHistogramsFct(int iThread_){
   for( auto& sample : _sampleSet_.getSampleList() ){
     sample.getMcContainer().refillHistogram(iThread_);
     sample.getDataContainer().refillHistogram(iThread_);
-  }
-}
-void Propagator::refillSampleHistogramsPostParallelFct(){
-  for( auto& sample : _sampleSet_.getSampleList() ){
-    sample.getMcContainer().rescaleHistogram();
-    sample.getDataContainer().rescaleHistogram();
   }
 }
 

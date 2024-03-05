@@ -78,7 +78,6 @@ protected:
   // multithreading
   void reweightMcEvents(int iThread_);
   void refillSampleHistogramsFct(int iThread_);
-  void refillSampleHistogramsPostParallelFct();
 
 private:
   // Parameters

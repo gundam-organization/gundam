@@ -58,8 +58,6 @@ private:
   // Yaml
   bool _isEnabled_{false};
   int _index_{-1};
-  double _mcNorm_{1};
-  double _dataNorm_{1};
   std::string _name_;
   std::string _selectionCutStr_;
   std::string _binningFilePath_;
