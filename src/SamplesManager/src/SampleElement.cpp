@@ -155,7 +155,7 @@ void SampleElement::throwEventMcError(){
     weightSum = 0;
     for (auto *eventPtr: bin.eventPtrList) {
       // gRandom->Poisson(1) -> returns an INT -> can be 0
-      eventPtr->setEventWeight(gRandom->Poisson(1) * eventPtr->getEventWeight());
+      eventPtr->getWeights().current = (gRandom->Poisson(1) * eventPtr->getEventWeight());
       weightSum += eventPtr->getEventWeight();
     }
     bin.content = weightSum;
@@ -179,7 +179,7 @@ void SampleElement::throwStatError(bool useGaussThrow_){
     }
     for (auto *eventPtr: bin.eventPtrList) {
       // make sure refill of the histogram will produce the same hist
-      eventPtr->setEventWeight( eventPtr->getEventWeight()*((double) nCounts / bin.content) );
+      eventPtr->getWeights().current = ( eventPtr->getEventWeight()*((double) nCounts / bin.content) );
     }
     bin.content = nCounts;
   }

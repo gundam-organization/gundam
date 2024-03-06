@@ -25,7 +25,7 @@ double Event::getEventWeight() const {
 #ifdef GUNDAM_USING_CACHE_MANAGER
   if( _cache_.valuePtr != nullptr ){ return _cache_.getWeight(); }
 #endif
-  return _eventWeight_;
+  return _weights_.current;
 }
 const std::vector<GenericToolbox::AnyType>& Event::getVarHolder( const std::string &leafName_) const{
   int index = this->findVarIndex(leafName_, true);
@@ -146,9 +146,7 @@ std::string Event::getSummary() const {
   std::stringstream ss;
 
   ss << "Indices{" << _indices_ << "}";
-  ss << std::endl << GET_VAR_NAME_VALUE(_baseWeight_);
-  ss << std::endl << GET_VAR_NAME_VALUE(_nominalWeight_);
-  ss << std::endl << GET_VAR_NAME_VALUE(_eventWeight_);
+  ss << std::endl << "Weights{" << _weights_ << "}";
 
   if( _varHolderList_.empty() ){ ss << std::endl << "LeafContent: { empty }"; }
   else{

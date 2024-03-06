@@ -136,6 +136,6 @@ void EventDialCache::reweightEntry( EventDialCache::CacheEntry& entry_){
   // applying event weight cap if defined
   _globalEventReweightCap_.process( tempReweight );
 
-  entry_.event->resetEventWeight(); // reset to the base weight
-  entry_.event->getEventWeightRef() *= tempReweight; // apply the reweight factor
+  entry_.event->getWeights().resetCurrentWeight(); // reset to the base weight
+  entry_.event->getWeights().current *= tempReweight; // apply the reweight factor
 }

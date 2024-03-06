@@ -40,22 +40,33 @@ public:
     }
     friend std::ostream& operator <<( std::ostream& o, const Indices& this_ ){ o << this_.getSummary(); return o; }
   };
+  struct Weights{
+    double base{1};
+    double nominal{1}; // to get rid of
+    double current{1};
+
+    void resetCurrentWeight(){ current = base; }
+    [[nodiscard]] std::string getSummary() const{
+      std::stringstream ss;
+      ss << "base(" << base << ")";
+      ss << ", " << "current(" << current << ")";
+      ss << ", " << "nominal(" << nominal << ")";
+      return ss.str();
+    }
+    friend std::ostream& operator <<( std::ostream& o, const Weights& this_ ){ o << this_.getSummary(); return o; }
+  };
 
 public:
   Event() = default;
 
   // setters
-  void setBaseWeight(double baseWeight_){ _baseWeight_ = baseWeight_; }
-  void setEventWeight(double eventWeight){ _eventWeight_ = eventWeight; }
-  void setNominalWeight(double nominalWeight){ _nominalWeight_ = nominalWeight; }
   void setCommonVarNameListPtr(const std::shared_ptr<std::vector<std::string>>& commonVarNameListPtr_);
   template<typename T> void setVariable(const T& value_, const std::string& leafName_, size_t arrayIndex_ = 0);
 
   // const getters
-  double getBaseWeight() const { return _baseWeight_; }
-  double getNominalWeight() const { return _nominalWeight_; }
   double getEventWeight() const;
   const Indices& getIndices() const{ return _indices_; }
+  const Weights& getWeights() const{ return _weights_; }
   const GenericToolbox::AnyType& getVar(int varIndex_, size_t arrayIndex_ = 0) const { return _varHolderList_[varIndex_][arrayIndex_]; }
   const std::vector<GenericToolbox::AnyType>& getVarHolder(int index_) const { return _varHolderList_[index_]; }
   const std::vector<GenericToolbox::AnyType>& getVarHolder(const std::string &leafName_) const;
@@ -66,14 +77,13 @@ public:
   template<typename T> auto getVariable(const std::string& leafName_, size_t arrayIndex_ = 0) const -> const T&;
 
   // mutable getters
-  double& getEventWeightRef(){ return _eventWeight_; }
   void* getVariableAddress(const std::string& leafName_, size_t arrayIndex_ = 0);
   Indices& getIndices(){ return _indices_; }
+  Weights& getWeights(){ return _weights_; }
   std::vector<std::vector<GenericToolbox::AnyType>> &getVarHolderList(){ return _varHolderList_; }
   GenericToolbox::AnyType& getVariableAsAnyType(const std::string& leafName_, size_t arrayIndex_ = 0);
 
   // core
-  void resetEventWeight(){ _eventWeight_ = _baseWeight_; }
   void resizeVarToDoubleCache();
   void invalidateVarToDoubleCache();
   void copyData(const std::vector<const GenericToolbox::LeafForm*>& leafFormList_);
@@ -97,10 +107,8 @@ public:
 
 private:
   // internals
-  Indices _indices_;
-  double _baseWeight_{1};
-  double _nominalWeight_{1};
-  double _eventWeight_{1};
+  Indices _indices_{};
+  Weights _weights_{};
 
   // Data storage variables
   std::shared_ptr<std::vector<std::string>> _commonVarNameListPtr_{nullptr};

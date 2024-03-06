@@ -209,13 +209,6 @@ void DataSetManager::loadData(){
   _propagator_.resetReweight();
   _propagator_.reweightMcEvents();
 
-  LogInfo << "Set the current MC prior weights as nominal weight..." << std::endl;
-  for( auto& sample : _propagator_.getSampleSet().getSampleList() ){
-    for( auto& event : sample.getMcContainer().getEventList() ){
-      event.setNominalWeight(event.getEventWeight());
-    }
-  }
-
   LogInfo << "Filling up sample bin caches..." << std::endl;
   GundamGlobals::getParallelWorker().runJob([this](int iThread){
     LogInfoIf(iThread <= 0) << "Updating sample per bin event lists..." << std::endl;

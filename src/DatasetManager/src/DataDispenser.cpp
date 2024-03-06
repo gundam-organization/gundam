@@ -522,7 +522,7 @@ void DataDispenser::loadFromHistContent(){
 
   Event eventPlaceholder;
   eventPlaceholder.getIndices().dataset = (_owner_->getDataSetIndex());
-  eventPlaceholder.setEventWeight(0); // default.
+  eventPlaceholder.getWeights().current = (0); // default.
 
   // claiming event memory
   for( size_t iSample = 0 ; iSample < _cache_.samplesToFillList.size() ; iSample++ ){
@@ -603,8 +603,8 @@ void DataDispenser::loadFromHistContent(){
       for( size_t iVar = 0 ; iVar < target.size() ; iVar++ ){
         container->getEventList()[iBin].setVariable( target[iVar], axisNameList[iVar] );
       }
-      container->getEventList()[iBin].setBaseWeight(hist->GetBinContent(histBinIndex));
-      container->getEventList()[iBin].resetEventWeight();
+      container->getEventList()[iBin].getWeights().base = (hist->GetBinContent(histBinIndex));
+      container->getEventList()[iBin].getWeights().resetCurrentWeight();
     }
 
   }
@@ -966,8 +966,8 @@ void DataDispenser::fillFunction(int iThread_){
     }
 
     if( nominalWeightTreeFormula != nullptr ){
-      eventIndexingBuffer.setBaseWeight(nominalWeightTreeFormula->EvalInstance());
-      if(eventIndexingBuffer.getBaseWeight() < 0 ){
+      eventIndexingBuffer.getWeights().base = (nominalWeightTreeFormula->EvalInstance());
+      if( eventIndexingBuffer.getWeights().base < 0 ){
         LogError << "Negative nominal weight:" << std::endl;
 
         LogError << "Event buffer is: " << eventIndexingBuffer.getSummary() << std::endl;
@@ -980,7 +980,7 @@ void DataDispenser::fillFunction(int iThread_){
 
         LogThrow("Negative nominal weight");
       }
-      if( eventIndexingBuffer.getBaseWeight() == 0 ){
+      if( eventIndexingBuffer.getWeights().base == 0 ){
         continue;
       } // skip this event
     }
@@ -1034,8 +1034,8 @@ void DataDispenser::fillFunction(int iThread_){
       eventPtr->getIndices().entry = iEntry;
       eventPtr->getIndices().sample = _cache_.samplesToFillList[iSample]->getIndex();
       eventPtr->getIndices().bin = eventIndexingBuffer.getIndices().bin;
-      eventPtr->setBaseWeight( eventIndexingBuffer.getBaseWeight() );
-      eventPtr->resetEventWeight();
+      eventPtr->getWeights().base = eventIndexingBuffer.getWeights().base;
+      eventPtr->getWeights().resetCurrentWeight();
 
       // drop the content of the leaves
       eventPtr->copyData( leafFormStorageList );

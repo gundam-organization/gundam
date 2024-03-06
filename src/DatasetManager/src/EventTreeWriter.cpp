@@ -92,9 +92,8 @@ template<typename T> void EventTreeWriter::writeEventsTemplate(TDirectory* saveD
 
   GenericToolbox::RawDataArray privateMemberArr;
   std::map<std::string, std::function<void(GenericToolbox::RawDataArray&, const Event&)>> leafDictionary;
-  leafDictionary["eventWeight/D"] =   [](GenericToolbox::RawDataArray& arr_, const Event& ev_){ arr_.writeRawData(ev_.getEventWeight()); };
-  leafDictionary["nominalWeight/D"] = [](GenericToolbox::RawDataArray& arr_, const Event& ev_){ arr_.writeRawData(ev_.getNominalWeight()); };
-  leafDictionary["treeWeight/D"] =    [](GenericToolbox::RawDataArray& arr_, const Event& ev_){ arr_.writeRawData(ev_.getBaseWeight()); };
+  leafDictionary["eventWeight/D"] =   [](GenericToolbox::RawDataArray& arr_, const Event& ev_){ arr_.writeRawData(ev_.getWeights().current); };
+  leafDictionary["treeWeight/D"] =    [](GenericToolbox::RawDataArray& arr_, const Event& ev_){ arr_.writeRawData(ev_.getWeights().base); };
   leafDictionary["sampleBinIndex/I"]= [](GenericToolbox::RawDataArray& arr_, const Event& ev_){ arr_.writeRawData(ev_.getIndices().bin); };
   leafDictionary["dataSetIndex/I"] =  [](GenericToolbox::RawDataArray& arr_, const Event& ev_){ arr_.writeRawData(ev_.getIndices().dataset); };
   leafDictionary["entryIndex/L"] =    [](GenericToolbox::RawDataArray& arr_, const Event& ev_){ arr_.writeRawData(ev_.getIndices().entry); };
