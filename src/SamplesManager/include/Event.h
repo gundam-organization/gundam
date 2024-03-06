@@ -30,11 +30,6 @@ public:
     int sample{-1}; // this information is lost in the EventDialCache manager
     int bin{-1}; // which bin of the sample?
 
-#ifdef GUNDAM_USING_CACHE_MANAGER
-    // An "opaque" index into the cache that is used to simplify bookkeeping.
-    int cacheManager{-1};
-#endif
-
     [[nodiscard]] std::string getSummary() const{
       std::stringstream ss;
       ss << "dataset(" << dataset << ")";
@@ -112,18 +107,28 @@ private:
   std::vector<std::vector<GenericToolbox::AnyType>> _varHolderList_{};
   mutable std::vector<std::vector<double>> _varToDoubleCache_{};
 
+
 #ifdef GUNDAM_USING_CACHE_MANAGER
 public:
-  void setCacheManagerValuePointer(const double* v) { _cacheManagerValue_ = v;}
-  void setCacheManagerValidPointer(const bool* v) { _cacheManagerValid_ = v;}
-  void setCacheManagerUpdatePointer(void (*p)()) { _cacheManagerUpdate_ = p;}
+  struct Cache{
+    // An "opaque" index into the cache that is used to simplify bookkeeping.
+    int index{-1};
+    // A pointer to the cached result.
+    const double* valuePtr{nullptr};
+    // A pointer to the cache validity flag.
+    const bool* isValidPtr{nullptr};
+    // A pointer to a callback to force the cache to be updated.
+    void (*updateCallbackPtr)(){nullptr};
+
+    double getWeight() const;
+  };
+
 private:
-  // A pointer to the cached result.
-  const double* _cacheManagerValue_{nullptr};
-  // A pointer to the cache validity flag.
-  const bool* _cacheManagerValid_{nullptr};
-  // A pointer to a callback to force the cache to be updated.
-  void (*_cacheManagerUpdate_)(){nullptr};
+  Cache _cache_{};
+
+public:
+  const Cache& getCache() const{ return _cache_; }
+  Cache& getCache(){ return _cache_; }
 #endif
 
 };

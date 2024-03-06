@@ -23,67 +23,9 @@ void Event::setCommonVarNameListPtr( const std::shared_ptr<std::vector<std::stri
 // const getters
 double Event::getEventWeight() const {
 #ifdef GUNDAM_USING_CACHE_MANAGER
-    if (_cacheManagerValue_) {
-        if (_cacheManagerValid_ != nullptr and not (*_cacheManagerValid_)) {
-            // This is slowish, but will make sure that the cached result is
-            // updated when the cache has changed.  The values pointed to by
-            // _CacheManagerValue_ and _CacheManagerValid_ are inside
-            // of the weights cache (a bit of evil coding here), and are
-            // updated by the cache.  The update is triggered by
-            // (*_CacheManagerUpdate_)().
-            if (_cacheManagerUpdate_) (*_cacheManagerUpdate_)();
-        }
-#ifdef CACHE_MANAGER_SLOW_VALIDATION
-#warning CACHE_MANAGER_SLOW_VALIDATION used in PhysicsEvent::getEventWeight
-        do {
-            static double maxDelta = 1.0E-20;
-            static double sumDelta = 0.0;
-            static double sum2Delta = 0.0;
-            static long long int numDelta = 0;
-            double res = *_CacheManagerValue_;
-            double avg = 0.5*(std::abs(res) + std::abs(_eventWeight_));
-            if (avg < getTreeWeight()) avg = getTreeWeight();
-            double delta = std::abs(res - _eventWeight_);
-            delta /= avg;
-            maxDelta = std::max(maxDelta,delta);
-            if (delta < 1e-4) {
-                sumDelta += delta;
-                sum2Delta += delta*delta;
-                ++numDelta;
-                if (numDelta < 0) throw std::runtime_error("validation wrap");
-                if ((numDelta % 1000000) == 0) {
-                    LogInfo << "VALIDATION: Average event weight delta: "
-                            << sumDelta/numDelta
-                            << " +/- " << std::sqrt(
-                                sum2Delta/numDelta
-                                - sumDelta*sumDelta/numDelta/numDelta)
-                            << " Maximum: " << maxDelta
-                            << " " << numDelta
-                            << std::endl;
-                }
-            }
-            if (maxDelta < 1E-5) break;
-            if (delta > 100.0*sumDelta/numDelta) break;
-            LogWarning << "WARNING: Event weight difference: " << delta
-                       << " Cache: " << res
-                       << " Dial: " << _eventWeight_
-                       << " Tree: " << getTreeWeight()
-                       << " Delta: " << delta
-                       << " Max: " << maxDelta
-                       << std::endl;
-        } while(false);
+  if( _cache_.valuePtr != nullptr ){ return _cache_.getWeight(); }
 #endif
-#ifdef CACHE_MANAGER_SLOW_VALIDATION
-#warning CACHE_MANAGER_SLOW_VALIDATION force CPU _eventWeight_
-        // When the slow validation is running, the "CPU" event weight is
-        // calculated after Cache::Manager::Fill
-        return _eventWeight_;
-#endif
-        LogThrowIf(not std::isfinite(*_cacheManagerValue_), "NaN weight: " << this->getSummary());
-      return *_cacheManagerValue_;
-    }
-#endif
-    return _eventWeight_;
+  return _eventWeight_;
 }
 const std::vector<GenericToolbox::AnyType>& Event::getVarHolder( const std::string &leafName_) const{
   int index = this->findVarIndex(leafName_, true);
@@ -237,6 +179,68 @@ void Event::fillBuffer( const std::vector<int>& indexList_, std::vector<double>&
   buffer_.resize(indexList_.size()); double* slot = &buffer_[0];
   std::for_each(indexList_.begin(), indexList_.end(), [&](auto& index){ *(slot++) = this->getVarAsDouble(index); });
 }
+
+#ifdef GUNDAM_USING_CACHE_MANAGER
+double Event::Cache::getWeight() const {
+  if( isValidPtr != nullptr and not (*isValidPtr) ){
+    // This is slowish, but will make sure that the cached result is
+    // updated when the cache has changed.  The values pointed to by
+    // _CacheManagerValue_ and _CacheManagerValid_ are inside
+    // of the weights cache (a bit of evil coding here), and are
+    // updated by the cache.  The update is triggered by
+    // (*_CacheManagerUpdate_)().
+    if( updateCallbackPtr != nullptr ){ (*updateCallbackPtr)(); }
+  }
+#ifdef CACHE_MANAGER_SLOW_VALIDATION
+    #warning CACHE_MANAGER_SLOW_VALIDATION used in PhysicsEvent::getEventWeight
+        do {
+            static double maxDelta = 1.0E-20;
+            static double sumDelta = 0.0;
+            static double sum2Delta = 0.0;
+            static long long int numDelta = 0;
+            double res = *_CacheManagerValue_;
+            double avg = 0.5*(std::abs(res) + std::abs(_eventWeight_));
+            if (avg < getTreeWeight()) avg = getTreeWeight();
+            double delta = std::abs(res - _eventWeight_);
+            delta /= avg;
+            maxDelta = std::max(maxDelta,delta);
+            if (delta < 1e-4) {
+                sumDelta += delta;
+                sum2Delta += delta*delta;
+                ++numDelta;
+                if (numDelta < 0) throw std::runtime_error("validation wrap");
+                if ((numDelta % 1000000) == 0) {
+                    LogInfo << "VALIDATION: Average event weight delta: "
+                            << sumDelta/numDelta
+                            << " +/- " << std::sqrt(
+                                sum2Delta/numDelta
+                                - sumDelta*sumDelta/numDelta/numDelta)
+                            << " Maximum: " << maxDelta
+                            << " " << numDelta
+                            << std::endl;
+                }
+            }
+            if (maxDelta < 1E-5) break;
+            if (delta > 100.0*sumDelta/numDelta) break;
+            LogWarning << "WARNING: Event weight difference: " << delta
+                       << " Cache: " << res
+                       << " Dial: " << _eventWeight_
+                       << " Tree: " << getTreeWeight()
+                       << " Delta: " << delta
+                       << " Max: " << maxDelta
+                       << std::endl;
+        } while(false);
+#endif
+#ifdef CACHE_MANAGER_SLOW_VALIDATION
+    #warning CACHE_MANAGER_SLOW_VALIDATION force CPU _eventWeight_
+        // When the slow validation is running, the "CPU" event weight is
+        // calculated after Cache::Manager::Fill
+        return _eventWeight_;
+#endif
+  LogThrowIf(not std::isfinite(*valuePtr), "NaN weight");
+  return *valuePtr;
+}
+#endif
 
 
 //  A Lesser GNU Public License
