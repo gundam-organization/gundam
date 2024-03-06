@@ -42,7 +42,6 @@ public:
   };
   struct Weights{
     double base{1};
-    double nominal{1}; // to get rid of
     double current{1};
 
     void resetCurrentWeight(){ current = base; }
@@ -50,7 +49,6 @@ public:
       std::stringstream ss;
       ss << "base(" << base << ")";
       ss << ", " << "current(" << current << ")";
-      ss << ", " << "nominal(" << nominal << ")";
       return ss.str();
     }
     friend std::ostream& operator <<( std::ostream& o, const Weights& this_ ){ o << this_.getSummary(); return o; }

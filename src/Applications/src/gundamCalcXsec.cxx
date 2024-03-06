@@ -493,15 +493,15 @@ int main(int argc, char** argv){
 
   int nToys{ clParser.getOptionVal<int>("nToys") };
 
-  // no bin volume of events -> use the nominal weight container
+  // no bin volume of events -> use the current weight container
   for( auto& xsec : crossSectionDataList ){
     {
       auto& mcEvList{xsec.samplePtr->getMcContainer().getEventList()};
-      std::for_each(mcEvList.begin(), mcEvList.end(), []( Event& ev_){ ev_.getWeights().nominal = (0); });
+      std::for_each(mcEvList.begin(), mcEvList.end(), []( Event& ev_){ ev_.getWeights().current = 0; });
     }
     {
       auto& dataEvList{xsec.samplePtr->getDataContainer().getEventList()};
-      std::for_each(dataEvList.begin(), dataEvList.end(), []( Event& ev_){ ev_.getWeights().nominal = (0); });
+      std::for_each(dataEvList.begin(), dataEvList.end(), []( Event& ev_){ ev_.getWeights().current = 0; });
     }
   }
 
@@ -544,7 +544,7 @@ int main(int argc, char** argv){
           auto& mcEvList{xsec.samplePtr->getMcContainer().getEventList()};
           std::for_each(mcEvList.begin(), mcEvList.end(), [&]( Event& ev_){
             if( iBin != ev_.getIndices().bin ){ return; }
-            ev_.getWeights().nominal += binData;
+            ev_.getWeights().current += binData;
           });
         }
 
@@ -553,7 +553,7 @@ int main(int argc, char** argv){
           auto& dataEvList{xsec.samplePtr->getDataContainer().getEventList()};
           std::for_each(dataEvList.begin(), dataEvList.end(), [&]( Event& ev_){
             if( iBin != ev_.getIndices().bin ){ return; }
-            ev_.getWeights().nominal = binData;
+            ev_.getWeights().current = binData;
           });
         }
 
@@ -695,7 +695,8 @@ int main(int argc, char** argv){
       }
 
       std::for_each(mcEvList.begin(), mcEvList.end(), [&]( Event &ev_) {
-        ev_.getWeights().current = ev_.getWeights().nominal / nToys / double(nEventInBin[ev_.getIndices().bin]);
+        ev_.getWeights().current /= nToys;
+        ev_.getWeights().current /= double(nEventInBin[ev_.getIndices().bin]);
       });
     }
     {
@@ -708,7 +709,8 @@ int main(int argc, char** argv){
       }
 
       std::for_each(dataEvList.begin(), dataEvList.end(), [&]( Event &ev_) {
-        ev_.getWeights().current = ev_.getWeights().nominal / nToys / double(nEventInBin[ev_.getIndices().bin]);
+        ev_.getWeights().current /= nToys;
+        ev_.getWeights().current /= double(nEventInBin[ev_.getIndices().bin]);
       });
     }
   }
