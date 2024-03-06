@@ -64,10 +64,10 @@ public:
 
     [[nodiscard]] std::string getSummary() const {
       std::stringstream ss;
-      ss << event->getSummary() << std::endl;
+      ss << *event << std::endl;
       ss << "dialCache = {";
       for( auto& dialResponseCache : dialResponseCacheList ) {
-        ss << std::endl << "  - " << dialResponseCache.dialInterface.getSummary();
+        ss << std::endl << "  { " << dialResponseCache.dialInterface.getSummary() << " }";
       }
       ss << std::endl << "}";
       return ss.str();

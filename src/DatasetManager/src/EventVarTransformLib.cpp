@@ -49,7 +49,7 @@ double EventVarTransformLib::evalTransformation( const Event& event_, std::vecto
   // Eval the requested variables
   size_t nFormula{_inputFormulaList_.size()};
   for( size_t iFormula = 0 ; iFormula < nFormula ; iFormula++ ){
-    inputBuffer_[iFormula] = event_.evalFormula(&(_inputFormulaList_[iFormula]));
+    inputBuffer_[iFormula] = event_.getVariables().evalFormula(&(_inputFormulaList_[iFormula]));
   }
   // Eval with dynamic function
   return reinterpret_cast<double(*)(double*)>(_evalVariable_)(&inputBuffer_[0]);

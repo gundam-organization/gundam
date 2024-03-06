@@ -603,14 +603,52 @@ void PlotGenerator::defineHistogramHolders() {
   _histHolderCacheList_[0].clear();
 
   LogInfo << "Fetching appearing split vars..." << std::endl;
-  std::map<std::string, std::map<const Sample*, std::vector<int>>> splitVarsDictionary;
+
+  struct SplitVariableDictionary{
+    struct Entry{
+      std::string name{};
+      struct SplitSample{
+        const Sample* samplePtr{nullptr};
+        std::vector<int> splitValueList{};
+      };
+      std::vector<SplitSample> sampleList{};
+
+      [[nodiscard]] const SplitSample& fetchSample(const Sample* samplePtr_) const{
+        int idx{GenericToolbox::findElementIndex(samplePtr_, sampleList, [](const SplitSample& s_){ return s_.samplePtr; })};
+        LogThrowIf(idx==-1, "Can't find SplitVariableDictionary for: " << samplePtr_->getName());
+        return sampleList[idx];
+      }
+      SplitSample& fetchSample(const Sample* samplePtr_){
+        int idx{GenericToolbox::findElementIndex(samplePtr_, sampleList, [](const SplitSample& s_){ return s_.samplePtr; })};
+        LogThrowIf(idx==-1, "Can't find SplitVariableDictionary for: " << samplePtr_->getName());
+        return sampleList[idx];
+      }
+    };
+    std::vector<Entry> entryList{};
+
+    [[nodiscard]] bool hasEntry(const std::string& name_) const{
+      return GenericToolbox::isIn(name_, entryList, [](const Entry& e_){ return e_.name; });
+    }
+    [[nodiscard]] const Entry& fetchEntry(const std::string& name_) const{
+      int idx{GenericToolbox::findElementIndex(name_, entryList, [](const Entry& e_){ return e_.name; })};
+      LogThrowIf(idx==-1, "Can't find SplitVariableDictionary for: " << name_);
+      return entryList[idx];
+    }
+  };
+
+
+  SplitVariableDictionary splitVarsDictionary{};
   for( const auto& histConfig : _histogramsDefinition_ ){
     auto splitVars = GenericToolbox::Json::fetchValue(histConfig, "splitVars", std::vector<std::string>{""});
     for( auto& splitVar : splitVars ){
-      if( not GenericToolbox::doesKeyIsInMap(splitVar, splitVarsDictionary) ){
+      if( not splitVarsDictionary.hasEntry(splitVar) ){
+        auto& entry = splitVarsDictionary.entryList.emplace_back();
+        entry.name = splitVar;
+        entry.sampleList.reserve( _sampleSetPtr_->getSampleList().size() );
         for( const auto& sample : _sampleSetPtr_->getSampleList() ){
-          splitVarsDictionary[splitVar][&sample] = std::vector<int>();
-          if( splitVar.empty() ) splitVarsDictionary[splitVar][&sample].emplace_back(0); // placeholder for no split var
+          auto& sampleSplit = entry.sampleList.emplace_back();
+          sampleSplit.samplePtr = &sample;
+          if( splitVar.empty() ){ sampleSplit.splitValueList.emplace_back(0); } // placeholder for no split var
         }
       }
     }
@@ -623,14 +661,12 @@ void PlotGenerator::defineHistogramHolders() {
     );
 
     for( int iSample = bounds.beginIndex ; iSample < bounds.endIndex ; iSample++ ){
-      const Sample& sample = _sampleSetPtr_->getSampleList()[iSample];
-      for( auto& event : sample.getMcContainer().getEventList() ){
-        for( auto& splitVarInstance: splitVarsDictionary ){
-          if(splitVarInstance.first.empty()) continue;
-          int splitValue = event.getVarValue<int>(splitVarInstance.first);
-          if( not GenericToolbox::doesElementIsInVector(splitValue, splitVarInstance.second[&sample]) ){
-            splitVarInstance.second[&sample].emplace_back(splitValue);
-          }
+      const Sample* samplePtr = &_sampleSetPtr_->getSampleList()[iSample];
+      for( auto& event : samplePtr->getMcContainer().getEventList() ){
+        for( auto& entry : splitVarsDictionary.entryList ){
+          if( entry.name.empty() ){ continue; }
+          int splitValue = event.getVariables().findVarIndex( entry.name );
+          GenericToolbox::addIfNotInVector(splitValue, entry.fetchSample( samplePtr ).splitValueList);
         } // splitVarList
       } // Event
     }
@@ -670,7 +706,8 @@ void PlotGenerator::defineHistogramHolders() {
 
           // Loop over split vars
           int splitValueIndex = -1;
-          for( const auto& splitValue : splitVarsDictionary[histDefBase.splitVarName][&sample] ){
+          auto& splitValueList = splitVarsDictionary.fetchEntry(histDefBase.splitVarName).fetchSample(&sample).splitValueList;
+          for( auto& splitValue : splitValueList ){
             splitValueIndex++;
             histDefBase.splitVarValue = splitValue;
 
@@ -853,11 +890,6 @@ void PlotGenerator::buildEventBinCache( const std::vector<HistHolder *> &histPtr
         // pre-allocate
         holder->_binEventPtrList_.resize(holder->histPtr->GetNbinsX());
         for (auto &evtList: holder->_binEventPtrList_) { evtList.reserve(eventListPtr->size()); }
-
-        // fill any to double cache
-        if (holder->varToPlot != "Raw") {
-          for (auto &evt: *eventListPtr) { evt.getVarAsDouble(holder->varToPlot); }
-        }
       }
     }
   };
@@ -875,10 +907,15 @@ void PlotGenerator::buildEventBinCache( const std::vector<HistHolder *> &histPtr
       if( not histPtr->isBinCacheBuilt ){
         int iBin{-1};
         for( const auto& event : *eventListPtr ){
-          if( histPtr->splitVarName.empty() or event.getVarValue<int>(histPtr->splitVarName) == histPtr->splitVarValue){
+          int splitValue;
+          if( not histPtr->splitVarName.empty() ){
+            splitValue = event.getVariables().fetchVariable(histPtr->splitVarName).get().getValue<int>();
+          }
+
+          if( histPtr->splitVarName.empty() or splitValue == histPtr->splitVarValue){
 
             if( histPtr->varToPlot == "Raw" ){ iBin = event.getIndices().bin + 1; }
-            else                             { iBin = histPtr->histPtr->FindBin(event.getVarAsDouble(histPtr->varToPlot)); }
+            else                             { iBin = histPtr->histPtr->FindBin(event.getVariables().fetchVariable(histPtr->varToPlot).getVarAsDouble()); }
 
             if( iBin > 0 and iBin <= histPtr->histPtr->GetNbinsX() ){
               // so it's a valid bin!

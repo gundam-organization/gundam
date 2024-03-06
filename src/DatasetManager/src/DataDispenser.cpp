@@ -409,17 +409,17 @@ void DataDispenser::preAllocateMemory(){
 
   Event eventPlaceholder;
   eventPlaceholder.getIndices().dataset = _owner_->getDataSetIndex();
-  eventPlaceholder.setCommonVarNameListPtr(std::make_shared<std::vector<std::string>>(_cache_.varsRequestedForStorage));
+  eventPlaceholder.getVariables().setVarNameList( std::make_shared<std::vector<std::string>>(_cache_.varsRequestedForStorage) );
 
   std::vector<const GenericToolbox::LeafForm*> leafFormToVarList{};
-  for( auto& storageVar : *eventPlaceholder.getCommonVarNameListPtr() ){
+  for( auto& storageVar : *eventPlaceholder.getVariables().getNameListPtr() ){
     leafFormToVarList.emplace_back( lCollection.getLeafFormPtr(
         GenericToolbox::doesKeyIsInMap(storageVar, _parameters_.variableDict) ?
         _parameters_.variableDict[storageVar] : storageVar
     ));
   }
 
-  eventPlaceholder.allocateMemory( leafFormToVarList );
+  eventPlaceholder.getVariables().allocateMemory( leafFormToVarList );
 
   LogInfo << "Reserving event memory..." << std::endl;
   _cache_.sampleIndexOffsetList.resize(_cache_.samplesToFillList.size());
@@ -527,15 +527,11 @@ void DataDispenser::loadFromHistContent(){
   // claiming event memory
   for( size_t iSample = 0 ; iSample < _cache_.samplesToFillList.size() ; iSample++ ){
 
-    eventPlaceholder.setCommonVarNameListPtr(
+    eventPlaceholder.getVariables().setVarNameList(
         std::make_shared<std::vector<std::string>>(
             _cache_.samplesToFillList[iSample]->getBinning().buildVariableNameList()
         )
     );
-    for( auto& varHolder : eventPlaceholder.getVarHolderList() ){
-      varHolder.emplace_back( double(0.) );
-    }
-    eventPlaceholder.resizeVarToDoubleCache();
 
     // one event per bin
     _cache_.sampleNbOfEvents[iSample] = _cache_.samplesToFillList[iSample]->getBinning().getBinList().size();
@@ -601,7 +597,7 @@ void DataDispenser::loadFromHistContent(){
 
       container->getEventList()[iBin].getIndices().sample = sample->getIndex();
       for( size_t iVar = 0 ; iVar < target.size() ; iVar++ ){
-        container->getEventList()[iBin].setVariable( target[iVar], axisNameList[iVar] );
+        container->getEventList()[iBin].getVariables().fetchVariable(axisNameList[iVar]).set(target[iVar]);
       }
       container->getEventList()[iBin].getWeights().base = (hist->GetBinContent(histBinIndex));
       container->getEventList()[iBin].getWeights().resetCurrentWeight();
@@ -861,13 +857,13 @@ void DataDispenser::fillFunction(int iThread_){
   // buffer that will store the data for indexing
   Event eventIndexingBuffer;
   eventIndexingBuffer.getIndices().dataset = _owner_->getDataSetIndex();
-  eventIndexingBuffer.setCommonVarNameListPtr(std::make_shared<std::vector<std::string>>(_cache_.varsRequestedForIndexing));
-  eventIndexingBuffer.allocateMemory(leafFormIndexingList);
+  eventIndexingBuffer.getVariables().setVarNameList(std::make_shared<std::vector<std::string>>(_cache_.varsRequestedForIndexing));
+  eventIndexingBuffer.getVariables().allocateMemory(leafFormIndexingList);
 
   Event eventStorageBuffer;
   eventStorageBuffer.getIndices().dataset = _owner_->getDataSetIndex();
-  eventStorageBuffer.setCommonVarNameListPtr(std::make_shared<std::vector<std::string>>(_cache_.varsRequestedForStorage));
-  eventStorageBuffer.allocateMemory(leafFormStorageList);
+  eventStorageBuffer.getVariables().setVarNameList(std::make_shared<std::vector<std::string>>(_cache_.varsRequestedForStorage));
+  eventStorageBuffer.getVariables().allocateMemory(leafFormStorageList);
 
   if(iThread_ == 0){
     LogInfo << "Feeding event variables with:" << std::endl;
@@ -991,7 +987,7 @@ void DataDispenser::fillFunction(int iThread_){
       if( not _cache_.eventIsInSamplesList[iEntry][iSample] ){ continue; }
 
       // Getting loaded data in tEventBuffer
-      eventIndexingBuffer.copyData( leafFormIndexingList );
+      eventIndexingBuffer.getVariables().copyData( leafFormIndexingList );
 
       // Propagate variable transformations for indexing
       for( auto* varTransformPtr : varTransformForIndexingList ){
@@ -1038,7 +1034,7 @@ void DataDispenser::fillFunction(int iThread_){
       eventPtr->getWeights().resetCurrentWeight();
 
       // drop the content of the leaves
-      eventPtr->copyData( leafFormStorageList );
+      eventPtr->getVariables().copyData( leafFormStorageList );
 
       // Propagate transformation for storage -> use the previous results calculated for indexing
       for( auto *varTransformPtr: varTransformForStorageList ){
@@ -1058,7 +1054,7 @@ void DataDispenser::fillFunction(int iThread_){
 
           // dial collections may come with a condition formula
           if( dialCollectionRef->getApplyConditionFormula() != nullptr ){
-            if( eventIndexingBuffer.evalFormula(dialCollectionRef->getApplyConditionFormula().get()) == 0 ){
+            if( eventIndexingBuffer.getVariables().evalFormula(dialCollectionRef->getApplyConditionFormula().get()) == 0 ){
               // next dialSet
               continue;
             }
@@ -1077,7 +1073,7 @@ void DataDispenser::fillFunction(int iThread_){
               dialEntryPtr++;
             }
             else{
-              auto dialBinIdx = eventIndexingBuffer.findBinIndex( dialCollectionRef->getDialBinSet() );
+              auto dialBinIdx = eventIndexingBuffer.getVariables().findBinIndex( dialCollectionRef->getDialBinSet() );
               if( dialBinIdx != -1 ){
                 dialEntryPtr->collectionIndex = iCollection;
                 dialEntryPtr->interfaceIndex = dialBinIdx;
@@ -1088,10 +1084,11 @@ void DataDispenser::fillFunction(int iThread_){
           else if( not dialCollectionRef->getGlobalDialLeafName().empty() ){
             // Event-by-event dial?
             // grab the dial as a general TObject -> let the factory figure out what to do with it
+
             auto *dialObjectPtr = (TObject *) *(
-                (TObject **) eventIndexingBuffer.getVariableAddress(
+                (TObject **) eventIndexingBuffer.getVariables().fetchVariable(
                     dialCollectionRef->getGlobalDialLeafName()
-                )
+                ).get().getPlaceHolderPtr()->getVariableAddress()
             );
 
             // Extra-step for selecting the right dial with TClonesArray

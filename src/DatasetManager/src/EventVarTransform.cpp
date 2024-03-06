@@ -69,7 +69,8 @@ double EventVarTransform::evalTransformation(const Event& event_) const {
 double EventVarTransform::evalTransformation( const Event& event_, std::vector<double>& inputBuffer_) const{
   return std::nan("defaultEvalTransformOutput");
 }
-void EventVarTransform::storeOutput( double output_, Event& storeEvent_) const{
-  storeEvent_.setVariable(output_, this->getOutputVariableName());
+void EventVarTransform::storeOutput( double output_, Event& storeEvent_ ) const{
+  auto& variable = storeEvent_.getVariables().fetchVariable(this->getOutputVariableName());
+  variable.set( output_ );
 }
 
