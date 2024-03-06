@@ -99,22 +99,22 @@ void SampleElement::refillHistogram(int iThread_){
   }
 #endif
 
-  auto bounds = GenericToolbox::ParallelWorker::getThreadBoundIndices( iThread_, nThreads, _myhistogram_.nBins );
-
-  std::for_each(
-      _myhistogram_.binList.begin() + bounds.beginIndex,
-      _myhistogram_.binList.begin() + bounds.endIndex,
-      [&]( Histogram::Bin& bin_){
-        bin_.content = 0;
-        bin_.error = 0;
+  // Faster that pointer shifter. -> would be slower if refillHistogram is
+  // handled by the propagator
+  int iBin = iThread_; // iBin += nbThreads;
+  Histogram::Bin* binPtr;
+  while( iBin < _myhistogram_.nBins ){
+    binPtr = &_myhistogram_.binList[iBin];
+    binPtr->content = 0;
+    binPtr->error = 0;
 #ifdef GUNDAM_USING_CACHE_MANAGER
-        if (_CacheManagerValue_ !=nullptr and _CacheManagerIndex_ >= 0) {
-          const double ew = _CacheManagerValue_[_CacheManagerIndex_+bin_.index];
-          const double ew2 = _CacheManagerValue2_[_CacheManagerIndex_+bin_.index];
-          bin_.content += ew;
-          bin_.error += ew2;
+    if (_CacheManagerValue_ !=nullptr and _CacheManagerIndex_ >= 0) {
+      const double ew = _CacheManagerValue_[_CacheManagerIndex_+binPtr->index];
+      const double ew2 = _CacheManagerValue2_[_CacheManagerIndex_+binPtr->index];
+      binPtr->content += ew;
+      binPtr->error += ew2;
 #ifdef CACHE_MANAGER_SLOW_VALIDATION
-          double content = binContentArray[iBin+1];
+      double content = binContentArray[iBin+1];
       double slowValue = 0.0;
       for( auto* eventPtr : perBinEventPtrList.at(iBin)){
         slowValue += eventPtr->getEventWeight();
@@ -130,19 +130,65 @@ void SampleElement::refillHistogram(int iThread_){
                 << std::endl;
       }
 #endif // CACHE_MANAGER_SLOW_VALIDATION
-        }
-        else {
+    }
+    else {
 #endif
-          for (auto *eventPtr: bin_.eventPtrList) {
-            bin_.content += eventPtr->getEventWeight();
-            bin_.error += eventPtr->getEventWeight() * eventPtr->getEventWeight();
-          }
-#ifdef GUNDAM_USING_CACHE_MANAGER
-        }
-#endif // GUNDAM_USING_CACHE_MANAGER
-        bin_.error = sqrt(bin_.error);
+      for (auto *eventPtr: binPtr->eventPtrList) {
+        binPtr->content += eventPtr->getEventWeight();
+        binPtr->error += eventPtr->getEventWeight() * eventPtr->getEventWeight();
       }
-  );
+#ifdef GUNDAM_USING_CACHE_MANAGER
+    }
+#endif // GUNDAM_USING_CACHE_MANAGER
+    binPtr->error = sqrt(binPtr->error);
+    iBin += nThreads;
+  }
+
+
+//  auto bounds = GenericToolbox::ParallelWorker::getThreadBoundIndices( iThread_, nThreads, _myhistogram_.nBins );
+//
+//  std::for_each(
+//      _myhistogram_.binList.begin() + bounds.beginIndex,
+//      _myhistogram_.binList.begin() + bounds.endIndex,
+//      [&]( Histogram::Bin& bin_){
+//        bin_.content = 0;
+//        bin_.error = 0;
+//#ifdef GUNDAM_USING_CACHE_MANAGER
+//        if (_CacheManagerValue_ !=nullptr and _CacheManagerIndex_ >= 0) {
+//          const double ew = _CacheManagerValue_[_CacheManagerIndex_+bin_.index];
+//          const double ew2 = _CacheManagerValue2_[_CacheManagerIndex_+bin_.index];
+//          bin_.content += ew;
+//          bin_.error += ew2;
+//#ifdef CACHE_MANAGER_SLOW_VALIDATION
+//          double content = binContentArray[iBin+1];
+//      double slowValue = 0.0;
+//      for( auto* eventPtr : perBinEventPtrList.at(iBin)){
+//        slowValue += eventPtr->getEventWeight();
+//      }
+//      double delta = std::abs(slowValue-content);
+//      if (delta > 1E-6) {
+//        LogInfo << "VALIDATION: Mismatched bin: " << _CacheManagerIndex_
+//                << "+" << iBin
+//                << "(" << name
+//                << ") gpu: " << content
+//                << " PhysEvt: " << slowValue
+//                << " delta: " << delta
+//                << std::endl;
+//      }
+//#endif // CACHE_MANAGER_SLOW_VALIDATION
+//        }
+//        else {
+//#endif
+//          for (auto *eventPtr: bin_.eventPtrList) {
+//            bin_.content += eventPtr->getEventWeight();
+//            bin_.error += eventPtr->getEventWeight() * eventPtr->getEventWeight();
+//          }
+//#ifdef GUNDAM_USING_CACHE_MANAGER
+//        }
+//#endif // GUNDAM_USING_CACHE_MANAGER
+//        bin_.error = sqrt(bin_.error);
+//      }
+//  );
 
 }
 
