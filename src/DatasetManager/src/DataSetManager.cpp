@@ -265,76 +265,8 @@ void DataSetManager::loadData(){
   /// Now caching the event for the plot generator
   _propagator_.getPlotGenerator().defineHistogramHolders();
 
-  /// Printouts for quick monitoring
-  if( _propagator_.isShowEventBreakdown() ){
-
-    // STAGED MASK
-    LogWarning << "Staged event breakdown:" << std::endl;
-    std::vector<std::vector<double>> stageBreakdownList(
-        _propagator_.getSampleSet().getSampleList().size(),
-        std::vector<double>(_propagator_.getParametersManager().getParameterSetsList().size() + 1, 0)
-    ); // [iSample][iStage]
-    std::vector<std::string> stageTitles;
-    stageTitles.emplace_back("Sample");
-    stageTitles.emplace_back("No reweight");
-    for( auto& parSet : _propagator_.getParametersManager().getParameterSetsList() ){
-      if( not parSet.isEnabled() ){ continue; }
-      stageTitles.emplace_back("+ " + parSet.getName());
-    }
-
-    int iStage{0};
-    std::vector<ParameterSet*> maskedParSetList;
-    for( auto& parSet : _propagator_.getParametersManager().getParameterSetsList() ){
-      if( not parSet.isEnabled() ){ continue; }
-      maskedParSetList.emplace_back( &parSet );
-      parSet.setMaskedForPropagation( true );
-    }
-
-    _propagator_.resetReweight();
-    _propagator_.reweightMcEvents();
-    for( size_t iSample = 0 ; iSample < _propagator_.getSampleSet().getSampleList().size() ; iSample++ ){
-      stageBreakdownList[iSample][iStage] = _propagator_.getSampleSet().getSampleList()[iSample].getMcContainer().getSumWeights();
-    }
-
-    for( auto* parSetPtr : maskedParSetList ){
-      parSetPtr->setMaskedForPropagation(false);
-      _propagator_.resetReweight();
-      _propagator_.reweightMcEvents();
-      iStage++;
-      for( size_t iSample = 0 ; iSample < _propagator_.getSampleSet().getSampleList().size() ; iSample++ ){
-        stageBreakdownList[iSample][iStage] = _propagator_.getSampleSet().getSampleList()[iSample].getMcContainer().getSumWeights();
-      }
-    }
-
-    GenericToolbox::TablePrinter t;
-    t.setColTitles(stageTitles);
-    for( size_t iSample = 0 ; iSample < _propagator_.getSampleSet().getSampleList().size() ; iSample++ ) {
-      std::vector<std::string> tableLine;
-      tableLine.emplace_back("\"" + _propagator_.getSampleSet().getSampleList()[iSample].getName() + "\"");
-      for( iStage = 0 ; iStage < stageBreakdownList[iSample].size() ; iStage++ ){
-        tableLine.emplace_back( std::to_string(stageBreakdownList[iSample][iStage]) );
-      }
-      t.addTableLine(tableLine);
-    }
-    t.printTable();
-
-    LogWarning << "Sample breakdown:" << std::endl;
-    std::cout << _propagator_.getSampleBreakdownTableStr() << std::endl;
-
-  }
-  if( _propagator_.isDebugPrintLoadedEvents() ){
-    LogDebug << GET_VAR_NAME_VALUE(_propagator_.getDebugPrintLoadedEventsNbPerSample()) << std::endl;
-    int iEvt{0};
-    for( auto& entry : _propagator_.getEventDialCache().getCache() ) {
-      LogDebug << "Event #" << iEvt++ << "{" << std::endl;
-      {
-        LogScopeIndent;
-        LogDebug << entry.getSummary() << std::endl;
-      }
-      LogDebug << "}" << std::endl;
-      if( iEvt >= _propagator_.getDebugPrintLoadedEventsNbPerSample() ) break;
-    }
-  }
+  /// Now printout the event breakdowns
+  _propagator_.printBreakdowns();
 
   /// Propagator needs to be fast, let the workers wait for the signal
   GundamGlobals::getParallelWorker().setCpuTimeSaverIsEnabled(false);

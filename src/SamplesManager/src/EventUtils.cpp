@@ -139,7 +139,6 @@ namespace EventUtils{
       if( not ss.str().empty() ){ ss << std::endl; }
       ss << "  { name: " << _nameListPtr_->at(iVar);
       ss << ", var: " << _varList_.at(iVar).get();
-      if( not std::isnan(_varList_.at(iVar).getVarAsDouble()) ){ ss << " / " << _varList_.at(iVar).getVarAsDouble(); }
       ss << " }";
     }
     return ss.str();

@@ -203,6 +203,75 @@ std::string Propagator::getSampleBreakdownTableStr() const{
   ss << t.generateTableString();
   return ss.str();
 }
+void Propagator::printBreakdowns(){
+  if( _showEventBreakdown_ ){
+
+    // STAGED MASK
+    LogWarning << "Staged event breakdown:" << std::endl;
+    std::vector<std::vector<double>> stageBreakdownList(
+        _sampleSet_.getSampleList().size(),
+        std::vector<double>(_parManager_.getParameterSetsList().size() + 1, 0)
+    ); // [iSample][iStage]
+    std::vector<std::string> stageTitles;
+    stageTitles.emplace_back("Sample");
+    stageTitles.emplace_back("No reweight");
+    for( auto& parSet : _parManager_.getParameterSetsList() ){
+      if( not parSet.isEnabled() ){ continue; }
+      stageTitles.emplace_back("+ " + parSet.getName());
+    }
+
+    int iStage{0};
+    std::vector<ParameterSet*> maskedParSetList;
+    for( auto& parSet : _parManager_.getParameterSetsList() ){
+      if( not parSet.isEnabled() ){ continue; }
+      maskedParSetList.emplace_back( &parSet );
+      parSet.setMaskedForPropagation( true );
+    }
+
+    resetReweight();
+    reweightMcEvents();
+    for( size_t iSample = 0 ; iSample < _sampleSet_.getSampleList().size() ; iSample++ ){
+      stageBreakdownList[iSample][iStage] = _sampleSet_.getSampleList()[iSample].getMcContainer().getSumWeights();
+    }
+
+    for( auto* parSetPtr : maskedParSetList ){
+      parSetPtr->setMaskedForPropagation(false);
+      resetReweight();
+      reweightMcEvents();
+      iStage++;
+      for( size_t iSample = 0 ; iSample < _sampleSet_.getSampleList().size() ; iSample++ ){
+        stageBreakdownList[iSample][iStage] = _sampleSet_.getSampleList()[iSample].getMcContainer().getSumWeights();
+      }
+    }
+
+    GenericToolbox::TablePrinter t;
+    t.setColTitles(stageTitles);
+    for( size_t iSample = 0 ; iSample < _sampleSet_.getSampleList().size() ; iSample++ ) {
+      std::vector<std::string> tableLine;
+      tableLine.emplace_back("\"" + _sampleSet_.getSampleList()[iSample].getName() + "\"");
+      for( iStage = 0 ; iStage < stageBreakdownList[iSample].size() ; iStage++ ){
+        tableLine.emplace_back( std::to_string(stageBreakdownList[iSample][iStage]) );
+      }
+      t.addTableLine(tableLine);
+    }
+    t.printTable();
+
+    LogWarning << "Sample breakdown:" << std::endl;
+    std::cout << this->getSampleBreakdownTableStr() << std::endl;
+
+  }
+  if( _debugPrintLoadedEvents_ ){
+    LogDebug << "Printing " << _debugPrintLoadedEventsNbPerSample_ << " events..." << std::endl;
+    for( int iEvt = 0 ; iEvt < _debugPrintLoadedEventsNbPerSample_ ; iEvt++ ){
+      LogDebug << "Event #" << iEvt << "{" << std::endl;
+      {
+        LogScopeIndent;
+        LogDebug << _eventDialCache_.getCache()[iEvt].getSummary() << std::endl;
+      }
+      LogDebug << "}" << std::endl;
+    }
+  }
+}
 
 // Protected
 void Propagator::initializeThreads() {
