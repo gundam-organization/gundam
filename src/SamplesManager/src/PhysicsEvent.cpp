@@ -204,12 +204,10 @@ void PhysicsEvent::print() const { LogInfo << *this << std::endl; }
 std::string PhysicsEvent::getSummary() const {
   std::stringstream ss;
 
-  ss << GET_VAR_NAME_VALUE(_dataSetIndex_);
-  ss << std::endl << GET_VAR_NAME_VALUE(_entryIndex_);
+  ss << "Indices{" << _indices_ << "}";
   ss << std::endl << GET_VAR_NAME_VALUE(_baseWeight_);
   ss << std::endl << GET_VAR_NAME_VALUE(_nominalWeight_);
   ss << std::endl << GET_VAR_NAME_VALUE(_eventWeight_);
-  ss << std::endl << GET_VAR_NAME_VALUE(_sampleBinIndex_);
 
   if( _varHolderList_.empty() ){ ss << std::endl << "LeafContent: { empty }"; }
   else{

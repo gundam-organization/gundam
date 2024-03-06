@@ -2,8 +2,8 @@
 // Created by Nadrino on 22/07/2021.
 //
 
-#ifndef GUNDAM_PHYSICSEVENT_H
-#define GUNDAM_PHYSICSEVENT_H
+#ifndef GUNDAM_PHYSICS_EVENT_H
+#define GUNDAM_PHYSICS_EVENT_H
 
 #include "ParameterSet.h"
 #include "DataBinSet.h"
@@ -19,18 +19,32 @@
 #include <mutex>
 #include <vector>
 #include <string>
+#include <sstream>
 
 class PhysicsEvent {
 
 public:
+  struct Indices{
+    int dataset{-1}; // which DatasetDefinition?
+    Long64_t entry{-1}; // which entry of the TChain?
+    int sample{-1}; // this information is lost in the EventDialCache manager
+    int bin{-1}; // which bin of the sample?
+
+    [[nodiscard]] std::string getSummary() const{
+      std::stringstream ss;
+      ss << "dataset(" << dataset << ")";
+      ss << ", " << "entry(" << entry << ")";
+      ss << ", " << "sample(" << sample << ")";
+      ss << ", " << "bin(" << bin << ")";
+      return ss.str();
+    }
+    friend std::ostream& operator <<( std::ostream& o, const Indices& this_ ){ o << this_.getSummary(); return o; }
+  };
+
+public:
   PhysicsEvent() = default;
-  virtual ~PhysicsEvent() = default;
 
   // setters
-  void setSampleIndex(int sampleIndex){ _sampleIndex_ = sampleIndex; }
-  void setDataSetIndex(int dataSetIndex_){ _dataSetIndex_ = dataSetIndex_; }
-  void setSampleBinIndex(int sampleBinIndex){ _sampleBinIndex_ = sampleBinIndex; }
-  void setEntryIndex(Long64_t entryIndex_){ _entryIndex_ = entryIndex_; }
   void setBaseWeight(double baseWeight_){ _baseWeight_ = baseWeight_; }
   void setEventWeight(double eventWeight){ _eventWeight_ = eventWeight; }
   void setNominalWeight(double nominalWeight){ _nominalWeight_ = nominalWeight; }
@@ -38,13 +52,10 @@ public:
   template<typename T> void setVariable(const T& value_, const std::string& leafName_, size_t arrayIndex_ = 0);
 
   // const getters
-  int getSampleIndex() const{ return _sampleIndex_; }
-  int getDataSetIndex() const { return _dataSetIndex_; }
-  int getSampleBinIndex() const{ return _sampleBinIndex_; }
-  Long64_t getEntryIndex() const { return _entryIndex_; }
   double getBaseWeight() const { return _baseWeight_; }
   double getNominalWeight() const { return _nominalWeight_; }
   double getEventWeight() const;
+  const Indices& getIndices() const{ return _indices_; }
   const GenericToolbox::AnyType& getVar(int varIndex_, size_t arrayIndex_ = 0) const { return _varHolderList_[varIndex_][arrayIndex_]; }
   const std::vector<GenericToolbox::AnyType>& getVarHolder(int index_) const { return _varHolderList_[index_]; }
   const std::vector<GenericToolbox::AnyType>& getVarHolder(const std::string &leafName_) const;
@@ -54,9 +65,10 @@ public:
   template<typename T> auto getVarValue(const std::string& leafName_, size_t arrayIndex_ = 0) const -> T;
   template<typename T> auto getVariable(const std::string& leafName_, size_t arrayIndex_ = 0) const -> const T&;
 
-  // non-const getters
+  // mutable getters
   double& getEventWeightRef(){ return _eventWeight_; }
   void* getVariableAddress(const std::string& leafName_, size_t arrayIndex_ = 0);
+  Indices& getIndices(){ return _indices_; }
   std::vector<std::vector<GenericToolbox::AnyType>> &getVarHolderList(){ return _varHolderList_; }
   GenericToolbox::AnyType& getVariableAsAnyType(const std::string& leafName_, size_t arrayIndex_ = 0);
 
@@ -80,16 +92,14 @@ public:
   void copyVarHolderList(const PhysicsEvent& ref_);
   void copyOnlyExistingVarHolders(const PhysicsEvent& other_);
   void fillBuffer(const std::vector<int>& indexList_, std::vector<double>& buffer_) const;
+  void fillBinIndex(const DataBinSet& binSet_){ _indices_.bin = findBinIndex(binSet_); }
 
   // operators
   friend std::ostream& operator <<( std::ostream& o, const PhysicsEvent& p );
 
 private:
-  // Context variables
-  int _sampleIndex_{-1}; // this information is lost in the EventDialCache manager
-  int _dataSetIndex_{-1};
-  int _sampleBinIndex_{-1};
-  Long64_t _entryIndex_{-1};
+  // internals
+  Indices _indices_;
   double _baseWeight_{1};
   double _nominalWeight_{1};
   double _eventWeight_{1};
@@ -137,4 +147,4 @@ template<typename T> void PhysicsEvent::setVariable(const T& value_, const std::
 }
 
 
-#endif //GUNDAM_PHYSICSEVENT_H
+#endif //GUNDAM_PHYSICS_EVENT_H

@@ -877,7 +877,7 @@ void PlotGenerator::buildEventBinCache(const std::vector<HistHolder *> &histPtrT
         for( const auto& event : *eventListPtr ){
           if( histPtr->splitVarName.empty() or event.getVarValue<int>(histPtr->splitVarName) == histPtr->splitVarValue){
 
-            if( histPtr->varToPlot == "Raw" ){ iBin = event.getSampleBinIndex() + 1; }
+            if( histPtr->varToPlot == "Raw" ){ iBin = event.getIndices().bin + 1; }
             else                             { iBin = histPtr->histPtr->FindBin(event.getVarAsDouble(histPtr->varToPlot)); }
 
             if( iBin > 0 and iBin <= histPtr->histPtr->GetNbinsX() ){

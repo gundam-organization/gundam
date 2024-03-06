@@ -155,7 +155,7 @@ bool Cache::Manager::Build( SampleSet& sampleList,
 
     std::map<std::string, int> useCount;
     for (EventDialCache::CacheEntry& elem : eventDials.getCache()) {
-        if (elem.event->getSampleBinIndex() < 0) {
+        if (elem.event->getIndices().bin < 0) {
             throw std::runtime_error("Caching event that isn't used");
         }
         ++events;
@@ -352,7 +352,7 @@ bool Cache::Manager::Update( SampleSet& sampleList,
     // Add the dials in the EventDialCache to the internal cache.
     for (EventDialCache::CacheEntry& elem : eventDials.getCache()) {
         // Skip events that are not in a bin.
-        if (elem.event->getSampleBinIndex() < 0) continue;
+        if (elem.event->getIndices().bin < 0) continue;
         PhysicsEvent& event = *elem.event;
         // The reduce index.  This is where to save the results for this
         // event in the cache.
@@ -560,7 +560,7 @@ bool Cache::Manager::Update( SampleSet& sampleList,
         for (PhysicsEvent& event
                  : sample.getMcContainer().getEventList()) {
             int eventIndex = event.getCacheManagerIndex();
-            int cellIndex = event.getSampleBinIndex();
+            int cellIndex = event.getIndices().bin;
             if (cellIndex < 0 || cells <= cellIndex) {
                 throw std::runtime_error("Histogram bin out of range");
             }

@@ -408,7 +408,7 @@ void DataDispenser::preAllocateMemory(){
   lCollection.initialize();
 
   PhysicsEvent eventPlaceholder;
-  eventPlaceholder.setDataSetIndex(_owner_->getDataSetIndex());
+  eventPlaceholder.getIndices().dataset = _owner_->getDataSetIndex();
   eventPlaceholder.setCommonVarNameListPtr(std::make_shared<std::vector<std::string>>(_cache_.varsRequestedForStorage));
 
   std::vector<const GenericToolbox::LeafForm*> leafFormToVarList{};
@@ -521,7 +521,7 @@ void DataDispenser::loadFromHistContent(){
   _cache_.sampleEventListPtrToFill.resize(_cache_.samplesToFillList.size());
 
   PhysicsEvent eventPlaceholder;
-  eventPlaceholder.setDataSetIndex(_owner_->getDataSetIndex());
+  eventPlaceholder.getIndices().dataset = (_owner_->getDataSetIndex());
   eventPlaceholder.setEventWeight(0); // default.
 
   // claiming event memory
@@ -549,7 +549,7 @@ void DataDispenser::loadFromHistContent(){
 
     // indexing according to the binning
     for( size_t iEvent=_cache_.sampleIndexOffsetList[iSample] ; iEvent < container->getEventList().size() ; iEvent++ ){
-      container->getEventList()[iEvent].setSampleBinIndex( int( iEvent ) );
+      container->getEventList()[iEvent].getIndices().bin = int( iEvent );
     }
   }
 
@@ -599,7 +599,7 @@ void DataDispenser::loadFromHistContent(){
       auto target = sample->getBinning().getBinList()[iBin].generateBinTarget( axisNameList );
       auto histBinIndex = hist->GetBin( target.data() ); // bad fetch..?
 
-      container->getEventList()[iBin].setSampleIndex( sample->getIndex() );
+      container->getEventList()[iBin].getIndices().sample = sample->getIndex();
       for( size_t iVar = 0 ; iVar < target.size() ; iVar++ ){
         container->getEventList()[iBin].setVariable( target[iVar], axisNameList[iVar] );
       }
@@ -860,12 +860,12 @@ void DataDispenser::fillFunction(int iThread_){
 
   // buffer that will store the data for indexing
   PhysicsEvent eventIndexingBuffer;
-  eventIndexingBuffer.setDataSetIndex(_owner_->getDataSetIndex());
+  eventIndexingBuffer.getIndices().dataset = _owner_->getDataSetIndex();
   eventIndexingBuffer.setCommonVarNameListPtr(std::make_shared<std::vector<std::string>>(_cache_.varsRequestedForIndexing));
   eventIndexingBuffer.allocateMemory(leafFormIndexingList);
 
   PhysicsEvent eventStorageBuffer;
-  eventStorageBuffer.setDataSetIndex(_owner_->getDataSetIndex());
+  eventStorageBuffer.getIndices().dataset = _owner_->getDataSetIndex();
   eventStorageBuffer.setCommonVarNameListPtr(std::make_shared<std::vector<std::string>>(_cache_.varsRequestedForStorage));
   eventStorageBuffer.allocateMemory(leafFormStorageList);
 
@@ -998,15 +998,11 @@ void DataDispenser::fillFunction(int iThread_){
         varTransformPtr->evalAndStore(eventIndexingBuffer);
       }
 
-      // Has valid bin?
-      eventIndexingBuffer.setSampleBinIndex(
-          eventIndexingBuffer.findBinIndex(
-              _cache_.samplesToFillList[iSample]->getBinning()
-          )
-      );
+      // Look for the bin index
+      eventIndexingBuffer.fillBinIndex( _cache_.samplesToFillList[iSample]->getBinning() );
 
       // No bin found -> next sample
-      if( eventIndexingBuffer.getSampleBinIndex() == -1){ break; }
+      if( eventIndexingBuffer.getIndices().bin == -1){ break; }
 
       // OK, now we have a valid fit bin. Let's claim an index.
       // Shared index among threads
@@ -1035,10 +1031,10 @@ void DataDispenser::fillFunction(int iThread_){
       PhysicsEvent *eventPtr = &(*_cache_.sampleEventListPtrToFill[iSample])[sampleEventIndex];
 
       // fill meta info
-      eventPtr->setEntryIndex( iEntry );
+      eventPtr->getIndices().entry = iEntry;
+      eventPtr->getIndices().sample = _cache_.samplesToFillList[iSample]->getIndex();
+      eventPtr->getIndices().bin = eventIndexingBuffer.getIndices().bin;
       eventPtr->setBaseWeight( eventIndexingBuffer.getBaseWeight() );
-      eventPtr->setSampleIndex( _cache_.samplesToFillList[iSample]->getIndex() );
-      eventPtr->setSampleBinIndex( eventIndexingBuffer.getSampleBinIndex() );
       eventPtr->resetEventWeight();
 
       // drop the content of the leaves

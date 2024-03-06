@@ -55,7 +55,7 @@ void EventTreeWriter::writeSamples(TDirectory* saveDir_, const Propagator& propa
         std::vector<const EventDialCache::CacheEntry*> cacheSampleList{};
         cacheSampleList.reserve( propagator_.getEventDialCache().getCache().size() );
         for( auto& cacheEntry : propagator_.getEventDialCache().getCache() ){
-          if( cacheEntry.event->getSampleIndex() == sample.getIndex() ){
+          if( cacheEntry.event->getIndices().sample == sample.getIndex() ){
             cacheSampleList.emplace_back( &cacheEntry );
           }
         }
@@ -95,9 +95,9 @@ template<typename T> void EventTreeWriter::writeEventsTemplate(TDirectory* saveD
   leafDictionary["eventWeight/D"] =   [](GenericToolbox::RawDataArray& arr_, const PhysicsEvent& ev_){ arr_.writeRawData(ev_.getEventWeight()); };
   leafDictionary["nominalWeight/D"] = [](GenericToolbox::RawDataArray& arr_, const PhysicsEvent& ev_){ arr_.writeRawData(ev_.getNominalWeight()); };
   leafDictionary["treeWeight/D"] =    [](GenericToolbox::RawDataArray& arr_, const PhysicsEvent& ev_){ arr_.writeRawData(ev_.getBaseWeight()); };
-  leafDictionary["sampleBinIndex/I"]= [](GenericToolbox::RawDataArray& arr_, const PhysicsEvent& ev_){ arr_.writeRawData(ev_.getSampleBinIndex()); };
-  leafDictionary["dataSetIndex/I"] =  [](GenericToolbox::RawDataArray& arr_, const PhysicsEvent& ev_){ arr_.writeRawData(ev_.getDataSetIndex()); };
-  leafDictionary["entryIndex/L"] =    [](GenericToolbox::RawDataArray& arr_, const PhysicsEvent& ev_){ arr_.writeRawData(ev_.getEntryIndex()); };
+  leafDictionary["sampleBinIndex/I"]= [](GenericToolbox::RawDataArray& arr_, const PhysicsEvent& ev_){ arr_.writeRawData(ev_.getIndices().bin); };
+  leafDictionary["dataSetIndex/I"] =  [](GenericToolbox::RawDataArray& arr_, const PhysicsEvent& ev_){ arr_.writeRawData(ev_.getIndices().dataset); };
+  leafDictionary["entryIndex/L"] =    [](GenericToolbox::RawDataArray& arr_, const PhysicsEvent& ev_){ arr_.writeRawData(ev_.getIndices().entry); };
   std::string branchDefStr;
   for( auto& leafDef : leafDictionary ){
     if( not branchDefStr.empty() ) branchDefStr += ":";

@@ -21,7 +21,7 @@ void SampleElement::buildHistogram(const DataBinSet& binning_){
     _histogram_.binList.back().dataBinPtr = &bin;
     _histogram_.binList.back().index = iBin++;
   }
-  _histogram_.nBins = int(_histogram_.binList.size() );
+  _histogram_.nBins = int( _histogram_.binList.size() );
 }
 void SampleElement::reserveEventMemory(size_t dataSetIndex_, size_t nEvents, const PhysicsEvent &eventBuffer_) {
   // adding one dataset:
@@ -71,13 +71,13 @@ void SampleElement::updateBinEventList(int iThread_) {
   // multithread technique with iBin += nbThreads;
   int iBin{iThread_};
   while( iBin < _histogram_.nBins ){
-    size_t count = std::count_if(_eventList_.begin(), _eventList_.end(), [&]( auto& e) {return e.getSampleBinIndex() == iBin;});
+    size_t count = std::count_if(_eventList_.begin(), _eventList_.end(), [&]( auto& e) {return e.getIndices().bin == iBin;});
     _histogram_.binList[iBin].eventPtrList.resize(count, nullptr);
 
     // Now filling the event indexes
     size_t index = 0;
     std::for_each(_eventList_.begin(), _eventList_.end(), [&]( auto& e){
-      if( e.getSampleBinIndex() == iBin){ _histogram_.binList[iBin].eventPtrList[index++] = &e; }
+      if( e.getIndices().bin == iBin){ _histogram_.binList[iBin].eventPtrList[index++] = &e; }
     });
 
     iBin += nbThreads;
@@ -201,8 +201,11 @@ double SampleElement::getSumWeights() const{
   return output;
 }
 size_t SampleElement::getNbBinnedEvents() const{
-  return std::accumulate(_eventList_.begin(), _eventList_.end(), size_t(0.),
-                         []( size_t sum_, const PhysicsEvent &ev_ ){ return sum_ + (ev_.getSampleBinIndex() != -1); });
+  return std::accumulate(
+      _eventList_.begin(), _eventList_.end(), size_t(0.),
+      []( size_t sum_, const PhysicsEvent &ev_ ){
+        return sum_ + (ev_.getIndices().bin != -1);
+  });
 }
 std::shared_ptr<TH1D> SampleElement::generateRootHistogram() const{
   std::shared_ptr<TH1D> out{nullptr};

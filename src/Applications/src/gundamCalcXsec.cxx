@@ -543,7 +543,7 @@ int main(int argc, char** argv){
         {
           auto& mcEvList{xsec.samplePtr->getMcContainer().getEventList()};
           std::for_each(mcEvList.begin(), mcEvList.end(), [&](PhysicsEvent& ev_){
-            if( iBin != ev_.getSampleBinIndex() ){ return; }
+            if( iBin != ev_.getIndices().bin ){ return; }
             ev_.setNominalWeight( ev_.getNominalWeight() + binData );
           });
         }
@@ -552,7 +552,7 @@ int main(int argc, char** argv){
         {
           auto& dataEvList{xsec.samplePtr->getDataContainer().getEventList()};
           std::for_each(dataEvList.begin(), dataEvList.end(), [&](PhysicsEvent& ev_){
-            if( iBin != ev_.getSampleBinIndex() ){ return; }
+            if( iBin != ev_.getIndices().bin ){ return; }
             ev_.setNominalWeight( ev_.getNominalWeight() + binData );
           });
         }
@@ -690,12 +690,12 @@ int main(int argc, char** argv){
       std::vector<size_t> nEventInBin(xsec.histogram.GetNbinsX(), 0);
       for( size_t iBin = 0 ; iBin < nEventInBin.size() ; iBin++ ){
         nEventInBin[iBin] = std::count_if(mcEvList.begin(), mcEvList.end(), [iBin](PhysicsEvent &ev_) {
-          return ev_.getSampleBinIndex() == iBin;
+          return ev_.getIndices().bin == iBin;
         });
       }
 
       std::for_each(mcEvList.begin(), mcEvList.end(), [&](PhysicsEvent &ev_) {
-        ev_.setEventWeight(ev_.getNominalWeight() / nToys / double(nEventInBin[ev_.getSampleBinIndex()]) );
+        ev_.setEventWeight(ev_.getNominalWeight() / nToys / double(nEventInBin[ev_.getIndices().bin]) );
       });
     }
     {
@@ -703,12 +703,12 @@ int main(int argc, char** argv){
       std::vector<size_t> nEventInBin(xsec.histogram.GetNbinsX(), 0);
       for( size_t iBin = 0 ; iBin < nEventInBin.size() ; iBin++ ){
         nEventInBin[iBin] = std::count_if(dataEvList.begin(), dataEvList.end(), [iBin](PhysicsEvent &ev_) {
-          return ev_.getSampleBinIndex() == iBin;
+          return ev_.getIndices().bin== iBin;
         });
       }
 
       std::for_each(dataEvList.begin(), dataEvList.end(), [&](PhysicsEvent &ev_) {
-        ev_.setEventWeight(ev_.getNominalWeight() / nToys / double(nEventInBin[ev_.getSampleBinIndex()]) );
+        ev_.setEventWeight(ev_.getNominalWeight() / nToys / double(nEventInBin[ev_.getIndices().bin]) );
       });
     }
   }

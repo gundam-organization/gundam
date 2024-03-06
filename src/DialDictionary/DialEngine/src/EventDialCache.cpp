@@ -45,8 +45,8 @@ void EventDialCache::buildReferenceCache( SampleSet& sampleSet_, std::vector<Dia
 
       auto p = GenericToolbox::getSortPermutation(
           sample.getMcContainer().getEventList(), [](const PhysicsEvent& a, const PhysicsEvent& b) {
-            if( a.getDataSetIndex() < b.getDataSetIndex() ){ return true; }
-            if( a.getEntryIndex() < b.getEntryIndex() ){ return true; }
+            if( a.getIndices().dataset < a.getIndices().dataset ){ return true; }
+            if( a.getIndices().entry < b.getIndices().entry ){ return true; }
             return false;
           });
 
