@@ -289,6 +289,13 @@ void ParametersManager::throwParametersFromGlobalCovariance(bool quietVerbose_){
     keepThrowing = false;
   }
 }
+
+void ParametersManager::moveParametersToPrior(){
+  for( auto& parSet : _parameterSetList_ ){
+    if( not parSet.isEnabled() ){ continue; }
+    parSet.moveParametersToPrior();
+  }
+}
 void ParametersManager::injectParameterValues(const JsonType &config_) {
   LogWarning << "Injecting parameters..." << std::endl;
 

@@ -251,22 +251,8 @@ void DataSetManager::loadData(){
     }
   }
 
-  if( not _propagator_.getParameterInjectorMc().empty() ){
-    LogWarning << "Injecting parameters on MC samples..." << std::endl;
-    _propagator_.getParametersManager().injectParameterValues( ConfigUtils::getForwardedConfig(_propagator_.getParameterInjectorMc()) );
-    _propagator_.resetReweight();
-    _propagator_.reweightMcEvents();
-  }
-
-  //////////////////////////////////////////
-  // DON'T MOVE PARAMETERS FROM THIS POINT
-  //////////////////////////////////////////
-
   /// Now caching the event for the plot generator
   _propagator_.getPlotGenerator().defineHistogramHolders();
-
-  /// Now printout the event breakdowns
-  _propagator_.printBreakdowns();
 
   /// Propagator needs to be fast, let the workers wait for the signal
   GundamGlobals::getParallelWorker().setCpuTimeSaverIsEnabled(false);
