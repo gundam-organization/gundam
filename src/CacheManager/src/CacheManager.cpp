@@ -358,7 +358,7 @@ bool Cache::Manager::Update( SampleSet& sampleList,
         // event in the cache.
         int resultIndex = usedResults++;
 
-        event.setCacheManagerIndex(resultIndex);
+        event.getIndices().cacheManager = resultIndex;
         event.setCacheManagerValuePointer(Cache::Manager::Get()
                                           ->GetWeightsCache()
                                           .GetResultPointer(resultIndex));
@@ -559,7 +559,7 @@ bool Cache::Manager::Update( SampleSet& sampleList,
         /// ARE ALL OF THE EVENTS HANDLED?
         for (Event& event
                  : sample.getMcContainer().getEventList()) {
-            int eventIndex = event.getCacheManagerIndex();
+            int eventIndex = event.getIndices().cacheManager;
             int cellIndex = event.getIndices().bin;
             if (cellIndex < 0 || cells <= cellIndex) {
                 throw std::runtime_error("Histogram bin out of range");

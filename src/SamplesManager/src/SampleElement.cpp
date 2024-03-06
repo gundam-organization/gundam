@@ -192,7 +192,7 @@ double SampleElement::getSumWeights() const{
   if( std::isnan(output) ){
     for( auto& event : _eventList_ ){
       if( std::isnan(event.getEventWeight()) ){
-        event.print();
+        LogError << event << std::endl;
       }
     }
     LogThrow("NAN getSumWeights");

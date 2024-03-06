@@ -200,7 +200,6 @@ double Event::evalFormula( const TFormula* formulaPtr_, std::vector<int>* indexD
 }
 
 // misc
-void Event::print() const { LogInfo << *this << std::endl; }
 std::string Event::getSummary() const {
   std::stringstream ss;
 
@@ -237,12 +236,6 @@ void Event::copyOnlyExistingVarHolders( const Event& other_){
 void Event::fillBuffer( const std::vector<int>& indexList_, std::vector<double>& buffer_) const{
   buffer_.resize(indexList_.size()); double* slot = &buffer_[0];
   std::for_each(indexList_.begin(), indexList_.end(), [&](auto& index){ *(slot++) = this->getVarAsDouble(index); });
-}
-
-// operators
-std::ostream& operator <<( std::ostream& o, const Event& p ){
-  o << p.getSummary();
-  return o;
 }
 
 

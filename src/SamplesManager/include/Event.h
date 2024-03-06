@@ -30,6 +30,11 @@ public:
     int sample{-1}; // this information is lost in the EventDialCache manager
     int bin{-1}; // which bin of the sample?
 
+#ifdef GUNDAM_USING_CACHE_MANAGER
+    // An "opaque" index into the cache that is used to simplify bookkeeping.
+    int cacheManager{-1};
+#endif
+
     [[nodiscard]] std::string getSummary() const{
       std::stringstream ss;
       ss << "dataset(" << dataset << ")";
@@ -87,15 +92,13 @@ public:
   double evalFormula(const TFormula* formulaPtr_, std::vector<int>* indexDict_ = nullptr) const;
 
   // misc
-  void print() const;
-  std::string getSummary() const;
   void copyVarHolderList(const Event& ref_);
   void copyOnlyExistingVarHolders(const Event& other_);
   void fillBuffer(const std::vector<int>& indexList_, std::vector<double>& buffer_) const;
   void fillBinIndex(const DataBinSet& binSet_){ _indices_.bin = findBinIndex(binSet_); }
 
-  // operators
-  friend std::ostream& operator <<( std::ostream& o, const Event& p );
+  [[nodiscard]] std::string getSummary() const;
+  friend std::ostream& operator <<( std::ostream& o, const Event& this_ ){ o << this_.getSummary(); return o; }
 
 private:
   // internals
@@ -111,15 +114,10 @@ private:
 
 #ifdef GUNDAM_USING_CACHE_MANAGER
 public:
-  void setCacheManagerIndex(int i) { _cacheManagerIndex_ = i;}
   void setCacheManagerValuePointer(const double* v) { _cacheManagerValue_ = v;}
   void setCacheManagerValidPointer(const bool* v) { _cacheManagerValid_ = v;}
   void setCacheManagerUpdatePointer(void (*p)()) { _cacheManagerUpdate_ = p;}
-
-  int getCacheManagerIndex() const {return _cacheManagerIndex_;}
 private:
-  // An "opaque" index into the cache that is used to simplify bookkeeping.
-  int _cacheManagerIndex_{-1};
   // A pointer to the cached result.
   const double* _cacheManagerValue_{nullptr};
   // A pointer to the cache validity flag.
