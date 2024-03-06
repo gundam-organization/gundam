@@ -26,6 +26,7 @@ public:
 
   struct Histogram{
     struct Bin{
+      int index{-1};
       double content{0};
       double error{0};
       const DataBin* dataBinPtr{nullptr};
@@ -43,14 +44,11 @@ public:
 
   // const-getters
   [[nodiscard]] const std::string& getName() const{ return _name_; }
-  [[nodiscard]] const TH1D* getHistogram() const{ return _histogram_.get(); }
-  [[nodiscard]] const std::shared_ptr<TH1D>& getHistogramSharedPtr() const{ return _histogram_; }
   [[nodiscard]] const std::vector<PhysicsEvent> &getEventList() const{ return _eventList_; }
+  [[nodiscard]] const Histogram &getHistogram() const{ return _myhistogram_; }
 
   // mutable-getters
-  TH1D* getHistogram(){ return _histogram_.get(); }
   std::vector<PhysicsEvent> &getEventList(){ return _eventList_; }
-  std::shared_ptr<TH1D>& getHistogramSharedPtr() { return _histogram_; }
 
   // core
   void buildHistogram(const DataBinSet& binning_);
@@ -67,6 +65,7 @@ public:
 
   [[nodiscard]] double getSumWeights() const;
   [[nodiscard]] size_t getNbBinnedEvents() const;
+  [[nodiscard]] std::shared_ptr<TH1D> generateRootHistogram() const; // for the plot generator or for TFile save
 
   // debug
   [[nodiscard]] std::string getSummary() const;
@@ -77,9 +76,6 @@ private:
   Histogram _myhistogram_{};
   std::vector<PhysicsEvent> _eventList_{};
   std::vector<DatasetProperties> _loadedDatasetList_{};
-
-  // TODO: to get rid of these
-  std::shared_ptr<TH1D> _histogram_{nullptr};
 
 #ifdef GUNDAM_USING_CACHE_MANAGER
 public:

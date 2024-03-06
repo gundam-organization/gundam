@@ -15,9 +15,11 @@ LoggerInit([]{ Logger::setUserHeaderStr("[SampleElement]"); });
 
 void SampleElement::buildHistogram(const DataBinSet& binning_){
   _myhistogram_.binList.reserve( binning_.getBinList().size() );
+  int iBin{0};
   for( auto& bin : binning_.getBinList() ){
     _myhistogram_.binList.emplace_back();
     _myhistogram_.binList.back().dataBinPtr = &bin;
+    _myhistogram_.binList.back().index = iBin++;
   }
   _myhistogram_.nBins = int( _myhistogram_.binList.size() );
 }
@@ -82,8 +84,8 @@ void SampleElement::updateBinEventList(int iThread_) {
   }
 }
 void SampleElement::refillHistogram(int iThread_){
-  int nbThreads = GundamGlobals::getParallelWorker().getNbThreads();
-  if( iThread_ == -1 ){ nbThreads = 1; iThread_ = 0; }
+  int nThreads = GundamGlobals::getParallelWorker().getNbThreads();
+  if( iThread_ == -1 ){ nThreads = 1; iThread_ = 0; }
 
 #ifdef GUNDAM_USING_CACHE_MANAGER
   if (_CacheManagerValid_ and not (*_CacheManagerValid_)) {
@@ -97,29 +99,22 @@ void SampleElement::refillHistogram(int iThread_){
   }
 #endif
 
-  // Faster that pointer shifter. -> would be slower if refillHistogram is
-  // handled by the propagator
-  int iBin = iThread_; // iBin += nbThreads;
-  auto* binContentArrayPtr = _histogram_->GetArray();
-  auto* binErrorArrayPtr = _histogram_->GetSumw2()->GetArray();
+  auto bounds = GenericToolbox::ParallelWorker::getThreadBoundIndices( iThread_, nThreads, _myhistogram_.nBins );
 
-  double* binContentPtr{nullptr};
-  double* binErrorPtr{nullptr};
-
-  while( iBin < _myhistogram_.nBins ) {
-    binContentPtr = &binContentArrayPtr[iBin+1];
-    binErrorPtr = &binErrorArrayPtr[iBin+1];
-
-    (*binContentPtr) = 0;
-    (*binErrorPtr) = 0;
+  std::for_each(
+      _myhistogram_.binList.begin() + bounds.beginIndex,
+      _myhistogram_.binList.begin() + bounds.endIndex,
+      [&]( Histogram::Bin& bin_){
+        bin_.content = 0;
+        bin_.error = 0;
 #ifdef GUNDAM_USING_CACHE_MANAGER
-    if (_CacheManagerValue_ !=nullptr and _CacheManagerIndex_ >= 0) {
-      const double ew = _CacheManagerValue_[_CacheManagerIndex_+iBin];
-      const double ew2 = _CacheManagerValue2_[_CacheManagerIndex_+iBin];
-      (*binContentPtr) += ew;
-      (*binErrorPtr) += ew2;
+        if (_CacheManagerValue_ !=nullptr and _CacheManagerIndex_ >= 0) {
+          const double ew = _CacheManagerValue_[_CacheManagerIndex_+bin_.index];
+          const double ew2 = _CacheManagerValue2_[_CacheManagerIndex_+bin_.index];
+          bin_.content += ew;
+          bin_.error += ew2;
 #ifdef CACHE_MANAGER_SLOW_VALIDATION
-      double content = binContentArray[iBin+1];
+          double content = binContentArray[iBin+1];
       double slowValue = 0.0;
       for( auto* eventPtr : perBinEventPtrList.at(iBin)){
         slowValue += eventPtr->getEventWeight();
@@ -135,35 +130,35 @@ void SampleElement::refillHistogram(int iThread_){
                 << std::endl;
       }
 #endif // CACHE_MANAGER_SLOW_VALIDATION
-    }
-    else {
-#endif // GUNDAM_USING_CACHE_MANAGER
-      for (auto *eventPtr: _myhistogram_.binList[iBin].eventPtrList) {
-        (*binContentPtr) += eventPtr->getEventWeight();
-        (*binErrorPtr) += eventPtr->getEventWeight() * eventPtr->getEventWeight();
-      }
-//      LogThrowIf(std::isnan((*binContentPtr)));
+        }
+        else {
+#endif
+          for (auto *eventPtr: bin_.eventPtrList) {
+            bin_.content += eventPtr->getEventWeight();
+            bin_.error += eventPtr->getEventWeight() * eventPtr->getEventWeight();
+          }
 #ifdef GUNDAM_USING_CACHE_MANAGER
-    }
+        }
 #endif // GUNDAM_USING_CACHE_MANAGER
-    iBin += nbThreads;
-  }
+        bin_.error = sqrt(bin_.error);
+      }
+  );
 
 }
 
 void SampleElement::throwEventMcError(){
   /*
- * This is to take into account the finite amount of event
- * */
+   * This is to take into account the finite amount of event
+   * */
   double weightSum;
-  for( int iBin = 1 ; iBin <= _histogram_->GetNbinsX() ; iBin++ ){
+  for( auto& bin : _myhistogram_.binList ){
     weightSum = 0;
-    for (auto *eventPtr: _myhistogram_.binList[iBin - 1].eventPtrList) {
+    for (auto *eventPtr: bin.eventPtrList) {
       // gRandom->Poisson(1) -> returns an INT -> can be 0
       eventPtr->setEventWeight(gRandom->Poisson(1) * eventPtr->getEventWeight());
       weightSum += eventPtr->getEventWeight();
     }
-    _histogram_->SetBinContent(iBin, weightSum);
+    bin.content = weightSum;
   }
 }
 void SampleElement::throwStatError(bool useGaussThrow_){
@@ -171,23 +166,22 @@ void SampleElement::throwStatError(bool useGaussThrow_){
    * This is to convert "Asimov" histogram to toy-experiment (pseudo-data), i.e. with statistical fluctuations
    * */
   int nCounts;
-  for( int iBin = 1 ; iBin <= _histogram_->GetNbinsX() ; iBin++ ){
-    if( _histogram_->GetBinContent(iBin) != 0 ){
-      if( not useGaussThrow_ ){
-        nCounts = gRandom->Poisson(_histogram_->GetBinContent(iBin));
-      }
-      else{
-        nCounts = std::max(
-            int( gRandom->Gaus(_histogram_->GetBinContent(iBin), TMath::Sqrt(_histogram_->GetBinContent(iBin))) )
-            , 0 // if the throw is negative, cap it to 0
-            );
-      }
-      for (auto *eventPtr: _myhistogram_.binList[iBin - 1].eventPtrList) {
-        // make sure refill of the histogram will produce the same hist
-        eventPtr->setEventWeight( eventPtr->getEventWeight()*((double) nCounts / _histogram_->GetBinContent(iBin)) );
-      }
-      _histogram_->SetBinContent(iBin, nCounts);
+  for( auto& bin : _myhistogram_.binList ){
+    if( bin.content == 0 ){ continue; }
+    if( not useGaussThrow_ ){
+      nCounts = gRandom->Poisson( bin.content );
     }
+    else{
+      nCounts = std::max(
+          int( gRandom->Gaus(bin.content, TMath::Sqrt(bin.content)) )
+          , 0 // if the throw is negative, cap it to 0
+      );
+    }
+    for (auto *eventPtr: bin.eventPtrList) {
+      // make sure refill of the histogram will produce the same hist
+      eventPtr->setEventWeight( eventPtr->getEventWeight()*((double) nCounts / bin.content) );
+    }
+    bin.content = nCounts;
   }
 }
 
@@ -208,7 +202,16 @@ double SampleElement::getSumWeights() const{
 }
 size_t SampleElement::getNbBinnedEvents() const{
   return std::accumulate(_eventList_.begin(), _eventList_.end(), size_t(0.),
-                         [](size_t sum_, const PhysicsEvent& ev_){ return sum_ + (ev_.getSampleBinIndex() != -1); });
+                         []( size_t sum_, const PhysicsEvent &ev_ ){ return sum_ + (ev_.getSampleBinIndex() != -1); });
+}
+std::shared_ptr<TH1D> SampleElement::generateRootHistogram() const{
+  std::shared_ptr<TH1D> out{nullptr};
+  if( _myhistogram_.nBins == 0 ){ return out; }
+  out = std::make_shared<TH1D>(
+      Form("%s_bins", _name_.c_str()), Form("%s_bins", _name_.c_str()),
+      _myhistogram_.nBins, 0, _myhistogram_.nBins
+  );
+  return out;
 }
 
 [[nodiscard]] std::string SampleElement::getSummary() const{

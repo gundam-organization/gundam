@@ -25,7 +25,7 @@ namespace JointProbability{
     bool allowZeroMcWhenZeroData{true};
     bool usePoissonLikelihood{false};
     bool BBNoUpdateWeights{false}; // OA 2021 bug reimplementation
-    mutable std::shared_ptr<TH1D> nomMC{nullptr}; // OA 2021 bug reimplementation
+    mutable std::vector<double> nomMcUncertList{}; // OA 2021 bug reimplementation
     mutable GenericToolbox::NoCopyWrapper<std::mutex> _mutex_{}; // for creating the nomMC
   };
 
@@ -47,31 +47,30 @@ namespace JointProbability{
     }
   }
   double BarlowBeestonBanff2022::eval(const Sample& sample_, int bin_) const {
-    const TH1D* data = sample_.getDataContainer().getHistogram();
-    const TH1D* predMC = sample_.getMcContainer().getHistogram();
+    double dataVal = sample_.getDataContainer().getHistogram().binList[bin_].content;
+    double predVal = sample_.getMcContainer().getHistogram().binList[bin_].content;
+    double mcuncert{0.0};
 
     /// the first time we reach this point, we assume the predMC is at its nominal value
-    if( nomMC == nullptr ){ createNominalMc(sample_); }
+    if( nomMcUncertList.empty() ){ createNominalMc(sample_); }
 
     // From OA2021_Eb branch -> BANFFBinnedSample::CalcLLRContrib
     // https://github.com/t2k-software/BANFF/blob/OA2021_Eb/src/BANFFSample/BANFFBinnedSample.cxx
 
-    double dataVal = data->GetBinContent(bin_);
-    double predVal = predMC->GetBinContent(bin_);
-
     // Why SQUARE?? -> GetBinError is returning the sqrt(Sum^2) but the BANFF
     // let the BBH make the sqrt
     // https://github.com/t2k-software/BANFF/blob/9140ec11bd74606c10ab4af9ec525352de119c06/src/BANFFSample/BANFFBinnedSample.cxx#L374
-    double mcuncert{0.0};
     if (BBNoUpdateWeights) {
-      mcuncert = nomMC->GetBinError(bin_) * nomMC->GetBinError(bin_);
+      mcuncert = nomMcUncertList[bin_];
+      mcuncert *= mcuncert;
+
       if (not std::isfinite(mcuncert) or mcuncert < 0.0) {
         if( throwIfInfLlh ){
           LogError << "BBNoUpdateWeights mcuncert is not valid "
                    << mcuncert
                    << std::endl;
           LogError << "nomMC bin " << bin_
-                   << " error is " << nomMC->GetBinError(bin_);
+                   << " error is " << nomMcUncertList[bin_];
           LogThrow("The mc uncertainty is not a usable number");
         }
         else{
@@ -80,13 +79,14 @@ namespace JointProbability{
       }
     }
     else {
-      mcuncert = predMC->GetBinError(bin_) * predMC->GetBinError(bin_);
+      mcuncert = sample_.getMcContainer().getHistogram().binList[bin_].error;
+      mcuncert *= mcuncert;
 
       if(not std::isfinite(mcuncert) or mcuncert < 0.0) {
         if( throwIfInfLlh ){
           LogError << "The mcuncert is not finite " << mcuncert << std::endl;
           LogError << "predMC bin " << bin_
-                   << " error is " << predMC->GetBinError(bin_);
+                   << " error is " << sample_.getMcContainer().getHistogram().binList[bin_].error;
           LogThrow("The mc uncertainty is not a usable number");
         }
         else{
@@ -197,11 +197,7 @@ namespace JointProbability{
                << GET_VAR_NAME_VALUE(newmc) << std::endl
                << GET_VAR_NAME_VALUE(stat) << std::endl
                << GET_VAR_NAME_VALUE(penalty) << std::endl
-               << GET_VAR_NAME_VALUE(mcuncert) << std::endl
-               << GET_VAR_NAME_VALUE(nomMC->GetBinContent(bin_)) << std::endl
-               << GET_VAR_NAME_VALUE(nomMC->GetBinError(bin_)) << std::endl
-               << GET_VAR_NAME_VALUE(predMC->GetBinError(bin_)) << std::endl
-               << GET_VAR_NAME_VALUE(predMC->GetBinContent(bin_)) << std::endl;
+               << GET_VAR_NAME_VALUE(mcuncert) << std::endl;
       LogThrow("Bad chisq for bin");
     }
 
@@ -214,9 +210,13 @@ namespace JointProbability{
   void BarlowBeestonBanff2022::createNominalMc(const Sample& sample_) const {
     std::lock_guard<std::mutex> g(_mutex_);
     // first recheck if another thread hasn't done this job:
-    if( nomMC != nullptr ){ return; }
+    if( not nomMcUncertList.empty() ){ return; }
     LogAlert << "Creating nominal MC histogram now..." << std::endl;
-    nomMC = std::make_shared<TH1D>(*(sample_.getMcContainer().getHistogram()));
+
+    nomMcUncertList.reserve( sample_.getMcContainer().getHistogram().nBins );
+    for( auto& bin : sample_.getMcContainer().getHistogram().binList ){
+      nomMcUncertList.emplace_back( bin.error );
+    }
   }
 
 }

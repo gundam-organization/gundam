@@ -43,25 +43,11 @@ void Sample::initializeImpl() {
   _binning_.readBinningDefinition( _binningFilePath_ );
   _binning_.sortBins();
 
-  TH1::SetDefaultSumw2(true);
-
   _mcContainer_.setName("MC_" + _name_);
   _mcContainer_.buildHistogram( _binning_ );
 
-  _mcContainer_.getHistogramSharedPtr() = std::make_shared<TH1D>(
-      Form("%s_MC_bins", _name_.c_str()), Form("%s_MC_bins", _name_.c_str()),
-      int(_binning_.getBinList().size()), 0, int(_binning_.getBinList().size())
-  );
-  _mcContainer_.getHistogramSharedPtr()->SetDirectory(nullptr);
-
   _dataContainer_.setName("Data_" + _name_);
   _dataContainer_.buildHistogram(_binning_);
-
-  _dataContainer_.getHistogramSharedPtr() = std::make_shared<TH1D>(
-      Form("%s_Data_bins", _name_.c_str()), Form("%s_Data_bins", _name_.c_str()),
-      int(_binning_.getBinList().size()), 0, int(_binning_.getBinList().size())
-  );
-  _dataContainer_.getHistogramSharedPtr()->SetDirectory(nullptr);
 }
 
 bool Sample::isDatasetValid(const std::string& datasetName_){

@@ -24,9 +24,9 @@ namespace JointProbability{
     //over underflow or overflow bins.
     double chisq{0};
 
-    double dataVal = sample_.getDataContainer().getHistogram()->GetBinContent(bin_);
-    double predVal = sample_.getMcContainer().getHistogram()->GetBinContent(bin_);
-    double mcuncert = sample_.getMcContainer().getHistogram()->GetBinError(bin_);
+    double dataVal = sample_.getDataContainer().getHistogram().binList[bin_].content;
+    double predVal = sample_.getMcContainer().getHistogram().binList[bin_].content;
+    double mcuncert = sample_.getMcContainer().getHistogram().binList[bin_].error;
 
     //implementing Barlow-Beeston correction for LH calculation the
     //following comments are inspired/copied from Clarence's comments in the
@@ -79,13 +79,13 @@ namespace JointProbability{
 
     if(std::isinf(chisq)){
       LogAlert << "Infinite chi2 " << predVal << " " << dataVal << " "
-               << sample_.getMcContainer().getHistogram()->GetBinError(bin_) << " "
-               << sample_.getMcContainer().getHistogram()->GetBinContent(bin_) << std::endl;
+               << sample_.getMcContainer().getHistogram().binList[bin_].error << " "
+               << sample_.getMcContainer().getHistogram().binList[bin_].content << std::endl;
     }
 
     LogThrowIf(std::isnan(chisq), "NaN chi2 " << predVal << " " << dataVal
-                                              << sample_.getMcContainer().getHistogram()->GetBinError(bin_) << " "
-                                              << sample_.getMcContainer().getHistogram()->GetBinContent(bin_));
+                                              << sample_.getMcContainer().getHistogram().binList[bin_].error << " "
+                                              << sample_.getMcContainer().getHistogram().binList[bin_].content);
 
     return chisq;
   }

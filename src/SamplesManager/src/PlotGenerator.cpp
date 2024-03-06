@@ -92,10 +92,8 @@ void PlotGenerator::generateSampleHistograms(TDirectory *saveDir_, int cacheSlot
     if( histDef.histPtr == nullptr ){
       if( histDef.varToPlot == "Raw" ){
         if( _sampleSetPtr_ != nullptr ){
-          const TH1D* histBase{nullptr};
-          if( histDef.isData ) { histBase = histDef.samplePtr->getDataContainer().getHistogram(); }
-          else { histBase = histDef.samplePtr->getMcContainer().getHistogram(); }
-          histDef.histPtr = std::make_shared<TH1D>( *histBase );
+          if( histDef.isData ) { histDef.histPtr = histDef.samplePtr->getDataContainer().generateRootHistogram(); }
+          else { histDef.histPtr = histDef.samplePtr->getMcContainer().generateRootHistogram(); }
         }
         else{
           LogThrow("Samples not set.");

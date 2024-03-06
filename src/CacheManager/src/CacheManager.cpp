@@ -210,8 +210,7 @@ bool Cache::Manager::Build( SampleSet& sampleList,
     // Count the total number of histogram cells.
     int histCells = 0;
     for(const Sample& sample : sampleList.getSampleList() ){
-        if( sample.getMcContainer().getHistogram() == nullptr ){ continue; }
-        int cells = sample.getMcContainer().getHistogram()->GetNcells();
+        int cells = sample.getMcContainer().generateRootHistogram()->GetNcells();
         LogInfo  << "Add histogram for " << sample.getName()
                 << " with " << cells
                 << " cells (includes under/over-flows)" << std::endl;
@@ -535,7 +534,7 @@ bool Cache::Manager::Update( SampleSet& sampleList,
         LogInfo  << "Fill cache for " << sample.getName()
                 << " with " << sample.getMcContainer().getEventList().size()
                 << " events" << std::endl;
-        std::shared_ptr<TH1> hist(sample.getMcContainer().getHistogramSharedPtr());
+        std::shared_ptr<TH1> hist(sample.getMcContainer().generateRootHistogram());
         if (!hist) {
             throw std::runtime_error("missing sample histogram");
         }
