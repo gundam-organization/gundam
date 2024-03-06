@@ -2,7 +2,7 @@
 // Created by Nadrino on 22/07/2021.
 //
 
-#include "PhysicsEvent.h"
+#include "Event.h"
 
 #include "GenericToolbox.Root.h"
 #include "Logger.h"
@@ -15,13 +15,13 @@ LoggerInit([]{
 
 
 // setters
-void PhysicsEvent::setCommonVarNameListPtr(const std::shared_ptr<std::vector<std::string>>& commonVarNameListPtr_){
+void Event::setCommonVarNameListPtr( const std::shared_ptr<std::vector<std::string>>& commonVarNameListPtr_){
   _commonVarNameListPtr_ = commonVarNameListPtr_;
   _varHolderList_.resize(_commonVarNameListPtr_->size());
 }
 
 // const getters
-double PhysicsEvent::getEventWeight() const {
+double Event::getEventWeight() const {
 #ifdef GUNDAM_USING_CACHE_MANAGER
     if (_cacheManagerValue_) {
         if (_cacheManagerValid_ != nullptr and not (*_cacheManagerValid_)) {
@@ -85,37 +85,37 @@ double PhysicsEvent::getEventWeight() const {
 #endif
     return _eventWeight_;
 }
-const std::vector<GenericToolbox::AnyType>& PhysicsEvent::getVarHolder(const std::string &leafName_) const{
+const std::vector<GenericToolbox::AnyType>& Event::getVarHolder( const std::string &leafName_) const{
   int index = this->findVarIndex(leafName_, true);
   return this->getVarHolder(index);
 }
-const GenericToolbox::AnyType& PhysicsEvent::getVariableAsAnyType(const std::string& leafName_, size_t arrayIndex_) const{
+const GenericToolbox::AnyType& Event::getVariableAsAnyType( const std::string& leafName_, size_t arrayIndex_) const{
   int index = this->findVarIndex(leafName_, true);
   return _varHolderList_[index][arrayIndex_];
 }
 
 // non-const getters
-void* PhysicsEvent::getVariableAddress(const std::string& leafName_, size_t arrayIndex_){
+void* Event::getVariableAddress( const std::string& leafName_, size_t arrayIndex_){
   return this->getVariableAsAnyType(leafName_, arrayIndex_).getPlaceHolderPtr()->getVariableAddress();
 }
-GenericToolbox::AnyType& PhysicsEvent::getVariableAsAnyType(const std::string& leafName_, size_t arrayIndex_){
-  return const_cast<GenericToolbox::AnyType&>(const_cast<const PhysicsEvent*>(this)->getVariableAsAnyType(leafName_, arrayIndex_));
+GenericToolbox::AnyType& Event::getVariableAsAnyType( const std::string& leafName_, size_t arrayIndex_){
+  return const_cast<GenericToolbox::AnyType&>(const_cast<const Event*>(this)->getVariableAsAnyType(leafName_, arrayIndex_));
 }
 
 // core
-void PhysicsEvent::resizeVarToDoubleCache(){
+void Event::resizeVarToDoubleCache(){
   _varToDoubleCache_.reserve(_varHolderList_.size());
   for( auto& leaf: _varHolderList_ ){
     _varToDoubleCache_.emplace_back(leaf.size(), std::nan("unset"));
   }
   this->invalidateVarToDoubleCache();
 }
-void PhysicsEvent::invalidateVarToDoubleCache(){
+void Event::invalidateVarToDoubleCache(){
   std::for_each(_varToDoubleCache_.begin(), _varToDoubleCache_.end(), [](auto& varArray){
     std::for_each( varArray.begin(), varArray.end(), [](auto& var){ var = std::nan("unset"); });
   });
 }
-void PhysicsEvent::copyData(const std::vector<const GenericToolbox::LeafForm*>& leafFormList_){
+void Event::copyData( const std::vector<const GenericToolbox::LeafForm*>& leafFormList_){
   // Don't check for the size? it has to be very fast
   size_t nLeaf{leafFormList_.size()};
   for( size_t iLeaf = 0 ; iLeaf < nLeaf ; iLeaf++ ){
@@ -123,7 +123,7 @@ void PhysicsEvent::copyData(const std::vector<const GenericToolbox::LeafForm*>& 
   }
   this->invalidateVarToDoubleCache();
 }
-bool PhysicsEvent::isInBin(const DataBin& bin_) const{
+bool Event::isInBin( const DataBin& bin_) const{
   return std::all_of(
       bin_.getEdgesList().begin(), bin_.getEdgesList().end(),
       [&](const DataBin::Edges& e){
@@ -131,10 +131,10 @@ bool PhysicsEvent::isInBin(const DataBin& bin_) const{
       }
   );
 }
-int PhysicsEvent::findBinIndex(const DataBinSet& binSet_) const{
+int Event::findBinIndex( const DataBinSet& binSet_) const{
   return this->findBinIndex( binSet_.getBinList() );
 }
-int PhysicsEvent::findBinIndex(const std::vector<DataBin>& binList_) const{
+int Event::findBinIndex( const std::vector<DataBin>& binList_) const{
   if( binList_.empty() ){ return -1; }
 
   auto dialItr = std::find_if(
@@ -145,7 +145,7 @@ int PhysicsEvent::findBinIndex(const std::vector<DataBin>& binList_) const{
   if ( dialItr == binList_.end() ){ return -1; }
   return int( std::distance( binList_.begin(), dialItr ) );
 }
-void PhysicsEvent::allocateMemory(const std::vector<const GenericToolbox::LeafForm*>& leafFormList_){
+void Event::allocateMemory( const std::vector<const GenericToolbox::LeafForm*>& leafFormList_){
   LogThrowIf( _commonVarNameListPtr_ == nullptr, "var name list not set." );
   LogThrowIf( _commonVarNameListPtr_->size() != leafFormList_.size(), "size mismatch." );
 
@@ -157,7 +157,7 @@ void PhysicsEvent::allocateMemory(const std::vector<const GenericToolbox::LeafFo
   }
   this->resizeVarToDoubleCache();
 }
-int PhysicsEvent::findVarIndex(const std::string& leafName_, bool throwIfNotFound_) const{
+int Event::findVarIndex( const std::string& leafName_, bool throwIfNotFound_) const{
   LogThrowIf(_commonVarNameListPtr_ == nullptr, "Can't " << __METHOD_NAME__ << " while _commonLeafNameListPtr_ is empty.");
   for( size_t iLeaf = 0 ; iLeaf < _varHolderList_.size() ; iLeaf++ ){
     if(_commonVarNameListPtr_->at(iLeaf) == leafName_ ){
@@ -173,7 +173,7 @@ int PhysicsEvent::findVarIndex(const std::string& leafName_, bool throwIfNotFoun
   }
   return -1;
 }
-double PhysicsEvent::getVarAsDouble(int varIndex_, size_t arrayIndex_) const{
+double Event::getVarAsDouble( int varIndex_, size_t arrayIndex_) const{
   if( _varToDoubleCache_.empty() ) return _varHolderList_[varIndex_][arrayIndex_].getValueAsDouble();
   else{
     // if using double cache:
@@ -183,11 +183,11 @@ double PhysicsEvent::getVarAsDouble(int varIndex_, size_t arrayIndex_) const{
     return _varToDoubleCache_[varIndex_][arrayIndex_];
   }
 }
-double PhysicsEvent::getVarAsDouble(const std::string& leafName_, size_t arrayIndex_) const{
+double Event::getVarAsDouble( const std::string& leafName_, size_t arrayIndex_) const{
   int index = this->findVarIndex(leafName_, true);
   return this->getVarAsDouble(index, arrayIndex_);
 }
-double PhysicsEvent::evalFormula(const TFormula* formulaPtr_, std::vector<int>* indexDict_) const{
+double Event::evalFormula( const TFormula* formulaPtr_, std::vector<int>* indexDict_) const{
   LogThrowIf(formulaPtr_ == nullptr, GET_VAR_NAME_VALUE(formulaPtr_));
 
   std::vector<double> parArray(formulaPtr_->GetNpar());
@@ -200,8 +200,8 @@ double PhysicsEvent::evalFormula(const TFormula* formulaPtr_, std::vector<int>* 
 }
 
 // misc
-void PhysicsEvent::print() const { LogInfo << *this << std::endl; }
-std::string PhysicsEvent::getSummary() const {
+void Event::print() const { LogInfo << *this << std::endl; }
+std::string Event::getSummary() const {
   std::stringstream ss;
 
   ss << "Indices{" << _indices_ << "}";
@@ -224,23 +224,23 @@ std::string PhysicsEvent::getSummary() const {
 
   return ss.str();
 }
-void PhysicsEvent::copyVarHolderList(const PhysicsEvent& ref_){
+void Event::copyVarHolderList( const Event& ref_){
   LogThrowIf(ref_.getCommonVarNameListPtr() != _commonVarNameListPtr_, "source event don't have the same leaf name list")
   _varHolderList_ = ref_.getVarHolderList();
 }
-void PhysicsEvent::copyOnlyExistingVarHolders(const PhysicsEvent& other_){
+void Event::copyOnlyExistingVarHolders( const Event& other_){
   LogThrowIf(_commonVarNameListPtr_ == nullptr, "_commonLeafNameListPtr_ not set");
   for(size_t iLeaf = 0 ; iLeaf < _commonVarNameListPtr_->size() ; iLeaf++ ){
     _varHolderList_[iLeaf] = other_.getVarHolder((*_commonVarNameListPtr_)[iLeaf]);
   }
 }
-void PhysicsEvent::fillBuffer(const std::vector<int>& indexList_, std::vector<double>& buffer_) const{
+void Event::fillBuffer( const std::vector<int>& indexList_, std::vector<double>& buffer_) const{
   buffer_.resize(indexList_.size()); double* slot = &buffer_[0];
   std::for_each(indexList_.begin(), indexList_.end(), [&](auto& index){ *(slot++) = this->getVarAsDouble(index); });
 }
 
 // operators
-std::ostream& operator <<( std::ostream& o, const PhysicsEvent& p ){
+std::ostream& operator <<( std::ostream& o, const Event& p ){
   o << p.getSummary();
   return o;
 }

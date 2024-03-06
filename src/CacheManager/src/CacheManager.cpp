@@ -353,7 +353,7 @@ bool Cache::Manager::Update( SampleSet& sampleList,
     for (EventDialCache::CacheEntry& elem : eventDials.getCache()) {
         // Skip events that are not in a bin.
         if (elem.event->getIndices().bin < 0) continue;
-        PhysicsEvent& event = *elem.event;
+        Event& event = *elem.event;
         // The reduce index.  This is where to save the results for this
         // event in the cache.
         int resultIndex = usedResults++;
@@ -557,7 +557,7 @@ bool Cache::Manager::Update( SampleSet& sampleList,
         int cells = hist->GetNcells();
         nextHist += cells;
         /// ARE ALL OF THE EVENTS HANDLED?
-        for (PhysicsEvent& event
+        for (Event& event
                  : sample.getMcContainer().getEventList()) {
             int eventIndex = event.getCacheManagerIndex();
             int cellIndex = event.getIndices().bin;

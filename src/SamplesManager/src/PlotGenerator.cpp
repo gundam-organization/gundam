@@ -120,7 +120,7 @@ void PlotGenerator::generateSampleHistograms(TDirectory *saveDir_, int cacheSlot
       // Datasets:
       for( bool isData : { false, true } ){
 
-        const std::vector<PhysicsEvent>* eventListPtr;
+        const std::vector<Event>* eventListPtr;
         std::vector<HistHolder*> histPtrToFillList;
 
         if( isData ){
@@ -843,7 +843,7 @@ void PlotGenerator::defineHistogramHolders() {
     } // histDef
   }
 }
-void PlotGenerator::buildEventBinCache(const std::vector<HistHolder *> &histPtrToFillList, const std::vector<PhysicsEvent> *eventListPtr, bool isData_) {
+void PlotGenerator::buildEventBinCache( const std::vector<HistHolder *> &histPtrToFillList, const std::vector<Event> *eventListPtr, bool isData_) {
 
   std::function<void()> prepareCacheFct = [&]() {
     for (auto *holder: histPtrToFillList) {

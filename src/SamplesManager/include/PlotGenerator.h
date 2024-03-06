@@ -6,7 +6,7 @@
 #define GUNDAM_PLOT_GENERATOR_H
 
 #include "SampleSet.h"
-#include "PhysicsEvent.h"
+#include "Event.h"
 #include "JsonBaseClass.h"
 
 #include "GenericToolbox.Wrappers.h"
@@ -37,7 +37,7 @@ struct HistHolder{
   // Data
   bool isData{false};
   const Sample* samplePtr{nullptr};
-  std::function<void(TH1D*, const PhysicsEvent*)> fillFunctionSample;
+  std::function<void(TH1D*, const Event*)> fillFunctionSample;
 
   // X axis
   std::string varToPlot;
@@ -65,7 +65,7 @@ struct HistHolder{
 
   // Caches
   bool isBinCacheBuilt{false};
-  std::vector<std::vector<const PhysicsEvent*>> _binEventPtrList_;
+  std::vector<std::vector<const Event*>> _binEventPtrList_;
 };
 
 struct CanvasHolder{
@@ -115,7 +115,7 @@ public:
 
 protected:
   // Internals
-  static void buildEventBinCache(const std::vector<HistHolder *> &histPtrToFillList, const std::vector<PhysicsEvent> *eventListPtr, bool isData_);
+  static void buildEventBinCache( const std::vector<HistHolder *> &histPtrToFillList, const std::vector<Event> *eventListPtr, bool isData_);
 
 private:
   // Parameters

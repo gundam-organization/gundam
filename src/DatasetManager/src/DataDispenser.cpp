@@ -407,7 +407,7 @@ void DataDispenser::preAllocateMemory(){
   }
   lCollection.initialize();
 
-  PhysicsEvent eventPlaceholder;
+  Event eventPlaceholder;
   eventPlaceholder.getIndices().dataset = _owner_->getDataSetIndex();
   eventPlaceholder.setCommonVarNameListPtr(std::make_shared<std::vector<std::string>>(_cache_.varsRequestedForStorage));
 
@@ -520,7 +520,7 @@ void DataDispenser::loadFromHistContent(){
   _cache_.sampleIndexOffsetList.resize(_cache_.samplesToFillList.size());
   _cache_.sampleEventListPtrToFill.resize(_cache_.samplesToFillList.size());
 
-  PhysicsEvent eventPlaceholder;
+  Event eventPlaceholder;
   eventPlaceholder.getIndices().dataset = (_owner_->getDataSetIndex());
   eventPlaceholder.setEventWeight(0); // default.
 
@@ -859,12 +859,12 @@ void DataDispenser::fillFunction(int iThread_){
   }
 
   // buffer that will store the data for indexing
-  PhysicsEvent eventIndexingBuffer;
+  Event eventIndexingBuffer;
   eventIndexingBuffer.getIndices().dataset = _owner_->getDataSetIndex();
   eventIndexingBuffer.setCommonVarNameListPtr(std::make_shared<std::vector<std::string>>(_cache_.varsRequestedForIndexing));
   eventIndexingBuffer.allocateMemory(leafFormIndexingList);
 
-  PhysicsEvent eventStorageBuffer;
+  Event eventStorageBuffer;
   eventStorageBuffer.getIndices().dataset = _owner_->getDataSetIndex();
   eventStorageBuffer.setCommonVarNameListPtr(std::make_shared<std::vector<std::string>>(_cache_.varsRequestedForStorage));
   eventStorageBuffer.allocateMemory(leafFormStorageList);
@@ -1028,7 +1028,7 @@ void DataDispenser::fillFunction(int iThread_){
       }
 
       // Get the next free event in our buffer
-      PhysicsEvent *eventPtr = &(*_cache_.sampleEventListPtrToFill[iSample])[sampleEventIndex];
+      Event *eventPtr = &(*_cache_.sampleEventListPtrToFill[iSample])[sampleEventIndex];
 
       // fill meta info
       eventPtr->getIndices().entry = iEntry;

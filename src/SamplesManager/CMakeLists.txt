@@ -5,7 +5,7 @@ set( SRCFILES
     src/SampleElement.cpp
     src/SampleSet.cpp
     src/Sample.cpp
-    src/PhysicsEvent.cpp
+    src/Event.cpp
     src/PlotGenerator.cpp
 )
 

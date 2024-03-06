@@ -21,7 +21,7 @@ public:
 
   void writeSamples(TDirectory* saveDir_, const Propagator& propagator_) const;
 
-  void writeEvents(TDirectory* saveDir_, const std::string& treeName_, const std::vector<PhysicsEvent> & eventList_) const;
+  void writeEvents(TDirectory* saveDir_, const std::string& treeName_, const std::vector<Event> & eventList_) const;
   void writeEvents(TDirectory* saveDir_, const std::string& treeName_, const std::vector<const EventDialCache::CacheEntry*>& cacheSampleList_) const;
 
 protected:
@@ -30,10 +30,10 @@ protected:
   // templates related -> ensure the exact same code is used to write standard vars
   template<typename T> void writeEventsTemplate(TDirectory* saveDir_, const std::string& treeName_, const T& eventList_) const;
 
-  static const PhysicsEvent* getEventPtr(const PhysicsEvent& ev_){ return &ev_; }
-  static const PhysicsEvent* getEventPtr(const EventDialCache::CacheEntry* ev_){ return ev_->event; }
+  static const Event* getEventPtr( const Event& ev_){ return &ev_; }
+  static const Event* getEventPtr( const EventDialCache::CacheEntry* ev_){ return ev_->event; }
 
-  static const std::vector<EventDialCache::DialResponseCache>* getDialElementsPtr( const PhysicsEvent& ev_){ return nullptr; }
+  static const std::vector<EventDialCache::DialResponseCache>* getDialElementsPtr( const Event& ev_){ return nullptr; }
   static const std::vector<EventDialCache::DialResponseCache>* getDialElementsPtr( const EventDialCache::CacheEntry* ev_){ return &ev_->dialResponseCacheList; }
 
 private:

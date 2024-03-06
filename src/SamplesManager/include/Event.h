@@ -2,8 +2,8 @@
 // Created by Nadrino on 22/07/2021.
 //
 
-#ifndef GUNDAM_PHYSICS_EVENT_H
-#define GUNDAM_PHYSICS_EVENT_H
+#ifndef GUNDAM_EVENT_H
+#define GUNDAM_EVENT_H
 
 #include "ParameterSet.h"
 #include "DataBinSet.h"
@@ -21,7 +21,7 @@
 #include <string>
 #include <sstream>
 
-class PhysicsEvent {
+class Event{
 
 public:
   struct Indices{
@@ -42,7 +42,7 @@ public:
   };
 
 public:
-  PhysicsEvent() = default;
+  Event() = default;
 
   // setters
   void setBaseWeight(double baseWeight_){ _baseWeight_ = baseWeight_; }
@@ -89,13 +89,13 @@ public:
   // misc
   void print() const;
   std::string getSummary() const;
-  void copyVarHolderList(const PhysicsEvent& ref_);
-  void copyOnlyExistingVarHolders(const PhysicsEvent& other_);
+  void copyVarHolderList(const Event& ref_);
+  void copyOnlyExistingVarHolders(const Event& other_);
   void fillBuffer(const std::vector<int>& indexList_, std::vector<double>& buffer_) const;
   void fillBinIndex(const DataBinSet& binSet_){ _indices_.bin = findBinIndex(binSet_); }
 
   // operators
-  friend std::ostream& operator <<( std::ostream& o, const PhysicsEvent& p );
+  friend std::ostream& operator <<( std::ostream& o, const Event& p );
 
 private:
   // internals
@@ -107,8 +107,6 @@ private:
   // Data storage variables
   std::shared_ptr<std::vector<std::string>> _commonVarNameListPtr_{nullptr};
   std::vector<std::vector<GenericToolbox::AnyType>> _varHolderList_{};
-
-  // Cache variables
   mutable std::vector<std::vector<double>> _varToDoubleCache_{};
 
 #ifdef GUNDAM_USING_CACHE_MANAGER
@@ -134,17 +132,17 @@ private:
 
 
 // TEMPLATES IMPLEMENTATION
-template<typename T> auto PhysicsEvent::getVarValue(const std::string &leafName_, size_t arrayIndex_) const -> T {
+template<typename T> auto Event::getVarValue( const std::string &leafName_, size_t arrayIndex_) const -> T {
   return this->getVariable<T>(leafName_, arrayIndex_);
 }
-template<typename T> auto PhysicsEvent::getVariable(const std::string& leafName_, size_t arrayIndex_) const -> const T&{
+template<typename T> auto Event::getVariable( const std::string& leafName_, size_t arrayIndex_) const -> const T&{
   return this->getVariableAsAnyType(leafName_, arrayIndex_).template getValue<T>();
 }
-template<typename T> void PhysicsEvent::setVariable(const T& value_, const std::string& leafName_, size_t arrayIndex_){
+template<typename T> void Event::setVariable( const T& value_, const std::string& leafName_, size_t arrayIndex_){
   int index = this->findVarIndex(leafName_, true);
   _varHolderList_[index][arrayIndex_].template getValue<T>() = value_;
   if( not _varToDoubleCache_.empty() ){ _varToDoubleCache_[index][arrayIndex_] = std::nan("unset"); }
 }
 
 
-#endif //GUNDAM_PHYSICS_EVENT_H
+#endif //GUNDAM_EVENT_H

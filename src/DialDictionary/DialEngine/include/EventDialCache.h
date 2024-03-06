@@ -7,7 +7,7 @@
 
 #include "SampleSet.h"
 #include "DialCollection.h"
-#include "PhysicsEvent.h"
+#include "Event.h"
 #include "DialInterface.h"
 
 
@@ -59,7 +59,7 @@ public:
   /// The cache element associating a PhysicsEvent to the appropriate
   /// DialInterface.
   struct CacheEntry {
-    PhysicsEvent* event;
+    Event* event;
     std::vector<DialResponseCache> dialResponseCacheList{};
 
     [[nodiscard]] std::string getSummary() const {

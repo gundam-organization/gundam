@@ -42,7 +42,7 @@ struct DataDispenserCache{
   std::vector<size_t> sampleNbOfEvents;
   std::vector<std::vector<bool>> eventIsInSamplesList{};
   std::vector<size_t> sampleIndexOffsetList;
-  std::vector< std::vector<PhysicsEvent>* > sampleEventListPtrToFill;
+  std::vector< std::vector<Event>* > sampleEventListPtrToFill;
   std::vector<DialCollection*> dialCollectionsRefList{};
 
   std::vector<std::string> varsRequestedForIndexing{};

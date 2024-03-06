@@ -23,7 +23,7 @@ void SampleElement::buildHistogram(const DataBinSet& binning_){
   }
   _histogram_.nBins = int( _histogram_.binList.size() );
 }
-void SampleElement::reserveEventMemory(size_t dataSetIndex_, size_t nEvents, const PhysicsEvent &eventBuffer_) {
+void SampleElement::reserveEventMemory(size_t dataSetIndex_, size_t nEvents, const Event &eventBuffer_) {
   // adding one dataset:
   _loadedDatasetList_.emplace_back();
 
@@ -187,7 +187,7 @@ void SampleElement::throwStatError(bool useGaussThrow_){
 
 double SampleElement::getSumWeights() const{
   double output = std::accumulate(_eventList_.begin(), _eventList_.end(), double(0.),
-                                  [](double sum_, const PhysicsEvent& ev_){ return sum_ + ev_.getEventWeight(); });
+                                  [](double sum_, const Event& ev_){ return sum_ + ev_.getEventWeight(); });
 
   if( std::isnan(output) ){
     for( auto& event : _eventList_ ){
@@ -203,7 +203,7 @@ double SampleElement::getSumWeights() const{
 size_t SampleElement::getNbBinnedEvents() const{
   return std::accumulate(
       _eventList_.begin(), _eventList_.end(), size_t(0.),
-      []( size_t sum_, const PhysicsEvent &ev_ ){
+      []( size_t sum_, const Event &ev_ ){
         return sum_ + (ev_.getIndices().bin != -1);
   });
 }

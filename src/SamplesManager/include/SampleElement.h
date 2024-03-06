@@ -6,7 +6,7 @@
 #define GUNDAM_SAMPLE_ELEMENT_H
 
 #include "DataBinSet.h"
-#include "PhysicsEvent.h"
+#include "Event.h"
 
 #include "TH1D.h"
 
@@ -30,7 +30,7 @@ public:
       double content{0};
       double error{0};
       const DataBin* dataBinPtr{nullptr};
-      std::vector<PhysicsEvent*> eventPtrList{};
+      std::vector<Event*> eventPtrList{};
     };
     std::vector<Bin> binList{};
     int nBins{0};
@@ -44,15 +44,15 @@ public:
 
   // const-getters
   [[nodiscard]] const std::string& getName() const{ return _name_; }
-  [[nodiscard]] const std::vector<PhysicsEvent> &getEventList() const{ return _eventList_; }
+  [[nodiscard]] const std::vector<Event> &getEventList() const{ return _eventList_; }
   [[nodiscard]] const Histogram &getHistogram() const{ return _histogram_; }
 
   // mutable-getters
-  std::vector<PhysicsEvent> &getEventList(){ return _eventList_; }
+  std::vector<Event> &getEventList(){ return _eventList_; }
 
   // core
   void buildHistogram(const DataBinSet& binning_);
-  void reserveEventMemory(size_t dataSetIndex_, size_t nEvents, const PhysicsEvent &eventBuffer_);
+  void reserveEventMemory(size_t dataSetIndex_, size_t nEvents, const Event &eventBuffer_);
   void shrinkEventList(size_t newTotalSize_);
   void updateBinEventList(int iThread_ = -1);
   void refillHistogram(int iThread_ = -1);
@@ -74,7 +74,7 @@ public:
 private:
   std::string _name_{};
   Histogram _histogram_{};
-  std::vector<PhysicsEvent> _eventList_{};
+  std::vector<Event> _eventList_{};
   std::vector<DatasetProperties> _loadedDatasetList_{};
 
 #ifdef GUNDAM_USING_CACHE_MANAGER
