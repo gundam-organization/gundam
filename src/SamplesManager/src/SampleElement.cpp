@@ -14,14 +14,14 @@ LoggerInit([]{ Logger::setUserHeaderStr("[SampleElement]"); });
 
 
 void SampleElement::buildHistogram(const DataBinSet& binning_){
-  _myhistogram_.binList.reserve( binning_.getBinList().size() );
+  _histogram_.binList.reserve(binning_.getBinList().size() );
   int iBin{0};
   for( auto& bin : binning_.getBinList() ){
-    _myhistogram_.binList.emplace_back();
-    _myhistogram_.binList.back().dataBinPtr = &bin;
-    _myhistogram_.binList.back().index = iBin++;
+    _histogram_.binList.emplace_back();
+    _histogram_.binList.back().dataBinPtr = &bin;
+    _histogram_.binList.back().index = iBin++;
   }
-  _myhistogram_.nBins = int( _myhistogram_.binList.size() );
+  _histogram_.nBins = int(_histogram_.binList.size() );
 }
 void SampleElement::reserveEventMemory(size_t dataSetIndex_, size_t nEvents, const PhysicsEvent &eventBuffer_) {
   // adding one dataset:
@@ -70,14 +70,14 @@ void SampleElement::updateBinEventList(int iThread_) {
 
   // multithread technique with iBin += nbThreads;
   int iBin{iThread_};
-  while( iBin < _myhistogram_.nBins ){
+  while( iBin < _histogram_.nBins ){
     size_t count = std::count_if(_eventList_.begin(), _eventList_.end(), [&]( auto& e) {return e.getSampleBinIndex() == iBin;});
-    _myhistogram_.binList[iBin].eventPtrList.resize(count, nullptr);
+    _histogram_.binList[iBin].eventPtrList.resize(count, nullptr);
 
     // Now filling the event indexes
     size_t index = 0;
     std::for_each(_eventList_.begin(), _eventList_.end(), [&]( auto& e){
-      if( e.getSampleBinIndex() == iBin){ _myhistogram_.binList[iBin].eventPtrList[index++] = &e; }
+      if( e.getSampleBinIndex() == iBin){ _histogram_.binList[iBin].eventPtrList[index++] = &e; }
     });
 
     iBin += nbThreads;
@@ -103,8 +103,8 @@ void SampleElement::refillHistogram(int iThread_){
   // handled by the propagator
   int iBin = iThread_; // iBin += nbThreads;
   Histogram::Bin* binPtr;
-  while( iBin < _myhistogram_.nBins ){
-    binPtr = &_myhistogram_.binList[iBin];
+  while( iBin < _histogram_.nBins ){
+    binPtr = &_histogram_.binList[iBin];
     binPtr->content = 0;
     binPtr->error = 0;
 #ifdef GUNDAM_USING_CACHE_MANAGER
@@ -151,7 +151,7 @@ void SampleElement::throwEventMcError(){
    * This is to take into account the finite amount of event
    * */
   double weightSum;
-  for( auto& bin : _myhistogram_.binList ){
+  for( auto& bin : _histogram_.binList ){
     weightSum = 0;
     for (auto *eventPtr: bin.eventPtrList) {
       // gRandom->Poisson(1) -> returns an INT -> can be 0
@@ -166,7 +166,7 @@ void SampleElement::throwStatError(bool useGaussThrow_){
    * This is to convert "Asimov" histogram to toy-experiment (pseudo-data), i.e. with statistical fluctuations
    * */
   int nCounts;
-  for( auto& bin : _myhistogram_.binList ){
+  for( auto& bin : _histogram_.binList ){
     if( bin.content == 0 ){ continue; }
     if( not useGaussThrow_ ){
       nCounts = gRandom->Poisson( bin.content );
@@ -206,10 +206,10 @@ size_t SampleElement::getNbBinnedEvents() const{
 }
 std::shared_ptr<TH1D> SampleElement::generateRootHistogram() const{
   std::shared_ptr<TH1D> out{nullptr};
-  if( _myhistogram_.nBins == 0 ){ return out; }
+  if( _histogram_.nBins == 0 ){ return out; }
   out = std::make_shared<TH1D>(
       Form("%s_bins", _name_.c_str()), Form("%s_bins", _name_.c_str()),
-      _myhistogram_.nBins, 0, _myhistogram_.nBins
+      _histogram_.nBins, 0, _histogram_.nBins
   );
   return out;
 }
@@ -217,7 +217,7 @@ std::shared_ptr<TH1D> SampleElement::generateRootHistogram() const{
 [[nodiscard]] std::string SampleElement::getSummary() const{
   std::stringstream ss;
   ss << "SampleElement: " << _name_ << std::endl;
-  ss << " - " << "Nb bins: " << _myhistogram_.binList.size() << std::endl;
+  ss << " - " << "Nb bins: " << _histogram_.binList.size() << std::endl;
   ss << " - " << "Nb events: " << _eventList_.size();
   return ss.str();
 }

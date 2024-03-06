@@ -45,7 +45,7 @@ public:
   // const-getters
   [[nodiscard]] const std::string& getName() const{ return _name_; }
   [[nodiscard]] const std::vector<PhysicsEvent> &getEventList() const{ return _eventList_; }
-  [[nodiscard]] const Histogram &getHistogram() const{ return _myhistogram_; }
+  [[nodiscard]] const Histogram &getHistogram() const{ return _histogram_; }
 
   // mutable-getters
   std::vector<PhysicsEvent> &getEventList(){ return _eventList_; }
@@ -73,7 +73,7 @@ public:
 
 private:
   std::string _name_{};
-  Histogram _myhistogram_{};
+  Histogram _histogram_{};
   std::vector<PhysicsEvent> _eventList_{};
   std::vector<DatasetProperties> _loadedDatasetList_{};
 
