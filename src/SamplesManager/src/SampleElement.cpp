@@ -135,7 +135,7 @@ void SampleElement::refillHistogram(int iThread_){
 #endif
       for (auto *eventPtr: binPtr->eventPtrList) {
         binPtr->content += eventPtr->getEventWeight();
-        binPtr->error += eventPtr->getEventWeight() * eventPtr->getEventWeight();
+        binPtr->error += binPtr->content * binPtr->content;
       }
 #ifdef GUNDAM_USING_CACHE_MANAGER
     }
