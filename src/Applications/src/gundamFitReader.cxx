@@ -214,7 +214,7 @@ int main(int argc, char** argv){
 
         int statusCode{int(tree->GetLeaf("fitStatusCode")->GetValue())};
         LogInfo << blueLightText << "Fit status code: " << resetColor;
-        LogInfo << ( GenericToolbox::doesKeyIsInMap( statusCode, GundamUtils::minuitStatusCodeStr ) ? GundamUtils::minuitStatusCodeStr.at(statusCode) : std::to_string(statusCode) );
+        LogInfo << ( GenericToolbox::isIn( statusCode, GundamUtils::minuitStatusCodeStr ) ? GundamUtils::minuitStatusCodeStr.at(statusCode) : std::to_string(statusCode) );
         LogInfo << std::endl;
       });
       GundamUtils::ObjectReader::readObject<TNamed>(f.get(), GenericToolbox::joinPath(pathPostFit, "llhState_TNamed"), [&](TNamed* injectorStr){

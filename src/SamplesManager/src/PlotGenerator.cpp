@@ -290,7 +290,7 @@ void PlotGenerator::generateCanvas(const std::vector<HistHolder> &histHolderList
 
       std::string canvasName = "samples_n" + std::to_string(canvasIndex);
       std::string canvasPath = canvasFolderPath + canvasName;
-      if (not GenericToolbox::doesKeyIsInMap(canvasPath, _bufferCanvasList_)) {
+      if (not GenericToolbox::isIn(canvasPath, _bufferCanvasList_)) {
         _bufferCanvasList_[canvasPath] = std::make_shared<TCanvas>( canvasPath.c_str(), canvasPath.c_str(), canvasWidth, canvasHeight );
         _bufferCanvasList_[canvasPath]->Divide(canvasNbXplots, canvasNbYplots);
       }

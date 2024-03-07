@@ -7,6 +7,9 @@
 
 #include "JointProbabilityBase.h"
 
+#include "GenericToolbox.Map.h"
+
+
 namespace JointProbability{
 
   class BarlowBeestonBanff2022 : public JointProbabilityBase {
@@ -49,11 +52,16 @@ namespace JointProbability{
   double BarlowBeestonBanff2022::eval(const Sample& sample_, int bin_) const {
     double dataVal = sample_.getDataContainer().getHistogram().binList[bin_].content;
     double predVal = sample_.getMcContainer().getHistogram().binList[bin_].content;
+
+    {
+      /// the first time we reach this point, we assume the predMC is at its nominal value
+      std::lock_guard<std::mutex> g(_mutex_);
+      if( not GenericToolbox::isIn(&sample_, nomMcUncertList) ){ createNominalMc(sample_); }
+    }
+
+    // it should exist past this point
     auto& nomHistErr = nomMcUncertList[&sample_];
     double mcuncert{0.0};
-
-    /// the first time we reach this point, we assume the predMC is at its nominal value
-    if( nomHistErr.empty() ){ createNominalMc(sample_); }
 
     // From OA2021_Eb branch -> BANFFBinnedSample::CalcLLRContrib
     // https://github.com/t2k-software/BANFF/blob/OA2021_Eb/src/BANFFSample/BANFFBinnedSample.cxx
@@ -209,12 +217,8 @@ namespace JointProbability{
     return chisq;
   }
   void BarlowBeestonBanff2022::createNominalMc(const Sample& sample_) const {
-    std::lock_guard<std::mutex> g(_mutex_);
-    // first recheck if another thread hasn't done this job:
-    auto& nomHistErr = nomMcUncertList[&sample_];
-    if( not nomHistErr.empty() ){ return; }
-
     LogWarning << "Creating nominal MC histogram for sample \"" << sample_.getName() << "\"" << std::endl;
+    auto& nomHistErr = nomMcUncertList[&sample_];
     nomHistErr.reserve( sample_.getMcContainer().getHistogram().nBins );
     for( auto& bin : sample_.getMcContainer().getHistogram().binList ){
       nomHistErr.emplace_back( bin.error );

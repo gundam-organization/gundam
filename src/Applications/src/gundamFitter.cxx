@@ -245,7 +245,7 @@ int main(int argc, char** argv){
     // Do something better in case multiple datasets are defined
     bool isFound{false};
     for( auto& dataSet : fitter.getLikelihoodInterface().getDataSetManager().getDataSetList() ){
-      if( GenericToolbox::doesKeyIsInMap( selectedDataEntry, dataSet.getDataDispenserDict() ) ){
+      if( GenericToolbox::isIn( selectedDataEntry, dataSet.getDataDispenserDict() ) ){
         LogWarning << "Using data entry \"" << selectedDataEntry << "\" for dataset: " << dataSet.getName() << std::endl;
         dataSet.setSelectedDataEntry( selectedDataEntry );
         isFound = true;

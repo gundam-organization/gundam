@@ -359,7 +359,7 @@ void DataDispenser::fetchRequestedLeaves(){
     _cache_.varToLeafDict[var].first = GenericToolbox::stripBracket(_cache_.varToLeafDict[var].first, '[', ']');
 
     // look for override requests
-    if( GenericToolbox::doesKeyIsInMap(_cache_.varToLeafDict[var].first, _parameters_.variableDict) ){
+    if( GenericToolbox::isIn(_cache_.varToLeafDict[var].first, _parameters_.variableDict) ){
       // leafVar will actually be the override leaf name while event will keep the original name
       _cache_.varToLeafDict[var].first = _parameters_.variableDict[_cache_.varToLeafDict[var].first];
       _cache_.varToLeafDict[var].first = GenericToolbox::stripBracket(_cache_.varToLeafDict[var].first, '[', ']');
@@ -401,7 +401,7 @@ void DataDispenser::preAllocateMemory(){
   for( auto& var : _cache_.varsRequestedForIndexing ){
     // look for override requests
     lCollection.addLeafExpression(
-        GenericToolbox::doesKeyIsInMap(var, _parameters_.variableDict) ?
+        GenericToolbox::isIn(var, _parameters_.variableDict) ?
         _parameters_.variableDict[var] : var
     );
   }
@@ -414,7 +414,7 @@ void DataDispenser::preAllocateMemory(){
   std::vector<const GenericToolbox::LeafForm*> leafFormToVarList{};
   for( auto& storageVar : *eventPlaceholder.getVariables().getNameListPtr() ){
     leafFormToVarList.emplace_back( lCollection.getLeafFormPtr(
-        GenericToolbox::doesKeyIsInMap(storageVar, _parameters_.variableDict) ?
+        GenericToolbox::isIn(storageVar, _parameters_.variableDict) ?
         _parameters_.variableDict[storageVar] : storageVar
     ));
   }
@@ -797,7 +797,7 @@ void DataDispenser::fillFunction(int iThread_){
   std::vector<const GenericToolbox::LeafForm*> leafFormStorageList{};
   for( auto& var : _cache_.varsRequestedForIndexing ){
     std::string leafExp{var};
-    if( GenericToolbox::doesKeyIsInMap( var, _parameters_.variableDict ) ){
+    if( GenericToolbox::isIn( var, _parameters_.variableDict ) ){
       leafExp = _parameters_.variableDict[leafExp];
     }
     auto idx = size_t(lCollection.addLeafExpression(leafExp));
@@ -805,7 +805,7 @@ void DataDispenser::fillFunction(int iThread_){
   }
   for( auto& var : _cache_.varsRequestedForStorage ){
     std::string leafExp{var};
-    if( GenericToolbox::doesKeyIsInMap( var, _parameters_.variableDict ) ){
+    if( GenericToolbox::isIn( var, _parameters_.variableDict ) ){
       leafExp = _parameters_.variableDict[leafExp];
     }
     auto idx = size_t(lCollection.getLeafExpIndex(leafExp));
