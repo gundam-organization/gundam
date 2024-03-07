@@ -25,7 +25,7 @@ namespace JointProbability{
     bool allowZeroMcWhenZeroData{true};
     bool usePoissonLikelihood{false};
     bool BBNoUpdateWeights{false}; // OA 2021 bug reimplementation
-    mutable std::vector<double> nomMcUncertList{}; // OA 2021 bug reimplementation
+    mutable std::map<const Sample*, std::vector<double>> nomMcUncertList{}; // OA 2021 bug reimplementation
     mutable GenericToolbox::NoCopyWrapper<std::mutex> _mutex_{}; // for creating the nomMC
   };
 
@@ -49,10 +49,11 @@ namespace JointProbability{
   double BarlowBeestonBanff2022::eval(const Sample& sample_, int bin_) const {
     double dataVal = sample_.getDataContainer().getHistogram().binList[bin_].content;
     double predVal = sample_.getMcContainer().getHistogram().binList[bin_].content;
+    auto& nomHistErr = nomMcUncertList[&sample_];
     double mcuncert{0.0};
 
     /// the first time we reach this point, we assume the predMC is at its nominal value
-    if( nomMcUncertList.empty() ){ createNominalMc(sample_); }
+    if( nomHistErr.empty() ){ createNominalMc(sample_); }
 
     // From OA2021_Eb branch -> BANFFBinnedSample::CalcLLRContrib
     // https://github.com/t2k-software/BANFF/blob/OA2021_Eb/src/BANFFSample/BANFFBinnedSample.cxx
@@ -61,7 +62,7 @@ namespace JointProbability{
     // let the BBH make the sqrt
     // https://github.com/t2k-software/BANFF/blob/9140ec11bd74606c10ab4af9ec525352de119c06/src/BANFFSample/BANFFBinnedSample.cxx#L374
     if (BBNoUpdateWeights) {
-      mcuncert = nomMcUncertList[bin_];
+      mcuncert = nomHistErr[bin_];
       mcuncert *= mcuncert;
 
       if (not std::isfinite(mcuncert) or mcuncert < 0.0) {
@@ -70,7 +71,7 @@ namespace JointProbability{
                    << mcuncert
                    << std::endl;
           LogError << "nomMC bin " << bin_
-                   << " error is " << nomMcUncertList[bin_];
+                   << " error is " << nomHistErr[bin_];
           LogThrow("The mc uncertainty is not a usable number");
         }
         else{
@@ -210,12 +211,13 @@ namespace JointProbability{
   void BarlowBeestonBanff2022::createNominalMc(const Sample& sample_) const {
     std::lock_guard<std::mutex> g(_mutex_);
     // first recheck if another thread hasn't done this job:
-    if( not nomMcUncertList.empty() ){ return; }
-    LogAlert << "Creating nominal MC histogram now..." << std::endl;
+    auto& nomHistErr = nomMcUncertList[&sample_];
+    if( not nomHistErr.empty() ){ return; }
 
-    nomMcUncertList.reserve( sample_.getMcContainer().getHistogram().nBins );
+    LogWarning << "Creating nominal MC histogram for sample \"" << sample_.getName() << "\"" << std::endl;
+    nomHistErr.reserve( sample_.getMcContainer().getHistogram().nBins );
     for( auto& bin : sample_.getMcContainer().getHistogram().binList ){
-      nomMcUncertList.emplace_back( bin.error );
+      nomHistErr.emplace_back( bin.error );
     }
   }
 
