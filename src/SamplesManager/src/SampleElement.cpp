@@ -103,6 +103,7 @@ void SampleElement::refillHistogram(int iThread_){
   // handled by the propagator
   int iBin = iThread_; // iBin += nbThreads;
   Histogram::Bin* binPtr;
+  double buffer{};
   while( iBin < _histogram_.nBins ){
     binPtr = &_histogram_.binList[iBin];
     binPtr->content = 0;
@@ -134,8 +135,9 @@ void SampleElement::refillHistogram(int iThread_){
     else {
 #endif
       for (auto *eventPtr: binPtr->eventPtrList) {
-        binPtr->content += eventPtr->getEventWeight();
-        binPtr->error += binPtr->content * binPtr->content;
+        buffer = eventPtr->getEventWeight();
+        binPtr->content += buffer;
+        binPtr->error += buffer * buffer;
       }
 #ifdef GUNDAM_USING_CACHE_MANAGER
     }
