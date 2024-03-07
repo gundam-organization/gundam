@@ -138,7 +138,7 @@ namespace EventUtils{
     for( int iVar = 0 ; iVar < int(_varList_.size()) ; iVar++ ){
       if( not ss.str().empty() ){ ss << std::endl; }
       ss << "  { name: " << _nameListPtr_->at(iVar);
-      ss << ", var: " << _varList_.at(iVar).get();
+      ss << ", value: " << _varList_.at(iVar).get();
       ss << " }";
     }
     return ss.str();
