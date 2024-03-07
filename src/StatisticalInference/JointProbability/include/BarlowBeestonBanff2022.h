@@ -222,7 +222,7 @@ namespace JointProbability{
     nomHistErr.reserve( sample_.getMcContainer().getHistogram().nBins );
     for( auto& bin : sample_.getMcContainer().getHistogram().binList ){
       nomHistErr.emplace_back( bin.error );
-      LogTrace << sample_.getName() << ": " << bin.index << " -> " << bin.content << " / " << bin.error << std::endl;
+      LogTraceIf(verboseLevel >= 2) << sample_.getName() << ": " << bin.index << " -> " << bin.content << " / " << bin.error << std::endl;
     }
   }
 
