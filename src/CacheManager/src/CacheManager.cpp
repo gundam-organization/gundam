@@ -155,7 +155,7 @@ bool Cache::Manager::Build( SampleSet& sampleList,
 
     std::map<std::string, int> useCount;
     for (EventDialCache::CacheEntry& elem : eventDials.getCache()) {
-        if (elem.event->getSampleBinIndex() < 0) {
+        if (elem.event->getIndices().bin < 0) {
             throw std::runtime_error("Caching event that isn't used");
         }
         ++events;
@@ -210,8 +210,7 @@ bool Cache::Manager::Build( SampleSet& sampleList,
     // Count the total number of histogram cells.
     int histCells = 0;
     for(const Sample& sample : sampleList.getSampleList() ){
-        if (!sample.getMcContainer().histogram) continue;
-        int cells = sample.getMcContainer().histogram->GetNcells();
+        int cells = sample.getMcContainer().generateRootHistogram()->GetNcells();
         LogInfo  << "Add histogram for " << sample.getName()
                 << " with " << cells
                 << " cells (includes under/over-flows)" << std::endl;
@@ -353,24 +352,24 @@ bool Cache::Manager::Update( SampleSet& sampleList,
     // Add the dials in the EventDialCache to the internal cache.
     for (EventDialCache::CacheEntry& elem : eventDials.getCache()) {
         // Skip events that are not in a bin.
-        if (elem.event->getSampleBinIndex() < 0) continue;
-        PhysicsEvent& event = *elem.event;
+        if (elem.event->getIndices().bin < 0) continue;
+        Event& event = *elem.event;
         // The reduce index.  This is where to save the results for this
         // event in the cache.
         int resultIndex = usedResults++;
 
-        event.setCacheManagerIndex(resultIndex);
-        event.setCacheManagerValuePointer(Cache::Manager::Get()
+        event.getCache().index = resultIndex;
+        event.getCache().valuePtr = (Cache::Manager::Get()
                                           ->GetWeightsCache()
                                           .GetResultPointer(resultIndex));
-        event.setCacheManagerValidPointer(Cache::Manager::Get()
+        event.getCache().isValidPtr = (Cache::Manager::Get()
                                           ->GetWeightsCache()
                                           .GetResultValidPointer());
-        event.setCacheManagerUpdatePointer(
+        event.getCache().updateCallbackPtr = (
             [](){Cache::Manager::Get()->GetWeightsCache().GetResult(0);});
 
         // Get the initial value for this event and save it.
-        double initialEventWeight = event.getBaseWeight();
+        double initialEventWeight = event.getWeights().base;
 
         // Add each dial for the event to the GPU caches.
         for( auto& dialElem : elem.dialResponseCacheList ){
@@ -533,9 +532,9 @@ bool Cache::Manager::Update( SampleSet& sampleList,
     int nextHist = 0;
     for(Sample& sample : sampleList.getSampleList() ) {
         LogInfo  << "Fill cache for " << sample.getName()
-                << " with " << sample.getMcContainer().eventList.size()
+                << " with " << sample.getMcContainer().getEventList().size()
                 << " events" << std::endl;
-        std::shared_ptr<TH1> hist(sample.getMcContainer().histogram);
+        std::shared_ptr<TH1> hist(sample.getMcContainer().generateRootHistogram());
         if (!hist) {
             throw std::runtime_error("missing sample histogram");
         }
@@ -558,10 +557,10 @@ bool Cache::Manager::Update( SampleSet& sampleList,
         int cells = hist->GetNcells();
         nextHist += cells;
         /// ARE ALL OF THE EVENTS HANDLED?
-        for (PhysicsEvent& event
-                 : sample.getMcContainer().eventList) {
-            int eventIndex = event.getCacheManagerIndex();
-            int cellIndex = event.getSampleBinIndex();
+        for (Event& event
+                 : sample.getMcContainer().getEventList()) {
+            int eventIndex = event.getCache().index;
+            int cellIndex = event.getIndices().bin;
             if (cellIndex < 0 || cells <= cellIndex) {
                 throw std::runtime_error("Histogram bin out of range");
             }

@@ -35,8 +35,8 @@ namespace JointProbability{
     LogWarning << "Using Least Squares Poissonian Approximation" << std::endl;
   }
   double LeastSquares::eval(const Sample& sample_, int bin_) const {
-    double predVal = sample_.getMcContainer().histogram->GetBinContent(bin_);
-    double dataVal = sample_.getDataContainer().histogram->GetBinContent(bin_);
+    double predVal = sample_.getMcContainer().getHistogram().binList[bin_].content;
+    double dataVal = sample_.getDataContainer().getHistogram().binList[bin_].content;
     double v = dataVal - predVal;
     v = v*v;
     if (lsqPoissonianApproximation && dataVal > 1.0) v /= 0.5*dataVal;

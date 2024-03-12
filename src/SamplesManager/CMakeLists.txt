@@ -2,10 +2,11 @@
 set( LIB_NAME GundamSamplesManager )
 
 set( SRCFILES
+    src/EventUtils.cpp
+    src/Event.cpp
     src/SampleElement.cpp
-    src/SampleSet.cpp
     src/Sample.cpp
-    src/PhysicsEvent.cpp
+    src/SampleSet.cpp
     src/PlotGenerator.cpp
 )
 

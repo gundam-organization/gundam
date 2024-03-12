@@ -44,7 +44,7 @@ public:
   [[nodiscard]] bool isLoadAsimovData() const { return _loadAsimovData_; }
   [[nodiscard]] bool isShowEventBreakdown() const { return _showEventBreakdown_; }
   [[nodiscard]] bool isDebugPrintLoadedEvents() const { return _debugPrintLoadedEvents_; }
-  [[nodiscard]] bool getDebugPrintLoadedEventsNbPerSample() const { return _debugPrintLoadedEventsNbPerSample_; }
+  [[nodiscard]] int getDebugPrintLoadedEventsNbPerSample() const { return _debugPrintLoadedEventsNbPerSample_; }
   [[nodiscard]] int getIThrow() const { return _iThrow_; }
   [[nodiscard]] const EventDialCache& getEventDialCache() const { return _eventDialCache_; }
   [[nodiscard]] const ParametersManager &getParametersManager() const { return _parManager_; }
@@ -63,10 +63,11 @@ public:
   void propagateParameters();
   void resetReweight();
   void reweightMcEvents();
-  void refillSampleHistograms();
+  void refillMcHistograms();
 
   // Misc
   [[nodiscard]] std::string getSampleBreakdownTableStr() const;
+  void printBreakdowns();
 
   // Logger related
   static void muteLogger();
@@ -77,8 +78,7 @@ protected:
 
   // multithreading
   void reweightMcEvents(int iThread_);
-  void refillSampleHistogramsFct(int iThread_);
-  void refillSampleHistogramsPostParallelFct();
+  void refillMcHistogramsFct( int iThread_);
 
 private:
   // Parameters

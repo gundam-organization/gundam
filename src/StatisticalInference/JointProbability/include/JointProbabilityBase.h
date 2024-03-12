@@ -25,7 +25,7 @@ namespace JointProbability{
     [[nodiscard]] virtual double eval( const Sample &sample_ ) const{
       double out{0};
       int nBins = int(sample_.getBinning().getBinList().size());
-      for( int iBin = 1; iBin <= nBins; iBin++ ){ out += this->eval(sample_, iBin); }
+      for( int iBin = 0; iBin < nBins; iBin++ ){ out += this->eval(sample_, iBin); }
       return out;
     }
 

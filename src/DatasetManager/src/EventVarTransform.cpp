@@ -45,31 +45,32 @@ const std::vector<std::string>& EventVarTransform::fetchRequestedVars() const {
   return _requestedLeavesForEvalCache_;
 }
 
-double EventVarTransform::eval(const PhysicsEvent& event_){
+double EventVarTransform::eval(const Event& event_){
   if( not _useCache_ ){ return this->evalTransformation(event_); }
   _outputCache_ = this->evalTransformation(event_, _inputBuffer_);
   return _outputCache_;
 }
-void EventVarTransform::storeCachedOutput(PhysicsEvent& event_) const{
+void EventVarTransform::storeCachedOutput( Event& event_) const{
   this->storeOutput(_outputCache_, event_);
 }
-void EventVarTransform::evalAndStore(PhysicsEvent& event_){
+void EventVarTransform::evalAndStore( Event& event_){
   this->storeOutput(this->eval(event_), event_);
 }
-void EventVarTransform::evalAndStore(const PhysicsEvent& evalEvent_, PhysicsEvent& storeEvent_){
+void EventVarTransform::evalAndStore( const Event& evalEvent_, Event& storeEvent_){
   this->storeOutput(this->eval(evalEvent_), storeEvent_);
 }
 
 
 
-double EventVarTransform::evalTransformation(const PhysicsEvent& event_) const {
+double EventVarTransform::evalTransformation(const Event& event_) const {
   std::vector<double> buff(_inputFormulaList_.size());
   return this->evalTransformation(event_, buff);
 }
-double EventVarTransform::evalTransformation(const PhysicsEvent& event_, std::vector<double>& inputBuffer_) const{
+double EventVarTransform::evalTransformation( const Event& event_, std::vector<double>& inputBuffer_) const{
   return std::nan("defaultEvalTransformOutput");
 }
-void EventVarTransform::storeOutput(double output_, PhysicsEvent& storeEvent_) const{
-  storeEvent_.setVariable(output_, this->getOutputVariableName());
+void EventVarTransform::storeOutput( double output_, Event& storeEvent_ ) const{
+  auto& variable = storeEvent_.getVariables().fetchVariable(this->getOutputVariableName());
+  variable.set( output_ );
 }
 

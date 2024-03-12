@@ -12,89 +12,87 @@
 
 LoggerInit([]{ Logger::setUserHeaderStr("[SampleElement]"); });
 
-void SampleElement::reserveEventMemory(size_t dataSetIndex_, size_t nEvents, const PhysicsEvent &eventBuffer_) {
+
+void SampleElement::buildHistogram(const DataBinSet& binning_){
+  _histogram_.binList.reserve(binning_.getBinList().size() );
+  int iBin{0};
+  for( auto& bin : binning_.getBinList() ){
+    _histogram_.binList.emplace_back();
+    _histogram_.binList.back().dataBinPtr = &bin;
+    _histogram_.binList.back().index = iBin++;
+  }
+  _histogram_.nBins = int( _histogram_.binList.size() );
+}
+void SampleElement::reserveEventMemory(size_t dataSetIndex_, size_t nEvents, const Event &eventBuffer_) {
+  // adding one dataset:
+  _loadedDatasetList_.emplace_back();
+
+  // filling up properties:
+  auto& datasetProperties{_loadedDatasetList_.back()};
+  datasetProperties.dataSetIndex = dataSetIndex_;
+  datasetProperties.eventOffSet = _eventList_.size();
+  datasetProperties.eventNb = nEvents;
+
   LogScopeIndent;
-  LogThrowIf(isLocked, "Can't " << __METHOD_NAME__ << " while locked");
-  if( nEvents == 0 ){ return; }
-  dataSetIndexList.emplace_back(dataSetIndex_);
-  eventOffSetList.emplace_back(eventList.size());
-  eventNbList.emplace_back(nEvents);
-  LogInfo << name << ": creating " << eventNbList.back() << " events ("
-  << GenericToolbox::parseSizeUnits( double(eventNbList.back()) * sizeof(eventBuffer_) )
-  << ")" << std::endl;
-  eventList.resize(eventOffSetList.back()+eventNbList.back(), eventBuffer_);
+  LogInfo << _name_ << ": creating " << nEvents << " events ("
+          << GenericToolbox::parseSizeUnits( double(nEvents) * sizeof(eventBuffer_) )
+          << ")" << std::endl;
+
+  _eventList_.resize(datasetProperties.eventOffSet + datasetProperties.eventNb, eventBuffer_);
 }
 void SampleElement::shrinkEventList(size_t newTotalSize_){
-  LogScopeIndent;
-  LogThrowIf(isLocked, "Can't " << __METHOD_NAME__ << " while locked");
-  if( eventNbList.empty() and newTotalSize_ == 0 ) return;
-  LogThrowIf(eventList.size() < newTotalSize_,
-             "Can't shrink since eventList is too small: " << GET_VAR_NAME_VALUE(newTotalSize_)
-             << " > " << GET_VAR_NAME_VALUE(eventList.size()));
-  LogThrowIf(not eventNbList.empty() and eventNbList.back() < (eventList.size() - newTotalSize_), "Can't shrink since eventList of the last dataSet is too small.");
-  LogInfo << name << ": shrinking event list from " << eventList.size() << " to " << newTotalSize_ << "..."
-  << "(+" << GenericToolbox::parseSizeUnits( double(eventList.size() - newTotalSize_) * sizeof(eventList.back()) ) << ")" << std::endl;
-  eventNbList.back() -= (eventList.size() - newTotalSize_);
-  eventList.resize(newTotalSize_);
-  eventList.shrink_to_fit();
-}
-void SampleElement::updateEventBinIndexes(int iThread_){
-  if( isLocked ) return;
 
-  int nThreads{GundamGlobals::getParallelWorker().getNbThreads()};
-  if( iThread_ == -1 ){ iThread_ = 0; nThreads = 1; }
-
-  PhysicsEvent* eventPtr{nullptr};
-  auto bounds = GenericToolbox::ParallelWorker::getThreadBoundIndices( iThread_, nThreads, int( eventList.size() ) );
-
-  if( iThread_ == 0 ){ LogScopeIndent; LogInfo << "Finding bin indexes for \"" << name << "\"..." << std::endl; }
-
-  for( int iEvent = bounds.first ; iEvent < bounds.second ; iEvent++ ){
-    eventPtr = &eventList[iEvent];
-    for( auto& bin : binning.getBinList() ){
-      bool isInBin = std::all_of(bin.getEdgesList().begin(), bin.getEdgesList().end(), [&](const DataBin::Edges& e){
-        return bin.isBetweenEdges( e, eventPtr->getVarAsDouble( e.varName ) );
-      });
-
-      if( isInBin ){
-        eventPtr->setSampleBinIndex( bin.getIndex() );
-        break;
-      }
-    }
+  if( _loadedDatasetList_.empty() and newTotalSize_ == 0 ){
+    LogAlert << "Empty dataset list. Nothing to shrink." << std::endl;
+    return;
   }
+
+  LogThrowIf(_eventList_.size() < newTotalSize_,
+             "Can't shrink since eventList is too small: " << GET_VAR_NAME_VALUE(newTotalSize_)
+             << " > " << GET_VAR_NAME_VALUE(_eventList_.size()));
+
+  LogThrowIf(not _loadedDatasetList_.empty() and _loadedDatasetList_.back().eventNb < (_eventList_.size() - newTotalSize_),
+              "Can't shrink since eventList of the last dataSet is too small.");
+
+  LogScopeIndent;
+  LogInfo << _name_ << ": shrinking event list from " << _eventList_.size() << " to " << newTotalSize_ << "..."
+          << "(+" << GenericToolbox::parseSizeUnits(double(_eventList_.size() - newTotalSize_) * sizeof(_eventList_.back()) ) << ")" << std::endl;
+
+  _loadedDatasetList_.back().eventNb -= (_eventList_.size() - newTotalSize_);
+  _eventList_.resize(newTotalSize_);
+  _eventList_.shrink_to_fit();
 }
 void SampleElement::updateBinEventList(int iThread_) {
-  if( isLocked ) return;
-
   int nbThreads = GundamGlobals::getParallelWorker().getNbThreads();
   if( iThread_ == -1 ){ iThread_ = 0; nbThreads = 1; }
-  if( iThread_ == 0 ){ LogScopeIndent; LogInfo << "Filling bin event cache for \"" << name << "\"..." << std::endl; }
+
+  if( iThread_ == 0 ){ LogScopeIndent; LogInfo << "Filling bin event cache for \"" << _name_ << "\"..." << std::endl; }
 
   // multithread technique with iBin += nbThreads;
-  int iBin{iThread_}, nBins{int(perBinEventPtrList.size())};
-  while( iBin < nBins ){
-    size_t count = std::count_if(eventList.begin(), eventList.end(), [&](auto& e) {return e.getSampleBinIndex() == iBin;});
-    perBinEventPtrList[iBin].resize(count, nullptr);
+  int iBin{iThread_};
+  while( iBin < _histogram_.nBins ){
+    size_t count = std::count_if(_eventList_.begin(), _eventList_.end(), [&]( auto& e) {return e.getIndices().bin == iBin;});
+    _histogram_.binList[iBin].eventPtrList.resize(count, nullptr);
 
     // Now filling the event indexes
     size_t index = 0;
-    std::for_each(eventList.begin(), eventList.end(), [&](auto& e){ if(e.getSampleBinIndex() == iBin){ perBinEventPtrList[iBin][index++] = &e; } });
+    std::for_each(_eventList_.begin(), _eventList_.end(), [&]( auto& e){
+      if( e.getIndices().bin == iBin){ _histogram_.binList[iBin].eventPtrList[index++] = &e; }
+    });
 
     iBin += nbThreads;
   }
 }
 void SampleElement::refillHistogram(int iThread_){
-  if( isLocked ) return;
-
-  int nbThreads = GundamGlobals::getParallelWorker().getNbThreads();
-  if( iThread_ == -1 ){ nbThreads = 1; iThread_ = 0; }
+  int nThreads = GundamGlobals::getParallelWorker().getNbThreads();
+  if( iThread_ == -1 ){ nThreads = 1; iThread_ = 0; }
 
 #ifdef GUNDAM_USING_CACHE_MANAGER
   if (_CacheManagerValid_ and not (*_CacheManagerValid_)) {
-      // This is can be slowish when data must be copied from the device, but
+      // This can be slowish when data must be copied from the device, but
       // it makes sure that the results are copied from the device when they
       // have changed. The values pointed to by _CacheManagerValue_ and
-      // _CacheManagerValid_ are inside of the summed index cache (a bit of
+      // _CacheManagerValid_ are inside the summed index cache (a bit of
       // evil coding here), and are updated by the cache.  The update is
       // triggered by (*_CacheManagerUpdate_)().
       if (_CacheManagerUpdate_) (*_CacheManagerUpdate_)();
@@ -104,25 +102,18 @@ void SampleElement::refillHistogram(int iThread_){
   // Faster that pointer shifter. -> would be slower if refillHistogram is
   // handled by the propagator
   int iBin = iThread_; // iBin += nbThreads;
-  int nBins = int(perBinEventPtrList.size());
-  auto* binContentArrayPtr = histogram->GetArray();
-  auto* binErrorArrayPtr = histogram->GetSumw2()->GetArray();
-
-  double* binContentPtr{nullptr};
-  double* binErrorPtr{nullptr};
-
-  while( iBin < nBins ) {
-    binContentPtr = &binContentArrayPtr[iBin+1];
-    binErrorPtr = &binErrorArrayPtr[iBin+1];
-
-    (*binContentPtr) = 0;
-    (*binErrorPtr) = 0;
+  Histogram::Bin* binPtr;
+  double buffer{};
+  while( iBin < _histogram_.nBins ){
+    binPtr = &_histogram_.binList[iBin];
+    binPtr->content = 0;
+    binPtr->error = 0;
 #ifdef GUNDAM_USING_CACHE_MANAGER
     if (_CacheManagerValue_ !=nullptr and _CacheManagerIndex_ >= 0) {
-      const double ew = _CacheManagerValue_[_CacheManagerIndex_+iBin];
-      const double ew2 = _CacheManagerValue2_[_CacheManagerIndex_+iBin];
-      (*binContentPtr) += ew;
-      (*binErrorPtr) += ew2;
+      const double ew = _CacheManagerValue_[_CacheManagerIndex_+binPtr->index];
+      const double ew2 = _CacheManagerValue2_[_CacheManagerIndex_+binPtr->index];
+      binPtr->content += ew;
+      binPtr->error += ew2;
 #ifdef CACHE_MANAGER_SLOW_VALIDATION
       double content = binContentArray[iBin+1];
       double slowValue = 0.0;
@@ -142,40 +133,34 @@ void SampleElement::refillHistogram(int iThread_){
 #endif // CACHE_MANAGER_SLOW_VALIDATION
     }
     else {
-#endif // GUNDAM_USING_CACHE_MANAGER
-      for (auto *eventPtr: perBinEventPtrList[iBin]) {
-        (*binContentPtr) += eventPtr->getEventWeight();
-        (*binErrorPtr) += eventPtr->getEventWeight() * eventPtr->getEventWeight();
+#endif
+      for (auto *eventPtr: binPtr->eventPtrList) {
+        buffer = eventPtr->getEventWeight();
+        binPtr->content += buffer;
+        binPtr->error += buffer * buffer;
       }
-//      LogThrowIf(std::isnan((*binContentPtr)));
 #ifdef GUNDAM_USING_CACHE_MANAGER
     }
 #endif // GUNDAM_USING_CACHE_MANAGER
-    iBin += nbThreads;
+    binPtr->error = sqrt(binPtr->error);
+    iBin += nThreads;
   }
 
-}
-void SampleElement::rescaleHistogram() {
-  if( isLocked ) return;
-  if( histScale != 1 ) histogram->Scale(histScale);
-}
-void SampleElement::saveAsHistogramNominal(){
-  histogramNominal = std::make_shared<TH1D>(*histogram);
 }
 
 void SampleElement::throwEventMcError(){
   /*
- * This is to take into account the finite amount of event
- * */
+   * This is to take into account the finite amount of event
+   * */
   double weightSum;
-  for( int iBin = 1 ; iBin <= histogram->GetNbinsX() ; iBin++ ){
+  for( auto& bin : _histogram_.binList ){
     weightSum = 0;
-    for (auto *eventPtr: perBinEventPtrList[iBin-1]) {
+    for (auto *eventPtr: bin.eventPtrList) {
       // gRandom->Poisson(1) -> returns an INT -> can be 0
-      eventPtr->setEventWeight(gRandom->Poisson(1) * eventPtr->getEventWeight());
+      eventPtr->getWeights().current = (gRandom->Poisson(1) * eventPtr->getEventWeight());
       weightSum += eventPtr->getEventWeight();
     }
-    histogram->SetBinContent(iBin, weightSum);
+    bin.content = weightSum;
   }
 }
 void SampleElement::throwStatError(bool useGaussThrow_){
@@ -183,34 +168,33 @@ void SampleElement::throwStatError(bool useGaussThrow_){
    * This is to convert "Asimov" histogram to toy-experiment (pseudo-data), i.e. with statistical fluctuations
    * */
   int nCounts;
-  for( int iBin = 1 ; iBin <= histogram->GetNbinsX() ; iBin++ ){
-    if( histogram->GetBinContent(iBin) != 0 ){
-      if( not useGaussThrow_ ){
-        nCounts = gRandom->Poisson(histogram->GetBinContent(iBin));
-      }
-      else{
-        nCounts = std::max(
-            int( gRandom->Gaus(histogram->GetBinContent(iBin), TMath::Sqrt(histogram->GetBinContent(iBin))) )
-            , 0 // if the throw is negative, cap it to 0
-            );
-      }
-      for (auto *eventPtr: perBinEventPtrList[iBin-1]) {
-        // make sure refill of the histogram will produce the same hist
-        eventPtr->setEventWeight( eventPtr->getEventWeight()*( (double) nCounts/histogram->GetBinContent(iBin)) );
-      }
-      histogram->SetBinContent(iBin, nCounts);
+  for( auto& bin : _histogram_.binList ){
+    if( bin.content == 0 ){ continue; }
+    if( not useGaussThrow_ ){
+      nCounts = gRandom->Poisson( bin.content );
     }
+    else{
+      nCounts = std::max(
+          int( gRandom->Gaus(bin.content, TMath::Sqrt(bin.content)) )
+          , 0 // if the throw is negative, cap it to 0
+      );
+    }
+    for (auto *eventPtr: bin.eventPtrList) {
+      // make sure refill of the histogram will produce the same hist
+      eventPtr->getWeights().current = ( eventPtr->getEventWeight()*((double) nCounts / bin.content) );
+    }
+    bin.content = nCounts;
   }
 }
 
 double SampleElement::getSumWeights() const{
-  double output = std::accumulate(eventList.begin(), eventList.end(), double(0.),
-                                  [](double sum_, const PhysicsEvent& ev_){ return sum_ + ev_.getEventWeight(); });
+  double output = std::accumulate(_eventList_.begin(), _eventList_.end(), double(0.),
+                                  [](double sum_, const Event& ev_){ return sum_ + ev_.getEventWeight(); });
 
   if( std::isnan(output) ){
-    for( auto& event : eventList ){
+    for( auto& event : _eventList_ ){
       if( std::isnan(event.getEventWeight()) ){
-        event.print();
+        LogError << event << std::endl;
       }
     }
     LogThrow("NAN getSumWeights");
@@ -219,15 +203,31 @@ double SampleElement::getSumWeights() const{
   return output;
 }
 size_t SampleElement::getNbBinnedEvents() const{
-  return std::accumulate(eventList.begin(), eventList.end(), size_t(0.),
-                         [](size_t sum_, const PhysicsEvent& ev_){ return sum_ + (ev_.getSampleBinIndex() != -1); });
+  return std::accumulate(
+      _eventList_.begin(), _eventList_.end(), size_t(0.),
+      []( size_t sum_, const Event &ev_ ){
+        return sum_ + (ev_.getIndices().bin != -1);
+  });
+}
+std::shared_ptr<TH1D> SampleElement::generateRootHistogram() const{
+  std::shared_ptr<TH1D> out{nullptr};
+  if( _histogram_.nBins == 0 ){ return out; }
+  out = std::make_shared<TH1D>(
+      Form("%s_bins", _name_.c_str()), Form("%s_bins", _name_.c_str()),
+      _histogram_.nBins, 0, _histogram_.nBins
+  );
+  return out;
 }
 
-void SampleElement::print() const{
-  LogInfo << "SampleElement: " << name << std::endl;
-  LogInfo << " - " << "Nb bins: " << binning.getBinList().size() << std::endl;
-  LogInfo << " - " << "Nb events: " << eventList.size() << std::endl;
-  LogInfo << " - " << "Hist rescale: " << histScale << std::endl;
+[[nodiscard]] std::string SampleElement::getSummary() const{
+  std::stringstream ss;
+  ss << "SampleElement: " << _name_ << std::endl;
+  ss << " - " << "Nb bins: " << _histogram_.binList.size() << std::endl;
+  ss << " - " << "Nb events: " << _eventList_.size();
+  return ss.str();
+}
+std::ostream& operator <<( std::ostream& o, const SampleElement& this_ ){
+  o << this_.getSummary(); return o;
 }
 
 //  A Lesser GNU Public License

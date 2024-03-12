@@ -359,7 +359,7 @@ void DataDispenser::fetchRequestedLeaves(){
     _cache_.varToLeafDict[var].first = GenericToolbox::stripBracket(_cache_.varToLeafDict[var].first, '[', ']');
 
     // look for override requests
-    if( GenericToolbox::doesKeyIsInMap(_cache_.varToLeafDict[var].first, _parameters_.variableDict) ){
+    if( GenericToolbox::isIn(_cache_.varToLeafDict[var].first, _parameters_.variableDict) ){
       // leafVar will actually be the override leaf name while event will keep the original name
       _cache_.varToLeafDict[var].first = _parameters_.variableDict[_cache_.varToLeafDict[var].first];
       _cache_.varToLeafDict[var].first = GenericToolbox::stripBracket(_cache_.varToLeafDict[var].first, '[', ']');
@@ -401,25 +401,25 @@ void DataDispenser::preAllocateMemory(){
   for( auto& var : _cache_.varsRequestedForIndexing ){
     // look for override requests
     lCollection.addLeafExpression(
-        GenericToolbox::doesKeyIsInMap(var, _parameters_.variableDict) ?
+        GenericToolbox::isIn(var, _parameters_.variableDict) ?
         _parameters_.variableDict[var] : var
     );
   }
   lCollection.initialize();
 
-  PhysicsEvent eventPlaceholder;
-  eventPlaceholder.setDataSetIndex(_owner_->getDataSetIndex());
-  eventPlaceholder.setCommonVarNameListPtr(std::make_shared<std::vector<std::string>>(_cache_.varsRequestedForStorage));
+  Event eventPlaceholder;
+  eventPlaceholder.getIndices().dataset = _owner_->getDataSetIndex();
+  eventPlaceholder.getVariables().setVarNameList( std::make_shared<std::vector<std::string>>(_cache_.varsRequestedForStorage) );
 
   std::vector<const GenericToolbox::LeafForm*> leafFormToVarList{};
-  for( auto& storageVar : *eventPlaceholder.getCommonVarNameListPtr() ){
+  for( auto& storageVar : *eventPlaceholder.getVariables().getNameListPtr() ){
     leafFormToVarList.emplace_back( lCollection.getLeafFormPtr(
-        GenericToolbox::doesKeyIsInMap(storageVar, _parameters_.variableDict) ?
+        GenericToolbox::isIn(storageVar, _parameters_.variableDict) ?
         _parameters_.variableDict[storageVar] : storageVar
     ));
   }
 
-  eventPlaceholder.allocateMemory( leafFormToVarList );
+  eventPlaceholder.getVariables().allocateMemory( leafFormToVarList );
 
   LogInfo << "Reserving event memory..." << std::endl;
   _cache_.sampleIndexOffsetList.resize(_cache_.samplesToFillList.size());
@@ -428,7 +428,7 @@ void DataDispenser::preAllocateMemory(){
     auto* container = &_cache_.samplesToFillList[iSample]->getDataContainer();
     if(_parameters_.useMcContainer) container = &_cache_.samplesToFillList[iSample]->getMcContainer();
 
-    _cache_.sampleEventListPtrToFill[iSample] = &container->eventList;
+    _cache_.sampleEventListPtrToFill[iSample] = &container->getEventList();
     _cache_.sampleIndexOffsetList[iSample] = _cache_.sampleEventListPtrToFill[iSample]->size();
     container->reserveEventMemory(_owner_->getDataSetIndex(), _cache_.sampleNbOfEvents[iSample], eventPlaceholder);
   }
@@ -520,22 +520,18 @@ void DataDispenser::loadFromHistContent(){
   _cache_.sampleIndexOffsetList.resize(_cache_.samplesToFillList.size());
   _cache_.sampleEventListPtrToFill.resize(_cache_.samplesToFillList.size());
 
-  PhysicsEvent eventPlaceholder;
-  eventPlaceholder.setDataSetIndex(_owner_->getDataSetIndex());
-  eventPlaceholder.setEventWeight(0); // default.
+  Event eventPlaceholder;
+  eventPlaceholder.getIndices().dataset = (_owner_->getDataSetIndex());
+  eventPlaceholder.getWeights().current = (0); // default.
 
   // claiming event memory
   for( size_t iSample = 0 ; iSample < _cache_.samplesToFillList.size() ; iSample++ ){
 
-    eventPlaceholder.setCommonVarNameListPtr(
+    eventPlaceholder.getVariables().setVarNameList(
         std::make_shared<std::vector<std::string>>(
             _cache_.samplesToFillList[iSample]->getBinning().buildVariableNameList()
         )
     );
-    for( auto& varHolder : eventPlaceholder.getVarHolderList() ){
-      varHolder.emplace_back( double(0.) );
-    }
-    eventPlaceholder.resizeVarToDoubleCache();
 
     // one event per bin
     _cache_.sampleNbOfEvents[iSample] = _cache_.samplesToFillList[iSample]->getBinning().getBinList().size();
@@ -543,13 +539,13 @@ void DataDispenser::loadFromHistContent(){
     // fetch event container
     auto* container = &_cache_.samplesToFillList[iSample]->getDataContainer();
 
-    _cache_.sampleEventListPtrToFill[iSample] = &container->eventList;
+    _cache_.sampleEventListPtrToFill[iSample] = &container->getEventList();
     _cache_.sampleIndexOffsetList[iSample] = _cache_.sampleEventListPtrToFill[iSample]->size();
     container->reserveEventMemory( _owner_->getDataSetIndex(), _cache_.sampleNbOfEvents[iSample], eventPlaceholder );
 
     // indexing according to the binning
-    for( size_t iEvent=_cache_.sampleIndexOffsetList[iSample] ; iEvent < container->eventList.size() ; iEvent++ ){
-      container->eventList[iEvent].setSampleBinIndex( int( iEvent ) );
+    for( size_t iEvent=_cache_.sampleIndexOffsetList[iSample] ; iEvent < container->getEventList().size() ; iEvent++ ){
+      container->getEventList()[iEvent].getIndices().bin = int( iEvent );
     }
   }
 
@@ -599,12 +595,12 @@ void DataDispenser::loadFromHistContent(){
       auto target = sample->getBinning().getBinList()[iBin].generateBinTarget( axisNameList );
       auto histBinIndex = hist->GetBin( target.data() ); // bad fetch..?
 
-      container->eventList[iBin].setSampleIndex( sample->getIndex() );
+      container->getEventList()[iBin].getIndices().sample = sample->getIndex();
       for( size_t iVar = 0 ; iVar < target.size() ; iVar++ ){
-        container->eventList[iBin].setVariable( target[iVar], axisNameList[iVar] );
+        container->getEventList()[iBin].getVariables().fetchVariable(axisNameList[iVar]).set(target[iVar]);
       }
-      container->eventList[iBin].setBaseWeight(hist->GetBinContent(histBinIndex));
-      container->eventList[iBin].resetEventWeight();
+      container->getEventList()[iBin].getWeights().base = (hist->GetBinContent(histBinIndex));
+      container->getEventList()[iBin].getWeights().resetCurrentWeight();
     }
 
   }
@@ -692,14 +688,14 @@ void DataDispenser::eventSelectionFunction(int iThread_){
   auto bounds = GenericToolbox::ParallelWorker::getThreadBoundIndices( iThread_, nThreads, nEvents );
 
   // Load the branches
-  treeChain->LoadTree( bounds.first );
+  treeChain->LoadTree( bounds.beginIndex );
 
   // for each event, which sample is active?
   std::string progressTitle = "Performing event selection on " + this->getTitle() + "...";
   std::stringstream ssProgressTitle;
   TFile *lastFilePtr{nullptr};
 
-  for ( Long64_t iEntry = bounds.first ; iEntry < bounds.second ; iEntry++ ) {
+  for ( Long64_t iEntry = bounds.beginIndex ; iEntry < bounds.endIndex ; iEntry++ ) {
     if( iThread_ == 0 ){
       readSpeed.addQuantity(treeChain->GetEntry(iEntry)*nThreads);
       if (GenericToolbox::showProgressBar(iGlobal, nEvents)) {
@@ -801,7 +797,7 @@ void DataDispenser::fillFunction(int iThread_){
   std::vector<const GenericToolbox::LeafForm*> leafFormStorageList{};
   for( auto& var : _cache_.varsRequestedForIndexing ){
     std::string leafExp{var};
-    if( GenericToolbox::doesKeyIsInMap( var, _parameters_.variableDict ) ){
+    if( GenericToolbox::isIn( var, _parameters_.variableDict ) ){
       leafExp = _parameters_.variableDict[leafExp];
     }
     auto idx = size_t(lCollection.addLeafExpression(leafExp));
@@ -809,7 +805,7 @@ void DataDispenser::fillFunction(int iThread_){
   }
   for( auto& var : _cache_.varsRequestedForStorage ){
     std::string leafExp{var};
-    if( GenericToolbox::doesKeyIsInMap( var, _parameters_.variableDict ) ){
+    if( GenericToolbox::isIn( var, _parameters_.variableDict ) ){
       leafExp = _parameters_.variableDict[leafExp];
     }
     auto idx = size_t(lCollection.getLeafExpIndex(leafExp));
@@ -859,15 +855,15 @@ void DataDispenser::fillFunction(int iThread_){
   }
 
   // buffer that will store the data for indexing
-  PhysicsEvent eventIndexingBuffer;
-  eventIndexingBuffer.setDataSetIndex(_owner_->getDataSetIndex());
-  eventIndexingBuffer.setCommonVarNameListPtr(std::make_shared<std::vector<std::string>>(_cache_.varsRequestedForIndexing));
-  eventIndexingBuffer.allocateMemory(leafFormIndexingList);
+  Event eventIndexingBuffer;
+  eventIndexingBuffer.getIndices().dataset = _owner_->getDataSetIndex();
+  eventIndexingBuffer.getVariables().setVarNameList(std::make_shared<std::vector<std::string>>(_cache_.varsRequestedForIndexing));
+  eventIndexingBuffer.getVariables().allocateMemory(leafFormIndexingList);
 
-  PhysicsEvent eventStorageBuffer;
-  eventStorageBuffer.setDataSetIndex(_owner_->getDataSetIndex());
-  eventStorageBuffer.setCommonVarNameListPtr(std::make_shared<std::vector<std::string>>(_cache_.varsRequestedForStorage));
-  eventStorageBuffer.allocateMemory(leafFormStorageList);
+  Event eventStorageBuffer;
+  eventStorageBuffer.getIndices().dataset = _owner_->getDataSetIndex();
+  eventStorageBuffer.getVariables().setVarNameList(std::make_shared<std::vector<std::string>>(_cache_.varsRequestedForStorage));
+  eventStorageBuffer.getVariables().allocateMemory(leafFormStorageList);
 
   if(iThread_ == 0){
     LogInfo << "Feeding event variables with:" << std::endl;
@@ -923,7 +919,7 @@ void DataDispenser::fillFunction(int iThread_){
   auto bounds = GenericToolbox::ParallelWorker::getThreadBoundIndices( iThread_, nThreads, nEvents );
 
   // Load the branches
-  treeChain->LoadTree(bounds.first);
+  treeChain->LoadTree(bounds.beginIndex);
 
   // IO speed monitor
   GenericToolbox::VariableMonitor readSpeed("bytes");
@@ -931,7 +927,7 @@ void DataDispenser::fillFunction(int iThread_){
   std::string progressTitle = "Loading and indexing...";
   std::stringstream ssProgressBar;
 
-  for( Long64_t iEntry = bounds.first ; iEntry < bounds.second; iEntry++ ){
+  for( Long64_t iEntry = bounds.beginIndex ; iEntry < bounds.endIndex; iEntry++ ){
 
     if( iThread_ == 0 ){
       if( GenericToolbox::showProgressBar(iEntry*nThreads, nEvents) ){
@@ -966,8 +962,8 @@ void DataDispenser::fillFunction(int iThread_){
     }
 
     if( nominalWeightTreeFormula != nullptr ){
-      eventIndexingBuffer.setBaseWeight(nominalWeightTreeFormula->EvalInstance());
-      if(eventIndexingBuffer.getBaseWeight() < 0 ){
+      eventIndexingBuffer.getWeights().base = (nominalWeightTreeFormula->EvalInstance());
+      if( eventIndexingBuffer.getWeights().base < 0 ){
         LogError << "Negative nominal weight:" << std::endl;
 
         LogError << "Event buffer is: " << eventIndexingBuffer.getSummary() << std::endl;
@@ -980,7 +976,7 @@ void DataDispenser::fillFunction(int iThread_){
 
         LogThrow("Negative nominal weight");
       }
-      if( eventIndexingBuffer.getBaseWeight() == 0 ){
+      if( eventIndexingBuffer.getWeights().base == 0 ){
         continue;
       } // skip this event
     }
@@ -991,22 +987,18 @@ void DataDispenser::fillFunction(int iThread_){
       if( not _cache_.eventIsInSamplesList[iEntry][iSample] ){ continue; }
 
       // Getting loaded data in tEventBuffer
-      eventIndexingBuffer.copyData( leafFormIndexingList );
+      eventIndexingBuffer.getVariables().copyData( leafFormIndexingList );
 
       // Propagate variable transformations for indexing
       for( auto* varTransformPtr : varTransformForIndexingList ){
         varTransformPtr->evalAndStore(eventIndexingBuffer);
       }
 
-      // Has valid bin?
-      eventIndexingBuffer.setSampleBinIndex(
-          eventIndexingBuffer.findBinIndex(
-              _cache_.samplesToFillList[iSample]->getBinning()
-          )
-      );
+      // Look for the bin index
+      eventIndexingBuffer.fillBinIndex( _cache_.samplesToFillList[iSample]->getBinning() );
 
       // No bin found -> next sample
-      if( eventIndexingBuffer.getSampleBinIndex() == -1){ break; }
+      if( eventIndexingBuffer.getIndices().bin == -1){ break; }
 
       // OK, now we have a valid fit bin. Let's claim an index.
       // Shared index among threads
@@ -1032,17 +1024,17 @@ void DataDispenser::fillFunction(int iThread_){
       }
 
       // Get the next free event in our buffer
-      PhysicsEvent *eventPtr = &(*_cache_.sampleEventListPtrToFill[iSample])[sampleEventIndex];
+      Event *eventPtr = &(*_cache_.sampleEventListPtrToFill[iSample])[sampleEventIndex];
 
       // fill meta info
-      eventPtr->setEntryIndex( iEntry );
-      eventPtr->setBaseWeight( eventIndexingBuffer.getBaseWeight() );
-      eventPtr->setSampleIndex( _cache_.samplesToFillList[iSample]->getIndex() );
-      eventPtr->setSampleBinIndex( eventIndexingBuffer.getSampleBinIndex() );
-      eventPtr->resetEventWeight();
+      eventPtr->getIndices().entry = iEntry;
+      eventPtr->getIndices().sample = _cache_.samplesToFillList[iSample]->getIndex();
+      eventPtr->getIndices().bin = eventIndexingBuffer.getIndices().bin;
+      eventPtr->getWeights().base = eventIndexingBuffer.getWeights().base;
+      eventPtr->getWeights().resetCurrentWeight();
 
       // drop the content of the leaves
-      eventPtr->copyData( leafFormStorageList );
+      eventPtr->getVariables().copyData( leafFormStorageList );
 
       // Propagate transformation for storage -> use the previous results calculated for indexing
       for( auto *varTransformPtr: varTransformForStorageList ){
@@ -1062,7 +1054,7 @@ void DataDispenser::fillFunction(int iThread_){
 
           // dial collections may come with a condition formula
           if( dialCollectionRef->getApplyConditionFormula() != nullptr ){
-            if( eventIndexingBuffer.evalFormula(dialCollectionRef->getApplyConditionFormula().get()) == 0 ){
+            if( eventIndexingBuffer.getVariables().evalFormula(dialCollectionRef->getApplyConditionFormula().get()) == 0 ){
               // next dialSet
               continue;
             }
@@ -1081,7 +1073,7 @@ void DataDispenser::fillFunction(int iThread_){
               dialEntryPtr++;
             }
             else{
-              auto dialBinIdx = eventIndexingBuffer.findBinIndex( dialCollectionRef->getDialBinSet() );
+              auto dialBinIdx = eventIndexingBuffer.getVariables().findBinIndex( dialCollectionRef->getDialBinSet() );
               if( dialBinIdx != -1 ){
                 dialEntryPtr->collectionIndex = iCollection;
                 dialEntryPtr->interfaceIndex = dialBinIdx;
@@ -1092,10 +1084,11 @@ void DataDispenser::fillFunction(int iThread_){
           else if( not dialCollectionRef->getGlobalDialLeafName().empty() ){
             // Event-by-event dial?
             // grab the dial as a general TObject -> let the factory figure out what to do with it
+
             auto *dialObjectPtr = (TObject *) *(
-                (TObject **) eventIndexingBuffer.getVariableAddress(
+                (TObject **) eventIndexingBuffer.getVariables().fetchVariable(
                     dialCollectionRef->getGlobalDialLeafName()
-                )
+                ).get().getPlaceHolderPtr()->getVariableAddress()
             );
 
             // Extra-step for selecting the right dial with TClonesArray

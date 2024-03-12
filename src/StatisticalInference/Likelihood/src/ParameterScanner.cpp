@@ -3,7 +3,6 @@
 //
 
 #include "ParameterScanner.h"
-#include "LikelihoodInterface.h"
 #include "Propagator.h"
 #include "Parameter.h"
 
@@ -86,16 +85,17 @@ void ParameterScanner::initializeImpl() {
   }
   if( GenericToolbox::Json::fetchValue(_varsConfig_, "llhStatPerSamplePerBin", false) ){
     for( auto& sample : _likelihoodInterfacePtr_->getDataSetManager().getPropagator().getSampleSet().getSampleList() ){
-      for( int iBin = 1 ; iBin <= sample.getMcContainer().histogram->GetNbinsX() ; iBin++ ){
+      for( auto& bin : sample.getMcContainer().getHistogram().binList ){
         _scanDataDict_.emplace_back();
         auto& scanEntry = _scanDataDict_.back();
         scanEntry.yPoints = std::vector<double>(_nbPoints_+1,0);
-        scanEntry.folder = "llhStat/" + sample.getName() + "/bin_" + std::to_string(iBin);
+        scanEntry.folder = "llhStat/" + sample.getName() + "/bin_" + std::to_string(bin.index);
         scanEntry.title = Form(R"(Stat LLH Scan of sample "%s", bin #%d "%s")",
-                               sample.getName().c_str(), iBin,
-                               sample.getBinning().getBinList()[iBin-1].getSummary().c_str());
+                               sample.getName().c_str(), bin.index,
+                               sample.getBinning().getBinList()[bin.index].getSummary().c_str());
         scanEntry.yTitle = "Stat LLH value";
         auto* samplePtr = &sample;
+        int iBin = bin.index;
         scanEntry.evalY = [this, samplePtr, iBin](){ return _likelihoodInterfacePtr_->getJointProbabilityPtr()->eval( *samplePtr, iBin ); };
       }
     }
@@ -114,18 +114,18 @@ void ParameterScanner::initializeImpl() {
   }
   if( GenericToolbox::Json::fetchValue(_varsConfig_, "weightPerSamplePerBin", false) ){
     for( auto& sample : _likelihoodInterfacePtr_->getDataSetManager().getPropagator().getSampleSet().getSampleList() ){
-      for( int iBin = 1 ; iBin <= sample.getMcContainer().histogram->GetNbinsX() ; iBin++ ){
+      for( auto& bin : sample.getMcContainer().getHistogram().binList ){
         _scanDataDict_.emplace_back();
         auto& scanEntry = _scanDataDict_.back();
         scanEntry.yPoints = std::vector<double>(_nbPoints_+1,0);
-        scanEntry.folder = "weight/" + sample.getName() + "/bin_" + std::to_string(iBin);
+        scanEntry.folder = "weight/" + sample.getName() + "/bin_" + std::to_string(bin.index);
         scanEntry.title = Form(R"(MC event weight scan of sample "%s", bin #%d "%s")",
                                sample.getName().c_str(),
-                               iBin,
-                               sample.getBinning().getBinList()[iBin-1].getSummary().c_str());
+                               bin.index,
+                               sample.getBinning().getBinList()[bin.index].getSummary().c_str());
         scanEntry.yTitle = "Total MC event weight";
         auto* samplePtr = &sample;
-        scanEntry.evalY = [samplePtr, iBin](){ return samplePtr->getMcContainer().histogram->GetBinContent(iBin); };
+        scanEntry.evalY = [bin](){ return bin.content; };
       }
     }
   }

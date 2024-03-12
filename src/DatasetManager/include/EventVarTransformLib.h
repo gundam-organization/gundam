@@ -22,7 +22,7 @@ protected:
   void loadLibrary();
   void initInputFormulas();
 
-  double evalTransformation(const PhysicsEvent& event_, std::vector<double>& inputBuffer_) const override;
+  double evalTransformation( const Event& event_, std::vector<double>& inputBuffer_) const override;
 
 private:
   std::string _libraryFile_{};

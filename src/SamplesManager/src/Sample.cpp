@@ -34,8 +34,6 @@ void Sample::readConfigImpl(){
 
   _selectionCutStr_ = GenericToolbox::Json::fetchValue(_config_, {{"selectionCutStr"}, {"selectionCuts"}}, _selectionCutStr_);
   _enabledDatasetList_ = GenericToolbox::Json::fetchValue(_config_, std::vector<std::string>{"datasets", "dataSets"}, _enabledDatasetList_);
-  _mcNorm_ = GenericToolbox::Json::fetchValue(_config_, "mcNorm", _mcNorm_);
-  _dataNorm_ = GenericToolbox::Json::fetchValue(_config_, "dataNorm", _dataNorm_);
 }
 void Sample::initializeImpl() {
   if( not _isEnabled_ ) return;
@@ -45,26 +43,11 @@ void Sample::initializeImpl() {
   _binning_.readBinningDefinition( _binningFilePath_ );
   _binning_.sortBins();
 
-  TH1::SetDefaultSumw2(true);
+  _mcContainer_.setName("MC_" + _name_);
+  _mcContainer_.buildHistogram( _binning_ );
 
-  _mcContainer_.name = "MC_" + _name_;
-  _mcContainer_.binning = _binning_;
-  _mcContainer_.histScale = _dataNorm_/_mcNorm_;
-  _mcContainer_.perBinEventPtrList.resize(_binning_.getBinList().size());
-  _mcContainer_.histogram = std::make_shared<TH1D>(
-      Form("%s_MC_bins", _name_.c_str()), Form("%s_MC_bins", _name_.c_str()),
-      int(_binning_.getBinList().size()), 0, int(_binning_.getBinList().size())
-  );
-  _mcContainer_.histogram->SetDirectory(nullptr);
-
-  _dataContainer_.name = "Data_" + _name_;
-  _dataContainer_.binning = _binning_;
-  _dataContainer_.perBinEventPtrList.resize(_binning_.getBinList().size());
-  _dataContainer_.histogram = std::make_shared<TH1D>(
-      Form("%s_Data_bins", _name_.c_str()), Form("%s_Data_bins", _name_.c_str()),
-      int(_binning_.getBinList().size()), 0, int(_binning_.getBinList().size())
-  );
-  _dataContainer_.histogram->SetDirectory(nullptr);
+  _dataContainer_.setName("Data_" + _name_);
+  _dataContainer_.buildHistogram(_binning_);
 }
 
 bool Sample::isDatasetValid(const std::string& datasetName_){

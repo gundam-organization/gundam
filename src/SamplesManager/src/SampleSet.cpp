@@ -41,62 +41,25 @@ void SampleSet::initializeImpl() {
   LogThrowIf(_sampleList_.empty(), "No sample is defined.");
 
   for( auto& sample : _sampleList_ ){ sample.initialize(); }
-
-  // Fill the bin index inside each event
-  std::function<void(int)> updateSampleEventBinIndexesFct = [this](int iThread){
-    LogInfoIf(iThread <= 0) << "Updating event sample bin indices..." << std::endl;
-    for( auto& sample : _sampleList_ ){
-      sample.getMcContainer().updateEventBinIndexes(iThread);
-      sample.getDataContainer().updateEventBinIndexes(iThread);
-    }
-  };
-  GundamGlobals::getParallelWorker().addJob("FitSampleSet::updateSampleEventBinIndexes", updateSampleEventBinIndexesFct);
-
-  // Fill bin event caches
-  std::function<void(int)> updateSampleBinEventListFct = [this](int iThread){
-    LogInfoIf(iThread <= 0) << "Updating sample per bin event lists..." << std::endl;
-    for( auto& sample : _sampleList_ ){
-      sample.getMcContainer().updateBinEventList(iThread);
-      sample.getDataContainer().updateBinEventList(iThread);
-    }
-  };
-  GundamGlobals::getParallelWorker().addJob("FitSampleSet::updateSampleBinEventList", updateSampleBinEventListFct);
-
-
-  // Histogram fills
-  std::function<void(int)> refillMcHistogramsFct = [this](int iThread){
-    for( auto& sample : _sampleList_ ){
-      sample.getMcContainer().refillHistogram(iThread);
-      sample.getDataContainer().refillHistogram(iThread);
-    }
-  };
-  std::function<void()> rescaleMcHistogramsFct = [this](){
-    for( auto& sample : _sampleList_ ){
-      sample.getMcContainer().rescaleHistogram();
-      sample.getDataContainer().rescaleHistogram();
-    }
-  };
-  GundamGlobals::getParallelWorker().addJob("FitSampleSet::updateSampleHistograms", refillMcHistogramsFct);
-  GundamGlobals::getParallelWorker().setPostParallelJob("FitSampleSet::updateSampleHistograms", rescaleMcHistogramsFct);
 }
 
 void SampleSet::copyMcEventListToDataContainer(){
   for( auto& sample : _sampleList_ ){
     LogInfo << "Copying MC events in sample \"" << sample.getName() << "\"" << std::endl;
-    sample.getDataContainer().eventList.clear();
-    sample.getDataContainer().eventList.reserve(sample.getMcContainer().eventList.size());
-//    sample.getDataContainer().eventList = sample.getMcContainer().eventList;
-    sample.getDataContainer().eventList.insert(
-        sample.getDataContainer().eventList.begin(),
-        std::begin(sample.getMcContainer().eventList),
-        std::end(sample.getMcContainer().eventList)
+    sample.getDataContainer().getEventList().clear();
+    sample.getDataContainer().getEventList().reserve(sample.getMcContainer().getEventList().size());
+//    sample.getDataContainer().getEventList() = sample.getMcContainer().getEventList();
+    sample.getDataContainer().getEventList().insert(
+        sample.getDataContainer().getEventList().begin(),
+        std::begin(sample.getMcContainer().getEventList()),
+        std::end(sample.getMcContainer().getEventList())
     );
   }
 }
 void SampleSet::clearMcContainers(){
   for( auto& sample : _sampleList_ ){
     LogInfo << "Clearing event list for \"" << sample.getName() << "\"" << std::endl;
-    sample.getMcContainer().eventList.clear();
+    sample.getMcContainer().getEventList().clear();
   }
 }
 
@@ -110,15 +73,3 @@ std::vector<std::string> SampleSet::fetchRequestedVariablesForIndexing() const{
   return out;
 }
 
-void SampleSet::updateSampleEventBinIndexes() const{
-  GundamGlobals::getParallelWorker().runJob("FitSampleSet::updateSampleEventBinIndexes");
-  LogDebugIf(_showTimeStats_) << __METHOD_NAME__ << " took: " << GundamGlobals::getParallelWorker().getLastJobTimer() << std::endl;
-}
-void SampleSet::updateSampleBinEventList() const{
-  GundamGlobals::getParallelWorker().runJob("FitSampleSet::updateSampleBinEventList");
-  LogDebugIf(_showTimeStats_) << __METHOD_NAME__ << " took: " << GundamGlobals::getParallelWorker().getLastJobTimer() << std::endl;
-}
-void SampleSet::updateSampleHistograms() const {
-  GundamGlobals::getParallelWorker().runJob("FitSampleSet::updateSampleHistograms");
-  LogDebugIf(_showTimeStats_) << __METHOD_NAME__ << " took: " << GundamGlobals::getParallelWorker().getLastJobTimer() << std::endl;
-}

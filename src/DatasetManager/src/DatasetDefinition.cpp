@@ -40,7 +40,7 @@ void DatasetDefinition::readConfigImpl() {
 
   for( auto& dataEntry : GenericToolbox::Json::fetchValue(_config_, "data", JsonType()) ){
     std::string name = GenericToolbox::Json::fetchValue(dataEntry, "name", "data");
-    LogThrowIf( GenericToolbox::doesKeyIsInMap(name, _dataDispenserDict_),
+    LogThrowIf( GenericToolbox::isIn(name, _dataDispenserDict_),
                 "\"" << name << "\" already taken, please use another name." )
 
     if( GenericToolbox::Json::fetchValue(dataEntry, "fromMc", bool(false)) ){ _dataDispenserDict_.emplace(name, _mcDispenser_); }
@@ -62,7 +62,7 @@ void DatasetDefinition::initializeImpl() {
     dataDispenser.second.initialize();
   }
 
-  if( not GenericToolbox::doesKeyIsInMap(_selectedDataEntry_, _dataDispenserDict_) ){
+  if( not GenericToolbox::isIn(_selectedDataEntry_, _dataDispenserDict_) ){
     LogThrow("selectedDataEntry could not be find in available data: "
                  << GenericToolbox::toString(_dataDispenserDict_, [](const std::pair<std::string, DataDispenser>& elm){ return elm.first; })
                  << std::endl);

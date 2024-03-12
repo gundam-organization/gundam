@@ -58,8 +58,8 @@ void LikelihoodInterface::readConfigImpl(){
 void LikelihoodInterface::initializeImpl() {
   LogWarning << "Initializing LikelihoodInterface..." << std::endl;
 
+  _dataSetManager_.initialize(); // parameter should be at their nominal value
   _jointProbabilityPtr_->initialize();
-  _dataSetManager_.initialize();
 
   LogInfo << "Fetching the effective number of fit parameters..." << std::endl;
   _nbParameters_ = 0;
@@ -72,6 +72,29 @@ void LikelihoodInterface::initializeImpl() {
   for( auto& sample : _dataSetManager_.getPropagator().getSampleSet().getSampleList() ){
     _nbSampleBins_ += int(sample.getBinning().getBinList().size() );
   }
+
+  /// some joint fit probability might need to save the value of the nominal histogram.
+  /// here we know every parameter is at its nominal value
+  LogInfo << "First evaluation of the LLH at the nominal value..." << std::endl;
+  _dataSetManager_.getPropagator().getParametersManager().moveParametersToPrior();
+  this->propagateAndEvalLikelihood();
+
+  /// move the parameter away from the prior if needed
+  if( not _dataSetManager_.getPropagator().getParameterInjectorMc().empty() ){
+    LogWarning << "Injecting parameters on MC samples..." << std::endl;
+    _dataSetManager_.getPropagator().getParametersManager().injectParameterValues(
+        ConfigUtils::getForwardedConfig(_dataSetManager_.getPropagator().getParameterInjectorMc())
+    );
+    _dataSetManager_.getPropagator().resetReweight();
+    _dataSetManager_.getPropagator().reweightMcEvents();
+  }
+
+  //////////////////////////////////////////
+  // DON'T MOVE PARAMETERS FROM THIS POINT
+  //////////////////////////////////////////
+
+  /// Now printout the event breakdowns
+  _dataSetManager_.getPropagator().printBreakdowns();
 
   LogInfo << "LikelihoodInterface initialized." << std::endl;
 }

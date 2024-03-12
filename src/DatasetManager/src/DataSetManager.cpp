@@ -149,10 +149,6 @@ void DataSetManager::loadData(){
     LogWarning << "Copying loaded mc-like event to data container..." << std::endl;
     _propagator_.getSampleSet().copyMcEventListToDataContainer();
 
-    for( auto& sample : _propagator_.getSampleSet().getSampleList() ){
-      sample.getDataContainer().histScale = sample.getMcContainer().histScale;
-    }
-
     // back to prior
     if( _propagator_.isThrowAsimovToyParameters() ){
       for( auto& parSet : _propagator_.getParametersManager().getParameterSetsList() ){
@@ -213,18 +209,22 @@ void DataSetManager::loadData(){
   _propagator_.resetReweight();
   _propagator_.reweightMcEvents();
 
-  LogInfo << "Set the current MC prior weights as nominal weight..." << std::endl;
-  for( auto& sample : _propagator_.getSampleSet().getSampleList() ){
-    for( auto& event : sample.getMcContainer().eventList ){
-      event.setNominalWeight(event.getEventWeight());
-    }
-  }
-
   LogInfo << "Filling up sample bin caches..." << std::endl;
-  _propagator_.getSampleSet().updateSampleBinEventList();
+  GundamGlobals::getParallelWorker().runJob([this](int iThread){
+    LogInfoIf(iThread <= 0) << "Updating sample per bin event lists..." << std::endl;
+    for( auto& sample : _propagator_.getSampleSet().getSampleList() ){
+      sample.getMcContainer().updateBinEventList(iThread);
+      sample.getDataContainer().updateBinEventList(iThread);
+    }
+  });
 
   LogInfo << "Filling up sample histograms..." << std::endl;
-  _propagator_.getSampleSet().updateSampleHistograms();
+  GundamGlobals::getParallelWorker().runJob([this](int iThread){
+    for( auto& sample : _propagator_.getSampleSet().getSampleList() ){
+      sample.getMcContainer().refillHistogram(iThread);
+      sample.getDataContainer().refillHistogram(iThread);
+    }
+  });
 
   // Throwing stat error on data -> BINNING SHOULD BE SET!!
   if( _propagator_.isThrowAsimovToyParameters() and _propagator_.isEnableStatThrowInToys() ){
@@ -251,102 +251,8 @@ void DataSetManager::loadData(){
     }
   }
 
-  LogInfo << "Locking data event containers..." << std::endl;
-  for( auto& sample : _propagator_.getSampleSet().getSampleList() ){
-    // Now the data won't be refilled each time
-    sample.getDataContainer().isLocked = true;
-  }
-
-  if( not _propagator_.getParameterInjectorMc().empty() ){
-    LogWarning << "Injecting parameters on MC samples..." << std::endl;
-    _propagator_.getParametersManager().injectParameterValues( ConfigUtils::getForwardedConfig(_propagator_.getParameterInjectorMc()) );
-    _propagator_.resetReweight();
-    _propagator_.reweightMcEvents();
-  }
-
-  //////////////////////////////////////////
-  // DON'T MOVE PARAMETERS FROM THIS POINT
-  //////////////////////////////////////////
-
-  /// Copy the current state of MC as "nominal" histogram
-  LogInfo << "Copy the current state of MC as \"nominal\" histogram..." << std::endl;
-  for( auto& sample : _propagator_.getSampleSet().getSampleList() ){
-    sample.getMcContainer().saveAsHistogramNominal();
-  }
-
   /// Now caching the event for the plot generator
   _propagator_.getPlotGenerator().defineHistogramHolders();
-
-  /// Printouts for quick monitoring
-  if( _propagator_.isShowEventBreakdown() ){
-
-    // STAGED MASK
-    LogWarning << "Staged event breakdown:" << std::endl;
-    std::vector<std::vector<double>> stageBreakdownList(
-        _propagator_.getSampleSet().getSampleList().size(),
-        std::vector<double>(_propagator_.getParametersManager().getParameterSetsList().size() + 1, 0)
-    ); // [iSample][iStage]
-    std::vector<std::string> stageTitles;
-    stageTitles.emplace_back("Sample");
-    stageTitles.emplace_back("No reweight");
-    for( auto& parSet : _propagator_.getParametersManager().getParameterSetsList() ){
-      if( not parSet.isEnabled() ){ continue; }
-      stageTitles.emplace_back("+ " + parSet.getName());
-    }
-
-    int iStage{0};
-    std::vector<ParameterSet*> maskedParSetList;
-    for( auto& parSet : _propagator_.getParametersManager().getParameterSetsList() ){
-      if( not parSet.isEnabled() ){ continue; }
-      maskedParSetList.emplace_back( &parSet );
-      parSet.setMaskedForPropagation( true );
-    }
-
-    _propagator_.resetReweight();
-    _propagator_.reweightMcEvents();
-    for( size_t iSample = 0 ; iSample < _propagator_.getSampleSet().getSampleList().size() ; iSample++ ){
-      stageBreakdownList[iSample][iStage] = _propagator_.getSampleSet().getSampleList()[iSample].getMcContainer().getSumWeights();
-    }
-
-    for( auto* parSetPtr : maskedParSetList ){
-      parSetPtr->setMaskedForPropagation(false);
-      _propagator_.resetReweight();
-      _propagator_.reweightMcEvents();
-      iStage++;
-      for( size_t iSample = 0 ; iSample < _propagator_.getSampleSet().getSampleList().size() ; iSample++ ){
-        stageBreakdownList[iSample][iStage] = _propagator_.getSampleSet().getSampleList()[iSample].getMcContainer().getSumWeights();
-      }
-    }
-
-    GenericToolbox::TablePrinter t;
-    t.setColTitles(stageTitles);
-    for( size_t iSample = 0 ; iSample < _propagator_.getSampleSet().getSampleList().size() ; iSample++ ) {
-      std::vector<std::string> tableLine;
-      tableLine.emplace_back("\"" + _propagator_.getSampleSet().getSampleList()[iSample].getName() + "\"");
-      for( iStage = 0 ; iStage < stageBreakdownList[iSample].size() ; iStage++ ){
-        tableLine.emplace_back( std::to_string(stageBreakdownList[iSample][iStage]) );
-      }
-      t.addTableLine(tableLine);
-    }
-    t.printTable();
-
-    LogWarning << "Sample breakdown:" << std::endl;
-    std::cout << _propagator_.getSampleBreakdownTableStr() << std::endl;
-
-  }
-  if( _propagator_.isDebugPrintLoadedEvents() ){
-    LogDebug << GET_VAR_NAME_VALUE(_propagator_.getDebugPrintLoadedEventsNbPerSample()) << std::endl;
-    int iEvt{0};
-    for( auto& entry : _propagator_.getEventDialCache().getCache() ) {
-      LogDebug << "Event #" << iEvt++ << "{" << std::endl;
-      {
-        LogScopeIndent;
-        LogDebug << entry.getSummary() << std::endl;
-      }
-      LogDebug << "}" << std::endl;
-      if( iEvt >= _propagator_.getDebugPrintLoadedEventsNbPerSample() ) break;
-    }
-  }
 
   /// Propagator needs to be fast, let the workers wait for the signal
   GundamGlobals::getParallelWorker().setCpuTimeSaverIsEnabled(false);

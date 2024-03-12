@@ -457,8 +457,8 @@ int main(int argc, char** argv){
     xsecEntry.config = sample.getConfig();
     xsecEntry.branchBinsData.resetCurrentByteOffset();
     std::vector<std::string> leafNameList{};
-    leafNameList.reserve( sample.getMcContainer().histogram->GetNbinsX() );
-    for( int iBin = 0 ; iBin < sample.getMcContainer().histogram->GetNbinsX() ; iBin++ ){
+    leafNameList.reserve( sample.getMcContainer().getHistogram().nBins );
+    for( int iBin = 0 ; iBin < sample.getMcContainer().getHistogram().nBins; iBin++ ){
       leafNameList.emplace_back(Form("bin_%i/D", iBin));
       xsecEntry.branchBinsData.writeRawData( double(0) );
     }
@@ -485,28 +485,25 @@ int main(int argc, char** argv){
     xsecEntry.histogram = TH1D(
         sample.getName().c_str(),
         sample.getName().c_str(),
-        sample.getMcContainer().histogram->GetNbinsX(),
+        sample.getMcContainer().getHistogram().nBins,
         0,
-        sample.getMcContainer().histogram->GetNbinsX()
+        sample.getMcContainer().getHistogram().nBins
     );
   }
 
   int nToys{ clParser.getOptionVal<int>("nToys") };
 
-  // no bin volume of events -> use the nominal weight container
+  // no bin volume of events -> use the current weight container
   for( auto& xsec : crossSectionDataList ){
     {
-      auto& mcEvList{xsec.samplePtr->getMcContainer().eventList};
-      std::for_each(mcEvList.begin(), mcEvList.end(), [](PhysicsEvent& ev_){ ev_.setNominalWeight(0); });
+      auto& mcEvList{xsec.samplePtr->getMcContainer().getEventList()};
+      std::for_each(mcEvList.begin(), mcEvList.end(), []( Event& ev_){ ev_.getWeights().current = 0; });
     }
     {
-      auto& dataEvList{xsec.samplePtr->getDataContainer().eventList};
-      std::for_each(dataEvList.begin(), dataEvList.end(), [](PhysicsEvent& ev_){ ev_.setNominalWeight(0); });
+      auto& dataEvList{xsec.samplePtr->getDataContainer().getEventList()};
+      std::for_each(dataEvList.begin(), dataEvList.end(), []( Event& ev_){ ev_.getWeights().current = 0; });
     }
   }
-
-
-
 
   bool enableEventMcThrow{true};
   bool enableStatThrowInToys{true};
@@ -514,13 +511,12 @@ int main(int argc, char** argv){
   enableStatThrowInToys = GenericToolbox::Json::fetchValue( xsecCalcConfig, "enableStatThrowInToys", enableStatThrowInToys);
   enableEventMcThrow    = GenericToolbox::Json::fetchValue( xsecCalcConfig, "enableEventMcThrow", enableEventMcThrow);
 
-
   auto writeBinDataFct = std::function<void()>([&]{
     for( auto& xsec : crossSectionDataList ){
 
       xsec.branchBinsData.resetCurrentByteOffset();
-      for( int iBin = 0 ; iBin < xsec.samplePtr->getMcContainer().histogram->GetNbinsX() ; iBin++ ){
-        double binData{ xsec.samplePtr->getMcContainer().histogram->GetBinContent(1+iBin) };
+      for( int iBin = 0 ; iBin < xsec.samplePtr->getMcContainer().getHistogram().nBins ; iBin++ ){
+        double binData{ xsec.samplePtr->getMcContainer().getHistogram().binList[iBin].content };
 
         // special re-norm
         for( auto& normData : xsec.normList ){
@@ -545,26 +541,24 @@ int main(int argc, char** argv){
 
         // no bin volume of events
         {
-          auto& mcEvList{xsec.samplePtr->getMcContainer().eventList};
-          std::for_each(mcEvList.begin(), mcEvList.end(), [&](PhysicsEvent& ev_){
-            if( iBin != ev_.getSampleBinIndex() ){ return; }
-            ev_.setNominalWeight( ev_.getNominalWeight() + binData );
+          auto& mcEvList{xsec.samplePtr->getMcContainer().getEventList()};
+          std::for_each(mcEvList.begin(), mcEvList.end(), [&]( Event& ev_){
+            if( iBin != ev_.getIndices().bin ){ return; }
+            ev_.getWeights().current += binData;
           });
         }
 
         // set event weight
         {
-          auto& dataEvList{xsec.samplePtr->getDataContainer().eventList};
-          std::for_each(dataEvList.begin(), dataEvList.end(), [&](PhysicsEvent& ev_){
-            if( iBin != ev_.getSampleBinIndex() ){ return; }
-            ev_.setNominalWeight( ev_.getNominalWeight() + binData );
+          auto& dataEvList{xsec.samplePtr->getDataContainer().getEventList()};
+          std::for_each(dataEvList.begin(), dataEvList.end(), [&]( Event& ev_){
+            if( iBin != ev_.getIndices().bin ){ return; }
+            ev_.getWeights().current = binData;
           });
         }
 
-
-
         // bin volume
-        auto& bin = xsec.samplePtr->getMcContainer().binning.getBinList()[iBin];
+        auto& bin = xsec.samplePtr->getBinning().getBinList()[iBin];
         double binVolume{1};
 
         for( auto& edges : bin.getEdgesList() ){
@@ -645,7 +639,7 @@ int main(int argc, char** argv){
 
   for( auto& xsec : crossSectionDataList ){
 
-    for( int iBin = 0 ; iBin < xsec.samplePtr->getMcContainer().histogram->GetNbinsX() ; iBin++ ){
+    for( int iBin = 0 ; iBin < xsec.samplePtr->getMcContainer().getHistogram().nBins ; iBin++ ){
       iBinGlobal++;
 
       std::string binTitle = xsec.samplePtr->getBinning().getBinList()[iBin].getSummary();
@@ -692,29 +686,31 @@ int main(int argc, char** argv){
   for( auto& xsec : crossSectionDataList ){
     // this gives the average as the event weights were summed together
     {
-      auto &mcEvList{xsec.samplePtr->getMcContainer().eventList};
+      auto &mcEvList{xsec.samplePtr->getMcContainer().getEventList()};
       std::vector<size_t> nEventInBin(xsec.histogram.GetNbinsX(), 0);
       for( size_t iBin = 0 ; iBin < nEventInBin.size() ; iBin++ ){
-        nEventInBin[iBin] = std::count_if(mcEvList.begin(), mcEvList.end(), [iBin](PhysicsEvent &ev_) {
-          return ev_.getSampleBinIndex() == iBin;
+        nEventInBin[iBin] = std::count_if(mcEvList.begin(), mcEvList.end(), [iBin]( Event &ev_) {
+          return ev_.getIndices().bin == iBin;
         });
       }
 
-      std::for_each(mcEvList.begin(), mcEvList.end(), [&](PhysicsEvent &ev_) {
-        ev_.setEventWeight(ev_.getNominalWeight() / nToys / double(nEventInBin[ev_.getSampleBinIndex()]) );
+      std::for_each(mcEvList.begin(), mcEvList.end(), [&]( Event &ev_) {
+        ev_.getWeights().current /= nToys;
+        ev_.getWeights().current /= double(nEventInBin[ev_.getIndices().bin]);
       });
     }
     {
-      auto &dataEvList{xsec.samplePtr->getDataContainer().eventList};
+      auto &dataEvList{xsec.samplePtr->getDataContainer().getEventList()};
       std::vector<size_t> nEventInBin(xsec.histogram.GetNbinsX(), 0);
       for( size_t iBin = 0 ; iBin < nEventInBin.size() ; iBin++ ){
-        nEventInBin[iBin] = std::count_if(dataEvList.begin(), dataEvList.end(), [iBin](PhysicsEvent &ev_) {
-          return ev_.getSampleBinIndex() == iBin;
+        nEventInBin[iBin] = std::count_if(dataEvList.begin(), dataEvList.end(), [iBin]( Event &ev_) {
+          return ev_.getIndices().bin== iBin;
         });
       }
 
-      std::for_each(dataEvList.begin(), dataEvList.end(), [&](PhysicsEvent &ev_) {
-        ev_.setEventWeight(ev_.getNominalWeight() / nToys / double(nEventInBin[ev_.getSampleBinIndex()]) );
+      std::for_each(dataEvList.begin(), dataEvList.end(), [&]( Event &ev_) {
+        ev_.getWeights().current /= nToys;
+        ev_.getWeights().current /= double(nEventInBin[ev_.getIndices().bin]);
       });
     }
   }

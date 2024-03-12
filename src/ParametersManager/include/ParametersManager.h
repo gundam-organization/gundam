@@ -43,6 +43,7 @@ public:
   [[nodiscard]] const ParameterSet* getFitParameterSetPtr(const std::string& name_) const;
 
   // core
+  void moveParametersToPrior();
   void injectParameterValues(const JsonType &config_);
   void throwParameters();
   void throwParametersFromParSetCovariance();

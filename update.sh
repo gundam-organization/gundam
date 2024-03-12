@@ -45,6 +45,7 @@ do
     shift
     if [[ -n $1 ]]; then
       echo "Updating to branch: $1"
+      git fetch # fetching new branches from remote
       git checkout $1
       if [[ "$1" == "remotes/origin/"* ]]; then
         # in case of remotes, checkout will be pointing at a commit hash without being attached to a branch.
