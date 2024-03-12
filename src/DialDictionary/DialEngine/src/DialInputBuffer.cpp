@@ -14,6 +14,10 @@ LoggerInit([]{
   Logger::setUserHeaderStr("[DialInputBuffer]");
 });
 
+void DialInputBuffer::setIsMasked(bool isMasked_){
+  _isMasked_ = isMasked_;
+  _isDialUpdateRequested_ = true;
+}
 
 void DialInputBuffer::initialise(){
   LogThrowIf(_parSetListPtr_ == nullptr, "ParameterSet list pointer not set.");
@@ -44,46 +48,58 @@ void DialInputBuffer::initialise(){
 }
 
 void DialInputBuffer::update(){
-  this->setIsMasked( false );
-  double tempBuffer;
-
   // will change if at least one parameter is updated
   _isDialUpdateRequested_ = false;
 
-  for( int iInput = 0 ; iInput < _inputArraySize_ ; iInput++ ){
-
-    if( getParameterSet(iInput).isMaskedForPropagation() ){
-      // in that case, the DialInterface will always return 1.
-      this->setIsMasked( true );
-      return;
+  // check the mask
+  bool isMasked = std::any_of(
+      _inputParameterReferenceList_.begin(), _inputParameterReferenceList_.end(),
+      [this](ParameterReference& parRef_){
+        return parRef_.getParameterSet(_parSetListPtr_).isMaskedForPropagation();
+  });
+  if( isMasked ){
+    if( not this->isMasked() ){
+      // if it was not masked before, it
+      // will trigger update as well
+      this->setIsMasked(true);
     }
 
+    // no need to go further
+    return;
+  }
+  else{
+    // was it masked before? if yes, then update the dial cache
+    if( this->isMasked() ){ this->setIsMasked( false ); }
+  }
+
+  // look for the parameter values
+  double tempBuffer;
+  for( auto& inputRef : _inputParameterReferenceList_ ){
     // grab the value of the parameter
-    tempBuffer = getParameter(iInput).getParameterValue();
+    tempBuffer = inputRef.getParameter(_parSetListPtr_).getParameterValue();
 
     // find the actual parameter value if mirroring is applied
-    if( not std::isnan( getMirrorEdges(iInput).minValue ) ){
+    if( not std::isnan( inputRef.mirrorEdges.minValue ) ){
       tempBuffer = std::abs(std::fmod(
-          tempBuffer - getMirrorEdges(iInput).minValue,
-          2 * getMirrorEdges(iInput).range
+          tempBuffer - inputRef.mirrorEdges.minValue,
+          2 * inputRef.mirrorEdges.range
       ));
 
-      if( tempBuffer > getMirrorEdges(iInput).range ){
+      if( tempBuffer > inputRef.mirrorEdges.range ){
         // odd pattern  -> mirrored -> decreasing effective X while increasing parameter
-        tempBuffer -= 2 * getMirrorEdges(iInput).range;
+        tempBuffer -= 2 * inputRef.mirrorEdges.range;
         tempBuffer = -tempBuffer;
       }
 
       // re-apply the offset
-      tempBuffer += getMirrorEdges(iInput).minValue;
+      tempBuffer += inputRef.mirrorEdges.minValue;
     }
 
     // has it been updated?
-    if( _inputBuffer_[iInput] != tempBuffer ){
+    if( _inputBuffer_[inputRef.bufferIndex] != tempBuffer ){
       _isDialUpdateRequested_ = true;
-      _inputBuffer_[iInput] = tempBuffer;
+      _inputBuffer_[inputRef.bufferIndex] = tempBuffer;
     }
-
   }
 
 #if USE_ZLIB
@@ -92,7 +108,8 @@ void DialInputBuffer::update(){
 }
 void DialInputBuffer::addParameterReference( const ParameterReference& parReference_){
   LogThrowIf(_isInitialized_, "Can't add parameter index while initialized.");
-  _inputParameterReferenceList_.emplace_back(parReference_);
+  auto& parRef = _inputParameterReferenceList_.emplace_back(parReference_);
+  parRef.bufferIndex = int(_inputParameterReferenceList_.size())-1;
 }
 std::string DialInputBuffer::getSummary() const{
   std::stringstream ss;

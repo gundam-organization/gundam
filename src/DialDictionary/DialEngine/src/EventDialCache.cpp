@@ -83,9 +83,8 @@ void EventDialCache::buildReferenceCache( SampleSet& sampleSet_, std::vector<Dia
 
   for( auto& sampleIndexCache : sampleIndexCacheList ){
     for( auto& indexCache : sampleIndexCache ){
-      _cache_.emplace_back();
 
-      auto& cacheEntry{_cache_.back()};
+      auto& cacheEntry{_cache_.emplace_back()};
 
       cacheEntry.event =
           &sampleSet_.getSampleList().at(
@@ -99,8 +98,7 @@ void EventDialCache::buildReferenceCache( SampleSet& sampleSet_, std::vector<Dia
         if( dialIndex.collectionIndex == size_t(-1) or dialIndex.interfaceIndex == size_t(-1) ){ continue; }
         cacheEntry.dialResponseCacheList.emplace_back(
             dialCollectionList_.at(dialIndex.collectionIndex)
-            .getDialInterfaceList().at(dialIndex.interfaceIndex),
-            std::nan("unset")
+            .getDialInterfaceList().at(dialIndex.interfaceIndex)
         );
       }
     }
@@ -131,7 +129,16 @@ void EventDialCache::reweightEntry( EventDialCache::CacheEntry& entry_){
   double tempReweight{1};
 
   // calculate the dial responses
-  for( auto& dialResponseCache : entry_.dialResponseCacheList ){ tempReweight *= dialResponseCache.getResponse(); }
+  for( auto& dialResponseCache : entry_.dialResponseCacheList ){
+    tempReweight *= dialResponseCache.getResponse();
+    if( std::isnan( tempReweight ) ){
+      LogError << entry_.getSummary() << std::endl;
+      LogError << GET_VAR_NAME_VALUE(dialResponseCache.getResponse()) << std::endl;
+      LogError << GET_VAR_NAME_VALUE(dialResponseCache.response) << std::endl;
+      LogError << GET_VAR_NAME_VALUE(dialResponseCache.dialInterface.evalResponse()) << std::endl;
+      LogThrow("BAD WEIGHT at " << dialResponseCache.dialInterface.getSummary(false));
+    }
+  }
 
   // applying event weight cap if defined
   _globalEventReweightCap_.process( tempReweight );

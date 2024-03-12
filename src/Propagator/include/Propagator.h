@@ -60,6 +60,7 @@ public:
   std::vector<DialCollection> &getDialCollectionList(){ return _dialCollectionList_; }
 
   // Core
+  void buildDialCache();
   void propagateParameters();
   void reweightMcEvents();
   void refillMcHistograms();

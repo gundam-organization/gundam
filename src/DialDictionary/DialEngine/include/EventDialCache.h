@@ -30,7 +30,7 @@ public:
     double maxReweight{std::nan("unset")};
 
     /// apply the cap if enabled
-    void process(double& reweightValue_) const{
+    void process( double& reweightValue_ ) const{
       if( not isEnabled ){ return; }
       if( reweightValue_ > maxReweight ){ reweightValue_ = maxReweight; }
     }
@@ -38,11 +38,11 @@ public:
 
   /// DialResponseCache is keeping a reference of a DialInterface and a cached double for the response
   struct DialResponseCache {
-    DialResponseCache( DialInterface& interface_, double response_): dialInterface(interface_), response(response_) {}
+    explicit DialResponseCache( DialInterface& interface_ ): dialInterface(interface_) {}
     // The dial interface to be used with the PhysicsEvent.
     DialInterface& dialInterface;
     // The cached result calculated by the dial.
-    double response;
+    double response{std::nan("unset")};
 
     void update(){
       // evaluate the dial if an update has been requested
@@ -51,7 +51,6 @@ public:
       }
     }
     double getResponse(){
-      if( dialInterface.getInputBufferRef()->isMasked() ){ return 1; }
       this->update();
       return response;
     }
@@ -66,8 +65,8 @@ public:
     [[nodiscard]] std::string getSummary() const {
       std::stringstream ss;
       ss << *event << std::endl;
-      ss << "dialCache = {";
-      for( auto& dialResponseCache : dialResponseCacheList ) {
+      ss << "Dials{";
+      for( auto& dialResponseCache : dialResponseCacheList ){
         ss << std::endl << "  { " << dialResponseCache.dialInterface.getSummary() << " }";
       }
       ss << std::endl << "}";

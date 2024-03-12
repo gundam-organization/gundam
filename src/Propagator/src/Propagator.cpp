@@ -136,6 +136,16 @@ void Propagator::initializeImpl(){
 }
 
 // Core
+void Propagator::buildDialCache(){
+  _eventDialCache_.shrinkIndexedCache();
+  _eventDialCache_.buildReferenceCache(_sampleSet_, _dialCollectionList_);
+
+  for( auto& dialCollection : _dialCollectionList_ ){
+    for( auto& dialInput : dialCollection.getDialInputBufferList() ){
+      dialInput.requestUpdate();
+    }
+  }
+}
 void Propagator::propagateParameters(){
 
   if( _enableEigenToOrigInPropagate_ ){

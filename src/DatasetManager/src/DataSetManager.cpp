@@ -83,8 +83,7 @@ void DataSetManager::loadData(){
     }
 
     LogInfo << "Build reference cache..." << std::endl;
-    _propagator_.getEventDialCache().shrinkIndexedCache();
-    _propagator_.getEventDialCache().buildReferenceCache(_propagator_.getSampleSet(), _propagator_.getDialCollectionList());
+    _propagator_.buildDialCache();
   }
 
   // Copy to data container
@@ -186,8 +185,7 @@ void DataSetManager::loadData(){
     }
 
     LogInfo << "Build reference cache..." << std::endl;
-    _propagator_.getEventDialCache().shrinkIndexedCache();
-    _propagator_.getEventDialCache().buildReferenceCache(_propagator_.getSampleSet(), _propagator_.getDialCollectionList());
+    _propagator_.buildDialCache();
   }
 
 #ifdef GUNDAM_USING_CACHE_MANAGER
