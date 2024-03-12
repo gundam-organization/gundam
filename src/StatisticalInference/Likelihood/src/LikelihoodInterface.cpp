@@ -85,7 +85,6 @@ void LikelihoodInterface::initializeImpl() {
     _dataSetManager_.getPropagator().getParametersManager().injectParameterValues(
         ConfigUtils::getForwardedConfig(_dataSetManager_.getPropagator().getParameterInjectorMc())
     );
-    _dataSetManager_.getPropagator().resetReweight();
     _dataSetManager_.getPropagator().reweightMcEvents();
   }
 

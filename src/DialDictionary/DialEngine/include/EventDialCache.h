@@ -51,6 +51,7 @@ public:
       }
     }
     double getResponse(){
+      if( dialInterface.getInputBufferRef()->isMasked() ){ return 1; }
       this->update();
       return response;
     }

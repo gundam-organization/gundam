@@ -55,6 +55,9 @@ void DataSetManager::initializeImpl(){
 void DataSetManager::loadData(){
   LogInfo << "Loading data into the PropagatorEngine..." << std::endl;
 
+  bool cacheManagerState = GundamGlobals::getEnableCacheManager();
+  GundamGlobals::setEnableCacheManager(false);
+
   // First start with the data:
   bool usedMcContainer{false};
   bool allAsimov{true};
@@ -91,11 +94,7 @@ void DataSetManager::loadData(){
 
       if( _propagator_.isShowEventBreakdown() ){
         LogInfo << "Propagating prior parameters on the initially loaded events..." << std::endl;
-        bool cacheManagerState = GundamGlobals::getEnableCacheManager();
-        GundamGlobals::setEnableCacheManager(false);
-        _propagator_.resetReweight();
         _propagator_.reweightMcEvents();
-        GundamGlobals::setEnableCacheManager(cacheManagerState);
 
         LogInfo << "Sample breakdown prior to the throwing:" << std::endl;
         std::cout << _propagator_.getSampleBreakdownTableStr() << std::endl;
@@ -139,11 +138,7 @@ void DataSetManager::loadData(){
       if( parSet.isEnableEigenDecomp() ) { parSet.propagateEigenToOriginal(); }
     }
 
-    bool cacheManagerState = GundamGlobals::getEnableCacheManager();
-    GundamGlobals::setEnableCacheManager(false);
-    _propagator_.resetReweight();
     _propagator_.reweightMcEvents();
-    GundamGlobals::setEnableCacheManager(cacheManagerState);
 
     // Copies MC events in data container for both Asimov and FakeData event types
     LogWarning << "Copying loaded mc-like event to data container..." << std::endl;
@@ -200,14 +195,10 @@ void DataSetManager::loadData(){
   // the MC has been copied for the Asimov fit, or the "data" use the MC
   // reweighting cache.  This must also be before the first use of
   // reweightMcEvents.
-  if(GundamGlobals::getEnableCacheManager()) {
+  if( cacheManagerState ) {
     Cache::Manager::Build(_propagator_.getSampleSet(), _propagator_.getEventDialCache());
   }
 #endif
-
-  LogInfo << "Propagating prior parameters on events..." << std::endl;
-  _propagator_.resetReweight();
-  _propagator_.reweightMcEvents();
 
   LogInfo << "Filling up sample bin caches..." << std::endl;
   GundamGlobals::getParallelWorker().runJob([this](int iThread){
@@ -253,6 +244,8 @@ void DataSetManager::loadData(){
 
   /// Now caching the event for the plot generator
   _propagator_.getPlotGenerator().defineHistogramHolders();
+
+  GundamGlobals::setEnableCacheManager(cacheManagerState);
 
   /// Propagator needs to be fast, let the workers wait for the signal
   GundamGlobals::getParallelWorker().setCpuTimeSaverIsEnabled(false);
