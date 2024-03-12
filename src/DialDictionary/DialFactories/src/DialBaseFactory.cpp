@@ -3,6 +3,9 @@
 #include "GraphDialBaseFactory.h"
 #include "SplineDialBaseFactory.h"
 
+#include "RootFormula.h"
+#include "CompiledLibDial.h"
+
 #include "Logger.h"
 
 LoggerInit([]{
@@ -71,6 +74,38 @@ DialBase* DialBaseFactory::makeDial(const std::string& dialTitle_,
   // Pass the ownership without any constraints!
   return dialBase.release();
 }
+
+
+DialBase* DialBaseFactory::makeDial(const JsonType& config_){
+  std::unique_ptr<DialBase> dialBase{nullptr};
+  std::string dialType{};
+
+  dialType = GenericToolbox::Json::fetchValue(config_, {{"dialType"}, {"dialsType"}}, dialType);
+
+  if( dialType == "Formula" or dialType == "RootFormula" ){
+    dialBase = std::make_unique<RootFormula>();
+    auto* rootFormulaPtr{(RootFormula*) dialBase.get()};
+
+    auto formulaConfig{GenericToolbox::Json::fetchValue<JsonType>(config_, "dialConfig")};
+
+    rootFormulaPtr->setFormulaStr( GenericToolbox::Json::fetchValue<std::string>(formulaConfig, "formulaStr") );
+  }
+  else if( dialType == "CompiledLibDial" ){
+    dialBase = std::make_unique<CompiledLibDial>();
+    auto* compiledLibDialPtr{(CompiledLibDial*) dialBase.get()};
+
+    auto formulaConfig{GenericToolbox::Json::fetchValue<JsonType>(config_, "dialConfig")};
+
+    bool success = compiledLibDialPtr->loadLibrary( GenericToolbox::Json::fetchValue<std::string>(formulaConfig, "libraryFile") );
+    if( not success ){
+      LogThrow("Could not load CompiledLibDial. " << GenericToolbox::Json::fetchValue(formulaConfig, "messageOnError", std::string("")) );
+    }
+  }
+  else{ LogThrow("Unknown dial type: " << dialType); }
+
+  return dialBase.release();
+}
+
 
 //  A Lesser GNU Public License
 

@@ -31,6 +31,7 @@ void EventVarTransformLib::reload(){
 
 void EventVarTransformLib::loadLibrary(){
   LogInfo << "Loading shared lib: " << _libraryFile_ << std::endl;
+  LogThrowIf(not GenericToolbox::isFile(_libraryFile_), "Could not find lib file: " << _libraryFile_ << std::endl << _messageOnError_);
   _loadedLibrary_ = dlopen(_libraryFile_.c_str(), RTLD_LAZY );
   LogThrowIf(_loadedLibrary_ == nullptr, "Cannot open library: " << dlerror() << std::endl << _messageOnError_);
   _evalVariable_ = (dlsym(_loadedLibrary_, "evalVariable"));
@@ -45,7 +46,6 @@ void EventVarTransformLib::initInputFormulas(){
   _inputBuffer_.resize(_inputFormulaList_.size(), std::nan("unset"));
 }
 double EventVarTransformLib::evalTransformation(const PhysicsEvent& event_, std::vector<double>& inputBuffer_) const{
-  LogThrowIf(_evalVariable_ == nullptr, "Library not loaded properly.");
   // Eval the requested variables
   size_t nFormula{_inputFormulaList_.size()};
   for( size_t iFormula = 0 ; iFormula < nFormula ; iFormula++ ){

@@ -63,7 +63,11 @@ void Propagator::readConfigImpl(){
   _devSingleThreadHistFill_ = GenericToolbox::Json::fetchValue(_config_, "devSingleThreadHistFill", _devSingleThreadHistFill_);
 
   // EventDialCache parameters
-  EventDialCache::globalEventReweightCap = GenericToolbox::Json::fetchValue(_config_, "globalEventReweightCap", EventDialCache::globalEventReweightCap);
+  if( GenericToolbox::Json::doKeyExist(_config_, "globalEventReweightCap") ){
+    _eventDialCache_.getGlobalEventReweightCap().isEnabled = true;
+    _eventDialCache_.getGlobalEventReweightCap().maxReweight = GenericToolbox::Json::fetchValue<double>(_config_, "globalEventReweightCap");
+  }
+
 
   LogInfo << "Reading samples configuration..." << std::endl;
   auto fitSampleSetConfig = GenericToolbox::Json::fetchValue(_config_, "fitSampleSetConfig", JsonType());
@@ -94,13 +98,10 @@ void Propagator::readConfigImpl(){
     // DEV / DialCollections
     if( not _parManager_.getParameterSetsList()[iParSet].getDialSetDefinitions().empty() ){
       for( auto& dialSetDef : _parManager_.getParameterSetsList()[iParSet].getDialSetDefinitions().get<std::vector<JsonType>>() ){
-        if( GenericToolbox::Json::doKeyExist(dialSetDef, "parametersBinningPath") ){
-          _dialCollections_.emplace_back(&_parManager_.getParameterSetsList());
-          _dialCollections_.back().setIndex(int(_dialCollections_.size())-1);
-          _dialCollections_.back().setSupervisedParameterSetIndex( int(iParSet) );
-          _dialCollections_.back().readConfig( dialSetDef );
-        }
-        else{ LogThrow("no parametersBinningPath option?"); }
+        _dialCollections_.emplace_back(&_parManager_.getParameterSetsList());
+        _dialCollections_.back().setIndex(int(_dialCollections_.size())-1);
+        _dialCollections_.back().setSupervisedParameterSetIndex( int(iParSet) );
+        _dialCollections_.back().readConfig( dialSetDef );
       }
     }
     else{
@@ -585,7 +586,7 @@ void Propagator::reweightMcEvents(int iThread_) {
   std::for_each(
       _eventDialCache_.getCache().begin() + bounds.first,
       _eventDialCache_.getCache().begin() + bounds.second,
-      &EventDialCache::reweightEntry
+      [this](EventDialCache::CacheElem_t& cache_){ _eventDialCache_.reweightEntry(cache_); }
   );
 
 }

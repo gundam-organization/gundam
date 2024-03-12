@@ -19,39 +19,65 @@
 #include <vector>
 #include <utility>
 
-class EventDialCache {
+
+class EventDialCache{
 
 public:
-  static double globalEventReweightCap;
 
-public:
-  EventDialCache() = default;
+  /// GlobalEventReweightCap is a struct keeping the properties of the reweight capping
+  struct GlobalEventReweightCap{
+    bool isEnabled{false};
+    double maxReweight{std::nan("unset")};
 
-  struct DialsElem_t {
-    DialsElem_t(DialInterface* interface_, double response_): interface(interface_), response(response_) {}
+    /// apply the cap if enabled
+    void process(double& reweightValue_){
+      if( not isEnabled ){ return; }
+      if( reweightValue_ > maxReweight ){ reweightValue_ = maxReweight; }
+    }
+  };
+
+  /// DialResponseCache is keeping a reference of a DialInterface and a cached double for the response
+  struct DialResponseCache {
+    DialResponseCache( DialInterface& interface_, double response_): dialInterface(interface_), response(response_) {}
     // The dial interface to be used with the PhysicsEvent.
-    DialInterface* interface;
+    DialInterface& dialInterface;
     // The cached result calculated by the dial.
     double response;
+
+    void update(){
+      // evaluate the dial if an update has been requested
+      if( dialInterface.getInputBufferRef()->isDialUpdateRequested() ){
+        response = dialInterface.evalResponse();
+      }
+    }
+    double getResponse(){
+      this->update();
+      return response;
+    }
   };
 
   /// The cache element associating a PhysicsEvent to the appropriate
   /// DialInterface.
   struct CacheElem_t {
     PhysicsEvent* event;
-    std::vector<DialsElem_t> dials;
+    std::vector<DialResponseCache> dialResponseCacheList{};
 
-    std::string getSummary() const {
+    [[nodiscard]] std::string getSummary() const {
       std::stringstream ss;
       ss << event->getSummary() << std::endl;
       ss << "dialCache = {";
-      for( auto& dialInterface : dials ) {
-        ss << std::endl << "  - " << dialInterface.interface->getSummary();
+      for( auto& dialResponseCache : dialResponseCacheList ) {
+        ss << std::endl << "  - " << dialResponseCache.dialInterface.getSummary();
       }
       ss << std::endl << "}";
       return ss.str();
     }
   };
+
+public:
+  EventDialCache() = default;
+
+
 
   /// A pair of indices into the vector of dial collections, and then the
   /// index of the dial interfaces in the dial collection vector of dial
@@ -100,6 +126,8 @@ public:
   std::vector<CacheElem_t> &getCache(){ return _cache_; }
   [[nodiscard]] const std::vector<CacheElem_t> &getCache() const{ return _cache_; }
 
+  GlobalEventReweightCap& getGlobalEventReweightCap(){ return _globalEventReweightCap_; }
+
   /// Allocate entries for events in the indexed cache.  The first parameter
   /// arethe number of events to allocate space for, and the second number is
   /// the total number of dials that might exist for each event.
@@ -120,15 +148,12 @@ public:
   /// Resize the cache vectors to remove entries with null events
   void shrinkIndexedCache();
 
-  static void reweightEntry(CacheElem_t& entry_);
+  void reweightEntry(CacheElem_t& entry_);
 
 
 private:
   // The next available entry in the indexed cache.
   size_t _fillIndex_{0};
-
-  // Keep the copy-constructor of the EventDialCache.
-  GenericToolbox::NoCopyWrapper<std::mutex> _mutex_;
 
   // A cache mapping events to dials.  This is built while the dials are
   // allocated, and might contain "empty" or invalid entries since some events
@@ -139,7 +164,10 @@ private:
 
   /// A cache of all of the valid PhysicsEvent* and DialInterface*
   /// associations for efficient use when reweighting the MC events.
-  std::vector<CacheElem_t> _cache_;
+  std::vector<CacheElem_t> _cache_{};
+
+  /// Global cap
+  GlobalEventReweightCap _globalEventReweightCap_{};
 };
 
 
