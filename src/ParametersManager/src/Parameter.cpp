@@ -104,7 +104,6 @@ void Parameter::setDialSetConfig(const JsonType &jsonConfig_) {
 }
 void Parameter::setParameterDefinitionConfig(const JsonType &config_){
   _parameterConfig_ = config_;
-  ConfigUtils::forwardConfig(_parameterConfig_);
 }
 
 bool Parameter::isValueWithinBounds() const{

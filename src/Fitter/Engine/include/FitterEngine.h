@@ -54,15 +54,15 @@ public:
   void setThrowMcBeforeFit(bool throwMcBeforeFit_){ _throwMcBeforeFit_ = throwMcBeforeFit_; }
   void setThrowGain(double throwGain_){ _throwGain_ = throwGain_; }
 
-  // Getters (const)
+  // const-getters
   [[nodiscard]] const JsonType &getPreFitParState() const{ return _preFitParState_; }
   [[nodiscard]] const JsonType &getPostFitParState() const{ return _postFitParState_; }
   [[nodiscard]] MinimizerType getMinimizerType() const{ return _minimizerType_; }
   [[nodiscard]] const MinimizerBase& getMinimizer() const{ return *_minimizer_; }
-  [[nodiscard]] const LikelihoodInterface& getLikelihood() const{ return _likelihoodInterface_; }
+  [[nodiscard]] const LikelihoodInterface& getLikelihoodInterface() const{ return _likelihoodInterface_; }
   [[nodiscard]] const ParameterScanner& getParameterScanner() const{ return _parameterScanner_; }
 
-  // Getters (non-const)
+  // mutable-getters
   MinimizerBase& getMinimizer(){ return *_minimizer_; }
   LikelihoodInterface& getLikelihoodInterface(){ return _likelihoodInterface_; }
   ParameterScanner& getParameterScanner(){ return _parameterScanner_; }
@@ -75,8 +75,8 @@ public:
   void checkNumericalAccuracy();
 
   // Deprecated
-  [[deprecated("use getLikelihoodInterface().getPropagator()")]] [[nodiscard]] const Propagator& getPropagator() const{ return getLikelihood().getPropagator(); }
-  [[deprecated("use getLikelihoodInterface().getPropagator()")]] Propagator& getPropagator(){ return getLikelihoodInterface().getPropagator(); }
+  [[deprecated("use getLikelihoodInterface().getDataSetManager().getPropagator()")]] [[nodiscard]] const Propagator& getPropagator() const{ return getLikelihoodInterface().getDataSetManager().getPropagator(); }
+  [[deprecated("use getLikelihoodInterface().getDataSetManager().getPropagator()")]] Propagator& getPropagator(){ return getLikelihoodInterface().getDataSetManager().getPropagator(); }
   [[deprecated("Use runPcaCheck()")]] void fixGhostFitParameters(){ runPcaCheck(); }
 
 

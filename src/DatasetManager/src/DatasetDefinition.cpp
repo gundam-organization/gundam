@@ -2,7 +2,7 @@
 // Created by Nadrino on 22/07/2021.
 //
 
-#include "DatasetLoader.h"
+#include "DatasetDefinition.h"
 
 #include "GenericToolbox.Utils.h"
 #include "GenericToolbox.Json.h"
@@ -17,7 +17,7 @@ LoggerInit([]{
 });
 
 
-void DatasetLoader::readConfigImpl() {
+void DatasetDefinition::readConfigImpl() {
   LogThrowIf(_config_.empty(), "Config not set.");
   _name_ = GenericToolbox::Json::fetchValue<std::string>(_config_, "name");
   LogInfo << "Reading config for dataset: \"" << _name_ << "\"" << std::endl;
@@ -53,7 +53,7 @@ void DatasetLoader::readConfigImpl() {
   _sortLoadedEvents_ = GenericToolbox::Json::fetchValue(_config_, "sortLoadedEvents", _sortLoadedEvents_);
 
 }
-void DatasetLoader::initializeImpl() {
+void DatasetDefinition::initializeImpl() {
   if( not _isEnabled_ ) return;
   LogInfo << "Initializing dataset: \"" << _name_ << "\"" << std::endl;
 
@@ -69,7 +69,7 @@ void DatasetLoader::initializeImpl() {
   }
 }
 
-void DatasetLoader::updateDispenserOwnership(){
+void DatasetDefinition::updateDispenserOwnership(){
   _mcDispenser_.setOwner(this);
   for( auto& dispenser : _dataDispenserDict_ ){
     dispenser.second.setOwner(this);

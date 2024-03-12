@@ -8,6 +8,7 @@
 #include "ParameterSet.h"
 #include "JointProbability.h"
 #include "Propagator.h"
+#include "DataSetManager.h"
 
 #include "GenericToolbox.Utils.h"
 #include "GenericToolbox.Time.h"
@@ -51,12 +52,12 @@ public:
   [[nodiscard]] double getLastLikelihood() const { return _buffer_.totalLikelihood; }
   [[nodiscard]] double getLastStatLikelihood() const { return _buffer_.statLikelihood; }
   [[nodiscard]] double getLastPenaltyLikelihood() const { return _buffer_.penaltyLikelihood; }
-  [[nodiscard]] const Propagator& getPropagator() const { return _propagator_; }
+  [[nodiscard]] const DataSetManager& getDataSetManager() const { return _dataSetManager_; }
   const JointProbability::JointProbabilityBase* getJointProbabilityPtr() const { return _jointProbabilityPtr_.get(); }
 
   // mutable getters
   Buffer& getBuffer() { return _buffer_; }
-  Propagator& getPropagator(){ return _propagator_; }
+  DataSetManager& getDataSetManager(){ return _dataSetManager_; }
 
   // mutable core
   void propagateAndEvalLikelihood();
@@ -69,12 +70,19 @@ public:
   [[nodiscard]] double evalPenaltyLikelihood(const ParameterSet& parSet_) const;
   [[nodiscard]] std::string getSummary() const;
 
+  // dev deprecated
+  [[deprecated("use getDataSetManager().getPropagator()")]] [[nodiscard]] const Propagator& getPropagator() const { return _dataSetManager_.getPropagator(); }
+  [[deprecated("use getDataSetManager().getPropagator()")]] Propagator& getPropagator(){ return _dataSetManager_.getPropagator(); }
+
 private:
   // internals
   int _nbParameters_{0};
   int _nbSampleBins_{0};
 
-  Propagator _propagator_{};
+  /// Definition of data sets to use for filling the Propagator
+  DataSetManager _dataSetManager_{};
+
+  /// Statistical likelihood
   std::shared_ptr<JointProbability::JointProbabilityBase> _jointProbabilityPtr_{nullptr};
 
   mutable Buffer _buffer_{};

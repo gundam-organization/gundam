@@ -2,8 +2,8 @@
 // Created by Adrien Blanchet on 28/02/2023.
 //
 
-#ifndef GUNDAM_CONFIGUTILS_H
-#define GUNDAM_CONFIGUTILS_H
+#ifndef GUNDAM_CONFIG_UTILS_H
+#define GUNDAM_CONFIG_UTILS_H
 
 
 #include "nlohmann/json.hpp"
@@ -59,4 +59,4 @@ namespace ConfigUtils {
 
 }
 
-#endif //GUNDAM_CONFIGUTILS_H
+#endif //GUNDAM_CONFIG_UTILS_H

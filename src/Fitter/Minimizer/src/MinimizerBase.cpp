@@ -299,8 +299,8 @@ void MinimizerBase::printParameters(){
 }
 
 
-Propagator& MinimizerBase::getPropagator(){ return _owner_->getLikelihoodInterface().getPropagator(); }
-[[nodiscard]] const Propagator& MinimizerBase::getPropagator() const { return _owner_->getLikelihoodInterface().getPropagator(); }
+Propagator& MinimizerBase::getPropagator(){ return _owner_->getLikelihoodInterface().getDataSetManager().getPropagator(); }
+[[nodiscard]] const Propagator& MinimizerBase::getPropagator() const { return _owner_->getLikelihoodInterface().getDataSetManager().getPropagator(); }
 ParameterScanner& MinimizerBase::getParameterScanner(){ return _owner_->getParameterScanner(); }
 [[nodiscard]] const ParameterScanner& MinimizerBase::getParameterScanner() const { return _owner_->getParameterScanner(); }
 LikelihoodInterface& MinimizerBase::getLikelihoodInterface(){ return _owner_->getLikelihoodInterface(); }

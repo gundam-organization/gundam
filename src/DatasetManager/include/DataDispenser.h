@@ -2,17 +2,14 @@
 // Created by Adrien BLANCHET on 14/05/2022.
 //
 
-#ifndef GUNDAM_DATADISPENSER_H
-#define GUNDAM_DATADISPENSER_H
+#ifndef GUNDAM_DATA_DISPENSER_H
+#define GUNDAM_DATA_DISPENSER_H
 
-#include "SampleSet.h"
-#include "PlotGenerator.h"
-#include "JsonBaseClass.h"
-#include "DialCollection.h"
-#include "EventDialCache.h"
-#include "ParameterSet.h"
 #include "EventVarTransformLib.h"
 #include "DataDispenserUtils.h"
+
+#include "Propagator.h"
+#include "JsonBaseClass.h"
 
 #include "TChain.h"
 #include "nlohmann/json.hpp"
@@ -22,7 +19,7 @@
 #include <vector>
 
 
-class DatasetLoader; // owner
+class DatasetDefinition; // owner
 
 
 class DataDispenser : public JsonBaseClass {
@@ -33,10 +30,10 @@ protected:
 
 public:
   DataDispenser() = delete; // owner should be set
-  explicit DataDispenser(DatasetLoader* owner_): _owner_(owner_) {}
+  explicit DataDispenser( DatasetDefinition* owner_): _owner_(owner_) {}
 
   // setters
-  void setOwner(DatasetLoader* owner_){ _owner_ = owner_; }
+  void setOwner( DatasetDefinition* owner_){ _owner_ = owner_; }
 
   // const getters
   [[nodiscard]] const DataDispenserParameters &getParameters() const{ return _parameters_; }
@@ -44,15 +41,11 @@ public:
   // non-const getters
   DataDispenserParameters &getParameters(){ return _parameters_; }
 
-  void setSampleSetPtrToLoad(SampleSet *sampleSetPtrToLoad);
-  void setParSetPtrToLoad(std::vector<ParameterSet> *parSetListPtrToLoad_);
-  void setDialCollectionListPtr(std::vector<DialCollection> *dialCollectionListPtr);
-  void setPlotGenPtr(PlotGenerator *plotGenPtr);
-  void setEventDialCache(EventDialCache* eventDialCache_);
-
+  // misc
   std::string getTitle();
 
-  void load();
+  // core
+  void load(Propagator& propagator_);
 
 protected:
   void buildSampleToFillList();
@@ -76,15 +69,10 @@ private:
   DataDispenserParameters _parameters_;
 
   // internals
-  DatasetLoader* _owner_{nullptr};
-  SampleSet* _sampleSetPtrToLoad_{nullptr};
-  PlotGenerator* _plotGenPtr_{nullptr}; // used to know which vars have to be kept in memory
-  EventDialCache* _eventDialCacheRef_{nullptr};
+  DatasetDefinition* _owner_{nullptr};
   DataDispenserCache _cache_;
-  std::vector<ParameterSet>* _parSetListPtrToLoad_{nullptr};
-  std::vector<DialCollection>* _dialCollectionListPtr_{nullptr};
 
 };
 
 
-#endif //GUNDAM_DATADISPENSER_H
+#endif //GUNDAM_DATA_DISPENSER_H

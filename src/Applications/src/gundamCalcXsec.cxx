@@ -2,7 +2,7 @@
 #include "GundamGlobals.h"
 #include "GundamApp.h"
 #include "GundamUtils.h"
-#include "Propagator.h"
+#include "FitterEngine.h"
 #include "ConfigUtils.h"
 
 #include "Logger.h"
@@ -128,23 +128,21 @@ int main(int argc, char** argv){
 
 
   LogInfo << "Fetching propagator config into fitter config..." << std::endl;
-  auto configPropagator = GenericToolbox::Json::fetchValuePath<JsonType>( cHandler.getConfig(), "fitterEngineConfig/propagatorConfig" );
 
-  // Create a propagator object
-  Propagator propagator;
+  // it will handle all the deprecated config options and names properly
+  FitterEngine fitter{nullptr};
+  fitter.readConfig( GenericToolbox::Json::fetchValuePath<JsonType>( cHandler.getConfig(), "fitterEngineConfig" ) );
 
-  // Read the whole fitter config with the override parameters
-  LogWarning << std::endl << GenericToolbox::addUpDownBars("Reading propagator config...") << std::endl;
-  propagator.readConfig( configPropagator );
+  DataSetManager& dataSetManager{fitter.getLikelihoodInterface().getDataSetManager()};
 
   // We are only interested in our MC. Data has already been used to get the post-fit error/values
-  propagator.setLoadAsimovData( true );
+  dataSetManager.getPropagator().setLoadAsimovData( true );
 
   // Disabling eigen decomposed parameters
-  propagator.setEnableEigenToOrigInPropagate( false );
+  dataSetManager.getPropagator().setEnableEigenToOrigInPropagate( false );
 
   // Sample binning using parameterSetName
-  for( auto& sample : propagator.getSampleSet().getSampleList() ){
+  for( auto& sample : dataSetManager.getPropagator().getSampleSet().getSampleList() ){
 
     if( clParser.isOptionTriggered("usePreFit") ){
       sample.setName( sample.getName() + " (pre-fit)" );
@@ -165,18 +163,20 @@ int main(int argc, char** argv){
 
     // Looking for parSet
     auto foundDialCollection = std::find_if(
-        propagator.getDialCollections().begin(), propagator.getDialCollections().end(),
+        dataSetManager.getPropagator().getDialCollectionList().begin(),
+        dataSetManager.getPropagator().getDialCollectionList().end(),
         [&](const DialCollection& dialCollection_){
           auto* parSetPtr{dialCollection_.getSupervisedParameterSet()};
           if( parSetPtr == nullptr ){ return false; }
           return ( parSetPtr->getName() == associatedParSet );
         });
     LogThrowIf(
-        foundDialCollection == propagator.getDialCollections().end(),
+        foundDialCollection == dataSetManager.getPropagator().getDialCollectionList().end(),
         "Could not find " << associatedParSet << " among fit dial collections: "
-                          << GenericToolbox::toString(propagator.getDialCollections(), [](const DialCollection& dialCollection_){
-                                                                return dialCollection_.getTitle();
-                                                              }
+                          << GenericToolbox::toString(dataSetManager.getPropagator().getDialCollectionList(),
+                                                      [](const DialCollection& dialCollection_){
+                                                        return dialCollection_.getTitle();
+                                                      }
                           ));
 
     LogThrowIf(foundDialCollection->getDialBinSet().getBinList().empty(), "Could not find binning");
@@ -185,7 +185,10 @@ int main(int argc, char** argv){
   }
 
   // Load everything
-  propagator.initialize();
+  dataSetManager.initialize();
+
+  Propagator& propagator{dataSetManager.getPropagator()};
+
 
   if( clParser.isOptionTriggered("dryRun") ){
     std::cout << cHandler.toString() << std::endl;
@@ -376,7 +379,7 @@ int main(int argc, char** argv){
         parSetNormList.emplace_back();
         parSetNormList.back().readConfig( parSetNormConfig );
 
-        for( auto& dialCollection : propagator.getDialCollections() ){
+        for( auto& dialCollection : propagator.getDialCollectionList() ){
           if( dialCollection.getSupervisedParameterSet() == &parSet ){
             parSetNormList.back().dialCollectionPtr = &dialCollection;
             break;
@@ -751,6 +754,9 @@ int main(int argc, char** argv){
 
 
   LogInfo << "Writing event samples in TTrees..." << std::endl;
-  propagator.getTreeWriter().writeSamples( GenericToolbox::mkdirTFile(calcXsecDir, "events") );
+  dataSetManager.getTreeWriter().writeSamples(
+      GenericToolbox::mkdirTFile(calcXsecDir, "events"),
+      dataSetManager.getPropagator()
+  );
 
 }

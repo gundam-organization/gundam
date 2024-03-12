@@ -79,6 +79,10 @@ struct CanvasHolder{
 
 class PlotGenerator : public JsonBaseClass {
 
+protected:
+  void readConfigImpl() override;
+  void initializeImpl() override;
+
 public:
   // Setters
   void setSampleSetPtr(const SampleSet *sampleSetPtr_){ _sampleSetPtr_ = sampleSetPtr_; }
@@ -110,9 +114,6 @@ public:
 
 
 protected:
-  void readConfigImpl() override;
-  void initializeImpl() override;
-
   // Internals
   static void buildEventBinCache(const std::vector<HistHolder *> &histPtrToFillList, const std::vector<PhysicsEvent> *eventListPtr, bool isData_);
 

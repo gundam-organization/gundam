@@ -2,14 +2,15 @@
 // Created by Nadrino on 22/07/2021.
 //
 
-#ifndef GUNDAM_DATASETLOADER_H
-#define GUNDAM_DATASETLOADER_H
+#ifndef GUNDAM_DATASET_DEFINITION_H
+#define GUNDAM_DATASET_DEFINITION_H
 
 #include "DataDispenser.h"
 #include "ParameterSet.h"
 #include <SampleSet.h>
 #include "PlotGenerator.h"
 #include "JsonBaseClass.h"
+#include "Propagator.h"
 
 #include <TChain.h>
 #include "nlohmann/json.hpp"
@@ -18,14 +19,14 @@
 #include <string>
 
 
-class DatasetLoader : public JsonBaseClass {
+class DatasetDefinition : public JsonBaseClass {
 
 protected:
   void readConfigImpl() override;
   void initializeImpl() override;
 
 public:
-  explicit DatasetLoader(const JsonType& config_, int datasetIndex_): _dataSetIndex_(datasetIndex_) { this->readConfig(config_); }
+  explicit DatasetDefinition( const JsonType& config_, int datasetIndex_): _dataSetIndex_(datasetIndex_) { this->readConfig(config_); }
 
   void setDataSetIndex(int dataSetIndex){ _dataSetIndex_ = dataSetIndex; }
   void setSelectedDataEntry(const std::string &selectedDataEntry){ _selectedDataEntry_ = selectedDataEntry; }
@@ -67,4 +68,4 @@ private:
 };
 
 
-#endif //GUNDAM_DATASETLOADER_H
+#endif //GUNDAM_DATASET_DEFINITION_H

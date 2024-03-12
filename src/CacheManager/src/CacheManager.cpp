@@ -129,8 +129,8 @@ bool Cache::Manager::HasCUDA() {
     return Cache::Parameters::UsingCUDA();
 }
 
-bool Cache::Manager::Build(SampleSet& sampleList,
-                           EventDialCache& eventDials) {
+bool Cache::Manager::Build( SampleSet& sampleList,
+                            EventDialCache& eventDials) {
     LogInfo << "Build the internal caches " << std::endl;
 
     /// Zero everything before counting the amount of space needed for the
@@ -154,7 +154,7 @@ bool Cache::Manager::Build(SampleSet& sampleList,
     std::set<const Parameter*> usedParameters;
 
     std::map<std::string, int> useCount;
-    for (EventDialCache::CacheElem_t& elem : eventDials.getCache()) {
+    for (EventDialCache::CacheEntry& elem : eventDials.getCache()) {
         if (elem.event->getSampleBinIndex() < 0) {
             throw std::runtime_error("Caching event that isn't used");
         }
@@ -326,8 +326,8 @@ void Cache::Manager::UpdateRequired() {
 }
 
 
-bool Cache::Manager::Update(SampleSet& sampleList,
-                            EventDialCache& eventDials) {
+bool Cache::Manager::Update( SampleSet& sampleList,
+                             EventDialCache& eventDials) {
     if (not fUpdateRequired) return true;
 
     // This is the updated that is required!
@@ -351,7 +351,7 @@ bool Cache::Manager::Update(SampleSet& sampleList,
     int usedResults = 0;
 
     // Add the dials in the EventDialCache to the internal cache.
-    for (EventDialCache::CacheElem_t& elem : eventDials.getCache()) {
+    for (EventDialCache::CacheEntry& elem : eventDials.getCache()) {
         // Skip events that are not in a bin.
         if (elem.event->getSampleBinIndex() < 0) continue;
         PhysicsEvent& event = *elem.event;
