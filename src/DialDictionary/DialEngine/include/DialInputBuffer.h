@@ -49,7 +49,7 @@ public:
   /// Set the IsMasked flag.  This flag is ignored internally, but
   /// can be set internally when a parameter set is masked.  The value
   /// of the flag is checked using isMasked()
-  void setIsMasked(bool isMasked_);
+  void setIsMasked(bool isMasked_){ _isMasked_ = isMasked_; }
 
   /// Tell the input buffer about the global vector of fit parameter sets.
   /// This is required, so it must be set before the DialInputBuffer can
@@ -74,7 +74,7 @@ public:
   std::vector<ParameterReference> &getInputParameterIndicesList(){ return _inputParameterReferenceList_; }
 
   // core
-  void requestUpdate(){ _isDialUpdateRequested_ = true; }
+  void invalidateBuffers();
 
   /// Make sure everything is ready for use
   void initialise();

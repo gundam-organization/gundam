@@ -64,6 +64,7 @@ public:
   void propagateParameters();
   void reweightMcEvents();
   void refillMcHistograms();
+  void clearContent();
 
   // Misc
   [[nodiscard]] std::string getSampleBreakdownTableStr() const;

@@ -58,6 +58,9 @@ void DataSetManager::loadData(){
   bool cacheManagerState = GundamGlobals::getEnableCacheManager();
   GundamGlobals::setEnableCacheManager(false);
 
+  // make sure everything is ready for loading
+  _propagator_.clearContent();
+
   // First start with the data:
   bool usedMcContainer{false};
   bool allAsimov{true};
@@ -161,17 +164,7 @@ void DataSetManager::loadData(){
   if( not allAsimov ){
     // reload everything
     // Filling the mc containers
-
-    // clearing events in MC containers
-    _propagator_.getSampleSet().clearMcContainers();
-
-    // also wiping event-by-event dials...
-    LogInfo << "Wiping event-by-event dials..." << std::endl;
-
-    for( auto& dialCollection: _propagator_.getDialCollectionList() ) {
-      if( not dialCollection.getGlobalDialLeafName().empty() ) { dialCollection.clear(); }
-    }
-    _propagator_.getEventDialCache() = EventDialCache();
+    _propagator_.clearContent();
 
     for( auto& dataSet : _dataSetList_ ){
       LogContinueIf(not dataSet.isEnabled(), "Dataset \"" << dataSet.getName() << "\" is disabled. Skipping");

@@ -14,9 +14,9 @@ LoggerInit([]{
   Logger::setUserHeaderStr("[DialInputBuffer]");
 });
 
-void DialInputBuffer::setIsMasked(bool isMasked_){
-  _isMasked_ = isMasked_;
-  _isDialUpdateRequested_ = true;
+void DialInputBuffer::invalidateBuffers(){
+  // invalidate buffer
+  for( auto& buf : _inputBuffer_ ){ buf = std::nan("unset"); }
 }
 
 void DialInputBuffer::initialise(){
@@ -48,32 +48,20 @@ void DialInputBuffer::initialise(){
 }
 
 void DialInputBuffer::update(){
-  // will change if at least one parameter is updated
-  _isDialUpdateRequested_ = false;
+  // by default consider we have to update
+  _isDialUpdateRequested_ = true;
 
   // check the mask
-  bool isMasked = std::any_of(
+  this->setIsMasked( std::any_of(
       _inputParameterReferenceList_.begin(), _inputParameterReferenceList_.end(),
       [this](ParameterReference& parRef_){
         return parRef_.getParameterSet(_parSetListPtr_).isMaskedForPropagation();
-  });
-  if( isMasked ){
-    if( not this->isMasked() ){
-      // if it was not masked before, it
-      // will trigger update as well
-      this->setIsMasked(true);
-    }
-
-    // no need to go further
-    return;
-  }
-  else{
-    // was it masked before? if yes, then update the dial cache
-    if( this->isMasked() ){ this->setIsMasked( false ); }
-  }
+  } ) );
+  if( _isMasked_ ){ this->invalidateBuffers(); return; }
 
   // look for the parameter values
   double tempBuffer;
+  _isDialUpdateRequested_ = false; // if ANY is different, request the update
   for( auto& inputRef : _inputParameterReferenceList_ ){
     // grab the value of the parameter
     tempBuffer = inputRef.getParameter(_parSetListPtr_).getParameterValue();
