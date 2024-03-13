@@ -56,6 +56,7 @@ public:
   DataBinSet &getDialBinSet(){ return _dialBinSet_; }
   std::vector<DialBaseObject> &getDialBaseList(){ return _dialBaseList_; }
   std::vector<DialInterface> &getDialInterfaceList(){ return _dialInterfaceList_; }
+  std::vector<DialInputBuffer> &getDialInputBufferList(){ return _dialInputBufferList_; }
 
   // non-trivial getters
   [[nodiscard]] bool isDatasetValid(const std::string& datasetName_) const;

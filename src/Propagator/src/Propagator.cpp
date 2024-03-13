@@ -136,6 +136,17 @@ void Propagator::initializeImpl(){
 }
 
 // Core
+void Propagator::buildDialCache(){
+  _eventDialCache_.shrinkIndexedCache();
+  _eventDialCache_.buildReferenceCache(_sampleSet_, _dialCollectionList_);
+
+  // be extra sure the dial input will request an update
+  for( auto& dialCollection : _dialCollectionList_ ){
+    for( auto& dialInput : dialCollection.getDialInputBufferList() ){
+      dialInput.invalidateBuffers();
+    }
+  }
+}
 void Propagator::propagateParameters(){
 
   if( _enableEigenToOrigInPropagate_ ){
@@ -145,18 +156,16 @@ void Propagator::propagateParameters(){
     }
   }
 
-  this->resetReweight();
   this->reweightMcEvents();
   this->refillMcHistograms();
 
 }
-void Propagator::resetReweight(){
-  std::for_each(_dialCollectionList_.begin(), _dialCollectionList_.end(), [&]( DialCollection& dc_){
-    dc_.updateInputBuffers();
-  });
-}
 void Propagator::reweightMcEvents() {
   reweightTimer.start();
+
+  std::for_each(_dialCollectionList_.begin(), _dialCollectionList_.end(), [&]( DialCollection& dc_ ){
+    dc_.updateInputBuffers();
+  });
 
   bool usedGPU{false};
 #ifdef GUNDAM_USING_CACHE_MANAGER
@@ -166,7 +175,9 @@ void Propagator::reweightMcEvents() {
   }
 #endif
   if( not usedGPU ){
-    if( not _devSingleThreadReweight_ ){ GundamGlobals::getParallelWorker().runJob("Propagator::reweightMcEvents"); }
+    if( not _devSingleThreadReweight_ ){
+      GundamGlobals::getParallelWorker().runJob("Propagator::reweightMcEvents");
+    }
     else{ this->reweightMcEvents(-1); }
   }
 
@@ -179,6 +190,24 @@ void Propagator::refillMcHistograms(){
   else{ refillMcHistogramsFct(-1); }
 
   refillHistogramTimer.stop();
+}
+void Propagator::clearContent(){
+  LogInfo << "Clearing Propagator content..." << std::endl;
+
+  // clearing events in MC containers
+  _sampleSet_.clearMcContainers();
+
+  // also wiping event-by-event dials...
+  for( auto& dialCollection: _dialCollectionList_ ) {
+    if( not dialCollection.getGlobalDialLeafName().empty() ) { dialCollection.clear(); }
+
+    // clear input buffer cache to trigger the cache eval
+    for( auto& dialInput : dialCollection.getDialInputBufferList() ){
+      dialInput.invalidateBuffers();
+    }
+  }
+  _eventDialCache_ = EventDialCache();
+
 }
 
 // Misc
@@ -228,15 +257,15 @@ void Propagator::printBreakdowns(){
       parSet.setMaskedForPropagation( true );
     }
 
-    resetReweight();
-    reweightMcEvents();
+    this->reweightMcEvents();
+
+    // no reweight
     for( size_t iSample = 0 ; iSample < _sampleSet_.getSampleList().size() ; iSample++ ){
       stageBreakdownList[iSample][iStage] = _sampleSet_.getSampleList()[iSample].getMcContainer().getSumWeights();
     }
 
     for( auto* parSetPtr : maskedParSetList ){
       parSetPtr->setMaskedForPropagation(false);
-      resetReweight();
       reweightMcEvents();
       iStage++;
       for( size_t iSample = 0 ; iSample < _sampleSet_.getSampleList().size() ; iSample++ ){

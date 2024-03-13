@@ -60,10 +60,11 @@ public:
   std::vector<DialCollection> &getDialCollectionList(){ return _dialCollectionList_; }
 
   // Core
+  void buildDialCache();
   void propagateParameters();
-  void resetReweight();
   void reweightMcEvents();
   void refillMcHistograms();
+  void clearContent();
 
   // Misc
   [[nodiscard]] std::string getSampleBreakdownTableStr() const;

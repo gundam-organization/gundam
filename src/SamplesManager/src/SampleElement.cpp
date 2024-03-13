@@ -190,16 +190,6 @@ void SampleElement::throwStatError(bool useGaussThrow_){
 double SampleElement::getSumWeights() const{
   double output = std::accumulate(_eventList_.begin(), _eventList_.end(), double(0.),
                                   [](double sum_, const Event& ev_){ return sum_ + ev_.getEventWeight(); });
-
-  if( std::isnan(output) ){
-    for( auto& event : _eventList_ ){
-      if( std::isnan(event.getEventWeight()) ){
-        LogError << event << std::endl;
-      }
-    }
-    LogThrow("NAN getSumWeights");
-  }
-
   return output;
 }
 size_t SampleElement::getNbBinnedEvents() const{

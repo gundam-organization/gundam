@@ -55,6 +55,12 @@ void DataSetManager::initializeImpl(){
 void DataSetManager::loadData(){
   LogInfo << "Loading data into the PropagatorEngine..." << std::endl;
 
+  bool cacheManagerState = GundamGlobals::getEnableCacheManager();
+  GundamGlobals::setEnableCacheManager(false);
+
+  // make sure everything is ready for loading
+  _propagator_.clearContent();
+
   // First start with the data:
   bool usedMcContainer{false};
   bool allAsimov{true};
@@ -80,8 +86,7 @@ void DataSetManager::loadData(){
     }
 
     LogInfo << "Build reference cache..." << std::endl;
-    _propagator_.getEventDialCache().shrinkIndexedCache();
-    _propagator_.getEventDialCache().buildReferenceCache(_propagator_.getSampleSet(), _propagator_.getDialCollectionList());
+    _propagator_.buildDialCache();
   }
 
   // Copy to data container
@@ -91,11 +96,7 @@ void DataSetManager::loadData(){
 
       if( _propagator_.isShowEventBreakdown() ){
         LogInfo << "Propagating prior parameters on the initially loaded events..." << std::endl;
-        bool cacheManagerState = GundamGlobals::getEnableCacheManager();
-        GundamGlobals::setEnableCacheManager(false);
-        _propagator_.resetReweight();
         _propagator_.reweightMcEvents();
-        GundamGlobals::setEnableCacheManager(cacheManagerState);
 
         LogInfo << "Sample breakdown prior to the throwing:" << std::endl;
         std::cout << _propagator_.getSampleBreakdownTableStr() << std::endl;
@@ -139,11 +140,7 @@ void DataSetManager::loadData(){
       if( parSet.isEnableEigenDecomp() ) { parSet.propagateEigenToOriginal(); }
     }
 
-    bool cacheManagerState = GundamGlobals::getEnableCacheManager();
-    GundamGlobals::setEnableCacheManager(false);
-    _propagator_.resetReweight();
     _propagator_.reweightMcEvents();
-    GundamGlobals::setEnableCacheManager(cacheManagerState);
 
     // Copies MC events in data container for both Asimov and FakeData event types
     LogWarning << "Copying loaded mc-like event to data container..." << std::endl;
@@ -167,17 +164,7 @@ void DataSetManager::loadData(){
   if( not allAsimov ){
     // reload everything
     // Filling the mc containers
-
-    // clearing events in MC containers
-    _propagator_.getSampleSet().clearMcContainers();
-
-    // also wiping event-by-event dials...
-    LogInfo << "Wiping event-by-event dials..." << std::endl;
-
-    for( auto& dialCollection: _propagator_.getDialCollectionList() ) {
-      if( not dialCollection.getGlobalDialLeafName().empty() ) { dialCollection.clear(); }
-    }
-    _propagator_.getEventDialCache() = EventDialCache();
+    _propagator_.clearContent();
 
     for( auto& dataSet : _dataSetList_ ){
       LogContinueIf(not dataSet.isEnabled(), "Dataset \"" << dataSet.getName() << "\" is disabled. Skipping");
@@ -191,8 +178,7 @@ void DataSetManager::loadData(){
     }
 
     LogInfo << "Build reference cache..." << std::endl;
-    _propagator_.getEventDialCache().shrinkIndexedCache();
-    _propagator_.getEventDialCache().buildReferenceCache(_propagator_.getSampleSet(), _propagator_.getDialCollectionList());
+    _propagator_.buildDialCache();
   }
 
 #ifdef GUNDAM_USING_CACHE_MANAGER
@@ -200,14 +186,10 @@ void DataSetManager::loadData(){
   // the MC has been copied for the Asimov fit, or the "data" use the MC
   // reweighting cache.  This must also be before the first use of
   // reweightMcEvents.
-  if(GundamGlobals::getEnableCacheManager()) {
+  if( cacheManagerState ) {
     Cache::Manager::Build(_propagator_.getSampleSet(), _propagator_.getEventDialCache());
   }
 #endif
-
-  LogInfo << "Propagating prior parameters on events..." << std::endl;
-  _propagator_.resetReweight();
-  _propagator_.reweightMcEvents();
 
   LogInfo << "Filling up sample bin caches..." << std::endl;
   GundamGlobals::getParallelWorker().runJob([this](int iThread){
@@ -253,6 +235,8 @@ void DataSetManager::loadData(){
 
   /// Now caching the event for the plot generator
   _propagator_.getPlotGenerator().defineHistogramHolders();
+
+  GundamGlobals::setEnableCacheManager(cacheManagerState);
 
   /// Propagator needs to be fast, let the workers wait for the signal
   GundamGlobals::getParallelWorker().setCpuTimeSaverIsEnabled(false);
