@@ -131,13 +131,6 @@ void EventDialCache::reweightEntry( EventDialCache::CacheEntry& entry_){
   // calculate the dial responses
   for( auto& dialResponseCache : entry_.dialResponseCacheList ){
     tempReweight *= dialResponseCache.getResponse();
-    if( std::isnan( tempReweight ) ){
-      LogError << entry_.getSummary() << std::endl;
-      LogError << GET_VAR_NAME_VALUE(dialResponseCache.getResponse()) << std::endl;
-      LogError << GET_VAR_NAME_VALUE(dialResponseCache.response) << std::endl;
-      LogError << GET_VAR_NAME_VALUE(dialResponseCache.dialInterface.evalResponse()) << std::endl;
-      LogThrow("BAD WEIGHT at " << dialResponseCache.dialInterface.getSummary(false));
-    }
   }
 
   // applying event weight cap if defined
