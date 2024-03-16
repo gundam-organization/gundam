@@ -246,8 +246,6 @@ void DataSetManager::loadData(){
   /// Now caching the event for the plot generator
   _propagator_.getPlotGenerator().defineHistogramHolders();
 
-  GundamGlobals::setEnableCacheManager(cacheManagerState);
-
   /// Propagator needs to be fast, let the workers wait for the signal
   GundamGlobals::getParallelWorker().setCpuTimeSaverIsEnabled(false);
 
