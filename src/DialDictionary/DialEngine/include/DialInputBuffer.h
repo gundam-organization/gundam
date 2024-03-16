@@ -25,6 +25,7 @@ public:
   struct ParameterReference{
     int parSetIndex{-1};
     int parIndex{-1};
+    int bufferIndex{-1};
 
     // it costs less memory to have only one vector with two potentially useless double (2*8bytes)
     // than an empty vector (24 bytes)
@@ -73,6 +74,7 @@ public:
   std::vector<ParameterReference> &getInputParameterIndicesList(){ return _inputParameterReferenceList_; }
 
   // core
+  void invalidateBuffers();
 
   /// Make sure everything is ready for use
   void initialise();
