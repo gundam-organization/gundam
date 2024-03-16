@@ -55,6 +55,9 @@ void DataSetManager::initializeImpl(){
 void DataSetManager::loadData(){
   LogInfo << "Loading data into the PropagatorEngine..." << std::endl;
 
+  bool cacheManagerState = GundamGlobals::getEnableCacheManager();
+  GundamGlobals::setEnableCacheManager(false);
+
   // First start with the data:
   bool usedMcContainer{false};
   bool allAsimov{true};
@@ -87,15 +90,10 @@ void DataSetManager::loadData(){
   // Copy to data container
   if( usedMcContainer ){
     if( _propagator_.isThrowAsimovToyParameters() ){
-      LogWarning << "Will throw toy parameters..." << std::endl;
 
       if( _propagator_.isShowEventBreakdown() ){
         LogInfo << "Propagating prior parameters on the initially loaded events..." << std::endl;
-        bool cacheManagerState = GundamGlobals::getEnableCacheManager();
-        GundamGlobals::setEnableCacheManager(false);
-        _propagator_.resetReweight();
         _propagator_.reweightMcEvents();
-        GundamGlobals::setEnableCacheManager(cacheManagerState);
 
         LogInfo << "Sample breakdown prior to the throwing:" << std::endl;
         std::cout << _propagator_.getSampleBreakdownTableStr() << std::endl;
@@ -116,16 +114,23 @@ void DataSetManager::loadData(){
         }
       }
 
-      _propagator_.getParametersManager().throwParameters();
+      if( _toyParameterInjector_.empty() ){
+        LogWarning << "Will throw toy parameters..." << std::endl;
+        _propagator_.getParametersManager().throwParameters();
 
-      // Handling possible masks
-      for( auto& parSet : _propagator_.getParametersManager().getParameterSetsList() ){
-        if( not parSet.isEnabled() ) continue;
+        // Handling possible masks
+        for( auto& parSet : _propagator_.getParametersManager().getParameterSetsList() ){
+          if( not parSet.isEnabled() ) continue;
 
-        if( parSet.isMaskForToyGeneration() ){
-          LogWarning << parSet.getName() << " will be masked for the toy generation." << std::endl;
-          parSet.setMaskedForPropagation( true );
+          if( parSet.isMaskForToyGeneration() ){
+            LogWarning << parSet.getName() << " will be masked for the toy generation." << std::endl;
+            parSet.setMaskedForPropagation( true );
+          }
         }
+      }
+      else{
+        LogWarning << "Injecting parameters..." << std::endl;
+        _propagator_.getParametersManager().injectParameterValues( _toyParameterInjector_ );
       }
 
     } // throw asimov?
@@ -139,11 +144,7 @@ void DataSetManager::loadData(){
       if( parSet.isEnableEigenDecomp() ) { parSet.propagateEigenToOriginal(); }
     }
 
-    bool cacheManagerState = GundamGlobals::getEnableCacheManager();
-    GundamGlobals::setEnableCacheManager(false);
-    _propagator_.resetReweight();
     _propagator_.reweightMcEvents();
-    GundamGlobals::setEnableCacheManager(cacheManagerState);
 
     // Copies MC events in data container for both Asimov and FakeData event types
     LogWarning << "Copying loaded mc-like event to data container..." << std::endl;
@@ -206,7 +207,6 @@ void DataSetManager::loadData(){
 #endif
 
   LogInfo << "Propagating prior parameters on events..." << std::endl;
-  _propagator_.resetReweight();
   _propagator_.reweightMcEvents();
 
   LogInfo << "Filling up sample bin caches..." << std::endl;
@@ -256,4 +256,7 @@ void DataSetManager::loadData(){
 
   /// Propagator needs to be fast, let the workers wait for the signal
   GundamGlobals::getParallelWorker().setCpuTimeSaverIsEnabled(false);
+
+  /// restoring state
+  GundamGlobals::setEnableCacheManager(cacheManagerState);
 }

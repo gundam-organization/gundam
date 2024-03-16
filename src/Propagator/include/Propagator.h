@@ -61,7 +61,6 @@ public:
 
   // Core
   void propagateParameters();
-  void resetReweight();
   void reweightMcEvents();
   void refillMcHistograms();
 

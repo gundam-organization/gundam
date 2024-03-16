@@ -145,18 +145,16 @@ void Propagator::propagateParameters(){
     }
   }
 
-  this->resetReweight();
   this->reweightMcEvents();
   this->refillMcHistograms();
 
 }
-void Propagator::resetReweight(){
+void Propagator::reweightMcEvents() {
+  reweightTimer.start();
+
   std::for_each(_dialCollectionList_.begin(), _dialCollectionList_.end(), [&]( DialCollection& dc_){
     dc_.updateInputBuffers();
   });
-}
-void Propagator::reweightMcEvents() {
-  reweightTimer.start();
 
   bool usedGPU{false};
 #ifdef GUNDAM_USING_CACHE_MANAGER
@@ -228,7 +226,6 @@ void Propagator::printBreakdowns(){
       parSet.setMaskedForPropagation( true );
     }
 
-    resetReweight();
     reweightMcEvents();
     for( size_t iSample = 0 ; iSample < _sampleSet_.getSampleList().size() ; iSample++ ){
       stageBreakdownList[iSample][iStage] = _sampleSet_.getSampleList()[iSample].getMcContainer().getSumWeights();
