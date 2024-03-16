@@ -160,16 +160,15 @@ void Propagator::propagateParameters(){
   this->refillMcHistograms();
 
 }
-void Propagator::reweightMcEvents() {
-  reweightTimer.start();
-
+void Propagator::resetEventWeights(){
   std::for_each(_dialCollectionList_.begin(), _dialCollectionList_.end(), [&]( DialCollection& dc_){
     dc_.updateInputBuffers();
   });
+}
+void Propagator::reweightMcEvents() {
+  reweightTimer.start();
 
-  std::for_each(_dialCollectionList_.begin(), _dialCollectionList_.end(), [&]( DialCollection& dc_ ){
-    dc_.updateInputBuffers();
-  });
+  resetEventWeights();
 
   bool usedGPU{false};
 #ifdef GUNDAM_USING_CACHE_MANAGER

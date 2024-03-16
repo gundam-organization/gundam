@@ -62,6 +62,7 @@ public:
   // Core
   void buildDialCache();
   void propagateParameters();
+  void resetEventWeights();
   void reweightMcEvents();
   void refillMcHistograms();
   void clearContent();
