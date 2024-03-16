@@ -197,6 +197,7 @@ int main(int argc, char** argv){
         {"kickMc", "KickMc"},
         {"lightOutputMode", "Light"},
         {"toyFit", "ToyFit_%s"},
+        {"injectToyParameters", "InjToyPar_%s"},
         {"dry-run", "DryRun"},
         {"appendix", "%s"},
     };
