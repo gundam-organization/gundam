@@ -58,6 +58,7 @@ void DataSetManager::loadData(){
   bool cacheManagerState = GundamGlobals::getEnableCacheManager();
   GundamGlobals::setEnableCacheManager(false);
 
+
   // make sure everything is ready for loading
   _propagator_.clearContent();
 
@@ -92,7 +93,6 @@ void DataSetManager::loadData(){
   // Copy to data container
   if( usedMcContainer ){
     if( _propagator_.isThrowAsimovToyParameters() ){
-      LogWarning << "Will throw toy parameters..." << std::endl;
 
       if( _propagator_.isShowEventBreakdown() ){
         LogInfo << "Propagating prior parameters on the initially loaded events..." << std::endl;
@@ -117,16 +117,23 @@ void DataSetManager::loadData(){
         }
       }
 
-      _propagator_.getParametersManager().throwParameters();
+      if( _toyParameterInjector_.empty() ){
+        LogWarning << "Will throw toy parameters..." << std::endl;
+        _propagator_.getParametersManager().throwParameters();
 
-      // Handling possible masks
-      for( auto& parSet : _propagator_.getParametersManager().getParameterSetsList() ){
-        if( not parSet.isEnabled() ) continue;
+        // Handling possible masks
+        for( auto& parSet : _propagator_.getParametersManager().getParameterSetsList() ){
+          if( not parSet.isEnabled() ) continue;
 
-        if( parSet.isMaskForToyGeneration() ){
-          LogWarning << parSet.getName() << " will be masked for the toy generation." << std::endl;
-          parSet.setMaskedForPropagation( true );
+          if( parSet.isMaskForToyGeneration() ){
+            LogWarning << parSet.getName() << " will be masked for the toy generation." << std::endl;
+            parSet.setMaskedForPropagation( true );
+          }
         }
+      }
+      else{
+        LogWarning << "Injecting parameters..." << std::endl;
+        _propagator_.getParametersManager().injectParameterValues( _toyParameterInjector_ );
       }
 
     } // throw asimov?
@@ -191,6 +198,9 @@ void DataSetManager::loadData(){
   }
 #endif
 
+  LogInfo << "Propagating prior parameters on events..." << std::endl;
+  _propagator_.reweightMcEvents();
+
   LogInfo << "Filling up sample bin caches..." << std::endl;
   GundamGlobals::getParallelWorker().runJob([this](int iThread){
     LogInfoIf(iThread <= 0) << "Updating sample per bin event lists..." << std::endl;
@@ -240,4 +250,7 @@ void DataSetManager::loadData(){
 
   /// Propagator needs to be fast, let the workers wait for the signal
   GundamGlobals::getParallelWorker().setCpuTimeSaverIsEnabled(false);
+
+  /// restoring state
+  GundamGlobals::setEnableCacheManager(cacheManagerState);
 }

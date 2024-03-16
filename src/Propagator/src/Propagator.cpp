@@ -163,6 +163,10 @@ void Propagator::propagateParameters(){
 void Propagator::reweightMcEvents() {
   reweightTimer.start();
 
+  std::for_each(_dialCollectionList_.begin(), _dialCollectionList_.end(), [&]( DialCollection& dc_){
+    dc_.updateInputBuffers();
+  });
+
   std::for_each(_dialCollectionList_.begin(), _dialCollectionList_.end(), [&]( DialCollection& dc_ ){
     dc_.updateInputBuffers();
   });
@@ -258,8 +262,6 @@ void Propagator::printBreakdowns(){
     }
 
     this->reweightMcEvents();
-
-    // no reweight
     for( size_t iSample = 0 ; iSample < _sampleSet_.getSampleList().size() ; iSample++ ){
       stageBreakdownList[iSample][iStage] = _sampleSet_.getSampleList()[iSample].getMcContainer().getSumWeights();
     }
