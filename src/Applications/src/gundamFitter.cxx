@@ -58,6 +58,7 @@ int main(int argc, char** argv){
   clParser.addOption("useDataEntry", {"--use-data-entry"}, "Overrides \"selectedDataEntry\" in dataSet config. Second arg is to select a given dataset");
   clParser.addOption("useDataConfig", {"--use-data-config"}, "Add a data entry to the data set definition and use it for the fit");
   clParser.addOption("injectParameterConfig", {"--inject-parameters"}, "Inject parameters defined in the provided config file");
+  clParser.addOption("injectToyParameters", {"--inject-toy-parameter"}, "Inject parameters defined in the provided config file");
   clParser.addOption("appendix", {"--appendix"}, "Add appendix to the output file name");
 
   clParser.addDummyOption("Trigger options");
@@ -140,6 +141,13 @@ int main(int argc, char** argv){
     injectParameterPath = clParser.getOptionVal<std::string>("injectParameterConfig");
   }
 
+  // toy par injector
+  std::string toyParInjector{};
+  if( clParser.isOptionTriggered("injectToyParameters") ){
+    toyParInjector = clParser.getOptionVal<std::string>("injectToyParameters");
+    LogWarning << "Inject toy parameter: " << toyParInjector << std::endl;
+  }
+
   // PRNG seed?
   gRandom = new TRandom3(0);    // Initialize with a UUID;
   if( clParser.isOptionTriggered("randomSeed") ){
@@ -189,6 +197,7 @@ int main(int argc, char** argv){
         {"kickMc", "KickMc"},
         {"lightOutputMode", "Light"},
         {"toyFit", "ToyFit_%s"},
+        {"injectToyParameters", "InjToyPar_%s"},
         {"dry-run", "DryRun"},
         {"appendix", "%s"},
     };
@@ -293,6 +302,12 @@ int main(int argc, char** argv){
   if( not injectParameterPath.empty() ){
     auto injectConfig = ConfigUtils::readConfigFile( injectParameterPath );
     fitter.getLikelihoodInterface().getDataSetManager().getPropagator().setParameterInjectorConfig(injectConfig);
+  }
+
+  // toyParInjector
+  if( not toyParInjector.empty() ){
+    auto injectConfig = ConfigUtils::readConfigFile( toyParInjector );
+    fitter.getLikelihoodInterface().getDataSetManager().setToyParameterInjector( injectConfig );
   }
 
   // Also check app level config options

@@ -20,6 +20,9 @@ protected:
 public:
   DataSetManager() = default;
 
+  // setters
+  void setToyParameterInjector(const JsonType& toyParameterInjector_){ _toyParameterInjector_ = toyParameterInjector_; }
+
   // const-getters
   [[nodiscard]] const Propagator& getPropagator() const{ return _propagator_; }
   [[nodiscard]] const EventTreeWriter& getTreeWriter() const{ return _treeWriter_; }
@@ -38,6 +41,8 @@ private:
   Propagator _propagator_{};
   EventTreeWriter _treeWriter_{};
   std::vector<DatasetDefinition> _dataSetList_{};
+
+  JsonType _toyParameterInjector_{};
 
 };
 

@@ -73,11 +73,14 @@ void LikelihoodInterface::initializeImpl() {
     _nbSampleBins_ += int(sample.getBinning().getBinList().size() );
   }
 
+  LogInfo << "Move back MC parameters to prior..." << std::endl;
+  _dataSetManager_.getPropagator().getParametersManager().moveParametersToPrior();
+
   /// some joint fit probability might need to save the value of the nominal histogram.
   /// here we know every parameter is at its nominal value
   LogInfo << "First evaluation of the LLH at the nominal value..." << std::endl;
-  _dataSetManager_.getPropagator().getParametersManager().moveParametersToPrior();
   this->propagateAndEvalLikelihood();
+  LogInfo << this->getSummary() << std::endl;
 
   /// move the parameter away from the prior if needed
   if( not _dataSetManager_.getPropagator().getParameterInjectorMc().empty() ){
