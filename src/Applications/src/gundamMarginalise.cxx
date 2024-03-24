@@ -60,6 +60,7 @@ int main(int argc, char** argv){
     clParser.addOption("parInject", {"--parameters-inject"}, "Input txt file for injecting params");
     clParser.addOption("pedestal", {"--pedestal"}, "Add pedestal to the sampling distribution (percents)");
     clParser.addOption("weightCap", {"--weight-cap"}, "Cap the weight of the throws (default: 1.e8)", 1);
+    clParser.addOption("tStudent", {"--t-student"}, "ndf for tStudent throw (default: gaussian throws)", 1);
 
     clParser.addDummyOption("Trigger options:");
     clParser.addTriggerOption("dryRun", {"-d", "--dry-run"}, "Only overrides fitter config and print it.");
@@ -179,6 +180,20 @@ int main(int argc, char** argv){
     }else{
         LogInfo << "Using default weight cap: "<< weightCap << std::endl;
     }
+    bool TStudent = false;
+    double tStudentNu = -1;
+    if(clParser.isOptionTriggered("tStudent")){
+        tStudentNu = clParser.getOptionVal<double>("tStudent");
+        LogInfo << "Throwing according to a multivariate t-student with ndf: "<< tStudentNu << std::endl;
+    }
+    if(tStudentNu==-1){
+        TStudent = false;
+    }else if(tStudentNu<=2){
+        LogError<< "Not possible to use ndf for t-student smaller than 2!"<<std::endl;
+        TStudent = false;
+    }else{
+        TStudent = true;
+    }
 
     auto configPropagator = GenericToolbox::Json::fetchValuePath<nlohmann::json>( cHandler.getConfig(), "fitterEngineConfig/propagatorConfig" );
 
@@ -240,7 +255,8 @@ int main(int argc, char** argv){
                 {"nToys",            "nToys_%s"},
                 {"randomSeed",       "Seed_%s"},
                 {"parInject",        "parInject_%s"},
-                {"pedestal",        "ped_%s_percent"}
+                {"pedestal",        "ped_%s_percent"},
+                {"tStudent",               "tStudentNu_%s"}
         };
         outFilePath = GundamUtils::generateFileName(clParser, appendixDict) + ".root";
 
@@ -428,6 +444,7 @@ int main(int argc, char** argv){
         LogInfo<< "Injecting parameters from file: " << parInjectFile << std::endl;
     }
 
+    double weightSum = 0, weightSquareSum = 0, ESS = 0;
     std::stringstream ss; ss << LogWarning.getPrefixString() << "Generating " << nToys << " toys...";
     //////////////////////////////////////
     // THROWS LOOP
@@ -443,10 +460,15 @@ int main(int argc, char** argv){
         if (usePedestal){
             // if the pedestal option is enabled, a uniform distribution is added to the gaussian sampling distribution
             propagator.getParametersManager().throwParametersFromGlobalCovariance(weightsChiSquare, pedestalEntity, pedestalLeftEdge, pedestalRightEdge);
-        }else {
-            // standard case: throw according to the covariance matrix
-            propagator.getParametersManager().throwParametersFromGlobalCovariance(weightsChiSquare);
+        }else{
+            if(!TStudent) {
+                // standard case: throw according to the covariance matrix
+                propagator.getParametersManager().throwParametersFromGlobalCovariance(weightsChiSquare);
+            }else{
+                propagator.getParametersManager().throwParametersFromTStudent(weightsChiSquare,tStudentNu);
+            }
         }
+
 
         if(injectParamsManually) {
             // count the number of parameters to be injected
@@ -541,13 +563,14 @@ int main(int argc, char** argv){
         }
         LhOverGauss = exp(LLH-gLLH);
         if ( LLH-gLLH > log(weightCap)) {
-            LogInfo << "Throw " << iToy << " rejected: LLH-gLLH = " << LLH - gLLH << std::endl;
+            LogInfo << "Throw " << iToy << " over weight cap: LLH-gLLH = " << LLH - gLLH << std::endl;
             countBigThrows++;
         }
         //debug
         LogInfo<<"LLH: "<<LLH<<" gLLH: "<<gLLH<<std::endl    ;
 
-
+        weightSum += LhOverGauss;
+        weightSquareSum += LhOverGauss*LhOverGauss;
         // Write the ttrees
         margThrowTree->Fill();
         ThrowsPThetaFormat->Fill();
@@ -562,7 +585,19 @@ int main(int argc, char** argv){
     }// end of main throws loop
 
     LogInfo<<"weight cap: "<<weightCap<<std::endl;
-    LogInfo<<"Number of throws rejected because LLH-gLLH > log(weightCap): "<<countBigThrows<<" - "<<(double)countBigThrows/nToys*100<<" % of total"<<std::endl;
+    LogInfo<<"Number of throws with overweight: LLH-gLLH > log(weightCap): "<<countBigThrows<<" - "<<(double)countBigThrows/nToys*100<<" % of total"<<std::endl;
+    LogInfo<<"Weight sum: "<<weightSum<<" weight^2 sum: "<< weightSquareSum <<std::endl;
+    LogInfo<<"ESS: "<<weightSum*weightSum/weightSquareSum<<std::endl;
+
+    // write ESS in output file
+    TVectorD ESS_writable(1); ESS_writable[0] = weightSum*weightSum/weightSquareSum;
+    TVectorD weightSum_writable(1); weightSum_writable[0] = weightSum;
+    TVectorD weightSquareSum_writable(1); weightSquareSum_writable[0] = weightSquareSum;
+    // I think this is stupid, I cannot write a double???
+    app.getOutfilePtr()->WriteObject(&ESS_writable,"ESS");
+    app.getOutfilePtr()->WriteObject(&weightSum_writable,"weight_sum");
+    app.getOutfilePtr()->WriteObject(&weightSquareSum_writable,"weight2_sum");
+
 
     double averageLLH = LLH_sum/nToys;
     epsilonNormAverage /= nToys;
