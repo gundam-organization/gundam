@@ -445,6 +445,7 @@ int main(int argc, char** argv){
     }
 
     double weightSum = 0, weightSquareSum = 0, ESS = 0;
+    int weightSumE50 = 0, weightSquareSumE50 = 0;
     std::stringstream ss; ss << LogWarning.getPrefixString() << "Generating " << nToys << " toys...";
     //////////////////////////////////////
     // THROWS LOOP
@@ -571,6 +572,14 @@ int main(int argc, char** argv){
 
         weightSum += LhOverGauss;
         weightSquareSum += LhOverGauss*LhOverGauss;
+        while(weightSum>1.e50){
+            weightSum /= 1.e50;
+            weightSumE50++;
+        }
+        while(weightSquareSum>1.e50){
+            weightSquareSum /= 1.e50;
+            weightSquareSumE50++;
+        }
         // Write the ttrees
         margThrowTree->Fill();
         ThrowsPThetaFormat->Fill();
@@ -584,13 +593,15 @@ int main(int argc, char** argv){
 //        }
     }// end of main throws loop
 
-    LogInfo<<"weight cap: "<<weightCap<<std::endl;
+
+    LogInfo<<"weight cap: "<<weightCap<<" x "<<weightSumE50<<" x 10^50"<<std::endl;
     LogInfo<<"Number of throws with overweight: LLH-gLLH > log(weightCap): "<<countBigThrows<<" - "<<(double)countBigThrows/nToys*100<<" % of total"<<std::endl;
-    LogInfo<<"Weight sum: "<<weightSum<<" weight^2 sum: "<< weightSquareSum <<std::endl;
-    LogInfo<<"ESS: "<<weightSum*weightSum/weightSquareSum<<std::endl;
+    LogInfo<<"Weight sum: "<<weightSum<<" weight^2 sum: "<< weightSquareSum<<" x "<<weightSquareSumE50<<" x 10^50" <<std::endl;
+    ESS = (weightSumE50*2-weightSquareSumE50) * 1.e50 * weightSum*weightSum/weightSquareSum;
+    LogInfo<<"ESS: "<<weightSum*weightSum/weightSquareSum<<" x "<<(weightSumE50*2-weightSquareSumE50)<<" x 10^50" <<std::endl;
 
     // write ESS in output file
-    TVectorD ESS_writable(1); ESS_writable[0] = weightSum*weightSum/weightSquareSum;
+    TVectorD ESS_writable(1); ESS_writable[0] = ESS;
     TVectorD weightSum_writable(1); weightSum_writable[0] = weightSum;
     TVectorD weightSquareSum_writable(1); weightSquareSum_writable[0] = weightSquareSum;
     // I think this is stupid, I cannot write a double???
