@@ -80,12 +80,12 @@ void DataSetManager::loadData(){
     // loading in the propagator
     LogInfo << "Reading dataset: " << dataSet.getName() << "/" << dispenser->getParameters().name << std::endl;
     dispenser->load( _propagator_ );
-  }
 
-  LogInfo << "Resizing dial containers..." << std::endl;
-  for( auto& dialCollection : _propagator_.getDialCollectionList() ) {
-    // event-by-event dials
-    if( not dialCollection.isBinned() ){ dialCollection.resizeContainers(); }
+    LogInfo << "Resizing dial containers..." << std::endl;
+    for( auto& dialCollection : _propagator_.getDialCollectionList() ) {
+      // event-by-event dials
+      if( not dialCollection.isBinned() ){ dialCollection.resizeContainers(); }
+    }
   }
 
   LogInfo << "Build reference cache..." << std::endl;
@@ -179,11 +179,11 @@ void DataSetManager::loadData(){
       LogContinueIf(not dataSet.isEnabled(), "Dataset \"" << dataSet.getName() << "\" is disabled. Skipping");
       auto& dispenser = dataSet.getMcDispenser();
       dispenser.load( _propagator_ );
-    }
 
-    LogInfo << "Resizing dial containers..." << std::endl;
-    for( auto& dialCollection : _propagator_.getDialCollectionList() ) {
-      if( not dialCollection.isBinned() ){ dialCollection.resizeContainers(); }
+      LogInfo << "Resizing dial containers..." << std::endl;
+      for( auto& dialCollection : _propagator_.getDialCollectionList() ) {
+        if( not dialCollection.isBinned() ){ dialCollection.resizeContainers(); }
+      }
     }
 
     LogInfo << "Build reference cache..." << std::endl;

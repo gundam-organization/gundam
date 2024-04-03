@@ -463,10 +463,9 @@ void DataDispenser::preAllocateMemory(){
           // Reserve memory for additional dials (those on a tree leaf)
           auto dialType = dialCollection->getGlobalDialType();
           LogInfo << dialCollection->getTitle() << ": creating " << nEvents;
-          LogInfo << " slots for " << dialType << std::endl;
+          LogInfo << " additional slots for " << dialType << std::endl;
 
-          dialCollection->getDialBaseList().clear();
-          dialCollection->getDialBaseList().resize(nEvents);
+          dialCollection->getDialBaseList().resize( dialCollection->getDialBaseList().size() + nEvents );
         }
         else{
           LogThrow("DEV ERROR: not binned, not event-by-event?");
