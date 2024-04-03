@@ -6,6 +6,7 @@ set( APPLICATION_LIST
     gundamFitReader
     gundamCalcXsec
     gundamFitCompare
+    gundamFitPlot
     gundamInputZipper
     gundamConfigCompare
     gundamPlotExtractor
@@ -75,6 +76,7 @@ target_link_libraries( gundamCalcXsec GundamFitter ) # using the fitter engine t
 target_link_libraries( gundamFitReader GundamUtils )
 target_link_libraries( gundamInputZipper GundamUtils )
 target_link_libraries( gundamFitCompare GundamUtils )
+target_link_libraries( gundamFitPlot GundamUtils )
 target_link_libraries( gundamConfigUnfolder GundamUtils )
 target_link_libraries( gundamConfigCompare GundamUtils )
 target_link_libraries( gundamPlotExtractor GundamUtils )
