@@ -192,7 +192,15 @@ namespace ConfigUtils {
             JsonType* outListEntryMatch{nullptr};
 
             if( identifier == "__INDEX__" ){
-              if     ( overrideListEntry.value()[identifier].get<int>() == -1 ){
+              if     ( overrideListEntry.value()[identifier].get<std::string>() == "*" ){
+                // applying on every entry
+                for( auto& outSubEntry : outEntry_ ){
+                  jsonPath.emplace_back(GenericToolbox::joinAsString("",overrideListEntry.key(),"(",identifier,":",overrideListEntry.value()[identifier],")"));
+                  overrideRecursive(outSubEntry, overrideListEntry.value());
+                  jsonPath.pop_back();
+                }
+              }
+              else if( overrideListEntry.value()[identifier].get<int>() == -1 ){
                 // add entry
                 if( allowAddMissingKey ){
                   LogAlert << "Adding: " << GenericToolbox::joinPath(jsonPath, outEntry_.size());
