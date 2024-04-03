@@ -135,11 +135,9 @@ void DialCollection::clear(){
 }
 void DialCollection::resizeContainers(){
   LogInfo << "Resizing containers of the dial collection \"" << this->getTitle() << "\" from "
-          << _dialInterfaceList_.size() << " to " << _dialFreeSlot_.getValue() << std::endl;
-  _dialInterfaceList_.resize(_dialFreeSlot_.getValue());
-  _dialBaseList_.resize(_dialFreeSlot_.getValue());
-  _dialInterfaceList_.shrink_to_fit();
-  _dialBaseList_.shrink_to_fit();
+          << _dialBaseList_.size() << " to " << _dialFreeSlot_.getValue() << std::endl;
+  _dialBaseList_.resize(_dialFreeSlot_.getValue()); _dialBaseList_.shrink_to_fit();
+  _dialInterfaceList_.resize(_dialFreeSlot_.getValue()); _dialInterfaceList_.shrink_to_fit();
   this->setupDialInterfaceReferences();
 }
 void DialCollection::updateInputBuffers(){

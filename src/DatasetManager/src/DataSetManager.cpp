@@ -74,7 +74,7 @@ void DataSetManager::loadData(){
     if( _propagator_.isLoadAsimovData() ){ dispenser = &dataSet.getDataDispenserDict().at("Asimov"); }
 
     // checking what we are loading
-    if(dispenser->getParameters().name != "Asimov" ){ allAsimov = false; }
+    if( dispenser->getParameters().name != "Asimov" ){ allAsimov = false; }
     if( dispenser->getParameters().useMcContainer ){ usedMcContainer = true; }
 
     // loading in the propagator
@@ -84,6 +84,7 @@ void DataSetManager::loadData(){
 
   LogInfo << "Resizing dial containers..." << std::endl;
   for( auto& dialCollection : _propagator_.getDialCollectionList() ) {
+    // event-by-event dials
     if( not dialCollection.isBinned() ){ dialCollection.resizeContainers(); }
   }
 
