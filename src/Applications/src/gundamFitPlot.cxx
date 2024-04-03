@@ -171,6 +171,7 @@ int main( int argc, char** argv ){
   for( auto& graphEntry : graphHolder ){
     auto* outGraph = graphEntry.generateGraph();
 
+    LogContinueIf(outGraph== nullptr);
     outGraph->GetYaxis()->SetTitle( "post-fit constraint (%)" );
     outGraph->GetXaxis()->SetTitle( xTitle.c_str() );
 
