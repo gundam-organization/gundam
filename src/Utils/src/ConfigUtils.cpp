@@ -192,7 +192,7 @@ namespace ConfigUtils {
             JsonType* outListEntryMatch{nullptr};
 
             if( identifier == "__INDEX__" ){
-              if     ( overrideListEntry.value()[identifier].get<std::string>() == "*" ){
+              if     ( overrideListEntry.value()[identifier].is_string() and overrideListEntry.value()[identifier].get<std::string>() == "*" ){
                 // applying on every entry
                 for( auto& outSubEntry : outEntry_ ){
                   jsonPath.emplace_back(GenericToolbox::joinAsString("",overrideListEntry.key(),"(",identifier,":",overrideListEntry.value()[identifier],")"));
