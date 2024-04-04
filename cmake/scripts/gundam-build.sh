@@ -15,8 +15,15 @@
 #
 #     -D<CMAKE_DEFINE> -- Add a definition to the cmake command.
 #
-# Set the GUNDAM_JOBS shell variable to control the number of threads
-# used during the compilation (defaults to 1).
+# Set the GUNDAM_JOBS environment variable (defaults to 1) to control
+# the number of threads used during the compilation.
+#
+# Set the GUNDAM_CMAKE_DEFINES environment variable (defaults to "")
+# to provide default cmake command line definitions.  This can be used
+# to override the defaults set in cmake/options.cmake for a particular
+# system.  e.g. A system that has GPU might want to use:
+#
+# `export GUNDAM_CMAKE_DEFINES="-DWITH_CUDA_LIB=ON"`
 
 # Check that the source root directory is defined.
 if [ ${#GUNDAM_ROOT} == 0 ]; then
@@ -61,6 +68,7 @@ RUN_CLEAN="no"
 RUN_TEST="no"
 DEFINES=" -DCMAKE_INSTALL_PREFIX=${GUNDAM_INSTALL} "
 DEFINES="${DEFINES} -DCMAKE_EXPORT_COMPILE_COMMANDS=1 "
+DEFINES="${GUNDAM_CMAKE_DEFINES} ${DEFINES}"
 if [ "x${GUNDAM_JOBS}" == x ]; then
     GUNDAM_JOBS=1
     echo XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
