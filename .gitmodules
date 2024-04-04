@@ -2,6 +2,10 @@
 	path = submodules/simple-cpp-logger
 	url = https://github.com/gundam-organization/simple-cpp-logger.git
 	branch = main
+[submodule "submodules/cpp-generic-toolbox"]
+	path = submodules/cpp-generic-toolbox
+	url = https://github.com/gundam-organization/cpp-generic-toolbox.git
+	branch = main
 [submodule "submodules/simple-cpp-cmd-line-parser"]
 	path = submodules/simple-cpp-cmd-line-parser
 	url = https://github.com/gundam-organization/simple-cpp-cmd-line-parser.git
