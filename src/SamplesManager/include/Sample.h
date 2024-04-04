@@ -58,15 +58,13 @@ private:
   // Yaml
   bool _isEnabled_{false};
   int _index_{-1};
-  double _mcNorm_{1};
-  double _dataNorm_{1};
   std::string _name_;
   std::string _selectionCutStr_;
   std::string _binningFilePath_;
   std::vector<std::string> _enabledDatasetList_;
 
   // Internals
-  double _llhStatBuffer_{std::nan("unset")}; // set by FitSampleSet which hold the joinProbability obj
+  double _llhStatBuffer_{std::nan("unset")}; // set by SampleSet which hold the joinProbability obj
   DataBinSet _binning_;
   SampleElement _mcContainer_;
   SampleElement _dataContainer_;

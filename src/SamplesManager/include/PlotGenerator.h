@@ -2,11 +2,11 @@
 // Created by Nadrino on 16/06/2021.
 //
 
-#ifndef GUNDAM_PLOTGENERATOR_H
-#define GUNDAM_PLOTGENERATOR_H
+#ifndef GUNDAM_PLOT_GENERATOR_H
+#define GUNDAM_PLOT_GENERATOR_H
 
 #include "SampleSet.h"
-#include "PhysicsEvent.h"
+#include "Event.h"
 #include "JsonBaseClass.h"
 
 #include "GenericToolbox.Wrappers.h"
@@ -36,8 +36,8 @@ struct HistHolder{
 
   // Data
   bool isData{false};
-  const Sample* fitSamplePtr{nullptr};
-  std::function<void(TH1D*, const PhysicsEvent*)> fillFunctionFitSample;
+  const Sample* samplePtr{nullptr};
+  std::function<void(TH1D*, const Event*)> fillFunctionSample;
 
   // X axis
   std::string varToPlot;
@@ -65,7 +65,7 @@ struct HistHolder{
 
   // Caches
   bool isBinCacheBuilt{false};
-  std::vector<std::vector<const PhysicsEvent*>> _binEventPtrList_;
+  std::vector<std::vector<const Event*>> _binEventPtrList_;
 };
 
 struct CanvasHolder{
@@ -79,9 +79,13 @@ struct CanvasHolder{
 
 class PlotGenerator : public JsonBaseClass {
 
+protected:
+  void readConfigImpl() override;
+  void initializeImpl() override;
+
 public:
   // Setters
-  void setFitSampleSetPtr(const SampleSet *fitSampleSetPtr);
+  void setSampleSetPtr(const SampleSet *sampleSetPtr_){ _sampleSetPtr_ = sampleSetPtr_; }
 
   // Getters
   [[nodiscard]] bool isEmpty() const;
@@ -104,20 +108,22 @@ public:
   std::vector<std::string> fetchListOfSplitVarNames();
 
   void defineHistogramHolders();
-protected:
-  void readConfigImpl() override;
-  void initializeImpl() override;
 
+  // Deprecated
+  [[deprecated("use setSampleSetPtr")]] void setFitSampleSetPtr(const SampleSet *sampleSetPtr_){ setSampleSetPtr(sampleSetPtr_); }
+
+
+protected:
   // Internals
-  static void buildEventBinCache(const std::vector<HistHolder *> &histPtrToFillList, const std::vector<PhysicsEvent> *eventListPtr, bool isData_);
+  static void buildEventBinCache( const std::vector<HistHolder *> &histPtrToFillList, const std::vector<Event> *eventListPtr, bool isData_);
 
 private:
   // Parameters
   bool _writeGeneratedHistograms_{false};
   int _maxLegendLength_{15};
-  nlohmann::json _varDictionary_;
-  nlohmann::json _canvasParameters_;
-  nlohmann::json _histogramsDefinition_;
+  JsonType _varDictionary_;
+  JsonType _canvasParameters_;
+  JsonType _histogramsDefinition_;
   std::vector<Color_t> defaultColorWheel {
       kGreen-3, kTeal+3, kAzure+7,
       kCyan-2, kBlue-7, kBlue+2,
@@ -125,7 +131,7 @@ private:
   };
 
   // Internals
-  const SampleSet* _fitSampleSetPtr_{nullptr};
+  const SampleSet* _sampleSetPtr_{nullptr};
   std::vector<std::vector<HistHolder>> _histHolderCacheList_{};
   std::vector<HistHolder> _comparisonHistHolderList_;
   std::map<std::string, std::shared_ptr<TCanvas>> _bufferCanvasList_;
@@ -133,4 +139,4 @@ private:
 };
 
 
-#endif //GUNDAM_PLOTGENERATOR_H
+#endif //GUNDAM_PLOT_GENERATOR_H

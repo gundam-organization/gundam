@@ -29,15 +29,15 @@ public:
   void setResponseSupervisorRef(const DialResponseSupervisor *responseSupervisorRef){ _responseSupervisorRef_ = responseSupervisorRef; }
   void setDialBinRef(const DataBin *dialBinRef){ _dialBinRef_ = dialBinRef; }
 
-  /// Return the input buffer containing the connection to the FitParameter(s)
-  /// used by this dial.  The number of FitParameters contained in the input
+  /// Return the input buffer containing the connection to the Parameter(s)
+  /// used by this dial.  The number of Parameters contained in the input
   /// buffer musts mach the number expected by the specialization of the
   /// DialBase.
   [[nodiscard]] inline DialInputBuffer *getInputBufferRef() const {return _inputBufferRef_;}
 
   /// Get the dial calculation method.  The dial will need one or more
-  /// FitParameter inputs, and the number *must* match the number and order of
-  /// the FitParameters in the DialInputBuffer.
+  /// Parameter inputs, and the number *must* match the number and order of
+  /// the Parameters in the DialInputBuffer.
   [[nodiscard]] inline DialBase* getDialBaseRef() const {return _dialBaseRef_;}
 
   /// Get the DialResponseSupervisor. This conditions the return value of the

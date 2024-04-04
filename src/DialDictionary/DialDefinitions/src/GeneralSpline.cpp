@@ -69,15 +69,10 @@ void GeneralSpline::buildDial(const std::vector<double>& xPoints,
     _splineData_[2 + 3*i + 2] = x;
   }
 
-//  LogThrow(GenericToolbox::parseVectorAsString(_splineData_));
 }
 
 double GeneralSpline::evalResponse(const DialInputBuffer& input_) const {
-  double dialInput{input_.getBuffer()[0]};
-
-#ifndef NDEBUG
-  LogThrowIf(not std::isfinite(dialInput), "Invalid input for GeneralSpline");
-#endif
+  double dialInput{input_.getInputBuffer()[0]};
 
   if( not _allowExtrapolation_ ){
     if     (dialInput <= _splineBounds_.first) { dialInput = _splineBounds_.first; }

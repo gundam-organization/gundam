@@ -34,7 +34,6 @@ public:
   // we don't need the reference counting since we can only have one of each
   // object.  Also shared_ptr is a bit to memory hungry.
   typedef std::shared_ptr<DialBase> DialBaseObject;
-  // typedef GenericToolbox::PolymorphicObjectWrapper<DialBase> DialBaseObject;
 
   // setters
   void setIndex(int index){ _index_ = index; }
@@ -57,6 +56,7 @@ public:
   DataBinSet &getDialBinSet(){ return _dialBinSet_; }
   std::vector<DialBaseObject> &getDialBaseList(){ return _dialBaseList_; }
   std::vector<DialInterface> &getDialInterfaceList(){ return _dialInterfaceList_; }
+  std::vector<DialInputBuffer> &getDialInputBufferList(){ return _dialInputBufferList_; }
 
   // non-trivial getters
   [[nodiscard]] bool isDatasetValid(const std::string& datasetName_) const;
@@ -79,8 +79,8 @@ protected:
 
   bool initializeNormDialsWithParBinning();
   bool initializeDialsWithDefinition();
-  void readGlobals(const nlohmann::json &config_);
-  nlohmann::json fetchDialsDefinition(const nlohmann::json &definitionsList_);
+  void readGlobals(const JsonType &config_);
+  JsonType fetchDialsDefinition(const JsonType &definitionsList_);
 
 private:
   // parameters

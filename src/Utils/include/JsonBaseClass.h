@@ -2,21 +2,24 @@
 // Created by Adrien BLANCHET on 23/10/2022.
 //
 
-#ifndef GUNDAM_JSONBASECLASS_H
-#define GUNDAM_JSONBASECLASS_H
+#ifndef GUNDAM_JSON_BASE_CLASS_H
+#define GUNDAM_JSON_BASE_CLASS_H
 
-#include "GenericToolbox.ConfigBaseClass.h"
+#include "ConfigUtils.h"
+
+#include "GenericToolbox.Utils.h"
 
 #include "nlohmann/json.hpp"
 
-class JsonBaseClass : public GenericToolbox::ConfigBaseClass<nlohmann::json> {
+
+class JsonBaseClass : public GenericToolbox::ConfigBaseClass<JsonType> {
 
 public:
   JsonBaseClass() = default;
 
-  void setConfig(const nlohmann::json& config_) override;
+  void setConfig(const JsonType& config_) override { _config_ = config_; }
 
 
 };
 
-#endif //GUNDAM_JSONBASECLASS_H
+#endif //GUNDAM_JSON_BASE_CLASS_H

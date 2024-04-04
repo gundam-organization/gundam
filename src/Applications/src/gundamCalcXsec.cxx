@@ -2,15 +2,14 @@
 #include "GundamGlobals.h"
 #include "GundamApp.h"
 #include "GundamUtils.h"
-#include "Propagator.h"
+#include "FitterEngine.h"
 #include "ConfigUtils.h"
 
 #include "Logger.h"
 #include "CmdLineParser.h"
-#include "GenericToolbox.h"
 #include "GenericToolbox.Json.h"
 #include "GenericToolbox.Root.h"
-#include "GenericToolbox.RawDataArray.h"
+#include "GenericToolbox.Utils.h"
 
 #include <TFile.h>
 #include "TH1D.h"
@@ -84,9 +83,9 @@ int main(int argc, char** argv){
   // Reading fitter file
   std::string fitterFile{clParser.getOptionVal<std::string>("fitterFile")};
   std::unique_ptr<TFile> fitterRootFile{nullptr};
-  nlohmann::json fitterConfig; // will be used to load the propagator
+  JsonType fitterConfig; // will be used to load the propagator
 
-  if( GenericToolbox::doesFilePathHasExtension(fitterFile, "root") ){
+  if( GenericToolbox::hasExtension(fitterFile, "root") ){
     LogWarning << "Opening fitter output file: " << fitterFile << std::endl;
     fitterRootFile = std::unique_ptr<TFile>( TFile::Open( fitterFile.c_str() ) );
     LogThrowIf( fitterRootFile == nullptr, "Could not open fitter output file." );
@@ -123,29 +122,27 @@ int main(int argc, char** argv){
   );
 
   // Defining signal samples
-  nlohmann::json xsecConfig{ ConfigUtils::readConfigFile( clParser.getOptionVal<std::string>("configFile") ) };
+  JsonType xsecConfig{ ConfigUtils::readConfigFile( clParser.getOptionVal<std::string>("configFile") ) };
   cHandler.override( xsecConfig );
   LogInfo << "Override done." << std::endl;
 
 
   LogInfo << "Fetching propagator config into fitter config..." << std::endl;
-  auto configPropagator = GenericToolbox::Json::fetchValuePath<nlohmann::json>( cHandler.getConfig(), "fitterEngineConfig/propagatorConfig" );
 
-  // Create a propagator object
-  Propagator propagator;
+  // it will handle all the deprecated config options and names properly
+  FitterEngine fitter{nullptr};
+  fitter.readConfig( GenericToolbox::Json::fetchValuePath<JsonType>( cHandler.getConfig(), "fitterEngineConfig" ) );
 
-  // Read the whole fitter config with the override parameters
-  LogWarning << std::endl << GenericToolbox::addUpDownBars("Reading propagator config...") << std::endl;
-  propagator.readConfig( configPropagator );
+  DataSetManager& dataSetManager{fitter.getLikelihoodInterface().getDataSetManager()};
 
   // We are only interested in our MC. Data has already been used to get the post-fit error/values
-  propagator.setLoadAsimovData( true );
+  dataSetManager.getPropagator().setLoadAsimovData( true );
 
   // Disabling eigen decomposed parameters
-  propagator.setEnableEigenToOrigInPropagate( false );
+  dataSetManager.getPropagator().setEnableEigenToOrigInPropagate( false );
 
   // Sample binning using parameterSetName
-  for( auto& sample : propagator.getFitSampleSet().getFitSampleList() ){
+  for( auto& sample : dataSetManager.getPropagator().getSampleSet().getSampleList() ){
 
     if( clParser.isOptionTriggered("usePreFit") ){
       sample.setName( sample.getName() + " (pre-fit)" );
@@ -166,18 +163,20 @@ int main(int argc, char** argv){
 
     // Looking for parSet
     auto foundDialCollection = std::find_if(
-        propagator.getDialCollections().begin(), propagator.getDialCollections().end(),
+        dataSetManager.getPropagator().getDialCollectionList().begin(),
+        dataSetManager.getPropagator().getDialCollectionList().end(),
         [&](const DialCollection& dialCollection_){
           auto* parSetPtr{dialCollection_.getSupervisedParameterSet()};
           if( parSetPtr == nullptr ){ return false; }
           return ( parSetPtr->getName() == associatedParSet );
         });
     LogThrowIf(
-        foundDialCollection == propagator.getDialCollections().end(),
+        foundDialCollection == dataSetManager.getPropagator().getDialCollectionList().end(),
         "Could not find " << associatedParSet << " among fit dial collections: "
-                          << GenericToolbox::iterableToString(propagator.getDialCollections(), [](const DialCollection& dialCollection_){
-                                                                return dialCollection_.getTitle();
-                                                              }
+                          << GenericToolbox::toString(dataSetManager.getPropagator().getDialCollectionList(),
+                                                      [](const DialCollection& dialCollection_){
+                                                        return dialCollection_.getTitle();
+                                                      }
                           ));
 
     LogThrowIf(foundDialCollection->getDialBinSet().getBinList().empty(), "Could not find binning");
@@ -186,7 +185,10 @@ int main(int argc, char** argv){
   }
 
   // Load everything
-  propagator.initialize();
+  dataSetManager.initialize();
+
+  Propagator& propagator{dataSetManager.getPropagator()};
+
 
   if( clParser.isOptionTriggered("dryRun") ){
     std::cout << cHandler.toString() << std::endl;
@@ -269,7 +271,7 @@ int main(int argc, char** argv){
   LogInfo << "Creating normalizer objects..." << std::endl;
   // flux renorm with toys
   struct ParSetNormaliser{
-    void readConfig(const nlohmann::json& config_){
+    void readConfig(const JsonType& config_){
       LogScopeIndent;
 
       name = GenericToolbox::Json::fetchValue<std::string>(config_, "name");
@@ -281,7 +283,7 @@ int main(int argc, char** argv){
       axisVariable = GenericToolbox::Json::fetchValue<std::string>(config_, "axisVariable");
 
       // optionals
-      for( auto& parSelConfig : GenericToolbox::Json::fetchValue<nlohmann::json>(config_, "parSelections") ){
+      for( auto& parSelConfig : GenericToolbox::Json::fetchValue<JsonType>(config_, "parSelections") ){
         parSelections.emplace_back();
         parSelections.back().first = GenericToolbox::Json::fetchValue<std::string>(parSelConfig, "name");
         parSelections.back().second = GenericToolbox::Json::fetchValue<double>(parSelConfig, "value");
@@ -373,11 +375,11 @@ int main(int argc, char** argv){
   std::vector<ParSetNormaliser> parSetNormList;
   for( auto& parSet : propagator.getParametersManager().getParameterSetsList() ){
     if( GenericToolbox::Json::doKeyExist(parSet.getConfig(), "normalisations") ){
-      for( auto& parSetNormConfig : GenericToolbox::Json::fetchValue<nlohmann::json>(parSet.getConfig(), "normalisations") ){
+      for( auto& parSetNormConfig : GenericToolbox::Json::fetchValue<JsonType>(parSet.getConfig(), "normalisations") ){
         parSetNormList.emplace_back();
         parSetNormList.back().readConfig( parSetNormConfig );
 
-        for( auto& dialCollection : propagator.getDialCollections() ){
+        for( auto& dialCollection : propagator.getDialCollectionList() ){
           if( dialCollection.getSupervisedParameterSet() == &parSet ){
             parSetNormList.back().dialCollectionPtr = &dialCollection;
             break;
@@ -393,7 +395,7 @@ int main(int argc, char** argv){
 
   // to be filled up
   struct BinNormaliser{
-    void readConfig(const nlohmann::json& config_){
+    void readConfig(const JsonType& config_){
       LogScopeIndent;
 
       name = GenericToolbox::Json::fetchValue<std::string>(config_, "name");
@@ -435,7 +437,7 @@ int main(int argc, char** argv){
 
   struct CrossSectionData{
     Sample* samplePtr{nullptr};
-    nlohmann::json config{};
+    JsonType config{};
     GenericToolbox::RawDataArray branchBinsData{};
 
     TH1D histogram{};
@@ -444,8 +446,8 @@ int main(int argc, char** argv){
   std::vector<CrossSectionData> crossSectionDataList{};
 
   LogInfo << "Initializing xsec samples..." << std::endl;
-  crossSectionDataList.reserve( propagator.getFitSampleSet().getFitSampleList().size() );
-  for( auto& sample : propagator.getFitSampleSet().getFitSampleList() ){
+  crossSectionDataList.reserve(propagator.getSampleSet().getSampleList().size() );
+  for( auto& sample : propagator.getSampleSet().getSampleList() ){
     crossSectionDataList.emplace_back();
     auto& xsecEntry = crossSectionDataList.back();
 
@@ -455,8 +457,8 @@ int main(int argc, char** argv){
     xsecEntry.config = sample.getConfig();
     xsecEntry.branchBinsData.resetCurrentByteOffset();
     std::vector<std::string> leafNameList{};
-    leafNameList.reserve( sample.getMcContainer().histogram->GetNbinsX() );
-    for( int iBin = 0 ; iBin < sample.getMcContainer().histogram->GetNbinsX() ; iBin++ ){
+    leafNameList.reserve( sample.getMcContainer().getHistogram().nBins );
+    for( int iBin = 0 ; iBin < sample.getMcContainer().getHistogram().nBins; iBin++ ){
       leafNameList.emplace_back(Form("bin_%i/D", iBin));
       xsecEntry.branchBinsData.writeRawData( double(0) );
     }
@@ -473,7 +475,7 @@ int main(int argc, char** argv){
         GenericToolbox::joinVectorString(leafNameList, ":").c_str()
     );
 
-    auto normConfigList = GenericToolbox::Json::fetchValue( xsecEntry.config, "normaliseParameterList", nlohmann::json() );
+    auto normConfigList = GenericToolbox::Json::fetchValue( xsecEntry.config, "normaliseParameterList", JsonType() );
     xsecEntry.normList.reserve( normConfigList.size() );
     for( auto& normConfig : normConfigList ){
       xsecEntry.normList.emplace_back();
@@ -483,42 +485,38 @@ int main(int argc, char** argv){
     xsecEntry.histogram = TH1D(
         sample.getName().c_str(),
         sample.getName().c_str(),
-        sample.getMcContainer().histogram->GetNbinsX(),
+        sample.getMcContainer().getHistogram().nBins,
         0,
-        sample.getMcContainer().histogram->GetNbinsX()
+        sample.getMcContainer().getHistogram().nBins
     );
   }
 
   int nToys{ clParser.getOptionVal<int>("nToys") };
 
-  // no bin volume of events -> use the nominal weight container
+  // no bin volume of events -> use the current weight container
   for( auto& xsec : crossSectionDataList ){
     {
-      auto& mcEvList{xsec.samplePtr->getMcContainer().eventList};
-      std::for_each(mcEvList.begin(), mcEvList.end(), [](PhysicsEvent& ev_){ ev_.setNominalWeight(0); });
+      auto& mcEvList{xsec.samplePtr->getMcContainer().getEventList()};
+      std::for_each(mcEvList.begin(), mcEvList.end(), []( Event& ev_){ ev_.getWeights().current = 0; });
     }
     {
-      auto& dataEvList{xsec.samplePtr->getDataContainer().eventList};
-      std::for_each(dataEvList.begin(), dataEvList.end(), [](PhysicsEvent& ev_){ ev_.setNominalWeight(0); });
+      auto& dataEvList{xsec.samplePtr->getDataContainer().getEventList()};
+      std::for_each(dataEvList.begin(), dataEvList.end(), []( Event& ev_){ ev_.getWeights().current = 0; });
     }
   }
 
-
-
-
   bool enableEventMcThrow{true};
   bool enableStatThrowInToys{true};
-  auto xsecCalcConfig   = GenericToolbox::Json::fetchValue( cHandler.getConfig(), "xsecCalcConfig", nlohmann::json() );
+  auto xsecCalcConfig   = GenericToolbox::Json::fetchValue( cHandler.getConfig(), "xsecCalcConfig", JsonType() );
   enableStatThrowInToys = GenericToolbox::Json::fetchValue( xsecCalcConfig, "enableStatThrowInToys", enableStatThrowInToys);
   enableEventMcThrow    = GenericToolbox::Json::fetchValue( xsecCalcConfig, "enableEventMcThrow", enableEventMcThrow);
-
 
   auto writeBinDataFct = std::function<void()>([&]{
     for( auto& xsec : crossSectionDataList ){
 
       xsec.branchBinsData.resetCurrentByteOffset();
-      for( int iBin = 0 ; iBin < xsec.samplePtr->getMcContainer().histogram->GetNbinsX() ; iBin++ ){
-        double binData{ xsec.samplePtr->getMcContainer().histogram->GetBinContent(1+iBin) };
+      for( int iBin = 0 ; iBin < xsec.samplePtr->getMcContainer().getHistogram().nBins ; iBin++ ){
+        double binData{ xsec.samplePtr->getMcContainer().getHistogram().binList[iBin].content };
 
         // special re-norm
         for( auto& normData : xsec.normList ){
@@ -543,26 +541,24 @@ int main(int argc, char** argv){
 
         // no bin volume of events
         {
-          auto& mcEvList{xsec.samplePtr->getMcContainer().eventList};
-          std::for_each(mcEvList.begin(), mcEvList.end(), [&](PhysicsEvent& ev_){
-            if( iBin != ev_.getSampleBinIndex() ){ return; }
-            ev_.setNominalWeight( ev_.getNominalWeight() + binData );
+          auto& mcEvList{xsec.samplePtr->getMcContainer().getEventList()};
+          std::for_each(mcEvList.begin(), mcEvList.end(), [&]( Event& ev_){
+            if( iBin != ev_.getIndices().bin ){ return; }
+            ev_.getWeights().current += binData;
           });
         }
 
         // set event weight
         {
-          auto& dataEvList{xsec.samplePtr->getDataContainer().eventList};
-          std::for_each(dataEvList.begin(), dataEvList.end(), [&](PhysicsEvent& ev_){
-            if( iBin != ev_.getSampleBinIndex() ){ return; }
-            ev_.setNominalWeight( ev_.getNominalWeight() + binData );
+          auto& dataEvList{xsec.samplePtr->getDataContainer().getEventList()};
+          std::for_each(dataEvList.begin(), dataEvList.end(), [&]( Event& ev_){
+            if( iBin != ev_.getIndices().bin ){ return; }
+            ev_.getWeights().current = binData;
           });
         }
 
-
-
         // bin volume
-        auto& bin = xsec.samplePtr->getMcContainer().binning.getBinList()[iBin];
+        auto& bin = xsec.samplePtr->getBinning().getBinList()[iBin];
         double binVolume{1};
 
         for( auto& edges : bin.getEdgesList() ){
@@ -584,8 +580,8 @@ int main(int argc, char** argv){
 
   {
     LogWarning << "Calculating weight at best-fit" << std::endl;
-    for( auto& parSet : propagator.getParametersManager().getParameterSetsList() ){ parSet.moveFitParametersToPrior(); }
-    propagator.propagateParametersOnSamples();
+    for( auto& parSet : propagator.getParametersManager().getParameterSetsList() ){ parSet.moveParametersToPrior(); }
+    propagator.propagateParameters();
     writeBinDataFct();
     xsecAtBestFitTree->Fill();
     GenericToolbox::writeInTFile( GenericToolbox::mkdirTFile(calcXsecDir, "throws"), xsecAtBestFitTree );
@@ -605,7 +601,7 @@ int main(int argc, char** argv){
 
     // Do the throwing:
     propagator.getParametersManager().throwParametersFromGlobalCovariance();
-    propagator.propagateParametersOnSamples();
+    propagator.propagateParameters();
 
     if( enableStatThrowInToys ){
       for( auto& xsec : crossSectionDataList ){
@@ -638,12 +634,12 @@ int main(int argc, char** argv){
   auto* globalCorMatrixHist = GenericToolbox::convertTMatrixDtoTH2D(GenericToolbox::convertToCorrelationMatrix(globalCovMatrix));
 
   std::vector<TH1D> binValues{};
-  binValues.reserve( propagator.getFitSampleSet().getFitSampleList().size() );
+  binValues.reserve(propagator.getSampleSet().getSampleList().size() );
   int iBinGlobal{-1};
 
   for( auto& xsec : crossSectionDataList ){
 
-    for( int iBin = 0 ; iBin < xsec.samplePtr->getMcContainer().histogram->GetNbinsX() ; iBin++ ){
+    for( int iBin = 0 ; iBin < xsec.samplePtr->getMcContainer().getHistogram().nBins ; iBin++ ){
       iBinGlobal++;
 
       std::string binTitle = xsec.samplePtr->getBinning().getBinList()[iBin].getSummary();
@@ -690,29 +686,31 @@ int main(int argc, char** argv){
   for( auto& xsec : crossSectionDataList ){
     // this gives the average as the event weights were summed together
     {
-      auto &mcEvList{xsec.samplePtr->getMcContainer().eventList};
+      auto &mcEvList{xsec.samplePtr->getMcContainer().getEventList()};
       std::vector<size_t> nEventInBin(xsec.histogram.GetNbinsX(), 0);
       for( size_t iBin = 0 ; iBin < nEventInBin.size() ; iBin++ ){
-        nEventInBin[iBin] = std::count_if(mcEvList.begin(), mcEvList.end(), [iBin](PhysicsEvent &ev_) {
-          return ev_.getSampleBinIndex() == iBin;
+        nEventInBin[iBin] = std::count_if(mcEvList.begin(), mcEvList.end(), [iBin]( Event &ev_) {
+          return ev_.getIndices().bin == iBin;
         });
       }
 
-      std::for_each(mcEvList.begin(), mcEvList.end(), [&](PhysicsEvent &ev_) {
-        ev_.setEventWeight(ev_.getNominalWeight() / nToys / double(nEventInBin[ev_.getSampleBinIndex()]) );
+      std::for_each(mcEvList.begin(), mcEvList.end(), [&]( Event &ev_) {
+        ev_.getWeights().current /= nToys;
+        ev_.getWeights().current /= double(nEventInBin[ev_.getIndices().bin]);
       });
     }
     {
-      auto &dataEvList{xsec.samplePtr->getDataContainer().eventList};
+      auto &dataEvList{xsec.samplePtr->getDataContainer().getEventList()};
       std::vector<size_t> nEventInBin(xsec.histogram.GetNbinsX(), 0);
       for( size_t iBin = 0 ; iBin < nEventInBin.size() ; iBin++ ){
-        nEventInBin[iBin] = std::count_if(dataEvList.begin(), dataEvList.end(), [iBin](PhysicsEvent &ev_) {
-          return ev_.getSampleBinIndex() == iBin;
+        nEventInBin[iBin] = std::count_if(dataEvList.begin(), dataEvList.end(), [iBin]( Event &ev_) {
+          return ev_.getIndices().bin== iBin;
         });
       }
 
-      std::for_each(dataEvList.begin(), dataEvList.end(), [&](PhysicsEvent &ev_) {
-        ev_.setEventWeight(ev_.getNominalWeight() / nToys / double(nEventInBin[ev_.getSampleBinIndex()]) );
+      std::for_each(dataEvList.begin(), dataEvList.end(), [&]( Event &ev_) {
+        ev_.getWeights().current /= nToys;
+        ev_.getWeights().current /= double(nEventInBin[ev_.getIndices().bin]);
       });
     }
   }
@@ -726,7 +724,7 @@ int main(int argc, char** argv){
 
     const CrossSectionData* xsecDataPtr{nullptr};
     for( auto& xsecData : crossSectionDataList ){
-      if( xsecData.samplePtr  == histHolder.fitSamplePtr){
+      if( xsecData.samplePtr  == histHolder.samplePtr){
         xsecDataPtr = &xsecData;
         break;
       }
@@ -752,6 +750,9 @@ int main(int argc, char** argv){
 
 
   LogInfo << "Writing event samples in TTrees..." << std::endl;
-  propagator.getTreeWriter().writeSamples( GenericToolbox::mkdirTFile(calcXsecDir, "events") );
+  dataSetManager.getTreeWriter().writeSamples(
+      GenericToolbox::mkdirTFile(calcXsecDir, "events"),
+      dataSetManager.getPropagator()
+  );
 
 }

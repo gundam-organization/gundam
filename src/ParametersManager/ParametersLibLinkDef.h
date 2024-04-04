@@ -15,8 +15,8 @@
 #pragma link C++ class Dial+;
 #pragma link C++ class DialSet+;
 #pragma link C++ class DialWrapper+;
-#pragma link C++ class FitParameter+;
-#pragma link C++ class FitParameterSet+;
+#pragma link C++ class Parameter+;
+#pragma link C++ class ParameterSet+;
 #pragma link C++ class GraphDial+;
 #pragma link C++ class NestedDialTest+;
 #pragma link C++ class NormDial+;

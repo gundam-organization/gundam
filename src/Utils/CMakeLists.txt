@@ -3,8 +3,6 @@ set(SRCFILES
     ${CMAKE_CURRENT_SOURCE_DIR}/src/DataBinSet.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/DataBin.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/GundamGreetings.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/JsonBaseClass.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/VariableDictionary.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ParameterThrowerMarkHarz.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ConfigUtils.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/GundamUtils.cpp
@@ -57,11 +55,9 @@ target_include_directories( GundamUtils PUBLIC
   ${CMAKE_BINARY_DIR}/generated
 )
 
-#target_link_libraries( GundamUtils PUBLIC )
+target_link_libraries( GundamUtils PUBLIC ${ROOT_LIBRARIES} )
+install( TARGETS GundamUtils DESTINATION lib )
 
-#set_target_properties(GundamUtils PROPERTIES VERSION "${GUNDAM_VERSION_STRING}")
-
-install(TARGETS GundamUtils DESTINATION lib)
 #Can uncomment this to install the headers... but is it really neccessary?
 #install(FILES ${HEADERS} DESTINATION include)
 

@@ -2,8 +2,11 @@
 // Created by Nadrino on 19/05/2021.
 //
 
-#ifndef GUNDAM_DATABIN_H
-#define GUNDAM_DATABIN_H
+#ifndef GUNDAM_DATA_BIN_H
+#define GUNDAM_DATA_BIN_H
+
+
+#include "ConfigUtils.h"
 
 #include "GenericToolbox.Json.h"
 
@@ -22,7 +25,7 @@ public:
     explicit Edges(int index_) : index(index_) {}
 
     // utils
-    void readConfig(const nlohmann::json& config_);
+    void readConfig(const JsonType& config_);
     [[nodiscard]] bool isOverlapping(const Edges& other_) const;
     [[nodiscard]] std::string getSummary() const;
 
@@ -38,7 +41,6 @@ public:
 public:
   DataBin() = delete;
   explicit DataBin(int index_) : _index_(index_) {}
-  virtual ~DataBin() = default;
 
   // setters
   void setIndex(int index_){ _index_ = index_; }
@@ -76,7 +78,7 @@ public:
   // Misc
   void generateFormula();
   void generateTreeFormula();
-  void readConfig( const nlohmann::json& config_);
+  void readConfig( const JsonType& config_);
   [[nodiscard]] std::string getSummary() const;
   [[nodiscard]] std::vector<double> generateBinTarget(const std::vector<std::string>& varNameList_ = {}) const;
 
@@ -98,4 +100,4 @@ private:
 
 };
 
-#endif //GUNDAM_DATABIN_H
+#endif //GUNDAM_DATA_BIN_H

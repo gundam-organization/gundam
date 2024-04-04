@@ -6,7 +6,8 @@
 #include "GundamUtils.h"
 
 #include "Logger.h"
-#include "GenericToolbox.h"
+#include "GenericToolbox.Os.h"
+#include "GenericToolbox.String.h"
 
 #include <sstream>
 

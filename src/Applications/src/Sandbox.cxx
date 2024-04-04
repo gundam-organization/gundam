@@ -3,7 +3,6 @@
 //
 
 #include "Logger.h"
-#include "GenericToolbox.h"
 
 #include <string>
 #include <vector>

@@ -6,6 +6,7 @@ set( APPLICATION_LIST
     gundamFitReader
     gundamCalcXsec
     gundamFitCompare
+    gundamFitPlot
     gundamInputZipper
     gundamConfigCompare
     gundamPlotExtractor
@@ -32,8 +33,7 @@ if( WITH_GUNDAM_ROOT_APP )
     ROOT_GENERATE_DICTIONARY(
         G__GundamRootDict
         ${CMAKE_SOURCE_DIR}/submodules/cpp-generic-toolbox/include/GenericToolbox.Root.h
-        ${CMAKE_SOURCE_DIR}/submodules/cpp-generic-toolbox/include/GenericToolbox.RawDataArray.h
-        ${CMAKE_SOURCE_DIR}/submodules/cpp-generic-toolbox/include/GenericToolbox.CorrelatedVariablesSampler.h
+        ${CMAKE_SOURCE_DIR}/submodules/cpp-generic-toolbox/include/GenericToolbox.Utils.h
         ${CMAKE_SOURCE_DIR}/submodules/simple-cpp-logger/include/Logger.h
         LINKDEF
         ${CMAKE_CURRENT_BINARY_DIR}/LinkDef.h
@@ -47,7 +47,7 @@ if( WITH_GUNDAM_ROOT_APP )
     )
     #target_compile_features(GundamRootDict PRIVATE cxx_std_17)
 
-    target_link_libraries( GundamRootDict ${ROOT_LIBRARIES} )
+    target_link_libraries( GundamRootDict PRIVATE ${ROOT_LIBRARIES} )
     install(TARGETS GundamRootDict DESTINATION lib)
 
     # Also need to install dict files
@@ -73,15 +73,16 @@ endforeach()
 
 # Dependencies
 target_link_libraries( gundamFitter GundamFitter )
+target_link_libraries( gundamCalcXsec GundamFitter ) # using the fitter engine to parse back the config file
 target_link_libraries( gundamFitReader GundamUtils )
 target_link_libraries( gundamInputZipper GundamUtils )
 target_link_libraries( gundamFitCompare GundamUtils )
+target_link_libraries( gundamFitPlot GundamUtils )
 target_link_libraries( gundamConfigUnfolder GundamUtils )
 target_link_libraries( gundamConfigCompare GundamUtils )
 target_link_libraries( gundamPlotExtractor GundamUtils )
 target_link_libraries( gundamCalcXsec GundamPropagator )
 target_link_libraries( gundamMarginalise GundamPropagator )
-
 if( WITH_GUNDAM_ROOT_APP )
 #target_sources( gundamRoot PRIVATE G__GundamRootDict.cxx )
 #target_link_libraries( gundamRoot GundamPropagator )
