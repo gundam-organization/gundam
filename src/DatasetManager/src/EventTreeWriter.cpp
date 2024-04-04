@@ -7,10 +7,9 @@
 #include "ConfigUtils.h"
 
 #include "Logger.h"
-#include "GenericToolbox.h"
+#include "GenericToolbox.Utils.h"
 #include "GenericToolbox.Root.h"
 #include "GenericToolbox.Json.h"
-#include "GenericToolbox.RawDataArray.h"
 
 
 LoggerInit([]{
@@ -19,7 +18,7 @@ LoggerInit([]{
 
 
 void EventTreeWriter::readConfigImpl() {
-  ConfigUtils::forwardConfig( _config_ );
+  LogInfo << "Reading TreeWriter configuration..." << std::endl;
 
   _writeDials_ = GenericToolbox::Json::fetchValue(_config_, "writeDials", _writeDials_);
   _nPointsPerDial_ = GenericToolbox::Json::fetchValue(_config_, "nPointsPerDial", _nPointsPerDial_);
@@ -35,27 +34,28 @@ void EventTreeWriter::readConfigImpl() {
 }
 
 
-void EventTreeWriter::writeSamples(TDirectory* saveDir_) const{
+void EventTreeWriter::writeSamples(TDirectory* saveDir_, const Propagator& propagator_) const{
   LogInfo << "Writing sample data in TTrees..." << std::endl;
 
-  for( const auto& sample : _fitSampleSetPtr_->getFitSampleList() ){
+  // for usage in other methods
+  propagatorPtr = &propagator_;
+
+  for( const auto& sample : propagator_.getSampleSet().getSampleList() ){
     LogScopeIndent;
     LogInfo << "Writing sample: " << sample.getName() << std::endl;
 
     for( bool isData : {false, true} ) {
-      const auto *evListPtr = (isData ? &sample.getDataContainer().eventList : &sample.getMcContainer().eventList);
+      const auto *evListPtr = (isData ? &sample.getDataContainer().getEventList() : &sample.getMcContainer().getEventList());
       if (evListPtr->empty()) continue;
 
       if( not _writeDials_ or isData ){
         this->writeEvents(GenericToolbox::mkdirTFile(saveDir_, sample.getName()), (isData ? "Data" : "MC"), *evListPtr);
       }
       else{
-        LogThrowIf(_eventDialCachePtr_ == nullptr, "Can't write dials if event dial cache is not set.");
-
-        std::vector<const EventDialCache::CacheElem_t*> cacheSampleList{};
-        cacheSampleList.reserve( _eventDialCachePtr_->getCache().size() );
-        for( auto& cacheEntry : _eventDialCachePtr_->getCache() ){
-          if( cacheEntry.event->getSampleIndex() == sample.getIndex() ){
+        std::vector<const EventDialCache::CacheEntry*> cacheSampleList{};
+        cacheSampleList.reserve( propagator_.getEventDialCache().getCache().size() );
+        for( auto& cacheEntry : propagator_.getEventDialCache().getCache() ){
+          if( cacheEntry.event->getIndices().sample == sample.getIndex() ){
             cacheSampleList.emplace_back( &cacheEntry );
           }
         }
@@ -67,10 +67,10 @@ void EventTreeWriter::writeSamples(TDirectory* saveDir_) const{
   } // sample
 
 }
-void EventTreeWriter::writeEvents(TDirectory *saveDir_, const std::string& treeName_, const std::vector<PhysicsEvent> & eventList_) const {
+void EventTreeWriter::writeEvents(TDirectory *saveDir_, const std::string& treeName_, const std::vector<Event> & eventList_) const {
   this->writeEventsTemplate(saveDir_, treeName_, eventList_);
 }
-void EventTreeWriter::writeEvents(TDirectory* saveDir_, const std::string& treeName_, const std::vector<const EventDialCache::CacheElem_t*>& cacheSampleList_) const{
+void EventTreeWriter::writeEvents(TDirectory* saveDir_, const std::string& treeName_, const std::vector<const EventDialCache::CacheEntry*>& cacheSampleList_) const{
   this->writeEventsTemplate(saveDir_, treeName_, cacheSampleList_);
 }
 
@@ -80,7 +80,7 @@ template<typename T> void EventTreeWriter::writeEventsTemplate(TDirectory* saveD
 
   LogReturnIf(eventList_.empty(), "No event to be written. Leaving...");
 
-  const std::vector<EventDialCache::DialsElem_t>* dialElements{getDialElementsPtr(eventList_[0])};
+  const std::vector<EventDialCache::DialResponseCache>* dialElements{getDialElementsPtr(eventList_[0])};
   bool writeDials{dialElements != nullptr};
 
   LogInfo << "Writing " << eventList_.size() << " events " << (writeDials? "with response dials": "without response dials") << " in TTree " << treeName_ << std::endl;
@@ -91,13 +91,12 @@ template<typename T> void EventTreeWriter::writeEventsTemplate(TDirectory* saveD
   auto* tree = new TTree(treeName_.c_str(), treeName_.c_str());
 
   GenericToolbox::RawDataArray privateMemberArr;
-  std::map<std::string, std::function<void(GenericToolbox::RawDataArray&, const PhysicsEvent&)>> leafDictionary;
-  leafDictionary["eventWeight/D"] =   [](GenericToolbox::RawDataArray& arr_, const PhysicsEvent& ev_){ arr_.writeRawData(ev_.getEventWeight()); };
-  leafDictionary["nominalWeight/D"] = [](GenericToolbox::RawDataArray& arr_, const PhysicsEvent& ev_){ arr_.writeRawData(ev_.getNominalWeight()); };
-  leafDictionary["treeWeight/D"] =    [](GenericToolbox::RawDataArray& arr_, const PhysicsEvent& ev_){ arr_.writeRawData(ev_.getBaseWeight()); };
-  leafDictionary["sampleBinIndex/I"]= [](GenericToolbox::RawDataArray& arr_, const PhysicsEvent& ev_){ arr_.writeRawData(ev_.getSampleBinIndex()); };
-  leafDictionary["dataSetIndex/I"] =  [](GenericToolbox::RawDataArray& arr_, const PhysicsEvent& ev_){ arr_.writeRawData(ev_.getDataSetIndex()); };
-  leafDictionary["entryIndex/L"] =    [](GenericToolbox::RawDataArray& arr_, const PhysicsEvent& ev_){ arr_.writeRawData(ev_.getEntryIndex()); };
+  std::map<std::string, std::function<void(GenericToolbox::RawDataArray&, const Event&)>> leafDictionary;
+  leafDictionary["eventWeight/D"] =   [](GenericToolbox::RawDataArray& arr_, const Event& ev_){ arr_.writeRawData(ev_.getWeights().current); };
+  leafDictionary["treeWeight/D"] =    [](GenericToolbox::RawDataArray& arr_, const Event& ev_){ arr_.writeRawData(ev_.getWeights().base); };
+  leafDictionary["sampleBinIndex/I"]= [](GenericToolbox::RawDataArray& arr_, const Event& ev_){ arr_.writeRawData(ev_.getIndices().bin); };
+  leafDictionary["dataSetIndex/I"] =  [](GenericToolbox::RawDataArray& arr_, const Event& ev_){ arr_.writeRawData(ev_.getIndices().dataset); };
+  leafDictionary["entryIndex/L"] =    [](GenericToolbox::RawDataArray& arr_, const Event& ev_){ arr_.writeRawData(ev_.getIndices().entry); };
   std::string branchDefStr;
   for( auto& leafDef : leafDictionary ){
     if( not branchDefStr.empty() ) branchDefStr += ":";
@@ -113,27 +112,25 @@ template<typename T> void EventTreeWriter::writeEventsTemplate(TDirectory* saveD
     std::string leafDefinitionStr{};
     bool disableArray{false};
 
-    void dropData(GenericToolbox::RawDataArray& arr_, const std::vector<GenericToolbox::AnyType>& variablesList_){
-      for(const auto & variable : variablesList_){
-        arr_.writeMemoryContent(
-            variable.getPlaceHolderPtr()->getVariableAddress(),
-            variable.getPlaceHolderPtr()->getVariableSize()
-        );
-        if( disableArray ){ return; }
-      }
+    void dropData(GenericToolbox::RawDataArray& arr_, const GenericToolbox::AnyType& var_){
+      arr_.writeMemoryContent(
+          var_.getPlaceHolderPtr()->getVariableAddress(),
+          var_.getPlaceHolderPtr()->getVariableSize()
+      );
+      if( disableArray ){ return; }
     }
   };
   std::vector<LeavesDictionary> lDict;
 
 
   auto* evPtr = EventTreeWriter::getEventPtr(eventList_[0]);
-  if( evPtr != nullptr and evPtr->getCommonVarNameListPtr() != nullptr ){
-    for( auto& varName : *EventTreeWriter::getEventPtr(eventList_[0])->getCommonVarNameListPtr() ){
+  if( evPtr != nullptr and evPtr->getVariables().getNameListPtr() != nullptr ){
+    for( auto& varName : *EventTreeWriter::getEventPtr(eventList_[0])->getVariables().getNameListPtr() ){
       lDict.emplace_back();
       lDict.back().disableArray = true;
 
-      const auto& lH = evPtr->getVarHolder( varName );
-      char typeTag = GenericToolbox::findOriginalVariableType(lH[0]);
+      auto& var = evPtr->getVariables().fetchVariable( varName ).get();
+      char typeTag = GenericToolbox::findOriginalVariableType(var);
       LogThrowIf( typeTag == 0 or typeTag == char(0xFF), varName << " has an invalid leaf type." );
 
       std::string leafDefStr{ varName };
@@ -147,12 +144,12 @@ template<typename T> void EventTreeWriter::writeEventsTemplate(TDirectory* saveD
   std::vector<std::string> leafNamesList;
   if( not lDict.empty() ){
     branchDefStr = "";
-    int iLeaf{0};
-    for( auto& entry : lDict ){
+    for( int iLeaf = 0 ; iLeaf < lDict.size() ; iLeaf++ ){
       if( not branchDefStr.empty() ) branchDefStr += ":";
-      branchDefStr += entry.leafDefinitionStr;
-      leafNamesList.emplace_back(entry.leafDefinitionStr.substr(0,entry.leafDefinitionStr.find("[")).substr(0, entry.leafDefinitionStr.find("/")));
-      entry.dropData(loadedLeavesArr, EventTreeWriter::getEventPtr(eventList_[0])->getVarHolder( iLeaf++ )); // resize buffer
+      branchDefStr += lDict[iLeaf].leafDefinitionStr;
+      leafNamesList.emplace_back(
+          lDict[iLeaf].leafDefinitionStr.substr(0,lDict[iLeaf].leafDefinitionStr.find("[")).substr(0, lDict[iLeaf].leafDefinitionStr.find("/")));
+      lDict[iLeaf].dropData(loadedLeavesArr, EventTreeWriter::getEventPtr(eventList_[0])->getVariables().getVarList()[iLeaf].get()); // resize buffer
     }
     loadedLeavesArr.lockArraySize();
     tree->Branch("Leaves", &loadedLeavesArr.getRawDataArray()[0], branchDefStr.c_str());
@@ -167,11 +164,9 @@ template<typename T> void EventTreeWriter::writeEventsTemplate(TDirectory* saveD
 
   if( writeDials ){
 
-    LogThrowIf(_parSetListPtr_ == nullptr, "Not parSet list provided.");
-
     // how many pars?
     size_t nPars = 0;
-    for( auto& parSet : *_parSetListPtr_ ){
+    for( auto& parSet : propagatorPtr->getParametersManager().getParameterSetsList() ){
       nPars += parSet.getNbParameters();
     }
 
@@ -182,7 +177,7 @@ template<typename T> void EventTreeWriter::writeEventsTemplate(TDirectory* saveD
 
     // create branches
     int iParSet{-1};
-    for( auto& parSet : *_parSetListPtr_ ){
+    for( auto& parSet : propagatorPtr->getParametersManager().getParameterSetsList() ){
       iParSet++;
       if( not parSet.isEnabled() ) continue;
       for( auto& par : parSet.getParameterList() ){
@@ -226,18 +221,19 @@ template<typename T> void EventTreeWriter::writeEventsTemplate(TDirectory* saveD
 
         // fetch corresponding dial if it exists
         for( auto& dial : *dialElements ){
-          if( dial.interface->getInputBufferRef()->getInputParameterIndicesList()[0] == parIndexList[iGlobalPar] ){
+          if( dial.dialInterface.getInputBufferRef()->getInputParameterIndicesList()[0].parSetIndex == parIndexList[iGlobalPar].first
+              and dial.dialInterface.getInputBufferRef()->getInputParameterIndicesList()[0].parIndex == parIndexList[iGlobalPar].second ){
 
-            DialInputBuffer inputBuf{*dial.interface->getInputBufferRef()};
+            DialInputBuffer inputBuf{*dial.dialInterface.getInputBufferRef()};
             grPtr->RemovePoint(0); // remove the first and recreate the whole thing
             for( double xPoint : parameterXvalues[iGlobalPar] ){
-              inputBuf.getBufferVector()[0] = xPoint;
+              inputBuf.getInputBuffer()[0] = xPoint;
               grPtr->AddPoint(
                   xPoint,
                   DialInterface::evalResponse(
                       &inputBuf,
-                      dial.interface->getDialBaseRef(),
-                      dial.interface->getResponseSupervisorRef()
+                      dial.dialInterface.getDialBaseRef(),
+                      dial.dialInterface.getResponseSupervisorRef()
                   )
               );
             }
@@ -249,7 +245,6 @@ template<typename T> void EventTreeWriter::writeEventsTemplate(TDirectory* saveD
     });
   }
 
-  int iLeaf;
   std::string progressTitle = LogInfo.getPrefixString() + Logger::getIndentStr() + "Writing " + treeName_;
   size_t iEvent{0}; size_t nEvents = (eventList_.size());
   for( auto& cacheEntry : eventList_ ){
@@ -258,12 +253,11 @@ template<typename T> void EventTreeWriter::writeEventsTemplate(TDirectory* saveD
     privateMemberArr.resetCurrentByteOffset();
     for( auto& leafDef : leafDictionary ){ leafDef.second(privateMemberArr, *EventTreeWriter::getEventPtr(cacheEntry)); }
 
-    iLeaf = 0;
     loadedLeavesArr.resetCurrentByteOffset();
-    for( auto& entry : lDict ){
-      entry.dropData(
+    for( int iLeaf = 0 ; iLeaf < lDict.size() ; iLeaf++ ){
+      lDict[iLeaf].dropData(
           loadedLeavesArr,
-          EventTreeWriter::getEventPtr( cacheEntry )->getVarHolder( iLeaf++ )
+          EventTreeWriter::getEventPtr( cacheEntry )->getVariables().getVarList()[iLeaf].get()
       );
     }
 

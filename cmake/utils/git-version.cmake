@@ -92,4 +92,7 @@ doVersionCheck()
 cmessage( STATUS "Generating version config header: ${GENERATE_DIR_FOR_VERSION_CHECK}/generated/VersionConfig.h" )
 configure_file( ${CMAKE_SOURCE_DIR}/cmake/generated/VersionConfig.h.in ${GENERATE_DIR_FOR_VERSION_CHECK}/generated/VersionConfig.h )
 
+cmessage( STATUS "Generating source config header: ${GENERATE_DIR_FOR_VERSION_CHECK}/generated/SourceConfig.h" )
+configure_file( ${CMAKE_SOURCE_DIR}/cmake/generated/SourceConfig.h.in ${GENERATE_DIR_FOR_VERSION_CHECK}/generated/SourceConfig.h )
+
 

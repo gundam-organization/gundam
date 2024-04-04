@@ -19,9 +19,11 @@ void Parameter::readConfigImpl(){
     _isEnabled_ = GenericToolbox::Json::fetchValue(_parameterConfig_, "isEnabled", true);
     if( not _isEnabled_ ) { return; }
 
+    _isFixed_ = GenericToolbox::Json::fetchValue(_parameterConfig_, "isFixed", _isFixed_);
+
     auto priorTypeStr = GenericToolbox::Json::fetchValue(_parameterConfig_, "priorType", "");
     if( not priorTypeStr.empty() ){
-      _priorType_ = PriorType::PriorTypeEnumNamespace::toEnum(priorTypeStr);
+      _priorType_ = PriorType::toEnum( priorTypeStr, true );
       if( _priorType_ == PriorType::Flat ){ _isFree_ = true; }
     }
 
@@ -49,7 +51,7 @@ void Parameter::readConfigImpl(){
     }
 
     if( GenericToolbox::Json::doKeyExist(_parameterConfig_, "physicalLimits") ){
-        auto physLimits = GenericToolbox::Json::fetchValue(_parameterConfig_, "physicalLimits", nlohmann::json());
+        auto physLimits = GenericToolbox::Json::fetchValue(_parameterConfig_, "physicalLimits", JsonType());
         _minPhysical_ = GenericToolbox::Json::fetchValue(physLimits, "minValue", std::nan("UNSET"));
         _maxPhysical_ = GenericToolbox::Json::fetchValue(physLimits, "maxValue", std::nan("UNSET"));
     }
@@ -86,31 +88,22 @@ void Parameter::setMaxMirror(double maxMirror) {
   _maxMirror_ = maxMirror;
 }
 void Parameter::setParameterValue(double parameterValue) {
-  LogThrowIf( std::isnan(parameterValue), "Attempting to set NaN value for par:" << std::endl << this->getSummary() );
   if( _parameterValue_ != parameterValue ){
     _gotUpdated_ = true;
     _parameterValue_ = parameterValue;
   }
   else{ _gotUpdated_ = false; }
 }
-void Parameter::setDialSetConfig(const nlohmann::json &jsonConfig_) {
+void Parameter::setDialSetConfig(const JsonType &jsonConfig_) {
   auto jsonConfig = jsonConfig_;
   while( jsonConfig.is_string() ){
     LogWarning << "Forwarding FitParameterSet config to: \"" << jsonConfig.get<std::string>() << "\"..." << std::endl;
     jsonConfig = ConfigUtils::readConfigFile(jsonConfig.get<std::string>());
   }
-  _dialDefinitionsList_ = jsonConfig.get<std::vector<nlohmann::json>>();
+  _dialDefinitionsList_ = jsonConfig.get<std::vector<JsonType>>();
 }
-void Parameter::setParameterDefinitionConfig(const nlohmann::json &config_){
+void Parameter::setParameterDefinitionConfig(const JsonType &config_){
   _parameterConfig_ = config_;
-  ConfigUtils::forwardConfig(_parameterConfig_);
-}
-
-void Parameter::setValueAtPrior(){
-  _parameterValue_ = _priorValue_;
-}
-void Parameter::setCurrentValueAsPrior(){
-  _priorValue_ = _parameterValue_;
 }
 
 bool Parameter::isValueWithinBounds() const{

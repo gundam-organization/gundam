@@ -26,12 +26,18 @@ if( ROOT_FOUND )
   cmessage( STATUS "[ROOT]: ROOT include directory: ${ROOT_INCLUDE_DIRS}" )
   cmessage( STATUS "[ROOT]: ROOT C++ Flags: ${ROOT_CXX_FLAGS}" )
 
+  execute_process(COMMAND ${ROOT_root_CMD}-config --version
+      OUTPUT_VARIABLE ROOT_VERSION
+      OUTPUT_STRIP_TRAILING_WHITESPACE
+  )
+  cmessage( STATUS "[ROOT]: ROOT Version: ${ROOT_VERSION}" )
+
   # Grab functions such as generate dictionary
   include( ${ROOT_USE_FILE} )
 
   if (NOT ROOT_minuit2_FOUND)
     # Minuit2 wasn't found, but make really sure before giving up.
-    execute_process (COMMAND root-config --has-minuit2
+    execute_process (COMMAND ${ROOT_INCLUDE_DIRS}/../bin/root-config --has-minuit2
         OUTPUT_VARIABLE ROOT_minuit2_FOUND
         OUTPUT_STRIP_TRAILING_WHITESPACE)
   endif(NOT ROOT_minuit2_FOUND)
@@ -91,13 +97,7 @@ execute_process(COMMAND root-config --has-cxx20 COMMAND grep yes
     OUTPUT_VARIABLE ROOT_cxx20_FOUND
     OUTPUT_STRIP_TRAILING_WHITESPACE)
 
-if (NOT ROOT_minuit2_FOUND)
-  cmessage( STATUS "[ROOT]:Rebuild root using -Dminuit2=on in the cmake command")
-  cmessage(FATAL_ERROR "[ROOT]: minuit2 is required")
-endif(NOT ROOT_minuit2_FOUND)
-
 include_directories( ${ROOT_INCLUDE_DIR} )
-link_libraries( ${ROOT_LIBRARIES} )
 
 
 ####################
@@ -156,19 +156,24 @@ link_libraries( ${YAML_CPP_LIBRARIES} )
 # ZLIB (optional)
 ####################
 
-cmessage( STATUS "Looking for optional ZLib install..." )
-find_package(ZLIB)
-if (${ZLIB_FOUND})
-  cmessage( STATUS "ZLIB found : ${ZLIB_VERSION_STRING}")
-  cmessage( STATUS "ZLIB_INCLUDE_DIRS = ${ZLIB_INCLUDE_DIRS}")
-  cmessage( STATUS "ZLIB_LIBRARIES = ${ZLIB_LIBRARIES}")
-
-  add_definitions( -D USE_ZLIB=1 )
-  include_directories( ${ZLIB_INCLUDE_DIRS} )
-  link_libraries( ${ZLIB_LIBRARIES} )
-else()
-  cmessage( WARNING "ZLib not found. Will compile without the associated features." )
+if( ${DISABLE_ZLIB} )
+  cmessage( WARNING "DISABLE_ZLIB=ON. Not using Zlib." )
   add_definitions( -D USE_ZLIB=0 )
+else()
+  cmessage( STATUS "Looking for optional ZLib install..." )
+  find_package(ZLIB)
+  if (${ZLIB_FOUND})
+    cmessage( STATUS "ZLIB found : ${ZLIB_VERSION_STRING}")
+    cmessage( STATUS "ZLIB_INCLUDE_DIRS = ${ZLIB_INCLUDE_DIRS}")
+    cmessage( STATUS "ZLIB_LIBRARIES = ${ZLIB_LIBRARIES}")
+
+    add_definitions( -D USE_ZLIB=1 )
+    include_directories( ${ZLIB_INCLUDE_DIRS} )
+    link_libraries( ${ZLIB_LIBRARIES} )
+  else()
+    cmessage( WARNING "ZLib not found. Will compile without the associated features." )
+    add_definitions( -D USE_ZLIB=0 )
+  endif ()
 endif ()
 
 

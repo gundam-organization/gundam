@@ -113,7 +113,7 @@ void CompactSpline::buildDial(const std::vector<double>& v1,
 }
 
 double CompactSpline::evalResponse(const DialInputBuffer& input_) const {
-  double dialInput{input_.getBuffer()[0]};
+  double dialInput{input_.getInputBuffer()[0]};
 
 #ifndef NDEBUG
   LogThrowIf(not std::isfinite(dialInput), "Invalid input for CompactSpline");
@@ -130,7 +130,7 @@ double CompactSpline::evalResponse(const DialInputBuffer& input_) const {
 
 std::string CompactSpline::getSummary() const {
   std::stringstream ss;
-  ss << this->getDialTypeName() << ": spline data = " << GenericToolbox::parseVectorAsString(_splineData_);
+  ss << this->getDialTypeName() << ": spline data = " << GenericToolbox::toString(_splineData_);
   ss << std::endl << this->getDialTypeName() << ": defined bounds = { " << _splineBounds_.first << ", " << _splineBounds_.second << " }";
   ss << std::endl << this->getDialTypeName() << ": allow extrapolation ? " << _allowExtrapolation_;
   return ss.str();

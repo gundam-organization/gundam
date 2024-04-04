@@ -24,7 +24,6 @@
 #include "Shift.h"
 
 #include <memory>
-#include <vector>
 #include <set>
 
 LoggerInit([]{
@@ -130,8 +129,8 @@ bool Cache::Manager::HasCUDA() {
     return Cache::Parameters::UsingCUDA();
 }
 
-bool Cache::Manager::Build(SampleSet& sampleList,
-                           EventDialCache& eventDials) {
+bool Cache::Manager::Build( SampleSet& sampleList,
+                            EventDialCache& eventDials) {
     LogInfo << "Build the internal caches " << std::endl;
 
     /// Zero everything before counting the amount of space needed for the
@@ -155,24 +154,23 @@ bool Cache::Manager::Build(SampleSet& sampleList,
     std::set<const Parameter*> usedParameters;
 
     std::map<std::string, int> useCount;
-    for (EventDialCache::CacheElem_t& elem : eventDials.getCache()) {
-        if (elem.event->getSampleBinIndex() < 0) {
+    for (EventDialCache::CacheEntry& elem : eventDials.getCache()) {
+        if (elem.event->getIndices().bin < 0) {
             throw std::runtime_error("Caching event that isn't used");
         }
         ++events;
-        for (EventDialCache::DialsElem_t& dialElem : elem.dials) {
-            DialInterface* dialInterface = dialElem.interface;
+        for( auto& dialResponseCache : elem.dialResponseCacheList) {
             // This is depending behavior that is not guarranteed, but which
             // is probably valid because of the particular usage.
-            // Specifically, it depends on the vector of FitParameter objects
+            // Specifically, it depends on the vector of Parameter objects
             // not being moved.  This happens after the vectors are "closed",
             // so it is probably safe, but this isn't good.  The particular
             // usage is forced do to an API change.
-            const Parameter* fp = &(dialInterface->getInputBufferRef()->getFitParameter());
+            const Parameter* fp = &(dialResponseCache.dialInterface.getInputBufferRef()->getParameter(0));
             usedParameters.insert(fp);
             ++useCount[fp->getFullTitle()];
 
-            DialBase* dial = dialInterface->getDialBaseRef();
+            DialBase* dial = dialResponseCache.dialInterface.getDialBaseRef();
             std::string dialType = dial->getDialTypeName();
             if (dialType.find("Norm") == 0) {
                 ++norms;
@@ -211,9 +209,8 @@ bool Cache::Manager::Build(SampleSet& sampleList,
 
     // Count the total number of histogram cells.
     int histCells = 0;
-    for(const Sample& sample : sampleList.getFitSampleList() ){
-        if (!sample.getMcContainer().histogram) continue;
-        int cells = sample.getMcContainer().histogram->GetNcells();
+    for(const Sample& sample : sampleList.getSampleList() ){
+        int cells = sample.getMcContainer().generateRootHistogram()->GetNcells();
         LogInfo  << "Add histogram for " << sample.getName()
                 << " with " << cells
                 << " cells (includes under/over-flows)" << std::endl;
@@ -328,8 +325,8 @@ void Cache::Manager::UpdateRequired() {
 }
 
 
-bool Cache::Manager::Update(SampleSet& sampleList,
-                            EventDialCache& eventDials) {
+bool Cache::Manager::Update( SampleSet& sampleList,
+                             EventDialCache& eventDials) {
     if (not fUpdateRequired) return true;
 
     // This is the updated that is required!
@@ -353,34 +350,33 @@ bool Cache::Manager::Update(SampleSet& sampleList,
     int usedResults = 0;
 
     // Add the dials in the EventDialCache to the internal cache.
-    for (EventDialCache::CacheElem_t& elem : eventDials.getCache()) {
+    for (EventDialCache::CacheEntry& elem : eventDials.getCache()) {
         // Skip events that are not in a bin.
-        if (elem.event->getSampleBinIndex() < 0) continue;
-        PhysicsEvent& event = *elem.event;
+        if (elem.event->getIndices().bin < 0) continue;
+        Event& event = *elem.event;
         // The reduce index.  This is where to save the results for this
         // event in the cache.
         int resultIndex = usedResults++;
 
-        event.setCacheManagerIndex(resultIndex);
-        event.setCacheManagerValuePointer(Cache::Manager::Get()
+        event.getCache().index = resultIndex;
+        event.getCache().valuePtr = (Cache::Manager::Get()
                                           ->GetWeightsCache()
                                           .GetResultPointer(resultIndex));
-        event.setCacheManagerValidPointer(Cache::Manager::Get()
+        event.getCache().isValidPtr = (Cache::Manager::Get()
                                           ->GetWeightsCache()
                                           .GetResultValidPointer());
-        event.setCacheManagerUpdatePointer(
+        event.getCache().updateCallbackPtr = (
             [](){Cache::Manager::Get()->GetWeightsCache().GetResult(0);});
 
         // Get the initial value for this event and save it.
-        double initialEventWeight = event.getBaseWeight();
+        double initialEventWeight = event.getWeights().base;
 
         // Add each dial for the event to the GPU caches.
-        for (EventDialCache::DialsElem_t& dialElem : elem.dials) {
-            DialInterface* dialInterface = dialElem.interface;
-            DialInputBuffer* dialInputs = dialInterface->getInputBufferRef();
+        for( auto& dialElem : elem.dialResponseCacheList ){
+            DialInputBuffer* dialInputs = dialElem.dialInterface.getInputBufferRef();
 
             // Check if this dial is used at all.
-            if (dialInputs->isMasked()) continue;
+            if (dialInputs->isMasked()){ continue; }
 
             // Make sure all of the used parameters are in the parameter
             // map.
@@ -388,8 +384,8 @@ bool Cache::Manager::Update(SampleSet& sampleList,
                 // Find the index (or allocate a new one) for the dial
                 // parameter.  This only works for 1D dials.
                 const Parameter* fp
-                    = &(dialInterface->getInputBufferRef()
-                        ->getFitParameter(i));
+                    = &(dialElem.dialInterface.getInputBufferRef()
+                        ->getParameter(i));
                 auto parMapIt = Cache::Manager::ParameterMap.find(fp);
                 if (parMapIt == Cache::Manager::ParameterMap.end()) {
                     Cache::Manager::ParameterMap[fp]
@@ -398,24 +394,22 @@ bool Cache::Manager::Update(SampleSet& sampleList,
             }
 
             // Apply the mirroring for the parameters
-            if (dialInputs->useParameterMirroring()) {
-                for (std::size_t i = 0; i < dialInputs->getBufferSize(); ++i) {
-                    const Parameter* fp = &(dialInputs->getFitParameter(i));
-                    const std::pair<double,double>& bounds =
-                        dialInputs->getMirrorBounds(i);
-                    int parIndex = Cache::Manager::ParameterMap[fp];
-                    Cache::Manager::Get()->GetParameterCache()
-                        .SetLowerMirror(parIndex,bounds.first);
-                    Cache::Manager::Get()->GetParameterCache()
-                        .SetUpperMirror(parIndex,bounds.first+bounds.second);
-                }
+          for (std::size_t i = 0; i < dialInputs->getBufferSize(); ++i) {
+            const Parameter* fp = &(dialInputs->getParameter(i));
+            auto& bounds = dialInputs->getMirrorEdges(i);
+            if( not std::isnan(bounds.minValue) ){
+              int parIndex = Cache::Manager::ParameterMap[fp];
+              Cache::Manager::Get()->GetParameterCache().SetLowerMirror(parIndex, bounds.minValue);
+              Cache::Manager::Get()->GetParameterCache().SetUpperMirror(parIndex, bounds.minValue+bounds.range);
             }
+
+          }
 
             // Apply the clamps to the parameter range
             for (std::size_t i = 0; i < dialInputs->getBufferSize(); ++i) {
-                const Parameter* fp = &(dialInputs->getFitParameter(i));
+                const Parameter* fp = &(dialInputs->getParameter(i));
                 const DialResponseSupervisor* resp
-                    = dialInterface->getResponseSupervisorRef();
+                    = dialElem.dialInterface.getResponseSupervisorRef();
                 int parIndex = Cache::Manager::ParameterMap[fp];
                 double minResponse = 0.0;
                 if (std::isfinite(resp->getMinResponse())) {
@@ -430,11 +424,11 @@ bool Cache::Manager::Update(SampleSet& sampleList,
 
             // Add the dial information to the appropriate caches
             int dialUsed = 0;
-            const DialBase* baseDial = dialInterface->getDialBaseRef();
+            const DialBase* baseDial = dialElem.dialInterface.getDialBaseRef();
             const Norm* normDial = dynamic_cast<const Norm*>(baseDial);
             if (normDial) {
                 ++dialUsed;
-                const Parameter* fp = &(dialInputs->getFitParameter(0));
+                const Parameter* fp = &(dialInputs->getParameter(0));
                 int parIndex = Cache::Manager::ParameterMap[fp];
                 Cache::Manager::Get()
                     ->fNormalizations
@@ -444,7 +438,7 @@ bool Cache::Manager::Update(SampleSet& sampleList,
                 = dynamic_cast<const CompactSpline*>(baseDial);
             if (compactSpline) {
                 ++dialUsed;
-                const Parameter* fp = &(dialInputs->getFitParameter(0));
+                const Parameter* fp = &(dialInputs->getParameter(0));
                 int parIndex = Cache::Manager::ParameterMap[fp];
                 Cache::Manager::Get()
                     ->fCompactSplines
@@ -455,7 +449,7 @@ bool Cache::Manager::Update(SampleSet& sampleList,
                 = dynamic_cast<const MonotonicSpline*>(baseDial);
             if (monotonicSpline) {
                 ++dialUsed;
-                const Parameter* fp = &(dialInputs->getFitParameter(0));
+                const Parameter* fp = &(dialInputs->getParameter(0));
                 int parIndex = Cache::Manager::ParameterMap[fp];
                 Cache::Manager::Get()
                     ->fMonotonicSplines
@@ -466,7 +460,7 @@ bool Cache::Manager::Update(SampleSet& sampleList,
                 = dynamic_cast<const UniformSpline*>(baseDial);
             if (uniformSpline) {
                 ++dialUsed;
-                const Parameter* fp = &(dialInputs->getFitParameter(0));
+                const Parameter* fp = &(dialInputs->getParameter(0));
                 int parIndex = Cache::Manager::ParameterMap[fp];
                 Cache::Manager::Get()
                     ->fUniformSplines
@@ -477,7 +471,7 @@ bool Cache::Manager::Update(SampleSet& sampleList,
                 = dynamic_cast<const GeneralSpline*>(baseDial);
             if (generalSpline) {
                 ++dialUsed;
-                const Parameter* fp = &(dialInputs->getFitParameter(0));
+                const Parameter* fp = &(dialInputs->getParameter(0));
                 int parIndex = Cache::Manager::ParameterMap[fp];
                 Cache::Manager::Get()
                     ->fGeneralSplines
@@ -488,7 +482,7 @@ bool Cache::Manager::Update(SampleSet& sampleList,
                 = dynamic_cast<const LightGraph*>(baseDial);
             if (lightGraph) {
                 ++dialUsed;
-                const Parameter* fp = &(dialInputs->getFitParameter(0));
+                const Parameter* fp = &(dialInputs->getParameter(0));
                 int parIndex = Cache::Manager::ParameterMap[fp];
                 Cache::Manager::Get()
                     ->fGraphs
@@ -536,11 +530,11 @@ bool Cache::Manager::Update(SampleSet& sampleList,
     // Add the histogram cells to the cache.  THIS CODE IS SUSPECT!!!!
     LogInfo << "Add this histogram cells to the cache." << std::endl;
     int nextHist = 0;
-    for(Sample& sample : sampleList.getFitSampleList() ) {
+    for(Sample& sample : sampleList.getSampleList() ) {
         LogInfo  << "Fill cache for " << sample.getName()
-                << " with " << sample.getMcContainer().eventList.size()
+                << " with " << sample.getMcContainer().getEventList().size()
                 << " events" << std::endl;
-        std::shared_ptr<TH1> hist(sample.getMcContainer().histogram);
+        std::shared_ptr<TH1> hist(sample.getMcContainer().generateRootHistogram());
         if (!hist) {
             throw std::runtime_error("missing sample histogram");
         }
@@ -563,10 +557,10 @@ bool Cache::Manager::Update(SampleSet& sampleList,
         int cells = hist->GetNcells();
         nextHist += cells;
         /// ARE ALL OF THE EVENTS HANDLED?
-        for (PhysicsEvent& event
-                 : sample.getMcContainer().eventList) {
-            int eventIndex = event.getCacheManagerIndex();
-            int cellIndex = event.getSampleBinIndex();
+        for (Event& event
+                 : sample.getMcContainer().getEventList()) {
+            int eventIndex = event.getCache().index;
+            int cellIndex = event.getIndices().bin;
             if (cellIndex < 0 || cells <= cellIndex) {
                 throw std::runtime_error("Histogram bin out of range");
             }

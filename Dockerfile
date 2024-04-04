@@ -2,6 +2,7 @@ FROM rootproject/root as base
 
 SHELL ["/bin/bash", "-c"]
 
+RUN apt-get update
 RUN apt-get install -y \
     git libyaml-cpp-dev nlohmann-json3-dev
 

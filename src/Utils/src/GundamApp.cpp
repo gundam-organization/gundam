@@ -36,7 +36,7 @@ void GundamApp::setConfigString(const std::string &configString) {
 
 void GundamApp::openOutputFile(const std::string& filePath_){
   LogWarning << "Creating output file: \"" << filePath_ << "\"..." << std::endl;
-  GenericToolbox::mkdirPath( GenericToolbox::getFolderPathFromFilePath( filePath_ ) );
+  GenericToolbox::mkdir( GenericToolbox::getFolderPath( filePath_ ) );
   _outFile_ = std::make_unique<TFile>( filePath_.c_str(), "RECREATE" );
 }
 void GundamApp::writeAppInfo(){

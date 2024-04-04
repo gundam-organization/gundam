@@ -2,20 +2,21 @@
 // Created by Nadrino on 01/06/2021.
 //
 
+#include "GundamGlobals.h"
 #include "FitterEngine.h"
+#include "RootMinimizer.h"
 #include "ConfigUtils.h"
 #include "GundamUtils.h"
 #include "GundamApp.h"
-#include "GundamGlobals.h"
-#include "MinimizerInterface.h"
 #ifdef GUNDAM_USING_CACHE_MANAGER
 #include "CacheManager.h"
 #endif
 
-#include "CmdLineParser.h"
-#include "Logger.h"
 #include "GenericToolbox.Root.h"
 #include "GenericToolbox.Json.h"
+#include "GenericToolbox.Map.h"
+#include "CmdLineParser.h"
+#include "Logger.h"
 
 #include <string>
 #include <vector>
@@ -57,6 +58,7 @@ int main(int argc, char** argv){
   clParser.addOption("useDataEntry", {"--use-data-entry"}, "Overrides \"selectedDataEntry\" in dataSet config. Second arg is to select a given dataset");
   clParser.addOption("useDataConfig", {"--use-data-config"}, "Add a data entry to the data set definition and use it for the fit");
   clParser.addOption("injectParameterConfig", {"--inject-parameters"}, "Inject parameters defined in the provided config file");
+  clParser.addOption("injectToyParameters", {"--inject-toy-parameter"}, "Inject parameters defined in the provided config file");
   clParser.addOption("appendix", {"--appendix"}, "Add appendix to the output file name");
 
   clParser.addDummyOption("Trigger options");
@@ -139,6 +141,13 @@ int main(int argc, char** argv){
     injectParameterPath = clParser.getOptionVal<std::string>("injectParameterConfig");
   }
 
+  // toy par injector
+  std::string toyParInjector{};
+  if( clParser.isOptionTriggered("injectToyParameters") ){
+    toyParInjector = clParser.getOptionVal<std::string>("injectToyParameters");
+    LogWarning << "Inject toy parameter: " << toyParInjector << std::endl;
+  }
+
   // PRNG seed?
   gRandom = new TRandom3(0);    // Initialize with a UUID;
   if( clParser.isOptionTriggered("randomSeed") ){
@@ -188,6 +197,7 @@ int main(int argc, char** argv){
         {"kickMc", "KickMc"},
         {"lightOutputMode", "Light"},
         {"toyFit", "ToyFit_%s"},
+        {"injectToyParameters", "InjToyPar_%s"},
         {"dry-run", "DryRun"},
         {"appendix", "%s"},
     };
@@ -235,15 +245,16 @@ int main(int argc, char** argv){
   fitter.readConfig(GenericToolbox::Json::fetchSubEntry(configHandler.getConfig(), {"fitterEngineConfig"}));
 
   // -a
-  fitter.getPropagator().setLoadAsimovData( clParser.isOptionTriggered("asimov") );
+  fitter.getLikelihoodInterface().getDataSetManager().getPropagator().setLoadAsimovData(clParser.isOptionTriggered("asimov") );
+  fitter.getLikelihoodInterface().getDataSetManager().getPropagator().setLoadAsimovData(clParser.isOptionTriggered("asimov") );
 
   // --use-data-entry
   if( clParser.isOptionTriggered("useDataEntry") ){
     auto selectedDataEntry = clParser.getOptionVal<std::string>("useDataEntry", 0);
     // Do something better in case multiple datasets are defined
     bool isFound{false};
-    for( auto& dataSet : fitter.getPropagator().getDataSetList() ){
-      if( GenericToolbox::doesKeyIsInMap( selectedDataEntry, dataSet.getDataDispenserDict() ) ){
+    for( auto& dataSet : fitter.getLikelihoodInterface().getDataSetManager().getDataSetList() ){
+      if( GenericToolbox::isIn( selectedDataEntry, dataSet.getDataDispenserDict() ) ){
         LogWarning << "Using data entry \"" << selectedDataEntry << "\" for dataset: " << dataSet.getName() << std::endl;
         dataSet.setSelectedDataEntry( selectedDataEntry );
         isFound = true;
@@ -258,15 +269,15 @@ int main(int argc, char** argv){
   }
 
   // --skip-hesse
-  fitter.getMinimizer().setEnablePostFitErrorEval(not clParser.isOptionTriggered("skipHesse"));
+  fitter.getMinimizer().setDisableCalcError( clParser.isOptionTriggered("skipHesse") );
 
   // --scan <N>
   if( clParser.isOptionTriggered("scanParameters") ) {
     fitter.setEnablePreFitScan( true );
     fitter.setEnablePostFitScan( true );
-    fitter.getPropagator().getParScanner().setNbPoints(
-        clParser.getOptionVal("scanParameters", fitter.getPropagator().getParScanner().getNbPoints())
-        );
+    fitter.getParameterScanner().setNbPoints(
+        clParser.getOptionVal("scanParameters", fitter.getParameterScanner().getNbPoints())
+    );
   }
 
   // --enable-pca
@@ -274,8 +285,8 @@ int main(int argc, char** argv){
 
   // --toy <iToy>
   if( clParser.isOptionTriggered("toyFit") ){
-    fitter.getPropagator().setThrowAsimovToyParameters(true);
-    fitter.getPropagator().setIThrow(clParser.getOptionVal("toyFit", -1));
+    fitter.getLikelihoodInterface().getDataSetManager().getPropagator().setThrowAsimovToyParameters(true);
+    fitter.getLikelihoodInterface().getDataSetManager().getPropagator().setIThrow(clParser.getOptionVal("toyFit", -1));
   }
 
   // -d
@@ -289,8 +300,14 @@ int main(int argc, char** argv){
 
   // injectParameterPath
   if( not injectParameterPath.empty() ){
-    auto injectConfig = ConfigUtils::readConfigFile( injectParameterPath ); ConfigUtils::forwardConfig( injectConfig );
-    fitter.getPropagator().setParameterInjectorConfig(injectConfig);
+    auto injectConfig = ConfigUtils::readConfigFile( injectParameterPath );
+    fitter.getLikelihoodInterface().getDataSetManager().getPropagator().setParameterInjectorConfig(injectConfig);
+  }
+
+  // toyParInjector
+  if( not toyParInjector.empty() ){
+    auto injectConfig = ConfigUtils::readConfigFile( toyParInjector );
+    fitter.getLikelihoodInterface().getDataSetManager().setToyParameterInjector( injectConfig );
   }
 
   // Also check app level config options
@@ -313,8 +330,8 @@ int main(int argc, char** argv){
 
   if( clParser.isOptionTriggered("skipSimplex") ){
     LogAlert << "Explicitly disabling SIMPLEX first pass" << std::endl;
-    LogThrowIf( fitter.getMinimizer().getMinimizerTypeName() != "MinimizerInterface", "invalid option --skip-simplex" );
-    ((MinimizerInterface*) &fitter.getMinimizer())->setEnableSimplexBeforeMinimize( false );
+    LogThrowIf( fitter.getMinimizerType() != FitterEngine::MinimizerType::RootMinimizer, "invalid option --skip-simplex" );
+    ((RootMinimizer*) &fitter.getMinimizer())->setEnableSimplexBeforeMinimize( false );
   }
 
 
@@ -326,7 +343,7 @@ int main(int argc, char** argv){
   // show initial conditions
   if( clParser.isOptionTriggered("injectParameterConfig") ) {
     LogDebug << "Starting mc parameters that where injected:" << std::endl;
-    LogDebug << fitter.getPropagator().getParametersManager().getParametersSummary( false ) << std::endl;
+    LogDebug << fitter.getLikelihoodInterface().getDataSetManager().getPropagator().getParametersManager().getParametersSummary(false ) << std::endl;
   }
 
   if( clParser.isOptionTriggered("scanLine") ){
@@ -339,7 +356,7 @@ int main(int argc, char** argv){
 
       GenericToolbox::writeInTFile( outDir, TNamed("endPoint", GenericToolbox::Json::toReadableString(endPoint).c_str()) );
 
-      fitter.getPropagator().getParScanner().scanSegment( outDir, endPoint );
+      fitter.getParameterScanner().scanSegment( outDir, endPoint );
     }
     else if( clParser.getNbValueSet("scanLine") == 2 ) {
       LogAlert << "Will scan the line from point A (" << clParser.getOptionVal<std::string>("scanLine", 0)
@@ -351,7 +368,7 @@ int main(int argc, char** argv){
       GenericToolbox::writeInTFile( outDir, TNamed("startPoint", GenericToolbox::Json::toReadableString(startPoint).c_str()) );
       GenericToolbox::writeInTFile( outDir, TNamed("endPoint", GenericToolbox::Json::toReadableString(endPoint).c_str()) );
 
-      fitter.getPropagator().getParScanner().scanSegment( outDir, endPoint, startPoint );
+      fitter.getParameterScanner().scanSegment( outDir, endPoint, startPoint );
     }
     else{
       LogThrow("");

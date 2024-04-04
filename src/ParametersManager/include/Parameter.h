@@ -7,25 +7,23 @@
 
 #include "JsonBaseClass.h"
 
-#include "GenericToolbox.h"
-
 #include "nlohmann/json.hpp"
 
 #include <vector>
 #include <string>
 
-namespace PriorType{
-  ENUM_EXPANDER(
-    PriorType, -1,
-    Unset,
-    Gaussian,
-    Flat
-  );
-}
 
 class ParameterSet;
 
 class Parameter : public JsonBaseClass {
+
+public:
+#define ENUM_NAME PriorType
+#define ENUM_FIELDS \
+  ENUM_FIELD(Unset, -1) \
+  ENUM_FIELD(Gaussian) \
+  ENUM_FIELD(Flat)
+#include "GenericToolbox.MakeEnum.h"
 
 protected:
   // called through public JsonBaseClass::readConfig() and JsonBaseClass::initialize()
@@ -56,10 +54,10 @@ public:
   void setStdDevValue(double stdDevValue){ _stdDevValue_ = stdDevValue; }
   void setParameterValue(double parameterValue);
   void setName(const std::string &name){ _name_ = name; }
-  void setDialSetConfig(const nlohmann::json &jsonConfig_);
-  void setParameterDefinitionConfig(const nlohmann::json &config_);
+  void setDialSetConfig(const JsonType &jsonConfig_);
+  void setParameterDefinitionConfig(const JsonType &config_);
   void setOwner(const ParameterSet *owner_){ _owner_ = owner_; }
-  void setPriorType(PriorType::PriorType priorType){ _priorType_ = priorType; }
+  void setPriorType(PriorType priorType){ _priorType_ = priorType; }
   void setMarginalised(bool isMarginalised){ _isMarginalised_ = isMarginalised; }
 
   // Getters
@@ -81,14 +79,18 @@ public:
   [[nodiscard]] double getStdDevValue() const{ return _stdDevValue_; }
   [[nodiscard]] double getParameterValue() const{ return _parameterValue_; }
   [[nodiscard]] const std::string &getName() const{ return _name_; }
-  [[nodiscard]] const nlohmann::json &getDialDefinitionsList() const{ return _dialDefinitionsList_; }
+  [[nodiscard]] const JsonType &getDialDefinitionsList() const{ return _dialDefinitionsList_; }
   [[nodiscard]] const ParameterSet *getOwner() const{ return _owner_; }
+<<<<<<< HEAD
   [[nodiscard]] PriorType::PriorType getPriorType() const{ return _priorType_; }
   [[nodiscard]] bool isMarginalised() const{ return _isMarginalised_; }
+=======
+  [[nodiscard]] PriorType getPriorType() const{ return _priorType_; }
+>>>>>>> origin/main
 
   // Core
-  void setValueAtPrior();
-  void setCurrentValueAsPrior();
+  void setValueAtPrior(){ _parameterValue_ = _priorValue_; }
+  void setCurrentValueAsPrior(){ _priorValue_ = _parameterValue_; }
   [[nodiscard]] bool isValueWithinBounds() const;
   [[nodiscard]] double getDistanceFromNominal() const; // in unit of sigmas
   [[nodiscard]] std::string getSummary(bool shallow_=false) const;
@@ -116,13 +118,18 @@ private:
   double _stepSize_{std::nan("unset")};
   std::string _name_{};
   std::string _dialsWorkingDirectory_{"."};
+<<<<<<< HEAD
   nlohmann::json _parameterConfig_{};
   nlohmann::json _dialDefinitionsList_{};
   bool _isMarginalised_{false};
+=======
+  JsonType _parameterConfig_{};
+  JsonType _dialDefinitionsList_{};
+>>>>>>> origin/main
 
   // Internals
   const ParameterSet* _owner_{nullptr};
-  PriorType::PriorType _priorType_{PriorType::Gaussian};
+  PriorType _priorType_{PriorType::Gaussian};
 
 };
 

@@ -2,12 +2,11 @@
 // Created by Adrien Blanchet on 29/09/2023.
 //
 
-#ifndef GUNDAM_DATADISPENSERUTILS_H
-#define GUNDAM_DATADISPENSERUTILS_H
+#ifndef GUNDAM_DATA_DISPENSER_UTILS_H
+#define GUNDAM_DATA_DISPENSER_UTILS_H
 
+#include "Propagator.h"
 #include "EventVarTransformLib.h"
-#include "DialCollection.h"
-#include "Sample.h"
 
 #include "GenericToolbox.Wrappers.h"
 
@@ -29,20 +28,21 @@ struct DataDispenserParameters{
   std::map<std::string, std::string> variableDict{};
   std::vector<std::string> additionalVarsStorage{};
   std::vector<std::string> dummyVariablesList;
-  int iThrow{-1};
   size_t debugNbMaxEventsToLoad{0};
 
-  nlohmann::json fromHistContent{};
+  JsonType fromHistContent{};
 
   [[nodiscard]] std::string getSummary() const;
 };
 
 struct DataDispenserCache{
+  Propagator* propagatorPtr{nullptr};
+
   std::vector<Sample*> samplesToFillList{};
   std::vector<size_t> sampleNbOfEvents;
   std::vector<std::vector<bool>> eventIsInSamplesList{};
   std::vector<size_t> sampleIndexOffsetList;
-  std::vector< std::vector<PhysicsEvent>* > sampleEventListPtrToFill;
+  std::vector< std::vector<Event>* > sampleEventListPtrToFill;
   std::vector<DialCollection*> dialCollectionsRefList{};
 
   std::vector<std::string> varsRequestedForIndexing{};
@@ -68,4 +68,4 @@ struct DataDispenserCache{
 
 
 
-#endif //GUNDAM_DATADISPENSERUTILS_H
+#endif //GUNDAM_DATA_DISPENSER_UTILS_H

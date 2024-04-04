@@ -4,7 +4,7 @@
 
 [![Generic badge](https://img.shields.io/badge/Example_of_inputs-OA2020-GREEN.svg)](https://github.com/nadrino/gundamInputOa2020)  [![GitHub forks](https://badgen.net/github/forks/nadrino/gundam/)](https://github.com/nadrino/gundam/network/members) [![GitHub release](https://img.shields.io/github/release/nadrino/gundam.svg)](https://github.com/nadrino/gundam/releases/)
 
-GUNDAM, for *Generic fitter for Upgraded Near Detector Analysis Methods*,
+GUNDAM, standing for *Generalized and Unified Neutrino Data Analysis Methods*,
 is a suite of applications which aims at performing various statistical
 analysis with different purposes and setups.
 It has been developed as a fork of 
@@ -20,16 +20,6 @@ As GUNDAM is designed for maximize flexibility to accommodate
 various physics works, it allows to share optimizations
 and debugging for every project at once.
 
-## Showcase
-
-![](./resources/images/samplesExample.png)
-
-<details>
-  <summary><b>Spoiler: More Screenshots</b></summary>
-
-![](./resources/images/postFitCorrExample.png)
-
-</details>
 
 ![bannerStyle.001.png](resources/images/bannerStyle/bannerStyle.001.png)
 
@@ -89,7 +79,7 @@ We assume
 
 ```bash
 cd $REPO_DIR
-git clone https://github.com/gundam-organization/gundam.git
+git clone --recurse-submodules https://github.com/gundam-organization/gundam.git
 cd gundam
 ```
 
@@ -103,7 +93,8 @@ check out the latest tagged version by tapping:
 
 Note that this command will also automatically check out the submodule
 included in the project. Therefore, in order to update your code when
-a new release is available, simply use the same command.
+a new release is available, simply use the same command. Note that git versions 
+before 2.0 may have issues to checkout the correct submodules (see issue #429)
 
 
 

@@ -1,13 +1,12 @@
 //
-// Created by Adrien Blanchet on 13/10/2023.
+// Created by Nadrino on 13/10/2023.
 //
 
 #include "ParametersManager.h"
 #include "ConfigUtils.h"
 
-#include "GenericToolbox.ScopedGuard.h"
+#include "GenericToolbox.Utils.h"
 #include "GenericToolbox.Json.h"
-#include "GenericToolbox.h"
 #include "Logger.h"
 
 #include <sstream>
@@ -25,8 +24,20 @@ void ParametersManager::unmuteLogger(){ Logger::setIsMuted( false ); }
 // config
 void ParametersManager::readConfigImpl(){
 
+  _parameterSetListConfig_ = GenericToolbox::Json::fetchValue(_config_, "parameterSetList", _parameterSetListConfig_);
+
   _reThrowParSetIfOutOfBounds_ = GenericToolbox::Json::fetchValue(_config_, "reThrowParSetIfOutOfBounds", _reThrowParSetIfOutOfBounds_);
   _throwToyParametersWithGlobalCov_ = GenericToolbox::Json::fetchValue(_config_, "throwToyParametersWithGlobalCov", _throwToyParametersWithGlobalCov_);
+
+  LogInfo << "Reading parameter configuration..." << std::endl;
+  _parameterSetList_.clear(); // make sure there nothing in case readConfig is called more than once
+  _parameterSetList_.reserve( _parameterSetListConfig_.size() );
+  for( const auto& parameterSetConfig : _parameterSetListConfig_ ){
+    _parameterSetList_.emplace_back();
+    _parameterSetList_.back().readConfig( parameterSetConfig );
+    LogInfo << _parameterSetList_.back().getSummary() << std::endl;
+  }
+  LogInfo << _parameterSetList_.size() << " parameter sets defined." << std::endl;
 
 }
 void ParametersManager::initializeImpl(){
@@ -96,10 +107,10 @@ std::string ParametersManager::getParametersSummary(bool showEigen_ ) const{
   }
   return ss.str();
 }
-nlohmann::json ParametersManager::exportParameterInjectorConfig() const{
-  nlohmann::json out;
+JsonType ParametersManager::exportParameterInjectorConfig() const{
+  JsonType out;
 
-  std::vector<nlohmann::json> parSetConfig;
+  std::vector<JsonType> parSetConfig;
   parSetConfig.reserve( _parameterSetList_.size() );
   for( auto& parSet : _parameterSetList_ ){
     if( not parSet.isEnabled() ){ continue; }
@@ -124,7 +135,7 @@ const ParameterSet* ParametersManager::getFitParameterSetPtr(const std::string& 
   std::vector<std::string> parSetNames{};
   parSetNames.reserve( _parameterSetList_.size() );
   for( auto& parSet : _parameterSetList_ ){ parSetNames.emplace_back(parSet.getName()); }
-  LogThrow("Could not find fit parameter set named \"" << name_ << "\" among defined: " << GenericToolbox::parseVectorAsString(parSetNames));
+  LogThrow("Could not find fit parameter set named \"" << name_ << "\" among defined: " << GenericToolbox::toString(parSetNames));
   return nullptr;
 }
 
@@ -151,7 +162,7 @@ void ParametersManager::throwParametersFromParSetCovariance(){
     if( parSet.getPriorCovarianceMatrix() != nullptr ){
       LogWarning << parSet.getName() << ": throwing correlated parameters..." << std::endl;
       LogScopeIndent;
-      parSet.throwFitParameters(_reThrowParSetIfOutOfBounds_);
+      parSet.throwParameters(_reThrowParSetIfOutOfBounds_);
     } // throw?
     else{
       LogAlert << "No correlation matrix defined for " << parSet.getName() << ". NOT THROWING. (dev: could throw only with sigmas?)" << std::endl;
@@ -227,7 +238,7 @@ void ParametersManager::throwParametersFromGlobalCovariance(bool quietVerbose_){
     // Making sure eigen decomposed parameters get the conversion done
     for( auto& parSet : _parameterSetList_ ){
       if( not parSet.isEnabled() ) continue;
-      if( parSet.isUseEigenDecompInFit() ){
+      if( parSet.isEnableEigenDecomp() ){
         parSet.propagateOriginalToEigen();
 
         // also check the bounds of real parameter space
@@ -261,7 +272,7 @@ void ParametersManager::throwParametersFromGlobalCovariance(bool quietVerbose_){
             LogInfo << " → " << par.getParameterValue() << std::endl;
           }
         }
-        if( parSet.isUseEigenDecompInFit() ){
+        if( parSet.isEnableEigenDecomp() ){
           LogInfo << "Translated to eigen space:" << std::endl;
           for( auto& eigenPar : parSet.getEigenParameterList() ){
             LogScopeIndent;
@@ -279,6 +290,7 @@ void ParametersManager::throwParametersFromGlobalCovariance(bool quietVerbose_){
   }
 }
 
+<<<<<<< HEAD
 void ParametersManager::throwParametersFromGlobalCovariance(std::vector<double> &weightsChiSquare){
     throwParametersFromGlobalCovariance(weightsChiSquare,0,0,0);
 }// end of function
@@ -499,7 +511,14 @@ void ParametersManager::throwParametersFromTStudent(std::vector<double> &weights
     }
 }
 
-void ParametersManager::injectParameterValues(const nlohmann::json &config_) {
+
+void ParametersManager::moveParametersToPrior(){
+  for( auto& parSet : _parameterSetList_ ){
+    if( not parSet.isEnabled() ){ continue; }
+    parSet.moveParametersToPrior();
+  }
+}
+void ParametersManager::injectParameterValues(const JsonType &config_) {
   LogWarning << "Injecting parameters..." << std::endl;
 
   if( not GenericToolbox::Json::doKeyExist(config_, "parameterSetList") ){
@@ -508,7 +527,7 @@ void ParametersManager::injectParameterValues(const nlohmann::json &config_) {
     return;
   }
 
-  for( auto& entryParSet : GenericToolbox::Json::fetchValue<nlohmann::json>( config_, "parameterSetList" ) ){
+  for( auto& entryParSet : GenericToolbox::Json::fetchValue<JsonType>( config_, "parameterSetList" ) ){
     auto parSetName = GenericToolbox::Json::fetchValue<std::string>(entryParSet, "name");
     LogInfo << "Reading injection parameters for parSet: " << parSetName << std::endl;
 

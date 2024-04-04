@@ -5,7 +5,7 @@
 #include "DataBin.h"
 
 #include "Logger.h"
-#include "GenericToolbox.h"
+
 #include "GenericToolbox.Root.h"
 
 #include <stdexcept>
@@ -16,7 +16,7 @@ LoggerInit([]{
 } );
 
 
-void DataBin::Edges::readConfig(const nlohmann::json& config_){
+void DataBin::Edges::readConfig(const JsonType& config_){
 
   varName = GenericToolbox::Json::fetchValue<std::string>(config_, "var");
 
@@ -194,9 +194,9 @@ void DataBin::generateTreeFormula() {
   }
   _treeFormula_ = std::shared_ptr<TTreeFormula>(GenericToolbox::createTreeFormulaWithoutTree(_treeFormulaStr_, varNameList));
 }
-void DataBin::readConfig( const nlohmann::json& config_){
+void DataBin::readConfig( const JsonType& config_){
 
-  auto edgesConfigList = GenericToolbox::Json::fetchValue(config_, "edgesList", nlohmann::json());
+  auto edgesConfigList = GenericToolbox::Json::fetchValue(config_, "edgesList", JsonType());
   _binEdgesList_.reserve( edgesConfigList.size() );
   for( auto& edgeConfig : edgesConfigList ){
     _binEdgesList_.emplace_back( _binEdgesList_.size() );

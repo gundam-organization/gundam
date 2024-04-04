@@ -9,10 +9,9 @@
 #include "ParameterThrowerMarkHarz.h"
 #include "ConfigUtils.h"
 
-#include "GenericToolbox.h"
 #include "GenericToolbox.Root.h"
 #include "GenericToolbox.Json.h"
-#include "GenericToolbox.TablePrinter.h"
+#include "GenericToolbox.Utils.h"
 #include "Logger.h"
 
 #include <memory>
@@ -23,7 +22,7 @@ LoggerInit([]{
 
 
 void ParameterSet::readConfigImpl(){
-  LogThrowIf(_config_.empty(), "FitParameterSet config not set.");
+  LogThrowIf(_config_.empty(), "ParameterSet config not set.");
 
   _name_ = GenericToolbox::Json::fetchValue<std::string>(_config_, "name");
   LogInfo << std::endl << "Initializing parameter set: " << _name_ << std::endl;
@@ -39,13 +38,13 @@ void ParameterSet::readConfigImpl(){
   _printParametersSummary_ = GenericToolbox::Json::fetchValue<bool>(_config_, "printParametersSummary", _printDialSetsSummary_);
 
   if( GenericToolbox::Json::doKeyExist(_config_, "parameterLimits") ){
-    auto parLimits = GenericToolbox::Json::fetchValue(_config_, "parameterLimits", nlohmann::json());
+    auto parLimits = GenericToolbox::Json::fetchValue(_config_, "parameterLimits", JsonType());
     _globalParameterMinValue_ = GenericToolbox::Json::fetchValue(parLimits, "minValue", _globalParameterMinValue_);
     _globalParameterMaxValue_ = GenericToolbox::Json::fetchValue(parLimits, "maxValue", _globalParameterMaxValue_);
   }
 
-  _useEigenDecompInFit_ = GenericToolbox::Json::fetchValue(_config_ , "useEigenDecompInFit", false);
-  if( _useEigenDecompInFit_ ){
+  _enableEigenDecomp_ = GenericToolbox::Json::fetchValue(_config_ , {{"enableEigenDecomp"}, {"useEigenDecompInFit"}}, false);
+  if( _enableEigenDecomp_ ){
     LogWarning << "Using eigen decomposition in fit." << std::endl;
     LogScopeIndent;
 
@@ -59,7 +58,7 @@ void ParameterSet::readConfigImpl(){
     }
 
     if( GenericToolbox::Json::doKeyExist(_config_, "eigenParBounds") ){
-      auto eigenLimits = GenericToolbox::Json::fetchValue(_config_, "eigenParBounds", nlohmann::json());
+      auto eigenLimits = GenericToolbox::Json::fetchValue(_config_, "eigenParBounds", JsonType());
       _eigenParBounds_.first = GenericToolbox::Json::fetchValue(eigenLimits, "minValue", _eigenParBounds_.first);
       _eigenParBounds_.second = GenericToolbox::Json::fetchValue(eigenLimits, "maxValue", _eigenParBounds_.second);
       LogInfo << "Using eigen parameter limits: [ " << _eigenParBounds_.first << ", " << _eigenParBounds_.first << "]" << std::endl;
@@ -73,11 +72,11 @@ void ParameterSet::readConfigImpl(){
   _enablePca_ = GenericToolbox::Json::fetchValue(_config_, std::vector<std::string>{"allowPca", "fixGhostFitParameters", "enablePca"}, _enablePca_);
   _enabledThrowToyParameters_ = GenericToolbox::Json::fetchValue(_config_, "enabledThrowToyParameters", _enabledThrowToyParameters_);
   _maskForToyGeneration_ = GenericToolbox::Json::fetchValue(_config_, "maskForToyGeneration", _maskForToyGeneration_);
-  _customFitParThrow_ = GenericToolbox::Json::fetchValue(_config_, "customFitParThrow", std::vector<nlohmann::json>());
+  _customParThrow_ = GenericToolbox::Json::fetchValue(_config_, {{"customParThrow"}, {"customFitParThrow"}}, std::vector<JsonType>());
   _releaseFixedParametersOnHesse_ = GenericToolbox::Json::fetchValue(_config_, "releaseFixedParametersOnHesse", _releaseFixedParametersOnHesse_);
 
   _parameterDefinitionFilePath_ = GenericToolbox::Json::fetchValue( _config_,
-    {{"parameterDefinitionFilePath"}, {"covarianceMatrixFilePath"} }, _parameterDefinitionFilePath_
+    { {"parameterDefinitionFilePath"}, {"covarianceMatrixFilePath"} }, _parameterDefinitionFilePath_
   );
   _covarianceMatrixTMatrixD_ = GenericToolbox::Json::fetchValue(_config_, "covarianceMatrixTMatrixD", _covarianceMatrixTMatrixD_);
   _parameterPriorTVectorD_ = GenericToolbox::Json::fetchValue(_config_, "parameterPriorTVectorD", _parameterPriorTVectorD_);
@@ -102,7 +101,7 @@ void ParameterSet::readConfigImpl(){
     LogWarning << "No number of parameter provided. Looking for alternative definitions..." << std::endl;
 
     if( not _dialSetDefinitions_.empty() ){
-      for( auto& dialSetDef : _dialSetDefinitions_.get<std::vector<nlohmann::json>>() ){
+      for( auto& dialSetDef : _dialSetDefinitions_.get<std::vector<JsonType>>() ){
         if( GenericToolbox::Json::doKeyExist(dialSetDef, "parametersBinningPath") ){
           LogInfo << "Found parameter binning within dialSetDefinition. Defining parameters number..." << std::endl;
           DataBinSet b;
@@ -116,7 +115,7 @@ void ParameterSet::readConfigImpl(){
 
     if( _nbParameterDefinition_ == -1 and not _parameterDefinitionConfig_.empty() ){
       LogInfo << "Using parameter definition config list to determine the number of parameters..." << std::endl;
-      _nbParameterDefinition_ = int(_parameterDefinitionConfig_.get<std::vector<nlohmann::json>>().size());
+      _nbParameterDefinition_ = int(_parameterDefinitionConfig_.get<std::vector<JsonType>>().size());
     }
 
     LogThrowIf(_nbParameterDefinition_==-1, "Could not figure out the number of parameters to be defined for the set: " << _name_ );
@@ -150,13 +149,13 @@ void ParameterSet::processCovarianceMatrix(){
   if( _priorCovarianceMatrix_ == nullptr ){ return; } // nothing to do
 
   LogInfo << "Stripping the matrix from fixed/disabled parameters..." << std::endl;
-  int nbFitParameters{0};
+  int nbParameters{0};
   for( const auto& par : _parameterList_ ){
-    if( ParameterSet::isValidCorrelatedParameter(par) ) nbFitParameters++;
+    if( ParameterSet::isValidCorrelatedParameter(par) ) nbParameters++;
   }
-  LogInfo << nbFitParameters << " effective parameters were defined in set: " << getName() << std::endl;
+  LogInfo << nbParameters << " effective parameters were defined in set: " << getName() << std::endl;
 
-  _strippedCovarianceMatrix_ = std::make_shared<TMatrixDSym>(nbFitParameters);
+  _strippedCovarianceMatrix_ = std::make_shared<TMatrixDSym>(nbParameters);
   int iStrippedPar = -1;
   for( int iPar = 0 ; iPar < int(_parameterList_.size()) ; iPar++ ){
     if( not ParameterSet::isValidCorrelatedParameter(_parameterList_[iPar]) ) continue;
@@ -168,11 +167,11 @@ void ParameterSet::processCovarianceMatrix(){
       (*_strippedCovarianceMatrix_)[iStrippedPar][jStrippedPar] = (*_priorCovarianceMatrix_)[iPar][jPar];
     }
   }
-  _deltaParameterList_ = std::make_shared<TVectorD>(_strippedCovarianceMatrix_->GetNrows());
+  _deltaVectorPtr_ = std::make_shared<TVectorD>(_strippedCovarianceMatrix_->GetNrows());
 
   LogThrowIf(not _strippedCovarianceMatrix_->IsSymmetric(), "Covariance matrix is not symmetric");
 
-  if( not _useEigenDecompInFit_ ){
+  if( not _enableEigenDecomp_ ){
     LogWarning << "Computing inverse of the stripped covariance matrix: "
                << _strippedCovarianceMatrix_->GetNcols() << "x"
                << _strippedCovarianceMatrix_->GetNrows() << std::endl;
@@ -300,47 +299,31 @@ void ParameterSet::processCovarianceMatrix(){
 
 // Getters
 const std::vector<Parameter>& ParameterSet::getEffectiveParameterList() const{
-  if( _useEigenDecompInFit_ ) return _eigenParameterList_;
+  if( _enableEigenDecomp_ ) return _eigenParameterList_;
   return _parameterList_;
 }
 
 // non const getters
 std::vector<Parameter>& ParameterSet::getEffectiveParameterList(){
-  if( _useEigenDecompInFit_ ) return _eigenParameterList_;
+  if( _enableEigenDecomp_ ) return _eigenParameterList_;
   return _parameterList_;
 }
 
 // Core
-double ParameterSet::getPenaltyChi2() {
-
-  if (not _isEnabled_) { return 0; }
-
-  _penaltyChi2Buffer_ = 0;
-
-  if( _priorCovarianceMatrix_ != nullptr ){
-    if( _useEigenDecompInFit_ ){
-      for( const auto& eigenPar : _eigenParameterList_ ){
-        if( eigenPar.isFixed() ) continue;
-        _penaltyChi2Buffer_ += TMath::Sq( (eigenPar.getParameterValue() - eigenPar.getPriorValue()) / eigenPar.getStdDevValue() ) ;
-      }
-    }
-    else{
-      // make delta vector
-      this->fillDeltaParameterList();
-
-      // compute penalty term with covariance
-      _penaltyChi2Buffer_ = (*_deltaParameterList_) * ( (*_inverseStrippedCovarianceMatrix_) * (*_deltaParameterList_) );
+void ParameterSet::updateDeltaVector() const{
+  int iFit{0};
+  for( const auto& par : _parameterList_ ){
+    if( ParameterSet::isValidCorrelatedParameter(par) ){
+      (*_deltaVectorPtr_)[iFit++] = par.getParameterValue() - par.getPriorValue();
     }
   }
-
-  return _penaltyChi2Buffer_;
 }
 
 // Parameter throw
-void ParameterSet::moveFitParametersToPrior(){
-  LogInfo << "Moving back fit parameters to their prior value in set: " << getName() << std::endl;
+void ParameterSet::moveParametersToPrior(){
+  LogInfo << "Moving back parameters to their prior value in set: " << getName() << std::endl;
 
-  if( not _useEigenDecompInFit_ ){
+  if( not _enableEigenDecomp_ ){
     for( auto& par : _parameterList_ ){
       if( par.isFixed() or not par.isEnabled() ){ continue; }
       par.setParameterValue(par.getPriorValue());
@@ -355,7 +338,7 @@ void ParameterSet::moveFitParametersToPrior(){
   }
 
 }
-void ParameterSet::throwFitParameters(bool rethrowIfNotInbounds_, double gain_){
+void ParameterSet::throwParameters( bool rethrowIfNotInbounds_, double gain_){
 
   LogThrowIf(_strippedCovarianceMatrix_==nullptr, "No covariance matrix provided");
 
@@ -373,15 +356,15 @@ void ParameterSet::throwFitParameters(bool rethrowIfNotInbounds_, double gain_){
           throwFct_();
 
           // throws with this function are always done in real space.
-          int iFit{-1};
+          int iPar{-1};
           for( auto& par : this->getParameterList() ){
             if( ParameterSet::isValidCorrelatedParameter(par) ){
-              iFit++;
-              par.setThrowValue( par.getPriorValue() + gain_ * throwsList[iFit] );
+              iPar++;
+              par.setThrowValue( par.getPriorValue() + gain_ * throwsList[iPar] );
               par.setParameterValue( par.getThrowValue() );
             }
           }
-          if( _useEigenDecompInFit_ ){
+          if( _enableEigenDecomp_ ){
             this->propagateOriginalToEigen();
             for( auto& eigenPar : _eigenParameterList_ ){
               eigenPar.setThrowValue( eigenPar.getParameterValue() );
@@ -422,7 +405,7 @@ void ParameterSet::throwFitParameters(bool rethrowIfNotInbounds_, double gain_){
               LogInfo << " → " << par.getParameterValue() << std::endl;
             }
           }
-          if( _useEigenDecompInFit_ ){
+          if( _enableEigenDecomp_ ){
             LogInfo << "Translated to eigen space:" << std::endl;
             for( auto& eigenPar : _eigenParameterList_ ){
               LogInfo << "Eigen par " << eigenPar.getTitle() << ": " << eigenPar.getPriorValue();
@@ -460,7 +443,7 @@ void ParameterSet::throwFitParameters(bool rethrowIfNotInbounds_, double gain_){
     throwParsFct( markScottThrowFct );
   }
   else{
-    if( _useEigenDecompForThrows_ and _useEigenDecompInFit_ ){
+    if( _useEigenDecompForThrows_ and _enableEigenDecomp_ ){
       LogInfo << "Throwing eigen parameters for " << _name_ << std::endl;
 
       int nTries{0};
@@ -567,7 +550,7 @@ void ParameterSet::propagateEigenToOriginal(){
 std::string ParameterSet::getSummary() const {
   std::stringstream ss;
 
-  ss << "FitParameterSet summary: " << _name_ << " -> enabled=" << _isEnabled_;
+  ss << "ParameterSet summary: " << _name_ << " -> enabled=" << _isEnabled_;
 
   if(_isEnabled_){
 
@@ -586,7 +569,7 @@ std::string ParameterSet::getSummary() const {
         if( not par.isEnabled() ) { statusStr = "Disabled"; colorStr = GenericToolbox::ColorCodes::yellowBackground; }
         else if( par.isFixed() )  { statusStr = "Fixed";    colorStr = GenericToolbox::ColorCodes::redBackground; }
         else if( par.isFree() )   { statusStr = "Free";     colorStr = GenericToolbox::ColorCodes::blueBackground; }
-        else                      { statusStr = "Fit"; }
+        else                      { statusStr = "Enabled"; }
 
 #ifdef NOCOLOR
         colorStr = "";
@@ -609,12 +592,12 @@ std::string ParameterSet::getSummary() const {
 
   return ss.str();
 }
-nlohmann::json ParameterSet::exportInjectorConfig() const{
-  nlohmann::json out;
+JsonType ParameterSet::exportInjectorConfig() const{
+  JsonType out;
 
   out["name"] = this->getName();
 
-  std::vector<nlohmann::json> parJsonList{};
+  std::vector<JsonType> parJsonList{};
   parJsonList.reserve( _parameterList_.size() );
 
   for( auto& par : _parameterList_ ){
@@ -636,7 +619,7 @@ nlohmann::json ParameterSet::exportInjectorConfig() const{
 
   return out;
 }
-void ParameterSet::injectParameterValues(const nlohmann::json& config_){
+void ParameterSet::injectParameterValues(const JsonType& config_){
   LogWarning << "Importing parameters from config for \"" << this->getName() << "\"" << std::endl;
 
   auto config = ConfigUtils::getForwardedConfig(config_);
@@ -646,7 +629,7 @@ void ParameterSet::injectParameterValues(const nlohmann::json& config_){
               "Mismatching between parSet name (" << this->getName() << ") and injector config ("
               << GenericToolbox::Json::fetchValue<std::string>(config, "name") << ")" );
 
-  auto parValues = GenericToolbox::Json::fetchValue( config, "parameterValues", nlohmann::json() );
+  auto parValues = GenericToolbox::Json::fetchValue( config, "parameterValues", JsonType() );
   if     ( parValues.empty() ) {
     LogThrow( "No parameterValues provided." );
   }
@@ -721,7 +704,7 @@ void ParameterSet::injectParameterValues(const nlohmann::json& config_){
     }
   }
 
-  if( this->isUseEigenDecompInFit() ){
+  if( this->isEnableEigenDecomp() ){
     LogInfo << "Propagating back to the eigen decomposed parameters for parSet: " << this->getName() << std::endl;
     this->propagateOriginalToEigen();
   }
@@ -865,7 +848,7 @@ void ParameterSet::defineParameters(){
       LogThrowIf(std::isnan(_nominalStepSize_), "Can't define free parameter without a \"nominalStepSize\"");
       par.setStdDevValue(_nominalStepSize_); // stdDev will only be used for display purpose
       par.setStepSize(_nominalStepSize_);
-      par.setPriorType(PriorType::Flat);
+      par.setPriorType(Parameter::PriorType::Flat);
       par.setIsFree(true);
     }
 
@@ -925,7 +908,6 @@ void ParameterSet::defineParameters(){
 
     if( not _parameterDefinitionConfig_.empty() ){
       // Alternative 1: define dials then parameters
-      ConfigUtils::forwardConfig(_parameterDefinitionConfig_);
       if (_parameterNamesList_ != nullptr) {
         // Find the parameter using the name from the vector of names for
         // the covariance.
@@ -940,7 +922,7 @@ void ParameterSet::defineParameters(){
       else {
         // No covariance provided, so find the name based on the order in
         // the parameter set.
-        auto configVector = _parameterDefinitionConfig_.get<std::vector<nlohmann::json>>();
+        auto configVector = _parameterDefinitionConfig_.get<std::vector<JsonType>>();
         LogThrowIf(configVector.size() <= par.getParameterIndex());
         auto parConfig = configVector.at(par.getParameterIndex());
         auto parName = GenericToolbox::Json::fetchValue<std::string>(parConfig, {{"name"}, {"parameterName"}});
@@ -959,14 +941,4 @@ void ParameterSet::defineParameters(){
     par.readConfig();
   }
 }
-
-void ParameterSet::fillDeltaParameterList(){
-  int iFit{0};
-  for( const auto& par : _parameterList_ ){
-    if( ParameterSet::isValidCorrelatedParameter(par) ){
-      (*_deltaParameterList_)[iFit++] = par.getParameterValue() - par.getPriorValue();
-    }
-  }
-}
-
 
