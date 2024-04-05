@@ -1,6 +1,7 @@
 # Applications
 
-set( APPLICATION_LIST
+set(
+    APPLICATION_LIST
     # GUNDAM apps
     gundamFitter
     gundamFitReader
@@ -11,7 +12,7 @@ set( APPLICATION_LIST
     gundamConfigCompare
     gundamPlotExtractor
     gundamConfigUnfolder
-    )
+)
 
 
 if( ENABLE_DEV_MODE )

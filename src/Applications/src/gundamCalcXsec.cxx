@@ -717,7 +717,7 @@ int main(int argc, char** argv){
 
   LogInfo << "Generating xsec sample plots..." << std::endl;
   // manual trigger to tweak the error bars
-  propagator.getPlotGenerator().generateSampleHistograms();
+  propagator.getPlotGenerator().generateSampleHistograms( GenericToolbox::mkdirTFile(calcXsecDir, "plots/histograms") );
 
   for( auto& histHolder : propagator.getPlotGenerator().getHistHolderList(0) ){
     if( not histHolder.isData ){ continue; } // only data will print errors
