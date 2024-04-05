@@ -575,12 +575,13 @@ int main(int argc, char** argv){
         if ( LLH-gLLH > log(weightCap)) {
             LogInfo << "Throw " << iToy << " over weight cap: LLH-gLLH = " << LLH - gLLH << std::endl;
             countBigThrows++;
+        }else{
+            weightSum += LhOverGauss;
+            weightSquareSum += LhOverGauss*LhOverGauss;
         }
         //debug
         //LogInfo<<"LLH: "<<LLH<<" gLLH: "<<gLLH<<std::endl    ;
 
-        weightSum += LhOverGauss;
-        weightSquareSum += LhOverGauss*LhOverGauss;
         while(weightSum>1.e50){
             weightSum /= 1.e50;
             weightSumE50++;
@@ -592,6 +593,15 @@ int main(int argc, char** argv){
         // Write the ttrees
         margThrowTree->Fill();
         ThrowsPThetaFormat->Fill();
+
+        // reset the parameters to the best fit values
+        for( auto& parSet : propagator.getParametersManager().getParameterSetsList() ){
+            if( not parSet.isEnabled() ) continue;
+            for( auto& par : parSet.getParameterList() ){
+                if( not par.isEnabled() ) continue;
+                par.setParameterValue(par.getPriorValue());
+            }
+        }
 
     }// end of main throws loop
 
