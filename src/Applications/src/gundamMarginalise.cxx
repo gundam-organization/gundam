@@ -22,6 +22,8 @@
 #include "TDirectory.h"
 #include "TH1D.h"
 #include "TH2D.h"
+#include "../../Fitter/Engine/include/FitterEngine.h"
+#include "../../StatisticalInference/Likelihood/include/LikelihoodInterface.h"
 
 #include <string>
 #include <vector>
@@ -113,13 +115,14 @@ int main(int argc, char** argv){
 
 
 
-    nlohmann::json fitterConfig;
+    JsonType fitterConfig;
     ObjectReader::readObject<TNamed>(fitterFile.get(), {{"gundam/config_TNamed"}, {"gundamFitter/unfoldedConfig_TNamed"}}, [&](TNamed* config_){
         fitterConfig = GenericToolbox::Json::readConfigJsonStr( config_->GetTitle() );
     });
     // Check if the config is an array (baobab compatibility)
 
     ConfigUtils::ConfigHandler cHandler{ fitterConfig };
+
 
 //    // Disabling defined samples:
 //    LogInfo << "Removing defined samples..." << std::endl;
@@ -144,7 +147,7 @@ int main(int argc, char** argv){
         // normal behavior
         margConfig = margConfig[0];
     }
-    cHandler.override( margConfig );
+    cHandler.override( (JsonType)margConfig );
     LogInfo << "Override done." << std::endl;
 
     if( clParser.isOptionTriggered("dryRun") ){
@@ -180,37 +183,39 @@ int main(int argc, char** argv){
     }else{
         LogInfo << "Using default weight cap: "<< weightCap << std::endl;
     }
-    bool TStudent = false;
+    bool tStudent = false;
     double tStudentNu = -1;
     if(clParser.isOptionTriggered("tStudent")){
         tStudentNu = clParser.getOptionVal<double>("tStudent");
         LogInfo << "Throwing according to a multivariate t-student with ndf: "<< tStudentNu << std::endl;
     }
     if(tStudentNu==-1){
-        TStudent = false;
+        tStudent = false;
     }else if(tStudentNu<=2){
         LogError<< "Not possible to use ndf for t-student smaller than 2!"<<std::endl;
-        TStudent = false;
+        tStudent = false;
     }else{
-        TStudent = true;
+        tStudent = true;
     }
 
     auto configPropagator = GenericToolbox::Json::fetchValuePath<nlohmann::json>( cHandler.getConfig(), "fitterEngineConfig/propagatorConfig" );
 
-    // Create a propagator object
-    Propagator propagator;
+    // Initialize the fitterEngine
+    LogInfo << "FitterEngine setup..." << std::endl;
+    FitterEngine fitter{nullptr};
+    fitter.readConfig(GenericToolbox::Json::fetchSubEntry((JsonType)cHandler.getConfig(), {"fitterEngineConfig"}));
 
-//    // Read the whole fitter config with the override parameters
-    propagator.readConfig( configPropagator );
+    DataSetManager& dataSetManager{fitter.getLikelihoodInterface().getDataSetManager()};
 
     // We are only interested in our MC. Data has already been used to get the post-fit error/values
-    propagator.setLoadAsimovData( true );
+    dataSetManager.getPropagator().setLoadAsimovData( true );
 
     // Disabling eigen decomposed parameters
-    propagator.setEnableEigenToOrigInPropagate( false );
+    dataSetManager.getPropagator().setEnableEigenToOrigInPropagate( false );
 
     // Load everything
-    propagator.initialize();
+    dataSetManager.initialize();
+    Propagator& propagator{dataSetManager.getPropagator()};
 
     propagator.getParametersManager().getParameterSetsList();
 
@@ -237,11 +242,6 @@ int main(int argc, char** argv){
             }
         }
     });
-    // also save the value of the LLH at the best fit point:
-    propagator.propagateParametersOnSamples();
-    propagator.updateLlhCache();
-    double bestFitLLH = propagator.getLlhBuffer();
-    LogInfo<<"LLH (computed on injected parameters): "<<bestFitLLH<<std::endl;
 
     // Creating output file
     std::string outFilePath{};
@@ -264,6 +264,9 @@ int main(int argc, char** argv){
         outFilePath = GenericToolbox::joinPath(outFolder, outFilePath);
     }
 
+
+
+
     // Load the post-fit covariance matrix
     ObjectReader::readObject<TH2D>(
             fitterFile.get(), "FitterEngine/postFit/Hesse/hessian/postfitCovarianceOriginal_TH2D",
@@ -279,10 +282,16 @@ int main(int argc, char** argv){
 
 
     app.setCmdLinePtr( &clParser );
-    app.setConfigString( ConfigUtils::ConfigHandler{margConfig}.toString() );
+    app.setConfigString( ConfigUtils::ConfigHandler{(JsonType)margConfig}.toString()  );
     app.openOutputFile( outFilePath );
     app.writeAppInfo();
 
+
+    // also save the value of the LLH at the best fit point:
+    propagator.propagateParameters();
+    fitter.getLikelihoodInterface().propagateAndEvalLikelihood();
+    double bestFitLLH = fitter.getLikelihoodInterface().getBuffer().totalLikelihood;
+    LogInfo<<"LLH (computed on injected parameters): "<<bestFitLLH<<std::endl;
     // write the post fit covariance matrix in the output file
     TDirectory* postFitInfo = app.getOutfilePtr()->mkdir("postFitInfo");
     postFitInfo->cd();
@@ -462,7 +471,7 @@ int main(int argc, char** argv){
             // if the pedestal option is enabled, a uniform distribution is added to the gaussian sampling distribution
             propagator.getParametersManager().throwParametersFromGlobalCovariance(weightsChiSquare, pedestalEntity, pedestalLeftEdge, pedestalRightEdge);
         }else{
-            if(!TStudent) {
+            if(!tStudent) {
                 // standard case: throw according to the covariance matrix
                 propagator.getParametersManager().throwParametersFromGlobalCovariance(weightsChiSquare);
             }else{
@@ -511,7 +520,7 @@ int main(int argc, char** argv){
             // If is in eigen space, propagateOriginalToEigen
             for (auto &parSet: propagator.getParametersManager().getParameterSetsList()) {
                 if (not parSet.isEnabled()) { continue; }
-                if (parSet.isUseEigenDecompInFit()){
+                if (parSet.isEnableEigenDecomp()){
                     parSet.propagateOriginalToEigen();
                 }
             }
@@ -519,8 +528,8 @@ int main(int argc, char** argv){
         }// end if(injectParamsManually)
 
         //LogInfo<<"Computing LH..."<<std::endl;
-        propagator.updateLlhCache();
-        LLH = propagator.getLlhBuffer();
+        fitter.getLikelihoodInterface().propagateAndEvalLikelihood();
+        LLH = fitter.getLikelihoodInterface().getBuffer().totalLikelihood;
         // make the LH a probability distribution (but still work with the log)
         // This is an approximation, it works only in case of gaussian LH
         LLH /= -2.0;
@@ -557,8 +566,6 @@ int main(int argc, char** argv){
                 gLLH += weightsChiSquare[iPar];
                 if(not par.isMarginalised())
                     survivingParameterValues.push_back(par.getParameterValue());
-
-                //LogInfo<<iPar<<": "<<weightsChiSquare[iPar]<<std::endl;
                 iPar++;
             }
         }
@@ -584,21 +591,14 @@ int main(int argc, char** argv){
         margThrowTree->Fill();
         ThrowsPThetaFormat->Fill();
 
-        //debug
-//        if(iToy==0 || iToy==1){
-//            LogInfo<<"DEBUG: Toy "<<iToy<<std::endl;
-//            for(int i=0;i<parameters.size();i++){
-//                LogInfo<<i<<": "<<parameters[i]<<" "<<margThis[i]<<std::endl;
-//            }
-//        }
     }// end of main throws loop
 
 
-    LogInfo<<"weight cap: "<<weightCap<<" x "<<weightSumE50<<" x 10^50"<<std::endl;
+    LogInfo<<"weight cap: "<<weightCap<<std::endl;
     LogInfo<<"Number of throws with overweight: LLH-gLLH > log(weightCap): "<<countBigThrows<<" - "<<(double)countBigThrows/nToys*100<<" % of total"<<std::endl;
-    LogInfo<<"Weight sum: "<<weightSum<<" weight^2 sum: "<< weightSquareSum<<" x "<<weightSquareSumE50<<" x 10^50" <<std::endl;
+    LogInfo<<"Weight sum: "<<weightSum<<" x (10^50)^"<<weightSumE50<<"  |  weight^2 sum: "<< weightSquareSum<<" x (10^50)^"<<weightSquareSumE50<<std::endl;
     ESS = (weightSumE50*2-weightSquareSumE50) * 1.e50 * weightSum*weightSum/weightSquareSum;
-    LogInfo<<"ESS: "<<weightSum*weightSum/weightSquareSum<<" x "<<(weightSumE50*2-weightSquareSumE50)<<" x 10^50" <<std::endl;
+    LogInfo<<"Nb. of throws: "<<nToys<<"\nESS: "<<weightSum*weightSum/weightSquareSum<<" x (10^50)^"<<(weightSumE50*2-weightSquareSumE50)<<std::endl;
 
     // write ESS in output file
     TVectorD ESS_writable(1); ESS_writable[0] = ESS;
