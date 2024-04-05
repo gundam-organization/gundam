@@ -527,9 +527,11 @@ int main(int argc, char** argv){
 
         }// end if(injectParamsManually)
 
-        //LogInfo<<"Computing LH..."<<std::endl;
+        LogInfo<<"Computing LH... ";
         fitter.getLikelihoodInterface().propagateAndEvalLikelihood();
+        LogInfo<<"Done.  ";
         LLH = fitter.getLikelihoodInterface().getBuffer().totalLikelihood;
+        LogInfo<<"LLH: "<<LLH<<std::endl;
         // make the LH a probability distribution (but still work with the log)
         // This is an approximation, it works only in case of gaussian LH
         LLH /= -2.0;
@@ -575,7 +577,7 @@ int main(int argc, char** argv){
             countBigThrows++;
         }
         //debug
-        LogInfo<<"LLH: "<<LLH<<" gLLH: "<<gLLH<<std::endl    ;
+        //LogInfo<<"LLH: "<<LLH<<" gLLH: "<<gLLH<<std::endl    ;
 
         weightSum += LhOverGauss;
         weightSquareSum += LhOverGauss*LhOverGauss;

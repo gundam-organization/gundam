@@ -665,6 +665,8 @@ int main(int argc, char** argv){
     xsec.histogram.GetXaxis()->SetLabelSize(0.02);
     xsec.histogram.GetYaxis()->SetTitle( GenericToolbox::Json::fetchValue(xsec.samplePtr->getConfig(), "yAxis", "#delta#sigma").c_str() );
 
+
+
     GenericToolbox::writeInTFile(
         GenericToolbox::mkdirTFile(calcXsecDir, "histograms"),
         &xsec.histogram, GenericToolbox::generateCleanBranchName( xsec.samplePtr->getName() )
@@ -743,6 +745,7 @@ int main(int argc, char** argv){
     }
   }
 
+  LogInfo << "Generating canvases..." << std::endl;
   propagator.getPlotGenerator().generateCanvas(
       propagator.getPlotGenerator().getHistHolderList(0),
       GenericToolbox::mkdirTFile(calcXsecDir, "plots/canvas")
