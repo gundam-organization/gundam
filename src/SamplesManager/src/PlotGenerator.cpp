@@ -665,7 +665,7 @@ void PlotGenerator::defineHistogramHolders() {
       for( auto& event : samplePtr->getMcContainer().getEventList() ){
         for( auto& entry : splitVarsDictionary.entryList ){
           if( entry.name.empty() ){ continue; }
-          int splitValue = event.getVariables().findVarIndex( entry.name );
+          auto splitValue = int( event.getVariables().getVarList()[event.getVariables().findVarIndex( entry.name )].getVarAsDouble() );
           GenericToolbox::addIfNotInVector(splitValue, entry.fetchSample( samplePtr ).splitValueList);
         } // splitVarList
       } // Event
