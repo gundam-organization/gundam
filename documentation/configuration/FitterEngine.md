@@ -10,7 +10,9 @@
 |----------------------------------------------------------|--------------|-------------------------------------------------------------------------------|---------|
 | [propagatorConfig](./Propagator.md)                      | json         | Propagator config                                                             |         |
 | [minimizerConfig](./MinimizerInterface.md)               | json         | MinimizerInterface config                                                     |         |
+| [mcmcConfig](./MCMCInterface.md)                         | json         | MinimizerInterface config                                                     |         |
 | [scanConfig](./ParScanner.md)                            | json         | Scan config                                                                   |         |
+| engineType                                               | string       | The fitter engine to use ("minimizer" or "mcmc")                            | minimizer |
 | enablePreFitScan                                         | bool         | Run fit parameter scan right before the minimization                          | false   |
 | enablePostFitScan                                        | bool         | Run fit parameter scan right after the minimization                           | false   |
 | generateSamplePlots                                      | bool         | Draw sample histograms according to the PlotGenerator config                  | true    |
@@ -36,4 +38,3 @@
 |-----------------|------|---------------------------------------|---------|
 | **parIndex**    | int  | Parameter index to move               |         |
 | **nbSigmaAway** | int  | Custom throw value (in unit of sigma) |         |
-

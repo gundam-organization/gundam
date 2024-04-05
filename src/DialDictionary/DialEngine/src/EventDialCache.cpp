@@ -93,7 +93,10 @@ void EventDialCache::buildReferenceCache( SampleSet& sampleSet_, std::vector<Dia
               indexCache.event.eventIndex
           );
 
+      // make sure we don't need extra allocation while emplace_back
       cacheEntry.dialResponseCacheList.reserve( countValidDials(indexCache.dials) );
+
+      // filling up the dial references
       for( auto& dialIndex : indexCache.dials ){
         if( dialIndex.collectionIndex == size_t(-1) or dialIndex.interfaceIndex == size_t(-1) ){ continue; }
         cacheEntry.dialResponseCacheList.emplace_back(

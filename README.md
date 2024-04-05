@@ -2,7 +2,10 @@
 
 ![](./resources/images/bannerv2.png)
 
-[![Generic badge](https://img.shields.io/badge/Example_of_inputs-OA2020-GREEN.svg)](https://github.com/nadrino/gundamInputOa2020)  [![GitHub forks](https://badgen.net/github/forks/nadrino/gundam/)](https://github.com/nadrino/gundam/network/members) [![GitHub release](https://img.shields.io/github/release/nadrino/gundam.svg)](https://github.com/nadrino/gundam/releases/)
+![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/gundam-organization/gundam/docker-image.yml)
+[![GitHub forks](https://badgen.net/github/forks/gundam-organization/gundam/)](https://github.com/gundam-organization/gundam/network/members) 
+[![GitHub release](https://img.shields.io/github/release/gundam-organization/gundam.svg)](https://github.com/gundam-organization/gundam/releases/)
+[![Generic badge](https://img.shields.io/badge/Users-Example_of_inputs-GREEN.svg)](https://github.com/gundam-organization/gundam-input-tutorial) 
 
 GUNDAM, standing for *Generalized and Unified Neutrino Data Analysis Methods*,
 is a suite of applications which aims at performing various statistical
