@@ -527,11 +527,11 @@ int main(int argc, char** argv){
 
         }// end if(injectParamsManually)
 
-        LogInfo<<"Computing LH... ";
+        // LogInfo<<"Computing LH... ";
         fitter.getLikelihoodInterface().propagateAndEvalLikelihood();
-        LogInfo<<"Done.  ";
+        // LogInfo<<"Done.  ";
         LLH = fitter.getLikelihoodInterface().getBuffer().totalLikelihood;
-        LogInfo<<"LLH: "<<LLH<<std::endl;
+        // LogInfo<<"LLH: "<<LLH<<std::endl;
         // make the LH a probability distribution (but still work with the log)
         // This is an approximation, it works only in case of gaussian LH
         LLH /= -2.0;
@@ -580,7 +580,7 @@ int main(int argc, char** argv){
             weightSquareSum += LhOverGauss*LhOverGauss;
         }
         //debug
-        //LogInfo<<"LLH: "<<LLH<<" gLLH: "<<gLLH<<std::endl    ;
+        LogInfo<<"LogLH: "<<LLH<<" sampl: "<<gLLH<<" weight: "<<LhOverGauss <<std::endl    ;
 
         while(weightSum>1.e50){
             weightSum /= 1.e50;
