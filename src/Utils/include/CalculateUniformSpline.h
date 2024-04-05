@@ -69,10 +69,11 @@ namespace {
         // double v = p1*(2.0*fxxx-3.0*fxx+1.0) + m1*(fxxx-2.0*fxx+fx)
         //         + p2*(3.0*fxx-2.0*fxxx) + m2*(fxxx-fxx));
 
-        // A more numerically stable calculation
-        const double t = 3.0*fxx-2.0*fxxx;
-        double v = p1 - p1*t + m1*(fxxx-2.0*fxx+fx)
-                    + p2*t + m2*(fxxx-fxx);
+        // Factored via Horner's method.
+        double v = ((((2.0*p1 - 2.0*p2 + m2 + m1)*fx
+                      + 3.0*p2 - 3.0*p1 - m2 - 2.0*m1)*fx
+                     +m1)*fx
+                    +p1);
 
         if (v < lowerBound) v = lowerBound;
         if (v > upperBound) v = upperBound;
