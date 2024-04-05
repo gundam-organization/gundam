@@ -81,12 +81,8 @@ public:
   [[nodiscard]] const std::string &getName() const{ return _name_; }
   [[nodiscard]] const JsonType &getDialDefinitionsList() const{ return _dialDefinitionsList_; }
   [[nodiscard]] const ParameterSet *getOwner() const{ return _owner_; }
-<<<<<<< HEAD
-  [[nodiscard]] PriorType::PriorType getPriorType() const{ return _priorType_; }
-  [[nodiscard]] bool isMarginalised() const{ return _isMarginalised_; }
-=======
   [[nodiscard]] PriorType getPriorType() const{ return _priorType_; }
->>>>>>> origin/main
+  [[nodiscard]] bool isMarginalised() const{ return _isMarginalised_; }
 
   // Core
   void setValueAtPrior(){ _parameterValue_ = _priorValue_; }
@@ -118,14 +114,9 @@ private:
   double _stepSize_{std::nan("unset")};
   std::string _name_{};
   std::string _dialsWorkingDirectory_{"."};
-<<<<<<< HEAD
-  nlohmann::json _parameterConfig_{};
-  nlohmann::json _dialDefinitionsList_{};
   bool _isMarginalised_{false};
-=======
   JsonType _parameterConfig_{};
   JsonType _dialDefinitionsList_{};
->>>>>>> origin/main
 
   // Internals
   const ParameterSet* _owner_{nullptr};

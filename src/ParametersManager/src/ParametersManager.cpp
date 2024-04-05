@@ -8,6 +8,7 @@
 #include "GenericToolbox.Utils.h"
 #include "GenericToolbox.Json.h"
 #include "Logger.h"
+#include "GundamUtils.h"
 
 #include <sstream>
 
@@ -217,7 +218,7 @@ void ParametersManager::throwParametersFromGlobalCovariance(bool quietVerbose_){
   while( keepThrowing ){
     throwNb++;
     bool rethrow{false};
-    auto throws = GenericToolbox::throwCorrelatedParameters(_choleskyMatrix_.get());
+    auto throws = GundamUtils::throwCorrelatedParameters(_choleskyMatrix_.get());
     for( int iPar = 0 ; iPar < _choleskyMatrix_->GetNrows() ; iPar++ ){
       auto* parPtr = _strippedParameterList_[iPar];
       parPtr->setParameterValue( parPtr->getPriorValue() + throws[iPar] );
@@ -290,7 +291,6 @@ void ParametersManager::throwParametersFromGlobalCovariance(bool quietVerbose_){
   }
 }
 
-<<<<<<< HEAD
 void ParametersManager::throwParametersFromGlobalCovariance(std::vector<double> &weightsChiSquare){
     throwParametersFromGlobalCovariance(weightsChiSquare,0,0,0);
 }// end of function
@@ -350,9 +350,9 @@ void ParametersManager::throwParametersFromGlobalCovariance(std::vector<double> 
         bool rethrow{false};
         std::vector<double> throws,weights;
         if(pedestalEntity==0){
-            GenericToolbox::throwCorrelatedParameters(_choleskyMatrix_.get(),throws, weights);
+            GundamUtils::throwCorrelatedParameters(_choleskyMatrix_.get(),throws, weights);
         }else{
-            GenericToolbox::throwCorrelatedParameters(_choleskyMatrix_.get(),throws, weights,
+            GundamUtils::throwCorrelatedParameters(_choleskyMatrix_.get(),throws, weights,
                                                       pedestalEntity,pedestalLeftEdge,pedestalRightEdge);
         }
         if(throws.size() != weights.size()){
@@ -458,7 +458,7 @@ void ParametersManager::throwParametersFromTStudent(std::vector<double> &weights
         bool rethrow{false};
         std::vector<double> throws,weights;
         // calling Toolbox function to throw random parameters
-        GenericToolbox::throwTStudentParameters(_choleskyMatrix_.get(),nu_,throws, weights);
+        GundamUtils::throwTStudentParameters(_choleskyMatrix_.get(),nu_,throws, weights);
         ///////
         if(throws.size() != weights.size()){
             LogInfo<<"WARNING: throws.size() != weights.size() "<< throws.size()<<weights.size()<<std::endl;

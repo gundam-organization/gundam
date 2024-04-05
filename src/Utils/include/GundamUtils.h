@@ -7,6 +7,7 @@
 
 
 #include "GenericToolbox.String.h"
+#include "GenericToolbox.Root.h"
 #include "CmdLineParser.h"
 #include "Logger.h"
 

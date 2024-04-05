@@ -234,7 +234,7 @@ std::string Propagator::getSampleBreakdownTableStr() const{
   std::stringstream ss;
   ss << t.generateTableString();
   return ss.str();
-}=
+}
 void Propagator::printBreakdowns(){
   if( _showEventBreakdown_ ){
 
