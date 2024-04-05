@@ -57,8 +57,6 @@ namespace {
         if (2*ix+7>dim) ix = (dim-2)/2 - 2 ;
 
         const double fx = xx-ix;
-        const double fxx = fx*fx;
-        const double fxxx = fx*fxx;
 
         const double p1 = data[2+2*ix];
         const double m1 = data[2+2*ix+1]*step;

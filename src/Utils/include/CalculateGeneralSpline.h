@@ -78,8 +78,6 @@ namespace {
         const double step = x2-x1;
 
         const double fx = (x - x1)/step;
-        const double fxx = fx*fx;
-        const double fxxx = fx*fxx;
 
         const double p1 = data[2+3*ix];
         const double m1 = data[2+3*ix+1]*step;
