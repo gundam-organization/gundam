@@ -18,7 +18,7 @@ LoggerInit([]{
 
 void DataBin::Edges::readConfig(const JsonType& config_){
 
-  varName = GenericToolbox::Json::fetchValue<std::string>(config_, "var");
+  varName = GenericToolbox::Json::fetchValue<std::string>(config_, "name");
 
   if( GenericToolbox::Json::doKeyExist(config_, "bounds") ){
     auto bounds = GenericToolbox::Json::fetchValue<std::vector<double>>(config_, "bounds");

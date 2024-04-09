@@ -825,20 +825,21 @@ void PlotGenerator::defineHistogramHolders() {
                 histDefBase.histName = "MC";
 
                 if( histDefBase.splitVarName.empty() ){
-                  histDefBase.histTitle = "Prediction";
+                  histDefBase.histTitle = "Model";
                   histDefBase.histColor = defaultColorWheel[ sampleCounter % defaultColorWheel.size() ];
                   histDefBase.fillStyle = 1001;
                 }
                 else{
-                  histDefBase.histTitle = "Prediction (" + splitVar + " == " + std::to_string(splitValue) + ")";
+                  histDefBase.histTitle = "Model (" + splitVar + " == " + std::to_string(splitValue) + ")";
                   histDefBase.histColor = defaultColorWheel[ splitValueIndex % defaultColorWheel.size() ];
 
                   // User defined color?
-                  auto varDict = GenericToolbox::Json::fetchMatchingEntry(_varDictionary_, "name", splitVar); // does the cosmetic pars are configured?
-                  auto dictEntries = varDict["dictionary"];
-
+                  JsonType varDict{};
+                  varDict = GenericToolbox::Json::fetchMatchingEntry(_varDictionary_, "name", splitVar); // does the cosmetic pars are configured?
+                  
                   if( not varDict.empty() ){
 
+                    auto dictEntries = varDict["dictionary"];
                     if( dictEntries.is_null() ){
                       LogError << R"(Could not find "dictionary" key in JSON config for var: ")" << splitVar << "\"" << std::endl;
                       throw std::runtime_error("dictionary not found, by variable name found in JSON.");
