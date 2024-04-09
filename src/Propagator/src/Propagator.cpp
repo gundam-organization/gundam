@@ -224,7 +224,7 @@ std::string Propagator::getSampleBreakdownTableStr() const{
   t << "Data (weighted)" << GenericToolbox::TablePrinter::NextLine;
 
   for( auto& sample : _sampleSet_.getSampleList() ){
-    t << "\"" << sample.getName() << "\"" << GenericToolbox::TablePrinter::NextColumn;
+    t << sample.getName() << GenericToolbox::TablePrinter::NextColumn;
     t << sample.getMcContainer().getNbBinnedEvents() << GenericToolbox::TablePrinter::NextColumn;
     t << sample.getDataContainer().getNbBinnedEvents() << GenericToolbox::TablePrinter::NextColumn;
     t << sample.getMcContainer().getSumWeights() << GenericToolbox::TablePrinter::NextColumn;
@@ -278,7 +278,7 @@ void Propagator::printBreakdowns(){
     t.setColTitles(stageTitles);
     for( size_t iSample = 0 ; iSample < _sampleSet_.getSampleList().size() ; iSample++ ) {
       std::vector<std::string> tableLine;
-      tableLine.emplace_back("\"" + _sampleSet_.getSampleList()[iSample].getName() + "\"");
+      tableLine.emplace_back(_sampleSet_.getSampleList()[iSample].getName());
       for( iStage = 0 ; iStage < stageBreakdownList[iSample].size() ; iStage++ ){
         tableLine.emplace_back( std::to_string(stageBreakdownList[iSample][iStage]) );
       }
