@@ -250,9 +250,9 @@ void DataBinSet::readTxtBinningDefinition(){
 
 void DataBinSet::readBinningConfig(const JsonType& binning_){
 
-  if( GenericToolbox::Json::doKeyExist(binning_, "binEdgesDefinition") ){
+  if( GenericToolbox::Json::doKeyExist(binning_, {"binningDefinition"}) ){
 
-    auto binEdgesList{GenericToolbox::Json::fetchValue<JsonType>(binning_, "binEdgesDefinition")};
+    auto binningDefinition{GenericToolbox::Json::fetchValue<JsonType>(binning_, "binningDefinition")};
     struct Dimension{
       int nBins{0};
       int nModulo{1};
@@ -260,13 +260,37 @@ void DataBinSet::readBinningConfig(const JsonType& binning_){
       std::vector<double> edgesList{};
     };
     std::vector<Dimension> dimensionList{};
-    dimensionList.reserve( binEdgesList.size() );
+    dimensionList.reserve( binningDefinition.size() );
 
-    for( auto& binEdgeEntry : binEdgesList ){
+    for( auto& binEdgeEntry : binningDefinition ){
       dimensionList.emplace_back();
       auto& dim = dimensionList.back();
       dim.var = GenericToolbox::Json::fetchValue<std::string>(binEdgeEntry, "name");
-      dim.edgesList = GenericToolbox::Json::fetchValue<std::vector<double>>(binEdgeEntry, "edges");
+
+      if( GenericToolbox::Json::doKeyExist(binEdgeEntry, "edges") ){
+        dim.edgesList = GenericToolbox::Json::fetchValue<std::vector<double>>(binEdgeEntry, "edges");
+      }
+      else if( GenericToolbox::Json::doKeyExist(binEdgeEntry, "nBins") ){
+        // TH1D-like definition
+        int nBins{ GenericToolbox::Json::fetchValue<int>(binEdgeEntry, "nBins") };
+        double minVal{ GenericToolbox::Json::fetchValue<double>(binEdgeEntry, "min") };
+        double maxVal{ GenericToolbox::Json::fetchValue<double>(binEdgeEntry, "max") };
+
+        double step{(maxVal - minVal)/nBins};
+        LogThrowIf( step <= 0, "Invalid binning: " << GenericToolbox::Json::toReadableString(binEdgeEntry) );
+
+        dim.edgesList.reserve( nBins + 1 );
+        double edgeValue{minVal};
+        for( int iBin = 0 ; iBin < nBins ; iBin++ ){
+          dim.edgesList.emplace_back( edgeValue );
+          edgeValue += step;
+        }
+        dim.edgesList.emplace_back( edgeValue );
+      }
+      else{
+        LogThrow("Unrecognised binning definition: " << binningDefinition);
+      }
+
       dim.nBins = int( dim.edgesList.size() ) - 1;
 
       LogThrowIf(dim.nBins == 0, "Invalid edgesList for binEdgeEntry: " << GenericToolbox::Json::toReadableString(binEdgeEntry));
