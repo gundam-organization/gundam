@@ -79,13 +79,13 @@ void FitterEngine::readConfigImpl(){
 
   _minimizer_->readConfig( minimizerConfig );
   _likelihoodInterface_.readConfig( GenericToolbox::Json::fetchValue(_config_, "likelihoodInterfaceConfig", _likelihoodInterface_.getConfig()) );
-  _parameterScanner_.readConfig( GenericToolbox::Json::fetchValue(_config_, "scanConfig", _parameterScanner_.getConfig()) );
+  _parameterScanner_.readConfig( GenericToolbox::Json::fetchValue(_config_, {{"parameterScannerConfig"}, {"scanConfig"}}, _parameterScanner_.getConfig()) );
   LogInfo << "Convergence monitor will be refreshed every " << _minimizer_->getMonitor().convergenceMonitor.getMaxRefreshRateInMs() << "ms." << std::endl;
 
 
   // local config
   _enablePca_ = GenericToolbox::Json::fetchValue(_config_, {{"enablePca"}, {"runPcaCheck"}, {"fixGhostFitParameters"}}, _enablePca_);
-  _pcaDeltaChi2Threshold_ = GenericToolbox::Json::fetchValue(_config_, {{"ghostParameterDeltaChi2Threshold"}, {"pcaDeltaChi2Threshold"}}, _pcaDeltaChi2Threshold_);
+  _pcaDeltaLlhThreshold_ = GenericToolbox::Json::fetchValue(_config_, {{"pcaDeltaLlhThreshold"}, {"pcaDeltaChi2Threshold"}, {"ghostParameterDeltaChi2Threshold"}}, _pcaDeltaLlhThreshold_);
 
   _enablePreFitScan_ = GenericToolbox::Json::fetchValue(_config_, "enablePreFitScan", _enablePreFitScan_);
   _enablePostFitScan_ = GenericToolbox::Json::fetchValue(_config_, "enablePostFitScan", _enablePostFitScan_);
@@ -503,7 +503,7 @@ void FitterEngine::runPcaCheck(){
         LogInfo.moveTerminalCursorBack(1);
         LogInfo << ssPrint.str() << std::endl;
 
-        if( std::abs(deltaChi2Stat) < _pcaDeltaChi2Threshold_ ){
+        if( std::abs(deltaChi2Stat) < _pcaDeltaLlhThreshold_ ){
           par.setIsFixed(true); // ignored in the Chi2 computation of the parSet
           ssPrint << " < " << GenericToolbox::Json::fetchValue(_config_, {{"ghostParameterDeltaChi2Threshold"}, {"pcaDeltaChi2Threshold"}}, 1E-6) << " -> FIXED";
           LogInfo.moveTerminalCursorBack(1);
@@ -537,7 +537,6 @@ void FitterEngine::runPcaCheck(){
   // comeback to old values
   _likelihoodInterface_.propagateAndEvalLikelihood();
 }
-
 void FitterEngine::rescaleParametersStepSize(){
   LogInfo << __METHOD_NAME__ << std::endl;
 

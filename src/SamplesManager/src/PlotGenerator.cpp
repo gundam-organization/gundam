@@ -642,11 +642,13 @@ void PlotGenerator::defineHistogramHolders() {
     auto splitVars = GenericToolbox::Json::fetchValue(histConfig, "splitVars", std::vector<std::string>{""});
     for( auto& splitVar : splitVars ){
       if( not splitVarsDictionary.hasEntry(splitVar) ){
-        auto& entry = splitVarsDictionary.entryList.emplace_back();
+        splitVarsDictionary.entryList.emplace_back();
+        auto& entry = splitVarsDictionary.entryList.back();
         entry.name = splitVar;
         entry.sampleList.reserve( _sampleSetPtr_->getSampleList().size() );
         for( const auto& sample : _sampleSetPtr_->getSampleList() ){
-          auto& sampleSplit = entry.sampleList.emplace_back();
+          entry.sampleList.emplace_back();
+          auto& sampleSplit = entry.sampleList.back();
           sampleSplit.samplePtr = &sample;
           if( splitVar.empty() ){ sampleSplit.splitValueList.emplace_back(0); } // placeholder for no split var
         }

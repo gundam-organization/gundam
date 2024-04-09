@@ -24,7 +24,7 @@ namespace ConfigUtils {
   // make sure both YAML and JSON are supported
   JsonType getForwardedConfig(const JsonType& config_);
   JsonType getForwardedConfig(const JsonType& config_, const std::string& keyName_);
-  void forwardConfig(JsonType& config_, const std::string& className_ = "");
+  void forwardConfig(JsonType& config_);
   void unfoldConfig(JsonType& config_);
 
   void applyOverrides(JsonType& jsonConfig_, const JsonType& overrideConfig_);
