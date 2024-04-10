@@ -43,6 +43,9 @@ void AdaptiveMcmc::readConfigImpl(){
   // the physically allowed range.
   _likelihoodValidity_ = GenericToolbox::Json::fetchValue(_config_, "likelihoodValidity", _likelihoodValidity_);
 
+ //Set whether MCMC chain start from a random point or the prior point.
+  _randomStart_ = GenericToolbox::Json::fetchValue(_config_, "randomStart", _saveRawSteps_);
+
   // Set whether the raw step should be saved, or only the step translated
   // into the likelihood space.
   _saveRawSteps_ = GenericToolbox::Json::fetchValue(_config_, "saveRawSteps", _saveRawSteps_);
@@ -497,15 +500,65 @@ void AdaptiveMcmc::setupAndRunAdaptiveStep( AdaptiveStepMCMC& mcmc) {
   // Create a fitting parameter vector and initialize it.  No need to worry
   // about resizing it or it moving, so be lazy and just use push_back.
   Vector prior;
-  for (const Parameter* par : _minimizerParameterPtrList_ ) {
-    double val = par->getParameterValue();
-    if (not _useNormalizedFitSpace_) {
-      prior.push_back(val);
+    
+  bool StartStatus = false;
+  if (_randomStart_==true){
+    LogInfo<<"MCMC chain starts from a random point"<<std::endl;
+    int throttle =10;
+    do{
+    for (const Parameter* par : getMinimizerFitParameterPtr() ) {
+      double val = par->getPriorValue();
+      double err = par->getStdDevValue();
+      double r = gRandom->Uniform(0.0,1.0);
+      double lowBound = val-1.0*err;
+      double highBound = val+1.0*err;
+      if(not std::isnan(par->getMinValue())) {
+        lowBound = std::max(lowBound, par->getMinValue());
+      }
+      if(not std::isnan(par->getMinMirror())) {
+        lowBound = std::max(lowBound, par->getMinMirror());
+      }
+      if(not std::isnan(par->getMinPhysical())) {
+        lowBound = std::max(lowBound, par->getMinPhysical());
+      }
+      
+      if(not std::isnan(par->getMaxValue())) {
+        highBound = std::min(highBound, par->getMaxValue());
+      }
+      if(not std::isnan(par->getMaxMirror())) {
+        highBound = std::min(highBound, par->getMaxMirror());
+      }
+      if(not std::isnan(par->getMaxPhysical())) {
+        highBound = std::min(highBound, par->getMaxPhysical());
+      }
+      val = lowBound + r*(highBound-lowBound);
+      if (not _useNormalizedFitSpace_) {
+        prior.push_back(val);
+      }
+      else {
+         prior.push_back(ParameterSet::toNormalizedParValue(val, *par));
+      }
+      
     }
-    else {
-      prior.push_back(ParameterSet::toNormalizedParValue(val, *par));
+    StartStatus = mcmc.Start(prior, false);
+    if(!StartStatus) prior.clear();
+    LogInfo<<"The size of prior is "<<prior.size()<<std::endl;
+    } while (!StartStatus&&--throttle>0);
+  }
+  else{
+    LogInfo<<"MCMC chain starts from the prior"<<std::endl;
+    for (const Parameter* par : getMinimizerFitParameterPtr() ) {
+      double val = par->getParameterValue();
+      if (not _useNormalizedFitSpace_) {
+        prior.push_back(val);
+      }
+      else {
+         prior.push_back(ParameterSet::toNormalizedParValue(val, *par));
+      }
     }
   }
+  StartStatus = mcmc.Start(prior, false);
+  if (StartStatus!=true || prior.size()==0) LogThrow("The initial point is bad. MCMC chain cannot start.");
 
   // Set the correlations in the default step proposal.
   if (not adaptiveLoadProposalCovariance(
