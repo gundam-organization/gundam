@@ -82,6 +82,9 @@ void Propagator::readConfigImpl(){
   LogInfo << "Reading DialCollection configurations..." << std::endl;
   _dialCollectionList_.clear(); // make sure it's empty in case readConfig() is called more than once
   for(size_t iParSet = 0 ; iParSet < _parManager_.getParameterSetsList().size() ; iParSet++ ){
+    LogScopeIndent;
+    LogInfo << "Reading dials from " << _parManager_.getParameterSetsList()[iParSet].getName() << std::endl;
+
     if( not _parManager_.getParameterSetsList()[iParSet].isEnabled() ) continue;
     // DEV / DialCollections
     if( not _parManager_.getParameterSetsList()[iParSet].getDialSetDefinitions().empty() ){
@@ -93,6 +96,7 @@ void Propagator::readConfigImpl(){
       }
     }
     else{
+
       for( auto& par : _parManager_.getParameterSetsList()[iParSet].getParameterList() ){
         if( not par.isEnabled() ) continue;
 
@@ -224,7 +228,7 @@ std::string Propagator::getSampleBreakdownTableStr() const{
   t << "Data (weighted)" << GenericToolbox::TablePrinter::NextLine;
 
   for( auto& sample : _sampleSet_.getSampleList() ){
-    t << "\"" << sample.getName() << "\"" << GenericToolbox::TablePrinter::NextColumn;
+    t << sample.getName() << GenericToolbox::TablePrinter::NextColumn;
     t << sample.getMcContainer().getNbBinnedEvents() << GenericToolbox::TablePrinter::NextColumn;
     t << sample.getDataContainer().getNbBinnedEvents() << GenericToolbox::TablePrinter::NextColumn;
     t << sample.getMcContainer().getSumWeights() << GenericToolbox::TablePrinter::NextColumn;
@@ -278,7 +282,7 @@ void Propagator::printBreakdowns(){
     t.setColTitles(stageTitles);
     for( size_t iSample = 0 ; iSample < _sampleSet_.getSampleList().size() ; iSample++ ) {
       std::vector<std::string> tableLine;
-      tableLine.emplace_back("\"" + _sampleSet_.getSampleList()[iSample].getName() + "\"");
+      tableLine.emplace_back(_sampleSet_.getSampleList()[iSample].getName());
       for( iStage = 0 ; iStage < stageBreakdownList[iSample].size() ; iStage++ ){
         tableLine.emplace_back( std::to_string(stageBreakdownList[iSample][iStage]) );
       }

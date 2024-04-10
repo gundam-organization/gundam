@@ -34,7 +34,7 @@ void LikelihoodInterface::readConfigImpl(){
 
   //
   JsonType configJointProbability;
-  std::string jointProbabilityTypeStr;
+  std::string jointProbabilityTypeStr{"PoissonLLH"};
 
   GenericToolbox::Json::deprecatedAction(_dataSetManager_.getPropagator().getSampleSet().getConfig(), "llhStatFunction", [&]{
     LogAlert << R"("llhStatFunction" should now be set under "likelihoodInterfaceConfig/jointProbabilityConfig/type".)" << std::endl;

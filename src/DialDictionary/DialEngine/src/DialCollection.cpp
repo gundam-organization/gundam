@@ -389,8 +389,8 @@ void DialCollection::readGlobals(const JsonType &config_) {
   _allowDialExtrapolation_ = GenericToolbox::Json::fetchValue(config_, "allowDialExtrapolation", _allowDialExtrapolation_);
 }
 bool DialCollection::initializeNormDialsWithParBinning() {
-  auto parameterBinningPath = GenericToolbox::Json::fetchValue<std::string>(_config_, "parametersBinningPath", "");
-  if( parameterBinningPath.empty() ){ return false; }
+  auto binning = GenericToolbox::Json::fetchValue(_config_, "parametersBinningPath", JsonType());
+  if( binning.empty() ){ return false; } // not defined
 
   // Get global parameters from the main config
   this->readGlobals(_config_);
@@ -398,7 +398,7 @@ bool DialCollection::initializeNormDialsWithParBinning() {
   // Read the binning
   _dialBinSet_ = DataBinSet();
   _dialBinSet_.setName("parameterBinning");
-  _dialBinSet_.readBinningDefinition(parameterBinningPath);
+  _dialBinSet_.readBinningDefinition( binning );
 
   // By default use min dial response for norm dials
   _dialResponseSupervisorList_.resize( 1 );
@@ -456,7 +456,7 @@ bool DialCollection::initializeDialsWithDefinition() {
       // A binning file has been provided, so this is a binned dial.  Create
       // the dials for each bin here.  The dials will be assigned to the
       // events in DataDispenser.
-      auto binningFilePath = GenericToolbox::Json::fetchValue<std::string>(dialsDefinition, "binningFilePath");
+      auto binningFilePath = GenericToolbox::Json::fetchValue(dialsDefinition, "binningFilePath", JsonType());
 
       _dialBinSet_ = DataBinSet();
       _dialBinSet_.setName(binningFilePath);

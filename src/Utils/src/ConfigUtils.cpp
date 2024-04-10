@@ -34,14 +34,15 @@ namespace ConfigUtils {
 
     JsonType output;
 
-    if( GenericToolbox::hasExtension(configFilePath_, "yml")
-        or GenericToolbox::hasExtension(configFilePath_,"yaml")
-        ){
-      output = ConfigUtils::convertYamlToJson(configFilePath_);
+    try{
+      if( GenericToolbox::hasExtension(configFilePath_, {{"yaml"}, {"yml"}}) ){
+        output = ConfigUtils::convertYamlToJson( configFilePath_ );
+      }
+      else{
+        output = GenericToolbox::Json::readConfigFile(configFilePath_);
+      }
     }
-    else{
-      output = GenericToolbox::Json::readConfigFile(configFilePath_);
-    }
+    catch(...){ LogThrow("Error while reading config file: " << configFilePath_); }
 
     // resolve sub-references to other config files
     ConfigUtils::unfoldConfig( output );
@@ -331,7 +332,6 @@ namespace ConfigUtils {
     else{
       LogInfo << "Reading config file: " << filePath_ << std::endl;
       config = ConfigUtils::readConfigFile(filePath_ ); // works with yaml
-      ConfigUtils::unfoldConfig( config );
     }
   }
   ConfigHandler::ConfigHandler(JsonType config_) : config(std::move(config_)) {}

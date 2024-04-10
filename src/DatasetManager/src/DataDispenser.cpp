@@ -257,7 +257,7 @@ void DataDispenser::doEventSelection(){
     GenericToolbox::TablePrinter t;
     t.setColTitles({{"Sample"}, {"# of events"}});
     for(size_t iSample = 0 ; iSample < _cache_.samplesToFillList.size() ; iSample++ ){
-      t.addTableLine({{"\""+_cache_.samplesToFillList[iSample]->getName()+"\""}, std::to_string(_cache_.sampleNbOfEvents[iSample])});
+      t.addTableLine({_cache_.samplesToFillList[iSample]->getName(), std::to_string(_cache_.sampleNbOfEvents[iSample])});
     }
     t.printTable();
   }

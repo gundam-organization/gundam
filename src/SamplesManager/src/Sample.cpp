@@ -27,7 +27,7 @@ void Sample::readConfigImpl(){
   LogScopeIndent;
   LogInfo << "Defining sample: " << _name_ << std::endl;
 
-  _binningFilePath_ = GenericToolbox::Json::fetchValue(_config_, {{"binningFilePath"}, {"binningFile"}, {"binning"}}, _binningFilePath_);
+  _binningConfig_ = GenericToolbox::Json::fetchValue(_config_, {{"binningFilePath"}, {"binningFile"}, {"binning"}}, _binningConfig_);
 
   _isEnabled_ = GenericToolbox::Json::fetchValue(_config_, "isEnabled", true);
   LogReturnIf(not _isEnabled_, "\"" << _name_ << "\" is disabled.");
@@ -38,9 +38,9 @@ void Sample::readConfigImpl(){
 void Sample::initializeImpl() {
   if( not _isEnabled_ ) return;
 
-  LogInfo << "Initializing FitSample: " << _name_ << std::endl;
+  LogInfo << "Initializing sample: " << _name_ << std::endl;
 
-  _binning_.readBinningDefinition( _binningFilePath_ );
+  _binning_.readBinningDefinition( _binningConfig_ );
   _binning_.sortBins();
 
   _mcContainer_.setName("MC_" + _name_);
