@@ -38,6 +38,7 @@ protected:
 
 private:
   // config
+  bool _isEnabled_{true};
   bool _writeDials_{false};
   int _nPointsPerDial_{3};
 
