@@ -83,8 +83,9 @@ void EventDialCache::buildReferenceCache( SampleSet& sampleSet_, std::vector<Dia
 
   for( auto& sampleIndexCache : sampleIndexCacheList ){
     for( auto& indexCache : sampleIndexCache ){
-
-      auto& cacheEntry{_cache_.emplace_back()};
+      
+      _cache_.emplace_back();
+      auto& cacheEntry = _cache_.back();
 
       cacheEntry.event =
           &sampleSet_.getSampleList().at(
