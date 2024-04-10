@@ -46,7 +46,6 @@ void DataBinSet::readBinningDefinition(const JsonType& binning_) {
 void DataBinSet::checkBinning(){
 
   bool hasErrors{false};
-  LogWarning << "Checking for overlaps in the binning: " << _filePath_ << std::endl; // debug
 
   for( auto& bin : _binList_ ){
     for( auto& otherBin : _binList_ ) {

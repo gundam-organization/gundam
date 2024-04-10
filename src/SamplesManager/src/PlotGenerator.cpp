@@ -29,7 +29,7 @@ void PlotGenerator::readConfigImpl(){
   LogWarning << __METHOD_NAME__ << std::endl;
   gStyle->SetOptStat(0);
   _histHolderCacheList_.resize(1);
-  _varDictionary_ = GenericToolbox::Json::fetchValue(_config_, "varDictionnaries", JsonType());
+  _varDictionary_ = GenericToolbox::Json::fetchValue(_config_, {{"varDictionaries"}, {"varDictionnaries"}}, JsonType());
   _canvasParameters_ = GenericToolbox::Json::fetchValue(_config_, "canvasParameters", JsonType());
   _histogramsDefinition_ = GenericToolbox::Json::fetchValue(_config_, "histogramsDefinition", JsonType());
 
@@ -835,8 +835,14 @@ void PlotGenerator::defineHistogramHolders() {
 
                   // User defined color?
                   JsonType varDict{};
-                  varDict = GenericToolbox::Json::fetchMatchingEntry(_varDictionary_, "name", splitVar); // does the cosmetic pars are configured?
-                  
+
+                  for( auto& varDictEntry : _varDictionary_ ){
+                    if( not GenericToolbox::Json::doKeyExist(varDictEntry, "name") ){ continue; }
+                    if( GenericToolbox::Json::fetchValue<std::string>(varDictEntry, "name") != splitVar ){ continue; }
+                    varDict = varDictEntry;
+                    break;
+                  }
+
                   if( not varDict.empty() ){
 
                     auto dictEntries = varDict["dictionary"];
@@ -846,11 +852,24 @@ void PlotGenerator::defineHistogramHolders() {
                     }
 
                     // Look for the value we want
-                    auto valDict = GenericToolbox::Json::fetchMatchingEntry(dictEntries, "value", splitValue);
+                    JsonType valDict{};
+                    for( auto& dictEntry : dictEntries ){
+                      if( GenericToolbox::Json::fetchValue<int>(dictEntry, "value") == splitValue ){
+                        valDict = dictEntry;
+                        break;
+                      }
+                    }
 
                     histDefBase.histTitle = GenericToolbox::Json::fetchValue(valDict, "title", histDefBase.histTitle);
                     histDefBase.fillStyle = GenericToolbox::Json::fetchValue(valDict, "fillStyle", short(1001));
-                    histDefBase.histColor = GenericToolbox::Json::fetchValue(valDict, "color", unsetSplitValueColor);
+
+                    histDefBase.histColor = unsetSplitValueColor;
+                    histDefBase.histColor = GenericToolbox::Json::fetchValue(valDict, {{"colorRoot"}, {"color"}}, histDefBase.histColor);
+                    if( GenericToolbox::Json::doKeyExist(valDict, "colorHex") ){
+                      TColor::SetColorThreshold(0.1); // will fetch the closest color
+                      histDefBase.histColor = short( TColor::GetColor( GenericToolbox::Json::fetchValue<std::string>(valDict, "colorHex").c_str() ) );
+                    }
+
                     if( histDefBase.histColor == unsetSplitValueColor ) unsetSplitValueColor++; // increment for the next ones
 
                   } // var dict?
