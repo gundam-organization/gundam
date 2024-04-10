@@ -105,7 +105,7 @@ void ParameterSet::readConfigImpl(){
         if( GenericToolbox::Json::doKeyExist(dialSetDef, "parametersBinningPath") ){
           LogInfo << "Found parameter binning within dialSetDefinition. Defining parameters number..." << std::endl;
           DataBinSet b;
-          b.readBinningDefinition( GenericToolbox::Json::fetchValue<std::string>(dialSetDef, "parametersBinningPath") );
+          b.readBinningDefinition( GenericToolbox::Json::fetchValue(dialSetDef, "parametersBinningPath", JsonType()) );
           // DON'T SORT THE BINNING -> tide to the cov matrix
           _nbParameterDefinition_ = int(b.getBinList().size());
           break;

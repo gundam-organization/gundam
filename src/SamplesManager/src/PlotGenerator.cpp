@@ -778,7 +778,7 @@ void PlotGenerator::defineHistogramHolders() {
                 } // sample binning ?
                 else if( GenericToolbox::Json::doKeyExist(histConfig, "binningFile") ){
                   DataBinSet b;
-                  b.readBinningDefinition(GenericToolbox::Json::fetchValue<std::string>(histConfig, "binningFile") );
+                  b.readBinningDefinition(GenericToolbox::Json::fetchValue(histConfig, "binningFile", JsonType()) );
                   b.sortBins();
 
                   auto varList{b.buildVariableNameList()};

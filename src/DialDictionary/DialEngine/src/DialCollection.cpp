@@ -456,7 +456,7 @@ bool DialCollection::initializeDialsWithDefinition() {
       // A binning file has been provided, so this is a binned dial.  Create
       // the dials for each bin here.  The dials will be assigned to the
       // events in DataDispenser.
-      auto binningFilePath = GenericToolbox::Json::fetchValue<std::string>(dialsDefinition, "binningFilePath");
+      auto binningFilePath = GenericToolbox::Json::fetchValue(dialsDefinition, "binningFilePath", JsonType());
 
       _dialBinSet_ = DataBinSet();
       _dialBinSet_.setName(binningFilePath);
