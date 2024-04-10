@@ -38,6 +38,8 @@ void EventTreeWriter::readConfigImpl() {
 
 
 void EventTreeWriter::writeSamples(TDirectory* saveDir_, const Propagator& propagator_) const{
+  LogReturnIf(not _isEnabled_, "Disabled EventTreeWriter. Skipping writeSamples.");
+
   LogInfo << "Writing sample data in TTrees..." << std::endl;
 
   // for usage in other methods
@@ -71,9 +73,11 @@ void EventTreeWriter::writeSamples(TDirectory* saveDir_, const Propagator& propa
 
 }
 void EventTreeWriter::writeEvents(TDirectory *saveDir_, const std::string& treeName_, const std::vector<Event> & eventList_) const {
+  LogReturnIf(not _isEnabled_, "Disabled EventTreeWriter. Skipping writeEvents.");
   this->writeEventsTemplate(saveDir_, treeName_, eventList_);
 }
 void EventTreeWriter::writeEvents(TDirectory* saveDir_, const std::string& treeName_, const std::vector<const EventDialCache::CacheEntry*>& cacheSampleList_) const{
+  LogReturnIf(not _isEnabled_, "Disabled EventTreeWriter. Skipping writeEvents.");
   this->writeEventsTemplate(saveDir_, treeName_, cacheSampleList_);
 }
 
