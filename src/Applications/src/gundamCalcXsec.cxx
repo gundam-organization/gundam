@@ -744,6 +744,7 @@ int main(int argc, char** argv){
       );
     }
   }
+  // here, fetch data from fitter file, to draw on top of MC predictions for each specific sample
 
   LogInfo << "Generating canvases..." << std::endl;
   propagator.getPlotGenerator().generateCanvas(
