@@ -89,6 +89,9 @@ private:
   // "mirror" value means that the parameter needs to be between the mirror
   // bounds too.
   std::string _likelihoodValidity_{"range,mirror,physical"};
+ 
+  //Choose the start point of MCMC is a random point (true) or the prior point (false).
+  bool _randomStart_{false};
 
   // Save or dump the raw (fitter space) points.  This can save about half the
   // output file space.  About the only time these would ever need to be saved
