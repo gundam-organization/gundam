@@ -31,7 +31,7 @@ void DatasetDefinition::readConfigImpl() {
   _showSelectedEventCount_ = GenericToolbox::Json::fetchValue(_config_, "showSelectedEventCount", _showSelectedEventCount_);
 
   _mcDispenser_ = DataDispenser(this);
-  _mcDispenser_.readConfig(GenericToolbox::Json::fetchValue<JsonType>(_config_, "mc"));
+  _mcDispenser_.readConfig(GenericToolbox::Json::fetchValue<JsonType>(_config_, {{"model"}, {"mc"}}));
   _mcDispenser_.getParameters().name = "Asimov";
   _mcDispenser_.getParameters().useMcContainer = true;
 
