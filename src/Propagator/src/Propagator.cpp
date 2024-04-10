@@ -82,6 +82,9 @@ void Propagator::readConfigImpl(){
   LogInfo << "Reading DialCollection configurations..." << std::endl;
   _dialCollectionList_.clear(); // make sure it's empty in case readConfig() is called more than once
   for(size_t iParSet = 0 ; iParSet < _parManager_.getParameterSetsList().size() ; iParSet++ ){
+    LogScopeIndent;
+    LogInfo << "Reading dials from " << _parManager_.getParameterSetsList()[iParSet].getName() << std::endl;
+
     if( not _parManager_.getParameterSetsList()[iParSet].isEnabled() ) continue;
     // DEV / DialCollections
     if( not _parManager_.getParameterSetsList()[iParSet].getDialSetDefinitions().empty() ){
@@ -93,6 +96,8 @@ void Propagator::readConfigImpl(){
       }
     }
     else{
+      LogDebug << GET_VAR_NAME_VALUE( _parManager_.getParameterSetsList()[iParSet].getDialSetDefinitions().empty() ) << std::endl;
+
       for( auto& par : _parManager_.getParameterSetsList()[iParSet].getParameterList() ){
         if( not par.isEnabled() ) continue;
 

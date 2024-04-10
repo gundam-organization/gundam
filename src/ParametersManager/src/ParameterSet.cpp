@@ -101,7 +101,7 @@ void ParameterSet::readConfigImpl(){
     LogWarning << "No number of parameter provided. Looking for alternative definitions..." << std::endl;
 
     if( not _dialSetDefinitions_.empty() ){
-      for( auto& dialSetDef : _dialSetDefinitions_.get<std::vector<JsonType>>() ){
+      for( auto& dialSetDef : _dialSetDefinitions_ ){
         if( GenericToolbox::Json::doKeyExist(dialSetDef, "parametersBinningPath") ){
           LogInfo << "Found parameter binning within dialSetDefinition. Defining parameters number..." << std::endl;
           DataBinSet b;
@@ -152,6 +152,11 @@ void ParameterSet::processCovarianceMatrix(){
   int nbParameters{0};
   for( const auto& par : _parameterList_ ){
     if( ParameterSet::isValidCorrelatedParameter(par) ) nbParameters++;
+  }
+  if( nbParameters == 0 ){
+    LogAlert << "No parameter is enabled. Disabling the parameter set." << std::endl;
+    _isEnabled_ = false;
+    return;
   }
   LogInfo << nbParameters << " effective parameters were defined in set: " << getName() << std::endl;
 
