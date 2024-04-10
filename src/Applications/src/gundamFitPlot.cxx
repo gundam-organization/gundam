@@ -158,7 +158,8 @@ int main( int argc, char** argv ){
         for(auto& graph: graphHolder){ if( graph.name == graphName ){ selectedGraph = &graph; break; } }
 
         if( selectedGraph == nullptr ){
-          selectedGraph = &graphHolder.emplace_back();
+          graphHolder.emplace_back();
+          selectedGraph = &graphHolder.back();
           selectedGraph->name = graphName;
           selectedGraph->path = parSetDir->GetName();
         }
