@@ -96,7 +96,6 @@ void Propagator::readConfigImpl(){
       }
     }
     else{
-      LogDebug << GET_VAR_NAME_VALUE( _parManager_.getParameterSetsList()[iParSet].getDialSetDefinitions().empty() ) << std::endl;
 
       for( auto& par : _parManager_.getParameterSetsList()[iParSet].getParameterList() ){
         if( not par.isEnabled() ) continue;
