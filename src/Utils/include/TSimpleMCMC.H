@@ -236,7 +236,7 @@ public:
 
     /// Set the starting point for the mcmc.  If the optional argument is
     /// true, then the point will be saved to the output.
-    void Start(Vector start, bool save=true) {
+    bool Start(Vector start, bool save=true) {
         fProposed.resize(start.size());
         std::copy(start.begin(), start.end(), fProposed.begin());
 
@@ -249,11 +249,18 @@ public:
         std::copy(start.begin(), start.end(), fTrialStep.begin());
 
         fProposedLogLikelihood = GetLogLikelihoodValue(fProposed);
+        MCMC_DEBUG(0)<<"The start likelihood is "<<fProposedLogLikelihood<<std::endl;
+        if (!std::isfinite(fProposedLogLikelihood)
+            || (fProposedLogLikelihood < -0.999999E+10)) {  ///Make the start likelihood value not too small.
+            return false;
+        }
+
         fAcceptedLogLikelihood = fProposedLogLikelihood;
 
         fProposeStep.InitializeState(fAccepted,fAcceptedLogLikelihood);
 
         if (save) SaveStep(false);
+        return true;
     }
 
     /// Restore the state from a previous chain.  If randomize is true, then
