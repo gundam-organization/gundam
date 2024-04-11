@@ -20,6 +20,9 @@ LoggerInit([]{
 void EventTreeWriter::readConfigImpl() {
   LogInfo << "Reading TreeWriter configuration..." << std::endl;
 
+  _isEnabled_ = GenericToolbox::Json::fetchValue(_config_, "isEnabled", _isEnabled_);
+  LogReturnIf(not _isEnabled_, "Disabled EventTreeWriter.");
+
   _writeDials_ = GenericToolbox::Json::fetchValue(_config_, "writeDials", _writeDials_);
   _nPointsPerDial_ = GenericToolbox::Json::fetchValue(_config_, "nPointsPerDial", _nPointsPerDial_);
 
@@ -35,6 +38,8 @@ void EventTreeWriter::readConfigImpl() {
 
 
 void EventTreeWriter::writeSamples(TDirectory* saveDir_, const Propagator& propagator_) const{
+  LogReturnIf(not _isEnabled_, "Disabled EventTreeWriter. Skipping writeSamples.");
+
   LogInfo << "Writing sample data in TTrees..." << std::endl;
 
   // for usage in other methods
@@ -68,9 +73,11 @@ void EventTreeWriter::writeSamples(TDirectory* saveDir_, const Propagator& propa
 
 }
 void EventTreeWriter::writeEvents(TDirectory *saveDir_, const std::string& treeName_, const std::vector<Event> & eventList_) const {
+  LogReturnIf(not _isEnabled_, "Disabled EventTreeWriter. Skipping writeEvents.");
   this->writeEventsTemplate(saveDir_, treeName_, eventList_);
 }
 void EventTreeWriter::writeEvents(TDirectory* saveDir_, const std::string& treeName_, const std::vector<const EventDialCache::CacheEntry*>& cacheSampleList_) const{
+  LogReturnIf(not _isEnabled_, "Disabled EventTreeWriter. Skipping writeEvents.");
   this->writeEventsTemplate(saveDir_, treeName_, cacheSampleList_);
 }
 
