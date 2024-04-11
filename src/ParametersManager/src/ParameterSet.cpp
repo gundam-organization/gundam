@@ -46,7 +46,6 @@ void ParameterSet::readConfigImpl(){
   _enableEigenDecomp_ = GenericToolbox::Json::fetchValue(_config_ , {{"enableEigenDecomp"}, {"useEigenDecompInFit"}}, false);
   if( _enableEigenDecomp_ ){
     LogWarning << "Using eigen decomposition in fit." << std::endl;
-    LogScopeIndent;
 
     _maxNbEigenParameters_ = GenericToolbox::Json::fetchValue(_config_ , "maxNbEigenParameters", -1);
     if( _maxNbEigenParameters_ != -1 ){
@@ -584,38 +583,41 @@ std::string ParameterSet::getSummary() const {
 
     ss << ", nbParameters: " << _parameterList_.size();
 
-    if( not _parameterList_.empty() ){
+    if( _printParametersSummary_ ){
+      if( not _parameterList_.empty() ){
 
-      GenericToolbox::TablePrinter t;
-      t.setColTitles({ {"Title"}, {"Value"}, {"Prior"}, {"StdDev"}, {"Min"}, {"Max"}, {"Status"} });
+        GenericToolbox::TablePrinter t;
+        t.setColTitles({ {"Title"}, {"Value"}, {"Prior"}, {"StdDev"}, {"Min"}, {"Max"}, {"Status"} });
 
 
-      for( const auto& par : _parameterList_ ){
-        std::string colorStr;
-        std::string statusStr;
+        for( const auto& par : _parameterList_ ){
+          std::string colorStr;
+          std::string statusStr;
 
-        if( not par.isEnabled() ) { statusStr = "Disabled"; colorStr = GenericToolbox::ColorCodes::yellowBackground; }
-        else if( par.isFixed() )  { statusStr = "Fixed";    colorStr = GenericToolbox::ColorCodes::redBackground; }
-        else if( par.isFree() )   { statusStr = "Free";     colorStr = GenericToolbox::ColorCodes::blueBackground; }
-        else                      { statusStr = "Enabled"; }
+          if( not par.isEnabled() ) { statusStr = "Disabled"; colorStr = GenericToolbox::ColorCodes::yellowBackground; }
+          else if( par.isFixed() )  { statusStr = "Fixed";    colorStr = GenericToolbox::ColorCodes::redBackground; }
+          else if( par.isFree() )   { statusStr = "Free";     colorStr = GenericToolbox::ColorCodes::blueBackground; }
+          else                      { statusStr = "Enabled"; }
 
 #ifdef NOCOLOR
-        colorStr = "";
+          colorStr = "";
 #endif
 
-        t.addTableLine({
-                           par.getTitle(),
-                           std::to_string( par.getParameterValue() ),
-                           std::to_string( par.getPriorValue() ),
-                           std::to_string( par.getStdDevValue() ),
-                           std::to_string( par.getMinValue() ),
-                           std::to_string( par.getMaxValue() ),
-                           statusStr
-                       }, colorStr);
-      }
+          t.addTableLine({
+                             par.getTitle(),
+                             std::to_string( par.getParameterValue() ),
+                             std::to_string( par.getPriorValue() ),
+                             std::to_string( par.getStdDevValue() ),
+                             std::to_string( par.getMinValue() ),
+                             std::to_string( par.getMaxValue() ),
+                             statusStr
+                         }, colorStr);
+        }
 
-      t.printTable();
+        t.printTable();
+      }
     }
+
   }
 
   return ss.str();
