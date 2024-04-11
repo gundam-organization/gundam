@@ -67,6 +67,9 @@ void ParameterSet::readConfigImpl(){
     _devUseParLimitsOnEigen_ = GenericToolbox::Json::fetchValue(_config_, "devUseParLimitsOnEigen", _devUseParLimitsOnEigen_);
     if( _devUseParLimitsOnEigen_ ){ LogAlert << "USING DEV OPTION: _devUseParLimitsOnEigen_ = true" << std::endl; }
 
+    _eigenSvdThreshold_ = GenericToolbox::Json::fetchValue(_config_, "eigenSvdThreshold", _eigenSvdThreshold_);
+    LogInfoIf(not std::isnan(_eigenSvdThreshold_)) << "Setting SVD eigen value threshold to: " << _eigenSvdThreshold_ << std::endl;
+
   }
 
   _enablePca_ = GenericToolbox::Json::fetchValue(_config_, std::vector<std::string>{"allowPca", "fixGhostFitParameters", "enablePca"}, _enablePca_);
@@ -187,6 +190,7 @@ void ParameterSet::processCovarianceMatrix(){
     LogWarning << "Decomposing the stripped covariance matrix..." << std::endl;
     _eigenParameterList_.resize(_strippedCovarianceMatrix_->GetNrows(), Parameter(this));
 
+    LogAlertIf(_strippedCovarianceMatrix_->GetNrows() > 1000) << "Decomposing matrix with " << _strippedCovarianceMatrix_->GetNrows() << " dim might take a while..." << std::endl;
     _eigenDecomp_     = std::make_shared<TMatrixDSymEigen>(*_strippedCovarianceMatrix_);
 
     // Used for base swapping
@@ -195,12 +199,16 @@ void ParameterSet::processCovarianceMatrix(){
     _eigenVectors_    = std::shared_ptr<TMatrixD>( (TMatrixD*) _eigenDecomp_->GetEigenVectors().Clone() );
     _eigenVectorsInv_ = std::make_shared<TMatrixD>(TMatrixD::kTransposed, *_eigenVectors_ );
 
-    double eigenCumulative = 0;
     _nbEnabledEigen_ = 0;
     double eigenTotal = _eigenValues_->Sum();
 
     LogInfo << "Covariance eigen values are between " << _eigenValues_->Min() << " and " << _eigenValues_->Max() << std::endl;
-    LogThrowIf(_eigenValues_->Min() < 0, "Input covariance matrix is not positive definite.");
+    if( std::isnan(_eigenSvdThreshold_) ){
+      LogThrowIf(_eigenValues_->Min() < 0, "Input covariance matrix is not positive definite.");
+    }
+    else if( _eigenValues_->Min()/_eigenValues_->Max() < _eigenSvdThreshold_ ){
+      LogAlert << "Eigen values bellow the threshold(" << _eigenSvdThreshold_ << "). Using SVD..." << std::endl;
+    }
 
     _inverseStrippedCovarianceMatrix_ = std::make_shared<TMatrixD>(_strippedCovarianceMatrix_->GetNrows(), _strippedCovarianceMatrix_->GetNrows());
     _projectorMatrix_                 = std::make_shared<TMatrixD>(_strippedCovarianceMatrix_->GetNrows(), _strippedCovarianceMatrix_->GetNrows());
@@ -209,29 +217,44 @@ void ParameterSet::processCovarianceMatrix(){
 
     for (int iEigen = 0; iEigen < _eigenValues_->GetNrows(); iEigen++) {
 
-      _eigenParameterList_[iEigen].setIsEigen(true);
+      _eigenParameterList_[iEigen].setParameterIndex( iEigen );
       _eigenParameterList_[iEigen].setIsEnabled(true);
-      _eigenParameterList_[iEigen].setIsFixed(false);
-      _eigenParameterList_[iEigen].setParameterIndex(iEigen);
+      _eigenParameterList_[iEigen].setIsEigen(true);
       _eigenParameterList_[iEigen].setStdDevValue(TMath::Sqrt((*_eigenValues_)[iEigen]));
       _eigenParameterList_[iEigen].setStepSize(TMath::Sqrt((*_eigenValues_)[iEigen]));
       _eigenParameterList_[iEigen].setName("eigen");
 
+      // fixing all of them by default
+      _eigenParameterList_[iEigen].setIsFixed(true);
+      (*eigenState)[iEigen] = 0;
+
+    }
+
+
+    double eigenCumulative{0};
+
+    // this loop assumes all eigen values are stored in decreasing order
+    for (int iEigen = 0; iEigen < _eigenValues_->GetNrows(); iEigen++) {
+
+      if( not std::isnan( _eigenSvdThreshold_ ) ){
+        // check the current matrix conditioning
+        if( (*_eigenValues_)[iEigen]/_eigenValues_->Max() < _eigenSvdThreshold_ ){
+          LogAlert << "Keeping " << iEigen << " eigen values with SVD." << std::endl;
+          break; // decreasing order
+        }
+      }
+
+
+      if(    ( _maxNbEigenParameters_ != -1 and iEigen >= _maxNbEigenParameters_ )
+             or ( _maxEigenFraction_ != 1 and (eigenCumulative + (*_eigenValues_)[iEigen]) / eigenTotal > _maxEigenFraction_ ) ){
+        break; // decreasing order
+      }
+
+      // if we reach this point, the eigen value is accepted
+      _eigenParameterList_[iEigen].setIsFixed( false );
       (*_eigenValuesInv_)[iEigen] = 1./(*_eigenValues_)[iEigen];
       (*eigenState)[iEigen] = 1.;
-
       eigenCumulative += (*_eigenValues_)[iEigen];
-      if(    ( _maxNbEigenParameters_ != -1 and iEigen >= _maxNbEigenParameters_ )
-          or ( _maxEigenFraction_ != 1      and eigenCumulative / eigenTotal > _maxEigenFraction_ ) ){
-        eigenCumulative -= (*_eigenValues_)[iEigen]; // not included
-        (*_eigenValues_)[iEigen] = 0;
-        (*_eigenValuesInv_)[iEigen] = 0;
-        (*eigenState)[iEigen] = 0;
-
-        _eigenParameterList_[iEigen].setIsFixed(true);
-
-        break;
-      }
       _nbEnabledEigen_++;
 
     } // iEigen

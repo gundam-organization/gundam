@@ -133,6 +133,7 @@ private:
   double _nominalStepSize_{std::nan("unset")};
   int _maxNbEigenParameters_{-1};
   double _maxEigenFraction_{1};
+  double _eigenSvdThreshold_{std::nan("unset")};
 
   double _globalParameterMinValue_{std::nan("unset")};
   double _globalParameterMaxValue_{std::nan("unset")};
