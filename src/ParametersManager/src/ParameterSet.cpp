@@ -80,9 +80,10 @@ void ParameterSet::readConfigImpl(){
   _parameterDefinitionFilePath_ = GenericToolbox::Json::fetchValue( _config_,
     { {"parameterDefinitionFilePath"}, {"covarianceMatrixFilePath"} }, _parameterDefinitionFilePath_
   );
-  _covarianceMatrixTMatrixD_ = GenericToolbox::Json::fetchValue(_config_, "covarianceMatrixTMatrixD", _covarianceMatrixTMatrixD_);
-  _parameterPriorTVectorD_ = GenericToolbox::Json::fetchValue(_config_, "parameterPriorTVectorD", _parameterPriorTVectorD_);
-  _parameterNameTObjArray_ = GenericToolbox::Json::fetchValue(_config_, "parameterNameTObjArray", _parameterNameTObjArray_);
+  _covarianceMatrixPath_ = GenericToolbox::Json::fetchValue(_config_, {{"covarianceMatrix"}, {"covarianceMatrixTMatrixD"}}, _covarianceMatrixPath_);
+  _parameterNameListPath_ = GenericToolbox::Json::fetchValue(_config_, {{"parameterNameList"}, {"parameterNameTObjArray"}}, _parameterNameListPath_);
+  _parameterPriorValueListPath_ = GenericToolbox::Json::fetchValue(_config_, {{"parameterPriorValueList"}, {"parameterPriorTVectorD"}}, _parameterPriorValueListPath_);
+
   _parameterLowerBoundsTVectorD_ = GenericToolbox::Json::fetchValue(_config_, "parameterLowerBoundsTVectorD", _parameterLowerBoundsTVectorD_);
   _parameterUpperBoundsTVectorD_ = GenericToolbox::Json::fetchValue(_config_, "parameterUpperBoundsTVectorD", _parameterUpperBoundsTVectorD_);
   _throwEnabledListPath_ = GenericToolbox::Json::fetchValue(_config_, "throwEnabledList", _throwEnabledListPath_);
@@ -791,12 +792,12 @@ void ParameterSet::readParameterDefinitionFile(){
 
   TObject* objBuffer{nullptr};
 
-  if( _covarianceMatrixTMatrixD_.empty() ){
+  if( _covarianceMatrixPath_.empty() ){
     LogWarning << "No covariance matrix provided. Free parameter definition expected." << std::endl;
   }
   else{
-    objBuffer = parDefFile->Get(_covarianceMatrixTMatrixD_.c_str());
-    LogThrowIf(objBuffer == nullptr, "Can't find \"" << _covarianceMatrixTMatrixD_ << "\" in " << parDefFile->GetPath())
+    objBuffer = parDefFile->Get(_covarianceMatrixPath_.c_str());
+    LogThrowIf(objBuffer == nullptr, "Can't find \"" << _covarianceMatrixPath_ << "\" in " << parDefFile->GetPath())
     _priorCovarianceMatrix_ = std::shared_ptr<TMatrixDSym>((TMatrixDSym*) objBuffer->Clone());
     _priorCorrelationMatrix_ = std::shared_ptr<TMatrixDSym>((TMatrixDSym*) GenericToolbox::convertToCorrelationMatrix((TMatrixD*)_priorCovarianceMatrix_.get()));
     LogThrowIf(_nbParameterDefinition_ != -1, "Nb of parameter was manually defined but the covariance matrix");
@@ -804,11 +805,11 @@ void ParameterSet::readParameterDefinitionFile(){
   }
 
   // parameterPriorTVectorD
-  if(not _parameterPriorTVectorD_.empty()){
-    LogInfo << "Reading provided parameterPriorTVectorD: \"" << _parameterPriorTVectorD_ << "\"" << std::endl;
+  if(not _parameterPriorValueListPath_.empty()){
+    LogInfo << "Reading provided parameterPriorTVectorD: \"" << _parameterPriorValueListPath_ << "\"" << std::endl;
 
-    objBuffer = parDefFile->Get(_parameterPriorTVectorD_.c_str());
-    LogThrowIf(objBuffer == nullptr, "Can't find \"" << _parameterPriorTVectorD_ << "\" in " << parDefFile->GetPath())
+    objBuffer = parDefFile->Get(_parameterPriorValueListPath_.c_str());
+    LogThrowIf(objBuffer == nullptr, "Can't find \"" << _parameterPriorValueListPath_ << "\" in " << parDefFile->GetPath())
     _parameterPriorList_ = std::shared_ptr<TVectorD>((TVectorD*) objBuffer->Clone());
 
     LogThrowIf(_parameterPriorList_->GetNrows() != _nbParameterDefinition_,
@@ -819,11 +820,11 @@ void ParameterSet::readParameterDefinitionFile(){
   }
 
   // parameterNameTObjArray
-  if(not _parameterNameTObjArray_.empty()){
-    LogInfo << "Reading provided parameterNameTObjArray: \"" << _parameterNameTObjArray_ << "\"" << std::endl;
+  if(not _parameterNameListPath_.empty()){
+    LogInfo << "Reading provided parameterNameTObjArray: \"" << _parameterNameListPath_ << "\"" << std::endl;
 
-    objBuffer = parDefFile->Get(_parameterNameTObjArray_.c_str());
-    LogThrowIf(objBuffer == nullptr, "Can't find \"" << _parameterNameTObjArray_ << "\" in " << parDefFile->GetPath())
+    objBuffer = parDefFile->Get(_parameterNameListPath_.c_str());
+    LogThrowIf(objBuffer == nullptr, "Can't find \"" << _parameterNameListPath_ << "\" in " << parDefFile->GetPath())
     _parameterNamesList_ = std::shared_ptr<TObjArray>((TObjArray*) objBuffer->Clone());
   }
 
