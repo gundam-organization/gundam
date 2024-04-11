@@ -29,6 +29,9 @@ void PlotGenerator::readConfigImpl(){
   LogWarning << __METHOD_NAME__ << std::endl;
   gStyle->SetOptStat(0);
   _histHolderCacheList_.resize(1);
+
+  if( not GenericToolbox::Json::fetchValue(_config_, "isEnabled", true) ){ return; }
+
   _varDictionary_ = GenericToolbox::Json::fetchValue(_config_, {{"varDictionaries"}, {"varDictionnaries"}}, JsonType());
   _canvasParameters_ = GenericToolbox::Json::fetchValue(_config_, "canvasParameters", JsonType());
   _histogramsDefinition_ = GenericToolbox::Json::fetchValue(_config_, "histogramsDefinition", JsonType());
@@ -570,6 +573,7 @@ std::vector<std::string> PlotGenerator::fetchListOfVarToPlot(bool isData_){
   std::vector<std::string> varNameList;
   _histogramsDefinition_ = GenericToolbox::Json::fetchValue(_config_, "histogramsDefinition", JsonType());
   for( const auto& histConfig : _histogramsDefinition_ ){
+    if( not GenericToolbox::Json::fetchValue(histConfig, "isEnabled", true) ){ continue; }
     auto varToPlot = GenericToolbox::Json::fetchValue<std::string>(histConfig, "varToPlot");
     if( varToPlot != "Raw"
         and not GenericToolbox::doesElementIsInVector(varToPlot, varNameList)
