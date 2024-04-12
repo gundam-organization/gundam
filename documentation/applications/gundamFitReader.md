@@ -1,13 +1,23 @@
 ## gundamFitReader
-
+[< back to parent (GettingStarted)](../GettingStarted.md)
 ### Description 
 
-The `gundamFitReader` app is an interface to the `FitterEngine` which is in charge
+The `gundamFitReader` app reads the fit output file from [gundamFitter](gundamFitter.md) and prints out relevant fit information. 
+### Usage
 
-### Config options
+Using the `-f` argument the user can specify the input fit file.
+```bash
+gundamFitReader -c path/to/fit.root 
+```
+Similarly using the `-e` trigger and the `-o` option, the output can be written in the a ROOT file.
+```bash
+gundamFitReader -c path/to/fit.root -e -o path/to/output.root
+```
+### Trigger options
 
-| Option                                                 | Type         | Description                                                     | Default |
-|--------------------------------------------------------|--------------|-----------------------------------------------------------------|---------|
-| [fitterEngineConfig](../configuration/FitterEngine.md) | json         | FitterEngine config                                             |         |
-| minGundamVersion                                       | string       | gundamFitter will stop if the version is lower                  |         |
-| outputFolder                                           | string       | Folder where the output file is written                         | ./      |
+A certain number of trigger options can be used depending  on what the user needs:
+
+| Option          | Description                                        |
+| --------------- | -------------------------------------------------- |
+| -e              | Export data to output files                        |
+| --show-par-list | Show parameters list                               |

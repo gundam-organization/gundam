@@ -1,13 +1,10 @@
 ## gundamRoot
-
+[< back to parent (GettingStarted)](../GettingStarted.md)
 ### Description 
 
-The `gundamRoot` app is an interface to the `FitterEngine` which is in charge
+The `gundamRoot` app is an interactive ROOT session that includes `GUNDAM`'s funcionality.
+### Usage
 
-### Config options
-
-| Option                                                 | Type         | Description                                                     | Default |
-|--------------------------------------------------------|--------------|-----------------------------------------------------------------|---------|
-| [fitterEngineConfig](../configuration/FitterEngine.md) | json         | FitterEngine config                                             |         |
-| minGundamVersion                                       | string       | gundamFitter will stop if the version is lower                  |         |
-| outputFolder                                           | string       | Folder where the output file is written                         | ./      |
+```bash
+gundamRoot 
+```

@@ -1,13 +1,17 @@
 ## gundamConfigUnfolder
-
+[< back to parent (GettingStarted)](../GettingStarted.md)
 ### Description 
 
-The `gundamConfigUnfolder` app is an interface to the `FitterEngine` which is in charge
+The `gundamConfigUnfolder` app takes a config file and and exports all related config files into one `.json` that can be used as an input for other apps that use said input.
 
-### Config options
+### Usage
 
-| Option                                                 | Type         | Description                                                     | Default |
-|--------------------------------------------------------|--------------|-----------------------------------------------------------------|---------|
-| [fitterEngineConfig](../configuration/FitterEngine.md) | json         | FitterEngine config                                             |         |
-| minGundamVersion                                       | string       | gundamFitter will stop if the version is lower                  |         |
-| outputFolder                                           | string       | Folder where the output file is written                         | ./      |
+Using the `-c` argument one provides the `.yaml` or `.json` config file:
+```bash
+gundamConfigUnfolder -c path/to/config.yaml -o path/to/output.json
+```
+
+One can also include an override file with `-of` to include config override.
+```bash
+gundamConfigUnfolder -c path/to/config.yaml -of path/to/override.yaml -o path/to/output.json
+```

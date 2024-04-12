@@ -1,13 +1,11 @@
 ## gundamFitPlot
-
+[< back to parent (GettingStarted)](../GettingStarted.md)
 ### Description 
 
-The `gundamFitPlot` app is an interface to the `FitterEngine` which is in charge
+The `gundamFitPlot` app is used to compare the constraints of several fits.
 
-### Config options
+### Usage
 
-| Option                                                 | Type         | Description                                                     | Default |
-|--------------------------------------------------------|--------------|-----------------------------------------------------------------|---------|
-| [fitterEngineConfig](../configuration/FitterEngine.md) | json         | FitterEngine config                                             |         |
-| minGundamVersion                                       | string       | gundamFitter will stop if the version is lower                  |         |
-| outputFolder                                           | string       | Folder where the output file is written                         | ./      |
+```bash
+gundamFitPlot -c path/to/config.yaml -o path/to/output.root
+```

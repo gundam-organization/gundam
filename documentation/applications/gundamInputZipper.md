@@ -1,13 +1,22 @@
 ## gundamInputZipper
-
+[< back to parent (GettingStarted)](../GettingStarted.md)
 ### Description 
 
-The `gundamInputZipper` app is an interface to the `FitterEngine` which is in charge
+The `gundamInputZipper` app reads in the config inputs and copies the inputs into a unified ZIP file. 
+### Usage
 
-### Config options
+Using the `-c` and `-of` arguments one can point to the desired config:
+```bash
+gundamInputZipper -c path/to/config.yaml -of path/to/override.yaml
+```
+This will create a directory with the same name as the config file.
 
-| Option                                                 | Type         | Description                                                     | Default |
-|--------------------------------------------------------|--------------|-----------------------------------------------------------------|---------|
-| [fitterEngineConfig](../configuration/FitterEngine.md) | json         | FitterEngine config                                             |         |
-| minGundamVersion                                       | string       | gundamFitter will stop if the version is lower                  |         |
-| outputFolder                                           | string       | Folder where the output file is written                         | ./      |
+Otherwise one can specify the name of the output with `-o` 
+```bash 
+gundamInputZipper -c path/to/config.yaml -of path/to/override.yaml -o output/
+```
+
+In addition, the user can define the maximum size (in MB) of the file with `--max-size` and zip the output folder with `-z`:
+```bash
+gundamInputZipper -c path/to/config.yaml -of path/to/override.yaml -o output/ -z --max-size 50
+```
