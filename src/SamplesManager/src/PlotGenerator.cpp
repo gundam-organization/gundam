@@ -935,18 +935,18 @@ void PlotGenerator::buildEventBinCache( const std::vector<HistHolder *> &histPtr
         int iBin{-1};
         for( const auto& event : *eventListPtr ){
           int splitValue;
+          double varValue;
           if( not histPtr->splitVarName.empty() ){
+            GundamGlobals::getThreadMutex().lock();
             splitValue = event.getVariables().fetchVariable(histPtr->splitVarName).get().getValue<int>();
+            if( histPtr->varToPlot != "Raw" ) varValue = event.getVariables().fetchVariable(histPtr->varToPlot).getVarAsDouble();
+            GundamGlobals::getThreadMutex().unlock();
           }
 
           if( histPtr->splitVarName.empty() or splitValue == histPtr->splitVarValue){
 
             if( histPtr->varToPlot == "Raw" ){ iBin = event.getIndices().bin + 1; }
-            else                             {
-//              iBin = histPtr->histPtr->FindBin(
-//                event.getVariables().fetchVariable(histPtr->varToPlot).getVarAsDouble()
-//                );
-            }
+            else                             { iBin = histPtr->histPtr->FindBin( varValue ); }
 
             if( iBin > 0 and iBin <= histPtr->histPtr->GetNbinsX() ){
               // so it's a valid bin!
