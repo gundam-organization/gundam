@@ -155,6 +155,7 @@ void PlotGenerator::generateSampleHistograms(TDirectory *saveDir_, int cacheSlot
             break; // all caches done at once
           }
         }
+        LogDebug << "Cache built." << std::endl;
 
         // Filling the selected histograms
         std::function<void(int)> fillJob = [&]( int iThread_ ){
@@ -959,11 +960,15 @@ void PlotGenerator::buildEventBinCache( const std::vector<HistHolder *> &histPtr
     }
   };
 
-  GundamGlobals::getParallelWorker().addJob("fillEventHistCache", fillEventHistCache);
-  GundamGlobals::getParallelWorker().setPreParallelJob("fillEventHistCache", prepareCacheFct);
-  GundamGlobals::getParallelWorker().setPostParallelJob("fillEventHistCache", shrinkAllocationsFct);
-  GundamGlobals::getParallelWorker().runJob("fillEventHistCache");
-  GundamGlobals::getParallelWorker().removeJob("fillEventHistCache");
+  prepareCacheFct();
+  fillEventHistCache(-1);
+  shrinkAllocationsFct();
+
+//  GundamGlobals::getParallelWorker().addJob("fillEventHistCache", fillEventHistCache);
+//  GundamGlobals::getParallelWorker().setPreParallelJob("fillEventHistCache", prepareCacheFct);
+//  GundamGlobals::getParallelWorker().setPostParallelJob("fillEventHistCache", shrinkAllocationsFct);
+//  GundamGlobals::getParallelWorker().runJob("fillEventHistCache");
+//  GundamGlobals::getParallelWorker().removeJob("fillEventHistCache");
 
 }
 
