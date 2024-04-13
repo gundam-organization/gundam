@@ -167,19 +167,23 @@ void FitterEngine::initializeImpl(){
   // and other properties)
   _minimizer_->initialize();
 
+  LogDebug << __LINE__ << std::endl;
   if( GundamGlobals::getVerboseLevel() >= VerboseLevel::MORE_PRINTOUT ){ checkNumericalAccuracy(); }
 
   // Write data
+  LogDebug << __LINE__ << std::endl;
   LogInfo << "Writing propagator objects..." << std::endl;
   GenericToolbox::writeInTFile(
       GenericToolbox::mkdirTFile(_saveDir_, "propagator"),
       TNamed("initialParameterState", GenericToolbox::Json::toReadableString(_likelihoodInterface_.getDataSetManager().getPropagator().getParametersManager().exportParameterInjectorConfig()).c_str())
   );
 
+  LogDebug << __LINE__ << std::endl;
   GenericToolbox::writeInTFile(
       GenericToolbox::mkdirTFile(_saveDir_, "propagator"),
       _likelihoodInterface_.getDataSetManager().getPropagator().getParametersManager().getGlobalCovarianceMatrix().get(), "globalCovarianceMatrix"
   );
+  LogDebug << __LINE__ << std::endl;
   GenericToolbox::writeInTFile(
       GenericToolbox::mkdirTFile(_saveDir_, "propagator"),
       _likelihoodInterface_.getDataSetManager().getPropagator().getParametersManager().getStrippedCovarianceMatrix().get(), "strippedCovarianceMatrix"
@@ -234,7 +238,7 @@ void FitterEngine::initializeImpl(){
     }
   }
 
-
+  LogDebug << __LINE__ << std::endl;
   if( _minimizerType_ == MinimizerType::RootMinimizer ){
     dynamic_cast<const RootMinimizer*>( &this->getMinimizer() )->saveMinimizerSettings( GenericToolbox::mkdirTFile(_saveDir_, "fit/minimizer" ) );
   }
