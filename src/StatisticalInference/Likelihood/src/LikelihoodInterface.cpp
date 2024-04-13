@@ -29,7 +29,7 @@ void LikelihoodInterface::readConfigImpl(){
     LogAlert << R"("dataSetList" should now be set under "likelihoodInterfaceConfig" instead of "propagatorConfig".)" << std::endl;
     dataSetManagerConfig = _dataSetManager_.getPropagator().getConfig();
   });
-  dataSetManagerConfig = GenericToolbox::Json::fetchValue(_config_, "dataSetManagerConfig", dataSetManagerConfig);
+  dataSetManagerConfig = GenericToolbox::Json::fetchValue(_config_, {{"datasetManagerConfig"}, {"dataSetManagerConfig"}}, dataSetManagerConfig);
   _dataSetManager_.readConfig( dataSetManagerConfig );
 
   //
