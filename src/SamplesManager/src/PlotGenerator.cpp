@@ -908,7 +908,6 @@ void PlotGenerator::defineHistogramHolders() {
 }
 void PlotGenerator::buildEventBinCache( const std::vector<HistHolder *> &histPtrToFillList, const std::vector<Event> *eventListPtr, bool isData_) {
 
-  std::this_thread::sleep_for( std::chrono::seconds(5) );
   std::function<void()> prepareCacheFct = [&]() {
     for (auto *holder: histPtrToFillList) {
       if (not holder->isBinCacheBuilt) {
