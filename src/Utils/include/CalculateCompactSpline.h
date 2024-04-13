@@ -64,7 +64,7 @@ namespace {
 
         // Get the integer part
         const double xx = (x-low)/step;
-        const int ix = xx;
+        const int ix = (xx<0) ? xx-1: xx;
 
         // Calculate the indices of the two points to calculate d10
         // int d10_0 = ix-2;             // p0
@@ -75,7 +75,7 @@ namespace {
         if (d21_0 < 0)     d21_0 = 0;
         if (d21_0 > dim-2) d21_0 = dim-2;
         int d21_1 = d21_0+1;          // p2
-        // Calculate the indices of the two points to calculate d21
+        // Calculate the indices of the two points to calculate d32
         int d32_0 = ix;               // p2
         if (d32_0 < 0)     d32_0 = 0;
         if (d32_0 > dim-2) d32_0 = dim-2;
@@ -85,11 +85,6 @@ namespace {
         if (d43_0 < 0)     d43_0 = 0;
         if (d43_0 > dim-2) d43_0 = dim-2;
         int d43_1 = d43_0+1;          // p4
-        // Calculate the indices of the two points to calculate d43;
-        int d54_0 = ix+2;             // p4
-        if (d54_0 < 0)     d54_0 = 0;
-        if (d54_0 > dim-2) d54_0 = dim-2;
-        int d54_1 = d54_0+1;          // p5
 
         // Find the points to use.
         const double p2 = data[2+d32_0];
@@ -99,8 +94,6 @@ namespace {
         // zero or greater than kPointSize-1, this is the distance from the
         // boundary.
         const double fx = xx-d32_0;
-        const double fxx = fx*fx;
-        const double fxxx = fx*fxx;
 
         // Get the values of the deltas
         const double d21 = data[2+d21_1] - data[2+d21_0];
@@ -112,14 +105,19 @@ namespace {
         double m2 = 0.5*(d21+d32);
         double m3 = 0.5*(d32+d43);
 
-        // Cubic spline with the points and slopes.
-        // double v = p2*(2.0*fxxx-3.0*fxx+1.0) + m2*(fxxx-2.0*fxx+fx)
-        //         + p3*(3.0*fxx-2.0*fxxx) + m3*(fxxx-fxx));
+        // Cubic spline with the points and slopes.  This is the formula that
+        // you will find in most text books.
 
-        // A more numerically stable calculation
-        const double t = 3.0*fxx-2.0*fxxx;
-        double v = p2 - p2*t + m2*(fxxx-2.0*fxx+fx)
-                    + p3*t + m3*(fxxx-fxx);
+        // const double fxx = fx*fx;
+        // const double fxxx = fx*fxx;
+        // double v = p2*(2.0*fxxx-3.0*fxx+1.0) + m2*(fxxx-2.0*fxx+fx)
+        //     + p3*(3.0*fxx-2.0*fxxx) + m3*(fxxx-fxx);
+
+        // Factored via Horner's method.
+        double v = ((((2.0*p2 - 2.0*p3 + m3 + m2)*fx
+                      + 3.0*p3 - 3.0*p2 - m3 - 2.0*m2)*fx
+                     +m2)*fx
+                    +p2);
 
         if (v < lowerBound) v = lowerBound;
         if (v > upperBound) v = upperBound;

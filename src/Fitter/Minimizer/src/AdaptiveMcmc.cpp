@@ -250,8 +250,8 @@ void AdaptiveMcmc::fillPoint( bool fillModel) {
 }
 
 bool AdaptiveMcmc::adaptiveRestoreState( AdaptiveStepMCMC& mcmc,
-                                                const std::string& fileName,
-                                                const std::string& treeName) {
+                                         const std::string& fileName,
+                                         const std::string& treeName) {
 
   // No filename so, no restoration.
   if (fileName.empty()) return false;
@@ -298,7 +298,7 @@ bool AdaptiveMcmc::adaptiveRestoreState( AdaptiveStepMCMC& mcmc,
   return true;
 }
 bool AdaptiveMcmc::adaptiveDefaultProposalCovariance( AdaptiveStepMCMC& mcmc,
-                                                             Vector& prior) {
+                                                      sMCMC::Vector& prior) {
 
   /// Set the diagonal elements for the parameters.
   int count0 = 0;
@@ -386,9 +386,9 @@ bool AdaptiveMcmc::adaptiveDefaultProposalCovariance( AdaptiveStepMCMC& mcmc,
   return true;
 }
 bool AdaptiveMcmc::adaptiveLoadProposalCovariance( AdaptiveStepMCMC& mcmc,
-                                                          Vector& prior,
-                                                          const std::string& fileName,
-                                                          const std::string& histName) {
+                                                   sMCMC::Vector& prior,
+                                                   const std::string& fileName,
+                                                   const std::string& histName) {
   // No filename so, no restoration.
   if (fileName.empty()) return false;
 
@@ -490,6 +490,7 @@ bool AdaptiveMcmc::adaptiveLoadProposalCovariance( AdaptiveStepMCMC& mcmc,
 
   return true;
 }
+
 void AdaptiveMcmc::setupAndRunAdaptiveStep( AdaptiveStepMCMC& mcmc) {
 
   mcmc.GetProposeStep().SetDim(_minimizerParameterPtrList_.size());
@@ -499,8 +500,8 @@ void AdaptiveMcmc::setupAndRunAdaptiveStep( AdaptiveStepMCMC& mcmc) {
 
   // Create a fitting parameter vector and initialize it.  No need to worry
   // about resizing it or it moving, so be lazy and just use push_back.
-  Vector prior;
-    
+  sMCMC::Vector prior;
+
   bool StartStatus = false;
   if (_randomStart_==true){
     LogInfo<<"MCMC chain starts from a random point"<<std::endl;
@@ -521,7 +522,7 @@ void AdaptiveMcmc::setupAndRunAdaptiveStep( AdaptiveStepMCMC& mcmc) {
       if(not std::isnan(par->getMinPhysical())) {
         lowBound = std::max(lowBound, par->getMinPhysical());
       }
-      
+
       if(not std::isnan(par->getMaxValue())) {
         highBound = std::min(highBound, par->getMaxValue());
       }
@@ -538,7 +539,7 @@ void AdaptiveMcmc::setupAndRunAdaptiveStep( AdaptiveStepMCMC& mcmc) {
       else {
          prior.push_back(ParameterSet::toNormalizedParValue(val, *par));
       }
-      
+
     }
     StartStatus = mcmc.Start(prior, false);
     if(!StartStatus) prior.clear();
@@ -644,7 +645,7 @@ void AdaptiveMcmc::setupAndRunAdaptiveStep( AdaptiveStepMCMC& mcmc) {
       // the previous cycle.  This only happens a few times to let it forget
       // about the very first burn-in cycles
       if (chain < _burninResets_) {
-        Vector saveCenter{mcmc.GetProposeStep().GetEstimatedCenter()};
+        sMCMC::Vector saveCenter{mcmc.GetProposeStep().GetEstimatedCenter()};
         mcmc.GetProposeStep().ResetProposal();
         // After the reset, set how many trials the prior covariance counts
         // for.  This needs to be done by hand since the extra weight lives
@@ -764,7 +765,7 @@ void AdaptiveMcmc::setupAndRunSimpleStep( SimpleStepMCMC& mcmc) {
   mcmc.GetLogLikelihood().functor = std::make_unique<ROOT::Math::Functor>(this, &AdaptiveMcmc::evalFitValid, _minimizerParameterPtrList_.size());
   mcmc.GetProposeStep().fSigma = _simpleSigma_;
 
-  Vector prior;
+  sMCMC::Vector prior;
   for (const Parameter* par : _minimizerParameterPtrList_ ) {
     prior.push_back(par->getPriorValue());
   }
@@ -941,11 +942,11 @@ void AdaptiveMcmc::minimize() {
 
   // Create the TSimpleMCMC object and call the specific runner.
   if (_proposalName_ == "adaptive") {
-    TSimpleMCMC<PrivateProxyLikelihood,TProposeAdaptiveStep> mcmc(outputTree);
+    sMCMC::TSimpleMCMC<PrivateProxyLikelihood,sMCMC::TProposeAdaptiveStep> mcmc(outputTree);
     setupAndRunAdaptiveStep(mcmc);
   }
   else if (_proposalName_ == "simple") {
-    TSimpleMCMC<PrivateProxyLikelihood,TProposeSimpleStep> mcmc(outputTree);
+    sMCMC::TSimpleMCMC<PrivateProxyLikelihood,sMCMC::TProposeSimpleStep> mcmc(outputTree);
     setupAndRunSimpleStep(mcmc);
   }
 
@@ -1056,5 +1057,5 @@ bool AdaptiveMcmc::hasValidParameterValues() const {
 // Local Variables:
 // mode:c++
 // c-basic-offset:2
-// compile-command:"$(git rev-parse --show-toplevel)/cmake/gundam-build.sh"
+// compile-command:"$(git rev-parse --show-toplevel)/cmake/scripts/gundam-build.sh"
 // End:

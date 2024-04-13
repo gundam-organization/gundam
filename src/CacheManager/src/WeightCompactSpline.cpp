@@ -338,8 +338,6 @@ namespace {
             const int id1 = sIndex[i+1];
             const int dim = id1-id0-2;
             const double x = params[pIndex[i]];
-            const double lowBound = knots[id0];
-            const double step = 1.0/knots[id0+1];
             const double lClamp = lowerClamp[pIndex[i]];
             const double uClamp = upperClamp[pIndex[i]];
 

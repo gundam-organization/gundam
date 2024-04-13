@@ -1,15 +1,6 @@
 #ifndef TSimpleMCMC_H_SEEN
 #define TSimpleMCMC_H_SEEN
 
-#include "Logger.h"
-
-#include <TRandom.h>
-#include <TFile.h>
-#include <TTree.h>
-#include <TMatrixD.h>
-#include <TMatrixDSymEigen.h>
-#include <TDecompChol.h>
-
 #include <iostream>
 #include <vector>
 #include <algorithm>
@@ -17,12 +8,12 @@
 #include <cmath>
 #include <stdexcept>
 
-
-typedef double ParameterType;
-typedef std::vector<ParameterType> Vector;
-
-// A typedef for how the parameters are written to a tree.
-typedef std::vector<ParameterType> SavedVector;
+#include <TRandom.h>
+#include <TFile.h>
+#include <TTree.h>
+#include <TMatrixD.h>
+#include <TMatrixDSymEigen.h>
+#include <TDecompChol.h>
 
 #ifndef MCMC_DEBUG_LEVEL
 #define MCMC_DEBUG_LEVEL 2
@@ -36,7 +27,23 @@ typedef std::vector<ParameterType> SavedVector;
 #define MCMC_ERROR (std::cout <<__FILE__<<":: "<<__LINE__<<": ")
 #endif
 
-class TProposeAdaptiveStep;
+namespace sMCMC {
+    // A typedef to control the basic data type of the MCMC This should
+    // normally be a double, but could be overridden to float and save space.
+    typedef double Parameter;
+
+    // A typedef a vector of the basic MCMC data type.
+    typedef std::vector<Parameter> Vector;
+
+    // A typedef for how the parameters are written to a tree.  This does not
+    // need to be the same precision as the internal data (but be very careful
+    // if they are different).
+    typedef std::vector<Parameter> SavedVector;
+
+    struct TProposeSimpleStep;
+    class TProposeAdaptiveStep;
+    template <typename L, typename P> class TSimpleMCMC;
+};
 
 /// A ROOT based include-file-only templated class to run an MCMC.  The
 /// resulting MCMC normally uses the Metropolis-Hastings algorithm with an
@@ -45,7 +52,7 @@ class TProposeAdaptiveStep;
 ///
 ///\code
 /// struct ExampleLogLikelihood {
-///    double operator() (const Vector& point);
+///    double operator() (const sMCMC::Vector& point);
 /// }
 ///\endcode
 ///
@@ -54,11 +61,11 @@ class TProposeAdaptiveStep;
 ///
 ///\code
 /// struct ExampleProposal {
-///    void operator() (Vector& proposed,
-///                     const Vector& previous,
+///    void operator() (sMCMC::Vector& proposed,
+///                     const sMCMC::Vector& previous,
 ///                     const double previousValue);
 ///    void InitializeState(const Vector& start, const double startValue);
-///    bool RestoreState(const Vector& previous,
+///    bool RestoreState(const sMCMC::Vector& previous,
 ///                      const double previousValue,
 ///                      TTree* tree);
 ///    bool AttachState(TTree* tree);
@@ -118,7 +125,7 @@ class TProposeAdaptiveStep;
 ///     TTree *tree = new TTree("SimpleMCMC",
 ///                             "Tree of accepted points");
 ///
-///     TSimpleMCMC<TDummyLogLikelihood> mcmc(tree);
+///     sMCMC::TSimpleMCMC<TDummyLogLikelihood> mcmc(tree);
 ///
 ///     // The next three lines are for example only and should almost never
 ///     // be used.  This is to show the syntax for controlling
@@ -132,7 +139,7 @@ class TProposeAdaptiveStep;
 ///     // If you need provide hints about correlations between two dimensions.
 ///     mcmc.GetProposeStep().SetCorrelation(3,4,0.3)
 ///
-///     Vector point(5);
+///     sMCMC::Vector point(5);
 ///     mcmc.Start(point);  // Set initial conditions
 ///
 ///     // Example of burn-in without saving the steps.  You probably
@@ -176,8 +183,8 @@ class TProposeAdaptiveStep;
 /// https://github.com/ClarkMcGrew/root-simple-mcmc
 ///
 template <typename UserLikelihood,
-          typename UserProposal = TProposeAdaptiveStep>
-class TSimpleMCMC {
+          typename UserProposal = sMCMC::TProposeAdaptiveStep>
+class sMCMC::TSimpleMCMC {
 public:
 
     /// Make the likelihood class available as TSimpleMCMC::LogLikelihood.
@@ -249,9 +256,14 @@ public:
         std::copy(start.begin(), start.end(), fTrialStep.begin());
 
         fProposedLogLikelihood = GetLogLikelihoodValue(fProposed);
-        MCMC_DEBUG(0)<<"The start likelihood is "<<fProposedLogLikelihood<<std::endl;
+        MCMC_DEBUG(0)<<"The start likelihood is "
+                     << fProposedLogLikelihood << std::endl;
+
+        /// Make sure the starting likelihood value is both finite, and
+        /// "reasonably" far from zero.  Notice that "reasonable" is still
+        /// less than 10**(-1E+9).
         if (!std::isfinite(fProposedLogLikelihood)
-            || (fProposedLogLikelihood < -0.999999E+10)) {  ///Make the start likelihood value not too small.
+            || (fProposedLogLikelihood < -0.999999E+10)) {
             return false;
         }
 
@@ -366,7 +378,7 @@ public:
         fProposeStep(fProposed,fAccepted,fAcceptedLogLikelihood);
 
         // Make sure that the last accepted is in the "save" accepted
-        // location.  This is needed uncase the user did something evil, like
+        // location.  This is needed in case the user did something evil, like
         // zero the save location (to save memory).
         if (fSaveAccepted.size() != fAccepted.size()) {
             fSaveAccepted.resize(fAccepted.size());
@@ -582,7 +594,7 @@ protected:
 // is the new point to be tried.  The current is the last successful step, and
 // the value is the log likelihood of the last successful step.  The step is
 // taken relative to the current and the value is ignored.
-struct TProposeSimpleStep {
+struct sMCMC::TProposeSimpleStep {
     TProposeSimpleStep(): fSigma(-1.0) {}
 
     void operator ()(Vector& proposal,
@@ -625,7 +637,7 @@ struct TProposeSimpleStep {
 ///
 /// Methods:
 ///
-class TProposeAdaptiveStep {
+class sMCMC::TProposeAdaptiveStep {
 public:
     TProposeAdaptiveStep() :
         fLastValue(0.0),
@@ -637,7 +649,7 @@ public:
         fAcceptanceWindow(-1), fAcceptanceRigidity(2.0),
         fTargetAcceptance(-1), fSigma(0.0), fStateInitialized(false),
         fScanDimension(-1) {
-        fMaxCorrelation = std::numeric_limits<ParameterType>::epsilon();
+        fMaxCorrelation = std::numeric_limits<Parameter>::epsilon();
         fMaxCorrelation = 1.0 - std::sqrt(fMaxCorrelation);
     }
 
@@ -1046,7 +1058,7 @@ public:
         }
 
         // The minimum allowed variance for the posterior along any axis.
-        double minVar = std::numeric_limits<ParameterType>::epsilon();
+        double minVar = std::numeric_limits<Parameter>::epsilon();
 
 #ifndef MCMC_SKIP_CHOLESKY_DECOMPOSITION
         // Decompose the current covariance and use it for the proposal.  If
@@ -1283,7 +1295,7 @@ public:
         // to the initial value.
 
         // Set the amount to increast the variances by at each trial.
-        double step = std::numeric_limits<ParameterType>::epsilon();
+        double step = std::numeric_limits<Parameter>::epsilon();
         for (std::size_t i=0; i<fLastPoint.size(); ++i) {
             step = std::max(step,fCurrentCov(i,i));
         }
@@ -1422,7 +1434,7 @@ public:
             fCovarianceWindow *= fLastPoint.size();
             fCovarianceWindow *= fLastPoint.size();
             fCovarianceWindow += minWindow;
-            double r = std::numeric_limits<ParameterType>::epsilon();
+            double r = std::numeric_limits<Parameter>::epsilon();
             fCovarianceWindow = std::min(fCovarianceWindow,std::sqrt(1.0/r));
         }
         // After reseting, erase the acceptance history.
@@ -1790,7 +1802,7 @@ private:
 
     // The current (running) estimate for the central value of each parameter.
     Vector fCentralPoint;
-    Vector fSaveCentralPoint;
+    SavedVector fSaveCentralPoint;
 
     // The change from the last position of the central point.
     Vector fCentralPointChange;
@@ -1810,7 +1822,7 @@ private:
     //            fSaveCovariance.push_back(fCurrentCov(i,j));
     //         }
     //    }
-    Vector fSaveCovariance;
+    SavedVector fSaveCovariance;
 
     // The trials being used for the current estimated covariance.  This
     // will be a value between one and fCovarianceWindow.

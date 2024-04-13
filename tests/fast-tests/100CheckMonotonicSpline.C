@@ -8,9 +8,9 @@ root <<EOF
 #include <cmath>
 
 ////////////////////////////////////////////////////////////////////////
-// Test the CalculateCompactSpline routine on the CPU.
+// Test the CalculateMonotonicSpline routine on the CPU.
 
-#include "${GUNDAM_ROOT}/src/Utils/include/CalculateCompactSpline.h"
+#include "${GUNDAM_ROOT}/src/Utils/include/CalculateMonotonicSpline.h"
 
 std::string args{"$*"};
 
@@ -58,14 +58,14 @@ int main() {
         std::unique_ptr<TGraph> graph1(new TGraph());
         int p = 0;
         for (double x = -1.0; x <= 2.0; x += 0.1) {
-            double v = CalculateCompactSpline(x, -10.0, 10.0, data, 2);
+            double v = CalculateMonotonicSpline(x, -10.0, 10.0, data, 2);
             TOLERANCE("Two Point Tolerance", x, v, 1E-6);
             graph1->SetPoint(p++,x,v);
         }
         graph1->Draw("AC");
         data1->Draw("*,same");
-        gPad->Print("100CheckCompactSpline1.pdf");
-        gPad->Print("100CheckCompactSpline1.png");
+        gPad->Print("100CheckMonotonicSpline1.pdf");
+        gPad->Print("100CheckMonotonicSpline1.png");
     }
 #endif
 
@@ -84,8 +84,8 @@ int main() {
         std::unique_ptr<TGraph> graph1(new TGraph());
         int p = 0;
         for (double x = -1.5; x <= 1.5; x += 0.1) {
-            double v0 = CalculateCompactSpline(x, -10.0, 10.0, data, nData);
-            double v1 = CalculateCompactSpline(-x, -10.0, 10.0, data, nData);
+            double v0 = CalculateMonotonicSpline(x, -10.0, 10.0, data, nData);
+            double v1 = CalculateMonotonicSpline(-x, -10.0, 10.0, data, nData);
             std::ostringstream tmp;
             tmp << "Symmetric tolerance (test 2) (X=" << x << ")";
             TOLERANCE(tmp.str(), v0, v1, 1E-6);
@@ -93,8 +93,8 @@ int main() {
         }
         graph1->Draw("AC");
         data1->Draw("*,same");
-        gPad->Print("100CheckCompactSpline2.pdf");
-        gPad->Print("100CheckCompactSpline2.png");
+        gPad->Print("100CheckMonotonicSpline2.pdf");
+        gPad->Print("100CheckMonotonicSpline2.png");
     }
 #endif
 
@@ -113,8 +113,8 @@ int main() {
         std::unique_ptr<TGraph> graph1(new TGraph());
         int p = 0;
         for (double x = -1.5; x <= 1.5; x += 0.01) {
-            double v0 = CalculateCompactSpline(x, -10.0, 10.0, data, nData);
-            double v1 = CalculateCompactSpline(-x, -10.0, 10.0, data, nData);
+            double v0 = CalculateMonotonicSpline(x, -10.0, 10.0, data, nData);
+            double v1 = CalculateMonotonicSpline(-x, -10.0, 10.0, data, nData);
             std::ostringstream tmp;
             tmp << "Symmetric tolerance (test 3) (X=" << x << ")";
             TOLERANCE(tmp.str(), v0, v1, 1E-6);
@@ -123,8 +123,8 @@ int main() {
         }
         graph1->Draw("AC");
         data1->Draw("*,same");
-        gPad->Print("100CheckCompactSpline3.pdf");
-        gPad->Print("100CheckCompactSpline3.png");
+        gPad->Print("100CheckMonotonicSpline3.pdf");
+        gPad->Print("100CheckMonotonicSpline3.png");
     }
 #endif
 
@@ -148,8 +148,8 @@ int main() {
         std::unique_ptr<TGraph> graph1(new TGraph());
         int p = 0;
         for (double x = -1.1; x <= 1.1; x += 0.01) {
-            double v0 = CalculateCompactSpline(x, -10.0, 10.0, data, nData);
-            double v1 = CalculateCompactSpline(-x, -10.0, 10.0, data, nData);
+            double v0 = CalculateMonotonicSpline(x, -10.0, 10.0, data, nData);
+            double v1 = CalculateMonotonicSpline(-x, -10.0, 10.0, data, nData);
             std::ostringstream tmp;
             tmp << "Symmetric tolerance (test 4) (X=" << x << ")";
             TOLERANCE(tmp.str(), v0, v1, 1E-6);
@@ -157,8 +157,8 @@ int main() {
         }
         graph1->Draw("AC");
         data1->Draw("*,same");
-        gPad->Print("100CheckCompactSpline4.pdf");
-        gPad->Print("100CheckCompactSpline4.png");
+        gPad->Print("100CheckMonotonicSpline4.pdf");
+        gPad->Print("100CheckMonotonicSpline4.png");
     }
 #endif
 
@@ -183,8 +183,8 @@ int main() {
         std::unique_ptr<TGraph> graph1(new TGraph());
         int p = 0;
         for (double x = -1.5; x <= 1.5; x += 0.01) {
-            double v0 = CalculateCompactSpline(x, -10.0, 10.0, data, nData);
-            double v1 = CalculateCompactSpline(-x, -10.0, 10.0, data, nData);
+            double v0 = CalculateMonotonicSpline(x, -10.0, 10.0, data, nData);
+            double v1 = CalculateMonotonicSpline(-x, -10.0, 10.0, data, nData);
             std::ostringstream tmp;
             tmp << "Symmetric tolerance (test 5) (X=" << x << ")";
             TOLERANCE(tmp.str(), v0, v1, 1E-6);
@@ -192,8 +192,8 @@ int main() {
         }
         graph1->Draw("AC");
         data1->Draw("*,same");
-        gPad->Print("100CheckCompactSpline5.pdf");
-        gPad->Print("100CheckCompactSpline5.png");
+        gPad->Print("100CheckMonotonicSpline5.pdf");
+        gPad->Print("100CheckMonotonicSpline5.png");
     }
 #endif
 
