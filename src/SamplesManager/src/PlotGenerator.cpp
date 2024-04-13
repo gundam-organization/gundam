@@ -942,7 +942,11 @@ void PlotGenerator::buildEventBinCache( const std::vector<HistHolder *> &histPtr
           if( histPtr->splitVarName.empty() or splitValue == histPtr->splitVarValue){
 
             if( histPtr->varToPlot == "Raw" ){ iBin = event.getIndices().bin + 1; }
-            else                             { iBin = histPtr->histPtr->FindBin(event.getVariables().fetchVariable(histPtr->varToPlot).getVarAsDouble()); }
+            else                             {
+//              iBin = histPtr->histPtr->FindBin(
+//                event.getVariables().fetchVariable(histPtr->varToPlot).getVarAsDouble()
+//                );
+            }
 
             if( iBin > 0 and iBin <= histPtr->histPtr->GetNbinsX() ){
               // so it's a valid bin!
@@ -960,15 +964,15 @@ void PlotGenerator::buildEventBinCache( const std::vector<HistHolder *> &histPtr
     }
   };
 
-  prepareCacheFct();
-  fillEventHistCache(-1);
-  shrinkAllocationsFct();
+//  prepareCacheFct();
+//  fillEventHistCache(-1);
+//  shrinkAllocationsFct();
 
-//  GundamGlobals::getParallelWorker().addJob("fillEventHistCache", fillEventHistCache);
-//  GundamGlobals::getParallelWorker().setPreParallelJob("fillEventHistCache", prepareCacheFct);
-//  GundamGlobals::getParallelWorker().setPostParallelJob("fillEventHistCache", shrinkAllocationsFct);
-//  GundamGlobals::getParallelWorker().runJob("fillEventHistCache");
-//  GundamGlobals::getParallelWorker().removeJob("fillEventHistCache");
+  GundamGlobals::getParallelWorker().addJob("fillEventHistCache", fillEventHistCache);
+  GundamGlobals::getParallelWorker().setPreParallelJob("fillEventHistCache", prepareCacheFct);
+  GundamGlobals::getParallelWorker().setPostParallelJob("fillEventHistCache", shrinkAllocationsFct);
+  GundamGlobals::getParallelWorker().runJob("fillEventHistCache");
+  GundamGlobals::getParallelWorker().removeJob("fillEventHistCache");
 
 }
 
