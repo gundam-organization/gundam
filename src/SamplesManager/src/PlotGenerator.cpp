@@ -927,6 +927,7 @@ void PlotGenerator::buildEventBinCache( const std::vector<HistHolder *> &histPtr
         int(histPtrToFillList.size())
     );
 
+    std::lock_guard<std::mutex> g(GundamGlobals::getThreadMutex());
     HistHolder* histPtr{nullptr};
     for( int iHist = bounds.beginIndex ; iHist < bounds.endIndex ; iHist++ ){
       histPtr = histPtrToFillList[iHist];
@@ -936,7 +937,6 @@ void PlotGenerator::buildEventBinCache( const std::vector<HistHolder *> &histPtr
         for( const auto& event : *eventListPtr ){
           int splitValue;
           double varValue;
-          std::lock_guard<std::mutex> g(GundamGlobals::getThreadMutex());
           if( not histPtr->splitVarName.empty() ){
             splitValue = event.getVariables().fetchVariable(histPtr->splitVarName).get().getValue<int>();
             if( histPtr->varToPlot != "Raw" ) varValue = event.getVariables().fetchVariable(histPtr->varToPlot).getVarAsDouble();
