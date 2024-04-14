@@ -927,13 +927,13 @@ void PlotGenerator::buildEventBinCache( const std::vector<HistHolder *> &histPtr
         int(histPtrToFillList.size())
     );
 
-    std::lock_guard<std::mutex> g(GundamGlobals::getThreadMutex());
     HistHolder* histPtr{nullptr};
     for( int iHist = bounds.beginIndex ; iHist < bounds.endIndex ; iHist++ ){
       histPtr = histPtrToFillList[iHist];
 
       if( not histPtr->isBinCacheBuilt ){
         int iBin{-1};
+        std::lock_guard<std::mutex> g(GundamGlobals::getThreadMutex());
         for( const auto& event : *eventListPtr ){
           int splitValue;
           double varValue;
@@ -949,7 +949,7 @@ void PlotGenerator::buildEventBinCache( const std::vector<HistHolder *> &histPtr
 
             if( iBin > 0 and iBin <= histPtr->histPtr->GetNbinsX() ){
               // so it's a valid bin!
-              histPtr->_binEventPtrList_[iBin-1].emplace_back( &event );
+//              histPtr->_binEventPtrList_[iBin-1].emplace_back( &event );
             }
           }
         }
