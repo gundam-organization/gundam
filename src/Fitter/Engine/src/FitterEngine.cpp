@@ -304,12 +304,8 @@ void FitterEngine::fit(){
   if( _generateSamplePlots_ and not _likelihoodInterface_.getDataSetManager().getPropagator().getPlotGenerator().getConfig().empty() ){
     LogInfo << "Generating pre-fit sample plots..." << std::endl;
     _likelihoodInterface_.getDataSetManager().getPropagator().getPlotGenerator().generateSamplePlots(GenericToolbox::mkdirTFile(_saveDir_, "preFit/samples"));
-    LogDebug << "WRITE IN TFILE" << std::endl;
-    std::this_thread::sleep_for( std::chrono::seconds(5) );
     GenericToolbox::triggerTFileWrite(_saveDir_);
   }
-
-  LogDebug << "NEXT" << std::endl;
 
   // Moving parameters
   if( _generateOneSigmaPlots_ and not _likelihoodInterface_.getDataSetManager().getPropagator().getPlotGenerator().getConfig().empty() ){
