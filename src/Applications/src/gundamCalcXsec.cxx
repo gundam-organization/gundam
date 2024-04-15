@@ -111,7 +111,7 @@ int main(int argc, char** argv){
   LogInfo << "Removing defined samples..." << std::endl;
   ConfigUtils::applyOverrides(
       cHandler.getConfig(),
-      GenericToolbox::Json::readConfigJsonStr(R"({"fitterEngineConfig":{"likelihoodInterfaceConfig":{"dataSetManagerConfig":{"propagatorConfig":{"fitSampleSetConfig":{}}}}}})")
+      GenericToolbox::Json::readConfigJsonStr(R"({"fitterEngineConfig":{"likelihoodInterfaceConfig":{"dataSetManagerConfig":{"propagatorConfig":{"fitSampleSetConfig":{"fitSampleList":[]}}}}}})")
   );
 
   // Disabling defined plots:
