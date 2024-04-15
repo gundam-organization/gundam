@@ -227,6 +227,7 @@ void ParameterSet::processCovarianceMatrix(){
       // fixing all of them by default
       _eigenParameterList_[iEigen].setIsFixed(true);
       (*eigenState)[iEigen] = 0;
+      (*_eigenValuesInv_)[iEigen] = 1./(*_eigenValues_)[iEigen];
 
     }
 
@@ -252,7 +253,6 @@ void ParameterSet::processCovarianceMatrix(){
 
       // if we reach this point, the eigen value is accepted
       _eigenParameterList_[iEigen].setIsFixed( false );
-      (*_eigenValuesInv_)[iEigen] = 1./(*_eigenValues_)[iEigen];
       (*eigenState)[iEigen] = 1.;
       eigenCumulative += (*_eigenValues_)[iEigen];
       _nbEnabledEigen_++;
@@ -920,7 +920,6 @@ void ParameterSet::defineParameters(){
         continue;
       }
     }
-
 
 
     if( _parameterPriorList_ != nullptr ){ par.setPriorValue((*_parameterPriorList_)[par.getParameterIndex()]); }
