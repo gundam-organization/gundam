@@ -139,7 +139,7 @@ this will create the build directory `gundam-${compiler}_${compiler_version}-${c
 
 ![bannerStyle.001.png](resources/images/bannerStyle/bannerStyle.004.png)
 
-[gundamFitter options](./documentation/applications/gundamFitter.md)
+[Getting started](./documentation/GettingStarted.md)
 
 
 ## I want to contribute!
