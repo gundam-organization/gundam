@@ -1,4 +1,4 @@
-# GUNDAM — 風をあつめて 
+# GUNDAM — 風をあつめて (Long Term Support Branch)
 
 ![](./resources/images/bannerv2.png)
 
@@ -19,6 +19,23 @@ groups to debug and optimize pieces of codes which does generic tasks.
 As GUNDAM is designed for maximize flexibility to accommodate
 various physics works, it allows to share optimizations
 and debugging for every project at once.
+
+## Long Term Support for Version 1.8
+
+This is the long term support branch starting from GUNDAM 1.8.0.  This
+branch consists of a set of carefully curated fixes, with minimal, or
+no, new features.  Please see
+~[LONG_TERM_SUPPORT.md][./LONG_TERM_SUPPORT.md] for specific
+documentation on how we create a new patch.
+
+The goals for this branch are:
+
+  1. Stability is the end-all-and-be-all goal.
+  1. All changes need to be documented in detail.
+  1. Changes should be absolutely MINIMAL.  No. New. Features.
+  1. All new 1.8 branch tags are based on the LTS/1.8.x branch.
+  1. Merges happen after a gundam coordinator consensus.
+  1. All validations should be rechecked after each new patch release.
 
 ## Showcase
 
