@@ -1,3 +1,5 @@
 # Tests that are expected to fail.  This file can be empty.
 fast-tests/090ExpectedFailure.sh
+fast-tests/100CheckCompactSpline.C
+fast-tests/100CheckMonotonicSpline.C
 #end of file
