@@ -103,8 +103,11 @@ void SampleSet::initializeImpl() {
 double SampleSet::evalLikelihood(){
   double llh = 0.;
   for( auto& sample : _fitSampleList_ ){
-    llh += this->evalLikelihood(sample);
-    LogThrowIf(std::isnan(llh) or std::isinf(llh), sample.getName() << ": reportde likelihood is invalid:" << llh);
+    const double sampleLLH = this->evalLikelihood(sample);
+    LogThrowIf(std::isnan(sampleLLH),
+               sample.getName() << ": reported likelihood is invalid: "
+               << sampleLLH);
+    llh += sampleLLH;
   }
   return llh;
 }
