@@ -25,7 +25,7 @@ and debugging for every project at once.
 This is the long term support branch starting from GUNDAM 1.8.0.  This
 branch consists of a set of carefully curated fixes, with minimal, or
 no, new features.  Please see
-![LONG_TERM_SUPPORT.md][./LONG_TERM_SUPPORT.md] for specific
+[LONG_TERM_SUPPORT.md](./LONG_TERM_SUPPORT.md) for specific
 documentation on how we create a new patch.
 
 The goals for this branch are:
