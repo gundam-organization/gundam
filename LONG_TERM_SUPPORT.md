@@ -43,9 +43,9 @@ LTS/issue<N>/<topic>, and should be rooted on LTS/1.8.x.  For example
 include instructions on how to reproduce the error.  If possible, add
 a test that shows the issue, and which should fail. Be sure to add the
 script that will fail to
-![EXPECTED_FAILURES][./tests/EXPECTED_FAILURES]. If the problem is to
-complex test in a script, make sure the instructions in the issue are
-complete.
+[./tests/EXPECTED_FAILURES](./tests/EXPECTED_FAILURES). If the problem
+is to complex test in a script, make sure the instructions in the
+issue are complete.
 
 1. Discuss fixing the issue with the GUNDAM group, and make sure it
 should be fixed.
