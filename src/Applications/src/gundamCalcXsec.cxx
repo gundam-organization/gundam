@@ -23,6 +23,8 @@ LoggerInit([]{
   Logger::getUserHeader() << "[" << FILENAME << "]";
 });
 
+void readBinningFromFile(const char* filename, std::vector<Double_t>& binEdges) ;
+
 
 int main(int argc, char** argv){
 
@@ -76,7 +78,7 @@ int main(int argc, char** argv){
     LogInfo << "Using \"time(nullptr)\" random seed: " << seed << std::endl;
     gRandom->SetSeed(seed);
   }
-  
+
   GundamGlobals::getParallelWorker().setNThreads( clParser.getOptionVal("nbThreads", 1) );
   LogInfo << "Running the fitter with " << GundamGlobals::getParallelWorker().getNbThreads() << " parallel threads." << std::endl;
 
@@ -107,12 +109,12 @@ int main(int argc, char** argv){
 
   ConfigUtils::ConfigHandler cHandler{ fitterConfig };
 
-  // Disabling defined fit samples:
-  LogInfo << "Removing defined samples..." << std::endl;
-  ConfigUtils::applyOverrides(
-      cHandler.getConfig(),
-      GenericToolbox::Json::readConfigJsonStr(R"({"fitterEngineConfig":{"propagatorConfig":{"fitSampleSetConfig":{"fitSampleList":[]}}}})")
-  );
+//  // Disabling defined fit samples:
+//  LogInfo << "Removing defined samples..." << std::endl;
+//  ConfigUtils::applyOverrides(
+//      cHandler.getConfig(),
+//      GenericToolbox::Json::readConfigJsonStr(R"({"fitterEngineConfig":{"propagatorConfig":{"fitSampleSetConfig":{"fitSampleList":[]}}}})")
+//  );
 
   // Disabling defined plots:
   LogInfo << "Removing defined plots..." << std::endl;
@@ -227,7 +229,6 @@ int main(int argc, char** argv){
         }
     );
   }
-
 
 
   // Creating output file
@@ -603,16 +604,18 @@ int main(int argc, char** argv){
     propagator.getParametersManager().throwParametersFromGlobalCovariance();
     propagator.propagateParameters();
 
-    if( enableStatThrowInToys ){
-      for( auto& xsec : crossSectionDataList ){
-        if( enableEventMcThrow ){
-          // Take into account the finite amount of event in MC
-          xsec.samplePtr->getMcContainer().throwEventMcError();
-        }
-        // Asimov bin content -> toy data
-        xsec.samplePtr->getMcContainer().throwStatError();
-      }
-    }
+
+    // disable stats throw
+//    if( enableStatThrowInToys ){
+//      for( auto& xsec : crossSectionDataList ){
+//        if( enableEventMcThrow ){
+//          // Take into account the finite amount of event in MC
+//          xsec.samplePtr->getMcContainer().throwEventMcError();
+//        }
+//        // Asimov bin content -> toy data
+//        xsec.samplePtr->getMcContainer().throwStatError();
+//      }
+//    }
 
     writeBinDataFct();
 
@@ -744,12 +747,119 @@ int main(int argc, char** argv){
       );
     }
   }
-  // here, fetch data from fitter file, to draw on top of MC predictions for each specific sample
 
-  LogInfo << "Generating canvases..." << std::endl;
+  //// SECTION TO MAKE THE HISTOGRAMS FROM THE DATA TTREE FOR THE CLOSURE TEST
+
+  // here, fetch data from fitter file, to draw on top of MC predictions for each specific sample
+  LogInfo << "Fetching data from fitter file..." << std::endl;
+  int i{0};
+  // Access the fitter output file
+  LogInfo<<"Opening fitter output file: "<<fitterFile<<std::endl;
+  std::unique_ptr<TFile> fitterFilePtr{ TFile::Open(fitterFile.c_str()) };
+
+  // Define a closureVariable struct to store the data needed to generate the histograms
+  struct closureVariable {
+      Sample* samplePtr{nullptr};
+      std::string varToPlot{};
+      std::string variableFormula{};
+      std::string binningFile{};
+      TH1D* histogram{};
+      bool rescaleAsBinWidth{false};
+  };
+
+  /// PSEUDO CODE:
+  //
+  // for(sample : samples){
+  //    for(varToPlot : varToPlotVector){
+  //    closureVariable closureVar;
+  //    closureVar.samplePtr = sample;
+  //    closureVar: generate the histogram using the binning file defined in the plotGenerator
+  //    closureVar.varToPlot = varToPlot;
+  //    closureVar: connect varToPlot to a leafvar
+  //    use the leafvar definition to fill the histogram properly
+  //    }
+  // }
+
+
+  if( propagator.getPlotGenerator().getConfig().at("histogramsDefinition").is_array() ){
+    std::cout << "\"Closure\" variable to plot: " << propagator.getPlotGenerator().getConfig().at("histogramsDefinition").size() <<std::endl;
+  }
+
+
+  std::vector<std::string> varToPlotVector = propagator.getPlotGenerator().fetchListOfVarToPlot();
+  size_t nHist = propagator.getPlotGenerator().getConfig().at("histogramsDefinition").size();
+  for( auto& sample : propagator.getSampleSet().getSampleList() ) {
+    LogInfo<<"Fetching data histogram for sample: "<<sample.getName()<<std::endl;
+    TTree* dataTree = (TTree*)fitterFilePtr->Get( ("FitterEngine/postFit/events/"+sample.getName()+"/Data_TTree").std::string::c_str() ) ;
+    LogErrorIf(dataTree == nullptr)<<"Could not find data tree for sample: "<<sample.getName()<<std::endl;
+    for( size_t iHist = 0 ; iHist < nHist ; iHist++ ){ // this loop is over the variables to plot
+      closureVariable closureVar;
+      closureVar.samplePtr = &sample;
+      closureVar.varToPlot = GenericToolbox::Json::fetchValue<std::string>(propagator.getPlotGenerator().getConfig().at("histogramsDefinition")[iHist], "varToPlot");
+      closureVar.binningFile = GenericToolbox::Json::fetchValue<std::string>(propagator.getPlotGenerator().getConfig().at("histogramsDefinition")[iHist], "binningFile");
+      closureVar.rescaleAsBinWidth = GenericToolbox::Json::fetchValue<bool>(propagator.getPlotGenerator().getConfig().at("histogramsDefinition")[iHist], "rescaleAsBinWidth");
+      LogInfo<< "Variable: " << closureVar.varToPlot << " | Sample: " << closureVar.samplePtr->getName() << " | Binning file: " << closureVar.binningFile << std::endl;
+      // Generate the histogram (using the binning file defined in the plotGenerator)
+      std::vector<double> binEdges;
+      readBinningFromFile(closureVar.binningFile.c_str(), binEdges);
+      closureVar.histogram = new TH1D(
+              (closureVar.samplePtr->getName() + "_" + closureVar.varToPlot).c_str(),
+              (closureVar.samplePtr->getName() + " " + closureVar.varToPlot).c_str(),
+              binEdges.size() - 1,
+              &binEdges[0]
+              );
+      // load the formula
+      for( int i = 0 ; i < propagator.getConfig()["dataSetList"][0]["mc"].at("overrideLeafDict").size() ; i++ ) {
+        std::string eventVar = propagator.getConfig()["dataSetList"][0]["mc"].at("overrideLeafDict")[i].at("eventVar");
+        if(eventVar == closureVar.varToPlot){
+          closureVar.variableFormula = propagator.getConfig()["dataSetList"][0]["mc"].at("overrideLeafDict")[i].at("leafVar");
+          break;
+        }
+      }
+      // LogInfo<< "    Variable formula: " << closureVar.variableFormula << std::endl; // a bit verbose, do not print this
+      LogErrorIf(closureVar.variableFormula.empty())<<"Could not find leafVar for varToPlot: "<<closureVar.varToPlot<<std::endl;
+      // Fill the histogram
+      dataTree->Draw( (closureVar.variableFormula+">>"+closureVar.histogram->GetName()).c_str() );
+
+      // rescale to bin width
+      if(closureVar.rescaleAsBinWidth){
+        for( int iBin = 0 ; iBin < closureVar.histogram->GetNbinsX() ; iBin++ ){
+          double binWidth = closureVar.histogram->GetBinWidth(iBin+1);
+          if (binWidth == 0) {
+            LogError << "Bin " << iBin << " has a width of 0. Skipping rescaling." << std::endl;
+            continue;
+          }
+          LogInfo<< "Bin " << iBin << " width: " << binWidth << " BinContent: "<< closureVar.histogram->GetBinContent(iBin+1) << std::endl;
+          closureVar.histogram->SetBinContent(iBin+1, closureVar.histogram->GetBinContent(iBin+1)/binWidth);
+          // closureVar.histogram->SetBinError(iBin+1, closureVar.histogram->GetBinError(iBin+1)/binWidth);
+        }
+      }
+      // cosmetics
+      closureVar.histogram->SetMarkerStyle(kFullDotLarge);
+      closureVar.histogram->SetMarkerColor(kRed);
+      closureVar.histogram->SetMarkerSize(0.5);
+      closureVar.histogram->SetLineWidth(2);
+      closureVar.histogram->SetLineColor(kRed);
+      closureVar.histogram->SetDrawOption("hist");
+      closureVar.histogram->SetTitle( (closureVar.varToPlot+" for "+closureVar.samplePtr->getName()  ).c_str() );
+      closureVar.histogram->GetXaxis()->SetTitle(closureVar.varToPlot.c_str());
+      GenericToolbox::writeInTFile(
+              GenericToolbox::mkdirTFile(calcXsecDir, "plots/data_histograms"),
+              closureVar.histogram,
+              GenericToolbox::generateCleanBranchName( "data_" + closureVar.varToPlot + "_" + sample.getName()  )
+      );
+      // Now generate, for each sample, a canvas with all the histograms: stack of all the MC with different reaction
+      // codes generated before, and the data histogram just generated from the fitter output file
+
+
+    }
+
+  }
+
+  LogInfo << "Generating canvases " << std::endl;
   propagator.getPlotGenerator().generateCanvas(
-      propagator.getPlotGenerator().getHistHolderList(0),
-      GenericToolbox::mkdirTFile(calcXsecDir, "plots/canvas")
+          propagator.getPlotGenerator().getHistHolderList(),
+          GenericToolbox::mkdirTFile(calcXsecDir, "plots/canvas")
   );
 
 
@@ -759,4 +869,39 @@ int main(int argc, char** argv){
       dataSetManager.getPropagator()
   );
 
+}
+
+
+
+void readBinningFromFile(const char* filename, std::vector<Double_t>& binEdges) {
+  std::ifstream file(filename);
+  if (!file.is_open()) {
+    std::cerr << "Error opening file: " << filename << std::endl;
+    return;
+  }
+
+  std::string line;
+  // Skip the first line
+  std::getline(file, line);
+  double lastRightEdge;
+
+  while (std::getline(file, line)) {
+    Double_t lower, upper;
+    std::istringstream iss(line);
+    // skip empty lines
+    if( line.empty() ){ continue; }
+    // skip commented lines
+    if( line[0] == '#' ){ continue; }
+    if (!(iss >> lower >> upper)) {
+      LogError << "Error reading bin edges from file: " << filename << std::endl;
+      break;
+    }
+    binEdges.push_back(lower);
+    lastRightEdge = upper;
+  }
+
+  // Add the last upper edge
+  binEdges.push_back(lastRightEdge);
+
+  file.close();
 }
