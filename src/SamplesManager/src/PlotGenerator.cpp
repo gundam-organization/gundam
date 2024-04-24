@@ -963,15 +963,15 @@ void PlotGenerator::buildEventBinCache( const std::vector<HistHolder *> &histPtr
     }
   };
 
-//  prepareCacheFct();
-//  fillEventHistCache(-1);
-//  shrinkAllocationsFct();
+  prepareCacheFct();
+  fillEventHistCache(-1);
+  shrinkAllocationsFct();
 
-  GundamGlobals::getParallelWorker().addJob("fillEventHistCache", fillEventHistCache);
-  GundamGlobals::getParallelWorker().setPreParallelJob("fillEventHistCache", prepareCacheFct);
-  GundamGlobals::getParallelWorker().setPostParallelJob("fillEventHistCache", shrinkAllocationsFct);
-  GundamGlobals::getParallelWorker().runJob("fillEventHistCache");
-  GundamGlobals::getParallelWorker().removeJob("fillEventHistCache");
+//  GundamGlobals::getParallelWorker().addJob("fillEventHistCache", fillEventHistCache);
+//  GundamGlobals::getParallelWorker().setPreParallelJob("fillEventHistCache", prepareCacheFct);
+//  GundamGlobals::getParallelWorker().setPostParallelJob("fillEventHistCache", shrinkAllocationsFct);
+//  GundamGlobals::getParallelWorker().runJob("fillEventHistCache");
+//  GundamGlobals::getParallelWorker().removeJob("fillEventHistCache");
 
 }
 
