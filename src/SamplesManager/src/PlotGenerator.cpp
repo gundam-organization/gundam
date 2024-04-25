@@ -120,68 +120,72 @@ void PlotGenerator::generateSampleHistograms(TDirectory *saveDir_, int cacheSlot
 
   // Fill histograms
   for( const auto& sample : _sampleSetPtr_->getSampleList() ){
-      // Datasets:
-      for( bool isData : { false, true } ){
+    // Datasets:
+    for( bool isData : { false, true } ){
 
-        const std::vector<Event>* eventListPtr;
-        std::vector<HistHolder*> histPtrToFillList;
+      const std::vector<Event>* eventListPtr;
+      std::vector<HistHolder*> histPtrToFillList;
 
-        if( isData ){
-          eventListPtr = &sample.getDataContainer().getEventList();
+      if( isData ){
+        eventListPtr = &sample.getDataContainer().getEventList();
 
-          // which hist should be filled?
-          for( auto& histDef : _histHolderCacheList_[cacheSlot_] ){
-            if(histDef.isData and histDef.samplePtr == &sample ){
-              histPtrToFillList.emplace_back( &histDef );
-            }
+        // which hist should be filled?
+        for( auto& histDef : _histHolderCacheList_[cacheSlot_] ){
+          if(histDef.isData and histDef.samplePtr == &sample ){
+            histPtrToFillList.emplace_back( &histDef );
           }
         }
-        else{
-          eventListPtr = &sample.getMcContainer().getEventList();
+      }
+      else{
+        eventListPtr = &sample.getMcContainer().getEventList();
 
-          // which hist should be filled?
-          for( auto& histDef : _histHolderCacheList_[cacheSlot_] ){
-            if(not histDef.isData and histDef.samplePtr == &sample ){
-              histPtrToFillList.emplace_back( &histDef );
-            }
+        // which hist should be filled?
+        for( auto& histDef : _histHolderCacheList_[cacheSlot_] ){
+          if(not histDef.isData and histDef.samplePtr == &sample ){
+            histPtrToFillList.emplace_back( &histDef );
           }
         }
+      }
 
-        for( auto& histPtrToFill : histPtrToFillList ){
-          if( not histPtrToFill->isBinCacheBuilt ){
-            // If any, launch rebuild cache
-            LogInfo << "Build event bin cache for sample \"" << sample.getName() << "\" " << (isData? "(data)":"(mc)") << std::endl;
-            PlotGenerator::buildEventBinCache(histPtrToFillList, eventListPtr, isData);
-            break; // all caches done at once
+      for( auto& histPtrToFill : histPtrToFillList ){
+        if( not histPtrToFill->isBinCacheBuilt ){
+          // If any, launch rebuild cache
+          LogInfo << "Build event bin cache for sample \"" << sample.getName() << "\" " << (isData? "(data)":"(mc)") << std::endl;
+          PlotGenerator::buildEventBinCache(histPtrToFillList, eventListPtr, isData);
+          break; // all caches done at once
+        }
+      }
+      LogDebug << "Cache built." << std::endl;
+
+      // Filling the selected histograms
+      std::function<void(int)> fillJob = [&]( int iThread_ ){
+
+        for( auto* hist : histPtrToFillList ){
+
+          auto bounds = GenericToolbox::ParallelWorker::getThreadBoundIndices(
+              iThread_, GundamGlobals::getParallelWorker().getNbThreads(),
+              hist->histPtr->GetNbinsX()
+          );
+
+          for( int iBin = bounds.beginIndex+1 ; iBin <= bounds.endIndex ; iBin++ ){
+            hist->histPtr->SetBinContent(iBin, 0);
+            for( auto* evtPtr : hist->_binEventPtrList_[iBin-1] ){
+              hist->histPtr->AddBinContent(iBin, evtPtr->getEventWeight());
+            }
+            hist->histPtr->SetBinError(iBin, TMath::Sqrt(hist->histPtr->GetBinContent(iBin)));
           }
         }
-        LogDebug << "Cache built." << std::endl;
+      };
 
-        // Filling the selected histograms
-        std::function<void(int)> fillJob = [&]( int iThread_ ){
+      GundamGlobals::getParallelWorker().addJob("fillJob", fillJob);
+      GundamGlobals::getParallelWorker().runJob("fillJob");
+      GundamGlobals::getParallelWorker().removeJob("fillJob");
 
-          for( auto* hist : histPtrToFillList ){
+      LogDebug << "Fill done." << std::endl;
+    } // isData loop
+  } // sample
 
-            auto bounds = GenericToolbox::ParallelWorker::getThreadBoundIndices(
-                iThread_, GundamGlobals::getParallelWorker().getNbThreads(),
-                hist->histPtr->GetNbinsX()
-            );
-
-            for( int iBin = bounds.beginIndex+1 ; iBin <= bounds.endIndex ; iBin++ ){
-              hist->histPtr->SetBinContent(iBin, 0);
-              for( auto* evtPtr : hist->_binEventPtrList_[iBin-1] ){
-                hist->histPtr->AddBinContent(iBin, evtPtr->getEventWeight());
-              }
-              hist->histPtr->SetBinError(iBin, TMath::Sqrt(hist->histPtr->GetBinContent(iBin)));
-            }
-          }
-        };
-
-        GundamGlobals::getParallelWorker().addJob("fillJob", fillJob);
-        GundamGlobals::getParallelWorker().runJob("fillJob");
-        GundamGlobals::getParallelWorker().removeJob("fillJob");
-      } // isData loop
-    } // sample
+  LogDebug << "End of LOOP." << std::endl;
 
   // Post-processing (norm, color)
   for( auto& histHolderCached : _histHolderCacheList_[cacheSlot_] ){
@@ -932,6 +936,7 @@ void PlotGenerator::buildEventBinCache( const std::vector<HistHolder *> &histPtr
       histPtr = histPtrToFillList[iHist];
 
       if( not histPtr->isBinCacheBuilt ){
+        histPtr->isBinCacheBuilt = true;
         int iBin{-1};
         std::lock_guard<std::mutex> g(GundamGlobals::getThreadMutex());
         for( const auto& event : *eventListPtr ){
@@ -953,7 +958,6 @@ void PlotGenerator::buildEventBinCache( const std::vector<HistHolder *> &histPtr
             }
           }
         }
-        histPtr->isBinCacheBuilt = true;
       }
     }
   };
@@ -963,9 +967,9 @@ void PlotGenerator::buildEventBinCache( const std::vector<HistHolder *> &histPtr
     }
   };
 
-  prepareCacheFct();
-  fillEventHistCache(-1);
-  shrinkAllocationsFct();
+//  prepareCacheFct();
+//  fillEventHistCache(-1);
+//  shrinkAllocationsFct();
 
 //  GundamGlobals::getParallelWorker().addJob("fillEventHistCache", fillEventHistCache);
 //  GundamGlobals::getParallelWorker().setPreParallelJob("fillEventHistCache", prepareCacheFct);
