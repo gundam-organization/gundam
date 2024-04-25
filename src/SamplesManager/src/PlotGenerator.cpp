@@ -155,38 +155,34 @@ void PlotGenerator::generateSampleHistograms(TDirectory *saveDir_, int cacheSlot
           break; // all caches done at once
         }
       }
-      LogDebug << "Cache built." << std::endl;
 
       // Filling the selected histograms
-//      std::function<void(int)> fillJob = [&]( int iThread_ ){
-//
-//        for( auto* hist : histPtrToFillList ){
-//
-//          auto bounds = GenericToolbox::ParallelWorker::getThreadBoundIndices(
-//              iThread_, GundamGlobals::getParallelWorker().getNbThreads(),
-//              hist->histPtr->GetNbinsX()
-//          );
-//
-//          for( int iBin = bounds.beginIndex+1 ; iBin <= bounds.endIndex ; iBin++ ){
-//            hist->histPtr->SetBinContent(iBin, 0);
-//            for( auto* evtPtr : hist->_binEventPtrList_[iBin-1] ){
-//              hist->histPtr->AddBinContent(iBin, evtPtr->getEventWeight());
-//            }
-//            hist->histPtr->SetBinError(iBin, TMath::Sqrt(hist->histPtr->GetBinContent(iBin)));
-//          }
-//        }
-//      };
-//
+      std::function<void(int)> fillJob = [&]( int iThread_ ){
+
+        for( auto* hist : histPtrToFillList ){
+
+          auto bounds = GenericToolbox::ParallelWorker::getThreadBoundIndices(
+              iThread_, GundamGlobals::getParallelWorker().getNbThreads(),
+              hist->histPtr->GetNbinsX()
+          );
+
+          for( int iBin = bounds.beginIndex+1 ; iBin <= bounds.endIndex ; iBin++ ){
+            hist->histPtr->SetBinContent(iBin, 0);
+            for( auto* evtPtr : hist->_binEventPtrList_[iBin-1] ){
+              hist->histPtr->AddBinContent(iBin, evtPtr->getEventWeight());
+            }
+            hist->histPtr->SetBinError(iBin, TMath::Sqrt(hist->histPtr->GetBinContent(iBin)));
+          }
+        }
+      };
+
+      fillJob(-1);
+
 //      GundamGlobals::getParallelWorker().addJob("fillJob", fillJob);
 //      GundamGlobals::getParallelWorker().runJob("fillJob");
 //      GundamGlobals::getParallelWorker().removeJob("fillJob");
-
-      LogDebug << "Fill done." << std::endl;
     } // isData loop
   } // sample
-
-  LogDebug << "End of LOOP." << std::endl;
-
 
   // Post-processing (norm, color)
   for( auto& histHolderCached : _histHolderCacheList_[cacheSlot_] ){
