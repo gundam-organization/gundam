@@ -786,11 +786,18 @@ int main(int argc, char** argv){
   }
 
 
+  std::string prePostFit ="";
+  if( clParser.isOptionTriggered("usePreFit") ){
+    prePostFit = "preFit";
+  } else {
+    prePostFit = "postFit";
+  }
+
   std::vector<std::string> varToPlotVector = propagator.getPlotGenerator().fetchListOfVarToPlot();
   size_t nHist = propagator.getPlotGenerator().getConfig().at("histogramsDefinition").size();
   for( auto& sample : propagator.getSampleSet().getSampleList() ) {
     LogInfo<<"Fetching data histogram for sample: "<<sample.getName()<<std::endl;
-    TTree* dataTree = (TTree*)fitterFilePtr->Get( ("FitterEngine/postFit/events/"+sample.getName()+"/Data_TTree").std::string::c_str() ) ;
+    TTree* dataTree = (TTree*)fitterFilePtr->Get( ("FitterEngine/"+prePostFit+"/events/"+sample.getName()+"/Data_TTree").std::string::c_str() ) ;
     LogErrorIf(dataTree == nullptr)<<"Could not find data tree for sample: "<<sample.getName()<<std::endl;
     for( size_t iHist = 0 ; iHist < nHist ; iHist++ ){ // this loop is over the variables to plot
       closureVariable closureVar;
