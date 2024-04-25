@@ -176,9 +176,12 @@ void PlotGenerator::generateSampleHistograms(TDirectory *saveDir_, int cacheSlot
           }
         };
 
-        GundamGlobals::getParallelWorker().addJob("fillJob", fillJob);
-        GundamGlobals::getParallelWorker().runJob("fillJob");
-        GundamGlobals::getParallelWorker().removeJob("fillJob");
+        fillJob(-1);
+
+//        GundamGlobals::getParallelWorker().addJob("fillJob", fillJob);
+//        GundamGlobals::getParallelWorker().runJob("fillJob");
+//        GundamGlobals::getParallelWorker().removeJob("fillJob");
+
       } // isData loop
     } // sample
 
@@ -959,16 +962,16 @@ void PlotGenerator::buildEventBinCache( const std::vector<HistHolder *> &histPtr
     }
   };
 
-  // temporary fix
-  prepareCacheFct();
-  fillEventHistCache(-1);
-  shrinkAllocationsFct();
+  // Single thread test
+//  prepareCacheFct();
+//  fillEventHistCache(-1);
+//  shrinkAllocationsFct();
 
-//  GundamGlobals::getParallelWorker().addJob("fillEventHistCache", fillEventHistCache);
-//  GundamGlobals::getParallelWorker().setPreParallelJob("fillEventHistCache", prepareCacheFct);
-//  GundamGlobals::getParallelWorker().setPostParallelJob("fillEventHistCache", shrinkAllocationsFct);
-//  GundamGlobals::getParallelWorker().runJob("fillEventHistCache");
-//  GundamGlobals::getParallelWorker().removeJob("fillEventHistCache");
+  GundamGlobals::getParallelWorker().addJob("fillEventHistCache", fillEventHistCache);
+  GundamGlobals::getParallelWorker().setPreParallelJob("fillEventHistCache", prepareCacheFct);
+  GundamGlobals::getParallelWorker().setPostParallelJob("fillEventHistCache", shrinkAllocationsFct);
+  GundamGlobals::getParallelWorker().runJob("fillEventHistCache");
+  GundamGlobals::getParallelWorker().removeJob("fillEventHistCache");
 
 }
 
