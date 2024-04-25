@@ -955,7 +955,7 @@ void PlotGenerator::buildEventBinCache( const std::vector<HistHolder *> &histPtr
 
             if( iBin > 0 and iBin <= histPtr->histPtr->GetNbinsX() ){
               // so it's a valid bin!
-//              histPtr->_binEventPtrList_[iBin-1].emplace_back( &event );
+              histPtr->_binEventPtrList_[iBin-1].emplace_back( &event );
             }
           }
         }
@@ -972,11 +972,11 @@ void PlotGenerator::buildEventBinCache( const std::vector<HistHolder *> &histPtr
 //  fillEventHistCache(-1);
 //  shrinkAllocationsFct();
 
-//  GundamGlobals::getParallelWorker().addJob("fillEventHistCache", fillEventHistCache);
-//  GundamGlobals::getParallelWorker().setPreParallelJob("fillEventHistCache", prepareCacheFct);
-//  GundamGlobals::getParallelWorker().setPostParallelJob("fillEventHistCache", shrinkAllocationsFct);
-//  GundamGlobals::getParallelWorker().runJob("fillEventHistCache");
-//  GundamGlobals::getParallelWorker().removeJob("fillEventHistCache");
+  GundamGlobals::getParallelWorker().addJob("fillEventHistCache", fillEventHistCache);
+  GundamGlobals::getParallelWorker().setPreParallelJob("fillEventHistCache", prepareCacheFct);
+  GundamGlobals::getParallelWorker().setPostParallelJob("fillEventHistCache", shrinkAllocationsFct);
+  GundamGlobals::getParallelWorker().runJob("fillEventHistCache");
+  GundamGlobals::getParallelWorker().removeJob("fillEventHistCache");
 
 }
 
