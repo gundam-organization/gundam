@@ -43,8 +43,7 @@ void ParameterSet::readConfigImpl(){
     _globalParameterMaxValue_ = GenericToolbox::Json::fetchValue(parLimits, "maxValue", _globalParameterMaxValue_);
   }
 
-  _enable
-    Decomp_ = GenericToolbox::Json::fetchValue(_config_ , {{"enableEigenDecomp"}, {"useEigenDecompInFit"}}, false);
+  _enableEigenDecomp_ = GenericToolbox::Json::fetchValue(_config_ , {{"enableEigenDecomp"}, {"useEigenDecompInFit"}}, false);
   if( _enableEigenDecomp_ ){
     LogWarning << "Using eigen decomposition in fit." << std::endl;
 
