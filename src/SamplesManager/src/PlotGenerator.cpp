@@ -176,9 +176,12 @@ void PlotGenerator::generateSampleHistograms(TDirectory *saveDir_, int cacheSlot
           }
         };
 
-        GundamGlobals::getParallelWorker().addJob("fillJob", fillJob);
-        GundamGlobals::getParallelWorker().runJob("fillJob");
-        GundamGlobals::getParallelWorker().removeJob("fillJob");
+        fillJob(-1);
+
+//        GundamGlobals::getParallelWorker().addJob("fillJob", fillJob);
+//        GundamGlobals::getParallelWorker().runJob("fillJob");
+//        GundamGlobals::getParallelWorker().removeJob("fillJob");
+
       } // isData loop
     } // sample
 
@@ -958,6 +961,11 @@ void PlotGenerator::buildEventBinCache( const std::vector<HistHolder *> &histPtr
       for( auto& evtList : holder->_binEventPtrList_ ){ evtList.shrink_to_fit(); }
     }
   };
+
+  // Single thread test
+//  prepareCacheFct();
+//  fillEventHistCache(-1);
+//  shrinkAllocationsFct();
 
   GundamGlobals::getParallelWorker().addJob("fillEventHistCache", fillEventHistCache);
   GundamGlobals::getParallelWorker().setPreParallelJob("fillEventHistCache", prepareCacheFct);

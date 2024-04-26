@@ -424,7 +424,6 @@ void FitterEngine::fit(){
   }
 
 
-
   if( _minimizer_->getMinimizerStatus() != 0 ){
     LogError << "Skipping post-fit error calculation since the minimizer did not converge." << std::endl;
   }

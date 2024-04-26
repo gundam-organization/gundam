@@ -59,10 +59,12 @@ void RootMinimizer::initializeImpl(){
 
   LogWarning << "Initializing RootMinimizer..." << std::endl;
 
+  LogInfo << "Defining minimizer as: " << _minimizerType_ << "/" << _minimizerAlgo_ << std::endl;
   _rootMinimizer_ = std::unique_ptr<ROOT::Math::Minimizer>(
       ROOT::Math::Factory::CreateMinimizer(_minimizerType_, _minimizerAlgo_)
   );
-  LogThrowIf(_rootMinimizer_ == nullptr, "Could not create minimizer: " << _minimizerType_ << "/" << _minimizerAlgo_)
+  LogThrowIf(_rootMinimizer_ == nullptr, "Could not create minimizer: " << _minimizerType_ << "/" << _minimizerAlgo_);
+
   if( _minimizerAlgo_.empty() ){
     _minimizerAlgo_ = _rootMinimizer_->Options().MinimizerAlgorithm();
     LogWarning << "Using default minimizer algo: " << _minimizerAlgo_ << std::endl;
@@ -100,6 +102,7 @@ void RootMinimizer::initializeImpl(){
     }
   }
 
+  LogWarning << "RootMinimizer initialized." << std::endl;
 }
 
 void RootMinimizer::minimize(){
