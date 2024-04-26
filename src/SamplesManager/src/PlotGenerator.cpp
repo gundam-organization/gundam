@@ -288,10 +288,10 @@ void PlotGenerator::generateCanvas(const std::vector<HistHolder> &histHolderList
         iSampleSlot = 1;
       }
 
-
+      // TODO: check and note this down!!
 //      std::string canvasName = "samples_n" + std::to_string(canvasIndex);
       // Lorenzo: print the sample name in the canvas name
-      std::string canvasName = "sample_" + samplePtr->getName();
+      std::string canvasName = "sample_" + GenericToolbox::generateCleanBranchName(samplePtr->getName());
       std::string canvasPath = canvasFolderPath + canvasName;
       if (not GenericToolbox::isIn(canvasPath, _bufferCanvasList_)) {
         _bufferCanvasList_[canvasPath] = std::make_shared<TCanvas>( canvasPath.c_str(), canvasPath.c_str(), canvasWidth, canvasHeight );

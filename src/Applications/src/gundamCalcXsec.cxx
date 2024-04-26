@@ -109,12 +109,12 @@ int main(int argc, char** argv){
 
   ConfigUtils::ConfigHandler cHandler{ fitterConfig };
 
-//  // Disabling defined fit samples:
-//  LogInfo << "Removing defined samples..." << std::endl;
-//  ConfigUtils::applyOverrides(
-//      cHandler.getConfig(),
-//      GenericToolbox::Json::readConfigJsonStr(R"({"fitterEngineConfig":{"propagatorConfig":{"fitSampleSetConfig":{"fitSampleList":[]}}}})")
-//  );
+  // Disabling defined fit samples:
+  LogInfo << "Removing defined samples..." << std::endl;
+  ConfigUtils::applyOverrides(
+      cHandler.getConfig(),
+      GenericToolbox::Json::readConfigJsonStr(R"({"fitterEngineConfig":{"propagatorConfig":{"fitSampleSetConfig":{"fitSampleList":[]}}}})")
+  );
 
   // Disabling defined plots:
   LogInfo << "Removing defined plots..." << std::endl;
@@ -146,9 +146,9 @@ int main(int argc, char** argv){
   // Sample binning using parameterSetName
   for( auto& sample : dataSetManager.getPropagator().getSampleSet().getSampleList() ){
 
-    if( clParser.isOptionTriggered("usePreFit") ){
-      sample.setName( sample.getName() + " (pre-fit)" );
-    }
+//    if( clParser.isOptionTriggered("usePreFit") ){
+//      sample.setName( sample.getName() + " (pre-fit)" );
+//    }
 
     // binning already set?
     if( not sample.getBinningFilePath().empty() ){ continue; }
@@ -460,7 +460,7 @@ int main(int argc, char** argv){
     std::vector<std::string> leafNameList{};
     leafNameList.reserve( sample.getMcContainer().getHistogram().nBins );
     for( int iBin = 0 ; iBin < sample.getMcContainer().getHistogram().nBins; iBin++ ){
-      leafNameList.emplace_back(Form("bin_%i/D", iBin));
+      leafNameList.emplace_back(Form("bin_%i /D", iBin ));
       xsecEntry.branchBinsData.writeRawData( double(0) );
     }
     xsecEntry.branchBinsData.lockArraySize();
@@ -765,6 +765,7 @@ int main(int argc, char** argv){
       std::string binningFile{};
       TH1D* histogram{};
       bool rescaleAsBinWidth{false};
+      TCanvas* canvas{};
   };
 
   /// PSEUDO CODE:
@@ -793,12 +794,20 @@ int main(int argc, char** argv){
     prePostFit = "postFit";
   }
 
+  std::vector<closureVariable> closureVarList;
   std::vector<std::string> varToPlotVector = propagator.getPlotGenerator().fetchListOfVarToPlot();
   size_t nHist = propagator.getPlotGenerator().getConfig().at("histogramsDefinition").size();
   for( auto& sample : propagator.getSampleSet().getSampleList() ) {
+
     LogInfo<<"Fetching data histogram for sample: "<<sample.getName()<<std::endl;
     TTree* dataTree = (TTree*)fitterFilePtr->Get( ("FitterEngine/"+prePostFit+"/events/"+sample.getName()+"/Data_TTree").std::string::c_str() ) ;
     LogErrorIf(dataTree == nullptr)<<"Could not find data tree for sample: "<<sample.getName()<<std::endl;
+//     Save data tree in the output file (instead of the data tree that is just a copy of the mc tree)
+//    GenericToolbox::writeInTFile(
+//            GenericToolbox::mkdirTFile(calcXsecDir, "events"),
+//            *dataTree,
+//            GenericToolbox::generateCleanBranchName( (sample.getName()+"/Data_TTree").c_str() )
+//    );
     for( size_t iHist = 0 ; iHist < nHist ; iHist++ ){ // this loop is over the variables to plot
       closureVariable closureVar;
       closureVar.samplePtr = &sample;
@@ -826,7 +835,9 @@ int main(int argc, char** argv){
       // LogInfo<< "    Variable formula: " << closureVar.variableFormula << std::endl; // a bit verbose, do not print this
       LogErrorIf(closureVar.variableFormula.empty())<<"Could not find leafVar for varToPlot: "<<closureVar.varToPlot<<std::endl;
       // Fill the histogram
-      dataTree->Draw( (closureVar.variableFormula+">>"+closureVar.histogram->GetName()).c_str() );
+      closureVar.canvas = new TCanvas( ("canvas_"+closureVar.varToPlot+"_"+GenericToolbox::generateCleanBranchName(sample.getName()) ).c_str(), ("canvas_"+closureVar.varToPlot+"_"+sample.getName()).c_str(), 800, 600);
+      closureVar.canvas->cd();
+      dataTree->Draw( ("("+closureVar.variableFormula+")>>"+closureVar.histogram->GetName()).c_str() , "Event.eventWeight","hist");
 
       // rescale to bin width
       if(closureVar.rescaleAsBinWidth){
@@ -858,7 +869,7 @@ int main(int argc, char** argv){
       // Now generate, for each sample, a canvas with all the histograms: stack of all the MC with different reaction
       // codes generated before, and the data histogram just generated from the fitter output file
 
-
+      closureVarList.push_back(closureVar);
     }
 
   }
@@ -870,13 +881,38 @@ int main(int argc, char** argv){
   );
 
 
+  // overlay the data histograms on the MC histograms
+  for(auto closureVar : closureVarList) {
+    std::string cleanSampleName = GenericToolbox::generateCleanBranchName(closureVar.samplePtr->getName());
+    TCanvas * c_MC = (TCanvas*)app.getOutfilePtr()->Get( ("calcXsec/plots/canvas/"+closureVar.varToPlot+"/ReactionCode/sample_"+cleanSampleName+"_TCanvas").c_str() );
+    if(!c_MC){
+      LogError << "Could not find canvas for variable: " << closureVar.varToPlot << " and sample: " << cleanSampleName << std::endl;
+      continue;
+    }else{
+      // how many pads in this canvas?
+      int nPads = c_MC->GetListOfPrimitives()->GetSize();
+      c_MC->cd(0);
+      gPad->GetListOfPrimitives()->Print();
+      closureVar.histogram->Draw("hist same");
+    }
+    c_MC->Update();
+    GenericToolbox::writeInTFile(
+            GenericToolbox::mkdirTFile(calcXsecDir, "plots/canvas"),
+            c_MC,
+            GenericToolbox::generateCleanBranchName( "Closure_"+closureVar.varToPlot+"_"+cleanSampleName+"_TCanvas" )
+    );
+  }
+
+
   LogInfo << "Writing event samples in TTrees..." << std::endl;
   dataSetManager.getTreeWriter().writeSamples(
       GenericToolbox::mkdirTFile(calcXsecDir, "events"),
       dataSetManager.getPropagator()
   );
 
-}
+} // end of main
+
+
 
 
 
