@@ -43,7 +43,8 @@ void ParameterSet::readConfigImpl(){
     _globalParameterMaxValue_ = GenericToolbox::Json::fetchValue(parLimits, "maxValue", _globalParameterMaxValue_);
   }
 
-  _enableEigenDecomp_ = GenericToolbox::Json::fetchValue(_config_ , {{"enableEigenDecomp"}, {"useEigenDecompInFit"}}, false);
+  _enable
+    Decomp_ = GenericToolbox::Json::fetchValue(_config_ , {{"enableEigenDecomp"}, {"useEigenDecompInFit"}}, false);
   if( _enableEigenDecomp_ ){
     LogWarning << "Using eigen decomposition in fit." << std::endl;
 
@@ -236,7 +237,7 @@ void ParameterSet::processCovarianceMatrix(){
 
     // this loop assumes all eigen values are stored in decreasing order
     for (int iEigen = 0; iEigen < _eigenValues_->GetNrows(); iEigen++) {
-
+      
       if( not std::isnan( _eigenSvdThreshold_ ) ){
         // check the current matrix conditioning
         if( (*_eigenValues_)[iEigen]/_eigenValues_->Max() < _eigenSvdThreshold_ ){

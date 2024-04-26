@@ -256,27 +256,32 @@ void DataBinSet::readBinningConfig(const JsonType& binning_){
       int nBins{0};
       int nModulo{1};
       std::string var{};
+      bool isEdgesDiscreteValues{false};
       std::vector<double> edgesList{};
     };
     std::vector<Dimension> dimensionList{};
     dimensionList.reserve( binningDefinition.size() );
 
-    for( auto& binEdgeEntry : binningDefinition ){
+    for( auto& binDefEntry : binningDefinition ){
       dimensionList.emplace_back();
       auto& dim = dimensionList.back();
-      dim.var = GenericToolbox::Json::fetchValue<std::string>(binEdgeEntry, "name");
+      dim.var = GenericToolbox::Json::fetchValue<std::string>(binDefEntry, "name");
 
-      if( GenericToolbox::Json::doKeyExist(binEdgeEntry, "edges") ){
-        dim.edgesList = GenericToolbox::Json::fetchValue<std::vector<double>>(binEdgeEntry, "edges");
+      if( GenericToolbox::Json::doKeyExist(binDefEntry, "edges") ){
+        dim.edgesList = GenericToolbox::Json::fetchValue(binDefEntry, "edges", dim.edgesList);
       }
-      else if( GenericToolbox::Json::doKeyExist(binEdgeEntry, "nBins") ){
+      else if( GenericToolbox::Json::doKeyExist(binDefEntry, "values") ){
+        dim.edgesList = GenericToolbox::Json::fetchValue(binDefEntry, "values", dim.edgesList);
+        dim.isEdgesDiscreteValues = true;
+      }
+      else if( GenericToolbox::Json::doKeyExist(binDefEntry, "nBins") ){
         // TH1D-like definition
-        int nBins{ GenericToolbox::Json::fetchValue<int>(binEdgeEntry, "nBins") };
-        double minVal{ GenericToolbox::Json::fetchValue<double>(binEdgeEntry, "min") };
-        double maxVal{ GenericToolbox::Json::fetchValue<double>(binEdgeEntry, "max") };
+        int nBins{ GenericToolbox::Json::fetchValue<int>(binDefEntry, "nBins") };
+        double minVal{ GenericToolbox::Json::fetchValue<double>(binDefEntry, "min") };
+        double maxVal{ GenericToolbox::Json::fetchValue<double>(binDefEntry, "max") };
 
         double step{(maxVal - minVal)/nBins};
-        LogThrowIf( step <= 0, "Invalid binning: " << GenericToolbox::Json::toReadableString(binEdgeEntry) );
+        LogThrowIf( step <= 0, "Invalid binning: " << GenericToolbox::Json::toReadableString(binDefEntry) );
 
         dim.edgesList.reserve( nBins + 1 );
         double edgeValue{minVal};
@@ -290,9 +295,10 @@ void DataBinSet::readBinningConfig(const JsonType& binning_){
         LogThrow("Unrecognised binning definition: " << binningDefinition);
       }
 
-      dim.nBins = int( dim.edgesList.size() ) - 1;
+      dim.nBins = int( dim.edgesList.size() );
+      if( not dim.isEdgesDiscreteValues ){ dim.nBins--; }
 
-      LogThrowIf(dim.nBins == 0, "Invalid edgesList for binEdgeEntry: " << GenericToolbox::Json::toReadableString(binEdgeEntry));
+      LogThrowIf(dim.nBins == 0, "Invalid edgesList for binEdgeEntry: " << GenericToolbox::Json::toReadableString(binDefEntry));
     }
 
     int nBinsTotal{1};
@@ -311,8 +317,14 @@ void DataBinSet::readBinningConfig(const JsonType& binning_){
         edge["name"] = dim.var;
 
         int edgeIndex = ( iBin/dim.nModulo ) % dim.nBins;
-        edge["bounds"].emplace_back( dim.edgesList[edgeIndex] );
-        edge["bounds"].emplace_back( dim.edgesList[edgeIndex+1] );
+
+        if( dim.isEdgesDiscreteValues ){
+          edge["value"] = dim.edgesList[edgeIndex];
+        }
+        else{
+          edge["bounds"].emplace_back( dim.edgesList[edgeIndex] );
+          edge["bounds"].emplace_back( dim.edgesList[edgeIndex+1] );
+        }
       }
 
       _binList_.emplace_back( _binList_.size() );
