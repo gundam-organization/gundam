@@ -46,7 +46,6 @@ void ParameterSet::readConfigImpl(){
   _enableEigenDecomp_ = GenericToolbox::Json::fetchValue(_config_ , {{"enableEigenDecomp"}, {"useEigenDecompInFit"}}, false);
   if( _enableEigenDecomp_ ){
     LogWarning << "Using eigen decomposition in fit." << std::endl;
-    LogScopeIndent;
 
     _maxNbEigenParameters_ = GenericToolbox::Json::fetchValue(_config_ , "maxNbEigenParameters", -1);
     if( _maxNbEigenParameters_ != -1 ){
@@ -67,6 +66,9 @@ void ParameterSet::readConfigImpl(){
     _devUseParLimitsOnEigen_ = GenericToolbox::Json::fetchValue(_config_, "devUseParLimitsOnEigen", _devUseParLimitsOnEigen_);
     if( _devUseParLimitsOnEigen_ ){ LogAlert << "USING DEV OPTION: _devUseParLimitsOnEigen_ = true" << std::endl; }
 
+    _eigenSvdThreshold_ = GenericToolbox::Json::fetchValue(_config_, "eigenSvdThreshold", _eigenSvdThreshold_);
+    LogInfoIf(not std::isnan(_eigenSvdThreshold_)) << "Setting SVD eigen value threshold to: " << _eigenSvdThreshold_ << std::endl;
+
   }
 
   _enablePca_ = GenericToolbox::Json::fetchValue(_config_, std::vector<std::string>{"allowPca", "fixGhostFitParameters", "enablePca"}, _enablePca_);
@@ -78,9 +80,10 @@ void ParameterSet::readConfigImpl(){
   _parameterDefinitionFilePath_ = GenericToolbox::Json::fetchValue( _config_,
     { {"parameterDefinitionFilePath"}, {"covarianceMatrixFilePath"} }, _parameterDefinitionFilePath_
   );
-  _covarianceMatrixTMatrixD_ = GenericToolbox::Json::fetchValue(_config_, "covarianceMatrixTMatrixD", _covarianceMatrixTMatrixD_);
-  _parameterPriorTVectorD_ = GenericToolbox::Json::fetchValue(_config_, "parameterPriorTVectorD", _parameterPriorTVectorD_);
-  _parameterNameTObjArray_ = GenericToolbox::Json::fetchValue(_config_, "parameterNameTObjArray", _parameterNameTObjArray_);
+  _covarianceMatrixPath_ = GenericToolbox::Json::fetchValue(_config_, {{"covarianceMatrix"}, {"covarianceMatrixTMatrixD"}}, _covarianceMatrixPath_);
+  _parameterNameListPath_ = GenericToolbox::Json::fetchValue(_config_, {{"parameterNameList"}, {"parameterNameTObjArray"}}, _parameterNameListPath_);
+  _parameterPriorValueListPath_ = GenericToolbox::Json::fetchValue(_config_, {{"parameterPriorValueList"}, {"parameterPriorTVectorD"}}, _parameterPriorValueListPath_);
+
   _parameterLowerBoundsTVectorD_ = GenericToolbox::Json::fetchValue(_config_, "parameterLowerBoundsTVectorD", _parameterLowerBoundsTVectorD_);
   _parameterUpperBoundsTVectorD_ = GenericToolbox::Json::fetchValue(_config_, "parameterUpperBoundsTVectorD", _parameterUpperBoundsTVectorD_);
   _throwEnabledListPath_ = GenericToolbox::Json::fetchValue(_config_, "throwEnabledList", _throwEnabledListPath_);
@@ -187,6 +190,7 @@ void ParameterSet::processCovarianceMatrix(){
     LogWarning << "Decomposing the stripped covariance matrix..." << std::endl;
     _eigenParameterList_.resize(_strippedCovarianceMatrix_->GetNrows(), Parameter(this));
 
+    LogAlertIf(_strippedCovarianceMatrix_->GetNrows() > 1000) << "Decomposing matrix with " << _strippedCovarianceMatrix_->GetNrows() << " dim might take a while..." << std::endl;
     _eigenDecomp_     = std::make_shared<TMatrixDSymEigen>(*_strippedCovarianceMatrix_);
 
     // Used for base swapping
@@ -195,12 +199,16 @@ void ParameterSet::processCovarianceMatrix(){
     _eigenVectors_    = std::shared_ptr<TMatrixD>( (TMatrixD*) _eigenDecomp_->GetEigenVectors().Clone() );
     _eigenVectorsInv_ = std::make_shared<TMatrixD>(TMatrixD::kTransposed, *_eigenVectors_ );
 
-    double eigenCumulative = 0;
     _nbEnabledEigen_ = 0;
     double eigenTotal = _eigenValues_->Sum();
 
     LogInfo << "Covariance eigen values are between " << _eigenValues_->Min() << " and " << _eigenValues_->Max() << std::endl;
-    LogThrowIf(_eigenValues_->Min() < 0, "Input covariance matrix is not positive definite.");
+    if( std::isnan(_eigenSvdThreshold_) ){
+      LogThrowIf(_eigenValues_->Min() < 0, "Input covariance matrix is not positive definite.");
+    }
+    else if( _eigenValues_->Min()/_eigenValues_->Max() < _eigenSvdThreshold_ ){
+      LogAlert << "Eigen values bellow the threshold(" << _eigenSvdThreshold_ << "). Using SVD..." << std::endl;
+    }
 
     _inverseStrippedCovarianceMatrix_ = std::make_shared<TMatrixD>(_strippedCovarianceMatrix_->GetNrows(), _strippedCovarianceMatrix_->GetNrows());
     _projectorMatrix_                 = std::make_shared<TMatrixD>(_strippedCovarianceMatrix_->GetNrows(), _strippedCovarianceMatrix_->GetNrows());
@@ -209,29 +217,44 @@ void ParameterSet::processCovarianceMatrix(){
 
     for (int iEigen = 0; iEigen < _eigenValues_->GetNrows(); iEigen++) {
 
-      _eigenParameterList_[iEigen].setIsEigen(true);
+      _eigenParameterList_[iEigen].setParameterIndex( iEigen );
       _eigenParameterList_[iEigen].setIsEnabled(true);
-      _eigenParameterList_[iEigen].setIsFixed(false);
-      _eigenParameterList_[iEigen].setParameterIndex(iEigen);
+      _eigenParameterList_[iEigen].setIsEigen(true);
       _eigenParameterList_[iEigen].setStdDevValue(TMath::Sqrt((*_eigenValues_)[iEigen]));
       _eigenParameterList_[iEigen].setStepSize(TMath::Sqrt((*_eigenValues_)[iEigen]));
       _eigenParameterList_[iEigen].setName("eigen");
 
+      // fixing all of them by default
+      _eigenParameterList_[iEigen].setIsFixed(true);
+      (*eigenState)[iEigen] = 0;
+
+    }
+
+
+    double eigenCumulative{0};
+
+    // this loop assumes all eigen values are stored in decreasing order
+    for (int iEigen = 0; iEigen < _eigenValues_->GetNrows(); iEigen++) {
+
+      if( not std::isnan( _eigenSvdThreshold_ ) ){
+        // check the current matrix conditioning
+        if( (*_eigenValues_)[iEigen]/_eigenValues_->Max() < _eigenSvdThreshold_ ){
+          LogAlert << "Keeping " << iEigen << " eigen values with SVD." << std::endl;
+          break; // decreasing order
+        }
+      }
+
+
+      if(    ( _maxNbEigenParameters_ != -1 and iEigen >= _maxNbEigenParameters_ )
+             or ( _maxEigenFraction_ != 1 and (eigenCumulative + (*_eigenValues_)[iEigen]) / eigenTotal > _maxEigenFraction_ ) ){
+        break; // decreasing order
+      }
+
+      // if we reach this point, the eigen value is accepted
+      _eigenParameterList_[iEigen].setIsFixed( false );
       (*_eigenValuesInv_)[iEigen] = 1./(*_eigenValues_)[iEigen];
       (*eigenState)[iEigen] = 1.;
-
       eigenCumulative += (*_eigenValues_)[iEigen];
-      if(    ( _maxNbEigenParameters_ != -1 and iEigen >= _maxNbEigenParameters_ )
-          or ( _maxEigenFraction_ != 1      and eigenCumulative / eigenTotal > _maxEigenFraction_ ) ){
-        eigenCumulative -= (*_eigenValues_)[iEigen]; // not included
-        (*_eigenValues_)[iEigen] = 0;
-        (*_eigenValuesInv_)[iEigen] = 0;
-        (*eigenState)[iEigen] = 0;
-
-        _eigenParameterList_[iEigen].setIsFixed(true);
-
-        break;
-      }
       _nbEnabledEigen_++;
 
     } // iEigen
@@ -561,38 +584,41 @@ std::string ParameterSet::getSummary() const {
 
     ss << ", nbParameters: " << _parameterList_.size();
 
-    if( not _parameterList_.empty() ){
+    if( _printParametersSummary_ ){
+      if( not _parameterList_.empty() ){
 
-      GenericToolbox::TablePrinter t;
-      t.setColTitles({ {"Title"}, {"Value"}, {"Prior"}, {"StdDev"}, {"Min"}, {"Max"}, {"Status"} });
+        GenericToolbox::TablePrinter t;
+        t.setColTitles({ {"Title"}, {"Value"}, {"Prior"}, {"StdDev"}, {"Min"}, {"Max"}, {"Status"} });
 
 
-      for( const auto& par : _parameterList_ ){
-        std::string colorStr;
-        std::string statusStr;
+        for( const auto& par : _parameterList_ ){
+          std::string colorStr;
+          std::string statusStr;
 
-        if( not par.isEnabled() ) { statusStr = "Disabled"; colorStr = GenericToolbox::ColorCodes::yellowBackground; }
-        else if( par.isFixed() )  { statusStr = "Fixed";    colorStr = GenericToolbox::ColorCodes::redBackground; }
-        else if( par.isFree() )   { statusStr = "Free";     colorStr = GenericToolbox::ColorCodes::blueBackground; }
-        else                      { statusStr = "Enabled"; }
+          if( not par.isEnabled() ) { statusStr = "Disabled"; colorStr = GenericToolbox::ColorCodes::yellowBackground; }
+          else if( par.isFixed() )  { statusStr = "Fixed (prior applied)";    colorStr = GenericToolbox::ColorCodes::redBackground; }
+          else if( par.isFree() )   { statusStr = "Free";     colorStr = GenericToolbox::ColorCodes::blueBackground; }
+          else                      { statusStr = "Enabled"; }
 
 #ifdef NOCOLOR
-        colorStr = "";
+          colorStr = "";
 #endif
 
-        t.addTableLine({
-                           par.getTitle(),
-                           std::to_string( par.getParameterValue() ),
-                           std::to_string( par.getPriorValue() ),
-                           std::to_string( par.getStdDevValue() ),
-                           std::to_string( par.getMinValue() ),
-                           std::to_string( par.getMaxValue() ),
-                           statusStr
-                       }, colorStr);
-      }
+          t.addTableLine({
+                             par.getTitle(),
+                             std::to_string( par.getParameterValue() ),
+                             std::to_string( par.getPriorValue() ),
+                             std::to_string( par.getStdDevValue() ),
+                             std::to_string( par.getMinValue() ),
+                             std::to_string( par.getMaxValue() ),
+                             statusStr
+                         }, colorStr);
+        }
 
-      t.printTable();
+        t.printTable();
+      }
     }
+
   }
 
   return ss.str();
@@ -766,12 +792,12 @@ void ParameterSet::readParameterDefinitionFile(){
 
   TObject* objBuffer{nullptr};
 
-  if( _covarianceMatrixTMatrixD_.empty() ){
+  if( _covarianceMatrixPath_.empty() ){
     LogWarning << "No covariance matrix provided. Free parameter definition expected." << std::endl;
   }
   else{
-    objBuffer = parDefFile->Get(_covarianceMatrixTMatrixD_.c_str());
-    LogThrowIf(objBuffer == nullptr, "Can't find \"" << _covarianceMatrixTMatrixD_ << "\" in " << parDefFile->GetPath())
+    objBuffer = parDefFile->Get(_covarianceMatrixPath_.c_str());
+    LogThrowIf(objBuffer == nullptr, "Can't find \"" << _covarianceMatrixPath_ << "\" in " << parDefFile->GetPath())
     _priorCovarianceMatrix_ = std::shared_ptr<TMatrixDSym>((TMatrixDSym*) objBuffer->Clone());
     _priorCorrelationMatrix_ = std::shared_ptr<TMatrixDSym>((TMatrixDSym*) GenericToolbox::convertToCorrelationMatrix((TMatrixD*)_priorCovarianceMatrix_.get()));
     LogThrowIf(_nbParameterDefinition_ != -1, "Nb of parameter was manually defined but the covariance matrix");
@@ -779,11 +805,11 @@ void ParameterSet::readParameterDefinitionFile(){
   }
 
   // parameterPriorTVectorD
-  if(not _parameterPriorTVectorD_.empty()){
-    LogInfo << "Reading provided parameterPriorTVectorD: \"" << _parameterPriorTVectorD_ << "\"" << std::endl;
+  if(not _parameterPriorValueListPath_.empty()){
+    LogInfo << "Reading provided parameterPriorTVectorD: \"" << _parameterPriorValueListPath_ << "\"" << std::endl;
 
-    objBuffer = parDefFile->Get(_parameterPriorTVectorD_.c_str());
-    LogThrowIf(objBuffer == nullptr, "Can't find \"" << _parameterPriorTVectorD_ << "\" in " << parDefFile->GetPath())
+    objBuffer = parDefFile->Get(_parameterPriorValueListPath_.c_str());
+    LogThrowIf(objBuffer == nullptr, "Can't find \"" << _parameterPriorValueListPath_ << "\" in " << parDefFile->GetPath())
     _parameterPriorList_ = std::shared_ptr<TVectorD>((TVectorD*) objBuffer->Clone());
 
     LogThrowIf(_parameterPriorList_->GetNrows() != _nbParameterDefinition_,
@@ -794,11 +820,11 @@ void ParameterSet::readParameterDefinitionFile(){
   }
 
   // parameterNameTObjArray
-  if(not _parameterNameTObjArray_.empty()){
-    LogInfo << "Reading provided parameterNameTObjArray: \"" << _parameterNameTObjArray_ << "\"" << std::endl;
+  if(not _parameterNameListPath_.empty()){
+    LogInfo << "Reading provided parameterNameTObjArray: \"" << _parameterNameListPath_ << "\"" << std::endl;
 
-    objBuffer = parDefFile->Get(_parameterNameTObjArray_.c_str());
-    LogThrowIf(objBuffer == nullptr, "Can't find \"" << _parameterNameTObjArray_ << "\" in " << parDefFile->GetPath())
+    objBuffer = parDefFile->Get(_parameterNameListPath_.c_str());
+    LogThrowIf(objBuffer == nullptr, "Can't find \"" << _parameterNameListPath_ << "\" in " << parDefFile->GetPath())
     _parameterNamesList_ = std::shared_ptr<TObjArray>((TObjArray*) objBuffer->Clone());
   }
 

@@ -112,9 +112,9 @@ private:
   // JSON
   std::string _name_{};
   std::string _parameterDefinitionFilePath_{};
-  std::string _covarianceMatrixTMatrixD_{};
-  std::string _parameterPriorTVectorD_{};
-  std::string _parameterNameTObjArray_{};
+  std::string _covarianceMatrixPath_{};
+  std::string _parameterPriorValueListPath_{};
+  std::string _parameterNameListPath_{};
   std::string _parameterLowerBoundsTVectorD_{};
   std::string _parameterUpperBoundsTVectorD_{};
   std::string _throwEnabledListPath_{};
@@ -133,6 +133,7 @@ private:
   double _nominalStepSize_{std::nan("unset")};
   int _maxNbEigenParameters_{-1};
   double _maxEigenFraction_{1};
+  double _eigenSvdThreshold_{std::nan("unset")};
 
   double _globalParameterMinValue_{std::nan("unset")};
   double _globalParameterMaxValue_{std::nan("unset")};

@@ -34,8 +34,8 @@ void DataSetManager::readConfigImpl(){
 
   // deprecated config files will already have filled up _treeWriter_.getConfig()
   GenericToolbox::Json::deprecatedAction(_propagator_.getConfig(), "eventTreeWriter", [&]{
-    LogAlert << R"("eventTreeWriter" should now be set under "dataSetManagerConfig" instead of "propagatorConfig".)" << std::endl;
-    _treeWriter_.setConfig( GenericToolbox::Json::fetchValue<JsonType>(_config_, "eventTreeWriter") );
+    LogAlert << R"("eventTreeWriter" should now be set under "datasetManagerConfig" instead of "propagatorConfig".)" << std::endl;
+    _treeWriter_.setConfig( GenericToolbox::Json::fetchValue<JsonType>(_propagator_.getConfig(), "eventTreeWriter") );
   });
   _treeWriter_.readConfig( GenericToolbox::Json::fetchValue(_config_, "eventTreeWriter", _treeWriter_.getConfig()) );
 }
