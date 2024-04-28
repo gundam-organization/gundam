@@ -892,7 +892,6 @@ int main(int argc, char** argv){
       // how many pads in this canvas?
       int nPads = c_MC->GetListOfPrimitives()->GetSize();
       c_MC->cd(0);
-      gPad->GetListOfPrimitives()->Print();
       closureVar.histogram->Draw("hist same");
     }
     c_MC->Update();
