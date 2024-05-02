@@ -34,11 +34,6 @@ public:
                       TObject* dialInitializer,
                       const std::string& splType);
 
-  /// Apply the monotonic constraint to the slopes.
-  void MakeMonotonic(const std::vector<double>& xPoint,
-                     const std::vector<double>& yPoint,
-                     std::vector<double>& slope);
-
   /// Implement the factory that constructs a pointer to the correct
   /// DialBase.  This uses the dialType and dialSubType to figure out the
   /// correct class, and then uses the object pointed to by the
@@ -93,7 +88,7 @@ private:
 // Local Variables:
 // mode:c++
 // c-basic-offset:2
-// compile-command:"$(git rev-parse --show-toplevel)/cmake/gundam-build.sh"
+// compile-command:"$(git rev-parse --show-toplevel)/cmake/scripts/gundam-build.sh"
 // End:
 
 #endif
