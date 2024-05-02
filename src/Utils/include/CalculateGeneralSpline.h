@@ -32,15 +32,17 @@ namespace {
     // about forty times faster than TSpline3.
     //
     // This takes the "index" of the point in the data, the parameter value
-    // (that made the index), a minimum and maximum bound, the buffer of data
-    // for this spline, and the number of data elements in the spline data.
-    // The input data is arrange as
+    // (x) (that made the index), a minimum (lowerBound) and maximum
+    // (upperBound) bound, the buffer of data for this spline, and the number
+    // of data elements in the spline data (dim).  The input data is arrange as
     //
     // data[0] -- spline lower bound (not used, kept to match other splines)
     // data[1] -- spline step (not used, kept to match other splines)
-    // data[2+3*n+0] -- The function value for knot n
-    // data[2+3*n+1] -- The function slope for knot n
-    // data[2+3*n+2] -- The point for knot n
+    // data[2+3*n+0] -- The function value for knot n (i.e. "Y")
+    // data[2+3*n+1] -- The function slope for knot n (i.e. "dYdX")
+    // data[2+3*n+2] -- The point for knot n (i.e. "X")
+    //
+    // There will be "dim" elements in the data[] array.
     //
     // NOTE: CalculateUniformSpline, CalculateGeneralSpline,
     // CalculateCompactSpline, and CalculateMonotonicSpline have very similar,
@@ -78,13 +80,15 @@ namespace {
         const double step = x2-x1;
 
         const double fx = (x - x1)/step;
-        const double fxx = fx*fx;
-        const double fxxx = fx*fxx;
 
         const double p1 = data[2+3*ix];
         const double m1 = data[2+3*ix+1]*step;
         const double p2 = data[2+3*(ix+1)];
         const double m2 = data[2+3*(ix+1)+1]*step;
+
+#ifdef DO_NOT_USE_HORNER_FACTORIZATION
+        const double fxx = fx*fx;
+        const double fxxx = fx*fxx;
 
         // Cubic spline with the points and slopes.
         // double v = p1*(2.0*fxxx-3.0*fxx+1.0) + m1*(fxxx-2.0*fxx+fx)
@@ -94,6 +98,13 @@ namespace {
         const double t = 3.0*fxx-2.0*fxxx;
         double v = p1 - p1*t + m1*(fxxx-2.0*fxx+fx)
                     + p2*t + m2*(fxxx-fxx);
+#else
+        // Factored via Horner's method.
+        double v = ((((2.0*p1 - 2.0*p2 + m2 + m1)*fx
+                      + 3.0*p2 - 3.0*p1 - m2 - 2.0*m1)*fx
+                     +m1)*fx
+                    +p1);
+#endif
 
         if (v < lowerBound) v = lowerBound;
         if (v > upperBound) v = upperBound;
@@ -127,6 +138,6 @@ namespace {
 // Local Variables:
 // mode:c++
 // c-basic-offset:4
-// compile-command:"$(git rev-parse --show-toplevel)/cmake/gundam-build.sh"
+// compile-command:"$(git rev-parse --show-toplevel)/cmake/scripts/gundam-build.sh"
 // End:
 #endif
