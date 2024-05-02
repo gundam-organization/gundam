@@ -874,6 +874,31 @@ int main(int argc, char** argv){
 
   }
 
+
+
+//  // print info about the histos in histHolder
+//  for(auto histHolder : propagator.getPlotGenerator().getHistHolderList()){
+//    LogInfo << "HistHolder: " << histHolder.samplePtr->getName() << " | " << histHolder.histPtr->GetName() << std::endl;
+//    LogInfo << "  isData? " << histHolder.isData << std::endl;
+//  }
+//  // Generate a temporary histHolderList that includes also the closure variable histograms
+//  std::vector<HistHolder> myHistHolderList = propagator.getPlotGenerator().getHistHolderList();
+//  for(auto closureVar : closureVarList){
+//    HistHolder histHolder;
+//    // copy a random histHolder from the plot generator
+//    histHolder = myHistHolderList.at(0);
+//    std::shared_ptr<TH1D> histPtr(closureVar.histogram);
+//    histHolder.histPtr = histPtr;
+//    histHolder.isData = true;
+//    myHistHolderList.push_back(histHolder);
+//  }
+//  // print info about the histos in histHolder
+// LogInfo << "Printing histHolderList" << std::endl;
+//  for(auto histHolder : myHistHolderList){
+//    LogInfo << "HistHolder: " << histHolder.samplePtr->getName() << " | " << histHolder.histPtr->GetName() << std::endl;
+//    LogInfo << "  isData? " << histHolder.isData << std::endl;
+//  }
+
   LogInfo << "Generating canvases " << std::endl;
   propagator.getPlotGenerator().generateCanvas(
           propagator.getPlotGenerator().getHistHolderList(),
@@ -884,22 +909,28 @@ int main(int argc, char** argv){
   // overlay the data histograms on the MC histograms
   for(auto closureVar : closureVarList) {
     std::string cleanSampleName = GenericToolbox::generateCleanBranchName(closureVar.samplePtr->getName());
-    TCanvas * c_MC = (TCanvas*)app.getOutfilePtr()->Get( ("calcXsec/plots/canvas/"+closureVar.varToPlot+"/ReactionCode/sample_"+cleanSampleName+"_TCanvas").c_str() );
+    TCanvas * c_MC = (TCanvas*)(app.getOutfilePtr()->Get( ("calcXsec/plots/canvas/"+closureVar.varToPlot+"/ReactionCode/sample_"+cleanSampleName+"_TCanvas").c_str() ) );
     if(!c_MC){
       LogError << "Could not find canvas for variable: " << closureVar.varToPlot << " and sample: " << cleanSampleName << std::endl;
       continue;
     }else{
-      // how many pads in this canvas?
+      // change canvas name
+       c_MC->SetName( ("Closure_"+closureVar.varToPlot+"_"+cleanSampleName+"_TCanvas").c_str() );
+      c_MC->SetTitle( ("Closure_"+closureVar.varToPlot+"_"+cleanSampleName+"_TCanvas").c_str() );
+      LogInfo<<"Creating canvas: "<<c_MC->GetName()<<std::endl;
       int nPads = c_MC->GetListOfPrimitives()->GetSize();
+//      c_MC->Draw("goff");
       c_MC->cd(0);
       closureVar.histogram->Draw("hist same");
+      c_MC->SaveAs("temporary.root"); // this one does not! (and also the canvas in the output file)
+      c_MC->SaveAs("temporary.png"); // this one works
+
+      GenericToolbox::writeInTFile(
+              GenericToolbox::mkdirTFile(calcXsecDir, "plots/canvas"),
+              c_MC,
+              GenericToolbox::generateCleanBranchName( c_MC->GetTitle() )
+      );
     }
-    c_MC->Update();
-    GenericToolbox::writeInTFile(
-            GenericToolbox::mkdirTFile(calcXsecDir, "plots/canvas"),
-            c_MC,
-            GenericToolbox::generateCleanBranchName( "Closure_"+closureVar.varToPlot+"_"+cleanSampleName+"_TCanvas" )
-    );
   }
 
 
@@ -908,6 +939,8 @@ int main(int argc, char** argv){
       GenericToolbox::mkdirTFile(calcXsecDir, "events"),
       dataSetManager.getPropagator()
   );
+
+
 
 } // end of main
 
