@@ -771,6 +771,7 @@ int main(int argc, char** argv){
       TH1D* histogram{}; // histogram generated from the fitted toy data
       TH1D* mcHistogram{}; // histogram generated from the MC at the best fit point
       TH1D* meanValueHistogram{}; // histogram generated from the mean value of the systematic throws
+      TH1D* bestFitHistogram{}; // histogram generated from the best fit point
       std::vector<TH1D*> mcHistogramReactionCodes{};
       bool rescaleAsBinWidth{false};
       TCanvas* canvas{};
@@ -854,6 +855,12 @@ int main(int argc, char** argv){
               binEdges.size() - 1,
               &binEdges[0]
       );
+      closureVar.bestFitHistogram = new TH1D(
+              (closureVar.samplePtr->getName() + "_bestFit_" + closureVar.varToPlot).c_str(),
+              (closureVar.samplePtr->getName() + " best fit ;" + closureVar.varToPlot).c_str(),
+              binEdges.size() - 1,
+              &binEdges[0]
+      );
       // load the formula
       for (int i = 0; i < propagator.getConfig()["dataSetList"][0]["mc"].at("overrideLeafDict").size(); i++) {
         std::string eventVar = propagator.getConfig()["dataSetList"][0]["mc"].at("overrideLeafDict")[i].at("eventVar");
@@ -865,7 +872,6 @@ int main(int argc, char** argv){
       }
       // Fill the mean value histogram
       std::vector<double> meanValues(closureVar.meanValueHistogram->GetNbinsX(),0);
-      xsecThrowTree->GetListOfLeaves();
       LogInfo << "Entries of throws tree: " << xsecThrowTree->GetEntries() << std::endl;
       for (int iToy = 0; iToy < xsecThrowTree->GetEntries(); iToy++) {
         xsecThrowTree->GetEntry(iToy);
@@ -912,7 +918,44 @@ int main(int argc, char** argv){
         meanValues.at(iBin) /= xsecThrowTree->GetEntries();
       }
       for(int iBin=0;iBin<closureVar.meanValueHistogram->GetNbinsX();iBin++){
-        closureVar.meanValueHistogram->SetBinContent(iBin+1, (*meanValuesVector)[iBin]);
+        closureVar.meanValueHistogram->SetBinContent(iBin+1, meanValues[iBin]);
+      }
+      // fill the best fit histogram
+      xsecAtBestFitTree->GetEntry(0);
+      // check that the number of leaves in the ttree is the same as the number of bins in the histogram
+      std::string branchName = GenericToolbox::generateCleanBranchName(sample.getName()).c_str();
+      TBranch *branch = xsecAtBestFitTree->GetBranch(branchName.c_str());
+      int leavesInBranch = 0;
+      if (branch == nullptr) {
+        LogError << "Could not find branch for sample: "
+                 << GenericToolbox::generateCleanBranchName(sample.getName()).c_str() << std::endl;
+        return 1;
+      } else {
+        leavesInBranch = xsecAtBestFitTree->GetBranch(
+                GenericToolbox::generateCleanBranchName(sample.getName()).c_str())->GetListOfLeaves()->GetEntries();
+//          LogInfo << "The branch " << GenericToolbox::generateCleanBranchName(sample.getName()).c_str() << " has "
+//                  << leavesInBranch << " leaves." << std::endl;
+//          // print list of leaves:
+//          branch->GetListOfLeaves()->Print();
+      }
+      int binsInHistogram = closureVar.meanValueHistogram->GetNbinsX();
+      if (leavesInBranch != binsInHistogram) {
+        LogError << "Number of leaves in the tree (" << leavesInBranch
+                 << ") is different from the number of bins in the histogram (" << binsInHistogram << ")."
+                 << std::endl;
+        return 1;
+      } else {
+        for (int iBin = 0; iBin < binsInHistogram; iBin++) {
+          std::string leafName = Form("bin_%i", iBin);
+          TLeaf* leaf = (TLeaf*)branch->GetLeaf(leafName.c_str());
+          if (leaf == nullptr) {
+            LogError << "Could not find leaf named " << leafName << " in branch " << branchName << std::endl;
+            return 1;
+          } else {
+            double binContent = leaf->GetValue();
+            closureVar.bestFitHistogram->SetBinContent(iBin+1, binContent);
+          }
+        }
       }
       // LogInfo<< "    Variable formula: " << closureVar.variableFormula << std::endl; // a bit verbose, do not print this
       LogErrorIf(closureVar.variableFormula.empty()) << "Could not find leafVar for varToPlot: " << closureVar.varToPlot
@@ -960,14 +1003,21 @@ int main(int argc, char** argv){
                                                   closureVar.histogram->GetBinContent(iBin + 1) / binWidth);
               closureVar.mcHistogram->SetBinContent(iBin + 1,
                                                     closureVar.mcHistogram->GetBinContent(iBin + 1) / binWidth);
-              closureVar.meanValueHistogram->SetBinContent(iBin + 1,
-                                                          closureVar.meanValueHistogram->GetBinContent(iBin + 1) / binWidth);
+              // No need to normalize to bin width the meanValue and bestFit histograms, that is already done
               closureVar.mcHistogram->SetBinError(iBin + 1,
                                                   closureVar.mcHistogram->GetBinError(iBin + 1) / binWidth );
             }
           }
         }
       }
+
+      // Only look at the shape
+//      closureVar.histogram->Scale(1.0/closureVar.histogram->Integral());
+//      closureVar.mcHistogram->Scale(1.0/closureVar.mcHistogram->Integral());
+//      closureVar.meanValueHistogram->Scale(1.0/closureVar.meanValueHistogram->Integral());
+//      closureVar.bestFitHistogram->Scale(1.0/closureVar.bestFitHistogram->Integral());
+
+
       // cosmetics
       closureVar.histogram->SetMarkerStyle(kFullDotLarge);
       closureVar.histogram->SetMarkerColor(kRed);
@@ -986,11 +1036,16 @@ int main(int argc, char** argv){
       closureVar.meanValueHistogram->SetMarkerColor(kBlack);
       closureVar.meanValueHistogram->SetLineColor(kBlack);
       closureVar.meanValueHistogram->Draw("hist same");
+      closureVar.bestFitHistogram->SetMarkerStyle(kFullDotLarge);
+      closureVar.bestFitHistogram->SetMarkerColor(kMagenta);
+      closureVar.bestFitHistogram->SetLineColor(kMagenta);
+      closureVar.bestFitHistogram->Draw("hist same");
       // legend
       TLegend *legend = new TLegend(0.7, 0.7, 0.9, 0.9);
       legend->AddEntry(closureVar.histogram, "Data", "l");
       legend->AddEntry(closureVar.mcHistogram, "MC", "l");
       legend->AddEntry(closureVar.meanValueHistogram, "Mean of throws", "l");
+      legend->AddEntry(closureVar.bestFitHistogram, "Best fit", "l");
       legend->Draw();
 
 
