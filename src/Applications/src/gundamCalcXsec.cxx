@@ -14,6 +14,7 @@
 #include <TFile.h>
 #include "TH1D.h"
 #include "TH2D.h"
+#include "TLegend.h"
 
 #include <string>
 #include <vector>
@@ -460,7 +461,7 @@ int main(int argc, char** argv){
     std::vector<std::string> leafNameList{};
     leafNameList.reserve( sample.getMcContainer().getHistogram().nBins );
     for( int iBin = 0 ; iBin < sample.getMcContainer().getHistogram().nBins; iBin++ ){
-      leafNameList.emplace_back(Form("bin_%i /D", iBin ));
+      leafNameList.emplace_back(Form("bin_%i/D", iBin ));
       xsecEntry.branchBinsData.writeRawData( double(0) );
     }
     xsecEntry.branchBinsData.lockArraySize();
@@ -631,6 +632,9 @@ int main(int argc, char** argv){
   auto* meanValuesVector = GenericToolbox::generateMeanVectorOfTree(
       useBestFitAsCentralValue ? xsecAtBestFitTree : xsecThrowTree
   );
+
+
+
   auto* globalCovMatrix = GenericToolbox::generateCovarianceMatrixOfTree( xsecThrowTree );
 
   auto* globalCovMatrixHist = GenericToolbox::convertTMatrixDtoTH2D(globalCovMatrix);
@@ -686,67 +690,67 @@ int main(int argc, char** argv){
   globalCorMatrixHist->GetZaxis()->SetRangeUser(-1, 1);
   GenericToolbox::writeInTFile(GenericToolbox::mkdirTFile(calcXsecDir, "matrices"), globalCorMatrixHist, "correlationMatrix");
 
-  // now propagate to the engine for the plot generator
-  LogInfo << "Re-normalizing the samples for the plot generator..." << std::endl;
-  for( auto& xsec : crossSectionDataList ){
-    // this gives the average as the event weights were summed together
-    {
-      auto &mcEvList{xsec.samplePtr->getMcContainer().getEventList()};
-      std::vector<size_t> nEventInBin(xsec.histogram.GetNbinsX(), 0);
-      for( size_t iBin = 0 ; iBin < nEventInBin.size() ; iBin++ ){
-        nEventInBin[iBin] = std::count_if(mcEvList.begin(), mcEvList.end(), [iBin]( Event &ev_) {
-          return ev_.getIndices().bin == iBin;
-        });
-      }
+//  // now propagate to the engine for the plot generator
+//  LogInfo << "Re-normalizing the samples for the plot generator..." << std::endl;
+//  for( auto& xsec : crossSectionDataList ){
+//    // this gives the average as the event weights were summed together
+//    {
+//      auto &mcEvList{xsec.samplePtr->getMcContainer().getEventList()};
+//      std::vector<size_t> nEventInBin(xsec.histogram.GetNbinsX(), 0);
+//      for( size_t iBin = 0 ; iBin < nEventInBin.size() ; iBin++ ){
+//        nEventInBin[iBin] = std::count_if(mcEvList.begin(), mcEvList.end(), [iBin]( Event &ev_) {
+//          return ev_.getIndices().bin == iBin;
+//        });
+//      }
+//
+//      std::for_each(mcEvList.begin(), mcEvList.end(), [&]( Event &ev_) {
+//        //ev_.getWeights().current /= nToys;
+//        ev_.getWeights().current /= double(nEventInBin[ev_.getIndices().bin]);
+//      });
+//    }
+//    {
+//      auto &dataEvList{xsec.samplePtr->getDataContainer().getEventList()};
+//      std::vector<size_t> nEventInBin(xsec.histogram.GetNbinsX(), 0);
+//      for( size_t iBin = 0 ; iBin < nEventInBin.size() ; iBin++ ){
+//        nEventInBin[iBin] = std::count_if(dataEvList.begin(), dataEvList.end(), [iBin]( Event &ev_) {
+//          return ev_.getIndices().bin== iBin;
+//        });
+//      }
+//
+//      std::for_each(dataEvList.begin(), dataEvList.end(), [&]( Event &ev_) {
+//        //ev_.getWeights().current /= nToys;
+//        ev_.getWeights().current /= double(nEventInBin[ev_.getIndices().bin]);
+//      });
+//    }
+//  }
 
-      std::for_each(mcEvList.begin(), mcEvList.end(), [&]( Event &ev_) {
-        //ev_.getWeights().current /= nToys;
-        ev_.getWeights().current /= double(nEventInBin[ev_.getIndices().bin]);
-      });
-    }
-    {
-      auto &dataEvList{xsec.samplePtr->getDataContainer().getEventList()};
-      std::vector<size_t> nEventInBin(xsec.histogram.GetNbinsX(), 0);
-      for( size_t iBin = 0 ; iBin < nEventInBin.size() ; iBin++ ){
-        nEventInBin[iBin] = std::count_if(dataEvList.begin(), dataEvList.end(), [iBin]( Event &ev_) {
-          return ev_.getIndices().bin== iBin;
-        });
-      }
-
-      std::for_each(dataEvList.begin(), dataEvList.end(), [&]( Event &ev_) {
-        //ev_.getWeights().current /= nToys;
-        ev_.getWeights().current /= double(nEventInBin[ev_.getIndices().bin]);
-      });
-    }
-  }
-
-  LogInfo << "Generating xsec sample plots..." << std::endl;
-  // manual trigger to tweak the error bars
-  propagator.getPlotGenerator().generateSampleHistograms( GenericToolbox::mkdirTFile(calcXsecDir, "plots/histograms") );
-
-  for( auto& histHolder : propagator.getPlotGenerator().getHistHolderList(0) ){
-    if( not histHolder.isData ){ continue; } // only data will print errors
-
-    const CrossSectionData* xsecDataPtr{nullptr};
-    for( auto& xsecData : crossSectionDataList ){
-      if( xsecData.samplePtr  == histHolder.samplePtr){
-        xsecDataPtr = &xsecData;
-        break;
-      }
-    }
-    LogThrowIf(xsecDataPtr==nullptr, "corresponding data not found");
-
-    // alright, now rescale error bars
-    for( int iBin = 0 ; iBin < histHolder.histPtr->GetNbinsX() ; iBin++ ){
-      // relative error should be set
-      histHolder.histPtr->SetBinError(
-          1+iBin,
-          histHolder.histPtr->GetBinContent(1+iBin)
-          * xsecDataPtr->histogram.GetBinError(1+iBin)
-          / xsecDataPtr->histogram.GetBinContent(1+iBin)
-      );
-    }
-  }
+//  LogInfo << "Generating xsec sample plots..." << std::endl;
+//  // manual trigger to tweak the error bars
+//  propagator.getPlotGenerator().generateSampleHistograms( GenericToolbox::mkdirTFile(calcXsecDir, "plots/histograms") );
+//
+//  for( auto& histHolder : propagator.getPlotGenerator().getHistHolderList(0) ){
+//    if( not histHolder.isData ){ continue; } // only data will print errors
+//
+//    const CrossSectionData* xsecDataPtr{nullptr};
+//    for( auto& xsecData : crossSectionDataList ){
+//      if( xsecData.samplePtr  == histHolder.samplePtr){
+//        xsecDataPtr = &xsecData;
+//        break;
+//      }
+//    }
+//    LogThrowIf(xsecDataPtr==nullptr, "corresponding data not found");
+//
+//    // alright, now rescale error bars
+//    for( int iBin = 0 ; iBin < histHolder.histPtr->GetNbinsX() ; iBin++ ){
+//      // relative error should be set
+//      histHolder.histPtr->SetBinError(
+//          1+iBin,
+//          histHolder.histPtr->GetBinContent(1+iBin)
+//          * xsecDataPtr->histogram.GetBinError(1+iBin)
+//          / xsecDataPtr->histogram.GetBinContent(1+iBin)
+//      );
+//    }
+//  }
 
   //// SECTION TO MAKE THE HISTOGRAMS FROM THE DATA TTREE FOR THE CLOSURE TEST
 
@@ -763,7 +767,11 @@ int main(int argc, char** argv){
       std::string varToPlot{};
       std::string variableFormula{};
       std::string binningFile{};
-      TH1D* histogram{};
+      std::vector<double> binErrors{}; // fetch this from the covariance matrix
+      TH1D* histogram{}; // histogram generated from the fitted toy data
+      TH1D* mcHistogram{}; // histogram generated from the MC at the best fit point
+      TH1D* meanValueHistogram{}; // histogram generated from the mean value of the systematic throws
+      std::vector<TH1D*> mcHistogramReactionCodes{};
       bool rescaleAsBinWidth{false};
       TCanvas* canvas{};
   };
@@ -780,6 +788,7 @@ int main(int argc, char** argv){
   //    use the leafvar definition to fill the histogram properly
   //    }
   // }
+
 
 
   if( propagator.getPlotGenerator().getConfig().at("histogramsDefinition").is_array() ){
@@ -799,57 +808,164 @@ int main(int argc, char** argv){
   size_t nHist = propagator.getPlotGenerator().getConfig().at("histogramsDefinition").size();
   for( auto& sample : propagator.getSampleSet().getSampleList() ) {
 
-    LogInfo<<"Fetching data histogram for sample: "<<sample.getName()<<std::endl;
-    TTree* dataTree = (TTree*)fitterFilePtr->Get( ("FitterEngine/"+prePostFit+"/events/"+sample.getName()+"/Data_TTree").std::string::c_str() ) ;
-    LogErrorIf(dataTree == nullptr)<<"Could not find data tree for sample: "<<sample.getName()<<std::endl;
+    LogInfo << "Fetching data histogram for sample: " << sample.getName() << std::endl;
+    TTree *dataTree = (TTree *) fitterFilePtr->Get(
+            ("FitterEngine/" + prePostFit + "/events/" + sample.getName() + "/Data_TTree").std::string::c_str());
+    TTree *mcTree = (TTree *) fitterFilePtr->Get(
+            ("FitterEngine/" + prePostFit + "/events/" + sample.getName() + "/MC_TTree").std::string::c_str());
+    LogErrorIf(dataTree == nullptr) << "Could not find data tree for sample: " << sample.getName() << std::endl;
 //     Save data tree in the output file (instead of the data tree that is just a copy of the mc tree)
 //    GenericToolbox::writeInTFile(
 //            GenericToolbox::mkdirTFile(calcXsecDir, "events"),
 //            *dataTree,
 //            GenericToolbox::generateCleanBranchName( (sample.getName()+"/Data_TTree").c_str() )
 //    );
-    for( size_t iHist = 0 ; iHist < nHist ; iHist++ ){ // this loop is over the variables to plot
+    LogErrorIf(mcTree == nullptr) << "Could not find mc tree for sample: " << sample.getName() << std::endl;
+
+    for (size_t iHist = 0; iHist < nHist; iHist++) { // this loop is over the variables to plot, as defined in the config file
       closureVariable closureVar;
       closureVar.samplePtr = &sample;
       closureVar.varToPlot = GenericToolbox::Json::fetchValue<std::string>(propagator.getPlotGenerator().getConfig().at("histogramsDefinition")[iHist], "varToPlot");
-      closureVar.binningFile = GenericToolbox::Json::fetchValue<std::string>(propagator.getPlotGenerator().getConfig().at("histogramsDefinition")[iHist], "binningFile");
+      bool useSampleBinning = GenericToolbox::Json::fetchValue<bool>(propagator.getPlotGenerator().getConfig().at("histogramsDefinition")[iHist], "useSampleBinning");
+      if (useSampleBinning) {
+        closureVar.binningFile = sample.getBinningFilePath();
+      }else {
+        closureVar.binningFile = GenericToolbox::Json::fetchValue<std::string>(propagator.getPlotGenerator().getConfig().at("histogramsDefinition")[iHist], "binningFile");
+      }
       closureVar.rescaleAsBinWidth = GenericToolbox::Json::fetchValue<bool>(propagator.getPlotGenerator().getConfig().at("histogramsDefinition")[iHist], "rescaleAsBinWidth");
-      LogInfo<< "Variable: " << closureVar.varToPlot << " | Sample: " << closureVar.samplePtr->getName() << " | Binning file: " << closureVar.binningFile << std::endl;
       // Generate the histogram (using the binning file defined in the plotGenerator)
       std::vector<double> binEdges;
       readBinningFromFile(closureVar.binningFile.c_str(), binEdges);
       closureVar.histogram = new TH1D(
               (closureVar.samplePtr->getName() + "_" + closureVar.varToPlot).c_str(),
-              (closureVar.samplePtr->getName() + " " + closureVar.varToPlot).c_str(),
+              (closureVar.samplePtr->getName() + " data ;" + closureVar.varToPlot).c_str(),
               binEdges.size() - 1,
               &binEdges[0]
-              );
+      );
+      closureVar.mcHistogram = new TH1D(
+              (closureVar.samplePtr->getName() + "_mc_" + closureVar.varToPlot).c_str(),
+              (closureVar.samplePtr->getName() + " mc ;" + closureVar.varToPlot).c_str(),
+              binEdges.size() - 1,
+              &binEdges[0]
+      );
+      closureVar.meanValueHistogram = new TH1D(
+              (closureVar.samplePtr->getName() + "_mean_" + closureVar.varToPlot).c_str(),
+              (closureVar.samplePtr->getName() + " mean of throws ;" + closureVar.varToPlot).c_str(),
+              binEdges.size() - 1,
+              &binEdges[0]
+      );
       // load the formula
-      for( int i = 0 ; i < propagator.getConfig()["dataSetList"][0]["mc"].at("overrideLeafDict").size() ; i++ ) {
+      for (int i = 0; i < propagator.getConfig()["dataSetList"][0]["mc"].at("overrideLeafDict").size(); i++) {
         std::string eventVar = propagator.getConfig()["dataSetList"][0]["mc"].at("overrideLeafDict")[i].at("eventVar");
-        if(eventVar == closureVar.varToPlot){
-          closureVar.variableFormula = propagator.getConfig()["dataSetList"][0]["mc"].at("overrideLeafDict")[i].at("leafVar");
+        if (eventVar == closureVar.varToPlot) {
+          closureVar.variableFormula = propagator.getConfig()["dataSetList"][0]["mc"].at("overrideLeafDict")[i].at(
+                  "leafVar");
           break;
         }
       }
-      // LogInfo<< "    Variable formula: " << closureVar.variableFormula << std::endl; // a bit verbose, do not print this
-      LogErrorIf(closureVar.variableFormula.empty())<<"Could not find leafVar for varToPlot: "<<closureVar.varToPlot<<std::endl;
-      // Fill the histogram
-      closureVar.canvas = new TCanvas( ("canvas_"+closureVar.varToPlot+"_"+GenericToolbox::generateCleanBranchName(sample.getName()) ).c_str(), ("canvas_"+closureVar.varToPlot+"_"+sample.getName()).c_str(), 800, 600);
-      closureVar.canvas->cd();
-      dataTree->Draw( ("("+closureVar.variableFormula+")>>"+closureVar.histogram->GetName()).c_str() , "Event.eventWeight","hist");
-
-      // rescale to bin width
-      if(closureVar.rescaleAsBinWidth){
-        for( int iBin = 0 ; iBin < closureVar.histogram->GetNbinsX() ; iBin++ ){
-          double binWidth = closureVar.histogram->GetBinWidth(iBin+1);
-          if (binWidth == 0) {
-            LogError << "Bin " << iBin << " has a width of 0. Skipping rescaling." << std::endl;
-            continue;
+      // Fill the mean value histogram
+      std::vector<double> meanValues(closureVar.meanValueHistogram->GetNbinsX(),0);
+      xsecThrowTree->GetListOfLeaves();
+      LogInfo << "Entries of throws tree: " << xsecThrowTree->GetEntries() << std::endl;
+      for (int iToy = 0; iToy < xsecThrowTree->GetEntries(); iToy++) {
+        xsecThrowTree->GetEntry(iToy);
+        // check that the number of leaves in the ttree is the same as the number of bins in the histogram
+        std::string branchName = GenericToolbox::generateCleanBranchName(sample.getName()).c_str();
+        TBranch *branch = xsecThrowTree->GetBranch(branchName.c_str());
+        int leavesInBranch = 0;
+        if (branch == nullptr) {
+          LogError << "Could not find branch for sample: "
+                   << GenericToolbox::generateCleanBranchName(sample.getName()).c_str() << std::endl;
+          return 1;
+        } else {
+          leavesInBranch = xsecThrowTree->GetBranch(
+                  GenericToolbox::generateCleanBranchName(sample.getName()).c_str())->GetListOfLeaves()->GetEntries();
+//          LogInfo << "The branch " << GenericToolbox::generateCleanBranchName(sample.getName()).c_str() << " has "
+//                  << leavesInBranch << " leaves." << std::endl;
+//          // print list of leaves:
+//          branch->GetListOfLeaves()->Print();
+        }
+        int binsInHistogram = closureVar.meanValueHistogram->GetNbinsX();
+        if (leavesInBranch != binsInHistogram) {
+          LogError << "Number of leaves in the tree (" << leavesInBranch
+                   << ") is different from the number of bins in the histogram (" << binsInHistogram << ")."
+                   << std::endl;
+          return 1;
+        } else {
+          for (int iBin = 0; iBin < binsInHistogram; iBin++) {
+            std::string leafName = Form("bin_%i", iBin);
+            TLeaf* leaf = (TLeaf*)branch->GetLeaf(leafName.c_str());
+            if (leaf == nullptr) {
+              LogError << "Could not find leaf named " << leafName << " in branch " << branchName << std::endl;
+              return 1;
+            } else {
+              double binContent = leaf->GetValue();
+              meanValues.at(iBin) += binContent;
+              if(iBin == 1){
+                LogInfo << "| Bin 1 content: " << binContent << std::endl;
+              }
+            }
           }
-          LogInfo<< "Bin " << iBin << " width: " << binWidth << " BinContent: "<< closureVar.histogram->GetBinContent(iBin+1) << std::endl;
-          closureVar.histogram->SetBinContent(iBin+1, closureVar.histogram->GetBinContent(iBin+1)/binWidth);
-          // closureVar.histogram->SetBinError(iBin+1, closureVar.histogram->GetBinError(iBin+1)/binWidth);
+        }
+      }
+      for (int iBin = 0; iBin < closureVar.meanValueHistogram->GetNbinsX(); iBin++) {
+        meanValues.at(iBin) /= xsecThrowTree->GetEntries();
+      }
+      for(int iBin=0;iBin<closureVar.meanValueHistogram->GetNbinsX();iBin++){
+        closureVar.meanValueHistogram->SetBinContent(iBin+1, (*meanValuesVector)[iBin]);
+      }
+      // LogInfo<< "    Variable formula: " << closureVar.variableFormula << std::endl; // a bit verbose, do not print this
+      LogErrorIf(closureVar.variableFormula.empty()) << "Could not find leafVar for varToPlot: " << closureVar.varToPlot
+                                                     << std::endl;
+      // Fill the histogram
+      closureVar.canvas = new TCanvas(("canvas_" + closureVar.varToPlot + "_" +
+                                       GenericToolbox::generateCleanBranchName(sample.getName())).c_str(),
+                                      ("canvas_" + closureVar.varToPlot + "_" + sample.getName()).c_str(), 800, 600);
+      closureVar.canvas->cd();
+      dataTree->Draw(("(" + closureVar.variableFormula + ")>>" + closureVar.histogram->GetName()).c_str(),
+                     "Event.eventWeight", "goff");
+      mcTree->Draw(("(" + closureVar.variableFormula + ")>>" + closureVar.mcHistogram->GetName()).c_str(),
+                   "Event.eventWeight", "goff");
+      // manually set the bin errors from the covariance matrix
+      LogInfo << "Variable: " << closureVar.varToPlot << " | Sample: " << closureVar.samplePtr->getName()
+              << " | Binning file: " << closureVar.binningFile << std::endl;
+      std::vector<std::string> binLabelList{};
+      std::vector<double> binErrorList{};
+      // find the error in the covariance matrix by looking for the sample anme and variable name in the bin labels
+      for (int iBinGlobal = 0; iBinGlobal < globalCovMatrixHist->GetNbinsX(); iBinGlobal++) {
+        std::string thisBinLabel = globalCovMatrixHist->GetXaxis()->GetBinLabel(iBinGlobal + 1);
+        if (thisBinLabel.find(closureVar.samplePtr->getName()) != std::string::npos and
+            thisBinLabel.find(closureVar.varToPlot) != std::string::npos) {
+          binLabelList.push_back(thisBinLabel);
+          binErrorList.push_back( sqrt(globalCovMatrixHist->GetBinContent(iBinGlobal + 1, iBinGlobal + 1)) );
+        }
+      }
+      if (binLabelList.size() != closureVar.histogram->GetNbinsX()) {
+        LogError << "Could not find the correct number of bin labels for sample: " << closureVar.samplePtr->getName()
+                 << " and variable: " << closureVar.varToPlot << " binlabelList.size: " << binLabelList.size() << " histogram binning.size: " << closureVar.histogram->GetNbinsX() << std::endl;
+        return 1;
+      } else {
+        for (int iBin = 0; iBin < closureVar.histogram->GetNbinsX(); iBin++) {
+          closureVar.histogram->SetBinError(iBin + 1, binErrorList[iBin]);
+          LogInfo << "Bin " << iBin << " width: " << closureVar.histogram->GetBinWidth(iBin + 1) << " BinContent: "
+                  << closureVar.histogram->GetBinContent(iBin + 1) << " BinError: "
+                  << closureVar.histogram->GetBinError(iBin + 1) << std::endl;
+          // rescale to bin width
+          if (closureVar.rescaleAsBinWidth) {
+            double binWidth = closureVar.histogram->GetBinWidth(iBin + 1);
+            if (binWidth == 0) {
+              LogError << "Bin " << iBin << " has a width of 0. Skipping rescaling." << std::endl;
+            } else {
+              closureVar.histogram->SetBinContent(iBin + 1,
+                                                  closureVar.histogram->GetBinContent(iBin + 1) / binWidth);
+              closureVar.mcHistogram->SetBinContent(iBin + 1,
+                                                    closureVar.mcHistogram->GetBinContent(iBin + 1) / binWidth);
+              closureVar.meanValueHistogram->SetBinContent(iBin + 1,
+                                                          closureVar.meanValueHistogram->GetBinContent(iBin + 1) / binWidth);
+              closureVar.mcHistogram->SetBinError(iBin + 1,
+                                                  closureVar.mcHistogram->GetBinError(iBin + 1) / binWidth );
+            }
+          }
         }
       }
       // cosmetics
@@ -861,11 +977,41 @@ int main(int argc, char** argv){
       closureVar.histogram->SetDrawOption("hist");
       closureVar.histogram->SetTitle( (closureVar.varToPlot+" for "+closureVar.samplePtr->getName()  ).c_str() );
       closureVar.histogram->GetXaxis()->SetTitle(closureVar.varToPlot.c_str());
+      closureVar.mcHistogram->DrawCopy("hist");
+      closureVar.mcHistogram->SetFillColor(kBlue);
+      closureVar.mcHistogram->SetFillStyle(3001);
+      closureVar.mcHistogram->Draw("e2 same");
+      closureVar.histogram->Draw("hist same");
+      closureVar.meanValueHistogram->SetMarkerStyle(kFullDotLarge);
+      closureVar.meanValueHistogram->SetMarkerColor(kBlack);
+      closureVar.meanValueHistogram->SetLineColor(kBlack);
+      closureVar.meanValueHistogram->Draw("hist same");
+      // legend
+      TLegend *legend = new TLegend(0.7, 0.7, 0.9, 0.9);
+      legend->AddEntry(closureVar.histogram, "Data", "l");
+      legend->AddEntry(closureVar.mcHistogram, "MC", "l");
+      legend->AddEntry(closureVar.meanValueHistogram, "Mean of throws", "l");
+      legend->Draw();
+
+
+      // save
       GenericToolbox::writeInTFile(
-              GenericToolbox::mkdirTFile(calcXsecDir, "plots/data_histograms"),
+              GenericToolbox::mkdirTFile(calcXsecDir, "plots/closure_histograms"),
               closureVar.histogram,
               GenericToolbox::generateCleanBranchName( "data_" + closureVar.varToPlot + "_" + sample.getName()  )
       );
+      GenericToolbox::writeInTFile(
+              GenericToolbox::mkdirTFile(calcXsecDir, "plots/closure_histograms"),
+              closureVar.mcHistogram,
+              GenericToolbox::generateCleanBranchName( "mc_" + closureVar.varToPlot + "_" + sample.getName()  )
+      );
+      GenericToolbox::writeInTFile(
+              GenericToolbox::mkdirTFile(calcXsecDir, "plots/closure_histograms"),
+              closureVar.canvas,
+              GenericToolbox::generateCleanBranchName( "overlay_" + closureVar.varToPlot + "_" + sample.getName()  )
+      );
+
+
       // Now generate, for each sample, a canvas with all the histograms: stack of all the MC with different reaction
       // codes generated before, and the data histogram just generated from the fitter output file
 
@@ -899,38 +1045,38 @@ int main(int argc, char** argv){
 //    LogInfo << "  isData? " << histHolder.isData << std::endl;
 //  }
 
-  LogInfo << "Generating canvases " << std::endl;
-  propagator.getPlotGenerator().generateCanvas(
-          propagator.getPlotGenerator().getHistHolderList(),
-          GenericToolbox::mkdirTFile(calcXsecDir, "plots/canvas")
-  );
+//  LogInfo << "Generating canvases " << std::endl;
+//  propagator.getPlotGenerator().generateCanvas(
+//          propagator.getPlotGenerator().getHistHolderList(),
+//          GenericToolbox::mkdirTFile(calcXsecDir, "plots/canvas")
+//  );
 
-
-  // overlay the data histograms on the MC histograms
-  for(auto closureVar : closureVarList) {
-    std::string cleanSampleName = GenericToolbox::generateCleanBranchName(closureVar.samplePtr->getName());
-    TCanvas * c_MC = (TCanvas*)(app.getOutfilePtr()->Get( ("calcXsec/plots/canvas/"+closureVar.varToPlot+"/ReactionCode/sample_"+cleanSampleName+"_TCanvas").c_str() ) );
-    if(!c_MC){
-      LogError << "Could not find canvas for variable: " << closureVar.varToPlot << " and sample: " << cleanSampleName << std::endl;
-      continue;
-    }else{
-      // change canvas name
-       c_MC->SetName( ("Closure_"+closureVar.varToPlot+"_"+cleanSampleName+"_TCanvas").c_str() );
-      c_MC->SetTitle( ("Closure_"+closureVar.varToPlot+"_"+cleanSampleName+"_TCanvas").c_str() );
-      LogInfo<<"Creating canvas: "<<c_MC->GetName()<<std::endl;
-      int nPads = c_MC->GetListOfPrimitives()->GetSize();
-//      c_MC->Draw("goff");
-      c_MC->cd(0);
-      closureVar.histogram->Draw("hist same");
-      c_MC->SaveAs(  "temp_"+TString(c_MC->GetTitle())+".png" );
-
-      GenericToolbox::writeInTFile(
-              GenericToolbox::mkdirTFile(calcXsecDir, "plots/canvas"),
-              c_MC,
-              GenericToolbox::generateCleanBranchName( c_MC->GetTitle() )
-      );
-    }
-  }
+//
+//  // overlay the data histograms on the MC histograms
+//  for(auto closureVar : closureVarList) {
+//    std::string cleanSampleName = GenericToolbox::generateCleanBranchName(closureVar.samplePtr->getName());
+//    TCanvas * c_MC = (TCanvas*)(app.getOutfilePtr()->Get( ("calcXsec/plots/canvas/"+closureVar.varToPlot+"/ReactionCode/sample_"+cleanSampleName+"_TCanvas").c_str() ) );
+//    if(!c_MC){
+//      LogError << "Could not find canvas for variable: " << closureVar.varToPlot << " and sample: " << cleanSampleName << std::endl;
+//      continue;
+//    }else{
+//      // change canvas name
+//       c_MC->SetName( ("Closure_"+closureVar.varToPlot+"_"+cleanSampleName+"_TCanvas").c_str() );
+//      c_MC->SetTitle( ("Closure_"+closureVar.varToPlot+"_"+cleanSampleName+"_TCanvas").c_str() );
+//      LogInfo<<"Creating canvas: "<<c_MC->GetName()<<std::endl;
+//      int nPads = c_MC->GetListOfPrimitives()->GetSize();
+////      c_MC->Draw("goff");
+//      c_MC->cd(0);
+//      closureVar.histogram->Draw("hist same");
+//      //c_MC->SaveAs(  "temp_"+TString(c_MC->GetTitle())+".png" );
+//
+//      GenericToolbox::writeInTFile(
+//              GenericToolbox::mkdirTFile(calcXsecDir, "plots/canvas"),
+//              c_MC,
+//              GenericToolbox::generateCleanBranchName( c_MC->GetTitle() )
+//      );
+//    }
+//  }
 
 
   LogInfo << "Writing event samples in TTrees..." << std::endl;
