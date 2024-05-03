@@ -700,7 +700,7 @@ int main(int argc, char** argv){
       }
 
       std::for_each(mcEvList.begin(), mcEvList.end(), [&]( Event &ev_) {
-        ev_.getWeights().current /= nToys;
+        //ev_.getWeights().current /= nToys;
         ev_.getWeights().current /= double(nEventInBin[ev_.getIndices().bin]);
       });
     }
@@ -714,7 +714,7 @@ int main(int argc, char** argv){
       }
 
       std::for_each(dataEvList.begin(), dataEvList.end(), [&]( Event &ev_) {
-        ev_.getWeights().current /= nToys;
+        //ev_.getWeights().current /= nToys;
         ev_.getWeights().current /= double(nEventInBin[ev_.getIndices().bin]);
       });
     }
@@ -922,8 +922,7 @@ int main(int argc, char** argv){
 //      c_MC->Draw("goff");
       c_MC->cd(0);
       closureVar.histogram->Draw("hist same");
-      c_MC->SaveAs("temporary.root"); // this one does not! (and also the canvas in the output file)
-      c_MC->SaveAs("temporary.png"); // this one works
+      c_MC->SaveAs(  "temp_"+TString(c_MC->GetTitle())+".png" );
 
       GenericToolbox::writeInTFile(
               GenericToolbox::mkdirTFile(calcXsecDir, "plots/canvas"),
