@@ -958,6 +958,8 @@ void DataDispenser::fillFunction(int iThread_){
 
     Int_t nBytes{ treeChain->GetEntry(iEntry) };
 
+    LogDebug << treeChain->GetLeaf("Pmu")->GetValue(0) << std::endl;
+
     // monitor
     if( iThread_ == 0 ){
       readSpeed.addQuantity(nBytes * nThreads);
