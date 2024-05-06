@@ -1000,6 +1000,8 @@ void DataDispenser::fillFunction(int iThread_){
       // No bin found -> next sample
       if( eventIndexingBuffer.getIndices().bin == -1){ break; }
 
+      LogDebug << eventIndexingBuffer.getSummary() << std::endl;
+
       // OK, now we have a valid fit bin. Let's claim an index.
       // Shared index among threads
       size_t sampleEventIndex{};
