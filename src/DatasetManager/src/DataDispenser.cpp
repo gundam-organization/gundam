@@ -927,6 +927,8 @@ void DataDispenser::fillFunction(int iThread_){
   std::string progressTitle = "Loading and indexing...";
   std::stringstream ssProgressBar;
 
+  treeChain->Print();
+
   for( Long64_t iEntry = bounds.beginIndex ; iEntry < bounds.endIndex; iEntry++ ){
 
     if( iThread_ == 0 ){
@@ -1001,6 +1003,7 @@ void DataDispenser::fillFunction(int iThread_){
       if( eventIndexingBuffer.getIndices().bin == -1){ break; }
 
       LogDebug << eventIndexingBuffer.getSummary() << std::endl;
+      exit(0);
 
       // OK, now we have a valid fit bin. Let's claim an index.
       // Shared index among threads
