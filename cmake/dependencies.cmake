@@ -91,10 +91,10 @@ execute_process(COMMAND root-config --has-cxx20 COMMAND grep yes
     OUTPUT_VARIABLE ROOT_cxx20_FOUND
     OUTPUT_STRIP_TRAILING_WHITESPACE)
 
-if (NOT ROOT_minuit2_FOUND)
-  cmessage( STATUS "[ROOT]:Rebuild root using -Dminuit2=on in the cmake command")
-  cmessage(FATAL_ERROR "[ROOT]: minuit2 is required")
-endif(NOT ROOT_minuit2_FOUND)
+#if (NOT ROOT_minuit2_FOUND)
+#  cmessage( STATUS "[ROOT]:Rebuild root using -Dminuit2=on in the cmake command")
+#  cmessage(FATAL_ERROR "[ROOT]: minuit2 is required")
+#endif(NOT ROOT_minuit2_FOUND)
 
 include_directories( ${ROOT_INCLUDE_DIR} )
 link_libraries( ${ROOT_LIBRARIES} )
