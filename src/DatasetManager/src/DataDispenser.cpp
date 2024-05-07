@@ -960,6 +960,7 @@ void DataDispenser::fillFunction(int iThread_){
 
     LogDebug << GET_VAR_NAME_VALUE(iEntry) << std::endl;
     LogDebug << GET_VAR_NAME_VALUE(nBytes) << std::endl;
+    LogDebug << GET_VAR_NAME_VALUE(treeChain->GetBranchStatus("Pmu")) << std::endl;
     LogDebug << GET_VAR_NAME_VALUE(treeChain->GetLeaf("Pmu")->GetValue(0)) << std::endl;
 
     // monitor
