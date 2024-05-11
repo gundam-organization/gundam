@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 #
 # Setup the GUNDAM directory for development (or simply
 # running the test).  This makes sure that the ROOT environment
@@ -20,6 +20,20 @@
 # cmake -DCMAKE_INSTALL_PREFIX=the-install-directory the-gundam-directory 
 # make
 # make install
+
+if [ "x${BASH_VERSION}" = "x" ]; then
+    echo
+    echo ERROR: Setup script requires bash.  The GUNDAM build can be hand
+    echo configured by setting the environment variables.
+    echo
+    echo GUNDAM_ROOT   -- The root for the gundam source
+    echo GUNDAM_BUILD  -- The location for the build
+    echo GUNDAM_INSTALL -- The location to install gundam - defaults to build
+    echo GUNDAM_JOBS    -- Number of jobs to use during build
+    echo GUNDAM_CMAKE_DEFINES -- Location specific cmake arguments
+    echo
+    return
+fi
 
 echo Setup gundam for development and building
 
@@ -60,11 +74,22 @@ fi
 
 ___gundam_target () {
     target="gundam"
-    compiler=gcc
+    if [ ${#GUNDAM_COMPILER} -gt 0 ]; then
+        echo Using ${GUNDAM_COMPILER}
+        compler=${GUNDAM_COMPILER}
+    elif which gcc >& /dev/null ; then
+        compiler=gcc
+    elif which clang >& /dev/null; then
+        compiler=clang
+    fi
     case ${compiler} in
         gcc)
             compiler_version=$(gcc -dumpversion)
             compiler_machine=$(gcc -dumpmachine)
+            ;;
+        clang)
+            compiler_version=$(clang -dumpversion)
+            compiler_machine=$(clang -dumpmachine)
             ;;
         *)
             compiler_version=unknown
