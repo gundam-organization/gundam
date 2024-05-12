@@ -153,6 +153,7 @@ bool Cache::Manager::Build( SampleSet& sampleList,
     /// Find the amount of space needed for the cache.
     std::set<const Parameter*> usedParameters;
 
+    int dialErrorCount = 0;
     std::map<std::string, int> useCount;
     for (EventDialCache::CacheEntry& elem : eventDials.getCache()) {
         if (elem.event->getIndices().bin < 0) {
@@ -199,12 +200,19 @@ bool Cache::Manager::Build( SampleSet& sampleList,
                 ++shifts;
             }
             else {
-                LogError << "Unsupported dial type in CacheManager -- "
+                LogError << "Unsupported dial type -- "
                           << dialType
                           << std::endl;
-                // throw std::runtime_error("unsupported dial");
+                ++dialErrorCount;
             }
         }
+    }
+
+    if (dialErrorCount > 0) {
+        LogError << "Dial creation errors: "
+                 << dialErrorCount
+                 << std::endl;
+        throw std::runtime_error("Unsupported dial type: Incomplete dial implementation");
     }
 
     // Count the total number of histogram cells.
@@ -371,6 +379,7 @@ bool Cache::Manager::Update( SampleSet& sampleList,
         // Get the initial value for this event and save it.
         double initialEventWeight = event.getWeights().base;
 
+        int dialErrorCount = 0;
         // Add each dial for the event to the GPU caches.
         for( auto& dialElem : elem.dialResponseCacheList ){
             DialInputBuffer* dialInputs = dialElem.dialInterface.getInputBufferRef();
@@ -499,11 +508,18 @@ bool Cache::Manager::Update( SampleSet& sampleList,
             if (dialUsed != 1) {
                 LogError << "Problem with dial: " << dialUsed
                           << std::endl;
-                LogError << "Dial Type Name: "
+                LogError << "Unsupported Dial Type Name: "
                           << baseDial->getDialTypeName()
                           << std::endl;
-                // std::runtime_error("Dial use problem");
+                ++dialErrorCount;
             }
+        }
+
+        if (dialErrorCount > 0) {
+            LogError << "Dial creation errors --"
+                     << " Unsupported dial types: " << dialErrorCount
+                     << std::endl;
+            throw std::runtime_error("Unsupported dial type: Incomplete dial implementation");
         }
 
         // Set the initial weight for the event.  This is done here since the
