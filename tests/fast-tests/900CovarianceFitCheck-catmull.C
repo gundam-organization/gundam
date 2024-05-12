@@ -116,7 +116,7 @@ int main() {
     TOLERANCE("Check HESSE value for #0_norm_A",
               postFitErrorsHesse->GetBinContent(1), 1.01026268, tolerance);
     TOLERANCE("Check variance for #0_norm_A",
-              (*covariance)(0,0), 1.47099577e-04, tolerance);
+              (*covariance)(0,0), 1.470995770e-04, tolerance);
 
     TOLERANCE("Check HESSE value for #1_norm_B",
               postFitErrorsHesse->GetBinContent(2), 9.74959268e-01, tolerance);
