@@ -39,11 +39,13 @@ Cache::Weight::Normalization::Normalization(
         // are copied once during initialization so do not pin the CPU memory
         // into the page set.
         fNormResult.reset(new hemi::Array<int>(GetNormsReserved(),false));
+        LogThrowIf(not fNormResult, "Bad NormResult Alloc");
         fNormParameter.reset(new hemi::Array<short>(GetNormsReserved(),false));
+        LogThrowIf(not fNormParameter, "Bad NormParameter Alloc");
     }
-    catch (std::bad_alloc&) {
-        LogError << "Failed to allocate memory, so stopping" << std::endl;
-        throw std::runtime_error("Not enough memory available");
+    catch (...) {
+        LogError << "Uncaught exception, so stopping" << std::endl;
+        LogThrow("WeightNormalization -- Uncaught exception");
     }
 
     Reset();
@@ -57,22 +59,22 @@ int Cache::Weight::Normalization::ReserveNorm(int resIndex, int parIndex) {
     if (resIndex < 0) {
         LogError << "Invalid result index"
                << std::endl;
-        throw std::runtime_error("Negative result index");
+        LogThrow("Negative result index");
     }
     if (fWeights.size() <= resIndex) {
         LogError << "Invalid result index"
                << std::endl;
-        throw std::runtime_error("Result index out of bounds");
+        LogThrow("Result index out of bounds");
     }
     if (parIndex < 0) {
         LogError << "Invalid parameter index"
                << std::endl;
-        throw std::runtime_error("Negative parameter index");
+        LogThrow("Negative parameter index");
     }
     if (fParameters.size() <= parIndex) {
         LogError << "Invalid parameter index"
                << std::endl;
-        throw std::runtime_error("Parameter index out of bounds");
+        LogThrow("Parameter index out of bounds");
     }
     int newIndex = fNormsUsed++;
     if (fNormsUsed > fNormsReserved) {
@@ -80,7 +82,7 @@ int Cache::Weight::Normalization::ReserveNorm(int resIndex, int parIndex) {
                  << " Reserved: " << fNormsReserved
                  << " Requested: " << fNormsUsed
                  << std::endl;
-        throw std::runtime_error("Not enough space reserved for results");
+        LogThrow("Not enough space reserved for results");
     }
     fNormResult->hostPtr()[newIndex] = resIndex;
     fNormParameter->hostPtr()[newIndex] = parIndex;
