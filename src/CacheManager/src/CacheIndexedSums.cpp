@@ -20,8 +20,8 @@ LoggerInit([]{
 Cache::IndexedSums::IndexedSums(Cache::Weights::Results& inputs,
                                 std::size_t bins)
     : fEventWeights(inputs) {
-    if (inputs.size()<1) throw std::runtime_error("No bins to sum");
-    if (bins<1) throw std::runtime_error("No bins to sum");
+    LogThrowIf((inputs.size()<1), "No bins to sum");
+    LogThrowIf((bins<1), "No bins to sum");
 
     LogInfo << "Cached IndexedSums -- bins reserved: "
            << bins
@@ -39,13 +39,20 @@ Cache::IndexedSums::IndexedSums(Cache::Weights::Results& inputs,
         // set.  The initial values are seldom changed, so they are not
         // pinned.
         fSums = std::make_unique<hemi::Array<double>>(bins,true);
+        LogThrowIf(not fSums, "Bad Sums Alloc");
         fSums2 = std::make_unique<hemi::Array<double>>(bins,true);
+        LogThrowIf(not fSums2, "Bad Sums2 Alloc");
         fIndexes = std::make_unique<hemi::Array<short>>(fEventWeights.size(),false);
+        LogThrowIf(not fIndexes, "Bad IndexesAlloc");
 
     }
     catch (std::bad_alloc&) {
         LogError << "Failed to allocate memory, so stopping" << std::endl;
-        throw std::runtime_error("Not enough memory available");
+        LogThrow("Failed to allocate memory -- not enough memory available");
+    }
+    catch (...) {
+        LogError << "Uncaught exception, so stopping" << std::endl;
+        LogThrow("Uncaught exception -- not enough memory available");
     }
 
     // Place the cache into a default state.
@@ -72,16 +79,16 @@ void Cache::IndexedSums::Reset() {
 }
 
 void Cache::IndexedSums::SetEventIndex(int event, int bin) {
-    if (event < 0) throw;
-    if (fEventWeights.size() <= event) throw;
-    if (bin < 0) throw;
-    if (fSums->size() <= bin) throw;
+    LogThrowIf((event < 0), "Event index out of range");
+    LogThrowIf((fEventWeights.size() <= event), "Event index out of range");
+    LogThrowIf((bin<0), "Bin is out of range");
+    LogThrowIf((fSums->size() <= bin), "Bin is out of range");
     fIndexes->hostPtr()[event] = bin;
 }
 
 double Cache::IndexedSums::GetSum(int i) {
-    if (i < 0) throw;
-    if (fSums->size() <= i) throw;
+    LogThrowIf(i<0, "Sum index out of range");
+    LogThrowIf((fSums->size() <= i), "Sum index out of range");
     // This odd ordering is to make sure the thread-safe hostPtr update
     // finishes before the sum is set to be valid.  The use of isfinite is to
     // make sure that the optimizer doesn't reorder the statements.
@@ -91,8 +98,8 @@ double Cache::IndexedSums::GetSum(int i) {
 }
 
 double Cache::IndexedSums::GetSum2(int i) {
-    if (i < 0) throw;
-    if (fSums2->size() <= i) throw;
+    LogThrowIf((i<0), "Sum2 index out of range");
+    LogThrowIf((fSums2->size()<= i), "Sum2 index out of range");
     // This odd ordering is to make sure the thread-safe hostPtr update
     // finishes before the sum is set to be valid.  The use of isfinite is to
     // make sure that the optimizer doesn't reorder the statements.
