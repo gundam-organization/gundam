@@ -58,7 +58,7 @@ Cache::Weight::UniformSpline::UniformSpline(
     LogInfo << "Reserved " << GetName()
             << " Spline Knots: " << GetSplineSpaceReserved()
             << std::endl;
-    fTotalBytes += GetSplineSpaceReserved()*sizeof(WEIGHT_BUFFER_FLOAT);  // fSpineKnots
+    fTotalBytes += GetSplineSpaceReserved()*sizeof(WEIGHT_BUFFER_FLOAT);  // fSplineKnots
 
     LogInfo << "Approximate Memory Size for " << GetName()
             << ": " << fTotalBytes/1E+9
@@ -69,15 +69,19 @@ Cache::Weight::UniformSpline::UniformSpline(
         // copied once during initialization so do not pin the CPU memory into
         // the page set.
         fSplineResult.reset(new hemi::Array<int>(GetSplinesReserved(),false));
+        LogThrowIf(not fSplineResult, "Bad SplineResult alloc");
         fSplineParameter.reset(
             new hemi::Array<short>(GetSplinesReserved(),false));
+        LogThrowIf(not fSplineParameter, "Bad SplineParameter alloc");
         fSplineIndex.reset(new hemi::Array<int>(1+GetSplinesReserved(),false));
+        LogThrowIf(not fSplineIndex, "Bad SplineIndex alloc");
 
 #ifdef CACHE_MANAGER_SLOW_VALIDATION
 #warning Using SLOW VALIDATION in Cache::Weight::UniformSpline::UniformSpline
         // Add validation code for the spline calculation.  This can be rather
         // slow, so do not use if it is not required.
         fSplineValue.reset(new hemi::Array<double>(GetSplinesReserved(),true));
+        LogThrowIf(not fSplineValue, "Bad SplineValue alloc");
 #endif
 
         // Get the CPU/GPU memory for the spline knots.  This is copied once
@@ -85,10 +89,11 @@ Cache::Weight::UniformSpline::UniformSpline(
         // set.
         fSplineSpace.reset(
             new hemi::Array<WEIGHT_BUFFER_FLOAT>(GetSplineSpaceReserved(),false));
+        LogThrowIf(not fSplineSpace, "Bad SplineSpace alloc");
     }
-    catch (std::bad_alloc&) {
-        LogError << "Failed to allocate memory, so stopping" << std::endl;
-        throw std::runtime_error("Not enough memory available");
+    catch (...) {
+        LogError << "Uncaught exception, so stopping" << std::endl;
+        LogThrow("WeightUniformSpline -- Uncaught exception");
     }
 
     // Initialize the caches.  Don't try to zero everything since the
@@ -109,41 +114,41 @@ void Cache::Weight::UniformSpline::AddSpline(int resIndex, int parIndex,
     if (resIndex < 0) {
         LogError << "Invalid result index"
                << std::endl;
-        throw std::runtime_error("Negative result index");
+        LogThrow("Negative result index");
     }
     if (fWeights.size() <= resIndex) {
         LogError << "Invalid result index"
                << std::endl;
-        throw std::runtime_error("Result index out of bounds");
+        LogThrow("Result index out of bounds");
     }
     if (parIndex < 0) {
         LogError << "Invalid parameter index"
                << std::endl;
-        throw std::runtime_error("Negative parameter index");
+        LogThrow("Negative parameter index");
     }
     if (fParameters.size() <= parIndex) {
         LogError << "Invalid parameter index"
                << std::endl;
-        throw std::runtime_error("Parameter index out of bounds");
+        LogThrow("Parameter index out of bounds");
     }
     int points = splineData.size();
     if (points < 8) {
         LogError << "Insufficient points in spline"
                << std::endl;
-        throw std::runtime_error("Invalid number of spline points");
+        LogThrow("Invalid number of spline points");
     }
     int newIndex = fSplinesUsed++;
     if (fSplinesUsed > fSplinesReserved) {
         LogError << "Not enough space reserved for splines"
                   << std::endl;
-        throw std::runtime_error("Not enough space reserved for splines");
+        LogThrow("Not enough space reserved for splines");
     }
     fSplineResult->hostPtr()[newIndex] = resIndex;
     fSplineParameter->hostPtr()[newIndex] = parIndex;
     if (fSplineIndex->hostPtr()[newIndex] != fSplineSpaceUsed) {
         LogError << "Last spline knot index should be at old end of splines"
                   << std::endl;
-        throw std::runtime_error("Problem with control indices");
+        LogThrow("Problem with control indices");
     }
     int knotIndex = fSplineSpaceUsed;
     fSplineSpaceUsed += points;
@@ -152,7 +157,7 @@ void Cache::Weight::UniformSpline::AddSpline(int resIndex, int parIndex,
                  << " -> SplineSpaceReserved = " << fSplineSpaceReserved
                  << " / SplineSpaceUsed = " << fSplineSpaceUsed
                  << std::endl;
-        throw std::runtime_error("Not enough space reserved for spline knots");
+        LogThrow("Not enough space reserved for spline knots");
     }
     fSplineIndex->hostPtr()[newIndex+1] = fSplineSpaceUsed;
     for (std::size_t i = 0; i<splineData.size(); ++i) {
@@ -163,10 +168,10 @@ void Cache::Weight::UniformSpline::AddSpline(int resIndex, int parIndex,
 
 int Cache::Weight::UniformSpline::GetSplineParameterIndex(int sIndex) {
     if (sIndex < 0) {
-        throw std::runtime_error("Spline index invalid");
+        LogThrow("Spline index invalid");
     }
     if (GetSplinesUsed() <= sIndex) {
-        throw std::runtime_error("Spline index invalid");
+        LogThrow("Spline index invalid");
     }
     return fSplineParameter->hostPtr()[sIndex];
 }
@@ -174,20 +179,20 @@ int Cache::Weight::UniformSpline::GetSplineParameterIndex(int sIndex) {
 double Cache::Weight::UniformSpline::GetSplineParameter(int sIndex) {
     int i = GetSplineParameterIndex(sIndex);
     if (i<0) {
-        throw std::runtime_error("Spine parameter index out of bounds");
+        LogThrow("Spline parameter index out of bounds");
     }
     if (fParameters.size() <= i) {
-        throw std::runtime_error("Spine parameter index out of bounds");
+        LogThrow("Spline parameter index out of bounds");
     }
     return fParameters.hostPtr()[i];
 }
 
 int Cache::Weight::UniformSpline::GetSplineKnotCount(int sIndex) {
     if (sIndex < 0) {
-        throw std::runtime_error("Spline index invalid");
+        LogThrow("Spline index invalid");
     }
     if (GetSplinesUsed() <= sIndex) {
-        throw std::runtime_error("Spline index invalid");
+        LogThrow("Spline index invalid");
     }
     int k = fSplineIndex->hostPtr()[sIndex+1]-fSplineIndex->hostPtr()[sIndex]-2;
     return k/2;
@@ -195,10 +200,10 @@ int Cache::Weight::UniformSpline::GetSplineKnotCount(int sIndex) {
 
 double Cache::Weight::UniformSpline::GetSplineLowerBound(int sIndex) {
     if (sIndex < 0) {
-        throw std::runtime_error("Spline index invalid");
+        LogThrow("Spline index invalid");
     }
     if (GetSplinesUsed() <= sIndex) {
-        throw std::runtime_error("Spline index invalid");
+        LogThrow("Spline index invalid");
     }
     int knotsIndex = fSplineIndex->hostPtr()[sIndex];
     return fSplineSpace->hostPtr()[knotsIndex];
@@ -206,10 +211,10 @@ double Cache::Weight::UniformSpline::GetSplineLowerBound(int sIndex) {
 
 double Cache::Weight::UniformSpline::GetSplineUpperBound(int sIndex) {
     if (sIndex < 0) {
-        throw std::runtime_error("Spline index invalid");
+        LogThrow("Spline index invalid");
     }
     if (GetSplinesUsed() <= sIndex) {
-        throw std::runtime_error("Spline index invalid");
+        LogThrow("Spline index invalid");
     }
     int knotCount = GetSplineKnotCount(sIndex);
     double lower = GetSplineLowerBound(sIndex);
@@ -221,10 +226,10 @@ double Cache::Weight::UniformSpline::GetSplineUpperBound(int sIndex) {
 double Cache::Weight::UniformSpline::GetSplineLowerClamp(int sIndex) {
     int i = GetSplineParameterIndex(sIndex);
     if (i<0) {
-        throw std::runtime_error("Spine lower clamp index out of bounds");
+        LogThrow("Spline lower clamp index out of bounds");
     }
     if (fLowerClamp.size() <= i) {
-        throw std::runtime_error("Spine lower clamp index out of bounds");
+        LogThrow("Spline lower clamp index out of bounds");
     }
     return fLowerClamp.hostPtr()[i];
 }
@@ -232,46 +237,46 @@ double Cache::Weight::UniformSpline::GetSplineLowerClamp(int sIndex) {
 double Cache::Weight::UniformSpline::GetSplineUpperClamp(int sIndex) {
     int i = GetSplineParameterIndex(sIndex);
     if (i<0) {
-        throw std::runtime_error("Spine upper clamp index out of bounds");
+        LogThrow("Spline upper clamp index out of bounds");
     }
     if (fUpperClamp.size() <= i) {
-        throw std::runtime_error("Spine upper clamp index out of bounds");
+        LogThrow("Spline upper clamp index out of bounds");
     }
     return fUpperClamp.hostPtr()[i];
 }
 
 double Cache::Weight::UniformSpline::GetSplineKnotValue(int sIndex, int knot) {
     if (sIndex < 0) {
-        throw std::runtime_error("Spline index invalid");
+        LogThrow("Spline index invalid");
     }
     if (GetSplinesUsed() <= sIndex) {
-        throw std::runtime_error("Spline index invalid");
+        LogThrow("Spline index invalid");
     }
     int knotsIndex = fSplineIndex->hostPtr()[sIndex];
     int count = GetSplineKnotCount(sIndex);
     if (knot < 0) {
-        throw std::runtime_error("Knot index invalid");
+        LogThrow("Knot index invalid");
     }
     if (count <= knot) {
-        throw std::runtime_error("Knot index invalid");
+        LogThrow("Knot index invalid");
     }
     return fSplineSpace->hostPtr()[knotsIndex+2+2*knot];
 }
 
 double Cache::Weight::UniformSpline::GetSplineKnotSlope(int sIndex, int knot) {
     if (sIndex < 0) {
-        throw std::runtime_error("Spline index invalid");
+        LogThrow("Spline index invalid");
     }
     if (GetSplinesUsed() <= sIndex) {
-        throw std::runtime_error("Spline index invalid");
+        LogThrow("Spline index invalid");
     }
     int knotsIndex = fSplineIndex->hostPtr()[sIndex];
     int count = GetSplineKnotCount(sIndex);
     if (knot < 0) {
-        throw std::runtime_error("Knot index invalid");
+        LogThrow("Knot index invalid");
     }
     if (count <= knot) {
-        throw std::runtime_error("Knot index invalid");
+        LogThrow("Knot index invalid");
     }
     return fSplineSpace->hostPtr()[knotsIndex+2+2*knot+1];
 }
@@ -289,10 +294,10 @@ double Cache::Weight::UniformSpline::GetSplineKnotSlope(int sIndex, int knot) {
 // use this method."
 double* Cache::Weight::UniformSpline::GetCachePointer(int sIndex) {
     if (sIndex < 0) {
-        throw std::runtime_error("GetSplineValue: Spline index invalid");
+        LogThrow("GetSplineValue: Spline index invalid");
     }
     if (GetSplinesUsed() <= sIndex) {
-        throw std::runtime_error("GetSplineValue: Spline index invalid");
+        LogThrow("GetSplineValue: Spline index invalid");
     }
     // This can trigger a *slow* copy of the spline values from the GPU to the
     // CPU.
@@ -402,7 +407,7 @@ bool Cache::Weight::UniformSpline::Apply() {
         );
 
 #ifdef CACHE_MANAGER_SLOW_VALIDATION
-#warning Using SLOW VALIDATION and copying spine values
+#warning Using SLOW VALIDATION and copying spline values
     fSplineValue->hostPtr();
 #endif
 
