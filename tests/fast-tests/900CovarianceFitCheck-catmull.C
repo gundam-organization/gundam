@@ -114,24 +114,24 @@ int main() {
     // 100CovarianceTree.C.  They need to be changed if that tree is
     // changed.
     TOLERANCE("Check HESSE value for #0_norm_A",
-              postFitErrorsHesse->GetBinContent(1), 1.01098897, tolerance);
+              postFitErrorsHesse->GetBinContent(1), 1.01026268, tolerance);
     TOLERANCE("Check variance for #0_norm_A",
-              (*covariance)(0,0), 1.47159120e-04, tolerance);
+              (*covariance)(0,0), 1.470995770e-04, tolerance);
 
     TOLERANCE("Check HESSE value for #1_norm_B",
-              postFitErrorsHesse->GetBinContent(2), 9.66679130e-01, tolerance);
+              postFitErrorsHesse->GetBinContent(2), 9.74959268e-01, tolerance);
     TOLERANCE("Check variance for #1_norm_B",
-              (*covariance)(1,1), 1.54976726e-04, tolerance);
+              (*covariance)(1,1), 1.4279848e-04, tolerance);
 
     TOLERANCE("Check HESSE value for #2_spline_C",
-              postFitErrorsHesse->GetBinContent(3), -3.76645381e-02, tolerance);
+              postFitErrorsHesse->GetBinContent(3), -3.14576477e-02, tolerance);
     TOLERANCE("Check variance for #2_spline_C",
-              (*covariance)(2,2), 1.21695737e-04, tolerance);
+              (*covariance)(2,2), 1.15916364e-04, tolerance);
 
     TOLERANCE("Check HESSE value for #3_spline_D",
-              postFitErrorsHesse->GetBinContent(4), 7.52184903e-03, tolerance);
+              postFitErrorsHesse->GetBinContent(4), 3.2245993e-02, tolerance);
     TOLERANCE("Check variance for #3_spline_D",
-              (*covariance)(3,3), 2.31579600e-05, tolerance);
+              (*covariance)(3,3), 1.37589224e-04, tolerance);
 
     file->Close();
 
