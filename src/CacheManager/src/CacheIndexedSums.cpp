@@ -46,10 +46,6 @@ Cache::IndexedSums::IndexedSums(Cache::Weights::Results& inputs,
         LogThrowIf(not fIndexes, "Bad IndexesAlloc");
 
     }
-    catch (std::bad_alloc&) {
-        LogError << "Failed to allocate memory, so stopping" << std::endl;
-        LogThrow("Failed to allocate memory -- not enough memory available");
-    }
     catch (...) {
         LogError << "Uncaught exception, so stopping" << std::endl;
         LogThrow("Uncaught exception -- not enough memory available");
