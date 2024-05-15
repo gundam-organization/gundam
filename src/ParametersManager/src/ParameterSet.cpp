@@ -62,7 +62,7 @@ void ParameterSet::readConfigImpl(){
       auto eigenLimits = GenericToolbox::Json::fetchValue(_config_, "eigenParBounds", nlohmann::json());
       _eigenParBounds_.first = GenericToolbox::Json::fetchValue(eigenLimits, "minValue", _eigenParBounds_.first);
       _eigenParBounds_.second = GenericToolbox::Json::fetchValue(eigenLimits, "maxValue", _eigenParBounds_.second);
-      LogInfo << "Using eigen parameter limits: [ " << _eigenParBounds_.first << ", " << _eigenParBounds_.first << "]" << std::endl;
+      LogInfo << "Using eigen parameter limits: [ " << _eigenParBounds_.first << ", " << _eigenParBounds_.second << "]" << std::endl;
     }
 
     _devUseParLimitsOnEigen_ = GenericToolbox::Json::fetchValue(_config_, "devUseParLimitsOnEigen", _devUseParLimitsOnEigen_);
@@ -968,5 +968,3 @@ void ParameterSet::fillDeltaParameterList(){
     }
   }
 }
-
-
