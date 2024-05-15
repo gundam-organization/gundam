@@ -43,9 +43,9 @@ Cache::IndexedSums::IndexedSums(Cache::Weights::Results& inputs,
         fIndexes = std::make_unique<hemi::Array<short>>(fEventWeights.size(),false);
 
     }
-    catch (std::bad_alloc&) {
-        LogError << "Failed to allocate memory, so stopping" << std::endl;
-        throw std::runtime_error("Not enough memory available");
+    catch (...) {
+        LogError << "Uncaught exception, so stopping" << std::endl;
+        LogThrow("Uncaught exception -- not enough memory available");
     }
 
     // Place the cache into a default state.

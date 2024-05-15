@@ -82,7 +82,6 @@ double Cache::Parameters::GetParameter(int parIdx) const {
 
 void Cache::Parameters::SetParameter(int parIdx, double value) {
     LogThrowIf((parIdx < 0), "Parameter index out of range");
-    if (GetParameterCount() <= parIdx) throw;
     LogThrowIf((GetParameterCount() <= parIdx), "Parameter index out of range");
     double lm = fLowerMirror->at(parIdx);
     double um = fUpperMirror->at(parIdx);
