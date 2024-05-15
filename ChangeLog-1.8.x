@@ -1,5 +1,7 @@
 Fixes relative to 1.8.2
 
+Issue #508 : Improve error checking for Cache::Manager.  This makes sure that LogThrow is preferred to std::runtime_error.  There is an issue filed for simple-cpp-logger to make sure that the output is flushed before throwing, so that should make the error output much more readable.
+
 Issue #502 : Update the validation code.  A validation failure caused by the recent corrections to the monotonic spline calculation (#486 and $494) has been fixed.  The expected result has been updated.  Unit testing with GoogleTest has been added and used for the HEMI GPU interface code.  Further tests are being implemented.  
 
 Issue #492 : Fix compiler warnings from NVCC.  This is removing some unused variables.  It also fixes a "fix" that applied some correct C++ conventions to code that is aimed at the GPU (the fix produces inefficient code on a SIMD processor, and was primarily aesthetic.
