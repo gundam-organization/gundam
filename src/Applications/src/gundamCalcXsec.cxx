@@ -515,10 +515,12 @@ int main(int argc, char** argv){
 
   auto writeBinDataFct = std::function<void()>([&]{
     for( auto& xsec : crossSectionDataList ){
-
+      LogInfo << xsec.samplePtr->getName() << std::endl;
       xsec.branchBinsData.resetCurrentByteOffset();
       for( int iBin = 0 ; iBin < xsec.samplePtr->getMcContainer().getHistogram().nBins ; iBin++ ){
         double binData{ xsec.samplePtr->getMcContainer().getHistogram().binList[iBin].content };
+
+//        LogInfo << iBin <<" Before norm: "<< binData << std::endl;
 
         // special re-norm
         for( auto& normData : xsec.normList ){
@@ -536,7 +538,6 @@ int main(int argc, char** argv){
               }
             }
             LogThrowIf(parSetNormPtr == nullptr, "Could not find parSetNorm obj with name: " << normData.parSetNormaliserName);
-
             binData /= parSetNormPtr->getNormFactor();
           }
         }
@@ -546,7 +547,7 @@ int main(int argc, char** argv){
           auto& mcEvList{xsec.samplePtr->getMcContainer().getEventList()};
           std::for_each(mcEvList.begin(), mcEvList.end(), [&]( Event& ev_){
             if( iBin != ev_.getIndices().bin ){ return; }
-            ev_.getWeights().current += binData;
+              ev_.getWeights().current += binData;
           });
         }
 
@@ -555,7 +556,7 @@ int main(int argc, char** argv){
           auto& dataEvList{xsec.samplePtr->getDataContainer().getEventList()};
           std::for_each(dataEvList.begin(), dataEvList.end(), [&]( Event& ev_){
             if( iBin != ev_.getIndices().bin ){ return; }
-            ev_.getWeights().current = binData;
+            //ev_.getWeights().current = binData;
           });
         }
 
@@ -576,6 +577,7 @@ int main(int argc, char** argv){
 
         binData /= binVolume;
         xsec.branchBinsData.writeRawData( binData );
+//        LogInfo <<  iBin << " After bin volume norm: "<< binData << " bin volume: "<< binVolume << std::endl;
       }
     }
   });
@@ -584,7 +586,16 @@ int main(int argc, char** argv){
     LogWarning << "Calculating weight at best-fit" << std::endl;
     for( auto& parSet : propagator.getParametersManager().getParameterSetsList() ){ parSet.moveParametersToPrior(); }
     propagator.propagateParameters();
+    // Print parameters at best-fit
+//    for( auto& parSet : propagator.getParametersManager().getParameterSetsList() ){
+//      LogInfo << "Best-fit parameters for " << parSet.getName() << ": " << std::endl;
+//      for( auto& par : parSet.getParameterList() ){
+//        LogInfo << par.getName() << " = " << par.getParameterValue() << std::endl;
+//      }
+//    }
+//    LogInfo << "AT BEST FIT" << std::endl;
     writeBinDataFct();
+
     xsecAtBestFitTree->Fill();
     GenericToolbox::writeInTFile( GenericToolbox::mkdirTFile(calcXsecDir, "throws"), xsecAtBestFitTree );
   }
@@ -605,6 +616,10 @@ int main(int argc, char** argv){
     propagator.getParametersManager().throwParametersFromGlobalCovariance();
     propagator.propagateParameters();
 
+    // print info about the throw
+    if( iToy == 0 ){
+      LogInfo << "First throw: " << std::endl;
+    }
 
     // disable stats throw
 //    if( enableStatThrowInToys ){
@@ -619,6 +634,9 @@ int main(int argc, char** argv){
 //    }
 
     writeBinDataFct();
+
+
+
 
     // Write the branches
     xsecThrowTree->Fill();
@@ -907,9 +925,7 @@ int main(int argc, char** argv){
             } else {
               double binContent = leaf->GetValue();
               meanValues.at(iBin) += binContent;
-              if(iBin == 1){
-                LogInfo << "| Bin 1 content: " << binContent << std::endl;
-              }
+
             }
           }
         }
