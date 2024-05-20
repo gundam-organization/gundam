@@ -67,19 +67,19 @@ double Cache::Weights::GetResult(int i) {
     LogThrowIf((i<0), "Index out of range");
     LogThrowIf((GetResultCount() <= i), "Index out of range");
     // This odd ordering is to make sure the thread-safe hostPtr update
-    // finishes before the result is set to be valid.  The use of isfinite is
+    // finishes before the result is set to be valid.  The use of isnan is
     // to make sure that the optimizer doesn't reorder the statements.
     double value = fResults->hostPtr()[i];
-    if (std::isfinite(value)) fResultsValid = true;
+    if (std::isnan(value)) fResultsValid = true;
     return value;
 }
 
 double Cache::Weights::GetResultFast(int i) {
     // This odd ordering is to make sure the thread-safe hostPtr update
-    // finishes before the result is set to be valid.  The use of isfinite is
+    // finishes before the result is set to be valid.  The use of isnan is
     // to make sure that the optimizer doesn't reorder the statements.
     double value = fResults->hostPtr()[i];
-    if (std::isfinite(value)) fResultsValid = true;
+    if (std::isnan(value)) fResultsValid = true;
     return value;
 }
 
