@@ -1,5 +1,10 @@
 #include "Logger.h"
 
+// Check if global variables need to be defined.
+#ifndef __cpp_inline_variables
+#define HEMI_COMPILE_DEFINITIONS
+#endif
+
 #include "CacheManager.h"
 #include "CacheParameters.h"
 #include "CacheWeights.h"
