@@ -199,19 +199,18 @@ namespace JointProbability{
     }
 
     if (not std::isfinite(chisq)) [[unlikely]] {
-      LogError << "Infinite chi2: " << chisq << std::endl
-               << " bin " << bin_
-               << GET_VAR_NAME_VALUE(predVal) << std::endl
-               << GET_VAR_NAME_VALUE(dataVal) << std::endl
-               << GET_VAR_NAME_VALUE(newmc) << std::endl
-               << GET_VAR_NAME_VALUE(stat) << std::endl
-               << GET_VAR_NAME_VALUE(penalty) << std::endl
-               << GET_VAR_NAME_VALUE(mcuncert) << std::endl
-               << GET_VAR_NAME_VALUE(nomMC->GetBinContent(bin_)) << std::endl
-               << GET_VAR_NAME_VALUE(nomMC->GetBinError(bin_)) << std::endl
-               << GET_VAR_NAME_VALUE(predMC->GetBinError(bin_)) << std::endl
-               << GET_VAR_NAME_VALUE(predMC->GetBinContent(bin_)) << std::endl;
-      LogThrow("Bad chisq for bin");
+      LogWarning << "Infinite chi2: " << chisq << std::endl
+                 << " bin " << bin_ << std::endl
+                 << GET_VAR_NAME_VALUE(predVal) << std::endl
+                 << GET_VAR_NAME_VALUE(dataVal) << std::endl
+                 << GET_VAR_NAME_VALUE(newmc) << std::endl
+                 << GET_VAR_NAME_VALUE(stat) << std::endl
+                 << GET_VAR_NAME_VALUE(penalty) << std::endl
+                 << GET_VAR_NAME_VALUE(mcuncert) << std::endl
+                 << GET_VAR_NAME_VALUE(nomMC->GetBinContent(bin_)) << std::endl
+                 << GET_VAR_NAME_VALUE(nomMC->GetBinError(bin_)) << std::endl
+                 << GET_VAR_NAME_VALUE(predMC->GetBinError(bin_)) << std::endl
+                 << GET_VAR_NAME_VALUE(predMC->GetBinContent(bin_)) << std::endl;
     }
 
     if(verboseLevel>=3){
