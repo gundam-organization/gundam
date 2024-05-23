@@ -123,6 +123,7 @@ void EventDialCache::shrinkIndexedCache(){
 EventDialCache::IndexedCacheEntry* EventDialCache::fetchNextCacheEntry(){
   // Warning warning Will Robinson!
   // This only works IFF the indexed cache is not resized.
+  LogThrowIf(_fillIndex_ >= _indexedCache_.size());
   return &_indexedCache_[_fillIndex_++];
 }
 

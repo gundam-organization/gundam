@@ -38,6 +38,8 @@ struct DataDispenserParameters{
 struct DataDispenserCache{
   Propagator* propagatorPtr{nullptr};
 
+  size_t totalNbEvents{0};
+
   std::vector<Sample*> samplesToFillList{};
   std::vector<size_t> sampleNbOfEvents;
   std::vector<std::vector<bool>> eventIsInSamplesList{};
