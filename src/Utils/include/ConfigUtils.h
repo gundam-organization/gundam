@@ -28,7 +28,7 @@ namespace ConfigUtils {
   void unfoldConfig(JsonType& config_);
 
   void applyOverrides(JsonType& jsonConfig_, const JsonType& overrideConfig_);
-  void clearEntry(JsonType& jsonConfig_, const std::string& path_, const JsonType& clearedEntry_ = "{}");
+  void clearEntry(JsonType& jsonConfig_, const std::string& path_);
 
 
   class ConfigHandler{
