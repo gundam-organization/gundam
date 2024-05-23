@@ -312,6 +312,34 @@ namespace ConfigUtils {
     }
 
   }
+  void clearEntry(JsonType& jsonConfig_, const std::string& path_, const JsonType& clearedEntry_){
+
+    auto pathEntries{ GenericToolbox::splitString(path_, "/") };
+    std::stringstream ssOverride;
+    std::stringstream ssClosure;
+    auto configEntry{jsonConfig_};
+
+    for( auto& pathEntry : pathEntries ){
+      ssOverride << "{\"" << pathEntry << "\":";
+      ssClosure << "}";
+
+      if( GenericToolbox::Json::doKeyExist( configEntry, pathEntry ) ){
+        // next
+        configEntry = GenericToolbox::Json::fetchValue<JsonType>(configEntry, pathEntry);
+      }
+      else{
+        // no need to override. The key does not exist in the config
+        return;
+      }
+    }
+
+    ssOverride << clearedEntry_;
+    ssOverride << ssClosure.str();
+
+    // clear the entry as it exists
+    applyOverrides(jsonConfig_, ssOverride.str());
+
+  }
 
   // class impl
   ConfigHandler::ConfigHandler(const std::string& filePath_){
