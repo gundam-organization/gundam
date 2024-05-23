@@ -252,6 +252,11 @@ void DataDispenser::doEventSelection(){
   LogInfo << "Freeing up thread buffers..." << std::endl;
   _cache_.threadSelectionResults.clear();
 
+
+  for(size_t iSample = 0 ; iSample < _cache_.samplesToFillList.size() ; iSample++ ){
+    _cache_.totalNbEvents += _cache_.sampleNbOfEvents[iSample];
+  }
+
   if( _owner_->isShowSelectedEventCount() ){
     LogWarning << "Events passing selection cuts:" << std::endl;
     GenericToolbox::TablePrinter t;
@@ -259,6 +264,7 @@ void DataDispenser::doEventSelection(){
     for(size_t iSample = 0 ; iSample < _cache_.samplesToFillList.size() ; iSample++ ){
       t.addTableLine({_cache_.samplesToFillList[iSample]->getName(), std::to_string(_cache_.sampleNbOfEvents[iSample])});
     }
+    t.addTableLine({"Total", std::to_string(_cache_.totalNbEvents)});
     t.printTable();
   }
 
@@ -442,8 +448,6 @@ void DataDispenser::preAllocateMemory(){
     }
   }
 
-
-  size_t nEvents = treeChain.GetEntries();
   if( _parameters_.useMcContainer ){
     if( not _cache_.dialCollectionsRefList.empty() ){
       LogInfo << "Creating slots for event-by-event dials..." << std::endl;
@@ -462,21 +466,24 @@ void DataDispenser::preAllocateMemory(){
         else if( not dialCollection->getGlobalDialLeafName().empty() ){
           // Reserve memory for additional dials (those on a tree leaf)
           auto dialType = dialCollection->getGlobalDialType();
-          LogInfo << dialCollection->getTitle() << ": creating " << nEvents;
+          LogInfo << dialCollection->getTitle() << ": creating " << _cache_.totalNbEvents;
           LogInfo << " slots for " << dialType << std::endl;
 
           dialCollection->getDialBaseList().clear();
-          dialCollection->getDialBaseList().resize(nEvents);
+          dialCollection->getDialBaseList().resize(_cache_.totalNbEvents);
         }
         else{
           LogThrow("DEV ERROR: not binned, not event-by-event?");
         }
       }
-      _cache_.propagatorPtr->getEventDialCache().allocateCacheEntries(nEvents, nDialsMaxPerEvent);
+
+      LogInfo << "Creating " << _cache_.totalNbEvents << " event cache slots." << std::endl;
+      _cache_.propagatorPtr->getEventDialCache().allocateCacheEntries(_cache_.totalNbEvents, nDialsMaxPerEvent);
     }
     else{
       // all events should be referenced in the cache even with 0 dial
-      _cache_.propagatorPtr->getEventDialCache().allocateCacheEntries(nEvents, 0);
+      LogInfo << "Creating " << _cache_.totalNbEvents << " event cache slots (dial-less)." << std::endl;
+      _cache_.propagatorPtr->getEventDialCache().allocateCacheEntries(_cache_.totalNbEvents, 0);
     }
   }
 }
