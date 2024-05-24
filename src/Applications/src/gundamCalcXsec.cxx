@@ -702,8 +702,10 @@ int main(int argc, char** argv){
   binValues.reserve(propagator.getSampleSet().getSampleList().size() );
   int iBinGlobal{-1};
 
-  for( auto& xsec : crossSectionDataList ){
 
+
+  for( auto& xsec : crossSectionDataList ){
+    LogInfo << "Sample: " << xsec.samplePtr->getName() << std::endl;
     for( int iBin = 0 ; iBin < xsec.samplePtr->getMcContainer().getHistogram().nBins ; iBin++ ){
       iBinGlobal++;
 
@@ -712,6 +714,7 @@ int main(int argc, char** argv){
 
       xsec.histogram.SetBinContent( 1+iBin, (*meanValuesVector)[iBinGlobal] );
       xsec.histogram.SetBinError( 1+iBin, TMath::Sqrt( (*globalCovMatrix)[iBinGlobal][iBinGlobal] ) );
+      LogInfo<<"Bin "<<iBin<<" mean = "<<(*meanValuesVector)[iBinGlobal]<<" RMS = "<<TMath::Sqrt( (*globalCovMatrix)[iBinGlobal][iBinGlobal] )<<std::endl;
       xsec.histogram.GetXaxis()->SetBinLabel( 1+iBin, binTitle.c_str() );
 
       globalCovMatrixHist->GetXaxis()->SetBinLabel(1+iBinGlobal, GenericToolbox::joinPath(xsec.samplePtr->getName(), binTitle).c_str());
@@ -865,6 +868,7 @@ int main(int argc, char** argv){
   std::vector<closureVariable> closureVarList;
   std::vector<std::string> varToPlotVector = propagator.getPlotGenerator().fetchListOfVarToPlot();
   size_t nHist = propagator.getPlotGenerator().getConfig().at("histogramsDefinition").size();
+  iBinGlobal = -1;
   for( auto& sample : propagator.getSampleSet().getSampleList() ) {
 
     LogInfo << "Fetching data histogram for sample: " << sample.getName() << std::endl;
@@ -881,6 +885,7 @@ int main(int argc, char** argv){
 //    );
     LogErrorIf(mcTree == nullptr) << "Could not find mc tree for sample: " << sample.getName() << std::endl;
 
+    nHist = 1; // otherwise the code does not work :)
     for (size_t iHist = 0; iHist < nHist; iHist++) { // this loop is over the variables to plot, as defined in the config file
       closureVariable closureVar;
       closureVar.samplePtr = &sample;
@@ -965,7 +970,6 @@ int main(int argc, char** argv){
             } else {
               double binContent = leaf->GetValue();
               meanValues.at(iBin) += binContent;
-
             }
           }
         }
@@ -1028,27 +1032,23 @@ int main(int argc, char** argv){
       // manually set the bin errors from the covariance matrix
       LogInfo << "Variable: " << closureVar.varToPlot << " | Sample: " << closureVar.samplePtr->getName()
               << " | Binning file: " << closureVar.binningFile << std::endl;
-      std::vector<std::string> binLabelList{};
-      std::vector<double> binErrorList{};
-      // find the error in the covariance matrix by looking for the sample anme and variable name in the bin labels
-      for (int iBinGlobal = 0; iBinGlobal < globalCovMatrixHist->GetNbinsX(); iBinGlobal++) {
-        std::string thisBinLabel = globalCovMatrixHist->GetXaxis()->GetBinLabel(iBinGlobal + 1);
-        if (thisBinLabel.find(closureVar.samplePtr->getName()) != std::string::npos and
-            thisBinLabel.find(closureVar.varToPlot) != std::string::npos) {
-          binLabelList.push_back(thisBinLabel);
-          binErrorList.push_back( sqrt(globalCovMatrixHist->GetBinContent(iBinGlobal + 1, iBinGlobal + 1)) );
-        }
+
+      // the bin errors are the square root of the diagonal of the covariance matrix,
+      // but the covariance matrix stores all samples in sequence, so we need to match the correct sample
+      // to the correct covariance matrix row
+      for(int iBinLocal = 0; iBinLocal < closureVar.histogram->GetNbinsX(); iBinLocal++){
+        closureVar.mcHistogram->SetBinError(iBinLocal+1, TMath::Sqrt( (*globalCovMatrix)[iBinGlobal+1][iBinGlobal+1])  );
+        closureVar.binErrors.push_back( TMath::Sqrt( (*globalCovMatrix)[iBinGlobal+1][iBinGlobal+1]) );
+        iBinGlobal++;
+        LogInfo << iBinLocal << iBinGlobal << " | Bin error: " << closureVar.mcHistogram->GetBinError(iBinLocal+1) << std::endl;
       }
-      if (binLabelList.size() != closureVar.histogram->GetNbinsX()) {
-        LogError << "Could not find the correct number of bin labels for sample: " << closureVar.samplePtr->getName()
-                 << " and variable: " << closureVar.varToPlot << " binlabelList.size: " << binLabelList.size() << " histogram binning.size: " << closureVar.histogram->GetNbinsX() << std::endl;
-        return 1;
-      } else {
+
+        LogInfo << "Before rescaling" << std::endl;
         for (int iBin = 0; iBin < closureVar.histogram->GetNbinsX(); iBin++) {
-          closureVar.histogram->SetBinError(iBin + 1, binErrorList[iBin]);
-          LogInfo << "Bin " << iBin << " width: " << closureVar.histogram->GetBinWidth(iBin + 1) << " BinContent: "
-                  << closureVar.histogram->GetBinContent(iBin + 1) << " BinError: "
-                  << closureVar.histogram->GetBinError(iBin + 1) << std::endl;
+          // print the bin content and error of histogram and mcHistogram (before rescaling)
+          LogInfo << "Bin " << iBin << " | Data: " << closureVar.histogram->GetBinContent(iBin + 1) << " +/- "
+                  << closureVar.histogram->GetBinError(iBin + 1) << " | MC: " << closureVar.mcHistogram->GetBinContent(iBin + 1) << " +/- "
+                  << closureVar.mcHistogram->GetBinError(iBin + 1) << std::endl;
           // rescale to bin width
           if (closureVar.rescaleAsBinWidth) {
             double binWidth = closureVar.histogram->GetBinWidth(iBin + 1);
@@ -1065,7 +1065,22 @@ int main(int argc, char** argv){
             }
           }
         }
-      }
+        // another loop just to print the bin contents and errors after rescaling
+        LogInfo << "After rescaling: bin contents" << std::endl;
+        for (int iBin = 0; iBin < closureVar.histogram->GetNbinsX(); iBin++) {
+          LogInfo << "Bin " << iBin << " | Data: " << closureVar.histogram->GetBinContent(iBin + 1)
+                  << " | MC: " << closureVar.mcHistogram->GetBinContent(iBin + 1)
+                  << " | Mean: " << closureVar.meanValueHistogram->GetBinContent(iBin + 1)
+                  << " | Best fit: " << closureVar.bestFitHistogram->GetBinContent(iBin + 1) << std::endl;
+        }
+        LogInfo << "After rescaling: bin errors" << std::endl;
+        for (int iBin = 0; iBin < closureVar.histogram->GetNbinsX(); iBin++) {
+          LogInfo << "Bin " << iBin << " | Data: " << closureVar.histogram->GetBinError(iBin + 1)
+                                    << " | MC: " << closureVar.mcHistogram->GetBinError(iBin + 1)
+                                    << " | Mean: " << closureVar.meanValueHistogram->GetBinError(iBin + 1)
+                                    << " | Best fit: " << closureVar.bestFitHistogram->GetBinError(iBin + 1) << std::endl;
+        }
+
 
       // Only look at the shape
 //      closureVar.histogram->Scale(1.0/closureVar.histogram->Integral());
@@ -1129,7 +1144,7 @@ int main(int argc, char** argv){
       closureVarList.push_back(closureVar);
     }
 
-  }
+  } // end of loop over samples
 
 
 
