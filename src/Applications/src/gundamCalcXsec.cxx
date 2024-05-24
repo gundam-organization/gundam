@@ -1060,8 +1060,11 @@ int main(int argc, char** argv){
               closureVar.mcHistogram->SetBinContent(iBin + 1,
                                                     closureVar.mcHistogram->GetBinContent(iBin + 1) / binWidth);
               // No need to normalize to bin width the meanValue and bestFit histograms, that is already done
-              closureVar.mcHistogram->SetBinError(iBin + 1,
-                                                  closureVar.mcHistogram->GetBinError(iBin + 1) / binWidth );
+              // The same arguments is valid for the errors on mcHistogram, that are taken from the
+              // width-normalized throws-generated histograms. This is why the following lines are commented.
+              // DO NOT UNCOMMENT
+              //              closureVar.mcHistogram->SetBinError(iBin + 1,
+              //                                    closureVar.mcHistogram->GetBinError(iBin + 1) / binWidth );
             }
           }
         }
