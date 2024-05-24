@@ -41,7 +41,7 @@ if( USE_STATIC_LINKS )
   add_library(GundamCache STATIC ${SRCFILES})
 else()
   add_library(GundamCache SHARED ${SRCFILES})
-endif()
+endif( USE_STATIC_LINKS )
 
 # Make sure the current directories are available for the later
 # compilation.
@@ -60,6 +60,6 @@ if(NOT CMAKE_CUDA_COMPILER)
     # HEMI_LAUNCH_DEBUG
     # HEMI_THREAD_DEBUG
     HEMI_CUDA_DISABLE)
-endif(CMAKE_CUDA_COMPILER)
+endif(NOT CMAKE_CUDA_COMPILER)
 
 install(TARGETS GundamCache DESTINATION lib)
