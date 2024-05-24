@@ -2,6 +2,8 @@
 #include "hemi/array.h"
 #include "hemi/launch.h"
 #include "hemi/grid_stride_range.h"
+#include "CacheAtomicAdd.h"
+#include "CacheAtomicSet.h"
 #include <algorithm>
 
 #include "gtest/gtest.h"
@@ -18,83 +20,142 @@
 
 TEST(hemiArrayTest, CreatesAndFillsArrayOnHost)
 {
-	const int n = 1000000;
-	const float val = 3.14159f;
-	hemi::Array<float> data(n);
+    const int n = 1000000;
+    const double val = 3.14159;
+    hemi::Array<double> data(n);
 
-	ASSERT_EQ(data.size(), n);
+    ASSERT_EQ(data.size(), n);
 
-	float *ptr = data.writeOnlyHostPtr();
-	std::fill(ptr, ptr+n, val);
+    double *ptr = data.writeOnlyHostPtr();
+    std::fill(ptr, ptr+n, val);
 
-	for(int i = 0; i < n; i++) {
-		ASSERT_EQ(val, data.readOnlyHostPtr()[i]);
-	}
+    for(int i = 0; i < n; i++) {
+        EXPECT_EQ(val, data.readOnlyHostPtr()[i]);
+    }
 }
 
 namespace {
     // A function to be used as the kernel on either the CPU or GPU.  This
     // must be valid CUDA coda.
-    HEMI_KERNEL_FUNCTION(HEMIFill, float* ptr, int N, float val) {
+    HEMI_KERNEL_FUNCTION(HEMIFill, double* ptr, int N, double val) {
         for (int i : hemi::grid_stride_range(0,N)) {
             ptr[i] = val;
         }
     }
 }
 
-void fillOnDevice(float* ptr, int n, float val) {
-    HEMIFill fillArray;
-    hemi::launch(fillArray,ptr,n,val);
-}
-
 TEST(hemiArrayTest, CreatesAndFillsArrayOnDevice)
 {
-	const int n = 1000000;
-	const float val = 3.14159f;
-	hemi::Array<float> data(n);
+    const int n = 1000000;
+    const double val = 3.14159;
+    hemi::Array<double> data(n);
 
-	ASSERT_EQ(data.size(), n);
+    HEMIFill fillArray;
+    hemi::launch(fillArray,data.writeOnlyPtr(),n,val);
 
-	fillOnDevice(data.writeOnlyPtr(), n, val);
+    for(int i = 0; i < n; i++) {
+        EXPECT_EQ(val, data.readOnlyPtr(hemi::host)[i])
+            << "Array value mismatched";
+    }
 
-	for(int i = 0; i < n; i++) {
-		ASSERT_EQ(val, data.readOnlyPtr(hemi::host)[i]);
-	}
-
-	ASSERT_SUCCESS(hemi::deviceSynchronize());
+    ASSERT_SUCCESS(hemi::deviceSynchronize());
 }
 
 namespace {
     // A function to be used as the kernel on either the CPU or GPU.  This
     // must be valid CUDA coda.
-    HEMI_KERNEL_FUNCTION(HEMISquare, float* ptr, int N) {
+    HEMI_KERNEL_FUNCTION(HEMISquare, double* ptr, int N) {
         for (int i : hemi::grid_stride_range(0,N)) {
-            ptr[i] = ptr[i]*ptr[i];
+            double value = ptr[i]*ptr[i];
+            CacheAtomicSet(&ptr[i],value);
         }
     }
 }
 
-void squareOnDevice(hemi::Array<float> &a) {
-        HEMISquare squareArray;
-        hemi::launch(squareArray,a.ptr(),a.size());
-}
-
 TEST(hemiArrayTest, FillsOnHostModifiesOnDevice)
 {
-	const int n = 50;
-	const float val = 3.14159f;
-	hemi::Array<float> data(n);
+    const int n = 100;
+    double val = 2.0;
+    hemi::Array<double> data(n);
 
-	ASSERT_EQ(data.size(), n);
+    ASSERT_EQ(data.size(), n);
 
-	float *ptr = data.writeOnlyHostPtr();
-	std::fill(ptr, ptr+n, val);
+    double *ptr = data.writeOnlyHostPtr();
+    std::fill(ptr, ptr+n, val);
 
-	squareOnDevice(data);
+    HEMISquare squareArray;
+    hemi::launch(squareArray,data.ptr(),data.size()); val *= val;
+    hemi::launch(squareArray,data.writeOnlyPtr(),data.size()); val *= val;
+    hemi::launch(squareArray,data.writeOnlyPtr(),data.size()); val *= val;
+    hemi::launch(squareArray,data.writeOnlyPtr(),data.size()); val *= val;
 
-	for(int i = 0; i < n; i++) {
-		ASSERT_EQ(val*val, data.readOnlyPtr(hemi::host)[i]);
-	}
+    for(int i = 0; i < n; i++) {
+        double result = data.readOnlyPtr(hemi::host)[i];
+        EXPECT_EQ(val,result)
+            << "Mismatch at element " << i
+            << " current: " << data.readOnlyPtr(hemi::host)[i];
+    }
 
-	ASSERT_SUCCESS(hemi::deviceSynchronize());
+    ASSERT_SUCCESS(hemi::deviceSynchronize());
+}
+
+namespace {
+    // A function to be used as the kernel on either the CPU or GPU.  This
+    // must be valid CUDA coda.
+    HEMI_KERNEL_FUNCTION(HEMICoverage, double* ptr, int N) {
+        for (int i : hemi::grid_stride_range(0,N)) {
+            CacheAtomicAdd(&ptr[i],1.0*i+1.0);
+        }
+    }
+}
+
+TEST(hemiArrayTest, CheckCoverageInKernel)
+{
+    const int n = 100;
+    hemi::Array<double> data(n);
+
+    ASSERT_EQ(data.size(), n);
+
+    double *ptr = data.writeOnlyHostPtr();
+    std::fill(ptr, ptr+n, 0.0);
+
+    HEMICoverage kernelCoverage;
+    hemi::launch(kernelCoverage,data.ptr(),data.size());
+    hemi::launch(kernelCoverage,data.writeOnlyPtr(),data.size());
+    hemi::launch(kernelCoverage,data.writeOnlyPtr(),data.size());
+
+    for(int i = 0; i < n; i++) {
+        EXPECT_EQ(3.0*(i+1), data.readOnlyPtr(hemi::host)[i])
+            << "Elements not covered by kernel";
+    }
+
+    ASSERT_SUCCESS(hemi::deviceSynchronize());
+}
+
+namespace {
+    // A function to be used as the kernel on either the CPU or GPU.  This
+    // must be valid CUDA coda.
+    HEMI_KERNEL_FUNCTION(HEMIAccumulate, double* result, int N) {
+        for (int i : hemi::grid_stride_range(0,N)) {
+            CacheAtomicAdd(result,1.0);
+        }
+    }
+}
+
+TEST(hemiArrayTest, AccumulatesOnDevice)
+{
+    hemi::Array<double> data(1);
+
+    ASSERT_EQ(data.size(), 1);
+
+    double *ptr = data.writeOnlyHostPtr();
+    std::fill(ptr, ptr+1, 0.0);
+
+    HEMIAccumulate arrayAccumulate;
+    const int maximum = 1000;
+    hemi::launch(arrayAccumulate,data.ptr(),maximum);
+
+    ASSERT_EQ(maximum, data.readOnlyPtr(hemi::host)[0]);
+
+    ASSERT_SUCCESS(hemi::deviceSynchronize());
 }
