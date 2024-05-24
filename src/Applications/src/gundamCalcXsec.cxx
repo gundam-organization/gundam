@@ -515,7 +515,7 @@ int main(int argc, char** argv){
 
   auto writeBinDataFct = std::function<void()>([&]{
     for( auto& xsec : crossSectionDataList ){
-      LogInfo << xsec.samplePtr->getName() << std::endl;
+//      LogInfo << xsec.samplePtr->getName() << std::endl;
       xsec.branchBinsData.resetCurrentByteOffset();
       for( int iBin = 0 ; iBin < xsec.samplePtr->getMcContainer().getHistogram().nBins ; iBin++ ){
         double binData{ xsec.samplePtr->getMcContainer().getHistogram().binList[iBin].content };
@@ -600,6 +600,22 @@ int main(int argc, char** argv){
     GenericToolbox::writeInTFile( GenericToolbox::mkdirTFile(calcXsecDir, "throws"), xsecAtBestFitTree );
   }
 
+  std::vector<double> vectorOfParametersThrow_Mean((*propagator.getParametersManager().getGlobalCovarianceMatrix()).GetNcols(), 0);
+  std::vector<double> vectorOfParametersThrow_RMS((*propagator.getParametersManager().getGlobalCovarianceMatrix()).GetNcols(), 0);
+
+  int i_aux = 0;
+  for( auto& parSet : propagator.getParametersManager().getParameterSetsList() ){
+    if( not parSet.isEnabled() ) continue;
+    for( auto& par : parSet.getParameterList() ){
+      if( not par.isEnabled() ) continue;
+      LogInfo << "Parameter "<<i_aux<<" mean = "<<par.getPriorValue()<<" RMS = "<<TMath::Sqrt((*propagator.getParametersManager().getGlobalCovarianceMatrix())[i_aux][i_aux])<<std::endl;
+      i_aux++;
+    }
+  }
+  if (i_aux!=(*propagator.getParametersManager().getGlobalCovarianceMatrix()).GetNcols()){
+    LogInfo << "ERROR: i = "<<i_aux<<" != "<<(*propagator.getParametersManager().getGlobalCovarianceMatrix()).GetNcols()<<std::endl;
+  }
+
 
   //////////////////////////////////////
   // THROWS LOOP
@@ -615,6 +631,20 @@ int main(int argc, char** argv){
     // Do the throwing:
     propagator.getParametersManager().throwParametersFromGlobalCovariance();
     propagator.propagateParameters();
+    int  i = 0;
+    for( auto& parSet : propagator.getParametersManager().getParameterSetsList() ){
+      if( not parSet.isEnabled() ) continue;
+      for( auto& par : parSet.getParameterList() ){
+        if( not par.isEnabled() ) continue;
+        vectorOfParametersThrow_Mean[i] += par.getParameterValue();
+        vectorOfParametersThrow_RMS[i] += par.getParameterValue()*par.getParameterValue();
+        i++;
+//        if(i>706){
+//          LogInfo << "i = "<<i<< "par = "<<par.getParameterValue()<<std::endl;
+//        }
+      }
+    }
+//    LogInfo<<"\n";
 
     // print info about the throw
     if( iToy == 0 ){
@@ -641,6 +671,16 @@ int main(int argc, char** argv){
     // Write the branches
     xsecThrowTree->Fill();
   }
+
+  // compute mean and rms of parameter throws
+  for(int i=0;i<vectorOfParametersThrow_Mean.size();i++){
+    vectorOfParametersThrow_Mean[i] /= nToys;
+    vectorOfParametersThrow_RMS[i] = TMath::Sqrt(vectorOfParametersThrow_RMS[i]/nToys - vectorOfParametersThrow_Mean[i]*vectorOfParametersThrow_Mean[i]);
+    LogInfo << "Parameter "<<i<<" mean = "<<vectorOfParametersThrow_Mean[i]<<" RMS = "<<vectorOfParametersThrow_RMS[i]<<std::endl;
+  }
+
+
+
 
 
   LogInfo << "Writing throws..." << std::endl;
