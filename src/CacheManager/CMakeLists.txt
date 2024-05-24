@@ -2,7 +2,7 @@
 
 set( SRCFILES
   ${CMAKE_CURRENT_SOURCE_DIR}/src/CacheManager.cpp
-  ${CMAKE_CURRENT_SOURCE_DIR}/src/CacheAtomicCAS.c
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/CacheAtomicCAS.cpp
 )
 
 set( HEADERS
@@ -55,9 +55,11 @@ target_link_libraries( GundamCache PUBLIC
   ${ROOT_LIBRARIES})
 
 if(NOT CMAKE_CUDA_COMPILER)
-  target_compile_definitions( GundamCache PUBLIC HEMI_CUDA_DISABLE)
+  target_compile_definitions( GundamCache PUBLIC
+    # HEMI_THREADS_DISABLE
+    # HEMI_LAUNCH_DEBUG
+    # HEMI_THREAD_DEBUG
+    HEMI_CUDA_DISABLE)
 endif(CMAKE_CUDA_COMPILER)
-
-#  set_target_properties(GundamCache PROPERTIES VERSION "${GUNDAM_VERSION_STRING}")
 
 install(TARGETS GundamCache DESTINATION lib)

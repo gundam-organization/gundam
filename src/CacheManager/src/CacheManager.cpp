@@ -3,6 +3,7 @@
 // Check if global variables need to be defined.
 #ifndef __cpp_inline_variables
 #define HEMI_COMPILE_DEFINITIONS
+#include <hemi/hemi.h>
 #endif
 
 #include "CacheManager.h"

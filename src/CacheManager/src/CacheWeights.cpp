@@ -114,8 +114,6 @@ void Cache::Weights::SetInitialValue(int i, double v) {
 // Define CACHE_DEBUG to get lots of output from the host
 #undef CACHE_DEBUG
 
-#include "CacheAtomicMult.h"
-
 namespace {
     // A function to be used as the kernen on a CPU or GPU.  This must be
     // valid CUDA.  This sets all of the results to a fixed value.
