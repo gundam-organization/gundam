@@ -142,13 +142,8 @@ namespace {
                          const int NP) {
         for (int i : hemi::grid_stride_range(0,NP)) {
             const double v = inputs[i];
-#ifdef HEMI_DEV_CODE
             CacheAtomicAdd(&sums[indexes[i]],v);
             CacheAtomicAdd(&sums2[indexes[i]],v*v);
-#else
-            sums[indexes[i]] += v;
-            sums2[indexes[i]] += v*v;
-#endif
         }
     }
 
