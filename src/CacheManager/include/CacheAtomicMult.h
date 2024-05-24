@@ -7,7 +7,7 @@
 
 namespace {
     /// Do an atomic multiplication for doubles.  On the GPU this uses
-    /// compare-and-set.  On the CPU, this leverages the C atomic operations.
+    /// compare-and-set.  On the CPU, this leverages CacheAtomicCAS.
     HEMI_DEV_CALLABLE_INLINE
     double CacheAtomicMult(double* address, const double v) {
 #ifndef HEMI_DEV_CODE
@@ -17,7 +17,7 @@ namespace {
         double update;
         do {
             update = expect*v;
-        } while (not CacheAtomicCAS_double(address,&expect,update));
+        } while (not CacheAtomicCAS(address,&expect,update));
         return expect;
 #else
         // When using CUDA use atomic compare-and-set to do an atomic
