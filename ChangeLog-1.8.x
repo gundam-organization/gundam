@@ -1,5 +1,9 @@
 Fixes relative to 1.8.2
 
+Issue #510 : Make the CacheManager calculation much more thread save when being run on the CPU.  This isn't the normal mode, but is an important cross check.  The CPU now uses (lock free) atomic addition, multiplication and value setting.
+
+Issue #513 : Fix JointProbability so that an infinite log likelihood produces a warning, but does not terminate the program.  Infinities are valid (e.g. a zero probability).  This does produce a warning since they shouldn't occur often during a normal run.
+
 Issue #506 : Fix output statement in ParameterSet.cpp to remove duplicated output.  
 
 Issue #508 : Improve error checking for Cache::Manager.  This makes sure that LogThrow is preferred to std::runtime_error.  There is an issue filed for simple-cpp-logger to make sure that the output is flushed before throwing, so that should make the error output much more readable.
