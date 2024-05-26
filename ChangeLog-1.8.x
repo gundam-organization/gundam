@@ -1,5 +1,7 @@
 Fixes relative to 1.8.2
 
+Associated Fix: The CalculateGeneralSpline and CalculateGraph functions have been changed to use a brute-force binary search in place of the linear search for the correct index.  This results in a speed up of about 50% for those routines.
+
 Issue #510 : Make the CacheManager calculation much more thread save when being run on the CPU.  This isn't the normal mode, but is an important cross check.  The CPU now uses (lock free) atomic addition, multiplication and value setting.
 
 Issue #513 : Fix JointProbability so that an infinite log likelihood produces a warning, but does not terminate the program.  Infinities are valid (e.g. a zero probability).  This does produce a warning since they shouldn't occur often during a normal run.
