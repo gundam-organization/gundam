@@ -1256,8 +1256,6 @@ int main(int argc, char** argv){
           hRelativeDiff->SetBinError(iBin + 1, 0);
           hMcErrors->SetBinContent(iBin + 1, 0);
           hMcErrors->SetBinError(iBin + 1, relativeError);
-          std::cout << iBin << "  " << hRelativeDiff->GetBinCenter(iBin+1) << " " << hRelativeDiff->GetBinContent(iBin + 1) << "  " << hMcErrors->GetBinContent(iBin + 1) << "  " << hMcErrors->GetBinError(iBin + 1)
-          << std::endl;
         }
       closureVar.canvas->cd(2);
       hRelativeDiff->Draw("hist");
