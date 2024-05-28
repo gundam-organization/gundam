@@ -1234,8 +1234,8 @@ int main(int argc, char** argv){
         // make histo with the relative difference between data and MC, overlaid
         // with the relative uncertainty on MC
         std::string sampleNameDiff = GenericToolbox::generateCleanBranchName( "hRelativeDiff" + closureVar.varToPlot + "_" + sample.getName()  );
-        TH1F* hRelativeDiff = new TH1F(sampleNameDiff.c_str(), "Relative difference", closureVar.histogram->GetNbinsX(), closureVar.histogram->GetXaxis()->GetXmin(), closureVar.histogram->GetXaxis()->GetXmax());
-        TH1F* hMcErrors = new TH1F((sampleNameDiff+"_err").c_str(), "MC errors", closureVar.histogram->GetNbinsX(), closureVar.histogram->GetXaxis()->GetXmin(), closureVar.histogram->GetXaxis()->GetXmax());
+        TH1F* hRelativeDiff = (TH1F*)closureVar.histogram->Clone( sampleNameDiff.c_str() );
+        TH1F* hMcErrors = (TH1F*)closureVar.histogram->Clone( (sampleNameDiff+"_err").c_str() );
         for (int iBin = 0; iBin < closureVar.histogram->GetNbinsX(); iBin++) {
           double data = closureVar.histogram->GetBinContent(iBin + 1);
           double mc = closureVar.mcHistogram->GetBinContent(iBin + 1);
@@ -1253,13 +1253,14 @@ int main(int argc, char** argv){
             relativeError = 0;
           }
           hRelativeDiff->SetBinContent(iBin + 1, relativeDiff);
+          hRelativeDiff->SetBinError(iBin + 1, 0);
           hMcErrors->SetBinContent(iBin + 1, 0);
           hMcErrors->SetBinError(iBin + 1, relativeError);
-          std::cout << iBin << "  " << hRelativeDiff->GetBinContent(iBin + 1) << "  " << hMcErrors->GetBinContent(iBin + 1) << "  " << hMcErrors->GetBinError(iBin + 1)
+          std::cout << iBin << "  " << hRelativeDiff->GetBinCenter(iBin+1) << " " << hRelativeDiff->GetBinContent(iBin + 1) << "  " << hMcErrors->GetBinContent(iBin + 1) << "  " << hMcErrors->GetBinError(iBin + 1)
           << std::endl;
         }
       closureVar.canvas->cd(2);
-      hRelativeDiff->Draw();
+      hRelativeDiff->Draw("hist");
       hMcErrors->Draw("e2 same");
       hRelativeDiff->SetMarkerStyle(kFullDotLarge);
       hRelativeDiff->SetMarkerColor(kRed);
