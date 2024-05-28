@@ -19,6 +19,8 @@ void Parameter::readConfigImpl(){
     _isEnabled_ = GenericToolbox::Json::fetchValue(_parameterConfig_, "isEnabled", true);
     if( not _isEnabled_ ) { return; }
 
+    _isFixed_ = GenericToolbox::Json::fetchValue(_parameterConfig_, "isFixed", _isFixed_);
+
     auto priorTypeStr = GenericToolbox::Json::fetchValue(_parameterConfig_, "priorType", "");
     if( not priorTypeStr.empty() ){
       _priorType_ = PriorType::PriorTypeEnumNamespace::toEnum(priorTypeStr);
