@@ -10,6 +10,8 @@ Issue #502 : Update the validation code.  A validation failure caused by the rec
 
 Issue #492 : Fix compiler warnings from NVCC.  This is removing some unused variables.  It also fixes a "fix" that applied some correct C++ conventions to code that is aimed at the GPU (the fix produces inefficient code on a SIMD processor, and was primarily aesthetic.
 
+Issue #490 : Don't set the value for disabled parameters in the output histograms.  This will prevent uninitialized values (i.e. NAN) from appearing in plots.
+
 Fixes relative to 1.8.1
 
 Issue #499 : Update to a new version of the cpp-generic-toolkit submodule. The cpp-generic-toolkit fix sets the branch status to enable branches that are used for the data.
