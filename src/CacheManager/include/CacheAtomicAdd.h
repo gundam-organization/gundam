@@ -1,19 +1,24 @@
 #ifndef CacheAtomicAdd_h_seen
 #define CacheAtomicAdd_h_seen
+
+#ifndef HEMI_DEV_CODE
+#include "CacheAtomicCAS.h"
+#endif
+
 namespace {
-    /// Do an atomic addition for doubles on the GPU.  On the GPU this
-    /// uses compare-and-set.  On the CPU, this is just an addition.  Later
-    /// versions of CUDA do support atomicAdd for doubles, but this will work
-    /// on earlier versions too.  It's a bit slower, so if we need, there can
-    /// some conditional compilation to use the "official" version when it is
-    /// available.
+    /// Do an atomic addition for doubles.  On the GPU this uses
+    /// compare-and-set.  On the CPU, this leverages CacheAtomicCAS.
     HEMI_DEV_CALLABLE_INLINE
     double CacheAtomicAdd(double* address, const double v) {
 #ifndef HEMI_DEV_CODE
-        // When this isn't CUDA use a simple addition.
-        double old = *address;
-        *address = *address + v;
-        return old;
+        // C++ is a little funky on it's support for atomic operations, so
+        // give it a little help.
+        double expect = *address;
+        double update;
+        do {
+            update = expect+v;
+        } while (not CacheAtomicCAS(address,&expect,update));
+        return expect;
 #else
         // When using CUDA use atomic compare-and-set to do an atomic
         // addition.  This only sets the result if the value at address_as_ull
@@ -24,6 +29,9 @@ namespace {
         // addition was being done.  If something changed the value at the
         // address "old" will not equal "assumed", and then retry the
         // addition.
+        //
+        // Later versions of CUDA (Compute Capability 6.0 and later) support
+        // atomicAdd for doubles, but this will work on earlier versions too.
         unsigned long long int* address_as_ull =
             (unsigned long long int*)address;
         unsigned long long int old = *address_as_ull;
@@ -36,7 +44,7 @@ namespace {
                                 v +  __longlong_as_double(assumed)));
             // Note: uses integer comparison to avoid hang in case of NaN
             // (since NaN != NaN)
-        } while (assumed != old);
+        } while (not (assumed == old));
         return __longlong_as_double(old);
 #endif
     }

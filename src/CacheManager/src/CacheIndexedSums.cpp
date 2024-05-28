@@ -86,10 +86,10 @@ double Cache::IndexedSums::GetSum(int i) {
     LogThrowIf(i<0, "Sum index out of range");
     LogThrowIf((fSums->size() <= i), "Sum index out of range");
     // This odd ordering is to make sure the thread-safe hostPtr update
-    // finishes before the sum is set to be valid.  The use of isfinite is to
+    // finishes before the sum is set to be valid.  The use of isnan is to
     // make sure that the optimizer doesn't reorder the statements.
     double value = fSums->hostPtr()[i];
-    if (std::isfinite(value)) fSumsValid = true;
+    if (not std::isnan(value)) fSumsValid = true;
     return value;
 }
 
@@ -100,7 +100,7 @@ double Cache::IndexedSums::GetSum2(int i) {
     // finishes before the sum is set to be valid.  The use of isfinite is to
     // make sure that the optimizer doesn't reorder the statements.
     double value = fSums2->hostPtr()[i];
-    if (std::isfinite(value)) fSumsValid = true;
+    if (not std::isnan(value)) fSumsValid = true;
     return value;
 }
 
@@ -142,13 +142,8 @@ namespace {
                          const int NP) {
         for (int i : hemi::grid_stride_range(0,NP)) {
             const double v = inputs[i];
-#ifdef HEMI_DEV_CODE
             CacheAtomicAdd(&sums[indexes[i]],v);
             CacheAtomicAdd(&sums2[indexes[i]],v*v);
-#else
-            sums[indexes[i]] += v;
-            sums2[indexes[i]] += v*v;
-#endif
         }
     }
 
