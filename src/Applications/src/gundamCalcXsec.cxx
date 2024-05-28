@@ -15,6 +15,7 @@
 #include "TH1D.h"
 #include "TH2D.h"
 #include "TLegend.h"
+#include "TGraphErrors.h"
 
 #include <string>
 #include <vector>
@@ -200,6 +201,7 @@ int main(int argc, char** argv){
     return EXIT_SUCCESS;
   }
 
+  std::vector<double> listOfParametersAtBestFit{}; // this will contain prior values in the pre-fit case!
 
   if( not clParser.isOptionTriggered("usePreFit") and fitterRootFile != nullptr ){
 
@@ -211,7 +213,9 @@ int main(int argc, char** argv){
         if( not parSet.isEnabled() ){ continue; }
         for( auto& par : parSet.getParameterList() ){
           if( not par.isEnabled() ){ continue; }
+          LogInfo << " moving par prior: " << par.getFullTitle() << " from " << par.getPriorValue() << " to " << par.getParameterValue() << std::endl;
           par.setPriorValue( par.getParameterValue() );
+          listOfParametersAtBestFit.emplace_back( par.getParameterValue() );
         }
       }
     });
@@ -229,6 +233,14 @@ int main(int argc, char** argv){
           }
         }
     );
+  }else{
+    for( auto& parSet : propagator.getParametersManager().getParameterSetsList() ){
+      if( not parSet.isEnabled() ){ continue; }
+      for( auto& par : parSet.getParameterList() ){
+        if( not par.isEnabled() ){ continue; }
+        listOfParametersAtBestFit.emplace_back( par.getPriorValue() );
+      }
+    }
   }
 
 
@@ -517,10 +529,12 @@ int main(int argc, char** argv){
     for( auto& xsec : crossSectionDataList ){
 //      LogInfo << xsec.samplePtr->getName() << std::endl;
       xsec.branchBinsData.resetCurrentByteOffset();
+//      xsec.samplePtr->getMcContainer().throwStatError();
+//      xsec.samplePtr->getMcContainer().throwEventMcError();
       for( int iBin = 0 ; iBin < xsec.samplePtr->getMcContainer().getHistogram().nBins ; iBin++ ){
         double binData{ xsec.samplePtr->getMcContainer().getHistogram().binList[iBin].content };
 
-//        LogInfo << iBin <<" Before norm: "<< binData << std::endl;
+        LogInfo << iBin <<" Before norm: "<< binData << std::endl;
 
         // special re-norm
         for( auto& normData : xsec.normList ){
@@ -546,8 +560,14 @@ int main(int argc, char** argv){
         {
           auto& mcEvList{xsec.samplePtr->getMcContainer().getEventList()};
           std::for_each(mcEvList.begin(), mcEvList.end(), [&]( Event& ev_){
-            if( iBin != ev_.getIndices().bin ){ return; }
-              ev_.getWeights().current += binData;
+            // get rid of events out of range by setting the weight to 0
+              double Pmu = ev_.getVariables().fetchVariable("Pmu").getVarAsDouble();
+              double CosThetamu = ev_.getVariables().fetchVariable("CosThetamu").getVarAsDouble();
+              if(Pmu <= 0 || Pmu >= 30000 || CosThetamu <= -1 || CosThetamu >= 1){
+                ev_.getWeights().current = 0.;
+              }
+              //if( iBin != ev_.getIndices().bin ){ return; }
+              //ev_.getWeights().current = ;
           });
         }
 
@@ -577,25 +597,70 @@ int main(int argc, char** argv){
 
         binData /= binVolume;
         xsec.branchBinsData.writeRawData( binData );
-//        LogInfo <<  iBin << " After bin volume norm: "<< binData << " bin volume: "<< binVolume << std::endl;
+        LogInfo <<  iBin << " After bin volume norm: "<< binData << " bin volume: "<< binVolume << std::endl;
       }
     }
   });
 
+
+
   {
     LogWarning << "Calculating weight at best-fit" << std::endl;
-    for( auto& parSet : propagator.getParametersManager().getParameterSetsList() ){ parSet.moveParametersToPrior(); }
+    // the following lines has to be avoided otherwise the parameter values are set back to the prior for the flux paramters.
+    // I don't know why this happens since the parameter priors should be moved to the best fit values already....
+    //for( auto& parSet : propagator.getParametersManager().getParameterSetsList() ){ parSet.moveParametersToPrior(); }
+    //  Print parameters at best-fit
+    int iPar = 0;
+    for( auto& parSet : propagator.getParametersManager().getParameterSetsList() ){
+      if (not parSet.isEnabled()) continue;
+      LogInfo << "Best-fit parameters for " << parSet.getName() << ": " << std::endl;
+      for( auto& par : parSet.getParameterList() ){
+        if (not par.isEnabled()) continue;
+        par.setParameterValue(listOfParametersAtBestFit[iPar]);
+        LogInfo << par.getTitle() << " = " << par.getParameterValue() << std::endl;
+        iPar++;
+      }
+    }
     propagator.propagateParameters();
-    // Print parameters at best-fit
-//    for( auto& parSet : propagator.getParametersManager().getParameterSetsList() ){
-//      LogInfo << "Best-fit parameters for " << parSet.getName() << ": " << std::endl;
-//      for( auto& par : parSet.getParameterList() ){
-//        LogInfo << par.getName() << " = " << par.getParameterValue() << std::endl;
-//      }
-//    }
-//    LogInfo << "AT BEST FIT" << std::endl;
-    writeBinDataFct();
+    // Set weight to 0 for events out of range
+    for( auto& xsec : crossSectionDataList ) {
+      LogInfo << "Events at best fit point for sample " << xsec.samplePtr->getName() << " = " <<
+              xsec.samplePtr->getMcContainer().getEventList().size()
+              << " binned events: " << xsec.samplePtr->getMcContainer().getNbBinnedEvents()
+              << std::endl;
+      int maxEventPrint = 60;
+      int iEvent = 0;
+      int inRange = 0;
+      int outOfRange = 0;
+      for (auto &ev: xsec.samplePtr->getMcContainer().getEventList()) {
+        if(iEvent < maxEventPrint) {
+          LogInfo << "Event: " << iEvent << " going into bin " << ev.getIndices().bin
+                  << " | EventWeight: " << ev.getEventWeight()
+                  << " | Pmu: " << ev.getVariables().fetchVariable("Pmu").getVarAsDouble()
+                  << " | CosThetamu: " << ev.getVariables().fetchVariable("CosThetamu").getVarAsDouble()
+                  << " | summary: " << ev.getSummary()
+                  << std::endl;
+        }
+        double Pmu = ev.getVariables().fetchVariable("Pmu").getVarAsDouble();
+        double CosThetamu = ev.getVariables().fetchVariable("CosThetamu").getVarAsDouble();
+        if(Pmu <= 0 || Pmu >= 30000 || CosThetamu <= -1 || CosThetamu >= 1){
+//          LogInfo << "Pmu or CosThetamu out of range: Pmu=" << Pmu << " CosThetamu=" << CosThetamu << std::endl;
+// need to remove these events!!!!
+          ev.getWeights().current = 0.;
+          //xsec.samplePtr->getMcContainer().getEventList().erase(xsec.samplePtr->getMcContainer().getEventList().begin() + iEvent);
+          outOfRange++;
+        }else{
+          inRange++;
+        }
+        iEvent++;
+      }
+      LogInfo << "Events in range: " << inRange << " out of range: " << outOfRange << std::endl;
+      auto eventListAtBestFit = xsec.samplePtr->getMcContainer().getEventList();
+      xsec.samplePtr->getMcContainer().refillHistogram();
+    }
 
+
+    writeBinDataFct();
     xsecAtBestFitTree->Fill();
     GenericToolbox::writeInTFile( GenericToolbox::mkdirTFile(calcXsecDir, "throws"), xsecAtBestFitTree );
   }
@@ -608,6 +673,9 @@ int main(int argc, char** argv){
     if( not parSet.isEnabled() ) continue;
     for( auto& par : parSet.getParameterList() ){
       if( not par.isEnabled() ) continue;
+      if(i_aux>706 || i_aux<10){
+        LogInfo << "i = "<<i_aux<<" par = "<<par.getParameterValue()<<std::endl;
+      }
       LogInfo << "Parameter "<<i_aux<<" mean = "<<par.getPriorValue()<<" RMS = "<<TMath::Sqrt((*propagator.getParametersManager().getGlobalCovarianceMatrix())[i_aux][i_aux])<<std::endl;
       i_aux++;
     }
@@ -864,12 +932,27 @@ int main(int argc, char** argv){
   } else {
     prePostFit = "postFit";
   }
+  // reset aprams to best fit (or prior in the prefit case)
+  int iParam=0;
+  for( auto& parSet : propagator.getParametersManager().getParameterSetsList() ){
+    if( not parSet.isEnabled() ) continue;
+    for( auto& par : parSet.getParameterList() ){
+      if( not par.isEnabled() ) continue;
+      par.setParameterValue(listOfParametersAtBestFit[iParam]);
+      iParam++;
+    }
+  }
+  propagator.propagateParameters();
+  writeBinDataFct();
+
 
   std::vector<closureVariable> closureVarList;
   std::vector<std::string> varToPlotVector = propagator.getPlotGenerator().fetchListOfVarToPlot();
   size_t nHist = propagator.getPlotGenerator().getConfig().at("histogramsDefinition").size();
   iBinGlobal = -1;
   for( auto& sample : propagator.getSampleSet().getSampleList() ) {
+    // roll back the sample to the best fit point
+
 
     LogInfo << "Fetching data histogram for sample: " << sample.getName() << std::endl;
     TTree *dataTree = (TTree *) fitterFilePtr->Get(
@@ -885,6 +968,8 @@ int main(int argc, char** argv){
 //    );
     LogErrorIf(mcTree == nullptr) << "Could not find mc tree for sample: " << sample.getName() << std::endl;
 
+
+
     nHist = 1; // otherwise the code does not work :)
     for (size_t iHist = 0; iHist < nHist; iHist++) { // this loop is over the variables to plot, as defined in the config file
       closureVariable closureVar;
@@ -895,6 +980,63 @@ int main(int argc, char** argv){
         closureVar.binningFile = sample.getBinningFilePath();
       }else {
         closureVar.binningFile = GenericToolbox::Json::fetchValue<std::string>(propagator.getPlotGenerator().getConfig().at("histogramsDefinition")[iHist], "binningFile");
+      }
+      // debug: print out summary of first 20 events in the mcTree
+      int maxLogEvents = 100;
+      int eventLogCounter = 0;
+      int iEventXsec = 0;
+      int iEventFiter = 0;
+      for(int iEvent=0; iEvent<mcTree->GetEntries(); iEvent++){
+        mcTree->GetEntry(iEvent + iEventFiter);
+        if(iEvent<60) {
+          LogInfo << "Event: " << iEvent
+                  << " | nominal weight: " << mcTree->GetLeaf("Event.nominalWeight")->GetValue()
+                  << " | EventWeight: " << mcTree->GetLeaf("Event.eventWeight")->GetValue()
+                  << " | Pmu: " << mcTree->GetLeaf("Leaves.Pmu")->GetValue()
+                  << " | CosThetamu: " << mcTree->GetLeaf("Leaves.CosThetamu")->GetValue()
+                  << std::endl;
+          LogInfo << " From xsec event list: " << sample.getMcContainer().getEventList().at(iEvent).getSummary()
+                  << std::endl;
+        }
+        if (iEvent + iEventXsec >= sample.getMcContainer().getEventList().size()) {
+          break;
+        }
+          double weightFromXsec = sample.getMcContainer().getEventList().at(iEvent + iEventXsec).getEventWeight();
+          double weightFromFitter = mcTree->GetLeaf("Event.eventWeight")->GetValue();
+          double Pmu_xsec = sample.getMcContainer().getEventList().at(iEvent + iEventXsec).getVariables().fetchVariable("Pmu").getVarAsDouble();
+          double CosThetamu_xsec = sample.getMcContainer().getEventList().at(iEvent + iEventXsec).getVariables().fetchVariable("CosThetamu").getVarAsDouble();
+          // so that if the weight is 0, the event is simply skipped
+          while ( Pmu_xsec <= 0 || Pmu_xsec >= 30000 || CosThetamu_xsec <= -1 || CosThetamu_xsec >= 1  || weightFromXsec == 0. ) {
+            iEventXsec++;
+            if (iEvent + iEventXsec >= sample.getMcContainer().getEventList().size()) {
+              break;
+            }
+            Pmu_xsec = sample.getMcContainer().getEventList().at(iEvent + iEventXsec).getVariables().fetchVariable("Pmu").getVarAsDouble();
+            CosThetamu_xsec = sample.getMcContainer().getEventList().at(iEvent + iEventXsec).getVariables().fetchVariable("CosThetamu").getVarAsDouble();
+            weightFromXsec = sample.getMcContainer().getEventList().at(iEvent + iEventXsec).getEventWeight();
+          }
+          double Pmu_fitter = mcTree->GetLeaf("Leaves.Pmu")->GetValue();
+          double CosThetamu_fitter = mcTree->GetLeaf("Leaves.CosThetamu")->GetValue();
+          while ( Pmu_fitter <= 0 || Pmu_fitter >= 30000 || CosThetamu_fitter <= -1 || CosThetamu_fitter >= 1  ||  weightFromFitter == 0. ) {
+            iEventFiter++;
+            if (iEvent + iEventFiter >= mcTree->GetEntries()) {
+              break;
+            }
+            mcTree->GetEntry(iEvent + iEventFiter);
+            Pmu_fitter = mcTree->GetLeaf("Leaves.Pmu")->GetValue();
+            CosThetamu_fitter = mcTree->GetLeaf("Leaves.CosThetamu")->GetValue();
+            weightFromFitter = mcTree->GetLeaf("Event.eventWeight")->GetValue();
+          }
+
+          if ( abs(weightFromXsec - weightFromFitter) > 1e-4 && eventLogCounter < maxLogEvents  ) {
+            if ( abs(Pmu_fitter-Pmu_xsec)<1.e-6 ) {
+              std::cout << "Event " << iEvent << " has different weights: " << weightFromXsec << " vs "
+                        << weightFromFitter << std::endl;
+            }else{
+             // std::cout << "    event shift " <<iEvent<< std::endl;
+            }
+          eventLogCounter++;
+          }
       }
       closureVar.rescaleAsBinWidth = GenericToolbox::Json::fetchValue<bool>(propagator.getPlotGenerator().getConfig().at("histogramsDefinition")[iHist], "rescaleAsBinWidth");
       // Generate the histogram (using the binning file defined in the plotGenerator)
@@ -1023,12 +1165,13 @@ int main(int argc, char** argv){
       // Fill the histogram
       closureVar.canvas = new TCanvas(("canvas_" + closureVar.varToPlot + "_" +
                                        GenericToolbox::generateCleanBranchName(sample.getName())).c_str(),
-                                      ("canvas_" + closureVar.varToPlot + "_" + sample.getName()).c_str(), 800, 600);
-      closureVar.canvas->cd();
+                                      ("canvas_" + closureVar.varToPlot + "_" + sample.getName()).c_str(), 800, 1600);
+      closureVar.canvas->Divide(1,2);
+      closureVar.canvas->cd(1);
       dataTree->Draw(("(" + closureVar.variableFormula + ")>>" + closureVar.histogram->GetName()).c_str(),
-                     "Event.eventWeight", "goff");
+                     "Event.eventWeight*(Leaves.Pmu > 0 && Leaves.Pmu < 30000 && Leaves.CosThetamu > -1 && Leaves.CosThetamu < 1)", "goff");
       mcTree->Draw(("(" + closureVar.variableFormula + ")>>" + closureVar.mcHistogram->GetName()).c_str(),
-                   "Event.eventWeight", "goff");
+                   "Event.eventWeight*(Leaves.Pmu > 0 && Leaves.Pmu < 30000 && Leaves.CosThetamu > -1 && Leaves.CosThetamu < 1)", "goff");
       // manually set the bin errors from the covariance matrix
       LogInfo << "Variable: " << closureVar.varToPlot << " | Sample: " << closureVar.samplePtr->getName()
               << " | Binning file: " << closureVar.binningFile << std::endl;
@@ -1051,7 +1194,7 @@ int main(int argc, char** argv){
                   << closureVar.mcHistogram->GetBinError(iBin + 1) << std::endl;
           // rescale to bin width
           if (closureVar.rescaleAsBinWidth) {
-            double binWidth = closureVar.histogram->GetBinWidth(iBin + 1);
+            double binWidth = closureVar.mcHistogram->GetBinWidth(iBin + 1);
             if (binWidth == 0) {
               LogError << "Bin " << iBin << " has a width of 0. Skipping rescaling." << std::endl;
             } else {
@@ -1074,7 +1217,11 @@ int main(int argc, char** argv){
           LogInfo << "Bin " << iBin << " | Data: " << closureVar.histogram->GetBinContent(iBin + 1)
                   << " | MC: " << closureVar.mcHistogram->GetBinContent(iBin + 1)
                   << " | Mean: " << closureVar.meanValueHistogram->GetBinContent(iBin + 1)
-                  << " | Best fit: " << closureVar.bestFitHistogram->GetBinContent(iBin + 1) << std::endl;
+                  << " | Best fit: " << closureVar.bestFitHistogram->GetBinContent(iBin + 1)
+                  << " | BF/MC: " << closureVar.bestFitHistogram->GetBinContent(iBin + 1) / closureVar.mcHistogram->GetBinContent(iBin + 1)
+                  << " | bin width mc: " << closureVar.mcHistogram->GetBinWidth(iBin + 1)
+                  << " | bin width bf: " << closureVar.bestFitHistogram->GetBinWidth(iBin + 1) << std::endl;
+
         }
         LogInfo << "After rescaling: bin errors" << std::endl;
         for (int iBin = 0; iBin < closureVar.histogram->GetNbinsX(); iBin++) {
@@ -1084,6 +1231,48 @@ int main(int argc, char** argv){
                                     << " | Best fit: " << closureVar.bestFitHistogram->GetBinError(iBin + 1) << std::endl;
         }
 
+        // make histo with the relative difference between data and MC, overlaid
+        // with the relative uncertainty on MC
+        std::string sampleNameDiff = GenericToolbox::generateCleanBranchName( "hRelativeDiff" + closureVar.varToPlot + "_" + sample.getName()  );
+        TH1F* hRelativeDiff = new TH1F(sampleNameDiff.c_str(), "Relative difference", closureVar.histogram->GetNbinsX(), closureVar.histogram->GetXaxis()->GetXmin(), closureVar.histogram->GetXaxis()->GetXmax());
+        TH1F* hMcErrors = new TH1F((sampleNameDiff+"_err").c_str(), "MC errors", closureVar.histogram->GetNbinsX(), closureVar.histogram->GetXaxis()->GetXmin(), closureVar.histogram->GetXaxis()->GetXmax());
+        for (int iBin = 0; iBin < closureVar.histogram->GetNbinsX(); iBin++) {
+          double data = closureVar.histogram->GetBinContent(iBin + 1);
+          double mc = closureVar.mcHistogram->GetBinContent(iBin + 1);
+          double mcError = closureVar.mcHistogram->GetBinError(iBin + 1);
+          double relativeDiff;
+          double relativeError;
+          if(mc!=0){
+            relativeDiff = (data - mc) / mc;
+            relativeError = mcError / mc;
+          }else if(data!=0){
+            relativeDiff = (data - mc) / data; // -> this will always be 1.
+            relativeError = 0;
+          }else{
+            relativeDiff = 0;
+            relativeError = 0;
+          }
+          hRelativeDiff->SetBinContent(iBin + 1, relativeDiff);
+          hMcErrors->SetBinContent(iBin + 1, 0);
+          hMcErrors->SetBinError(iBin + 1, relativeError);
+          std::cout << iBin << "  " << hRelativeDiff->GetBinContent(iBin + 1) << "  " << hMcErrors->GetBinContent(iBin + 1) << "  " << hMcErrors->GetBinError(iBin + 1)
+          << std::endl;
+        }
+      closureVar.canvas->cd(2);
+      hRelativeDiff->Draw();
+      hMcErrors->Draw("e2 same");
+      hRelativeDiff->SetMarkerStyle(kFullDotLarge);
+      hRelativeDiff->SetMarkerColor(kRed);
+      hRelativeDiff->SetMarkerSize(1);
+      hRelativeDiff->SetLineWidth(2);
+      hRelativeDiff->SetLineColor(kRed);
+      hMcErrors->SetFillColor(kBlue);
+      hMcErrors->SetFillStyle(3001);
+      hMcErrors->GetYaxis()->SetRangeUser(-1,1);
+      hRelativeDiff->GetYaxis()->SetRangeUser(-1,1);
+      hRelativeDiff->GetYaxis()->SetTitle("(data - mc) / mc");
+      hRelativeDiff->GetXaxis()->SetTitle(closureVar.varToPlot.c_str());
+      hRelativeDiff->SetTitle("Relative difference between data and MC");
 
       // Only look at the shape
 //      closureVar.histogram->Scale(1.0/closureVar.histogram->Integral());
@@ -1092,10 +1281,11 @@ int main(int argc, char** argv){
 //      closureVar.bestFitHistogram->Scale(1.0/closureVar.bestFitHistogram->Integral());
 
 
-      // cosmetics
+      // cosmetics + draw
+      closureVar.canvas->cd(1);
       closureVar.histogram->SetMarkerStyle(kFullDotLarge);
       closureVar.histogram->SetMarkerColor(kRed);
-      closureVar.histogram->SetMarkerSize(0.5);
+      closureVar.histogram->SetMarkerSize(1);
       closureVar.histogram->SetLineWidth(2);
       closureVar.histogram->SetLineColor(kRed);
       closureVar.histogram->SetDrawOption("hist");
@@ -1121,6 +1311,8 @@ int main(int argc, char** argv){
       legend->AddEntry(closureVar.meanValueHistogram, "Mean of throws", "l");
       legend->AddEntry(closureVar.bestFitHistogram, "Best fit", "l");
       legend->Draw();
+
+
 
 
       // save
