@@ -43,9 +43,9 @@ Cache::IndexedSums::IndexedSums(Cache::Weights::Results& inputs,
         fIndexes = std::make_unique<hemi::Array<short>>(fEventWeights.size(),false);
 
     }
-    catch (std::bad_alloc&) {
-        LogError << "Failed to allocate memory, so stopping" << std::endl;
-        throw std::runtime_error("Not enough memory available");
+    catch (...) {
+        LogError << "Uncaught exception, so stopping" << std::endl;
+        LogThrow("Uncaught exception -- not enough memory available");
     }
 
     // Place the cache into a default state.
@@ -83,10 +83,10 @@ double Cache::IndexedSums::GetSum(int i) {
     if (i < 0) throw;
     if (fSums->size() <= i) throw;
     // This odd ordering is to make sure the thread-safe hostPtr update
-    // finishes before the sum is set to be valid.  The use of isfinite is to
+    // finishes before the sum is set to be valid.  The use of isnan is to
     // make sure that the optimizer doesn't reorder the statements.
     double value = fSums->hostPtr()[i];
-    if (std::isfinite(value)) fSumsValid = true;
+    if (not std::isnan(value)) fSumsValid = true;
     return value;
 }
 
@@ -97,7 +97,7 @@ double Cache::IndexedSums::GetSum2(int i) {
     // finishes before the sum is set to be valid.  The use of isfinite is to
     // make sure that the optimizer doesn't reorder the statements.
     double value = fSums2->hostPtr()[i];
-    if (std::isfinite(value)) fSumsValid = true;
+    if (not std::isnan(value)) fSumsValid = true;
     return value;
 }
 
@@ -139,13 +139,8 @@ namespace {
                          const int NP) {
         for (int i : hemi::grid_stride_range(0,NP)) {
             const double v = inputs[i];
-#ifdef HEMI_DEV_CODE
             CacheAtomicAdd(&sums[indexes[i]],v);
             CacheAtomicAdd(&sums2[indexes[i]],v*v);
-#else
-            sums[indexes[i]] += v;
-            sums2[indexes[i]] += v*v;
-#endif
         }
     }
 

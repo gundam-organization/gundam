@@ -1,5 +1,11 @@
 #include "Logger.h"
 
+// Check if global variables need to be defined.
+#ifndef __cpp_inline_variables
+#define HEMI_COMPILE_DEFINITIONS
+#include <hemi/hemi.h>
+#endif
+
 #include "CacheManager.h"
 #include "CacheParameters.h"
 #include "CacheWeights.h"
@@ -47,15 +53,18 @@ Cache::Manager::Manager(int events, int parameters,
     fTotalBytes = 0;
     try {
         fParameterCache = std::make_unique<Cache::Parameters>(parameters);
+        LogThrowIf(not fParameterCache, "Bad ParameterCache alloc");
         fTotalBytes += fParameterCache->GetResidentMemory();
 
         fWeightsCache = std::make_unique<Cache::Weights>(events);
+        LogThrowIf(not fWeightsCache, "Bad WeightsCache alloc");
         fTotalBytes += fWeightsCache->GetResidentMemory();
 
         fNormalizations = std::make_unique<Cache::Weight::Normalization>(
                                   fWeightsCache->GetWeights(),
                                   fParameterCache->GetParameters(),
                                   norms);
+        LogThrowIf(not fNormalizations, "Bad Normalizations alloc");
         fWeightsCache->AddWeightCalculator(fNormalizations.get());
         fTotalBytes += fNormalizations->GetResidentMemory();
 
@@ -66,6 +75,7 @@ Cache::Manager::Manager(int events, int parameters,
                                   fParameterCache->GetUpperClamps(),
                                   compactSplines, compactPoints,
                                   spaceOption);
+        LogThrowIf(not fCompactSplines, "Bad CompactSplines alloc");
         fWeightsCache->AddWeightCalculator(fCompactSplines.get());
         fTotalBytes += fCompactSplines->GetResidentMemory();
 
@@ -76,6 +86,7 @@ Cache::Manager::Manager(int events, int parameters,
                                   fParameterCache->GetUpperClamps(),
                                   monotonicSplines, monotonicPoints,
                                   spaceOption);
+        LogThrowIf(not fMonotonicSplines, "Bad MonotonicSplines alloc");
         fWeightsCache->AddWeightCalculator(fMonotonicSplines.get());
         fTotalBytes += fMonotonicSplines->GetResidentMemory();
 
@@ -86,6 +97,7 @@ Cache::Manager::Manager(int events, int parameters,
                                   fParameterCache->GetUpperClamps(),
                                   uniformSplines, uniformPoints,
                                   spaceOption);
+        LogThrowIf(not fUniformSplines, "Bad UniformSplines alloc");
         fWeightsCache->AddWeightCalculator(fUniformSplines.get());
         fTotalBytes += fUniformSplines->GetResidentMemory();
 
@@ -96,6 +108,7 @@ Cache::Manager::Manager(int events, int parameters,
                                   fParameterCache->GetUpperClamps(),
                                   generalSplines, generalPoints,
                                   spaceOption);
+        LogThrowIf(not fGeneralSplines, "Bad GeneralSplines alloc");
         fWeightsCache->AddWeightCalculator(fGeneralSplines.get());
         fTotalBytes += fGeneralSplines->GetResidentMemory();
 
@@ -105,17 +118,19 @@ Cache::Manager::Manager(int events, int parameters,
                                   fParameterCache->GetLowerClamps(),
                                   fParameterCache->GetUpperClamps(),
                                   graphs, graphPoints);
+        LogThrowIf(not fGraphs, "Bad Graphs alloc");
         fWeightsCache->AddWeightCalculator(fGraphs.get());
         fTotalBytes += fGraphs->GetResidentMemory();
         fHistogramsCache = std::make_unique<Cache::IndexedSums>(
                                   fWeightsCache->GetWeights(),
                                   histBins);
+        LogThrowIf(not fHistogramsCache, "Bad HistogramsCache alloc");
         fTotalBytes += fHistogramsCache->GetResidentMemory();
 
     }
     catch (...) {
         LogError << "Failed to allocate memory, so stopping" << std::endl;
-        throw std::runtime_error("Not enough memory available");
+        LogThrow("Not enough memory available");
     }
 
     LogInfo << "Approximate cache manager size for"
@@ -153,10 +168,11 @@ bool Cache::Manager::Build( SampleSet& sampleList,
     /// Find the amount of space needed for the cache.
     std::set<const Parameter*> usedParameters;
 
+    int dialErrorCount = 0;
     std::map<std::string, int> useCount;
     for (EventDialCache::CacheEntry& elem : eventDials.getCache()) {
         if (elem.event->getIndices().bin < 0) {
-            throw std::runtime_error("Caching event that isn't used");
+            LogThrow("Caching event that isn't used");
         }
         ++events;
         for( auto& dialResponseCache : elem.dialResponseCacheList) {
@@ -199,12 +215,19 @@ bool Cache::Manager::Build( SampleSet& sampleList,
                 ++shifts;
             }
             else {
-                LogError << "Unsupported dial type in CacheManager -- "
+                LogError << "Unsupported dial type -- "
                           << dialType
                           << std::endl;
-                // throw std::runtime_error("unsupported dial");
+                ++dialErrorCount;
             }
         }
+    }
+
+    if (dialErrorCount > 0) {
+        LogError << "Dial creation errors: "
+                 << dialErrorCount
+                 << std::endl;
+        LogThrow("Unsupported dial type: Incomplete dial implementation");
     }
 
     // Count the total number of histogram cells.
@@ -295,15 +318,23 @@ bool Cache::Manager::Build( SampleSet& sampleList,
             LogInfo << "    GPU Not enabled with Cache::Manager"
                       << std::endl;
         }
-        fSingleton = new Manager(events,parameters,
-                                 norms,
-                                 compactSplines,compactPoints,
-                                 monotonicSplines,monotonicPoints,
-                                 uniformSplines,uniformPoints,
-                                 generalSplines,generalPoints,
-                                 graphs, graphPoints,
-                                 histCells,
-                                 "space");
+        try {
+            fSingleton = new Manager(events,parameters,
+                                     norms,
+                                     compactSplines,compactPoints,
+                                     monotonicSplines,monotonicPoints,
+                                     uniformSplines,uniformPoints,
+                                     generalSplines,generalPoints,
+                                     graphs, graphPoints,
+                                     histCells,
+                                     "space");
+            LogThrowIf(not fSingleton, "CacheManager Not allocated");
+        }
+        catch (...) {
+            LogError << "Did not allocated cache manager" << std::endl;
+            LogThrow("Cache::Manager allocation error");
+        }
+
     }
 
     // In case the cache isn't allocated (usually because it's turned off on
@@ -371,6 +402,7 @@ bool Cache::Manager::Update( SampleSet& sampleList,
         // Get the initial value for this event and save it.
         double initialEventWeight = event.getWeights().base;
 
+        int dialErrorCount = 0;
         // Add each dial for the event to the GPU caches.
         for( auto& dialElem : elem.dialResponseCacheList ){
             DialInputBuffer* dialInputs = dialElem.dialInterface.getInputBufferRef();
@@ -499,11 +531,18 @@ bool Cache::Manager::Update( SampleSet& sampleList,
             if (dialUsed != 1) {
                 LogError << "Problem with dial: " << dialUsed
                           << std::endl;
-                LogError << "Dial Type Name: "
+                LogError << "Unsupported Dial Type Name: "
                           << baseDial->getDialTypeName()
                           << std::endl;
-                // std::runtime_error("Dial use problem");
+                ++dialErrorCount;
             }
+        }
+
+        if (dialErrorCount > 0) {
+            LogError << "Dial creation errors --"
+                     << " Unsupported dial types: " << dialErrorCount
+                     << std::endl;
+            LogThrow("Unsupported dial type: Incomplete dial implementation");
         }
 
         // Set the initial weight for the event.  This is done here since the
@@ -524,7 +563,7 @@ bool Cache::Manager::Update( SampleSet& sampleList,
         LogError << "Cache Manager -- expected Results: "
                  << Cache::Manager::Get()->GetWeightsCache().GetResultCount()
                  << std::endl;
-        // throw std::runtime_error("Probable problem putting dials in cache");
+        LogThrow("Probable problem putting dials in cache");
     }
 
     // Add the histogram cells to the cache.  THIS CODE IS SUSPECT!!!!
@@ -536,7 +575,7 @@ bool Cache::Manager::Update( SampleSet& sampleList,
                 << " events" << std::endl;
         std::shared_ptr<TH1> hist(sample.getMcContainer().generateRootHistogram());
         if (!hist) {
-            throw std::runtime_error("missing sample histogram");
+            LogThrow("missing sample histogram");
         }
         int thisHist = nextHist;
         sample.getMcContainer().setCacheManagerIndex(thisHist);
@@ -562,7 +601,7 @@ bool Cache::Manager::Update( SampleSet& sampleList,
             int eventIndex = event.getCache().index;
             int cellIndex = event.getIndices().bin;
             if (cellIndex < 0 || cells <= cellIndex) {
-                throw std::runtime_error("Histogram bin out of range");
+                LogThrow("Histogram bin out of range");
             }
             int theEntry = thisHist + cellIndex;
             Cache::Manager::Get()->GetHistogramsCache()
@@ -572,7 +611,7 @@ bool Cache::Manager::Update( SampleSet& sampleList,
 
     if (Cache::Manager::Get()->GetHistogramsCache().GetSumCount()
         != nextHist) {
-        throw std::runtime_error("Histogram cells are missing");
+        LogThrow("Histogram cells are missing");
     }
 
     return true;

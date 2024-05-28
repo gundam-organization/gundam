@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 #
 # Setup the GUNDAM directory for development (or simply
 # running the test).  This makes sure that the ROOT environment
@@ -11,6 +11,11 @@
 #  gundam-setup == Source this file.  You probably never have to use
 #           this one.
 #
+# If the script is sourced with an argument, the argument is appended to the
+# build directory
+#
+# Example: gundam-setup -gpu -- append "-gpu" to GUNDAM_TARGET
+#
 # This setup script is not needed.  You can also do it by hand.  It's
 # a usual cmake build, but you need to make sure root is
 # "in the path".
@@ -21,7 +26,27 @@
 # make
 # make install
 
+if [ "x${BASH_VERSION}" = "x" ]; then
+    echo
+    echo ERROR: Setup script requires bash.  The GUNDAM build can be hand
+    echo configured by setting the environment variables.
+    echo
+    echo GUNDAM_ROOT    -- The root for the gundam source
+    echo GUNDAM_BUILD   -- Force the location for the build
+    echo GUNDAM_INSTALL -- The location to install gundam - defaults to build
+    echo GUNDAM_JOBS    -- Number of jobs to use during build
+    echo GUNDAM_CMAKE_DEFINES -- Location specific cmake arguments
+    echo
+    return
+fi
+
 echo Setup gundam for development and building
+GUNDAM_EXTRA=""
+if [ ${#1} -gt 0 ]; then
+    echo Add extra string to GUNDAM_TARGET: ${1}
+    GUNDAM_EXTRA=${1}
+    shift
+fi
 
 # Try to setup root.  ROOT installs thisroot.sh in the bin directory
 # to setup the environment.  The first "thisroot.sh" in the path will
@@ -60,11 +85,22 @@ fi
 
 ___gundam_target () {
     target="gundam"
-    compiler=gcc
+    if [ ${#GUNDAM_COMPILER} -gt 0 ]; then
+        echo Using ${GUNDAM_COMPILER}
+        compler=${GUNDAM_COMPILER}
+    elif which gcc >& /dev/null ; then
+        compiler=gcc
+    elif which clang >& /dev/null; then
+        compiler=clang
+    fi
     case ${compiler} in
         gcc)
             compiler_version=$(gcc -dumpversion)
             compiler_machine=$(gcc -dumpmachine)
+            ;;
+        clang)
+            compiler_version=$(clang -dumpversion)
+            compiler_machine=$(clang -dumpmachine)
             ;;
         *)
             compiler_version=unknown
@@ -76,7 +112,7 @@ ___gundam_target () {
 }
 
 export GUNDAM_TARGET
-GUNDAM_TARGET=$(___gundam_target)
+GUNDAM_TARGET=$(___gundam_target)${GUNDAM_EXTRA}
 unset -f ___gundam_target
 
 ___path_prepend () {

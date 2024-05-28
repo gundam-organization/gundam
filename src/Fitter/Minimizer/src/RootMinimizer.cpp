@@ -922,33 +922,54 @@ void RootMinimizer::writePostFitData( TDirectory* saveDir_) {
           legend->AddEntry(postFitErrorHist.get(),"Post-fit values","ep");
 
           for( const auto& par : parList_ ){
+            if (par.isEnabled()) {
+              if (std::isnan(par.getParameterValue())) {
+                LogError << "Parameter with invalid value: "
+                         << par.getTitle() << std::endl;
+              }
+              if (std::isnan((*covMatrix_)
+                             [par.getParameterIndex()]
+                             [par.getParameterIndex()])) {
+                LogError << "Parameter error with invalid value: "
+                         << par.getTitle() << std::endl;
+              }
+            }
+
             longestTitleSize = std::max(longestTitleSize, par.getTitle().size());
 
             postFitErrorHist->GetXaxis()->SetBinLabel(1 + par.getParameterIndex(), par.getTitle().c_str());
             preFitErrorHist->GetXaxis()->SetBinLabel(1 + par.getParameterIndex(), par.getTitle().c_str());
 
             if(not isNorm_){
-              postFitErrorHist->SetBinContent( 1 + par.getParameterIndex(), par.getParameterValue());
-              postFitErrorHist->SetBinError( 1 + par.getParameterIndex(), TMath::Sqrt((*covMatrix_)[par.getParameterIndex()][par.getParameterIndex()]));
+              if (par.isEnabled()) {
+                postFitErrorHist->SetBinContent( 1 + par.getParameterIndex(),
+                                                 par.getParameterValue());
+                postFitErrorHist->SetBinError(
+                  1 + par.getParameterIndex(),
+                  TMath::Sqrt((*covMatrix_)
+                              [par.getParameterIndex()]
+                              [par.getParameterIndex()]));
+              }
               preFitErrorHist->SetBinContent( 1 + par.getParameterIndex(), par.getPriorValue() );
-
               if( par.isEnabled() and not par.isFixed() and not par.isFree() ){
                 preFitErrorHist->SetBinError( 1 + par.getParameterIndex(), par.getStdDevValue() );
               }
             }
             else{
-              postFitErrorHist->SetBinContent(
+              if (par.isEnabled()) {
+                postFitErrorHist->SetBinContent(
                   1 + par.getParameterIndex(),
-                  ParameterSet::toNormalizedParValue(par.getParameterValue(), par)
-              );
-              preFitErrorHist->SetBinContent( 1 + par.getParameterIndex(), 0 );
-
-              postFitErrorHist->SetBinError(
+                  ParameterSet::toNormalizedParValue(par.getParameterValue(),
+                                                     par));
+                postFitErrorHist->SetBinError(
                   1 + par.getParameterIndex(),
                   ParameterSet::toNormalizedParRange(
-                      TMath::Sqrt((*covMatrix_)[par.getParameterIndex()][par.getParameterIndex()]), par
-                  )
-              );
+                    TMath::Sqrt((*covMatrix_)
+                                [par.getParameterIndex()]
+                                [par.getParameterIndex()]), par));
+              }
+
+              preFitErrorHist->SetBinContent( 1 + par.getParameterIndex(), 0 );
               if( par.isEnabled() and not par.isFixed() and not par.isFree() ){
                 preFitErrorHist->SetBinError( 1 + par.getParameterIndex(), 1 );
               }
