@@ -30,6 +30,14 @@ private:
     // The accumulated weights for each histogram bin.
     std::unique_ptr<hemi::Array<double>> fSums2;
 
+    // The lower bound for any individual entry in the fWeights array.  This
+    // is a global event weight clamp.
+    double fLowerClamp;
+
+    // The upper bound for any individual entry in the fWeights array.  This
+    // is a global event weight clamp.
+    double fUpperClamp;
+
     // Cache of whether the result values in memory are valid.
     bool fSumsValid;
 
@@ -53,6 +61,14 @@ public:
 
     // Assigns the bin number that an event will be added to.
     void SetEventIndex(int event, int bin);
+
+    // Set the maximum event weight to be applied as an upper clamp during the
+    // sum.  (Default: infinity).
+    void SetMaximumEventWeight(double maximum);
+
+    // Set the minimum event weight to be applied as an upper clamp during the
+    // sum.  (Default: negative infinity).
+    void SetMinimumEventWeight(double minimum);
 
     /// Return the number of histogram bins that are accumulated.
     std::size_t GetSumCount() const {return fSums->size();}

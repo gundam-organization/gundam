@@ -5,6 +5,7 @@
 #include <exception>
 #include <cmath>
 #include <memory>
+#include <limits>
 
 #include <hemi/hemi_error.h>
 #include <hemi/launch.h>
@@ -19,7 +20,9 @@ LoggerInit([]{
 // The constructor
 Cache::IndexedSums::IndexedSums(Cache::Weights::Results& inputs,
                                 std::size_t bins)
-    : fEventWeights(inputs) {
+    : fEventWeights(inputs),
+      fLowerClamp(-std::numeric_limits<double>::infinity()),
+      fUpperClamp(std::numeric_limits<double>::infinity()) {
     LogThrowIf((inputs.size()<1), "No bins to sum");
     LogThrowIf((bins<1), "No bins to sum");
 
@@ -80,6 +83,14 @@ void Cache::IndexedSums::SetEventIndex(int event, int bin) {
     LogThrowIf((bin<0), "Bin is out of range");
     LogThrowIf((fSums->size() <= bin), "Bin is out of range");
     fIndexes->hostPtr()[event] = bin;
+}
+
+void Cache::IndexedSums::SetMaximumEventWeight(double maximum) {
+    fUpperClamp = maximum;
+}
+
+void Cache::IndexedSums::SetMinimumEventWeight(double minimum) {
+    fLowerClamp = minimum;
 }
 
 double Cache::IndexedSums::GetSum(int i) {
@@ -147,6 +158,24 @@ namespace {
         }
     }
 
+    // A function to do the sums
+    HEMI_KERNEL_FUNCTION(HEMIClampedIndexedSumKernel,
+                         double* sums,
+                         double* sums2,
+                         const double* inputs,
+                         const short* indexes,
+                         const double lowerClamp,
+                         const double upperClamp,
+                         const int NP) {
+        for (int i : hemi::grid_stride_range(0,NP)) {
+            double v = inputs[i];
+            if (v < lowerClamp) v = lowerClamp;
+            if (v > upperClamp) v = upperClamp;
+            CacheAtomicAdd(&sums[indexes[i]],v);
+            CacheAtomicAdd(&sums2[indexes[i]],v*v);
+        }
+    }
+
 }
 
 bool Cache::IndexedSums::Apply() {
@@ -164,13 +193,25 @@ bool Cache::IndexedSums::Apply() {
                  0.0,
                  fSums2->size());
 
-    HEMIIndexedSumKernel indexedSumKernel;
-    hemi::launch(indexedSumKernel,
-                 fSums->writeOnlyPtr(),
-                 fSums2->writeOnlyPtr(),
-                 fEventWeights.readOnlyPtr(),
-                 fIndexes->readOnlyPtr(),
-                 fEventWeights.size());
+    if (std::isfinite(fLowerClamp) || std::isfinite(fUpperClamp)) {
+        HEMIClampedIndexedSumKernel clampedIndexedSumKernel;
+        hemi::launch(clampedIndexedSumKernel,
+                     fSums->writeOnlyPtr(),
+                     fSums2->writeOnlyPtr(),
+                     fEventWeights.readOnlyPtr(),
+                     fIndexes->readOnlyPtr(),
+                     fLowerClamp, fUpperClamp,
+                     fEventWeights.size());
+    }
+    else {
+        HEMIIndexedSumKernel indexedSumKernel;
+        hemi::launch(indexedSumKernel,
+                     fSums->writeOnlyPtr(),
+                     fSums2->writeOnlyPtr(),
+                     fEventWeights.readOnlyPtr(),
+                     fIndexes->readOnlyPtr(),
+                     fEventWeights.size());
+    }
 
     // Synchronization prevents the GPU from running in parallel with the CPU,
     // so it can make the whole program a little slower.  In practice, the
