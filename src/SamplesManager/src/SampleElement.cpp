@@ -89,12 +89,12 @@ void SampleElement::refillHistogram(int iThread_){
 
 #ifdef GUNDAM_USING_CACHE_MANAGER
   if (_CacheManagerValid_ and not (*_CacheManagerValid_)) {
-      // This can be slowish when data must be copied from the device, but
-      // it makes sure that the results are copied from the device when they
-      // have changed. The values pointed to by _CacheManagerValue_ and
-      // _CacheManagerValid_ are inside the summed index cache (a bit of
-      // evil coding here), and are updated by the cache.  The update is
-      // triggered by (*_CacheManagerUpdate_)().
+      // This can be slow (~10 usec for 5000 bins) when data must be copied
+      // from the device, but it makes sure that the results are copied from
+      // the device when they have changed. The values pointed to by
+      // _CacheManagerValue_ and _CacheManagerValid_ are inside the summed
+      // index cache (a bit of evil coding here), and are updated by the
+      // cache.  The update is triggered by (*_CacheManagerUpdate_)().
       if (_CacheManagerUpdate_) (*_CacheManagerUpdate_)();
   }
 #endif
@@ -114,23 +114,6 @@ void SampleElement::refillHistogram(int iThread_){
       const double ew2 = _CacheManagerValue2_[_CacheManagerIndex_+binPtr->index];
       binPtr->content += ew;
       binPtr->error += ew2;
-#ifdef CACHE_MANAGER_SLOW_VALIDATION
-      double content = binContentArray[iBin+1];
-      double slowValue = 0.0;
-      for( auto* eventPtr : perBinEventPtrList.at(iBin)){
-        slowValue += eventPtr->getEventWeight();
-      }
-      double delta = std::abs(slowValue-content);
-      if (delta > 1E-6) {
-        LogInfo << "VALIDATION: Mismatched bin: " << _CacheManagerIndex_
-                << "+" << iBin
-                << "(" << name
-                << ") gpu: " << content
-                << " PhysEvt: " << slowValue
-                << " delta: " << delta
-                << std::endl;
-      }
-#endif // CACHE_MANAGER_SLOW_VALIDATION
     }
     else {
 #endif
