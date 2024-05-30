@@ -250,10 +250,6 @@ void DialCollection::setupDialInterfaceReferences(){
 
 
 }
-size_t DialCollection::getNextDialFreeSlot(){
-  return _dialFreeSlot_++;
-}
-
 
 // init protected
 void DialCollection::readGlobals(const JsonType &config_) {

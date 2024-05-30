@@ -70,7 +70,7 @@ public:
   void resizeContainers();
   void setupDialInterfaceReferences();
   void updateInputBuffers();
-  size_t getNextDialFreeSlot();
+  size_t getNextDialFreeSlot(){ return _dialFreeSlot_++; }
 
 
 protected:
