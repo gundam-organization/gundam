@@ -391,11 +391,11 @@ bool Cache::Manager::Update( SampleSet& sampleList,
 
         event.getCache().index = resultIndex;
         event.getCache().valuePtr = (Cache::Manager::Get()
-                                          ->GetWeightsCache()
-                                          .GetResultPointer(resultIndex));
+                                     ->GetWeightsCache()
+                                     .GetResultPointer(resultIndex));
         event.getCache().isValidPtr = (Cache::Manager::Get()
-                                          ->GetWeightsCache()
-                                          .GetResultValidPointer());
+                                       ->GetWeightsCache()
+                                       .GetResultValidPointer());
         event.getCache().updateCallbackPtr = (
             [](){Cache::Manager::Get()->GetWeightsCache().GetResult(0);});
 
@@ -648,12 +648,6 @@ bool Cache::Manager::Fill() {
     cache->GetWeightsCache().Apply();
     cache->GetHistogramsCache().Apply();
 
-#ifdef CACHE_MANAGER_SLOW_VALIDATION
-#warning CACHE_MANAGER_SLOW_VALIDATION in Cache::Manager::Fill()
-    // Returning false means that the event weights will also be calculated
-    // using the CPU.
-    return false;
-#endif
     return true;
 }
 
