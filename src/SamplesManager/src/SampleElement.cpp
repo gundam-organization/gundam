@@ -3,15 +3,17 @@
 //
 
 #include "GundamGlobals.h"
+#include "GundamAlmostEqual.h"
+
 #include "SampleElement.h"
 
 #include "Logger.h"
 
 #include "TRandom.h"
 
+#include <cmath>
 
 LoggerInit([]{ Logger::setUserHeaderStr("[SampleElement]"); });
-
 
 void SampleElement::buildHistogram(const DataBinSet& binning_){
   _histogram_.binList.reserve(binning_.getBinList().size() );
@@ -99,33 +101,52 @@ void SampleElement::refillHistogram(int iThread_){
   }
 #endif
 
-  // Faster that pointer shifter. -> would be slower if refillHistogram is
+  // Faster than pointer shifter. -> would be slower if refillHistogram is
   // handled by the propagator
   int iBin = iThread_; // iBin += nbThreads;
   Histogram::Bin* binPtr;
   double buffer{};
   while( iBin < _histogram_.nBins ){
+    bool binFilled = false;
     binPtr = &_histogram_.binList[iBin];
-    binPtr->content = 0;
-    binPtr->error = 0;
+    binPtr->content = std::nan("not-set");
+    binPtr->error = std::nan("not-set");
 #ifdef GUNDAM_USING_CACHE_MANAGER
+    bool filledWithManager = false;
+    double value{std::nan("not-set")};
+    double error{std::nan("not-set")};
     if (_CacheManagerValue_ !=nullptr and _CacheManagerIndex_ >= 0) {
-      const double ew = _CacheManagerValue_[_CacheManagerIndex_+binPtr->index];
-      const double ew2 = _CacheManagerValue2_[_CacheManagerIndex_+binPtr->index];
-      binPtr->content += ew;
-      binPtr->error += ew2;
+      value = _CacheManagerValue_[_CacheManagerIndex_+binPtr->index];
+      error = _CacheManagerValue2_[_CacheManagerIndex_+binPtr->index];
+      binPtr->content = value;
+      binPtr->error = error;
+      binFilled = not GundamGlobals::getForceDirectCalculation();
+      filledWithManager = true;
     }
-    else {
 #endif
+    if (not binFilled) {
+      binPtr->content = 0;
+      binPtr->error = 0;
       for (auto *eventPtr: binPtr->eventPtrList) {
         buffer = eventPtr->getEventWeight();
         binPtr->content += buffer;
         binPtr->error += buffer * buffer;
       }
-#ifdef GUNDAM_USING_CACHE_MANAGER
     }
-#endif // GUNDAM_USING_CACHE_MANAGER
-    binPtr->error = sqrt(binPtr->error);
+#ifdef GUNDAM_USING_CACHE_MANAGER
+    // Parallel calculations of the histogramming have been run.  Make sure
+    // they are the same.
+    if (GundamGlobals::getForceDirectCalculation() and filledWithManager) {
+      if (not GundamUtils::almostEqual(value,binPtr->content)
+          || not GundamUtils::almostEqual(error,binPtr->error)) {
+        LogError << "Incorrect weight calculation"
+                 << " Content: " << value << "!=" << binPtr->content
+                 << " Error: " << error << "!=" << binPtr->error
+                 << std::endl;
+      }
+    }
+#endif
+    binPtr->error = std::sqrt(binPtr->error);
     iBin += nThreads;
   }
 
