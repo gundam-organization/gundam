@@ -4,6 +4,8 @@
 
 #include "Event.h"
 
+#include "GundamGlobals.h"
+
 #include "GenericToolbox.Root.h"
 #include "Logger.h"
 
@@ -13,11 +15,11 @@ LoggerInit([]{
   Logger::setUserHeaderStr("[Event]");
 });
 
-
 // const getters
 double Event::getEventWeight() const {
 #ifdef GUNDAM_USING_CACHE_MANAGER
-  if( _cache_.valuePtr != nullptr ){ return _cache_.getWeight(); }
+  if( not GundamGlobals::getForceDirectCalculation()
+      && getCache().valuePtr != nullptr  ){ return getCache().getWeight(); }
 #endif
   return _weights_.current;
 }
@@ -30,7 +32,6 @@ std::string Event::getSummary() const {
   ss << std::endl << "Variables{" << std::endl << _variables_ << std::endl << "}";
   return ss.str();
 }
-
 
 //  A Lesser GNU Public License
 
