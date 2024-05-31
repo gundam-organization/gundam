@@ -118,6 +118,7 @@ void SampleElement::refillHistogram(int iThread_){
     if (_CacheManagerValue_ !=nullptr and _CacheManagerIndex_ >= 0) {
       value = _CacheManagerValue_[_CacheManagerIndex_+binPtr->index];
       error = _CacheManagerValue2_[_CacheManagerIndex_+binPtr->index];
+      LogThrowIf(std::isnan(value), "Incorrect Cache::Manager initialization");
       binPtr->content = value;
       binPtr->error = error;
       binFilled = not GundamGlobals::getForceDirectCalculation();
@@ -137,13 +138,11 @@ void SampleElement::refillHistogram(int iThread_){
     // Parallel calculations of the histogramming have been run.  Make sure
     // they are the same.
     if (GundamGlobals::getForceDirectCalculation() and filledWithManager) {
-      if (not GundamUtils::almostEqual(value,binPtr->content)
-          || not GundamUtils::almostEqual(error,binPtr->error)) {
-        LogError << "Incorrect weight calculation"
+      LogThrowIf(not GundamUtils::almostEqual(value,binPtr->content)
+                 || not GundamUtils::almostEqual(error,binPtr->error),
+                 "Incorrect histogram content --"
                  << " Content: " << value << "!=" << binPtr->content
-                 << " Error: " << error << "!=" << binPtr->error
-                 << std::endl;
-      }
+                 << " Error: " << error << "!=" << binPtr->error);
     }
 #endif
     binPtr->error = std::sqrt(binPtr->error);

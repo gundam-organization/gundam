@@ -162,7 +162,6 @@ namespace EventUtils{
     }
     LogThrowIf(valuePtr == nullptr, "No value cache"); // Trap for bad calls
     LogThrowIf(std::isnan(*valuePtr), "NaN weight");   // Trap for bad calcs.
-    LogError << "Using Cache::Manager for event weight (very slow)" << std::endl;
     return *valuePtr;
   }
 }

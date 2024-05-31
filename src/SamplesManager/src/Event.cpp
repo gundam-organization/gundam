@@ -5,6 +5,7 @@
 #include "Event.h"
 
 #include "GundamGlobals.h"
+#include "GundamAlmostEqual.h"
 
 #include "GenericToolbox.Root.h"
 #include "Logger.h"
@@ -18,8 +19,14 @@ LoggerInit([]{
 // const getters
 double Event::getEventWeight() const {
 #ifdef GUNDAM_USING_CACHE_MANAGER
-  if( not GundamGlobals::getForceDirectCalculation()
-      && getCache().valuePtr != nullptr  ){ return getCache().getWeight(); }
+  if( getCache().valuePtr != nullptr  ){
+    double value =  getCache().getWeight();
+    if (not GundamGlobals::getForceDirectCalculation()) return value;
+    LogThrowIf(not GundamUtils::almostEqual(value, _weights_.current),
+               "Inconsistent event weight -- "
+               << " Calculated: " << value
+               << " Cached: " << _weights_.current);
+  }
 #endif
   return _weights_.current;
 }
