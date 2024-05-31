@@ -1,3 +1,7 @@
+Fixes relative to 1.8.3
+
+Issue # 524 : Apply the global event weight cap when using the Cache::Manager to calculate the likelihood.
+
 Fixes relative to 1.8.2
 
 Associated Fix: The CalculateGeneralSpline and CalculateGraph functions have been changed to use a brute-force binary search in place of the linear search for the correct index.  This results in a speed up of about 50% for those routines.
