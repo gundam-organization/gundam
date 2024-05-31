@@ -397,7 +397,10 @@ bool Cache::Manager::Update( SampleSet& sampleList,
                                        ->GetWeightsCache()
                                        .GetResultValidPointer());
         event.getCache().updateCallbackPtr = (
-            [](){Cache::Manager::Get()->GetWeightsCache().GetResult(0);});
+            [](){
+                LogTrace << "Copy event weights from Device to Host" << std::endl;
+                Cache::Manager::Get()->GetWeightsCache().GetResult(0);
+            });
 
         // Get the initial value for this event and save it.
         double initialEventWeight = event.getWeights().base;
@@ -590,6 +593,7 @@ bool Cache::Manager::Update( SampleSet& sampleList,
             .GetSumsValidPointer());
         sample.getMcContainer().setCacheManagerUpdatePointer(
             [](){
+                LogTrace << "Copy histogram content from Device to Host" << std::endl;
                 Cache::Manager::Get()->GetHistogramsCache().GetSum(0);
                 Cache::Manager::Get()->GetHistogramsCache().GetSum2(0);
             });
@@ -624,6 +628,7 @@ bool Cache::Manager::Fill() {
         LogError << "Fill while an update is required" << std::endl;
         LogThrow("Fill while an update is required");
     }
+    LogTrace << "Cache::Manager::Fill -- Fill the GPU cache" << std::endl;
 #define DUMP_FILL_INPUT_PARAMETERS
 #ifdef DUMP_FILL_INPUT_PARAMETERS
     do {
