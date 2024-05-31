@@ -55,10 +55,6 @@ void DataSetManager::initializeImpl(){
 void DataSetManager::loadData(){
   LogInfo << "Loading data into the PropagatorEngine..." << std::endl;
 
-  bool cacheManagerState = GundamGlobals::getEnableCacheManager();
-  GundamGlobals::setEnableCacheManager(false);
-
-
   // make sure everything is ready for loading
   _propagator_.clearContent();
 
@@ -193,10 +189,8 @@ void DataSetManager::loadData(){
   // After all the data has been loaded.  Specifically, this must be after
   // the MC has been copied for the Asimov fit, or the "data" use the MC
   // reweighting cache.  This must also be before the first use of
-  // reweightMcEvents.
-  if( cacheManagerState ) {
-    Cache::Manager::Build(_propagator_.getSampleSet(), _propagator_.getEventDialCache());
-  }
+  // reweightMcEvents that is done using the GPU.
+  Cache::Manager::Build(_propagator_.getSampleSet(), _propagator_.getEventDialCache());
 #endif
 
   LogInfo << "Propagating prior parameters on events..." << std::endl;
@@ -250,6 +244,4 @@ void DataSetManager::loadData(){
   /// Propagator needs to be fast, let the workers wait for the signal
   GundamGlobals::getParallelWorker().setCpuTimeSaverIsEnabled(false);
 
-  /// restoring state
-  GundamGlobals::setEnableCacheManager(cacheManagerState);
 }
