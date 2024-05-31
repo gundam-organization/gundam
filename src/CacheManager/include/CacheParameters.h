@@ -22,6 +22,7 @@ public:
 
     // Returns true if this is compiled with a CUDA compiler
     static bool UsingCUDA();
+    static bool HasGPU(bool dump = false);
 
     // This is a singleton, so the constructor is private.
     Parameters(std::size_t parameters);
