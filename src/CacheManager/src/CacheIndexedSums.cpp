@@ -101,6 +101,7 @@ double Cache::IndexedSums::GetSum(int i) {
     // make sure that the optimizer doesn't reorder the statements.
     double value = fSums->hostPtr()[i];
     if (not std::isnan(value)) fSumsValid = true;
+    else LogThrow("Cache::IndexedSums sum is nan");
     return value;
 }
 
@@ -112,6 +113,7 @@ double Cache::IndexedSums::GetSum2(int i) {
     // make sure that the optimizer doesn't reorder the statements.
     double value = fSums2->hostPtr()[i];
     if (not std::isnan(value)) fSumsValid = true;
+    else LogThrow("Cache::IndexedSums sum2 is nan");
     return value;
 }
 

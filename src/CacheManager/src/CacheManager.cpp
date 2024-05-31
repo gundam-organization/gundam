@@ -30,7 +30,6 @@
 #include "Shift.h"
 
 #include <memory>
-#include <vector>
 #include <set>
 
 LoggerInit([]{
