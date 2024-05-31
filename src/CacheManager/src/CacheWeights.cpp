@@ -70,7 +70,8 @@ double Cache::Weights::GetResult(int i) {
     // finishes before the result is set to be valid.  The use of isnan is
     // to make sure that the optimizer doesn't reorder the statements.
     double value = fResults->hostPtr()[i];
-    if (std::isnan(value)) fResultsValid = true;
+    if (not std::isnan(value)) fResultsValid = true;
+    else LogThrow("Cache::Weights result is nan");
     return value;
 }
 
@@ -79,7 +80,8 @@ double Cache::Weights::GetResultFast(int i) {
     // finishes before the result is set to be valid.  The use of isnan is
     // to make sure that the optimizer doesn't reorder the statements.
     double value = fResults->hostPtr()[i];
-    if (std::isnan(value)) fResultsValid = true;
+    if (not std::isnan(value)) fResultsValid = true;
+    else LogThrow("Cache::Weights result is nan");
     return value;
 }
 
