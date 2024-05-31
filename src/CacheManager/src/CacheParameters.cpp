@@ -3,7 +3,9 @@
 #include "ParameterSet.h"
 #include "GundamGlobals.h"
 
-#include "GenericToolbox.Root.h"
+// #include "GenericToolbox.Root.h"
+
+#include "Logger.h"
 
 #include <vector>
 #include <set>
@@ -17,6 +19,67 @@ bool Cache::Parameters::UsingCUDA() {
     return true;
 #else
     return false;
+#endif
+}
+
+#ifdef __CUDACC__
+#include <cuda_runtime_api.h>
+#endif
+
+bool Cache::Parameters::HasGPU(bool dump) {
+#ifndef __CUDACC__
+    return false;
+#else
+    cudaError_t status;
+    int devCount;
+    status = cudaGetDeviceCount(&devCount);
+    if (status != cudaSuccess) {
+        if (dump) LogInfo << "CUDA DEVICE COUNT: No Device" << std::endl;
+        return false;
+    }
+
+    int devId;
+    status = cudaGetDevice(&devId);
+    if (status != cudaSuccess) {
+        if (dump) LogInfo << "CUDA DEVICE COUNT: No Device" << std::endl;
+        return false;
+    }
+
+    cudaDeviceProp prop;
+    status = cudaGetDeviceProperties(&prop, devId);
+    if (status != cudaSuccess) {
+        if (dump) LogInfo << "CUDA DEVICE COUNT: No Device" << std::endl;
+        return false;
+    }
+
+    if (dump) {
+        LogInfo << "CUDA DEVICE COUNT:         " << devCount << std::endl;
+        LogInfo << "CUDA DEVICE ID:            " << devId << std::endl;
+        LogInfo << "CUDA DEVICE NAME:          " << prop.name << std::endl;
+        LogInfo << "CUDA COMPUTE CAPABILITY:   " << prop.major << "." << prop.minor << std::endl;
+        LogInfo << "CUDA PROCESSORS:           " << prop.multiProcessorCount << std::endl;
+        LogInfo << "CUDA PROCESSOR THREADS:    " << prop.maxThreadsPerMultiProcessor << std::endl;
+        LogInfo << "CUDA MAX THREADS:          " << prop.maxThreadsPerMultiProcessor*prop.multiProcessorCount << std::endl;
+        LogInfo << "CUDA THREADS PER BLOCK:    " << prop.maxThreadsPerBlock << std::endl;
+        LogInfo << "CUDA BLOCK MAX DIM:        " << "X:" << prop.maxThreadsDim[0]
+                  << " Y:" << prop.maxThreadsDim[1]
+                  << " Z:" << prop.maxThreadsDim[2] << std::endl;
+        LogInfo << "CUDA GRID MAX DIM:         " << "X:" << prop.maxGridSize[0]
+                  << " Y:" << prop.maxGridSize[1]
+                  << " Z:" << prop.maxGridSize[2] << std::endl;
+        LogInfo << "CUDA WARP:                 " << prop.warpSize << std::endl;
+        LogInfo << "CUDA CLOCK:                " << prop.clockRate << std::endl;
+        LogInfo << "CUDA GLOBAL MEM:           " << prop.totalGlobalMem << std::endl;
+        LogInfo << "CUDA SHARED MEM:           " << prop.sharedMemPerBlock << std::endl;
+        LogInfo << "CUDA L2 CACHE MEM:         " << prop.l2CacheSize << std::endl;
+        LogInfo << "CUDA CONST MEM:            " << prop.totalConstMem << std::endl;
+        LogInfo << "CUDA MEM PITCH:            " << prop.memPitch << std::endl;
+        LogInfo << "CUDA REGISTERS:            " << prop.regsPerBlock << std::endl;
+    }
+    if (prop.totalGlobalMem < 1) return false;
+    if (prop.multiProcessorCount < 1) return false;
+    if (prop.maxThreadsPerBlock < 1) return false;
+    return true;
 #endif
 }
 

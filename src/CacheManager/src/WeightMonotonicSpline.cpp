@@ -46,13 +46,6 @@ Cache::Weight::MonotonicSpline::MonotonicSpline(
                    "Invalid space option for compact splines");
     }
 
-#ifdef CACHE_MANAGER_SLOW_VALIDATION
-#warning Using SLOW VALIDATION in Cache::Weight::MonotonicSpline::MonotonicSpline
-        // Add validation code for the spline calculation.  This can be rather
-        // slow, so do not use if it is not required.
-    fTotalBytes += GetSplinesReserved()*sizeof(double);
-#endif
-
     LogInfo << "Reserved " << GetName()
             << " Spline Knots: " << GetSplineSpaceReserved()
             << std::endl;
@@ -74,14 +67,6 @@ Cache::Weight::MonotonicSpline::MonotonicSpline(
         LogThrowIf(not fSplineParameter, "Bad SplineParameter alloc");
         fSplineIndex.reset(new hemi::Array<int>(1+GetSplinesReserved(),false));
         LogThrowIf(not fSplineIndex, "Bad SplineIndex alloc");
-
-#ifdef CACHE_MANAGER_SLOW_VALIDATION
-#warning Using SLOW VALIDATION in Cache::Weight::MonotonicSpline::MonotonicSpline
-        // Add validation code for the spline calculation.  This can be rather
-        // slow, so do not use if it is not required.
-        fSplineValue.reset(new hemi::Array<double>(GetSplinesReserved(),true));
-        LogThrowIf(not fSplineValue, "Bad SplineValue alloc");
-#endif
 
         // Get the CPU/GPU memory for the spline knots.  This is copied once
         // during initialization so do not pin the CPU memory into the page
@@ -290,30 +275,6 @@ double Cache::Weight::MonotonicSpline::GetSplineKnot(int sIndex, int knot) {
     return fSplineSpace->hostPtr()[knotsIndex+2+knot];
 }
 
-////////////////////////////////////////////////////////////////////
-// This section is for the validation methods.  They should mostly be
-// NOOPs and should mostly not be called.
-
-#ifdef CACHE_MANAGER_SLOW_VALIDATION
-#warning Using SLOW VALIDATION in Cache::Weight::MonotonicSpline::GetSplineValue
-// Get the intermediate spline result that is used to calculate an event
-// weight.  This can trigger a copy from the GPU to CPU, and must only be
-// enabled during validation.  Using this validation code also significantly
-// increases the amount of GPU memory required.  In a short sentence, "Do not
-// use this method."
-double* Cache::Weight::MonotonicSpline::GetCachePointer(int sIndex) {
-    if (sIndex < 0) {
-        LogThrow("GetSplineValue: Spline index invalid");
-    }
-    if (GetSplinesUsed() <= sIndex) {
-        LogThrow("GetSplineValue: Spline index invalid");
-    }
-    // This can trigger a *slow* copy of the spline values from the GPU to the
-    // CPU.
-    return fSplineValue->hostPtr() + sIndex;
-}
-#endif
-
 #include "CacheAtomicMult.h"
 #include "CalculateMonotonicSpline.h"
 
@@ -326,11 +287,6 @@ namespace {
     // must be valid CUDA coda.
     HEMI_KERNEL_FUNCTION(HEMISplinesKernel,
                          double* results,
-#ifdef CACHE_MANAGER_SLOW_VALIDATION
-#warning Using SLOW VALIDATION in Cache::Weight::MonotonicSpline::HEMISplinesKernel
-                         // inputs/output for validation
-                         double* splineValues,
-#endif
                          const double* params,
                          const double* lowerClamp,
                          const double* upperClamp,
@@ -349,11 +305,6 @@ namespace {
 
             double v = CalculateMonotonicSpline(x, lClamp,uClamp,
                                                 &knots[id0],dim);
-
-#ifdef CACHE_MANAGER_SLOW_VALIDATION
-#warning Using SLOW VALIDATION in Cache::Weight::MonotonicSpline::HEMISplinesKernel
-            splineValues[i] = v;
-#endif
             CacheAtomicMult(&results[rIndex[i]], v);
 #ifndef HEMI_DEV_CODE
 #ifdef CACHE_DEBUG
@@ -385,10 +336,6 @@ bool Cache::Weight::MonotonicSpline::Apply() {
     HEMISplinesKernel splinesKernel;
     hemi::launch(splinesKernel,
                  fWeights.writeOnlyPtr(),
-#ifdef CACHE_MANAGER_SLOW_VALIDATION
-#warning Using SLOW VALIDATION in Cache::Weight::MonotonicSpline::Apply
-                 fSplineValue->writeOnlyPtr(),
-#endif
                  fParameters.readOnlyPtr(),
                  fLowerClamp.readOnlyPtr(),
                  fUpperClamp.readOnlyPtr(),
@@ -398,12 +345,6 @@ bool Cache::Weight::MonotonicSpline::Apply() {
                  fSplineIndex->readOnlyPtr(),
                  GetSplinesUsed()
         );
-
-#ifdef CACHE_MANAGER_SLOW_VALIDATION
-    // This MUST be done for slow validation.
-#warning Using SLOW VALIDATION and copying spline values
-    fSplineValue->hostPtr();
-#endif
 
     return true;
 }

@@ -22,6 +22,9 @@
 #include <string>
 #include <sstream>
 
+
+namespace Cache { class Manager; }
+
 class Event{
 
 public:
@@ -53,7 +56,8 @@ private:
   EventUtils::Variables _variables_{};
 
 #ifdef GUNDAM_USING_CACHE_MANAGER
-public:
+private:
+  friend class Cache::Manager;
   [[nodiscard]] const EventUtils::Cache& getCache() const{ return _cache_; }
   EventUtils::Cache& getCache(){ return _cache_; }
 
