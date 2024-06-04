@@ -56,6 +56,9 @@ public:
     /// does not deallocate any memory.
     void Reset();
 
+    /// Dummy to match interface with CacheRecursiveSums.
+    void Initialize() {}
+
     /// Return the approximate allocated memory (e.g. on the GPU).
     std::size_t GetResidentMemory() const {return fTotalBytes;}
 
