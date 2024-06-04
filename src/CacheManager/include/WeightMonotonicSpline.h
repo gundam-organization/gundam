@@ -132,20 +132,6 @@ public:
     // Get the function value for a knot in the spline at sIndex
     double GetSplineKnot(int sIndex,int knot);
 
-    ////////////////////////////////////////////////////////////////////
-    // This section is for the validation methods.  They should mostly be
-    // NOOPs and should mostly not be called.
-
-#ifdef CACHE_MANAGER_SLOW_VALIDATION
-    double* GetCachePointer(int sIndex);
-
-    /// An array of values for the result of each spline.  When this is
-    /// active, it is filled but the kernel, but only copied to the CPU if
-    /// it's access.  NOTE: Enabling this significantly slows the calculation
-    /// since it adds another large copy from the GPU.
-    std::unique_ptr<hemi::Array<double>> fSplineValue;
-#endif
-
 };
 
 // An MIT Style License

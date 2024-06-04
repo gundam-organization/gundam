@@ -30,7 +30,6 @@
 #include "Shift.h"
 
 #include <memory>
-#include <vector>
 #include <set>
 
 LoggerInit([]{
@@ -618,6 +617,12 @@ bool Cache::Manager::Update(SampleSet& sampleList,
     if (Cache::Manager::Get()->GetHistogramsCache().GetSumCount()
         != nextHist) {
         LogThrow("Histogram cells are missing");
+    }
+
+    // If the event weight cap has been set, then pass it along
+    if (std::isfinite(EventDialCache::globalEventReweightCap)) {
+        Cache::Manager::Get()->GetHistogramsCache().SetMaximumEventWeight(
+            EventDialCache::globalEventReweightCap);
     }
 
     return true;
