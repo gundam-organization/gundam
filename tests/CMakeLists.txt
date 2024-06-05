@@ -37,6 +37,7 @@ if(GTEST_FOUND)
   add_executable(hemiTest_host.exe
     GTests/hemiArrayTest.cpp
     GTests/hemiExecutionPolicyTest.cpp
+    GTests/cachedSumsTest.cpp
     GTests/hemiExternals.cpp)
   target_link_libraries(hemiTest_host.exe GTest::gtest_main)
   target_link_libraries(hemiTest_host.exe GundamCache)
@@ -49,6 +50,7 @@ if(GTEST_FOUND)
       GTests/hemiArrayTest.cu
       GTests/hemiExecutionPolicyTest.cu
       GTests/hemiLaunch.cu
+      GTests/cachedSumsTest.cu
       GTests/hemiExternals.cpp)
     target_link_libraries(hemiTest_device.exe GTest::gtest_main)
     target_link_libraries(hemiTest_device.exe GundamCache)
