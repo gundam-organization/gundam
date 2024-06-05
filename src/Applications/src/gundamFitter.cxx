@@ -30,7 +30,7 @@ int main(int argc, char** argv){
   GundamApp app{"main fitter"};
 
 #ifdef GUNDAM_USING_CACHE_MANAGER
-  if (Cache::Manager::HasCUDA()){ LogWarning << "CUDA compatible build." << std::endl; }
+  if (Cache::Manager::HasCUDA()){ LogInfo << "CUDA inside" << std::endl; }
 #endif
 
   // --------------------------
@@ -79,8 +79,9 @@ int main(int argc, char** argv){
   clParser.addDummyOption("Runtime/debug options");
 
   clParser.addOption("debugVerbose", {"--debug"}, "Enable debug verbose (can provide verbose level arg)", 1, true);
-  clParser.addTriggerOption("usingCacheManager", {"--cache-manager"}, "Event weight cache handle by the CacheManager");
+  clParser.addTriggerOption("usingCacheManager", {"--cache-manager"}, "Toggle the usage of the CacheManager (i.e. the GPU)");
   clParser.addTriggerOption("usingGpu", {"--gpu"}, "Use GPU parallelization");
+  clParser.addTriggerOption("forceDirect", {"--cpu"}, "Force direct calculation of weights (for debugging)");
   clParser.addOption("overrides", {"-O", "--override"}, "Add a config override [e.g. /fitterEngineConfig/engineType=mcmc)", -1);
   clParser.addOption("overrideFiles", {"-of", "--override-files"}, "Provide config files that will override keys", -1);
 
@@ -117,14 +118,24 @@ int main(int argc, char** argv){
     LogWarning << "Using GPU parallelization." << std::endl;
   }
 
-  // Is build compatible with cache manager option?
-  if( clParser.isOptionTriggered("usingCacheManager") or clParser.isOptionTriggered("usingGpu") ){
+  if (clParser.isOptionTriggered("forceDirect")) GundamGlobals::setForceDirectCalculation(true);
+
+  bool useCache = false;
 #ifdef GUNDAM_USING_CACHE_MANAGER
-    GundamGlobals::setEnableCacheManager(true);
-#else
-    LogThrow("useCacheManager can only be set while GUNDAM is compiled with -D WITH_CACHE_MANAGER=ON cmake option.");
+  useCache = Cache::Parameters::HasGPU(true);
 #endif
+  if (clParser.isOptionTriggered("usingCacheManager")) useCache = not useCache;
+  if (clParser.isOptionTriggered("usingGpu")) useCache = true;
+
+#ifdef GUNDAM_USING_CACHE_MANAGER
+  GundamGlobals::setEnableCacheManager(useCache);
+  if (not useCache) {
+      LogWarning << "Cache::Manager enabled but turned off for job"
+                 << std::endl;
   }
+#else
+  LogThrowIf(useCache, "GUNDAM compiled without Cache::Manager");
+#endif
 
   // No cache on dials?
   if( clParser.isOptionTriggered("noDialCache") ){
@@ -147,7 +158,9 @@ int main(int argc, char** argv){
   }
 
   // How many parallel threads?
-  GundamGlobals::getParallelWorker().setNThreads( clParser.getOptionVal("nbThreads", 1) );
+  GundamGlobals::setNumberOfThreads( clParser.getOptionVal("nbThreads", 1) );
+
+  GundamGlobals::getParallelWorker().setNThreads(GundamGlobals::getNumberOfThreads());
   LogInfo << "Running the fitter with " << GundamGlobals::getParallelWorker().getNbThreads() << " parallel threads." << std::endl;
 
   // Reading configuration
