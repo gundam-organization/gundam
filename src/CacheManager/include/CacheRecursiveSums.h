@@ -1,5 +1,5 @@
-#ifndef CacheIndexedSums_h_seen
-#define CacheIndexedSums_h_seen
+#ifndef CacheRecursiveSums_h_seen
+#define CacheRecursiveSums_h_seen
 
 #include "CacheWeights.h"
 
@@ -9,27 +9,53 @@
 #include <memory>
 
 namespace Cache {
-    class IndexedSums;
+    class RecursiveSums;
 }
 
 /// A class to accumulate the sum of event weights into the histogram bins on
-/// the GPU (or CPU).  This provides a parallel reduction (a sum) by using
-/// attomic operations when adding values.  On a GPU, this can result in a lot
-/// of collisions since the additions are happening in a large number of
-/// (almost) synchronized threads.
+/// the GPU (or CPU).  This provides a parallel reduction (a sum) without
+/// using atomic operations by interleaving pairwise sums and "recursively"
+/// calling the kernel.  On a GPU, it results in about a x10 speed up over a
+/// naive sum using atomic operations, but requires more GPU global memory
+/// since it uses an internal work space.
 ///
-/// The accumulation runs the "sum" kernel once, so conceptually each thread
-/// adds one number to a sum, but the atomic operation will take O(N) attempts
-/// to finish the addition where N is the number of entries in the maximum
-/// histogram bin.
-class Cache::IndexedSums {
+/// The accumulation runs the "sum" kernel O(log N) times where N is the
+/// number of entries in the maximum histogram bin.  The sum is "logically"
+/// recursive, but the code actually iterates by calling the summing kernel
+/// multiple times.
+class Cache::RecursiveSums {
 private:
-    // Save the event weight cache reference for later use
+    // Save the event weight cache reference for later use.  This is provided
+    // to the constructor.
     Cache::Weights::Results& fEventWeights;
 
     // The histogram bin index for each entry in the fWeights array (this is
-    // the same size as fEventWeights.
+    // the same size as fEventWeights.  This is filled before initialization.
     std::unique_ptr<hemi::Array<short>> fIndexes;
+
+    // An internal buffer holding the offset of each histogram bin in the
+    // event index array.  The start of the events in bin "N" will be
+    // fBinOffsets[N], and the end will be fBinOffsets[N+1], so looping over
+    // the events will be "for(i=fBinOffsets[N]; i<fBinOffsets[N+1]; ++i)"
+    std::unique_ptr<hemi::Array<int>> fBinOffsets;
+
+    // An internal buffer storing the index of each entry associated in the
+    // fWeights array associated with the histogram bin.  The fBinOffsets
+    // field defines which bin the entries are associated with.
+    std::unique_ptr<hemi::Array<int>> fEventIndexes;
+
+    // An internal buffer used to do the recursive sum.  This starts as a copy
+    // of the fEventWeights input array (reordered by bin index), and is
+    // mutated until the sums can be read.
+    std::unique_ptr<hemi::Array<double>> fWorkBuffer;
+
+    // An internal buffer used to map the fWorkBuffer index to the histogram
+    // bin index.
+    std::unique_ptr<hemi::Array<short>> fBinIndexes;
+
+    // The maximum number of entries in any bin. This will determine the number
+    // of iterations needed to calculate the sum.
+    int fMaxEntries;
 
     // The accumulated weights for each histogram bin.
     std::unique_ptr<hemi::Array<double>> fSums;
@@ -52,19 +78,21 @@ private:
     std::size_t fTotalBytes{};
 
 public:
-    IndexedSums(Cache::Weights::Results& eventWeight,
-               std::size_t bins);
+    RecursiveSums(Cache::Weights::Results& eventWeight,
+                  std::size_t bins);
 
     /// Deconstruct the class.  This should deallocate all the memory
     /// everyplace.
-    virtual ~IndexedSums();
+    virtual ~RecursiveSums();
 
     /// Reinitialize the cache.  This puts it into a state to be refilled, but
     /// does not deallocate any memory.
     void Reset();
 
-    /// Dummy to match interface with CacheRecursiveSums.
-    void Initialize() {}
+    /// Initialize the internal buffers for the cache for all of the events.
+    /// This builds all the maps between histogram bin and event index (and
+    /// counts the number of entries in each bin.
+    void Initialize();
 
     /// Return the approximate allocated memory (e.g. on the GPU).
     std::size_t GetResidentMemory() const {return fTotalBytes;}
@@ -108,7 +136,7 @@ public:
 
 // An MIT Style License
 
-// Copyright (c) 2022 Clark McGrew
+// Copyright (c) 2024 Clark McGrew
 
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal

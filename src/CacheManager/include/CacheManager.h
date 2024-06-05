@@ -11,7 +11,21 @@
 #include "WeightGeneralSpline.h"
 #include "WeightGraph.h"
 
+#ifdef CACHE_MANAGER_USE_INDEXED_SUMS
+// An older implementation of the histogram summing that may be faster for
+// some (peculiar) data sets.
 #include "CacheIndexedSums.h"
+namespace Cache {
+    using HistogramSum = Cache::IndexedSums;
+}
+#else
+// A GPU optimized implementation of histogram summing that will be faster
+// for most data sets.
+#include "CacheRecursiveSums.h"
+namespace Cache {
+    using HistogramSum = Cache::RecursiveSums;
+}
+#endif
 
 #include "SampleSet.h"
 #include "EventDialCache.h"
@@ -112,7 +126,7 @@ private:
     std::unique_ptr<Cache::Weight::Graph> fGraphs;
 
     /// The cache for the summed histgram weights
-    std::unique_ptr<Cache::IndexedSums> fHistogramsCache;
+    std::unique_ptr<Cache::HistogramSum> fHistogramsCache;
 
     // The rough size of all the caches.
     std::size_t fTotalBytes;
@@ -124,7 +138,7 @@ public:
     // implementation, and should be ignored by most people.
     Cache::Parameters& GetParameterCache() {return *fParameterCache;}
     Cache::Weights&    GetWeightsCache() {return *fWeightsCache;}
-    Cache::IndexedSums& GetHistogramsCache() {return *fHistogramsCache;}
+    Cache::HistogramSum& GetHistogramsCache() {return *fHistogramsCache;}
 };
 
 // An MIT Style License
