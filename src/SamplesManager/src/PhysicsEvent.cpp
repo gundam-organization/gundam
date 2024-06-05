@@ -2,17 +2,20 @@
 // Created by Nadrino on 22/07/2021.
 //
 
+#include "GundamAlmostEqual.h"
+#include "GundamGlobals.h"
+
 #include "PhysicsEvent.h"
 
 #include "GenericToolbox.Root.h"
 #include "Logger.h"
 
 #include <cmath>
+#include <sstream>
 
 LoggerInit([]{
   Logger::setUserHeaderStr("[PhysicsEvent]");
 });
-
 
 // setters
 void PhysicsEvent::setCommonVarNameListPtr(const std::shared_ptr<std::vector<std::string>>& commonVarNameListPtr_){
@@ -33,54 +36,17 @@ double PhysicsEvent::getEventWeight() const {
             // (*_CacheManagerUpdate_)().
             if (_cacheManagerUpdate_) (*_cacheManagerUpdate_)();
         }
-#ifdef CACHE_MANAGER_SLOW_VALIDATION
-#warning CACHE_MANAGER_SLOW_VALIDATION used in PhysicsEvent::getEventWeight
-        do {
-            static double maxDelta = 1.0E-20;
-            static double sumDelta = 0.0;
-            static double sum2Delta = 0.0;
-            static long long int numDelta = 0;
-            double res = *_CacheManagerValue_;
-            double avg = 0.5*(std::abs(res) + std::abs(_eventWeight_));
-            if (avg < getTreeWeight()) avg = getTreeWeight();
-            double delta = std::abs(res - _eventWeight_);
-            delta /= avg;
-            maxDelta = std::max(maxDelta,delta);
-            if (delta < 1e-4) {
-                sumDelta += delta;
-                sum2Delta += delta*delta;
-                ++numDelta;
-                if (numDelta < 0) throw std::runtime_error("validation wrap");
-                if ((numDelta % 1000000) == 0) {
-                    LogInfo << "VALIDATION: Average event weight delta: "
-                            << sumDelta/numDelta
-                            << " +/- " << std::sqrt(
-                                sum2Delta/numDelta
-                                - sumDelta*sumDelta/numDelta/numDelta)
-                            << " Maximum: " << maxDelta
-                            << " " << numDelta
-                            << std::endl;
-                }
-            }
-            if (maxDelta < 1E-5) break;
-            if (delta > 100.0*sumDelta/numDelta) break;
-            LogWarning << "WARNING: Event weight difference: " << delta
-                       << " Cache: " << res
-                       << " Dial: " << _eventWeight_
-                       << " Tree: " << getTreeWeight()
-                       << " Delta: " << delta
-                       << " Max: " << maxDelta
-                       << std::endl;
-        } while(false);
-#endif
-#ifdef CACHE_MANAGER_SLOW_VALIDATION
-#warning CACHE_MANAGER_SLOW_VALIDATION force CPU _eventWeight_
-        // When the slow validation is running, the "CPU" event weight is
-        // calculated after Cache::Manager::Fill
-        return _eventWeight_;
-#endif
-        LogThrowIf(not std::isfinite(*_cacheManagerValue_), "NaN weight: " << this->getSummary());
-      return *_cacheManagerValue_;
+        double value = *_cacheManagerValue_;
+        LogThrowIf(std::isnan(value), "NaN weight: " << this->getSummary());
+        if (not GundamGlobals::getForceDirectCalculation()) return value;
+        if (not GundamUtils::almostEqual(value, _eventWeight_)) {
+          std::ostringstream str;
+          str << "Inconsistent event weight -- "
+              << " Calculated: " << value
+              << " Cached: " << _eventWeight_;
+          LogError << str.str() << std::endl;
+          LogThrow(str.str());
+        }
     }
 #endif
     return _eventWeight_;
