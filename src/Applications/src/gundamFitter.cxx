@@ -79,7 +79,7 @@ int main(int argc, char** argv){
   clParser.addDummyOption("Runtime/debug options");
 
   clParser.addOption("debugVerbose", {"--debug"}, "Enable debug verbose (can provide verbose level arg)", 1, true);
-  clParser.addTriggerOption("usingCacheManager", {"--cache-manager"}, "Toggle the usage of the CacheManager (i.e. the GPU)");
+  clParser.addOption("usingCacheManager", {"--cache-manager"}, "Toggle the usage of the CacheManager (i.e. the GPU) [empty, 'on', or 'off']",1,true);
   clParser.addTriggerOption("usingGpu", {"--gpu"}, "Use GPU parallelization");
   clParser.addTriggerOption("forceDirect", {"--cpu"}, "Force direct calculation of weights (for debugging)");
   clParser.addOption("overrides", {"-O", "--override"}, "Add a config override [e.g. /fitterEngineConfig/engineType=mcmc)", -1);
@@ -124,7 +124,15 @@ int main(int argc, char** argv){
 #ifdef GUNDAM_USING_CACHE_MANAGER
   useCache = Cache::Parameters::HasGPU(true);
 #endif
-  if (clParser.isOptionTriggered("usingCacheManager")) useCache = not useCache;
+  if (clParser.isOptionTriggered("usingCacheManager")) {
+      int values = clParser.getNbValueSet("usingCacheManager");
+      if (values < 1) useCache = not useCache;
+      else if ("on" == clParser.getOptionVal<std::string>("usingCacheManager",0)) useCache = true;
+      else if ("off" == clParser.getOptionVal<std::string>("usingCacheManager",0)) useCache = false;
+      else {
+          LogThrow("Invalid --cache-manager argument: must be empty, 'on' or 'off'");
+      }
+  }
   if (clParser.isOptionTriggered("usingGpu")) useCache = true;
 
 #ifdef GUNDAM_USING_CACHE_MANAGER
