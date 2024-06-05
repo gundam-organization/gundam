@@ -12,9 +12,16 @@ namespace Cache {
     class IndexedSums;
 }
 
-/// A class to calculate and cache a bunch of events weights.  This is where
-/// the actual calculation is controled for the GPU.  It's used by the cache
-/// manager when the GPU needs to be fired up.
+/// A class to accumulate the sum of event weights into the histogram bins on
+/// the GPU (or CPU).  This provides a parallel reduction (a sum) by using
+/// attomic operations when adding values.  On a GPU, this can result in a lot
+/// of collisions since the additions are happening in a large number of
+/// (almost) synchronized threads.
+///
+/// The accumulation runs the "sum" kernel once, so conceptually each thread
+/// adds one number to a sum, but the atomic operation will take O(N) attempts
+/// to finish the addition where N is the number of entries in the maximum
+/// histogram bin.
 class Cache::IndexedSums {
 private:
     // Save the event weight cache reference for later use
