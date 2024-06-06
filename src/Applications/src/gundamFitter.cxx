@@ -124,7 +124,7 @@ int main(int argc, char** argv){
 
   bool useCache = false;
 #ifdef GUNDAM_USING_CACHE_MANAGER
-  useCache = Cache::Parameters::HasGPU(true);
+  useCache = Cache::Manager::HasGPU(true);
 #endif
   if (clParser.isOptionTriggered("usingCacheManager")) {
       int values = clParser.getNbValueSet("usingCacheManager");
