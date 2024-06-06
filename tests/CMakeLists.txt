@@ -8,6 +8,7 @@
 #
 
 cmessage( STATUS "Setting up tests..." )
+enable_testing()
 
 # Run the gundam-tests.sh script which runs scripted tests.  The
 # COMMAND is a little complicated since the testing script needs to
@@ -29,10 +30,8 @@ add_test(
 
 ## Compiled unit tests using GoogleTest.  These are only run if GTest
 ## is found.
-find_package(GTest)
+find_package(GTest QUIET)
 if(GTEST_FOUND)
-  enable_testing()
-
   # Setup the hemi test suite for the host
   add_executable(hemiTest_host.exe
     GTests/hemiArrayTest.cpp
@@ -56,5 +55,4 @@ if(GTEST_FOUND)
     target_link_libraries(hemiTest_device.exe GundamCache)
     gtest_discover_tests(hemiTest_device.exe)
   endif(CMAKE_CUDA_COMPILER)
-
 endif(GTEST_FOUND)
