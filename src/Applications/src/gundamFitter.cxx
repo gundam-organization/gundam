@@ -66,7 +66,6 @@ int main(int argc, char** argv){
   clParser.addTriggerOption("enablePca", {"--pca", "--enable-pca"}, "Enable principle component analysis for eigen decomposed parameter sets");
   clParser.addTriggerOption("skipHesse", {"--skip-hesse"}, "Don't perform postfit error evaluation");
   clParser.addTriggerOption("skipSimplex", {"--skip-simplex"}, "Don't run SIMPLEX before the actual fit");
-  clParser.addTriggerOption("kickMc", {"--kick-mc"}, "Push MC parameters away from their prior to help the fit converge");
   clParser.addTriggerOption("generateOneSigmaPlots", {"--one-sigma"}, "Generate one sigma plots");
   clParser.addTriggerOption("lightOutputMode", {"--light-mode"}, "Disable plot generation");
   clParser.addTriggerOption("noDialCache", {"--no-dial-cache"}, "Disable cache handling for dial eval");
@@ -78,6 +77,7 @@ int main(int argc, char** argv){
 
   clParser.addDummyOption("Runtime/debug options");
 
+  clParser.addOption("kickMc", {"--kick-mc"}, "Amount to push the starting parameters away from their prior values (default: 0)", 1, true);
   clParser.addOption("debugVerbose", {"--debug"}, "Enable debug verbose (can provide verbose level arg)", 1, true);
   clParser.addOption("usingCacheManager", {"--cache-manager"}, "Toggle the usage of the CacheManager (i.e. the GPU) [empty, 'on', or 'off']",1,true);
   clParser.addTriggerOption("usingGpu", {"--gpu"}, "Use GPU parallelization");
@@ -326,10 +326,21 @@ int main(int argc, char** argv){
     fitter.setAllParamVariationsSigmas(GenericToolbox::Json::fetchValue<std::vector<double>>(configHandler.getConfig(), "allParamVariations"));
   });
 
-
-  if( clParser.isOptionTriggered("kickMc") ){
-    fitter.setThrowMcBeforeFit( true );
-    fitter.setThrowGain( 0.1 );
+  // Check if the first point of the fit should be moved before the
+  // minimization.  This is not changing the prior value, only the starting
+  // point of the fit.  The kick is in units of prior standard deviations
+  // about the prior point.
+  double kickMc = 0.0;       // Set the default value
+  if (clParser.isOptionTriggered("kickMc")) {
+      int values = clParser.getNbValueSet("usingCacheManager");
+      if (values > 0) kickMc = clParser.getOptionVal<double>("kickMc",0);
+  }
+  if( kickMc > 0.01) {
+      LogAlert << "Fit starting point randomized by " << kickMc << " sigma"
+               << " around prior values."
+               << std::endl;
+      fitter.setThrowMcBeforeFit( true );
+      fitter.setThrowGain( kickMc );
   }
 
   if( clParser.isOptionTriggered("skipSimplex") ){
