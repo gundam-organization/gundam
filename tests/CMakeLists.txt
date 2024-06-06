@@ -30,8 +30,9 @@ add_test(
 
 ## Compiled unit tests using GoogleTest.  These are only run if GTest
 ## is found.
-find_package(GTest QUIET)
+# find_package(GTest QUIET)
 if(GTEST_FOUND)
+  cmessage( STATUS "Compiling google tests..." )
   # Setup the hemi test suite for the host
   add_executable(hemiTest_host.exe
     GTests/hemiArrayTest.cpp
@@ -55,4 +56,6 @@ if(GTEST_FOUND)
     target_link_libraries(hemiTest_device.exe GundamCache)
     gtest_discover_tests(hemiTest_device.exe)
   endif(CMAKE_CUDA_COMPILER)
+else(GTEST_FOUND)
+  cmessage( STATUS "Google test is not available..." )
 endif(GTEST_FOUND)
