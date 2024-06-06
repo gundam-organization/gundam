@@ -143,6 +143,10 @@ bool Cache::Manager::HasCUDA() {
     return Cache::Parameters::UsingCUDA();
 }
 
+bool Cache::Manager::HasGPU(bool dump) {
+    return Cache::Parameters::HasGPU(dump);
+}
+
 bool Cache::Manager::Build(SampleSet& sampleList,
                            EventDialCache& eventDials) {
     LogInfo << "Build the internal caches " << std::endl;

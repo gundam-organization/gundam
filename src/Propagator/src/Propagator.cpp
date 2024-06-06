@@ -571,6 +571,7 @@ void Propagator::reweightMcEvents() {
   if(GundamGlobals::getEnableCacheManager()) {
     Cache::Manager::Update(getFitSampleSet(), getEventDialCache());
     usedGPU = Cache::Manager::Fill();
+    if (GundamGlobals::getForceDirectCalculation()) usedGPU = false;
   }
 #endif
   if( not usedGPU ){

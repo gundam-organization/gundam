@@ -1,6 +1,8 @@
 Fixes relative to 1.8.3
 
-Issue # 530 : Fix an inefficiency in the summation of the event weights on the GPU and double the speed of the likelihood calculation using the GPU.
+Issue #534 : Backport CPU and GPU calculation backing from `main`, and add validation that the two calculations agree within machine precision.
+
+Issue #530 : Fix an inefficiency in the summation of the event weights on the GPU and double the speed of the likelihood calculation using the GPU.
 
 Issue # 524 : Apply the global event weight cap when using the Cache::Manager to calculate the likelihood.
 

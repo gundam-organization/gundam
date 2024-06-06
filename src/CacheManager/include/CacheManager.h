@@ -70,8 +70,13 @@ public:
     /// parameter isn't defined, this will return a negative value.
     static int ParameterIndex(const Parameter* fp);
 
-    /// Return true if a GPU is available.
+    /// Return true if CUDA was used during compilation.  Necessary for
+    /// running a GPU.
     static bool HasCUDA();
+
+    /// Return true if a GPU is available at runtime.  Must have also been
+    // compiled using CUDA
+    static bool HasGPU(bool dump = false);
 
     /// Return the approximate allocated memory (e.g. on the GPU).
     std::size_t GetResidentMemory() const {return fTotalBytes;}

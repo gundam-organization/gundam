@@ -12,8 +12,10 @@ LoggerInit([]{
 });
 
 // statics
+int GundamGlobals::_gundamThreads_{1};
 bool GundamGlobals::_disableDialCache_{false};
 bool GundamGlobals::_enableCacheManager_{false};
+bool GundamGlobals::_forceDirectCalculation_{false};
 bool GundamGlobals::_lightOutputMode_{false};
 std::mutex GundamGlobals::_threadMutex_;
 VerboseLevel GundamGlobals::_verboseLevel_{NORMAL_MODE};

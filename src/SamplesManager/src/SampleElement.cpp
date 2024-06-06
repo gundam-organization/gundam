@@ -3,6 +3,7 @@
 //
 
 #include "GundamGlobals.h"
+#include "GundamAlmostEqual.h"
 #include "SampleElement.h"
 
 #include "Logger.h"
@@ -10,6 +11,7 @@
 
 #include "TRandom.h"
 
+#include <sstream>
 
 LoggerInit([]{ Logger::setUserHeaderStr("[SampleElement]"); });
 
@@ -92,17 +94,17 @@ void SampleElement::refillHistogram(int iThread_){
 
 #ifdef GUNDAM_USING_CACHE_MANAGER
   if (_CacheManagerValid_ and not (*_CacheManagerValid_)) {
-      // This is can be slowish when data must be copied from the device, but
-      // it makes sure that the results are copied from the device when they
-      // have changed. The values pointed to by _CacheManagerValue_ and
-      // _CacheManagerValid_ are inside of the summed index cache (a bit of
-      // evil coding here), and are updated by the cache.  The update is
-      // triggered by (*_CacheManagerUpdate_)().
+      // This can be slow (~10 usec for 5000 bins) when data must be copied
+      // from the device, but it makes sure that the results are copied from
+      // the device when they have changed. The values pointed to by
+      // _CacheManagerValue_ and _CacheManagerValid_ are inside the summed
+      // index cache (a bit of evil coding here), and are updated by the
+      // cache.  The update is triggered by (*_CacheManagerUpdate_)().
       if (_CacheManagerUpdate_) (*_CacheManagerUpdate_)();
   }
 #endif
 
-  // Faster that pointer shifter. -> would be slower if refillHistogram is
+  // Faster than pointer shifter. -> would be slower if refillHistogram is
   // handled by the propagator
   int iBin = iThread_; // iBin += nbThreads;
   int nBins = int(perBinEventPtrList.size());
@@ -113,43 +115,49 @@ void SampleElement::refillHistogram(int iThread_){
   double* binErrorPtr{nullptr};
 
   while( iBin < nBins ) {
+    bool binFilled = false;
+
     binContentPtr = &binContentArrayPtr[iBin+1];
     binErrorPtr = &binErrorArrayPtr[iBin+1];
 
     (*binContentPtr) = 0;
     (*binErrorPtr) = 0;
 #ifdef GUNDAM_USING_CACHE_MANAGER
+    bool filledWithManager = false;
+    double value{std::nan("not-set")};
+    double error{std::nan("not-set")};
     if (_CacheManagerValue_ !=nullptr and _CacheManagerIndex_ >= 0) {
-      const double ew = _CacheManagerValue_[_CacheManagerIndex_+iBin];
-      const double ew2 = _CacheManagerValue2_[_CacheManagerIndex_+iBin];
-      (*binContentPtr) += ew;
-      (*binErrorPtr) += ew2;
-#ifdef CACHE_MANAGER_SLOW_VALIDATION
-      double content = binContentArray[iBin+1];
-      double slowValue = 0.0;
-      for( auto* eventPtr : perBinEventPtrList.at(iBin)){
-        slowValue += eventPtr->getEventWeight();
-      }
-      double delta = std::abs(slowValue-content);
-      if (delta > 1E-6) {
-        LogInfo << "VALIDATION: Mismatched bin: " << _CacheManagerIndex_
-                << "+" << iBin
-                << "(" << name
-                << ") gpu: " << content
-                << " PhysEvt: " << slowValue
-                << " delta: " << delta
-                << std::endl;
-      }
-#endif // CACHE_MANAGER_SLOW_VALIDATION
+      value = _CacheManagerValue_[_CacheManagerIndex_+iBin];
+      error = _CacheManagerValue2_[_CacheManagerIndex_+iBin];
+      (*binContentPtr) += value;
+      (*binErrorPtr) += error;
+      binFilled = not GundamGlobals::getForceDirectCalculation();
+      filledWithManager = true;
     }
-    else {
-#endif // GUNDAM_USING_CACHE_MANAGER
+#endif
+    if (not binFilled) {
+      (*binContentPtr) = 0;
+      (*binErrorPtr) = 0;
       for (auto *eventPtr: perBinEventPtrList[iBin]) {
-        (*binContentPtr) += eventPtr->getEventWeight();
-        (*binErrorPtr) += eventPtr->getEventWeight() * eventPtr->getEventWeight();
+        const double buffer = eventPtr->getEventWeight();
+        (*binContentPtr) += buffer;
+        (*binErrorPtr) += buffer*buffer;
       }
-      LogThrowIf(std::isnan((*binContentPtr)));
+      LogThrowIf(std::isnan((*binContentPtr)), "NaN while filling histogram");
+    }
 #ifdef GUNDAM_USING_CACHE_MANAGER
+    // Parallel calculations of the histogramming have been run.  Make sure
+    // they are the same.
+    if (GundamGlobals::getForceDirectCalculation() and filledWithManager) {
+      if (not GundamUtils::almostEqual(value,(*binContentPtr))
+          || not GundamUtils::almostEqual(error,(*binErrorPtr))) {
+        std::ostringstream str;
+        str << "Incorrect histogram content --"
+            << " Content: " << value << "!=" << (*binContentPtr)
+            << " Error: " << error << "!=" << (*binErrorPtr);
+        LogError << str.str() << std::endl;
+        LogThrow(str.str());
+      }
     }
 #endif // GUNDAM_USING_CACHE_MANAGER
     iBin += nbThreads;
