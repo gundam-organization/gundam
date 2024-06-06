@@ -143,8 +143,12 @@ bool Cache::Manager::HasCUDA() {
     return Cache::Parameters::UsingCUDA();
 }
 
-bool Cache::Manager::Build( SampleSet& sampleList,
-                            EventDialCache& eventDials) {
+bool Cache::Manager::HasGPU(bool dump) {
+    return Cache::Parameters::HasGPU(dump);
+}
+
+bool Cache::Manager::Build(SampleSet& sampleList,
+                           EventDialCache& eventDials) {
     LogInfo << "Build the internal caches " << std::endl;
 
     /// Zero everything before counting the amount of space needed for the
@@ -354,8 +358,8 @@ void Cache::Manager::UpdateRequired() {
 }
 
 
-bool Cache::Manager::Update( SampleSet& sampleList,
-                             EventDialCache& eventDials) {
+bool Cache::Manager::Update(SampleSet& sampleList,
+                            EventDialCache& eventDials) {
     if (not fUpdateRequired) return true;
 
     // This is the updated that is required!
@@ -594,7 +598,6 @@ bool Cache::Manager::Update( SampleSet& sampleList,
             .GetSumsValidPointer());
         sample.getMcContainer().setCacheManagerUpdatePointer(
             [](){
-                LogTrace << "Copy histogram content from Device to Host" << std::endl;
                 Cache::Manager::Get()->GetHistogramsCache().GetSum(0);
                 Cache::Manager::Get()->GetHistogramsCache().GetSum2(0);
             });
@@ -617,6 +620,15 @@ bool Cache::Manager::Update( SampleSet& sampleList,
     if (Cache::Manager::Get()->GetHistogramsCache().GetSumCount()
         != nextHist) {
         LogThrow("Histogram cells are missing");
+    }
+
+    // If the event weight cap has been set, then pass it along
+    if (eventDials.getGlobalEventReweightCap().isEnabled) {
+        double cap = eventDials.getGlobalEventReweightCap().maxReweight;
+        if (std::isfinite(cap)) {
+            Cache::Manager::Get()
+                ->GetHistogramsCache().SetMaximumEventWeight(cap);
+        }
     }
 
     // Notify all of the internal caches (mostly the CacheRecursiveSums) that
