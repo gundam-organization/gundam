@@ -11,7 +11,21 @@
 #include "WeightGeneralSpline.h"
 #include "WeightGraph.h"
 
+#ifdef CACHE_MANAGER_USE_INDEXED_SUMS
+// An older implementation of the histogram summing that may be faster for
+// some (peculiar) data sets.
 #include "CacheIndexedSums.h"
+namespace Cache {
+    using HistogramSum = Cache::IndexedSums;
+}
+#else
+// A GPU optimized implementation of histogram summing that will be faster
+// for most data sets.
+#include "CacheRecursiveSums.h"
+namespace Cache {
+    using HistogramSum = Cache::RecursiveSums;
+}
+#endif
 
 #include "SampleSet.h"
 #include "EventDialCache.h"
@@ -40,13 +54,13 @@ public:
 
     /// Build the cache and load it into the device.  This is used in
     /// Propagator.cpp to fill the constants needed to for the calculations.
-    static bool Build( SampleSet& sampleList, EventDialCache& eventDials);
+    static bool Build(SampleSet& sampleList, EventDialCache& eventDials);
 
     /// Update the cache with the event and spline information.  This is
     /// called as part of Build, and can be called in other code if the cache
     /// needs to be changed.  It forages all of the information from the
     /// original sample list and event dials.
-    static bool Update( SampleSet& sampleList, EventDialCache& eventDials);
+    static bool Update(SampleSet& sampleList, EventDialCache& eventDials);
 
     /// Flag that the Cache::Manager internal caches must be updated from the
     /// SampleSet and EventDialCache before it can be used.
@@ -56,8 +70,13 @@ public:
     /// parameter isn't defined, this will return a negative value.
     static int ParameterIndex(const Parameter* fp);
 
-    /// Return true if a GPU is available.
+    /// Return true if CUDA was used during compilation.  Necessary for
+    /// running a GPU.
     static bool HasCUDA();
+
+    /// Return true if a GPU is available at runtime.  Must have also been
+    // compiled using CUDA
+    static bool HasGPU(bool dump = false);
 
     /// Return the approximate allocated memory (e.g. on the GPU).
     std::size_t GetResidentMemory() const {return fTotalBytes;}
@@ -107,7 +126,7 @@ private:
     std::unique_ptr<Cache::Weight::Graph> fGraphs;
 
     /// The cache for the summed histgram weights
-    std::unique_ptr<Cache::IndexedSums> fHistogramsCache;
+    std::unique_ptr<Cache::HistogramSum> fHistogramsCache;
 
     // The rough size of all the caches.
     std::size_t fTotalBytes;
@@ -119,7 +138,7 @@ public:
     // implementation, and should be ignored by most people.
     Cache::Parameters& GetParameterCache() {return *fParameterCache;}
     Cache::Weights&    GetWeightsCache() {return *fWeightsCache;}
-    Cache::IndexedSums& GetHistogramsCache() {return *fHistogramsCache;}
+    Cache::HistogramSum& GetHistogramsCache() {return *fHistogramsCache;}
 };
 
 // An MIT Style License

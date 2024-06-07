@@ -8,6 +8,7 @@
 #
 
 cmessage( STATUS "Setting up tests..." )
+enable_testing()
 
 # Run the gundam-tests.sh script which runs scripted tests.  The
 # COMMAND is a little complicated since the testing script needs to
@@ -29,30 +30,32 @@ add_test(
 
 ## Compiled unit tests using GoogleTest.  These are only run if GTest
 ## is found.
-find_package(GTest)
+find_package(GTest QUIET)
 if(GTEST_FOUND)
-  enable_testing()
-
+  cmessage( STATUS "Compiling google tests..." )
   # Setup the hemi test suite for the host
-  add_executable(hemiTest_host.exe
+  add_executable(gundamGTest_host.exe
     GTests/hemiArrayTest.cpp
     GTests/hemiExecutionPolicyTest.cpp
+    GTests/cachedSumsTest.cpp
     GTests/hemiExternals.cpp)
-  target_link_libraries(hemiTest_host.exe GTest::gtest_main)
-  target_link_libraries(hemiTest_host.exe GundamCache)
-  target_compile_definitions(hemiTest_host.exe PUBLIC HEMI_CUDA_DISABLE)
-  gtest_discover_tests(hemiTest_host.exe)
+  target_link_libraries(gundamGTest_host.exe GTest::gtest_main)
+  target_link_libraries(gundamGTest_host.exe GundamCache)
+  target_compile_definitions(gundamGTest_host.exe PUBLIC HEMI_CUDA_DISABLE)
+  gtest_discover_tests(gundamGTest_host.exe)
 
   if(CMAKE_CUDA_COMPILER)
     # Setup the hemi test suite for the device.
-    add_executable(hemiTest_device.exe
+    add_executable(gundamGTest_device.exe
       GTests/hemiArrayTest.cu
       GTests/hemiExecutionPolicyTest.cu
       GTests/hemiLaunch.cu
+      GTests/cachedSumsTest.cu
       GTests/hemiExternals.cpp)
-    target_link_libraries(hemiTest_device.exe GTest::gtest_main)
-    target_link_libraries(hemiTest_device.exe GundamCache)
-    gtest_discover_tests(hemiTest_device.exe)
+    target_link_libraries(gundamGTest_device.exe GTest::gtest_main)
+    target_link_libraries(gundamGTest_device.exe GundamCache)
+    gtest_discover_tests(gundamGTest_device.exe)
   endif(CMAKE_CUDA_COMPILER)
-
+else(GTEST_FOUND)
+  cmessage( STATUS "Google test is not available..." )
 endif(GTEST_FOUND)

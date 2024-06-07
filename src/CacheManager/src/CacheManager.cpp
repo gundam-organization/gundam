@@ -15,7 +15,6 @@
 #include "WeightUniformSpline.h"
 #include "WeightGeneralSpline.h"
 #include "WeightGraph.h"
-#include "CacheIndexedSums.h"
 
 #include "ParameterSet.h"
 #include "GundamGlobals.h"
@@ -121,7 +120,7 @@ Cache::Manager::Manager(int events, int parameters,
         LogThrowIf(not fGraphs, "Bad Graphs alloc");
         fWeightsCache->AddWeightCalculator(fGraphs.get());
         fTotalBytes += fGraphs->GetResidentMemory();
-        fHistogramsCache = std::make_unique<Cache::IndexedSums>(
+        fHistogramsCache = std::make_unique<Cache::HistogramSum>(
                                   fWeightsCache->GetWeights(),
                                   histBins);
         LogThrowIf(not fHistogramsCache, "Bad HistogramsCache alloc");
@@ -144,8 +143,12 @@ bool Cache::Manager::HasCUDA() {
     return Cache::Parameters::UsingCUDA();
 }
 
-bool Cache::Manager::Build( SampleSet& sampleList,
-                            EventDialCache& eventDials) {
+bool Cache::Manager::HasGPU(bool dump) {
+    return Cache::Parameters::HasGPU(dump);
+}
+
+bool Cache::Manager::Build(SampleSet& sampleList,
+                           EventDialCache& eventDials) {
     LogInfo << "Build the internal caches " << std::endl;
 
     /// Zero everything before counting the amount of space needed for the
@@ -347,7 +350,6 @@ bool Cache::Manager::Build( SampleSet& sampleList,
 
     Cache::Manager::UpdateRequired();
 
-    // return Update(sampleList, eventDials);
     return true;
 }
 
@@ -356,8 +358,8 @@ void Cache::Manager::UpdateRequired() {
 }
 
 
-bool Cache::Manager::Update( SampleSet& sampleList,
-                             EventDialCache& eventDials) {
+bool Cache::Manager::Update(SampleSet& sampleList,
+                            EventDialCache& eventDials) {
     if (not fUpdateRequired) return true;
 
     // This is the updated that is required!
@@ -569,7 +571,10 @@ bool Cache::Manager::Update( SampleSet& sampleList,
         LogThrow("Probable problem putting dials in cache");
     }
 
-    // Add the histogram cells to the cache.  THIS CODE IS SUSPECT!!!!
+    // Add the histogram cells to the cache.  THIS CODE IS SUSPECT SINCE IT IS
+    // SAVING ADDRESSES OF CLASS FIELDS.  This *will* be OK since the fields
+    // are not going to be moved, and is needed for a huge win in efficiency,
+    // but is officially "dangerous".
     LogInfo << "Add this histogram cells to the cache." << std::endl;
     int nextHist = 0;
     for(Sample& sample : sampleList.getSampleList() ) {
@@ -593,7 +598,6 @@ bool Cache::Manager::Update( SampleSet& sampleList,
             .GetSumsValidPointer());
         sample.getMcContainer().setCacheManagerUpdatePointer(
             [](){
-                LogTrace << "Copy histogram content from Device to Host" << std::endl;
                 Cache::Manager::Get()->GetHistogramsCache().GetSum(0);
                 Cache::Manager::Get()->GetHistogramsCache().GetSum2(0);
             });
@@ -617,6 +621,19 @@ bool Cache::Manager::Update( SampleSet& sampleList,
         != nextHist) {
         LogThrow("Histogram cells are missing");
     }
+
+    // If the event weight cap has been set, then pass it along
+    if (eventDials.getGlobalEventReweightCap().isEnabled) {
+        double cap = eventDials.getGlobalEventReweightCap().maxReweight;
+        if (std::isfinite(cap)) {
+            Cache::Manager::Get()
+                ->GetHistogramsCache().SetMaximumEventWeight(cap);
+        }
+    }
+
+    // Notify all of the internal caches (mostly the CacheRecursiveSums) that
+    // the internal buffers should be update
+    Cache::Manager::Get()->GetHistogramsCache().Initialize();
 
     return true;
 }

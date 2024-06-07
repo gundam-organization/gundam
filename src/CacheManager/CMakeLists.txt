@@ -17,6 +17,7 @@ set( HEADERS
     ${CMAKE_CURRENT_SOURCE_DIR}/include/WeightGraph.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/WeightBase.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/CacheIndexedSums.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/CacheRecursiveSums.h
 )
 
 set( SRC_FILE_EXT "cpp" )
@@ -36,6 +37,7 @@ list( APPEND SRCFILES ${CMAKE_CURRENT_SOURCE_DIR}/src/WeightBase.${SRC_FILE_EXT}
 list( APPEND SRCFILES ${CMAKE_CURRENT_SOURCE_DIR}/src/CacheParameters.${SRC_FILE_EXT} )
 list( APPEND SRCFILES ${CMAKE_CURRENT_SOURCE_DIR}/src/CacheWeights.${SRC_FILE_EXT} )
 list( APPEND SRCFILES ${CMAKE_CURRENT_SOURCE_DIR}/src/CacheIndexedSums.${SRC_FILE_EXT} )
+list( APPEND SRCFILES ${CMAKE_CURRENT_SOURCE_DIR}/src/CacheRecursiveSums.${SRC_FILE_EXT} )
 
 if( USE_STATIC_LINKS )
   add_library(GundamCache STATIC ${SRCFILES})
