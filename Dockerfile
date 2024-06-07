@@ -1,10 +1,26 @@
-FROM rootproject/root as base
+# Set which version of ROOT to be built with.  This is usually going
+# to be latest, but there are sometimes problems.  The available tags
+# are found at https://hub.docker.com/r/rootproject/root.  There can
+# be only one!
+
+# ROOT generally distributes docker for the latest ubuntu LTS release
+FROM rootproject/root:latest as base
+
+# FROM rootproject/root:6.32.00-ubuntu24.04 as base
+# FROM rootproject/root:6.30.06-ubuntu22.04 as base
 
 SHELL ["/bin/bash", "-c"]
 
 RUN apt-get update
-RUN apt-get install -y \
-    git libyaml-cpp-dev nlohmann-json3-dev
+
+# Install the prerequisites.  Install individually and allow
+# installation to fail since ubuntu tends to be a little jumpy about
+# which packages are distributed.
+
+RUN apt-get install -y git || true
+RUN apt-get install -y libyaml-cpp-dev || true
+RUN apt-get install -y nlohmann-json3-dev || true
+RUN apt-get install -y libvdt-dev || true
 
 ENV WORK_DIR /home/work
 ENV REPO_DIR $WORK_DIR/repo
@@ -15,7 +31,6 @@ RUN mkdir -p $REPO_DIR
 RUN mkdir -p $BUILD_DIR
 RUN mkdir -p $INSTALL_DIR
 
-
 # Copying GUNDAM source files
 COPY ./src $REPO_DIR/src
 # COPY ./submodules $REPO_DIR/submodules # submodules are not pulled on github
@@ -24,17 +39,15 @@ COPY ./CMakeLists.txt $REPO_DIR/CMakeLists.txt
 COPY ./tests $REPO_DIR/tests
 COPY ./.git $REPO_DIR/.git
 
-
 # Checking out missing code
 WORKDIR $REPO_DIR
 RUN git submodule update --init --recursive
-
 
 # Now build GUNDAM
 WORKDIR $BUILD_DIR
 RUN cmake \
       -D CMAKE_INSTALL_PREFIX=$INSTALL_DIR \
-      $REPO_DIR
+      $REPO_DIR 
 RUN make -j3 install
 
 # run the tests
