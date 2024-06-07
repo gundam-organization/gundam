@@ -330,12 +330,13 @@ int main(int argc, char** argv){
   // minimization.  This is not changing the prior value, only the starting
   // point of the fit.  The kick is in units of prior standard deviations
   // about the prior point.
-  double kickMc = 0.0;       // Set the default value
+  double kickMc = 0.0;          // Set the default value without an option
   if (clParser.isOptionTriggered("kickMc")) {
       int values = clParser.getNbValueSet("usingCacheManager");
-      if (values > 0) kickMc = clParser.getOptionVal<double>("kickMc",0);
+      if (values < 1) kickMc = 0.1; // Default without an argument.
+      else kickMc = clParser.getOptionVal<double>("kickMc",0);
   }
-  if( kickMc > 0.01) {
+  if ( kickMc > 0.01 ) {
       LogAlert << "Fit starting point randomized by " << kickMc << " sigma"
                << " around prior values."
                << std::endl;
