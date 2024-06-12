@@ -469,8 +469,10 @@ void DataDispenser::preAllocateMemory(){
           LogInfo << dialCollection->getTitle() << ": creating " << _cache_.totalNbEvents;
           LogInfo << " slots for " << dialType << std::endl;
 
-          dialCollection->getDialBaseList().clear();
-          dialCollection->getDialBaseList().resize(_cache_.totalNbEvents);
+          dialCollection->getDialBaseList().resize(
+              dialCollection->getDialBaseList().size()
+              + _cache_.totalNbEvents
+          );
         }
         else{
           LogThrow("DEV ERROR: not binned, not event-by-event?");
