@@ -7,29 +7,31 @@
 #include <vector>
 #include <utility>
 
+/// Manage a bilinear interpolation for a grid of points.
 class Bilinear : public DialBase {
 
 public:
   Bilinear() = default;
   ~Bilinear() override = default;
 
-  [[nodiscard]] std::unique_ptr<DialBase> clone() const override { return std::make_unique<Bilinear>(*this); }
-  [[nodiscard]] std::string getDialTypeName() const override { return {"Bilinear"}; }
+  [[nodiscard]] std::unique_ptr<DialBase> clone() const override {
+       return std::make_unique<Bilinear>(*this);
+  }
+
+  [[nodiscard]] std::string getDialTypeName() const override {return {"Bilinear"};}
+
+  /// Allow extrapolation of the data.  The default is to
+  /// forbid extrapolation.
+  virtual void setAllowExtrapolation(bool allow_) override;
+  [[nodiscard]] virtual bool getAllowExtrapolation() const override;
+
+  // Return the dial response for the input parameters.  The DialInputBuffer
+  // should contain two input parameters.
   [[nodiscard]] double evalResponse(const DialInputBuffer& input_) const override;
 
-  [[nodiscard]] std::string getSummary() const override;
-
-  void setAllowExtrapolation(bool allowExtrapolation) override;
-  [[nodiscard]] bool getAllowExtrapolation() const override;
-
-  void buildSplineData(TGraph& graph_);
-  [[nodiscard]] double evaluateSpline(const DialInputBuffer& input_) const;
-
-  /// Pass information to the dial so that it can build it's
-  /// internal information.  New build overloads should be
-  /// added as we have classes of dials
-  /// (e.g. multi-dimensional dials).
-  virtual void buildDial(const TH2D& grf, const std::string& option_="") override;
+  /// Pass information to the dial so that it can build it's internal
+  /// information.
+  virtual void buildDial(const TH2& h2, const std::string& option_="") override;
 
   [[nodiscard]] const std::vector<double>& getDialData() const override {return _splineData_;}
 
@@ -40,7 +42,9 @@ protected:
   // the Cache::Manager to work, and provides the input for spline calculation
   // functions that can be shared between the CPU and the GPU.
   std::vector<double> _splineData_{};
-  std::pair<double, double> _splineBounds_{std::nan("unset"), std::nan("unset")};
+
+  // The vector of input parameter bounds.
+  std::vector<std::pair<double, double>> _splineBounds_;
 };
 
 typedef CachedDial<Bilinear> BilinearCache;
