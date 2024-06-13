@@ -20,6 +20,7 @@ set( SRCFILES
     DialDefinitions/src/CompactSpline.cpp
     DialDefinitions/src/MonotonicSpline.cpp
     DialDefinitions/src/Bilinear.cpp
+    DialDefinitions/src/Bicubic.cpp
 
     DialDefinitions/src/CompiledLibDial.cpp
     DialDefinitions/src/RootFormula.cpp
@@ -57,6 +58,7 @@ set( HEADERS
     DialDefinitions/include/CompactSpline.h
     DialDefinitions/include/MonotonicSpline.h
     DialDefinitions/include/Bilinear.h
+    DialDefinitions/include/Bicubic.h
 
     DialDefinitions/include/RootFormula.h
     DialDefinitions/include/Polynomial.h
