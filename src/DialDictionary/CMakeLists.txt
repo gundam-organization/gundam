@@ -31,6 +31,7 @@ set( SRCFILES
     DialFactories/src/NormDialBaseFactory.cpp
     DialFactories/src/GraphDialBaseFactory.cpp
     DialFactories/src/SplineDialBaseFactory.cpp
+    DialFactories/src/SurfaceDialBaseFactory.cpp
     )
 
 set( HEADERS
@@ -65,6 +66,7 @@ set( HEADERS
     DialFactories/include/NormDialBaseFactory.h
     DialFactories/include/GraphDialBaseFactory.h
     DialFactories/include/SplineDialBaseFactory.h
+    DialFactories/include/SurfaceDialBaseFactory.h
     )
 
 if( USE_STATIC_LINKS )
