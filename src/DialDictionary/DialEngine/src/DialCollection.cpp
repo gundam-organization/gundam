@@ -40,7 +40,7 @@ void DialCollection::readConfigImpl() {
   if( GenericToolbox::Json::doKeyExist(_config_, "dialInputList") ){
     auto dialInputList = GenericToolbox::Json::fetchValue<JsonType>(_config_, "dialInputList");
 
-    LogThrowIf(_supervisedParameterSetIndex_ == -1, "Can't initialize dialInputList with out setting _supervisedParameterSetIndex_");
+    LogThrowIf(_supervisedParameterSetIndex_ == -1, "Can't initialize dialInputList without setting _supervisedParameterSetIndex_");
 
     _dialInputBufferList_.emplace_back();
     _dialInputBufferList_.back().setParSetRef( _parameterSetListPtr_ );

@@ -2,6 +2,7 @@
 #include "NormDialBaseFactory.h"
 #include "GraphDialBaseFactory.h"
 #include "SplineDialBaseFactory.h"
+#include "SurfaceDialBaseFactory.h"
 
 #include "RootFormula.h"
 #include "CompiledLibDial.h"
@@ -35,6 +36,10 @@ DialBase* DialBaseFactory::makeDial(const std::string& dialTitle_,
   }
   else if (dialType_ == "Spline") {
     SplineDialBaseFactory factory;
+    dialBase.reset(factory.makeDial(dialTitle_, dialType_, dialSubType_, dialInitializer_, useCachedDial_));
+  }
+  else if (dialType_ == "Surface") {
+    SurfaceDialBaseFactory factory;
     dialBase.reset(factory.makeDial(dialTitle_, dialType_, dialSubType_, dialInitializer_, useCachedDial_));
   }
 #define INCLUDE_DEPRECATED_DIAL_TYPES
