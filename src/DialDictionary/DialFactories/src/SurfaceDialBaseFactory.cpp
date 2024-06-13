@@ -3,7 +3,7 @@
 // Explicitly list the headers that are actually needed.  Do not include
 // others.
 #include "Bilinear.h"
-#include "Shift.h"
+#include "Bicubic.h"
 
 #include <TH2.h>
 
@@ -33,9 +33,9 @@ DialBase* SurfaceDialBaseFactory::makeDial(const std::string& dialTitle_,
       std::make_unique<Bilinear>();
   }
   else if (dialSubType_ == "Bicubic") {
-    // dialBase = (useCachedDial_) ?
-    //   std::make_unique<BicubicCache>():
-    //   std::make_unique<Bicubic>();
+    dialBase = (useCachedDial_) ?
+      std::make_unique<BicubicCache>():
+      std::make_unique<Bicubic>();
   }
 
   LogThrowIf(dialBase == nullptr, "Invalid Surface dial subtype");
@@ -70,5 +70,5 @@ DialBase* SurfaceDialBaseFactory::makeDial(const std::string& dialTitle_,
 // Local Variables:
 // mode:c++
 // c-basic-offset:2
-// compile-command:"$(git rev-parse --show-toplevel)/cmake/gundam-build.sh"
+// compile-command:"$(git rev-parse --show-toplevel)/cmake/scripts/gundam-build.sh"
 // End:
