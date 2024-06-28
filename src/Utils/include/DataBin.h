@@ -27,6 +27,7 @@ public:
     // utils
     void readConfig(const JsonType& config_);
     [[nodiscard]] bool isOverlapping(const Edges& other_) const;
+    [[nodiscard]] double getCenterValue() const { return min + (max-min)/2.; }
     [[nodiscard]] std::string getSummary() const;
 
 
