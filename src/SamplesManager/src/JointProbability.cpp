@@ -199,7 +199,7 @@ namespace JointProbability{
     }
 
     if (not std::isfinite(chisq)) [[unlikely]] {
-      LogWarning << "Infinite chi2: " << chisq << std::endl
+      LogWarning << "Non finite chi2: " << chisq << std::endl
                  << " bin " << bin_ << std::endl
                  << GET_VAR_NAME_VALUE(predVal) << std::endl
                  << GET_VAR_NAME_VALUE(dataVal) << std::endl
@@ -216,6 +216,11 @@ namespace JointProbability{
     if(verboseLevel>=3){
       LogTrace << "Bin #" << bin_ << ": chisq(" << chisq << ") / predVal(" << predVal << ") / dataVal(" << dataVal << ")" << std::endl;
     }
+
+    // The chi-squared value must not be NaN.  If it is, then the calculation
+    // should stop since the likelihood and it's derivatives are broken.  This
+    // can only happen with invalid inputs.
+    LogThrowIf(std::isnan(chisq),"Chi2 is NaN");
 
     return chisq;
   }
