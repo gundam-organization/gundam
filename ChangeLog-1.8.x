@@ -1,5 +1,11 @@
 Fixes relative to 1.8.3
 
+Update (Related to #540): Strengthen the NaN trap in the JointProbability calculation.  An NaN there means the fit cannot continue, so throw an error.  Continue to allow INF.
+
+Update (Prompted by #541): Make compilation less alarming by quieting warnings.  They were originally part of debugging.
+
+Issue #536 : Add control over the size of a "kick" when starting a fit.  The starting point can be fluctuated around the prior, and the size of the step is controlled by an optional argument to --kickmc
+
 Issue #534 : Backport CPU and GPU calculation backing from `main`, and add validation that the two calculations agree within machine precision.
 
 Issue #530 : Fix an inefficiency in the summation of the event weights on the GPU and double the speed of the likelihood calculation using the GPU.
