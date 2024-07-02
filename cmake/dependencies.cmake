@@ -37,13 +37,14 @@ if( ROOT_FOUND )
 
   if (NOT ROOT_minuit2_FOUND)
     # Minuit2 wasn't found, but make really sure before giving up.
-    execute_process (COMMAND ${ROOT_INCLUDE_DIRS}/../bin/root-config --has-minuit2
+    execute_process (COMMAND ${ROOT_root_CMD}-config --has-minuit2
         OUTPUT_VARIABLE ROOT_minuit2_FOUND
         OUTPUT_STRIP_TRAILING_WHITESPACE)
   endif(NOT ROOT_minuit2_FOUND)
 
-  # inc dir is $ROOTSYS/include/root
-  set(CMAKE_ROOTSYS ${ROOT_INCLUDE_DIRS}/..)
+  execute_process (COMMAND ${ROOT_root_CMD}-config --prefix
+          OUTPUT_VARIABLE CMAKE_ROOTSYS
+          OUTPUT_STRIP_TRAILING_WHITESPACE)
 
 else( ROOT_FOUND )
   cmessage( STATUS "find_package didn't find ROOT. Using shell instead...")
