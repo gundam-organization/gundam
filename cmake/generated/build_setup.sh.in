@@ -1,4 +1,6 @@
-#!/bin/sh
+#!/usr/bin/bash
+#
+# A minimal setup for bash to run GUNDAM.
 
 source "@CMAKE_ROOTSYS@/bin/thisroot.sh"
 
