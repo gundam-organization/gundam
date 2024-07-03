@@ -1,5 +1,7 @@
 Fixes relative to 1.8.3
 
+Issue #545 : Make the handling of ROOT config information portable between linux and macos.  This no longer assumes how ROOT is installed, and uses root-config portably.
+
 Update (Related to #540): Strengthen the NaN trap in the JointProbability calculation.  An NaN there means the fit cannot continue, so throw an error.  Continue to allow INF.
 
 Update (Prompted by #541): Make compilation less alarming by quieting warnings.  They were originally part of debugging.
