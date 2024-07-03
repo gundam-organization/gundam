@@ -1,5 +1,3 @@
-
-
 message("")
 cmessage( WARNING "Checking dependencies...")
 
@@ -20,24 +18,23 @@ find_package(
 )
 
 if( ROOT_FOUND )
-  cmessage( STATUS "[ROOT]: ROOT found." )
+  if (NOT ROOT_config_CMD)
+    set(ROOT_config_CMD ${ROOT_root_CMD}-config)
+  endif(NOT ROOT_config_CMD)
 
+  cmessage( STATUS "[ROOT]: ROOT found." )
   cmessage( STATUS "[ROOT]: ROOT cmake use file ${ROOT_USE_FILE}")
   cmessage( STATUS "[ROOT]: ROOT include directory: ${ROOT_INCLUDE_DIRS}" )
   cmessage( STATUS "[ROOT]: ROOT C++ Flags: ${ROOT_CXX_FLAGS}" )
 
+  execute_process(COMMAND ${ROOT_config_CMD} --version
+      OUTPUT_VARIABLE ROOT_VERSION
+      OUTPUT_STRIP_TRAILING_WHITESPACE
+  )
+  cmessage( STATUS "[ROOT]: ROOT Version: ${ROOT_VERSION}" )
+
   # Grab functions such as generate dictionary
   include( ${ROOT_USE_FILE} )
-
-  if (NOT ROOT_minuit2_FOUND)
-    # Minuit2 wasn't found, but make really sure before giving up.
-    execute_process (COMMAND root-config --has-minuit2
-        OUTPUT_VARIABLE ROOT_minuit2_FOUND
-        OUTPUT_STRIP_TRAILING_WHITESPACE)
-  endif(NOT ROOT_minuit2_FOUND)
-
-  # inc dir is $ROOTSYS/include/root
-  set(CMAKE_ROOTSYS ${ROOT_INCLUDE_DIRS}/..)
 
 else( ROOT_FOUND )
   cmessage( STATUS "find_package didn't find ROOT. Using shell instead...")
@@ -47,26 +44,29 @@ else( ROOT_FOUND )
     cmessage( FATAL_ERROR "$ROOTSYS is not defined, please set up root first." )
   else()
     cmessage( STATUS "Using ROOT installed at $ENV{ROOTSYS}")
-    set(CMAKE_ROOTSYS $ENV{ROOTSYS})
   endif()
+
+  if (NOT ROOT_config_CMD)
+    set(ROOT_config_CMD root-config)
+  endif(NOT ROOT_config_CMD)
 
   cmessage( STATUS "Including local GENERATE_ROOT_DICTIONARY implementation." )
   include(${CMAKE_SOURCE_DIR}/cmake/utils/GenROOTDictionary.cmake)
-  execute_process(COMMAND root-config --cflags
+  execute_process(COMMAND ${ROOT_config_CMD} --cflags
       OUTPUT_VARIABLE ROOT_CXX_FLAGS
       OUTPUT_STRIP_TRAILING_WHITESPACE)
-  execute_process(COMMAND root-config --libs
+  execute_process(COMMAND ${ROOT_config_CMD} --libs
       OUTPUT_VARIABLE ROOT_LIBRARIES
       OUTPUT_STRIP_TRAILING_WHITESPACE)
-  execute_process(COMMAND root-config --version
-      OUTPUT_VARIABLE ROOT_VERSION
-      OUTPUT_STRIP_TRAILING_WHITESPACE)
-  execute_process (COMMAND root-config --ldflags
-      OUTPUT_VARIABLE ROOT_LINK_FLAGS
-      OUTPUT_STRIP_TRAILING_WHITESPACE)
-  execute_process (COMMAND root-config --has-minuit2
-      OUTPUT_VARIABLE ROOT_minuit2_FOUND
-      OUTPUT_STRIP_TRAILING_WHITESPACE)
+  execute_process(COMMAND ${ROOT_config_CMD} --version
+    OUTPUT_VARIABLE ROOT_VERSION
+    OUTPUT_STRIP_TRAILING_WHITESPACE)
+  execute_process (COMMAND ${ROOT_config_CMD} --ldflags
+    OUTPUT_VARIABLE ROOT_LINK_FLAGS
+    OUTPUT_STRIP_TRAILING_WHITESPACE)
+  execute_process (COMMAND ${ROOT_config_CMD} --has-minuit2
+    OUTPUT_VARIABLE ROOT_minuit2_FOUND
+    OUTPUT_STRIP_TRAILING_WHITESPACE)
 
   cmessage( STATUS "[ROOT]: root-config --version: ${ROOT_VERSION}")
   cmessage( STATUS "[ROOT]: root-config --libs: ${ROOT_LIBRARIES}")
@@ -81,18 +81,31 @@ endif( ROOT_FOUND )
 # Try to figure out which version of C++ was used to compile ROOT.  ROOT
 # generates header files that depend on the compiler version so we will
 # need to use the same version.
-execute_process(COMMAND root-config --has-cxx14 COMMAND grep yes
-    OUTPUT_VARIABLE ROOT_cxx14_FOUND
-    OUTPUT_STRIP_TRAILING_WHITESPACE)
-execute_process(COMMAND root-config --has-cxx17 COMMAND grep yes
-    OUTPUT_VARIABLE ROOT_cxx17_FOUND
-    OUTPUT_STRIP_TRAILING_WHITESPACE)
-execute_process(COMMAND root-config --has-cxx20 COMMAND grep yes
-    OUTPUT_VARIABLE ROOT_cxx20_FOUND
-    OUTPUT_STRIP_TRAILING_WHITESPACE)
+execute_process(COMMAND ${ROOT_config_CMD} --has-cxx14 COMMAND grep yes
+  OUTPUT_VARIABLE ROOT_cxx14_FOUND
+  OUTPUT_STRIP_TRAILING_WHITESPACE)
+execute_process(COMMAND ${ROOT_config_CMD} --has-cxx17 COMMAND grep yes
+  OUTPUT_VARIABLE ROOT_cxx17_FOUND
+  OUTPUT_STRIP_TRAILING_WHITESPACE)
+execute_process(COMMAND ${ROOT_config_CMD} --has-cxx20 COMMAND grep yes
+  OUTPUT_VARIABLE ROOT_cxx20_FOUND
+  OUTPUT_STRIP_TRAILING_WHITESPACE)
 
+# Extract the home location for ROOT.  This is the value of ROOTSYS
+execute_process (COMMAND ${ROOT_config_CMD} --prefix
+  OUTPUT_VARIABLE CMAKE_ROOTSYS
+  OUTPUT_STRIP_TRAILING_WHITESPACE)
+
+# Minuit2 wasn't found, but make really sure before giving up.
 if (NOT ROOT_minuit2_FOUND)
-  cmessage( STATUS "[ROOT]:Rebuild root using -Dminuit2=on in the cmake command")
+  execute_process (COMMAND ${ROOT_config_CMD} --has-minuit2
+    OUTPUT_VARIABLE ROOT_minuit2_FOUND
+    OUTPUT_STRIP_TRAILING_WHITESPACE)
+endif(NOT ROOT_minuit2_FOUND)
+
+# If we truly don't have minuit2, then stop.
+if (NOT ROOT_minuit2_FOUND)
+  cmessage( STATUS "[ROOT]: Use >6.32 or rebuild root with-Dminuit2=on in the cmake command")
   cmessage(FATAL_ERROR "[ROOT]: minuit2 is required")
 endif(NOT ROOT_minuit2_FOUND)
 
@@ -156,9 +169,14 @@ link_libraries( ${YAML_CPP_LIBRARIES} )
 # ZLIB (optional)
 ####################
 
-cmessage( STATUS "Looking for optional ZLib install..." )
-find_package(ZLIB)
-if (${ZLIB_FOUND})
+if( ${DISABLE_ZLIB} )
+  cmessage( WARNING "DISABLE_ZLIB=ON. Not using Zlib." )
+else()
+  cmessage( STATUS "Looking for optional ZLib install..." )
+  find_package(ZLIB)
+endif()
+
+if ( ZLIB_FOUND )
   cmessage( STATUS "ZLIB found : ${ZLIB_VERSION_STRING}")
   cmessage( STATUS "ZLIB_INCLUDE_DIRS = ${ZLIB_INCLUDE_DIRS}")
   cmessage( STATUS "ZLIB_LIBRARIES = ${ZLIB_LIBRARIES}")
