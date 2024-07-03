@@ -91,6 +91,7 @@ execute_process(COMMAND ${ROOT_config_CMD} --has-cxx20 COMMAND grep yes
   OUTPUT_VARIABLE ROOT_cxx20_FOUND
   OUTPUT_STRIP_TRAILING_WHITESPACE)
 
+# Extract the home location for ROOT.  This is the value of ROOTSYS
 execute_process (COMMAND ${ROOT_config_CMD} --prefix
   OUTPUT_VARIABLE CMAKE_ROOTSYS
   OUTPUT_STRIP_TRAILING_WHITESPACE)
@@ -102,6 +103,7 @@ if (NOT ROOT_minuit2_FOUND)
     OUTPUT_STRIP_TRAILING_WHITESPACE)
 endif(NOT ROOT_minuit2_FOUND)
 
+# If we truly don't have minuit2, then stop.
 if (NOT ROOT_minuit2_FOUND)
   cmessage( STATUS "[ROOT]: Use >6.32 or rebuild root with-Dminuit2=on in the cmake command")
   cmessage(FATAL_ERROR "[ROOT]: minuit2 is required")
@@ -168,22 +170,22 @@ link_libraries( ${YAML_CPP_LIBRARIES} )
 
 if( ${DISABLE_ZLIB} )
   cmessage( WARNING "DISABLE_ZLIB=ON. Not using Zlib." )
-  add_definitions( -D USE_ZLIB=0 )
 else()
   cmessage( STATUS "Looking for optional ZLib install..." )
   find_package(ZLIB)
-  if (${ZLIB_FOUND})
-    cmessage( STATUS "ZLIB found : ${ZLIB_VERSION_STRING}")
-    cmessage( STATUS "ZLIB_INCLUDE_DIRS = ${ZLIB_INCLUDE_DIRS}")
-    cmessage( STATUS "ZLIB_LIBRARIES = ${ZLIB_LIBRARIES}")
+endif()
 
-    add_definitions( -D USE_ZLIB=1 )
-    include_directories( ${ZLIB_INCLUDE_DIRS} )
-    link_libraries( ${ZLIB_LIBRARIES} )
-  else()
-    cmessage( WARNING "ZLib not found. Will compile without the associated features." )
-    add_definitions( -D USE_ZLIB=0 )
-  endif ()
+if ( ZLIB_FOUND )
+  cmessage( STATUS "ZLIB found : ${ZLIB_VERSION_STRING}")
+  cmessage( STATUS "ZLIB_INCLUDE_DIRS = ${ZLIB_INCLUDE_DIRS}")
+  cmessage( STATUS "ZLIB_LIBRARIES = ${ZLIB_LIBRARIES}")
+
+  add_definitions( -D USE_ZLIB=1 )
+  include_directories( ${ZLIB_INCLUDE_DIRS} )
+  link_libraries( ${ZLIB_LIBRARIES} )
+else()
+  cmessage( WARNING "ZLib not found. Will compile without the associated features." )
+  add_definitions( -D USE_ZLIB=0 )
 endif ()
 
 
