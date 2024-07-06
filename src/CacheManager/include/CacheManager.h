@@ -10,6 +10,7 @@
 #include "WeightUniformSpline.h"
 #include "WeightGeneralSpline.h"
 #include "WeightGraph.h"
+#include "WeightBilinear.h"
 
 #ifdef CACHE_MANAGER_USE_INDEXED_SUMS
 // An older implementation of the histogram summing that may be faster for
@@ -82,15 +83,68 @@ public:
     std::size_t GetResidentMemory() const {return fTotalBytes;}
 
 private:
+    // Hold the configuration that will be used to construct the manager
+    // (singleton).  This information was originally passed as arguments to
+    // the constructor, but it became to complex and prone to mistakes since
+    // C++ parameters cannot be named, and the order of a dozen or more
+    // integers is easy to scramble.
+    struct Configuration {
+        // The number of results that are going to be calculated.  There is
+        // one "result", or weight per event.
+        int events{0};
+
+        // The number of parameteters in the fit
+        int parameters{0};
+
+        // The number of histogram bins in the final histogram.
+        int histBins{0};
+
+        // The option for how the space should be allocated that is
+        // passed to the weight calculation classes.
+        std::string spaceOption{"space"};
+
+        // The number of normalization parameters
+        int norms{0};
+
+        // The number of shift dials that have been applied.  These are
+        // applied to the initial event weight outside of Cache::Manager and
+        // are counted here for informational purposes.
+        int shifts{0};
+
+        // The parameters for the dial type CompactSpline (i.e. the
+        // Catmull-Rom) splines
+        int compactSplines{0}; // The number of splines
+        int compactPoints{0};  // The number of knots used in the splines
+
+        // The parameters for the dial type MonotonicSpline (i.e. the
+        // Catmul-Rom splines with monotonic conditions applied).
+        int monotonicSplines{0};   // The number of splines
+        int monotonicPoints{0};    // The data reserved for the splines.
+
+        // The parameters for the dial type UniformSpline (i.e. a spline with
+        // values, and slopes at uniform abcissas).
+        int uniformSplines{0};     // The number of splines
+        int uniformPoints{0};      // The data reserved for the splines.
+
+        // The parameters for the dial type GeneralSpline (i.e. a spline with
+        // values and slopes at non-uniform abcissas).
+        int generalSplines{0};  // The number of splines
+        int generalPoints{0};   // The amount of data reserved for the splines
+
+        // The parameters for the dial type LightGraph (i.e. a graph for
+        // linear interpolation at non-uniform abcissas).
+        int graphs{0};          // The number of graphs
+        int graphPoints{0};     // The amount of data reserved for the graphs
+
+        // The parameters for the dial type Bilinear (i.e. a bilinear
+        // surface).
+        int bilinear{0};       // The number of bilinear surfaces
+        int bilinearPoints{0}; // The amount of data reserved for the surfaces
+
+    };
+
     // This is a singleton, so the constructor is private.
-    Manager(int results, int parameters,
-            int norms,
-            int compactSplines, int compactPoints,
-            int monotonicSplines, int monotonicPoints,
-            int uniformSplines, int uniformPoints,
-            int generalSplines, int generalPoints,
-            int graphs, int graphPoints,
-            int histBins, std::string spaceType);
+    Manager(const Cache::Manager::Configuration& config);
     static Manager* fSingleton;  // You get one guess...
     static bool fUpdateRequired; // Set to true when the cache needs an update.
 
@@ -124,6 +178,9 @@ private:
 
     /// The cache for the general splines
     std::unique_ptr<Cache::Weight::Graph> fGraphs;
+
+    /// The cache for the general splines
+    std::unique_ptr<Cache::Weight::Bilinear> fBilinear;
 
     /// The cache for the summed histgram weights
     std::unique_ptr<Cache::HistogramSum> fHistogramsCache;
@@ -166,6 +223,5 @@ public:
 // Local Variables:
 // mode:c++
 // c-basic-offset:4
-// compile-command:"$(git rev-parse --show-toplevel)/cmake/gundam-build.sh"
 // End:
 #endif
