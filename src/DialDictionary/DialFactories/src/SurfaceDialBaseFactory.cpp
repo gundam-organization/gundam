@@ -38,7 +38,11 @@ DialBase* SurfaceDialBaseFactory::makeDial(const std::string& dialTitle_,
       std::make_unique<Bicubic>();
   }
 
-  LogThrowIf(dialBase == nullptr, "Invalid Surface dial subtype");
+  if (not dialBase) {
+    LogError << "Invalid dialSubType value: " << dialSubType_ << std::endl;
+    LogError << "Valid dialSubType values are: Bilinear, Bicubic" << std::endl;
+    LogThrow("Invalid Surface dialSubType");
+  }
 
   dialBase->buildDial(*srcObject);
 
