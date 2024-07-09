@@ -187,7 +187,7 @@ bool Cache::Manager::Build(SampleSet& sampleList,
             // Make sure all of the used parameters are in the parameter
             // map.
             for (std::size_t i = 0; i < dialResponseCache.dialInterface.getInputBufferRef()->getBufferSize(); ++i) {
-                const Parameter* fp = &(dialResponseCache.dialInterface.getInputBufferRef()->getParameter(0));
+                const Parameter* fp = &(dialResponseCache.dialInterface.getInputBufferRef()->getParameter(i));
                 usedParameters.insert(fp);
                 ++useCount[fp->getFullTitle()];
             }
