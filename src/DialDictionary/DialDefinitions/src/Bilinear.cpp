@@ -58,8 +58,8 @@ double Bilinear::evalResponse(const DialInputBuffer& input_) const {
     if( not _allowExtrapolation_ ){
         if (input0 < _splineBounds_[0].first) input0 = _splineBounds_[0].first;
         if (input0 > _splineBounds_[0].second) input0 = _splineBounds_[0].second;
-        if (input1 < _splineBounds_[1].first) input0 = _splineBounds_[1].first;
-        if (input1 > _splineBounds_[1].second) input0 = _splineBounds_[1].second;
+        if (input1 < _splineBounds_[1].first) input1 = _splineBounds_[1].first;
+        if (input1 > _splineBounds_[1].second) input1 = _splineBounds_[1].second;
     }
 
     const double *data = _splineData_.data();
@@ -70,8 +70,9 @@ double Bilinear::evalResponse(const DialInputBuffer& input_) const {
     const double* yy = data;
     data += ny;
     const double* knots = data;
-    return CalculateBilinearInterpolation(input0, input1, -1E20, 1E20,
-                                          knots, nx, ny,
-                                          xx, nx,
-                                          yy, ny);
+    return CalculateBilinearInterpolation(
+        input0, input1, -1E20, 1E20,
+        knots, nx, ny,
+        xx, nx,
+        yy, ny);
 }
