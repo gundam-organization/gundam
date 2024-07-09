@@ -11,6 +11,7 @@
 #include "WeightGeneralSpline.h"
 #include "WeightGraph.h"
 #include "WeightBilinear.h"
+#include "WeightBicubic.h"
 
 #ifdef CACHE_MANAGER_USE_INDEXED_SUMS
 // An older implementation of the histogram summing that may be faster for
@@ -141,6 +142,11 @@ private:
         int bilinear{0};       // The number of bilinear surfaces
         int bilinearPoints{0}; // The amount of data reserved for the surfaces
 
+        // The parameters for the dial type Bicubic (i.e. a bicubic
+        // surface).
+        int bicubic{0};       // The number of bicubic surfaces
+        int bicubicPoints{0}; // The amount of data reserved for the surfaces
+
     };
 
     // This is a singleton, so the constructor is private.
@@ -181,6 +187,9 @@ private:
 
     /// The cache for the general splines
     std::unique_ptr<Cache::Weight::Bilinear> fBilinear;
+
+    /// The cache for the general splines
+    std::unique_ptr<Cache::Weight::Bicubic> fBicubic;
 
     /// The cache for the summed histgram weights
     std::unique_ptr<Cache::HistogramSum> fHistogramsCache;

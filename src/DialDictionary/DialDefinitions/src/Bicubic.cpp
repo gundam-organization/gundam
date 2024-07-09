@@ -62,12 +62,14 @@ double Bicubic::evalResponse(const DialInputBuffer& input_) const {
         if (input1 > _splineBounds_[1].second) input0 = _splineBounds_[1].second;
     }
 
-    int nx = _splineData_[0];
-    int ny = _splineData_[1];
     const double *data = _splineData_.data();
-    const double* xx = data + 2;
-    const double* yy = data + 2 + nx;
-    const double* knots = data + 2 + nx + ny;
+    const int nx = *(data++);
+    const int ny = *(data++);
+    const double* xx = data;
+    data += nx;
+    const double* yy = data;
+    data += ny;
+    const double* knots = data;
     return CalculateBicubicSpline(input0, input1, -1E20, 1E20,
                                   knots, nx, ny,
                                   xx, nx,

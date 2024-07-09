@@ -27,6 +27,7 @@
 #include "MonotonicSpline.h"
 #include "LightGraph.h"
 #include "Bilinear.h"
+#include "Bicubic.h"
 #include "Shift.h"
 
 #include <memory>
@@ -220,6 +221,10 @@ bool Cache::Manager::Build(SampleSet& sampleList,
             else if (dialType.find("Bilinear") == 0) {
                 ++config.bilinear;
                 config.bilinearPoints += dial->getDialData().size();
+            }
+            else if (dialType.find("Bicubic") == 0) {
+                ++config.bicubic;
+                config.bicubicPoints += dial->getDialData().size();
             }
             else if (dialType.find("Shift") == 0) {
                 ++config.shifts;
@@ -531,6 +536,16 @@ bool Cache::Manager::Update(SampleSet& sampleList,
             const Bilinear* bilinear
                 = dynamic_cast<const Bilinear*>(baseDial);
             if (bilinear) {
+                ++dialUsed;
+                const Parameter* fp1 = &(dialInputs->getParameter(0));
+                int parIndex1 = Cache::Manager::ParameterMap[fp1];
+                const Parameter* fp2 = &(dialInputs->getParameter(1));
+                int parIndex2 = Cache::Manager::ParameterMap[fp2];
+                // Add the surface here.
+            }
+            const Bicubic* bicubic
+                = dynamic_cast<const Bicubic*>(baseDial);
+            if (bicubic) {
                 ++dialUsed;
                 const Parameter* fp1 = &(dialInputs->getParameter(0));
                 int parIndex1 = Cache::Manager::ParameterMap[fp1];

@@ -12,6 +12,7 @@ set( HEADERS
     ${CMAKE_CURRENT_SOURCE_DIR}/include/WeightGeneralSpline.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/WeightGraph.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/WeightBilinear.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/WeightBicubic.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/WeightBase.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/CacheIndexedSums.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/CacheRecursiveSums.h
@@ -39,6 +40,7 @@ list( APPEND SRCFILES ${CMAKE_CURRENT_SOURCE_DIR}/src/WeightUniformSpline.${SRC_
 list( APPEND SRCFILES ${CMAKE_CURRENT_SOURCE_DIR}/src/WeightGeneralSpline.${SRC_FILE_EXT} )
 list( APPEND SRCFILES ${CMAKE_CURRENT_SOURCE_DIR}/src/WeightGraph.${SRC_FILE_EXT} )
 list( APPEND SRCFILES ${CMAKE_CURRENT_SOURCE_DIR}/src/WeightBilinear.${SRC_FILE_EXT} )
+list( APPEND SRCFILES ${CMAKE_CURRENT_SOURCE_DIR}/src/WeightBicubic.${SRC_FILE_EXT} )
 list( APPEND SRCFILES ${CMAKE_CURRENT_SOURCE_DIR}/src/WeightBase.${SRC_FILE_EXT} )
 list( APPEND SRCFILES ${CMAKE_CURRENT_SOURCE_DIR}/src/CacheParameters.${SRC_FILE_EXT} )
 list( APPEND SRCFILES ${CMAKE_CURRENT_SOURCE_DIR}/src/CacheWeights.${SRC_FILE_EXT} )
