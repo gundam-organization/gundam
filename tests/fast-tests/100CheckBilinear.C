@@ -68,9 +68,12 @@ int main() {
         }
 
         std::unique_ptr<TGraph2D> graph1(new TGraph2D());
+        std::vector<std::unique_ptr<TGraph>> graph1x;
         int p = 0;
-        for (double x = -1.5; x <= 1.5; x += 0.01) {
-            for (double y = -1.5; y <= 1.5; y += 0.01) {
+        for (double x = -1.5; x <= 1.5; x += 0.1) {
+            graph1x.emplace_back(new TGraph());
+            int px = 0;
+            for (double y = -1.5; y <= 1.5; y += 0.1) {
                 double v0
                     = CalculateBilinearInterpolation(x, y,
                                                      -10.0, 10.0,
@@ -99,11 +102,21 @@ int main() {
                 TOLERANCE("Symmetry -+ (test 1)", v0, v2, 1E-8);
                 TOLERANCE("Symmetry -- (test 1)", v0, v3, 1E-8);
                 graph1->SetPoint(p++,x,y,v0);
+                graph1x.back()->SetPoint(px++, y, v0);
             }
         }
         graph1->Draw("colz");
         gPad->Print("100CheckBilinear1.pdf");
         gPad->Print("100CheckBilinear1.png");
+
+        graph1x.front()->Draw("A");
+        graph1x.front()->SetMaximum(1.0);
+        for (auto& g: graph1x) {
+            g->Draw();
+            gPad->Update();
+        }
+        gPad->Print("100CheckBilinear1x.pdf");
+        gPad->Print("100CheckBilinear1x.png");
     }
 #endif
 
