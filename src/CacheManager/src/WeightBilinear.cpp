@@ -26,21 +26,21 @@ Cache::Weight::Bilinear::Bilinear(
     std::size_t splines, std::size_t space)
     : Cache::Weight::Base("bilinear",weights,parameters),
       fLowerClamp(lowerClamps), fUpperClamp(upperClamps),
-      fSplinesReserved(splines), fSplinesUsed(0),
-      fSplineSpaceReserved(space), fSplineSpaceUsed(0) {
+      fReserved(splines), fUsed(0),
+      fSpaceReserved(space), fSpaceUsed(0) {
 
     LogInfo << "Reserved " << GetName() << " Splines: "
-            << GetSplinesReserved() << std::endl;
-    if (GetSplinesReserved() < 1) return;
+            << GetReserved() << std::endl;
+    if (GetReserved() < 1) return;
 
-    fTotalBytes += GetSplinesReserved()*sizeof(int);        // fSplineResult
-    fTotalBytes += 2*GetSplinesReserved()*sizeof(short);    // fSplineParameter
-    fTotalBytes += (1+GetSplinesReserved())*sizeof(int);    // fSplineIndex
+    fTotalBytes += GetReserved()*sizeof(int);        // fResult
+    fTotalBytes += 2*GetReserved()*sizeof(short);    // fParameter
+    fTotalBytes += (1+GetReserved())*sizeof(int);    // fIndex
 
     LogInfo << "Reserved " << GetName()
-            << " Spline Space: " << GetSplineSpaceReserved()
+            << " Spline Space: " << GetSpaceReserved()
             << std::endl;
-    fTotalBytes += GetSplineSpaceReserved()*sizeof(WEIGHT_BUFFER_FLOAT);  // fSplineData
+    fTotalBytes += GetSpaceReserved()*sizeof(WEIGHT_BUFFER_FLOAT);  // fData
 
     LogInfo << "Approximate Memory Size for " << GetName()
             << ": " << fTotalBytes/1E+9
@@ -50,20 +50,20 @@ Cache::Weight::Bilinear::Bilinear(
         // Get the CPU/GPU memory for the spline index tables.  These are
         // copied once during initialization so do not pin the CPU memory into
         // the page set.
-        fSplineResult.reset(new hemi::Array<int>(GetSplinesReserved(),false));
-        LogThrowIf(not fSplineResult, "Bad SplineResult alloc");
-        fSplineParameter.reset(
-            new hemi::Array<short>(2*GetSplinesReserved(),false));
-        LogThrowIf(not fSplineParameter, "Bad SplineParameter alloc");
-        fSplineIndex.reset(new hemi::Array<int>(1+GetSplinesReserved(),false));
-        LogThrowIf(not fSplineIndex, "Bad SplineIndex alloc");
+        fResult.reset(new hemi::Array<int>(GetReserved(),false));
+        LogThrowIf(not fResult, "Bad SplineResult alloc");
+        fParameter.reset(
+            new hemi::Array<short>(2*GetReserved(),false));
+        LogThrowIf(not fParameter, "Bad SplineParameter alloc");
+        fIndex.reset(new hemi::Array<int>(1+GetReserved(),false));
+        LogThrowIf(not fIndex, "Bad SplineIndex alloc");
 
         // Get the CPU/GPU memory for the spline knots.  This is copied once
         // during initialization so do not pin the CPU memory into the page
         // set.
-        fSplineData.reset(
-            new hemi::Array<WEIGHT_BUFFER_FLOAT>(GetSplineSpaceReserved(),false));
-        LogThrowIf(not fSplineData, "Bad SplineSpacealloc");
+        fData.reset(
+            new hemi::Array<WEIGHT_BUFFER_FLOAT>(GetSpaceReserved(),false));
+        LogThrowIf(not fData, "Bad SplineSpacealloc");
     }
     catch (...) {
         LogError << "Failed to allocate memory, so stopping" << std::endl;
@@ -73,15 +73,15 @@ Cache::Weight::Bilinear::Bilinear(
     // Initialize the caches.  Don't try to zero everything since the
     // caches can be huge.
     Reset();
-    fSplineIndex->hostPtr()[0] = 0;
+    fIndex->hostPtr()[0] = 0;
 }
 
 // The destructor
 Cache::Weight::Bilinear::~Bilinear() {}
 
-void Cache::Weight::Bilinear::AddSpline(int resIndex,
+void Cache::Weight::Bilinear::AddData(int resIndex,
                                         int par1Index, int par2Index,
-                                        const std::vector<double>& splineData) {
+                                        const std::vector<double>& data) {
     if (resIndex < 0) {
         LogError << "Invalid result index"
                << std::endl;
@@ -112,30 +112,30 @@ void Cache::Weight::Bilinear::AddSpline(int resIndex,
                << std::endl;
         LogThrow("Parameter 2 index out of bounds");
     }
-    if (splineData.size() < 11) {
-        LogError << "Insufficient points in spline " << splineData.size()
+    if (data.size() < 11) {
+        LogError << "Insufficient points in spline " << data.size()
                << std::endl;
         LogThrow("Invalid number of spline points");
     }
 
-    int newIndex = fSplinesUsed++;
-    if (fSplinesUsed > fSplinesReserved) {
+    int newIndex = fUsed++;
+    if (fUsed > fReserved) {
         LogError << "Not enough space reserved for splines"
                   << std::endl;
         LogThrow("Not enough space reserved for splines");
     }
-    if (fSplineSpaceUsed + splineData.size() > fSplineSpaceReserved) {
+    if (fSpaceUsed + data.size() > fSpaceReserved) {
         LogError << "Not enough space reserved for spline knots"
                << std::endl;
         LogThrow("Not enough space reserved for spline knots");
     }
-    fSplineResult->hostPtr()[newIndex] = resIndex;
-    fSplineParameter->hostPtr()[2*newIndex] = par1Index;
-    fSplineParameter->hostPtr()[2*newIndex+1] = par2Index;
-    fSplineIndex->hostPtr()[newIndex] = fSplineSpaceUsed;
-    for (double d : splineData) {
-        fSplineData->hostPtr()[fSplineSpaceUsed++] = d;
-        if (fSplineSpaceUsed > fSplineSpaceReserved) {
+    fResult->hostPtr()[newIndex] = resIndex;
+    fParameter->hostPtr()[2*newIndex] = par1Index;
+    fParameter->hostPtr()[2*newIndex+1] = par2Index;
+    fIndex->hostPtr()[newIndex] = fSpaceUsed;
+    for (double d : data) {
+        fData->hostPtr()[fSpaceUsed++] = d;
+        if (fSpaceUsed > fSpaceReserved) {
             LogError << "Not enough space reserved for spline knots"
                      << std::endl;
             LogThrow("Not enough space reserved for spline knots");
@@ -155,7 +155,7 @@ namespace {
                          const double* params,
                          const double* lowerClamp,
                          const double* upperClamp,
-                         const WEIGHT_BUFFER_FLOAT* data,
+                         const WEIGHT_BUFFER_FLOAT* dataTable,
                          const int* rIndex,
                          const short* pIndex,
                          const int* sIndex,
@@ -167,12 +167,12 @@ namespace {
             const double y = params[pIndex[2*i+1]];
             const double lClamp = lowerClamp[pIndex[i]];
             const double uClamp = upperClamp[pIndex[i]];
-            const WEIGHT_BUFFER_FLOAT* splineData = data + id0;
-            const int nx = *(splineData++);
-            const int ny = *(splineData++);
-            const double* xx = splineData; splineData += nx;
-            const double* yy = splineData; splineData += ny;
-            const double* knots = splineData;
+            const WEIGHT_BUFFER_FLOAT* data = dataTable + id0;
+            const int nx = *(data++);
+            const int ny = *(data++);
+            const double* xx = data; data += nx;
+            const double* yy = data; data += ny;
+            const double* knots = data;
 
             double v = CalculateBilinearInterpolation(
                 x, y, lClamp, uClamp, knots, nx, ny, xx, nx, yy, ny);
@@ -186,12 +186,12 @@ void Cache::Weight::Bilinear::Reset() {
     // Use the parent reset.
     Cache::Weight::Base::Reset();
     // Reset this class
-    fSplinesUsed = 0;
-    fSplineSpaceUsed = 0;
+    fUsed = 0;
+    fSpaceUsed = 0;
 }
 
 bool Cache::Weight::Bilinear::Apply() {
-    if (GetSplinesUsed() < 1) return false;
+    if (GetUsed() < 1) return false;
 
     HEMIBilinearKernel bilinearKernel;
     hemi::launch(bilinearKernel,
@@ -199,11 +199,11 @@ bool Cache::Weight::Bilinear::Apply() {
                  fParameters.readOnlyPtr(),
                  fLowerClamp.readOnlyPtr(),
                  fUpperClamp.readOnlyPtr(),
-                 fSplineData->readOnlyPtr(),
-                 fSplineResult->readOnlyPtr(),
-                 fSplineParameter->readOnlyPtr(),
-                 fSplineIndex->readOnlyPtr(),
-                 GetSplinesUsed()
+                 fData->readOnlyPtr(),
+                 fResult->readOnlyPtr(),
+                 fParameter->readOnlyPtr(),
+                 fIndex->readOnlyPtr(),
+                 GetUsed()
         );
 
     return true;
@@ -234,5 +234,4 @@ bool Cache::Weight::Bilinear::Apply() {
 // Local Variables:
 // mode:c++
 // c-basic-offset:4
-// compile-command:"$(git rev-parse --show-toplevel)/cmake/gundam-build.sh"
 // End:

@@ -541,7 +541,10 @@ bool Cache::Manager::Update(SampleSet& sampleList,
                 int parIndex1 = Cache::Manager::ParameterMap[fp1];
                 const Parameter* fp2 = &(dialInputs->getParameter(1));
                 int parIndex2 = Cache::Manager::ParameterMap[fp2];
-                // Add the surface here.
+                Cache::Manager::Get()
+                    ->fBilinear
+                    ->AddData(resultIndex,parIndex1,parIndex2,
+                              baseDial->getDialData());
             }
             const Bicubic* bicubic
                 = dynamic_cast<const Bicubic*>(baseDial);
@@ -551,7 +554,10 @@ bool Cache::Manager::Update(SampleSet& sampleList,
                 int parIndex1 = Cache::Manager::ParameterMap[fp1];
                 const Parameter* fp2 = &(dialInputs->getParameter(1));
                 int parIndex2 = Cache::Manager::ParameterMap[fp2];
-                // Add the surface here.
+                Cache::Manager::Get()
+                    ->fBicubic
+                    ->AddData(resultIndex,parIndex1,parIndex2,
+                              baseDial->getDialData());
             }
             const Shift* shift
                 = dynamic_cast<const Shift*>(baseDial);

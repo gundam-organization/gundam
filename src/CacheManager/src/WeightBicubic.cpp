@@ -26,21 +26,21 @@ Cache::Weight::Bicubic::Bicubic(
     std::size_t splines, std::size_t space)
     : Cache::Weight::Base("bicubic",weights,parameters),
       fLowerClamp(lowerClamps), fUpperClamp(upperClamps),
-      fSplinesReserved(splines), fSplinesUsed(0),
-      fSplineSpaceReserved(space), fSplineSpaceUsed(0) {
+      fReserved(splines), fUsed(0),
+      fSpaceReserved(space), fSpaceUsed(0) {
 
     LogInfo << "Reserved " << GetName() << " Splines: "
-            << GetSplinesReserved() << std::endl;
-    if (GetSplinesReserved() < 1) return;
+            << GetReserved() << std::endl;
+    if (GetReserved() < 1) return;
 
-    fTotalBytes += GetSplinesReserved()*sizeof(int);        // fSplineResult
-    fTotalBytes += 2*GetSplinesReserved()*sizeof(short);    // fSplineParameter
-    fTotalBytes += (1+GetSplinesReserved())*sizeof(int);    // fSplineIndex
+    fTotalBytes += GetReserved()*sizeof(int);        // fResult
+    fTotalBytes += 2*GetReserved()*sizeof(short);    // fParameter
+    fTotalBytes += (1+GetReserved())*sizeof(int);    // fIndex
 
     LogInfo << "Reserved " << GetName()
-            << " Spline Space: " << GetSplineSpaceReserved()
+            << " Spline Space: " << GetSpaceReserved()
             << std::endl;
-    fTotalBytes += GetSplineSpaceReserved()*sizeof(WEIGHT_BUFFER_FLOAT);  // fSplineData
+    fTotalBytes += GetSpaceReserved()*sizeof(WEIGHT_BUFFER_FLOAT);  // fData
 
     LogInfo << "Approximate Memory Size for " << GetName()
             << ": " << fTotalBytes/1E+9
@@ -50,20 +50,20 @@ Cache::Weight::Bicubic::Bicubic(
         // Get the CPU/GPU memory for the spline index tables.  These are
         // copied once during initialization so do not pin the CPU memory into
         // the page set.
-        fSplineResult.reset(new hemi::Array<int>(GetSplinesReserved(),false));
-        LogThrowIf(not fSplineResult, "Bad SplineResult alloc");
-        fSplineParameter.reset(
-            new hemi::Array<short>(2*GetSplinesReserved(),false));
-        LogThrowIf(not fSplineParameter, "Bad SplineParameter alloc");
-        fSplineIndex.reset(new hemi::Array<int>(1+GetSplinesReserved(),false));
-        LogThrowIf(not fSplineIndex, "Bad SplineIndex alloc");
+        fResult.reset(new hemi::Array<int>(GetReserved(),false));
+        LogThrowIf(not fResult, "Bad SplineResult alloc");
+        fParameter.reset(
+            new hemi::Array<short>(2*GetReserved(),false));
+        LogThrowIf(not fParameter, "Bad SplineParameter alloc");
+        fIndex.reset(new hemi::Array<int>(1+GetReserved(),false));
+        LogThrowIf(not fIndex, "Bad SplineIndex alloc");
 
         // Get the CPU/GPU memory for the spline knots.  This is copied once
         // during initialization so do not pin the CPU memory into the page
         // set.
-        fSplineData.reset(
-            new hemi::Array<WEIGHT_BUFFER_FLOAT>(GetSplineSpaceReserved(),false));
-        LogThrowIf(not fSplineData, "Bad SplineSpacealloc");
+        fData.reset(
+            new hemi::Array<WEIGHT_BUFFER_FLOAT>(GetSpaceReserved(),false));
+        LogThrowIf(not fData, "Bad SplineSpacealloc");
     }
     catch (...) {
         LogError << "Failed to allocate memory, so stopping" << std::endl;
@@ -73,15 +73,15 @@ Cache::Weight::Bicubic::Bicubic(
     // Initialize the caches.  Don't try to zero everything since the
     // caches can be huge.
     Reset();
-    fSplineIndex->hostPtr()[0] = 0;
+    fIndex->hostPtr()[0] = 0;
 }
 
 // The destructor
 Cache::Weight::Bicubic::~Bicubic() {}
 
-void Cache::Weight::Bicubic::AddSpline(int resIndex,
-                                        int par1Index, int par2Index,
-                                        const std::vector<double>& splineData) {
+void Cache::Weight::Bicubic::AddData(int resIndex,
+                                     int par1Index, int par2Index,
+                                     const std::vector<double>& splineData) {
     if (resIndex < 0) {
         LogError << "Invalid result index"
                << std::endl;
@@ -118,24 +118,24 @@ void Cache::Weight::Bicubic::AddSpline(int resIndex,
         LogThrow("Invalid number of spline points");
     }
 
-    int newIndex = fSplinesUsed++;
-    if (fSplinesUsed > fSplinesReserved) {
+    int newIndex = fUsed++;
+    if (fUsed > fReserved) {
         LogError << "Not enough space reserved for splines"
                   << std::endl;
         LogThrow("Not enough space reserved for splines");
     }
-    if (fSplineSpaceUsed + splineData.size() > fSplineSpaceReserved) {
+    if (fSpaceUsed + splineData.size() > fSpaceReserved) {
         LogError << "Not enough space reserved for spline knots"
                << std::endl;
         LogThrow("Not enough space reserved for spline knots");
     }
-    fSplineResult->hostPtr()[newIndex] = resIndex;
-    fSplineParameter->hostPtr()[2*newIndex] = par1Index;
-    fSplineParameter->hostPtr()[2*newIndex+1] = par2Index;
-    fSplineIndex->hostPtr()[newIndex] = fSplineSpaceUsed;
+    fResult->hostPtr()[newIndex] = resIndex;
+    fParameter->hostPtr()[2*newIndex] = par1Index;
+    fParameter->hostPtr()[2*newIndex+1] = par2Index;
+    fIndex->hostPtr()[newIndex] = fSpaceUsed;
     for (double d : splineData) {
-        fSplineData->hostPtr()[fSplineSpaceUsed++] = d;
-        if (fSplineSpaceUsed > fSplineSpaceReserved) {
+        fData->hostPtr()[fSpaceUsed++] = d;
+        if (fSpaceUsed > fSpaceReserved) {
             LogError << "Not enough space reserved for spline knots"
                      << std::endl;
             LogThrow("Not enough space reserved for spline knots");
@@ -155,7 +155,7 @@ namespace {
                          const double* params,
                          const double* lowerClamp,
                          const double* upperClamp,
-                         const WEIGHT_BUFFER_FLOAT* data,
+                         const WEIGHT_BUFFER_FLOAT* dataTable,
                          const int* rIndex,
                          const short* pIndex,
                          const int* sIndex,
@@ -167,7 +167,7 @@ namespace {
             const double y = params[pIndex[2*i+1]];
             const double lClamp = lowerClamp[pIndex[i]];
             const double uClamp = upperClamp[pIndex[i]];
-            const WEIGHT_BUFFER_FLOAT* splineData = data + id0;
+            const WEIGHT_BUFFER_FLOAT* splineData = dataTable + id0;
             const int nx = *(splineData++);
             const int ny = *(splineData++);
             const double* xx = splineData; splineData += nx;
@@ -186,12 +186,12 @@ void Cache::Weight::Bicubic::Reset() {
     // Use the parent reset.
     Cache::Weight::Base::Reset();
     // Reset this class
-    fSplinesUsed = 0;
-    fSplineSpaceUsed = 0;
+    fUsed = 0;
+    fSpaceUsed = 0;
 }
 
 bool Cache::Weight::Bicubic::Apply() {
-    if (GetSplinesUsed() < 1) return false;
+    if (GetUsed() < 1) return false;
 
     HEMIBicubicKernel bicubicKernel;
     hemi::launch(bicubicKernel,
@@ -199,11 +199,11 @@ bool Cache::Weight::Bicubic::Apply() {
                  fParameters.readOnlyPtr(),
                  fLowerClamp.readOnlyPtr(),
                  fUpperClamp.readOnlyPtr(),
-                 fSplineData->readOnlyPtr(),
-                 fSplineResult->readOnlyPtr(),
-                 fSplineParameter->readOnlyPtr(),
-                 fSplineIndex->readOnlyPtr(),
-                 GetSplinesUsed()
+                 fData->readOnlyPtr(),
+                 fResult->readOnlyPtr(),
+                 fParameter->readOnlyPtr(),
+                 fIndex->readOnlyPtr(),
+                 GetUsed()
         );
 
     return true;
