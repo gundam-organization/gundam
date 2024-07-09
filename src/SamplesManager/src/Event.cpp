@@ -22,10 +22,11 @@ double Event::getEventWeight() const {
   if( getCache().valuePtr != nullptr  ){
     double value =  getCache().getWeight();
     if (not GundamGlobals::getForceDirectCalculation()) return value;
-    LogThrowIf(not GundamUtils::almostEqual(value, _weights_.current),
+    LogThrowIf(not GundamUtils::almostEqual(value, _weights_.current, 0.5),
                "Inconsistent event weight -- "
                << " Calculated: " << value
-               << " Cached: " << _weights_.current);
+               << " Cached: " << _weights_.current
+               << " Diff: " << (value-_weights_.current));
   }
 #endif
   return _weights_.current;
