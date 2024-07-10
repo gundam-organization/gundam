@@ -688,11 +688,13 @@ bool Cache::Manager::Fill() {
         for (auto& par : Cache::Manager::ParameterMap ) {
             // This produces a crazy amount of output.
             LogInfo  << "FILL: " << par.second
-                    << "/" << Cache::Manager::ParameterMap.size()
-                    << " " << par.first->isEnabled()
-                    << " " << par.first->getParameterValue()
-                    << " (" << par.first->getFullTitle() << ")"
-                    << std::endl;
+                     << "/" << Cache::Manager::ParameterMap.size()
+                     << " " << par.first->getParameterValue()
+                     << " (" << par.first->getFullTitle() << ")"
+                     << " enabled: " << par.first->isEnabled()
+                     << " masked: " << par.first->isMaskedForPropagation()
+                     << " masked for toy: " << par.first->getOwner()->isMaskForToyGeneration()
+                     << std::endl;
         }
     } while(false);
 #endif

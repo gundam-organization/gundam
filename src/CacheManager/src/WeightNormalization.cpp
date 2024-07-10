@@ -102,14 +102,16 @@ namespace {
                          const short* pIndex,
                          const int NP) {
         for (int i : hemi::grid_stride_range(0,NP)) {
-            CacheAtomicMult(&results[rIndex[i]], params[pIndex[i]]);
+            const double x =  params[pIndex[i]];
+
+            CacheAtomicMult(&results[rIndex[i]], x);
 #ifndef HEMI_DEV_CODE
 #ifdef CACHE_DEBUG
             if (rIndex[i] < PRINT_STEP) {
                 std::cout << "Norms kernel " << i
                        << " iEvt " << rIndex[i]
                        << " iPar " << pIndex[i]
-                       << " = " << params[pIndex[i]]
+                       << " = " << x
                        << std::endl;
             }
 #endif
@@ -164,5 +166,4 @@ bool Cache::Weight::Normalization::Apply() {
 // Local Variables:
 // mode:c++
 // c-basic-offset:4
-// compile-command:"$(git rev-parse --show-toplevel)/cmake/gundam-build.sh"
 // End:
