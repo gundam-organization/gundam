@@ -126,6 +126,16 @@ Cache::Manager::Manager(const Cache::Manager::Configuration& config) {
         fWeightsCache->AddWeightCalculator(fBilinear.get());
         fTotalBytes += fBilinear->GetResidentMemory();
 
+        fBicubic = std::make_unique<Cache::Weight::Bicubic>(
+            fWeightsCache->GetWeights(),
+            fParameterCache->GetParameters(),
+            fParameterCache->GetLowerClamps(),
+            fParameterCache->GetUpperClamps(),
+            config.bicubic, config.bicubicPoints);
+        LogThrowIf(not fBicubic, "Bad Bicubic alloc");
+        fWeightsCache->AddWeightCalculator(fBicubic.get());
+        fTotalBytes += fBicubic->GetResidentMemory();
+
         fHistogramsCache = std::make_unique<Cache::HistogramSum>(
                                   fWeightsCache->GetWeights(),
                                   config.histBins);
@@ -366,9 +376,6 @@ bool Cache::Manager::Update(SampleSet& sampleList,
                             EventDialCache& eventDials) {
     if (not fUpdateRequired) return true;
 
-    // This is the updated that is required!
-    fUpdateRequired = false;
-
     // In case the cache isn't allocated (usually because it's turned off on
     // the command line), but this is a safety check.
     if (!Cache::Manager::Get()) {
@@ -376,6 +383,9 @@ bool Cache::Manager::Update(SampleSet& sampleList,
                    << std::endl;
         return false;
     }
+
+    // This is the updated that is required!
+    fUpdateRequired = false;
 
     LogInfo << "Update the internal caches" << std::endl;
 
