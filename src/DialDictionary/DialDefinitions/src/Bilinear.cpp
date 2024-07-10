@@ -43,8 +43,8 @@ void Bilinear::buildDial(const TH2& h2_, const std::string& option_){
     }
     _splineBounds_.push_back(std::make_pair(h2_.GetYaxis()->GetBinCenter(1),
                                             h2_.GetYaxis()->GetBinCenter(nx)));
-    for (int i = 0; i < nx; ++i) {
-        for (int j = 0; j < ny; ++j) {
+    for (int i = 1; i <= nx; ++i) {
+        for (int j = 1; j <= ny; ++j) {
             _splineData_.emplace_back(h2_.GetBinContent(i,j));
         }
     }
