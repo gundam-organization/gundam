@@ -95,9 +95,6 @@ void LikelihoodInterface::initializeImpl() {
   // DON'T MOVE PARAMETERS FROM THIS POINT
   //////////////////////////////////////////
 
-  /// Now printout the event breakdowns
-  _dataSetManager_.getPropagator().printBreakdowns();
-
   LogInfo << "LikelihoodInterface initialized." << std::endl;
 }
 
