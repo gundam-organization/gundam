@@ -291,6 +291,12 @@ bool Cache::Manager::Build(SampleSet& sampleList,
     LogInfo  << "    Shifts: " << config.shifts
             <<" ("<< 1.0*config.shifts/config.events <<" per event)"
             << std::endl;
+    LogInfo  << "    Bilinear: " << config.bilinear
+            <<" ("<< 1.0*config.bilinear/config.events <<" per event)"
+            << std::endl;
+    LogInfo  << "    Bicubic: " << config.bicubic
+            <<" ("<< 1.0*config.bicubic/config.events <<" per event)"
+            << std::endl;
     LogInfo  << "    Histogram bins: " << config.histBins
             << " (" << 1.0*config.events/config.histBins << " events per bin)"
             << std::endl;
@@ -331,6 +337,18 @@ bool Cache::Manager::Build(SampleSet& sampleList,
         LogInfo  << "    Graph cache uses "
                 << config.graphPoints << " control points --"
                 << " (" << 1.0*config.graphPoints/config.graphs << " points per graph)"
+                << std::endl;
+    }
+    if (config.bilinear > 0) {
+        LogInfo  << "    Bilinear cache uses "
+                << config.bilinearPoints << " control points --"
+                << " (" << 1.0*config.bilinearPoints/config.bilinear << " points per surface)"
+                << std::endl;
+    }
+    if (config.bicubic > 0) {
+        LogInfo  << "    Bicubic cache uses "
+                << config.bicubicPoints << " control points --"
+                << " (" << 1.0*config.bicubicPoints/config.bicubic << " points per surface)"
                 << std::endl;
     }
 
