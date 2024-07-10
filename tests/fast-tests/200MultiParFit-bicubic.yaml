@@ -17,7 +17,6 @@ fitterEngineConfig:
     minimizer: "Minuit2"
     algorithm: "Migrad"
     errors: "Hesse"
-    // print_level: 2
 
   propagatorConfig:
     throwAsimovFitParameters: false
@@ -25,11 +24,10 @@ fitterEngineConfig:
     dataSetList:
       - name: "TestSample"
         isEnabled: true
-        selectedDataEntry: "TestData"
         mc:
           tree: tree_mc
           selectionCutFormula: "(1)"
-          nominalWeightFormula: "(0.10)"
+          nominalWeightFormula: "(0.1)"
           filePathList:
             - "${DATA_DIR}/100MultiParTree.root"
         data:
@@ -39,13 +37,8 @@ fitterEngineConfig:
               - "${DATA_DIR}/100MultiParTree.root"
 
     fitSampleSetConfig:
-      # LeastSquares is used for tests because it is mathematically simple
-      # and numerically stable.
-      llhStatFunction: LeastSquares
-      dataEventType: TestData
-
-      llhConfig:
-        lsqPoissonianApproximation: true
+      # dataEventType: TestData
+      dataEventType: Asimov
 
       fitSampleList:
         - name: AB
@@ -54,7 +47,7 @@ fitterEngineConfig:
           dataSets: [ "TestSample" ]
 
     parameterSetListConfig:
-      - name: Normalizations
+      - name: MultiParFit
         isEnabled: true
         nominalStepSize: 1.0
 
@@ -66,18 +59,16 @@ fitterEngineConfig:
             priorType: Flat
             parameterStepSize: 1.0
             parameterLimits: [ 0.9, 1.1 ]
-            
+
           - parameterName: "Var_C"
             isEnabled: true
             priorValue: 0.0
             priorType: Flat
-            parameterLimits: [ -2.0, 2.0]
 
           - parameterName: "Var_D"
             isEnabled: true
             priorValue: 0.0
             priorType: Flat
-            parameterLimits: [ -2.0, 2.0 ]
 
         dialSetDefinitions:
           - dialType: Normalization
