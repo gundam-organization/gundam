@@ -51,6 +51,8 @@ const double trueC = 0.0;
 const double trueD = 0.0;
 const double resA = 0.1;
 const double resB = 0.1;
+const double mcEvents = 10000;
+const double dataEvents = 1000;
 
 ///////////////////////////////////////////////////////////////////////////////
 /// A class to generate a repeatable sequence of "random" Gaussian distributed
@@ -129,9 +131,9 @@ private:
 void writeMCTree() {
     TTree* tree = new TTree("tree_mc","GUNDAM MC Sample Tree with splines");
     TH2D* priorHist
-         = new TH2D("priorHist", "Prior MC", 50, -5.0, 5.0, 50, -5.0, 5.0);
+         = new TH2D("priorHist", "Prior MC", 20, -5.0, 5.0, 20, -5.0, 5.0);
     TH2D* weightedHist
-         = new TH2D("weightedHist", "Weighted MC", 50, -5.0, 5.0, 50, -5.0, 5.0);
+         = new TH2D("weightedHist", "Weighted MC", 20, -5.0, 5.0, 20, -5.0, 5.0);
 
     double varA;
     tree->Branch("A",&varA);
@@ -156,11 +158,12 @@ void writeMCTree() {
 
     // These events are reweighted by
     // spline_C in the fit, and spline_D is set to be flat.
-    std::string name("100MultParTreeSplines.pdf");
+    std::string name("100MultiParTreeSplines.pdf");
     std::string suffix("(");
-    int stride = 1000;
+    int stride = mcEvents/50;
     int i = 0;
-    while (i < 100000) {
+    std::cout << "Stride is " << stride << std::endl;
+    while (i < mcEvents) {
         std::ostringstream title;
         do {varAt = MakeAt();} while (std::abs(varAt) > 5.0);
         do {varA = gRandom->Gaus(varAt,resA);} while (std::abs(varA) > 5.0);
@@ -171,26 +174,30 @@ void writeMCTree() {
               << " Bt " << varBt << " (" << varB << ")";
         fillCD(spline_CD[0],varAt,varBt);
         ((TH2*)spline_CD[0])->SetTitle(title.str().c_str());
+        tree->Fill();
+        priorHist->Fill(varA, varB);
+        double w = fillCD.weight(varAt, varBt, trueC, trueD);
+        weightedHist->Fill(varA, varB, w);
         if (i % stride == 0) {
+            std::cout << "Dump at " << i << " " << stride << std::endl;
             ((TH2*)spline_CD[0])->SetStats(false);
             spline_CD[0]->Draw("colz,cont3");
             gPad->Print((name+suffix).c_str());
             suffix = "";
         }
-        tree->Fill();
-        priorHist->Fill(varA, varB);
-        double w = fillCD.weight(varAt, varBt, trueC, trueD);
-        weightedHist->Fill(varA, varB, w);
         ++i;
     }
     spline_CD[0]->Draw("colz,cont3");
+    gPad->Print((name+suffix).c_str());
+    priorHist->Draw("colz");
+    weightedHist->Draw("same,cont3");
     gPad->Print((name + ")").c_str());
 
 }
 
 void writeDataTree() {
     TH2D* dataHist
-        = new TH2D("dataHist", "Fake Data", 50, -5.0, 5.0, 50, -5.0, 5.0);
+        = new TH2D("dataHist", "Fake Data", 20, -5.0, 5.0, 20, -5.0, 5.0);
     TTree* tree = new TTree("tree_dt","GUNDAM Data Sample Tree");
 
     double varA;
@@ -209,7 +216,7 @@ void writeDataTree() {
 
     // Write a data sample.  These are biased.
     int i = 0;
-    while (i < 10000) {
+    while (i < dataEvents) {
         do {varAt = MakeAt() + fillCD.shiftC(trueC);} while (std::abs(varAt) > 5.0);
         do {varA = gRandom->Gaus(varAt,resA);} while (std::abs(varA) > 5.0);
         do {varBt = MakeBt() + fillCD.shiftD(trueD);} while (std::abs(varBt) > 5.0);
@@ -218,6 +225,10 @@ void writeDataTree() {
         dataHist->Fill(varA, varB);
         ++i;
     }
+
+    dataHist->Draw("colz");
+    gPad->Print("100MultiParTreeData.pdf");
+
 }
 
 int main() {
