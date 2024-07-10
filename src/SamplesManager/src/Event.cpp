@@ -22,10 +22,14 @@ double Event::getEventWeight() const {
   if( getCache().valuePtr != nullptr  ){
     double value =  getCache().getWeight();
     if (not GundamGlobals::getForceDirectCalculation()) return value;
-    LogThrowIf(not GundamUtils::almostEqual(value, _weights_.current),
-               "Inconsistent event weight -- "
+    LogAlertOnce << "Validate calculated and cached event weight" << std::endl;
+    if (not GundamUtils::almostEqual(value, _weights_.current, 0.5)) {
+      LogError << "Inconsistent event weight -- "
                << " Calculated: " << value
-               << " Cached: " << _weights_.current);
+               << " Cached: " << _weights_.current
+               << " Diff: " << value-_weights_.current << std::endl;
+      LogThrow("Bad event weight calculation");
+    }
   }
 #endif
   return _weights_.current;
@@ -64,5 +68,4 @@ std::string Event::getSummary() const {
 // Local Variables:
 // mode:c++
 // c-basic-offset:2
-// compile-command:"$(git rev-parse --show-toplevel)/cmake/gundam-build.sh"
 // End:

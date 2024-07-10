@@ -27,7 +27,7 @@
 // #define HEMI_CUDA_DISABLE
 
 #ifdef HEMI_CUDA_DISABLE
-#warning HEMI: HEMI_CUDA_DISABLED is defined so CUDA usage is disabled
+// #warning HEMI: HEMI_CUDA_DISABLED is defined so CUDA usage is disabled
 #endif
 
 #if !defined(HEMI_CUDA_DISABLE) && defined(__CUDACC__) // CUDA compiler

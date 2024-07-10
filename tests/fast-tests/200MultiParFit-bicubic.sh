@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Set the base name for this test (should match the script name)
-BASE=200CovarianceFit-graph
+BASE=200MultiParFit-bicubic
 
 # Get the directory containing the script from the command line
 # parameters (avoids bash trickery).  Use the current directory as the
@@ -27,6 +27,6 @@ OUTPUT_FILE=${DATA_DIR}/${BASE}.root
 echo ${OUTPUT_FILE}
 echo ${CONFIG_FILE}
 
-gundamFitter --cpu -t 1 -s 10000 --scan -c ${CONFIG_FILE} -o ${OUTPUT_FILE}
+gundamFitter --cpu -t 1 --scan -s 10000 -c ${CONFIG_FILE} -o ${OUTPUT_FILE}
 
 # End of the script

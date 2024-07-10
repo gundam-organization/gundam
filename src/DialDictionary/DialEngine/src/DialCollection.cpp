@@ -40,7 +40,7 @@ void DialCollection::readConfigImpl() {
   if( GenericToolbox::Json::doKeyExist(_config_, "dialInputList") ){
     auto dialInputList = GenericToolbox::Json::fetchValue<JsonType>(_config_, "dialInputList");
 
-    LogThrowIf(_supervisedParameterSetIndex_ == -1, "Can't initialize dialInputList with out setting _supervisedParameterSetIndex_");
+    LogThrowIf(_supervisedParameterSetIndex_ == -1, "Can't initialize dialInputList without setting _supervisedParameterSetIndex_");
 
     _dialInputBufferList_.emplace_back();
     _dialInputBufferList_.back().setParSetRef( _parameterSetListPtr_ );
@@ -515,7 +515,7 @@ bool DialCollection::initializeDialsWithDefinition() {
 
       ///////////////////////////////////////////////////////////////////////
       else if ( GenericToolbox::Json::doKeyExist(dialsDefinition, "dialsTreePath") ) {
-        // Deprecated: A tree with event binning has beenprovided, so this is
+        // Deprecated: A tree with event binning has been provided, so this is
         // a binned dial.  Create the dials for each bin here.  The dials will
         // be assigned to the events in DataDispenser.
         auto objPath = GenericToolbox::Json::fetchValue<std::string>(dialsDefinition, "dialsTreePath");

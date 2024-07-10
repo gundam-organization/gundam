@@ -27,6 +27,6 @@ OUTPUT_FILE=${DATA_DIR}/${BASE}-CacheManager.root
 echo ${OUTPUT_FILE}
 echo ${CONFIG_FILE}
 
-gundamFitter --cpu --cache-manager -t 1 -s 10000 -c ${CONFIG_FILE} -o ${OUTPUT_FILE}
+gundamFitter --cpu --cache-manager -t 1 -s 10000 --scan -c ${CONFIG_FILE} -o ${OUTPUT_FILE}
 
 # End of the script

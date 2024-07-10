@@ -85,7 +85,7 @@ fitterEngineConfig:
             isEnabled: true
             dialSetDefinitions:
               - dialsType: Graph
-                # No longer tested -- dialSubType: ROOT
+                # dialSubType intentionally missing
                 dialLeafName: "spline_C"
                 applyOnDataSets: [ "TestSample" ]
                 applyCondition: "[C] > 0"

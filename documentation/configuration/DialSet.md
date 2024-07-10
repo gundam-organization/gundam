@@ -32,7 +32,7 @@
       values are ROOT, or light.
   - ROOT: A ROOT TGraph object is used
   - light: A gundam LightGraph object is used.
-* Spline: Implement a spline controled by input knots provided as a
+* Spline: A spline controlled by input knots provided as a
       graph.  In several cases a GeneralSpline, or UniformSpline
       object may be used.  The choice depends on the spacing of the
       input points.  UniformSpline assumes regular point spacing, and
@@ -49,6 +49,14 @@
       are used.  This applies to "not-a-knot", "natural" and
       "catmull-rom" splines.  The monotonic criteria cannot be applied
       the "ROOT" TSpline3.
+
+* Surface: A surfaced controlled by a mesh of input knots.  The mesh
+      is usually provided by a TH2 object (for a uniform grid), but
+      the mesh could be specified by a TGraph2D object The subtyupe
+      meanings are:
+  - Bilinear : Bilinear interpolation with a regular grid of knots.
+  - Bicubic : Bicubic interpolation (i.e. a 2D spline) with a regular
+      grid of knots.
 
 ### applyConditions options
 
@@ -74,4 +82,4 @@
 | dialsFilePath       | string | root file containing the set of dials                              |         |
 | dialsList           | string | path within root file to the list of dials                         |         |
 | dialsTreePath (old) | string | tree name where the dials are stored                               |         |
-| dialSubType         | string | cache manager spline type (dev)                                    |         |
+| dialSubType         | string | the specific form of the dial (values depend on the dial type)     |         |

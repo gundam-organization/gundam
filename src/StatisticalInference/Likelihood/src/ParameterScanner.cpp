@@ -187,7 +187,12 @@ void ParameterScanner::scanParameter(Parameter& par_, TDirectory* saveDir_) {
     _likelihoodInterfacePtr_->propagateAndEvalLikelihood();
     parPoints[iPt] = par_.getParameterValue();
 
-    for( auto& scanEntry : _scanDataDict_ ){ scanEntry.yPoints[iPt] = scanEntry.evalY(); }
+    for( auto& scanEntry : _scanDataDict_ ){
+        double y = scanEntry.evalY();
+        if (std::isnan(y)) y = -2.0;
+        if (not std::isfinite(y)) y = -1.0;
+        scanEntry.yPoints[iPt] = y;
+    }
   }
 
   // sorting points in increasing order
