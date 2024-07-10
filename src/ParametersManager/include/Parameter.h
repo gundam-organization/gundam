@@ -64,6 +64,7 @@ public:
   [[nodiscard]] bool isFixed() const{ return _isFixed_; }
   [[nodiscard]] bool isEigen() const{ return _isEigen_; }
   [[nodiscard]] bool isEnabled() const{ return _isEnabled_; }
+  [[nodiscard]] bool isMaskedForPropagation() const;
   [[nodiscard]] bool gotUpdated() const { return _gotUpdated_; }
   [[nodiscard]] int getParameterIndex() const{ return _parameterIndex_; }
   [[nodiscard]] double getStepSize() const{ return _stepSize_; }

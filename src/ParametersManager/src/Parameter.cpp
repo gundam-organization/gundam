@@ -111,6 +111,9 @@ bool Parameter::isValueWithinBounds() const{
   if( not std::isnan(_maxValue_) and _parameterValue_ > _maxValue_ ) return false;
   return true;
 }
+bool Parameter::isMaskedForPropagation() const{
+  return getOwner()->isMaskedForPropagation();
+}
 double Parameter::getDistanceFromNominal() const{
   return (_parameterValue_ - _priorValue_) / _stdDevValue_;
 }
