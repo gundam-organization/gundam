@@ -40,8 +40,19 @@ public:
   void setSupervisedParameterIndex(int supervisedParameterIndex){ _supervisedParameterIndex_ = supervisedParameterIndex; }
   void setSupervisedParameterSetIndex(int supervisedParameterSetIndex){ _supervisedParameterSetIndex_ = supervisedParameterSetIndex; }
 
+  // DEPRECATED: Replace with 'not isEventByEvent()' -- When GUNDAM
+  // started, there were three types of dials that could be applied to
+  // events (normalization, event-by-event splines, and binned
+  // splines).  Since normalization didn't have a "real" dial, we only
+  // needed to distinguish between binned and unbinned splines.  Now
+  // we have event-by-event splines, and "everything else"
+  // (Normalization, Formula, "binned", Tabulated, &c).  This may be
+  // "undeprecated" as soon as we start adding different queries for
+  // dial types.
+  [[deprecated("Replace with 'not isEventByEvent()'")]] bool isBinned() const {return not isEventByEvent();}
+
   // const getters
-  [[nodiscard]] bool isBinned() const{ return _isBinned_; }
+  [[nodiscard]] bool isEventByEvent() const {return _isEventByEvent_;}
   [[nodiscard]] bool isEnabled() const{ return _isEnabled_; }
   [[nodiscard]] bool isAllowDialExtrapolation() const{ return _allowDialExtrapolation_; }
   [[nodiscard]] int getIndex() const{ return _index_; }
@@ -79,12 +90,14 @@ protected:
 
   bool initializeNormDialsWithParBinning();
   bool initializeDialsWithDefinition();
+  bool initializeDialsWithBinningFile(JsonType dialsDefinition);
+
   void readGlobals(const JsonType &config_);
   JsonType fetchDialsDefinition(const JsonType &definitionsList_);
 
 private:
   // parameters
-  bool _isBinned_{true};
+  bool _isEventByEvent_{false};
   bool _isEnabled_{true};
   bool _useMirrorDial_{false};
   bool _disableDialCache_{false};
@@ -117,6 +130,4 @@ private:
   std::vector<ParameterSet>* _parameterSetListPtr_{nullptr};
 
 };
-
-
 #endif //GUNDAM_DIALCOLLECTION_H
