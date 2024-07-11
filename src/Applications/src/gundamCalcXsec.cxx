@@ -76,7 +76,7 @@ int main(int argc, char** argv){
     LogInfo << "Using \"time(nullptr)\" random seed: " << seed << std::endl;
     gRandom->SetSeed(seed);
   }
-  
+
   GundamGlobals::getParallelWorker().setNThreads( clParser.getOptionVal("nbThreads", 1) );
   LogInfo << "Running the fitter with " << GundamGlobals::getParallelWorker().getNbThreads() << " parallel threads." << std::endl;
 
@@ -304,7 +304,7 @@ int main(int argc, char** argv){
     }
     void initialize(){
       LogThrowIf(dialCollectionPtr == nullptr, "Associated dial collection not provided.");
-      LogThrowIf(not dialCollectionPtr->isBinned(), "Dial collection is not binned.");
+      LogThrowIf(dialCollectionPtr->isEventByEvent(), "Dial collection is event by event.");
       LogThrowIf(dialCollectionPtr->getSupervisedParameter() != nullptr, "Need a dial collection that handle a whole parSet.");
 
       file = std::make_shared<TFile>( filePath.c_str() );

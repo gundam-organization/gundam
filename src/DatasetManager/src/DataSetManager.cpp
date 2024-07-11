@@ -80,7 +80,7 @@ void DataSetManager::loadData(){
 
   LogInfo << "Resizing dial containers..." << std::endl;
   for( auto& dialCollection : _propagator_.getDialCollectionList() ) {
-    if( not dialCollection.isBinned() ){ dialCollection.resizeContainers(); }
+    if( dialCollection.isEventByEvent() ){ dialCollection.resizeContainers(); }
   }
 
   LogInfo << "Build reference cache..." << std::endl;
@@ -178,7 +178,7 @@ void DataSetManager::loadData(){
 
     LogInfo << "Resizing dial containers..." << std::endl;
     for( auto& dialCollection : _propagator_.getDialCollectionList() ) {
-      if( not dialCollection.isBinned() ){ dialCollection.resizeContainers(); }
+      if( dialCollection.isEventByEvent() ){ dialCollection.resizeContainers(); }
     }
 
     LogInfo << "Build reference cache..." << std::endl;
