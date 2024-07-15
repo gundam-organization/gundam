@@ -165,6 +165,8 @@ bool Cache::Manager::HasGPU(bool dump) {
 
 bool Cache::Manager::Build(SampleSet& sampleList,
                            EventDialCache& eventDials) {
+    if (not GundamGlobals::getEnableCacheManager()) return false;
+
     LogInfo << "Build the internal caches " << std::endl;
 
     // Create a "config" variable to hold the configuration that will be used
@@ -369,7 +371,6 @@ bool Cache::Manager::Build(SampleSet& sampleList,
             LogError << "Did not allocated cache manager" << std::endl;
             LogThrow("Cache::Manager allocation error");
         }
-
     }
 
     // In case the cache isn't allocated (usually because it's turned off on
