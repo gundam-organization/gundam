@@ -9,6 +9,7 @@
 extern "C"
 int initializeTable(const char* name, int argc, const char* argv[],
                     int bins) {
+#undef LOUD_AND_PROUD
 #ifdef LOUD_AND_PROUD
     std::cout << LIB_NAME << "INITIALIZE TABLE" << std::endl;
     std::cout << LIB_NAME << "name: " << name << std::endl;
@@ -42,10 +43,9 @@ int updateTable(const char* name,
         throw std::runtime_error("NAN parameter value");
     }
     double amplitude = par[0];
-    double period = par[1];
     for (int i = 0; i<bins; ++i) {
         double v = i/10.0;
-        table[i] = 1.0 + amplitude*std::cos(2.0*3.1415*v/period);
+        table[i] = 1.0 + amplitude*std::cos(2.0*3.1415*v);
     }
     return 0;
 }
@@ -54,6 +54,7 @@ extern "C"
 double binTable(const char* name,
                 int varc, double varv[],
                 int bins) {
+#undef LOUD_AND_PROUD
 #ifdef LOUD_AND_PROUD
     std::cout << LIB_NAME << "BIN TABLE" << std::endl;
     std::cout << LIB_NAME << "name: " << name << std::endl;

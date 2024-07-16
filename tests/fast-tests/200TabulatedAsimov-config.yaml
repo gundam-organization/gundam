@@ -70,12 +70,6 @@ fitterEngineConfig:
             priorType: Flat
             parameterLimits: [-0.5, 0.5]
 
-          - parameterName: "Oscillation_Period"
-            isEnabled: true
-            priorValue: 1.0
-            priorType: Flat
-            parameterLimits: [0.8, 1.2]
-
         dialSetDefinitions:
           - dialType: Normalization
             printDialsSummary: true
@@ -93,7 +87,6 @@ fitterEngineConfig:
             printDialsSummary: true
             dialInputList:
               - name: "Oscillation_Amplitude"
-              - name: "Oscillation_Period"
             tableConfig:
               name: "AB Oscillation"
               libraryPath: "${DATA_DIR}/200TabulatedAsimov.so"
