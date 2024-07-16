@@ -34,12 +34,14 @@ private:
     // associated TabulatedDialFactory.
     const std::vector<double>* _table_{nullptr};
 
-    // Interpolation between successive point tables.  This can be a float
+    // Interpolation between successive point tables.  This could be a float
     // since it is a fraction (zero to one) of the small difference between
-    // table values, and keeps the 32 bit alignment of the following _index_
-    // without wasting memory.  BUT, keep it before index for alignment (in
-    // case changed to double).
-    float _fraction_{0.0};
+    // table values, and loses almost all of it's bits during the
+    // interpolation.  A float would save 8 bytes and keep the 32 bit
+    // alignment of the following _index_ without wasting memory.  BOTTOM
+    // LINE: keep it before index for alignment (safe for both float and
+    // double).
+    double _fraction_{0.0};
 
     // The precalculated point in the table to use for interpolation.
     int _index_{0};

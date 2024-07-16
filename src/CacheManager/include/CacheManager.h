@@ -2,8 +2,8 @@
 #define CacheManager_h_seen
 
 #include "CacheParameters.h"
-
 #include "CacheWeights.h"
+
 #include "WeightNormalization.h"
 #include "WeightCompactSpline.h"
 #include "WeightMonotonicSpline.h"
@@ -12,6 +12,7 @@
 #include "WeightGraph.h"
 #include "WeightBilinear.h"
 #include "WeightBicubic.h"
+#include "WeightTabulated.h"
 
 #ifdef CACHE_MANAGER_USE_INDEXED_SUMS
 // An older implementation of the histogram summing that may be faster for
@@ -147,6 +148,11 @@ private:
         int bicubic{0};       // The number of bicubic surfaces
         int bicubicPoints{0}; // The amount of data reserved for the surfaces
 
+        // The parameters for the dial type Tabulated
+        int tabulated{0};     // The number of tabulated dials
+        int tabulatedPoints{0};   // The number of entries in all the tables
+        std::map<const std::vector<double>*, int> tables; // The offsets of each lookup table.
+
     };
 
     // This is a singleton, so the constructor is private.
@@ -190,6 +196,9 @@ private:
 
     /// The cache for the general splines
     std::unique_ptr<Cache::Weight::Bicubic> fBicubic;
+
+    /// The cache for the precalculated weight tables.
+    std::unique_ptr<Cache::Weight::Tabulated> fTabulated;
 
     /// The cache for the summed histgram weights
     std::unique_ptr<Cache::HistogramSum> fHistogramsCache;
