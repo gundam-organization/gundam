@@ -141,7 +141,6 @@ DialBase* TabulatedDialFactory::makeDial(const Event& event) {
     if (fracBin > 1.0) fracBin = 1.0;
 
     // Do the unique_ptr dance in case there are exceptions.
-    std::unique_ptr<Tabulated> dialBase = std::make_unique<Tabulated>();
-    dialBase->buildDial(_table_.data(), iBin, fracBin);
+    std::unique_ptr<Tabulated> dialBase = std::make_unique<Tabulated>(&_table_, iBin, fracBin);
     return dialBase.release();
 }
