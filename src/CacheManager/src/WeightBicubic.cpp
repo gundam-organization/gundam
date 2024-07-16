@@ -51,19 +51,19 @@ Cache::Weight::Bicubic::Bicubic(
         // copied once during initialization so do not pin the CPU memory into
         // the page set.
         fResult.reset(new hemi::Array<int>(GetReserved(),false));
-        LogThrowIf(not fResult, "Bad SplineResult alloc");
+        LogThrowIf(not fResult, "Bad Result alloc");
         fParameter.reset(
             new hemi::Array<short>(2*GetReserved(),false));
         LogThrowIf(not fParameter, "Bad SplineParameter alloc");
         fIndex.reset(new hemi::Array<int>(1+GetReserved(),false));
-        LogThrowIf(not fIndex, "Bad SplineIndex alloc");
+        LogThrowIf(not fIndex, "Bad Index alloc");
 
         // Get the CPU/GPU memory for the spline knots.  This is copied once
         // during initialization so do not pin the CPU memory into the page
         // set.
         fData.reset(
             new hemi::Array<WEIGHT_BUFFER_FLOAT>(GetSpaceReserved(),false));
-        LogThrowIf(not fData, "Bad SplineSpacealloc");
+        LogThrowIf(not fData, "Bad Data alloc");
     }
     catch (...) {
         LogError << "Failed to allocate memory, so stopping" << std::endl;
