@@ -7,14 +7,19 @@
 #endif
 
 #include "CacheManager.h"
+
 #include "CacheParameters.h"
 #include "CacheWeights.h"
+
 #include "WeightNormalization.h"
 #include "WeightCompactSpline.h"
 #include "WeightMonotonicSpline.h"
 #include "WeightUniformSpline.h"
 #include "WeightGeneralSpline.h"
 #include "WeightGraph.h"
+#include "WeightBilinear.h"
+#include "WeightBicubic.h"
+#include "WeightTabulated.h"
 
 #include "ParameterSet.h"
 #include "GundamGlobals.h"
@@ -29,6 +34,7 @@
 #include "Bilinear.h"
 #include "Bicubic.h"
 #include "Shift.h"
+#include "Tabulated.h"
 
 #include <memory>
 #include <set>
@@ -136,6 +142,16 @@ Cache::Manager::Manager(const Cache::Manager::Configuration& config) {
         fWeightsCache->AddWeightCalculator(fBicubic.get());
         fTotalBytes += fBicubic->GetResidentMemory();
 
+        fTabulated = std::make_unique<Cache::Weight::Tabulated>(
+            fWeightsCache->GetWeights(),
+            fParameterCache->GetParameters(),
+            config.tabulated,
+            config.tabulatedPoints,
+            config.tables);
+        LogThrowIf(not fTabulated, "Bad Tabulated alloc");
+        fWeightsCache->AddWeightCalculator(fTabulated.get());
+        fTotalBytes += fTabulated->GetResidentMemory();
+
         fHistogramsCache = std::make_unique<Cache::HistogramSum>(
                                   fWeightsCache->GetWeights(),
                                   config.histBins);
@@ -165,6 +181,8 @@ bool Cache::Manager::HasGPU(bool dump) {
 
 bool Cache::Manager::Build(SampleSet& sampleList,
                            EventDialCache& eventDials) {
+    if (not GundamGlobals::getEnableCacheManager()) return false;
+
     LogInfo << "Build the internal caches " << std::endl;
 
     // Create a "config" variable to hold the configuration that will be used
@@ -239,6 +257,14 @@ bool Cache::Manager::Build(SampleSet& sampleList,
             else if (dialType.find("Shift") == 0) {
                 ++config.shifts;
             }
+            else if (dialType.find("Tabulated") == 0) {
+                ++config.tabulated;
+                Tabulated* tabDial = dynamic_cast<Tabulated*>(dial);
+                LogThrowIf(tabDial == nullptr, "Tabulated dial is not a Tabulated dial");
+                // Add a place holder for this table.  This will be filled
+                // with the offset to the table when the weighting is built.
+                config.tables[tabDial->getTable()] = 0;
+            }
             else {
                 LogError << "Unsupported dial type -- "
                           << dialType
@@ -253,6 +279,15 @@ bool Cache::Manager::Build(SampleSet& sampleList,
                  << dialErrorCount
                  << std::endl;
         LogThrow("Unsupported dial type: Incomplete dial implementation");
+    }
+
+    // Finish filling the configuration for the tabulated dials
+    {
+        config.tabulatedPoints = 0;
+        for (auto table : config.tables) {
+            table.second = config.tabulatedPoints;
+            config.tabulatedPoints += table.first->size();
+        }
     }
 
     // Count the total number of histogram cells.
@@ -290,6 +325,9 @@ bool Cache::Manager::Build(SampleSet& sampleList,
             << std::endl;
     LogInfo  << "    Shifts: " << config.shifts
             <<" ("<< 1.0*config.shifts/config.events <<" per event)"
+            << std::endl;
+    LogInfo  << "    Tabulated: " << config.tabulated
+            <<" ("<< 1.0*config.tabulated/config.events <<" per event)"
             << std::endl;
     LogInfo  << "    Bilinear: " << config.bilinear
             <<" ("<< 1.0*config.bilinear/config.events <<" per event)"
@@ -369,7 +407,6 @@ bool Cache::Manager::Build(SampleSet& sampleList,
             LogError << "Did not allocated cache manager" << std::endl;
             LogThrow("Cache::Manager allocation error");
         }
-
     }
 
     // In case the cache isn't allocated (usually because it's turned off on
@@ -592,6 +629,17 @@ bool Cache::Manager::Update(SampleSet& sampleList,
             if (shift) {
                 ++dialUsed;
                 initialEventWeight *= shift->evalResponse(DialInputBuffer());
+            }
+            const Tabulated* tabulated
+                = dynamic_cast<const Tabulated*>(baseDial);
+            if (tabulated) {
+                ++dialUsed;
+                Cache::Manager::Get()
+                    ->fTabulated
+                    ->AddData(resultIndex,
+                              tabulated->getTable(),
+                              tabulated->getIndex(),
+                              tabulated->getFraction());
             }
 
             if (dialUsed != 1) {

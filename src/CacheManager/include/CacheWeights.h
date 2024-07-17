@@ -48,7 +48,7 @@ private:
     /// because vectors cause trouble with some versions of the nvcc cuda
     /// compiler.
     int fWeightCalculators{0};
-    std::array<Cache::Weight::Base*,8> fWeightCalculator;
+    std::array<Cache::Weight::Base*,16> fWeightCalculator;
 
 public:
     // Construct the class.  This should allocate all the memory on the host
@@ -137,6 +137,5 @@ public:
 // Local Variables:
 // mode:c++
 // c-basic-offset:4
-// compile-command:"$(git rev-parse --show-toplevel)/cmake/gundam-build.sh"
 // End:
 #endif

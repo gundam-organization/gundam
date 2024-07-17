@@ -165,12 +165,19 @@ void Propagator::propagateParameters(){
 
 }
 void Propagator::updateDialState(){
-  std::for_each(_dialCollectionList_.begin(), _dialCollectionList_.end(), [&]( DialCollection& dc_){
-    dc_.updateInputBuffers();
+  std::for_each(_dialCollectionList_.begin(), _dialCollectionList_.end(),
+                [&]( DialCollection& dc_){
+                  dc_.updateInputBuffers();
   });
+  std::for_each(_dialCollectionList_.begin(), _dialCollectionList_.end(),
+                [&]( DialCollection& dc_){
+                  dc_.update();
+                });
 }
 void Propagator::reweightMcEvents() {
   reweightTimer.start();
+
+  updateDialState();
 
   bool usedGPU{false};
 #ifdef GUNDAM_USING_CACHE_MANAGER
@@ -182,7 +189,6 @@ void Propagator::reweightMcEvents() {
   }
 #endif
   if( not usedGPU ){
-    updateDialState();
     if( not _devSingleThreadReweight_ ){
       GundamGlobals::getParallelWorker().runJob("Propagator::reweightMcEvents");
     }

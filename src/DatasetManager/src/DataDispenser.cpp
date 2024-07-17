@@ -13,6 +13,7 @@
 
 #include "DialCollection.h"
 #include "DialBaseFactory.h"
+#include "TabulatedDialFactory.h"
 
 #include "GenericToolbox.Utils.h"
 #include "GenericToolbox.Root.h"
@@ -297,6 +298,9 @@ void DataDispenser::fetchRequestedLeaves(){
           GenericToolbox::addIfNotInVector(edges.varName, indexRequests);
         }
       }
+      for( auto& leafName : dialCollection->getExtraLeafNames()) {
+        GenericToolbox::addIfNotInVector(leafName, indexRequests);
+      }
     }
     LogInfo << "DialCollection requests for indexing: " << GenericToolbox::toString(indexRequests) << std::endl;
     for( auto& var : indexRequests ){ _cache_.addVarRequestedForIndexing(var); }
@@ -455,27 +459,31 @@ void DataDispenser::preAllocateMemory(){
       for( auto& dialCollection : _cache_.dialCollectionsRefList ){
         LogScopeIndent;
         nDialsMaxPerEvent += 1;
-        if( not dialCollection->isEventByEvent() ){
+
+        if (dialCollection->isEventByEvent()) {
+            // Reserve enough space for all of the event-by-event dials
+          // that might be added.  This size may be reduced later.
+          auto dialType = dialCollection->getGlobalDialType();
+          int origSize = dialCollection->getDialBaseList().size();
+          LogInfo << dialCollection->getTitle()
+                  << ": adding " << _cache_.totalNbEvents
+                  << " (was " << origSize << ")"
+                  << " " << dialType << " slots"<< std::endl;
+
+          // Only increase the size.  It's probably zero before
+          // starting, but add the original size... just in case.
+          dialCollection->getDialBaseList().resize(
+              dialCollection->getDialBaseList().size()
+              + _cache_.totalNbEvents
+          );
+        }
+        else {
           // Filling var indexes for faster eval with PhysicsEvent:
           for( auto& bin : dialCollection->getDialBinSet().getBinList() ){
             for( auto& edges : bin.getEdgesList() ){
               edges.varIndexCache = GenericToolbox::findElementIndex( edges.varName, _cache_.varsRequestedForIndexing );
             }
           }
-        }
-        else if( not dialCollection->getGlobalDialLeafName().empty() ){
-          // Reserve memory for additional dials (those on a tree leaf)
-          auto dialType = dialCollection->getGlobalDialType();
-          LogInfo << dialCollection->getTitle() << ": creating " << _cache_.totalNbEvents;
-          LogInfo << " slots for " << dialType << std::endl;
-
-          dialCollection->getDialBaseList().resize(
-              dialCollection->getDialBaseList().size()
-              + _cache_.totalNbEvents
-          );
-        }
-        else{
-          LogThrow("DEV ERROR: Dial is event-by-event and doesn't have a leaf");
         }
       }
 
@@ -1095,9 +1103,31 @@ void DataDispenser::fillFunction(int iThread_){
               }
             }
           }
+          else if( dialCollectionRef->getGlobalDialType() == "Tabulated" ) {
+            // Event-by-event dial for a precalculated table.  The table
+            // can hold things like oscillation weights and is filled before
+            // the event weighting is done.
+
+            std::unique_ptr<DialBase> dialBase(
+              dialCollectionRef->getCollectionData<TabulatedDialFactory>(0)
+              ->makeDial(eventIndexingBuffer));
+
+            // dialBase is valid -> store it
+            if (dialBase != nullptr) {
+              size_t freeSlotDial = dialCollectionRef->getNextDialFreeSlot();
+              dialBase->setAllowExtrapolation(dialCollectionRef->isAllowDialExtrapolation());
+              dialCollectionRef->getDialBaseList()[freeSlotDial] = DialCollection::DialBaseObject(
+                dialBase.release());
+
+              dialEntryPtr->collectionIndex = iCollection;
+              dialEntryPtr->interfaceIndex = freeSlotDial;
+              dialEntryPtr++;
+            }
+          }
           else if( not dialCollectionRef->getGlobalDialLeafName().empty() ){
-            // Event-by-event dial: THERE MUST BE A GlobalDialLeafName.
-            // grab the dial as a general TObject -> let the factory figure out what to do with it
+            // Event-by-event dial with leaf for "spline" data: grab as a
+            // general TObject -> let the factory figure out what to do with
+            // it
 
             auto *dialObjectPtr = (TObject *) *(
                 (TObject **) eventIndexingBuffer.getVariables().fetchVariable(
@@ -1177,5 +1207,4 @@ void DataDispenser::fillFunction(int iThread_){
 // Local Variables:
 // mode:c++
 // c-basic-offset:2
-// compile-command:"$(git rev-parse --show-toplevel)/cmake/gundam-build.sh"
 // End:

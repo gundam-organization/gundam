@@ -33,6 +33,7 @@ set( SRCFILES
     DialFactories/src/GraphDialBaseFactory.cpp
     DialFactories/src/SplineDialBaseFactory.cpp
     DialFactories/src/SurfaceDialBaseFactory.cpp
+    DialFactories/src/TabulatedDialFactory.cpp
     )
 
 set( HEADERS
@@ -47,6 +48,7 @@ set( HEADERS
 
     DialDefinitions/include/Norm.h
     DialDefinitions/include/Shift.h
+    DialDefinitions/include/Tabulated.h
 
     DialDefinitions/include/Graph.h
     DialDefinitions/include/LightGraph.h
@@ -69,6 +71,7 @@ set( HEADERS
     DialFactories/include/GraphDialBaseFactory.h
     DialFactories/include/SplineDialBaseFactory.h
     DialFactories/include/SurfaceDialBaseFactory.h
+    DialFactories/include/TabulatedDialFactory.h
     )
 
 if( USE_STATIC_LINKS )
