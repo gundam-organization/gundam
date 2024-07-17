@@ -54,7 +54,7 @@ void ParameterThrowerMarkHarz::ThrowSet(std::vector<double> &parms)
   }
   TVectorD prod = (*chel_dec) * std_rand;
   for (int i = 0; i < npars; i++)
-    parms[i] = prod(i) + (*pvals)(i);
+    parms[i] = prod(i);
 }
 
 void ParameterThrowerMarkHarz::StdNormRand(double *z)
