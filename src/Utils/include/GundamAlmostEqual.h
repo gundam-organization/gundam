@@ -2,6 +2,7 @@
 #define GundamAlmostEqual_h_seen
 #include <iostream>
 #include <cmath>
+#include <limits>
 
 namespace GundamUtils {
 

@@ -62,9 +62,7 @@ public:
   // Core
   void buildDialCache();
   void propagateParameters();
-  void resetEventWeights();
   void reweightMcEvents();
-  void refillMcHistograms();
   void clearContent();
 
   // Misc
@@ -75,14 +73,16 @@ public:
   static void muteLogger();
   static void unmuteLogger();
 
-protected:
+private:
   void initializeThreads();
 
   // multithreading
   void reweightMcEvents(int iThread_);
   void refillMcHistogramsFct( int iThread_);
 
-private:
+  void updateDialState();
+  void refillMcHistograms();
+
   // Parameters
   bool _showTimeStats_{false};
   bool _loadAsimovData_{false};

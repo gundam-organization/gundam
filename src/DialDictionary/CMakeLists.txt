@@ -19,16 +19,20 @@ set( SRCFILES
     DialDefinitions/src/UniformSpline.cpp
     DialDefinitions/src/CompactSpline.cpp
     DialDefinitions/src/MonotonicSpline.cpp
+    DialDefinitions/src/Bilinear.cpp
+    DialDefinitions/src/Bicubic.cpp
 
     DialDefinitions/src/CompiledLibDial.cpp
     DialDefinitions/src/RootFormula.cpp
     DialDefinitions/src/Polynomial.cpp
+
 
     # DialFactories
     DialFactories/src/DialBaseFactory.cpp
     DialFactories/src/NormDialBaseFactory.cpp
     DialFactories/src/GraphDialBaseFactory.cpp
     DialFactories/src/SplineDialBaseFactory.cpp
+    DialFactories/src/SurfaceDialBaseFactory.cpp
     )
 
 set( HEADERS
@@ -53,6 +57,8 @@ set( HEADERS
     DialDefinitions/include/UniformSpline.h
     DialDefinitions/include/CompactSpline.h
     DialDefinitions/include/MonotonicSpline.h
+    DialDefinitions/include/Bilinear.h
+    DialDefinitions/include/Bicubic.h
 
     DialDefinitions/include/RootFormula.h
     DialDefinitions/include/Polynomial.h
@@ -62,6 +68,7 @@ set( HEADERS
     DialFactories/include/NormDialBaseFactory.h
     DialFactories/include/GraphDialBaseFactory.h
     DialFactories/include/SplineDialBaseFactory.h
+    DialFactories/include/SurfaceDialBaseFactory.h
     )
 
 if( USE_STATIC_LINKS )

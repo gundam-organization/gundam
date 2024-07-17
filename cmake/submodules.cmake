@@ -52,15 +52,17 @@ endif( ENABLE_BATCH_MODE )
 ## Add the Logger
 # Reproduce needed parts of the simple-cpp-logger CMakeLists.txt
 include_directories(submodules/simple-cpp-logger/include)
-add_definitions( -D LOGGER_MAX_LOG_LEVEL_PRINTED=6 )
-add_definitions( -D LOGGER_PREFIX_LEVEL=3 )
 add_definitions( -D LOGGER_TIME_FORMAT="\\\"%Y.%m.%d %H:%M:%S"\\\" )
 
 if(${CMAKE_BUILD_TYPE} MATCHES Debug OR ${ENABLE_DEV_MODE})
   cmessage( STATUS "Logger set in dev mode." )
+  add_definitions( -D LOGGER_MAX_LOG_LEVEL_PRINTED=6 )
+  add_definitions( -D LOGGER_PREFIX_LEVEL=3 )
   add_definitions( -D LOGGER_PREFIX_FORMAT="\\\"{TIME} {USER_HEADER} {FILELINE}"\\\" )
 else()
   cmessage( STATUS "Logger set in release mode." )
+  add_definitions( -D LOGGER_MAX_LOG_LEVEL_PRINTED=4 )
+  add_definitions( -D LOGGER_PREFIX_LEVEL=3 )
   add_definitions( -D LOGGER_PREFIX_FORMAT="\\\"{TIME} {USER_HEADER}"\\\" )
 endif()
 

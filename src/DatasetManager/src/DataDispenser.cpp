@@ -455,7 +455,7 @@ void DataDispenser::preAllocateMemory(){
       for( auto& dialCollection : _cache_.dialCollectionsRefList ){
         LogScopeIndent;
         nDialsMaxPerEvent += 1;
-        if( dialCollection->isBinned() ){
+        if( not dialCollection->isEventByEvent() ){
           // Filling var indexes for faster eval with PhysicsEvent:
           for( auto& bin : dialCollection->getDialBinSet().getBinList() ){
             for( auto& edges : bin.getEdgesList() ){
@@ -475,7 +475,7 @@ void DataDispenser::preAllocateMemory(){
           );
         }
         else{
-          LogThrow("DEV ERROR: not binned, not event-by-event?");
+          LogThrow("DEV ERROR: Dial is event-by-event and doesn't have a leaf");
         }
       }
 
@@ -1071,17 +1071,22 @@ void DataDispenser::fillFunction(int iThread_){
 
           int iCollection = dialCollectionRef->getIndex();
 
-          if     ( dialCollectionRef->isBinned() ){
+          if ( not dialCollectionRef->isEventByEvent() ){
 
-            // is only one bin with no condition:
-            if( dialCollectionRef->getDialBaseList().size() == 1 and dialCollectionRef->getDialBinSet().getBinList().empty() ){
-              // if is it NOT a DialBinned -> this is the one we are
-              // supposed to use
+            if( dialCollectionRef->getDialBaseList().size() == 1
+                and dialCollectionRef->getDialBinSet().getBinList().empty() ){
+              // There isn't any binning, and there is only one dial.
+              // In this case we don't need to check if the dial is in
+              // a bin.
               dialEntryPtr->collectionIndex = iCollection;
               dialEntryPtr->interfaceIndex = 0;
               dialEntryPtr++;
             }
             else{
+              // There are multiple dials, or there is a list of bins
+              // to apply the dial to.  Check if the event falls into
+              // a bin, and apply the correct binning.  Some events
+              // may not be in any bin.
               auto dialBinIdx = eventIndexingBuffer.getVariables().findBinIndex( dialCollectionRef->getDialBinSet() );
               if( dialBinIdx != -1 ){
                 dialEntryPtr->collectionIndex = iCollection;
@@ -1091,7 +1096,7 @@ void DataDispenser::fillFunction(int iThread_){
             }
           }
           else if( not dialCollectionRef->getGlobalDialLeafName().empty() ){
-            // Event-by-event dial?
+            // Event-by-event dial: THERE MUST BE A GlobalDialLeafName.
             // grab the dial as a general TObject -> let the factory figure out what to do with it
 
             auto *dialObjectPtr = (TObject *) *(
@@ -1133,7 +1138,7 @@ void DataDispenser::fillFunction(int iThread_){
             }
           }
           else {
-            LogThrow("neither an event by event dial, nor a binned dial");
+            LogThrow("Invalid dial collection -- not a known dial type");
           }
 
         } // dial collection loop
