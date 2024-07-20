@@ -33,6 +33,13 @@ public:
   ENUM_FIELD( AdaptiveMCMC )
 #include "GenericToolbox.MakeEnum.h"
 
+#define ENUM_NAME PcaMethod
+#define ENUM_FIELDS \
+  ENUM_FIELD( DeltaChi2Threshold, 0 ) \
+  ENUM_FIELD( ReducedDeltaChi2Threshold ) \
+  ENUM_FIELD( SigmaThreshold )
+#include "GenericToolbox.MakeEnum.h"
+
 protected:
   void readConfigImpl() override;
   void initializeImpl() override;
@@ -94,11 +101,14 @@ private:
   bool _scaleParStepWithChi2Response_{false};
   double _throwGain_{1.};
   double _parStepGain_{0.1};
-  double _pcaDeltaLlhThreshold_{0};
   bool _savePostfitEventTrees_{false};
   std::vector<double> _allParamVariationsSigmas_{};
   JsonType _preFitParState_{};
   JsonType _postFitParState_{};
+
+  // dev
+  double _pcaThreshold_{0};
+  PcaMethod _pcaMethod_{PcaMethod::DeltaChi2Threshold};
 
   // Internals
   TDirectory* _saveDir_{nullptr};
