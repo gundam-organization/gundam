@@ -60,6 +60,8 @@ public:
   void setAllParamVariationsSigmas(const std::vector<double> &allParamVariationsSigmas){ _allParamVariationsSigmas_ = allParamVariationsSigmas; }
   void setThrowMcBeforeFit(bool throwMcBeforeFit_){ _throwMcBeforeFit_ = throwMcBeforeFit_; }
   void setThrowGain(double throwGain_){ _throwGain_ = throwGain_; }
+  void setPcaThreshold(double pcaThreshold_){ _pcaThreshold_ = pcaThreshold_; }
+  void setPcaMethod(PcaMethod pcaMethod_){ _pcaMethod_ = pcaMethod_; }
 
   // const-getters
   [[nodiscard]] const JsonType &getPreFitParState() const{ return _preFitParState_; }
