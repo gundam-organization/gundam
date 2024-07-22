@@ -91,7 +91,18 @@ fitterEngineConfig:
               name: "AB Oscillation"
               libraryPath: "${DATA_DIR}/200TabulatedAsimov.so"
               initFunction: "initializeTable"
-              initArguments: ["one", "two", "three", "four"]
+              initArguments:
+                - "NEUTRINO_TYPES 6"
+                - "BINS 100"
+                - "MIN_ENERGY 0.05"
+                - "MAX_PATH 295.0"
+                - "PARAMETERS ${CONFIG_DIR}/200TabulatedAzimov-parameters.txt"
+                - "FLUX ${DATA_DIR}/nue.txt"
+                - "FLUX ${DATA_DIR}/nuebar.txt"
+                - "FLUX ${DATA_DIR}/numu.txt"
+                - "FLUX ${DATA_DIR}/numubar.txt"
+                - "FLUX ${DATA_DIR}/nutau.txt"
+                - "FLUX ${DATA_DIR}/nutaubar.txt"
               updateFunction: "updateTable"
               binningFunction: "binTable"
               variables: ["At", "Bt"]
