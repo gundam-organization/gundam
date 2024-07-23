@@ -54,9 +54,9 @@ int main( int argc, char** argv ){
     // appendixDict["optionName"] = "Appendix"
     // this list insure all appendices will appear in the same order
     std::vector<std::pair<std::string, std::string>> appendixDict{
-        {"configFile", "%s"},
-        {"overrideFiles", "With_%s"},
-        {"appendix", "%s"},
+        {"configFile", ""},
+        {"overrideFiles", "With"},
+        {"appendix", ""},
     };
 
     std::string outPath{GundamUtils::generateFileName(clp, appendixDict) + ".json"};

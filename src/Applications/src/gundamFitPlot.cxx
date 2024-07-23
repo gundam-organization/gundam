@@ -66,14 +66,14 @@ int main( int argc, char** argv ){
     // appendixDict["optionName"] = "Appendix"
     // this list insure all appendices will appear in the same order
     std::vector<std::pair<std::string, std::string>> appendixDict{
-        {"configFile", "%s"},
-        {"overrideFiles", "With_%s"},
-        {"appendix", "%s"}
+        {"configFile", ""},
+        {"overrideFiles", "With"},
+        {"appendix", ""}
     };
 
     outFileName = GenericToolbox::joinPath(
         outFolder,
-        GundamUtils::generateFileName(clp, appendixDict)
+        "gundamFitPlot_" + GundamUtils::generateFileName(clp, appendixDict)
     ) + ".root";
   }
 
