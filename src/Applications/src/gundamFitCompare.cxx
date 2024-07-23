@@ -90,16 +90,16 @@ int main( int argc, char** argv ){
     std::vector<std::pair<std::string, std::string>> appendixDict;
 
     // file1
-    if( clp.isOptionTriggered("name-1") ){ appendixDict.emplace_back("name-1", "%s"); }
-    else                                 { appendixDict.emplace_back("file-1", "%s"); }
+    if( clp.isOptionTriggered("name-1") ){ appendixDict.emplace_back("name-1", ""); }
+    else                                 { appendixDict.emplace_back("file-1", ""); }
     if( clp.isOptionTriggered("use-prefit-1") ){ appendixDict.emplace_back("use-prefit-1", "PreFit"); }
 
     // file2
-    if( clp.isOptionTriggered("name-2") ){ appendixDict.emplace_back("name-2", "vs_%s"); }
-    else                                 { appendixDict.emplace_back("file-2", "vs_%s"); }
+    if( clp.isOptionTriggered("name-2") ){ appendixDict.emplace_back("name-2", "vs_"); }
+    else                                 { appendixDict.emplace_back("file-2", "vs_"); }
     if( clp.isOptionTriggered("use-prefit-2") ){ appendixDict.emplace_back("use-prefit-2", "PreFit"); }
 
-    outPath = "fitCompare_" + GundamUtils::generateFileName(clp, appendixDict) + ".root";
+    outPath = "gundamFitCompare_" + GundamUtils::generateFileName(clp, appendixDict) + ".root";
     LogWarning << "Output file: " << outPath << std::endl;
   }
   outFile = TFile::Open(outPath.c_str(), "RECREATE");
