@@ -95,8 +95,8 @@ int main( int argc, char** argv ){
     if( clp.isOptionTriggered("use-prefit-1") ){ appendixDict.emplace_back("use-prefit-1", "PreFit"); }
 
     // file2
-    if( clp.isOptionTriggered("name-2") ){ appendixDict.emplace_back("name-2", "vs_"); }
-    else                                 { appendixDict.emplace_back("file-2", "vs_"); }
+    if( clp.isOptionTriggered("name-2") ){ appendixDict.emplace_back("name-2", "vs"); }
+    else                                 { appendixDict.emplace_back("file-2", "vs"); }
     if( clp.isOptionTriggered("use-prefit-2") ){ appendixDict.emplace_back("use-prefit-2", "PreFit"); }
 
     outPath = "gundamFitCompare_" + GundamUtils::generateFileName(clp, appendixDict) + ".root";
