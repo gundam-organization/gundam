@@ -220,7 +220,7 @@ int main(int argc, char** argv){
         {"toyFit", "ToyFit"},
         {"injectToyParameters", "InjToyPar"},
         {"dry-run", "DryRun"},
-        {"appendix", "%s"},
+        {"appendix", ""},
     };
 
     outFileName = GenericToolbox::joinPath(

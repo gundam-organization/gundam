@@ -234,14 +234,14 @@ int main(int argc, char** argv){
     // appendixDict["optionName"] = "Appendix"
     // this list insure all appendices will appear in the same order
     std::vector<std::pair<std::string, std::string>> appendixDict{
-        {"configFile", "%s"},
-        {"fitterFile", "Fit_%s"},
-        {"nToys", "nToys_%s"},
-        {"randomSeed", "Seed_%s"},
+        {"configFile", ""},
+        {"fitterFile", "Fit"},
+        {"nToys", "nToys"},
+        {"randomSeed", "Seed"},
         {"usePreFit", "PreFit"},
     };
 
-    outFilePath = "xsecCalc_" + GundamUtils::generateFileName(clParser, appendixDict) + ".root";
+    outFilePath = "gundamCalcXsec_" + GundamUtils::generateFileName(clParser, appendixDict) + ".root";
 
     std::string outFolder{GenericToolbox::Json::fetchValue<std::string>(xsecConfig, "outputFolder", "./")};
     outFilePath = GenericToolbox::joinPath(outFolder, outFilePath);

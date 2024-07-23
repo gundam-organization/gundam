@@ -69,12 +69,12 @@ int main(int argc, char** argv) {
     // appendixDict["optionName"] = "Appendix"
     // this list insure all appendices will appear in the same order
     std::vector<std::pair<std::string, std::string>> appendixDict{
-        {"configFile", "%s"},
-        {"overrideFiles", "With_%s"},
-        {"maxFileSizeInMb", "MaxInputSize_%sMB"},
+        {"configFile", ""},
+        {"overrideFiles", "With"},
+        {"maxFileSizeInMb", "MaxInputSizeInMB"},
     };
 
-    outFolder = {GundamUtils::generateFileName(clParser, appendixDict)};
+    outFolder = {"gundamInputZipper_" + GundamUtils::generateFileName(clParser, appendixDict)};
   }
   else{
     outFolder = clParser.getOptionVal<std::string>("outputFolder");
