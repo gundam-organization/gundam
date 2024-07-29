@@ -444,7 +444,7 @@ void FitterEngine::runPcaCheck(){
 
   _likelihoodInterface_.propagateAndEvalLikelihood();
 
-  LogInfo << "Using PCA method: " << _pcaMethod_.toString() << std::endl;
+  LogInfo << "Using PCA method: " << _pcaMethod_.toString() << " / threshold = " << _pcaThreshold_ << std::endl;
 
   double baseLlh = _likelihoodInterface_.getLastLikelihood();
   double baseLlhStat = _likelihoodInterface_.getLastStatLikelihood();
