@@ -65,7 +65,6 @@ int main(int argc, char** argv){
 
   clParser.addTriggerOption("dry-run", {"--dry-run", "-d"},"Perform the full sequence of initialization, but don't do the actual fit.");
   clParser.addTriggerOption("asimov", {"-a", "--asimov"}, "Use MC dataset to fill the data histograms");
-  clParser.addTriggerOption("enablePca", {"--pca", "--enable-pca"}, "Enable principle component analysis for eigen decomposed parameter sets");
   clParser.addTriggerOption("skipHesse", {"--skip-hesse"}, "Don't perform postfit error evaluation");
   clParser.addTriggerOption("skipSimplex", {"--skip-simplex"}, "Don't run SIMPLEX before the actual fit");
   clParser.addTriggerOption("generateOneSigmaPlots", {"--one-sigma"}, "Generate one sigma plots");
@@ -76,6 +75,7 @@ int main(int argc, char** argv){
   clParser.addOption("scanParameters", {"--scan"}, "Enable parameter scan before and after the fit (can provide nSteps)", 1, true);
   clParser.addOption("scanLine", {"--scan-line"}, "Provide par injector files: start and end point or only end point (start will be prefit)", 2, true);
   clParser.addOption("toyFit", {"--toy"}, "Run a toy fit (optional arg to provide toy index)", 1, true);
+  clParser.addOption("enablePca", {"--pca", "--enable-pca"}, "Enable principle component analysis for eigen decomposed parameter sets", 2, true);
 
   clParser.addDummyOption("Runtime/debug options");
 
@@ -204,11 +204,11 @@ int main(int argc, char** argv){
     // appendixDict["optionName"] = "Appendix"
     // this list insure all appendices will appear in the same order
     std::vector<std::pair<std::string, std::string>> appendixDict{
-        {"configFile", "%s"},
-        {"overrideFiles", "With_%s"},
-        {"injectParameterConfig", "Inj_%s"},
-        {"scanLine", "LineSc_%s"},
-        {"useDataEntry", "DataEntry_%s"},
+        {"configFile", ""},
+        {"overrideFiles", "With"},
+        {"injectParameterConfig", "Inj"},
+        {"scanLine", "LineSc"},
+        {"useDataEntry", "DataEntry"},
         {"asimov", "Asimov"},
         {"scanParameters", "Scan"},
         {"generateOneSigmaPlots", "OneSigma"},
@@ -217,15 +217,15 @@ int main(int argc, char** argv){
         {"skipSimplex", "NoSimplex"},
         {"kickMc", "KickMc"},
         {"lightOutputMode", "Light"},
-        {"toyFit", "ToyFit_%s"},
-        {"injectToyParameters", "InjToyPar_%s"},
+        {"toyFit", "ToyFit"},
+        {"injectToyParameters", "InjToyPar"},
         {"dry-run", "DryRun"},
-        {"appendix", "%s"},
+        {"appendix", ""},
     };
 
     outFileName = GenericToolbox::joinPath(
         outFolder,
-        GundamUtils::generateFileName(clParser, appendixDict)
+        "gundamFitter_" + GundamUtils::generateFileName(clParser, appendixDict)
     ) + ".root";
   }
 
