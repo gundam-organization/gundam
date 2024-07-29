@@ -160,6 +160,7 @@ void DataBinSet::readTxtBinningDefinition(){
     // stripping comments
     line = GenericToolbox::splitString(line, "#")[0];
     GenericToolbox::trimInputString(line, " "); // removing trailing spaces
+    GenericToolbox::removeEscapeCodes(line);
 
     std::vector<std::string> lineElements = GenericToolbox::splitString(line, " ", true);
     if( lineElements.empty() ){ continue; }
@@ -212,7 +213,7 @@ void DataBinSet::readTxtBinningDefinition(){
     else{
 
       if( int(lineElements.size()) != nbExpectedValues ){
-        LogError << "(" << GET_VAR_NAME_VALUE(lineElements.size()) << ") != (" << GET_VAR_NAME_VALUE(lineElements.size()) << ")" << std::endl;
+        LogError << "(" << GET_VAR_NAME_VALUE(lineElements.size()) << ") != (" << GET_VAR_NAME_VALUE(nbExpectedValues) << ")" << std::endl;
         LogError << "Expected: " << GenericToolbox::toString(expectedVariableTitleList) << std::endl;
         LogError << "Got: " << GenericToolbox::toString(lineElements) << std::endl;
         throw std::runtime_error("lineElements.size() != nbExpectedValues");
