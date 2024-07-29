@@ -526,7 +526,7 @@ void FitterEngine::runPcaCheck(){
           }
 
         }
-        else if( _pcaMethod_ == PcaMethod::SigmaThreshold ){
+        else if( _pcaMethod_ == PcaMethod::SqrtReducedDeltaChi2Threshold ){
 
           if( std::sqrt( std::abs(deltaChi2Stat)/_minimizer_->fetchNbDegreeOfFreedom() ) < _pcaThreshold_ ){
             ssPrint << " < " << std::pow( _pcaThreshold_*_minimizer_->fetchNbDegreeOfFreedom(), 2 ) << " -> FIXED";

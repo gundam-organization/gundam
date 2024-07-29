@@ -37,7 +37,7 @@ public:
 #define ENUM_FIELDS \
   ENUM_FIELD( DeltaChi2Threshold, 0 ) \
   ENUM_FIELD( ReducedDeltaChi2Threshold ) \
-  ENUM_FIELD( SigmaThreshold )
+  ENUM_FIELD( SqrtReducedDeltaChi2Threshold )
 #include "GenericToolbox.MakeEnum.h"
 
 protected:
