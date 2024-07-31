@@ -302,7 +302,16 @@ int main(int argc, char** argv){
   }
 
   // --enable-pca
-  fitter.setEnablePca(clParser.isOptionTriggered("enablePca"));
+  if( clParser.isOptionTriggered("enablePca") ){
+    fitter.setEnablePca( true );
+    if( clParser.getNbValueSet("enablePca") == 1 ){
+      fitter.setPcaThreshold( clParser.getOptionVal<double>("enablePca") );
+    }
+    if( clParser.getNbValueSet("enablePca") == 2 ){
+      fitter.setPcaThreshold( clParser.getOptionVal<double>("enablePca", 0) );
+      fitter.setPcaMethod( FitterEngine::PcaMethod::toEnum(clParser.getOptionVal<std::string>("enablePca", 1), true) );
+    }
+  }
 
   // --toy <iToy>
   if( clParser.isOptionTriggered("toyFit") ){
