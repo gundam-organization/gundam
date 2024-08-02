@@ -37,7 +37,8 @@ fitterEngineConfig:
     algorithm: "Migrad"
     errors: "Hesse"
     print_level: 2
-
+    tolerance: 1E-6
+    
   propagatorConfig:
     throwAsimovFitParameters: false
 
