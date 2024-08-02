@@ -136,9 +136,11 @@ DialBase* TabulatedDialFactory::makeDial(const Event& event) {
                                (int) _variables_.size(), _variables_.data(),
                                (int) _table_.size());
 
+    if (bin < 0.0) return nullptr;
+
     // Determine the bin index and the fractional part of the bin.
     int iBin = bin;
-    if (iBin < 0) iBin = 0;
+    if (iBin < 0) iBin = 0;     // Shouldn't happen, but just in case.
     if (iBin > _table_.size()-1) iBin = _table_.size()-1;
     double fracBin = bin - iBin;
     if (fracBin < 0.0) fracBin = 0.0;
