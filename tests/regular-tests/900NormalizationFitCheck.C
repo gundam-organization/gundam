@@ -117,23 +117,27 @@ int main() {
     // 100NormalizationTree.C.  They need to be changed if that tree is
     // changed.
     TOLERANCE("Check HESSE value for #0_Positive_C",
-              postFitErrorsHesse->GetBinContent(1), 7.96683932e-01, tolerance);
+              postFitErrorsHesse->GetBinContent(1), 7.97804110e-01, tolerance);
+    TOLERANCE("Check MIGRAD value for #0_Positive_C",
+              postFitErrorsMigrad->GetBinContent(1), 7.97804110e-01, tolerance);
     TOLERANCE("Check MIGRAD matches HESSE value for #0_Positive_C",
               postFitErrorsMigrad->GetBinContent(1),
               postFitErrorsHesse->GetBinContent(1), 1E-12);
     TOLERANCE("Check variance for #0_Positive_C",
-              (*covariance)(0,0), 1.10574664e-04, tolerance);
+              (*covariance)(0,0), 1.10704985e-04, tolerance);
 
     TOLERANCE("Check HESSE value for #1_Negative_C",
-              postFitErrorsHesse->GetBinContent(2), 5.88292045e-01, tolerance);
+              postFitErrorsHesse->GetBinContent(2), 5.87979132e-01, tolerance);
+    TOLERANCE("Check MIGRAD value for #1_Negative_C",
+              postFitErrorsMigrad->GetBinContent(2), 5.87979132e-01, tolerance);
     TOLERANCE("Check MIGRAD matches HESSE value for #1_Negative_C",
               postFitErrorsMigrad->GetBinContent(2),
-               postFitErrorsHesse->GetBinContent(2), 1E-12);
+              postFitErrorsHesse->GetBinContent(2), 1E-12);
     TOLERANCE("Check variance for #1_Negative_C",
-              (*covariance)(1,1), 8.97100595e-05, tolerance);
+              (*covariance)(1,1), 8.97224863e-05, tolerance);
 
     TOLERANCE("Check covariance",
-              (*covariance)(0,1), -3.08874630e-05, tolerance);
+              (*covariance)(0,1), -3.09245736e-05, tolerance);
 
     file->Close();
 
