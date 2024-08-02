@@ -24,7 +24,8 @@ std::string args{"$*"};
 //
 //    (A, B) -- These are the analogs to the detector reconstructed values.
 //              Used to fill the likelihood histograms.
-//    C      -- A "truth" variable.
+//    (At, Bt) -- "Truth" variables for A and B
+//    C      -- Another "truth" variable.
 //
 //    Variable "B" is generated as a normal distribution centered at 0.0.
 //    Variable "A" is generated as two normal distributions.  When "C" is less
@@ -40,6 +41,9 @@ std::string args{"$*"};
 //    1.0.  The normalization for the first sub-sample is 80% of the same set
 //    in tree_mc.  The normalization of the second sub-sample is 60% of the
 //    same set in tree_mc.
+
+const double resA = 0.1;
+const double resB = 0.1;
 
 ///////////////////////////////////////////////////////////////////////////////
 /// A class to generate a repeatable sequence of "random" Gaussian distributed
@@ -72,11 +76,15 @@ void writeMCTree() {
     TTree* tree = new TTree("tree_mc","GUNDAM MC Sample Tree");
 
     Gaussian MakeA(10000);
+    double varAt;
     double varA;
+    tree->Branch("At",&varAt);
     tree->Branch("A",&varA);
 
     Gaussian MakeB(10001);
+    double varBt;
     double varB;
+    tree->Branch("Bt",&varBt);
     tree->Branch("B",&varB);
 
     Gaussian MakeC(10002);
@@ -84,20 +92,24 @@ void writeMCTree() {
     tree->Branch("C",&varC);
 
     for (int i=0; i<5000; ++i) {
-        varA = MakeA();
-        varB = MakeB();
+        varAt = MakeA();
+        varBt = MakeB();
         varC = MakeC();
         if (varC <= 0.0) varC = - varC + 1E-10;
-        varA += 1.0;
+        varAt += 1.0;
+        varA = gRandom->Gaus(varAt,resA);
+        varB = gRandom->Gaus(varBt,resB);
         tree->Fill();
     }
 
     for (int i=0; i<5000; ++i) {
-        varA = MakeA();
-        varB = MakeB();
+        varAt = MakeA();
+        varBt = MakeB();
         varC = MakeC();
         if (varC > 0.0) varC = - varC - 1E-10;
-        varA -= 1.0;
+        varAt -= 1.0;
+        varA = gRandom->Gaus(varAt,resA);
+        varB = gRandom->Gaus(varBt,resB);
         tree->Fill();
     }
 
@@ -107,24 +119,30 @@ void writeDataTree() {
     TTree* tree = new TTree("tree_dt","GUNDAM Data Sample Tree");
 
     Gaussian MakeA(20000);
+    double varAt;
     double varA;
     tree->Branch("A",&varA);
 
     Gaussian MakeB(20001);
+    double varBt;
     double varB;
     tree->Branch("B",&varB);
 
     for (int i=0; i<4000; ++i) {
-        varA = MakeA();
-        varB = MakeB();
-        varA += 1.0;
+        varAt = MakeA();
+        varBt = MakeB();
+        varAt += 1.0;
+        varA = gRandom->Gaus(varAt,resA);
+        varB = gRandom->Gaus(varBt,resB);
         tree->Fill();
     }
 
     for (int i=0; i<3000; ++i) {
-        varA = MakeA();
-        varB = MakeB();
-        varA -= 1.0;
+        varAt = MakeA();
+        varBt = MakeB();
+        varAt -= 1.0;
+        varA = gRandom->Gaus(varAt,resA);
+        varB = gRandom->Gaus(varBt,resB);
         tree->Fill();
     }
 }
