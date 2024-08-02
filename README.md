@@ -166,7 +166,3 @@ the cross-section working group of T2K. The original project can be found on *gi
 GUNDAM has originally been developed as an new fitter to perform T2K oscillation
 analysis, and provide an expandable base on which future studies with the *Upgraded
 ND280 Detectors* will be performed.
-
-![](./resources/images/ride.png)
-
-
