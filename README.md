@@ -138,7 +138,14 @@ this will create the build directory `gundam-${compiler}_${compiler_version}-${c
 
 ![Inputs banner](resources/images/README/sections/sections.004.png)
 
-[Getting started](./documentation/GettingStarted.md)
+## Input examples
+
+- Official input examples: [link to repo](https://github.com/gundam-organization/gundam-input-tutorial/tree/main)
+
+
+## Documentation 
+
+- gundamFitter options: [link to page](./documentation/GettingStarted.md)
 
 
 ![Developers banner](resources/images/README/sections/sections.005.png)
