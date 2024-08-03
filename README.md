@@ -1,6 +1,6 @@
 # GUNDAM — 風をあつめて 
 
-![gundamInfography.001.png](./resources/images/gundamInfography/gundamInfography.001.png)
+![GUNDAM banner](./resources/images/README/title/title.001.png)
 
 ![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/gundam-organization/gundam/docker-image.yml)
 [![GitHub forks](https://badgen.net/github/forks/gundam-organization/gundam/)](https://github.com/gundam-organization/gundam/network/members) 
@@ -24,7 +24,7 @@ various physics works, it allows to share optimizations
 and debugging for every project at once.
 
 
-![bannerStyle.001.png](resources/images/bannerStyle/bannerStyle.001.png)
+![Dependencies banner](resources/images/README/sections/sections.001.png)
 
 ### There are several requirements for building the fitter:
 
@@ -71,7 +71,7 @@ mkdir -p $REPO_DIR
 ```
 
 
-![bannerStyle.001.png](resources/images/bannerStyle/bannerStyle.002.png)
+![Clone & Update banner](resources/images/README/sections/sections.002.png)
 
 ### Cloning the source code
 
@@ -101,7 +101,7 @@ before 2.0 may have issues to checkout the correct submodules (see issue #429)
 
 
 
-![bannerStyle.001.png](resources/images/bannerStyle/bannerStyle.003.png)
+![Install banner](resources/images/README/sections/sections.003.png)
 
 ### Compiling on macOS:
 
@@ -137,14 +137,14 @@ this will create the build directory `gundam-${compiler}_${compiler_version}-${c
 
 ## How do I use GUNDAM?
 
-![bannerStyle.001.png](resources/images/bannerStyle/bannerStyle.004.png)
+![Inputs banner](resources/images/README/sections/sections.004.png)
 
 [Getting started](./documentation/GettingStarted.md)
 
 
 ## I want to contribute!
 
-![bannerStyle.001.png](resources/images/bannerStyle/bannerStyle.005.png)
+![Developers banner](resources/images/README/sections/sections.005.png)
 
 ### Development policy
 
