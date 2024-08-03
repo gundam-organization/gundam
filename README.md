@@ -1,6 +1,6 @@
 # GUNDAM — 風をあつめて 
 
-![](./resources/images/bannerv2.png)
+![gundamInfography.001.png](./resources/images/gundamInfography/gundamInfography.001.png)
 
 ![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/gundam-organization/gundam/docker-image.yml)
 [![GitHub forks](https://badgen.net/github/forks/gundam-organization/gundam/)](https://github.com/gundam-organization/gundam/network/members) 
