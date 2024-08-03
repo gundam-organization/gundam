@@ -63,7 +63,8 @@ PROJECT_BRIEF          = Generic fitter for Upgraded Near Detector Analysis Meth
 # pixels and the maximum width should not exceed 200 pixels. Doxygen will copy
 # the logo to the output directory.
 
-PROJECT_LOGO           = @CMAKE_CURRENT_SOURCE_DIR@/resources/images/organisation/logo/logo.001.png
+# logo is too big
+# PROJECT_LOGO           = @CMAKE_CURRENT_SOURCE_DIR@/resources/images/organisation/logo/logo.001.png
 
 # The OUTPUT_DIRECTORY tag is used to specify the (relative or absolute) path
 # into which the generated documentation will be written. If a relative path is
