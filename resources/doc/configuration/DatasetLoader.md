@@ -1,6 +1,6 @@
 ## DatasetDefinition
 
-[< back to parent (Propagator)](./Propagator.md)
+[< back to parent (Propagator)](Propagator.md)
 
 ### Description
 

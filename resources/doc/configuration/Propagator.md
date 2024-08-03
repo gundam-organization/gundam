@@ -1,6 +1,6 @@
 ## Propagator
 
-[< back to parent (FitterEngine)](./FitterEngine.md)
+[< back to parent (FitterEngine)](FitterEngine.md)
 
 ### Description
 
@@ -15,8 +15,8 @@ It owns the parameters, the samples, and the data loader.
 | [fitSampleSetConfig](./SampleSet.md)        | json   | SampleSet config                                                                        |         |
 | [parameterSetListConfig](./ParameterSet.md) | json   | ParameterSetList config                                                                    |         |
 | [dataSetList](./DatasetDefinition.md)              | json   | DatasetManager config                                                                      |         |
-| [plotGeneratorConfig](./PlotGenerator.md)      | json   | PlotGenerator config                                                                       |         |
-| [eventTreeWriter](./EventTreeWriter.md)        | json   | EventTreeWriter config                                                                     |         |
+| [plotGeneratorConfig](PlotGenerator.md)      | json   | PlotGenerator config                                                                       |         |
+| [eventTreeWriter](EventTreeWriter.md)        | json   | EventTreeWriter config                                                                     |         |
 | showEventBreakdown                             | bool   | Print sample total weight                                                                  | true    |
 | enableStatThrowInToys                          | bool   | Throw statistical error with a poisson distribution                                        | true    |
 | enableEventMcThrow                             | bool   | Each MC event get reweighted with Poisson(1)                                               | true    |

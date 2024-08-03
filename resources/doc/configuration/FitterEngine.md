@@ -8,9 +8,9 @@
 
 | FitterEngine Options                                     | Type         | Description                                                                   | Default |
 |----------------------------------------------------------|--------------|-------------------------------------------------------------------------------|---------|
-| [propagatorConfig](./Propagator.md)                      | json         | Propagator config                                                             |         |
-| [minimizerConfig](./MinimizerInterface.md)               | json         | MinimizerInterface config                                                     |         |
-| [mcmcConfig](./MCMCInterface.md)                         | json         | MinimizerInterface config                                                     |         |
+| [propagatorConfig](Propagator.md)                      | json         | Propagator config                                                             |         |
+| [minimizerConfig](MinimizerInterface.md)               | json         | MinimizerInterface config                                                     |         |
+| [mcmcConfig](MCMCInterface.md)                         | json         | MinimizerInterface config                                                     |         |
 | [scanConfig](./ParScanner.md)                            | json         | Scan config                                                                   |         |
 | engineType                                               | string       | The fitter engine to use ("minimizer" or "mcmc")                            | minimizer |
 | enablePreFitScan                                         | bool         | Run fit parameter scan right before the minimization                          | false   |
