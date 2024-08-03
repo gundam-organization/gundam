@@ -105,22 +105,22 @@ before 2.0 may have issues to checkout the correct submodules (see issue #429)
 
 ### Compiling on macOS:
 
-[![](resources/documentation/guides/images/macOsLogo.png)](resources/documentation/guides/installOnMacOs.md)
+[![](resources/doc/guides/images/macOsLogo.png)](resources/doc/guides/installOnMacOs.md)
 
 
 ### Compiling on CCLyon:
 
-[![](resources/documentation/guides/images/cc_in2p3_logo.png)](resources/documentation/guides/installOnCCLyon.md)
+[![](resources/doc/guides/images/cc_in2p3_logo.png)](resources/doc/guides/installOnCCLyon.md)
 
 
 ### Compiling on HPC:
 
-[![](resources/documentation/guides/images/hpcLogo.png)](resources/documentation/guides/installOnHpc.md)
+[![](resources/doc/guides/images/hpcLogo.png)](resources/doc/guides/installOnHpc.md)
 
 
 ### Compiling on LXPLUS:
 
-[![](resources/documentation/guides/images/lxplusLogo.png)](resources/documentation/guides/installOnLXPLUS.md)
+[![](resources/doc/guides/images/lxplusLogo.png)](resources/doc/guides/installOnLXPLUS.md)
 
 
 ### Alternative installation procedure
@@ -145,7 +145,7 @@ this will create the build directory `gundam-${compiler}_${compiler_version}-${c
 
 ## Documentation 
 
-- gundamFitter options: [link to page](resources/documentation/GettingStarted.md)
+- gundamFitter options: [link to page](resources/doc/GettingStarted.md)
 
 
 ![Developers banner](resources/images/README/sections/sections.005.png)
