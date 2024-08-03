@@ -135,14 +135,11 @@ cd cmake/scripts
 this will create the build directory `gundam-${compiler}_${compiler_version}-${compiler_machine}`.
 
 
-## How do I use GUNDAM?
 
 ![Inputs banner](resources/images/README/sections/sections.004.png)
 
 [Getting started](./documentation/GettingStarted.md)
 
-
-## I want to contribute!
 
 ![Developers banner](resources/images/README/sections/sections.005.png)
 
@@ -157,7 +154,8 @@ this will create the build directory `gundam-${compiler}_${compiler_version}-${c
 - Forks are allowed and the usage of the forked code is regulated by the code license.
 - Share of the code is regulated by the code license.
 
-## Lineage & Legacy
+
+![Lineage & Legacy banner](resources/images/README/sections/sections.006.png)
 
 GUNDAM was born as a fork of the *xsllhFitter* project which was developped and used by
 the cross-section working group of T2K. The original project can be found on *gitlab*:
