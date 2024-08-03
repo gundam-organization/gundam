@@ -63,7 +63,7 @@ PROJECT_BRIEF          = Generic fitter for Upgraded Near Detector Analysis Meth
 # pixels and the maximum width should not exceed 200 pixels. Doxygen will copy
 # the logo to the output directory.
 
-PROJECT_LOGO           = @CMAKE_CURRENT_SOURCE_DIR@/resources/images/gundamIconDoxy.png
+PROJECT_LOGO           = @CMAKE_CURRENT_SOURCE_DIR@/resources/images/organisation/logo/logo.001.png
 
 # The OUTPUT_DIRECTORY tag is used to specify the (relative or absolute) path
 # into which the generated documentation will be written. If a relative path is
@@ -910,18 +910,17 @@ WARN_LOGFILE           =
 # Note: If this tag is empty the current directory is searched.
 
 INPUT                  = @CMAKE_CURRENT_SOURCE_DIR@/src/Applications/src/gundamFitter.cxx \
+                         @CMAKE_CURRENT_SOURCE_DIR@/src/Applications/src/gundamCalcXsec.cxx \
                          @CMAKE_CURRENT_SOURCE_DIR@/src/CacheManager \
                          @CMAKE_CURRENT_SOURCE_DIR@/src/DatasetManager \
-                         @CMAKE_CURRENT_SOURCE_DIR@/src/FitParameters \
-                         @CMAKE_CURRENT_SOURCE_DIR@/src/FitSamples \
+                         @CMAKE_CURRENT_SOURCE_DIR@/src/DialDictionary \
                          @CMAKE_CURRENT_SOURCE_DIR@/src/Fitter \
+                         @CMAKE_CURRENT_SOURCE_DIR@/src/ParametersManager \
                          @CMAKE_CURRENT_SOURCE_DIR@/src/Propagator \
+                         @CMAKE_CURRENT_SOURCE_DIR@/src/SamplesManager \
+                         @CMAKE_CURRENT_SOURCE_DIR@/src/StatisticalInference \
                          @CMAKE_CURRENT_SOURCE_DIR@/src/Utils \
                          @CMAKE_CURRENT_SOURCE_DIR@/README.md
-#                         @CMAKE_CURRENT_SOURCE_DIR@/src/DialDirectory \
-#                         @CMAKE_CURRENT_SOURCE_DIR@/submodules/cpp-generic-toolbox/include \
-#                         @CMAKE_CURRENT_SOURCE_DIR@/submodules/simple-cpp-cmd-line-parser/include \
-#                         @CMAKE_CURRENT_SOURCE_DIR@/submodules/simple-cpp-logger/include
 
 # This tag can be used to specify the character encoding of the source files
 # that doxygen parses. Internally doxygen uses the UTF-8 encoding. Doxygen uses
