@@ -14,4 +14,4 @@
 | priorType                          | string       | penalty LLH shape                         | Gaussian   |
 | priorValue                         | double       | prior value                               | nan        |
 | parameterLimits                    | pair(double) | min max                                   | [nan, nan] |
-| [dialSetDefinitions](./DialSet.md) | list(json)   | definition of dialsets for this parameter |            |
+| [dialSetDefinitions](DialSet.md) | list(json)   | definition of dialsets for this parameter |            |

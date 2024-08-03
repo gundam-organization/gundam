@@ -1,4 +1,4 @@
-![](./images/hpcLogo.png)
+![](images/hpcLogo.png)
 
 The HPC cluster (University of Geneva) provides a wide range of
 software that can be linked using the `module` command.

@@ -1,6 +1,6 @@
 ## MCMCInterface
 
-[< back to parent (FitterEngine)](./FitterEngine.md)
+[< back to parent (FitterEngine)](FitterEngine.md)
 
 ### Config options
 

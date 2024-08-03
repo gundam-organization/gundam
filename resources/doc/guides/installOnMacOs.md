@@ -1,4 +1,4 @@
-![](./images/macOsLogo.png)
+![](images/macOsLogo.png)
 
 ## Quick installation with Homebrew
 

@@ -1,6 +1,6 @@
 ## ScanConfig
 
-[< back to parent (FitterEngine)](./FitterEngine.md)
+[< back to parent (FitterEngine)](FitterEngine.md)
 
 
 #### Scan options

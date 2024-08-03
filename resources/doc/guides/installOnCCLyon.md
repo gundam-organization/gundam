@@ -1,4 +1,4 @@
-![](./images/cc_in2p3_logo.png)
+![](images/cc_in2p3_logo.png)
 
 As several libraries are available to the users, compiling on the
 cluster can be challenging. Here we described how to get the software
