@@ -70,19 +70,23 @@ public:
   [[nodiscard]] const std::shared_ptr<TMatrixDSym> &getPriorCovarianceMatrix() const { return _priorCovarianceMatrix_; }
 
   /// Get the vector of parameters for this parameter set in the real
-  /// parameter space.  These parameters are not eigendecomposed.
+  /// parameter space.  These parameters are not eigendecomposed.  WARNING:
+  /// While the parameters are provided as a vector, elements must not be
+  /// added or removed from the vector.  But, the value of the elements may be
+  /// changed, so `getParameterList().front().setParameterValue(0)' is OK, but
+  /// 'getParameterList().emplace_back(Parameter())' is NOT OK.
   [[nodiscard]] const std::vector<Parameter> &getParameterList() const{ return _parameterList_; }
   [[nodiscard]] std::vector<Parameter> &getParameterList(){ return _parameterList_; }
 
   /// Get the vector of parameters for this parameter set in the
-  /// eigendecomposed basis.
+  /// eigendecomposed basis.  WARNING: See warning for getParameterList().
   [[nodiscard]] const std::vector<Parameter> &getEigenParameterList() const{ return _eigenParameterList_; }
   [[nodiscard]] std::vector<Parameter> &getEigenParameterList(){ return _eigenParameterList_; }
 
   /// Get the vector of parameters for this parameter set that is applicable
   /// for the current stage of the fit.  This will either be the
   /// eigendecomposed parameters, or the parameters in the non-decomposed
-  /// basis.
+  /// basis.  WARNING: See warning for getParameterList().
   [[nodiscard]] const std::vector<Parameter>& getEffectiveParameterList() const;
   [[nodiscard]] std::vector<Parameter>& getEffectiveParameterList();
 
