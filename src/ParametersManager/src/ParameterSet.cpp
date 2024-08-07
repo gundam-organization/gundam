@@ -300,14 +300,14 @@ void ParameterSet::processCovarianceMatrix(){
 
 // Getters
 const std::vector<Parameter>& ParameterSet::getEffectiveParameterList() const{
-  if( _useEigenDecompInFit_ ) return _eigenParameterList_;
-  return _parameterList_;
+  if( _useEigenDecompInFit_ ) return getEigenParameterList();
+  return getParameterList();
 }
 
 // non const getters
 std::vector<Parameter>& ParameterSet::getEffectiveParameterList(){
-  if( _useEigenDecompInFit_ ) return _eigenParameterList_;
-  return _parameterList_;
+  if( _useEigenDecompInFit_ ) return getEigenParameterList();
+  return getParameterList();
 }
 
 // Core
@@ -358,7 +358,6 @@ void ParameterSet::moveFitParametersToPrior(){
 void ParameterSet::throwFitParameters(bool rethrowIfNotInbounds_, double gain_){
 
   LogThrowIf(_strippedCovarianceMatrix_==nullptr, "No covariance matrix provided");
-
 
   TVectorD throwsList{_strippedCovarianceMatrix_->GetNrows()};
 

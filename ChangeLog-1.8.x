@@ -1,3 +1,7 @@
+Fixes relative to 1.8.4
+
+Fixes: Guarrantee that all parameter value access is through the setter and getter so that the validity checks are correctly applied.
+
 Fixes relative to 1.8.3
 
 Issue #545 : Make the handling of ROOT config information portable between linux and macos.  This no longer assumes how ROOT is installed, and uses root-config portably.
