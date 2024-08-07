@@ -88,11 +88,34 @@ void Parameter::setMaxMirror(double maxMirror) {
   _maxMirror_ = maxMirror;
 }
 void Parameter::setParameterValue(double parameterValue) {
+  if( std::isnan(parameterValue) ) {
+    LogError << "Attempting to set NaN for parameter" << std::endl;
+    LogError << "Summary: " << getSummary() << std::endl;
+    LogThrow("Setting parameter to a NaN value");
+  }
+  if ( not std::isnan(_minValue_) and parameterValue < _minValue_ ) {
+    LogError << "Attempting to set parameter below minimum" << std::endl;
+    LogError << "Summary: " << getSummary() << std::endl;
+    LogThrow("Setting parameter below minimum");
+  }
+  if ( not std::isnan(_maxValue_) and parameterValue > _maxValue_ ) {
+    LogError << "Attempting to set parameter above the maximum" << std::endl;
+    LogError << "Summary: " << getSummary() << std::endl;
+    LogThrow("Setting parameter above maximum");
+  }
   if( _parameterValue_ != parameterValue ){
     _gotUpdated_ = true;
     _parameterValue_ = parameterValue;
   }
   else{ _gotUpdated_ = false; }
+}
+double Parameter::getParameterValue() const {
+  if ( not isValueWithinBounds() ) {
+    LogError << "Getting parameter value that is out of bounds" << std::endl;
+    LogError << "Summary: " << getSummary() << std::endl;
+    LogThrow("Getting invalid parameter value");
+  }
+  return _parameterValue_;
 }
 void Parameter::setDialSetConfig(const JsonType &jsonConfig_) {
   auto jsonConfig = jsonConfig_;
@@ -106,7 +129,15 @@ void Parameter::setParameterDefinitionConfig(const JsonType &config_){
   _parameterConfig_ = config_;
 }
 
+void Parameter::setValueAtPrior(){
+  setParameterValue(getPriorValue());
+}
+void Parameter::setCurrentValueAsPrior(){
+  setPriorValue(getParameterValue());
+}
+
 bool Parameter::isValueWithinBounds() const{
+  if( std::isnan(_parameterValue_) ) return false;
   if( not std::isnan(_minValue_) and _parameterValue_ < _minValue_ ) return false;
   if( not std::isnan(_maxValue_) and _parameterValue_ > _maxValue_ ) return false;
   return true;
@@ -115,7 +146,7 @@ bool Parameter::isMaskedForPropagation() const{
   return getOwner()->isMaskedForPropagation();
 }
 double Parameter::getDistanceFromNominal() const{
-  return (_parameterValue_ - _priorValue_) / _stdDevValue_;
+  return (getParameterValue() - getPriorValue()) / _stdDevValue_;
 }
 std::string Parameter::getTitle() const {
   std::stringstream ss;
@@ -141,6 +172,7 @@ std::string Parameter::getSummary(bool shallow_) const {
   if( std::isnan(_maxValue_) ) ss << "+inf";
   else ss << _maxValue_;
   ss << " ]";
+  if (not isValueWithinBounds()) ss << " out of bounds";
 
   return ss.str();
 }

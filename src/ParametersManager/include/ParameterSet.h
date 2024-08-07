@@ -62,23 +62,48 @@ public:
   [[nodiscard]] const std::vector<JsonType>& getCustomParThrow() const{ return _customParThrow_; }
   [[nodiscard]] const std::shared_ptr<TMatrixDSym> &getPriorCorrelationMatrix() const{ return _priorCorrelationMatrix_; }
   [[nodiscard]] const std::shared_ptr<TMatrixDSym> &getPriorCovarianceMatrix() const { return _priorCovarianceMatrix_; }
+
+  /// Get the vector of parameters for this parameter set in the real
+  /// parameter space.  These parameters are not eigendecomposed.  WARNING:
+  /// While the parameters are provided as a vector, elements must not be
+  /// added or removed from the vector.  But, the value of the elements may be
+  /// changed, so `getParameterList().front().setParameterValue(0)' is OK, but
+  /// 'getParameterList().emplace_back(Parameter())' is NOT OK.
   [[nodiscard]] const std::vector<Parameter> &getParameterList() const{ return _parameterList_; }
+  [[nodiscard]] std::vector<Parameter> &getParameterList(){ return _parameterList_; }
+
+  /// Get the vector of parameters for this parameter set in the
+  /// eigendecomposed basis.  WARNING: See warning for getParameterList().
   [[nodiscard]] const std::vector<Parameter> &getEigenParameterList() const{ return _eigenParameterList_; }
+  [[nodiscard]] std::vector<Parameter> &getEigenParameterList(){ return _eigenParameterList_; }
+
+  /// Get the vector of parameters for this parameter set that is applicable
+  /// for the current stage of the fit.  This will either be the
+  /// eigendecomposed parameters, or the parameters in the non-decomposed
+  /// basis.  WARNING: See warning for getParameterList().
   [[nodiscard]] const std::vector<Parameter>& getEffectiveParameterList() const;
+  [[nodiscard]] std::vector<Parameter>& getEffectiveParameterList();
 
-  // non-const Getters
-  std::vector<Parameter> &getParameterList(){ return _parameterList_; }
-  std::vector<Parameter> &getEigenParameterList(){ return _eigenParameterList_; }
-  std::vector<Parameter>& getEffectiveParameterList();
-
-  // Core
   void updateDeltaVector() const;
 
-  // Throw / Shifts
+  /// Set all of the parameters to their prior values.
   void moveParametersToPrior();
+
+  /// Set the parameter values based on a random throw with fluctuations
+  /// determined by the striped covariance matrix.  If the first parameter,
+  /// rethrowIfNotInbounds, is true, then the throw is retried untill all of
+  /// the parameters are within the allowed bounds.  if the second parameter,
+  /// gain_, is set, it determines the variance of the thrown distribution
+  /// relative to the stripped covariance matrix.  A value larger than one
+  /// will increase the thrown variance.
   void throwParameters( bool rethrowIfNotInbounds_ = true, double gain_ = 1);
 
+  /// Update the parameter values in the set based on the parameter values in
+  /// the eigen decomposed basis.
   void propagateEigenToOriginal();
+
+  /// Update the parameters in the eigen decomposed basis based on the
+  /// parameter values in non-decomposed basis.
   void propagateOriginalToEigen();
 
   // Misc
