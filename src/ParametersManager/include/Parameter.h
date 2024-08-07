@@ -25,6 +25,9 @@ namespace PriorType{
 
 class ParameterSet;
 
+/// Hold a Parameter that is a member of a ParameterSet to be used in the fit.
+/// Parameters are always owned by a ParameterSet, and the instantiation
+/// resides in the ParameterSet.
 class Parameter : public JsonBaseClass {
 
 protected:
