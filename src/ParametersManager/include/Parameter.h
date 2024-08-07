@@ -78,7 +78,7 @@ public:
   [[nodiscard]] double getMinPhysical() const{ return _minPhysical_; }
   [[nodiscard]] double getMaxPhysical() const{ return _maxPhysical_; }
   [[nodiscard]] double getStdDevValue() const{ return _stdDevValue_; }
-  [[nodiscard]] double getParameterValue() const{ return _parameterValue_; }
+  [[nodiscard]] double getParameterValue() const;
   [[nodiscard]] const std::string &getName() const{ return _name_; }
   [[nodiscard]] const nlohmann::json &getDialDefinitionsList() const{ return _dialDefinitionsList_; }
   [[nodiscard]] const ParameterSet *getOwner() const{ return _owner_; }
