@@ -9,7 +9,7 @@
 extern "C"
 int initializeTable(const char* name, int argc, const char* argv[],
                     int bins) {
-#undef LOUD_AND_PROUD
+#define LOUD_AND_PROUD
 #ifdef LOUD_AND_PROUD
     std::cout << LIB_NAME << "INITIALIZE TABLE" << std::endl;
     std::cout << LIB_NAME << "name: " << name << std::endl;
@@ -19,6 +19,7 @@ int initializeTable(const char* name, int argc, const char* argv[],
     }
     std::cout << LIB_NAME << "bins: " << bins << std::endl;
 #endif
+#undef LOUD_AND_PROUD
     return 100;
 }
 
@@ -26,6 +27,7 @@ extern "C"
 int updateTable(const char* name,
                 double table[], int bins,
                 const double par[], int npar) {
+#undef LOUD_AND_PROUD
 #ifdef LOUD_AND_PROUD
     std::cout << LIB_NAME << "UPDATE TABLE" << std::endl;
     std::cout << LIB_NAME << "name: " << name << std::endl;
@@ -35,6 +37,7 @@ int updateTable(const char* name,
         std::cout << LIB_NAME << "par[" << i << "]: " << par[i] << std::endl;
     }
 #endif
+#undef LOUD_AND_PROUD
     for (int i = 0; i<npar; ++i) {
         if (not std::isnan(par[i])) continue;
         std::cerr << LIB_NAME << ": " << name
@@ -63,6 +66,7 @@ double binTable(const char* name,
         std::cout << LIB_NAME << "varv[" << i << "]: " << varv[i] << std::endl;
     }
 #endif
+#undef LOUD_AND_PROUD
     double value = 0.0;
     for (int i = 0; i<varc; ++i) {
         value += 10.0*varv[i]*varv[i];

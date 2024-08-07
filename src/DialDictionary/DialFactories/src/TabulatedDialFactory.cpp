@@ -68,12 +68,16 @@ TabulatedDialFactory::TabulatedDialFactory(const JsonType& config_) {
                      << std::endl;
             std::exit(EXIT_FAILURE); // Exit, not throw!
         }
+        std::vector<std::string> argv_buffer;
+        for (std::string arg : getInitializationArguments()) {
+            argv_buffer.push_back(GenericToolbox::expandEnvironmentVariables(arg));
+        }
+        std::vector<const char*> argv;
+        for (std::string& arg : argv_buffer) argv.push_back(arg.c_str());
         _initFunc_
             = reinterpret_cast<
                 int(*)(const char* name,int argc, const char* argv[], int bins)
             >(initFunc);
-        std::vector<const char*> argv;
-        for (const std::string& arg : getInitializationArguments()) argv.push_back(arg.c_str());
         int result = _initFunc_(_name_.c_str(),(int) argv.size(), argv.data(), bins);
         if (result < 1) {
             LogError << "Error calling initialization function: "
@@ -132,9 +136,11 @@ DialBase* TabulatedDialFactory::makeDial(const Event& event) {
                                (int) _variables_.size(), _variables_.data(),
                                (int) _table_.size());
 
+    if (bin < 0.0) return nullptr;
+
     // Determine the bin index and the fractional part of the bin.
     int iBin = bin;
-    if (iBin < 0) iBin = 0;
+    if (iBin < 0) iBin = 0;     // Shouldn't happen, but just in case.
     if (iBin > _table_.size()-1) iBin = _table_.size()-1;
     double fracBin = bin - iBin;
     if (fracBin < 0.0) fracBin = 0.0;
