@@ -378,7 +378,7 @@ void ParameterSet::moveFitParametersToPrior(){
   }
 
 }
-void ParameterSet::throwFitParameters(bool rethrowIfNotInbounds_, double gain_){
+void ParameterSet::throwFitParameters(bool rethrowIfNotInPhysical_, double gain_){
 
   LogThrowIf(_strippedCovarianceMatrix_==nullptr, "No covariance matrix provided");
 
@@ -389,9 +389,8 @@ void ParameterSet::throwFitParameters(bool rethrowIfNotInbounds_, double gain_){
       [&](const std::function<void()>& throwFct_){
 
         int nTries{0};
-        bool throwIsValid{false};
-        while( not throwIsValid ){
-
+        while( true ){
+          ++nTries;
           throwFct_();
 
           // throws with this function are always done in real space.
@@ -399,10 +398,63 @@ void ParameterSet::throwFitParameters(bool rethrowIfNotInbounds_, double gain_){
           for( auto& par : this->getParameterList() ){
             if( ParameterSet::isValidCorrelatedParameter(par) ){
               iFit++;
-              par.setThrowValue( par.getPriorValue() + gain_ * throwsList[iFit] );
-              par.setParameterValue( par.getThrowValue() );
+              par.setThrowValue( par.getPriorValue() + gain_*throwsList[iFit] );
             }
           }
+
+          bool throwIsValid = true; // default case
+          LogInfo << "Check that thrown parameters are within bounds..."
+                  << std::endl;
+
+          for( auto& par : this->getParameterList() ){
+            if( not ParameterSet::isValidCorrelatedParameter(par) ) continue;
+            if( not std::isnan(par.getMinValue())
+                and par.getThrowValue() < par.getMinValue() ){
+              throwIsValid = false;
+              LogAlert << "thrown value lower than min bound -> "
+                       << par.getSummary(true) << std::endl;
+              break;
+            }
+            if( not std::isnan(par.getMaxValue())
+                and par.getThrowValue() > par.getMaxValue() ){
+              throwIsValid = false;
+              LogAlert <<"thrown value higher than max bound -> "
+                       << par.getSummary(true) << std::endl;
+              break;
+            }
+
+            if ( not rethrowIfNotInPhysical_ ) continue;
+            if( not std::isnan(par.getMinPhysical())
+                and par.getThrowValue() < par.getMinPhysical() ){
+              throwIsValid = false;
+              LogAlert << "thrown value lower than min physical bound -> "
+                       << par.getSummary(true) << std::endl;
+              break;
+            }
+            if( not std::isnan(par.getMaxPhysical())
+                and par.getThrowValue() > par.getMaxPhysical() ){
+              throwIsValid = false;
+              LogAlert <<"thrown value higher than max physical bound -> "
+                       << par.getSummary(true) << std::endl;
+              break;
+            }
+          }
+
+          if (not throwIsValid) {
+            LogAlert << "Rethrowing \"" << this->getName() << "\"... try #" << nTries+1 << std::endl;
+            LogThrowIf(nTries > 10000, "Failed to find valid throw");
+            continue;
+          }
+
+          // Throw looks OK, so set the parameter values.
+          for( auto& par : this->getParameterList() ){
+            if( ParameterSet::isValidCorrelatedParameter(par) ){
+              par.setParameterValue(par.getThrowValue());
+            }
+          }
+
+          // Copy the throws to the eigen space and set the throw value in
+          // eigenspace too.
           if( _useEigenDecompInFit_ ){
             this->propagateOriginalToEigen();
             for( auto& eigenPar : _eigenParameterList_ ){
@@ -410,52 +462,29 @@ void ParameterSet::throwFitParameters(bool rethrowIfNotInbounds_, double gain_){
             }
           }
 
-          throwIsValid = true; // default case
-          if( rethrowIfNotInbounds_ ){
-            LogInfo << "Checking if the thrown parameters of the set are within bounds..." << std::endl;
-
-            for( auto& par : this->getEffectiveParameterList() ){
-              if      ( not std::isnan(par.getMinValue()) and par.getParameterValue() < par.getMinValue() ){
-                throwIsValid = false;
-                LogAlert << GenericToolbox::ColorCodes::redLightText << "thrown value lower than min bound -> " << GenericToolbox::ColorCodes::resetColor
-                         << par.getSummary(true) << std::endl;
-              }
-              else if( not std::isnan(par.getMaxValue()) and par.getParameterValue() > par.getMaxValue() ){
-                throwIsValid = false;
-                LogAlert << GenericToolbox::ColorCodes::redLightText <<"thrown value higher than max bound -> " << GenericToolbox::ColorCodes::resetColor
-                         << par.getSummary(true) << std::endl;
-              }
-            }
-
-            if( not throwIsValid ){
-              LogAlert << "Rethrowing \"" << this->getName() << "\"... try #" << nTries+1 << std::endl;
-              nTries++;
-              continue;
-            }
-            else{
-              LogInfo << "Keeping throw after " << nTries+1 << " attempt(s)." << std::endl;
-            }
-          } // check bounds?
-
           // alright at this point it's fine, print them
           for( auto& par : _parameterList_ ){
             if( ParameterSet::isValidCorrelatedParameter(par) ){
               LogInfo << "Thrown par " << par.getTitle() << ": " << par.getPriorValue();
-              LogInfo << " → " << par.getParameterValue() << std::endl;
+              LogInfo << " becomes " << par.getParameterValue() << std::endl;
             }
           }
           if( _useEigenDecompInFit_ ){
             LogInfo << "Translated to eigen space:" << std::endl;
             for( auto& eigenPar : _eigenParameterList_ ){
               LogInfo << "Eigen par " << eigenPar.getTitle() << ": " << eigenPar.getPriorValue();
-              LogInfo << " → " << eigenPar.getParameterValue() << std::endl;
+              LogInfo << " becomes " << eigenPar.getParameterValue() << std::endl;
             }
           }
+          break;
         }
 
   };
 
   if( _useMarkGenerator_ ){
+    // Throw using an alternative method that was copied from BANFF
+    LogAlert << "Alternative toy generator used: Mark Hartz Generator"
+             << std::endl;
     int iPar{0};
     for( auto& par : _parameterList_ ){
       if( ParameterSet::isValidCorrelatedParameter(par) ){ throwsList[iPar++] = par.getPriorValue(); }
@@ -481,56 +510,56 @@ void ParameterSet::throwFitParameters(bool rethrowIfNotInbounds_, double gain_){
 
     throwParsFct( markScottThrowFct );
   }
-  else{
-    if( _useEigenDecompForThrows_ and _useEigenDecompInFit_ ){
-      LogInfo << "Throwing eigen parameters for " << _name_ << std::endl;
+  else if( _useEigenDecompForThrows_ and _useEigenDecompInFit_ ){
+    // Throw using a deprecated alternative method.  Do not use.
+    LogAlert << "Alternative toy generator used: Eigen Decomposition Generator"
+             << std::endl;
+    LogInfo << "Throwing eigen parameters for " << _name_ << std::endl;
 
-      int nTries{0};
-      bool throwIsValid{false};
-      while( not throwIsValid ){
-        for( auto& eigenPar : _eigenParameterList_ ){
-          eigenPar.setThrowValue(eigenPar.getPriorValue() + gain_ * gRandom->Gaus(0, eigenPar.getStdDevValue()));
-          eigenPar.setParameterValue( eigenPar.getThrowValue() );
-        }
-        this->propagateEigenToOriginal();
-
-        throwIsValid = true;
-        if( rethrowIfNotInbounds_ ){
-          LogInfo << "Checking if the thrown parameters of the set are within bounds..." << std::endl;
-
-          for( auto& par : this->getEffectiveParameterList() ){
-            if( not std::isnan(par.getMinValue()) and par.getParameterValue() < par.getMinValue() ){
-              throwIsValid = false;
-              LogAlert << GenericToolbox::ColorCodes::redLightText << "thrown value lower than min bound -> " << GenericToolbox::ColorCodes::resetColor
-                       << par.getSummary(true) << std::endl;
-            }
-            else if( not std::isnan(par.getMaxValue()) and par.getParameterValue() > par.getMaxValue() ){
-              throwIsValid = false;
-              LogAlert << GenericToolbox::ColorCodes::redLightText <<"thrown value higher than max bound -> " << GenericToolbox::ColorCodes::resetColor
-                       << par.getSummary(true) << std::endl;
-            }
-          }
-
-          if( not throwIsValid ){
-            LogAlert << "Rethrowing \"" << this->getName() << "\"... try #" << nTries+1 << std::endl;
-            nTries++;
-            continue;
-          }
-          else{
-            LogInfo << "Keeping throw after " << nTries << " attempt(s)." << std::endl;
-          }
-        } // check bounds?
-
-        for( auto& par : _parameterList_ ){
-          LogInfo << "Thrown par (through eigen decomp) " << par.getTitle() << ": " << par.getPriorValue();
-          par.setThrowValue(par.getParameterValue());
-          LogInfo << " → " << par.getParameterValue() << std::endl;
-        }
+    int nTries{0};
+    bool throwIsValid{false};
+    while( not throwIsValid ){
+      for( auto& eigenPar : _eigenParameterList_ ){
+        eigenPar.setThrowValue(eigenPar.getPriorValue() + gain_ * gRandom->Gaus(0, eigenPar.getStdDevValue()));
+        eigenPar.setParameterValue( eigenPar.getThrowValue() );
       }
+      this->propagateEigenToOriginal();
 
+      throwIsValid = true;
+      if( true ){
+        LogInfo << "Checking if the thrown parameters of the set are within bounds..." << std::endl;
 
+        for( auto& par : this->getEffectiveParameterList() ){
+          if( not std::isnan(par.getMinValue()) and par.getParameterValue() < par.getMinValue() ){
+            throwIsValid = false;
+            LogAlert << GenericToolbox::ColorCodes::redLightText << "thrown value lower than min bound -> " << GenericToolbox::ColorCodes::resetColor
+                     << par.getSummary(true) << std::endl;
+          }
+          else if( not std::isnan(par.getMaxValue()) and par.getParameterValue() > par.getMaxValue() ){
+            throwIsValid = false;
+            LogAlert << GenericToolbox::ColorCodes::redLightText <<"thrown value higher than max bound -> " << GenericToolbox::ColorCodes::resetColor
+                     << par.getSummary(true) << std::endl;
+          }
+        }
+
+        if( not throwIsValid ){
+          LogAlert << "Rethrowing \"" << this->getName() << "\"... try #" << nTries+1 << std::endl;
+          nTries++;
+          continue;
+        }
+        else{
+          LogInfo << "Keeping throw after " << nTries << " attempt(s)." << std::endl;
+        }
+      } // check bounds?
+
+      for( auto& par : _parameterList_ ){
+        LogInfo << "Thrown par (through eigen decomp) " << par.getTitle() << ": " << par.getPriorValue();
+        par.setThrowValue(par.getParameterValue());
+        LogInfo << " → " << par.getParameterValue() << std::endl;
+      }
     }
-    else{
+  }
+  else {
       LogInfo << "Throwing parameters for " << _name_ << " using Cholesky matrix" << std::endl;
 
       if( not _correlatedVariableThrower_.isInitialized() ){
@@ -545,8 +574,6 @@ void ParameterSet::throwFitParameters(bool rethrowIfNotInbounds_, double gain_){
       throwParsFct( gundamThrowFct );
 
     }
-  }
-
 }
 
 void ParameterSet::propagateOriginalToEigen(){
