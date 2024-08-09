@@ -49,6 +49,8 @@ void ParameterSet::readConfigImpl(){
     LogWarning << "Using eigen decomposition in fit." << std::endl;
     LogScopeIndent;
 
+    _allowEigenDecompWithBounds_ = GenericToolbox::Json::fetchValue(_config_ , "allowEigenDecompWithBounds", false);
+
     _maxNbEigenParameters_ = GenericToolbox::Json::fetchValue(_config_ , "maxNbEigenParameters", -1);
     if( _maxNbEigenParameters_ != -1 ){
       LogInfo << "Maximum nb of eigen parameters is set to " << _maxNbEigenParameters_ << std::endl;
@@ -151,10 +153,31 @@ void ParameterSet::processCovarianceMatrix(){
 
   LogInfo << "Stripping the matrix from fixed/disabled parameters..." << std::endl;
   int nbFitParameters{0};
+  int configWarnings{0};
   for( const auto& par : _parameterList_ ){
-    if( ParameterSet::isValidCorrelatedParameter(par) ) nbFitParameters++;
+    if( not ParameterSet::isValidCorrelatedParameter(par) ) continue;
+    nbFitParameters++;
+    if( not _useEigenDecompInFit_ ) continue;
+    // Warn if using eigen decomposition with bounded parameters.
+    if ( std::isnan(par.getMinValue()) and std::isnan(par.getMaxValue())) continue;
+    LogWarning << "Undefined behavior: Eigen-decomposition of a bounded parameter: "
+               << par.getFullTitle()
+               << std::endl;
+    ++configWarnings;
   }
   LogInfo << nbFitParameters << " effective parameters were defined in set: " << getName() << std::endl;
+
+  if (configWarnings > 0) {
+    LogError << "Undefined behavior: Using bounded parameters with eigendecomposition"
+             << std::endl;
+    if ( not _allowEigenDecompWithBounds_ ) {
+      LogError << "Eigendecomposition not allowed with parameter bounds"
+               << std::endl;
+      LogError << "Add 'allowEigenDecompWithBounds' to config file to enable"
+               << std::endl;
+      std::exit(1);
+    }
+  }
 
   _strippedCovarianceMatrix_ = std::make_shared<TMatrixDSym>(nbFitParameters);
   int iStrippedPar = -1;
