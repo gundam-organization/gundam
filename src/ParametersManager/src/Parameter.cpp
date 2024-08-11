@@ -94,12 +94,16 @@ void Parameter::setParameterValue(double parameterValue) {
     LogThrow("Setting parameter to a NaN value");
   }
   if ( not std::isnan(_minValue_) and parameterValue < _minValue_ ) {
-    LogError << "Attempting to set parameter below minimum" << std::endl;
+    LogError << "Attempting to set parameter below minimum"
+             << " -- New value: " << parameterValue
+             << std::endl;
     LogError << "Summary: " << getSummary() << std::endl;
     LogThrow("Setting parameter below minimum");
   }
   if ( not std::isnan(_maxValue_) and parameterValue > _maxValue_ ) {
-    LogError << "Attempting to set parameter above the maximum" << std::endl;
+    LogError << "Attempting to set parameter above the maximum"
+             << " -- New value: " << parameterValue
+             << std::endl;
     LogError << "Summary: " << getSummary() << std::endl;
     LogThrow("Setting parameter above maximum");
   }
@@ -113,7 +117,7 @@ double Parameter::getParameterValue() const {
   if ( not isValueWithinBounds() ) {
     LogError << "Getting parameter value that is out of bounds" << std::endl;
     LogError << "Summary: " << getSummary() << std::endl;
-    LogThrow("Getting invalid parameter value");
+    if (isEnabled()) abort();
   }
   return _parameterValue_;
 }
