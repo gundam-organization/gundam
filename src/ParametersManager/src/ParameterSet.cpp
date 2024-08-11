@@ -635,7 +635,12 @@ std::string ParameterSet::getSummary() const {
         if( not par.isEnabled() ) { statusStr = "Disabled"; colorStr = GenericToolbox::ColorCodes::yellowBackground; }
         else if( par.isFixed() )  { statusStr = "Fixed";    colorStr = GenericToolbox::ColorCodes::redBackground; }
         else if( par.isFree() )   { statusStr = "Free";     colorStr = GenericToolbox::ColorCodes::blueBackground; }
-        else                      { statusStr = "Fit"; }
+        else                      {
+          statusStr = "Fit";
+          if( not par.isValueWithinBounds() ) {
+            colorStr = GenericToolbox::ColorCodes::redBackground;
+          }
+        }
 
 #ifdef NOCOLOR
         colorStr = "";
@@ -643,7 +648,9 @@ std::string ParameterSet::getSummary() const {
 
         t.addTableLine({
                            par.getTitle(),
-                           std::to_string( par.getParameterValue() ),
+                           std::to_string( par.isValueWithinBounds() ?
+                                           par.getParameterValue()
+                                           : std::nan("Invalid") ),
                            std::to_string( par.getPriorValue() ),
                            std::to_string( par.getStdDevValue() ),
                            std::to_string( par.getMinValue() ),
