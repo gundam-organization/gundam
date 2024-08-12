@@ -86,40 +86,40 @@ void MinimizerInterface::initializeImpl(){
     auto& fitPar = *(getMinimizerFitParameterPtr()[iFitPar]);
 
     if( not getLikelihood().getUseNormalizedFitSpace() ){
-      LogDebug << "MINUIT #" << iFitPar << " --> " << fitPar.getFullTitle();
-      LogDebug << " Starting value: " << fitPar.getParameterValue();
-      LogDebug << " Step: " << fitPar.getStepSize()*_stepSizeScaling_;
+      LogInfo << "MINUIT #" << iFitPar << " --> " << fitPar.getFullTitle();
+      LogInfo << " Starting value: " << fitPar.getParameterValue();
+      LogInfo << " Step: " << fitPar.getStepSize()*_stepSizeScaling_;
       _minimizer_->SetVariable(iFitPar, fitPar.getFullTitle(),fitPar.getParameterValue(),fitPar.getStepSize()*_stepSizeScaling_);
       if( not std::isnan( fitPar.getMinValue() ) ){
-        LogDebug << " Min: " << fitPar.getMinValue();
+        LogInfo << " Min: " << fitPar.getMinValue();
         _minimizer_->SetVariableLowerLimit(iFitPar, fitPar.getMinValue());
       }
       if( not std::isnan( fitPar.getMaxValue() ) ){
-        LogDebug << " Max: " << fitPar.getMaxValue();
+        LogInfo << " Max: " << fitPar.getMaxValue();
         _minimizer_->SetVariableUpperLimit(iFitPar, fitPar.getMaxValue());
       }
-      LogDebug << std::endl;
+      LogInfo << std::endl;
       // Changing the boundaries, change the value/step size?
       _minimizer_->SetVariableValue(iFitPar, fitPar.getParameterValue());
       _minimizer_->SetVariableStepSize(iFitPar, fitPar.getStepSize()*_stepSizeScaling_);
     }
     else{
-      LogDebug << "Normalized MINUIT #" << iFitPar << " --> " << fitPar.getFullTitle();
-      LogDebug << " Starting value: " << fitPar.getParameterValue();
-      LogDebug << " Step: " << fitPar.getStepSize()*_stepSizeScaling_;
+      LogInfo << "Normalized MINUIT #" << iFitPar << " --> " << fitPar.getFullTitle();
+      LogInfo << " Starting value: " << fitPar.getParameterValue();
+      LogInfo << " Step: " << fitPar.getStepSize()*_stepSizeScaling_;
       _minimizer_->SetVariable(iFitPar, fitPar.getFullTitle(),
                                ParameterSet::toNormalizedParValue(fitPar.getParameterValue(), fitPar),
                                ParameterSet::toNormalizedParRange(fitPar.getStepSize() * _stepSizeScaling_, fitPar)
       );
       if( not std::isnan( fitPar.getMinValue() ) ){
-        LogDebug << " Min: " << fitPar.getMinValue();
+        LogInfo << " Min: " << fitPar.getMinValue();
         _minimizer_->SetVariableLowerLimit(iFitPar, ParameterSet::toNormalizedParValue(fitPar.getMinValue(), fitPar));
       }
       if( not std::isnan( fitPar.getMaxValue() ) ){
-        LogDebug << " Max: " << fitPar.getMaxValue();
+        LogInfo << " Max: " << fitPar.getMaxValue();
         _minimizer_->SetVariableUpperLimit(iFitPar, ParameterSet::toNormalizedParValue(fitPar.getMaxValue(), fitPar));
       }
-      LogDebug << std::endl;
+      LogInfo << std::endl;
       // Changing the boundaries, change the value/step size?
       _minimizer_->SetVariableValue(iFitPar, ParameterSet::toNormalizedParValue(fitPar.getParameterValue(), fitPar));
       _minimizer_->SetVariableStepSize(iFitPar, ParameterSet::toNormalizedParRange(fitPar.getStepSize() * _stepSizeScaling_, fitPar));
