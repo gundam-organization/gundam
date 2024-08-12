@@ -590,7 +590,7 @@ void ParameterSet::propagateOriginalToEigen(){
 
   // Propagate back to eigen parameters
   for( int iEigen = 0 ; iEigen < _eigenParBuffer_->GetNrows() ; iEigen++ ){
-    _eigenParameterList_[iEigen].setParameterValue((*_eigenParBuffer_)[iEigen]);
+    _eigenParameterList_[iEigen].setParameterValue((*_eigenParBuffer_)[iEigen], true);
   }
 }
 void ParameterSet::propagateEigenToOriginal(){
@@ -607,7 +607,7 @@ void ParameterSet::propagateEigenToOriginal(){
   int iParOffSet{0};
   for( auto& par : _parameterList_ ){
     if( par.isFixed() or not par.isEnabled() ) continue;
-    par.setParameterValue((*_originalParBuffer_)[iParOffSet++]);
+    par.setParameterValue((*_originalParBuffer_)[iParOffSet++], true);
   }
 }
 
