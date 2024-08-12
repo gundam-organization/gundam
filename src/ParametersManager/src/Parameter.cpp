@@ -9,6 +9,8 @@
 #include "GenericToolbox.Json.h"
 #include "Logger.h"
 
+#include "GundamBacktrace.h"
+
 #include <sstream>
 
 LoggerInit([]{ Logger::setUserHeaderStr("[Parameter]"); });
@@ -87,25 +89,31 @@ void Parameter::setMaxMirror(double maxMirror) {
   }
   _maxMirror_ = maxMirror;
 }
-void Parameter::setParameterValue(double parameterValue) {
+void Parameter::setParameterValue(double parameterValue, bool force) {
   if( std::isnan(parameterValue) ) {
     LogError << "Attempting to set NaN for parameter" << std::endl;
     LogError << "Summary: " << getSummary() << std::endl;
-    LogThrow("Setting parameter to a NaN value");
+    LogError << GundamUtils::Backtrace;
+    if (not force) std::exit(EXIT_FAILURE);
+    else LogAlert << "Forced continuation with invalid parameter" << std::endl;
   }
   if ( not std::isnan(_minValue_) and parameterValue < _minValue_ ) {
     LogError << "Attempting to set parameter below minimum"
              << " -- New value: " << parameterValue
              << std::endl;
     LogError << "Summary: " << getSummary() << std::endl;
-    LogThrow("Setting parameter below minimum");
+    LogError << GundamUtils::Backtrace;
+    if (not force) std::exit(EXIT_FAILURE);
+    else LogAlert << "Forced continuation with invalid parameter" << std::endl;
   }
   if ( not std::isnan(_maxValue_) and parameterValue > _maxValue_ ) {
     LogError << "Attempting to set parameter above the maximum"
              << " -- New value: " << parameterValue
              << std::endl;
     LogError << "Summary: " << getSummary() << std::endl;
-    LogThrow("Setting parameter above maximum");
+    LogError << GundamUtils::Backtrace;
+    if (not force) std::exit(EXIT_FAILURE);
+    else LogAlert << "Forced continuation with invalid parameter" << std::endl;
   }
   if( _parameterValue_ != parameterValue ){
     _gotUpdated_ = true;
@@ -115,9 +123,9 @@ void Parameter::setParameterValue(double parameterValue) {
 }
 double Parameter::getParameterValue() const {
   if ( not isValueWithinBounds() ) {
-    LogError << "Getting parameter value that is out of bounds" << std::endl;
-    LogError << "Summary: " << getSummary() << std::endl;
-    if (isEnabled()) abort();
+    LogWarning << "Getting out of bounds parameter: "
+               << getSummary() << std::endl;
+    LogDebug << GundamUtils::Backtrace;
   }
   return _parameterValue_;
 }
