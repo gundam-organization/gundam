@@ -1,5 +1,7 @@
 Fixes relative to 1.8.4
 
+Issue #578: Apply cleanups to make sure that eigendecoposition and parameter throwing honor the parameter boundaries.  
+
 Fixes: Guarrantee that all parameter value access is through the setter and getter so that the validity checks are correctly applied.
 
 Fixes relative to 1.8.3

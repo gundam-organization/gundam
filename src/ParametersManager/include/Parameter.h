@@ -96,7 +96,11 @@ public:
   void setPriorValue(double priorValue){ _priorValue_ = priorValue; }
   void setThrowValue(double throwValue){ _throwValue_ = throwValue; }
   void setStdDevValue(double stdDevValue){ _stdDevValue_ = stdDevValue; }
-  void setParameterValue(double parameterValue);
+
+  /// Set the parameter value.  This always checks the parameter validity, but
+  /// if force is true, then it will only print warnings, otherwise it stops
+  /// with EXIT_FAILURE.
+  void setParameterValue(double parameterValue, bool force=false);
   void setName(const std::string &name){ _name_ = name; }
   void setDialSetConfig(const nlohmann::json &jsonConfig_);
   void setParameterDefinitionConfig(const nlohmann::json &config_);

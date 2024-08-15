@@ -58,7 +58,14 @@ protected:
 
 private:
 
-  // Parameters
+  // Dump the Math::Minimizer table of parameter settings.  This is mostly
+  // useful for debugging.
+  void dumpFitParameterSettings();
+
+  // Dump the ROOT::Minuit2::MnUserParameterState.  This is mostly useful
+  // for debugging.
+  void dumpMinuit2State();
+
   bool _enableSimplexBeforeMinimize_{false};
   // bool _enablePostFitErrorEval_{true};
   bool _restoreStepSizeBeforeHesse_{false};

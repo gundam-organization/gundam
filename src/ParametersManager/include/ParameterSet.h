@@ -174,6 +174,7 @@ private:
   int _nbEnabledEigen_{0};
   bool _enablePca_{false};
   bool _useEigenDecompInFit_{false};
+  bool _allowEigenDecompWithBounds_{false};
   bool _useOnlyOneParameterPerEvent_{false};
   std::vector<Parameter> _eigenParameterList_{};
   std::shared_ptr<TMatrixDSymEigen> _eigenDecomp_{nullptr};

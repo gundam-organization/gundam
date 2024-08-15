@@ -93,7 +93,9 @@ void MinimizerBase::printMinimizerFitParameters () {
 
       t.addTableLine({
                          par.getTitle(),
-                         std::to_string( par.getParameterValue() ),
+                         std::to_string( par.isValueWithinBounds() ?
+                                         par.getParameterValue()
+                                         : std::nan("Invalid")),
                          std::to_string( par.getPriorValue() ),
                          std::to_string( par.getStdDevValue() ),
                          std::to_string( par.getMinValue() ),
