@@ -16,8 +16,11 @@
 #include "Math/Factory.h"
 #include "Math/Minimizer.h"
 #include "Math/Functor.h"
+#include "Fit/ParameterSettings.h"
+#include "Minuit2/Minuit2Minimizer.h"
+#include "Minuit2/MnUserParameterState.h"
+#include "Minuit2/MinuitParameter.h"
 #include "TLegend.h"
-
 
 LoggerInit([]{
   Logger::setUserHeaderStr("[MinimizerInterface]");
@@ -86,43 +89,38 @@ void MinimizerInterface::initializeImpl(){
     auto& fitPar = *(getMinimizerFitParameterPtr()[iFitPar]);
 
     if( not getLikelihood().getUseNormalizedFitSpace() ){
-      LogInfo << "MINUIT #" << iFitPar << " --> " << fitPar.getFullTitle();
-      LogInfo << " Starting value: " << fitPar.getParameterValue();
-      LogInfo << " Step: " << fitPar.getStepSize()*_stepSizeScaling_;
-      _minimizer_->SetVariable(iFitPar, fitPar.getFullTitle(),fitPar.getParameterValue(),fitPar.getStepSize()*_stepSizeScaling_);
-      if( not std::isnan( fitPar.getMinValue() ) ){
-        LogInfo << " Min: " << fitPar.getMinValue();
+      _minimizer_->SetVariable(iFitPar, fitPar.getFullTitle(),
+                               fitPar.getParameterValue(),
+                               fitPar.getStepSize()*_stepSizeScaling_);
+      if (not std::isnan(fitPar.getMinValue())
+          and not std::isnan(fitPar.getMaxValue())) {
+        _minimizer_->SetVariableLimits(iFitPar, fitPar.getMinValue(), fitPar.getMaxValue());
+      }
+      else if (not std::isnan(fitPar.getMinValue())) {
         _minimizer_->SetVariableLowerLimit(iFitPar, fitPar.getMinValue());
       }
-      if( not std::isnan( fitPar.getMaxValue() ) ){
-        LogInfo << " Max: " << fitPar.getMaxValue();
+      else if (not std::isnan(fitPar.getMaxValue()) ) {
         _minimizer_->SetVariableUpperLimit(iFitPar, fitPar.getMaxValue());
       }
-      LogInfo << std::endl;
-      // Changing the boundaries, change the value/step size?
-      _minimizer_->SetVariableValue(iFitPar, fitPar.getParameterValue());
-      _minimizer_->SetVariableStepSize(iFitPar, fitPar.getStepSize()*_stepSizeScaling_);
     }
     else{
-      LogInfo << "Normalized MINUIT #" << iFitPar << " --> " << fitPar.getFullTitle();
-      LogInfo << " Starting value: " << fitPar.getParameterValue();
-      LogInfo << " Step: " << fitPar.getStepSize()*_stepSizeScaling_;
       _minimizer_->SetVariable(iFitPar, fitPar.getFullTitle(),
                                ParameterSet::toNormalizedParValue(fitPar.getParameterValue(), fitPar),
                                ParameterSet::toNormalizedParRange(fitPar.getStepSize() * _stepSizeScaling_, fitPar)
       );
-      if( not std::isnan( fitPar.getMinValue() ) ){
-        LogInfo << " Min: " << fitPar.getMinValue();
+      if (not std::isnan(fitPar.getMinValue())
+          and not std::isnan(fitPar.getMaxValue())) {
+        _minimizer_->SetVariableLimits(
+          iFitPar,
+          ParameterSet::toNormalizedParValue(fitPar.getMinValue(), fitPar),
+          ParameterSet::toNormalizedParValue(fitPar.getMaxValue(), fitPar));
+      }
+      else if (not std::isnan(fitPar.getMinValue())) {
         _minimizer_->SetVariableLowerLimit(iFitPar, ParameterSet::toNormalizedParValue(fitPar.getMinValue(), fitPar));
       }
-      if( not std::isnan( fitPar.getMaxValue() ) ){
-        LogInfo << " Max: " << fitPar.getMaxValue();
+      else if (not std::isnan(fitPar.getMaxValue()) ) {
         _minimizer_->SetVariableUpperLimit(iFitPar, ParameterSet::toNormalizedParValue(fitPar.getMaxValue(), fitPar));
       }
-      LogInfo << std::endl;
-      // Changing the boundaries, change the value/step size?
-      _minimizer_->SetVariableValue(iFitPar, ParameterSet::toNormalizedParValue(fitPar.getParameterValue(), fitPar));
-      _minimizer_->SetVariableStepSize(iFitPar, ParameterSet::toNormalizedParRange(fitPar.getStepSize() * _stepSizeScaling_, fitPar));
     }
   }
 
@@ -138,6 +136,46 @@ double MinimizerInterface::getTargetEdm() const{
   // to change the function value by UP. Normally, for chisquared fits
   // UP=1, and for negative log likelihood, UP=0.5
   return 0.001 * _tolerance_ * 1;
+}
+
+void MinimizerInterface::dumpFitParameterSettings() {
+  for( std::size_t iFitPar = 0 ;
+       iFitPar < getMinimizerFitParameterPtr().size() ; ++iFitPar ) {
+    ROOT::Fit::ParameterSettings parSettings;
+    _minimizer_->GetVariableSettings(iFitPar,parSettings);
+    LogDebug << "MINIMIZER #" << iFitPar;
+    LogDebug << " Fixed: " << parSettings.IsFixed();
+    if (parSettings.HasLowerLimit()) {
+      LogDebug << " Lower: " << parSettings.LowerLimit();
+    }
+    if (parSettings.HasUpperLimit()) {
+      LogDebug << " Upper: " << parSettings.UpperLimit();
+    }
+    LogDebug << " Name" << parSettings.Name();
+    LogDebug  << std::endl;
+  }
+}
+
+void MinimizerInterface::dumpMinuit2State() {
+  ROOT::Minuit2::Minuit2Minimizer* mn2
+    = dynamic_cast<ROOT::Minuit2::Minuit2Minimizer*>(_minimizer_.get());
+  if (not mn2) return;
+  const ROOT::Minuit2::MnUserParameterState& mn2State = mn2->State();
+  for( std::size_t iFitPar = 0 ;
+       iFitPar < getMinimizerFitParameterPtr().size() ; ++iFitPar ) {
+    const ROOT::Minuit2::MinuitParameter& par = mn2State.Parameter(iFitPar);
+    LogDebug << "MINUIT2 #" << iFitPar;
+    LogDebug << " Value: " << par.Value();
+    LogDebug << " Fixed: " << par.IsFixed();
+    if (par.HasLowerLimit()) {
+      LogDebug << " Lower: " << par.LowerLimit();
+    }
+    if (par.HasUpperLimit()) {
+      LogDebug << " Upper: " << par.UpperLimit();
+    }
+    LogDebug << " Name: " << par.GetName();
+    LogDebug  << std::endl;
+  }
 }
 
 // core overrides
@@ -175,6 +213,8 @@ void MinimizerInterface::minimize(){
 
     // SIMPLEX
     getLikelihood().enableFitMonitor();
+    // dumpFitParameterSettings(); // Dump internal ROOT::Minimizer info
+    // dumpMinuit2State();         // Dump internal ROOT::Minuit2Minimizer info
     _fitHasConverged_ = _minimizer_->Minimize();
     getLikelihood().disableFitMonitor();
 
@@ -201,6 +241,8 @@ void MinimizerInterface::minimize(){
   getLikelihood().setStateTitleMonitor("Running " + _minimizer_->Options().MinimizerAlgorithm() + "...");
 
   getLikelihood().enableFitMonitor();
+  // dumpFitParameterSettings(); // Dump internal ROOT::Minimizer info
+  // dumpMinuit2State();         // Dump internal ROOT::Minuit2Minimizer info
   _fitHasConverged_ = _minimizer_->Minimize();
   getLikelihood().disableFitMonitor();
 
@@ -1190,5 +1232,4 @@ void MinimizerInterface::updateCacheToBestfitPoint(){
 // Local Variables:
 // mode:c++
 // c-basic-offset:2
-// compile-command:"$(git rev-parse --show-toplevel)/cmake/gundam-build.sh"
 // End:
