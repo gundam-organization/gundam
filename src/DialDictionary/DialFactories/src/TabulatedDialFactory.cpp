@@ -30,8 +30,8 @@ TabulatedDialFactory::TabulatedDialFactory(const JsonType& config_) {
 
     int bins =  GenericToolbox::Json::fetchValue<int>(tableConfig, "bins", -1);
 
-    _variableNames_ = GenericToolbox::Json::fetchValue(tableConfig, "variables", _variableNames_);
-    _variables_.resize(_variableNames_.size());
+    _binningVariableNames_ = GenericToolbox::Json::fetchValue(tableConfig, "binningVariables", _binningVariableNames_);
+    _binningVariableCache_.resize(_binningVariableNames_.size());
 
     std::string expandedPath = GenericToolbox::expandEnvironmentVariables(getLibraryPath());
 
@@ -42,7 +42,7 @@ TabulatedDialFactory::TabulatedDialFactory(const JsonType& config_) {
     LogInfo << "  Bin events function:     " << getBinningFunction() << std::endl;
     {
         int i{0};
-        for (const std::string& var: getVariables()) {
+        for (const std::string& var: getBinningVariables()) {
             LogInfo << "      Variable[" << i++ << "]: " << var << std::endl;
         }
     }
@@ -128,12 +128,13 @@ void TabulatedDialFactory::updateTable(DialInputBuffer& inputBuffer) {
 
 DialBase* TabulatedDialFactory::makeDial(const Event& event) {
     int i=0;
-    for (const std::string& varName : getVariables()) {
+    for (const std::string& varName : getBinningVariables()) {
         double v = event.getVariables().fetchVariable(varName).getVarAsDouble();
-        _variables_[i++] = v;
+        _binningVariableCache_[i++] = v;
     }
     double bin = _binningFunc_(getName().c_str(),
-                               (int) _variables_.size(), _variables_.data(),
+                               (int) _binningVariableCache_.size(),
+                               _binningVariableCache_.data(),
                                (int) _table_.size());
 
     if (bin < 0.0) return nullptr;
