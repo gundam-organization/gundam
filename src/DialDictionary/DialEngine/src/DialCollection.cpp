@@ -493,7 +493,7 @@ bool DialCollection::initializeDialsWithTabulation(JsonType dialsDefinition_) {
   _dialCollectionData_.emplace_back(std::move(tabulated));
 
   for (const std::string& var :
-         getCollectionData<TabulatedDialFactory>()->getVariables()) {
+         getCollectionData<TabulatedDialFactory>()->getBinningVariables()) {
     addExtraLeafName(var);
   }
 
