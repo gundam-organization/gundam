@@ -302,9 +302,9 @@ bool AdaptiveMcmc::adaptiveDefaultProposalCovariance( AdaptiveStepMCMC& mcmc,
 
   /// Set the diagonal elements for the parameters.
   int count0 = 0;
-  for (const Parameter* par : _minimizerParameterPtrList_ ) {
+  for (const Parameter* par : getMinimizerFitParameterPtr() ) {
     ++count0;
-    if( _useNormalizedFitSpace_ ){
+    if( useNormalizedFitSpace() ){
       // Changing the boundaries, change the value/step size?
       double step
           = ParameterSet::toNormalizedParRange(
@@ -318,7 +318,7 @@ bool AdaptiveMcmc::adaptiveDefaultProposalCovariance( AdaptiveStepMCMC& mcmc,
       if (step <= std::abs(1E-10*par->getPriorValue())) {
         step = std::max(par->getStepSize(),par->getStdDevValue());
       }
-      step /= std::sqrt(_minimizerParameterPtrList_.size());
+      step /= std::sqrt(getMinimizerFitParameterPtr().size());
       mcmc.GetProposeStep().SetGaussian(count0-1,step);
     }
     else {
@@ -331,7 +331,7 @@ bool AdaptiveMcmc::adaptiveDefaultProposalCovariance( AdaptiveStepMCMC& mcmc,
 
   // Set up the correlations in the priors.
   int count1 = 0;
-  for (const Parameter* par1 : _minimizerParameterPtrList_ ) {
+  for (const Parameter* par1 : getMinimizerFitParameterPtr() ) {
     ++count1;
     const ParameterSet* set1 = par1->getOwner();
     if (!set1) {
@@ -345,7 +345,7 @@ bool AdaptiveMcmc::adaptiveDefaultProposalCovariance( AdaptiveStepMCMC& mcmc,
     }
 
     int count2 = 0;
-    for (const Parameter* par2 : _minimizerParameterPtrList_) {
+    for (const Parameter* par2 : getMinimizerFitParameterPtr()) {
       ++count2;
       const ParameterSet* set2 = par2->getOwner();
       if (!set2) {
@@ -440,7 +440,7 @@ bool AdaptiveMcmc::adaptiveLoadProposalCovariance( AdaptiveStepMCMC& mcmc,
 
   TAxis* covAxisLabels = dynamic_cast<TAxis*>(proposalCov->GetXaxis());
   int count1 = 0;
-  for (const Parameter* par1 : _minimizerParameterPtrList_ ) {
+  for (const Parameter* par1 : getMinimizerFitParameterPtr() ) {
     ++count1;
     std::string parName(par1->getFullTitle());
     std::string covName(covAxisLabels->GetBinLabel(count1));
@@ -452,7 +452,7 @@ bool AdaptiveMcmc::adaptiveLoadProposalCovariance( AdaptiveStepMCMC& mcmc,
     }
     double sig1 = std::sqrt(proposalCov->GetBinContent(count1,count1));
     int count2 = 0;
-    for (const Parameter* par2 : _minimizerParameterPtrList_ ) {
+    for (const Parameter* par2 : getMinimizerFitParameterPtr() ) {
       ++count2;
       double sig2 = std::sqrt(proposalCov->GetBinContent(count2,count2));
       if (count2 < count1) continue;
@@ -461,7 +461,7 @@ bool AdaptiveMcmc::adaptiveLoadProposalCovariance( AdaptiveStepMCMC& mcmc,
         double step = sig1;
 #define COVARIANCE_NOT_IN_NORMALIZED_FIT_SPACE
 #ifdef  COVARIANCE_NOT_IN_NORMALIZED_FIT_SPACE
-        if (_useNormalizedFitSpace_) {
+        if (useNormalizedFitSpace()) {
           step = ParameterSet::toNormalizedParRange(sig1, *par1);
         }
 #endif
@@ -493,8 +493,8 @@ bool AdaptiveMcmc::adaptiveLoadProposalCovariance( AdaptiveStepMCMC& mcmc,
 
 void AdaptiveMcmc::setupAndRunAdaptiveStep( AdaptiveStepMCMC& mcmc) {
 
-  mcmc.GetProposeStep().SetDim(_minimizerParameterPtrList_.size());
-  mcmc.GetLogLikelihood().functor = std::make_unique<ROOT::Math::Functor>(this, &AdaptiveMcmc::evalFitValid, _minimizerParameterPtrList_.size());
+  mcmc.GetProposeStep().SetDim(getMinimizerFitParameterPtr().size());
+  mcmc.GetLogLikelihood().functor = std::make_unique<ROOT::Math::Functor>(this, &AdaptiveMcmc::evalFitValid, getMinimizerFitParameterPtr().size());
   mcmc.GetProposeStep().SetCovarianceUpdateDeweighting(0.0);
   mcmc.GetProposeStep().SetCovarianceFrozen(false);
 
@@ -533,7 +533,7 @@ void AdaptiveMcmc::setupAndRunAdaptiveStep( AdaptiveStepMCMC& mcmc) {
         highBound = std::min(highBound, par->getMaxPhysical());
       }
       val = lowBound + r*(highBound-lowBound);
-      if (not _useNormalizedFitSpace_) {
+      if (not useNormalizedFitSpace()) {
         prior.push_back(val);
       }
       else {
@@ -550,7 +550,7 @@ void AdaptiveMcmc::setupAndRunAdaptiveStep( AdaptiveStepMCMC& mcmc) {
     LogInfo<<"MCMC chain starts from the prior"<<std::endl;
     for (const Parameter* par : getMinimizerFitParameterPtr() ) {
       double val = par->getParameterValue();
-      if (not _useNormalizedFitSpace_) {
+      if (not useNormalizedFitSpace()) {
         prior.push_back(val);
       }
       else {
@@ -761,12 +761,12 @@ void AdaptiveMcmc::setupAndRunAdaptiveStep( AdaptiveStepMCMC& mcmc) {
 }
 void AdaptiveMcmc::setupAndRunSimpleStep( SimpleStepMCMC& mcmc) {
 
-  mcmc.GetProposeStep().SetDim(_minimizerParameterPtrList_.size());
-  mcmc.GetLogLikelihood().functor = std::make_unique<ROOT::Math::Functor>(this, &AdaptiveMcmc::evalFitValid, _minimizerParameterPtrList_.size());
+  mcmc.GetProposeStep().SetDim(getMinimizerFitParameterPtr().size());
+  mcmc.GetLogLikelihood().functor = std::make_unique<ROOT::Math::Functor>(this, &AdaptiveMcmc::evalFitValid, getMinimizerFitParameterPtr().size());
   mcmc.GetProposeStep().fSigma = _simpleSigma_;
 
   sMCMC::Vector prior;
-  for (const Parameter* par : _minimizerParameterPtrList_ ) {
+  for (const Parameter* par : getMinimizerFitParameterPtr() ) {
     prior.push_back(par->getPriorValue());
   }
 
@@ -933,11 +933,11 @@ void AdaptiveMcmc::minimize() {
   outputTree->Branch("Models",&_saveModel_);
   outputTree->Branch("ModelUncertainty",&_saveUncertainty_);
 
-  _monitor_.stateTitleMonitor = "Running MCMC chain...";
-  _monitor_.minimizerTitle = _algorithmName_ + "/" + _proposalName_;
+  getMonitor().stateTitleMonitor = "Running MCMC chain...";
+  getMonitor().minimizerTitle = _algorithmName_ + "/" + _proposalName_;
 
   // Run a chain.
-  int nbFitCallOffset = _monitor_.nbEvalLikelihoodCalls;
+  int nbFitCallOffset = getMonitor().nbEvalLikelihoodCalls;
   LogInfo << "Fit call offset: " << nbFitCallOffset << std::endl;
 
   // Create the TSimpleMCMC object and call the specific runner.
@@ -950,17 +950,17 @@ void AdaptiveMcmc::minimize() {
     setupAndRunSimpleStep(mcmc);
   }
 
-  int nbMCMCCalls = _monitor_.nbEvalLikelihoodCalls - nbFitCallOffset;
+  int nbMCMCCalls = getMonitor().nbEvalLikelihoodCalls - nbFitCallOffset;
 
   // lasting printout
-  LogInfo << _monitor_.convergenceMonitor.generateMonitorString();
+  LogInfo << getMonitor().convergenceMonitor.generateMonitorString();
   LogInfo << "MCMC ended after " << nbMCMCCalls << " calls." << std::endl;
 
   // Save the sampled points to the outputfile
   outputTree->Write();
 
   // success
-  _minimizerStatus_ = 0;
+  setMinimizerStatus(0);
 }
 
 double AdaptiveMcmc::evalFitValid(const double* parArray_) {
@@ -1057,5 +1057,4 @@ bool AdaptiveMcmc::hasValidParameterValues() const {
 // Local Variables:
 // mode:c++
 // c-basic-offset:2
-// compile-command:"$(git rev-parse --show-toplevel)/cmake/scripts/gundam-build.sh"
 // End:
