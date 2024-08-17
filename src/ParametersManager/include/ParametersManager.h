@@ -24,7 +24,16 @@ protected:
 public:
   // setters
   void setParameterSetListConfig(const JsonType& parameterSetListConfig_){ _parameterSetListConfig_ = parameterSetListConfig_; }
+  // Deprecated because out of bounds parameters are illegal and will result
+  // in a crash.  An out of bounds parameter is always rethrown and this value
+  // is ignored.
   [[deprecated("Must always be true")]] void setReThrowParSetIfOutOfBounds(bool reThrowParSetIfOutOfBounds_){ _reThrowParSetIfOutOfBounds_ = reThrowParSetIfOutOfBounds_; }
+  // If set to true, parameters that are outside of the physical bounds will
+  // be rethrown.  The physical bounds are always contained in the overall
+  // parameter bounds, and the throw value will always be inside of the
+  // overall parameter bounds (the overall bounds are the "domain" of the
+  // parameter).  See the Parameter::setMinValue() and
+  // Parameter::setMinPhysical for more details.
   void setReThrowParSetIfOutOfPhysical(bool reThrowParSetIfOutOfPhysical_){ _reThrowParSetIfOutOfPhysical_ = reThrowParSetIfOutOfPhysical_; }
   void setThrowToyParametersWithGlobalCov(bool throwToyParametersWithGlobalCov_){ _throwToyParametersWithGlobalCov_ = throwToyParametersWithGlobalCov_; }
   void setGlobalCovarianceMatrix(const std::shared_ptr<TMatrixD> &globalCovarianceMatrix){ _globalCovarianceMatrix_ = globalCovarianceMatrix; }
