@@ -206,7 +206,7 @@ double LikelihoodInterface::evalFit(const double* parArray_){
 
   // Minuit based algo might want this
   if( _monitorGradientDescent_ ){
-    // check if minuit is moving toward the minimum
+    // check if point is moving toward the minimum
     bool isGradientDescentStep = std::all_of(_minimizerFitParameterPtr_.begin(), _minimizerFitParameterPtr_.end(), [](const Parameter* par_){
       return ( par_->gotUpdated() or par_->isFixed() or not par_->isEnabled() );
     } );
@@ -220,7 +220,7 @@ double LikelihoodInterface::evalFit(const double* parArray_){
         _lastGradientFall_ = _nbFitCalls_;
       }
       else{
-        // saving each step of the gradient descen
+        // saving each step of the gradient descent
         _gradientMonitor_.emplace_back();
         LogWarning << "Gradient step detected at iteration #" << _nbFitCalls_ << ": ";
         LogWarning(_gradientMonitor_.size() >= 2) << _gradientMonitor_[_gradientMonitor_.size() - 2].llh << " -> ";
@@ -364,56 +364,11 @@ double LikelihoodInterface::getLastLikelihoodPenalty() const {
 }
 
 void LikelihoodInterface::setParameterValidity(const std::string& validity) {
-  LogWarning << "Set parameter validity to " << validity << std::endl;
-  if (validity.find("noran") != std::string::npos) _validFlags_ &= ~0b0001;
-  else if (validity.find("ran") != std::string::npos) _validFlags_ |= 0b0001;
-  if (validity.find("nomir") != std::string::npos) _validFlags_ &= ~0b0010;
-  else if (validity.find("mir") != std::string::npos) _validFlags_ |= 0b0010;
-  if (validity.find("nophy") != std::string::npos) _validFlags_ &= ~0b0100;
-  else if (validity.find("phy") != std::string::npos) _validFlags_ |= 0b0100;
-  LogWarning << "Set parameter validity to " << validity
-             << " (" << _validFlags_ << ")" << std::endl;
+  return _owner_->getPropagator().getParametersManager().setParameterValidity(validity);
 }
 
 bool LikelihoodInterface::hasValidParameterValues() const {
-  int invalid = 0;
-  for (const ParameterSet& parSet:
-         _owner_->getPropagator().getParametersManager().getParameterSetsList()) {
-    for (const Parameter& par : parSet.getParameterList()) {
-      if ( (_validFlags_ & 0b0001) != 0
-          and std::isfinite(par.getMinValue())
-          and par.getParameterValue() < par.getMinValue()) [[unlikely]] {
-        ++invalid;
-      }
-      if ((_validFlags_ & 0b0001) != 0
-          and std::isfinite(par.getMaxValue())
-          and par.getParameterValue() > par.getMaxValue()) [[unlikely]] {
-        ++invalid;
-      }
-      if ((_validFlags_ & 0b0010) != 0
-          and std::isfinite(par.getMinMirror())
-          and par.getParameterValue() < par.getMinMirror()) [[unlikely]] {
-        ++invalid;
-      }
-      if ((_validFlags_ & 0b0010) != 0
-          and std::isfinite(par.getMaxMirror())
-          and par.getParameterValue() > par.getMaxMirror()) [[unlikely]] {
-        ++invalid;
-      }
-      if ((_validFlags_ & 0b0100) != 0
-          and std::isfinite(par.getMinPhysical())
-          and par.getParameterValue() < par.getMinPhysical()) [[unlikely]] {
-        ++invalid;
-      }
-      if ((_validFlags_ & 0b0100) != 0
-          and std::isfinite(par.getMaxPhysical())
-          and par.getParameterValue() > par.getMaxPhysical()) [[unlikely]] {
-        ++invalid;
-      }
-
-    }
-  }
-  return (invalid == 0);
+  return _owner_->getPropagator().getParametersManager().hasValidParameterSets();
 }
 
 // An MIT Style License
