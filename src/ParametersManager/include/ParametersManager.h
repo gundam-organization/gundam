@@ -24,7 +24,8 @@ protected:
 public:
   // setters
   void setParameterSetListConfig(const JsonType& parameterSetListConfig_){ _parameterSetListConfig_ = parameterSetListConfig_; }
-  void setReThrowParSetIfOutOfBounds(bool reThrowParSetIfOutOfBounds_){ _reThrowParSetIfOutOfBounds_ = reThrowParSetIfOutOfBounds_; }
+  [[deprecated("Must always be true")]] void setReThrowParSetIfOutOfBounds(bool reThrowParSetIfOutOfBounds_){ _reThrowParSetIfOutOfBounds_ = reThrowParSetIfOutOfBounds_; }
+  void setReThrowParSetIfOutOfPhysical(bool reThrowParSetIfOutOfPhysical_){ _reThrowParSetIfOutOfPhysical_ = reThrowParSetIfOutOfPhysical_; }
   void setThrowToyParametersWithGlobalCov(bool throwToyParametersWithGlobalCov_){ _throwToyParametersWithGlobalCov_ = throwToyParametersWithGlobalCov_; }
   void setGlobalCovarianceMatrix(const std::shared_ptr<TMatrixD> &globalCovarianceMatrix){ _globalCovarianceMatrix_ = globalCovarianceMatrix; }
 
@@ -56,7 +57,8 @@ public:
 
 private:
   // config
-  bool _reThrowParSetIfOutOfBounds_{true};
+  bool _reThrowParSetIfOutOfBounds_{true};  // NO LONGER USE. ALWAYS TRUE.
+  bool _reThrowParSetIfOutOfPhysical_{true};
   bool _throwToyParametersWithGlobalCov_{false};
   JsonType _parameterSetListConfig_{};
 
@@ -69,6 +71,4 @@ private:
   std::shared_ptr<TMatrixD> _choleskyMatrix_{nullptr};
 
 };
-
-
 #endif //GUNDAM_PARAMETERS_MANAGER_H
