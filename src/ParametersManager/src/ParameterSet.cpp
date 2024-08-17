@@ -21,7 +21,6 @@ LoggerInit([]{
   Logger::setUserHeaderStr("[ParameterSet]");
 } );
 
-
 void ParameterSet::readConfigImpl(){
   LogThrowIf(_config_.empty(), "FitParameterSet config not set.");
 
@@ -327,6 +326,20 @@ const std::vector<Parameter>& ParameterSet::getEffectiveParameterList() const{
   return getParameterList();
 }
 
+bool ParameterSet::isValid() const {
+  if (_validFlags_ == 0) return true;
+  for (const Parameter& par : getParameterList()) {
+    if (not par.isEnabled()) continue;
+    if ((_validFlags_ & 0b0001) != 0
+        and (not par.isInDomain(par.getParameterValue()))) return false;
+    if ((_validFlags_ & 0b0010) != 0
+        and (par.isMirrored(par.getParameterValue()))) return false;
+    if ((_validFlags_ & 0b0100) != 0
+        and (not par.isPhysical(par.getParameterValue()))) return false;
+  }
+  return true;
+}
+
 // non const getters
 std::vector<Parameter>& ParameterSet::getEffectiveParameterList(){
   if( _useEigenDecompInFit_ ) return getEigenParameterList();
@@ -357,6 +370,18 @@ double ParameterSet::getPenaltyChi2() {
   }
 
   return _penaltyChi2Buffer_;
+}
+
+void ParameterSet::setValidity(const std::string& validity) {
+  LogWarning << "Set parameter validity to " << validity << std::endl;
+  if (validity.find("noran") != std::string::npos) _validFlags_ &= ~0b0001;
+  else if (validity.find("ran") != std::string::npos) _validFlags_ |= 0b0001;
+  if (validity.find("nomir") != std::string::npos) _validFlags_ &= ~0b0010;
+  else if (validity.find("mir") != std::string::npos) _validFlags_ |= 0b0010;
+  if (validity.find("nophy") != std::string::npos) _validFlags_ &= ~0b0100;
+  else if (validity.find("phy") != std::string::npos) _validFlags_ |= 0b0100;
+  LogWarning << "Set parameter validity to " << validity
+             << " (" << _validFlags_ << ")" << std::endl;
 }
 
 // Parameter throw

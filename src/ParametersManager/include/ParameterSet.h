@@ -50,6 +50,22 @@ public:
   // Setters
   void setMaskedForPropagation(bool maskedForPropagation_){ _maskedForPropagation_ = maskedForPropagation_; }
 
+  /// Define the type of validity that needs to be required by
+  /// hasValidParameterValues.  This accepts a string with the possible values
+  /// being:
+  ///
+  ///  "range" (default) -- Between the parameter minimum and maximum values.
+  ///  "norange"         -- Do not require parameters in the valid range
+  ///  "mirror"          -- Between the mirrored values (if parameter has
+  ///                       mirroring).
+  ///  "nomirror"        -- Do not require parameters in the mirrored range
+  ///  "physical"        -- Only physically meaningful values.
+  ///  "nophysical"      -- Do not require parameters in the physical range.
+  ///
+  /// Example: setParameterValidity("range,mirror,physical")
+  void setValidity(const std::string& validity);
+  void setValidity(int validity) {_validFlags_ = validity;}
+
   // Getters
   [[nodiscard]] bool isEnabled() const{ return _isEnabled_; }
   [[nodiscard]] bool isEnablePca() const{ return _enablePca_; }
@@ -68,6 +84,10 @@ public:
   [[nodiscard]] const std::vector<nlohmann::json>& getCustomFitParThrow() const{ return _customFitParThrow_; }
   [[nodiscard]] const std::shared_ptr<TMatrixDSym> &getPriorCorrelationMatrix() const{ return _priorCorrelationMatrix_; }
   [[nodiscard]] const std::shared_ptr<TMatrixDSym> &getPriorCovarianceMatrix() const { return _priorCovarianceMatrix_; }
+  [[nodiscard]] int getValidity() const {return _validFlags_;}
+
+  /// True if all of the enabled parameters have valid values.
+  [[nodiscard]] bool isValid() const;
 
   /// Get the vector of parameters for this parameter set in the real
   /// parameter space.  These parameters are not eigendecomposed.  WARNING:
@@ -134,6 +154,13 @@ protected:
 private:
   // Internals
   std::vector<Parameter> _parameterList_;
+
+  /// A set of flags used to define if the parameter set has valid parameter
+  /// values.
+  /// "1" -- require valid parameters (Parameter::isInDomain will be true)
+  /// "2" -- require in the mirrored range (is inside mirrored range).
+  /// "4" -- require in the physical range (Parameter::isPhysical will be true)
+  int _validFlags_{1};
 
   // JSON
   std::string _name_{};
