@@ -90,27 +90,9 @@ void Parameter::setMaxMirror(double maxMirror) {
   _maxMirror_ = maxMirror;
 }
 void Parameter::setParameterValue(double parameterValue, bool force) {
-  if( std::isnan(parameterValue) ) {
-    LogError << "Attempting to set NaN for parameter" << std::endl;
-    LogError << "Summary: " << getSummary() << std::endl;
-    LogError << GundamUtils::Backtrace;
-    if (not force) std::exit(EXIT_FAILURE);
-    else LogAlert << "Forced continuation with invalid parameter" << std::endl;
-  }
-  if ( not std::isnan(_minValue_) and parameterValue < _minValue_ ) {
-    LogError << "Attempting to set parameter below minimum"
-             << " -- New value: " << parameterValue
+  if (not isInDomain(parameterValue, true)) {
+    LogError << "New parameter value is not in domain: " << parameterValue
              << std::endl;
-    LogError << "Summary: " << getSummary() << std::endl;
-    LogError << GundamUtils::Backtrace;
-    if (not force) std::exit(EXIT_FAILURE);
-    else LogAlert << "Forced continuation with invalid parameter" << std::endl;
-  }
-  if ( not std::isnan(_maxValue_) and parameterValue > _maxValue_ ) {
-    LogError << "Attempting to set parameter above the maximum"
-             << " -- New value: " << parameterValue
-             << std::endl;
-    LogError << "Summary: " << getSummary() << std::endl;
     LogError << GundamUtils::Backtrace;
     if (not force) std::exit(EXIT_FAILURE);
     else LogAlert << "Forced continuation with invalid parameter" << std::endl;
@@ -148,12 +130,46 @@ void Parameter::setValueAtPrior(){
 void Parameter::setCurrentValueAsPrior(){
   setPriorValue(getParameterValue());
 }
-
-bool Parameter::isValueWithinBounds() const{
-  if( std::isnan(_parameterValue_) ) return false;
-  if( not std::isnan(_minValue_) and _parameterValue_ < _minValue_ ) return false;
-  if( not std::isnan(_maxValue_) and _parameterValue_ > _maxValue_ ) return false;
+bool Parameter::isInDomain(double value_, bool verbose_) const {
+  if( std::isnan(value_) ) {
+    if (verbose_) {
+      LogError << "NaN value is not in parameter domain" << std::endl;
+      LogError << "Summary: " << getSummary() << std::endl;
+    }
+    return false;
+  }
+  if ( not std::isnan(_minValue_) and value_ < _minValue_ ) {
+    if (verbose_) {
+      LogError << "Value is below minimum: " << value_
+               << std::endl;
+      LogError << "Summary: " << getSummary() << std::endl;
+    }
+    return false;
+  }
+  if ( not std::isnan(_maxValue_) and value_ > _maxValue_ ) {
+    if (verbose_) {
+      LogError << "Attempting to set parameter above the maximum"
+               << " -- New value: " << value_
+               << std::endl;
+      LogError << "Summary: " << getSummary() << std::endl;
+    }
+    return false;
+  }
   return true;
+}
+bool Parameter::isPhysical(double value_) const {
+  if (not isInDomain(value_)) return false;
+  if ( not std::isnan(_minPhysical_) and value_ < _minPhysical_ ) return false;
+  if ( not std::isnan(_maxPhysical_) and value_ > _maxPhysical_ ) return false;
+  return true;
+}
+bool Parameter::isMirrored(double value_) const {
+  if ( not std::isnan(_minMirror_) and value_ < _minMirror_ ) return true;
+  if ( not std::isnan(_maxMirror_) and value_ > _maxMirror_ ) return true;
+  return false;
+}
+bool Parameter::isValueWithinBounds() const{
+  return isInDomain(_parameterValue_);
 }
 double Parameter::getDistanceFromNominal() const{
   return (getParameterValue() - getPriorValue()) / _stdDevValue_;

@@ -39,6 +39,7 @@ public:
   Parameter() = delete; // should always provide the owner
   explicit Parameter(const ParameterSet* owner_): _owner_(owner_) {}
 
+  //
   void setIsEnabled(bool isEnabled){ _isEnabled_ = isEnabled; }
   void setIsFixed(bool isFixed){ _isFixed_ = isFixed; }
   void setIsEigen(bool isEigen){ _isEigen_ = isEigen; }
@@ -107,7 +108,24 @@ public:
   void setOwner(const ParameterSet *owner_){ _owner_ = owner_; }
   void setPriorType(PriorType::PriorType priorType){ _priorType_ = priorType; }
 
-  // Getters
+  /// Query if a value is in the domain of likelihood for this parameter.  Math
+  /// remediation for those of us (including myself) who don't recall grammar
+  /// school math: The DOMAIN of a function is the range over which it is
+  /// defined.  For instance, the domain of the information transfer speed
+  /// (dX/dT) is greater than or equal to zero.  To be in the domain, a value
+  /// must not be NaN, and be between minValue and maxValue (if they are
+  /// defined).
+  [[nodiscard]] bool isInDomain(double value, bool verbose=false) const;
+
+  /// Query if a value is in the range where the parameter will have a
+  /// physically meaningful value.  For example, within special relativity, the
+  /// information transfer speed is between zero and the speed of light.
+  [[nodiscard]] bool isPhysical(double value) const;
+
+  /// Query if a value will be mirrored.  This is true if the parameter value
+  /// is not between the minimum and maximum mirror values.
+  [[nodiscard]] bool isMirrored(double value) const;
+
   [[nodiscard]] bool isFree() const{ return _isFree_; }
   [[nodiscard]] bool isFixed() const{ return _isFixed_; }
   [[nodiscard]] bool isEigen() const{ return _isEigen_; }
@@ -186,6 +204,4 @@ private:
   PriorType::PriorType _priorType_{PriorType::Gaussian};
 
 };
-
-
 #endif //GUNDAM_PARAMETER_H
