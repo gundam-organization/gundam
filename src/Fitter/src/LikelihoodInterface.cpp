@@ -185,7 +185,6 @@ void LikelihoodInterface::saveGradientSteps(){
 
 double LikelihoodInterface::evalFit(const double* parArray_){
   LogThrowIf(not _isInitialized_, "not initialized");
-  GenericToolbox::getElapsedTimeSinceLastCallInMicroSeconds(__METHOD_NAME__);
 
   if(_nbFitCalls_ != 0){
     _outEvalFitAvgTimer_.counts++ ; _outEvalFitAvgTimer_.cumulated += GenericToolbox::getElapsedTimeSinceLastCallInMicroSeconds("out_evalFit");
@@ -193,11 +192,13 @@ double LikelihoodInterface::evalFit(const double* parArray_){
   ++_nbFitCalls_;
 
   // Update fit parameter values:
-  int iFitPar{0};
+  const double *v = parArray_;
   for( auto* par : _minimizerFitParameterPtr_ ){
-    if( getUseNormalizedFitSpace() ) par->setParameterValue(ParameterSet::toRealParValue(parArray_[iFitPar++], *par));
-    else par->setParameterValue(parArray_[iFitPar++]);
+    if (not getUseNormalizedFitSpace()) par->setParameterValue(*(v++));
+    else par->setParameterValue(ParameterSet::toRealParValue(*(v++), *par));
   }
+
+  GenericToolbox::getElapsedTimeSinceLastCallInMicroSeconds(__METHOD_NAME__);
 
   // Compute the Chi2
   _owner_->getPropagator().updateLlhCache();
@@ -341,14 +342,12 @@ double LikelihoodInterface::evalFit(const double* parArray_){
 }
 
 double LikelihoodInterface::evalFitValid(const double* parArray_) {
-  double value = evalFit(parArray_);
-  if (hasValidParameterValues()) return value;
-  /// A "Really Big Number".  This is nominally just infinity, but is done as
-  /// a defined constant to make the code easier to understand.  This needs to
-  /// be an appropriate value to safely represent an impossible chi-squared
-  /// value "representing" -log(0.0)/2 and should should be larger than 5E+30.
-  const double RBN = std::numeric_limits<double>::infinity();
-  return RBN;
+  // Check fit parameter values:
+  const double *v = parArray_;
+  for( auto* par : _minimizerFitParameterPtr_ ){
+    if (not par->isValidValue(*(v++))) return std::numeric_limits<double>::infinity();
+  }
+  return evalFit(parArray_);
 }
 
 double LikelihoodInterface::getLastLikelihood() const {
@@ -396,5 +395,4 @@ bool LikelihoodInterface::hasValidParameterValues() const {
 // Local Variables:
 // mode:c++
 // c-basic-offset:2
-// compile-command:"$(git rev-parse --show-toplevel)/cmake/gundam-build.sh"
 // End:

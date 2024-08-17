@@ -126,6 +126,9 @@ public:
   /// is not between the minimum and maximum mirror values.
   [[nodiscard]] bool isMirrored(double value) const;
 
+  /// Query if a value matchs the validity requirements.
+  [[nodiscard]] bool isValidValue(double value) const;
+
   [[nodiscard]] bool isFree() const{ return _isFree_; }
   [[nodiscard]] bool isFixed() const{ return _isFixed_; }
   [[nodiscard]] bool isEigen() const{ return _isEigen_; }
@@ -175,6 +178,22 @@ public:
   [[nodiscard]] std::string getTitle() const;
   [[nodiscard]] std::string getFullTitle() const;
 
+  /// Define the type of validity that needs to be required by
+  /// hasValidParameterValues.  This accepts a string with the possible values
+  /// being:
+  ///
+  ///  "range" (default) -- Between the parameter minimum and maximum values.
+  ///  "norange"         -- Do not require parameters in the valid range
+  ///  "mirror"          -- Between the mirrored values (if parameter has
+  ///                       mirroring).
+  ///  "nomirror"        -- Do not require parameters in the mirrored range
+  ///  "physical"        -- Only physically meaningful values.
+  ///  "nophysical"      -- Do not require parameters in the physical range.
+  ///
+  /// Example: setParameterValidity("range,mirror,physical")
+  void setValidity(const std::string& validity);
+  void setValidity(int validity) {_validFlags_ = validity;}
+
 private:
   // Parameters
   bool _isEnabled_{true};
@@ -202,6 +221,13 @@ private:
   // Internals
   const ParameterSet* _owner_{nullptr};
   PriorType::PriorType _priorType_{PriorType::Gaussian};
+
+  /// A set of flags used to define if the parameter set has valid parameter
+  /// values.
+  /// "1" -- require valid parameters (Parameter::isInDomain will be true)
+  /// "2" -- require in the mirrored range (is inside mirrored range).
+  /// "4" -- require in the physical range (Parameter::isPhysical will be true)
+  int _validFlags_{1};
 
 };
 #endif //GUNDAM_PARAMETER_H

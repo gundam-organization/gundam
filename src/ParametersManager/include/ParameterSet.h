@@ -64,7 +64,7 @@ public:
   ///
   /// Example: setParameterValidity("range,mirror,physical")
   void setValidity(const std::string& validity);
-  void setValidity(int validity) {_validFlags_ = validity;}
+  void setValidity(int validity);
 
   // Getters
   [[nodiscard]] bool isEnabled() const{ return _isEnabled_; }
@@ -84,10 +84,13 @@ public:
   [[nodiscard]] const std::vector<nlohmann::json>& getCustomFitParThrow() const{ return _customFitParThrow_; }
   [[nodiscard]] const std::shared_ptr<TMatrixDSym> &getPriorCorrelationMatrix() const{ return _priorCorrelationMatrix_; }
   [[nodiscard]] const std::shared_ptr<TMatrixDSym> &getPriorCovarianceMatrix() const { return _priorCovarianceMatrix_; }
-  [[nodiscard]] int getValidity() const {return _validFlags_;}
 
   /// True if all of the enabled parameters have valid values.
   [[nodiscard]] bool isValid() const;
+
+  /// Convenience method to check if a value will be valid for a particular
+  /// parameter.
+  [[nodiscard]] bool isValidParameterValue(const Parameter& p, double v) const;
 
   /// Get the vector of parameters for this parameter set in the real
   /// parameter space.  These parameters are not eigendecomposed.  WARNING:
@@ -154,13 +157,6 @@ protected:
 private:
   // Internals
   std::vector<Parameter> _parameterList_;
-
-  /// A set of flags used to define if the parameter set has valid parameter
-  /// values.
-  /// "1" -- require valid parameters (Parameter::isInDomain will be true)
-  /// "2" -- require in the mirrored range (is inside mirrored range).
-  /// "4" -- require in the physical range (Parameter::isPhysical will be true)
-  int _validFlags_{1};
 
   // JSON
   std::string _name_{};
