@@ -126,7 +126,8 @@ void SampleElement::refillHistogram(int iThread_){
     bool filledWithManager = false;
     double value{std::nan("not-set")};
     double error{std::nan("not-set")};
-    if (_CacheManagerValue_ !=nullptr and _CacheManagerIndex_ >= 0) {
+    if (_CacheManagerValid_ and (*_CacheManagerValid_)
+        and _CacheManagerValue_ and _CacheManagerIndex_ >= 0) {
       value = _CacheManagerValue_[_CacheManagerIndex_+iBin];
       error = _CacheManagerValue2_[_CacheManagerIndex_+iBin];
       (*binContentPtr) += value;

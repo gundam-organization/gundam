@@ -26,30 +26,30 @@ void PhysicsEvent::setCommonVarNameListPtr(const std::shared_ptr<std::vector<std
 // const getters
 double PhysicsEvent::getEventWeight() const {
 #ifdef GUNDAM_USING_CACHE_MANAGER
-    if (_cacheManagerValue_) {
-        if (_cacheManagerValid_ != nullptr and not (*_cacheManagerValid_)) {
-            // This is slowish, but will make sure that the cached result is
-            // updated when the cache has changed.  The values pointed to by
-            // _CacheManagerValue_ and _CacheManagerValid_ are inside
-            // of the weights cache (a bit of evil coding here), and are
-            // updated by the cache.  The update is triggered by
-            // (*_CacheManagerUpdate_)().
-            if (_cacheManagerUpdate_) (*_cacheManagerUpdate_)();
-        }
-        double value = *_cacheManagerValue_;
-        LogThrowIf(std::isnan(value), "NaN weight: " << this->getSummary());
-        if (not GundamGlobals::getForceDirectCalculation()) return value;
-        if (not GundamUtils::almostEqual(value, _eventWeight_)) {
-          std::ostringstream str;
-          str << "Inconsistent event weight -- "
-              << " Calculated: " << value
-              << " Cached: " << _eventWeight_;
-          LogError << str.str() << std::endl;
-          LogThrow(str.str());
-        }
+  if (_cacheManagerValid_ and not (*_cacheManagerValid_)) {
+    // This can be slowish, but will make sure that the cached result is
+    // updated when the cache has changed.  The values pointed to by
+    // _CacheManagerValue_ and _CacheManagerValid_ are inside
+    // of the weights cache (a bit of evil coding here), and are
+    // updated by the cache.  The update is triggered by
+    // (*_CacheManagerUpdate_)().
+    if (_cacheManagerUpdate_) (*_cacheManagerUpdate_)();
+  }
+  if (_cacheManagerValid_ and (*_cacheManagerValid_) and _cacheManagerValue_) {
+    double value = *_cacheManagerValue_;
+    LogThrowIf(std::isnan(value), "NaN weight: " << this->getSummary());
+    if (not GundamGlobals::getForceDirectCalculation()) return value;
+    if (not GundamUtils::almostEqual(value, _eventWeight_)) {
+      std::ostringstream str;
+      str << "Inconsistent event weight -- "
+          << " Calculated: " << value
+          << " Cached: " << _eventWeight_;
+      LogError << str.str() << std::endl;
+      LogThrow(str.str());
     }
+  }
 #endif
-    return _eventWeight_;
+  return _eventWeight_;
 }
 const std::vector<GenericToolbox::AnyType>& PhysicsEvent::getVarHolder(const std::string &leafName_) const{
   int index = this->findVarIndex(leafName_, true);
