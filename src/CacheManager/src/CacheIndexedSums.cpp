@@ -74,7 +74,7 @@ Cache::IndexedSums::~IndexedSums() = default;
 void Cache::IndexedSums::Reset() {
     // Very little to do here since the indexed sum cache is zeroed with it is
     // filled.  Mark it as invalid out of an abundance of caution!
-    fSumsValid = false;
+    Invalidate();
 }
 
 void Cache::IndexedSums::SetEventIndex(int event, int bin) {
@@ -100,7 +100,8 @@ double Cache::IndexedSums::GetSum(int i) {
     // finishes before the sum is set to be valid.  The use of isnan is to
     // make sure that the optimizer doesn't reorder the statements.
     double value = fSums->hostPtr()[i];
-    if (not std::isnan(value)) fSumsValid = true;
+    if (not fSumsApplied) fSumsValid = false;
+    else if (not std::isnan(value)) fSumsValid = true;
     else LogThrow("Cache::IndexedSums sum is nan");
     return value;
 }
@@ -112,7 +113,8 @@ double Cache::IndexedSums::GetSum2(int i) {
     // finishes before the sum is set to be valid.  The use of isfinite is to
     // make sure that the optimizer doesn't reorder the statements.
     double value = fSums2->hostPtr()[i];
-    if (not std::isnan(value)) fSumsValid = true;
+    if (not fSumsApplied) fSumsValid = false;
+    else if (not std::isnan(value)) fSumsValid = true;
     else LogThrow("Cache::IndexedSums sum2 is nan");
     return value;
 }
@@ -182,7 +184,7 @@ namespace {
 
 bool Cache::IndexedSums::Apply() {
     // Mark the results has having changed.
-    fSumsValid = false;
+    Invalidate();
 
     HEMIResetKernel resetKernel;
     hemi::launch(resetKernel,
@@ -214,6 +216,8 @@ bool Cache::IndexedSums::Apply() {
                      fIndexes->readOnlyPtr(),
                      fEventWeights.size());
     }
+
+    fSumsApplied = true;
 
     // Synchronization prevents the GPU from running in parallel with the CPU,
     // so it can make the whole program a little slower.  In practice, the
@@ -253,5 +257,4 @@ bool Cache::IndexedSums::Apply() {
 // Local Variables:
 // mode:c++
 // c-basic-offset:4
-// compile-command:"$(git rev-parse --show-toplevel)/cmake/gundam-build.sh"
 // End:
