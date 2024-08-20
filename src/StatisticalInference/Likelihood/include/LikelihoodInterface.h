@@ -17,15 +17,17 @@
 #include <string>
 
 
-/*
- The LikelihoodInterface job is to evaluate the Likelihood component of a given pair of data/MC.
- It contains a few buffers that are used externally to monitor the fit status.
-
- The "likelihood" for GUNDAM is documented in the JointProbability class as the LLH
- (Log Likelihood), but while it is proportional to the LLH, it's actually
- more closely related to the chi-square (so -LLH/2) as it is treated in the penalty term.
-*/
-
+/// Evaluate the likelihood between data and MC.  The calculation is buffered
+/// and and updated by the propagateAndEvalLikelihood() method.  The
+/// likelihood value for the last calculation is accessible through
+/// getLastLikelihood().
+///
+/// The "likelihood" for GUNDAM is based on the comparision between a "data"
+/// and "expected" (i.e. MC) histogram.  The bin-by-bin comparisions are done
+/// using the JointProbability class and are based on one of several LLH (Log
+/// Likelihood) calculations (e.g. Barlow-Beeston, Icecube, Poissonian).
+/// While the value is proportional to the LLH, it is more closely related to
+/// the chi-square since we use -2*LLH.
 class LikelihoodInterface : public JsonBaseClass  {
 
 public:
@@ -46,6 +48,7 @@ protected:
   void initializeImpl() override;
 
 public:
+
   // const getters
   [[nodiscard]] int getNbParameters() const {return _nbParameters_; }
   [[nodiscard]] int getNbSampleBins() const {return _nbSampleBins_; }
@@ -115,5 +118,4 @@ private:
 // Local Variables:
 // mode:c++
 // c-basic-offset:2
-// compile-command:"$(git rev-parse --show-toplevel)/cmake/gundam-build.sh"
 // End:
