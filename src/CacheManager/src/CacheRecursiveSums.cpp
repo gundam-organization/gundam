@@ -341,6 +341,8 @@ bool Cache::RecursiveSums::Apply() {
                  fBinOffsets->readOnlyPtr(),
                  fSums2->size());
 
+    fSumsApplied = true;
+
     return true;
 }
 
