@@ -60,8 +60,12 @@ if(GTEST_FOUND)
       gtest_discover_tests(gundamGTest_device.exe)
     endif(CMAKE_CUDA_COMPILER)
 
+  else( WITH_CACHE_MANAGER )
+
+    cmessage( WARNING "WITH_CACHE_MANAGER is set to false. Skipping Google test executables." )
+
   endif( WITH_CACHE_MANAGER )
 
 else(GTEST_FOUND)
-  cmessage( STATUS "Google test is not available..." )
+  cmessage( WARNING "Google test is not available." )
 endif(GTEST_FOUND)
