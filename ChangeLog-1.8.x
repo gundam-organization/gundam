@@ -1,8 +1,10 @@
 Fixes relative to 1.8.4
 
+Issue #582: Safely check parameter limits during fits.  The old method for checking parameter validity during fits depended on first setting an invalid value, and then checking the validity.  Queries are added to check validity before setting.  This also adds checks for the GPU that the likelihood has not been changed since initialization.  If there is a change, a log message is generated, and the calculation falls back to the CPU.  This should only happen during debugging.
+
 Issue #578: Apply cleanups to make sure that eigendecoposition and parameter throwing honor the parameter boundaries.  
 
-Fixes: Guarrantee that all parameter value access is through the setter and getter so that the validity checks are correctly applied.
+Fixes: Guarantee that all parameter value access is through the setter and getter so that the validity checks are correctly applied.
 
 Fixes relative to 1.8.3
 

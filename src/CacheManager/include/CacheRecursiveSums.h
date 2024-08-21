@@ -71,6 +71,9 @@ private:
     // is a global event weight clamp.
     double fUpperClamp;
 
+    // Flag that the sum has been applied.
+    bool fSumsApplied;
+
     // Cache of whether the result values in memory are valid.
     bool fSumsValid;
 
@@ -84,6 +87,9 @@ public:
     /// Deconstruct the class.  This should deallocate all the memory
     /// everyplace.
     virtual ~RecursiveSums();
+
+    /// Invalidate the sum in the CPU memory.
+    void Invalidate() {fSumsApplied = false; fSumsValid = false;}
 
     /// Reinitialize the cache.  This puts it into a state to be refilled, but
     /// does not deallocate any memory.
@@ -159,6 +165,5 @@ public:
 // Local Variables:
 // mode:c++
 // c-basic-offset:4
-// compile-command:"$(git rev-parse --show-toplevel)/cmake/gundam-build.sh"
 // End:
 #endif

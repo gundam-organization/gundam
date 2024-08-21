@@ -21,7 +21,6 @@ LoggerInit([]{
   Logger::setUserHeaderStr("[ParameterSet]");
 } );
 
-
 void ParameterSet::readConfigImpl(){
   LogThrowIf(_config_.empty(), "FitParameterSet config not set.");
 
@@ -327,6 +326,14 @@ const std::vector<Parameter>& ParameterSet::getEffectiveParameterList() const{
   return getParameterList();
 }
 
+bool ParameterSet::isValid() const {
+  for (const Parameter& par : getParameterList()) {
+    if (not par.isEnabled()) continue;
+    if (not par.isValidValue(par.getParameterValue())) return false;
+  }
+  return true;
+}
+
 // non const getters
 std::vector<Parameter>& ParameterSet::getEffectiveParameterList(){
   if( _useEigenDecompInFit_ ) return getEigenParameterList();
@@ -357,6 +364,13 @@ double ParameterSet::getPenaltyChi2() {
   }
 
   return _penaltyChi2Buffer_;
+}
+
+void ParameterSet::setValidity(const std::string& validity) {
+  for (Parameter& par : getParameterList()) {
+    par.setValidity(validity);
+  }
+  LogWarning << "Set parameter set validity to " << validity << std::endl;
 }
 
 // Parameter throw

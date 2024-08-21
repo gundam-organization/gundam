@@ -185,7 +185,6 @@ void LikelihoodInterface::saveGradientSteps(){
 
 double LikelihoodInterface::evalFit(const double* parArray_){
   LogThrowIf(not _isInitialized_, "not initialized");
-  GenericToolbox::getElapsedTimeSinceLastCallInMicroSeconds(__METHOD_NAME__);
 
   if(_nbFitCalls_ != 0){
     _outEvalFitAvgTimer_.counts++ ; _outEvalFitAvgTimer_.cumulated += GenericToolbox::getElapsedTimeSinceLastCallInMicroSeconds("out_evalFit");
@@ -193,11 +192,13 @@ double LikelihoodInterface::evalFit(const double* parArray_){
   ++_nbFitCalls_;
 
   // Update fit parameter values:
-  int iFitPar{0};
+  const double *v = parArray_;
   for( auto* par : _minimizerFitParameterPtr_ ){
-    if( getUseNormalizedFitSpace() ) par->setParameterValue(ParameterSet::toRealParValue(parArray_[iFitPar++], *par));
-    else par->setParameterValue(parArray_[iFitPar++]);
+    if (not getUseNormalizedFitSpace()) par->setParameterValue(*(v++));
+    else par->setParameterValue(ParameterSet::toRealParValue(*(v++), *par));
   }
+
+  GenericToolbox::getElapsedTimeSinceLastCallInMicroSeconds(__METHOD_NAME__);
 
   // Compute the Chi2
   _owner_->getPropagator().updateLlhCache();
@@ -206,7 +207,7 @@ double LikelihoodInterface::evalFit(const double* parArray_){
 
   // Minuit based algo might want this
   if( _monitorGradientDescent_ ){
-    // check if minuit is moving toward the minimum
+    // check if point is moving toward the minimum
     bool isGradientDescentStep = std::all_of(_minimizerFitParameterPtr_.begin(), _minimizerFitParameterPtr_.end(), [](const Parameter* par_){
       return ( par_->gotUpdated() or par_->isFixed() or not par_->isEnabled() );
     } );
@@ -220,7 +221,7 @@ double LikelihoodInterface::evalFit(const double* parArray_){
         _lastGradientFall_ = _nbFitCalls_;
       }
       else{
-        // saving each step of the gradient descen
+        // saving each step of the gradient descent
         _gradientMonitor_.emplace_back();
         LogWarning << "Gradient step detected at iteration #" << _nbFitCalls_ << ": ";
         LogWarning(_gradientMonitor_.size() >= 2) << _gradientMonitor_[_gradientMonitor_.size() - 2].llh << " -> ";
@@ -341,14 +342,12 @@ double LikelihoodInterface::evalFit(const double* parArray_){
 }
 
 double LikelihoodInterface::evalFitValid(const double* parArray_) {
-  double value = evalFit(parArray_);
-  if (hasValidParameterValues()) return value;
-  /// A "Really Big Number".  This is nominally just infinity, but is done as
-  /// a defined constant to make the code easier to understand.  This needs to
-  /// be an appropriate value to safely represent an impossible chi-squared
-  /// value "representing" -log(0.0)/2 and should should be larger than 5E+30.
-  const double RBN = std::numeric_limits<double>::infinity();
-  return RBN;
+  // Check fit parameter values:
+  const double *v = parArray_;
+  for( auto* par : _minimizerFitParameterPtr_ ){
+    if (not par->isValidValue(*(v++))) return std::numeric_limits<double>::infinity();
+  }
+  return evalFit(parArray_);
 }
 
 double LikelihoodInterface::getLastLikelihood() const {
@@ -364,56 +363,11 @@ double LikelihoodInterface::getLastLikelihoodPenalty() const {
 }
 
 void LikelihoodInterface::setParameterValidity(const std::string& validity) {
-  LogWarning << "Set parameter validity to " << validity << std::endl;
-  if (validity.find("noran") != std::string::npos) _validFlags_ &= ~0b0001;
-  else if (validity.find("ran") != std::string::npos) _validFlags_ |= 0b0001;
-  if (validity.find("nomir") != std::string::npos) _validFlags_ &= ~0b0010;
-  else if (validity.find("mir") != std::string::npos) _validFlags_ |= 0b0010;
-  if (validity.find("nophy") != std::string::npos) _validFlags_ &= ~0b0100;
-  else if (validity.find("phy") != std::string::npos) _validFlags_ |= 0b0100;
-  LogWarning << "Set parameter validity to " << validity
-             << " (" << _validFlags_ << ")" << std::endl;
+  return _owner_->getPropagator().getParametersManager().setParameterValidity(validity);
 }
 
 bool LikelihoodInterface::hasValidParameterValues() const {
-  int invalid = 0;
-  for (const ParameterSet& parSet:
-         _owner_->getPropagator().getParametersManager().getParameterSetsList()) {
-    for (const Parameter& par : parSet.getParameterList()) {
-      if ( (_validFlags_ & 0b0001) != 0
-          and std::isfinite(par.getMinValue())
-          and par.getParameterValue() < par.getMinValue()) [[unlikely]] {
-        ++invalid;
-      }
-      if ((_validFlags_ & 0b0001) != 0
-          and std::isfinite(par.getMaxValue())
-          and par.getParameterValue() > par.getMaxValue()) [[unlikely]] {
-        ++invalid;
-      }
-      if ((_validFlags_ & 0b0010) != 0
-          and std::isfinite(par.getMinMirror())
-          and par.getParameterValue() < par.getMinMirror()) [[unlikely]] {
-        ++invalid;
-      }
-      if ((_validFlags_ & 0b0010) != 0
-          and std::isfinite(par.getMaxMirror())
-          and par.getParameterValue() > par.getMaxMirror()) [[unlikely]] {
-        ++invalid;
-      }
-      if ((_validFlags_ & 0b0100) != 0
-          and std::isfinite(par.getMinPhysical())
-          and par.getParameterValue() < par.getMinPhysical()) [[unlikely]] {
-        ++invalid;
-      }
-      if ((_validFlags_ & 0b0100) != 0
-          and std::isfinite(par.getMaxPhysical())
-          and par.getParameterValue() > par.getMaxPhysical()) [[unlikely]] {
-        ++invalid;
-      }
-
-    }
-  }
-  return (invalid == 0);
+  return _owner_->getPropagator().getParametersManager().hasValidParameterSets();
 }
 
 // An MIT Style License
@@ -441,5 +395,4 @@ bool LikelihoodInterface::hasValidParameterValues() const {
 // Local Variables:
 // mode:c++
 // c-basic-offset:2
-// compile-command:"$(git rev-parse --show-toplevel)/cmake/gundam-build.sh"
 // End:
