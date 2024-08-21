@@ -64,6 +64,24 @@ public:
   static void muteLogger();
   static void unmuteLogger();
 
+  /// Define the type of validity that needs to be required by
+  /// hasValidParameterValues.  The validity is propagated to each
+  /// ParameterSet.  The validity is:
+  ///
+  ///  "range" (default) -- Between the parameter minimum and maximum values.
+  ///  "norange"         -- Do not require parameters in the valid range
+  ///  "mirror"          -- Between the mirrored values (if parameter has
+  ///                       mirroring).
+  ///  "nomirror"        -- Do not require parameters in the mirrored range
+  ///  "physical"        -- Only physically meaningful values.
+  ///  "nophysical"      -- Do not require parameters in the physical range.
+  ///
+  /// Example: setParameterValidity("range,mirror,physical")
+  void setParameterValidity(const std::string& validity);
+
+  /// Check that the parameters in all of the enabled ParameterSets are valid.
+  [[nodiscard]] bool hasValidParameterSets() const;
+
 private:
   // config
   bool _reThrowParSetIfOutOfBounds_{true};  // NO LONGER USE. ALWAYS TRUE.

@@ -105,19 +105,26 @@ public:
   void setOwner(const ParameterSet *owner_){ _owner_ = owner_; }
   void setPriorType(PriorType priorType){ _priorType_ = priorType; }
 
-  // Query if a value is in the domain of likelihood for this parameter.  Math
-  // remediation for those of us (including myself) who don't recall grammar
-  // school math: The DOMAIN of a function is the range over which it is
-  // defined.  For instance, the domain of the information transfer speed
-  // (dX/dT) is greater than or equal to zero.  To be in the domain, a value
-  // must not be NaN, and be between minValue and maxValue (if they are
-  // defined).
+  /// Query if a value is in the domain of likelihood for this parameter.  Math
+  /// remediation for those of us (including myself) who don't recall grammar
+  /// school math: The DOMAIN of a function is the range over which it is
+  /// defined.  For instance, the domain of the information transfer speed
+  /// (dX/dT) is greater than or equal to zero.  To be in the domain, a value
+  /// must not be NaN, and be between minValue and maxValue (if they are
+  /// defined).
   [[nodiscard]] bool isInDomain(double value, bool verbose=false) const;
 
-  // Query if a value is in the range where the parameter will have a
-  // physically meaningful value.  For example, within special relativity, the
-  // information transfer speed is between zero and the speed of light.
+  /// Query if a value is in the range where the parameter will have a
+  /// physically meaningful value.  For example, within special relativity, the
+  /// information transfer speed is between zero and the speed of light.
   [[nodiscard]] bool isPhysical(double value) const;
+
+  /// Query if a value will be mirrored.  This is true if the parameter value
+  /// is not between the minimum and maximum mirror values.
+  [[nodiscard]] bool isMirrored(double value) const;
+
+  /// Query if a value matchs the validity requirements.
+  [[nodiscard]] bool isValidValue(double value) const;
 
   [[nodiscard]] bool isFree() const{ return _isFree_; }
   [[nodiscard]] bool isFixed() const{ return _isFixed_; }
@@ -169,6 +176,22 @@ public:
   [[nodiscard]] std::string getTitle() const;
   [[nodiscard]] std::string getFullTitle() const;
 
+  /// Define the type of validity that needs to be required by
+  /// hasValidParameterValues.  This accepts a string with the possible values
+  /// being:
+  ///
+  ///  "range" (default) -- Between the parameter minimum and maximum values.
+  ///  "norange"         -- Do not require parameters in the valid range
+  ///  "mirror"          -- Between the mirrored values (if parameter has
+  ///                       mirroring).
+  ///  "nomirror"        -- Do not require parameters in the mirrored range
+  ///  "physical"        -- Only physically meaningful values.
+  ///  "nophysical"      -- Do not require parameters in the physical range.
+  ///
+  /// Example: setParameterValidity("range,mirror,physical")
+  void setValidity(const std::string& validity);
+  void setValidity(int validity) {_validFlags_ = validity;}
+
 private:
   // Parameters
   bool _isEnabled_{true};
@@ -196,6 +219,13 @@ private:
   // Internals
   const ParameterSet* _owner_{nullptr};
   PriorType _priorType_{PriorType::Gaussian};
+
+  /// A set of flags used to define if the parameter set has valid parameter
+  /// values.
+  /// "1" -- require valid parameters (Parameter::isInDomain will be true)
+  /// "2" -- require in the mirrored range (is inside mirrored range).
+  /// "4" -- require in the physical range (Parameter::isPhysical will be true)
+  int _validFlags_{1};
 
 };
 #endif //GUNDAM_PARAMETER_H
