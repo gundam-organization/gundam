@@ -125,7 +125,14 @@ namespace EventUtils{
     // A pointer to a callback to force the cache to be updated.  This will
     // force the value to be copied from the GPU to the host (if necessary).
     void (*updateCallbackPtr)(){nullptr};
-    // Get the value of the weight.
+    // Safely update the value.  The value may not be valid after
+    // this call.
+    void update() const;
+    // Check if there is a valid value.  The update might not provide a valid
+    // value for the cache, so THIS. MUST. BE. CHECKED.
+    [[nodiscard]] bool valid() const;
+    // Get the current value of the weight.  Only valid if valid() returned
+    // true.
     [[nodiscard]] double getWeight() const;
   };
 #endif

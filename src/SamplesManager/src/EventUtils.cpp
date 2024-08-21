@@ -143,23 +143,31 @@ namespace EventUtils{
     }
     return ss.str();
   }
-
 }
 
 
 #ifdef GUNDAM_USING_CACHE_MANAGER
 /// Cache
-namespace EventUtils{
-  double Cache::getWeight() const{
-    if( isValidPtr != nullptr and not(*isValidPtr)){
-      // This is slowish, but will make sure that the cached result is
-      // updated when the cache has changed.  The values pointed to by
-      // _CacheManagerValue_ and _CacheManagerValid_ are inside
-      // of the weights cache (a bit of evil coding here), and are
+namespace EventUtils {
+  void Cache::update() const {
+    if( isValidPtr and not (*isValidPtr)) {
+      // This is slowish, but will make sure that the cached result is updated
+      // when the cache has changed.  The value pointed to by isValidPtr is
+      // inside of the weights cache (a bit of evil coding here), and are
       // updated by the cache.  The update is triggered by
-      // (*_CacheManagerUpdate_)().
+      // (*updateCallbackPtr)().
       if( updateCallbackPtr != nullptr ){ (*updateCallbackPtr)(); }
     }
+  }
+
+  bool Cache::valid() const {
+    // Check that the valuePtr points to a value that exists, and is valid.
+    return valuePtr and isValidPtr and *isValidPtr;
+  }
+
+  double Cache::getWeight() const {
+    // The value pointed to by valuePtr limes inside of the weights cache (a
+    // bit of evil coding here).
     LogThrowIf(valuePtr == nullptr, "No value cache"); // Trap for bad calls
     LogThrowIf(std::isnan(*valuePtr), "NaN weight");   // Trap for bad calcs.
     return *valuePtr;

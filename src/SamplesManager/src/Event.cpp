@@ -19,17 +19,17 @@ LoggerInit([]{
 // const getters
 double Event::getEventWeight() const {
 #ifdef GUNDAM_USING_CACHE_MANAGER
-  if( getCache().valuePtr != nullptr  ){
-    double value =  getCache().getWeight();
-    if (not GundamGlobals::getForceDirectCalculation()) return value;
-    LogAlertOnce << "Validate calculated and cached event weight" << std::endl;
-    if (not GundamUtils::almostEqual(value, _weights_.current, 0.5)) {
-      LogError << "Inconsistent event weight -- "
-               << " Calculated: " << value
-               << " Cached: " << _weights_.current
-               << " Diff: " << value-_weights_.current << std::endl;
-      LogThrow("Bad event weight calculation");
-    }
+  if (!getCache().valid()) getCache().update();
+  if (!getCache().valid()) return _weights_.current;
+  const double value =  getCache().getWeight();
+  if (not GundamGlobals::getForceDirectCalculation()) return value;
+  LogAlertOnce << "Validate calculated and cached event weight" << std::endl;
+  if (not GundamUtils::almostEqual(value, _weights_.current, 0.5)) {
+    LogError << "Inconsistent event weight -- "
+             << " Calculated: " << value
+             << " Cached: " << _weights_.current
+             << " Diff: " << value-_weights_.current << std::endl;
+    LogThrow("Bad event weight calculation");
   }
 #endif
   return _weights_.current;

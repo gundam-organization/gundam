@@ -56,12 +56,9 @@ private:
   EventUtils::Variables _variables_{};
 
 #ifdef GUNDAM_USING_CACHE_MANAGER
-private:
   friend class Cache::Manager;
   [[nodiscard]] const EventUtils::Cache& getCache() const{ return _cache_; }
   EventUtils::Cache& getCache(){ return _cache_; }
-
-private:
   EventUtils::Cache _cache_{};
 #endif
 
