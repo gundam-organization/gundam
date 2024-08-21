@@ -87,7 +87,7 @@ Cache::RecursiveSums::~RecursiveSums() = default;
 void Cache::RecursiveSums::Reset() {
     // Very little to do here since the indexed sum cache is zeroed with it is
     // filled.  Mark it as invalid out of an abundance of caution!
-    fSumsValid = false;
+    Invalidate();
 }
 
 /// Build the internal tables after all the events are filled.  This can be
@@ -170,7 +170,8 @@ double Cache::RecursiveSums::GetSum(int i) {
     // finishes before the sum is set to be valid.  The use of isnan is to
     // make sure that the optimizer doesn't reorder the statements.
     double value = fSums->hostPtr()[i];
-    if (not std::isnan(value)) fSumsValid = true;
+    if (not fSumsApplied) fSumsValid = false;
+    else if (not std::isnan(value)) fSumsValid = true;
     else LogThrow("Cache::RecursiveSums sum is nan");
     return value;
 }
@@ -182,7 +183,8 @@ double Cache::RecursiveSums::GetSum2(int i) {
     // finishes before the sum is set to be valid.  The use of isfinite is to
     // make sure that the optimizer doesn't reorder the statements.
     double value = fSums2->hostPtr()[i];
-    if (not std::isnan(value)) fSumsValid = true;
+    if (not fSumsApplied) fSumsValid = false;
+    else if (not std::isnan(value)) fSumsValid = true;
     else LogThrow("Cache::RecursiveSums sum2 is nan");
     return value;
 }
@@ -274,7 +276,7 @@ namespace {
 
 bool Cache::RecursiveSums::Apply() {
     // Mark the results has having changed.
-    fSumsValid = false;
+    Invalidate();
 
     ///////////////////////////////////////////////////
     // Calculate the sum
@@ -339,6 +341,8 @@ bool Cache::RecursiveSums::Apply() {
                  fBinOffsets->readOnlyPtr(),
                  fSums2->size());
 
+    fSumsApplied = true;
+
     return true;
 }
 
@@ -367,5 +371,4 @@ bool Cache::RecursiveSums::Apply() {
 // Local Variables:
 // mode:c++
 // c-basic-offset:4
-// compile-command:"$(git rev-parse --show-toplevel)/cmake/gundam-build.sh"
 // End:

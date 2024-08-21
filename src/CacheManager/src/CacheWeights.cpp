@@ -53,7 +53,7 @@ Cache::Weights::Weights(std::size_t results)
 }
 
 void Cache::Weights::Reset() {
-    fResultsValid = false;
+    Invalidate();
     std::fill(fInitialValues->hostPtr(),
               fInitialValues->hostPtr() + fInitialValues->size(),
               1.0);
@@ -70,7 +70,8 @@ double Cache::Weights::GetResult(int i) {
     // finishes before the result is set to be valid.  The use of isnan is
     // to make sure that the optimizer doesn't reorder the statements.
     double value = fResults->hostPtr()[i];
-    if (not std::isnan(value)) fResultsValid = true;
+    if (not fKernelApplied) fResultsValid = false;
+    else if (not std::isnan(value)) fResultsValid = true;
     else LogThrow("Cache::Weights result is nan");
     return value;
 }
@@ -80,7 +81,8 @@ double Cache::Weights::GetResultFast(int i) {
     // finishes before the result is set to be valid.  The use of isnan is
     // to make sure that the optimizer doesn't reorder the statements.
     double value = fResults->hostPtr()[i];
-    if (not std::isnan(value)) fResultsValid = true;
+    if (not fKernelApplied) fResultsValid = false;
+    else if (not std::isnan(value)) fResultsValid = true;
     else LogThrow("Cache::Weights result is nan");
     return value;
 }
@@ -139,6 +141,10 @@ namespace {
 
 bool Cache::Weights::Apply() {
 
+    // Mark the results will be changed.
+    Invalidate();
+
+    // Apply the kernels.
     HEMISetKernel setKernel;
     hemi::launch(setKernel,
                  fResults->writeOnlyPtr(),
@@ -150,8 +156,7 @@ bool Cache::Weights::Apply() {
         fWeightCalculator.at(i)->Apply();
     }
 
-    // Mark the results has having changed.
-    fResultsValid = false;
+    fKernelApplied = true;
 
     // Synchronization prevents the GPU from running in parallel with the CPU,
     // so it can make the whole program a little slower.  In practice, the
