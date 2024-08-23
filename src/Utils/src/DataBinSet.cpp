@@ -252,7 +252,7 @@ void DataBinSet::readBinningConfig(const JsonType& binning_){
 
   if( GenericToolbox::Json::doKeyExist(binning_, {"binningDefinition"}) ){
 
-    auto binningDefinition{GenericToolbox::Json::fetchValue<JsonType>(binning_, "binningDefinition")};
+    auto binningDefinition = GenericToolbox::Json::fetchValue<JsonType>(binning_, "binningDefinition");
     struct Dimension{
       int nBins{0};
       int nModulo{1};
@@ -263,13 +263,10 @@ void DataBinSet::readBinningConfig(const JsonType& binning_){
     std::vector<Dimension> dimensionList{};
     dimensionList.reserve( binningDefinition.size() );
 
-    LogWarning << GET_VAR_NAME_VALUE(binningDefinition) << std::endl;
-
     for( auto& binDefEntry : binningDefinition ){
       dimensionList.emplace_back();
       auto& dim = dimensionList.back();
 
-      LogWarning << GET_VAR_NAME_VALUE(binDefEntry) << std::endl;
       dim.var = GenericToolbox::Json::fetchValue<std::string>(binDefEntry, "name");
 
       if( GenericToolbox::Json::doKeyExist(binDefEntry, "edges") ){
@@ -281,9 +278,9 @@ void DataBinSet::readBinningConfig(const JsonType& binning_){
       }
       else if( GenericToolbox::Json::doKeyExist(binDefEntry, "nBins") ){
         // TH1D-like definition
-        int nBins{ GenericToolbox::Json::fetchValue<int>(binDefEntry, "nBins") };
-        double minVal{ GenericToolbox::Json::fetchValue<double>(binDefEntry, "min") };
-        double maxVal{ GenericToolbox::Json::fetchValue<double>(binDefEntry, "max") };
+        auto nBins( GenericToolbox::Json::fetchValue<int>(binDefEntry, "nBins") );
+        auto minVal( GenericToolbox::Json::fetchValue<double>(binDefEntry, "min") );
+        auto maxVal( GenericToolbox::Json::fetchValue<double>(binDefEntry, "max") );
 
         double step{(maxVal - minVal)/nBins};
         LogThrowIf( step <= 0, "Invalid binning: " << GenericToolbox::Json::toReadableString(binDefEntry) );

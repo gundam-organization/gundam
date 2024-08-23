@@ -243,7 +243,7 @@ int main(int argc, char** argv){
 
     outFilePath = "gundamCalcXsec_" + GundamUtils::generateFileName(clParser, appendixDict) + ".root";
 
-    std::string outFolder{GenericToolbox::Json::fetchValue<std::string>(xsecConfig, "outputFolder", "./")};
+    std::string outFolder(GenericToolbox::Json::fetchValue<std::string>(xsecConfig, "outputFolder", "./"));
     outFilePath = GenericToolbox::joinPath(outFolder, outFilePath);
   }
 
