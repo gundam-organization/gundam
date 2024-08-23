@@ -263,9 +263,13 @@ void DataBinSet::readBinningConfig(const JsonType& binning_){
     std::vector<Dimension> dimensionList{};
     dimensionList.reserve( binningDefinition.size() );
 
+    LogWarning << GET_VAR_NAME_VALUE(binningDefinition) << std::endl;
+
     for( auto& binDefEntry : binningDefinition ){
       dimensionList.emplace_back();
       auto& dim = dimensionList.back();
+
+      LogWarning << GET_VAR_NAME_VALUE(binDefEntry) << std::endl;
       dim.var = GenericToolbox::Json::fetchValue<std::string>(binDefEntry, "name");
 
       if( GenericToolbox::Json::doKeyExist(binDefEntry, "edges") ){
