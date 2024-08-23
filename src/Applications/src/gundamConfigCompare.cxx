@@ -162,7 +162,7 @@ void compareConfigStage(const JsonType& config1_, const JsonType& config2_){
 
         }
         else if( entry1_.is_structured() and entry2_.is_structured() ){
-          std::vector<std::string> keysToFetch{GenericToolbox::Json::ls(entry1_)};
+          std::vector<std::string> keysToFetch(GenericToolbox::Json::ls(entry1_));
           for( auto& key2 : GenericToolbox::Json::ls(entry2_) ){
             if( not GenericToolbox::doesElementIsInVector(key2, keysToFetch) ){ keysToFetch.emplace_back(key2); }
           }
