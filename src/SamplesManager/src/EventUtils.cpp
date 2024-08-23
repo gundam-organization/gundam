@@ -150,13 +150,13 @@ namespace EventUtils{
 /// Cache
 namespace EventUtils {
   void Cache::update() const {
-    if( isValidPtr and not (*isValidPtr)) {
+    if( valuePtr and isValidPtr and not (*isValidPtr)) {
       // This is slowish, but will make sure that the cached result is updated
       // when the cache has changed.  The value pointed to by isValidPtr is
       // inside of the weights cache (a bit of evil coding here), and are
       // updated by the cache.  The update is triggered by
       // (*updateCallbackPtr)().
-      if( updateCallbackPtr != nullptr ){ (*updateCallbackPtr)(); }
+      if(updateCallbackPtr) { (*updateCallbackPtr)(); }
     }
   }
 
@@ -168,8 +168,6 @@ namespace EventUtils {
   double Cache::getWeight() const {
     // The value pointed to by valuePtr limes inside of the weights cache (a
     // bit of evil coding here).
-    LogThrowIf(valuePtr == nullptr, "No value cache"); // Trap for bad calls
-    LogThrowIf(std::isnan(*valuePtr), "NaN weight");   // Trap for bad calcs.
     return *valuePtr;
   }
 }
