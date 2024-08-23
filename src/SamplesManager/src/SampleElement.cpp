@@ -141,15 +141,32 @@ void SampleElement::refillHistogram(int iThread_){
     // Parallel calculations of the histogramming have been run.  Make sure
     // they are the same.
     if (GundamGlobals::getForceDirectCalculation() and filledWithManager) {
-      if (not GundamUtils::almostEqual(value,(binPtr->content))
-          || not GundamUtils::almostEqual(error,(binPtr->error))) {
+      bool problemFound = false;
+      if (not GundamUtils::almostEqual(value,(binPtr->content))) {
+        double magnitude = std::abs(value) + std::abs(binPtr->content);
+        double delta = std::abs(value - binPtr->content);
+        if (magnitude > 0.0) delta /= magnitude;
         std::ostringstream str;
         str << "Incorrect histogram content --"
             << " Content: " << value << "!=" << binPtr->content
-            << " Error: " << error << "!=" << binPtr->error;
+            << " Error: " << error << "!=" << binPtr->error
+            << " Precision: " << delta;
         LogError << str.str() << std::endl;
-        LogThrow(str.str());
+        problemFound = true;
       }
+      if (not GundamUtils::almostEqual(error,(binPtr->error))) {
+        double magnitude = std::abs(error) + std::abs(binPtr->error);
+        double delta = std::abs(error - binPtr->error);
+        if (magnitude > 0.0) delta /= magnitude;
+        std::ostringstream str;
+        str << "Incorrect histogram error --"
+            << " Content: " << value << "!=" << binPtr->content
+            << " Error: " << error << "!=" << binPtr->error
+            << " Precision: " << delta;
+        LogError << str.str() << std::endl;
+        problemFound = true;
+      }
+      if (false and problemFound) std::exit(EXIT_FAILURE); // For debugging
     }
 #endif
     // We don't use TH1D anymore.  TH1 tracks the variance, while we track the
