@@ -145,25 +145,23 @@ void SampleElement::refillHistogram(int iThread_){
       if (not GundamUtils::almostEqual(value,(binPtr->content))) {
         double magnitude = std::abs(value) + std::abs(binPtr->content);
         double delta = std::abs(value - binPtr->content);
-        if (magnitude > 0.0) delta /= magnitude;
-        std::ostringstream str;
-        str << "Incorrect histogram content --"
-            << " Content: " << value << "!=" << binPtr->content
-            << " Error: " << error << "!=" << binPtr->error
-            << " Precision: " << delta;
-        LogError << str.str() << std::endl;
+        if (magnitude > 0.0) delta /= 0.5*magnitude;
+        LogError << "Incorrect histogram content --"
+                 << " Content: " << value << "!=" << binPtr->content
+                 << " Error: " << error << "!=" << binPtr->error
+                 << " Precision: " << delta
+                 << std::endl;
         problemFound = true;
       }
       if (not GundamUtils::almostEqual(error,(binPtr->error))) {
         double magnitude = std::abs(error) + std::abs(binPtr->error);
         double delta = std::abs(error - binPtr->error);
-        if (magnitude > 0.0) delta /= magnitude;
-        std::ostringstream str;
-        str << "Incorrect histogram error --"
-            << " Content: " << value << "!=" << binPtr->content
-            << " Error: " << error << "!=" << binPtr->error
-            << " Precision: " << delta;
-        LogError << str.str() << std::endl;
+        if (magnitude > 0.0) delta /= 0.5*magnitude;
+        LogError << "Incorrect histogram error --"
+                 << " Content: " << value << "!=" << binPtr->content
+                 << " Error: " << error << "!=" << binPtr->error
+                 << " Precision: " << delta
+                 << std::endl;
         problemFound = true;
       }
       if (false and problemFound) std::exit(EXIT_FAILURE); // For debugging
