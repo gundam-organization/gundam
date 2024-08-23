@@ -6,6 +6,10 @@
 #include "DialCollection.h"
 #include "DialBaseFactory.h"
 #include "TabulatedDialFactory.h"
+#include "RootFormula.h"
+
+#include "GenericToolbox.Json.h"
+#include "Logger.h"
 
 #include <sstream>
 
@@ -676,7 +680,30 @@ bool DialCollection::initializeDialsWithDefinition() {
     // is a single dial for all events.  Create the dial here.
     _isEventByEvent_ = false;
     DialBaseFactory f;
-    _dialBaseList_.emplace_back( DialBaseObject( f.makeDial( dialsDefinition ) ) );
+
+    if( GenericToolbox::Json::doKeyExist(dialsDefinition, "binning") ){
+      auto binning = GenericToolbox::Json::fetchValue(dialsDefinition, "binning", JsonType());
+
+      _dialBinSet_ = DataBinSet();
+      _dialBinSet_.setName( "formula binning" );
+      _dialBinSet_.readBinningDefinition(binning);
+
+      _dialBaseList_.reserve( _dialBinSet_.getBinList().size() );
+      for( auto& bin : _dialBinSet_.getBinList() ){
+        _dialBaseList_.emplace_back( DialBaseObject( f.makeDial( dialsDefinition ) ) );
+
+        for( auto& var : bin.getEdgesList() ){
+          ((RootFormula*) _dialBaseList_.back().get())->getFormula().SetParameter(
+              var.varName.c_str(), var.getCenterValue()
+              );
+        }
+      }
+
+    }
+    else{
+      _dialBaseList_.emplace_back( DialBaseObject( f.makeDial( dialsDefinition ) ) );
+    }
+
   }
   else if( _globalDialType_ == "CompiledLibDial" ){
     // This dial collection calculates a function of the parameter values so it
