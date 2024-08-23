@@ -1,5 +1,5 @@
 //
-// Created by Nadrino on 13/10/2023.
+// Created by Adrien Blanchet on 13/10/2023.
 //
 
 #include "ParametersManager.h"
@@ -26,7 +26,7 @@ void ParametersManager::readConfigImpl(){
 
   _parameterSetListConfig_ = GenericToolbox::Json::fetchValue(_config_, "parameterSetList", _parameterSetListConfig_);
 
-  _reThrowParSetIfOutOfBounds_ = GenericToolbox::Json::fetchValue(_config_, "reThrowParSetIfOutOfBounds", _reThrowParSetIfOutOfBounds_);
+  _reThrowParSetIfOutOfPhysical_ = GenericToolbox::Json::fetchValue(_config_, {{"reThrowParSetIfOutOfBounds"},{"reThrowParSetIfOutOfPhysical"}}, _reThrowParSetIfOutOfPhysical_);
   _throwToyParametersWithGlobalCov_ = GenericToolbox::Json::fetchValue(_config_, "throwToyParametersWithGlobalCov", _throwToyParametersWithGlobalCov_);
 
   LogInfo << "Reading parameter configuration..." << std::endl;
@@ -162,7 +162,7 @@ void ParametersManager::throwParametersFromParSetCovariance(){
     if( parSet.getPriorCovarianceMatrix() != nullptr ){
       LogWarning << parSet.getName() << ": throwing correlated parameters..." << std::endl;
       LogScopeIndent;
-      parSet.throwParameters(_reThrowParSetIfOutOfBounds_);
+      parSet.throwParameters(_reThrowParSetIfOutOfPhysical_);
     } // throw?
     else{
       LogAlert << "No correlation matrix defined for " << parSet.getName() << ". NOT THROWING. (dev: could throw only with sigmas?)" << std::endl;
@@ -211,82 +211,82 @@ void ParametersManager::throwParametersFromGlobalCovariance(bool quietVerbose_){
     );
   }
 
-  bool keepThrowing{true};
   int throwNb{0};
-
-  while( keepThrowing ){
+  while( true ) {
     throwNb++;
     bool rethrow{false};
     auto throws = GenericToolbox::throwCorrelatedParameters(_choleskyMatrix_.get());
     for( int iPar = 0 ; iPar < _choleskyMatrix_->GetNrows() ; iPar++ ){
       auto* parPtr = _strippedParameterList_[iPar];
-      parPtr->setParameterValue( parPtr->getPriorValue() + throws[iPar] );
-      if( _reThrowParSetIfOutOfBounds_ ){
-        if      ( not std::isnan(parPtr->getMinValue()) and parPtr->getParameterValue() < parPtr->getMinValue() ){
-          rethrow = true;
-          LogAlert << GenericToolbox::ColorCodes::redLightText << "thrown value lower than min bound -> " << GenericToolbox::ColorCodes::resetColor
-                   << parPtr->getSummary(true) << std::endl;
-        }
-        else if( not std::isnan(parPtr->getMaxValue()) and parPtr->getParameterValue() > parPtr->getMaxValue() ){
-          rethrow = true;
-          LogAlert << GenericToolbox::ColorCodes::redLightText <<"thrown value higher than max bound -> " << GenericToolbox::ColorCodes::resetColor
-                   << parPtr->getSummary(true) << std::endl;
-        }
+      parPtr->setThrowValue(parPtr->getPriorValue() + throws[iPar]);
+      if ( not std::isnan(parPtr->getMinValue()) and parPtr->getThrowValue() < parPtr->getMinValue()) {
+        LogAlert << "Thrown value lower than min bound -> " << parPtr->getSummary(true) << std::endl;
+        rethrow = true;
+        break;
+      }
+      if ( not std::isnan(parPtr->getMaxValue()) and parPtr->getThrowValue() > parPtr->getMaxValue()) {
+        LogAlert << "Thrown value lower than max bound -> " << parPtr->getSummary(true) << std::endl;
+        rethrow = true;
+        break;
+      }
+      parPtr->setParameterValue( parPtr->getThrowValue() );
+      if( not _reThrowParSetIfOutOfPhysical_ ) continue;
+      if( not std::isnan(parPtr->getMinPhysical()) and parPtr->getParameterValue() < parPtr->getMinPhysical() ){
+        rethrow = true;
+        LogAlert << "thrown value lower than physical min bound -> "
+                 << parPtr->getSummary(true) << std::endl;
+        break;
+      }
+      if( not std::isnan(parPtr->getMaxPhysical()) and parPtr->getParameterValue() > parPtr->getMaxPhysical() ){
+        rethrow = true;
+        LogAlert << "thrown value higher than physical max bound -> "
+                 << parPtr->getSummary(true) << std::endl;
+        break;
       }
     }
 
     // Making sure eigen decomposed parameters get the conversion done
-    for( auto& parSet : _parameterSetList_ ){
+    for( auto& parSet : _parameterSetList_ ) {
+      if (rethrow) break;  // short circuit if we are already rethrowing.
       if( not parSet.isEnabled() ) continue;
-      if( parSet.isEnableEigenDecomp() ){
-        parSet.propagateOriginalToEigen();
-
-        // also check the bounds of real parameter space
-        if( _reThrowParSetIfOutOfBounds_ ){
-          for( auto& par : parSet.getEigenParameterList() ){
-            if( not par.isEnabled() ) continue;
-            if( not par.isValueWithinBounds() ){
-              // re-do the throwing
-              rethrow = true;
-              break;
-            }
-          }
-        }
+      if( not parSet.isEnableEigenDecomp() ) continue;
+      parSet.propagateOriginalToEigen();
+      // also check the bounds of real parameter space
+      for( auto& par : parSet.getEigenParameterList() ){
+        if( not par.isEnabled() ) continue;
+        if( par.isValueWithinBounds() ) continue;
+        // re-do the throwing
+        rethrow = true;
+        break;
       }
     }
 
-
-    if( rethrow ){
+    if( rethrow ) {
+      LogThrowIf( throwNb > 10000, "To many throw attempts")
       // wrap back to the while loop
-      LogWarning << "Re-throwing attempt #" << throwNb << std::endl;
+      LogWarning << "Rethrowing after attempt #" << throwNb << std::endl;
       continue;
     }
-    else{
-      for( auto& parSet : _parameterSetList_ ){
-        LogInfo << parSet.getName() << ":" << std::endl;
-        for( auto& par : parSet.getParameterList() ){
-          LogScopeIndent;
-          if( ParameterSet::isValidCorrelatedParameter(par) ){
-            par.setThrowValue( par.getParameterValue() );
-            LogInfo << "Thrown par " << par.getFullTitle() << ": " << par.getPriorValue();
-            LogInfo << " → " << par.getParameterValue() << std::endl;
-          }
-        }
-        if( parSet.isEnableEigenDecomp() ){
-          LogInfo << "Translated to eigen space:" << std::endl;
-          for( auto& eigenPar : parSet.getEigenParameterList() ){
-            LogScopeIndent;
-            eigenPar.setThrowValue( eigenPar.getParameterValue() );
-            LogInfo << "Eigen par " << eigenPar.getFullTitle() << ": " << eigenPar.getPriorValue();
-            LogInfo << " → " << eigenPar.getParameterValue() << std::endl;
-          }
+
+    for( auto& parSet : _parameterSetList_ ){
+      LogInfo << parSet.getName() << ":" << std::endl;
+      for( auto& par : parSet.getParameterList() ){
+        LogScopeIndent;
+        if( ParameterSet::isValidCorrelatedParameter(par) ){
+          par.setThrowValue( par.getParameterValue() );
+          LogInfo << "Thrown par " << par.getFullTitle() << ": " << par.getPriorValue();
+          LogInfo << " becomes " << par.getParameterValue() << std::endl;
         }
       }
-
+      if( not parSet.isEnableEigenDecomp() ) continue;
+      LogInfo << "Translated to eigen space:" << std::endl;
+      for( auto& eigenPar : parSet.getEigenParameterList() ){
+        LogScopeIndent;
+        eigenPar.setThrowValue( eigenPar.getParameterValue() );
+        LogInfo << "Eigen par " << eigenPar.getFullTitle() << ": " << eigenPar.getPriorValue();
+        LogInfo << " becomes " << eigenPar.getParameterValue() << std::endl;
+      }
     }
-
-    // reached this point: all parameters are within bounds
-    keepThrowing = false;
   }
 }
 
@@ -318,4 +318,3 @@ void ParametersManager::injectParameterValues(const JsonType &config_) {
 ParameterSet* ParametersManager::getFitParameterSetPtr(const std::string& name_){
   return const_cast<ParameterSet*>(const_cast<const ParametersManager*>(this)->getFitParameterSetPtr(name_));
 }
-

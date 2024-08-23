@@ -36,6 +36,10 @@ if( ROOT_FOUND )
   # Grab functions such as generate dictionary
   include( ${ROOT_USE_FILE} )
 
+  if (ROOT_VERSION VERSION_GREATER_EQUAL 6.30.00)
+    set(ROOT_minuit2_FOUND "yes")
+  endif()
+
 else( ROOT_FOUND )
   cmessage( STATUS "find_package didn't find ROOT. Using shell instead...")
 
@@ -76,6 +80,10 @@ else( ROOT_FOUND )
   add_compile_options("SHELL:${ROOT_CXX_FLAGS}")
   add_link_options("SHELL:${ROOT_LINK_FLAGS}")
 
+  if (ROOT_VERSION VERSION_GREATER_EQUAL 6.30.00)
+    set(ROOT_minuit2_FOUND "yes")
+  endif()
+
 endif( ROOT_FOUND )
 
 # Try to figure out which version of C++ was used to compile ROOT.  ROOT
@@ -103,11 +111,12 @@ if (NOT ROOT_minuit2_FOUND)
     OUTPUT_STRIP_TRAILING_WHITESPACE)
 endif(NOT ROOT_minuit2_FOUND)
 
-# If we truly don't have minuit2, then stop.
-if (NOT ROOT_minuit2_FOUND)
-  cmessage( STATUS "[ROOT]: Use >6.32 or rebuild root with-Dminuit2=on in the cmake command")
+# If we truly don't have minuit2, then complain
+if (NOT ROOT_minuit2_FOUND AND NOT WITH_MINUIT2_MISSING)
+  cmessage(WARNING "[ROOT]: Use >6.30 or rebuild root with -Dminuit2=on")
+  cmessage(WARNING "[ROOT]: Set WITH_MINUIT2_MISSING OFF to disable check")
   cmessage(FATAL_ERROR "[ROOT]: minuit2 is required")
-endif(NOT ROOT_minuit2_FOUND)
+endif()
 
 include_directories( ${ROOT_INCLUDE_DIR} )
 
@@ -175,7 +184,7 @@ else()
   find_package(ZLIB)
 endif()
 
-if ( ZLIB_FOUND )
+if( ZLIB_FOUND )
   cmessage( STATUS "ZLIB found : ${ZLIB_VERSION_STRING}")
   cmessage( STATUS "ZLIB_INCLUDE_DIRS = ${ZLIB_INCLUDE_DIRS}")
   cmessage( STATUS "ZLIB_LIBRARIES = ${ZLIB_LIBRARIES}")
@@ -186,7 +195,7 @@ if ( ZLIB_FOUND )
 else()
   cmessage( WARNING "ZLib not found. Will compile without the associated features." )
   add_definitions( -D USE_ZLIB=0 )
-endif ()
+endif()
 
 
 ####################

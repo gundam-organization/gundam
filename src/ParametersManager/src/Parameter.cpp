@@ -9,6 +9,8 @@
 #include "GenericToolbox.Json.h"
 #include "Logger.h"
 
+#include "GundamBacktrace.h"
+
 #include <sstream>
 
 LoggerInit([]{ Logger::setUserHeaderStr("[Parameter]"); });
@@ -87,12 +89,27 @@ void Parameter::setMaxMirror(double maxMirror) {
   }
   _maxMirror_ = maxMirror;
 }
-void Parameter::setParameterValue(double parameterValue) {
+void Parameter::setParameterValue(double parameterValue, bool force) {
+  if (not isInDomain(parameterValue, true)) {
+    LogError << "New parameter value is not in domain: " << parameterValue
+             << std::endl;
+    LogError << GundamUtils::Backtrace;
+    if (not force) std::exit(EXIT_FAILURE);
+    else LogAlert << "Forced continuation with invalid parameter" << std::endl;
+  }
   if( _parameterValue_ != parameterValue ){
     _gotUpdated_ = true;
     _parameterValue_ = parameterValue;
   }
   else{ _gotUpdated_ = false; }
+}
+double Parameter::getParameterValue() const {
+  if ( not isValueWithinBounds() ) {
+    LogWarning << "Getting out of bounds parameter: "
+               << getSummary() << std::endl;
+    LogDebug << GundamUtils::Backtrace;
+  }
+  return _parameterValue_;
 }
 void Parameter::setDialSetConfig(const JsonType &jsonConfig_) {
   auto jsonConfig = jsonConfig_;
@@ -106,16 +123,53 @@ void Parameter::setParameterDefinitionConfig(const JsonType &config_){
   _parameterConfig_ = config_;
 }
 
-bool Parameter::isValueWithinBounds() const{
-  if( not std::isnan(_minValue_) and _parameterValue_ < _minValue_ ) return false;
-  if( not std::isnan(_maxValue_) and _parameterValue_ > _maxValue_ ) return false;
+void Parameter::setValueAtPrior(){
+  setParameterValue(getPriorValue());
+}
+void Parameter::setCurrentValueAsPrior(){
+  setPriorValue(getParameterValue());
+}
+bool Parameter::isInDomain(double value_, bool verbose_) const {
+  if( std::isnan(value_) ) {
+    if (verbose_) {
+      LogError << "NaN value is not in parameter domain" << std::endl;
+      LogError << "Summary: " << getSummary() << std::endl;
+    }
+    return false;
+  }
+  if ( not std::isnan(_minValue_) and value_ < _minValue_ ) {
+    if (verbose_) {
+      LogError << "Value is below minimum: " << value_
+               << std::endl;
+      LogError << "Summary: " << getSummary() << std::endl;
+    }
+    return false;
+  }
+  if ( not std::isnan(_maxValue_) and value_ > _maxValue_ ) {
+    if (verbose_) {
+      LogError << "Attempting to set parameter above the maximum"
+               << " -- New value: " << value_
+               << std::endl;
+      LogError << "Summary: " << getSummary() << std::endl;
+    }
+    return false;
+  }
   return true;
+}
+bool Parameter::isPhysical(double value_) const {
+  if (not isInDomain(value_)) return false;
+  if ( not std::isnan(_minPhysical_) and value_ < _minPhysical_ ) return false;
+  if ( not std::isnan(_maxPhysical_) and value_ > _maxPhysical_ ) return false;
+  return true;
+}
+bool Parameter::isValueWithinBounds() const{
+  return isInDomain(_parameterValue_);
 }
 bool Parameter::isMaskedForPropagation() const{
   return getOwner()->isMaskedForPropagation();
 }
 double Parameter::getDistanceFromNominal() const{
-  return (_parameterValue_ - _priorValue_) / _stdDevValue_;
+  return (getParameterValue() - getPriorValue()) / _stdDevValue_;
 }
 std::string Parameter::getTitle() const {
   std::stringstream ss;
@@ -141,6 +195,7 @@ std::string Parameter::getSummary(bool shallow_) const {
   if( std::isnan(_maxValue_) ) ss << "+inf";
   else ss << _maxValue_;
   ss << " ]";
+  if (not isValueWithinBounds()) ss << " out of bounds";
 
   return ss.str();
 }

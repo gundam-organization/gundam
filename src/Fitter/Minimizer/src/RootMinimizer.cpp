@@ -15,20 +15,22 @@
 #include "Math/Factory.h"
 #include "Math/Minimizer.h"
 #include "Math/Functor.h"
+#include "Fit/ParameterSettings.h"
+#include "Minuit2/Minuit2Minimizer.h"
+#include "Minuit2/MnUserParameterState.h"
+#include "Minuit2/MinuitParameter.h"
 #include "TLegend.h"
-
 
 LoggerInit([]{
   Logger::setUserHeaderStr("[RootMinimizer]");
 });
-
 
 void RootMinimizer::readConfigImpl(){
   LogReturnIf(_config_.empty(), __METHOD_NAME__ << " config is empty." );
   this->MinimizerBase::readConfigImpl();
   LogWarning << "Configuring RootMinimizer..." << std::endl;
 
-  _monitor_.gradientDescentMonitor.isEnabled = GenericToolbox::Json::fetchValue( _config_, "monitorGradientDescent", _monitor_.gradientDescentMonitor.isEnabled );
+  getMonitor().gradientDescentMonitor.isEnabled = GenericToolbox::Json::fetchValue( _config_, "monitorGradientDescent", getMonitor().gradientDescentMonitor.isEnabled );
 
   _minimizerType_ = GenericToolbox::Json::fetchValue(_config_, "minimizer", _minimizerType_);
   _minimizerAlgo_ = GenericToolbox::Json::fetchValue(_config_, "algorithm", _minimizerAlgo_);
@@ -70,7 +72,7 @@ void RootMinimizer::initializeImpl(){
     LogWarning << "Using default minimizer algo: " << _minimizerAlgo_ << std::endl;
   }
 
-  _functor_ = ROOT::Math::Functor(this, &RootMinimizer::evalFit, _minimizerParameterPtrList_.size());
+  _functor_ = ROOT::Math::Functor(this, &RootMinimizer::evalFit, getMinimizerFitParameterPtr().size());
   _rootMinimizer_->SetFunction( _functor_ );
   _rootMinimizer_->SetStrategy(_strategy_);
   _rootMinimizer_->SetPrintLevel(_printLevel_);
@@ -78,39 +80,91 @@ void RootMinimizer::initializeImpl(){
   _rootMinimizer_->SetMaxIterations(_maxIterations_);
   _rootMinimizer_->SetMaxFunctionCalls(_maxFcnCalls_);
 
-  for( std::size_t iFitPar = 0 ; iFitPar < _minimizerParameterPtrList_.size() ; iFitPar++ ){
-    auto& fitPar = *(_minimizerParameterPtrList_[iFitPar]);
+  for( std::size_t iFitPar = 0 ; iFitPar < getMinimizerFitParameterPtr().size() ; iFitPar++ ){
+    auto& fitPar = *(getMinimizerFitParameterPtr()[iFitPar]);
 
-    if( not _useNormalizedFitSpace_ ){
+    if( not useNormalizedFitSpace() ){
       _rootMinimizer_->SetVariable(iFitPar, fitPar.getFullTitle(), fitPar.getParameterValue(), fitPar.getStepSize() * _stepSizeScaling_);
-      if( not std::isnan( fitPar.getMinValue() ) ){ _rootMinimizer_->SetVariableLowerLimit(iFitPar, fitPar.getMinValue()); }
-      if( not std::isnan( fitPar.getMaxValue() ) ){ _rootMinimizer_->SetVariableUpperLimit(iFitPar, fitPar.getMaxValue()); }
-      // Changing the boundaries, change the value/step size?
-      _rootMinimizer_->SetVariableValue(iFitPar, fitPar.getParameterValue());
-      _rootMinimizer_->SetVariableStepSize(iFitPar, fitPar.getStepSize() * _stepSizeScaling_);
+      if (not std::isnan(fitPar.getMinValue())
+          and not std::isnan(fitPar.getMaxValue())) {
+        _rootMinimizer_->SetVariableLimits(iFitPar, fitPar.getMinValue(), fitPar.getMaxValue());
+      }
+      else if (not std::isnan(fitPar.getMinValue())) {
+        _rootMinimizer_->SetVariableLowerLimit(iFitPar, fitPar.getMinValue());
+      }
+      else if (not std::isnan(fitPar.getMaxValue()) ) {
+        _rootMinimizer_->SetVariableUpperLimit(iFitPar, fitPar.getMaxValue());
+      }
     }
     else{
       _rootMinimizer_->SetVariable(iFitPar, fitPar.getFullTitle(),
                                    ParameterSet::toNormalizedParValue(fitPar.getParameterValue(), fitPar),
                                    ParameterSet::toNormalizedParRange(fitPar.getStepSize() * _stepSizeScaling_, fitPar)
       );
-      if( not std::isnan( fitPar.getMinValue() ) ){ _rootMinimizer_->SetVariableLowerLimit(iFitPar, ParameterSet::toNormalizedParValue(fitPar.getMinValue(), fitPar)); }
-      if( not std::isnan( fitPar.getMaxValue() ) ){ _rootMinimizer_->SetVariableUpperLimit(iFitPar, ParameterSet::toNormalizedParValue(fitPar.getMaxValue(), fitPar)); }
-      // Changing the boundaries, change the value/step size?
-      _rootMinimizer_->SetVariableValue(iFitPar, ParameterSet::toNormalizedParValue(fitPar.getParameterValue(), fitPar));
-      _rootMinimizer_->SetVariableStepSize(iFitPar, ParameterSet::toNormalizedParRange(fitPar.getStepSize() * _stepSizeScaling_, fitPar));
+      if (not std::isnan(fitPar.getMinValue())
+          and not std::isnan(fitPar.getMaxValue())) {
+        _rootMinimizer_->SetVariableLimits(
+          iFitPar,
+          ParameterSet::toNormalizedParValue(fitPar.getMinValue(), fitPar),
+          ParameterSet::toNormalizedParValue(fitPar.getMaxValue(), fitPar));
+      }
+      else if (not std::isnan(fitPar.getMinValue())) {
+        _rootMinimizer_->SetVariableLowerLimit(iFitPar, ParameterSet::toNormalizedParValue(fitPar.getMinValue(), fitPar));
+      }
+      else if (not std::isnan(fitPar.getMaxValue()) ) {
+        _rootMinimizer_->SetVariableUpperLimit(iFitPar, ParameterSet::toNormalizedParValue(fitPar.getMaxValue(), fitPar));
+      }
     }
   }
 
   LogWarning << "RootMinimizer initialized." << std::endl;
 }
 
-void RootMinimizer::minimize(){
+void RootMinimizer::dumpFitParameterSettings() {
+  for( std::size_t iFitPar = 0 ;
+       iFitPar < getMinimizerFitParameterPtr().size() ; ++iFitPar ) {
+    ROOT::Fit::ParameterSettings parSettings;
+    _rootMinimizer_->GetVariableSettings(iFitPar,parSettings);
+    LogDebug << "MINIMIZER #" << iFitPar;
+    LogDebug << " Fixed: " << parSettings.IsFixed();
+    if (parSettings.HasLowerLimit()) {
+      LogDebug << " Lower: " << parSettings.LowerLimit();
+    }
+    if (parSettings.HasUpperLimit()) {
+      LogDebug << " Upper: " << parSettings.UpperLimit();
+    }
+    LogDebug << " Name" << parSettings.Name();
+    LogDebug  << std::endl;
+  }
+}
 
+void RootMinimizer::dumpMinuit2State() {
+  ROOT::Minuit2::Minuit2Minimizer* mn2
+    = dynamic_cast<ROOT::Minuit2::Minuit2Minimizer*>(_rootMinimizer_.get());
+  if (not mn2) return;
+  const ROOT::Minuit2::MnUserParameterState& mn2State = mn2->State();
+  for( std::size_t iFitPar = 0 ;
+       iFitPar < getMinimizerFitParameterPtr().size() ; ++iFitPar ) {
+    const ROOT::Minuit2::MinuitParameter& par = mn2State.Parameter(iFitPar);
+    LogDebug << "MINUIT2 #" << iFitPar;
+    LogDebug << " Value: " << par.Value();
+    LogDebug << " Fixed: " << par.IsFixed();
+    if (par.HasLowerLimit()) {
+      LogDebug << " Lower: " << par.LowerLimit();
+    }
+    if (par.HasUpperLimit()) {
+      LogDebug << " Upper: " << par.UpperLimit();
+    }
+    LogDebug << " Name: " << par.GetName();
+    LogDebug  << std::endl;
+  }
+}
+
+void RootMinimizer::minimize(){
   // calling the common routine
   this->MinimizerBase::minimize();
 
-  int nbFitCallOffset = _monitor_.nbEvalLikelihoodCalls;
+  int nbFitCallOffset = getMonitor().nbEvalLikelihoodCalls;
   LogInfo << "Fit call offset: " << nbFitCallOffset << std::endl;
 
   if( _preFitWithSimplex_ ){
@@ -124,13 +178,15 @@ void RootMinimizer::minimize(){
     _rootMinimizer_->SetTolerance(_tolerance_ * _simplexToleranceLoose_ );
     _rootMinimizer_->SetStrategy(0);
 
-    _monitor_.minimizerTitle = _minimizerType_ + "/" + "Simplex";
-    _monitor_.stateTitleMonitor = "Running Simplex...";
+    getMonitor().minimizerTitle = _minimizerType_ + "/" + "Simplex";
+    getMonitor().stateTitleMonitor = "Running Simplex...";
 
     // SIMPLEX
-    _monitor_.isEnabled = true;
+    getMonitor().isEnabled = true;
+    // dumpFitParameterSettings(); // Dump internal ROOT::Minimizer info
+    // dumpMinuit2State();         // Dump internal ROOT::Minuit2Minimizer info
     _fitHasConverged_ = _rootMinimizer_->Minimize();
-    _monitor_.isEnabled = false;
+    getMonitor().isEnabled = false;
 
     // Make sure we are on the right spot
     updateCacheToBestfitPoint();
@@ -148,20 +204,22 @@ void RootMinimizer::minimize(){
     _rootMinimizer_->SetTolerance(_tolerance_);
     _rootMinimizer_->SetStrategy(_strategy_);
 
-    LogInfo << _monitor_.convergenceMonitor.generateMonitorString(); // lasting printout
-    LogWarning << "Simplex ended after " << _monitor_.nbEvalLikelihoodCalls - nbFitCallOffset << " calls." << std::endl;
+    LogInfo << getMonitor().convergenceMonitor.generateMonitorString(); // lasting printout
+    LogWarning << "Simplex ended after " << getMonitor().nbEvalLikelihoodCalls - nbFitCallOffset << " calls." << std::endl;
   }
 
-  _monitor_.minimizerTitle = _minimizerType_ + "/" + _minimizerAlgo_;
-  _monitor_.stateTitleMonitor = "Running " + _rootMinimizer_->Options().MinimizerAlgorithm() + "...";
+  getMonitor().minimizerTitle = _minimizerType_ + "/" + _minimizerAlgo_;
+  getMonitor().stateTitleMonitor = "Running " + _rootMinimizer_->Options().MinimizerAlgorithm() + "...";
 
-  _monitor_.isEnabled = true;
+  getMonitor().isEnabled = true;
+  // dumpFitParameterSettings(); // Dump internal ROOT::Minimizer info
+  // dumpMinuit2State();         // Dump internal ROOT::Minuit2Minimizer info
   _fitHasConverged_ = _rootMinimizer_->Minimize();
-  _monitor_.isEnabled = false;
+  getMonitor().isEnabled = false;
 
-  int nbMinimizeCalls = _monitor_.nbEvalLikelihoodCalls - nbFitCallOffset;
+  int nbMinimizeCalls = getMonitor().nbEvalLikelihoodCalls - nbFitCallOffset;
 
-  LogInfo << _monitor_.convergenceMonitor.generateMonitorString(); // lasting printout
+  LogInfo << getMonitor().convergenceMonitor.generateMonitorString(); // lasting printout
   LogInfo << "Minimization ended after " << nbMinimizeCalls << " calls." << std::endl;
   if(_minimizerType_ == "Minuit" or _minimizerType_ == "Minuit2") LogWarning << "Status code: " << GundamUtils::minuitStatusCodeStr.at(_rootMinimizer_->Status()) << std::endl;
   else LogWarning << "Status code: " << _rootMinimizer_->Status() << std::endl;
@@ -178,12 +236,12 @@ void RootMinimizer::minimize(){
       TNamed("parameterStateAfterMinimize", GenericToolbox::Json::toReadableString( getPropagator().getParametersManager().exportParameterInjectorConfig() ).c_str() )
   );
 
-  if( _monitor_.historyTree != nullptr ){
+  if( getMonitor().historyTree != nullptr ){
     LogInfo << "Saving LLH history..." << std::endl;
-    GenericToolbox::writeInTFile(getOwner().getSaveDir(), _monitor_.historyTree.get());
+    GenericToolbox::writeInTFile(getOwner().getSaveDir(), getMonitor().historyTree.get());
   }
 
-  if( _monitor_.gradientDescentMonitor.isEnabled ){ saveGradientSteps(); }
+  if( getMonitor().gradientDescentMonitor.isEnabled ){ saveGradientSteps(); }
 
   if( _fitHasConverged_ ){ LogInfo << "Minimization has converged!" << std::endl; }
   else{ LogError << "Minimization did not converged." << std::endl; }
@@ -209,11 +267,11 @@ void RootMinimizer::minimize(){
   bestFitStats->Branch("chi2MinFitter", &chi2MinFitter);
   bestFitStats->Branch("toyIndex", &toyIndex);
   bestFitStats->Branch("nFitBins", &nbFitBins);
-  bestFitStats->Branch("nbFreeParameters", &_nbFreeParameters_);
+  bestFitStats->Branch("nbFreeParameters", getNbFreeParametersPtr());
   bestFitStats->Branch("nFitPars", &nFitPars);
   bestFitStats->Branch("nbDegreeOfFreedom", &nDof);
 
-  bestFitStats->Branch("nCallsAtBestFit", &_monitor_.nbEvalLikelihoodCalls);
+  bestFitStats->Branch("nCallsAtBestFit", &getMonitor().nbEvalLikelihoodCalls);
   bestFitStats->Branch("totalLikelihoodAtBestFit", &getLikelihoodInterface().getBuffer().totalLikelihood );
   bestFitStats->Branch("statLikelihoodAtBestFit",  &getLikelihoodInterface().getBuffer().statLikelihood );
   bestFitStats->Branch("penaltyLikelihoodAtBestFit",  &getLikelihoodInterface().getBuffer().penaltyLikelihood );
@@ -273,8 +331,8 @@ void RootMinimizer::minimize(){
   this->writePostFitData(GenericToolbox::mkdirTFile(getOwner().getSaveDir(), GenericToolbox::joinPath("postFit", _minimizerAlgo_)));
   GenericToolbox::triggerTFileWrite(GenericToolbox::mkdirTFile(getOwner().getSaveDir(), GenericToolbox::joinPath("postFit", _minimizerAlgo_)));
 
-  if( _fitHasConverged_ ){ _minimizerStatus_ = 0; }
-  else{ _minimizerStatus_ = _rootMinimizer_->Status(); }
+  if( _fitHasConverged_ ){ setMinimizerStatus(0); }
+  else{ setMinimizerStatus(_rootMinimizer_->Status()); }
 }
 void RootMinimizer::calcErrors(){
 
@@ -282,7 +340,7 @@ void RootMinimizer::calcErrors(){
 
   LogWarning << std::endl << GenericToolbox::addUpDownBars("Calling calcErrors()...") << std::endl;
 
-  int nbFitCallOffset = _monitor_.nbEvalLikelihoodCalls;
+  int nbFitCallOffset = getMonitor().nbEvalLikelihoodCalls;
   LogInfo << "Fit call offset: " << nbFitCallOffset << std::endl;
 
   if     ( _errorAlgo_ == "Minos" ){
@@ -294,9 +352,9 @@ void RootMinimizer::calcErrors(){
     for( int iFitPar = 0 ; iFitPar < _rootMinimizer_->NDim() ; iFitPar++ ){
       LogInfo << "Evaluating: " << _rootMinimizer_->VariableName(iFitPar) << "..." << std::endl;
 
-      _monitor_.isEnabled = true;
+      getMonitor().isEnabled = true;
       bool isOk = _rootMinimizer_->GetMinosError(iFitPar, errLow, errHigh);
-      _monitor_.isEnabled = false;
+      getMonitor().isEnabled = false;
 
 #if ROOT_VERSION_CODE >= ROOT_VERSION(6,23,02)
       LogWarning << GundamUtils::minosStatusCodeStr.at(_rootMinimizer_->MinosStatus()) << std::endl;
@@ -312,7 +370,7 @@ void RootMinimizer::calcErrors(){
 
     // Put back at minimum
     for( int iFitPar = 0 ; iFitPar < _rootMinimizer_->NDim() ; iFitPar++ ){
-      _minimizerParameterPtrList_[iFitPar]->setParameterValue(_rootMinimizer_->X()[iFitPar]);
+      getMinimizerFitParameterPtr()[iFitPar]->setParameterValue(_rootMinimizer_->X()[iFitPar]);
     }
   } // Minos
   else if( _errorAlgo_ == "Hesse" ){
@@ -320,8 +378,8 @@ void RootMinimizer::calcErrors(){
     if( _restoreStepSizeBeforeHesse_ ){
       LogWarning << "Restoring step size before HESSE..." << std::endl;
       for( int iFitPar = 0 ; iFitPar < _rootMinimizer_->NDim() ; iFitPar++ ){
-        auto& par = *_minimizerParameterPtrList_[iFitPar];
-        if(not _useNormalizedFitSpace_){ _rootMinimizer_->SetVariableStepSize(iFitPar, par.getStepSize() * _stepSizeScaling_); }
+        auto& par = *getMinimizerFitParameterPtr()[iFitPar];
+        if(not useNormalizedFitSpace()){ _rootMinimizer_->SetVariableStepSize(iFitPar, par.getStepSize() * _stepSizeScaling_); }
         else{ _rootMinimizer_->SetVariableStepSize(iFitPar, ParameterSet::toNormalizedParRange(par.getStepSize() * _stepSizeScaling_, par)); } // should be 1
       }
     }
@@ -329,14 +387,14 @@ void RootMinimizer::calcErrors(){
     // Make sure we are on the right spot
     updateCacheToBestfitPoint();
 
-    _monitor_.minimizerTitle = _minimizerType_ + "/" + _errorAlgo_;
-    _monitor_.stateTitleMonitor = "Running HESSE...";
+    getMonitor().minimizerTitle = _minimizerType_ + "/" + _errorAlgo_;
+    getMonitor().stateTitleMonitor = "Running HESSE...";
 
-    _monitor_.isEnabled = true;
+    getMonitor().isEnabled = true;
     _fitHasConverged_ = _rootMinimizer_->Hesse();
-    _monitor_.isEnabled = false;
+    getMonitor().isEnabled = false;
 
-    LogInfo << "Hesse ended after " << _monitor_.nbEvalLikelihoodCalls - nbFitCallOffset << " calls." << std::endl;
+    LogInfo << "Hesse ended after " << getMonitor().nbEvalLikelihoodCalls - nbFitCallOffset << " calls." << std::endl;
     LogWarning << "HESSE status code: " << GundamUtils::hesseStatusCodeStr.at(_rootMinimizer_->Status()) << std::endl;
     LogWarning << "Covariance matrix status code: " << GundamUtils::covMatrixStatusCodeStr.at(_rootMinimizer_->CovMatrixStatus()) << std::endl;
 
@@ -345,11 +403,11 @@ void RootMinimizer::calcErrors(){
 
     if(not _fitHasConverged_){
       LogError  << "Hesse did not converge." << std::endl;
-      LogError << _monitor_.convergenceMonitor.generateMonitorString(); // lasting printout
+      LogError << getMonitor().convergenceMonitor.generateMonitorString(); // lasting printout
     }
     else{
       LogInfo << "Hesse converged." << std::endl;
-      LogInfo << _monitor_.convergenceMonitor.generateMonitorString(); // lasting printout
+      LogInfo << getMonitor().convergenceMonitor.generateMonitorString(); // lasting printout
     }
 
     int covStatus = _rootMinimizer_->CovMatrixStatus();
@@ -379,7 +437,7 @@ void RootMinimizer::scanParameters( TDirectory* saveDir_ ){
                  << " is fixed. Skipping..." << std::endl;
       continue;
     }
-    getOwner().getParameterScanner().scanParameter(*_minimizerParameterPtrList_[iPar], saveDir_);
+    getOwner().getParameterScanner().scanParameter(*getMinimizerFitParameterPtr()[iPar], saveDir_);
   } // iPar
   for( auto& parSet : this->getPropagator().getParametersManager().getParameterSetsList() ){
     if( not parSet.isEnabled() ) continue;
@@ -418,7 +476,7 @@ void RootMinimizer::saveMinimizerSettings( TDirectory* saveDir_) const {
   GenericToolbox::writeInTFile( saveDir_, TNamed("maxFcnCalls", std::to_string(_maxFcnCalls_).c_str()) );
   GenericToolbox::writeInTFile( saveDir_, TNamed("tolerance", std::to_string(_tolerance_).c_str()) );
   GenericToolbox::writeInTFile( saveDir_, TNamed("stepSizeScaling", std::to_string(_stepSizeScaling_).c_str()) );
-  GenericToolbox::writeInTFile( saveDir_, TNamed("useNormalizedFitSpace", std::to_string(_useNormalizedFitSpace_).c_str()) );
+  GenericToolbox::writeInTFile( saveDir_, TNamed("useNormalizedFitSpace", std::to_string(useNormalizedFitSpace()).c_str()) );
 
   if( _preFitWithSimplex_ ){
     GenericToolbox::writeInTFile( saveDir_, TNamed("enableSimplexBeforeMinimize", std::to_string(_preFitWithSimplex_).c_str()) );
@@ -701,7 +759,7 @@ void RootMinimizer::writePostFitData( TDirectory* saveDir_) {
 
         auto* iParList = &iParSet.getEffectiveParameterList();
         for( auto& iPar : *iParList ){
-          int iMinimizerIndex = GenericToolbox::findElementIndex((Parameter*) &iPar, _minimizerParameterPtrList_);
+          int iMinimizerIndex = GenericToolbox::findElementIndex((Parameter*) &iPar, getMinimizerFitParameterPtr());
 
           int jOffset{0};
           for( const auto& jParSet : getPropagator().getParametersManager().getParameterSetsList() ){
@@ -710,7 +768,7 @@ void RootMinimizer::writePostFitData( TDirectory* saveDir_) {
             auto* jParList = &jParSet.getEffectiveParameterList();
             for( auto& jPar : *jParList ){
               int jMinimizerIndex = GenericToolbox::findElementIndex((Parameter*) &jPar,
-                                                                     _minimizerParameterPtrList_);
+                                                                     getMinimizerFitParameterPtr());
 
               if( iMinimizerIndex != -1 and jMinimizerIndex != -1 ){
                 // Use the fit-constrained value
@@ -773,7 +831,7 @@ void RootMinimizer::writePostFitData( TDirectory* saveDir_) {
 
   };
 
-  if( _useNormalizedFitSpace_ ){
+  if( useNormalizedFitSpace() ){
     LogInfo << "Writing normalized decomposition of the output matrix..." << std::endl;
     if( not GundamGlobals::isLightOutputMode() ) {
       decomposeCovarianceMatrixFct(GenericToolbox::mkdirTFile(matricesDir, "normalizedFitSpace"));
@@ -782,7 +840,7 @@ void RootMinimizer::writePostFitData( TDirectory* saveDir_) {
     // Rescale the post-fit values:
     for(int iRow = 0 ; iRow < postfitCovarianceMatrix.GetNrows() ; iRow++ ){
       for(int iCol = 0 ; iCol < postfitCovarianceMatrix.GetNcols() ; iCol++ ){
-        postfitCovarianceMatrix[iRow][iCol] *= (_minimizerParameterPtrList_[iRow]->getStdDevValue()) * (_minimizerParameterPtrList_[iCol]->getStdDevValue());
+        postfitCovarianceMatrix[iRow][iCol] *= (getMinimizerFitParameterPtr()[iRow]->getStdDevValue()) * (getMinimizerFitParameterPtr()[iCol]->getStdDevValue());
       }
     }
 
@@ -1100,10 +1158,10 @@ void RootMinimizer::writePostFitData( TDirectory* saveDir_) {
     // dimension should be the right one -> parList includes the fixed one
     auto covMatrix = std::make_unique<TMatrixD>(int(parList->size()), int(parList->size()));
     for( auto& iPar : *parList ){
-      int iMinimizerIndex = GenericToolbox::findElementIndex((Parameter*) &iPar, _minimizerParameterPtrList_);
+      int iMinimizerIndex = GenericToolbox::findElementIndex((Parameter*) &iPar, getMinimizerFitParameterPtr());
       if( iMinimizerIndex == -1 ) continue;
       for( auto& jPar : *parList ){
-        int jMinimizerIndex = GenericToolbox::findElementIndex((Parameter*) &jPar, _minimizerParameterPtrList_);
+        int jMinimizerIndex = GenericToolbox::findElementIndex((Parameter*) &jPar, getMinimizerFitParameterPtr());
         if( jMinimizerIndex == -1 ) continue;
         (*covMatrix)[iPar.getParameterIndex()][jPar.getParameterIndex()] = postfitCovarianceMatrix[iMinimizerIndex][jMinimizerIndex];
       }
@@ -1161,7 +1219,7 @@ void RootMinimizer::saveGradientSteps(){
     return;
   }
 
-  LogInfo << "Saving " << _monitor_.gradientDescentMonitor.stepPointList.size() << " gradient steps..." << std::endl;
+  LogInfo << "Saving " << getMonitor().gradientDescentMonitor.stepPointList.size() << " gradient steps..." << std::endl;
 
   // make sure the parameter states get restored as we leave
   auto currentParState = getPropagator().getParametersManager().exportParameterInjectorConfig();
@@ -1183,24 +1241,24 @@ void RootMinimizer::saveGradientSteps(){
   auto lastParStep{getOwner().getPreFitParState()};
 
   std::vector<ParameterScanner::GraphEntry> globalGraphList;
-  for(size_t iGradStep = 0 ; iGradStep < _monitor_.gradientDescentMonitor.stepPointList.size() ; iGradStep++ ){
-    GenericToolbox::displayProgressBar(iGradStep, _monitor_.gradientDescentMonitor.stepPointList.size(), LogInfo.getPrefixString() + "Saving gradient steps...");
+  for(size_t iGradStep = 0 ; iGradStep < getMonitor().gradientDescentMonitor.stepPointList.size() ; iGradStep++ ){
+    GenericToolbox::displayProgressBar(iGradStep, getMonitor().gradientDescentMonitor.stepPointList.size(), LogInfo.getPrefixString() + "Saving gradient steps...");
 
     // why do we need to remute the logger at each loop??
     ParameterSet::muteLogger(); Propagator::muteLogger(); ParametersManager::muteLogger();
-    getPropagator().getParametersManager().injectParameterValues(_monitor_.gradientDescentMonitor.stepPointList[iGradStep].parState );
+    getPropagator().getParametersManager().injectParameterValues(getMonitor().gradientDescentMonitor.stepPointList[iGradStep].parState );
 
     getLikelihoodInterface().propagateAndEvalLikelihood();
 
     if( not GundamGlobals::isLightOutputMode() ) {
       auto outDir = GenericToolbox::mkdirTFile(getOwner().getSaveDir(), Form("fit/gradient/step_%i", int(iGradStep)));
-      GenericToolbox::writeInTFile(outDir, TNamed("parState", GenericToolbox::Json::toReadableString(_monitor_.gradientDescentMonitor.stepPointList[iGradStep].parState).c_str()));
+      GenericToolbox::writeInTFile(outDir, TNamed("parState", GenericToolbox::Json::toReadableString(getMonitor().gradientDescentMonitor.stepPointList[iGradStep].parState).c_str()));
       GenericToolbox::writeInTFile(outDir, TNamed("llhState", getLikelihoodInterface().getSummary().c_str()));
     }
 
     // line scan from previous point
-    getParameterScanner().scanSegment( nullptr, _monitor_.gradientDescentMonitor.stepPointList[iGradStep].parState, lastParStep, 8 );
-    lastParStep = _monitor_.gradientDescentMonitor.stepPointList[iGradStep].parState;
+    getParameterScanner().scanSegment( nullptr, getMonitor().gradientDescentMonitor.stepPointList[iGradStep].parState, lastParStep, 8 );
+    lastParStep = getMonitor().gradientDescentMonitor.stepPointList[iGradStep].parState;
 
     if( globalGraphList.empty() ){
       // copy
@@ -1251,5 +1309,4 @@ void RootMinimizer::saveGradientSteps(){
 // Local Variables:
 // mode:c++
 // c-basic-offset:2
-// compile-command:"$(git rev-parse --show-toplevel)/cmake/gundam-build.sh"
 // End:

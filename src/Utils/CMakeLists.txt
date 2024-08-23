@@ -24,6 +24,7 @@ set(HEADERS
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ConfigUtils.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/GundamUtils.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/GundamApp.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/GundamBacktrace.h
     )
 
 
@@ -71,4 +72,3 @@ install( TARGETS GundamUtils DESTINATION lib )
 #        COMPONENT
 #        libraries
 #)
-

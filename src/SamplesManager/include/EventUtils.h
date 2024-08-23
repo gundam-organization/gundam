@@ -20,8 +20,12 @@
 namespace EventUtils{
 
   struct Indices{
+
+    // source
     int dataset{-1}; // which DatasetDefinition?
     Long64_t entry{-1}; // which entry of the TChain?
+
+    // destination
     int sample{-1}; // this information is lost in the EventDialCache manager
     int bin{-1}; // which bin of the sample?
 

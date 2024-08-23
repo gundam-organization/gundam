@@ -5,6 +5,7 @@
 #include "GundamGlobals.h"
 #include "DialCollection.h"
 #include "DialBaseFactory.h"
+#include "TabulatedDialFactory.h"
 #include "RootFormula.h"
 
 #include "GenericToolbox.Json.h"
@@ -414,6 +415,100 @@ bool DialCollection::initializeNormDialsWithParBinning() {
   return true;
 }
 
+bool DialCollection::initializeDialsWithTabulation(JsonType dialsDefinition_) {
+  // Initialize the Tabulated type.  That yaml for this is
+  // tableConfig:
+  //    - name: <table-name>                A table name passed to the library.
+  //      libraryPath: <path-to-library>    Location of the library
+  //      initFunction: <init-func-name>    Function called for initialization
+  //      updateFunction: <update-func-name>    Function called to update table
+  //      binningFunction: <bin-func-name>  Function to find bin index
+  //      initArguments: [<arg1>, ...]      List of argument strings (e.g.
+  //                                           input file names)
+  //      bins:  <number>                   Number of bins in the table
+  //      variables: [<var1>, <var2>, ... ] Variables used for binning the
+  //                                           table "X" coordinate by the
+  //                                           binning function.
+  //
+  //
+  // If initFunction is provided it will be called with the signature:
+  //
+  //    extern "C"
+  //    int initFunc(char* name, int argc, char* argv[], int bins)
+  //
+  //        name -- The name of the table
+  //        argc -- number of arguments
+  //        argv -- argument strings (0 is table name)
+  //                arguments 1+ are defined by the library
+  //        bins -- The size of the table.
+  //
+  // The function should return 0 for success, and any other value for failure
+  //
+  // The updateFunction signature is:
+  //
+  //    extern "C"
+  //    int updateFunc(char* name,
+  //                 double table[], int bins,
+  //                 double par[], int npar)
+  //
+  //        name  -- table name
+  //        table -- address of the table to update
+  //        bins  -- The size of the table
+  //        par   -- The parameters.  Must match parameters
+  //                   define in the dial definition.
+  //        npar  -- number of parameters
+  //
+  // The function should return 0 for success, and any other value for failure
+  //
+  // The table will be filled with "bins" values calculated with uniform
+  // spacing between "low" and "high".  If bins is one, there must be one
+  // value calculated for "low", if bins is two or more, then the first point
+  // is located at "low", and the last point is located at "high".  The step
+  // between the bins is (high-low)/(bins-1).  Examples:
+  //
+  //    bins = 2, low = 1.0, high = 6.0
+  //       values calculated at 1.0 and 6.0
+  //
+  //    bins = 3, low = 1.0, high = 6.0
+  //       values calculated at 1.0, 3.5, and 6.0
+  //
+  //    extern "C"
+  //    double binFunc(char* name, int nvar, double varv[]);
+  //        name -- table name
+  //        nvar -- number of (truth) variables used to find bin
+  //        varv -- array of (truth) variables used to find bin
+  //        bins -- The number of bins in the table.
+  //
+  // The function should return a double giving the fractional bin number
+  // greater or equal to zero and LESS THAN the maximum number of bins.  The
+  // integer part determines the index of the value below the value to be
+  // interpolated, and the fractional part determines the interpolation
+  // between the indexed bin, and the next.
+  //
+  // The code should be compiled with
+  // gcc -fPIC -rdynamic --shared -o libLibraryName.so
+
+  // Create a unique copy of this dial data so that it gets deleted if
+  // there is a problem during initialization.
+  std::unique_ptr<TabulatedDialFactory> tabulated
+    = std::make_unique<TabulatedDialFactory>(dialsDefinition_);
+
+  // Save the new object.
+  _dialCollectionData_.emplace_back(std::move(tabulated));
+
+  for (const std::string& var :
+         getCollectionData<TabulatedDialFactory>()->getBinningVariables()) {
+    addExtraLeafName(var);
+  }
+
+  addUpdate(
+    [=]{getCollectionData<TabulatedDialFactory>()->updateTable(
+        getDialInputBufferList().front());
+    });
+
+  return true;
+}
+
 bool DialCollection::initializeDialsWithBinningFile(JsonType dialsDefinition) {
   if(not GenericToolbox::Json::doKeyExist(dialsDefinition, "binningFilePath") ) return false;
 
@@ -576,10 +671,14 @@ bool DialCollection::initializeDialsWithDefinition() {
   if( _globalDialType_ == "Norm" or _globalDialType_ == "Normalization" ) {
     // This dial collection is a normalization, so there is a single dial.
     // Create it here.
+    _isEventByEvent_ = false;
     _dialBaseList_.emplace_back(
       DialBaseObject(dialBaseFactory.makeDial(getTitle(),"Normalization","",nullptr,false)));
   }
   else if( _globalDialType_ == "Formula" or _globalDialType_ == "RootFormula" ){
+    // This dial collection calculates a function of the parameter values, so it
+    // is a single dial for all events.  Create the dial here.
+    _isEventByEvent_ = false;
     DialBaseFactory f;
 
     if( GenericToolbox::Json::doKeyExist(dialsDefinition, "binning") ){
@@ -607,17 +706,32 @@ bool DialCollection::initializeDialsWithDefinition() {
 
   }
   else if( _globalDialType_ == "CompiledLibDial" ){
+    // This dial collection calculates a function of the parameter values so it
+    // is a single dial for all events.  Create the dial here.
+    _isEventByEvent_ = false;
     DialBaseFactory f;
     _dialBaseList_.emplace_back( DialBaseObject( f.makeDial( dialsDefinition ) ) );
   }
+  else if ( _globalDialType_ == "Tabulated" ) {
+    // This dial uses a precalculated table to apply weight to each event (e.g. it
+    // might be used to implement neutrino osillations).  It has a different
+    // weight for each event.
+    _isEventByEvent_ = true;
+    LogThrowIf(not initializeDialsWithTabulation(dialsDefinition),
+               "Error initializing dials with tabulation");
+  }
   else if( GenericToolbox::Json::doKeyExist(dialsDefinition, "binningFilePath") ) {
-    initializeDialsWithBinningFile(dialsDefinition);
+    // This dial collection is binned with different weights for each bin.
+    // Create the dials here.
+    _isEventByEvent_ = false;
+    LogThrowIf(not initializeDialsWithBinningFile(dialsDefinition),
+               "Error initializing dials with binning file");
   }
   else if (not _globalDialLeafName_.empty()) {
-    // None of the other dial types are matched, and a dialLeafName
-    // field has been provided, so this is an event by event dial with
-    // one spline per event.  The generation of the dials will be
-    // handled in DataDispenser.
+    // None of the other dial types are matched, and a dialLeafName field has
+    // been provided, so this is an event by event dial with one TGraph (or
+    // TSpline3) per event.  The generation of the dials will be handled in
+    // DataDispenser.
     _isEventByEvent_ = true;
   }
   else{
@@ -654,6 +768,16 @@ JsonType DialCollection::fetchDialsDefinition(const JsonType &definitionsList_) 
     }
   }
   return {};
+}
+
+void DialCollection::update() {
+  for (std::function<void(void)>& func : _dialCollectionCallbacks_) {
+    func();
+  }
+}
+
+void DialCollection::addUpdate(std::function<void(void)> callback) {
+  _dialCollectionCallbacks_.emplace_back(callback);
 }
 
 //  A Lesser GNU Public License

@@ -13,6 +13,7 @@
 
 #include "DialCollection.h"
 #include "DialBaseFactory.h"
+#include "TabulatedDialFactory.h"
 
 #include "GenericToolbox.Utils.h"
 #include "GenericToolbox.Root.h"
@@ -297,6 +298,9 @@ void DataDispenser::fetchRequestedLeaves(){
           GenericToolbox::addIfNotInVector(edges.varName, indexRequests);
         }
       }
+      for( auto& leafName : dialCollection->getExtraLeafNames()) {
+        GenericToolbox::addIfNotInVector(leafName, indexRequests);
+      }
     }
     LogInfo << "DialCollection requests for indexing: " << GenericToolbox::toString(indexRequests) << std::endl;
     for( auto& var : indexRequests ){ _cache_.addVarRequestedForIndexing(var); }
@@ -455,27 +459,31 @@ void DataDispenser::preAllocateMemory(){
       for( auto& dialCollection : _cache_.dialCollectionsRefList ){
         LogScopeIndent;
         nDialsMaxPerEvent += 1;
-        if( not dialCollection->isEventByEvent() ){
+
+        if (dialCollection->isEventByEvent()) {
+            // Reserve enough space for all of the event-by-event dials
+          // that might be added.  This size may be reduced later.
+          auto dialType = dialCollection->getGlobalDialType();
+          int origSize = dialCollection->getDialBaseList().size();
+          LogInfo << dialCollection->getTitle()
+                  << ": adding " << _cache_.totalNbEvents
+                  << " (was " << origSize << ")"
+                  << " " << dialType << " slots"<< std::endl;
+
+          // Only increase the size.  It's probably zero before
+          // starting, but add the original size... just in case.
+          dialCollection->getDialBaseList().resize(
+              dialCollection->getDialBaseList().size()
+              + _cache_.totalNbEvents
+          );
+        }
+        else {
           // Filling var indexes for faster eval with PhysicsEvent:
           for( auto& bin : dialCollection->getDialBinSet().getBinList() ){
             for( auto& edges : bin.getEdgesList() ){
               edges.varIndexCache = GenericToolbox::findElementIndex( edges.varName, _cache_.varsRequestedForIndexing );
             }
           }
-        }
-        else if( not dialCollection->getGlobalDialLeafName().empty() ){
-          // Reserve memory for additional dials (those on a tree leaf)
-          auto dialType = dialCollection->getGlobalDialType();
-          LogInfo << dialCollection->getTitle() << ": creating " << _cache_.totalNbEvents;
-          LogInfo << " slots for " << dialType << std::endl;
-
-          dialCollection->getDialBaseList().resize(
-              dialCollection->getDialBaseList().size()
-              + _cache_.totalNbEvents
-          );
-        }
-        else{
-          LogThrow("DEV ERROR: Dial is event-by-event and doesn't have a leaf");
         }
       }
 
@@ -882,34 +890,68 @@ void DataDispenser::fillFunction(int iThread_){
     table << "LeafForm" << GenericToolbox::TablePrinter::NextColumn;
     table << "Transforms" << GenericToolbox::TablePrinter::NextLine;
 
+
+
+
+    struct VarDisplay{
+      std::string varName{};
+
+      std::string leafName{};
+      std::string leafTypeName{};
+
+      std::string transformStr{};
+
+      std::string lineColor{};
+
+      int priorityIndex{-1};
+    };
+    std::vector<VarDisplay> varDisplayList{};
+
+    varDisplayList.reserve( _cache_.varsRequestedForIndexing.size() );
     for( size_t iVar = 0 ; iVar < _cache_.varsRequestedForIndexing.size() ; iVar++ ){
-      std::string var = _cache_.varsRequestedForIndexing[iVar];
+      varDisplayList.emplace_back();
+
+      varDisplayList.back().varName = _cache_.varsRequestedForIndexing[iVar];
+
+      varDisplayList.back().leafName = leafFormIndexingList[iVar]->getPrimaryExprStr();
+      varDisplayList.back().leafTypeName = leafFormIndexingList[iVar]->getLeafTypeName();
+
+      std::vector<std::string> transformsList;
+      for( auto* varTransformForIndexing : varTransformForIndexingList ){
+        if( varTransformForIndexing->getOutputVariableName() == _cache_.varsRequestedForIndexing[iVar] ){
+          transformsList.emplace_back(varTransformForIndexing->getName());
+        }
+      }
+      varDisplayList.back().transformStr = GenericToolbox::toString(transformsList);
+      varDisplayList.back().priorityIndex = leafFormIndexingList[iVar]->isPointerLeaf() ? 999 : int( leafFormIndexingList[iVar]->getDataSize() );
 
       // line color?
-      if( GenericToolbox::doesElementIsInVector(var, _cache_.varsRequestedForStorage)){
-        table.setColorBuffer(GenericToolbox::ColorCodes::blueBackground);
+      if( GenericToolbox::doesElementIsInVector(_cache_.varsRequestedForIndexing[iVar], _cache_.varsRequestedForStorage)){
+        varDisplayList.back().lineColor = GenericToolbox::ColorCodes::blueBackground;
       }
       else if(
           leafFormIndexingList[iVar]->getLeafTypeName() == "TClonesArray"
           or leafFormIndexingList[iVar]->getLeafTypeName() == "TGraph"
           ){
-        table.setColorBuffer( GenericToolbox::ColorCodes::magentaBackground );
+        varDisplayList.back().lineColor =  GenericToolbox::ColorCodes::magentaBackground;
       }
-
-      table << var << GenericToolbox::TablePrinter::NextColumn;
-
-      table << leafFormIndexingList[iVar]->getPrimaryExprStr() << "/" << leafFormIndexingList[iVar]->getLeafTypeName();
-      table << GenericToolbox::TablePrinter::NextColumn;
-
-      std::vector<std::string> transformsList;
-      for( auto* varTransformForIndexing : varTransformForIndexingList ){
-        if( varTransformForIndexing->getOutputVariableName() == var ){
-          transformsList.emplace_back(varTransformForIndexing->getName());
-        }
-      }
-      table << GenericToolbox::toString(transformsList) << GenericToolbox::TablePrinter::NextColumn;
     }
 
+    GenericToolbox::sortVector( varDisplayList, [](const VarDisplay& a_, const VarDisplay& b_){
+      if( a_.priorityIndex < b_.priorityIndex ){ return true; }
+      if( a_.priorityIndex > b_.priorityIndex ){ return false; }
+      if( a_.leafTypeName.size() < b_.leafTypeName.size() ){ return true; }
+      if( a_.leafTypeName.size() > b_.leafTypeName.size() ){ return false; }
+      if( a_.varName < b_.varName ){ return true; }
+      return false;
+    } );
+
+    for( auto& varDisplay : varDisplayList ){
+      if( not varDisplay.lineColor.empty() ){ table.setColorBuffer( varDisplay.lineColor ); }
+      table << varDisplay.varName << GenericToolbox::TablePrinter::NextColumn;
+      table << varDisplay.leafName << "/" << varDisplay.leafTypeName << GenericToolbox::TablePrinter::NextColumn;
+      table << varDisplay.transformStr << GenericToolbox::TablePrinter::NextColumn;
+    }
 
     table.printTable();
 
@@ -1095,9 +1137,31 @@ void DataDispenser::fillFunction(int iThread_){
               }
             }
           }
+          else if( dialCollectionRef->getGlobalDialType() == "Tabulated" ) {
+            // Event-by-event dial for a precalculated table.  The table
+            // can hold things like oscillation weights and is filled before
+            // the event weighting is done.
+
+            std::unique_ptr<DialBase> dialBase(
+              dialCollectionRef->getCollectionData<TabulatedDialFactory>(0)
+              ->makeDial(eventIndexingBuffer));
+
+            // dialBase is valid -> store it
+            if (dialBase != nullptr) {
+              size_t freeSlotDial = dialCollectionRef->getNextDialFreeSlot();
+              dialBase->setAllowExtrapolation(dialCollectionRef->isAllowDialExtrapolation());
+              dialCollectionRef->getDialBaseList()[freeSlotDial] = DialCollection::DialBaseObject(
+                dialBase.release());
+
+              dialEntryPtr->collectionIndex = iCollection;
+              dialEntryPtr->interfaceIndex = freeSlotDial;
+              dialEntryPtr++;
+            }
+          }
           else if( not dialCollectionRef->getGlobalDialLeafName().empty() ){
-            // Event-by-event dial: THERE MUST BE A GlobalDialLeafName.
-            // grab the dial as a general TObject -> let the factory figure out what to do with it
+            // Event-by-event dial with leaf for "spline" data: grab as a
+            // general TObject -> let the factory figure out what to do with
+            // it
 
             auto *dialObjectPtr = (TObject *) *(
                 (TObject **) eventIndexingBuffer.getVariables().fetchVariable(
@@ -1177,5 +1241,4 @@ void DataDispenser::fillFunction(int iThread_){
 // Local Variables:
 // mode:c++
 // c-basic-offset:2
-// compile-command:"$(git rev-parse --show-toplevel)/cmake/gundam-build.sh"
 // End:

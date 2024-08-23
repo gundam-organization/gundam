@@ -23,7 +23,10 @@
 #include <vector>
 #include <string>
 
-
+/// Handle a set of parameters and dials that logically go together.  The
+/// parameter values can be and which are correlated throw a user provided
+/// covariance matrix that describes known correlations between the parameter
+/// values.
 class ParameterSet : public JsonBaseClass  {
 
 protected:
@@ -36,10 +39,14 @@ public:
   static void muteLogger();
   static void unmuteLogger();
 
-  // Post-init
-  void processCovarianceMatrix(); // invert the matrices, and make sure fixed parameters are detached from correlations
+  /// Process the input covariance matrix to make sure that fixed, free, and
+  /// disabled parameters are detached from the from the covariance matrix.
+  /// This also applies validity checks to the parameter set (e.g. make sure
+  /// that eigendecomposed ParameterSets are not also applying parameter
+  /// bounds).  The stripped covariance matrix is built, and the eigen
+  /// decomposition is done (if requested).
+  void processCovarianceMatrix();
 
-  // Setters
   void setMaskedForPropagation(bool maskedForPropagation_){ _maskedForPropagation_ = maskedForPropagation_; }
 
   // Getters
@@ -49,7 +56,7 @@ public:
   [[nodiscard]] bool isEnabledThrowToyParameters() const{ return _enabledThrowToyParameters_; }
   [[nodiscard]] bool isMaskForToyGeneration() const { return _maskForToyGeneration_; }
   [[nodiscard]] bool isMaskedForPropagation() const{ return _maskedForPropagation_; }
-  [[nodiscard]] bool isUseOnlyOneParameterPerEvent() const{ return _useOnlyOneParameterPerEvent_; }
+  [[deprecated]] [[nodiscard]] bool isUseOnlyOneParameterPerEvent() const{ return _useOnlyOneParameterPerEvent_; }
   [[nodiscard]] int getNbEnabledEigenParameters() const{ return _nbEnabledEigen_; }
   [[nodiscard]] double getPenaltyChi2Buffer() const{ return _penaltyChi2Buffer_; }
   [[nodiscard]] size_t getNbParameters() const{ return _parameterList_.size(); }
@@ -62,44 +69,85 @@ public:
   [[nodiscard]] const std::vector<JsonType>& getCustomParThrow() const{ return _customParThrow_; }
   [[nodiscard]] const std::shared_ptr<TMatrixDSym> &getPriorCorrelationMatrix() const{ return _priorCorrelationMatrix_; }
   [[nodiscard]] const std::shared_ptr<TMatrixDSym> &getPriorCovarianceMatrix() const { return _priorCovarianceMatrix_; }
+
+  /// Get the vector of parameters for this parameter set in the real
+  /// parameter space.  These parameters are not eigendecomposed.  WARNING:
+  /// While the parameters are provided as a vector, elements must not be
+  /// added or removed from the vector.  But, the value of the elements may be
+  /// changed, so `getParameterList().front().setParameterValue(0)' is OK, but
+  /// 'getParameterList().emplace_back(Parameter())' is NOT OK.
   [[nodiscard]] const std::vector<Parameter> &getParameterList() const{ return _parameterList_; }
+  [[nodiscard]] std::vector<Parameter> &getParameterList(){ return _parameterList_; }
+
+  /// Get the vector of parameters for this parameter set in the
+  /// eigendecomposed basis.  WARNING: See warning for getParameterList().
   [[nodiscard]] const std::vector<Parameter> &getEigenParameterList() const{ return _eigenParameterList_; }
+  [[nodiscard]] std::vector<Parameter> &getEigenParameterList(){ return _eigenParameterList_; }
+
+  /// Get the vector of parameters for this parameter set that is applicable
+  /// for the current stage of the fit.  This will either be the
+  /// eigendecomposed parameters, or the parameters in the non-decomposed
+  /// basis.  WARNING: See warning for getParameterList().
   [[nodiscard]] const std::vector<Parameter>& getEffectiveParameterList() const;
+  [[nodiscard]] std::vector<Parameter>& getEffectiveParameterList();
 
-  // non-const Getters
-  std::vector<Parameter> &getParameterList(){ return _parameterList_; }
-  std::vector<Parameter> &getEigenParameterList(){ return _eigenParameterList_; }
-  std::vector<Parameter>& getEffectiveParameterList();
-
-  // Core
   void updateDeltaVector() const;
 
-  // Throw / Shifts
+  /// Set all of the parameters to their prior values.
   void moveParametersToPrior();
-  void throwParameters( bool rethrowIfNotInbounds_ = true, double gain_ = 1);
 
+  /// Set the parameter values based on a random throw with fluctuations
+  /// determined by the striped covariance matrix.  If the first parameter,
+  /// rethrowIfNotPhysical, is true, then the throw is retried until all of
+  /// the parameters are within the physically allowed bounds.  if the second
+  /// parameter, gain_, is set, it determines the variance of the thrown
+  /// distribution relative to the stripped covariance matrix.  A value larger
+  /// than one will increase the thrown variance.
+  void throwParameters( bool rethrowIfNotPhysical_ = true, double gain_ = 1);
+
+  /// Update the parameter values in the set based on the parameter values in
+  /// the eigen decomposed basis.
   void propagateEigenToOriginal();
+
+  /// Update the parameters in the eigen decomposed basis based on the
+  /// parameter values in non-decomposed basis.
   void propagateOriginalToEigen();
 
-  // Misc
+  /// Pretty print a table summarizing the parameter set.
   [[nodiscard]] std::string getSummary() const;
+
+  /// Build a JSON object to save the current values of the parameters.  The
+  /// same object can be loaded using `injectParameterValues()` to restore the
+  /// state and can be written to a file (See
+  /// GenericToolbox::Json::toReadableString(JsonType) to make a "clean"
+  /// string.
   [[nodiscard]] JsonType exportInjectorConfig() const;
+
+  /// Set the parameter set parameter values from a JSON object that was written
+  /// by hand or exportInjectorConfig.
   void injectParameterValues(const JsonType& config_);
+
   Parameter* getParameterPtr(const std::string& parName_);
   Parameter* getParameterPtrWithTitle(const std::string& parTitle_);
 
-  // statics
+  // Normalize a value or range in units of the parameter StdDev
   static double toNormalizedParRange(double parRange, const Parameter& par);
   static double toNormalizedParValue(double parValue, const Parameter& par);
+
+  // Convert a normalized value or range to a parameter value.
   static double toRealParValue(double normParValue, const Parameter& par);
   static double toRealParRange(double normParRange, const Parameter& par);
+
+  /// A convenience function to check if a parameter is enabled, not free, and
+  /// not fix.  This is true if the parameter should be in the stripped
+  /// covariance matrix.
   static bool isValidCorrelatedParameter(const Parameter& par_);
 
   // Deprecated
   [[deprecated("use getCustomParThrow()")]] [[nodiscard]] const std::vector<JsonType>& getCustomFitParThrow() const{ return getCustomParThrow(); }
   [[deprecated("use isEnableEigenDecomp()")]] [[nodiscard]] bool isUseEigenDecompInFit() const{ return isEnableEigenDecomp(); }
   [[deprecated("use moveParametersToPrior()")]] void moveFitParametersToPrior(){ moveParametersToPrior(); }
-  [[deprecated("use throwParameters()")]] void throwFitParameters( bool rethrowIfNotInbounds_ = true, double gain_ = 1){ throwParameters(rethrowIfNotInbounds_, gain_); }
+  [[deprecated("use throwParameters()")]] void throwFitParameters( bool rethrowIfNotPhysical_ = true, double gain_ = 1){ throwParameters(rethrowIfNotPhysical_, gain_); }
 
 protected:
   void readParameterDefinitionFile();
@@ -149,6 +197,7 @@ private:
   int _nbEnabledEigen_{0};
   bool _enablePca_{false};
   bool _enableEigenDecomp_{false};
+  bool _allowEigenDecompWithBounds_{false};
   bool _useOnlyOneParameterPerEvent_{false};
   std::vector<Parameter> _eigenParameterList_{};
   std::shared_ptr<TMatrixDSymEigen> _eigenDecomp_{nullptr};

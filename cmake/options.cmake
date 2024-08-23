@@ -15,6 +15,7 @@ option( WITH_DOXYGEN "Build documentation with doxygen." OFF )
 option( WITH_GUNDAM_ROOT_APP "Build app gundamRoot." ON )
 option( WITH_CACHE_MANAGER "Enable compiling of the cache manager (required for GPU computing)." ON )
 option( WITH_CUDA_LIB "Enable CUDA language check (Cache::Manager requires a GPU if CUDA is found)." OFF )
+option( WITH_MINUIT2_MISSING "Allow MINUIT2 to be missing" OFF )
 
 # compile helper
 option( YAMLCPP_DIR "Set custom path to yaml-cpp lib." OFF )
@@ -70,7 +71,7 @@ if( WITH_DOXYGEN )
   find_package(Doxygen)
   if( DOXYGEN_FOUND )
     # set input and output files
-    set(DOXYGEN_IN ${CMAKE_CURRENT_SOURCE_DIR}/doxygen/Doxygen.in)
+    set(DOXYGEN_IN ${CMAKE_CURRENT_SOURCE_DIR}/resources/doxygen/Doxygen.in)
     set(DOXYGEN_OUT ${CMAKE_CURRENT_BINARY_DIR}/Doxyfile)
 
     # request to configure the file

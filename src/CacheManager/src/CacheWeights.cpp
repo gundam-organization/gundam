@@ -191,5 +191,4 @@ bool Cache::Weights::Apply() {
 // Local Variables:
 // mode:c++
 // c-basic-offset:4
-// compile-command:"$(git rev-parse --show-toplevel)/cmake/gundam-build.sh"
 // End:

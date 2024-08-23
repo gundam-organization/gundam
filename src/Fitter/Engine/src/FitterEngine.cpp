@@ -85,7 +85,9 @@ void FitterEngine::readConfigImpl(){
 
   // local config
   _enablePca_ = GenericToolbox::Json::fetchValue(_config_, {{"enablePca"}, {"runPcaCheck"}, {"fixGhostFitParameters"}}, _enablePca_);
-  _pcaDeltaLlhThreshold_ = GenericToolbox::Json::fetchValue(_config_, {{"pcaDeltaLlhThreshold"}, {"pcaDeltaChi2Threshold"}, {"ghostParameterDeltaChi2Threshold"}}, _pcaDeltaLlhThreshold_);
+
+  _pcaMethod_ = PcaMethod::toEnum( GenericToolbox::Json::fetchValue(_config_, "pcaMethod", "DeltaChi2Threshold"), true );
+  _pcaThreshold_ = GenericToolbox::Json::fetchValue(_config_, {{"pcaThreshold"}, {"pcaDeltaLlhThreshold"}, {"pcaDeltaChi2Threshold"}, {"ghostParameterDeltaChi2Threshold"}}, _pcaThreshold_);
 
   _enablePreFitScan_ = GenericToolbox::Json::fetchValue(_config_, "enablePreFitScan", _enablePreFitScan_);
   _enablePostFitScan_ = GenericToolbox::Json::fetchValue(_config_, "enablePostFitScan", _enablePostFitScan_);
@@ -442,6 +444,8 @@ void FitterEngine::runPcaCheck(){
 
   _likelihoodInterface_.propagateAndEvalLikelihood();
 
+  LogInfo << "Using PCA method: " << _pcaMethod_.toString() << " / threshold = " << _pcaThreshold_ << std::endl;
+
   double baseLlh = _likelihoodInterface_.getLastLikelihood();
   double baseLlhStat = _likelihoodInterface_.getLastStatLikelihood();
   double baseLlhSyst = _likelihoodInterface_.getLastPenaltyLikelihood();
@@ -502,10 +506,38 @@ void FitterEngine::runPcaCheck(){
         LogInfo.moveTerminalCursorBack(1);
         LogInfo << ssPrint.str() << std::endl;
 
-        if( std::abs(deltaChi2Stat) < _pcaDeltaLlhThreshold_ ){
+
+        bool fixParPca{false};
+        if( _pcaMethod_ == PcaMethod::DeltaChi2Threshold ){
+
+          if( std::abs(deltaChi2Stat) < _pcaThreshold_ ){
+            ssPrint << " < " << _pcaThreshold_ << " -> FIXED";
+            LogInfo.moveTerminalCursorBack(1);
+            fixParPca = true;
+          }
+
+        }
+        else if( _pcaMethod_ == PcaMethod::ReducedDeltaChi2Threshold ){
+
+          if( std::abs(deltaChi2Stat)/_minimizer_->fetchNbDegreeOfFreedom() < _pcaThreshold_ ){
+            ssPrint << " < " << _pcaThreshold_*_minimizer_->fetchNbDegreeOfFreedom() << " -> FIXED";
+            LogInfo.moveTerminalCursorBack(1);
+            fixParPca = true;
+          }
+
+        }
+        else if( _pcaMethod_ == PcaMethod::SqrtReducedDeltaChi2Threshold ){
+
+          if( std::sqrt( std::abs(deltaChi2Stat)/_minimizer_->fetchNbDegreeOfFreedom() ) < _pcaThreshold_ ){
+            ssPrint << " < " << std::pow( _pcaThreshold_*_minimizer_->fetchNbDegreeOfFreedom(), 2 ) << " -> FIXED";
+            LogInfo.moveTerminalCursorBack(1);
+            fixParPca = true;
+          }
+
+        }
+
+        if( fixParPca ){
           par.setIsFixed(true); // ignored in the Chi2 computation of the parSet
-          ssPrint << " < " << GenericToolbox::Json::fetchValue(_config_, {{"ghostParameterDeltaChi2Threshold"}, {"pcaDeltaChi2Threshold"}}, 1E-6) << " -> FIXED";
-          LogInfo.moveTerminalCursorBack(1);
 #ifndef NOCOLOR
           std::string red(GenericToolbox::ColorCodes::redBackground);
           std::string rst(GenericToolbox::ColorCodes::resetColor);
