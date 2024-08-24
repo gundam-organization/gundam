@@ -47,7 +47,7 @@ void Parameter::readConfigImpl(){
     }
 
     if( GenericToolbox::Json::doKeyExist(_parameterConfig_, "parameterStepSize") ){
-      double stepSize{GenericToolbox::Json::fetchValue<double>(_parameterConfig_, "parameterStepSize")};
+      double stepSize(GenericToolbox::Json::fetchValue<double>(_parameterConfig_, "parameterStepSize"));
       LogWarning << "Using step size: " << stepSize << std::endl;
       this->setStepSize( stepSize );
     }

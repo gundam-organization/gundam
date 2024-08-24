@@ -51,7 +51,7 @@ void DialCollection::readConfigImpl() {
       p.parSetIndex = _supervisedParameterSetIndex_;
 
       if( GenericToolbox::Json::doKeyExist(dialInput, "name") ){
-        auto parName{GenericToolbox::Json::fetchValue<std::string>(dialInput, "name")};
+        auto parName = GenericToolbox::Json::fetchValue<std::string>(dialInput, "name");
         auto* parPtr{_parameterSetListPtr_->at( _supervisedParameterSetIndex_ ).getParameterPtr( parName )};
         LogThrowIf(parPtr == nullptr, "Could not find parameter: " << parName);
         p.parIndex = parPtr->getParameterIndex();
