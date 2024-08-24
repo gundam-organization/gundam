@@ -37,6 +37,9 @@ private:
     // Cache of whether the result values in memory are valid.
     bool fResultsValid;
 
+    /// Flag that the kernels have been started.
+    bool fKernelApplied;
+
     /// An array of the initial value for each result.  It's copied from the
     /// CPU to the GPU once at the beginning.
     std::unique_ptr<hemi::Array<double>> fInitialValues;
@@ -90,6 +93,12 @@ public:
         fWeightCalculator.at(index) = v;
         return index;
     }
+
+    /// Mark that the results on the CPU are no longer valid. This
+    /// is used by the Cache::Manager::Fill method to note that the input
+    /// parameters have changed.  The results will become valid after the
+    /// kernel finishes (asynchronously).
+    virtual void Invalidate() {fKernelApplied = false; fResultsValid = false;}
 
     /// Calculate the results and save them for later use.  This copies the
     /// results from the GPU to the CPU.

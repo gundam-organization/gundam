@@ -148,6 +148,10 @@ protected:
   std::vector<Parameter *> &getMinimizerFitParameterPtr(){ return _minimizerParameterPtrList_; }
   const std::vector<Parameter *> &getMinimizerFitParameterPtr() const{ return _minimizerParameterPtrList_; }
 
+  // The minimizer evalFit function won't explicitly check the parameter
+  // validity without setting this to true.
+  void setCheckParameterValidity(bool c) {_checkParameterValidity_ = c;}
+
   // Query if a normalized fit space is being used.
   bool useNormalizedFitSpace() const {return _useNormalizedFitSpace_;}
   int* getNbFreeParametersPtr() {return &_nbFreeParameters_;}
@@ -160,10 +164,10 @@ private:
   int _minimizerStatus_{-1}; // -1: invalid, 0: success, >0: errors
   int _nbFreeParameters_{0};
 
-
   // config
   bool _throwOnBadLlh_{false};
   bool _useNormalizedFitSpace_{true};
+  bool _checkParameterValidity_{false};
 
   // internals
   bool _disableCalcError_{false};

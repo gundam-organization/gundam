@@ -318,3 +318,15 @@ void ParametersManager::injectParameterValues(const JsonType &config_) {
 ParameterSet* ParametersManager::getFitParameterSetPtr(const std::string& name_){
   return const_cast<ParameterSet*>(const_cast<const ParametersManager*>(this)->getFitParameterSetPtr(name_));
 }
+bool ParametersManager::hasValidParameterSets() const {
+  for (const ParameterSet& parSet: getParameterSetsList()) {
+    if (not parSet.isEnabled()) continue;
+    if (not parSet.isValid()) return false;
+  }
+  return true;
+}
+void ParametersManager::setParameterValidity(const std::string& v) {
+  for (ParameterSet& parSet: getParameterSetsList()) {
+    parSet.setValidity(v);
+  }
+}

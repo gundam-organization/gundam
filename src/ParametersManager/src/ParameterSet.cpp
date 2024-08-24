@@ -20,7 +20,6 @@ LoggerInit([]{
   Logger::setUserHeaderStr("[ParameterSet]");
 } );
 
-
 void ParameterSet::readConfigImpl(){
   LogThrowIf(_config_.empty(), "ParameterSet config not set.");
 
@@ -356,6 +355,14 @@ const std::vector<Parameter>& ParameterSet::getEffectiveParameterList() const{
   return getParameterList();
 }
 
+bool ParameterSet::isValid() const {
+  for (const Parameter& par : getParameterList()) {
+    if (not par.isEnabled()) continue;
+    if (not par.isValidValue(par.getParameterValue())) return false;
+  }
+  return true;
+}
+
 // non const getters
 std::vector<Parameter>& ParameterSet::getEffectiveParameterList(){
   if( isEnableEigenDecomp() ) return getEigenParameterList();
@@ -370,6 +377,13 @@ void ParameterSet::updateDeltaVector() const{
       (*_deltaVectorPtr_)[iFit++] = par.getParameterValue() - par.getPriorValue();
     }
   }
+}
+
+void ParameterSet::setValidity(const std::string& validity) {
+  for (Parameter& par : getParameterList()) {
+    par.setValidity(validity);
+  }
+  LogWarning << "Set parameter set validity to " << validity << std::endl;
 }
 
 // Parameter throw
@@ -971,7 +985,6 @@ void ParameterSet::defineParameters(){
         continue;
       }
     }
-
 
     if( _parameterPriorList_ != nullptr ){ par.setPriorValue((*_parameterPriorList_)[par.getParameterIndex()]); }
     else{ par.setPriorValue(1); }

@@ -11,6 +11,7 @@
 
 #include "TRandom.h"
 
+#include <sstream>
 #include <cmath>
 
 LoggerInit([]{ Logger::setUserHeaderStr("[SampleElement]"); });
@@ -115,7 +116,8 @@ void SampleElement::refillHistogram(int iThread_){
     bool filledWithManager = false;
     double value{std::nan("not-set")};
     double error{std::nan("not-set")};
-    if (_CacheManagerValue_ !=nullptr and _CacheManagerIndex_ >= 0) {
+    if (_CacheManagerValid_ and (*_CacheManagerValid_)
+        and _CacheManagerValue_ and _CacheManagerIndex_ >= 0) {
       value = _CacheManagerValue_[_CacheManagerIndex_+binPtr->index];
       error = _CacheManagerValue2_[_CacheManagerIndex_+binPtr->index];
       LogThrowIf(std::isnan(value), "Incorrect Cache::Manager initialization");
@@ -125,7 +127,7 @@ void SampleElement::refillHistogram(int iThread_){
       filledWithManager = true;
     }
 #endif
-    if (not binFilled) {
+    if (not binFilled) {  // Will (should) optimize away w/o Cache::Manager
       binPtr->content = 0;
       binPtr->error = 0;
       for (auto *eventPtr: binPtr->eventPtrList) {
@@ -134,27 +136,48 @@ void SampleElement::refillHistogram(int iThread_){
         binPtr->error += buffer * buffer;
       }
     }
+    LogThrowIf(std::isnan((binPtr->content)), "NaN while filling histogram");
 #ifdef GUNDAM_USING_CACHE_MANAGER
     // Parallel calculations of the histogramming have been run.  Make sure
     // they are the same.
     if (GundamGlobals::getForceDirectCalculation() and filledWithManager) {
-      LogThrowIf(not GundamUtils::almostEqual(value,binPtr->content)
-                 || not GundamUtils::almostEqual(error,binPtr->error),
-                 "Incorrect histogram content --"
+      bool problemFound = false;
+      if (not GundamUtils::almostEqual(value,(binPtr->content))) {
+        double magnitude = std::abs(value) + std::abs(binPtr->content);
+        double delta = std::abs(value - binPtr->content);
+        if (magnitude > 0.0) delta /= 0.5*magnitude;
+        LogError << "Incorrect histogram content --"
                  << " Content: " << value << "!=" << binPtr->content
-                 << " Error: " << error << "!=" << binPtr->error);
+                 << " Error: " << error << "!=" << binPtr->error
+                 << " Precision: " << delta
+                 << std::endl;
+        problemFound = true;
+      }
+      if (not GundamUtils::almostEqual(error,(binPtr->error))) {
+        double magnitude = std::abs(error) + std::abs(binPtr->error);
+        double delta = std::abs(error - binPtr->error);
+        if (magnitude > 0.0) delta /= 0.5*magnitude;
+        LogError << "Incorrect histogram error --"
+                 << " Content: " << value << "!=" << binPtr->content
+                 << " Error: " << error << "!=" << binPtr->error
+                 << " Precision: " << delta
+                 << std::endl;
+        problemFound = true;
+      }
+      if (false and problemFound) std::exit(EXIT_FAILURE); // For debugging
     }
 #endif
-    binPtr->error = std::sqrt(binPtr->error);
+    // We don't use TH1D anymore.  TH1 tracks the variance, while we track the
+    // standard deviation (i.e. sqrt(variance)).  This changed from older
+    // versions.
+    binPtr->error = std::sqrt(binPtr->error); // YIKES!  NOTICE THIS!
     iBin += nThreads;
   }
 
 }
 
 void SampleElement::throwEventMcError(){
-  /*
-   * This is to take into account the finite amount of event
-   * */
+  // Take into account the finite number of events
   double weightSum;
   for( auto& bin : _histogram_.binList ){
     weightSum = 0;

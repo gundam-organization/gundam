@@ -15,7 +15,6 @@
 
 LoggerInit([]{ Logger::setUserHeaderStr("[Parameter]"); });
 
-
 void Parameter::readConfigImpl(){
   if( not _parameterConfig_.empty() ){
     _isEnabled_ = GenericToolbox::Json::fetchValue(_parameterConfig_, "isEnabled", true);
@@ -162,6 +161,25 @@ bool Parameter::isPhysical(double value_) const {
   if ( not std::isnan(_maxPhysical_) and value_ > _maxPhysical_ ) return false;
   return true;
 }
+bool Parameter::isMirrored(double value_) const {
+  if ( not std::isnan(_minMirror_) and value_ < _minMirror_ ) return true;
+  if ( not std::isnan(_maxMirror_) and value_ > _maxMirror_ ) return true;
+  return false;
+}
+bool Parameter::isValidValue(double value) const {
+  if ((_validFlags_ & 0b0001)!=0 and (not isInDomain(value))) return false;
+  if ((_validFlags_ & 0b0010)!=0 and (isMirrored(value))) return false;
+  if ((_validFlags_ & 0b0100)!=0 and (not isPhysical(value))) return false;
+  return true;
+}
+void Parameter::setValidity(const std::string& validity) {
+  if (validity.find("noran") != std::string::npos) _validFlags_ &= ~0b0001;
+  else if (validity.find("ran") != std::string::npos) _validFlags_ |= 0b0001;
+  if (validity.find("nomir") != std::string::npos) _validFlags_ &= ~0b0010;
+  else if (validity.find("mir") != std::string::npos) _validFlags_ |= 0b0010;
+  if (validity.find("nophy") != std::string::npos) _validFlags_ &= ~0b0100;
+  else if (validity.find("phy") != std::string::npos) _validFlags_ |= 0b0100;
+}
 bool Parameter::isValueWithinBounds() const{
   return isInDomain(_parameterValue_);
 }
@@ -224,5 +242,4 @@ std::string Parameter::getSummary(bool shallow_) const {
 // Local Variables:
 // mode:c++
 // c-basic-offset:2
-// compile-command:"$(git rev-parse --show-toplevel)/cmake/gundam-build.sh"
 // End:

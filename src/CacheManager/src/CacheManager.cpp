@@ -774,7 +774,25 @@ bool Cache::Manager::Fill() {
         }
     } while(false);
 #endif
+    cache->GetWeightsCache().Invalidate();
+    cache->GetHistogramsCache().Invalidate();
     for (auto& par : Cache::Manager::ParameterMap ) {
+        if (par.first->getOwner()->isMaskedForPropagation()) {
+            LogWarning << "WARNING: Masked parameter: "
+                       << par.first->getFullTitle()
+                       << std::endl;
+            LogWarning << "WARNING: Cache::Manager will not be used"
+                       << std::endl;
+            return false;
+        }
+        if (not par.first->isEnabled()) {
+            LogWarning << "WARNING: Disabled parameter: "
+                       << par.first->getFullTitle()
+                       << std::endl;
+            LogWarning << "WARNING: Cache::Manager will not be used"
+                       << std::endl;
+            return false;
+        }
         cache->GetParameterCache().SetParameter(
             par.second, par.first->getParameterValue());
     }

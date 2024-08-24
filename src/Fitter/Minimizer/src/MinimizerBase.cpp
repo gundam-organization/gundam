@@ -110,21 +110,41 @@ void MinimizerBase::scanParameters(TDirectory* saveDir_){
   for( auto& parPtr : _minimizerParameterPtrList_ ) { getParameterScanner().scanParameter( *parPtr, saveDir_ ); }
 }
 double MinimizerBase::evalFit( const double* parArray_ ){
-/// The main access is through the evalFit method which takes an array of floating
-/// point values and returns the likelihood. The meaning of the parameters is
-/// defined by the vector of pointers to Parameter returned by the LikelihoodInterface.
+/// The main access is through the evalFit method which takes an array of
+/// floating point values and returns the likelihood. The meaning of the
+/// parameters is defined by the vector of pointers to Parameter returned by
+/// the LikelihoodInterface.
 
   _monitor_.externalTimer.stop();
   _monitor_.evalLlhTimer.start();
 
-  // Update fit parameter values:
-  int iFitPar{0};
-  for( auto* parPtr : _minimizerParameterPtrList_ ){
-    parPtr->setParameterValue(
-        _useNormalizedFitSpace_ ?
-        ParameterSet::toRealParValue(parArray_[iFitPar++], *parPtr) :
-        parArray_[iFitPar++]
-    );
+  // Check the fit parameter values.  Do this first so that the parameters
+  // don't change when a bad set of values is tried with evalFit.  This will
+  // only be enabled if the derived class has requested it.
+  if (_checkParameterValidity_) {
+    const double* v = parArray_;
+    for( auto* par : _minimizerParameterPtrList_ ){
+      double val = *(v++);
+      if (_useNormalizedFitSpace_) val = ParameterSet::toRealParValue(val,*par);
+      if (par->isValidValue(val)) continue;
+      _monitor_.evalLlhTimer.stop();
+      return std::numeric_limits<double>::infinity();
+    }
+  }
+
+  // Looks OK, so update the parameter values.  The check for the
+  // normalization outside of the loop so it runs a tiny bit faster.
+  if (_useNormalizedFitSpace_) {
+    const double* v = parArray_;
+    for( auto* par : _minimizerParameterPtrList_ ){
+      par->setParameterValue(ParameterSet::toRealParValue(*(v++),*par));
+    }
+  }
+  else {
+    const double* v = parArray_;
+    for( auto* par : _minimizerParameterPtrList_ ){
+      par->setParameterValue(*(v++));
+    }
   }
 
   // Propagate the parameters
@@ -140,7 +160,8 @@ double MinimizerBase::evalFit( const double* parArray_ ){
 
       auto& gradient = _monitor_.gradientDescentMonitor;
 
-      // When gradient descent base minimizer probe a point toward the minimum, every parameter get updated
+      // When gradient descent base minimizer probe a point toward the
+      // minimum, every parameter get updated
       bool isGradientDescentStep =
           std::all_of(
               _minimizerParameterPtrList_.begin(), _minimizerParameterPtrList_.end(),
@@ -148,7 +169,6 @@ double MinimizerBase::evalFit( const double* parArray_ ){
                 return ( par_->gotUpdated() or par_->isFixed() or not par_->isEnabled() );
               } );
       if( isGradientDescentStep ){
-
         if( gradient.lastGradientFall == _monitor_.nbEvalLikelihoodCalls - 1 ){
           LogWarning << "Minimizer is adjusting the step size: ";
         }
@@ -331,5 +351,4 @@ LikelihoodInterface& MinimizerBase::getLikelihoodInterface(){ return _owner_->ge
 // Local Variables:
 // mode:c++
 // c-basic-offset:2
-// compile-command:"$(git rev-parse --show-toplevel)/cmake/gundam-build.sh"
 // End:
