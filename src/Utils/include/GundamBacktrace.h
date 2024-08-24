@@ -17,7 +17,7 @@
 #include <execinfo.h>
 #include <cstdlib>
 #else
-#warning Backtrace is not available
+// Backtrace is not available
 #endif
 
 namespace GundamUtils {
