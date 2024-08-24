@@ -172,8 +172,8 @@ protected:
 
   bool initializeNormDialsWithParBinning();
   bool initializeDialsWithDefinition();
-  bool initializeDialsWithBinningFile(JsonType dialsDefinition);
-  bool initializeDialsWithTabulation(JsonType dialsDefinition);
+  bool initializeDialsWithBinningFile(const JsonType& dialsDefinition);
+  bool initializeDialsWithTabulation(const JsonType& dialsDefinition);
 
   void readGlobals(const JsonType &config_);
   JsonType fetchDialsDefinition(const JsonType &definitionsList_);
