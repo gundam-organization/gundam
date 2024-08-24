@@ -655,6 +655,7 @@ void RootMinimizer::writePostFitData( TDirectory* saveDir_) {
         gPad->SetGridy();
 
         if( not GundamGlobals::isLightOutputMode() ) {
+          GenericToolbox::cleanupForDisplay(&accumPlot);
           GenericToolbox::writeInTFile(GenericToolbox::mkdirTFile(outDir_, "eigenDecomposition"), &accumPlot, "eigenBreakdown");
         }
       }
@@ -702,6 +703,7 @@ void RootMinimizer::writePostFitData( TDirectory* saveDir_) {
         }
 
         if( not GundamGlobals::isLightOutputMode() ) {
+          GenericToolbox::cleanupForDisplay(&accumPlot);
           GenericToolbox::writeInTFile(
               GenericToolbox::mkdirTFile(outDir_, "eigenDecomposition"),
               &accumPlot, "parBreakdown"
@@ -900,6 +902,8 @@ void RootMinimizer::writePostFitData( TDirectory* saveDir_) {
         GenericToolbox::writeInTFile(GenericToolbox::mkdirTFile(saveSubdir_, "matrices"), corMatrix, "Correlation");
         GenericToolbox::writeInTFile(GenericToolbox::mkdirTFile(saveSubdir_, "matrices"), corMatrixTH2D, "Correlation");
         GenericToolbox::writeInTFile(GenericToolbox::mkdirTFile(saveSubdir_, "matrices"), corMatrix, "Correlation");
+
+        GenericToolbox::cleanupForDisplay(corMatrixCanvas.get());
         GenericToolbox::writeInTFile(GenericToolbox::mkdirTFile(saveSubdir_, "matrices"), corMatrixCanvas.get(), "Correlation");
 
         // Table printout
@@ -1136,6 +1140,7 @@ void RootMinimizer::writePostFitData( TDirectory* saveDir_) {
 
           if( not isNorm_ ){ preFitErrorHist->SetTitle(Form("Pre-fit/Post-fit comparison for %s", parSet_.getName().c_str())); }
           else             { preFitErrorHist->SetTitle(Form("Pre-fit/Post-fit comparison for %s (normalized)", parSet_.getName().c_str())); }
+          GenericToolbox::cleanupForDisplay(errorsCanvas.get());
           GenericToolbox::writeInTFile(saveDir_, errorsCanvas.get(), "fitConstraints");
 
         }; // makePrePostFitCompPlot
