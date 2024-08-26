@@ -81,6 +81,7 @@ set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -fPIC -g")
 ###############################################################################
 
 cmessage( STATUS "C++ Compiler      : ${CMAKE_CXX_COMPILER_ID} ${CMAKE_CXX_COMPILER_VERSION}" )
+cmessage( STATUS "C++ Flags         : ${CMAKE_CXX_FLAGS}")
 cmessage( STATUS "C++ Standard      : ${CMAKE_CXX_STANDARD}" )
 cmessage( STATUS "C++ Release flags : ${CMAKE_CXX_FLAGS_RELEASE}" )
 cmessage( STATUS "C++ Debug flags   : ${CMAKE_CXX_FLAGS_DEBUG}" )

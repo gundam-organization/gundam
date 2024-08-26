@@ -38,15 +38,23 @@ public:
 
   /// DialResponseCache is keeping a reference of a DialInterface and a cached double for the response
   struct DialResponseCache {
-    explicit DialResponseCache( DialInterface& interface_ ): dialInterface(interface_) {}
-    // The dial interface to be used with the PhysicsEvent.
+    explicit DialResponseCache( DialInterface& interface_ )
+      : dialInterface(interface_) {
+      this->updateRequested = dialInterface.getInputBufferRef()->isDialUpdateRequestedPtr();
+    }
+    // The dial interface to be used with the Event.
     DialInterface& dialInterface;
     // The cached result calculated by the dial.
     double response{std::nan("unset")};
-
+    // A cached boolean to check if the dial needs to be updated.
+    bool *updateRequested{nullptr};
     void update(){
-      // evaluate the dial if an update has been requested
+      // Reevaluate the dial if an update has been requested
+#ifdef EVENT_DIAL_CACHE_SAFE_SLOW_INTERFACE
       if( dialInterface.getInputBufferRef()->isDialUpdateRequested() ){
+#else
+      if( *(this->updateRequested) ) {
+#endif
         response = dialInterface.evalResponse();
       }
     }
@@ -56,7 +64,7 @@ public:
     }
   };
 
-  /// The cache element associating a PhysicsEvent to the appropriate
+  /// The cache element associating a Event to the appropriate
   /// DialInterface.
   struct CacheEntry {
     Event* event;
@@ -223,5 +231,4 @@ private:
 // Local Variables:
 // mode:c++
 // c-basic-offset:2
-// compile-command:"$(git rev-parse --show-toplevel)/cmake/gundam-build.sh"
 // End:
