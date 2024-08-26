@@ -59,6 +59,7 @@ public:
   // const getters
   [[nodiscard]] bool isMasked() const{ return _isMasked_; }
   [[nodiscard]] bool isDialUpdateRequested() const{ return _isDialUpdateRequested_; }
+  [[nodiscard]] bool* isDialUpdateRequestedPtr() { return &_isDialUpdateRequested_; }
   [[nodiscard]] int getBufferSize() const{ return _inputArraySize_; }
   [[nodiscard]] const std::vector<double>& getInputBuffer() const { return _inputBuffer_; }
   [[nodiscard]] const std::vector<ParameterReference> &getInputParameterIndicesList() const{ return _inputParameterReferenceList_; }
