@@ -33,11 +33,14 @@ option( CMAKE_CXX_EXTENSIONS "Enable GNU extensions to C++ language (-std=gnu++1
 
 # Set the default built type if it isn't already defined
 if( NOT DEFINED CMAKE_BUILD_TYPE OR CMAKE_BUILD_TYPE STREQUAL "")
-  cmessage( STATUS "Using default build type: Release." )
-  set( CMAKE_BUILD_TYPE Release )
-else()
-  cmessage( STATUS "Using build type: ${CMAKE_BUILD_TYPE}" )
+  cmessage( STATUS "Using default build type: RELEASE." )
+  set( CMAKE_BUILD_TYPE RELEASE )
 endif()
+
+# make sure the case is unified
+string( TOUPPER "${CMAKE_BUILD_TYPE}" CMAKE_BUILD_TYPE )
+cmessage( STATUS "Using build type: ${CMAKE_BUILD_TYPE}" )
+
 
 if( ENABLE_BATCH_MODE )
   cmessage( STATUS "-D ENABLE_BATCH_MODE=ON: defining appropriate compile options..." )
