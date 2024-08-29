@@ -20,9 +20,7 @@
 #include <utility>
 
 
-LoggerInit([]{
-  Logger::getUserHeader() << "[" << FILENAME << "]";
-});
+
 
 
 CmdLineParser clp;

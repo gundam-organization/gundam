@@ -14,7 +14,6 @@
 #include <sstream>
 #include <cmath>
 
-LoggerInit([]{ Logger::setUserHeaderStr("[SampleElement]"); });
 
 void SampleElement::buildHistogram(const DataBinSet& binning_){
   _histogram_.binList.reserve(binning_.getBinList().size() );

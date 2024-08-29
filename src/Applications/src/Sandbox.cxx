@@ -10,11 +10,6 @@
 #include <future>
 
 
-LoggerInit([]{
-  Logger::getUserHeader() << "[" << FILENAME << "]";
-});
-
-
 int main(int argc, char** argv){
   int nThreads = 4;
 

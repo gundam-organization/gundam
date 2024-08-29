@@ -16,9 +16,6 @@
 #include <memory>
 
 
-LoggerInit([]{ Logger::setUserHeaderStr("[SampleSet]"); });
-
-
 void SampleSet::readConfigImpl(){
   LogWarning << __METHOD_NAME__ << std::endl;
   LogThrowIf(_config_.empty(), "_config_ is not set." << std::endl);

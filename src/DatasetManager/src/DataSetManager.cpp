@@ -10,10 +10,6 @@
 
 #include "Logger.h"
 
-LoggerInit([]{
-  Logger::getUserHeader() << "[DataSetManager]";
-});
-
 
 void DataSetManager::readConfigImpl(){
   LogInfo << "Reading DataSetManager configurations..." << std::endl;

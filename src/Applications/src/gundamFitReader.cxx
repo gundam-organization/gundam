@@ -20,9 +20,7 @@
 #include <map>
 
 
-LoggerInit([]{
-  Logger::getUserHeader() << "[" << FILENAME << "]";
-});
+
 
 
 using namespace GenericToolbox::ColorCodes;

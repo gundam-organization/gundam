@@ -18,11 +18,6 @@
 #include <cstdlib>
 
 
-LoggerInit([]{
-  Logger::getUserHeader() << "[" << FILENAME << "]";
-  Logger::setPrefixFormat("{TIME} {USER_HEADER}");
-});
-
 CmdLineParser clp{};
 
 void compareConfigStage(const JsonType& config1_, const JsonType& config2_);

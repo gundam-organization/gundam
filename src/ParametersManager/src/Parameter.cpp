@@ -13,7 +13,6 @@
 
 #include <sstream>
 
-LoggerInit([]{ Logger::setUserHeaderStr("[Parameter]"); });
 
 void Parameter::readConfigImpl(){
   if( not _parameterConfig_.empty() ){

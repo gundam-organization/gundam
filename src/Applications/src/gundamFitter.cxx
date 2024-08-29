@@ -21,9 +21,7 @@
 #include <string>
 #include <vector>
 
-LoggerInit([]{
-  Logger::getUserHeader() << "[" << FILENAME << "]";
-});
+
 
 
 int main(int argc, char** argv){

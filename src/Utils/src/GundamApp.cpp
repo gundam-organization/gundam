@@ -11,10 +11,6 @@
 
 #include <memory>
 
-LoggerInit([]{
-  Logger::getUserHeader() << "[GundamApp]";
-});
-
 
 GundamApp::GundamApp(std::string  appName_) : _appName_(std::move(appName_)) {
   _greeting_.setAppName( _appName_ );

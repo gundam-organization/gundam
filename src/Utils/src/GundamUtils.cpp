@@ -11,9 +11,7 @@
 
 #include <sstream>
 
-LoggerInit([]{
-  Logger::getUserHeader() << "[" << FILENAME << "]";
-});
+
 
 
 namespace GundamUtils {

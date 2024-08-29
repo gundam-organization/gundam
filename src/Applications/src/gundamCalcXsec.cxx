@@ -19,11 +19,6 @@
 #include <vector>
 
 
-LoggerInit([]{
-  Logger::getUserHeader() << "[" << FILENAME << "]";
-});
-
-
 int main(int argc, char** argv){
 
   using namespace GundamUtils;

@@ -11,10 +11,6 @@
 
 #include <sstream>
 
-LoggerInit([]{
-  Logger::getUserHeader() << "[EventUtils]";
-});
-
 
 /// Indices
 namespace EventUtils{

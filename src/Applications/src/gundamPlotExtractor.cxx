@@ -19,9 +19,7 @@
 #include <cstdlib>
 
 
-LoggerInit([]{
-  Logger::getUserHeader() << "[" << FILENAME << "]";
-});
+
 
 std::vector<std::string> outExtensions;
 int nPlots{0};
