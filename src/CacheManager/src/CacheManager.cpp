@@ -39,9 +39,7 @@
 #include <memory>
 #include <set>
 
-LoggerInit([]{
-  Logger::setUserHeaderStr("[Cache::Manager]");
-});
+
 
 Cache::Manager* Cache::Manager::fSingleton = nullptr;
 bool Cache::Manager::fUpdateRequired = true;

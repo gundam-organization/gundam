@@ -10,9 +10,7 @@
 
 #include <dlfcn.h>
 
-LoggerInit([]{
-  Logger::setUserHeaderStr("[Tabulated]");
-});
+
 
 TabulatedDialFactory::TabulatedDialFactory(const JsonType& config_) {
     auto tableConfig = GenericToolbox::Json::fetchValue<JsonType>(config_, "tableConfig");

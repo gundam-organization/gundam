@@ -13,9 +13,7 @@
 #include <hemi/grid_stride_range.h>
 
 #include "Logger.h"
-LoggerInit([]{
-  Logger::setUserHeaderStr("[Cache::Weight::UniformSpline]");
-});
+
 
 // The constructor
 Cache::Weight::UniformSpline::UniformSpline(

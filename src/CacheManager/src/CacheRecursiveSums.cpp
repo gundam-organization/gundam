@@ -13,9 +13,7 @@
 
 #include "Logger.h"
 
-LoggerInit([]{
-  Logger::setUserHeaderStr("[Cache::RecursiveSums]");
-});
+
 
 // The constructor
 Cache::RecursiveSums::RecursiveSums(Cache::Weights::Results& inputs,

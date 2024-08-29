@@ -16,9 +16,7 @@
 
 #include <memory>
 
-LoggerInit([]{
-  Logger::setUserHeaderStr("[ParameterSet]");
-} );
+
 
 void ParameterSet::readConfigImpl(){
   LogThrowIf(_config_.empty(), "ParameterSet config not set.");

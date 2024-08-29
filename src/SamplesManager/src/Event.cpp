@@ -12,9 +12,7 @@
 
 #include <cmath>
 
-LoggerInit([]{
-  Logger::setUserHeaderStr("[Event]");
-});
+
 
 // const getters
 double Event::getEventWeight() const {

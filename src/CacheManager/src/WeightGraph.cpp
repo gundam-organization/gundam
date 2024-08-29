@@ -13,9 +13,7 @@
 #include <hemi/grid_stride_range.h>
 
 #include "Logger.h"
-LoggerInit([]{
-  Logger::setUserHeaderStr("[Cache::Weight::Graph]");
-});
+
 
 // The constructor
 Cache::Weight::Graph::Graph(

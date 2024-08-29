@@ -13,9 +13,7 @@
 
 #include <locale>
 
-LoggerInit([]{
-  Logger::setUserHeaderStr("[MCMC]");
-});
+
 
 
 void AdaptiveMcmc::readConfigImpl(){

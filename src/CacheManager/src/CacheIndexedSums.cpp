@@ -13,9 +13,7 @@
 
 #include "Logger.h"
 
-LoggerInit([]{
-  Logger::setUserHeaderStr("[Cache::IndexedSums]");
-});
+
 
 // The constructor
 Cache::IndexedSums::IndexedSums(Cache::Weights::Results& inputs,

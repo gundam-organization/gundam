@@ -5,9 +5,7 @@
 #include "Logger.h"
 
 
-LoggerInit([]{
-  Logger::setUserHeaderStr("[Bilinear]");
-});
+
 
 void Bilinear::setAllowExtrapolation(bool allowExtrapolation) {
   _allowExtrapolation_ = allowExtrapolation;

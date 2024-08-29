@@ -9,9 +9,7 @@
 
 #include "sstream"
 
-LoggerInit([]{
-  Logger::setUserHeaderStr("[DataDispenserUtils]");
-});
+
 
 
 std::string DataDispenserParameters::getSummary() const{

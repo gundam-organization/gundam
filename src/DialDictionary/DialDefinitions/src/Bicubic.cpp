@@ -5,9 +5,7 @@
 #include "Logger.h"
 
 
-LoggerInit([]{
-  Logger::setUserHeaderStr("[Bicubic]");
-});
+
 
 void Bicubic::setAllowExtrapolation(bool allowExtrapolation) {
   _allowExtrapolation_ = allowExtrapolation;

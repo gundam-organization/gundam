@@ -6,9 +6,7 @@
 
 #include "Logger.h"
 
-LoggerInit([]{
-  Logger::setUserHeaderStr("[DialBase]");
-});
+
 
 const std::vector<double>& DialBase::getDialData() const {
     LogError << "getDialData not implemented for "

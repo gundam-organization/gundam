@@ -10,9 +10,7 @@
 
 #include <limits>
 
-LoggerInit([]{
-  Logger::setUserHeaderStr("[UniformSpline]");
-});
+
 
 void UniformSpline::setAllowExtrapolation(bool allowExtrapolation) {
   _allowExtrapolation_ = allowExtrapolation;

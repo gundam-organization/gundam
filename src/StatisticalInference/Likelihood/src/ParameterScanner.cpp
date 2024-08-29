@@ -16,9 +16,7 @@
 #include <utility>
 
 
-LoggerInit([]{
-  Logger::setUserHeaderStr("[ParameterScanner]");
-});
+
 
 void ParameterScanner::muteLogger(){ Logger::setIsMuted(true); }
 void ParameterScanner::unmuteLogger(){ Logger::setIsMuted(false); }

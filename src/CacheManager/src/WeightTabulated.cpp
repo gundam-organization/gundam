@@ -14,9 +14,7 @@
 
 #include "Logger.h"
 
-LoggerInit([]{
-  Logger::setUserHeaderStr("[Cache::Weight::Tabulated]");
-});
+
 
 // The constructor
 Cache::Weight::Tabulated::Tabulated(

@@ -10,9 +10,7 @@
 #include "GenericToolbox.Json.h"
 #include "Logger.h"
 
-LoggerInit([]{
-  Logger::setUserHeaderStr("[LikelihoodInterface]");
-});
+
 
 void LikelihoodInterface::readConfigImpl(){
   LogWarning << "Configuring LikelihoodInterface..." << std::endl;

@@ -21,9 +21,7 @@
 #include "Minuit2/MinuitParameter.h"
 #include "TLegend.h"
 
-LoggerInit([]{
-  Logger::setUserHeaderStr("[RootMinimizer]");
-});
+
 
 void RootMinimizer::readConfigImpl(){
   LogReturnIf(_config_.empty(), __METHOD_NAME__ << " config is empty." );

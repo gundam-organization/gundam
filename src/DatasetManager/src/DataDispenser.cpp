@@ -30,9 +30,7 @@
 #include <vector>
 #include <sstream>
 
-LoggerInit([]{
-  Logger::setUserHeaderStr("[DataDispenser]");
-});
+
 
 
 void DataDispenser::readConfigImpl(){

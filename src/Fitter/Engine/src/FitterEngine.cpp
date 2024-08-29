@@ -20,9 +20,7 @@
 #include <memory>
 
 
-LoggerInit([]{
-  Logger::setUserHeaderStr("[FitterEngine]");
-});
+
 
 
 void FitterEngine::readConfigImpl(){

@@ -11,9 +11,7 @@
 #include <stdexcept>
 #include <sstream>
 
-LoggerInit([]{
-  Logger::setUserHeaderStr("[DataBin]");
-} );
+
 
 
 void DataBin::Edges::readConfig(const JsonType& config_){

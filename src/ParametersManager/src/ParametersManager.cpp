@@ -12,9 +12,7 @@
 #include <sstream>
 
 
-LoggerInit([]{
-  Logger::setUserHeaderStr("[ParameterManager]");
-});
+
 
 
 // logger

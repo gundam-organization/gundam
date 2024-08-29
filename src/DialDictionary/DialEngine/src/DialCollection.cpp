@@ -13,9 +13,7 @@
 
 #include <sstream>
 
-LoggerInit([]{
-  Logger::setUserHeaderStr("[DialCollection]");
-});
+
 
 void DialCollection::readConfigImpl() {
 

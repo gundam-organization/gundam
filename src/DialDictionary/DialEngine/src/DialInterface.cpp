@@ -7,9 +7,7 @@
 
 #include "Logger.h"
 
-LoggerInit([]{
-  Logger::setUserHeaderStr("[DialInterface]");
-});
+
 
 
 double DialInterface::evalResponse() const {

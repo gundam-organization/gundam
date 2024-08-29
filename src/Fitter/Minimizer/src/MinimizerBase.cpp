@@ -4,9 +4,7 @@
 #include "GenericToolbox.Json.h"
 #include "Logger.h"
 
-LoggerInit([]{
-  Logger::setUserHeaderStr("[MinimizerBase]");
-});
+
 
 
 void MinimizerBase::readConfigImpl(){

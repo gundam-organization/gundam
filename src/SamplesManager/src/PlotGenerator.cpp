@@ -20,9 +20,7 @@
 #include <memory>
 #include <sstream>
 
-LoggerInit([]{
-  Logger::setUserHeaderStr("[PlotGenerator]");
-});
+
 
 
 void PlotGenerator::readConfigImpl(){

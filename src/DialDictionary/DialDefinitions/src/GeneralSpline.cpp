@@ -9,9 +9,7 @@
 #include "Logger.h"
 
 
-LoggerInit([]{
-  Logger::setUserHeaderStr("[GeneralSpline]");
-});
+
 
 void GeneralSpline::setAllowExtrapolation(bool allowExtrapolation) {
   _allowExtrapolation_ = allowExtrapolation;

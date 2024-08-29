@@ -15,9 +15,6 @@
 #include "Logger.h"
 
 
-LoggerInit([]{
-  Logger::setUserHeaderStr("[JointProbability]");
-});
 
 namespace JointProbability{
 

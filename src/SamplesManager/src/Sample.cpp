@@ -13,9 +13,7 @@
 #include <memory>
 
 
-LoggerInit([]{
-  Logger::setUserHeaderStr("[Sample]");
-});
+
 
 
 void Sample::readConfigImpl(){

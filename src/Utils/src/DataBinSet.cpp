@@ -13,9 +13,7 @@
 #include <stdexcept>
 
 
-LoggerInit([]{
-  Logger::setUserHeaderStr("[DataBinSet]");
-} );
+
 
 void DataBinSet::setVerbosity(int maxLogLevel_){ Logger::setMaxLogLevel(maxLogLevel_); }
 

@@ -11,9 +11,7 @@
 #include <hemi/grid_stride_range.h>
 
 #include "Logger.h"
-LoggerInit([]{
-  Logger::setUserHeaderStr("[Cache::Weight::Normalization]");
-});
+
 
 // The constructor
 Cache::Weight::Normalization::Normalization(

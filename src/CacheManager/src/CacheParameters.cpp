@@ -8,9 +8,7 @@
 #include <vector>
 #include <set>
 
-LoggerInit([]{
-  Logger::setUserHeaderStr("[Cache::Parameters]");
-});
+
 
 bool Cache::Parameters::UsingCUDA() {
 #ifdef __CUDACC__

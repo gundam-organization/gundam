@@ -12,9 +12,7 @@
 #include "GenericToolbox.Json.h"
 
 
-LoggerInit([]{
-  Logger::setUserHeaderStr("[TreeWriter]");
-});
+
 
 
 void EventTreeWriter::readConfigImpl() {

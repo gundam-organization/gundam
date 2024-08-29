@@ -19,11 +19,6 @@
 #include <iostream>
 
 
-LoggerInit([]{
-  Logger::setUserHeaderStr("[ConfigUtils]");
-} );
-
-
 namespace ConfigUtils {
 
   JsonType readConfigFile(const std::string& configFilePath_){
