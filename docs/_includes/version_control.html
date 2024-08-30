@@ -15,7 +15,7 @@
             <img src="https://github.githubassets.com/images/icons/emoji/unicode/1f4cc.png" alt="tag" style="width: 16px; vertical-align: middle;">
           </strong> ${release.tag_name}
         </p>
-        <div>${marked(release.body)}</div>
+        <div>${release.body}</div>
         <a href="${release.html_url}" target="_blank">View Release</a>
       `;
       releasesContainer.appendChild(releaseElement);
