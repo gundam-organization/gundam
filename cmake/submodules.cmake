@@ -63,7 +63,7 @@ else()
   cmessage( STATUS "Logger set in release mode." )
   add_definitions( -D LOGGER_MAX_LOG_LEVEL_PRINTED=4 )
   add_definitions( -D LOGGER_PREFIX_LEVEL=3 )
-  add_definitions( -D LOGGER_PREFIX_FORMAT="\\\"{TIME} {SEVERITY}"\\\" )
+  add_definitions( -D LOGGER_PREFIX_FORMAT="\\\"{TIME} {SEVERITY} {FILENAME}"\\\" )
 endif()
 
 if(NOT ENABLE_COLOR_OUTPUT)
