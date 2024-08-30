@@ -9,13 +9,12 @@
     releases.forEach(release => {
       const releaseElement = document.createElement('div');
       releaseElement.innerHTML = `
-        <h3>${release.name}</h3>
         <p>
           <strong>
             <img src="https://github.githubassets.com/images/icons/emoji/unicode/1f4cc.png" alt="tag" style="width: 16px; vertical-align: middle;">
-          </strong> ${release.tag_name}
+          </strong> ${release.name}
+          <a href="${release.html_url}" target="_blank">View Release</a>
         </p>
-        <a href="${release.html_url}" target="_blank">View Release</a>
       `;
       releasesContainer.appendChild(releaseElement);
     });
