@@ -956,8 +956,8 @@ void DataDispenser::fillFunction(int iThread_){
     table.printTable();
 
     // printing legend
-    LogInfo(Logger::Color::BG_BLUE)    << "      " << Logger::getColorEscapeCode(Logger::Color::RESET) << " -> Variables stored in RAM" << std::endl;
-    LogInfo(Logger::Color::BG_MAGENTA) << "      " << Logger::getColorEscapeCode(Logger::Color::RESET) << " -> Dials stored in RAM" << std::endl;
+    LogInfo << LOGGER_STR_COLOR_BLUE_BG    << "      " << LOGGER_STR_COLOR_RESET << " -> Variables stored in RAM" << std::endl;
+    LogInfo << LOGGER_STR_COLOR_MAGENTA_BG << "      " << LOGGER_STR_COLOR_RESET << " -> Dials stored in RAM" << std::endl;
 
     if( _owner_->isDevSingleThreadEventLoaderAndIndexer() ){
       LogAlert << "Loading data in single thread (devSingleThreadEventLoaderAndIndexer option set to true)" << std::endl;
