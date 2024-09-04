@@ -20,9 +20,11 @@
 #include <memory>
 #include <sstream>
 
+#ifndef DISABLE_USER_HEADER
 LoggerInit([]{
   Logger::setUserHeaderStr("[PlotGenerator]");
 });
+#endif
 
 
 void PlotGenerator::readConfigImpl(){

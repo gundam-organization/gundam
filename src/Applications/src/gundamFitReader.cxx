@@ -20,9 +20,11 @@
 #include <map>
 
 
+#ifndef DISABLE_USER_HEADER
 LoggerInit([]{
   Logger::getUserHeader() << "[" << FILENAME << "]";
 });
+#endif
 
 
 using namespace GenericToolbox::ColorCodes;

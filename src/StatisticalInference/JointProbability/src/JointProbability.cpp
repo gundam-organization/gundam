@@ -15,9 +15,11 @@
 #include "Logger.h"
 
 
+#ifndef DISABLE_USER_HEADER
 LoggerInit([]{
   Logger::setUserHeaderStr("[JointProbability]");
 });
+#endif
 
 namespace JointProbability{
 

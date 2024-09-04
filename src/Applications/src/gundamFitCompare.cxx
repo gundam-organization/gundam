@@ -20,9 +20,11 @@
 #include <utility>
 
 
+#ifndef DISABLE_USER_HEADER
 LoggerInit([]{
   Logger::getUserHeader() << "[" << FILENAME << "]";
 });
+#endif
 
 
 CmdLineParser clp;

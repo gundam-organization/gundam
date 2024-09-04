@@ -9,9 +9,11 @@
 
 
 
+#ifndef DISABLE_USER_HEADER
 LoggerInit([]{
   Logger::setUserHeaderStr("[EventVarTransform]");
 });
+#endif
 
 void EventVarTransform::readConfigImpl(){
   _isEnabled_ = GenericToolbox::Json::fetchValue(_config_, "isEnabled", _isEnabled_);

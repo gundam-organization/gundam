@@ -8,9 +8,11 @@
 
 #include <dlfcn.h>
 
+#ifndef DISABLE_USER_HEADER
 LoggerInit([]{
   Logger::setUserHeaderStr("[EventVarTransformLib]");
 });
+#endif
 
 
 void EventVarTransformLib::readConfigImpl(){

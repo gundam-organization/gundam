@@ -13,9 +13,11 @@
 #include <memory>
 
 
+#ifndef DISABLE_USER_HEADER
 LoggerInit([]{
   Logger::setUserHeaderStr("[Sample]");
 });
+#endif
 
 
 void Sample::readConfigImpl(){

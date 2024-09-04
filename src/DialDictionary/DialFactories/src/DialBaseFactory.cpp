@@ -9,9 +9,11 @@
 
 #include "Logger.h"
 
+#ifndef DISABLE_USER_HEADER
 LoggerInit([]{
   Logger::setUserHeaderStr("[DialBaseFactory]");
 });
+#endif
 
 
 DialBase* DialBaseFactory::makeDial(const std::string& dialTitle_,

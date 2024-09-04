@@ -12,9 +12,11 @@
 #include <sstream>
 
 
+#ifndef DISABLE_USER_HEADER
 LoggerInit([]{
   Logger::setUserHeaderStr("[GundamGreetings]");
 });
+#endif
 
 GundamGreetings::GundamGreetings() = default;
 GundamGreetings::~GundamGreetings() = default;
