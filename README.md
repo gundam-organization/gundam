@@ -37,10 +37,6 @@ The goals for this branch are:
   1. Merges happen after a gundam coordinator consensus.
   1. All validations should be rechecked after each new patch release.
 
-## Showcase
-
-![](./resources/images/samplesExample.png)
-
 <details>
   <summary><b>Spoiler: More Screenshots</b></summary>
 
