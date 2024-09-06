@@ -18,10 +18,8 @@
 #include <cstdlib>
 
 
-LoggerInit([]{
-  Logger::getUserHeader() << "[" << FILENAME << "]";
-  Logger::setPrefixFormat("{TIME} {USER_HEADER}");
-});
+LoggerInit([]{ Logger::setPrefixFormat("{TIME} {SEVERITY}"); });
+
 
 CmdLineParser clp{};
 

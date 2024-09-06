@@ -9,9 +9,9 @@
 
 #include "sstream"
 
-LoggerInit([]{
-  Logger::setUserHeaderStr("[DataDispenserUtils]");
-});
+#ifndef DISABLE_USER_HEADER
+LoggerInit([]{ Logger::setUserHeaderStr("[DataDispenserUtils]"); });
+#endif
 
 
 std::string DataDispenserParameters::getSummary() const{

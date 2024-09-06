@@ -4,9 +4,9 @@
 #include "GenericToolbox.Json.h"
 #include "Logger.h"
 
-LoggerInit([]{
-  Logger::setUserHeaderStr("[MinimizerBase]");
-});
+#ifndef DISABLE_USER_HEADER
+LoggerInit([]{ Logger::setUserHeaderStr("[MinimizerBase]"); });
+#endif
 
 
 void MinimizerBase::readConfigImpl(){

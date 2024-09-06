@@ -10,9 +10,9 @@
 
 #include <dlfcn.h>
 
-LoggerInit([]{
-  Logger::setUserHeaderStr("[Tabulated]");
-});
+#ifndef DISABLE_USER_HEADER
+LoggerInit([]{ Logger::setUserHeaderStr("[Tabulated]"); });
+#endif
 
 TabulatedDialFactory::TabulatedDialFactory(const JsonType& config_) {
     auto tableConfig = GenericToolbox::Json::fetchValue<JsonType>(config_, "tableConfig");

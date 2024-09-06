@@ -14,7 +14,11 @@
 #include <sstream>
 #include <cmath>
 
+
+#ifndef DISABLE_USER_HEADER
 LoggerInit([]{ Logger::setUserHeaderStr("[SampleElement]"); });
+#endif
+
 
 void SampleElement::buildHistogram(const DataBinSet& binning_){
   _histogram_.binList.reserve(binning_.getBinList().size() );

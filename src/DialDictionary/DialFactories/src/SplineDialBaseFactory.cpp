@@ -18,9 +18,9 @@
 
 #include <limits>
 
-LoggerInit([]{
-  Logger::setUserHeaderStr("[SplineFactory]");
-});
+#ifndef DISABLE_USER_HEADER
+LoggerInit([]{ Logger::setUserHeaderStr("[SplineFactory]"); });
+#endif
 
 bool SplineDialBaseFactory::FillFromGraph(std::vector<double>& xPoint,
                                           std::vector<double>& yPoint,

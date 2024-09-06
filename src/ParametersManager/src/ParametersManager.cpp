@@ -12,9 +12,9 @@
 #include <sstream>
 
 
-LoggerInit([]{
-  Logger::setUserHeaderStr("[ParameterManager]");
-});
+#ifndef DISABLE_USER_HEADER
+LoggerInit([]{ Logger::setUserHeaderStr("[ParameterManager]"); });
+#endif
 
 
 // logger

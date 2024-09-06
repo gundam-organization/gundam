@@ -39,9 +39,9 @@
 #include <memory>
 #include <set>
 
-LoggerInit([]{
-  Logger::setUserHeaderStr("[Cache::Manager]");
-});
+#ifndef DISABLE_USER_HEADER
+LoggerInit([]{ Logger::setUserHeaderStr("[Cache::Manager]"); });
+#endif
 
 Cache::Manager* Cache::Manager::fSingleton = nullptr;
 bool Cache::Manager::fUpdateRequired = true;

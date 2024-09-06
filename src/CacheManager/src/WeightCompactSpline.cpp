@@ -13,9 +13,9 @@
 #include <hemi/grid_stride_range.h>
 
 #include "Logger.h"
-LoggerInit([]{
-  Logger::setUserHeaderStr("[Cache::Weight::CompactSpline]");
-});
+#ifndef DISABLE_USER_HEADER
+LoggerInit([]{ Logger::setUserHeaderStr("[Cache::Weight::CompactSpline]"); });
+#endif
 
 // The constructor
 Cache::Weight::CompactSpline::CompactSpline(

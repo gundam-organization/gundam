@@ -13,9 +13,9 @@
 
 #include "Logger.h"
 
-LoggerInit([]{
-  Logger::setUserHeaderStr("[Cache::IndexedSums]");
-});
+#ifndef DISABLE_USER_HEADER
+LoggerInit([]{ Logger::setUserHeaderStr("[Cache::IndexedSums]"); });
+#endif
 
 // The constructor
 Cache::IndexedSums::IndexedSums(Cache::Weights::Results& inputs,

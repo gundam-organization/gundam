@@ -4,9 +4,9 @@
 
 #include "Spline.h"
 
-LoggerInit([]{
-  Logger::setUserHeaderStr("[Spline]");
-});
+#ifndef DISABLE_USER_HEADER
+LoggerInit([]{ Logger::setUserHeaderStr("[Spline]"); });
+#endif
 
 void Spline::setAllowExtrapolation(bool allowExtrapolation) {
   _allowExtrapolation_ = allowExtrapolation;

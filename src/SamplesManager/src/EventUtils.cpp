@@ -11,9 +11,9 @@
 
 #include <sstream>
 
-LoggerInit([]{
-  Logger::getUserHeader() << "[EventUtils]";
-});
+#ifndef DISABLE_USER_HEADER
+LoggerInit([]{ Logger::getUserHeader() << "[EventUtils]"; });
+#endif
 
 
 /// Indices

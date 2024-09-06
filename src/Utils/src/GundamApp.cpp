@@ -11,9 +11,9 @@
 
 #include <memory>
 
-LoggerInit([]{
-  Logger::getUserHeader() << "[GundamApp]";
-});
+#ifndef DISABLE_USER_HEADER
+LoggerInit([]{ Logger::getUserHeader() << "[GundamApp]"; });
+#endif
 
 
 GundamApp::GundamApp(std::string  appName_) : _appName_(std::move(appName_)) {

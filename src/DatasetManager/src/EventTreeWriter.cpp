@@ -12,9 +12,9 @@
 #include "GenericToolbox.Json.h"
 
 
-LoggerInit([]{
-  Logger::setUserHeaderStr("[TreeWriter]");
-});
+#ifndef DISABLE_USER_HEADER
+LoggerInit([]{ Logger::setUserHeaderStr("[TreeWriter]"); });
+#endif
 
 
 void EventTreeWriter::readConfigImpl() {

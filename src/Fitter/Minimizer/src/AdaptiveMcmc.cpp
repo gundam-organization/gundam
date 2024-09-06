@@ -13,9 +13,9 @@
 
 #include <locale>
 
-LoggerInit([]{
-  Logger::setUserHeaderStr("[MCMC]");
-});
+#ifndef DISABLE_USER_HEADER
+LoggerInit([]{ Logger::setUserHeaderStr("[MCMC]"); });
+#endif
 
 
 void AdaptiveMcmc::readConfigImpl(){

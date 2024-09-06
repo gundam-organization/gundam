@@ -20,9 +20,9 @@
 #include <memory>
 
 
-LoggerInit([]{
-  Logger::setUserHeaderStr("[FitterEngine]");
-});
+#ifndef DISABLE_USER_HEADER
+LoggerInit([]{ Logger::setUserHeaderStr("[FitterEngine]"); });
+#endif
 
 
 void FitterEngine::readConfigImpl(){

@@ -10,9 +10,9 @@
 
 #include "Logger.h"
 
-LoggerInit([]{
-  Logger::getUserHeader() << "[DataSetManager]";
-});
+#ifndef DISABLE_USER_HEADER
+LoggerInit([]{ Logger::getUserHeader() << "[DataSetManager]"; });
+#endif
 
 
 void DataSetManager::readConfigImpl(){

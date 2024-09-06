@@ -12,9 +12,9 @@
 #include <hemi/grid_stride_range.h>
 
 #include "Logger.h"
-LoggerInit([]{
-  Logger::setUserHeaderStr("[Cache::Weights]");
-});
+#ifndef DISABLE_USER_HEADER
+LoggerInit([]{ Logger::setUserHeaderStr("[Cache::Weights]"); });
+#endif
 
 // The constructor
 Cache::Weights::Weights(std::size_t results)

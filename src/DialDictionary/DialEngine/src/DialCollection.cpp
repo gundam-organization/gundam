@@ -13,9 +13,9 @@
 
 #include <sstream>
 
-LoggerInit([]{
-  Logger::setUserHeaderStr("[DialCollection]");
-});
+#ifndef DISABLE_USER_HEADER
+LoggerInit([]{ Logger::setUserHeaderStr("[DialCollection]"); });
+#endif
 
 void DialCollection::readConfigImpl() {
 

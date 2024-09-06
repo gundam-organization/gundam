@@ -12,9 +12,9 @@
 #include "TTreeFormulaManager.h"
 
 
-LoggerInit([]{
-  Logger::setUserHeaderStr("[DataSetLoader]");
-});
+#ifndef DISABLE_USER_HEADER
+LoggerInit([]{ Logger::setUserHeaderStr("[DataSetLoader]"); });
+#endif
 
 
 void DatasetDefinition::readConfigImpl() {

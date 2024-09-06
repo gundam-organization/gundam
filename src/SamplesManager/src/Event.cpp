@@ -12,9 +12,9 @@
 
 #include <cmath>
 
-LoggerInit([]{
-  Logger::setUserHeaderStr("[Event]");
-});
+#ifndef DISABLE_USER_HEADER
+LoggerInit([]{ Logger::setUserHeaderStr("[Event]"); });
+#endif
 
 // const getters
 double Event::getEventWeight() const {

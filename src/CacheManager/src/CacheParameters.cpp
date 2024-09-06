@@ -8,9 +8,9 @@
 #include <vector>
 #include <set>
 
-LoggerInit([]{
-  Logger::setUserHeaderStr("[Cache::Parameters]");
-});
+#ifndef DISABLE_USER_HEADER
+LoggerInit([]{ Logger::setUserHeaderStr("[Cache::Parameters]"); });
+#endif
 
 bool Cache::Parameters::UsingCUDA() {
 #ifdef __CUDACC__

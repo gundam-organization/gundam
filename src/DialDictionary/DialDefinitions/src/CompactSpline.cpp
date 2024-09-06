@@ -8,9 +8,9 @@
 #include "GenericToolbox.Root.h"
 #include "Logger.h"
 
-LoggerInit([]{
-  Logger::setUserHeaderStr("[CompactSpline]");
-});
+#ifndef DISABLE_USER_HEADER
+LoggerInit([]{ Logger::setUserHeaderStr("[CompactSpline]"); });
+#endif
 
 void CompactSpline::setAllowExtrapolation(bool allowExtrapolation) {
   _allowExtrapolation_ = allowExtrapolation;

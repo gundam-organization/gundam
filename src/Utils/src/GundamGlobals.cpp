@@ -7,9 +7,9 @@
 
 #include "TRandom3.h"
 
-LoggerInit([]{
-  Logger::setUserHeaderStr("[GlobalVariables]");
-});
+#ifndef DISABLE_USER_HEADER
+LoggerInit([]{ Logger::setUserHeaderStr("[GlobalVariables]"); });
+#endif
 
 // statics
 int GundamGlobals::_gundamThreads_{1};

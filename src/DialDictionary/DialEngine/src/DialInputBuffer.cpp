@@ -10,9 +10,9 @@
 #include "zlib.h"
 #endif
 
-LoggerInit([]{
-  Logger::setUserHeaderStr("[DialInputBuffer]");
-});
+#ifndef DISABLE_USER_HEADER
+LoggerInit([]{ Logger::setUserHeaderStr("[DialInputBuffer]"); });
+#endif
 
 void DialInputBuffer::invalidateBuffers(){
   // invalidate buffer
