@@ -17,9 +17,7 @@
 
 
 #ifndef DISABLE_USER_HEADER
-LoggerInit([]{
-  Logger::getUserHeader() << "[" << FILENAME << "]";
-});
+LoggerInit([]{ Logger::getUserHeader() << "[" << FILENAME << "]"; });
 #endif
 
 

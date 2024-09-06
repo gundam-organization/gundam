@@ -10,8 +10,7 @@
 
 
 #ifndef DISABLE_USER_HEADER
-LoggerInit([]{
-  Logger::getUserHeader() << "[CompiledLibDial]";
+LoggerInit([]{ Logger::getUserHeader() << "[CompiledLibDial]";
 });
 #endif
 

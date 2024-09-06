@@ -11,8 +11,7 @@
 #include "Logger.h"
 
 #ifndef DISABLE_USER_HEADER
-LoggerInit([]{
-  Logger::getUserHeader() << "[DataSetManager]";
+LoggerInit([]{ Logger::getUserHeader() << "[DataSetManager]";
 });
 #endif
 

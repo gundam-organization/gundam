@@ -12,8 +12,7 @@
 #include <memory>
 
 #ifndef DISABLE_USER_HEADER
-LoggerInit([]{
-  Logger::getUserHeader() << "[GundamApp]";
+LoggerInit([]{ Logger::getUserHeader() << "[GundamApp]";
 });
 #endif
 

@@ -12,8 +12,7 @@
 #include <sstream>
 
 #ifndef DISABLE_USER_HEADER
-LoggerInit([]{
-  Logger::getUserHeader() << "[EventUtils]";
+LoggerInit([]{ Logger::getUserHeader() << "[EventUtils]";
 });
 #endif
 
