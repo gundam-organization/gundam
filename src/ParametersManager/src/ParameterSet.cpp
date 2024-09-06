@@ -20,6 +20,7 @@
 LoggerInit([]{
   Logger::setUserHeaderStr("[ParameterSet]");
 } );
+#endif
 
 void ParameterSet::readConfigImpl(){
   LogThrowIf(_config_.empty(), "ParameterSet config not set.");
