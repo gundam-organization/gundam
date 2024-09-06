@@ -16,6 +16,7 @@
 
 #include <memory>
 
+#ifndef DISABLE_USER_HEADER
 LoggerInit([]{
   Logger::setUserHeaderStr("[ParameterSet]");
 } );

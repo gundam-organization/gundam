@@ -12,10 +12,11 @@
 #include <sstream>
 #include <stdexcept>
 
-
+#ifndef DISABLE_USER_HEADER
 LoggerInit([]{
   Logger::setUserHeaderStr("[DataBinSet]");
 } );
+#endif
 
 void DataBinSet::setVerbosity(int maxLogLevel_){ Logger::setMaxLogLevel(maxLogLevel_); }
 

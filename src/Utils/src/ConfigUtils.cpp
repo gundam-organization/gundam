@@ -19,10 +19,11 @@
 #include <iostream>
 
 
+#ifndef DISABLE_USER_HEADER
 LoggerInit([]{
   Logger::setUserHeaderStr("[ConfigUtils]");
 } );
-
+#endif
 
 namespace ConfigUtils {
 
