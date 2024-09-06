@@ -194,8 +194,9 @@ double LikelihoodInterface::evalFit(const double* parArray_){
   // Update fit parameter values:
   const double *v = parArray_;
   for( auto* par : _minimizerFitParameterPtr_ ){
-    if (not getUseNormalizedFitSpace()) par->setParameterValue(*(v++));
-    else par->setParameterValue(ParameterSet::toRealParValue(*(v++), *par));
+    double p = *(v++);
+    if (getUseNormalizedFitSpace()) p = ParameterSet::toRealParValue(p, *par);
+    par->setParameterValue(p,true);
   }
 
   GenericToolbox::getElapsedTimeSinceLastCallInMicroSeconds(__METHOD_NAME__);
