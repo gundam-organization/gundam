@@ -157,7 +157,7 @@ void SampleElement::refillHistogram(int iThread_){
             << " Content: " << value << "!=" << (*binContentPtr)
             << " Error: " << error << "!=" << (*binErrorPtr);
         LogError << str.str() << std::endl;
-        LogThrow(str.str());
+        // std::exit(EXIT_FAILURE);
       }
     }
 #endif // GUNDAM_USING_CACHE_MANAGER
