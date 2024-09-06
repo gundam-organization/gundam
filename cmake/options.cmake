@@ -26,7 +26,7 @@ option( DISABLE_ZLIB "Disable Zlib dependency." OFF )
 option( CXX_WARNINGS "Enable most C++ warning flags." ON )
 option( CXX_MARCH_FLAG "Enable cpu architecture specific optimisations." OFF )
 option( CMAKE_CXX_EXTENSIONS "Enable GNU extensions to C++ language (-std=gnu++14)." OFF )
-option( USE_MINIMAL_LOG_OUTPUT "Don't print the class name in the header." OFF )
+option( DISABLE_MANUAL_LOG_HEADER "Don't rely on the manually set logger user header string." OFF )
 
 
 # Reading options
