@@ -17,12 +17,9 @@
 #include <vector>
 #include <cstdlib>
 
-#ifndef DISABLE_USER_HEADER
-LoggerInit([]{
-  Logger::getUserHeader() << "[" << FILENAME << "]";
-  Logger::setPrefixFormat("{TIME} {USER_HEADER}");
-});
-#endif
+
+LoggerInit([]{ Logger::setPrefixFormat("{TIME} {SEVERITY}"); });
+
 
 CmdLineParser clp{};
 
