@@ -5,9 +5,7 @@
 #include "Graph.h"
 
 #ifndef DISABLE_USER_HEADER
-LoggerInit([]{
-  Logger::setUserHeaderStr("[Graph-ROOT]");
-});
+LoggerInit([]{ Logger::setUserHeaderStr("[Graph-ROOT]"); });
 #endif
 
 void Graph::setAllowExtrapolation(bool allowExtrapolation) {

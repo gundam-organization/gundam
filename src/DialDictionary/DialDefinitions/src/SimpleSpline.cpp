@@ -12,9 +12,7 @@
 #include "GenericToolbox.Root.h"
 
 #ifndef DISABLE_USER_HEADER
-LoggerInit([]{
-  Logger::setUserHeaderStr("[SimpleSpline]");
-});
+LoggerInit([]{ Logger::setUserHeaderStr("[SimpleSpline]"); });
 #endif
 
 void SimpleSpline::setAllowExtrapolation(bool allowExtrapolation) {

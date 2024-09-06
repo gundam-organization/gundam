@@ -31,9 +31,7 @@
 #include <sstream>
 
 #ifndef DISABLE_USER_HEADER
-LoggerInit([]{
-  Logger::setUserHeaderStr("[DataDispenser]");
-});
+LoggerInit([]{ Logger::setUserHeaderStr("[DataDispenser]"); });
 #endif
 
 

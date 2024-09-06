@@ -8,9 +8,7 @@
 #include "Logger.h"
 
 #ifndef DISABLE_USER_HEADER
-LoggerInit([]{
-  Logger::setUserHeaderStr("[DialInterface]");
-});
+LoggerInit([]{ Logger::setUserHeaderStr("[DialInterface]"); });
 #endif
 
 

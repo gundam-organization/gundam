@@ -7,9 +7,7 @@
 #include "Logger.h"
 
 #ifndef DISABLE_USER_HEADER
-LoggerInit([]{
-  Logger::setUserHeaderStr("[EventDialCache]");
-});
+LoggerInit([]{ Logger::setUserHeaderStr("[EventDialCache]"); });
 #endif
 
 void EventDialCache::buildReferenceCache( SampleSet& sampleSet_, std::vector<DialCollection>& dialCollectionList_){

@@ -12,9 +12,7 @@
 
 #include "Logger.h"
 #ifndef DISABLE_USER_HEADER
-LoggerInit([]{
-  Logger::setUserHeaderStr("[Cache::Weight::Normalization]");
-});
+LoggerInit([]{ Logger::setUserHeaderStr("[Cache::Weight::Normalization]"); });
 #endif
 
 // The constructor

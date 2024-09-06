@@ -19,9 +19,7 @@
 #include <vector>
 
 #ifndef DISABLE_USER_HEADER
-LoggerInit([]{
-  Logger::setUserHeaderStr("[Propagator]");
-});
+LoggerInit([]{ Logger::setUserHeaderStr("[Propagator]"); });
 #endif
 
 void Propagator::muteLogger(){ Logger::setIsMuted( true ); }

@@ -21,9 +21,7 @@
 #include <sstream>
 
 #ifndef DISABLE_USER_HEADER
-LoggerInit([]{
-  Logger::setUserHeaderStr("[PlotGenerator]");
-});
+LoggerInit([]{ Logger::setUserHeaderStr("[PlotGenerator]"); });
 #endif
 
 

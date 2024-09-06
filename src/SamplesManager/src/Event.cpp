@@ -13,9 +13,7 @@
 #include <cmath>
 
 #ifndef DISABLE_USER_HEADER
-LoggerInit([]{
-  Logger::setUserHeaderStr("[Event]");
-});
+LoggerInit([]{ Logger::setUserHeaderStr("[Event]"); });
 #endif
 
 // const getters

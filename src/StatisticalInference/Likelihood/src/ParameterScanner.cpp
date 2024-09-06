@@ -17,9 +17,7 @@
 
 
 #ifndef DISABLE_USER_HEADER
-LoggerInit([]{
-  Logger::setUserHeaderStr("[ParameterScanner]");
-});
+LoggerInit([]{ Logger::setUserHeaderStr("[ParameterScanner]"); });
 #endif
 
 void ParameterScanner::muteLogger(){ Logger::setIsMuted(true); }

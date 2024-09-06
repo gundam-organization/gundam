@@ -9,9 +9,7 @@
 #include <TGraph.h>
 
 #ifndef DISABLE_USER_HEADER
-LoggerInit([]{
-  Logger::setUserHeaderStr("[GraphFactory]");
-});
+LoggerInit([]{ Logger::setUserHeaderStr("[GraphFactory]"); });
 #endif
 
 DialBase* GraphDialBaseFactory::makeDial(const std::string& dialTitle_,

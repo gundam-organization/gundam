@@ -8,9 +8,7 @@
 #include <TH2.h>
 
 #ifndef DISABLE_USER_HEADER
-LoggerInit([]{
-  Logger::setUserHeaderStr("[SurfaceFactory]");
-});
+LoggerInit([]{ Logger::setUserHeaderStr("[SurfaceFactory]"); });
 #endif
 
 DialBase* SurfaceDialBaseFactory::makeDial(const std::string& dialTitle_,

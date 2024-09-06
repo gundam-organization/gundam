@@ -13,9 +13,7 @@
 
 #include "Logger.h"
 #ifndef DISABLE_USER_HEADER
-LoggerInit([]{
-  Logger::setUserHeaderStr("[Cache::Weights]");
-});
+LoggerInit([]{ Logger::setUserHeaderStr("[Cache::Weights]"); });
 #endif
 
 // The constructor

@@ -10,9 +10,7 @@
 #include "sstream"
 
 #ifndef DISABLE_USER_HEADER
-LoggerInit([]{
-  Logger::setUserHeaderStr("[DataDispenserUtils]");
-});
+LoggerInit([]{ Logger::setUserHeaderStr("[DataDispenserUtils]"); });
 #endif
 
 

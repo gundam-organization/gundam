@@ -11,9 +11,7 @@
 #include <dlfcn.h>
 
 #ifndef DISABLE_USER_HEADER
-LoggerInit([]{
-  Logger::setUserHeaderStr("[Tabulated]");
-});
+LoggerInit([]{ Logger::setUserHeaderStr("[Tabulated]"); });
 #endif
 
 TabulatedDialFactory::TabulatedDialFactory(const JsonType& config_) {

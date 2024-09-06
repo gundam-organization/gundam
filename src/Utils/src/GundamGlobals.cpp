@@ -8,9 +8,7 @@
 #include "TRandom3.h"
 
 #ifndef DISABLE_USER_HEADER
-LoggerInit([]{
-  Logger::setUserHeaderStr("[GlobalVariables]");
-});
+LoggerInit([]{ Logger::setUserHeaderStr("[GlobalVariables]"); });
 #endif
 
 // statics

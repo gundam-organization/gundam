@@ -14,9 +14,7 @@
 #include "Logger.h"
 
 #ifndef DISABLE_USER_HEADER
-LoggerInit([]{
-  Logger::setUserHeaderStr("[Cache::IndexedSums]");
-});
+LoggerInit([]{ Logger::setUserHeaderStr("[Cache::IndexedSums]"); });
 #endif
 
 // The constructor

@@ -14,9 +14,7 @@
 
 #include "Logger.h"
 #ifndef DISABLE_USER_HEADER
-LoggerInit([]{
-  Logger::setUserHeaderStr("[Cache::Weight::MonotonicSpline]");
-});
+LoggerInit([]{ Logger::setUserHeaderStr("[Cache::Weight::MonotonicSpline]"); });
 #endif
 
 // The constructor

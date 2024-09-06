@@ -16,9 +16,7 @@
 
 
 #ifndef DISABLE_USER_HEADER
-LoggerInit([]{
-  Logger::setUserHeaderStr("[JointProbability]");
-});
+LoggerInit([]{ Logger::setUserHeaderStr("[JointProbability]"); });
 #endif
 
 namespace JointProbability{

@@ -10,9 +10,7 @@
 
 
 #ifndef DISABLE_USER_HEADER
-LoggerInit([]{
-  Logger::setUserHeaderStr("[EventVarTransform]");
-});
+LoggerInit([]{ Logger::setUserHeaderStr("[EventVarTransform]"); });
 #endif
 
 void EventVarTransform::readConfigImpl(){

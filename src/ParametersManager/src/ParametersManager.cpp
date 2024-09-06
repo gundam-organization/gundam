@@ -13,9 +13,7 @@
 
 
 #ifndef DISABLE_USER_HEADER
-LoggerInit([]{
-  Logger::setUserHeaderStr("[ParameterManager]");
-});
+LoggerInit([]{ Logger::setUserHeaderStr("[ParameterManager]"); });
 #endif
 
 

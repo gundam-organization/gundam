@@ -14,9 +14,7 @@
 #include <locale>
 
 #ifndef DISABLE_USER_HEADER
-LoggerInit([]{
-  Logger::setUserHeaderStr("[MCMC]");
-});
+LoggerInit([]{ Logger::setUserHeaderStr("[MCMC]"); });
 #endif
 
 

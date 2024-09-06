@@ -40,9 +40,7 @@
 #include <set>
 
 #ifndef DISABLE_USER_HEADER
-LoggerInit([]{
-  Logger::setUserHeaderStr("[Cache::Manager]");
-});
+LoggerInit([]{ Logger::setUserHeaderStr("[Cache::Manager]"); });
 #endif
 
 Cache::Manager* Cache::Manager::fSingleton = nullptr;

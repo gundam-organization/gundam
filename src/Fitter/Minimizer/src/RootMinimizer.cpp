@@ -22,9 +22,7 @@
 #include "TLegend.h"
 
 #ifndef DISABLE_USER_HEADER
-LoggerInit([]{
-  Logger::setUserHeaderStr("[RootMinimizer]");
-});
+LoggerInit([]{ Logger::setUserHeaderStr("[RootMinimizer]"); });
 #endif
 
 void RootMinimizer::readConfigImpl(){

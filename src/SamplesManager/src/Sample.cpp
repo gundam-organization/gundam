@@ -14,9 +14,7 @@
 
 
 #ifndef DISABLE_USER_HEADER
-LoggerInit([]{
-  Logger::setUserHeaderStr("[Sample]");
-});
+LoggerInit([]{ Logger::setUserHeaderStr("[Sample]"); });
 #endif
 
 

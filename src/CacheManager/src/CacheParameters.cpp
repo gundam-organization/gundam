@@ -9,9 +9,7 @@
 #include <set>
 
 #ifndef DISABLE_USER_HEADER
-LoggerInit([]{
-  Logger::setUserHeaderStr("[Cache::Parameters]");
-});
+LoggerInit([]{ Logger::setUserHeaderStr("[Cache::Parameters]"); });
 #endif
 
 bool Cache::Parameters::UsingCUDA() {

@@ -9,9 +9,7 @@
 #include "Logger.h"
 
 #ifndef DISABLE_USER_HEADER
-LoggerInit([]{
-  Logger::setUserHeaderStr("[MonotonicSpline]");
-});
+LoggerInit([]{ Logger::setUserHeaderStr("[MonotonicSpline]"); });
 #endif
 
 void MonotonicSpline::setAllowExtrapolation(bool allowExtrapolation) {

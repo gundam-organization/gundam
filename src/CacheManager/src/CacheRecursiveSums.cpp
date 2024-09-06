@@ -14,9 +14,7 @@
 #include "Logger.h"
 
 #ifndef DISABLE_USER_HEADER
-LoggerInit([]{
-  Logger::setUserHeaderStr("[Cache::RecursiveSums]");
-});
+LoggerInit([]{ Logger::setUserHeaderStr("[Cache::RecursiveSums]"); });
 #endif
 
 // The constructor

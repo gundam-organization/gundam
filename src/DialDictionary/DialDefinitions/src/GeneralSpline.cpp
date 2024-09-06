@@ -10,9 +10,7 @@
 
 
 #ifndef DISABLE_USER_HEADER
-LoggerInit([]{
-  Logger::setUserHeaderStr("[GeneralSpline]");
-});
+LoggerInit([]{ Logger::setUserHeaderStr("[GeneralSpline]"); });
 #endif
 
 void GeneralSpline::setAllowExtrapolation(bool allowExtrapolation) {

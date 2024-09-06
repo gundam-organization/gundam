@@ -9,9 +9,7 @@
 #include "Logger.h"
 
 #ifndef DISABLE_USER_HEADER
-LoggerInit([]{
-  Logger::setUserHeaderStr("[CompactSpline]");
-});
+LoggerInit([]{ Logger::setUserHeaderStr("[CompactSpline]"); });
 #endif
 
 void CompactSpline::setAllowExtrapolation(bool allowExtrapolation) {

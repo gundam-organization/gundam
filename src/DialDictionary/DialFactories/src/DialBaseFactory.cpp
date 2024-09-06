@@ -10,9 +10,7 @@
 #include "Logger.h"
 
 #ifndef DISABLE_USER_HEADER
-LoggerInit([]{
-  Logger::setUserHeaderStr("[DialBaseFactory]");
-});
+LoggerInit([]{ Logger::setUserHeaderStr("[DialBaseFactory]"); });
 #endif
 
 
