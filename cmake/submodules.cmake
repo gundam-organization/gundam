@@ -71,7 +71,7 @@ else()
 
   if( USE_MINIMAL_LOG_OUTPUT )
     add_definitions( -D DISABLE_USER_HEADER )
-    add_definitions( -D LOGGER_PREFIX_FORMAT="\\\"{TIME} {SEVERITY}"\\\" )
+    add_definitions( -D LOGGER_PREFIX_FORMAT="\\\"{TIME} {SEVERITY} {FILENAME}"\\\" )
   else()
     add_definitions( -D LOGGER_PREFIX_FORMAT="\\\"{TIME} {SEVERITY} {USER_HEADER}"\\\" )
   endif()
