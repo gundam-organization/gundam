@@ -65,6 +65,8 @@ void DataDispenser::readConfigImpl(){
     auto varExpr = GenericToolbox::Json::fetchValue<std::string>(entry, {{"expr"}, {"expression"}, {"leafVar"}});
     _parameters_.variableDict[ varName ] = varExpr;
   }
+
+  _parameters_.overridePropagatorConfig = GenericToolbox::Json::fetchValue(_config_, "overridePropagatorConfig", _parameters_.overridePropagatorConfig);
 }
 void DataDispenser::initializeImpl(){
   // Nothing else to do other than read config?
@@ -461,10 +463,10 @@ void DataDispenser::preAllocateMemory(){
         nDialsMaxPerEvent += 1;
 
         if (dialCollection->isEventByEvent()) {
-            // Reserve enough space for all of the event-by-event dials
+          // Reserve enough space for all the event-by-event dials
           // that might be added.  This size may be reduced later.
-          auto dialType = dialCollection->getGlobalDialType();
-          int origSize = dialCollection->getDialBaseList().size();
+          auto& dialType = dialCollection->getGlobalDialType();
+          size_t origSize = dialCollection->getDialBaseList().size();
           LogInfo << dialCollection->getTitle()
                   << ": adding " << _cache_.totalNbEvents
                   << " (was " << origSize << ")"

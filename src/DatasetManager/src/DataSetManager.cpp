@@ -49,144 +49,142 @@ void DataSetManager::initializeImpl(){
   _propagator_.getPlotGenerator().setSampleSetPtr(&_propagator_.getSampleSet());
   _propagator_.getPlotGenerator().initialize();
 
-  loadData();
+  load();
 }
 
-void DataSetManager::loadData(){
-  LogInfo << "Loading data into the PropagatorEngine..." << std::endl;
+void DataSetManager::loadPropagator( bool isModel_ ){
 
-  // make sure everything is ready for loading
-  _propagator_.clearContent();
-
-  // First start with the data:
-  bool usedMcContainer{false};
-  bool allAsimov{true};
+  std::vector<DataDispenser*> dispenserToLoadList{};
   for( auto& dataSet : _dataSetList_ ){
     LogContinueIf(not dataSet.isEnabled(), "Dataset \"" << dataSet.getName() << "\" is disabled. Skipping");
 
-    // selecting the right dispenser
-    DataDispenser* dispenser = &dataSet.getSelectedDataDispenser();
-    if( _propagator_.isThrowAsimovToyParameters() ) { dispenser = &dataSet.getToyDataDispenser(); }
-    if( _propagator_.isLoadAsimovData() ){ dispenser = &dataSet.getDataDispenserDict().at("Asimov"); }
+    if( isModel_ or _propagator_.isLoadAsimovData() ){ dispenserToLoadList.emplace_back( &dataSet.getModelDispenser() ); }
+    else{
+      dispenserToLoadList.emplace_back( &dataSet.getDataDispenser() );
+      if( _propagator_.isThrowAsimovToyParameters() ){ dispenserToLoadList.back() = &dataSet.getToyDataDispenser(); }
+    }
 
-    // checking what we are loading
-    if(dispenser->getParameters().name != "Asimov" ){ allAsimov = false; }
-    if( dispenser->getParameters().useMcContainer ){ usedMcContainer = true; }
+    // if we don't load an Asimov-tagged dataset, we'll need to reload the data for building our model.
+    if( dispenserToLoadList.back()->getParameters().name != "Asimov" ){ _reloadModelRequested_ = true; }
+  }
 
-    // loading in the propagator
-    LogInfo << "Reading dataset: " << dataSet.getName() << "/" << dispenser->getParameters().name << std::endl;
-    dispenser->load( _propagator_ );
+  // by default, load the model
+  std::shared_ptr<Propagator> propagatorPtr{ &_propagator_ };
+
+  // use a temporary propagator as some parameter can be edited
+  if( _reloadModelRequested_ ){ propagatorPtr = std::make_shared<Propagator>(_propagator_); }
+
+  // make sure everything is ready for loading
+  propagatorPtr->clearContent();
+
+  // perform the loading
+  for( auto* dispenserToLoad : dispenserToLoadList ){
+    LogInfo << "Reading dataset: " << dispenserToLoad->getOwner()->getName() << "/" << dispenserToLoad->getParameters().name << std::endl;
+
+    if( not dispenserToLoad->getParameters().overridePropagatorConfig.empty() ){
+      LogWarning << "Reload the propagator config with override options" << std::endl;
+      ConfigUtils::ConfigHandler configHandler( _propagator_.getConfig() );
+      configHandler.override( dispenserToLoad->getParameters().overridePropagatorConfig );
+      propagatorPtr->readConfig( configHandler.getConfig() );
+      propagatorPtr->initialize();
+    }
+
+    // legacy: replacing the parameterSet option "maskForToyGeneration" -> now should use the config override above
+    if( not isModel_ ){
+      for( auto& parSet : propagatorPtr->getParametersManager().getParameterSetsList() ){
+        if( GenericToolbox::Json::fetchValue(parSet.getConfig(), "maskForToyGeneration", false) ){ parSet.nullify(); }
+      }
+    }
+
+    dispenserToLoad->load( *propagatorPtr );
   }
 
   LogInfo << "Resizing dial containers..." << std::endl;
-  for( auto& dialCollection : _propagator_.getDialCollectionList() ) {
+  for( auto& dialCollection : propagatorPtr->getDialCollectionList() ) {
     if( dialCollection.isEventByEvent() ){ dialCollection.resizeContainers(); }
   }
 
   LogInfo << "Build reference cache..." << std::endl;
-  _propagator_.buildDialCache();
+  propagatorPtr->buildDialCache();
 
+  if( not isModel_ ){
+    if( propagatorPtr->isThrowAsimovToyParameters() ){
 
-  // Copy to data container
-  if( usedMcContainer ){
-    if( _propagator_.isThrowAsimovToyParameters() ){
-
-      if( _propagator_.isShowEventBreakdown() ){
+      if( propagatorPtr->isShowEventBreakdown() ){
         LogInfo << "Propagating prior parameters on the initially loaded events..." << std::endl;
-        _propagator_.reweightMcEvents();
+        propagatorPtr->reweightMcEvents();
 
         LogInfo << "Sample breakdown prior to the throwing:" << std::endl;
-        std::cout << _propagator_.getSampleBreakdownTableStr() << std::endl;
+        std::cout << propagatorPtr->getSampleBreakdownTableStr() << std::endl;
 
-        if( _propagator_.isDebugPrintLoadedEvents() ){
+        if( propagatorPtr->isDebugPrintLoadedEvents() ){
           LogDebug << "Toy events:" << std::endl;
-          LogDebug << GET_VAR_NAME_VALUE(_propagator_.getDebugPrintLoadedEventsNbPerSample()) << std::endl;
+          LogDebug << GET_VAR_NAME_VALUE(propagatorPtr->getDebugPrintLoadedEventsNbPerSample()) << std::endl;
           int iEvt{0};
-          for( auto& entry : _propagator_.getEventDialCache().getCache() ) {
+          for( auto& entry : propagatorPtr->getEventDialCache().getCache() ) {
             LogDebug << "Event #" << iEvt++ << "{" << std::endl;
             {
               LogScopeIndent;
               LogDebug << entry.getSummary() << std::endl;
             }
             LogDebug << "}" << std::endl;
-            if( iEvt >= _propagator_.getDebugPrintLoadedEventsNbPerSample() ) break;
+            if( iEvt >= propagatorPtr->getDebugPrintLoadedEventsNbPerSample() ) break;
           }
         }
       }
 
       if( _toyParameterInjector_.empty() ){
         LogWarning << "Will throw toy parameters..." << std::endl;
-        _propagator_.getParametersManager().throwParameters();
-
-        // Handling possible masks
-        for( auto& parSet : _propagator_.getParametersManager().getParameterSetsList() ){
-          if( not parSet.isEnabled() ) continue;
-
-          if( parSet.isMaskForToyGeneration() ){
-            LogWarning << parSet.getName() << " will be masked for the toy generation." << std::endl;
-            parSet.setMaskedForPropagation( true );
-          }
-        }
+        propagatorPtr->getParametersManager().throwParameters();
       }
       else{
         LogWarning << "Injecting parameters..." << std::endl;
-        _propagator_.getParametersManager().injectParameterValues( _toyParameterInjector_ );
+        propagatorPtr->getParametersManager().injectParameterValues( _toyParameterInjector_ );
       }
 
     } // throw asimov?
 
     LogInfo << "Propagating parameters on events..." << std::endl;
 
+    // IS THAT NECESSARY THO?
+    // TODO: check with or without
     // Make sure before the copy to the data:
     // At this point, MC events have been reweighted using their prior
     // but when using eigen decomp, the conversion eigen -> original has a small computational error
-    for( auto& parSet: _propagator_.getParametersManager().getParameterSetsList() ) {
+    for( auto& parSet: propagatorPtr->getParametersManager().getParameterSetsList() ) {
+      if( not parSet.isEnabled() ){ continue; }
       if( parSet.isEnableEigenDecomp() ) { parSet.propagateEigenToOriginal(); }
     }
 
-    _propagator_.reweightMcEvents();
+    propagatorPtr->reweightMcEvents();
 
     // Copies MC events in data container for both Asimov and FakeData event types
     LogWarning << "Copying loaded mc-like event to data container..." << std::endl;
-    _propagator_.getSampleSet().copyMcEventListToDataContainer();
+    propagatorPtr->getSampleSet().copyMcEventListToDataContainer( _propagator_.getSampleSet().getSampleList() );
 
-    // back to prior
-    if( _propagator_.isThrowAsimovToyParameters() ){
-      for( auto& parSet : _propagator_.getParametersManager().getParameterSetsList() ){
-
-        if( parSet.isMaskForToyGeneration() ){
-          // unmasking
-          LogWarning << "Unmasking parSet: " << parSet.getName() << std::endl;
-          parSet.setMaskedForPropagation( false );
-        }
-
+    // back to prior in case the original _propagator_ has been used.
+    if( propagatorPtr->isThrowAsimovToyParameters() ){
+      for( auto& parSet : propagatorPtr->getParametersManager().getParameterSetsList() ){
+        if( not parSet.isEnabled() ){ continue; }
         parSet.moveParametersToPrior();
       }
     }
   }
 
-  if( not allAsimov ){
-    // reload everything
-    // Filling the mc containers
-    _propagator_.clearContent();
+}
+void DataSetManager::load(){
 
-    for( auto& dataSet : _dataSetList_ ){
-      LogContinueIf(not dataSet.isEnabled(), "Dataset \"" << dataSet.getName() << "\" is disabled. Skipping");
-      auto& dispenser = dataSet.getMcDispenser();
-      dispenser.load( _propagator_ );
-    }
+  LogInfo << "Loading data into the propagator engine..." << std::endl;
+  this->loadPropagator( false );
 
-    LogInfo << "Resizing dial containers..." << std::endl;
-    for( auto& dialCollection : _propagator_.getDialCollectionList() ) {
-      if( dialCollection.isEventByEvent() ){ dialCollection.resizeContainers(); }
-    }
-
-    LogInfo << "Build reference cache..." << std::endl;
-    _propagator_.buildDialCache();
+  // For non-Asimov fits, we need to reload the data.
+  if( _reloadModelRequested_ ){
+    LogInfo << "Loading the model in the propagator engine..." << std::endl;
+    this->loadPropagator( true );
   }
 
-  // The event reweighting is competely defined!  Now print a breakdown of all
-  // the loaded events with all of the global reweighting applied, but none of
+  // The event reweighting is completely defined!  Now print a breakdown of all
+  // the loaded events with all the global reweighting applied, but none of
   // the dials applied.  It needs to be done BEFORE the cache manager is built
   // since this uses a hack to apply the global weights that modifies the
   // reweighting, and then modifies it back. (The reweighting needs to be

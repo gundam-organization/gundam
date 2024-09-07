@@ -36,6 +36,7 @@ public:
   void setOwner( DatasetDefinition* owner_){ _owner_ = owner_; }
 
   // const getters
+  [[nodiscard]] const DatasetDefinition* getOwner() const{ return _owner_; }
   [[nodiscard]] const DataDispenserParameters &getParameters() const{ return _parameters_; }
 
   // non-const getters

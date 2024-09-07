@@ -68,7 +68,6 @@ public:
   [[nodiscard]] bool isEnablePca() const{ return _enablePca_; }
   [[nodiscard]] bool isEnableEigenDecomp() const{ return _enableEigenDecomp_; }
   [[nodiscard]] bool isEnabledThrowToyParameters() const{ return _enabledThrowToyParameters_; }
-  [[nodiscard]] bool isMaskForToyGeneration() const { return _maskForToyGeneration_; }
   [[nodiscard]] int getNbEnabledEigenParameters() const{ return _nbEnabledEigen_; }
   [[nodiscard]] double getPenaltyChi2Buffer() const{ return _penaltyChi2Buffer_; }
   [[nodiscard]] size_t getNbParameters() const{ return _parameterList_.size(); }
@@ -149,6 +148,9 @@ public:
   Parameter* getParameterPtr(const std::string& parName_);
   Parameter* getParameterPtrWithTitle(const std::string& parTitle_);
 
+  // disable completely by wiping its members
+  void nullify();
+
   // Normalize a value or range in units of the parameter StdDev
   static double toNormalizedParRange(double parRange, const Parameter& par);
   static double toNormalizedParValue(double parValue, const Parameter& par);
@@ -173,6 +175,8 @@ protected:
   void readParameterDefinitionFile();
   void defineParameters();
 
+  void setName(const std::string& name_){ _name_ = name_; }
+
 private:
   // Internals
   std::vector<Parameter> _parameterList_;
@@ -188,14 +192,13 @@ private:
   std::string _throwEnabledListPath_{};
   JsonType _parameterDefinitionConfig_{};
   JsonType _dialSetDefinitions_{};
-  bool _isEnabled_{};
+  bool _isEnabled_{false};
   bool _useMarkGenerator_{false};
   bool _useEigenDecompForThrows_{false};
   bool _printDialSetsSummary_{false};
   bool _printParametersSummary_{false};
   bool _releaseFixedParametersOnHesse_{false};
   bool _devUseParLimitsOnEigen_{false};
-  bool _maskForToyGeneration_{false};
   int _nbParameterDefinition_{-1};
   double _nominalStepSize_{std::nan("unset")};
   int _maxNbEigenParameters_{-1};

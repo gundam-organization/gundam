@@ -34,10 +34,13 @@ public:
   std::vector<DatasetDefinition>& getDataSetList(){ return _dataSetList_; }
 
 protected:
-  void loadData();
+  void load();
+  void loadPropagator(bool isModel_);
 
 private:
   // internals
+  bool _reloadModelRequested_{false};
+
   Propagator _propagator_{};
   EventTreeWriter _treeWriter_{};
   std::vector<DatasetDefinition> _dataSetList_{};
