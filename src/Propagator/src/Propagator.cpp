@@ -25,8 +25,6 @@ LoggerInit([]{ Logger::setUserHeaderStr("[Propagator]"); });
 void Propagator::muteLogger(){ Logger::setIsMuted( true ); }
 void Propagator::unmuteLogger(){ Logger::setIsMuted( false ); }
 
-using namespace GenericToolbox::ColorCodes;
-
 void Propagator::readConfigImpl(){
   LogWarning << __METHOD_NAME__ << std::endl;
 
@@ -46,6 +44,7 @@ void Propagator::readConfigImpl(){
 
   // Monitoring parameters
   _showEventBreakdown_ = GenericToolbox::Json::fetchValue(_config_, "showEventBreakdown", _showEventBreakdown_);
+  _showNbEventParameterBreakdown_ = GenericToolbox::Json::fetchValue(_config_, "showNbEventParameterBreakdown", _showNbEventParameterBreakdown_);
   _throwAsimovToyParameters_ = GenericToolbox::Json::fetchValue(_config_, "throwAsimovFitParameters", _throwAsimovToyParameters_);
   _enableStatThrowInToys_ = GenericToolbox::Json::fetchValue(_config_, "enableStatThrowInToys", _enableStatThrowInToys_);
   _gaussStatThrowInToys_ = GenericToolbox::Json::fetchValue(_config_, "gaussStatThrowInToys", _gaussStatThrowInToys_);
@@ -297,6 +296,37 @@ void Propagator::printBreakdowns(){
     std::cout << this->getSampleBreakdownTableStr() << std::endl;
 
   }
+
+  if( _showNbEventParameterBreakdown_ ){
+
+    std::map<const Parameter*, int> nbEventForParameter{}; // assuming int = 0 by default
+    for( auto& cache: _eventDialCache_.getCache() ){
+      for( auto& dial : cache.dialResponseCacheList ){
+        for( int iInput = 0 ; iInput < dial.dialInterface.getInputBufferRef()->getInputSize() ; iInput++ ){
+          nbEventForParameter[ &dial.dialInterface.getInputBufferRef()->getParameter(iInput) ] += 1;
+        }
+      }
+    }
+
+    GenericToolbox::TablePrinter t;
+    for( auto& parSet : _parManager_.getParameterSetsList() ){
+      if( not parSet.isEnabled() ){ continue; }
+      for( auto& par : parSet.getParameterList() ){
+        if( not par.isEnabled() ){ continue; }
+
+        t.setColorBuffer( GenericToolbox::ColorCodes::resetColor );
+        if( nbEventForParameter[ &par ] == 0 ){ t.setColorBuffer( GenericToolbox::ColorCodes::redBackground ); }
+
+        t << par.getFullTitle() << GenericToolbox::TablePrinter::NextColumn;
+        t << nbEventForParameter[ &par ] << GenericToolbox::TablePrinter::NextLine;
+      }
+    }
+
+    LogInfo << "Nb of event affected by parameters:" << std::endl;
+    t.printTable();
+
+  }
+
   if( _debugPrintLoadedEvents_ ){
     LogDebug << "Printing " << _debugPrintLoadedEventsNbPerSample_ << " events..." << std::endl;
     for( int iEvt = 0 ; iEvt < _debugPrintLoadedEventsNbPerSample_ ; iEvt++ ){

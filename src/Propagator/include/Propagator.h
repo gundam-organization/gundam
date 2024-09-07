@@ -99,6 +99,7 @@ private:
   bool _gaussStatThrowInToys_{false};
   bool _enableEventMcThrow_{true};
   bool _showEventBreakdown_{true};
+  bool _showNbEventParameterBreakdown_{true};
   bool _enableEigenToOrigInPropagate_{true};
   int _iThrow_{-1};
 
