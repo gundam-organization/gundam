@@ -34,6 +34,8 @@ void EventTreeWriter::readConfigImpl() {
       LogInfo << GET_VAR_NAME_VALUE(_nPointsPerDial_) << std::endl;
     }
   }
+
+  _threadPool_.setNThreads( GundamGlobals::getNumberOfThreads() );
 }
 
 
@@ -213,10 +215,10 @@ template<typename T> void EventTreeWriter::writeEventsTemplate(TDirectory* saveD
     }
 
     // parallel job to write dials
-    GundamGlobals::getParallelWorker().addJob("buildResponseGraph", [&](int iThread_){
+    _threadPool_.addJob("buildResponseGraph", [&](int iThread_){
       TGraph* grPtr{nullptr};
       for( size_t iGlobalPar = 0 ; iGlobalPar < parIndexList.size() ; iGlobalPar++ ){
-        if( iThread_ != -1 and iGlobalPar % GundamGlobals::getParallelWorker().getNbThreads() != iThread_ ) continue;
+        if( iThread_ != -1 and iGlobalPar % GundamGlobals::getNumberOfThreads() != iThread_ ) continue;
 
         // reset the corresponding graph
         grPtr = graphParResponse[iGlobalPar];
@@ -270,14 +272,14 @@ template<typename T> void EventTreeWriter::writeEventsTemplate(TDirectory* saveD
 
     if( writeDials ){
       dialElements = getDialElementsPtr(cacheEntry);
-      GundamGlobals::getParallelWorker().runJob("buildResponseGraph");
+      _threadPool_.runJob("buildResponseGraph");
     }
 
     tree->Fill();
   }
 
   if( writeDials ) {
-    GundamGlobals::getParallelWorker().removeJob("buildResponseGraph");
+    _threadPool_.removeJob("buildResponseGraph");
   }
 
 

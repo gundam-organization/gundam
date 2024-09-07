@@ -18,6 +18,8 @@ LoggerInit([]{ Logger::getUserHeader() << "[DataSetManager]"; });
 void DataSetManager::readConfigImpl(){
   LogInfo << "Reading DataSetManager configurations..." << std::endl;
 
+  _threadPool_.setNThreads( GundamGlobals::getNumberOfThreads() );
+
   // Propagator config is supposed to be set in the likelihood interface.
   // however in old GUNDAM versions it was set at the FitterEngine level.
   // In that case, the config has already been set, hence "_propagator_.getConfig()"
@@ -202,7 +204,7 @@ void DataSetManager::loadPropagator( bool isModel_ ){
     // The histogram bin was assigned to each event by the DataDispenser, now
     // cache the binning results for speed into each of the samples.
     LogInfo << "Filling up sample bin caches..." << std::endl;
-    GundamGlobals::getParallelWorker().runJob([this](int iThread){
+    _threadPool_.runJob([this](int iThread){
       LogInfoIf(iThread <= 0) << "Updating sample per bin event lists..." << std::endl;
       for( auto& sample : _propagator_.getSampleSet().getSampleList() ){
         sample.getMcContainer().updateBinEventList(iThread);
@@ -211,16 +213,13 @@ void DataSetManager::loadPropagator( bool isModel_ ){
     });
 
     LogInfo << "Filling up sample histograms..." << std::endl;
-    GundamGlobals::getParallelWorker().runJob([this](int iThread){
+    _threadPool_.runJob([this](int iThread){
       for( auto& sample : _propagator_.getSampleSet().getSampleList() ){
         sample.getMcContainer().refillHistogram(iThread);
         sample.getDataContainer().refillHistogram(iThread);
       }
     });
   }
-
-  LogWarning << "END" << std::endl;
-
 }
 void DataSetManager::load(){
 
@@ -262,6 +261,6 @@ void DataSetManager::load(){
   _propagator_.getPlotGenerator().defineHistogramHolders();
 
   /// Propagator needs to be fast, let the workers wait for the signal
-  GundamGlobals::getParallelWorker().setCpuTimeSaverIsEnabled(false);
+  _propagator_.getThreadPool().setCpuTimeSaverIsEnabled(false);
 
 }

@@ -19,7 +19,6 @@ bool GundamGlobals::_forceDirectCalculation_{false};
 bool GundamGlobals::_lightOutputMode_{false};
 std::mutex GundamGlobals::_threadMutex_;
 VerboseLevel GundamGlobals::_verboseLevel_{VerboseLevel::NORMAL_MODE};
-GenericToolbox::ParallelWorker GundamGlobals::_threadPool_;
 
 // setters
 void GundamGlobals::setVerboseLevel(VerboseLevel verboseLevel_){

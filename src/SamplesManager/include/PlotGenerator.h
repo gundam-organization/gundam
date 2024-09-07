@@ -10,6 +10,7 @@
 #include "JsonBaseClass.h"
 
 #include "GenericToolbox.Wrappers.h"
+#include "GenericToolbox.Thread.h"
 
 #include "nlohmann/json.hpp"
 #include "TDirectory.h"
@@ -115,7 +116,7 @@ public:
 
 protected:
   // Internals
-  static void buildEventBinCache( const std::vector<HistHolder *> &histPtrToFillList, const std::vector<Event> *eventListPtr, bool isData_);
+  void buildEventBinCache( const std::vector<HistHolder *> &histPtrToFillList, const std::vector<Event> *eventListPtr, bool isData_);
 
 private:
   // Parameters
@@ -135,6 +136,8 @@ private:
   std::vector<std::vector<HistHolder>> _histHolderCacheList_{};
   std::vector<HistHolder> _comparisonHistHolderList_;
   std::map<std::string, std::shared_ptr<TCanvas>> _bufferCanvasList_;
+
+  GenericToolbox::ParallelWorker _threadPool_{};
 
 };
 

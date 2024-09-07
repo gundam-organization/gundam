@@ -11,6 +11,8 @@
 #include "Propagator.h"
 #include "JsonBaseClass.h"
 
+#include "GenericToolbox.Thread.h"
+
 #include "TChain.h"
 #include "nlohmann/json.hpp"
 
@@ -72,6 +74,8 @@ private:
   // internals
   DatasetDefinition* _owner_{nullptr};
   DataDispenserCache _cache_;
+
+  GenericToolbox::ParallelWorker _threadPool_{};
 
 };
 

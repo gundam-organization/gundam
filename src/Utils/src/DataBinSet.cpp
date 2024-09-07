@@ -21,6 +21,8 @@ void DataBinSet::setVerbosity(int maxLogLevel_){ Logger::setMaxLogLevel(maxLogLe
 // core
 void DataBinSet::readBinningDefinition(const JsonType& binning_) {
 
+  _binList_.clear();
+
   if( binning_.is_structured() ){
     // config like -> should already be unfolded
     this->readBinningConfig( binning_ );

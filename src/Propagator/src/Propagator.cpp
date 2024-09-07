@@ -132,7 +132,7 @@ void Propagator::initializeImpl(){
   initializeThreads();
 
   // will set it off when the Propagator will be loaded
-  GundamGlobals::getParallelWorker().setCpuTimeSaverIsEnabled(true);
+  _threadPool_.setCpuTimeSaverIsEnabled(true);
 }
 
 // Core
@@ -186,7 +186,7 @@ void Propagator::reweightMcEvents() {
 #endif
   if( not usedGPU ){
     if( not _devSingleThreadReweight_ ){
-      GundamGlobals::getParallelWorker().runJob("Propagator::reweightMcEvents");
+      _threadPool_.runJob("Propagator::reweightMcEvents");
     }
     else{ this->reweightMcEvents(-1); }
   }
@@ -196,7 +196,7 @@ void Propagator::reweightMcEvents() {
 void Propagator::refillMcHistograms(){
   refillHistogramTimer.start();
 
-  if( not _devSingleThreadHistFill_ ){ GundamGlobals::getParallelWorker().runJob("Propagator::refillMcHistograms"); }
+  if( not _devSingleThreadHistFill_ ){ _threadPool_.runJob("Propagator::refillMcHistograms"); }
   else{ refillMcHistogramsFct(-1); }
 
   refillHistogramTimer.stop();
@@ -326,12 +326,15 @@ void Propagator::printBreakdowns(){
 // Protected
 void Propagator::initializeThreads() {
 
-  GundamGlobals::getParallelWorker().addJob(
+  _threadPool_ = GenericToolbox::ParallelWorker();
+  _threadPool_.setNThreads( GundamGlobals::getNumberOfThreads() );
+
+  _threadPool_.addJob(
       "Propagator::reweightMcEvents",
       [this](int iThread){ this->reweightMcEvents(iThread); }
   );
 
-  GundamGlobals::getParallelWorker().addJob(
+  _threadPool_.addJob(
       "Propagator::refillMcHistograms",
       [this](int iThread){ this->refillMcHistogramsFct(iThread); }
   );
@@ -345,7 +348,7 @@ void Propagator::reweightMcEvents(int iThread_) {
   //! fitter
 
   auto bounds = GenericToolbox::ParallelWorker::getThreadBoundIndices(
-      iThread_, GundamGlobals::getParallelWorker().getNbThreads(),
+      iThread_, _threadPool_.getNbThreads(),
       int(_eventDialCache_.getCache().size())
   );
 

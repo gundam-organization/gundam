@@ -2,6 +2,8 @@
 // Created by Nadrino on 17/06/2021.
 //
 
+#include "GenericToolbox.Thread.h"
+
 #include "Logger.h"
 
 #include <string>

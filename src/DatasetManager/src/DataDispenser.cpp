@@ -38,6 +38,8 @@ LoggerInit([]{ Logger::setUserHeaderStr("[DataDispenser]"); });
 void DataDispenser::readConfigImpl(){
   LogThrowIf( _config_.empty(), "Config is not set." );
 
+  _threadPool_.setNThreads( GundamGlobals::getNumberOfThreads() );
+
   _parameters_.name = GenericToolbox::Json::fetchValue<std::string>(_config_, "name", _parameters_.name);
 
   if( GenericToolbox::Json::doKeyExist( _config_, "fromHistContent" ) ) {
@@ -206,7 +208,7 @@ void DataDispenser::doEventSelection(){
   ROOT::EnableThreadSafety();
 
   // how meaning buffers?
-  int nThreads{GundamGlobals::getParallelWorker().getNbThreads()};
+  int nThreads{GundamGlobals::getNumberOfThreads()};
   if( _owner_->isDevSingleThreadEventSelection() ) { nThreads = 1; }
 
   Long64_t nEntries{0};
@@ -224,9 +226,9 @@ void DataDispenser::doEventSelection(){
   }
 
   if( not _owner_->isDevSingleThreadEventSelection() ) {
-    GundamGlobals::getParallelWorker().addJob(__METHOD_NAME__, [this](int iThread_){ this->eventSelectionFunction(iThread_); });
-    GundamGlobals::getParallelWorker().runJob(__METHOD_NAME__);
-    GundamGlobals::getParallelWorker().removeJob(__METHOD_NAME__);
+    _threadPool_.addJob(__METHOD_NAME__, [this](int iThread_){ this->eventSelectionFunction(iThread_); });
+    _threadPool_.runJob(__METHOD_NAME__);
+    _threadPool_.removeJob(__METHOD_NAME__);
   }
   else {
     this->eventSelectionFunction(-1);
@@ -514,11 +516,11 @@ void DataDispenser::readAndFill(){
   }
 
   LogWarning << "Loading and indexing..." << std::endl;
-  if(not _owner_->isDevSingleThreadEventLoaderAndIndexer() and GundamGlobals::getParallelWorker().getNbThreads() > 1 ){
+  if(not _owner_->isDevSingleThreadEventLoaderAndIndexer() and GundamGlobals::getNumberOfThreads() > 1 ){
     ROOT::EnableThreadSafety(); // EXTREMELY IMPORTANT
-    GundamGlobals::getParallelWorker().addJob(__METHOD_NAME__, [&](int iThread_){ this->fillFunction(iThread_); });
-    GundamGlobals::getParallelWorker().runJob(__METHOD_NAME__);
-    GundamGlobals::getParallelWorker().removeJob(__METHOD_NAME__);
+    _threadPool_.addJob(__METHOD_NAME__, [&](int iThread_){ this->fillFunction(iThread_); });
+    _threadPool_.runJob(__METHOD_NAME__);
+    _threadPool_.removeJob(__METHOD_NAME__);
   }
   else{
     this->fillFunction(-1); // for better debug breakdown
@@ -650,7 +652,7 @@ std::unique_ptr<TChain> DataDispenser::openChain(bool verbose_){
 
 void DataDispenser::eventSelectionFunction(int iThread_){
 
-  int nThreads{GundamGlobals::getParallelWorker().getNbThreads()};
+  int nThreads{GundamGlobals::getNumberOfThreads()};
   if( iThread_ == -1 ){ iThread_ = 0; nThreads = 1; }
 
   // Opening ROOT file...
@@ -785,7 +787,7 @@ void DataDispenser::eventSelectionFunction(int iThread_){
 }
 void DataDispenser::fillFunction(int iThread_){
 
-  int nThreads = GundamGlobals::getParallelWorker().getNbThreads();
+  int nThreads = GundamGlobals::getNumberOfThreads();
   if( iThread_ == -1 ){ iThread_ = 0; nThreads = 1; } // special mode
 
   auto treeChain = this->openChain();

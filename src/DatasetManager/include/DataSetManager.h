@@ -47,6 +47,8 @@ private:
 
   JsonType _toyParameterInjector_{};
 
+  GenericToolbox::ParallelWorker _threadPool_{};
+
 };
 
 

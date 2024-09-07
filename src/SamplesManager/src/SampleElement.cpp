@@ -70,7 +70,7 @@ void SampleElement::shrinkEventList(size_t newTotalSize_){
   _eventList_.shrink_to_fit();
 }
 void SampleElement::updateBinEventList(int iThread_) {
-  int nbThreads = GundamGlobals::getParallelWorker().getNbThreads();
+  int nbThreads = GundamGlobals::getNumberOfThreads();
   if( iThread_ == -1 ){ iThread_ = 0; nbThreads = 1; }
 
   if( iThread_ == 0 ){ LogScopeIndent; LogInfo << "Filling bin event cache for \"" << _name_ << "\"..." << std::endl; }
@@ -91,7 +91,7 @@ void SampleElement::updateBinEventList(int iThread_) {
   }
 }
 void SampleElement::refillHistogram(int iThread_){
-  int nThreads = GundamGlobals::getParallelWorker().getNbThreads();
+  int nThreads = GundamGlobals::getNumberOfThreads();
   if( iThread_ == -1 ){ nThreads = 1; iThread_ = 0; }
 
 #ifdef GUNDAM_USING_CACHE_MANAGER
