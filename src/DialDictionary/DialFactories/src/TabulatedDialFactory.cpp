@@ -118,7 +118,6 @@ TabulatedDialFactory::TabulatedDialFactory(const JsonType& config_) {
 }
 
 void TabulatedDialFactory::updateTable(DialInputBuffer& inputBuffer) {
-    if (inputBuffer.isMasked()) return;
     _updateFunc_(_name_.c_str(),
                  _table_.data(),
                  (int) _table_.size(),

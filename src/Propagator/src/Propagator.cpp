@@ -44,7 +44,6 @@ void Propagator::readConfigImpl(){
 
   // Monitoring parameters
   _showEventBreakdown_ = GenericToolbox::Json::fetchValue(_config_, "showEventBreakdown", _showEventBreakdown_);
-  _showStagedEventBreakdown_ = GenericToolbox::Json::fetchValue(_config_, "showStagedEventBreakdown", _showStagedEventBreakdown_);
   _showNbEventParameterBreakdown_ = GenericToolbox::Json::fetchValue(_config_, "showNbEventParameterBreakdown", _showNbEventParameterBreakdown_);
   _showNbEventPerSampleParameterBreakdown_ = GenericToolbox::Json::fetchValue(_config_, "showNbEventPerSampleParameterBreakdown", _showNbEventPerSampleParameterBreakdown_);
   _throwAsimovToyParameters_ = GenericToolbox::Json::fetchValue(_config_, "throwAsimovFitParameters", _throwAsimovToyParameters_);
@@ -244,58 +243,6 @@ std::string Propagator::getSampleBreakdownTableStr() const{
   return ss.str();
 }
 void Propagator::printBreakdowns(){
-
-  if( _showStagedEventBreakdown_ ){
-
-    // STAGED MASK
-    LogWarning << "Staged event breakdown:" << std::endl;
-    std::vector<std::vector<double>> stageBreakdownList(
-        _sampleSet_.getSampleList().size(),
-        std::vector<double>(_parManager_.getParameterSetsList().size() + 1, 0)
-    ); // [iSample][iStage]
-    std::vector<std::string> stageTitles;
-    stageTitles.emplace_back("Sample");
-    stageTitles.emplace_back("Base weight");
-    for( auto& parSet : _parManager_.getParameterSetsList() ){
-      if( not parSet.isEnabled() ){ continue; }
-      stageTitles.emplace_back("+ " + parSet.getName());
-    }
-
-    int iStage{0};
-    std::vector<ParameterSet*> maskedParSetList;
-    for( auto& parSet : _parManager_.getParameterSetsList() ){
-      if( not parSet.isEnabled() ){ continue; }
-      maskedParSetList.emplace_back( &parSet );
-      parSet.setMaskedForPropagation( true );
-    }
-
-    this->reweightMcEvents();
-    for( size_t iSample = 0 ; iSample < _sampleSet_.getSampleList().size() ; iSample++ ){
-      stageBreakdownList[iSample][iStage] = _sampleSet_.getSampleList()[iSample].getMcContainer().getSumWeights();
-    }
-
-    for( auto* parSetPtr : maskedParSetList ){
-      parSetPtr->setMaskedForPropagation(false);
-      reweightMcEvents();
-      iStage++;
-      for( size_t iSample = 0 ; iSample < _sampleSet_.getSampleList().size() ; iSample++ ){
-        stageBreakdownList[iSample][iStage] = _sampleSet_.getSampleList()[iSample].getMcContainer().getSumWeights();
-      }
-    }
-
-    GenericToolbox::TablePrinter t;
-    t.setColTitles(stageTitles);
-    for( size_t iSample = 0 ; iSample < _sampleSet_.getSampleList().size() ; iSample++ ) {
-      std::vector<std::string> tableLine;
-      tableLine.emplace_back(_sampleSet_.getSampleList()[iSample].getName());
-      for( iStage = 0 ; iStage < stageBreakdownList[iSample].size() ; iStage++ ){
-        tableLine.emplace_back( std::to_string(stageBreakdownList[iSample][iStage]) );
-      }
-      t.addTableLine(tableLine);
-    }
-    t.printTable();
-
-  }
 
   if( _showEventBreakdown_ ){
     LogWarning << "Sample breakdown:" << std::endl;

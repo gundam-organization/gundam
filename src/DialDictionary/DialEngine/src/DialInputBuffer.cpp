@@ -51,14 +51,6 @@ void DialInputBuffer::update(){
   // by default consider we have to update
   _isDialUpdateRequested_ = true;
 
-  // check the mask
-  this->setIsMasked( std::any_of(
-      _inputParameterReferenceList_.begin(), _inputParameterReferenceList_.end(),
-      [this](ParameterReference& parRef_){
-        return parRef_.getParameterSet(_parSetListPtr_).isMaskedForPropagation();
-  } ) );
-  if( _isMasked_ ){ this->invalidateBuffers(); return; }
-
   // look for the parameter values
   double tempBuffer;
   _isDialUpdateRequested_ = false; // if ANY is different, request the update
