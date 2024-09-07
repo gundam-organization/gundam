@@ -25,8 +25,6 @@ LoggerInit([]{ Logger::setUserHeaderStr("[Propagator]"); });
 void Propagator::muteLogger(){ Logger::setIsMuted( true ); }
 void Propagator::unmuteLogger(){ Logger::setIsMuted( false ); }
 
-using namespace GenericToolbox::ColorCodes;
-
 void Propagator::readConfigImpl(){
   LogWarning << __METHOD_NAME__ << std::endl;
 
@@ -46,6 +44,9 @@ void Propagator::readConfigImpl(){
 
   // Monitoring parameters
   _showEventBreakdown_ = GenericToolbox::Json::fetchValue(_config_, "showEventBreakdown", _showEventBreakdown_);
+  _showStagedEventBreakdown_ = GenericToolbox::Json::fetchValue(_config_, "showStagedEventBreakdown", _showStagedEventBreakdown_);
+  _showNbEventParameterBreakdown_ = GenericToolbox::Json::fetchValue(_config_, "showNbEventParameterBreakdown", _showNbEventParameterBreakdown_);
+  _showNbEventPerSampleParameterBreakdown_ = GenericToolbox::Json::fetchValue(_config_, "showNbEventPerSampleParameterBreakdown", _showNbEventPerSampleParameterBreakdown_);
   _throwAsimovToyParameters_ = GenericToolbox::Json::fetchValue(_config_, "throwAsimovFitParameters", _throwAsimovToyParameters_);
   _enableStatThrowInToys_ = GenericToolbox::Json::fetchValue(_config_, "enableStatThrowInToys", _enableStatThrowInToys_);
   _gaussStatThrowInToys_ = GenericToolbox::Json::fetchValue(_config_, "gaussStatThrowInToys", _gaussStatThrowInToys_);
@@ -243,7 +244,8 @@ std::string Propagator::getSampleBreakdownTableStr() const{
   return ss.str();
 }
 void Propagator::printBreakdowns(){
-  if( _showEventBreakdown_ ){
+
+  if( _showStagedEventBreakdown_ ){
 
     // STAGED MASK
     LogWarning << "Staged event breakdown:" << std::endl;
@@ -253,7 +255,7 @@ void Propagator::printBreakdowns(){
     ); // [iSample][iStage]
     std::vector<std::string> stageTitles;
     stageTitles.emplace_back("Sample");
-    stageTitles.emplace_back("No reweight");
+    stageTitles.emplace_back("Base weight");
     for( auto& parSet : _parManager_.getParameterSetsList() ){
       if( not parSet.isEnabled() ){ continue; }
       stageTitles.emplace_back("+ " + parSet.getName());
@@ -293,10 +295,74 @@ void Propagator::printBreakdowns(){
     }
     t.printTable();
 
+  }
+
+  if( _showEventBreakdown_ ){
     LogWarning << "Sample breakdown:" << std::endl;
     std::cout << this->getSampleBreakdownTableStr() << std::endl;
+  }
+
+  if( _showNbEventParameterBreakdown_ ){
+
+    struct NbEventBreakdown{
+      size_t nbTotal{0};
+      std::map<int, int> nbForSample{};
+    };
+
+    std::map<const Parameter*, NbEventBreakdown> nbEventForParameter{}; // assuming int = 0 by default
+    for( auto& cache: _eventDialCache_.getCache() ){
+      for( auto& dial : cache.dialResponseCacheList ){
+        for( int iInput = 0 ; iInput < dial.dialInterface.getInputBufferRef()->getInputSize() ; iInput++ ){
+          nbEventForParameter[ &dial.dialInterface.getInputBufferRef()->getParameter(iInput) ].nbTotal += 1;
+
+          if( _showNbEventPerSampleParameterBreakdown_ ){
+            nbEventForParameter[ &dial.dialInterface.getInputBufferRef()->getParameter(iInput) ]
+                .nbForSample[cache.event->getIndices().sample] += 1;
+          }
+        }
+      }
+    }
+
+    GenericToolbox::TablePrinter t;
+    t << "Parameter";
+    t << GenericToolbox::TablePrinter::NextColumn << "All samples";
+
+    if( _showNbEventPerSampleParameterBreakdown_ ){
+      for( auto& sample : _sampleSet_.getSampleList() ){
+        if( not sample.isEnabled() ){ continue; }
+        t << GenericToolbox::TablePrinter::NextColumn << sample.getName();
+      }
+    }
+
+    t << GenericToolbox::TablePrinter::NextLine;
+
+    for( auto& parSet : _parManager_.getParameterSetsList() ){
+      if( not parSet.isEnabled() ){ continue; }
+      for( auto& par : parSet.getParameterList() ){
+        if( not par.isEnabled() ){ continue; }
+
+        t.setColorBuffer( GenericToolbox::ColorCodes::resetColor );
+        if( nbEventForParameter[ &par ].nbTotal == 0 ){ t.setColorBuffer( GenericToolbox::ColorCodes::redBackground ); }
+
+        t << par.getFullTitle();
+        t << GenericToolbox::TablePrinter::NextColumn << nbEventForParameter[ &par ].nbTotal;
+
+        if( _showNbEventPerSampleParameterBreakdown_ ){
+          for( auto& sample : _sampleSet_.getSampleList() ){
+            if( not sample.isEnabled() ){ continue; }
+            t << GenericToolbox::TablePrinter::NextColumn << nbEventForParameter[ &par ].nbForSample[sample.getIndex()];
+          }
+        }
+
+        t << GenericToolbox::TablePrinter::NextLine;
+      }
+    }
+
+    LogInfo << "Nb of event affected by parameters:" << std::endl;
+    t.printTable();
 
   }
+
   if( _debugPrintLoadedEvents_ ){
     LogDebug << "Printing " << _debugPrintLoadedEventsNbPerSample_ << " events..." << std::endl;
     for( int iEvt = 0 ; iEvt < _debugPrintLoadedEventsNbPerSample_ ; iEvt++ ){
