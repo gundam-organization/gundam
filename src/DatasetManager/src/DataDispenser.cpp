@@ -263,11 +263,15 @@ void DataDispenser::doEventSelection(){
   if( _owner_->isShowSelectedEventCount() ){
     LogWarning << "Events passing selection cuts:" << std::endl;
     GenericToolbox::TablePrinter t;
-    t.setColTitles({{"Sample"}, {"# of events"}});
+    t.setColTitles({{"Sample"}, {"Selection Cut"}, {"# of events"}});
     for(size_t iSample = 0 ; iSample < _cache_.samplesToFillList.size() ; iSample++ ){
-      t.addTableLine({_cache_.samplesToFillList[iSample]->getName(), std::to_string(_cache_.sampleNbOfEvents[iSample])});
+      t.addTableLine({
+        _cache_.samplesToFillList[iSample]->getName(),
+        _cache_.samplesToFillList[iSample]->getSelectionCutsStr(),
+        std::to_string(_cache_.sampleNbOfEvents[iSample])
+      });
     }
-    t.addTableLine({"Total", std::to_string(_cache_.totalNbEvents)});
+    t.addTableLine({"Total", {""}, std::to_string(_cache_.totalNbEvents)});
     t.printTable();
   }
 
@@ -665,9 +669,6 @@ void DataDispenser::eventSelectionFunction(int iThread_){
   }
 
   // sample cuts
-  GenericToolbox::TablePrinter tableSelectionCuts;
-  tableSelectionCuts.setColTitles({{"Sample"}, {"Selection Cut"}});
-
   struct SampleCut{
     int sampleIndex{-1};
     int cutIndex{-1};
@@ -690,11 +691,7 @@ void DataDispenser::eventSelectionFunction(int iThread_){
     if( selectionCut.empty() ){ continue; }
 
     sampleCutList.back().cutIndex = lCollection.addLeafExpression( selectionCut );
-    tableSelectionCuts << samplePtr->getName() << GenericToolbox::TablePrinter::Action::NextColumn;
-    tableSelectionCuts << selectionCut << GenericToolbox::TablePrinter::Action::NextLine;
-
   }
-  if( iThread_==0 ){ tableSelectionCuts.printTable(); }
 
   lCollection.initialize();
 
