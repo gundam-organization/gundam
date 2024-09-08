@@ -179,13 +179,8 @@ void DataSetManager::loadPropagator( bool isModel_ ){
       }
     }
 
-    std::cout << _propagator_.getSampleBreakdownTableStr() << std::endl;
-
     // then copy the events that can have been loaded by the MC container
     propagatorPtr->getSampleSet().copyMcEventListToDataContainer( _propagator_.getSampleSet().getSampleList() );
-
-    std::cout << _propagator_.getSampleBreakdownTableStr() << std::endl;
-    exit(0);
 
     // back to prior in case the original _propagator_ has been used.
     if( propagatorPtr->isThrowAsimovToyParameters() ){
