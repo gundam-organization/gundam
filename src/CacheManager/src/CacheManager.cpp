@@ -483,9 +483,6 @@ bool Cache::Manager::Update(SampleSet& sampleList,
             DialInputBuffer* dialInputs
                 = dialElem.dialInterface.getInputBufferRef();
 
-            // Check if this dial is used at all.
-            if (dialInputs->isMasked()) continue;
-
             // Make sure all of the used parameters are in the parameter
             // map.
             for (std::size_t i = 0; i < dialInputs->getBufferSize(); ++i) {
@@ -768,8 +765,6 @@ bool Cache::Manager::Fill() {
                      << " " << par.first->getParameterValue()
                      << " (" << par.first->getFullTitle() << ")"
                      << " enabled: " << par.first->isEnabled()
-                     << " masked: " << par.first->isMaskedForPropagation()
-                     << " masked for toy: " << par.first->getOwner()->isMaskForToyGeneration()
                      << std::endl;
         }
     } while(false);
@@ -777,14 +772,6 @@ bool Cache::Manager::Fill() {
     cache->GetWeightsCache().Invalidate();
     cache->GetHistogramsCache().Invalidate();
     for (auto& par : Cache::Manager::ParameterMap ) {
-        if (par.first->getOwner()->isMaskedForPropagation()) {
-            LogWarning << "WARNING: Masked parameter: "
-                       << par.first->getFullTitle()
-                       << std::endl;
-            LogWarning << "WARNING: Cache::Manager will not be used"
-                       << std::endl;
-            return false;
-        }
         if (not par.first->isEnabled()) {
             LogWarning << "WARNING: Disabled parameter: "
                        << par.first->getFullTitle()
