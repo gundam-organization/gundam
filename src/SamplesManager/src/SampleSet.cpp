@@ -63,12 +63,12 @@ void SampleSet::copyMcEventListToDataContainer(std::vector<Sample>& destinationS
   LogThrowIf(_sampleList_.size() != destinationSampleList_.size(), "Can't copy the data into mismatching containers.");
   for( size_t iSample = 0 ; iSample < _sampleList_.size() ; iSample++ ){
     LogInfo << "Copying events in sample \"" << _sampleList_[iSample].getName() << "\"" << std::endl;
-    destinationSampleList_[iSample].getDataContainer().getEventList().clear();
     destinationSampleList_[iSample].getDataContainer().getEventList().reserve(
-        _sampleList_[iSample].getMcContainer().getEventList().size()
+        destinationSampleList_[iSample].getDataContainer().getEventList().size()
+        + _sampleList_[iSample].getMcContainer().getEventList().size()
     );
     destinationSampleList_[iSample].getDataContainer().getEventList().insert(
-        destinationSampleList_[iSample].getDataContainer().getEventList().begin(),
+        destinationSampleList_[iSample].getDataContainer().getEventList().end(),
         std::begin(_sampleList_[iSample].getMcContainer().getEventList()),
         std::end(_sampleList_[iSample].getMcContainer().getEventList())
     );

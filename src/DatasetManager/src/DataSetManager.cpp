@@ -170,7 +170,22 @@ void DataSetManager::loadPropagator( bool isModel_ ){
 
     // Copies MC events in data container for both Asimov and FakeData event types
     LogWarning << "Copying loaded mc-like event to data container..." << std::endl;
+
+    // first copy the event directly placed in the data container
+    if( &_propagator_ != propagatorPtr ){
+      for( size_t iSample = 0 ; iSample < _propagator_.getSampleSet().getSampleList().size() ; iSample++ ){
+        _propagator_.getSampleSet().getSampleList()[iSample].getDataContainer().getEventList() =
+            propagatorPtr->getSampleSet().getSampleList()[iSample].getDataContainer().getEventList();
+      }
+    }
+
+    std::cout << _propagator_.getSampleBreakdownTableStr() << std::endl;
+
+    // then copy the events that can have been loaded by the MC container
     propagatorPtr->getSampleSet().copyMcEventListToDataContainer( _propagator_.getSampleSet().getSampleList() );
+
+    std::cout << _propagator_.getSampleBreakdownTableStr() << std::endl;
+    exit(0);
 
     // back to prior in case the original _propagator_ has been used.
     if( propagatorPtr->isThrowAsimovToyParameters() ){
