@@ -27,7 +27,7 @@ protected:
 
 public:
   // Post init
-  void copyMcEventListToDataContainer();
+  void copyMcEventListToDataContainer( std::vector<Sample>& destinationSampleList_ );
   void clearMcContainers();
 
   // const getters

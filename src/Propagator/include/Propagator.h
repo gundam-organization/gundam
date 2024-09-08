@@ -14,6 +14,7 @@
 #include "SampleSet.h"
 
 #include "GenericToolbox.Time.h"
+#include "GenericToolbox.Thread.h"
 
 #include <vector>
 #include <map>
@@ -58,6 +59,7 @@ public:
   PlotGenerator &getPlotGenerator(){ return _plotGenerator_; }
   EventDialCache& getEventDialCache(){ return _eventDialCache_; }
   std::vector<DialCollection> &getDialCollectionList(){ return _dialCollectionList_; }
+  GenericToolbox::ParallelWorker& getThreadPool(){ return _threadPool_; }
 
   // Core
   void buildDialCache();
@@ -99,7 +101,6 @@ private:
   bool _gaussStatThrowInToys_{false};
   bool _enableEventMcThrow_{true};
   bool _showEventBreakdown_{true};
-  bool _showStagedEventBreakdown_{false};
   bool _showNbEventParameterBreakdown_{true};
   bool _showNbEventPerSampleParameterBreakdown_{false};
   bool _enableEigenToOrigInPropagate_{true};
@@ -115,6 +116,8 @@ private:
   // Once a dial collection has been added to this vector, it's index becomes
   // the immutable tag for that specific group of dials.
   std::vector<DialCollection> _dialCollectionList_{};
+
+  GenericToolbox::ParallelWorker _threadPool_{};
 
 public:
   GenericToolbox::Time::AveragedTimer<10> reweightTimer;

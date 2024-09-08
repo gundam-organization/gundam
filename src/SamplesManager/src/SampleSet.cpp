@@ -28,14 +28,28 @@ void SampleSet::readConfigImpl(){
   _showTimeStats_ = GenericToolbox::Json::fetchValue(_config_, "showTimeStats", _showTimeStats_);
 
   LogInfo << "Reading samples definition..." << std::endl;
-  _sampleList_.clear(); // make sure we start from scratch in case readConfig is called twice
-  auto fitSampleListConfig = GenericToolbox::Json::fetchValue(_config_, {{"sampleList"}, {"fitSampleList"}}, JsonType());
-  for( const auto& fitSampleConfig: fitSampleListConfig ){
-    if( not GenericToolbox::Json::fetchValue(fitSampleConfig, "isEnabled", true) ) continue;
-    _sampleList_.emplace_back();
-    _sampleList_.back().setIndex(int(_sampleList_.size()) - 1);
-    _sampleList_.back().setConfig(fitSampleConfig);
-    _sampleList_.back().readConfig();
+  auto sampleListConfig = GenericToolbox::Json::fetchValue(_config_, {{"sampleList"}, {"fitSampleList"}}, JsonType());
+
+  if( _sampleList_.empty() ){
+    // alright no problem, it's from scratch
+    _sampleList_.resize( sampleListConfig.size() );
+  }
+  else{
+    // for temporary propagators, we want to read the config without removing the content of the samples
+
+    // need to check how many samples are enabled. It should match the list.
+    size_t nSamples{0};
+    for(const auto & sampleConfig : sampleListConfig){
+      if( not GenericToolbox::Json::fetchValue(sampleConfig, "isEnabled", true) ) continue;
+      nSamples++;
+    }
+    LogThrowIf(nSamples != _sampleList_.size(), "Can't reload config with different number of samples");
+  }
+
+  for( size_t iSample = 0 ; iSample < sampleListConfig.size() ; iSample++ ){
+    if( not GenericToolbox::Json::fetchValue(sampleListConfig[iSample], "isEnabled", true) ) continue;
+    _sampleList_[iSample].setIndex( int(iSample) );
+    _sampleList_[iSample].readConfig( sampleListConfig[iSample] );
   }
 }
 void SampleSet::initializeImpl() {
@@ -45,16 +59,18 @@ void SampleSet::initializeImpl() {
   for( auto& sample : _sampleList_ ){ sample.initialize(); }
 }
 
-void SampleSet::copyMcEventListToDataContainer(){
-  for( auto& sample : _sampleList_ ){
-    LogInfo << "Copying MC events in sample \"" << sample.getName() << "\"" << std::endl;
-    sample.getDataContainer().getEventList().clear();
-    sample.getDataContainer().getEventList().reserve(sample.getMcContainer().getEventList().size());
-//    sample.getDataContainer().getEventList() = sample.getMcContainer().getEventList();
-    sample.getDataContainer().getEventList().insert(
-        sample.getDataContainer().getEventList().begin(),
-        std::begin(sample.getMcContainer().getEventList()),
-        std::end(sample.getMcContainer().getEventList())
+void SampleSet::copyMcEventListToDataContainer(std::vector<Sample>& destinationSampleList_){
+  LogThrowIf(_sampleList_.size() != destinationSampleList_.size(), "Can't copy the data into mismatching containers.");
+  for( size_t iSample = 0 ; iSample < _sampleList_.size() ; iSample++ ){
+    LogInfo << "Copying events in sample \"" << _sampleList_[iSample].getName() << "\"" << std::endl;
+    destinationSampleList_[iSample].getDataContainer().getEventList().reserve(
+        destinationSampleList_[iSample].getDataContainer().getEventList().size()
+        + _sampleList_[iSample].getMcContainer().getEventList().size()
+    );
+    destinationSampleList_[iSample].getDataContainer().getEventList().insert(
+        destinationSampleList_[iSample].getDataContainer().getEventList().end(),
+        std::begin(_sampleList_[iSample].getMcContainer().getEventList()),
+        std::end(_sampleList_[iSample].getMcContainer().getEventList())
     );
   }
 }

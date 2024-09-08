@@ -5,8 +5,6 @@
 #ifndef GUNDAM_GUNDAM_GLOBALS_H
 #define GUNDAM_GUNDAM_GLOBALS_H
 
-#include "GenericToolbox.Thread.h"
-
 #include <TTree.h>
 #include <TChain.h>
 #include <TRandom3.h>
@@ -44,7 +42,6 @@ public:
   static bool isLightOutputMode(){ return _lightOutputMode_; }
   static VerboseLevel::EnumType getVerboseLevel(){ return _verboseLevel_.value; }
   static std::mutex& getThreadMutex(){ return _threadMutex_; }
-  static GenericToolbox::ParallelWorker &getParallelWorker(){ return _threadPool_; }
 
 private:
 
@@ -55,8 +52,6 @@ private:
   static bool _lightOutputMode_;
   static std::mutex _threadMutex_;
   static VerboseLevel _verboseLevel_;
-  static GenericToolbox::ParallelWorker _threadPool_;
-
 
 };
 

@@ -30,6 +30,8 @@ void PlotGenerator::readConfigImpl(){
   gStyle->SetOptStat(0);
   _histHolderCacheList_.resize(1);
 
+  _threadPool_.setNThreads( GundamGlobals::getNumberOfThreads() );
+
   if( not GenericToolbox::Json::fetchValue(_config_, "isEnabled", true) ){ return; }
 
   _varDictionary_ = GenericToolbox::Json::fetchValue(_config_, {{"varDictionaries"}, {"varDictionnaries"}}, JsonType());
@@ -151,7 +153,7 @@ void PlotGenerator::generateSampleHistograms(TDirectory *saveDir_, int cacheSlot
           if( not histPtrToFill->isBinCacheBuilt ){
             // If any, launch rebuild cache
             LogInfo << "Build event bin cache for sample \"" << sample.getName() << "\" " << (isData? "(data)":"(mc)") << std::endl;
-            PlotGenerator::buildEventBinCache(histPtrToFillList, eventListPtr, isData);
+            this->buildEventBinCache(histPtrToFillList, eventListPtr, isData);
             break; // all caches done at once
           }
         }
@@ -162,7 +164,7 @@ void PlotGenerator::generateSampleHistograms(TDirectory *saveDir_, int cacheSlot
           for( auto* hist : histPtrToFillList ){
 
             auto bounds = GenericToolbox::ParallelWorker::getThreadBoundIndices(
-                iThread_, GundamGlobals::getParallelWorker().getNbThreads(),
+                iThread_, GundamGlobals::getNumberOfThreads(),
                 hist->histPtr->GetNbinsX()
             );
 
@@ -178,9 +180,9 @@ void PlotGenerator::generateSampleHistograms(TDirectory *saveDir_, int cacheSlot
 
         fillJob(-1);
 
-//        GundamGlobals::getParallelWorker().addJob("fillJob", fillJob);
-//        GundamGlobals::getParallelWorker().runJob("fillJob");
-//        GundamGlobals::getParallelWorker().removeJob("fillJob");
+//        _threadPool_.addJob("fillJob", fillJob);
+//        _threadPool_.runJob("fillJob");
+//        _threadPool_.removeJob("fillJob");
 
       } // isData loop
     } // sample
@@ -665,7 +667,7 @@ void PlotGenerator::defineHistogramHolders() {
 
   std::function<void(int)> fetchSplitVar = [&](int iThread_){
     auto bounds = GenericToolbox::ParallelWorker::getThreadBoundIndices(
-        iThread_, GundamGlobals::getParallelWorker().getNbThreads(),
+        iThread_, GundamGlobals::getNumberOfThreads(),
         int(_sampleSetPtr_->getSampleList().size())
     );
 
@@ -681,9 +683,9 @@ void PlotGenerator::defineHistogramHolders() {
     }
   };
 
-  GundamGlobals::getParallelWorker().addJob("fetchSplitVar", fetchSplitVar);
-  GundamGlobals::getParallelWorker().runJob("fetchSplitVar");
-  GundamGlobals::getParallelWorker().removeJob("fetchSplitVar");
+  _threadPool_.addJob("fetchSplitVar", fetchSplitVar);
+  _threadPool_.runJob("fetchSplitVar");
+  _threadPool_.removeJob("fetchSplitVar");
 
   int sampleCounter = -1;
   HistHolder histDefBase;
@@ -925,7 +927,7 @@ void PlotGenerator::buildEventBinCache( const std::vector<HistHolder *> &histPtr
   std::function<void(int)> fillEventHistCache = [&](int iThread_){
 
     auto bounds = GenericToolbox::ParallelWorker::getThreadBoundIndices(
-        iThread_, GundamGlobals::getParallelWorker().getNbThreads(),
+        iThread_, GundamGlobals::getNumberOfThreads(),
         int(histPtrToFillList.size())
     );
 
@@ -967,11 +969,11 @@ void PlotGenerator::buildEventBinCache( const std::vector<HistHolder *> &histPtr
 //  fillEventHistCache(-1);
 //  shrinkAllocationsFct();
 
-  GundamGlobals::getParallelWorker().addJob("fillEventHistCache", fillEventHistCache);
-  GundamGlobals::getParallelWorker().setPreParallelJob("fillEventHistCache", prepareCacheFct);
-  GundamGlobals::getParallelWorker().setPostParallelJob("fillEventHistCache", shrinkAllocationsFct);
-  GundamGlobals::getParallelWorker().runJob("fillEventHistCache");
-  GundamGlobals::getParallelWorker().removeJob("fillEventHistCache");
+  _threadPool_.addJob("fillEventHistCache", fillEventHistCache);
+  _threadPool_.setPreParallelJob("fillEventHistCache", prepareCacheFct);
+  _threadPool_.setPostParallelJob("fillEventHistCache", shrinkAllocationsFct);
+  _threadPool_.runJob("fillEventHistCache");
+  _threadPool_.removeJob("fillEventHistCache");
 
 }
 

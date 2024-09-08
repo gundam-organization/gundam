@@ -47,8 +47,6 @@ public:
   /// decomposition is done (if requested).
   void processCovarianceMatrix();
 
-  void setMaskedForPropagation(bool maskedForPropagation_){ _maskedForPropagation_ = maskedForPropagation_; }
-
   /// Define the type of validity that needs to be required by
   /// hasValidParameterValues.  This accepts a string with the possible values
   /// being:
@@ -70,9 +68,6 @@ public:
   [[nodiscard]] bool isEnablePca() const{ return _enablePca_; }
   [[nodiscard]] bool isEnableEigenDecomp() const{ return _enableEigenDecomp_; }
   [[nodiscard]] bool isEnabledThrowToyParameters() const{ return _enabledThrowToyParameters_; }
-  [[nodiscard]] bool isMaskForToyGeneration() const { return _maskForToyGeneration_; }
-  [[nodiscard]] bool isMaskedForPropagation() const{ return _maskedForPropagation_; }
-  [[deprecated]] [[nodiscard]] bool isUseOnlyOneParameterPerEvent() const{ return _useOnlyOneParameterPerEvent_; }
   [[nodiscard]] int getNbEnabledEigenParameters() const{ return _nbEnabledEigen_; }
   [[nodiscard]] double getPenaltyChi2Buffer() const{ return _penaltyChi2Buffer_; }
   [[nodiscard]] size_t getNbParameters() const{ return _parameterList_.size(); }
@@ -153,6 +148,9 @@ public:
   Parameter* getParameterPtr(const std::string& parName_);
   Parameter* getParameterPtrWithTitle(const std::string& parTitle_);
 
+  // disable completely by wiping its members
+  void nullify();
+
   // Normalize a value or range in units of the parameter StdDev
   static double toNormalizedParRange(double parRange, const Parameter& par);
   static double toNormalizedParValue(double parValue, const Parameter& par);
@@ -171,10 +169,13 @@ public:
   [[deprecated("use isEnableEigenDecomp()")]] [[nodiscard]] bool isUseEigenDecompInFit() const{ return isEnableEigenDecomp(); }
   [[deprecated("use moveParametersToPrior()")]] void moveFitParametersToPrior(){ moveParametersToPrior(); }
   [[deprecated("use throwParameters()")]] void throwFitParameters( bool rethrowIfNotPhysical_ = true, double gain_ = 1){ throwParameters(rethrowIfNotPhysical_, gain_); }
+  [[deprecated]] [[nodiscard]] bool isUseOnlyOneParameterPerEvent() const{ return _useOnlyOneParameterPerEvent_; }
 
 protected:
   void readParameterDefinitionFile();
   void defineParameters();
+
+  void setName(const std::string& name_){ _name_ = name_; }
 
 private:
   // Internals
@@ -191,15 +192,13 @@ private:
   std::string _throwEnabledListPath_{};
   JsonType _parameterDefinitionConfig_{};
   JsonType _dialSetDefinitions_{};
-  bool _isEnabled_{};
+  bool _isEnabled_{false};
   bool _useMarkGenerator_{false};
   bool _useEigenDecompForThrows_{false};
-  bool _maskedForPropagation_{false};
   bool _printDialSetsSummary_{false};
   bool _printParametersSummary_{false};
   bool _releaseFixedParametersOnHesse_{false};
   bool _devUseParLimitsOnEigen_{false};
-  bool _maskForToyGeneration_{false};
   int _nbParameterDefinition_{-1};
   double _nominalStepSize_{std::nan("unset")};
   int _maxNbEigenParameters_{-1};

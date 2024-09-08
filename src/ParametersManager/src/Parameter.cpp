@@ -185,9 +185,6 @@ void Parameter::setValidity(const std::string& validity) {
 bool Parameter::isValueWithinBounds() const{
   return isInDomain(_parameterValue_);
 }
-bool Parameter::isMaskedForPropagation() const{
-  return getOwner()->isMaskedForPropagation();
-}
 double Parameter::getDistanceFromNominal() const{
   return (getParameterValue() - getPriorValue()) / _stdDevValue_;
 }

@@ -8,6 +8,7 @@
 #include "Propagator.h"
 
 #include "GenericToolbox.Utils.h"
+#include "GenericToolbox.Thread.h"
 
 #include <TDirectory.h>
 
@@ -44,6 +45,7 @@ private:
 
   // cache
   mutable const Propagator* propagatorPtr{nullptr};
+  mutable GenericToolbox::ParallelWorker _threadPool_{};
 
 };
 

@@ -31,6 +31,7 @@ struct DataDispenserParameters{
   size_t debugNbMaxEventsToLoad{0};
 
   JsonType fromHistContent{};
+  JsonType overridePropagatorConfig{};
 
   [[nodiscard]] std::string getSummary() const;
 };

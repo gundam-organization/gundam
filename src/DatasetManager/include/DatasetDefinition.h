@@ -41,9 +41,9 @@ public:
   [[nodiscard]] const std::string &getToyDataEntry() const{ return _selectedToyEntry_; }
   [[nodiscard]] const std::string &getSelectedDataEntry() const{ return _selectedDataEntry_; }
 
-  DataDispenser &getMcDispenser(){ return _mcDispenser_; }
+  DataDispenser &getModelDispenser(){ return _modelDispenser_; }
+  DataDispenser &getDataDispenser(){ return _dataDispenserDict_.at(_selectedDataEntry_); }
   DataDispenser &getToyDataDispenser(){ return _dataDispenserDict_.at(_selectedToyEntry_); }
-  DataDispenser &getSelectedDataDispenser(){ return _dataDispenserDict_.at(_selectedDataEntry_); }
   std::map<std::string, DataDispenser> &getDataDispenserDict(){ return _dataDispenserDict_; }
 
   void updateDispenserOwnership();
@@ -62,7 +62,7 @@ private:
   bool _devSingleThreadEventSelection_{false};
 
   // internals
-  DataDispenser _mcDispenser_{this};
+  DataDispenser _modelDispenser_{this};
   std::map<std::string, DataDispenser> _dataDispenserDict_;
 
 };

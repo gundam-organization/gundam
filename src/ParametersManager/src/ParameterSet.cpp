@@ -74,7 +74,6 @@ void ParameterSet::readConfigImpl(){
 
   _enablePca_ = GenericToolbox::Json::fetchValue(_config_, std::vector<std::string>{"allowPca", "fixGhostFitParameters", "enablePca"}, _enablePca_);
   _enabledThrowToyParameters_ = GenericToolbox::Json::fetchValue(_config_, "enabledThrowToyParameters", _enabledThrowToyParameters_);
-  _maskForToyGeneration_ = GenericToolbox::Json::fetchValue(_config_, "maskForToyGeneration", _maskForToyGeneration_);
   _customParThrow_ = GenericToolbox::Json::fetchValue(_config_, {{"customParThrow"}, {"customFitParThrow"}}, std::vector<JsonType>());
   _releaseFixedParametersOnHesse_ = GenericToolbox::Json::fetchValue(_config_, "releaseFixedParametersOnHesse", _releaseFixedParametersOnHesse_);
 
@@ -821,6 +820,12 @@ Parameter* ParameterSet::getParameterPtrWithTitle(const std::string& parTitle_){
     }
   }
   return nullptr;
+}
+
+void ParameterSet::nullify(){
+  std::string name{_name_};
+  (*this) = ParameterSet();
+  this->setName(name);
 }
 
 // Static

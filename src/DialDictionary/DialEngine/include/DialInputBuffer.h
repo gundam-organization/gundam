@@ -46,18 +46,12 @@ public:
 public:
   DialInputBuffer() = default;
 
-  /// Set the IsMasked flag.  This flag is ignored internally, but
-  /// can be set internally when a parameter set is masked.  The value
-  /// of the flag is checked using isMasked()
-  void setIsMasked(bool isMasked_){ _isMasked_ = isMasked_; }
-
   /// Tell the input buffer about the global vector of fit parameter sets.
   /// This is required, so it must be set before the DialInputBuffer can
   /// be used.
   void setParSetRef(std::vector<ParameterSet> *parSetRef_){ _parSetListPtr_ = parSetRef_; }
 
   // const getters
-  [[nodiscard]] bool isMasked() const{ return _isMasked_; }
   [[nodiscard]] bool isDialUpdateRequested() const{ return _isDialUpdateRequested_; }
   [[nodiscard]] bool* isDialUpdateRequestedPtr() { return &_isDialUpdateRequested_; }
   [[nodiscard]] int getBufferSize() const{ return _inputArraySize_; }
@@ -110,10 +104,6 @@ protected:
 private:
   /// Flag if the member can be still edited.
   bool _isInitialized_{false};
-
-  /// Flag to check if all the associated dials should be ignored in the
-  /// propagation.
-  bool _isMasked_{false};
 
   /// Flag for if the dials need to be recalculated.  Dials don't need to
   /// be recalculated if the parameter values have not changed.

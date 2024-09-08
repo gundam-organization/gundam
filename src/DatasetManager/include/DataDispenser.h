@@ -11,6 +11,8 @@
 #include "Propagator.h"
 #include "JsonBaseClass.h"
 
+#include "GenericToolbox.Thread.h"
+
 #include "TChain.h"
 #include "nlohmann/json.hpp"
 
@@ -36,6 +38,7 @@ public:
   void setOwner( DatasetDefinition* owner_){ _owner_ = owner_; }
 
   // const getters
+  [[nodiscard]] const DatasetDefinition* getOwner() const{ return _owner_; }
   [[nodiscard]] const DataDispenserParameters &getParameters() const{ return _parameters_; }
 
   // non-const getters
@@ -71,6 +74,8 @@ private:
   // internals
   DatasetDefinition* _owner_{nullptr};
   DataDispenserCache _cache_;
+
+  GenericToolbox::ParallelWorker _threadPool_{};
 
 };
 
