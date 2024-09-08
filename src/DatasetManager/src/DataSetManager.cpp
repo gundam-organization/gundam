@@ -156,11 +156,10 @@ void DataSetManager::loadPropagator( bool isModel_ ){
 
     LogInfo << "Propagating parameters on events..." << std::endl;
 
-    // IS THAT NECESSARY THO?
-    // TODO: check with or without
-    // Make sure before the copy to the data:
     // At this point, MC events have been reweighted using their prior
-    // but when using eigen decomp, the conversion eigen -> original has a small computational error
+    // but when using eigen decomp, the conversion eigen to original has a small computational error
+    // this will make sure the "asimov" data will be reweighted the same way the model is expected to behave
+    // while using the eigen decomp
     for( auto& parSet: propagatorPtr->getParametersManager().getParameterSetsList() ) {
       if( not parSet.isEnabled() ){ continue; }
       if( parSet.isEnableEigenDecomp() ) { parSet.propagateEigenToOriginal(); }
@@ -183,6 +182,7 @@ void DataSetManager::loadPropagator( bool isModel_ ){
     propagatorPtr->getSampleSet().copyMcEventListToDataContainer( _propagator_.getSampleSet().getSampleList() );
 
     // back to prior in case the original _propagator_ has been used.
+    // typically with `-a --toy` options
     if( propagatorPtr->isThrowAsimovToyParameters() ){
       for( auto& parSet : propagatorPtr->getParametersManager().getParameterSetsList() ){
         if( not parSet.isEnabled() ){ continue; }
@@ -191,48 +191,6 @@ void DataSetManager::loadPropagator( bool isModel_ ){
     }
   }
 
-  if( not _reloadModelRequested_ ){
-
-    // The event reweighting is completely defined!  Now print a breakdown of all
-    // the loaded events with all the global reweighting applied, but none of
-    // the dials applied.  It needs to be done BEFORE the cache manager is built
-    // since this uses a hack to apply the global weights that modifies the
-    // reweighting, and then modifies it back. (The reweighting needs to be
-    // immutable after the Cache::Manager is created, or it's going to introduce
-    // bugs).
-    _propagator_.printBreakdowns();
-
-#ifdef GUNDAM_USING_CACHE_MANAGER
-    // After all the data has been loaded.  Specifically, this must be after
-    // the MC has been copied for the Asimov fit, or the "data" use the MC
-    // reweighting cache.  This must also be before the first use of
-    // reweightMcEvents that is done using the GPU.
-    Cache::Manager::Build(_propagator_.getSampleSet(),
-                          _propagator_.getEventDialCache());
-#endif
-
-    LogInfo << "Propagating prior parameters on events..." << std::endl;
-    _propagator_.reweightMcEvents();
-
-    // The histogram bin was assigned to each event by the DataDispenser, now
-    // cache the binning results for speed into each of the samples.
-    LogInfo << "Filling up sample bin caches..." << std::endl;
-    _threadPool_.runJob([this](int iThread){
-      LogInfoIf(iThread <= 0) << "Updating sample per bin event lists..." << std::endl;
-      for( auto& sample : _propagator_.getSampleSet().getSampleList() ){
-        sample.getMcContainer().updateBinEventList(iThread);
-        sample.getDataContainer().updateBinEventList(iThread);
-      }
-    });
-
-    LogInfo << "Filling up sample histograms..." << std::endl;
-    _threadPool_.runJob([this](int iThread){
-      for( auto& sample : _propagator_.getSampleSet().getSampleList() ){
-        sample.getMcContainer().refillHistogram(iThread);
-        sample.getDataContainer().refillHistogram(iThread);
-      }
-    });
-  }
 }
 void DataSetManager::load(){
 
@@ -244,6 +202,48 @@ void DataSetManager::load(){
     LogInfo << "Loading the model in the propagator engine..." << std::endl;
     this->loadPropagator( true );
   }
+
+  // The event reweighting is completely defined!  Now print a breakdown of all
+  // the loaded events with all the global reweighting applied, but none of
+  // the dials applied.  It needs to be done BEFORE the cache manager is built
+  // since this uses a hack to apply the global weights that modifies the
+  // reweighting, and then modifies it back. (The reweighting needs to be
+  // immutable after the Cache::Manager is created, or it's going to introduce
+  // bugs).
+  _propagator_.printBreakdowns();
+
+#ifdef GUNDAM_USING_CACHE_MANAGER
+  // After all the data has been loaded.  Specifically, this must be after
+  // the MC has been copied for the Asimov fit, or the "data" use the MC
+  // reweighting cache.  This must also be before the first use of
+  // reweightMcEvents that is done using the GPU.
+  Cache::Manager::Build(
+    _propagator_.getSampleSet(),
+    _propagator_.getEventDialCache()
+  );
+#endif
+
+  LogInfo << "Propagating prior parameters on events..." << std::endl;
+  _propagator_.reweightMcEvents();
+
+  // The histogram bin was assigned to each event by the DataDispenser, now
+  // cache the binning results for speed into each of the samples.
+  LogInfo << "Filling up sample bin caches..." << std::endl;
+  _threadPool_.runJob([this](int iThread){
+    LogInfoIf(iThread <= 0) << "Updating sample per bin event lists..." << std::endl;
+    for( auto& sample : _propagator_.getSampleSet().getSampleList() ){
+      sample.getMcContainer().updateBinEventList(iThread);
+      sample.getDataContainer().updateBinEventList(iThread);
+    }
+  });
+
+  LogInfo << "Filling up sample histograms..." << std::endl;
+  _threadPool_.runJob([this](int iThread){
+    for( auto& sample : _propagator_.getSampleSet().getSampleList() ){
+      sample.getMcContainer().refillHistogram(iThread);
+      sample.getDataContainer().refillHistogram(iThread);
+    }
+  });
 
   // Throwing stat error on data -> BINNING SHOULD BE SET!!
   if( _propagator_.isThrowAsimovToyParameters() and _propagator_.isEnableStatThrowInToys() ){

@@ -56,7 +56,6 @@ int main(int argc, char** argv){
   clParser.addOption("outputDir", {"--out-dir"}, "Specify the output directory");
   clParser.addOption("randomSeed", {"-s", "--seed"}, "Set random seed");
   clParser.addOption("useDataEntry", {"--use-data-entry"}, "Overrides \"selectedDataEntry\" in dataSet config. Second arg is to select a given dataset");
-  clParser.addOption("useDataConfig", {"--use-data-config"}, "Add a data entry to the data set definition and use it for the fit");
   clParser.addOption("injectParameterConfig", {"--inject-parameters"}, "Inject parameters defined in the provided config file");
   clParser.addOption("injectToyParameters", {"--inject-toy-parameter"}, "Inject parameters defined in the provided config file");
   clParser.addOption("appendix", {"--appendix"}, "Add appendix to the output file name");
@@ -280,11 +279,6 @@ int main(int argc, char** argv){
       }
     }
     LogThrowIf(not isFound, "Could not find data entry \"" << selectedDataEntry << "\" among defined data sets");
-  }
-
-  // --use-data-config
-  if( clParser.isOptionTriggered("useDataConfig") ){
-    LogThrow("--use-data-config not implemented yet");
   }
 
   // --skip-hesse
