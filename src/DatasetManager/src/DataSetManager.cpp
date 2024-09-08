@@ -56,6 +56,9 @@ void DataSetManager::initializeImpl(){
 
 void DataSetManager::loadPropagator( bool isModel_ ){
 
+  // assume we are loading the model
+  _reloadModelRequested_ = false;
+
   std::vector<DataDispenser*> dispenserToLoadList{};
   for( auto& dataSet : _dataSetList_ ){
     LogContinueIf(not dataSet.isEnabled(), "Dataset \"" << dataSet.getName() << "\" is disabled. Skipping");

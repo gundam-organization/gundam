@@ -244,6 +244,8 @@ std::string Propagator::getSampleBreakdownTableStr() const{
 }
 void Propagator::printBreakdowns(){
 
+  LogInfo << std::endl << "Breaking down samples..." << std::endl;
+
   if( _showEventBreakdown_ ){
     LogWarning << "Sample breakdown:" << std::endl;
     std::cout << this->getSampleBreakdownTableStr() << std::endl;
