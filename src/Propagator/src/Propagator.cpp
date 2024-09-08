@@ -130,9 +130,6 @@ void Propagator::initializeImpl(){
 
   LogInfo << "Initializing propagation threads..." << std::endl;
   initializeThreads();
-
-  // will set it off when the Propagator will be loaded
-  _threadPool_.setCpuTimeSaverIsEnabled(true);
 }
 
 // Core
