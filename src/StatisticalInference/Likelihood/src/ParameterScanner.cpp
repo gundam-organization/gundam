@@ -514,7 +514,7 @@ void ParameterScanner::varyEvenRates(const std::vector<double>& paramVariationLi
     }
 
     if( parSet.isEnableEigenDecomp() ){
-      // TODO ?
+      // not implemented
       continue;
     }
     else{

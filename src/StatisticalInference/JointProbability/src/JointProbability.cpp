@@ -25,10 +25,6 @@ namespace JointProbability{
 
     std::string enumTypeStr{type_};
 
-    // TODO: possible backward compatibility
-//    if(  ){ }
-
-
     auto jType{JointProbabilityType::toEnum( type_, true )};
 
     if( jType == JointProbabilityType::EnumOverflow  ){
