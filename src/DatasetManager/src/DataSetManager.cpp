@@ -156,11 +156,10 @@ void DataSetManager::loadPropagator( bool isModel_ ){
 
     LogInfo << "Propagating parameters on events..." << std::endl;
 
-    // IS THAT NECESSARY THO?
-    // TODO: check with or without
-    // Make sure before the copy to the data:
     // At this point, MC events have been reweighted using their prior
-    // but when using eigen decomp, the conversion eigen -> original has a small computational error
+    // but when using eigen decomp, the conversion eigen to original has a small computational error
+    // this will make sure the "asimov" data will be reweighted the same way the model is expected to behave
+    // while using the eigen decomp
     for( auto& parSet: propagatorPtr->getParametersManager().getParameterSetsList() ) {
       if( not parSet.isEnabled() ){ continue; }
       if( parSet.isEnableEigenDecomp() ) { parSet.propagateEigenToOriginal(); }
@@ -183,6 +182,7 @@ void DataSetManager::loadPropagator( bool isModel_ ){
     propagatorPtr->getSampleSet().copyMcEventListToDataContainer( _propagator_.getSampleSet().getSampleList() );
 
     // back to prior in case the original _propagator_ has been used.
+    // typically with `-a --toy` options
     if( propagatorPtr->isThrowAsimovToyParameters() ){
       for( auto& parSet : propagatorPtr->getParametersManager().getParameterSetsList() ){
         if( not parSet.isEnabled() ){ continue; }
@@ -217,8 +217,10 @@ void DataSetManager::load(){
   // the MC has been copied for the Asimov fit, or the "data" use the MC
   // reweighting cache.  This must also be before the first use of
   // reweightMcEvents that is done using the GPU.
-  Cache::Manager::Build(_propagator_.getSampleSet(),
-                        _propagator_.getEventDialCache());
+  Cache::Manager::Build(
+    _propagator_.getSampleSet(),
+    _propagator_.getEventDialCache()
+  );
 #endif
 
   LogInfo << "Propagating prior parameters on events..." << std::endl;
