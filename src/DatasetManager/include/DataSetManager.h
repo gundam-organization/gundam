@@ -24,12 +24,14 @@ public:
   void setToyParameterInjector(const JsonType& toyParameterInjector_){ _toyParameterInjector_ = toyParameterInjector_; }
 
   // const-getters
-  [[nodiscard]] const Propagator& getPropagator() const{ return _propagator_; }
+  [[nodiscard]] const Propagator& getModelPropagator() const{ return _modelPropagator_; }
+  [[nodiscard]] const Propagator& getDataPropagator() const{ return _dataPropagator_; }
   [[nodiscard]] const EventTreeWriter& getTreeWriter() const{ return _treeWriter_; }
   [[nodiscard]] const std::vector<DatasetDefinition>& getDataSetList() const{ return _dataSetList_; }
 
   // mutable-getters
-  Propagator& getPropagator(){ return _propagator_; }
+  Propagator& getModelPropagator(){ return _modelPropagator_; }
+  Propagator& getDataPropagator(){ return _dataPropagator_; }
   EventTreeWriter& getTreeWriter(){ return _treeWriter_; }
   std::vector<DatasetDefinition>& getDataSetList(){ return _dataSetList_; }
 
@@ -41,7 +43,8 @@ private:
   // internals
   bool _reloadModelRequested_{false};
 
-  Propagator _propagator_{};
+  Propagator _modelPropagator_{};
+  Propagator _dataPropagator_{};
   EventTreeWriter _treeWriter_{};
   std::vector<DatasetDefinition> _dataSetList_{};
 

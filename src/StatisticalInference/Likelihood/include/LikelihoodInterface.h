@@ -74,8 +74,8 @@ public:
   [[nodiscard]] std::string getSummary() const;
 
   // dev deprecated
-  [[deprecated("use getDataSetManager().getPropagator()")]] [[nodiscard]] const Propagator& getPropagator() const { return _dataSetManager_.getPropagator(); }
-  [[deprecated("use getDataSetManager().getPropagator()")]] Propagator& getPropagator(){ return _dataSetManager_.getPropagator(); }
+  [[deprecated("use getDataSetManager().getModelPropagator()")]] [[nodiscard]] const Propagator& getModelPropagator() const { return _dataSetManager_.getModelPropagator(); }
+  [[deprecated("use getDataSetManager().getModelPropagator()")]] Propagator& getModelPropagator(){ return _dataSetManager_.getModelPropagator(); }
 
 private:
   // internals
