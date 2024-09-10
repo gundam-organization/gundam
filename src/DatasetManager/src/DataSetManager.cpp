@@ -203,6 +203,9 @@ void DataSetManager::load(){
     this->loadPropagator( true );
   }
 
+  // Now everything is loaded, create the list
+  this->buildSamplePairList();
+
   // The event reweighting is completely defined!  Now print a breakdown of all
   // the loaded events with all the global reweighting applied, but none of
   // the dials applied.  It needs to be done BEFORE the cache manager is built
@@ -275,5 +278,24 @@ void DataSetManager::load(){
 
   /// Propagator needs to be fast, let the workers wait for the signal
   _modelPropagator_.getThreadPool().setCpuTimeSaverIsEnabled(false);
+
+}
+
+void DataSetManager::buildSamplePairList(){
+
+  auto nModelSamples{_modelPropagator_.getSampleSet().getSampleList().size()};
+  auto nDataSamples{_dataPropagator_.getSampleSet().getSampleList().size()};
+  LogThrowIf(nModelSamples != nDataSamples,
+             "Mismatching number of samples for model(" << nModelSamples <<
+             ") and data(" << nDataSamples << ") propagators."
+ );
+
+  _samplePairList_.clear();
+  _samplePairList_.reserve( nModelSamples );
+  for( size_t iSample = 0 ; iSample < nModelSamples ; iSample++ ){
+    _samplePairList_.emplace_back();
+    _samplePairList_.back().model = &_modelPropagator_.getSampleSet().getSampleList()[iSample];
+    _samplePairList_.back().data = &_dataPropagator_.getSampleSet().getSampleList()[iSample];
+  }
 
 }

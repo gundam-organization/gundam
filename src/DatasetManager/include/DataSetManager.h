@@ -45,6 +45,7 @@ public:
 protected:
   void load();
   void loadPropagator(bool isModel_);
+  void buildSamplePairList();
 
 private:
   // internals
