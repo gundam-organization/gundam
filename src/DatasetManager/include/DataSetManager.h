@@ -5,6 +5,7 @@
 #ifndef GUNDAM_DATASET_MANAGER_H
 #define GUNDAM_DATASET_MANAGER_H
 
+#include "SamplePair.h"
 #include "DatasetDefinition.h"
 #include "EventTreeWriter.h"
 #include "Propagator.h"
@@ -13,12 +14,6 @@
 
 class DataSetManager : public JsonBaseClass {
 
-public:
-  struct SamplePair{
-    // associate two samples from MC and Data for the statistal inference
-    Sample* model{nullptr};
-    Sample* data{nullptr};
-  };
 
 protected:
   void readConfigImpl() override;

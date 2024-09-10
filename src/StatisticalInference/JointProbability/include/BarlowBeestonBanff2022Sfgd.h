@@ -13,14 +13,14 @@ namespace JointProbability{
   class BarlowBeestonBanff2022Sfgd : public JointProbabilityBase {
   public:
     [[nodiscard]] std::string getType() const override { return "BarlowBeestonBanff2022Sfgd"; }
-    [[nodiscard]] double eval(const Sample& sample_, int bin_) const override;
+    [[nodiscard]] double eval(const SamplePair& samplePair_, int bin_) const override;
   };
 
-  double BarlowBeestonBanff2022Sfgd::eval(const Sample& sample_, int bin_) const {
+  double BarlowBeestonBanff2022Sfgd::eval(const SamplePair& samplePair_, int bin_) const {
 
-    double dataVal = sample_.getDataContainer().getHistogram().binList[bin_].content;
-    double predVal = sample_.getMcContainer().getHistogram().binList[bin_].content;
-    double mcuncert = sample_.getMcContainer().getHistogram().binList[bin_].error;
+    double dataVal = samplePair_.data->getHistogram().binList[bin_].content;
+    double predVal = samplePair_.model->getHistogram().binList[bin_].content;
+    double mcuncert = samplePair_.model->getHistogram().binList[bin_].error;
 
     double chisq = 0.0;
 
@@ -113,8 +113,8 @@ namespace JointProbability{
     if (std::isinf(chisq))
     {
       LogAlert << "Infinite chi2 " << predVal << " " << dataVal
-               << sample_.getMcContainer().getHistogram().binList[bin_].error << " "
-               << sample_.getMcContainer().getHistogram().binList[bin_].content << std::endl;
+               << samplePair_.model->getHistogram().binList[bin_].error << " "
+               << samplePair_.model->getHistogram().binList[bin_].content << std::endl;
     }
 
     return chisq;
