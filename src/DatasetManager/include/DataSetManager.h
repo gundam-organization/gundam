@@ -31,12 +31,12 @@ public:
   void setToyParameterInjector(const JsonType& toyParameterInjector_){ _toyParameterInjector_ = toyParameterInjector_; }
 
   // const-getters
-  [[nodiscard]] const Propagator& getPropagator() const{ return _modelPropagator_; }
+  [[nodiscard]] const Propagator& getModelPropagator() const{ return _modelPropagator_; }
   [[nodiscard]] const EventTreeWriter& getTreeWriter() const{ return _treeWriter_; }
   [[nodiscard]] const std::vector<DatasetDefinition>& getDataSetList() const{ return _dataSetList_; }
 
   // mutable-getters
-  Propagator& getPropagator(){ return _modelPropagator_; }
+  Propagator& getModelPropagator(){ return _modelPropagator_; }
   EventTreeWriter& getTreeWriter(){ return _treeWriter_; }
   std::vector<DatasetDefinition>& getDataSetList(){ return _dataSetList_; }
 
