@@ -35,9 +35,9 @@ public:
 
 #define ENUM_NAME PcaMethod
 #define ENUM_FIELDS \
-  ENUM_FIELD( DeltaChi2Threshold, 0 )         /* original method      */ \
-  ENUM_FIELD( ReducedDeltaChi2Threshold )     /* dividing by the dof  */ \
-  ENUM_FIELD( SqrtReducedDeltaChi2Threshold ) /* also taking the sqrt */
+  ENUM_FIELD( DeltaChi2Threshold, 0 ) \
+  ENUM_FIELD( ReducedDeltaChi2Threshold ) \
+  ENUM_FIELD( SqrtReducedDeltaChi2Threshold )
 #include "GenericToolbox.MakeEnum.h"
 
 protected:

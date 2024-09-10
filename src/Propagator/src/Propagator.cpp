@@ -229,10 +229,10 @@ std::string Propagator::getSampleBreakdownTableStr() const{
 
   for( auto& sample : _sampleSet_.getSampleList() ){
     t << sample.getName() << GenericToolbox::TablePrinter::NextColumn;
-    t << sample.getNbBinnedEvents() << GenericToolbox::TablePrinter::NextColumn;
-    t << sample.getNbBinnedEvents() << GenericToolbox::TablePrinter::NextColumn;
-    t << sample.getSumWeights() << GenericToolbox::TablePrinter::NextColumn;
-    t << sample.getSumWeights() << GenericToolbox::TablePrinter::NextLine;
+    t << sample.getMcContainer().getNbBinnedEvents() << GenericToolbox::TablePrinter::NextColumn;
+    t << sample.getDataContainer().getNbBinnedEvents() << GenericToolbox::TablePrinter::NextColumn;
+    t << sample.getMcContainer().getSumWeights() << GenericToolbox::TablePrinter::NextColumn;
+    t << sample.getDataContainer().getSumWeights() << GenericToolbox::TablePrinter::NextLine;
   }
 
   std::stringstream ss;
@@ -360,7 +360,7 @@ void Propagator::reweightMcEvents(int iThread_) {
 }
 void Propagator::refillMcHistogramsFct( int iThread_){
   for( auto& sample : _sampleSet_.getSampleList() ){
-    sample.refillHistogram(iThread_);
+    sample.getMcContainer().refillHistogram(iThread_);
   }
 }
 

@@ -293,7 +293,7 @@ bool Cache::Manager::Build(SampleSet& sampleList,
     // Count the total number of histogram cells.
     config.histBins = 0;
     for(const Sample& sample : sampleList.getSampleList() ){
-        int cells = sample.generateRootHistogram()->GetNcells();
+        int cells = sample.getMcContainer().generateRootHistogram()->GetNcells();
         LogInfo  << "Add histogram for " << sample.getName()
                 << " with " << cells
                 << " cells (includes under/over-flows)" << std::endl;
@@ -685,24 +685,24 @@ bool Cache::Manager::Update(SampleSet& sampleList,
     int nextHist = 0;
     for(Sample& sample : sampleList.getSampleList() ) {
         LogInfo  << "Fill cache for " << sample.getName()
-                << " with " << sample.getEventList().size()
+                << " with " << sample.getMcContainer().getEventList().size()
                 << " events" << std::endl;
-        std::shared_ptr<TH1> hist(sample.generateRootHistogram());
+        std::shared_ptr<TH1> hist(sample.getMcContainer().generateRootHistogram());
         if (!hist) {
             LogThrow("missing sample histogram");
         }
         int thisHist = nextHist;
-        sample.setCacheManagerIndex(thisHist);
-        sample.setCacheManagerValuePointer(
+        sample.getMcContainer().setCacheManagerIndex(thisHist);
+        sample.getMcContainer().setCacheManagerValuePointer(
             Cache::Manager::Get()->GetHistogramsCache()
             .GetSumsPointer());
-        sample.setCacheManagerValue2Pointer(
+        sample.getMcContainer().setCacheManagerValue2Pointer(
             Cache::Manager::Get()->GetHistogramsCache()
             .GetSums2Pointer());
-        sample.setCacheManagerValidPointer(
+        sample.getMcContainer().setCacheManagerValidPointer(
             Cache::Manager::Get()->GetHistogramsCache()
             .GetSumsValidPointer());
-        sample.setCacheManagerUpdatePointer(
+        sample.getMcContainer().setCacheManagerUpdatePointer(
             [](){
                 Cache::Manager::Get()->GetHistogramsCache().GetSum(0);
                 Cache::Manager::Get()->GetHistogramsCache().GetSum2(0);
@@ -711,7 +711,7 @@ bool Cache::Manager::Update(SampleSet& sampleList,
         nextHist += cells;
         /// ARE ALL OF THE EVENTS HANDLED?
         for (Event& event
-                 : sample.getEventList()) {
+                 : sample.getMcContainer().getEventList()) {
             int eventIndex = event.getCache().index;
             int cellIndex = event.getIndices().bin;
             if (cellIndex < 0 || cells <= cellIndex) {

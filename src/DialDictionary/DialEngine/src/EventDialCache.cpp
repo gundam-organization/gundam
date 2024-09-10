@@ -44,25 +44,25 @@ void EventDialCache::buildReferenceCache( SampleSet& sampleSet_, std::vector<Dia
       iSample++;
 
       auto p = GenericToolbox::getSortPermutation(
-          sample.getEventList(), []( const Event& a, const Event& b) {
+          sample.getMcContainer().getEventList(), []( const Event& a, const Event& b) {
             if( a.getIndices().dataset < a.getIndices().dataset ){ return true; }
             if( a.getIndices().entry < b.getIndices().entry ){ return true; }
             return false;
           });
 
       LogThrowIf(
-          sampleIndexCacheList[iSample].size() != sample.getEventList().size(),
+          sampleIndexCacheList[iSample].size() != sample.getMcContainer().getEventList().size(),
           std::endl << "MISMATCH cache and event list for sample: #" << sample.getIndex() << " " << sample.getName()
               << std::endl << GET_VAR_NAME_VALUE(sampleIndexCacheList[iSample].size())
-              << " <-> " << GET_VAR_NAME_VALUE(sample.getEventList().size())
+              << " <-> " << GET_VAR_NAME_VALUE(sample.getMcContainer().getEventList().size())
       );
       nCacheSlots += sampleIndexCacheList[iSample].size();
 
-      GenericToolbox::applyPermutation( sample.getEventList(), p );
+      GenericToolbox::applyPermutation( sample.getMcContainer().getEventList(), p );
       GenericToolbox::applyPermutation( sampleIndexCacheList[iSample],     p );
 
       // now update the event indices
-      for( size_t iEvent = 0 ; iEvent < sample.getEventList().size() ; iEvent++ ){
+      for( size_t iEvent = 0 ; iEvent < sample.getMcContainer().getEventList().size() ; iEvent++ ){
         sampleIndexCacheList[iSample][iEvent].event.eventIndex = iEvent;
       }
     }
@@ -90,7 +90,7 @@ void EventDialCache::buildReferenceCache( SampleSet& sampleSet_, std::vector<Dia
       cacheEntry.event =
           &sampleSet_.getSampleList().at(
               indexCache.event.sampleIndex
-          ).getEventList().at(
+          ).getMcContainer().getEventList().at(
               indexCache.event.eventIndex
           );
 

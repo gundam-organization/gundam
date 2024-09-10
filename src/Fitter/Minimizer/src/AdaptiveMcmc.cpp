@@ -240,7 +240,7 @@ void AdaptiveMcmc::fillPoint( bool fillModel) {
   if (not fillModel) return;
   for (const Sample& sample
       : getPropagator().getSampleSet().getSampleList()) {
-    auto& hist = sample.getHistogram();
+    auto& hist = sample.getMcContainer().getHistogram();
     /// Adrien: isn't it a bug?? i from 1 to nBins ? Should be from 0 ? or until nBins+1 ?
     for (int i = 1; i < hist.nBins; ++i) {
       _model_.push_back( hist.binList[i-1].content );
@@ -905,7 +905,7 @@ void AdaptiveMcmc::minimize() {
       : getPropagator().getSampleSet().getSampleList()) {
     parameterSampleNames.push_back(sample.getName());
     parameterSampleOffsets.push_back(parameterSampleData.size());
-    auto& hist = sample.getHistogram();
+    auto& hist = sample.getDataContainer().getHistogram();
     // Adrien: same here... the last been has always been skipped
     for (int i = 1; i < hist.nBins; ++i) {
       parameterSampleData.push_back(hist.binList[i-1].content);

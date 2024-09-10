@@ -104,7 +104,7 @@ public:
 
   /// A pair of indices into the the vector of Samples in the SampleSet
   /// vector of fit samples, and the index of the event eventList in the
-  /// SampleElement returned by
+  /// SampleElement returned by getMcContainer().
   struct EventIndexCacheEntry {
     /// The index of the fit sample being referenced by this indexed cache
     /// entry in the SampleSet vector of Sample objects (returned by
