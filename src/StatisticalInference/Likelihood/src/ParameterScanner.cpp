@@ -85,7 +85,7 @@ void ParameterScanner::initializeImpl() {
   }
   if( GenericToolbox::Json::fetchValue(_varsConfig_, "llhStatPerSamplePerBin", false) ){
     for( auto& sample : _likelihoodInterfacePtr_->getDataSetManager().getPropagator().getSampleSet().getSampleList() ){
-      for( auto& bin : sample.getMcContainer().getHistogram().binList ){
+      for( auto& bin : sample.getHistogram().binList ){
         _scanDataDict_.emplace_back();
         auto& scanEntry = _scanDataDict_.back();
         scanEntry.yPoints = std::vector<double>(_nbPoints_+1,0);
@@ -109,12 +109,12 @@ void ParameterScanner::initializeImpl() {
       scanEntry.title = Form("MC event weight scan of sample \"%s\"", sample.getName().c_str());
       scanEntry.yTitle = "Total MC event weight";
       auto* samplePtr = &sample;
-      scanEntry.evalY = [samplePtr](){ return samplePtr->getMcContainer().getSumWeights(); };
+      scanEntry.evalY = [samplePtr](){ return samplePtr->getSumWeights(); };
     }
   }
   if( GenericToolbox::Json::fetchValue(_varsConfig_, "weightPerSamplePerBin", false) ){
     for( auto& sample : _likelihoodInterfacePtr_->getDataSetManager().getPropagator().getSampleSet().getSampleList() ){
-      for( auto& bin : sample.getMcContainer().getHistogram().binList ){
+      for( auto& bin : sample.getHistogram().binList ){
         _scanDataDict_.emplace_back();
         auto& scanEntry = _scanDataDict_.back();
         scanEntry.yPoints = std::vector<double>(_nbPoints_+1,0);
@@ -462,7 +462,7 @@ void ParameterScanner::varyEvenRates(const std::vector<double>& paramVariationLi
       _likelihoodInterfacePtr_->getDataSetManager().getPropagator().propagateParameters();
 
       for(auto & sample : _likelihoodInterfacePtr_->getDataSetManager().getPropagator().getSampleSet().getSampleList()){
-        buffEvtRatesMap[iVar].emplace_back( sample.getMcContainer().getSumWeights() );
+        buffEvtRatesMap[iVar].emplace_back( sample.getSumWeights() );
       }
 
       // back to the prior

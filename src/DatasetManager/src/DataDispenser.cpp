@@ -443,12 +443,9 @@ void DataDispenser::preAllocateMemory(){
   _cache_.sampleIndexOffsetList.resize(_cache_.samplesToFillList.size());
   _cache_.sampleEventListPtrToFill.resize(_cache_.samplesToFillList.size());
   for( size_t iSample = 0 ; iSample < _cache_.sampleNbOfEvents.size() ; iSample++ ){
-    auto* container = &_cache_.samplesToFillList[iSample]->getDataContainer();
-    if(_parameters_.useMcContainer) container = &_cache_.samplesToFillList[iSample]->getMcContainer();
-
-    _cache_.sampleEventListPtrToFill[iSample] = &container->getEventList();
+    _cache_.sampleEventListPtrToFill[iSample] = &_cache_.samplesToFillList[iSample]->getEventList();
     _cache_.sampleIndexOffsetList[iSample] = _cache_.sampleEventListPtrToFill[iSample]->size();
-    container->reserveEventMemory(_owner_->getDataSetIndex(), _cache_.sampleNbOfEvents[iSample], eventPlaceholder);
+    _cache_.samplesToFillList[iSample]->reserveEventMemory(_owner_->getDataSetIndex(), _cache_.sampleNbOfEvents[iSample], eventPlaceholder);
   }
 
   LogInfo << "Filling var index cache for bin edges..." << std::endl;
@@ -528,9 +525,7 @@ void DataDispenser::readAndFill(){
 
   LogInfo << "Shrinking lists..." << std::endl;
   for( size_t iSample = 0 ; iSample < _cache_.samplesToFillList.size() ; iSample++ ){
-    auto* container = &_cache_.samplesToFillList[iSample]->getDataContainer();
-    if(_parameters_.useMcContainer) container = &_cache_.samplesToFillList[iSample]->getMcContainer();
-    container->shrinkEventList( _cache_.sampleIndexOffsetList[iSample] );
+    _cache_.samplesToFillList[iSample]->shrinkEventList( _cache_.sampleIndexOffsetList[iSample] );
   }
 
 }
@@ -561,16 +556,13 @@ void DataDispenser::loadFromHistContent(){
     // one event per bin
     _cache_.sampleNbOfEvents[iSample] = _cache_.samplesToFillList[iSample]->getBinning().getBinList().size();
 
-    // fetch event container
-    auto* container = &_cache_.samplesToFillList[iSample]->getDataContainer();
-
-    _cache_.sampleEventListPtrToFill[iSample] = &container->getEventList();
+    _cache_.sampleEventListPtrToFill[iSample] = &_cache_.samplesToFillList[iSample]->getEventList();
     _cache_.sampleIndexOffsetList[iSample] = _cache_.sampleEventListPtrToFill[iSample]->size();
-    container->reserveEventMemory( _owner_->getDataSetIndex(), _cache_.sampleNbOfEvents[iSample], eventPlaceholder );
+    _cache_.samplesToFillList[iSample]->reserveEventMemory( _owner_->getDataSetIndex(), _cache_.sampleNbOfEvents[iSample], eventPlaceholder );
 
     // indexing according to the binning
-    for( size_t iEvent=_cache_.sampleIndexOffsetList[iSample] ; iEvent < container->getEventList().size() ; iEvent++ ){
-      container->getEventList()[iEvent].getIndices().bin = int( iEvent );
+    for( size_t iEvent=_cache_.sampleIndexOffsetList[iSample] ; iEvent < _cache_.samplesToFillList[iSample]->getEventList().size() ; iEvent++ ){
+      _cache_.samplesToFillList[iSample]->getEventList()[iEvent].getIndices().bin = int( iEvent );
     }
   }
 
@@ -615,17 +607,16 @@ void DataDispenser::loadFromHistContent(){
                                                                            << GET_VAR_NAME_VALUE(nBins) << std::endl
                                                                            << GET_VAR_NAME_VALUE(sample->getBinning().getBinList().size()) << std::endl;
 
-    auto* container = &sample->getDataContainer();
     for( size_t iBin = 0 ; iBin < sample->getBinning().getBinList().size() ; iBin++ ){
       auto target = sample->getBinning().getBinList()[iBin].generateBinTarget( axisNameList );
       auto histBinIndex = hist->GetBin( target.data() ); // bad fetch..?
 
-      container->getEventList()[iBin].getIndices().sample = sample->getIndex();
+      sample->getEventList()[iBin].getIndices().sample = sample->getIndex();
       for( size_t iVar = 0 ; iVar < target.size() ; iVar++ ){
-        container->getEventList()[iBin].getVariables().fetchVariable(axisNameList[iVar]).set(target[iVar]);
+        sample->getEventList()[iBin].getVariables().fetchVariable(axisNameList[iVar]).set(target[iVar]);
       }
-      container->getEventList()[iBin].getWeights().base = (hist->GetBinContent(histBinIndex));
-      container->getEventList()[iBin].getWeights().resetCurrentWeight();
+      sample->getEventList()[iBin].getWeights().base = (hist->GetBinContent(histBinIndex));
+      sample->getEventList()[iBin].getWeights().resetCurrentWeight();
     }
 
   }

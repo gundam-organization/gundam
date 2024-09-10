@@ -50,8 +50,8 @@ namespace JointProbability{
     }
   }
   double BarlowBeestonBanff2022::eval(const Sample& sample_, int bin_) const {
-    double dataVal = sample_.getDataContainer().getHistogram().binList[bin_].content;
-    double predVal = sample_.getMcContainer().getHistogram().binList[bin_].content;
+    double dataVal = sample_.getHistogram().binList[bin_].content;
+    double predVal = sample_.getHistogram().binList[bin_].content;
 
     {
       /// the first time we reach this point, we assume the predMC is at its nominal value
@@ -88,14 +88,14 @@ namespace JointProbability{
       }
     }
     else {
-      mcuncert = sample_.getMcContainer().getHistogram().binList[bin_].error;
+      mcuncert = sample_.getHistogram().binList[bin_].error;
       mcuncert *= mcuncert;
 
       if(not std::isfinite(mcuncert) or mcuncert < 0.0) {
         if( throwIfInfLlh ){
           LogError << "The mcuncert is not finite " << mcuncert << std::endl;
           LogError << "predMC bin " << bin_
-                   << " error is " << sample_.getMcContainer().getHistogram().binList[bin_].error;
+                   << " error is " << sample_.getHistogram().binList[bin_].error;
           LogThrow("The mc uncertainty is not a usable number");
         }
         else{
@@ -219,8 +219,8 @@ namespace JointProbability{
   void BarlowBeestonBanff2022::createNominalMc(const Sample& sample_) const {
     LogWarning << "Creating nominal MC histogram for sample \"" << sample_.getName() << "\"" << std::endl;
     auto& nomHistErr = nomMcUncertList[&sample_];
-    nomHistErr.reserve( sample_.getMcContainer().getHistogram().nBins );
-    for( auto& bin : sample_.getMcContainer().getHistogram().binList ){
+    nomHistErr.reserve( sample_.getHistogram().nBins );
+    for( auto& bin : sample_.getHistogram().binList ){
       nomHistErr.emplace_back( bin.error );
       LogTraceIf(verboseLevel >= 2) << sample_.getName() << ": " << bin.index << " -> " << bin.content << " / " << bin.error << std::endl;
     }

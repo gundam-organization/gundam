@@ -63,21 +63,21 @@ void SampleSet::copyMcEventListToDataContainer(std::vector<Sample>& destinationS
   LogThrowIf(_sampleList_.size() != destinationSampleList_.size(), "Can't copy the data into mismatching containers.");
   for( size_t iSample = 0 ; iSample < _sampleList_.size() ; iSample++ ){
     LogInfo << "Copying events in sample \"" << _sampleList_[iSample].getName() << "\"" << std::endl;
-    destinationSampleList_[iSample].getDataContainer().getEventList().reserve(
-        destinationSampleList_[iSample].getDataContainer().getEventList().size()
-        + _sampleList_[iSample].getMcContainer().getEventList().size()
+    destinationSampleList_[iSample].getEventList().reserve(
+        destinationSampleList_[iSample].getEventList().size()
+        + _sampleList_[iSample].getEventList().size()
     );
-    destinationSampleList_[iSample].getDataContainer().getEventList().insert(
-        destinationSampleList_[iSample].getDataContainer().getEventList().end(),
-        std::begin(_sampleList_[iSample].getMcContainer().getEventList()),
-        std::end(_sampleList_[iSample].getMcContainer().getEventList())
+    destinationSampleList_[iSample].getEventList().insert(
+        destinationSampleList_[iSample].getEventList().end(),
+        std::begin(_sampleList_[iSample].getEventList()),
+        std::end(_sampleList_[iSample].getEventList())
     );
   }
 }
 void SampleSet::clearMcContainers(){
   for( auto& sample : _sampleList_ ){
     LogInfo << "Clearing event list for \"" << sample.getName() << "\"" << std::endl;
-    sample.getMcContainer().getEventList().clear();
+    sample.getEventList().clear();
   }
 }
 

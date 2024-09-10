@@ -97,8 +97,8 @@ void PlotGenerator::generateSampleHistograms(TDirectory *saveDir_, int cacheSlot
     if( histDef.histPtr == nullptr ){
       if( histDef.varToPlot == "Raw" ){
         if( _sampleSetPtr_ != nullptr ){
-          if( histDef.isData ) { histDef.histPtr = histDef.samplePtr->getDataContainer().generateRootHistogram(); }
-          else { histDef.histPtr = histDef.samplePtr->getMcContainer().generateRootHistogram(); }
+          if( histDef.isData ) { histDef.histPtr = histDef.samplePtr->generateRootHistogram(); }
+          else { histDef.histPtr = histDef.samplePtr->generateRootHistogram(); }
         }
         else{
           LogThrow("Samples not set.");
@@ -129,7 +129,7 @@ void PlotGenerator::generateSampleHistograms(TDirectory *saveDir_, int cacheSlot
         std::vector<HistHolder*> histPtrToFillList;
 
         if( isData ){
-          eventListPtr = &sample.getDataContainer().getEventList();
+          eventListPtr = &sample.getEventList();
 
           // which hist should be filled?
           for( auto& histDef : _histHolderCacheList_[cacheSlot_] ){
@@ -139,7 +139,7 @@ void PlotGenerator::generateSampleHistograms(TDirectory *saveDir_, int cacheSlot
           }
         }
         else{
-          eventListPtr = &sample.getMcContainer().getEventList();
+          eventListPtr = &sample.getEventList();
 
           // which hist should be filled?
           for( auto& histDef : _histHolderCacheList_[cacheSlot_] ){
@@ -673,7 +673,7 @@ void PlotGenerator::defineHistogramHolders() {
 
     for( int iSample = bounds.beginIndex ; iSample < bounds.endIndex ; iSample++ ){
       const Sample* samplePtr = &_sampleSetPtr_->getSampleList()[iSample];
-      for( auto& event : samplePtr->getMcContainer().getEventList() ){
+      for( auto& event : samplePtr->getEventList() ){
         for( auto& entry : splitVarsDictionary.entryList ){
           if( entry.name.empty() ){ continue; }
           auto splitValue = int( event.getVariables().getVarList()[event.getVariables().findVarIndex( entry.name )].getVarAsDouble() );

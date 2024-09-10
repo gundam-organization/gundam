@@ -173,8 +173,8 @@ void DataSetManager::loadPropagator( bool isModel_ ){
     // first copy the event directly placed in the data container
     if( &_propagator_ != propagatorPtr ){
       for( size_t iSample = 0 ; iSample < _propagator_.getSampleSet().getSampleList().size() ; iSample++ ){
-        _propagator_.getSampleSet().getSampleList()[iSample].getDataContainer().getEventList() =
-            propagatorPtr->getSampleSet().getSampleList()[iSample].getDataContainer().getEventList();
+        _propagator_.getSampleSet().getSampleList()[iSample].getEventList() =
+            propagatorPtr->getSampleSet().getSampleList()[iSample].getEventList();
       }
     }
 
@@ -232,16 +232,16 @@ void DataSetManager::load(){
   _threadPool_.runJob([this](int iThread){
     LogInfoIf(iThread <= 0) << "Updating sample per bin event lists..." << std::endl;
     for( auto& sample : _propagator_.getSampleSet().getSampleList() ){
-      sample.getMcContainer().updateBinEventList(iThread);
-      sample.getDataContainer().updateBinEventList(iThread);
+      sample.updateBinEventList(iThread);
+      sample.updateBinEventList(iThread);
     }
   });
 
   LogInfo << "Filling up sample histograms..." << std::endl;
   _threadPool_.runJob([this](int iThread){
     for( auto& sample : _propagator_.getSampleSet().getSampleList() ){
-      sample.getMcContainer().refillHistogram(iThread);
-      sample.getDataContainer().refillHistogram(iThread);
+      sample.refillHistogram(iThread);
+      sample.refillHistogram(iThread);
     }
   });
 
@@ -253,7 +253,7 @@ void DataSetManager::load(){
       // Take into account the finite amount of event in MC
       LogInfo << "enableEventMcThrow is enabled: throwing individual MC events" << std::endl;
       for( auto& sample : _propagator_.getSampleSet().getSampleList() ) {
-        sample.getDataContainer().throwEventMcError();
+        sample.throwEventMcError();
       }
     }
     else{
@@ -266,7 +266,7 @@ void DataSetManager::load(){
     }
     for( auto& sample : _propagator_.getSampleSet().getSampleList() ){
       // Asimov bin content -> toy data
-      sample.getDataContainer().throwStatError( _propagator_.isGaussStatThrowInToys() );
+      sample.throwStatError( _propagator_.isGaussStatThrowInToys() );
     }
   }
 
