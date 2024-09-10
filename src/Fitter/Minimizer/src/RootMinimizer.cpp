@@ -195,7 +195,7 @@ void RootMinimizer::minimize(){
     LogInfo << "Writing " << _minimizerType_ << "/Simplex best fit parameters..." << std::endl;
     GenericToolbox::writeInTFile(
         GenericToolbox::mkdirTFile( getOwner().getSaveDir(), GenericToolbox::joinPath("postFit", _minimizerAlgo_) ),
-        TNamed("parameterStateAfterSimplex", GenericToolbox::Json::toReadableString( getModelPropagator().getParametersManager().exportParameterInjectorConfig() ).c_str() )
+        TNamed("parameterStateAfterSimplex", GenericToolbox::Json::toReadableString( getPropagator().getParametersManager().exportParameterInjectorConfig() ).c_str() )
     );
 
     // Back to original
@@ -233,7 +233,7 @@ void RootMinimizer::minimize(){
   LogInfo << "Writing " << _minimizerType_ << "/" << _minimizerAlgo_ << " best fit parameters..." << std::endl;
   GenericToolbox::writeInTFile(
       GenericToolbox::mkdirTFile( getOwner().getSaveDir(), GenericToolbox::joinPath("postFit", _minimizerAlgo_) ),
-      TNamed("parameterStateAfterMinimize", GenericToolbox::Json::toReadableString( getModelPropagator().getParametersManager().exportParameterInjectorConfig() ).c_str() )
+      TNamed("parameterStateAfterMinimize", GenericToolbox::Json::toReadableString( getPropagator().getParametersManager().exportParameterInjectorConfig() ).c_str() )
   );
 
   if( getMonitor().historyTree != nullptr ){
@@ -247,7 +247,7 @@ void RootMinimizer::minimize(){
   else{ LogError << "Minimization did not converged." << std::endl; }
 
   LogInfo << "Writing convergence stats..." << std::endl;
-  int toyIndex = getModelPropagator().getIThrow();
+  int toyIndex = getPropagator().getIThrow();
   int nIterations = int(_rootMinimizer_->NIterations());
   int nFitPars = int(_rootMinimizer_->NFree());
   double edmBestFit = _rootMinimizer_->Edm();
@@ -276,9 +276,9 @@ void RootMinimizer::minimize(){
   bestFitStats->Branch("statLikelihoodAtBestFit",  &getLikelihoodInterface().getBuffer().statLikelihood );
   bestFitStats->Branch("penaltyLikelihoodAtBestFit",  &getLikelihoodInterface().getBuffer().penaltyLikelihood );
 
-  std::vector<GenericToolbox::RawDataArray> samplesArrList(getModelPropagator().getSampleSet().getSampleList().size());
+  std::vector<GenericToolbox::RawDataArray> samplesArrList(getPropagator().getSampleSet().getSampleList().size());
   int iSample{-1};
-  for( auto& sample : getModelPropagator().getSampleSet().getSampleList() ){
+  for( auto& sample : getPropagator().getSampleSet().getSampleList() ){
     if( not sample.isEnabled() ) continue;
 
     std::vector<std::string> leavesDict;
@@ -301,9 +301,9 @@ void RootMinimizer::minimize(){
     );
   }
 
-  std::vector<GenericToolbox::RawDataArray> parameterSetArrList(getModelPropagator().getParametersManager().getParameterSetsList().size());
+  std::vector<GenericToolbox::RawDataArray> parameterSetArrList(getPropagator().getParametersManager().getParameterSetsList().size());
   int iParSet{-1};
-  for( auto& parSet : getModelPropagator().getParametersManager().getParameterSetsList() ){
+  for( auto& parSet : getPropagator().getParametersManager().getParameterSetsList() ){
     if( not parSet.isEnabled() ) continue;
 
     std::vector<std::string> leavesDict;
@@ -439,7 +439,7 @@ void RootMinimizer::scanParameters( TDirectory* saveDir_ ){
     }
     getOwner().getParameterScanner().scanParameter(*getMinimizerFitParameterPtr()[iPar], saveDir_);
   } // iPar
-  for( auto& parSet : this->getModelPropagator().getParametersManager().getParameterSetsList() ){
+  for( auto& parSet : this->getPropagator().getParametersManager().getParameterSetsList() ){
     if( not parSet.isEnabled() ) continue;
     if( parSet.isEnableEigenDecomp() ){
       LogWarning << parSet.getName() << " is using eigen decomposition. Scanning original parameters..." << std::endl;
@@ -724,14 +724,14 @@ void RootMinimizer::writePostFitData( TDirectory* saveDir_) {
       };
 
       int nGlobalPars{0};
-      for( const auto& parSet : getModelPropagator().getParametersManager().getParameterSetsList() ){ if( parSet.isEnabled() ) nGlobalPars += int(parSet.getNbParameters()); }
+      for( const auto& parSet : getPropagator().getParametersManager().getParameterSetsList() ){ if( parSet.isEnabled() ) nGlobalPars += int(parSet.getNbParameters()); }
 
       // Reconstruct the global passage matrix
       std::vector<std::string> parameterLabels(nGlobalPars);
       auto globalPassageMatrix = std::make_unique<TMatrixD>(nGlobalPars, nGlobalPars);
       for(int i = 0 ; i < nGlobalPars; i++ ){ (*globalPassageMatrix)[i][i] = 1; }
       int blocOffset{0};
-      for( const auto& parSet : getModelPropagator().getParametersManager().getParameterSetsList() ){
+      for( const auto& parSet : getPropagator().getParametersManager().getParameterSetsList() ){
         if( not parSet.isEnabled() ) continue;
 
         auto* parList = &parSet.getParameterList(); // we want the original names
@@ -756,7 +756,7 @@ void RootMinimizer::writePostFitData( TDirectory* saveDir_) {
       // Reconstruct the global cov matrix (including eigen decomp parameters)
       auto unstrippedCovMatrix = std::make_unique<TMatrixD>(nGlobalPars, nGlobalPars);
       int iOffset{0};
-      for( const auto& iParSet : getModelPropagator().getParametersManager().getParameterSetsList() ){
+      for( const auto& iParSet : getPropagator().getParametersManager().getParameterSetsList() ){
         if( not iParSet.isEnabled() ) continue;
 
         auto* iParList = &iParSet.getEffectiveParameterList();

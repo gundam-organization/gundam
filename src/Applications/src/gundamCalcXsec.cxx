@@ -133,13 +133,13 @@ int main(int argc, char** argv){
   DataSetManager& dataSetManager{fitter.getLikelihoodInterface().getDataSetManager()};
 
   // We are only interested in our MC. Data has already been used to get the post-fit error/values
-  dataSetManager.getModelPropagator().setLoadAsimovData( true );
+  dataSetManager.getPropagator().setLoadAsimovData( true );
 
   // Disabling eigen decomposed parameters
-  dataSetManager.getModelPropagator().setEnableEigenToOrigInPropagate( false );
+  dataSetManager.getPropagator().setEnableEigenToOrigInPropagate( false );
 
   // Sample binning using parameterSetName
-  for( auto& sample : dataSetManager.getModelPropagator().getSampleSet().getSampleList() ){
+  for( auto& sample : dataSetManager.getPropagator().getSampleSet().getSampleList() ){
 
     if( clParser.isOptionTriggered("usePreFit") ){
       sample.setName( sample.getName() + " (pre-fit)" );
@@ -160,17 +160,17 @@ int main(int argc, char** argv){
 
     // Looking for parSet
     auto foundDialCollection = std::find_if(
-        dataSetManager.getModelPropagator().getDialCollectionList().begin(),
-        dataSetManager.getModelPropagator().getDialCollectionList().end(),
+        dataSetManager.getPropagator().getDialCollectionList().begin(),
+        dataSetManager.getPropagator().getDialCollectionList().end(),
         [&](const DialCollection& dialCollection_){
           auto* parSetPtr{dialCollection_.getSupervisedParameterSet()};
           if( parSetPtr == nullptr ){ return false; }
           return ( parSetPtr->getName() == associatedParSet );
         });
     LogThrowIf(
-        foundDialCollection == dataSetManager.getModelPropagator().getDialCollectionList().end(),
+        foundDialCollection == dataSetManager.getPropagator().getDialCollectionList().end(),
         "Could not find " << associatedParSet << " among fit dial collections: "
-                          << GenericToolbox::toString(dataSetManager.getModelPropagator().getDialCollectionList(),
+                          << GenericToolbox::toString(dataSetManager.getPropagator().getDialCollectionList(),
                                                       [](const DialCollection& dialCollection_){
                                                         return dialCollection_.getTitle();
                                                       }
@@ -184,7 +184,7 @@ int main(int argc, char** argv){
   // Load everything
   dataSetManager.initialize();
 
-  Propagator& propagator{dataSetManager.getModelPropagator()};
+  Propagator& propagator{dataSetManager.getPropagator()};
 
 
   if( clParser.isOptionTriggered("dryRun") ){
@@ -749,7 +749,7 @@ int main(int argc, char** argv){
   LogInfo << "Writing event samples in TTrees..." << std::endl;
   dataSetManager.getTreeWriter().writeSamples(
       GenericToolbox::mkdirTFile(calcXsecDir, "events"),
-      dataSetManager.getModelPropagator()
+      dataSetManager.getPropagator()
   );
 
 }

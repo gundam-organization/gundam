@@ -263,8 +263,8 @@ int main(int argc, char** argv){
   fitter.readConfig(GenericToolbox::Json::fetchSubEntry(configHandler.getConfig(), {"fitterEngineConfig"}));
 
   // -a
-  fitter.getLikelihoodInterface().getDataSetManager().getModelPropagator().setLoadAsimovData(clParser.isOptionTriggered("asimov") );
-  fitter.getLikelihoodInterface().getDataSetManager().getModelPropagator().setLoadAsimovData(clParser.isOptionTriggered("asimov") );
+  fitter.getLikelihoodInterface().getDataSetManager().getPropagator().setLoadAsimovData(clParser.isOptionTriggered("asimov") );
+  fitter.getLikelihoodInterface().getDataSetManager().getPropagator().setLoadAsimovData(clParser.isOptionTriggered("asimov") );
 
   // --use-data-entry
   if( clParser.isOptionTriggered("useDataEntry") ){
@@ -307,8 +307,8 @@ int main(int argc, char** argv){
 
   // --toy <iToy>
   if( clParser.isOptionTriggered("toyFit") ){
-    fitter.getLikelihoodInterface().getDataSetManager().getModelPropagator().setThrowAsimovToyParameters(true);
-    fitter.getLikelihoodInterface().getDataSetManager().getModelPropagator().setIThrow(clParser.getOptionVal("toyFit", -1));
+    fitter.getLikelihoodInterface().getDataSetManager().getPropagator().setThrowAsimovToyParameters(true);
+    fitter.getLikelihoodInterface().getDataSetManager().getPropagator().setIThrow(clParser.getOptionVal("toyFit", -1));
   }
 
   // -d
@@ -323,7 +323,7 @@ int main(int argc, char** argv){
   // injectParameterPath
   if( not injectParameterPath.empty() ){
     auto injectConfig = ConfigUtils::readConfigFile( injectParameterPath );
-    fitter.getLikelihoodInterface().getDataSetManager().getModelPropagator().setParameterInjectorConfig(injectConfig);
+    fitter.getLikelihoodInterface().getDataSetManager().getPropagator().setParameterInjectorConfig(injectConfig);
   }
 
   // toyParInjector
@@ -377,7 +377,7 @@ int main(int argc, char** argv){
   // show initial conditions
   if( clParser.isOptionTriggered("injectParameterConfig") ) {
     LogDebug << "Starting mc parameters that where injected:" << std::endl;
-    LogDebug << fitter.getLikelihoodInterface().getDataSetManager().getModelPropagator().getParametersManager().getParametersSummary(false ) << std::endl;
+    LogDebug << fitter.getLikelihoodInterface().getDataSetManager().getPropagator().getParametersManager().getParametersSummary(false ) << std::endl;
   }
 
   if( clParser.isOptionTriggered("scanLine") ){

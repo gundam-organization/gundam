@@ -219,7 +219,7 @@ void AdaptiveMcmc::initializeImpl(){
 /// Copy the current parameter values to the tree.
 void AdaptiveMcmc::fillPoint( bool fillModel) {
   int count = 0;
-  for (const ParameterSet& parSet: getModelPropagator().getParametersManager().getParameterSetsList()) {
+  for (const ParameterSet& parSet: getPropagator().getParametersManager().getParameterSetsList()) {
     for (const Parameter& iPar : parSet.getParameterList()) {
       if (count >= _point_.size()) {
         LogWarning << "Point out of range " << _point_.size() << " " << count << std::endl;
@@ -239,7 +239,7 @@ void AdaptiveMcmc::fillPoint( bool fillModel) {
   _saveUncertainty_.clear();
   if (not fillModel) return;
   for (const Sample& sample
-      : getModelPropagator().getSampleSet().getSampleList()) {
+      : getPropagator().getSampleSet().getSampleList()) {
     auto& hist = sample.getHistogram();
     /// Adrien: isn't it a bug?? i from 1 to nBins ? Should be from 0 ? or until nBins+1 ?
     for (int i = 1; i < hist.nBins; ++i) {
@@ -880,7 +880,7 @@ void AdaptiveMcmc::minimize() {
   // of the parameters in the call to the likelihood function.  Those
   // parameters are defined by the _minimizerFitParameterPtr_ vector.
 
-  for (const ParameterSet& parSet: getModelPropagator().getParametersManager().getParameterSetsList()) {
+  for (const ParameterSet& parSet: getPropagator().getParametersManager().getParameterSetsList()) {
     // Save name of parameter set
     parameterSetNames.push_back(parSet.getName());
     parameterSetOffsets.push_back(parameterIndex.size());
@@ -902,7 +902,7 @@ void AdaptiveMcmc::minimize() {
 
   parameterSampleData.clear();
   for (const Sample& sample
-      : getModelPropagator().getSampleSet().getSampleList()) {
+      : getPropagator().getSampleSet().getSampleList()) {
     parameterSampleNames.push_back(sample.getName());
     parameterSampleOffsets.push_back(parameterSampleData.size());
     auto& hist = sample.getHistogram();
@@ -994,7 +994,7 @@ bool AdaptiveMcmc::hasValidParameterValues() const {
 
 
   int invalid = 0;
-  for( auto& parSet: getModelPropagator().getParametersManager().getParameterSetsList() ){
+  for( auto& parSet: getPropagator().getParametersManager().getParameterSetsList() ){
     for( auto& par : parSet.getParameterList() ){
       if ( (_validFlags_ & 0b0001) != 0
            and std::isfinite(par.getMinValue())

@@ -130,8 +130,8 @@ protected:
 
   // Get the propagator being used to calculate the likelihood.  This is a
   // local convenience function to get the propagator from the owner.
-  Propagator& getModelPropagator();
-  [[nodiscard]] const Propagator& getModelPropagator() const;
+  Propagator& getPropagator();
+  [[nodiscard]] const Propagator& getPropagator() const;
 
   // Get the parameter scanner object owned by the LikelihoodInterface.
   ParameterScanner& getParameterScanner();

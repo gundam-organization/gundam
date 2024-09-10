@@ -71,8 +71,8 @@ void ParameterScanner::initializeImpl() {
     scanEntry.evalY = [this](){ return _likelihoodInterfacePtr_->getLastStatLikelihood(); };
   }
   if( GenericToolbox::Json::fetchValue(_varsConfig_, "llhStatPerSample", false) ){
-    _scanDataDict_.reserve( _likelihoodInterfacePtr_->getDataSetManager().getModelPropagator().getSampleSet().getSampleList().size() );
-    for( auto& sample : _likelihoodInterfacePtr_->getDataSetManager().getModelPropagator().getSampleSet().getSampleList() ){
+    _scanDataDict_.reserve( _likelihoodInterfacePtr_->getDataSetManager().getPropagator().getSampleSet().getSampleList().size() );
+    for( auto& sample : _likelihoodInterfacePtr_->getDataSetManager().getPropagator().getSampleSet().getSampleList() ){
       _scanDataDict_.emplace_back();
       auto& scanEntry = _scanDataDict_.back();
       scanEntry.yPoints = std::vector<double>(_nbPoints_+1,0);
@@ -84,7 +84,7 @@ void ParameterScanner::initializeImpl() {
     }
   }
   if( GenericToolbox::Json::fetchValue(_varsConfig_, "llhStatPerSamplePerBin", false) ){
-    for( auto& sample : _likelihoodInterfacePtr_->getDataSetManager().getModelPropagator().getSampleSet().getSampleList() ){
+    for( auto& sample : _likelihoodInterfacePtr_->getDataSetManager().getPropagator().getSampleSet().getSampleList() ){
       for( auto& bin : sample.getHistogram().binList ){
         _scanDataDict_.emplace_back();
         auto& scanEntry = _scanDataDict_.back();
@@ -101,7 +101,7 @@ void ParameterScanner::initializeImpl() {
     }
   }
   if( GenericToolbox::Json::fetchValue(_varsConfig_, "weightPerSample", false) ){
-    for( auto& sample : _likelihoodInterfacePtr_->getDataSetManager().getModelPropagator().getSampleSet().getSampleList() ){
+    for( auto& sample : _likelihoodInterfacePtr_->getDataSetManager().getPropagator().getSampleSet().getSampleList() ){
       _scanDataDict_.emplace_back();
       auto& scanEntry = _scanDataDict_.back();
       scanEntry.yPoints = std::vector<double>(_nbPoints_+1,0);
@@ -113,7 +113,7 @@ void ParameterScanner::initializeImpl() {
     }
   }
   if( GenericToolbox::Json::fetchValue(_varsConfig_, "weightPerSamplePerBin", false) ){
-    for( auto& sample : _likelihoodInterfacePtr_->getDataSetManager().getModelPropagator().getSampleSet().getSampleList() ){
+    for( auto& sample : _likelihoodInterfacePtr_->getDataSetManager().getPropagator().getSampleSet().getSampleList() ){
       for( auto& bin : sample.getHistogram().binList ){
         _scanDataDict_.emplace_back();
         auto& scanEntry = _scanDataDict_.back();
@@ -147,7 +147,7 @@ void ParameterScanner::scanParameter(Parameter& par_, TDirectory* saveDir_) {
 
   if( par_.getOwner()->isEnableEigenDecomp() and not par_.isEigen() ){
     // temporarily disable the automatic conversion Eigen -> Original
-    _likelihoodInterfacePtr_->getDataSetManager().getModelPropagator().setEnableEigenToOrigInPropagate( false );
+    _likelihoodInterfacePtr_->getDataSetManager().getPropagator().setEnableEigenToOrigInPropagate( false );
   }
 
   double origVal = par_.getParameterValue();

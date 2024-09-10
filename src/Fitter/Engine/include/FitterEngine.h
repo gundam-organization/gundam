@@ -84,8 +84,8 @@ public:
   void checkNumericalAccuracy();
 
   // Deprecated
-  [[deprecated("use getLikelihoodInterface().getDataSetManager().getModelPropagator()")]] [[nodiscard]] const Propagator& getModelPropagator() const{ return getLikelihoodInterface().getDataSetManager().getModelPropagator(); }
-  [[deprecated("use getLikelihoodInterface().getDataSetManager().getModelPropagator()")]] Propagator& getModelPropagator(){ return getLikelihoodInterface().getDataSetManager().getModelPropagator(); }
+  [[deprecated("use getLikelihoodInterface().getDataSetManager().getPropagator()")]] [[nodiscard]] const Propagator& getPropagator() const{ return getLikelihoodInterface().getDataSetManager().getPropagator(); }
+  [[deprecated("use getLikelihoodInterface().getDataSetManager().getPropagator()")]] Propagator& getPropagator(){ return getLikelihoodInterface().getDataSetManager().getPropagator(); }
   [[deprecated("Use runPcaCheck()")]] void fixGhostFitParameters(){ runPcaCheck(); }
 
 

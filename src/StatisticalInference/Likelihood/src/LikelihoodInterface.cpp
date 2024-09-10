@@ -19,13 +19,13 @@ void LikelihoodInterface::readConfigImpl(){
 
   // First taking care of the DataSetManager
   JsonType dataSetManagerConfig{};
-  GenericToolbox::Json::deprecatedAction(getDataSetManager().getModelPropagator().getConfig(), {{"fitSampleSetConfig"}, {"dataSetList"}}, [&]{
+  GenericToolbox::Json::deprecatedAction(getDataSetManager().getPropagator().getConfig(), {{"fitSampleSetConfig"}, {"dataSetList"}}, [&]{
     LogAlert << R"("dataSetList" should now be set under "likelihoodInterfaceConfig" instead of "fitSampleSet".)" << std::endl;
-    dataSetManagerConfig = GenericToolbox::Json::fetchValue<JsonType>(getDataSetManager().getModelPropagator().getConfig(), "fitSampleSetConfig"); // DataSetManager will look for "dataSetList"
+    dataSetManagerConfig = GenericToolbox::Json::fetchValue<JsonType>(getDataSetManager().getPropagator().getConfig(), "fitSampleSetConfig"); // DataSetManager will look for "dataSetList"
   });
-  GenericToolbox::Json::deprecatedAction(getDataSetManager().getModelPropagator().getConfig(), "dataSetList", [&]{
+  GenericToolbox::Json::deprecatedAction(getDataSetManager().getPropagator().getConfig(), "dataSetList", [&]{
     LogAlert << R"("dataSetList" should now be set under "likelihoodInterfaceConfig" instead of "propagatorConfig".)" << std::endl;
-    dataSetManagerConfig = getDataSetManager().getModelPropagator().getConfig();
+    dataSetManagerConfig = getDataSetManager().getPropagator().getConfig();
   });
   dataSetManagerConfig = GenericToolbox::Json::fetchValue(_config_, {{"datasetManagerConfig"}, {"dataSetManagerConfig"}}, dataSetManagerConfig);
   getDataSetManager().readConfig( dataSetManagerConfig );
@@ -34,13 +34,13 @@ void LikelihoodInterface::readConfigImpl(){
   JsonType configJointProbability;
   std::string jointProbabilityTypeStr{"PoissonLLH"};
 
-  GenericToolbox::Json::deprecatedAction(getDataSetManager().getModelPropagator().getSampleSet().getConfig(), "llhStatFunction", [&]{
+  GenericToolbox::Json::deprecatedAction(getDataSetManager().getPropagator().getSampleSet().getConfig(), "llhStatFunction", [&]{
     LogAlert << R"("llhStatFunction" should now be set under "likelihoodInterfaceConfig/jointProbabilityConfig/type".)" << std::endl;
-    jointProbabilityTypeStr = GenericToolbox::Json::fetchValue( getDataSetManager().getModelPropagator().getSampleSet().getConfig(), "llhStatFunction", jointProbabilityTypeStr );
+    jointProbabilityTypeStr = GenericToolbox::Json::fetchValue( getDataSetManager().getPropagator().getSampleSet().getConfig(), "llhStatFunction", jointProbabilityTypeStr );
   });
-  GenericToolbox::Json::deprecatedAction(getDataSetManager().getModelPropagator().getSampleSet().getConfig(), "llhConfig", [&]{
+  GenericToolbox::Json::deprecatedAction(getDataSetManager().getPropagator().getSampleSet().getConfig(), "llhConfig", [&]{
     LogAlert << R"("llhConfig" should now be set under "likelihoodInterfaceConfig/jointProbabilityConfig".)" << std::endl;
-    configJointProbability = GenericToolbox::Json::fetchValue( getDataSetManager().getModelPropagator().getSampleSet().getConfig(), "llhConfig", configJointProbability );
+    configJointProbability = GenericToolbox::Json::fetchValue( getDataSetManager().getPropagator().getSampleSet().getConfig(), "llhConfig", configJointProbability );
   });
 
   // new config structure
@@ -61,18 +61,18 @@ void LikelihoodInterface::initializeImpl() {
 
   LogInfo << "Fetching the effective number of fit parameters..." << std::endl;
   _nbParameters_ = 0;
-  for( auto& parSet : getDataSetManager().getModelPropagator().getParametersManager().getParameterSetsList() ){
+  for( auto& parSet : getDataSetManager().getPropagator().getParametersManager().getParameterSetsList() ){
     _nbParameters_ += int( parSet.getNbParameters() );
   }
 
   LogInfo << "Fetching the number of bins parameters..." << std::endl;
   _nbSampleBins_ = 0;
-  for( auto& sample : getDataSetManager().getModelPropagator().getSampleSet().getSampleList() ){
+  for( auto& sample : getDataSetManager().getPropagator().getSampleSet().getSampleList() ){
     _nbSampleBins_ += int(sample.getBinning().getBinList().size() );
   }
 
   LogInfo << "Move back MC parameters to prior..." << std::endl;
-  getDataSetManager().getModelPropagator().getParametersManager().moveParametersToPrior();
+  getDataSetManager().getPropagator().getParametersManager().moveParametersToPrior();
 
   /// some joint fit probability might need to save the value of the nominal histogram.
   /// here we know every parameter is at its nominal value
@@ -81,12 +81,12 @@ void LikelihoodInterface::initializeImpl() {
   LogInfo << this->getSummary() << std::endl;
 
   /// move the parameter away from the prior if needed
-  if( not getDataSetManager().getModelPropagator().getParameterInjectorMc().empty() ){
+  if( not getDataSetManager().getPropagator().getParameterInjectorMc().empty() ){
     LogWarning << "Injecting parameters on MC samples..." << std::endl;
-    getDataSetManager().getModelPropagator().getParametersManager().injectParameterValues(
-        ConfigUtils::getForwardedConfig(getDataSetManager().getModelPropagator().getParameterInjectorMc())
+    getDataSetManager().getPropagator().getParametersManager().injectParameterValues(
+        ConfigUtils::getForwardedConfig(getDataSetManager().getPropagator().getParameterInjectorMc())
     );
-    getDataSetManager().getModelPropagator().reweightMcEvents();
+    getDataSetManager().getPropagator().reweightMcEvents();
   }
 
   //////////////////////////////////////////
@@ -97,7 +97,7 @@ void LikelihoodInterface::initializeImpl() {
 }
 
 void LikelihoodInterface::propagateAndEvalLikelihood(){
-  getDataSetManager().getModelPropagator().propagateParameters();
+  getDataSetManager().getPropagator().propagateParameters();
   this->evalLikelihood();
 }
 
