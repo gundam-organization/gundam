@@ -109,8 +109,8 @@ double LikelihoodInterface::evalLikelihood() const {
 }
 double LikelihoodInterface::evalStatLikelihood() const {
   _buffer_.statLikelihood = 0.;
-  for( auto &sample: getDataSetManager().getModelPropagator().getSampleSet().getSampleList()){
-    _buffer_.statLikelihood += this->evalStatLikelihood( sample );
+  for( auto &samplePair: getDataSetManager().getSamplePairList()){
+    _buffer_.statLikelihood += this->evalStatLikelihood( samplePair );
   }
   return _buffer_.statLikelihood;
 }
@@ -121,8 +121,8 @@ double LikelihoodInterface::evalPenaltyLikelihood() const {
   }
   return _buffer_.penaltyLikelihood;
 }
-double LikelihoodInterface::evalStatLikelihood(const Sample& sample_) const {
-  return _jointProbabilityPtr_->eval( sample_ );
+double LikelihoodInterface::evalStatLikelihood(const SamplePair& samplePair_) const {
+  return _jointProbabilityPtr_->eval( samplePair_ );
 }
 double LikelihoodInterface::evalPenaltyLikelihood(const ParameterSet& parSet_) const {
   if( not parSet_.isEnabled() ){ return 0; }
@@ -157,10 +157,10 @@ double LikelihoodInterface::evalPenaltyLikelihood(const ParameterSet& parSet_) c
   ss << "Total likelihood = " << _buffer_.totalLikelihood;
   ss << std::endl << "Stat likelihood = " << _buffer_.statLikelihood;
   ss << " = sum of: " << GenericToolbox::toString(
-      getDataSetManager().getModelPropagator().getSampleSet().getSampleList(), [&]( const Sample& sample_){
+      getDataSetManager().getSamplePairList(), [&]( const SamplePair& samplePair_){
         std::stringstream ssSub;
-        ssSub << sample_.getName() << ": ";
-        if( sample_.isEnabled() ){ ssSub << this->evalStatLikelihood( sample_ ); }
+        ssSub << samplePair_.model->getName() << ": ";
+        if( samplePair_.model->isEnabled() ){ ssSub << this->evalStatLikelihood( samplePair_ ); }
         else                     { ssSub << "disabled."; }
         return ssSub.str();
       }

@@ -69,7 +69,7 @@ public:
   double evalLikelihood() const;
   double evalStatLikelihood() const;
   double evalPenaltyLikelihood() const;
-  [[nodiscard]] double evalStatLikelihood(const Sample& sample_) const;
+  [[nodiscard]] double evalStatLikelihood(const SamplePair& samplePair_) const;
   [[nodiscard]] double evalPenaltyLikelihood(const ParameterSet& parSet_) const;
   [[nodiscard]] std::string getSummary() const;
 

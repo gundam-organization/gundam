@@ -33,22 +33,22 @@ namespace JointProbability{
 
     // SFGD detector uncertainty
     double sfgd_det_uncert = 0.;
-    if (sample_.getName().find("SFGD") != std::string::npos){
+    if (samplePair_.model->getName().find("SFGD") != std::string::npos){
       // to be applied on SFGD samples only
       sfgd_det_uncert = 0.;
-      if (sample_.getName().find("FHC") != std::string::npos){
-        if (sample_.getName().find("0p") != std::string::npos){
+      if (samplePair_.model->getName().find("FHC") != std::string::npos){
+        if (samplePair_.model->getName().find("0p") != std::string::npos){
           sfgd_det_uncert = 0.02;
         }
-        else if (sample_.getName().find("Np") != std::string::npos){
+        else if (samplePair_.model->getName().find("Np") != std::string::npos){
           sfgd_det_uncert = 0.04;
         }
       }
-      else if (sample_.getName().find("RHC") != std::string::npos){
-        if (sample_.getName().find("0n") != std::string::npos){
+      else if (samplePair_.model->getName().find("RHC") != std::string::npos){
+        if (samplePair_.model->getName().find("0n") != std::string::npos){
           sfgd_det_uncert = 0.025;
         }
-        else if (sample_.getName().find("Nn") != std::string::npos){
+        else if (samplePair_.model->getName().find("Nn") != std::string::npos){
           sfgd_det_uncert = 0.05;
         }
       }
@@ -56,18 +56,18 @@ namespace JointProbability{
 
     // DETECTOR UNCERTAINTY FOR WAGASCI
     double wg_det_uncert = 0.;
-    if (sample_.getName().find("WAGASCI") != std::string::npos){
+    if (samplePair_.model->getName().find("WAGASCI") != std::string::npos){
       wg_det_uncert = 0.;
-      if(sample_.getName().find("#0pi") != std::string::npos) {
-        if(sample_.getName().find("PM-BM") != std::string::npos) wg_det_uncert = 0.05;
-        if(sample_.getName().find("PM-WMRD") != std::string::npos) wg_det_uncert = 0.1;
-        if(sample_.getName().find("DWG-BM") != std::string::npos) wg_det_uncert = 0.1;
-        if(sample_.getName().find("UWG-BM") != std::string::npos) wg_det_uncert = 0.12;
-        if(sample_.getName().find("UWG-WMRD") != std::string::npos) wg_det_uncert = 0.1;
+      if(samplePair_.model->getName().find("#0pi") != std::string::npos) {
+        if(samplePair_.model->getName().find("PM-BM") != std::string::npos) wg_det_uncert = 0.05;
+        if(samplePair_.model->getName().find("PM-WMRD") != std::string::npos) wg_det_uncert = 0.1;
+        if(samplePair_.model->getName().find("DWG-BM") != std::string::npos) wg_det_uncert = 0.1;
+        if(samplePair_.model->getName().find("UWG-BM") != std::string::npos) wg_det_uncert = 0.12;
+        if(samplePair_.model->getName().find("UWG-WMRD") != std::string::npos) wg_det_uncert = 0.1;
       }
-      if(sample_.getName().find("#1pi") != std::string::npos)  {
-        if(sample_.getName().find("PM") != std::string::npos) wg_det_uncert = 0.1;
-        if(sample_.getName().find("WG") != std::string::npos) wg_det_uncert = 0.08;
+      if(samplePair_.model->getName().find("#1pi") != std::string::npos)  {
+        if(samplePair_.model->getName().find("PM") != std::string::npos) wg_det_uncert = 0.1;
+        if(samplePair_.model->getName().find("WG") != std::string::npos) wg_det_uncert = 0.08;
       }
     }
 
