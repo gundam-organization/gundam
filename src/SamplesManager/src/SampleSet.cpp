@@ -75,4 +75,15 @@ std::vector<std::string> SampleSet::fetchRequestedVariablesForIndexing() const{
   }
   return out;
 }
+void SampleSet::copyEventsFrom(const SampleSet& src_){
+  LogThrowIf(
+      src_.getSampleList().size() != this->getSampleList().size(),
+      "Can't copy events from mismatching sample lists. src(" << src_.getSampleList().size() << ")"
+      << "dst(" << this->getSampleList().size() << ")."
+  );
+
+  for( size_t iSample = 0 ; iSample < src_.getSampleList().size() ; iSample++ ){
+    this->getSampleList()[iSample].getEventList() = src_.getSampleList()[iSample].getEventList();
+  }
+}
 

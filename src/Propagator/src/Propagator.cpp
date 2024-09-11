@@ -132,7 +132,31 @@ void Propagator::initializeImpl(){
   initializeThreads();
 }
 
-// Core
+// core
+void Propagator::clearContent(){
+  LogInfo << "Clearing Propagator content..." << std::endl;
+
+  // clearing events in MC containers
+  _sampleSet_.clearMcContainers();
+
+  // also wiping event-by-event dials...
+  for( auto& dialCollection: _dialCollectionList_ ) {
+    if( not dialCollection.getGlobalDialLeafName().empty() ) { dialCollection.clear(); }
+
+    // clear input buffer cache to trigger the cache eval
+    for( auto& dialInput : dialCollection.getDialInputBufferList() ){
+      dialInput.invalidateBuffers();
+    }
+  }
+  _eventDialCache_ = EventDialCache();
+
+}
+void Propagator::shrinkDialContainers(){
+  LogInfo << "Resizing dial containers..." << std::endl;
+  for( auto& dialCollection : _dialCollectionList_ ) {
+    if( dialCollection.isEventByEvent() ){ dialCollection.resizeContainers(); }
+  }
+}
 void Propagator::buildDialCache(){
   _eventDialCache_.shrinkIndexedCache();
   _eventDialCache_.buildReferenceCache(_sampleSet_, _dialCollectionList_);
@@ -157,16 +181,6 @@ void Propagator::propagateParameters(){
   this->refillHistograms();
 
 }
-void Propagator::updateDialState(){
-  std::for_each(_dialCollectionList_.begin(), _dialCollectionList_.end(),
-                [&]( DialCollection& dc_){
-                  dc_.updateInputBuffers();
-  });
-  std::for_each(_dialCollectionList_.begin(), _dialCollectionList_.end(),
-                [&]( DialCollection& dc_){
-                  dc_.update();
-                });
-}
 void Propagator::reweightEvents() {
   reweightTimer.start();
 
@@ -190,53 +204,8 @@ void Propagator::reweightEvents() {
 
   reweightTimer.stop();
 }
-void Propagator::refillHistograms(){
-  refillHistogramTimer.start();
 
-  if( not _devSingleThreadHistFill_ ){ _threadPool_.runJob("Propagator::refillHistograms"); }
-  else{ refillHistogramsFct(-1); }
-
-  refillHistogramTimer.stop();
-}
-void Propagator::clearContent(){
-  LogInfo << "Clearing Propagator content..." << std::endl;
-
-  // clearing events in MC containers
-  _sampleSet_.clearMcContainers();
-
-  // also wiping event-by-event dials...
-  for( auto& dialCollection: _dialCollectionList_ ) {
-    if( not dialCollection.getGlobalDialLeafName().empty() ) { dialCollection.clear(); }
-
-    // clear input buffer cache to trigger the cache eval
-    for( auto& dialInput : dialCollection.getDialInputBufferList() ){
-      dialInput.invalidateBuffers();
-    }
-  }
-  _eventDialCache_ = EventDialCache();
-
-}
-
-// Misc
-std::string Propagator::getSampleBreakdownTableStr() const{
-  GenericToolbox::TablePrinter t;
-
-  t << "Sample" << GenericToolbox::TablePrinter::NextColumn;
-  t << "MC (# binned event)" << GenericToolbox::TablePrinter::NextColumn;
-  t << "Data (# binned event)" << GenericToolbox::TablePrinter::NextColumn;
-  t << "MC (weighted)" << GenericToolbox::TablePrinter::NextColumn;
-  t << "Data (weighted)" << GenericToolbox::TablePrinter::NextLine;
-
-  for( auto& sample : _sampleSet_.getSampleList() ){
-    t << sample.getName() << GenericToolbox::TablePrinter::NextColumn;
-    t << sample.getNbBinnedEvents() << GenericToolbox::TablePrinter::NextColumn;
-    t << sample.getSumWeights() << GenericToolbox::TablePrinter::NextColumn;
-  }
-
-  std::stringstream ss;
-  ss << t.generateTableString();
-  return ss.str();
-}
+// misc
 void Propagator::printBreakdowns(){
 
   LogInfo << std::endl << "Breaking down samples..." << std::endl;
@@ -319,6 +288,26 @@ void Propagator::printBreakdowns(){
     }
   }
 }
+std::string Propagator::getSampleBreakdownTableStr() const{
+  GenericToolbox::TablePrinter t;
+
+  t << "Sample" << GenericToolbox::TablePrinter::NextColumn;
+  t << "MC (# binned event)" << GenericToolbox::TablePrinter::NextColumn;
+  t << "Data (# binned event)" << GenericToolbox::TablePrinter::NextColumn;
+  t << "MC (weighted)" << GenericToolbox::TablePrinter::NextColumn;
+  t << "Data (weighted)" << GenericToolbox::TablePrinter::NextLine;
+
+  for( auto& sample : _sampleSet_.getSampleList() ){
+    t << sample.getName() << GenericToolbox::TablePrinter::NextColumn;
+    t << sample.getNbBinnedEvents() << GenericToolbox::TablePrinter::NextColumn;
+    t << sample.getSumWeights() << GenericToolbox::TablePrinter::NextColumn;
+  }
+
+  std::stringstream ss;
+  ss << t.generateTableString();
+  return ss.str();
+}
+
 
 // Protected
 void Propagator::initializeThreads() {
@@ -336,6 +325,26 @@ void Propagator::initializeThreads() {
       [this](int iThread){ this->refillHistogramsFct(iThread); }
   );
 
+}
+
+// private
+void Propagator::updateDialState(){
+  std::for_each(_dialCollectionList_.begin(), _dialCollectionList_.end(),
+                [&]( DialCollection& dc_){
+                  dc_.updateInputBuffers();
+                });
+  std::for_each(_dialCollectionList_.begin(), _dialCollectionList_.end(),
+                [&]( DialCollection& dc_){
+                  dc_.update();
+                });
+}
+void Propagator::refillHistograms(){
+  refillHistogramTimer.start();
+
+  if( not _devSingleThreadHistFill_ ){ _threadPool_.runJob("Propagator::refillHistograms"); }
+  else{ refillHistogramsFct(-1); }
+
+  refillHistogramTimer.stop();
 }
 
 // multithreading

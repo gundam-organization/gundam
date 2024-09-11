@@ -263,7 +263,10 @@ int main(int argc, char** argv){
   fitter.readConfig(GenericToolbox::Json::fetchSubEntry(configHandler.getConfig(), {"fitterEngineConfig"}));
 
   // -a
-  fitter.getLikelihoodInterface().setLoadAsimovData( clParser.isOptionTriggered("asimov") );
+  if( clParser.isOptionTriggered("asimov") ){
+    fitter.getLikelihoodInterface().setDataType( LikelihoodInterface::DataType::Asimov );
+  }
+
 
   // --use-data-entry
   if( clParser.isOptionTriggered("useDataEntry") ){
@@ -306,8 +309,8 @@ int main(int argc, char** argv){
 
   // --toy <iToy>
   if( clParser.isOptionTriggered("toyFit") ){
-    fitter.getLikelihoodInterface().getDataPropagator().setThrowAsimovToyParameters(true);
-    fitter.getLikelihoodInterface().getDataPropagator().setIThrow(clParser.getOptionVal("toyFit", -1));
+    fitter.getLikelihoodInterface().setDataType( LikelihoodInterface::DataType::Toy );
+    fitter.getLikelihoodInterface().getDataPropagator().setIThrow( clParser.getOptionVal("toyFit", -1) );
   }
 
   // -d

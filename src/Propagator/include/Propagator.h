@@ -24,11 +24,16 @@
 
 class Propagator : public JsonBaseClass {
 
+
 protected:
   void readConfigImpl() override;
   void initializeImpl() override;
 
+
 public:
+  static void muteLogger();
+  static void unmuteLogger();
+
   Propagator() = default;
 
   // Setters
@@ -63,19 +68,21 @@ public:
 
   // Core
   void clearContent();
+  void shrinkDialContainers();
   void buildDialCache();
   void propagateParameters();
   void reweightEvents();
 
-  // Misc
-  [[nodiscard]] std::string getSampleBreakdownTableStr() const;
+  // misc
   void printBreakdowns();
+  [[nodiscard]] std::string getSampleBreakdownTableStr() const;
 
-  // Logger related
-  static void muteLogger();
-  static void unmuteLogger();
+  // public members
+  GenericToolbox::Time::AveragedTimer<10> reweightTimer;
+  GenericToolbox::Time::AveragedTimer<10> refillHistogramTimer;
 
-private:
+
+protected:
   void initializeThreads();
 
   // multithreading
@@ -84,6 +91,9 @@ private:
 
   void updateDialState();
   void refillHistograms();
+
+
+private:
 
   // Parameters
   bool _showTimeStats_{false};
@@ -117,10 +127,6 @@ private:
   std::vector<DialCollection> _dialCollectionList_{};
 
   GenericToolbox::ParallelWorker _threadPool_{};
-
-public:
-  GenericToolbox::Time::AveragedTimer<10> reweightTimer;
-  GenericToolbox::Time::AveragedTimer<10> refillHistogramTimer;
 
 };
 #endif //GUNDAM_PROPAGATOR_H

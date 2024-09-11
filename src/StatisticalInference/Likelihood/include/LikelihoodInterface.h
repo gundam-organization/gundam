@@ -33,6 +33,12 @@
 class LikelihoodInterface : public JsonBaseClass  {
 
 public:
+#define ENUM_NAME DataType
+#define ENUM_FIELDS \
+  ENUM_FIELD( Asimov, 0 ) \
+  ENUM_FIELD( Toy ) \
+  ENUM_FIELD( RealData )
+#include "GenericToolbox.MakeEnum.h"
 
   struct Buffer{
     double totalLikelihood{0};
@@ -52,7 +58,7 @@ protected:
 public:
 
   // setters
-  void setLoadAsimovData(bool loadAsimovData_){ _loadAsimovData_ = loadAsimovData_; }
+  void setDataType(const DataType& dataType_){ _dataType_ = dataType_; }
 
   // const getters
   [[nodiscard]] int getNbParameters() const {return _nbParameters_; }
@@ -85,12 +91,14 @@ public:
 protected:
   void loadPropagators();
   void loadPropagator(bool isModel_);
+  void loadModelPropagator();
+  void loadDataPropagator();
   void buildSamplePairList();
 
 
 private:
   // parameters
-  bool _loadAsimovData_{false};
+  DataType _dataType_{DataType::Asimov};
 
   // internals
   int _nbParameters_{0};
