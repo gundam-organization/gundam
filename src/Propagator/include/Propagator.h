@@ -79,11 +79,11 @@ private:
   void initializeThreads();
 
   // multithreading
-  void reweightMcEvents(int iThread_);
-  void refillMcHistogramsFct( int iThread_);
+  void reweightEvents( int iThread_);
+  void refillHistogramsFct( int iThread_);
 
   void updateDialState();
-  void refillMcHistograms();
+  void refillHistograms();
 
   // Parameters
   bool _showTimeStats_{false};

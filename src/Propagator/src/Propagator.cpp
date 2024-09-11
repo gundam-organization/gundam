@@ -154,7 +154,7 @@ void Propagator::propagateParameters(){
   }
 
   this->reweightMcEvents();
-  this->refillMcHistograms();
+  this->refillHistograms();
 
 }
 void Propagator::updateDialState(){
@@ -183,18 +183,18 @@ void Propagator::reweightMcEvents() {
 #endif
   if( not usedGPU ){
     if( not _devSingleThreadReweight_ ){
-      _threadPool_.runJob("Propagator::reweightMcEvents");
+      _threadPool_.runJob("Propagator::reweightEvents");
     }
-    else{ this->reweightMcEvents(-1); }
+    else{ this->reweightEvents(-1); }
   }
 
   reweightTimer.stop();
 }
-void Propagator::refillMcHistograms(){
+void Propagator::refillHistograms(){
   refillHistogramTimer.start();
 
-  if( not _devSingleThreadHistFill_ ){ _threadPool_.runJob("Propagator::refillMcHistograms"); }
-  else{ refillMcHistogramsFct(-1); }
+  if( not _devSingleThreadHistFill_ ){ _threadPool_.runJob("Propagator::refillHistograms"); }
+  else{ refillHistogramsFct(-1); }
 
   refillHistogramTimer.stop();
 }
@@ -229,10 +229,8 @@ std::string Propagator::getSampleBreakdownTableStr() const{
 
   for( auto& sample : _sampleSet_.getSampleList() ){
     t << sample.getName() << GenericToolbox::TablePrinter::NextColumn;
-    t << sample.getMcContainer().getNbBinnedEvents() << GenericToolbox::TablePrinter::NextColumn;
-    t << sample.getDataContainer().getNbBinnedEvents() << GenericToolbox::TablePrinter::NextColumn;
-    t << sample.getMcContainer().getSumWeights() << GenericToolbox::TablePrinter::NextColumn;
-    t << sample.getDataContainer().getSumWeights() << GenericToolbox::TablePrinter::NextLine;
+    t << sample.getNbBinnedEvents() << GenericToolbox::TablePrinter::NextColumn;
+    t << sample.getSumWeights() << GenericToolbox::TablePrinter::NextColumn;
   }
 
   std::stringstream ss;
@@ -329,19 +327,19 @@ void Propagator::initializeThreads() {
   _threadPool_.setNThreads( GundamGlobals::getNumberOfThreads() );
 
   _threadPool_.addJob(
-      "Propagator::reweightMcEvents",
-      [this](int iThread){ this->reweightMcEvents(iThread); }
+      "Propagator::reweightEvents",
+      [this](int iThread){ this->reweightEvents(iThread); }
   );
 
   _threadPool_.addJob(
-      "Propagator::refillMcHistograms",
-      [this](int iThread){ this->refillMcHistogramsFct(iThread); }
+      "Propagator::refillHistograms",
+      [this](int iThread){ this->refillHistogramsFct(iThread); }
   );
 
 }
 
 // multithreading
-void Propagator::reweightMcEvents(int iThread_) {
+void Propagator::reweightEvents( int iThread_) {
 
   //! Warning: everything you modify here, may significantly slow down the
   //! fitter
@@ -358,9 +356,9 @@ void Propagator::reweightMcEvents(int iThread_) {
   );
 
 }
-void Propagator::refillMcHistogramsFct( int iThread_){
+void Propagator::refillHistogramsFct( int iThread_){
   for( auto& sample : _sampleSet_.getSampleList() ){
-    sample.getMcContainer().refillHistogram(iThread_);
+    sample.refillHistogram(iThread_);
   }
 }
 

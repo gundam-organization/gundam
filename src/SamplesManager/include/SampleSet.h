@@ -15,8 +15,8 @@
 #include <vector>
 
 
-/// Hold a description of all of the event samples (both "data" and the
-/// matching "MC") that are going to be managed by the Propagator.  The
+/// Hold a description of all of the event samples
+/// that are going to be managed by the Propagator.  The
 /// samples in the set can be referred to by their sample set index.
 class SampleSet : public JsonBaseClass {
 
@@ -27,7 +27,6 @@ protected:
 
 public:
   // Post init
-  void copyMcEventListToDataContainer( std::vector<Sample>& destinationSampleList_ );
   void clearMcContainers();
 
   // const getters
