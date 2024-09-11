@@ -5,6 +5,8 @@
 #ifndef GUNDAM_LIKELIHOOD_INTERFACE_H
 #define GUNDAM_LIKELIHOOD_INTERFACE_H
 
+#include "SamplePair.h"
+#include "Propagator.h"
 #include "ParameterSet.h"
 #include "JointProbability.h"
 #include "Propagator.h"
@@ -13,8 +15,8 @@
 #include "GenericToolbox.Utils.h"
 #include "GenericToolbox.Time.h"
 
-#include <memory>
 #include <string>
+#include <memory>
 
 
 /// Evaluate the likelihood between data and MC.  The calculation is buffered
@@ -55,6 +57,8 @@ public:
   [[nodiscard]] double getLastLikelihood() const { return _buffer_.totalLikelihood; }
   [[nodiscard]] double getLastStatLikelihood() const { return _buffer_.statLikelihood; }
   [[nodiscard]] double getLastPenaltyLikelihood() const { return _buffer_.penaltyLikelihood; }
+  [[nodiscard]] const Propagator& getModelPropagator() const { return _modelPropagator_; }
+  [[nodiscard]] const Propagator& getDataPropagator() const { return _dataPropagator_; }
   [[nodiscard]] const DataSetManager& getDataSetManager() const { return _dataSetManager_; }
   const JointProbability::JointProbabilityBase* getJointProbabilityPtr() const { return _jointProbabilityPtr_.get(); }
 
@@ -85,10 +89,16 @@ private:
   /// Definition of data sets to use for filling the Propagator
   DataSetManager _dataSetManager_{};
 
+  /// this is where model and data are kept to be compared
+  Propagator _modelPropagator_{};
+  Propagator _dataPropagator_{};
+
   /// Statistical likelihood
   std::shared_ptr<JointProbability::JointProbabilityBase> _jointProbabilityPtr_{nullptr};
 
+  /// Cache
   mutable Buffer _buffer_{};
+  std::vector<SamplePair> _samplePairList_{};
 };
 
 #endif //  GUNDAM_LIKELIHOOD_INTERFACE_H

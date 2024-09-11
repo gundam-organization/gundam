@@ -2,9 +2,10 @@
 // Created by Nadrino on 16/06/2021.
 //
 
+#include "PlotGenerator.h"
+
 #include "GenericToolbox.Json.h"
 #include "GundamGlobals.h"
-#include "PlotGenerator.h"
 #include "ConfigUtils.h"
 
 #include "Logger.h"
@@ -42,7 +43,7 @@ void PlotGenerator::readConfigImpl(){
 }
 void PlotGenerator::initializeImpl() {
   LogWarning << __METHOD_NAME__ << std::endl;
-  LogThrowIf(_sampleSetPtr_ == nullptr);
+  LogThrowIf(_samplePairListPtr_ == nullptr);
 }
 
 
@@ -96,9 +97,9 @@ void PlotGenerator::generateSampleHistograms(TDirectory *saveDir_, int cacheSlot
 
     if( histDef.histPtr == nullptr ){
       if( histDef.varToPlot == "Raw" ){
-        if( _sampleSetPtr_ != nullptr ){
-          if( histDef.isData ) { histDef.histPtr = histDef.samplePtr->getDataContainer().generateRootHistogram(); }
-          else { histDef.histPtr = histDef.samplePtr->getMcContainer().generateRootHistogram(); }
+        if( _samplePairListPtr_ != nullptr ){
+          if( histDef.isData ) { histDef.histPtr = histDef.samplePtr->data->generateRootHistogram(); }
+          else                 { histDef.histPtr = histDef.samplePtr->model->generateRootHistogram(); }
         }
         else{
           LogThrow("Samples not set.");
@@ -121,7 +122,7 @@ void PlotGenerator::generateSampleHistograms(TDirectory *saveDir_, int cacheSlot
   }
 
   // Fill histograms
-  for( const auto& sample : _sampleSetPtr_->getSampleList() ){
+  for( const auto& sample : _samplePairListPtr_->getSampleList() ){
       // Datasets:
       for( bool isData : { false, true } ){
 
@@ -252,7 +253,7 @@ void PlotGenerator::generateCanvas(const std::vector<HistHolder> &histHolderList
   int canvasNbXplots = GenericToolbox::Json::fetchValue(_canvasParameters_, "nbXplots", 3);
   int canvasNbYplots = GenericToolbox::Json::fetchValue(_canvasParameters_, "nbYplots", 2);
 
-  std::map<std::string, std::map<const Sample*, std::vector<const HistHolder*>>> histsToStackMap; // histsToStackMap[path][sample] = listOfTh1d
+  std::map<std::string, std::map<const SamplePair*, std::vector<const HistHolder*>>> histsToStackMap; // histsToStackMap[path][sample] = listOfTh1d
   for( auto& histHolder : histHolderList_ ){
     if( histHolder.isData ) continue; // data associated to each later
     histsToStackMap[buildCanvasPath(&histHolder)][histHolder.samplePtr].emplace_back(&histHolder );
@@ -263,7 +264,7 @@ void PlotGenerator::generateCanvas(const std::vector<HistHolder> &histHolderList
     const std::string& canvasPath = histsSamples.first;
     for( auto& histsToStack : histsSamples.second ){
       for( auto& histHolder : histHolderList_ ){
-        const Sample* samplePtr = histsToStack.first;
+        const SamplePair* samplePtr = histsToStack.first;
 
         // we are searching for data
         if( not histHolder.isData ) continue;
@@ -288,7 +289,7 @@ void PlotGenerator::generateCanvas(const std::vector<HistHolder> &histHolderList
     int canvasIndex = 0;
     int iSampleSlot = 0;
     for (const auto &histList : histsToStackPair.second) {
-      const Sample* samplePtr = histList.first;
+      const SamplePair* samplePtr = histList.first;
       iSampleSlot++;
 
       if (iSampleSlot > canvasNbXplots * canvasNbYplots) {
@@ -617,17 +618,17 @@ void PlotGenerator::defineHistogramHolders() {
     struct Entry{
       std::string name{};
       struct SplitSample{
-        const Sample* samplePtr{nullptr};
+        const SamplePair* samplePtr{nullptr};
         std::vector<int> splitValueList{};
       };
       std::vector<SplitSample> sampleList{};
 
-      [[nodiscard]] const SplitSample& fetchSample(const Sample* samplePtr_) const{
+      [[nodiscard]] const SplitSample& fetchSample(const SamplePair* samplePtr_) const{
         int idx{GenericToolbox::findElementIndex(samplePtr_, sampleList, [](const SplitSample& s_){ return s_.samplePtr; })};
         LogThrowIf(idx==-1, "Can't find SplitVariableDictionary for: " << samplePtr_->getName());
         return sampleList[idx];
       }
-      SplitSample& fetchSample(const Sample* samplePtr_){
+      SplitSample& fetchSample(const SamplePair* samplePtr_){
         int idx{GenericToolbox::findElementIndex(samplePtr_, sampleList, [](const SplitSample& s_){ return s_.samplePtr; })};
         LogThrowIf(idx==-1, "Can't find SplitVariableDictionary for: " << samplePtr_->getName());
         return sampleList[idx];
@@ -654,11 +655,11 @@ void PlotGenerator::defineHistogramHolders() {
         splitVarsDictionary.entryList.emplace_back();
         auto& entry = splitVarsDictionary.entryList.back();
         entry.name = splitVar;
-        entry.sampleList.reserve( _sampleSetPtr_->getSampleList().size() );
-        for( const auto& sample : _sampleSetPtr_->getSampleList() ){
+        entry.sampleList.reserve( _samplePairListPtr_->size() );
+        for( const auto& samplePair : *_samplePairListPtr_ ){
           entry.sampleList.emplace_back();
           auto& sampleSplit = entry.sampleList.back();
-          sampleSplit.samplePtr = &sample;
+          sampleSplit.samplePtr = &samplePair
           if( splitVar.empty() ){ sampleSplit.splitValueList.emplace_back(0); } // placeholder for no split var
         }
       }
@@ -672,7 +673,7 @@ void PlotGenerator::defineHistogramHolders() {
     );
 
     for( int iSample = bounds.beginIndex ; iSample < bounds.endIndex ; iSample++ ){
-      const Sample* samplePtr = &_sampleSetPtr_->getSampleList()[iSample];
+      const SamplePair* samplePtr = &_sampleSetPtr_->getSampleList()[iSample];
       for( auto& event : samplePtr->getMcContainer().getEventList() ){
         for( auto& entry : splitVarsDictionary.entryList ){
           if( entry.name.empty() ){ continue; }

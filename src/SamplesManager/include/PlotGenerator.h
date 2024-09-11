@@ -5,7 +5,7 @@
 #ifndef GUNDAM_PLOT_GENERATOR_H
 #define GUNDAM_PLOT_GENERATOR_H
 
-#include "SampleSet.h"
+#include "SamplePair.h"
 #include "Event.h"
 #include "JsonBaseClass.h"
 
@@ -37,7 +37,7 @@ struct HistHolder{
 
   // Data
   bool isData{false};
-  const Sample* samplePtr{nullptr};
+  const SamplePair* samplePtr{nullptr};
   std::function<void(TH1D*, const Event*)> fillFunctionSample;
 
   // X axis
@@ -132,7 +132,7 @@ private:
   };
 
   // Internals
-  const SampleSet* _sampleSetPtr_{nullptr};
+  const std::vector<SamplePair>* _samplePairListPtr_{nullptr};
   std::vector<std::vector<HistHolder>> _histHolderCacheList_{};
   std::vector<HistHolder> _comparisonHistHolderList_;
   std::map<std::string, std::shared_ptr<TCanvas>> _bufferCanvasList_;

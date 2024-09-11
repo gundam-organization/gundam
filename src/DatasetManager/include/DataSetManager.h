@@ -30,6 +30,7 @@ public:
   [[nodiscard]] const Propagator& getModelPropagator() const{ return _modelPropagator_; }
   [[nodiscard]] const EventTreeWriter& getTreeWriter() const{ return _treeWriter_; }
   [[nodiscard]] const std::vector<DatasetDefinition>& getDataSetList() const{ return _dataSetList_; }
+  [[nodiscard]] const std::vector<SamplePair>& getSamplePairList() const{ return _samplePairList_; }
 
   // mutable-getters
   Propagator& getDataPropagator(){ return _dataPropagator_; }
