@@ -153,7 +153,7 @@ void Propagator::propagateParameters(){
     }
   }
 
-  this->reweightMcEvents();
+  this->reweightEvents();
   this->refillHistograms();
 
 }
@@ -167,7 +167,7 @@ void Propagator::updateDialState(){
                   dc_.update();
                 });
 }
-void Propagator::reweightMcEvents() {
+void Propagator::reweightEvents() {
   reweightTimer.start();
 
   updateDialState();

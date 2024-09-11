@@ -51,6 +51,9 @@ protected:
 
 public:
 
+  // setters
+  void setLoadAsimovData(bool loadAsimovData_){ _loadAsimovData_ = loadAsimovData_; }
+
   // const getters
   [[nodiscard]] int getNbParameters() const {return _nbParameters_; }
   [[nodiscard]] int getNbSampleBins() const {return _nbSampleBins_; }
@@ -59,12 +62,13 @@ public:
   [[nodiscard]] double getLastPenaltyLikelihood() const { return _buffer_.penaltyLikelihood; }
   [[nodiscard]] const Propagator& getModelPropagator() const { return _modelPropagator_; }
   [[nodiscard]] const Propagator& getDataPropagator() const { return _dataPropagator_; }
-  [[nodiscard]] const DataSetManager& getDataSetManager() const { return _dataSetManager_; }
-  const JointProbability::JointProbabilityBase* getJointProbabilityPtr() const { return _jointProbabilityPtr_.get(); }
+  [[nodiscard]] const JointProbability::JointProbabilityBase* getJointProbabilityPtr() const { return _jointProbabilityPtr_.get(); }
+  [[nodiscard]] const std::vector<DatasetDefinition>& getDatasetList() const { return _dataSetList_; }
 
   // mutable getters
   Buffer& getBuffer() { return _buffer_; }
-  DataSetManager& getDataSetManager(){ return _dataSetManager_; }
+  Propagator& getDataPropagator() { return _dataPropagator_; }
+  std::vector<DatasetDefinition>& getDatasetList(){ return _dataSetList_; }
 
   // mutable core
   void propagateAndEvalLikelihood();
@@ -77,17 +81,26 @@ public:
   [[nodiscard]] double evalPenaltyLikelihood(const ParameterSet& parSet_) const;
   [[nodiscard]] std::string getSummary() const;
 
-  // dev deprecated
-  [[deprecated("use getDataSetManager().getPropagator()")]] [[nodiscard]] const Propagator& getPropagator() const { return _dataSetManager_.getModelPropagator(); }
-  [[deprecated("use getDataSetManager().getPropagator()")]] Propagator& getPropagator(){ return _dataSetManager_.getModelPropagator(); }
+
+protected:
+  void loadPropagators();
+  void loadPropagator(bool isModel_);
+  void buildSamplePairList();
+
 
 private:
+  // parameters
+  bool _loadAsimovData_{false};
+
   // internals
   int _nbParameters_{0};
   int _nbSampleBins_{0};
 
-  /// Definition of data sets to use for filling the Propagator
-  DataSetManager _dataSetManager_{};
+  // multi-threading
+  GenericToolbox::ParallelWorker _threadPool_{};
+
+  /// user defined datasets
+  std::vector<DatasetDefinition> _dataSetList_;
 
   /// this is where model and data are kept to be compared
   Propagator _modelPropagator_{};

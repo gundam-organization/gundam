@@ -40,6 +40,7 @@ public:
   [[nodiscard]] const std::string &getName() const{ return _name_; }
   [[nodiscard]] const std::string &getToyDataEntry() const{ return _selectedToyEntry_; }
   [[nodiscard]] const std::string &getSelectedDataEntry() const{ return _selectedDataEntry_; }
+  [[nodiscard]] const std::map<std::string, DataDispenser> &getDataDispenserDict() const { return _dataDispenserDict_; }
 
   DataDispenser &getModelDispenser(){ return _modelDispenser_; }
   DataDispenser &getDataDispenser(){ return _dataDispenserDict_.at(_selectedDataEntry_); }

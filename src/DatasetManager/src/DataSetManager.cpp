@@ -122,7 +122,7 @@ void DataSetManager::loadPropagator( bool isModel_ ){
 
       if( propagatorPtr->isShowEventBreakdown() ){
         LogInfo << "Propagating prior parameters on the initially loaded events..." << std::endl;
-        propagatorPtr->reweightMcEvents();
+        propagatorPtr->reweightEvents();
 
         LogInfo << "Sample breakdown prior to the throwing:" << std::endl;
         std::cout << propagatorPtr->getSampleBreakdownTableStr() << std::endl;
@@ -165,7 +165,7 @@ void DataSetManager::loadPropagator( bool isModel_ ){
       if( parSet.isEnableEigenDecomp() ) { parSet.propagateEigenToOriginal(); }
     }
 
-    propagatorPtr->reweightMcEvents();
+    propagatorPtr->reweightEvents();
 
     // Copies MC events in data container for both Asimov and FakeData event types
     LogWarning << "Copying loaded mc-like event to data container..." << std::endl;
@@ -227,7 +227,7 @@ void DataSetManager::load(){
 #endif
 
   LogInfo << "Propagating prior parameters on events..." << std::endl;
-  _modelPropagator_.reweightMcEvents();
+  _modelPropagator_.reweightEvents();
 
   // The histogram bin was assigned to each event by the DataDispenser, now
   // cache the binning results for speed into each of the samples.

@@ -6,6 +6,7 @@
 #define GUNDAM_PROPAGATOR_H
 
 
+#include "EventTreeWriter.h"
 #include "ParametersManager.h"
 #include "DialCollection.h"
 #include "EventDialCache.h"
@@ -19,6 +20,7 @@
 #include <vector>
 #include <map>
 #include <future>
+
 
 class Propagator : public JsonBaseClass {
 
@@ -34,7 +36,6 @@ public:
   void setThrowAsimovToyParameters(bool throwAsimovToyParameters){ _throwAsimovToyParameters_ = throwAsimovToyParameters; }
   void setEnableEigenToOrigInPropagate(bool enableEigenToOrigInPropagate){ _enableEigenToOrigInPropagate_ = enableEigenToOrigInPropagate; }
   void setIThrow(int iThrow){ _iThrow_ = iThrow; }
-  void setLoadAsimovData(bool loadAsimovData){ _loadAsimovData_ = loadAsimovData; }
   void setParameterInjectorConfig(const JsonType &parameterInjector){ _parameterInjectorMc_ = parameterInjector; }
 
   // Const getters
@@ -42,7 +43,6 @@ public:
   [[nodiscard]] bool isEnableStatThrowInToys() const { return _enableStatThrowInToys_; }
   [[nodiscard]] bool isEnableEventMcThrow() const { return _enableEventMcThrow_; }
   [[nodiscard]] bool isGaussStatThrowInToys() const { return _gaussStatThrowInToys_; }
-  [[nodiscard]] bool isLoadAsimovData() const { return _loadAsimovData_; }
   [[nodiscard]] bool isShowEventBreakdown() const { return _showEventBreakdown_; }
   [[nodiscard]] bool isDebugPrintLoadedEvents() const { return _debugPrintLoadedEvents_; }
   [[nodiscard]] int getDebugPrintLoadedEventsNbPerSample() const { return _debugPrintLoadedEventsNbPerSample_; }
@@ -62,10 +62,10 @@ public:
   GenericToolbox::ParallelWorker& getThreadPool(){ return _threadPool_; }
 
   // Core
+  void clearContent();
   void buildDialCache();
   void propagateParameters();
-  void reweightMcEvents();
-  void clearContent();
+  void reweightEvents();
 
   // Misc
   [[nodiscard]] std::string getSampleBreakdownTableStr() const;
@@ -87,7 +87,6 @@ private:
 
   // Parameters
   bool _showTimeStats_{false};
-  bool _loadAsimovData_{false};
   bool _debugPrintLoadedEvents_{false};
   bool _devSingleThreadReweight_{false};
   bool _devSingleThreadHistFill_{false};

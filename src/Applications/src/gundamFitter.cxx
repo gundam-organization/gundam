@@ -263,15 +263,14 @@ int main(int argc, char** argv){
   fitter.readConfig(GenericToolbox::Json::fetchSubEntry(configHandler.getConfig(), {"fitterEngineConfig"}));
 
   // -a
-  fitter.getLikelihoodInterface().getDataSetManager().getModelPropagator().setLoadAsimovData(clParser.isOptionTriggered("asimov") );
-  fitter.getLikelihoodInterface().getDataSetManager().getModelPropagator().setLoadAsimovData(clParser.isOptionTriggered("asimov") );
+  fitter.getLikelihoodInterface().setLoadAsimovData( clParser.isOptionTriggered("asimov") );
 
   // --use-data-entry
   if( clParser.isOptionTriggered("useDataEntry") ){
     auto selectedDataEntry = clParser.getOptionVal<std::string>("useDataEntry", 0);
     // Do something better in case multiple datasets are defined
     bool isFound{false};
-    for( auto& dataSet : fitter.getLikelihoodInterface().getDataSetManager().getDataSetList() ){
+    for( auto& dataSet : fitter.getLikelihoodInterface().getDatasetList() ){
       if( GenericToolbox::isIn( selectedDataEntry, dataSet.getDataDispenserDict() ) ){
         LogWarning << "Using data entry \"" << selectedDataEntry << "\" for dataset: " << dataSet.getName() << std::endl;
         dataSet.setSelectedDataEntry( selectedDataEntry );
@@ -307,8 +306,8 @@ int main(int argc, char** argv){
 
   // --toy <iToy>
   if( clParser.isOptionTriggered("toyFit") ){
-    fitter.getLikelihoodInterface().getDataSetManager().getModelPropagator().setThrowAsimovToyParameters(true);
-    fitter.getLikelihoodInterface().getDataSetManager().getModelPropagator().setIThrow(clParser.getOptionVal("toyFit", -1));
+    fitter.getLikelihoodInterface().getDataPropagator().setThrowAsimovToyParameters(true);
+    fitter.getLikelihoodInterface().getDataPropagator().setIThrow(clParser.getOptionVal("toyFit", -1));
   }
 
   // -d

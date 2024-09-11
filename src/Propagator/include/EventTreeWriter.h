@@ -5,7 +5,8 @@
 #ifndef GUNDAM_EVENT_TREE_WRITER_H
 #define GUNDAM_EVENT_TREE_WRITER_H
 
-#include "Propagator.h"
+
+#include "GundamUtils.h"
 
 #include "GenericToolbox.Utils.h"
 #include "GenericToolbox.Thread.h"
@@ -44,7 +45,6 @@ private:
   int _nPointsPerDial_{3};
 
   // cache
-  mutable const Propagator* propagatorPtr{nullptr};
   mutable GenericToolbox::ParallelWorker _threadPool_{};
 
 };

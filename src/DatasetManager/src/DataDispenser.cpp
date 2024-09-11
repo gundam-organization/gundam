@@ -6,6 +6,7 @@
 #include "DataDispenser.h"
 #include "DatasetDefinition.h"
 
+#include "Propagator.h"
 #include "EventVarTransform.h"
 #include "GundamGlobals.h"
 #include "GenericToolbox.Json.h"
@@ -86,6 +87,17 @@ void DataDispenser::load(Propagator& propagator_){
 
   _cache_.clear();
   _cache_.propagatorPtr = &propagator_;
+
+
+  if( not _parameters_.overridePropagatorConfig.empty() ){
+    LogWarning << "Reload the propagator config with override options" << std::endl;
+    ConfigUtils::ConfigHandler configHandler( _cache_.propagatorPtr->getConfig() );
+    configHandler.override( _parameters_.overridePropagatorConfig );
+    _cache_.propagatorPtr->readConfig( configHandler.getConfig() );
+    _cache_.propagatorPtr->initialize();
+  }
+
+
 
   this->buildSampleToFillList();
 
