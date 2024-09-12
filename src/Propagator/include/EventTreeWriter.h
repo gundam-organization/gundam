@@ -53,7 +53,7 @@ private:
   int _nPointsPerDial_{3};
 
   // cache
-  const Propagator* propagatorPtr;
+  const Propagator* propagatorPtr{nullptr};
   mutable GenericToolbox::ParallelWorker _threadPool_{};
 
 };
