@@ -191,6 +191,14 @@ double LikelihoodInterface::evalFit(const double* parArray_){
   }
   ++_nbFitCalls_;
 
+  static bool lastCallOK{true};
+  if (not lastCallOK) {
+    // Provide a marker in the log file after there was an evaluation problem.
+    LogError << "Call: " << _nbFitCalls_
+             << " -- Previous evalFit call was not OK" << std::endl;
+  }
+  lastCallOK = true;
+
   // Update fit parameter values:
   const double *v = parArray_;
   for( auto* par : _minimizerFitParameterPtr_ ){
@@ -203,6 +211,42 @@ double LikelihoodInterface::evalFit(const double* parArray_){
 
   // Compute the Chi2
   _owner_->getPropagator().updateLlhCache();
+
+  if( std::isnan(_owner_->getPropagator().getLlhBuffer()) ){
+    lastCallOK = false;
+    LogError << "Call: " << _nbFitCalls_
+             << " " << _owner_->getPropagator().getLlhBuffer() << ": invalid reported likelihood value." << std::endl;
+    LogError << GET_VAR_NAME_VALUE( _owner_->getPropagator().getLlhStatBuffer() ) << std::endl;
+    for( auto& sample : _owner_->getPropagator().getFitSampleSet().getFitSampleList() ){
+      LogScopeIndent;
+      LogError << sample.getName() << ": " << sample.getLlhStatBuffer() << std::endl;
+    }
+    LogError << GET_VAR_NAME_VALUE( _owner_->getPropagator().getLlhPenaltyBuffer() ) << std::endl;
+    LogThrow("Invalid total llh.");
+  }
+  else if( _owner_->getPropagator().getLlhBuffer() > 0.05*std::numeric_limits<float>::max()
+           or not std::isfinite(_owner_->getPropagator().getLlhBuffer())) {
+    lastCallOK = false;
+    LogError << "Call: " << _nbFitCalls_
+             << " " << _owner_->getPropagator().getLlhBuffer() << ": very large likelihood value." << std::endl;
+    LogError << GET_VAR_NAME_VALUE( _owner_->getPropagator().getLlhStatBuffer() ) << std::endl;
+    for( auto& sample : _owner_->getPropagator().getFitSampleSet().getFitSampleList() ){
+      LogScopeIndent;
+      LogError << sample.getName() << ": " << sample.getLlhStatBuffer() << std::endl;
+    }
+    LogError << GET_VAR_NAME_VALUE( _owner_->getPropagator().getLlhPenaltyBuffer() ) << std::endl;
+  }
+  else if( _owner_->getPropagator().getLlhBuffer() < 0.0) {
+    lastCallOK = false;
+    LogError << "Call: " << _nbFitCalls_
+             << " "  << _owner_->getPropagator().getLlhBuffer() << ": negative likelihood value." << std::endl;
+    LogError << GET_VAR_NAME_VALUE( _owner_->getPropagator().getLlhStatBuffer() ) << std::endl;
+    for( auto& sample : _owner_->getPropagator().getFitSampleSet().getFitSampleList() ){
+      LogScopeIndent;
+      LogError << sample.getName() << ": " << sample.getLlhStatBuffer() << std::endl;
+    }
+    LogError << GET_VAR_NAME_VALUE( _owner_->getPropagator().getLlhPenaltyBuffer() ) << std::endl;
+  }
 
   _evalFitAvgTimer_.counts++; _evalFitAvgTimer_.cumulated += GenericToolbox::getElapsedTimeSinceLastCallInMicroSeconds(__METHOD_NAME__);
 
@@ -327,19 +371,25 @@ double LikelihoodInterface::evalFit(const double* parArray_){
     _chi2HistoryTree_->Fill();
   }
 
-  if( std::isnan(_owner_->getPropagator().getLlhBuffer()) ){
-    LogError << _owner_->getPropagator().getLlhBuffer() << ": invalid reported likelihood value." << std::endl;
-    LogError << GET_VAR_NAME_VALUE( _owner_->getPropagator().getLlhStatBuffer() ) << std::endl;
-    for( auto& sample : _owner_->getPropagator().getFitSampleSet().getFitSampleList() ){
-      LogScopeIndent;
-      LogError << sample.getName() << ": " << sample.getLlhStatBuffer() << std::endl;
-    }
-    LogError << GET_VAR_NAME_VALUE( _owner_->getPropagator().getLlhPenaltyBuffer() ) << std::endl;
-    LogThrow("Invalid total llh.");
+  GenericToolbox::getElapsedTimeSinceLastCallInMicroSeconds("out_evalFit");
+
+  // Protect the caller from an "infinite" value.  In principle, the caller
+  // should correctly handle infinite values, but in practice they tend to
+  // skimp on numeric safety in the pursuit of speed.  Truncate based on a
+  // "float" so that it doesn't matter what type of real number the caller is
+  // using.  (The maximum float is about 3.4E+38).
+  double llh = _owner_->getPropagator().getLlhBuffer();
+  if (llh > 0.1*std::numeric_limits<float>::max()) {
+    lastCallOK = false;
+    llh = 0.1*std::numeric_limits<float>::max();
+    LogError << "Call: " << _nbFitCalls_
+             << " "  << "Truncate LLH from "
+             << _owner_->getPropagator().getLlhBuffer()
+             << " to " << llh
+             << std::endl;
   }
 
-  GenericToolbox::getElapsedTimeSinceLastCallInMicroSeconds("out_evalFit");
-  return _owner_->getPropagator().getLlhBuffer();
+  return llh;
 }
 
 double LikelihoodInterface::evalFitValid(const double* parArray_) {
