@@ -278,24 +278,24 @@ void RootMinimizer::minimize(){
 
   std::vector<GenericToolbox::RawDataArray> samplesArrList(getModelPropagator().getSampleSet().getSampleList().size());
   int iSample{-1};
-  for( auto& sample : getModelPropagator().getSampleSet().getSampleList() ){
-    if( not sample.isEnabled() ) continue;
+  for( auto& samplePair : getLikelihoodInterface().getSamplePairList() ){
+    if( not samplePair.model->isEnabled() ) continue;
 
     std::vector<std::string> leavesDict;
     iSample++;
 
     leavesDict.emplace_back("llhSample/D");
-    samplesArrList[iSample].writeRawData( getLikelihoodInterface().evalStatLikelihood(sample) );
+    samplesArrList[iSample].writeRawData( getLikelihoodInterface().evalStatLikelihood( samplePair ) );
 
-    int nBins = int(sample.getBinning().getBinList().size());
+    int nBins = int(samplePair.model->getBinning().getBinList().size());
     for( int iBin = 1 ; iBin <= nBins ; iBin++ ){
       leavesDict.emplace_back("llhSample_bin" + std::to_string(iBin) + "/D");
-      samplesArrList[iSample].writeRawData( getLikelihoodInterface().getJointProbabilityPtr()->eval(sample, iBin) );
+      samplesArrList[iSample].writeRawData( getLikelihoodInterface().getJointProbabilityPtr()->eval(samplePair, iBin) );
     }
 
     samplesArrList[iSample].lockArraySize();
     bestFitStats->Branch(
-        GenericToolbox::generateCleanBranchName(sample.getName()).c_str(),
+        GenericToolbox::generateCleanBranchName(samplePair.model->getName()).c_str(),
         &samplesArrList[iSample].getRawDataArray()[0],
         GenericToolbox::joinVectorString(leavesDict, ":").c_str()
     );

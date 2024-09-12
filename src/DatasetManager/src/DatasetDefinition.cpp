@@ -33,7 +33,7 @@ void DatasetDefinition::readConfigImpl() {
   _modelDispenser_ = DataDispenser(this);
   _modelDispenser_.readConfig(GenericToolbox::Json::fetchValue<JsonType>(_config_, {{"model"}, {"mc"}}));
   _modelDispenser_.getParameters().name = "Asimov";
-  _modelDispenser_.getParameters().useMcContainer = true;
+  _modelDispenser_.getParameters().useReweightEngine = true;
 
   // Always loaded by default
   _dataDispenserDict_.emplace("Asimov", DataDispenser(_modelDispenser_));

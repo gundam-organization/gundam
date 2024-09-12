@@ -250,6 +250,7 @@ void LikelihoodInterface::loadModelPropagator(){
   _modelPropagator_.clearContent();
 
   for( auto& dataSet : _dataSetList_ ){
+    dataSet.getModelDispenser().setPlotGeneratorPtr( &_plotGenerator_ );
     dataSet.getModelDispenser().load( _modelPropagator_ );
   }
 
@@ -289,7 +290,7 @@ void LikelihoodInterface::loadModelPropagator(){
   });
 
   /// Now caching the event for the plot generator
-  _modelPropagator_.getPlotGenerator().defineHistogramHolders();
+  _plotGenerator_.defineHistogramHolders();
 
 }
 void LikelihoodInterface::loadDataPropagator(){
@@ -316,6 +317,8 @@ void LikelihoodInterface::loadDataPropagator(){
         _dataPropagator_.readConfig( configHandler.getConfig() );
         _dataPropagator_.initialize();
       }
+
+      dataDispenser->setPlotGeneratorPtr( &_plotGenerator_ );
 
       // otherwise load the dataset
       dataDispenser->load( _dataPropagator_ );

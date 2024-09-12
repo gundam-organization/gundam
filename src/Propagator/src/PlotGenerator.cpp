@@ -561,7 +561,7 @@ void PlotGenerator::generateComparisonHistograms(const std::vector<HistHolder> &
 }
 
 // Misc
-std::vector<std::string> PlotGenerator::fetchListOfVarToPlot(bool isData_){
+std::vector<std::string> PlotGenerator::fetchListOfVarToPlot(bool isData_) const {
   std::vector<std::string> varNameList;
   _histogramsDefinition_ = GenericToolbox::Json::fetchValue(_config_, "histogramsDefinition", JsonType());
   for( const auto& histConfig : _histogramsDefinition_ ){
@@ -577,7 +577,7 @@ std::vector<std::string> PlotGenerator::fetchListOfVarToPlot(bool isData_){
   }
   return varNameList;
 }
-std::vector<std::string> PlotGenerator::fetchListOfSplitVarNames(){
+std::vector<std::string> PlotGenerator::fetchListOfSplitVarNames() const {
 //  LogThrowIf(_config_.empty(), "Config not set, can't call " << __METHOD_NAME__);
 
   std::vector<std::string> varNameList;

@@ -17,7 +17,10 @@
 
 
 struct DataDispenserParameters{
-  bool useMcContainer{false}; // define the container to fill -> could get rid of it?
+
+  // should be load dials and request the associate variables?
+  bool useReweightEngine{false};
+
   std::string name{};
   std::string treePath{};
   std::string dialIndexFormula{};

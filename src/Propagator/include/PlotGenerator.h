@@ -105,8 +105,8 @@ public:
   void generateComparisonHistograms(const std::vector<HistHolder> &histList_, const std::vector<HistHolder> &refHistsList_, TDirectory *saveDir_ = nullptr);
 
   // Misc
-  std::vector<std::string> fetchListOfVarToPlot(bool isData_ = false);
-  std::vector<std::string> fetchListOfSplitVarNames();
+  std::vector<std::string> fetchListOfVarToPlot(bool isData_ = false) const;
+  std::vector<std::string> fetchListOfSplitVarNames() const;
 
   void defineHistogramHolders();
 
@@ -121,7 +121,7 @@ private:
   int _maxLegendLength_{15};
   JsonType _varDictionary_;
   JsonType _canvasParameters_;
-  JsonType _histogramsDefinition_;
+  mutable JsonType _histogramsDefinition_;
   std::vector<Color_t> defaultColorWheel {
       kGreen-3, kTeal+3, kAzure+7,
       kCyan-2, kBlue-7, kBlue+2,

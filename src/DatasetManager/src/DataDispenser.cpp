@@ -54,7 +54,7 @@ void DataDispenser::readConfigImpl(){
   _parameters_.filePathList = GenericToolbox::Json::fetchValue<std::vector<std::string>>(_config_, "filePathList", _parameters_.filePathList);
   _parameters_.additionalVarsStorage = GenericToolbox::Json::fetchValue(_config_, {{"additionalLeavesStorage"}, {"additionalVarsStorage"}}, _parameters_.additionalVarsStorage);
   _parameters_.dummyVariablesList = GenericToolbox::Json::fetchValue(_config_, "dummyVariablesList", _parameters_.dummyVariablesList);
-  _parameters_.useMcContainer = GenericToolbox::Json::fetchValue(_config_, "useMcContainer", _parameters_.useMcContainer);
+  _parameters_.useReweightEngine = GenericToolbox::Json::fetchValue(_config_, {{"useReweightEngine"}, {"useMcContainer"}}, _parameters_.useReweightEngine);
 
   _parameters_.dialIndexFormula = GenericToolbox::Json::fetchValue(_config_, "dialIndexFormula", _parameters_.dialIndexFormula);
   _parameters_.selectionCutFormulaStr = GenericToolbox::Json::buildFormula(_config_, "selectionCutFormula", "&&", _parameters_.selectionCutFormulaStr);
@@ -293,7 +293,7 @@ void DataDispenser::doEventSelection(){
 void DataDispenser::fetchRequestedLeaves(){
   LogWarning << "Poll every objects for requested variables..." << std::endl;
 
-  if( _parameters_.useMcContainer ){
+  if( _parameters_.useReweightEngine ){
     LogInfo << "Selecting dial collections..." << std::endl;
     for( auto& dialCollection : _cache_.propagatorPtr->getDialCollectionList() ){
       if( not dialCollection.isEnabled() ){ continue; }
@@ -337,11 +337,12 @@ void DataDispenser::fetchRequestedLeaves(){
   }
 
   // plotGen -> for storage as we need those in prefit and postfit
-  {
+  if( _plotGeneratorPtr_ != nullptr ){
     std::vector<std::string> varForStorageListBuffer{};
-    varForStorageListBuffer = _cache_.propagatorPtr->getPlotGenerator().fetchListOfVarToPlot(not _parameters_.useMcContainer);
-    if( _parameters_.useMcContainer ){
-      for( auto& var : _cache_.propagatorPtr->getPlotGenerator().fetchListOfSplitVarNames() ){
+    // TODO: don't use _parameters_.useReweightEngine for this, as for data we don't need split vars
+    varForStorageListBuffer = _plotGeneratorPtr_->fetchListOfVarToPlot(not _parameters_.useReweightEngine);
+    if( _parameters_.useReweightEngine ){
+      for( auto& var : _plotGeneratorPtr_->fetchListOfSplitVarNames() ){
         GenericToolbox::addIfNotInVector(var, varForStorageListBuffer);
       }
     }
@@ -455,12 +456,11 @@ void DataDispenser::preAllocateMemory(){
   _cache_.sampleIndexOffsetList.resize(_cache_.samplesToFillList.size());
   _cache_.sampleEventListPtrToFill.resize(_cache_.samplesToFillList.size());
   for( size_t iSample = 0 ; iSample < _cache_.sampleNbOfEvents.size() ; iSample++ ){
-    auto* container = &_cache_.samplesToFillList[iSample]->getDataContainer();
-    if(_parameters_.useMcContainer) container = &_cache_.samplesToFillList[iSample]->getMcContainer();
-
-    _cache_.sampleEventListPtrToFill[iSample] = &container->getEventList();
+    _cache_.sampleEventListPtrToFill[iSample] = &_cache_.samplesToFillList[iSample]->getEventList();
     _cache_.sampleIndexOffsetList[iSample] = _cache_.sampleEventListPtrToFill[iSample]->size();
-    container->reserveEventMemory(_owner_->getDataSetIndex(), _cache_.sampleNbOfEvents[iSample], eventPlaceholder);
+    _cache_.samplesToFillList[iSample]->reserveEventMemory(
+        _owner_->getDataSetIndex(), _cache_.sampleNbOfEvents[iSample], eventPlaceholder
+    );
   }
 
   LogInfo << "Filling var index cache for bin edges..." << std::endl;
@@ -472,7 +472,7 @@ void DataDispenser::preAllocateMemory(){
     }
   }
 
-  if( _parameters_.useMcContainer ){
+  if( _parameters_.useReweightEngine ){
     if( not _cache_.dialCollectionsRefList.empty() ){
       LogInfo << "Creating slots for event-by-event dials..." << std::endl;
       size_t nDialsMaxPerEvent{0};
@@ -540,9 +540,7 @@ void DataDispenser::readAndFill(){
 
   LogInfo << "Shrinking lists..." << std::endl;
   for( size_t iSample = 0 ; iSample < _cache_.samplesToFillList.size() ; iSample++ ){
-    auto* container = &_cache_.samplesToFillList[iSample]->getDataContainer();
-    if(_parameters_.useMcContainer) container = &_cache_.samplesToFillList[iSample]->getMcContainer();
-    container->shrinkEventList( _cache_.sampleIndexOffsetList[iSample] );
+    _cache_.samplesToFillList[iSample]->shrinkEventList( _cache_.sampleIndexOffsetList[iSample] );
   }
 
 }
@@ -550,7 +548,7 @@ void DataDispenser::loadFromHistContent(){
   LogWarning << "Creating dummy PhysicsEvent entries for loading hist content" << std::endl;
 
   // non-trivial as we need to propagate systematics. Need to merge with the original data loader, but not straight forward?
-  LogThrowIf( _parameters_.useMcContainer, "Hist loader not implemented for MC containers" );
+  LogThrowIf( _parameters_.useReweightEngine, "Hist loader not implemented for MC containers" );
 
   // counting events
   _cache_.sampleNbOfEvents.resize(_cache_.samplesToFillList.size());
@@ -573,16 +571,13 @@ void DataDispenser::loadFromHistContent(){
     // one event per bin
     _cache_.sampleNbOfEvents[iSample] = _cache_.samplesToFillList[iSample]->getBinning().getBinList().size();
 
-    // fetch event container
-    auto* container = &_cache_.samplesToFillList[iSample]->getDataContainer();
-
-    _cache_.sampleEventListPtrToFill[iSample] = &container->getEventList();
+    _cache_.sampleEventListPtrToFill[iSample] = &_cache_.samplesToFillList[iSample]->getEventList();
     _cache_.sampleIndexOffsetList[iSample] = _cache_.sampleEventListPtrToFill[iSample]->size();
-    container->reserveEventMemory( _owner_->getDataSetIndex(), _cache_.sampleNbOfEvents[iSample], eventPlaceholder );
+    _cache_.samplesToFillList[iSample]->reserveEventMemory( _owner_->getDataSetIndex(), _cache_.sampleNbOfEvents[iSample], eventPlaceholder );
 
     // indexing according to the binning
-    for( size_t iEvent=_cache_.sampleIndexOffsetList[iSample] ; iEvent < container->getEventList().size() ; iEvent++ ){
-      container->getEventList()[iEvent].getIndices().bin = int( iEvent );
+    for( size_t iEvent=_cache_.sampleIndexOffsetList[iSample] ; iEvent < _cache_.samplesToFillList[iSample]->getEventList().size() ; iEvent++ ){
+      _cache_.samplesToFillList[iSample]->getEventList()[iEvent].getIndices().bin = int( iEvent );
     }
   }
 
@@ -627,17 +622,16 @@ void DataDispenser::loadFromHistContent(){
                                                                            << GET_VAR_NAME_VALUE(nBins) << std::endl
                                                                            << GET_VAR_NAME_VALUE(sample->getBinning().getBinList().size()) << std::endl;
 
-    auto* container = &sample->getDataContainer();
     for( size_t iBin = 0 ; iBin < sample->getBinning().getBinList().size() ; iBin++ ){
       auto target = sample->getBinning().getBinList()[iBin].generateBinTarget( axisNameList );
       auto histBinIndex = hist->GetBin( target.data() ); // bad fetch..?
 
-      container->getEventList()[iBin].getIndices().sample = sample->getIndex();
+      sample->getEventList()[iBin].getIndices().sample = sample->getIndex();
       for( size_t iVar = 0 ; iVar < target.size() ; iVar++ ){
-        container->getEventList()[iBin].getVariables().fetchVariable(axisNameList[iVar]).set(target[iVar]);
+        sample->getEventList()[iBin].getVariables().fetchVariable(axisNameList[iVar]).set(target[iVar]);
       }
-      container->getEventList()[iBin].getWeights().base = (hist->GetBinContent(histBinIndex));
-      container->getEventList()[iBin].getWeights().resetCurrentWeight();
+      sample->getEventList()[iBin].getWeights().base = (hist->GetBinContent(histBinIndex));
+      sample->getEventList()[iBin].getWeights().resetCurrentWeight();
     }
 
   }
@@ -1070,7 +1064,7 @@ void DataDispenser::fillFunction(int iThread_){
       EventDialCache::IndexedCacheEntry* eventDialCacheEntry{nullptr};
       {
         std::unique_lock<std::mutex> lock(GundamGlobals::getThreadMutex());
-        if( _parameters_.useMcContainer ){
+        if( _parameters_.useReweightEngine ){
 
           if( _parameters_.debugNbMaxEventsToLoad != 0 ){
             // check if the limit has been reached
