@@ -58,7 +58,9 @@ protected:
 public:
 
   // setters
+  void setForceAsimovData(bool forceAsimovData_){ _forceAsimovData_ = forceAsimovData_; }
   void setDataType(const DataType& dataType_){ _dataType_ = dataType_; }
+  void setToyParameterInjector(const JsonType& toyParameterInjector_){ _toyParameterInjector_ = toyParameterInjector_; }
 
   // const getters
   [[nodiscard]] int getNbParameters() const {return _nbParameters_; }
@@ -89,16 +91,19 @@ public:
 
 
 protected:
-  void loadPropagators();
-  void loadPropagator(bool isModel_);
+  void load();
   void loadModelPropagator();
   void loadDataPropagator();
   void buildSamplePairList();
 
+  DataDispenser* getDataDispenser( DatasetDefinition& dataset_ );
+
 
 private:
   // parameters
+  bool _forceAsimovData_{false};
   DataType _dataType_{DataType::Asimov};
+  JsonType _toyParameterInjector_{};
 
   // internals
   int _nbParameters_{0};

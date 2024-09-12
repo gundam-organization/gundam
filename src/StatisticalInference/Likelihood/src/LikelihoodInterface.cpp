@@ -8,6 +8,7 @@
 #endif
 #include "GundamGlobals.h"
 
+#include "GenericToolbox.Map.h"
 #include "GenericToolbox.Utils.h"
 #include "GenericToolbox.Root.h"
 #include "GenericToolbox.Json.h"
@@ -71,7 +72,8 @@ void LikelihoodInterface::initializeImpl() {
 
   for( auto& dataSet : _dataSetList_ ){ dataSet.initialize(); }
 
-  this->loadPropagators();
+  // loading the propagators
+  this->load();
 
   _jointProbabilityPtr_->initialize();
 
@@ -127,7 +129,7 @@ double LikelihoodInterface::evalLikelihood() const {
 }
 double LikelihoodInterface::evalStatLikelihood() const {
   _buffer_.statLikelihood = 0.;
-  for( auto &samplePair: getDataSetManager().getSamplePairList()){
+  for( auto &samplePair: _samplePairList_ ){
     _buffer_.statLikelihood += this->evalStatLikelihood( samplePair );
   }
   return _buffer_.statLikelihood;
@@ -175,7 +177,7 @@ double LikelihoodInterface::evalPenaltyLikelihood(const ParameterSet& parSet_) c
   ss << "Total likelihood = " << _buffer_.totalLikelihood;
   ss << std::endl << "Stat likelihood = " << _buffer_.statLikelihood;
   ss << " = sum of: " << GenericToolbox::toString(
-      getDataSetManager().getSamplePairList(), [&]( const SamplePair& samplePair_){
+      _samplePairList_, [&]( const SamplePair& samplePair_){
         std::stringstream ssSub;
         ssSub << samplePair_.model->getName() << ": ";
         if( samplePair_.model->isEnabled() ){ ssSub << this->evalStatLikelihood( samplePair_ ); }
@@ -196,15 +198,27 @@ double LikelihoodInterface::evalPenaltyLikelihood(const ParameterSet& parSet_) c
   return ss.str();
 }
 
-void LikelihoodInterface::loadPropagators(){
+void LikelihoodInterface::load(){
 
   loadModelPropagator();
   loadDataPropagator();
 
-  this->loadPropagator( true );  // load the model first
-  this->loadPropagator( false ); // load the data next, could use the model propagator
+  buildSamplePairList();
 
-  this->buildSamplePairList();
+  /// model propagator needs to be fast, let the workers wait for the signal
+  _modelPropagator_.getThreadPool().setCpuTimeSaverIsEnabled( false );
+
+}
+void LikelihoodInterface::loadModelPropagator(){
+
+  _modelPropagator_.clearContent();
+
+  for( auto& dataSet : _dataSetList_ ){
+    dataSet.getModelDispenser().load( _modelPropagator_ );
+  }
+
+  _modelPropagator_.shrinkDialContainers();
+  _modelPropagator_.buildDialCache();
 
 #ifdef GUNDAM_USING_CACHE_MANAGER
   // After all the data has been loaded.  Specifically, this must be after
@@ -220,30 +234,138 @@ void LikelihoodInterface::loadPropagators(){
   LogInfo << "Propagating prior parameters on events..." << std::endl;
   _modelPropagator_.reweightEvents();
 
+
   // The histogram bin was assigned to each event by the DataDispenser, now
   // cache the binning results for speed into each of the samples.
-  LogInfo << "Filling up sample bin caches..." << std::endl;
+  LogInfo << "Filling up model sample bin caches..." << std::endl;
   _threadPool_.runJob([this](int iThread){
     LogInfoIf(iThread <= 0) << "Updating sample per bin event lists..." << std::endl;
-    for( auto& samplePair : _samplePairList_ ){
-      samplePair.model->updateBinEventList(iThread);
-      samplePair.data->updateBinEventList(iThread);
+    for( auto& sample : _modelPropagator_.getSampleSet().getSampleList() ){
+      sample.updateBinEventList(iThread);
     }
   });
 
-  LogInfo << "Filling up sample histograms..." << std::endl;
+  LogInfo << "Filling up model sample histograms..." << std::endl;
   _threadPool_.runJob([this](int iThread){
-    for( auto& samplePair : _samplePairList_ ){
-      samplePair.model->refillHistogram(iThread);
-      samplePair.data->refillHistogram(iThread);
+    for( auto& sample : _modelPropagator_.getSampleSet().getSampleList() ){
+      sample.refillHistogram(iThread);
+    }
+  });
+
+  /// Now caching the event for the plot generator
+  _modelPropagator_.getPlotGenerator().defineHistogramHolders();
+
+}
+void LikelihoodInterface::loadDataPropagator(){
+
+  _dataPropagator_.clearContent();
+
+  if( _dataType_ == DataType::Asimov or _forceAsimovData_ ){
+    // copy the events directly from the model
+    _dataPropagator_.getSampleSet().copyEventsFrom( _modelPropagator_.getSampleSet() );
+  }
+  else{
+    for( auto& dataSet : _dataSetList_ ){
+      // let the llh interface choose witch data entry to load
+      auto* dataDispenser{this->getDataDispenser( dataSet )};
+
+      // nothing has been selected, skip (warning message is within getDataDispenser)
+      if( dataDispenser == nullptr ){ continue; }
+
+      // handling override of the propagator config
+      if( not dataDispenser->getParameters().overridePropagatorConfig.empty() ){
+        LogWarning << "Reload the data propagator config with override options..." << std::endl;
+        ConfigUtils::ConfigHandler configHandler( _modelPropagator_.getConfig() );
+        configHandler.override( dataDispenser->getParameters().overridePropagatorConfig );
+        _dataPropagator_.readConfig( configHandler.getConfig() );
+        _dataPropagator_.initialize();
+      }
+
+      // otherwise load the dataset
+      dataDispenser->load( _dataPropagator_ );
+
+      // make sure the config is from scratch each time we read a new dataset
+      if( not dataDispenser->getParameters().overridePropagatorConfig.empty() ){
+        LogWarning << "Restoring propagator config overrides..." << std::endl;
+        _dataPropagator_.readConfig( _modelPropagator_.getConfig() );
+        _dataPropagator_.initialize();
+      }
+    }
+  }
+
+  _dataPropagator_.shrinkDialContainers();
+  _dataPropagator_.buildDialCache();
+
+  if( _dataPropagator_.isThrowAsimovToyParameters() ){
+
+    if( _dataPropagator_.isShowEventBreakdown() ){
+      LogInfo << "Propagating prior parameters on the initially loaded events..." << std::endl;
+      _dataPropagator_.reweightEvents();
+
+      LogInfo << "Sample breakdown prior to the throwing:" << std::endl;
+      std::cout << _dataPropagator_.getSampleBreakdownTableStr() << std::endl;
+
+      if( _dataPropagator_.isDebugPrintLoadedEvents() ){
+        LogDebug << "Toy events:" << std::endl;
+        LogDebug << GET_VAR_NAME_VALUE(_dataPropagator_.getDebugPrintLoadedEventsNbPerSample()) << std::endl;
+        int iEvt{0};
+        for( auto& entry : _dataPropagator_.getEventDialCache().getCache() ) {
+          LogDebug << "Event #" << iEvt++ << "{" << std::endl;
+          {
+            LogScopeIndent;
+            LogDebug << entry.getSummary() << std::endl;
+          }
+          LogDebug << "}" << std::endl;
+          if( iEvt >= _dataPropagator_.getDebugPrintLoadedEventsNbPerSample() ) break;
+        }
+      }
+    }
+
+    if( _toyParameterInjector_.empty() ){
+      LogWarning << "Will throw toy parameters..." << std::endl;
+      _dataPropagator_.getParametersManager().throwParameters();
+    }
+    else{
+      LogWarning << "Injecting parameters..." << std::endl;
+      _dataPropagator_.getParametersManager().injectParameterValues( _toyParameterInjector_ );
+    }
+
+  } // throw asimov?
+
+  LogInfo << "Propagating parameters on events..." << std::endl;
+
+  // At this point, MC events have been reweighted using their prior
+  // but when using eigen decomp, the conversion eigen to original has a small computational error
+  // this will make sure the "asimov" data will be reweighted the same way the model is expected to behave
+  // while using the eigen decomp
+  for( auto& parSet: _dataPropagator_.getParametersManager().getParameterSetsList() ) {
+    if( not parSet.isEnabled() ){ continue; }
+    if( parSet.isEnableEigenDecomp() ) { parSet.propagateEigenToOriginal(); }
+  }
+
+  // re-propagate systematics if applicable
+  _dataPropagator_.reweightEvents();
+
+  LogInfo << "Filling up data sample bin caches..." << std::endl;
+  _threadPool_.runJob([this](int iThread){
+    LogInfoIf(iThread <= 0) << "Updating sample per bin event lists..." << std::endl;
+    for( auto& sample : _dataPropagator_.getSampleSet().getSampleList() ){
+      sample.updateBinEventList(iThread);
+    }
+  });
+
+  LogInfo << "Filling up data sample histograms..." << std::endl;
+  _threadPool_.runJob([this](int iThread){
+    for( auto& sample : _dataPropagator_.getSampleSet().getSampleList() ){
+      sample.refillHistogram(iThread);
     }
   });
 
   // Throwing stat error on data -> BINNING SHOULD BE SET!!
-  if( _modelPropagator_.isThrowAsimovToyParameters() and _modelPropagator_.isEnableStatThrowInToys() ){
+  if( _dataType_ == DataType::Toy and _dataPropagator_.isEnableStatThrowInToys() ){
     LogInfo << "Throwing statistical error for data container..." << std::endl;
 
-    if( _modelPropagator_.isEnableEventMcThrow() ){
+    if( _dataPropagator_.isEnableEventMcThrow() ){
       // Take into account the finite amount of event in MC
       LogInfo << "enableEventMcThrow is enabled: throwing individual MC events" << std::endl;
       for( auto& sample : _dataPropagator_.getSampleSet().getSampleList() ) {
@@ -255,187 +377,13 @@ void LikelihoodInterface::loadPropagators(){
     }
 
     LogInfo << "Throwing statistical error on histograms..." << std::endl;
-    if( _modelPropagator_.isGaussStatThrowInToys() ) {
+    if( _dataPropagator_.isGaussStatThrowInToys() ) {
       LogWarning << "Using gaussian statistical throws. (caveat: distribution truncated when the bins are close to zero)" << std::endl;
     }
     for( auto& sample : _dataPropagator_.getSampleSet().getSampleList() ){
       // Asimov bin content -> toy data
       sample.throwStatError( _dataPropagator_.isGaussStatThrowInToys() );
     }
-  }
-
-  /// Now caching the event for the plot generator
-  _modelPropagator_.getPlotGenerator().defineHistogramHolders();
-
-  /// Propagator needs to be fast, let the workers wait for the signal
-  _modelPropagator_.getThreadPool().setCpuTimeSaverIsEnabled(false);
-
-}
-void LikelihoodInterface::loadPropagator(bool isModel_){
-
-  // assume we are loading the model
-  bool _reloadModelRequested_ = false;
-
-  std::vector<DataDispenser*> dispenserToLoadList{};
-  for( auto& dataSet : _dataSetList_ ){
-    LogContinueIf(not dataSet.isEnabled(), "Dataset \"" << dataSet.getName() << "\" is disabled. Skipping");
-
-    if( isModel_ or _dataType_ == DataType::Asimov ){ dispenserToLoadList.emplace_back(&dataSet.getModelDispenser() ); }
-    else{
-      dispenserToLoadList.emplace_back( &dataSet.getDataDispenser() );
-      if( _modelPropagator_.isThrowAsimovToyParameters() ){ dispenserToLoadList.back() = &dataSet.getToyDataDispenser(); }
-    }
-
-    // if we don't load an Asimov-tagged dataset, we'll need to reload the data for building our model.
-    if( dispenserToLoadList.back()->getParameters().name != "Asimov" ){ _reloadModelRequested_ = true; }
-  }
-
-  // by default, load the model
-  Propagator* propagatorPtr{ &_modelPropagator_ };
-  std::unique_ptr<Propagator> propagatorUniquePtr{nullptr};
-
-  // use a temporary propagator as some parameter can be edited
-  if( _reloadModelRequested_ ){
-    // unique ptr will make sure its properly deleted
-    propagatorUniquePtr = std::make_unique<Propagator>(_modelPropagator_);
-    propagatorPtr = propagatorUniquePtr.get();
-  }
-
-  // make sure everything is ready for loading
-  propagatorPtr->clearContent();
-
-  // perform the loading
-  for( auto* dispenserToLoad : dispenserToLoadList ){
-    LogInfo << "Reading dataset: " << dispenserToLoad->getOwner()->getName() << "/" << dispenserToLoad->getParameters().name << std::endl;
-
-    if( not dispenserToLoad->getParameters().overridePropagatorConfig.empty() ){
-      LogWarning << "Reload the propagator config with override options" << std::endl;
-      ConfigUtils::ConfigHandler configHandler(_modelPropagator_.getConfig() );
-      configHandler.override( dispenserToLoad->getParameters().overridePropagatorConfig );
-      propagatorPtr->readConfig( configHandler.getConfig() );
-      propagatorPtr->initialize();
-    }
-
-    // legacy: replacing the parameterSet option "maskForToyGeneration" -> now should use the config override above
-    if( not isModel_ ){
-      for( auto& parSet : propagatorPtr->getParametersManager().getParameterSetsList() ){
-        if( GenericToolbox::Json::fetchValue(parSet.getConfig(), "maskForToyGeneration", false) ){ parSet.nullify(); }
-      }
-    }
-
-    dispenserToLoad->load( *propagatorPtr );
-  }
-
-  LogInfo << "Resizing dial containers..." << std::endl;
-  for( auto& dialCollection : propagatorPtr->getDialCollectionList() ) {
-    if( dialCollection.isEventByEvent() ){ dialCollection.resizeContainers(); }
-  }
-
-  LogInfo << "Build reference cache..." << std::endl;
-  propagatorPtr->buildDialCache();
-
-  if( not isModel_ ){
-    if( propagatorPtr->isThrowAsimovToyParameters() ){
-
-      if( propagatorPtr->isShowEventBreakdown() ){
-        LogInfo << "Propagating prior parameters on the initially loaded events..." << std::endl;
-        propagatorPtr->reweightEvents();
-
-        LogInfo << "Sample breakdown prior to the throwing:" << std::endl;
-        std::cout << propagatorPtr->getSampleBreakdownTableStr() << std::endl;
-
-        if( propagatorPtr->isDebugPrintLoadedEvents() ){
-          LogDebug << "Toy events:" << std::endl;
-          LogDebug << GET_VAR_NAME_VALUE(propagatorPtr->getDebugPrintLoadedEventsNbPerSample()) << std::endl;
-          int iEvt{0};
-          for( auto& entry : propagatorPtr->getEventDialCache().getCache() ) {
-            LogDebug << "Event #" << iEvt++ << "{" << std::endl;
-            {
-              LogScopeIndent;
-              LogDebug << entry.getSummary() << std::endl;
-            }
-            LogDebug << "}" << std::endl;
-            if( iEvt >= propagatorPtr->getDebugPrintLoadedEventsNbPerSample() ) break;
-          }
-        }
-      }
-
-      if( _toyParameterInjector_.empty() ){
-        LogWarning << "Will throw toy parameters..." << std::endl;
-        propagatorPtr->getParametersManager().throwParameters();
-      }
-      else{
-        LogWarning << "Injecting parameters..." << std::endl;
-        propagatorPtr->getParametersManager().injectParameterValues( _toyParameterInjector_ );
-      }
-
-    } // throw asimov?
-
-    LogInfo << "Propagating parameters on events..." << std::endl;
-
-    // At this point, MC events have been reweighted using their prior
-    // but when using eigen decomp, the conversion eigen to original has a small computational error
-    // this will make sure the "asimov" data will be reweighted the same way the model is expected to behave
-    // while using the eigen decomp
-    for( auto& parSet: propagatorPtr->getParametersManager().getParameterSetsList() ) {
-      if( not parSet.isEnabled() ){ continue; }
-      if( parSet.isEnableEigenDecomp() ) { parSet.propagateEigenToOriginal(); }
-    }
-
-    propagatorPtr->reweightEvents();
-
-    // Copies MC events in data container for both Asimov and FakeData event types
-    LogWarning << "Copying loaded mc-like event to data container..." << std::endl;
-
-    // first copy the event directly placed in the data container
-    if( &_modelPropagator_ != propagatorPtr ){
-      for( size_t iSample = 0 ; iSample < _modelPropagator_.getSampleSet().getSampleList().size() ; iSample++ ){
-        _modelPropagator_.getSampleSet().getSampleList()[iSample].getDataContainer().getEventList() =
-            propagatorPtr->getSampleSet().getSampleList()[iSample].getDataContainer().getEventList();
-      }
-    }
-
-    // then copy the events that can have been loaded by the MC container
-    propagatorPtr->getSampleSet().copyMcEventListToDataContainer(_modelPropagator_.getSampleSet().getSampleList() );
-
-    // back to prior in case the original _propagator_ has been used.
-    // typically with `-a --toy` options
-    if( propagatorPtr->isThrowAsimovToyParameters() ){
-      for( auto& parSet : propagatorPtr->getParametersManager().getParameterSetsList() ){
-        if( not parSet.isEnabled() ){ continue; }
-        parSet.moveParametersToPrior();
-      }
-    }
-  }
-
-
-
-}
-void LikelihoodInterface::loadModelPropagator(){
-
-  _modelPropagator_.clearContent();
-
-  for( auto& dataSet : _dataSetList_ ){
-    dataSet.getModelDispenser().load( _modelPropagator_ );
-  }
-
-  _modelPropagator_.shrinkDialContainers();
-  _modelPropagator_.buildDialCache();
-
-}
-void LikelihoodInterface::loadDataPropagator(){
-
-  _dataPropagator_.clearContent();
-
-
-  // only the LLHI should be aware of what type of data to use -> dataEntry / toyEntry
-
-  bool allDatasetsFromModel{true};
-  for( auto& dataSet : _dataSetList_ ){
-
-    dataSet.getDataDispenser();
-
-    dataSet.getModelDispenser().load( _modelPropagator_ );
   }
 
 
@@ -457,6 +405,49 @@ void LikelihoodInterface::buildSamplePairList(){
     _samplePairList_.back().data = &_dataPropagator_.getSampleSet().getSampleList()[iSample];
   }
 
+}
+
+DataDispenser* LikelihoodInterface::getDataDispenser( DatasetDefinition& dataset_ ){
+
+  if( _dataType_ == DataType::Asimov ){
+    LogInfo << "Fetching asimov entry for dataset: " << dataset_.getName() << std::endl;
+    return &dataset_.getModelDispenser();
+  }
+  else if( _dataType_ == DataType::Toy ){
+
+    auto& selectedToyEntry = dataset_.getSelectedToyEntry();
+    if( selectedToyEntry.empty() or selectedToyEntry == "Asimov" ){
+      LogInfo << "Fetching asimov toy entry for dataset: " << dataset_.getName() << std::endl;
+      return &dataset_.getModelDispenser();
+    }
+
+    if( not GenericToolbox::isIn( selectedToyEntry, dataset_.getDataDispenserDict()) ){
+      LogWarning << "Could not find toy entry \"" << selectedToyEntry << "\" in dataset: " << dataset_.getName() << std::endl;
+      return nullptr;
+    }
+
+    LogInfo << "Fetching toy entry \"" << selectedToyEntry << "\" for dataset: " << dataset_.getName() << std::endl;
+    return &dataset_.getDataDispenserDict().at(selectedToyEntry);
+  }
+  else if( _dataType_ == DataType::RealData ){
+
+    auto& selectedDataEntry = dataset_.getSelectedDataEntry();
+    if( selectedDataEntry.empty() or selectedDataEntry == "Asimov" ){
+      LogInfo << "Fetching asimov data entry for dataset: " << dataset_.getName() << std::endl;
+      return &dataset_.getModelDispenser();
+    }
+
+    if( not GenericToolbox::isIn( selectedDataEntry, dataset_.getDataDispenserDict()) ){
+      LogWarning << "Could not find toy entry \"" << selectedDataEntry << "\" in dataset: " << dataset_.getName() << std::endl;
+      return nullptr;
+    }
+
+    LogInfo << "Fetching toy entry \"" << selectedDataEntry << "\" for dataset: " << dataset_.getName() << std::endl;
+    return &dataset_.getDataDispenserDict().at(selectedDataEntry);
+  }
+
+  // invalid
+  return nullptr;
 }
 
 

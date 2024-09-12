@@ -38,7 +38,6 @@ public:
 
   // Setters
   void setShowTimeStats(bool showTimeStats){ _showTimeStats_ = showTimeStats; }
-  void setThrowAsimovToyParameters(bool throwAsimovToyParameters){ _throwAsimovToyParameters_ = throwAsimovToyParameters; }
   void setEnableEigenToOrigInPropagate(bool enableEigenToOrigInPropagate){ _enableEigenToOrigInPropagate_ = enableEigenToOrigInPropagate; }
   void setIThrow(int iThrow){ _iThrow_ = iThrow; }
   void setParameterInjectorConfig(const JsonType &parameterInjector){ _parameterInjectorMc_ = parameterInjector; }

@@ -264,7 +264,12 @@ int main(int argc, char** argv){
 
   // -a
   if( clParser.isOptionTriggered("asimov") ){
+    fitter.getLikelihoodInterface().setForceAsimovData( true );
     fitter.getLikelihoodInterface().setDataType( LikelihoodInterface::DataType::Asimov );
+  }
+  else{
+    // by default, assume it's a real/fake data fit
+    fitter.getLikelihoodInterface().setDataType( LikelihoodInterface::DataType::RealData );
   }
 
 

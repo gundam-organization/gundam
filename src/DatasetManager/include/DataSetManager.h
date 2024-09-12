@@ -22,8 +22,6 @@ protected:
 public:
   DataSetManager() = default;
 
-  // setters
-  void setToyParameterInjector(const JsonType& toyParameterInjector_){ _toyParameterInjector_ = toyParameterInjector_; }
 
   // const-getters
   [[nodiscard]] const std::vector<DatasetDefinition>& getDataSetList() const{ return _dataSetList_; }
@@ -43,8 +41,6 @@ private:
 
   std::vector<DatasetDefinition> _dataSetList_{};
   std::vector<SamplePair> _samplePairList_{};
-
-  JsonType _toyParameterInjector_{};
 
   GenericToolbox::ParallelWorker _threadPool_{};
 
