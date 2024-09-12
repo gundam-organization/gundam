@@ -23,8 +23,8 @@ void LikelihoodInterface::readConfigImpl(){
 
   _threadPool_.setNThreads( GundamGlobals::getNumberOfThreads() );
 
+  // only configure the model, data will be copied later
   _modelPropagator_.readConfig();
-  _dataPropagator_.readConfig( _modelPropagator_.getConfig() );
 
   // First taking care of the DataSetManager
   JsonType dataSetManagerConfig{};
@@ -86,7 +86,7 @@ void LikelihoodInterface::initializeImpl() {
   for( auto& dataSet : _dataSetList_ ){ dataSet.initialize(); }
 
   _modelPropagator_.initialize();
-  _dataPropagator_.initialize(); // TODO: should be copied to avoid duplicated printouts
+  _dataPropagator_ = _modelPropagator_; // avoid tons of printouts
 
   _plotGenerator_.setModelSampleSetPtr( &_modelPropagator_.getSampleSet().getSampleList() );
   _plotGenerator_.setDataSampleSetPtr( &_modelPropagator_.getSampleSet().getSampleList() );

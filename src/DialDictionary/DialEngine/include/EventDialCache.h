@@ -38,12 +38,13 @@ public:
 
   /// DialResponseCache is keeping a reference of a DialInterface and a cached double for the response
   struct DialResponseCache {
+    DialResponseCache() = delete; // prevent not setting up the interface ptr
     explicit DialResponseCache( DialInterface& interface_ )
-      : dialInterface(interface_) {
-      this->updateRequested = dialInterface.getInputBufferRef()->isDialUpdateRequestedPtr();
+      : dialInterface(&interface_) {
+      this->updateRequested = dialInterface->getInputBufferRef()->isDialUpdateRequestedPtr();
     }
     // The dial interface to be used with the Event.
-    DialInterface& dialInterface;
+    DialInterface* dialInterface{nullptr};
     // The cached result calculated by the dial.
     double response{std::nan("unset")};
     // A cached boolean to check if the dial needs to be updated.
@@ -51,11 +52,11 @@ public:
     void update(){
       // Reevaluate the dial if an update has been requested
 #ifdef EVENT_DIAL_CACHE_SAFE_SLOW_INTERFACE
-      if( dialInterface.getInputBufferRef()->isDialUpdateRequested() ){
+      if( dialInterface->getInputBufferRef()->isDialUpdateRequested() ){
 #else
       if( *(this->updateRequested) ) {
 #endif
-        response = dialInterface.evalResponse();
+        response = dialInterface->evalResponse();
       }
     }
     double getResponse(){
@@ -75,7 +76,7 @@ public:
       ss << *event << std::endl;
       ss << "Dials{";
       for( auto& dialResponseCache : dialResponseCacheList ){
-        ss << std::endl << "  { " << dialResponseCache.dialInterface.getSummary() << " }";
+        ss << std::endl << "  { " << dialResponseCache.dialInterface->getSummary() << " }";
       }
       ss << std::endl << "}";
       return ss.str();

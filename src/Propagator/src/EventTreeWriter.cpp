@@ -191,10 +191,10 @@ template<typename T> void EventTreeWriter::writeEventsTemplate(const GenericTool
 
         // fetch corresponding dial if it exists
         for( auto& dial : *dialElements ){
-          if( dial.dialInterface.getInputBufferRef()->getInputParameterIndicesList()[0].parSetIndex == parIndexList[iGlobalPar].first
-              and dial.dialInterface.getInputBufferRef()->getInputParameterIndicesList()[0].parIndex == parIndexList[iGlobalPar].second ){
+          if( dial.dialInterface->getInputBufferRef()->getInputParameterIndicesList()[0].parSetIndex == parIndexList[iGlobalPar].first
+              and dial.dialInterface->getInputBufferRef()->getInputParameterIndicesList()[0].parIndex == parIndexList[iGlobalPar].second ){
 
-            DialInputBuffer inputBuf{*dial.dialInterface.getInputBufferRef()};
+            DialInputBuffer inputBuf{*dial.dialInterface->getInputBufferRef()};
             grPtr->RemovePoint(0); // remove the first and recreate the whole thing
             for( double xPoint : parameterXvalues[iGlobalPar] ){
               inputBuf.getInputBuffer()[0] = xPoint;
@@ -202,8 +202,8 @@ template<typename T> void EventTreeWriter::writeEventsTemplate(const GenericTool
                   xPoint,
                   DialInterface::evalResponse(
                       &inputBuf,
-                      dial.dialInterface.getDialBaseRef(),
-                      dial.dialInterface.getResponseSupervisorRef()
+                      dial.dialInterface->getDialBaseRef(),
+                      dial.dialInterface->getResponseSupervisorRef()
                   )
               );
             }

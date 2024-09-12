@@ -215,13 +215,13 @@ bool Cache::Manager::Build(SampleSet& sampleList,
             // usage is forced do to an API change.
             // Make sure all of the used parameters are in the parameter
             // map.
-            for (std::size_t i = 0; i < dialResponseCache.dialInterface.getInputBufferRef()->getBufferSize(); ++i) {
-                const Parameter* fp = &(dialResponseCache.dialInterface.getInputBufferRef()->getParameter(i));
+            for (std::size_t i = 0; i < dialResponseCache.dialInterface->getInputBufferRef()->getBufferSize(); ++i) {
+                const Parameter* fp = &(dialResponseCache.dialInterface->getInputBufferRef()->getParameter(i));
                 usedParameters.insert(fp);
                 ++useCount[fp->getFullTitle()];
             }
 
-            DialBase* dial = dialResponseCache.dialInterface.getDialBaseRef();
+            DialBase* dial = dialResponseCache.dialInterface->getDialBaseRef();
             std::string dialType = dial->getDialTypeName();
             if (dialType.find("Norm") == 0) {
                 ++config.norms;
@@ -481,7 +481,7 @@ bool Cache::Manager::Update(SampleSet& sampleList,
         // Add each dial for the event to the GPU caches.
         for( auto& dialElem : elem.dialResponseCacheList ){
             DialInputBuffer* dialInputs
-                = dialElem.dialInterface.getInputBufferRef();
+                = dialElem.dialInterface->getInputBufferRef();
 
             // Make sure all of the used parameters are in the parameter
             // map.
@@ -489,7 +489,7 @@ bool Cache::Manager::Update(SampleSet& sampleList,
                 // Find the index (or allocate a new one) for the dial
                 // parameter.
                 const Parameter* fp
-                    = &(dialElem.dialInterface.getInputBufferRef()
+                    = &(dialElem.dialInterface->getInputBufferRef()
                         ->getParameter(i));
                 auto parMapIt = Cache::Manager::ParameterMap.find(fp);
                 if (parMapIt == Cache::Manager::ParameterMap.end()) {
@@ -515,7 +515,7 @@ bool Cache::Manager::Update(SampleSet& sampleList,
             for (std::size_t i = 0; i < dialInputs->getBufferSize(); ++i) {
                 const Parameter* fp = &(dialInputs->getParameter(i));
                 const DialResponseSupervisor* resp
-                    = dialElem.dialInterface.getResponseSupervisorRef();
+                    = dialElem.dialInterface->getResponseSupervisorRef();
                 int parIndex = Cache::Manager::ParameterMap[fp];
                 double minResponse = 0.0;
                 if (std::isfinite(resp->getMinResponse())) {
@@ -530,7 +530,7 @@ bool Cache::Manager::Update(SampleSet& sampleList,
 
             // Add the dial information to the appropriate caches
             int dialUsed = 0;
-            const DialBase* baseDial = dialElem.dialInterface.getDialBaseRef();
+            const DialBase* baseDial = dialElem.dialInterface->getDialBaseRef();
             const Norm* normDial = dynamic_cast<const Norm*>(baseDial);
             if (normDial) {
                 ++dialUsed;
