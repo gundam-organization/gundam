@@ -260,6 +260,7 @@ void LikelihoodInterface::load(){
 
 }
 void LikelihoodInterface::loadModelPropagator(){
+  LogInfo << std::endl << "Loading model..." << std::endl;
 
   _modelPropagator_.clearContent();
 
@@ -308,6 +309,7 @@ void LikelihoodInterface::loadModelPropagator(){
 
 }
 void LikelihoodInterface::loadDataPropagator(){
+  LogInfo << std::endl << "Loading data..." << std::endl;
 
   _dataPropagator_.clearContent();
 
@@ -344,60 +346,62 @@ void LikelihoodInterface::loadDataPropagator(){
         _dataPropagator_.initialize();
       }
     }
-  }
 
-  _dataPropagator_.shrinkDialContainers();
-  _dataPropagator_.buildDialCache();
+    _dataPropagator_.shrinkDialContainers();
+    _dataPropagator_.buildDialCache();
 
-  if( _dataPropagator_.isThrowAsimovToyParameters() ){
+    if( _dataPropagator_.isThrowAsimovToyParameters() ){
 
-    if( _dataPropagator_.isShowEventBreakdown() ){
-      LogInfo << "Propagating prior parameters on the initially loaded events..." << std::endl;
-      _dataPropagator_.reweightEvents();
+      if( _dataPropagator_.isShowEventBreakdown() ){
+        LogInfo << "Propagating prior parameters on the initially loaded events..." << std::endl;
+        _dataPropagator_.reweightEvents();
 
-      LogInfo << "Sample breakdown prior to the throwing:" << std::endl;
-      std::cout << _dataPropagator_.getSampleBreakdownTableStr() << std::endl;
+        LogInfo << "Sample breakdown prior to the throwing:" << std::endl;
+        std::cout << _dataPropagator_.getSampleBreakdownTableStr() << std::endl;
 
-      if( _dataPropagator_.isDebugPrintLoadedEvents() ){
-        LogDebug << "Toy events:" << std::endl;
-        LogDebug << GET_VAR_NAME_VALUE(_dataPropagator_.getDebugPrintLoadedEventsNbPerSample()) << std::endl;
-        int iEvt{0};
-        for( auto& entry : _dataPropagator_.getEventDialCache().getCache() ) {
-          LogDebug << "Event #" << iEvt++ << "{" << std::endl;
-          {
-            LogScopeIndent;
-            LogDebug << entry.getSummary() << std::endl;
+        if( _dataPropagator_.isDebugPrintLoadedEvents() ){
+          LogDebug << "Toy events:" << std::endl;
+          LogDebug << GET_VAR_NAME_VALUE(_dataPropagator_.getDebugPrintLoadedEventsNbPerSample()) << std::endl;
+          int iEvt{0};
+          for( auto& entry : _dataPropagator_.getEventDialCache().getCache() ) {
+            LogDebug << "Event #" << iEvt++ << "{" << std::endl;
+            {
+              LogScopeIndent;
+              LogDebug << entry.getSummary() << std::endl;
+            }
+            LogDebug << "}" << std::endl;
+            if( iEvt >= _dataPropagator_.getDebugPrintLoadedEventsNbPerSample() ) break;
           }
-          LogDebug << "}" << std::endl;
-          if( iEvt >= _dataPropagator_.getDebugPrintLoadedEventsNbPerSample() ) break;
         }
       }
+
+      if( _toyParameterInjector_.empty() ){
+        LogWarning << "Will throw toy parameters..." << std::endl;
+        _dataPropagator_.getParametersManager().throwParameters();
+      }
+      else{
+        LogWarning << "Injecting parameters..." << std::endl;
+        _dataPropagator_.getParametersManager().injectParameterValues( _toyParameterInjector_ );
+      }
+
+    } // throw asimov?
+
+    LogInfo << "Propagating parameters on events..." << std::endl;
+
+    // At this point, MC events have been reweighted using their prior
+    // but when using eigen decomp, the conversion eigen to original has a small computational error
+    // this will make sure the "asimov" data will be reweighted the same way the model is expected to behave
+    // while using the eigen decomp
+    for( auto& parSet: _dataPropagator_.getParametersManager().getParameterSetsList() ) {
+      if( not parSet.isEnabled() ){ continue; }
+      if( parSet.isEnableEigenDecomp() ) { parSet.propagateEigenToOriginal(); }
     }
 
-    if( _toyParameterInjector_.empty() ){
-      LogWarning << "Will throw toy parameters..." << std::endl;
-      _dataPropagator_.getParametersManager().throwParameters();
-    }
-    else{
-      LogWarning << "Injecting parameters..." << std::endl;
-      _dataPropagator_.getParametersManager().injectParameterValues( _toyParameterInjector_ );
-    }
+    // re-propagate systematics if applicable
+    _dataPropagator_.reweightEvents();
 
-  } // throw asimov?
-
-  LogInfo << "Propagating parameters on events..." << std::endl;
-
-  // At this point, MC events have been reweighted using their prior
-  // but when using eigen decomp, the conversion eigen to original has a small computational error
-  // this will make sure the "asimov" data will be reweighted the same way the model is expected to behave
-  // while using the eigen decomp
-  for( auto& parSet: _dataPropagator_.getParametersManager().getParameterSetsList() ) {
-    if( not parSet.isEnabled() ){ continue; }
-    if( parSet.isEnableEigenDecomp() ) { parSet.propagateEigenToOriginal(); }
   }
 
-  // re-propagate systematics if applicable
-  _dataPropagator_.reweightEvents();
 
   LogInfo << "Filling up data sample bin caches..." << std::endl;
   _threadPool_.runJob([this](int iThread){
