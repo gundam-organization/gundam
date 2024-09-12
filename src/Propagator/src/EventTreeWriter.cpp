@@ -3,6 +3,7 @@
 //
 
 #include "EventTreeWriter.h"
+#include "Propagator.h"
 
 #include "ConfigUtils.h"
 

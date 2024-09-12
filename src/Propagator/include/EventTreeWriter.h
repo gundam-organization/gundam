@@ -6,7 +6,10 @@
 #define GUNDAM_EVENT_TREE_WRITER_H
 
 
+#include "EventDialCache.h"
+#include "Event.h"
 #include "GundamUtils.h"
+#include "JsonBaseClass.h"
 
 #include "GenericToolbox.Utils.h"
 #include "GenericToolbox.Thread.h"
@@ -16,7 +19,12 @@
 #include <vector>
 #include <string>
 
-class EventTreeWriter : public GenericToolbox::ConfigBaseClass<JsonType> {
+
+// forward declaration?
+class Propagator;
+
+
+class EventTreeWriter : public JsonBaseClass {
 
 public:
   EventTreeWriter() = default;
@@ -45,6 +53,7 @@ private:
   int _nPointsPerDial_{3};
 
   // cache
+  const Propagator* propagatorPtr;
   mutable GenericToolbox::ParallelWorker _threadPool_{};
 
 };

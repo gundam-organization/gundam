@@ -2,7 +2,7 @@
 // Created by Nadrino on 16/06/2021.
 //
 
-#include "PlotGenerator.h"
+#include "../include/PlotGenerator.h"
 
 #include "GenericToolbox.Json.h"
 #include "GundamGlobals.h"

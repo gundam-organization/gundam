@@ -1,9 +1,11 @@
 set(SRCFILES
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/PlotGenerator.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/EventTreeWriter.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Propagator.cpp
     )
 
 set(HEADERS
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/PlotGenerator.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/EventTreeWriter.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/Propagator.h
 )

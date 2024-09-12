@@ -5,7 +5,6 @@
 #ifndef GUNDAM_PLOT_GENERATOR_H
 #define GUNDAM_PLOT_GENERATOR_H
 
-#include "SamplePair.h"
 #include "Event.h"
 #include "JsonBaseClass.h"
 
