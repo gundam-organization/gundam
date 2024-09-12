@@ -23,6 +23,9 @@ void LikelihoodInterface::readConfigImpl(){
 
   _threadPool_.setNThreads( GundamGlobals::getNumberOfThreads() );
 
+  _modelPropagator_.readConfig();
+  _dataPropagator_.readConfig( _modelPropagator_.getConfig() );
+
   // First taking care of the DataSetManager
   JsonType dataSetManagerConfig{};
   GenericToolbox::Json::deprecatedAction(_modelPropagator_.getConfig(), {{"fitSampleSetConfig"}, {"dataSetList"}}, [&]{
@@ -42,7 +45,9 @@ void LikelihoodInterface::readConfigImpl(){
 
   // creating the dataSets:
   _dataSetList_.reserve( dataSetList.size() );
-  for( const auto& dataSetConfig : dataSetList ){ _dataSetList_.emplace_back(dataSetConfig, int(_dataSetList_.size())); }
+  for( const auto& dataSetConfig : dataSetList ){
+    _dataSetList_.emplace_back(dataSetConfig, int(_dataSetList_.size()));
+  }
 
 
   JsonType configJointProbability;
@@ -79,6 +84,15 @@ void LikelihoodInterface::initializeImpl() {
   LogWarning << "Initializing LikelihoodInterface..." << std::endl;
 
   for( auto& dataSet : _dataSetList_ ){ dataSet.initialize(); }
+
+  _modelPropagator_.initialize();
+  _dataPropagator_.initialize(); // TODO: should be copied to avoid duplicated printouts
+
+  _plotGenerator_.setModelSampleSetPtr( &_modelPropagator_.getSampleSet().getSampleList() );
+  _plotGenerator_.setDataSampleSetPtr( &_modelPropagator_.getSampleSet().getSampleList() );
+
+  _eventTreeWriter_.initialize();
+  _plotGenerator_.initialize();
 
   // loading the propagators
   this->load();

@@ -910,12 +910,6 @@ void PlotGenerator::defineHistogramHolders() {
     histHolder.samplePtr = &_dataSampleListPtr_->at(sampleIndex);
   }
 
-  for( size_t iSample = 0 ; iSample < _modelSampleListPtr_->size() ; iSample++ ){
-
-
-
-  }
-
 }
 void PlotGenerator::buildEventBinCache( const std::vector<HistHolder *> &histPtrToFillList, const std::vector<Event> *eventListPtr, bool isData_) {
 

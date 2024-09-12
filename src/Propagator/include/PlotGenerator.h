@@ -87,6 +87,7 @@ protected:
 public:
   // Setters
   void setModelSampleSetPtr(const std::vector<Sample> *modelSampleListPtr_){ _modelSampleListPtr_ = modelSampleListPtr_; }
+  void setDataSampleSetPtr(const std::vector<Sample> *dataSampleListPtr_){ _dataSampleListPtr_ = dataSampleListPtr_; }
 
   // Getters
   [[nodiscard]] bool isEmpty() const;
