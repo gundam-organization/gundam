@@ -71,6 +71,7 @@ void FitterEngine::readConfigImpl(){
     LogAlert << R"("propagatorConfig" should now be set within "datasetManagerConfig".)" << std::endl;
     // reading the config already since nested objects need to be filled up for handling further deprecation
     getLikelihoodInterface().getModelPropagator().setConfig( GenericToolbox::Json::fetchValue<JsonType>(_config_, "propagatorConfig") );
+    getLikelihoodInterface().setConfig( GenericToolbox::Json::fetchValue<JsonType>(_config_, "propagatorConfig") );
   });
   GenericToolbox::Json::deprecatedAction(getLikelihoodInterface().getModelPropagator().getConfig(), "scanConfig", [&]{
     LogAlert << R"("scanConfig" should now be set within "fitterEngineConfig".)" << std::endl;
@@ -81,7 +82,6 @@ void FitterEngine::readConfigImpl(){
   getLikelihoodInterface().readConfig( GenericToolbox::Json::fetchValue(_config_, "likelihoodInterfaceConfig", getLikelihoodInterface().getConfig()) );
   _parameterScanner_.readConfig( GenericToolbox::Json::fetchValue(_config_, {{"parameterScannerConfig"}, {"scanConfig"}}, _parameterScanner_.getConfig()) );
   LogInfo << "Convergence monitor will be refreshed every " << _minimizer_->getMonitor().convergenceMonitor.getMaxRefreshRateInMs() << "ms." << std::endl;
-
 
   // local config
   _enablePca_ = GenericToolbox::Json::fetchValue(_config_, {{"enablePca"}, {"runPcaCheck"}, {"fixGhostFitParameters"}}, _enablePca_);
