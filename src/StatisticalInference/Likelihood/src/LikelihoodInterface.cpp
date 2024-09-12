@@ -65,6 +65,14 @@ void LikelihoodInterface::readConfigImpl(){
   _jointProbabilityPtr_ = std::shared_ptr<JointProbability::JointProbabilityBase>( JointProbability::makeJointProbability( jointProbabilityTypeStr ) );
   _jointProbabilityPtr_->readConfig( configJointProbability );
 
+
+  GenericToolbox::Json::deprecatedAction(_modelPropagator_.getConfig(), "plotGeneratorConfig", [&]{
+    LogAlert << R"("plotGeneratorConfig" should now be set under "likelihoodInterfaceConfig".)" << std::endl;
+    _plotGenerator_.setConfig( GenericToolbox::Json::fetchValue( _modelPropagator_.getSampleSet().getConfig(), "plotGeneratorConfig", _plotGenerator_.getConfig() ) );
+  });
+  _plotGenerator_.setConfig( GenericToolbox::Json::fetchValue( _config_, "plotGeneratorConfig", _plotGenerator_.getConfig() ) );
+  _plotGenerator_.readConfig();
+
   LogWarning << "LikelihoodInterface configured." << std::endl;
 }
 void LikelihoodInterface::initializeImpl() {

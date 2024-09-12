@@ -64,20 +64,25 @@ public:
   void setToyParameterInjector(const JsonType& toyParameterInjector_){ _toyParameterInjector_ = toyParameterInjector_; }
 
   // const getters
-  [[nodiscard]] int getNbParameters() const {return _nbParameters_; }
-  [[nodiscard]] int getNbSampleBins() const {return _nbSampleBins_; }
-  [[nodiscard]] double getLastLikelihood() const { return _buffer_.totalLikelihood; }
-  [[nodiscard]] double getLastStatLikelihood() const { return _buffer_.statLikelihood; }
-  [[nodiscard]] double getLastPenaltyLikelihood() const { return _buffer_.penaltyLikelihood; }
-  [[nodiscard]] const Propagator& getModelPropagator() const { return _modelPropagator_; }
-  [[nodiscard]] const Propagator& getDataPropagator() const { return _dataPropagator_; }
+  [[nodiscard]] int getNbParameters() const{ return _nbParameters_; }
+  [[nodiscard]] int getNbSampleBins() const{ return _nbSampleBins_; }
+  [[nodiscard]] double getLastLikelihood() const{ return _buffer_.totalLikelihood; }
+  [[nodiscard]] double getLastStatLikelihood() const{ return _buffer_.statLikelihood; }
+  [[nodiscard]] double getLastPenaltyLikelihood() const{ return _buffer_.penaltyLikelihood; }
+  [[nodiscard]] const Propagator& getModelPropagator() const{ return _modelPropagator_; }
+  [[nodiscard]] const Propagator& getDataPropagator() const{ return _dataPropagator_; }
+  [[nodiscard]] const PlotGenerator& getPlotGenerator() const{ return _plotGenerator_; }
   [[nodiscard]] const JointProbability::JointProbabilityBase* getJointProbabilityPtr() const { return _jointProbabilityPtr_.get(); }
   [[nodiscard]] const std::vector<DatasetDefinition>& getDatasetList() const { return _dataSetList_; }
+  [[nodiscard]] const std::vector<SamplePair>& getSamplePairList() const { return _samplePairList_; }
 
   // mutable getters
-  Buffer& getBuffer() { return _buffer_; }
-  Propagator& getDataPropagator() { return _dataPropagator_; }
+  Buffer& getBuffer(){ return _buffer_; }
+  Propagator& getModelPropagator(){ return _modelPropagator_; }
+  Propagator& getDataPropagator(){ return _dataPropagator_; }
+  PlotGenerator& getPlotGenerator(){ return _plotGenerator_; }
   std::vector<DatasetDefinition>& getDatasetList(){ return _dataSetList_; }
+  std::vector<SamplePair>& getSamplePairList(){ return _samplePairList_; }
 
   // mutable core
   void propagateAndEvalLikelihood();
@@ -124,6 +129,7 @@ private:
   Propagator _dataPropagator_{};
 
   EventTreeWriter _eventTreeWriter_{};
+  PlotGenerator _plotGenerator_{}; // TODO: handle its configuration
 
   /// Statistical likelihood
   std::shared_ptr<JointProbability::JointProbabilityBase> _jointProbabilityPtr_{nullptr};

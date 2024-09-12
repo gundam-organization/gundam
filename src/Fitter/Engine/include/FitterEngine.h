@@ -83,12 +83,6 @@ public:
   void rescaleParametersStepSize();
   void checkNumericalAccuracy();
 
-  // Deprecated
-  [[deprecated("use getLikelihoodInterface().getDataSetManager().getPropagator()")]] [[nodiscard]] const Propagator& getPropagator() const{ return getLikelihoodInterface().getDataSetManager().getModelPropagator(); }
-  [[deprecated("use getLikelihoodInterface().getDataSetManager().getPropagator()")]] Propagator& getPropagator(){ return getLikelihoodInterface().getDataSetManager().getModelPropagator(); }
-  [[deprecated("Use runPcaCheck()")]] void fixGhostFitParameters(){ runPcaCheck(); }
-
-
 private:
   // Parameters
   bool _isDryRun_{false};

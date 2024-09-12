@@ -71,7 +71,7 @@ void Propagator::readConfigImpl(){
   _sampleSet_.readConfig();
 
   LogInfo << "Reading PlotGenerator configuration..." << std::endl;
-  auto plotGeneratorConfig = ConfigUtils::getForwardedConfig(GenericToolbox::Json::fetchValue(_config_, "plotGeneratorConfig", JsonType()));
+  auto plotGeneratorConfig = GenericToolbox::Json::fetchValue(_config_, "plotGeneratorConfig", JsonType());
   _plotGenerator_.setConfig(plotGeneratorConfig);
   _plotGenerator_.readConfig();
 

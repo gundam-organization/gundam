@@ -5,6 +5,7 @@
 #ifndef GUNDAM_PLOT_GENERATOR_H
 #define GUNDAM_PLOT_GENERATOR_H
 
+#include "Sample.h"
 #include "Event.h"
 #include "JsonBaseClass.h"
 
@@ -36,7 +37,7 @@ struct HistHolder{
 
   // Data
   bool isData{false};
-  const SamplePair* samplePtr{nullptr};
+  const Sample* samplePtr{nullptr};
   std::function<void(TH1D*, const Event*)> fillFunctionSample;
 
   // X axis
@@ -85,13 +86,13 @@ protected:
 
 public:
   // Setters
-  void setSampleSetPtr(const SampleSet *sampleSetPtr_){ _sampleSetPtr_ = sampleSetPtr_; }
+  void setModelSampleSetPtr(const std::vector<Sample> *modelSampleListPtr_){ _modelSampleListPtr_ = modelSampleListPtr_; }
 
   // Getters
   [[nodiscard]] bool isEmpty() const;
   [[nodiscard]] const std::vector<HistHolder> &getHistHolderList(int cacheSlot_ = 0) const;
-  [[nodiscard]] const std::vector<HistHolder> &getComparisonHistHolderList() const;
-  [[nodiscard]] std::map<std::string, std::shared_ptr<TCanvas>> getBufferCanvasList() const;
+  [[nodiscard]] const std::vector<HistHolder> &getComparisonHistHolderList() const { return _comparisonHistHolderList_; }
+  [[nodiscard]] std::map<std::string, std::shared_ptr<TCanvas>> getBufferCanvasList() const { return _bufferCanvasList_; }
 
   // non-const getters
   std::vector<HistHolder> &getHistHolderList(int cacheSlot_ = 0);
@@ -108,9 +109,6 @@ public:
   std::vector<std::string> fetchListOfSplitVarNames();
 
   void defineHistogramHolders();
-
-  // Deprecated
-  [[deprecated("use setSampleSetPtr")]] void setFitSampleSetPtr(const SampleSet *sampleSetPtr_){ setSampleSetPtr(sampleSetPtr_); }
 
 
 protected:
@@ -131,7 +129,8 @@ private:
   };
 
   // Internals
-  const std::vector<SamplePair>* _samplePairListPtr_{nullptr};
+  const std::vector<Sample>* _modelSampleListPtr_{nullptr};
+  const std::vector<Sample>* _dataSampleListPtr_{nullptr};
   std::vector<std::vector<HistHolder>> _histHolderCacheList_{};
   std::vector<HistHolder> _comparisonHistHolderList_;
   std::map<std::string, std::shared_ptr<TCanvas>> _bufferCanvasList_;
