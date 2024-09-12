@@ -330,13 +330,13 @@ int main(int argc, char** argv){
   // injectParameterPath
   if( not injectParameterPath.empty() ){
     auto injectConfig = ConfigUtils::readConfigFile( injectParameterPath );
-    fitter.getLikelihoodInterface().getDataSetManager().getModelPropagator().setParameterInjectorConfig(injectConfig);
+    fitter.getLikelihoodInterface().getModelPropagator().setParameterInjectorConfig(injectConfig);
   }
 
   // toyParInjector
   if( not toyParInjector.empty() ){
     auto injectConfig = ConfigUtils::readConfigFile( toyParInjector );
-    fitter.getLikelihoodInterface().getDataSetManager().setToyParameterInjector( injectConfig );
+    fitter.getLikelihoodInterface().setToyParameterInjector( injectConfig );
   }
 
   // Also check app level config options
@@ -384,7 +384,7 @@ int main(int argc, char** argv){
   // show initial conditions
   if( clParser.isOptionTriggered("injectParameterConfig") ) {
     LogDebug << "Starting mc parameters that where injected:" << std::endl;
-    LogDebug << fitter.getLikelihoodInterface().getDataSetManager().getModelPropagator().getParametersManager().getParametersSummary(false ) << std::endl;
+    LogDebug << fitter.getLikelihoodInterface().getModelPropagator().getParametersManager().getParametersSummary(false ) << std::endl;
   }
 
   if( clParser.isOptionTriggered("scanLine") ){

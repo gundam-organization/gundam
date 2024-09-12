@@ -70,11 +70,6 @@ void Propagator::readConfigImpl(){
   _sampleSet_.setConfig(fitSampleSetConfig);
   _sampleSet_.readConfig();
 
-  LogInfo << "Reading PlotGenerator configuration..." << std::endl;
-  auto plotGeneratorConfig = GenericToolbox::Json::fetchValue(_config_, "plotGeneratorConfig", JsonType());
-  _plotGenerator_.setConfig(plotGeneratorConfig);
-  _plotGenerator_.readConfig();
-
   LogInfo << "Reading DialCollection configurations..." << std::endl;
   _dialCollectionList_.clear(); // make sure it's empty in case readConfig() is called more than once
   for(size_t iParSet = 0 ; iParSet < _parManager_.getParameterSetsList().size() ; iParSet++ ){

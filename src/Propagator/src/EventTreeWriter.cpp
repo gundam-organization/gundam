@@ -132,9 +132,11 @@ template<typename T> void EventTreeWriter::writeEventsTemplate(const GenericTool
   std::vector<std::pair<size_t,size_t>> parIndexList{};
 
   if( writeDials ){
+    LogThrowIf(parSetListPtr == nullptr);
+
     // how many pars?
     size_t nPars = 0;
-    for( auto& parSet : propagatorPtr->getParametersManager().getParameterSetsList() ){
+    for( auto& parSet : *parSetListPtr ){
       nPars += parSet.getNbParameters();
     }
 
@@ -145,7 +147,7 @@ template<typename T> void EventTreeWriter::writeEventsTemplate(const GenericTool
 
     // create branches
     int iParSet{-1};
-    for( auto& parSet : propagatorPtr->getParametersManager().getParameterSetsList() ){
+    for( auto& parSet : *parSetListPtr ){
       iParSet++;
       if( not parSet.isEnabled() ) continue;
       for( auto& par : parSet.getParameterList() ){

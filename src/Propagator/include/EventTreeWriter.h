@@ -48,7 +48,7 @@ private:
   int _nPointsPerDial_{3};
 
   // cache
-  const Propagator* propagatorPtr{nullptr};
+  const std::vector<ParameterSet>* parSetListPtr{nullptr};
   mutable GenericToolbox::ParallelWorker _threadPool_{};
 
 };
