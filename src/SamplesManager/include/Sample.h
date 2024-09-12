@@ -70,6 +70,7 @@ public:
   std::vector<Event> &getEventList(){ return _eventList_; }
 
   // misc
+  void writeEventRates(const GenericToolbox::TFilePath& saveDir_) const;
   bool isDatasetValid(const std::string& datasetName_);
 
   // core

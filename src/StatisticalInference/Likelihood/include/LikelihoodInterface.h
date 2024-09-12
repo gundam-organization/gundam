@@ -10,7 +10,8 @@
 #include "ParameterSet.h"
 #include "JointProbability.h"
 #include "Propagator.h"
-#include "DataSetManager.h"
+#include "EventTreeWriter.h"
+#include "DatasetDefinition.h"
 
 #include "GenericToolbox.Utils.h"
 #include "GenericToolbox.Time.h"
@@ -89,6 +90,9 @@ public:
   [[nodiscard]] double evalPenaltyLikelihood(const ParameterSet& parSet_) const;
   [[nodiscard]] std::string getSummary() const;
 
+  void writeEvents(const GenericToolbox::TFilePath& saveDir_) const;
+  void writeEventRates(const GenericToolbox::TFilePath& saveDir_) const;
+
 
 protected:
   void load();
@@ -118,6 +122,8 @@ private:
   /// this is where model and data are kept to be compared
   Propagator _modelPropagator_{};
   Propagator _dataPropagator_{};
+
+  EventTreeWriter _eventTreeWriter_{};
 
   /// Statistical likelihood
   std::shared_ptr<JointProbability::JointProbabilityBase> _jointProbabilityPtr_{nullptr};

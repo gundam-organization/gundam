@@ -244,40 +244,9 @@ void FitterEngine::initializeImpl(){
   getLikelihoodInterface().propagateAndEvalLikelihood();
 
   if( not GundamGlobals::isLightOutputMode() ){
-    getLikelihoodInterface().getDataSetManager().getTreeWriter().writeSamples(
-        GenericToolbox::mkdirTFile(_saveDir_, "preFit/events"),
-        getLikelihoodInterface().getDataSetManager().getModelPropagator()
-    );
+    getLikelihoodInterface().writeEvents( GenericToolbox::TFilePath(_saveDir_, "preFit/events") );
+    getLikelihoodInterface().writeEventRates( GenericToolbox::TFilePath(_saveDir_, "preFit/rates") );
   }
-
-  // writing event rates
-  LogInfo << "Writing event rates..." << std::endl;
-  for( auto& sample : getLikelihoodInterface().getDataSetManager().getModelPropagator().getSampleSet().getSampleList() ){
-    if( not sample.isEnabled() ){ continue; }
-
-
-    {
-      TVectorD mcRate(1);
-      mcRate[0] = sample.getMcContainer().getSumWeights();
-      auto outDir = GenericToolbox::joinPath("preFit/rates", GenericToolbox::generateCleanBranchName(sample.getName()), "MC");
-      GenericToolbox::writeInTFile(
-          GenericToolbox::mkdirTFile(_saveDir_, outDir),
-          mcRate, "sumWeights"
-      );
-    }
-
-    {
-      TVectorD dataRate(1);
-      dataRate[0] = sample.getDataContainer().getSumWeights();
-      auto outDir = GenericToolbox::joinPath("preFit/rates", GenericToolbox::generateCleanBranchName(sample.getName()), "Data");
-      GenericToolbox::writeInTFile(
-          GenericToolbox::mkdirTFile(_saveDir_, outDir),
-          dataRate, "sumWeights"
-      );
-    }
-
-  }
-
 
   LogWarning << "Saving all objects to disk..." << std::endl;
   GenericToolbox::triggerTFileWrite(_saveDir_);

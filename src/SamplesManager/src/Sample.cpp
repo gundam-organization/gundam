@@ -21,18 +21,13 @@ LoggerInit([]{ Logger::setUserHeaderStr("[Sample]"); });
 
 void Sample::readConfigImpl(){
   _name_ = GenericToolbox::Json::fetchValue(_config_, "name", _name_);
-  LogThrowIf(
-      GenericToolbox::hasSubStr(_name_, "/"),
-      "Invalid sample name: \"" << _name_ << "\": should not have '/'.");
-
-  LogScopeIndent;
+  GenericToolbox::replaceSubstringInsideInputString(_name_, "/", " ");
   LogInfo << "Defining sample: " << _name_ << std::endl;
-
-  _binningConfig_ = GenericToolbox::Json::fetchValue(_config_, {{"binningFilePath"}, {"binningFile"}, {"binning"}}, _binningConfig_);
 
   _isEnabled_ = GenericToolbox::Json::fetchValue(_config_, "isEnabled", true);
   LogReturnIf(not _isEnabled_, "\"" << _name_ << "\" is disabled.");
 
+  _binningConfig_ = GenericToolbox::Json::fetchValue(_config_, {{"binningFilePath"}, {"binningFile"}, {"binning"}}, _binningConfig_);
   _selectionCutStr_ = GenericToolbox::Json::fetchValue(_config_, {{"selectionCutStr"}, {"selectionCuts"}}, _selectionCutStr_);
   _enabledDatasetList_ = GenericToolbox::Json::fetchValue(_config_, std::vector<std::string>{"datasets", "dataSets"}, _enabledDatasetList_);
 }
@@ -47,6 +42,10 @@ void Sample::initializeImpl() {
 
 }
 
+void Sample::writeEventRates(const GenericToolbox::TFilePath& saveDir_) const{
+  if( not _isEnabled_ ){ return; } // don't write anything, even the containing dir
+  GenericToolbox::writeInTFile(saveDir_.getSubDir(_name_).getDir(), getSumWeights(), "sumWeights");
+}
 bool Sample::isDatasetValid(const std::string& datasetName_){
   if( _enabledDatasetList_.empty() ) return true;
   for( auto& dataSetName : _enabledDatasetList_){

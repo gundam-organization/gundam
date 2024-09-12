@@ -206,6 +206,9 @@ void Propagator::reweightEvents() {
 }
 
 // misc
+void Propagator::writeEventRates(const GenericToolbox::TFilePath& saveDir_) const {
+  for( auto& sample : _sampleSet_.getSampleList() ){ sample.writeEventRates(saveDir_); }
+}
 void Propagator::printBreakdowns(){
 
   LogInfo << std::endl << "Breaking down samples..." << std::endl;

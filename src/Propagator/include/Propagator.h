@@ -6,11 +6,9 @@
 #define GUNDAM_PROPAGATOR_H
 
 
-#include "EventTreeWriter.h"
 #include "ParametersManager.h"
 #include "DialCollection.h"
 #include "EventDialCache.h"
-#include "PlotGenerator.h"
 #include "JsonBaseClass.h"
 #include "SampleSet.h"
 
@@ -60,7 +58,6 @@ public:
   // Non-const getters
   SampleSet &getSampleSet(){ return _sampleSet_; }
   ParametersManager &getParametersManager(){ return _parManager_; }
-  PlotGenerator &getPlotGenerator(){ return _plotGenerator_; }
   EventDialCache& getEventDialCache(){ return _eventDialCache_; }
   std::vector<DialCollection> &getDialCollectionList(){ return _dialCollectionList_; }
   GenericToolbox::ParallelWorker& getThreadPool(){ return _threadPool_; }
@@ -73,6 +70,7 @@ public:
   void reweightEvents();
 
   // misc
+  void writeEventRates(const GenericToolbox::TFilePath& saveDir_) const;
   void printBreakdowns();
   [[nodiscard]] std::string getSampleBreakdownTableStr() const;
 
@@ -116,7 +114,6 @@ private:
 
   // Sub-layers
   SampleSet _sampleSet_{};
-  PlotGenerator _plotGenerator_{};
   EventDialCache _eventDialCache_{};
   ParametersManager _parManager_{};
 

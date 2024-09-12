@@ -169,7 +169,7 @@ double LikelihoodInterface::evalPenaltyLikelihood(const ParameterSet& parSet_) c
 
   return buffer;
 }
-[[nodiscard]] std::string LikelihoodInterface::getSummary() const {
+std::string LikelihoodInterface::getSummary() const {
   std::stringstream ss;
 
   this->evalLikelihood(); // make sure the buffer is up-to-date
@@ -196,6 +196,34 @@ double LikelihoodInterface::evalPenaltyLikelihood(const ParameterSet& parSet_) c
       }
   );
   return ss.str();
+}
+
+void LikelihoodInterface::writeEvents(const GenericToolbox::TFilePath& saveDir_) const {
+  LogInfo << "Writing sample events data." << std::endl;
+
+  // TODO: use the EventDialCache for writing the dials?
+
+  LogInfo << "Writing model sample events..." << std::endl;
+  for( auto& sample : _modelPropagator_.getSampleSet().getSampleList() ){
+    if( not sample.isEnabled() ){ continue; }
+    _eventTreeWriter_.writeEvents( saveDir_.getSubDir("model").getSubDir(sample.getName()), sample.getEventList() );
+  }
+
+  LogInfo << "Writing data sample events..." << std::endl;
+  for( auto& sample : _dataPropagator_.getSampleSet().getSampleList() ){
+    if( not sample.isEnabled() ){ continue; }
+    _eventTreeWriter_.writeEvents( saveDir_.getSubDir("data").getSubDir(sample.getName()), sample.getEventList() );
+  }
+
+}
+void LikelihoodInterface::writeEventRates(const GenericToolbox::TFilePath& saveDir_) const {
+  LogInfo << "Writing event rates." << std::endl;
+
+  LogInfo << "Writing model event rates..." << std::endl;
+  _modelPropagator_.writeEventRates( saveDir_.getSubDir("model") );
+
+  LogInfo << "Writing data event rates..." << std::endl;
+  _dataPropagator_.writeEventRates( saveDir_.getSubDir("data") );
 }
 
 void LikelihoodInterface::load(){

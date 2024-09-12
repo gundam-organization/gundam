@@ -40,65 +40,25 @@ void EventTreeWriter::readConfigImpl() {
 }
 
 
-void EventTreeWriter::writeSamples(TDirectory* saveDir_, const Propagator& propagator_) const{
-  LogReturnIf(not _isEnabled_, "Disabled EventTreeWriter. Skipping writeSamples.");
-
-  LogInfo << "Writing sample data in TTrees..." << std::endl;
-
-  // for usage in other methods
-  propagatorPtr = &propagator_;
-
-  for( const auto& sample : propagator_.getSampleSet().getSampleList() ){
-    LogScopeIndent;
-    LogInfo << "Writing sample: " << sample.getName() << std::endl;
-
-    for( bool isData : {false, true} ) {
-      const auto *evListPtr = (isData ? &sample.getDataContainer().getEventList() : &sample.getMcContainer().getEventList());
-      if (evListPtr->empty()) continue;
-
-      if( not _writeDials_ or isData ){
-        this->writeEvents(GenericToolbox::mkdirTFile(saveDir_, sample.getName()), (isData ? "Data" : "MC"), *evListPtr);
-      }
-      else{
-        std::vector<const EventDialCache::CacheEntry*> cacheSampleList{};
-        cacheSampleList.reserve( propagator_.getEventDialCache().getCache().size() );
-        for( auto& cacheEntry : propagator_.getEventDialCache().getCache() ){
-          if( cacheEntry.event->getIndices().sample == sample.getIndex() ){
-            cacheSampleList.emplace_back( &cacheEntry );
-          }
-        }
-        cacheSampleList.shrink_to_fit();
-
-        this->writeEvents(GenericToolbox::mkdirTFile(saveDir_, sample.getName()), "MC", cacheSampleList);
-      }
-    } // isData
-  } // sample
-
+void EventTreeWriter::writeEvents(const GenericToolbox::TFilePath& saveDir_, const std::vector<Event> & eventList_) const {
+  this->writeEventsTemplate(saveDir_, eventList_);
 }
-void EventTreeWriter::writeEvents(TDirectory *saveDir_, const std::string& treeName_, const std::vector<Event> & eventList_) const {
+void EventTreeWriter::writeEvents(const GenericToolbox::TFilePath& saveDir_, const std::vector<const EventDialCache::CacheEntry*>& cacheSampleList_) const{
   LogReturnIf(not _isEnabled_, "Disabled EventTreeWriter. Skipping writeEvents.");
-  this->writeEventsTemplate(saveDir_, treeName_, eventList_);
-}
-void EventTreeWriter::writeEvents(TDirectory* saveDir_, const std::string& treeName_, const std::vector<const EventDialCache::CacheEntry*>& cacheSampleList_) const{
-  LogReturnIf(not _isEnabled_, "Disabled EventTreeWriter. Skipping writeEvents.");
-  this->writeEventsTemplate(saveDir_, treeName_, cacheSampleList_);
+  this->writeEventsTemplate(saveDir_, cacheSampleList_);
 }
 
-template<typename T> void EventTreeWriter::writeEventsTemplate(TDirectory* saveDir_, const std::string& treeName_, const T& eventList_) const {
-  LogThrowIf(saveDir_ == nullptr, "Save TDirectory is not set.");
-  LogThrowIf(treeName_.empty(), "TTree name no set.");
-
+template<typename T> void EventTreeWriter::writeEventsTemplate(const GenericToolbox::TFilePath& saveDir_, const T& eventList_) const {
   LogReturnIf(eventList_.empty(), "No event to be written. Leaving...");
 
   const std::vector<EventDialCache::DialResponseCache>* dialElements{getDialElementsPtr(eventList_[0])};
   bool writeDials{dialElements != nullptr};
 
-  LogInfo << "Writing " << eventList_.size() << " events " << (writeDials? "with response dials": "without response dials") << " in TTree " << treeName_ << std::endl;
+  LogInfo << "Writing " << eventList_.size() << " events " << (writeDials? "with response dials": "without response dials") << " in TTree." << std::endl;
 
   auto* oldDir = GenericToolbox::getCurrentTDirectory();
-
-  saveDir_->cd();
-  auto* tree = new TTree(treeName_.c_str(), treeName_.c_str());
+  saveDir_.getDir()->cd();
+  auto* tree = new TTree("events", "events");
 
   GenericToolbox::RawDataArray privateMemberArr;
   std::map<std::string, std::function<void(GenericToolbox::RawDataArray&, const Event&)>> leafDictionary;
@@ -171,9 +131,7 @@ template<typename T> void EventTreeWriter::writeEventsTemplate(TDirectory* saveD
   std::vector<TGraph*> graphParResponse{};
   std::vector<std::pair<size_t,size_t>> parIndexList{};
 
-
   if( writeDials ){
-
     // how many pars?
     size_t nPars = 0;
     for( auto& parSet : propagatorPtr->getParametersManager().getParameterSetsList() ){
@@ -255,7 +213,7 @@ template<typename T> void EventTreeWriter::writeEventsTemplate(TDirectory* saveD
     });
   }
 
-  std::string progressTitle = LogInfo.getPrefixString() + Logger::getIndentStr() + "Writing " + treeName_;
+  std::string progressTitle = LogInfo.getPrefixString() + Logger::getIndentStr() + "Writing events";
   size_t iEvent{0}; size_t nEvents = (eventList_.size());
   for( auto& cacheEntry : eventList_ ){
     GenericToolbox::displayProgressBar(iEvent++,nEvents,progressTitle);
@@ -283,10 +241,8 @@ template<typename T> void EventTreeWriter::writeEventsTemplate(TDirectory* saveD
     _threadPool_.removeJob("buildResponseGraph");
   }
 
-
-//  tree->Write();
-  GenericToolbox::writeInTFile( saveDir_, tree );
+  GenericToolbox::writeInTFile( saveDir_.getDir(), tree );
   delete tree;
 
-  if(oldDir != nullptr) oldDir->cd();
+  if(oldDir != nullptr){ oldDir->cd(); }
 }

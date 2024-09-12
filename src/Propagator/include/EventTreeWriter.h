@@ -11,6 +11,7 @@
 #include "GundamUtils.h"
 #include "JsonBaseClass.h"
 
+#include "GenericToolbox.Root.h"
 #include "GenericToolbox.Utils.h"
 #include "GenericToolbox.Thread.h"
 
@@ -20,25 +21,19 @@
 #include <string>
 
 
-// forward declaration?
-class Propagator;
-
-
 class EventTreeWriter : public JsonBaseClass {
 
 public:
   EventTreeWriter() = default;
 
-  void writeSamples(TDirectory* saveDir_, const Propagator& propagator_) const;
-
-  void writeEvents(TDirectory* saveDir_, const std::string& treeName_, const std::vector<Event> & eventList_) const;
-  void writeEvents(TDirectory* saveDir_, const std::string& treeName_, const std::vector<const EventDialCache::CacheEntry*>& cacheSampleList_) const;
+  void writeEvents(const GenericToolbox::TFilePath& saveDir_, const std::vector<Event> & eventList_) const;
+  void writeEvents(const GenericToolbox::TFilePath& saveDir_, const std::vector<const EventDialCache::CacheEntry*>& cacheSampleList_) const;
 
 protected:
   void readConfigImpl() override;
 
   // templates related -> ensure the exact same code is used to write standard vars
-  template<typename T> void writeEventsTemplate(TDirectory* saveDir_, const std::string& treeName_, const T& eventList_) const;
+  template<typename T> void writeEventsTemplate(const GenericToolbox::TFilePath& saveDir_, const T& eventList_) const;
 
   static const Event* getEventPtr( const Event& ev_){ return &ev_; }
   static const Event* getEventPtr( const EventDialCache::CacheEntry* ev_){ return ev_->event; }
