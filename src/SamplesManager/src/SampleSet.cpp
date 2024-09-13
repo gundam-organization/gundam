@@ -22,20 +22,25 @@ LoggerInit([]{ Logger::setUserHeaderStr("[SampleSet]"); });
 
 
 void SampleSet::readConfigImpl(){
-  LogWarning << __METHOD_NAME__ << std::endl;
-  LogThrowIf(_config_.empty(), "_config_ is not set." << std::endl);
 
-  _showTimeStats_ = GenericToolbox::Json::fetchValue(_config_, "showTimeStats", _showTimeStats_);
-
-  LogInfo << "Reading samples definition..." << std::endl;
   auto sampleListConfig = GenericToolbox::Json::fetchValue(_config_, {{"sampleList"}, {"fitSampleList"}}, JsonType());
 
   if( _sampleList_.empty() ){
-    // alright no problem, it's from scratch
-    _sampleList_.resize( sampleListConfig.size() );
+    // from scratch
+    _sampleList_.reserve( sampleListConfig.size() );
+    int iSample{0};
+    for( auto& sampleConfig : sampleListConfig ){
+      _sampleList_.emplace_back();
+      _sampleList_.back().setIndex( iSample++ );
+      _sampleList_.back().readConfig( sampleConfig );
+
+      // remove from the list if not enabled
+      if( _sampleList_.back().isEnabled() ){ _sampleList_.pop_back(); iSample--; }
+    }
   }
   else{
-    // for temporary propagators, we want to read the config without removing the content of the samples
+    // for temporary config overrides of propagators,
+    // we want to read the config without removing the content of the samples
 
     // need to check how many samples are enabled. It should match the list.
     size_t nSamples{0};
@@ -44,22 +49,18 @@ void SampleSet::readConfigImpl(){
       nSamples++;
     }
     LogThrowIf(nSamples != _sampleList_.size(), "Can't reload config with different number of samples");
-  }
 
-  for( size_t iSample = 0 ; iSample < sampleListConfig.size() ; iSample++ ){
-    if( not GenericToolbox::Json::fetchValue(sampleListConfig[iSample], "isEnabled", true) ) continue;
-    _sampleList_[iSample].setIndex( int(iSample) );
-    _sampleList_[iSample].readConfig( sampleListConfig[iSample] );
+    for( size_t iSample = 0 ; iSample < _sampleList_.size() ; iSample++ ){
+      if( not GenericToolbox::Json::fetchValue(sampleListConfig[iSample], "isEnabled", true) ) continue;
+      _sampleList_[ iSample ].readConfig( sampleListConfig[iSample] ); // read the config again
+    }
   }
 }
 void SampleSet::initializeImpl() {
-  LogWarning << __METHOD_NAME__ << std::endl;
-  LogThrowIf(_sampleList_.empty(), "No sample is defined.");
-
   for( auto& sample : _sampleList_ ){ sample.initialize(); }
 }
 
-void SampleSet::clearMcContainers(){
+void SampleSet::clearEventLists(){
   for( auto& sample : _sampleList_ ){
     LogInfo << "Clearing event list for \"" << sample.getName() << "\"" << std::endl;
     sample.getEventList().clear();

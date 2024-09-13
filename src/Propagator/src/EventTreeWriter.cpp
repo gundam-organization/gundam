@@ -54,8 +54,6 @@ template<typename T> void EventTreeWriter::writeEventsTemplate(const GenericTool
   const std::vector<EventDialCache::DialResponseCache>* dialElements{getDialElementsPtr(eventList_[0])};
   bool writeDials{dialElements != nullptr};
 
-  LogInfo << "Writing " << eventList_.size() << " events " << (writeDials? "with response dials": "without response dials") << " in TTree." << std::endl;
-
   auto* oldDir = GenericToolbox::getCurrentTDirectory();
   saveDir_.getDir()->cd();
   auto* tree = new TTree("events", "events");
@@ -215,10 +213,8 @@ template<typename T> void EventTreeWriter::writeEventsTemplate(const GenericTool
     });
   }
 
-  std::string progressTitle = LogInfo.getPrefixString() + Logger::getIndentStr() + "Writing events";
   size_t iEvent{0}; size_t nEvents = (eventList_.size());
   for( auto& cacheEntry : eventList_ ){
-    GenericToolbox::displayProgressBar(iEvent++,nEvents,progressTitle);
 
     privateMemberArr.resetCurrentByteOffset();
     for( auto& leafDef : leafDictionary ){ leafDef.second(privateMemberArr, *EventTreeWriter::getEventPtr(cacheEntry)); }

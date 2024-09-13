@@ -22,10 +22,9 @@ LoggerInit([]{ Logger::setUserHeaderStr("[Sample]"); });
 void Sample::readConfigImpl(){
   _name_ = GenericToolbox::Json::fetchValue(_config_, "name", _name_);
   GenericToolbox::replaceSubstringInsideInputString(_name_, "/", " ");
-  LogInfo << "Defining sample: " << _name_ << std::endl;
 
   _isEnabled_ = GenericToolbox::Json::fetchValue(_config_, "isEnabled", true);
-  LogReturnIf(not _isEnabled_, "\"" << _name_ << "\" is disabled.");
+  if( not _isEnabled_ ){ return; }
 
   _binningConfig_ = GenericToolbox::Json::fetchValue(_config_, {{"binningFilePath"}, {"binningFile"}, {"binning"}}, _binningConfig_);
   _selectionCutStr_ = GenericToolbox::Json::fetchValue(_config_, {{"selectionCutStr"}, {"selectionCuts"}}, _selectionCutStr_);
@@ -33,8 +32,6 @@ void Sample::readConfigImpl(){
 }
 void Sample::initializeImpl() {
   if( not _isEnabled_ ) return;
-
-  LogInfo << "Initializing sample: " << _name_ << std::endl;
 
   _binning_.readBinningDefinition( _binningConfig_ );
   _binning_.sortBins();

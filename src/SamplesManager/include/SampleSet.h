@@ -27,7 +27,7 @@ protected:
 
 public:
   // Post init
-  void clearMcContainers();
+  void clearEventLists();
 
   // const getters
   [[nodiscard]] const std::vector<Sample> &getSampleList() const { return _sampleList_; }
@@ -43,7 +43,6 @@ public:
 
 private:
   // config
-  bool _showTimeStats_{false};
   std::vector<Sample> _sampleList_;
 
   // internals

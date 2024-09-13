@@ -26,7 +26,6 @@ void Propagator::muteLogger(){ Logger::setIsMuted( true ); }
 void Propagator::unmuteLogger(){ Logger::setIsMuted( false ); }
 
 void Propagator::readConfigImpl(){
-  LogWarning << __METHOD_NAME__ << std::endl;
 
   // legacy -- option within propagator -> should be defined elsewhere
   GenericToolbox::Json::deprecatedAction(_config_, "parameterSetListConfig", [&]{
@@ -41,6 +40,43 @@ void Propagator::readConfigImpl(){
 
   // nested objects
   _parManager_.readConfig( GenericToolbox::Json::fetchValue( _config_, "parametersManagerConfig", _parManager_.getConfig()) );
+  _sampleSet_.readConfig( GenericToolbox::Json::fetchValue(_config_, {{"sampleSetConfig"}, {"fitSampleSetConfig"}}, JsonType()) );
+
+  _dialCollectionList_.clear(); // make sure it's empty in case readConfig() is called more than once
+  for(size_t iParSet = 0 ; iParSet < _parManager_.getParameterSetsList().size() ; iParSet++ ){
+    if( not _parManager_.getParameterSetsList()[iParSet].isEnabled() ){ continue; }
+    // DEV / DialCollections
+    if( not _parManager_.getParameterSetsList()[iParSet].getDialSetDefinitions().empty() ){
+      for( auto& dialSetDef : _parManager_.getParameterSetsList()[iParSet].getDialSetDefinitions().get<std::vector<JsonType>>() ){
+        _dialCollectionList_.emplace_back(&_parManager_.getParameterSetsList());
+        _dialCollectionList_.back().setIndex(int(_dialCollectionList_.size()) - 1);
+        _dialCollectionList_.back().setSupervisedParameterSetIndex(int(iParSet) );
+        _dialCollectionList_.back().readConfig(dialSetDef );
+      }
+    }
+    else{
+
+      for( auto& par : _parManager_.getParameterSetsList()[iParSet].getParameterList() ){
+        if( not par.isEnabled() ){ continue; }
+
+        // Check if no definition is present -> disable the parameter in that case
+        if( par.getDialDefinitionsList().empty() ) {
+          LogAlert << "Disabling \"" << par.getFullTitle() << "\": no dial definition." << std::endl;
+          par.setIsEnabled(false);
+          continue;
+        }
+
+        for( const auto& dialDefinitionConfig : par.getDialDefinitionsList() ){
+          _dialCollectionList_.emplace_back(&_parManager_.getParameterSetsList());
+          _dialCollectionList_.back().setIndex(int(_dialCollectionList_.size()) - 1);
+          _dialCollectionList_.back().setSupervisedParameterSetIndex(int(iParSet) );
+          _dialCollectionList_.back().setSupervisedParameterIndex(par.getParameterIndex() );
+          _dialCollectionList_.back().readConfig( dialDefinitionConfig );
+        }
+      }
+    }
+  }
+
 
   // Monitoring parameters
   _showEventBreakdown_ = GenericToolbox::Json::fetchValue(_config_, "showEventBreakdown", _showEventBreakdown_);
@@ -64,66 +100,15 @@ void Propagator::readConfigImpl(){
     _eventDialCache_.getGlobalEventReweightCap().maxReweight = GenericToolbox::Json::fetchValue<double>(_config_, "globalEventReweightCap");
   }
 
-
-  LogInfo << "Reading samples configuration..." << std::endl;
-  auto fitSampleSetConfig = GenericToolbox::Json::fetchValue(_config_, {{"sampleSetConfig"}, {"fitSampleSetConfig"}}, JsonType());
-  _sampleSet_.setConfig(fitSampleSetConfig);
-  _sampleSet_.readConfig();
-
-  LogInfo << "Reading DialCollection configurations..." << std::endl;
-  _dialCollectionList_.clear(); // make sure it's empty in case readConfig() is called more than once
-  for(size_t iParSet = 0 ; iParSet < _parManager_.getParameterSetsList().size() ; iParSet++ ){
-    LogScopeIndent;
-    LogInfo << "Reading dial definitions for " << _parManager_.getParameterSetsList()[iParSet].getName() << std::endl;
-
-    if( not _parManager_.getParameterSetsList()[iParSet].isEnabled() ) continue;
-    // DEV / DialCollections
-    if( not _parManager_.getParameterSetsList()[iParSet].getDialSetDefinitions().empty() ){
-      for( auto& dialSetDef : _parManager_.getParameterSetsList()[iParSet].getDialSetDefinitions().get<std::vector<JsonType>>() ){
-        _dialCollectionList_.emplace_back(&_parManager_.getParameterSetsList());
-        _dialCollectionList_.back().setIndex(int(_dialCollectionList_.size()) - 1);
-        _dialCollectionList_.back().setSupervisedParameterSetIndex(int(iParSet) );
-        _dialCollectionList_.back().readConfig(dialSetDef );
-      }
-    }
-    else{
-
-      for( auto& par : _parManager_.getParameterSetsList()[iParSet].getParameterList() ){
-        if( not par.isEnabled() ) continue;
-
-        // Check if no definition is present -> disable the parameter in that case
-        if( par.getDialDefinitionsList().empty() ) {
-          LogAlert << "Disabling \"" << par.getFullTitle() << "\": no dial definition." << std::endl;
-          par.setIsEnabled(false);
-          continue;
-        }
-
-        for( const auto& dialDefinitionConfig : par.getDialDefinitionsList() ){
-          _dialCollectionList_.emplace_back(&_parManager_.getParameterSetsList());
-          _dialCollectionList_.back().setIndex(int(_dialCollectionList_.size()) - 1);
-          _dialCollectionList_.back().setSupervisedParameterSetIndex(int(iParSet) );
-          _dialCollectionList_.back().setSupervisedParameterIndex(par.getParameterIndex() );
-          _dialCollectionList_.back().readConfig(dialDefinitionConfig );
-        }
-      }
-    }
-  }
-
-  LogInfo << "Reading config of the Propagator done." << std::endl;
 }
 void Propagator::initializeImpl(){
   LogWarning << __METHOD_NAME__ << std::endl;
 
-  LogInfo << std::endl << GenericToolbox::addUpDownBars("Initializing parameters...") << std::endl;
   _parManager_.initialize();
-
-  LogInfo << std::endl << GenericToolbox::addUpDownBars("Initializing samples...") << std::endl;
   _sampleSet_.initialize();
 
-  LogInfo << std::endl << GenericToolbox::addUpDownBars("Initializing dials...") << std::endl;
   for( auto& dialCollection : _dialCollectionList_ ){ dialCollection.initialize(); }
 
-  LogInfo << "Initializing propagation threads..." << std::endl;
   initializeThreads();
 }
 
@@ -132,7 +117,7 @@ void Propagator::clearContent(){
   LogInfo << "Clearing Propagator content..." << std::endl;
 
   // clearing events in MC containers
-  _sampleSet_.clearMcContainers();
+  _sampleSet_.clearEventLists();
 
   // also wiping event-by-event dials...
   for( auto& dialCollection: _dialCollectionList_ ) {

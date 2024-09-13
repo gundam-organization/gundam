@@ -315,7 +315,7 @@ int main(int argc, char** argv){
   // --toy <iToy>
   if( clParser.isOptionTriggered("toyFit") ){
     fitter.getLikelihoodInterface().setDataType( LikelihoodInterface::DataType::Toy );
-    fitter.getLikelihoodInterface().getDataPropagator().setIThrow( clParser.getOptionVal("toyFit", -1) );
+    fitter.getLikelihoodInterface().getModelPropagator().setIThrow( clParser.getOptionVal("toyFit", -1) );
   }
 
   // -d

@@ -274,7 +274,7 @@ void FitterEngine::fit(){
   // Not moving parameters
   if( _generateSamplePlots_ and not getLikelihoodInterface().getPlotGenerator().getConfig().empty() ){
     LogInfo << "Generating pre-fit sample plots..." << std::endl;
-    getLikelihoodInterface().getPlotGenerator().generateSamplePlots(GenericToolbox::mkdirTFile(_saveDir_, "preFit/samples"));
+    getLikelihoodInterface().getPlotGenerator().generateSamplePlots(GenericToolbox::mkdirTFile(_saveDir_, "preFit/plots"));
     GenericToolbox::triggerTFileWrite(_saveDir_);
   }
 

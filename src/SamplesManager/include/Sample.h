@@ -95,8 +95,8 @@ public:
   friend std::ostream& operator <<( std::ostream& o, const Sample& this_ );
 
 private:
-  // Yaml
-  bool _isEnabled_{false};
+  // configuration
+  bool _isEnabled_{true};
   int _index_{-1};
   std::string _name_;
   std::string _selectionCutStr_;

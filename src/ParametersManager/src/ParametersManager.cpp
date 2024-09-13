@@ -25,19 +25,18 @@ void ParametersManager::unmuteLogger(){ Logger::setIsMuted( false ); }
 void ParametersManager::readConfigImpl(){
 
   _parameterSetListConfig_ = GenericToolbox::Json::fetchValue(_config_, "parameterSetList", _parameterSetListConfig_);
-
-  _reThrowParSetIfOutOfPhysical_ = GenericToolbox::Json::fetchValue(_config_, {{"reThrowParSetIfOutOfBounds"},{"reThrowParSetIfOutOfPhysical"}}, _reThrowParSetIfOutOfPhysical_);
-  _throwToyParametersWithGlobalCov_ = GenericToolbox::Json::fetchValue(_config_, "throwToyParametersWithGlobalCov", _throwToyParametersWithGlobalCov_);
-
-  LogInfo << "Reading parameter configuration..." << std::endl;
   _parameterSetList_.clear(); // make sure there nothing in case readConfig is called more than once
   _parameterSetList_.reserve( _parameterSetListConfig_.size() );
   for( const auto& parameterSetConfig : _parameterSetListConfig_ ){
     _parameterSetList_.emplace_back();
     _parameterSetList_.back().readConfig( parameterSetConfig );
-    LogInfo << _parameterSetList_.back().getSummary() << std::endl;
+
+    // clear the parameter sets that have been disabled
+    if( not _parameterSetList_.back().isEnabled() ){ _parameterSetList_.pop_back(); }
   }
-  LogInfo << _parameterSetList_.size() << " parameter sets defined." << std::endl;
+
+  _reThrowParSetIfOutOfPhysical_ = GenericToolbox::Json::fetchValue(_config_, {{"reThrowParSetIfOutOfBounds"},{"reThrowParSetIfOutOfPhysical"}}, _reThrowParSetIfOutOfPhysical_);
+  _throwToyParametersWithGlobalCov_ = GenericToolbox::Json::fetchValue(_config_, "throwToyParametersWithGlobalCov", _throwToyParametersWithGlobalCov_);
 
 }
 void ParametersManager::initializeImpl(){
