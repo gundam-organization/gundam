@@ -326,7 +326,7 @@ void LikelihoodInterface::loadModelPropagator(){
 
 }
 void LikelihoodInterface::loadDataPropagator(){
-  LogInfo << std::endl << "Loading data..." << std::endl;
+  LogInfo << "Loading data..." << std::endl;
 
   _dataPropagator_.clearContent();
 

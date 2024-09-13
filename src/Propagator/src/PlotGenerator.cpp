@@ -598,7 +598,7 @@ void PlotGenerator::defineHistogramHolders() {
   LogWarning << __METHOD_NAME__ << std::endl;
   _histHolderCacheList_[0].clear();
 
-  LogInfo << "Fetching appearing split vars..." << std::endl;
+  LogInfo << "Defining histogram holders..." << std::endl;
 
   struct SplitVariableDictionary{
     struct Entry{
@@ -677,8 +677,6 @@ void PlotGenerator::defineHistogramHolders() {
   int sampleCounter = -1;
   HistHolder histDefBase;
   for( const auto& sample : *_modelSampleListPtr_ ){
-    LogScopeIndent;
-    LogInfo << "Defining holders for sample: \"" << sample.getName() << "\"" << std::endl;
     sampleCounter++;
     histDefBase.samplePtr = &sample;
     short unsetSplitValueColor = kGray; // will increment if needed

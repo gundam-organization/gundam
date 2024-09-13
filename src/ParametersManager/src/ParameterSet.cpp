@@ -375,8 +375,6 @@ void ParameterSet::setValidity(const std::string& validity) {
 
 // Parameter throw
 void ParameterSet::moveParametersToPrior(){
-  LogInfo << "Moving back parameters to their prior value in set: " << getName() << std::endl;
-
   if( not isEnableEigenDecomp() ){
     for( auto& par : _parameterList_ ){
       if( par.isFixed() or not par.isEnabled() ){ continue; }
@@ -390,7 +388,6 @@ void ParameterSet::moveParametersToPrior(){
     }
     this->propagateEigenToOriginal();
   }
-
 }
 void ParameterSet::throwParameters(bool rethrowIfNotInPhysical_, double gain_){
 
