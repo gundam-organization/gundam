@@ -114,7 +114,6 @@ void Propagator::initializeImpl(){
 
 // core
 void Propagator::clearContent(){
-  LogInfo << "Clearing Propagator content..." << std::endl;
 
   // clearing events in MC containers
   _sampleSet_.clearEventLists();
@@ -193,6 +192,7 @@ void Propagator::printConfiguration() const {
   LogInfo << std::endl << "Printing propagator configuration:" << std::endl;
 
   _sampleSet_.printConfiguration();
+  _parManager_.printConfiguration();
 
   LogInfo << std::endl;
 }

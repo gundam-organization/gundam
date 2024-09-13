@@ -20,9 +20,11 @@
 LoggerInit([]{ Logger::setUserHeaderStr("[ParameterSet]"); });
 #endif
 
+
 void ParameterSet::readConfigImpl(){
 
   _name_ = GenericToolbox::Json::fetchValue<std::string>(_config_, "name");
+  LogDebugIf(GundamGlobals::isDebugConfig()) << "Reading config for parameter set: " << _name_ << std::endl;
 
   _isEnabled_ = GenericToolbox::Json::fetchValue(_config_, "isEnabled", _isEnabled_);
   if( not _isEnabled_ ){ return; } // don't go any further
@@ -103,7 +105,7 @@ void ParameterSet::readConfigImpl(){
     }
 
     if( _nbParameterDefinition_ == -1 and not _parameterDefinitionConfig_.empty() ){
-      LogInfo << "Using parameter definition config list to determine the number of parameters..." << std::endl;
+      LogDebugIf(GundamGlobals::isDebugConfig()) << "Using parameter definition config list to determine the number of parameters..." << std::endl;
       _nbParameterDefinition_ = int(_parameterDefinitionConfig_.get<std::vector<JsonType>>().size());
     }
 
@@ -829,6 +831,16 @@ double ParameterSet::toRealParValue(double normParValue, const Parameter& par) {
 }
 bool ParameterSet::isValidCorrelatedParameter(const Parameter& par_){
   return ( par_.isEnabled() and not par_.isFixed() and not par_.isFree() );
+}
+
+void ParameterSet::printConfiguration() const {
+
+  LogInfo << "ParameterSet: name(" << _name_ << ")";
+  LogInfo << ", nPars(" << _nbParameterDefinition_ << ")";
+  LogInfo << std::endl;
+
+  for( auto& par : _parameterList_ ){ par.printConfiguration(); }
+
 }
 
 

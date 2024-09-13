@@ -81,10 +81,6 @@ void DataDispenser::load(Propagator& propagator_){
   LogThrowIf(not this->isInitialized(), "Can't load while not initialized.");
   LogThrowIf(not propagator_.isInitialized(), "Can't load while propagator_ is not initialized.");
 
-  if(GundamGlobals::getVerboseLevel() >= VerboseLevel::MORE_PRINTOUT ){
-    LogDebug << "Configuration: " << _parameters_.getSummary() << std::endl;
-  }
-
   _cache_.clear();
   _cache_.propagatorPtr = &propagator_;
 
@@ -747,10 +743,6 @@ void DataDispenser::eventSelectionFunction(int iThread_){
         for (size_t iSample = 0; iSample < _cache_.samplesToFillList.size(); iSample++) {
           _cache_.threadSelectionResults[iThread_].eventIsInSamplesList[iEntry][iSample] = false;
         }
-        if (GundamGlobals::getVerboseLevel() == VerboseLevel::INLOOP_TRACE) {
-          LogTrace << "Event #" << treeChain->GetFileNumber() << ":" << treeChain->GetReadEntry()
-                   << " rejected because of " << _parameters_.selectionCutFormulaStr << std::endl;
-        }
         continue;
       }
     }
@@ -761,28 +753,17 @@ void DataDispenser::eventSelectionFunction(int iThread_){
       if( sampleCut.cutIndex == -1 ){
         _cache_.threadSelectionResults[iThread_].eventIsInSamplesList[iEntry][sampleCut.sampleIndex] = true;
         _cache_.threadSelectionResults[iThread_].sampleNbOfEvents[sampleCut.sampleIndex]++;
-        if (GundamGlobals::getVerboseLevel() == VerboseLevel::INLOOP_TRACE) {
-          LogDebug << "Event #" << treeChain->GetFileNumber() << ":" << treeChain->GetReadEntry()
-                   << " included as sample " << sampleCut.sampleIndex << " (NO SELECTION CUT)" << std::endl;
-        }
       }
         // pass cut?
       else if( lCollection.getLeafFormList()[sampleCut.cutIndex].evalAsDouble() != 0 ){
         _cache_.threadSelectionResults[iThread_].eventIsInSamplesList[iEntry][sampleCut.sampleIndex] = true;
         _cache_.threadSelectionResults[iThread_].sampleNbOfEvents[sampleCut.sampleIndex]++;
-        if (GundamGlobals::getVerboseLevel() == VerboseLevel::INLOOP_TRACE) {
-          LogDebug << "Event #" << treeChain->GetFileNumber() << ":" << treeChain->GetReadEntry()
-                   << " included as sample " << sampleCut.sampleIndex << " because of "
-                   << lCollection.getLeafFormList()[sampleCut.cutIndex].getSummary() << std::endl;
-        }
       }
         // don't pass cut?
       else {
-        if (GundamGlobals::getVerboseLevel() == VerboseLevel::INLOOP_TRACE) {
-          LogTrace << "Event #" << treeChain->GetFileNumber() << ":" << treeChain->GetReadEntry()
-                   << " rejected as sample " << sampleCut.sampleIndex << " because of "
-                   << lCollection.getLeafFormList()[sampleCut.cutIndex].getSummary() << std::endl;
-        }
+//          LogTrace << "Event #" << treeChain->GetFileNumber() << ":" << treeChain->GetReadEntry()
+//                   << " rejected as sample " << sampleCut.sampleIndex << " because of "
+//                   << lCollection.getLeafFormList()[sampleCut.cutIndex].getSummary() << std::endl;
       }
     }
 

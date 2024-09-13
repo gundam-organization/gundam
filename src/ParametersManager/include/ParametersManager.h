@@ -72,6 +72,9 @@ public:
   /// Check that the parameters in all of the enabled ParameterSets are valid.
   [[nodiscard]] bool hasValidParameterSets() const;
 
+  // print
+  void printConfiguration() const;
+
 private:
   // config
   bool _reThrowParSetIfOutOfPhysical_{true};

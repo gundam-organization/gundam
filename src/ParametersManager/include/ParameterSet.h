@@ -175,6 +175,9 @@ public:
   [[deprecated("use throwParameters()")]] void throwFitParameters( bool rethrowIfNotPhysical_ = true, double gain_ = 1){ throwParameters(rethrowIfNotPhysical_, gain_); }
   [[deprecated]] [[nodiscard]] bool isUseOnlyOneParameterPerEvent() const{ return _useOnlyOneParameterPerEvent_; }
 
+  // print
+  void printConfiguration() const;
+
 protected:
   void readParameterDefinitionFile();
   void defineParameters();

@@ -35,8 +35,8 @@ void ParametersManager::readConfigImpl(){
     if( not _parameterSetList_.back().isEnabled() ){ _parameterSetList_.pop_back(); }
   }
 
-  _reThrowParSetIfOutOfPhysical_ = GenericToolbox::Json::fetchValue(_config_, {{"reThrowParSetIfOutOfBounds"},{"reThrowParSetIfOutOfPhysical"}}, _reThrowParSetIfOutOfPhysical_);
   _throwToyParametersWithGlobalCov_ = GenericToolbox::Json::fetchValue(_config_, "throwToyParametersWithGlobalCov", _throwToyParametersWithGlobalCov_);
+  _reThrowParSetIfOutOfPhysical_ = GenericToolbox::Json::fetchValue(_config_, {{"reThrowParSetIfOutOfBounds"},{"reThrowParSetIfOutOfPhysical"}}, _reThrowParSetIfOutOfPhysical_);
 
 }
 void ParametersManager::initializeImpl(){
@@ -324,6 +324,16 @@ bool ParametersManager::hasValidParameterSets() const {
   }
   return true;
 }
+void ParametersManager::printConfiguration() const {
+
+  LogInfo << GET_VAR_NAME_VALUE(_throwToyParametersWithGlobalCov_) << std::endl;
+  LogInfo << GET_VAR_NAME_VALUE(_reThrowParSetIfOutOfPhysical_) << std::endl;
+
+  LogInfo << _parameterSetList_.size() << " parameter sets defined." << std::endl;
+  for( auto& parSet : _parameterSetList_ ){ parSet.printConfiguration(); }
+
+}
+
 void ParametersManager::setParameterValidity(const std::string& v) {
   for (ParameterSet& parSet: getParameterSetsList()) {
     parSet.setValidity(v);

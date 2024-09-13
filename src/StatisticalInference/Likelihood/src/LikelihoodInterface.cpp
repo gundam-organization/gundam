@@ -252,8 +252,11 @@ void LikelihoodInterface::writeEventRates(const GenericToolbox::TFilePath& saveD
 
 void LikelihoodInterface::load(){
 
-  loadModelPropagator();
-  loadDataPropagator();
+  LogInfo << std::endl; loadModelPropagator();
+
+  LogInfo << std::endl; loadDataPropagator();
+
+  LogInfo << std::endl;
 
   buildSamplePairList();
 
@@ -262,7 +265,7 @@ void LikelihoodInterface::load(){
 
 }
 void LikelihoodInterface::loadModelPropagator(){
-  LogInfo << std::endl << "Loading model..." << std::endl;
+  LogInfo << "Loading model..." << std::endl;
 
   _modelPropagator_.clearContent();
 

@@ -13,14 +13,6 @@
 #include <mutex>
 #include <memory>
 
-#define ENUM_NAME VerboseLevel
-#define ENUM_FIELDS \
-  ENUM_FIELD(NORMAL_MODE, 0) \
-  ENUM_FIELD(MORE_PRINTOUT) \
-  ENUM_FIELD(DEBUG_TRACE) \
-  ENUM_FIELD(INLOOP_TRACE) \
-  ENUM_FIELD(DEV_TRACE)
-#include "GenericToolbox.MakeEnum.h"
 
 class GundamGlobals{
 
@@ -33,7 +25,6 @@ public:
   static void setForceDirectCalculation(bool enable=false){ _forceDirectCalculation_ = enable; }
   static void setLightOutputMode(bool enable_){ _lightOutputMode_ = enable_; }
   static void setDisableDialCache(bool disableDialCache_){ _disableDialCache_ = disableDialCache_; }
-  static void setVerboseLevel(VerboseLevel verboseLevel_);
 
   // Getters
   static int getNumberOfThreads(){ return _gundamThreads_; }
@@ -42,7 +33,6 @@ public:
   static bool getForceDirectCalculation(){ return _forceDirectCalculation_; }
   static bool isDisableDialCache(){ return _disableDialCache_; }
   static bool isLightOutputMode(){ return _lightOutputMode_; }
-  static VerboseLevel::EnumType getVerboseLevel(){ return _verboseLevel_.value; }
   static std::mutex& getThreadMutex(){ return _threadMutex_; }
 
 private:
@@ -54,7 +44,6 @@ private:
   static bool _forceDirectCalculation_;
   static bool _lightOutputMode_;
   static std::mutex _threadMutex_;
-  static VerboseLevel _verboseLevel_;
 
 };
 

@@ -217,6 +217,10 @@ std::string Parameter::getSummary(bool shallow_) const {
   return ss.str();
 }
 
+void Parameter::printConfiguration() const {
+  LogInfo << "Parameter: " << getSummary() << std::endl;
+}
+
 //  A Lesser GNU Public License
 
 //  Copyright (C) 2023 GUNDAM DEVELOPERS

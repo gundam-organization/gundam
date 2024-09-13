@@ -169,8 +169,6 @@ void FitterEngine::initializeImpl(){
   // and other properties)
   _minimizer_->initialize();
 
-  if( GundamGlobals::getVerboseLevel() >= VerboseLevel::MORE_PRINTOUT ){ checkNumericalAccuracy(); }
-
   // Write data
   LogInfo << "Writing propagator objects..." << std::endl;
   GenericToolbox::writeInTFile(

@@ -69,10 +69,7 @@ void SampleSet::initializeImpl() {
 }
 
 void SampleSet::clearEventLists(){
-  for( auto& sample : _sampleList_ ){
-    LogInfo << "Clearing event list for \"" << sample.getName() << "\"" << std::endl;
-    sample.getEventList().clear();
-  }
+  for( auto& sample : _sampleList_ ){ sample.getEventList().clear(); }
 }
 
 std::vector<std::string> SampleSet::fetchRequestedVariablesForIndexing() const{
