@@ -24,6 +24,7 @@ LoggerInit([]{ Logger::setUserHeaderStr("[SampleSet]"); });
 void SampleSet::readConfigImpl(){
 
   auto sampleListConfig = GenericToolbox::Json::fetchValue(_config_, {{"sampleList"}, {"fitSampleList"}}, JsonType());
+  LogDebugIf(GundamGlobals::isDebugConfig()) << sampleListConfig.size() << " samples defined in the config." << std::endl;
 
   if( _sampleList_.empty() ){
     // from scratch
@@ -34,8 +35,13 @@ void SampleSet::readConfigImpl(){
       _sampleList_.back().setIndex( iSample++ );
       _sampleList_.back().readConfig( sampleConfig );
 
+      LogDebugIf(GundamGlobals::isDebugConfig()) << _sampleList_.back().getName() << std::endl;
+
       // remove from the list if not enabled
-      if( _sampleList_.back().isEnabled() ){ _sampleList_.pop_back(); iSample--; }
+      if( not _sampleList_.back().isEnabled() ){
+        LogDebugIf(GundamGlobals::isDebugConfig()) << "Removing disabled sample." << std::endl;
+        _sampleList_.pop_back(); iSample--;
+      }
     }
   }
   else{
@@ -55,6 +61,8 @@ void SampleSet::readConfigImpl(){
       _sampleList_[ iSample ].readConfig( sampleListConfig[iSample] ); // read the config again
     }
   }
+
+  LogDebugIf(GundamGlobals::isDebugConfig()) << sampleListConfig.size() << " samples were defined." << std::endl;
 }
 void SampleSet::initializeImpl() {
   for( auto& sample : _sampleList_ ){ sample.initialize(); }
@@ -88,3 +96,9 @@ void SampleSet::copyEventsFrom(const SampleSet& src_){
   }
 }
 
+void SampleSet::printConfiguration() const {
+
+  LogInfo << _sampleList_.size() << " samples defined." << std::endl;
+  for( auto& sample : _sampleList_ ){ sample.printConfiguration(); }
+
+}

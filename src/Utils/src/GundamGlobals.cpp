@@ -15,6 +15,7 @@ LoggerInit([]{ Logger::setUserHeaderStr("[GlobalVariables]"); });
 int GundamGlobals::_gundamThreads_{1};
 bool GundamGlobals::_disableDialCache_{false};
 bool GundamGlobals::_enableCacheManager_{false};
+bool GundamGlobals::_debugConfigReading_{false};
 bool GundamGlobals::_forceDirectCalculation_{false};
 bool GundamGlobals::_lightOutputMode_{false};
 std::mutex GundamGlobals::_threadMutex_;

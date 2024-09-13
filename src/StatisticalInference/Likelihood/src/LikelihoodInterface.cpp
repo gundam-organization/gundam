@@ -26,6 +26,8 @@ void LikelihoodInterface::readConfigImpl(){
   // only configure the model, data will be copied later
   _modelPropagator_.readConfig();
 
+  _modelPropagator_.printConfiguration();
+
   // First taking care of the DataSetManager
   JsonType dataSetManagerConfig{};
   GenericToolbox::Json::deprecatedAction(_modelPropagator_.getConfig(), {{"fitSampleSetConfig"}, {"dataSetList"}}, [&]{

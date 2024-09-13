@@ -34,13 +34,13 @@ public:
 
   Propagator() = default;
 
-  // Setters
+  // setters
   void setShowTimeStats(bool showTimeStats){ _showTimeStats_ = showTimeStats; }
   void setEnableEigenToOrigInPropagate(bool enableEigenToOrigInPropagate){ _enableEigenToOrigInPropagate_ = enableEigenToOrigInPropagate; }
   void setIThrow(int iThrow){ _iThrow_ = iThrow; }
   void setParameterInjectorConfig(const JsonType &parameterInjector){ _parameterInjectorMc_ = parameterInjector; }
 
-  // Const getters
+  // const getters
   [[nodiscard]] bool isThrowAsimovToyParameters() const { return _throwAsimovToyParameters_; }
   [[nodiscard]] bool isEnableStatThrowInToys() const { return _enableStatThrowInToys_; }
   [[nodiscard]] bool isEnableEventMcThrow() const { return _enableEventMcThrow_; }
@@ -55,7 +55,7 @@ public:
   [[nodiscard]] const SampleSet &getSampleSet() const { return _sampleSet_; }
   [[nodiscard]] const JsonType &getParameterInjectorMc() const { return _parameterInjectorMc_;; }
 
-  // Non-const getters
+  // mutable getters
   SampleSet &getSampleSet(){ return _sampleSet_; }
   ParametersManager &getParametersManager(){ return _parManager_; }
   EventDialCache& getEventDialCache(){ return _eventDialCache_; }
@@ -70,8 +70,9 @@ public:
   void reweightEvents();
 
   // misc
-  void writeEventRates(const GenericToolbox::TFilePath& saveDir_) const;
+  void printConfiguration() const;
   void printBreakdowns();
+  void writeEventRates(const GenericToolbox::TFilePath& saveDir_) const;
   [[nodiscard]] std::string getSampleBreakdownTableStr() const;
 
   // public members

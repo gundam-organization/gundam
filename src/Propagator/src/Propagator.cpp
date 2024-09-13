@@ -39,8 +39,8 @@ void Propagator::readConfigImpl(){
   });
 
   // nested objects
+  _sampleSet_.readConfig( GenericToolbox::Json::fetchValue(_config_, {{"sampleSetConfig"}, {"fitSampleSetConfig"}}, _sampleSet_.getConfig()) );
   _parManager_.readConfig( GenericToolbox::Json::fetchValue( _config_, "parametersManagerConfig", _parManager_.getConfig()) );
-  _sampleSet_.readConfig( GenericToolbox::Json::fetchValue(_config_, {{"sampleSetConfig"}, {"fitSampleSetConfig"}}, JsonType()) );
 
   _dialCollectionList_.clear(); // make sure it's empty in case readConfig() is called more than once
   for(size_t iParSet = 0 ; iParSet < _parManager_.getParameterSetsList().size() ; iParSet++ ){
@@ -188,6 +188,12 @@ void Propagator::reweightEvents() {
 // misc
 void Propagator::writeEventRates(const GenericToolbox::TFilePath& saveDir_) const {
   for( auto& sample : _sampleSet_.getSampleList() ){ sample.writeEventRates(saveDir_); }
+}
+void Propagator::printConfiguration() const {
+  LogInfo << "Propagator loaded configuration:" << std::endl;
+
+  _sampleSet_.printConfiguration();
+
 }
 void Propagator::printBreakdowns(){
 

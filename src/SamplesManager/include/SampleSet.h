@@ -6,10 +6,7 @@
 #define GUNDAM_SAMPLE_SET_H
 
 #include "Sample.h"
-#include "ParameterSet.h"
 #include "JsonBaseClass.h"
-
-#include "GenericToolbox.Time.h"
 
 #include <string>
 #include <vector>
@@ -41,12 +38,12 @@ public:
 
   void copyEventsFrom(const SampleSet& src_);
 
+  // misc
+  void printConfiguration() const;
+
 private:
   // config
   std::vector<Sample> _sampleList_;
-
-  // internals
-  std::vector<std::string> _eventByEventDialLeafList_;
 
 };
 

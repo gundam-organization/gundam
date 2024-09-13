@@ -23,20 +23,16 @@ void Sample::readConfigImpl(){
   _name_ = GenericToolbox::Json::fetchValue(_config_, "name", _name_);
   GenericToolbox::replaceSubstringInsideInputString(_name_, "/", " ");
 
-  _isEnabled_ = GenericToolbox::Json::fetchValue(_config_, "isEnabled", true);
+  _isEnabled_ = GenericToolbox::Json::fetchValue(_config_, "isEnabled", _isEnabled_);
   if( not _isEnabled_ ){ return; }
 
   _binningConfig_ = GenericToolbox::Json::fetchValue(_config_, {{"binningFilePath"}, {"binningFile"}, {"binning"}}, _binningConfig_);
   _selectionCutStr_ = GenericToolbox::Json::fetchValue(_config_, {{"selectionCutStr"}, {"selectionCuts"}}, _selectionCutStr_);
   _enabledDatasetList_ = GenericToolbox::Json::fetchValue(_config_, std::vector<std::string>{"datasets", "dataSets"}, _enabledDatasetList_);
-}
-void Sample::initializeImpl() {
-  if( not _isEnabled_ ) return;
 
   _binning_.readBinningDefinition( _binningConfig_ );
   _binning_.sortBins();
   this->buildHistogram( _binning_ );
-
 }
 
 void Sample::writeEventRates(const GenericToolbox::TFilePath& saveDir_) const{
@@ -272,6 +268,14 @@ std::shared_ptr<TH1D> Sample::generateRootHistogram() const{
   return out;
 }
 
+void Sample::printConfiguration() const{
+
+  LogInfo << "Sample #" << _index_;
+  LogInfo << " name(" << _name_ << ")";
+  LogInfo << " nBins(" << _histogram_.binList.size() << ")";
+  LogInfo << std::endl;
+
+}
 [[nodiscard]] std::string Sample::getSummary() const{
   std::stringstream ss;
   ss << "Sample: " << _name_ << std::endl;

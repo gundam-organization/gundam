@@ -43,7 +43,6 @@ public:
 protected:
   // called through public JsonBaseClass::readConfig() and JsonBaseClass::initialize()
   void readConfigImpl() override;
-  void initializeImpl() override;
 
 public:
   // SETTERS
@@ -91,6 +90,7 @@ public:
   [[nodiscard]] std::shared_ptr<TH1D> generateRootHistogram() const; // for the plot generator or for TFile save
 
   // printouts
+  void printConfiguration() const;
   [[nodiscard]] std::string getSummary() const;
   friend std::ostream& operator <<( std::ostream& o, const Sample& this_ );
 
