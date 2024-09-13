@@ -69,10 +69,7 @@ void Sample::reserveEventMemory(size_t dataSetIndex_, size_t nEvents, const Even
   datasetProperties.eventOffSet = _eventList_.size();
   datasetProperties.eventNb = nEvents;
 
-  LogScopeIndent;
-  LogInfo << _name_ << ": creating " << nEvents << " events ("
-          << GenericToolbox::parseSizeUnits( double(nEvents) * sizeof(eventBuffer_) )
-          << ")" << std::endl;
+  LogInfo << _name_ << ": creating " << nEvents << " events." << std::endl;
 
   _eventList_.resize(datasetProperties.eventOffSet + datasetProperties.eventNb, eventBuffer_);
 }
@@ -90,9 +87,7 @@ void Sample::shrinkEventList(size_t newTotalSize_){
   LogThrowIf(not _loadedDatasetList_.empty() and _loadedDatasetList_.back().eventNb < (_eventList_.size() - newTotalSize_),
              "Can't shrink since eventList of the last dataSet is too small.");
 
-  LogScopeIndent;
-  LogInfo << _name_ << ": shrinking event list from " << _eventList_.size() << " to " << newTotalSize_ << "..."
-          << "(+" << GenericToolbox::parseSizeUnits(double(_eventList_.size() - newTotalSize_) * sizeof(_eventList_.back()) ) << ")" << std::endl;
+  LogInfo << _name_ << ": shrinking event list from " << _eventList_.size() << " to " << newTotalSize_ << "..." << std::endl;
 
   _loadedDatasetList_.back().eventNb -= (_eventList_.size() - newTotalSize_);
   _eventList_.resize(newTotalSize_);
@@ -101,9 +96,6 @@ void Sample::shrinkEventList(size_t newTotalSize_){
 void Sample::updateBinEventList(int iThread_) {
   int nbThreads = GundamGlobals::getNumberOfThreads();
   if( iThread_ == -1 ){ iThread_ = 0; nbThreads = 1; }
-
-  if( iThread_ == 0 ){ LogScopeIndent; LogInfo << "Filling bin event cache for \"" << _name_ << "\"..." << std::endl; }
-
   // multithread technique with iBin += nbThreads;
   int iBin{iThread_};
   while( iBin < _histogram_.nBins ){

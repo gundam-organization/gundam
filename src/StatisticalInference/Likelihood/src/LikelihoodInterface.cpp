@@ -99,6 +99,8 @@ void LikelihoodInterface::initializeImpl() {
   // loading the propagators
   this->load();
 
+  this->printBreakdowns();
+
   _jointProbabilityPtr_->initialize();
 
   // Loading monitoring values:
@@ -168,31 +170,6 @@ double LikelihoodInterface::evalPenaltyLikelihood() const {
 double LikelihoodInterface::evalStatLikelihood(const SamplePair& samplePair_) const {
   return _jointProbabilityPtr_->eval( samplePair_ );
 }
-double LikelihoodInterface::evalPenaltyLikelihood(const ParameterSet& parSet_) const {
-  if( not parSet_.isEnabled() ){ return 0; }
-
-  double buffer = 0;
-
-  if( parSet_.getPriorCovarianceMatrix() != nullptr ){
-    if( parSet_.isEnableEigenDecomp() ){
-      for( const auto& eigenPar : parSet_.getEigenParameterList() ){
-        if( eigenPar.isFixed() ){ continue; }
-        buffer += TMath::Sq( (eigenPar.getParameterValue() - eigenPar.getPriorValue()) / eigenPar.getStdDevValue() ) ;
-      }
-    }
-    else{
-      // make delta vector
-      parSet_.updateDeltaVector();
-
-      // compute penalty term with covariance
-      buffer =
-          (*parSet_.getDeltaVectorPtr())
-          * ( (*parSet_.getInverseStrippedCovarianceMatrix()) * (*parSet_.getDeltaVectorPtr()) );
-    }
-  }
-
-  return buffer;
-}
 std::string LikelihoodInterface::getSummary() const {
   std::stringstream ss;
 
@@ -250,6 +227,40 @@ void LikelihoodInterface::writeEventRates(const GenericToolbox::TFilePath& saveD
   _dataPropagator_.writeEventRates( saveDir_.getSubDir("data") );
 }
 
+// print
+void LikelihoodInterface::printBreakdowns() const{
+
+
+
+}
+
+// static
+double LikelihoodInterface::evalPenaltyLikelihood(const ParameterSet& parSet_) {
+  if( not parSet_.isEnabled() ){ return 0; }
+
+  double buffer = 0;
+
+  if( parSet_.getPriorCovarianceMatrix() != nullptr ){
+    if( parSet_.isEnableEigenDecomp() ){
+      for( const auto& eigenPar : parSet_.getEigenParameterList() ){
+        if( eigenPar.isFixed() ){ continue; }
+        buffer += TMath::Sq( (eigenPar.getParameterValue() - eigenPar.getPriorValue()) / eigenPar.getStdDevValue() ) ;
+      }
+    }
+    else{
+      // make delta vector
+      parSet_.updateDeltaVector();
+
+      // compute penalty term with covariance
+      buffer =
+          (*parSet_.getDeltaVectorPtr())
+          * ( (*parSet_.getInverseStrippedCovarianceMatrix()) * (*parSet_.getDeltaVectorPtr()) );
+    }
+  }
+
+  return buffer;
+}
+
 void LikelihoodInterface::load(){
 
   LogInfo << std::endl; loadModelPropagator();
@@ -269,6 +280,7 @@ void LikelihoodInterface::loadModelPropagator(){
 
   _modelPropagator_.clearContent();
 
+  LogInfo << "Loading datasets..." << std::endl;
   for( auto& dataSet : _dataSetList_ ){
     dataSet.getModelDispenser().setPlotGeneratorPtr( &_plotGenerator_ );
     dataSet.getModelDispenser().load( _modelPropagator_ );
@@ -320,9 +332,11 @@ void LikelihoodInterface::loadDataPropagator(){
 
   if( _dataType_ == DataType::Asimov or _forceAsimovData_ ){
     // copy the events directly from the model
+    LogInfo << "Copying events from the model..." << std::endl;
     _dataPropagator_.getSampleSet().copyEventsFrom( _modelPropagator_.getSampleSet() );
   }
   else{
+    LogInfo << "Loading datasets..." << std::endl;
     for( auto& dataSet : _dataSetList_ ){
       // let the llh interface choose witch data entry to load
       auto* dataDispenser{this->getDataDispenser( dataSet )};

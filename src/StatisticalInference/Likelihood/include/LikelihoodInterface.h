@@ -92,12 +92,16 @@ public:
   double evalStatLikelihood() const;
   double evalPenaltyLikelihood() const;
   [[nodiscard]] double evalStatLikelihood(const SamplePair& samplePair_) const;
-  [[nodiscard]] double evalPenaltyLikelihood(const ParameterSet& parSet_) const;
   [[nodiscard]] std::string getSummary() const;
 
   void writeEvents(const GenericToolbox::TFilePath& saveDir_) const;
   void writeEventRates(const GenericToolbox::TFilePath& saveDir_) const;
 
+  // print
+  void printBreakdowns() const;
+
+  // statics
+  [[nodiscard]] static double evalPenaltyLikelihood(const ParameterSet& parSet_);
 
 protected:
   void load();
