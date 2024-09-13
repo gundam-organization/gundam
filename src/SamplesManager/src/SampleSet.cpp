@@ -35,11 +35,11 @@ void SampleSet::readConfigImpl(){
       _sampleList_.back().setIndex( iSample++ );
       _sampleList_.back().readConfig( sampleConfig );
 
-      LogDebugIf(GundamGlobals::isDebugConfig()) << _sampleList_.back().getName() << std::endl;
+      LogDebugIf(GundamGlobals::isDebugConfig()) << "Defined sample: " << _sampleList_.back().getName() << std::endl;
 
       // remove from the list if not enabled
       if( not _sampleList_.back().isEnabled() ){
-        LogDebugIf(GundamGlobals::isDebugConfig()) << "Removing disabled sample." << std::endl;
+        LogDebugIf(GundamGlobals::isDebugConfig()) << "-> removing this sample as it is disabled." << std::endl;
         _sampleList_.pop_back(); iSample--;
       }
     }

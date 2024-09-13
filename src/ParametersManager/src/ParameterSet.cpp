@@ -937,7 +937,7 @@ void ParameterSet::defineParameters(){
         par.setIsEnabled( false );
       }
       else{
-        LogInfo << "Enabling parameter \"" << par.getFullTitle() << "\" as it is set in enableOnlyParameters" << std::endl;
+        LogDebugIf(GundamGlobals::isDebugConfig()) << "Enabling parameter \"" << par.getFullTitle() << "\" as it is set in enableOnlyParameters" << std::endl;
       }
     }
     if( not _disableParameters_.empty() ){
@@ -951,7 +951,7 @@ void ParameterSet::defineParameters(){
       }
 
       if( not isEnabled ){
-        LogWarning << "Skipping parameter \"" << par.getFullTitle() << "\" as it is set in disableParameters" << std::endl;
+        LogDebugIf(GundamGlobals::isDebugConfig()) << "Skipping parameter \"" << par.getFullTitle() << "\" as it is set in disableParameters" << std::endl;
         par.setIsEnabled( false );
         continue;
       }

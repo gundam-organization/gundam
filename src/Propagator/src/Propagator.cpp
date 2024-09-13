@@ -190,10 +190,11 @@ void Propagator::writeEventRates(const GenericToolbox::TFilePath& saveDir_) cons
   for( auto& sample : _sampleSet_.getSampleList() ){ sample.writeEventRates(saveDir_); }
 }
 void Propagator::printConfiguration() const {
-  LogInfo << "Propagator loaded configuration:" << std::endl;
+  LogInfo << std::endl << "Printing propagator configuration:" << std::endl;
 
   _sampleSet_.printConfiguration();
 
+  LogInfo << std::endl;
 }
 void Propagator::printBreakdowns(){
 

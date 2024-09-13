@@ -271,8 +271,8 @@ std::shared_ptr<TH1D> Sample::generateRootHistogram() const{
 void Sample::printConfiguration() const{
 
   LogInfo << "Sample #" << _index_;
-  LogInfo << " name(" << _name_ << ")";
-  LogInfo << " nBins(" << _histogram_.binList.size() << ")";
+  LogInfo << ", name(" << _name_ << ")";
+  LogInfo << ", nBins(" << _histogram_.binList.size() << ")";
   LogInfo << std::endl;
 
 }
