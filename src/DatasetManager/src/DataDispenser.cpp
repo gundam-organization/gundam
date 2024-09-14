@@ -467,50 +467,41 @@ void DataDispenser::preAllocateMemory(){
     }
   }
 
-  if( _parameters_.useReweightEngine ){
-    if( not _cache_.dialCollectionsRefList.empty() ){
-      LogInfo << "Creating slots for event-by-event dials..." << std::endl;
-      size_t nDialsMaxPerEvent{0};
-      for( auto& dialCollection : _cache_.dialCollectionsRefList ){
-        LogScopeIndent;
-        nDialsMaxPerEvent += 1;
+  LogInfo << "Creating slots for event-by-event dials..." << std::endl;
+  size_t nDialsMaxPerEvent{0};
+  for( auto& dialCollection : _cache_.dialCollectionsRefList ){
+    LogScopeIndent;
+    nDialsMaxPerEvent += 1;
 
-        if (dialCollection->isEventByEvent()) {
-          // Reserve enough space for all the event-by-event dials
-          // that might be added.  This size may be reduced later.
-          auto& dialType = dialCollection->getGlobalDialType();
-          size_t origSize = dialCollection->getDialBaseList().size();
-          LogInfo << dialCollection->getTitle()
-                  << ": adding " << _cache_.totalNbEvents
-                  << " (was " << origSize << ")"
-                  << " " << dialType << " slots"<< std::endl;
+    if (dialCollection->isEventByEvent()) {
+      // Reserve enough space for all the event-by-event dials
+      // that might be added.  This size may be reduced later.
+      auto& dialType = dialCollection->getGlobalDialType();
+      size_t origSize = dialCollection->getDialBaseList().size();
+      LogInfo << dialCollection->getTitle()
+              << ": adding " << _cache_.totalNbEvents
+              << " (was " << origSize << ")"
+              << " " << dialType << " slots"<< std::endl;
 
-          // Only increase the size.  It's probably zero before
-          // starting, but add the original size... just in case.
-          dialCollection->getDialBaseList().resize(
-              dialCollection->getDialBaseList().size()
-              + _cache_.totalNbEvents
-          );
-        }
-        else {
-          // Filling var indexes for faster eval with PhysicsEvent:
-          for( auto& bin : dialCollection->getDialBinSet().getBinList() ){
-            for( auto& edges : bin.getEdgesList() ){
-              edges.varIndexCache = GenericToolbox::findElementIndex( edges.varName, _cache_.varsRequestedForIndexing );
-            }
-          }
+      // Only increase the size.  It's probably zero before
+      // starting, but add the original size... just in case.
+      dialCollection->getDialBaseList().resize(
+          dialCollection->getDialBaseList().size()
+          + _cache_.totalNbEvents
+      );
+    }
+    else {
+      // Filling var indexes for faster eval with PhysicsEvent:
+      for( auto& bin : dialCollection->getDialBinSet().getBinList() ){
+        for( auto& edges : bin.getEdgesList() ){
+          edges.varIndexCache = GenericToolbox::findElementIndex( edges.varName, _cache_.varsRequestedForIndexing );
         }
       }
-
-      LogInfo << "Creating " << _cache_.totalNbEvents << " event cache slots." << std::endl;
-      _cache_.propagatorPtr->getEventDialCache().allocateCacheEntries(_cache_.totalNbEvents, nDialsMaxPerEvent);
-    }
-    else{
-      // all events should be referenced in the cache even with 0 dial
-      LogInfo << "Creating " << _cache_.totalNbEvents << " event cache slots (dial-less)." << std::endl;
-      _cache_.propagatorPtr->getEventDialCache().allocateCacheEntries(_cache_.totalNbEvents, 0);
     }
   }
+
+  LogInfo << "Creating " << _cache_.totalNbEvents << " event cache slots." << std::endl;
+  _cache_.propagatorPtr->getEventDialCache().allocateCacheEntries(_cache_.totalNbEvents, nDialsMaxPerEvent);
 }
 void DataDispenser::readAndFill(){
   LogWarning << "Reading dataset and loading..." << std::endl;
@@ -1044,20 +1035,18 @@ void DataDispenser::fillFunction(int iThread_){
       EventDialCache::IndexedCacheEntry* eventDialCacheEntry{nullptr};
       {
         std::unique_lock<std::mutex> lock(GundamGlobals::getThreadMutex());
-        if( _parameters_.useReweightEngine ){
 
-          if( _parameters_.debugNbMaxEventsToLoad != 0 ){
-            // check if the limit has been reached
-            if( _cache_.propagatorPtr->getEventDialCache().getFillIndex() >= _parameters_.debugNbMaxEventsToLoad ){
-              LogAlertIf(iThread_==0) << std::endl << std::endl; // flush pBar
-              LogAlertIf(iThread_==0) << "debugNbMaxEventsToLoad: Event number cap reached (";
-              LogAlertIf(iThread_==0) << _parameters_.debugNbMaxEventsToLoad << ")" << std::endl;
-              return;
-            }
+        if( _parameters_.debugNbMaxEventsToLoad != 0 ){
+          // check if the limit has been reached
+          if( _cache_.propagatorPtr->getEventDialCache().getFillIndex() >= _parameters_.debugNbMaxEventsToLoad ){
+            LogAlertIf(iThread_==0) << std::endl << std::endl; // flush pBar
+            LogAlertIf(iThread_==0) << "debugNbMaxEventsToLoad: Event number cap reached (";
+            LogAlertIf(iThread_==0) << _parameters_.debugNbMaxEventsToLoad << ")" << std::endl;
+            return;
           }
-
-          eventDialCacheEntry = _cache_.propagatorPtr->getEventDialCache().fetchNextCacheEntry();
         }
+
+        eventDialCacheEntry = _cache_.propagatorPtr->getEventDialCache().fetchNextCacheEntry();
         sampleEventIndex = _cache_.sampleIndexOffsetList[iSample]++;
       }
 
