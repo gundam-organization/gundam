@@ -166,6 +166,8 @@ public:
 
   std::vector<std::string>& getExtraLeafNames() {return _globalDialExtraLeafNames_;}
 
+  void printConfiguration() const;
+
 protected:
   void readConfigImpl() override;
   void initializeImpl() override;

@@ -65,8 +65,6 @@ void DialCollection::readConfigImpl() {
 }
 
 void DialCollection::initializeImpl() {
-  LogInfo << "Initialising dial collection \"" << this->getTitle() << "\"" << std::endl;
-
   LogThrowIf(_index_==-1, "Index not set.");
   this->setupDialInterfaceReferences();
 }
@@ -778,6 +776,12 @@ void DialCollection::update() {
 
 void DialCollection::addUpdate(std::function<void(void)> callback) {
   _dialCollectionCallbacks_.emplace_back(callback);
+}
+
+void DialCollection::printConfiguration() const {
+
+  LogInfo << "DialCollection: " << this->getTitle() << std::endl;
+
 }
 
 //  A Lesser GNU Public License

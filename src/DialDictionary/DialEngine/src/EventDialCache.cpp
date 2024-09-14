@@ -83,7 +83,7 @@ void EventDialCache::buildReferenceCache( SampleSet& sampleSet_, std::vector<Dia
 
   for( auto& sampleIndexCache : sampleIndexCacheList ){
     for( auto& indexCache : sampleIndexCache ){
-      
+
       _cache_.emplace_back();
       auto& cacheEntry = _cache_.back();
 
@@ -100,6 +100,15 @@ void EventDialCache::buildReferenceCache( SampleSet& sampleSet_, std::vector<Dia
       // filling up the dial references
       for( auto& dialIndex : indexCache.dials ){
         if( dialIndex.collectionIndex == size_t(-1) or dialIndex.interfaceIndex == size_t(-1) ){ continue; }
+
+        LogThrowIf( dialIndex.collectionIndex >= dialCollectionList_.size() );
+        LogThrowIf( dialIndex.interfaceIndex >= dialCollectionList_.at(dialIndex.collectionIndex).getDialInterfaceList().size(),
+                    GET_VAR_NAME_VALUE(dialIndex.collectionIndex)
+                    << " / " << GET_VAR_NAME_VALUE(dialIndex.interfaceIndex)
+                    << " / " << dialCollectionList_.at(dialIndex.collectionIndex).getDialInterfaceList().size()
+                    << " / " << dialCollectionList_.at(dialIndex.collectionIndex).getSummary()
+                    );
+
         cacheEntry.dialResponseCacheList.emplace_back(
             dialCollectionList_.at(dialIndex.collectionIndex)
             .getDialInterfaceList().at(dialIndex.interfaceIndex)
@@ -107,6 +116,8 @@ void EventDialCache::buildReferenceCache( SampleSet& sampleSet_, std::vector<Dia
       }
     }
   }
+
+  LogInfo << "Reference cache has been setup." << std::endl;
 }
 void EventDialCache::allocateCacheEntries( size_t nEvent_, size_t nDialsMaxPerEvent_) {
     _indexedCache_.resize(

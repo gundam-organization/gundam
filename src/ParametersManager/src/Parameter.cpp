@@ -212,7 +212,9 @@ std::string Parameter::getSummary(bool shallow_) const {
   if( std::isnan(_maxValue_) ) ss << "+inf";
   else ss << _maxValue_;
   ss << " ]";
-  if (not isValueWithinBounds()) ss << " out of bounds";
+  if (not isValueWithinBounds()){
+    ss << GenericToolbox::ColorCodes::redBackground << " out of bounds" << GenericToolbox::ColorCodes::resetColor;
+  }
 
   return ss.str();
 }

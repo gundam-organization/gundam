@@ -194,6 +194,8 @@ void Propagator::printConfiguration() const {
   _sampleSet_.printConfiguration();
   _parManager_.printConfiguration();
 
+  for( auto& dialCollection : _dialCollectionList_ ){ dialCollection.printConfiguration(); }
+
   LogInfo << std::endl;
 }
 void Propagator::printBreakdowns(){

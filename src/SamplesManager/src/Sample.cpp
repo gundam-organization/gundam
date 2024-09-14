@@ -69,7 +69,7 @@ void Sample::reserveEventMemory(size_t dataSetIndex_, size_t nEvents, const Even
   datasetProperties.eventOffSet = _eventList_.size();
   datasetProperties.eventNb = nEvents;
 
-  LogInfo << _name_ << ": creating " << nEvents << " events." << std::endl;
+  LogInfo << "Creating " << nEvents << " event slots for sample:" << _name_ << std::endl;
 
   _eventList_.resize(datasetProperties.eventOffSet + datasetProperties.eventNb, eventBuffer_);
 }

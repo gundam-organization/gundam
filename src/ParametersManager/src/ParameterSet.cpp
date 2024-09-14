@@ -115,15 +115,11 @@ void ParameterSet::readConfigImpl(){
   this->defineParameters();
 }
 void ParameterSet::initializeImpl() {
-  LogInfo << "Initializing \"" << this->getName() << "\"" << std::endl;
-
-  LogReturnIf(not _isEnabled_, this->getName() << " is not enabled. Skipping.");
-
   for( auto& par : _parameterList_ ){
     par.initialize();
-    if( _printParametersSummary_ and par.isEnabled() ){
-      LogInfo << par.getSummary(not _printDialSetsSummary_) << std::endl;
-    }
+//    if( _printParametersSummary_ and par.isEnabled() ){
+//      LogInfo << par.getSummary(not _printDialSetsSummary_) << std::endl;
+//    }
   }
 
   // Make the matrix inversion
@@ -831,13 +827,11 @@ bool ParameterSet::isValidCorrelatedParameter(const Parameter& par_){
 }
 
 void ParameterSet::printConfiguration() const {
-
   LogInfo << "ParameterSet: name(" << _name_ << ")";
   LogInfo << ", nPars(" << _nbParameterDefinition_ << ")";
   LogInfo << std::endl;
 
   for( auto& par : _parameterList_ ){ par.printConfiguration(); }
-
 }
 
 

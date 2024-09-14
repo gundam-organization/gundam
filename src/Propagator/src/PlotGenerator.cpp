@@ -63,12 +63,13 @@ std::vector<HistHolder> &PlotGenerator::getHistHolderList(int cacheSlot_){
 // Core
 void PlotGenerator::generateSamplePlots(TDirectory *saveDir_, int cacheSlot_) {
   LogThrowIf( not isInitialized() );
-  LogScopeIndent;
   this->generateSampleHistograms(GenericToolbox::mkdirTFile(saveDir_, "histograms"), cacheSlot_);
   this->generateCanvas(_histHolderCacheList_[cacheSlot_], GenericToolbox::mkdirTFile(saveDir_, "canvas"));
 }
 void PlotGenerator::generateSampleHistograms(TDirectory *saveDir_, int cacheSlot_) {
   LogThrowIf(not isInitialized());
+
+  LogInfo << "Generating sample histograms..." << std::endl;
 
   if( _histogramsDefinition_.empty() ){
     LogWarning << "No histogram has been defined." << std::endl;
@@ -141,7 +142,6 @@ void PlotGenerator::generateSampleHistograms(TDirectory *saveDir_, int cacheSlot
         for( auto& histPtrToFill : histPtrToFillList ){
           if( not histPtrToFill->isBinCacheBuilt ){
             // If any, launch rebuild cache
-            LogInfo << "Build event bin cache for sample \"" << sample.getName() << "\" " << (isData? "(data)":"(mc)") << std::endl;
             this->buildEventBinCache(histPtrToFillList, eventListPtr, isData);
             break; // all caches done at once
           }
