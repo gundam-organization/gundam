@@ -79,7 +79,6 @@ void Propagator::readConfigImpl(){
 
 
   // Monitoring parameters
-  _showEventBreakdown_ = GenericToolbox::Json::fetchValue(_config_, "showEventBreakdown", _showEventBreakdown_);
   _showNbEventParameterBreakdown_ = GenericToolbox::Json::fetchValue(_config_, "showNbEventParameterBreakdown", _showNbEventParameterBreakdown_);
   _showNbEventPerSampleParameterBreakdown_ = GenericToolbox::Json::fetchValue(_config_, "showNbEventPerSampleParameterBreakdown", _showNbEventPerSampleParameterBreakdown_);
   _throwAsimovToyParameters_ = GenericToolbox::Json::fetchValue(_config_, "throwAsimovFitParameters", _throwAsimovToyParameters_);
@@ -202,75 +201,70 @@ void Propagator::printConfiguration() const {
 
   LogInfo << std::endl;
 }
-void Propagator::printBreakdowns(){
+void Propagator::printBreakdowns() const {
 
   LogInfo << std::endl << "Breaking down samples..." << std::endl;
 
-  if( _showEventBreakdown_ ){
-    LogWarning << "Sample breakdown:" << std::endl;
-    std::cout << this->getSampleBreakdownTableStr() << std::endl;
-  }
-
-  if( _showNbEventParameterBreakdown_ ){
-
-    struct NbEventBreakdown{
-      size_t nbTotal{0};
-      std::map<int, int> nbForSample{};
-    };
-
-    std::map<const Parameter*, NbEventBreakdown> nbEventForParameter{}; // assuming int = 0 by default
-    for( auto& cache: _eventDialCache_.getCache() ){
-      for( auto& dial : cache.dialResponseCacheList ){
-        for( int iInput = 0 ; iInput < dial.dialInterface->getInputBufferRef()->getInputSize() ; iInput++ ){
-          nbEventForParameter[ &dial.dialInterface->getInputBufferRef()->getParameter(iInput) ].nbTotal += 1;
-
-          if( _showNbEventPerSampleParameterBreakdown_ ){
-            nbEventForParameter[ &dial.dialInterface->getInputBufferRef()->getParameter(iInput) ]
-                .nbForSample[cache.event->getIndices().sample] += 1;
-          }
-        }
-      }
-    }
-
-    GenericToolbox::TablePrinter t;
-    t << "Parameter";
-    t << GenericToolbox::TablePrinter::NextColumn << "All samples";
-
-    if( _showNbEventPerSampleParameterBreakdown_ ){
-      for( auto& sample : _sampleSet_.getSampleList() ){
-        if( not sample.isEnabled() ){ continue; }
-        t << GenericToolbox::TablePrinter::NextColumn << sample.getName();
-      }
-    }
-
-    t << GenericToolbox::TablePrinter::NextLine;
-
-    for( auto& parSet : _parManager_.getParameterSetsList() ){
-      if( not parSet.isEnabled() ){ continue; }
-      for( auto& par : parSet.getParameterList() ){
-        if( not par.isEnabled() ){ continue; }
-
-        t.setColorBuffer( GenericToolbox::ColorCodes::resetColor );
-        if( nbEventForParameter[ &par ].nbTotal == 0 ){ t.setColorBuffer( GenericToolbox::ColorCodes::redBackground ); }
-
-        t << par.getFullTitle();
-        t << GenericToolbox::TablePrinter::NextColumn << nbEventForParameter[ &par ].nbTotal;
-
-        if( _showNbEventPerSampleParameterBreakdown_ ){
-          for( auto& sample : _sampleSet_.getSampleList() ){
-            if( not sample.isEnabled() ){ continue; }
-            t << GenericToolbox::TablePrinter::NextColumn << nbEventForParameter[ &par ].nbForSample[sample.getIndex()];
-          }
-        }
-
-        t << GenericToolbox::TablePrinter::NextLine;
-      }
-    }
-
-    LogInfo << "Nb of event affected by parameters:" << std::endl;
-    t.printTable();
-
-  }
+//  if( _showNbEventParameterBreakdown_ ){
+//
+//    struct NbEventBreakdown{
+//      size_t nbTotal{0};
+//      std::map<int, int> nbForSample{};
+//    };
+//
+//    std::map<const Parameter*, NbEventBreakdown> nbEventForParameter{}; // assuming int = 0 by default
+//    for( auto& cache: _eventDialCache_.getCache() ){
+//      for( auto& dial : cache.dialResponseCacheList ){
+//        for( int iInput = 0 ; iInput < dial.dialInterface->getInputBufferRef()->getInputSize() ; iInput++ ){
+//          nbEventForParameter[ &dial.dialInterface->getInputBufferRef()->getParameter(iInput) ].nbTotal += 1;
+//
+//          if( _showNbEventPerSampleParameterBreakdown_ ){
+//            nbEventForParameter[ &dial.dialInterface->getInputBufferRef()->getParameter(iInput) ]
+//                .nbForSample[cache.event->getIndices().sample] += 1;
+//          }
+//        }
+//      }
+//    }
+//
+//    GenericToolbox::TablePrinter t;
+//    t << "Parameter";
+//    t << GenericToolbox::TablePrinter::NextColumn << "All samples";
+//
+//    if( _showNbEventPerSampleParameterBreakdown_ ){
+//      for( auto& sample : _sampleSet_.getSampleList() ){
+//        if( not sample.isEnabled() ){ continue; }
+//        t << GenericToolbox::TablePrinter::NextColumn << sample.getName();
+//      }
+//    }
+//
+//    t << GenericToolbox::TablePrinter::NextLine;
+//
+//    for( auto& parSet : _parManager_.getParameterSetsList() ){
+//      if( not parSet.isEnabled() ){ continue; }
+//      for( auto& par : parSet.getParameterList() ){
+//        if( not par.isEnabled() ){ continue; }
+//
+//        t.setColorBuffer( GenericToolbox::ColorCodes::resetColor );
+//        if( nbEventForParameter[ &par ].nbTotal == 0 ){ t.setColorBuffer( GenericToolbox::ColorCodes::redBackground ); }
+//
+//        t << par.getFullTitle();
+//        t << GenericToolbox::TablePrinter::NextColumn << nbEventForParameter[ &par ].nbTotal;
+//
+//        if( _showNbEventPerSampleParameterBreakdown_ ){
+//          for( auto& sample : _sampleSet_.getSampleList() ){
+//            if( not sample.isEnabled() ){ continue; }
+//            t << GenericToolbox::TablePrinter::NextColumn << nbEventForParameter[ &par ].nbForSample[sample.getIndex()];
+//          }
+//        }
+//
+//        t << GenericToolbox::TablePrinter::NextLine;
+//      }
+//    }
+//
+//    LogInfo << "Nb of event affected by parameters:" << std::endl;
+//    t.printTable();
+//
+//  }
 
   if( _debugPrintLoadedEvents_ ){
     LogDebug << "Printing " << _debugPrintLoadedEventsNbPerSample_ << " events..." << std::endl;
@@ -284,25 +278,7 @@ void Propagator::printBreakdowns(){
     }
   }
 }
-std::string Propagator::getSampleBreakdownTableStr() const{
-  GenericToolbox::TablePrinter t;
 
-  t << "Sample" << GenericToolbox::TablePrinter::NextColumn;
-  t << "MC (# binned event)" << GenericToolbox::TablePrinter::NextColumn;
-  t << "Data (# binned event)" << GenericToolbox::TablePrinter::NextColumn;
-  t << "MC (weighted)" << GenericToolbox::TablePrinter::NextColumn;
-  t << "Data (weighted)" << GenericToolbox::TablePrinter::NextLine;
-
-  for( auto& sample : _sampleSet_.getSampleList() ){
-    t << sample.getName() << GenericToolbox::TablePrinter::NextColumn;
-    t << sample.getNbBinnedEvents() << GenericToolbox::TablePrinter::NextColumn;
-    t << sample.getSumWeights() << GenericToolbox::TablePrinter::NextColumn;
-  }
-
-  std::stringstream ss;
-  ss << t.generateTableString();
-  return ss.str();
-}
 
 
 // Protected

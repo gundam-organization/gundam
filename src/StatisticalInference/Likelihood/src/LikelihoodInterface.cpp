@@ -99,7 +99,7 @@ void LikelihoodInterface::initializeImpl() {
   // loading the propagators
   this->load();
 
-  this->printBreakdowns();
+
 
   _jointProbabilityPtr_->initialize();
 
@@ -163,7 +163,7 @@ double LikelihoodInterface::evalStatLikelihood() const {
 double LikelihoodInterface::evalPenaltyLikelihood() const {
   _buffer_.penaltyLikelihood = 0;
   for( auto& parSet : _modelPropagator_.getParametersManager().getParameterSetsList() ){
-    _buffer_.penaltyLikelihood += this->evalPenaltyLikelihood( parSet );
+    _buffer_.penaltyLikelihood += LikelihoodInterface::evalPenaltyLikelihood( parSet );
   }
   return _buffer_.penaltyLikelihood;
 }
@@ -191,7 +191,7 @@ std::string LikelihoodInterface::getSummary() const {
       _modelPropagator_.getParametersManager().getParameterSetsList(), [&](const ParameterSet& parSet_){
         std::stringstream ssSub;
         ssSub << parSet_.getName() << ": ";
-        if( parSet_.isEnabled() ){ ssSub << this->evalPenaltyLikelihood( parSet_ ); }
+        if( parSet_.isEnabled() ){ ssSub << LikelihoodInterface::evalPenaltyLikelihood( parSet_ ); }
         else                     { ssSub << "disabled."; }
         return ssSub.str();
       }
@@ -230,8 +230,28 @@ void LikelihoodInterface::writeEventRates(const GenericToolbox::TFilePath& saveD
 // print
 void LikelihoodInterface::printBreakdowns() const{
 
+  LogInfo << "Samples breakdown:" << std::endl;
+  std::cout << getSampleBreakdownTable() << std::endl;
 
+}
+std::string LikelihoodInterface::getSampleBreakdownTable() const{
+  GenericToolbox::TablePrinter t;
 
+  t << "Sample" << GenericToolbox::TablePrinter::NextColumn;
+  t << "MC (# binned event)" << GenericToolbox::TablePrinter::NextColumn;
+  t << "Data (# binned event)" << GenericToolbox::TablePrinter::NextColumn;
+  t << "MC (weighted)" << GenericToolbox::TablePrinter::NextColumn;
+  t << "Data (weighted)" << GenericToolbox::TablePrinter::NextLine;
+
+  for( auto& samplePair : _samplePairList_ ){
+    t << samplePair.model->getName() << GenericToolbox::TablePrinter::NextColumn;
+    t << samplePair.model->getNbBinnedEvents() << GenericToolbox::TablePrinter::NextColumn;
+    t << samplePair.data->getNbBinnedEvents() << GenericToolbox::TablePrinter::NextColumn;
+    t << samplePair.model->getSumWeights() << GenericToolbox::TablePrinter::NextColumn;
+    t << samplePair.data->getSumWeights() << GenericToolbox::TablePrinter::NextLine;
+  }
+
+  return t.generateTableString();
 }
 
 // static
@@ -269,7 +289,8 @@ void LikelihoodInterface::load(){
 
   LogInfo << std::endl;
 
-  buildSamplePairList();
+  this->buildSamplePairList();
+  this->printBreakdowns();
 
   /// model propagator needs to be fast, let the workers wait for the signal
   _modelPropagator_.getThreadPool().setCpuTimeSaverIsEnabled( false );
@@ -324,6 +345,8 @@ void LikelihoodInterface::loadModelPropagator(){
   /// Now caching the event for the plot generator
   _plotGenerator_.defineHistogramHolders();
 
+  _modelPropagator_.printBreakdowns();
+
 }
 void LikelihoodInterface::loadDataPropagator(){
   LogInfo << "Loading data..." << std::endl;
@@ -373,26 +396,25 @@ void LikelihoodInterface::loadDataPropagator(){
 
     if( _dataPropagator_.isThrowAsimovToyParameters() ){
 
-      if( _dataPropagator_.isShowEventBreakdown() ){
-        LogInfo << "Propagating prior parameters on the initially loaded events..." << std::endl;
-        _dataPropagator_.reweightEvents();
+      LogInfo << "Propagating prior parameters on the initially loaded events..." << std::endl;
+      _dataPropagator_.reweightEvents();
 
-        LogInfo << "Sample breakdown prior to the throwing:" << std::endl;
-        std::cout << _dataPropagator_.getSampleBreakdownTableStr() << std::endl;
+      LogInfo << "Sample breakdown prior to the throwing:" << std::endl;
+      // TODO: need to setup the pair sample first or create a new table in Propagator
+//        std::cout << getSampleBreakdownTable() << std::endl;
 
-        if( _dataPropagator_.isDebugPrintLoadedEvents() ){
-          LogDebug << "Toy events:" << std::endl;
-          LogDebug << GET_VAR_NAME_VALUE(_dataPropagator_.getDebugPrintLoadedEventsNbPerSample()) << std::endl;
-          int iEvt{0};
-          for( auto& entry : _dataPropagator_.getEventDialCache().getCache() ) {
-            LogDebug << "Event #" << iEvt++ << "{" << std::endl;
-            {
-              LogScopeIndent;
-              LogDebug << entry.getSummary() << std::endl;
-            }
-            LogDebug << "}" << std::endl;
-            if( iEvt >= _dataPropagator_.getDebugPrintLoadedEventsNbPerSample() ) break;
+      if( _dataPropagator_.isDebugPrintLoadedEvents() ){
+        LogDebug << "Toy events:" << std::endl;
+        LogDebug << GET_VAR_NAME_VALUE(_dataPropagator_.getDebugPrintLoadedEventsNbPerSample()) << std::endl;
+        int iEvt{0};
+        for( auto& entry : _dataPropagator_.getEventDialCache().getCache() ) {
+          LogDebug << "Event #" << iEvt++ << "{" << std::endl;
+          {
+            LogScopeIndent;
+            LogDebug << entry.getSummary() << std::endl;
           }
+          LogDebug << "}" << std::endl;
+          if( iEvt >= _dataPropagator_.getDebugPrintLoadedEventsNbPerSample() ) break;
         }
       }
 
@@ -462,6 +484,7 @@ void LikelihoodInterface::loadDataPropagator(){
     }
   }
 
+  _dataPropagator_.printBreakdowns();
 
 }
 void LikelihoodInterface::buildSamplePairList(){

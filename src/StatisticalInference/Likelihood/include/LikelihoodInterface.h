@@ -99,6 +99,7 @@ public:
 
   // print
   void printBreakdowns() const;
+  std::string getSampleBreakdownTable() const;
 
   // statics
   [[nodiscard]] static double evalPenaltyLikelihood(const ParameterSet& parSet_);

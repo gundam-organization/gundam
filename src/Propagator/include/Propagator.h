@@ -45,7 +45,6 @@ public:
   [[nodiscard]] bool isEnableStatThrowInToys() const { return _enableStatThrowInToys_; }
   [[nodiscard]] bool isEnableEventMcThrow() const { return _enableEventMcThrow_; }
   [[nodiscard]] bool isGaussStatThrowInToys() const { return _gaussStatThrowInToys_; }
-  [[nodiscard]] bool isShowEventBreakdown() const { return _showEventBreakdown_; }
   [[nodiscard]] bool isDebugPrintLoadedEvents() const { return _debugPrintLoadedEvents_; }
   [[nodiscard]] int getDebugPrintLoadedEventsNbPerSample() const { return _debugPrintLoadedEventsNbPerSample_; }
   [[nodiscard]] int getIThrow() const { return _iThrow_; }
@@ -72,9 +71,8 @@ public:
   // misc
   void copyEventsFrom(const Propagator& src_);
   void printConfiguration() const;
-  void printBreakdowns();
+  void printBreakdowns() const;
   void writeEventRates(const GenericToolbox::TFilePath& saveDir_) const;
-  [[nodiscard]] std::string getSampleBreakdownTableStr() const;
 
   // public members
   GenericToolbox::Time::AveragedTimer<10> reweightTimer;
@@ -108,7 +106,6 @@ private:
   bool _enableStatThrowInToys_{true};
   bool _gaussStatThrowInToys_{false};
   bool _enableEventMcThrow_{true};
-  bool _showEventBreakdown_{true};
   bool _showNbEventParameterBreakdown_{true};
   bool _showNbEventPerSampleParameterBreakdown_{false};
   bool _enableEigenToOrigInPropagate_{true};
