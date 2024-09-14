@@ -148,8 +148,11 @@ public:
 public:
   EventDialCache() = default;
 
+
   // returns the current index
   [[nodiscard]] size_t getFillIndex() const { return _fillIndex_; }
+
+  [[nodiscard]] const std::vector<IndexedCacheEntry> getIndexedCache() const { return _indexedCache_; }
 
   /// Provide the event dial cache.  The event dial cache containes a
   /// CacheElem_t object for every dial applied to a physics event.  The
@@ -182,6 +185,9 @@ public:
 
   /// Resize the cache vectors to remove entries with null events
   void shrinkIndexedCache();
+
+  // copy from
+  void fillCacheEntries(const SampleSet& sampleSet_);
 
   void reweightEntry( CacheEntry& entry_);
 

@@ -70,6 +70,7 @@ public:
   void reweightEvents();
 
   // misc
+  void copyEventsFrom(const Propagator& src_);
   void printConfiguration() const;
   void printBreakdowns();
   void writeEventRates(const GenericToolbox::TFilePath& saveDir_) const;

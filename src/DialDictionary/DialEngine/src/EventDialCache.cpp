@@ -130,6 +130,17 @@ void EventDialCache::shrinkIndexedCache(){
   _indexedCache_.resize(_fillIndex_+1);
   _indexedCache_.shrink_to_fit();
 }
+void EventDialCache::fillCacheEntries(const SampleSet& sampleSet_){
+  _fillIndex_ = 0;
+  allocateCacheEntries( sampleSet_.getNbOfEvents(), 0 );
+  for( size_t iSample = 0 ; iSample < sampleSet_.getSampleList().size() ; iSample++ ){
+    for( size_t iEvent = 0 ; iEvent < sampleSet_.getSampleList()[iSample].getEventList().size() ; iEvent++ ){
+      auto* entry = fetchNextCacheEntry();
+      entry->event.sampleIndex = iSample;
+      entry->event.eventIndex = iEvent;
+    }
+  }
+}
 
 EventDialCache::IndexedCacheEntry* EventDialCache::fetchNextCacheEntry(){
   // Warning warning Will Robinson!

@@ -185,6 +185,10 @@ void Propagator::reweightEvents() {
 }
 
 // misc
+void Propagator::copyEventsFrom(const Propagator& src_){
+  _sampleSet_.copyEventsFrom( src_.getSampleSet() );
+  _eventDialCache_.fillCacheEntries( _sampleSet_ );
+}
 void Propagator::writeEventRates(const GenericToolbox::TFilePath& saveDir_) const {
   for( auto& sample : _sampleSet_.getSampleList() ){ sample.writeEventRates(saveDir_); }
 }

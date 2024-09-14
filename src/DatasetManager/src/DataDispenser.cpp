@@ -1069,120 +1069,118 @@ void DataDispenser::fillFunction(int iThread_){
       }
 
       // Now the event is ready. Let's index the dials:
-      if ( eventDialCacheEntry != nullptr) {
-        // there should always be a cache entry even if no dials are applied.
-        // This cache is actually used to write MC events with dials in output tree
-        eventDialCacheEntry->event.sampleIndex = std::size_t(_cache_.samplesToFillList[iSample]->getIndex());
-        eventDialCacheEntry->event.eventIndex = sampleEventIndex;
+      // there should always be a cache entry even if no dials are applied.
+      // This cache is actually used to write MC events with dials in output tree
+      eventDialCacheEntry->event.sampleIndex = std::size_t(_cache_.samplesToFillList[iSample]->getIndex());
+      eventDialCacheEntry->event.eventIndex = sampleEventIndex;
 
-        auto* dialEntryPtr = &eventDialCacheEntry->dials[0];
+      auto* dialEntryPtr = &eventDialCacheEntry->dials[0];
 
-        for( auto *dialCollectionRef: _cache_.dialCollectionsRefList ){
+      for( auto *dialCollectionRef: _cache_.dialCollectionsRefList ){
 
-          // dial collections may come with a condition formula
-          if( dialCollectionRef->getApplyConditionFormula() != nullptr ){
-            if( eventIndexingBuffer.getVariables().evalFormula(dialCollectionRef->getApplyConditionFormula().get()) == 0 ){
-              // next dialSet
-              continue;
-            }
+        // dial collections may come with a condition formula
+        if( dialCollectionRef->getApplyConditionFormula() != nullptr ){
+          if( eventIndexingBuffer.getVariables().evalFormula(dialCollectionRef->getApplyConditionFormula().get()) == 0 ){
+            // next dialSet
+            continue;
           }
+        }
 
-          int iCollection = dialCollectionRef->getIndex();
+        int iCollection = dialCollectionRef->getIndex();
 
-          if ( not dialCollectionRef->isEventByEvent() ){
+        if ( not dialCollectionRef->isEventByEvent() ){
 
-            if( dialCollectionRef->getDialBaseList().size() == 1
-                and dialCollectionRef->getDialBinSet().getBinList().empty() ){
-              // There isn't any binning, and there is only one dial.
-              // In this case we don't need to check if the dial is in
-              // a bin.
+          if( dialCollectionRef->getDialBaseList().size() == 1
+              and dialCollectionRef->getDialBinSet().getBinList().empty() ){
+            // There isn't any binning, and there is only one dial.
+            // In this case we don't need to check if the dial is in
+            // a bin.
+            dialEntryPtr->collectionIndex = iCollection;
+            dialEntryPtr->interfaceIndex = 0;
+            dialEntryPtr++;
+          }
+          else{
+            // There are multiple dials, or there is a list of bins
+            // to apply the dial to.  Check if the event falls into
+            // a bin, and apply the correct binning.  Some events
+            // may not be in any bin.
+            auto dialBinIdx = eventIndexingBuffer.getVariables().findBinIndex( dialCollectionRef->getDialBinSet() );
+            if( dialBinIdx != -1 ){
               dialEntryPtr->collectionIndex = iCollection;
-              dialEntryPtr->interfaceIndex = 0;
+              dialEntryPtr->interfaceIndex = dialBinIdx;
               dialEntryPtr++;
             }
-            else{
-              // There are multiple dials, or there is a list of bins
-              // to apply the dial to.  Check if the event falls into
-              // a bin, and apply the correct binning.  Some events
-              // may not be in any bin.
-              auto dialBinIdx = eventIndexingBuffer.getVariables().findBinIndex( dialCollectionRef->getDialBinSet() );
-              if( dialBinIdx != -1 ){
-                dialEntryPtr->collectionIndex = iCollection;
-                dialEntryPtr->interfaceIndex = dialBinIdx;
-                dialEntryPtr++;
-              }
-            }
           }
-          else if( dialCollectionRef->getGlobalDialType() == "Tabulated" ) {
-            // Event-by-event dial for a precalculated table.  The table
-            // can hold things like oscillation weights and is filled before
-            // the event weighting is done.
+        }
+        else if( dialCollectionRef->getGlobalDialType() == "Tabulated" ) {
+          // Event-by-event dial for a precalculated table.  The table
+          // can hold things like oscillation weights and is filled before
+          // the event weighting is done.
 
-            std::unique_ptr<DialBase> dialBase(
-              dialCollectionRef->getCollectionData<TabulatedDialFactory>(0)
-              ->makeDial(eventIndexingBuffer));
+          std::unique_ptr<DialBase> dialBase(
+            dialCollectionRef->getCollectionData<TabulatedDialFactory>(0)
+            ->makeDial(eventIndexingBuffer));
 
-            // dialBase is valid -> store it
-            if (dialBase != nullptr) {
-              size_t freeSlotDial = dialCollectionRef->getNextDialFreeSlot();
-              dialBase->setAllowExtrapolation(dialCollectionRef->isAllowDialExtrapolation());
-              dialCollectionRef->getDialBaseList()[freeSlotDial] = DialCollection::DialBaseObject(
+          // dialBase is valid -> store it
+          if (dialBase != nullptr) {
+            size_t freeSlotDial = dialCollectionRef->getNextDialFreeSlot();
+            dialBase->setAllowExtrapolation(dialCollectionRef->isAllowDialExtrapolation());
+            dialCollectionRef->getDialBaseList()[freeSlotDial] = DialCollection::DialBaseObject(
+              dialBase.release());
+
+            dialEntryPtr->collectionIndex = iCollection;
+            dialEntryPtr->interfaceIndex = freeSlotDial;
+            dialEntryPtr++;
+          }
+        }
+        else if( not dialCollectionRef->getGlobalDialLeafName().empty() ){
+          // Event-by-event dial with leaf for "spline" data: grab as a
+          // general TObject -> let the factory figure out what to do with
+          // it
+
+          auto *dialObjectPtr = (TObject *) *(
+              (TObject **) eventIndexingBuffer.getVariables().fetchVariable(
+                  dialCollectionRef->getGlobalDialLeafName()
+              ).get().getPlaceHolderPtr()->getVariableAddress()
+          );
+
+          // Extra-step for selecting the right dial with TClonesArray
+          if (not strcmp(dialObjectPtr->ClassName(), "TClonesArray")) {
+            dialObjectPtr = ((TClonesArray *) dialObjectPtr)->At(
+                (dialIndexTreeFormula == nullptr ? 0 : int(dialIndexTreeFormula->EvalInstance()))
+            );
+          }
+
+          // Do the unique_ptr dance so that memory gets deleted if
+          // there is an exception (being stupidly paranoid).
+          DialBaseFactory factory{};
+          std::unique_ptr<DialBase> dialBase(
+              factory.makeDial(
+                  dialCollectionRef->getTitle(),
+                  dialCollectionRef->getGlobalDialType(),
+                  dialCollectionRef->getGlobalDialSubType(),
+                  dialObjectPtr,
+                  false
+              )
+          );
+
+          // dialBase is valid -> store it
+          if (dialBase != nullptr) {
+            size_t freeSlotDial = dialCollectionRef->getNextDialFreeSlot();
+            dialBase->setAllowExtrapolation(dialCollectionRef->isAllowDialExtrapolation());
+            dialCollectionRef->getDialBaseList()[freeSlotDial] = DialCollection::DialBaseObject(
                 dialBase.release());
 
-              dialEntryPtr->collectionIndex = iCollection;
-              dialEntryPtr->interfaceIndex = freeSlotDial;
-              dialEntryPtr++;
-            }
+            dialEntryPtr->collectionIndex = iCollection;
+            dialEntryPtr->interfaceIndex = freeSlotDial;
+            dialEntryPtr++;
           }
-          else if( not dialCollectionRef->getGlobalDialLeafName().empty() ){
-            // Event-by-event dial with leaf for "spline" data: grab as a
-            // general TObject -> let the factory figure out what to do with
-            // it
+        }
+        else {
+          LogThrow("Invalid dial collection -- not a known dial type");
+        }
 
-            auto *dialObjectPtr = (TObject *) *(
-                (TObject **) eventIndexingBuffer.getVariables().fetchVariable(
-                    dialCollectionRef->getGlobalDialLeafName()
-                ).get().getPlaceHolderPtr()->getVariableAddress()
-            );
-
-            // Extra-step for selecting the right dial with TClonesArray
-            if (not strcmp(dialObjectPtr->ClassName(), "TClonesArray")) {
-              dialObjectPtr = ((TClonesArray *) dialObjectPtr)->At(
-                  (dialIndexTreeFormula == nullptr ? 0 : int(dialIndexTreeFormula->EvalInstance()))
-              );
-            }
-
-            // Do the unique_ptr dance so that memory gets deleted if
-            // there is an exception (being stupidly paranoid).
-            DialBaseFactory factory{};
-            std::unique_ptr<DialBase> dialBase(
-                factory.makeDial(
-                    dialCollectionRef->getTitle(),
-                    dialCollectionRef->getGlobalDialType(),
-                    dialCollectionRef->getGlobalDialSubType(),
-                    dialObjectPtr,
-                    false
-                )
-            );
-
-            // dialBase is valid -> store it
-            if (dialBase != nullptr) {
-              size_t freeSlotDial = dialCollectionRef->getNextDialFreeSlot();
-              dialBase->setAllowExtrapolation(dialCollectionRef->isAllowDialExtrapolation());
-              dialCollectionRef->getDialBaseList()[freeSlotDial] = DialCollection::DialBaseObject(
-                  dialBase.release());
-
-              dialEntryPtr->collectionIndex = iCollection;
-              dialEntryPtr->interfaceIndex = freeSlotDial;
-              dialEntryPtr++;
-            }
-          }
-          else {
-            LogThrow("Invalid dial collection -- not a known dial type");
-          }
-
-        } // dial collection loop
-      }
+      } // dial collection loop
 
 
     } // samples

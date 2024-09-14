@@ -37,6 +37,7 @@ public:
   [[nodiscard]] std::vector<std::string> fetchRequestedVariablesForIndexing() const;
 
   void copyEventsFrom(const SampleSet& src_);
+  size_t getNbOfEvents() const;
 
   // misc
   void printConfiguration() const;

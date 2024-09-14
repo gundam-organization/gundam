@@ -92,6 +92,11 @@ void SampleSet::copyEventsFrom(const SampleSet& src_){
     this->getSampleList()[iSample].getEventList() = src_.getSampleList()[iSample].getEventList();
   }
 }
+size_t SampleSet::getNbOfEvents() const {
+  return std::accumulate(
+      _sampleList_.begin(), _sampleList_.end(), size_t(0),
+      [](size_t sum_, const Sample& s_){ return sum_ + s_.getEventList().size(); });
+}
 
 void SampleSet::printConfiguration() const {
 

@@ -333,7 +333,9 @@ void LikelihoodInterface::loadDataPropagator(){
   if( _dataType_ == DataType::Asimov or _forceAsimovData_ ){
     // copy the events directly from the model
     LogInfo << "Copying events from the model..." << std::endl;
-    _dataPropagator_.getSampleSet().copyEventsFrom( _modelPropagator_.getSampleSet() );
+    _dataPropagator_.copyEventsFrom( _modelPropagator_ );
+    _dataPropagator_.shrinkDialContainers();
+    _dataPropagator_.buildDialCache();
   }
   else{
     LogInfo << "Loading datasets..." << std::endl;
@@ -405,22 +407,20 @@ void LikelihoodInterface::loadDataPropagator(){
 
     } // throw asimov?
 
-    LogInfo << "Propagating parameters on events..." << std::endl;
-
-    // At this point, MC events have been reweighted using their prior
-    // but when using eigen decomp, the conversion eigen to original has a small computational error
-    // this will make sure the "asimov" data will be reweighted the same way the model is expected to behave
-    // while using the eigen decomp
-    for( auto& parSet: _dataPropagator_.getParametersManager().getParameterSetsList() ) {
-      if( not parSet.isEnabled() ){ continue; }
-      if( parSet.isEnableEigenDecomp() ) { parSet.propagateEigenToOriginal(); }
-    }
-
-    // re-propagate systematics if applicable
-    _dataPropagator_.reweightEvents();
-
   }
 
+  LogInfo << "Propagating parameters on events..." << std::endl;
+
+  // At this point, MC events have been reweighted using their prior
+  // but when using eigen decomp, the conversion eigen to original has a small computational error
+  // this will make sure the "asimov" data will be reweighted the same way the model is expected to behave
+  // while using the eigen decomp
+  for( auto& parSet: _dataPropagator_.getParametersManager().getParameterSetsList() ) {
+    if( not parSet.isEnabled() ){ continue; }
+    if( parSet.isEnableEigenDecomp() ) { parSet.propagateEigenToOriginal(); }
+  }
+
+  _dataPropagator_.reweightEvents();
 
   LogInfo << "Filling up data sample bin caches..." << std::endl;
   _threadPool_.runJob([this](int iThread){
