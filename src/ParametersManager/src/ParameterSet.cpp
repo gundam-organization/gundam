@@ -144,7 +144,7 @@ void ParameterSet::processCovarianceMatrix(){
     if( not isEnableEigenDecomp() ) continue;
     // Warn if using eigen decomposition with bounded parameters.
     if ( std::isnan(par.getMinValue()) and std::isnan(par.getMaxValue())) continue;
-    LogWarning << "Undefined behavior: Eigen-decomposition of a bounded parameter: "
+    LogAlert << "Undefined behavior: Eigen-decomposition of a bounded parameter: "
                << par.getFullTitle()
                << std::endl;
     ++configWarnings;
@@ -804,6 +804,7 @@ Parameter* ParameterSet::getParameterPtrWithTitle(const std::string& parTitle_){
 }
 
 void ParameterSet::nullify(){
+  // TODO: reimplement toy disabling
   std::string name{_name_};
   (*this) = ParameterSet();
   this->setName(name);
