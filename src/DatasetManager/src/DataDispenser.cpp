@@ -332,12 +332,9 @@ void DataDispenser::fetchRequestedLeaves(){
   // plotGen -> for storage as we need those in prefit and postfit
   if( _plotGeneratorPtr_ != nullptr ){
     std::vector<std::string> varForStorageListBuffer{};
-    // TODO: don't use _parameters_.useReweightEngine for this, as for data we don't need split vars
-    varForStorageListBuffer = _plotGeneratorPtr_->fetchListOfVarToPlot(not _parameters_.useReweightEngine);
-    if( _parameters_.useReweightEngine ){
-      for( auto& var : _plotGeneratorPtr_->fetchListOfSplitVarNames() ){
-        GenericToolbox::addIfNotInVector(var, varForStorageListBuffer);
-      }
+    varForStorageListBuffer = _plotGeneratorPtr_->fetchListOfVarToPlot(not _parameters_.isData);
+    for( auto& var : _plotGeneratorPtr_->fetchListOfSplitVarNames() ){
+      GenericToolbox::addIfNotInVector(var, varForStorageListBuffer);
     }
     LogInfo << "PlotGenerator variable request for storage: " << GenericToolbox::toString(varForStorageListBuffer) << std::endl;
     for( auto& var : varForStorageListBuffer ){ _cache_.addVarRequestedForStorage(var); }

@@ -48,6 +48,8 @@ void DatasetDefinition::readConfigImpl() {
     _dataDispenserDict_.at(name).readConfig(dataEntry);
   }
 
+  for( auto& dataEntry : _dataDispenserDict_ ){ dataEntry.second.getParameters().isData = true; }
+
   _devSingleThreadEventLoaderAndIndexer_ = GenericToolbox::Json::fetchValue(_config_, "devSingleThreadEventLoaderAndIndexer", _devSingleThreadEventLoaderAndIndexer_);
   _devSingleThreadEventSelection_ = GenericToolbox::Json::fetchValue(_config_, "devSingleThreadEventSelection", _devSingleThreadEventSelection_);
   _sortLoadedEvents_ = GenericToolbox::Json::fetchValue(_config_, "sortLoadedEvents", _sortLoadedEvents_);

@@ -23,11 +23,10 @@ void LikelihoodInterface::readConfigImpl(){
 
   _threadPool_.setNThreads( GundamGlobals::getNumberOfThreads() );
 
+  // TODO: load the configuration of the propagator at this stage
   // only configure the model, data will be copied later
   _modelPropagator_.readConfig();
   _modelPropagator_.printConfiguration();
-
-  _dataPropagator_.readConfig( _modelPropagator_.getConfig() );
 
   // First taking care of the DataSetManager
   JsonType dataSetManagerConfig{};
@@ -89,14 +88,13 @@ void LikelihoodInterface::initializeImpl() {
   for( auto& dataSet : _dataSetList_ ){ dataSet.initialize(); }
 
   _modelPropagator_.initialize();
-  _dataPropagator_.initialize();
-//  _dataPropagator_ = _modelPropagator_; // avoid tons of printouts
+  _dataPropagator_ = _modelPropagator_; // avoid tons of printouts
 
   _plotGenerator_.setModelSampleSetPtr( &_modelPropagator_.getSampleSet().getSampleList() );
   _plotGenerator_.setDataSampleSetPtr( &_dataPropagator_.getSampleSet().getSampleList() );
+  _plotGenerator_.initialize();
 
   _eventTreeWriter_.initialize();
-  _plotGenerator_.initialize();
 
   // loading the propagators
   this->load();
@@ -291,6 +289,9 @@ void LikelihoodInterface::load(){
 
   LogInfo << std::endl;
 
+  /// Now caching the event for the plot generator
+  _plotGenerator_.defineHistogramHolders();
+
   this->buildSamplePairList();
   this->printBreakdowns();
 
@@ -343,9 +344,6 @@ void LikelihoodInterface::loadModelPropagator(){
       sample.refillHistogram(iThread);
     }
   });
-
-  /// Now caching the event for the plot generator
-  _plotGenerator_.defineHistogramHolders();
 
   _modelPropagator_.printBreakdowns();
 

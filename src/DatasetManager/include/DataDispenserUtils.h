@@ -20,6 +20,7 @@ struct DataDispenserParameters{
 
   // should be load dials and request the associate variables?
   bool useReweightEngine{false};
+  bool isData{false}; // shall fetch slpit vars?
 
   std::string name{};
   std::string treePath{};
