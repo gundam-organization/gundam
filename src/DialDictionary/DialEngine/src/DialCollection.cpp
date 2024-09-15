@@ -141,7 +141,7 @@ void DialCollection::clear(){
 }
 
 void DialCollection::resizeContainers(){
-  LogTrace << "Resizing containers of the dial collection \"" << this->getTitle() << "\" from "
+  LogDebugIf(GundamGlobals::isDebugConfig()) << "Resizing containers of the dial collection \"" << this->getTitle() << "\" from "
           << _dialInterfaceList_.size() << " to " << _dialFreeSlot_.getValue() << std::endl;
 
   _dialBaseList_.resize(_dialFreeSlot_.getValue());
@@ -207,7 +207,6 @@ void DialCollection::setupDialInterfaceReferences(){
 
   // Initializing dial interfaces:
   if( _dialInterfaceList_.size() != _dialBaseList_.size() ){
-    LogDebug << "Initializing dial interfaces -> EVENTBYEVENT ->" << _dialBaseList_.size() << std::endl;
     _dialInterfaceList_.clear();
     _dialInterfaceList_.resize( _dialBaseList_.size() );
   }

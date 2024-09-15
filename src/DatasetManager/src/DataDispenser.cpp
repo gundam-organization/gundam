@@ -116,11 +116,6 @@ void DataDispenser::load(Propagator& propagator_){
   this->preAllocateMemory();
   this->readAndFill();
 
-  LogDebug << "DialCollection postload" << std::endl;
-  for( auto* dc : _cache_.dialCollectionsRefList ){
-    LogDebug << dc->getSummary() << std::endl;
-  }
-
   LogWarning << "Loaded " << getTitle() << std::endl;
 }
 std::string DataDispenser::getTitle(){
@@ -506,19 +501,9 @@ void DataDispenser::preAllocateMemory(){
   LogInfo << "Creating " << _cache_.totalNbEvents << " event cache slots." << std::endl;
   _cache_.propagatorPtr->getEventDialCache().allocateCacheEntries(_cache_.totalNbEvents, nDialsMaxPerEvent);
 
-
-  LogDebug << "DialCollection post creating" << std::endl;
-  for( auto* dc : _cache_.dialCollectionsRefList ){
-    LogDebug << dc->getSummary() << std::endl;
-  }
 }
 void DataDispenser::readAndFill(){
   LogWarning << "Reading dataset and loading..." << std::endl;
-
-  LogDebug << "DialCollection pre read and fill" << std::endl;
-  for( auto* dc : _cache_.dialCollectionsRefList ){
-    LogDebug << dc->getSummary() << std::endl;
-  }
 
   if( not _parameters_.nominalWeightFormulaStr.empty() ){
     LogInfo << "Nominal weight: \"" << _parameters_.nominalWeightFormulaStr << "\"" << std::endl;

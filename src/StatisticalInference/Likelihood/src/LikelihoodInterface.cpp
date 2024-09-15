@@ -25,7 +25,6 @@ void LikelihoodInterface::readConfigImpl(){
 
   // only configure the model, data will be copied later
   _modelPropagator_.readConfig();
-
   _modelPropagator_.printConfiguration();
 
   // First taking care of the DataSetManager
@@ -385,9 +384,10 @@ void LikelihoodInterface::loadDataPropagator(){
 
       // make sure the config is from scratch each time we read a new dataset
       if( not dataDispenser->getParameters().overridePropagatorConfig.empty() ){
-        LogWarning << "Restoring propagator config overrides..." << std::endl;
-        _dataPropagator_.readConfig( _modelPropagator_.getConfig() );
-        _dataPropagator_.initialize();
+        // TODO: handle multiple datasets loading when editing the configuration
+//        LogWarning << "Restoring propagator config overrides..." << std::endl;
+//        _dataPropagator_.readConfig( _modelPropagator_.getConfig() );
+//        _dataPropagator_.initialize();
       }
     }
 
