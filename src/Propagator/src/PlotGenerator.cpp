@@ -253,7 +253,7 @@ void PlotGenerator::generateCanvas(const std::vector<HistHolder> &histHolderList
         if( not GenericToolbox::startsWith(canvasPath, buildCanvasPath(&histHolder)) ) continue;
 
         // same sample?
-        if( samplePtr != histHolder.samplePtr ) continue;
+        if( samplePtr->getIndex() != histHolder.samplePtr->getIndex() ) continue;
 
         histsToStack.second.emplace_back( &histHolder );
         break; // no need to check for more
