@@ -37,10 +37,10 @@ void ParametersManager::readConfigImpl(){
     _parameterSetList_.back().readConfig( parameterSetConfig );
 
     // clear the parameter sets that have been disabled
-    if( not _parameterSetList_.back().isEnabled() ){
-      LogDebugIf(GundamGlobals::isDebugConfig()) << "Removing disabled parSet: " << _parameterSetList_.back().getName() << std::endl;
-      _parameterSetList_.pop_back();
-    }
+//    if( not _parameterSetList_.back().isEnabled() ){
+//      LogDebugIf(GundamGlobals::isDebugConfig()) << "Removing disabled parSet: " << _parameterSetList_.back().getName() << std::endl;
+//      _parameterSetList_.pop_back();
+//    }
   }
 
 }
