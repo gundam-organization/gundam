@@ -42,42 +42,6 @@ void Propagator::readConfigImpl(){
   _sampleSet_.readConfig( GenericToolbox::Json::fetchValue(_config_, {{"sampleSetConfig"}, {"fitSampleSetConfig"}}, _sampleSet_.getConfig()) );
   _parManager_.readConfig( GenericToolbox::Json::fetchValue( _config_, "parametersManagerConfig", _parManager_.getConfig()) );
 
-  _dialCollectionList_.clear(); // make sure it's empty in case readConfig() is called more than once
-  for(size_t iParSet = 0 ; iParSet < _parManager_.getParameterSetsList().size() ; iParSet++ ){
-    if( not _parManager_.getParameterSetsList()[iParSet].isEnabled() ){ continue; }
-    // DEV / DialCollections
-    if( not _parManager_.getParameterSetsList()[iParSet].getDialSetDefinitions().empty() ){
-      for( auto& dialSetDef : _parManager_.getParameterSetsList()[iParSet].getDialSetDefinitions().get<std::vector<JsonType>>() ){
-        _dialCollectionList_.emplace_back(&_parManager_.getParameterSetsList());
-        _dialCollectionList_.back().setIndex(int(_dialCollectionList_.size()) - 1);
-        _dialCollectionList_.back().setSupervisedParameterSetIndex(int(iParSet) );
-        _dialCollectionList_.back().readConfig(dialSetDef );
-      }
-    }
-    else{
-
-      for( auto& par : _parManager_.getParameterSetsList()[iParSet].getParameterList() ){
-        if( not par.isEnabled() ){ continue; }
-
-        // Check if no definition is present -> disable the parameter in that case
-        if( par.getDialDefinitionsList().empty() ) {
-          LogAlert << "Disabling \"" << par.getFullTitle() << "\": no dial definition." << std::endl;
-          par.setIsEnabled(false);
-          continue;
-        }
-
-        for( const auto& dialDefinitionConfig : par.getDialDefinitionsList() ){
-          _dialCollectionList_.emplace_back(&_parManager_.getParameterSetsList());
-          _dialCollectionList_.back().setIndex(int(_dialCollectionList_.size()) - 1);
-          _dialCollectionList_.back().setSupervisedParameterSetIndex(int(iParSet) );
-          _dialCollectionList_.back().setSupervisedParameterIndex(par.getParameterIndex() );
-          _dialCollectionList_.back().readConfig( dialDefinitionConfig );
-        }
-      }
-    }
-  }
-
-
   // Monitoring parameters
   _showNbEventParameterBreakdown_ = GenericToolbox::Json::fetchValue(_config_, "showNbEventParameterBreakdown", _showNbEventParameterBreakdown_);
   _showNbEventPerSampleParameterBreakdown_ = GenericToolbox::Json::fetchValue(_config_, "showNbEventPerSampleParameterBreakdown", _showNbEventPerSampleParameterBreakdown_);
@@ -98,6 +62,9 @@ void Propagator::readConfigImpl(){
     _eventDialCache_.getGlobalEventReweightCap().isEnabled = true;
     _eventDialCache_.getGlobalEventReweightCap().maxReweight = GenericToolbox::Json::fetchValue<double>(_config_, "globalEventReweightCap");
   }
+
+  // can it be set later -> not really, still reading the config
+  setupDialCollections();
 
 }
 void Propagator::initializeImpl(){
@@ -122,9 +89,7 @@ void Propagator::clearContent(){
     if( not dialCollection.getGlobalDialLeafName().empty() ) { dialCollection.clear(); }
 
     // clear input buffer cache to trigger the cache eval
-    for( auto& dialInput : dialCollection.getDialInputBufferList() ){
-      dialInput.invalidateBuffers();
-    }
+    dialCollection.invalidateCachedInputBuffers();
   }
   _eventDialCache_ = EventDialCache();
 
@@ -141,9 +106,7 @@ void Propagator::buildDialCache(){
 
   // be extra sure the dial input will request an update
   for( auto& dialCollection : _dialCollectionList_ ){
-    for( auto& dialInput : dialCollection.getDialInputBufferList() ){
-      dialInput.invalidateBuffers();
-    }
+    dialCollection.invalidateCachedInputBuffers();
   }
 }
 void Propagator::propagateParameters(){
@@ -317,6 +280,50 @@ void Propagator::refillHistograms(){
   else{ refillHistogramsFct(-1); }
 
   refillHistogramTimer.stop();
+}
+
+void Propagator::setupDialCollections(){
+
+  LogInfo << "Setting up the dial collections..." << std::endl;
+
+  // make sure it's empty in case readConfig() is called more than once
+  _dialCollectionList_.clear();
+
+
+  for(size_t iParSet = 0 ; iParSet < _parManager_.getParameterSetsList().size() ; iParSet++ ){
+    if( not _parManager_.getParameterSetsList()[iParSet].isEnabled() ){ continue; }
+    // DEV / DialCollections
+    if( not _parManager_.getParameterSetsList()[iParSet].getDialSetDefinitions().empty() ){
+      for( auto& dialSetDef : _parManager_.getParameterSetsList()[iParSet].getDialSetDefinitions().get<std::vector<JsonType>>() ){
+        _dialCollectionList_.emplace_back(&_parManager_.getParameterSetsList());
+        _dialCollectionList_.back().setIndex(int(_dialCollectionList_.size()) - 1);
+        _dialCollectionList_.back().setSupervisedParameterSetIndex(int(iParSet) );
+        _dialCollectionList_.back().readConfig(dialSetDef );
+      }
+    }
+    else{
+
+      for( auto& par : _parManager_.getParameterSetsList()[iParSet].getParameterList() ){
+        if( not par.isEnabled() ){ continue; }
+
+        // Check if no definition is present -> disable the parameter in that case
+        if( par.getDialDefinitionsList().empty() ) {
+          LogAlert << "Disabling \"" << par.getFullTitle() << "\": no dial definition." << std::endl;
+          par.setIsEnabled(false);
+          continue;
+        }
+
+        for( const auto& dialDefinitionConfig : par.getDialDefinitionsList() ){
+          _dialCollectionList_.emplace_back(&_parManager_.getParameterSetsList());
+          _dialCollectionList_.back().setIndex(int(_dialCollectionList_.size()) - 1);
+          _dialCollectionList_.back().setSupervisedParameterSetIndex(int(iParSet) );
+          _dialCollectionList_.back().setSupervisedParameterIndex(par.getParameterIndex() );
+          _dialCollectionList_.back().readConfig( dialDefinitionConfig );
+        }
+      }
+    }
+  }
+
 }
 
 // multithreading

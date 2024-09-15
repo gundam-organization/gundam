@@ -166,6 +166,8 @@ public:
 
   std::vector<std::string>& getExtraLeafNames() {return _globalDialExtraLeafNames_;}
 
+  void invalidateCachedInputBuffers(){ for( auto& inputBuffer : _dialInputBufferList_ ){ inputBuffer.invalidateBuffers(); }}
+
   void printConfiguration() const;
 
 protected:

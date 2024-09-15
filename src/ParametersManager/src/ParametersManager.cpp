@@ -4,6 +4,7 @@
 
 #include "ParametersManager.h"
 #include "ConfigUtils.h"
+#include "GundamGlobals.h"
 
 #include "GenericToolbox.Utils.h"
 #include "GenericToolbox.Json.h"
@@ -24,7 +25,11 @@ void ParametersManager::unmuteLogger(){ Logger::setIsMuted( false ); }
 // config
 void ParametersManager::readConfigImpl(){
 
+  _throwToyParametersWithGlobalCov_ = GenericToolbox::Json::fetchValue(_config_, "throwToyParametersWithGlobalCov", _throwToyParametersWithGlobalCov_);
+  _reThrowParSetIfOutOfPhysical_ = GenericToolbox::Json::fetchValue(_config_, {{"reThrowParSetIfOutOfBounds"},{"reThrowParSetIfOutOfPhysical"}}, _reThrowParSetIfOutOfPhysical_);
+
   _parameterSetListConfig_ = GenericToolbox::Json::fetchValue(_config_, "parameterSetList", _parameterSetListConfig_);
+
   _parameterSetList_.clear(); // make sure there nothing in case readConfig is called more than once
   _parameterSetList_.reserve( _parameterSetListConfig_.size() );
   for( const auto& parameterSetConfig : _parameterSetListConfig_ ){
@@ -32,11 +37,11 @@ void ParametersManager::readConfigImpl(){
     _parameterSetList_.back().readConfig( parameterSetConfig );
 
     // clear the parameter sets that have been disabled
-    if( not _parameterSetList_.back().isEnabled() ){ _parameterSetList_.pop_back(); }
+    if( not _parameterSetList_.back().isEnabled() ){
+      LogDebugIf(GundamGlobals::isDebugConfig()) << "Removing disabled parSet: " << _parameterSetList_.back().getName() << std::endl;
+      _parameterSetList_.pop_back();
+    }
   }
-
-  _throwToyParametersWithGlobalCov_ = GenericToolbox::Json::fetchValue(_config_, "throwToyParametersWithGlobalCov", _throwToyParametersWithGlobalCov_);
-  _reThrowParSetIfOutOfPhysical_ = GenericToolbox::Json::fetchValue(_config_, {{"reThrowParSetIfOutOfBounds"},{"reThrowParSetIfOutOfPhysical"}}, _reThrowParSetIfOutOfPhysical_);
 
 }
 void ParametersManager::initializeImpl(){

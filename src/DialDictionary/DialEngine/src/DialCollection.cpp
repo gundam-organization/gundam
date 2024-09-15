@@ -130,16 +130,18 @@ ParameterSet* DialCollection::getSupervisedParameterSet() const{
 
 // core
 void DialCollection::clear(){
-  _dialInterfaceList_.clear();
   _dialBaseList_.clear();
-  _dialInterfaceList_.shrink_to_fit();
   _dialBaseList_.shrink_to_fit();
+
+  _dialInterfaceList_.clear();
+  _dialInterfaceList_.shrink_to_fit();
+
   _dialFreeSlot_.setValue(0);
 }
 
 void DialCollection::resizeContainers(){
-//  LogTrace << "Resizing containers of the dial collection \"" << this->getTitle() << "\" from "
-//          << _dialInterfaceList_.size() << " to " << _dialFreeSlot_.getValue() << std::endl;
+  LogTrace << "Resizing containers of the dial collection \"" << this->getTitle() << "\" from "
+          << _dialInterfaceList_.size() << " to " << _dialFreeSlot_.getValue() << std::endl;
   _dialInterfaceList_.resize(_dialFreeSlot_.getValue());
   _dialBaseList_.resize(_dialFreeSlot_.getValue());
   _dialInterfaceList_.shrink_to_fit();

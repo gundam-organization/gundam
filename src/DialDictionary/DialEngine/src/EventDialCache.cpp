@@ -101,13 +101,18 @@ void EventDialCache::buildReferenceCache( SampleSet& sampleSet_, std::vector<Dia
       for( auto& dialIndex : indexCache.dials ){
         if( dialIndex.collectionIndex == size_t(-1) or dialIndex.interfaceIndex == size_t(-1) ){ continue; }
 
-        LogThrowIf( dialIndex.collectionIndex >= dialCollectionList_.size() );
-        LogThrowIf( dialIndex.interfaceIndex >= dialCollectionList_.at(dialIndex.collectionIndex).getDialInterfaceList().size(),
-                    GET_VAR_NAME_VALUE(dialIndex.collectionIndex)
-                    << " / " << GET_VAR_NAME_VALUE(dialIndex.interfaceIndex)
-                    << " / " << dialCollectionList_.at(dialIndex.collectionIndex).getDialInterfaceList().size()
-                    << " / " << dialCollectionList_.at(dialIndex.collectionIndex).getSummary()
-                    );
+        if( dialIndex.interfaceIndex >= dialCollectionList_.at(dialIndex.collectionIndex).getDialInterfaceList().size() ){
+          LogError << GET_VAR_NAME_VALUE(dialIndex.interfaceIndex) << std::endl;
+          LogError << "Selected collection: " << dialCollectionList_.at(dialIndex.collectionIndex).getSummary() << std::endl;
+          LogError << "Nb of defined interfaces: " << dialCollectionList_.at(dialIndex.collectionIndex).getDialInterfaceList().size() << std::endl;
+
+          LogError << "Listing available collections:" << std::endl;
+          for( auto& dialCol : dialCollectionList_ ){
+            LogDebug << dialCol.getSummary() << std::endl;
+          }
+
+          LogThrow("DEV ERROR: Please report this issue to github!! This should not happen");
+        }
 
         cacheEntry.dialResponseCacheList.emplace_back(
             dialCollectionList_.at(dialIndex.collectionIndex)
