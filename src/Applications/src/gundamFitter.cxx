@@ -65,7 +65,6 @@ int main(int argc, char** argv){
   clParser.addTriggerOption("dry-run", {"--dry-run", "-d"},"Perform the full sequence of initialization, but don't do the actual fit.");
   clParser.addTriggerOption("asimov", {"-a", "--asimov"}, "Use MC dataset to fill the data histograms");
   clParser.addTriggerOption("skipHesse", {"--skip-hesse"}, "Don't perform postfit error evaluation");
-  clParser.addTriggerOption("skipSimplex", {"--skip-simplex"}, "Don't run SIMPLEX before the actual fit");
   clParser.addTriggerOption("generateOneSigmaPlots", {"--one-sigma"}, "Generate one sigma plots");
   clParser.addTriggerOption("lightOutputMode", {"--light-mode"}, "Disable plot generation");
   clParser.addTriggerOption("noDialCache", {"--no-dial-cache"}, "Disable cache handling for dial eval");
@@ -76,15 +75,18 @@ int main(int argc, char** argv){
   clParser.addOption("toyFit", {"--toy"}, "Run a toy fit (optional arg to provide toy index)", 1, true);
   clParser.addOption("enablePca", {"--pca", "--enable-pca"}, "Enable principle component analysis for eigen decomposed parameter sets", 2, true);
 
-  clParser.addDummyOption("Runtime/debug options");
+  clParser.addDummyOption("Runtime options");
 
   clParser.addOption("kickMc", {"--kick-mc"}, "Amount to push the starting parameters away from their prior values (default: 0)", 1, true);
   clParser.addOption("debugVerbose", {"--debug"}, "Enable debug verbose (can provide verbose level arg)", 1, true);
   clParser.addOption("usingCacheManager", {"--cache-manager"}, "Toggle the usage of the CacheManager (i.e. the GPU) [empty, 'on', or 'off']",1,true);
   clParser.addTriggerOption("usingGpu", {"--gpu"}, "Use GPU parallelization");
-  clParser.addTriggerOption("forceDirect", {"--cpu"}, "Force direct calculation of weights (for debugging)");
   clParser.addOption("overrides", {"-O", "--override"}, "Add a config override [e.g. /fitterEngineConfig/engineType=mcmc)", -1);
   clParser.addOption("overrideFiles", {"-of", "--override-files"}, "Provide config files that will override keys", -1);
+
+  clParser.addDummyOption("Debugging options");
+  clParser.addTriggerOption("forceDirect", {"--cpu"}, "Force direct calculation of weights (for debugging)");
+  clParser.addOption("debugMaxNbEventToLoad", {"-me", "--max-events"}, "Set the maximum number of events to load per dataset", 1);
 
   clParser.addDummyOption();
 
@@ -211,11 +213,15 @@ int main(int argc, char** argv){
         {"generateOneSigmaPlots", "OneSigma"},
         {"enablePca", "PCA"},
         {"skipHesse", "NoHesse"},
-        {"skipSimplex", "NoSimplex"},
         {"kickMc", "KickMc"},
         {"lightOutputMode", "Light"},
         {"toyFit", "ToyFit"},
         {"injectToyParameters", "InjToyPar"},
+
+        // debug options
+        {"debugMaxNbEventToLoad", "debugNbEventMax"},
+
+        // trailing
         {"dry-run", "DryRun"},
         {"appendix", ""},
     };
@@ -369,12 +375,13 @@ int main(int argc, char** argv){
       fitter.setThrowGain( kickMc );
   }
 
-  if( clParser.isOptionTriggered("skipSimplex") ){
-    LogAlert << "Explicitly disabling SIMPLEX first pass" << std::endl;
-    LogThrowIf( fitter.getMinimizerType() != FitterEngine::MinimizerType::RootMinimizer, "invalid option --skip-simplex" );
-    ((RootMinimizer*) &fitter.getMinimizer())->setEnableSimplexBeforeMinimize( false );
+  if( clParser.isOptionTriggered("debugMaxNbEventToLoad") ){
+    LogThrowIf(clParser.getNbValueSet("debugMaxNbEventToLoad") != 1, "Nb of event not specified.");
+    LogDebug << "Load " << clParser.getOptionVal<size_t>("debugMaxNbEventToLoad") << "max events per dataset." << std::endl;
+    for( auto& dataset : fitter.getLikelihoodInterface().getDatasetList() ){
+      dataset.setNbMaxEventToLoad(clParser.getOptionVal<size_t>("debugMaxNbEventToLoad"));
+    }
   }
-
 
   // --------------------------
   // Load:

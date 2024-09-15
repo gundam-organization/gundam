@@ -48,13 +48,19 @@ public:
 
   void updateDispenserOwnership();
 
+  void setNbMaxEventToLoad( size_t nbMaxEventToLoad_ ){
+    _modelDispenser_.getParameters().debugNbMaxEventsToLoad = nbMaxEventToLoad_;
+    for( auto& dd : _dataDispenserDict_ ){
+      dd.second.getParameters().debugNbMaxEventsToLoad = nbMaxEventToLoad_;
+    }
+  }
+
 private:
   // config
   bool _isEnabled_{false};
   bool _showSelectedEventCount_{true};
   int _dataSetIndex_{-1};
   std::string _name_{};
-
   std::string _selectedDataEntry_{};
   std::string _selectedToyEntry_{};
 

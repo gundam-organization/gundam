@@ -100,7 +100,8 @@ std::string DialCollection::getSummary(bool shallow_){
   std::stringstream ss;
   ss << "DialCollection: ";
   ss << this->getTitle();
-  ss << " / nDials=" << _dialInterfaceList_.size();
+  ss << " / nDialInterfaces=" << _dialInterfaceList_.size();
+  ss << " / nDialBases=" << _dialBaseList_.size();
 
   if( not shallow_ ){
     // print parameters
@@ -142,10 +143,13 @@ void DialCollection::clear(){
 void DialCollection::resizeContainers(){
   LogTrace << "Resizing containers of the dial collection \"" << this->getTitle() << "\" from "
           << _dialInterfaceList_.size() << " to " << _dialFreeSlot_.getValue() << std::endl;
-  _dialInterfaceList_.resize(_dialFreeSlot_.getValue());
+
   _dialBaseList_.resize(_dialFreeSlot_.getValue());
-  _dialInterfaceList_.shrink_to_fit();
   _dialBaseList_.shrink_to_fit();
+
+  _dialInterfaceList_.resize(_dialFreeSlot_.getValue());
+  _dialInterfaceList_.shrink_to_fit();
+
   this->setupDialInterfaceReferences();
 }
 
@@ -203,6 +207,7 @@ void DialCollection::setupDialInterfaceReferences(){
 
   // Initializing dial interfaces:
   if( _dialInterfaceList_.size() != _dialBaseList_.size() ){
+    LogDebug << "Initializing dial interfaces -> EVENTBYEVENT ->" << _dialBaseList_.size() << std::endl;
     _dialInterfaceList_.clear();
     _dialInterfaceList_.resize( _dialBaseList_.size() );
   }
