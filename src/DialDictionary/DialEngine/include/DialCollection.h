@@ -155,6 +155,7 @@ public:
   // Return the next slot in the DialBaseList that can b filled. Its
   // thread safe, so multiple threads can fill the list.
   size_t getNextDialFreeSlot(){ return _dialFreeSlot_++; }
+  size_t getDialFreeSlotIndex() const { return _dialFreeSlot_.getValue(); }
 
   // Provide access to a the collection data.  The ownership is retained by
   // the collection.

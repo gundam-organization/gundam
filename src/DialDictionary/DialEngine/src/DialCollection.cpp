@@ -102,6 +102,7 @@ std::string DialCollection::getSummary(bool shallow_){
   ss << this->getTitle();
   ss << " / nDialInterfaces=" << _dialInterfaceList_.size();
   ss << " / nDialBases=" << _dialBaseList_.size();
+  ss << " / lastDialFreeSlot=" << getDialFreeSlotIndex();
 
   if( not shallow_ ){
     // print parameters

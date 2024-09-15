@@ -27,6 +27,8 @@ void LikelihoodInterface::readConfigImpl(){
   _modelPropagator_.readConfig();
   _modelPropagator_.printConfiguration();
 
+  _dataPropagator_.readConfig( _modelPropagator_.getConfig() );
+
   // First taking care of the DataSetManager
   JsonType dataSetManagerConfig{};
   GenericToolbox::Json::deprecatedAction(_modelPropagator_.getConfig(), {{"fitSampleSetConfig"}, {"dataSetList"}}, [&]{
@@ -87,10 +89,11 @@ void LikelihoodInterface::initializeImpl() {
   for( auto& dataSet : _dataSetList_ ){ dataSet.initialize(); }
 
   _modelPropagator_.initialize();
-  _dataPropagator_ = _modelPropagator_; // avoid tons of printouts
+  _dataPropagator_.initialize();
+//  _dataPropagator_ = _modelPropagator_; // avoid tons of printouts
 
   _plotGenerator_.setModelSampleSetPtr( &_modelPropagator_.getSampleSet().getSampleList() );
-  _plotGenerator_.setDataSampleSetPtr( &_modelPropagator_.getSampleSet().getSampleList() );
+  _plotGenerator_.setDataSampleSetPtr( &_dataPropagator_.getSampleSet().getSampleList() );
 
   _eventTreeWriter_.initialize();
   _plotGenerator_.initialize();
@@ -352,7 +355,23 @@ void LikelihoodInterface::loadDataPropagator(){
 
   _dataPropagator_.clearContent();
 
-  if( _dataType_ == DataType::Asimov or _forceAsimovData_ ){
+  bool isAsimov{_dataType_ == DataType::Asimov or _forceAsimovData_};
+  for( auto& dataSet : _dataSetList_ ){
+    if( _dataType_ == DataType::Toy ){
+      if( dataSet.getSelectedToyEntry().empty() or dataSet.getSelectedToyEntry() == "Asimov" ){
+        isAsimov = true;
+        break;
+      }
+    }
+    if( _dataType_ == DataType::RealData ){
+      if( dataSet.getSelectedDataEntry().empty() or dataSet.getSelectedDataEntry() == "Asimov" ){
+        isAsimov = true;
+        break;
+      }
+    }
+  }
+
+  if( isAsimov ){
     // copy the events directly from the model
     LogInfo << "Copying events from the model..." << std::endl;
     _dataPropagator_.copyEventsFrom( _modelPropagator_ );
