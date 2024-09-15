@@ -111,44 +111,38 @@ void PlotGenerator::generateSampleHistograms(TDirectory *saveDir_, int cacheSlot
   }
 
   // Fill histograms
-  for( const auto& sample : *_modelSampleListPtr_ ){
-      // Datasets:
-      for( bool isData : { false, true } ){
+  for( bool isData : { false, true } ){
 
-        const std::vector<Event>* eventListPtr;
-        std::vector<HistHolder*> histPtrToFillList;
+    auto* sampleList{_modelSampleListPtr_};
+    if( isData ){ sampleList = _dataSampleListPtr_; }
 
-        if( isData and _dataSampleListPtr_ != nullptr ){
-          eventListPtr = &sample.getEventList();
+    if( sampleList == nullptr ){ continue; }
 
-          // which hist should be filled?
-          for( auto& histDef : _histHolderCacheList_[cacheSlot_] ){
-            if(histDef.isData and histDef.samplePtr == &sample ){
-              histPtrToFillList.emplace_back( &histDef );
-            }
-          }
+    const std::vector<Event>* eventListPtr;
+    std::vector<HistHolder*> histPtrToFillList;
+
+    // Datasets:
+    for( const auto& sample : *sampleList ){
+
+      eventListPtr = &sample.getEventList();
+
+      // which hist should be filled?
+      for( auto& histDef : _histHolderCacheList_[cacheSlot_] ){
+        if( histDef.samplePtr == &sample ){
+          histPtrToFillList.emplace_back( &histDef );
         }
-        else{
-          eventListPtr = &sample.getEventList();
+      }
 
-          // which hist should be filled?
-          for( auto& histDef : _histHolderCacheList_[cacheSlot_] ){
-            if(not histDef.isData and histDef.samplePtr == &sample ){
-              histPtrToFillList.emplace_back( &histDef );
-            }
-          }
+      for( auto& histPtrToFill : histPtrToFillList ){
+        if( not histPtrToFill->isBinCacheBuilt ){
+          // If any, launch rebuild cache
+          this->buildEventBinCache(histPtrToFillList, eventListPtr, isData);
+          break; // all caches done at once
         }
+      }
 
-        for( auto& histPtrToFill : histPtrToFillList ){
-          if( not histPtrToFill->isBinCacheBuilt ){
-            // If any, launch rebuild cache
-            this->buildEventBinCache(histPtrToFillList, eventListPtr, isData);
-            break; // all caches done at once
-          }
-        }
-
-        // Filling the selected histograms
-        std::function<void(int)> fillJob = [&]( int iThread_ ){
+      // Filling the selected histograms
+      std::function<void(int)> fillJob = [&]( int iThread_ ){
 
           for( auto* hist : histPtrToFillList ){
 
@@ -167,14 +161,14 @@ void PlotGenerator::generateSampleHistograms(TDirectory *saveDir_, int cacheSlot
           }
         };
 
-        fillJob(-1);
+      fillJob(-1);
 
 //        _threadPool_.addJob("fillJob", fillJob);
 //        _threadPool_.runJob("fillJob");
 //        _threadPool_.removeJob("fillJob");
 
-      } // isData loop
-    } // sample
+    } // isData loop
+  } // sample
 
   // Post-processing (norm, color)
   for( auto& histHolderCached : _histHolderCacheList_[cacheSlot_] ){
