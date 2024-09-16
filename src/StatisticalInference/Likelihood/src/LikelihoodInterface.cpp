@@ -247,15 +247,6 @@ std::string LikelihoodInterface::getSampleBreakdownTable() const{
     t << samplePair.data->getNbBinnedEvents() << GenericToolbox::TablePrinter::NextColumn;
     t << samplePair.model->getSumWeights() << GenericToolbox::TablePrinter::NextColumn;
     t << samplePair.data->getSumWeights() << GenericToolbox::TablePrinter::NextLine;
-
-    LogDebug << samplePair.model->getName() << " => ";
-    if( samplePair.model->getSumWeights() != samplePair.data->getSumWeights() ){
-      LogDebug << "identical";
-    }
-    else{
-      LogDebug << "differs -> " << std::setprecision(18) << samplePair.data->getSumWeights() << " / " << samplePair.model->getSumWeights();
-    }
-    LogDebug << std::endl;
   }
 
   return t.generateTableString();
