@@ -219,6 +219,9 @@ namespace JointProbability{
       LogTrace << "Bin #" << bin_ << ": chisq(" << chisq << ") / predVal(" << predVal << ") / dataVal(" << dataVal << ")" << std::endl;
     }
 
+    // make sure even with numerical noise, this never gets negative
+    if( usePerfectAsimov ){ chisq = std::abs(chisq); }
+
     return chisq;
   }
   void BarlowBeestonBanff2022::createNominalMc(const Sample& modelSample_) const {
