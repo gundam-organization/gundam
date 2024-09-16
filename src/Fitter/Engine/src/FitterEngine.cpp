@@ -123,7 +123,7 @@ void FitterEngine::initializeImpl(){
   _parameterScanner_.setLikelihoodInterfacePtr( &getLikelihoodInterface() );
   _parameterScanner_.initialize();
 
-  if( getLikelihoodInterface().getModelPropagator().isThrowAsimovToyParameters() ){
+  if( getLikelihoodInterface().isThrowAsimovToyParameters() ){
     LogInfo << "Writing throws in TTree..." << std::endl;
     auto* throwsTree = new TTree("throws", "throws");
 

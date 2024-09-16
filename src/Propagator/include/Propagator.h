@@ -48,10 +48,6 @@ public:
   void setParameterInjectorConfig(const JsonType &parameterInjector){ _parameterInjectorMc_ = parameterInjector; }
 
   // const getters
-  [[nodiscard]] bool isThrowAsimovToyParameters() const { return _throwAsimovToyParameters_; }
-  [[nodiscard]] bool isEnableStatThrowInToys() const { return _enableStatThrowInToys_; }
-  [[nodiscard]] bool isEnableEventMcThrow() const { return _enableEventMcThrow_; }
-  [[nodiscard]] bool isGaussStatThrowInToys() const { return _gaussStatThrowInToys_; }
   [[nodiscard]] bool isDebugPrintLoadedEvents() const { return _debugPrintLoadedEvents_; }
   [[nodiscard]] int getDebugPrintLoadedEventsNbPerSample() const { return _debugPrintLoadedEventsNbPerSample_; }
   [[nodiscard]] int getIThrow() const { return _iThrow_; }
@@ -111,10 +107,6 @@ private:
   JsonType _parameterInjectorToy_;
 
   // Internals
-  bool _throwAsimovToyParameters_{false};
-  bool _enableStatThrowInToys_{true};
-  bool _gaussStatThrowInToys_{false};
-  bool _enableEventMcThrow_{true};
   bool _showNbEventParameterBreakdown_{true};
   bool _showNbEventPerSampleParameterBreakdown_{false};
   bool _enableEigenToOrigInPropagate_{true};

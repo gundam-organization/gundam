@@ -64,6 +64,7 @@ public:
   void setToyParameterInjector(const JsonType& toyParameterInjector_){ _toyParameterInjector_ = toyParameterInjector_; }
 
   // const getters
+  [[nodiscard]] bool isThrowAsimovToyParameters() const{ return _throwAsimovToyParameters_; }
   [[nodiscard]] int getNbParameters() const{ return _nbParameters_; }
   [[nodiscard]] int getNbSampleBins() const{ return _nbSampleBins_; }
   [[nodiscard]] double getLastLikelihood() const{ return _buffer_.totalLikelihood; }
@@ -118,6 +119,10 @@ protected:
 private:
   // parameters
   bool _forceAsimovData_{false};
+  bool _throwAsimovToyParameters_{false};
+  bool _enableStatThrowInToys_{true};
+  bool _gaussStatThrowInToys_{false};
+  bool _enableEventMcThrow_{true};
   DataType _dataType_{DataType::Asimov};
   JsonType _toyParameterInjector_{};
 
@@ -136,7 +141,7 @@ private:
   Propagator _dataPropagator_{};
 
   EventTreeWriter _eventTreeWriter_{};
-  PlotGenerator _plotGenerator_{}; // TODO: handle its configuration
+  PlotGenerator _plotGenerator_{};
 
   /// Statistical likelihood
   std::shared_ptr<JointProbability::JointProbabilityBase> _jointProbabilityPtr_{nullptr};

@@ -23,38 +23,37 @@ void LikelihoodInterface::readConfigImpl(){
 
   _threadPool_.setNThreads( GundamGlobals::getNumberOfThreads() );
 
-  // TODO: load the configuration of the propagator at this stage
-  // only configure the model, data will be copied later
+  // reading the configuration of the propagator, which corresponds to the model
+  // TODO: handle new config there
   _modelPropagator_.readConfig();
   _modelPropagator_.printConfiguration();
-
-  // First taking care of the DataSetManager
-  JsonType dataSetManagerConfig{};
-  GenericToolbox::Json::deprecatedAction(_modelPropagator_.getConfig(), {{"fitSampleSetConfig"}, {"dataSetList"}}, [&]{
-    LogAlert << R"("dataSetList" should now be set under "likelihoodInterfaceConfig" instead of "fitSampleSet".)" << std::endl;
-    dataSetManagerConfig = GenericToolbox::Json::fetchValue<JsonType>(_modelPropagator_.getConfig(), "fitSampleSetConfig"); // DataSetManager will look for "dataSetList"
-  });
-  GenericToolbox::Json::deprecatedAction(_modelPropagator_.getConfig(), "dataSetList", [&]{
-    LogAlert << R"("dataSetList" should now be set under "likelihoodInterfaceConfig" instead of "propagatorConfig".)" << std::endl;
-    dataSetManagerConfig = _modelPropagator_.getConfig();
-  });
-  dataSetManagerConfig = GenericToolbox::Json::fetchValue(_config_, {{"datasetManagerConfig"}, {"dataSetManagerConfig"}}, dataSetManagerConfig);
-
-
-  // dataSetList should be present
-  JsonType dataSetList;
-  dataSetList = GenericToolbox::Json::fetchValue(_config_, "dataSetList", dataSetManagerConfig);
-
-  // creating the dataSets:
-  _dataSetList_.reserve( dataSetList.size() );
-  for( const auto& dataSetConfig : dataSetList ){
-    _dataSetList_.emplace_back(dataSetConfig, int(_dataSetList_.size()));
-  }
-
 
   JsonType configJointProbability;
   std::string jointProbabilityTypeStr{"PoissonLLH"};
 
+  // prior to this version a few parameters were set in the propagator itself
+  GenericToolbox::Json::deprecatedAction(_modelPropagator_.getConfig(), "throwAsimovFitParameters", [&]{
+    LogAlert << R"("throwAsimovFitParameters" should now be set under "likelihoodInterfaceConfig" instead of "propagatorConfig".)" << std::endl;
+    GenericToolbox::Json::fillValue(_modelPropagator_.getConfig(), "throwAsimovFitParameters", _throwAsimovToyParameters_);
+  });
+  GenericToolbox::Json::deprecatedAction(_modelPropagator_.getConfig(), "enableStatThrowInToys", [&]{
+    LogAlert << R"("enableStatThrowInToys" should now be set under "likelihoodInterfaceConfig" instead of "propagatorConfig".)" << std::endl;
+    _enableStatThrowInToys_ = GenericToolbox::Json::fetchValue(_modelPropagator_.getConfig(), "enableStatThrowInToys", _enableStatThrowInToys_);
+  });
+  GenericToolbox::Json::deprecatedAction(_modelPropagator_.getConfig(), "gaussStatThrowInToys", [&]{
+    LogAlert << R"("gaussStatThrowInToys" should now be set under "likelihoodInterfaceConfig" instead of "propagatorConfig".)" << std::endl;
+    _gaussStatThrowInToys_ = GenericToolbox::Json::fetchValue(_modelPropagator_.getConfig(), "gaussStatThrowInToys", _gaussStatThrowInToys_);
+  });
+  GenericToolbox::Json::deprecatedAction(_modelPropagator_.getConfig(), "enableEventMcThrow", [&]{
+    LogAlert << R"("enableEventMcThrow" should now be set under "likelihoodInterfaceConfig" instead of "propagatorConfig".)" << std::endl;
+    _enableEventMcThrow_ = GenericToolbox::Json::fetchValue(_modelPropagator_.getConfig(), "enableEventMcThrow", _enableEventMcThrow_);
+  });
+  GenericToolbox::Json::deprecatedAction(_modelPropagator_.getConfig(), "plotGeneratorConfig", [&]{
+    LogAlert << R"("plotGeneratorConfig" should now be set under "likelihoodInterfaceConfig".)" << std::endl;
+    _plotGenerator_.setConfig(
+        GenericToolbox::Json::fetchValue( _modelPropagator_.getSampleSet().getConfig(), "plotGeneratorConfig", _plotGenerator_.getConfig() )
+    );
+  });
   GenericToolbox::Json::deprecatedAction(_modelPropagator_.getSampleSet().getConfig(), "llhStatFunction", [&]{
     LogAlert << R"("llhStatFunction" should now be set under "likelihoodInterfaceConfig/jointProbabilityConfig/type".)" << std::endl;
     jointProbabilityTypeStr = GenericToolbox::Json::fetchValue( _modelPropagator_.getSampleSet().getConfig(), "llhStatFunction", jointProbabilityTypeStr );
@@ -64,6 +63,34 @@ void LikelihoodInterface::readConfigImpl(){
     configJointProbability = GenericToolbox::Json::fetchValue( _modelPropagator_.getSampleSet().getConfig(), "llhConfig", configJointProbability );
   });
 
+
+  // datasets used to be defined within the propagator
+  JsonType dataSetManagerConfig{};
+  GenericToolbox::Json::deprecatedAction(_modelPropagator_.getConfig(), "fitSampleSetConfig/dataSetList", [&]{
+    LogAlert << R"("dataSetList" should now be set under "likelihoodInterfaceConfig" instead of "fitSampleSet".)" << std::endl;
+    dataSetManagerConfig = GenericToolbox::Json::fetchValue<JsonType>(_modelPropagator_.getConfig(), "fitSampleSetConfig");
+  });
+  GenericToolbox::Json::deprecatedAction(_modelPropagator_.getConfig(), "dataSetList", [&]{
+    LogAlert << R"("dataSetList" should now be set under "likelihoodInterfaceConfig" instead of "propagatorConfig".)" << std::endl;
+    dataSetManagerConfig = _modelPropagator_.getConfig();
+  });
+  dataSetManagerConfig = GenericToolbox::Json::fetchValue(_config_, {{"datasetManagerConfig"}, {"dataSetManagerConfig"}}, dataSetManagerConfig);
+
+
+  // dataSetList should be present
+  JsonType dataSetListConfig = GenericToolbox::Json::fetchValue(_config_, "dataSetList", dataSetManagerConfig);
+
+  // creating the dataSets:
+  _dataSetList_.reserve( dataSetListConfig.size() );
+  for( const auto& dataSetConfig : dataSetListConfig ){
+    _dataSetList_.emplace_back(dataSetConfig, int(_dataSetList_.size()));
+  }
+
+
+
+
+
+
   // new config structure
   configJointProbability = GenericToolbox::Json::fetchValue(_config_, "jointProbabilityConfig", configJointProbability);
   jointProbabilityTypeStr = GenericToolbox::Json::fetchValue(configJointProbability, "type", jointProbabilityTypeStr);
@@ -72,13 +99,15 @@ void LikelihoodInterface::readConfigImpl(){
   _jointProbabilityPtr_ = std::shared_ptr<JointProbability::JointProbabilityBase>( JointProbability::makeJointProbability( jointProbabilityTypeStr ) );
   _jointProbabilityPtr_->readConfig( configJointProbability );
 
+  // nested configurations
+  _plotGenerator_.readConfig( GenericToolbox::Json::fetchValue( _config_, "plotGeneratorConfig", _plotGenerator_.getConfig() ) );
 
-  GenericToolbox::Json::deprecatedAction(_modelPropagator_.getConfig(), "plotGeneratorConfig", [&]{
-    LogAlert << R"("plotGeneratorConfig" should now be set under "likelihoodInterfaceConfig".)" << std::endl;
-    _plotGenerator_.setConfig( GenericToolbox::Json::fetchValue( _modelPropagator_.getSampleSet().getConfig(), "plotGeneratorConfig", _plotGenerator_.getConfig() ) );
-  });
-  _plotGenerator_.setConfig( GenericToolbox::Json::fetchValue( _config_, "plotGeneratorConfig", _plotGenerator_.getConfig() ) );
-  _plotGenerator_.readConfig();
+
+  // reading local parameters
+  _throwAsimovToyParameters_ = GenericToolbox::Json::fetchValue(_config_, "throwAsimovFitParameters", _throwAsimovToyParameters_);
+  _enableStatThrowInToys_ = GenericToolbox::Json::fetchValue(_config_, "enableStatThrowInToys", _enableStatThrowInToys_);
+  _gaussStatThrowInToys_ = GenericToolbox::Json::fetchValue(_config_, "gaussStatThrowInToys", _gaussStatThrowInToys_);
+  _enableEventMcThrow_ = GenericToolbox::Json::fetchValue(_config_, "enableEventMcThrow", _enableEventMcThrow_);
 
   LogWarning << "LikelihoodInterface configured." << std::endl;
 }
@@ -371,7 +400,7 @@ void LikelihoodInterface::loadDataPropagator(){
 
   if( isAsimov ){
     // don't reload, just use the _modelPropagator_
-    if( _dataType_ == DataType::Toy and _modelPropagator_.isThrowAsimovToyParameters() ){
+    if( _dataType_ == DataType::Toy and _throwAsimovToyParameters_ ){
       throwToyParameters(_modelPropagator_);
     }
 
@@ -382,7 +411,7 @@ void LikelihoodInterface::loadDataPropagator(){
     _dataPropagator_.buildDialCache();
 
     // move the model back to the prior
-    if( _dataType_ == DataType::Toy and _modelPropagator_.isThrowAsimovToyParameters() ){
+    if( _dataType_ == DataType::Toy and _throwAsimovToyParameters_ ){
       _modelPropagator_.getParametersManager().moveParametersToPrior();
       _modelPropagator_.reweightEvents();
     }
@@ -431,7 +460,7 @@ void LikelihoodInterface::loadDataPropagator(){
     _dataPropagator_.shrinkDialContainers();
     _dataPropagator_.buildDialCache();
 
-    if( _dataPropagator_.isThrowAsimovToyParameters() ){
+    if( _throwAsimovToyParameters_ ){
       throwToyParameters(_dataPropagator_);
     } // throw asimov?
 
@@ -561,12 +590,12 @@ void LikelihoodInterface::throwStatErrors(Propagator& propagator_){
   LogInfo << "Throwing statistical error..." << std::endl;
 
   // TODO: those config parameters should be handled here, not within the propagator...
-  if( not propagator_.isEnableStatThrowInToys() ){
+  if( not _enableStatThrowInToys_ ){
     LogAlert << "Stat error throw is disabled. Skipping..." << std::endl;
     return;
   }
 
-  if( propagator_.isEnableEventMcThrow() ){
+  if( _enableEventMcThrow_ ){
     // Take into account the finite amount of event in MC
     LogInfo << "enableEventMcThrow is enabled: throwing individual MC events" << std::endl;
     for( auto& sample : propagator_.getSampleSet().getSampleList() ) {
@@ -578,12 +607,12 @@ void LikelihoodInterface::throwStatErrors(Propagator& propagator_){
   }
 
   LogInfo << "Throwing statistical error on histograms..." << std::endl;
-  if( propagator_.isGaussStatThrowInToys() ) {
+  if( _gaussStatThrowInToys_ ) {
     LogWarning << "Using gaussian statistical throws. (caveat: distribution truncated when the bins are close to zero)" << std::endl;
   }
   for( auto& sample : propagator_.getSampleSet().getSampleList() ){
     // Asimov bin content -> toy data
-    sample.throwStatError( propagator_.isGaussStatThrowInToys() );
+    sample.throwStatError( _gaussStatThrowInToys_ );
   }
 }
 

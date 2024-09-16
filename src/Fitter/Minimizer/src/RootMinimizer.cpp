@@ -1038,7 +1038,7 @@ void RootMinimizer::writePostFitData( TDirectory* saveDir_) {
             } // norm
           } // par
 
-          if( getModelPropagator().isThrowAsimovToyParameters() ){
+          if( getLikelihoodInterface().isThrowAsimovToyParameters() ){
             bool draw{false};
 
             for( auto& par : parList_ ){

@@ -45,10 +45,6 @@ void Propagator::readConfigImpl(){
   // Monitoring parameters
   _showNbEventParameterBreakdown_ = GenericToolbox::Json::fetchValue(_config_, "showNbEventParameterBreakdown", _showNbEventParameterBreakdown_);
   _showNbEventPerSampleParameterBreakdown_ = GenericToolbox::Json::fetchValue(_config_, "showNbEventPerSampleParameterBreakdown", _showNbEventPerSampleParameterBreakdown_);
-  _throwAsimovToyParameters_ = GenericToolbox::Json::fetchValue(_config_, "throwAsimovFitParameters", _throwAsimovToyParameters_);
-  _enableStatThrowInToys_ = GenericToolbox::Json::fetchValue(_config_, "enableStatThrowInToys", _enableStatThrowInToys_);
-  _gaussStatThrowInToys_ = GenericToolbox::Json::fetchValue(_config_, "gaussStatThrowInToys", _gaussStatThrowInToys_);
-  _enableEventMcThrow_ = GenericToolbox::Json::fetchValue(_config_, "enableEventMcThrow", _enableEventMcThrow_);
   _parameterInjectorMc_ = GenericToolbox::Json::fetchValue(_config_, "parameterInjection", _parameterInjectorMc_);
 
   // debug/dev parameters
