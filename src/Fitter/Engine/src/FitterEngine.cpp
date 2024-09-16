@@ -38,7 +38,7 @@ void FitterEngine::readConfigImpl(){
     minimizerConfig = GenericToolbox::Json::fetchValue( _config_, "mcmcConfig" , minimizerConfig );
   });
   GenericToolbox::Json::deprecatedAction(_config_, "engineType", [&]{
-    LogAlert << "engineType should now be specified withing minimizerConfig/minimizerType" << std::endl;
+    LogAlert << R"("engineType" should now be specified withing "minimizerConfig/minimizerType")" << std::endl;
     minimizerTypeStr = GenericToolbox::Json::fetchValue( _config_, "engineType", minimizerTypeStr );
 
     // handle deprecated types
@@ -68,10 +68,9 @@ void FitterEngine::readConfigImpl(){
     _minimizer_->getMonitor().convergenceMonitor.setMaxRefreshRateInMs(GenericToolbox::Json::fetchValue<int>(_config_, "monitorRefreshRateInMs"));
   });
   GenericToolbox::Json::deprecatedAction(_config_, "propagatorConfig", [&]{
-    LogAlert << R"("propagatorConfig" should now be set within "datasetManagerConfig".)" << std::endl;
+    LogAlert << R"("propagatorConfig" should now be set within "likelihoodInterfaceConfig".)" << std::endl;
     // reading the config already since nested objects need to be filled up for handling further deprecation
     getLikelihoodInterface().getModelPropagator().setConfig( GenericToolbox::Json::fetchValue<JsonType>(_config_, "propagatorConfig") );
-    getLikelihoodInterface().setConfig( GenericToolbox::Json::fetchValue<JsonType>(_config_, "propagatorConfig") );
   });
   GenericToolbox::Json::deprecatedAction(getLikelihoodInterface().getModelPropagator().getConfig(), "scanConfig", [&]{
     LogAlert << R"("scanConfig" should now be set within "fitterEngineConfig".)" << std::endl;

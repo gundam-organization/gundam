@@ -23,9 +23,9 @@ void LikelihoodInterface::readConfigImpl(){
 
   _threadPool_.setNThreads( GundamGlobals::getNumberOfThreads() );
 
-  // reading the configuration of the propagator, which corresponds to the model
-  // TODO: handle new config there
-  _modelPropagator_.readConfig();
+  // reading the configuration of the propagator
+  // allows to implement
+  _modelPropagator_.readConfig( GenericToolbox::Json::fetchValue(_config_, "propagatorConfig", _modelPropagator_.getConfig()) );
   _modelPropagator_.printConfiguration();
 
   JsonType dataSetListConfig{};
@@ -56,7 +56,7 @@ void LikelihoodInterface::readConfigImpl(){
     );
   });
   GenericToolbox::Json::deprecatedAction(_modelPropagator_.getConfig(), {{"dataSetList"}, {"fitSampleSetConfig/dataSetList"}}, [&](const std::string& path_){
-    LogAlert << path_ << R"( should now be set under "likelihoodInterfaceConfig".)" << std::endl;
+    LogAlert << "\"" << path_ << R"(" should now be set under "likelihoodInterfaceConfig".)" << std::endl;
     GenericToolbox::Json::fillValue(_modelPropagator_.getConfig(), path_, dataSetListConfig);
   });
   GenericToolbox::Json::deprecatedAction(_modelPropagator_.getSampleSet().getConfig(), "llhStatFunction", [&]{
@@ -83,7 +83,6 @@ void LikelihoodInterface::readConfigImpl(){
 
   // nested configurations
   _plotGenerator_.readConfig( GenericToolbox::Json::fetchValue( _config_, "plotGeneratorConfig", _plotGenerator_.getConfig() ) );
-
 
   // reading local parameters
   GenericToolbox::Json::fillValue(_config_, "throwAsimovFitParameters", _throwAsimovToyParameters_);
