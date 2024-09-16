@@ -111,6 +111,8 @@ protected:
   void buildSamplePairList();
 
   DataDispenser* getDataDispenser( DatasetDefinition& dataset_ );
+  void throwToyParameters(Propagator& propagator_);
+  void throwStatErrors(Propagator& propagator_);
 
 
 private:

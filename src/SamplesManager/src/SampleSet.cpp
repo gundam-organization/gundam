@@ -104,3 +104,18 @@ void SampleSet::printConfiguration() const {
   for( auto& sample : _sampleList_ ){ sample.printConfiguration(); }
 
 }
+std::string SampleSet::getSampleBreakdown() const{
+  GenericToolbox::TablePrinter t;
+
+  t << "Sample" << GenericToolbox::TablePrinter::NextColumn;
+  t << "# of binned event" << GenericToolbox::TablePrinter::NextColumn;
+  t << "total rate (weighted)" << GenericToolbox::TablePrinter::NextLine;
+
+  for( auto& sample : _sampleList_ ){
+    t << sample.getName() << GenericToolbox::TablePrinter::NextColumn;
+    t << sample.getNbBinnedEvents() << GenericToolbox::TablePrinter::NextColumn;
+    t << sample.getSumWeights() << GenericToolbox::TablePrinter::NextLine;
+  }
+
+  return t.generateTableString();
+}

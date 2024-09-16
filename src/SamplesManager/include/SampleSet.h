@@ -41,6 +41,7 @@ public:
 
   // misc
   void printConfiguration() const;
+  std::string getSampleBreakdown() const;
 
 private:
   // config

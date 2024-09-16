@@ -370,11 +370,22 @@ void LikelihoodInterface::loadDataPropagator(){
   }
 
   if( isAsimov ){
+    // don't reload, just use the _modelPropagator_
+    if( _dataType_ == DataType::Toy and _modelPropagator_.isThrowAsimovToyParameters() ){
+      throwToyParameters(_modelPropagator_);
+    }
+
     // copy the events directly from the model
     LogInfo << "Copying events from the model..." << std::endl;
     _dataPropagator_.copyEventsFrom( _modelPropagator_ );
     _dataPropagator_.shrinkDialContainers();
     _dataPropagator_.buildDialCache();
+
+    // move the model back to the prior
+    if( _dataType_ == DataType::Toy and _modelPropagator_.isThrowAsimovToyParameters() ){
+      _modelPropagator_.getParametersManager().moveParametersToPrior();
+      _modelPropagator_.reweightEvents();
+    }
   }
   else{
     LogInfo << "Loading datasets..." << std::endl;
@@ -413,38 +424,7 @@ void LikelihoodInterface::loadDataPropagator(){
     _dataPropagator_.buildDialCache();
 
     if( _dataPropagator_.isThrowAsimovToyParameters() ){
-
-      LogInfo << "Propagating prior parameters on the initially loaded events..." << std::endl;
-      _dataPropagator_.reweightEvents();
-
-      LogInfo << "Sample breakdown prior to the throwing:" << std::endl;
-      // TODO: need to setup the pair sample first or create a new table in Propagator
-//        std::cout << getSampleBreakdownTable() << std::endl;
-
-      if( _dataPropagator_.isDebugPrintLoadedEvents() ){
-        LogDebug << "Toy events:" << std::endl;
-        LogDebug << GET_VAR_NAME_VALUE(_dataPropagator_.getDebugPrintLoadedEventsNbPerSample()) << std::endl;
-        int iEvt{0};
-        for( auto& entry : _dataPropagator_.getEventDialCache().getCache() ) {
-          LogDebug << "Event #" << iEvt++ << "{" << std::endl;
-          {
-            LogScopeIndent;
-            LogDebug << entry.getSummary() << std::endl;
-          }
-          LogDebug << "}" << std::endl;
-          if( iEvt >= _dataPropagator_.getDebugPrintLoadedEventsNbPerSample() ) break;
-        }
-      }
-
-      if( _toyParameterInjector_.empty() ){
-        LogWarning << "Will throw toy parameters..." << std::endl;
-        _dataPropagator_.getParametersManager().throwParameters();
-      }
-      else{
-        LogWarning << "Injecting parameters..." << std::endl;
-        _dataPropagator_.getParametersManager().injectParameterValues( _toyParameterInjector_ );
-      }
-
+      throwToyParameters(_dataPropagator_);
     } // throw asimov?
 
   }
@@ -477,30 +457,7 @@ void LikelihoodInterface::loadDataPropagator(){
     }
   });
 
-  // Throwing stat error on data -> BINNING SHOULD BE SET!!
-  if( _dataType_ == DataType::Toy and _dataPropagator_.isEnableStatThrowInToys() ){
-    LogInfo << "Throwing statistical error for data container..." << std::endl;
-
-    if( _dataPropagator_.isEnableEventMcThrow() ){
-      // Take into account the finite amount of event in MC
-      LogInfo << "enableEventMcThrow is enabled: throwing individual MC events" << std::endl;
-      for( auto& sample : _dataPropagator_.getSampleSet().getSampleList() ) {
-        sample.throwEventMcError();
-      }
-    }
-    else{
-      LogWarning << "enableEventMcThrow is disabled. Not throwing individual MC events" << std::endl;
-    }
-
-    LogInfo << "Throwing statistical error on histograms..." << std::endl;
-    if( _dataPropagator_.isGaussStatThrowInToys() ) {
-      LogWarning << "Using gaussian statistical throws. (caveat: distribution truncated when the bins are close to zero)" << std::endl;
-    }
-    for( auto& sample : _dataPropagator_.getSampleSet().getSampleList() ){
-      // Asimov bin content -> toy data
-      sample.throwStatError( _dataPropagator_.isGaussStatThrowInToys() );
-    }
-  }
+  if( _dataType_ == DataType::Toy ){ throwStatErrors(_dataPropagator_); }
 
   _dataPropagator_.printBreakdowns();
 
@@ -566,7 +523,70 @@ DataDispenser* LikelihoodInterface::getDataDispenser( DatasetDefinition& dataset
   // invalid
   return nullptr;
 }
+void LikelihoodInterface::throwToyParameters(Propagator& propagator_){
 
+  LogInfo << "Propagating prior parameters on the initially loaded events..." << std::endl;
+  propagator_.reweightEvents();
+
+  LogInfo << "Sample breakdown prior to the throwing:" << std::endl;
+  std::cout << propagator_.getSampleSet().getSampleBreakdown() << std::endl;
+
+  if( propagator_.isDebugPrintLoadedEvents() ){
+    LogDebug << "Toy events:" << std::endl;
+    LogDebug << GET_VAR_NAME_VALUE(propagator_.getDebugPrintLoadedEventsNbPerSample()) << std::endl;
+    int iEvt{0};
+    for( auto& entry : propagator_.getEventDialCache().getCache() ) {
+      LogDebug << "Event #" << iEvt++ << "{" << std::endl;
+      {
+        LogScopeIndent;
+        LogDebug << entry.getSummary() << std::endl;
+      }
+      LogDebug << "}" << std::endl;
+      if( iEvt >= propagator_.getDebugPrintLoadedEventsNbPerSample() ) break;
+    }
+  }
+
+  if( not _toyParameterInjector_.empty() ){
+    LogWarning << "Injecting parameters..." << std::endl;
+    propagator_.getParametersManager().injectParameterValues( _toyParameterInjector_ );
+  }
+  else{
+    LogWarning << "Throwing toy parameters according to covariance matrices..." << std::endl;
+    propagator_.getParametersManager().throwParameters();
+  }
+
+  // reweighting the events accordingly
+  propagator_.reweightEvents();
+
+}
+void LikelihoodInterface::throwStatErrors(Propagator& propagator_){
+  LogInfo << "Throwing statistical error for data container..." << std::endl;
+
+  if( not propagator_.isEnableStatThrowInToys() ){
+    LogAlert << "Stat error throw is disabled. Skipping..." << std::endl;
+    return;
+  }
+
+  if( propagator_.isEnableEventMcThrow() ){
+    // Take into account the finite amount of event in MC
+    LogInfo << "enableEventMcThrow is enabled: throwing individual MC events" << std::endl;
+    for( auto& sample : propagator_.getSampleSet().getSampleList() ) {
+      sample.throwEventMcError();
+    }
+  }
+  else{
+    LogWarning << "enableEventMcThrow is disabled. Not throwing individual MC events" << std::endl;
+  }
+
+  LogInfo << "Throwing statistical error on histograms..." << std::endl;
+  if( propagator_.isGaussStatThrowInToys() ) {
+    LogWarning << "Using gaussian statistical throws. (caveat: distribution truncated when the bins are close to zero)" << std::endl;
+  }
+  for( auto& sample : propagator_.getSampleSet().getSampleList() ){
+    // Asimov bin content -> toy data
+    sample.throwStatError( propagator_.isGaussStatThrowInToys() );
+  }
+}
 
 // An MIT Style License
 
