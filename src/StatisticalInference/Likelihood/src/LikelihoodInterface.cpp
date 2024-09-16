@@ -397,6 +397,7 @@ void LikelihoodInterface::loadDataPropagator(){
       dataDispenser->setPlotGeneratorPtr( &_plotGenerator_ );
 
       // otherwise load the dataset
+      dataDispenser->getParameters().isData = true;
       dataDispenser->load( _dataPropagator_ );
 
       // make sure the config is from scratch each time we read a new dataset

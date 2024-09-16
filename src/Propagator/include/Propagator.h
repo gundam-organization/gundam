@@ -22,6 +22,13 @@
 
 class Propagator : public JsonBaseClass {
 
+public:
+  struct OnReloadOptions{
+    bool keepSamples{false};
+    bool keepParameters{false};
+    bool keepDialCollections{false};
+  };
+
 
 protected:
   void readConfigImpl() override;
@@ -60,6 +67,7 @@ public:
   EventDialCache& getEventDialCache(){ return _eventDialCache_; }
   std::vector<DialCollection> &getDialCollectionList(){ return _dialCollectionList_; }
   GenericToolbox::ParallelWorker& getThreadPool(){ return _threadPool_; }
+  OnReloadOptions& getOnReloadOptions(){ return _onReloadOptions_; }
 
   // Core
   void clearContent();
@@ -77,7 +85,6 @@ public:
   // public members
   GenericToolbox::Time::AveragedTimer<10> reweightTimer;
   GenericToolbox::Time::AveragedTimer<10> refillHistogramTimer;
-
 
 protected:
   void initializeThreads();
@@ -124,6 +131,8 @@ private:
   std::vector<DialCollection> _dialCollectionList_{};
 
   GenericToolbox::ParallelWorker _threadPool_{};
+
+  OnReloadOptions _onReloadOptions_{};
 
 };
 #endif //GUNDAM_PROPAGATOR_H
