@@ -28,7 +28,6 @@ namespace JointProbability{
     bool allowZeroMcWhenZeroData{true};
     bool usePoissonLikelihood{false};
     bool BBNoUpdateWeights{false}; // OA 2021 bug reimplementation
-    bool usePerfectAsimov{false};
     mutable std::map<const Sample*, std::vector<double>> nomMcUncertList{}; // OA 2021 bug reimplementation
     mutable GenericToolbox::NoCopyWrapper<std::mutex> _mutex_{}; // for creating the nomMC
   };
@@ -39,7 +38,6 @@ namespace JointProbability{
     BBNoUpdateWeights = GenericToolbox::Json::fetchValue(_config_, "BBNoUpdateWeights", BBNoUpdateWeights);
     verboseLevel = GenericToolbox::Json::fetchValue(_config_, {{"verboseLevel"}, {"isVerbose"}}, verboseLevel);
     throwIfInfLlh = GenericToolbox::Json::fetchValue(_config_, "throwIfInfLlh", throwIfInfLlh);
-    usePerfectAsimov = GenericToolbox::Json::fetchValue(_config_, "usePerfectAsimov", usePerfectAsimov);
 
     LogInfo << "Using BarlowLLH_BANFF_OA2021 parameters:" << std::endl;
     {
@@ -49,7 +47,6 @@ namespace JointProbability{
       LogInfo << GET_VAR_NAME_VALUE(BBNoUpdateWeights) << std::endl;
       LogInfo << GET_VAR_NAME_VALUE(verboseLevel) << std::endl;
       LogInfo << GET_VAR_NAME_VALUE(throwIfInfLlh) << std::endl;
-      LogInfo << GET_VAR_NAME_VALUE(usePerfectAsimov) << std::endl;
     }
   }
   double BarlowBeestonBanff2022::eval(const SamplePair& samplePair_, int bin_) const {
@@ -61,10 +58,6 @@ namespace JointProbability{
       std::lock_guard<std::mutex> g(_mutex_);
       if( not GenericToolbox::isIn((const Sample*) samplePair_.model, nomMcUncertList) ){ createNominalMc(*samplePair_.model); }
     }
-
-    // In asimov by definition:
-    // prevents from having 1E-14 noise
-    if( usePerfectAsimov and predVal != 0 and dataVal == predVal ){ return 0; }
 
     // it should exist past this point
     auto& nomHistErr = nomMcUncertList[samplePair_.model];
@@ -220,9 +213,6 @@ namespace JointProbability{
     if(verboseLevel>=3){
       LogTrace << "Bin #" << bin_ << ": chisq(" << chisq << ") / predVal(" << predVal << ") / dataVal(" << dataVal << ")" << std::endl;
     }
-
-    // make sure even with numerical noise, this never gets negative
-    if( usePerfectAsimov ){ chisq = std::abs(chisq); }
 
     return chisq;
   }
