@@ -44,6 +44,7 @@ public:
 
   // core
   void moveParametersToPrior();
+  void convertEigenToOrig();
   void injectParameterValues(const JsonType &config_);
   void throwParameters();
   void throwParametersFromParSetCovariance();

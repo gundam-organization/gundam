@@ -110,20 +110,14 @@ void Propagator::buildDialCache(){
   }
 }
 void Propagator::propagateParameters(){
-
-  if( _enableEigenToOrigInPropagate_ ){
-    // Only real parameters are propagated on the spectra -> need to convert the eigen to original
-    for( auto& parSet : _parManager_.getParameterSetsList() ){
-      if( parSet.isEnableEigenDecomp() ){ parSet.propagateEigenToOriginal(); }
-    }
-  }
-
   this->reweightEvents();
   this->refillHistograms();
-
 }
 void Propagator::reweightEvents() {
   reweightTimer.start();
+
+  // Only real parameters are propagated on the spectra -> need to convert the eigen to original
+  if( _enableEigenToOrigInPropagate_ ){ _parManager_.convertEigenToOrig(); }
 
   updateDialState();
 
@@ -147,10 +141,6 @@ void Propagator::reweightEvents() {
 }
 
 // misc
-void Propagator::copyEventsFrom(const Propagator& src_){
-  _sampleSet_.copyEventsFrom( src_.getSampleSet() );
-  _eventDialCache_.fillCacheEntries( _sampleSet_ );
-}
 void Propagator::writeEventRates(const GenericToolbox::TFilePath& saveDir_) const {
   for( auto& sample : _sampleSet_.getSampleList() ){ sample.writeEventRates(saveDir_); }
 }
@@ -240,6 +230,10 @@ void Propagator::printBreakdowns() const {
       LogDebug << "}" << std::endl;
     }
   }
+}
+void Propagator::copyEventsFrom(const Propagator& src_){
+  _sampleSet_.copyEventsFrom( src_.getSampleSet() );
+  _eventDialCache_.fillCacheEntries( _sampleSet_ );
 }
 
 

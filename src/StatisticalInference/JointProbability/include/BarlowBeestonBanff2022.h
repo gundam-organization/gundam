@@ -23,11 +23,12 @@ namespace JointProbability{
 
     void createNominalMc(const Sample& modelSample_) const;
 
-    int verboseLevel{0};
+    mutable int verboseLevel{0};
     bool throwIfInfLlh{false};
     bool allowZeroMcWhenZeroData{true};
     bool usePoissonLikelihood{false};
     bool BBNoUpdateWeights{false}; // OA 2021 bug reimplementation
+    bool usePerfectAsimov{true};
     mutable std::map<const Sample*, std::vector<double>> nomMcUncertList{}; // OA 2021 bug reimplementation
     mutable GenericToolbox::NoCopyWrapper<std::mutex> _mutex_{}; // for creating the nomMC
   };
@@ -58,6 +59,10 @@ namespace JointProbability{
       std::lock_guard<std::mutex> g(_mutex_);
       if( not GenericToolbox::isIn((const Sample*) samplePair_.model, nomMcUncertList) ){ createNominalMc(*samplePair_.model); }
     }
+
+    // In asimov by definition:
+    // prevents from having 1E-14 noise
+    if( usePerfectAsimov and predVal != 0 and dataVal == predVal ){ return 0; }
 
     // it should exist past this point
     auto& nomHistErr = nomMcUncertList[samplePair_.model];

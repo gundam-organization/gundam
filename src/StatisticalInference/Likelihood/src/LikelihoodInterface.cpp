@@ -99,8 +99,6 @@ void LikelihoodInterface::initializeImpl() {
   // loading the propagators
   this->load();
 
-
-
   _jointProbabilityPtr_->initialize();
 
   // Loading monitoring values:
@@ -249,6 +247,15 @@ std::string LikelihoodInterface::getSampleBreakdownTable() const{
     t << samplePair.data->getNbBinnedEvents() << GenericToolbox::TablePrinter::NextColumn;
     t << samplePair.model->getSumWeights() << GenericToolbox::TablePrinter::NextColumn;
     t << samplePair.data->getSumWeights() << GenericToolbox::TablePrinter::NextLine;
+
+    LogDebug << samplePair.model->getName() << " => ";
+    if( samplePair.model->getSumWeights() != samplePair.data->getSumWeights() ){
+      LogDebug << "identical";
+    }
+    else{
+      LogDebug << "differs -> " << std::setprecision(18) << samplePair.data->getSumWeights() << " / " << samplePair.model->getSumWeights();
+    }
+    LogDebug << std::endl;
   }
 
   return t.generateTableString();
@@ -284,9 +291,7 @@ double LikelihoodInterface::evalPenaltyLikelihood(const ParameterSet& parSet_) {
 void LikelihoodInterface::load(){
 
   LogInfo << std::endl; loadModelPropagator();
-
   LogInfo << std::endl; loadDataPropagator();
-
   LogInfo << std::endl;
 
   /// Now caching the event for the plot generator
@@ -414,6 +419,7 @@ void LikelihoodInterface::loadDataPropagator(){
         if( GenericToolbox::Json::fetchValue(parSet.getConfig(), "maskForToyGeneration", false) ){ parSet.nullify(); }
       }
 
+
       // otherwise load the dataset
       dataDispenser->getParameters().isData = true;
       dataDispenser->load( _dataPropagator_ );
@@ -437,16 +443,6 @@ void LikelihoodInterface::loadDataPropagator(){
   }
 
   LogInfo << "Propagating parameters on events..." << std::endl;
-
-  // At this point, MC events have been reweighted using their prior
-  // but when using eigen decomp, the conversion eigen to original has a small computational error
-  // this will make sure the "asimov" data will be reweighted the same way the model is expected to behave
-  // while using the eigen decomp
-  for( auto& parSet: _dataPropagator_.getParametersManager().getParameterSetsList() ) {
-    if( not parSet.isEnabled() ){ continue; }
-    if( parSet.isEnableEigenDecomp() ) { parSet.propagateEigenToOriginal(); }
-  }
-
   _dataPropagator_.reweightEvents();
 
   LogInfo << "Filling up data sample bin caches..." << std::endl;
@@ -567,8 +563,9 @@ void LikelihoodInterface::throwToyParameters(Propagator& propagator_){
 
 }
 void LikelihoodInterface::throwStatErrors(Propagator& propagator_){
-  LogInfo << "Throwing statistical error for data container..." << std::endl;
+  LogInfo << "Throwing statistical error..." << std::endl;
 
+  // TODO: those config parameters should be handled here, not within the propagator...
   if( not propagator_.isEnableStatThrowInToys() ){
     LogAlert << "Stat error throw is disabled. Skipping..." << std::endl;
     return;

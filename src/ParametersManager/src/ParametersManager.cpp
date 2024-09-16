@@ -300,6 +300,12 @@ void ParametersManager::moveParametersToPrior(){
     parSet.moveParametersToPrior();
   }
 }
+void ParametersManager::convertEigenToOrig(){
+  for( auto& parSet : _parameterSetList_ ){
+    if( not parSet.isEnabled() ){ continue; }
+    if( parSet.isEnableEigenDecomp() ){ parSet.propagateEigenToOriginal(); }
+  }
+}
 void ParametersManager::injectParameterValues(const JsonType &config_) {
   LogWarning << "Injecting parameters..." << std::endl;
 
