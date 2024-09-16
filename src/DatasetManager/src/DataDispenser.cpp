@@ -332,7 +332,7 @@ void DataDispenser::fetchRequestedLeaves(){
   // plotGen -> for storage as we need those in prefit and postfit
   if( _plotGeneratorPtr_ != nullptr ){
     std::vector<std::string> varForStorageListBuffer{};
-    varForStorageListBuffer = _plotGeneratorPtr_->fetchListOfVarToPlot(not _parameters_.isData);
+    varForStorageListBuffer = _plotGeneratorPtr_->fetchListOfVarToPlot(_parameters_.isData);
     for( auto& var : _plotGeneratorPtr_->fetchListOfSplitVarNames() ){
       GenericToolbox::addIfNotInVector(var, varForStorageListBuffer);
     }
