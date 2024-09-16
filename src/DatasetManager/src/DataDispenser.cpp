@@ -333,8 +333,10 @@ void DataDispenser::fetchRequestedLeaves(){
   if( _plotGeneratorPtr_ != nullptr ){
     std::vector<std::string> varForStorageListBuffer{};
     varForStorageListBuffer = _plotGeneratorPtr_->fetchListOfVarToPlot(_parameters_.isData);
-    for( auto& var : _plotGeneratorPtr_->fetchListOfSplitVarNames() ){
-      GenericToolbox::addIfNotInVector(var, varForStorageListBuffer);
+    if( not _parameters_.isData ){
+      for( auto& var : _plotGeneratorPtr_->fetchListOfSplitVarNames() ){
+        GenericToolbox::addIfNotInVector(var, varForStorageListBuffer);
+      }
     }
     LogInfo << "PlotGenerator variable request for storage: " << GenericToolbox::toString(varForStorageListBuffer) << std::endl;
     for( auto& var : varForStorageListBuffer ){ _cache_.addVarRequestedForStorage(var); }
