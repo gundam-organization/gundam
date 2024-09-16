@@ -396,6 +396,10 @@ void LikelihoodInterface::loadDataPropagator(){
       // nothing has been selected, skip (warning message is within getDataDispenser)
       if( dataDispenser == nullptr ){ continue; }
 
+      // TODO: handle it better? -> data dispenser need to be aware about it for fetching the requested variables
+      // Is it better to do the fetching here and provide it to the dispenser?
+      dataDispenser->setPlotGeneratorPtr( &_plotGenerator_ );
+
       // handling override of the propagator config
       if( not dataDispenser->getParameters().overridePropagatorConfig.empty() ){
         LogWarning << "Reload the data propagator config with override options..." << std::endl;
@@ -405,7 +409,10 @@ void LikelihoodInterface::loadDataPropagator(){
         _dataPropagator_.initialize();
       }
 
-      dataDispenser->setPlotGeneratorPtr( &_plotGenerator_ );
+      // legacy: replacing the parameterSet option "maskForToyGeneration" -> now should use the config override above
+      for( auto& parSet : _dataPropagator_.getParametersManager().getParameterSetsList() ){
+        if( GenericToolbox::Json::fetchValue(parSet.getConfig(), "maskForToyGeneration", false) ){ parSet.nullify(); }
+      }
 
       // otherwise load the dataset
       dataDispenser->getParameters().isData = true;
