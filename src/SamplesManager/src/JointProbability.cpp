@@ -58,6 +58,7 @@ namespace JointProbability{
     allowZeroMcWhenZeroData = GenericToolbox::Json::fetchValue(_config_, "allowZeroMcWhenZeroData", allowZeroMcWhenZeroData);
     usePoissonLikelihood = GenericToolbox::Json::fetchValue(_config_, "usePoissonLikelihood", usePoissonLikelihood);
     BBNoUpdateWeights = GenericToolbox::Json::fetchValue(_config_, "BBNoUpdateWeights", BBNoUpdateWeights);
+    expectedValueMinimum = GenericToolbox::Json::fetchValue(_config_, "ExpectedValueMinimum", expectedValueMinimum);
     verboseLevel = GenericToolbox::Json::fetchValue(_config_, {{"verboseLevel"}, {"isVerbose"}}, verboseLevel);
 
     LogInfo << "Using BarlowLLH_BANFF_OA2021 parameters:" << std::endl;
@@ -106,6 +107,19 @@ namespace JointProbability{
       }
     }
     mcuncert = std::max(mcuncert, std::numeric_limits<double>::epsilon());
+
+    // Add the (broken) expected value threshold that we saw in the old
+    // likelihood. This is here to help understand the old behavior.
+    if (predVal <= expectedValueMinimum) {
+      LogAlert << "Use incorrect expectation behavior --"
+               << " predVal: " << predVal
+               << " dataVal: " << dataVal
+               << std::endl;
+      if (predVal <= 0.0 and dataVal > 0.0) {
+        return std::numeric_limits<double>::infinity();
+      }
+      return 0.0;
+    }
 
     // The MC used in the likelihood calculation is allowed to be changed by
     // Barlow Beeston beta parameters.

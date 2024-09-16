@@ -98,7 +98,10 @@ namespace JointProbability {
     int verboseLevel{0};
     bool allowZeroMcWhenZeroData{true};
     bool usePoissonLikelihood{false};
-    bool BBNoUpdateWeights{false}; // OA 2021 bug reimplementation
+    // OA 2021 bug reimplementation
+    bool BBNoUpdateWeights{false};
+    // OA2021 bug reimplmentation (set to numeric_limits::min() to reproduce)
+    double expectedValueMinimum{-1.0};
   };
 
   class BarlowLLH_BANFF_OA2021_SFGD : public JointProbability{
@@ -106,10 +109,4 @@ namespace JointProbability {
   };
 
 }
-
-
-
-
-
-
 #endif //GUNDAM_JOINTPROBABILITY_H
