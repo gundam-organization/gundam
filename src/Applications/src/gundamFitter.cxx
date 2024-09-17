@@ -264,7 +264,7 @@ int main(int argc, char** argv){
   // Configure:
   // --------------------------
   LogInfo << "FitterEngine setup..." << std::endl;
-  FitterEngine fitter{GenericToolbox::mkdirTFile(app.getOutfilePtr(), "FitterEngine")};
+  FitterEngine fitter(GenericToolbox::mkdirTFile(app.getOutfilePtr(), "FitterEngine"));
 
   fitter.readConfig(GenericToolbox::Json::fetchValue<JsonType>(configHandler.getConfig(), "fitterEngineConfig"));
 
