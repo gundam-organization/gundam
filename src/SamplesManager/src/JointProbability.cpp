@@ -59,6 +59,7 @@ namespace JointProbability{
     usePoissonLikelihood = GenericToolbox::Json::fetchValue(_config_, "usePoissonLikelihood", usePoissonLikelihood);
     BBNoUpdateWeights = GenericToolbox::Json::fetchValue(_config_, "BBNoUpdateWeights", BBNoUpdateWeights);
     expectedValueMinimum = GenericToolbox::Json::fetchValue(_config_, "ExpectedValueMinimum", expectedValueMinimum);
+    fractionalErrorLimit = GenericToolbox::Json::fetchValue(_config_, "FractionalErrorLimit", fractionalErrorLimit);
     verboseLevel = GenericToolbox::Json::fetchValue(_config_, {{"verboseLevel"}, {"isVerbose"}}, verboseLevel);
 
     LogInfo << "Using BarlowLLH_BANFF_OA2021 parameters:" << std::endl;
@@ -106,7 +107,6 @@ namespace JointProbability{
         LogThrow("The mc uncertainty is not a usable number");
       }
     }
-    mcuncert = std::max(mcuncert, std::numeric_limits<double>::epsilon());
 
     // Add the (broken) expected value threshold that we saw in the old
     // likelihood. This is here to help understand the old behavior.
@@ -136,17 +136,19 @@ namespace JointProbability{
     // any more parameters.  Assume the MC has a Gaussian distribution
     // generated as in https://arxiv.org/abs/1103.0354 eq 10, 11
     if (not usePoissonLikelihood and mcuncert > 0.0) {
-      // Physically, the fractional uncertainty should be less than 100% since
-      // one MC event in a bin would have 100% fractional uncertainty [under
-      // the "Gaussian" approximation, so sqrt(1.0)/1.0].  The OA2021 behavior
-      // lets the fractional error grow, but the entire likelihood became
-      // discontinuous around a predicted value of 1E-16.  Setting
-      // fractionalLimit to 1E+20 exactly matches OA2021 before the
-      // discontinuity and behaves reasonably below it.
-      const double fractionalLimit = 1E+19;  // Match OA2021 behavior
       // Barlow-Beeston uses fractional uncertainty on MC, so
-      // sqrt(sum[w^2])/mc -b/2a in quadratic equation.
-      double fractional = std::min(std::sqrt(mcuncert)/newmc, fractionalLimit);
+      // sqrt(sum[w^2])/mc -b/2a in quadratic equation.  Physically, the
+      // fractional uncertainty should be less than 100% since one MC event in
+      // a bin would have 100% fractional uncertainty [under the "Gaussian"
+      // approximation, so sqrt(1.0)/1.0].  The OA2021 behavior lets the
+      // fractional error grow, but the entire likelihood became discontinuous
+      // around a predicted value of 1E-16. Setting fractionalLimit to 1E+19
+      // matches OA2021 before the discontinuity.  The BANFF behavior has the
+      // likelihood failed around 1E-154.  Setting fractionalLimit to 1E+150
+      // matchs BANFF.  In both cases, the new likelihood behaves reasonably
+      // all the way to zero.
+      double fractional = std::min(std::sqrt(mcuncert)/newmc,
+                                   fractionalErrorLimit);
       double temp = newmc * fractional * fractional - 1;
       // b^2 - 4ac in quadratic equation
       double temp2 = temp * temp + 4 * dataVal * fractional * fractional;
@@ -162,21 +164,22 @@ namespace JointProbability{
     }
 
     // And calculate the Poisson likelihood.  The "stat" variable is valid for
-    // both Poisson and the Barlow-Beeston correctin.  The newmc value is
+    // both Poisson and the Barlow-Beeston correction.  The newmc value is
     // either the original predVal, or if Barlow-Beeston is applied it is
     // modified to calculate statistical part of the Barlow-Beeston
     // likelihood.
     double stat = 0;
     if (dataVal < std::numeric_limits<double>::epsilon()) {
-      // dataVal should be roughly an integer, so this equivalent to "dataVal
-      // == 0", but safer.
+      // dataVal should be roughly an integer, so this is the same as
+      // "dataVal==0", but safer.
       stat = newmc;
     }
     else if (newmc > std::numeric_limits<double>::min()) {
       // The newmc value is normally not a lot less than O(1), but could
       // approach zero.  This splits the ratio of "data/expected" into a
       // difference of logs so that it avoids denormalization problems
-      // (i.e. big/small).
+      // (i.e. big/small).  The protection is set at the smallest normalized
+      // double value (it's approximately 2E-308).
       stat = newmc - dataVal + dataVal*(TMath::Log(dataVal)-TMath::Log(newmc));
     }
     else {
@@ -198,7 +201,7 @@ namespace JointProbability{
 
     // Build the chisq value based on previous calculations.
     double chisq =  2.0*stat;
-    // Apply the Barlow-Beeston penalty.
+    // Possibly apply the Barlow-Beeston penalty.
     if (not usePoissonLikelihood) chisq += 2.0 * penalty;
 
     // Warn when the expected value for a bin is going to zero.
