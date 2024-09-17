@@ -266,7 +266,7 @@ int main(int argc, char** argv){
   LogInfo << "FitterEngine setup..." << std::endl;
   FitterEngine fitter{GenericToolbox::mkdirTFile(app.getOutfilePtr(), "FitterEngine")};
 
-  fitter.readConfig(GenericToolbox::Json::fetchSubEntry(configHandler.getConfig(), {"fitterEngineConfig"}));
+  fitter.readConfig(GenericToolbox::Json::fetchValue<JsonType>(configHandler.getConfig(), "fitterEngineConfig"));
 
   // -a
   if( clParser.isOptionTriggered("asimov") ){
