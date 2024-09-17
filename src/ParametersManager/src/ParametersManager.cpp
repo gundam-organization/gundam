@@ -224,12 +224,12 @@ void ParametersManager::throwParametersFromGlobalCovariance(bool quietVerbose_){
       auto* parPtr = _strippedParameterList_[iPar];
       parPtr->setThrowValue(parPtr->getPriorValue() + throws[iPar]);
       if ( not std::isnan(parPtr->getMinValue()) and parPtr->getThrowValue() < parPtr->getMinValue()) {
-        LogAlert << "Thrown value lower than min bound -> " << parPtr->getSummary(true) << std::endl;
+        LogAlert << "Thrown value lower than min bound -> " << parPtr->getThrowValue() << " < min(" << parPtr->getMinValue() << ") " << parPtr->getFullTitle() << std::endl;
         rethrow = true;
         break;
       }
       if ( not std::isnan(parPtr->getMaxValue()) and parPtr->getThrowValue() > parPtr->getMaxValue()) {
-        LogAlert << "Thrown value lower than max bound -> " << parPtr->getSummary(true) << std::endl;
+        LogAlert << "Thrown value greater than max bound -> " << parPtr->getThrowValue() << " > max(" << parPtr->getMaxValue() << ") " << parPtr->getFullTitle() << std::endl;
         rethrow = true;
         break;
       }
@@ -266,31 +266,34 @@ void ParametersManager::throwParametersFromGlobalCovariance(bool quietVerbose_){
     }
 
     if( rethrow ) {
-      LogThrowIf( throwNb > 10000, "To many throw attempts")
+      LogThrowIf( throwNb > 100000, "Too many throw attempts")
       // wrap back to the while loop
       LogWarning << "Rethrowing after attempt #" << throwNb << std::endl;
       continue;
     }
 
     for( auto& parSet : _parameterSetList_ ){
+      if( not parSet.isEnabled() ){ continue; }
       LogInfo << parSet.getName() << ":" << std::endl;
       for( auto& par : parSet.getParameterList() ){
+        if( not par.isEnabled() ){ continue; }
         LogScopeIndent;
-        if( ParameterSet::isValidCorrelatedParameter(par) ){
-          par.setThrowValue( par.getParameterValue() );
-          LogInfo << "Thrown par " << par.getFullTitle() << ": " << par.getPriorValue();
-          LogInfo << " becomes " << par.getParameterValue() << std::endl;
-        }
+        par.setThrowValue( par.getParameterValue() );
+        LogInfo << "Thrown par " << par.getFullTitle() << ": " << par.getPriorValue();
+        LogInfo << " becomes " << par.getParameterValue() << std::endl;
       }
       if( not parSet.isEnableEigenDecomp() ) continue;
       LogInfo << "Translated to eigen space:" << std::endl;
       for( auto& eigenPar : parSet.getEigenParameterList() ){
+        if( not eigenPar.isEnabled() ){ continue; }
         LogScopeIndent;
         eigenPar.setThrowValue( eigenPar.getParameterValue() );
         LogInfo << "Eigen par " << eigenPar.getFullTitle() << ": " << eigenPar.getPriorValue();
         LogInfo << " becomes " << eigenPar.getParameterValue() << std::endl;
       }
     }
+
+    break;
   }
 }
 

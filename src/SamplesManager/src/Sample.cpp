@@ -20,16 +20,21 @@ LoggerInit([]{ Logger::setUserHeaderStr("[Sample]"); });
 
 
 void Sample::readConfigImpl(){
-  _name_ = GenericToolbox::Json::fetchValue(_config_, "name", _name_);
+  _name_ = GenericToolbox::Json::fetchValue<std::string>(_config_, "name");
   GenericToolbox::replaceSubstringInsideInputString(_name_, "/", " ");
+  LogDebugIf(GundamGlobals::isDebugConfig()) << "Defining sample \"" << _name_ << "\"" << std::endl;
 
   _isEnabled_ = GenericToolbox::Json::fetchValue(_config_, "isEnabled", _isEnabled_);
-  if( not _isEnabled_ ){ return; }
+  if( not _isEnabled_ ){
+    LogDebugIf(GundamGlobals::isDebugConfig()) << "-> disabled" << std::endl;
+    return;
+  }
 
   _binningConfig_ = GenericToolbox::Json::fetchValue(_config_, {{"binningFilePath"}, {"binningFile"}, {"binning"}}, _binningConfig_);
   _selectionCutStr_ = GenericToolbox::Json::fetchValue(_config_, {{"selectionCutStr"}, {"selectionCuts"}}, _selectionCutStr_);
   _enabledDatasetList_ = GenericToolbox::Json::fetchValue(_config_, std::vector<std::string>{"datasets", "dataSets"}, _enabledDatasetList_);
 
+  LogDebugIf(GundamGlobals::isDebugConfig()) << "Reading binning: " << _config_ << std::endl;
   _binning_.readBinningDefinition( _binningConfig_ );
   _binning_.sortBins();
   this->buildHistogram( _binning_ );

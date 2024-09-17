@@ -372,8 +372,7 @@ namespace ConfigUtils {
     LogThrowIf(not GenericToolbox::isFile(filePath_), "Could not find " << filePath_);
 
     LogScopeIndent;
-    auto override{ConfigUtils::readConfigFile(filePath_)};
-    ConfigHandler::override(override);
+    ConfigHandler::override(ConfigUtils::readConfigFile(filePath_));
   }
   void ConfigHandler::override( const std::vector<std::string>& filesList_ ){
     for( auto& file : filesList_ ){ this->override( file ); }

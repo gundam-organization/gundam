@@ -47,6 +47,7 @@ int main(int argc, char** argv){
   clParser.addTriggerOption("dryRun", {"-d", "--dry-run"}, "Only overrides fitter config and print it.");
   clParser.addTriggerOption("useBfAsXsec", {"--use-bf-as-xsec"}, "Use best-fit as x-sec value instead of mean of toys.");
   clParser.addTriggerOption("usePreFit", {"--use-prefit"}, "Use prefit covariance matrices for the toy throws.");
+  clParser.addTriggerOption("debugVerbose", {"--debug"}, "Add debug verbose.");
 
   LogInfo << "Usage: " << std::endl;
   LogInfo << clParser.getConfigSummary() << std::endl << std::endl;
@@ -58,6 +59,8 @@ int main(int argc, char** argv){
   LogInfo << "Provided arguments: " << std::endl;
   LogInfo << clParser.getValueSummary() << std::endl << std::endl;
 
+
+  GundamGlobals::setIsDebugConfig( clParser.isOptionTriggered("debugVerbose") );
 
   // Sanity checks
   LogThrowIf(not clParser.isOptionTriggered("configFile"), "Xsec calculator config file not provided.");
@@ -595,7 +598,7 @@ int main(int argc, char** argv){
     GenericToolbox::displayProgressBar( iToy+1, nToys, ss.str() );
 
     // Do the throwing:
-    propagator.getParametersManager().throwParametersFromGlobalCovariance();
+    propagator.getParametersManager().throwParametersFromGlobalCovariance( not GundamGlobals::isDebugConfig() );
     propagator.propagateParameters();
 
     if( enableStatThrowInToys ){
