@@ -119,7 +119,7 @@ int main(int argc, char** argv){
   ConfigUtils::clearEntry( cHandler.getConfig(), "fitterEngineConfig/propagatorConfig/plotGeneratorConfig" );
 
   // Defining signal samples
-  JsonType xsecConfig{ ConfigUtils::readConfigFile( clParser.getOptionVal<std::string>("configFile") ) };
+  JsonType xsecConfig( ConfigUtils::readConfigFile( clParser.getOptionVal<std::string>("configFile") ) );
   cHandler.override( xsecConfig );
   LogInfo << "Override done." << std::endl;
 
