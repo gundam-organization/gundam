@@ -220,7 +220,7 @@ std::string Parameter::getSummary(bool shallow_) const {
 }
 
 void Parameter::printConfiguration() const {
-  LogInfo << "Parameter: " << getSummary() << std::endl;
+  LogInfo << getSummary() << std::endl;
 }
 
 //  A Lesser GNU Public License

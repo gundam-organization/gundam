@@ -828,7 +828,7 @@ bool ParameterSet::isValidCorrelatedParameter(const Parameter& par_){
 }
 
 void ParameterSet::printConfiguration() const {
-  LogInfo << "ParameterSet: name(" << _name_ << ")";
+  LogInfo << "name(" << _name_ << ")";
   LogInfo << ", nPars(" << _nbParameterDefinition_ << ")";
   LogInfo << std::endl;
 
