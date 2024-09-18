@@ -68,9 +68,9 @@ int main( int argc, char** argv ){
   if( GenericToolbox::doesTFileIsValid( clp.getOptionVal<std::string>("config-1") ) ){
     auto f = std::unique_ptr<TFile>( GenericToolbox::openExistingTFile( clp.getOptionVal<std::string>("config-1") ) );
     TNamed* version{nullptr};
-    GundamUtils::ObjectReader::readObject<TNamed>( f.get(), {{"gundam/version_TNamed"}, {"gundamFitter/gundamVersion_TNamed"}}, [&](TNamed* obj_){ version = obj_; });
+    GundamUtils::ObjectReader::readObject<TNamed>( f.get(), {{"gundam/build/version_TNamed"}, {"gundam/version_TNamed"}, {"gundamFitter/gundamVersion_TNamed"}}, [&](TNamed* obj_){ version = obj_; });
     TNamed* cmdLine{nullptr};
-    GundamUtils::ObjectReader::readObject<TNamed>( f.get(), {{"gundam/commandLine_TNamed"}, {"gundamFitter/commandLine_TNamed"}}, [&](TNamed* obj_){ version = cmdLine; });
+    GundamUtils::ObjectReader::readObject<TNamed>( f.get(), {{"gundam/runtime/commandLine_TNamed"}, {"gundam/commandLine_TNamed"}, {"gundamFitter/commandLine_TNamed"}}, [&](TNamed* obj_){ version = cmdLine; });
     if( version != nullptr and cmdLine != nullptr ){
       LogInfo << "config-1 is within .root file. Ran under GUNDAM v" << version->GetTitle() << " with cmdLine: "<< cmdLine->GetTitle() << std::endl;
     }
@@ -78,9 +78,9 @@ int main( int argc, char** argv ){
   if( GenericToolbox::doesTFileIsValid( clp.getOptionVal<std::string>("config-2") ) ){
     auto f = std::unique_ptr<TFile>( GenericToolbox::openExistingTFile( clp.getOptionVal<std::string>("config-2") ) );
     TNamed* version{nullptr};
-    GundamUtils::ObjectReader::readObject<TNamed>( f.get(), {{"gundam/version_TNamed"}, {"gundamFitter/gundamVersion_TNamed"}}, [&](TNamed* obj_){ version = obj_; });
+    GundamUtils::ObjectReader::readObject<TNamed>( f.get(), {{"gundam/build/version_TNamed"}, {"gundam/version_TNamed"}, {"gundamFitter/gundamVersion_TNamed"}}, [&](TNamed* obj_){ version = obj_; });
     TNamed* cmdLine{nullptr};
-    GundamUtils::ObjectReader::readObject<TNamed>( f.get(), {{"gundam/commandLine_TNamed"}, {"gundamFitter/gundamVersion_TNamed"}}, [&](TNamed* obj_){ version = cmdLine; });
+    GundamUtils::ObjectReader::readObject<TNamed>( f.get(), {{"gundam/runtime/commandLine_TNamed"}, {"gundam/commandLine_TNamed"}, {"gundamFitter/gundamVersion_TNamed"}}, [&](TNamed* obj_){ version = cmdLine; });
     if( version != nullptr and cmdLine != nullptr ){
       LogInfo << "config-2 is within .root file. Ran under GUNDAM v" << version->GetTitle() << " with cmdLine: "<< cmdLine->GetTitle() << std::endl;
     }

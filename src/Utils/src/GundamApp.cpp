@@ -5,6 +5,7 @@
 #include "GundamApp.h"
 
 #include "GenericToolbox.Root.h"
+#include "GenericToolbox.Time.h"
 #include "Logger.h"
 
 #include <TFile.h>
@@ -47,16 +48,26 @@ void GundamApp::writeAppInfo(){
 
   auto* dir = GenericToolbox::mkdirTFile(_outFile_.get(), "gundam");
 
-  // Gundam version?
-  GenericToolbox::writeInTFile( dir, TNamed("version", GundamUtils::getVersionFullStr().c_str()) );
-
-  // Command line?
+  auto* runtimeDir = GenericToolbox::mkdirTFile(dir, "runtime");
+  GenericToolbox::writeInTFile( runtimeDir, TNamed("date", GenericToolbox::getNowDateString("%Y.%m.%d %H:%M:%S").c_str()) );
+  GenericToolbox::writeInTFile( runtimeDir, TNamed("user", GenericToolbox::getUserName().c_str()) );
+  GenericToolbox::writeInTFile( runtimeDir, TNamed("host", GenericToolbox::getHostName().c_str()) );
+  GenericToolbox::writeInTFile( runtimeDir, TNamed("pwd", GenericToolbox::getCurrentWorkingDirectory().c_str()) );
+  GenericToolbox::writeInTFile( runtimeDir, TNamed("os", GenericToolbox::getOsName().c_str()) );
   if( _cmdLinePtr_ != nullptr ){
-    GenericToolbox::writeInTFile( dir, TNamed("commandLine", _cmdLinePtr_->getCommandLineString().c_str()) );
+    GenericToolbox::writeInTFile( runtimeDir, TNamed("commandLine", _cmdLinePtr_->getCommandLineString().c_str()) );
   }
 
+  auto* buildDir = GenericToolbox::mkdirTFile(dir, "build");
+  GenericToolbox::writeInTFile( buildDir, TNamed("version", GundamUtils::getVersionFullStr().c_str()) );
+
+  auto* rootDir = GenericToolbox::mkdirTFile(buildDir, "root");
+  GenericToolbox::writeInTFile( rootDir, TNamed("version", std::string(gROOT->GetVersion()).c_str()) );
+  GenericToolbox::writeInTFile( rootDir, TNamed("date", std::to_string(gROOT->GetVersionDate()).c_str()) );
+  GenericToolbox::writeInTFile( rootDir, TNamed("install", std::string(gROOT->GetDataDir()).c_str()) );
+
   if( not _configString_.empty() ){
-    GenericToolbox::writeInTFile( dir, TNamed("config", _configString_.c_str()) );
+    GenericToolbox::writeInTFile( GenericToolbox::mkdirTFile(dir, "config"), TNamed("unfoldedJson", _configString_.c_str()) );
   }
 
   GenericToolbox::triggerTFileWrite( dir );

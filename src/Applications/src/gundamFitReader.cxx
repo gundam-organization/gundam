@@ -104,15 +104,24 @@ int main(int argc, char** argv){
     else if( f->Get("gundamCalcXsec") != nullptr ){ gundamDirName = "gundamCalcXsec"; } // legacy
     LogContinueIf(gundamDirName.empty(), "Not a gundam fitter output file.");
 
-    GundamUtils::ObjectReader::readObject<TNamed>(f.get(), GenericToolbox::joinPath(gundamDirName, "commandLine_TNamed"), [](TNamed* obj_){
+    GundamUtils::ObjectReader::readObject<TNamed>(
+        f.get(),
+        {{GenericToolbox::joinPath(gundamDirName, "runtime/commandLine_TNamed")},
+         {GenericToolbox::joinPath(gundamDirName, "commandLine_TNamed")}},
+        [](TNamed* obj_){
       LogInfo << blueLightText << "Cmd line: " << resetColor << obj_->GetTitle() << std::endl;
     });
-    GundamUtils::ObjectReader::readObject<TNamed>(f.get(), GenericToolbox::joinPath(gundamDirName, "version_TNamed"), [](TNamed* obj_){
+    GundamUtils::ObjectReader::readObject<TNamed>(
+        f.get(),
+        {{GenericToolbox::joinPath(gundamDirName, "build/version_TNamed")},
+         {GenericToolbox::joinPath(gundamDirName, "version_TNamed")}},
+        [](TNamed* obj_){
       LogInfo << blueLightText << "Ran with GUNDAM version: " << resetColor << obj_->GetTitle() << std::endl;
     });
     GundamUtils::ObjectReader::readObject<TNamed>(
         f.get(),
-        {{GenericToolbox::joinPath(gundamDirName, "config_TNamed")},
+        {{GenericToolbox::joinPath(gundamDirName, "config/unfoldedJson_TNamed")},
+         {GenericToolbox::joinPath(gundamDirName, "config_TNamed")},
          {GenericToolbox::joinPath(gundamDirName, "unfoldedConfig_TNamed")}},
         [&](TNamed* obj_){
       if( clParser.isOptionTriggered("extractDataToDisk") ){
