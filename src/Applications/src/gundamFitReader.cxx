@@ -170,7 +170,7 @@ int main(int argc, char** argv){
           f.get(), GenericToolbox::joinPath(gundamDirName, "build/root/install_TNamed"),
           []( TNamed *obj_ ){
             LogScopeIndent;
-            LogInfo << blueLightText << "ROOT install pathh: " << resetColor << obj_->GetTitle() << std::endl;
+            LogInfo << blueLightText << "ROOT install path: " << resetColor << obj_->GetTitle() << std::endl;
           });
     }
 
