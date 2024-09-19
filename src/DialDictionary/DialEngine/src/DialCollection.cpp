@@ -65,8 +65,6 @@ void DialCollection::readConfigImpl() {
 }
 
 void DialCollection::initializeImpl() {
-  LogInfo << "Initialising dial collection \"" << this->getTitle() << "\"" << std::endl;
-
   LogThrowIf(_index_==-1, "Index not set.");
   this->setupDialInterfaceReferences();
 }
@@ -102,7 +100,9 @@ std::string DialCollection::getSummary(bool shallow_){
   std::stringstream ss;
   ss << "DialCollection: ";
   ss << this->getTitle();
-  ss << " / nDials=" << _dialInterfaceList_.size();
+  ss << " / nDialInterfaces=" << _dialInterfaceList_.size();
+  ss << " / nDialBases=" << _dialBaseList_.size();
+  ss << " / lastDialFreeSlot=" << getDialFreeSlotIndex();
 
   if( not shallow_ ){
     // print parameters
@@ -132,20 +132,25 @@ ParameterSet* DialCollection::getSupervisedParameterSet() const{
 
 // core
 void DialCollection::clear(){
-  _dialInterfaceList_.clear();
   _dialBaseList_.clear();
-  _dialInterfaceList_.shrink_to_fit();
   _dialBaseList_.shrink_to_fit();
+
+  _dialInterfaceList_.clear();
+  _dialInterfaceList_.shrink_to_fit();
+
   _dialFreeSlot_.setValue(0);
 }
 
 void DialCollection::resizeContainers(){
-  LogInfo << "Resizing containers of the dial collection \"" << this->getTitle() << "\" from "
+  LogDebugIf(GundamGlobals::isDebugConfig()) << "Resizing containers of the dial collection \"" << this->getTitle() << "\" from "
           << _dialInterfaceList_.size() << " to " << _dialFreeSlot_.getValue() << std::endl;
-  _dialInterfaceList_.resize(_dialFreeSlot_.getValue());
+
   _dialBaseList_.resize(_dialFreeSlot_.getValue());
-  _dialInterfaceList_.shrink_to_fit();
   _dialBaseList_.shrink_to_fit();
+
+  _dialInterfaceList_.resize(_dialFreeSlot_.getValue());
+  _dialInterfaceList_.shrink_to_fit();
+
   this->setupDialInterfaceReferences();
 }
 
@@ -778,6 +783,12 @@ void DialCollection::update() {
 
 void DialCollection::addUpdate(std::function<void(void)> callback) {
   _dialCollectionCallbacks_.emplace_back(callback);
+}
+
+void DialCollection::printConfiguration() const {
+
+  LogInfo << "DialCollection: " << this->getTitle() << std::endl;
+
 }
 
 //  A Lesser GNU Public License

@@ -18,7 +18,7 @@ namespace JointProbability{
   public:
     [[nodiscard]] std::string getType() const override { return "PluginJointProbability"; }
 
-    [[nodiscard]] double eval(const Sample& sample_, int bin_) const override;
+    [[nodiscard]] double eval(const SamplePair& samplePair_, int bin_) const override;
 
     std::string llhPluginSrc;
     std::string llhSharedLib;
@@ -55,12 +55,12 @@ namespace JointProbability{
     else{ LogThrow("Can't initialize JointProbabilityPlugin without llhSharedLib nor llhPluginSrc."); }
   }
 
-  double PluginJointProbability::eval( const Sample &sample_, int bin_ ) const{
+  double PluginJointProbability::eval( const SamplePair& samplePair_, int bin_ ) const{
     LogThrowIf(evalFcn == nullptr, "Library not loaded properly.");
     return reinterpret_cast<double (*)( double, double, double )>(evalFcn)(
-        sample_.getDataContainer().getHistogram().binList[bin_].content,
-        sample_.getMcContainer().getHistogram().binList[bin_].content,
-        sample_.getMcContainer().getHistogram().binList[bin_].error
+        samplePair_.data->getHistogram().binList[bin_].content,
+        samplePair_.model->getHistogram().binList[bin_].content,
+        samplePair_.model->getHistogram().binList[bin_].error
     );
   }
 

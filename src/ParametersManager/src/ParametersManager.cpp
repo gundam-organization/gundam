@@ -4,6 +4,7 @@
 
 #include "ParametersManager.h"
 #include "ConfigUtils.h"
+#include "GundamGlobals.h"
 
 #include "GenericToolbox.Utils.h"
 #include "GenericToolbox.Json.h"
@@ -24,20 +25,23 @@ void ParametersManager::unmuteLogger(){ Logger::setIsMuted( false ); }
 // config
 void ParametersManager::readConfigImpl(){
 
+  _throwToyParametersWithGlobalCov_ = GenericToolbox::Json::fetchValue(_config_, "throwToyParametersWithGlobalCov", _throwToyParametersWithGlobalCov_);
+  _reThrowParSetIfOutOfPhysical_ = GenericToolbox::Json::fetchValue(_config_, {{"reThrowParSetIfOutOfBounds"},{"reThrowParSetIfOutOfPhysical"}}, _reThrowParSetIfOutOfPhysical_);
+
   _parameterSetListConfig_ = GenericToolbox::Json::fetchValue(_config_, "parameterSetList", _parameterSetListConfig_);
 
-  _reThrowParSetIfOutOfPhysical_ = GenericToolbox::Json::fetchValue(_config_, {{"reThrowParSetIfOutOfBounds"},{"reThrowParSetIfOutOfPhysical"}}, _reThrowParSetIfOutOfPhysical_);
-  _throwToyParametersWithGlobalCov_ = GenericToolbox::Json::fetchValue(_config_, "throwToyParametersWithGlobalCov", _throwToyParametersWithGlobalCov_);
-
-  LogInfo << "Reading parameter configuration..." << std::endl;
   _parameterSetList_.clear(); // make sure there nothing in case readConfig is called more than once
   _parameterSetList_.reserve( _parameterSetListConfig_.size() );
   for( const auto& parameterSetConfig : _parameterSetListConfig_ ){
     _parameterSetList_.emplace_back();
     _parameterSetList_.back().readConfig( parameterSetConfig );
-    LogInfo << _parameterSetList_.back().getSummary() << std::endl;
+
+    // clear the parameter sets that have been disabled
+    if( not _parameterSetList_.back().isEnabled() ){
+      LogDebugIf(GundamGlobals::isDebugConfig()) << "Removing disabled parSet: " << _parameterSetList_.back().getName() << std::endl;
+      _parameterSetList_.pop_back();
+    }
   }
-  LogInfo << _parameterSetList_.size() << " parameter sets defined." << std::endl;
 
 }
 void ParametersManager::initializeImpl(){
@@ -220,12 +224,12 @@ void ParametersManager::throwParametersFromGlobalCovariance(bool quietVerbose_){
       auto* parPtr = _strippedParameterList_[iPar];
       parPtr->setThrowValue(parPtr->getPriorValue() + throws[iPar]);
       if ( not std::isnan(parPtr->getMinValue()) and parPtr->getThrowValue() < parPtr->getMinValue()) {
-        LogAlert << "Thrown value lower than min bound -> " << parPtr->getSummary(true) << std::endl;
+        LogAlert << "Thrown value lower than min bound -> " << parPtr->getThrowValue() << " < min(" << parPtr->getMinValue() << ") " << parPtr->getFullTitle() << std::endl;
         rethrow = true;
         break;
       }
       if ( not std::isnan(parPtr->getMaxValue()) and parPtr->getThrowValue() > parPtr->getMaxValue()) {
-        LogAlert << "Thrown value lower than max bound -> " << parPtr->getSummary(true) << std::endl;
+        LogAlert << "Thrown value greater than max bound -> " << parPtr->getThrowValue() << " > max(" << parPtr->getMaxValue() << ") " << parPtr->getFullTitle() << std::endl;
         rethrow = true;
         break;
       }
@@ -262,31 +266,34 @@ void ParametersManager::throwParametersFromGlobalCovariance(bool quietVerbose_){
     }
 
     if( rethrow ) {
-      LogThrowIf( throwNb > 10000, "To many throw attempts")
+      LogThrowIf( throwNb > 100000, "Too many throw attempts")
       // wrap back to the while loop
       LogWarning << "Rethrowing after attempt #" << throwNb << std::endl;
       continue;
     }
 
     for( auto& parSet : _parameterSetList_ ){
+      if( not parSet.isEnabled() ){ continue; }
       LogInfo << parSet.getName() << ":" << std::endl;
       for( auto& par : parSet.getParameterList() ){
+        if( not par.isEnabled() ){ continue; }
         LogScopeIndent;
-        if( ParameterSet::isValidCorrelatedParameter(par) ){
-          par.setThrowValue( par.getParameterValue() );
-          LogInfo << "Thrown par " << par.getFullTitle() << ": " << par.getPriorValue();
-          LogInfo << " becomes " << par.getParameterValue() << std::endl;
-        }
+        par.setThrowValue( par.getParameterValue() );
+        LogInfo << "Thrown par " << par.getFullTitle() << ": " << par.getPriorValue();
+        LogInfo << " becomes " << par.getParameterValue() << std::endl;
       }
       if( not parSet.isEnableEigenDecomp() ) continue;
       LogInfo << "Translated to eigen space:" << std::endl;
       for( auto& eigenPar : parSet.getEigenParameterList() ){
+        if( not eigenPar.isEnabled() ){ continue; }
         LogScopeIndent;
         eigenPar.setThrowValue( eigenPar.getParameterValue() );
         LogInfo << "Eigen par " << eigenPar.getFullTitle() << ": " << eigenPar.getPriorValue();
         LogInfo << " becomes " << eigenPar.getParameterValue() << std::endl;
       }
     }
+
+    break;
   }
 }
 
@@ -294,6 +301,12 @@ void ParametersManager::moveParametersToPrior(){
   for( auto& parSet : _parameterSetList_ ){
     if( not parSet.isEnabled() ){ continue; }
     parSet.moveParametersToPrior();
+  }
+}
+void ParametersManager::convertEigenToOrig(){
+  for( auto& parSet : _parameterSetList_ ){
+    if( not parSet.isEnabled() ){ continue; }
+    if( parSet.isEnableEigenDecomp() ){ parSet.propagateEigenToOriginal(); }
   }
 }
 void ParametersManager::injectParameterValues(const JsonType &config_) {
@@ -325,6 +338,16 @@ bool ParametersManager::hasValidParameterSets() const {
   }
   return true;
 }
+void ParametersManager::printConfiguration() const {
+
+  LogInfo << GET_VAR_NAME_VALUE(_throwToyParametersWithGlobalCov_) << std::endl;
+  LogInfo << GET_VAR_NAME_VALUE(_reThrowParSetIfOutOfPhysical_) << std::endl;
+
+  LogInfo << _parameterSetList_.size() << " parameter sets defined." << std::endl;
+  for( auto& parSet : _parameterSetList_ ){ parSet.printConfiguration(); }
+
+}
+
 void ParametersManager::setParameterValidity(const std::string& v) {
   for (ParameterSet& parSet: getParameterSetsList()) {
     parSet.setValidity(v);

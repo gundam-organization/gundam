@@ -22,20 +22,31 @@ LoggerInit([]{ Logger::setUserHeaderStr("[SampleSet]"); });
 
 
 void SampleSet::readConfigImpl(){
-  LogWarning << __METHOD_NAME__ << std::endl;
-  LogThrowIf(_config_.empty(), "_config_ is not set." << std::endl);
 
-  _showTimeStats_ = GenericToolbox::Json::fetchValue(_config_, "showTimeStats", _showTimeStats_);
-
-  LogInfo << "Reading samples definition..." << std::endl;
   auto sampleListConfig = GenericToolbox::Json::fetchValue(_config_, {{"sampleList"}, {"fitSampleList"}}, JsonType());
+  LogDebugIf(GundamGlobals::isDebugConfig()) << sampleListConfig.size() << " samples defined in the config." << std::endl;
 
   if( _sampleList_.empty() ){
-    // alright no problem, it's from scratch
-    _sampleList_.resize( sampleListConfig.size() );
+    // from scratch
+    _sampleList_.reserve( sampleListConfig.size() );
+    int iSample{0};
+    for( auto& sampleConfig : sampleListConfig ){
+      _sampleList_.emplace_back();
+      _sampleList_.back().setIndex( iSample++ );
+      _sampleList_.back().readConfig( sampleConfig );
+
+      LogDebugIf(GundamGlobals::isDebugConfig()) << "Defined sample: " << _sampleList_.back().getName() << std::endl;
+
+      // remove from the list if not enabled
+      if( not _sampleList_.back().isEnabled() ){
+        LogDebugIf(GundamGlobals::isDebugConfig()) << "-> removing this sample as it is disabled." << std::endl;
+        _sampleList_.pop_back(); iSample--;
+      }
+    }
   }
   else{
-    // for temporary propagators, we want to read the config without removing the content of the samples
+    // for temporary config overrides of propagators,
+    // we want to read the config without removing the content of the samples
 
     // need to check how many samples are enabled. It should match the list.
     size_t nSamples{0};
@@ -44,41 +55,21 @@ void SampleSet::readConfigImpl(){
       nSamples++;
     }
     LogThrowIf(nSamples != _sampleList_.size(), "Can't reload config with different number of samples");
+
+    for( size_t iSample = 0 ; iSample < _sampleList_.size() ; iSample++ ){
+      if( not GenericToolbox::Json::fetchValue(sampleListConfig[iSample], "isEnabled", true) ) continue;
+      _sampleList_[ iSample ].readConfig( sampleListConfig[iSample] ); // read the config again
+    }
   }
 
-  for( size_t iSample = 0 ; iSample < sampleListConfig.size() ; iSample++ ){
-    if( not GenericToolbox::Json::fetchValue(sampleListConfig[iSample], "isEnabled", true) ) continue;
-    _sampleList_[iSample].setIndex( int(iSample) );
-    _sampleList_[iSample].readConfig( sampleListConfig[iSample] );
-  }
+  LogDebugIf(GundamGlobals::isDebugConfig()) << sampleListConfig.size() << " samples were defined." << std::endl;
 }
 void SampleSet::initializeImpl() {
-  LogWarning << __METHOD_NAME__ << std::endl;
-  LogThrowIf(_sampleList_.empty(), "No sample is defined.");
-
   for( auto& sample : _sampleList_ ){ sample.initialize(); }
 }
 
-void SampleSet::copyMcEventListToDataContainer(std::vector<Sample>& destinationSampleList_){
-  LogThrowIf(_sampleList_.size() != destinationSampleList_.size(), "Can't copy the data into mismatching containers.");
-  for( size_t iSample = 0 ; iSample < _sampleList_.size() ; iSample++ ){
-    LogInfo << "Copying events in sample \"" << _sampleList_[iSample].getName() << "\"" << std::endl;
-    destinationSampleList_[iSample].getDataContainer().getEventList().reserve(
-        destinationSampleList_[iSample].getDataContainer().getEventList().size()
-        + _sampleList_[iSample].getMcContainer().getEventList().size()
-    );
-    destinationSampleList_[iSample].getDataContainer().getEventList().insert(
-        destinationSampleList_[iSample].getDataContainer().getEventList().end(),
-        std::begin(_sampleList_[iSample].getMcContainer().getEventList()),
-        std::end(_sampleList_[iSample].getMcContainer().getEventList())
-    );
-  }
-}
-void SampleSet::clearMcContainers(){
-  for( auto& sample : _sampleList_ ){
-    LogInfo << "Clearing event list for \"" << sample.getName() << "\"" << std::endl;
-    sample.getMcContainer().getEventList().clear();
-  }
+void SampleSet::clearEventLists(){
+  for( auto& sample : _sampleList_ ){ sample.getEventList().clear(); }
 }
 
 std::vector<std::string> SampleSet::fetchRequestedVariablesForIndexing() const{
@@ -90,4 +81,41 @@ std::vector<std::string> SampleSet::fetchRequestedVariablesForIndexing() const{
   }
   return out;
 }
+void SampleSet::copyEventsFrom(const SampleSet& src_){
+  LogThrowIf(
+      src_.getSampleList().size() != this->getSampleList().size(),
+      "Can't copy events from mismatching sample lists. src(" << src_.getSampleList().size() << ")"
+      << "dst(" << this->getSampleList().size() << ")."
+  );
 
+  for( size_t iSample = 0 ; iSample < src_.getSampleList().size() ; iSample++ ){
+    this->getSampleList()[iSample].getEventList() = src_.getSampleList()[iSample].getEventList();
+  }
+}
+size_t SampleSet::getNbOfEvents() const {
+  return std::accumulate(
+      _sampleList_.begin(), _sampleList_.end(), size_t(0),
+      [](size_t sum_, const Sample& s_){ return sum_ + s_.getEventList().size(); });
+}
+
+void SampleSet::printConfiguration() const {
+
+  LogInfo << _sampleList_.size() << " samples defined." << std::endl;
+  for( auto& sample : _sampleList_ ){ sample.printConfiguration(); }
+
+}
+std::string SampleSet::getSampleBreakdown() const{
+  GenericToolbox::TablePrinter t;
+
+  t << "Sample" << GenericToolbox::TablePrinter::NextColumn;
+  t << "# of binned event" << GenericToolbox::TablePrinter::NextColumn;
+  t << "total rate (weighted)" << GenericToolbox::TablePrinter::NextLine;
+
+  for( auto& sample : _sampleList_ ){
+    t << sample.getName() << GenericToolbox::TablePrinter::NextColumn;
+    t << sample.getNbBinnedEvents() << GenericToolbox::TablePrinter::NextColumn;
+    t << sample.getSumWeights() << GenericToolbox::TablePrinter::NextLine;
+  }
+
+  return t.generateTableString();
+}

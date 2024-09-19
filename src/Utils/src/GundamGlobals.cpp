@@ -15,13 +15,7 @@ LoggerInit([]{ Logger::setUserHeaderStr("[GlobalVariables]"); });
 int GundamGlobals::_gundamThreads_{1};
 bool GundamGlobals::_disableDialCache_{false};
 bool GundamGlobals::_enableCacheManager_{false};
+bool GundamGlobals::_debugConfigReading_{false};
 bool GundamGlobals::_forceDirectCalculation_{false};
 bool GundamGlobals::_lightOutputMode_{false};
 std::mutex GundamGlobals::_threadMutex_;
-VerboseLevel GundamGlobals::_verboseLevel_{VerboseLevel::NORMAL_MODE};
-
-// setters
-void GundamGlobals::setVerboseLevel(VerboseLevel verboseLevel_){
-  _verboseLevel_ = verboseLevel_;
-  LogWarning << "Verbose level set to: " << _verboseLevel_.toString() << std::endl;
-}

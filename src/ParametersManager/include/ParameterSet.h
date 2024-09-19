@@ -39,6 +39,10 @@ public:
   static void muteLogger();
   static void unmuteLogger();
 
+  // setters
+  void setEnableDebugPrintout(bool enableDebugPrintout_){ _enableDebugPrintout_ = enableDebugPrintout_; }
+
+
   /// Process the input covariance matrix to make sure that fixed, free, and
   /// disabled parameters are detached from the from the covariance matrix.
   /// This also applies validity checks to the parameter set (e.g. make sure
@@ -171,6 +175,9 @@ public:
   [[deprecated("use throwParameters()")]] void throwFitParameters( bool rethrowIfNotPhysical_ = true, double gain_ = 1){ throwParameters(rethrowIfNotPhysical_, gain_); }
   [[deprecated]] [[nodiscard]] bool isUseOnlyOneParameterPerEvent() const{ return _useOnlyOneParameterPerEvent_; }
 
+  // print
+  void printConfiguration() const;
+
 protected:
   void readParameterDefinitionFile();
   void defineParameters();
@@ -178,10 +185,22 @@ protected:
   void setName(const std::string& name_){ _name_ = name_; }
 
 private:
-  // Internals
-  std::vector<Parameter> _parameterList_;
+  // options
+  bool _enableDebugPrintout_{false}; // used for printing out config reading
 
-  // JSON
+  // configuration
+  bool _isEnabled_{false};
+  bool _useMarkGenerator_{false};
+  bool _useEigenDecompForThrows_{false};
+  bool _printDialSetsSummary_{false};
+  bool _printParametersSummary_{false};
+  bool _releaseFixedParametersOnHesse_{false};
+  bool _devUseParLimitsOnEigen_{false};
+  int _nbParameterDefinition_{-1};
+  int _maxNbEigenParameters_{-1};
+  double _nominalStepSize_{std::nan("unset")};
+  double _eigenSvdThreshold_{std::nan("unset")};
+  double _maxEigenFraction_{1};
   std::string _name_{};
   std::string _parameterDefinitionFilePath_{};
   std::string _covarianceMatrixPath_{};
@@ -192,18 +211,6 @@ private:
   std::string _throwEnabledListPath_{};
   JsonType _parameterDefinitionConfig_{};
   JsonType _dialSetDefinitions_{};
-  bool _isEnabled_{false};
-  bool _useMarkGenerator_{false};
-  bool _useEigenDecompForThrows_{false};
-  bool _printDialSetsSummary_{false};
-  bool _printParametersSummary_{false};
-  bool _releaseFixedParametersOnHesse_{false};
-  bool _devUseParLimitsOnEigen_{false};
-  int _nbParameterDefinition_{-1};
-  double _nominalStepSize_{std::nan("unset")};
-  int _maxNbEigenParameters_{-1};
-  double _maxEigenFraction_{1};
-  double _eigenSvdThreshold_{std::nan("unset")};
 
   double _globalParameterMinValue_{std::nan("unset")};
   double _globalParameterMaxValue_{std::nan("unset")};
@@ -223,6 +230,9 @@ private:
   bool _useOnlyOneParameterPerEvent_{false};
   std::vector<Parameter> _eigenParameterList_{};
   std::shared_ptr<TMatrixDSymEigen> _eigenDecomp_{nullptr};
+
+  // internals
+  std::vector<Parameter> _parameterList_;
 
   // Toy throwing
   bool _enabledThrowToyParameters_{true};

@@ -19,11 +19,11 @@ namespace JointProbability{
 
   public:
     [[nodiscard]] std::string getType() const override { return "BarlowBeestonBanff2022"; }
-    [[nodiscard]] double eval(const Sample& sample_, int bin_) const override;
+    [[nodiscard]] double eval(const SamplePair& samplePair_, int bin_) const override;
 
-    void createNominalMc(const Sample& sample_) const;
+    void createNominalMc(const Sample& modelSample_) const;
 
-    int verboseLevel{0};
+    mutable int verboseLevel{0};
     bool throwIfInfLlh{false};
     bool allowZeroMcWhenZeroData{true};
     bool usePoissonLikelihood{false};
@@ -49,18 +49,18 @@ namespace JointProbability{
       LogInfo << GET_VAR_NAME_VALUE(throwIfInfLlh) << std::endl;
     }
   }
-  double BarlowBeestonBanff2022::eval(const Sample& sample_, int bin_) const {
-    double dataVal = sample_.getDataContainer().getHistogram().binList[bin_].content;
-    double predVal = sample_.getMcContainer().getHistogram().binList[bin_].content;
+  double BarlowBeestonBanff2022::eval(const SamplePair& samplePair_, int bin_) const {
+    double dataVal = samplePair_.data->getHistogram().binList[bin_].content;
+    double predVal = samplePair_.model->getHistogram().binList[bin_].content;
 
     {
       /// the first time we reach this point, we assume the predMC is at its nominal value
       std::lock_guard<std::mutex> g(_mutex_);
-      if( not GenericToolbox::isIn(&sample_, nomMcUncertList) ){ createNominalMc(sample_); }
+      if( not GenericToolbox::isIn((const Sample*) samplePair_.model, nomMcUncertList) ){ createNominalMc(*samplePair_.model); }
     }
 
     // it should exist past this point
-    auto& nomHistErr = nomMcUncertList[&sample_];
+    auto& nomHistErr = nomMcUncertList[samplePair_.model];
     double mcuncert{0.0};
 
     // From OA2021_Eb branch -> BANFFBinnedSample::CalcLLRContrib
@@ -88,14 +88,14 @@ namespace JointProbability{
       }
     }
     else {
-      mcuncert = sample_.getMcContainer().getHistogram().binList[bin_].error;
+      mcuncert = samplePair_.model->getHistogram().binList[bin_].error;
       mcuncert *= mcuncert;
 
       if(not std::isfinite(mcuncert) or mcuncert < 0.0) {
         if( throwIfInfLlh ){
           LogError << "The mcuncert is not finite " << mcuncert << std::endl;
           LogError << "predMC bin " << bin_
-                   << " error is " << sample_.getMcContainer().getHistogram().binList[bin_].error;
+                   << " error is " << samplePair_.model->getHistogram().binList[bin_].error;
           LogThrow("The mc uncertainty is not a usable number");
         }
         else{
@@ -199,7 +199,7 @@ namespace JointProbability{
 
     if( throwIfInfLlh and not std::isfinite(chisq) ) [[unlikely]] {
       LogError << "Infinite chi2: " << chisq << std::endl
-               << GET_VAR_NAME_VALUE(sample_.getName()) << std::endl
+               << GET_VAR_NAME_VALUE(samplePair_.model->getName()) << std::endl
                << GET_VAR_NAME_VALUE(bin_) << std::endl
                << GET_VAR_NAME_VALUE(predVal) << std::endl
                << GET_VAR_NAME_VALUE(dataVal) << std::endl
@@ -216,13 +216,13 @@ namespace JointProbability{
 
     return chisq;
   }
-  void BarlowBeestonBanff2022::createNominalMc(const Sample& sample_) const {
-    LogWarning << "Creating nominal MC histogram for sample \"" << sample_.getName() << "\"" << std::endl;
-    auto& nomHistErr = nomMcUncertList[&sample_];
-    nomHistErr.reserve( sample_.getMcContainer().getHistogram().nBins );
-    for( auto& bin : sample_.getMcContainer().getHistogram().binList ){
+  void BarlowBeestonBanff2022::createNominalMc(const Sample& modelSample_) const {
+    LogWarning << "Creating nominal MC histogram for sample \"" << modelSample_.getName() << "\"" << std::endl;
+    auto& nomHistErr = nomMcUncertList[&modelSample_];
+    nomHistErr.reserve( modelSample_.getHistogram().nBins );
+    for( auto& bin : modelSample_.getHistogram().binList ){
       nomHistErr.emplace_back( bin.error );
-      LogTraceIf(verboseLevel >= 2) << sample_.getName() << ": " << bin.index << " -> " << bin.content << " / " << bin.error << std::endl;
+      LogTraceIf(verboseLevel >= 2) << modelSample_.getName() << ": " << bin.index << " -> " << bin.content << " / " << bin.error << std::endl;
     }
   }
 

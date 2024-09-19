@@ -191,6 +191,9 @@ public:
   void setValidity(const std::string& validity);
   void setValidity(int validity) {_validFlags_ = validity;}
 
+  // print
+  void printConfiguration() const;
+
 private:
   // Parameters
   bool _isEnabled_{true};

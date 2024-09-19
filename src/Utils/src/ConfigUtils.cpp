@@ -339,16 +339,13 @@ namespace ConfigUtils {
       LogThrowIf( not GenericToolbox::doesTFileIsValid(filePath_), "Invalid root file: " << filePath_ );
       auto fitFile = std::shared_ptr<TFile>( GenericToolbox::openExistingTFile( filePath_ ) );
 
-      bool isSuccess = GundamUtils::ObjectReader::readObject<TNamed>(
-          fitFile.get(),
-          {{"gundam/config/unfoldedJson_TNamed"},
-           {"gundam/config_TNamed"},
-           {"gundamFitter/unfoldedConfig_TNamed"}},
-          [&](TNamed* config_){
-            config = GenericToolbox::Json::readConfigJsonStr( config_->GetTitle() );
-          });
-
-      LogThrowIf(not isSuccess, "no config in ROOT file " << filePath_);
+      auto* conf = fitFile->Get<TNamed>("gundam/config_TNamed");
+      if( conf == nullptr ){
+        // legacy
+        conf = fitFile->Get<TNamed>("gundamFitter/unfoldedConfig_TNamed");
+      }
+      LogThrowIf(conf==nullptr, "no config in ROOT file " << filePath_);
+      config = GenericToolbox::Json::readConfigJsonStr( conf->GetTitle() );
       fitFile->Close();
     }
     else{

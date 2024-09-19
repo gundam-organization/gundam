@@ -44,6 +44,7 @@ public:
 
   // core
   void moveParametersToPrior();
+  void convertEigenToOrig();
   void injectParameterValues(const JsonType &config_);
   void throwParameters();
   void throwParametersFromParSetCovariance();
@@ -71,6 +72,9 @@ public:
 
   /// Check that the parameters in all of the enabled ParameterSets are valid.
   [[nodiscard]] bool hasValidParameterSets() const;
+
+  // print
+  void printConfiguration() const;
 
 private:
   // config

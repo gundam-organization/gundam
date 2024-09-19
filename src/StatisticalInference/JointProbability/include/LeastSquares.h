@@ -21,7 +21,7 @@ namespace JointProbability{
 
   public:
     [[nodiscard]] std::string getType() const override { return "PluginJointProbability"; }
-    [[nodiscard]] double eval(const Sample& sample_, int bin_) const override;
+    [[nodiscard]] double eval(const SamplePair& samplePair_, int bin_) const override;
 
     /// If true the use Poissonian approximation with the variance equal to
     /// the observed value (i.e. the data).
@@ -34,9 +34,9 @@ namespace JointProbability{
     lsqPoissonianApproximation = GenericToolbox::Json::fetchValue(_config_, "lsqPoissonianApproximation", lsqPoissonianApproximation);
     LogWarning << "Using Least Squares Poissonian Approximation" << std::endl;
   }
-  double LeastSquares::eval(const Sample& sample_, int bin_) const {
-    double predVal = sample_.getMcContainer().getHistogram().binList[bin_].content;
-    double dataVal = sample_.getDataContainer().getHistogram().binList[bin_].content;
+  double LeastSquares::eval(const SamplePair& samplePair_, int bin_) const {
+    double predVal = samplePair_.model->getHistogram().binList[bin_].content;
+    double dataVal = samplePair_.data->getHistogram().binList[bin_].content;
     double v = dataVal - predVal;
     v = v*v;
     if (lsqPoissonianApproximation && dataVal > 1.0) v /= 0.5*dataVal;

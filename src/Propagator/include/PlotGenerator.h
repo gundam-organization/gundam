@@ -5,7 +5,7 @@
 #ifndef GUNDAM_PLOT_GENERATOR_H
 #define GUNDAM_PLOT_GENERATOR_H
 
-#include "SampleSet.h"
+#include "Sample.h"
 #include "Event.h"
 #include "JsonBaseClass.h"
 
@@ -86,13 +86,14 @@ protected:
 
 public:
   // Setters
-  void setSampleSetPtr(const SampleSet *sampleSetPtr_){ _sampleSetPtr_ = sampleSetPtr_; }
+  void setModelSampleSetPtr(const std::vector<Sample> *modelSampleListPtr_){ _modelSampleListPtr_ = modelSampleListPtr_; }
+  void setDataSampleSetPtr(const std::vector<Sample> *dataSampleListPtr_){ _dataSampleListPtr_ = dataSampleListPtr_; }
 
   // Getters
   [[nodiscard]] bool isEmpty() const;
   [[nodiscard]] const std::vector<HistHolder> &getHistHolderList(int cacheSlot_ = 0) const;
-  [[nodiscard]] const std::vector<HistHolder> &getComparisonHistHolderList() const;
-  [[nodiscard]] std::map<std::string, std::shared_ptr<TCanvas>> getBufferCanvasList() const;
+  [[nodiscard]] const std::vector<HistHolder> &getComparisonHistHolderList() const { return _comparisonHistHolderList_; }
+  [[nodiscard]] std::map<std::string, std::shared_ptr<TCanvas>> getBufferCanvasList() const { return _bufferCanvasList_; }
 
   // non-const getters
   std::vector<HistHolder> &getHistHolderList(int cacheSlot_ = 0);
@@ -105,13 +106,10 @@ public:
   void generateComparisonHistograms(const std::vector<HistHolder> &histList_, const std::vector<HistHolder> &refHistsList_, TDirectory *saveDir_ = nullptr);
 
   // Misc
-  std::vector<std::string> fetchListOfVarToPlot(bool isData_ = false);
-  std::vector<std::string> fetchListOfSplitVarNames();
+  std::vector<std::string> fetchListOfVarToPlot(bool isData_ = false) const;
+  std::vector<std::string> fetchListOfSplitVarNames() const;
 
   void defineHistogramHolders();
-
-  // Deprecated
-  [[deprecated("use setSampleSetPtr")]] void setFitSampleSetPtr(const SampleSet *sampleSetPtr_){ setSampleSetPtr(sampleSetPtr_); }
 
 
 protected:
@@ -124,7 +122,7 @@ private:
   int _maxLegendLength_{15};
   JsonType _varDictionary_;
   JsonType _canvasParameters_;
-  JsonType _histogramsDefinition_;
+  mutable JsonType _histogramsDefinition_;
   std::vector<Color_t> defaultColorWheel {
       kGreen-3, kTeal+3, kAzure+7,
       kCyan-2, kBlue-7, kBlue+2,
@@ -132,7 +130,8 @@ private:
   };
 
   // Internals
-  const SampleSet* _sampleSetPtr_{nullptr};
+  const std::vector<Sample>* _modelSampleListPtr_{nullptr};
+  const std::vector<Sample>* _dataSampleListPtr_{nullptr};
   std::vector<std::vector<HistHolder>> _histHolderCacheList_{};
   std::vector<HistHolder> _comparisonHistHolderList_;
   std::map<std::string, std::shared_ptr<TCanvas>> _bufferCanvasList_;
