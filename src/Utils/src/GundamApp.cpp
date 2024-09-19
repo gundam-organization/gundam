@@ -54,6 +54,8 @@ void GundamApp::writeAppInfo(){
   GenericToolbox::writeInTFile( runtimeDir, TNamed("host", GenericToolbox::getHostName().c_str()) );
   GenericToolbox::writeInTFile( runtimeDir, TNamed("pwd", GenericToolbox::getCurrentWorkingDirectory().c_str()) );
   GenericToolbox::writeInTFile( runtimeDir, TNamed("os", GenericToolbox::getOsName().c_str()) );
+  GenericToolbox::writeInTFile( runtimeDir, TNamed("dist", GenericToolbox::getOsVersion().c_str()) );
+  GenericToolbox::writeInTFile( runtimeDir, TNamed("arch", GenericToolbox::getOsArchitecture().c_str()) );
   if( _cmdLinePtr_ != nullptr ){
     GenericToolbox::writeInTFile( runtimeDir, TNamed("commandLine", _cmdLinePtr_->getCommandLineString().c_str()) );
   }

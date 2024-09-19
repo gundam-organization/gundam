@@ -134,6 +134,14 @@ int main(int argc, char** argv){
           f.get(), GenericToolbox::joinPath(gundamDirName, "runtime/os_TNamed"),
           []( TNamed *obj_ ){ LogInfo << blueLightText << "OS: " << resetColor << obj_->GetTitle() << std::endl; }
       );
+      GundamUtils::ObjectReader::readObject<TNamed>(
+          f.get(), GenericToolbox::joinPath(gundamDirName, "runtime/dist_TNamed"),
+          []( TNamed *obj_ ){ LogInfo << blueLightText << "Distribution: " << resetColor << obj_->GetTitle() << std::endl; }
+      );
+      GundamUtils::ObjectReader::readObject<TNamed>(
+          f.get(), GenericToolbox::joinPath(gundamDirName, "runtime/arch_TNamed"),
+          []( TNamed *obj_ ){ LogInfo << blueLightText << "Architecture: " << resetColor << obj_->GetTitle() << std::endl; }
+      );
     }
 
     {
