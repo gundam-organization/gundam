@@ -252,7 +252,7 @@ void ParametersManager::throwParametersFromGlobalCovariance(bool quietVerbose_){
     }
 
     if( rethrow ) {
-      LogThrowIf( throwNb > 10000, "To many throw attempts")
+      LogThrowIf( throwNb > 100000, "To many throw attempts")
       // wrap back to the while loop
       LogWarning << "Rethrowing after attempt #" << throwNb << std::endl;
       continue;
@@ -277,6 +277,9 @@ void ParametersManager::throwParametersFromGlobalCovariance(bool quietVerbose_){
         LogInfo << " becomes " << eigenPar.getParameterValue() << std::endl;
       }
     }
+
+    // if we reach this point, all good!
+    break;
   }
 }
 void ParametersManager::injectParameterValues(const nlohmann::json &config_) {
