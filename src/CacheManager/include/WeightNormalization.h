@@ -33,6 +33,10 @@ private:
     /// then constant.
     std::unique_ptr<hemi::Array<short>> fNormParameter;
 
+    // The bounds to apply to the normalization.
+    Cache::Parameters::Clamps& fLowerClamp;
+    Cache::Parameters::Clamps& fUpperClamp;
+
 public:
 
     // Construct the class.  This should allocate all the memory on the host
@@ -40,6 +44,8 @@ public:
     // which are managed by the Weights class.
     Normalization(Cache::Weights::Results& weights,
                   Cache::Parameters::Values& parameters,
+                  Cache::Parameters::Clamps& lowerClamps,
+                  Cache::Parameters::Clamps& upperClamps,
                   std::size_t norms);
 
     // Deconstruct the class.  This should deallocate all the memory

@@ -19,9 +19,12 @@ LoggerInit([]{
 Cache::Weight::Normalization::Normalization(
     Cache::Weights::Results& weights,
     Cache::Parameters::Values& parameters,
+    Cache::Parameters::Clamps& lowerClamps,
+    Cache::Parameters::Clamps& upperClamps,
     std::size_t norms)
     : Cache::Weight::Base("normalization",weights,parameters),
-      fNormsReserved(norms), fNormsUsed(0) {
+      fNormsReserved(norms), fNormsUsed(0),
+      fLowerClamp(lowerClamps), fUpperClamp(upperClamps) {
 
     LogInfo << "Cached Weights: reserved Normalizations: "
            << GetNormsReserved()
@@ -98,11 +101,18 @@ namespace {
     HEMI_KERNEL_FUNCTION(HEMINormsKernel,
                          double* results,
                          const double* params,
+                         const double* lowerClamp,
+                         const double* upperClamp,
                          const int* rIndex,
                          const short* pIndex,
                          const int NP) {
         for (int i : hemi::grid_stride_range(0,NP)) {
-            CacheAtomicMult(&results[rIndex[i]], params[pIndex[i]]);
+            double v =  params[pIndex[i]];
+            const double lClamp = lowerClamp[pIndex[i]];
+            if (not (v > lClamp)) v = lClamp;  // deal with nan and inf too
+            const double uClamp = upperClamp[pIndex[i]];
+            if (not (v < uClamp)) v = uClamp;  // deal with nan and inf too
+            CacheAtomicMult(&results[rIndex[i]], v);
 #ifndef HEMI_DEV_CODE
 #ifdef CACHE_DEBUG
             if (rIndex[i] < PRINT_STEP) {
@@ -132,6 +142,8 @@ bool Cache::Weight::Normalization::Apply() {
     hemi::launch(normsKernel,
                  fWeights.writeOnlyPtr(),
                  fParameters.readOnlyPtr(),
+                 fLowerClamp.readOnlyPtr(),
+                 fUpperClamp.readOnlyPtr(),
                  fNormResult->readOnlyPtr(),
                  fNormParameter->readOnlyPtr(),
                  GetNormsUsed());
