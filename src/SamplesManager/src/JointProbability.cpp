@@ -62,14 +62,20 @@ namespace JointProbability{
     fractionalErrorLimit = GenericToolbox::Json::fetchValue(_config_, "FractionalErrorLimit", fractionalErrorLimit);
     verboseLevel = GenericToolbox::Json::fetchValue(_config_, {{"verboseLevel"}, {"isVerbose"}}, verboseLevel);
 
+    // Place a hard limit on the fractional error to prevent numeric issues.
+    fractionalErrorLimit = std::min(fractionalErrorLimit,1.0E+152);
+
     LogInfo << "Using BarlowLLH_BANFF_OA2021 parameters:" << std::endl;
     {
       LogScopeIndent;
       LogInfo << GET_VAR_NAME_VALUE(allowZeroMcWhenZeroData) << std::endl;
       LogInfo << GET_VAR_NAME_VALUE(usePoissonLikelihood) << std::endl;
       LogInfo << GET_VAR_NAME_VALUE(BBNoUpdateWeights) << std::endl;
+      LogInfo << GET_VAR_NAME_VALUE(expectedValueMinimum) << std::endl;
+      LogInfo << GET_VAR_NAME_VALUE(fractionalErrorLimit) << std::endl;
       LogInfo << GET_VAR_NAME_VALUE(verboseLevel) << std::endl;
     }
+
   }
 
   double BarlowLLH_BANFF_OA2021::eval(const Sample& sample_, int bin_) {
