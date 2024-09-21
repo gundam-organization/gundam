@@ -62,6 +62,8 @@ Cache::Manager::Manager(int events, int parameters,
         fNormalizations = std::make_unique<Cache::Weight::Normalization>(
                                   fWeightsCache->GetWeights(),
                                   fParameterCache->GetParameters(),
+                                  fParameterCache->GetLowerClamps(),
+                                  fParameterCache->GetUpperClamps(),
                                   norms);
         LogThrowIf(not fNormalizations, "Bad Normalizations alloc");
         fWeightsCache->AddWeightCalculator(fNormalizations.get());
@@ -430,6 +432,7 @@ bool Cache::Manager::Update(SampleSet& sampleList,
                 }
             }
 
+            Cache::Parameters& pCache = Cache::Manager::Get()->GetParameterCache();
             // Apply the mirroring for the parameters
             if (dialInputs->useParameterMirroring()) {
                 for (std::size_t i = 0; i < dialInputs->getBufferSize(); ++i) {
@@ -437,10 +440,8 @@ bool Cache::Manager::Update(SampleSet& sampleList,
                     const std::pair<double,double>& bounds =
                         dialInputs->getMirrorBounds(i);
                     int parIndex = Cache::Manager::ParameterMap[fp];
-                    Cache::Manager::Get()->GetParameterCache()
-                        .SetLowerMirror(parIndex,bounds.first);
-                    Cache::Manager::Get()->GetParameterCache()
-                        .SetUpperMirror(parIndex,bounds.first+bounds.second);
+                    pCache.SetLowerMirror(parIndex,bounds.first);
+                    pCache.SetUpperMirror(parIndex,bounds.first+bounds.second);
                 }
             }
 
@@ -449,16 +450,21 @@ bool Cache::Manager::Update(SampleSet& sampleList,
                 const Parameter* fp = &(dialInputs->getFitParameter(i));
                 const DialResponseSupervisor* resp
                     = dialInterface->getResponseSupervisorRef();
+
                 int parIndex = Cache::Manager::ParameterMap[fp];
-                double minResponse = 0.0;
+                double minResponse
+                    = std::max(0.0, pCache.GetLowerClamp(parIndex));
                 if (std::isfinite(resp->getMinResponse())) {
-                    minResponse = resp->getMinResponse();
+                    minResponse = std::max(minResponse,resp->getMinResponse());
                 }
-                Cache::Manager::Get()->GetParameterCache()
-                    .SetLowerClamp(parIndex,minResponse);
+                LogThrowIf(minResponse < 0.0,"Negative dial minimum response");
+                pCache.SetLowerClamp(parIndex,minResponse);
                 if (not std::isfinite(resp->getMaxResponse())) continue;
-                Cache::Manager::Get()->GetParameterCache()
-                    .SetUpperClamp(parIndex,resp->getMaxResponse());
+                double maxResponse = pCache.GetUpperClamp(parIndex);
+                maxResponse = std::min(maxResponse,resp->getMaxResponse());
+                LogThrowIf(maxResponse < minResponse,
+                           "Bad maximum dial response");
+                pCache.SetUpperClamp(parIndex,maxResponse);
             }
 
             // Add the dial information to the appropriate caches
