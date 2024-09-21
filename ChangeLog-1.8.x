@@ -1,3 +1,7 @@
+Fixes relative to 1.8.5
+
+Issue #621: GPU normalization weight was not being checked for validity before being applied to the event weight.  This only caused problems in corner cases, but when it caused trouble, you could end up with negative expectations.  It was found while torture testing the detector systematics.  The normalization now handles invalid inputs.
+
 Fixes relative to 1.8.4
 
 Issue #582: Safely check parameter limits during fits.  The old method for checking parameter validity during fits depended on first setting an invalid value, and then checking the validity.  Queries are added to check validity before setting.  This also adds checks for the GPU that the likelihood has not been changed since initialization.  If there is a change, a log message is generated, and the calculation falls back to the CPU.  This should only happen during debugging.
