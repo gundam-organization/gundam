@@ -1,12 +1,14 @@
 Fixes relative to 1.8.5
 
+Issue #615: Fix discontinuities in the JointProbability for the MC and data in a histogram bin.  The joint probability calculation has to be correct over ~620 powers of ten, so there is a lot of room for numeric issues.  The probability is cleaned up so that it has all of the right limits, and "never" fails numerically (never means we haven't found anymore corner cases).  The new implementation numerically matches the OA2021 when the OA2021 implementation is valid, and is smooth outside of that domain.  Options are added to reproduce the old bugs.
+
 Issue #621: GPU normalization weight was not being checked for validity before being applied to the event weight.  This only caused problems in corner cases, but when it caused trouble, you could end up with negative expectations.  It was found while torture testing the detector systematics.  The normalization now handles invalid inputs.
 
 Fixes relative to 1.8.4
 
 Issue #582: Safely check parameter limits during fits.  The old method for checking parameter validity during fits depended on first setting an invalid value, and then checking the validity.  Queries are added to check validity before setting.  This also adds checks for the GPU that the likelihood has not been changed since initialization.  If there is a change, a log message is generated, and the calculation falls back to the CPU.  This should only happen during debugging.
 
-Issue #578: Apply cleanups to make sure that eigendecoposition and parameter throwing honor the parameter boundaries.  
+Issue #578: Apply cleanups to make sure that eigendecoposition and parameter throwing honor the parameter boundaries.
 
 Fixes: Guarantee that all parameter value access is through the setter and getter so that the validity checks are correctly applied.
 
@@ -36,13 +38,13 @@ Issue #510 : Make the CacheManager calculation much more thread save when being 
 
 Issue #513 : Fix JointProbability so that an infinite log likelihood produces a warning, but does not terminate the program.  Infinities are valid (e.g. a zero probability).  This does produce a warning since they shouldn't occur often during a normal run.
 
-Issue #506 : Fix output statement in ParameterSet.cpp to remove duplicated output.  
+Issue #506 : Fix output statement in ParameterSet.cpp to remove duplicated output.
 
 Issue #505 : Add the "isFixed" option for parameters in the configuration file.
 
 Issue #508 : Improve error checking for Cache::Manager.  This makes sure that LogThrow is preferred to std::runtime_error.  There is an issue filed for simple-cpp-logger to make sure that the output is flushed before throwing, so that should make the error output much more readable.
 
-Issue #502 : Update the validation code.  A validation failure caused by the recent corrections to the monotonic spline calculation (#486 and $494) has been fixed.  The expected result has been updated.  Unit testing with GoogleTest has been added and used for the HEMI GPU interface code.  Further tests are being implemented.  
+Issue #502 : Update the validation code.  A validation failure caused by the recent corrections to the monotonic spline calculation (#486 and $494) has been fixed.  The expected result has been updated.  Unit testing with GoogleTest has been added and used for the HEMI GPU interface code.  Further tests are being implemented.
 
 Issue #492 : Fix compiler warnings from NVCC.  This is removing some unused variables.  It also fixes a "fix" that applied some correct C++ conventions to code that is aimed at the GPU (the fix produces inefficient code on a SIMD processor, and was primarily aesthetic.
 
