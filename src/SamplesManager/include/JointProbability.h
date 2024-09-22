@@ -98,19 +98,22 @@ namespace JointProbability {
     bool usePoissonLikelihood{false};
     // OA 2021 bug reimplementation
     bool BBNoUpdateWeights{false};
-    // OA2021 bug reimplmentation (set to numeric_limits::min() to reproduce)
+    // OA2021 bug reimplmentation (set to numeric_limits::min() to reproduce
+    // the bug).
     double expectedValueMinimum{-1.0};
-    // OA2021 and BANFF fractional error limitation.  This is needed to
-    // reproduce bugs there.  Physically, the fractional uncertainty should be
-    // less than 100% since one MC event in a bin would have 100% fractional
-    // uncertainty [under the "Gaussian" approximation, so sqrt(1.0)/1.0].
-    // The OA2021 behavior lets the fractional error grow, but the entire
-    // likelihood became discontinuous around a predicted value of
-    // 1E-16. Setting fractionalErrorLimit to 1E+19 matches OA2021 before the
-    // discontinuity.  The BANFF behavior has the likelihood failed around
+    // OA2021 and BANFF fractional error limitation is only relevent with
+    // BBNoUpdateWeights is true, and is needed to reproduce bugs when it is
+    // true.  When BBNoUpdateWeights is false, the fractional error will
+    // naturally be limited to less than 100%.  Physically, the fractional
+    // uncertainty should be less than 100% since one MC event in a bin would
+    // have 100% fractional uncertainty [under the "Gaussian" approximation,
+    // so sqrt(1.0)/1.0].  The OA2021 behavior lets the fractional error grow,
+    // but the entire likelihood became discontinuous around a predicted value
+    // of 1E-16. Setting fractionalErrorLimit to 1E+19 matches OA2021 before
+    // the discontinuity.  The BANFF behavior has the likelihood failed around
     // 1E-154.  Setting fractionalErrorLimit to 1E+150 matchs BANFF.  In both
     // cases, the new likelihood behaves reasonably all the way to zero.
-    double fractionalErrorLimit{1.0};
+    double fractionalErrorLimit{1.0E+150};
   };
 
   class BarlowLLH_BANFF_OA2021_SFGD : public JointProbability{
