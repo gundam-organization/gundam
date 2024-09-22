@@ -2,6 +2,8 @@ Fixes relative to 1.8.5
 
 Issue #615: Fix discontinuities in the JointProbability for the MC and data in a histogram bin.  The joint probability calculation has to be correct over ~620 powers of ten, so there is a lot of room for numeric issues.  The probability is cleaned up so that it has all of the right limits, and "never" fails numerically (never means we haven't found anymore corner cases).  The new implementation numerically matches the OA2021 when the OA2021 implementation is valid, and is smooth outside of that domain.  Options are added to reproduce the old bugs.
 
+Fix (Merge #620): Fix an infinite loop when parameters are being drawn from a global convariance.
+
 Issue #621: GPU normalization weight was not being checked for validity before being applied to the event weight.  This only caused problems in corner cases, but when it caused trouble, you could end up with negative expectations.  It was found while torture testing the detector systematics.  The normalization now handles invalid inputs.
 
 Fixes relative to 1.8.4
