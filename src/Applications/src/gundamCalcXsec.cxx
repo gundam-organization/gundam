@@ -265,6 +265,12 @@ int main(int argc, char** argv){
   auto* xsecAtBestFitTree = new TTree("xsecAtBestFitTree", "xsecAtBestFitTree");
   xsecAtBestFitTree->SetDirectory( GenericToolbox::mkdirTFile(calcXsecDir, "throws") ); // temp saves will be done here
 
+  LogInfo << "Writing event samples in TTrees..." << std::endl;
+  dataSetManager.getTreeWriter().writeSamples(
+      GenericToolbox::mkdirTFile(calcXsecDir, "events"),
+      dataSetManager.getPropagator()
+  );
+
   LogInfo << "Creating normalizer objects..." << std::endl;
   // flux renorm with toys
   struct ParSetNormaliser{
@@ -743,13 +749,6 @@ int main(int argc, char** argv){
   propagator.getPlotGenerator().generateCanvas(
       propagator.getPlotGenerator().getHistHolderList(0),
       GenericToolbox::mkdirTFile(calcXsecDir, "plots/canvas")
-  );
-
-
-  LogInfo << "Writing event samples in TTrees..." << std::endl;
-  dataSetManager.getTreeWriter().writeSamples(
-      GenericToolbox::mkdirTFile(calcXsecDir, "events"),
-      dataSetManager.getPropagator()
   );
 
 }

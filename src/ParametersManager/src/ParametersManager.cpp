@@ -287,6 +287,9 @@ void ParametersManager::throwParametersFromGlobalCovariance(bool quietVerbose_){
         LogInfo << " becomes " << eigenPar.getParameterValue() << std::endl;
       }
     }
+
+    // reached this point: all parameters are within bounds
+    break;    
   }
 }
 
