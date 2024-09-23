@@ -293,6 +293,7 @@ void ParametersManager::throwParametersFromGlobalCovariance(bool quietVerbose_){
       }
     }
 
+    // reached this point: all parameters are within bounds
     break;
   }
 }
