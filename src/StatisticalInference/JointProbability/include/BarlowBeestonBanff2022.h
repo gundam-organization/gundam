@@ -6,6 +6,7 @@
 #define GUNDAM_BARLOW_BEESTON_BANFF_2022_H
 
 #include "JointProbabilityBase.h"
+#include "GundamUtils.h"
 
 #include "GenericToolbox.Map.h"
 
@@ -163,21 +164,21 @@ namespace JointProbability{
     }
 
     double chisq = 0.0;
-    if ((predVal > 0.0) && (dataVal > 0.0)) [[likely]] {
-      if (usePoissonLikelihood) [[unlikely]] {
+    if ((predVal > 0.0) && (dataVal > 0.0)) GUNDAM_LIKELY_COMPILER_FLAG {
+      if (usePoissonLikelihood) GUNDAM_UNLIKELY_COMPILER_FLAG {
         // Not quite safe, but not used much, so don't protect
         chisq += 2.0*(predVal - dataVal + dataVal*TMath::Log( dataVal/predVal));
       }
-      else [[likely]] {
+      else GUNDAM_LIKELY_COMPILER_FLAG {
         // Barlow-Beeston likelihood.
         chisq += 2.0 * (stat + penalty);
       }
     }
     else if( predVal > 0.0 ) {
-      if (usePoissonLikelihood) [[unlikely]] {
+      if (usePoissonLikelihood) GUNDAM_UNLIKELY_COMPILER_FLAG {
         chisq += 2.0*predVal;
       }
-      else [[likely]] {
+      else GUNDAM_LIKELY_COMPILER_FLAG {
         // Barlow-Beeston likelihood
         chisq += 2.0 * (stat + penalty);
       }
@@ -197,7 +198,7 @@ namespace JointProbability{
       }
     }
 
-    if( throwIfInfLlh and not std::isfinite(chisq) ) [[unlikely]] {
+    if( throwIfInfLlh and not std::isfinite(chisq) ) GUNDAM_UNLIKELY_COMPILER_FLAG {
       LogError << "Infinite chi2: " << chisq << std::endl
                << GET_VAR_NAME_VALUE(sample_.getName()) << std::endl
                << GET_VAR_NAME_VALUE(bin_) << std::endl
