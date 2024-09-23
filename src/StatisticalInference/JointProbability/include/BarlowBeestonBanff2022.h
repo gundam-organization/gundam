@@ -9,6 +9,15 @@
 
 #include "GenericToolbox.Map.h"
 
+// likely/unlikely compiler flag are for C++17 only
+#if HAS_CPP_17
+#define LIKELY_FLAG [[likely]]
+#define UNLIKELY_FLAG [[unlikely]]
+#else
+#define LIKELY_FLAG
+#define UNLIKELY_FLAG
+#endif
+
 
 namespace JointProbability{
 
@@ -163,21 +172,21 @@ namespace JointProbability{
     }
 
     double chisq = 0.0;
-    if ((predVal > 0.0) && (dataVal > 0.0)) [[likely]] {
-      if (usePoissonLikelihood) [[unlikely]] {
+    if ((predVal > 0.0) && (dataVal > 0.0)) LIKELY_FLAG {
+      if (usePoissonLikelihood) UNLIKELY_FLAG {
         // Not quite safe, but not used much, so don't protect
         chisq += 2.0*(predVal - dataVal + dataVal*TMath::Log( dataVal/predVal));
       }
-      else [[likely]] {
+      else LIKELY_FLAG {
         // Barlow-Beeston likelihood.
         chisq += 2.0 * (stat + penalty);
       }
     }
     else if( predVal > 0.0 ) {
-      if (usePoissonLikelihood) [[unlikely]] {
+      if (usePoissonLikelihood) UNLIKELY_FLAG {
         chisq += 2.0*predVal;
       }
-      else [[likely]] {
+      else LIKELY_FLAG {
         // Barlow-Beeston likelihood
         chisq += 2.0 * (stat + penalty);
       }
@@ -197,7 +206,7 @@ namespace JointProbability{
       }
     }
 
-    if( throwIfInfLlh and not std::isfinite(chisq) ) [[unlikely]] {
+    if( throwIfInfLlh and not std::isfinite(chisq) ) UNLIKELY_FLAG {
       LogError << "Infinite chi2: " << chisq << std::endl
                << GET_VAR_NAME_VALUE(samplePair_.model->getName()) << std::endl
                << GET_VAR_NAME_VALUE(bin_) << std::endl
