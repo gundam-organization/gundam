@@ -104,24 +104,92 @@ int main(int argc, char** argv){
     else if( f->Get("gundamCalcXsec") != nullptr ){ gundamDirName = "gundamCalcXsec"; } // legacy
     LogContinueIf(gundamDirName.empty(), "Not a gundam fitter output file.");
 
-    GundamUtils::ObjectReader::readObject<TNamed>(f.get(), GenericToolbox::joinPath(gundamDirName, "commandLine_TNamed"), [](TNamed* obj_){
-      LogInfo << blueLightText << "Cmd line: " << resetColor << obj_->GetTitle() << std::endl;
-    });
-    GundamUtils::ObjectReader::readObject<TNamed>(f.get(), GenericToolbox::joinPath(gundamDirName, "version_TNamed"), [](TNamed* obj_){
-      LogInfo << blueLightText << "Ran with GUNDAM version: " << resetColor << obj_->GetTitle() << std::endl;
-    });
-    GundamUtils::ObjectReader::readObject<TNamed>(
-        f.get(),
-        {{GenericToolbox::joinPath(gundamDirName, "config_TNamed")},
-         {GenericToolbox::joinPath(gundamDirName, "unfoldedConfig_TNamed")}},
-        [&](TNamed* obj_){
-      if( clParser.isOptionTriggered("extractDataToDisk") ){
-        if( not GenericToolbox::isDir(outDir) ){ GenericToolbox::mkdir(outDir); }
-        auto outConfigPath = GenericToolbox::joinPath(outDir, "config.json");
-        LogInfo << blueLightText << "Writing unfolded config under: " << resetColor << outConfigPath << std::endl;
-        GenericToolbox::dumpStringInFile( outConfigPath, obj_->GetTitle() );
-      }
-    });
+
+    {
+      LogInfo << "Fetching runtime info..." << std::endl; LogScopeIndent;
+      GundamUtils::ObjectReader::readObject<TNamed>(
+          f.get(),
+          {{GenericToolbox::joinPath(gundamDirName, "runtime/commandLine_TNamed")},
+           {GenericToolbox::joinPath(gundamDirName, "commandLine_TNamed")}},
+          []( TNamed *obj_ ){
+            LogInfo << blueLightText << "Command line: " << resetColor << obj_->GetTitle() << std::endl;
+          });
+      GundamUtils::ObjectReader::readObject<TNamed>(
+          f.get(), GenericToolbox::joinPath(gundamDirName, "runtime/date_TNamed"),
+          []( TNamed *obj_ ){ LogInfo << blueLightText << "Date: " << resetColor << obj_->GetTitle() << std::endl; }
+      );
+      GundamUtils::ObjectReader::readObject<TNamed>(
+          f.get(), GenericToolbox::joinPath(gundamDirName, "runtime/user_TNamed"),
+          []( TNamed *obj_ ){ LogInfo << blueLightText << "User: " << resetColor << obj_->GetTitle() << std::endl; }
+      );
+      GundamUtils::ObjectReader::readObject<TNamed>(
+          f.get(), GenericToolbox::joinPath(gundamDirName, "runtime/pwd_TNamed"),
+          []( TNamed *obj_ ){ LogInfo << blueLightText << "Directory: " << resetColor << obj_->GetTitle() << std::endl; }
+      );
+      GundamUtils::ObjectReader::readObject<TNamed>(
+          f.get(), GenericToolbox::joinPath(gundamDirName, "runtime/host_TNamed"),
+          []( TNamed *obj_ ){ LogInfo << blueLightText << "Hostname: " << resetColor << obj_->GetTitle() << std::endl; }
+      );
+      GundamUtils::ObjectReader::readObject<TNamed>(
+          f.get(), GenericToolbox::joinPath(gundamDirName, "runtime/os_TNamed"),
+          []( TNamed *obj_ ){ LogInfo << blueLightText << "OS: " << resetColor << obj_->GetTitle() << std::endl; }
+      );
+      GundamUtils::ObjectReader::readObject<TNamed>(
+          f.get(), GenericToolbox::joinPath(gundamDirName, "runtime/dist_TNamed"),
+          []( TNamed *obj_ ){ LogInfo << blueLightText << "Distribution: " << resetColor << obj_->GetTitle() << std::endl; }
+      );
+      GundamUtils::ObjectReader::readObject<TNamed>(
+          f.get(), GenericToolbox::joinPath(gundamDirName, "runtime/arch_TNamed"),
+          []( TNamed *obj_ ){ LogInfo << blueLightText << "Architecture: " << resetColor << obj_->GetTitle() << std::endl; }
+      );
+    }
+
+    {
+      LogInfo << "Fetching build info..." << std::endl; LogScopeIndent;
+      GundamUtils::ObjectReader::readObject<TNamed>(
+          f.get(),
+          {{GenericToolbox::joinPath(gundamDirName, "build/version_TNamed")},
+           {GenericToolbox::joinPath(gundamDirName, "version_TNamed")}},
+          []( TNamed *obj_ ){
+            LogInfo << blueLightText << "Generated with GUNDAM version: " << resetColor << obj_->GetTitle()
+                    << std::endl;
+          });
+      GundamUtils::ObjectReader::readObject<TNamed>(
+          f.get(), GenericToolbox::joinPath(gundamDirName, "build/root/version_TNamed"),
+          []( TNamed *obj_ ){
+            LogScopeIndent;
+            LogInfo << blueLightText << "GUNDAM built against ROOT version: " << resetColor << obj_->GetTitle() << std::endl;
+          });
+      GundamUtils::ObjectReader::readObject<TNamed>(
+          f.get(), GenericToolbox::joinPath(gundamDirName, "build/root/date_TNamed"),
+          []( TNamed *obj_ ){
+            LogScopeIndent;
+            LogInfo << blueLightText << "ROOT release date: " << resetColor << obj_->GetTitle() << std::endl;
+          });
+      GundamUtils::ObjectReader::readObject<TNamed>(
+          f.get(), GenericToolbox::joinPath(gundamDirName, "build/root/install_TNamed"),
+          []( TNamed *obj_ ){
+            LogScopeIndent;
+            LogInfo << blueLightText << "ROOT install path: " << resetColor << obj_->GetTitle() << std::endl;
+          });
+    }
+
+
+    if( clParser.isOptionTriggered("extractDataToDisk") ){
+      LogInfo << "Extract data to disk..." << std::endl; LogScopeIndent;
+      GundamUtils::ObjectReader::readObject<TNamed>(
+          f.get(),
+          {{GenericToolbox::joinPath(gundamDirName, "config/unfoldedJson_TNamed")},
+           {GenericToolbox::joinPath(gundamDirName, "config_TNamed")},
+           {GenericToolbox::joinPath(gundamDirName, "unfoldedConfig_TNamed")}},
+          [&](TNamed* obj_){
+            if( not GenericToolbox::isDir(outDir) ){ GenericToolbox::mkdir(outDir); }
+            auto outConfigPath = GenericToolbox::joinPath(outDir, "config.json");
+            LogInfo << blueLightText << "Writing unfolded config under: " << resetColor << outConfigPath << std::endl;
+            GenericToolbox::dumpStringInFile( outConfigPath, obj_->GetTitle() );
+          });
+    }
+
 
 
     // FitterEngine/propagator

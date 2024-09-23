@@ -95,7 +95,12 @@ int main(int argc, char** argv){
 
     ObjectReader::throwIfNotFound = true;
 
-    ObjectReader::readObject<TNamed>(fitterRootFile.get(), {{"gundam/config_TNamed"}, {"gundamFitter/unfoldedConfig_TNamed"}}, [&](TNamed* config_){
+    ObjectReader::readObject<TNamed>(
+        fitterRootFile.get(),
+        {{"gundam/config/unfoldedJson_TNamed"},
+         {"gundam/config_TNamed"},
+         {"gundamFitter/unfoldedConfig_TNamed"}},
+        [&](TNamed* config_){
       fitterConfig = GenericToolbox::Json::readConfigJsonStr( config_->GetTitle() );
     });
   }
