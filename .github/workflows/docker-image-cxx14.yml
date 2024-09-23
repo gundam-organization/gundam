@@ -1,4 +1,4 @@
-name: Docker Image CI
+name: Ubuntu 20 C++14 Docker Image CI
 
 on:
   push:
