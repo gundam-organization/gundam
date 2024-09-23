@@ -2,12 +2,17 @@
 set( LIB_NAME GundamSamplesManager )
 
 set( SRCFILES
-    src/EventUtils.cpp
-    src/Event.cpp
-    src/SampleElement.cpp
-    src/Sample.cpp
-    src/SampleSet.cpp
-    src/PlotGenerator.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/EventUtils.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/Event.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/Sample.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/SampleSet.cpp
+)
+
+set( HEADERS
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/EventUtils.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/Event.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/Sample.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/SampleSet.h
 )
 
 if( USE_STATIC_LINKS )

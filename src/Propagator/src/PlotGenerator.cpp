@@ -2,9 +2,10 @@
 // Created by Nadrino on 16/06/2021.
 //
 
+#include "../include/PlotGenerator.h"
+
 #include "GenericToolbox.Json.h"
 #include "GundamGlobals.h"
-#include "PlotGenerator.h"
 #include "ConfigUtils.h"
 
 #include "Logger.h"
@@ -42,7 +43,7 @@ void PlotGenerator::readConfigImpl(){
 }
 void PlotGenerator::initializeImpl() {
   LogWarning << __METHOD_NAME__ << std::endl;
-  LogThrowIf(_sampleSetPtr_ == nullptr);
+  LogThrowIf(_modelSampleListPtr_ == nullptr);
 }
 
 
@@ -53,12 +54,6 @@ bool PlotGenerator::isEmpty() const{
 const std::vector<HistHolder> &PlotGenerator::getHistHolderList(int cacheSlot_) const {
   return _histHolderCacheList_[cacheSlot_];
 }
-const std::vector<HistHolder> &PlotGenerator::getComparisonHistHolderList() const {
-  return _comparisonHistHolderList_;
-}
-std::map<std::string, std::shared_ptr<TCanvas>> PlotGenerator::getBufferCanvasList() const {
-  return _bufferCanvasList_;
-}
 
 
 std::vector<HistHolder> &PlotGenerator::getHistHolderList(int cacheSlot_){
@@ -68,12 +63,13 @@ std::vector<HistHolder> &PlotGenerator::getHistHolderList(int cacheSlot_){
 // Core
 void PlotGenerator::generateSamplePlots(TDirectory *saveDir_, int cacheSlot_) {
   LogThrowIf( not isInitialized() );
-  LogScopeIndent;
   this->generateSampleHistograms(GenericToolbox::mkdirTFile(saveDir_, "histograms"), cacheSlot_);
   this->generateCanvas(_histHolderCacheList_[cacheSlot_], GenericToolbox::mkdirTFile(saveDir_, "canvas"));
 }
 void PlotGenerator::generateSampleHistograms(TDirectory *saveDir_, int cacheSlot_) {
   LogThrowIf(not isInitialized());
+
+  LogInfo << "Generating sample histograms..." << std::endl;
 
   if( _histogramsDefinition_.empty() ){
     LogWarning << "No histogram has been defined." << std::endl;
@@ -95,14 +91,8 @@ void PlotGenerator::generateSampleHistograms(TDirectory *saveDir_, int cacheSlot
   for( auto& histDef : _histHolderCacheList_[cacheSlot_] ){
 
     if( histDef.histPtr == nullptr ){
-      if( histDef.varToPlot == "Raw" ){
-        if( _sampleSetPtr_ != nullptr ){
-          if( histDef.isData ) { histDef.histPtr = histDef.samplePtr->getDataContainer().generateRootHistogram(); }
-          else { histDef.histPtr = histDef.samplePtr->getMcContainer().generateRootHistogram(); }
-        }
-        else{
-          LogThrow("Samples not set.");
-        }
+      if( histDef.varToPlot == "Raw" and histDef.samplePtr != nullptr ){
+        histDef.histPtr = histDef.samplePtr->generateRootHistogram();
       }
       else{
         histDef.histPtr = std::make_shared<TH1D>(
@@ -121,45 +111,38 @@ void PlotGenerator::generateSampleHistograms(TDirectory *saveDir_, int cacheSlot
   }
 
   // Fill histograms
-  for( const auto& sample : _sampleSetPtr_->getSampleList() ){
-      // Datasets:
-      for( bool isData : { false, true } ){
+  for( bool isData : { false, true } ){
 
-        const std::vector<Event>* eventListPtr;
-        std::vector<HistHolder*> histPtrToFillList;
+    auto* sampleList{_modelSampleListPtr_};
+    if( isData ){ sampleList = _dataSampleListPtr_; }
 
-        if( isData ){
-          eventListPtr = &sample.getDataContainer().getEventList();
+    if( sampleList == nullptr ){ continue; }
 
-          // which hist should be filled?
-          for( auto& histDef : _histHolderCacheList_[cacheSlot_] ){
-            if(histDef.isData and histDef.samplePtr == &sample ){
-              histPtrToFillList.emplace_back( &histDef );
-            }
-          }
+    const std::vector<Event>* eventListPtr;
+    std::vector<HistHolder*> histPtrToFillList;
+
+    // Datasets:
+    for( const auto& sample : *sampleList ){
+
+      eventListPtr = &sample.getEventList();
+
+      // which hist should be filled?
+      for( auto& histDef : _histHolderCacheList_[cacheSlot_] ){
+        if( histDef.samplePtr == &sample ){
+          histPtrToFillList.emplace_back( &histDef );
         }
-        else{
-          eventListPtr = &sample.getMcContainer().getEventList();
+      }
 
-          // which hist should be filled?
-          for( auto& histDef : _histHolderCacheList_[cacheSlot_] ){
-            if(not histDef.isData and histDef.samplePtr == &sample ){
-              histPtrToFillList.emplace_back( &histDef );
-            }
-          }
+      for( auto& histPtrToFill : histPtrToFillList ){
+        if( not histPtrToFill->isBinCacheBuilt ){
+          // If any, launch rebuild cache
+          this->buildEventBinCache(histPtrToFillList, eventListPtr, isData);
+          break; // all caches done at once
         }
+      }
 
-        for( auto& histPtrToFill : histPtrToFillList ){
-          if( not histPtrToFill->isBinCacheBuilt ){
-            // If any, launch rebuild cache
-            LogInfo << "Build event bin cache for sample \"" << sample.getName() << "\" " << (isData? "(data)":"(mc)") << std::endl;
-            this->buildEventBinCache(histPtrToFillList, eventListPtr, isData);
-            break; // all caches done at once
-          }
-        }
-
-        // Filling the selected histograms
-        std::function<void(int)> fillJob = [&]( int iThread_ ){
+      // Filling the selected histograms
+      std::function<void(int)> fillJob = [&]( int iThread_ ){
 
           for( auto* hist : histPtrToFillList ){
 
@@ -178,19 +161,17 @@ void PlotGenerator::generateSampleHistograms(TDirectory *saveDir_, int cacheSlot
           }
         };
 
-        fillJob(-1);
+      fillJob(-1);
 
 //        _threadPool_.addJob("fillJob", fillJob);
 //        _threadPool_.runJob("fillJob");
 //        _threadPool_.removeJob("fillJob");
 
-      } // isData loop
-    } // sample
+    } // isData loop
+  } // sample
 
   // Post-processing (norm, color)
   for( auto& histHolderCached : _histHolderCacheList_[cacheSlot_] ){
-
-    LogThrowIf( _sampleSetPtr_ == nullptr, "Samples not set.");
 
     for(int iBin = 0 ; iBin <= histHolderCached.histPtr->GetNbinsX() + 1 ; iBin++ ){
       double binContent = histHolderCached.histPtr->GetBinContent(iBin); // this is the real number of counts
@@ -263,7 +244,7 @@ void PlotGenerator::generateCanvas(const std::vector<HistHolder> &histHolderList
     const std::string& canvasPath = histsSamples.first;
     for( auto& histsToStack : histsSamples.second ){
       for( auto& histHolder : histHolderList_ ){
-        const Sample* samplePtr = histsToStack.first;
+        auto* samplePtr = histsToStack.first;
 
         // we are searching for data
         if( not histHolder.isData ) continue;
@@ -272,7 +253,7 @@ void PlotGenerator::generateCanvas(const std::vector<HistHolder> &histHolderList
         if( not GenericToolbox::startsWith(canvasPath, buildCanvasPath(&histHolder)) ) continue;
 
         // same sample?
-        if( samplePtr != histHolder.samplePtr ) continue;
+        if( samplePtr->getIndex() != histHolder.samplePtr->getIndex() ) continue;
 
         histsToStack.second.emplace_back( &histHolder );
         break; // no need to check for more
@@ -288,7 +269,7 @@ void PlotGenerator::generateCanvas(const std::vector<HistHolder> &histHolderList
     int canvasIndex = 0;
     int iSampleSlot = 0;
     for (const auto &histList : histsToStackPair.second) {
-      const Sample* samplePtr = histList.first;
+      auto* samplePtr = histList.first;
       iSampleSlot++;
 
       if (iSampleSlot > canvasNbXplots * canvasNbYplots) {
@@ -574,7 +555,7 @@ void PlotGenerator::generateComparisonHistograms(const std::vector<HistHolder> &
 }
 
 // Misc
-std::vector<std::string> PlotGenerator::fetchListOfVarToPlot(bool isData_){
+std::vector<std::string> PlotGenerator::fetchListOfVarToPlot(bool isData_) const {
   std::vector<std::string> varNameList;
   _histogramsDefinition_ = GenericToolbox::Json::fetchValue(_config_, "histogramsDefinition", JsonType());
   for( const auto& histConfig : _histogramsDefinition_ ){
@@ -590,9 +571,7 @@ std::vector<std::string> PlotGenerator::fetchListOfVarToPlot(bool isData_){
   }
   return varNameList;
 }
-std::vector<std::string> PlotGenerator::fetchListOfSplitVarNames(){
-//  LogThrowIf(_config_.empty(), "Config not set, can't call " << __METHOD_NAME__);
-
+std::vector<std::string> PlotGenerator::fetchListOfSplitVarNames() const {
   std::vector<std::string> varNameList;
   _histogramsDefinition_ = GenericToolbox::Json::fetchValue(_config_, "histogramsDefinition", JsonType());
   for( const auto& histConfig : _histogramsDefinition_ ){
@@ -611,7 +590,7 @@ void PlotGenerator::defineHistogramHolders() {
   LogWarning << __METHOD_NAME__ << std::endl;
   _histHolderCacheList_[0].clear();
 
-  LogInfo << "Fetching appearing split vars..." << std::endl;
+  LogInfo << "Defining histogram holders..." << std::endl;
 
   struct SplitVariableDictionary{
     struct Entry{
@@ -654,8 +633,8 @@ void PlotGenerator::defineHistogramHolders() {
         splitVarsDictionary.entryList.emplace_back();
         auto& entry = splitVarsDictionary.entryList.back();
         entry.name = splitVar;
-        entry.sampleList.reserve( _sampleSetPtr_->getSampleList().size() );
-        for( const auto& sample : _sampleSetPtr_->getSampleList() ){
+        entry.sampleList.reserve( _modelSampleListPtr_->size() );
+        for( const auto& sample : *_modelSampleListPtr_ ){
           entry.sampleList.emplace_back();
           auto& sampleSplit = entry.sampleList.back();
           sampleSplit.samplePtr = &sample;
@@ -668,12 +647,12 @@ void PlotGenerator::defineHistogramHolders() {
   std::function<void(int)> fetchSplitVar = [&](int iThread_){
     auto bounds = GenericToolbox::ParallelWorker::getThreadBoundIndices(
         iThread_, GundamGlobals::getNumberOfThreads(),
-        int(_sampleSetPtr_->getSampleList().size())
+        int(_modelSampleListPtr_->size())
     );
 
     for( int iSample = bounds.beginIndex ; iSample < bounds.endIndex ; iSample++ ){
-      const Sample* samplePtr = &_sampleSetPtr_->getSampleList()[iSample];
-      for( auto& event : samplePtr->getMcContainer().getEventList() ){
+      const Sample* samplePtr = &(*_modelSampleListPtr_)[iSample];
+      for( auto& event : samplePtr->getEventList() ){
         for( auto& entry : splitVarsDictionary.entryList ){
           if( entry.name.empty() ){ continue; }
           auto splitValue = int( event.getVariables().getVarList()[event.getVariables().findVarIndex( entry.name )].getVarAsDouble() );
@@ -689,9 +668,7 @@ void PlotGenerator::defineHistogramHolders() {
 
   int sampleCounter = -1;
   HistHolder histDefBase;
-  for( const auto& sample : _sampleSetPtr_->getSampleList() ){
-    LogScopeIndent;
-    LogInfo << "Defining holders for sample: \"" << sample.getName() << "\"" << std::endl;
+  for( const auto& sample : *_modelSampleListPtr_ ){
     sampleCounter++;
     histDefBase.samplePtr = &sample;
     short unsetSplitValueColor = kGray; // will increment if needed
@@ -910,6 +887,19 @@ void PlotGenerator::defineHistogramHolders() {
 
     } // histDef
   }
+
+
+  // use data samples when needed:
+  for( auto& histHolder : _histHolderCacheList_[0] ){
+    if( not histHolder.isData ){ continue; }
+
+    auto sampleIndex = histHolder.samplePtr->getIndex();
+    histHolder.samplePtr = nullptr;
+    if( _dataSampleListPtr_ == nullptr ){ continue; }
+
+    histHolder.samplePtr = &_dataSampleListPtr_->at(sampleIndex);
+  }
+
 }
 void PlotGenerator::buildEventBinCache( const std::vector<HistHolder *> &histPtrToFillList, const std::vector<Event> *eventListPtr, bool isData_) {
 

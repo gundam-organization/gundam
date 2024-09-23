@@ -44,7 +44,7 @@ namespace GundamUtils {
         // Free the strings pointer that was allocated with malloc.
         std::free(strings);
 #else
-        out << "Backtrace not available" << std::endl;
+//        out << "Backtrace not available" << std::endl;
 #endif
         return out;
     }

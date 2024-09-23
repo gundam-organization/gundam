@@ -33,7 +33,7 @@ void DatasetDefinition::readConfigImpl() {
   _modelDispenser_ = DataDispenser(this);
   _modelDispenser_.readConfig(GenericToolbox::Json::fetchValue<JsonType>(_config_, {{"model"}, {"mc"}}));
   _modelDispenser_.getParameters().name = "Asimov";
-  _modelDispenser_.getParameters().useMcContainer = true;
+  _modelDispenser_.getParameters().useReweightEngine = true;
 
   // Always loaded by default
   _dataDispenserDict_.emplace("Asimov", DataDispenser(_modelDispenser_));
@@ -47,6 +47,8 @@ void DatasetDefinition::readConfigImpl() {
     else{ _dataDispenserDict_.emplace(name, DataDispenser(this)); }
     _dataDispenserDict_.at(name).readConfig(dataEntry);
   }
+
+  for( auto& dataEntry : _dataDispenserDict_ ){ dataEntry.second.getParameters().isData = true; }
 
   _devSingleThreadEventLoaderAndIndexer_ = GenericToolbox::Json::fetchValue(_config_, "devSingleThreadEventLoaderAndIndexer", _devSingleThreadEventLoaderAndIndexer_);
   _devSingleThreadEventSelection_ = GenericToolbox::Json::fetchValue(_config_, "devSingleThreadEventSelection", _devSingleThreadEventSelection_);

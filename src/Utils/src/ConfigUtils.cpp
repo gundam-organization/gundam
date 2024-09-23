@@ -339,17 +339,15 @@ namespace ConfigUtils {
       auto fitFile = std::shared_ptr<TFile>( GenericToolbox::openExistingTFile( filePath_ ) );
 
       auto* conf = fitFile->Get<TNamed>("gundam/config_TNamed");
-      if( conf == nullptr ){
-        // legacy
-        conf = fitFile->Get<TNamed>("gundamFitter/unfoldedConfig_TNamed");
-      }
+      // legacy
+      if( conf == nullptr ){ conf = fitFile->Get<TNamed>("gundamFitter/unfoldedConfig_TNamed"); }
       LogThrowIf(conf==nullptr, "no config in ROOT file " << filePath_);
       config = GenericToolbox::Json::readConfigJsonStr( conf->GetTitle() );
       fitFile->Close();
     }
     else{
       LogInfo << "Reading config file: " << filePath_ << std::endl;
-      config = ConfigUtils::readConfigFile(filePath_ ); // works with yaml
+      config = ConfigUtils::readConfigFile( filePath_ ); // works with yaml
     }
   }
   ConfigHandler::ConfigHandler(JsonType config_) : config(std::move(config_)) {}
@@ -374,8 +372,7 @@ namespace ConfigUtils {
     LogThrowIf(not GenericToolbox::isFile(filePath_), "Could not find " << filePath_);
 
     LogScopeIndent;
-    auto override{ConfigUtils::readConfigFile(filePath_)};
-    ConfigHandler::override(override);
+    ConfigHandler::override(ConfigUtils::readConfigFile(filePath_));
   }
   void ConfigHandler::override( const std::vector<std::string>& filesList_ ){
     for( auto& file : filesList_ ){ this->override( file ); }

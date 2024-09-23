@@ -20,19 +20,19 @@
 LoggerInit([]{ Logger::setUserHeaderStr("[ParameterSet]"); });
 #endif
 
+
 void ParameterSet::readConfigImpl(){
-  LogThrowIf(_config_.empty(), "ParameterSet config not set.");
 
   _name_ = GenericToolbox::Json::fetchValue<std::string>(_config_, "name");
-  LogInfo << std::endl << "Initializing parameter set: " << _name_ << std::endl;
+  LogDebugIf(GundamGlobals::isDebugConfig()) << "Reading config for parameter set: " << _name_ << std::endl;
 
-  _isEnabled_ = GenericToolbox::Json::fetchValue<bool>(_config_, "isEnabled");
-  LogReturnIf(not _isEnabled_, _name_ << " parameters are disabled.");
+  _isEnabled_ = GenericToolbox::Json::fetchValue(_config_, "isEnabled", _isEnabled_);
+  if( not _isEnabled_ ){ return; } // don't go any further
 
   _nbParameterDefinition_ = GenericToolbox::Json::fetchValue(_config_, "numberOfParameters", _nbParameterDefinition_);
   _nominalStepSize_ = GenericToolbox::Json::fetchValue(_config_, "nominalStepSize", _nominalStepSize_);
 
-  _useOnlyOneParameterPerEvent_ = GenericToolbox::Json::fetchValue<bool>(_config_, "useOnlyOneParameterPerEvent", false);
+  _useOnlyOneParameterPerEvent_ = GenericToolbox::Json::fetchValue<bool>(_config_, "useOnlyOneParameterPerEvent", _useOnlyOneParameterPerEvent_);
   _printDialSetsSummary_ = GenericToolbox::Json::fetchValue<bool>(_config_, "printDialSetsSummary", _printDialSetsSummary_);
   _printParametersSummary_ = GenericToolbox::Json::fetchValue<bool>(_config_, "printParametersSummary", _printDialSetsSummary_);
 
@@ -40,36 +40,6 @@ void ParameterSet::readConfigImpl(){
     auto parLimits = GenericToolbox::Json::fetchValue(_config_, "parameterLimits", JsonType());
     _globalParameterMinValue_ = GenericToolbox::Json::fetchValue(parLimits, "minValue", _globalParameterMinValue_);
     _globalParameterMaxValue_ = GenericToolbox::Json::fetchValue(parLimits, "maxValue", _globalParameterMaxValue_);
-  }
-
-  _enableEigenDecomp_ = GenericToolbox::Json::fetchValue(_config_ , {{"enableEigenDecomp"}, {"useEigenDecompInFit"}}, false);
-  if( isEnableEigenDecomp() ){
-    LogWarning << "Using eigen decomposition in fit." << std::endl;
-
-    _allowEigenDecompWithBounds_ = GenericToolbox::Json::fetchValue(_config_ , "allowEigenDecompWithBounds", false);
-
-    _maxNbEigenParameters_ = GenericToolbox::Json::fetchValue(_config_ , "maxNbEigenParameters", -1);
-    if( _maxNbEigenParameters_ != -1 ){
-      LogInfo << "Maximum nb of eigen parameters is set to " << _maxNbEigenParameters_ << std::endl;
-    }
-    _maxEigenFraction_ = GenericToolbox::Json::fetchValue(_config_ , "maxEigenFraction", double(1.));
-    if( _maxEigenFraction_ != 1 ){
-      LogInfo << "Max eigen fraction set to: " << _maxEigenFraction_*100 << "%" << std::endl;
-    }
-
-    if( GenericToolbox::Json::doKeyExist(_config_, "eigenParBounds") ){
-      auto eigenLimits = GenericToolbox::Json::fetchValue(_config_, "eigenParBounds", JsonType());
-      _eigenParBounds_.first = GenericToolbox::Json::fetchValue(eigenLimits, "minValue", _eigenParBounds_.first);
-      _eigenParBounds_.second = GenericToolbox::Json::fetchValue(eigenLimits, "maxValue", _eigenParBounds_.second);
-      LogInfo << "Using eigen parameter limits: [ " << _eigenParBounds_.first << ", " << _eigenParBounds_.first << "]" << std::endl;
-    }
-
-    _devUseParLimitsOnEigen_ = GenericToolbox::Json::fetchValue(_config_, "devUseParLimitsOnEigen", _devUseParLimitsOnEigen_);
-    if( _devUseParLimitsOnEigen_ ){ LogAlert << "USING DEV OPTION: _devUseParLimitsOnEigen_ = true" << std::endl; }
-
-    _eigenSvdThreshold_ = GenericToolbox::Json::fetchValue(_config_, "eigenSvdThreshold", _eigenSvdThreshold_);
-    LogInfoIf(not std::isnan(_eigenSvdThreshold_)) << "Setting SVD eigen value threshold to: " << _eigenSvdThreshold_ << std::endl;
-
   }
 
   _enablePca_ = GenericToolbox::Json::fetchValue(_config_, std::vector<std::string>{"allowPca", "fixGhostFitParameters", "enablePca"}, _enablePca_);
@@ -93,15 +63,33 @@ void ParameterSet::readConfigImpl(){
   _enableOnlyParameters_ = GenericToolbox::Json::fetchValue(_config_, "enableOnlyParameters", _enableOnlyParameters_);
   _disableParameters_ = GenericToolbox::Json::fetchValue(_config_, "disableParameters", _disableParameters_);
 
-
-  // MISC / DEV
+  // throws options
   _useMarkGenerator_ = GenericToolbox::Json::fetchValue(_config_, "useMarkGenerator", _useMarkGenerator_);
   _useEigenDecompForThrows_ = GenericToolbox::Json::fetchValue(_config_, "useEigenDecompForThrows", _useEigenDecompForThrows_);
 
-  this->readParameterDefinitionFile();
+  // eigen related parameters
+  _enableEigenDecomp_ = GenericToolbox::Json::fetchValue(_config_ , {{"enableEigenDecomp"}, {"useEigenDecompInFit"}}, _enableEigenDecomp_);
+  _allowEigenDecompWithBounds_ = GenericToolbox::Json::fetchValue(_config_ , "allowEigenDecompWithBounds", _allowEigenDecompWithBounds_);
+  _maxNbEigenParameters_ = GenericToolbox::Json::fetchValue(_config_ , "maxNbEigenParameters", _maxNbEigenParameters_);
+  _maxEigenFraction_ = GenericToolbox::Json::fetchValue(_config_ , "maxEigenFraction", _maxEigenFraction_);
+  _eigenSvdThreshold_ = GenericToolbox::Json::fetchValue(_config_, "eigenSvdThreshold", _eigenSvdThreshold_);
+
+  if( GenericToolbox::Json::doKeyExist(_config_, "eigenParBounds") ){
+    auto eigenLimits = GenericToolbox::Json::fetchValue(_config_, "eigenParBounds", JsonType());
+    _eigenParBounds_.first = GenericToolbox::Json::fetchValue(eigenLimits, "minValue", _eigenParBounds_.first);
+    _eigenParBounds_.second = GenericToolbox::Json::fetchValue(eigenLimits, "maxValue", _eigenParBounds_.second);
+  }
+
+  // dev option -> was used for validation
+  _devUseParLimitsOnEigen_ = GenericToolbox::Json::fetchValue(_config_, "devUseParLimitsOnEigen", _devUseParLimitsOnEigen_);
+
+
+  // individual parameter definitions:
+  if( not _parameterDefinitionFilePath_.empty() ){ readParameterDefinitionFile(); }
 
   if( _nbParameterDefinition_ == -1 ){
-    LogWarning << "No number of parameter provided. Looking for alternative definitions..." << std::endl;
+    // no number of parameter provided -> parameters were not defined
+    // looking for alternative/legacy definitions...
 
     if( not _dialSetDefinitions_.empty() ){
       for( auto& dialSetDef : _dialSetDefinitions_ ){
@@ -117,7 +105,7 @@ void ParameterSet::readConfigImpl(){
     }
 
     if( _nbParameterDefinition_ == -1 and not _parameterDefinitionConfig_.empty() ){
-      LogInfo << "Using parameter definition config list to determine the number of parameters..." << std::endl;
+      LogDebugIf(GundamGlobals::isDebugConfig()) << "Using parameter definition config list to determine the number of parameters..." << std::endl;
       _nbParameterDefinition_ = int(_parameterDefinitionConfig_.get<std::vector<JsonType>>().size());
     }
 
@@ -127,15 +115,11 @@ void ParameterSet::readConfigImpl(){
   this->defineParameters();
 }
 void ParameterSet::initializeImpl() {
-  LogInfo << "Initializing \"" << this->getName() << "\"" << std::endl;
-
-  LogReturnIf(not _isEnabled_, this->getName() << " is not enabled. Skipping.");
-
   for( auto& par : _parameterList_ ){
     par.initialize();
-    if( _printParametersSummary_ and par.isEnabled() ){
-      LogInfo << par.getSummary(not _printDialSetsSummary_) << std::endl;
-    }
+//    if( _printParametersSummary_ and par.isEnabled() ){
+//      LogInfo << par.getSummary(not _printDialSetsSummary_) << std::endl;
+//    }
   }
 
   // Make the matrix inversion
@@ -160,7 +144,7 @@ void ParameterSet::processCovarianceMatrix(){
     if( not isEnableEigenDecomp() ) continue;
     // Warn if using eigen decomposition with bounded parameters.
     if ( std::isnan(par.getMinValue()) and std::isnan(par.getMaxValue())) continue;
-    LogWarning << "Undefined behavior: Eigen-decomposition of a bounded parameter: "
+    LogAlert << "Undefined behavior: Eigen-decomposition of a bounded parameter: "
                << par.getFullTitle()
                << std::endl;
     ++configWarnings;
@@ -387,8 +371,6 @@ void ParameterSet::setValidity(const std::string& validity) {
 
 // Parameter throw
 void ParameterSet::moveParametersToPrior(){
-  LogInfo << "Moving back parameters to their prior value in set: " << getName() << std::endl;
-
   if( not isEnableEigenDecomp() ){
     for( auto& par : _parameterList_ ){
       if( par.isFixed() or not par.isEnabled() ){ continue; }
@@ -402,7 +384,6 @@ void ParameterSet::moveParametersToPrior(){
     }
     this->propagateEigenToOriginal();
   }
-
 }
 void ParameterSet::throwParameters(bool rethrowIfNotInPhysical_, double gain_){
 
@@ -823,6 +804,7 @@ Parameter* ParameterSet::getParameterPtrWithTitle(const std::string& parTitle_){
 }
 
 void ParameterSet::nullify(){
+  // TODO: reimplement toy disabling
   std::string name{_name_};
   (*this) = ParameterSet();
   this->setName(name);
@@ -845,27 +827,27 @@ bool ParameterSet::isValidCorrelatedParameter(const Parameter& par_){
   return ( par_.isEnabled() and not par_.isFixed() and not par_.isFree() );
 }
 
+void ParameterSet::printConfiguration() const {
+  LogInfo << "name(" << _name_ << ")";
+  LogInfo << ", nPars(" << _nbParameterDefinition_ << ")";
+  LogInfo << std::endl;
+
+  for( auto& par : _parameterList_ ){ par.printConfiguration(); }
+}
+
 
 // Protected
 void ParameterSet::readParameterDefinitionFile(){
 
-  if( _parameterDefinitionFilePath_.empty() ) return;
+  TObject* objBuffer{nullptr};
 
   std::string path = GenericToolbox::expandEnvironmentVariables(_parameterDefinitionFilePath_);
-  if (path != _parameterDefinitionFilePath_) {
-    LogInfo << "Using parameter definition file " << path
-            << std::endl;
-  }
-
   std::unique_ptr<TFile> parDefFile(TFile::Open(path.c_str()));
   LogThrowIf(parDefFile == nullptr or not parDefFile->IsOpen(), "Could not open: " << path);
 
-  TObject* objBuffer{nullptr};
 
-  if( _covarianceMatrixPath_.empty() ){
-    LogWarning << "No covariance matrix provided. Free parameter definition expected." << std::endl;
-  }
-  else{
+  // define with the covariance matrix size
+  if( not _covarianceMatrixPath_.empty() ){
     objBuffer = parDefFile->Get(_covarianceMatrixPath_.c_str());
     LogThrowIf(objBuffer == nullptr, "Can't find \"" << _covarianceMatrixPath_ << "\" in " << parDefFile->GetPath())
     _priorCovarianceMatrix_ = std::shared_ptr<TMatrixDSym>((TMatrixDSym*) objBuffer->Clone());
@@ -876,12 +858,9 @@ void ParameterSet::readParameterDefinitionFile(){
 
   // parameterPriorTVectorD
   if(not _parameterPriorValueListPath_.empty()){
-    LogInfo << "Reading provided parameterPriorTVectorD: \"" << _parameterPriorValueListPath_ << "\"" << std::endl;
-
     objBuffer = parDefFile->Get(_parameterPriorValueListPath_.c_str());
     LogThrowIf(objBuffer == nullptr, "Can't find \"" << _parameterPriorValueListPath_ << "\" in " << parDefFile->GetPath())
     _parameterPriorList_ = std::shared_ptr<TVectorD>((TVectorD*) objBuffer->Clone());
-
     LogThrowIf(_parameterPriorList_->GetNrows() != _nbParameterDefinition_,
       "Parameter prior list don't have the same size("
       << _parameterPriorList_->GetNrows()
@@ -891,8 +870,6 @@ void ParameterSet::readParameterDefinitionFile(){
 
   // parameterNameTObjArray
   if(not _parameterNameListPath_.empty()){
-    LogInfo << "Reading provided parameterNameTObjArray: \"" << _parameterNameListPath_ << "\"" << std::endl;
-
     objBuffer = parDefFile->Get(_parameterNameListPath_.c_str());
     LogThrowIf(objBuffer == nullptr, "Can't find \"" << _parameterNameListPath_ << "\" in " << parDefFile->GetPath())
     _parameterNamesList_ = std::shared_ptr<TObjArray>((TObjArray*) objBuffer->Clone());
@@ -900,8 +877,6 @@ void ParameterSet::readParameterDefinitionFile(){
 
   // parameterLowerBoundsTVectorD
   if( not _parameterLowerBoundsTVectorD_.empty() ){
-    LogInfo << "Reading provided parameterLowerBoundsTVectorD: \"" << _parameterLowerBoundsTVectorD_ << "\"" << std::endl;
-
     objBuffer = parDefFile->Get(_parameterLowerBoundsTVectorD_.c_str());
     LogThrowIf(objBuffer == nullptr, "Can't find \"" << _parameterLowerBoundsTVectorD_ << "\" in " << parDefFile->GetPath())
     _parameterLowerBoundsList_ = std::shared_ptr<TVectorD>((TVectorD*) objBuffer->Clone());
@@ -913,8 +888,6 @@ void ParameterSet::readParameterDefinitionFile(){
 
   // parameterUpperBoundsTVectorD
   if( not _parameterUpperBoundsTVectorD_.empty() ){
-    LogInfo << "Reading provided parameterUpperBoundsTVectorD: \"" << _parameterUpperBoundsTVectorD_ << "\"" << std::endl;
-
     objBuffer = parDefFile->Get(_parameterUpperBoundsTVectorD_.c_str());
     LogThrowIf(objBuffer == nullptr, "Can't find \"" << _parameterUpperBoundsTVectorD_ << "\" in " << parDefFile->GetPath())
     _parameterUpperBoundsList_ = std::shared_ptr<TVectorD>((TVectorD*) objBuffer->Clone());
@@ -924,8 +897,6 @@ void ParameterSet::readParameterDefinitionFile(){
   }
 
   if( not _throwEnabledListPath_.empty() ){
-    LogInfo << "Reading provided throwEnabledList: \"" << _throwEnabledListPath_ << "\"" << std::endl;
-
     objBuffer = parDefFile->Get(_throwEnabledListPath_.c_str());
     LogThrowIf(objBuffer == nullptr, "Can't find \"" << _throwEnabledListPath_ << "\" in " << parDefFile->GetPath())
     _throwEnabledList_ = std::shared_ptr<TVectorD>((TVectorD*) objBuffer->Clone());
@@ -934,7 +905,6 @@ void ParameterSet::readParameterDefinitionFile(){
   parDefFile->Close();
 }
 void ParameterSet::defineParameters(){
-  LogInfo << "Defining " << _nbParameterDefinition_ << " parameters for the set: " << getName() << std::endl;
   _parameterList_.resize(_nbParameterDefinition_, Parameter(this));
   int parIndex{0};
 
@@ -971,7 +941,7 @@ void ParameterSet::defineParameters(){
         par.setIsEnabled( false );
       }
       else{
-        LogInfo << "Enabling parameter \"" << par.getFullTitle() << "\" as it is set in enableOnlyParameters" << std::endl;
+        LogDebugIf(GundamGlobals::isDebugConfig()) << "Enabling parameter \"" << par.getFullTitle() << "\" as it is set in enableOnlyParameters" << std::endl;
       }
     }
     if( not _disableParameters_.empty() ){
@@ -985,7 +955,7 @@ void ParameterSet::defineParameters(){
       }
 
       if( not isEnabled ){
-        LogWarning << "Skipping parameter \"" << par.getFullTitle() << "\" as it is set in disableParameters" << std::endl;
+        LogDebugIf(GundamGlobals::isDebugConfig()) << "Skipping parameter \"" << par.getFullTitle() << "\" as it is set in disableParameters" << std::endl;
         par.setIsEnabled( false );
         continue;
       }
