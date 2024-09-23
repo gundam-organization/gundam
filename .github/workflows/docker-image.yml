@@ -8,14 +8,14 @@ on:
 
 jobs:
 
-  build:
-
-    runs-on: ubuntu-latest
-
+  build-latest:
     steps:
     - uses: actions/checkout@v2
-    - name: Latest ROOT build
+    - name: Build the Docker image
       run: docker build . --file Dockerfile
 
-    - name: C++14 ROOT build
-      run: docker build . --file Dockerfile --build-arg ROOT_IMAGE=rootproject/root:6.24.06-ubuntu20.04
+  build-cxx14:
+    steps:
+      - uses: actions/checkout@v2
+      - name: Build the Docker image
+        run: docker build . --file Dockerfile --build-arg ROOT_IMAGE=rootproject/root:6.24.06-ubuntu20.04
