@@ -6,6 +6,7 @@
 #include "LikelihoodInterface.h"
 #include "FitterEngine.h"
 #include "GundamGlobals.h"
+#include "GundamUtils.h"
 
 #include "GenericToolbox.Json.h"
 #include "GenericToolbox.Root.h"
@@ -998,32 +999,32 @@ bool AdaptiveMcmc::hasValidParameterValues() const {
     for( auto& par : parSet.getParameterList() ){
       if ( (_validFlags_ & 0b0001) != 0
            and std::isfinite(par.getMinValue())
-           and par.getParameterValue() < par.getMinValue()) [[unlikely]] {
+           and par.getParameterValue() < par.getMinValue()) GUNDAM_UNLIKELY_COMPILER_FLAG {
         ++invalid;
       }
       if ((_validFlags_ & 0b0001) != 0
           and std::isfinite(par.getMaxValue())
-          and par.getParameterValue() > par.getMaxValue()) [[unlikely]] {
+          and par.getParameterValue() > par.getMaxValue()) GUNDAM_UNLIKELY_COMPILER_FLAG {
         ++invalid;
       }
       if ((_validFlags_ & 0b0010) != 0
           and std::isfinite(par.getMinMirror())
-          and par.getParameterValue() < par.getMinMirror()) [[unlikely]] {
+          and par.getParameterValue() < par.getMinMirror()) GUNDAM_UNLIKELY_COMPILER_FLAG {
         ++invalid;
       }
       if ((_validFlags_ & 0b0010) != 0
           and std::isfinite(par.getMaxMirror())
-          and par.getParameterValue() > par.getMaxMirror()) [[unlikely]] {
+          and par.getParameterValue() > par.getMaxMirror()) GUNDAM_UNLIKELY_COMPILER_FLAG {
         ++invalid;
       }
       if ((_validFlags_ & 0b0100) != 0
           and std::isfinite(par.getMinPhysical())
-          and par.getParameterValue() < par.getMinPhysical()) [[unlikely]] {
+          and par.getParameterValue() < par.getMinPhysical()) GUNDAM_UNLIKELY_COMPILER_FLAG {
         ++invalid;
       }
       if ((_validFlags_ & 0b0100) != 0
           and std::isfinite(par.getMaxPhysical())
-          and par.getParameterValue() > par.getMaxPhysical()) [[unlikely]] {
+          and par.getParameterValue() > par.getMaxPhysical()) GUNDAM_UNLIKELY_COMPILER_FLAG {
         ++invalid;
       }
 

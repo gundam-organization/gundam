@@ -26,7 +26,7 @@ option( CXX_WARNINGS "Enable most C++ warning flags." ON )
 option( CXX_MARCH_FLAG "Enable cpu architecture specific optimisations." OFF )
 option( CMAKE_CXX_EXTENSIONS "Enable GNU extensions to C++ language (-std=gnu++14)." OFF )
 option( DISABLE_MANUAL_LOG_HEADER "Don't rely on the manually set logger user header string." ON )
-option( DISABLE_GOOGLE_TESTS "Don't build Google tests." OFF )
+option( ENABLE_GOOGLE_TESTS "Build Google tests." OFF )
 option( ENABLE_ZLIB "Use ZLib hash for cache invalidation." OFF )
 
 
