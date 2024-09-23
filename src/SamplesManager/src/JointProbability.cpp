@@ -9,7 +9,7 @@
 #include "GenericToolbox.Json.h"
 
 #include "TMath.h"
-
+#include <cmath>
 
 LoggerInit([]{
   Logger::setUserHeaderStr("[JointProbability]");
@@ -30,10 +30,10 @@ namespace JointProbability{
   double JointProbabilityPlugin::eval(const Sample& sample_, int bin_) {
     LogThrowIf(evalFcn == nullptr, "Library not loaded properly.");
     return reinterpret_cast<double(*)(double, double, double)>(evalFcn)(
-        sample_.getDataContainer().histogram->GetBinContent(bin_),
-        sample_.getMcContainer().histogram->GetBinContent(bin_),
-        sample_.getMcContainer().histogram->GetBinError(bin_)
-    );
+      sample_.getDataContainer().histogram->GetBinContent(bin_),
+      sample_.getMcContainer().histogram->GetBinContent(bin_),
+      sample_.getMcContainer().histogram->GetBinError(bin_)
+      );
   }
   void JointProbabilityPlugin::compile(){
     LogInfo << "Compiling: " << llhPluginSrc << std::endl;
@@ -58,7 +58,12 @@ namespace JointProbability{
     allowZeroMcWhenZeroData = GenericToolbox::Json::fetchValue(_config_, "allowZeroMcWhenZeroData", allowZeroMcWhenZeroData);
     usePoissonLikelihood = GenericToolbox::Json::fetchValue(_config_, "usePoissonLikelihood", usePoissonLikelihood);
     BBNoUpdateWeights = GenericToolbox::Json::fetchValue(_config_, "BBNoUpdateWeights", BBNoUpdateWeights);
+    expectedValueMinimum = GenericToolbox::Json::fetchValue(_config_, "ExpectedValueMinimum", expectedValueMinimum);
+    fractionalErrorLimit = GenericToolbox::Json::fetchValue(_config_, "FractionalErrorLimit", fractionalErrorLimit);
     verboseLevel = GenericToolbox::Json::fetchValue(_config_, {{"verboseLevel"}, {"isVerbose"}}, verboseLevel);
+
+    // Place a hard limit on the fractional error to prevent numeric issues.
+    fractionalErrorLimit = std::min(fractionalErrorLimit,1.0E+152);
 
     LogInfo << "Using BarlowLLH_BANFF_OA2021 parameters:" << std::endl;
     {
@@ -66,8 +71,11 @@ namespace JointProbability{
       LogInfo << GET_VAR_NAME_VALUE(allowZeroMcWhenZeroData) << std::endl;
       LogInfo << GET_VAR_NAME_VALUE(usePoissonLikelihood) << std::endl;
       LogInfo << GET_VAR_NAME_VALUE(BBNoUpdateWeights) << std::endl;
+      LogInfo << GET_VAR_NAME_VALUE(expectedValueMinimum) << std::endl;
+      LogInfo << GET_VAR_NAME_VALUE(fractionalErrorLimit) << std::endl;
       LogInfo << GET_VAR_NAME_VALUE(verboseLevel) << std::endl;
     }
+
   }
 
   double BarlowLLH_BANFF_OA2021::eval(const Sample& sample_, int bin_) {
@@ -106,95 +114,124 @@ namespace JointProbability{
       }
     }
 
-    // Implementing Barlow-Beeston correction for LH calculation. The
-    // following comments are inspired/copied from Clarence's comments in the
-    // MaCh3 implementation of the same feature
+    // Add the (broken) expected value threshold that we saw in the old
+    // likelihood. This is here to help understand the old behavior.
+    if (predVal <= expectedValueMinimum) {
+      LogAlert << "Use incorrect expectation behavior --"
+               << " predVal: " << predVal
+               << " dataVal: " << dataVal
+               << std::endl;
+      if (predVal <= 0.0 and dataVal > 0.0) {
+        return std::numeric_limits<double>::infinity();
+      }
+      return 0.0;
+    }
 
     // The MC used in the likelihood calculation is allowed to be changed by
-    // Barlow Beeston beta parameters
+    // Barlow Beeston beta parameters.
     double newmc = predVal;
 
-    // Not full Barlow-Beeston or what is referred to as "light": we're not
-    // introducing any more parameters.  Assume the MC has a Gaussian
-    // distribution generated as in https://arxiv.org/abs/1103.0354 eq 10, 11
-
-    // The penalty from MC statistics
+    // The penalty from MC statistics.  This will remain zero if
+    // Barlow-Beeston is not applied.
     double penalty = 0.0;
 
-    // Barlow-Beeston uses fractional uncertainty on MC, so sqrt(sum[w^2])/mc
-    // -b/2a in quadratic equation
-    if (mcuncert > std::numeric_limits<double>::epsilon()
-        and predVal > std::numeric_limits<double>::epsilon()) {
-      double fractional = sqrt(mcuncert) / predVal;
-      double temp = predVal * fractional * fractional - 1;
+    // Implementing Barlow-Beeston correction for LLH calculation. The
+    // following comments are inspired/copied from Clarence's comments in the
+    // MaCh3 implementation of the same feature.  This is not full
+    // Barlow-Beeston or what is referred to as "light": we're not introducing
+    // any more parameters.  Assume the MC has a Gaussian distribution
+    // generated as in https://arxiv.org/abs/1103.0354 eq 10, 11
+    if (not usePoissonLikelihood and mcuncert > 0.0) {
+      // Barlow-Beeston uses fractional uncertainty on MC, so
+      // sqrt(sum[w^2])/mc -b/2a in quadratic equation.  Physically, the
+      // fractional uncertainty should be less than 100% since one MC event in
+      // a bin would have 100% fractional uncertainty [under the "Gaussian"
+      // approximation, so sqrt(1.0)/1.0].  The OA2021 behavior lets the
+      // fractional error grow, but the entire likelihood became discontinuous
+      // around a predicted value of 1E-16. Setting fractionalLimit to 1E+19
+      // matches OA2021 before the discontinuity.  The BANFF behavior has the
+      // likelihood failed around 1E-154.  Setting fractionalLimit to 1E+150
+      // matchs BANFF.  In both cases, the new likelihood behaves reasonably
+      // all the way to zero.
+      double fractional = std::min(std::sqrt(mcuncert)/newmc,
+                                   fractionalErrorLimit);
+      double temp = newmc * fractional * fractional - 1;
       // b^2 - 4ac in quadratic equation
       double temp2 = temp * temp + 4 * dataVal * fractional * fractional;
       LogThrowIf((temp2 < 0),
                  "Negative square root in Barlow Beeston");
       // Solve for the positive beta
-      double beta = (-1 * temp + sqrt(temp2)) / 2.;
-      newmc = predVal * beta;
-      // And penalise the movement in beta relative the mc uncertainty
+      double beta = (-1 * temp + std::sqrt(temp2)) / 2.;
+      // Update the "expected" value for Barlow-Beeston (protect against
+      // underflow).
+      newmc = std::max(newmc * beta, std::numeric_limits<double>::min());
+      // And penalise the movement relative the mc uncertainty
       penalty = (beta - 1) * (beta - 1) / (2 * fractional * fractional);
     }
 
-    // And calculate the new Poisson likelihood.  For Barlow-Beeston newmc is
-    // modified, so can only calculate Poisson likelihood after Barlow-Beeston
+    // And calculate the Poisson likelihood.  The "stat" variable is valid for
+    // both Poisson and the Barlow-Beeston correction.  The newmc value is
+    // either the original predVal, or if Barlow-Beeston is applied it is
+    // modified to calculate statistical part of the Barlow-Beeston
+    // likelihood.
     double stat = 0;
-    if (dataVal <= std::numeric_limits<double>::epsilon()) {
-      // dataVal should be roughly an integer, so this safer, but roughly
-      // equivalent to "dataVal == 0"
+    if (dataVal < std::numeric_limits<double>::epsilon()) {
+      // dataVal should be roughly an integer, so this is the same as
+      // "dataVal==0", but safer.
       stat = newmc;
     }
-    else if (newmc > std::numeric_limits<double>::epsilon()) {
-      // The newMC value should not be a lot less than O(1), This protects
-      // against small values (intentionally use epsilon() instead of min()
-      // since this is relative to 1.0).
-      stat = newmc - dataVal + dataVal * TMath::Log(dataVal / newmc);
+    else if (newmc > std::numeric_limits<double>::min()) {
+      // The newmc value is normally not a lot less than O(1), but could
+      // approach zero.  This splits the ratio of "data/expected" into a
+      // difference of logs so that it avoids denormalization problems
+      // (i.e. big/small).  The protection is set at the smallest normalized
+      // double value (it's approximately 2E-308).
+      stat = newmc - dataVal + dataVal*(TMath::Log(dataVal)-TMath::Log(newmc));
     }
     else {
-      // The mc predicted value is zero, and the data value is not zero.
-      // Inconceivable!
-      LogErrorIf(verboseLevel>=1) << "Data and predicted value give infinite statistical LLH / "
-               << "Data: " << dataVal
-               << " / Barlow Beeston adjusted MC: " << newmc
-               << std::endl;
+      // The mc predicted value is "zero", and the data value is not zero.
+      // Inconceivable!  Protect against actual zero expectation, which means
+      // data events have a "zero" probability results in an infinite
+      // likelihood.  Minimizers don't like it when they recieve an infinite
+      // function value since that introduces a discontinuity in the
+      // function. This has the practical effect of capping the likelihood per
+      // bin, and prevents discontinuities in the likelihood.
+      LogErrorIf(verboseLevel>=1)
+        << "Data and predicted value give infinite statistical LLH / "
+        << "Data: " << dataVal
+        << " / Barlow Beeston adjusted MC: " << newmc
+        << std::endl;
+      const double mc = std::numeric_limits<double>::min();
+      stat = mc - dataVal + dataVal*(TMath::Log(dataVal) - TMath::Log(mc));
     }
 
-    double chisq = 0.0;
-    if ((predVal > 0.0) && (dataVal > 0.0)) [[likely]] {
-      if (usePoissonLikelihood) [[unlikely]] {
-        // Not quite safe, but not used much, so don't protect
-        chisq += 2.0*(predVal - dataVal + dataVal*TMath::Log( dataVal/predVal));
-      }
-      else [[likely]] {
-        // Barlow-Beeston likelihood.
-        chisq += 2.0 * (stat + penalty);
-      }
-    }
-    else if( predVal > 0.0 ) {
-      if (usePoissonLikelihood) [[unlikely]] {
-        chisq += 2.0*predVal;
-      }
-      else [[likely]] {
-        // Barlow-Beeston likelihood
-        chisq += 2.0 * (stat + penalty);
-      }
-    }
-    else { // predVal == 0
-      if( allowZeroMcWhenZeroData and dataVal == 0 ){
-        // need to warn the user something is wrong with the binning definition
-        // This might indicate that more MC stat would be needed
-        LogErrorOnce << "allowZeroMcWhenZeroData=true: MC bin(s) with 0 as predicted value. "
-          << "Data is also 0, null penalty is applied."
+    // Build the chisq value based on previous calculations.
+    double chisq =  2.0*stat;
+    // Possibly apply the Barlow-Beeston penalty.
+    if (not usePoissonLikelihood) chisq += 2.0 * penalty;
+
+    // Warn when the expected value for a bin is going to zero.
+    if (predVal == 0.0
+        and dataVal < std::numeric_limits<double>::epsilon()) [[unlikely]] {
+      if( allowZeroMcWhenZeroData ) {
+        // Need to warn the user something is wrong with the binning
+        // definition.  This might indicate that more MC stat would be needed,
+        // or the binning needs to be reconsidered..
+        LogErrorOnce
+          << "Sample bin with no events in the data and MC bin."
           << "This is an ill conditioned problem. Please check your inputs."
           << std::endl;
-        chisq = 0.;
       }
-      else{
-        chisq = std::numeric_limits<double>::infinity();
-        LogErrorIf(verboseLevel) << "Data and predicted value give infinite statistical LLH / "
-           << "Data: " << dataVal << " / MC: " << newmc << std::endl;
+      else {
+        LogWarningIf(verboseLevel > 0)
+          << "Infinite statistical LLH --"
+          << " Data: " << dataVal
+          << " / MC: " << predVal
+          << " Adjusted MC: " << newmc
+          << " / Stat: " << stat
+          << " Penalty: " << penalty
+          << " Truncated ChiSq: " << chisq
+          << std::endl;
       }
     }
 
@@ -227,85 +264,86 @@ namespace JointProbability{
 
   // BarlowLLH_BANFF_OA2020
   double BarlowLLH_BANFF_OA2020::eval(const Sample& sample_, int bin_){
-      // From BANFF: origin/OA2020 branch -> BANFFBinnedSample::CalcLLRContrib()
+    // From BANFF: origin/OA2020 branch -> BANFFBinnedSample::CalcLLRContrib()
 
-      //Loop over all the bins one by one using their unique bin index.
-      //Use the stored nBins value and bins array so avoid trying to calculate
-      //over underflow or overflow bins.
-      double chisq{0};
+    //Loop over all the bins one by one using their unique bin index.
+    //Use the stored nBins value and bins array so avoid trying to calculate
+    //over underflow or overflow bins.
+    double chisq{0};
 
-      double dataVal = sample_.getDataContainer().histogram->GetBinContent(bin_);
-      double predVal = sample_.getMcContainer().histogram->GetBinContent(bin_);
-      double mcuncert = sample_.getMcContainer().histogram->GetBinError(bin_);
+    double dataVal = sample_.getDataContainer().histogram->GetBinContent(bin_);
+    double predVal = sample_.getMcContainer().histogram->GetBinContent(bin_);
+    double mcuncert = sample_.getMcContainer().histogram->GetBinError(bin_);
 
-      //implementing Barlow-Beeston correction for LH calculation the
-      //following comments are inspired/copied from Clarence's comments in the
-      //MaCh3 implementation of the same feature
+    //implementing Barlow-Beeston correction for LH calculation the
+    //following comments are inspired/copied from Clarence's comments in the
+    //MaCh3 implementation of the same feature
 
-      // The MC used in the likeliihood calculation
-      // Is allowed to be changed by Barlow Beeston beta parameters
-      double newmc = predVal;
-      // Not full Barlow-Beeston or what is referred to as "light": we're not introducing any more parameters
-      // Assume the MC has a Gaussian distribution around generated
-      // As in https://arxiv.org/abs/1103.0354 eq 10, 11
+    // The MC used in the likeliihood calculation
+    // Is allowed to be changed by Barlow Beeston beta parameters
+    double newmc = predVal;
+    // Not full Barlow-Beeston or what is referred to as "light": we're not
+    // introducing any more parameters Assume the MC has a Gaussian
+    // distribution around generated As in https://arxiv.org/abs/1103.0354 eq
+    // 10, 11
 
-      // The penalty from MC statistics
-      double penalty = 0;
-      // Barlow-Beeston uses fractional uncertainty on MC, so sqrt(sum[w^2])/mc
-      double fractional = sqrt(mcuncert)/predVal;
-      // -b/2a in quadratic equation
-      double temp = predVal*fractional*fractional-1;
-      // b^2 - 4ac in quadratic equation
-      double temp2 = temp*temp + 4*dataVal*fractional*fractional;
-      LogThrowIf(temp2 < 0, "Negative square root in Barlow Beeston coefficient calculation!");
+    // The penalty from MC statistics
+    double penalty = 0;
+    // Barlow-Beeston uses fractional uncertainty on MC, so sqrt(sum[w^2])/mc
+    double fractional = std::sqrt(mcuncert)/predVal;
+    // -b/2a in quadratic equation
+    double temp = predVal*fractional*fractional-1;
+    // b^2 - 4ac in quadratic equation
+    double temp2 = temp*temp + 4*dataVal*fractional*fractional;
+    LogThrowIf(temp2 < 0, "Negative square root in Barlow Beeston coefficient calculation!");
 
-      // Solve for the positive beta
-      double beta = (-1*temp+sqrt(temp2))/2.;
-      newmc = predVal*beta;
-      // And penalise the movement in beta relative the mc uncertainty
-      penalty = (beta-1)*(beta-1)/(2*fractional*fractional);
+    // Solve for the positive beta
+    double beta = (-1*temp+std::sqrt(temp2))/2.;
+    newmc = predVal*beta;
+    // And penalise the movement in beta relative the mc uncertainty
+    penalty = (beta-1)*(beta-1)/(2*fractional*fractional);
 
-      //    LogThrowIf(
-      //        std::isnan(penalty),
-      //        GET_VAR_NAME_VALUE(fractional)
-      //        << " / " << GET_VAR_NAME_VALUE(mcuncert)
-      //        << " / " << GET_VAR_NAME_VALUE(predVal)
-      //        << " / " << GET_VAR_NAME_VALUE(bin_)
-      //        );
+    //    LogThrowIf(
+    //        std::isnan(penalty),
+    //        GET_VAR_NAME_VALUE(fractional)
+    //        << " / " << GET_VAR_NAME_VALUE(mcuncert)
+    //        << " / " << GET_VAR_NAME_VALUE(predVal)
+    //        << " / " << GET_VAR_NAME_VALUE(bin_)
+    //        );
 
-      // And calculate the new Poisson likelihood
-      // For Barlow-Beeston newmc is modified, so can only calculate Poisson likelihood after Barlow-Beeston
-      double stat = 0;
-      if (dataVal == 0) stat = newmc;
-      else if (newmc > 0) stat = newmc-dataVal+dataVal*TMath::Log(dataVal/newmc);
+    // And calculate the new Poisson likelihood
+    // For Barlow-Beeston newmc is modified, so can only calculate Poisson likelihood after Barlow-Beeston
+    double stat = 0;
+    if (dataVal == 0) stat = newmc;
+    else if (newmc > 0) stat = newmc-dataVal+dataVal*TMath::Log(dataVal/newmc);
 
-      if( std::isnan(penalty) ){ penalty = (1+stat)*1E32; } // huge penalty
+    if( std::isnan(penalty) ){ penalty = (1+stat)*1E32; } // huge penalty
 
-      if((predVal > 0.0) && (dataVal > 0.0)){
+    if((predVal > 0.0) && (dataVal > 0.0)){
 
-          chisq += 2.0*(stat+penalty);
-          //chisq += 2.0*(predVal - dataVal +dataVal*TMath::Log( dataVal/predVal) );    //this is what was in BANFF before BB
+      chisq += 2.0*(stat+penalty);
+      //chisq += 2.0*(predVal - dataVal +dataVal*TMath::Log( dataVal/predVal) );    //this is what was in BANFF before BB
 
-      }
+    }
 
-      else if(predVal > 0.0){
+    else if(predVal > 0.0){
 
-          chisq += 2.0*(stat+penalty);
-          //chisq += 2.0*predVal;    //this is what was in BANFF before BB
+      chisq += 2.0*(stat+penalty);
+      //chisq += 2.0*predVal;    //this is what was in BANFF before BB
 
-      }
+    }
 
-      if(std::isinf(chisq)){
-          LogAlert << "Infinite chi2 " << predVal << " " << dataVal << " "
-              << sample_.getMcContainer().histogram->GetBinError(bin_) << " "
-              << sample_.getMcContainer().histogram->GetBinContent(bin_) << std::endl;
-      }
+    if(std::isinf(chisq)){
+      LogAlert << "Infinite chi2 " << predVal << " " << dataVal << " "
+               << sample_.getMcContainer().histogram->GetBinError(bin_) << " "
+               << sample_.getMcContainer().histogram->GetBinContent(bin_) << std::endl;
+    }
 
-      LogThrowIf(std::isnan(chisq), "NaN chi2 " << predVal << " " << dataVal
-              << sample_.getMcContainer().histogram->GetBinError(bin_) << " "
-              << sample_.getMcContainer().histogram->GetBinContent(bin_));
+    LogThrowIf(std::isnan(chisq), "NaN chi2 " << predVal << " " << dataVal
+               << sample_.getMcContainer().histogram->GetBinError(bin_) << " "
+               << sample_.getMcContainer().histogram->GetBinContent(bin_));
 
-      return chisq;
+    return chisq;
   }
 
   // Chi2
@@ -323,22 +361,22 @@ namespace JointProbability{
 
   // PoissonLLH
   double PoissonLLH::eval(const Sample& sample_, int bin_){
-      double predVal = sample_.getMcContainer().histogram->GetBinContent(bin_);
-      double dataVal = sample_.getDataContainer().histogram->GetBinContent(bin_);
+    double predVal = sample_.getMcContainer().histogram->GetBinContent(bin_);
+    double dataVal = sample_.getDataContainer().histogram->GetBinContent(bin_);
 
-      if(predVal <= 0){
-          LogAlert << "Zero MC events in bin " << bin_ << ". predVal = " << predVal << ", dataVal = " << dataVal
-              << ". Setting llh = +inf for this bin." << std::endl;
-          return std::numeric_limits<double>::infinity();
-      }
+    if(predVal <= 0){
+      LogAlert << "Zero MC events in bin " << bin_ << ". predVal = " << predVal << ", dataVal = " << dataVal
+               << ". Setting llh = +inf for this bin." << std::endl;
+      return std::numeric_limits<double>::infinity();
+    }
 
-      if(dataVal <= 0){
-        // lim x -> 0 : x ln(x) = 0
-        return 2.0 * predVal;
-      }
+    if(dataVal <= 0){
+      // lim x -> 0 : x ln(x) = 0
+      return 2.0 * predVal;
+    }
 
-      // LLH calculation
-      return 2.0 * (predVal - dataVal + dataVal * TMath::Log(dataVal / predVal));
+    // LLH calculation
+    return 2.0 * (predVal - dataVal + dataVal * TMath::Log(dataVal / predVal));
   }
 
   // LeastSquaresLLH
@@ -358,134 +396,134 @@ namespace JointProbability{
 
   // BarlowLLH
   double BarlowLLH::eval(const Sample& sample_, int bin_){
-      rel_var = sample_.getMcContainer().histogram->GetBinError(bin_) / TMath::Sq(sample_.getMcContainer().histogram->GetBinContent(bin_));
-      b       = (sample_.getMcContainer().histogram->GetBinContent(bin_) * rel_var) - 1;
-      c       = 4 * sample_.getDataContainer().histogram->GetBinContent(bin_) * rel_var;
+    rel_var = sample_.getMcContainer().histogram->GetBinError(bin_) / TMath::Sq(sample_.getMcContainer().histogram->GetBinContent(bin_));
+    b       = (sample_.getMcContainer().histogram->GetBinContent(bin_) * rel_var) - 1;
+    c       = 4 * sample_.getDataContainer().histogram->GetBinContent(bin_) * rel_var;
 
-      beta   = (-b + std::sqrt(b * b + c)) / 2.0;
-      mc_hat = sample_.getMcContainer().histogram->GetBinContent(bin_) * beta;
+    beta   = (-b + std::sqrt(b * b + c)) / 2.0;
+    mc_hat = sample_.getMcContainer().histogram->GetBinContent(bin_) * beta;
 
-      // Calculate the following LLH:
-      //-2lnL = 2 * beta*mc - data + data * ln(data / (beta*mc)) + (beta-1)^2 / sigma^2
-      // where sigma^2 is the same as above.
-      chi2 = 0.0;
-      if(sample_.getDataContainer().histogram->GetBinContent(bin_) <= 0.0) {
-          chi2 = 2 * mc_hat;
-          chi2 += (beta - 1) * (beta - 1) / rel_var;
+    // Calculate the following LLH:
+    //-2lnL = 2 * beta*mc - data + data * ln(data / (beta*mc)) + (beta-1)^2 / sigma^2
+    // where sigma^2 is the same as above.
+    chi2 = 0.0;
+    if(sample_.getDataContainer().histogram->GetBinContent(bin_) <= 0.0) {
+      chi2 = 2 * mc_hat;
+      chi2 += (beta - 1) * (beta - 1) / rel_var;
+    }
+    else{
+      chi2 = 2 * (mc_hat - sample_.getDataContainer().histogram->GetBinContent(bin_));
+      if(sample_.getDataContainer().histogram->GetBinContent(bin_) > 0.0) {
+        chi2 += 2 * sample_.getDataContainer().histogram->GetBinContent(bin_) *
+          std::log(sample_.getDataContainer().histogram->GetBinContent(bin_) / mc_hat);
       }
-      else{
-          chi2 = 2 * (mc_hat - sample_.getDataContainer().histogram->GetBinContent(bin_));
-          if(sample_.getDataContainer().histogram->GetBinContent(bin_) > 0.0) {
-              chi2 += 2 * sample_.getDataContainer().histogram->GetBinContent(bin_) *
-                  std::log(sample_.getDataContainer().histogram->GetBinContent(bin_) / mc_hat);
-          }
-          chi2 += (beta - 1) * (beta - 1) / rel_var;
-      }
-      return chi2;
+      chi2 += (beta - 1) * (beta - 1) / rel_var;
+    }
+    return chi2;
   }
 
   double BarlowLLH_BANFF_OA2021_SFGD::eval(const Sample& sample_, int bin_){
 
-      double dataVal = sample_.getDataContainer().histogram->GetBinContent(bin_);
-      double predVal = sample_.getMcContainer().histogram->GetBinContent(bin_);
-      double mcuncert = sample_.getMcContainer().histogram->GetBinError(bin_);
+    double dataVal = sample_.getDataContainer().histogram->GetBinContent(bin_);
+    double predVal = sample_.getMcContainer().histogram->GetBinContent(bin_);
+    double mcuncert = sample_.getMcContainer().histogram->GetBinError(bin_);
 
-      double chisq = 0.0;
+    double chisq = 0.0;
 
-      bool usePoissonLikelihood = false;
+    bool usePoissonLikelihood = false;
 
-      double newmc = predVal;
+    double newmc = predVal;
 
-      // The penalty from MC statistics
-      double penalty = 0;
+    // The penalty from MC statistics
+    double penalty = 0;
 
-      // SFGD detector uncertainty
-      double sfgd_det_uncert = 0.;
-      if (sample_.getName().find("SFGD") != std::string::npos){
-          // to be applied on SFGD samples only
-          sfgd_det_uncert = 0.;
-          if (sample_.getName().find("FHC") != std::string::npos){
-              if (sample_.getName().find("0p") != std::string::npos){
-                  sfgd_det_uncert = 0.02;
-              }
-              else if (sample_.getName().find("Np") != std::string::npos){
-                  sfgd_det_uncert = 0.04;
-              }
-          }
-          else if (sample_.getName().find("RHC") != std::string::npos){
-              if (sample_.getName().find("0n") != std::string::npos){
-                  sfgd_det_uncert = 0.025;
-              }
-              else if (sample_.getName().find("Nn") != std::string::npos){
-                  sfgd_det_uncert = 0.05;
-              }
-          }
+    // SFGD detector uncertainty
+    double sfgd_det_uncert = 0.;
+    if (sample_.getName().find("SFGD") != std::string::npos){
+      // to be applied on SFGD samples only
+      sfgd_det_uncert = 0.;
+      if (sample_.getName().find("FHC") != std::string::npos){
+        if (sample_.getName().find("0p") != std::string::npos){
+          sfgd_det_uncert = 0.02;
+        }
+        else if (sample_.getName().find("Np") != std::string::npos){
+          sfgd_det_uncert = 0.04;
+        }
       }
-
-      // DETECTOR UNCERTAINTY FOR WAGASCI
-      double wg_det_uncert = 0.;
-      if (sample_.getName().find("WAGASCI") != std::string::npos){
-          wg_det_uncert = 0.;
-          if(sample_.getName().find("#0pi") != std::string::npos) {
-              if(sample_.getName().find("PM-BM") != std::string::npos) wg_det_uncert = 0.05;
-              if(sample_.getName().find("PM-WMRD") != std::string::npos) wg_det_uncert = 0.1;
-              if(sample_.getName().find("DWG-BM") != std::string::npos) wg_det_uncert = 0.1;
-              if(sample_.getName().find("UWG-BM") != std::string::npos) wg_det_uncert = 0.12;
-              if(sample_.getName().find("UWG-WMRD") != std::string::npos) wg_det_uncert = 0.1;
-          }
-          if(sample_.getName().find("#1pi") != std::string::npos)  {
-              if(sample_.getName().find("PM") != std::string::npos) wg_det_uncert = 0.1;
-              if(sample_.getName().find("WG") != std::string::npos) wg_det_uncert = 0.08;
-          }
+      else if (sample_.getName().find("RHC") != std::string::npos){
+        if (sample_.getName().find("0n") != std::string::npos){
+          sfgd_det_uncert = 0.025;
+        }
+        else if (sample_.getName().find("Nn") != std::string::npos){
+          sfgd_det_uncert = 0.05;
+        }
       }
+    }
 
-      // Barlow-Beeston uses fractional uncertainty on MC, so sqrt(sum[w^2])/mc
-      double fractional = mcuncert / predVal + sfgd_det_uncert + wg_det_uncert; // Add SFGD detector uncertainty
-      // -b/2a in quadratic equation
-      double temp = predVal * fractional * fractional - 1;
-      // b^2 - 4ac in quadratic equation
-      double temp2 = temp * temp + 4 * dataVal * fractional * fractional;
-
-      LogThrowIf(temp2 < 0, "Negative square root in Barlow Beeston coefficient calculation!");
-
-
-      // Solve for the positive beta
-      double beta = (-1 * temp + sqrt(temp2)) / 2.;
-      newmc = predVal * beta;
-      // And penalise the movement in beta relative the mc uncertainty
-      penalty = (beta - 1) * (beta - 1) / (2 * fractional * fractional);
-      // And calculate the new Poisson likelihood
-      // For Barlow-Beeston newmc is modified, so can only calculate Poisson likelihood after Barlow-Beeston
-      double stat = 0;
-      if (dataVal == 0)
-          stat = newmc;
-      else if (newmc > 0)
-          stat = newmc - dataVal + dataVal * TMath::Log(dataVal / newmc);
-
-      if ((predVal > 0.0) && (dataVal > 0.0))
-      {
-          if (usePoissonLikelihood)
-              chisq += 2.0*(predVal - dataVal +dataVal*TMath::Log( dataVal/predVal) );
-          else // Barlow-Beeston likelihood
-              chisq += 2.0 * (stat + penalty);
+    // DETECTOR UNCERTAINTY FOR WAGASCI
+    double wg_det_uncert = 0.;
+    if (sample_.getName().find("WAGASCI") != std::string::npos){
+      wg_det_uncert = 0.;
+      if(sample_.getName().find("#0pi") != std::string::npos) {
+        if(sample_.getName().find("PM-BM") != std::string::npos) wg_det_uncert = 0.05;
+        if(sample_.getName().find("PM-WMRD") != std::string::npos) wg_det_uncert = 0.1;
+        if(sample_.getName().find("DWG-BM") != std::string::npos) wg_det_uncert = 0.1;
+        if(sample_.getName().find("UWG-BM") != std::string::npos) wg_det_uncert = 0.12;
+        if(sample_.getName().find("UWG-WMRD") != std::string::npos) wg_det_uncert = 0.1;
       }
-
-      else if (predVal > 0.0)
-      {
-          if (usePoissonLikelihood)
-              chisq += 2.0*predVal;
-          else // Barlow-Beeston likelihood
-              chisq += 2.0 * (stat + penalty);
+      if(sample_.getName().find("#1pi") != std::string::npos)  {
+        if(sample_.getName().find("PM") != std::string::npos) wg_det_uncert = 0.1;
+        if(sample_.getName().find("WG") != std::string::npos) wg_det_uncert = 0.08;
       }
+    }
 
-      if (std::isinf(chisq))
-      {
-          LogAlert << "Infinite chi2 " << predVal << " " << dataVal
-              << sample_.getMcContainer().histogram->GetBinError(bin_) << " "
-              << sample_.getMcContainer().histogram->GetBinContent(bin_) << std::endl;
-      }
+    // Barlow-Beeston uses fractional uncertainty on MC, so sqrt(sum[w^2])/mc
+    double fractional = mcuncert / predVal + sfgd_det_uncert + wg_det_uncert; // Add SFGD detector uncertainty
+    // -b/2a in quadratic equation
+    double temp = predVal * fractional * fractional - 1;
+    // b^2 - 4ac in quadratic equation
+    double temp2 = temp * temp + 4 * dataVal * fractional * fractional;
 
-      return chisq;
+    LogThrowIf(temp2 < 0, "Negative square root in Barlow Beeston coefficient calculation!");
+
+
+    // Solve for the positive beta
+    double beta = (-1 * temp + std::sqrt(temp2)) / 2.;
+    newmc = predVal * beta;
+    // And penalise the movement in beta relative the mc uncertainty
+    penalty = (beta - 1) * (beta - 1) / (2 * fractional * fractional);
+    // And calculate the new Poisson likelihood
+    // For Barlow-Beeston newmc is modified, so can only calculate Poisson likelihood after Barlow-Beeston
+    double stat = 0;
+    if (dataVal == 0)
+      stat = newmc;
+    else if (newmc > 0)
+      stat = newmc - dataVal + dataVal * TMath::Log(dataVal / newmc);
+
+    if ((predVal > 0.0) && (dataVal > 0.0))
+    {
+      if (usePoissonLikelihood)
+        chisq += 2.0*(predVal - dataVal +dataVal*TMath::Log( dataVal/predVal) );
+      else // Barlow-Beeston likelihood
+        chisq += 2.0 * (stat + penalty);
+    }
+
+    else if (predVal > 0.0)
+    {
+      if (usePoissonLikelihood)
+        chisq += 2.0*predVal;
+      else // Barlow-Beeston likelihood
+        chisq += 2.0 * (stat + penalty);
+    }
+
+    if (std::isinf(chisq))
+    {
+      LogAlert << "Infinite chi2 " << predVal << " " << dataVal
+               << sample_.getMcContainer().histogram->GetBinError(bin_) << " "
+               << sample_.getMcContainer().histogram->GetBinContent(bin_) << std::endl;
+    }
+
+    return chisq;
   }
 
 }
@@ -514,5 +552,4 @@ namespace JointProbability{
 // Local Variables:
 // mode:c++
 // c-basic-offset:2
-// compile-command:"$(git rev-parse --show-toplevel)/cmake/gundam-build.sh"
 // End:
