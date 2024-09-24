@@ -1054,8 +1054,8 @@ void RootMinimizer::writePostFitData( TDirectory* saveDir_) {
           auto yBounds = GenericToolbox::getYBounds({preFitErrorHist.get(), postFitErrorHist.get(), toyParametersLine.get()});
 
           for( const auto& par : parList_ ){
-            TBox b(preFitErrorHist->GetBinLowEdge(1+par.getParameterIndex()), yBounds.first,
-                   preFitErrorHist->GetBinLowEdge(1+par.getParameterIndex()+1), yBounds.second);
+            TBox b(preFitErrorHist->GetBinLowEdge(1+par.getParameterIndex()), yBounds.min,
+                   preFitErrorHist->GetBinLowEdge(1+par.getParameterIndex()+1), yBounds.max);
             b.SetFillStyle(3001);
 
             if( par.isFree() ){
@@ -1087,7 +1087,7 @@ void RootMinimizer::writePostFitData( TDirectory* saveDir_) {
 
           preFitErrorHist->SetTitle(Form("Pre-fit Errors of %s", parSet_.getName().c_str()));
           preFitErrorHist->SetMarkerSize(0);
-          preFitErrorHist->GetYaxis()->SetRangeUser(yBounds.first, yBounds.second);
+          preFitErrorHist->GetYaxis()->SetRangeUser(yBounds.min, yBounds.max);
           GenericToolbox::writeInTFile(saveDir_, preFitErrorHist.get());
 
           postFitErrorHist->SetLineColor(9);
