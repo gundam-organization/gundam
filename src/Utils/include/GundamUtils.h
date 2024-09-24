@@ -28,6 +28,7 @@
 #define GUNDAM_UNLIKELY_COMPILER_FLAG
 #endif
 
+#define DEBUG_VAR(myVar) LogDebug << "DEBUG_VAR: " << GET_VAR_NAME_VALUE(myVar) << std::endl
 
 
 namespace GundamUtils {
