@@ -127,7 +127,7 @@ private:
       kOrange+1, kOrange+9, kRed+2, kPink+9
   };
 
-  struct sa{
+  struct HistogramDefinition{
     bool noData{false};
     bool rescaleAsBinWidth{true};
     bool useSampleBinning{false};
