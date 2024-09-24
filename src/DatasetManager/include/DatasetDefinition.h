@@ -57,12 +57,12 @@ public:
 
 private:
   // config
-  bool _isEnabled_{false};
+  bool _isEnabled_{true};
   bool _showSelectedEventCount_{true};
   int _dataSetIndex_{-1};
   std::string _name_{};
-  std::string _selectedDataEntry_{};
-  std::string _selectedToyEntry_{};
+  std::string _selectedDataEntry_{"Asimov"};
+  std::string _selectedToyEntry_{"Asimov"};
 
   bool _sortLoadedEvents_{true}; // needed for reproducibility of toys in stat throw
   bool _devSingleThreadEventLoaderAndIndexer_{false};
