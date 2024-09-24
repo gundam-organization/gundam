@@ -102,8 +102,8 @@ int main(int argc, char** argv){
         gRandom->SetSeed(seed);
     }
 
-    GundamGlobals::getParallelWorker().setNThreads(clParser.getOptionVal("nbThreads", 1));
-    LogInfo << "Running the fitter with " << GundamGlobals::getParallelWorker().getNbThreads() << " parallel threads." << std::endl;
+    GundamGlobals::setNumberOfThreads(clParser.getOptionVal("nbThreads", 1));
+    LogInfo << "Running the fitter with " << GundamGlobals::getNumberOfThreads() << " parallel threads." << std::endl;
 
     // Reading fitter file
     LogInfo << "Opening fitter output file: " << clParser.getOptionVal<std::string>("fitterOutputFile") << std::endl;
@@ -198,24 +198,22 @@ int main(int argc, char** argv){
         tStudent = true;
     }
 
-    auto configPropagator = GenericToolbox::Json::fetchValuePath<nlohmann::json>( cHandler.getConfig(), "fitterEngineConfig/propagatorConfig" );
+    auto configPropagator = GenericToolbox::Json::fetchValue<JsonType>( cHandler.getConfig(), "fitterEngineConfig/propagatorConfig" );
 
     // Initialize the fitterEngine
     LogInfo << "FitterEngine setup..." << std::endl;
     FitterEngine fitter{nullptr};
-    fitter.readConfig(GenericToolbox::Json::fetchSubEntry((JsonType)cHandler.getConfig(), {"fitterEngineConfig"}));
-
-    DataSetManager& dataSetManager{fitter.getLikelihoodInterface().getDataSetManager()};
+    fitter.readConfig(GenericToolbox::Json::fetchValue<JsonType>( cHandler.getConfig(), "fitterEngineConfig"));
 
     // We are only interested in our MC. Data has already been used to get the post-fit error/values
-    dataSetManager.getPropagator().setLoadAsimovData( true );
+    fitter.getLikelihoodInterface().setForceAsimovData( true );
 
     // Disabling eigen decomposed parameters
-    dataSetManager.getPropagator().setEnableEigenToOrigInPropagate( false );
+    fitter.getLikelihoodInterface().getModelPropagator().setEnableEigenToOrigInPropagate( false );
 
     // Load everything
-    dataSetManager.initialize();
-    Propagator& propagator{dataSetManager.getPropagator()};
+    fitter.getLikelihoodInterface().initialize();
+    Propagator& propagator{fitter.getLikelihoodInterface().getModelPropagator()};
 
     propagator.getParametersManager().getParameterSetsList();
 
