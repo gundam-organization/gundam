@@ -29,7 +29,6 @@ void FitterEngine::readConfigImpl(){
   LogInfo << "Reading FitterEngine config..." << std::endl;
   GenericToolbox::setT2kPalette();
 
-
   // need to determine the type before defining the minimizer
   JsonType minimizerConfig{};
   std::string minimizerTypeStr{"RootMinimizer"};
@@ -261,17 +260,13 @@ void FitterEngine::fit(){
 
   LogWarning << "Pre-fit likelihood state:" << std::endl;
 
+  auto preFitDir(GenericToolbox::mkdirTFile( _saveDir_, "preFit" ));
+
   std::string llhState{getLikelihoodInterface().getSummary()};
   LogInfo << llhState << std::endl;
-  GenericToolbox::writeInTFile(
-      GenericToolbox::mkdirTFile( _saveDir_, "preFit" ),
-      TNamed("llhState", llhState.c_str())
-  );
+  GenericToolbox::writeInTFile(preFitDir, llhState, "llhState");
   _preFitParState_ = getLikelihoodInterface().getModelPropagator().getParametersManager().exportParameterInjectorConfig();
-  GenericToolbox::writeInTFile(
-      GenericToolbox::mkdirTFile( _saveDir_, "preFit" ),
-      TNamed("parState", GenericToolbox::Json::toReadableString(_preFitParState_).c_str())
-  );
+  GenericToolbox::writeInTFile(preFitDir, GenericToolbox::Json::toReadableString(_preFitParState_), "parState");
 
   // Not moving parameters
   if( _generateSamplePlots_ and not getLikelihoodInterface().getPlotGenerator().getConfig().empty() ){
