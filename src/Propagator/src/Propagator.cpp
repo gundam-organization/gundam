@@ -27,41 +27,36 @@ void Propagator::unmuteLogger(){ Logger::setIsMuted( false ); }
 
 void Propagator::readConfigImpl(){
 
-  // legacy -- option within propagator -> should be defined elsewhere
+  // nested objects
+  GenericToolbox::Json::fillValue(_config_, {{"sampleSetConfig"}, {"fitSampleSetConfig"}}, _sampleSet_.getConfig());
+  _sampleSet_.readConfig();
+
   GenericToolbox::Json::deprecatedAction(_config_, "parameterSetListConfig", [&]{
     LogAlert << R"("parameterSetListConfig" should now be set under "parametersManagerConfig/parameterSetList".)" << std::endl;
     auto parameterSetListConfig = GenericToolbox::Json::fetchValue<JsonType>(_config_, "parameterSetListConfig");
-    _parManager_.setParameterSetListConfig( ConfigUtils::getForwardedConfig( parameterSetListConfig ) );
+    _parManager_.setParameterSetListConfig( parameterSetListConfig );
   });
   GenericToolbox::Json::deprecatedAction(_config_, "throwToyParametersWithGlobalCov", [&]{
     LogAlert << "Forwarding the option to ParametersManager. Consider moving it into \"parametersManagerConfig:\"" << std::endl;
     _parManager_.setThrowToyParametersWithGlobalCov(GenericToolbox::Json::fetchValue<bool>(_config_, "throwToyParametersWithGlobalCov"));
   });
-
-  // nested objects
-  _sampleSet_.readConfig( GenericToolbox::Json::fetchValue(_config_, {{"sampleSetConfig"}, {"fitSampleSetConfig"}}, _sampleSet_.getConfig()) );
-  _parManager_.readConfig( GenericToolbox::Json::fetchValue( _config_, "parametersManagerConfig", _parManager_.getConfig()) );
+  GenericToolbox::Json::fillValue( _config_, "parametersManagerConfig", _parManager_.getConfig());
+  _parManager_.readConfig();
 
   // Monitoring parameters
-  _showNbEventParameterBreakdown_ = GenericToolbox::Json::fetchValue(_config_, "showNbEventParameterBreakdown", _showNbEventParameterBreakdown_);
-  _showNbEventPerSampleParameterBreakdown_ = GenericToolbox::Json::fetchValue(_config_, "showNbEventPerSampleParameterBreakdown", _showNbEventPerSampleParameterBreakdown_);
-  _parameterInjectorMc_ = GenericToolbox::Json::fetchValue(_config_, "parameterInjection", _parameterInjectorMc_);
-
-  // debug/dev parameters
-  _debugPrintLoadedEvents_ = GenericToolbox::Json::fetchValue(_config_, "debugPrintLoadedEvents", _debugPrintLoadedEvents_);
-  _debugPrintLoadedEventsNbPerSample_ = GenericToolbox::Json::fetchValue(_config_, "debugPrintLoadedEventsNbPerSample", _debugPrintLoadedEventsNbPerSample_);
-  _devSingleThreadReweight_ = GenericToolbox::Json::fetchValue(_config_, "devSingleThreadReweight", _devSingleThreadReweight_);
-  _devSingleThreadHistFill_ = GenericToolbox::Json::fetchValue(_config_, "devSingleThreadHistFill", _devSingleThreadHistFill_);
-
-  // EventDialCache parameters
-  if( GenericToolbox::Json::doKeyExist(_config_, "globalEventReweightCap") ){
-    _eventDialCache_.getGlobalEventReweightCap().isEnabled = true;
-    _eventDialCache_.getGlobalEventReweightCap().maxReweight = GenericToolbox::Json::fetchValue<double>(_config_, "globalEventReweightCap");
-  }
+  GenericToolbox::Json::fillValue(_config_, "showNbEventParameterBreakdown", _showNbEventParameterBreakdown_);
+  GenericToolbox::Json::fillValue(_config_, "showNbEventPerSampleParameterBreakdown", _showNbEventPerSampleParameterBreakdown_);
+  GenericToolbox::Json::fillValue(_config_, "parameterInjection", _parameterInjectorMc_);
+  GenericToolbox::Json::fillValue(_config_, "debugPrintLoadedEvents", _debugPrintLoadedEvents_);
+  GenericToolbox::Json::fillValue(_config_, "debugPrintLoadedEventsNbPerSample", _debugPrintLoadedEventsNbPerSample_);
+  GenericToolbox::Json::fillValue(_config_, "devSingleThreadReweight", _devSingleThreadReweight_);
+  GenericToolbox::Json::fillValue(_config_, "devSingleThreadHistFill", _devSingleThreadHistFill_);
+  GenericToolbox::Json::fillValue(_config_, "globalEventReweightCap", _eventDialCache_.getGlobalEventReweightCap().maxReweight);
 
   // can it be set later -> not really, still reading the config
   setupDialCollections();
 
+  _eventDialCache_.getGlobalEventReweightCap().isEnabled = not std::isnan(_eventDialCache_.getGlobalEventReweightCap().maxReweight);
 }
 void Propagator::initializeImpl(){
   LogWarning << __METHOD_NAME__ << std::endl;
