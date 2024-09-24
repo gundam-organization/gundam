@@ -2,21 +2,25 @@ name: Ubuntu 20 C++14 Docker Image CI
 
 on:
   push:
-    branches: [ "main" ]
+    branches: [ main ]
   pull_request:
-    branches: [ "main" ]
+    branches: [ main ]
     types:
       - opened
       - reopened
       - synchronize
-      - ready_for_review # not drafts
+      - ready_for_review # not drafts -> check if the user have tagged it as ready for reviews
+      - labeled # check for labels
 
 jobs:
 
   build:
 
     runs-on: ubuntu-latest
-    if: ${{ !github.event.pull_request.draft }}
+
+    # save CPU time on GitHub
+    # disable on draft PRs &&
+    if: ${{ !github.event.pull_request.draft && github.event.label.name == 'enable workflow' }}
 
     steps:
     - uses: actions/checkout@v4
