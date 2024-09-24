@@ -72,6 +72,7 @@ public:
   [[nodiscard]] bool isEnablePca() const{ return _enablePca_; }
   [[nodiscard]] bool isEnableEigenDecomp() const{ return _enableEigenDecomp_; }
   [[nodiscard]] bool isEnabledThrowToyParameters() const{ return _enabledThrowToyParameters_; }
+  [[nodiscard]] bool isMaskForToyGeneration() const{ return _maskForToyGeneration_; }
   [[nodiscard]] int getNbEnabledEigenParameters() const{ return _nbEnabledEigen_; }
   [[nodiscard]] double getPenaltyChi2Buffer() const{ return _penaltyChi2Buffer_; }
   [[nodiscard]] size_t getNbParameters() const{ return _parameterList_.size(); }
@@ -215,6 +216,9 @@ private:
   double _globalParameterMinValue_{std::nan("unset")};
   double _globalParameterMaxValue_{std::nan("unset")};
   std::pair<double, double> _eigenParBounds_{std::nan("unset"), std::nan("unset")};
+
+  // backward compatibility
+  bool _maskForToyGeneration_{false};
 
   double _penaltyChi2Buffer_{std::nan("unset")};
 

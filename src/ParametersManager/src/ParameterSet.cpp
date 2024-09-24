@@ -80,6 +80,8 @@ void ParameterSet::readConfigImpl(){
     _eigenParBounds_.second = GenericToolbox::Json::fetchValue(eigenLimits, "maxValue", _eigenParBounds_.second);
   }
 
+  GenericToolbox::Json::fillValue(_config_, "maskForToyGeneration", _maskForToyGeneration_);
+
   // dev option -> was used for validation
   _devUseParLimitsOnEigen_ = GenericToolbox::Json::fetchValue(_config_, "devUseParLimitsOnEigen", _devUseParLimitsOnEigen_);
 

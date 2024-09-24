@@ -52,9 +52,7 @@ void LikelihoodInterface::readConfigImpl(){
   });
   GenericToolbox::Json::deprecatedAction(_modelPropagator_.getConfig(), "plotGeneratorConfig", [&]{
     LogAlert << R"("plotGeneratorConfig" should now be set under "likelihoodInterfaceConfig".)" << std::endl;
-    _plotGenerator_.setConfig(
-        GenericToolbox::Json::fetchValue( _modelPropagator_.getSampleSet().getConfig(), "plotGeneratorConfig", _plotGenerator_.getConfig() )
-    );
+    GenericToolbox::Json::fillValue( _modelPropagator_.getSampleSet().getConfig(), "plotGeneratorConfig", _plotGenerator_.getConfig() );
   });
   GenericToolbox::Json::deprecatedAction(_modelPropagator_.getConfig(), {{"dataSetList"}, {"fitSampleSetConfig/dataSetList"}}, [&](const std::string& path_){
     LogAlert << "\"" << path_ << R"(" should now be set under "likelihoodInterfaceConfig".)" << std::endl;
@@ -424,7 +422,7 @@ void LikelihoodInterface::loadDataPropagator(){
 
       // legacy: replacing the parameterSet option "maskForToyGeneration" -> now should use the config override above
       for( auto& parSet : _dataPropagator_.getParametersManager().getParameterSetsList() ){
-        if( GenericToolbox::Json::fetchValue(parSet.getConfig(), "maskForToyGeneration", false) ){ parSet.nullify(); }
+        if( parSet.isMaskForToyGeneration() ){ parSet.nullify(); }
       }
 
 
