@@ -27,12 +27,11 @@ void ParameterScanner::readConfigImpl() {
   if( _config_.empty() ) return;
   LogWarning << "Configuring ParameterScanner..." << std::endl;
 
-  _useParameterLimits_ = GenericToolbox::Json::fetchValue(_config_, "useParameterLimits", _useParameterLimits_);
-  _nbPoints_ = GenericToolbox::Json::fetchValue(_config_, "nbPoints", _nbPoints_);
-  _nbPointsLineScan_ = GenericToolbox::Json::fetchValue(_config_, "nbPointsLineScan", _nbPoints_);
-  _parameterSigmaRange_ = GenericToolbox::Json::fetchValue(_config_, "parameterSigmaRange", _parameterSigmaRange_);
-
-  _varsConfig_ = GenericToolbox::Json::fetchValue(_config_, "varsConfig", JsonType());
+  GenericToolbox::Json::fillValue(_config_, "nbPoints", _nbPoints_);
+  GenericToolbox::Json::fillValue(_config_, "varsConfig", _varsConfig_);
+  GenericToolbox::Json::fillValue(_config_, "nbPointsLineScan", _nbPointsLineScan_);
+  GenericToolbox::Json::fillValue(_config_, "useParameterLimits", _useParameterLimits_);
+  GenericToolbox::Json::fillValue(_config_, "parameterSigmaRange", _parameterSigmaRange_);
 
   LogWarning << "ParameterScanner configured." << std::endl;
 }
@@ -174,17 +173,17 @@ void ParameterScanner::scanParameter(Parameter& par_, TDirectory* saveDir_) {
     LogThrowIf(
         std::isnan(newVal),
         "Scanning point is nan. Current values are: "
-        << std::endl
-        << GET_VAR_NAME_VALUE(iPt) << std::endl
-        << GET_VAR_NAME_VALUE(lowBound) << std::endl
-        << GET_VAR_NAME_VALUE(highBound) << std::endl
-        << GET_VAR_NAME_VALUE(_nbPoints_) << std::endl
-        << GET_VAR_NAME_VALUE(offSet) << std::endl
-        << GET_VAR_NAME_VALUE(origVal) << std::endl
-        << GET_VAR_NAME_VALUE(_parameterSigmaRange_.first) << std::endl
-        << GET_VAR_NAME_VALUE(_parameterSigmaRange_.second) << std::endl
-        << GET_VAR_NAME_VALUE(par_.getStdDevValue()) << std::endl
-        );
+            << std::endl
+            << GET_VAR_NAME_VALUE(iPt) << std::endl
+            << GET_VAR_NAME_VALUE(lowBound) << std::endl
+            << GET_VAR_NAME_VALUE(highBound) << std::endl
+            << GET_VAR_NAME_VALUE(_nbPoints_) << std::endl
+            << GET_VAR_NAME_VALUE(offSet) << std::endl
+            << GET_VAR_NAME_VALUE(origVal) << std::endl
+            << GET_VAR_NAME_VALUE(_parameterSigmaRange_.first) << std::endl
+            << GET_VAR_NAME_VALUE(_parameterSigmaRange_.second) << std::endl
+            << GET_VAR_NAME_VALUE(par_.getStdDevValue()) << std::endl
+    );
 
     par_.setParameterValue(newVal);
 
@@ -192,10 +191,10 @@ void ParameterScanner::scanParameter(Parameter& par_, TDirectory* saveDir_) {
     parPoints[iPt] = par_.getParameterValue();
 
     for( auto& scanEntry : _scanDataDict_ ){
-        double y = scanEntry.evalY();
-        if (std::isnan(y)) y = -2.0;
-        if (not std::isfinite(y)) y = -1.0;
-        scanEntry.yPoints[iPt] = y;
+      double y = scanEntry.evalY();
+      if (std::isnan(y)) y = -2.0;
+      if (not std::isfinite(y)) y = -1.0;
+      scanEntry.yPoints[iPt] = y;
     }
   }
 
@@ -298,7 +297,7 @@ void ParameterScanner::scanSegment(TDirectory *saveDir_, const JsonType &end_, c
       par->setParameterValue(
           startPointParValList[iPar].second
           + ( endPointParValList[iPar].second - startPointParValList[iPar].second ) * double(iStep) / double(nTotalSteps-1)
-          );
+      );
     }
 
     for( auto& parSet : _likelihoodInterfacePtr_->getModelPropagator().getParametersManager().getParameterSetsList() ){
