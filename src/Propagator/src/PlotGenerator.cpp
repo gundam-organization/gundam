@@ -77,6 +77,8 @@ void PlotGenerator::readConfigImpl(){
       histDef.binning.readBinningDefinition( binning );
       histDef.binning.sortBins();
     }
+
+    GenericToolbox::addIfNotInVector("", histDef.splitVarList);
   }
 
   // options
@@ -721,172 +723,171 @@ void PlotGenerator::defineHistogramHolders() {
         LogAlert << "Skipping 2D plot def: " << histDefBase.varToPlot << std::endl;
         continue;
       }
-      else{
 
-        for( const auto& splitVar : histDef.splitVarList ){
+      for( const auto& splitVar : histDef.splitVarList ){
 
-          histDefBase.splitVarName = splitVar;
+        histDefBase.splitVarName = splitVar;
 
-          // Loop over split vars
-          int splitValueIndex = -1;
-          auto& splitValueList = splitVarsDictionary.fetchEntry(histDefBase.splitVarName).fetchSample(&sample).splitValueList;
-          for( auto& splitValue : splitValueList ){
-            splitValueIndex++;
-            histDefBase.splitVarValue = splitValue;
+        // Loop over split vars
+        int splitValueIndex = -1;
+        auto& splitValueList = splitVarsDictionary.fetchEntry(histDefBase.splitVarName).fetchSample(&sample).splitValueList;
+        for( auto& splitValue : splitValueList ){
+          splitValueIndex++;
+          histDefBase.splitVarValue = splitValue;
 
-            for( bool isData: {false, true} ){
-              histDefBase.isData = isData;
-              bool buildFillFunction = false;
+          for( bool isData: {false, true} ){
+            histDefBase.isData = isData;
+            bool buildFillFunction = false;
 
-              if( histDefBase.isData and
-                  ( not histDefBase.splitVarName.empty()
-                    or histDef.noData
-                  ) ){
-                continue;
-              }
+            if( histDefBase.isData and
+                ( not histDefBase.splitVarName.empty()
+                  or histDef.noData
+                ) ){
+              continue;
+            }
 
-              if( histDefBase.varToPlot != "Raw" ){
-                // Then filling the histo is needed
+            if( histDefBase.varToPlot != "Raw" ){
+              // Then filling the histo is needed
 
-                // Binning
-                histDefBase.xEdges.clear();
+              // Binning
+              histDefBase.xEdges.clear();
 
-                histDefBase.xMin = histDef.xMin;
-                histDefBase.xMax = histDef.xMax;
+              histDefBase.xMin = histDef.xMin;
+              histDefBase.xMax = histDef.xMax;
 
-                if( histDef.useSampleBinning ){
+              if( histDef.useSampleBinning ){
 
-                  bool varNotAvailable{false};
-                  std::string sampleObsBinning = histDef.useSampleBinningOfVar;
+                bool varNotAvailable{false};
+                std::string sampleObsBinning = histDef.useSampleBinningOfVar;
 
-                  for( const auto& bin : sample.getBinning().getBinList() ){
-                    std::string variableNameForBinning{sampleObsBinning};
+                for( const auto& bin : sample.getBinning().getBinList() ){
+                  std::string variableNameForBinning{sampleObsBinning};
 
-                    if( not GenericToolbox::doesElementIsInVector(sampleObsBinning, bin.getEdgesList(), [](const DataBin::Edges& e){ return e.varName; }) ){
-                      for( auto& sampleVar : histDef.sampleVariableIfNotAvailable ){
-                        if( GenericToolbox::doesElementIsInVector(sampleVar, bin.getEdgesList(), [](const DataBin::Edges& e){ return e.varName; }) ){
-                          variableNameForBinning = sampleVar;
-                          break;
-                        }
-                      }
-                    } // sampleObsBinning not in the sample binning
-
-                    const DataBin::Edges* edges{bin.getVarEdgesPtr(variableNameForBinning)};
-                    if( edges == nullptr ){
-                      LogAlert << "Can't use sample binning for var " << variableNameForBinning << " and sample " << sample.getName() << std::endl;
-                      varNotAvailable = true;
-                      break;
-                    }
-
-                    for( const auto& edge : { edges->min, edges->max } ) {
-                      if (    ( std::isnan( histDefBase.xMin ) or histDefBase.xMin <= edge )
-                          and ( std::isnan( histDefBase.xMax ) or histDefBase.xMax >= edge)) {
-                        // either NaN or in bounds
-                        if (not GenericToolbox::doesElementIsInVector(edge, histDefBase.xEdges)) {
-                          histDefBase.xEdges.emplace_back(edge);
-                        }
+                  if( not GenericToolbox::doesElementIsInVector(sampleObsBinning, bin.getEdgesList(), [](const DataBin::Edges& e){ return e.varName; }) ){
+                    for( auto& sampleVar : histDef.sampleVariableIfNotAvailable ){
+                      if( GenericToolbox::doesElementIsInVector(sampleVar, bin.getEdgesList(), [](const DataBin::Edges& e){ return e.varName; }) ){
+                        variableNameForBinning = sampleVar;
+                        break;
                       }
                     }
+                  } // sampleObsBinning not in the sample binning
+
+                  const DataBin::Edges* edges{bin.getVarEdgesPtr(variableNameForBinning)};
+                  if( edges == nullptr ){
+                    LogAlert << "Can't use sample binning for var " << variableNameForBinning << " and sample " << sample.getName() << std::endl;
+                    varNotAvailable = true;
+                    break;
                   }
 
-
-                  if( varNotAvailable ) break;
-                  if( histDefBase.xEdges.empty() ) continue; // skip
-                  std::sort( histDefBase.xEdges.begin(), histDefBase.xEdges.end() ); // sort for ROOT
-
-                } // sample binning ?
-                else if( not histDef.binning.getBinList().empty() ){
-
-                  auto varList{histDef.binning.buildVariableNameList()};
-                  LogThrowIf(varList.size()!=1, "Binning should be defined with only one variable, here: " << GenericToolbox::toString(varList))
-
-                  for(const auto& bin: histDef.binning.getBinList()){
-                    const auto& edges = bin.getVarEdges(varList[0]);
-                    for( const auto& edge : { edges.min, edges.max } ) {
-                      if (    ( std::isnan( histDefBase.xMin ) or histDefBase.xMin <= edge)
-                          and ( std::isnan( histDefBase.xMax ) or histDefBase.xMax >= edge)) {
-                        // either NaN or in bounds
-                        if (not GenericToolbox::doesElementIsInVector(edge, histDefBase.xEdges)) {
-                          histDefBase.xEdges.emplace_back(edge);
-                        }
+                  for( const auto& edge : { edges->min, edges->max } ) {
+                    if (    ( std::isnan( histDefBase.xMin ) or histDefBase.xMin <= edge )
+                            and ( std::isnan( histDefBase.xMax ) or histDefBase.xMax >= edge)) {
+                      // either NaN or in bounds
+                      if (not GenericToolbox::doesElementIsInVector(edge, histDefBase.xEdges)) {
+                        histDefBase.xEdges.emplace_back(edge);
                       }
                     }
                   }
                 }
-                else{
-                  LogThrow("Could not find the binning definition.")
+
+
+                if( varNotAvailable ) break;
+                if( histDefBase.xEdges.empty() ) continue; // skip
+                std::sort( histDefBase.xEdges.begin(), histDefBase.xEdges.end() ); // sort for ROOT
+
+              } // sample binning ?
+              else if( not histDef.binning.getBinList().empty() ){
+
+                auto varList{histDef.binning.buildVariableNameList()};
+                LogThrowIf(varList.size()!=1, "Binning should be defined with only one variable, here: " << GenericToolbox::toString(varList))
+
+                for(const auto& bin: histDef.binning.getBinList()){
+                  const auto& edges = bin.getVarEdges(varList[0]);
+                  for( const auto& edge : { edges.min, edges.max } ) {
+                    if (    ( std::isnan( histDefBase.xMin ) or histDefBase.xMin <= edge)
+                            and ( std::isnan( histDefBase.xMax ) or histDefBase.xMax >= edge)) {
+                      // either NaN or in bounds
+                      if (not GenericToolbox::doesElementIsInVector(edge, histDefBase.xEdges)) {
+                        histDefBase.xEdges.emplace_back(edge);
+                      }
+                    }
+                  }
                 }
-
-                // Hist fill function
-                buildFillFunction = true; // build Later
-
-              } // not Raw?
-
-              histDefBase.xTitle = histDef.xTitle;
-              histDefBase.yTitle = histDef.yTitle;
-              if( histDefBase.yTitle.empty() ){
-                histDefBase.yTitle = "Counts";
-                if( histDefBase.rescaleAsBinWidth ) histDefBase.yTitle += " (/bin width)";
-                if( histDefBase.rescaleBinFactor != 1. ) histDefBase.yTitle += "*" + std::to_string(histDefBase.rescaleBinFactor);
+              }
+              else{
+                LogThrow("Could not find the binning definition.")
               }
 
-              // Colors / Title (legend) / Name
-              if( histDefBase.isData ){
-                histDefBase.histName = "Data";
-                histDefBase.histTitle = "Data";
-                histDefBase.histColor = kBlack;
+              // Hist fill function
+              buildFillFunction = true; // build Later
+
+            } // not Raw?
+
+            histDefBase.xTitle = histDef.xTitle;
+            histDefBase.yTitle = histDef.yTitle;
+            if( histDefBase.yTitle.empty() ){
+              histDefBase.yTitle = "Counts";
+              if( histDefBase.rescaleAsBinWidth ) histDefBase.yTitle += " (/bin width)";
+              if( histDefBase.rescaleBinFactor != 1. ) histDefBase.yTitle += "*" + std::to_string(histDefBase.rescaleBinFactor);
+            }
+
+            // Colors / Title (legend) / Name
+            if( histDefBase.isData ){
+              histDefBase.histName = "Data";
+              histDefBase.histTitle = "Data";
+              histDefBase.histColor = kBlack;
+              histDefBase.fillStyle = 1001;
+            }
+            else{
+              histDefBase.histName = "MC";
+
+              if( histDefBase.splitVarName.empty() ){
+                histDefBase.histTitle = "Model";
+                histDefBase.histColor = defaultColorWheel[ sampleCounter % defaultColorWheel.size() ];
                 histDefBase.fillStyle = 1001;
               }
               else{
-                histDefBase.histName = "MC";
+                histDefBase.histTitle = "Model (" + splitVar + " == " + std::to_string(splitValue) + ")";
+                histDefBase.histColor = defaultColorWheel[ splitValueIndex % defaultColorWheel.size() ];
 
-                if( histDefBase.splitVarName.empty() ){
-                  histDefBase.histTitle = "Model";
-                  histDefBase.histColor = defaultColorWheel[ sampleCounter % defaultColorWheel.size() ];
-                  histDefBase.fillStyle = 1001;
-                }
-                else{
-                  histDefBase.histTitle = "Model (" + splitVar + " == " + std::to_string(splitValue) + ")";
-                  histDefBase.histColor = defaultColorWheel[ splitValueIndex % defaultColorWheel.size() ];
+                auto* varDictPtr = this->fetchVarDictionaryPtr(splitVar);
+                if( varDictPtr != nullptr ){
 
-                  auto* varDictPtr = this->fetchVarDictionaryPtr(splitVar);
-                  if( varDictPtr != nullptr ){
-
-                    auto* valDictPtr = varDictPtr->fetchDictEntryPtr(splitValue);
-                    if( valDictPtr != nullptr ){
-                      histDefBase.histTitle = valDictPtr->title;
-                      histDefBase.fillStyle = valDictPtr->fillStyle;
-                      histDefBase.histColor = valDictPtr->color;
-                    }
-                    else{
-                      histDefBase.histColor = unsetSplitValueColor++;
-                    }
-
+                  auto* valDictPtr = varDictPtr->fetchDictEntryPtr(splitValue);
+                  if( valDictPtr != nullptr ){
+                    histDefBase.histTitle = valDictPtr->title;
+                    histDefBase.fillStyle = valDictPtr->fillStyle;
+                    histDefBase.histColor = valDictPtr->color;
                   }
+                  else{
+                    histDefBase.histColor = unsetSplitValueColor++;
+                  }
+
                 }
-
-              } // isData?
-
-              // Config DONE : creating save path
-              histDefBase.folderPath = sample.getName();
-              histDefBase.folderPath += "/" + histDefBase.varToPlot;
-              if( not histDefBase.splitVarName.empty() ){
-                histDefBase.folderPath += "/" + histDefBase.splitVarName;
-                histDefBase.folderPath += "/" + std::to_string(histDefBase.splitVarValue);
               }
 
-              // Config DONE
-              _histHolderCacheList_[0].emplace_back(histDefBase);
-              if( buildFillFunction ){
-                auto splitVarValue = _histHolderCacheList_[0].back().splitVarValue;
-                auto varToPlot = _histHolderCacheList_[0].back().varToPlot;
-                auto splitVarName = _histHolderCacheList_[0].back().splitVarName;
-              }
+            } // isData?
 
-            } // isData
-          } // splitValue
-        } // splitVar
-      }
+            // Config DONE : creating save path
+            histDefBase.folderPath = sample.getName();
+            histDefBase.folderPath += "/" + histDefBase.varToPlot;
+            if( not histDefBase.splitVarName.empty() ){
+              histDefBase.folderPath += "/" + histDefBase.splitVarName;
+              histDefBase.folderPath += "/" + std::to_string(histDefBase.splitVarValue);
+            }
+
+            // Config DONE
+            _histHolderCacheList_[0].emplace_back(histDefBase);
+            if( buildFillFunction ){
+              auto splitVarValue = _histHolderCacheList_[0].back().splitVarValue;
+              auto varToPlot = _histHolderCacheList_[0].back().varToPlot;
+              auto splitVarName = _histHolderCacheList_[0].back().splitVarName;
+            }
+
+          } // isData
+        } // splitValue
+
+      } // splitVar
 
     } // histDef
   }
