@@ -376,24 +376,21 @@ void ParametersManager::throwParametersFromGlobalCovariance(std::vector<double> 
             );
             weightsChiSquare.push_back(weights[iPar]);
 
-            if( _reThrowParSetIfOutOfBounds_ ){
-                if( not _strippedParameterList_[iPar]->isValueWithinBounds() ){
-                    // re-do the throwing
+            if( not _strippedParameterList_[iPar]->isValueWithinBounds() ){
+                // re-do the throwing
 //          LogDebug << "Not within bounds: " << _strippedParameterList_[iPar]->getSummary() << std::endl;
-                    rethrow = true;
-                }
+                rethrow = true;
             }
         }
 
         // Making sure eigen decomposed parameters get the conversion done
         for( auto& parSet : _parameterSetList_ ){
             if( not parSet.isEnabled() ) continue;
-            if( parSet.isUseEigenDecompInFit() ){
+            if( parSet.isEnableEigenDecomp() ){
                 parSet.propagateOriginalToEigen();
 
                 // also check the bounds of real parameter space
-                if( _reThrowParSetIfOutOfBounds_ ){
-                    for( auto& par : parSet.getEigenParameterList() ){
+                for( auto& par : parSet.getEigenParameterList() ){
                         if( not par.isEnabled() ) continue;
                         if( not par.isValueWithinBounds() ){
                             // re-do the throwing
@@ -401,7 +398,6 @@ void ParametersManager::throwParametersFromGlobalCovariance(std::vector<double> 
                             break;
                         }
                     }
-                }
             }
         }
 
@@ -481,24 +477,21 @@ void ParametersManager::throwParametersFromTStudent(std::vector<double> &weights
             );
             weightsChiSquare.push_back(weights[iPar]);
 
-            if( _reThrowParSetIfOutOfBounds_ ){
-                if( not _strippedParameterList_[iPar]->isValueWithinBounds() ){
+            if( not _strippedParameterList_[iPar]->isValueWithinBounds() ){
                     // re-do the throwing
 //          LogDebug << "Not within bounds: " << _strippedParameterList_[iPar]->getSummary() << std::endl;
                     rethrow = true;
                 }
-            }
         }
 
         // Making sure eigen decomposed parameters get the conversion done
         for( auto& parSet : _parameterSetList_ ){
             if( not parSet.isEnabled() ) continue;
-            if( parSet.isUseEigenDecompInFit() ){
+            if( parSet.isEnableEigenDecomp() ){
                 parSet.propagateOriginalToEigen();
 
                 // also check the bounds of real parameter space
-                if( _reThrowParSetIfOutOfBounds_ ){
-                    for( auto& par : parSet.getEigenParameterList() ){
+                for( auto& par : parSet.getEigenParameterList() ){
                         if( not par.isEnabled() ) continue;
                         if( not par.isValueWithinBounds() ){
                             // re-do the throwing
@@ -506,7 +499,6 @@ void ParametersManager::throwParametersFromTStudent(std::vector<double> &weights
                             break;
                         }
                     }
-                }
             }
         }
 
