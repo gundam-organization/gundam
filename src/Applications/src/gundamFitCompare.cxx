@@ -445,7 +445,7 @@ void makeErrorComparePlots(bool usePrefit_, bool useNomVal_) {
     hist1->SetTitle(Form("%s (%s)", name1.c_str(), algo1.c_str()));
     hist1->GetXaxis()->SetLabelSize(0.03);
     hist1->GetXaxis()->LabelsOption("v");
-    hist1->GetYaxis()->SetRangeUser(yBounds.first, yBounds.second);
+    hist1->GetYaxis()->SetRangeUser(yBounds.min, yBounds.max);
     useNomVal_ ? hist1->GetYaxis()->SetTitle("Parameter values (normalized to the prior)"): hist1->GetYaxis()->SetTitle("Parameter values (a.u.)");
     hist1->Draw("E2");
 

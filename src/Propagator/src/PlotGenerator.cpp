@@ -296,7 +296,7 @@ void PlotGenerator::generateCanvas(const std::vector<HistHolder> &histHolderList
       double maxYValue{std::nan("unset")};
       for( const auto* histHolder : histList.second ) {
         TH1D* hist{ histHolder->histPtr.get() };
-        std::pair<double, double> yBounds;
+        GenericToolbox::Range yBounds;
         if( histHolder->isData ){
           dataSampleHist = hist;
           yBounds = GenericToolbox::fetchYRange(hist);
@@ -305,8 +305,8 @@ void PlotGenerator::generateCanvas(const std::vector<HistHolder> &histHolderList
           mcSampleHistList.emplace_back(hist);
           yBounds = GenericToolbox::fetchYRange(hist, false); // don't consider un-ploted errors on MC
         }
-        minYValue = std::min(yBounds.first, minYValue); // NAN on the right!!
-        maxYValue = std::max(yBounds.second, maxYValue);
+        minYValue = std::min(yBounds.min, minYValue); // NAN on the right!!
+        maxYValue = std::max(yBounds.max, maxYValue);
       }
 
       TH1D* firstHistToPlot{nullptr};
