@@ -27,18 +27,41 @@ LoggerInit([]{ Logger::setUserHeaderStr("[PlotGenerator]"); });
 
 
 void PlotGenerator::readConfigImpl(){
-  LogWarning << __METHOD_NAME__ << std::endl;
+
   gStyle->SetOptStat(0);
   _histHolderCacheList_.resize(1);
-
   _threadPool_.setNThreads( GundamGlobals::getNumberOfThreads() );
 
   GenericToolbox::Json::fillValue(_config_, "isEnabled", _isEnabled_);
   if( not _isEnabled_ ){ return; }
 
-  GenericToolbox::Json::fillValue(_config_, {{"varDictionaries"}, {"varDictionnaries"}}, _varDictionary_);
-  GenericToolbox::Json::fillValue(_config_, "canvasParameters", _canvasParameters_);
+  // nested first
+  for( auto& varDictConfig : GenericToolbox::Json::fetchValue(_config_, {{"varDictionaries"}, {"varDictionnaries"}}, JsonType())){
+    auto& varDict = _varDictionaryList_.emplace_back();
+    GenericToolbox::Json::fillValue(varDictConfig, "name", varDict.name);
+
+    for( auto& dictEntryConfig : GenericToolbox::Json::fetchValue(_config_, "dictionary", JsonType())){
+      auto& dictEntry = varDict.dictEntryList.emplace_back();
+      GenericToolbox::Json::fillValue(dictEntryConfig, "value", dictEntry.value);
+      GenericToolbox::Json::fillValue(dictEntryConfig, "title", dictEntry.title);
+      GenericToolbox::Json::fillValue(dictEntryConfig, "fillStyle", dictEntry.fillStyle);
+      GenericToolbox::Json::fillValue(dictEntryConfig, {{"colorRoot"}, {"color"}}, dictEntry.color);
+      if( GenericToolbox::Json::doKeyExist(dictEntryConfig, "colorHex") ){
+        TColor::SetColorThreshold(0.1); // will fetch the closest color
+        dictEntry.color = short( TColor::GetColor( GenericToolbox::Json::fetchValue<std::string>(dictEntryConfig, "colorHex").c_str() ) );
+      }
+    }
+
+  }
+
+  // options
+  GenericToolbox::Json::fillValue(_config_, "canvasParameters/height", _canvasParameters_.height);
+  GenericToolbox::Json::fillValue(_config_, "canvasParameters/width", _canvasParameters_.width);
+  GenericToolbox::Json::fillValue(_config_, "canvasParameters/nbXplots", _canvasParameters_.nbXplots);
+  GenericToolbox::Json::fillValue(_config_, "canvasParameters/nbYplots", _canvasParameters_.nbYplots);
+
   GenericToolbox::Json::fillValue(_config_, "histogramsDefinition", _histogramsDefinition_);
+
   GenericToolbox::Json::fillValue(_config_, "writeGeneratedHistograms", _writeGeneratedHistograms_);
 }
 void PlotGenerator::initializeImpl() {
@@ -228,11 +251,6 @@ void PlotGenerator::generateCanvas(const std::vector<HistHolder> &histHolderList
     return ss.str();
   };
 
-  int canvasHeight = GenericToolbox::Json::fetchValue(_canvasParameters_, "height", 700);
-  int canvasWidth = GenericToolbox::Json::fetchValue(_canvasParameters_, "width", 1200);
-  int canvasNbXplots = GenericToolbox::Json::fetchValue(_canvasParameters_, "nbXplots", 3);
-  int canvasNbYplots = GenericToolbox::Json::fetchValue(_canvasParameters_, "nbYplots", 2);
-
   std::map<std::string, std::map<const Sample*, std::vector<const HistHolder*>>> histsToStackMap; // histsToStackMap[path][sample] = listOfTh1d
   for( auto& histHolder : histHolderList_ ){
     if( histHolder.isData ) continue; // data associated to each later
@@ -272,7 +290,7 @@ void PlotGenerator::generateCanvas(const std::vector<HistHolder> &histHolderList
       auto* samplePtr = histList.first;
       iSampleSlot++;
 
-      if (iSampleSlot > canvasNbXplots * canvasNbYplots) {
+      if (iSampleSlot > _canvasParameters_.nbXplots * _canvasParameters_.nbYplots) {
         canvasIndex++;
         iSampleSlot = 1;
       }
@@ -280,8 +298,8 @@ void PlotGenerator::generateCanvas(const std::vector<HistHolder> &histHolderList
       std::string canvasName = "samples_n" + std::to_string(canvasIndex);
       std::string canvasPath = canvasFolderPath + canvasName;
       if (not GenericToolbox::isIn(canvasPath, _bufferCanvasList_)) {
-        _bufferCanvasList_[canvasPath] = std::make_shared<TCanvas>( canvasPath.c_str(), canvasPath.c_str(), canvasWidth, canvasHeight );
-        _bufferCanvasList_[canvasPath]->Divide(canvasNbXplots, canvasNbYplots);
+        _bufferCanvasList_[canvasPath] = std::make_shared<TCanvas>( canvasPath.c_str(), canvasPath.c_str(), _canvasParameters_.width, _canvasParameters_.height );
+        _bufferCanvasList_[canvasPath]->Divide(_canvasParameters_.nbXplots, _canvasParameters_.nbYplots);
       }
       _bufferCanvasList_[canvasPath]->cd(iSampleSlot);
       _bufferCanvasList_[canvasPath]->GetPad(iSampleSlot)->SetLeftMargin(0.12); // Y title prints ok
@@ -819,48 +837,21 @@ void PlotGenerator::defineHistogramHolders() {
                   histDefBase.histTitle = "Model (" + splitVar + " == " + std::to_string(splitValue) + ")";
                   histDefBase.histColor = defaultColorWheel[ splitValueIndex % defaultColorWheel.size() ];
 
-                  // User defined color?
-                  JsonType varDict{};
+                  auto* varDictPtr = this->fetchVarDictionaryPtr(splitVar);
+                  if( varDictPtr != nullptr ){
 
-                  for( auto& varDictEntry : _varDictionary_ ){
-                    if( not GenericToolbox::Json::doKeyExist(varDictEntry, "name") ){ continue; }
-                    if( GenericToolbox::Json::fetchValue<std::string>(varDictEntry, "name") != splitVar ){ continue; }
-                    varDict = varDictEntry;
-                    break;
+                    auto* valDictPtr = varDictPtr->fetchDictEntryPtr(splitValue);
+                    if( valDictPtr != nullptr ){
+                      histDefBase.histTitle = valDictPtr->title;
+                      histDefBase.fillStyle = valDictPtr->fillStyle;
+                      histDefBase.histColor = valDictPtr->color;
+                    }
+                    else{
+                      histDefBase.histColor = unsetSplitValueColor++;
+                    }
+
                   }
-
-                  if( not varDict.empty() ){
-
-                    auto dictEntries = varDict["dictionary"];
-                    if( dictEntries.is_null() ){
-                      LogError << R"(Could not find "dictionary" key in JSON config for var: ")" << splitVar << "\"" << std::endl;
-                      throw std::runtime_error("dictionary not found, by variable name found in JSON.");
-                    }
-
-                    // Look for the value we want
-                    JsonType valDict{};
-                    for( auto& dictEntry : dictEntries ){
-                      if( GenericToolbox::Json::fetchValue<int>(dictEntry, "value") == splitValue ){
-                        valDict = dictEntry;
-                        break;
-                      }
-                    }
-
-                    histDefBase.histTitle = GenericToolbox::Json::fetchValue(valDict, "title", histDefBase.histTitle);
-                    histDefBase.fillStyle = GenericToolbox::Json::fetchValue(valDict, "fillStyle", short(1001));
-
-                    histDefBase.histColor = unsetSplitValueColor;
-                    histDefBase.histColor = GenericToolbox::Json::fetchValue(valDict, {{"colorRoot"}, {"color"}}, histDefBase.histColor);
-                    if( GenericToolbox::Json::doKeyExist(valDict, "colorHex") ){
-                      TColor::SetColorThreshold(0.1); // will fetch the closest color
-                      histDefBase.histColor = short( TColor::GetColor( GenericToolbox::Json::fetchValue<std::string>(valDict, "colorHex").c_str() ) );
-                    }
-
-                    if( histDefBase.histColor == unsetSplitValueColor ) unsetSplitValueColor++; // increment for the next ones
-
-                  } // var dict?
-
-                } // splitVar ?
+                }
 
               } // isData?
 

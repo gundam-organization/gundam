@@ -121,14 +121,46 @@ private:
   bool _isEnabled_{true};
   bool _writeGeneratedHistograms_{false};
   int _maxLegendLength_{15};
-  JsonType _varDictionary_;
-  JsonType _canvasParameters_;
   mutable JsonType _histogramsDefinition_;
   std::vector<Color_t> defaultColorWheel {
       kGreen-3, kTeal+3, kAzure+7,
       kCyan-2, kBlue-7, kBlue+2,
       kOrange+1, kOrange+9, kRed+2, kPink+9
   };
+
+  struct CanvasParameters{
+    int height{700};
+    int width{1200};
+    int nbXplots{3};
+    int nbYplots{2};
+  };
+  CanvasParameters _canvasParameters_{};
+
+  struct VarDictionary{
+    std::string name{};
+
+    struct DictEntry{
+      int value{};
+      std::string title{};
+      short fillStyle{1001};
+      short color{};
+    };
+    std::vector<DictEntry> dictEntryList{};
+
+    const DictEntry* fetchDictEntryPtr(int value_) const {
+      for( auto& dictEntry : dictEntryList ){
+        if( dictEntry.value == value_ ){ return &dictEntry; }
+      }
+      return nullptr;
+    }
+  };
+  std::vector<VarDictionary> _varDictionaryList_{};
+  const VarDictionary* fetchVarDictionaryPtr(const std::string& name_){
+    for( auto& varDict : _varDictionaryList_ ){
+      if( varDict.name == name_ ){ return &varDict; }
+    }
+    return nullptr;
+  }
 
   // Internals
   const std::vector<Sample>* _modelSampleListPtr_{nullptr};
