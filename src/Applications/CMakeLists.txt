@@ -74,6 +74,7 @@ endforeach()
 # Dependencies
 target_link_libraries( gundamFitter GundamFitter )
 target_link_libraries( gundamCalcXsec GundamFitter ) # using the fitter engine to parse back the config file
+target_link_libraries( gundamMarginalise GundamFitter )
 target_link_libraries( gundamFitReader GundamUtils )
 target_link_libraries( gundamInputZipper GundamUtils )
 target_link_libraries( gundamFitCompare GundamUtils )
@@ -81,7 +82,6 @@ target_link_libraries( gundamFitPlot GundamUtils )
 target_link_libraries( gundamConfigUnfolder GundamUtils )
 target_link_libraries( gundamConfigCompare GundamUtils )
 target_link_libraries( gundamPlotExtractor GundamUtils )
-target_link_libraries( gundamMarginalise GundamPropagator GundamFitter GundamUtils )
 
 if( WITH_GUNDAM_ROOT_APP )
 #target_sources( gundamRoot PRIVATE G__GundamRootDict.cxx )
