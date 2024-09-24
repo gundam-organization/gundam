@@ -44,8 +44,6 @@ void DataDispenserCache::clear(){
   varToLeafDict.clear();
 
   varsToOverrideList.clear();
-
-  eventVarTransformList.clear();
 }
 void DataDispenserCache::addVarRequestedForIndexing(const std::string& varName_) {
   LogThrowIf(varName_.empty(), "no var name provided.");

@@ -41,8 +41,8 @@ void DatasetDefinition::readConfigImpl() {
 
     if( GenericToolbox::Json::fetchValue(dataEntry, "fromMc", bool(false)) ){ _dataDispenserDict_.emplace(name, _modelDispenser_); }
     else{ _dataDispenserDict_.emplace(name, DataDispenser(this)); }
-    _dataDispenserDict_.at(name).readConfig(dataEntry);
     _dataDispenserDict_.at(name).getParameters().isData = true;
+    _dataDispenserDict_.at(name).readConfig(dataEntry);
   }
 
   GenericToolbox::Json::fillValue(_config_, "selectedDataEntry", _selectedDataEntry_);
