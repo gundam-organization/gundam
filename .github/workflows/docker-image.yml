@@ -19,8 +19,9 @@ jobs:
     runs-on: ubuntu-latest
 
     # save CPU time on GitHub
-    # disable on draft PRs &&
-    if: ${{ !github.event.pull_request.draft && github.event.label.name == 'enable workflow' }}
+    # either it's a push to main
+    # either ( disable for draft PRs && correctly labeled )
+    if: ${{ (github.event_name == 'push') || (!github.event.pull_request.draft && github.event.label.name == 'enable workflow') }}
 
     steps:
     - uses: actions/checkout@v4
