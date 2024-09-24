@@ -49,6 +49,9 @@ public:
   void throwParameters();
   void throwParametersFromParSetCovariance();
   void throwParametersFromGlobalCovariance(bool quietVerbose_ = true);
+  void throwParametersFromGlobalCovariance(std::vector<double> &weightsChiSquare);
+  void throwParametersFromGlobalCovariance(std::vector<double> &weightsChiSquare, double pedestalEntity, double pedestalLeftEdge, double pedestalRightEdge);
+  void throwParametersFromTStudent(std::vector<double> &weightsChiSquare,double nu_);
   void initializeStrippedGlobalCov();
   ParameterSet* getFitParameterSetPtr(const std::string& name_);
 

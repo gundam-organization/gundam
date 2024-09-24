@@ -1,7 +1,6 @@
 # Applications
 
-set(
-    APPLICATION_LIST
+set( APPLICATION_LIST
     # GUNDAM apps
     gundamFitter
     gundamFitReader
@@ -12,6 +11,7 @@ set(
     gundamConfigCompare
     gundamPlotExtractor
     gundamConfigUnfolder
+    gundamMarginalise
 )
 
 
@@ -74,6 +74,7 @@ endforeach()
 # Dependencies
 target_link_libraries( gundamFitter GundamFitter )
 target_link_libraries( gundamCalcXsec GundamFitter ) # using the fitter engine to parse back the config file
+target_link_libraries( gundamMarginalise GundamFitter )
 target_link_libraries( gundamFitReader GundamUtils )
 target_link_libraries( gundamInputZipper GundamUtils )
 target_link_libraries( gundamFitCompare GundamUtils )

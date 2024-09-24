@@ -104,6 +104,7 @@ public:
   void setParameterDefinitionConfig(const JsonType &config_);
   void setOwner(const ParameterSet *owner_){ _owner_ = owner_; }
   void setPriorType(PriorType priorType){ _priorType_ = priorType; }
+  void setMarginalised(bool isMarginalised){ _isMarginalised_ = isMarginalised; }
 
   /// Query if a value is in the domain of likelihood for this parameter.  Math
   /// remediation for those of us (including myself) who don't recall grammar
@@ -153,6 +154,7 @@ public:
   [[nodiscard]] const JsonType &getDialDefinitionsList() const{ return _dialDefinitionsList_; }
   [[nodiscard]] const ParameterSet *getOwner() const{ return _owner_; }
   [[nodiscard]] PriorType getPriorType() const{ return _priorType_; }
+  [[nodiscard]] bool isMarginalised() const{ return _isMarginalised_; }
 
   /// Copy the prior value of the parameter into the current value.  This will
   /// fail if the prior value has not been set.
@@ -215,6 +217,7 @@ private:
   double _stepSize_{std::nan("unset")};
   std::string _name_{};
   std::string _dialsWorkingDirectory_{"."};
+  bool _isMarginalised_{false};
   JsonType _parameterConfig_{};
   JsonType _dialDefinitionsList_{};
 
