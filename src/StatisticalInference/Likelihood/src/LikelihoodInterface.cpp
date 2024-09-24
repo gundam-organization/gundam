@@ -25,7 +25,8 @@ void LikelihoodInterface::readConfigImpl(){
 
   // reading the configuration of the propagator
   // allows to implement
-  _modelPropagator_.readConfig( GenericToolbox::Json::fetchValue(_config_, "propagatorConfig", _modelPropagator_.getConfig()) );
+  GenericToolbox::Json::fillValue(_config_, "propagatorConfig", _modelPropagator_.getConfig());
+  _modelPropagator_.readConfig();
   _modelPropagator_.printConfiguration();
 
   JsonType dataSetListConfig{};
@@ -79,10 +80,12 @@ void LikelihoodInterface::readConfigImpl(){
   GenericToolbox::Json::fillValue(jointProbabilityConfig, "type", jointProbabilityTypeStr);
   LogInfo << "Using \"" << jointProbabilityTypeStr << "\" JointProbabilityType." << std::endl;
   _jointProbabilityPtr_ = std::shared_ptr<JointProbability::JointProbabilityBase>( JointProbability::makeJointProbability( jointProbabilityTypeStr ) );
-  _jointProbabilityPtr_->readConfig( jointProbabilityConfig );
+  _jointProbabilityPtr_->setConfig( jointProbabilityConfig );
+  _jointProbabilityPtr_->readConfig();
 
   // nested configurations
-  _plotGenerator_.readConfig( GenericToolbox::Json::fetchValue( _config_, "plotGeneratorConfig", _plotGenerator_.getConfig() ) );
+  GenericToolbox::Json::fillValue( _config_, "plotGeneratorConfig", _plotGenerator_.getConfig() );
+  _plotGenerator_.readConfig();
 
   // reading local parameters
   GenericToolbox::Json::fillValue(_config_, "throwAsimovFitParameters", _throwAsimovToyParameters_);
