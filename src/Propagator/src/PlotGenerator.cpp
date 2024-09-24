@@ -2,11 +2,12 @@
 // Created by Nadrino on 16/06/2021.
 //
 
-#include "../include/PlotGenerator.h"
+#include "PlotGenerator.h"
 
 #include "GenericToolbox.Json.h"
 #include "GundamGlobals.h"
 #include "ConfigUtils.h"
+#include "GundamUtils.h"
 
 #include "Logger.h"
 #include "GenericToolbox.Root.h"
@@ -27,7 +28,7 @@ LoggerInit([]{ Logger::setUserHeaderStr("[PlotGenerator]"); });
 
 
 void PlotGenerator::readConfigImpl(){
-
+  
   gStyle->SetOptStat(0);
   _histHolderCacheList_.resize(1);
   _threadPool_.setNThreads( GundamGlobals::getNumberOfThreads() );

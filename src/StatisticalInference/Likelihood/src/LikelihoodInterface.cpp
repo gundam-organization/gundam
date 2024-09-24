@@ -19,7 +19,6 @@ LoggerInit([]{ Logger::setUserHeaderStr("[LikelihoodInterface]"); });
 #endif
 
 void LikelihoodInterface::readConfigImpl(){
-  LogWarning << "Configuring LikelihoodInterface..." << std::endl;
 
   _threadPool_.setNThreads( GundamGlobals::getNumberOfThreads() );
 
@@ -52,7 +51,7 @@ void LikelihoodInterface::readConfigImpl(){
   });
   GenericToolbox::Json::deprecatedAction(_modelPropagator_.getConfig(), "plotGeneratorConfig", [&]{
     LogAlert << R"("plotGeneratorConfig" should now be set under "likelihoodInterfaceConfig".)" << std::endl;
-    GenericToolbox::Json::fillValue( _modelPropagator_.getSampleSet().getConfig(), "plotGeneratorConfig", _plotGenerator_.getConfig() );
+    GenericToolbox::Json::fillValue( _modelPropagator_.getConfig(), "plotGeneratorConfig", _plotGenerator_.getConfig() );
   });
   GenericToolbox::Json::deprecatedAction(_modelPropagator_.getConfig(), {{"dataSetList"}, {"fitSampleSetConfig/dataSetList"}}, [&](const std::string& path_){
     LogAlert << "\"" << path_ << R"(" should now be set under "likelihoodInterfaceConfig".)" << std::endl;
