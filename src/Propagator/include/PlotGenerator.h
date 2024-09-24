@@ -121,12 +121,29 @@ private:
   bool _isEnabled_{true};
   bool _writeGeneratedHistograms_{false};
   int _maxLegendLength_{15};
-  mutable JsonType _histogramsDefinition_;
   std::vector<Color_t> defaultColorWheel {
       kGreen-3, kTeal+3, kAzure+7,
       kCyan-2, kBlue-7, kBlue+2,
       kOrange+1, kOrange+9, kRed+2, kPink+9
   };
+
+  struct sa{
+    bool noData{false};
+    bool rescaleAsBinWidth{true};
+    bool useSampleBinning{false};
+    double rescaleBinFactor{1.};
+    double xMin{std::nan("unset")};
+    double xMax{std::nan("unset")};
+    std::string prefix{};
+    std::string varToPlot{};
+    std::string xTitle{};
+    std::string yTitle{};
+    std::string useSampleBinningOfVar{};
+    std::vector<std::string> splitVarList{};
+    std::vector<std::string> sampleVariableIfNotAvailable{};
+    DataBinSet binning{};
+  };
+  std::vector<HistogramDefinition> _histDefList_{};
 
   struct CanvasParameters{
     int height{700};
