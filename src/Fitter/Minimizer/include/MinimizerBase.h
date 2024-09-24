@@ -105,10 +105,10 @@ public:
   explicit MinimizerBase(FitterEngine* owner_): _owner_(owner_){}
 
   /// Set if the calcErrors method should be called by the FitterEngine.
-  void setDisableCalcError(bool disableCalcError_){ _disableCalcError_ = disableCalcError_; }
+  void setDisableCalcError(bool disableCalcError_){ _isEnabledCalcError_ = not disableCalcError_; }
 
   // const getters
-  [[nodiscard]] bool disableCalcError() const{ return _disableCalcError_; }
+  [[nodiscard]] bool disableCalcError() const{ return not _isEnabledCalcError_; }
 
   // Get the return status for the fitter.  The return value is specific
   // to the instantiated fitter, but is mostly centered around MINUIT
@@ -168,9 +168,7 @@ private:
   bool _throwOnBadLlh_{false};
   bool _useNormalizedFitSpace_{true};
   bool _checkParameterValidity_{false};
-
-  // internals
-  bool _disableCalcError_{false};
+  bool _isEnabledCalcError_{true};
   Monitor _monitor_{};
 
 };

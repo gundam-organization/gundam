@@ -10,20 +10,19 @@ LoggerInit([]{ Logger::setUserHeaderStr("[MinimizerBase]"); });
 
 
 void MinimizerBase::readConfigImpl(){
-  LogReturnIf(_config_.empty(), __METHOD_NAME__ << " config is empty." );
-  LogWarning << "Configuring MinimizerBase..." << std::endl;
 
   // nested objects first
-  _monitor_.showParameters = GenericToolbox::Json::fetchValue(_config_, "showParametersOnFitMonitor", _monitor_.showParameters);
-  _monitor_.maxNbParametersPerLine = GenericToolbox::Json::fetchValue(_config_, "maxNbParametersPerLineOnMonitor", _monitor_.maxNbParametersPerLine);
-  _monitor_.convergenceMonitor.setMaxRefreshRateInMs(
-      GenericToolbox::Json::fetchValue( _config_, "monitorRefreshRateInMs", int(5000) )
-      * ( GenericToolbox::getTerminalWidth() != 0 ? 1 : 10 ) // slow down the refresh rate if in batch mode
-  );
+  int monitorRefreshRateInMs(5000);
+  GenericToolbox::Json::fillValue( _config_, "monitorRefreshRateInMs", monitorRefreshRateInMs );
+  // slow down the refresh rate if in batch mode
+  monitorRefreshRateInMs *= ( GenericToolbox::getTerminalWidth() != 0 ? 1 : 10 );
+  _monitor_.convergenceMonitor.setMaxRefreshRateInMs( monitorRefreshRateInMs );
 
   // members
-  _disableCalcError_ = not GenericToolbox::Json::fetchValue(_config_, "enablePostFitErrorFit", not _disableCalcError_);
-  _useNormalizedFitSpace_ = GenericToolbox::Json::fetchValue(_config_, "useNormalizedFitSpace", _useNormalizedFitSpace_);
+  GenericToolbox::Json::fillValue(_config_, "showParametersOnFitMonitor", _monitor_.showParameters);
+  GenericToolbox::Json::fillValue(_config_, "maxNbParametersPerLineOnMonitor", _monitor_.maxNbParametersPerLine);
+  GenericToolbox::Json::fillValue(_config_, "enablePostFitErrorFit", _isEnabledCalcError_);
+  GenericToolbox::Json::fillValue(_config_, "useNormalizedFitSpace", _useNormalizedFitSpace_);
 
   LogWarning << "MinimizerBase configured." << std::endl;
 }
