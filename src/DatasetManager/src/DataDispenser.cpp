@@ -37,31 +37,21 @@ LoggerInit([]{ Logger::setUserHeaderStr("[DataDispenser]"); });
 
 
 void DataDispenser::readConfigImpl(){
-  LogThrowIf( _config_.empty(), "Config is not set." );
 
+  // first of all
   _threadPool_.setNThreads( GundamGlobals::getNumberOfThreads() );
 
-  _parameters_.name = GenericToolbox::Json::fetchValue<std::string>(_config_, "name", _parameters_.name);
+  GenericToolbox::Json::fillValue(_config_, "name", _parameters_.name);
+  LogThrowIf(_parameters_.name.empty(), "Dataset name not set.");
 
+  // histograms don't need other parameters
   if( GenericToolbox::Json::doKeyExist( _config_, "fromHistContent" ) ) {
     LogWarning << "Dataset \"" << _parameters_.name << "\" will be defined with histogram data." << std::endl;
-
-    _parameters_.fromHistContent = GenericToolbox::Json::fetchValue<JsonType>( _config_, "fromHistContent" );
+    GenericToolbox::Json::fillValue<JsonType>( _config_, "fromHistContent", _parameters_.fromHistContent );
     return;
   }
 
-  _parameters_.treePath = GenericToolbox::Json::fetchValue<std::string>(_config_, "tree", _parameters_.treePath);
-  _parameters_.filePathList = GenericToolbox::Json::fetchValue<std::vector<std::string>>(_config_, "filePathList", _parameters_.filePathList);
-  _parameters_.additionalVarsStorage = GenericToolbox::Json::fetchValue(_config_, {{"additionalLeavesStorage"}, {"additionalVarsStorage"}}, _parameters_.additionalVarsStorage);
-  _parameters_.dummyVariablesList = GenericToolbox::Json::fetchValue(_config_, "dummyVariablesList", _parameters_.dummyVariablesList);
-  _parameters_.useReweightEngine = GenericToolbox::Json::fetchValue(_config_, {{"useReweightEngine"}, {"useMcContainer"}}, _parameters_.useReweightEngine);
-
-  _parameters_.dialIndexFormula = GenericToolbox::Json::fetchValue(_config_, "dialIndexFormula", _parameters_.dialIndexFormula);
-  _parameters_.selectionCutFormulaStr = GenericToolbox::Json::buildFormula(_config_, "selectionCutFormula", "&&", _parameters_.selectionCutFormulaStr);
-  _parameters_.nominalWeightFormulaStr = GenericToolbox::Json::buildFormula(_config_, "nominalWeightFormula", "*", _parameters_.nominalWeightFormulaStr);
-
-  _parameters_.debugNbMaxEventsToLoad = GenericToolbox::Json::fetchValue(_config_, "debugNbMaxEventsToLoad", _parameters_.debugNbMaxEventsToLoad);
-
+  // nested
   _parameters_.variableDict.clear();
   for( auto& entry : GenericToolbox::Json::fetchValue(_config_, {{"variableDict"}, {"overrideLeafDict"}}, JsonType()) ){
     auto varName = GenericToolbox::Json::fetchValue<std::string>(entry, {{"name"}, {"eventVar"}});
@@ -69,7 +59,20 @@ void DataDispenser::readConfigImpl(){
     _parameters_.variableDict[ varName ] = varExpr;
   }
 
-  _parameters_.overridePropagatorConfig = GenericToolbox::Json::fetchValue(_config_, "overridePropagatorConfig", _parameters_.overridePropagatorConfig);
+  // TODO: better implementation of those
+  _parameters_.selectionCutFormulaStr = GenericToolbox::Json::buildFormula(_config_, "selectionCutFormula", "&&", _parameters_.selectionCutFormulaStr);
+  _parameters_.nominalWeightFormulaStr = GenericToolbox::Json::buildFormula(_config_, "nominalWeightFormula", "*", _parameters_.nominalWeightFormulaStr);
+
+  // options
+  GenericToolbox::Json::fillValue(_config_, "tree", _parameters_.treePath);
+  GenericToolbox::Json::fillValue(_config_, "filePathList", _parameters_.filePathList);
+  GenericToolbox::Json::fillValue(_config_, {{"additionalLeavesStorage"}, {"additionalVarsStorage"}}, _parameters_.additionalVarsStorage);
+  GenericToolbox::Json::fillValue(_config_, "dummyVariablesList", _parameters_.dummyVariablesList);
+  GenericToolbox::Json::fillValue(_config_, {{"useReweightEngine"}, {"useMcContainer"}}, _parameters_.useReweightEngine);
+  GenericToolbox::Json::fillValue(_config_, "debugNbMaxEventsToLoad", _parameters_.debugNbMaxEventsToLoad);
+  GenericToolbox::Json::fillValue(_config_, "dialIndexFormula", _parameters_.dialIndexFormula);
+  GenericToolbox::Json::fillValue(_config_, "overridePropagatorConfig", _parameters_.overridePropagatorConfig);
+
 }
 void DataDispenser::initializeImpl(){
   // Nothing else to do other than read config?

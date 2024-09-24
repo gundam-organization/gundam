@@ -27,10 +27,10 @@ void DatasetDefinition::readConfigImpl() {
   LogReturnIf(not _isEnabled_, "\"" << _name_ << "\" is disabled.");
 
   _modelDispenser_ = DataDispenser(this);
-  GenericToolbox::Json::fillValue<JsonType>(_config_, {{"model"}, {"mc"}}, _modelDispenser_.getConfig());
-  _modelDispenser_.readConfig();
   _modelDispenser_.getParameters().name = "Asimov";
   _modelDispenser_.getParameters().useReweightEngine = true;
+  GenericToolbox::Json::fillValue<JsonType>(_config_, {{"model"}, {"mc"}}, _modelDispenser_.getConfig());
+  _modelDispenser_.readConfig();
 
   // Always put the Asimov as a data entry
   _dataDispenserDict_.emplace("Asimov", DataDispenser(_modelDispenser_));
