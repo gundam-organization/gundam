@@ -118,6 +118,7 @@ private:
   // Once a dial collection has been added to this vector, it's index becomes
   // the immutable tag for that specific group of dials.
   std::vector<DialCollection> _dialCollectionList_{};
+  // TODO: create a DialManager
 
   GenericToolbox::ParallelWorker _threadPool_{};
 
