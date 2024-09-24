@@ -9,7 +9,6 @@ on:
       - opened
       - reopened
       - synchronize
-      - ready_for_review # not drafts -> check if the user have tagged it as ready for reviews
       - labeled # check for labels
 
 jobs:
@@ -21,7 +20,7 @@ jobs:
     # save CPU time on GitHub
     # either it's a push to main
     # either ( disable for draft PRs && correctly labeled )
-    if: ${{ (github.event_name == 'push') || (!github.event.pull_request.draft && github.event.label.name == 'enable workflow') }}
+    if: ${{ github.event_name == 'push' || github.event.label.name == 'enable workflow' }}
 
     steps:
     - uses: actions/checkout@v4
