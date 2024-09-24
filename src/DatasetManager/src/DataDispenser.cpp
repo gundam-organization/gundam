@@ -144,7 +144,7 @@ void DataDispenser::load(Propagator& propagator_){
     return;
   }
 
-  if( not _parameters_.fromHistContent.isEnabled ){
+  if( _parameters_.fromHistContent.isEnabled ){
     this->loadFromHistContent();
     return;
   }
