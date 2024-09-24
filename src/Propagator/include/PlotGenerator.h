@@ -118,6 +118,7 @@ protected:
 
 private:
   // Parameters
+  bool _isEnabled_{true};
   bool _writeGeneratedHistograms_{false};
   int _maxLegendLength_{15};
   JsonType _varDictionary_;

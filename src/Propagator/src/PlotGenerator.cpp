@@ -33,13 +33,13 @@ void PlotGenerator::readConfigImpl(){
 
   _threadPool_.setNThreads( GundamGlobals::getNumberOfThreads() );
 
-  if( not GenericToolbox::Json::fetchValue(_config_, "isEnabled", true) ){ return; }
+  GenericToolbox::Json::fillValue(_config_, "isEnabled", _isEnabled_);
+  if( not _isEnabled_ ){ return; }
 
-  _varDictionary_ = GenericToolbox::Json::fetchValue(_config_, {{"varDictionaries"}, {"varDictionnaries"}}, JsonType());
-  _canvasParameters_ = GenericToolbox::Json::fetchValue(_config_, "canvasParameters", JsonType());
-  _histogramsDefinition_ = GenericToolbox::Json::fetchValue(_config_, "histogramsDefinition", JsonType());
-
-  _writeGeneratedHistograms_ = GenericToolbox::Json::fetchValue(_config_, "writeGeneratedHistograms", _writeGeneratedHistograms_);
+  GenericToolbox::Json::fillValue(_config_, {{"varDictionaries"}, {"varDictionnaries"}}, _varDictionary_);
+  GenericToolbox::Json::fillValue(_config_, "canvasParameters", _canvasParameters_);
+  GenericToolbox::Json::fillValue(_config_, "histogramsDefinition", _histogramsDefinition_);
+  GenericToolbox::Json::fillValue(_config_, "writeGeneratedHistograms", _writeGeneratedHistograms_);
 }
 void PlotGenerator::initializeImpl() {
   LogWarning << __METHOD_NAME__ << std::endl;
