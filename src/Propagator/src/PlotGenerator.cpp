@@ -28,7 +28,7 @@ LoggerInit([]{ Logger::setUserHeaderStr("[PlotGenerator]"); });
 
 
 void PlotGenerator::readConfigImpl(){
-  
+
   gStyle->SetOptStat(0);
   _histHolderCacheList_.resize(1);
   _threadPool_.setNThreads( GundamGlobals::getNumberOfThreads() );
@@ -41,7 +41,7 @@ void PlotGenerator::readConfigImpl(){
     auto& varDict = _varDictionaryList_.emplace_back();
     GenericToolbox::Json::fillValue(varDictConfig, "name", varDict.name);
 
-    for( auto& dictEntryConfig : GenericToolbox::Json::fetchValue(_config_, "dictionary", JsonType())){
+    for( auto& dictEntryConfig : GenericToolbox::Json::fetchValue(varDictConfig, "dictionary", JsonType())){
       auto& dictEntry = varDict.dictEntryList.emplace_back();
       GenericToolbox::Json::fillValue(dictEntryConfig, "value", dictEntry.value);
       GenericToolbox::Json::fillValue(dictEntryConfig, "title", dictEntry.title);
