@@ -5,7 +5,7 @@
 #ifndef GUNDAM_JOINT_PROBABILITY_BASE_H
 #define GUNDAM_JOINT_PROBABILITY_BASE_H
 
-#include "Sample.h"
+#include "SamplePair.h"
 #include "JsonBaseClass.h"
 
 #include <string>
@@ -19,13 +19,13 @@ namespace JointProbability{
     [[nodiscard]] virtual std::string getType() const = 0;
 
     // two choices -> either override bin by bin llh or global eval function
-    [[nodiscard]] virtual double eval( const Sample &sample_, int bin_ ) const{ return 0; }
+    [[nodiscard]] virtual double eval( const SamplePair& samplePair_, int bin_ ) const{ return 0; }
 
     // classic binned llh. Could be overriden to introduce correlations for instance.
-    [[nodiscard]] virtual double eval( const Sample &sample_ ) const{
+    [[nodiscard]] virtual double eval( const SamplePair& samplePair_ ) const{
       double out{0};
-      int nBins = int(sample_.getBinning().getBinList().size());
-      for( int iBin = 0; iBin < nBins; iBin++ ){ out += this->eval(sample_, iBin); }
+      int nBins = int(samplePair_.model->getBinning().getBinList().size());
+      for( int iBin = 0; iBin < nBins; iBin++ ){ out += this->eval(samplePair_, iBin); }
       return out;
     }
 

@@ -9,9 +9,9 @@
 #include <dlfcn.h>
 
 
-LoggerInit([]{
-  Logger::getUserHeader() << "[CompiledLibDial]";
-});
+#ifndef DISABLE_USER_HEADER
+LoggerInit([]{ Logger::getUserHeader() << "[CompiledLibDial]"; });
+#endif
 
 double CompiledLibDial::evalResponse( const DialInputBuffer &input_ ) const{
   // Eval with dynamic function

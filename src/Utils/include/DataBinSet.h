@@ -32,7 +32,7 @@ public:
   std::vector<DataBin> &getBinList() { return _binList_; }
 
   // core
-  void readBinningDefinition(const std::string& filePath_);
+  void readBinningDefinition(const JsonType& binning_);
   void checkBinning();
   [[nodiscard]] std::string getSummary() const;
 
@@ -43,7 +43,7 @@ public:
 
 protected:
   void readTxtBinningDefinition();    // original txt
-  void readBinningConfig(); // yaml/json
+  void readBinningConfig(const JsonType& binning_); // yaml/json
 
 private:
   std::string _name_;

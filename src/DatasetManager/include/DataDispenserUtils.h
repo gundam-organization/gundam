@@ -17,7 +17,11 @@
 
 
 struct DataDispenserParameters{
-  bool useMcContainer{false}; // define the container to fill -> could get rid of it?
+
+  // should be load dials and request the associate variables?
+  bool useReweightEngine{false};
+  bool isData{false}; // shall fetch slpit vars?
+
   std::string name{};
   std::string treePath{};
   std::string dialIndexFormula{};
@@ -31,12 +35,15 @@ struct DataDispenserParameters{
   size_t debugNbMaxEventsToLoad{0};
 
   JsonType fromHistContent{};
+  JsonType overridePropagatorConfig{};
 
   [[nodiscard]] std::string getSummary() const;
 };
 
 struct DataDispenserCache{
   Propagator* propagatorPtr{nullptr};
+
+  size_t totalNbEvents{0};
 
   std::vector<Sample*> samplesToFillList{};
   std::vector<size_t> sampleNbOfEvents;

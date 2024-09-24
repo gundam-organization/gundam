@@ -15,28 +15,41 @@ option( WITH_DOXYGEN "Build documentation with doxygen." OFF )
 option( WITH_GUNDAM_ROOT_APP "Build app gundamRoot." ON )
 option( WITH_CACHE_MANAGER "Enable compiling of the cache manager (required for GPU computing)." ON )
 option( WITH_CUDA_LIB "Enable CUDA language check (Cache::Manager requires a GPU if CUDA is found)." OFF )
+option( WITH_MINUIT2_MISSING "Allow MINUIT2 to be missing" OFF )
 
 # compile helper
 option( YAMLCPP_DIR "Set custom path to yaml-cpp lib." OFF )
 
 # dev options
 option( USE_STATIC_LINKS "Use static link of libraries and apps instead of shared." OFF )
-option( DISABLE_ZLIB "Disable Zlib dependency." OFF )
 option( CXX_WARNINGS "Enable most C++ warning flags." ON )
 option( CXX_MARCH_FLAG "Enable cpu architecture specific optimisations." OFF )
 option( CMAKE_CXX_EXTENSIONS "Enable GNU extensions to C++ language (-std=gnu++14)." OFF )
+option( DISABLE_MANUAL_LOG_HEADER "Don't rely on the manually set logger user header string." ON )
+option( ENABLE_GOOGLE_TESTS "Build Google tests." OFF )
+option( ENABLE_ZLIB "Use ZLib hash for cache invalidation." OFF )
 
 
 # Reading options
 ##################
 
+# make sure the build type is upper cased
+string( TOUPPER "${CMAKE_BUILD_TYPE}" CMAKE_BUILD_TYPE )
+
 # Set the default built type if it isn't already defined
 if( NOT DEFINED CMAKE_BUILD_TYPE OR CMAKE_BUILD_TYPE STREQUAL "")
-  cmessage( STATUS "Using default build type: Release." )
-  set( CMAKE_BUILD_TYPE Release )
+  set( CMAKE_BUILD_TYPE "RELEASE" )
+  cmessage( STATUS "Build type not set. Using default build type: RELEASE." )
+elseif( CMAKE_BUILD_TYPE STREQUAL "RELEASE" )
+  cmessage( STATUS "Build type manually specified to: RELEASE." )
+elseif( CMAKE_BUILD_TYPE STREQUAL "DEBUG" )
+  cmessage( STATUS "Build type manually specified to: DEBUG." )
 else()
-  cmessage( STATUS "Using build type: ${CMAKE_BUILD_TYPE}" )
+  cmessage( WARNING "Build type not recognised: ${CMAKE_BUILD_TYPE}. Using default build type: RELEASE." )
+  set( CMAKE_BUILD_TYPE "RELEASE" )
 endif()
+
+cmessage( STATUS "Using build type: ${CMAKE_BUILD_TYPE}" )
 
 if( ENABLE_BATCH_MODE )
   cmessage( STATUS "-D ENABLE_BATCH_MODE=ON: defining appropriate compile options..." )
@@ -70,7 +83,7 @@ if( WITH_DOXYGEN )
   find_package(Doxygen)
   if( DOXYGEN_FOUND )
     # set input and output files
-    set(DOXYGEN_IN ${CMAKE_CURRENT_SOURCE_DIR}/doxygen/Doxygen.in)
+    set(DOXYGEN_IN ${CMAKE_CURRENT_SOURCE_DIR}/resources/doxygen/Doxygen.in)
     set(DOXYGEN_OUT ${CMAKE_CURRENT_BINARY_DIR}/Doxyfile)
 
     # request to configure the file

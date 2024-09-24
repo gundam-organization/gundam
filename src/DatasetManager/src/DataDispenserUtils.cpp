@@ -9,14 +9,14 @@
 
 #include "sstream"
 
-LoggerInit([]{
-  Logger::setUserHeaderStr("[DataDispenserUtils]");
-});
+#ifndef DISABLE_USER_HEADER
+LoggerInit([]{ Logger::setUserHeaderStr("[DataDispenserUtils]"); });
+#endif
 
 
 std::string DataDispenserParameters::getSummary() const{
   std::stringstream ss;
-  ss << GET_VAR_NAME_VALUE(useMcContainer);
+  ss << GET_VAR_NAME_VALUE(useReweightEngine);
   ss << std::endl << GET_VAR_NAME_VALUE(name);
   ss << std::endl << GET_VAR_NAME_VALUE(treePath);
   ss << std::endl << GET_VAR_NAME_VALUE(nominalWeightFormulaStr);

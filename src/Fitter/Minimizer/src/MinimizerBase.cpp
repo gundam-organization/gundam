@@ -4,9 +4,9 @@
 #include "GenericToolbox.Json.h"
 #include "Logger.h"
 
-LoggerInit([]{
-  Logger::setUserHeaderStr("[MinimizerBase]");
-});
+#ifndef DISABLE_USER_HEADER
+LoggerInit([]{ Logger::setUserHeaderStr("[MinimizerBase]"); });
+#endif
 
 
 void MinimizerBase::readConfigImpl(){
@@ -35,7 +35,7 @@ void MinimizerBase::initializeImpl(){
   _nbFreeParameters_ = 0;
   _minimizerParameterPtrList_.clear();
   _minimizerParameterPtrList_.reserve( getLikelihoodInterface().getNbParameters() );
-  for( auto& parSet : getPropagator().getParametersManager().getParameterSetsList() ){
+  for( auto& parSet : getModelPropagator().getParametersManager().getParameterSetsList() ){
     for( auto& par : parSet.getEffectiveParameterList() ){
       if( par.isEnabled() and not par.isFixed() ) {
         _minimizerParameterPtrList_.emplace_back( &par );
@@ -110,21 +110,41 @@ void MinimizerBase::scanParameters(TDirectory* saveDir_){
   for( auto& parPtr : _minimizerParameterPtrList_ ) { getParameterScanner().scanParameter( *parPtr, saveDir_ ); }
 }
 double MinimizerBase::evalFit( const double* parArray_ ){
-/// The main access is through the evalFit method which takes an array of floating
-/// point values and returns the likelihood. The meaning of the parameters is
-/// defined by the vector of pointers to Parameter returned by the LikelihoodInterface.
+/// The main access is through the evalFit method which takes an array of
+/// floating point values and returns the likelihood. The meaning of the
+/// parameters is defined by the vector of pointers to Parameter returned by
+/// the LikelihoodInterface.
 
   _monitor_.externalTimer.stop();
   _monitor_.evalLlhTimer.start();
 
-  // Update fit parameter values:
-  int iFitPar{0};
-  for( auto* parPtr : _minimizerParameterPtrList_ ){
-    parPtr->setParameterValue(
-        _useNormalizedFitSpace_ ?
-        ParameterSet::toRealParValue(parArray_[iFitPar++], *parPtr) :
-        parArray_[iFitPar++]
-    );
+  // Check the fit parameter values.  Do this first so that the parameters
+  // don't change when a bad set of values is tried with evalFit.  This will
+  // only be enabled if the derived class has requested it.
+  if (_checkParameterValidity_) {
+    const double* v = parArray_;
+    for( auto* par : _minimizerParameterPtrList_ ){
+      double val = *(v++);
+      if (_useNormalizedFitSpace_) val = ParameterSet::toRealParValue(val,*par);
+      if (par->isValidValue(val)) continue;
+      _monitor_.evalLlhTimer.stop();
+      return std::numeric_limits<double>::infinity();
+    }
+  }
+
+  // Looks OK, so update the parameter values.  The check for the
+  // normalization outside of the loop so it runs a tiny bit faster.
+  if (_useNormalizedFitSpace_) {
+    const double* v = parArray_;
+    for( auto* par : _minimizerParameterPtrList_ ){
+      par->setParameterValue(ParameterSet::toRealParValue(*(v++),*par));
+    }
+  }
+  else {
+    const double* v = parArray_;
+    for( auto* par : _minimizerParameterPtrList_ ){
+      par->setParameterValue(*(v++));
+    }
   }
 
   // Propagate the parameters
@@ -140,7 +160,8 @@ double MinimizerBase::evalFit( const double* parArray_ ){
 
       auto& gradient = _monitor_.gradientDescentMonitor;
 
-      // When gradient descent base minimizer probe a point toward the minimum, every parameter get updated
+      // When gradient descent base minimizer probe a point toward the
+      // minimum, every parameter get updated
       bool isGradientDescentStep =
           std::all_of(
               _minimizerParameterPtrList_.begin(), _minimizerParameterPtrList_.end(),
@@ -148,7 +169,6 @@ double MinimizerBase::evalFit( const double* parArray_ ){
                 return ( par_->gotUpdated() or par_->isFixed() or not par_->isEnabled() );
               } );
       if( isGradientDescentStep ){
-
         if( gradient.lastGradientFall == _monitor_.nbEvalLikelihoodCalls - 1 ){
           LogWarning << "Minimizer is adjusting the step size: ";
         }
@@ -158,7 +178,7 @@ double MinimizerBase::evalFit( const double* parArray_ ){
         }
         LogWarningIf(gradient.stepPointList.size() >= 2) << gradient.stepPointList[gradient.stepPointList.size() - 2].llh << " -> ";
         LogWarning << getLikelihoodInterface().getLastLikelihood() << std::endl;
-        gradient.stepPointList.back().parState = getPropagator().getParametersManager().exportParameterInjectorConfig();
+        gradient.stepPointList.back().parState = getModelPropagator().getParametersManager().exportParameterInjectorConfig();
         gradient.stepPointList.back().llh = getLikelihoodInterface().getLastLikelihood();
         gradient.lastGradientFall = _monitor_.nbEvalLikelihoodCalls;
       }
@@ -173,7 +193,7 @@ double MinimizerBase::evalFit( const double* parArray_ ){
 //    ssHeader << std::endl << "Target EDM: " << getMinimizer().get;
       ssHeader << std::endl << "RAM: " << GenericToolbox::parseSizeUnits(double(GenericToolbox::getProcessMemoryUsage()));
       double cpuPercent = GenericToolbox::getCpuUsageByProcess();
-      ssHeader << " / CPU: " << cpuPercent << "% (" << cpuPercent / GundamGlobals::getParallelWorker().getNbThreads() << "% efficiency)";
+      ssHeader << " / CPU: " << cpuPercent << "% (" << cpuPercent / GundamGlobals::getNumberOfThreads() << "% efficiency)";
       ssHeader << std::endl << "Avg log-likelihood computation time: " << _monitor_.evalLlhTimer;
       ssHeader << std::endl;
 
@@ -187,8 +207,8 @@ double MinimizerBase::evalFit( const double* parArray_ ){
 
       t << "Speed" << GenericToolbox::TablePrinter::NextColumn;
       t << _monitor_.iterationCounterClock.evalTickSpeed() << " it/s" << GenericToolbox::TablePrinter::NextColumn;
-      t << getPropagator().reweightTimer << GenericToolbox::TablePrinter::NextColumn;
-      t << getPropagator().refillHistogramTimer << GenericToolbox::TablePrinter::NextColumn;
+      t << getModelPropagator().reweightTimer << GenericToolbox::TablePrinter::NextColumn;
+      t << getModelPropagator().refillHistogramTimer << GenericToolbox::TablePrinter::NextColumn;
       t << _monitor_.externalTimer << GenericToolbox::TablePrinter::NextLine;
 
       ssHeader << t.generateTableString();
@@ -259,7 +279,7 @@ void MinimizerBase::printParameters(){
   // output is a little more clear.
 
   LogWarning << std::endl << GenericToolbox::addUpDownBars("Summary of the fit parameters:") << std::endl;
-  for( const auto& parSet : getPropagator().getParametersManager().getParameterSetsList() ){
+  for( const auto& parSet : getModelPropagator().getParametersManager().getParameterSetsList() ){
 
     GenericToolbox::TablePrinter t;
     t.setColTitles({ {"Title"}, {"Starting"}, {"Prior"}, {"StdDev"}, {"Min"}, {"Max"}, {"Status"} });
@@ -273,7 +293,7 @@ void MinimizerBase::printParameters(){
       std::string statusStr;
 
       if( not par.isEnabled() ) { statusStr = "Disabled"; colorStr = GenericToolbox::ColorCodes::yellowBackground; }
-      else if( par.isFixed() )  { statusStr = "Fixed";    colorStr = GenericToolbox::ColorCodes::redBackground; }
+      else if( par.isFixed() )  { statusStr = "Fixed (prior applied)";    colorStr = GenericToolbox::ColorCodes::redBackground; }
       else                      {
         statusStr = Parameter::PriorType::toString(par.getPriorType()) + " Prior";
         if(par.getPriorType()==Parameter::PriorType::Flat) colorStr = GenericToolbox::ColorCodes::blueBackground;
@@ -299,8 +319,8 @@ void MinimizerBase::printParameters(){
 }
 
 
-Propagator& MinimizerBase::getPropagator(){ return _owner_->getLikelihoodInterface().getDataSetManager().getPropagator(); }
-[[nodiscard]] const Propagator& MinimizerBase::getPropagator() const { return _owner_->getLikelihoodInterface().getDataSetManager().getPropagator(); }
+Propagator& MinimizerBase::getModelPropagator(){ return _owner_->getLikelihoodInterface().getModelPropagator(); }
+[[nodiscard]] const Propagator& MinimizerBase::getModelPropagator() const { return _owner_->getLikelihoodInterface().getModelPropagator(); }
 ParameterScanner& MinimizerBase::getParameterScanner(){ return _owner_->getParameterScanner(); }
 [[nodiscard]] const ParameterScanner& MinimizerBase::getParameterScanner() const { return _owner_->getParameterScanner(); }
 LikelihoodInterface& MinimizerBase::getLikelihoodInterface(){ return _owner_->getLikelihoodInterface(); }
@@ -331,5 +351,4 @@ LikelihoodInterface& MinimizerBase::getLikelihoodInterface(){ return _owner_->ge
 // Local Variables:
 // mode:c++
 // c-basic-offset:2
-// compile-command:"$(git rev-parse --show-toplevel)/cmake/gundam-build.sh"
 // End:

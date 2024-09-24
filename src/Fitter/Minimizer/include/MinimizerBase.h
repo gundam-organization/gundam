@@ -44,7 +44,7 @@ protected:
   void readConfigImpl() override;
   void initializeImpl() override;
 
-  // Internal struct that hold infos on the minimizer state
+  // Internal struct that hold info about the minimizer state
   struct Monitor{
     bool isEnabled{false};
     bool showParameters{false};
@@ -109,7 +109,11 @@ public:
 
   // const getters
   [[nodiscard]] bool disableCalcError() const{ return _disableCalcError_; }
+
+  // Get the return status for the fitter.  The return value is specific
+  // to the instantiated fitter, but is mostly centered around MINUIT
   [[nodiscard]] int getMinimizerStatus() const { return _minimizerStatus_; }
+  void setMinimizerStatus(int s) {_minimizerStatus_ = s;}
 
   // mutable getters
   Monitor& getMonitor(){ return _monitor_; }
@@ -126,8 +130,8 @@ protected:
 
   // Get the propagator being used to calculate the likelihood.  This is a
   // local convenience function to get the propagator from the owner.
-  Propagator& getPropagator();
-  [[nodiscard]] const Propagator& getPropagator() const;
+  Propagator& getModelPropagator();
+  [[nodiscard]] const Propagator& getModelPropagator() const;
 
   // Get the parameter scanner object owned by the LikelihoodInterface.
   ParameterScanner& getParameterScanner();
@@ -142,23 +146,32 @@ protected:
   // function to get the vector of fit parameter pointers.  The actual vector
   // lives in the likelihood.
   std::vector<Parameter *> &getMinimizerFitParameterPtr(){ return _minimizerParameterPtrList_; }
+  const std::vector<Parameter *> &getMinimizerFitParameterPtr() const{ return _minimizerParameterPtrList_; }
 
-protected:
-  // config
-  bool _throwOnBadLlh_{false};
-  bool _useNormalizedFitSpace_{true};
+  // The minimizer evalFit function won't explicitly check the parameter
+  // validity without setting this to true.
+  void setCheckParameterValidity(bool c) {_checkParameterValidity_ = c;}
 
-  // internals
-  bool _disableCalcError_{false};
-  int _minimizerStatus_{-1}; // -1: invalid, 0: success, >0: errors
-  int _nbFreeParameters_{0};
-  std::vector<Parameter*> _minimizerParameterPtrList_{};
-  Monitor _monitor_{};
-
+  // Query if a normalized fit space is being used.
+  bool useNormalizedFitSpace() const {return _useNormalizedFitSpace_;}
+  int* getNbFreeParametersPtr() {return &_nbFreeParameters_;}
 
 private:
   /// Save a copy of the address of the engine that owns this object.
   FitterEngine* _owner_{nullptr};
+
+  std::vector<Parameter*> _minimizerParameterPtrList_{};
+  int _minimizerStatus_{-1}; // -1: invalid, 0: success, >0: errors
+  int _nbFreeParameters_{0};
+
+  // config
+  bool _throwOnBadLlh_{false};
+  bool _useNormalizedFitSpace_{true};
+  bool _checkParameterValidity_{false};
+
+  // internals
+  bool _disableCalcError_{false};
+  Monitor _monitor_{};
 
 };
 
@@ -188,5 +201,4 @@ private:
 // Local Variables:
 // mode:c++
 // c-basic-offset:2
-// compile-command:"$(git rev-parse --show-toplevel)/cmake/gundam-build.sh"
 // End:

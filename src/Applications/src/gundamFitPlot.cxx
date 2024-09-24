@@ -17,9 +17,9 @@
 #include <algorithm>
 
 
-LoggerInit([]{
-  Logger::getUserHeader() << "[" << FILENAME << "]";
-});
+#ifndef DISABLE_USER_HEADER
+LoggerInit([]{ Logger::getUserHeader() << "[" << FILENAME << "]"; });
+#endif
 
 
 int main( int argc, char** argv ){
@@ -66,14 +66,14 @@ int main( int argc, char** argv ){
     // appendixDict["optionName"] = "Appendix"
     // this list insure all appendices will appear in the same order
     std::vector<std::pair<std::string, std::string>> appendixDict{
-        {"configFile", "%s"},
-        {"overrideFiles", "With_%s"},
-        {"appendix", "%s"}
+        {"configFile", ""},
+        {"overrideFiles", "With"},
+        {"appendix", ""}
     };
 
     outFileName = GenericToolbox::joinPath(
         outFolder,
-        GundamUtils::generateFileName(clp, appendixDict)
+        "gundamFitPlot_" + GundamUtils::generateFileName(clp, appendixDict)
     ) + ".root";
   }
 
@@ -158,7 +158,8 @@ int main( int argc, char** argv ){
         for(auto& graph: graphHolder){ if( graph.name == graphName ){ selectedGraph = &graph; break; } }
 
         if( selectedGraph == nullptr ){
-          selectedGraph = &graphHolder.emplace_back();
+          graphHolder.emplace_back();
+          selectedGraph = &graphHolder.back();
           selectedGraph->name = graphName;
           selectedGraph->path = parSetDir->GetName();
         }

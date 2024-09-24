@@ -8,8 +8,11 @@
 #include "EventVarTransformLib.h"
 #include "DataDispenserUtils.h"
 
+#include "PlotGenerator.h"
 #include "Propagator.h"
 #include "JsonBaseClass.h"
+
+#include "GenericToolbox.Thread.h"
 
 #include "TChain.h"
 #include "nlohmann/json.hpp"
@@ -34,8 +37,10 @@ public:
 
   // setters
   void setOwner( DatasetDefinition* owner_){ _owner_ = owner_; }
+  void setPlotGeneratorPtr( const PlotGenerator* plotGeneratorPtr_ ){ _plotGeneratorPtr_ = plotGeneratorPtr_; }
 
   // const getters
+  [[nodiscard]] const DatasetDefinition* getOwner() const{ return _owner_; }
   [[nodiscard]] const DataDispenserParameters &getParameters() const{ return _parameters_; }
 
   // non-const getters
@@ -71,6 +76,11 @@ private:
   // internals
   DatasetDefinition* _owner_{nullptr};
   DataDispenserCache _cache_;
+
+  // needed to check which variables need to be loaded
+  const PlotGenerator* _plotGeneratorPtr_{nullptr};
+
+  GenericToolbox::ParallelWorker _threadPool_{};
 
 };
 

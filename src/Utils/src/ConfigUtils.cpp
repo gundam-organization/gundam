@@ -3,6 +3,7 @@
 //
 
 #include "ConfigUtils.h"
+#include "GundamUtils.h"
 
 #include "GenericToolbox.Json.h"
 #include "GenericToolbox.Root.h"
@@ -19,10 +20,9 @@
 #include <iostream>
 
 
-LoggerInit([]{
-  Logger::setUserHeaderStr("[ConfigUtils]");
-} );
-
+#ifndef DISABLE_USER_HEADER
+LoggerInit([]{ Logger::setUserHeaderStr("[ConfigUtils]"); });
+#endif
 
 namespace ConfigUtils {
 
@@ -34,14 +34,15 @@ namespace ConfigUtils {
 
     JsonType output;
 
-    if( GenericToolbox::hasExtension(configFilePath_, "yml")
-        or GenericToolbox::hasExtension(configFilePath_,"yaml")
-        ){
-      output = ConfigUtils::convertYamlToJson(configFilePath_);
+    try{
+      if( GenericToolbox::hasExtension(configFilePath_, {{"yaml"}, {"yml"}}) ){
+        output = ConfigUtils::convertYamlToJson( configFilePath_ );
+      }
+      else{
+        output = GenericToolbox::Json::readConfigFile(configFilePath_);
+      }
     }
-    else{
-      output = GenericToolbox::Json::readConfigFile(configFilePath_);
-    }
+    catch(...){ LogThrow("Error while reading config file: " << configFilePath_); }
 
     // resolve sub-references to other config files
     ConfigUtils::unfoldConfig( output );
@@ -110,7 +111,7 @@ namespace ConfigUtils {
   JsonType getForwardedConfig(const JsonType& config_, const std::string& keyName_){
     return ConfigUtils::getForwardedConfig(GenericToolbox::Json::fetchValue<JsonType>(config_, keyName_));
   }
-  void forwardConfig(JsonType& config_, const std::string& className_){
+  void forwardConfig(JsonType& config_){
     while( config_.is_string() and
          ( GenericToolbox::endsWith(config_.get<std::string>(), ".yaml", true)
         or GenericToolbox::endsWith(config_.get<std::string>(), ".json", true) )
@@ -311,6 +312,25 @@ namespace ConfigUtils {
     }
 
   }
+  void clearEntry(JsonType& jsonConfig_, const std::string& path_){
+
+    auto pathEntries{ GenericToolbox::splitString(path_, "/") };
+    auto* configEntry{&jsonConfig_};
+
+    for( auto& pathEntry : pathEntries ){
+      if( GenericToolbox::Json::doKeyExist( *configEntry, pathEntry ) ){
+        // next
+        configEntry = &( configEntry->find(pathEntry).value() );
+      }
+      else{
+        // no need to override. The key does not exist in the config
+        return;
+      }
+    }
+
+    // clearing up
+    configEntry->clear();
+  }
 
   // class impl
   ConfigHandler::ConfigHandler(const std::string& filePath_){
@@ -331,7 +351,6 @@ namespace ConfigUtils {
     else{
       LogInfo << "Reading config file: " << filePath_ << std::endl;
       config = ConfigUtils::readConfigFile(filePath_ ); // works with yaml
-      ConfigUtils::unfoldConfig( config );
     }
   }
   ConfigHandler::ConfigHandler(JsonType config_) : config(std::move(config_)) {}

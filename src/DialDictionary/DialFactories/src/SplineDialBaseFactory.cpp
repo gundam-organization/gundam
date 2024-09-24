@@ -8,6 +8,7 @@
 #include "UniformSpline.h"
 #include "GeneralSpline.h"
 #include "MonotonicSpline.h"
+#include "MakeMonotonicSpline.h"
 #include "Shift.h"
 
 #include "TGraph.h"
@@ -17,9 +18,9 @@
 
 #include <limits>
 
-LoggerInit([]{
-  Logger::setUserHeaderStr("[SplineFactory]");
-});
+#ifndef DISABLE_USER_HEADER
+LoggerInit([]{ Logger::setUserHeaderStr("[SplineFactory]"); });
+#endif
 
 bool SplineDialBaseFactory::FillFromGraph(std::vector<double>& xPoint,
                                           std::vector<double>& yPoint,
@@ -174,34 +175,6 @@ void SplineDialBaseFactory::FillAkimaSlopes(
   }
   k = yPoint.size()-1;
   slope[k] = (yPoint[k]-yPoint[k-1])/(xPoint[k]-xPoint[k-1]);
-}
-
-
-void SplineDialBaseFactory::MakeMonotonic(const std::vector<double>& xPoint,
-                                          const std::vector<double>& yPoint,
-                                          std::vector<double>& slope) {
-  // Apply the Fritsh-Carlson monotonic condition to the slopes.  This adjusts
-  // the slopes (when necessary), however, with Catmull-Rom the modified
-  // slopes will be ignored and the monotonic criteria is applied as the
-  // spline is evaluated (saves memory).
-  //
-  // F.N.Fritsch, and R.E.Carlson, "Monotone Piecewise Cubic Interpolation"
-  // SIAM Journal on Numerical Analysis, Vol. 17, Iss. 2 (1980)
-  // doi:10.1137/0717021
-  //
-  for (int i = 0; i<xPoint.size(); ++i) {
-    double m{std::numeric_limits<double>::infinity()};
-    if (i>0) m = (yPoint[i] - yPoint[i-1])/(xPoint[i] - xPoint[i-1]);
-    double p{std::numeric_limits<double>::infinity()};
-    if (i<xPoint.size()-1) p =(yPoint[i+1]-yPoint[i])/(xPoint[i+1]-xPoint[i]);
-    double delta = std::min(std::abs(m),std::abs(p));
-    // This a conservative bound on when the slope is "safe".  It's not the
-    // actual value at which the spline becomes non-monotonic.
-    if (std::abs(slope[i]) > 3.0*delta) {
-      if (slope[i] < 0.0) slope[i] = -3.0*delta;
-      else slope[i] = 3.0*delta;
-    }
-  }
 }
 
 DialBase* SplineDialBaseFactory::makeDial(const std::string& dialTitle_,
@@ -390,7 +363,7 @@ DialBase* SplineDialBaseFactory::makeDial(const std::string& dialTitle_,
   // flag that can be checked later.
   ////////////////////////////////////////////////////////////////
   bool isMonotonic = ( dialSubType_.find("monotonic") != std::string::npos );
-  if ( isMonotonic ) { MakeMonotonic(_xPointListBuffer_, _yPointListBuffer_, _slopeListBuffer_); }
+  if ( isMonotonic ) { ::util::MakeMonotonicSpline(_xPointListBuffer_, _yPointListBuffer_, _slopeListBuffer_); }
 
   // If there are only two points, then force a catmull-rom.  This could be
   // handled using a graph, but Catmull-Rom is fast, and works better with the

@@ -2,15 +2,16 @@
 #include "NormDialBaseFactory.h"
 #include "GraphDialBaseFactory.h"
 #include "SplineDialBaseFactory.h"
+#include "SurfaceDialBaseFactory.h"
 
 #include "RootFormula.h"
 #include "CompiledLibDial.h"
 
 #include "Logger.h"
 
-LoggerInit([]{
-  Logger::setUserHeaderStr("[DialBaseFactory]");
-});
+#ifndef DISABLE_USER_HEADER
+LoggerInit([]{ Logger::setUserHeaderStr("[DialBaseFactory]"); });
+#endif
 
 
 DialBase* DialBaseFactory::makeDial(const std::string& dialTitle_,
@@ -37,32 +38,42 @@ DialBase* DialBaseFactory::makeDial(const std::string& dialTitle_,
     SplineDialBaseFactory factory;
     dialBase.reset(factory.makeDial(dialTitle_, dialType_, dialSubType_, dialInitializer_, useCachedDial_));
   }
+  else if (dialType_ == "Surface") {
+    SurfaceDialBaseFactory factory;
+    dialBase.reset(factory.makeDial(dialTitle_, dialType_, dialSubType_, dialInitializer_, useCachedDial_));
+  }
 #define INCLUDE_DEPRECATED_DIAL_TYPES
 #ifdef INCLUDE_DEPRECATED_DIAL_TYPES
   else if (dialType_ == "MonotonicSpline") {
     LogAlertOnce << "DEPRECATED DIAL-TYPE USED: MonotonicSpline will be removed. Instead use:"
-    << std::endl << "  dialType: \"Spline\""
-    << std::endl << "  dialSubType: \"catmull-rom, monotonic\""
-            << std::endl;
+                 << std::endl << "  dialType: \"Spline\""
+                 << std::endl << "  dialSubType: \"catmull-rom, monotonic\""
+                 << std::endl;
     SplineDialBaseFactory factory;
     dialBase.reset(factory.makeDial(dialTitle_, "Spline", "catmull-rom, monotonic",
                            dialInitializer_, useCachedDial_));
   }
   else if (dialType_ == "GeneralSpline") {
-    LogAlertOnce << "DEPRECATED DIAL-TYPE USED: GeneralSpline will be removed. Instead use: \"Spline\""
-            << std::endl;
-    SplineDialBaseFactory factory;
+    LogAlertOnce << "DEPRECATED DIAL-TYPE USED: GeneralSpline will be removed. Instead use:"
+                 << std::endl << "  dialType: \"Spline\""
+                 << std::endl << "  dialSubType: \"not-a-knot\""
+                 << std::endl;
+   SplineDialBaseFactory factory;
     dialBase.reset(factory.makeDial(dialTitle_, "Spline", "not-a-knot", dialInitializer_, useCachedDial_));
   }
   else if (dialType_ == "SimpleSpline") {
-    LogAlertOnce << "DEPRECATED DIAL-TYPE USED: SimpleSpline will be removed. Instead use: \"Spline\""
-            << std::endl;
+    LogAlertOnce << "DEPRECATED DIAL-TYPE USED: SimpleSpline will be removed. Instead use:"
+                 << std::endl << "  dialType: \"Spline\""
+                 << std::endl << "  dialSubType: \"not-a-knot\""
+                 << std::endl;
     SplineDialBaseFactory factory;
     dialBase.reset(factory.makeDial(dialTitle_, "Spline", "knot-a-knot", dialInitializer_, useCachedDial_));
   }
   else if (dialType_ == "LightGraph") {
-    LogAlertOnce << "DEPRECATED DIAL-TYPE USED: LightGraph will be removed. Instead use: \"Graph\""
-            << std::endl;
+    LogAlertOnce << "DEPRECATED DIAL-TYPE USED: LightGraph will be removed. Instead use:"
+                 << std::endl << "  dialType: \"Graph\""
+                 << std::endl << "  dialSubType: \"light\""
+                 << std::endl;
     GraphDialBaseFactory factory;
     dialBase.reset(factory.makeDial(dialTitle_, "Graph", "light", dialInitializer_, useCachedDial_));
   }
@@ -86,7 +97,7 @@ DialBase* DialBaseFactory::makeDial(const JsonType& config_){
     dialBase = std::make_unique<RootFormula>();
     auto* rootFormulaPtr{(RootFormula*) dialBase.get()};
 
-    auto formulaConfig{GenericToolbox::Json::fetchValue<JsonType>(config_, "dialConfig")};
+    auto formulaConfig(GenericToolbox::Json::fetchValue<JsonType>(config_, "dialConfig"));
 
     rootFormulaPtr->setFormulaStr( GenericToolbox::Json::fetchValue<std::string>(formulaConfig, "formulaStr") );
   }
@@ -94,7 +105,7 @@ DialBase* DialBaseFactory::makeDial(const JsonType& config_){
     dialBase = std::make_unique<CompiledLibDial>();
     auto* compiledLibDialPtr{(CompiledLibDial*) dialBase.get()};
 
-    auto formulaConfig{GenericToolbox::Json::fetchValue<JsonType>(config_, "dialConfig")};
+    auto formulaConfig(GenericToolbox::Json::fetchValue<JsonType>(config_, "dialConfig"));
 
     bool success = compiledLibDialPtr->loadLibrary( GenericToolbox::Json::fetchValue<std::string>(formulaConfig, "libraryFile") );
     if( not success ){

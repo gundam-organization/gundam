@@ -5,6 +5,7 @@
 #include <exception>
 #include <cmath>
 #include <memory>
+#include <limits>
 
 #include <hemi/hemi_error.h>
 #include <hemi/launch.h>
@@ -12,16 +13,18 @@
 
 #include "Logger.h"
 
-LoggerInit([]{
-  Logger::setUserHeaderStr("[Cache::IndexedSums]");
-});
+#ifndef DISABLE_USER_HEADER
+LoggerInit([]{ Logger::setUserHeaderStr("[Cache::IndexedSums]"); });
+#endif
 
 // The constructor
 Cache::IndexedSums::IndexedSums(Cache::Weights::Results& inputs,
                                 std::size_t bins)
-    : fEventWeights(inputs) {
-    if (inputs.size()<1) throw std::runtime_error("No bins to sum");
-    if (bins<1) throw std::runtime_error("No bins to sum");
+    : fEventWeights(inputs),
+      fLowerClamp(-std::numeric_limits<double>::infinity()),
+      fUpperClamp(std::numeric_limits<double>::infinity()) {
+    LogThrowIf((inputs.size()<1), "No bins to sum");
+    LogThrowIf((bins<1), "No bins to sum");
 
     LogInfo << "Cached IndexedSums -- bins reserved: "
            << bins
@@ -39,13 +42,16 @@ Cache::IndexedSums::IndexedSums(Cache::Weights::Results& inputs,
         // set.  The initial values are seldom changed, so they are not
         // pinned.
         fSums = std::make_unique<hemi::Array<double>>(bins,true);
+        LogThrowIf(not fSums, "Bad Sums Alloc");
         fSums2 = std::make_unique<hemi::Array<double>>(bins,true);
+        LogThrowIf(not fSums2, "Bad Sums2 Alloc");
         fIndexes = std::make_unique<hemi::Array<short>>(fEventWeights.size(),false);
+        LogThrowIf(not fIndexes, "Bad IndexesAlloc");
 
     }
-    catch (std::bad_alloc&) {
-        LogError << "Failed to allocate memory, so stopping" << std::endl;
-        throw std::runtime_error("Not enough memory available");
+    catch (...) {
+        LogError << "Uncaught exception, so stopping" << std::endl;
+        LogThrow("Uncaught exception -- not enough memory available");
     }
 
     // Place the cache into a default state.
@@ -68,36 +74,48 @@ Cache::IndexedSums::~IndexedSums() = default;
 void Cache::IndexedSums::Reset() {
     // Very little to do here since the indexed sum cache is zeroed with it is
     // filled.  Mark it as invalid out of an abundance of caution!
-    fSumsValid = false;
+    Invalidate();
 }
 
 void Cache::IndexedSums::SetEventIndex(int event, int bin) {
-    if (event < 0) throw;
-    if (fEventWeights.size() <= event) throw;
-    if (bin < 0) throw;
-    if (fSums->size() <= bin) throw;
+    LogThrowIf((event < 0), "Event index out of range");
+    LogThrowIf((fEventWeights.size() <= event), "Event index out of range");
+    LogThrowIf((bin<0), "Bin is out of range");
+    LogThrowIf((fSums->size() <= bin), "Bin is out of range");
     fIndexes->hostPtr()[event] = bin;
 }
 
+void Cache::IndexedSums::SetMaximumEventWeight(double maximum) {
+    fUpperClamp = maximum;
+}
+
+void Cache::IndexedSums::SetMinimumEventWeight(double minimum) {
+    fLowerClamp = minimum;
+}
+
 double Cache::IndexedSums::GetSum(int i) {
-    if (i < 0) throw;
-    if (fSums->size() <= i) throw;
+    LogThrowIf(i<0, "Sum index out of range");
+    LogThrowIf((fSums->size() <= i), "Sum index out of range");
     // This odd ordering is to make sure the thread-safe hostPtr update
-    // finishes before the sum is set to be valid.  The use of isfinite is to
+    // finishes before the sum is set to be valid.  The use of isnan is to
     // make sure that the optimizer doesn't reorder the statements.
     double value = fSums->hostPtr()[i];
-    if (std::isfinite(value)) fSumsValid = true;
+    if (not fSumsApplied) fSumsValid = false;
+    else if (not std::isnan(value)) fSumsValid = true;
+    else LogThrow("Cache::IndexedSums sum is nan");
     return value;
 }
 
 double Cache::IndexedSums::GetSum2(int i) {
-    if (i < 0) throw;
-    if (fSums2->size() <= i) throw;
+    LogThrowIf((i<0), "Sum2 index out of range");
+    LogThrowIf((fSums2->size()<= i), "Sum2 index out of range");
     // This odd ordering is to make sure the thread-safe hostPtr update
     // finishes before the sum is set to be valid.  The use of isfinite is to
     // make sure that the optimizer doesn't reorder the statements.
     double value = fSums2->hostPtr()[i];
-    if (std::isfinite(value)) fSumsValid = true;
+    if (not fSumsApplied) fSumsValid = false;
+    else if (not std::isnan(value)) fSumsValid = true;
+    else LogThrow("Cache::IndexedSums sum2 is nan");
     return value;
 }
 
@@ -139,13 +157,26 @@ namespace {
                          const int NP) {
         for (int i : hemi::grid_stride_range(0,NP)) {
             const double v = inputs[i];
-#ifdef HEMI_DEV_CODE
             CacheAtomicAdd(&sums[indexes[i]],v);
             CacheAtomicAdd(&sums2[indexes[i]],v*v);
-#else
-            sums[indexes[i]] += v;
-            sums2[indexes[i]] += v*v;
-#endif
+        }
+    }
+
+    // A function to do the sums
+    HEMI_KERNEL_FUNCTION(HEMIClampedIndexedSumKernel,
+                         double* sums,
+                         double* sums2,
+                         const double* inputs,
+                         const short* indexes,
+                         const double lowerClamp,
+                         const double upperClamp,
+                         const int NP) {
+        for (int i : hemi::grid_stride_range(0,NP)) {
+            double v = inputs[i];
+            if (v < lowerClamp) v = lowerClamp;
+            if (v > upperClamp) v = upperClamp;
+            CacheAtomicAdd(&sums[indexes[i]],v);
+            CacheAtomicAdd(&sums2[indexes[i]],v*v);
         }
     }
 
@@ -153,7 +184,7 @@ namespace {
 
 bool Cache::IndexedSums::Apply() {
     // Mark the results has having changed.
-    fSumsValid = false;
+    Invalidate();
 
     HEMIResetKernel resetKernel;
     hemi::launch(resetKernel,
@@ -166,13 +197,27 @@ bool Cache::IndexedSums::Apply() {
                  0.0,
                  fSums2->size());
 
-    HEMIIndexedSumKernel indexedSumKernel;
-    hemi::launch(indexedSumKernel,
-                 fSums->writeOnlyPtr(),
-                 fSums2->writeOnlyPtr(),
-                 fEventWeights.readOnlyPtr(),
-                 fIndexes->readOnlyPtr(),
-                 fEventWeights.size());
+    if (std::isfinite(fLowerClamp) || std::isfinite(fUpperClamp)) {
+        HEMIClampedIndexedSumKernel clampedIndexedSumKernel;
+        hemi::launch(clampedIndexedSumKernel,
+                     fSums->writeOnlyPtr(),
+                     fSums2->writeOnlyPtr(),
+                     fEventWeights.readOnlyPtr(),
+                     fIndexes->readOnlyPtr(),
+                     fLowerClamp, fUpperClamp,
+                     fEventWeights.size());
+    }
+    else {
+        HEMIIndexedSumKernel indexedSumKernel;
+        hemi::launch(indexedSumKernel,
+                     fSums->writeOnlyPtr(),
+                     fSums2->writeOnlyPtr(),
+                     fEventWeights.readOnlyPtr(),
+                     fIndexes->readOnlyPtr(),
+                     fEventWeights.size());
+    }
+
+    fSumsApplied = true;
 
     // Synchronization prevents the GPU from running in parallel with the CPU,
     // so it can make the whole program a little slower.  In practice, the
@@ -212,5 +257,4 @@ bool Cache::IndexedSums::Apply() {
 // Local Variables:
 // mode:c++
 // c-basic-offset:4
-// compile-command:"$(git rev-parse --show-toplevel)/cmake/gundam-build.sh"
 // End:

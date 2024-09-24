@@ -12,9 +12,16 @@ namespace Cache {
     class IndexedSums;
 }
 
-/// A class to calculate and cache a bunch of events weights.  This is where
-/// the actual calculation is controled for the GPU.  It's used by the cache
-/// manager when the GPU needs to be fired up.
+/// A class to accumulate the sum of event weights into the histogram bins on
+/// the GPU (or CPU).  This provides a parallel reduction (a sum) by using
+/// attomic operations when adding values.  On a GPU, this can result in a lot
+/// of collisions since the additions are happening in a large number of
+/// (almost) synchronized threads.
+///
+/// The accumulation runs the "sum" kernel once, so conceptually each thread
+/// adds one number to a sum, but the atomic operation will take O(N) attempts
+/// to finish the addition where N is the number of entries in the maximum
+/// histogram bin.
 class Cache::IndexedSums {
 private:
     // Save the event weight cache reference for later use
@@ -30,6 +37,17 @@ private:
     // The accumulated weights for each histogram bin.
     std::unique_ptr<hemi::Array<double>> fSums2;
 
+    // The lower bound for any individual entry in the fWeights array.  This
+    // is a global event weight clamp.
+    double fLowerClamp;
+
+    // The upper bound for any individual entry in the fWeights array.  This
+    // is a global event weight clamp.
+    double fUpperClamp;
+
+    // Flag that the sum has been applied.
+    bool fSumsApplied;
+
     // Cache of whether the result values in memory are valid.
     bool fSumsValid;
 
@@ -44,15 +62,29 @@ public:
     /// everyplace.
     virtual ~IndexedSums();
 
+    /// Invalidate the sum in the CPU memory.
+    void Invalidate() {fSumsApplied = false; fSumsValid = false;}
+
     /// Reinitialize the cache.  This puts it into a state to be refilled, but
     /// does not deallocate any memory.
     void Reset();
+
+    /// Dummy to match interface with CacheRecursiveSums.
+    void Initialize() {}
 
     /// Return the approximate allocated memory (e.g. on the GPU).
     std::size_t GetResidentMemory() const {return fTotalBytes;}
 
     // Assigns the bin number that an event will be added to.
     void SetEventIndex(int event, int bin);
+
+    // Set the maximum event weight to be applied as an upper clamp during the
+    // sum.  (Default: infinity).
+    void SetMaximumEventWeight(double maximum);
+
+    // Set the minimum event weight to be applied as an upper clamp during the
+    // sum.  (Default: negative infinity).
+    void SetMinimumEventWeight(double minimum);
 
     /// Return the number of histogram bins that are accumulated.
     std::size_t GetSumCount() const {return fSums->size();}
@@ -105,6 +137,5 @@ public:
 // Local Variables:
 // mode:c++
 // c-basic-offset:4
-// compile-command:"$(git rev-parse --show-toplevel)/cmake/gundam-build.sh"
 // End:
 #endif

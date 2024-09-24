@@ -12,14 +12,14 @@
 #include <hemi/grid_stride_range.h>
 
 #include "Logger.h"
-LoggerInit([]{
-  Logger::setUserHeaderStr("[Cache::Weights]");
-});
+#ifndef DISABLE_USER_HEADER
+LoggerInit([]{ Logger::setUserHeaderStr("[Cache::Weights]"); });
+#endif
 
 // The constructor
 Cache::Weights::Weights(std::size_t results)
     : fTotalBytes(0), fResultCount(results) {
-    if (fResultCount<1) throw std::runtime_error("No results in weight cache");
+    LogThrowIf((fResultCount<1),"No results in weight cache");
 
     LogInfo << "Cached Weights -- output results reserved: "
            << GetResultCount()
@@ -37,12 +37,14 @@ Cache::Weights::Weights(std::size_t results)
         // set.  The initial values are seldom changed, so they are not
         // pinned.
         fResults.reset(new hemi::Array<double>(GetResultCount(),true));
+        LogThrowIf(not fResults, "Bad Results alloc");
         fInitialValues.reset(new hemi::Array<double>(GetResultCount(),false));
+        LogThrowIf(not fInitialValues, "Bad InitialValues alloc");
 
     }
-    catch (std::bad_alloc&) {
+    catch (...) {
         LogError << "Failed to allocate memory, so stopping" << std::endl;
-        throw std::runtime_error("Not enough memory available");
+        LogThrow("Not enough memory available");
     }
 
     // Initialize the caches.  Don't try to zero everything since the
@@ -51,7 +53,7 @@ Cache::Weights::Weights(std::size_t results)
 }
 
 void Cache::Weights::Reset() {
-    fResultsValid = false;
+    Invalidate();
     std::fill(fInitialValues->hostPtr(),
               fInitialValues->hostPtr() + fInitialValues->size(),
               1.0);
@@ -62,34 +64,38 @@ void Cache::Weights::Reset() {
 }
 
 double Cache::Weights::GetResult(int i) {
-    if (i < 0) throw;
-    if (GetResultCount() <= i) throw;
+    LogThrowIf((i<0), "Index out of range");
+    LogThrowIf((GetResultCount() <= i), "Index out of range");
     // This odd ordering is to make sure the thread-safe hostPtr update
-    // finishes before the result is set to be valid.  The use of isfinite is
+    // finishes before the result is set to be valid.  The use of isnan is
     // to make sure that the optimizer doesn't reorder the statements.
     double value = fResults->hostPtr()[i];
-    if (std::isfinite(value)) fResultsValid = true;
+    if (not fKernelApplied) fResultsValid = false;
+    else if (not std::isnan(value)) fResultsValid = true;
+    else LogThrow("Cache::Weights result is nan");
     return value;
 }
 
 double Cache::Weights::GetResultFast(int i) {
     // This odd ordering is to make sure the thread-safe hostPtr update
-    // finishes before the result is set to be valid.  The use of isfinite is
+    // finishes before the result is set to be valid.  The use of isnan is
     // to make sure that the optimizer doesn't reorder the statements.
     double value = fResults->hostPtr()[i];
-    if (std::isfinite(value)) fResultsValid = true;
+    if (not fKernelApplied) fResultsValid = false;
+    else if (not std::isnan(value)) fResultsValid = true;
+    else LogThrow("Cache::Weights result is nan");
     return value;
 }
 
 void Cache::Weights::SetResult(int i, double v) {
-    if (i < 0) throw;
-    if (GetResultCount() <= i) throw;
+    LogThrowIf((i<0), "Index out of range");
+    LogThrowIf((GetResultCount() <= i), "Index out of range");
     fResults->hostPtr()[i] = v;
 }
 
 double* Cache::Weights::GetResultPointer(int i) {
-    if (i < 0) throw;
-    if (GetResultCount() <= i) throw;
+    LogThrowIf((i<0), "Index out of range");
+    LogThrowIf((GetResultCount() <= i), "Index out of range");
     return (fResults->hostPtr() + i);
 }
 
@@ -98,21 +104,19 @@ bool* Cache::Weights::GetResultValidPointer() {
 }
 
 double  Cache::Weights::GetInitialValue(int i) {
-    if (i < 0) throw;
-    if (GetResultCount() <= i) throw;
+    LogThrowIf((i<0), "Index out of range");
+    LogThrowIf((GetResultCount() <= i), "Index out of range");
     return fInitialValues->hostPtr()[i];
 }
 
 void Cache::Weights::SetInitialValue(int i, double v) {
-    if (i < 0) throw;
-    if (GetResultCount() <= i) throw;
+    LogThrowIf((i<0), "Index out of range");
+    LogThrowIf((GetResultCount() <= i), "Index out of range");
     fInitialValues->hostPtr()[i] = v;
 }
 
 // Define CACHE_DEBUG to get lots of output from the host
 #undef CACHE_DEBUG
-
-#include "CacheAtomicMult.h"
 
 namespace {
     // A function to be used as the kernen on a CPU or GPU.  This must be
@@ -137,6 +141,10 @@ namespace {
 
 bool Cache::Weights::Apply() {
 
+    // Mark the results will be changed.
+    Invalidate();
+
+    // Apply the kernels.
     HEMISetKernel setKernel;
     hemi::launch(setKernel,
                  fResults->writeOnlyPtr(),
@@ -148,8 +156,7 @@ bool Cache::Weights::Apply() {
         fWeightCalculator.at(i)->Apply();
     }
 
-    // Mark the results has having changed.
-    fResultsValid = false;
+    fKernelApplied = true;
 
     // Synchronization prevents the GPU from running in parallel with the CPU,
     // so it can make the whole program a little slower.  In practice, the
@@ -189,5 +196,4 @@ bool Cache::Weights::Apply() {
 // Local Variables:
 // mode:c++
 // c-basic-offset:4
-// compile-command:"$(git rev-parse --show-toplevel)/cmake/gundam-build.sh"
 // End:

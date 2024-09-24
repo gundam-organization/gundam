@@ -11,9 +11,9 @@
 
 #include <sstream>
 
-LoggerInit([]{
-  Logger::getUserHeader() << "[" << FILENAME << "]";
-});
+#ifndef DISABLE_USER_HEADER
+LoggerInit([]{ Logger::getUserHeader() << "[" << FILENAME << "]"; });
+#endif
 
 
 namespace GundamUtils {
@@ -81,17 +81,15 @@ namespace GundamUtils {
 
             // cleanup from special chars
             arg = GenericToolbox::generateCleanBranchName(arg);
-          }
 
-          appendixList.back() = Form(
-              appendixList.back().c_str(),
-              GenericToolbox::joinVectorString(args, "_").c_str()
-          );
+            if( not arg.empty() ){
+              if( not appendixList.back().empty() ){ appendixList.back() += "_"; }
+              appendixList.back() += arg;
+            }
+          }
         }
-        else{
-          appendixList.back() = GenericToolbox::trimString(Form( appendixList.back().c_str(), "" ), "_");
-        }
-      }
+
+      } // option triggered?
     }
 
     return GenericToolbox::joinVectorString(appendixList, "_");

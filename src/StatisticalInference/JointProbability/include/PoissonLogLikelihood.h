@@ -14,9 +14,9 @@ namespace JointProbability{
 
   public:
     [[nodiscard]] std::string getType() const override { return "PoissonLogLikelihood"; }
-    [[nodiscard]] double eval(const Sample& sample_, int bin_) const override {
-      double predVal = sample_.getMcContainer().getHistogram().binList[bin_].content;
-      double dataVal = sample_.getDataContainer().getHistogram().binList[bin_].content;
+    [[nodiscard]] double eval(const SamplePair& samplePair_, int bin_) const override {
+      double predVal = samplePair_.model->getHistogram().binList[bin_].content;
+      double dataVal = samplePair_.data->getHistogram().binList[bin_].content;
 
       if(predVal <= 0){
         LogAlert << "Zero MC events in bin " << bin_ << ". predVal = " << predVal << ", dataVal = " << dataVal

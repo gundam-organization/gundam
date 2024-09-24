@@ -38,16 +38,25 @@ public:
 
   /// DialResponseCache is keeping a reference of a DialInterface and a cached double for the response
   struct DialResponseCache {
-    explicit DialResponseCache( DialInterface& interface_ ): dialInterface(interface_) {}
-    // The dial interface to be used with the PhysicsEvent.
-    DialInterface& dialInterface;
+    DialResponseCache() = delete; // prevent not setting up the interface ptr
+    explicit DialResponseCache( DialInterface& interface_ )
+      : dialInterface(&interface_) {
+      this->updateRequested = dialInterface->getInputBufferRef()->isDialUpdateRequestedPtr();
+    }
+    // The dial interface to be used with the Event.
+    DialInterface* dialInterface{nullptr};
     // The cached result calculated by the dial.
     double response{std::nan("unset")};
-
+    // A cached boolean to check if the dial needs to be updated.
+    bool *updateRequested{nullptr};
     void update(){
-      // evaluate the dial if an update has been requested
-      if( dialInterface.getInputBufferRef()->isDialUpdateRequested() ){
-        response = dialInterface.evalResponse();
+      // Reevaluate the dial if an update has been requested
+#ifdef EVENT_DIAL_CACHE_SAFE_SLOW_INTERFACE
+      if( dialInterface->getInputBufferRef()->isDialUpdateRequested() ){
+#else
+      if( *(this->updateRequested) ) {
+#endif
+        response = dialInterface->evalResponse();
       }
     }
     double getResponse(){
@@ -56,7 +65,7 @@ public:
     }
   };
 
-  /// The cache element associating a PhysicsEvent to the appropriate
+  /// The cache element associating a Event to the appropriate
   /// DialInterface.
   struct CacheEntry {
     Event* event;
@@ -67,7 +76,7 @@ public:
       ss << *event << std::endl;
       ss << "Dials{";
       for( auto& dialResponseCache : dialResponseCacheList ){
-        ss << std::endl << "  { " << dialResponseCache.dialInterface.getSummary() << " }";
+        ss << std::endl << "  { " << dialResponseCache.dialInterface->getSummary() << " }";
       }
       ss << std::endl << "}";
       return ss.str();
@@ -139,8 +148,11 @@ public:
 public:
   EventDialCache() = default;
 
+
   // returns the current index
   [[nodiscard]] size_t getFillIndex() const { return _fillIndex_; }
+
+  [[nodiscard]] const std::vector<IndexedCacheEntry> getIndexedCache() const { return _indexedCache_; }
 
   /// Provide the event dial cache.  The event dial cache containes a
   /// CacheElem_t object for every dial applied to a physics event.  The
@@ -173,6 +185,9 @@ public:
 
   /// Resize the cache vectors to remove entries with null events
   void shrinkIndexedCache();
+
+  // copy from
+  void fillCacheEntries(const SampleSet& sampleSet_);
 
   void reweightEntry( CacheEntry& entry_);
 
@@ -223,5 +238,4 @@ private:
 // Local Variables:
 // mode:c++
 // c-basic-offset:2
-// compile-command:"$(git rev-parse --show-toplevel)/cmake/gundam-build.sh"
 // End:

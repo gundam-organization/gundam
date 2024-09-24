@@ -18,10 +18,8 @@
 #include <cstdlib>
 
 
-LoggerInit([]{
-  Logger::getUserHeader() << "[" << FILENAME << "]";
-  Logger::setPrefixFormat("{TIME} {USER_HEADER}");
-});
+LoggerInit([]{ Logger::setPrefixFormat("{TIME} {SEVERITY}"); });
+
 
 CmdLineParser clp{};
 
@@ -70,9 +68,9 @@ int main( int argc, char** argv ){
   if( GenericToolbox::doesTFileIsValid( clp.getOptionVal<std::string>("config-1") ) ){
     auto f = std::unique_ptr<TFile>( GenericToolbox::openExistingTFile( clp.getOptionVal<std::string>("config-1") ) );
     TNamed* version{nullptr};
-    GundamUtils::ObjectReader::readObject<TNamed>( f.get(), {{"gundam/version_TNamed"}, {"gundamFitter/gundamVersion_TNamed"}}, [&](TNamed* obj_){ version = obj_; });
+    GundamUtils::ObjectReader::readObject<TNamed>( f.get(), {{"gundam/build/version_TNamed"}, {"gundam/version_TNamed"}, {"gundamFitter/gundamVersion_TNamed"}}, [&](TNamed* obj_){ version = obj_; });
     TNamed* cmdLine{nullptr};
-    GundamUtils::ObjectReader::readObject<TNamed>( f.get(), {{"gundam/commandLine_TNamed"}, {"gundamFitter/commandLine_TNamed"}}, [&](TNamed* obj_){ version = cmdLine; });
+    GundamUtils::ObjectReader::readObject<TNamed>( f.get(), {{"gundam/runtime/commandLine_TNamed"}, {"gundam/commandLine_TNamed"}, {"gundamFitter/commandLine_TNamed"}}, [&](TNamed* obj_){ version = cmdLine; });
     if( version != nullptr and cmdLine != nullptr ){
       LogInfo << "config-1 is within .root file. Ran under GUNDAM v" << version->GetTitle() << " with cmdLine: "<< cmdLine->GetTitle() << std::endl;
     }
@@ -80,9 +78,9 @@ int main( int argc, char** argv ){
   if( GenericToolbox::doesTFileIsValid( clp.getOptionVal<std::string>("config-2") ) ){
     auto f = std::unique_ptr<TFile>( GenericToolbox::openExistingTFile( clp.getOptionVal<std::string>("config-2") ) );
     TNamed* version{nullptr};
-    GundamUtils::ObjectReader::readObject<TNamed>( f.get(), {{"gundam/version_TNamed"}, {"gundamFitter/gundamVersion_TNamed"}}, [&](TNamed* obj_){ version = obj_; });
+    GundamUtils::ObjectReader::readObject<TNamed>( f.get(), {{"gundam/build/version_TNamed"}, {"gundam/version_TNamed"}, {"gundamFitter/gundamVersion_TNamed"}}, [&](TNamed* obj_){ version = obj_; });
     TNamed* cmdLine{nullptr};
-    GundamUtils::ObjectReader::readObject<TNamed>( f.get(), {{"gundam/commandLine_TNamed"}, {"gundamFitter/gundamVersion_TNamed"}}, [&](TNamed* obj_){ version = cmdLine; });
+    GundamUtils::ObjectReader::readObject<TNamed>( f.get(), {{"gundam/runtime/commandLine_TNamed"}, {"gundam/commandLine_TNamed"}, {"gundamFitter/gundamVersion_TNamed"}}, [&](TNamed* obj_){ version = cmdLine; });
     if( version != nullptr and cmdLine != nullptr ){
       LogInfo << "config-2 is within .root file. Ran under GUNDAM v" << version->GetTitle() << " with cmdLine: "<< cmdLine->GetTitle() << std::endl;
     }
@@ -162,7 +160,7 @@ void compareConfigStage(const JsonType& config1_, const JsonType& config2_){
 
         }
         else if( entry1_.is_structured() and entry2_.is_structured() ){
-          std::vector<std::string> keysToFetch{GenericToolbox::Json::ls(entry1_)};
+          std::vector<std::string> keysToFetch(GenericToolbox::Json::ls(entry1_));
           for( auto& key2 : GenericToolbox::Json::ls(entry2_) ){
             if( not GenericToolbox::doesElementIsInVector(key2, keysToFetch) ){ keysToFetch.emplace_back(key2); }
           }

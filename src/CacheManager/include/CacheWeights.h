@@ -37,6 +37,9 @@ private:
     // Cache of whether the result values in memory are valid.
     bool fResultsValid;
 
+    /// Flag that the kernels have been started.
+    bool fKernelApplied;
+
     /// An array of the initial value for each result.  It's copied from the
     /// CPU to the GPU once at the beginning.
     std::unique_ptr<hemi::Array<double>> fInitialValues;
@@ -48,7 +51,7 @@ private:
     /// because vectors cause trouble with some versions of the nvcc cuda
     /// compiler.
     int fWeightCalculators{0};
-    std::array<Cache::Weight::Base*,8> fWeightCalculator;
+    std::array<Cache::Weight::Base*,16> fWeightCalculator;
 
 public:
     // Construct the class.  This should allocate all the memory on the host
@@ -90,6 +93,12 @@ public:
         fWeightCalculator.at(index) = v;
         return index;
     }
+
+    /// Mark that the results on the CPU are no longer valid. This
+    /// is used by the Cache::Manager::Fill method to note that the input
+    /// parameters have changed.  The results will become valid after the
+    /// kernel finishes (asynchronously).
+    virtual void Invalidate() {fKernelApplied = false; fResultsValid = false;}
 
     /// Calculate the results and save them for later use.  This copies the
     /// results from the GPU to the CPU.
@@ -137,6 +146,5 @@ public:
 // Local Variables:
 // mode:c++
 // c-basic-offset:4
-// compile-command:"$(git rev-parse --show-toplevel)/cmake/gundam-build.sh"
 // End:
 #endif

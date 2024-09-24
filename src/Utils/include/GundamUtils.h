@@ -20,6 +20,15 @@
 #include <utility>
 #include <functional>
 
+// compiler flags
+#if HAS_CPP_17
+#define GUNDAM_LIKELY_COMPILER_FLAG [[likely]]
+#define GUNDAM_UNLIKELY_COMPILER_FLAG [[unlikely]]
+#else
+#define GUNDAM_LIKELY_COMPILER_FLAG
+#define GUNDAM_UNLIKELY_COMPILER_FLAG
+#endif
+
 
 
 namespace GundamUtils {

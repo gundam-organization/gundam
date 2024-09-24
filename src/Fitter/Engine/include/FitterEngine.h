@@ -33,6 +33,13 @@ public:
   ENUM_FIELD( AdaptiveMCMC )
 #include "GenericToolbox.MakeEnum.h"
 
+#define ENUM_NAME PcaMethod
+#define ENUM_FIELDS \
+  ENUM_FIELD( DeltaChi2Threshold, 0 ) \
+  ENUM_FIELD( ReducedDeltaChi2Threshold ) \
+  ENUM_FIELD( SqrtReducedDeltaChi2Threshold )
+#include "GenericToolbox.MakeEnum.h"
+
 protected:
   void readConfigImpl() override;
   void initializeImpl() override;
@@ -53,6 +60,8 @@ public:
   void setAllParamVariationsSigmas(const std::vector<double> &allParamVariationsSigmas){ _allParamVariationsSigmas_ = allParamVariationsSigmas; }
   void setThrowMcBeforeFit(bool throwMcBeforeFit_){ _throwMcBeforeFit_ = throwMcBeforeFit_; }
   void setThrowGain(double throwGain_){ _throwGain_ = throwGain_; }
+  void setPcaThreshold(double pcaThreshold_){ _pcaThreshold_ = pcaThreshold_; }
+  void setPcaMethod(PcaMethod pcaMethod_){ _pcaMethod_ = pcaMethod_; }
 
   // const-getters
   [[nodiscard]] const JsonType &getPreFitParState() const{ return _preFitParState_; }
@@ -74,12 +83,6 @@ public:
   void rescaleParametersStepSize();
   void checkNumericalAccuracy();
 
-  // Deprecated
-  [[deprecated("use getLikelihoodInterface().getDataSetManager().getPropagator()")]] [[nodiscard]] const Propagator& getPropagator() const{ return getLikelihoodInterface().getDataSetManager().getPropagator(); }
-  [[deprecated("use getLikelihoodInterface().getDataSetManager().getPropagator()")]] Propagator& getPropagator(){ return getLikelihoodInterface().getDataSetManager().getPropagator(); }
-  [[deprecated("Use runPcaCheck()")]] void fixGhostFitParameters(){ runPcaCheck(); }
-
-
 private:
   // Parameters
   bool _isDryRun_{false};
@@ -94,11 +97,14 @@ private:
   bool _scaleParStepWithChi2Response_{false};
   double _throwGain_{1.};
   double _parStepGain_{0.1};
-  double _pcaDeltaChi2Threshold_{1E-6};
   bool _savePostfitEventTrees_{false};
   std::vector<double> _allParamVariationsSigmas_{};
   JsonType _preFitParState_{};
   JsonType _postFitParState_{};
+
+  // dev
+  double _pcaThreshold_{0};
+  PcaMethod _pcaMethod_{PcaMethod::DeltaChi2Threshold};
 
   // Internals
   TDirectory* _saveDir_{nullptr};

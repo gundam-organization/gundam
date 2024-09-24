@@ -15,19 +15,15 @@
 #include "Logger.h"
 
 
-LoggerInit([]{
-  Logger::setUserHeaderStr("[JointProbability]");
-});
+#ifndef DISABLE_USER_HEADER
+LoggerInit([]{ Logger::setUserHeaderStr("[JointProbability]"); });
+#endif
 
 namespace JointProbability{
 
   JointProbabilityBase* makeJointProbability(const std::string& type_){
 
     std::string enumTypeStr{type_};
-
-    // TODO: possible backward compatibility
-//    if(  ){ }
-
 
     auto jType{JointProbabilityType::toEnum( type_, true )};
 

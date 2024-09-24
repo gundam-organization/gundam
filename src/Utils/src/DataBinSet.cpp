@@ -12,28 +12,32 @@
 #include <sstream>
 #include <stdexcept>
 
-
-LoggerInit([]{
-  Logger::setUserHeaderStr("[DataBinSet]");
-} );
+#ifndef DISABLE_USER_HEADER
+LoggerInit([]{ Logger::setUserHeaderStr("[DataBinSet]"); });
+#endif
 
 void DataBinSet::setVerbosity(int maxLogLevel_){ Logger::setMaxLogLevel(maxLogLevel_); }
 
 // core
-void DataBinSet::readBinningDefinition(const std::string &filePath_) {
+void DataBinSet::readBinningDefinition(const JsonType& binning_) {
 
-  _filePath_ = GenericToolbox::expandEnvironmentVariables(filePath_);
-  if( not GenericToolbox::isFile(_filePath_) ){
-    LogError << GET_VAR_NAME_VALUE(_filePath_) << ": file not found." << std::endl;
-    throw std::runtime_error(GET_VAR_NAME_VALUE(_filePath_) + ": file not found.");
+  _binList_.clear();
+
+  if( binning_.is_structured() ){
+    // config like -> should already be unfolded
+    this->readBinningConfig( binning_ );
   }
+  else if( binning_.is_string() ){
+    _filePath_ = GenericToolbox::expandEnvironmentVariables( binning_.get<std::string>() );
+    if( not GenericToolbox::isFile(_filePath_) ){
+      LogError << GET_VAR_NAME_VALUE(_filePath_) << ": file not found." << std::endl;
+      throw std::runtime_error(GET_VAR_NAME_VALUE(_filePath_) + ": file not found.");
+    }
 
-  if( GenericToolbox::hasExtension(_filePath_, "txt") ){ this->readTxtBinningDefinition(); }
-  if( GenericToolbox::hasExtension(_filePath_, "yaml") or
-      GenericToolbox::hasExtension(_filePath_, "json") or
-      GenericToolbox::hasExtension(_filePath_, "yml")
-  ){
-    this->readBinningConfig();
+    if( GenericToolbox::hasExtension(_filePath_, "txt") ){ this->readTxtBinningDefinition(); }
+  }
+  else{
+    LogThrow("Unknown binning config entry: " << GenericToolbox::Json::toReadableString(binning_));
   }
 
   this->sortBinEdges();
@@ -43,7 +47,6 @@ void DataBinSet::readBinningDefinition(const std::string &filePath_) {
 void DataBinSet::checkBinning(){
 
   bool hasErrors{false};
-  LogWarning << "Checking for overlaps in the binning: " << _filePath_ << std::endl; // debug
 
   for( auto& bin : _binList_ ){
     for( auto& otherBin : _binList_ ) {
@@ -158,6 +161,7 @@ void DataBinSet::readTxtBinningDefinition(){
     // stripping comments
     line = GenericToolbox::splitString(line, "#")[0];
     GenericToolbox::trimInputString(line, " "); // removing trailing spaces
+    GenericToolbox::removeEscapeCodes(line);
 
     std::vector<std::string> lineElements = GenericToolbox::splitString(line, " ", true);
     if( lineElements.empty() ){ continue; }
@@ -210,7 +214,7 @@ void DataBinSet::readTxtBinningDefinition(){
     else{
 
       if( int(lineElements.size()) != nbExpectedValues ){
-        LogError << "(" << GET_VAR_NAME_VALUE(lineElements.size()) << ") != (" << GET_VAR_NAME_VALUE(lineElements.size()) << ")" << std::endl;
+        LogError << "(" << GET_VAR_NAME_VALUE(lineElements.size()) << ") != (" << GET_VAR_NAME_VALUE(nbExpectedValues) << ")" << std::endl;
         LogError << "Expected: " << GenericToolbox::toString(expectedVariableTitleList) << std::endl;
         LogError << "Got: " << GenericToolbox::toString(lineElements) << std::endl;
         throw std::runtime_error("lineElements.size() != nbExpectedValues");
@@ -245,11 +249,94 @@ void DataBinSet::readTxtBinningDefinition(){
 
 }
 
-void DataBinSet::readBinningConfig(){
+void DataBinSet::readBinningConfig(const JsonType& binning_){
 
-  auto conf = ConfigUtils::ConfigHandler( _filePath_ ).getConfig();
+  if( GenericToolbox::Json::doKeyExist(binning_, {"binningDefinition"}) ){
 
-  for( auto& binDef : GenericToolbox::Json::fetchValue(conf, "binList", JsonType()) ){
+    auto binningDefinition = GenericToolbox::Json::fetchValue<JsonType>(binning_, "binningDefinition");
+    struct Dimension{
+      int nBins{0};
+      int nModulo{1};
+      std::string var{};
+      bool isEdgesDiscreteValues{false};
+      std::vector<double> edgesList{};
+    };
+    std::vector<Dimension> dimensionList{};
+    dimensionList.reserve( binningDefinition.size() );
+
+    for( auto& binDefEntry : binningDefinition ){
+      dimensionList.emplace_back();
+      auto& dim = dimensionList.back();
+
+      dim.var = GenericToolbox::Json::fetchValue<std::string>(binDefEntry, "name");
+
+      if( GenericToolbox::Json::doKeyExist(binDefEntry, "edges") ){
+        dim.edgesList = GenericToolbox::Json::fetchValue(binDefEntry, "edges", dim.edgesList);
+      }
+      else if( GenericToolbox::Json::doKeyExist(binDefEntry, "values") ){
+        dim.edgesList = GenericToolbox::Json::fetchValue(binDefEntry, "values", dim.edgesList);
+        dim.isEdgesDiscreteValues = true;
+      }
+      else if( GenericToolbox::Json::doKeyExist(binDefEntry, "nBins") ){
+        // TH1D-like definition
+        auto nBins( GenericToolbox::Json::fetchValue<int>(binDefEntry, "nBins") );
+        auto minVal( GenericToolbox::Json::fetchValue<double>(binDefEntry, "min") );
+        auto maxVal( GenericToolbox::Json::fetchValue<double>(binDefEntry, "max") );
+
+        double step{(maxVal - minVal)/nBins};
+        LogThrowIf( step <= 0, "Invalid binning: " << GenericToolbox::Json::toReadableString(binDefEntry) );
+
+        dim.edgesList.reserve( nBins + 1 );
+        double edgeValue{minVal};
+        for( int iBin = 0 ; iBin < nBins ; iBin++ ){
+          dim.edgesList.emplace_back( edgeValue );
+          edgeValue += step;
+        }
+        dim.edgesList.emplace_back( edgeValue );
+      }
+      else{
+        LogThrow("Unrecognised binning definition: " << binningDefinition);
+      }
+
+      dim.nBins = int( dim.edgesList.size() );
+      if( not dim.isEdgesDiscreteValues ){ dim.nBins--; }
+
+      LogThrowIf(dim.nBins == 0, "Invalid edgesList for binEdgeEntry: " << GenericToolbox::Json::toReadableString(binDefEntry));
+    }
+
+    int nBinsTotal{1};
+    for( int iDim = int( dimensionList.size() )-1 ; iDim >= 0 ; iDim-- ){
+      dimensionList[iDim].nModulo = nBinsTotal;
+      nBinsTotal *= dimensionList[iDim].nBins;
+    }
+
+    _binList_.reserve( nBinsTotal );
+    for( int iBin = 0 ; iBin < nBinsTotal ; iBin++ ){
+      JsonType binDefConfig{};
+      auto& edgesListConfig = binDefConfig["edgesList"];
+
+      for( auto& dim : dimensionList ){
+        edgesListConfig.emplace_back(); auto& edge = edgesListConfig.back();
+        edge["name"] = dim.var;
+
+        int edgeIndex = ( iBin/dim.nModulo ) % dim.nBins;
+
+        if( dim.isEdgesDiscreteValues ){
+          edge["value"] = dim.edgesList[edgeIndex];
+        }
+        else{
+          edge["bounds"].emplace_back( dim.edgesList[edgeIndex] );
+          edge["bounds"].emplace_back( dim.edgesList[edgeIndex+1] );
+        }
+      }
+
+      _binList_.emplace_back( _binList_.size() );
+      _binList_.back().readConfig( binDefConfig );
+    }
+
+  }
+
+  for( auto& binDef : GenericToolbox::Json::fetchValue(binning_, "binList", JsonType()) ){
     _binList_.emplace_back( _binList_.size() );
     _binList_.back().readConfig( binDef );
   }

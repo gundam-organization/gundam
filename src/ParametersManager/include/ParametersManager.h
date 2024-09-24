@@ -24,7 +24,7 @@ protected:
 public:
   // setters
   void setParameterSetListConfig(const JsonType& parameterSetListConfig_){ _parameterSetListConfig_ = parameterSetListConfig_; }
-  void setReThrowParSetIfOutOfBounds(bool reThrowParSetIfOutOfBounds_){ _reThrowParSetIfOutOfBounds_ = reThrowParSetIfOutOfBounds_; }
+  void setReThrowParSetIfOutOfPhysical(bool reThrowParSetIfOutOfPhysical_){ _reThrowParSetIfOutOfPhysical_ = reThrowParSetIfOutOfPhysical_; }
   void setThrowToyParametersWithGlobalCov(bool throwToyParametersWithGlobalCov_){ _throwToyParametersWithGlobalCov_ = throwToyParametersWithGlobalCov_; }
   void setGlobalCovarianceMatrix(const std::shared_ptr<TMatrixD> &globalCovarianceMatrix){ _globalCovarianceMatrix_ = globalCovarianceMatrix; }
 
@@ -44,22 +44,42 @@ public:
 
   // core
   void moveParametersToPrior();
+  void convertEigenToOrig();
   void injectParameterValues(const JsonType &config_);
   void throwParameters();
   void throwParametersFromParSetCovariance();
   void throwParametersFromGlobalCovariance(bool quietVerbose_ = true);
-  void throwParametersFromGlobalCovariance(std::vector<double> &weightsChiSquare);
-  void throwParametersFromGlobalCovariance(std::vector<double> &weightsChiSquare, double pedestalEntity, double pedestalLeftEdge, double pedestalRightEdge);
-  void throwParametersFromTStudent(std::vector<double> &weightsChiSquare,double nu_);
+  void initializeStrippedGlobalCov();
   ParameterSet* getFitParameterSetPtr(const std::string& name_);
 
   // Logger related
   static void muteLogger();
   static void unmuteLogger();
 
+  /// Define the type of validity that needs to be required by
+  /// hasValidParameterValues.  The validity is propagated to each
+  /// ParameterSet.  The validity is:
+  ///
+  ///  "range" (default) -- Between the parameter minimum and maximum values.
+  ///  "norange"         -- Do not require parameters in the valid range
+  ///  "mirror"          -- Between the mirrored values (if parameter has
+  ///                       mirroring).
+  ///  "nomirror"        -- Do not require parameters in the mirrored range
+  ///  "physical"        -- Only physically meaningful values.
+  ///  "nophysical"      -- Do not require parameters in the physical range.
+  ///
+  /// Example: setParameterValidity("range,mirror,physical")
+  void setParameterValidity(const std::string& validity);
+
+  /// Check that the parameters in all of the enabled ParameterSets are valid.
+  [[nodiscard]] bool hasValidParameterSets() const;
+
+  // print
+  void printConfiguration() const;
+
 private:
   // config
-  bool _reThrowParSetIfOutOfBounds_{true};
+  bool _reThrowParSetIfOutOfPhysical_{true};
   bool _throwToyParametersWithGlobalCov_{false};
   JsonType _parameterSetListConfig_{};
 
@@ -72,6 +92,4 @@ private:
   std::shared_ptr<TMatrixD> _choleskyMatrix_{nullptr};
 
 };
-
-
 #endif //GUNDAM_PARAMETERS_MANAGER_H

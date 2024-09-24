@@ -21,9 +21,9 @@
 #include <string>
 #include <vector>
 
-LoggerInit([]{
-  Logger::getUserHeader() << "[" << FILENAME << "]";
-});
+#ifndef DISABLE_USER_HEADER
+LoggerInit([]{ Logger::getUserHeader() << "[" << FILENAME << "]"; });
+#endif
 
 
 int main(int argc, char** argv){
@@ -31,7 +31,7 @@ int main(int argc, char** argv){
   GundamApp app{"main fitter"};
 
 #ifdef GUNDAM_USING_CACHE_MANAGER
-  if (Cache::Manager::HasCUDA()){ LogWarning << "CUDA compatible build." << std::endl; }
+  if (Cache::Manager::HasCUDA()){ LogInfo << "CUDA inside" << std::endl; }
 #endif
 
   // --------------------------
@@ -56,7 +56,6 @@ int main(int argc, char** argv){
   clParser.addOption("outputDir", {"--out-dir"}, "Specify the output directory");
   clParser.addOption("randomSeed", {"-s", "--seed"}, "Set random seed");
   clParser.addOption("useDataEntry", {"--use-data-entry"}, "Overrides \"selectedDataEntry\" in dataSet config. Second arg is to select a given dataset");
-  clParser.addOption("useDataConfig", {"--use-data-config"}, "Add a data entry to the data set definition and use it for the fit");
   clParser.addOption("injectParameterConfig", {"--inject-parameters"}, "Inject parameters defined in the provided config file");
   clParser.addOption("injectToyParameters", {"--inject-toy-parameter"}, "Inject parameters defined in the provided config file");
   clParser.addOption("appendix", {"--appendix"}, "Add appendix to the output file name");
@@ -65,10 +64,7 @@ int main(int argc, char** argv){
 
   clParser.addTriggerOption("dry-run", {"--dry-run", "-d"},"Perform the full sequence of initialization, but don't do the actual fit.");
   clParser.addTriggerOption("asimov", {"-a", "--asimov"}, "Use MC dataset to fill the data histograms");
-  clParser.addTriggerOption("enablePca", {"--pca", "--enable-pca"}, "Enable principle component analysis for eigen decomposed parameter sets");
   clParser.addTriggerOption("skipHesse", {"--skip-hesse"}, "Don't perform postfit error evaluation");
-  clParser.addTriggerOption("skipSimplex", {"--skip-simplex"}, "Don't run SIMPLEX before the actual fit");
-  clParser.addTriggerOption("kickMc", {"--kick-mc"}, "Push MC parameters away from their prior to help the fit converge");
   clParser.addTriggerOption("generateOneSigmaPlots", {"--one-sigma"}, "Generate one sigma plots");
   clParser.addTriggerOption("lightOutputMode", {"--light-mode"}, "Disable plot generation");
   clParser.addTriggerOption("noDialCache", {"--no-dial-cache"}, "Disable cache handling for dial eval");
@@ -77,14 +73,20 @@ int main(int argc, char** argv){
   clParser.addOption("scanParameters", {"--scan"}, "Enable parameter scan before and after the fit (can provide nSteps)", 1, true);
   clParser.addOption("scanLine", {"--scan-line"}, "Provide par injector files: start and end point or only end point (start will be prefit)", 2, true);
   clParser.addOption("toyFit", {"--toy"}, "Run a toy fit (optional arg to provide toy index)", 1, true);
+  clParser.addOption("enablePca", {"--pca", "--enable-pca"}, "Enable principle component analysis for eigen decomposed parameter sets", 2, true);
 
-  clParser.addDummyOption("Runtime/debug options");
+  clParser.addDummyOption("Runtime options");
 
+  clParser.addOption("kickMc", {"--kick-mc"}, "Amount to push the starting parameters away from their prior values (default: 0)", 1, true);
   clParser.addOption("debugVerbose", {"--debug"}, "Enable debug verbose (can provide verbose level arg)", 1, true);
-  clParser.addTriggerOption("usingCacheManager", {"--cache-manager"}, "Event weight cache handle by the CacheManager");
+  clParser.addOption("usingCacheManager", {"--cache-manager"}, "Toggle the usage of the CacheManager (i.e. the GPU) [empty, 'on', or 'off']",1,true);
   clParser.addTriggerOption("usingGpu", {"--gpu"}, "Use GPU parallelization");
   clParser.addOption("overrides", {"-O", "--override"}, "Add a config override [e.g. /fitterEngineConfig/engineType=mcmc)", -1);
   clParser.addOption("overrideFiles", {"-of", "--override-files"}, "Provide config files that will override keys", -1);
+
+  clParser.addDummyOption("Debugging options");
+  clParser.addTriggerOption("forceDirect", {"--cpu"}, "Force direct calculation of weights (for debugging)");
+  clParser.addOption("debugMaxNbEventToLoad", {"-me", "--max-events"}, "Set the maximum number of events to load per dataset", 1);
 
   clParser.addDummyOption();
 
@@ -107,7 +109,7 @@ int main(int argc, char** argv){
   // Init command line args:
   // --------------------------
 
-  if( clParser.isOptionTriggered("debugVerbose") ) GundamGlobals::setVerboseLevel(clParser.getOptionVal("debugVerbose", 1));
+  if( clParser.isOptionTriggered("debugVerbose") ){ GundamGlobals::setIsDebugConfig( true ); }
 
   // Is build compatible with GPU option?
   if( clParser.isOptionTriggered("usingGpu") ){
@@ -119,14 +121,32 @@ int main(int argc, char** argv){
     LogWarning << "Using GPU parallelization." << std::endl;
   }
 
-  // Is build compatible with cache manager option?
-  if( clParser.isOptionTriggered("usingCacheManager") or clParser.isOptionTriggered("usingGpu") ){
+  if (clParser.isOptionTriggered("forceDirect")) GundamGlobals::setForceDirectCalculation(true);
+
+  bool useCache = false;
 #ifdef GUNDAM_USING_CACHE_MANAGER
-    GundamGlobals::setEnableCacheManager(true);
-#else
-    LogThrow("useCacheManager can only be set while GUNDAM is compiled with -D WITH_CACHE_MANAGER=ON cmake option.");
+  useCache = Cache::Manager::HasGPU(true);
 #endif
+  if (clParser.isOptionTriggered("usingCacheManager")) {
+      int values = clParser.getNbValueSet("usingCacheManager");
+      if (values < 1) useCache = not useCache;
+      else if ("on" == clParser.getOptionVal<std::string>("usingCacheManager",0)) useCache = true;
+      else if ("off" == clParser.getOptionVal<std::string>("usingCacheManager",0)) useCache = false;
+      else {
+          LogThrow("Invalid --cache-manager argument: must be empty, 'on' or 'off'");
+      }
   }
+  if (clParser.isOptionTriggered("usingGpu")) useCache = true;
+
+#ifdef GUNDAM_USING_CACHE_MANAGER
+    GundamGlobals::setEnableCacheManager(useCache);
+    if (not useCache) {
+      LogWarning << "Cache::Manager enabled but turned off for job"
+                 << std::endl;
+    }
+#else
+    LogThrowIf(useCache, "GUNDAM compiled without Cache::Manager");
+#endif
 
   // No cache on dials?
   if( clParser.isOptionTriggered("noDialCache") ){
@@ -156,8 +176,8 @@ int main(int argc, char** argv){
   }
 
   // How many parallel threads?
-  GundamGlobals::getParallelWorker().setNThreads( clParser.getOptionVal("nbThreads", 1) );
-  LogInfo << "Running the fitter with " << GundamGlobals::getParallelWorker().getNbThreads() << " parallel threads." << std::endl;
+  GundamGlobals::setNumberOfThreads( clParser.getOptionVal("nbThreads", 1) );
+  LogInfo << "Running the fitter with " << GundamGlobals::getNumberOfThreads() << " parallel threads." << std::endl;
 
   // Reading configuration
   auto configFilePath = clParser.getOptionVal("configFile", "");
@@ -183,28 +203,32 @@ int main(int argc, char** argv){
     // appendixDict["optionName"] = "Appendix"
     // this list insure all appendices will appear in the same order
     std::vector<std::pair<std::string, std::string>> appendixDict{
-        {"configFile", "%s"},
-        {"overrideFiles", "With_%s"},
-        {"injectParameterConfig", "Inj_%s"},
-        {"scanLine", "LineSc_%s"},
-        {"useDataEntry", "DataEntry_%s"},
+        {"configFile", ""},
+        {"overrideFiles", "With"},
+        {"injectParameterConfig", "Inj"},
+        {"scanLine", "LineSc"},
+        {"useDataEntry", "DataEntry"},
         {"asimov", "Asimov"},
         {"scanParameters", "Scan"},
         {"generateOneSigmaPlots", "OneSigma"},
         {"enablePca", "PCA"},
         {"skipHesse", "NoHesse"},
-        {"skipSimplex", "NoSimplex"},
         {"kickMc", "KickMc"},
         {"lightOutputMode", "Light"},
-        {"toyFit", "ToyFit_%s"},
-        {"injectToyParameters", "InjToyPar_%s"},
+        {"toyFit", "ToyFit"},
+        {"injectToyParameters", "InjToyPar"},
+
+        // debug options
+        {"debugMaxNbEventToLoad", "debugNbEventMax"},
+
+        // trailing
         {"dry-run", "DryRun"},
-        {"appendix", "%s"},
+        {"appendix", ""},
     };
 
     outFileName = GenericToolbox::joinPath(
         outFolder,
-        GundamUtils::generateFileName(clParser, appendixDict)
+        "gundamFitter_" + GundamUtils::generateFileName(clParser, appendixDict)
     ) + ".root";
   }
 
@@ -240,20 +264,27 @@ int main(int argc, char** argv){
   // Configure:
   // --------------------------
   LogInfo << "FitterEngine setup..." << std::endl;
-  FitterEngine fitter{GenericToolbox::mkdirTFile(app.getOutfilePtr(), "FitterEngine")};
+  FitterEngine fitter(GenericToolbox::mkdirTFile(app.getOutfilePtr(), "FitterEngine"));
 
-  fitter.readConfig(GenericToolbox::Json::fetchSubEntry(configHandler.getConfig(), {"fitterEngineConfig"}));
+  fitter.readConfig(GenericToolbox::Json::fetchValue<JsonType>(configHandler.getConfig(), "fitterEngineConfig"));
 
   // -a
-  fitter.getLikelihoodInterface().getDataSetManager().getPropagator().setLoadAsimovData(clParser.isOptionTriggered("asimov") );
-  fitter.getLikelihoodInterface().getDataSetManager().getPropagator().setLoadAsimovData(clParser.isOptionTriggered("asimov") );
+  if( clParser.isOptionTriggered("asimov") ){
+    fitter.getLikelihoodInterface().setForceAsimovData( true );
+    fitter.getLikelihoodInterface().setDataType( LikelihoodInterface::DataType::Asimov );
+  }
+  else{
+    // by default, assume it's a real/fake data fit
+    fitter.getLikelihoodInterface().setDataType( LikelihoodInterface::DataType::RealData );
+  }
+
 
   // --use-data-entry
   if( clParser.isOptionTriggered("useDataEntry") ){
     auto selectedDataEntry = clParser.getOptionVal<std::string>("useDataEntry", 0);
     // Do something better in case multiple datasets are defined
     bool isFound{false};
-    for( auto& dataSet : fitter.getLikelihoodInterface().getDataSetManager().getDataSetList() ){
+    for( auto& dataSet : fitter.getLikelihoodInterface().getDatasetList() ){
       if( GenericToolbox::isIn( selectedDataEntry, dataSet.getDataDispenserDict() ) ){
         LogWarning << "Using data entry \"" << selectedDataEntry << "\" for dataset: " << dataSet.getName() << std::endl;
         dataSet.setSelectedDataEntry( selectedDataEntry );
@@ -261,11 +292,6 @@ int main(int argc, char** argv){
       }
     }
     LogThrowIf(not isFound, "Could not find data entry \"" << selectedDataEntry << "\" among defined data sets");
-  }
-
-  // --use-data-config
-  if( clParser.isOptionTriggered("useDataConfig") ){
-    LogThrow("--use-data-config not implemented yet");
   }
 
   // --skip-hesse
@@ -281,12 +307,21 @@ int main(int argc, char** argv){
   }
 
   // --enable-pca
-  fitter.setEnablePca(clParser.isOptionTriggered("enablePca"));
+  if( clParser.isOptionTriggered("enablePca") ){
+    fitter.setEnablePca( true );
+    if( clParser.getNbValueSet("enablePca") == 1 ){
+      fitter.setPcaThreshold( clParser.getOptionVal<double>("enablePca") );
+    }
+    if( clParser.getNbValueSet("enablePca") == 2 ){
+      fitter.setPcaThreshold( clParser.getOptionVal<double>("enablePca", 0) );
+      fitter.setPcaMethod( FitterEngine::PcaMethod::toEnum(clParser.getOptionVal<std::string>("enablePca", 1), true) );
+    }
+  }
 
   // --toy <iToy>
   if( clParser.isOptionTriggered("toyFit") ){
-    fitter.getLikelihoodInterface().getDataSetManager().getPropagator().setThrowAsimovToyParameters(true);
-    fitter.getLikelihoodInterface().getDataSetManager().getPropagator().setIThrow(clParser.getOptionVal("toyFit", -1));
+    fitter.getLikelihoodInterface().setDataType( LikelihoodInterface::DataType::Toy );
+    fitter.getLikelihoodInterface().getModelPropagator().setIThrow( clParser.getOptionVal("toyFit", -1) );
   }
 
   // -d
@@ -301,13 +336,13 @@ int main(int argc, char** argv){
   // injectParameterPath
   if( not injectParameterPath.empty() ){
     auto injectConfig = ConfigUtils::readConfigFile( injectParameterPath );
-    fitter.getLikelihoodInterface().getDataSetManager().getPropagator().setParameterInjectorConfig(injectConfig);
+    fitter.getLikelihoodInterface().getModelPropagator().setParameterInjectorConfig(injectConfig);
   }
 
   // toyParInjector
   if( not toyParInjector.empty() ){
     auto injectConfig = ConfigUtils::readConfigFile( toyParInjector );
-    fitter.getLikelihoodInterface().getDataSetManager().setToyParameterInjector( injectConfig );
+    fitter.getLikelihoodInterface().setToyParameterInjector( injectConfig );
   }
 
   // Also check app level config options
@@ -322,18 +357,31 @@ int main(int argc, char** argv){
     fitter.setAllParamVariationsSigmas(GenericToolbox::Json::fetchValue<std::vector<double>>(configHandler.getConfig(), "allParamVariations"));
   });
 
-
-  if( clParser.isOptionTriggered("kickMc") ){
-    fitter.setThrowMcBeforeFit( true );
-    fitter.setThrowGain( 0.1 );
+  // Check if the first point of the fit should be moved before the
+  // minimization.  This is not changing the prior value, only the starting
+  // point of the fit.  The kick is in units of prior standard deviations
+  // about the prior point.
+  double kickMc = 0.0;          // Set the default value without an option
+  if (clParser.isOptionTriggered("kickMc")) {
+      int values = clParser.getNbValueSet("usingCacheManager");
+      if (values < 1) kickMc = 0.1; // Default without an argument.
+      else kickMc = clParser.getOptionVal<double>("kickMc",0);
+  }
+  if ( kickMc > 0.01 ) {
+      LogAlert << "Fit starting point randomized by " << kickMc << " sigma"
+               << " around prior values."
+               << std::endl;
+      fitter.setThrowMcBeforeFit( true );
+      fitter.setThrowGain( kickMc );
   }
 
-  if( clParser.isOptionTriggered("skipSimplex") ){
-    LogAlert << "Explicitly disabling SIMPLEX first pass" << std::endl;
-    LogThrowIf( fitter.getMinimizerType() != FitterEngine::MinimizerType::RootMinimizer, "invalid option --skip-simplex" );
-    ((RootMinimizer*) &fitter.getMinimizer())->setEnableSimplexBeforeMinimize( false );
+  if( clParser.isOptionTriggered("debugMaxNbEventToLoad") ){
+    LogThrowIf(clParser.getNbValueSet("debugMaxNbEventToLoad") != 1, "Nb of event not specified.");
+    LogDebug << "Load " << clParser.getOptionVal<size_t>("debugMaxNbEventToLoad") << "max events per dataset." << std::endl;
+    for( auto& dataset : fitter.getLikelihoodInterface().getDatasetList() ){
+      dataset.setNbMaxEventToLoad(clParser.getOptionVal<size_t>("debugMaxNbEventToLoad"));
+    }
   }
-
 
   // --------------------------
   // Load:
@@ -343,7 +391,7 @@ int main(int argc, char** argv){
   // show initial conditions
   if( clParser.isOptionTriggered("injectParameterConfig") ) {
     LogDebug << "Starting mc parameters that where injected:" << std::endl;
-    LogDebug << fitter.getLikelihoodInterface().getDataSetManager().getPropagator().getParametersManager().getParametersSummary(false ) << std::endl;
+    LogDebug << fitter.getLikelihoodInterface().getModelPropagator().getParametersManager().getParametersSummary(false ) << std::endl;
   }
 
   if( clParser.isOptionTriggered("scanLine") ){

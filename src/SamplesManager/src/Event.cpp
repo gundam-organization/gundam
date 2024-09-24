@@ -4,20 +4,38 @@
 
 #include "Event.h"
 
+#include "GundamGlobals.h"
+#include "GundamAlmostEqual.h"
+
 #include "GenericToolbox.Root.h"
 #include "Logger.h"
 
 #include <cmath>
 
-LoggerInit([]{
-  Logger::setUserHeaderStr("[Event]");
-});
-
+#ifndef DISABLE_USER_HEADER
+LoggerInit([]{ Logger::setUserHeaderStr("[Event]"); });
+#endif
 
 // const getters
 double Event::getEventWeight() const {
 #ifdef GUNDAM_USING_CACHE_MANAGER
-  if( _cache_.valuePtr != nullptr ){ return _cache_.getWeight(); }
+  if (!getCache().valid()) {
+    getCache().update();
+  }
+  if (getCache().valid()) {
+    const double value =  getCache().getWeight();
+    if (not GundamGlobals::getForceDirectCalculation()) return value;
+    if (not GundamUtils::almostEqual(value, _weights_.current)) {
+      const double magnitude = std::abs(value) + std::abs(_weights_.current);
+      double delta = std::abs(value - _weights_.current);
+      if (magnitude > 0.0) delta /= 0.5*magnitude;
+      LogError << "Inconsistent event weight -- "
+               << " Calculated: " << value
+               << " Cached: " << _weights_.current
+               << " Precision: " << delta
+               << std::endl;
+    }
+  }
 #endif
   return _weights_.current;
 }
@@ -30,7 +48,6 @@ std::string Event::getSummary() const {
   ss << std::endl << "Variables{" << std::endl << _variables_ << std::endl << "}";
   return ss.str();
 }
-
 
 //  A Lesser GNU Public License
 
@@ -56,5 +73,4 @@ std::string Event::getSummary() const {
 // Local Variables:
 // mode:c++
 // c-basic-offset:2
-// compile-command:"$(git rev-parse --show-toplevel)/cmake/gundam-build.sh"
 // End:

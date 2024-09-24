@@ -11,9 +11,9 @@
 #include <hemi/grid_stride_range.h>
 
 #include "Logger.h"
-LoggerInit([]{
-  Logger::setUserHeaderStr("[Cache::Weight::Normalization]");
-});
+#ifndef DISABLE_USER_HEADER
+LoggerInit([]{ Logger::setUserHeaderStr("[Cache::Weight::Normalization]"); });
+#endif
 
 // The constructor
 Cache::Weight::Normalization::Normalization(
@@ -39,11 +39,13 @@ Cache::Weight::Normalization::Normalization(
         // are copied once during initialization so do not pin the CPU memory
         // into the page set.
         fNormResult.reset(new hemi::Array<int>(GetNormsReserved(),false));
+        LogThrowIf(not fNormResult, "Bad NormResult Alloc");
         fNormParameter.reset(new hemi::Array<short>(GetNormsReserved(),false));
+        LogThrowIf(not fNormParameter, "Bad NormParameter Alloc");
     }
-    catch (std::bad_alloc&) {
-        LogError << "Failed to allocate memory, so stopping" << std::endl;
-        throw std::runtime_error("Not enough memory available");
+    catch (...) {
+        LogError << "Uncaught exception, so stopping" << std::endl;
+        LogThrow("WeightNormalization -- Uncaught exception");
     }
 
     Reset();
@@ -57,22 +59,22 @@ int Cache::Weight::Normalization::ReserveNorm(int resIndex, int parIndex) {
     if (resIndex < 0) {
         LogError << "Invalid result index"
                << std::endl;
-        throw std::runtime_error("Negative result index");
+        LogThrow("Negative result index");
     }
     if (fWeights.size() <= resIndex) {
         LogError << "Invalid result index"
                << std::endl;
-        throw std::runtime_error("Result index out of bounds");
+        LogThrow("Result index out of bounds");
     }
     if (parIndex < 0) {
         LogError << "Invalid parameter index"
                << std::endl;
-        throw std::runtime_error("Negative parameter index");
+        LogThrow("Negative parameter index");
     }
     if (fParameters.size() <= parIndex) {
         LogError << "Invalid parameter index"
                << std::endl;
-        throw std::runtime_error("Parameter index out of bounds");
+        LogThrow("Parameter index out of bounds");
     }
     int newIndex = fNormsUsed++;
     if (fNormsUsed > fNormsReserved) {
@@ -80,7 +82,7 @@ int Cache::Weight::Normalization::ReserveNorm(int resIndex, int parIndex) {
                  << " Reserved: " << fNormsReserved
                  << " Requested: " << fNormsUsed
                  << std::endl;
-        throw std::runtime_error("Not enough space reserved for results");
+        LogThrow("Not enough space reserved for results");
     }
     fNormResult->hostPtr()[newIndex] = resIndex;
     fNormParameter->hostPtr()[newIndex] = parIndex;
@@ -100,14 +102,16 @@ namespace {
                          const short* pIndex,
                          const int NP) {
         for (int i : hemi::grid_stride_range(0,NP)) {
-            CacheAtomicMult(&results[rIndex[i]], params[pIndex[i]]);
+            const double x =  params[pIndex[i]];
+
+            CacheAtomicMult(&results[rIndex[i]], x);
 #ifndef HEMI_DEV_CODE
 #ifdef CACHE_DEBUG
             if (rIndex[i] < PRINT_STEP) {
                 std::cout << "Norms kernel " << i
                        << " iEvt " << rIndex[i]
                        << " iPar " << pIndex[i]
-                       << " = " << params[pIndex[i]]
+                       << " = " << x
                        << std::endl;
             }
 #endif
@@ -162,5 +166,4 @@ bool Cache::Weight::Normalization::Apply() {
 // Local Variables:
 // mode:c++
 // c-basic-offset:4
-// compile-command:"$(git rev-parse --show-toplevel)/cmake/gundam-build.sh"
 // End:

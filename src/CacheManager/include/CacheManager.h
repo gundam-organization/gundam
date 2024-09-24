@@ -2,16 +2,33 @@
 #define CacheManager_h_seen
 
 #include "CacheParameters.h"
-
 #include "CacheWeights.h"
+
 #include "WeightNormalization.h"
 #include "WeightCompactSpline.h"
 #include "WeightMonotonicSpline.h"
 #include "WeightUniformSpline.h"
 #include "WeightGeneralSpline.h"
 #include "WeightGraph.h"
+#include "WeightBilinear.h"
+#include "WeightBicubic.h"
+#include "WeightTabulated.h"
 
+#ifdef CACHE_MANAGER_USE_INDEXED_SUMS
+// An older implementation of the histogram summing that may be faster for
+// some (peculiar) data sets.
 #include "CacheIndexedSums.h"
+namespace Cache {
+    using HistogramSum = Cache::IndexedSums;
+}
+#else
+// A GPU optimized implementation of histogram summing that will be faster
+// for most data sets.
+#include "CacheRecursiveSums.h"
+namespace Cache {
+    using HistogramSum = Cache::RecursiveSums;
+}
+#endif
 
 #include "SampleSet.h"
 #include "EventDialCache.h"
@@ -40,13 +57,13 @@ public:
 
     /// Build the cache and load it into the device.  This is used in
     /// Propagator.cpp to fill the constants needed to for the calculations.
-    static bool Build( SampleSet& sampleList, EventDialCache& eventDials);
+    static bool Build(SampleSet& sampleList, EventDialCache& eventDials);
 
     /// Update the cache with the event and spline information.  This is
     /// called as part of Build, and can be called in other code if the cache
     /// needs to be changed.  It forages all of the information from the
     /// original sample list and event dials.
-    static bool Update( SampleSet& sampleList, EventDialCache& eventDials);
+    static bool Update(SampleSet& sampleList, EventDialCache& eventDials);
 
     /// Flag that the Cache::Manager internal caches must be updated from the
     /// SampleSet and EventDialCache before it can be used.
@@ -56,22 +73,90 @@ public:
     /// parameter isn't defined, this will return a negative value.
     static int ParameterIndex(const Parameter* fp);
 
-    /// Return true if a GPU is available.
+    /// Return true if CUDA was used during compilation.  Necessary for
+    /// running a GPU.
     static bool HasCUDA();
+
+    /// Return true if a GPU is available at runtime.  Must have also been
+    // compiled using CUDA
+    static bool HasGPU(bool dump = false);
 
     /// Return the approximate allocated memory (e.g. on the GPU).
     std::size_t GetResidentMemory() const {return fTotalBytes;}
 
 private:
+    // Hold the configuration that will be used to construct the manager
+    // (singleton).  This information was originally passed as arguments to
+    // the constructor, but it became to complex and prone to mistakes since
+    // C++ parameters cannot be named, and the order of a dozen or more
+    // integers is easy to scramble.
+    struct Configuration {
+        // The number of results that are going to be calculated.  There is
+        // one "result", or weight per event.
+        int events{0};
+
+        // The number of parameteters in the fit
+        int parameters{0};
+
+        // The number of histogram bins in the final histogram.
+        int histBins{0};
+
+        // The option for how the space should be allocated that is
+        // passed to the weight calculation classes.
+        std::string spaceOption{"space"};
+
+        // The number of normalization parameters
+        int norms{0};
+
+        // The number of shift dials that have been applied.  These are
+        // applied to the initial event weight outside of Cache::Manager and
+        // are counted here for informational purposes.
+        int shifts{0};
+
+        // The parameters for the dial type CompactSpline (i.e. the
+        // Catmull-Rom) splines
+        int compactSplines{0}; // The number of splines
+        int compactPoints{0};  // The number of knots used in the splines
+
+        // The parameters for the dial type MonotonicSpline (i.e. the
+        // Catmul-Rom splines with monotonic conditions applied).
+        int monotonicSplines{0};   // The number of splines
+        int monotonicPoints{0};    // The data reserved for the splines.
+
+        // The parameters for the dial type UniformSpline (i.e. a spline with
+        // values, and slopes at uniform abcissas).
+        int uniformSplines{0};     // The number of splines
+        int uniformPoints{0};      // The data reserved for the splines.
+
+        // The parameters for the dial type GeneralSpline (i.e. a spline with
+        // values and slopes at non-uniform abcissas).
+        int generalSplines{0};  // The number of splines
+        int generalPoints{0};   // The amount of data reserved for the splines
+
+        // The parameters for the dial type LightGraph (i.e. a graph for
+        // linear interpolation at non-uniform abcissas).
+        int graphs{0};          // The number of graphs
+        int graphPoints{0};     // The amount of data reserved for the graphs
+
+        // The parameters for the dial type Bilinear (i.e. a bilinear
+        // surface).
+        int bilinear{0};       // The number of bilinear surfaces
+        int bilinearPoints{0}; // The amount of data reserved for the surfaces
+
+        // The parameters for the dial type Bicubic (i.e. a bicubic
+        // surface).
+        int bicubic{0};       // The number of bicubic surfaces
+        int bicubicPoints{0}; // The amount of data reserved for the surfaces
+
+        // The parameters for the dial type Tabulated
+        int tabulated{0};     // The number of tabulated dials
+        int tabulatedPoints{0};   // The number of entries in all the tables
+        std::map<const std::vector<double>*, int> tables; // The offsets of each lookup table.
+
+    };
+
     // This is a singleton, so the constructor is private.
-    Manager(int results, int parameters,
-            int norms,
-            int compactSplines, int compactPoints,
-            int monotonicSplines, int monotonicPoints,
-            int uniformSplines, int uniformPoints,
-            int generalSplines, int generalPoints,
-            int graphs, int graphPoints,
-            int histBins, std::string spaceType);
+    Manager(const Cache::Manager::Configuration& config);
     static Manager* fSingleton;  // You get one guess...
     static bool fUpdateRequired; // Set to true when the cache needs an update.
 
@@ -106,8 +191,17 @@ private:
     /// The cache for the general splines
     std::unique_ptr<Cache::Weight::Graph> fGraphs;
 
+    /// The cache for the general splines
+    std::unique_ptr<Cache::Weight::Bilinear> fBilinear;
+
+    /// The cache for the general splines
+    std::unique_ptr<Cache::Weight::Bicubic> fBicubic;
+
+    /// The cache for the precalculated weight tables.
+    std::unique_ptr<Cache::Weight::Tabulated> fTabulated;
+
     /// The cache for the summed histgram weights
-    std::unique_ptr<Cache::IndexedSums> fHistogramsCache;
+    std::unique_ptr<Cache::HistogramSum> fHistogramsCache;
 
     // The rough size of all the caches.
     std::size_t fTotalBytes;
@@ -119,7 +213,7 @@ public:
     // implementation, and should be ignored by most people.
     Cache::Parameters& GetParameterCache() {return *fParameterCache;}
     Cache::Weights&    GetWeightsCache() {return *fWeightsCache;}
-    Cache::IndexedSums& GetHistogramsCache() {return *fHistogramsCache;}
+    Cache::HistogramSum& GetHistogramsCache() {return *fHistogramsCache;}
 };
 
 // An MIT Style License
@@ -147,6 +241,5 @@ public:
 // Local Variables:
 // mode:c++
 // c-basic-offset:4
-// compile-command:"$(git rev-parse --show-toplevel)/cmake/gundam-build.sh"
 // End:
 #endif

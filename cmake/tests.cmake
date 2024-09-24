@@ -1,6 +1,9 @@
 
-message("")
-cmessage( WARNING "Defining tests...")
 
-include( CTest )
-add_subdirectory( ${CMAKE_SOURCE_DIR}/tests )
+if( ENABLE_GOOGLE_TESTS )
+  message("")
+  cmessage( WARNING "Defining tests...")
+  include( CTest )
+  add_subdirectory( ${CMAKE_SOURCE_DIR}/tests )
+endif()
+

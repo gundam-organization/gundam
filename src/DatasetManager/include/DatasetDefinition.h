@@ -29,8 +29,9 @@ public:
   explicit DatasetDefinition( const JsonType& config_, int datasetIndex_): _dataSetIndex_(datasetIndex_) { this->readConfig(config_); }
 
   void setDataSetIndex(int dataSetIndex){ _dataSetIndex_ = dataSetIndex; }
-  void setSelectedDataEntry(const std::string &selectedDataEntry){ _selectedDataEntry_ = selectedDataEntry; }
+  void setSelectedDataEntry(const std::string& selectedDataEntry_){ _selectedDataEntry_ = selectedDataEntry_; }
 
+  // const-getters
   [[nodiscard]] bool isEnabled() const{ return _isEnabled_; }
   [[nodiscard]] bool isSortLoadedEvents() const{ return _sortLoadedEvents_; }
   [[nodiscard]] bool isShowSelectedEventCount() const{ return _showSelectedEventCount_; }
@@ -38,15 +39,21 @@ public:
   [[nodiscard]] bool isDevSingleThreadEventLoaderAndIndexer() const{ return _devSingleThreadEventLoaderAndIndexer_; }
   [[nodiscard]] int getDataSetIndex() const{ return _dataSetIndex_; }
   [[nodiscard]] const std::string &getName() const{ return _name_; }
-  [[nodiscard]] const std::string &getToyDataEntry() const{ return _selectedToyEntry_; }
   [[nodiscard]] const std::string &getSelectedDataEntry() const{ return _selectedDataEntry_; }
+  [[nodiscard]] const std::string &getSelectedToyEntry() const{ return _selectedToyEntry_; }
+  [[nodiscard]] const std::map<std::string, DataDispenser> &getDataDispenserDict() const { return _dataDispenserDict_; }
 
-  DataDispenser &getMcDispenser(){ return _mcDispenser_; }
-  DataDispenser &getToyDataDispenser(){ return _dataDispenserDict_.at(_selectedToyEntry_); }
-  DataDispenser &getSelectedDataDispenser(){ return _dataDispenserDict_.at(_selectedDataEntry_); }
+  DataDispenser &getModelDispenser(){ return _modelDispenser_; }
   std::map<std::string, DataDispenser> &getDataDispenserDict(){ return _dataDispenserDict_; }
 
   void updateDispenserOwnership();
+
+  void setNbMaxEventToLoad( size_t nbMaxEventToLoad_ ){
+    _modelDispenser_.getParameters().debugNbMaxEventsToLoad = nbMaxEventToLoad_;
+    for( auto& dd : _dataDispenserDict_ ){
+      dd.second.getParameters().debugNbMaxEventsToLoad = nbMaxEventToLoad_;
+    }
+  }
 
 private:
   // config
@@ -54,15 +61,15 @@ private:
   bool _showSelectedEventCount_{true};
   int _dataSetIndex_{-1};
   std::string _name_{};
-  std::string _selectedDataEntry_{"Asimov"};
-  std::string _selectedToyEntry_{"Asimov"};
+  std::string _selectedDataEntry_{};
+  std::string _selectedToyEntry_{};
 
   bool _sortLoadedEvents_{true}; // needed for reproducibility of toys in stat throw
   bool _devSingleThreadEventLoaderAndIndexer_{false};
   bool _devSingleThreadEventSelection_{false};
 
   // internals
-  DataDispenser _mcDispenser_{this};
+  DataDispenser _modelDispenser_{this};
   std::map<std::string, DataDispenser> _dataDispenserDict_;
 
 };

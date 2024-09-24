@@ -50,25 +50,15 @@ namespace {
         if (dim < 4) return data[0];
 
         // Check to find a point that is less than x.  This is "brute force"
-        // and does more comparisons than a binary search, but simpler
-        // calculations.
-        const int knotCount = (dim)/2;
+        // binary search for upto 16 elements.  The "if" has been checked and
+        // is efficient with CUDA.
+        const int knotCount = (dim)/2 - 2;
         int ix = 0;
-        if (x > data[2*(ix+1)+1] && ix < knotCount-2) ++ix; // 1
-        if (x > data[2*(ix+1)+1] && ix < knotCount-2) ++ix; // 2
-        if (x > data[2*(ix+1)+1] && ix < knotCount-2) ++ix; // 3
-        if (x > data[2*(ix+1)+1] && ix < knotCount-2) ++ix; // 4
-        if (x > data[2*(ix+1)+1] && ix < knotCount-2) ++ix; // 5
-        if (x > data[2*(ix+1)+1] && ix < knotCount-2) ++ix; // 6
-        if (x > data[2*(ix+1)+1] && ix < knotCount-2) ++ix; // 7
-        if (x > data[2*(ix+1)+1] && ix < knotCount-2) ++ix; // 8
-        if (x > data[2*(ix+1)+1] && ix < knotCount-2) ++ix; // 9
-        if (x > data[2*(ix+1)+1] && ix < knotCount-2) ++ix; // 10
-        if (x > data[2*(ix+1)+1] && ix < knotCount-2) ++ix; // 11
-        if (x > data[2*(ix+1)+1] && ix < knotCount-2) ++ix; // 12
-        if (x > data[2*(ix+1)+1] && ix < knotCount-2) ++ix; // 13
-        if (x > data[2*(ix+1)+1] && ix < knotCount-2) ++ix; // 14
-        if (x > data[2*(ix+1)+1] && ix < knotCount-2) ++ix; // 15
+#define CHECK_OFFSET(ioff)  if ((ix+ioff < knotCount) && (x > data[2*(ix+ioff)+1])) ix += ioff
+        CHECK_OFFSET(8);
+        CHECK_OFFSET(4);
+        CHECK_OFFSET(2);
+        CHECK_OFFSET(1);
 
         const double p1 = data[2*ix];
         const double x1 = data[2*ix+1];

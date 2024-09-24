@@ -13,10 +13,10 @@ namespace JointProbability{
   class BarlowBeestonBanff2020 : public JointProbabilityBase {
   public:
     [[nodiscard]] std::string getType() const override { return "BarlowBeestonBanff2020"; }
-    [[nodiscard]] double eval(const Sample& sample_, int bin_) const override;
+    [[nodiscard]] double eval(const SamplePair& samplePair_, int bin_) const override;
   };
 
-  double BarlowBeestonBanff2020::eval(const Sample& sample_, int bin_) const {
+  double BarlowBeestonBanff2020::eval(const SamplePair& samplePair_, int bin_) const {
     // From BANFF: origin/OA2020 branch -> BANFFBinnedSample::CalcLLRContrib()
 
     //Loop over all the bins one by one using their unique bin index.
@@ -24,9 +24,9 @@ namespace JointProbability{
     //over underflow or overflow bins.
     double chisq{0};
 
-    double dataVal = sample_.getDataContainer().getHistogram().binList[bin_].content;
-    double predVal = sample_.getMcContainer().getHistogram().binList[bin_].content;
-    double mcuncert = sample_.getMcContainer().getHistogram().binList[bin_].error;
+    double dataVal = samplePair_.data->getHistogram().binList[bin_].content;
+    double predVal = samplePair_.model->getHistogram().binList[bin_].content;
+    double mcuncert = samplePair_.model->getHistogram().binList[bin_].error;
 
     //implementing Barlow-Beeston correction for LH calculation the
     //following comments are inspired/copied from Clarence's comments in the
@@ -79,13 +79,13 @@ namespace JointProbability{
 
     if(std::isinf(chisq)){
       LogAlert << "Infinite chi2 " << predVal << " " << dataVal << " "
-               << sample_.getMcContainer().getHistogram().binList[bin_].error << " "
-               << sample_.getMcContainer().getHistogram().binList[bin_].content << std::endl;
+               << samplePair_.model->getHistogram().binList[bin_].error << " "
+               << samplePair_.model->getHistogram().binList[bin_].content << std::endl;
     }
 
     LogThrowIf(std::isnan(chisq), "NaN chi2 " << predVal << " " << dataVal
-                                              << sample_.getMcContainer().getHistogram().binList[bin_].error << " "
-                                              << sample_.getMcContainer().getHistogram().binList[bin_].content);
+                                              << samplePair_.model->getHistogram().binList[bin_].error << " "
+                                              << samplePair_.model->getHistogram().binList[bin_].content);
 
     return chisq;
   }

@@ -2,6 +2,8 @@
 // Created by Nadrino on 17/06/2021.
 //
 
+#include "GenericToolbox.Thread.h"
+
 #include "Logger.h"
 
 #include <string>
@@ -10,9 +12,9 @@
 #include <future>
 
 
-LoggerInit([]{
-  Logger::getUserHeader() << "[" << FILENAME << "]";
-});
+#ifndef DISABLE_USER_HEADER
+LoggerInit([]{ Logger::getUserHeader() << "[" << FILENAME << "]"; });
+#endif
 
 
 int main(int argc, char** argv){
