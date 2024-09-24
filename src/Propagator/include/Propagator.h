@@ -92,9 +92,6 @@ protected:
   void updateDialState();
   void refillHistograms();
 
-  void setupDialCollections();
-
-
 private:
 
   // Parameters
