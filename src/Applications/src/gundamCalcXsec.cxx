@@ -595,15 +595,47 @@ int main(int argc, char** argv){
   // THROWS LOOP
   /////////////////////////////////////
   LogWarning << std::endl << GenericToolbox::addUpDownBars( "Generating toys..." ) << std::endl;
+  propagator.getParametersManager().initializeStrippedGlobalCov();
 
+  // stats printing
+  GenericToolbox::Time::AveragedTimer<1> totalTimer{};
+  GenericToolbox::Time::AveragedTimer<1> throwTimer{};
+  GenericToolbox::Time::AveragedTimer<1> propagateTimer{};
+  GenericToolbox::Time::AveragedTimer<1> otherTimer{};
+  GenericToolbox::Time::AveragedTimer<1> writeTimer{};
+  GenericToolbox::TablePrinter t{};
+  std::stringstream progressSs;
   std::stringstream ss; ss << LogWarning.getPrefixString() << "Generating " << nToys << " toys...";
   for( int iToy = 0 ; iToy < nToys ; iToy++ ){
 
+    t.reset();
+    t << "Total time" << GenericToolbox::TablePrinter::NextColumn;
+    t << "Throw toys" << GenericToolbox::TablePrinter::NextColumn;
+    t << "Propagate pars" << GenericToolbox::TablePrinter::NextColumn;
+    t << "Re-normalize" << GenericToolbox::TablePrinter::NextColumn;
+    t << "Write throws" << GenericToolbox::TablePrinter::NextLine;
+
+    t << totalTimer << GenericToolbox::TablePrinter::NextColumn;
+    t << throwTimer << GenericToolbox::TablePrinter::NextColumn;
+    t << propagateTimer << GenericToolbox::TablePrinter::NextColumn;
+    t << otherTimer << GenericToolbox::TablePrinter::NextColumn;
+    t << writeTimer << GenericToolbox::TablePrinter::NextLine;
+
+    totalTimer.stop();
+    totalTimer.start();
+
     // loading...
-    GenericToolbox::displayProgressBar( iToy+1, nToys, ss.str() );
+    progressSs.str("");
+    progressSs << t.generateTableString() << std::endl;
+    progressSs << ss.str();
+    GenericToolbox::displayProgressBar( iToy+1, nToys, progressSs.str() );
 
     // Do the throwing:
+    throwTimer.start();
     propagator.getParametersManager().throwParametersFromGlobalCovariance( not GundamGlobals::isDebugConfig() );
+    throwTimer.stop();
+
+    propagateTimer.start();
     propagator.propagateParameters();
 
     if( enableStatThrowInToys ){
@@ -616,11 +648,17 @@ int main(int argc, char** argv){
         xsec.samplePtr->throwStatError();
       }
     }
+    propagateTimer.stop();
 
+    otherTimer.start();
+    // TODO: parallelize this
     writeBinDataFct();
+    otherTimer.stop();
 
     // Write the branches
+    writeTimer.start();
     xsecThrowTree->Fill();
+    writeTimer.stop();
   }
 
 

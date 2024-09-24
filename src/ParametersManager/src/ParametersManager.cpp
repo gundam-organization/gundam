@@ -173,29 +173,32 @@ void ParametersManager::throwParametersFromParSetCovariance(){
     }
   } // parSet
 }
+void ParametersManager::initializeStrippedGlobalCov(){
+  LogInfo << "Creating stripped global covariance matrix..." << std::endl;
+  LogThrowIf( _globalCovarianceMatrix_ == nullptr, "Global covariance matrix not set." );
+
+  _strippedParameterList_.clear();
+  for( int iGlobPar = 0 ; iGlobPar < _globalCovarianceMatrix_->GetNrows() ; iGlobPar++ ){
+    if( _globalCovParList_[iGlobPar]->isFixed() ){ continue; }
+    if( _globalCovParList_[iGlobPar]->isFree() and (*_globalCovarianceMatrix_)[iGlobPar][iGlobPar] == 0 ){ continue; }
+    _strippedParameterList_.emplace_back( _globalCovParList_[iGlobPar] );
+  }
+
+  int nStripped{int(_strippedParameterList_.size())};
+  _strippedCovarianceMatrix_ = std::make_shared<TMatrixD>(nStripped, nStripped);
+
+  for( int iStrippedPar = 0 ; iStrippedPar < nStripped ; iStrippedPar++ ){
+    int iGlobPar{GenericToolbox::findElementIndex(_strippedParameterList_[iStrippedPar], _globalCovParList_)};
+    for( int jStrippedPar = 0 ; jStrippedPar < nStripped ; jStrippedPar++ ){
+      int jGlobPar{GenericToolbox::findElementIndex(_strippedParameterList_[jStrippedPar], _globalCovParList_)};
+      (*_strippedCovarianceMatrix_)[iStrippedPar][jStrippedPar] = (*_globalCovarianceMatrix_)[iGlobPar][jGlobPar];
+    }
+  }
+}
 void ParametersManager::throwParametersFromGlobalCovariance(bool quietVerbose_){
 
   if( _strippedCovarianceMatrix_ == nullptr ){
-    LogInfo << "Creating stripped global covariance matrix..." << std::endl;
-    LogThrowIf( _globalCovarianceMatrix_ == nullptr, "Global covariance matrix not set." );
-
-    _strippedParameterList_.clear();
-    for( int iGlobPar = 0 ; iGlobPar < _globalCovarianceMatrix_->GetNrows() ; iGlobPar++ ){
-      if( _globalCovParList_[iGlobPar]->isFixed() ){ continue; }
-      if( _globalCovParList_[iGlobPar]->isFree() and (*_globalCovarianceMatrix_)[iGlobPar][iGlobPar] == 0 ){ continue; }
-      _strippedParameterList_.emplace_back( _globalCovParList_[iGlobPar] );
-    }
-
-    int nStripped{int(_strippedParameterList_.size())};
-    _strippedCovarianceMatrix_ = std::make_shared<TMatrixD>(nStripped, nStripped);
-
-    for( int iStrippedPar = 0 ; iStrippedPar < nStripped ; iStrippedPar++ ){
-      int iGlobPar{GenericToolbox::findElementIndex(_strippedParameterList_[iStrippedPar], _globalCovParList_)};
-      for( int jStrippedPar = 0 ; jStrippedPar < nStripped ; jStrippedPar++ ){
-        int jGlobPar{GenericToolbox::findElementIndex(_strippedParameterList_[jStrippedPar], _globalCovParList_)};
-        (*_strippedCovarianceMatrix_)[iStrippedPar][jStrippedPar] = (*_globalCovarianceMatrix_)[iGlobPar][jGlobPar];
-      }
-    }
+    initializeStrippedGlobalCov();
   }
 
   bool isLoggerAlreadyMuted{Logger::isMuted()};
