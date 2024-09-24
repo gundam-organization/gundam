@@ -72,8 +72,11 @@ void PlotGenerator::readConfigImpl(){
     histDef.xTitle = GenericToolbox::Json::fetchValue(histDefConfig, "xTitle", histDef.varToPlot);
     histDef.useSampleBinningOfVar = GenericToolbox::Json::fetchValue(histDefConfig, {{"useSampleBinningOfVar"}, {"useSampleBinningOfObservable"}}, histDef.varToPlot);
 
-    histDef.binning.readBinningDefinition( GenericToolbox::Json::fetchValue(histDefConfig, {{"binning"}, {"binningFile"}}, JsonType()) );
-    histDef.binning.sortBins();
+    auto binning = GenericToolbox::Json::fetchValue(histDefConfig, {{"binning"}, {"binningFile"}}, JsonType());
+    if( not binning.empty() ){
+      histDef.binning.readBinningDefinition( binning );
+      histDef.binning.sortBins();
+    }
   }
 
   // options
@@ -611,6 +614,7 @@ std::vector<std::string> PlotGenerator::fetchListOfSplitVarNames() const {
 
   for( auto& histDef : _histDefList_ ){
     for( auto& splitVar : histDef.splitVarList ){
+      if( splitVar.empty() ){ continue; }
       GenericToolbox::addIfNotInVector(splitVar, varNameList);
     }
   }
