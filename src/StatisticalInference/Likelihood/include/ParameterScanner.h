@@ -74,7 +74,7 @@ private:
   bool _useParameterLimits_{true};
   int _nbPoints_{100};
   int _nbPointsLineScan_{_nbPoints_};
-  std::pair<double, double> _parameterSigmaRange_{-3,3};
+  GenericToolbox::Range _parameterSigmaRange_{-3.,3.};
   JsonType _varsConfig_{};
 
   // Internals

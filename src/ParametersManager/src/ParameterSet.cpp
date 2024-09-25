@@ -40,8 +40,8 @@ void ParameterSet::readConfigImpl(){
   GenericToolbox::Json::fillValue(_config_, "printDialSetsSummary", _printDialSetsSummary_);
   GenericToolbox::Json::fillValue(_config_, "printParametersSummary", _printParametersSummary_);
 
-  GenericToolbox::Json::fillValue(_config_, "parameterLimits/minValue", _globalParameterMinValue_);
-  GenericToolbox::Json::fillValue(_config_, "parameterLimits/maxValue", _globalParameterMaxValue_);
+  GenericToolbox::Json::fillValue(_config_, "parameterLimits/minValue", _globalParRange_.min);
+  GenericToolbox::Json::fillValue(_config_, "parameterLimits/maxValue", _globalParRange_.max);
 
   GenericToolbox::Json::fillValue(_config_, {{"enablePca"}, {"allowPca"}, {"fixGhostFitParameters"}}, _enablePca_);
   GenericToolbox::Json::fillValue(_config_, "enabledThrowToyParameters", _enabledThrowToyParameters_);
@@ -73,8 +73,8 @@ void ParameterSet::readConfigImpl(){
   GenericToolbox::Json::fillValue(_config_ , "maxEigenFraction", _maxEigenFraction_);
   GenericToolbox::Json::fillValue(_config_, "eigenSvdThreshold", _eigenSvdThreshold_);
 
-  GenericToolbox::Json::fillValue(_config_, "eigenParBounds/minValue", _eigenParBounds_.first);
-  GenericToolbox::Json::fillValue(_config_, "eigenParBounds/maxValue", _eigenParBounds_.second);
+  GenericToolbox::Json::fillValue(_config_, "eigenParBounds/minValue", _eigenParRange_.min);
+  GenericToolbox::Json::fillValue(_config_, "eigenParBounds/maxValue", _eigenParRange_.max);
 
   // legacy
   GenericToolbox::Json::fillValue(_config_, "maskForToyGeneration", _maskForToyGeneration_);
@@ -326,8 +326,8 @@ void ParameterSet::processCovarianceMatrix(){
         LogThrowIf( not std::isnan(eigenPar.getMaxValue()) and eigenPar.getPriorValue() > eigenPar.getMaxValue(), "PRIOR IS ABOVE MAX: " << eigenPar.getSummary(true) );
       }
       else{
-        eigenPar.setMinValue( _eigenParBounds_.first );
-        eigenPar.setMaxValue( _eigenParBounds_.second );
+        eigenPar.setMinValue( _eigenParRange_.min );
+        eigenPar.setMaxValue( _eigenParRange_.max );
 
         LogThrowIf( not std::isnan(eigenPar.getMinValue()) and eigenPar.getPriorValue() < eigenPar.getMinValue(), "Prior value is bellow min: " << eigenPar.getSummary(true) );
         LogThrowIf( not std::isnan(eigenPar.getMaxValue()) and eigenPar.getPriorValue() > eigenPar.getMaxValue(), "Prior value is above max: " << eigenPar.getSummary(true) );
@@ -972,8 +972,8 @@ void ParameterSet::defineParameters(){
 
     par.setParameterValue(par.getPriorValue());
 
-    if( not std::isnan(_globalParameterMinValue_) ){ par.setMinValue(_globalParameterMinValue_); }
-    if( not std::isnan(_globalParameterMaxValue_) ){ par.setMaxValue(_globalParameterMaxValue_); }
+    if( not std::isnan(_globalParRange_.min) ){ par.setMinValue(_globalParRange_.min); }
+    if( not std::isnan(_globalParRange_.max) ){ par.setMaxValue(_globalParRange_.max); }
 
     if( _parameterLowerBoundsList_ != nullptr ){ par.setMinValue((*_parameterLowerBoundsList_)[par.getParameterIndex()]); }
     if( _parameterUpperBoundsList_ != nullptr ){ par.setMaxValue((*_parameterUpperBoundsList_)[par.getParameterIndex()]); }
