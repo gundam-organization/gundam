@@ -18,49 +18,21 @@ LoggerInit([]{ Logger::setUserHeaderStr("[Parameter]"); });
 #endif
 
 void Parameter::readConfigImpl(){
-  if( not _parameterConfig_.empty() ){
-    _isEnabled_ = GenericToolbox::Json::fetchValue(_parameterConfig_, "isEnabled", true);
-    if( not _isEnabled_ ) { return; }
 
-    _isFixed_ = GenericToolbox::Json::fetchValue(_parameterConfig_, "isFixed", _isFixed_);
+  GenericToolbox::Json::fillValue(_config_, "isEnabled", _isEnabled_);
+  if( not _isEnabled_ ) { return; }
 
-    auto priorTypeStr = GenericToolbox::Json::fetchValue(_parameterConfig_, "priorType", "");
-    if( not priorTypeStr.empty() ){
-      _priorType_ = PriorType::toEnum( priorTypeStr, true );
-      if( _priorType_ == PriorType::Flat ){ _isFree_ = true; }
-    }
+  GenericToolbox::Json::fillValue(_config_, "isFixed", _isFixed_);
+  GenericToolbox::Json::fillValue(_config_, "priorValue", _priorValue_);
+  GenericToolbox::Json::fillValue(_config_, "parameterStepSize", _stepSize_);
+  GenericToolbox::Json::fillValue(_config_, "parameterLimits", _limitRange_);
+  GenericToolbox::Json::fillValue(_config_, "physicalLimits", _physicalRange_);
+  GenericToolbox::Json::fillValue(_config_, "mirrorRange", _mirrorRange_);
+  GenericToolbox::Json::fillValue(_config_, "dialSetDefinitions", _dialDefinitionsList_);
 
-    if( GenericToolbox::Json::doKeyExist(_parameterConfig_, "priorValue") ){
-      double priorOverride = GenericToolbox::Json::fetchValue(_parameterConfig_, "priorValue", this->getPriorValue());
-      if( not std::isnan(priorOverride) ){
-        LogWarning << this->getTitle() << ": prior value override -> " << priorOverride << std::endl;
-        this->setPriorValue(priorOverride);
-        this->setParameterValue(priorOverride);
-      }
-    }
+  GenericToolbox::Json::fillEnum(_config_, "priorType", _priorType_);
+  if( _priorType_ == PriorType::Flat ){ _isFree_ = true; }
 
-    if( GenericToolbox::Json::doKeyExist(_parameterConfig_, "parameterLimits") ){
-      std::pair<double, double> limits{std::nan(""), std::nan("")};
-      limits = GenericToolbox::Json::fetchValue(_parameterConfig_, "parameterLimits", limits);
-      LogWarning << "Overriding parameter limits: [" << limits.first << ", " << limits.second << "]." << std::endl;
-      this->setMinValue(limits.first);
-      this->setMaxValue(limits.second);
-    }
-
-    if( GenericToolbox::Json::doKeyExist(_parameterConfig_, "parameterStepSize") ){
-      double stepSize(GenericToolbox::Json::fetchValue<double>(_parameterConfig_, "parameterStepSize"));
-      LogWarning << "Using step size: " << stepSize << std::endl;
-      this->setStepSize( stepSize );
-    }
-
-    if( GenericToolbox::Json::doKeyExist(_parameterConfig_, "physicalLimits") ){
-        auto physLimits = GenericToolbox::Json::fetchValue(_parameterConfig_, "physicalLimits", JsonType());
-        _minPhysical_ = GenericToolbox::Json::fetchValue(physLimits, "minValue", std::nan("UNSET"));
-        _maxPhysical_ = GenericToolbox::Json::fetchValue(physLimits, "maxValue", std::nan("UNSET"));
-    }
-
-    _dialDefinitionsList_ = GenericToolbox::Json::fetchValue(_parameterConfig_, "dialSetDefinitions", _dialDefinitionsList_);
-  }
 }
 void Parameter::initializeImpl() {
   LogThrowIf(_owner_ == nullptr, "Parameter set ref is not set.");
@@ -73,22 +45,22 @@ void Parameter::initializeImpl() {
 }
 
 void Parameter::setMinMirror(double minMirror) {
-  if (std::isfinite(_minMirror_) and std::abs(_minMirror_-minMirror) > 1E-6) {
+  if (std::isfinite(_mirrorRange_.min) and std::abs(_mirrorRange_.min-minMirror) > 1E-6) {
     LogWarning << "Minimum mirror bound changed for " << getFullTitle()
-               << " old: " << _minMirror_
+               << " old: " << _mirrorRange_.min
                << " new: " << minMirror
                << std::endl;
   }
-  _minMirror_ = minMirror;
+  _mirrorRange_.min = minMirror;
 }
 void Parameter::setMaxMirror(double maxMirror) {
-  if (std::isfinite(_maxMirror_) and std::abs(_maxMirror_-maxMirror) > 1E-6) {
+  if (std::isfinite(_mirrorRange_.max) and std::abs(_mirrorRange_.max-maxMirror) > 1E-6) {
     LogWarning << "Maximum mirror bound changed for " << getFullTitle()
-               << " old: " << _maxMirror_
+               << " old: " << _mirrorRange_.max
                << " new: " << maxMirror
                << std::endl;
   }
-  _maxMirror_ = maxMirror;
+  _mirrorRange_.max = maxMirror;
 }
 void Parameter::setParameterValue(double parameterValue, bool force) {
   if (not isInDomain(parameterValue, true)) {
@@ -120,9 +92,6 @@ void Parameter::setDialSetConfig(const JsonType &jsonConfig_) {
   }
   _dialDefinitionsList_ = jsonConfig.get<std::vector<JsonType>>();
 }
-void Parameter::setParameterDefinitionConfig(const JsonType &config_){
-  _parameterConfig_ = config_;
-}
 
 void Parameter::setValueAtPrior(){
   setParameterValue(getPriorValue());
@@ -138,7 +107,7 @@ bool Parameter::isInDomain(double value_, bool verbose_) const {
     }
     return false;
   }
-  if ( not std::isnan(_minValue_) and value_ < _minValue_ ) {
+  if ( not std::isnan(_limitRange_.min) and value_ < _limitRange_.min ) {
     if (verbose_) {
       LogError << "Value is below minimum: " << value_
                << std::endl;
@@ -146,7 +115,7 @@ bool Parameter::isInDomain(double value_, bool verbose_) const {
     }
     return false;
   }
-  if ( not std::isnan(_maxValue_) and value_ > _maxValue_ ) {
+  if ( not std::isnan(_limitRange_.max) and value_ > _limitRange_.max ) {
     if (verbose_) {
       LogError << "Attempting to set parameter above the maximum"
                << " -- New value: " << value_
@@ -159,13 +128,13 @@ bool Parameter::isInDomain(double value_, bool verbose_) const {
 }
 bool Parameter::isPhysical(double value_) const {
   if (not isInDomain(value_)) return false;
-  if ( not std::isnan(_minPhysical_) and value_ < _minPhysical_ ) return false;
-  if ( not std::isnan(_maxPhysical_) and value_ > _maxPhysical_ ) return false;
+  if ( not std::isnan(_physicalRange_.min) and value_ < _physicalRange_.min ) return false;
+  if ( not std::isnan(_physicalRange_.max) and value_ > _physicalRange_.max ) return false;
   return true;
 }
 bool Parameter::isMirrored(double value_) const {
-  if ( not std::isnan(_minMirror_) and value_ < _minMirror_ ) return true;
-  if ( not std::isnan(_maxMirror_) and value_ > _maxMirror_ ) return true;
+  if ( not std::isnan(_mirrorRange_.min) and value_ < _mirrorRange_.min ) return true;
+  if ( not std::isnan(_mirrorRange_.max) and value_ > _mirrorRange_.max ) return true;
   return false;
 }
 bool Parameter::isValidValue(double value) const {
@@ -206,11 +175,11 @@ std::string Parameter::getSummary(bool shallow_) const {
   ss << ", prior=" << _priorValue_;
   ss << ", stdDev=" << _stdDevValue_;
   ss << ", bounds=[ ";
-  if( std::isnan(_minValue_) ) ss << "-inf";
-  else ss << _minValue_;
+  if( std::isnan(_limitRange_.min) ) ss << "-inf";
+  else ss << _limitRange_.min;
   ss << ", ";
-  if( std::isnan(_maxValue_) ) ss << "+inf";
-  else ss << _maxValue_;
+  if( std::isnan(_limitRange_.max) ) ss << "+inf";
+  else ss << _limitRange_.max;
   ss << " ]";
   if (not isValueWithinBounds()){
     ss << GenericToolbox::ColorCodes::redBackground << " out of bounds" << GenericToolbox::ColorCodes::resetColor;

@@ -7,6 +7,8 @@
 
 #include "JsonBaseClass.h"
 
+#include "GenericToolbox.Utils.h"
+
 #include "nlohmann/json.hpp"
 
 #include <vector>
@@ -101,7 +103,6 @@ public:
   void setParameterValue(double parameterValue, bool force=false);
   void setName(const std::string &name){ _name_ = name; }
   void setDialSetConfig(const JsonType &jsonConfig_);
-  void setParameterDefinitionConfig(const JsonType &config_);
   void setOwner(const ParameterSet *owner_){ _owner_ = owner_; }
   void setPriorType(PriorType priorType){ _priorType_ = priorType; }
 
@@ -134,19 +135,19 @@ public:
   [[nodiscard]] int getParameterIndex() const{ return _parameterIndex_; }
   [[nodiscard]] double getStepSize() const{ return _stepSize_; }
   /// See setMinValue() for documentation.
-  [[nodiscard]] double getMinValue() const{ return _minValue_; }
+  [[nodiscard]] double getMinValue() const{ return _limitRange_.min; }
   /// See setMaxValue() for documentation.
-  [[nodiscard]] double getMaxValue() const{ return _maxValue_; }
+  [[nodiscard]] double getMaxValue() const{ return _limitRange_.max; }
   /// See setMinMirror for documentation.
-  [[nodiscard]] double getMinMirror() const{ return _minMirror_; }
+  [[nodiscard]] double getMinMirror() const{ return _mirrorRange_.min; }
   /// See setMaxMirror for documentation.
-  [[nodiscard]] double getMaxMirror() const{ return _maxMirror_; }
+  [[nodiscard]] double getMaxMirror() const{ return _mirrorRange_.max; }
   [[nodiscard]] double getPriorValue() const{ return _priorValue_; }
   [[nodiscard]] double getThrowValue() const{ return _throwValue_; }
   /// See setMinPhysical for documentation.
-  [[nodiscard]] double getMinPhysical() const{ return _minPhysical_; }
+  [[nodiscard]] double getMinPhysical() const{ return _physicalRange_.min; }
   /// See setMinPhysical for documentation.
-  [[nodiscard]] double getMaxPhysical() const{ return _maxPhysical_; }
+  [[nodiscard]] double getMaxPhysical() const{ return _physicalRange_.max; }
   [[nodiscard]] double getStdDevValue() const{ return _stdDevValue_; }
   [[nodiscard]] double getParameterValue() const;
   [[nodiscard]] const std::string &getName() const{ return _name_; }
@@ -206,12 +207,11 @@ private:
   double _priorValue_{std::nan("unset")};
   double _throwValue_{std::nan("unset")};
   double _stdDevValue_{std::nan("unset")};
-  double _minValue_{std::nan("unset")};
-  double _maxValue_{std::nan("unset")};
-  double _minMirror_{std::nan("unset")};
-  double _maxMirror_{std::nan("unset")};
-  double _minPhysical_{std::nan("unset")};
-  double _maxPhysical_{std::nan("unset")};
+
+  GenericToolbox::Range _limitRange_;
+  GenericToolbox::Range _mirrorRange_;
+  GenericToolbox::Range _physicalRange_;
+
   double _stepSize_{std::nan("unset")};
   std::string _name_{};
   std::string _dialsWorkingDirectory_{"."};

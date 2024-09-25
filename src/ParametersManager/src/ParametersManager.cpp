@@ -25,10 +25,11 @@ void ParametersManager::unmuteLogger(){ Logger::setIsMuted( false ); }
 // config
 void ParametersManager::readConfigImpl(){
 
-  _throwToyParametersWithGlobalCov_ = GenericToolbox::Json::fetchValue(_config_, "throwToyParametersWithGlobalCov", _throwToyParametersWithGlobalCov_);
-  _reThrowParSetIfOutOfPhysical_ = GenericToolbox::Json::fetchValue(_config_, {{"reThrowParSetIfOutOfBounds"},{"reThrowParSetIfOutOfPhysical"}}, _reThrowParSetIfOutOfPhysical_);
+  GenericToolbox::Json::fillValue(_config_, "throwToyParametersWithGlobalCov", _throwToyParametersWithGlobalCov_);
+  GenericToolbox::Json::fillValue(_config_, {{"reThrowParSetIfOutOfBounds"},{"reThrowParSetIfOutOfPhysical"}}, _reThrowParSetIfOutOfPhysical_);
+  GenericToolbox::Json::fillValue(_config_, "parameterSetList", _parameterSetListConfig_);
 
-  _parameterSetListConfig_ = GenericToolbox::Json::fetchValue(_config_, "parameterSetList", _parameterSetListConfig_);
+  LogDebugIf(GundamGlobals::isDebugConfig()) << _parameterSetListConfig_.size() << " parameter sets are defined." << std::endl;
 
   _parameterSetList_.clear(); // make sure there nothing in case readConfig is called more than once
   _parameterSetList_.reserve( _parameterSetListConfig_.size() );

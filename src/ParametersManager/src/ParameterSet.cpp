@@ -23,67 +23,64 @@ LoggerInit([]{ Logger::setUserHeaderStr("[ParameterSet]"); });
 
 void ParameterSet::readConfigImpl(){
 
-  _name_ = GenericToolbox::Json::fetchValue<std::string>(_config_, "name");
+  GenericToolbox::Json::fillValue(_config_, "name", _name_);
+  LogThrowIf(_name_.empty(), "ParameterSet have no name.");
   LogDebugIf(GundamGlobals::isDebugConfig()) << "Reading config for parameter set: " << _name_ << std::endl;
 
-  _isEnabled_ = GenericToolbox::Json::fetchValue(_config_, "isEnabled", _isEnabled_);
-  if( not _isEnabled_ ){ return; } // don't go any further
-
-  _nbParameterDefinition_ = GenericToolbox::Json::fetchValue(_config_, "numberOfParameters", _nbParameterDefinition_);
-  _nominalStepSize_ = GenericToolbox::Json::fetchValue(_config_, "nominalStepSize", _nominalStepSize_);
-
-  _useOnlyOneParameterPerEvent_ = GenericToolbox::Json::fetchValue<bool>(_config_, "useOnlyOneParameterPerEvent", _useOnlyOneParameterPerEvent_);
-  _printDialSetsSummary_ = GenericToolbox::Json::fetchValue<bool>(_config_, "printDialSetsSummary", _printDialSetsSummary_);
-  _printParametersSummary_ = GenericToolbox::Json::fetchValue<bool>(_config_, "printParametersSummary", _printDialSetsSummary_);
-
-  if( GenericToolbox::Json::doKeyExist(_config_, "parameterLimits") ){
-    auto parLimits = GenericToolbox::Json::fetchValue(_config_, "parameterLimits", JsonType());
-    _globalParameterMinValue_ = GenericToolbox::Json::fetchValue(parLimits, "minValue", _globalParameterMinValue_);
-    _globalParameterMaxValue_ = GenericToolbox::Json::fetchValue(parLimits, "maxValue", _globalParameterMaxValue_);
+  GenericToolbox::Json::fillValue(_config_, "isEnabled", _isEnabled_);
+  if( not _isEnabled_ ){
+    LogDebugIf(GundamGlobals::isDebugConfig()) << " -> marked as disabled." << std::endl;
+    return; // don't go any further
   }
 
-  _enablePca_ = GenericToolbox::Json::fetchValue(_config_, std::vector<std::string>{"allowPca", "fixGhostFitParameters", "enablePca"}, _enablePca_);
-  _enabledThrowToyParameters_ = GenericToolbox::Json::fetchValue(_config_, "enabledThrowToyParameters", _enabledThrowToyParameters_);
-  _customParThrow_ = GenericToolbox::Json::fetchValue(_config_, {{"customParThrow"}, {"customFitParThrow"}}, std::vector<JsonType>());
-  _releaseFixedParametersOnHesse_ = GenericToolbox::Json::fetchValue(_config_, "releaseFixedParametersOnHesse", _releaseFixedParametersOnHesse_);
+  GenericToolbox::Json::fillValue(_config_, "numberOfParameters", _nbParameterDefinition_);
+  GenericToolbox::Json::fillValue(_config_, "nominalStepSize", _nominalStepSize_);
 
-  _parameterDefinitionFilePath_ = GenericToolbox::Json::fetchValue( _config_,
-    { {"parameterDefinitionFilePath"}, {"covarianceMatrixFilePath"} }, _parameterDefinitionFilePath_
-  );
-  _covarianceMatrixPath_ = GenericToolbox::Json::fetchValue(_config_, {{"covarianceMatrix"}, {"covarianceMatrixTMatrixD"}}, _covarianceMatrixPath_);
-  _parameterNameListPath_ = GenericToolbox::Json::fetchValue(_config_, {{"parameterNameList"}, {"parameterNameTObjArray"}}, _parameterNameListPath_);
-  _parameterPriorValueListPath_ = GenericToolbox::Json::fetchValue(_config_, {{"parameterPriorValueList"}, {"parameterPriorTVectorD"}}, _parameterPriorValueListPath_);
+  GenericToolbox::Json::fillValue(_config_, "useOnlyOneParameterPerEvent", _useOnlyOneParameterPerEvent_);
+  GenericToolbox::Json::fillValue(_config_, "printDialSetsSummary", _printDialSetsSummary_);
+  GenericToolbox::Json::fillValue(_config_, "printParametersSummary", _printParametersSummary_);
 
-  _parameterLowerBoundsTVectorD_ = GenericToolbox::Json::fetchValue(_config_, "parameterLowerBoundsTVectorD", _parameterLowerBoundsTVectorD_);
-  _parameterUpperBoundsTVectorD_ = GenericToolbox::Json::fetchValue(_config_, "parameterUpperBoundsTVectorD", _parameterUpperBoundsTVectorD_);
-  _throwEnabledListPath_ = GenericToolbox::Json::fetchValue(_config_, "throwEnabledList", _throwEnabledListPath_);
+  GenericToolbox::Json::fillValue(_config_, "parameterLimits/minValue", _globalParameterMinValue_);
+  GenericToolbox::Json::fillValue(_config_, "parameterLimits/maxValue", _globalParameterMaxValue_);
 
-  _parameterDefinitionConfig_ = GenericToolbox::Json::fetchValue(_config_, "parameterDefinitions", _parameterDefinitionConfig_);
-  _dialSetDefinitions_ = GenericToolbox::Json::fetchValue(_config_, "dialSetDefinitions", _dialSetDefinitions_);
-  _enableOnlyParameters_ = GenericToolbox::Json::fetchValue(_config_, "enableOnlyParameters", _enableOnlyParameters_);
-  _disableParameters_ = GenericToolbox::Json::fetchValue(_config_, "disableParameters", _disableParameters_);
+  GenericToolbox::Json::fillValue(_config_, {{"enablePca"}, {"allowPca"}, {"fixGhostFitParameters"}}, _enablePca_);
+  GenericToolbox::Json::fillValue(_config_, "enabledThrowToyParameters", _enabledThrowToyParameters_);
+  GenericToolbox::Json::fillValue(_config_, {{"customParThrow"}, {"customFitParThrow"}}, _customParThrow_);
+  GenericToolbox::Json::fillValue(_config_, "releaseFixedParametersOnHesse", _releaseFixedParametersOnHesse_);
+
+  GenericToolbox::Json::fillValue(_config_, {{"parameterDefinitionFilePath"}, {"covarianceMatrixFilePath"}}, _parameterDefinitionFilePath_);
+  GenericToolbox::Json::fillValue(_config_, {{"covarianceMatrix"}, {"covarianceMatrixTMatrixD"}}, _covarianceMatrixPath_);
+  GenericToolbox::Json::fillValue(_config_, {{"parameterNameList"}, {"parameterNameTObjArray"}}, _parameterNameListPath_);
+  GenericToolbox::Json::fillValue(_config_, {{"parameterPriorValueList"}, {"parameterPriorTVectorD"}}, _parameterPriorValueListPath_);
+
+  GenericToolbox::Json::fillValue(_config_, "parameterLowerBoundsTVectorD", _parameterLowerBoundsTVectorD_);
+  GenericToolbox::Json::fillValue(_config_, "parameterUpperBoundsTVectorD", _parameterUpperBoundsTVectorD_);
+  GenericToolbox::Json::fillValue(_config_, "throwEnabledList", _throwEnabledListPath_);
+
+  GenericToolbox::Json::fillValue(_config_, "parameterDefinitions", _parameterDefinitionConfig_);
+  GenericToolbox::Json::fillValue(_config_, "dialSetDefinitions", _dialSetDefinitions_);
+  GenericToolbox::Json::fillValue(_config_, "enableOnlyParameters", _enableOnlyParameters_);
+  GenericToolbox::Json::fillValue(_config_, "disableParameters", _disableParameters_);
 
   // throws options
-  _useMarkGenerator_ = GenericToolbox::Json::fetchValue(_config_, "useMarkGenerator", _useMarkGenerator_);
-  _useEigenDecompForThrows_ = GenericToolbox::Json::fetchValue(_config_, "useEigenDecompForThrows", _useEigenDecompForThrows_);
+  GenericToolbox::Json::fillValue(_config_, "useMarkGenerator", _useMarkGenerator_);
+  GenericToolbox::Json::fillValue(_config_, "useEigenDecompForThrows", _useEigenDecompForThrows_);
 
   // eigen related parameters
-  _enableEigenDecomp_ = GenericToolbox::Json::fetchValue(_config_ , {{"enableEigenDecomp"}, {"useEigenDecompInFit"}}, _enableEigenDecomp_);
-  _allowEigenDecompWithBounds_ = GenericToolbox::Json::fetchValue(_config_ , "allowEigenDecompWithBounds", _allowEigenDecompWithBounds_);
-  _maxNbEigenParameters_ = GenericToolbox::Json::fetchValue(_config_ , "maxNbEigenParameters", _maxNbEigenParameters_);
-  _maxEigenFraction_ = GenericToolbox::Json::fetchValue(_config_ , "maxEigenFraction", _maxEigenFraction_);
-  _eigenSvdThreshold_ = GenericToolbox::Json::fetchValue(_config_, "eigenSvdThreshold", _eigenSvdThreshold_);
+  GenericToolbox::Json::fillValue(_config_, {{"enableEigenDecomp"}, {"useEigenDecompInFit"}}, _enableEigenDecomp_);
+  GenericToolbox::Json::fillValue(_config_ , "allowEigenDecompWithBounds", _allowEigenDecompWithBounds_);
+  GenericToolbox::Json::fillValue(_config_ , "maxNbEigenParameters", _maxNbEigenParameters_);
+  GenericToolbox::Json::fillValue(_config_ , "maxEigenFraction", _maxEigenFraction_);
+  GenericToolbox::Json::fillValue(_config_, "eigenSvdThreshold", _eigenSvdThreshold_);
 
-  if( GenericToolbox::Json::doKeyExist(_config_, "eigenParBounds") ){
-    auto eigenLimits = GenericToolbox::Json::fetchValue(_config_, "eigenParBounds", JsonType());
-    _eigenParBounds_.first = GenericToolbox::Json::fetchValue(eigenLimits, "minValue", _eigenParBounds_.first);
-    _eigenParBounds_.second = GenericToolbox::Json::fetchValue(eigenLimits, "maxValue", _eigenParBounds_.second);
-  }
+  GenericToolbox::Json::fillValue(_config_, "eigenParBounds/minValue", _eigenParBounds_.first);
+  GenericToolbox::Json::fillValue(_config_, "eigenParBounds/maxValue", _eigenParBounds_.second);
 
+  // legacy
   GenericToolbox::Json::fillValue(_config_, "maskForToyGeneration", _maskForToyGeneration_);
 
   // dev option -> was used for validation
-  _devUseParLimitsOnEigen_ = GenericToolbox::Json::fetchValue(_config_, "devUseParLimitsOnEigen", _devUseParLimitsOnEigen_);
+  GenericToolbox::Json::fillValue(_config_, "devUseParLimitsOnEigen", _devUseParLimitsOnEigen_);
 
 
   // individual parameter definitions:
@@ -95,14 +92,21 @@ void ParameterSet::readConfigImpl(){
 
     if( not _dialSetDefinitions_.empty() ){
       for( auto& dialSetDef : _dialSetDefinitions_ ){
-        if( GenericToolbox::Json::doKeyExist(dialSetDef, "parametersBinningPath") ){
-          LogInfo << "Found parameter binning within dialSetDefinition. Defining parameters number..." << std::endl;
-          DataBinSet b;
-          b.readBinningDefinition( GenericToolbox::Json::fetchValue(dialSetDef, "parametersBinningPath", JsonType()) );
-          // DON'T SORT THE BINNING -> tide to the cov matrix
-          _nbParameterDefinition_ = int(b.getBinList().size());
-          break;
-        }
+
+        JsonType parameterBinning{};
+        GenericToolbox::Json::fetchValue<JsonType>(dialSetDef, {{"binning"}, {"parametersBinningPath"}}, parameterBinning);
+
+        if( parameterBinning.empty() ){ continue; }
+
+        LogInfo << "Found parameter binning within dialSetDefinition. Defining parameters number..." << std::endl;
+        DataBinSet b;
+        b.readBinningDefinition( parameterBinning );
+        // DON'T SORT THE BINNING -> tide to the cov matrix
+        _nbParameterDefinition_ = int(b.getBinList().size());
+
+        // don't fetch other dataset as they should always have the same assumption
+        break;
+
       }
     }
 
@@ -988,7 +992,7 @@ void ParameterSet::defineParameters(){
             // try with par index
           parConfig = GenericToolbox::Json::fetchMatchingEntry(_parameterDefinitionConfig_, "parameterIndex", par.getParameterIndex());
         }
-        par.setParameterDefinitionConfig(parConfig);
+        par.setConfig(parConfig);
       }
       else {
         // No covariance provided, so find the name based on the order in
@@ -998,7 +1002,7 @@ void ParameterSet::defineParameters(){
         auto parConfig = configVector.at(par.getParameterIndex());
         auto parName = GenericToolbox::Json::fetchValue<std::string>(parConfig, {{"name"}, {"parameterName"}});
         if (not parName.empty()) par.setName(parName);
-        par.setParameterDefinitionConfig(parConfig);
+        par.setConfig(parConfig);
         LogWarning << "Parameter #" << par.getParameterIndex()
                    << " (name \"" << par.getName() << "\")"
                    << " not defined by covariance matrix file"
