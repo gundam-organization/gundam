@@ -52,8 +52,8 @@ void GeneralSpline::buildDial(const std::vector<double>& xPoints,
                               const std::string& option_){
   LogThrowIf(not _splineData_.empty(), "Spline data already set.");
 
-  _splineBounds_.first = xPoints.front();
-  _splineBounds_.second = xPoints.back();
+  _splineBounds_.min = xPoints.front();
+  _splineBounds_.max = xPoints.back();
 
   _splineData_.resize(2 + xPoints.size()*3);
   _splineData_[0] = xPoints.front();
@@ -75,8 +75,8 @@ double GeneralSpline::evalResponse(const DialInputBuffer& input_) const {
   double dialInput{input_.getInputBuffer()[0]};
 
   if( not _allowExtrapolation_ ){
-    if     (dialInput <= _splineBounds_.first) { dialInput = _splineBounds_.first; }
-    else if(dialInput >= _splineBounds_.second){ dialInput = _splineBounds_.second; }
+    if     (dialInput <= _splineBounds_.min) { dialInput = _splineBounds_.min; }
+    else if(dialInput >= _splineBounds_.max){ dialInput = _splineBounds_.max; }
   }
 
   return CalculateGeneralSpline( dialInput, -1E20, 1E20, _splineData_.data(), int(_splineData_.size()) );

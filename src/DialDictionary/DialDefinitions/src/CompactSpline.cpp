@@ -55,8 +55,8 @@ void CompactSpline::buildDial(const std::vector<double>& v1,
                               const std::string& option_) {
   LogThrowIf(not _splineData_.empty(), "Spline data already set.");
 
-  _splineBounds_.first = v1.front();
-  _splineBounds_.second = v1.back();
+  _splineBounds_.min = v1.front();
+  _splineBounds_.max = v1.back();
 
   _splineData_.resize(2 + v1.size());
   _splineData_[0] = v1.front();
@@ -78,8 +78,8 @@ void CompactSpline::buildDial(const std::vector<double>& v1,
   // Make lots of output if there is a problem!  This hopefully gives a clue
   // which spline is causing trouble.
   if (not validInputs) {
-      LogError << "Invalid inputs -- Bounds: " << _splineBounds_.first
-               << " to " << _splineBounds_.second
+      LogError << "Invalid inputs -- Bounds: " << _splineBounds_.min
+               << " to " << _splineBounds_.max
                << ", First X: " << _splineData_[0]
                << ", X spacing: " << _splineData_[1]
                << std::endl;
@@ -120,8 +120,8 @@ double CompactSpline::evalResponse(const DialInputBuffer& input_) const {
 #endif
 
   if( not _allowExtrapolation_ ){
-    if     (dialInput <= _splineBounds_.first) { dialInput = _splineBounds_.first; }
-    else if(dialInput >= _splineBounds_.second){ dialInput = _splineBounds_.second; }
+    if     (dialInput <= _splineBounds_.min) { dialInput = _splineBounds_.min; }
+    else if(dialInput >= _splineBounds_.max){ dialInput = _splineBounds_.max; }
   }
 
   return CalculateCompactSpline( dialInput, -1E20, 1E20, _splineData_.data(), int(_splineData_.size()-2) );
@@ -131,7 +131,7 @@ double CompactSpline::evalResponse(const DialInputBuffer& input_) const {
 std::string CompactSpline::getSummary() const {
   std::stringstream ss;
   ss << this->getDialTypeName() << ": spline data = " << GenericToolbox::toString(_splineData_);
-  ss << std::endl << this->getDialTypeName() << ": defined bounds = { " << _splineBounds_.first << ", " << _splineBounds_.second << " }";
+  ss << std::endl << this->getDialTypeName() << ": defined bounds = { " << _splineBounds_.min << ", " << _splineBounds_.max << " }";
   ss << std::endl << this->getDialTypeName() << ": allow extrapolation ? " << _allowExtrapolation_;
   return ss.str();
 };

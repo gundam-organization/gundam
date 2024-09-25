@@ -6,6 +6,7 @@
 #define GUNDAM_MONOTONICSPLINE_H
 
 #include "DialBase.h"
+#include "DialUtils.h"
 #include "DialInputBuffer.h"
 
 #include "TGraph.h"
@@ -46,7 +47,7 @@ protected:
   // the Cache::Manager to work, and provides the input for spline calculation
   // functions that can be shared between the CPU and the GPU.
   std::vector<double> _splineData_{};
-  std::pair<double, double> _splineBounds_{std::nan("unset"), std::nan("unset")};
+  DialUtils::Range _splineBounds_{};
 };
 
 typedef CachedDial<MonotonicSpline> MonotonicSplineCache;
