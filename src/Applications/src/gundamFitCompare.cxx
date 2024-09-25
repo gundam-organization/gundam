@@ -9,7 +9,6 @@
 #include "CmdLineParser.h"
 #include "GenericToolbox.Root.h"
 
-#include "nlohmann/json.hpp"
 #include "TKey.h"
 #include "TFile.h"
 #include <TLegend.h>
@@ -314,18 +313,18 @@ void makeScanComparePlots(bool usePrefit_){
 
         gr1->SetTitle( dir1_->GetListOfKeys()->At(iKey)->GetName() );
 
-        std::pair<double, double> xBounds{
+        GenericToolbox::Range xBounds{
             std::min( gr1->GetXaxis()->GetXmin(), gr2->GetXaxis()->GetXmin() ),
             std::max( gr1->GetXaxis()->GetXmax(), gr2->GetXaxis()->GetXmax() )
         };
-        std::pair<double, double> yBounds{
+        GenericToolbox::Range yBounds{
           std::min( gr1->GetMinimum(), gr2->GetMinimum() ),
           std::max( gr1->GetMaximum(), gr2->GetMaximum() )
         };
 
-        gr1->GetXaxis()->SetLimits( xBounds.first - ( xBounds.second - xBounds.first )*0.1, xBounds.second + ( xBounds.second - xBounds.first )*0.1 );
-        gr1->SetMinimum( yBounds.first - ( yBounds.second - yBounds.first )*0.1 ); // not working
-        gr1->SetMaximum( yBounds.second + ( yBounds.second - yBounds.first )*0.2 ); // not working
+        gr1->GetXaxis()->SetLimits( xBounds.min - ( xBounds.max - xBounds.min )*0.1, xBounds.max + ( xBounds.max - xBounds.min )*0.1 );
+        gr1->SetMinimum( yBounds.min - ( yBounds.max - yBounds.min )*0.1 ); // not working
+        gr1->SetMaximum( yBounds.max + ( yBounds.max - yBounds.min )*0.2 ); // not working
 
         gr1->Draw();
         gr2->Draw("LPSAME");
