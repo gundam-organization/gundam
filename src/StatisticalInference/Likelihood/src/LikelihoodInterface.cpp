@@ -257,7 +257,7 @@ std::string LikelihoodInterface::getSampleBreakdownTable() const{
     t << samplePair.model->getName() << GenericToolbox::TablePrinter::NextColumn;
     t << samplePair.model->getNbBinnedEvents() << GenericToolbox::TablePrinter::NextColumn;
     t << samplePair.data->getNbBinnedEvents() << GenericToolbox::TablePrinter::NextColumn;
-    t << samplePair.data->getNbBinnedEvents() - samplePair.model->getNbBinnedEvents() << GenericToolbox::TablePrinter::NextColumn;
+    t << long(samplePair.data->getNbBinnedEvents()) - long(samplePair.model->getNbBinnedEvents()) << GenericToolbox::TablePrinter::NextColumn;
     t << samplePair.model->getSumWeights() << GenericToolbox::TablePrinter::NextColumn;
     t << samplePair.data->getSumWeights() << GenericToolbox::TablePrinter::NextColumn;
     t << samplePair.data->getSumWeights() - samplePair.model->getSumWeights() << GenericToolbox::TablePrinter::NextLine;
