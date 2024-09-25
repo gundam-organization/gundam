@@ -54,7 +54,7 @@ public:
   /// boundaries and may set take values that are out of bounds.  In this
   /// case, the job will stop.  Note: If the minimum value is not set, then
   /// the bound is a negative infinity.
-  void setMinValue(double minValue){ _minValue_ = minValue; }
+  void setMinValue(double minValue){ _limitRange_.min = minValue; }
 
   /// Set the maximum value for this parameter.  Parameter values more than
   /// this value are illegal, and the likelihood is undefined. The job will
@@ -64,7 +64,7 @@ public:
   /// boundaries and may set take values that are out of bounds.  In this
   /// case, the job will stop.  Note: If the maximum value is not set, then
   /// the bound is at positive infinity.
-  void setMaxValue(double maxValue){ _maxValue_ = maxValue; }
+  void setMaxValue(double maxValue){ _limitRange_.max = maxValue; }
 
   /// Record the minimum mirroring boundary being used by any dials for this
   /// parameter.  If this is set, then GUNDAM will constrain the parameter
@@ -84,7 +84,7 @@ public:
   /// the physical range.  From a mathmatical perspective, the value of the
   /// LLH is infinite below the physical minimum.  This can be enforced
   /// using the Likelihood::SetParameterValidity() method.
-  void setMinPhysical(double minPhysical){ _minPhysical_ = minPhysical; }
+  void setMinPhysical(double minPhysical){ _physicalRange_.min = minPhysical; }
 
   /// Record the physical maximum bound for the parameter.  This is the range
   /// where the parameter has a physically meaningful value.  Because of
@@ -92,7 +92,7 @@ public:
   /// the physical range.  From a mathmatical perspective, the value of the
   /// LLH is infinite below the physical minimum.  This can be enforced
   /// using the Likelihood::SetParameterValidity() method.
-  void setMaxPhysical(double maxPhysical){ _maxPhysical_ = maxPhysical; }
+  void setMaxPhysical(double maxPhysical){ _physicalRange_.max = maxPhysical; }
   void setPriorValue(double priorValue){ _priorValue_ = priorValue; }
   void setThrowValue(double throwValue){ _throwValue_ = throwValue; }
   void setStdDevValue(double stdDevValue){ _stdDevValue_ = stdDevValue; }
