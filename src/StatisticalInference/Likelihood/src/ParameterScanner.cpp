@@ -154,8 +154,8 @@ void ParameterScanner::scanParameter(Parameter& par_, TDirectory* saveDir_) {
   }
 
   double origVal = par_.getParameterValue();
-  double lowBound = origVal + _parameterSigmaRange_.first * par_.getStdDevValue();
-  double highBound = origVal + _parameterSigmaRange_.second * par_.getStdDevValue();
+  double lowBound = origVal + _parameterSigmaRange_.min * par_.getStdDevValue();
+  double highBound = origVal + _parameterSigmaRange_.max * par_.getStdDevValue();
 
   if( _useParameterLimits_ ){
     lowBound = std::max(lowBound, par_.getMinValue());
@@ -180,8 +180,8 @@ void ParameterScanner::scanParameter(Parameter& par_, TDirectory* saveDir_) {
             << GET_VAR_NAME_VALUE(_nbPoints_) << std::endl
             << GET_VAR_NAME_VALUE(offSet) << std::endl
             << GET_VAR_NAME_VALUE(origVal) << std::endl
-            << GET_VAR_NAME_VALUE(_parameterSigmaRange_.first) << std::endl
-            << GET_VAR_NAME_VALUE(_parameterSigmaRange_.second) << std::endl
+            << GET_VAR_NAME_VALUE(_parameterSigmaRange_.min) << std::endl
+            << GET_VAR_NAME_VALUE(_parameterSigmaRange_.max) << std::endl
             << GET_VAR_NAME_VALUE(par_.getStdDevValue()) << std::endl
     );
 

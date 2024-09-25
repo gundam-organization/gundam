@@ -39,7 +39,7 @@ public:
   // const getters
   [[nodiscard]] bool isUseParameterLimits() const{ return _useParameterLimits_; }
   [[nodiscard]] int getNbPoints() const{ return _nbPoints_; }
-  [[nodiscard]] const std::pair<double, double> &getParameterSigmaRange() const{ return _parameterSigmaRange_; }
+  [[nodiscard]] const GenericToolbox::Range &getParameterSigmaRange() const{ return _parameterSigmaRange_; }
   [[nodiscard]] const JsonType &getVarsConfig() const { return _varsConfig_; };
   [[nodiscard]] const std::vector<GraphEntry> &getGraphEntriesBuf() const { return _graphEntriesBuf_; };
 
