@@ -38,11 +38,11 @@ void PlotGenerator::readConfigImpl(){
 
   // nested first
   for( auto& varDictConfig : GenericToolbox::Json::fetchValue(_config_, {{"varDictionaries"}, {"varDictionnaries"}}, JsonType())){
-    auto& varDict = _varDictionaryList_.emplace_back();
+    _varDictionaryList_.emplace_back(); auto& varDict = _varDictionaryList_.back();
     GenericToolbox::Json::fillValue(varDictConfig, "name", varDict.name);
 
     for( auto& dictEntryConfig : GenericToolbox::Json::fetchValue(varDictConfig, "dictionary", JsonType())){
-      auto& dictEntry = varDict.dictEntryList.emplace_back();
+      varDict.dictEntryList.emplace_back(); auto& dictEntry = varDict.dictEntryList.back();
       GenericToolbox::Json::fillValue(dictEntryConfig, "value", dictEntry.value);
       GenericToolbox::Json::fillValue(dictEntryConfig, "title", dictEntry.title);
       GenericToolbox::Json::fillValue(dictEntryConfig, "fillStyle", dictEntry.fillStyle);
@@ -56,7 +56,7 @@ void PlotGenerator::readConfigImpl(){
 
   for( auto& histDefConfig : GenericToolbox::Json::fetchValue(_config_, "histogramsDefinition", JsonType()) ){
     if( not GenericToolbox::Json::fetchValue(histDefConfig, "isEnabled", true) ){ continue; }
-    auto& histDef = _histDefList_.emplace_back();
+    _histDefList_.emplace_back(); auto& histDef = _histDefList_.back();
     GenericToolbox::Json::fillValue(histDefConfig, "noData", histDef.noData);
     GenericToolbox::Json::fillValue(histDefConfig, "useSampleBinning", histDef.useSampleBinning);
     GenericToolbox::Json::fillValue(histDefConfig, "rescaleAsBinWidth", histDef.rescaleAsBinWidth);
