@@ -287,11 +287,10 @@ int main(int argc, char** argv){
 
       // optionals
       for( auto& parSelConfig : GenericToolbox::Json::fetchValue<JsonType>(config_, "parSelections") ){
-        parSelections.emplace_back();
-        parSelections.back().first = GenericToolbox::Json::fetchValue<std::string>(parSelConfig, "name");
-        parSelections.back().second = GenericToolbox::Json::fetchValue<double>(parSelConfig, "value");
+        parSelectionList.emplace_back();
+        GenericToolbox::Json::fillValue(parSelConfig, "name", parSelectionList.back().name);
+        GenericToolbox::Json::fillValue(parSelConfig, "value", parSelectionList.back().value);
       }
-      parSelections = GenericToolbox::Json::fetchValue(config_, "parSelections", parSelections);
 
       // init
       LogScopeIndent;
@@ -299,11 +298,11 @@ int main(int argc, char** argv){
       LogInfo << GET_VAR_NAME_VALUE(histogramPath) << std::endl;
       LogInfo << GET_VAR_NAME_VALUE(axisVariable) << std::endl;
 
-      if( not parSelections.empty() ){
+      if( not parSelectionList.empty() ){
         LogInfo << "parSelections:" << std::endl;
-        for( auto& parSelection : parSelections ){
+        for( auto& parSelection : parSelectionList ){
           LogScopeIndent;
-          LogInfo << parSelection.first << " -> " << parSelection.second << std::endl;
+          LogInfo << parSelection.name << " -> " << parSelection.value << std::endl;
         }
       }
 
@@ -334,8 +333,8 @@ int main(int argc, char** argv){
           bool isParBinValid{true};
 
           // first check the conditions
-          for( auto& selection : parSelections ){
-            if( parBin.isVariableSet(selection.first) and not parBin.isBetweenEdges(selection.first, selection.second) ){
+          for( auto& selection : parSelectionList ){
+            if( parBin.isVariableSet(selection.name) and not parBin.isBetweenEdges(selection.name, selection.value) ){
               isParBinValid = false;
               break;
             }
@@ -368,7 +367,12 @@ int main(int argc, char** argv){
     std::string filePath{};
     std::string histogramPath{};
     std::string axisVariable{};
-    std::vector<std::pair<std::string, double>> parSelections{};
+
+    struct ParSelection{
+      std::string name{};
+      double value{};
+    };
+    std::vector<ParSelection> parSelectionList{};
 
     // internals
     std::shared_ptr<TFile> file{nullptr};
@@ -411,9 +415,9 @@ int main(int argc, char** argv){
       LogInfo << "Re-normalization config \"" << name << "\": ";
 
       if     ( GenericToolbox::Json::doKeyExist( config_, "meanValue" ) ){
-        normParameter.first  = GenericToolbox::Json::fetchValue<double>(config_, "meanValue");
-        normParameter.second = GenericToolbox::Json::fetchValue(config_, "stdDev", double(0.));
-        LogInfo << "mean ± sigma = " << normParameter.first << " ± " << normParameter.second;
+        normParameter.min  = GenericToolbox::Json::fetchValue<double>(config_, "meanValue");
+        normParameter.max = GenericToolbox::Json::fetchValue(config_, "stdDev", double(0.));
+        LogInfo << "mean ± sigma = " << normParameter.min << " ± " << normParameter.max;
       }
       else if( GenericToolbox::Json::doKeyExist( config_, "disabledBinDim" ) ){
         disabledBinDim = GenericToolbox::Json::fetchValue<std::string>(config_, "disabledBinDim");
@@ -432,7 +436,7 @@ int main(int argc, char** argv){
     }
 
     std::string name{};
-    std::pair<double, double> normParameter{std::nan("mean unset"), std::nan("stddev unset")};
+    GenericToolbox::Range normParameter{};
     std::string disabledBinDim{};
     std::string parSetNormaliserName{};
 
@@ -523,9 +527,9 @@ int main(int argc, char** argv){
 
         // special re-norm
         for( auto& normData : xsec.normList ){
-          if( not std::isnan( normData.normParameter.first ) ){
-            double norm{normData.normParameter.first};
-            if( normData.normParameter.second != 0 ){ norm += normData.normParameter.second * gRandom->Gaus(); }
+          if( not std::isnan( normData.normParameter.min ) ){
+            double norm{normData.normParameter.min};
+            if( normData.normParameter.max != 0 ){ norm += normData.normParameter.max * gRandom->Gaus(); }
             binData /= norm;
           }
           else if( not normData.parSetNormaliserName.empty() ){
