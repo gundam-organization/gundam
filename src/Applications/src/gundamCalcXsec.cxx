@@ -286,7 +286,7 @@ int main(int argc, char** argv){
       axisVariable = GenericToolbox::Json::fetchValue<std::string>(config_, "axisVariable");
 
       // optionals
-      for( auto& parSelConfig : GenericToolbox::Json::fetchValue<JsonType>(config_, "parSelections") ){
+      for( auto& parSelConfig : GenericToolbox::Json::fetchValue(config_, "parSelections", JsonType()) ){
         parSelectionList.emplace_back();
         GenericToolbox::Json::fillValue(parSelConfig, "name", parSelectionList.back().name);
         GenericToolbox::Json::fillValue(parSelConfig, "value", parSelectionList.back().value);
@@ -381,20 +381,18 @@ int main(int argc, char** argv){
   };
   std::vector<ParSetNormaliser> parSetNormList;
   for( auto& parSet : propagator.getParametersManager().getParameterSetsList() ){
-    if( GenericToolbox::Json::doKeyExist(parSet.getConfig(), "normalisations") ){
-      for( auto& parSetNormConfig : GenericToolbox::Json::fetchValue<JsonType>(parSet.getConfig(), "normalisations") ){
-        parSetNormList.emplace_back();
-        parSetNormList.back().readConfig( parSetNormConfig );
+    for( auto& parSetNormConfig : GenericToolbox::Json::fetchValue(parSet.getConfig(), "normalisations", JsonType()) ){
+      parSetNormList.emplace_back();
+      parSetNormList.back().readConfig( parSetNormConfig );
 
-        for( auto& dialCollection : propagator.getDialCollectionList() ){
-          if( dialCollection.getSupervisedParameterSet() == &parSet ){
-            parSetNormList.back().dialCollectionPtr = &dialCollection;
-            break;
-          }
+      for( auto& dialCollection : propagator.getDialCollectionList() ){
+        if( dialCollection.getSupervisedParameterSet() == &parSet ){
+          parSetNormList.back().dialCollectionPtr = &dialCollection;
+          break;
         }
-
-        parSetNormList.back().initialize();
       }
+
+      parSetNormList.back().initialize();
     }
   }
 
