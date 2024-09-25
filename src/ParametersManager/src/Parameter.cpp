@@ -23,7 +23,13 @@ void Parameter::readConfigImpl(){
   if( not _isEnabled_ ) { return; }
 
   GenericToolbox::Json::fillValue(_config_, "isFixed", _isFixed_);
-  GenericToolbox::Json::fillValue(_config_, "priorValue", _priorValue_);
+
+  if( GenericToolbox::Json::doKeyExist(_config_, "priorValue") ){
+    double priorValue{std::nan("unset")};
+    GenericToolbox::Json::fillValue(_config_, "priorValue", priorValue);
+    if( not std::isnan(priorValue) ){ _priorValue_ = priorValue; }
+  }
+
   GenericToolbox::Json::fillValue(_config_, "parameterStepSize", _stepSize_);
   GenericToolbox::Json::fillValue(_config_, "parameterLimits", _limitRange_);
   GenericToolbox::Json::fillValue(_config_, "physicalLimits", _physicalRange_);
@@ -39,9 +45,9 @@ void Parameter::initializeImpl() {
   LogThrowIf(_parameterIndex_ == -1, "Parameter index is not set.");
 
   if( not _isEnabled_ ) { return; }
-  LogThrowIf(std::isnan(_priorValue_), "Prior value is not set.");
-  LogThrowIf(std::isnan(_stdDevValue_), "Std dev value is not set.");
-  LogThrowIf(std::isnan(_parameterValue_), "Parameter value is not set.");
+  LogThrowIf(std::isnan(_priorValue_), "Prior value is not set: " << getFullTitle());
+  LogThrowIf(std::isnan(_stdDevValue_), "Std dev value is not set: " << getFullTitle());
+  LogThrowIf(std::isnan(_parameterValue_), "Parameter value is not set: " << getFullTitle());
 }
 
 void Parameter::setMinMirror(double minMirror) {
