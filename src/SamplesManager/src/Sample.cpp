@@ -9,7 +9,6 @@
 #include "GenericToolbox.Json.h"
 #include "Logger.h"
 
-#include <vector>
 #include <string>
 #include <memory>
 
@@ -21,18 +20,17 @@ LoggerInit([]{ Logger::setUserHeaderStr("[Sample]"); });
 
 void Sample::readConfigImpl(){
   _name_ = GenericToolbox::Json::fetchValue<std::string>(_config_, "name");
-  GenericToolbox::replaceSubstringInsideInputString(_name_, "/", " ");
   LogDebugIf(GundamGlobals::isDebugConfig()) << "Defining sample \"" << _name_ << "\"" << std::endl;
 
-  _isEnabled_ = GenericToolbox::Json::fetchValue(_config_, "isEnabled", _isEnabled_);
+  GenericToolbox::Json::fillValue(_config_, "isEnabled", _isEnabled_);
   if( not _isEnabled_ ){
     LogDebugIf(GundamGlobals::isDebugConfig()) << "-> disabled" << std::endl;
     return;
   }
 
-  _binningConfig_ = GenericToolbox::Json::fetchValue(_config_, {{"binningFilePath"}, {"binningFile"}, {"binning"}}, _binningConfig_);
-  _selectionCutStr_ = GenericToolbox::Json::fetchValue(_config_, {{"selectionCutStr"}, {"selectionCuts"}}, _selectionCutStr_);
-  _enabledDatasetList_ = GenericToolbox::Json::fetchValue(_config_, std::vector<std::string>{"datasets", "dataSets"}, _enabledDatasetList_);
+  GenericToolbox::Json::fillValue(_config_, {{"binningFilePath"}, {"binningFile"}, {"binning"}}, _binningConfig_);
+  GenericToolbox::Json::fillValue(_config_, {{"selectionCutStr"}, {"selectionCuts"}}, _selectionCutStr_);
+  GenericToolbox::Json::fillValue(_config_, {{"datasets"}, {"dataSets"}}, _enabledDatasetList_);
 
   LogDebugIf(GundamGlobals::isDebugConfig()) << "Reading binning: " << _config_ << std::endl;
   _binning_.readBinningDefinition( _binningConfig_ );
@@ -41,17 +39,16 @@ void Sample::readConfigImpl(){
 }
 
 void Sample::writeEventRates(const GenericToolbox::TFilePath& saveDir_) const{
-  if( not _isEnabled_ ){ return; } // don't write anything, even the containing dir
   GenericToolbox::writeInTFile(saveDir_.getSubDir(_name_).getDir(), getSumWeights(), "sumWeights");
 }
 bool Sample::isDatasetValid(const std::string& datasetName_){
   if( _enabledDatasetList_.empty() ) return true;
-  for( auto& dataSetName : _enabledDatasetList_){
-    if( dataSetName == "*" or dataSetName == datasetName_ ){
-      return true;
-    }
-  }
-  return false;
+  return std::any_of(
+      _enabledDatasetList_.begin(), _enabledDatasetList_.end(),
+      [&](const std::string& enabled_){
+        return (enabled_ == "*" or enabled_ == datasetName_);
+      }
+  );
 }
 
 void Sample::buildHistogram(const DataBinSet& binning_){
