@@ -751,7 +751,7 @@ bool Cache::Manager::Fill() {
         LogError << "Fill while an update is required" << std::endl;
         LogThrow("Fill while an update is required");
     }
-    LogTrace << "Cache::Manager::Fill -- Fill the GPU cache" << std::endl;
+    LogTraceIf( GundamGlobals::isDebugConfig() ) << "Cache::Manager::Fill -- Fill the GPU cache" << std::endl;
 #define DUMP_FILL_INPUT_PARAMETERS
 #ifdef DUMP_FILL_INPUT_PARAMETERS
     do {
