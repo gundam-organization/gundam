@@ -25,11 +25,11 @@ LoggerInit([]{ Logger::setUserHeaderStr("[Propagator]"); });
 void Propagator::muteLogger(){ Logger::setIsMuted( true ); }
 void Propagator::unmuteLogger(){ Logger::setIsMuted( false ); }
 
-void Propagator::readConfigImpl(){
+void Propagator::configureImpl(){
 
   // nested objects
   GenericToolbox::Json::fillValue(_config_, _sampleSet_.getConfig(), {{"sampleSetConfig"}, {"fitSampleSetConfig"}});
-  _sampleSet_.readConfig();
+  _sampleSet_.configure();
 
   GenericToolbox::Json::deprecatedAction(_config_, "parameterSetListConfig", [&]{
     LogAlert << R"("parameterSetListConfig" should now be set under "parametersManagerConfig/parameterSetList".)" << std::endl;
@@ -41,7 +41,7 @@ void Propagator::readConfigImpl(){
     _parManager_.setThrowToyParametersWithGlobalCov(GenericToolbox::Json::fetchValue<bool>(_config_, "throwToyParametersWithGlobalCov"));
   });
   GenericToolbox::Json::fillValue(_config_, _parManager_.getConfig(), "parametersManagerConfig");
-  _parManager_.readConfig();
+  _parManager_.configure();
 
   _dialCollectionList_.clear();
   for(size_t iParSet = 0 ; iParSet < _parManager_.getParameterSetsList().size() ; iParSet++ ){
@@ -52,7 +52,7 @@ void Propagator::readConfigImpl(){
         _dialCollectionList_.emplace_back(&_parManager_.getParameterSetsList());
         _dialCollectionList_.back().setIndex(int(_dialCollectionList_.size()) - 1);
         _dialCollectionList_.back().setSupervisedParameterSetIndex(int(iParSet) );
-        _dialCollectionList_.back().readConfig(dialSetDef );
+        _dialCollectionList_.back().configure(dialSetDef );
       }
     }
     else{
@@ -72,7 +72,7 @@ void Propagator::readConfigImpl(){
           _dialCollectionList_.back().setIndex(int(_dialCollectionList_.size()) - 1);
           _dialCollectionList_.back().setSupervisedParameterSetIndex(int(iParSet) );
           _dialCollectionList_.back().setSupervisedParameterIndex(par.getParameterIndex() );
-          _dialCollectionList_.back().readConfig( dialDefinitionConfig );
+          _dialCollectionList_.back().configure( dialDefinitionConfig );
         }
       }
     }

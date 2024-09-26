@@ -23,7 +23,7 @@ public:
   class Edges : public JsonBaseClass {
 
   protected:
-    void readConfigImpl() override;
+    void configureImpl() override;
 
   public:
     Edges() = delete;
@@ -44,7 +44,7 @@ public:
   };
 
 protected:
-  void readConfigImpl() override;
+  void configureImpl() override;
 
 public:
   DataBin() = delete;

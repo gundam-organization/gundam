@@ -17,7 +17,7 @@ LoggerInit([]{ Logger::setUserHeaderStr("[DataSetLoader]"); });
 #endif
 
 
-void DatasetDefinition::readConfigImpl() {
+void DatasetDefinition::configureImpl() {
 
   // mandatory
   _name_ = GenericToolbox::Json::fetchValue<std::string>(_config_, "name");
@@ -30,7 +30,7 @@ void DatasetDefinition::readConfigImpl() {
   _modelDispenser_.getParameters().name = "Asimov";
   _modelDispenser_.getParameters().useReweightEngine = true;
   GenericToolbox::Json::fillValue<JsonType>(_config_, _modelDispenser_.getConfig(), {{"model"},{"mc"}});
-  _modelDispenser_.readConfig();
+  _modelDispenser_.configure();
 
   // Always put the Asimov as a data entry
   _dataDispenserDict_.emplace("Asimov", DataDispenser(_modelDispenser_));
@@ -42,7 +42,7 @@ void DatasetDefinition::readConfigImpl() {
     if( GenericToolbox::Json::fetchValue(dataEntry, "fromMc", bool(false)) ){ _dataDispenserDict_.emplace(name, _modelDispenser_); }
     else{ _dataDispenserDict_.emplace(name, DataDispenser(this)); }
     _dataDispenserDict_.at(name).getParameters().isData = true;
-    _dataDispenserDict_.at(name).readConfig(dataEntry);
+    _dataDispenserDict_.at(name).configure(dataEntry);
   }
 
   GenericToolbox::Json::fillValue(_config_, _selectedDataEntry_, "selectedDataEntry");

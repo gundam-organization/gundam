@@ -17,7 +17,7 @@
 LoggerInit([]{ Logger::setUserHeaderStr("[Parameter]"); });
 #endif
 
-void Parameter::readConfigImpl(){
+void Parameter::configureImpl(){
 
   GenericToolbox::Json::fillValue(_config_, _isEnabled_, "isEnabled");
   if( not _isEnabled_ ) { return; }

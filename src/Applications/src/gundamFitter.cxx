@@ -270,7 +270,7 @@ int main(int argc, char** argv){
   FitterEngine fitter(GenericToolbox::mkdirTFile(app.getOutfilePtr(), "FitterEngine"));
 
   GenericToolbox::Json::fillValue(gundamFitterConfig, fitter.getConfig(), "fitterEngineConfig");
-  fitter.readConfig();
+  fitter.configure();
 
   // -a
   if( clParser.isOptionTriggered("asimov") ){

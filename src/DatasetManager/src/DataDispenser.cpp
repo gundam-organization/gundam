@@ -36,7 +36,7 @@ LoggerInit([]{ Logger::setUserHeaderStr("[DataDispenser]"); });
 #endif
 
 
-void DataDispenser::readConfigImpl(){
+void DataDispenser::configureImpl(){
 
   // first of all
   _threadPool_.setNThreads( GundamGlobals::getNumberOfThreads() );
@@ -70,7 +70,7 @@ void DataDispenser::readConfigImpl(){
   for( auto& varTransform : GenericToolbox::Json::fetchValue(_config_, "variablesTransform", std::vector<JsonType>()) ){
     _parameters_.eventVarTransformList.emplace_back( varTransform );
     _parameters_.eventVarTransformList.back().setIndex(index++);
-    _parameters_.eventVarTransformList.back().readConfig();
+    _parameters_.eventVarTransformList.back().configure();
     if( not _parameters_.eventVarTransformList.back().isEnabled() ){
       _parameters_.eventVarTransformList.pop_back();
       continue;
@@ -133,7 +133,7 @@ void DataDispenser::load(Propagator& propagator_){
     LogWarning << "Reload the propagator config with override options" << std::endl;
     ConfigUtils::ConfigHandler configHandler( _cache_.propagatorPtr->getConfig() );
     configHandler.override( _parameters_.overridePropagatorConfig );
-    _cache_.propagatorPtr->readConfig( configHandler.getConfig() );
+    _cache_.propagatorPtr->configure( configHandler.getConfig() );
     _cache_.propagatorPtr->initialize();
   }
 

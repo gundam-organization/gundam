@@ -17,7 +17,7 @@
 LoggerInit([]{ Logger::setUserHeaderStr("[DialCollection]"); });
 #endif
 
-void DialCollection::readConfigImpl() {
+void DialCollection::configureImpl() {
 
   _dataSetNameList_ = GenericToolbox::Json::fetchValue<std::vector<std::string>>(
       _config_, "applyOnDataSets", std::vector<std::string>());

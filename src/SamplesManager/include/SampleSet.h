@@ -17,8 +17,8 @@
 class SampleSet : public JsonBaseClass {
 
 protected:
-  // called through JsonBaseClass::readConfig() and JsonBaseClass::initialize()
-  void readConfigImpl() override;
+  // called through JsonBaseClass::configure() and JsonBaseClass::initialize()
+  void configureImpl() override;
   void initializeImpl() override;
 
 public:

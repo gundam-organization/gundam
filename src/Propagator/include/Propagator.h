@@ -22,7 +22,7 @@
 class Propagator : public JsonBaseClass {
 
 protected:
-  void readConfigImpl() override;
+  void configureImpl() override;
   void initializeImpl() override;
 
 

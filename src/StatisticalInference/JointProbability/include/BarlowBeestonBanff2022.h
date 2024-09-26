@@ -16,7 +16,7 @@ namespace JointProbability{
   class BarlowBeestonBanff2022 : public JointProbabilityBase {
 
   protected:
-    void readConfigImpl() override;
+    void configureImpl() override;
 
   public:
     [[nodiscard]] std::string getType() const override { return "BarlowBeestonBanff2022"; }
@@ -33,7 +33,7 @@ namespace JointProbability{
     mutable GenericToolbox::NoCopyWrapper<std::mutex> _mutex_{}; // for creating the nomMC
   };
 
-  void BarlowBeestonBanff2022::readConfigImpl(){
+  void BarlowBeestonBanff2022::configureImpl(){
     GenericToolbox::Json::fillValue(_config_, allowZeroMcWhenZeroData, "allowZeroMcWhenZeroData");
     GenericToolbox::Json::fillValue(_config_, usePoissonLikelihood, "usePoissonLikelihood");
     GenericToolbox::Json::fillValue(_config_, BBNoUpdateWeights, "BBNoUpdateWeights");

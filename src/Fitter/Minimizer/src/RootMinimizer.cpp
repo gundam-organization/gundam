@@ -25,10 +25,10 @@
 LoggerInit([]{ Logger::setUserHeaderStr("[RootMinimizer]"); });
 #endif
 
-void RootMinimizer::readConfigImpl(){
+void RootMinimizer::configureImpl(){
 
   // read general parameters first
-  this->MinimizerBase::readConfigImpl();
+  this->MinimizerBase::configureImpl();
 
   GenericToolbox::Json::fillValue(_config_, getMonitor().gradientDescentMonitor.isEnabled, "monitorGradientDescent");
   GenericToolbox::Json::fillValue(_config_, _minimizerType_, "minimizer");

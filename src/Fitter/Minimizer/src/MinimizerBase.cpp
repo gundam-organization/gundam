@@ -9,7 +9,7 @@ LoggerInit([]{ Logger::setUserHeaderStr("[MinimizerBase]"); });
 #endif
 
 
-void MinimizerBase::readConfigImpl(){
+void MinimizerBase::configureImpl(){
 
   // nested objects first
   int monitorRefreshRateInMs(5000);

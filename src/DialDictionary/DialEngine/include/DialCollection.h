@@ -171,7 +171,7 @@ public:
   void printConfiguration() const;
 
 protected:
-  void readConfigImpl() override;
+  void configureImpl() override;
   void initializeImpl() override;
 
   bool initializeNormDialsWithParBinning();

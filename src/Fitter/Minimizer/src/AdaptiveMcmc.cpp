@@ -19,9 +19,9 @@ LoggerInit([]{ Logger::setUserHeaderStr("[MCMC]"); });
 #endif
 
 
-void AdaptiveMcmc::readConfigImpl(){
+void AdaptiveMcmc::configureImpl(){
 
-  this->MinimizerBase::readConfigImpl();
+  this->MinimizerBase::configureImpl();
 
   // The type of algorithm to be using.  It should be left at the default
   // value (metropolis is the only supported MCMC algorithm right now).

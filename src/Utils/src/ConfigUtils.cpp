@@ -10,7 +10,6 @@
 #include "Logger.h"
 
 #include <string>
-#include <utility>
 #include <vector>
 #include <sstream>
 #include <iostream>

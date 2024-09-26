@@ -18,14 +18,14 @@
 LoggerInit([]{ Logger::setUserHeaderStr("[LikelihoodInterface]"); });
 #endif
 
-void LikelihoodInterface::readConfigImpl(){
+void LikelihoodInterface::configureImpl(){
 
   _threadPool_.setNThreads( GundamGlobals::getNumberOfThreads() );
 
   // reading the configuration of the propagator
   // allows to implement
   GenericToolbox::Json::fillValue(_config_, _modelPropagator_.getConfig(), "propagatorConfig");
-  _modelPropagator_.readConfig();
+  _modelPropagator_.configure();
   _modelPropagator_.printConfiguration();
 
   JsonType dataSetListConfig{};
@@ -78,11 +78,11 @@ void LikelihoodInterface::readConfigImpl(){
   LogInfo << "Using \"" << jointProbabilityTypeStr << "\" JointProbabilityType." << std::endl;
   _jointProbabilityPtr_ = std::shared_ptr<JointProbability::JointProbabilityBase>( JointProbability::makeJointProbability( jointProbabilityTypeStr ) );
   _jointProbabilityPtr_->setConfig( jointProbabilityConfig );
-  _jointProbabilityPtr_->readConfig();
+  _jointProbabilityPtr_->configure();
 
   // nested configurations
   GenericToolbox::Json::fillValue(_config_, _plotGenerator_.getConfig(), "plotGeneratorConfig");
-  _plotGenerator_.readConfig();
+  _plotGenerator_.configure();
 
   // reading local parameters
   GenericToolbox::Json::fillValue(_config_, _throwAsimovToyParameters_, "throwAsimovFitParameters");
@@ -415,7 +415,7 @@ void LikelihoodInterface::loadDataPropagator(){
         LogWarning << "Reload the data propagator config with override options..." << std::endl;
         ConfigUtils::ConfigHandler configHandler( _modelPropagator_.getConfig() );
         configHandler.override( dataDispenser->getParameters().overridePropagatorConfig );
-        _dataPropagator_.readConfig( configHandler.getConfig() );
+        _dataPropagator_.configure( configHandler.getConfig() );
         _dataPropagator_.initialize();
       }
 
@@ -433,7 +433,7 @@ void LikelihoodInterface::loadDataPropagator(){
       if( not dataDispenser->getParameters().overridePropagatorConfig.empty() ){
         // TODO: handle multiple datasets loading when editing the configuration
 //        LogWarning << "Restoring propagator config overrides..." << std::endl;
-//        _dataPropagator_.readConfig( _modelPropagator_.getConfig() );
+//        _dataPropagator_.configure( _modelPropagator_.getConfig() );
 //        _dataPropagator_.initialize();
       }
     }

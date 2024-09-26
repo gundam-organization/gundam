@@ -18,7 +18,7 @@ LoggerInit([]{ Logger::setUserHeaderStr("[Sample]"); });
 #endif
 
 
-void Sample::readConfigImpl(){
+void Sample::configureImpl(){
   _name_ = GenericToolbox::Json::fetchValue<std::string>(_config_, "name");
   LogDebugIf(GundamGlobals::isDebugConfig()) << "Defining sample \"" << _name_ << "\"" << std::endl;
 

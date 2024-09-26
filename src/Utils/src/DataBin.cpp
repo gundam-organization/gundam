@@ -16,7 +16,7 @@ LoggerInit([]{ Logger::setUserHeaderStr("[DataBin]"); });
 #endif
 
 
-void DataBin::Edges::readConfigImpl(){
+void DataBin::Edges::configureImpl(){
 
   varName = GenericToolbox::Json::fetchValue<std::string>(_config_, "name");
 
@@ -64,11 +64,11 @@ std::string DataBin::Edges::getSummary() const {
 
 
 // configure
-void DataBin::readConfigImpl(){
+void DataBin::configureImpl(){
 
   for( auto& edgeConfig : GenericToolbox::Json::fetchValue(_config_, "edgesList", JsonType()) ){
     _binEdgesList_.emplace_back( _binEdgesList_.size() );
-    _binEdgesList_.back().readConfig( edgeConfig );
+    _binEdgesList_.back().configure( edgeConfig );
   }
 
 }

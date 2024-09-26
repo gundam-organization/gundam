@@ -18,7 +18,7 @@ LoggerInit([]{ Logger::setUserHeaderStr("[TreeWriter]"); });
 #endif
 
 
-void EventTreeWriter::readConfigImpl() {
+void EventTreeWriter::configureImpl() {
 
   GenericToolbox::Json::fillValue(_config_, _isEnabled_, "isEnabled");
   LogReturnIf(not _isEnabled_, "Disabled EventTreeWriter.");

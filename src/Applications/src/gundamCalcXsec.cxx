@@ -135,7 +135,7 @@ int main(int argc, char** argv){
 
   // it will handle all the deprecated config options and names properly
   FitterEngine fitter{nullptr};
-  fitter.readConfig( GenericToolbox::Json::fetchValue<JsonType>( cHandler.getConfig(), "fitterEngineConfig" ) );
+  fitter.configure( GenericToolbox::Json::fetchValue<JsonType>( cHandler.getConfig(), "fitterEngineConfig" ) );
 
   // We are only interested in our MC. Data has already been used to get the post-fit error/values
   fitter.getLikelihoodInterface().setForceAsimovData( true );
@@ -273,7 +273,7 @@ int main(int argc, char** argv){
   LogInfo << "Creating normalizer objects..." << std::endl;
   // flux renorm with toys
   struct ParSetNormaliser{
-    void readConfig(const JsonType& config_){
+    void configure(const JsonType& config_){
       LogScopeIndent;
 
       name = GenericToolbox::Json::fetchValue<std::string>(config_, "name");
@@ -382,7 +382,7 @@ int main(int argc, char** argv){
   for( auto& parSet : propagator.getParametersManager().getParameterSetsList() ){
     for( auto& parSetNormConfig : GenericToolbox::Json::fetchValue(parSet.getConfig(), "normalisations", JsonType()) ){
       parSetNormList.emplace_back();
-      parSetNormList.back().readConfig( parSetNormConfig );
+      parSetNormList.back().configure( parSetNormConfig );
 
       for( auto& dialCollection : propagator.getDialCollectionList() ){
         if( dialCollection.getSupervisedParameterSet() == &parSet ){
@@ -399,7 +399,7 @@ int main(int argc, char** argv){
 
   // to be filled up
   struct BinNormaliser{
-    void readConfig(const JsonType& config_){
+    void configure(const JsonType& config_){
       LogScopeIndent;
 
       name = GenericToolbox::Json::fetchValue<std::string>(config_, "name");
@@ -483,7 +483,7 @@ int main(int argc, char** argv){
     xsecEntry.normList.reserve( normConfigList.size() );
     for( auto& normConfig : normConfigList ){
       xsecEntry.normList.emplace_back();
-      xsecEntry.normList.back().readConfig( normConfig );
+      xsecEntry.normList.back().configure( normConfig );
     }
 
     xsecEntry.histogram = TH1D(

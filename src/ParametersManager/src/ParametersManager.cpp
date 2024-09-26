@@ -23,7 +23,7 @@ void ParametersManager::muteLogger(){ Logger::setIsMuted( true ); }
 void ParametersManager::unmuteLogger(){ Logger::setIsMuted( false ); }
 
 // config
-void ParametersManager::readConfigImpl(){
+void ParametersManager::configureImpl(){
 
   GenericToolbox::Json::fillValue(_config_, _throwToyParametersWithGlobalCov_, "throwToyParametersWithGlobalCov");
   GenericToolbox::Json::fillValue(_config_, _reThrowParSetIfOutOfPhysical_, {{"reThrowParSetIfOutOfBounds"},{"reThrowParSetIfOutOfPhysical"}});
@@ -35,7 +35,7 @@ void ParametersManager::readConfigImpl(){
   _parameterSetList_.reserve( _parameterSetListConfig_.size() );
   for( const auto& parameterSetConfig : _parameterSetListConfig_ ){
     _parameterSetList_.emplace_back();
-    _parameterSetList_.back().readConfig( parameterSetConfig );
+    _parameterSetList_.back().configure( parameterSetConfig );
 
     // clear the parameter sets that have been disabled
     if( not _parameterSetList_.back().isEnabled() ){

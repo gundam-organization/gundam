@@ -39,9 +39,9 @@ protected:
   /// Implement the methods required by JsonBaseClass.  These MinimizerBase
   /// methods may be overridden by the derived class, but if overriden, the
   /// derived class must run these instantiations (i.e. call
-  /// MinimizerBase::readConfigImpl() and MinimizerBase::initializeImpl in the
+  /// MinimizerBase::configureImpl() and MinimizerBase::initializeImpl in the
   /// respective methods).
-  void readConfigImpl() override;
+  void configureImpl() override;
   void initializeImpl() override;
 
   // Internal struct that hold info about the minimizer state

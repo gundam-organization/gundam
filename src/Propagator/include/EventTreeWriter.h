@@ -29,7 +29,7 @@ public:
   void writeEvents(const GenericToolbox::TFilePath& saveDir_, const std::vector<const EventDialCache::CacheEntry*>& cacheSampleList_) const;
 
 protected:
-  void readConfigImpl() override;
+  void configureImpl() override;
 
   // templates related -> ensure the exact same code is used to write standard vars
   template<typename T> void writeEventsTemplate(const GenericToolbox::TFilePath& saveDir_, const T& eventList_) const;

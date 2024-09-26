@@ -32,7 +32,7 @@ class FitterEngine;
 class AdaptiveMcmc : public MinimizerBase {
 
 protected:
-  void readConfigImpl() override;
+  void configureImpl() override;
   void initializeImpl() override;
 
 public:

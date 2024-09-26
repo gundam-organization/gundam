@@ -27,7 +27,7 @@ LoggerInit([]{ Logger::setUserHeaderStr("[PlotGenerator]"); });
 #endif
 
 
-void PlotGenerator::readConfigImpl(){
+void PlotGenerator::configureImpl(){
 
   gStyle->SetOptStat(0);
   _histHolderCacheList_.resize(1);

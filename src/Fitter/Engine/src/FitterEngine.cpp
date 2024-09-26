@@ -25,7 +25,7 @@ LoggerInit([]{ Logger::setUserHeaderStr("[FitterEngine]"); });
 #endif
 
 
-void FitterEngine::readConfigImpl(){
+void FitterEngine::configureImpl(){
   LogInfo << "Reading FitterEngine config..." << std::endl;
   GenericToolbox::setT2kPalette();
 
@@ -67,7 +67,7 @@ void FitterEngine::readConfigImpl(){
     _minimizer_->getMonitor().convergenceMonitor.setMaxRefreshRateInMs(GenericToolbox::Json::fetchValue<int>(_config_, "monitorRefreshRateInMs"));
   });
   _minimizer_->setConfig( minimizerConfig );
-  _minimizer_->readConfig();
+  _minimizer_->configure();
 
   GenericToolbox::Json::deprecatedAction(_config_, "propagatorConfig", [&]{
     LogAlert << R"("propagatorConfig" should now be set within "likelihoodInterfaceConfig".)" << std::endl;
@@ -75,14 +75,14 @@ void FitterEngine::readConfigImpl(){
     getLikelihoodInterface().getModelPropagator().setConfig( GenericToolbox::Json::fetchValue<JsonType>(_config_, "propagatorConfig") );
   });
   GenericToolbox::Json::fillValue(_config_, _likelihoodInterface_.getConfig(), "likelihoodInterfaceConfig");
-  _likelihoodInterface_.readConfig();
+  _likelihoodInterface_.configure();
 
   GenericToolbox::Json::deprecatedAction(getLikelihoodInterface().getModelPropagator().getConfig(), "scanConfig", [&]{
     LogAlert << R"("scanConfig" should now be set within "fitterEngineConfig".)" << std::endl;
     _parameterScanner_.setConfig( GenericToolbox::Json::fetchValue<JsonType>(getLikelihoodInterface().getModelPropagator().getConfig(), "scanConfig") );
   });
   GenericToolbox::Json::fillValue(_config_, _parameterScanner_.getConfig(), {{"parameterScannerConfig"},{"scanConfig"}});
-  _parameterScanner_.readConfig();
+  _parameterScanner_.configure();
 
   LogInfo << "Convergence monitor will be refreshed every " << _minimizer_->getMonitor().convergenceMonitor.getMaxRefreshRateInMs() << "ms." << std::endl;
 
@@ -118,7 +118,7 @@ void FitterEngine::initializeImpl(){
   if( GundamGlobals::isLightOutputMode() ){
     // TODO: this check should be more universal
     LogWarning << "Light mode enabled, wiping plot gen config..." << std::endl;
-    getLikelihoodInterface().getPlotGenerator().readConfig(JsonType());
+    getLikelihoodInterface().getPlotGenerator().configure(JsonType());
   }
 
   getLikelihoodInterface().initialize();

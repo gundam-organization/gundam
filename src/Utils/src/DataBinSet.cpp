@@ -331,14 +331,14 @@ void DataBinSet::readBinningConfig(const JsonType& binning_){
       }
 
       _binList_.emplace_back( _binList_.size() );
-      _binList_.back().readConfig( binDefConfig );
+      _binList_.back().configure( binDefConfig );
     }
 
   }
 
   for( auto& binDef : GenericToolbox::Json::fetchValue(binning_, "binList", JsonType()) ){
     _binList_.emplace_back( _binList_.size() );
-    _binList_.back().readConfig( binDef );
+    _binList_.back().configure( binDef );
   }
 
 

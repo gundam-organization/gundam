@@ -21,7 +21,7 @@ LoggerInit([]{ Logger::setUserHeaderStr("[ParameterSet]"); });
 #endif
 
 
-void ParameterSet::readConfigImpl(){
+void ParameterSet::configureImpl(){
 
   GenericToolbox::Json::fillValue(_config_, _name_, "name");
   LogThrowIf(_name_.empty(), "ParameterSet have no name.");
@@ -1013,6 +1013,6 @@ void ParameterSet::defineParameters(){
       // Alternative 2: define dials then parameters
       par.setDialSetConfig( _dialSetDefinitions_ );
     }
-    par.readConfig();
+    par.configure();
   }
 }

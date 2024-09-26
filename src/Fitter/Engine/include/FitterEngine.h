@@ -40,7 +40,7 @@ public:
 #include "GenericToolbox.MakeEnum.h"
 
 protected:
-  void readConfigImpl() override;
+  void configureImpl() override;
   void initializeImpl() override;
 
 public:

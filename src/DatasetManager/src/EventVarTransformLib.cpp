@@ -13,8 +13,8 @@ LoggerInit([]{ Logger::setUserHeaderStr("[EventVarTransformLib]"); });
 #endif
 
 
-void EventVarTransformLib::readConfigImpl(){
-  this->EventVarTransform::readConfigImpl();
+void EventVarTransformLib::configureImpl(){
+  this->EventVarTransform::configureImpl();
   _libraryFile_ = GenericToolbox::Json::fetchValue(_config_, "libraryFile", _libraryFile_);
 }
 void EventVarTransformLib::initializeImpl(){

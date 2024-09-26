@@ -23,7 +23,7 @@ LoggerInit([]{ Logger::setUserHeaderStr("[ParameterScanner]"); });
 void ParameterScanner::muteLogger(){ Logger::setIsMuted(true); }
 void ParameterScanner::unmuteLogger(){ Logger::setIsMuted(false); }
 
-void ParameterScanner::readConfigImpl() {
+void ParameterScanner::configureImpl() {
   if( _config_.empty() ) return;
   LogWarning << "Configuring ParameterScanner..." << std::endl;
 
