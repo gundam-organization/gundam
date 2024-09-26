@@ -166,16 +166,12 @@ namespace ConfigUtils {
   }
 
   void ConfigHandler::override( const JsonType& overrideConfig_ ){
-    auto output = GenericToolbox::Json::applyOverrides(config, overrideConfig_);
-    LogWarning << output << std::endl;
+    LogWarning << GenericToolbox::Json::applyOverrides(config, overrideConfig_);
   }
   void ConfigHandler::override( const std::string& filePath_ ){
     LogInfo << "Overriding config with \"" << filePath_ << "\"" << std::endl;
     LogThrowIf(not GenericToolbox::isFile(filePath_), "Could not find " << filePath_);
-
-    LogScopeIndent;
-    auto override= ConfigUtils::readConfigFile(filePath_);
-    ConfigHandler::override(override);
+    this->override( ConfigUtils::readConfigFile(filePath_) );
   }
   void ConfigHandler::override( const std::vector<std::string>& filesList_ ){
     for( auto& file : filesList_ ){ this->override( file ); }
