@@ -29,7 +29,6 @@ namespace ConfigUtils {
 
   // unfolding JSON/YAML
   JsonType getForwardedConfig(const JsonType& config_);
-  JsonType getForwardedConfig(const JsonType& config_, const std::string& keyName_);
   void forwardConfig(JsonType& config_);
   void unfoldConfig(JsonType& config_);
 
