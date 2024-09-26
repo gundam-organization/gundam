@@ -355,14 +355,21 @@ int main(int argc, char** argv){
               return;
             }
 
-            std::vector<std::pair<std::string, double>> corrDict{};
+            struct CorrelationEntry{
+              std::string parTitle{};
+              double correlation{};
+
+              CorrelationEntry() = default;
+              CorrelationEntry(std::string parTitle_, double correlation_) : parTitle(std::move(parTitle_)), correlation(correlation_) {}
+            };
+            std::vector<CorrelationEntry> corrDict{};
             corrDict.reserve(cor_->GetNbinsX()-1);
             for( int iPar = 1 ; iPar <= cor_->GetNbinsX() ; iPar++ ){
               corrDict.emplace_back(cor_->GetXaxis()->GetBinLabel(iPar), cor_->GetBinContent(selectedParIndex, iPar));
             }
 
-            GenericToolbox::sortVector(corrDict, [](const std::pair<std::string, double>& a, const std::pair<std::string, double>& b){
-              return std::abs( a.second ) > std::abs( b.second );
+            GenericToolbox::sortVector(corrDict, [](const CorrelationEntry& a, const CorrelationEntry& b){
+              return std::abs( a.correlation ) > std::abs( b.correlation );
             });
 
             GenericToolbox::TablePrinter t;
@@ -370,8 +377,8 @@ int main(int argc, char** argv){
             t << "Correlation" << GenericToolbox::TablePrinter::NextLine;
 
             for( auto& corrEntry : corrDict ){
-              t << corrEntry.first << GenericToolbox::TablePrinter::NextColumn;
-              t << corrEntry.second * 100 << " %" << GenericToolbox::TablePrinter::NextLine;
+              t << corrEntry.parTitle << GenericToolbox::TablePrinter::NextColumn;
+              t << corrEntry.correlation * 100 << " %" << GenericToolbox::TablePrinter::NextLine;
             }
 
             t.printTable();
