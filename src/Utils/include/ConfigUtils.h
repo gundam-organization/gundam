@@ -31,10 +31,6 @@ namespace ConfigUtils {
   void forwardConfig(JsonType& config_);
   void unfoldConfig(JsonType& config_);
 
-  void applyOverrides(JsonType& jsonConfig_, const JsonType& overrideConfig_);
-  void clearEntry(JsonType& jsonConfig_, const std::string& path_);
-
-
   class ConfigHandler{
     JsonType config{};
 
