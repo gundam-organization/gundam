@@ -86,7 +86,7 @@ int main( int argc, char** argv ){
   if( clp.isOptionTriggered("output") ){ outPath = clp.getOptionVal<std::string>("output"); }
   else{
     // auto generate
-    std::vector<std::pair<std::string, std::string>> appendixDict;
+    std::vector<GundamUtils::AppendixEntry> appendixDict;
 
     // file1
     if( clp.isOptionTriggered("name-1") ){ appendixDict.emplace_back("name-1", ""); }

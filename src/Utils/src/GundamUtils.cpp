@@ -57,17 +57,17 @@ namespace GundamUtils {
     return true;
   }
 
-  std::string generateFileName(const CmdLineParser& clp_, const std::vector<std::pair<std::string, std::string>>& appendixDict_){
+  std::string generateFileName(const CmdLineParser& clp_, const std::vector<AppendixEntry>& appendixDict_){
     std::vector<std::string> appendixList{};
 
     int maxArgLength{64};
 
     for( const auto& appendixDictEntry : appendixDict_ ){
-      if( clp_.isOptionTriggered(appendixDictEntry.first) ){
-        appendixList.emplace_back( appendixDictEntry.second );
-        if( clp_.getNbValueSet(appendixDictEntry.first) > 0 ){
+      if( clp_.isOptionTriggered( appendixDictEntry.optionName ) ){
+        appendixList.emplace_back( appendixDictEntry.appendix );
+        if( clp_.getNbValueSet(appendixDictEntry.optionName) > 0 ){
 
-          auto args = clp_.getOptionValList<std::string>(appendixDictEntry.first);
+          auto args = clp_.getOptionValList<std::string>(appendixDictEntry.optionName);
           for( auto& arg : args ){
             // strip potential slashes and extensions
             arg = GenericToolbox::getFileName(arg, false);

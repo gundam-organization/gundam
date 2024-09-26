@@ -239,7 +239,7 @@ int main(int argc, char** argv){
   else{
     // appendixDict["optionName"] = "Appendix"
     // this list insure all appendices will appear in the same order
-    std::vector<std::pair<std::string, std::string>> appendixDict{
+    std::vector<GundamUtils::AppendixEntry> appendixDict{
         {"configFile", ""},
         {"fitterFile", "Fit"},
         {"nToys", "nToys"},

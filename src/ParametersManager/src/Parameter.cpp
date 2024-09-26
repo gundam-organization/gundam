@@ -25,8 +25,7 @@ void Parameter::readConfigImpl(){
   GenericToolbox::Json::fillValue(_config_, "isFixed", _isFixed_);
 
   if( GenericToolbox::Json::doKeyExist(_config_, "priorValue") ){
-    double priorValue{std::nan("unset")};
-    GenericToolbox::Json::fillValue(_config_, "priorValue", priorValue);
+    auto priorValue = GenericToolbox::Json::fetchValue<double>(_config_, "priorValue");
     if( not std::isnan(priorValue) ){ _priorValue_ = priorValue; }
   }
 
