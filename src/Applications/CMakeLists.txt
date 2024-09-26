@@ -67,7 +67,7 @@ endif()
 # Now define the frontends
 foreach( app ${APPLICATION_LIST} )
     cmessage( STATUS "Defining app: ${app}" )
-    add_executable( ${app} src/${app}.cxx )
+    add_executable( ${app} ${CMAKE_CURRENT_SOURCE_DIR}/src/${app}.cxx )
     install( TARGETS ${app} DESTINATION bin )
 endforeach()
 
@@ -81,6 +81,8 @@ target_link_libraries( gundamFitPlot GundamUtils )
 target_link_libraries( gundamConfigUnfolder GundamUtils )
 target_link_libraries( gundamConfigCompare GundamUtils )
 target_link_libraries( gundamPlotExtractor GundamUtils )
+
+include_directories( gundamFitter ${CMAKE_CURRENT_SOURCE_DIR}/include )
 
 if( WITH_GUNDAM_ROOT_APP )
 #target_sources( gundamRoot PRIVATE G__GundamRootDict.cxx )
