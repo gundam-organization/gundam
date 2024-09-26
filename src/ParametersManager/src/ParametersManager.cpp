@@ -25,9 +25,9 @@ void ParametersManager::unmuteLogger(){ Logger::setIsMuted( false ); }
 // config
 void ParametersManager::readConfigImpl(){
 
-  GenericToolbox::Json::fillValue(_config_, "throwToyParametersWithGlobalCov", _throwToyParametersWithGlobalCov_);
-  GenericToolbox::Json::fillValue(_config_, {{"reThrowParSetIfOutOfBounds"},{"reThrowParSetIfOutOfPhysical"}}, _reThrowParSetIfOutOfPhysical_);
-  GenericToolbox::Json::fillValue(_config_, "parameterSetList", _parameterSetListConfig_);
+  GenericToolbox::Json::fillValue(_config_, _throwToyParametersWithGlobalCov_, "throwToyParametersWithGlobalCov");
+  GenericToolbox::Json::fillValue(_config_, _reThrowParSetIfOutOfPhysical_, {{"reThrowParSetIfOutOfBounds"},{"reThrowParSetIfOutOfPhysical"}});
+  GenericToolbox::Json::fillValue(_config_, _parameterSetListConfig_, "parameterSetList");
 
   LogDebugIf(GundamGlobals::isDebugConfig()) << _parameterSetListConfig_.size() << " parameter sets are defined." << std::endl;
 

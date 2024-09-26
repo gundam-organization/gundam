@@ -27,11 +27,11 @@ void ParameterScanner::readConfigImpl() {
   if( _config_.empty() ) return;
   LogWarning << "Configuring ParameterScanner..." << std::endl;
 
-  GenericToolbox::Json::fillValue(_config_, "nbPoints", _nbPoints_);
-  GenericToolbox::Json::fillValue(_config_, "varsConfig", _varsConfig_);
-  GenericToolbox::Json::fillValue(_config_, "nbPointsLineScan", _nbPointsLineScan_);
-  GenericToolbox::Json::fillValue(_config_, "useParameterLimits", _useParameterLimits_);
-  GenericToolbox::Json::fillValue(_config_, "parameterSigmaRange", _parameterSigmaRange_);
+  GenericToolbox::Json::fillValue(_config_, _nbPoints_, "nbPoints");
+  GenericToolbox::Json::fillValue(_config_, _varsConfig_, "varsConfig");
+  GenericToolbox::Json::fillValue(_config_, _nbPointsLineScan_, "nbPointsLineScan");
+  GenericToolbox::Json::fillValue(_config_, _useParameterLimits_, "useParameterLimits");
+  GenericToolbox::Json::fillValue(_config_, _parameterSigmaRange_, "parameterSigmaRange");
 
   LogWarning << "ParameterScanner configured." << std::endl;
 }

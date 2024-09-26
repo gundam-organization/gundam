@@ -22,15 +22,15 @@ void Sample::readConfigImpl(){
   _name_ = GenericToolbox::Json::fetchValue<std::string>(_config_, "name");
   LogDebugIf(GundamGlobals::isDebugConfig()) << "Defining sample \"" << _name_ << "\"" << std::endl;
 
-  GenericToolbox::Json::fillValue(_config_, "isEnabled", _isEnabled_);
+  GenericToolbox::Json::fillValue(_config_, _isEnabled_, "isEnabled");
   if( not _isEnabled_ ){
     LogDebugIf(GundamGlobals::isDebugConfig()) << "-> disabled" << std::endl;
     return;
   }
 
-  GenericToolbox::Json::fillValue(_config_, {{"binningFilePath"}, {"binningFile"}, {"binning"}}, _binningConfig_);
-  GenericToolbox::Json::fillValue(_config_, {{"selectionCutStr"}, {"selectionCuts"}}, _selectionCutStr_);
-  GenericToolbox::Json::fillValue(_config_, {{"datasets"}, {"dataSets"}}, _enabledDatasetList_);
+  GenericToolbox::Json::fillValue(_config_, _binningConfig_, {{"binningFilePath"},{"binningFile"},{"binning"}});
+  GenericToolbox::Json::fillValue(_config_, _selectionCutStr_, {{"selectionCutStr"},{"selectionCuts"}});
+  GenericToolbox::Json::fillValue(_config_, _enabledDatasetList_, {{"datasets"},{"dataSets"}});
 
   LogDebugIf(GundamGlobals::isDebugConfig()) << "Reading binning: " << _config_ << std::endl;
   _binning_.readBinningDefinition( _binningConfig_ );

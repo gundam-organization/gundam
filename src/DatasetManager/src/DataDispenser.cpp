@@ -41,7 +41,7 @@ void DataDispenser::readConfigImpl(){
   // first of all
   _threadPool_.setNThreads( GundamGlobals::getNumberOfThreads() );
 
-  GenericToolbox::Json::fillValue(_config_, "name", _parameters_.name);
+  GenericToolbox::Json::fillValue(_config_, _parameters_.name, "name");
   LogThrowIf(_parameters_.name.empty(), "Dataset name not set.");
 
   // histograms don't need other parameters
@@ -57,8 +57,8 @@ void DataDispenser::readConfigImpl(){
     for( auto& sampleConfig : sampleListConfig ){
 
       auto& sampleHist = _parameters_.fromHistContent.addSampleHist(GenericToolbox::Json::fetchValue<std::string>(sampleConfig, "name"));
-      GenericToolbox::Json::fillValue(sampleConfig, "hist", sampleHist.hist);
-      GenericToolbox::Json::fillValue(sampleConfig, {{"axisList"}, {"axis"}}, sampleHist.axisList);
+      GenericToolbox::Json::fillValue(sampleConfig, sampleHist.hist, "hist");
+      GenericToolbox::Json::fillValue(sampleConfig, sampleHist.axisList, {{"axisList"},{"axis"}});
     }
 
     return;
@@ -89,14 +89,14 @@ void DataDispenser::readConfigImpl(){
   _parameters_.nominalWeightFormulaStr = GenericToolbox::Json::buildFormula(_config_, "nominalWeightFormula", "*", _parameters_.nominalWeightFormulaStr);
 
   // options
-  GenericToolbox::Json::fillValue(_config_, "tree", _parameters_.treePath);
-  GenericToolbox::Json::fillValue(_config_, "filePathList", _parameters_.filePathList);
-  GenericToolbox::Json::fillValue(_config_, {{"additionalLeavesStorage"}, {"additionalVarsStorage"}}, _parameters_.additionalVarsStorage);
-  GenericToolbox::Json::fillValue(_config_, "dummyVariablesList", _parameters_.dummyVariablesList);
-  GenericToolbox::Json::fillValue(_config_, {{"useReweightEngine"}, {"useMcContainer"}}, _parameters_.useReweightEngine);
-  GenericToolbox::Json::fillValue(_config_, "debugNbMaxEventsToLoad", _parameters_.debugNbMaxEventsToLoad);
-  GenericToolbox::Json::fillValue(_config_, "dialIndexFormula", _parameters_.dialIndexFormula);
-  GenericToolbox::Json::fillValue(_config_, "overridePropagatorConfig", _parameters_.overridePropagatorConfig);
+  GenericToolbox::Json::fillValue(_config_, _parameters_.treePath, "tree");
+  GenericToolbox::Json::fillValue(_config_, _parameters_.filePathList, "filePathList");
+  GenericToolbox::Json::fillValue(_config_, _parameters_.additionalVarsStorage, {{"additionalLeavesStorage"}, {"additionalVarsStorage"}});
+  GenericToolbox::Json::fillValue(_config_, _parameters_.dummyVariablesList, "dummyVariablesList");
+  GenericToolbox::Json::fillValue(_config_, _parameters_.useReweightEngine, {{"useReweightEngine"}, {"useMcContainer"}});
+  GenericToolbox::Json::fillValue(_config_, _parameters_.debugNbMaxEventsToLoad, "debugNbMaxEventsToLoad");
+  GenericToolbox::Json::fillValue(_config_, _parameters_.dialIndexFormula, "dialIndexFormula");
+  GenericToolbox::Json::fillValue(_config_, _parameters_.overridePropagatorConfig, "overridePropagatorConfig");
 
 }
 void DataDispenser::initializeImpl(){

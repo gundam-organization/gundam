@@ -30,29 +30,29 @@ void RootMinimizer::readConfigImpl(){
   // read general parameters first
   this->MinimizerBase::readConfigImpl();
 
-  GenericToolbox::Json::fillValue(_config_, "monitorGradientDescent", getMonitor().gradientDescentMonitor.isEnabled);
-  GenericToolbox::Json::fillValue(_config_, "minimizer", _minimizerType_);
-  GenericToolbox::Json::fillValue(_config_, "algorithm", _minimizerAlgo_);
+  GenericToolbox::Json::fillValue(_config_, getMonitor().gradientDescentMonitor.isEnabled, "monitorGradientDescent");
+  GenericToolbox::Json::fillValue(_config_, _minimizerType_, "minimizer");
+  GenericToolbox::Json::fillValue(_config_, _minimizerAlgo_, "algorithm");
 
-  GenericToolbox::Json::fillValue(_config_, "strategy", _strategy_);
-  GenericToolbox::Json::fillValue(_config_, "print_level", _printLevel_);
-  GenericToolbox::Json::fillValue(_config_, "tolerance", _tolerance_);
-  GenericToolbox::Json::fillValue(_config_, {{"maxIterations"}, {"max_iter"}}, _maxIterations_ );
-  GenericToolbox::Json::fillValue(_config_, {{"maxFcnCalls"}, {"max_fcn"}}, _maxFcnCalls_ );
+  GenericToolbox::Json::fillValue(_config_, _strategy_, "strategy");
+  GenericToolbox::Json::fillValue(_config_, _printLevel_, "print_level");
+  GenericToolbox::Json::fillValue(_config_, _tolerance_, "tolerance");
+  GenericToolbox::Json::fillValue(_config_, _maxIterations_, {{"maxIterations"},{"max_iter"}});
+  GenericToolbox::Json::fillValue(_config_, _maxFcnCalls_, {{"maxFcnCalls"},{"max_fcn"}});
 
-  GenericToolbox::Json::fillValue(_config_, "enableSimplexBeforeMinimize", _preFitWithSimplex_);
-  GenericToolbox::Json::fillValue(_config_, "simplexMaxFcnCalls", _simplexMaxFcnCalls_);
-  GenericToolbox::Json::fillValue(_config_, "simplexToleranceLoose", _simplexToleranceLoose_);
-  GenericToolbox::Json::fillValue(_config_, "simplexStrategy", _simplexStrategy_);
+  GenericToolbox::Json::fillValue(_config_, _preFitWithSimplex_, "enableSimplexBeforeMinimize");
+  GenericToolbox::Json::fillValue(_config_, _simplexMaxFcnCalls_, "simplexMaxFcnCalls");
+  GenericToolbox::Json::fillValue(_config_, _simplexToleranceLoose_, "simplexToleranceLoose");
+  GenericToolbox::Json::fillValue(_config_, _simplexStrategy_, "simplexStrategy");
 
-  GenericToolbox::Json::fillValue(_config_, {{"errorsAlgo"}, {"errors"}}, _errorAlgo_);
+  GenericToolbox::Json::fillValue(_config_, _errorAlgo_, {{"errorsAlgo"},{"errors"}});
 
-  GenericToolbox::Json::fillValue(_config_, "generatedPostFitParBreakdown", _generatedPostFitParBreakdown_);
-  GenericToolbox::Json::fillValue(_config_, "generatedPostFitEigenBreakdown", _generatedPostFitEigenBreakdown_);
+  GenericToolbox::Json::fillValue(_config_, _generatedPostFitParBreakdown_, "generatedPostFitParBreakdown");
+  GenericToolbox::Json::fillValue(_config_, _generatedPostFitEigenBreakdown_, "generatedPostFitEigenBreakdown");
 
   // old -- should flag as dev or deprecated?
-  GenericToolbox::Json::fillValue(_config_, "stepSizeScaling", _stepSizeScaling_);
-  GenericToolbox::Json::fillValue(_config_, "restoreStepSizeBeforeHesse", _restoreStepSizeBeforeHesse_);
+  GenericToolbox::Json::fillValue(_config_, _stepSizeScaling_, "stepSizeScaling");
+  GenericToolbox::Json::fillValue(_config_, _restoreStepSizeBeforeHesse_, "restoreStepSizeBeforeHesse");
 
   LogWarning << "RootMinimizer configured." << std::endl;
 }

@@ -25,15 +25,15 @@ void AdaptiveMcmc::readConfigImpl(){
 
   // The type of algorithm to be using.  It should be left at the default
   // value (metropolis is the only supported MCMC algorithm right now).
-  GenericToolbox::Json::fillValue(_config_, "algorithm", _algorithmName_);
+  GenericToolbox::Json::fillValue(_config_, _algorithmName_, "algorithm");
 
   // The step proposal algorithm.  This should usually be left at the default
   // value.
-  GenericToolbox::Json::fillValue(_config_, "proposal", _proposalName_);
+  GenericToolbox::Json::fillValue(_config_, _proposalName_, "proposal");
 
   // The name of the MCMC result tree in the output file.  This doesn't need
   // to be changed.  Generally, leave it alone.
-  GenericToolbox::Json::fillValue(_config_, "mcmcOutputTree", _outTreeName_);
+  GenericToolbox::Json::fillValue(_config_, _outTreeName_, "mcmcOutputTree");
 
   // Define what sort of validity the parameters have to have for a finite
   // likelihood.  The "range" value means that the parameter needs to be
@@ -41,21 +41,21 @@ void AdaptiveMcmc::readConfigImpl(){
   // "mirror" value means that the parameter needs to be between the mirror
   // bounds too.  The "physical" value means that the parameter has to be in
   // the physically allowed range.
-  GenericToolbox::Json::fillValue(_config_, "likelihoodValidity", _likelihoodValidity_);
+  GenericToolbox::Json::fillValue(_config_, _likelihoodValidity_, "likelihoodValidity");
 
   //Set whether MCMC chain start from a random point or the prior point.
-  GenericToolbox::Json::fillValue(_config_, "randomStart", _randomStart_);
+  GenericToolbox::Json::fillValue(_config_, _randomStart_, "randomStart");
 
   // Set whether the raw step should be saved, or only the step translated
   // into the likelihood space.
-  GenericToolbox::Json::fillValue(_config_, "saveRawSteps", _saveRawSteps_);
+  GenericToolbox::Json::fillValue(_config_, _saveRawSteps_, "saveRawSteps");
 
   // The number of steps between when the predicted sample histograms should
   // be saved into the output file.  The sample histograms can then be used
   // with the parameterSampleData vector to calculate the PPP for the chain.
   // Note that the model is what the MC is predicting, so for a PPP
   // calculation, the data will need to be fluctuated around the prediction.
-  GenericToolbox::Json::fillValue(_config_, "modelSaveStride", _modelStride_);
+  GenericToolbox::Json::fillValue(_config_, _modelStride_, "modelSaveStride");
 
   // Get the MCMC chain parameters to be used during burn-in.  The burn-in will
   // be skipped if the state has been restored from a file.  The burn-in can be
@@ -63,21 +63,21 @@ void AdaptiveMcmc::readConfigImpl(){
   // (usually a better option).  A run is broken into "mini-Chains" called a
   // "cycle" where the posterior covariance information is updated after each
   // mini-chain.  Each cycle will have "steps" steps.
-  GenericToolbox::Json::fillValue(_config_, "burninCycles", _burninCycles_);
+  GenericToolbox::Json::fillValue(_config_, _burninCycles_, "burninCycles");
 
   // The number of steps to run in each burn in cycle
-  GenericToolbox::Json::fillValue(_config_, "burninSteps", _burninLength_);
+  GenericToolbox::Json::fillValue(_config_, _burninLength_, "burninSteps");
 
   // If this is set to false, the burn-in steps will not be saved to disk.
   // This should usually be true since it lets you see the progress of the
   // burn-in.
-  GenericToolbox::Json::fillValue(_config_, "saveBurnin", _saveBurnin_);
+  GenericToolbox::Json::fillValue(_config_, _saveBurnin_, "saveBurnin");
 
   // Get the MCMC chain parameters.  A run is broken into "mini-Chains"
   // called a "cycle" where the posterior covariance information is updated
   // after each mini-chain.  Each cycle will have "steps" steps.
-  GenericToolbox::Json::fillValue(_config_, "cycles", _cycles_);
-  GenericToolbox::Json::fillValue(_config_, "steps", _steps_);
+  GenericToolbox::Json::fillValue(_config_, _cycles_, "cycles");
+  GenericToolbox::Json::fillValue(_config_, _steps_, "steps");
 
   ///////////////////////////////////////////////////////////////
   // Get parameters for the adaptive proposal.
@@ -86,29 +86,29 @@ void AdaptiveMcmc::readConfigImpl(){
   // burn-in.  If this is set to short, the step size will fluctuate.  If this
   // is set to long, the step size won't be adjusted to match the target
   // acceptance.  Make this very large to lock the step size.
-  GenericToolbox::Json::fillValue(_config_, "burninCovWindow", _burninCovWindow_);
+  GenericToolbox::Json::fillValue(_config_, _burninCovWindow_, "burninCovWindow");
 
   // The covariance deweighting during burn-in.  This should usually be left
   // at the default value.  This sets how much extra influence new points
   // should have on the covariance.
-  GenericToolbox::Json::fillValue(_config_, "burninCovDeweighting", _burninCovDeweighting_);
+  GenericToolbox::Json::fillValue(_config_, _burninCovDeweighting_, "burninCovDeweighting");
 
   // The number of times that the burn-in state will be reset.  If this is
   // zero, then there are no resets (one means reset after the first cycle,
   // &c).  Resets are sometimes needed if the initial conditions are far from
   // the main probability in the posterior and the "best fit" parameters need
   // to be found.
-  GenericToolbox::Json::fillValue(_config_, "burninResets", _burninResets_);
+  GenericToolbox::Json::fillValue(_config_, _burninResets_, "burninResets");
 
   // Freeze the step size after this many burn-in chains.  This stops
   // adaptively adjusting the step size.
-  GenericToolbox::Json::fillValue(_config_, "burninFreezeAfter", _burninFreezeAfter_);
+  GenericToolbox::Json::fillValue(_config_, _burninFreezeAfter_, "burninFreezeAfter");
 
   // Set the window to calculate the current acceptance value over during
   // burn-in.  If this is set to short, the step size will fluctuate.  If this
   // is set to long, the step size won't be adjusted to match the target
   // acceptance.  Make this very large to lock the step size.
-  GenericToolbox::Json::fillValue(_config_, "burninWindow", _burninWindow_);
+  GenericToolbox::Json::fillValue(_config_, _burninWindow_, "burninWindow");
 
   // Set the name of a file containing an existing Markov chain to be
   // extended.  If this is set, then the burn-in will be skipped.
@@ -120,7 +120,7 @@ void AdaptiveMcmc::readConfigImpl(){
   //
   // If restore is going to be used, the adaptiveRestore value must exist in
   // the configuration file (with a NULL value)
-  GenericToolbox::Json::fillValue(_config_, "adaptiveRestore", _adaptiveRestore_);
+  GenericToolbox::Json::fillValue(_config_, _adaptiveRestore_, "adaptiveRestore");
   _adaptiveRestore_ = GenericToolbox::expandEnvironmentVariables(_adaptiveRestore_);
 
   // Set the name of a file containing a TH2D that describes the covariance of
@@ -134,13 +134,13 @@ void AdaptiveMcmc::readConfigImpl(){
   // For this to be used the adaptiveCovFile value must exist in the
   // configuration file (with a value of "none" to be ignored, or a default
   // value if a default should be loaded)
-  GenericToolbox::Json::fillValue(_config_, "adaptiveCovFile", _adaptiveCovFile_);
+  GenericToolbox::Json::fillValue(_config_, _adaptiveCovFile_, "adaptiveCovFile");
   _adaptiveCovFile_ = GenericToolbox::expandEnvironmentVariables(_adaptiveCovFile_);
 
   // Set the name of a ROOT TH2D that will be used as the covariance of the
   // step proposal.  If adaptiveCovFile is not set, or has a value of "none",
   // this will be ignored.
-  GenericToolbox::Json::fillValue(_config_, "adaptiveCovName", _adaptiveCovName_);
+  GenericToolbox::Json::fillValue(_config_, _adaptiveCovName_, "adaptiveCovName");
 
   // Get the effective number of trials for a proposal covariance that is
   // being read from a file. This should typically be about 0.5*N^2 where N is
@@ -148,43 +148,43 @@ void AdaptiveMcmc::readConfigImpl(){
   // number of function calculations that were used to estimate the
   // covariance.  The default value of zero triggers the interface to make
   // it's own estimate.
-  GenericToolbox::Json::fillValue(_config_, "adaptiveCovTrials", _adaptiveCovTrials_);
+  GenericToolbox::Json::fillValue(_config_, _adaptiveCovTrials_, "adaptiveCovTrials");
 
   // Set the window to calculate the current covariance value over.  If this
   // is set to short, the covariance will not sample the entire posterior.
   // Generally, the window should be long compared to the number of steps
   // required to get to an uncorrelated point.
-  GenericToolbox::Json::fillValue(_config_, "adaptiveCovWindow", _adaptiveCovWindow_);
+  GenericToolbox::Json::fillValue(_config_, _adaptiveCovWindow_, "adaptiveCovWindow");
 
   // The covariance deweighting while the chain is running.  This should
   // usually be left at zero so the entire chain history is used after an
   // update and more recent points don't get a heavier weight (within the
   // covariance window).
-  GenericToolbox::Json::fillValue(_config_, "adaptiveCovDeweighting", _adaptiveCovDeweighting_);
+  GenericToolbox::Json::fillValue(_config_, _adaptiveCovDeweighting_, "adaptiveCovDeweighting");
 
   // Stop updating the correlations between the steps after this many cycles.
   // If this is negative, the step size is never updated.  This freeze the
   // running covariance calculation.
-  GenericToolbox::Json::fillValue(_config_, "adaptiveFreezeCorrelations", _adaptiveFreezeCorrelations_);
+  GenericToolbox::Json::fillValue(_config_, _adaptiveFreezeCorrelations_, "adaptiveFreezeCorrelations");
 
   // Stop updating the step length after this many cycles.  If this is
   // negative, the step size is never updated.  Take the default from one more
   // than the number of steps to freeze the correlations.  An explicit value
   // in the config file will always override the default.
   _adaptiveFreezeAfter_ = _adaptiveFreezeCorrelations_+1;
-  GenericToolbox::Json::fillValue(_config_, "adaptiveFreezeLength", _adaptiveFreezeAfter_);
+  GenericToolbox::Json::fillValue(_config_, _adaptiveFreezeAfter_, "adaptiveFreezeLength");
 
   // Set the window to calculate the current acceptance value over.  If this
   // is set to short, the step size will fluctuate a lot.  If this is set to
   // long, the step size won't be adjusted to match the target acceptance.
   // Make this very large effectively locks the step size.
-  GenericToolbox::Json::fillValue(_config_, "adaptiveWindow", _adaptiveWindow_);
+  GenericToolbox::Json::fillValue(_config_, _adaptiveWindow_, "adaptiveWindow");
 
   ///////////////////////////////////////////////////////////////
   // Get parameters for the simple proposal.
 
   // Set the step size for the simple proposal.
-  GenericToolbox::Json::fillValue(_config_, "simpleSigma", _simpleSigma_);
+  GenericToolbox::Json::fillValue(_config_, _simpleSigma_, "simpleSigma");
 }
 void AdaptiveMcmc::initializeImpl(){
   MinimizerBase::initializeImpl();

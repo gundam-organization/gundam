@@ -54,7 +54,7 @@ public:
   /// boundaries and may set take values that are out of bounds.  In this
   /// case, the job will stop.  Note: If the minimum value is not set, then
   /// the bound is a negative infinity.
-  void setMinValue(double minValue){ _limitRange_.min = minValue; }
+  void setMinValue(double minValue){ _parameterLimits_.min = minValue; }
 
   /// Set the maximum value for this parameter.  Parameter values more than
   /// this value are illegal, and the likelihood is undefined. The job will
@@ -64,7 +64,7 @@ public:
   /// boundaries and may set take values that are out of bounds.  In this
   /// case, the job will stop.  Note: If the maximum value is not set, then
   /// the bound is at positive infinity.
-  void setMaxValue(double maxValue){ _limitRange_.max = maxValue; }
+  void setMaxValue(double maxValue){ _parameterLimits_.max = maxValue; }
 
   /// Record the minimum mirroring boundary being used by any dials for this
   /// parameter.  If this is set, then GUNDAM will constrain the parameter
@@ -84,7 +84,7 @@ public:
   /// the physical range.  From a mathmatical perspective, the value of the
   /// LLH is infinite below the physical minimum.  This can be enforced
   /// using the Likelihood::SetParameterValidity() method.
-  void setMinPhysical(double minPhysical){ _physicalRange_.min = minPhysical; }
+  void setMinPhysical(double minPhysical){ _physicalLimits_.min = minPhysical; }
 
   /// Record the physical maximum bound for the parameter.  This is the range
   /// where the parameter has a physically meaningful value.  Because of
@@ -92,7 +92,7 @@ public:
   /// the physical range.  From a mathmatical perspective, the value of the
   /// LLH is infinite below the physical minimum.  This can be enforced
   /// using the Likelihood::SetParameterValidity() method.
-  void setMaxPhysical(double maxPhysical){ _physicalRange_.max = maxPhysical; }
+  void setMaxPhysical(double maxPhysical){ _physicalLimits_.max = maxPhysical; }
   void setPriorValue(double priorValue){ _priorValue_ = priorValue; }
   void setThrowValue(double throwValue){ _throwValue_ = throwValue; }
   void setStdDevValue(double stdDevValue){ _stdDevValue_ = stdDevValue; }
@@ -135,9 +135,9 @@ public:
   [[nodiscard]] int getParameterIndex() const{ return _parameterIndex_; }
   [[nodiscard]] double getStepSize() const{ return _stepSize_; }
   /// See setMinValue() for documentation.
-  [[nodiscard]] double getMinValue() const{ return _limitRange_.min; }
+  [[nodiscard]] double getMinValue() const{ return _parameterLimits_.min; }
   /// See setMaxValue() for documentation.
-  [[nodiscard]] double getMaxValue() const{ return _limitRange_.max; }
+  [[nodiscard]] double getMaxValue() const{ return _parameterLimits_.max; }
   /// See setMinMirror for documentation.
   [[nodiscard]] double getMinMirror() const{ return _mirrorRange_.min; }
   /// See setMaxMirror for documentation.
@@ -145,9 +145,9 @@ public:
   [[nodiscard]] double getPriorValue() const{ return _priorValue_; }
   [[nodiscard]] double getThrowValue() const{ return _throwValue_; }
   /// See setMinPhysical for documentation.
-  [[nodiscard]] double getMinPhysical() const{ return _physicalRange_.min; }
+  [[nodiscard]] double getMinPhysical() const{ return _physicalLimits_.min; }
   /// See setMinPhysical for documentation.
-  [[nodiscard]] double getMaxPhysical() const{ return _physicalRange_.max; }
+  [[nodiscard]] double getMaxPhysical() const{ return _physicalLimits_.max; }
   [[nodiscard]] double getStdDevValue() const{ return _stdDevValue_; }
   [[nodiscard]] double getParameterValue() const;
   [[nodiscard]] const std::string &getName() const{ return _name_; }
@@ -208,9 +208,9 @@ private:
   double _throwValue_{std::nan("unset")};
   double _stdDevValue_{std::nan("unset")};
 
-  GenericToolbox::Range _limitRange_;
+  GenericToolbox::Range _parameterLimits_;
+  GenericToolbox::Range _physicalLimits_;
   GenericToolbox::Range _mirrorRange_;
-  GenericToolbox::Range _physicalRange_;
 
   double _stepSize_{std::nan("unset")};
   std::string _name_{};

@@ -20,11 +20,11 @@ LoggerInit([]{ Logger::setUserHeaderStr("[TreeWriter]"); });
 
 void EventTreeWriter::readConfigImpl() {
 
-  GenericToolbox::Json::fillValue(_config_, "isEnabled", _isEnabled_);
+  GenericToolbox::Json::fillValue(_config_, _isEnabled_, "isEnabled");
   LogReturnIf(not _isEnabled_, "Disabled EventTreeWriter.");
 
-  GenericToolbox::Json::fillValue(_config_, "writeDials", _writeDials_);
-  GenericToolbox::Json::fillValue(_config_, "nPointsPerDial", _nPointsPerDial_);
+  GenericToolbox::Json::fillValue(_config_, _writeDials_, "writeDials");
+  GenericToolbox::Json::fillValue(_config_, _nPointsPerDial_, "nPointsPerDial");
 
   if( _writeDials_ ){
     LogInfo << "EventTreeWriter configured as:" << std::endl;

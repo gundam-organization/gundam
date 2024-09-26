@@ -36,19 +36,19 @@ void FitterEngine::readConfigImpl(){
   // legacy configs:
   GenericToolbox::Json::deprecatedAction(_config_, "mcmcConfig", [&]{
     LogAlert << "mcmcConfig should now be set as minimizerConfig" << std::endl;
-    GenericToolbox::Json::fillValue( _config_, "mcmcConfig" , minimizerConfig );
+    GenericToolbox::Json::fillValue(_config_, minimizerConfig, "mcmcConfig");
   });
   GenericToolbox::Json::deprecatedAction(_config_, "engineType", [&]{
     LogAlert << R"("engineType" should now be specified withing "minimizerConfig/minimizerType")" << std::endl;
-    GenericToolbox::Json::fillValue( _config_, "engineType", minimizerTypeStr );
+    GenericToolbox::Json::fillValue(_config_, minimizerTypeStr, "engineType");
 
     // handle deprecated types
     if     ( minimizerTypeStr == "minimizer" ){ minimizerTypeStr = "RootMinimizer"; }
     else if( minimizerTypeStr == "mcmc" )     { minimizerTypeStr = "AdaptiveMCMC"; }
   });
 
-  GenericToolbox::Json::fillValue( _config_, "minimizerConfig" , minimizerConfig );
-  GenericToolbox::Json::fillValue( minimizerConfig, "type", minimizerTypeStr );
+  GenericToolbox::Json::fillValue(_config_, minimizerConfig, "minimizerConfig");
+  GenericToolbox::Json::fillValue(minimizerConfig, minimizerTypeStr, "type");
   _minimizerType_ = MinimizerType::toEnum( minimizerTypeStr, true );
   switch( _minimizerType_.value ){
     case MinimizerType::RootMinimizer:
@@ -74,40 +74,40 @@ void FitterEngine::readConfigImpl(){
     // reading the config already since nested objects need to be filled up for handling further deprecation
     getLikelihoodInterface().getModelPropagator().setConfig( GenericToolbox::Json::fetchValue<JsonType>(_config_, "propagatorConfig") );
   });
-  GenericToolbox::Json::fillValue(_config_, "likelihoodInterfaceConfig", _likelihoodInterface_.getConfig());
+  GenericToolbox::Json::fillValue(_config_, _likelihoodInterface_.getConfig(), "likelihoodInterfaceConfig");
   _likelihoodInterface_.readConfig();
 
   GenericToolbox::Json::deprecatedAction(getLikelihoodInterface().getModelPropagator().getConfig(), "scanConfig", [&]{
     LogAlert << R"("scanConfig" should now be set within "fitterEngineConfig".)" << std::endl;
     _parameterScanner_.setConfig( GenericToolbox::Json::fetchValue<JsonType>(getLikelihoodInterface().getModelPropagator().getConfig(), "scanConfig") );
   });
-  GenericToolbox::Json::fillValue(_config_, {{"parameterScannerConfig"}, {"scanConfig"}}, _parameterScanner_.getConfig());
+  GenericToolbox::Json::fillValue(_config_, _parameterScanner_.getConfig(), {{"parameterScannerConfig"},{"scanConfig"}});
   _parameterScanner_.readConfig();
 
   LogInfo << "Convergence monitor will be refreshed every " << _minimizer_->getMonitor().convergenceMonitor.getMaxRefreshRateInMs() << "ms." << std::endl;
 
   // local config
-  GenericToolbox::Json::fillValue(_config_, {{"enablePca"}, {"runPcaCheck"}, {"fixGhostFitParameters"}}, _enablePca_);
+  GenericToolbox::Json::fillValue(_config_, _enablePca_, {{"enablePca"},{"runPcaCheck"},{"fixGhostFitParameters"}});
 
-  _pcaMethod_ = PcaMethod::toEnum( GenericToolbox::Json::fetchValue(_config_, "pcaMethod", _pcaMethod_.toString()), true );
-  GenericToolbox::Json::fillValue(_config_, {{"pcaThreshold"}, {"pcaDeltaLlhThreshold"}, {"pcaDeltaChi2Threshold"}, {"ghostParameterDeltaChi2Threshold"}}, _pcaThreshold_);
+  GenericToolbox::Json::fillEnum(_config_, _pcaMethod_, "pcaMethod");
+  GenericToolbox::Json::fillValue(_config_, _pcaThreshold_, {{"pcaThreshold"},{"pcaDeltaLlhThreshold"},{"pcaDeltaChi2Threshold"},{"ghostParameterDeltaChi2Threshold"}});
 
-  GenericToolbox::Json::fillValue(_config_, "enablePreFitScan", _enablePreFitScan_);
-  GenericToolbox::Json::fillValue(_config_, "enablePostFitScan", _enablePostFitScan_);
-  GenericToolbox::Json::fillValue(_config_, "enablePreFitToPostFitLineScan", _enablePreFitToPostFitLineScan_);
+  GenericToolbox::Json::fillValue(_config_, _enablePreFitScan_, "enablePreFitScan");
+  GenericToolbox::Json::fillValue(_config_, _enablePostFitScan_, "enablePostFitScan");
+  GenericToolbox::Json::fillValue(_config_, _enablePreFitToPostFitLineScan_, "enablePreFitToPostFitLineScan");
 
-  GenericToolbox::Json::fillValue(_config_, "generateSamplePlots", _generateSamplePlots_);
-  GenericToolbox::Json::fillValue(_config_, "generateOneSigmaPlots", _generateOneSigmaPlots_);
+  GenericToolbox::Json::fillValue(_config_, _generateSamplePlots_, "generateSamplePlots");
+  GenericToolbox::Json::fillValue(_config_, _generateOneSigmaPlots_, "generateOneSigmaPlots");
 
-  GenericToolbox::Json::fillValue(_config_, "enableParamVariations", _doAllParamVariations_);
-  GenericToolbox::Json::fillValue(_config_, {{"paramVariationsSigmas"}, {"allParamVariations"}}, _allParamVariationsSigmas_);
+  GenericToolbox::Json::fillValue(_config_, _doAllParamVariations_, "enableParamVariations");
+  GenericToolbox::Json::fillValue(_config_, _allParamVariationsSigmas_, {{"paramVariationsSigmas"},{"allParamVariations"}});
 
-  GenericToolbox::Json::fillValue(_config_, "scaleParStepWithChi2Response", _scaleParStepWithChi2Response_);
-  GenericToolbox::Json::fillValue(_config_, "parStepGain", _parStepGain_);
+  GenericToolbox::Json::fillValue(_config_, _scaleParStepWithChi2Response_, "scaleParStepWithChi2Response");
+  GenericToolbox::Json::fillValue(_config_, _parStepGain_, "parStepGain");
 
-  GenericToolbox::Json::fillValue(_config_, "throwMcBeforeFit", _throwMcBeforeFit_);
-  GenericToolbox::Json::fetchValue(_config_, "throwMcBeforeFitGain", _throwGain_);
-  GenericToolbox::Json::fetchValue(_config_, "savePostfitEventTrees", _savePostfitEventTrees_);
+  GenericToolbox::Json::fillValue(_config_, _throwMcBeforeFit_, "throwMcBeforeFit");
+  GenericToolbox::Json::fillValue(_config_, _throwGain_, "throwMcBeforeFitGain");
+  GenericToolbox::Json::fillValue(_config_, _savePostfitEventTrees_, "savePostfitEventTrees");
 
   LogWarning << "FitterEngine configured." << std::endl;
 }

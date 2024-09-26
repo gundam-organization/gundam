@@ -34,11 +34,11 @@ namespace JointProbability{
   };
 
   void BarlowBeestonBanff2022::readConfigImpl(){
-    GenericToolbox::Json::fillValue(_config_, "allowZeroMcWhenZeroData", allowZeroMcWhenZeroData);
-    GenericToolbox::Json::fillValue(_config_, "usePoissonLikelihood", usePoissonLikelihood);
-    GenericToolbox::Json::fillValue(_config_, "BBNoUpdateWeights", BBNoUpdateWeights);
-    GenericToolbox::Json::fillValue(_config_, {{"verboseLevel"}, {"isVerbose"}}, verboseLevel);
-    GenericToolbox::Json::fillValue(_config_, "throwIfInfLlh", throwIfInfLlh);
+    GenericToolbox::Json::fillValue(_config_, allowZeroMcWhenZeroData, "allowZeroMcWhenZeroData");
+    GenericToolbox::Json::fillValue(_config_, usePoissonLikelihood, "usePoissonLikelihood");
+    GenericToolbox::Json::fillValue(_config_, BBNoUpdateWeights, "BBNoUpdateWeights");
+    GenericToolbox::Json::fillValue(_config_, verboseLevel, {{"verboseLevel"},{"isVerbose"}});
+    GenericToolbox::Json::fillValue(_config_, throwIfInfLlh, "throwIfInfLlh");
 
     LogInfo << "Using BarlowLLH_BANFF_OA2021 parameters:" << std::endl;
     {

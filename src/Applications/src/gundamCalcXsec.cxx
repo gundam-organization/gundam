@@ -288,8 +288,8 @@ int main(int argc, char** argv){
       // optionals
       for( auto& parSelConfig : GenericToolbox::Json::fetchValue(config_, "parSelections", JsonType()) ){
         parSelectionList.emplace_back();
-        GenericToolbox::Json::fillValue(parSelConfig, "name", parSelectionList.back().name);
-        GenericToolbox::Json::fillValue(parSelConfig, "value", parSelectionList.back().value);
+        GenericToolbox::Json::fillValue(parSelConfig, parSelectionList.back().name, "name");
+        GenericToolbox::Json::fillValue(parSelConfig, parSelectionList.back().value, "value");
       }
 
       // init

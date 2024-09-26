@@ -13,16 +13,16 @@ void MinimizerBase::readConfigImpl(){
 
   // nested objects first
   int monitorRefreshRateInMs(5000);
-  GenericToolbox::Json::fillValue( _config_, "monitorRefreshRateInMs", monitorRefreshRateInMs );
+  GenericToolbox::Json::fillValue(_config_, monitorRefreshRateInMs, "monitorRefreshRateInMs");
   // slow down the refresh rate if in batch mode
   monitorRefreshRateInMs *= ( GenericToolbox::getTerminalWidth() != 0 ? 1 : 10 );
   _monitor_.convergenceMonitor.setMaxRefreshRateInMs( monitorRefreshRateInMs );
 
   // members
-  GenericToolbox::Json::fillValue(_config_, "showParametersOnFitMonitor", _monitor_.showParameters);
-  GenericToolbox::Json::fillValue(_config_, "maxNbParametersPerLineOnMonitor", _monitor_.maxNbParametersPerLine);
-  GenericToolbox::Json::fillValue(_config_, "enablePostFitErrorFit", _isEnabledCalcError_);
-  GenericToolbox::Json::fillValue(_config_, "useNormalizedFitSpace", _useNormalizedFitSpace_);
+  GenericToolbox::Json::fillValue(_config_, _monitor_.showParameters, "showParametersOnFitMonitor");
+  GenericToolbox::Json::fillValue(_config_, _monitor_.maxNbParametersPerLine, "maxNbParametersPerLineOnMonitor");
+  GenericToolbox::Json::fillValue(_config_, _isEnabledCalcError_, "enablePostFitErrorFit");
+  GenericToolbox::Json::fillValue(_config_, _useNormalizedFitSpace_, "useNormalizedFitSpace");
 
   LogWarning << "MinimizerBase configured." << std::endl;
 }

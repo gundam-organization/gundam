@@ -23,13 +23,13 @@ void DatasetDefinition::readConfigImpl() {
   _name_ = GenericToolbox::Json::fetchValue<std::string>(_config_, "name");
 
   // optional
-  GenericToolbox::Json::fillValue(_config_, "isEnabled", _isEnabled_);
+  GenericToolbox::Json::fillValue(_config_, _isEnabled_, "isEnabled");
   LogReturnIf(not _isEnabled_, "\"" << _name_ << "\" is disabled.");
 
   _modelDispenser_ = DataDispenser(this);
   _modelDispenser_.getParameters().name = "Asimov";
   _modelDispenser_.getParameters().useReweightEngine = true;
-  GenericToolbox::Json::fillValue<JsonType>(_config_, {{"model"}, {"mc"}}, _modelDispenser_.getConfig());
+  GenericToolbox::Json::fillValue<JsonType>(_config_, _modelDispenser_.getConfig(), {{"model"},{"mc"}});
   _modelDispenser_.readConfig();
 
   // Always put the Asimov as a data entry
@@ -45,12 +45,13 @@ void DatasetDefinition::readConfigImpl() {
     _dataDispenserDict_.at(name).readConfig(dataEntry);
   }
 
-  GenericToolbox::Json::fillValue(_config_, "selectedDataEntry", _selectedDataEntry_);
-  GenericToolbox::Json::fillValue(_config_, "selectedToyEntry", _selectedToyEntry_);
-  GenericToolbox::Json::fillValue(_config_, "showSelectedEventCount", _showSelectedEventCount_);
-  GenericToolbox::Json::fillValue(_config_, "devSingleThreadEventLoaderAndIndexer", _devSingleThreadEventLoaderAndIndexer_);
-  GenericToolbox::Json::fillValue(_config_, "devSingleThreadEventSelection", _devSingleThreadEventSelection_);
-  GenericToolbox::Json::fillValue(_config_, "sortLoadedEvents", _sortLoadedEvents_);
+  GenericToolbox::Json::fillValue(_config_, _selectedDataEntry_, "selectedDataEntry");
+  GenericToolbox::Json::fillValue(_config_, _selectedToyEntry_, "selectedToyEntry");
+  GenericToolbox::Json::fillValue(_config_, _showSelectedEventCount_, "showSelectedEventCount");
+  GenericToolbox::Json::fillValue(_config_, _devSingleThreadEventLoaderAndIndexer_,
+                                  "devSingleThreadEventLoaderAndIndexer");
+  GenericToolbox::Json::fillValue(_config_, _devSingleThreadEventSelection_, "devSingleThreadEventSelection");
+  GenericToolbox::Json::fillValue(_config_, _sortLoadedEvents_, "sortLoadedEvents");
 
 }
 void DatasetDefinition::initializeImpl() {

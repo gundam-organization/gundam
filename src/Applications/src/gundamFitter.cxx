@@ -197,7 +197,7 @@ int main(int argc, char** argv){
   else{
 
     std::string outFolder{"./"};
-    GenericToolbox::Json::fillValue(gundamFitterConfig, "outputFolder", outFolder);
+    GenericToolbox::Json::fillValue(gundamFitterConfig, outFolder, "outputFolder");
     if( clParser.isOptionTriggered("outputDir") ){ outFolder = clParser.getOptionVal<std::string>("outputDir"); }
 
     // appendixDict["optionName"] = "Appendix"
@@ -243,7 +243,7 @@ int main(int argc, char** argv){
   }
   else{
     std::string minGundamVersion("0.0.0");
-    GenericToolbox::Json::fillValue(gundamFitterConfig, "minGundamVersion", minGundamVersion);
+    GenericToolbox::Json::fillValue(gundamFitterConfig, minGundamVersion, "minGundamVersion");
     LogThrowIf(
         not GundamUtils::isNewerOrEqualVersion( minGundamVersion ),
         "Version check FAILED: " << GundamUtils::getVersionStr() << " < " << minGundamVersion
@@ -269,7 +269,7 @@ int main(int argc, char** argv){
   LogInfo << "FitterEngine setup..." << std::endl;
   FitterEngine fitter(GenericToolbox::mkdirTFile(app.getOutfilePtr(), "FitterEngine"));
 
-  GenericToolbox::Json::fillValue(gundamFitterConfig, "fitterEngineConfig", fitter.getConfig());
+  GenericToolbox::Json::fillValue(gundamFitterConfig, fitter.getConfig(), "fitterEngineConfig");
   fitter.readConfig();
 
   // -a

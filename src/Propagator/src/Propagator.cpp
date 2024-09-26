@@ -28,7 +28,7 @@ void Propagator::unmuteLogger(){ Logger::setIsMuted( false ); }
 void Propagator::readConfigImpl(){
 
   // nested objects
-  GenericToolbox::Json::fillValue(_config_, {{"sampleSetConfig"}, {"fitSampleSetConfig"}}, _sampleSet_.getConfig());
+  GenericToolbox::Json::fillValue(_config_, _sampleSet_.getConfig(), {{"sampleSetConfig"}, {"fitSampleSetConfig"}});
   _sampleSet_.readConfig();
 
   GenericToolbox::Json::deprecatedAction(_config_, "parameterSetListConfig", [&]{
@@ -40,7 +40,7 @@ void Propagator::readConfigImpl(){
     LogAlert << "Forwarding the option to ParametersManager. Consider moving it into \"parametersManagerConfig:\"" << std::endl;
     _parManager_.setThrowToyParametersWithGlobalCov(GenericToolbox::Json::fetchValue<bool>(_config_, "throwToyParametersWithGlobalCov"));
   });
-  GenericToolbox::Json::fillValue( _config_, "parametersManagerConfig", _parManager_.getConfig());
+  GenericToolbox::Json::fillValue(_config_, _parManager_.getConfig(), "parametersManagerConfig");
   _parManager_.readConfig();
 
   _dialCollectionList_.clear();
@@ -79,14 +79,14 @@ void Propagator::readConfigImpl(){
   }
 
   // Monitoring parameters
-  GenericToolbox::Json::fillValue(_config_, "showNbEventParameterBreakdown", _showNbEventParameterBreakdown_);
-  GenericToolbox::Json::fillValue(_config_, "showNbEventPerSampleParameterBreakdown", _showNbEventPerSampleParameterBreakdown_);
-  GenericToolbox::Json::fillValue(_config_, "parameterInjection", _parameterInjectorMc_);
-  GenericToolbox::Json::fillValue(_config_, "debugPrintLoadedEvents", _debugPrintLoadedEvents_);
-  GenericToolbox::Json::fillValue(_config_, "debugPrintLoadedEventsNbPerSample", _debugPrintLoadedEventsNbPerSample_);
-  GenericToolbox::Json::fillValue(_config_, "devSingleThreadReweight", _devSingleThreadReweight_);
-  GenericToolbox::Json::fillValue(_config_, "devSingleThreadHistFill", _devSingleThreadHistFill_);
-  GenericToolbox::Json::fillValue(_config_, "globalEventReweightCap", _eventDialCache_.getGlobalEventReweightCap().maxReweight);
+  GenericToolbox::Json::fillValue(_config_, _showNbEventParameterBreakdown_, "showNbEventParameterBreakdown");
+  GenericToolbox::Json::fillValue(_config_, _showNbEventPerSampleParameterBreakdown_, "showNbEventPerSampleParameterBreakdown");
+  GenericToolbox::Json::fillValue(_config_, _parameterInjectorMc_, "parameterInjection");
+  GenericToolbox::Json::fillValue(_config_, _debugPrintLoadedEvents_, "debugPrintLoadedEvents");
+  GenericToolbox::Json::fillValue(_config_, _debugPrintLoadedEventsNbPerSample_, "debugPrintLoadedEventsNbPerSample");
+  GenericToolbox::Json::fillValue(_config_, _devSingleThreadReweight_, "devSingleThreadReweight");
+  GenericToolbox::Json::fillValue(_config_, _devSingleThreadHistFill_, "devSingleThreadHistFill");
+  GenericToolbox::Json::fillValue(_config_, _eventDialCache_.getGlobalEventReweightCap().maxReweight, "globalEventReweightCap");
 
 }
 void Propagator::initializeImpl(){

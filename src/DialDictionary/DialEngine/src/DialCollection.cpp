@@ -282,16 +282,13 @@ void DialCollection::readGlobals(const JsonType &config_) {
       if (condEntry.is_string()) {
         conditionsList.emplace_back(condEntry.get<std::string>());
       } else if (condEntry.is_structured()) {
-        auto expression = GenericToolbox::Json::fetchValue<std::string>(condEntry, {{"exp"},
-                                                                                    {"expression"},
-                                                                                    {"var"},
-                                                                                    {"variable"}});
+        auto expression = GenericToolbox::Json::fetchValue<std::string>(condEntry, {{"exp"},{"expression"},{"var"},{"variable"}});
         std::stringstream ssCondEntry;
 
         // allowedRanges
         {
           std::vector<GenericToolbox::Range> allowedRanges;
-          GenericToolbox::Json::fillValue(condEntry, "allowedRanges", allowedRanges);
+          GenericToolbox::Json::fillValue(condEntry, allowedRanges, "allowedRanges");
           if (not allowedRanges.empty()) {
             std::vector<std::string> allowedRangesCond;
             for (auto &allowedRange: allowedRanges) {
@@ -322,7 +319,7 @@ void DialCollection::readGlobals(const JsonType &config_) {
         }
 
         std::vector<GenericToolbox::Range> excludedRanges;
-        GenericToolbox::Json::fillValue(condEntry, "excludedRanges", excludedRanges);
+        GenericToolbox::Json::fillValue(condEntry, excludedRanges, "excludedRanges");
         auto excludedValues = GenericToolbox::Json::fetchValue(condEntry, "excludedValues", std::vector<double>());
         if (not excludedRanges.empty() or not excludedValues.empty()) {
           if (not ssCondEntry.str().empty()) {

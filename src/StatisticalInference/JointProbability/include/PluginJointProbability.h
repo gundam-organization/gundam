@@ -42,8 +42,8 @@ namespace JointProbability{
 
   // JointProbabilityPlugin
   void PluginJointProbability::readConfigImpl(){
-    GenericToolbox::Json::fillValue(_config_, "llhPluginSrc", llhPluginSrc);
-    GenericToolbox::Json::fillValue(_config_, "llhSharedLib", llhSharedLib);
+    GenericToolbox::Json::fillValue(_config_, llhPluginSrc, "llhPluginSrc");
+    GenericToolbox::Json::fillValue(_config_, llhSharedLib, "llhSharedLib");
   }
 
   void PluginJointProbability::initializeImpl(){

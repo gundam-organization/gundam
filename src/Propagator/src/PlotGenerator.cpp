@@ -33,20 +33,20 @@ void PlotGenerator::readConfigImpl(){
   _histHolderCacheList_.resize(1);
   _threadPool_.setNThreads( GundamGlobals::getNumberOfThreads() );
 
-  GenericToolbox::Json::fillValue(_config_, "isEnabled", _isEnabled_);
+  GenericToolbox::Json::fillValue(_config_, _isEnabled_, "isEnabled");
   if( not _isEnabled_ ){ return; }
 
   // nested first
   for( auto& varDictConfig : GenericToolbox::Json::fetchValue(_config_, {{"varDictionaries"}, {"varDictionnaries"}}, JsonType())){
     _varDictionaryList_.emplace_back(); auto& varDict = _varDictionaryList_.back();
-    GenericToolbox::Json::fillValue(varDictConfig, "name", varDict.name);
+    GenericToolbox::Json::fillValue(varDictConfig, varDict.name, "name");
 
     for( auto& dictEntryConfig : GenericToolbox::Json::fetchValue(varDictConfig, "dictionary", JsonType())){
       varDict.dictEntryList.emplace_back(); auto& dictEntry = varDict.dictEntryList.back();
-      GenericToolbox::Json::fillValue(dictEntryConfig, "value", dictEntry.value);
-      GenericToolbox::Json::fillValue(dictEntryConfig, "title", dictEntry.title);
-      GenericToolbox::Json::fillValue(dictEntryConfig, "fillStyle", dictEntry.fillStyle);
-      GenericToolbox::Json::fillValue(dictEntryConfig, {{"colorRoot"}, {"color"}}, dictEntry.color);
+      GenericToolbox::Json::fillValue(dictEntryConfig, dictEntry.value, "value");
+      GenericToolbox::Json::fillValue(dictEntryConfig, dictEntry.title, "title");
+      GenericToolbox::Json::fillValue(dictEntryConfig, dictEntry.fillStyle, "fillStyle");
+      GenericToolbox::Json::fillValue(dictEntryConfig, dictEntry.color, {{"colorRoot"},{"color"}});
       if( GenericToolbox::Json::doKeyExist(dictEntryConfig, "colorHex") ){
         TColor::SetColorThreshold(0.1); // will fetch the closest color
         dictEntry.color = short( TColor::GetColor( GenericToolbox::Json::fetchValue<std::string>(dictEntryConfig, "colorHex").c_str() ) );
@@ -57,20 +57,24 @@ void PlotGenerator::readConfigImpl(){
   for( auto& histDefConfig : GenericToolbox::Json::fetchValue(_config_, "histogramsDefinition", JsonType()) ){
     if( not GenericToolbox::Json::fetchValue(histDefConfig, "isEnabled", true) ){ continue; }
     _histDefList_.emplace_back(); auto& histDef = _histDefList_.back();
-    GenericToolbox::Json::fillValue(histDefConfig, "noData", histDef.noData);
-    GenericToolbox::Json::fillValue(histDefConfig, "useSampleBinning", histDef.useSampleBinning);
-    GenericToolbox::Json::fillValue(histDefConfig, "rescaleAsBinWidth", histDef.rescaleAsBinWidth);
-    GenericToolbox::Json::fillValue(histDefConfig, "rescaleBinFactor", histDef.rescaleBinFactor);
-    GenericToolbox::Json::fillValue(histDefConfig, "xMin", histDef.xMin);
-    GenericToolbox::Json::fillValue(histDefConfig, "xMax", histDef.xMax);
-    GenericToolbox::Json::fillValue(histDefConfig, "prefix", histDef.prefix);
-    GenericToolbox::Json::fillValue(histDefConfig, "varToPlot", histDef.varToPlot);
-    GenericToolbox::Json::fillValue(histDefConfig, "yTitle", histDef.yTitle);
-    GenericToolbox::Json::fillValue(histDefConfig, {{"splitVarList"}, {"splitVars"}}, histDef.splitVarList);
-    GenericToolbox::Json::fillValue(histDefConfig, "sampleVariableIfNotAvailable", histDef.sampleVariableIfNotAvailable);
 
-    histDef.xTitle = GenericToolbox::Json::fetchValue(histDefConfig, "xTitle", histDef.varToPlot);
-    histDef.useSampleBinningOfVar = GenericToolbox::Json::fetchValue(histDefConfig, {{"useSampleBinningOfVar"}, {"useSampleBinningOfObservable"}}, histDef.varToPlot);
+    GenericToolbox::Json::fillValue(histDefConfig, histDef.noData, "noData");
+    GenericToolbox::Json::fillValue(histDefConfig, histDef.useSampleBinning, "useSampleBinning");
+    GenericToolbox::Json::fillValue(histDefConfig, histDef.rescaleAsBinWidth, "rescaleAsBinWidth");
+    GenericToolbox::Json::fillValue(histDefConfig, histDef.rescaleBinFactor, "rescaleBinFactor");
+    GenericToolbox::Json::fillValue(histDefConfig, histDef.xMin, "xMin");
+    GenericToolbox::Json::fillValue(histDefConfig, histDef.xMax, "xMax");
+    GenericToolbox::Json::fillValue(histDefConfig, histDef.prefix, "prefix");
+    GenericToolbox::Json::fillValue(histDefConfig, histDef.varToPlot, "varToPlot");
+    GenericToolbox::Json::fillValue(histDefConfig, histDef.yTitle, "yTitle");
+    GenericToolbox::Json::fillValue(histDefConfig, histDef.splitVarList, {{"splitVarList"}, {"splitVars"}});
+    GenericToolbox::Json::fillValue(histDefConfig, histDef.sampleVariableIfNotAvailable, "sampleVariableIfNotAvailable");
+
+    histDef.xTitle = histDef.varToPlot;
+    histDef.useSampleBinningOfVar = histDef.varToPlot;
+
+    GenericToolbox::Json::fillValue(histDefConfig, histDef.xTitle, "xTitle");
+    GenericToolbox::Json::fillValue(histDefConfig, histDef.useSampleBinningOfVar, {{"useSampleBinningOfVar"}, {"useSampleBinningOfObservable"}});
 
     auto binning = GenericToolbox::Json::fetchValue(histDefConfig, {{"binning"}, {"binningFile"}}, JsonType());
     if( not binning.empty() ){
@@ -82,12 +86,12 @@ void PlotGenerator::readConfigImpl(){
   }
 
   // options
-  GenericToolbox::Json::fillValue(_config_, "canvasParameters/height", _canvasParameters_.height);
-  GenericToolbox::Json::fillValue(_config_, "canvasParameters/width", _canvasParameters_.width);
-  GenericToolbox::Json::fillValue(_config_, "canvasParameters/nbXplots", _canvasParameters_.nbXplots);
-  GenericToolbox::Json::fillValue(_config_, "canvasParameters/nbYplots", _canvasParameters_.nbYplots);
+  GenericToolbox::Json::fillValue(_config_, _canvasParameters_.height, "canvasParameters/height");
+  GenericToolbox::Json::fillValue(_config_, _canvasParameters_.width, "canvasParameters/width");
+  GenericToolbox::Json::fillValue(_config_, _canvasParameters_.nbXplots, "canvasParameters/nbXplots");
+  GenericToolbox::Json::fillValue(_config_, _canvasParameters_.nbYplots, "canvasParameters/nbYplots");
 
-  GenericToolbox::Json::fillValue(_config_, "writeGeneratedHistograms", _writeGeneratedHistograms_);
+  GenericToolbox::Json::fillValue(_config_, _writeGeneratedHistograms_, "writeGeneratedHistograms");
 }
 void PlotGenerator::initializeImpl() {
   LogWarning << __METHOD_NAME__ << std::endl;

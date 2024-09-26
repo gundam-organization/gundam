@@ -23,64 +23,64 @@ LoggerInit([]{ Logger::setUserHeaderStr("[ParameterSet]"); });
 
 void ParameterSet::readConfigImpl(){
 
-  GenericToolbox::Json::fillValue(_config_, "name", _name_);
+  GenericToolbox::Json::fillValue(_config_, _name_, "name");
   LogThrowIf(_name_.empty(), "ParameterSet have no name.");
   LogDebugIf(GundamGlobals::isDebugConfig()) << "Reading config for parameter set: " << _name_ << std::endl;
 
-  GenericToolbox::Json::fillValue(_config_, "isEnabled", _isEnabled_);
+  GenericToolbox::Json::fillValue(_config_, _isEnabled_, "isEnabled");
   if( not _isEnabled_ ){
     LogDebugIf(GundamGlobals::isDebugConfig()) << " -> marked as disabled." << std::endl;
     return; // don't go any further
   }
 
-  GenericToolbox::Json::fillValue(_config_, "numberOfParameters", _nbParameterDefinition_);
-  GenericToolbox::Json::fillValue(_config_, "nominalStepSize", _nominalStepSize_);
+  GenericToolbox::Json::fillValue(_config_, _nbParameterDefinition_, "numberOfParameters");
+  GenericToolbox::Json::fillValue(_config_, _nominalStepSize_, "nominalStepSize");
 
-  GenericToolbox::Json::fillValue(_config_, "useOnlyOneParameterPerEvent", _useOnlyOneParameterPerEvent_);
-  GenericToolbox::Json::fillValue(_config_, "printDialSetsSummary", _printDialSetsSummary_);
-  GenericToolbox::Json::fillValue(_config_, "printParametersSummary", _printParametersSummary_);
+  GenericToolbox::Json::fillValue(_config_, _useOnlyOneParameterPerEvent_, "useOnlyOneParameterPerEvent");
+  GenericToolbox::Json::fillValue(_config_, _printDialSetsSummary_, "printDialSetsSummary");
+  GenericToolbox::Json::fillValue(_config_, _printParametersSummary_, "printParametersSummary");
 
-  GenericToolbox::Json::fillValue(_config_, "parameterLimits/minValue", _globalParRange_.min);
-  GenericToolbox::Json::fillValue(_config_, "parameterLimits/maxValue", _globalParRange_.max);
+  GenericToolbox::Json::fillValue(_config_, _globalParRange_.min, "parameterLimits/minValue");
+  GenericToolbox::Json::fillValue(_config_, _globalParRange_.max, "parameterLimits/maxValue");
 
-  GenericToolbox::Json::fillValue(_config_, {{"enablePca"}, {"allowPca"}, {"fixGhostFitParameters"}}, _enablePca_);
-  GenericToolbox::Json::fillValue(_config_, "enabledThrowToyParameters", _enabledThrowToyParameters_);
-  GenericToolbox::Json::fillValue(_config_, {{"customParThrow"}, {"customFitParThrow"}}, _customParThrow_);
-  GenericToolbox::Json::fillValue(_config_, "releaseFixedParametersOnHesse", _releaseFixedParametersOnHesse_);
+  GenericToolbox::Json::fillValue(_config_, _enablePca_, {{"enablePca"},{"allowPca"},{"fixGhostFitParameters"}});
+  GenericToolbox::Json::fillValue(_config_, _enabledThrowToyParameters_, "enabledThrowToyParameters");
+  GenericToolbox::Json::fillValue(_config_, _customParThrow_, {{"customParThrow"},{"customFitParThrow"}});
+  GenericToolbox::Json::fillValue(_config_, _releaseFixedParametersOnHesse_, "releaseFixedParametersOnHesse");
 
-  GenericToolbox::Json::fillValue(_config_, {{"parameterDefinitionFilePath"}, {"covarianceMatrixFilePath"}}, _parameterDefinitionFilePath_);
-  GenericToolbox::Json::fillValue(_config_, {{"covarianceMatrix"}, {"covarianceMatrixTMatrixD"}}, _covarianceMatrixPath_);
-  GenericToolbox::Json::fillValue(_config_, {{"parameterNameList"}, {"parameterNameTObjArray"}}, _parameterNameListPath_);
-  GenericToolbox::Json::fillValue(_config_, {{"parameterPriorValueList"}, {"parameterPriorTVectorD"}}, _parameterPriorValueListPath_);
+  GenericToolbox::Json::fillValue(_config_, _parameterDefinitionFilePath_, {{"parameterDefinitionFilePath"},{"covarianceMatrixFilePath"}});
+  GenericToolbox::Json::fillValue(_config_, _covarianceMatrixPath_, {{"covarianceMatrix"},{"covarianceMatrixTMatrixD"}});
+  GenericToolbox::Json::fillValue(_config_, _parameterNameListPath_, {{"parameterNameList"},{"parameterNameTObjArray"}});
+  GenericToolbox::Json::fillValue(_config_, _parameterPriorValueListPath_, {{"parameterPriorValueList"},{"parameterPriorTVectorD"}});
 
-  GenericToolbox::Json::fillValue(_config_, "parameterLowerBoundsTVectorD", _parameterLowerBoundsTVectorD_);
-  GenericToolbox::Json::fillValue(_config_, "parameterUpperBoundsTVectorD", _parameterUpperBoundsTVectorD_);
-  GenericToolbox::Json::fillValue(_config_, "throwEnabledList", _throwEnabledListPath_);
+  GenericToolbox::Json::fillValue(_config_, _parameterLowerBoundsTVectorD_, "parameterLowerBoundsTVectorD");
+  GenericToolbox::Json::fillValue(_config_, _parameterUpperBoundsTVectorD_, "parameterUpperBoundsTVectorD");
+  GenericToolbox::Json::fillValue(_config_, _throwEnabledListPath_, "throwEnabledList");
 
-  GenericToolbox::Json::fillValue(_config_, "parameterDefinitions", _parameterDefinitionConfig_);
-  GenericToolbox::Json::fillValue(_config_, "dialSetDefinitions", _dialSetDefinitions_);
-  GenericToolbox::Json::fillValue(_config_, "enableOnlyParameters", _enableOnlyParameters_);
-  GenericToolbox::Json::fillValue(_config_, "disableParameters", _disableParameters_);
+  GenericToolbox::Json::fillValue(_config_, _parameterDefinitionConfig_, "parameterDefinitions");
+  GenericToolbox::Json::fillValue(_config_, _dialSetDefinitions_, "dialSetDefinitions");
+  GenericToolbox::Json::fillValue(_config_, _enableOnlyParameters_, "enableOnlyParameters");
+  GenericToolbox::Json::fillValue(_config_, _disableParameters_, "disableParameters");
 
   // throws options
-  GenericToolbox::Json::fillValue(_config_, "useMarkGenerator", _useMarkGenerator_);
-  GenericToolbox::Json::fillValue(_config_, "useEigenDecompForThrows", _useEigenDecompForThrows_);
+  GenericToolbox::Json::fillValue(_config_, _useMarkGenerator_, "useMarkGenerator");
+  GenericToolbox::Json::fillValue(_config_, _useEigenDecompForThrows_, "useEigenDecompForThrows");
 
   // eigen related parameters
-  GenericToolbox::Json::fillValue(_config_, {{"enableEigenDecomp"}, {"useEigenDecompInFit"}}, _enableEigenDecomp_);
-  GenericToolbox::Json::fillValue(_config_ , "allowEigenDecompWithBounds", _allowEigenDecompWithBounds_);
-  GenericToolbox::Json::fillValue(_config_ , "maxNbEigenParameters", _maxNbEigenParameters_);
-  GenericToolbox::Json::fillValue(_config_ , "maxEigenFraction", _maxEigenFraction_);
-  GenericToolbox::Json::fillValue(_config_, "eigenSvdThreshold", _eigenSvdThreshold_);
+  GenericToolbox::Json::fillValue(_config_, _enableEigenDecomp_, {{"enableEigenDecomp"},{"useEigenDecompInFit"}});
+  GenericToolbox::Json::fillValue(_config_, _allowEigenDecompWithBounds_, "allowEigenDecompWithBounds");
+  GenericToolbox::Json::fillValue(_config_, _maxNbEigenParameters_, "maxNbEigenParameters");
+  GenericToolbox::Json::fillValue(_config_, _maxEigenFraction_, "maxEigenFraction");
+  GenericToolbox::Json::fillValue(_config_, _eigenSvdThreshold_, "eigenSvdThreshold");
 
-  GenericToolbox::Json::fillValue(_config_, "eigenParBounds/minValue", _eigenParRange_.min);
-  GenericToolbox::Json::fillValue(_config_, "eigenParBounds/maxValue", _eigenParRange_.max);
+  GenericToolbox::Json::fillValue(_config_, _eigenParRange_.min, "eigenParBounds/minValue");
+  GenericToolbox::Json::fillValue(_config_, _eigenParRange_.max, "eigenParBounds/maxValue");
 
   // legacy
-  GenericToolbox::Json::fillValue(_config_, "maskForToyGeneration", _maskForToyGeneration_);
+  GenericToolbox::Json::fillValue(_config_, _maskForToyGeneration_, "maskForToyGeneration");
 
   // dev option -> was used for validation
-  GenericToolbox::Json::fillValue(_config_, "devUseParLimitsOnEigen", _devUseParLimitsOnEigen_);
+  GenericToolbox::Json::fillValue(_config_, _devUseParLimitsOnEigen_, "devUseParLimitsOnEigen");
 
 
   // individual parameter definitions:
