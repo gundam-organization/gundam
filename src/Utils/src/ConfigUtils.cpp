@@ -22,9 +22,6 @@ LoggerInit([]{ Logger::setUserHeaderStr("[ConfigUtils]"); });
 
 namespace ConfigUtils {
 
-  // for JsonType
-  using namespace GenericToolbox::Json;
-
   // open file
   JsonType readConfigFile(const std::string& configFilePath_){
     if( not GenericToolbox::isFile(configFilePath_) ){
