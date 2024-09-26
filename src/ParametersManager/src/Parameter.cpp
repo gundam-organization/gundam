@@ -176,6 +176,8 @@ std::string Parameter::getSummary(bool shallow_) const {
 
   ss << this->getFullTitle();
   ss << ", isEnabled=" << _isEnabled_;
+  if( not _isEnabled_ ){ return ss.str(); }
+
   ss << ": value=" << _parameterValue_;
   ss << ", prior=" << _priorValue_;
   ss << ", stdDev=" << _stdDevValue_;
