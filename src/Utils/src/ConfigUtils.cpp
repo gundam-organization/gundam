@@ -5,17 +5,13 @@
 #include "ConfigUtils.h"
 #include "GundamUtils.h"
 
-#include "GenericToolbox.Json.h"
 #include "GenericToolbox.Root.h"
 #include "GenericToolbox.Yaml.h"
 #include "Logger.h"
 
-#include "nlohmann/json.hpp"
-
 #include <string>
 #include <utility>
 #include <vector>
-#include <utility>
 #include <sstream>
 #include <iostream>
 
@@ -25,6 +21,9 @@ LoggerInit([]{ Logger::setUserHeaderStr("[ConfigUtils]"); });
 #endif
 
 namespace ConfigUtils {
+
+  // for JsonType
+  using namespace GenericToolbox::Json;
 
   JsonType readConfigFile(const std::string& configFilePath_){
     if( not GenericToolbox::isFile(configFilePath_) ){

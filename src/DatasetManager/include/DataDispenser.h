@@ -10,12 +10,10 @@
 
 #include "PlotGenerator.h"
 #include "Propagator.h"
-#include "JsonBaseClass.h"
 
 #include "GenericToolbox.Thread.h"
 
 #include "TChain.h"
-#include "nlohmann/json.hpp"
 
 #include <map>
 #include <string>

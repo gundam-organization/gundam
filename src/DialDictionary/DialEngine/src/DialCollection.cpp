@@ -8,7 +8,7 @@
 #include "TabulatedDialFactory.h"
 #include "RootFormula.h"
 
-#include "GenericToolbox.Json.h"
+
 #include "Logger.h"
 
 #include <sstream>

@@ -7,11 +7,10 @@
 
 #include "GundamGlobals.h"
 
-#include "GenericToolbox.Json.h"
+
 #include "Logger.h"
 
 #include <TTreeFormulaManager.h>
-#include "nlohmann/json.hpp"
 
 #include <memory>
 

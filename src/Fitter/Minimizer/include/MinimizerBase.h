@@ -9,7 +9,7 @@
 #include "ParameterScanner.h"
 #include "LikelihoodInterface.h"
 #include "Parameter.h"
-#include "JsonBaseClass.h"
+
 
 #include "GenericToolbox.Utils.h"
 

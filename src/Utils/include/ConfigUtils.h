@@ -6,12 +6,16 @@
 #define GUNDAM_CONFIG_UTILS_H
 
 
-#include "nlohmann/json.hpp"
+#include "GenericToolbox.Json.h"
+
 #include "yaml-cpp/yaml.h"
 
 #include <string>
 
-typedef nlohmann::ordered_json JsonType;
+
+// shortcuts
+typedef GenericToolbox::Json::JsonType JsonType;
+typedef GenericToolbox::Json::ConfigBaseClass JsonBaseClass;
 
 
 namespace ConfigUtils {

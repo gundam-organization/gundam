@@ -6,13 +6,11 @@
 #define GUNDAM_PARAMETERSET_H
 
 #include "Parameter.h"
-#include "JsonBaseClass.h"
 #include "ParameterThrowerMarkHarz.h"
 
 #include "Logger.h"
 #include "GenericToolbox.Root.h"
 
-#include "nlohmann/json.hpp"
 #include "TMatrixDSym.h"
 #include "TVectorT.h"
 #include "TFile.h"
@@ -30,7 +28,7 @@
 class ParameterSet : public JsonBaseClass  {
 
 protected:
-  // called through public JsonBaseClass::readConfig() and JsonBaseClass::initialize()
+  // called through JsonBaseClass::readConfig() and JsonBaseClass::initialize()
   void readConfigImpl() override;
   void initializeImpl() override;
 

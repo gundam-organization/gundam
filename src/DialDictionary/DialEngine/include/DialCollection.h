@@ -13,7 +13,6 @@
 
 #include "GenericToolbox.Wrappers.h"
 
-#include "nlohmann/json.hpp"
 
 #include <vector>
 #include <string>

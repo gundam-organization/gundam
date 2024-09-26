@@ -6,7 +6,6 @@
 #define GUNDAM_EVENTVARTRANSFORM_H
 
 #include "Event.h"
-#include "JsonBaseClass.h"
 
 #include "TFormula.h"
 

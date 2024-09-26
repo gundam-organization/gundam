@@ -7,7 +7,6 @@
 
 #include "Logger.h"
 #include "CmdLineParser.h"
-#include "GenericToolbox.Json.h"
 #include "GenericToolbox.Root.h"
 #include "GenericToolbox.Utils.h"
 
@@ -127,7 +126,7 @@ int main(int argc, char** argv){
   ConfigUtils::clearEntry( cHandler.getConfig(), "fitterEngineConfig/propagatorConfig/plotGeneratorConfig" );
 
   // Defining signal samples
-  JsonType xsecConfig( ConfigUtils::readConfigFile( clParser.getOptionVal<std::string>("configFile") ) );
+  auto xsecConfig( ConfigUtils::readConfigFile( clParser.getOptionVal<std::string>("configFile") ) );
   cHandler.override( xsecConfig );
   LogInfo << "Override done." << std::endl;
 

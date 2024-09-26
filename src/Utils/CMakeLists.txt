@@ -17,7 +17,6 @@ set(HEADERS
     ${CMAKE_CURRENT_SOURCE_DIR}/include/DataBinSet.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/GundamGlobals.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/GundamGreetings.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/include/JsonBaseClass.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/Likelihoods.hh
     ${CMAKE_CURRENT_SOURCE_DIR}/include/VariableDictionary.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ParameterThrowerMarkHarz.h

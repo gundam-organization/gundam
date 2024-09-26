@@ -7,12 +7,10 @@
 
 #include "Sample.h"
 #include "Event.h"
-#include "JsonBaseClass.h"
 
 #include "GenericToolbox.Wrappers.h"
 #include "GenericToolbox.Thread.h"
 
-#include "nlohmann/json.hpp"
 #include "TDirectory.h"
 #include "TH1D.h"
 

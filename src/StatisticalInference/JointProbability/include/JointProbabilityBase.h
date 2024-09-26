@@ -6,7 +6,6 @@
 #define GUNDAM_JOINT_PROBABILITY_BASE_H
 
 #include "SamplePair.h"
-#include "JsonBaseClass.h"
 
 #include <string>
 

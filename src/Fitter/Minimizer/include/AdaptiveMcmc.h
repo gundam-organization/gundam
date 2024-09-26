@@ -7,14 +7,12 @@
 
 #include "ParameterSet.h"
 #include "MinimizerBase.h"
-#include "JsonBaseClass.h"
 
 #include "GenericToolbox.Utils.h"
 #include "GenericToolbox.Time.h"
 
 #include "Math/Functor.h"
 #include "TDirectory.h"
-#include "nlohmann/json.hpp"
 
 #include <memory>
 #include <vector>

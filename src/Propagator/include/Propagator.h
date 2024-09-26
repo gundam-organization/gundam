@@ -9,7 +9,6 @@
 #include "ParametersManager.h"
 #include "DialCollection.h"
 #include "EventDialCache.h"
-#include "JsonBaseClass.h"
 #include "SampleSet.h"
 
 #include "GenericToolbox.Time.h"

@@ -7,9 +7,7 @@
 
 #include "LikelihoodInterface.h"
 #include "Parameter.h"
-#include "JsonBaseClass.h"
 
-#include "nlohmann/json.hpp"
 #include "TDirectory.h"
 #include "TGraph.h"
 

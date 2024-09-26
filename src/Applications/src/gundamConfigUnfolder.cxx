@@ -2,7 +2,7 @@
 // Created by Nadrino on 21/04/2021.
 //
 
-#include "GenericToolbox.Json.h"
+
 #include "ConfigUtils.h"
 #include "GundamGreetings.h"
 #include "GundamUtils.h"
@@ -11,7 +11,6 @@
 #include "CmdLineParser.h"
 #include "GenericToolbox.Root.h"
 
-#include "nlohmann/json.hpp"
 
 #include <string>
 

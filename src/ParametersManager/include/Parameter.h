@@ -5,11 +5,7 @@
 #ifndef GUNDAM_PARAMETER_H
 #define GUNDAM_PARAMETER_H
 
-#include "JsonBaseClass.h"
-
-#include "GenericToolbox.Utils.h"
-
-#include "nlohmann/json.hpp"
+#include "ConfigUtils.h"
 
 #include <vector>
 #include <string>
@@ -31,7 +27,7 @@ public:
 #include "GenericToolbox.MakeEnum.h"
 
 protected:
-  // called through public JsonBaseClass::readConfig() and JsonBaseClass::initialize()
+  // called through JsonBaseClass::readConfig() and JsonBaseClass::initialize()
   void readConfigImpl() override;
   void initializeImpl() override;
 
