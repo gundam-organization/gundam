@@ -25,6 +25,7 @@ namespace ConfigUtils {
   // for JsonType
   using namespace GenericToolbox::Json;
 
+  // open file
   JsonType readConfigFile(const std::string& configFilePath_){
     if( not GenericToolbox::isFile(configFilePath_) ){
       LogError << "\"" << configFilePath_ << "\" could not be found." << std::endl;
@@ -49,6 +50,7 @@ namespace ConfigUtils {
     return output;
   }
 
+  // YAML to JSON converting
   JsonType convertYamlToJson(const std::string& configFilePath_){
     return ConfigUtils::convertYamlToJson(GenericToolbox::Yaml::readConfigFile(configFilePath_));
   }
@@ -100,6 +102,7 @@ namespace ConfigUtils {
     return output;
   }
 
+  // unfolding
   JsonType getForwardedConfig(const JsonType& config_){
     JsonType out = config_;
     while( out.is_string() ){
@@ -161,22 +164,10 @@ namespace ConfigUtils {
       config = ConfigUtils::readConfigFile(filePath_ ); // works with yaml
     }
   }
-  ConfigHandler::ConfigHandler(JsonType config_) : config(std::move(config_)) {}
-
-  std::string ConfigHandler::toString() const{
-    return GenericToolbox::Json::toReadableString( config );
-  }
-  const JsonType &ConfigHandler::getConfig() const {
-    return config;
-  }
-
-  JsonType &ConfigHandler::getConfig(){
-    return config;
-  }
-
 
   void ConfigHandler::override( const JsonType& overrideConfig_ ){
-    GenericToolbox::Json::applyOverrides(config, overrideConfig_);
+    auto output = GenericToolbox::Json::applyOverrides(config, overrideConfig_);
+    LogWarning << output << std::endl;
   }
   void ConfigHandler::override( const std::string& filePath_ ){
     LogInfo << "Overriding config with \"" << filePath_ << "\"" << std::endl;
@@ -218,8 +209,6 @@ namespace ConfigUtils {
   void ConfigHandler::flatOverride( const std::vector<std::string>& flattenEntryList_ ){
     for( auto& flattenEntry : flattenEntryList_ ){ this->flatOverride( flattenEntry ); }
   }
-
-
   void ConfigHandler::exportToJsonFile(const std::string &filePath_) const {
     auto outPath{filePath_};
 
@@ -232,7 +221,5 @@ namespace ConfigUtils {
     GenericToolbox::dumpStringInFile(outPath, this->toString());
     LogInfo << "Unfolded config written as: " << outPath << std::endl;
   }
-
-
 
 }
