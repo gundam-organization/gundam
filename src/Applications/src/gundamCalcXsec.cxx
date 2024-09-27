@@ -80,7 +80,7 @@ int main(int argc, char** argv){
   }
 
   GundamGlobals::setNumberOfThreads( clParser.getOptionVal("nbThreads", 1) );
-  LogInfo << "Running the fitter with " << GundamGlobals::getNumberOfThreads() << " parallel threads." << std::endl;
+  LogInfo << "Running the fitter with " << GundamGlobals::getNbCpuThreads() << " parallel threads." << std::endl;
 
   // Reading fitter file
   std::string fitterFile{clParser.getOptionVal<std::string>("fitterFile")};

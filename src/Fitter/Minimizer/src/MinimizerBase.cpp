@@ -191,7 +191,7 @@ double MinimizerBase::evalFit( const double* parArray_ ){
 //    ssHeader << std::endl << "Target EDM: " << getMinimizer().get;
       ssHeader << std::endl << "RAM: " << GenericToolbox::parseSizeUnits(double(GenericToolbox::getProcessMemoryUsage()));
       double cpuPercent = GenericToolbox::getCpuUsageByProcess();
-      ssHeader << " / CPU: " << cpuPercent << "% (" << cpuPercent / GundamGlobals::getNumberOfThreads() << "% efficiency)";
+      ssHeader << " / CPU: " << cpuPercent << "% (" << cpuPercent / GundamGlobals::getNbCpuThreads() << "% efficiency)";
       ssHeader << std::endl << "Avg log-likelihood computation time: " << _monitor_.evalLlhTimer;
       ssHeader << std::endl;
 

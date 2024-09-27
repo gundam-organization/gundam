@@ -31,7 +31,7 @@ void PlotGenerator::configureImpl(){
 
   gStyle->SetOptStat(0);
   _histHolderCacheList_.resize(1);
-  _threadPool_.setNThreads( GundamGlobals::getNumberOfThreads() );
+  _threadPool_.setNThreads(GundamGlobals::getNbCpuThreads() );
 
   GenericToolbox::Json::fillValue(_config_, _isEnabled_, "isEnabled");
   if( not _isEnabled_ ){ return; }
@@ -199,7 +199,7 @@ void PlotGenerator::generateSampleHistograms(TDirectory *saveDir_, int cacheSlot
           for( auto* hist : histPtrToFillList ){
 
             auto bounds = GenericToolbox::ParallelWorker::getThreadBoundIndices(
-                iThread_, GundamGlobals::getNumberOfThreads(),
+                iThread_, GundamGlobals::getNbCpuThreads(),
                 hist->histPtr->GetNbinsX()
             );
 
@@ -688,7 +688,7 @@ void PlotGenerator::defineHistogramHolders() {
 
   std::function<void(int)> fetchSplitVar = [&](int iThread_){
     auto bounds = GenericToolbox::ParallelWorker::getThreadBoundIndices(
-        iThread_, GundamGlobals::getNumberOfThreads(),
+        iThread_, GundamGlobals::getNbCpuThreads(),
         int(_modelSampleListPtr_->size())
     );
 
@@ -925,7 +925,7 @@ void PlotGenerator::buildEventBinCache( const std::vector<HistHolder *> &histPtr
   std::function<void(int)> fillEventHistCache = [&](int iThread_){
 
     auto bounds = GenericToolbox::ParallelWorker::getThreadBoundIndices(
-        iThread_, GundamGlobals::getNumberOfThreads(),
+        iThread_, GundamGlobals::getNbCpuThreads(),
         int(histPtrToFillList.size())
     );
 

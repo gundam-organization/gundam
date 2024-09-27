@@ -39,7 +39,7 @@ LoggerInit([]{ Logger::setUserHeaderStr("[DataDispenser]"); });
 void DataDispenser::configureImpl(){
 
   // first of all
-  _threadPool_.setNThreads( GundamGlobals::getNumberOfThreads() );
+  _threadPool_.setNThreads(GundamGlobals::getNbCpuThreads() );
 
   GenericToolbox::Json::fillValue(_config_, _parameters_.name, "name");
   LogThrowIf(_parameters_.name.empty(), "Dataset name not set.");
@@ -231,7 +231,7 @@ void DataDispenser::doEventSelection(){
   ROOT::EnableThreadSafety();
 
   // how meaning buffers?
-  int nThreads{GundamGlobals::getNumberOfThreads()};
+  int nThreads{GundamGlobals::getNbCpuThreads()};
   if( _owner_->isDevSingleThreadEventSelection() ) { nThreads = 1; }
 
   Long64_t nEntries{0};
@@ -530,7 +530,7 @@ void DataDispenser::readAndFill(){
   }
 
   LogWarning << "Loading and indexing..." << std::endl;
-  if(not _owner_->isDevSingleThreadEventLoaderAndIndexer() and GundamGlobals::getNumberOfThreads() > 1 ){
+  if(not _owner_->isDevSingleThreadEventLoaderAndIndexer() and GundamGlobals::getNbCpuThreads() > 1 ){
     ROOT::EnableThreadSafety(); // EXTREMELY IMPORTANT
     _threadPool_.addJob(__METHOD_NAME__, [&](int iThread_){ this->fillFunction(iThread_); });
     _threadPool_.runJob(__METHOD_NAME__);
@@ -646,7 +646,7 @@ std::unique_ptr<TChain> DataDispenser::openChain(bool verbose_){
 
 void DataDispenser::eventSelectionFunction(int iThread_){
 
-  int nThreads{GundamGlobals::getNumberOfThreads()};
+  int nThreads{GundamGlobals::getNbCpuThreads()};
   if( iThread_ == -1 ){ iThread_ = 0; nThreads = 1; }
 
   // Opening ROOT file...
@@ -766,7 +766,7 @@ void DataDispenser::eventSelectionFunction(int iThread_){
 }
 void DataDispenser::fillFunction(int iThread_){
 
-  int nThreads = GundamGlobals::getNumberOfThreads();
+  int nThreads = GundamGlobals::getNbCpuThreads();
   if( iThread_ == -1 ){ iThread_ = 0; nThreads = 1; } // special mode
 
   auto treeChain = this->openChain();

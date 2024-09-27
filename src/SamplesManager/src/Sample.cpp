@@ -96,7 +96,7 @@ void Sample::shrinkEventList(size_t newTotalSize_){
   _eventList_.shrink_to_fit();
 }
 void Sample::updateBinEventList(int iThread_) {
-  int nbThreads = GundamGlobals::getNumberOfThreads();
+  int nbThreads = GundamGlobals::getNbCpuThreads();
   if( iThread_ == -1 ){ iThread_ = 0; nbThreads = 1; }
   // multithread technique with iBin += nbThreads;
   int iBin{iThread_};
@@ -114,7 +114,7 @@ void Sample::updateBinEventList(int iThread_) {
   }
 }
 void Sample::refillHistogram(int iThread_){
-  int nThreads = GundamGlobals::getNumberOfThreads();
+  int nThreads = GundamGlobals::getNbCpuThreads();
   if( iThread_ == -1 ){ nThreads = 1; iThread_ = 0; }
 
 #ifdef GUNDAM_USING_CACHE_MANAGER

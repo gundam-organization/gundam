@@ -265,7 +265,7 @@ void Propagator::copyEventsFrom(const Propagator& src_){
 void Propagator::initializeThreads() {
 
   _threadPool_ = GenericToolbox::ParallelWorker();
-  _threadPool_.setNThreads( GundamGlobals::getNumberOfThreads() );
+  _threadPool_.setNThreads(GundamGlobals::getNbCpuThreads() );
 
   _threadPool_.addJob(
       "Propagator::reweightEvents",
