@@ -23,6 +23,7 @@ namespace JointProbability{
     [[nodiscard]] double eval(const SamplePair& samplePair_, int bin_) const override;
 
     void createNominalMc(const Sample& modelSample_) const;
+    void printConfiguration() const;
 
     mutable int verboseLevel{0};
     bool throwIfInfLlh{false};
@@ -34,21 +35,13 @@ namespace JointProbability{
   };
 
   void BarlowBeestonBanff2022::configureImpl(){
+
     GenericToolbox::Json::fillValue(_config_, allowZeroMcWhenZeroData, "allowZeroMcWhenZeroData");
     GenericToolbox::Json::fillValue(_config_, usePoissonLikelihood, "usePoissonLikelihood");
     GenericToolbox::Json::fillValue(_config_, BBNoUpdateWeights, "BBNoUpdateWeights");
     GenericToolbox::Json::fillValue(_config_, verboseLevel, {{"verboseLevel"},{"isVerbose"}});
     GenericToolbox::Json::fillValue(_config_, throwIfInfLlh, "throwIfInfLlh");
 
-    LogInfo << "Using BarlowLLH_BANFF_OA2021 parameters:" << std::endl;
-    {
-      LogScopeIndent;
-      LogInfo << GET_VAR_NAME_VALUE(allowZeroMcWhenZeroData) << std::endl;
-      LogInfo << GET_VAR_NAME_VALUE(usePoissonLikelihood) << std::endl;
-      LogInfo << GET_VAR_NAME_VALUE(BBNoUpdateWeights) << std::endl;
-      LogInfo << GET_VAR_NAME_VALUE(verboseLevel) << std::endl;
-      LogInfo << GET_VAR_NAME_VALUE(throwIfInfLlh) << std::endl;
-    }
   }
   double BarlowBeestonBanff2022::eval(const SamplePair& samplePair_, int bin_) const {
     double dataVal = samplePair_.data->getHistogram().binList[bin_].content;
@@ -225,6 +218,19 @@ namespace JointProbability{
       nomHistErr.emplace_back( bin.error );
       LogTraceIf(verboseLevel >= 2) << modelSample_.getName() << ": " << bin.index << " -> " << bin.content << " / " << bin.error << std::endl;
     }
+  }
+  void BarlowBeestonBanff2022::printConfiguration() const{
+
+    LogInfo << "Using BarlowLLH_BANFF_OA2021 parameters:" << std::endl;
+    {
+      LogScopeIndent;
+      LogInfo << GET_VAR_NAME_VALUE(allowZeroMcWhenZeroData) << std::endl;
+      LogInfo << GET_VAR_NAME_VALUE(usePoissonLikelihood) << std::endl;
+      LogInfo << GET_VAR_NAME_VALUE(BBNoUpdateWeights) << std::endl;
+      LogInfo << GET_VAR_NAME_VALUE(verboseLevel) << std::endl;
+      LogInfo << GET_VAR_NAME_VALUE(throwIfInfLlh) << std::endl;
+    }
+
   }
 
 }

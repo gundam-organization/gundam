@@ -24,7 +24,6 @@ void MinimizerBase::configureImpl(){
   GenericToolbox::Json::fillValue(_config_, _isEnabledCalcError_, "enablePostFitErrorFit");
   GenericToolbox::Json::fillValue(_config_, _useNormalizedFitSpace_, "useNormalizedFitSpace");
 
-  LogWarning << "MinimizerBase configured." << std::endl;
 }
 void MinimizerBase::initializeImpl(){
   LogWarning << "Initializing MinimizerBase..." << std::endl;

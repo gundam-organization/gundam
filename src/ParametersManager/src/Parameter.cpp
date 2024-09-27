@@ -170,12 +170,15 @@ std::string Parameter::getTitle() const {
 std::string Parameter::getFullTitle() const{
   return _owner_->getName() + "/" + this->getTitle();
 }
-std::string Parameter::getSummary(bool shallow_) const {
+std::string Parameter::getSummary() const {
   std::stringstream ss;
 
   ss << this->getFullTitle();
-  ss << ", isEnabled=" << _isEnabled_;
-  if( not _isEnabled_ ){ return ss.str(); }
+
+  ss << ", ";
+  if( not _isEnabled_ ){ ss << GenericToolbox::ColorCodes::redBackground; }
+  ss << "isEnabled=" << _isEnabled_;
+  if( not _isEnabled_ ){ ss << GenericToolbox::ColorCodes::resetColor; return ss.str(); }
 
   ss << ": value=" << _parameterValue_;
   ss << ", prior=" << _priorValue_;

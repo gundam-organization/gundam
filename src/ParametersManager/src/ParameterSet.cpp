@@ -322,15 +322,15 @@ void ParameterSet::processCovarianceMatrix(){
         eigenPar.setMinValue( _parameterList_[eigenPar.getParameterIndex()].getMinValue() );
         eigenPar.setMaxValue( _parameterList_[eigenPar.getParameterIndex()].getMaxValue() );
 
-        LogThrowIf( not std::isnan(eigenPar.getMinValue()) and eigenPar.getPriorValue() < eigenPar.getMinValue(), "PRIOR IS BELLOW MIN: " << eigenPar.getSummary(true) );
-        LogThrowIf( not std::isnan(eigenPar.getMaxValue()) and eigenPar.getPriorValue() > eigenPar.getMaxValue(), "PRIOR IS ABOVE MAX: " << eigenPar.getSummary(true) );
+        LogThrowIf( not std::isnan(eigenPar.getMinValue()) and eigenPar.getPriorValue() < eigenPar.getMinValue(), "PRIOR IS BELLOW MIN: " << eigenPar.getSummary() );
+        LogThrowIf( not std::isnan(eigenPar.getMaxValue()) and eigenPar.getPriorValue() > eigenPar.getMaxValue(), "PRIOR IS ABOVE MAX: " << eigenPar.getSummary() );
       }
       else{
         eigenPar.setMinValue( _eigenParRange_.min );
         eigenPar.setMaxValue( _eigenParRange_.max );
 
-        LogThrowIf( not std::isnan(eigenPar.getMinValue()) and eigenPar.getPriorValue() < eigenPar.getMinValue(), "Prior value is bellow min: " << eigenPar.getSummary(true) );
-        LogThrowIf( not std::isnan(eigenPar.getMaxValue()) and eigenPar.getPriorValue() > eigenPar.getMaxValue(), "Prior value is above max: " << eigenPar.getSummary(true) );
+        LogThrowIf( not std::isnan(eigenPar.getMinValue()) and eigenPar.getPriorValue() < eigenPar.getMinValue(), "Prior value is bellow min: " << eigenPar.getSummary() );
+        LogThrowIf( not std::isnan(eigenPar.getMaxValue()) and eigenPar.getPriorValue() > eigenPar.getMaxValue(), "Prior value is above max: " << eigenPar.getSummary() );
       }
     }
 
@@ -425,14 +425,14 @@ void ParameterSet::throwParameters(bool rethrowIfNotInPhysical_, double gain_){
                 and par.getThrowValue() < par.getMinValue() ){
               throwIsValid = false;
               LogAlert << "thrown value lower than min bound -> "
-                       << par.getSummary(true) << std::endl;
+                       << par.getSummary() << std::endl;
               break;
             }
             if( not std::isnan(par.getMaxValue())
                 and par.getThrowValue() > par.getMaxValue() ){
               throwIsValid = false;
               LogAlert <<"thrown value higher than max bound -> "
-                       << par.getSummary(true) << std::endl;
+                       << par.getSummary() << std::endl;
               break;
             }
 
@@ -441,14 +441,14 @@ void ParameterSet::throwParameters(bool rethrowIfNotInPhysical_, double gain_){
                 and par.getThrowValue() < par.getMinPhysical() ){
               throwIsValid = false;
               LogAlert << "thrown value lower than min physical bound -> "
-                       << par.getSummary(true) << std::endl;
+                       << par.getSummary() << std::endl;
               break;
             }
             if( not std::isnan(par.getMaxPhysical())
                 and par.getThrowValue() > par.getMaxPhysical() ){
               throwIsValid = false;
               LogAlert <<"thrown value higher than max physical bound -> "
-                       << par.getSummary(true) << std::endl;
+                       << par.getSummary() << std::endl;
               break;
             }
           }
@@ -545,12 +545,12 @@ void ParameterSet::throwParameters(bool rethrowIfNotInPhysical_, double gain_){
           if( not std::isnan(par.getMinValue()) and par.getParameterValue() < par.getMinValue() ){
             throwIsValid = false;
             LogAlert << GenericToolbox::ColorCodes::redLightText << "thrown value lower than min bound -> " << GenericToolbox::ColorCodes::resetColor
-                     << par.getSummary(true) << std::endl;
+                     << par.getSummary() << std::endl;
           }
           else if( not std::isnan(par.getMaxValue()) and par.getParameterValue() > par.getMaxValue() ){
             throwIsValid = false;
             LogAlert << GenericToolbox::ColorCodes::redLightText <<"thrown value higher than max bound -> " << GenericToolbox::ColorCodes::resetColor
-                     << par.getSummary(true) << std::endl;
+                     << par.getSummary() << std::endl;
           }
         }
 
@@ -978,8 +978,8 @@ void ParameterSet::defineParameters(){
     if( _parameterLowerBoundsList_ != nullptr ){ par.setMinValue((*_parameterLowerBoundsList_)[par.getParameterIndex()]); }
     if( _parameterUpperBoundsList_ != nullptr ){ par.setMaxValue((*_parameterUpperBoundsList_)[par.getParameterIndex()]); }
 
-    LogThrowIf( not std::isnan(par.getMinValue()) and par.getPriorValue() < par.getMinValue(), "PRIOR IS BELLOW MIN: " << par.getSummary(true) );
-    LogThrowIf( not std::isnan(par.getMaxValue()) and par.getPriorValue() > par.getMaxValue(), "PRIOR IS ABOVE MAX: " << par.getSummary(true) );
+    LogThrowIf( not std::isnan(par.getMinValue()) and par.getPriorValue() < par.getMinValue(), "PRIOR IS BELLOW MIN: " << par.getSummary() );
+    LogThrowIf( not std::isnan(par.getMaxValue()) and par.getPriorValue() > par.getMaxValue(), "PRIOR IS ABOVE MAX: " << par.getSummary() );
 
     if( not _parameterDefinitionConfig_.empty() ){
       // Alternative 1: define dials then parameters

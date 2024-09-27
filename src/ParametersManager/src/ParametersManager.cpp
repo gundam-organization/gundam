@@ -243,13 +243,13 @@ void ParametersManager::throwParametersFromGlobalCovariance(bool quietVerbose_){
       if( not std::isnan(parPtr->getMinPhysical()) and parPtr->getParameterValue() < parPtr->getMinPhysical() ){
         rethrow = true;
         LogAlert << "thrown value lower than physical min bound -> "
-                 << parPtr->getSummary(true) << std::endl;
+                 << parPtr->getSummary() << std::endl;
         break;
       }
       if( not std::isnan(parPtr->getMaxPhysical()) and parPtr->getParameterValue() > parPtr->getMaxPhysical() ){
         rethrow = true;
         LogAlert << "thrown value higher than physical max bound -> "
-                 << parPtr->getSummary(true) << std::endl;
+                 << parPtr->getSummary() << std::endl;
         break;
       }
     }

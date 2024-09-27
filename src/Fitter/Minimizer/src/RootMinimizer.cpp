@@ -26,6 +26,7 @@ LoggerInit([]{ Logger::setUserHeaderStr("[RootMinimizer]"); });
 #endif
 
 void RootMinimizer::configureImpl(){
+  LogDebugIf(GundamGlobals::isDebugConfig()) << "Configuring RootMinimizer..." << std::endl;
 
   // read general parameters first
   this->MinimizerBase::configureImpl();
@@ -54,7 +55,6 @@ void RootMinimizer::configureImpl(){
   GenericToolbox::Json::fillValue(_config_, _stepSizeScaling_, "stepSizeScaling");
   GenericToolbox::Json::fillValue(_config_, _restoreStepSizeBeforeHesse_, "restoreStepSizeBeforeHesse");
 
-  LogWarning << "RootMinimizer configured." << std::endl;
 }
 void RootMinimizer::initializeImpl(){
   MinimizerBase::initializeImpl();

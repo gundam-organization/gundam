@@ -26,7 +26,6 @@ void LikelihoodInterface::configureImpl(){
   // allows to implement
   GenericToolbox::Json::fillValue(_config_, _modelPropagator_.getConfig(), "propagatorConfig");
   _modelPropagator_.configure();
-  _modelPropagator_.printConfiguration();
 
   JsonType dataSetListConfig{};
   JsonType jointProbabilityConfig{};
@@ -75,7 +74,7 @@ void LikelihoodInterface::configureImpl(){
   // new config structure
   GenericToolbox::Json::fillValue(_config_, jointProbabilityConfig, "jointProbabilityConfig");
   GenericToolbox::Json::fillValue(jointProbabilityConfig, jointProbabilityTypeStr, "type");
-  LogInfo << "Using \"" << jointProbabilityTypeStr << "\" JointProbabilityType." << std::endl;
+  LogDebugIf(GundamGlobals::isDebugConfig()) << "Using \"" << jointProbabilityTypeStr << "\" JointProbabilityType." << std::endl;
   _jointProbabilityPtr_ = std::shared_ptr<JointProbability::JointProbabilityBase>( JointProbability::makeJointProbability( jointProbabilityTypeStr ) );
   _jointProbabilityPtr_->setConfig( jointProbabilityConfig );
   _jointProbabilityPtr_->configure();
@@ -90,7 +89,9 @@ void LikelihoodInterface::configureImpl(){
   GenericToolbox::Json::fillValue(_config_, _gaussStatThrowInToys_, "gaussStatThrowInToys");
   GenericToolbox::Json::fillValue(_config_, _enableEventMcThrow_, "enableEventMcThrow");
 
-  LogWarning << "LikelihoodInterface configured." << std::endl;
+
+  // TODO: move it outside
+  _modelPropagator_.printConfiguration();
 }
 void LikelihoodInterface::initializeImpl() {
   LogWarning << "Initializing LikelihoodInterface..." << std::endl;

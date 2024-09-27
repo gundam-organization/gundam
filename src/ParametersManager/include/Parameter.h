@@ -168,7 +168,7 @@ public:
   /// setStdDevvalue()).  This is a signed difference.
   [[nodiscard]] double getDistanceFromNominal() const;
 
-  [[nodiscard]] std::string getSummary(bool shallow_=false) const;
+  [[nodiscard]] std::string getSummary() const;
   [[nodiscard]] std::string getTitle() const;
   [[nodiscard]] std::string getFullTitle() const;
 

@@ -46,7 +46,7 @@ void DataDispenser::configureImpl(){
 
   // histograms don't need other parameters
   if( GenericToolbox::Json::doKeyExist( _config_, "fromHistContent" ) ) {
-    LogWarning << "Dataset \"" << _parameters_.name << "\" will be defined with histogram data." << std::endl;
+    LogDebugIf(GundamGlobals::isDebugConfig()) << "Dataset \"" << _parameters_.name << "\" will be defined with histogram data." << std::endl;
     auto fromHistConfig( GenericToolbox::Json::fetchValue<JsonType>(_config_, "fromHistContent") );
 
     _parameters_.fromHistContent.isEnabled = true;
