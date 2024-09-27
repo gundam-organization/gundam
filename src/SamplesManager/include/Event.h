@@ -5,6 +5,7 @@
 #ifndef GUNDAM_EVENT_H
 #define GUNDAM_EVENT_H
 
+#include "VariableCollection.h"
 #include "EventUtils.h"
 #include "DataBinSet.h"
 #include "DataBin.h"
@@ -28,12 +29,12 @@ public:
   // const getters
   [[nodiscard]] const EventUtils::Indices& getIndices() const{ return _indices_; }
   [[nodiscard]] const EventUtils::Weights& getWeights() const{ return _weights_; }
-  [[nodiscard]] const EventUtils::Variables& getVariables() const{ return _variables_; }
+  [[nodiscard]] const VariableCollection& getVariables() const{ return _variables_; }
 
   // mutable getters
   EventUtils::Indices& getIndices(){ return _indices_; }
   EventUtils::Weights& getWeights(){ return _weights_; }
-  EventUtils::Variables& getVariables(){ return _variables_; }
+  VariableCollection& getVariables(){ return _variables_; }
 
   // const core
   [[nodiscard]] double getEventWeight() const;
@@ -48,7 +49,7 @@ private:
   // internals
   EventUtils::Indices _indices_{};
   EventUtils::Weights _weights_{};
-  EventUtils::Variables _variables_{};
+  VariableCollection _variables_{};
 
 #ifdef GUNDAM_USING_CACHE_MANAGER
   friend class Cache::Manager;
@@ -58,15 +59,6 @@ private:
 #endif
 
 };
-
-
-// TEMPLATES IMPLEMENTATION
-//template<typename T> auto Event::getVarValue( const std::string &leafName_, size_t arrayIndex_) const -> T {
-//  return this->getVariable<T>(leafName_, arrayIndex_);
-//}
-//template<typename T> auto Event::getVariable( const std::string& leafName_, size_t arrayIndex_) const -> const T&{
-//  return this->getVariableAsAnyType(leafName_, arrayIndex_).template getValue<T>();
-//}
 
 
 #endif //GUNDAM_EVENT_H
