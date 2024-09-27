@@ -2,34 +2,34 @@
 // Created by Nadrino on 19/05/2021.
 //
 
-#ifndef GUNDAM_DATABINSET_H
-#define GUNDAM_DATABINSET_H
+#ifndef GUNDAM_BINSET_H
+#define GUNDAM_BINSET_H
 
 
-#include "DataBin.h"
+#include "Bin.h"
 
 #include <vector>
 #include <string>
 
 
-class DataBinSet {
+class BinSet {
 
 public:
   // static
   static void setVerbosity(int maxLogLevel_);
 
 public:
-  DataBinSet() = default;
+  BinSet() = default;
 
   // setter
   void setName(const std::string &name){ _name_ = name; }
 
   // const getters
   [[nodiscard]] const std::string &getFilePath() const { return _filePath_; }
-  [[nodiscard]] const std::vector<DataBin> &getBinList() const { return _binList_; }
+  [[nodiscard]] const std::vector<Bin> &getBinList() const { return _binList_; }
 
   // getters
-  std::vector<DataBin> &getBinList() { return _binList_; }
+  std::vector<Bin> &getBinList() { return _binList_; }
 
   // core
   void readBinningDefinition(const JsonType& binning_);
@@ -48,9 +48,9 @@ protected:
 private:
   std::string _name_;
   std::string _filePath_;
-  std::vector<DataBin> _binList_{};
+  std::vector<Bin> _binList_{};
 
 };
 
 
-#endif //GUNDAM_DATABINSET_H
+#endif //GUNDAM_BINSET_H

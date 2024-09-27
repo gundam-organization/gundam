@@ -767,16 +767,16 @@ void PlotGenerator::defineHistogramHolders() {
                 for( const auto& bin : sample.getBinning().getBinList() ){
                   std::string variableNameForBinning{sampleObsBinning};
 
-                  if( not GenericToolbox::doesElementIsInVector(sampleObsBinning, bin.getEdgesList(), [](const DataBin::Edges& e){ return e.varName; }) ){
+                  if( not GenericToolbox::doesElementIsInVector(sampleObsBinning, bin.getEdgesList(), [](const Bin::Edges& e){ return e.varName; }) ){
                     for( auto& sampleVar : histDef.sampleVariableIfNotAvailable ){
-                      if( GenericToolbox::doesElementIsInVector(sampleVar, bin.getEdgesList(), [](const DataBin::Edges& e){ return e.varName; }) ){
+                      if( GenericToolbox::doesElementIsInVector(sampleVar, bin.getEdgesList(), [](const Bin::Edges& e){ return e.varName; }) ){
                         variableNameForBinning = sampleVar;
                         break;
                       }
                     }
                   } // sampleObsBinning not in the sample binning
 
-                  const DataBin::Edges* edges{bin.getVarEdgesPtr(variableNameForBinning)};
+                  const Bin::Edges* edges{bin.getVarEdgesPtr(variableNameForBinning)};
                   if( edges == nullptr ){
                     LogAlert << "Can't use sample binning for var " << variableNameForBinning << " and sample " << sample.getName() << std::endl;
                     varNotAvailable = true;

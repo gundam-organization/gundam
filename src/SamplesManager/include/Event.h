@@ -7,8 +7,8 @@
 
 #include "VariableCollection.h"
 #include "EventUtils.h"
-#include "DataBinSet.h"
-#include "DataBin.h"
+#include "BinSet.h"
+#include "Bin.h"
 
 #include "GenericToolbox.Utils.h"
 
@@ -40,7 +40,7 @@ public:
   [[nodiscard]] double getEventWeight() const;
 
   // misc
-  void fillBinIndex(const DataBinSet& binSet_){ _indices_.bin = _variables_.findBinIndex(binSet_); }
+  void fillBinIndex(const BinSet& binSet_){ _indices_.bin = _variables_.findBinIndex(binSet_); }
 
   [[nodiscard]] std::string getSummary() const;
   friend std::ostream& operator <<( std::ostream& o, const Event& this_ ){ o << this_.getSummary(); return o; }

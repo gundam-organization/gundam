@@ -17,7 +17,7 @@
 
 
 
-class DataBin : public JsonBaseClass {
+class Bin : public JsonBaseClass {
 
 public:
   class Edges : public JsonBaseClass {
@@ -47,8 +47,8 @@ protected:
   void configureImpl() override;
 
 public:
-  DataBin() = delete;
-  explicit DataBin(int index_) : _index_(index_) {}
+  Bin() = delete;
+  explicit Bin( int index_) : _index_(index_) {}
 
   // setters
   void setIndex(int index_){ _index_ = index_; }
@@ -75,7 +75,7 @@ public:
   [[nodiscard]] double getVolume() const;
 
   // Management
-  [[nodiscard]] bool isOverlapping(const DataBin& other_) const;
+  [[nodiscard]] bool isOverlapping(const Bin& other_) const;
   [[nodiscard]] bool isInBin(const std::vector<double>& valuesList_) const;
   [[nodiscard]] bool isVariableSet(const std::string& variableName_) const;
   [[nodiscard]] bool isBetweenEdges(const std::string& variableName_, double value_) const;

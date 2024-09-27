@@ -87,7 +87,7 @@ public:
   // (e.g. it might be an tabulated event-by-event dial).
   [[nodiscard]] const std::string &getGlobalDialLeafName() const{ return _globalDialLeafName_; }
 
-  [[nodiscard]] const DataBinSet &getDialBinSet() const{ return _dialBinSet_; }
+  [[nodiscard]] const BinSet &getDialBinSet() const{ return _dialBinSet_; }
   [[nodiscard]] const std::vector<std::string> &getDataSetNameList() const{ return _dataSetNameList_; }
 
   // A formula to decide if the dial should be applied to an event.  The dial
@@ -95,7 +95,7 @@ public:
   [[nodiscard]] const std::shared_ptr<TFormula> &getApplyConditionFormula() const{ return _applyConditionFormula_; }
 
   // non-const getters
-  DataBinSet &getDialBinSet(){ return _dialBinSet_; }
+  BinSet &getDialBinSet(){ return _dialBinSet_; }
 
   // Vector of object to calculate the response for this dial.  There will be
   // one DialBaseObject per event, or one DialBaseObject for each bin (for
@@ -206,7 +206,7 @@ private:
   // internal
   int _supervisedParameterIndex_{-1};
   int _supervisedParameterSetIndex_{-1};
-  DataBinSet _dialBinSet_{};
+  BinSet _dialBinSet_{};
 
   // One interface per DialBase.  The interface groups the input buffer,
   // response supervisor, dialBase (what actually calculates the weight) into

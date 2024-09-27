@@ -3,7 +3,7 @@
 //
 
 #include "ParameterSet.h"
-#include "DataBinSet.h"
+#include "BinSet.h"
 
 #include "GundamGlobals.h"
 #include "ParameterThrowerMarkHarz.h"
@@ -99,7 +99,7 @@ void ParameterSet::configureImpl(){
         if( parameterBinning.empty() ){ continue; }
 
         LogInfo << "Found parameter binning within dialSetDefinition. Defining parameters number..." << std::endl;
-        DataBinSet b;
+        BinSet b;
         b.readBinningDefinition( parameterBinning );
         // DON'T SORT THE BINNING -> tide to the cov matrix
         _nbParameterDefinition_ = int(b.getBinList().size());

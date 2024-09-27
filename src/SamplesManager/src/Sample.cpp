@@ -49,12 +49,12 @@ bool Sample::isDatasetValid(const std::string& datasetName_){
   );
 }
 
-void Sample::buildHistogram(const DataBinSet& binning_){
+void Sample::buildHistogram(const BinSet& binning_){
   _histogram_.binList.reserve(binning_.getBinList().size() );
   int iBin{0};
   for( auto& bin : binning_.getBinList() ){
     _histogram_.binList.emplace_back();
-    _histogram_.binList.back().dataBinPtr = &bin;
+    _histogram_.binList.back().binPtr = &bin;
     _histogram_.binList.back().index = iBin++;
   }
   _histogram_.nBins = int( _histogram_.binList.size() );
@@ -130,7 +130,7 @@ void Sample::refillHistogram(int iThread_){
   // Faster than pointer shifter. -> would be slower if refillHistogram is
   // handled by the propagator
   int iBin = iThread_; // iBin += nbThreads;
-  Histogram::Bin* binPtr;
+  Histogram::BinContext* binPtr;
   double buffer{};
   while( iBin < _histogram_.nBins ){
     bool binFilled = false;

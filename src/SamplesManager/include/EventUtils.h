@@ -5,8 +5,8 @@
 #ifndef GUNDAM_EVENT_UTILS_H
 #define GUNDAM_EVENT_UTILS_H
 
-#include "DataBin.h"
-#include "DataBinSet.h"
+#include "Bin.h"
+#include "BinSet.h"
 
 #include "GenericToolbox.Utils.h"
 #include "GenericToolbox.Root.h"

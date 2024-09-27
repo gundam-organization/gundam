@@ -6,7 +6,7 @@
 #define GUNDAM_VARIABLE_COLLECTION_H
 
 #include "VariableHolder.h"
-#include "DataBinSet.h"
+#include "BinSet.h"
 
 #include "GenericToolbox.Utils.h" // Any objects
 
@@ -47,9 +47,9 @@ public:
   VariableHolder& fetchVariable( const std::string& name_);
 
   // bin tools
-  [[nodiscard]] bool isInBin(const DataBin& bin_) const;
-  [[nodiscard]] int findBinIndex(const std::vector<DataBin>& binList_) const;
-  [[nodiscard]] int findBinIndex(const DataBinSet& binSet_) const;
+  [[nodiscard]] bool isInBin(const Bin& bin_) const;
+  [[nodiscard]] int findBinIndex(const std::vector<Bin>& binList_) const;
+  [[nodiscard]] int findBinIndex(const BinSet& binSet_) const;
 
   // formula
   [[nodiscard]] double evalFormula(const TFormula* formulaPtr_, std::vector<int>* indexDict_ = nullptr) const;

@@ -2,7 +2,7 @@
 // Created by Nadrino on 19/05/2021.
 //
 
-#include "DataBinSet.h"
+#include "BinSet.h"
 #include "ConfigUtils.h"
 
 
@@ -16,10 +16,10 @@
 LoggerInit([]{ Logger::setUserHeaderStr("[DataBinSet]"); });
 #endif
 
-void DataBinSet::setVerbosity(int maxLogLevel_){ Logger::setMaxLogLevel(maxLogLevel_); }
+void BinSet::setVerbosity( int maxLogLevel_){ Logger::setMaxLogLevel(maxLogLevel_); }
 
 // core
-void DataBinSet::readBinningDefinition(const JsonType& binning_) {
+void BinSet::readBinningDefinition( const JsonType& binning_) {
 
   _binList_.clear();
 
@@ -44,7 +44,7 @@ void DataBinSet::readBinningDefinition(const JsonType& binning_) {
   this->checkBinning();
 }
 
-void DataBinSet::checkBinning(){
+void BinSet::checkBinning(){
 
   bool hasErrors{false};
 
@@ -63,7 +63,7 @@ void DataBinSet::checkBinning(){
   LogThrowIf(hasErrors);
 
 }
-void DataBinSet::sortBins(){
+void BinSet::sortBins(){
 
   /// DON'T SORT THE BINS FOR DIALS!!! THE ORDER MIGHT REFER TO THE COV MATRIX DEFINITION
 
@@ -93,7 +93,7 @@ void DataBinSet::sortBins(){
 //  }
 
 }
-std::string DataBinSet::getSummary() const{
+std::string BinSet::getSummary() const{
   std::stringstream ss;
   ss << "DataBinSet";
   if( not _name_.empty() ) ss << "(" << _name_ << ")";
@@ -108,11 +108,11 @@ std::string DataBinSet::getSummary() const{
 }
 
 
-void DataBinSet::sortBinEdges(){
+void BinSet::sortBinEdges(){
   for( auto& bin : _binList_ ){
     std::sort(
         bin.getEdgesList().begin(), bin.getEdgesList().end(),
-        [](const DataBin::Edges& edges1_, const DataBin::Edges& edges2_){
+        []( const Bin::Edges& edges1_, const Bin::Edges& edges2_){
           if( edges1_.isConditionVar and not edges2_.isConditionVar ){ return true; }
           if( not edges1_.isConditionVar and edges2_.isConditionVar ){ return false; }
           return GenericToolbox::toLowerCase(edges1_.varName) < GenericToolbox::toLowerCase(edges2_.varName);
@@ -122,7 +122,7 @@ void DataBinSet::sortBinEdges(){
     for( int iEdges = 0 ; iEdges < int(bin.getEdgesList().size()) ; iEdges++ ){ bin.getEdgesList()[iEdges].index = iEdges; }
   }
 }
-std::vector<std::string> DataBinSet::buildVariableNameList() const{
+std::vector<std::string> BinSet::buildVariableNameList() const{
   std::vector<std::string> out;
   for( auto& bin : _binList_ ){
     for( auto& edges : bin.getEdgesList() ){
@@ -133,7 +133,7 @@ std::vector<std::string> DataBinSet::buildVariableNameList() const{
 }
 
 
-void DataBinSet::readTxtBinningDefinition(){
+void BinSet::readTxtBinningDefinition(){
 
   auto lines = GenericToolbox::dumpFileAsVectorString(_filePath_);
 
@@ -249,7 +249,7 @@ void DataBinSet::readTxtBinningDefinition(){
 
 }
 
-void DataBinSet::readBinningConfig(const JsonType& binning_){
+void BinSet::readBinningConfig( const JsonType& binning_){
 
   if( GenericToolbox::Json::doKeyExist(binning_, {"binningDefinition"}) ){
 

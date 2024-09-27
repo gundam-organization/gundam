@@ -329,7 +329,7 @@ int main(int argc, char** argv){
         // do we skip this bin? if not, apply coefficient
         bool skipBin{true};
         for( size_t iParBin = 0 ; iParBin < dialCollectionPtr->getDialBinSet().getBinList().size() ; iParBin++ ){
-          const DataBin& parBin = dialCollectionPtr->getDialBinSet().getBinList()[iParBin];
+          const Bin& parBin = dialCollectionPtr->getDialBinSet().getBinList()[iParBin];
 
           bool isParBinValid{true};
 

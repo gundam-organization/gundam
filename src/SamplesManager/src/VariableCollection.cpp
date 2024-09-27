@@ -48,10 +48,10 @@ VariableHolder& VariableCollection::fetchVariable( const std::string& name_){
 }
 
 // bin tools
-bool VariableCollection::isInBin( const DataBin& bin_) const{
+bool VariableCollection::isInBin( const Bin& bin_) const{
   return std::all_of(
       bin_.getEdgesList().begin(), bin_.getEdgesList().end(),
-      [&](const DataBin::Edges& edges_){
+      [&](const Bin::Edges& edges_){
         return bin_.isBetweenEdges(
             edges_,
             ( edges_.varIndexCache != -1 ?
@@ -62,18 +62,18 @@ bool VariableCollection::isInBin( const DataBin& bin_) const{
       }
   );
 }
-int VariableCollection::findBinIndex( const std::vector<DataBin>& binList_) const{
+int VariableCollection::findBinIndex( const std::vector<Bin>& binList_) const{
   if( binList_.empty() ){ return -1; }
 
   auto dialItr = std::find_if(
       binList_.begin(), binList_.end(),
-      [&](const DataBin& bin_){ return this->isInBin(bin_); }
+      [&](const Bin& bin_){ return this->isInBin(bin_); }
   );
 
   if ( dialItr == binList_.end() ){ return -1; }
   return int( std::distance( binList_.begin(), dialItr ) );
 }
-int VariableCollection::findBinIndex( const DataBinSet& binSet_) const{ return this->findBinIndex(binSet_.getBinList() ); }
+int VariableCollection::findBinIndex( const BinSet& binSet_) const{ return this->findBinIndex(binSet_.getBinList() ); }
 
 // formula
 double VariableCollection::evalFormula( const TFormula* formulaPtr_, std::vector<int>* indexDict_) const{
