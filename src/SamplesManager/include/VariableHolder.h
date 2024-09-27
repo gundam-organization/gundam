@@ -6,7 +6,6 @@
 #define GUNDAM_VARIABLE_HOLDER_H
 
 #include "GenericToolbox.Utils.h"
-#include "GenericToolbox.Root.h"
 
 
 class VariableHolder{
@@ -24,7 +23,7 @@ public:
 
   // setters
   template<typename T>void set(const T& value_){ var = value_; updateCache(); }
-  void set(const GenericToolbox::LeafForm& leafForm_);
+  void set(void *src_, size_t size_);
 
   // const-getters
   [[nodiscard]] const GenericToolbox::AnyType& get() const { return var; }
@@ -42,6 +41,13 @@ private:
   double cache{std::nan("unset")};
 
 };
+
+
+inline void VariableHolder::set(void *src_, size_t size_){
+  memcpy(var.getPlaceHolderPtr()->getVariableAddress(), src_, size_);
+  updateCache();
+}
+
 
 
 #endif //GUNDAM_VARIABLE_HOLDER_H

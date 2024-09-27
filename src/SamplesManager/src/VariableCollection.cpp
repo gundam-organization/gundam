@@ -15,23 +15,6 @@ void VariableCollection::setVarNameList( const std::shared_ptr<std::vector<std::
   _varList_.resize(_nameListPtr_->size());
 }
 
-// memory
-void VariableCollection::allocateMemory( const std::vector<const GenericToolbox::LeafForm*>& leafFormList_){
-  LogThrowIf( _nameListPtr_ == nullptr, "var name list not set." );
-  LogThrowIf( _nameListPtr_->size() != leafFormList_.size(), "size mismatch." );
-
-  auto nLeaf{_nameListPtr_->size()};
-  for(size_t iVar = 0 ; iVar < nLeaf ; iVar++ ){
-    _varList_[iVar].set(GenericToolbox::leafToAnyType( leafFormList_[iVar]->getLeafTypeName() ));
-  }
-}
-void VariableCollection::copyData( const std::vector<const GenericToolbox::LeafForm*>& leafFormList_){
-  size_t nLeaf{leafFormList_.size()};
-  for( size_t iLeaf = 0 ; iLeaf < nLeaf ; iLeaf++ ){
-    _varList_[iLeaf].set( *leafFormList_[iLeaf] );
-  }
-}
-
 int VariableCollection::findVarIndex( const std::string& leafName_, bool throwIfNotFound_) const{
   LogThrowIf(_nameListPtr_ == nullptr, "Can't " << __METHOD_NAME__ << " while _commonLeafNameListPtr_ is empty.");
   int out{GenericToolbox::findElementIndex(leafName_, *_nameListPtr_)};
@@ -74,19 +57,6 @@ int VariableCollection::findBinIndex( const std::vector<Bin>& binList_) const{
   return int( std::distance( binList_.begin(), dialItr ) );
 }
 int VariableCollection::findBinIndex( const BinSet& binSet_) const{ return this->findBinIndex(binSet_.getBinList() ); }
-
-// formula
-double VariableCollection::evalFormula( const TFormula* formulaPtr_, std::vector<int>* indexDict_) const{
-  LogThrowIf(formulaPtr_ == nullptr, GET_VAR_NAME_VALUE(formulaPtr_));
-
-  std::vector<double> parArray(formulaPtr_->GetNpar());
-  for( int iPar = 0 ; iPar < formulaPtr_->GetNpar() ; iPar++ ){
-    if(indexDict_ != nullptr){ parArray[iPar] = _varList_[(*indexDict_)[iPar]].getVarAsDouble(); }
-    else                     { parArray[iPar] = this->fetchVariable(formulaPtr_->GetParName(iPar)).getVarAsDouble(); }
-  }
-
-  return formulaPtr_->EvalPar(nullptr, &parArray[0]);
-}
 
 // printout
 std::string VariableCollection::getSummary() const{

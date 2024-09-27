@@ -37,10 +37,6 @@ public:
   // mutable-getters
   std::vector<VariableHolder>& getVarList(){ return _varList_; }
 
-  // memory
-  void allocateMemory(const std::vector<const GenericToolbox::LeafForm*>& leafFormList_);
-  void copyData(const std::vector<const GenericToolbox::LeafForm*>& leafFormList_);
-
   // fetch
   [[nodiscard]] int findVarIndex( const std::string& leafName_, bool throwIfNotFound_ = true) const;
   [[nodiscard]] const VariableHolder& fetchVariable( const std::string& name_) const;
@@ -50,9 +46,6 @@ public:
   [[nodiscard]] bool isInBin(const Bin& bin_) const;
   [[nodiscard]] int findBinIndex(const std::vector<Bin>& binList_) const;
   [[nodiscard]] int findBinIndex(const BinSet& binSet_) const;
-
-  // formula
-  [[nodiscard]] double evalFormula(const TFormula* formulaPtr_, std::vector<int>* indexDict_ = nullptr) const;
 
   // printouts
   [[nodiscard]] std::string getSummary() const;

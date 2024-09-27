@@ -9,7 +9,6 @@
 #include "BinSet.h"
 
 #include "GenericToolbox.Utils.h"
-#include "GenericToolbox.Root.h"
 
 #include <iostream>
 #include <string>
@@ -21,7 +20,7 @@ namespace EventUtils{
 
     // source
     int dataset{-1}; // which DatasetDefinition?
-    Long64_t entry{-1}; // which entry of the TChain?
+    long long entry{-1}; // which entry of the TChain?
 
     // destination
     int sample{-1}; // this information is lost in the EventDialCache manager

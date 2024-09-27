@@ -9,6 +9,8 @@
 #include "Event.h"
 #include "BinSet.h"
 
+#include "GenericToolbox.Root.h"
+
 #include <TH1D.h>
 
 #include <vector>

@@ -4,11 +4,6 @@
 
 #include "EventUtils.h"
 
-#include "GenericToolbox.Vector.h"
-#include "GenericToolbox.String.h"
-#include "GenericToolbox.Macro.h"
-#include "Logger.h"
-
 #include <sstream>
 
 #ifndef DISABLE_USER_HEADER
