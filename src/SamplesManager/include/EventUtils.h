@@ -11,10 +11,8 @@
 #include "GenericToolbox.Utils.h"
 #include "GenericToolbox.Root.h"
 
-#include <RtypesCore.h> // ROOT types
-
-#include <string>
 #include <iostream>
+#include <string>
 
 
 namespace EventUtils{

@@ -6,12 +6,10 @@
 #include "GundamGlobals.h"
 #include "GundamAlmostEqual.h"
 
-
 #include "Logger.h"
 
 #include <string>
 #include <memory>
-
 
 #ifndef DISABLE_USER_HEADER
 LoggerInit([]{ Logger::setUserHeaderStr("[Sample]"); });

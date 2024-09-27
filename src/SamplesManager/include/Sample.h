@@ -10,7 +10,6 @@
 #include "DataBinSet.h"
 
 #include <TH1D.h>
-#include <TTreeFormula.h>
 
 #include <vector>
 #include <string>

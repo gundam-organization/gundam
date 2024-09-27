@@ -4,13 +4,9 @@
 
 
 #include "SampleSet.h"
-
 #include "GundamGlobals.h"
 
-
 #include "Logger.h"
-
-#include <TTreeFormulaManager.h>
 
 #include <memory>
 
