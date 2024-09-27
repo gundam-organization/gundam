@@ -11,7 +11,6 @@
 #include "Logger.h"
 
 #include "TDirectory.h"
-#include "TObject.h"
 
 #include <map>
 #include <string>

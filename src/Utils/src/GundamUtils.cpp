@@ -6,8 +6,8 @@
 #include "VersionConfig.h" // the only place it is included
 #include "SourceConfig.h" // the only place it is included
 
+#include "GenericToolbox.Fs.h"
 #include "Logger.h"
-#include "GenericToolbox.Root.h"
 
 #include <sstream>
 
@@ -80,7 +80,7 @@ namespace GundamUtils {
             }
 
             // cleanup from special chars
-            arg = GenericToolbox::generateCleanBranchName(arg);
+            arg = GenericToolbox::generateCleanFileName(arg);
 
             if( not arg.empty() ){
               if( not appendixList.back().empty() ){ appendixList.back() += "_"; }
