@@ -7,7 +7,6 @@
 #include "GundamGlobals.h"
 #include "GundamAlmostEqual.h"
 
-#include "GenericToolbox.Root.h"
 #include "Logger.h"
 
 #include <cmath>
