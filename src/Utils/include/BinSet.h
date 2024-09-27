@@ -38,8 +38,10 @@ public:
 
   // utils
   void sortBinEdges();
-  void sortBins();
   [[nodiscard]] std::vector<std::string> buildVariableNameList() const;
+
+  // caused a lot of problem
+  [[deprecated("don't sort bins. let the user ordering.")]] void sortBins();
 
 protected:
   void readTxtBinningDefinition();    // original txt

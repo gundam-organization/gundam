@@ -32,7 +32,6 @@ void Sample::configureImpl(){
 
   LogDebugIf(GundamGlobals::isDebugConfig()) << "Reading binning: " << _config_ << std::endl;
   _binning_.readBinningDefinition( _binningConfig_ );
-  _binning_.sortBins();
   this->buildHistogram( _binning_ );
 }
 

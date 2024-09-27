@@ -63,6 +63,21 @@ void BinSet::checkBinning(){
   LogThrowIf(hasErrors);
 
 }
+std::string BinSet::getSummary() const{
+  std::stringstream ss;
+  ss << "DataBinSet";
+  if( not _name_.empty() ) ss << "(" << _name_ << ")";
+  ss << ": holding " << _binList_.size() << " bins.";
+
+
+  for( auto& bin : _binList_ ){
+    ss << std::endl << GenericToolbox::indentString("#" + std::to_string(bin.getIndex()) + ": " + bin.getSummary(), 2);
+  }
+
+  return ss.str();
+}
+
+// deprecated
 void BinSet::sortBins(){
 
   /// DON'T SORT THE BINS FOR DIALS!!! THE ORDER MIGHT REFER TO THE COV MATRIX DEFINITION
@@ -92,19 +107,6 @@ void BinSet::sortBins(){
 //    _binList_[iBin].setIndex( iBin );
 //  }
 
-}
-std::string BinSet::getSummary() const{
-  std::stringstream ss;
-  ss << "DataBinSet";
-  if( not _name_.empty() ) ss << "(" << _name_ << ")";
-  ss << ": holding " << _binList_.size() << " bins.";
-
-
-  for( auto& bin : _binList_ ){
-    ss << std::endl << GenericToolbox::indentString("#" + std::to_string(bin.getIndex()) + ": " + bin.getSummary(), 2);
-  }
-
-  return ss.str();
 }
 
 
