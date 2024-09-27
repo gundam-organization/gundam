@@ -10,8 +10,6 @@
 #include "CmdLineParser.h"
 #include "Logger.h"
 
-#include "TDirectory.h"
-
 #include <map>
 #include <string>
 #include <vector>
@@ -27,6 +25,7 @@
 #define GUNDAM_UNLIKELY_COMPILER_FLAG
 #endif
 
+// dev tools
 #define DEBUG_VAR(myVar) LogDebug << "DEBUG_VAR: " << GET_VAR_NAME_VALUE(myVar) << std::endl
 
 
@@ -80,32 +79,6 @@ namespace GundamUtils {
       { 1, "status = 1    : approximated"},
       { 2, "status = 2    : made pos def"},
       { 3, "status = 3    : accurate"}
-  };
-
-  class ObjectReader{
-
-  public:
-    template<typename T> static bool readObject( TDirectory* f_, const std::vector<std::string>& objPathList_, const std::function<void(T*)>& action_ = [](T*){} ){
-      using namespace GenericToolbox::ColorCodes;
-      T* obj;
-      for( auto& objPath : objPathList_ ){
-        obj = f_->Get<T>(objPath.c_str());
-        if( obj != nullptr ){ break; }
-      }
-      if( obj == nullptr ){
-        LogErrorIf(not ObjectReader::quiet) << redLightText << "Could not find object among names: " << resetColor << GenericToolbox::toString(objPathList_) << std::endl;
-        LogThrowIf(ObjectReader::throwIfNotFound, "Object not found.");
-        return false;
-      }
-      action_(obj);
-      return true;
-    }
-    template<typename T> static bool readObject( TDirectory* f_, const std::string& objPath_, const std::function<void(T*)>& action_ = [](T*){} ){ return readObject(f_, std::vector<std::string>{objPath_}, action_); }
-    static bool readObject( TDirectory* f_, const std::string& objPath_);
-
-    static bool quiet;
-    static bool throwIfNotFound;
-
   };
 
 }

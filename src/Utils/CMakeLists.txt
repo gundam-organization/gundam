@@ -6,6 +6,7 @@ set(SRCFILES
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ParameterThrowerMarkHarz.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ConfigUtils.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/GundamUtils.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/RootUtils.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/GundamApp.cpp
     )
 

@@ -11,6 +11,8 @@
 
 #include "CmdLineParser.h"
 
+#include "TFile.h"
+
 #include <string>
 #include <memory>
 #include <utility>
