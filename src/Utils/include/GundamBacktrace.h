@@ -13,7 +13,7 @@
 // that so for now it's not included.
 //
 // Note: This is a candidate for the generic tool kit, or simple cpp logger.
-#if defined(__linux__)
+#if defined(__linux__) || defined(__APPLE__) || defined(__MACH__)
 #include <execinfo.h>
 #include <cstdlib>
 #else

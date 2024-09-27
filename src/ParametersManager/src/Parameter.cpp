@@ -5,17 +5,16 @@
 #include "Parameter.h"
 #include "ParameterSet.h"
 #include "ConfigUtils.h"
-
+#include "GundamBacktrace.h"
 
 #include "Logger.h"
-
-#include "GundamBacktrace.h"
 
 #include <sstream>
 
 #ifndef DISABLE_USER_HEADER
 LoggerInit([]{ Logger::setUserHeaderStr("[Parameter]"); });
 #endif
+
 
 void Parameter::configureImpl(){
 
