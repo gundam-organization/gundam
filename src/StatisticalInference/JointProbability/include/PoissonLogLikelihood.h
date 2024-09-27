@@ -7,6 +7,8 @@
 
 #include "JointProbabilityBase.h"
 
+#include "Logger.h"
+
 
 namespace JointProbability{
 
