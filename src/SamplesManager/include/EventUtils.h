@@ -79,8 +79,8 @@ namespace EventUtils{
     std::vector<Variable>& getVarList(){ return _varList_; }
 
     // memory
-    void allocateMemory( const std::vector<const GenericToolbox::LeafForm*>& leafFormList_);
-    void copyData( const std::vector<const GenericToolbox::LeafForm*>& leafFormList_);
+    void allocateMemory(const std::vector<const GenericToolbox::LeafForm*>& leafFormList_);
+    void copyData(const std::vector<const GenericToolbox::LeafForm*>& leafFormList_);
 
     // fetch
     [[nodiscard]] int findVarIndex( const std::string& leafName_, bool throwIfNotFound_ = true) const;
