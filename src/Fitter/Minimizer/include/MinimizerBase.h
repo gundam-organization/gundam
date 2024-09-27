@@ -9,7 +9,7 @@
 #include "ParameterScanner.h"
 #include "LikelihoodInterface.h"
 #include "Parameter.h"
-#include "JsonBaseClass.h"
+
 
 #include "GenericToolbox.Utils.h"
 
@@ -39,9 +39,9 @@ protected:
   /// Implement the methods required by JsonBaseClass.  These MinimizerBase
   /// methods may be overridden by the derived class, but if overriden, the
   /// derived class must run these instantiations (i.e. call
-  /// MinimizerBase::readConfigImpl() and MinimizerBase::initializeImpl in the
+  /// MinimizerBase::configureImpl() and MinimizerBase::initializeImpl in the
   /// respective methods).
-  void readConfigImpl() override;
+  void configureImpl() override;
   void initializeImpl() override;
 
   // Internal struct that hold info about the minimizer state
@@ -105,10 +105,10 @@ public:
   explicit MinimizerBase(FitterEngine* owner_): _owner_(owner_){}
 
   /// Set if the calcErrors method should be called by the FitterEngine.
-  void setDisableCalcError(bool disableCalcError_){ _disableCalcError_ = disableCalcError_; }
+  void setDisableCalcError(bool disableCalcError_){ _isEnabledCalcError_ = not disableCalcError_; }
 
   // const getters
-  [[nodiscard]] bool disableCalcError() const{ return _disableCalcError_; }
+  [[nodiscard]] bool disableCalcError() const{ return not _isEnabledCalcError_; }
 
   // Get the return status for the fitter.  The return value is specific
   // to the instantiated fitter, but is mostly centered around MINUIT
@@ -168,9 +168,7 @@ private:
   bool _throwOnBadLlh_{false};
   bool _useNormalizedFitSpace_{true};
   bool _checkParameterValidity_{false};
-
-  // internals
-  bool _disableCalcError_{false};
+  bool _isEnabledCalcError_{true};
   Monitor _monitor_{};
 
 };

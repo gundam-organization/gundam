@@ -5,9 +5,10 @@
 #include "ParametersManager.h"
 #include "ConfigUtils.h"
 #include "GundamGlobals.h"
+#include "GundamUtils.h"
 
 #include "GenericToolbox.Utils.h"
-#include "GenericToolbox.Json.h"
+
 #include "Logger.h"
 
 #include <sstream>
@@ -23,18 +24,19 @@ void ParametersManager::muteLogger(){ Logger::setIsMuted( true ); }
 void ParametersManager::unmuteLogger(){ Logger::setIsMuted( false ); }
 
 // config
-void ParametersManager::readConfigImpl(){
+void ParametersManager::configureImpl(){
 
-  _throwToyParametersWithGlobalCov_ = GenericToolbox::Json::fetchValue(_config_, "throwToyParametersWithGlobalCov", _throwToyParametersWithGlobalCov_);
-  _reThrowParSetIfOutOfPhysical_ = GenericToolbox::Json::fetchValue(_config_, {{"reThrowParSetIfOutOfBounds"},{"reThrowParSetIfOutOfPhysical"}}, _reThrowParSetIfOutOfPhysical_);
+  GenericToolbox::Json::fillValue(_config_, _throwToyParametersWithGlobalCov_, "throwToyParametersWithGlobalCov");
+  GenericToolbox::Json::fillValue(_config_, _reThrowParSetIfOutOfPhysical_, {{"reThrowParSetIfOutOfBounds"},{"reThrowParSetIfOutOfPhysical"}});
+  GenericToolbox::Json::fillValue(_config_, _parameterSetListConfig_, "parameterSetList");
 
-  _parameterSetListConfig_ = GenericToolbox::Json::fetchValue(_config_, "parameterSetList", _parameterSetListConfig_);
+  LogDebugIf(GundamGlobals::isDebugConfig()) << _parameterSetListConfig_.size() << " parameter sets are defined." << std::endl;
 
   _parameterSetList_.clear(); // make sure there nothing in case readConfig is called more than once
   _parameterSetList_.reserve( _parameterSetListConfig_.size() );
   for( const auto& parameterSetConfig : _parameterSetListConfig_ ){
     _parameterSetList_.emplace_back();
-    _parameterSetList_.back().readConfig( parameterSetConfig );
+    _parameterSetList_.back().configure( parameterSetConfig );
 
     // clear the parameter sets that have been disabled
     if( not _parameterSetList_.back().isEnabled() ){
@@ -241,13 +243,13 @@ void ParametersManager::throwParametersFromGlobalCovariance(bool quietVerbose_){
       if( not std::isnan(parPtr->getMinPhysical()) and parPtr->getParameterValue() < parPtr->getMinPhysical() ){
         rethrow = true;
         LogAlert << "thrown value lower than physical min bound -> "
-                 << parPtr->getSummary(true) << std::endl;
+                 << parPtr->getSummary() << std::endl;
         break;
       }
       if( not std::isnan(parPtr->getMaxPhysical()) and parPtr->getParameterValue() > parPtr->getMaxPhysical() ){
         rethrow = true;
         LogAlert << "thrown value higher than physical max bound -> "
-                 << parPtr->getSummary(true) << std::endl;
+                 << parPtr->getSummary() << std::endl;
         break;
       }
     }

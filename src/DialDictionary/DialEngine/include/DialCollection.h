@@ -13,7 +13,6 @@
 
 #include "GenericToolbox.Wrappers.h"
 
-#include "nlohmann/json.hpp"
 
 #include <vector>
 #include <string>
@@ -172,7 +171,7 @@ public:
   void printConfiguration() const;
 
 protected:
-  void readConfigImpl() override;
+  void configureImpl() override;
   void initializeImpl() override;
 
   bool initializeNormDialsWithParBinning();

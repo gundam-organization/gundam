@@ -16,28 +16,28 @@ LoggerInit([]{ Logger::setUserHeaderStr("[DataBin]"); });
 #endif
 
 
-void DataBin::Edges::readConfig(const JsonType& config_){
+void DataBin::Edges::configureImpl(){
 
-  varName = GenericToolbox::Json::fetchValue<std::string>(config_, "name");
+  varName = GenericToolbox::Json::fetchValue<std::string>(_config_, "name");
 
-  if( GenericToolbox::Json::doKeyExist(config_, "bounds") ){
-    auto bounds = GenericToolbox::Json::fetchValue<std::vector<double>>(config_, "bounds");
-    LogThrowIf( bounds.size() != 2, "bounds don't have two elements: " << config_ );
-    min = std::min( bounds[0], bounds[1] );
-    max = std::max( bounds[0], bounds[1] );
+  if( GenericToolbox::Json::doKeyExist(_config_, "bounds") ){
+    GenericToolbox::Range bounds{};
+    GenericToolbox::Json::fillValue(_config_, bounds, "bounds");
+    min = bounds.min;
+    max = bounds.max;
     if( min == max ){ isConditionVar = true; }
   }
-  else if( GenericToolbox::Json::doKeyExist(config_, "value") ){
-    min = GenericToolbox::Json::fetchValue<double>(config_, "value");
+  else if( GenericToolbox::Json::doKeyExist(_config_, "value") ){
+    GenericToolbox::Json::fillValue(_config_, min, "value");
     max = min;
     isConditionVar = true;
   }
   else{
-    LogThrow("No bound definition for edges: " << config_);
+    LogThrow("No bound definition for edges: " << _config_);
   }
 
 }
-bool DataBin::Edges::isOverlapping(const DataBin::Edges& other_) const{
+bool DataBin::Edges::isOverlapping(const Edges& other_) const{
   if( this->isConditionVar != other_.isConditionVar ){
     LogError << "Mismatch with a variable: in one bin, it is a condition variable while in another it's a range." << std::endl;
     LogError << "ref edge: " << this->getSummary() << std::endl;
@@ -63,6 +63,16 @@ std::string DataBin::Edges::getSummary() const {
 }
 
 
+// configure
+void DataBin::configureImpl(){
+
+  for( auto& edgeConfig : GenericToolbox::Json::fetchValue(_config_, "edgesList", JsonType()) ){
+    _binEdgesList_.emplace_back( _binEdgesList_.size() );
+    _binEdgesList_.back().configure( edgeConfig );
+  }
+
+}
+
 // Setters
 void DataBin::addBinEdge(const std::string &variableName_, double lowEdge_, double highEdge_) {
   if( this->isVariableSet(variableName_) ){
@@ -81,7 +91,6 @@ void DataBin::addBinEdge(const std::string &variableName_, double lowEdge_, doub
   }
   _binEdgesList_.back().varName = variableName_;
 }
-
 
 // Getters
 const DataBin::Edges& DataBin::getVarEdges( const std::string& varName_ ) const{
@@ -193,16 +202,6 @@ void DataBin::generateTreeFormula() {
     }
   }
   _treeFormula_ = std::shared_ptr<TTreeFormula>(GenericToolbox::createTreeFormulaWithoutTree(_treeFormulaStr_, varNameList));
-}
-void DataBin::readConfig( const JsonType& config_){
-
-  auto edgesConfigList = GenericToolbox::Json::fetchValue(config_, "edgesList", JsonType());
-  _binEdgesList_.reserve( edgesConfigList.size() );
-  for( auto& edgeConfig : edgesConfigList ){
-    _binEdgesList_.emplace_back( _binEdgesList_.size() );
-    _binEdgesList_.back().readConfig( edgeConfig );
-  }
-
 }
 std::string DataBin::getSummary() const{
   std::stringstream ss;

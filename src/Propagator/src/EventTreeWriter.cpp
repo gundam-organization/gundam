@@ -10,7 +10,7 @@
 #include "Logger.h"
 #include "GenericToolbox.Utils.h"
 #include "GenericToolbox.Root.h"
-#include "GenericToolbox.Json.h"
+
 
 
 #ifndef DISABLE_USER_HEADER
@@ -18,14 +18,13 @@ LoggerInit([]{ Logger::setUserHeaderStr("[TreeWriter]"); });
 #endif
 
 
-void EventTreeWriter::readConfigImpl() {
-  LogInfo << "Reading TreeWriter configuration..." << std::endl;
+void EventTreeWriter::configureImpl() {
 
-  _isEnabled_ = GenericToolbox::Json::fetchValue(_config_, "isEnabled", _isEnabled_);
+  GenericToolbox::Json::fillValue(_config_, _isEnabled_, "isEnabled");
   LogReturnIf(not _isEnabled_, "Disabled EventTreeWriter.");
 
-  _writeDials_ = GenericToolbox::Json::fetchValue(_config_, "writeDials", _writeDials_);
-  _nPointsPerDial_ = GenericToolbox::Json::fetchValue(_config_, "nPointsPerDial", _nPointsPerDial_);
+  GenericToolbox::Json::fillValue(_config_, _writeDials_, "writeDials");
+  GenericToolbox::Json::fillValue(_config_, _nPointsPerDial_, "nPointsPerDial");
 
   if( _writeDials_ ){
     LogInfo << "EventTreeWriter configured as:" << std::endl;

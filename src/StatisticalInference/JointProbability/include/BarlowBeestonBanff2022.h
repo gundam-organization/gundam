@@ -16,13 +16,14 @@ namespace JointProbability{
   class BarlowBeestonBanff2022 : public JointProbabilityBase {
 
   protected:
-    void readConfigImpl() override;
+    void configureImpl() override;
 
   public:
     [[nodiscard]] std::string getType() const override { return "BarlowBeestonBanff2022"; }
     [[nodiscard]] double eval(const SamplePair& samplePair_, int bin_) const override;
 
     void createNominalMc(const Sample& modelSample_) const;
+    void printConfiguration() const;
 
     mutable int verboseLevel{0};
     bool throwIfInfLlh{false};
@@ -33,22 +34,14 @@ namespace JointProbability{
     mutable GenericToolbox::NoCopyWrapper<std::mutex> _mutex_{}; // for creating the nomMC
   };
 
-  void BarlowBeestonBanff2022::readConfigImpl(){
-    allowZeroMcWhenZeroData = GenericToolbox::Json::fetchValue(_config_, "allowZeroMcWhenZeroData", allowZeroMcWhenZeroData);
-    usePoissonLikelihood = GenericToolbox::Json::fetchValue(_config_, "usePoissonLikelihood", usePoissonLikelihood);
-    BBNoUpdateWeights = GenericToolbox::Json::fetchValue(_config_, "BBNoUpdateWeights", BBNoUpdateWeights);
-    verboseLevel = GenericToolbox::Json::fetchValue(_config_, {{"verboseLevel"}, {"isVerbose"}}, verboseLevel);
-    throwIfInfLlh = GenericToolbox::Json::fetchValue(_config_, "throwIfInfLlh", throwIfInfLlh);
+  void BarlowBeestonBanff2022::configureImpl(){
 
-    LogInfo << "Using BarlowLLH_BANFF_OA2021 parameters:" << std::endl;
-    {
-      LogScopeIndent;
-      LogInfo << GET_VAR_NAME_VALUE(allowZeroMcWhenZeroData) << std::endl;
-      LogInfo << GET_VAR_NAME_VALUE(usePoissonLikelihood) << std::endl;
-      LogInfo << GET_VAR_NAME_VALUE(BBNoUpdateWeights) << std::endl;
-      LogInfo << GET_VAR_NAME_VALUE(verboseLevel) << std::endl;
-      LogInfo << GET_VAR_NAME_VALUE(throwIfInfLlh) << std::endl;
-    }
+    GenericToolbox::Json::fillValue(_config_, allowZeroMcWhenZeroData, "allowZeroMcWhenZeroData");
+    GenericToolbox::Json::fillValue(_config_, usePoissonLikelihood, "usePoissonLikelihood");
+    GenericToolbox::Json::fillValue(_config_, BBNoUpdateWeights, "BBNoUpdateWeights");
+    GenericToolbox::Json::fillValue(_config_, verboseLevel, {{"verboseLevel"},{"isVerbose"}});
+    GenericToolbox::Json::fillValue(_config_, throwIfInfLlh, "throwIfInfLlh");
+
   }
   double BarlowBeestonBanff2022::eval(const SamplePair& samplePair_, int bin_) const {
     double dataVal = samplePair_.data->getHistogram().binList[bin_].content;
@@ -225,6 +218,19 @@ namespace JointProbability{
       nomHistErr.emplace_back( bin.error );
       LogTraceIf(verboseLevel >= 2) << modelSample_.getName() << ": " << bin.index << " -> " << bin.content << " / " << bin.error << std::endl;
     }
+  }
+  void BarlowBeestonBanff2022::printConfiguration() const{
+
+    LogInfo << "Using BarlowLLH_BANFF_OA2021 parameters:" << std::endl;
+    {
+      LogScopeIndent;
+      LogInfo << GET_VAR_NAME_VALUE(allowZeroMcWhenZeroData) << std::endl;
+      LogInfo << GET_VAR_NAME_VALUE(usePoissonLikelihood) << std::endl;
+      LogInfo << GET_VAR_NAME_VALUE(BBNoUpdateWeights) << std::endl;
+      LogInfo << GET_VAR_NAME_VALUE(verboseLevel) << std::endl;
+      LogInfo << GET_VAR_NAME_VALUE(throwIfInfLlh) << std::endl;
+    }
+
   }
 
 }

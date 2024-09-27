@@ -24,7 +24,7 @@ namespace JointProbability{
     std::string llhSharedLib;
 
   protected:
-    void readConfigImpl() override;
+    void configureImpl() override;
     void initializeImpl() override;
     void compile();
     void load();
@@ -41,9 +41,9 @@ namespace JointProbability{
 namespace JointProbability{
 
   // JointProbabilityPlugin
-  void PluginJointProbability::readConfigImpl(){
-    llhPluginSrc = GenericToolbox::Json::fetchValue<std::string>(_config_, "llhPluginSrc");
-    llhSharedLib = GenericToolbox::Json::fetchValue<std::string>(_config_, "llhSharedLib");
+  void PluginJointProbability::configureImpl(){
+    GenericToolbox::Json::fillValue(_config_, llhPluginSrc, "llhPluginSrc");
+    GenericToolbox::Json::fillValue(_config_, llhSharedLib, "llhSharedLib");
   }
 
   void PluginJointProbability::initializeImpl(){

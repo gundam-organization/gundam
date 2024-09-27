@@ -2,6 +2,7 @@
 #define GUNDAM_BICUBIC_INTERPOLATION_H
 
 #include "DialBase.h"
+#include "DialUtils.h"
 #include "DialInputBuffer.h"
 
 #include <vector>
@@ -44,7 +45,7 @@ protected:
   std::vector<double> _splineData_{};
 
   // The vector of input parameter bounds.
-  std::vector<std::pair<double, double>> _splineBounds_;
+  std::vector<DialUtils::Range> _splineBounds_;
 };
 
 typedef CachedDial<Bicubic> BicubicCache;

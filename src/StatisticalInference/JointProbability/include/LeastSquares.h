@@ -17,7 +17,7 @@ namespace JointProbability{
   /// minimal numeric problems (doesn't use any functions like Log or Sqrt).
 
   protected:
-    void readConfigImpl() override;
+    void configureImpl() override;
 
   public:
     [[nodiscard]] std::string getType() const override { return "PluginJointProbability"; }
@@ -29,9 +29,9 @@ namespace JointProbability{
 
   };
 
-  void LeastSquares::readConfigImpl(){
+  void LeastSquares::configureImpl(){
     LogWarning << "Using LeastSquaresLLH: NOT A REAL LIKELIHOOD" << std::endl;
-    lsqPoissonianApproximation = GenericToolbox::Json::fetchValue(_config_, "lsqPoissonianApproximation", lsqPoissonianApproximation);
+    GenericToolbox::Json::fillValue(_config_, lsqPoissonianApproximation, "lsqPoissonianApproximation");
     LogWarning << "Using Least Squares Poissonian Approximation" << std::endl;
   }
   double LeastSquares::eval(const SamplePair& samplePair_, int bin_) const {

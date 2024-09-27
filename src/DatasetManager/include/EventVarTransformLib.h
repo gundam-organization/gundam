@@ -11,13 +11,13 @@ class EventVarTransformLib : public EventVarTransform {
 
 public:
   EventVarTransformLib() = default;
-  explicit EventVarTransformLib(const JsonType& config_){ this->readConfig(config_); }
+  explicit EventVarTransformLib(const JsonType& config_){ this->configure(config_); }
 
   void reload();
 
 protected:
   void initializeImpl() override;
-  void readConfigImpl() override;
+  void configureImpl() override;
 
   void loadLibrary();
   void initInputFormulas();

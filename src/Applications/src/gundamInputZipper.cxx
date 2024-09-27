@@ -7,7 +7,7 @@
 #include "ConfigUtils.h"
 
 #include "GenericToolbox.Os.h"
-#include "GenericToolbox.Json.h"
+
 #include "CmdLineParser.h"
 #include "Logger.h"
 
@@ -68,7 +68,7 @@ int main(int argc, char** argv) {
   if( not clParser.isOptionTriggered("outputFolder") ){
     // appendixDict["optionName"] = "Appendix"
     // this list insure all appendices will appear in the same order
-    std::vector<std::pair<std::string, std::string>> appendixDict{
+    std::vector<GundamUtils::AppendixEntry> appendixDict{
         {"configFile", ""},
         {"overrideFiles", "With"},
         {"maxFileSizeInMb", "MaxInputSizeInMB"},

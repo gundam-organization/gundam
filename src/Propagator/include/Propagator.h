@@ -9,7 +9,6 @@
 #include "ParametersManager.h"
 #include "DialCollection.h"
 #include "EventDialCache.h"
-#include "JsonBaseClass.h"
 #include "SampleSet.h"
 
 #include "GenericToolbox.Time.h"
@@ -22,16 +21,8 @@
 
 class Propagator : public JsonBaseClass {
 
-public:
-  struct OnReloadOptions{
-    bool keepSamples{false};
-    bool keepParameters{false};
-    bool keepDialCollections{false};
-  };
-
-
 protected:
-  void readConfigImpl() override;
+  void configureImpl() override;
   void initializeImpl() override;
 
 
@@ -63,7 +54,6 @@ public:
   EventDialCache& getEventDialCache(){ return _eventDialCache_; }
   std::vector<DialCollection> &getDialCollectionList(){ return _dialCollectionList_; }
   GenericToolbox::ParallelWorker& getThreadPool(){ return _threadPool_; }
-  OnReloadOptions& getOnReloadOptions(){ return _onReloadOptions_; }
 
   // Core
   void clearContent();
@@ -92,9 +82,6 @@ protected:
   void updateDialState();
   void refillHistograms();
 
-  void setupDialCollections();
-
-
 private:
 
   // Parameters
@@ -121,10 +108,9 @@ private:
   // Once a dial collection has been added to this vector, it's index becomes
   // the immutable tag for that specific group of dials.
   std::vector<DialCollection> _dialCollectionList_{};
+  // TODO: create a DialManager
 
   GenericToolbox::ParallelWorker _threadPool_{};
-
-  OnReloadOptions _onReloadOptions_{};
 
 };
 #endif //GUNDAM_PROPAGATOR_H

@@ -28,6 +28,7 @@
 #define GUNDAM_UNLIKELY_COMPILER_FLAG
 #endif
 
+#define DEBUG_VAR(myVar) LogDebug << "DEBUG_VAR: " << GET_VAR_NAME_VALUE(myVar) << std::endl
 
 
 namespace GundamUtils {
@@ -38,7 +39,14 @@ namespace GundamUtils {
   std::string getSourceCodePath();
   bool isNewerOrEqualVersion( const std::string& minVersion_ );
 
-  std::string generateFileName(const CmdLineParser& clp_, const std::vector<std::pair<std::string, std::string>>& appendixDict_);
+  struct AppendixEntry{
+    std::string optionName{};
+    std::string appendix{};
+
+    AppendixEntry() = default;
+    AppendixEntry(std::string optionName_, std::string  appendix_) : optionName(std::move(optionName_)), appendix(std::move(appendix_)) {}
+  };
+  std::string generateFileName(const CmdLineParser& clp_, const std::vector<AppendixEntry>& appendixDict_);
 
   // dicts
   static const std::map<int, std::string> minuitStatusCodeStr{

@@ -8,8 +8,6 @@
 
 #include "ConfigUtils.h"
 
-#include "GenericToolbox.Json.h"
-
 #include <TFormula.h>
 #include <TTreeFormula.h>
 
@@ -17,27 +15,36 @@
 #include <vector>
 #include <string>
 
-class DataBin {
+
+
+class DataBin : public JsonBaseClass {
 
 public:
-  struct Edges{
+  class Edges : public JsonBaseClass {
+
+  protected:
+    void configureImpl() override;
+
+  public:
     Edges() = delete;
     explicit Edges(int index_) : index(index_) {}
 
     // utils
-    void readConfig(const JsonType& config_);
     [[nodiscard]] bool isOverlapping(const Edges& other_) const;
     [[nodiscard]] double getCenterValue() const { return min + (max-min)/2.; }
     [[nodiscard]] std::string getSummary() const;
 
-
     bool isConditionVar{false};
     int index{-1};
     int varIndexCache{-1};
-    std::string varName{};
     double min{std::nan("unset")};
     double max{std::nan("unset")};
+    std::string varName{};
+
   };
+
+protected:
+  void configureImpl() override;
 
 public:
   DataBin() = delete;
@@ -79,7 +86,6 @@ public:
   // Misc
   void generateFormula();
   void generateTreeFormula();
-  void readConfig( const JsonType& config_);
   [[nodiscard]] std::string getSummary() const;
   [[nodiscard]] std::vector<double> generateBinTarget(const std::vector<std::string>& varNameList_ = {}) const;
 

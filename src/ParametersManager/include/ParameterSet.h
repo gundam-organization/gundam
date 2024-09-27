@@ -6,13 +6,11 @@
 #define GUNDAM_PARAMETERSET_H
 
 #include "Parameter.h"
-#include "JsonBaseClass.h"
 #include "ParameterThrowerMarkHarz.h"
 
 #include "Logger.h"
 #include "GenericToolbox.Root.h"
 
-#include "nlohmann/json.hpp"
 #include "TMatrixDSym.h"
 #include "TVectorT.h"
 #include "TFile.h"
@@ -30,8 +28,8 @@
 class ParameterSet : public JsonBaseClass  {
 
 protected:
-  // called through public JsonBaseClass::readConfig() and JsonBaseClass::initialize()
-  void readConfigImpl() override;
+  // called through JsonBaseClass::configure() and JsonBaseClass::initialize()
+  void configureImpl() override;
   void initializeImpl() override;
 
 public:
@@ -72,6 +70,7 @@ public:
   [[nodiscard]] bool isEnablePca() const{ return _enablePca_; }
   [[nodiscard]] bool isEnableEigenDecomp() const{ return _enableEigenDecomp_; }
   [[nodiscard]] bool isEnabledThrowToyParameters() const{ return _enabledThrowToyParameters_; }
+  [[nodiscard]] bool isMaskForToyGeneration() const{ return _maskForToyGeneration_; }
   [[nodiscard]] int getNbEnabledEigenParameters() const{ return _nbEnabledEigen_; }
   [[nodiscard]] double getPenaltyChi2Buffer() const{ return _penaltyChi2Buffer_; }
   [[nodiscard]] size_t getNbParameters() const{ return _parameterList_.size(); }
@@ -212,9 +211,11 @@ private:
   JsonType _parameterDefinitionConfig_{};
   JsonType _dialSetDefinitions_{};
 
-  double _globalParameterMinValue_{std::nan("unset")};
-  double _globalParameterMaxValue_{std::nan("unset")};
-  std::pair<double, double> _eigenParBounds_{std::nan("unset"), std::nan("unset")};
+  GenericToolbox::Range _globalParRange_{};
+  GenericToolbox::Range _eigenParRange_{};
+
+  // backward compatibility
+  bool _maskForToyGeneration_{false};
 
   double _penaltyChi2Buffer_{std::nan("unset")};
 

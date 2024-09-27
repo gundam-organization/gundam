@@ -8,7 +8,7 @@
 #include "TabulatedDialFactory.h"
 #include "RootFormula.h"
 
-#include "GenericToolbox.Json.h"
+
 #include "Logger.h"
 
 #include <sstream>
@@ -17,7 +17,7 @@
 LoggerInit([]{ Logger::setUserHeaderStr("[DialCollection]"); });
 #endif
 
-void DialCollection::readConfigImpl() {
+void DialCollection::configureImpl() {
 
   _dataSetNameList_ = GenericToolbox::Json::fetchValue<std::vector<std::string>>(
       _config_, "applyOnDataSets", std::vector<std::string>());
@@ -282,24 +282,21 @@ void DialCollection::readGlobals(const JsonType &config_) {
       if (condEntry.is_string()) {
         conditionsList.emplace_back(condEntry.get<std::string>());
       } else if (condEntry.is_structured()) {
-        auto expression = GenericToolbox::Json::fetchValue<std::string>(condEntry, {{"exp"},
-                                                                                    {"expression"},
-                                                                                    {"var"},
-                                                                                    {"variable"}});
+        auto expression = GenericToolbox::Json::fetchValue<std::string>(condEntry, {{"exp"},{"expression"},{"var"},{"variable"}});
         std::stringstream ssCondEntry;
 
         // allowedRanges
         {
-          auto allowedRanges = GenericToolbox::Json::fetchValue(condEntry, "allowedRanges",
-                                                                std::vector<std::pair<double, double>>());
+          std::vector<GenericToolbox::Range> allowedRanges;
+          GenericToolbox::Json::fillValue(condEntry, allowedRanges, "allowedRanges");
           if (not allowedRanges.empty()) {
             std::vector<std::string> allowedRangesCond;
             for (auto &allowedRange: allowedRanges) {
-              LogThrowIf(allowedRange.first >= allowedRange.second,
-                         "Invalid range bounds: min(" << allowedRange.first << ") max(" << allowedRange.second << ")")
+              LogThrowIf(allowedRange.min >= allowedRange.max,
+                         "Invalid range bounds: min(" << allowedRange.min << ") max(" << allowedRange.max << ")")
               std::stringstream condSs;
-              condSs << "(" << expression << " >= " << allowedRange.first;
-              condSs << " && " << expression << " < " << allowedRange.second << ")";
+              condSs << "(" << expression << " >= " << allowedRange.min;
+              condSs << " && " << expression << " < " << allowedRange.max << ")";
               allowedRangesCond.emplace_back(condSs.str());
             }
             ssCondEntry << GenericToolbox::joinVectorString(allowedRangesCond, " || ");
@@ -321,8 +318,8 @@ void DialCollection::readGlobals(const JsonType &config_) {
           }
         }
 
-        auto excludedRanges = GenericToolbox::Json::fetchValue(condEntry, "excludedRanges",
-                                                               std::vector<std::pair<double, double>>());
+        std::vector<GenericToolbox::Range> excludedRanges;
+        GenericToolbox::Json::fillValue(condEntry, excludedRanges, "excludedRanges");
         auto excludedValues = GenericToolbox::Json::fetchValue(condEntry, "excludedValues", std::vector<double>());
         if (not excludedRanges.empty() or not excludedValues.empty()) {
           if (not ssCondEntry.str().empty()) {
@@ -335,12 +332,12 @@ void DialCollection::readGlobals(const JsonType &config_) {
             if (not excludedRanges.empty()) {
               std::vector<std::string> excludedRangesCond;
               for (auto &excludedRange: excludedRanges) {
-                LogThrowIf(excludedRange.first >= excludedRange.second,
-                           "Invalid range bounds: min(" << excludedRange.first << ") max(" << excludedRange.second
+                LogThrowIf(excludedRange.min >= excludedRange.max,
+                           "Invalid range bounds: min(" << excludedRange.min << ") max(" << excludedRange.max
                                                         << ")")
                 std::stringstream condSs;
-                condSs << expression << " < " << excludedRange.first << " && ";
-                condSs << expression << " >= " << excludedRange.second;
+                condSs << expression << " < " << excludedRange.min << " && ";
+                condSs << expression << " >= " << excludedRange.max;
                 excludedRangesCond.emplace_back(condSs.str());
               }
               if (not ssCondEntry.str().empty()) ssCondEntry << " && "; // allowed regions are linked with "OR"

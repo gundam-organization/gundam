@@ -3,7 +3,7 @@
 //
 
 #include "EventVarTransform.h"
-#include "GenericToolbox.Json.h"
+
 
 #include "Logger.h"
 
@@ -13,7 +13,7 @@
 LoggerInit([]{ Logger::setUserHeaderStr("[EventVarTransform]"); });
 #endif
 
-void EventVarTransform::readConfigImpl(){
+void EventVarTransform::configureImpl(){
   _isEnabled_ = GenericToolbox::Json::fetchValue(_config_, "isEnabled", _isEnabled_);
   _name_ = GenericToolbox::Json::fetchValue(_config_, {{"name"}, {"title"}}, _name_);
 
@@ -32,7 +32,7 @@ void EventVarTransform::initializeImpl(){
 }
 
 
-EventVarTransform::EventVarTransform(const JsonType& config_){ this->readConfig(config_); }
+EventVarTransform::EventVarTransform(const JsonType& config_){ this->configure(config_); }
 
 const std::vector<std::string>& EventVarTransform::fetchRequestedVars() const {
   if( _requestedLeavesForEvalCache_.empty() ){

@@ -7,11 +7,10 @@
 
 #include "GundamGlobals.h"
 
-#include "GenericToolbox.Json.h"
+
 #include "Logger.h"
 
 #include <TTreeFormulaManager.h>
-#include "nlohmann/json.hpp"
 
 #include <memory>
 
@@ -21,7 +20,7 @@ LoggerInit([]{ Logger::setUserHeaderStr("[SampleSet]"); });
 #endif
 
 
-void SampleSet::readConfigImpl(){
+void SampleSet::configureImpl(){
 
   auto sampleListConfig = GenericToolbox::Json::fetchValue(_config_, {{"sampleList"}, {"fitSampleList"}}, JsonType());
   LogDebugIf(GundamGlobals::isDebugConfig()) << sampleListConfig.size() << " samples defined in the config." << std::endl;
@@ -33,7 +32,7 @@ void SampleSet::readConfigImpl(){
     for( auto& sampleConfig : sampleListConfig ){
       _sampleList_.emplace_back();
       _sampleList_.back().setIndex( iSample++ );
-      _sampleList_.back().readConfig( sampleConfig );
+      _sampleList_.back().configure( sampleConfig );
 
       LogDebugIf(GundamGlobals::isDebugConfig()) << "Defined sample: " << _sampleList_.back().getName() << std::endl;
 
@@ -58,7 +57,7 @@ void SampleSet::readConfigImpl(){
 
     for( size_t iSample = 0 ; iSample < _sampleList_.size() ; iSample++ ){
       if( not GenericToolbox::Json::fetchValue(sampleListConfig[iSample], "isEnabled", true) ) continue;
-      _sampleList_[ iSample ].readConfig( sampleListConfig[iSample] ); // read the config again
+      _sampleList_[ iSample ].configure( sampleListConfig[iSample] ); // read the config again
     }
   }
 

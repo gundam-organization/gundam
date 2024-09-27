@@ -9,11 +9,9 @@
 #include "ParameterSet.h"
 #include <SampleSet.h>
 #include "PlotGenerator.h"
-#include "JsonBaseClass.h"
 #include "Propagator.h"
 
 #include <TChain.h>
-#include "nlohmann/json.hpp"
 
 #include <vector>
 #include <string>
@@ -22,11 +20,11 @@
 class DatasetDefinition : public JsonBaseClass {
 
 protected:
-  void readConfigImpl() override;
+  void configureImpl() override;
   void initializeImpl() override;
 
 public:
-  explicit DatasetDefinition( const JsonType& config_, int datasetIndex_): _dataSetIndex_(datasetIndex_) { this->readConfig(config_); }
+  explicit DatasetDefinition( const JsonType& config_, int datasetIndex_): _dataSetIndex_(datasetIndex_) { this->configure(config_); }
 
   void setDataSetIndex(int dataSetIndex){ _dataSetIndex_ = dataSetIndex; }
   void setSelectedDataEntry(const std::string& selectedDataEntry_){ _selectedDataEntry_ = selectedDataEntry_; }
@@ -57,12 +55,12 @@ public:
 
 private:
   // config
-  bool _isEnabled_{false};
+  bool _isEnabled_{true};
   bool _showSelectedEventCount_{true};
   int _dataSetIndex_{-1};
   std::string _name_{};
-  std::string _selectedDataEntry_{};
-  std::string _selectedToyEntry_{};
+  std::string _selectedDataEntry_{"Asimov"};
+  std::string _selectedToyEntry_{"Asimov"};
 
   bool _sortLoadedEvents_{true}; // needed for reproducibility of toys in stat throw
   bool _devSingleThreadEventLoaderAndIndexer_{false};

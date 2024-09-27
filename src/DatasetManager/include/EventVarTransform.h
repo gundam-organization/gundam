@@ -6,7 +6,6 @@
 #define GUNDAM_EVENTVARTRANSFORM_H
 
 #include "Event.h"
-#include "JsonBaseClass.h"
 
 #include "TFormula.h"
 
@@ -40,7 +39,7 @@ public:
 
 protected:
   void initializeImpl() override;
-  void readConfigImpl() override;
+  void configureImpl() override;
 
   double evalTransformation(const Event& event_) const;
   virtual double evalTransformation( const Event& event_, std::vector<double>& inputBuffer_) const;

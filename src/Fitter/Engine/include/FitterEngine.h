@@ -9,7 +9,7 @@
 #include "Propagator.h"
 #include "LikelihoodInterface.h"
 #include "MinimizerBase.h"
-#include "JsonBaseClass.h"
+
 
 #include "GenericToolbox.Utils.h"
 #include "GenericToolbox.Time.h"
@@ -17,7 +17,6 @@
 #include "TDirectory.h"
 #include "Math/Functor.h"
 #include "Math/Minimizer.h"
-#include "nlohmann/json.hpp"
 
 #include <string>
 #include <vector>
@@ -41,7 +40,7 @@ public:
 #include "GenericToolbox.MakeEnum.h"
 
 protected:
-  void readConfigImpl() override;
+  void configureImpl() override;
   void initializeImpl() override;
 
 public:
@@ -64,8 +63,8 @@ public:
   void setPcaMethod(PcaMethod pcaMethod_){ _pcaMethod_ = pcaMethod_; }
 
   // const-getters
-  [[nodiscard]] const JsonType &getPreFitParState() const{ return _preFitParState_; }
-  [[nodiscard]] const JsonType &getPostFitParState() const{ return _postFitParState_; }
+  [[nodiscard]] const auto& getPreFitParState() const{ return _preFitParState_; }
+  [[nodiscard]] const auto& getPostFitParState() const{ return _postFitParState_; }
   [[nodiscard]] MinimizerType getMinimizerType() const{ return _minimizerType_; }
   [[nodiscard]] const MinimizerBase& getMinimizer() const{ return *_minimizer_; }
   [[nodiscard]] const LikelihoodInterface& getLikelihoodInterface() const{ return _likelihoodInterface_; }
@@ -99,8 +98,8 @@ private:
   double _parStepGain_{0.1};
   bool _savePostfitEventTrees_{false};
   std::vector<double> _allParamVariationsSigmas_{};
-  JsonType _preFitParState_{};
-  JsonType _postFitParState_{};
+  GenericToolbox::Json::JsonType _preFitParState_{};
+  GenericToolbox::Json::JsonType _postFitParState_{};
 
   // dev
   double _pcaThreshold_{0};

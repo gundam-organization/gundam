@@ -10,7 +10,7 @@
 #include "ConfigUtils.h"
 
 #include "GenericToolbox.Root.h"
-#include "GenericToolbox.Json.h"
+
 #include "GenericToolbox.Utils.h"
 #include "Logger.h"
 
@@ -21,67 +21,66 @@ LoggerInit([]{ Logger::setUserHeaderStr("[ParameterSet]"); });
 #endif
 
 
-void ParameterSet::readConfigImpl(){
+void ParameterSet::configureImpl(){
 
-  _name_ = GenericToolbox::Json::fetchValue<std::string>(_config_, "name");
+  GenericToolbox::Json::fillValue(_config_, _name_, "name");
+  LogThrowIf(_name_.empty(), "ParameterSet have no name.");
   LogDebugIf(GundamGlobals::isDebugConfig()) << "Reading config for parameter set: " << _name_ << std::endl;
 
-  _isEnabled_ = GenericToolbox::Json::fetchValue(_config_, "isEnabled", _isEnabled_);
-  if( not _isEnabled_ ){ return; } // don't go any further
-
-  _nbParameterDefinition_ = GenericToolbox::Json::fetchValue(_config_, "numberOfParameters", _nbParameterDefinition_);
-  _nominalStepSize_ = GenericToolbox::Json::fetchValue(_config_, "nominalStepSize", _nominalStepSize_);
-
-  _useOnlyOneParameterPerEvent_ = GenericToolbox::Json::fetchValue<bool>(_config_, "useOnlyOneParameterPerEvent", _useOnlyOneParameterPerEvent_);
-  _printDialSetsSummary_ = GenericToolbox::Json::fetchValue<bool>(_config_, "printDialSetsSummary", _printDialSetsSummary_);
-  _printParametersSummary_ = GenericToolbox::Json::fetchValue<bool>(_config_, "printParametersSummary", _printDialSetsSummary_);
-
-  if( GenericToolbox::Json::doKeyExist(_config_, "parameterLimits") ){
-    auto parLimits = GenericToolbox::Json::fetchValue(_config_, "parameterLimits", JsonType());
-    _globalParameterMinValue_ = GenericToolbox::Json::fetchValue(parLimits, "minValue", _globalParameterMinValue_);
-    _globalParameterMaxValue_ = GenericToolbox::Json::fetchValue(parLimits, "maxValue", _globalParameterMaxValue_);
+  GenericToolbox::Json::fillValue(_config_, _isEnabled_, "isEnabled");
+  if( not _isEnabled_ ){
+    LogDebugIf(GundamGlobals::isDebugConfig()) << " -> marked as disabled." << std::endl;
+    return; // don't go any further
   }
 
-  _enablePca_ = GenericToolbox::Json::fetchValue(_config_, std::vector<std::string>{"allowPca", "fixGhostFitParameters", "enablePca"}, _enablePca_);
-  _enabledThrowToyParameters_ = GenericToolbox::Json::fetchValue(_config_, "enabledThrowToyParameters", _enabledThrowToyParameters_);
-  _customParThrow_ = GenericToolbox::Json::fetchValue(_config_, {{"customParThrow"}, {"customFitParThrow"}}, std::vector<JsonType>());
-  _releaseFixedParametersOnHesse_ = GenericToolbox::Json::fetchValue(_config_, "releaseFixedParametersOnHesse", _releaseFixedParametersOnHesse_);
+  GenericToolbox::Json::fillValue(_config_, _nbParameterDefinition_, "numberOfParameters");
+  GenericToolbox::Json::fillValue(_config_, _nominalStepSize_, "nominalStepSize");
 
-  _parameterDefinitionFilePath_ = GenericToolbox::Json::fetchValue( _config_,
-    { {"parameterDefinitionFilePath"}, {"covarianceMatrixFilePath"} }, _parameterDefinitionFilePath_
-  );
-  _covarianceMatrixPath_ = GenericToolbox::Json::fetchValue(_config_, {{"covarianceMatrix"}, {"covarianceMatrixTMatrixD"}}, _covarianceMatrixPath_);
-  _parameterNameListPath_ = GenericToolbox::Json::fetchValue(_config_, {{"parameterNameList"}, {"parameterNameTObjArray"}}, _parameterNameListPath_);
-  _parameterPriorValueListPath_ = GenericToolbox::Json::fetchValue(_config_, {{"parameterPriorValueList"}, {"parameterPriorTVectorD"}}, _parameterPriorValueListPath_);
+  GenericToolbox::Json::fillValue(_config_, _useOnlyOneParameterPerEvent_, "useOnlyOneParameterPerEvent");
+  GenericToolbox::Json::fillValue(_config_, _printDialSetsSummary_, "printDialSetsSummary");
+  GenericToolbox::Json::fillValue(_config_, _printParametersSummary_, "printParametersSummary");
 
-  _parameterLowerBoundsTVectorD_ = GenericToolbox::Json::fetchValue(_config_, "parameterLowerBoundsTVectorD", _parameterLowerBoundsTVectorD_);
-  _parameterUpperBoundsTVectorD_ = GenericToolbox::Json::fetchValue(_config_, "parameterUpperBoundsTVectorD", _parameterUpperBoundsTVectorD_);
-  _throwEnabledListPath_ = GenericToolbox::Json::fetchValue(_config_, "throwEnabledList", _throwEnabledListPath_);
+  GenericToolbox::Json::fillValue(_config_, _globalParRange_.min, "parameterLimits/minValue");
+  GenericToolbox::Json::fillValue(_config_, _globalParRange_.max, "parameterLimits/maxValue");
 
-  _parameterDefinitionConfig_ = GenericToolbox::Json::fetchValue(_config_, "parameterDefinitions", _parameterDefinitionConfig_);
-  _dialSetDefinitions_ = GenericToolbox::Json::fetchValue(_config_, "dialSetDefinitions", _dialSetDefinitions_);
-  _enableOnlyParameters_ = GenericToolbox::Json::fetchValue(_config_, "enableOnlyParameters", _enableOnlyParameters_);
-  _disableParameters_ = GenericToolbox::Json::fetchValue(_config_, "disableParameters", _disableParameters_);
+  GenericToolbox::Json::fillValue(_config_, _enablePca_, {{"enablePca"},{"allowPca"},{"fixGhostFitParameters"}});
+  GenericToolbox::Json::fillValue(_config_, _enabledThrowToyParameters_, "enabledThrowToyParameters");
+  GenericToolbox::Json::fillValue(_config_, _customParThrow_, {{"customParThrow"},{"customFitParThrow"}});
+  GenericToolbox::Json::fillValue(_config_, _releaseFixedParametersOnHesse_, "releaseFixedParametersOnHesse");
+
+  GenericToolbox::Json::fillValue(_config_, _parameterDefinitionFilePath_, {{"parameterDefinitionFilePath"},{"covarianceMatrixFilePath"}});
+  GenericToolbox::Json::fillValue(_config_, _covarianceMatrixPath_, {{"covarianceMatrix"},{"covarianceMatrixTMatrixD"}});
+  GenericToolbox::Json::fillValue(_config_, _parameterNameListPath_, {{"parameterNameList"},{"parameterNameTObjArray"}});
+  GenericToolbox::Json::fillValue(_config_, _parameterPriorValueListPath_, {{"parameterPriorValueList"},{"parameterPriorTVectorD"}});
+
+  GenericToolbox::Json::fillValue(_config_, _parameterLowerBoundsTVectorD_, "parameterLowerBoundsTVectorD");
+  GenericToolbox::Json::fillValue(_config_, _parameterUpperBoundsTVectorD_, "parameterUpperBoundsTVectorD");
+  GenericToolbox::Json::fillValue(_config_, _throwEnabledListPath_, "throwEnabledList");
+
+  GenericToolbox::Json::fillValue(_config_, _parameterDefinitionConfig_, "parameterDefinitions");
+  GenericToolbox::Json::fillValue(_config_, _dialSetDefinitions_, "dialSetDefinitions");
+  GenericToolbox::Json::fillValue(_config_, _enableOnlyParameters_, "enableOnlyParameters");
+  GenericToolbox::Json::fillValue(_config_, _disableParameters_, "disableParameters");
 
   // throws options
-  _useMarkGenerator_ = GenericToolbox::Json::fetchValue(_config_, "useMarkGenerator", _useMarkGenerator_);
-  _useEigenDecompForThrows_ = GenericToolbox::Json::fetchValue(_config_, "useEigenDecompForThrows", _useEigenDecompForThrows_);
+  GenericToolbox::Json::fillValue(_config_, _useMarkGenerator_, "useMarkGenerator");
+  GenericToolbox::Json::fillValue(_config_, _useEigenDecompForThrows_, "useEigenDecompForThrows");
 
   // eigen related parameters
-  _enableEigenDecomp_ = GenericToolbox::Json::fetchValue(_config_ , {{"enableEigenDecomp"}, {"useEigenDecompInFit"}}, _enableEigenDecomp_);
-  _allowEigenDecompWithBounds_ = GenericToolbox::Json::fetchValue(_config_ , "allowEigenDecompWithBounds", _allowEigenDecompWithBounds_);
-  _maxNbEigenParameters_ = GenericToolbox::Json::fetchValue(_config_ , "maxNbEigenParameters", _maxNbEigenParameters_);
-  _maxEigenFraction_ = GenericToolbox::Json::fetchValue(_config_ , "maxEigenFraction", _maxEigenFraction_);
-  _eigenSvdThreshold_ = GenericToolbox::Json::fetchValue(_config_, "eigenSvdThreshold", _eigenSvdThreshold_);
+  GenericToolbox::Json::fillValue(_config_, _enableEigenDecomp_, {{"enableEigenDecomp"},{"useEigenDecompInFit"}});
+  GenericToolbox::Json::fillValue(_config_, _allowEigenDecompWithBounds_, "allowEigenDecompWithBounds");
+  GenericToolbox::Json::fillValue(_config_, _maxNbEigenParameters_, "maxNbEigenParameters");
+  GenericToolbox::Json::fillValue(_config_, _maxEigenFraction_, "maxEigenFraction");
+  GenericToolbox::Json::fillValue(_config_, _eigenSvdThreshold_, "eigenSvdThreshold");
 
-  if( GenericToolbox::Json::doKeyExist(_config_, "eigenParBounds") ){
-    auto eigenLimits = GenericToolbox::Json::fetchValue(_config_, "eigenParBounds", JsonType());
-    _eigenParBounds_.first = GenericToolbox::Json::fetchValue(eigenLimits, "minValue", _eigenParBounds_.first);
-    _eigenParBounds_.second = GenericToolbox::Json::fetchValue(eigenLimits, "maxValue", _eigenParBounds_.second);
-  }
+  GenericToolbox::Json::fillValue(_config_, _eigenParRange_.min, "eigenParBounds/minValue");
+  GenericToolbox::Json::fillValue(_config_, _eigenParRange_.max, "eigenParBounds/maxValue");
+
+  // legacy
+  GenericToolbox::Json::fillValue(_config_, _maskForToyGeneration_, "maskForToyGeneration");
 
   // dev option -> was used for validation
-  _devUseParLimitsOnEigen_ = GenericToolbox::Json::fetchValue(_config_, "devUseParLimitsOnEigen", _devUseParLimitsOnEigen_);
+  GenericToolbox::Json::fillValue(_config_, _devUseParLimitsOnEigen_, "devUseParLimitsOnEigen");
 
 
   // individual parameter definitions:
@@ -93,14 +92,21 @@ void ParameterSet::readConfigImpl(){
 
     if( not _dialSetDefinitions_.empty() ){
       for( auto& dialSetDef : _dialSetDefinitions_ ){
-        if( GenericToolbox::Json::doKeyExist(dialSetDef, "parametersBinningPath") ){
-          LogInfo << "Found parameter binning within dialSetDefinition. Defining parameters number..." << std::endl;
-          DataBinSet b;
-          b.readBinningDefinition( GenericToolbox::Json::fetchValue(dialSetDef, "parametersBinningPath", JsonType()) );
-          // DON'T SORT THE BINNING -> tide to the cov matrix
-          _nbParameterDefinition_ = int(b.getBinList().size());
-          break;
-        }
+
+        JsonType parameterBinning{};
+        GenericToolbox::Json::fetchValue<JsonType>(dialSetDef, {{"binning"}, {"parametersBinningPath"}}, parameterBinning);
+
+        if( parameterBinning.empty() ){ continue; }
+
+        LogInfo << "Found parameter binning within dialSetDefinition. Defining parameters number..." << std::endl;
+        DataBinSet b;
+        b.readBinningDefinition( parameterBinning );
+        // DON'T SORT THE BINNING -> tide to the cov matrix
+        _nbParameterDefinition_ = int(b.getBinList().size());
+
+        // don't fetch other dataset as they should always have the same assumption
+        break;
+
       }
     }
 
@@ -316,15 +322,15 @@ void ParameterSet::processCovarianceMatrix(){
         eigenPar.setMinValue( _parameterList_[eigenPar.getParameterIndex()].getMinValue() );
         eigenPar.setMaxValue( _parameterList_[eigenPar.getParameterIndex()].getMaxValue() );
 
-        LogThrowIf( not std::isnan(eigenPar.getMinValue()) and eigenPar.getPriorValue() < eigenPar.getMinValue(), "PRIOR IS BELLOW MIN: " << eigenPar.getSummary(true) );
-        LogThrowIf( not std::isnan(eigenPar.getMaxValue()) and eigenPar.getPriorValue() > eigenPar.getMaxValue(), "PRIOR IS ABOVE MAX: " << eigenPar.getSummary(true) );
+        LogThrowIf( not std::isnan(eigenPar.getMinValue()) and eigenPar.getPriorValue() < eigenPar.getMinValue(), "PRIOR IS BELLOW MIN: " << eigenPar.getSummary() );
+        LogThrowIf( not std::isnan(eigenPar.getMaxValue()) and eigenPar.getPriorValue() > eigenPar.getMaxValue(), "PRIOR IS ABOVE MAX: " << eigenPar.getSummary() );
       }
       else{
-        eigenPar.setMinValue( _eigenParBounds_.first );
-        eigenPar.setMaxValue( _eigenParBounds_.second );
+        eigenPar.setMinValue( _eigenParRange_.min );
+        eigenPar.setMaxValue( _eigenParRange_.max );
 
-        LogThrowIf( not std::isnan(eigenPar.getMinValue()) and eigenPar.getPriorValue() < eigenPar.getMinValue(), "Prior value is bellow min: " << eigenPar.getSummary(true) );
-        LogThrowIf( not std::isnan(eigenPar.getMaxValue()) and eigenPar.getPriorValue() > eigenPar.getMaxValue(), "Prior value is above max: " << eigenPar.getSummary(true) );
+        LogThrowIf( not std::isnan(eigenPar.getMinValue()) and eigenPar.getPriorValue() < eigenPar.getMinValue(), "Prior value is bellow min: " << eigenPar.getSummary() );
+        LogThrowIf( not std::isnan(eigenPar.getMaxValue()) and eigenPar.getPriorValue() > eigenPar.getMaxValue(), "Prior value is above max: " << eigenPar.getSummary() );
       }
     }
 
@@ -419,14 +425,14 @@ void ParameterSet::throwParameters(bool rethrowIfNotInPhysical_, double gain_){
                 and par.getThrowValue() < par.getMinValue() ){
               throwIsValid = false;
               LogAlert << "thrown value lower than min bound -> "
-                       << par.getSummary(true) << std::endl;
+                       << par.getSummary() << std::endl;
               break;
             }
             if( not std::isnan(par.getMaxValue())
                 and par.getThrowValue() > par.getMaxValue() ){
               throwIsValid = false;
               LogAlert <<"thrown value higher than max bound -> "
-                       << par.getSummary(true) << std::endl;
+                       << par.getSummary() << std::endl;
               break;
             }
 
@@ -435,14 +441,14 @@ void ParameterSet::throwParameters(bool rethrowIfNotInPhysical_, double gain_){
                 and par.getThrowValue() < par.getMinPhysical() ){
               throwIsValid = false;
               LogAlert << "thrown value lower than min physical bound -> "
-                       << par.getSummary(true) << std::endl;
+                       << par.getSummary() << std::endl;
               break;
             }
             if( not std::isnan(par.getMaxPhysical())
                 and par.getThrowValue() > par.getMaxPhysical() ){
               throwIsValid = false;
               LogAlert <<"thrown value higher than max physical bound -> "
-                       << par.getSummary(true) << std::endl;
+                       << par.getSummary() << std::endl;
               break;
             }
           }
@@ -539,12 +545,12 @@ void ParameterSet::throwParameters(bool rethrowIfNotInPhysical_, double gain_){
           if( not std::isnan(par.getMinValue()) and par.getParameterValue() < par.getMinValue() ){
             throwIsValid = false;
             LogAlert << GenericToolbox::ColorCodes::redLightText << "thrown value lower than min bound -> " << GenericToolbox::ColorCodes::resetColor
-                     << par.getSummary(true) << std::endl;
+                     << par.getSummary() << std::endl;
           }
           else if( not std::isnan(par.getMaxValue()) and par.getParameterValue() > par.getMaxValue() ){
             throwIsValid = false;
             LogAlert << GenericToolbox::ColorCodes::redLightText <<"thrown value higher than max bound -> " << GenericToolbox::ColorCodes::resetColor
-                     << par.getSummary(true) << std::endl;
+                     << par.getSummary() << std::endl;
           }
         }
 
@@ -966,14 +972,14 @@ void ParameterSet::defineParameters(){
 
     par.setParameterValue(par.getPriorValue());
 
-    if( not std::isnan(_globalParameterMinValue_) ){ par.setMinValue(_globalParameterMinValue_); }
-    if( not std::isnan(_globalParameterMaxValue_) ){ par.setMaxValue(_globalParameterMaxValue_); }
+    if( not std::isnan(_globalParRange_.min) ){ par.setMinValue(_globalParRange_.min); }
+    if( not std::isnan(_globalParRange_.max) ){ par.setMaxValue(_globalParRange_.max); }
 
     if( _parameterLowerBoundsList_ != nullptr ){ par.setMinValue((*_parameterLowerBoundsList_)[par.getParameterIndex()]); }
     if( _parameterUpperBoundsList_ != nullptr ){ par.setMaxValue((*_parameterUpperBoundsList_)[par.getParameterIndex()]); }
 
-    LogThrowIf( not std::isnan(par.getMinValue()) and par.getPriorValue() < par.getMinValue(), "PRIOR IS BELLOW MIN: " << par.getSummary(true) );
-    LogThrowIf( not std::isnan(par.getMaxValue()) and par.getPriorValue() > par.getMaxValue(), "PRIOR IS ABOVE MAX: " << par.getSummary(true) );
+    LogThrowIf( not std::isnan(par.getMinValue()) and par.getPriorValue() < par.getMinValue(), "PRIOR IS BELLOW MIN: " << par.getSummary() );
+    LogThrowIf( not std::isnan(par.getMaxValue()) and par.getPriorValue() > par.getMaxValue(), "PRIOR IS ABOVE MAX: " << par.getSummary() );
 
     if( not _parameterDefinitionConfig_.empty() ){
       // Alternative 1: define dials then parameters
@@ -986,7 +992,7 @@ void ParameterSet::defineParameters(){
             // try with par index
           parConfig = GenericToolbox::Json::fetchMatchingEntry(_parameterDefinitionConfig_, "parameterIndex", par.getParameterIndex());
         }
-        par.setParameterDefinitionConfig(parConfig);
+        par.setConfig(parConfig);
       }
       else {
         // No covariance provided, so find the name based on the order in
@@ -996,7 +1002,7 @@ void ParameterSet::defineParameters(){
         auto parConfig = configVector.at(par.getParameterIndex());
         auto parName = GenericToolbox::Json::fetchValue<std::string>(parConfig, {{"name"}, {"parameterName"}});
         if (not parName.empty()) par.setName(parName);
-        par.setParameterDefinitionConfig(parConfig);
+        par.setConfig(parConfig);
         LogWarning << "Parameter #" << par.getParameterIndex()
                    << " (name \"" << par.getName() << "\")"
                    << " not defined by covariance matrix file"
@@ -1007,6 +1013,6 @@ void ParameterSet::defineParameters(){
       // Alternative 2: define dials then parameters
       par.setDialSetConfig( _dialSetDefinitions_ );
     }
-    par.readConfig();
+    par.configure();
   }
 }

@@ -6,7 +6,6 @@
 #define GUNDAM_SAMPLE_SET_H
 
 #include "Sample.h"
-#include "JsonBaseClass.h"
 
 #include <string>
 #include <vector>
@@ -18,8 +17,8 @@
 class SampleSet : public JsonBaseClass {
 
 protected:
-  // called through public JsonBaseClass::readConfig() and JsonBaseClass::initialize()
-  void readConfigImpl() override;
+  // called through JsonBaseClass::configure() and JsonBaseClass::initialize()
+  void configureImpl() override;
   void initializeImpl() override;
 
 public:

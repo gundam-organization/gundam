@@ -7,12 +7,10 @@
 
 #include "Sample.h"
 #include "Event.h"
-#include "JsonBaseClass.h"
 
 #include "GenericToolbox.Wrappers.h"
 #include "GenericToolbox.Thread.h"
 
-#include "nlohmann/json.hpp"
 #include "TDirectory.h"
 #include "TH1D.h"
 
@@ -81,7 +79,7 @@ struct CanvasHolder{
 class PlotGenerator : public JsonBaseClass {
 
 protected:
-  void readConfigImpl() override;
+  void configureImpl() override;
   void initializeImpl() override;
 
 public:
@@ -118,16 +116,66 @@ protected:
 
 private:
   // Parameters
+  bool _isEnabled_{true};
   bool _writeGeneratedHistograms_{false};
   int _maxLegendLength_{15};
-  JsonType _varDictionary_;
-  JsonType _canvasParameters_;
-  mutable JsonType _histogramsDefinition_;
   std::vector<Color_t> defaultColorWheel {
       kGreen-3, kTeal+3, kAzure+7,
       kCyan-2, kBlue-7, kBlue+2,
       kOrange+1, kOrange+9, kRed+2, kPink+9
   };
+
+  struct HistogramDefinition{
+    bool noData{false};
+    bool rescaleAsBinWidth{true};
+    bool useSampleBinning{false};
+    double rescaleBinFactor{1.};
+    double xMin{std::nan("unset")};
+    double xMax{std::nan("unset")};
+    std::string prefix{};
+    std::string varToPlot{};
+    std::string xTitle{};
+    std::string yTitle{};
+    std::string useSampleBinningOfVar{};
+    std::vector<std::string> splitVarList{};
+    std::vector<std::string> sampleVariableIfNotAvailable{};
+    DataBinSet binning{};
+  };
+  std::vector<HistogramDefinition> _histDefList_{};
+
+  struct CanvasParameters{
+    int height{700};
+    int width{1200};
+    int nbXplots{3};
+    int nbYplots{2};
+  };
+  CanvasParameters _canvasParameters_{};
+
+  struct VarDictionary{
+    std::string name{};
+
+    struct DictEntry{
+      int value{};
+      std::string title{};
+      short fillStyle{1001};
+      short color{};
+    };
+    std::vector<DictEntry> dictEntryList{};
+
+    const DictEntry* fetchDictEntryPtr(int value_) const {
+      for( auto& dictEntry : dictEntryList ){
+        if( dictEntry.value == value_ ){ return &dictEntry; }
+      }
+      return nullptr;
+    }
+  };
+  std::vector<VarDictionary> _varDictionaryList_{};
+  const VarDictionary* fetchVarDictionaryPtr(const std::string& name_){
+    for( auto& varDict : _varDictionaryList_ ){
+      if( varDict.name == name_ ){ return &varDict; }
+    }
+    return nullptr;
+  }
 
   // Internals
   const std::vector<Sample>* _modelSampleListPtr_{nullptr};

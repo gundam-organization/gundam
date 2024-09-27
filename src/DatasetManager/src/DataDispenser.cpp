@@ -9,7 +9,7 @@
 #include "Propagator.h"
 #include "EventVarTransform.h"
 #include "GundamGlobals.h"
-#include "GenericToolbox.Json.h"
+
 #include "ConfigUtils.h"
 
 #include "DialCollection.h"
@@ -36,31 +36,46 @@ LoggerInit([]{ Logger::setUserHeaderStr("[DataDispenser]"); });
 #endif
 
 
-void DataDispenser::readConfigImpl(){
-  LogThrowIf( _config_.empty(), "Config is not set." );
+void DataDispenser::configureImpl(){
 
+  // first of all
   _threadPool_.setNThreads( GundamGlobals::getNumberOfThreads() );
 
-  _parameters_.name = GenericToolbox::Json::fetchValue<std::string>(_config_, "name", _parameters_.name);
+  GenericToolbox::Json::fillValue(_config_, _parameters_.name, "name");
+  LogThrowIf(_parameters_.name.empty(), "Dataset name not set.");
 
+  // histograms don't need other parameters
   if( GenericToolbox::Json::doKeyExist( _config_, "fromHistContent" ) ) {
-    LogWarning << "Dataset \"" << _parameters_.name << "\" will be defined with histogram data." << std::endl;
+    LogDebugIf(GundamGlobals::isDebugConfig()) << "Dataset \"" << _parameters_.name << "\" will be defined with histogram data." << std::endl;
+    auto fromHistConfig( GenericToolbox::Json::fetchValue<JsonType>(_config_, "fromHistContent") );
 
-    _parameters_.fromHistContent = GenericToolbox::Json::fetchValue<JsonType>( _config_, "fromHistContent" );
+    _parameters_.fromHistContent.isEnabled = true;
+    _parameters_.fromHistContent.rootFilePath = GenericToolbox::Json::fetchValue<std::string>(fromHistConfig, "fromRootFile");
+
+    auto sampleListConfig(GenericToolbox::Json::fetchValue<std::vector<JsonType>>(fromHistConfig, "sampleList"));
+    _parameters_.fromHistContent.sampleHistList.reserve(sampleListConfig.size());
+    for( auto& sampleConfig : sampleListConfig ){
+
+      auto& sampleHist = _parameters_.fromHistContent.addSampleHist(GenericToolbox::Json::fetchValue<std::string>(sampleConfig, "name"));
+      GenericToolbox::Json::fillValue(sampleConfig, sampleHist.hist, "hist");
+      GenericToolbox::Json::fillValue(sampleConfig, sampleHist.axisList, {{"axisList"},{"axis"}});
+    }
+
     return;
   }
 
-  _parameters_.treePath = GenericToolbox::Json::fetchValue<std::string>(_config_, "tree", _parameters_.treePath);
-  _parameters_.filePathList = GenericToolbox::Json::fetchValue<std::vector<std::string>>(_config_, "filePathList", _parameters_.filePathList);
-  _parameters_.additionalVarsStorage = GenericToolbox::Json::fetchValue(_config_, {{"additionalLeavesStorage"}, {"additionalVarsStorage"}}, _parameters_.additionalVarsStorage);
-  _parameters_.dummyVariablesList = GenericToolbox::Json::fetchValue(_config_, "dummyVariablesList", _parameters_.dummyVariablesList);
-  _parameters_.useReweightEngine = GenericToolbox::Json::fetchValue(_config_, {{"useReweightEngine"}, {"useMcContainer"}}, _parameters_.useReweightEngine);
-
-  _parameters_.dialIndexFormula = GenericToolbox::Json::fetchValue(_config_, "dialIndexFormula", _parameters_.dialIndexFormula);
-  _parameters_.selectionCutFormulaStr = GenericToolbox::Json::buildFormula(_config_, "selectionCutFormula", "&&", _parameters_.selectionCutFormulaStr);
-  _parameters_.nominalWeightFormulaStr = GenericToolbox::Json::buildFormula(_config_, "nominalWeightFormula", "*", _parameters_.nominalWeightFormulaStr);
-
-  _parameters_.debugNbMaxEventsToLoad = GenericToolbox::Json::fetchValue(_config_, "debugNbMaxEventsToLoad", _parameters_.debugNbMaxEventsToLoad);
+  // nested
+  // load transformations
+  int index{0};
+  for( auto& varTransform : GenericToolbox::Json::fetchValue(_config_, "variablesTransform", std::vector<JsonType>()) ){
+    _parameters_.eventVarTransformList.emplace_back( varTransform );
+    _parameters_.eventVarTransformList.back().setIndex(index++);
+    _parameters_.eventVarTransformList.back().configure();
+    if( not _parameters_.eventVarTransformList.back().isEnabled() ){
+      _parameters_.eventVarTransformList.pop_back();
+      continue;
+    }
+  }
 
   _parameters_.variableDict.clear();
   for( auto& entry : GenericToolbox::Json::fetchValue(_config_, {{"variableDict"}, {"overrideLeafDict"}}, JsonType()) ){
@@ -69,11 +84,40 @@ void DataDispenser::readConfigImpl(){
     _parameters_.variableDict[ varName ] = varExpr;
   }
 
-  _parameters_.overridePropagatorConfig = GenericToolbox::Json::fetchValue(_config_, "overridePropagatorConfig", _parameters_.overridePropagatorConfig);
+  // TODO: better implementation of those
+  _parameters_.selectionCutFormulaStr = GenericToolbox::Json::buildFormula(_config_, "selectionCutFormula", "&&", _parameters_.selectionCutFormulaStr);
+  _parameters_.nominalWeightFormulaStr = GenericToolbox::Json::buildFormula(_config_, "nominalWeightFormula", "*", _parameters_.nominalWeightFormulaStr);
+
+  // options
+  GenericToolbox::Json::fillValue(_config_, _parameters_.treePath, "tree");
+  GenericToolbox::Json::fillValue(_config_, _parameters_.filePathList, "filePathList");
+  GenericToolbox::Json::fillValue(_config_, _parameters_.additionalVarsStorage, {{"additionalLeavesStorage"}, {"additionalVarsStorage"}});
+  GenericToolbox::Json::fillValue(_config_, _parameters_.dummyVariablesList, "dummyVariablesList");
+  GenericToolbox::Json::fillValue(_config_, _parameters_.useReweightEngine, {{"useReweightEngine"}, {"useMcContainer"}});
+  GenericToolbox::Json::fillValue(_config_, _parameters_.debugNbMaxEventsToLoad, "debugNbMaxEventsToLoad");
+  GenericToolbox::Json::fillValue(_config_, _parameters_.dialIndexFormula, "dialIndexFormula");
+  GenericToolbox::Json::fillValue(_config_, _parameters_.overridePropagatorConfig, "overridePropagatorConfig");
+
 }
 void DataDispenser::initializeImpl(){
   // Nothing else to do other than read config?
   LogWarning << "Initialized data dispenser: " << getTitle() << std::endl;
+
+  for( auto& eventVarTransform: _parameters_.eventVarTransformList ){
+    eventVarTransform.initialize();
+  }
+  // sort them according to their output
+  GenericToolbox::sortVector(_parameters_.eventVarTransformList, [](const EventVarTransformLib& a_, const EventVarTransformLib& b_){
+    // does a_ is a self transformation? -> if yes, don't change the order
+    if( GenericToolbox::doesElementIsInVector(a_.getOutputVariableName(), a_.fetchRequestedVars()) ){ return false; }
+    // does b_ transformation needs a_ output? -> if yes, a needs to go first
+    if( GenericToolbox::doesElementIsInVector(a_.getOutputVariableName(), b_.fetchRequestedVars()) ){ return true; }
+    // otherwise keep the order from the declaration
+    if( a_.getIndex() < b_.getIndex() ) return true;
+    // default -> won't change the order
+    return false;
+  });
+
 }
 
 void DataDispenser::load(Propagator& propagator_){
@@ -89,7 +133,7 @@ void DataDispenser::load(Propagator& propagator_){
     LogWarning << "Reload the propagator config with override options" << std::endl;
     ConfigUtils::ConfigHandler configHandler( _cache_.propagatorPtr->getConfig() );
     configHandler.override( _parameters_.overridePropagatorConfig );
-    _cache_.propagatorPtr->readConfig( configHandler.getConfig() );
+    _cache_.propagatorPtr->configure( configHandler.getConfig() );
     _cache_.propagatorPtr->initialize();
   }
 
@@ -100,7 +144,7 @@ void DataDispenser::load(Propagator& propagator_){
     return;
   }
 
-  if( not _parameters_.fromHistContent.empty() ){
+  if( _parameters_.fromHistContent.isEnabled ){
     this->loadFromHistContent();
     return;
   }
@@ -163,32 +207,6 @@ void DataDispenser::parseStringParameters() {
     }
     // make sure we process the longest words first: "thisIsATest" variable should be replaced before "thisIs"
     GenericToolbox::sortVector(_cache_.varsToOverrideList, [](const std::string& a_, const std::string& b_){ return a_.size() > b_.size(); });
-  }
-
-  if( GenericToolbox::Json::doKeyExist(_config_, "variablesTransform") ){
-    // load transformations
-    int index{0};
-    for( auto& varTransform : GenericToolbox::Json::fetchValue<std::vector<JsonType>>(_config_, "variablesTransform") ){
-      _cache_.eventVarTransformList.emplace_back( varTransform );
-      _cache_.eventVarTransformList.back().setIndex(index++);
-      _cache_.eventVarTransformList.back().readConfig();
-      if( not _cache_.eventVarTransformList.back().isEnabled() ){
-        _cache_.eventVarTransformList.pop_back();
-        continue;
-      }
-      _cache_.eventVarTransformList.back().initialize();
-    }
-    // sort them according to their output
-    GenericToolbox::sortVector(_cache_.eventVarTransformList, [](const EventVarTransformLib& a_, const EventVarTransformLib& b_){
-      // does a_ is a self transformation? -> if yes, don't change the order
-      if( GenericToolbox::doesElementIsInVector(a_.getOutputVariableName(), a_.fetchRequestedVars()) ){ return false; }
-      // does b_ transformation needs a_ output? -> if yes, a needs to go first
-      if( GenericToolbox::doesElementIsInVector(a_.getOutputVariableName(), b_.fetchRequestedVars()) ){ return true; }
-      // otherwise keep the order from the declaration
-      if( a_.getIndex() < b_.getIndex() ) return true;
-      // default -> won't change the order
-      return false;
-    });
   }
 
   replaceToyIndexFct(_parameters_.dialIndexFormula);
@@ -351,16 +369,16 @@ void DataDispenser::fetchRequestedLeaves(){
   }
 
   // transforms inputs
-  if( not _cache_.eventVarTransformList.empty() ){
+  if( not _parameters_.eventVarTransformList.empty() ){
     std::vector<std::string> indexRequests;
-    for( int iTrans = int(_cache_.eventVarTransformList.size())-1 ; iTrans >= 0 ; iTrans-- ){
+    for( int iTrans = int(_parameters_.eventVarTransformList.size())-1 ; iTrans >= 0 ; iTrans-- ){
       // in reverse order -> Treat the highest level vars first (they might need lower level variables)
-      std::string outVarName = _cache_.eventVarTransformList[iTrans].getOutputVariableName();
+      std::string outVarName = _parameters_.eventVarTransformList[iTrans].getOutputVariableName();
       if( GenericToolbox::doesElementIsInVector( outVarName, _cache_.varsRequestedForIndexing )
           or GenericToolbox::doesElementIsInVector( outVarName, indexRequests )
           ){
         // ok it is needed -> activate dependencies
-        for( auto& var: _cache_.eventVarTransformList[iTrans].fetchRequestedVars() ){
+        for( auto& var: _parameters_.eventVarTransformList[iTrans].fetchRequestedVars() ){
           GenericToolbox::addIfNotInVector(var, indexRequests);
         }
       }
@@ -391,7 +409,7 @@ void DataDispenser::fetchRequestedLeaves(){
     // possible dummy ?
     // [OUT] variables only
     // [OUT] not requested by its inputs
-    for( auto& varTransform : _cache_.eventVarTransformList ){
+    for( auto& varTransform : _parameters_.eventVarTransformList ){
       std::string outVarName = varTransform.getOutputVariableName();
       if( outVarName != var ) continue;
       if( GenericToolbox::doesElementIsInVector(outVarName, varTransform.fetchRequestedVars()) ) continue;
@@ -568,33 +586,19 @@ void DataDispenser::loadFromHistContent(){
   LogInfo << "Reading external hist files..." << std::endl;
 
   // read hist content from file
-  TFile* fHist{nullptr};
-  LogThrowIf( not GenericToolbox::Json::doKeyExist(_parameters_.fromHistContent, "fromRootFile"), "No root file provided." );
-  auto filePath = GenericToolbox::Json::fetchValue<std::string>(_parameters_.fromHistContent, "fromRootFile");
+  LogInfo << "Opening: " << _parameters_.fromHistContent.rootFilePath << std::endl;
+  auto* fHist = GenericToolbox::openExistingTFile(_parameters_.fromHistContent.rootFilePath);
 
-  LogInfo << "Opening: " << filePath << std::endl;
-
-  LogThrowIf( not GenericToolbox::doesTFileIsValid(filePath), "Could not open file: " << filePath );
-  fHist = TFile::Open(filePath.c_str());
-  LogThrowIf(fHist == nullptr, "Could not open file: " << filePath);
-
-  LogThrowIf( not GenericToolbox::Json::doKeyExist(_parameters_.fromHistContent, "sampleList"), "Could not find samplesList." );
-  auto sampleList = GenericToolbox::Json::fetchValue<JsonType>(_parameters_.fromHistContent, "sampleList");
   for( auto& sample : _cache_.samplesToFillList ){
     LogScopeIndent;
 
-    auto entry = GenericToolbox::Json::fetchMatchingEntry( sampleList, "name", sample->getName() );
-    LogContinueIf( entry.empty(), "Could not find sample histogram: " << sample->getName() );
+    auto* sampleHistDef = _parameters_.fromHistContent.getSampleHistPtr(sample->getName());
+    LogThrowIf(sampleHistDef== nullptr, "Could not find sample histogram: " << sample->getName());
 
-    LogThrowIf( not GenericToolbox::Json::doKeyExist( entry, "hist" ), "No hist name provided for " << sample->getName() );
-    auto histName = GenericToolbox::Json::fetchValue<std::string>( entry, "hist" );
-    LogInfo << "Filling sample \"" << sample->getName() << "\" using hist with name: " << histName << std::endl;
+    LogInfo << "Filling sample \"" << sample->getName() << "\" using hist with name: " << sampleHistDef->hist << std::endl;
 
-    LogThrowIf( not GenericToolbox::Json::doKeyExist( entry, "axis" ), "No axis names provided for " << sample->getName() );
-    auto axisNameList = GenericToolbox::Json::fetchValue<std::vector<std::string>>(entry, "axis");
-
-    auto* hist = fHist->Get<THnD>( histName.c_str() );
-    LogThrowIf( hist == nullptr, "Could not find THnD \"" << histName << "\" within " << fHist->GetPath() );
+    auto* hist = fHist->Get<THnD>( sampleHistDef->hist.c_str() );
+    LogThrowIf( hist == nullptr, "Could not find THnD \"" << sampleHistDef->hist << "\" within " << fHist->GetPath() );
 
     int nBins = 1;
     for( int iDim = 0 ; iDim < hist->GetNdimensions() ; iDim++ ){
@@ -607,12 +611,12 @@ void DataDispenser::loadFromHistContent(){
                                                                            << GET_VAR_NAME_VALUE(sample->getBinning().getBinList().size()) << std::endl;
 
     for( size_t iBin = 0 ; iBin < sample->getBinning().getBinList().size() ; iBin++ ){
-      auto target = sample->getBinning().getBinList()[iBin].generateBinTarget( axisNameList );
+      auto target = sample->getBinning().getBinList()[iBin].generateBinTarget( sampleHistDef->axisList );
       auto histBinIndex = hist->GetBin( target.data() ); // bad fetch..?
 
       sample->getEventList()[iBin].getIndices().sample = sample->getIndex();
       for( size_t iVar = 0 ; iVar < target.size() ; iVar++ ){
-        sample->getEventList()[iBin].getVariables().fetchVariable(axisNameList[iVar]).set(target[iVar]);
+        sample->getEventList()[iBin].getVariables().fetchVariable(sampleHistDef->axisList[iVar]).set(target[iVar]);
       }
       sample->getEventList()[iBin].getWeights().base = (hist->GetBinContent(histBinIndex));
       sample->getEventList()[iBin].getWeights().resetCurrentWeight();
@@ -818,7 +822,7 @@ void DataDispenser::fillFunction(int iThread_){
   for( auto& lfSto: leafFormStorageList ){ lfSto = &(lCollection.getLeafFormList()[(size_t) lfSto]); }
 
   // Event Var Transform
-  auto eventVarTransformList = _cache_.eventVarTransformList; // copy for cache
+  auto eventVarTransformList = _parameters_.eventVarTransformList; // copy for cache
   std::vector<EventVarTransformLib*> varTransformForIndexingList;
   std::vector<EventVarTransformLib*> varTransformForStorageList;
   for( auto& eventVarTransform : eventVarTransformList ){

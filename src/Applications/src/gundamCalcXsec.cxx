@@ -7,7 +7,6 @@
 
 #include "Logger.h"
 #include "CmdLineParser.h"
-#include "GenericToolbox.Json.h"
 #include "GenericToolbox.Root.h"
 #include "GenericToolbox.Utils.h"
 
@@ -117,17 +116,19 @@ int main(int argc, char** argv){
 
   // Disabling defined fit samples:
   LogInfo << "Removing defined samples..." << std::endl;
-  ConfigUtils::clearEntry( cHandler.getConfig(), "fitterEngineConfig/likelihoodInterfaceConfig/dataSetManagerConfig/propagatorConfig/sampleSetConfig/sampleList" );
-  ConfigUtils::clearEntry( cHandler.getConfig(), "fitterEngineConfig/likelihoodInterfaceConfig/dataSetManagerConfig/propagatorConfig/fitSampleSetConfig/fitSampleList" );
-  ConfigUtils::clearEntry( cHandler.getConfig(), "fitterEngineConfig/propagatorConfig/fitSampleSetConfig/fitSampleList" );
+  GenericToolbox::Json::clearEntry( cHandler.getConfig(), "fitterEngineConfig/likelihoodInterfaceConfig/propagatorConfig/sampleSetConfig/sampleList" );
+  GenericToolbox::Json::clearEntry( cHandler.getConfig(), "fitterEngineConfig/likelihoodInterfaceConfig/dataSetManagerConfig/propagatorConfig/sampleSetConfig/sampleList" );
+  GenericToolbox::Json::clearEntry( cHandler.getConfig(), "fitterEngineConfig/likelihoodInterfaceConfig/dataSetManagerConfig/propagatorConfig/fitSampleSetConfig/fitSampleList" );
+  GenericToolbox::Json::clearEntry( cHandler.getConfig(), "fitterEngineConfig/propagatorConfig/fitSampleSetConfig/fitSampleList" );
 
   // Disabling defined plots:
   LogInfo << "Removing defined plots..." << std::endl;
-  ConfigUtils::clearEntry( cHandler.getConfig(), "fitterEngineConfig/likelihoodInterfaceConfig/dataSetManagerConfig/propagatorConfig/plotGeneratorConfig" );
-  ConfigUtils::clearEntry( cHandler.getConfig(), "fitterEngineConfig/propagatorConfig/plotGeneratorConfig" );
+  GenericToolbox::Json::clearEntry( cHandler.getConfig(), "fitterEngineConfig/likelihoodInterfaceConfig/propagatorConfig/plotGeneratorConfig" );
+  GenericToolbox::Json::clearEntry( cHandler.getConfig(), "fitterEngineConfig/likelihoodInterfaceConfig/dataSetManagerConfig/propagatorConfig/plotGeneratorConfig" );
+  GenericToolbox::Json::clearEntry( cHandler.getConfig(), "fitterEngineConfig/propagatorConfig/plotGeneratorConfig" );
 
   // Defining signal samples
-  JsonType xsecConfig( ConfigUtils::readConfigFile( clParser.getOptionVal<std::string>("configFile") ) );
+  auto xsecConfig( ConfigUtils::readConfigFile( clParser.getOptionVal<std::string>("configFile") ) );
   cHandler.override( xsecConfig );
   LogInfo << "Override done." << std::endl;
 
@@ -136,7 +137,7 @@ int main(int argc, char** argv){
 
   // it will handle all the deprecated config options and names properly
   FitterEngine fitter{nullptr};
-  fitter.readConfig( GenericToolbox::Json::fetchValue<JsonType>( cHandler.getConfig(), "fitterEngineConfig" ) );
+  fitter.configure( GenericToolbox::Json::fetchValue<JsonType>( cHandler.getConfig(), "fitterEngineConfig" ) );
 
   // We are only interested in our MC. Data has already been used to get the post-fit error/values
   fitter.getLikelihoodInterface().setForceAsimovData( true );
@@ -239,7 +240,7 @@ int main(int argc, char** argv){
   else{
     // appendixDict["optionName"] = "Appendix"
     // this list insure all appendices will appear in the same order
-    std::vector<std::pair<std::string, std::string>> appendixDict{
+    std::vector<GundamUtils::AppendixEntry> appendixDict{
         {"configFile", ""},
         {"fitterFile", "Fit"},
         {"nToys", "nToys"},
@@ -274,7 +275,7 @@ int main(int argc, char** argv){
   LogInfo << "Creating normalizer objects..." << std::endl;
   // flux renorm with toys
   struct ParSetNormaliser{
-    void readConfig(const JsonType& config_){
+    void configure(const JsonType& config_){
       LogScopeIndent;
 
       name = GenericToolbox::Json::fetchValue<std::string>(config_, "name");
@@ -286,12 +287,11 @@ int main(int argc, char** argv){
       axisVariable = GenericToolbox::Json::fetchValue<std::string>(config_, "axisVariable");
 
       // optionals
-      for( auto& parSelConfig : GenericToolbox::Json::fetchValue<JsonType>(config_, "parSelections") ){
-        parSelections.emplace_back();
-        parSelections.back().first = GenericToolbox::Json::fetchValue<std::string>(parSelConfig, "name");
-        parSelections.back().second = GenericToolbox::Json::fetchValue<double>(parSelConfig, "value");
+      for( auto& parSelConfig : GenericToolbox::Json::fetchValue(config_, "parSelections", JsonType()) ){
+        parSelectionList.emplace_back();
+        GenericToolbox::Json::fillValue(parSelConfig, parSelectionList.back().name, "name");
+        GenericToolbox::Json::fillValue(parSelConfig, parSelectionList.back().value, "value");
       }
-      parSelections = GenericToolbox::Json::fetchValue(config_, "parSelections", parSelections);
 
       // init
       LogScopeIndent;
@@ -299,11 +299,11 @@ int main(int argc, char** argv){
       LogInfo << GET_VAR_NAME_VALUE(histogramPath) << std::endl;
       LogInfo << GET_VAR_NAME_VALUE(axisVariable) << std::endl;
 
-      if( not parSelections.empty() ){
+      if( not parSelectionList.empty() ){
         LogInfo << "parSelections:" << std::endl;
-        for( auto& parSelection : parSelections ){
+        for( auto& parSelection : parSelectionList ){
           LogScopeIndent;
-          LogInfo << parSelection.first << " -> " << parSelection.second << std::endl;
+          LogInfo << parSelection.name << " -> " << parSelection.value << std::endl;
         }
       }
 
@@ -334,8 +334,8 @@ int main(int argc, char** argv){
           bool isParBinValid{true};
 
           // first check the conditions
-          for( auto& selection : parSelections ){
-            if( parBin.isVariableSet(selection.first) and not parBin.isBetweenEdges(selection.first, selection.second) ){
+          for( auto& selection : parSelectionList ){
+            if( parBin.isVariableSet(selection.name) and not parBin.isBetweenEdges(selection.name, selection.value) ){
               isParBinValid = false;
               break;
             }
@@ -368,7 +368,12 @@ int main(int argc, char** argv){
     std::string filePath{};
     std::string histogramPath{};
     std::string axisVariable{};
-    std::vector<std::pair<std::string, double>> parSelections{};
+
+    struct ParSelection{
+      std::string name{};
+      double value{};
+    };
+    std::vector<ParSelection> parSelectionList{};
 
     // internals
     std::shared_ptr<TFile> file{nullptr};
@@ -377,20 +382,18 @@ int main(int argc, char** argv){
   };
   std::vector<ParSetNormaliser> parSetNormList;
   for( auto& parSet : propagator.getParametersManager().getParameterSetsList() ){
-    if( GenericToolbox::Json::doKeyExist(parSet.getConfig(), "normalisations") ){
-      for( auto& parSetNormConfig : GenericToolbox::Json::fetchValue<JsonType>(parSet.getConfig(), "normalisations") ){
-        parSetNormList.emplace_back();
-        parSetNormList.back().readConfig( parSetNormConfig );
+    for( auto& parSetNormConfig : GenericToolbox::Json::fetchValue(parSet.getConfig(), "normalisations", JsonType()) ){
+      parSetNormList.emplace_back();
+      parSetNormList.back().configure( parSetNormConfig );
 
-        for( auto& dialCollection : propagator.getDialCollectionList() ){
-          if( dialCollection.getSupervisedParameterSet() == &parSet ){
-            parSetNormList.back().dialCollectionPtr = &dialCollection;
-            break;
-          }
+      for( auto& dialCollection : propagator.getDialCollectionList() ){
+        if( dialCollection.getSupervisedParameterSet() == &parSet ){
+          parSetNormList.back().dialCollectionPtr = &dialCollection;
+          break;
         }
-
-        parSetNormList.back().initialize();
       }
+
+      parSetNormList.back().initialize();
     }
   }
 
@@ -398,7 +401,7 @@ int main(int argc, char** argv){
 
   // to be filled up
   struct BinNormaliser{
-    void readConfig(const JsonType& config_){
+    void configure(const JsonType& config_){
       LogScopeIndent;
 
       name = GenericToolbox::Json::fetchValue<std::string>(config_, "name");
@@ -411,9 +414,9 @@ int main(int argc, char** argv){
       LogInfo << "Re-normalization config \"" << name << "\": ";
 
       if     ( GenericToolbox::Json::doKeyExist( config_, "meanValue" ) ){
-        normParameter.first  = GenericToolbox::Json::fetchValue<double>(config_, "meanValue");
-        normParameter.second = GenericToolbox::Json::fetchValue(config_, "stdDev", double(0.));
-        LogInfo << "mean ± sigma = " << normParameter.first << " ± " << normParameter.second;
+        normParameter.min  = GenericToolbox::Json::fetchValue<double>(config_, "meanValue");
+        normParameter.max = GenericToolbox::Json::fetchValue(config_, "stdDev", double(0.));
+        LogInfo << "mean ± sigma = " << normParameter.min << " ± " << normParameter.max;
       }
       else if( GenericToolbox::Json::doKeyExist( config_, "disabledBinDim" ) ){
         disabledBinDim = GenericToolbox::Json::fetchValue<std::string>(config_, "disabledBinDim");
@@ -432,7 +435,7 @@ int main(int argc, char** argv){
     }
 
     std::string name{};
-    std::pair<double, double> normParameter{std::nan("mean unset"), std::nan("stddev unset")};
+    GenericToolbox::Range normParameter{};
     std::string disabledBinDim{};
     std::string parSetNormaliserName{};
 
@@ -482,7 +485,7 @@ int main(int argc, char** argv){
     xsecEntry.normList.reserve( normConfigList.size() );
     for( auto& normConfig : normConfigList ){
       xsecEntry.normList.emplace_back();
-      xsecEntry.normList.back().readConfig( normConfig );
+      xsecEntry.normList.back().configure( normConfig );
     }
 
     xsecEntry.histogram = TH1D(
@@ -523,9 +526,9 @@ int main(int argc, char** argv){
 
         // special re-norm
         for( auto& normData : xsec.normList ){
-          if( not std::isnan( normData.normParameter.first ) ){
-            double norm{normData.normParameter.first};
-            if( normData.normParameter.second != 0 ){ norm += normData.normParameter.second * gRandom->Gaus(); }
+          if( not std::isnan( normData.normParameter.min ) ){
+            double norm{normData.normParameter.min};
+            if( normData.normParameter.max != 0 ){ norm += normData.normParameter.max * gRandom->Gaus(); }
             binData /= norm;
           }
           else if( not normData.parSetNormaliserName.empty() ){
