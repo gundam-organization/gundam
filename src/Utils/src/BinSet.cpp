@@ -5,7 +5,6 @@
 #include "BinSet.h"
 #include "ConfigUtils.h"
 
-
 #include "Logger.h"
 
 #include <string>

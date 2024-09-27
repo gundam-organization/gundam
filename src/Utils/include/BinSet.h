@@ -5,7 +5,6 @@
 #ifndef GUNDAM_BINSET_H
 #define GUNDAM_BINSET_H
 
-
 #include "Bin.h"
 
 #include <vector>

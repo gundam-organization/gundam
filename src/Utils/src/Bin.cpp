@@ -6,8 +6,6 @@
 
 #include "Logger.h"
 
-#include "GenericToolbox.Root.h"
-
 #include <stdexcept>
 #include <sstream>
 
@@ -184,39 +182,15 @@ std::vector<std::string> Bin::buildVariableNameList() const{
   return out;
 }
 
-
 // Misc
-void Bin::generateFormula() {
-  _formulaStr_ = generateFormulaStr(false);
-  _formula_ = std::make_shared<TFormula>(_formulaStr_.c_str(), _formulaStr_.c_str());
-}
-void Bin::generateTreeFormula() {
-  _treeFormulaStr_ = generateFormulaStr(true);
-  // For treeFormula we need a fake tree to compile the formula
-  std::vector<std::string> varNameList;
-  varNameList.reserve( _binEdgesList_.size() );
-  for( auto& edges : _binEdgesList_ ){
-    std::string nameCandidate{(edges.varName.empty() ? "var" + std::to_string(edges.index): edges.varName)};
-    if( not GenericToolbox::doesElementIsInVector(nameCandidate, varNameList) ){
-      varNameList.emplace_back(nameCandidate);
-    }
-  }
-  _treeFormula_ = std::shared_ptr<TTreeFormula>(GenericToolbox::createTreeFormulaWithoutTree(_treeFormulaStr_, varNameList));
-}
 std::string Bin::getSummary() const{
   std::stringstream ss;
 
   if( _binEdgesList_.empty() ) ss << "bin not set.";
   else{
-
-    if( _treeFormula_ != nullptr ){
-      ss << "\"" << _treeFormula_->GetExpFormula() << "\"";
-    }
-    else{
-      for( auto& edges : _binEdgesList_ ){
-        if( edges.index != 0 ){ ss << ", "; }
-        ss << edges.getSummary();
-      }
+    for( auto& edges : _binEdgesList_ ){
+      if( edges.index != 0 ){ ss << ", "; }
+      ss << edges.getSummary();
     }
   }
   return ss.str();
@@ -230,35 +204,4 @@ std::vector<double> Bin::generateBinTarget( const std::vector<std::string>& varN
   }
   return out;
 }
-
-
-// Protected
-std::string Bin::generateFormulaStr( bool varNamesAsTreeFormula_) {
-  std::stringstream ss;
-  for( auto& edges : _binEdgesList_ ){
-
-    std::string varName{};
-    if( edges.varName.empty() ){ varName = "var" + std::to_string(edges.index); }
-    else{ varName = edges.varName; }
-
-    if(not varNamesAsTreeFormula_){
-      // Formula: no array authorized, putting parenthesis instead
-      GenericToolbox::replaceSubstringInsideInputString(varName, "[", "(");
-      GenericToolbox::replaceSubstringInsideInputString(varName, "]", ")");
-      // Wrapping varname in brackets
-      varName.insert(varName.begin(), '[');
-      varName += ']';
-    }
-
-    if( not ss.str().empty() ){
-      ss << " && ";
-    }
-
-    if( edges.isConditionVar ){ ss << varName << " == " << edges.min; }
-    else{ ss << edges.min << " <= " << varName << " && " << varName << " < " << edges.max; }
-  }
-
-  return ss.str();
-}
-
 
