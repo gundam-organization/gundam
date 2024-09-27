@@ -58,9 +58,6 @@ public:
   [[nodiscard]] size_t getInputSize() const{ return _inputParameterReferenceList_.size(); }
   [[nodiscard]] const std::vector<double>& getInputBuffer() const { return _inputBuffer_; }
   [[nodiscard]] const std::vector<ParameterReference> &getInputParameterIndicesList() const{ return _inputParameterReferenceList_; }
-#if USE_ZLIB
-  [[nodiscard]] const uint32_t& getCurrentHash() const{ return _currentHash_; }
-#endif
 
   // mutable getters
 
@@ -96,11 +93,6 @@ public:
   [[deprecated("use getParameter()")]] [[nodiscard]] const Parameter& getFitParameter(int i=0) const { return getParameter(i); }
   [[deprecated("use getParameterSet()")]] [[nodiscard]] const ParameterSet& getFitParameterSet(int i=0) const { return getParameterSet(i); }
 
-protected:
-#if USE_ZLIB
-  uint32_t generateHash();
-#endif
-
 private:
   /// Flag if the member can be still edited.
   bool _isInitialized_{false};
@@ -125,11 +117,6 @@ private:
   /// There is one entry per parameter used by the dial (e.g. a 1D parameter
   /// has one entry)
   std::vector<ParameterReference> _inputParameterReferenceList_{};
-
-#if USE_ZLIB
-  // for cache
-  uint32_t _currentHash_{0};
-#endif
 
 };
 

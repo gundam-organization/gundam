@@ -173,30 +173,6 @@ include_directories( ${YAMLCPP_INCLUDE_DIR} )
 link_libraries( ${YAML_CPP_LIBRARIES} )
 
 
-####################
-# ZLIB (optional)
-####################
-
-if( ${ENABLE_ZLIB} )
-  cmessage( STATUS "Looking for optional ZLib install..." )
-  find_package(ZLIB)
-
-  if( ZLIB_FOUND )
-    cmessage( STATUS "ZLIB found : ${ZLIB_VERSION_STRING}")
-    cmessage( STATUS "ZLIB_INCLUDE_DIRS = ${ZLIB_INCLUDE_DIRS}")
-    cmessage( STATUS "ZLIB_LIBRARIES = ${ZLIB_LIBRARIES}")
-
-    add_definitions( -D USE_ZLIB=1 )
-    include_directories( ${ZLIB_INCLUDE_DIRS} )
-    link_libraries( ${ZLIB_LIBRARIES} )
-  else()
-    cmessage( FATAL "Could not find ZLib. (ENABLE_ZLIB=ON)" )
-  endif()
-else()
-  add_definitions( -D USE_ZLIB=0 )
-endif()
-
-
 
 ####################
 # CUDA (optional)
