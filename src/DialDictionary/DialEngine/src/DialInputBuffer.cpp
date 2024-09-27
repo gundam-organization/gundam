@@ -6,9 +6,6 @@
 
 #include "Logger.h"
 
-#if USE_ZLIB
-#include "zlib.h"
-#endif
 
 #ifndef DISABLE_USER_HEADER
 LoggerInit([]{ Logger::setUserHeaderStr("[DialInputBuffer]"); });
@@ -81,10 +78,6 @@ void DialInputBuffer::update(){
       _inputBuffer_[inputRef.bufferIndex] = tempBuffer;
     }
   }
-
-#if USE_ZLIB
-  _currentHash_ = generateHash();
-#endif
 }
 void DialInputBuffer::addParameterReference( const ParameterReference& parReference_){
   LogThrowIf(_isInitialized_, "Can't add parameter index while initialized.");
@@ -114,15 +107,3 @@ std::string DialInputBuffer::getSummary() const{
 
   return ss.str();
 }
-
-#if USE_ZLIB
-uint32_t DialInputBuffer::generateHash(){
-  uint32_t out = crc32(0L, Z_NULL, 0);
-  double* inputPtr = _inputBuffer_.data();
-  while( inputPtr < _inputBuffer_.data() + _inputBuffer_.size() ){
-    out = crc32( out, (const Bytef*) inputPtr, sizeof(double) );
-    inputPtr++;
-  }
-  return out;
-}
-#endif
