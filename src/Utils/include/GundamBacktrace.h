@@ -26,7 +26,7 @@ namespace GundamUtils {
     template<class CharT, class Traits>
     std::basic_ostream<CharT,Traits>&
     Backtrace(std::basic_ostream<CharT, Traits>& out) {
-#if defined(__linux__)
+#if defined(__linux__) || defined(__APPLE__) || defined(__MACH__)
         void *buffer[100];
         int nptrs = backtrace(buffer,100);
         out << "Backtrace of " << nptrs << " calls" << std::endl;
