@@ -6,15 +6,10 @@
 #define GUNDAM_EVENT_H
 
 #include "EventUtils.h"
-#include "ParameterSet.h"
 #include "DataBinSet.h"
 #include "DataBin.h"
 
-#include "GenericToolbox.Root.h"
 #include "GenericToolbox.Utils.h"
-
-#include "TTree.h"
-#include "TFormula.h"
 
 #include <map>
 #include <mutex>
