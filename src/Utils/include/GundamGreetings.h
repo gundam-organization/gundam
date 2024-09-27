@@ -5,22 +5,19 @@
 #ifndef GUNDAM_GUNDAMGREETINGS_H
 #define GUNDAM_GUNDAMGREETINGS_H
 
-
 #include <string>
 
 
 class GundamGreetings {
 
 public:
-  GundamGreetings();
-  virtual ~GundamGreetings();
+  GundamGreetings() = default;
+  virtual ~GundamGreetings() = default;
 
-  void setAppName(const std::string &appName);
+  void setAppName(const std::string &appName){ _appName_ = appName; }
 
   void hello();
   void goodbye();
-
-  static bool isNewerOrEqualVersion(const std::string &appName);
 
 private:
   std::string _appName_{};
