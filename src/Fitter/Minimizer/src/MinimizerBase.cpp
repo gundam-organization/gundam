@@ -290,7 +290,7 @@ void MinimizerBase::printParameters(){
       std::string colorStr;
       std::string statusStr;
 
-      if( not par.isEnabled() ) { statusStr = "Disabled"; colorStr = GenericToolbox::ColorCodes::yellowBackground; }
+      if( not par.isEnabled() ) { continue; }
       else if( par.isFixed() )  { statusStr = "Fixed (prior applied)";    colorStr = GenericToolbox::ColorCodes::redBackground; }
       else                      {
         statusStr = Parameter::PriorType::toString(par.getPriorType()) + " Prior";
