@@ -43,7 +43,7 @@ if(GTEST_FOUND)
         GTests/cachedSumsTest.cpp
         GTests/hemiExternals.cpp)
     target_link_libraries(gundamGTest_host.exe GTest::gtest_main)
-    target_link_libraries(gundamGTest_host.exe GundamCache)
+    target_link_libraries(gundamGTest_host.exe GundamCacheManager)
     target_compile_definitions(gundamGTest_host.exe PUBLIC HEMI_CUDA_DISABLE)
     gtest_discover_tests(gundamGTest_host.exe)
 
@@ -56,7 +56,7 @@ if(GTEST_FOUND)
           GTests/cachedSumsTest.cu
           GTests/hemiExternals.cpp)
       target_link_libraries(gundamGTest_device.exe GTest::gtest_main)
-      target_link_libraries(gundamGTest_device.exe GundamCache)
+      target_link_libraries(gundamGTest_device.exe GundamCacheManager)
       gtest_discover_tests(gundamGTest_device.exe)
     endif(CMAKE_CUDA_COMPILER)
 

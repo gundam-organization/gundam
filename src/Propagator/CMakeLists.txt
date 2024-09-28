@@ -35,7 +35,7 @@ target_include_directories( GundamPropagator
 )
 
 if( WITH_CACHE_MANAGER )
-  set(CACHE_MANAGER_LIBRARIES "GundamCache")
+  set(CACHE_MANAGER_LIBRARIES "GundamCacheManager")
 else()
   set(CACHE_MANAGER_LIBRARIES "")
 endif()
