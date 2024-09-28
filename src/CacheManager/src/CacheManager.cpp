@@ -293,7 +293,8 @@ bool Cache::Manager::Build(SampleSet& sampleList,
   // Count the total number of histogram cells.
   config.histBins = 0;
   for(const Sample& sample : sampleList.getSampleList() ){
-    int cells = sample.generateRootHistogram()->GetNcells();
+    int cells = sample.getHistogram().nBins;
+    // sample.generateRootHistogram()->GetNcells()
     LogInfo  << "Add histogram for " << sample.getName()
              << " with " << cells
              << " cells (includes under/over-flows)" << std::endl;
@@ -469,7 +470,7 @@ bool Cache::Manager::Update(SampleSet& sampleList,
         .GetResultValidPointer());
     event.getCache().updateCallbackPtr = (
         [](){
-          LogTrace << "Copy event weights from Device to Host"
+          LogInfo << "Copy event weights from Device to Host"
                    << std::endl;
           Cache::Manager::Get()->GetWeightsCache().GetResult(0);
         });
@@ -683,14 +684,14 @@ bool Cache::Manager::Update(SampleSet& sampleList,
   // but is officially "dangerous".
   LogInfo << "Add this histogram cells to the cache." << std::endl;
   int nextHist = 0;
-  for(Sample& sample : sampleList.getSampleList() ) {
+  for( Sample& sample : sampleList.getSampleList() ) {
     LogInfo  << "Fill cache for " << sample.getName()
              << " with " << sample.getEventList().size()
              << " events" << std::endl;
-    std::shared_ptr<TH1> hist(sample.generateRootHistogram());
-    if (!hist) {
-      LogThrow("missing sample histogram");
-    }
+//    std::shared_ptr<TH1> hist(sample.generateRootHistogram());
+//    if (!hist) {
+//      LogThrow("missing sample histogram");
+//    }
     int thisHist = nextHist;
     sample.setCacheManagerIndex(thisHist);
     sample.setCacheManagerValuePointer(
@@ -707,19 +708,18 @@ bool Cache::Manager::Update(SampleSet& sampleList,
           Cache::Manager::Get()->GetHistogramsCache().GetSum(0);
           Cache::Manager::Get()->GetHistogramsCache().GetSum2(0);
         });
-    int cells = hist->GetNcells();
+    int cells = sample.getHistogram().nBins;
+    // ->GetNcells()
     nextHist += cells;
     /// ARE ALL OF THE EVENTS HANDLED?
-    for (Event& event
-        : sample.getEventList()) {
+    for( auto& event : sample.getEventList() ){
       int eventIndex = event.getCache().index;
       int cellIndex = event.getIndices().bin;
       if (cellIndex < 0 || cells <= cellIndex) {
         LogThrow("Histogram bin out of range");
       }
       int theEntry = thisHist + cellIndex;
-      Cache::Manager::Get()->GetHistogramsCache()
-          .SetEventIndex(eventIndex,theEntry);
+      Cache::Manager::Get()->GetHistogramsCache().SetEventIndex(eventIndex,theEntry);
     }
   }
 
