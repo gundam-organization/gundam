@@ -144,16 +144,16 @@ void Propagator::reweightEvents() {
 
   updateDialState();
 
-  bool usedGPU{false};
+  usedGpu = false;
 #ifdef GUNDAM_USING_CACHE_MANAGER
   if( GundamGlobals::getEnableCacheManager() ) {
     if (Cache::Manager::Update(getSampleSet(), getEventDialCache())) {
-      usedGPU = Cache::Manager::Fill();
+      usedGpu = Cache::Manager::Fill();
     }
-    if (GundamGlobals::getForceDirectCalculation()) usedGPU = false;
+    if (GundamGlobals::getForceDirectCalculation()) usedGpu = false;
   }
 #endif
-  if( not usedGPU ){
+  if( not usedGpu ){
     if( not _devSingleThreadReweight_ ){
       _threadPool_.runJob("Propagator::reweightEvents");
     }
@@ -293,8 +293,10 @@ void Propagator::updateDialState(){
 void Propagator::refillHistograms(){
   refillHistogramTimer.start();
 
-  if( not _devSingleThreadHistFill_ ){ _threadPool_.runJob("Propagator::refillHistograms"); }
-  else{ refillHistogramsFct(-1); }
+  if( not usedGpu ){
+    if( not _devSingleThreadHistFill_ ){ _threadPool_.runJob("Propagator::refillHistograms"); }
+    else{ refillHistogramsFct(-1); }
+  }
 
   refillHistogramTimer.stop();
 }
