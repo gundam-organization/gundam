@@ -16,9 +16,9 @@ class SplineDial;
 #include <map>
 
 namespace Cache {
-    namespace Weight {
-        class Tabulated;
-    }
+  namespace Weight {
+    class Tabulated;
+  }
 }
 
 /// A class to apply the tabulated interpolation weight parameter to the cached
@@ -27,78 +27,78 @@ class Cache::Weight::Tabulated:
     public Cache::Weight::Base {
 public:
 
-    // Construct the class.  This should allocate all the memory on the host
-    // and on the GPU.  The "results" are the total number of results to be
-    // calculated (one result per event, often >1E+6).  The "parameters" are
-    // the number of input parameters that are used (often ~1000).  The
-    // parameters are not used by this class since the weight table is filled
-    // before the Cache::Manager starts.  The dials are the total entries that
-    // need to be reserved (typically one or two per event).  The tableSpace
-    // is the number of elements in the precalculated weight tables that will
-    // need to be copied to the GPU.  The map of tables holds the offset of each
-    // table in the table data that is copied to the GPU.
-    Tabulated(Cache::Weights::Results& results,
-              Cache::Parameters::Values& parameters,
-              std::size_t dials,
-              std::size_t tableSpace,
-              const std::map<const std::vector<double>*,int>& tables);
+  // Construct the class.  This should allocate all the memory on the host
+  // and on the GPU.  The "results" are the total number of results to be
+  // calculated (one result per event, often >1E+6).  The "parameters" are
+  // the number of input parameters that are used (often ~1000).  The
+  // parameters are not used by this class since the weight table is filled
+  // before the Cache::Manager starts.  The dials are the total entries that
+  // need to be reserved (typically one or two per event).  The tableSpace
+  // is the number of elements in the precalculated weight tables that will
+  // need to be copied to the GPU.  The map of tables holds the offset of each
+  // table in the table data that is copied to the GPU.
+  Tabulated(Cache::Weights::Results& results,
+            Cache::Parameters::Values& parameters,
+            std::size_t dials,
+            std::size_t tableSpace,
+            const std::map<const std::vector<double>*,int>& tables);
 
-    virtual ~Tabulated() = default;
+  virtual ~Tabulated() = default;
 
-    /// Reinitialize the cache.  This puts it into a state to be refilled, but
-    /// does not deallocate any memory.
-    virtual void Reset() override;
+  /// Reinitialize the cache.  This puts it into a state to be refilled, but
+  /// does not deallocate any memory.
+  virtual void Reset() override;
 
-    // Apply the kernel to the event weights.
-    virtual bool Apply() override;
+  // Apply the kernel to the event weights.
+  virtual bool Apply() override;
 
-    /// Add the data for a single dial.  The "table" must exist in the map of
-    /// tables.
-    void AddData(int resultIndex,
-                 const std::vector<double>* table,
-                 int index,
-                 double fraction);
+  /// Add the data for a single dial.  The "table" must exist in the map of
+  /// tables.
+  void AddData(int resultIndex,
+               const std::vector<double>* table,
+               int index,
+               double fraction);
 
-    /// Get the number of event-by-event entries reserved for the tabulated
-    /// splines
-    std::size_t GetReserved() const {return fReserved;}
+  /// Get the number of event-by-event entries reserved for the tabulated
+  /// splines
+  std::size_t GetReserved() const {return fReserved;}
 
-    /// Return the number of entries used for the tabulated splines
-    std::size_t GetUsed() const {return fUsed;}
+  /// Return the number of entries used for the tabulated splines
+  std::size_t GetUsed() const {return fUsed;}
 
-    /// Get the space reserved for the tables.
-    std::size_t GetDataReserved() const { return fDataReserved; }
+  /// Get the space reserved for the tables.
+  std::size_t GetDataReserved() const { return fDataReserved; }
 
-    /// Get the space used by the the tables.
-    std::size_t GetDataUsed() const { return fDataUsed; }
+  /// Get the space used by the the tables.
+  std::size_t GetDataUsed() const { return fDataUsed; }
 
 private:
 
-    // The number of tabulated dials that have been reserved, and used.
-    std::size_t fReserved;
-    std::size_t fUsed;
+  // The number of tabulated dials that have been reserved, and used.
+  std::size_t fReserved;
+  std::size_t fUsed;
 
-    ///////////////////////////////////////////////////////////////////////
-    /// An array of indices into the results that go for each surface.
-    /// This is copied from the CPU to the GPU once, and is then constant.
-    std::unique_ptr<hemi::Array<int>> fResult;
+  ///////////////////////////////////////////////////////////////////////
+  /// An array of indices into the results that go for each surface.
+  /// This is copied from the CPU to the GPU once, and is then constant.
+  std::unique_ptr<hemi::Array<int>> fResult;
 
-    /// An array of indices for the dial in the tables. This is copied from
-    /// the CPU to the GPU once, and is then constant.
-    std::unique_ptr<hemi::Array<int>> fIndex;
+  /// An array of indices for the dial in the tables. This is copied from
+  /// the CPU to the GPU once, and is then constant.
+  std::unique_ptr<hemi::Array<int>> fIndex;
 
-    /// An array of fractional components for the dial in the tables. This is
-    /// copied from the CPU to the GPU once, and is then constant.
-    std::unique_ptr<hemi::Array<WEIGHT_BUFFER_FLOAT>> fFraction;
+  /// An array of fractional components for the dial in the tables. This is
+  /// copied from the CPU to the GPU once, and is then constant.
+  std::unique_ptr<hemi::Array<WEIGHT_BUFFER_FLOAT>> fFraction;
 
-    /// An array for the data in the tables.  This is copied from the CPU to
-    /// the GPU for each iteration.
-    std::size_t    fDataReserved;
-    std::size_t    fDataUsed;
-    std::unique_ptr<hemi::Array<WEIGHT_BUFFER_FLOAT>> fData;
+  /// An array for the data in the tables.  This is copied from the CPU to
+  /// the GPU for each iteration.
+  std::size_t    fDataReserved;
+  std::size_t    fDataUsed;
+  std::unique_ptr<hemi::Array<WEIGHT_BUFFER_FLOAT>> fData;
 
-    // The offsets for each table in the data.
-    const std::map<const std::vector<double>*, int> fTables;
+  // The offsets for each table in the data.
+  const std::map<const std::vector<double>*, int> fTables;
 };
 
 // An MIT Style License

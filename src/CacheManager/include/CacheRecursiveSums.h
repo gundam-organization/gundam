@@ -9,7 +9,7 @@
 #include <memory>
 
 namespace Cache {
-    class RecursiveSums;
+  class RecursiveSums;
 }
 
 /// A class to accumulate the sum of event weights into the histogram bins on
@@ -25,118 +25,118 @@ namespace Cache {
 /// multiple times.
 class Cache::RecursiveSums {
 private:
-    // Save the event weight cache reference for later use.  This is provided
-    // to the constructor.
-    Cache::Weights::Results& fEventWeights;
+  // Save the event weight cache reference for later use.  This is provided
+  // to the constructor.
+  Cache::Weights::Results& fEventWeights;
 
-    // The histogram bin index for each entry in the fWeights array (this is
-    // the same size as fEventWeights.  This is filled before initialization.
-    std::unique_ptr<hemi::Array<short>> fIndexes;
+  // The histogram bin index for each entry in the fWeights array (this is
+  // the same size as fEventWeights.  This is filled before initialization.
+  std::unique_ptr<hemi::Array<short>> fIndexes;
 
-    // An internal buffer holding the offset of each histogram bin in the
-    // event index array.  The start of the events in bin "N" will be
-    // fBinOffsets[N], and the end will be fBinOffsets[N+1], so looping over
-    // the events will be "for(i=fBinOffsets[N]; i<fBinOffsets[N+1]; ++i)"
-    std::unique_ptr<hemi::Array<int>> fBinOffsets;
+  // An internal buffer holding the offset of each histogram bin in the
+  // event index array.  The start of the events in bin "N" will be
+  // fBinOffsets[N], and the end will be fBinOffsets[N+1], so looping over
+  // the events will be "for(i=fBinOffsets[N]; i<fBinOffsets[N+1]; ++i)"
+  std::unique_ptr<hemi::Array<int>> fBinOffsets;
 
-    // An internal buffer storing the index of each entry associated in the
-    // fWeights array associated with the histogram bin.  The fBinOffsets
-    // field defines which bin the entries are associated with.
-    std::unique_ptr<hemi::Array<int>> fEventIndexes;
+  // An internal buffer storing the index of each entry associated in the
+  // fWeights array associated with the histogram bin.  The fBinOffsets
+  // field defines which bin the entries are associated with.
+  std::unique_ptr<hemi::Array<int>> fEventIndexes;
 
-    // An internal buffer used to do the recursive sum.  This starts as a copy
-    // of the fEventWeights input array (reordered by bin index), and is
-    // mutated until the sums can be read.
-    std::unique_ptr<hemi::Array<double>> fWorkBuffer;
+  // An internal buffer used to do the recursive sum.  This starts as a copy
+  // of the fEventWeights input array (reordered by bin index), and is
+  // mutated until the sums can be read.
+  std::unique_ptr<hemi::Array<double>> fWorkBuffer;
 
-    // An internal buffer used to map the fWorkBuffer index to the histogram
-    // bin index.
-    std::unique_ptr<hemi::Array<short>> fBinIndexes;
+  // An internal buffer used to map the fWorkBuffer index to the histogram
+  // bin index.
+  std::unique_ptr<hemi::Array<short>> fBinIndexes;
 
-    // The maximum number of entries in any bin. This will determine the number
-    // of iterations needed to calculate the sum.
-    int fMaxEntries;
+  // The maximum number of entries in any bin. This will determine the number
+  // of iterations needed to calculate the sum.
+  int fMaxEntries;
 
-    // The accumulated weights for each histogram bin.
-    std::unique_ptr<hemi::Array<double>> fSums;
+  // The accumulated weights for each histogram bin.
+  std::unique_ptr<hemi::Array<double>> fSums;
 
-    // The accumulated weights for each histogram bin.
-    std::unique_ptr<hemi::Array<double>> fSums2;
+  // The accumulated weights for each histogram bin.
+  std::unique_ptr<hemi::Array<double>> fSums2;
 
-    // The lower bound for any individual entry in the fWeights array.  This
-    // is a global event weight clamp.
-    double fLowerClamp;
+  // The lower bound for any individual entry in the fWeights array.  This
+  // is a global event weight clamp.
+  double fLowerClamp;
 
-    // The upper bound for any individual entry in the fWeights array.  This
-    // is a global event weight clamp.
-    double fUpperClamp;
+  // The upper bound for any individual entry in the fWeights array.  This
+  // is a global event weight clamp.
+  double fUpperClamp;
 
-    // Flag that the sum has been applied.
-    bool fSumsApplied;
+  // Flag that the sum has been applied.
+  bool fSumsApplied;
 
-    // Cache of whether the result values in memory are valid.
-    bool fSumsValid;
+  // Cache of whether the result values in memory are valid.
+  bool fSumsValid;
 
-    /// The (approximate) amount of memory required on the GPU.
-    std::size_t fTotalBytes{};
+  /// The (approximate) amount of memory required on the GPU.
+  std::size_t fTotalBytes{};
 
 public:
-    RecursiveSums(Cache::Weights::Results& eventWeight,
-                  std::size_t bins);
+  RecursiveSums(Cache::Weights::Results& eventWeight,
+                std::size_t bins);
 
-    /// Deconstruct the class.  This should deallocate all the memory
-    /// everyplace.
-    virtual ~RecursiveSums();
+  /// Deconstruct the class.  This should deallocate all the memory
+  /// everyplace.
+  virtual ~RecursiveSums();
 
-    /// Invalidate the sum in the CPU memory.
-    void Invalidate() {fSumsApplied = false; fSumsValid = false;}
+  /// Invalidate the sum in the CPU memory.
+  void Invalidate() {fSumsApplied = false; fSumsValid = false;}
 
-    /// Reinitialize the cache.  This puts it into a state to be refilled, but
-    /// does not deallocate any memory.
-    void Reset();
+  /// Reinitialize the cache.  This puts it into a state to be refilled, but
+  /// does not deallocate any memory.
+  void Reset();
 
-    /// Initialize the internal buffers for the cache for all of the events.
-    /// This builds all the maps between histogram bin and event index (and
-    /// counts the number of entries in each bin.
-    void Initialize();
+  /// Initialize the internal buffers for the cache for all of the events.
+  /// This builds all the maps between histogram bin and event index (and
+  /// counts the number of entries in each bin.
+  void Initialize();
 
-    /// Return the approximate allocated memory (e.g. on the GPU).
-    std::size_t GetResidentMemory() const {return fTotalBytes;}
+  /// Return the approximate allocated memory (e.g. on the GPU).
+  std::size_t GetResidentMemory() const {return fTotalBytes;}
 
-    // Assigns the bin number that an event will be added to.
-    void SetEventIndex(int event, int bin);
+  // Assigns the bin number that an event will be added to.
+  void SetEventIndex(int event, int bin);
 
-    // Set the maximum event weight to be applied as an upper clamp during the
-    // sum.  (Default: infinity).
-    void SetMaximumEventWeight(double maximum);
+  // Set the maximum event weight to be applied as an upper clamp during the
+  // sum.  (Default: infinity).
+  void SetMaximumEventWeight(double maximum);
 
-    // Set the minimum event weight to be applied as an upper clamp during the
-    // sum.  (Default: negative infinity).
-    void SetMinimumEventWeight(double minimum);
+  // Set the minimum event weight to be applied as an upper clamp during the
+  // sum.  (Default: negative infinity).
+  void SetMinimumEventWeight(double minimum);
 
-    /// Return the number of histogram bins that are accumulated.
-    std::size_t GetSumCount() const {return fSums->size();}
+  /// Return the number of histogram bins that are accumulated.
+  std::size_t GetSumCount() const {return fSums->size();}
 
-    /// Calculate the results and save them for later use.  This copies the
-    /// results from the GPU to the CPU.
-    virtual bool Apply();
+  /// Calculate the results and save them for later use.  This copies the
+  /// results from the GPU to the CPU.
+  virtual bool Apply();
 
-    /// Get the sum for index i from host memory.  This might trigger a copy
-    /// from the device if that is necessary.
-    double GetSum(int i);
+  /// Get the sum for index i from host memory.  This might trigger a copy
+  /// from the device if that is necessary.
+  double GetSum(int i);
 
-    /// Get the sum squared for index i from host memory.  This might trigger
-    /// a copy from the device if that is necessary.
-    double GetSum2(int i);
+  /// Get the sum squared for index i from host memory.  This might trigger
+  /// a copy from the device if that is necessary.
+  double GetSum2(int i);
 
-    /// The pointer to the array of sums on the host.
-    const double* GetSumsPointer();
+  /// The pointer to the array of sums on the host.
+  const double* GetSumsPointer();
 
-    /// The pointer to the array of sums squared on the host.
-    const double* GetSums2Pointer();
+  /// The pointer to the array of sums squared on the host.
+  const double* GetSums2Pointer();
 
-    /// A pointer to the validity flag.
-    bool* GetSumsValidPointer();
+  /// A pointer to the validity flag.
+  bool* GetSumsValidPointer();
 
 };
 

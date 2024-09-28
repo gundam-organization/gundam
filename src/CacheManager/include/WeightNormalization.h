@@ -9,10 +9,10 @@
 #include <memory>
 
 namespace Cache {
-    namespace Weight {
-        class Base;
-        class Normalization;
-    }
+  namespace Weight {
+    class Base;
+    class Normalization;
+  }
 }
 
 /// A class apply a normalization parameter to the cached event weights.  This
@@ -21,48 +21,48 @@ namespace Cache {
 class Cache::Weight::Normalization: public Cache::Weight::Base {
 private:
 
-    ///////////////////////////////////////////////////////////////////////
-    /// An array of indices into the results that go for each normalization.
-    /// This is copied from the CPU to the GPU once, and is then constant.
-    std::size_t fNormsReserved;
-    std::size_t fNormsUsed;
-    std::unique_ptr<hemi::Array<int>> fNormResult;
+  ///////////////////////////////////////////////////////////////////////
+  /// An array of indices into the results that go for each normalization.
+  /// This is copied from the CPU to the GPU once, and is then constant.
+  std::size_t fNormsReserved;
+  std::size_t fNormsUsed;
+  std::unique_ptr<hemi::Array<int>> fNormResult;
 
-    /// An array of indices into the parameters that go for each
-    /// normalization.  This is copied from the CPU to the GPU once, and is
-    /// then constant.
-    std::unique_ptr<hemi::Array<short>> fNormParameter;
+  /// An array of indices into the parameters that go for each
+  /// normalization.  This is copied from the CPU to the GPU once, and is
+  /// then constant.
+  std::unique_ptr<hemi::Array<short>> fNormParameter;
 
 public:
 
-    // Construct the class.  This should allocate all the memory on the host
-    // and on the GPU.  The normalizations are applied to the event weights
-    // which are managed by the Weights class.
-    Normalization(Cache::Weights::Results& weights,
-                  Cache::Parameters::Values& parameters,
-                  std::size_t norms);
+  // Construct the class.  This should allocate all the memory on the host
+  // and on the GPU.  The normalizations are applied to the event weights
+  // which are managed by the Weights class.
+  Normalization(Cache::Weights::Results& weights,
+                Cache::Parameters::Values& parameters,
+                std::size_t norms);
 
-    // Deconstruct the class.  This should deallocate all the memory
-    // everyplace.
-    virtual ~Normalization();
+  // Deconstruct the class.  This should deallocate all the memory
+  // everyplace.
+  virtual ~Normalization();
 
-    /// Reinitialize the cache.  This puts it into a state to be refilled, but
-    /// does not deallocate any memory.
-    virtual void Reset() override;
+  /// Reinitialize the cache.  This puts it into a state to be refilled, but
+  /// does not deallocate any memory.
+  virtual void Reset() override;
 
-    /// Apply the normalizations to the event weight cache.  This will run a
-    /// HEMI kernel to modify the weights cache.
-    virtual bool Apply() override;
+  /// Apply the normalizations to the event weight cache.  This will run a
+  /// HEMI kernel to modify the weights cache.
+  virtual bool Apply() override;
 
-    /// Return the number of normalization parameters that are reserved
-    std::size_t GetNormsReserved() {return fNormsReserved;}
+  /// Return the number of normalization parameters that are reserved
+  std::size_t GetNormsReserved() {return fNormsReserved;}
 
-    /// Return the number of normalization parameters that are used.
-    std::size_t GetNormsUsed() {return fNormsUsed;}
+  /// Return the number of normalization parameters that are used.
+  std::size_t GetNormsUsed() {return fNormsUsed;}
 
-    /// Add a normalization parameter. This takes a result index, and a
-    /// parameter index as inputs.
-    int ReserveNorm(int resIndex, int parIndex);
+  /// Add a normalization parameter. This takes a result index, and a
+  /// parameter index as inputs.
+  int ReserveNorm(int resIndex, int parIndex);
 };
 
 // An MIT Style License

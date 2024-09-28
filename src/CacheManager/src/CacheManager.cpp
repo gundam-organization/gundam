@@ -181,7 +181,7 @@ bool Cache::Manager::HasGPU(bool dump) {
 
 bool Cache::Manager::Build(SampleSet& sampleList,
                            EventDialCache& eventDials) {
-  if (not GundamGlobals::isCacheManagerEnabled()) return false;
+  if (not GundamGlobals::getEnableCacheManager()) return false;
 
   LogInfo << "Build the internal caches " << std::endl;
 
@@ -392,10 +392,12 @@ bool Cache::Manager::Build(SampleSet& sampleList,
 
   // Try to allocate the Cache::Manager memory (including for the GPU if
   // it's being used).
-  if( Cache::Manager::Get() != nullptr and GundamGlobals::isCacheManagerEnabled() ) {
+  if (!Cache::Manager::Get()
+      && GundamGlobals::getEnableCacheManager()) {
     LogInfo << "Creating the Cache::Manager" << std::endl;
-    if( not Cache::Manager::HasCUDA() ){
-      LogInfo << "    GPU Not enabled with Cache::Manager" << std::endl;
+    if (!Cache::Manager::HasCUDA()) {
+      LogInfo << "    GPU Not enabled with Cache::Manager"
+              << std::endl;
     }
     try {
       fSingleton = new Manager(config);
@@ -425,12 +427,17 @@ void Cache::Manager::UpdateRequired() {
 }
 
 
-bool Cache::Manager::Update(SampleSet& sampleList, EventDialCache& eventDials) {
-  if (not fUpdateRequired){ return true; }
+bool Cache::Manager::Update(SampleSet& sampleList,
+                            EventDialCache& eventDials) {
+  if (not fUpdateRequired) return true;
 
   // In case the cache isn't allocated (usually because it's turned off on
   // the command line), but this is a safety check.
-  if( Cache::Manager::Get() == nullptr ){ LogWarning << "Cache will not be used" << std::endl; return false; }
+  if (!Cache::Manager::Get()) {
+    LogWarning << "Cache will not be used"
+               << std::endl;
+    return false;
+  }
 
   // This is the updated that is required!
   fUpdateRequired = false;
@@ -739,9 +746,12 @@ bool Cache::Manager::Update(SampleSet& sampleList, EventDialCache& eventDials) {
 
 bool Cache::Manager::Fill() {
   Cache::Manager* cache = Cache::Manager::Get();
-  if( cache == nullptr ){ return false; }
-  LogThrowIf(fUpdateRequired, "Calling fill while an update is required");
-  LogTraceIf(GundamGlobals::isDebug()) << "Cache::Manager::Fill -- Fill the GPU cache" << std::endl;
+  if (!cache) return false;
+  if (fUpdateRequired) {
+    LogError << "Fill while an update is required" << std::endl;
+    LogThrow("Fill while an update is required");
+  }
+  LogTraceIf( GundamGlobals::isDebugConfig() ) << "Cache::Manager::Fill -- Fill the GPU cache" << std::endl;
 #define DUMP_FILL_INPUT_PARAMETERS
 #ifdef DUMP_FILL_INPUT_PARAMETERS
   do {
@@ -760,6 +770,7 @@ bool Cache::Manager::Fill() {
   } while(false);
 #endif
   cache->GetWeightsCache().Invalidate();
+  cache->GetHistogramsCache().Invalidate();
   for (auto& par : Cache::Manager::ParameterMap ) {
     if (not par.first->isEnabled()) {
       LogWarning << "WARNING: Disabled parameter: "
@@ -773,17 +784,6 @@ bool Cache::Manager::Fill() {
         par.second, par.first->getParameterValue());
   }
   cache->GetWeightsCache().Apply();
-
-
-  return true;
-}
-bool Cache::Manager::FillHistograms(){
-  Cache::Manager* cache = Cache::Manager::Get();
-  if( cache == nullptr ){ return false; }
-  LogThrowIf(fUpdateRequired, "Calling fill while an update is required");
-  LogTraceIf(GundamGlobals::isDebug()) << "Cache::Manager::FillHistograms -- Fill the GPU cache" << std::endl;
-
-  cache->GetHistogramsCache().Invalidate();
   cache->GetHistogramsCache().Apply();
 
   return true;
