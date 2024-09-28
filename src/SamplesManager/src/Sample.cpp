@@ -151,7 +151,6 @@ void Sample::refillHistogram(int iThread_){
     }
 #endif
     if (not binFilled) {  // Will (should) optimize away w/o Cache::Manager
-      LogDebug << "sum with CPU" << std::endl;
       binPtr->content = 0;
       binPtr->error = 0;
       for (auto *eventPtr: binPtr->eventPtrList) {
