@@ -504,7 +504,7 @@ bool DialCollection::initializeDialsWithTabulation(const JsonType& dialsDefiniti
   }
 
   addUpdate(
-      [=]{getCollectionData<TabulatedDialFactory>()->updateTable(
+      [this]{getCollectionData<TabulatedDialFactory>()->updateTable(
           getDialInputBufferList().front());
       });
 
