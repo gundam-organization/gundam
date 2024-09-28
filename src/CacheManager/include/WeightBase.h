@@ -9,9 +9,9 @@
 #include <string>
 
 namespace Cache {
-    namespace Weight {
-        class Base;
-    }
+  namespace Weight {
+    class Base;
+  }
 }
 
 // Do a definition here to "trick" nvcc which doesn't like the type to be
@@ -23,42 +23,42 @@ namespace Cache {
 /// weight calculator.
 class Cache::Weight::Base {
 public:
-    // Construct the class.  This should allocate all the memory on the host
-    // and on the GPU.  The normalizations are applied to the event weights
-    // which are managed by the EventWeights class.
-    Base(std::string name,
-         Cache::Weights::Results& weights,
-         Cache::Parameters::Values& parameters)
-        : fName(name), fWeights(weights), fParameters(parameters) {}
+  // Construct the class.  This should allocate all the memory on the host
+  // and on the GPU.  The normalizations are applied to the event weights
+  // which are managed by the EventWeights class.
+  Base(std::string name,
+       Cache::Weights::Results& weights,
+       Cache::Parameters::Values& parameters)
+      : fName(name), fWeights(weights), fParameters(parameters) {}
 
-    // Deconstruct the class.  This should deallocate all the memory
-    // everyplace.
-    virtual ~Base() {}
+  // Deconstruct the class.  This should deallocate all the memory
+  // everyplace.
+  virtual ~Base() {}
 
-    /// Reinitialize the cache.  This puts it into a state to be refilled, but
-    /// does not deallocate any memory.
-    virtual void Reset() = 0;
+  /// Reinitialize the cache.  This puts it into a state to be refilled, but
+  /// does not deallocate any memory.
+  virtual void Reset() = 0;
 
-    /// Apply the weights to the event weight cache.  This will run a kernel
-    /// to modify the weights cache.
-    virtual bool Apply() = 0;
+  /// Apply the weights to the event weight cache.  This will run a kernel
+  /// to modify the weights cache.
+  virtual bool Apply() = 0;
 
-    std::size_t GetResidentMemory() {return fTotalBytes;}
+  std::size_t GetResidentMemory() {return fTotalBytes;}
 
-    std::string GetName() {return fName;}
+  std::string GetName() {return fName;}
 
 protected:
 
-    // The name of the weight calculator.
-    std::string fName;
+  // The name of the weight calculator.
+  std::string fName;
 
-    // Save the event weight cache reference for later use
-    Cache::Weights::Results& fWeights;
+  // Save the event weight cache reference for later use
+  Cache::Weights::Results& fWeights;
 
-    // Save the parameter cache reference for later use
-    Cache::Parameters::Values& fParameters;
+  // Save the parameter cache reference for later use
+  Cache::Parameters::Values& fParameters;
 
-    std::size_t fTotalBytes{0};
+  std::size_t fTotalBytes{0};
 
 };
 

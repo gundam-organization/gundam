@@ -2,8 +2,8 @@
 #include <mutex>
 
 namespace {
-    // Lock the atomic operation.  Only used when builtins are not available.
-    std::mutex cacheAtomicCASMutEx;
+  // Lock the atomic operation.  Only used when builtins are not available.
+  std::mutex cacheAtomicCASMutEx;
 }
 
 // This is a function to do an atomic compare-and-set.  Compare-and-set is
@@ -34,13 +34,13 @@ namespace {
 // to understand.
 int CacheAtomicCAS(double *variable, double *expected, double update) {
 #ifdef TEMP_CACHE_ATOMIC_CAS_MANAGED
-#error internal definition TEMP_CACHE_ATOMIC_CAS_MANAGED must be undefined
+  #error internal definition TEMP_CACHE_ATOMIC_CAS_MANAGED must be undefined
 #undef TEMP_CACHE_ATOMIC_CAS_MANAGED
 #endif
 #ifndef TEMP_CACHE_ATOMIC_CAS_MANAGED
 #ifdef __has_builtin
 #if __has_builtin(__atomic_compare_exchange)
-    // #warning CacheAtomicCAS -- Using builtin __atomic_compare_exchange
+  // #warning CacheAtomicCAS -- Using builtin __atomic_compare_exchange
     return __atomic_compare_exchange(
         variable, expected, &update, 0,
         __ATOMIC_SEQ_CST,
@@ -53,7 +53,7 @@ int CacheAtomicCAS(double *variable, double *expected, double update) {
 #ifdef __GNUC__
 #include <features.h>
 #if __GNUC_PREREQ(5,0)
-    // #warning CacheAtomicCAS -- Using GCC >5 builtin __atomic_compare_exchange
+  // #warning CacheAtomicCAS -- Using GCC >5 builtin __atomic_compare_exchange
     return __atomic_compare_exchange(
         variable, expected, &update, 0,
         __ATOMIC_SEQ_CST,
@@ -64,7 +64,7 @@ int CacheAtomicCAS(double *variable, double *expected, double update) {
 #endif
 #ifndef TEMP_CACHE_ATOMIC_CAS_MANAGED
 #ifdef __STDC_VERSION__
-#if __STDC_VERSION__ >= 201112L
+  #if __STDC_VERSION__ >= 201112L
 // #warning CacheAtomicCAS -- Using C11 atomic_compare_exchange_strong_explicit
     return atomic_compare_exchange_strong_explicit(
         variable, expected, update,
@@ -76,14 +76,14 @@ int CacheAtomicCAS(double *variable, double *expected, double update) {
 #endif
 #ifndef TEMP_CACHE_ATOMIC_CAS_MANAGED
 #warning CacheAtomicCAS -- Using MutEx to implement Compare and Set for doubles
-    std::lock_guard<std::mutex> lock(cacheAtomicCASMutEx);
-    double expectation = *expected;
-    *expected = *variable;
-    if (*variable == expectation) {
-        *variable = update;
-        return true;
-    }
-    return false;
+  std::lock_guard<std::mutex> lock(cacheAtomicCASMutEx);
+  double expectation = *expected;
+  *expected = *variable;
+  if (*variable == expectation) {
+    *variable = update;
+    return true;
+  }
+  return false;
 #define TEMP_CACHE_ATOMIC_CAS_MANAGED
 #endif
 #undef TEMP_CACHE_ATOMIC_CAS_MANAGED
@@ -92,13 +92,13 @@ int CacheAtomicCAS(double *variable, double *expected, double update) {
 // See documentation for CasheAtomicCAS_double
 int CacheAtomicCAS(float *variable, float *expected, float update) {
 #ifdef TEMP_CACHE_ATOMIC_CAS_MANAGED
-#error internal definition TEMP_CACHE_ATOMIC_CAS_MANAGED must be undefined
+  #error internal definition TEMP_CACHE_ATOMIC_CAS_MANAGED must be undefined
 #undef TEMP_CACHE_ATOMIC_CAS_MANAGED
 #endif
 #ifndef TEMP_CACHE_ATOMIC_CAS_MANAGED
 #ifdef __has_builtin
 #if __has_builtin(__atomic_compare_exchange)
-    // #warning CacheAtomicCAS -- Using builtin __atomic_compare_exchange
+  // #warning CacheAtomicCAS -- Using builtin __atomic_compare_exchange
     return __atomic_compare_exchange(
         variable, expected, &update, 0,
         __ATOMIC_SEQ_CST,
@@ -111,7 +111,7 @@ int CacheAtomicCAS(float *variable, float *expected, float update) {
 #ifdef __GNUC__
 #include <features.h>
 #if __GNUC_PREREQ(5,0)
-    // #warning CacheAtomicCAS -- Using GCC >5 builtin __atomic_compare_exchange
+  // #warning CacheAtomicCAS -- Using GCC >5 builtin __atomic_compare_exchange
     return __atomic_compare_exchange(
         variable, expected, &update, 0,
         __ATOMIC_SEQ_CST,
@@ -122,7 +122,7 @@ int CacheAtomicCAS(float *variable, float *expected, float update) {
 #endif
 #ifndef TEMP_CACHE_ATOMIC_CAS_MANAGED
 #ifdef __STDC_VERSION__
-#if __STDC_VERSION__ >= 201112L
+  #if __STDC_VERSION__ >= 201112L
 // #warning CacheAtomicCAS -- Using C11 atomic_compare_exchange_strong_explicit
     return atomic_compare_exchange_strong_explicit(
         variable, expected, update,
@@ -134,14 +134,14 @@ int CacheAtomicCAS(float *variable, float *expected, float update) {
 #endif
 #ifndef TEMP_CACHE_ATOMIC_CAS_MANAGED
 #warning CacheAtomicCAS -- Using MutEx to implement Compare and Set for floats
-    std::lock_guard<std::mutex> lock(cacheAtomicCASMutEx);
-    float expectation = *expected;
-    *expected = *variable;
-    if (*variable == expectation) {
-        *variable = update;
-        return true;
-    }
-    return false;
+  std::lock_guard<std::mutex> lock(cacheAtomicCASMutEx);
+  float expectation = *expected;
+  *expected = *variable;
+  if (*variable == expectation) {
+    *variable = update;
+    return true;
+  }
+  return false;
 #define TEMP_CACHE_ATOMIC_CAS_MANAGED
 #endif
 #undef TEMP_CACHE_ATOMIC_CAS_MANAGED
@@ -150,13 +150,13 @@ int CacheAtomicCAS(float *variable, float *expected, float update) {
 // See documentation for CacheAtomicCAS_double
 int CacheAtomicCAS(int *variable, int *expected, int update) {
 #ifdef TEMP_CACHE_ATOMIC_CAS_MANAGED
-#error internal definition TEMP_CACHE_ATOMIC_CAS_MANAGED must be undefined
+  #error internal definition TEMP_CACHE_ATOMIC_CAS_MANAGED must be undefined
 #undef TEMP_CACHE_ATOMIC_CAS_MANAGED
 #endif
 #ifndef TEMP_CACHE_ATOMIC_CAS_MANAGED
 #ifdef __has_builtin
 #if __has_builtin(__atomic_compare_exchange)
-    // #warning CacheAtomicCAS -- Using builtin __atomic_compare_exchange
+  // #warning CacheAtomicCAS -- Using builtin __atomic_compare_exchange
     return __atomic_compare_exchange(
         variable, expected, &update, 0,
         __ATOMIC_SEQ_CST,
@@ -169,7 +169,7 @@ int CacheAtomicCAS(int *variable, int *expected, int update) {
 #ifdef __GNUC__
 #include <features.h>
 #if __GNUC_PREREQ(5,0)
-    // #warning CacheAtomicCAS -- Using GCC >5 builtin __atomic_compare_exchange
+  // #warning CacheAtomicCAS -- Using GCC >5 builtin __atomic_compare_exchange
     return __atomic_compare_exchange(
         variable, expected, &update, 0,
         __ATOMIC_SEQ_CST,
@@ -180,7 +180,7 @@ int CacheAtomicCAS(int *variable, int *expected, int update) {
 #endif
 #ifndef TEMP_CACHE_ATOMIC_CAS_MANAGED
 #ifdef __STDC_VERSION__
-#if __STDC_VERSION__ >= 201112L
+  #if __STDC_VERSION__ >= 201112L
 // #warning CacheAtomicCAS -- Using C11 atomic_compare_exchange_strong_explicit
     return atomic_compare_exchange_strong_explicit(
         variable, expected, update,
@@ -192,14 +192,14 @@ int CacheAtomicCAS(int *variable, int *expected, int update) {
 #endif
 #ifndef TEMP_CACHE_ATOMIC_CAS_MANAGED
 #warning CacheAtomicCAS -- Using MutEx to implement Compare and Set for integers
-    std::lock_guard<std::mutex> lock(cacheAtomicCASMutEx);
-    int expectation = *expected;
-    *expected = *variable;
-    if (*variable == expectation) {
-        *variable = update;
-        return true;
-    }
-    return false;
+  std::lock_guard<std::mutex> lock(cacheAtomicCASMutEx);
+  int expectation = *expected;
+  *expected = *variable;
+  if (*variable == expectation) {
+    *variable = update;
+    return true;
+  }
+  return false;
 #define TEMP_CACHE_ATOMIC_CAS_MANAGED
 #endif
 #undef TEMP_CACHE_ATOMIC_CAS_MANAGED
