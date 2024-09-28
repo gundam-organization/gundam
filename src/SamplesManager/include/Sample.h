@@ -114,24 +114,24 @@ private:
 
 #ifdef GUNDAM_USING_CACHE_MANAGER
 public:
-  void setCacheManagerIndex(int i) {_CacheManagerIndex_ = i;}
-  void setCacheManagerValuePointer(const double* v) {_CacheManagerValue_ = v;}
-  void setCacheManagerValue2Pointer(const double* v) {_CacheManagerValue2_ = v;}
-  void setCacheManagerValidPointer(const bool* v) {_CacheManagerValid_ = v;}
-  void setCacheManagerUpdatePointer(void (*p)()) {_CacheManagerUpdate_ = p;}
+  void setCacheManagerIndex(int i) { _cacheManagerIndex_ = i;}
+  void setCacheManagerValuePointer(const double* v) { _cacheManagerValue_ = v;}
+  void setCacheManagerValue2Pointer(const double* v) { _cacheManagerValue2_ = v;}
+  void setCacheManagerValidPointer(const bool* v) { _cacheManagerValid_ = v;}
+  void setCacheManagerUpdatePointer(void (*p)()) { _cacheManagerUpdate_ = p;}
 
-  [[nodiscard]] int getCacheManagerIndex() const {return _CacheManagerIndex_;}
+  [[nodiscard]] int getCacheManagerIndex() const {return _cacheManagerIndex_;}
 private:
   // An "opaque" index into the cache that is used to simplify bookkeeping.
-  int _CacheManagerIndex_{-1};
+  int _cacheManagerIndex_{-1};
   // A pointer to the cached result.
-  const double* _CacheManagerValue_{nullptr};
+  const double* _cacheManagerValue_{nullptr};
   // A pointer to the cached result.
-  const double* _CacheManagerValue2_{nullptr};
+  const double* _cacheManagerValue2_{nullptr};
   // A pointer to the cache validity flag.
-  const bool* _CacheManagerValid_{nullptr};
+  const bool* _cacheManagerValid_{nullptr};
   // A pointer to a callback to force the cache to be updated.
-  void (*_CacheManagerUpdate_)(){nullptr};
+  void (*_cacheManagerUpdate_)(){nullptr};
 #endif
 
 };
