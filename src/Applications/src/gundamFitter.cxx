@@ -109,7 +109,7 @@ int main(int argc, char** argv){
   // Init command line args:
   // --------------------------
 
-  if( clParser.isOptionTriggered("debugVerbose") ){ GundamGlobals::setIsDebugConfig( true ); }
+  if( clParser.isOptionTriggered("debugVerbose") ){ GundamGlobals::setIsDebug(true); }
 
   // Is build compatible with GPU option?
   if( clParser.isOptionTriggered("usingGpu") ){
@@ -139,7 +139,7 @@ int main(int argc, char** argv){
   if (clParser.isOptionTriggered("usingGpu")) useCache = true;
 
 #ifdef GUNDAM_USING_CACHE_MANAGER
-    GundamGlobals::setEnableCacheManager(useCache);
+  GundamGlobals::setIsCacheManagerEnabled(useCache);
     if (not useCache) {
       LogWarning << "Cache::Manager enabled but turned off for job"
                  << std::endl;

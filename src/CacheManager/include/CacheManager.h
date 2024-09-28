@@ -55,6 +55,9 @@ public:
     /// before the cached weights can be used.  This is used in Propagator.cpp.
     static bool Fill();
 
+    /// Fill the histogram bins by summing the weights
+    static bool FillHistograms();
+
     /// Build the cache and load it into the device.  This is used in
     /// Propagator.cpp to fill the constants needed to for the calculations.
     static bool Build(SampleSet& sampleList, EventDialCache& eventDials);

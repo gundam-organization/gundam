@@ -24,13 +24,13 @@ void Sample::configureImpl(){
   GenericToolbox::Json::fillValue(_config_, _enabledDatasetList_, {{"datasets"},{"dataSets"}});
 
   LogThrowIf(_name_.empty(), "No name was provided for sample #" << _index_ << std::endl << GenericToolbox::Json::toReadableString(_config_));
-  LogDebugIf(GundamGlobals::isDebugConfig()) << "Defining sample \"" << _name_ << "\"" << std::endl;
+  LogDebugIf(GundamGlobals::isDebug()) << "Defining sample \"" << _name_ << "\"" << std::endl;
   if( not _isEnabled_ ){
-    LogDebugIf(GundamGlobals::isDebugConfig()) << "-> disabled" << std::endl;
+    LogDebugIf(GundamGlobals::isDebug()) << "-> disabled" << std::endl;
     return;
   }
 
-  LogDebugIf(GundamGlobals::isDebugConfig()) << "Reading binning: " << _config_ << std::endl;
+  LogDebugIf(GundamGlobals::isDebug()) << "Reading binning: " << _config_ << std::endl;
   _binning_.configure( _binningConfig_ );
   this->buildHistogram( _binning_ );
 }

@@ -58,7 +58,7 @@ int main(int argc, char** argv){
   LogInfo << clParser.getValueSummary() << std::endl << std::endl;
 
 
-  GundamGlobals::setIsDebugConfig( clParser.isOptionTriggered("debugVerbose") );
+  GundamGlobals::setIsDebug(clParser.isOptionTriggered("debugVerbose"));
 
   // Sanity checks
   LogThrowIf(not clParser.isOptionTriggered("configFile"), "Xsec calculator config file not provided.");
@@ -634,7 +634,7 @@ int main(int argc, char** argv){
 
     // Do the throwing:
     throwTimer.start();
-    propagator.getParametersManager().throwParametersFromGlobalCovariance( not GundamGlobals::isDebugConfig() );
+    propagator.getParametersManager().throwParametersFromGlobalCovariance( not GundamGlobals::isDebug() );
     throwTimer.stop();
 
     propagateTimer.start();
