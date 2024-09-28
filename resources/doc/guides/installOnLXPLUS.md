@@ -1,6 +1,27 @@
-[![](./resources/guides/images/lxplusLogo.png)]
+![](./images/lxplusLogo.png)
 
-This is a rough guide to get going on lxplus. GUNDAM has pretty modern dependencies so we’ll need to pick these up from what we can find on cvmfs etc. It turns out the ROOT v.18/04 we often use (the one inside the LArSoft cvmfs) is too old but we can use Adrien’s 6.26/10. 
+
+This is a rough guide to get going on LXPlus. 
+GUNDAM has pretty modern dependencies so we’ll need to pick these up
+from what we can find on cvmfs etc.
+LXPlus has recently switched towards "Red Hat Enterprise Linux release 9.4",
+aka el9, which changed the dependencies paths.
+This guide has been updated with the current software libraries available
+on the platform.
+
+
+## Common software available
+
+Common software libraries can be found under `/cvmfs/sft.cern.ch/lcg/views/`.
+They are documented on https://lcginfo.cern.ch/. 
+To this date, the latest LCG release is 106 (Jun 19, 2024).
+We can set up this environment by sourcing the dedicated bash file:
+
+```bash
+source /cvmfs/sft.cern.ch/lcg/views/LCG_106/x86_64-el9-gcc13-opt/setup.sh
+```
+
+
 
 ## Environment Setup
 Go to the directory you cloned GUNDAM into and create the following script, filling in the correct location for REPO_DIR:
