@@ -295,14 +295,8 @@ void Propagator::refillHistograms(){
 
 #ifdef GUNDAM_USING_CACHE_MANAGER
   if( usedGpu ){
-//    int index{0};
-//    auto* cm = Cache::Manager::Get();
-//    LogThrowIf( cm == nullptr );
-//    for( auto& sample : _sampleSet_.getSampleList() ){
-//      for( auto& bin : sample.getHistogram().binList ){
-//        bin.content = cm->GetHistogramsCache().GetSum(index++);
-//      }
-//    }
+    // it should be single threaded
+    refillHistogramsFct(-1);
   }
   else{
 #endif

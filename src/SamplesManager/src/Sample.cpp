@@ -115,14 +115,14 @@ void Sample::refillHistogram(int iThread_){
   if( iThread_ == -1 ){ nThreads = 1; iThread_ = 0; }
 
 #ifdef GUNDAM_USING_CACHE_MANAGER
-  if (_CacheManagerValid_ and not (*_CacheManagerValid_)) {
+  if (_cacheManagerValid_ and not (*_cacheManagerValid_)) {
     // This can be slow (~10 usec for 5000 bins) when data must be copied
     // from the device, but it makes sure that the results are copied from
     // the device when they have changed. The values pointed to by
-    // _CacheManagerValue_ and _CacheManagerValid_ are inside the summed
+    // _cacheManagerValue_ and _cacheManagerValid_ are inside the summed
     // index cache (a bit of evil coding here), and are updated by the
-    // cache.  The update is triggered by (*_CacheManagerUpdate_)().
-    if (_CacheManagerUpdate_) (*_CacheManagerUpdate_)();
+    // cache.  The update is triggered by (*_cacheManagerUpdate_)().
+    if (_cacheManagerUpdate_) (*_cacheManagerUpdate_)();
   }
 #endif
 
@@ -140,10 +140,9 @@ void Sample::refillHistogram(int iThread_){
     bool filledWithManager = false;
     double value{std::nan("not-set")};
     double error{std::nan("not-set")};
-    if (_CacheManagerValid_ and (*_CacheManagerValid_)
-        and _CacheManagerValue_ and _CacheManagerIndex_ >= 0) {
-      value = _CacheManagerValue_[_CacheManagerIndex_+binPtr->index];
-      error = _CacheManagerValue2_[_CacheManagerIndex_+binPtr->index];
+    if (_cacheManagerValid_ and (*_cacheManagerValid_) and _cacheManagerValue_ and _cacheManagerIndex_ >= 0) {
+      value = _cacheManagerValue_[_cacheManagerIndex_+binPtr->index];
+      error = _cacheManagerValue2_[_cacheManagerIndex_+binPtr->index];
       LogThrowIf(std::isnan(value), "Incorrect Cache::Manager initialization");
       binPtr->content = value;
       binPtr->error = error;
@@ -152,6 +151,7 @@ void Sample::refillHistogram(int iThread_){
     }
 #endif
     if (not binFilled) {  // Will (should) optimize away w/o Cache::Manager
+      LogDebug << "sum with CPU" << std::endl;
       binPtr->content = 0;
       binPtr->error = 0;
       for (auto *eventPtr: binPtr->eventPtrList) {
