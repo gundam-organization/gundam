@@ -14,9 +14,9 @@ LoggerInit([]{ Logger::setUserHeaderStr("[Cache::Parameters]"); });
 
 bool Cache::Parameters::UsingCUDA() {
 #ifdef __CUDACC__
-    return true;
+  return true;
 #else
-    return false;
+  return false;
 #endif
 }
 
@@ -26,9 +26,9 @@ bool Cache::Parameters::UsingCUDA() {
 
 bool Cache::Parameters::HasGPU(bool dump) {
 #ifndef __CUDACC__
-    return false;
+  return false;
 #else
-    cudaError_t status;
+  cudaError_t status;
     int devCount;
     status = cudaGetDeviceCount(&devCount);
     if (status != cudaSuccess) {
@@ -82,126 +82,126 @@ bool Cache::Parameters::HasGPU(bool dump) {
 }
 
 Cache::Parameters::Parameters(std::size_t parameters)
-: fParameterCount{parameters} {
-    LogInfo << "Cached Parameters -- input parameter count: "
-            << GetParameterCount()
-            << std::endl;
+    : fParameterCount{parameters} {
+  LogInfo << "Cached Parameters -- input parameter count: "
+          << GetParameterCount()
+          << std::endl;
 
-    fTotalBytes = 0;
-    fTotalBytes += GetParameterCount()*sizeof(double); // fParameters
-    fTotalBytes += GetParameterCount()*sizeof(double);  // fLowerClamp
-    fTotalBytes += GetParameterCount()*sizeof(double);  // fUpperclamp
+  fTotalBytes = 0;
+  fTotalBytes += GetParameterCount()*sizeof(double); // fParameters
+  fTotalBytes += GetParameterCount()*sizeof(double);  // fLowerClamp
+  fTotalBytes += GetParameterCount()*sizeof(double);  // fUpperclamp
 
-    try {
-        // The mirrors are only on the CPU, so use vectors.  Initialize with
-        // lowest and highest floating point values.
-        fLowerMirror.reset(new std::vector<double>(
-                               GetParameterCount(),
-                               std::numeric_limits<double>::lowest()));
-        LogThrowIf(not fLowerMirror, "Bad LowerMirror alloc");
-        fUpperMirror.reset(new std::vector<double>(
-                               GetParameterCount(),
-                               std::numeric_limits<double>::max()));
-        LogThrowIf(not fUpperMirror, "Bad UpperMirror alloc");
+  try {
+    // The mirrors are only on the CPU, so use vectors.  Initialize with
+    // lowest and highest floating point values.
+    fLowerMirror.reset(new std::vector<double>(
+        GetParameterCount(),
+        std::numeric_limits<double>::lowest()));
+    LogThrowIf(not fLowerMirror, "Bad LowerMirror alloc");
+    fUpperMirror.reset(new std::vector<double>(
+        GetParameterCount(),
+        std::numeric_limits<double>::max()));
+    LogThrowIf(not fUpperMirror, "Bad UpperMirror alloc");
 
-        // Get CPU/GPU memory for the parameter values.  The mirroring is done
-        // to every entry, so its also done on the GPU.  The parameters are
-        // copied every iteration, so pin the CPU memory into the page set.
-        fParameters.reset(new hemi::Array<double>(GetParameterCount()));
-        LogThrowIf(not fParameters, "Bad Parameters alloc");
-        fLowerClamp.reset(new hemi::Array<double>(GetParameterCount(),false));
-        LogThrowIf(not fLowerClamp, "Bad LowerClamp alloc");
-        fUpperClamp.reset(new hemi::Array<double>(GetParameterCount(),false));
-        LogThrowIf(not fUpperClamp, "Bad UpperClamp alloc");
-    }
-    catch (...) {
-        LogError << "Failed to allocate memory, so stopping" << std::endl;
-        LogThrow("Not enough memory available");
-    }
+    // Get CPU/GPU memory for the parameter values.  The mirroring is done
+    // to every entry, so its also done on the GPU.  The parameters are
+    // copied every iteration, so pin the CPU memory into the page set.
+    fParameters.reset(new hemi::Array<double>(GetParameterCount()));
+    LogThrowIf(not fParameters, "Bad Parameters alloc");
+    fLowerClamp.reset(new hemi::Array<double>(GetParameterCount(),false));
+    LogThrowIf(not fLowerClamp, "Bad LowerClamp alloc");
+    fUpperClamp.reset(new hemi::Array<double>(GetParameterCount(),false));
+    LogThrowIf(not fUpperClamp, "Bad UpperClamp alloc");
+  }
+  catch (...) {
+    LogError << "Failed to allocate memory, so stopping" << std::endl;
+    LogThrow("Not enough memory available");
+  }
 
-    // Initialize the caches.  Don't try to zero everything since the
-    // caches can be huge.
-    Reset();
+  // Initialize the caches.  Don't try to zero everything since the
+  // caches can be huge.
+  Reset();
 }
 
 Cache::Parameters::~Parameters() {}
 
 void Cache::Parameters::Reset() {
-    std::fill(fLowerClamp->hostPtr(),
-              fLowerClamp->hostPtr() + GetParameterCount(),
-              std::numeric_limits<double>::lowest());
-    std::fill(fUpperClamp->hostPtr(),
-              fUpperClamp->hostPtr() + GetParameterCount(),
-              std::numeric_limits<double>::max());
+  std::fill(fLowerClamp->hostPtr(),
+            fLowerClamp->hostPtr() + GetParameterCount(),
+            std::numeric_limits<double>::lowest());
+  std::fill(fUpperClamp->hostPtr(),
+            fUpperClamp->hostPtr() + GetParameterCount(),
+            std::numeric_limits<double>::max());
 }
 
 double Cache::Parameters::GetParameter(int parIdx) const {
-    if (parIdx < 0) throw;
-    if (GetParameterCount() <= parIdx) throw;
-    return fParameters->hostPtr()[parIdx];
+  if (parIdx < 0) throw;
+  if (GetParameterCount() <= parIdx) throw;
+  return fParameters->hostPtr()[parIdx];
 }
 
 void Cache::Parameters::SetParameter(int parIdx, double value) {
-    LogThrowIf((parIdx < 0), "Parameter index out of range");
-    LogThrowIf((GetParameterCount() <= parIdx), "Parameter index out of range");
-    double lm = fLowerMirror->at(parIdx);
-    double um = fUpperMirror->at(parIdx);
-    // Mirror the input value at lm and um.
-    int brake = 20;
-    while (value < lm || value > um) {
-        if (value < lm) value = lm + (lm - value);
-        if (value > um) value = um - (value - um);
-        if (--brake < 1) throw;
-    }
-    fParameters->hostPtr()[parIdx] = value;
+  LogThrowIf((parIdx < 0), "Parameter index out of range");
+  LogThrowIf((GetParameterCount() <= parIdx), "Parameter index out of range");
+  double lm = fLowerMirror->at(parIdx);
+  double um = fUpperMirror->at(parIdx);
+  // Mirror the input value at lm and um.
+  int brake = 20;
+  while (value < lm || value > um) {
+    if (value < lm) value = lm + (lm - value);
+    if (value > um) value = um - (value - um);
+    if (--brake < 1) throw;
+  }
+  fParameters->hostPtr()[parIdx] = value;
 }
 
 double Cache::Parameters::GetLowerMirror(int parIdx) {
-    LogThrowIf((parIdx < 0), "Parameter index out of range");
-    LogThrowIf((GetParameterCount() <= parIdx), "Parameter index out of range");
-    return fLowerMirror->at(parIdx);
+  LogThrowIf((parIdx < 0), "Parameter index out of range");
+  LogThrowIf((GetParameterCount() <= parIdx), "Parameter index out of range");
+  return fLowerMirror->at(parIdx);
 }
 
 void Cache::Parameters::SetLowerMirror(int parIdx, double value) {
-    LogThrowIf((parIdx < 0), "Parameter index out of range");
-    LogThrowIf((GetParameterCount() <= parIdx), "Parameter index out of range");
-    fLowerMirror->at(parIdx) = value;
+  LogThrowIf((parIdx < 0), "Parameter index out of range");
+  LogThrowIf((GetParameterCount() <= parIdx), "Parameter index out of range");
+  fLowerMirror->at(parIdx) = value;
 }
 
 double Cache::Parameters::GetUpperMirror(int parIdx) {
-    LogThrowIf((parIdx < 0), "Parameter index out of range");
-    LogThrowIf((GetParameterCount() <= parIdx), "Parameter index out of range");
-    return fUpperMirror->at(parIdx);
+  LogThrowIf((parIdx < 0), "Parameter index out of range");
+  LogThrowIf((GetParameterCount() <= parIdx), "Parameter index out of range");
+  return fUpperMirror->at(parIdx);
 }
 
 void Cache::Parameters::SetUpperMirror(int parIdx, double value) {
-    LogThrowIf((parIdx < 0), "Parameter index out of range");
-    LogThrowIf((GetParameterCount() <= parIdx), "Parameter index out of range");
-    fUpperMirror->at(parIdx) = value;
+  LogThrowIf((parIdx < 0), "Parameter index out of range");
+  LogThrowIf((GetParameterCount() <= parIdx), "Parameter index out of range");
+  fUpperMirror->at(parIdx) = value;
 }
 
 double Cache::Parameters::GetLowerClamp(int parIdx) {
-    LogThrowIf((parIdx < 0), "Parameter index out of range");
-    LogThrowIf((GetParameterCount() <= parIdx), "Parameter index out of range");
-    return fLowerClamp->hostPtr()[parIdx];
+  LogThrowIf((parIdx < 0), "Parameter index out of range");
+  LogThrowIf((GetParameterCount() <= parIdx), "Parameter index out of range");
+  return fLowerClamp->hostPtr()[parIdx];
 }
 
 void Cache::Parameters::SetLowerClamp(int parIdx, double value) {
-    LogThrowIf((parIdx < 0), "Parameter index out of range");
-    LogThrowIf((GetParameterCount() <= parIdx), "Parameter index out of range");
-    fLowerClamp->hostPtr()[parIdx] = value;
+  LogThrowIf((parIdx < 0), "Parameter index out of range");
+  LogThrowIf((GetParameterCount() <= parIdx), "Parameter index out of range");
+  fLowerClamp->hostPtr()[parIdx] = value;
 }
 
 double Cache::Parameters::GetUpperClamp(int parIdx) {
-    LogThrowIf((parIdx < 0), "Parameter index out of range");
-    LogThrowIf((GetParameterCount() <= parIdx), "Parameter index out of range");
-    return fUpperClamp->hostPtr()[parIdx];
+  LogThrowIf((parIdx < 0), "Parameter index out of range");
+  LogThrowIf((GetParameterCount() <= parIdx), "Parameter index out of range");
+  return fUpperClamp->hostPtr()[parIdx];
 }
 
 void Cache::Parameters::SetUpperClamp(int parIdx, double value) {
-    LogThrowIf((parIdx < 0), "Parameter index out of range");
-    LogThrowIf((GetParameterCount() <= parIdx), "Parameter index out of range");
-    fUpperClamp->hostPtr()[parIdx] = value;
+  LogThrowIf((parIdx < 0), "Parameter index out of range");
+  LogThrowIf((GetParameterCount() <= parIdx), "Parameter index out of range");
+  fUpperClamp->hostPtr()[parIdx] = value;
 }
 
 // An MIT Style License
