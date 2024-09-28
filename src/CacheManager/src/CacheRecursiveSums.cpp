@@ -72,6 +72,9 @@ Cache::RecursiveSums::RecursiveSums(Cache::Weights::Results& inputs,
 
     // Initialize the caches.  Don't try to zero everything since the
     // caches can be huge.
+
+  LogThrowIf(fSums->hostPtr() == nullptr);
+
     std::fill(fSums->hostPtr(),
               fSums->hostPtr() + fSums->size(),
               0.0);

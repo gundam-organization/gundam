@@ -392,12 +392,10 @@ bool Cache::Manager::Build(SampleSet& sampleList,
 
   // Try to allocate the Cache::Manager memory (including for the GPU if
   // it's being used).
-  if (!Cache::Manager::Get()
-      && GundamGlobals::isCacheManagerEnabled()) {
+  if( Cache::Manager::Get() != nullptr and GundamGlobals::isCacheManagerEnabled() ) {
     LogInfo << "Creating the Cache::Manager" << std::endl;
-    if (!Cache::Manager::HasCUDA()) {
-      LogInfo << "    GPU Not enabled with Cache::Manager"
-              << std::endl;
+    if( not Cache::Manager::HasCUDA() ){
+      LogInfo << "    GPU Not enabled with Cache::Manager" << std::endl;
     }
     try {
       fSingleton = new Manager(config);
