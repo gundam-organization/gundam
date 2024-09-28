@@ -645,10 +645,10 @@ std::string ParameterSet::getSummary() const {
           std::string colorStr;
           std::string statusStr;
 
-          if( not par.isEnabled() ) { statusStr = "Disabled"; colorStr = GenericToolbox::ColorCodes::yellowBackground; }
-          else if( par.isFixed() )  { statusStr = "Fixed (prior applied)";    colorStr = GenericToolbox::ColorCodes::redBackground; }
-          else if( par.isFree() )   { statusStr = "Free";     colorStr = GenericToolbox::ColorCodes::blueBackground; }
-          else                      { statusStr = "Enabled"; }
+          if( not par.isEnabled() ) { continue; }
+          else if( par.isFixed() )  { statusStr = "Fixed (prior applied)";    colorStr = GenericToolbox::ColorCodes::yellowLightText; }
+          else if( par.isFree() )   { statusStr = "Free";     colorStr = GenericToolbox::ColorCodes::blueLightText; }
+          else                      { statusStr = "Constrained"; }
 
 #ifdef NOCOLOR
           colorStr = "";

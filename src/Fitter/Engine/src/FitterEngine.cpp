@@ -501,12 +501,12 @@ void FitterEngine::runPcaCheck(){
 
         if( fixParPca ){
           par.setIsFixed(true); // ignored in the Chi2 computation of the parSet
-#ifndef NOCOLOR
-          std::string red(GenericToolbox::ColorCodes::redBackground);
-          std::string rst(GenericToolbox::ColorCodes::resetColor);
-#else
+#ifdef NOCOLOR
           std::string red;
-        std::string rst;
+          std::string rst;
+#else
+          std::string red(GenericToolbox::ColorCodes::yellowLightText);
+          std::string rst(GenericToolbox::ColorCodes::resetColor);
 #endif
           LogInfo << red << ssPrint.str() << rst << std::endl;
 
