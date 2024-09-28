@@ -77,7 +77,7 @@ void PlotGenerator::configureImpl(){
     GenericToolbox::Json::fillValue(histDefConfig, histDef.useSampleBinningOfVar, {{"useSampleBinningOfVar"}, {"useSampleBinningOfObservable"}});
 
     auto binning = GenericToolbox::Json::fetchValue(histDefConfig, {{"binning"}, {"binningFile"}}, JsonType());
-    if( not binning.empty() ){ histDef.binning.readBinningDefinition( binning ); }
+    if( not binning.empty() ){ histDef.binning.configure( binning ); }
 
     GenericToolbox::addIfNotInVector("", histDef.splitVarList);
   }

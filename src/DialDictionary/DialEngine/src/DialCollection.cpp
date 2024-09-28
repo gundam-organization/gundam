@@ -401,7 +401,7 @@ bool DialCollection::initializeNormDialsWithParBinning() {
   // Read the binning
   _dialBinSet_ = BinSet();
   _dialBinSet_.setName("parameterBinning");
-  _dialBinSet_.readBinningDefinition( binning );
+  _dialBinSet_.configure( binning );
 
   // By default use min dial response for norm dials
   _dialResponseSupervisorList_.resize( 1 );
@@ -522,7 +522,7 @@ bool DialCollection::initializeDialsWithBinningFile(const JsonType& dialsDefinit
 
   _dialBinSet_ = BinSet();
   _dialBinSet_.setName(binningFilePath);
-  _dialBinSet_.readBinningDefinition(binningFilePath);
+  _dialBinSet_.configure(binningFilePath);
 
   // Get the filename for a file with the object array of dials (graphs)
   // that will be applied based on the binning.
@@ -688,7 +688,7 @@ bool DialCollection::initializeDialsWithDefinition() {
 
       _dialBinSet_ = BinSet();
       _dialBinSet_.setName( "formula binning" );
-      _dialBinSet_.readBinningDefinition(binning);
+      _dialBinSet_.configure(binning);
 
       _dialBaseList_.reserve( _dialBinSet_.getBinList().size() );
       for( auto& bin : _dialBinSet_.getBinList() ){

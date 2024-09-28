@@ -17,17 +17,15 @@ LoggerInit([]{ Logger::setUserHeaderStr("[DataBinSet]"); });
 
 void BinSet::setVerbosity( int maxLogLevel_){ Logger::setMaxLogLevel(maxLogLevel_); }
 
-// core
-void BinSet::readBinningDefinition( const JsonType& binning_) {
-
+void BinSet::configureImpl() {
   _binList_.clear();
 
-  if( binning_.is_structured() ){
+  if( _config_.is_structured() ){
     // config like -> should already be unfolded
-    this->readBinningConfig( binning_ );
+    this->readBinningConfig( _config_ );
   }
-  else if( binning_.is_string() ){
-    _filePath_ = GenericToolbox::expandEnvironmentVariables( binning_.get<std::string>() );
+  else if( _config_.is_string() ){
+    _filePath_ = GenericToolbox::expandEnvironmentVariables( _config_.get<std::string>() );
     if( not GenericToolbox::isFile(_filePath_) ){
       LogError << GET_VAR_NAME_VALUE(_filePath_) << ": file not found." << std::endl;
       throw std::runtime_error(GET_VAR_NAME_VALUE(_filePath_) + ": file not found.");
@@ -36,13 +34,12 @@ void BinSet::readBinningDefinition( const JsonType& binning_) {
     if( GenericToolbox::hasExtension(_filePath_, "txt") ){ this->readTxtBinningDefinition(); }
   }
   else{
-    LogThrow("Unknown binning config entry: " << GenericToolbox::Json::toReadableString(binning_));
+    LogThrow("Unknown binning config entry: " << GenericToolbox::Json::toReadableString(_config_));
   }
 
   this->sortBinEdges();
   this->checkBinning();
 }
-
 void BinSet::checkBinning(){
 
   bool hasErrors{false};

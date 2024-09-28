@@ -6,16 +6,20 @@
 #define GUNDAM_BINSET_H
 
 #include "Bin.h"
+#include "ConfigUtils.h"
 
 #include <vector>
 #include <string>
 
 
-class BinSet {
+class BinSet : public JsonBaseClass {
 
 public:
   // static
   static void setVerbosity(int maxLogLevel_);
+
+protected:
+  void configureImpl() override;
 
 public:
   BinSet() = default;
@@ -31,7 +35,6 @@ public:
   std::vector<Bin> &getBinList() { return _binList_; }
 
   // core
-  void readBinningDefinition(const JsonType& binning_);
   void checkBinning();
   [[nodiscard]] std::string getSummary() const;
 

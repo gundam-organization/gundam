@@ -100,7 +100,7 @@ void ParameterSet::configureImpl(){
 
         LogInfo << "Found parameter binning within dialSetDefinition. Defining parameters number..." << std::endl;
         BinSet b;
-        b.readBinningDefinition( parameterBinning );
+        b.configure( parameterBinning );
         // DON'T SORT THE BINNING -> tide to the cov matrix
         _nbParameterDefinition_ = int(b.getBinList().size());
 
