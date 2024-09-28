@@ -399,9 +399,9 @@ bool DialCollection::initializeNormDialsWithParBinning() {
   this->readGlobals(_config_);
 
   // Read the binning
-  _dialBinSet_ = DataBinSet();
+  _dialBinSet_ = BinSet();
   _dialBinSet_.setName("parameterBinning");
-  _dialBinSet_.readBinningDefinition( binning );
+  _dialBinSet_.configure( binning );
 
   // By default use min dial response for norm dials
   _dialResponseSupervisorList_.resize( 1 );
@@ -520,9 +520,9 @@ bool DialCollection::initializeDialsWithBinningFile(const JsonType& dialsDefinit
   // events in DataDispenser.
   auto binningFilePath = GenericToolbox::Json::fetchValue(dialsDefinition, "binningFilePath", JsonType());
 
-  _dialBinSet_ = DataBinSet();
+  _dialBinSet_ = BinSet();
   _dialBinSet_.setName(binningFilePath);
-  _dialBinSet_.readBinningDefinition(binningFilePath);
+  _dialBinSet_.configure(binningFilePath);
 
   // Get the filename for a file with the object array of dials (graphs)
   // that will be applied based on the binning.
@@ -686,9 +686,9 @@ bool DialCollection::initializeDialsWithDefinition() {
     if( GenericToolbox::Json::doKeyExist(dialsDefinition, "binning") ){
       auto binning = GenericToolbox::Json::fetchValue(dialsDefinition, "binning", JsonType());
 
-      _dialBinSet_ = DataBinSet();
+      _dialBinSet_ = BinSet();
       _dialBinSet_.setName( "formula binning" );
-      _dialBinSet_.readBinningDefinition(binning);
+      _dialBinSet_.configure(binning);
 
       _dialBaseList_.reserve( _dialBinSet_.getBinList().size() );
       for( auto& bin : _dialBinSet_.getBinList() ){

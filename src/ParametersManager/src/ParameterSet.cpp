@@ -3,7 +3,7 @@
 //
 
 #include "ParameterSet.h"
-#include "DataBinSet.h"
+#include "BinSet.h"
 
 #include "GundamGlobals.h"
 #include "ParameterThrowerMarkHarz.h"
@@ -99,8 +99,8 @@ void ParameterSet::configureImpl(){
         if( parameterBinning.empty() ){ continue; }
 
         LogInfo << "Found parameter binning within dialSetDefinition. Defining parameters number..." << std::endl;
-        DataBinSet b;
-        b.readBinningDefinition( parameterBinning );
+        BinSet b;
+        b.configure( parameterBinning );
         // DON'T SORT THE BINNING -> tide to the cov matrix
         _nbParameterDefinition_ = int(b.getBinList().size());
 
@@ -645,10 +645,10 @@ std::string ParameterSet::getSummary() const {
           std::string colorStr;
           std::string statusStr;
 
-          if( not par.isEnabled() ) { statusStr = "Disabled"; colorStr = GenericToolbox::ColorCodes::yellowBackground; }
-          else if( par.isFixed() )  { statusStr = "Fixed (prior applied)";    colorStr = GenericToolbox::ColorCodes::redBackground; }
-          else if( par.isFree() )   { statusStr = "Free";     colorStr = GenericToolbox::ColorCodes::blueBackground; }
-          else                      { statusStr = "Enabled"; }
+          if( not par.isEnabled() ) { continue; }
+          else if( par.isFixed() )  { statusStr = "Fixed (prior applied)";    colorStr = GenericToolbox::ColorCodes::yellowLightText; }
+          else if( par.isFree() )   { statusStr = "Free";     colorStr = GenericToolbox::ColorCodes::blueLightText; }
+          else                      { statusStr = "Constrained"; }
 
 #ifdef NOCOLOR
           colorStr = "";

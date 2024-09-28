@@ -139,7 +139,7 @@ private:
     std::string useSampleBinningOfVar{};
     std::vector<std::string> splitVarList{};
     std::vector<std::string> sampleVariableIfNotAvailable{};
-    DataBinSet binning{};
+    BinSet binning{};
   };
   std::vector<HistogramDefinition> _histDefList_{};
 

@@ -139,8 +139,7 @@ void RootMinimizer::dumpFitParameterSettings() {
 }
 
 void RootMinimizer::dumpMinuit2State() {
-  ROOT::Minuit2::Minuit2Minimizer* mn2
-    = dynamic_cast<ROOT::Minuit2::Minuit2Minimizer*>(_rootMinimizer_.get());
+  auto* mn2 = dynamic_cast<ROOT::Minuit2::Minuit2Minimizer*>(_rootMinimizer_.get());
   if (not mn2) return;
   const ROOT::Minuit2::MnUserParameterState& mn2State = mn2->State();
   for( std::size_t iFitPar = 0 ;
@@ -943,7 +942,7 @@ void RootMinimizer::writePostFitData( TDirectory* saveDir_) {
             std::string colorStr;
             if( par.isFree() ){
               lineValues[valIndex++] = "Unconstrained";
-              colorStr = GenericToolbox::ColorCodes::blueBackground;
+              colorStr = GenericToolbox::ColorCodes::blueLightText;
             }
             else{
               lineValues[valIndex++] = std::to_string( priorFraction*100 ) + " \%";

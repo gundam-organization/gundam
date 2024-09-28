@@ -3,21 +3,20 @@
 //
 
 #include "ConfigUtils.h"
-#include "GundamGlobals.h"
 #include "GundamGreetings.h"
 #include "GundamUtils.h"
+#include "RootUtils.h"
 
-#include "CmdLineParser.h"
-#include "Logger.h"
 #include "GenericToolbox.Map.h"
 #include "GenericToolbox.Root.h"
 #include "GenericToolbox.Utils.h"
+#include "CmdLineParser.h"
+#include "Logger.h"
 
 #include <TMatrixDEigen.h>
 
 #include <string>
 #include <vector>
-#include <map>
 
 
 #ifndef DISABLE_USER_HEADER
@@ -107,38 +106,38 @@ int main(int argc, char** argv){
 
     {
       LogInfo << "Fetching runtime info..." << std::endl; LogScopeIndent;
-      GundamUtils::ObjectReader::readObject<TNamed>(
+      RootUtils::ObjectReader::readObject<TNamed>(
           f.get(),
           {{GenericToolbox::joinPath(gundamDirName, "runtime/commandLine_TNamed")},
            {GenericToolbox::joinPath(gundamDirName, "commandLine_TNamed")}},
           []( TNamed *obj_ ){
             LogInfo << blueLightText << "Command line: " << resetColor << obj_->GetTitle() << std::endl;
           });
-      GundamUtils::ObjectReader::readObject<TNamed>(
+      RootUtils::ObjectReader::readObject<TNamed>(
           f.get(), GenericToolbox::joinPath(gundamDirName, "runtime/date_TNamed"),
           []( TNamed *obj_ ){ LogInfo << blueLightText << "Date: " << resetColor << obj_->GetTitle() << std::endl; }
       );
-      GundamUtils::ObjectReader::readObject<TNamed>(
+      RootUtils::ObjectReader::readObject<TNamed>(
           f.get(), GenericToolbox::joinPath(gundamDirName, "runtime/user_TNamed"),
           []( TNamed *obj_ ){ LogInfo << blueLightText << "User: " << resetColor << obj_->GetTitle() << std::endl; }
       );
-      GundamUtils::ObjectReader::readObject<TNamed>(
+      RootUtils::ObjectReader::readObject<TNamed>(
           f.get(), GenericToolbox::joinPath(gundamDirName, "runtime/pwd_TNamed"),
           []( TNamed *obj_ ){ LogInfo << blueLightText << "Directory: " << resetColor << obj_->GetTitle() << std::endl; }
       );
-      GundamUtils::ObjectReader::readObject<TNamed>(
+      RootUtils::ObjectReader::readObject<TNamed>(
           f.get(), GenericToolbox::joinPath(gundamDirName, "runtime/host_TNamed"),
           []( TNamed *obj_ ){ LogInfo << blueLightText << "Hostname: " << resetColor << obj_->GetTitle() << std::endl; }
       );
-      GundamUtils::ObjectReader::readObject<TNamed>(
+      RootUtils::ObjectReader::readObject<TNamed>(
           f.get(), GenericToolbox::joinPath(gundamDirName, "runtime/os_TNamed"),
           []( TNamed *obj_ ){ LogInfo << blueLightText << "OS: " << resetColor << obj_->GetTitle() << std::endl; }
       );
-      GundamUtils::ObjectReader::readObject<TNamed>(
+      RootUtils::ObjectReader::readObject<TNamed>(
           f.get(), GenericToolbox::joinPath(gundamDirName, "runtime/dist_TNamed"),
           []( TNamed *obj_ ){ LogInfo << blueLightText << "Distribution: " << resetColor << obj_->GetTitle() << std::endl; }
       );
-      GundamUtils::ObjectReader::readObject<TNamed>(
+      RootUtils::ObjectReader::readObject<TNamed>(
           f.get(), GenericToolbox::joinPath(gundamDirName, "runtime/arch_TNamed"),
           []( TNamed *obj_ ){ LogInfo << blueLightText << "Architecture: " << resetColor << obj_->GetTitle() << std::endl; }
       );
@@ -146,7 +145,7 @@ int main(int argc, char** argv){
 
     {
       LogInfo << "Fetching build info..." << std::endl; LogScopeIndent;
-      GundamUtils::ObjectReader::readObject<TNamed>(
+      RootUtils::ObjectReader::readObject<TNamed>(
           f.get(),
           {{GenericToolbox::joinPath(gundamDirName, "build/version_TNamed")},
            {GenericToolbox::joinPath(gundamDirName, "version_TNamed")}},
@@ -154,19 +153,19 @@ int main(int argc, char** argv){
             LogInfo << blueLightText << "Generated with GUNDAM version: " << resetColor << obj_->GetTitle()
                     << std::endl;
           });
-      GundamUtils::ObjectReader::readObject<TNamed>(
+      RootUtils::ObjectReader::readObject<TNamed>(
           f.get(), GenericToolbox::joinPath(gundamDirName, "build/root/version_TNamed"),
           []( TNamed *obj_ ){
             LogScopeIndent;
             LogInfo << blueLightText << "GUNDAM built against ROOT version: " << resetColor << obj_->GetTitle() << std::endl;
           });
-      GundamUtils::ObjectReader::readObject<TNamed>(
+      RootUtils::ObjectReader::readObject<TNamed>(
           f.get(), GenericToolbox::joinPath(gundamDirName, "build/root/date_TNamed"),
           []( TNamed *obj_ ){
             LogScopeIndent;
             LogInfo << blueLightText << "ROOT release date: " << resetColor << obj_->GetTitle() << std::endl;
           });
-      GundamUtils::ObjectReader::readObject<TNamed>(
+      RootUtils::ObjectReader::readObject<TNamed>(
           f.get(), GenericToolbox::joinPath(gundamDirName, "build/root/install_TNamed"),
           []( TNamed *obj_ ){
             LogScopeIndent;
@@ -177,7 +176,7 @@ int main(int argc, char** argv){
 
     if( clParser.isOptionTriggered("extractDataToDisk") ){
       LogInfo << "Extract data to disk..." << std::endl; LogScopeIndent;
-      GundamUtils::ObjectReader::readObject<TNamed>(
+      RootUtils::ObjectReader::readObject<TNamed>(
           f.get(),
           {{GenericToolbox::joinPath(gundamDirName, "config/unfoldedJson_TNamed")},
            {GenericToolbox::joinPath(gundamDirName, "config_TNamed")},
@@ -195,19 +194,19 @@ int main(int argc, char** argv){
     // FitterEngine/propagator
     do {
       auto pathPropagator{GenericToolbox::joinPath("FitterEngine", "propagator")};
-      if( not GundamUtils::ObjectReader::readObject(f.get(), pathPropagator) ){ break; }
+      if( not RootUtils::ObjectReader::readObject(f.get(), pathPropagator) ){ break; }
 
       LogInfo << cyanLightText << "Reading inside: " << pathPropagator << resetColor << std::endl;
       LogScopeIndent;
 
-      GundamUtils::ObjectReader::readObject<TMatrixT<double>>(f.get(), GenericToolbox::joinPath(pathPropagator, "globalCovarianceMatrix_TMatrixD"), [&](TMatrixT<double>* matrix){
+      RootUtils::ObjectReader::readObject<TMatrixT<double>>(f.get(), GenericToolbox::joinPath(pathPropagator, "globalCovarianceMatrix_TMatrixD"), [&](TMatrixT<double>* matrix){
         readMatrix("Global prior covariance matrix", matrix);
       });
 
       for( auto& parSet : GenericToolbox::lsSubDirTDirectory( f->Get<TDirectory>(pathPropagator.c_str()) ) ){
 
         if( f->Get(GenericToolbox::joinPath(pathPropagator, parSet, "covarianceMatrix_TMatrixD").c_str()) ){
-          GundamUtils::ObjectReader::readObject<TMatrixT<double>>(
+          RootUtils::ObjectReader::readObject<TMatrixT<double>>(
               f.get(),
               GenericToolbox::joinPath(pathPropagator, parSet, "covarianceMatrix_TMatrixD"),
               [&](TMatrixT<double>* matrix){
@@ -215,7 +214,7 @@ int main(int argc, char** argv){
               });
         }
         else if( f->Get(GenericToolbox::joinPath(pathPropagator, parSet, "covarianceMatrix_TMatrixDSym").c_str()) ){
-          GundamUtils::ObjectReader::readObject<TMatrixTSym<double>>(
+          RootUtils::ObjectReader::readObject<TMatrixTSym<double>>(
               f.get(),
               GenericToolbox::joinPath(pathPropagator, parSet, "covarianceMatrix_TMatrixDSym"),
               [&](TMatrixTSym<double>* matrix){
@@ -232,12 +231,12 @@ int main(int argc, char** argv){
     /// FitterEngine/preFit
     do {
       auto pathPreFit{GenericToolbox::joinPath("FitterEngine", "preFit")};
-      if( not GundamUtils::ObjectReader::readObject(f.get(), pathPreFit) ){ break; }
+      if( not RootUtils::ObjectReader::readObject(f.get(), pathPreFit) ){ break; }
 
       LogInfo << cyanLightText << "Reading inside: " << pathPreFit << resetColor << std::endl;
       LogScopeIndent;
 
-      GundamUtils::ObjectReader::readObject<TNamed>(f.get(), GenericToolbox::joinPath(pathPreFit, "llhState_TNamed"), [&](TNamed* injectorStr){
+      RootUtils::ObjectReader::readObject<TNamed>(f.get(), GenericToolbox::joinPath(pathPreFit, "llhState_TNamed"), [&](TNamed* injectorStr){
         if( clParser.isOptionTriggered("verbose") ){
           LogInfo << blueLightText << "Pre-fit Likelihood state: " << resetColor << injectorStr->GetTitle() << std::endl;
         }
@@ -250,7 +249,7 @@ int main(int argc, char** argv){
         }
       });
 
-      GundamUtils::ObjectReader::readObject<TNamed>(f.get(), GenericToolbox::joinPath(pathPreFit, "parState_TNamed"), [&](TNamed* injectorStr){
+      RootUtils::ObjectReader::readObject<TNamed>(f.get(), GenericToolbox::joinPath(pathPreFit, "parState_TNamed"), [&](TNamed* injectorStr){
         if( clParser.getOptionVal("verbose", 0) >= 1 ){
           LogInfo << blueLightText << "Pre-fit parameters state: " << resetColor << injectorStr->GetTitle() << std::endl;
         }
@@ -268,13 +267,13 @@ int main(int argc, char** argv){
     /// FitterEngine/postFit
     do {
       auto pathPostFit{GenericToolbox::joinPath("FitterEngine", "postFit")};
-      if( not GundamUtils::ObjectReader::readObject(f.get(), pathPostFit) ){ break; }
+      if( not RootUtils::ObjectReader::readObject(f.get(), pathPostFit) ){ break; }
 
       LogInfo << cyanLightText << "Reading inside: " << pathPostFit << resetColor << std::endl;
       LogScopeIndent;
 
       std::string minimizationAlgo{};
-      GundamUtils::ObjectReader::readObject<TTree>(f.get(), GenericToolbox::joinPath(pathPostFit, "bestFitStats"), [&](TTree* tree){
+      RootUtils::ObjectReader::readObject<TTree>(f.get(), GenericToolbox::joinPath(pathPostFit, "bestFitStats"), [&](TTree* tree){
         tree->GetEntry(0);
 
         bool converged{tree->GetLeaf("fitConverged")->GetValue() == 1};
@@ -285,7 +284,7 @@ int main(int argc, char** argv){
         LogInfo << ( GenericToolbox::isIn( statusCode, GundamUtils::minuitStatusCodeStr ) ? GundamUtils::minuitStatusCodeStr.at(statusCode) : std::to_string(statusCode) );
         LogInfo << std::endl;
       });
-      GundamUtils::ObjectReader::readObject<TNamed>(f.get(), GenericToolbox::joinPath(pathPostFit, "llhState_TNamed"), [&](TNamed* injectorStr){
+      RootUtils::ObjectReader::readObject<TNamed>(f.get(), GenericToolbox::joinPath(pathPostFit, "llhState_TNamed"), [&](TNamed* injectorStr){
         LogInfo << blueLightText << "Post-fit Likelihood state: " << resetColor << injectorStr->GetTitle() << std::endl;
         if( clParser.isOptionTriggered("extractDataToDisk") ){
           auto outSubDir{GenericToolbox::joinPath( outDir, pathPostFit)};
@@ -295,7 +294,7 @@ int main(int argc, char** argv){
           GenericToolbox::dumpStringInFile( outConfigPath, injectorStr->GetTitle() );
         }
       });
-      GundamUtils::ObjectReader::readObject<TNamed>(f.get(), GenericToolbox::joinPath(pathPostFit, "parState_TNamed"), [&](TNamed* injectorStr){
+      RootUtils::ObjectReader::readObject<TNamed>(f.get(), GenericToolbox::joinPath(pathPostFit, "parState_TNamed"), [&](TNamed* injectorStr){
         if( clParser.getOptionVal("verbose", 0) >= 1 ){
           LogInfo << blueLightText << "Post-fit parameters state: " << resetColor << injectorStr->GetTitle() << std::endl;
         }
@@ -319,9 +318,9 @@ int main(int argc, char** argv){
         auto parSetPath = GenericToolbox::joinPath( pathPropagator, parSetDir, "parameters" );
         for( auto& parEntry : GenericToolbox::lsSubDirTDirectory( f->Get<TDirectory>(parSetPath.c_str()) ) ){
           LogScopeIndent;
-          GundamUtils::ObjectReader::readObject<TNamed>( f.get(), GenericToolbox::joinPath( parSetPath, parEntry, "fullTitle_TNamed" ), [&](TNamed* obj){
+          RootUtils::ObjectReader::readObject<TNamed>( f.get(), GenericToolbox::joinPath( parSetPath, parEntry, "fullTitle_TNamed" ), [&](TNamed* obj){
             bool isEnabled{false};
-            GundamUtils::ObjectReader::readObject<TNamed>( f.get(), GenericToolbox::joinPath( parSetPath, parEntry, "isEnabled_TNamed" ), [&](TNamed* obj){
+            RootUtils::ObjectReader::readObject<TNamed>( f.get(), GenericToolbox::joinPath( parSetPath, parEntry, "isEnabled_TNamed" ), [&](TNamed* obj){
               isEnabled = GenericToolbox::toBool(obj->GetTitle());
             });
             if( isEnabled ){
@@ -337,9 +336,9 @@ int main(int argc, char** argv){
       LogInfo << "Looking for strongest correlations with " << clParser.getOptionVal<std::string>("showCorrelationsWith", 0) << std::endl;
       auto pathPostFit{"FitterEngine/postFit"};
 
-      GundamUtils::ObjectReader::readObject<TDirectory>( f.get(), pathPostFit, [&](TDirectory* postFitDir_){
-        GundamUtils::ObjectReader::readObject<TDirectory>( postFitDir_, {{"Hesse"}, {"Migrad"}}, [&](TDirectory* hesseDir_){
-          GundamUtils::ObjectReader::readObject<TH2D>( hesseDir_, "hessian/postfitCorrelationOriginal_TH2D", [&](TH2D* cor_){
+      RootUtils::ObjectReader::readObject<TDirectory>( f.get(), pathPostFit, [&](TDirectory* postFitDir_){
+        RootUtils::ObjectReader::readObject<TDirectory>( postFitDir_, {{"Hesse"}, {"Migrad"}}, [&](TDirectory* hesseDir_){
+          RootUtils::ObjectReader::readObject<TH2D>( hesseDir_, "hessian/postfitCorrelationOriginal_TH2D", [&](TH2D* cor_){
 
             // clParser.getOptionVal<std::string>("showCorrelationsWith", 0)
             int selectedParIndex{-1};

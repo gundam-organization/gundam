@@ -2,6 +2,7 @@
 set( LIB_NAME GundamSamplesManager )
 
 set( SRCFILES
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/VariableCollection.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/EventUtils.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Event.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Sample.cpp

@@ -20,7 +20,7 @@ LoggerInit([]{ Logger::setUserHeaderStr("[LikelihoodInterface]"); });
 
 void LikelihoodInterface::configureImpl(){
 
-  _threadPool_.setNThreads( GundamGlobals::getNumberOfThreads() );
+  _threadPool_.setNThreads(GundamGlobals::getNbCpuThreads() );
 
   // reading the configuration of the propagator
   // allows to implement

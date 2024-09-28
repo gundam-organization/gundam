@@ -7,10 +7,11 @@
 
 
 #include "Event.h"
-#include "DataBinSet.h"
+#include "BinSet.h"
+
+#include "GenericToolbox.Root.h"
 
 #include <TH1D.h>
-#include <TTreeFormula.h>
 
 #include <vector>
 #include <string>
@@ -27,14 +28,14 @@ public:
   };
 
   struct Histogram{
-    struct Bin{
+    struct BinContext{
       int index{-1};
       double content{0};
       double error{0};
-      const DataBin* dataBinPtr{nullptr};
+      const Bin* binPtr{nullptr};
       std::vector<Event*> eventPtrList{};
     };
-    std::vector<Bin> binList{};
+    std::vector<BinContext> binList{};
     int nBins{0};
   };
 
@@ -58,12 +59,12 @@ public:
   [[nodiscard]] const std::string &getName() const{ return _name_; }
   [[nodiscard]] const std::string &getSelectionCutsStr() const{ return _selectionCutStr_; }
   [[nodiscard]] const JsonType &getBinningFilePath() const{ return _binningConfig_; }
-  [[nodiscard]] const DataBinSet &getBinning() const{ return _binning_; }
+  [[nodiscard]] const BinSet &getBinning() const{ return _binning_; }
   [[nodiscard]] const Histogram &getHistogram() const{ return _histogram_; }
   [[nodiscard]] const std::vector<Event> &getEventList() const{ return _eventList_; }
 
   // getters
-  DataBinSet &getBinning() { return _binning_; }
+  BinSet &getBinning() { return _binning_; }
   std::vector<Event> &getEventList(){ return _eventList_; }
 
   // misc
@@ -71,7 +72,7 @@ public:
   bool isDatasetValid(const std::string& datasetName_);
 
   // core
-  void buildHistogram(const DataBinSet& binning_);
+  void buildHistogram(const BinSet& binning_);
   void reserveEventMemory(size_t dataSetIndex_, size_t nEvents, const Event &eventBuffer_);
   void shrinkEventList(size_t newTotalSize_);
   void updateBinEventList(int iThread_ = -1);
@@ -103,7 +104,7 @@ private:
 
   // Internals
   double _llhStatBuffer_{std::nan("unset")}; // set by SampleSet which hold the joinProbability obj
-  DataBinSet _binning_;
+  BinSet _binning_;
   std::vector<size_t> _dataSetIndexList_;
 
   Histogram _histogram_{};

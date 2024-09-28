@@ -6,12 +6,10 @@
 #include "GundamGlobals.h"
 #include "GundamAlmostEqual.h"
 
-
 #include "Logger.h"
 
 #include <string>
 #include <memory>
-
 
 #ifndef DISABLE_USER_HEADER
 LoggerInit([]{ Logger::setUserHeaderStr("[Sample]"); });
@@ -19,22 +17,21 @@ LoggerInit([]{ Logger::setUserHeaderStr("[Sample]"); });
 
 
 void Sample::configureImpl(){
-  _name_ = GenericToolbox::Json::fetchValue<std::string>(_config_, "name");
-  LogDebugIf(GundamGlobals::isDebugConfig()) << "Defining sample \"" << _name_ << "\"" << std::endl;
-
+  GenericToolbox::Json::fillValue(_config_, _name_, "name");
   GenericToolbox::Json::fillValue(_config_, _isEnabled_, "isEnabled");
+  GenericToolbox::Json::fillValue(_config_, _binningConfig_, {{"binningFilePath"},{"binningFile"},{"binning"}});
+  GenericToolbox::Json::fillValue(_config_, _selectionCutStr_, {{"selectionCutStr"},{"selectionCuts"}});
+  GenericToolbox::Json::fillValue(_config_, _enabledDatasetList_, {{"datasets"},{"dataSets"}});
+
+  LogThrowIf(_name_.empty(), "No name was provided for sample #" << _index_ << std::endl << GenericToolbox::Json::toReadableString(_config_));
+  LogDebugIf(GundamGlobals::isDebugConfig()) << "Defining sample \"" << _name_ << "\"" << std::endl;
   if( not _isEnabled_ ){
     LogDebugIf(GundamGlobals::isDebugConfig()) << "-> disabled" << std::endl;
     return;
   }
 
-  GenericToolbox::Json::fillValue(_config_, _binningConfig_, {{"binningFilePath"},{"binningFile"},{"binning"}});
-  GenericToolbox::Json::fillValue(_config_, _selectionCutStr_, {{"selectionCutStr"},{"selectionCuts"}});
-  GenericToolbox::Json::fillValue(_config_, _enabledDatasetList_, {{"datasets"},{"dataSets"}});
-
   LogDebugIf(GundamGlobals::isDebugConfig()) << "Reading binning: " << _config_ << std::endl;
-  _binning_.readBinningDefinition( _binningConfig_ );
-  _binning_.sortBins();
+  _binning_.configure( _binningConfig_ );
   this->buildHistogram( _binning_ );
 }
 
@@ -51,12 +48,12 @@ bool Sample::isDatasetValid(const std::string& datasetName_){
   );
 }
 
-void Sample::buildHistogram(const DataBinSet& binning_){
+void Sample::buildHistogram(const BinSet& binning_){
   _histogram_.binList.reserve(binning_.getBinList().size() );
   int iBin{0};
   for( auto& bin : binning_.getBinList() ){
     _histogram_.binList.emplace_back();
-    _histogram_.binList.back().dataBinPtr = &bin;
+    _histogram_.binList.back().binPtr = &bin;
     _histogram_.binList.back().index = iBin++;
   }
   _histogram_.nBins = int( _histogram_.binList.size() );
@@ -96,7 +93,7 @@ void Sample::shrinkEventList(size_t newTotalSize_){
   _eventList_.shrink_to_fit();
 }
 void Sample::updateBinEventList(int iThread_) {
-  int nbThreads = GundamGlobals::getNumberOfThreads();
+  int nbThreads = GundamGlobals::getNbCpuThreads();
   if( iThread_ == -1 ){ iThread_ = 0; nbThreads = 1; }
   // multithread technique with iBin += nbThreads;
   int iBin{iThread_};
@@ -114,7 +111,7 @@ void Sample::updateBinEventList(int iThread_) {
   }
 }
 void Sample::refillHistogram(int iThread_){
-  int nThreads = GundamGlobals::getNumberOfThreads();
+  int nThreads = GundamGlobals::getNbCpuThreads();
   if( iThread_ == -1 ){ nThreads = 1; iThread_ = 0; }
 
 #ifdef GUNDAM_USING_CACHE_MANAGER
@@ -132,7 +129,7 @@ void Sample::refillHistogram(int iThread_){
   // Faster than pointer shifter. -> would be slower if refillHistogram is
   // handled by the propagator
   int iBin = iThread_; // iBin += nbThreads;
-  Histogram::Bin* binPtr;
+  Histogram::BinContext* binPtr;
   double buffer{};
   while( iBin < _histogram_.nBins ){
     bool binFilled = false;

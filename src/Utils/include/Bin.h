@@ -5,19 +5,14 @@
 #ifndef GUNDAM_DATA_BIN_H
 #define GUNDAM_DATA_BIN_H
 
-
 #include "ConfigUtils.h"
-
-#include <TFormula.h>
-#include <TTreeFormula.h>
 
 #include <utility>
 #include <vector>
 #include <string>
 
 
-
-class DataBin : public JsonBaseClass {
+class Bin : public JsonBaseClass {
 
 public:
   class Edges : public JsonBaseClass {
@@ -47,8 +42,8 @@ protected:
   void configureImpl() override;
 
 public:
-  DataBin() = delete;
-  explicit DataBin(int index_) : _index_(index_) {}
+  Bin() = delete;
+  explicit Bin( int index_) : _index_(index_) {}
 
   // setters
   void setIndex(int index_){ _index_ = index_; }
@@ -62,8 +57,6 @@ public:
   [[nodiscard]] int getIndex() const { return _index_; }
   [[nodiscard]] const std::string &getFormulaStr() const { return _formulaStr_; }
   [[nodiscard]] const std::string &getTreeFormulaStr() const{ return _treeFormulaStr_; }
-  [[nodiscard]] TFormula *getFormula() const{ return _formula_.get(); }
-  [[nodiscard]] TTreeFormula *getTreeFormula() const{ return _treeFormula_.get(); }
   [[nodiscard]] const std::vector<Edges> &getEdgesList() const { return _binEdgesList_; }
   [[nodiscard]] const Edges& getVarEdges( const std::string& varName_ ) const;
   [[nodiscard]] const Edges* getVarEdgesPtr( const std::string& varName_ ) const;
@@ -75,7 +68,7 @@ public:
   [[nodiscard]] double getVolume() const;
 
   // Management
-  [[nodiscard]] bool isOverlapping(const DataBin& other_) const;
+  [[nodiscard]] bool isOverlapping(const Bin& other_) const;
   [[nodiscard]] bool isInBin(const std::vector<double>& valuesList_) const;
   [[nodiscard]] bool isVariableSet(const std::string& variableName_) const;
   [[nodiscard]] bool isBetweenEdges(const std::string& variableName_, double value_) const;
@@ -84,13 +77,8 @@ public:
   [[nodiscard]] std::vector<std::string> buildVariableNameList() const;
 
   // Misc
-  void generateFormula();
-  void generateTreeFormula();
   [[nodiscard]] std::string getSummary() const;
   [[nodiscard]] std::vector<double> generateBinTarget(const std::vector<std::string>& varNameList_ = {}) const;
-
-protected:
-  std::string generateFormulaStr(bool varNamesAsTreeFormula_);
 
 private:
   bool _isLowMemoryUsageMode_{false};
@@ -102,8 +90,6 @@ private:
 
   std::string _formulaStr_{};
   std::string _treeFormulaStr_{};
-  std::shared_ptr<TFormula> _formula_{nullptr};
-  std::shared_ptr<TTreeFormula> _treeFormula_{nullptr};
 
 };
 

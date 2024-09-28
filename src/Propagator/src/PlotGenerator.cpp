@@ -31,7 +31,7 @@ void PlotGenerator::configureImpl(){
 
   gStyle->SetOptStat(0);
   _histHolderCacheList_.resize(1);
-  _threadPool_.setNThreads( GundamGlobals::getNumberOfThreads() );
+  _threadPool_.setNThreads(GundamGlobals::getNbCpuThreads() );
 
   GenericToolbox::Json::fillValue(_config_, _isEnabled_, "isEnabled");
   if( not _isEnabled_ ){ return; }
@@ -77,10 +77,7 @@ void PlotGenerator::configureImpl(){
     GenericToolbox::Json::fillValue(histDefConfig, histDef.useSampleBinningOfVar, {{"useSampleBinningOfVar"}, {"useSampleBinningOfObservable"}});
 
     auto binning = GenericToolbox::Json::fetchValue(histDefConfig, {{"binning"}, {"binningFile"}}, JsonType());
-    if( not binning.empty() ){
-      histDef.binning.readBinningDefinition( binning );
-      histDef.binning.sortBins();
-    }
+    if( not binning.empty() ){ histDef.binning.configure( binning ); }
 
     GenericToolbox::addIfNotInVector("", histDef.splitVarList);
   }
@@ -199,7 +196,7 @@ void PlotGenerator::generateSampleHistograms(TDirectory *saveDir_, int cacheSlot
           for( auto* hist : histPtrToFillList ){
 
             auto bounds = GenericToolbox::ParallelWorker::getThreadBoundIndices(
-                iThread_, GundamGlobals::getNumberOfThreads(),
+                iThread_, GundamGlobals::getNbCpuThreads(),
                 hist->histPtr->GetNbinsX()
             );
 
@@ -688,7 +685,7 @@ void PlotGenerator::defineHistogramHolders() {
 
   std::function<void(int)> fetchSplitVar = [&](int iThread_){
     auto bounds = GenericToolbox::ParallelWorker::getThreadBoundIndices(
-        iThread_, GundamGlobals::getNumberOfThreads(),
+        iThread_, GundamGlobals::getNbCpuThreads(),
         int(_modelSampleListPtr_->size())
     );
 
@@ -767,16 +764,16 @@ void PlotGenerator::defineHistogramHolders() {
                 for( const auto& bin : sample.getBinning().getBinList() ){
                   std::string variableNameForBinning{sampleObsBinning};
 
-                  if( not GenericToolbox::doesElementIsInVector(sampleObsBinning, bin.getEdgesList(), [](const DataBin::Edges& e){ return e.varName; }) ){
+                  if( not GenericToolbox::doesElementIsInVector(sampleObsBinning, bin.getEdgesList(), [](const Bin::Edges& e){ return e.varName; }) ){
                     for( auto& sampleVar : histDef.sampleVariableIfNotAvailable ){
-                      if( GenericToolbox::doesElementIsInVector(sampleVar, bin.getEdgesList(), [](const DataBin::Edges& e){ return e.varName; }) ){
+                      if( GenericToolbox::doesElementIsInVector(sampleVar, bin.getEdgesList(), [](const Bin::Edges& e){ return e.varName; }) ){
                         variableNameForBinning = sampleVar;
                         break;
                       }
                     }
                   } // sampleObsBinning not in the sample binning
 
-                  const DataBin::Edges* edges{bin.getVarEdgesPtr(variableNameForBinning)};
+                  const Bin::Edges* edges{bin.getVarEdgesPtr(variableNameForBinning)};
                   if( edges == nullptr ){
                     LogAlert << "Can't use sample binning for var " << variableNameForBinning << " and sample " << sample.getName() << std::endl;
                     varNotAvailable = true;
@@ -925,7 +922,7 @@ void PlotGenerator::buildEventBinCache( const std::vector<HistHolder *> &histPtr
   std::function<void(int)> fillEventHistCache = [&](int iThread_){
 
     auto bounds = GenericToolbox::ParallelWorker::getThreadBoundIndices(
-        iThread_, GundamGlobals::getNumberOfThreads(),
+        iThread_, GundamGlobals::getNbCpuThreads(),
         int(histPtrToFillList.size())
     );
 

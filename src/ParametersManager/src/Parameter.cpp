@@ -5,17 +5,16 @@
 #include "Parameter.h"
 #include "ParameterSet.h"
 #include "ConfigUtils.h"
-
+#include "GundamBacktrace.h"
 
 #include "Logger.h"
-
-#include "GundamBacktrace.h"
 
 #include <sstream>
 
 #ifndef DISABLE_USER_HEADER
 LoggerInit([]{ Logger::setUserHeaderStr("[Parameter]"); });
 #endif
+
 
 void Parameter::configureImpl(){
 
@@ -81,7 +80,7 @@ void Parameter::setParameterValue(double parameterValue, bool force) {
   else{ _gotUpdated_ = false; }
 }
 double Parameter::getParameterValue() const {
-  if ( not isValueWithinBounds() ) {
+  if ( isEnabled() and not isValueWithinBounds() ) {
     LogWarning << "Getting out of bounds parameter: "
                << getSummary() << std::endl;
     LogDebug << GundamUtils::Backtrace;

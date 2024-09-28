@@ -1,11 +1,12 @@
 set(SRCFILES
     ${CMAKE_CURRENT_SOURCE_DIR}/src/GundamGlobals.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/DataBinSet.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/DataBin.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/BinSet.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/Bin.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/GundamGreetings.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ParameterThrowerMarkHarz.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ConfigUtils.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/GundamUtils.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/RootUtils.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/GundamApp.cpp
     )
 
@@ -13,11 +14,10 @@ set(HEADERS
     ${CMAKE_CURRENT_SOURCE_DIR}/include/CalculateGeneralSpline.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/CalculateMonotonicSpline.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/CalculateUniformSpline.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/include/DataBin.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/include/DataBinSet.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/Bin.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/BinSet.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/GundamGlobals.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/GundamGreetings.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/include/Likelihoods.hh
     ${CMAKE_CURRENT_SOURCE_DIR}/include/VariableDictionary.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ParameterThrowerMarkHarz.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ConfigUtils.h

@@ -2,12 +2,11 @@
 // Created by Adrien BLANCHET on 14/05/2022.
 //
 
-
 #include "DataDispenser.h"
 #include "DatasetDefinition.h"
+#include "LoaderUtils.h"
 
 #include "Propagator.h"
-#include "EventVarTransform.h"
 #include "GundamGlobals.h"
 
 #include "ConfigUtils.h"
@@ -39,7 +38,7 @@ LoggerInit([]{ Logger::setUserHeaderStr("[DataDispenser]"); });
 void DataDispenser::configureImpl(){
 
   // first of all
-  _threadPool_.setNThreads( GundamGlobals::getNumberOfThreads() );
+  _threadPool_.setNThreads(GundamGlobals::getNbCpuThreads() );
 
   GenericToolbox::Json::fillValue(_config_, _parameters_.name, "name");
   LogThrowIf(_parameters_.name.empty(), "Dataset name not set.");
@@ -231,7 +230,7 @@ void DataDispenser::doEventSelection(){
   ROOT::EnableThreadSafety();
 
   // how meaning buffers?
-  int nThreads{GundamGlobals::getNumberOfThreads()};
+  int nThreads{GundamGlobals::getNbCpuThreads()};
   if( _owner_->isDevSingleThreadEventSelection() ) { nThreads = 1; }
 
   Long64_t nEntries{0};
@@ -337,8 +336,6 @@ void DataDispenser::fetchRequestedLeaves(){
     for( auto& var : indexRequests ){ _cache_.addVarRequestedForIndexing(var); }
   }
 
-  std::vector<std::string> varForStorageListBuffer{};
-
   // sample binning -> indexing only
   {
     std::vector<std::string> varForIndexingListBuffer{};
@@ -410,7 +407,7 @@ void DataDispenser::fetchRequestedLeaves(){
     // [OUT] variables only
     // [OUT] not requested by its inputs
     for( auto& varTransform : _parameters_.eventVarTransformList ){
-      std::string outVarName = varTransform.getOutputVariableName();
+      const std::string& outVarName = varTransform.getOutputVariableName();
       if( outVarName != var ) continue;
       if( GenericToolbox::doesElementIsInVector(outVarName, varTransform.fetchRequestedVars()) ) continue;
       _cache_.varToLeafDict[var].second = true;
@@ -460,7 +457,7 @@ void DataDispenser::preAllocateMemory(){
     ));
   }
 
-  eventPlaceholder.getVariables().allocateMemory( leafFormToVarList );
+  LoaderUtils::allocateMemory(eventPlaceholder, leafFormToVarList);
 
   LogInfo << "Reserving event memory..." << std::endl;
   _cache_.sampleIndexOffsetList.resize(_cache_.samplesToFillList.size());
@@ -530,7 +527,7 @@ void DataDispenser::readAndFill(){
   }
 
   LogWarning << "Loading and indexing..." << std::endl;
-  if(not _owner_->isDevSingleThreadEventLoaderAndIndexer() and GundamGlobals::getNumberOfThreads() > 1 ){
+  if(not _owner_->isDevSingleThreadEventLoaderAndIndexer() and GundamGlobals::getNbCpuThreads() > 1 ){
     ROOT::EnableThreadSafety(); // EXTREMELY IMPORTANT
     _threadPool_.addJob(__METHOD_NAME__, [&](int iThread_){ this->fillFunction(iThread_); });
     _threadPool_.runJob(__METHOD_NAME__);
@@ -646,7 +643,7 @@ std::unique_ptr<TChain> DataDispenser::openChain(bool verbose_){
 
 void DataDispenser::eventSelectionFunction(int iThread_){
 
-  int nThreads{GundamGlobals::getNumberOfThreads()};
+  int nThreads{GundamGlobals::getNbCpuThreads()};
   if( iThread_ == -1 ){ iThread_ = 0; nThreads = 1; }
 
   // Opening ROOT file...
@@ -741,18 +738,15 @@ void DataDispenser::eventSelectionFunction(int iThread_){
 
     for( auto& sampleCut : sampleCutList ){
 
-      // no cut?
-      if( sampleCut.cutIndex == -1 ){
+
+      if(  sampleCut.cutIndex == -1  // no cut?
+        or lCollection.getLeafFormList()[sampleCut.cutIndex].evalAsDouble() != 0 // pass cut?
+      ){
         _cache_.threadSelectionResults[iThread_].eventIsInSamplesList[iEntry][sampleCut.sampleIndex] = true;
         _cache_.threadSelectionResults[iThread_].sampleNbOfEvents[sampleCut.sampleIndex]++;
       }
-        // pass cut?
-      else if( lCollection.getLeafFormList()[sampleCut.cutIndex].evalAsDouble() != 0 ){
-        _cache_.threadSelectionResults[iThread_].eventIsInSamplesList[iEntry][sampleCut.sampleIndex] = true;
-        _cache_.threadSelectionResults[iThread_].sampleNbOfEvents[sampleCut.sampleIndex]++;
-      }
+      else{
         // don't pass cut?
-      else {
 //          LogTrace << "Event #" << treeChain->GetFileNumber() << ":" << treeChain->GetReadEntry()
 //                   << " rejected as sample " << sampleCut.sampleIndex << " because of "
 //                   << lCollection.getLeafFormList()[sampleCut.cutIndex].getSummary() << std::endl;
@@ -766,7 +760,7 @@ void DataDispenser::eventSelectionFunction(int iThread_){
 }
 void DataDispenser::fillFunction(int iThread_){
 
-  int nThreads = GundamGlobals::getNumberOfThreads();
+  int nThreads = GundamGlobals::getNbCpuThreads();
   if( iThread_ == -1 ){ iThread_ = 0; nThreads = 1; } // special mode
 
   auto treeChain = this->openChain();
@@ -855,12 +849,12 @@ void DataDispenser::fillFunction(int iThread_){
   Event eventIndexingBuffer;
   eventIndexingBuffer.getIndices().dataset = _owner_->getDataSetIndex();
   eventIndexingBuffer.getVariables().setVarNameList(std::make_shared<std::vector<std::string>>(_cache_.varsRequestedForIndexing));
-  eventIndexingBuffer.getVariables().allocateMemory(leafFormIndexingList);
+  LoaderUtils::allocateMemory(eventIndexingBuffer, leafFormIndexingList);
 
   Event eventStorageBuffer;
   eventStorageBuffer.getIndices().dataset = _owner_->getDataSetIndex();
   eventStorageBuffer.getVariables().setVarNameList(std::make_shared<std::vector<std::string>>(_cache_.varsRequestedForStorage));
-  eventStorageBuffer.getVariables().allocateMemory(leafFormStorageList);
+  LoaderUtils::allocateMemory(eventStorageBuffer, leafFormStorageList);
 
   if(iThread_ == 0){
     LogInfo << "Feeding event variables with:" << std::endl;
@@ -1018,7 +1012,7 @@ void DataDispenser::fillFunction(int iThread_){
       if( not _cache_.eventIsInSamplesList[iEntry][iSample] ){ continue; }
 
       // Getting loaded data in tEventBuffer
-      eventIndexingBuffer.getVariables().copyData( leafFormIndexingList );
+      LoaderUtils::copyData(eventIndexingBuffer, leafFormIndexingList);
 
       // Propagate variable transformations for indexing
       for( auto* varTransformPtr : varTransformForIndexingList ){
@@ -1063,7 +1057,7 @@ void DataDispenser::fillFunction(int iThread_){
       eventPtr->getWeights().resetCurrentWeight();
 
       // drop the content of the leaves
-      eventPtr->getVariables().copyData( leafFormStorageList );
+      LoaderUtils::copyData(*eventPtr, leafFormStorageList);
 
       // Propagate transformation for storage -> use the previous results calculated for indexing
       for( auto *varTransformPtr: varTransformForStorageList ){
@@ -1082,7 +1076,7 @@ void DataDispenser::fillFunction(int iThread_){
 
         // dial collections may come with a condition formula
         if( dialCollectionRef->getApplyConditionFormula() != nullptr ){
-          if( eventIndexingBuffer.getVariables().evalFormula(dialCollectionRef->getApplyConditionFormula().get()) == 0 ){
+          if( LoaderUtils::evalFormula(eventIndexingBuffer, dialCollectionRef->getApplyConditionFormula().get()) == 0 ){
             // next dialSet
             continue;
           }

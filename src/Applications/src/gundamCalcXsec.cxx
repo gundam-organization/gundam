@@ -2,6 +2,7 @@
 #include "GundamGlobals.h"
 #include "GundamApp.h"
 #include "GundamUtils.h"
+#include "RootUtils.h"
 #include "FitterEngine.h"
 #include "ConfigUtils.h"
 
@@ -24,8 +25,6 @@ LoggerInit([]{ Logger::getUserHeader() << "[" << FILENAME << "]"; });
 
 
 int main(int argc, char** argv){
-
-  using namespace GundamUtils;
 
   GundamApp app{"cross-section calculator tool"};
 
@@ -80,7 +79,7 @@ int main(int argc, char** argv){
   }
 
   GundamGlobals::setNumberOfThreads( clParser.getOptionVal("nbThreads", 1) );
-  LogInfo << "Running the fitter with " << GundamGlobals::getNumberOfThreads() << " parallel threads." << std::endl;
+  LogInfo << "Running the fitter with " << GundamGlobals::getNbCpuThreads() << " parallel threads." << std::endl;
 
   // Reading fitter file
   std::string fitterFile{clParser.getOptionVal<std::string>("fitterFile")};
@@ -92,9 +91,9 @@ int main(int argc, char** argv){
     fitterRootFile = std::unique_ptr<TFile>( TFile::Open( fitterFile.c_str() ) );
     LogThrowIf( fitterRootFile == nullptr, "Could not open fitter output file." );
 
-    ObjectReader::throwIfNotFound = true;
+    RootUtils::ObjectReader::throwIfNotFound = true;
 
-    ObjectReader::readObject<TNamed>(
+    RootUtils::ObjectReader::readObject<TNamed>(
         fitterRootFile.get(),
         {{"gundam/config/unfoldedJson_TNamed"},
          {"gundam/config_TNamed"},
@@ -206,7 +205,7 @@ int main(int argc, char** argv){
 
     // Load post-fit parameters as "prior" so we can reset the weight to this point when throwing toys
     LogWarning << std::endl << GenericToolbox::addUpDownBars("Injecting post-fit parameters...") << std::endl;
-    ObjectReader::readObject<TNamed>( fitterRootFile.get(), "FitterEngine/postFit/parState_TNamed", [&](TNamed* parState_){
+    RootUtils::ObjectReader::readObject<TNamed>( fitterRootFile.get(), "FitterEngine/postFit/parState_TNamed", [&](TNamed* parState_){
       propagator.getParametersManager().injectParameterValues( GenericToolbox::Json::readConfigJsonStr( parState_->GetTitle() ) );
       for( auto& parSet : propagator.getParametersManager().getParameterSetsList() ){
         if( not parSet.isEnabled() ){ continue; }
@@ -219,7 +218,7 @@ int main(int argc, char** argv){
 
     // Load the post-fit covariance matrix
     LogWarning << std::endl << GenericToolbox::addUpDownBars("Injecting post-fit covariance matrix...") << std::endl;
-    ObjectReader::readObject<TH2D>(
+    RootUtils::ObjectReader::readObject<TH2D>(
         fitterRootFile.get(), "FitterEngine/postFit/Hesse/hessian/postfitCovarianceOriginal_TH2D",
         [&](TH2D* hCovPostFit_){
           propagator.getParametersManager().setGlobalCovarianceMatrix(std::make_shared<TMatrixD>(hCovPostFit_->GetNbinsX(), hCovPostFit_->GetNbinsX()));
@@ -329,7 +328,7 @@ int main(int argc, char** argv){
         // do we skip this bin? if not, apply coefficient
         bool skipBin{true};
         for( size_t iParBin = 0 ; iParBin < dialCollectionPtr->getDialBinSet().getBinList().size() ; iParBin++ ){
-          const DataBin& parBin = dialCollectionPtr->getDialBinSet().getBinList()[iParBin];
+          const Bin& parBin = dialCollectionPtr->getDialBinSet().getBinList()[iParBin];
 
           bool isParBinValid{true};
 

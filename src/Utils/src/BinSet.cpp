@@ -2,9 +2,8 @@
 // Created by Nadrino on 19/05/2021.
 //
 
-#include "DataBinSet.h"
+#include "BinSet.h"
 #include "ConfigUtils.h"
-
 
 #include "Logger.h"
 
@@ -16,19 +15,17 @@
 LoggerInit([]{ Logger::setUserHeaderStr("[DataBinSet]"); });
 #endif
 
-void DataBinSet::setVerbosity(int maxLogLevel_){ Logger::setMaxLogLevel(maxLogLevel_); }
+void BinSet::setVerbosity( int maxLogLevel_){ Logger::setMaxLogLevel(maxLogLevel_); }
 
-// core
-void DataBinSet::readBinningDefinition(const JsonType& binning_) {
-
+void BinSet::configureImpl() {
   _binList_.clear();
 
-  if( binning_.is_structured() ){
+  if( _config_.is_structured() ){
     // config like -> should already be unfolded
-    this->readBinningConfig( binning_ );
+    this->readBinningConfig( _config_ );
   }
-  else if( binning_.is_string() ){
-    _filePath_ = GenericToolbox::expandEnvironmentVariables( binning_.get<std::string>() );
+  else if( _config_.is_string() ){
+    _filePath_ = GenericToolbox::expandEnvironmentVariables( _config_.get<std::string>() );
     if( not GenericToolbox::isFile(_filePath_) ){
       LogError << GET_VAR_NAME_VALUE(_filePath_) << ": file not found." << std::endl;
       throw std::runtime_error(GET_VAR_NAME_VALUE(_filePath_) + ": file not found.");
@@ -37,14 +34,13 @@ void DataBinSet::readBinningDefinition(const JsonType& binning_) {
     if( GenericToolbox::hasExtension(_filePath_, "txt") ){ this->readTxtBinningDefinition(); }
   }
   else{
-    LogThrow("Unknown binning config entry: " << GenericToolbox::Json::toReadableString(binning_));
+    LogThrow("Unknown binning config entry: " << GenericToolbox::Json::toReadableString(_config_));
   }
 
   this->sortBinEdges();
   this->checkBinning();
 }
-
-void DataBinSet::checkBinning(){
+void BinSet::checkBinning(){
 
   bool hasErrors{false};
 
@@ -63,7 +59,22 @@ void DataBinSet::checkBinning(){
   LogThrowIf(hasErrors);
 
 }
-void DataBinSet::sortBins(){
+std::string BinSet::getSummary() const{
+  std::stringstream ss;
+  ss << "DataBinSet";
+  if( not _name_.empty() ) ss << "(" << _name_ << ")";
+  ss << ": holding " << _binList_.size() << " bins.";
+
+
+  for( auto& bin : _binList_ ){
+    ss << std::endl << GenericToolbox::indentString("#" + std::to_string(bin.getIndex()) + ": " + bin.getSummary(), 2);
+  }
+
+  return ss.str();
+}
+
+// deprecated
+void BinSet::sortBins(){
 
   /// DON'T SORT THE BINS FOR DIALS!!! THE ORDER MIGHT REFER TO THE COV MATRIX DEFINITION
 
@@ -93,26 +104,13 @@ void DataBinSet::sortBins(){
 //  }
 
 }
-std::string DataBinSet::getSummary() const{
-  std::stringstream ss;
-  ss << "DataBinSet";
-  if( not _name_.empty() ) ss << "(" << _name_ << ")";
-  ss << ": holding " << _binList_.size() << " bins.";
 
 
-  for( auto& bin : _binList_ ){
-    ss << std::endl << GenericToolbox::indentString("#" + std::to_string(bin.getIndex()) + ": " + bin.getSummary(), 2);
-  }
-
-  return ss.str();
-}
-
-
-void DataBinSet::sortBinEdges(){
+void BinSet::sortBinEdges(){
   for( auto& bin : _binList_ ){
     std::sort(
         bin.getEdgesList().begin(), bin.getEdgesList().end(),
-        [](const DataBin::Edges& edges1_, const DataBin::Edges& edges2_){
+        []( const Bin::Edges& edges1_, const Bin::Edges& edges2_){
           if( edges1_.isConditionVar and not edges2_.isConditionVar ){ return true; }
           if( not edges1_.isConditionVar and edges2_.isConditionVar ){ return false; }
           return GenericToolbox::toLowerCase(edges1_.varName) < GenericToolbox::toLowerCase(edges2_.varName);
@@ -122,7 +120,7 @@ void DataBinSet::sortBinEdges(){
     for( int iEdges = 0 ; iEdges < int(bin.getEdgesList().size()) ; iEdges++ ){ bin.getEdgesList()[iEdges].index = iEdges; }
   }
 }
-std::vector<std::string> DataBinSet::buildVariableNameList() const{
+std::vector<std::string> BinSet::buildVariableNameList() const{
   std::vector<std::string> out;
   for( auto& bin : _binList_ ){
     for( auto& edges : bin.getEdgesList() ){
@@ -133,7 +131,7 @@ std::vector<std::string> DataBinSet::buildVariableNameList() const{
 }
 
 
-void DataBinSet::readTxtBinningDefinition(){
+void BinSet::readTxtBinningDefinition(){
 
   auto lines = GenericToolbox::dumpFileAsVectorString(_filePath_);
 
@@ -249,7 +247,7 @@ void DataBinSet::readTxtBinningDefinition(){
 
 }
 
-void DataBinSet::readBinningConfig(const JsonType& binning_){
+void BinSet::readBinningConfig( const JsonType& binning_){
 
   if( GenericToolbox::Json::doKeyExist(binning_, {"binningDefinition"}) ){
 

@@ -36,11 +36,11 @@ public:
   [[nodiscard]] std::vector<std::string> fetchRequestedVariablesForIndexing() const;
 
   void copyEventsFrom(const SampleSet& src_);
-  size_t getNbOfEvents() const;
+  [[nodiscard]] size_t getNbOfEvents() const;
 
   // misc
   void printConfiguration() const;
-  std::string getSampleBreakdown() const;
+  [[nodiscard]] std::string getSampleBreakdown() const;
 
 private:
   // config

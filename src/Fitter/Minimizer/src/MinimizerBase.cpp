@@ -191,7 +191,7 @@ double MinimizerBase::evalFit( const double* parArray_ ){
 //    ssHeader << std::endl << "Target EDM: " << getMinimizer().get;
       ssHeader << std::endl << "RAM: " << GenericToolbox::parseSizeUnits(double(GenericToolbox::getProcessMemoryUsage()));
       double cpuPercent = GenericToolbox::getCpuUsageByProcess();
-      ssHeader << " / CPU: " << cpuPercent << "% (" << cpuPercent / GundamGlobals::getNumberOfThreads() << "% efficiency)";
+      ssHeader << " / CPU: " << cpuPercent << "% (" << cpuPercent / GundamGlobals::getNbCpuThreads() << "% efficiency)";
       ssHeader << std::endl << "Avg log-likelihood computation time: " << _monitor_.evalLlhTimer;
       ssHeader << std::endl;
 
@@ -290,11 +290,11 @@ void MinimizerBase::printParameters(){
       std::string colorStr;
       std::string statusStr;
 
-      if( not par.isEnabled() ) { statusStr = "Disabled"; colorStr = GenericToolbox::ColorCodes::yellowBackground; }
-      else if( par.isFixed() )  { statusStr = "Fixed (prior applied)";    colorStr = GenericToolbox::ColorCodes::redBackground; }
+      if( not par.isEnabled() ) { continue; }
+      else if( par.isFixed() )  { statusStr = "Fixed (prior applied)";    colorStr = GenericToolbox::ColorCodes::yellowLightText; }
       else                      {
         statusStr = Parameter::PriorType::toString(par.getPriorType()) + " Prior";
-        if(par.getPriorType()==Parameter::PriorType::Flat) colorStr = GenericToolbox::ColorCodes::blueBackground;
+        if(par.getPriorType()==Parameter::PriorType::Flat) colorStr = GenericToolbox::ColorCodes::blueLightText;
       }
 
 #ifdef NOCOLOR
