@@ -65,6 +65,7 @@ public:
 
   // getters
   BinSet &getBinning() { return _binning_; }
+  Histogram &getHistogram(){ return _histogram_; }
   std::vector<Event> &getEventList(){ return _eventList_; }
 
   // misc

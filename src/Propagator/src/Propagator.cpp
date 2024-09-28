@@ -293,10 +293,24 @@ void Propagator::updateDialState(){
 void Propagator::refillHistograms(){
   refillHistogramTimer.start();
 
-  if( not usedGpu ){
+#ifdef GUNDAM_USING_CACHE_MANAGER
+  if( usedGpu ){
+    int index{0};
+    auto* cm = Cache::Manager::Get();
+    LogThrowIf( cm == nullptr );
+    for( auto& sample : _sampleSet_.getSampleList() ){
+      for( auto& bin : sample.getHistogram().binList ){
+        bin.content = cm->GetHistogramsCache().GetSum(index++);
+      }
+    }
+  }
+  else{
+#endif
     if( not _devSingleThreadHistFill_ ){ _threadPool_.runJob("Propagator::refillHistograms"); }
     else{ refillHistogramsFct(-1); }
+#ifdef GUNDAM_USING_CACHE_MANAGER
   }
+#endif
 
   refillHistogramTimer.stop();
 }
