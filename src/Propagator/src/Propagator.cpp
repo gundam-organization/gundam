@@ -142,16 +142,16 @@ void Propagator::reweightEvents() {
   // Only real parameters are propagated on the spectra -> need to convert the eigen to original
   if( _enableEigenToOrigInPropagate_ ){ _parManager_.convertEigenToOrig(); }
 
-  bool usedGPU{false};
+  usedGpu = false;
 #ifdef GUNDAM_USING_CACHE_MANAGER
   if( GundamGlobals::isCacheManagerEnabled() ) {
     if (Cache::Manager::Update(getSampleSet(), getEventDialCache())) {
-      usedGPU = Cache::Manager::Fill();
+      usedGpu = Cache::Manager::Fill();
     }
-    if (GundamGlobals::getForceDirectCalculation()) usedGPU = false;
+    if (GundamGlobals::getForceDirectCalculation()) usedGpu = false;
   }
 #endif
-  if( not usedGPU ){
+  if( not usedGpu ){
     updateDialState();
     if( not _devSingleThreadReweight_ ){
       _threadPool_.runJob("Propagator::reweightEvents");
@@ -292,16 +292,7 @@ void Propagator::updateDialState(){
 void Propagator::refillHistograms(){
   refillHistogramTimer.start();
 
-  bool usedGPU{false};
-#ifdef GUNDAM_USING_CACHE_MANAGER
-  if( GundamGlobals::isCacheManagerEnabled() ) {
-    if( Cache::Manager::Update(getSampleSet(), getEventDialCache()) ) {
-      usedGPU = Cache::Manager::FillHistograms();
-    }
-    if (GundamGlobals::getForceDirectCalculation()) usedGPU = false;
-  }
-#endif
-  if( not usedGPU ){
+  if( not usedGpu ){
     if( not _devSingleThreadHistFill_ ){ _threadPool_.runJob("Propagator::refillHistograms"); }
     else{ refillHistogramsFct(-1); }
   }
