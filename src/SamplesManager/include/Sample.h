@@ -121,6 +121,11 @@ public:
   void setCacheManagerUpdatePointer(void (*p)()) { _cacheManagerUpdate_ = p;}
 
   [[nodiscard]] int getCacheManagerIndex() const {return _cacheManagerIndex_;}
+  [[nodiscard]] const bool *getCacheManagerValid() const{ return _cacheManagerValid_; }
+  [[nodiscard]] const double *getCacheManagerValue() const{ return _cacheManagerValue_; }
+  [[nodiscard]] const double *getCacheManagerValue2() const{ return _cacheManagerValue2_; }
+  void (*getCacheManagerUpdate() const)() { return _cacheManagerUpdate_; }
+
 private:
   // An "opaque" index into the cache that is used to simplify bookkeeping.
   int _cacheManagerIndex_{-1};

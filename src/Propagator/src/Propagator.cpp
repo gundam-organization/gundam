@@ -296,7 +296,29 @@ void Propagator::refillHistograms(){
 #ifdef GUNDAM_USING_CACHE_MANAGER
   if( usedGpu ){
     // it should be single threaded
-    refillHistogramsFct(-1);
+//    refillHistogramsFct(-1);
+#ifdef GUNDAM_USING_CACHE_MANAGER
+    for( auto& sample : _sampleSet_.getSampleList() ){
+      if( sample.getCacheManagerValid() != nullptr and not (*sample.getCacheManagerValid()) ){
+        // This can be slow (~10 usec for 5000 bins) when data must be copied
+        // from the device, but it makes sure that the results are copied from
+        // the device when they have changed. The values pointed to by
+        // _cacheManagerValue_ and _cacheManagerValid_ are inside the summed
+        // index cache (a bit of evil coding here), and are updated by the
+        // cache.  The update is triggered by (*_cacheManagerUpdate_)().
+        if( sample.getCacheManagerUpdate() ) (*sample.getCacheManagerUpdate())();
+      }
+
+      auto sampleCacheIndex(sample.getCacheManagerIndex());
+      for( auto& histBin : sample.getHistogram().binList ){
+        histBin.content = sample.getCacheManagerValue()[sampleCacheIndex+histBin.index];
+        histBin.error = sample.getCacheManagerValue2()[sampleCacheIndex+histBin.index];
+        histBin.error = std::sqrt(histBin.error);
+      }
+    }
+#endif
+
+
   }
   else{
 #endif
