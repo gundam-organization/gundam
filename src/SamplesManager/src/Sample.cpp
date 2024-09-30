@@ -24,13 +24,13 @@ void Sample::configureImpl(){
   GenericToolbox::Json::fillValue(_config_, _enabledDatasetList_, {{"datasets"},{"dataSets"}});
 
   LogThrowIf(_name_.empty(), "No name was provided for sample #" << _index_ << std::endl << GenericToolbox::Json::toReadableString(_config_));
-  LogDebugIf(GundamGlobals::isDebugConfig()) << "Defining sample \"" << _name_ << "\"" << std::endl;
+  LogDebugIf(GundamGlobals::isDebug()) << "Defining sample \"" << _name_ << "\"" << std::endl;
   if( not _isEnabled_ ){
-    LogDebugIf(GundamGlobals::isDebugConfig()) << "-> disabled" << std::endl;
+    LogDebugIf(GundamGlobals::isDebug()) << "-> disabled" << std::endl;
     return;
   }
 
-  LogDebugIf(GundamGlobals::isDebugConfig()) << "Reading binning: " << _config_ << std::endl;
+  LogDebugIf(GundamGlobals::isDebug()) << "Reading binning: " << _config_ << std::endl;
   _binning_.configure( _binningConfig_ );
   this->buildHistogram( _binning_ );
 }
@@ -115,14 +115,14 @@ void Sample::refillHistogram(int iThread_){
   if( iThread_ == -1 ){ nThreads = 1; iThread_ = 0; }
 
 #ifdef GUNDAM_USING_CACHE_MANAGER
-  if (_CacheManagerValid_ and not (*_CacheManagerValid_)) {
+  if (_cacheManagerValid_ and not (*_cacheManagerValid_)) {
     // This can be slow (~10 usec for 5000 bins) when data must be copied
     // from the device, but it makes sure that the results are copied from
     // the device when they have changed. The values pointed to by
-    // _CacheManagerValue_ and _CacheManagerValid_ are inside the summed
+    // _cacheManagerValue_ and _cacheManagerValid_ are inside the summed
     // index cache (a bit of evil coding here), and are updated by the
-    // cache.  The update is triggered by (*_CacheManagerUpdate_)().
-    if (_CacheManagerUpdate_) (*_CacheManagerUpdate_)();
+    // cache.  The update is triggered by (*_cacheManagerUpdate_)().
+    if (_cacheManagerUpdate_) (*_cacheManagerUpdate_)();
   }
 #endif
 
@@ -140,14 +140,13 @@ void Sample::refillHistogram(int iThread_){
     bool filledWithManager = false;
     double value{std::nan("not-set")};
     double error{std::nan("not-set")};
-    if (_CacheManagerValid_ and (*_CacheManagerValid_)
-        and _CacheManagerValue_ and _CacheManagerIndex_ >= 0) {
-      value = _CacheManagerValue_[_CacheManagerIndex_+binPtr->index];
-      error = _CacheManagerValue2_[_CacheManagerIndex_+binPtr->index];
+    if (_cacheManagerValid_ and (*_cacheManagerValid_) and _cacheManagerValue_ and _cacheManagerIndex_ >= 0) {
+      value = _cacheManagerValue_[_cacheManagerIndex_+binPtr->index];
+      error = _cacheManagerValue2_[_cacheManagerIndex_+binPtr->index];
       LogThrowIf(std::isnan(value), "Incorrect Cache::Manager initialization");
       binPtr->content = value;
       binPtr->error = error;
-      binFilled = not GundamGlobals::getForceDirectCalculation();
+      binFilled = not GundamGlobals::isForceCpuCalculation();
       filledWithManager = true;
     }
 #endif
@@ -164,7 +163,7 @@ void Sample::refillHistogram(int iThread_){
 #ifdef GUNDAM_USING_CACHE_MANAGER
     // Parallel calculations of the histogramming have been run.  Make sure
     // they are the same.
-    if (GundamGlobals::getForceDirectCalculation() and filledWithManager) {
+    if ( GundamGlobals::isForceCpuCalculation() and filledWithManager) {
       bool problemFound = false;
       if (not GundamUtils::almostEqual(value,(binPtr->content))) {
         double magnitude = std::abs(value) + std::abs(binPtr->content);

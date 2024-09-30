@@ -29,7 +29,7 @@ void ParametersManager::configureImpl(){
   GenericToolbox::Json::fillValue(_config_, _reThrowParSetIfOutOfPhysical_, {{"reThrowParSetIfOutOfBounds"},{"reThrowParSetIfOutOfPhysical"}});
   GenericToolbox::Json::fillValue(_config_, _parameterSetListConfig_, "parameterSetList");
 
-  LogDebugIf(GundamGlobals::isDebugConfig()) << _parameterSetListConfig_.size() << " parameter sets are defined." << std::endl;
+  LogDebugIf(GundamGlobals::isDebug()) << _parameterSetListConfig_.size() << " parameter sets are defined." << std::endl;
 
   _parameterSetList_.clear(); // make sure there nothing in case readConfig is called more than once
   _parameterSetList_.reserve( _parameterSetListConfig_.size() );
@@ -39,7 +39,7 @@ void ParametersManager::configureImpl(){
 
     // clear the parameter sets that have been disabled
     if( not _parameterSetList_.back().isEnabled() ){
-      LogDebugIf(GundamGlobals::isDebugConfig()) << "Removing disabled parSet: " << _parameterSetList_.back().getName() << std::endl;
+      LogDebugIf(GundamGlobals::isDebug()) << "Removing disabled parSet: " << _parameterSetList_.back().getName() << std::endl;
       _parameterSetList_.pop_back();
     }
   }

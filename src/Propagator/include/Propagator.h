@@ -112,6 +112,8 @@ private:
 
   GenericToolbox::ParallelWorker _threadPool_{};
 
+  bool usedGpu{false};
+
 };
 #endif //GUNDAM_PROPAGATOR_H
 

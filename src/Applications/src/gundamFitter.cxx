@@ -67,7 +67,6 @@ int main(int argc, char** argv){
   clParser.addTriggerOption("skipHesse", {"--skip-hesse"}, "Don't perform postfit error evaluation");
   clParser.addTriggerOption("generateOneSigmaPlots", {"--one-sigma"}, "Generate one sigma plots");
   clParser.addTriggerOption("lightOutputMode", {"--light-mode"}, "Disable plot generation");
-  clParser.addTriggerOption("noDialCache", {"--no-dial-cache"}, "Disable cache handling for dial eval");
   clParser.addTriggerOption("ignoreVersionCheck", {"--ignore-version"}, "Don't check GUNDAM version with config request");
 
   clParser.addOption("scanParameters", {"--scan"}, "Enable parameter scan before and after the fit (can provide nSteps)", 1, true);
@@ -109,7 +108,7 @@ int main(int argc, char** argv){
   // Init command line args:
   // --------------------------
 
-  if( clParser.isOptionTriggered("debugVerbose") ){ GundamGlobals::setIsDebugConfig( true ); }
+  if( clParser.isOptionTriggered("debugVerbose") ){ GundamGlobals::setIsDebug(true); }
 
   // Is build compatible with GPU option?
   if( clParser.isOptionTriggered("usingGpu") ){
@@ -121,7 +120,7 @@ int main(int argc, char** argv){
     LogWarning << "Using GPU parallelization." << std::endl;
   }
 
-  if (clParser.isOptionTriggered("forceDirect")) GundamGlobals::setForceDirectCalculation(true);
+  GundamGlobals::setIsForceCpuCalculation(clParser.isOptionTriggered("forceDirect"));
 
   bool useCache = false;
 #ifdef GUNDAM_USING_CACHE_MANAGER
@@ -139,7 +138,7 @@ int main(int argc, char** argv){
   if (clParser.isOptionTriggered("usingGpu")) useCache = true;
 
 #ifdef GUNDAM_USING_CACHE_MANAGER
-    GundamGlobals::setEnableCacheManager(useCache);
+  GundamGlobals::setIsCacheManagerEnabled(useCache);
     if (not useCache) {
       LogWarning << "Cache::Manager enabled but turned off for job"
                  << std::endl;
@@ -147,12 +146,6 @@ int main(int argc, char** argv){
 #else
     LogThrowIf(useCache, "GUNDAM compiled without Cache::Manager");
 #endif
-
-  // No cache on dials?
-  if( clParser.isOptionTriggered("noDialCache") ){
-    LogAlert << "Disabling cache in dial evaluation (when available)..." << std::endl;
-    GundamGlobals::setDisableDialCache(true);
-  }
 
   // inject parameter config?
   std::string injectParameterPath{};

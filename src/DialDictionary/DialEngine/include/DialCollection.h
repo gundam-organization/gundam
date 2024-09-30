@@ -187,7 +187,6 @@ private:
   bool _isEventByEvent_{false};
   bool _isEnabled_{true};
   bool _useMirrorDial_{false};
-  bool _disableDialCache_{false};
   bool _enableDialsSummary_{false};
   bool _allowDialExtrapolation_{true};
   int _index_{-1};

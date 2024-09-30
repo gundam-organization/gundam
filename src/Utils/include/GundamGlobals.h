@@ -12,29 +12,26 @@ class GundamGlobals{
 
 public:
   // setters
-  static void setEnableCacheManager(bool enable){ _enableCacheManager_ = enable; }
-  static void setIsDebugConfig(bool enable){ _debugConfigReading_ = enable; }
+  static void setIsDebug( bool enable){ _isDebug_ = enable; }
+  static void setLightOutputMode(bool enable_){ _lightOutputModeEnabled_ = enable_; }
+  static void setIsCacheManagerEnabled( bool enable){ _useCacheManager_ = enable; }
+  static void setIsForceCpuCalculation( bool enable){ _forceCpuCalculation_ = enable; }
   static void setNumberOfThreads(int nbCpuThreads_){ _nbCpuThreads_ = nbCpuThreads_; }
-  static void setForceDirectCalculation(bool enable){ _forceDirectCalculation_ = enable; }
-  static void setLightOutputMode(bool enable_){ _lightOutputMode_ = enable_; }
-  static void setDisableDialCache(bool disableDialCache_){ _disableDialCache_ = disableDialCache_; }
 
   // getters
+  static bool isDebug(){ return _isDebug_; }
+  static bool isLightOutputMode(){ return _lightOutputModeEnabled_; }
+  static bool isCacheManagerEnabled(){ return _useCacheManager_; }
+  static bool isForceCpuCalculation(){ return _forceCpuCalculation_; }
   static int getNbCpuThreads(){ return _nbCpuThreads_; }
-  static bool getEnableCacheManager(){ return _enableCacheManager_; }
-  static bool isDebugConfig(){ return _debugConfigReading_; }
-  static bool getForceDirectCalculation(){ return _forceDirectCalculation_; }
-  static bool isDisableDialCache(){ return _disableDialCache_; }
-  static bool isLightOutputMode(){ return _lightOutputMode_; }
-  static std::mutex& getThreadMutex(){ return _threadMutex_; }
+  static std::mutex& getMutex(){ return _threadMutex_; }
 
 private:
+  static bool _isDebug_; /* enable debug printouts for the config reading */
+  static bool _useCacheManager_; /* enable the use of the cache manager in the propagator (mainly for GPU) */
+  static bool _forceCpuCalculation_; /* force using CPU in the cache manager */
+  static bool _lightOutputModeEnabled_;
   static int _nbCpuThreads_;
-  static bool _disableDialCache_;
-  static bool _enableCacheManager_;
-  static bool _debugConfigReading_;
-  static bool _forceDirectCalculation_;
-  static bool _lightOutputMode_;
   static std::mutex _threadMutex_;
 
 };

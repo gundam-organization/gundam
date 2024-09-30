@@ -26,7 +26,7 @@ LoggerInit([]{ Logger::setUserHeaderStr("[RootMinimizer]"); });
 #endif
 
 void RootMinimizer::configureImpl(){
-  LogDebugIf(GundamGlobals::isDebugConfig()) << "Configuring RootMinimizer..." << std::endl;
+  LogDebugIf(GundamGlobals::isDebug()) << "Configuring RootMinimizer..." << std::endl;
 
   // read general parameters first
   this->MinimizerBase::configureImpl();

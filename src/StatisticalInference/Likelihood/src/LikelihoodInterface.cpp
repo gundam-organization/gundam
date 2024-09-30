@@ -74,7 +74,7 @@ void LikelihoodInterface::configureImpl(){
   // new config structure
   GenericToolbox::Json::fillValue(_config_, jointProbabilityConfig, "jointProbabilityConfig");
   GenericToolbox::Json::fillValue(jointProbabilityConfig, jointProbabilityTypeStr, "type");
-  LogDebugIf(GundamGlobals::isDebugConfig()) << "Using \"" << jointProbabilityTypeStr << "\" JointProbabilityType." << std::endl;
+  LogDebugIf(GundamGlobals::isDebug()) << "Using \"" << jointProbabilityTypeStr << "\" JointProbabilityType." << std::endl;
   _jointProbabilityPtr_ = std::shared_ptr<JointProbability::JointProbabilityBase>( JointProbability::makeJointProbability( jointProbabilityTypeStr ) );
   _jointProbabilityPtr_->setConfig( jointProbabilityConfig );
   _jointProbabilityPtr_->configure();

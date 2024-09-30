@@ -25,11 +25,11 @@ void ParameterSet::configureImpl(){
 
   GenericToolbox::Json::fillValue(_config_, _name_, "name");
   LogThrowIf(_name_.empty(), "ParameterSet have no name.");
-  LogDebugIf(GundamGlobals::isDebugConfig()) << "Reading config for parameter set: " << _name_ << std::endl;
+  LogDebugIf(GundamGlobals::isDebug()) << "Reading config for parameter set: " << _name_ << std::endl;
 
   GenericToolbox::Json::fillValue(_config_, _isEnabled_, "isEnabled");
   if( not _isEnabled_ ){
-    LogDebugIf(GundamGlobals::isDebugConfig()) << " -> marked as disabled." << std::endl;
+    LogDebugIf(GundamGlobals::isDebug()) << " -> marked as disabled." << std::endl;
     return; // don't go any further
   }
 
@@ -111,7 +111,7 @@ void ParameterSet::configureImpl(){
     }
 
     if( _nbParameterDefinition_ == -1 and not _parameterDefinitionConfig_.empty() ){
-      LogDebugIf(GundamGlobals::isDebugConfig()) << "Using parameter definition config list to determine the number of parameters..." << std::endl;
+      LogDebugIf(GundamGlobals::isDebug()) << "Using parameter definition config list to determine the number of parameters..." << std::endl;
       _nbParameterDefinition_ = int(_parameterDefinitionConfig_.get<std::vector<JsonType>>().size());
     }
 
@@ -947,7 +947,7 @@ void ParameterSet::defineParameters(){
         par.setIsEnabled( false );
       }
       else{
-        LogDebugIf(GundamGlobals::isDebugConfig()) << "Enabling parameter \"" << par.getFullTitle() << "\" as it is set in enableOnlyParameters" << std::endl;
+        LogDebugIf(GundamGlobals::isDebug()) << "Enabling parameter \"" << par.getFullTitle() << "\" as it is set in enableOnlyParameters" << std::endl;
       }
     }
     if( not _disableParameters_.empty() ){
@@ -961,7 +961,7 @@ void ParameterSet::defineParameters(){
       }
 
       if( not isEnabled ){
-        LogDebugIf(GundamGlobals::isDebugConfig()) << "Skipping parameter \"" << par.getFullTitle() << "\" as it is set in disableParameters" << std::endl;
+        LogDebugIf(GundamGlobals::isDebug()) << "Skipping parameter \"" << par.getFullTitle() << "\" as it is set in disableParameters" << std::endl;
         par.setIsEnabled( false );
         continue;
       }
