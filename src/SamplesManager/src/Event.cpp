@@ -23,7 +23,7 @@ double Event::getEventWeight() const {
   }
   if (getCache().valid()) {
     const double value =  getCache().getWeight();
-    if (not GundamGlobals::getForceDirectCalculation()) return value;
+    if (not GundamGlobals::isForceCpuCalculation()) return value;
     if (not GundamUtils::almostEqual(value, _weights_.current)) {
       const double magnitude = std::abs(value) + std::abs(_weights_.current);
       double delta = std::abs(value - _weights_.current);

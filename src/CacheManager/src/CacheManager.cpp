@@ -181,7 +181,7 @@ bool Cache::Manager::HasGPU(bool dump) {
 
 bool Cache::Manager::Build(SampleSet& sampleList,
                            EventDialCache& eventDials) {
-  if (not GundamGlobals::getEnableCacheManager()) return false;
+  if (not GundamGlobals::isCacheManagerEnabled()) return false;
 
   LogInfo << "Build the internal caches " << std::endl;
 
@@ -393,7 +393,7 @@ bool Cache::Manager::Build(SampleSet& sampleList,
   // Try to allocate the Cache::Manager memory (including for the GPU if
   // it's being used).
   if (!Cache::Manager::Get()
-      && GundamGlobals::getEnableCacheManager()) {
+      && GundamGlobals::isCacheManagerEnabled()) {
     LogInfo << "Creating the Cache::Manager" << std::endl;
     if (!Cache::Manager::HasCUDA()) {
       LogInfo << "    GPU Not enabled with Cache::Manager"
@@ -751,7 +751,7 @@ bool Cache::Manager::Fill() {
     LogError << "Fill while an update is required" << std::endl;
     LogThrow("Fill while an update is required");
   }
-  LogTraceIf( GundamGlobals::isDebugConfig() ) << "Cache::Manager::Fill -- Fill the GPU cache" << std::endl;
+  LogTraceIf(GundamGlobals::isDebug() ) << "Cache::Manager::Fill -- Fill the GPU cache" << std::endl;
 #define DUMP_FILL_INPUT_PARAMETERS
 #ifdef DUMP_FILL_INPUT_PARAMETERS
   do {
