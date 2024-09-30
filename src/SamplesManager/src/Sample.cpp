@@ -24,13 +24,13 @@ void Sample::configureImpl(){
   GenericToolbox::Json::fillValue(_config_, _enabledDatasetList_, {{"datasets"},{"dataSets"}});
 
   LogThrowIf(_name_.empty(), "No name was provided for sample #" << _index_ << std::endl << GenericToolbox::Json::toReadableString(_config_));
-  LogDebugIf(GundamGlobals::isDebugConfig()) << "Defining sample \"" << _name_ << "\"" << std::endl;
+  LogDebugIf(GundamGlobals::isDebug()) << "Defining sample \"" << _name_ << "\"" << std::endl;
   if( not _isEnabled_ ){
-    LogDebugIf(GundamGlobals::isDebugConfig()) << "-> disabled" << std::endl;
+    LogDebugIf(GundamGlobals::isDebug()) << "-> disabled" << std::endl;
     return;
   }
 
-  LogDebugIf(GundamGlobals::isDebugConfig()) << "Reading binning: " << _config_ << std::endl;
+  LogDebugIf(GundamGlobals::isDebug()) << "Reading binning: " << _config_ << std::endl;
   _binning_.configure( _binningConfig_ );
   this->buildHistogram( _binning_ );
 }
@@ -146,7 +146,7 @@ void Sample::refillHistogram(int iThread_){
       LogThrowIf(std::isnan(value), "Incorrect Cache::Manager initialization");
       binPtr->content = value;
       binPtr->error = error;
-      binFilled = not GundamGlobals::getForceDirectCalculation();
+      binFilled = not GundamGlobals::isForceCpuCalculation();
       filledWithManager = true;
     }
 #endif
@@ -163,7 +163,7 @@ void Sample::refillHistogram(int iThread_){
 #ifdef GUNDAM_USING_CACHE_MANAGER
     // Parallel calculations of the histogramming have been run.  Make sure
     // they are the same.
-    if (GundamGlobals::getForceDirectCalculation() and filledWithManager) {
+    if ( GundamGlobals::isForceCpuCalculation() and filledWithManager) {
       bool problemFound = false;
       if (not GundamUtils::almostEqual(value,(binPtr->content))) {
         double magnitude = std::abs(value) + std::abs(binPtr->content);

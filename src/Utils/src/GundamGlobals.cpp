@@ -6,9 +6,8 @@
 
 // statics
 int GundamGlobals::_nbCpuThreads_{1};
-bool GundamGlobals::_disableDialCache_{false};
-bool GundamGlobals::_enableCacheManager_{false};
-bool GundamGlobals::_debugConfigReading_{false};
-bool GundamGlobals::_forceDirectCalculation_{false};
-bool GundamGlobals::_lightOutputMode_{false};
+bool GundamGlobals::_useCacheManager_{false};
+bool GundamGlobals::_isDebug_{false};
+bool GundamGlobals::_forceCpuCalculation_{false};
+bool GundamGlobals::_lightOutputModeEnabled_{false};
 std::mutex GundamGlobals::_threadMutex_;

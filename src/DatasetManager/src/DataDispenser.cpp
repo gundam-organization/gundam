@@ -45,7 +45,7 @@ void DataDispenser::configureImpl(){
 
   // histograms don't need other parameters
   if( GenericToolbox::Json::doKeyExist( _config_, "fromHistContent" ) ) {
-    LogDebugIf(GundamGlobals::isDebugConfig()) << "Dataset \"" << _parameters_.name << "\" will be defined with histogram data." << std::endl;
+    LogDebugIf(GundamGlobals::isDebug()) << "Dataset \"" << _parameters_.name << "\" will be defined with histogram data." << std::endl;
     auto fromHistConfig( GenericToolbox::Json::fetchValue<JsonType>(_config_, "fromHistContent") );
 
     _parameters_.fromHistContent.isEnabled = true;
@@ -1030,7 +1030,7 @@ void DataDispenser::fillFunction(int iThread_){
       size_t sampleEventIndex{};
       EventDialCache::IndexedCacheEntry* eventDialCacheEntry{nullptr};
       {
-        std::unique_lock<std::mutex> lock(GundamGlobals::getThreadMutex());
+        std::unique_lock<std::mutex> lock(GundamGlobals::getMutex());
 
         if( _parameters_.debugNbMaxEventsToLoad != 0 ){
           // check if the limit has been reached
