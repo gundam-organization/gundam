@@ -93,7 +93,8 @@ void ParameterSet::configureImpl(){
     if( not _dialSetDefinitions_.empty() ){
       for( auto& dialSetDef : _dialSetDefinitions_ ){
 
-        JsonType parameterBinning = GenericToolbox::Json::fetchValue<JsonType>(dialSetDef, {{"binning"}, {"parametersBinningPath"}});
+        JsonType parameterBinning;
+        GenericToolbox::Json::fillValue(dialSetDef, parameterBinning, {{"binning"}, {"parametersBinningPath"}});
 
         if( parameterBinning.empty() ){ continue;}
 
