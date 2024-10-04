@@ -93,10 +93,10 @@ void ParameterSet::configureImpl(){
     if( not _dialSetDefinitions_.empty() ){
       for( auto& dialSetDef : _dialSetDefinitions_ ){
 
-        JsonType parameterBinning{};
-        GenericToolbox::Json::fetchValue<JsonType>(dialSetDef, {{"binning"}, {"parametersBinningPath"}}, parameterBinning);
+        JsonType parameterBinning;
+        GenericToolbox::Json::fillValue(dialSetDef, parameterBinning, {{"binning"}, {"parametersBinningPath"}});
 
-        if( parameterBinning.empty() ){ continue; }
+        if( parameterBinning.empty() ){ continue;}
 
         LogInfo << "Found parameter binning within dialSetDefinition. Defining parameters number..." << std::endl;
         BinSet b;
