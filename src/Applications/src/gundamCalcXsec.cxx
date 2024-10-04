@@ -767,10 +767,16 @@ int main(int argc, char** argv){
 
     const CrossSectionData* xsecDataPtr{nullptr};
     for( auto& xsecData : crossSectionDataList ){
+      /*
       if( xsecData.samplePtr  == histHolder.samplePtr){
         xsecDataPtr = &xsecData;
         break;
       }
+      */
+      if( (xsecData.samplePtr)->getName()  == (histHolder.samplePtr)->getName()){
+        xsecDataPtr = &xsecData;
+        break;
+      }      
     }
     LogThrowIf(xsecDataPtr==nullptr, "corresponding data not found");
 
