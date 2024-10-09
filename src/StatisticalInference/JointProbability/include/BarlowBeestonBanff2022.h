@@ -45,7 +45,7 @@ namespace JointProbability{
     double fractionalErrorLimit{1.0E+150};
     // OA2021 bug reimplmentation (set to numeric_limits::min() to reproduce
     // the bug).
-    double expectedValueMinimum{0.};
+    double expectedValueMinimum{-1.};
 
     mutable std::map<const Sample*, std::vector<double>> nomMcUncertList{}; // OA 2021 bug reimplementation
     mutable GenericToolbox::NoCopyWrapper<std::mutex> _mutex_{}; // for creating the nomMC
@@ -57,6 +57,7 @@ namespace JointProbability{
     GenericToolbox::Json::fillValue(_config_, usePoissonLikelihood, "usePoissonLikelihood");
     GenericToolbox::Json::fillValue(_config_, BBNoUpdateWeights, "BBNoUpdateWeights");
     GenericToolbox::Json::fillValue(_config_, fractionalErrorLimit, "fractionalErrorLimit");
+    GenericToolbox::Json::fillValue(_config_, expectedValueMinimum, "expectedValueMinimum");
     GenericToolbox::Json::fillValue(_config_, verboseLevel, {{"verboseLevel"},{"isVerbose"}});
     GenericToolbox::Json::fillValue(_config_, throwIfInfLlh, "throwIfInfLlh");
 
