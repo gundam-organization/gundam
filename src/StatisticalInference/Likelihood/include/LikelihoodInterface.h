@@ -119,7 +119,7 @@ protected:
 private:
   // parameters
   bool _forceAsimovData_{false};
-  bool _throwAsimovToyParameters_{false};
+  bool _throwAsimovToyParameters_{true};
   bool _enableStatThrowInToys_{true};
   bool _gaussStatThrowInToys_{false};
   bool _enableEventMcThrow_{true};
