@@ -83,11 +83,13 @@ void Parameter::setParameterValue(double parameterValue, bool force) {
   else{ _gotUpdated_ = false; }
 }
 double Parameter::getParameterValue() const {
+#ifdef DEBUG_BUILD
   if ( isEnabled() and not isValueWithinBounds() ) {
     LogWarning << "Getting out of bounds parameter: "
                << getSummary() << std::endl;
     LogDebug << GundamUtils::Backtrace;
   }
+#endif
   return _parameterValue_;
 }
 void Parameter::setDialSetConfig(const JsonType &jsonConfig_) {
