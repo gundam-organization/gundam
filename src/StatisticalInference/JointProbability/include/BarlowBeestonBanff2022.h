@@ -30,6 +30,23 @@ namespace JointProbability{
     bool allowZeroMcWhenZeroData{true};
     bool usePoissonLikelihood{false};
     bool BBNoUpdateWeights{false}; // OA 2021 bug reimplementation
+    // OA2021 and BANFF fractional error limitation is only relevent with
+    // BBNoUpdateWeights is true, and is needed to reproduce bugs when it is
+    // true.  When BBNoUpdateWeights is false, the fractional error will
+    // naturally be limited to less than 100%.  Physically, the fractional
+    // uncertainty should be less than 100% since one MC event in a bin would
+    // have 100% fractional uncertainty [under the "Gaussian" approximation,
+    // so sqrt(1.0)/1.0].  The OA2021 behavior lets the fractional error grow,
+    // but the entire likelihood became discontinuous around a predicted value
+    // of 1E-16. Setting fractionalErrorLimit to 1E+19 matches OA2021 before
+    // the discontinuity.  The BANFF behavior has the likelihood failed around
+    // 1E-154.  Setting fractionalErrorLimit to 1E+150 matchs BANFF.  In both
+    // cases, the new likelihood behaves reasonably all the way to zero.
+    double fractionalErrorLimit{1.0E+150};
+    // OA2021 bug reimplmentation (set to numeric_limits::min() to reproduce
+    // the bug).
+    double expectedValueMinimum{0.};
+
     mutable std::map<const Sample*, std::vector<double>> nomMcUncertList{}; // OA 2021 bug reimplementation
     mutable GenericToolbox::NoCopyWrapper<std::mutex> _mutex_{}; // for creating the nomMC
   };
@@ -39,8 +56,15 @@ namespace JointProbability{
     GenericToolbox::Json::fillValue(_config_, allowZeroMcWhenZeroData, "allowZeroMcWhenZeroData");
     GenericToolbox::Json::fillValue(_config_, usePoissonLikelihood, "usePoissonLikelihood");
     GenericToolbox::Json::fillValue(_config_, BBNoUpdateWeights, "BBNoUpdateWeights");
+    GenericToolbox::Json::fillValue(_config_, fractionalErrorLimit, "fractionalErrorLimit");
     GenericToolbox::Json::fillValue(_config_, verboseLevel, {{"verboseLevel"},{"isVerbose"}});
     GenericToolbox::Json::fillValue(_config_, throwIfInfLlh, "throwIfInfLlh");
+
+    // Place a hard limit on the fractional error to prevent numeric issues.
+    if( fractionalErrorLimit > 1.0E+152 ){
+      LogAlert << "Placing a hard limit on the fractional error to prevent numeric issues." << std::endl;
+      fractionalErrorLimit = 1.0E+152;
+    }
 
   }
   double BarlowBeestonBanff2022::eval(const SamplePair& samplePair_, int bin_) const {
@@ -98,6 +122,19 @@ namespace JointProbability{
       }
     }
 
+    // Add the (broken) expected value threshold that we saw in the old
+    // likelihood. This is here to help understand the old behavior.
+    if (predVal <= expectedValueMinimum) {
+      LogAlert << "Use incorrect expectation behavior --"
+               << " predVal: " << predVal
+               << " dataVal: " << dataVal
+               << std::endl;
+      if (predVal <= 0.0 and dataVal > 0.0) {
+        return std::numeric_limits<double>::infinity();
+      }
+      return 0.0;
+    }
+
     // Implementing Barlow-Beeston correction for LH calculation. The
     // following comments are inspired/copied from Clarence's comments in the
     // MaCh3 implementation of the same feature
@@ -115,9 +152,19 @@ namespace JointProbability{
 
     // Barlow-Beeston uses fractional uncertainty on MC, so sqrt(sum[w^2])/mc
     // -b/2a in quadratic equation
-    if (mcuncert > std::numeric_limits<double>::epsilon()
-        and predVal > std::numeric_limits<double>::epsilon()) {
-      double fractional = sqrt(mcuncert) / predVal;
+    if ( mcuncert > 0.0 ) {
+      // Physically, the
+      // fractional uncertainty should be less than 100% since one MC event in
+      // a bin would have 100% fractional uncertainty [under the "Gaussian"
+      // approximation, so sqrt(1.0)/1.0].  The OA2021 behavior lets the
+      // fractional error grow, but the entire likelihood became discontinuous
+      // around a predicted value of 1E-16. Setting fractionalLimit to 1E+19
+      // matches OA2021 before the discontinuity.  The BANFF behavior has the
+      // likelihood failed around 1E-154.  Setting fractionalLimit to 1E+150
+      // matchs BANFF.  In both cases, the new likelihood behaves reasonably
+      // all the way to zero.
+      double fractional = std::min( std::sqrt(mcuncert) / predVal, fractionalErrorLimit);
+
       double temp = predVal * fractional * fractional - 1;
       // b^2 - 4ac in quadratic equation
       double temp2 = temp * temp + 4 * dataVal * fractional * fractional;
@@ -229,6 +276,8 @@ namespace JointProbability{
       LogInfo << GET_VAR_NAME_VALUE(BBNoUpdateWeights) << std::endl;
       LogInfo << GET_VAR_NAME_VALUE(verboseLevel) << std::endl;
       LogInfo << GET_VAR_NAME_VALUE(throwIfInfLlh) << std::endl;
+      LogInfo << GET_VAR_NAME_VALUE(expectedValueMinimum) << std::endl;
+      LogInfo << GET_VAR_NAME_VALUE(fractionalErrorLimit) << std::endl;
     }
 
   }
