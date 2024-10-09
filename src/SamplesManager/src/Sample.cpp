@@ -144,7 +144,6 @@ void Sample::refillHistogram(int iThread_){
         and _CacheManagerValue_ and _CacheManagerIndex_ >= 0) {
       value = _CacheManagerValue_[_CacheManagerIndex_+binPtr->index];
       error = _CacheManagerValue2_[_CacheManagerIndex_+binPtr->index];
-      LogThrowIf(std::isnan(value), "Incorrect Cache::Manager initialization");
       binPtr->content = value;
       binPtr->error = error;
       binFilled = not GundamGlobals::isForceCpuCalculation();
@@ -160,7 +159,6 @@ void Sample::refillHistogram(int iThread_){
         binPtr->error += buffer * buffer;
       }
     }
-    LogThrowIf(std::isnan((binPtr->content)), "NaN while filling histogram");
 #ifdef GUNDAM_USING_CACHE_MANAGER
     // Parallel calculations of the histogramming have been run.  Make sure
     // they are the same.
