@@ -39,17 +39,22 @@ void DatasetDefinition::configureImpl() {
     auto name = GenericToolbox::Json::fetchValue<std::string>(dataEntry, "name");
     LogThrowIf( GenericToolbox::isIn(name, _dataDispenserDict_), "\"" << name << "\" already taken, please use another name." )
 
-    if( GenericToolbox::Json::fetchValue(dataEntry, "fromMc", bool(false)) ){ _dataDispenserDict_.emplace(name, _modelDispenser_); }
-    else{ _dataDispenserDict_.emplace(name, DataDispenser(this)); }
+    _dataDispenserDict_.emplace(name, DataDispenser(this));
     _dataDispenserDict_.at(name).getParameters().isData = true;
-    _dataDispenserDict_.at(name).configure(dataEntry);
+
+    if( GenericToolbox::Json::fetchValue(dataEntry, "fromMc", bool(false)) ){
+      _dataDispenserDict_.at(name).setConfig( _modelDispenser_.getConfig() );
+    }
+
+    // use override
+    GenericToolbox::Json::applyOverrides( _dataDispenserDict_.at(name).getConfig(), dataEntry );
+    _dataDispenserDict_.at(name).configure();
   }
 
   GenericToolbox::Json::fillValue(_config_, _selectedDataEntry_, "selectedDataEntry");
   GenericToolbox::Json::fillValue(_config_, _selectedToyEntry_, "selectedToyEntry");
   GenericToolbox::Json::fillValue(_config_, _showSelectedEventCount_, "showSelectedEventCount");
-  GenericToolbox::Json::fillValue(_config_, _devSingleThreadEventLoaderAndIndexer_,
-                                  "devSingleThreadEventLoaderAndIndexer");
+  GenericToolbox::Json::fillValue(_config_, _devSingleThreadEventLoaderAndIndexer_, "devSingleThreadEventLoaderAndIndexer");
   GenericToolbox::Json::fillValue(_config_, _devSingleThreadEventSelection_, "devSingleThreadEventSelection");
   GenericToolbox::Json::fillValue(_config_, _sortLoadedEvents_, "sortLoadedEvents");
 
