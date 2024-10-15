@@ -96,6 +96,7 @@ public:
 private:
   // configuration
   bool _isEnabled_{true};
+  bool _disableEventMcThrow_{false};
   int _index_{-1};
   std::string _name_;
   std::string _selectionCutStr_;
