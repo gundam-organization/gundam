@@ -19,6 +19,7 @@ LoggerInit([]{ Logger::setUserHeaderStr("[Sample]"); });
 void Sample::configureImpl(){
   GenericToolbox::Json::fillValue(_config_, _name_, "name");
   GenericToolbox::Json::fillValue(_config_, _isEnabled_, "isEnabled");
+  GenericToolbox::Json::fillValue(_config_, _disableEventMcThrow_, "disableEventMcThrow");
   GenericToolbox::Json::fillValue(_config_, _binningConfig_, {{"binningFilePath"},{"binningFile"},{"binning"}});
   GenericToolbox::Json::fillValue(_config_, _selectionCutStr_, {{"selectionCutStr"},{"selectionCuts"}});
   GenericToolbox::Json::fillValue(_config_, _enabledDatasetList_, {{"datasets"},{"dataSets"}});
@@ -200,6 +201,12 @@ void Sample::refillHistogram(int iThread_){
 
 void Sample::throwEventMcError(){
   // Take into account the finite number of events
+
+  if( _disableEventMcThrow_ ){
+    LogAlert << "MC event throw is disabled for sample: " << this->getName() << std::endl;
+    return;
+  }
+
   double weightSum;
   for( auto& bin : _histogram_.binList ){
     weightSum = 0;
