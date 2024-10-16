@@ -66,6 +66,8 @@ void Parameter::setMaxMirror(double maxMirror) {
   _mirrorRange_.max = maxMirror;
 }
 void Parameter::setParameterValue(double parameterValue, bool force) {
+#ifdef DEBUG_BUILD
+  // those printouts will only show if the CMAKE_BUILD_TYPE is set to DEBUG
   if (not isInDomain(parameterValue, true)) {
     LogError << "New parameter value is not in domain: " << parameterValue
              << std::endl;
@@ -73,6 +75,7 @@ void Parameter::setParameterValue(double parameterValue, bool force) {
     if (not force) std::exit(EXIT_FAILURE);
     else LogAlert << "Forced continuation with invalid parameter" << std::endl;
   }
+#endif
   if( _parameterValue_ != parameterValue ){
     _gotUpdated_ = true;
     _parameterValue_ = parameterValue;
@@ -80,11 +83,13 @@ void Parameter::setParameterValue(double parameterValue, bool force) {
   else{ _gotUpdated_ = false; }
 }
 double Parameter::getParameterValue() const {
+#ifdef DEBUG_BUILD
   if ( isEnabled() and not isValueWithinBounds() ) {
     LogWarning << "Getting out of bounds parameter: "
                << getSummary() << std::endl;
     LogDebug << GundamUtils::Backtrace;
   }
+#endif
   return _parameterValue_;
 }
 void Parameter::setDialSetConfig(const JsonType &jsonConfig_) {
@@ -112,8 +117,7 @@ bool Parameter::isInDomain(double value_, bool verbose_) const {
   }
   if ( not std::isnan(_parameterLimits_.min) and value_ < _parameterLimits_.min ) {
     if (verbose_) {
-      LogError << "Value is below minimum: " << value_
-               << std::endl;
+      LogError << "Value is below minimum: " << value_ << std::endl;
       LogError << "Summary: " << getSummary() << std::endl;
     }
     return false;
