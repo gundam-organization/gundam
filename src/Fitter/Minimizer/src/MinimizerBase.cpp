@@ -52,18 +52,39 @@ void MinimizerBase::initializeImpl(){
     _monitor_.historyTree->Branch("penaltyLikelihood", &getLikelihoodInterface().getBuffer().penaltyLikelihood);
   }
 
+  _monitor_.convergenceMonitor.defineNewQuantity({ "LastStep", "Last step descent", [&](GenericToolbox::VariableMonitor& v){
+    return GenericToolbox::parseUnitPrefix(_monitor_.gradientDescentMonitor.getLastStepDeltaValue(v.getName()), 8); }
+  });
+
+
   _monitor_.convergenceMonitor.addDisplayedQuantity("VarName");
   _monitor_.convergenceMonitor.addDisplayedQuantity("LastAddedValue");
   _monitor_.convergenceMonitor.addDisplayedQuantity("SlopePerCall");
+  _monitor_.convergenceMonitor.addDisplayedQuantity("LastStep");
+
 
   _monitor_.convergenceMonitor.getQuantity("VarName").title = "Likelihood";
   _monitor_.convergenceMonitor.getQuantity("LastAddedValue").title = "Current Value";
   _monitor_.convergenceMonitor.getQuantity("SlopePerCall").title = "Avg. Slope /call";
+  _monitor_.convergenceMonitor.getQuantity("LastStep").title = "Last step descent";
 
   _monitor_.convergenceMonitor.addVariable("Total/dof");
   _monitor_.convergenceMonitor.addVariable("Total");
   _monitor_.convergenceMonitor.addVariable("Stat");
   _monitor_.convergenceMonitor.addVariable("Syst");
+
+  _monitor_.gradientDescentMonitor.valueDefinitionList.emplace_back(
+    "Total/dof", [](const MinimizerBase* this_){ return this_->getLikelihoodInterface().getLastLikelihood() / this_->fetchNbDegreeOfFreedom(); }
+  );
+  _monitor_.gradientDescentMonitor.valueDefinitionList.emplace_back(
+    "Total", [](const MinimizerBase* this_){ return this_->getLikelihoodInterface().getBuffer().totalLikelihood; }
+  );
+  _monitor_.gradientDescentMonitor.valueDefinitionList.emplace_back(
+    "Stat", [](const MinimizerBase* this_){ return this_->getLikelihoodInterface().getBuffer().statLikelihood; }
+  );
+  _monitor_.gradientDescentMonitor.valueDefinitionList.emplace_back(
+    "Syst", [](const MinimizerBase* this_){ return this_->getLikelihoodInterface().getBuffer().penaltyLikelihood; }
+  );
 
   LogWarning << "MinimizerBase initialized." << std::endl;
 }
@@ -166,19 +187,28 @@ double MinimizerBase::evalFit( const double* parArray_ ){
               [](const Parameter* par_){
                 return ( par_->gotUpdated() or par_->isFixed() or not par_->isEnabled() );
               } );
-      if( isGradientDescentStep ){
-        if( gradient.lastGradientFall == _monitor_.nbEvalLikelihoodCalls - 1 ){
-          LogWarning << "Minimizer is adjusting the step size: ";
+      if( isGradientDescentStep or gradient.stepPointList.empty() ){
+
+        if( gradient.stepPointList.empty() ){
+          // add the initial point
+          LogWarning << "Adding initial point of the gradient monitor: ";
+          gradient.addStep( this );
         }
         else{
-          gradient.stepPointList.emplace_back();
-          LogWarning << "Gradient step detected at iteration #" << _monitor_.nbEvalLikelihoodCalls << ": ";
+          if( gradient.stepPointList.back().fitCallNb == _monitor_.nbEvalLikelihoodCalls - 1 ){
+            LogWarning << "Minimizer is adjusting the step size: ";
+            gradient.fillLastStep( this );
+          }
+          else{
+            LogWarning << "Gradient step detected at iteration #" << _monitor_.nbEvalLikelihoodCalls << ": ";
+            gradient.addStep( this );
+          }
         }
-        LogWarningIf(gradient.stepPointList.size() >= 2) << gradient.stepPointList[gradient.stepPointList.size() - 2].llh << " -> ";
-        LogWarning << getLikelihoodInterface().getLastLikelihood() << std::endl;
-        gradient.stepPointList.back().parState = getModelPropagator().getParametersManager().exportParameterInjectorConfig();
-        gradient.stepPointList.back().llh = getLikelihoodInterface().getLastLikelihood();
-        gradient.lastGradientFall = _monitor_.nbEvalLikelihoodCalls;
+
+        if( gradient.stepPointList.size() >= 2 ){
+          LogWarning << gradient.getLastStepValue("Total") + gradient.getLastStepDeltaValue("Total") << " -> ";
+        }
+        LogWarning << gradient.getLastStepValue("Total") << std::endl;
       }
     }
     if( _monitor_.convergenceMonitor.isGenerateMonitorStringOk() ){
@@ -251,7 +281,7 @@ double MinimizerBase::evalFit( const double* parArray_ ){
 
       if( _monitor_.nbEvalLikelihoodCalls == 1 ){
         // don't erase these lines
-        LogWarning << _monitor_.convergenceMonitor.generateMonitorString();
+        LogWarning << _monitor_.convergenceMonitor.generateMonitorString(false, true);
       }
       else{
         LogInfo << _monitor_.convergenceMonitor.generateMonitorString(
@@ -259,6 +289,11 @@ double MinimizerBase::evalFit( const double* parArray_ ){
             true // force generate
         );
       }
+
+      // in some ROOT versions the trail back does not work properly. This seems to fix the issue
+      Logger::moveTerminalCursorBack(1);
+      std::cout << std::endl;
+
     }
   }
 

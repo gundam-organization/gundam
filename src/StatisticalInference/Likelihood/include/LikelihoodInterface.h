@@ -76,6 +76,7 @@ public:
   [[nodiscard]] const JointProbability::JointProbabilityBase* getJointProbabilityPtr() const { return _jointProbabilityPtr_.get(); }
   [[nodiscard]] const std::vector<DatasetDefinition>& getDatasetList() const { return _dataSetList_; }
   [[nodiscard]] const std::vector<SamplePair>& getSamplePairList() const { return _samplePairList_; }
+  [[nodiscard]] const Buffer& getBuffer() const { return _buffer_; }
 
   // mutable getters
   Buffer& getBuffer(){ return _buffer_; }
