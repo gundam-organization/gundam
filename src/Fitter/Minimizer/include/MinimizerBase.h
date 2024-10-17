@@ -64,12 +64,53 @@ protected:
 
     struct GradientDescentMonitor{
       bool isEnabled{false};
-      int lastGradientFall{-2};
-      struct GradientStepPoint {
-        JsonType parState;
-        double llh;
+
+      struct ValueDefinition{
+        std::string name{};
+        std::function<double(const MinimizerBase* this_)> getValueFct{};
+
+        ValueDefinition(const std::string& name_, const std::function<double(const MinimizerBase* this_)>& getValueFct_){
+          name = name_;
+          getValueFct = getValueFct_;
+        }
       };
-      std::vector<GradientStepPoint> stepPointList{};
+      std::vector<ValueDefinition> valueDefinitionList{};
+
+      struct StepPoint{
+        JsonType parState;
+        double fitCallNb{0};
+        std::vector<double> valueMonitorList{}; // .size() = valueDefinitionList.size()
+      };
+      std::vector<StepPoint> stepPointList{};
+
+      void addStep(const MinimizerBase* this_){
+        stepPointList.emplace_back();
+        stepPointList.back().valueMonitorList.reserve( valueDefinitionList.size() );
+        fillLastStep(this_);
+      }
+      void fillLastStep(const MinimizerBase* this_){
+        stepPointList.back().parState = this_->getModelPropagator().getParametersManager().exportParameterInjectorConfig();
+        stepPointList.back().fitCallNb = this_->getMonitor().nbEvalLikelihoodCalls;
+        for( auto& valueDefinition : valueDefinitionList ){
+          stepPointList.back().valueMonitorList.emplace_back( valueDefinition.getValueFct(this_) );
+        }
+      }
+
+      [[nodiscard]] int getValueIndex(const std::string& name_) const {
+        int idx = GenericToolbox::findElementIndex(name_, valueDefinitionList, [](const ValueDefinition& elm){ return elm.name; });
+        LogThrowIf(idx == -1, "Could not find element " << name_);
+        return idx;
+      }
+      [[nodiscard]] double getLastStepValue(const std::string& name_) const {
+        LogThrowIf(stepPointList.empty());
+        return stepPointList.back().valueMonitorList[getValueIndex(name_)];
+      }
+      [[nodiscard]] double getLastStepDeltaValue(const std::string& name_) const {
+        if( stepPointList.size() < 2 ){ return 0; }
+        auto idx = getValueIndex(name_);
+        return stepPointList[stepPointList.size()-2].valueMonitorList[idx] - stepPointList.back().valueMonitorList[idx];
+      }
+
     };
     GradientDescentMonitor gradientDescentMonitor{};
   };
@@ -117,10 +158,11 @@ public:
 
   // mutable getters
   Monitor& getMonitor(){ return _monitor_; }
+  [[nodiscard]] const Monitor& getMonitor() const { return _monitor_; }
 
   // core
   void printParameters();
-  int fetchNbDegreeOfFreedom(){ return getLikelihoodInterface().getNbSampleBins() - _nbFreeParameters_; }
+  [[nodiscard]] int fetchNbDegreeOfFreedom() const { return getLikelihoodInterface().getNbSampleBins() - _nbFreeParameters_; }
 
 
 protected:
