@@ -52,39 +52,41 @@ void MinimizerBase::initializeImpl(){
     _monitor_.historyTree->Branch("penaltyLikelihood", &getLikelihoodInterface().getBuffer().penaltyLikelihood);
   }
 
-  _monitor_.convergenceMonitor.defineNewQuantity({ "LastStep", "Last step descent", [&](GenericToolbox::VariableMonitor& v){
-    return GenericToolbox::parseUnitPrefix(_monitor_.gradientDescentMonitor.getLastStepDeltaValue(v.getName()), 8); }
-  });
-
 
   _monitor_.convergenceMonitor.addDisplayedQuantity("VarName");
   _monitor_.convergenceMonitor.addDisplayedQuantity("LastAddedValue");
   _monitor_.convergenceMonitor.addDisplayedQuantity("SlopePerCall");
-  _monitor_.convergenceMonitor.addDisplayedQuantity("LastStep");
-
 
   _monitor_.convergenceMonitor.getQuantity("VarName").title = "Likelihood";
   _monitor_.convergenceMonitor.getQuantity("LastAddedValue").title = "Current Value";
   _monitor_.convergenceMonitor.getQuantity("SlopePerCall").title = "Avg. Slope /call";
-  _monitor_.convergenceMonitor.getQuantity("LastStep").title = "Last step descent";
 
   _monitor_.convergenceMonitor.addVariable("Total/dof");
   _monitor_.convergenceMonitor.addVariable("Total");
   _monitor_.convergenceMonitor.addVariable("Stat");
   _monitor_.convergenceMonitor.addVariable("Syst");
 
-  _monitor_.gradientDescentMonitor.valueDefinitionList.emplace_back(
-    "Total/dof", [](const MinimizerBase* this_){ return this_->getLikelihoodInterface().getLastLikelihood() / this_->fetchNbDegreeOfFreedom(); }
-  );
-  _monitor_.gradientDescentMonitor.valueDefinitionList.emplace_back(
-    "Total", [](const MinimizerBase* this_){ return this_->getLikelihoodInterface().getBuffer().totalLikelihood; }
-  );
-  _monitor_.gradientDescentMonitor.valueDefinitionList.emplace_back(
-    "Stat", [](const MinimizerBase* this_){ return this_->getLikelihoodInterface().getBuffer().statLikelihood; }
-  );
-  _monitor_.gradientDescentMonitor.valueDefinitionList.emplace_back(
-    "Syst", [](const MinimizerBase* this_){ return this_->getLikelihoodInterface().getBuffer().penaltyLikelihood; }
-  );
+  if( _monitor_.gradientDescentMonitor.isEnabled ){
+    _monitor_.convergenceMonitor.defineNewQuantity({ "LastStep", "Last step descent", [&](GenericToolbox::VariableMonitor& v){
+      return GenericToolbox::parseUnitPrefix(_monitor_.gradientDescentMonitor.getLastStepDeltaValue(v.getName()), 8); }
+    });
+    _monitor_.convergenceMonitor.addDisplayedQuantity("LastStep");
+    _monitor_.convergenceMonitor.getQuantity("LastStep").title = "Last step descent";
+
+    _monitor_.gradientDescentMonitor.valueDefinitionList.emplace_back(
+        "Total/dof", [](const MinimizerBase* this_){ return this_->getLikelihoodInterface().getLastLikelihood() / this_->fetchNbDegreeOfFreedom(); }
+    );
+    _monitor_.gradientDescentMonitor.valueDefinitionList.emplace_back(
+        "Total", [](const MinimizerBase* this_){ return this_->getLikelihoodInterface().getBuffer().totalLikelihood; }
+    );
+    _monitor_.gradientDescentMonitor.valueDefinitionList.emplace_back(
+        "Stat", [](const MinimizerBase* this_){ return this_->getLikelihoodInterface().getBuffer().statLikelihood; }
+    );
+    _monitor_.gradientDescentMonitor.valueDefinitionList.emplace_back(
+        "Syst", [](const MinimizerBase* this_){ return this_->getLikelihoodInterface().getBuffer().penaltyLikelihood; }
+    );
+  }
+
 
   LogWarning << "MinimizerBase initialized." << std::endl;
 }
