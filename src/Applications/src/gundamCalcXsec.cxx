@@ -563,7 +563,7 @@ int main(int argc, char** argv){
 //        }
 
         // bin volume
-        auto& bin = xsec.samplePtr->getHistogram().getBinning().getBinList()[iBin];
+        auto& bin = xsec.samplePtr->getHistogram().getBinContextList()[iBin].bin;
         double binVolume{1};
 
         for( auto& edges : bin.getEdgesList() ){
@@ -685,8 +685,8 @@ int main(int argc, char** argv){
     for( int iBin = 0 ; iBin < xsec.samplePtr->getHistogram().getNbBins() ; iBin++ ){
       iBinGlobal++;
 
-      std::string binTitle = xsec.samplePtr->getHistogram().getBinning().getBinList()[iBin].getSummary();
-      double binVolume = xsec.samplePtr->getHistogram().getBinning().getBinList()[iBin].getVolume();
+      std::string binTitle = xsec.samplePtr->getHistogram().getBinContextList()[iBin].bin.getSummary();
+      double binVolume = xsec.samplePtr->getHistogram().getBinContextList()[iBin].bin.getVolume();
 
       xsec.histogram.SetBinContent( 1+iBin, (*meanValuesVector)[iBinGlobal] );
       xsec.histogram.SetBinError( 1+iBin, TMath::Sqrt( (*globalCovMatrix)[iBinGlobal][iBinGlobal] ) );

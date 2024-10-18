@@ -18,6 +18,23 @@ LoggerInit([]{ Logger::setUserHeaderStr("[Sample]"); });
 #endif
 
 
+void Sample::Histogram::build(const JsonType& binningConfig_){
+
+  BinSet binning;
+  binning.configure( binningConfig_ );
+
+  nBins = int( binning.getBinList().size() );
+  binContentList.resize( nBins );
+  binContextList.resize( nBins );
+
+  // filling bin contexts
+  for( int iBin = 0 ; iBin < nBins ; iBin++ ){
+    binContextList[iBin].bin = binning.getBinList()[iBin];
+  }
+
+}
+
+
 void Sample::configureImpl(){
   GenericToolbox::Json::fillValue(_config_, _name_, "name");
   GenericToolbox::Json::fillValue(_config_, _isEnabled_, "isEnabled");
@@ -34,8 +51,7 @@ void Sample::configureImpl(){
   }
 
   LogDebugIf(GundamGlobals::isDebug()) << "Reading binning: " << _config_ << std::endl;
-  _histogram_.getBinning().configure( _binningConfig_ );
-  _histogram_.build();
+  _histogram_.build(_binningConfig_);
 }
 
 void Sample::writeEventRates(const GenericToolbox::TFilePath& saveDir_) const{
@@ -51,19 +67,6 @@ bool Sample::isDatasetValid(const std::string& datasetName_){
   );
 }
 
-void Sample::Histogram::build(){
-
-  nBins = int( _binning_.getBinList().size() );
-  binContentList.resize( nBins );
-  binContextList.resize( nBins );
-
-  // filling bin contexts
-  for( int iBin = 0 ; iBin < nBins ; iBin++ ){
-    binContextList[iBin].index = iBin;
-    binContextList[iBin].binPtr = &_binning_.getBinList()[iBin];
-  }
-
-}
 void Sample::reserveEventMemory(size_t dataSetIndex_, size_t nEvents, const Event &eventBuffer_) {
   // adding one dataset:
   _loadedDatasetList_.emplace_back();
@@ -162,16 +165,16 @@ void Sample::refillHistogram(int iThread_){
 
       if( not useCpuCalculation ){
         // copy the result as
-        binContent.sumWeights = _CacheManagerValue_[_CacheManagerIndex_+binContext.index];
-        binContent.sqrtSumSqWeights = _CacheManagerValue2_[_CacheManagerIndex_ + binContext.index];
+        binContent.sumWeights = _CacheManagerValue_[_CacheManagerIndex_+binContext.bin.getIndex()];
+        binContent.sqrtSumSqWeights = _CacheManagerValue2_[_CacheManagerIndex_ + binContext.bin.getIndex()];
         binContent.sqrtSumSqWeights = sqrt(binContent.sqrtSumSqWeights);
       }
       else{
         // container used for debugging
         Histogram::BinContent cacheManagerValue;
 
-        cacheManagerValue.sumWeights = _CacheManagerValue_[_CacheManagerIndex_+binContext.index];
-        cacheManagerValue.sqrtSumSqWeights = _CacheManagerValue2_[_CacheManagerIndex_ + binContext.index];
+        cacheManagerValue.sumWeights = _CacheManagerValue_[_CacheManagerIndex_+binContext.bin.getIndex()];
+        cacheManagerValue.sqrtSumSqWeights = _CacheManagerValue2_[_CacheManagerIndex_ + binContext.bin.getIndex()];
         cacheManagerValue.sqrtSumSqWeights = sqrt(cacheManagerValue.sqrtSumSqWeights);
 
         // Parallel calculations of the histogramming have been run.  Make sure

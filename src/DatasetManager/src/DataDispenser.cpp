@@ -472,8 +472,8 @@ void DataDispenser::preAllocateMemory(){
 
   LogInfo << "Filling var index cache for bin edges..." << std::endl;
   for( auto* samplePtr : _cache_.samplesToFillList ){
-    for( auto& bin : samplePtr->getHistogram().getBinning().getBinList() ){
-      for( auto& edges : bin.getEdgesList() ){
+    for( auto& binContext : samplePtr->getHistogram().getBinContextList() ){
+      for( auto& edges : binContext.bin.getEdgesList() ){
         edges.varIndexCache = GenericToolbox::findElementIndex( edges.varName, _cache_.varsRequestedForIndexing );
       }
     }
@@ -561,14 +561,17 @@ void DataDispenser::loadFromHistContent(){
   // claiming event memory
   for( size_t iSample = 0 ; iSample < _cache_.samplesToFillList.size() ; iSample++ ){
 
+    std::vector<std::string> varNameList;
+    for( auto& binContext : _cache_.samplesToFillList[iSample]->getHistogram().getBinContextList() ){
+      GenericToolbox::mergeInVector(varNameList, binContext.bin.buildVariableNameList(), false);
+    }
+
     eventPlaceholder.getVariables().setVarNameList(
-        std::make_shared<std::vector<std::string>>(
-            _cache_.samplesToFillList[iSample]->getHistogram().getBinning().buildVariableNameList()
-        )
+        std::make_shared<std::vector<std::string>>( varNameList )
     );
 
     // one event per bin
-    _cache_.sampleNbOfEvents[iSample] = _cache_.samplesToFillList[iSample]->getHistogram().getBinning().getBinList().size();
+    _cache_.sampleNbOfEvents[iSample] = _cache_.samplesToFillList[iSample]->getHistogram().getNbBins();
 
     _cache_.sampleEventListPtrToFill[iSample] = &_cache_.samplesToFillList[iSample]->getEventList();
     _cache_.sampleIndexOffsetList[iSample] = _cache_.sampleEventListPtrToFill[iSample]->size();
@@ -602,13 +605,13 @@ void DataDispenser::loadFromHistContent(){
       nBins *= hist->GetAxis(iDim)->GetNbins();
     }
 
-    LogAlertIf( nBins != int( sample->getHistogram().getBinning().getBinList().size() ) ) <<
-                                                                           "Mismatching bin number for " << sample->getName() << ":" << std::endl
-                                                                           << GET_VAR_NAME_VALUE(nBins) << std::endl
-                                                                           << GET_VAR_NAME_VALUE(sample->getHistogram().getBinning().getBinList().size()) << std::endl;
+    LogAlertIf( nBins != sample->getHistogram().getNbBins() )
+    << "Mismatching bin number for " << sample->getName() << ":" << std::endl
+    << GET_VAR_NAME_VALUE(nBins) << std::endl
+    << GET_VAR_NAME_VALUE(sample->getHistogram().getNbBins()) << std::endl;
 
-    for( size_t iBin = 0 ; iBin < sample->getHistogram().getBinning().getBinList().size() ; iBin++ ){
-      auto target = sample->getHistogram().getBinning().getBinList()[iBin].generateBinTarget( sampleHistDef->axisList );
+    for( int iBin = 0 ; iBin < sample->getHistogram().getNbBins() ; iBin++ ){
+      auto target = sample->getHistogram().getBinContextList()[iBin].bin.generateBinTarget( sampleHistDef->axisList );
       auto histBinIndex = hist->GetBin( target.data() ); // bad fetch..?
 
       sample->getEventList()[iBin].getIndices().sample = sample->getIndex();
@@ -1020,7 +1023,7 @@ void DataDispenser::fillFunction(int iThread_){
       }
 
       // Look for the bin index
-      eventIndexingBuffer.fillBinIndex( _cache_.samplesToFillList[iSample]->getHistogram().getBinning() );
+      LoaderUtils::fillBinIndex(eventIndexingBuffer, _cache_.samplesToFillList[iSample]->getHistogram().getBinContextList());
 
       // No bin found -> next sample
       if( eventIndexingBuffer.getIndices().bin == -1){ break; }

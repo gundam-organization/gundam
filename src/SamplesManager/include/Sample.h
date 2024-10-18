@@ -39,25 +39,22 @@ public:
       double sqrtSumSqWeights{0};
     };
     struct BinContext{
-      int index{-1};
-      const Bin* binPtr{nullptr};
+      Bin bin{};
       std::vector<Event*> eventPtrList{};
     };
 
     // const getters
     [[nodiscard]] int getNbBins() const { return nBins; }
-    [[nodiscard]] const BinSet& getBinning() const { return _binning_; }
     [[nodiscard]] const std::vector<BinContent>& getBinContentList() const { return binContentList; }
     [[nodiscard]] const std::vector<BinContext>& getBinContextList() const { return binContextList; }
 
     // mutable getters
-    BinSet& getBinning(){ return _binning_; }
     std::vector<BinContent>& getBinContentList(){ return binContentList; }
     std::vector<BinContext>& getBinContextList(){ return binContextList; }
 
 
     // core
-    void build();
+    void build(const JsonType& binningConfig_);
     auto loop(){ return GenericToolbox::Zip(binContentList, binContextList); }
     auto loop(size_t start_, size_t end_){ return GenericToolbox::ZipPartial(start_, end_, binContentList, binContextList); }
     [[nodiscard]] auto loop() const{ return GenericToolbox::Zip(binContentList, binContextList); }
@@ -65,7 +62,6 @@ public:
 
   private:
     int nBins{0};
-    BinSet _binning_;
     std::vector<BinContent> binContentList{};
     std::vector<BinContext> binContextList{};
 

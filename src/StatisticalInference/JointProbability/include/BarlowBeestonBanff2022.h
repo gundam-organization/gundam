@@ -216,7 +216,7 @@ namespace JointProbability{
     nomHistErr.reserve( modelSample_.getHistogram().getNbBins() );
     for( auto [binContent, binContext] : modelSample_.getHistogram().loop() ){
       nomHistErr.emplace_back( binContent.sqrtSumSqWeights );
-      LogTraceIf(verboseLevel >= 2) << modelSample_.getName() << ": " << binContext.index << " -> " << binContent.sumWeights << " / " << binContent.sqrtSumSqWeights << std::endl;
+      LogTraceIf(verboseLevel >= 2) << modelSample_.getName() << ": " << binContext.bin.getIndex() << " -> " << binContent.sumWeights << " / " << binContent.sqrtSumSqWeights << std::endl;
     }
   }
   void BarlowBeestonBanff2022::printConfiguration() const{

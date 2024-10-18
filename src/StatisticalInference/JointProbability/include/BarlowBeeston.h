@@ -20,7 +20,7 @@ namespace JointProbability{
   };
 
   double BarlowBeeston::eval(const SamplePair& samplePair_, int bin_) const {
-    _buf_.rel_var = samplePair_.model->getHistogram().getBinContentList()[bin_].sqrtSumSqWeight / TMath::Sq(samplePair_.model->getHistogram().getBinContentList()[bin_].sumWeights);
+    _buf_.rel_var = samplePair_.model->getHistogram().getBinContentList()[bin_].sqrtSumSqWeights / TMath::Sq(samplePair_.model->getHistogram().getBinContentList()[bin_].sumWeights);
     _buf_.b       = (samplePair_.model->getHistogram().getBinContentList()[bin_].sumWeights * _buf_.rel_var) - 1;
     _buf_.c       = 4 * samplePair_.data->getHistogram().getBinContentList()[bin_].sumWeights * _buf_.rel_var;
 

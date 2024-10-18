@@ -6,6 +6,7 @@
 #define GUNDAM_LOADER_UTILS_H
 
 #include "Event.h"
+#include "Sample.h"
 
 #include "GenericToolbox.Root.h"
 
@@ -18,6 +19,7 @@ namespace LoaderUtils{
 
   void allocateMemory(Event& event_, const std::vector<const GenericToolbox::LeafForm*>& leafFormList_);
   void copyData(Event& event_, const std::vector<const GenericToolbox::LeafForm*>& leafFormList_);
+  void fillBinIndex(Event& event_, const std::vector<Sample::Histogram::BinContext>& binList_);
   double evalFormula(const Event& event_, const TFormula* formulaPtr_, std::vector<int>* indexDict_ = nullptr);
 
 }
