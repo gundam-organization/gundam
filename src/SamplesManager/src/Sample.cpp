@@ -117,8 +117,19 @@ void Sample::updateBinEventList(int iThread_) {
 }
 void Sample::refillHistogram(int iThread_){
 
+  auto bounds = GenericToolbox::ParallelWorker::getThreadBoundIndices(
+      iThread_, GundamGlobals::getNbCpuThreads(), _histogram_.getNbBins()
+  );
+
+  // avoid using [] operator for each access. Use the memory address directly
+  double weightBuffer;
+
 #ifdef GUNDAM_USING_CACHE_MANAGER
-  if (_CacheManagerValid_ and not (*_CacheManagerValid_)) {
+  // avoid checking those variables at each bin
+  bool isCacheManagerEnabled{this->isCacheManagerEnabled()};
+  bool useCpuCalculation{not isCacheManagerEnabled or GundamGlobals::isForceCpuCalculation()};
+
+  if( isCacheManagerEnabled ){
     // This can be slow (~10 usec for 5000 bins) when data must be copied
     // from the device, but it makes sure that the results are copied from
     // the device when they have changed. The values pointed to by
@@ -129,30 +140,10 @@ void Sample::refillHistogram(int iThread_){
   }
 #endif
 
-  auto bounds = GenericToolbox::ParallelWorker::getThreadBoundIndices(
-      iThread_, GundamGlobals::getNbCpuThreads(), _histogram_.getNbBins()
-  );
-
-  // avoid using [] operator for each access. Use the memory address directly
-  double weightBuffer;
-
   for( auto [binContent, binContext] : _histogram_.loop(bounds.beginIndex, bounds.endIndex) ){
 
-
 #ifdef GUNDAM_USING_CACHE_MANAGER
-    bool filledWithManager = false;
-
-    // container used for debugging
-    Histogram::BinContent cacheManagerValue;
-
-    if (_CacheManagerValid_ and (*_CacheManagerValid_)
-        and _CacheManagerValue_ and _CacheManagerIndex_ >= 0) {
-      cacheManagerValue.sumWeights = _CacheManagerValue_[_CacheManagerIndex_+binContext.index];
-      cacheManagerValue.sqrtSumSqWeight = _CacheManagerValue2_[_CacheManagerIndex_+binContext.index];
-      cacheManagerValue.sqrtSumSqWeight = sqrt(cacheManagerValue.sqrtSumSqWeight);
-      filledWithManager = true;
-    }
-    if( not filledWithManager or GundamGlobals::isForceCpuCalculation() ){
+    if( useCpuCalculation ){
 #endif
       // reset
       binContent.sumWeights = 0;
@@ -166,39 +157,51 @@ void Sample::refillHistogram(int iThread_){
       binContent.sqrtSumSqWeight = std::sqrt(binContent.sqrtSumSqWeight);
 #ifdef GUNDAM_USING_CACHE_MANAGER
     }
-    else{
-      // copy the result as
-      binContent.sumWeights = cacheManagerValue.sumWeights;
-      binContent.sqrtSumSqWeight = cacheManagerValue.sqrtSumSqWeight;
-    }
 
-    // Parallel calculations of the histogramming have been run.  Make sure
-    // they are the same.
-    if( filledWithManager and  GundamGlobals::isForceCpuCalculation() ){
-      bool problemFound = false;
-      if (not GundamUtils::almostEqual(cacheManagerValue.sumWeights,(binContent.sumWeights))) {
-        double magnitude = std::abs(cacheManagerValue.sumWeights) + std::abs(binContent.sumWeights);
-        double delta = std::abs(cacheManagerValue.sumWeights - binContent.sumWeights);
-        if (magnitude > 0.0) delta /= 0.5*magnitude;
-        LogError << "Incorrect histogram content --"
-                 << " Content: " << cacheManagerValue.sumWeights << "!=" << binContent.sumWeights
-                 << " Error: " << cacheManagerValue.sqrtSumSqWeight << "!=" << binContent.sqrtSumSqWeight
-                 << " Precision: " << delta
-                 << std::endl;
-        problemFound = true;
+    if( isCacheManagerEnabled ){
+
+      if( not useCpuCalculation ){
+        // copy the result as
+        binContent.sumWeights = _CacheManagerValue_[_CacheManagerIndex_+binContext.index];
+        binContent.sqrtSumSqWeight = _CacheManagerValue2_[_CacheManagerIndex_+binContext.index];
+        binContent.sqrtSumSqWeight = sqrt(binContent.sqrtSumSqWeight);
       }
-      if (not GundamUtils::almostEqual(cacheManagerValue.sqrtSumSqWeight,(binContent.sqrtSumSqWeight))) {
-        double magnitude = std::abs(cacheManagerValue.sqrtSumSqWeight) + std::abs(binContent.sqrtSumSqWeight);
-        double delta = std::abs(cacheManagerValue.sqrtSumSqWeight - binContent.sqrtSumSqWeight);
-        if (magnitude > 0.0) delta /= 0.5*magnitude;
-        LogError << "Incorrect histogram error --"
-                 << " Content: " << cacheManagerValue.sumWeights << "!=" << binContent.sumWeights
-                 << " Error: " << cacheManagerValue.sqrtSumSqWeight << "!=" << binContent.sqrtSumSqWeight
-                 << " Precision: " << delta
-                 << std::endl;
-        problemFound = true;
+      else{
+        // container used for debugging
+        Histogram::BinContent cacheManagerValue;
+
+        cacheManagerValue.sumWeights = _CacheManagerValue_[_CacheManagerIndex_+binContext.index];
+        cacheManagerValue.sqrtSumSqWeight = _CacheManagerValue2_[_CacheManagerIndex_+binContext.index];
+        cacheManagerValue.sqrtSumSqWeight = sqrt(cacheManagerValue.sqrtSumSqWeight);
+
+        // Parallel calculations of the histogramming have been run.  Make sure
+        // they are the same.
+        bool problemFound = false;
+        if (not GundamUtils::almostEqual(cacheManagerValue.sumWeights,(binContent.sumWeights))) {
+          double magnitude = std::abs(cacheManagerValue.sumWeights) + std::abs(binContent.sumWeights);
+          double delta = std::abs(cacheManagerValue.sumWeights - binContent.sumWeights);
+          if (magnitude > 0.0) delta /= 0.5*magnitude;
+          LogError << "Incorrect histogram content --"
+                   << " Content: " << cacheManagerValue.sumWeights << "!=" << binContent.sumWeights
+                   << " Error: " << cacheManagerValue.sqrtSumSqWeight << "!=" << binContent.sqrtSumSqWeight
+                   << " Precision: " << delta
+                   << std::endl;
+          problemFound = true;
+        }
+        if (not GundamUtils::almostEqual(cacheManagerValue.sqrtSumSqWeight,(binContent.sqrtSumSqWeight))) {
+          double magnitude = std::abs(cacheManagerValue.sqrtSumSqWeight) + std::abs(binContent.sqrtSumSqWeight);
+          double delta = std::abs(cacheManagerValue.sqrtSumSqWeight - binContent.sqrtSumSqWeight);
+          if (magnitude > 0.0) delta /= 0.5*magnitude;
+          LogError << "Incorrect histogram error --"
+                   << " Content: " << cacheManagerValue.sumWeights << "!=" << binContent.sumWeights
+                   << " Error: " << cacheManagerValue.sqrtSumSqWeight << "!=" << binContent.sqrtSumSqWeight
+                   << " Precision: " << delta
+                   << std::endl;
+          problemFound = true;
+        }
+        if( false and problemFound ){ std::exit(EXIT_FAILURE); }// For debugging
       }
-      if( false and problemFound ){ std::exit(EXIT_FAILURE); }// For debugging
+
     }
 #endif
 
@@ -220,7 +223,7 @@ void Sample::throwEventMcError(){
     binContent.sqrtSumSqWeight = 0;
     for (auto *eventPtr: binContext.eventPtrList) {
       // gRandom->Poisson(1) -> returns an INT -> can be 0
-      eventPtr->getWeights().current = (gRandom->Poisson(1) * eventPtr->getEventWeight());
+      eventPtr->getWeights().current = (double(gRandom->Poisson(1)) * eventPtr->getEventWeight());
 
       double weight{eventPtr->getEventWeight()};
       binContent.sumWeights += weight;
@@ -235,7 +238,7 @@ void Sample::throwStatError(bool useGaussThrow_){
   /*
    * This is to convert "Asimov" histogram to toy-experiment (pseudo-data), i.e. with statistical fluctuations
    * */
-  int nCounts;
+  double nCounts;
   for( auto [binContent, binContext] : _histogram_.loop() ){
     if( binContent.sumWeights == 0 ){
       // this should not happen.
@@ -243,13 +246,13 @@ void Sample::throwStatError(bool useGaussThrow_){
     }
 
     if( not useGaussThrow_ ){
-      nCounts = gRandom->Poisson( binContent.sumWeights );
+      nCounts = double( gRandom->Poisson( binContent.sumWeights ) );
     }
     else{
-      nCounts = std::max(
+      nCounts = double( std::max(
           int( gRandom->Gaus(binContent.sumWeights, TMath::Sqrt(binContent.sumWeights)) )
           , 0 // if the throw is negative, cap it to 0
-      );
+      ) );
     }
     for (auto *eventPtr: binContext.eventPtrList) {
       // make sure refill of the histogram will produce the same hist

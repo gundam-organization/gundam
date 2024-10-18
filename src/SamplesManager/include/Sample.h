@@ -8,6 +8,7 @@
 
 #include "Event.h"
 #include "BinSet.h"
+#include "GundamGlobals.h"
 
 #include "GenericToolbox.Root.h"
 #include "GenericToolbox.Loops.h"
@@ -44,10 +45,10 @@ public:
     };
 
     // const getters
-    int getNbBins() const { return nBins; }
-    const BinSet& getBinning() const { return _binning_; }
-    const std::vector<BinContent>& getBinContentList() const { return binContentList; }
-    const std::vector<BinContext>& getBinContextList() const { return binContextList; }
+    [[nodiscard]] int getNbBins() const { return nBins; }
+    [[nodiscard]] const BinSet& getBinning() const { return _binning_; }
+    [[nodiscard]] const std::vector<BinContent>& getBinContentList() const { return binContentList; }
+    [[nodiscard]] const std::vector<BinContext>& getBinContextList() const { return binContextList; }
 
     // mutable getters
     BinSet& getBinning(){ return _binning_; }
@@ -57,25 +58,14 @@ public:
 
     // core
     void build();
-    GenericToolbox::ZipRange<std::vector<BinContent>, std::vector<BinContext>> loop(){
-      return GenericToolbox::Zip(binContentList, binContextList);
-    }
-    GenericToolbox::ZipRange<std::vector<BinContent>, std::vector<BinContext>> loop(size_t start_, size_t end_){
-      return GenericToolbox::ZipPartial(start_, end_, binContentList, binContextList);
-    }
-    GenericToolbox::ZipRange<const std::vector<BinContent>, const std::vector<BinContext>> loop() const{
-      return GenericToolbox::Zip(binContentList, binContextList);
-    }
-    GenericToolbox::ZipRange<const std::vector<BinContent>, const std::vector<BinContext>> loop(size_t start_, size_t end_) const {
-      return GenericToolbox::ZipPartial(start_, end_, binContentList, binContextList);
-    }
-
-
+    auto loop(){ return GenericToolbox::Zip(binContentList, binContextList); }
+    auto loop(size_t start_, size_t end_){ return GenericToolbox::ZipPartial(start_, end_, binContentList, binContextList); }
+    [[nodiscard]] auto loop() const{ return GenericToolbox::Zip(binContentList, binContextList); }
+    [[nodiscard]] auto loop(size_t start_, size_t end_) const { return GenericToolbox::ZipPartial(start_, end_, binContentList, binContextList); }
 
   private:
     int nBins{0};
     BinSet _binning_;
-
     std::vector<BinContent> binContentList{};
     std::vector<BinContext> binContextList{};
 
@@ -153,6 +143,8 @@ private:
 
 #ifdef GUNDAM_USING_CACHE_MANAGER
 public:
+  [[nodiscard]] bool isCacheManagerEnabled() const { return GundamGlobals::isCacheManagerEnabled() and _CacheManagerValid_ and (*_CacheManagerValid_) and _CacheManagerValue_ and _CacheManagerIndex_ >= 0; };
+
   void setCacheManagerIndex(int i) {_CacheManagerIndex_ = i;}
   void setCacheManagerValuePointer(const double* v) {_CacheManagerValue_ = v;}
   void setCacheManagerValue2Pointer(const double* v) {_CacheManagerValue2_ = v;}
