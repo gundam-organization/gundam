@@ -58,9 +58,9 @@ namespace JointProbability{
   double PluginJointProbability::eval( const SamplePair& samplePair_, int bin_ ) const{
     LogThrowIf(evalFcn == nullptr, "Library not loaded properly.");
     return reinterpret_cast<double (*)( double, double, double )>(evalFcn)(
-        samplePair_.data->getHistogram().binList[bin_].content,
-        samplePair_.model->getHistogram().binList[bin_].content,
-        samplePair_.model->getHistogram().binList[bin_].error
+        samplePair_.data->getHistogram().getBinContentList()[bin_].sumWeights,
+        samplePair_.model->getHistogram().getBinContentList()[bin_].sumWeights,
+        samplePair_.model->getHistogram().getBinContentList()[bin_].sqrtSumSqWeight
     );
   }
 

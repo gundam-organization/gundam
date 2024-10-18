@@ -123,7 +123,7 @@ void LikelihoodInterface::initializeImpl() {
   LogInfo << "Fetching the number of bins parameters..." << std::endl;
   _nbSampleBins_ = 0;
   for( auto& sample : _modelPropagator_.getSampleSet().getSampleList() ){
-    _nbSampleBins_ += int(sample.getBinning().getBinList().size() );
+    _nbSampleBins_ += sample.getHistogram().getNbBins();
   }
 
   LogInfo << "Move back MC parameters to prior..." << std::endl;

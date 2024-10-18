@@ -10,12 +10,14 @@
 #include "BinSet.h"
 
 #include "GenericToolbox.Root.h"
+#include "GenericToolbox.Loops.h"
 
 #include <TH1D.h>
 
 #include <vector>
 #include <string>
 #include <memory>
+
 
 
 class Sample : public JsonBaseClass {
@@ -27,16 +29,56 @@ public:
     size_t eventNb{0};
   };
 
-  struct Histogram{
+  class Histogram{
+
+  public:
+    // structs
+    struct BinContent{
+      double sumWeights{0};
+      double sqrtSumSqWeight{0};
+    };
     struct BinContext{
       int index{-1};
-      double content{0};
-      double error{0};
       const Bin* binPtr{nullptr};
       std::vector<Event*> eventPtrList{};
     };
-    std::vector<BinContext> binList{};
+
+    // const getters
+    int getNbBins() const { return nBins; }
+    const BinSet& getBinning() const { return _binning_; }
+    const std::vector<BinContent>& getBinContentList() const { return binContentList; }
+    const std::vector<BinContext>& getBinContextList() const { return binContextList; }
+
+    // mutable getters
+    BinSet& getBinning(){ return _binning_; }
+    std::vector<BinContent>& getBinContentList(){ return binContentList; }
+    std::vector<BinContext>& getBinContextList(){ return binContextList; }
+
+
+    // core
+    void build();
+    GenericToolbox::ZipRange<std::vector<BinContent>, std::vector<BinContext>> loop(){
+      return GenericToolbox::Zip(binContentList, binContextList);
+    }
+    GenericToolbox::ZipRange<std::vector<BinContent>, std::vector<BinContext>> loop(size_t start_, size_t end_){
+      return GenericToolbox::ZipPartial(start_, end_, binContentList, binContextList);
+    }
+    GenericToolbox::ZipRange<const std::vector<BinContent>, const std::vector<BinContext>> loop() const{
+      return GenericToolbox::Zip(binContentList, binContextList);
+    }
+    GenericToolbox::ZipRange<const std::vector<BinContent>, const std::vector<BinContext>> loop(size_t start_, size_t end_) const {
+      return GenericToolbox::ZipPartial(start_, end_, binContentList, binContextList);
+    }
+
+
+
+  private:
     int nBins{0};
+    BinSet _binning_;
+
+    std::vector<BinContent> binContentList{};
+    std::vector<BinContext> binContextList{};
+
   };
 
 protected:
@@ -59,12 +101,11 @@ public:
   [[nodiscard]] const std::string &getName() const{ return _name_; }
   [[nodiscard]] const std::string &getSelectionCutsStr() const{ return _selectionCutStr_; }
   [[nodiscard]] const JsonType &getBinningFilePath() const{ return _binningConfig_; }
-  [[nodiscard]] const BinSet &getBinning() const{ return _binning_; }
   [[nodiscard]] const Histogram &getHistogram() const{ return _histogram_; }
   [[nodiscard]] const std::vector<Event> &getEventList() const{ return _eventList_; }
 
   // getters
-  BinSet &getBinning() { return _binning_; }
+  Histogram &getHistogram(){ return _histogram_; }
   std::vector<Event> &getEventList(){ return _eventList_; }
 
   // misc
@@ -72,7 +113,6 @@ public:
   bool isDatasetValid(const std::string& datasetName_);
 
   // core
-  void buildHistogram(const BinSet& binning_);
   void reserveEventMemory(size_t dataSetIndex_, size_t nEvents, const Event &eventBuffer_);
   void shrinkEventList(size_t newTotalSize_);
   void updateBinEventList(int iThread_ = -1);
@@ -105,7 +145,6 @@ private:
 
   // Internals
   double _llhStatBuffer_{std::nan("unset")}; // set by SampleSet which hold the joinProbability obj
-  BinSet _binning_;
   std::vector<size_t> _dataSetIndexList_;
 
   Histogram _histogram_{};

@@ -84,18 +84,18 @@ void ParameterScanner::initializeImpl() {
   }
   if( GenericToolbox::Json::fetchValue(_varsConfig_, "llhStatPerSamplePerBin", false) ){
     for( auto& samplePair : _likelihoodInterfacePtr_->getSamplePairList() ){
-      for( auto& bin : samplePair.model->getHistogram().binList ){
+      for( auto& bin : samplePair.model->getHistogram().getBinning().getBinList() ){
         _scanDataDict_.emplace_back();
         auto& scanEntry = _scanDataDict_.back();
         scanEntry.yPoints = std::vector<double>(_nbPoints_+1,0);
-        scanEntry.folder = "llhStat/" + samplePair.model->getName() + "/bin_" + std::to_string(bin.index);
+        scanEntry.folder = "llhStat/" + samplePair.model->getName() + "/bin_" + std::to_string(bin.getIndex());
         scanEntry.title = Form(R"(Stat LLH Scan of sample "%s", bin #%d "%s")",
-                               samplePair.model->getName().c_str(), bin.index,
-                               samplePair.model->getBinning().getBinList()[bin.index].getSummary().c_str());
+                               samplePair.model->getName().c_str(), bin.getIndex(),
+                               samplePair.model->getHistogram().getBinning().getBinList()[bin.getIndex()].getSummary().c_str());
         scanEntry.yTitle = "Stat LLH value";
         // TODO: check if the sample data/MC match in the initialization sequence
         auto* samplePairPtr = &samplePair;
-        int iBin = bin.index;
+        int iBin = bin.getIndex();
         scanEntry.evalY = [this, samplePairPtr, iBin](){ return _likelihoodInterfacePtr_->getJointProbabilityPtr()->eval( *samplePairPtr, iBin ); };
       }
     }
@@ -114,18 +114,19 @@ void ParameterScanner::initializeImpl() {
   }
   if( GenericToolbox::Json::fetchValue(_varsConfig_, "weightPerSamplePerBin", false) ){
     for( auto& sample : _likelihoodInterfacePtr_->getModelPropagator().getSampleSet().getSampleList() ){
-      for( auto& bin : sample.getHistogram().binList ){
+      for( auto [binContent, binContext] : sample.getHistogram().loop() ){
         _scanDataDict_.emplace_back();
         auto& scanEntry = _scanDataDict_.back();
         scanEntry.yPoints = std::vector<double>(_nbPoints_+1,0);
-        scanEntry.folder = "weight/" + sample.getName() + "/bin_" + std::to_string(bin.index);
+        scanEntry.folder = "weight/" + sample.getName() + "/bin_" + std::to_string(binContext.index);
         scanEntry.title = Form(R"(MC event weight scan of sample "%s", bin #%d "%s")",
                                sample.getName().c_str(),
-                               bin.index,
-                               sample.getBinning().getBinList()[bin.index].getSummary().c_str());
+                               binContext.index,
+                               binContext.binPtr->getSummary().c_str());
         scanEntry.yTitle = "Total MC event weight";
         auto* samplePtr = &sample;
-        scanEntry.evalY = [bin](){ return bin.content; };
+        auto* binSumWeightPtr = &binContent.sumWeights;
+        scanEntry.evalY = [binSumWeightPtr](){ return *binSumWeightPtr; };
       }
     }
   }

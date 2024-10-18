@@ -761,7 +761,7 @@ void PlotGenerator::defineHistogramHolders() {
                 bool varNotAvailable{false};
                 std::string sampleObsBinning = histDef.useSampleBinningOfVar;
 
-                for( const auto& bin : sample.getBinning().getBinList() ){
+                for( const auto& bin : sample.getHistogram().getBinning().getBinList() ){
                   std::string variableNameForBinning{sampleObsBinning};
 
                   if( not GenericToolbox::doesElementIsInVector(sampleObsBinning, bin.getEdgesList(), [](const Bin::Edges& e){ return e.varName; }) ){

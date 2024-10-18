@@ -18,9 +18,9 @@ namespace JointProbability{
 
   double BarlowBeestonBanff2022Sfgd::eval(const SamplePair& samplePair_, int bin_) const {
 
-    double dataVal = samplePair_.data->getHistogram().binList[bin_].content;
-    double predVal = samplePair_.model->getHistogram().binList[bin_].content;
-    double mcuncert = samplePair_.model->getHistogram().binList[bin_].error;
+    double dataVal = samplePair_.data->getHistogram().getBinContentList()[bin_].sumWeights;
+    double predVal = samplePair_.model->getHistogram().getBinContentList()[bin_].sumWeights;
+    double mcuncert = samplePair_.model->getHistogram().getBinContentList()[bin_].sqrtSumSqWeight;
 
     double chisq = 0.0;
 
@@ -113,8 +113,8 @@ namespace JointProbability{
     if (std::isinf(chisq))
     {
       LogAlert << "Infinite chi2 " << predVal << " " << dataVal
-               << samplePair_.model->getHistogram().binList[bin_].error << " "
-               << samplePair_.model->getHistogram().binList[bin_].content << std::endl;
+               << samplePair_.model->getHistogram().getBinContentList()[bin_].sqrtSumSqWeight << " "
+               << samplePair_.model->getHistogram().getBinContentList()[bin_].sumWeights << std::endl;
     }
 
     return chisq;
