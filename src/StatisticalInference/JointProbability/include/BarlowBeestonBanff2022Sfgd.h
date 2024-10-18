@@ -20,7 +20,7 @@ namespace JointProbability{
 
     double dataVal = samplePair_.data->getHistogram().getBinContentList()[bin_].sumWeights;
     double predVal = samplePair_.model->getHistogram().getBinContentList()[bin_].sumWeights;
-    double mcuncert = samplePair_.model->getHistogram().getBinContentList()[bin_].sqrtSumSqWeight;
+    double mcuncert = samplePair_.model->getHistogram().getBinContentList()[bin_].sqrtSumSqWeights;
 
     double chisq = 0.0;
 
@@ -113,7 +113,7 @@ namespace JointProbability{
     if (std::isinf(chisq))
     {
       LogAlert << "Infinite chi2 " << predVal << " " << dataVal
-               << samplePair_.model->getHistogram().getBinContentList()[bin_].sqrtSumSqWeight << " "
+               << samplePair_.model->getHistogram().getBinContentList()[bin_].sqrtSumSqWeights << " "
                << samplePair_.model->getHistogram().getBinContentList()[bin_].sumWeights << std::endl;
     }
 

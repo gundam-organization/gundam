@@ -147,14 +147,14 @@ void Sample::refillHistogram(int iThread_){
 #endif
       // reset
       binContent.sumWeights = 0;
-      binContent.sqrtSumSqWeight = 0;
+      binContent.sqrtSumSqWeights = 0;
       for( auto *eventPtr: binContext.eventPtrList ){
         weightBuffer = eventPtr->getEventWeight();
         binContent.sumWeights += weightBuffer;
-        binContent.sqrtSumSqWeight += weightBuffer * weightBuffer;
+        binContent.sqrtSumSqWeights += weightBuffer * weightBuffer;
       }
 
-      binContent.sqrtSumSqWeight = std::sqrt(binContent.sqrtSumSqWeight);
+      binContent.sqrtSumSqWeights = std::sqrt(binContent.sqrtSumSqWeights);
 #ifdef GUNDAM_USING_CACHE_MANAGER
     }
 
@@ -163,16 +163,16 @@ void Sample::refillHistogram(int iThread_){
       if( not useCpuCalculation ){
         // copy the result as
         binContent.sumWeights = _CacheManagerValue_[_CacheManagerIndex_+binContext.index];
-        binContent.sqrtSumSqWeight = _CacheManagerValue2_[_CacheManagerIndex_+binContext.index];
-        binContent.sqrtSumSqWeight = sqrt(binContent.sqrtSumSqWeight);
+        binContent.sqrtSumSqWeights = _CacheManagerValue2_[_CacheManagerIndex_ + binContext.index];
+        binContent.sqrtSumSqWeights = sqrt(binContent.sqrtSumSqWeights);
       }
       else{
         // container used for debugging
         Histogram::BinContent cacheManagerValue;
 
         cacheManagerValue.sumWeights = _CacheManagerValue_[_CacheManagerIndex_+binContext.index];
-        cacheManagerValue.sqrtSumSqWeight = _CacheManagerValue2_[_CacheManagerIndex_+binContext.index];
-        cacheManagerValue.sqrtSumSqWeight = sqrt(cacheManagerValue.sqrtSumSqWeight);
+        cacheManagerValue.sqrtSumSqWeights = _CacheManagerValue2_[_CacheManagerIndex_ + binContext.index];
+        cacheManagerValue.sqrtSumSqWeights = sqrt(cacheManagerValue.sqrtSumSqWeights);
 
         // Parallel calculations of the histogramming have been run.  Make sure
         // they are the same.
@@ -183,18 +183,18 @@ void Sample::refillHistogram(int iThread_){
           if (magnitude > 0.0) delta /= 0.5*magnitude;
           LogError << "Incorrect histogram content --"
                    << " Content: " << cacheManagerValue.sumWeights << "!=" << binContent.sumWeights
-                   << " Error: " << cacheManagerValue.sqrtSumSqWeight << "!=" << binContent.sqrtSumSqWeight
+                   << " Error: " << cacheManagerValue.sqrtSumSqWeights << "!=" << binContent.sqrtSumSqWeights
                    << " Precision: " << delta
                    << std::endl;
           problemFound = true;
         }
-        if (not GundamUtils::almostEqual(cacheManagerValue.sqrtSumSqWeight,(binContent.sqrtSumSqWeight))) {
-          double magnitude = std::abs(cacheManagerValue.sqrtSumSqWeight) + std::abs(binContent.sqrtSumSqWeight);
-          double delta = std::abs(cacheManagerValue.sqrtSumSqWeight - binContent.sqrtSumSqWeight);
+        if (not GundamUtils::almostEqual(cacheManagerValue.sqrtSumSqWeights, (binContent.sqrtSumSqWeights))) {
+          double magnitude = std::abs(cacheManagerValue.sqrtSumSqWeights) + std::abs(binContent.sqrtSumSqWeights);
+          double delta = std::abs(cacheManagerValue.sqrtSumSqWeights - binContent.sqrtSumSqWeights);
           if (magnitude > 0.0) delta /= 0.5*magnitude;
           LogError << "Incorrect histogram error --"
                    << " Content: " << cacheManagerValue.sumWeights << "!=" << binContent.sumWeights
-                   << " Error: " << cacheManagerValue.sqrtSumSqWeight << "!=" << binContent.sqrtSumSqWeight
+                   << " Error: " << cacheManagerValue.sqrtSumSqWeights << "!=" << binContent.sqrtSumSqWeights
                    << " Precision: " << delta
                    << std::endl;
           problemFound = true;
@@ -220,17 +220,17 @@ void Sample::throwEventMcError(){
   for( auto [binContent, binContext] : _histogram_.loop() ){
 
     binContent.sumWeights = 0;
-    binContent.sqrtSumSqWeight = 0;
+    binContent.sqrtSumSqWeights = 0;
     for (auto *eventPtr: binContext.eventPtrList) {
       // gRandom->Poisson(1) -> returns an INT -> can be 0
       eventPtr->getWeights().current = (double(gRandom->Poisson(1)) * eventPtr->getEventWeight());
 
       double weight{eventPtr->getEventWeight()};
       binContent.sumWeights += weight;
-      binContent.sqrtSumSqWeight += weight * weight;
+      binContent.sqrtSumSqWeights += weight * weight;
     }
 
-    binContent.sqrtSumSqWeight = sqrt(binContent.sqrtSumSqWeight);
+    binContent.sqrtSumSqWeights = sqrt(binContent.sqrtSumSqWeights);
   }
 
 }

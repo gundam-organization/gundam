@@ -82,14 +82,14 @@ namespace JointProbability{
       }
     }
     else {
-      mcuncert = samplePair_.model->getHistogram().getBinContentList()[bin_].sqrtSumSqWeight;
+      mcuncert = samplePair_.model->getHistogram().getBinContentList()[bin_].sqrtSumSqWeights;
       mcuncert *= mcuncert;
 
       if(not std::isfinite(mcuncert) or mcuncert < 0.0) {
         if( throwIfInfLlh ){
           LogError << "The mcuncert is not finite " << mcuncert << std::endl;
           LogError << "predMC bin " << bin_
-                   << " error is " << samplePair_.model->getHistogram().getBinContentList()[bin_].sqrtSumSqWeight;
+                   << " error is " << samplePair_.model->getHistogram().getBinContentList()[bin_].sqrtSumSqWeights;
           LogThrow("The mc uncertainty is not a usable number");
         }
         else{
@@ -215,8 +215,8 @@ namespace JointProbability{
     auto& nomHistErr = nomMcUncertList[&modelSample_];
     nomHistErr.reserve( modelSample_.getHistogram().getNbBins() );
     for( auto [binContent, binContext] : modelSample_.getHistogram().loop() ){
-      nomHistErr.emplace_back( binContent.sqrtSumSqWeight );
-      LogTraceIf(verboseLevel >= 2) << modelSample_.getName() << ": " << binContext.index << " -> " << binContent.sumWeights << " / " << binContent.sqrtSumSqWeight << std::endl;
+      nomHistErr.emplace_back( binContent.sqrtSumSqWeights );
+      LogTraceIf(verboseLevel >= 2) << modelSample_.getName() << ": " << binContext.index << " -> " << binContent.sumWeights << " / " << binContent.sqrtSumSqWeights << std::endl;
     }
   }
   void BarlowBeestonBanff2022::printConfiguration() const{

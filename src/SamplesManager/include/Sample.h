@@ -36,7 +36,7 @@ public:
     // structs
     struct BinContent{
       double sumWeights{0};
-      double sqrtSumSqWeight{0};
+      double sqrtSumSqWeights{0};
     };
     struct BinContext{
       int index{-1};

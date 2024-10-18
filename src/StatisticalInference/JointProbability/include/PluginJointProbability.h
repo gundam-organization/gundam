@@ -60,7 +60,7 @@ namespace JointProbability{
     return reinterpret_cast<double (*)( double, double, double )>(evalFcn)(
         samplePair_.data->getHistogram().getBinContentList()[bin_].sumWeights,
         samplePair_.model->getHistogram().getBinContentList()[bin_].sumWeights,
-        samplePair_.model->getHistogram().getBinContentList()[bin_].sqrtSumSqWeight
+        samplePair_.model->getHistogram().getBinContentList()[bin_].sqrtSumSqWeights
     );
   }
 

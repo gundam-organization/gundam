@@ -222,7 +222,7 @@ void AdaptiveMcmc::fillPoint( bool fillModel) {
     /// Adrien: isn't it a bug?? i from 1 to nBins ? Should be from 0 ? or until nBins+1 ?
     for (int i = 1; i < hist.getNbBins(); ++i) {
       _model_.push_back( hist.getBinContentList()[i-1].sumWeights );
-      _uncertainty_.push_back( hist.getBinContentList()[i-1].sqrtSumSqWeight );
+      _uncertainty_.push_back( hist.getBinContentList()[i-1].sqrtSumSqWeights );
     }
   }
 }

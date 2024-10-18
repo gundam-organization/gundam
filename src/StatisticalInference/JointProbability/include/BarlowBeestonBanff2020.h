@@ -26,7 +26,7 @@ namespace JointProbability{
 
     double dataVal = samplePair_.data->getHistogram().getBinContentList()[bin_].sumWeights;
     double predVal = samplePair_.model->getHistogram().getBinContentList()[bin_].sumWeights;
-    double mcuncert = samplePair_.model->getHistogram().getBinContentList()[bin_].sqrtSumSqWeight;
+    double mcuncert = samplePair_.model->getHistogram().getBinContentList()[bin_].sqrtSumSqWeights;
 
     //implementing Barlow-Beeston correction for LH calculation the
     //following comments are inspired/copied from Clarence's comments in the
@@ -79,12 +79,12 @@ namespace JointProbability{
 
     if(std::isinf(chisq)){
       LogAlert << "Infinite chi2 " << predVal << " " << dataVal << " "
-               << samplePair_.model->getHistogram().getBinContentList()[bin_].sqrtSumSqWeight << " "
+               << samplePair_.model->getHistogram().getBinContentList()[bin_].sqrtSumSqWeights << " "
                << samplePair_.model->getHistogram().getBinContentList()[bin_].sumWeights << std::endl;
     }
 
     LogThrowIf(std::isnan(chisq), "NaN chi2 " << predVal << " " << dataVal
-                                              << samplePair_.model->getHistogram().getBinContentList()[bin_].sqrtSumSqWeight << " "
+                                              << samplePair_.model->getHistogram().getBinContentList()[bin_].sqrtSumSqWeights << " "
                                               << samplePair_.model->getHistogram().getBinContentList()[bin_].sumWeights);
 
     return chisq;
