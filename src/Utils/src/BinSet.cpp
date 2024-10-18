@@ -123,9 +123,7 @@ void BinSet::sortBinEdges(){
 std::vector<std::string> BinSet::buildVariableNameList() const{
   std::vector<std::string> out;
   for( auto& bin : _binList_ ){
-    for( auto& edges : bin.getEdgesList() ){
-      GenericToolbox::addIfNotInVector(edges.varName, out);
-    }
+    GenericToolbox::mergeInVector(out, bin.buildVariableNameList(), false);
   }
   return out;
 }

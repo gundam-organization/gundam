@@ -220,9 +220,9 @@ void AdaptiveMcmc::fillPoint( bool fillModel) {
       : getModelPropagator().getSampleSet().getSampleList()) {
     auto& hist = sample.getHistogram();
     /// Adrien: isn't it a bug?? i from 1 to nBins ? Should be from 0 ? or until nBins+1 ?
-    for (int i = 1; i < hist.nBins; ++i) {
-      _model_.push_back( hist.binList[i-1].content );
-      _uncertainty_.push_back( hist.binList[i-1].error );
+    for (int i = 1; i < hist.getNbBins(); ++i) {
+      _model_.push_back( hist.getBinContentList()[i-1].sumWeights );
+      _uncertainty_.push_back( hist.getBinContentList()[i-1].sqrtSumSqWeights );
     }
   }
 }
@@ -885,12 +885,12 @@ void AdaptiveMcmc::minimize() {
     parameterSampleOffsets.push_back(parameterSampleData.size());
     auto& hist = sample.getHistogram();
     // Adrien: same here... the last been has always been skipped
-    for (int i = 1; i < hist.nBins; ++i) {
-      parameterSampleData.push_back(hist.binList[i-1].content);
+    for (int i = 1; i < hist.getNbBins(); ++i) {
+      parameterSampleData.push_back(hist.getBinContentList()[i-1].sumWeights);
     }
     LogInfo << "Save data histogram for " << parameterSampleNames.back()
             << " @ " << parameterSampleOffsets.back()
-            << " w/ " << hist.nBins << " bins"
+            << " w/ " << hist.getNbBins() << " bins"
             << std::endl;
   }
 

@@ -8,14 +8,17 @@
 
 #include "Event.h"
 #include "BinSet.h"
+#include "GundamGlobals.h"
 
 #include "GenericToolbox.Root.h"
+#include "GenericToolbox.Loops.h"
 
 #include <TH1D.h>
 
 #include <vector>
 #include <string>
 #include <memory>
+
 
 
 class Sample : public JsonBaseClass {
@@ -27,16 +30,41 @@ public:
     size_t eventNb{0};
   };
 
-  struct Histogram{
+  class Histogram{
+
+  public:
+    // structs
+    struct BinContent{
+      double sumWeights{0};
+      double sqrtSumSqWeights{0};
+    };
     struct BinContext{
-      int index{-1};
-      double content{0};
-      double error{0};
-      const Bin* binPtr{nullptr};
+      Bin bin{};
       std::vector<Event*> eventPtrList{};
     };
-    std::vector<BinContext> binList{};
+
+    // const getters
+    [[nodiscard]] int getNbBins() const { return nBins; }
+    [[nodiscard]] const std::vector<BinContent>& getBinContentList() const { return binContentList; }
+    [[nodiscard]] const std::vector<BinContext>& getBinContextList() const { return binContextList; }
+
+    // mutable getters
+    std::vector<BinContent>& getBinContentList(){ return binContentList; }
+    std::vector<BinContext>& getBinContextList(){ return binContextList; }
+
+
+    // core
+    void build(const JsonType& binningConfig_);
+    auto loop(){ return GenericToolbox::Zip(binContentList, binContextList); }
+    auto loop(size_t start_, size_t end_){ return GenericToolbox::ZipPartial(start_, end_, binContentList, binContextList); }
+    [[nodiscard]] auto loop() const{ return GenericToolbox::Zip(binContentList, binContextList); }
+    [[nodiscard]] auto loop(size_t start_, size_t end_) const { return GenericToolbox::ZipPartial(start_, end_, binContentList, binContextList); }
+
+  private:
     int nBins{0};
+    std::vector<BinContent> binContentList{};
+    std::vector<BinContext> binContextList{};
+
   };
 
 protected:
@@ -59,12 +87,11 @@ public:
   [[nodiscard]] const std::string &getName() const{ return _name_; }
   [[nodiscard]] const std::string &getSelectionCutsStr() const{ return _selectionCutStr_; }
   [[nodiscard]] const JsonType &getBinningFilePath() const{ return _binningConfig_; }
-  [[nodiscard]] const BinSet &getBinning() const{ return _binning_; }
   [[nodiscard]] const Histogram &getHistogram() const{ return _histogram_; }
   [[nodiscard]] const std::vector<Event> &getEventList() const{ return _eventList_; }
 
   // getters
-  BinSet &getBinning() { return _binning_; }
+  Histogram &getHistogram(){ return _histogram_; }
   std::vector<Event> &getEventList(){ return _eventList_; }
 
   // misc
@@ -72,7 +99,6 @@ public:
   bool isDatasetValid(const std::string& datasetName_);
 
   // core
-  void buildHistogram(const BinSet& binning_);
   void reserveEventMemory(size_t dataSetIndex_, size_t nEvents, const Event &eventBuffer_);
   void shrinkEventList(size_t newTotalSize_);
   void updateBinEventList(int iThread_ = -1);
@@ -105,7 +131,6 @@ private:
 
   // Internals
   double _llhStatBuffer_{std::nan("unset")}; // set by SampleSet which hold the joinProbability obj
-  BinSet _binning_;
   std::vector<size_t> _dataSetIndexList_;
 
   Histogram _histogram_{};
@@ -114,6 +139,8 @@ private:
 
 #ifdef GUNDAM_USING_CACHE_MANAGER
 public:
+  [[nodiscard]] bool isCacheManagerEnabled() const { return GundamGlobals::isCacheManagerEnabled() and _CacheManagerValid_ and (*_CacheManagerValid_) and _CacheManagerValue_ and _CacheManagerIndex_ >= 0; };
+
   void setCacheManagerIndex(int i) {_CacheManagerIndex_ = i;}
   void setCacheManagerValuePointer(const double* v) {_CacheManagerValue_ = v;}
   void setCacheManagerValue2Pointer(const double* v) {_CacheManagerValue2_ = v;}
