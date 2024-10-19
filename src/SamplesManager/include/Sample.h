@@ -35,6 +35,7 @@ public:
   public:
     // structs
     struct BinContent{
+      // keeps the contents close together in memory
       double sumWeights{0};
       double sqrtSumSqWeights{0};
     };
@@ -51,7 +52,6 @@ public:
     // mutable getters
     std::vector<BinContent>& getBinContentList(){ return binContentList; }
     std::vector<BinContext>& getBinContextList(){ return binContextList; }
-
 
     // core
     void build(const JsonType& binningConfig_);

@@ -31,7 +31,7 @@ VariableHolder& VariableCollection::fetchVariable( const std::string& name_){
 }
 
 // bin tools
-bool VariableCollection::isInBin( const Bin& bin_) const{
+bool VariableCollection::isInBin(const Bin& bin_) const{
   return std::all_of(
       bin_.getEdgesList().begin(), bin_.getEdgesList().end(),
       [&](const Bin::Edges& edges_){
@@ -56,7 +56,6 @@ int VariableCollection::findBinIndex( const std::vector<Bin>& binList_) const{
   if ( dialItr == binList_.end() ){ return -1; }
   return int( std::distance( binList_.begin(), dialItr ) );
 }
-int VariableCollection::findBinIndex( const BinSet& binSet_) const{ return this->findBinIndex(binSet_.getBinList() ); }
 
 // printout
 std::string VariableCollection::getSummary() const{

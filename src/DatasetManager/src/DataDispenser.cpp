@@ -1103,7 +1103,7 @@ void DataDispenser::fillFunction(int iThread_){
             // to apply the dial to.  Check if the event falls into
             // a bin, and apply the correct binning.  Some events
             // may not be in any bin.
-            auto dialBinIdx = eventIndexingBuffer.getVariables().findBinIndex( dialCollectionRef->getDialBinSet() );
+            auto dialBinIdx = eventIndexingBuffer.getVariables().findBinIndex( dialCollectionRef->getDialBinSet().getBinList() );
             if( dialBinIdx != -1 ){
               dialEntryPtr->collectionIndex = iCollection;
               dialEntryPtr->interfaceIndex = dialBinIdx;
