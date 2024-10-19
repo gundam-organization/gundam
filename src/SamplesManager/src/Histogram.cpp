@@ -115,6 +115,7 @@ void Histogram::refillHistogram(int iThread_){
   LogDebug << GET_VAR_NAME_VALUE(this->isCacheManagerEnabled()) << std::endl;
   LogDebug << GET_VAR_NAME_VALUE(_cacheManagerIndex_) << std::endl;
   LogDebug << GET_VAR_NAME_VALUE(_cacheManagerValidFlagPtr_) << std::endl;
+  LogDebugIf(_cacheManagerValidFlagPtr_ != nullptr) << GET_VAR_NAME_VALUE(*_cacheManagerValidFlagPtr_) << std::endl;
 //  LogThrow("debug stop");
 
   if( _cacheManagerValidFlagPtr_ != nullptr and *_cacheManagerValidFlagPtr_ ){
@@ -124,7 +125,7 @@ void Histogram::refillHistogram(int iThread_){
     // _CacheManagerValue_ and _CacheManagerValid_ are inside the summed
     // index cache (a bit of evil coding here), and are updated by the
     // cache.  The update is triggered by (*_CacheManagerUpdate_)().
-    if( _cacheManagerUpdateFctPtr_ != nullptr ) (*_cacheManagerUpdateFctPtr_)();
+    if( _cacheManagerUpdateFctPtr_ != nullptr ){ (*_cacheManagerUpdateFctPtr_)(); }
   }
 #endif
 
