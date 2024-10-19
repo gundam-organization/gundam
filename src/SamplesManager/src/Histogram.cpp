@@ -113,7 +113,7 @@ void Histogram::refillHistogram(int iThread_){
   LogDebug << GET_VAR_NAME_VALUE(isCacheManagerEnabled) << std::endl;
   LogDebug << GET_VAR_NAME_VALUE(GundamGlobals::isForceCpuCalculation()) << std::endl;
   LogDebug << GET_VAR_NAME_VALUE(this->isCacheManagerEnabled()) << std::endl;
-  LogThrow("debug stop");
+//  LogThrow("debug stop");
 
   if( isCacheManagerEnabled ){
     // This can be slow (~10 usec for 5000 bins) when data must be copied
