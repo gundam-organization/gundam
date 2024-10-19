@@ -11,7 +11,7 @@
 #include "BinSet.h"
 #include "GundamGlobals.h"
 
-#include "GenericToolbox.Root.h"
+#include "GenericToolbox.Root.h" // TFile
 #include "GenericToolbox.Loops.h"
 
 #include <vector>
@@ -34,32 +34,28 @@ protected:
   void configureImpl() override;
 
 public:
-  // SETTERS
+  // setters
   void setIndex(int index){ _index_ = index; }
-  void setLlhStatBuffer(double llhStatBuffer_) { _llhStatBuffer_ = llhStatBuffer_; }
   void setName(const std::string &name){ _name_ = name; }
   void setBinningFilePath(const JsonType &binningFilePath_){ _binningConfig_ = binningFilePath_; }
-  void setSelectionCutStr(const std::string &selectionCutStr_){ _selectionCutStr_ = selectionCutStr_; }
-  void setEnabledDatasetList(const std::vector<std::string>& enabledDatasetList_){ _enabledDatasetList_ = enabledDatasetList_; }
 
   // const getters
   [[nodiscard]] bool isEnabled() const{ return _isEnabled_; }
   [[nodiscard]] bool isEventMcThrowDisabled() const{ return _disableEventMcThrow_; }
   [[nodiscard]] int getIndex() const{ return _index_; }
-  [[nodiscard]] double getLlhStatBuffer() const { return _llhStatBuffer_; }
   [[nodiscard]] const std::string &getName() const{ return _name_; }
   [[nodiscard]] const std::string &getSelectionCutsStr() const{ return _selectionCutStr_; }
   [[nodiscard]] const JsonType &getBinningFilePath() const{ return _binningConfig_; }
   [[nodiscard]] const Histogram &getHistogram() const{ return _histogram_; }
   [[nodiscard]] const std::vector<Event> &getEventList() const{ return _eventList_; }
 
-  // getters
+  // mutable getters
   Histogram &getHistogram(){ return _histogram_; }
   std::vector<Event> &getEventList(){ return _eventList_; }
 
   // const core
   void writeEventRates(const GenericToolbox::TFilePath& saveDir_) const;
-  bool isDatasetValid(const std::string& datasetName_) const;
+  [[nodiscard]] bool isDatasetValid(const std::string& datasetName_) const;
   [[nodiscard]] double getSumWeights() const;
   [[nodiscard]] size_t getNbBinnedEvents() const;
 
@@ -86,7 +82,6 @@ private:
   std::vector<std::string> _enabledDatasetList_;
 
   // Internals
-  double _llhStatBuffer_{std::nan("unset")}; // set by SampleSet which hold the joinProbability obj
   std::vector<size_t> _dataSetIndexList_;
 
   Histogram _histogram_{};
