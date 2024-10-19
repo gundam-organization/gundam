@@ -57,7 +57,7 @@ private:
 
 #ifdef GUNDAM_USING_CACHE_MANAGER
 public:
-  [[nodiscard]] bool isCacheManagerEnabled() const { return _cacheManagerValidFlagPtr_ and (*_cacheManagerValidFlagPtr_) and _cacheManagerSumWeightsArray_ and _cacheManagerIndex_ >= 0; };
+  [[nodiscard]] bool isCacheManagerEnabled() const { return _cacheManagerValidFlagPtr_ and (*_cacheManagerValidFlagPtr_) and _cacheManagerIndex_ >= 0; };
 
   void setCacheManagerIndex(int i) { _cacheManagerIndex_ = i;}
   void setCacheManagerValuePointer(const double* v) { _cacheManagerSumWeightsArray_ = v;}

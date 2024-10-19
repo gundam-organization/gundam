@@ -148,6 +148,7 @@ void Histogram::refillHistogram(int iThread_){
 
       if( not useCpuCalculation ){
         // copy the result as
+        LogThrowIf(_cacheManagerSumWeightsArray_ == nullptr);
         binContent.sumWeights = _cacheManagerSumWeightsArray_[_cacheManagerIndex_ + binContext.bin.getIndex()];
         binContent.sqrtSumSqWeights = _cacheManagerSumSqWeightsArray_[_cacheManagerIndex_ + binContext.bin.getIndex()];
         binContent.sqrtSumSqWeights = sqrt(binContent.sqrtSumSqWeights);
@@ -156,6 +157,7 @@ void Histogram::refillHistogram(int iThread_){
         // container used for debugging
         Histogram::BinContent cacheManagerValue;
 
+        LogThrowIf(_cacheManagerSumWeightsArray_ == nullptr);
         cacheManagerValue.sumWeights = _cacheManagerSumWeightsArray_[_cacheManagerIndex_ + binContext.bin.getIndex()];
         cacheManagerValue.sqrtSumSqWeights = _cacheManagerSumSqWeightsArray_[_cacheManagerIndex_ + binContext.bin.getIndex()];
         cacheManagerValue.sqrtSumSqWeights = sqrt(cacheManagerValue.sqrtSumSqWeights);
