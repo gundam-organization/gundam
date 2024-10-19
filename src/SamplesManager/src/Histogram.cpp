@@ -115,7 +115,7 @@ void Histogram::refillHistogram(int iThread_){
   LogDebug << GET_VAR_NAME_VALUE(this->isCacheManagerEnabled()) << std::endl;
   LogDebug << GET_VAR_NAME_VALUE(_cacheManagerIndex_) << std::endl;
   LogDebug << GET_VAR_NAME_VALUE(_cacheManagerValidFlagPtr_) << std::endl;
-  LogDebugIf(_cacheManagerValidFlagPtr_ != 0) << GET_VAR_NAME_VALUE(*_cacheManagerValidFlagPtr_) << std::endl;
+  LogDebugIf(_cacheManagerIndex_ >= 0) << GET_VAR_NAME_VALUE(*_cacheManagerValidFlagPtr_) << std::endl;
 //  LogThrow("debug stop");
 
   if( _cacheManagerValidFlagPtr_ != nullptr and *_cacheManagerValidFlagPtr_ ){
