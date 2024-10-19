@@ -106,7 +106,7 @@ void Histogram::refillHistogram(int iThread_){
 
 #ifdef GUNDAM_USING_CACHE_MANAGER
   // avoid checking those variables at each bin
-  bool isCacheManagerEnabled{this->isCacheManagerEnabled()};
+  bool isCacheManagerEnabled{_cacheManagerIndex_ >= 0 and _cacheManagerValidFlagPtr_ and (*_cacheManagerValidFlagPtr_)};
   bool useCpuCalculation{not isCacheManagerEnabled or GundamGlobals::isForceCpuCalculation()};
 
   LogDebug << GET_VAR_NAME_VALUE(useCpuCalculation) << std::endl;
@@ -117,14 +117,14 @@ void Histogram::refillHistogram(int iThread_){
   LogDebug << GET_VAR_NAME_VALUE(_cacheManagerValidFlagPtr_) << std::endl;
 //  LogThrow("debug stop");
 
-  if( isCacheManagerEnabled ){
+  if( _cacheManagerValidFlagPtr_ != nullptr and *_cacheManagerValidFlagPtr_ ){
     // This can be slow (~10 usec for 5000 bins) when data must be copied
     // from the device, but it makes sure that the results are copied from
     // the device when they have changed. The values pointed to by
     // _CacheManagerValue_ and _CacheManagerValid_ are inside the summed
     // index cache (a bit of evil coding here), and are updated by the
     // cache.  The update is triggered by (*_CacheManagerUpdate_)().
-    if (_cacheManagerUpdateFctPtr_) (*_cacheManagerUpdateFctPtr_)();
+    if( _cacheManagerUpdateFctPtr_ != nullptr ) (*_cacheManagerUpdateFctPtr_)();
   }
 #endif
 
