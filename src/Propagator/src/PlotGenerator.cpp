@@ -141,7 +141,10 @@ void PlotGenerator::generateSampleHistograms(TDirectory *saveDir_, int cacheSlot
 
     if( histDef.histPtr == nullptr ){
       if( histDef.varToPlot == "Raw" and histDef.samplePtr != nullptr ){
-        histDef.histPtr = histDef.samplePtr->generateRootHistogram();
+        histDef.histPtr = std::make_shared<TH1D>(
+            Form("%s_bins", histDef.samplePtr->getName().c_str()), Form("%s_bins", histDef.samplePtr->getName().c_str()),
+            histDef.samplePtr->getHistogram().getNbBins(), 0, histDef.samplePtr->getHistogram().getNbBins()
+        );
       }
       else{
         histDef.histPtr = std::make_shared<TH1D>(

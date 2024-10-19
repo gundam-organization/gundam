@@ -5,12 +5,14 @@ set( SRCFILES
     ${CMAKE_CURRENT_SOURCE_DIR}/src/VariableCollection.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/EventUtils.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Event.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/Histogram.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Sample.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/SampleSet.cpp
 )
 
 set( HEADERS
     ${CMAKE_CURRENT_SOURCE_DIR}/include/EventUtils.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/Histogram.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/Event.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/Sample.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/SampleSet.h

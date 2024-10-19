@@ -293,7 +293,7 @@ bool Cache::Manager::Build(SampleSet& sampleList,
   // Count the total number of histogram cells.
   config.histBins = 0;
   for(const Sample& sample : sampleList.getSampleList() ){
-    int cells = sample.generateRootHistogram()->GetNcells();
+    int cells = sample.getHistogram().getNbBins() + 2; // GetNcells() of TH1D
     LogInfo  << "Add histogram for " << sample.getName()
              << " with " << cells
              << " cells (includes under/over-flows)" << std::endl;
@@ -687,27 +687,23 @@ bool Cache::Manager::Update(SampleSet& sampleList,
     LogInfo  << "Fill cache for " << sample.getName()
              << " with " << sample.getEventList().size()
              << " events" << std::endl;
-    std::shared_ptr<TH1> hist(sample.generateRootHistogram());
-    if (!hist) {
-      LogThrow("missing sample histogram");
-    }
     int thisHist = nextHist;
-    sample.setCacheManagerIndex(thisHist);
-    sample.setCacheManagerValuePointer(
+    sample.getHistogram().setCacheManagerIndex(thisHist);
+    sample.getHistogram().setCacheManagerValuePointer(
         Cache::Manager::Get()->GetHistogramsCache()
             .GetSumsPointer());
-    sample.setCacheManagerValue2Pointer(
+    sample.getHistogram().setCacheManagerValue2Pointer(
         Cache::Manager::Get()->GetHistogramsCache()
             .GetSums2Pointer());
-    sample.setCacheManagerValidPointer(
+    sample.getHistogram().setCacheManagerValidPointer(
         Cache::Manager::Get()->GetHistogramsCache()
             .GetSumsValidPointer());
-    sample.setCacheManagerUpdatePointer(
+    sample.getHistogram().setCacheManagerUpdatePointer(
         [](){
           Cache::Manager::Get()->GetHistogramsCache().GetSum(0);
           Cache::Manager::Get()->GetHistogramsCache().GetSum2(0);
         });
-    int cells = hist->GetNcells();
+    int cells = sample.getHistogram().getNbBins() + 2;
     nextHist += cells;
     /// ARE ALL OF THE EVENTS HANDLED?
     for (Event& event

@@ -7,13 +7,12 @@
 
 
 #include "Event.h"
+#include "Histogram.h"
 #include "BinSet.h"
 #include "GundamGlobals.h"
 
 #include "GenericToolbox.Root.h"
 #include "GenericToolbox.Loops.h"
-
-#include <TH1D.h>
 
 #include <vector>
 #include <string>
@@ -28,43 +27,6 @@ public:
     size_t dataSetIndex{0};
     size_t eventOffSet{0};
     size_t eventNb{0};
-  };
-
-  class Histogram{
-
-  public:
-    // structs
-    struct BinContent{
-      // keeps the contents close together in memory
-      double sumWeights{0};
-      double sqrtSumSqWeights{0};
-    };
-    struct BinContext{
-      Bin bin{};
-      std::vector<Event*> eventPtrList{};
-    };
-
-    // const getters
-    [[nodiscard]] int getNbBins() const { return nBins; }
-    [[nodiscard]] const std::vector<BinContent>& getBinContentList() const { return binContentList; }
-    [[nodiscard]] const std::vector<BinContext>& getBinContextList() const { return binContextList; }
-
-    // mutable getters
-    std::vector<BinContent>& getBinContentList(){ return binContentList; }
-    std::vector<BinContext>& getBinContextList(){ return binContextList; }
-
-    // core
-    void build(const JsonType& binningConfig_);
-    auto loop(){ return GenericToolbox::Zip(binContentList, binContextList); }
-    auto loop(size_t start_, size_t end_){ return GenericToolbox::ZipPartial(start_, end_, binContentList, binContextList); }
-    [[nodiscard]] auto loop() const{ return GenericToolbox::Zip(binContentList, binContextList); }
-    [[nodiscard]] auto loop(size_t start_, size_t end_) const { return GenericToolbox::ZipPartial(start_, end_, binContentList, binContextList); }
-
-  private:
-    int nBins{0};
-    std::vector<BinContent> binContentList{};
-    std::vector<BinContext> binContextList{};
-
   };
 
 protected:
@@ -82,6 +44,7 @@ public:
 
   // const getters
   [[nodiscard]] bool isEnabled() const{ return _isEnabled_; }
+  [[nodiscard]] bool isEventMcThrowDisabled() const{ return _disableEventMcThrow_; }
   [[nodiscard]] int getIndex() const{ return _index_; }
   [[nodiscard]] double getLlhStatBuffer() const { return _llhStatBuffer_; }
   [[nodiscard]] const std::string &getName() const{ return _name_; }
@@ -94,30 +57,23 @@ public:
   Histogram &getHistogram(){ return _histogram_; }
   std::vector<Event> &getEventList(){ return _eventList_; }
 
-  // misc
+  // const core
   void writeEventRates(const GenericToolbox::TFilePath& saveDir_) const;
-  bool isDatasetValid(const std::string& datasetName_);
+  bool isDatasetValid(const std::string& datasetName_) const;
+  [[nodiscard]] double getSumWeights() const;
+  [[nodiscard]] size_t getNbBinnedEvents() const;
 
   // core
   void reserveEventMemory(size_t dataSetIndex_, size_t nEvents, const Event &eventBuffer_);
   void shrinkEventList(size_t newTotalSize_);
-  void updateBinEventList(int iThread_ = -1);
-  void refillHistogram(int iThread_ = -1);
-
-  // event by event poisson throw -> takes into account the finite amount of stat in MC
-  void throwEventMcError();
-
-  // generate a toy experiment -> hist content as the asimov -> throw poisson for each bin
-  void throwStatError(bool useGaussThrow_ = false);
-
-  [[nodiscard]] double getSumWeights() const;
-  [[nodiscard]] size_t getNbBinnedEvents() const;
-  [[nodiscard]] std::shared_ptr<TH1D> generateRootHistogram() const; // for the plot generator or for TFile save
 
   // printouts
   void printConfiguration() const;
   [[nodiscard]] std::string getSummary() const;
   friend std::ostream& operator <<( std::ostream& o, const Sample& this_ );
+
+  // multi-thread
+  void indexEventInHistogramBin( int iThread_ = -1);
 
 private:
   // configuration
@@ -136,30 +92,6 @@ private:
   Histogram _histogram_{};
   std::vector<Event> _eventList_{};
   std::vector<DatasetProperties> _loadedDatasetList_{};
-
-#ifdef GUNDAM_USING_CACHE_MANAGER
-public:
-  [[nodiscard]] bool isCacheManagerEnabled() const { return GundamGlobals::isCacheManagerEnabled() and _CacheManagerValid_ and (*_CacheManagerValid_) and _CacheManagerValue_ and _CacheManagerIndex_ >= 0; };
-
-  void setCacheManagerIndex(int i) {_CacheManagerIndex_ = i;}
-  void setCacheManagerValuePointer(const double* v) {_CacheManagerValue_ = v;}
-  void setCacheManagerValue2Pointer(const double* v) {_CacheManagerValue2_ = v;}
-  void setCacheManagerValidPointer(const bool* v) {_CacheManagerValid_ = v;}
-  void setCacheManagerUpdatePointer(void (*p)()) {_CacheManagerUpdate_ = p;}
-
-  [[nodiscard]] int getCacheManagerIndex() const {return _CacheManagerIndex_;}
-private:
-  // An "opaque" index into the cache that is used to simplify bookkeeping.
-  int _CacheManagerIndex_{-1};
-  // A pointer to the cached result.
-  const double* _CacheManagerValue_{nullptr};
-  // A pointer to the cached result.
-  const double* _CacheManagerValue2_{nullptr};
-  // A pointer to the cache validity flag.
-  const bool* _CacheManagerValid_{nullptr};
-  // A pointer to a callback to force the cache to be updated.
-  void (*_CacheManagerUpdate_)(){nullptr};
-#endif
 
 };
 

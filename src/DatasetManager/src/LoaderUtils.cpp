@@ -25,7 +25,7 @@ namespace LoaderUtils{
       event_.getVariables().getVarList()[iLeaf].set( leafFormList_[iLeaf]->getDataAddress(), leafFormList_[iLeaf]->getDataSize() );
     }
   }
-  void fillBinIndex(Event& event_, const std::vector<Sample::Histogram::BinContext>& binList_){
+  void fillBinIndex(Event& event_, const std::vector<Histogram::BinContext>& binList_){
     for( auto& binContext : binList_ ){
       if( event_.getVariables().isInBin(binContext.bin) ){
         event_.getIndices().bin = binContext.bin.getIndex();

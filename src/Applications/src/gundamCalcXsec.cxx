@@ -642,12 +642,12 @@ int main(int argc, char** argv){
 
     if( enableStatThrowInToys ){
       for( auto& xsec : crossSectionDataList ){
-        if( enableEventMcThrow ){
+        if( enableEventMcThrow and not xsec.samplePtr->isEventMcThrowDisabled() ){
           // Take into account the finite amount of event in MC
-          xsec.samplePtr->throwEventMcError();
+          xsec.samplePtr->getHistogram().throwEventMcError();
         }
         // Asimov bin content -> toy data
-        xsec.samplePtr->throwStatError();
+        xsec.samplePtr->getHistogram().throwStatError();
       }
     }
     propagateTimer.stop();

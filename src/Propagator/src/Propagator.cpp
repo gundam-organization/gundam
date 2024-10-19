@@ -319,7 +319,7 @@ void Propagator::reweightEvents( int iThread_) {
 }
 void Propagator::refillHistogramsFct( int iThread_){
   for( auto& sample : _sampleSet_.getSampleList() ){
-    sample.refillHistogram(iThread_);
+    sample.getHistogram().refillHistogram(iThread_);
   }
 }
 
