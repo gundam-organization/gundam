@@ -123,7 +123,7 @@ void LikelihoodInterface::initializeImpl() {
   LogInfo << "Fetching the number of bins parameters..." << std::endl;
   _nbSampleBins_ = 0;
   for( auto& sample : _modelPropagator_.getSampleSet().getSampleList() ){
-    _nbSampleBins_ += int(sample.getBinning().getBinList().size() );
+    _nbSampleBins_ += sample.getHistogram().getNbBins();
   }
 
   LogInfo << "Move back MC parameters to prior..." << std::endl;
@@ -345,14 +345,14 @@ void LikelihoodInterface::loadModelPropagator(){
   _threadPool_.runJob([this](int iThread){
     LogInfoIf(iThread <= 0) << "Updating sample per bin event lists..." << std::endl;
     for( auto& sample : _modelPropagator_.getSampleSet().getSampleList() ){
-      sample.updateBinEventList(iThread);
+      sample.indexEventInHistogramBin(iThread);
     }
   });
 
   LogInfo << "Filling up model sample histograms..." << std::endl;
   _threadPool_.runJob([this](int iThread){
     for( auto& sample : _modelPropagator_.getSampleSet().getSampleList() ){
-      sample.refillHistogram(iThread);
+      sample.getHistogram().refillHistogram(iThread);
     }
   });
 
@@ -455,14 +455,14 @@ void LikelihoodInterface::loadDataPropagator(){
   _threadPool_.runJob([this](int iThread){
     LogInfoIf(iThread <= 0) << "Updating sample per bin event lists..." << std::endl;
     for( auto& sample : _dataPropagator_.getSampleSet().getSampleList() ){
-      sample.updateBinEventList(iThread);
+      sample.indexEventInHistogramBin(iThread);
     }
   });
 
   LogInfo << "Filling up data sample histograms..." << std::endl;
   _threadPool_.runJob([this](int iThread){
     for( auto& sample : _dataPropagator_.getSampleSet().getSampleList() ){
-      sample.refillHistogram(iThread);
+      sample.getHistogram().refillHistogram(iThread);
     }
   });
 
@@ -581,7 +581,11 @@ void LikelihoodInterface::throwStatErrors(Propagator& propagator_){
     // Take into account the finite amount of event in MC
     LogInfo << "enableEventMcThrow is enabled: throwing individual MC events" << std::endl;
     for( auto& sample : propagator_.getSampleSet().getSampleList() ) {
-      sample.throwEventMcError();
+      if( sample.isEventMcThrowDisabled() ){
+        LogAlert << "MC event throw is disabled for sample: " << sample.getName() << std::endl;
+      }
+
+      sample.getHistogram().throwEventMcError();
     }
   }
   else{
@@ -594,7 +598,7 @@ void LikelihoodInterface::throwStatErrors(Propagator& propagator_){
   }
   for( auto& sample : propagator_.getSampleSet().getSampleList() ){
     // Asimov bin content -> toy data
-    sample.throwStatError( _gaussStatThrowInToys_ );
+    sample.getHistogram().throwStatError( _gaussStatThrowInToys_ );
   }
 }
 

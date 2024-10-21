@@ -2,7 +2,7 @@
 
 ### Applications
 
-`GUNDAM` has a series of applications at it's disposal:
+`GUNDAM` has a series of applications at its disposal:
 - [gundamFitter](applications/gundamFitter.md)
 - [gundamCalcXsec](applications/gundamCalcXsec.md)
 - [gundamConfigCompare](applications/gundamConfigCompare.md)

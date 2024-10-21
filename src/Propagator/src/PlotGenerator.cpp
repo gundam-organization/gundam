@@ -141,7 +141,10 @@ void PlotGenerator::generateSampleHistograms(TDirectory *saveDir_, int cacheSlot
 
     if( histDef.histPtr == nullptr ){
       if( histDef.varToPlot == "Raw" and histDef.samplePtr != nullptr ){
-        histDef.histPtr = histDef.samplePtr->generateRootHistogram();
+        histDef.histPtr = std::make_shared<TH1D>(
+            Form("%s_bins", histDef.samplePtr->getName().c_str()), Form("%s_bins", histDef.samplePtr->getName().c_str()),
+            histDef.samplePtr->getHistogram().getNbBins(), 0, histDef.samplePtr->getHistogram().getNbBins()
+        );
       }
       else{
         histDef.histPtr = std::make_shared<TH1D>(
@@ -761,19 +764,19 @@ void PlotGenerator::defineHistogramHolders() {
                 bool varNotAvailable{false};
                 std::string sampleObsBinning = histDef.useSampleBinningOfVar;
 
-                for( const auto& bin : sample.getBinning().getBinList() ){
+                for( const auto& binContext : sample.getHistogram().getBinContextList() ){
                   std::string variableNameForBinning{sampleObsBinning};
 
-                  if( not GenericToolbox::doesElementIsInVector(sampleObsBinning, bin.getEdgesList(), [](const Bin::Edges& e){ return e.varName; }) ){
+                  if( not GenericToolbox::doesElementIsInVector(sampleObsBinning, binContext.bin.getEdgesList(), [](const Bin::Edges& e){ return e.varName; }) ){
                     for( auto& sampleVar : histDef.sampleVariableIfNotAvailable ){
-                      if( GenericToolbox::doesElementIsInVector(sampleVar, bin.getEdgesList(), [](const Bin::Edges& e){ return e.varName; }) ){
+                      if( GenericToolbox::doesElementIsInVector(sampleVar, binContext.bin.getEdgesList(), [](const Bin::Edges& e){ return e.varName; }) ){
                         variableNameForBinning = sampleVar;
                         break;
                       }
                     }
                   } // sampleObsBinning not in the sample binning
 
-                  const Bin::Edges* edges{bin.getVarEdgesPtr(variableNameForBinning)};
+                  const Bin::Edges* edges{binContext.bin.getVarEdgesPtr(variableNameForBinning)};
                   if( edges == nullptr ){
                     LogAlert << "Can't use sample binning for var " << variableNameForBinning << " and sample " << sample.getName() << std::endl;
                     varNotAvailable = true;

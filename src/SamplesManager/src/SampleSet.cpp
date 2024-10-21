@@ -70,8 +70,8 @@ void SampleSet::clearEventLists(){
 std::vector<std::string> SampleSet::fetchRequestedVariablesForIndexing() const{
   std::vector<std::string> out;
   for (auto &sample: _sampleList_) {
-    for (auto &bin: sample.getBinning().getBinList()) {
-      for (auto &edges: bin.getEdgesList()) { GenericToolbox::addIfNotInVector(edges.varName, out); }
+    for (auto &binContext: sample.getHistogram().getBinContextList()) {
+      for (auto &edges: binContext.bin.getEdgesList()) { GenericToolbox::addIfNotInVector(edges.varName, out); }
     }
   }
   return out;

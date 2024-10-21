@@ -7,6 +7,7 @@
 #include <exception>
 #include <limits>
 #include <cmath>
+#include <memory>
 
 #include <hemi/hemi_error.h>
 #include <hemi/launch.h>
@@ -50,19 +51,19 @@ Cache::Weight::Bilinear::Bilinear(
     // Get the CPU/GPU memory for the spline index tables.  These are
     // copied once during initialization so do not pin the CPU memory into
     // the page set.
-    fResult.reset(new hemi::Array<int>(GetReserved(),false));
+    fResult = std::make_unique<hemi::Array<int>>(GetReserved(),false);
     LogThrowIf(not fResult, "Bad SplineResult alloc");
-    fParameter.reset(
-        new hemi::Array<short>(2*GetReserved(),false));
+    fParameter = std::make_unique<hemi::Array<short>>(
+        2*GetReserved(),false);
     LogThrowIf(not fParameter, "Bad SplineParameter alloc");
-    fIndex.reset(new hemi::Array<int>(1+GetReserved(),false));
+    fIndex = std::make_unique<hemi::Array<int>>(1+GetReserved(),false);
     LogThrowIf(not fIndex, "Bad SplineIndex alloc");
 
     // Get the CPU/GPU memory for the spline knots.  This is copied once
     // during initialization so do not pin the CPU memory into the page
     // set.
-    fData.reset(
-        new hemi::Array<WEIGHT_BUFFER_FLOAT>(GetSpaceReserved(),false));
+    fData = std::make_unique<hemi::Array<WEIGHT_BUFFER_FLOAT>>(
+        GetSpaceReserved(),false);
     LogThrowIf(not fData, "Bad SplineSpacealloc");
   }
   catch (...) {
@@ -77,7 +78,7 @@ Cache::Weight::Bilinear::Bilinear(
 }
 
 // The destructor
-Cache::Weight::Bilinear::~Bilinear() {}
+Cache::Weight::Bilinear::~Bilinear() = default;
 
 void Cache::Weight::Bilinear::AddData(int resIndex,
                                       int par1Index, int par2Index,

@@ -462,8 +462,8 @@ int main(int argc, char** argv){
     xsecEntry.config = sample.getConfig();
     xsecEntry.branchBinsData.resetCurrentByteOffset();
     std::vector<std::string> leafNameList{};
-    leafNameList.reserve( sample.getHistogram().nBins );
-    for( int iBin = 0 ; iBin < sample.getHistogram().nBins; iBin++ ){
+    leafNameList.reserve( sample.getHistogram().getNbBins() );
+    for( int iBin = 0 ; iBin < sample.getHistogram().getNbBins(); iBin++ ){
       leafNameList.emplace_back(Form("bin_%i/D", iBin));
       xsecEntry.branchBinsData.writeRawData( double(0) );
     }
@@ -490,9 +490,9 @@ int main(int argc, char** argv){
     xsecEntry.histogram = TH1D(
         sample.getName().c_str(),
         sample.getName().c_str(),
-        sample.getHistogram().nBins,
+        sample.getHistogram().getNbBins(),
         0,
-        sample.getHistogram().nBins
+        sample.getHistogram().getNbBins()
     );
   }
 
@@ -520,8 +520,8 @@ int main(int argc, char** argv){
     for( auto& xsec : crossSectionDataList ){
 
       xsec.branchBinsData.resetCurrentByteOffset();
-      for( int iBin = 0 ; iBin < xsec.samplePtr->getHistogram().nBins ; iBin++ ){
-        double binData{ xsec.samplePtr->getHistogram().binList[iBin].content };
+      for( int iBin = 0 ; iBin < xsec.samplePtr->getHistogram().getNbBins() ; iBin++ ){
+        double binData{ xsec.samplePtr->getHistogram().getBinContentList()[iBin].sumWeights };
 
         // special re-norm
         for( auto& normData : xsec.normList ){
@@ -563,7 +563,7 @@ int main(int argc, char** argv){
 //        }
 
         // bin volume
-        auto& bin = xsec.samplePtr->getBinning().getBinList()[iBin];
+        auto& bin = xsec.samplePtr->getHistogram().getBinContextList()[iBin].bin;
         double binVolume{1};
 
         for( auto& edges : bin.getEdgesList() ){
@@ -642,12 +642,12 @@ int main(int argc, char** argv){
 
     if( enableStatThrowInToys ){
       for( auto& xsec : crossSectionDataList ){
-        if( enableEventMcThrow ){
+        if( enableEventMcThrow and not xsec.samplePtr->isEventMcThrowDisabled() ){
           // Take into account the finite amount of event in MC
-          xsec.samplePtr->throwEventMcError();
+          xsec.samplePtr->getHistogram().throwEventMcError();
         }
         // Asimov bin content -> toy data
-        xsec.samplePtr->throwStatError();
+        xsec.samplePtr->getHistogram().throwStatError();
       }
     }
     propagateTimer.stop();
@@ -682,11 +682,11 @@ int main(int argc, char** argv){
 
   for( auto& xsec : crossSectionDataList ){
 
-    for( int iBin = 0 ; iBin < xsec.samplePtr->getHistogram().nBins ; iBin++ ){
+    for( int iBin = 0 ; iBin < xsec.samplePtr->getHistogram().getNbBins() ; iBin++ ){
       iBinGlobal++;
 
-      std::string binTitle = xsec.samplePtr->getBinning().getBinList()[iBin].getSummary();
-      double binVolume = xsec.samplePtr->getBinning().getBinList()[iBin].getVolume();
+      std::string binTitle = xsec.samplePtr->getHistogram().getBinContextList()[iBin].bin.getSummary();
+      double binVolume = xsec.samplePtr->getHistogram().getBinContextList()[iBin].bin.getVolume();
 
       xsec.histogram.SetBinContent( 1+iBin, (*meanValuesVector)[iBinGlobal] );
       xsec.histogram.SetBinError( 1+iBin, TMath::Sqrt( (*globalCovMatrix)[iBinGlobal][iBinGlobal] ) );

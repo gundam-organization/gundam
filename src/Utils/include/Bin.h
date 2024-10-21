@@ -42,7 +42,7 @@ protected:
   void configureImpl() override;
 
 public:
-  Bin() = delete;
+  Bin() = default;
   explicit Bin( int index_) : _index_(index_) {}
 
   // setters

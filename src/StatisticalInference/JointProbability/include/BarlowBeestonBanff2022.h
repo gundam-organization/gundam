@@ -44,8 +44,8 @@ namespace JointProbability{
 
   }
   double BarlowBeestonBanff2022::eval(const SamplePair& samplePair_, int bin_) const {
-    double dataVal = samplePair_.data->getHistogram().binList[bin_].content;
-    double predVal = samplePair_.model->getHistogram().binList[bin_].content;
+    double dataVal = samplePair_.data->getHistogram().getBinContentList()[bin_].sumWeights;
+    double predVal = samplePair_.model->getHistogram().getBinContentList()[bin_].sumWeights;
 
     {
       /// the first time we reach this point, we assume the predMC is at its nominal value
@@ -82,14 +82,14 @@ namespace JointProbability{
       }
     }
     else {
-      mcuncert = samplePair_.model->getHistogram().binList[bin_].error;
+      mcuncert = samplePair_.model->getHistogram().getBinContentList()[bin_].sqrtSumSqWeights;
       mcuncert *= mcuncert;
 
       if(not std::isfinite(mcuncert) or mcuncert < 0.0) {
         if( throwIfInfLlh ){
           LogError << "The mcuncert is not finite " << mcuncert << std::endl;
           LogError << "predMC bin " << bin_
-                   << " error is " << samplePair_.model->getHistogram().binList[bin_].error;
+                   << " error is " << samplePair_.model->getHistogram().getBinContentList()[bin_].sqrtSumSqWeights;
           LogThrow("The mc uncertainty is not a usable number");
         }
         else{
@@ -213,10 +213,14 @@ namespace JointProbability{
   void BarlowBeestonBanff2022::createNominalMc(const Sample& modelSample_) const {
     LogWarning << "Creating nominal MC histogram for sample \"" << modelSample_.getName() << "\"" << std::endl;
     auto& nomHistErr = nomMcUncertList[&modelSample_];
-    nomHistErr.reserve( modelSample_.getHistogram().nBins );
-    for( auto& bin : modelSample_.getHistogram().binList ){
-      nomHistErr.emplace_back( bin.error );
-      LogTraceIf(verboseLevel >= 2) << modelSample_.getName() << ": " << bin.index << " -> " << bin.content << " / " << bin.error << std::endl;
+    nomHistErr.reserve( modelSample_.getHistogram().getNbBins() );
+#if HAS_CPP_17
+    for( auto [binContent, binContext] : modelSample_.getHistogram().loop() ){
+#else
+    for( auto element : modelSample_.getHistogram().loop() ){ auto& binContent = std::get<0>(element); auto& binContext = std::get<1>(element);
+#endif
+      nomHistErr.emplace_back( binContent.sqrtSumSqWeights );
+      LogTraceIf(verboseLevel >= 2) << modelSample_.getName() << ": " << binContext.bin.getIndex() << " -> " << binContent.sumWeights << " / " << binContent.sqrtSumSqWeights << std::endl;
     }
   }
   void BarlowBeestonBanff2022::printConfiguration() const{

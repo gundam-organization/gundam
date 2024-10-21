@@ -17,8 +17,8 @@ namespace JointProbability{
   };
 
   double ChiSquared::eval(const SamplePair& samplePair_, int bin_) const {
-    double predVal = samplePair_.model->getHistogram().binList[bin_].content;
-    double dataVal = samplePair_.data->getHistogram().binList[bin_].content;
+    double predVal = samplePair_.model->getHistogram().getBinContentList()[bin_].sumWeights;
+    double dataVal = samplePair_.data->getHistogram().getBinContentList()[bin_].sumWeights;
     if( predVal == 0 ){
       // should not be the case right?
       LogAlert << "Zero MC events in bin " << bin_ << ". predVal = " << predVal << ", dataVal = " << dataVal

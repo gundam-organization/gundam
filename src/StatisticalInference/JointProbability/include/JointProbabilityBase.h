@@ -23,7 +23,7 @@ namespace JointProbability{
     // classic binned llh. Could be overriden to introduce correlations for instance.
     [[nodiscard]] virtual double eval( const SamplePair& samplePair_ ) const{
       double out{0};
-      int nBins = int(samplePair_.model->getBinning().getBinList().size());
+      int nBins = int(samplePair_.model->getHistogram().getNbBins());
       for( int iBin = 0; iBin < nBins; iBin++ ){ out += this->eval(samplePair_, iBin); }
       return out;
     }

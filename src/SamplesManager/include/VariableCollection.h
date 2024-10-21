@@ -6,7 +6,7 @@
 #define GUNDAM_VARIABLE_COLLECTION_H
 
 #include "VariableHolder.h"
-#include "BinSet.h"
+#include "Bin.h"
 
 #include "GenericToolbox.Utils.h" // Any objects
 
@@ -45,7 +45,6 @@ public:
   // bin tools
   [[nodiscard]] bool isInBin(const Bin& bin_) const;
   [[nodiscard]] int findBinIndex(const std::vector<Bin>& binList_) const;
-  [[nodiscard]] int findBinIndex(const BinSet& binSet_) const;
 
   // printouts
   [[nodiscard]] std::string getSummary() const;
