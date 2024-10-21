@@ -259,6 +259,15 @@ void Propagator::copyEventsFrom(const Propagator& src_){
   _eventDialCache_.fillCacheEntries( _sampleSet_ );
 }
 
+#if GUNDAM_USING_CACHE_MANAGER
+void Propagator::initializeCacheManger(){
+  // After all the data has been loaded.  Specifically, this must be after
+  // the MC has been copied for the Asimov fit, or the "data" use the MC
+  // reweighting cache.  This must also be before the first use of
+  // reweightMcEvents that is done using the GPU.
+  Cache::Manager::Build( _sampleSet_, _eventDialCache_ );
+}
+#endif
 
 
 // Protected

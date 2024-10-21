@@ -68,6 +68,10 @@ public:
   void printBreakdowns() const;
   void writeEventRates(const GenericToolbox::TFilePath& saveDir_) const;
 
+#if GUNDAM_USING_CACHE_MANAGER
+  void initializeCacheManger();
+#endif
+
   // public members
   GenericToolbox::Time::AveragedTimer<10> reweightTimer;
   GenericToolbox::Time::AveragedTimer<10> refillHistogramTimer;

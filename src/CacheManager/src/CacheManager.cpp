@@ -179,8 +179,7 @@ bool Cache::Manager::HasGPU(bool dump) {
   return Cache::Parameters::HasGPU(dump);
 }
 
-bool Cache::Manager::Build(SampleSet& sampleList,
-                           EventDialCache& eventDials) {
+bool Cache::Manager::Build(SampleSet& sampleList, EventDialCache& eventDials) {
   if (not GundamGlobals::isCacheManagerEnabled()) return false;
 
   LogInfo << "Build the internal caches " << std::endl;
