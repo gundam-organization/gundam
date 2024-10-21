@@ -105,6 +105,16 @@ void Histogram::refillHistogram(int iThread_){
   double weightBuffer;
 
 #ifdef GUNDAM_USING_CACHE_MANAGER
+  if( _cacheManagerValidFlagPtr_ != nullptr and *_cacheManagerValidFlagPtr_ ){
+    // This can be slow (~10 usec for 5000 bins) when data must be copied
+    // from the device, but it makes sure that the results are copied from
+    // the device when they have changed. The values pointed to by
+    // _CacheManagerValue_ and _CacheManagerValid_ are inside the summed
+    // index cache (a bit of evil coding here), and are updated by the
+    // cache.  The update is triggered by (*_CacheManagerUpdate_)().
+    if( _cacheManagerUpdateFctPtr_ != nullptr ){ (*_cacheManagerUpdateFctPtr_)(); }
+  }
+
   // avoid checking those variables at each bin
   bool isCacheManagerEnabled{_cacheManagerIndex_ >= 0 and _cacheManagerValidFlagPtr_ and (*_cacheManagerValidFlagPtr_)};
   bool useCpuCalculation{not isCacheManagerEnabled or GundamGlobals::isForceCpuCalculation()};
@@ -115,18 +125,8 @@ void Histogram::refillHistogram(int iThread_){
   LogDebug << GET_VAR_NAME_VALUE(this->isCacheManagerEnabled()) << std::endl;
   LogDebug << GET_VAR_NAME_VALUE(_cacheManagerIndex_) << std::endl;
   LogDebug << GET_VAR_NAME_VALUE(_cacheManagerValidFlagPtr_) << std::endl;
-  LogDebugIf(_cacheManagerIndex_ >= 0) << GET_VAR_NAME_VALUE(*_cacheManagerValidFlagPtr_) << std::endl;
+  if(_cacheManagerIndex_ >= 0) LogDebug << GET_VAR_NAME_VALUE(*_cacheManagerValidFlagPtr_) << std::endl;
 //  LogThrow("debug stop");
-
-  if( _cacheManagerValidFlagPtr_ != nullptr and *_cacheManagerValidFlagPtr_ ){
-    // This can be slow (~10 usec for 5000 bins) when data must be copied
-    // from the device, but it makes sure that the results are copied from
-    // the device when they have changed. The values pointed to by
-    // _CacheManagerValue_ and _CacheManagerValid_ are inside the summed
-    // index cache (a bit of evil coding here), and are updated by the
-    // cache.  The update is triggered by (*_CacheManagerUpdate_)().
-    if( _cacheManagerUpdateFctPtr_ != nullptr ){ (*_cacheManagerUpdateFctPtr_)(); }
-  }
 #endif
 
   for( auto [binContent, binContext] : loop(bounds.beginIndex, bounds.endIndex) ){
@@ -147,7 +147,10 @@ void Histogram::refillHistogram(int iThread_){
 #ifdef GUNDAM_USING_CACHE_MANAGER
     }
 
-    if( isCacheManagerEnabled ){
+    if( _cacheManagerValidFlagPtr_ != nullptr
+        and (*_cacheManagerValidFlagPtr_)
+        and _cacheManagerSumWeightsArray_
+        and _cacheManagerIndex_ >= 0 ){
 
       if( not useCpuCalculation ){
         // copy the result as
