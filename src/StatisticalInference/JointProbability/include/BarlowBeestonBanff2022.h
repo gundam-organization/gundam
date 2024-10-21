@@ -214,7 +214,11 @@ namespace JointProbability{
     LogWarning << "Creating nominal MC histogram for sample \"" << modelSample_.getName() << "\"" << std::endl;
     auto& nomHistErr = nomMcUncertList[&modelSample_];
     nomHistErr.reserve( modelSample_.getHistogram().getNbBins() );
+#if HAS_CPP_17
     for( auto [binContent, binContext] : modelSample_.getHistogram().loop() ){
+#else
+    for( auto element : modelSample_.getHistogram().loop() ){ auto& binContent = std::get<0>(element); auto& binContext = std::get<1>(element);
+#endif
       nomHistErr.emplace_back( binContent.sqrtSumSqWeights );
       LogTraceIf(verboseLevel >= 2) << modelSample_.getName() << ": " << binContext.bin.getIndex() << " -> " << binContent.sumWeights << " / " << binContent.sqrtSumSqWeights << std::endl;
     }

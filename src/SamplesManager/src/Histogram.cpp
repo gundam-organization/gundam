@@ -32,8 +32,11 @@ void Histogram::build(const JsonType& binningConfig_){
 void Histogram::throwEventMcError(){
   // event by event poisson throw -> takes into account the finite amount of stat in MC
 
+#if HAS_CPP_17
   for( auto [binContent, binContext] : loop() ){
-
+#else
+  for( auto element : loop() ){ auto& binContent = std::get<0>(element); auto& binContext = std::get<1>(element);
+#endif
     binContent.sumWeights = 0;
     binContent.sqrtSumSqWeights = 0;
     for (auto *eventPtr: binContext.eventPtrList) {
@@ -54,7 +57,12 @@ void Histogram::throwStatError(bool useGaussThrow_){
    * This is to convert "Asimov" histogram to toy-experiment (pseudo-data), i.e. with statistical fluctuations
    * */
   double nCounts;
+
+#if HAS_CPP_17
   for( auto [binContent, binContext] : loop() ){
+#else
+  for( auto element : loop() ){ auto& binContent = std::get<0>(element); auto& binContext = std::get<1>(element);
+#endif
     if( binContent.sumWeights == 0 ){
       // this should not happen.
       continue;
@@ -118,7 +126,11 @@ void Histogram::refillHistogram(int iThread_){
   bool useCpuCalculation{not isCacheManagerEnabled or GundamGlobals::isForceCpuCalculation()};
 #endif
 
+#if HAS_CPP_17
   for( auto [binContent, binContext] : loop(bounds.beginIndex, bounds.endIndex) ){
+#else
+  for( auto element : loop(bounds.beginIndex, bounds.endIndex) ){ auto& binContent = std::get<0>(element); auto& binContext = std::get<1>(element);
+#endif
 
 #ifdef GUNDAM_USING_CACHE_MANAGER
     if( useCpuCalculation ){
