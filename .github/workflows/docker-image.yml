@@ -20,7 +20,7 @@ jobs:
     # save CPU time on GitHub
     # either it's a push to main
     # either ( disable for draft PRs && correctly labeled )
-    if: ${{ github.event_name == 'push' || github.event.label.name == 'enable workflow' }}
+    if: ${{ github.event_name == 'push' || github.event.pull_request.labels.*.name == 'enable workflow' }}
 
     steps:
     - uses: actions/checkout@v4
