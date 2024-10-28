@@ -333,6 +333,8 @@ void LikelihoodInterface::loadModelPropagator(){
   Cache::Manager::SetEventDialSetPtr( _modelPropagator_.getEventDialCache() );
 
   Cache::Manager::Build();
+
+  Cache::Manager::SetIsHistContentCopyEnabled( true );
 #endif
 
   LogInfo << "Propagating prior parameters on events..." << std::endl;

@@ -63,6 +63,8 @@ public:
   /// Set addresses of the Propagator objects the CacheManager should take care of
   static void SetSampleSetPtr(SampleSet& sampleSet_){ fSampleSetPtr = &sampleSet_; }
   static void SetEventDialSetPtr(EventDialCache& eventDialCache_){ fEventDialCachePtr = &eventDialCache_; }
+  static void SetIsHistContentCopyEnabled(bool fIsHistContentCopyEnabled_){ fIsHistContentCopyEnabled = fIsHistContentCopyEnabled_; }
+  static void SetIsEventWeightCopyEnabled(bool fIsEventWeightCopyEnabled_){ fIsEventWeightCopyEnabled = fIsEventWeightCopyEnabled_; }
 
   /// Build the cache and load it into the device.  This is used in
   /// Propagator.cpp to fill the constants needed to for the calculations.
@@ -97,8 +99,8 @@ public:
   static bool PropagateParameters();
 
   /// Drop to CPU
-  static bool DropEventWeights();
-  static bool DropHistogramsContent();
+  static bool CopyEventWeights();
+  static bool CopyHistogramsContent();
 
 
 private:
@@ -188,6 +190,8 @@ private:
   static SampleSet* fSampleSetPtr;
   static EventDialCache* fEventDialCachePtr;
   static std::vector<CacheSampleHistFiller> fSampleHistFillerList;
+  static bool fIsHistContentCopyEnabled;
+  static bool fIsEventWeightCopyEnabled;
 
   /// The cache for parameter weights (on the GPU).
   std::unique_ptr<Cache::Parameters> fParameterCache;
