@@ -299,7 +299,7 @@ bool Cache::Manager::Build() {
   // Count the total number of histogram cells.
   config.histBins = 0;
   for(const Sample& sample : fSampleSetPtr->getSampleList() ){
-    int cells = sample.getHistogram().getNbBins() + 2; // GetNcells() of TH1D
+    int cells = sample.getHistogram().getNbBins(); // GetNcells() of TH1D
     LogInfo  << "Add histogram for " << sample.getName()
              << " with " << cells
              << " cells (includes under/over-flows)" << std::endl;
@@ -676,6 +676,9 @@ bool Cache::Manager::Update() {
     LogThrow("Probable problem putting dials in cache");
   }
 
+  fSampleHistFillerList.clear();
+  fSampleHistFillerList.reserve( fSampleSetPtr->getSampleList().size() );
+
   // Add the histogram cells to the cache.  THIS CODE IS SUSPECT SINCE IT IS
   // SAVING ADDRESSES OF CLASS FIELDS.  This *will* be OK since the fields
   // are not going to be moved, and is needed for a huge win in efficiency,
@@ -687,22 +690,10 @@ bool Cache::Manager::Update() {
              << " with " << sample.getEventList().size()
              << " events" << std::endl;
     int thisHist = nextHist;
-    sample.getHistogram().setCacheManagerIndex(thisHist);
-    sample.getHistogram().setCacheManagerValuePointer(
-        Cache::Manager::Get()->GetHistogramsCache()
-            .GetSumsPointer());
-    sample.getHistogram().setCacheManagerValue2Pointer(
-        Cache::Manager::Get()->GetHistogramsCache()
-            .GetSums2Pointer());
-    sample.getHistogram().setCacheManagerValidPointer(
-        Cache::Manager::Get()->GetHistogramsCache()
-            .GetSumsValidPointer());
-    sample.getHistogram().setCacheManagerUpdatePointer(
-        [](){
-          Cache::Manager::Get()->GetHistogramsCache().GetSum(0);
-          Cache::Manager::Get()->GetHistogramsCache().GetSum2(0);
-        });
-    int cells = sample.getHistogram().getNbBins() + 2;
+
+    fSampleHistFillerList.emplace_back( &sample.getHistogram(), thisHist );
+
+    int cells = sample.getHistogram().getNbBins();
     nextHist += cells;
     /// ARE ALL OF THE EVENTS HANDLED?
     for (Event& event
@@ -795,11 +786,13 @@ bool Cache::Manager::PropagateParameters(){
   if( fUpdateRequired ){ Cache::Manager::Update(); }
 
   isSuccess = Cache::Manager::Fill();
+  if( not isSuccess ){ return false; }
 
   // need to handle pull of data (event weights or bin content)
-  DropHistogramsContent();
+  isSuccess = Cache::Manager::DropHistogramsContent();
+  if( not isSuccess ){ return false; }
 
-  return isSuccess;
+  return true;
 }
 bool Cache::Manager::DropEventWeights(){
   bool isSuccess{false};
@@ -809,90 +802,33 @@ bool Cache::Manager::DropEventWeights(){
   return isSuccess;
 }
 bool Cache::Manager::DropHistogramsContent(){
-  bool isSuccess{false};
 
-  LogThrowIf( fSampleSetPtr == nullptr );
+  // This can be slow (~10 usec for 5000 bins) when data must be copied
+  // from the device, but it makes sure that the results are copied from
+  // the device when they have changed. The values pointed to by
+  // _CacheManagerValue_ and _CacheManagerValid_ are inside the summed
+  // index cache (a bit of evil coding here), and are updated by the
+  // cache.  The update is triggered by (*_CacheManagerUpdate_)().
+  Cache::Manager::Get()->GetHistogramsCache().GetSum(0);
+  Cache::Manager::Get()->GetHistogramsCache().GetSum2(0);
 
-  for( auto& sample : fSampleSetPtr->getSampleList() ){
-
-    if( sample.getHistogram().getCacheManagerUpdateFctPtr() != nullptr ){
-      // This can be slow (~10 usec for 5000 bins) when data must be copied
-      // from the device, but it makes sure that the results are copied from
-      // the device when they have changed. The values pointed to by
-      // _CacheManagerValue_ and _CacheManagerValid_ are inside the summed
-      // index cache (a bit of evil coding here), and are updated by the
-      // cache.  The update is triggered by (*_CacheManagerUpdate_)().
-      (*sample.getHistogram().getCacheManagerUpdateFctPtr())();
-    }
-
-    // avoid checking those variables at each bin
-    bool isCacheManagerEnabled{
-      sample.getHistogram().getCacheManagerIndex() >= 0
-      and sample.getHistogram().getCacheManagerValidFlagPtr() != nullptr
-      and (*sample.getHistogram().getCacheManagerValidFlagPtr())
-    };
-
-#if HAS_CPP_17
-    for( auto [binContent, binContext] : sample.getHistogram().loop() ){
-#else
-    for( auto element : sample.getHistogram().loop() ){ auto& binContent = std::get<0>(element); auto& binContext = std::get<1>(element);
-#endif
-
-      if( isCacheManagerEnabled and sample.getHistogram().getCacheManagerSumSqWeightsArray() != nullptr ){
-
-        binContent.sumWeights = sample.getHistogram().getCacheManagerSumWeightsArray()[sample.getHistogram().getCacheManagerIndex() + binContext.bin.getIndex()];
-        binContent.sqrtSumSqWeights = sample.getHistogram().getCacheManagerSumSqWeightsArray()[sample.getHistogram().getCacheManagerIndex() + binContext.bin.getIndex()];
-        binContent.sqrtSumSqWeights = sqrt(binContent.sqrtSumSqWeights);
-
-//        if( not useCpuCalculation ){
-//          // copy the result as
-//          binContent.sumWeights = _cacheManagerSumWeightsArray_[_cacheManagerIndex_ + binContext.bin.getIndex()];
-//          binContent.sqrtSumSqWeights = _cacheManagerSumSqWeightsArray_[_cacheManagerIndex_ + binContext.bin.getIndex()];
-//          binContent.sqrtSumSqWeights = sqrt(binContent.sqrtSumSqWeights);
-//        }
-//        else{
-//          // container used for debugging
-//          Histogram::BinContent cacheManagerValue;
-//
-//          LogThrowIf(_cacheManagerSumWeightsArray_ == nullptr);
-//          cacheManagerValue.sumWeights = _cacheManagerSumWeightsArray_[_cacheManagerIndex_ + binContext.bin.getIndex()];
-//          cacheManagerValue.sqrtSumSqWeights = _cacheManagerSumSqWeightsArray_[_cacheManagerIndex_ + binContext.bin.getIndex()];
-//          cacheManagerValue.sqrtSumSqWeights = sqrt(cacheManagerValue.sqrtSumSqWeights);
-//
-//          // Parallel calculations of the histogramming have been run.  Make sure
-//          // they are the same.
-//          bool problemFound = false;
-//          if (not GundamUtils::almostEqual(cacheManagerValue.sumWeights,(binContent.sumWeights))) {
-//            double magnitude = std::abs(cacheManagerValue.sumWeights) + std::abs(binContent.sumWeights);
-//            double delta = std::abs(cacheManagerValue.sumWeights - binContent.sumWeights);
-//            if (magnitude > 0.0) delta /= 0.5*magnitude;
-//            LogError << "Incorrect histogram content --"
-//                     << " Content: " << cacheManagerValue.sumWeights << "!=" << binContent.sumWeights
-//                     << " Error: " << cacheManagerValue.sqrtSumSqWeights << "!=" << binContent.sqrtSumSqWeights
-//                     << " Precision: " << delta
-//                     << std::endl;
-//            problemFound = true;
-//          }
-//          if (not GundamUtils::almostEqual(cacheManagerValue.sqrtSumSqWeights, (binContent.sqrtSumSqWeights))) {
-//            double magnitude = std::abs(cacheManagerValue.sqrtSumSqWeights) + std::abs(binContent.sqrtSumSqWeights);
-//            double delta = std::abs(cacheManagerValue.sqrtSumSqWeights - binContent.sqrtSumSqWeights);
-//            if (magnitude > 0.0) delta /= 0.5*magnitude;
-//            LogError << "Incorrect histogram error --"
-//                     << " Content: " << cacheManagerValue.sumWeights << "!=" << binContent.sumWeights
-//                     << " Error: " << cacheManagerValue.sqrtSumSqWeights << "!=" << binContent.sqrtSumSqWeights
-//                     << " Precision: " << delta
-//                     << std::endl;
-//            problemFound = true;
-//          }
-//          if( false and problemFound ){ std::exit(EXIT_FAILURE); }// For debugging
-//        }
-
-      }
-    }
-
+  if( Cache::Manager::Get()->GetHistogramsCache().GetSumsValidPointer() == nullptr
+    or not (*Cache::Manager::Get()->GetHistogramsCache().GetSumsValidPointer())
+  ){
+    // invalid sum
+    return false;
   }
 
-  return isSuccess;
+  LogThrowIf( fSampleSetPtr == nullptr, "SampleSet hasn't been set." );
+
+  for( auto& histFiller : fSampleHistFillerList ){
+    histFiller.pullHistContent(
+        Cache::Manager::Get()->GetHistogramsCache().GetSumsPointer(),
+        Cache::Manager::Get()->GetHistogramsCache().GetSums2Pointer()
+    );
+  }
+
+  return true;
 }
 
 int Cache::Manager::ParameterIndex(const Parameter* fp) {

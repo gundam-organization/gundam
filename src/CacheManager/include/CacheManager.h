@@ -1,6 +1,7 @@
 #ifndef CacheManager_h_seen
 #define CacheManager_h_seen
 
+#include "CacheSampleHistFiller.h"
 #include "CacheParameters.h"
 #include "CacheWeights.h"
 
@@ -36,6 +37,7 @@ namespace Cache {
 #include "hemi/array.h"
 
 #include <map>
+#include <vector>
 
 namespace Cache {
   class Manager;
@@ -185,6 +187,7 @@ private:
   /// pointers to the corresponding Propagator structure
   static SampleSet* fSampleSetPtr;
   static EventDialCache* fEventDialCachePtr;
+  static std::vector<CacheSampleHistFiller> fSampleHistFillerList;
 
   /// The cache for parameter weights (on the GPU).
   std::unique_ptr<Cache::Parameters> fParameterCache;
