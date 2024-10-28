@@ -55,6 +55,9 @@ public:
   /// before the cached weights can be used.  This is used in Propagator.cpp.
   static bool Fill();
 
+  /// Dedicated setter for fUpdateRequired flag
+  static void SetUpdateRequired(bool isUpdateRequired_){ fUpdateRequired = isUpdateRequired_; };
+
   /// Set addresses of the Propagator objects the CacheManager should take care of
   static void SetSampleSetPtr(SampleSet& sampleSet_){ fSampleSetPtr = &sampleSet_; }
   static void SetEventDialSetPtr(EventDialCache& eventDialCache_){ fEventDialCachePtr = &eventDialCache_; }
@@ -71,7 +74,7 @@ public:
 
   /// Flag that the Cache::Manager internal caches must be updated from the
   /// SampleSet and EventDialCache before it can be used.
-  static void UpdateRequired();
+  static void RequireUpdate(){ SetUpdateRequired(true); }
 
   /// This returns the index of the parameter in the cache.  If the
   /// parameter isn't defined, this will return a negative value.

@@ -423,13 +423,9 @@ bool Cache::Manager::Build() {
     return false;
   }
 
-  Cache::Manager::UpdateRequired();
+  Cache::Manager::RequireUpdate();
 
   return true;
-}
-
-void Cache::Manager::UpdateRequired() {
-  fUpdateRequired = true;
 }
 
 
@@ -794,7 +790,12 @@ bool Cache::Manager::PropagateParameters(){
 
   bool isSuccess{false};
 
+  if( Cache::Manager::Update() ){
+    isSuccess = Cache::Manager::Fill();
+  }
 
+  //
+  if( GundamGlobals::isForceCpuCalculation()){ isSuccess = false; }
 
   return isSuccess;
 }
