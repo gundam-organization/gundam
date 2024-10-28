@@ -133,6 +133,11 @@ void Propagator::buildDialCache(){
   }
 }
 void Propagator::propagateParameters(){
+#ifdef GUNDAM_USING_CACHE_MANAGER
+  bool usedCacheManager{false};
+  usedCacheManager = Cache::Manager::PropagateParameters();
+  if( usedCacheManager and not GundamGlobals::isForceCpuCalculation() ){ return; }
+#endif
   this->reweightEvents();
   this->refillHistograms();
 }
@@ -144,21 +149,10 @@ void Propagator::reweightEvents() {
 
   updateDialState();
 
-  bool usedGPU{false};
-#ifdef GUNDAM_USING_CACHE_MANAGER
-  if( GundamGlobals::isCacheManagerEnabled() ) {
-    if (Cache::Manager::Update()) {
-      usedGPU = Cache::Manager::Fill();
-    }
-    if ( GundamGlobals::isForceCpuCalculation()) usedGPU = false;
+  if( not _devSingleThreadReweight_ ){
+    _threadPool_.runJob("Propagator::reweightEvents");
   }
-#endif
-  if( not usedGPU ){
-    if( not _devSingleThreadReweight_ ){
-      _threadPool_.runJob("Propagator::reweightEvents");
-    }
-    else{ this->reweightEvents(-1); }
-  }
+  else{ this->reweightEvents(-1); }
 
   reweightTimer.stop();
 }

@@ -430,8 +430,6 @@ bool Cache::Manager::Build() {
 
 
 bool Cache::Manager::Update() {
-  if (not fUpdateRequired) return true;
-
   // In case the cache isn't allocated (usually because it's turned off on
   // the command line), but this is a safety check.
   if (!Cache::Manager::Get()) {
@@ -441,7 +439,7 @@ bool Cache::Manager::Update() {
   }
 
   // This is the updated that is required!
-  fUpdateRequired = false;
+  SetUpdateRequired( false );
 
   LogInfo << "Update the internal caches" << std::endl;
 
@@ -790,12 +788,109 @@ bool Cache::Manager::PropagateParameters(){
 
   bool isSuccess{false};
 
-  if( Cache::Manager::Update() ){
-    isSuccess = Cache::Manager::Fill();
-  }
+  // if disabled, leave
+  if( Cache::Manager::Get() == nullptr ){ return false; }
 
-  //
-  if( GundamGlobals::isForceCpuCalculation()){ isSuccess = false; }
+  // update the cache if necessary
+  if( fUpdateRequired ){ Cache::Manager::Update(); }
+
+  isSuccess = Cache::Manager::Fill();
+
+  // need to handle pull of data (event weights or bin content)
+  DropHistogramsContent();
+
+  return isSuccess;
+}
+bool Cache::Manager::DropEventWeights(){
+  bool isSuccess{false};
+
+
+
+  return isSuccess;
+}
+bool Cache::Manager::DropHistogramsContent(){
+  bool isSuccess{false};
+
+  LogThrowIf( fSampleSetPtr == nullptr );
+
+  for( auto& sample : fSampleSetPtr->getSampleList() ){
+
+    if( sample.getHistogram().getCacheManagerUpdateFctPtr() != nullptr ){
+      // This can be slow (~10 usec for 5000 bins) when data must be copied
+      // from the device, but it makes sure that the results are copied from
+      // the device when they have changed. The values pointed to by
+      // _CacheManagerValue_ and _CacheManagerValid_ are inside the summed
+      // index cache (a bit of evil coding here), and are updated by the
+      // cache.  The update is triggered by (*_CacheManagerUpdate_)().
+      (*sample.getHistogram().getCacheManagerUpdateFctPtr())();
+    }
+
+    // avoid checking those variables at each bin
+    bool isCacheManagerEnabled{
+      sample.getHistogram().getCacheManagerIndex() >= 0
+      and sample.getHistogram().getCacheManagerValidFlagPtr() != nullptr
+      and (*sample.getHistogram().getCacheManagerValidFlagPtr())
+    };
+
+#if HAS_CPP_17
+    for( auto [binContent, binContext] : sample.getHistogram().loop() ){
+#else
+    for( auto element : sample.getHistogram().loop() ){ auto& binContent = std::get<0>(element); auto& binContext = std::get<1>(element);
+#endif
+
+      if( isCacheManagerEnabled and sample.getHistogram().getCacheManagerSumSqWeightsArray() != nullptr ){
+
+        binContent.sumWeights = sample.getHistogram().getCacheManagerSumWeightsArray()[sample.getHistogram().getCacheManagerIndex() + binContext.bin.getIndex()];
+        binContent.sqrtSumSqWeights = sample.getHistogram().getCacheManagerSumSqWeightsArray()[sample.getHistogram().getCacheManagerIndex() + binContext.bin.getIndex()];
+        binContent.sqrtSumSqWeights = sqrt(binContent.sqrtSumSqWeights);
+
+//        if( not useCpuCalculation ){
+//          // copy the result as
+//          binContent.sumWeights = _cacheManagerSumWeightsArray_[_cacheManagerIndex_ + binContext.bin.getIndex()];
+//          binContent.sqrtSumSqWeights = _cacheManagerSumSqWeightsArray_[_cacheManagerIndex_ + binContext.bin.getIndex()];
+//          binContent.sqrtSumSqWeights = sqrt(binContent.sqrtSumSqWeights);
+//        }
+//        else{
+//          // container used for debugging
+//          Histogram::BinContent cacheManagerValue;
+//
+//          LogThrowIf(_cacheManagerSumWeightsArray_ == nullptr);
+//          cacheManagerValue.sumWeights = _cacheManagerSumWeightsArray_[_cacheManagerIndex_ + binContext.bin.getIndex()];
+//          cacheManagerValue.sqrtSumSqWeights = _cacheManagerSumSqWeightsArray_[_cacheManagerIndex_ + binContext.bin.getIndex()];
+//          cacheManagerValue.sqrtSumSqWeights = sqrt(cacheManagerValue.sqrtSumSqWeights);
+//
+//          // Parallel calculations of the histogramming have been run.  Make sure
+//          // they are the same.
+//          bool problemFound = false;
+//          if (not GundamUtils::almostEqual(cacheManagerValue.sumWeights,(binContent.sumWeights))) {
+//            double magnitude = std::abs(cacheManagerValue.sumWeights) + std::abs(binContent.sumWeights);
+//            double delta = std::abs(cacheManagerValue.sumWeights - binContent.sumWeights);
+//            if (magnitude > 0.0) delta /= 0.5*magnitude;
+//            LogError << "Incorrect histogram content --"
+//                     << " Content: " << cacheManagerValue.sumWeights << "!=" << binContent.sumWeights
+//                     << " Error: " << cacheManagerValue.sqrtSumSqWeights << "!=" << binContent.sqrtSumSqWeights
+//                     << " Precision: " << delta
+//                     << std::endl;
+//            problemFound = true;
+//          }
+//          if (not GundamUtils::almostEqual(cacheManagerValue.sqrtSumSqWeights, (binContent.sqrtSumSqWeights))) {
+//            double magnitude = std::abs(cacheManagerValue.sqrtSumSqWeights) + std::abs(binContent.sqrtSumSqWeights);
+//            double delta = std::abs(cacheManagerValue.sqrtSumSqWeights - binContent.sqrtSumSqWeights);
+//            if (magnitude > 0.0) delta /= 0.5*magnitude;
+//            LogError << "Incorrect histogram error --"
+//                     << " Content: " << cacheManagerValue.sumWeights << "!=" << binContent.sumWeights
+//                     << " Error: " << cacheManagerValue.sqrtSumSqWeights << "!=" << binContent.sqrtSumSqWeights
+//                     << " Precision: " << delta
+//                     << std::endl;
+//            problemFound = true;
+//          }
+//          if( false and problemFound ){ std::exit(EXIT_FAILURE); }// For debugging
+//        }
+
+      }
+    }
+
+  }
 
   return isSuccess;
 }

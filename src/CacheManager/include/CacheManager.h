@@ -94,6 +94,11 @@ public:
   /// Same as Propagator::propagateParameters()
   static bool PropagateParameters();
 
+  /// Drop to CPU
+  static bool DropEventWeights();
+  static bool DropHistogramsContent();
+
+
 private:
   // Hold the configuration that will be used to construct the manager
   // (singleton).  This information was originally passed as arguments to

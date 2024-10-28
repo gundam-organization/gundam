@@ -65,7 +65,12 @@ public:
   void setCacheManagerValidPointer(const bool* v) { _cacheManagerValidFlagPtr_ = v;}
   void setCacheManagerUpdatePointer(void (*p)()) { _cacheManagerUpdateFctPtr_ = p;}
 
+  [[nodiscard]] void (*getCacheManagerUpdateFctPtr() const)() { return _cacheManagerUpdateFctPtr_; }
   [[nodiscard]] int getCacheManagerIndex() const {return _cacheManagerIndex_;}
+  [[nodiscard]] const bool* getCacheManagerValidFlagPtr() const { return _cacheManagerValidFlagPtr_; }
+  [[nodiscard]] const double* getCacheManagerSumWeightsArray() const { return _cacheManagerSumWeightsArray_; }
+  [[nodiscard]] const double* getCacheManagerSumSqWeightsArray() const { return _cacheManagerSumSqWeightsArray_; }
+
 private:
   // An "opaque" index into the cache that is used to simplify bookkeeping.
   int _cacheManagerIndex_{-1};

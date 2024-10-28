@@ -112,93 +112,22 @@ void Histogram::refillHistogram(int iThread_){
   // avoid using [] operator for each access. Use the memory address directly
   double weightBuffer;
 
-#ifdef GUNDAM_USING_CACHE_MANAGER
-  // This can be slow (~10 usec for 5000 bins) when data must be copied
-  // from the device, but it makes sure that the results are copied from
-  // the device when they have changed. The values pointed to by
-  // _CacheManagerValue_ and _CacheManagerValid_ are inside the summed
-  // index cache (a bit of evil coding here), and are updated by the
-  // cache.  The update is triggered by (*_CacheManagerUpdate_)().
-  if( _cacheManagerUpdateFctPtr_ != nullptr ){ (*_cacheManagerUpdateFctPtr_)(); }
-
-  // avoid checking those variables at each bin
-  bool isCacheManagerEnabled{_cacheManagerIndex_ >= 0 and _cacheManagerValidFlagPtr_ and (*_cacheManagerValidFlagPtr_)};
-  bool useCpuCalculation{not isCacheManagerEnabled or GundamGlobals::isForceCpuCalculation()};
-#endif
-
 #if HAS_CPP_17
   for( auto [binContent, binContext] : loop(bounds.beginIndex, bounds.endIndex) ){
 #else
   for( auto element : loop(bounds.beginIndex, bounds.endIndex) ){ auto& binContent = std::get<0>(element); auto& binContext = std::get<1>(element);
 #endif
 
-#ifdef GUNDAM_USING_CACHE_MANAGER
-    if( useCpuCalculation ){
-#endif
-      // reset
-      binContent.sumWeights = 0;
-      binContent.sqrtSumSqWeights = 0;
-      for( auto *eventPtr: binContext.eventPtrList ){
-        weightBuffer = eventPtr->getEventWeight();
-        binContent.sumWeights += weightBuffer;
-        binContent.sqrtSumSqWeights += weightBuffer * weightBuffer;
-      }
-
-      binContent.sqrtSumSqWeights = std::sqrt(binContent.sqrtSumSqWeights);
-#ifdef GUNDAM_USING_CACHE_MANAGER
+    // reset
+    binContent.sumWeights = 0;
+    binContent.sqrtSumSqWeights = 0;
+    for( auto *eventPtr: binContext.eventPtrList ){
+      weightBuffer = eventPtr->getEventWeight();
+      binContent.sumWeights += weightBuffer;
+      binContent.sqrtSumSqWeights += weightBuffer * weightBuffer;
     }
 
-    if( _cacheManagerValidFlagPtr_ != nullptr
-        and (*_cacheManagerValidFlagPtr_)
-        and _cacheManagerSumWeightsArray_
-        and _cacheManagerIndex_ >= 0 ){
-
-      if( not useCpuCalculation ){
-        // copy the result as
-        LogThrowIf(_cacheManagerSumWeightsArray_ == nullptr);
-        binContent.sumWeights = _cacheManagerSumWeightsArray_[_cacheManagerIndex_ + binContext.bin.getIndex()];
-        binContent.sqrtSumSqWeights = _cacheManagerSumSqWeightsArray_[_cacheManagerIndex_ + binContext.bin.getIndex()];
-        binContent.sqrtSumSqWeights = sqrt(binContent.sqrtSumSqWeights);
-      }
-      else{
-        // container used for debugging
-        Histogram::BinContent cacheManagerValue;
-
-        LogThrowIf(_cacheManagerSumWeightsArray_ == nullptr);
-        cacheManagerValue.sumWeights = _cacheManagerSumWeightsArray_[_cacheManagerIndex_ + binContext.bin.getIndex()];
-        cacheManagerValue.sqrtSumSqWeights = _cacheManagerSumSqWeightsArray_[_cacheManagerIndex_ + binContext.bin.getIndex()];
-        cacheManagerValue.sqrtSumSqWeights = sqrt(cacheManagerValue.sqrtSumSqWeights);
-
-        // Parallel calculations of the histogramming have been run.  Make sure
-        // they are the same.
-        bool problemFound = false;
-        if (not GundamUtils::almostEqual(cacheManagerValue.sumWeights,(binContent.sumWeights))) {
-          double magnitude = std::abs(cacheManagerValue.sumWeights) + std::abs(binContent.sumWeights);
-          double delta = std::abs(cacheManagerValue.sumWeights - binContent.sumWeights);
-          if (magnitude > 0.0) delta /= 0.5*magnitude;
-          LogError << "Incorrect histogram content --"
-                   << " Content: " << cacheManagerValue.sumWeights << "!=" << binContent.sumWeights
-                   << " Error: " << cacheManagerValue.sqrtSumSqWeights << "!=" << binContent.sqrtSumSqWeights
-                   << " Precision: " << delta
-                   << std::endl;
-          problemFound = true;
-        }
-        if (not GundamUtils::almostEqual(cacheManagerValue.sqrtSumSqWeights, (binContent.sqrtSumSqWeights))) {
-          double magnitude = std::abs(cacheManagerValue.sqrtSumSqWeights) + std::abs(binContent.sqrtSumSqWeights);
-          double delta = std::abs(cacheManagerValue.sqrtSumSqWeights - binContent.sqrtSumSqWeights);
-          if (magnitude > 0.0) delta /= 0.5*magnitude;
-          LogError << "Incorrect histogram error --"
-                   << " Content: " << cacheManagerValue.sumWeights << "!=" << binContent.sumWeights
-                   << " Error: " << cacheManagerValue.sqrtSumSqWeights << "!=" << binContent.sqrtSumSqWeights
-                   << " Precision: " << delta
-                   << std::endl;
-          problemFound = true;
-        }
-        if( false and problemFound ){ std::exit(EXIT_FAILURE); }// For debugging
-      }
-
-    }
-#endif
+    binContent.sqrtSumSqWeights = std::sqrt(binContent.sqrtSumSqWeights);
 
   }
 
