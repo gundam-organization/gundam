@@ -46,6 +46,8 @@ LoggerInit([]{ Logger::setUserHeaderStr("[Cache::Manager]"); });
 Cache::Manager* Cache::Manager::fSingleton = nullptr;
 bool Cache::Manager::fUpdateRequired = true;
 std::map<const Parameter*, int> Cache::Manager::ParameterMap;
+SampleSet* Cache::Manager::fSampleSetPtr{nullptr};
+EventDialCache* Cache::Manager::fEventDialCachePtr{nullptr};
 
 Cache::Manager::Manager(const Cache::Manager::Configuration& config) {
   LogInfo  << "Creating cache manager" << std::endl;
@@ -179,9 +181,13 @@ bool Cache::Manager::HasGPU(bool dump) {
   return Cache::Parameters::HasGPU(dump);
 }
 
-bool Cache::Manager::Build(SampleSet& sampleList,
-                           EventDialCache& eventDials) {
+bool Cache::Manager::Build() {
   if (not GundamGlobals::isCacheManagerEnabled()) return false;
+
+  if( fSampleSetPtr == nullptr or fEventDialCachePtr == nullptr ){
+    LogError << "fSampleSetPtr or fEventDialCachePtr not set." << std::endl;
+    LogThrow("Can't Build()");
+  }
 
   LogInfo << "Build the internal caches " << std::endl;
 
@@ -201,7 +207,7 @@ bool Cache::Manager::Build(SampleSet& sampleList,
 
   int dialErrorCount = 0;     // This should *stay* zero.
   std::map<std::string, int> useCount;
-  for (EventDialCache::CacheEntry& elem : eventDials.getCache()) {
+  for (EventDialCache::CacheEntry& elem : fEventDialCachePtr->getCache()) {
     if (elem.event->getIndices().bin < 0) {
       LogThrow("Caching event that isn't used");
     }
@@ -292,7 +298,7 @@ bool Cache::Manager::Build(SampleSet& sampleList,
 
   // Count the total number of histogram cells.
   config.histBins = 0;
-  for(const Sample& sample : sampleList.getSampleList() ){
+  for(const Sample& sample : fSampleSetPtr->getSampleList() ){
     int cells = sample.getHistogram().getNbBins() + 2; // GetNcells() of TH1D
     LogInfo  << "Add histogram for " << sample.getName()
              << " with " << cells
@@ -427,8 +433,7 @@ void Cache::Manager::UpdateRequired() {
 }
 
 
-bool Cache::Manager::Update(SampleSet& sampleList,
-                            EventDialCache& eventDials) {
+bool Cache::Manager::Update() {
   if (not fUpdateRequired) return true;
 
   // In case the cache isn't allocated (usually because it's turned off on
@@ -452,7 +457,7 @@ bool Cache::Manager::Update(SampleSet& sampleList,
   int usedResults = 0;
 
   // Add the dials in the EventDialCache to the internal cache.
-  for (EventDialCache::CacheEntry& elem : eventDials.getCache()) {
+  for (EventDialCache::CacheEntry& elem : fEventDialCachePtr->getCache()) {
     // Skip events that are not in a bin.
     if (elem.event->getIndices().bin < 0) continue;
     Event& event = *elem.event;
@@ -683,7 +688,7 @@ bool Cache::Manager::Update(SampleSet& sampleList,
   // but is officially "dangerous".
   LogInfo << "Add this histogram cells to the cache." << std::endl;
   int nextHist = 0;
-  for(Sample& sample : sampleList.getSampleList() ) {
+  for(Sample& sample : fSampleSetPtr->getSampleList() ) {
     LogInfo  << "Fill cache for " << sample.getName()
              << " with " << sample.getEventList().size()
              << " events" << std::endl;
@@ -725,8 +730,8 @@ bool Cache::Manager::Update(SampleSet& sampleList,
   }
 
   // If the event weight cap has been set, then pass it along
-  if (eventDials.getGlobalEventReweightCap().isEnabled) {
-    double cap = eventDials.getGlobalEventReweightCap().maxReweight;
+  if (fEventDialCachePtr->getGlobalEventReweightCap().isEnabled) {
+    double cap = fEventDialCachePtr->getGlobalEventReweightCap().maxReweight;
     if (std::isfinite(cap)) {
       Cache::Manager::Get()
           ->GetHistogramsCache().SetMaximumEventWeight(cap);
@@ -783,6 +788,15 @@ bool Cache::Manager::Fill() {
   cache->GetHistogramsCache().Apply();
 
   return true;
+}
+
+bool Cache::Manager::PropagateParameters(){
+
+  bool isSuccess{false};
+
+
+
+  return isSuccess;
 }
 
 int Cache::Manager::ParameterIndex(const Parameter* fp) {

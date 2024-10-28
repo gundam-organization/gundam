@@ -329,10 +329,10 @@ void LikelihoodInterface::loadModelPropagator(){
   // the MC has been copied for the Asimov fit, or the "data" use the MC
   // reweighting cache.  This must also be before the first use of
   // reweightMcEvents that is done using the GPU.
-  Cache::Manager::Build(
-      _modelPropagator_.getSampleSet(),
-      _modelPropagator_.getEventDialCache()
-  );
+  Cache::Manager::SetSampleSetPtr( _modelPropagator_.getSampleSet() );
+  Cache::Manager::SetEventDialSetPtr( _modelPropagator_.getEventDialCache() );
+
+  Cache::Manager::Build();
 #endif
 
   LogInfo << "Propagating prior parameters on events..." << std::endl;

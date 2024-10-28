@@ -147,7 +147,7 @@ void Propagator::reweightEvents() {
   bool usedGPU{false};
 #ifdef GUNDAM_USING_CACHE_MANAGER
   if( GundamGlobals::isCacheManagerEnabled() ) {
-    if (Cache::Manager::Update(getSampleSet(), getEventDialCache())) {
+    if (Cache::Manager::Update()) {
       usedGPU = Cache::Manager::Fill();
     }
     if ( GundamGlobals::isForceCpuCalculation()) usedGPU = false;

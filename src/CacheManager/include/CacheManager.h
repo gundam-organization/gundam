@@ -55,15 +55,19 @@ public:
   /// before the cached weights can be used.  This is used in Propagator.cpp.
   static bool Fill();
 
+  /// Set addresses of the Propagator objects the CacheManager should take care of
+  static void SetSampleSetPtr(SampleSet& sampleSet_){ fSampleSetPtr = &sampleSet_; }
+  static void SetEventDialSetPtr(EventDialCache& eventDialCache_){ fEventDialCachePtr = &eventDialCache_; }
+
   /// Build the cache and load it into the device.  This is used in
   /// Propagator.cpp to fill the constants needed to for the calculations.
-  static bool Build(SampleSet& sampleList, EventDialCache& eventDials);
+  static bool Build();
 
   /// Update the cache with the event and spline information.  This is
   /// called as part of Build, and can be called in other code if the cache
   /// needs to be changed.  It forages all of the information from the
   /// original sample list and event dials.
-  static bool Update(SampleSet& sampleList, EventDialCache& eventDials);
+  static bool Update();
 
   /// Flag that the Cache::Manager internal caches must be updated from the
   /// SampleSet and EventDialCache before it can be used.
@@ -82,7 +86,10 @@ public:
   static bool HasGPU(bool dump = false);
 
   /// Return the approximate allocated memory (e.g. on the GPU).
-  std::size_t GetResidentMemory() const {return fTotalBytes;}
+  [[nodiscard]] std::size_t GetResidentMemory() const {return fTotalBytes;}
+
+  /// Same as Propagator::propagateParameters()
+  static bool PropagateParameters();
 
 private:
   // Hold the configuration that will be used to construct the manager
@@ -166,6 +173,10 @@ private:
 
   /// Declare all of the actual GPU caches here.  There is one GPU, so this
   /// is the ONE place that everything is collected together.
+
+  /// pointers to the corresponding Propagator structure
+  static SampleSet* fSampleSetPtr;
+  static EventDialCache* fEventDialCachePtr;
 
   /// The cache for parameter weights (on the GPU).
   std::unique_ptr<Cache::Parameters> fParameterCache;
