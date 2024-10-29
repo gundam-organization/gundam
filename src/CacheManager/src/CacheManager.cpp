@@ -471,20 +471,6 @@ bool Cache::Manager::Update() {
 
     fEventWeightFillerList.emplace_back( elem.event, resultIndex );
 
-//    event.getCache().index = resultIndex;
-//    event.getCache().valuePtr = (Cache::Manager::Get()
-//        ->GetWeightsCache()
-//        .GetResultPointer(resultIndex));
-//    event.getCache().isValidPtr = (Cache::Manager::Get()
-//        ->GetWeightsCache()
-//        .GetResultValidPointer());
-//    event.getCache().updateCallbackPtr = (
-//        [](){
-//          LogTrace << "Copy event weights from Device to Host"
-//                   << std::endl;
-//          Cache::Manager::Get()->GetWeightsCache().GetResult(0);
-//        });
-
     // Get the initial value for this event and save it.
     double initialEventWeight = event.getWeights().base;
 
@@ -707,17 +693,6 @@ bool Cache::Manager::Update() {
 
     int cells = sample.getHistogram().getNbBins();
     nextHist += cells;
-    /// ARE ALL OF THE EVENTS HANDLED?
-//    for( Event& event : sample.getEventList() ){
-//      int eventIndex = event.getCache().index;
-//      int cellIndex = event.getIndices().bin;
-//      if (cellIndex < 0 || cells <= cellIndex) {
-//        LogThrow("Histogram bin out of range");
-//      }
-//      int theEntry = thisHistIndexOffset + cellIndex;
-//      Cache::Manager::Get()->GetHistogramsCache()
-//          .SetEventIndex(eventIndex,theEntry);
-//    }
 
     for( auto& eventFiller : fEventWeightFillerList ){
       if( eventFiller.getEventPtr()->getIndices().sample == sample.getIndex() ){
