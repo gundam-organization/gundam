@@ -104,6 +104,9 @@ public:
   /// results from the GPU to the CPU.
   virtual bool Apply();
 
+  // const getters
+  [[nodiscard]] bool IsResultValid() const{ return fResultsValid; }
+
   /// Get the result for index i from host memory.  This will trigger copying
   /// the results from the device if that is necessary.
   double GetResult(int i);

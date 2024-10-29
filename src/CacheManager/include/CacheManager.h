@@ -2,6 +2,7 @@
 #define CacheManager_h_seen
 
 #include "CacheSampleHistFiller.h"
+#include "CacheEventWeightFiller.h"
 #include "CacheParameters.h"
 #include "CacheWeights.h"
 
@@ -190,6 +191,7 @@ private:
   static SampleSet* fSampleSetPtr;
   static EventDialCache* fEventDialCachePtr;
   static std::vector<CacheSampleHistFiller> fSampleHistFillerList;
+  static std::vector<CacheEventWeightFiller> fEventWeightFillerList;
   static bool fIsHistContentCopyEnabled;
   static bool fIsEventWeightCopyEnabled;
 

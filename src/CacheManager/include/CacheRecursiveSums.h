@@ -115,7 +115,7 @@ public:
   void SetMinimumEventWeight(double minimum);
 
   /// Return the number of histogram bins that are accumulated.
-  std::size_t GetSumCount() const {return fSums->size();}
+  [[nodiscard]] std::size_t GetSumCount() const {return fSums->size();}
 
   /// Calculate the results and save them for later use.  This copies the
   /// results from the GPU to the CPU.
@@ -137,6 +137,9 @@ public:
 
   /// A pointer to the validity flag.
   bool* GetSumsValidPointer();
+
+  /// Validity flag
+  [[nodiscard]] bool IsSumsValid() const { return fSumsValid; }
 
 };
 

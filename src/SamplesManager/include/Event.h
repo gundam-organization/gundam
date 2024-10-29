@@ -35,7 +35,7 @@ public:
   VariableCollection& getVariables(){ return _variables_; }
 
   // const core
-  [[nodiscard]] double getEventWeight() const;
+  [[nodiscard]] double getEventWeight() const { return _weights_.current; }
   [[nodiscard]] std::string getSummary() const;
   friend std::ostream& operator <<( std::ostream& o, const Event& this_ ){ o << this_.getSummary(); return o; }
 
@@ -44,13 +44,6 @@ private:
   EventUtils::Indices _indices_{};
   EventUtils::Weights _weights_{};
   VariableCollection _variables_{};
-
-#ifdef GUNDAM_USING_CACHE_MANAGER
-  friend class Cache::Manager;
-  [[nodiscard]] const EventUtils::Cache& getCache() const{ return _cache_; }
-  EventUtils::Cache& getCache(){ return _cache_; }
-  EventUtils::Cache _cache_{};
-#endif
 
 };
 
