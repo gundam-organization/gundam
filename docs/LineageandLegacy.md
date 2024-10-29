@@ -1,14 +1,14 @@
 ---
 layout: default
-title: Development policy 
-next_page: "https://ulyevarou.github.io/GUNDAM-documentation/appendix.html"
+title: Lineage and Legacy
+next_page: "https://gundam-organization.github.io/gundam/appendix.html"
 ---
 
+GUNDAM was primarily developed as a tool for conducting sensitivity studies with the *Upgraded
+ND280 Detector*. Originally, it was created as a fork of the xsllhFitter project, 
+which was developed and used by the T2K cross-section Working Group. The original project is 
+available on [GitLab](https://gitlab.com/cuddandr/xsLLhFitter). GUNDAM also benefits from over 10 years 
+of expertise gained by the T2K Oscillation Analysis Working Group through the near-detector 
+analysis part of the T2K oscillation analysis, which uses the internal software BANFF.
 
-GUNDAM was born as a fork of the *xsllhFitter* project which was developped and used by
-the cross-section working group of T2K. The original project can be found on *gitlab*:
-[https://gitlab.com/cuddandr/xsLLhFitter](https://gitlab.com/cuddandr/xsLLhFitter).
-
-GUNDAM has originally been developed as an new fitter to perform T2K oscillation
-analysis, and provide an expandable base on which future studies with the *Upgraded
-ND280 Detectors* will be performed.
+Designed as a general-purpose tool, GUNDAM is intended for use in a variety of analyses and collaborations.
