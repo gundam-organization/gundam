@@ -144,7 +144,8 @@ void Propagator::propagateParameters(){
   this->refillHistograms();
 }
 void Propagator::reweightEvents() {
-  reweightTimer.start();
+  // timer start/stop in scope
+  auto s{reweightTimer.scopeTime()};
 
   // Only real parameters are propagated on the spectra -> need to convert the eigen to original
   if( _enableEigenToOrigInPropagate_ ){ _parManager_.convertEigenToOrig(); }
@@ -156,7 +157,6 @@ void Propagator::reweightEvents() {
   }
   else{ this->reweightEvents(-1); }
 
-  reweightTimer.stop();
 }
 
 // misc
@@ -287,12 +287,11 @@ void Propagator::updateDialState(){
                 });
 }
 void Propagator::refillHistograms(){
-  refillHistogramTimer.start();
+  // timer start/stop in scope
+  auto s{refillHistogramTimer.scopeTime()};
 
   if( not _devSingleThreadHistFill_ ){ _threadPool_.runJob("Propagator::refillHistograms"); }
   else{ refillHistogramsFct(-1); }
-
-  refillHistogramTimer.stop();
 }
 
 // multithreading
