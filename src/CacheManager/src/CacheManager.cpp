@@ -706,16 +706,16 @@ bool Cache::Manager::Update() {
     int cells = sample.getHistogram().getNbBins();
     nextHist += cells;
     /// ARE ALL OF THE EVENTS HANDLED?
-    for( Event& event : sample.getEventList() ){
-      int eventIndex = event.getCache().index;
-      int cellIndex = event.getIndices().bin;
-      if (cellIndex < 0 || cells <= cellIndex) {
-        LogThrow("Histogram bin out of range");
-      }
-      int theEntry = thisHistIndexOffset + cellIndex;
-      Cache::Manager::Get()->GetHistogramsCache()
-          .SetEventIndex(eventIndex,theEntry);
-    }
+//    for( Event& event : sample.getEventList() ){
+//      int eventIndex = event.getCache().index;
+//      int cellIndex = event.getIndices().bin;
+//      if (cellIndex < 0 || cells <= cellIndex) {
+//        LogThrow("Histogram bin out of range");
+//      }
+//      int theEntry = thisHistIndexOffset + cellIndex;
+//      Cache::Manager::Get()->GetHistogramsCache()
+//          .SetEventIndex(eventIndex,theEntry);
+//    }
   }
 
   if (Cache::Manager::Get()->GetHistogramsCache().GetSumCount()
