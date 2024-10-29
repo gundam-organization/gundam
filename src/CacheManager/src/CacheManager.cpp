@@ -51,6 +51,8 @@ EventDialCache* Cache::Manager::fEventDialCachePtr{nullptr};
 bool Cache::Manager::fIsHistContentCopyEnabled{false};
 bool Cache::Manager::fIsEventWeightCopyEnabled{false};
 bool Cache::Manager::fIsCacheManagerBuilt{false};
+std::vector<CacheSampleHistFiller> Cache::Manager::fSampleHistFillerList{};
+std::vector<CacheEventWeightFiller> Cache::Manager::fEventWeightFillerList{};
 
 Cache::Manager::Manager(const Cache::Manager::Configuration& config) {
   LogInfo  << "Creating cache manager" << std::endl;
