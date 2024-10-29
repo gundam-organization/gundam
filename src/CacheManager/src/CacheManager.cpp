@@ -53,6 +53,8 @@ bool Cache::Manager::fIsEventWeightCopyEnabled{false};
 bool Cache::Manager::fIsCacheManagerBuilt{false};
 std::vector<CacheSampleHistFiller> Cache::Manager::fSampleHistFillerList{};
 std::vector<CacheEventWeightFiller> Cache::Manager::fEventWeightFillerList{};
+GenericToolbox::Time::AveragedTimer<10> Cache::Manager::cacheFillTimer{};
+GenericToolbox::Time::AveragedTimer<10> Cache::Manager::pullFromDeviceTimer{};
 
 Cache::Manager::Manager(const Cache::Manager::Configuration& config) {
   LogInfo  << "Creating cache manager" << std::endl;
@@ -774,30 +776,38 @@ bool Cache::Manager::PropagateParameters(){
 
   bool isSuccess{false};
 
-  // if disabled, leave
-  if( Cache::Manager::Get() == nullptr ){ return false; }
+  {
+    auto s{cacheFillTimer.scopeTime()};
 
-  // update the cache if necessary
-  if( fUpdateRequired ){ Cache::Manager::Update(); }
+    // if disabled, leave
+    if( Cache::Manager::Get() == nullptr ){ return false; }
 
-  // do the propagation on the device
-  isSuccess = Cache::Manager::Fill();
-  if( not isSuccess ){ return false; }
+    // update the cache if necessary
+    if( fUpdateRequired ){ Cache::Manager::Update(); }
 
+    // do the propagation on the device
+    isSuccess = Cache::Manager::Fill();
+    if( not isSuccess ){ return false; }
+  }
 
   // now everything is on the device, what info do we need on the CPU?
 
-  // do we need to copy every event weight to the CPU structures ?
-  if( Cache::Manager::fIsEventWeightCopyEnabled ){
-    isSuccess = Cache::Manager::CopyEventWeights();
-    if( not isSuccess ){ return false; }
+  {
+    auto s{pullFromDeviceTimer.scopeTime()};
+
+    // do we need to copy every event weight to the CPU structures ?
+    if( Cache::Manager::fIsEventWeightCopyEnabled ){
+      isSuccess = Cache::Manager::CopyEventWeights();
+      if( not isSuccess ){ return false; }
+    }
+
+    // do we need to copy bin content to the CPU structures ?
+    if( Cache::Manager::fIsHistContentCopyEnabled ){
+      isSuccess = Cache::Manager::CopyHistogramsContent();
+      if( not isSuccess ){ return false; }
+    }
   }
 
-  // do we need to copy bin content to the CPU structures ?
-  if( Cache::Manager::fIsHistContentCopyEnabled ){
-    isSuccess = Cache::Manager::CopyHistogramsContent();
-    if( not isSuccess ){ return false; }
-  }
 
   return true;
 }

@@ -35,6 +35,8 @@ namespace Cache {
 #include "SampleSet.h"
 #include "EventDialCache.h"
 
+#include "GenericToolbox.Time.h"
+
 #include "hemi/array.h"
 
 #include <map>
@@ -66,6 +68,9 @@ public:
   static void SetEventDialSetPtr(EventDialCache& eventDialCache_){ fEventDialCachePtr = &eventDialCache_; }
   static void SetIsHistContentCopyEnabled(bool fIsHistContentCopyEnabled_){ fIsHistContentCopyEnabled = fIsHistContentCopyEnabled_; }
   static void SetIsEventWeightCopyEnabled(bool fIsEventWeightCopyEnabled_){ fIsEventWeightCopyEnabled = fIsEventWeightCopyEnabled_; }
+
+  static const GenericToolbox::Time::AveragedTimer<10>& GetCacheFillTimer() { return cacheFillTimer; }
+  static const GenericToolbox::Time::AveragedTimer<10>& GetPullFromDeviceTimer() { return pullFromDeviceTimer; }
 
   /// Build the cache and load it into the device.  This is used in
   /// Propagator.cpp to fill the constants needed to for the calculations.
@@ -197,6 +202,8 @@ private:
   static bool fIsHistContentCopyEnabled;
   static bool fIsEventWeightCopyEnabled;
   static bool fIsCacheManagerBuilt;
+  static GenericToolbox::Time::AveragedTimer<10> cacheFillTimer;
+  static GenericToolbox::Time::AveragedTimer<10> pullFromDeviceTimer;
 
   /// The cache for parameter weights (on the GPU).
   std::unique_ptr<Cache::Parameters> fParameterCache;
