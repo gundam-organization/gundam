@@ -334,6 +334,7 @@ void LikelihoodInterface::loadModelPropagator(){
 
   Cache::Manager::Build();
 
+  // Make sure the histogram bin content are pulled back to the CPU part
   Cache::Manager::SetIsHistContentCopyEnabled( true );
 #endif
 

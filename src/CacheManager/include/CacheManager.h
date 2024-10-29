@@ -103,6 +103,8 @@ public:
   static bool CopyEventWeights();
   static bool CopyHistogramsContent();
 
+  static bool IsBuilt(){ return fIsCacheManagerBuilt; }
+
 
 private:
   // Hold the configuration that will be used to construct the manager
@@ -194,6 +196,7 @@ private:
   static std::vector<CacheEventWeightFiller> fEventWeightFillerList;
   static bool fIsHistContentCopyEnabled;
   static bool fIsEventWeightCopyEnabled;
+  static bool fIsCacheManagerBuilt;
 
   /// The cache for parameter weights (on the GPU).
   std::unique_ptr<Cache::Parameters> fParameterCache;

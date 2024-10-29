@@ -50,6 +50,7 @@ SampleSet* Cache::Manager::fSampleSetPtr{nullptr};
 EventDialCache* Cache::Manager::fEventDialCachePtr{nullptr};
 bool Cache::Manager::fIsHistContentCopyEnabled{false};
 bool Cache::Manager::fIsEventWeightCopyEnabled{false};
+bool Cache::Manager::fIsCacheManagerBuilt{false};
 
 Cache::Manager::Manager(const Cache::Manager::Configuration& config) {
   LogInfo  << "Creating cache manager" << std::endl;
@@ -426,6 +427,8 @@ bool Cache::Manager::Build() {
   }
 
   Cache::Manager::RequireUpdate();
+
+  fIsCacheManagerBuilt = true;
 
   return true;
 }

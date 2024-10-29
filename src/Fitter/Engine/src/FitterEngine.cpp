@@ -7,6 +7,10 @@
 #include "RootMinimizer.h"
 #include "AdaptiveMcmc.h"
 
+#ifdef GUNDAM_USING_CACHE_MANAGER
+#include "CacheManager.h"
+#endif
+
 #include "GenericToolbox.Utils.h"
 
 #include "GenericToolbox.Root.h"
@@ -346,8 +350,23 @@ void FitterEngine::fit(){
     return;
   }
 
+#ifdef GUNDAM_USING_CACHE_MANAGER
+  if( Cache::Manager::IsBuilt() ){
+    // To calculate the llh, we only need to grab the bin content, not individual weight
+    Cache::Manager::SetIsHistContentCopyEnabled( true );
+    Cache::Manager::SetIsEventWeightCopyEnabled( false );
+  }
+#endif
+
   LogInfo << "Minimizing LLH..." << std::endl;
   this->_minimizer_->minimize();
+
+#ifdef GUNDAM_USING_CACHE_MANAGER
+  if( Cache::Manager::IsBuilt() ){
+    LogWarning << "Pulling back individual weight from device..." << std::endl;
+    Cache::Manager::CopyEventWeights();
+  }
+#endif
 
   LogWarning << "Saving post-fit par state..." << std::endl;
   _postFitParState_ = getLikelihoodInterface().getModelPropagator().getParametersManager().exportParameterInjectorConfig();
@@ -396,6 +415,13 @@ void FitterEngine::fit(){
     if( _minimizer_->isErrorCalcEnabled() ){
       LogInfo << "Computing post-fit errors..." << std::endl;
       _minimizer_->calcErrors();
+
+#ifdef GUNDAM_USING_CACHE_MANAGER
+      if( Cache::Manager::IsBuilt() ){
+        LogWarning << "Pulling back individual weight from device..." << std::endl;
+        Cache::Manager::CopyEventWeights();
+      }
+#endif
     }
   }
 
