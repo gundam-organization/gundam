@@ -718,6 +718,15 @@ bool Cache::Manager::Update() {
 //      Cache::Manager::Get()->GetHistogramsCache()
 //          .SetEventIndex(eventIndex,theEntry);
 //    }
+
+    for( auto& eventFiller : fEventWeightFillerList ){
+      if( eventFiller.getEventPtr()->getIndices().sample == sample.getIndex() ){
+        Cache::Manager::Get()->GetHistogramsCache().SetEventIndex(
+            eventFiller.getValueIndex(),
+            thisHistIndexOffset + eventFiller.getEventPtr()->getIndices().bin
+        );
+      }
+    }
   }
 
   if (Cache::Manager::Get()->GetHistogramsCache().GetSumCount()

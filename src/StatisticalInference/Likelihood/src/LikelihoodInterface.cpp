@@ -324,20 +324,6 @@ void LikelihoodInterface::loadModelPropagator(){
   _modelPropagator_.shrinkDialContainers();
   _modelPropagator_.buildDialCache();
 
-#ifdef GUNDAM_USING_CACHE_MANAGER
-  // After all the data has been loaded.  Specifically, this must be after
-  // the MC has been copied for the Asimov fit, or the "data" use the MC
-  // reweighting cache.  This must also be before the first use of
-  // reweightMcEvents that is done using the GPU.
-  Cache::Manager::SetSampleSetPtr( _modelPropagator_.getSampleSet() );
-  Cache::Manager::SetEventDialSetPtr( _modelPropagator_.getEventDialCache() );
-
-  Cache::Manager::Build();
-
-  // Make sure the histogram bin content are pulled back to the CPU part
-  Cache::Manager::SetIsHistContentCopyEnabled( true );
-#endif
-
   LogInfo << "Propagating prior parameters on events..." << std::endl;
   _modelPropagator_.reweightEvents();
 
@@ -358,6 +344,24 @@ void LikelihoodInterface::loadModelPropagator(){
       sample.getHistogram().refillHistogram(iThread);
     }
   });
+
+#ifdef GUNDAM_USING_CACHE_MANAGER
+  LogInfo << "Setting up the cache manager..." << std::endl;
+
+  // After all the data has been loaded.  Specifically, this must be after
+  // the MC has been copied for the Asimov fit, or the "data" use the MC
+  // reweighting cache.  This must also be before the first use of
+  // reweightMcEvents that is done using the GPU.
+  Cache::Manager::SetSampleSetPtr( _modelPropagator_.getSampleSet() );
+  Cache::Manager::SetEventDialSetPtr( _modelPropagator_.getEventDialCache() );
+
+  Cache::Manager::Build();
+
+  // Make sure the histogram bin content are pulled back to the CPU part
+  Cache::Manager::SetIsHistContentCopyEnabled( true );
+
+  Cache::Manager::PropagateParameters();
+#endif
 
   _modelPropagator_.printBreakdowns();
 

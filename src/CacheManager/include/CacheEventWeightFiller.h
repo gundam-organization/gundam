@@ -13,6 +13,9 @@ class CacheEventWeightFiller{
 public:
   CacheEventWeightFiller(Event* eventPtr_, int valueIndex_): eventPtr(eventPtr_), valueIndex(valueIndex_) {}
 
+  [[nodiscard]] Event *getEventPtr() const{ return eventPtr; }
+  [[nodiscard]] int getValueIndex() const{ return valueIndex; }
+
   void copyCacheToCpu(const double* eventWeightsArray_);
 
 private:
