@@ -7,7 +7,7 @@
 #  ${CMAKE_BINARY_DIR}/Testing/gundam-tests.<date>
 #
 
-cmessage( STATUS "Setting up tests..." )
+cmessage( STATUS "Build GUNDAM tests" )
 
 # Run the gundam-tests.sh script which runs scripted tests.  The
 # COMMAND is a little complicated since the testing script needs to
@@ -29,8 +29,14 @@ add_test(
 
 ## Compiled unit tests using GoogleTest.  These are only run if GTest
 ## is found.
-find_package(GTest)
-if(GTEST_FOUND)
+if (NOT SKIP_GOOGLE_TEST)
+  find_package(GTest)
+else()
+  cmessage( WARNING "GTest unit testing explicitly disabled by user")
+endif()
+if (NOT GTEST_FOUND)
+  cmessage( WARNING "GTest package disabled or not found.  Disable unit tests.")
+else()
   enable_testing()
 
   # Setup the hemi test suite for the host
@@ -56,5 +62,4 @@ if(GTEST_FOUND)
     target_link_libraries(hemiTest_device.exe GundamCache)
     gtest_discover_tests(hemiTest_device.exe)
   endif(CMAKE_CUDA_COMPILER)
-
-endif(GTEST_FOUND)
+endif(NOT GTEST_FOUND)
