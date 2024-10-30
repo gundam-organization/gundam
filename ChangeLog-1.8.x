@@ -1,5 +1,11 @@
 Fixes relative to 1.8.5
 
+Fix (Merge #676 and #665): Make usage of GTest unit testing optional.  The full testing suite can be disabled by setting the CMake option ENABLE_TESTS to OFF.  Just the unit tests can be disabled by setting SKIP_GOOGLE_TESTS to ON.  Warning messages during the CMake build are now actual warnings that should be noticed by the users.
+
+Issue #674: Change termination behavior when DialInputBuffer finds an invalid parameter.  Previously it would throw, and it has been changed to print a descriptive message and the exit with failure.  This is because the most common way that there will be a bad parameter value in DialInputBuffer is from a bad user configuration file (or other user inputs).
+
+Issue #673: Fix linear interpolation when there are more than two knots.  Interpolation for two knots was working correctly.
+
 Issue #615: Fix discontinuities in the JointProbability for the MC and data in a histogram bin.  The joint probability calculation has to be correct over ~620 powers of ten, so there is a lot of room for numeric issues.  The probability is cleaned up so that it has all of the right limits, and "never" fails numerically (never means we haven't found anymore corner cases).  The new implementation numerically matches the OA2021 when the OA2021 implementation is valid, and is smooth outside of that domain.  Options are added to reproduce the old bugs.
 
 Fix (Merge #620): Fix an infinite loop when parameters are being drawn from a global convariance.
