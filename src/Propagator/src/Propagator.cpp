@@ -255,6 +255,25 @@ void Propagator::copyEventsFrom(const Propagator& src_){
   _eventDialCache_.fillCacheEntries( _sampleSet_ );
 }
 
+#ifdef GUNDAM_USING_CACHE_MANAGER
+void Propagator::initializeCacheManager(){
+  LogInfo << "Setting up the cache manager..." << std::endl;
+
+  // After all the data has been loaded.  Specifically, this must be after
+  // the MC has been copied for the Asimov fit, or the "data" use the MC
+  // reweighting cache.  This must also be before the first use of
+  // reweightMcEvents that is done using the GPU.
+  Cache::Manager::SetSampleSetPtr( _sampleSet_ );
+  Cache::Manager::SetEventDialSetPtr( _eventDialCache_ );
+
+  Cache::Manager::Build();
+
+  // Make sure the histogram bin content are pulled back to the CPU part
+  Cache::Manager::SetIsHistContentCopyEnabled( true );
+
+  Cache::Manager::PropagateParameters();
+}
+#endif
 
 
 // Protected
