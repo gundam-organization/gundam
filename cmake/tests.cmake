@@ -1,8 +1,7 @@
-
-
-if( ENABLE_GOOGLE_TESTS )
-  message("")
-  cmessage( WARNING "Defining tests...")
+if( ENABLE_TESTS )
+  cmessage( STATUS "Build GUNDAM test and validations")
   include( CTest )
   add_subdirectory( ${CMAKE_SOURCE_DIR}/tests )
+else()
+  cmessage(WARNING "GUNDAM tests and validations not enabled.  Use with caution.")
 endif()

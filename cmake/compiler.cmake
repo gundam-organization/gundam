@@ -1,7 +1,7 @@
 
 
 message("")
-cmessage( WARNING "Configuring compiler options...")
+cmessage( STATUS "Configuring compiler options...")
 
 # Changes default install path to be a subdirectory of the build dir.
 # Should set the installation dir at configure time with

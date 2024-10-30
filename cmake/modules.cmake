@@ -1,6 +1,6 @@
 
 message("")
-cmessage( WARNING "Defining modules...")
+cmessage( STATUS "Defining modules...")
 
 set( MODULES Utils )
 

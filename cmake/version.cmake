@@ -1,6 +1,6 @@
 
 message("")
-cmessage( WARNING "Checking out git version...")
+cmessage( STATUS "Check git version...")
 
 # Printout version & generate header
 cmessage( STATUS "Pre-checking GUNDAM version" )

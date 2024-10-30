@@ -1,5 +1,5 @@
 message("")
-cmessage( WARNING "Checking dependencies...")
+cmessage( STATUS "Checking dependencies...")
 
 
 ##########

@@ -2,7 +2,7 @@
 # SubModules: These are just adding the code directly, as stand-alone projects.
 
 message("")
-cmessage( WARNING "Checking submodules..." )
+cmessage( STATUS "Checking submodules..." )
 
 function( checkSubmodule )
 
