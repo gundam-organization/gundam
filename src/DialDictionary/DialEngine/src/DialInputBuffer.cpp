@@ -5,6 +5,7 @@
 #include "DialInputBuffer.h"
 
 #include "Logger.h"
+#include "GundamBacktrace.h"
 
 
 #ifndef DISABLE_USER_HEADER
@@ -70,6 +71,16 @@ void DialInputBuffer::update(){
 
       // re-apply the offset
       tempBuffer += inputRef.mirrorEdges.minValue;
+    }
+    if( std::isnan(tempBuffer) ){
+        // LogThrowIf is broken, but OK for real error traps, but this is
+        // checking user input it's critical that the error message is
+        // properly formated so print an error, a backtrace, and then exit.
+        LogError << "NaN while evaluating input buffer of "
+                 << inputRef.getParameter(_parSetListPtr_).getTitle()
+                 << std::endl;
+        LogError << GundamUtils::Backtrace << std::endl;
+        std::exit(EXIT_FAILURE);
     }
 
     // has it been updated?
