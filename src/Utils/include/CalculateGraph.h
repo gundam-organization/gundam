@@ -52,7 +52,7 @@ namespace {
         // Check to find a point that is less than x.  This is "brute force"
         // binary search for upto 16 elements.  The "if" has been checked and
         // is efficient with CUDA.
-        const int knotCount = (dim)/2 - 2;
+        const int knotCount = (dim)/2;
         int ix = 0;
 #define CHECK_OFFSET(ioff)  if ((ix+ioff < knotCount) && (x > data[2*(ix+ioff)+1])) ix += ioff
         CHECK_OFFSET(8);
