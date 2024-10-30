@@ -43,6 +43,7 @@
 LoggerInit([]{ Logger::setUserHeaderStr("[Cache::Manager]"); });
 #endif
 
+bool Cache::Manager::fEnableDebugPrintouts{false};
 Cache::Manager* Cache::Manager::fSingleton = nullptr;
 bool Cache::Manager::fUpdateRequired = true;
 std::map<const Parameter*, int> Cache::Manager::ParameterMap;
@@ -797,14 +798,12 @@ bool Cache::Manager::PropagateParameters(){
 
     // do we need to copy every event weight to the CPU structures ?
     if( Cache::Manager::fIsEventWeightCopyEnabled ){
-      isSuccess = Cache::Manager::CopyEventWeights();
-      if( not isSuccess ){ return false; }
+      Cache::Manager::CopyEventWeights();
     }
 
     // do we need to copy bin content to the CPU structures ?
     if( Cache::Manager::fIsHistContentCopyEnabled ){
-      isSuccess = Cache::Manager::CopyHistogramsContent();
-      if( not isSuccess ){ return false; }
+      Cache::Manager::CopyHistogramsContent();
     }
   }
 
@@ -815,7 +814,7 @@ bool Cache::Manager::CopyEventWeights(){
 
   if( not Cache::Manager::Get()->GetWeightsCache().IsResultValid() ){
     // Trigger this update
-    LogDebug << "Copy event weights from Device to Host" << std::endl;
+    if( fEnableDebugPrintouts ){ LogDebug << "Copy event weights from Device to Host" << std::endl; }
     Cache::Manager::Get()->GetWeightsCache().GetResult(0);
   }
 
@@ -834,6 +833,8 @@ bool Cache::Manager::CopyHistogramsContent(){
     // _CacheManagerValue_ and _CacheManagerValid_ are inside the summed
     // index cache (a bit of evil coding here), and are updated by the
     // cache.  The update is triggered by (*_CacheManagerUpdate_)().
+    if( fEnableDebugPrintouts ){ LogDebug << "Copy bin contents from Device to Host" << std::endl; }
+
     Cache::Manager::Get()->GetHistogramsCache().GetSum(0);
     Cache::Manager::Get()->GetHistogramsCache().GetSum2(0);
   }

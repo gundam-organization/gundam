@@ -68,6 +68,7 @@ public:
   static void SetEventDialSetPtr(EventDialCache& eventDialCache_){ fEventDialCachePtr = &eventDialCache_; }
   static void SetIsHistContentCopyEnabled(bool fIsHistContentCopyEnabled_){ fIsHistContentCopyEnabled = fIsHistContentCopyEnabled_; }
   static void SetIsEventWeightCopyEnabled(bool fIsEventWeightCopyEnabled_){ fIsEventWeightCopyEnabled = fIsEventWeightCopyEnabled_; }
+  static void SetEnableDebugPrintouts(bool fEnableDebugPrintouts_){ fEnableDebugPrintouts = fEnableDebugPrintouts_; }
 
   static const GenericToolbox::Time::AveragedTimer<10>& GetCacheFillTimer() { return cacheFillTimer; }
   static const GenericToolbox::Time::AveragedTimer<10>& GetPullFromDeviceTimer() { return pullFromDeviceTimer; }
@@ -195,6 +196,7 @@ private:
   /// is the ONE place that everything is collected together.
 
   /// pointers to the corresponding Propagator structure
+  static bool fEnableDebugPrintouts;
   static SampleSet* fSampleSetPtr;
   static EventDialCache* fEventDialCachePtr;
   static std::vector<CacheSampleHistFiller> fSampleHistFillerList;

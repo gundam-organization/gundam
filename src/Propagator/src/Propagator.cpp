@@ -268,7 +268,9 @@ void Propagator::initializeCacheManager(){
 
   Cache::Manager::Build();
 
-  // Make sure the histogram bin content are pulled back to the CPU part
+  // By default, make sure every data is copied to the CPU part
+  // Some of those part might get disabled for faster calculation
+  Cache::Manager::SetIsEventWeightCopyEnabled( true );
   Cache::Manager::SetIsHistContentCopyEnabled( true );
 
   Cache::Manager::PropagateParameters();

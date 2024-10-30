@@ -353,7 +353,6 @@ void FitterEngine::fit(){
 #ifdef GUNDAM_USING_CACHE_MANAGER
   if( Cache::Manager::IsBuilt() ){
     // To calculate the llh, we only need to grab the bin content, not individual weight
-    Cache::Manager::SetIsHistContentCopyEnabled( true );
     Cache::Manager::SetIsEventWeightCopyEnabled( false );
   }
 #endif
@@ -365,6 +364,7 @@ void FitterEngine::fit(){
   if( Cache::Manager::IsBuilt() ){
     LogWarning << "Pulling back individual weight from device..." << std::endl;
     Cache::Manager::CopyEventWeights();
+    Cache::Manager::SetIsEventWeightCopyEnabled( true );
   }
 #endif
 
@@ -413,6 +413,13 @@ void FitterEngine::fit(){
   }
   else{
     if( _minimizer_->isErrorCalcEnabled() ){
+#ifdef GUNDAM_USING_CACHE_MANAGER
+      if( Cache::Manager::IsBuilt() ){
+        // To calculate the llh, we only need to grab the bin content, not individual weight
+        Cache::Manager::SetIsEventWeightCopyEnabled( false );
+      }
+#endif
+
       LogInfo << "Computing post-fit errors..." << std::endl;
       _minimizer_->calcErrors();
 
@@ -420,6 +427,9 @@ void FitterEngine::fit(){
       if( Cache::Manager::IsBuilt() ){
         LogWarning << "Pulling back individual weight from device..." << std::endl;
         Cache::Manager::CopyEventWeights();
+
+        // return to default behavior
+        Cache::Manager::SetIsEventWeightCopyEnabled( true );
       }
 #endif
     }
