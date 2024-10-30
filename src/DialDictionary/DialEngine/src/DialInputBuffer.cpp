@@ -5,6 +5,7 @@
 #include "DialInputBuffer.h"
 
 #include "Logger.h"
+#include "GundamBacktrace.h"
 
 #if USE_ZLIB
 #include "zlib.h"
@@ -56,7 +57,17 @@ void DialInputBuffer::updateBuffer(){
       // re-apply the offset
       buffer += _parameterMirrorBounds_[std::distance(_buffer_.data(), bufferPtr)].first;
     }
-    LogThrowIf(std::isnan(buffer), "NaN while evaluating input buffer of " << (*_parSetRef_)[parIndices.first].getParameterList()[parIndices.second].getTitle());
+    if (std::isnan(buffer)) {
+        // LogThrowIf is broken, but OK for real error traps, but this is
+        // checking user input it's critical that the error message is
+        // properly formated so print an error, a backtrace, and then exit.
+        LogError << "NaN while evaluating input buffer of "
+                 << (*_parSetRef_)[parIndices.first].getParameterList()[
+                     parIndices.second].getTitle()
+                 << std::endl;
+        LogError << GundamUtils::Backtrace << std::endl;
+        std::exit(EXIT_FAILURE);
+    }
 
     if( *bufferPtr != buffer ){
 //      LogTrace << "UPT: " << this->getSummary() << ": " << *bufferPtr << " -> " << buffer << std::endl;
