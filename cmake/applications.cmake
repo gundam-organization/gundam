@@ -1,6 +1,6 @@
 
 message("")
-cmessage( WARNING "Defining applications...")
+cmessage( STATUS "Defining applications...")
 
 add_subdirectory( ${CMAKE_SOURCE_DIR}/src/Applications )
 
