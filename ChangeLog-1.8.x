@@ -1,5 +1,7 @@
 Fixes relative to 1.8.5
 
+Fix (Merge #681): Handle over sized graphs and splines. The number of points that can be handled in a spline/graph has been increased, but that needs to be used carefully since large splines and graphs will make fits run more slowly. Note: Using linear interpolation with more than two knots is explicitly forbidden by MINUIT since it introduces a discontinuous derivative.  MINUIT may still run, but the results are undefined (that means the answer could be useful, or could start a thermonuclear war.  Both outcomes are formally correct).
+
 Fix (Merge #676 and #665): Make usage of GTest unit testing optional.  The full testing suite can be disabled by setting the CMake option ENABLE_TESTS to OFF.  Just the unit tests can be disabled by setting SKIP_GOOGLE_TESTS to ON.  Warning messages during the CMake build are now actual warnings that should be noticed by the users.
 
 Issue #674: Change termination behavior when DialInputBuffer finds an invalid parameter.  Previously it would throw, and it has been changed to print a descriptive message and the exit with failure.  This is because the most common way that there will be a bad parameter value in DialInputBuffer is from a bad user configuration file (or other user inputs).

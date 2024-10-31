@@ -98,26 +98,53 @@ int main() {
     }
 #endif
 
+#define TEST3
 #ifdef TEST3
     {
-        // Test interpolation between six points
-        int nData = 6;
-        double data[] = {-1.0, 2.0/(nData-1), 0.0, 0.0, 1.0, 1.0, 0.0, 0.0};
+        // Test interpolation between 19 points
+        int nData = 19;
+        double data[] = {
+            30.0, -9.0,
+            29.0, -8.0,
+            20.0, -7.0,
+            16.0, -6.0,
+            11.0, -5.0,
+            7.0, -4.0,
+            4.0, -3.0,
+            2.0, -2.0,
+            1.0, -1.0,
+            0.0, 0.0,
+            1.0, 1.0,
+            2.0, 2.0,
+            4.0, 3.0,
+            7.0, 4.0,
+            11.0, 5.0,
+            16.0, 6.0,
+            20.0, 7.0,
+            29.0, 8.0,
+            30.0, 9.0,
+            0.0, 0.0,
+            0.0, 0.0,
+            0.0, 0.0,
+            0.0, 0.0,
+            0.0, 0.0,
+            0.0, 0.0,
+            0.0, 0.0,
+        };
         std::unique_ptr<TGraph> data1(new TGraph());
         for (int p=0; p<nData; ++p) {
-            double x = data[0] + p*data[1];
-            double y = data[p+2];
+            double x = data[2*p+1];
+            double y = data[2*p+0];
             data1->SetPoint(p,x,y);
         }
         std::unique_ptr<TGraph> graph1(new TGraph());
         int p = 0;
-        for (double x = -1.5; x <= 1.5; x += 0.01) {
-            double v0 = CalculateCompactSpline(x, -10.0, 10.0, data, nData);
-            double v1 = CalculateCompactSpline(-x, -10.0, 10.0, data, nData);
+        for (double x = -10.0; x <= 10.0; x += 0.1) {
+            double v0 = CalculateGraph(x, -50.0, 50.0, data, 2*nData);
+            double v1 = CalculateGraph(-x, -50.0, 50.0, data, 2*nData);
             std::ostringstream tmp;
-            tmp << "Symmetric tolerance (test 3) (X=" << x << ")";
+            tmp << "Symmetric tolerance (test 4) (X=" << x << ")";
             TOLERANCE(tmp.str(), v0, v1, 1E-6);
-            graph1->SetPoint(p++,x,v0);
             graph1->SetPoint(p++,x,v0);
         }
         graph1->Draw("AC");
@@ -127,72 +154,6 @@ int main() {
     }
 #endif
 
-#ifdef TEST4
-    {
-        // Test interpolation where there can be a lot of overshoot
-        int nData = 13;
-        double data[] = {-1.0, 2.0/(nData-1),
-                         0.5, 1.5,
-                         1.0, 1.0, 1.0, 1.0,
-                         0.5,
-                         1.0, 1.0, 1.0, 1.0,
-                         1.5, 0.5};
-        std::unique_ptr<TGraph> data1(new TGraph());
-        for (int p=0; p<nData; ++p) {
-            double x = data[0] + p*data[1];
-            double y = data[p+2];
-            data1->SetPoint(p,x,y);
-        }
-        std::unique_ptr<TGraph> graph1(new TGraph());
-        int p = 0;
-        for (double x = -1.1; x <= 1.1; x += 0.01) {
-            double v0 = CalculateCompactSpline(x, -10.0, 10.0, data, nData);
-            double v1 = CalculateCompactSpline(-x, -10.0, 10.0, data, nData);
-            std::ostringstream tmp;
-            tmp << "Symmetric tolerance (test 4) (X=" << x << ")";
-            TOLERANCE(tmp.str(), v0, v1, 1E-6);
-            graph1->SetPoint(p++,x,v0);
-        }
-        graph1->Draw("AC");
-        data1->Draw("*,same");
-        gPad->Print("100CheckGraph4.pdf");
-        gPad->Print("100CheckGraph4.png");
-    }
-#endif
-
-#ifdef TEST5
-    {
-        // Test interpolation where there is a smooth symmetric function
-        int nData = 17;
-        double data[] = {-1.0, 2.0/(nData-1),
-                         0.0, 0.0, 0.0, 0.5, 1.5,
-                         1.0, 1.0, 1.0, 1.0,
-                         0.5,
-                         1.0, 1.0, 1.0, 1.0,
-                         1.5, 0.5, 0.0, 0.0, 0.0};
-        std::unique_ptr<TGraph> data1(new TGraph());
-        for (int p=0; p<nData; ++p) {
-            double x = data[0] + p*data[1];
-            data[p+2] = std::cos(4.0*x);
-            double y = data[p+2];
-            data1->SetPoint(p,x,y);
-        }
-        std::unique_ptr<TGraph> graph1(new TGraph());
-        int p = 0;
-        for (double x = -1.5; x <= 1.5; x += 0.01) {
-            double v0 = CalculateCompactSpline(x, -10.0, 10.0, data, nData);
-            double v1 = CalculateCompactSpline(-x, -10.0, 10.0, data, nData);
-            std::ostringstream tmp;
-            tmp << "Symmetric tolerance (test 5) (X=" << x << ")";
-            TOLERANCE(tmp.str(), v0, v1, 1E-6);
-            graph1->SetPoint(p++,x,v0);
-        }
-        graph1->Draw("AC");
-        data1->Draw("*,same");
-        gPad->Print("100CheckGraph5.pdf");
-        gPad->Print("100CheckGraph5.png");
-    }
-#endif
 
     return status;
 }
