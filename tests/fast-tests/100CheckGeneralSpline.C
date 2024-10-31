@@ -64,7 +64,7 @@ int main() {
         double data[dim];
         data[0] = -3.0;
         data[1] = 0.0;
-        std::cout << "Number of knots " << nKnots << std::endl;
+        std::cout << "Test1: Number of knots " << nKnots << std::endl;
         for (int knot = 0; knot < nKnots; ++knot) {
             double xx;
             double yy;
@@ -116,7 +116,7 @@ int main() {
         double data[dim];
         data[0] = -3.0;
         data[1] = 0.0;
-        std::cout << "Number of knots " << nKnots << std::endl;
+        std::cout << "Test2: Number of knots " << nKnots << std::endl;
         for (int knot = 0; knot < nKnots; ++knot) {
             double xx;
             double yy;
@@ -136,7 +136,7 @@ int main() {
                 = CalculateGeneralSpline(xxx,-100.0, 100.0,
                                        data, dim);
             generalSpline.SetPoint(point++, xxx, calcValue);
-            TOLERANCE("Test1: Spline Mismatch", splineValue, calcValue, 1E-6);
+            TOLERANCE("Test2: Spline Mismatch", splineValue, calcValue, 1E-6);
         }
         generalSpline.SetLineWidth(3);
         generalSpline.SetLineColor(kGreen);
