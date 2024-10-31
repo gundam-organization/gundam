@@ -97,7 +97,7 @@ int main() {
 #define TEST2
 #ifdef TEST2
     {
-        // Define a TSpline3 and make sure that GeneralSpline reproduces it
+        // Define a TGraph and make sure that GeneralSpline reproduces it
         TGraph graph(3);
         graph.SetPoint(0,-3.0, 0.0);
         graph.SetPoint(1, 0.1, 1.0);
@@ -143,6 +143,60 @@ int main() {
         generalSpline.Draw("same");
         gPad->Print("100CheckGeneralSpline2.pdf");
         gPad->Print("100CheckGeneralSpline2.png");
+    }
+#endif
+
+
+#define TEST3
+#ifdef TEST3
+    {
+        // Define a large spline and make sure that GeneralSpline reproduces
+        // it
+        TGraph graph;
+        int count = 0;
+        for (int i = -10; i<11; ++i) {
+            double v = i;
+            graph.SetPoint(count++,v, std::abs(v));
+        }
+        TSpline3 spline("splineOfGraph",&graph);
+        graph.Draw("AC*");
+        graph.SetMinimum(-0.5);
+        graph.SetMaximum(15.0);
+        spline.SetLineWidth(5);
+        spline.SetLineColor(kRed);
+        spline.Draw("same");
+        const int nKnots = spline.GetNp();
+        const int dim = 3*nKnots + 2;
+        double data[dim];
+        data[0] = -3.0;
+        data[1] = 0.0;
+        std::cout << "Test1: Number of knots " << nKnots << std::endl;
+        for (int knot = 0; knot < nKnots; ++knot) {
+            double xx;
+            double yy;
+            double ss;
+            spline.GetKnot(knot,xx,yy);
+            ss = spline.Derivative(xx);
+            data[2+3*knot+0] = yy;
+            data[2+3*knot+1] = ss;
+            data[2+3*knot+2] = xx;
+        }
+        TGraph generalSpline;
+        int point = 0;
+        for (double xxx = spline.GetXmin() - 2.0;
+             xxx<=spline.GetXmax() + 2.0; xxx += 0.01) {
+            double splineValue = spline.Eval(xxx);
+            double calcValue
+                = CalculateGeneralSpline(xxx,-100.0, 100.0,
+                                       data, dim);
+            generalSpline.SetPoint(point++, xxx, calcValue);
+            TOLERANCE("Test3: Spline Mismatch", splineValue, calcValue, 1E-6);
+        }
+        generalSpline.SetLineWidth(3);
+        generalSpline.SetLineColor(kGreen);
+        generalSpline.Draw("same");
+        gPad->Print("100CheckGeneralSpline3.pdf");
+        gPad->Print("100CheckGeneralSpline3.png");
     }
 #endif
 
