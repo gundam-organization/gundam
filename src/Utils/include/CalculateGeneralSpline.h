@@ -129,6 +129,7 @@ namespace {
         const int knotCount = (dim-2)/3 - 2;
         int ix = 0;
 #define CHECK_OFFSET(ioff)  if ((ix+ioff < knotCount) && (x > data[2+3*(ix+ioff)+2])) ix += ioff
+        CHECK_OFFSET(16);
         CHECK_OFFSET(8);
         CHECK_OFFSET(4);
         CHECK_OFFSET(2);

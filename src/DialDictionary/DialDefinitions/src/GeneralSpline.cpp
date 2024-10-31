@@ -8,7 +8,6 @@
 #include "GenericToolbox.Root.h"
 #include "Logger.h"
 
-
 LoggerInit([]{
   Logger::setUserHeaderStr("[GeneralSpline]");
 });
@@ -51,6 +50,13 @@ void GeneralSpline::buildDial(const std::vector<double>& xPoints,
                               const std::vector<double>& deriv,
                               const std::string& option_){
   LogThrowIf(not _splineData_.empty(), "Spline data already set.");
+
+  if (xPoints.size() > 31) {
+      LogError << "Requesting a spline with to many points: "
+               << xPoints.size() << std::endl;
+      LogError << "Event weight splines are limited to 31 points" << std::endl;
+      std::exit(EXIT_FAILURE);
+  }
 
   _splineBounds_.first = xPoints.front();
   _splineBounds_.second = xPoints.back();
