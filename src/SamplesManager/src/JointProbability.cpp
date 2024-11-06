@@ -235,8 +235,8 @@ namespace JointProbability{
       }
     }
 
-    if (not std::isfinite(chisq)) [[unlikely]] {
-      LogWarning << "Non finite chi2: " << chisq << std::endl
+    if (not std::isfinite(chisq) or chisq < 0.0) [[unlikely]] {
+      LogWarning << "Non finite chi2 or negative: " << chisq << std::endl
                  << " bin " << bin_ << std::endl
                  << GET_VAR_NAME_VALUE(predVal) << std::endl
                  << GET_VAR_NAME_VALUE(dataVal) << std::endl
