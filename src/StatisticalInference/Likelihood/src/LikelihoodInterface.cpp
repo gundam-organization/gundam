@@ -65,7 +65,9 @@ void LikelihoodInterface::configureImpl(){
     GenericToolbox::Json::fillValue(_modelPropagator_.getSampleSet().getConfig(), jointProbabilityConfig, "llhConfig");
   });
 
+
   // defining datasets:
+  GenericToolbox::Json::fillValue(_config_, dataSetListConfig, {{"datasetList"}, {"dataSetList"}});
   _dataSetList_.reserve( dataSetListConfig.size() );
   for( const auto& dataSetConfig : dataSetListConfig ){
     _dataSetList_.emplace_back(dataSetConfig, int(_dataSetList_.size()));
