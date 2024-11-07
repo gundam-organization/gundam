@@ -158,13 +158,13 @@ double MinimizerBase::evalFit( const double* parArray_ ){
   if (_useNormalizedFitSpace_) {
     const double* v = parArray_;
     for( auto* par : _minimizerParameterPtrList_ ){
-      par->setParameterValue(ParameterSet::toRealParValue(*(v++),*par));
+      par->setParameterValue(ParameterSet::toRealParValue(*(v++),*par), true);
     }
   }
   else {
     const double* v = parArray_;
     for( auto* par : _minimizerParameterPtrList_ ){
-      par->setParameterValue(*(v++));
+      par->setParameterValue(*(v++), true);
     }
   }
 
