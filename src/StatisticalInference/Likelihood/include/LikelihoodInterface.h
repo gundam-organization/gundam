@@ -74,7 +74,7 @@ public:
   [[nodiscard]] const Propagator& getDataPropagator() const{ return _dataPropagator_; }
   [[nodiscard]] const PlotGenerator& getPlotGenerator() const{ return _plotGenerator_; }
   [[nodiscard]] const JointProbability::JointProbabilityBase* getJointProbabilityPtr() const { return _jointProbabilityPtr_.get(); }
-  [[nodiscard]] const std::vector<DatasetDefinition>& getDatasetList() const { return _dataSetList_; }
+  [[nodiscard]] const std::vector<DatasetDefinition>& getDatasetList() const { return _datasetList_; }
   [[nodiscard]] const std::vector<SamplePair>& getSamplePairList() const { return _samplePairList_; }
   [[nodiscard]] const Buffer& getBuffer() const { return _buffer_; }
 
@@ -83,7 +83,7 @@ public:
   Propagator& getModelPropagator(){ return _modelPropagator_; }
   Propagator& getDataPropagator(){ return _dataPropagator_; }
   PlotGenerator& getPlotGenerator(){ return _plotGenerator_; }
-  std::vector<DatasetDefinition>& getDatasetList(){ return _dataSetList_; }
+  std::vector<DatasetDefinition>& getDatasetList(){ return _datasetList_; }
   std::vector<SamplePair>& getSamplePairList(){ return _samplePairList_; }
 
   // mutable core
@@ -135,7 +135,7 @@ private:
   GenericToolbox::ParallelWorker _threadPool_{};
 
   /// user defined datasets
-  std::vector<DatasetDefinition> _dataSetList_;
+  std::vector<DatasetDefinition> _datasetList_;
 
   /// this is where model and data are kept to be compared
   Propagator _modelPropagator_{};

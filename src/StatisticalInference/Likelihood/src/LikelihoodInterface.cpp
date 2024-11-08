@@ -27,7 +27,7 @@ void LikelihoodInterface::configureImpl(){
   GenericToolbox::Json::fillValue(_config_, _modelPropagator_.getConfig(), "propagatorConfig");
   _modelPropagator_.configure();
 
-  JsonType dataSetListConfig{};
+  JsonType datasetListConfig{};
   JsonType jointProbabilityConfig{};
   std::string jointProbabilityTypeStr{"PoissonLLH"};
 
@@ -54,7 +54,7 @@ void LikelihoodInterface::configureImpl(){
   });
   GenericToolbox::Json::deprecatedAction(_modelPropagator_.getConfig(), {{"dataSetList"}, {"fitSampleSetConfig/dataSetList"}}, [&](const std::string& path_){
     LogAlert << "\"" << path_ << R"(" should now be set under "likelihoodInterfaceConfig".)" << std::endl;
-    GenericToolbox::Json::fillValue(_modelPropagator_.getConfig(), dataSetListConfig, path_);
+    GenericToolbox::Json::fillValue(_modelPropagator_.getConfig(), datasetListConfig, path_);
   });
   GenericToolbox::Json::deprecatedAction(_modelPropagator_.getSampleSet().getConfig(), "llhStatFunction", [&]{
     LogAlert << R"("llhStatFunction" should now be set under "likelihoodInterfaceConfig/jointProbabilityConfig/type".)" << std::endl;
@@ -65,10 +65,12 @@ void LikelihoodInterface::configureImpl(){
     GenericToolbox::Json::fillValue(_modelPropagator_.getSampleSet().getConfig(), jointProbabilityConfig, "llhConfig");
   });
 
+
   // defining datasets:
-  _dataSetList_.reserve( dataSetListConfig.size() );
-  for( const auto& dataSetConfig : dataSetListConfig ){
-    _dataSetList_.emplace_back(dataSetConfig, int(_dataSetList_.size()));
+  GenericToolbox::Json::fillValue(_config_, datasetListConfig, {{"datasetList"}, {"dataSetList"}});
+  _datasetList_.reserve(datasetListConfig.size() );
+  for( const auto& dataSetConfig : datasetListConfig ){
+    _datasetList_.emplace_back(dataSetConfig, int(_datasetList_.size()));
   }
 
   // new config structure
@@ -96,7 +98,7 @@ void LikelihoodInterface::configureImpl(){
 void LikelihoodInterface::initializeImpl() {
   LogWarning << "Initializing LikelihoodInterface..." << std::endl;
 
-  for( auto& dataSet : _dataSetList_ ){ dataSet.initialize(); }
+  for( auto& dataSet : _datasetList_ ){ dataSet.initialize(); }
 
   _modelPropagator_.initialize();
   _dataPropagator_ = _modelPropagator_; // avoid tons of printouts
@@ -316,7 +318,7 @@ void LikelihoodInterface::loadModelPropagator(){
   _modelPropagator_.clearContent();
 
   LogInfo << "Loading datasets..." << std::endl;
-  for( auto& dataSet : _dataSetList_ ){
+  for( auto& dataSet : _datasetList_ ){
     dataSet.getModelDispenser().setPlotGeneratorPtr( &_plotGenerator_ );
     dataSet.getModelDispenser().load( _modelPropagator_ );
   }
@@ -360,7 +362,7 @@ void LikelihoodInterface::loadDataPropagator(){
   _dataPropagator_.clearContent();
 
   bool isAsimov{_dataType_ == DataType::Asimov or _forceAsimovData_};
-  for( auto& dataSet : _dataSetList_ ){
+  for( auto& dataSet : _datasetList_ ){
     if( _dataType_ == DataType::Toy ){
       if( dataSet.getSelectedToyEntry().empty() or dataSet.getSelectedToyEntry() == "Asimov" ){
         isAsimov = true;
@@ -395,7 +397,7 @@ void LikelihoodInterface::loadDataPropagator(){
   }
   else{
     LogInfo << "Loading datasets..." << std::endl;
-    for( auto& dataSet : _dataSetList_ ){
+    for( auto& dataSet : _datasetList_ ){
       // let the llh interface choose witch data entry to load
       auto* dataDispenser{this->getDataDispenser( dataSet )};
 
