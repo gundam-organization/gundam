@@ -23,8 +23,8 @@ Cache::IndexedSums::IndexedSums(Cache::Weights::Results& inputs,
     : fEventWeights(inputs),
       fLowerClamp(-std::numeric_limits<double>::infinity()),
       fUpperClamp(std::numeric_limits<double>::infinity()) {
-  LogThrowIf((inputs.size()<1), "No bins to sum");
-  LogThrowIf((bins<1), "No bins to sum");
+  LogExitIf((inputs.size()<1), "No bins to sum");
+  LogExitIf((bins<1), "No bins to sum");
 
   LogInfo << "Cached IndexedSums -- bins reserved: "
           << bins
@@ -42,16 +42,16 @@ Cache::IndexedSums::IndexedSums(Cache::Weights::Results& inputs,
     // set.  The initial values are seldom changed, so they are not
     // pinned.
     fSums = std::make_unique<hemi::Array<double>>(bins,true);
-    LogThrowIf(not fSums, "Bad Sums Alloc");
+    LogExitIf(not fSums, "Bad Sums Alloc");
     fSums2 = std::make_unique<hemi::Array<double>>(bins,true);
-    LogThrowIf(not fSums2, "Bad Sums2 Alloc");
+    LogExitIf(not fSums2, "Bad Sums2 Alloc");
     fIndexes = std::make_unique<hemi::Array<short>>(fEventWeights.size(),false);
-    LogThrowIf(not fIndexes, "Bad IndexesAlloc");
+    LogExitIf(not fIndexes, "Bad IndexesAlloc");
 
   }
   catch (...) {
     LogError << "Uncaught exception, so stopping" << std::endl;
-    LogThrow("Uncaught exception -- not enough memory available");
+    LogExit("Uncaught exception -- not enough memory available");
   }
 
   // Place the cache into a default state.
@@ -78,10 +78,10 @@ void Cache::IndexedSums::Reset() {
 }
 
 void Cache::IndexedSums::SetEventIndex(int event, int bin) {
-  LogThrowIf((event < 0), "Event index out of range");
-  LogThrowIf((fEventWeights.size() <= event), "Event index out of range");
-  LogThrowIf((bin<0), "Bin is out of range");
-  LogThrowIf((fSums->size() <= bin), "Bin is out of range");
+  LogExitIf((event < 0), "Event index out of range");
+  LogExitIf((fEventWeights.size() <= event), "Event index out of range");
+  LogExitIf((bin<0), "Bin is out of range");
+  LogExitIf((fSums->size() <= bin), "Bin is out of range");
   fIndexes->hostPtr()[event] = bin;
 }
 
@@ -94,28 +94,28 @@ void Cache::IndexedSums::SetMinimumEventWeight(double minimum) {
 }
 
 double Cache::IndexedSums::GetSum(int i) {
-  LogThrowIf(i<0, "Sum index out of range");
-  LogThrowIf((fSums->size() <= i), "Sum index out of range");
+  LogExitIf(i<0, "Sum index out of range");
+  LogExitIf((fSums->size() <= i), "Sum index out of range");
   // This odd ordering is to make sure the thread-safe hostPtr update
   // finishes before the sum is set to be valid.  The use of isnan is to
   // make sure that the optimizer doesn't reorder the statements.
   double value = fSums->hostPtr()[i];
   if (not fSumsApplied) fSumsValid = false;
   else if (not std::isnan(value)) fSumsValid = true;
-  else LogThrow("Cache::IndexedSums sum is nan");
+  else LogExit("Cache::IndexedSums sum is nan");
   return value;
 }
 
 double Cache::IndexedSums::GetSum2(int i) {
-  LogThrowIf((i<0), "Sum2 index out of range");
-  LogThrowIf((fSums2->size()<= i), "Sum2 index out of range");
+  LogExitIf((i<0), "Sum2 index out of range");
+  LogExitIf((fSums2->size()<= i), "Sum2 index out of range");
   // This odd ordering is to make sure the thread-safe hostPtr update
   // finishes before the sum is set to be valid.  The use of isfinite is to
   // make sure that the optimizer doesn't reorder the statements.
   double value = fSums2->hostPtr()[i];
   if (not fSumsApplied) fSumsValid = false;
   else if (not std::isnan(value)) fSumsValid = true;
-  else LogThrow("Cache::IndexedSums sum2 is nan");
+  else LogExit("Cache::IndexedSums sum2 is nan");
   return value;
 }
 

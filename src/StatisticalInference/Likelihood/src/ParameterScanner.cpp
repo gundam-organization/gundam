@@ -35,7 +35,7 @@ void ParameterScanner::configureImpl() {
 void ParameterScanner::initializeImpl() {
   LogWarning << "Initializing ParameterScanner..." << std::endl;
 
-  LogThrowIf(_likelihoodInterfacePtr_ == nullptr, "_likelihoodInterfacePtr_ not set.");
+  LogExitIf(_likelihoodInterfacePtr_ == nullptr, "_likelihoodInterfacePtr_ not set.");
 
   _scanDataDict_.clear();
   if( GenericToolbox::Json::fetchValue(_varsConfig_, "llh", true) ){
@@ -140,13 +140,13 @@ void ParameterScanner::initializeImpl() {
 }
 
 void ParameterScanner::scanParameterList( std::vector<Parameter>& par_, TDirectory* saveDir_){
-  LogThrowIf(not isInitialized());
-  LogThrowIf(saveDir_ == nullptr);
+  LogExitIf(not isInitialized());
+  LogExitIf(saveDir_ == nullptr);
   for( auto& par : par_ ){ this->scanParameter(par, saveDir_); }
 }
 void ParameterScanner::scanParameter(Parameter& par_, TDirectory* saveDir_) {
-  LogThrowIf(not isInitialized());
-  LogThrowIf(saveDir_ == nullptr);
+  LogExitIf(not isInitialized());
+  LogExitIf(saveDir_ == nullptr);
   std::vector<double> parPoints(_nbPoints_+1,0);
 
   LogInfo << "Scanning: " << par_.getFullTitle() << " / " << _nbPoints_ << " steps..." << std::endl;
@@ -173,7 +173,7 @@ void ParameterScanner::scanParameter(Parameter& par_, TDirectory* saveDir_) {
       offSet = 1;
     }
 
-    LogThrowIf(
+    LogExitIf(
         std::isnan(newVal),
         "Scanning point is nan. Current values are: "
             << std::endl
@@ -250,8 +250,8 @@ void ParameterScanner::scanSegment(TDirectory *saveDir_, const JsonType &end_, c
       []{ ParameterSet::unmuteLogger(); ParametersManager::unmuteLogger(); }
   );
 
-  LogThrowIf(end_.empty(), "Ending injector config is empty()");
-  LogThrowIf(nSteps_ < 0, "Invalid nSteps");
+  LogExitIf(end_.empty(), "Ending injector config is empty()");
+  LogExitIf(nSteps_ < 0, "Invalid nSteps");
 
   // nSteps_+2 as we also want the first and last points
   int nTotalSteps = nSteps_+2;
@@ -330,8 +330,8 @@ void ParameterScanner::scanSegment(TDirectory *saveDir_, const JsonType &end_, c
   _likelihoodInterfacePtr_->propagateAndEvalLikelihood();
 }
 void ParameterScanner::generateOneSigmaPlots(TDirectory* saveDir_){
-  LogThrowIf(not isInitialized());
-  LogThrowIf(saveDir_ == nullptr, "saveDir_ not set.");
+  LogExitIf(not isInitialized());
+  LogExitIf(saveDir_ == nullptr, "saveDir_ not set.");
 
   // Build the histograms with the current parameters
   _likelihoodInterfacePtr_->getModelPropagator().propagateParameters();
@@ -392,7 +392,7 @@ void ParameterScanner::generateOneSigmaPlots(TDirectory* saveDir_){
 
 }
 void ParameterScanner::varyEvenRates(const std::vector<double>& paramVariationList_, TDirectory* saveDir_){
-  LogThrowIf(not isInitialized());
+  LogExitIf(not isInitialized());
   saveDir_->cd();
 
   LogInfo << __METHOD_NAME__ << std::endl;

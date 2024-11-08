@@ -18,7 +18,7 @@ void DialInputBuffer::invalidateBuffers(){
 }
 
 void DialInputBuffer::initialise(){
-  LogThrowIf(_parSetListPtr_ == nullptr, "ParameterSet list pointer not set.");
+  LogExitIf(_parSetListPtr_ == nullptr, "ParameterSet list pointer not set.");
 
   // the size won't change anymore
   _inputParameterReferenceList_.shrink_to_fit();
@@ -31,14 +31,14 @@ void DialInputBuffer::initialise(){
 
   // sanity checks
   for( int iInput = 0 ; iInput < _inputArraySize_ ; iInput++ ){
-    LogThrowIf(_inputParameterReferenceList_[iInput].parSetIndex < 0,
+    LogExitIf(_inputParameterReferenceList_[iInput].parSetIndex < 0,
                "Parameter set index invalid: " << _inputParameterReferenceList_[iInput].parSetIndex);
-    LogThrowIf(_inputParameterReferenceList_[iInput].parSetIndex >= _parSetListPtr_->size(),
+    LogExitIf(_inputParameterReferenceList_[iInput].parSetIndex >= _parSetListPtr_->size(),
                "Parameter set index invalid: " << _inputParameterReferenceList_[iInput].parSetIndex);
 
-    LogThrowIf(_inputParameterReferenceList_[iInput].parIndex < 0,
+    LogExitIf(_inputParameterReferenceList_[iInput].parIndex < 0,
                "Parameter index invalid: " << _inputParameterReferenceList_[iInput].parIndex);
-    LogThrowIf(_inputParameterReferenceList_[iInput].parIndex >= getParameterSet(iInput).getParameterList().size(),
+    LogExitIf(_inputParameterReferenceList_[iInput].parIndex >= getParameterSet(iInput).getParameterList().size(),
                "Parameter index invalid: " << _inputParameterReferenceList_[iInput].parIndex);
   }
 
@@ -73,7 +73,7 @@ void DialInputBuffer::update(){
       tempBuffer += inputRef.mirrorEdges.minValue;
     }
     if( std::isnan(tempBuffer) ){
-        // LogThrowIf is broken, but OK for real error traps, but this is
+        // LogExitIf is broken, but OK for real error traps, but this is
         // checking user input it's critical that the error message is
         // properly formated so print an error, a backtrace, and then exit.
         LogError << "NaN while evaluating input buffer of "
@@ -91,7 +91,7 @@ void DialInputBuffer::update(){
   }
 }
 void DialInputBuffer::addParameterReference( const ParameterReference& parReference_){
-  LogThrowIf(_isInitialized_, "Can't add parameter index while initialized.");
+  LogExitIf(_isInitialized_, "Can't add parameter index while initialized.");
   _inputParameterReferenceList_.emplace_back(parReference_);
   auto& parRef = _inputParameterReferenceList_.back();
   parRef.bufferIndex = int(_inputParameterReferenceList_.size())-1;

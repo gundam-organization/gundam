@@ -39,13 +39,13 @@ Cache::Weight::Normalization::Normalization(
     // are copied once during initialization so do not pin the CPU memory
     // into the page set.
     fNormResult.reset(new hemi::Array<int>(GetNormsReserved(),false));
-    LogThrowIf(not fNormResult, "Bad NormResult Alloc");
+    LogExitIf(not fNormResult, "Bad NormResult Alloc");
     fNormParameter.reset(new hemi::Array<short>(GetNormsReserved(),false));
-    LogThrowIf(not fNormParameter, "Bad NormParameter Alloc");
+    LogExitIf(not fNormParameter, "Bad NormParameter Alloc");
   }
   catch (...) {
     LogError << "Uncaught exception, so stopping" << std::endl;
-    LogThrow("WeightNormalization -- Uncaught exception");
+    LogExit("WeightNormalization -- Uncaught exception");
   }
 
   Reset();
@@ -59,22 +59,22 @@ int Cache::Weight::Normalization::ReserveNorm(int resIndex, int parIndex) {
   if (resIndex < 0) {
     LogError << "Invalid result index"
              << std::endl;
-    LogThrow("Negative result index");
+    LogExit("Negative result index");
   }
   if (fWeights.size() <= resIndex) {
     LogError << "Invalid result index"
              << std::endl;
-    LogThrow("Result index out of bounds");
+    LogExit("Result index out of bounds");
   }
   if (parIndex < 0) {
     LogError << "Invalid parameter index"
              << std::endl;
-    LogThrow("Negative parameter index");
+    LogExit("Negative parameter index");
   }
   if (fParameters.size() <= parIndex) {
     LogError << "Invalid parameter index"
              << std::endl;
-    LogThrow("Parameter index out of bounds");
+    LogExit("Parameter index out of bounds");
   }
   int newIndex = fNormsUsed++;
   if (fNormsUsed > fNormsReserved) {
@@ -82,7 +82,7 @@ int Cache::Weight::Normalization::ReserveNorm(int resIndex, int parIndex) {
              << " Reserved: " << fNormsReserved
              << " Requested: " << fNormsUsed
              << std::endl;
-    LogThrow("Not enough space reserved for results");
+    LogExit("Not enough space reserved for results");
   }
   fNormResult->hostPtr()[newIndex] = resIndex;
   fNormParameter->hostPtr()[newIndex] = parIndex;

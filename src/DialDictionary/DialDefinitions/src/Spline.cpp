@@ -56,7 +56,7 @@ double Spline::evalResponse(const DialInputBuffer& input_) const {
   const double dialInput{input_.getInputBuffer()[0]};
 
 #ifndef NDEBUG
-  LogThrowIf(not std::isfinite(dialInput), "Invalid input for Spline");
+  LogExitIf(not std::isfinite(dialInput), "Invalid input for Spline");
 #endif
 
   if( not _allowExtrapolation_ ){

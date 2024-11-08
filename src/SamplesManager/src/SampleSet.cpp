@@ -49,7 +49,7 @@ void SampleSet::configureImpl(){
       if( not GenericToolbox::Json::fetchValue(sampleConfig, "isEnabled", true) ) continue;
       nSamples++;
     }
-    LogThrowIf(nSamples != _sampleList_.size(), "Can't reload config with different number of samples");
+    LogExitIf(nSamples != _sampleList_.size(), "Can't reload config with different number of samples");
 
     for( size_t iSample = 0 ; iSample < _sampleList_.size() ; iSample++ ){
       if( not GenericToolbox::Json::fetchValue(sampleListConfig[iSample], "isEnabled", true) ) continue;
@@ -77,7 +77,7 @@ std::vector<std::string> SampleSet::fetchRequestedVariablesForIndexing() const{
   return out;
 }
 void SampleSet::copyEventsFrom(const SampleSet& src_){
-  LogThrowIf(
+  LogExitIf(
       src_.getSampleList().size() != this->getSampleList().size(),
       "Can't copy events from mismatching sample lists. src(" << src_.getSampleList().size() << ")"
       << "dst(" << this->getSampleList().size() << ")."

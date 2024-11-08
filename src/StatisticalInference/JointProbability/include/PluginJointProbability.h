@@ -52,11 +52,11 @@ namespace JointProbability{
       this->compile();
       this->load();
     }
-    else{ LogThrow("Can't initialize JointProbabilityPlugin without llhSharedLib nor llhPluginSrc."); }
+    else{ LogExit("Can't initialize JointProbabilityPlugin without llhSharedLib nor llhPluginSrc."); }
   }
 
   double PluginJointProbability::eval( const SamplePair& samplePair_, int bin_ ) const{
-    LogThrowIf(evalFcn == nullptr, "Library not loaded properly.");
+    LogExitIf(evalFcn == nullptr, "Library not loaded properly.");
     return reinterpret_cast<double (*)( double, double, double )>(evalFcn)(
         samplePair_.data->getHistogram().getBinContentList()[bin_].sumWeights,
         samplePair_.model->getHistogram().getBinContentList()[bin_].sumWeights,
@@ -70,17 +70,17 @@ namespace JointProbability{
 
     // create library
     std::stringstream ss;
-    LogThrowIf(getenv("CXX") == nullptr, "CXX env is not set. Can't compile.");
+    LogExitIf(getenv("CXX") == nullptr, "CXX env is not set. Can't compile.");
     ss << "$CXX -std=c++11 -shared " << llhPluginSrc << " -o " << llhSharedLib;
-    LogThrowIf(system(ss.str().c_str()) != 0, "Compile command failed.");
+    LogExitIf(system(ss.str().c_str()) != 0, "Compile command failed.");
   }
 
   void PluginJointProbability::load(){
     LogInfo << "Loading shared lib: " << llhSharedLib << std::endl;
     fLib = dlopen(llhSharedLib.c_str(), RTLD_LAZY);
-    LogThrowIf(fLib == nullptr, "Cannot open library: " << dlerror());
+    LogExitIf(fLib == nullptr, "Cannot open library: " << dlerror());
     evalFcn = (dlsym(fLib, "evalFct"));
-    LogThrowIf(evalFcn == nullptr, "Cannot open evalFcn");
+    LogExitIf(evalFcn == nullptr, "Cannot open evalFcn");
   }
 
 }

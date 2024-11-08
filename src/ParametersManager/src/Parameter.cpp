@@ -38,13 +38,13 @@ void Parameter::configureImpl(){
 
 }
 void Parameter::initializeImpl() {
-  LogThrowIf(_owner_ == nullptr, "Parameter set ref is not set.");
-  LogThrowIf(_parameterIndex_ == -1, "Parameter index is not set.");
+  LogExitIf(_owner_ == nullptr, "Parameter set ref is not set.");
+  LogExitIf(_parameterIndex_ == -1, "Parameter index is not set.");
 
   if( not _isEnabled_ ) { return; }
-  LogThrowIf(std::isnan(_priorValue_), "Prior value is not set: " << getFullTitle());
-  LogThrowIf(std::isnan(_stdDevValue_), "Std dev value is not set: " << getFullTitle());
-  LogThrowIf(std::isnan(_parameterValue_), "Parameter value is not set: " << getFullTitle());
+  LogExitIf(std::isnan(_priorValue_), "Prior value is not set: " << getFullTitle());
+  LogExitIf(std::isnan(_stdDevValue_), "Std dev value is not set: " << getFullTitle());
+  LogExitIf(std::isnan(_parameterValue_), "Parameter value is not set: " << getFullTitle());
 }
 
 void Parameter::setMinMirror(double minMirror) {

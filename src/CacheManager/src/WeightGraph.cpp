@@ -52,23 +52,23 @@ Cache::Weight::Graph::Graph(
     // copied once during initialization so do not pin the CPU memory into
     // the page set.
     fGraphResult.reset(new hemi::Array<int>(GetGraphsReserved(),false));
-    LogThrowIf(not fGraphResult, "GraphResult not allocated");
+    LogExitIf(not fGraphResult, "GraphResult not allocated");
     fGraphParameter.reset(
         new hemi::Array<short>(GetGraphsReserved(),false));
-    LogThrowIf(not fGraphParameter, "GraphParameter not allocated");
+    LogExitIf(not fGraphParameter, "GraphParameter not allocated");
     fGraphIndex.reset(new hemi::Array<int>(1+GetGraphsReserved(),false));
-    LogThrowIf(not fGraphIndex, "GraphIndex not allocated");
+    LogExitIf(not fGraphIndex, "GraphIndex not allocated");
 
     // Get the CPU/GPU memory for the graph space.  This is copied once
     // during initialization so do not pin the CPU memory into the page
     // set.
     fGraphSpace.reset(
         new hemi::Array<WEIGHT_BUFFER_FLOAT>(GetGraphSpaceReserved(),false));
-    LogThrowIf(not fGraphSpace, "GraphSpace not allocated");
+    LogExitIf(not fGraphSpace, "GraphSpace not allocated");
   }
   catch (...) {
     LogError << "Uncaught exception in WeightGraph" << std::endl;
-    LogThrow("WeightGraph -- uncaught exception");
+    LogExit("WeightGraph -- uncaught exception");
   }
 
   // Initialize the caches.  Don't try to zero everything since the
@@ -85,54 +85,54 @@ void Cache::Weight::Graph::AddGraph(int resIndex, int parIndex,
   if (resIndex < 0) {
     LogError << "Invalid result index"
              << std::endl;
-    LogThrow("Negative result index");
+    LogExit("Negative result index");
   }
   if (fWeights.size() <= resIndex) {
     LogError << "Invalid result index"
              << std::endl;
-    LogThrow("Result index out of bounds");
+    LogExit("Result index out of bounds");
   }
   if (parIndex < 0) {
     LogError << "Invalid parameter index"
              << std::endl;
-    LogThrow("Negative parameter index");
+    LogExit("Negative parameter index");
   }
   if (fParameters.size() <= parIndex) {
     LogError << "Invalid parameter index " << parIndex
              << std::endl;
-    LogThrow("Parameter index out of bounds");
+    LogExit("Parameter index out of bounds");
   }
   if (graphData.size() < 2) {
     LogError << "Insufficient points in graph " << graphData.size()
              << std::endl;
-    LogThrow("Invalid number of graph points");
+    LogExit("Invalid number of graph points");
   }
   int knots = (graphData.size())/2;
   if (15 < knots) {
     LogError << "Up to 15 knots supported by Graph " << knots
              << std::endl;
-    LogThrow("Invalid number of graph points");
+    LogExit("Invalid number of graph points");
   }
 
   int newIndex = fGraphsUsed++;
   if (fGraphsUsed > fGraphsReserved) {
     LogError << "Not enough space reserved for graphs"
              << std::endl;
-    LogThrow("Not enough space reserved for graphs");
+    LogExit("Not enough space reserved for graphs");
   }
   fGraphResult->hostPtr()[newIndex] = resIndex;
   fGraphParameter->hostPtr()[newIndex] = parIndex;
   if (fGraphIndex->hostPtr()[newIndex] != fGraphSpaceUsed) {
     LogError << "Last graph knot index should be at old end of graphs"
              << std::endl;
-    LogThrow("Problem with control indices");
+    LogExit("Problem with control indices");
   }
   int knotIndex = fGraphSpaceUsed;
   fGraphSpaceUsed += graphData.size();
   if (fGraphSpaceUsed > fGraphSpaceReserved) {
     LogError << "Not enough space reserved for graph space"
              << std::endl;
-    LogThrow("Not enough space reserved for graph space");
+    LogExit("Not enough space reserved for graph space");
   }
   fGraphIndex->hostPtr()[newIndex+1] = fGraphSpaceUsed;
   for (std::size_t i = 0; i<graphData.size(); ++i) {
@@ -143,10 +143,10 @@ void Cache::Weight::Graph::AddGraph(int resIndex, int parIndex,
 
 int Cache::Weight::Graph::GetGraphParameterIndex(int sIndex) {
   if (sIndex < 0) {
-    LogThrow("Graph index invalid");
+    LogExit("Graph index invalid");
   }
   if (GetGraphsUsed() <= sIndex) {
-    LogThrow("Graph index invalid");
+    LogExit("Graph index invalid");
   }
   return fGraphParameter->hostPtr()[sIndex];
 }
@@ -154,20 +154,20 @@ int Cache::Weight::Graph::GetGraphParameterIndex(int sIndex) {
 double Cache::Weight::Graph::GetGraphParameter(int sIndex) {
   int i = GetGraphParameterIndex(sIndex);
   if (i<0) {
-    LogThrow("Graph parameter index out of bounds");
+    LogExit("Graph parameter index out of bounds");
   }
   if (fParameters.size() <= i) {
-    LogThrow("Graph parameter index out of bounds");
+    LogExit("Graph parameter index out of bounds");
   }
   return fParameters.hostPtr()[i];
 }
 
 int Cache::Weight::Graph::GetGraphKnotCount(int sIndex) {
   if (sIndex < 0) {
-    LogThrow("Graph index invalid");
+    LogExit("Graph index invalid");
   }
   if (GetGraphsUsed() <= sIndex) {
-    LogThrow("Graph index invalid");
+    LogExit("Graph index invalid");
   }
   int k = fGraphIndex->hostPtr()[sIndex+1]-fGraphIndex->hostPtr()[sIndex];
   return k/2;
@@ -175,10 +175,10 @@ int Cache::Weight::Graph::GetGraphKnotCount(int sIndex) {
 
 double Cache::Weight::Graph::GetGraphLowerBound(int sIndex) {
   if (sIndex < 0) {
-    LogThrow("Graph index invalid");
+    LogExit("Graph index invalid");
   }
   if (GetGraphsUsed() <= sIndex) {
-    LogThrow("Graph index invalid");
+    LogExit("Graph index invalid");
   }
   int spaceIndex = fGraphIndex->hostPtr()[sIndex];
   return fGraphSpace->hostPtr()[spaceIndex];
@@ -186,10 +186,10 @@ double Cache::Weight::Graph::GetGraphLowerBound(int sIndex) {
 
 double Cache::Weight::Graph::GetGraphUpperBound(int sIndex) {
   if (sIndex < 0) {
-    LogThrow("Graph index invalid");
+    LogExit("Graph index invalid");
   }
   if (GetGraphsUsed() <= sIndex) {
-    LogThrow("Graph index invalid");
+    LogExit("Graph index invalid");
   }
   int knotCount = GetGraphKnotCount(sIndex);
   double lower = GetGraphLowerBound(sIndex);
@@ -201,10 +201,10 @@ double Cache::Weight::Graph::GetGraphUpperBound(int sIndex) {
 double Cache::Weight::Graph::GetGraphLowerClamp(int sIndex) {
   int i = GetGraphParameterIndex(sIndex);
   if (i<0) {
-    LogThrow("Graph lower clamp index out of bounds");
+    LogExit("Graph lower clamp index out of bounds");
   }
   if (fLowerClamp.size() <= i) {
-    LogThrow("Graph lower clamp index out of bounds");
+    LogExit("Graph lower clamp index out of bounds");
   }
   return fLowerClamp.hostPtr()[i];
 }
@@ -212,46 +212,46 @@ double Cache::Weight::Graph::GetGraphLowerClamp(int sIndex) {
 double Cache::Weight::Graph::GetGraphUpperClamp(int sIndex) {
   int i = GetGraphParameterIndex(sIndex);
   if (i<0) {
-    LogThrow("Graph upper clamp index out of bounds");
+    LogExit("Graph upper clamp index out of bounds");
   }
   if (fUpperClamp.size() <= i) {
-    LogThrow("Graph upper clamp index out of bounds");
+    LogExit("Graph upper clamp index out of bounds");
   }
   return fUpperClamp.hostPtr()[i];
 }
 
 double Cache::Weight::Graph::GetGraphKnotValue(int sIndex, int knot) {
   if (sIndex < 0) {
-    LogThrow("Graph index invalid");
+    LogExit("Graph index invalid");
   }
   if (GetGraphsUsed() <= sIndex) {
-    LogThrow("Graph index invalid");
+    LogExit("Graph index invalid");
   }
   int spaceIndex = fGraphIndex->hostPtr()[sIndex];
   int count = GetGraphKnotCount(sIndex);
   if (knot < 0) {
-    LogThrow("Knot index invalid");
+    LogExit("Knot index invalid");
   }
   if (count <= knot) {
-    LogThrow("Knot index invalid");
+    LogExit("Knot index invalid");
   }
   return fGraphSpace->hostPtr()[spaceIndex+2+2*knot];
 }
 
 double Cache::Weight::Graph::GetGraphKnotPlace(int sIndex, int knot) {
   if (sIndex < 0) {
-    LogThrow("Graph index invalid");
+    LogExit("Graph index invalid");
   }
   if (GetGraphsUsed() <= sIndex) {
-    LogThrow("Graph index invalid");
+    LogExit("Graph index invalid");
   }
   int spaceIndex = fGraphIndex->hostPtr()[sIndex];
   int count = GetGraphKnotCount(sIndex);
   if (knot < 0) {
-    LogThrow("Knot index invalid");
+    LogExit("Knot index invalid");
   }
   if (count <= knot) {
-    LogThrow("Knot index invalid");
+    LogExit("Knot index invalid");
   }
   return fGraphSpace->hostPtr()[spaceIndex+2+2*knot+1];
 }

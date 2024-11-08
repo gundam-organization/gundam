@@ -63,18 +63,18 @@ Cache::Manager::Manager(const Cache::Manager::Configuration& config) {
   fTotalBytes = 0;
   try {
     fParameterCache = std::make_unique<Cache::Parameters>(config.parameters);
-    LogThrowIf(not fParameterCache, "Bad ParameterCache alloc");
+    LogExitIf(not fParameterCache, "Bad ParameterCache alloc");
     fTotalBytes += fParameterCache->GetResidentMemory();
 
     fWeightsCache = std::make_unique<Cache::Weights>(config.events);
-    LogThrowIf(not fWeightsCache, "Bad WeightsCache alloc");
+    LogExitIf(not fWeightsCache, "Bad WeightsCache alloc");
     fTotalBytes += fWeightsCache->GetResidentMemory();
 
     fNormalizations = std::make_unique<Cache::Weight::Normalization>(
         fWeightsCache->GetWeights(),
         fParameterCache->GetParameters(),
         config.norms);
-    LogThrowIf(not fNormalizations, "Bad Normalizations alloc");
+    LogExitIf(not fNormalizations, "Bad Normalizations alloc");
     fWeightsCache->AddWeightCalculator(fNormalizations.get());
     fTotalBytes += fNormalizations->GetResidentMemory();
 
@@ -85,7 +85,7 @@ Cache::Manager::Manager(const Cache::Manager::Configuration& config) {
         fParameterCache->GetUpperClamps(),
         config.compactSplines, config.compactPoints,
         config.spaceOption);
-    LogThrowIf(not fCompactSplines, "Bad CompactSplines alloc");
+    LogExitIf(not fCompactSplines, "Bad CompactSplines alloc");
     fWeightsCache->AddWeightCalculator(fCompactSplines.get());
     fTotalBytes += fCompactSplines->GetResidentMemory();
 
@@ -96,7 +96,7 @@ Cache::Manager::Manager(const Cache::Manager::Configuration& config) {
         fParameterCache->GetUpperClamps(),
         config.monotonicSplines, config.monotonicPoints,
         config.spaceOption);
-    LogThrowIf(not fMonotonicSplines, "Bad MonotonicSplines alloc");
+    LogExitIf(not fMonotonicSplines, "Bad MonotonicSplines alloc");
     fWeightsCache->AddWeightCalculator(fMonotonicSplines.get());
     fTotalBytes += fMonotonicSplines->GetResidentMemory();
 
@@ -107,7 +107,7 @@ Cache::Manager::Manager(const Cache::Manager::Configuration& config) {
         fParameterCache->GetUpperClamps(),
         config.uniformSplines, config.uniformPoints,
         config.spaceOption);
-    LogThrowIf(not fUniformSplines, "Bad UniformSplines alloc");
+    LogExitIf(not fUniformSplines, "Bad UniformSplines alloc");
     fWeightsCache->AddWeightCalculator(fUniformSplines.get());
     fTotalBytes += fUniformSplines->GetResidentMemory();
 
@@ -118,7 +118,7 @@ Cache::Manager::Manager(const Cache::Manager::Configuration& config) {
         fParameterCache->GetUpperClamps(),
         config.generalSplines, config.generalPoints,
         config.spaceOption);
-    LogThrowIf(not fGeneralSplines, "Bad GeneralSplines alloc");
+    LogExitIf(not fGeneralSplines, "Bad GeneralSplines alloc");
     fWeightsCache->AddWeightCalculator(fGeneralSplines.get());
     fTotalBytes += fGeneralSplines->GetResidentMemory();
 
@@ -128,7 +128,7 @@ Cache::Manager::Manager(const Cache::Manager::Configuration& config) {
         fParameterCache->GetLowerClamps(),
         fParameterCache->GetUpperClamps(),
         config.graphs, config.graphPoints);
-    LogThrowIf(not fGraphs, "Bad Graphs alloc");
+    LogExitIf(not fGraphs, "Bad Graphs alloc");
     fWeightsCache->AddWeightCalculator(fGraphs.get());
     fTotalBytes += fGraphs->GetResidentMemory();
 
@@ -138,7 +138,7 @@ Cache::Manager::Manager(const Cache::Manager::Configuration& config) {
         fParameterCache->GetLowerClamps(),
         fParameterCache->GetUpperClamps(),
         config.bilinear, config.bilinearPoints);
-    LogThrowIf(not fBilinear, "Bad Bilinear alloc");
+    LogExitIf(not fBilinear, "Bad Bilinear alloc");
     fWeightsCache->AddWeightCalculator(fBilinear.get());
     fTotalBytes += fBilinear->GetResidentMemory();
 
@@ -148,7 +148,7 @@ Cache::Manager::Manager(const Cache::Manager::Configuration& config) {
         fParameterCache->GetLowerClamps(),
         fParameterCache->GetUpperClamps(),
         config.bicubic, config.bicubicPoints);
-    LogThrowIf(not fBicubic, "Bad Bicubic alloc");
+    LogExitIf(not fBicubic, "Bad Bicubic alloc");
     fWeightsCache->AddWeightCalculator(fBicubic.get());
     fTotalBytes += fBicubic->GetResidentMemory();
 
@@ -158,20 +158,20 @@ Cache::Manager::Manager(const Cache::Manager::Configuration& config) {
         config.tabulated,
         config.tabulatedPoints,
         config.tables);
-    LogThrowIf(not fTabulated, "Bad Tabulated alloc");
+    LogExitIf(not fTabulated, "Bad Tabulated alloc");
     fWeightsCache->AddWeightCalculator(fTabulated.get());
     fTotalBytes += fTabulated->GetResidentMemory();
 
     fHistogramsCache = std::make_unique<Cache::HistogramSum>(
         fWeightsCache->GetWeights(),
         config.histBins);
-    LogThrowIf(not fHistogramsCache, "Bad HistogramsCache alloc");
+    LogExitIf(not fHistogramsCache, "Bad HistogramsCache alloc");
     fTotalBytes += fHistogramsCache->GetResidentMemory();
 
   }
   catch (...) {
     LogError << "Failed to allocate memory, so stopping" << std::endl;
-    LogThrow("Not enough memory available");
+    LogExit("Not enough memory available");
   }
 
   LogInfo << "Approximate cache manager size for"
@@ -194,7 +194,7 @@ bool Cache::Manager::Build() {
 
   if( fSampleSetPtr == nullptr or fEventDialCachePtr == nullptr ){
     LogError << "fSampleSetPtr or fEventDialCachePtr not set." << std::endl;
-    LogThrow("Can't Build()");
+    LogExit("Can't Build()");
   }
 
   LogInfo << "Build the internal caches " << std::endl;
@@ -217,7 +217,7 @@ bool Cache::Manager::Build() {
   std::map<std::string, int> useCount;
   for (EventDialCache::CacheEntry& elem : fEventDialCachePtr->getCache()) {
     if (elem.event->getIndices().bin < 0) {
-      LogThrow("Caching event that isn't used");
+      LogExit("Caching event that isn't used");
     }
     ++config.events;
     for( auto& dialResponseCache : elem.dialResponseCacheList) {
@@ -274,7 +274,7 @@ bool Cache::Manager::Build() {
       else if (dialType.find("Tabulated") == 0) {
         ++config.tabulated;
         Tabulated* tabDial = dynamic_cast<Tabulated*>(dial);
-        LogThrowIf(tabDial == nullptr, "Tabulated dial is not a Tabulated dial");
+        LogExitIf(tabDial == nullptr, "Tabulated dial is not a Tabulated dial");
         // Add a place holder for this table.  This will be filled
         // with the offset to the table when the weighting is built.
         config.tables[tabDial->getTable()] = 0;
@@ -292,7 +292,7 @@ bool Cache::Manager::Build() {
     LogError << "Dial creation errors: "
              << dialErrorCount
              << std::endl;
-    LogThrow("Unsupported dial type: Incomplete dial implementation");
+    LogExit("Unsupported dial type: Incomplete dial implementation");
   }
 
   // Finish filling the configuration for the tabulated dials
@@ -415,11 +415,11 @@ bool Cache::Manager::Build() {
     }
     try {
       fSingleton = new Manager(config);
-      LogThrowIf(not fSingleton, "CacheManager Not allocated");
+      LogExitIf(not fSingleton, "CacheManager Not allocated");
     }
     catch (...) {
       LogError << "Did not allocated cache manager" << std::endl;
-      LogThrow("Cache::Manager allocation error");
+      LogExit("Cache::Manager allocation error");
     }
   }
 
@@ -653,7 +653,7 @@ bool Cache::Manager::Update() {
       LogError << "Dial creation errors --"
                << " Unsupported dial types: " << dialErrorCount
                << std::endl;
-      LogThrow("Unsupported dial type: Incomplete dial implementation");
+      LogExit("Unsupported dial type: Incomplete dial implementation");
     }
 
     // Set the initial weight for the event.  This is done here since the
@@ -674,7 +674,7 @@ bool Cache::Manager::Update() {
     LogError << "Cache Manager -- expected Results: "
              << Cache::Manager::Get()->GetWeightsCache().GetResultCount()
              << std::endl;
-    LogThrow("Probable problem putting dials in cache");
+    LogExit("Probable problem putting dials in cache");
   }
 
   fSampleHistFillerList.clear();
@@ -709,7 +709,7 @@ bool Cache::Manager::Update() {
 
   if (Cache::Manager::Get()->GetHistogramsCache().GetSumCount()
       != nextHist) {
-    LogThrow("Histogram cells are missing");
+    LogExit("Histogram cells are missing");
   }
 
   // If the event weight cap has been set, then pass it along
@@ -733,7 +733,7 @@ bool Cache::Manager::Fill() {
   if (!cache) return false;
   if (fUpdateRequired) {
     LogError << "Fill while an update is required" << std::endl;
-    LogThrow("Fill while an update is required");
+    LogExit("Fill while an update is required");
   }
   LogTraceIf(GundamGlobals::isDebug() ) << "Cache::Manager::Fill -- Fill the GPU cache" << std::endl;
 #define DUMP_FILL_INPUT_PARAMETERS

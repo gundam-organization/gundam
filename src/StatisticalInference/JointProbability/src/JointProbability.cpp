@@ -28,7 +28,7 @@ namespace JointProbability{
     auto jType{JointProbabilityType::toEnum( type_, true )};
 
     if( jType == JointProbabilityType::EnumOverflow  ){
-      LogThrow( "Unknown JointProbabilityType: " << type_ );
+      LogExit( "Unknown JointProbabilityType: " << type_ );
     }
 
     return makeJointProbability( jType );
@@ -62,7 +62,7 @@ namespace JointProbability{
         out = std::make_unique<BarlowBeestonBanff2022Sfgd>();
         break;
       default:
-        LogThrow( "Unknown JointProbabilityType: " << type_.toString() );
+        LogExit( "Unknown JointProbabilityType: " << type_.toString() );
     }
 
     return out.release();

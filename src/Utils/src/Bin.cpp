@@ -31,7 +31,7 @@ void Bin::Edges::configureImpl(){
     isConditionVar = true;
   }
   else{
-    LogThrow("No bound definition for edges: " << _config_);
+    LogExit("No bound definition for edges: " << _config_);
   }
 
 }
@@ -93,7 +93,7 @@ void Bin::addBinEdge( const std::string &variableName_, double lowEdge_, double 
 // Getters
 const Bin::Edges& Bin::getVarEdges( const std::string& varName_ ) const{
   auto* varEgdesPtr{getVarEdgesPtr(varName_)};
-  LogThrowIf(varEgdesPtr == nullptr, "Couldn't find varEdges corresponding to varName:" << varName_);
+  LogExitIf(varEgdesPtr == nullptr, "Couldn't find varEdges corresponding to varName:" << varName_);
   return *varEgdesPtr;
 }
 const Bin::Edges* Bin::getVarEdgesPtr( const std::string& varName_ ) const{
@@ -132,7 +132,7 @@ bool Bin::isOverlapping( const Bin& other_) const{
   return true;
 }
 bool Bin::isInBin( const std::vector<double>& valuesList_) const{
-  LogThrowIf( valuesList_.size() != _binEdgesList_.size(),
+  LogExitIf( valuesList_.size() != _binEdgesList_.size(),
               "Provided " << GET_VAR_NAME_VALUE(valuesList_.size()) << " does not match " << GET_VAR_NAME_VALUE(_binEdgesList_.size()));
   const double* buf = &valuesList_[0];
 

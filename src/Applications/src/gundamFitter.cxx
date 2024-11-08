@@ -97,7 +97,7 @@ int main(int argc, char** argv){
 
   clParser.parseCmdLine(argc, argv);
 
-  LogThrowIf(clParser.isNoOptionTriggered(), "No option was provided.");
+  LogExitIf(clParser.isNoOptionTriggered(), "No option was provided.");
 
   LogInfo << "Provided arguments: " << std::endl;
   LogInfo << clParser.getValueSummary() << std::endl << std::endl;
@@ -118,9 +118,9 @@ int main(int argc, char** argv){
   // Is build compatible with GPU option?
   if( clParser.isOptionTriggered("usingGpu") ){
 #ifdef GUNDAM_USING_CACHE_MANAGER
-    LogThrowIf( not Cache::Manager::HasCUDA(), "CUDA support not enabled with this GUNDAM build." );
+    LogExitIf( not Cache::Manager::HasCUDA(), "CUDA support not enabled with this GUNDAM build." );
 #else
-    LogThrow("CUDA support not enabled with this GUNDAM build (GUNDAM_USING_CACHE_MANAGER required).")
+    LogExit("CUDA support not enabled with this GUNDAM build (GUNDAM_USING_CACHE_MANAGER required).")
 #endif
     LogWarning << "Using GPU parallelization." << std::endl;
   }
@@ -137,7 +137,7 @@ int main(int argc, char** argv){
       else if ("on" == clParser.getOptionVal<std::string>("usingCacheManager",0)) useCache = true;
       else if ("off" == clParser.getOptionVal<std::string>("usingCacheManager",0)) useCache = false;
       else {
-          LogThrow("Invalid --cache-manager argument: must be empty, 'on' or 'off'");
+          LogExit("Invalid --cache-manager argument: must be empty, 'on' or 'off'");
       }
   }
   if (clParser.isOptionTriggered("usingGpu")) useCache = true;
@@ -149,7 +149,7 @@ int main(int argc, char** argv){
                  << std::endl;
     }
 #else
-    LogThrowIf(useCache, "GUNDAM compiled without Cache::Manager");
+    LogExitIf(useCache, "GUNDAM compiled without Cache::Manager");
 #endif
 
   // inject parameter config?
@@ -179,7 +179,7 @@ int main(int argc, char** argv){
 
   // Reading configuration
   auto configFilePath = clParser.getOptionVal("configFile", "");
-  LogThrowIf(configFilePath.empty(), "Config file not provided.");
+  LogExitIf(configFilePath.empty(), "Config file not provided.");
 
   ConfigUtils::ConfigHandler configHandler(configFilePath);
   configHandler.override( clParser.getOptionValList<std::string>("overrideFiles") );
@@ -242,7 +242,7 @@ int main(int argc, char** argv){
   else{
     std::string minGundamVersion("0.0.0");
     GenericToolbox::Json::fillValue(gundamFitterConfig, minGundamVersion, "minGundamVersion");
-    LogThrowIf(
+    LogExitIf(
         not GundamUtils::isNewerOrEqualVersion( minGundamVersion ),
         "Version check FAILED: " << GundamUtils::getVersionStr() << " < " << minGundamVersion
     );
@@ -293,7 +293,7 @@ int main(int argc, char** argv){
         isFound = true;
       }
     }
-    LogThrowIf(not isFound, "Could not find data entry \"" << selectedDataEntry << "\" among defined data sets");
+    LogExitIf(not isFound, "Could not find data entry \"" << selectedDataEntry << "\" among defined data sets");
   }
 
   // --skip-hesse
@@ -378,7 +378,7 @@ int main(int argc, char** argv){
   }
 
   if( clParser.isOptionTriggered("debugMaxNbEventToLoad") ){
-    LogThrowIf(clParser.getNbValueSet("debugMaxNbEventToLoad") != 1, "Nb of event not specified.");
+    LogExitIf(clParser.getNbValueSet("debugMaxNbEventToLoad") != 1, "Nb of event not specified.");
     LogDebug << "Load " << clParser.getOptionVal<size_t>("debugMaxNbEventToLoad") << "max events per dataset." << std::endl;
     for( auto& dataset : fitter.getLikelihoodInterface().getDatasetList() ){
       dataset.setNbMaxEventToLoad(clParser.getOptionVal<size_t>("debugMaxNbEventToLoad"));
@@ -398,7 +398,7 @@ int main(int argc, char** argv){
 
   if( clParser.isOptionTriggered("scanLine") ){
     auto* outDir = GenericToolbox::mkdirTFile(fitter.getSaveDir(), GenericToolbox::joinPath("preFit", "cmdScanLine"));
-    LogThrowIf( clParser.getNbValueSet("scanLine") == 0, "No injector file provided.");
+    LogExitIf( clParser.getNbValueSet("scanLine") == 0, "No injector file provided.");
     if( clParser.getNbValueSet("scanLine") == 1 ){
       LogAlert << "Will scan the line toward the point set in: " << clParser.getOptionVal<std::string>("scanLine", 0) << std::endl;
 
@@ -421,7 +421,7 @@ int main(int argc, char** argv){
       fitter.getParameterScanner().scanSegment( outDir, endPoint, startPoint );
     }
     else{
-      LogThrow("");
+      LogExit("");
     }
   }
 

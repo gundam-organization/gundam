@@ -24,7 +24,7 @@ DialBase* DialBaseFactory::makeDial(const std::string& dialTitle_,
   // in the event of an exception.
   std::unique_ptr<DialBase> dialBase;
 
-  LogThrowIf(dialType_.empty(), "Dial type not set.");
+  LogExitIf(dialType_.empty(), "Dial type not set.");
 
   if (dialType_ == "Norm" || dialType_ == "Normalization") {
     NormDialBaseFactory factory;
@@ -79,7 +79,7 @@ DialBase* DialBaseFactory::makeDial(const std::string& dialTitle_,
   }
 #endif
   else{
-    LogThrow("Unrecognized dial type: " << dialType_);
+    LogExit("Unrecognized dial type: " << dialType_);
   }
 
   // Pass the ownership without any constraints!
@@ -109,10 +109,10 @@ DialBase* DialBaseFactory::makeDial(const JsonType& config_){
 
     bool success = compiledLibDialPtr->loadLibrary( GenericToolbox::Json::fetchValue<std::string>(formulaConfig, "libraryFile") );
     if( not success ){
-      LogThrow("Could not load CompiledLibDial. " << GenericToolbox::Json::fetchValue(formulaConfig, "messageOnError", std::string("")) );
+      LogExit("Could not load CompiledLibDial. " << GenericToolbox::Json::fetchValue(formulaConfig, "messageOnError", std::string("")) );
     }
   }
-  else{ LogThrow("Unknown dial type: " << dialType); }
+  else{ LogExit("Unknown dial type: " << dialType); }
 
   return dialBase.release();
 }

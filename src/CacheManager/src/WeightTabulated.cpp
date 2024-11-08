@@ -51,24 +51,24 @@ Cache::Weight::Tabulated::Tabulated(
     // copied once during initialization so do not pin the CPU memory into
     // the page set.
     fResult.reset(new hemi::Array<int>(GetReserved(),false));
-    LogThrowIf(not fResult, "Bad Result alloc");
+    LogExitIf(not fResult, "Bad Result alloc");
 
     fIndex.reset(new hemi::Array<int>(GetReserved(),false));
-    LogThrowIf(not fIndex, "Bad Index alloc");
+    LogExitIf(not fIndex, "Bad Index alloc");
 
     fFraction.reset(
         new hemi::Array<WEIGHT_BUFFER_FLOAT>(GetReserved(),false));
-    LogThrowIf(not fFraction, "Bad Fraction alloc");
+    LogExitIf(not fFraction, "Bad Fraction alloc");
 
     // Get the CPU/GPU memory for the tables.  This is copied for each
     // evaluation.  The table is filled before this class is used.
     fData.reset(
         new hemi::Array<WEIGHT_BUFFER_FLOAT>(fDataReserved,false));
-    LogThrowIf(not fData, "Bad Table alloc");
+    LogExitIf(not fData, "Bad Table alloc");
   }
   catch (...) {
     LogError << "Failed to allocate memory, so stopping" << std::endl;
-    LogThrow("Not enough memory available");
+    LogExit("Not enough memory available");
   }
 
   // Initialize the caches.  Don't try to zero everything since the
@@ -88,31 +88,31 @@ void Cache::Weight::Tabulated::AddData(int resIndex,
   if (resIndex < 0) {
     LogError << "Invalid result index"
              << std::endl;
-    LogThrow("Negative result index");
+    LogExit("Negative result index");
   }
   if (fWeights.size() <= resIndex) {
     LogError << "Invalid result index"
              << std::endl;
-    LogThrow("Result index out of bounds");
+    LogExit("Result index out of bounds");
   }
 
   int newIndex = fUsed++;
   if (fUsed > fReserved) {
     LogError << "Not enough space reserved for dials"
              << std::endl;
-    LogThrow("Not enough space reserved for dials");
+    LogExit("Not enough space reserved for dials");
   }
 
   auto tableEntry = fTables.find(table);
   if (tableEntry == fTables.end()) {
     LogError << "Request to create Tabulated weight for invalid table"
              << std::endl;
-    LogThrow("Invalid table request");
+    LogExit("Invalid table request");
   }
   int offset = tableEntry->second + index;
   if (fData->size() <= offset) {
     LogError << "Insufficent table space" << std::endl;
-    LogThrow("Insufficient table space");
+    LogExit("Insufficient table space");
   }
 
   fResult->hostPtr()[newIndex] = resIndex;

@@ -98,7 +98,7 @@ template<typename T> void EventTreeWriter::writeEventsTemplate(const GenericTool
 
       auto& var = evPtr->getVariables().fetchVariable( varName ).get();
       char typeTag = GenericToolbox::findOriginalVariableType(var);
-      LogThrowIf( typeTag == 0 or typeTag == char(0xFF), varName << " has an invalid leaf type." );
+      LogExitIf( typeTag == 0 or typeTag == char(0xFF), varName << " has an invalid leaf type." );
 
       std::string leafDefStr{ varName };
 //      if(not disableArrays_ and lH.size() > 1){ leafDefStr += "[" + std::to_string(lH.size()) + "]"; }
@@ -129,7 +129,7 @@ template<typename T> void EventTreeWriter::writeEventsTemplate(const GenericTool
   std::vector<std::pair<size_t,size_t>> parIndexList{};
 
   if( writeDials ){
-    LogThrowIf(parSetListPtr == nullptr);
+    LogExitIf(parSetListPtr == nullptr);
 
     // how many pars?
     size_t nPars = 0;

@@ -65,7 +65,7 @@ void RootMinimizer::initializeImpl(){
   _rootMinimizer_ = std::unique_ptr<ROOT::Math::Minimizer>(
       ROOT::Math::Factory::CreateMinimizer(_minimizerType_, _minimizerAlgo_)
   );
-  LogThrowIf(_rootMinimizer_ == nullptr, "Could not create minimizer: " << _minimizerType_ << "/" << _minimizerAlgo_);
+  LogExitIf(_rootMinimizer_ == nullptr, "Could not create minimizer: " << _minimizerType_ << "/" << _minimizerAlgo_);
 
   if( _minimizerAlgo_.empty() ){
     _minimizerAlgo_ = _rootMinimizer_->Options().MinimizerAlgorithm();
@@ -168,7 +168,7 @@ void RootMinimizer::minimize(){
 
   if( _preFitWithSimplex_ ){
     LogWarning << "Running simplex algo before the minimizer" << std::endl;
-    LogThrowIf(_minimizerType_ != "Minuit2", "Can't launch simplex with " << _minimizerType_);
+    LogExitIf(_minimizerType_ != "Minuit2", "Can't launch simplex with " << _minimizerType_);
 
     std::string originalAlgo = _rootMinimizer_->Options().MinimizerAlgorithm();
 
@@ -335,7 +335,7 @@ void RootMinimizer::minimize(){
 }
 void RootMinimizer::calcErrors(){
 
-  LogThrowIf(not isInitialized(), "not initialized");
+  LogExitIf(not isInitialized(), "not initialized");
 
   LogWarning << std::endl << GenericToolbox::addUpDownBars("Calling calcErrors()...") << std::endl;
 
@@ -428,7 +428,7 @@ void RootMinimizer::calcErrors(){
   }
 }
 void RootMinimizer::scanParameters( TDirectory* saveDir_ ){
-  LogThrowIf(not isInitialized());
+  LogExitIf(not isInitialized());
   LogInfo << "Performing scans of fit parameters..." << std::endl;
   for( int iPar = 0 ; iPar < getMinimizer()->NDim() ; iPar++ ){
     if( getMinimizer()->IsFixedVariable(iPar) ){
@@ -493,8 +493,8 @@ void RootMinimizer::saveMinimizerSettings( TDirectory* saveDir_) const {
 // protected
 void RootMinimizer::writePostFitData( TDirectory* saveDir_) {
   LogInfo << __METHOD_NAME__ << std::endl;
-  LogThrowIf(not isInitialized(), "not initialized");
-  LogThrowIf(saveDir_==nullptr, "Save dir not specified");
+  LogExitIf(not isInitialized(), "not initialized");
+  LogExitIf(saveDir_==nullptr, "Save dir not specified");
 
   LogInfo << "Extracting post-fit covariance matrix" << std::endl;
   auto* matricesDir = GenericToolbox::mkdirTFile(saveDir_, "hessian");
@@ -1211,7 +1211,7 @@ void RootMinimizer::writePostFitData( TDirectory* saveDir_) {
   } // parSet
 }
 void RootMinimizer::updateCacheToBestfitPoint(){
-  LogThrowIf(_rootMinimizer_->X() == nullptr, "No best fit point provided by the minimizer.");
+  LogExitIf(_rootMinimizer_->X() == nullptr, "No best fit point provided by the minimizer.");
 
   LogWarning << "Updating propagator cache to the best fit point..." << std::endl;
   this->evalFit(_rootMinimizer_->X() );

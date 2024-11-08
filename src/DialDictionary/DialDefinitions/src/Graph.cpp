@@ -17,8 +17,8 @@ bool Graph::getAllowExtrapolation() const {
 }
 
 void Graph::buildDial(const TGraph &graph, const std::string& option_) {
-    LogThrowIf(_graph_.GetN() != 0, "Graph already set.");
-  LogThrowIf(graph.GetN() == 0, "Invalid input graph");
+    LogExitIf(_graph_.GetN() != 0, "Graph already set.");
+  LogExitIf(graph.GetN() == 0, "Invalid input graph");
   _graph_ = graph;
   _graph_.Sort();
 }
@@ -27,7 +27,7 @@ double Graph::evalResponse(const DialInputBuffer& input_) const {
   double dialInput{input_.getInputBuffer()[0]};
 
 #ifndef NDEBUG
-  LogThrowIf(not std::isfinite(dialInput), "Invalid input for Graph");
+  LogExitIf(not std::isfinite(dialInput), "Invalid input for Graph");
 #endif
 
   if( not _allowExtrapolation_ ){

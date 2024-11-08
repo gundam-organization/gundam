@@ -68,14 +68,14 @@ int main(int argc, char** argv){
 
   clParser.parseCmdLine(argc, argv);
 
-  LogThrowIf(clParser.isNoOptionTriggered(), "No option was provided.");
+  LogExitIf(clParser.isNoOptionTriggered(), "No option was provided.");
 
   LogInfo << "Provided arguments: " << std::endl;
   LogInfo << clParser.getValueSummary() << std::endl << std::endl;
   LogInfo << clParser.dumpConfigAsJsonStr() << std::endl;
 
 
-  LogThrowIf( clParser.getNbValueSet("fitFiles") == 0, "no fit files provided" );
+  LogExitIf( clParser.getNbValueSet("fitFiles") == 0, "no fit files provided" );
 
 
   for( auto& file : clParser.getOptionValList<std::string>("fitFiles") ){

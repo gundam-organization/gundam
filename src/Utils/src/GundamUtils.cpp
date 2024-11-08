@@ -38,7 +38,7 @@ namespace GundamUtils {
       return true;
     }
     auto minVersionSplit = GenericToolbox::splitString(minVersion_, ".");
-    LogThrowIf(minVersionSplit.size() != 3, "Invalid version format: " << minVersion_);
+    LogExitIf(minVersionSplit.size() != 3, "Invalid version format: " << minVersion_);
 
     // stripping "f" tag
     if( minVersionSplit[2].back() == 'f' ){ minVersionSplit[2].pop_back(); }

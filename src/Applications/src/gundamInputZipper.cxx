@@ -53,13 +53,13 @@ int main(int argc, char** argv) {
 
   clParser.parseCmdLine(argc, argv);
 
-  LogThrowIf(clParser.isNoOptionTriggered(), "No option was provided.");
+  LogExitIf(clParser.isNoOptionTriggered(), "No option was provided.");
 
   LogInfo << "Provided arguments: " << std::endl;
   LogInfo << clParser.getValueSummary() << std::endl << std::endl;
   LogInfo << clParser.dumpConfigAsJsonStr() << std::endl;
 
-  LogThrowIf( not clParser.isOptionTriggered("configFile") );
+  LogExitIf( not clParser.isOptionTriggered("configFile") );
 
   ConfigUtils::ConfigHandler configHandler( clParser.getOptionVal<std::string>("configFile") );
   configHandler.override( clParser.getOptionValList<std::string>("overrideFiles") );
@@ -140,10 +140,10 @@ int main(int argc, char** argv) {
   if( clParser.isOptionTriggered("zipOutFolder") ){
     LogInfo << "Creating a .gz archive of \"" << outFolder << "\"" << std::endl;
     auto err = std::system( ("tar -czvf \"" + outFolder + ".tar.gz\" \"" + outFolder + "\"").c_str() );
-    LogThrowIf( err != 0, "Error while running the tar command." );
+    LogExitIf( err != 0, "Error while running the tar command." );
     LogInfo << "Removing created temp folder..." << std::endl;
     err = std::system( ("rm -r \"" + outFolder + "\"").c_str() );
-    LogThrowIf( err != 0, "Error while running the tar command." );
+    LogExitIf( err != 0, "Error while running the tar command." );
     LogInfo << "Archive writen under \"" << outFolder << ".tar.gz\"" << std::endl;
   }
 

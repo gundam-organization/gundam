@@ -52,7 +52,7 @@ int main(int argc, char** argv){
 
   clParser.parseCmdLine(argc, argv);
 
-  LogThrowIf(clParser.isNoOptionTriggered(), "No option was provided.");
+  LogExitIf(clParser.isNoOptionTriggered(), "No option was provided.");
 
   LogInfo << "Provided arguments: " << std::endl;
   LogInfo << clParser.getValueSummary() << std::endl << std::endl;
@@ -61,9 +61,9 @@ int main(int argc, char** argv){
   GundamGlobals::setIsDebug(clParser.isOptionTriggered("debugVerbose"));
 
   // Sanity checks
-  LogThrowIf(not clParser.isOptionTriggered("configFile"), "Xsec calculator config file not provided.");
-  LogThrowIf(not clParser.isOptionTriggered("fitterFile"), "Did not provide the output fitter file.");
-  LogThrowIf(not clParser.isOptionTriggered("nToys"), "Did not provide number of toys.");
+  LogExitIf(not clParser.isOptionTriggered("configFile"), "Xsec calculator config file not provided.");
+  LogExitIf(not clParser.isOptionTriggered("fitterFile"), "Did not provide the output fitter file.");
+  LogExitIf(not clParser.isOptionTriggered("nToys"), "Did not provide number of toys.");
 
 
   // Global parameters
@@ -89,7 +89,7 @@ int main(int argc, char** argv){
   if( GenericToolbox::hasExtension(fitterFile, "root") ){
     LogWarning << "Opening fitter output file: " << fitterFile << std::endl;
     fitterRootFile = std::unique_ptr<TFile>( TFile::Open( fitterFile.c_str() ) );
-    LogThrowIf( fitterRootFile == nullptr, "Could not open fitter output file." );
+    LogExitIf( fitterRootFile == nullptr, "Could not open fitter output file." );
 
     RootUtils::ObjectReader::throwIfNotFound = true;
 
@@ -162,7 +162,7 @@ int main(int argc, char** argv){
         std::string()
     );
 
-    LogThrowIf(associatedParSet.empty(), "Could not find parSetBinning.");
+    LogExitIf(associatedParSet.empty(), "Could not find parSetBinning.");
 
     // Looking for parSet
     auto foundDialCollection = std::find_if(
@@ -173,7 +173,7 @@ int main(int argc, char** argv){
           if( parSetPtr == nullptr ){ return false; }
           return ( parSetPtr->getName() == associatedParSet );
         });
-    LogThrowIf(
+    LogExitIf(
         foundDialCollection == fitter.getLikelihoodInterface().getModelPropagator().getDialCollectionList().end(),
         "Could not find " << associatedParSet << " among fit dial collections: "
                           << GenericToolbox::toString(fitter.getLikelihoodInterface().getModelPropagator().getDialCollectionList(),
@@ -182,7 +182,7 @@ int main(int argc, char** argv){
                                                       }
                           ));
 
-    LogThrowIf(foundDialCollection->getDialBinSet().getBinList().empty(), "Could not find binning");
+    LogExitIf(foundDialCollection->getDialBinSet().getBinList().empty(), "Could not find binning");
     sample.setBinningFilePath( foundDialCollection->getDialBinSet().getFilePath() );
 
   }
@@ -308,15 +308,15 @@ int main(int argc, char** argv){
 
     }
     void initialize(){
-      LogThrowIf(dialCollectionPtr == nullptr, "Associated dial collection not provided.");
-      LogThrowIf(dialCollectionPtr->isEventByEvent(), "Dial collection is event by event.");
-      LogThrowIf(dialCollectionPtr->getSupervisedParameter() != nullptr, "Need a dial collection that handle a whole parSet.");
+      LogExitIf(dialCollectionPtr == nullptr, "Associated dial collection not provided.");
+      LogExitIf(dialCollectionPtr->isEventByEvent(), "Dial collection is event by event.");
+      LogExitIf(dialCollectionPtr->getSupervisedParameter() != nullptr, "Need a dial collection that handle a whole parSet.");
 
       file = std::make_shared<TFile>( filePath.c_str() );
-      LogThrowIf(file == nullptr, "Could not open file");
+      LogExitIf(file == nullptr, "Could not open file");
 
       histogram = file->Get<TH1D>( histogramPath.c_str() );
-      LogThrowIf(histogram == nullptr, "Could not find histogram.");
+      LogExitIf(histogram == nullptr, "Could not find histogram.");
     }
     [[nodiscard]] double getNormFactor() const {
       double out{0};
@@ -427,7 +427,7 @@ int main(int argc, char** argv){
       }
       else{
         LogInfo << std::endl;
-        LogThrow("Unrecognized config.");
+        LogExit("Unrecognized config.");
       }
 
       LogInfo << std::endl;
@@ -538,7 +538,7 @@ int main(int argc, char** argv){
                 break;
               }
             }
-            LogThrowIf(parSetNormPtr == nullptr, "Could not find parSetNorm obj with name: " << normData.parSetNormaliserName);
+            LogExitIf(parSetNormPtr == nullptr, "Could not find parSetNorm obj with name: " << normData.parSetNormaliserName);
 
             binData /= parSetNormPtr->getNormFactor();
           }
@@ -778,7 +778,7 @@ int main(int argc, char** argv){
         break;
       }      
     }
-    LogThrowIf(xsecDataPtr==nullptr, "corresponding data not found");
+    LogExitIf(xsecDataPtr==nullptr, "corresponding data not found");
 
     // alright, now rescale error bars
     for( int iBin = 0 ; iBin < histHolder.histPtr->GetNbinsX() ; iBin++ ){

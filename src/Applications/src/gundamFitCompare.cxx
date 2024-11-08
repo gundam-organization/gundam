@@ -76,7 +76,7 @@ int main( int argc, char** argv ){
     exit(EXIT_FAILURE);
   }
 
-  LogThrowIf(clp.isOptionTriggered("use-prefit-1") and clp.isOptionTriggered("use-prefit-2"),
+  LogExitIf(clp.isOptionTriggered("use-prefit-1") and clp.isOptionTriggered("use-prefit-2"),
              "Remove the two options to see prefit comparison of both files");
 
   LogInfo << "Reading config..." << std::endl;

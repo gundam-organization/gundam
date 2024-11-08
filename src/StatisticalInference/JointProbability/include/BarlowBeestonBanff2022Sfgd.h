@@ -78,7 +78,7 @@ namespace JointProbability{
     // b^2 - 4ac in quadratic equation
     double temp2 = temp * temp + 4 * dataVal * fractional * fractional;
 
-    LogThrowIf(temp2 < 0, "Negative square root in Barlow Beeston coefficient calculation!");
+    LogExitIf(temp2 < 0, "Negative square root in Barlow Beeston coefficient calculation!");
 
 
     // Solve for the positive beta

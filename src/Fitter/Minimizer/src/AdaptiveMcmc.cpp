@@ -410,7 +410,7 @@ bool AdaptiveMcmc::adaptiveLoadProposalCovariance( AdaptiveStepMCMC& mcmc,
              << std::endl;
     LogError << "   Proposal Y Bins:     " << proposalCov->GetNbinsY()
              << std::endl;
-    LogThrow("Mismatched proposal covariance matrix");
+    LogExit("Mismatched proposal covariance matrix");
   }
 
   // Dump all of the previous correlations.
@@ -426,7 +426,7 @@ bool AdaptiveMcmc::adaptiveLoadProposalCovariance( AdaptiveStepMCMC& mcmc,
       LogError << "Mismatch of parameter and covariance names" << std::endl;
       LogError << "Parameter:  " << parName << std::endl;
       LogError << "Covariance: " << covName << std::endl;
-      LogThrow("Mismatched covariance histogram");
+      LogExit("Mismatched covariance histogram");
     }
     double sig1 = std::sqrt(proposalCov->GetBinContent(count1,count1));
     int count2 = 0;
@@ -537,7 +537,7 @@ void AdaptiveMcmc::setupAndRunAdaptiveStep( AdaptiveStepMCMC& mcmc) {
     }
   }
   StartStatus = mcmc.Start(prior, false);
-  if (StartStatus!=true || prior.size()==0) LogThrow("The initial point is bad. MCMC chain cannot start.");
+  if (StartStatus!=true || prior.size()==0) LogExit("The initial point is bad. MCMC chain cannot start.");
 
   // Set the correlations in the default step proposal.
   if (not adaptiveLoadProposalCovariance(

@@ -50,7 +50,7 @@ void EventDialCache::buildReferenceCache( SampleSet& sampleSet_, std::vector<Dia
             return false;
           });
 
-      LogThrowIf(
+      LogExitIf(
           sampleIndexCacheList[iSample].size() != sample.getEventList().size(),
           std::endl << "MISMATCH cache and event list for sample: #" << sample.getIndex() << " " << sample.getName()
               << std::endl << GET_VAR_NAME_VALUE(sampleIndexCacheList[iSample].size())
@@ -112,7 +112,7 @@ void EventDialCache::buildReferenceCache( SampleSet& sampleSet_, std::vector<Dia
             LogDebug << dialCol.getSummary() << std::endl;
           }
 
-          LogThrow("DEV ERROR: Please report this issue to github!! This should not happen");
+          LogExit("DEV ERROR: Please report this issue to github!! This should not happen");
         }
 
         cacheEntry.dialResponseCacheList.emplace_back(
@@ -151,7 +151,7 @@ void EventDialCache::fillCacheEntries(const SampleSet& sampleSet_){
 EventDialCache::IndexedCacheEntry* EventDialCache::fetchNextCacheEntry(){
   // Warning warning Will Robinson!
   // This only works IFF the indexed cache is not resized.
-  LogThrowIf(_fillIndex_ >= _indexedCache_.size());
+  LogExitIf(_fillIndex_ >= _indexedCache_.size());
   return &_indexedCache_[_fillIndex_++];
 }
 

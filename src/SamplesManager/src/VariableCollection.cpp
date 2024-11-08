@@ -9,16 +9,16 @@
 
 
 void VariableCollection::setVarNameList( const std::shared_ptr<std::vector<std::string>> &nameListPtr_ ){
-  LogThrowIf(nameListPtr_ == nullptr, "Invalid commonNameListPtr_ provided.");
+  LogExitIf(nameListPtr_ == nullptr, "Invalid commonNameListPtr_ provided.");
   _nameListPtr_ = nameListPtr_;
   _varList_.clear();
   _varList_.resize(_nameListPtr_->size());
 }
 
 int VariableCollection::findVarIndex( const std::string& leafName_, bool throwIfNotFound_) const{
-  LogThrowIf(_nameListPtr_ == nullptr, "Can't " << __METHOD_NAME__ << " while _commonLeafNameListPtr_ is empty.");
+  LogExitIf(_nameListPtr_ == nullptr, "Can't " << __METHOD_NAME__ << " while _commonLeafNameListPtr_ is empty.");
   int out{GenericToolbox::findElementIndex(leafName_, *_nameListPtr_)};
-  LogThrowIf(throwIfNotFound_ and out == -1, leafName_ << " not found in: " << GenericToolbox::toString(*_nameListPtr_));
+  LogExitIf(throwIfNotFound_ and out == -1, leafName_ << " not found in: " << GenericToolbox::toString(*_nameListPtr_));
   return out;
 }
 const VariableHolder& VariableCollection::fetchVariable( const std::string& name_) const{

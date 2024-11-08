@@ -32,7 +32,7 @@ void MinimizerBase::configureImpl(){
 void MinimizerBase::initializeImpl(){
   LogWarning << "Initializing MinimizerBase..." << std::endl;
 
-  LogThrowIf(_owner_ == nullptr, "FitterEngine owner not set.");
+  LogExitIf(_owner_ == nullptr, "FitterEngine owner not set.");
 
   _nbFreeParameters_ = 0;
   _minimizerParameterPtrList_.clear();
@@ -103,7 +103,7 @@ void MinimizerBase::minimize(){
   /// This base implementation can be called in derived class in order to print
   /// the initial state of the fit.
 
-  LogThrowIf(not isInitialized(), "not initialized");
+  LogExitIf(not isInitialized(), "not initialized");
 
   this->printParameters();
 
@@ -131,7 +131,7 @@ void MinimizerBase::scanParameters(TDirectory* saveDir_){
   /// be different from the parameters used for the likelihood.
 
   LogInfo << "Performing scans of fit parameters..." << std::endl;
-  LogThrowIf( not isInitialized() );
+  LogExitIf( not isInitialized() );
   for( auto& parPtr : _minimizerParameterPtrList_ ) { getParameterScanner().scanParameter( *parPtr, saveDir_ ); }
 }
 double MinimizerBase::evalFit( const double* parArray_ ){
@@ -328,7 +328,7 @@ double MinimizerBase::evalFit( const double* parArray_ ){
 
   if( _throwOnBadLlh_ and not getLikelihoodInterface().getBuffer().isValid() ){
     LogError << getLikelihoodInterface().getSummary() << std::endl;
-    LogThrow( "Invalid total likelihood value." );
+    LogExit( "Invalid total likelihood value." );
   }
 
   _monitor_.externalTimer.start();

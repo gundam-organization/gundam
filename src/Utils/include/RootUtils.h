@@ -38,7 +38,7 @@ namespace RootUtils{
     }
     if( obj == nullptr ){
       LogErrorIf(not ObjectReader::quiet) << redLightText << "Could not find object among names: " << resetColor << GenericToolbox::toString(objPathList_) << std::endl;
-      LogThrowIf(ObjectReader::throwIfNotFound, "Object not found.");
+      LogExitIf(ObjectReader::throwIfNotFound, "Object not found.");
       return false;
     }
     action_(obj);

@@ -51,7 +51,7 @@ void UniformSpline::buildDial(const std::vector<double>& xPoints,
                               const std::vector<double>& yPoints,
                               const std::vector<double>& deriv,
                               const std::string& option_){
-  LogThrowIf(not _splineData_.empty(), "Spline data already set.");
+  LogExitIf(not _splineData_.empty(), "Spline data already set.");
 
   _splineBounds_.min = xPoints.front();
   _splineBounds_.max = xPoints.back();
@@ -67,7 +67,7 @@ void UniformSpline::buildDial(const std::vector<double>& xPoints,
   const double tolerance{std::sqrt(std::numeric_limits<float>::epsilon())};
   for (int i=0; i<xPoints.size()-1; ++i) {
       double d = std::abs(xPoints[i] - _splineData_[0] - i*_splineData_[1]);
-      LogThrowIf((d/_splineData_[1])>tolerance,
+      LogExitIf((d/_splineData_[1])>tolerance,
                  "UniformSplines require uniformly spaced knots");
   }
 
@@ -86,7 +86,7 @@ double UniformSpline::evalResponse(const DialInputBuffer& input_) const {
   double dialInput{input_.getInputBuffer()[0]};
 
 #ifndef NDEBUG
-  LogThrowIf(not std::isfinite(dialInput), "Invalid input for UniformSpline");
+  LogExitIf(not std::isfinite(dialInput), "Invalid input for UniformSpline");
 #endif
 
   if( not _allowExtrapolation_ ){

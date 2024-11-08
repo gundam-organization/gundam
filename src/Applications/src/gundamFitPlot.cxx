@@ -51,7 +51,7 @@ int main( int argc, char** argv ){
 
   // Reading configuration
   auto configFilePath = clp.getOptionVal("configFile", "");
-  LogThrowIf(configFilePath.empty(), "Config file not provided.");
+  LogExitIf(configFilePath.empty(), "Config file not provided.");
 
   ConfigUtils::ConfigHandler configHandler(configFilePath);
   configHandler.override( clp.getOptionValList<std::string>("overrideFiles") );
@@ -145,7 +145,7 @@ int main( int argc, char** argv ){
     auto* file = GenericToolbox::openExistingTFile( filePath );
 
     auto* errorsDir = file->Get<TDirectory>("FitterEngine/postFit/Hesse/errors");
-    LogThrowIf(errorsDir == nullptr);
+    LogExitIf(errorsDir == nullptr);
     for( int iParSet = 0 ; iParSet < errorsDir->GetListOfKeys()->GetEntries() ; iParSet++ ){
       auto* parSetDir{errorsDir->Get<TDirectory>(errorsDir->GetListOfKeys()->At(iParSet)->GetName())};
       auto* hist = parSetDir->Get<TH1D>("valuesNorm/postFitErrors_TH1D");

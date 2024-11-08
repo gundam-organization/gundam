@@ -53,7 +53,7 @@ void CompactSpline::buildDial(const std::vector<double>& v1,
                               const std::vector<double>& v2,
                               const std::vector<double>& v3,
                               const std::string& option_) {
-  LogThrowIf(not _splineData_.empty(), "Spline data already set.");
+  LogExitIf(not _splineData_.empty(), "Spline data already set.");
 
   _splineBounds_.min = v1.front();
   _splineBounds_.max = v1.back();
@@ -104,7 +104,7 @@ void CompactSpline::buildDial(const std::vector<double>& v1,
                 << " CompactSpline: Invalid inputs" << std::endl;
       std::cerr << "ERROR " << __FILE__ << "(" << __LINE__ << "): "
                 << " CompactSpline: Invalid inputs -- terminating" << std::endl;
-      LogThrow("CompactSpline with invalid inputs");
+      LogExit("CompactSpline with invalid inputs");
 #endif
   }
 
@@ -116,7 +116,7 @@ double CompactSpline::evalResponse(const DialInputBuffer& input_) const {
   double dialInput{input_.getInputBuffer()[0]};
 
 #ifndef NDEBUG
-  LogThrowIf(not std::isfinite(dialInput), "Invalid input for CompactSpline");
+  LogExitIf(not std::isfinite(dialInput), "Invalid input for CompactSpline");
 #endif
 
   if( not _allowExtrapolation_ ){

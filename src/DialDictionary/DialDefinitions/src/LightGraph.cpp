@@ -19,12 +19,12 @@ bool LightGraph::getAllowExtrapolation() const {
 }
 
 void LightGraph::buildDial(const TGraph &grf, const std::string& option_) {
-  LogThrowIf(grf.GetN() == 0, "Invalid input graph");
+  LogExitIf(grf.GetN() == 0, "Invalid input graph");
   TGraph graph(grf);
   graph.Sort();
 
   int nPoints = graph.GetN();
-  LogThrowIf(nPoints>15, "Light graphs must have fewer than 15 points");
+  LogExitIf(nPoints>15, "Light graphs must have fewer than 15 points");
 
   _Data_.reserve(2*nPoints);
   _Data_.clear();
@@ -38,7 +38,7 @@ double LightGraph::evalResponse(const DialInputBuffer& input_) const {
   double dialInput{input_.getInputBuffer()[0]};
 
 #ifndef NDEBUG
-  LogThrowIf(not std::isfinite(dialInput), "Invalid input for LightGraph");
+  LogExitIf(not std::isfinite(dialInput), "Invalid input for LightGraph");
 #endif
 
   if( not _allowExtrapolation_ ){

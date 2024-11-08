@@ -19,7 +19,7 @@ LoggerInit([]{ Logger::setUserHeaderStr("[Cache::Weights]"); });
 // The constructor
 Cache::Weights::Weights(std::size_t results)
     : fTotalBytes(0), fResultCount(results) {
-  LogThrowIf((fResultCount<1),"No results in weight cache");
+  LogExitIf((fResultCount<1),"No results in weight cache");
 
   LogInfo << "Cached Weights -- output results reserved: "
           << GetResultCount()
@@ -37,14 +37,14 @@ Cache::Weights::Weights(std::size_t results)
     // set.  The initial values are seldom changed, so they are not
     // pinned.
     fResults.reset(new hemi::Array<double>(GetResultCount(),true));
-    LogThrowIf(not fResults, "Bad Results alloc");
+    LogExitIf(not fResults, "Bad Results alloc");
     fInitialValues.reset(new hemi::Array<double>(GetResultCount(),false));
-    LogThrowIf(not fInitialValues, "Bad InitialValues alloc");
+    LogExitIf(not fInitialValues, "Bad InitialValues alloc");
 
   }
   catch (...) {
     LogError << "Failed to allocate memory, so stopping" << std::endl;
-    LogThrow("Not enough memory available");
+    LogExit("Not enough memory available");
   }
 
   // Initialize the caches.  Don't try to zero everything since the
@@ -64,15 +64,15 @@ void Cache::Weights::Reset() {
 }
 
 double Cache::Weights::GetResult(int i) {
-  LogThrowIf((i<0), "Index out of range");
-  LogThrowIf((GetResultCount() <= i), "Index out of range");
+  LogExitIf((i<0), "Index out of range");
+  LogExitIf((GetResultCount() <= i), "Index out of range");
   // This odd ordering is to make sure the thread-safe hostPtr update
   // finishes before the result is set to be valid.  The use of isnan is
   // to make sure that the optimizer doesn't reorder the statements.
   double value = fResults->hostPtr()[i];
   if (not fKernelApplied) fResultsValid = false;
   else if (not std::isnan(value)) fResultsValid = true;
-  else LogThrow("Cache::Weights result is nan");
+  else LogExit("Cache::Weights result is nan");
   return value;
 }
 
@@ -83,19 +83,19 @@ double Cache::Weights::GetResultFast(int i) {
   double value = fResults->hostPtr()[i];
   if (not fKernelApplied) fResultsValid = false;
   else if (not std::isnan(value)) fResultsValid = true;
-  else LogThrow("Cache::Weights result is nan");
+  else LogExit("Cache::Weights result is nan");
   return value;
 }
 
 void Cache::Weights::SetResult(int i, double v) {
-  LogThrowIf((i<0), "Index out of range");
-  LogThrowIf((GetResultCount() <= i), "Index out of range");
+  LogExitIf((i<0), "Index out of range");
+  LogExitIf((GetResultCount() <= i), "Index out of range");
   fResults->hostPtr()[i] = v;
 }
 
 double* Cache::Weights::GetResultPointer(int i) {
-  LogThrowIf((i<0), "Index out of range");
-  LogThrowIf((GetResultCount() <= i), "Index out of range");
+  LogExitIf((i<0), "Index out of range");
+  LogExitIf((GetResultCount() <= i), "Index out of range");
   return (fResults->hostPtr() + i);
 }
 
@@ -104,14 +104,14 @@ bool* Cache::Weights::GetResultValidPointer() {
 }
 
 double  Cache::Weights::GetInitialValue(int i) {
-  LogThrowIf((i<0), "Index out of range");
-  LogThrowIf((GetResultCount() <= i), "Index out of range");
+  LogExitIf((i<0), "Index out of range");
+  LogExitIf((GetResultCount() <= i), "Index out of range");
   return fInitialValues->hostPtr()[i];
 }
 
 void Cache::Weights::SetInitialValue(int i, double v) {
-  LogThrowIf((i<0), "Index out of range");
-  LogThrowIf((GetResultCount() <= i), "Index out of range");
+  LogExitIf((i<0), "Index out of range");
+  LogExitIf((GetResultCount() <= i), "Index out of range");
   fInitialValues->hostPtr()[i] = v;
 }
 

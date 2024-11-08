@@ -214,7 +214,7 @@ DialBase* SplineDialBaseFactory::makeDial(const std::string& dialTitle_,
     std::size_t bg = dialSubType_.find("uniformity(");
     bg = dialSubType_.find("(",bg);
     std::size_t en = dialSubType_.find(")",bg);
-    LogThrowIf(en == std::string::npos,
+    LogExitIf(en == std::string::npos,
                "Invalid spline uniformity with dialSubType: " << dialSubType_
                << " dial: " << dialTitle_);
     en = en - bg;
@@ -259,7 +259,7 @@ DialBase* SplineDialBaseFactory::makeDial(const std::string& dialTitle_,
 
   // Check that there are equal numbers of X and Y.  There have to be an equal
   // number of points or something is very wrong.
-  LogThrowIf( _xPointListBuffer_.size() != _yPointListBuffer_.size(),
+  LogExitIf( _xPointListBuffer_.size() != _yPointListBuffer_.size(),
               "INVALID Spline Input: "
               << "must have the same number of X and Y points "
               << "for dial " << dialTitle_ );
@@ -269,7 +269,7 @@ DialBase* SplineDialBaseFactory::makeDial(const std::string& dialTitle_,
   // detailed logic.  This shouldn't happen, and indicates there is a problem
   // with the inputs.  Don't try to continue!
   for (int i = 1; i<_xPointListBuffer_.size(); ++i) {
-    LogThrowIf(_xPointListBuffer_[i] <= _xPointListBuffer_[i-1],
+    LogExitIf(_xPointListBuffer_[i] <= _xPointListBuffer_[i-1],
                "INVALID Spline Input: points are not in increasing order "
                << " for dial " << dialTitle_);
   }
@@ -319,7 +319,7 @@ DialBase* SplineDialBaseFactory::makeDial(const std::string& dialTitle_,
   // Sanity check.  By the time we get here, there can't be fewer than two
   // points, and it should have been trapped above by other conditionals
   // (e.g. a single point "spline" should have been flagged as flat).
-  LogThrowIf((_xPointListBuffer_.size() < 2),
+  LogExitIf((_xPointListBuffer_.size() < 2),
              "Input data logic error: two few points "
              << "for dial " << dialTitle_ );
 
@@ -404,7 +404,7 @@ DialBase* SplineDialBaseFactory::makeDial(const std::string& dialTitle_,
       }
       // If the user specified a tolerance then crash, otherwise trust the
       // user knows that it's not uniform and continue.
-      LogThrowIf(uniformityTolerance != defUniformityTolerance,
+      LogExitIf(uniformityTolerance != defUniformityTolerance,
                  "Invalid catmull-rom inputs -- Nonuniform spacing");
     }
     dialBase = (not useCachedDial_) ?
@@ -428,7 +428,7 @@ DialBase* SplineDialBaseFactory::makeDial(const std::string& dialTitle_,
       }
       // If the user specified a tolerance then crash, otherwise trust the
       // user knows that it's not uniform and continue.
-      LogThrowIf(uniformityTolerance != defUniformityTolerance,
+      LogExitIf(uniformityTolerance != defUniformityTolerance,
                  "Invalid catmull-rom inputs -- Nonuniform spacing");
     }
     dialBase = (not useCachedDial_) ?

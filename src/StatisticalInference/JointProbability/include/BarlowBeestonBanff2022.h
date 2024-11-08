@@ -99,7 +99,7 @@ namespace JointProbability{
                    << std::endl;
           LogError << "nomMC bin " << bin_
                    << " error is " << nomHistErr[bin_];
-          LogThrow("The mc uncertainty is not a usable number");
+          LogExit("The mc uncertainty is not a usable number");
         }
         else{
           return std::numeric_limits<double>::infinity();
@@ -115,7 +115,7 @@ namespace JointProbability{
           LogError << "The mcuncert is not finite " << mcuncert << std::endl;
           LogError << "predMC bin " << bin_
                    << " error is " << samplePair_.model->getHistogram().getBinContentList()[bin_].sqrtSumSqWeights;
-          LogThrow("The mc uncertainty is not a usable number");
+          LogExit("The mc uncertainty is not a usable number");
         }
         else{
           return std::numeric_limits<double>::infinity();
@@ -170,7 +170,7 @@ namespace JointProbability{
       // b^2 - 4ac in quadratic equation
       double temp2 = temp * temp + 4 * dataVal * fractional * fractional;
       if(temp2 < 0){
-        if( throwIfInfLlh ){ LogThrow("Negative square root in Barlow Beeston"); }
+        if( throwIfInfLlh ){ LogExit("Negative square root in Barlow Beeston"); }
         else{ return std::numeric_limits<double>::infinity(); }
       }
 
@@ -249,7 +249,7 @@ namespace JointProbability{
                << GET_VAR_NAME_VALUE(stat) << std::endl
                << GET_VAR_NAME_VALUE(penalty) << std::endl
                << GET_VAR_NAME_VALUE(mcuncert) << std::endl;
-      LogThrow("Bad chisq for bin");
+      LogExit("Bad chisq for bin");
     }
 
     if(verboseLevel>=3){

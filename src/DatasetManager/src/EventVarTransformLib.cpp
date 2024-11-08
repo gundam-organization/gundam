@@ -21,7 +21,7 @@ void EventVarTransformLib::configureImpl(){
 }
 void EventVarTransformLib::initializeImpl(){
   LogInfo << "Loading variable transformation: " << _name_ << std::endl;
-  LogThrowIf(_outputVariableName_.empty(), "output variable name not set.");
+  LogExitIf(_outputVariableName_.empty(), "output variable name not set.");
 
   this->reload();
 }
@@ -33,17 +33,17 @@ void EventVarTransformLib::reload(){
 
 void EventVarTransformLib::loadLibrary(){
   LogInfo << "Loading shared lib: " << _libraryFile_ << std::endl;
-  LogThrowIf(not GenericToolbox::isFile(_libraryFile_), "Could not find lib file: " << _libraryFile_ << std::endl << _messageOnError_);
+  LogExitIf(not GenericToolbox::isFile(_libraryFile_), "Could not find lib file: " << _libraryFile_ << std::endl << _messageOnError_);
   _loadedLibrary_ = dlopen(_libraryFile_.c_str(), RTLD_LAZY );
-  LogThrowIf(_loadedLibrary_ == nullptr, "Cannot open library: " << dlerror() << std::endl << _messageOnError_);
+  LogExitIf(_loadedLibrary_ == nullptr, "Cannot open library: " << dlerror() << std::endl << _messageOnError_);
   _evalVariable_ = (dlsym(_loadedLibrary_, "evalVariable"));
-  LogThrowIf(_evalVariable_ == nullptr, "Cannot open evalFcn" << std::endl << _messageOnError_);
+  LogExitIf(_evalVariable_ == nullptr, "Cannot open evalFcn" << std::endl << _messageOnError_);
 }
 void EventVarTransformLib::initInputFormulas(){
   _inputFormulaList_.clear();
   for( auto& inputFormulaStr : _inputFormulaStrList_ ){
     _inputFormulaList_.emplace_back( inputFormulaStr.c_str(), inputFormulaStr.c_str() );
-    LogThrowIf(not _inputFormulaList_.back().IsValid(), "\"" << inputFormulaStr << "\": could not be parsed as formula expression.")
+    LogExitIf(not _inputFormulaList_.back().IsValid(), "\"" << inputFormulaStr << "\": could not be parsed as formula expression.")
   }
   _inputBuffer_.resize(_inputFormulaList_.size(), std::nan("unset"));
 }

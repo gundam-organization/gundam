@@ -92,7 +92,7 @@ void PlotGenerator::configureImpl(){
 }
 void PlotGenerator::initializeImpl() {
   LogWarning << __METHOD_NAME__ << std::endl;
-  LogThrowIf(_modelSampleListPtr_ == nullptr);
+  LogExitIf(_modelSampleListPtr_ == nullptr);
 }
 
 
@@ -111,12 +111,12 @@ std::vector<HistHolder> &PlotGenerator::getHistHolderList(int cacheSlot_){
 
 // Core
 void PlotGenerator::generateSamplePlots(TDirectory *saveDir_, int cacheSlot_) {
-  LogThrowIf( not isInitialized() );
+  LogExitIf( not isInitialized() );
   this->generateSampleHistograms(GenericToolbox::mkdirTFile(saveDir_, "histograms"), cacheSlot_);
   this->generateCanvas(_histHolderCacheList_[cacheSlot_], GenericToolbox::mkdirTFile(saveDir_, "canvas"));
 }
 void PlotGenerator::generateSampleHistograms(TDirectory *saveDir_, int cacheSlot_) {
-  LogThrowIf(not isInitialized());
+  LogExitIf(not isInitialized());
 
   LogInfo << "Generating sample histograms..." << std::endl;
 
@@ -271,7 +271,7 @@ void PlotGenerator::generateSampleHistograms(TDirectory *saveDir_, int cacheSlot
 
 }
 void PlotGenerator::generateCanvas(const std::vector<HistHolder> &histHolderList_, TDirectory *saveDir_, bool stackHist_){
-  LogThrowIf(not isInitialized());
+  LogExitIf(not isInitialized());
 
   auto buildCanvasPath = [](const HistHolder* hist_){
     std::stringstream ss;
@@ -505,7 +505,7 @@ void PlotGenerator::generateComparisonPlots(const std::vector<HistHolder> &hists
   this->generateCanvas(_comparisonHistHolderList_, GenericToolbox::mkdirTFile(saveDir_, "canvas"), false);
 }
 void PlotGenerator::generateComparisonHistograms(const std::vector<HistHolder> &histList_, const std::vector<HistHolder> &refHistsList_, TDirectory *saveDir_) {
-  LogThrowIf(not isInitialized());
+  LogExitIf(not isInitialized());
 
   bool newHistHolder{false};
   if( _comparisonHistHolderList_.empty() ) newHistHolder = true;
@@ -646,12 +646,12 @@ void PlotGenerator::defineHistogramHolders() {
 
       [[nodiscard]] const SplitSample& fetchSample(const Sample* samplePtr_) const{
         int idx{GenericToolbox::findElementIndex(samplePtr_, sampleList, [](const SplitSample& s_){ return s_.samplePtr; })};
-        LogThrowIf(idx==-1, "Can't find SplitVariableDictionary for: " << samplePtr_->getName());
+        LogExitIf(idx==-1, "Can't find SplitVariableDictionary for: " << samplePtr_->getName());
         return sampleList[idx];
       }
       SplitSample& fetchSample(const Sample* samplePtr_){
         int idx{GenericToolbox::findElementIndex(samplePtr_, sampleList, [](const SplitSample& s_){ return s_.samplePtr; })};
-        LogThrowIf(idx==-1, "Can't find SplitVariableDictionary for: " << samplePtr_->getName());
+        LogExitIf(idx==-1, "Can't find SplitVariableDictionary for: " << samplePtr_->getName());
         return sampleList[idx];
       }
     };
@@ -662,7 +662,7 @@ void PlotGenerator::defineHistogramHolders() {
     }
     [[nodiscard]] const Entry& fetchEntry(const std::string& name_) const{
       int idx{GenericToolbox::findElementIndex(name_, entryList, [](const Entry& e_){ return e_.name; })};
-      LogThrowIf(idx==-1, "Can't find SplitVariableDictionary for: " << name_);
+      LogExitIf(idx==-1, "Can't find SplitVariableDictionary for: " << name_);
       return entryList[idx];
     }
   };
@@ -803,7 +803,7 @@ void PlotGenerator::defineHistogramHolders() {
               else if( not histDef.binning.getBinList().empty() ){
 
                 auto varList{histDef.binning.buildVariableNameList()};
-                LogThrowIf(varList.size()!=1, "Binning should be defined with only one variable, here: " << GenericToolbox::toString(varList))
+                LogExitIf(varList.size()!=1, "Binning should be defined with only one variable, here: " << GenericToolbox::toString(varList))
 
                 for(const auto& bin: histDef.binning.getBinList()){
                   const auto& edges = bin.getVarEdges(varList[0]);
@@ -819,7 +819,7 @@ void PlotGenerator::defineHistogramHolders() {
                 }
               }
               else{
-                LogThrow("Could not find the binning definition.")
+                LogExit("Could not find the binning definition.")
               }
 
               // Hist fill function

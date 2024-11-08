@@ -47,7 +47,7 @@ namespace JointProbability{
     double temp = predVal*fractional*fractional-1;
     // b^2 - 4ac in quadratic equation
     double temp2 = temp*temp + 4*dataVal*fractional*fractional;
-    LogThrowIf(temp2 < 0, "Negative square root in Barlow Beeston coefficient calculation!");
+    LogExitIf(temp2 < 0, "Negative square root in Barlow Beeston coefficient calculation!");
 
     // Solve for the positive beta
     double beta = (-1*temp+sqrt(temp2))/2.;
@@ -83,7 +83,7 @@ namespace JointProbability{
                << samplePair_.model->getHistogram().getBinContentList()[bin_].sumWeights << std::endl;
     }
 
-    LogThrowIf(std::isnan(chisq), "NaN chi2 " << predVal << " " << dataVal
+    LogExitIf(std::isnan(chisq), "NaN chi2 " << predVal << " " << dataVal
                                               << samplePair_.model->getHistogram().getBinContentList()[bin_].sqrtSumSqWeights << " "
                                               << samplePair_.model->getHistogram().getBinContentList()[bin_].sumWeights);
 

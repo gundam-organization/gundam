@@ -24,7 +24,7 @@ LoggerInit([]{ Logger::setUserHeaderStr("[ParameterSet]"); });
 void ParameterSet::configureImpl(){
 
   GenericToolbox::Json::fillValue(_config_, _name_, "name");
-  LogThrowIf(_name_.empty(), "ParameterSet have no name.");
+  LogExitIf(_name_.empty(), "ParameterSet have no name.");
   LogDebugIf(GundamGlobals::isDebug()) << "Reading config for parameter set: " << _name_ << std::endl;
 
   GenericToolbox::Json::fillValue(_config_, _isEnabled_, "isEnabled");
@@ -115,7 +115,7 @@ void ParameterSet::configureImpl(){
       _nbParameterDefinition_ = int(_parameterDefinitionConfig_.get<std::vector<JsonType>>().size());
     }
 
-    LogThrowIf(_nbParameterDefinition_==-1, "Could not figure out the number of parameters to be defined for the set: " << _name_ );
+    LogExitIf(_nbParameterDefinition_==-1, "Could not figure out the number of parameters to be defined for the set: " << _name_ );
   }
 
   this->defineParameters();
@@ -190,7 +190,7 @@ void ParameterSet::processCovarianceMatrix(){
   }
   _deltaVectorPtr_ = std::make_shared<TVectorD>(_strippedCovarianceMatrix_->GetNrows());
 
-  LogThrowIf(not _strippedCovarianceMatrix_->IsSymmetric(), "Covariance matrix is not symmetric");
+  LogExitIf(not _strippedCovarianceMatrix_->IsSymmetric(), "Covariance matrix is not symmetric");
 
   if( not isEnableEigenDecomp() ){
     LogWarning << "Computing inverse of the stripped covariance matrix: "
@@ -217,7 +217,7 @@ void ParameterSet::processCovarianceMatrix(){
 
     LogInfo << "Covariance eigen values are between " << _eigenValues_->Min() << " and " << _eigenValues_->Max() << std::endl;
     if( std::isnan(_eigenSvdThreshold_) ){
-      LogThrowIf(_eigenValues_->Min() < 0, "Input covariance matrix is not positive definite.");
+      LogExitIf(_eigenValues_->Min() < 0, "Input covariance matrix is not positive definite.");
     }
     else if( _eigenValues_->Min()/_eigenValues_->Max() < _eigenSvdThreshold_ ){
       LogAlert << "Eigen values bellow the threshold(" << _eigenSvdThreshold_ << "). Using SVD..." << std::endl;
@@ -322,15 +322,15 @@ void ParameterSet::processCovarianceMatrix(){
         eigenPar.setMinValue( _parameterList_[eigenPar.getParameterIndex()].getMinValue() );
         eigenPar.setMaxValue( _parameterList_[eigenPar.getParameterIndex()].getMaxValue() );
 
-        LogThrowIf( not std::isnan(eigenPar.getMinValue()) and eigenPar.getPriorValue() < eigenPar.getMinValue(), "PRIOR IS BELLOW MIN: " << eigenPar.getSummary() );
-        LogThrowIf( not std::isnan(eigenPar.getMaxValue()) and eigenPar.getPriorValue() > eigenPar.getMaxValue(), "PRIOR IS ABOVE MAX: " << eigenPar.getSummary() );
+        LogExitIf( not std::isnan(eigenPar.getMinValue()) and eigenPar.getPriorValue() < eigenPar.getMinValue(), "PRIOR IS BELLOW MIN: " << eigenPar.getSummary() );
+        LogExitIf( not std::isnan(eigenPar.getMaxValue()) and eigenPar.getPriorValue() > eigenPar.getMaxValue(), "PRIOR IS ABOVE MAX: " << eigenPar.getSummary() );
       }
       else{
         eigenPar.setMinValue( _eigenParRange_.min );
         eigenPar.setMaxValue( _eigenParRange_.max );
 
-        LogThrowIf( not std::isnan(eigenPar.getMinValue()) and eigenPar.getPriorValue() < eigenPar.getMinValue(), "Prior value is bellow min: " << eigenPar.getSummary() );
-        LogThrowIf( not std::isnan(eigenPar.getMaxValue()) and eigenPar.getPriorValue() > eigenPar.getMaxValue(), "Prior value is above max: " << eigenPar.getSummary() );
+        LogExitIf( not std::isnan(eigenPar.getMinValue()) and eigenPar.getPriorValue() < eigenPar.getMinValue(), "Prior value is bellow min: " << eigenPar.getSummary() );
+        LogExitIf( not std::isnan(eigenPar.getMaxValue()) and eigenPar.getPriorValue() > eigenPar.getMaxValue(), "Prior value is above max: " << eigenPar.getSummary() );
       }
     }
 
@@ -393,7 +393,7 @@ void ParameterSet::moveParametersToPrior(){
 }
 void ParameterSet::throwParameters(bool rethrowIfNotInPhysical_, double gain_){
 
-  LogThrowIf(_strippedCovarianceMatrix_==nullptr, "No covariance matrix provided");
+  LogExitIf(_strippedCovarianceMatrix_==nullptr, "No covariance matrix provided");
 
   TVectorD throwsList{_strippedCovarianceMatrix_->GetNrows()};
 
@@ -455,7 +455,7 @@ void ParameterSet::throwParameters(bool rethrowIfNotInPhysical_, double gain_){
 
           if (not throwIsValid) {
             LogAlert << "Rethrowing \"" << this->getName() << "\"... try #" << nTries+1 << std::endl;
-            LogThrowIf(nTries > 10000, "Failed to find valid throw");
+            LogExitIf(nTries > 10000, "Failed to find valid throw");
             continue;
           }
 
@@ -705,21 +705,21 @@ void ParameterSet::injectParameterValues(const JsonType& config_){
   LogWarning << "Importing parameters from config for \"" << this->getName() << "\"" << std::endl;
 
   auto config = ConfigUtils::getForwardedConfig(config_);
-  LogThrowIf( config.empty(), "Invalid injector config" << std::endl << config_ );
-  LogThrowIf( not GenericToolbox::Json::doKeyExist(config, "name"), "No parameter set name provided in" << std::endl << config_ );
-  LogThrowIf( GenericToolbox::Json::fetchValue<std::string>(config, "name") != this->getName(),
+  LogExitIf( config.empty(), "Invalid injector config" << std::endl << config_ );
+  LogExitIf( not GenericToolbox::Json::doKeyExist(config, "name"), "No parameter set name provided in" << std::endl << config_ );
+  LogExitIf( GenericToolbox::Json::fetchValue<std::string>(config, "name") != this->getName(),
               "Mismatching between parSet name (" << this->getName() << ") and injector config ("
               << GenericToolbox::Json::fetchValue<std::string>(config, "name") << ")" );
 
   auto parValues = GenericToolbox::Json::fetchValue( config, "parameterValues", JsonType() );
   if     ( parValues.empty() ) {
-    LogThrow( "No parameterValues provided." );
+    LogExit( "No parameterValues provided." );
   }
   else if( parValues.is_string() ){
     //
     LogInfo << "Reading parameter values from file: " << parValues.get<std::string>() << std::endl;
     auto parList = GenericToolbox::dumpFileAsVectorString( parValues.get<std::string>(), true );
-    LogThrowIf( parList.size() != this->getNbParameters()  ,
+    LogExitIf( parList.size() != this->getNbParameters()  ,
                 parList.size() << " parameters provided for " << this->getName() << ", expecting " << this->getNbParameters()
     );
 
@@ -741,7 +741,7 @@ void ParameterSet::injectParameterValues(const JsonType& config_){
       if     ( GenericToolbox::Json::doKeyExist(parValueEntry, "name") ) {
         auto parName = GenericToolbox::Json::fetchValue<std::string>(parValueEntry, "name");
         auto* parPtr = this->getParameterPtr(parName);
-        LogThrowIf(parPtr == nullptr, "Could not find " << parName << " among the defined parameters in " << this->getName());
+        LogExitIf(parPtr == nullptr, "Could not find " << parName << " among the defined parameters in " << this->getName());
 
 
         if( not parPtr->isEnabled() ){
@@ -755,7 +755,7 @@ void ParameterSet::injectParameterValues(const JsonType& config_){
       else if( GenericToolbox::Json::doKeyExist(parValueEntry, "title") ){
         auto parTitle = GenericToolbox::Json::fetchValue<std::string>(parValueEntry, "title");
         auto* parPtr = this->getParameterPtrWithTitle(parTitle);
-        LogThrowIf(parPtr == nullptr, "Could not find " << parTitle << " among the defined parameters in " << this->getName());
+        LogExitIf(parPtr == nullptr, "Could not find " << parTitle << " among the defined parameters in " << this->getName());
 
 
         if( not parPtr->isEnabled() ){
@@ -768,7 +768,7 @@ void ParameterSet::injectParameterValues(const JsonType& config_){
       }
       else if( GenericToolbox::Json::doKeyExist(parValueEntry, "index") ){
         auto parIndex = GenericToolbox::Json::fetchValue<int>(parValueEntry, "index");
-        LogThrowIf( parIndex < 0 or parIndex >= this->getParameterList().size(),
+        LogExitIf( parIndex < 0 or parIndex >= this->getParameterList().size(),
                     "invalid parameter index (" << parIndex << ") for injection in parSet: " << this->getName() );
 
         auto* parPtr = &this->getParameterList()[parIndex];
@@ -781,7 +781,7 @@ void ParameterSet::injectParameterValues(const JsonType& config_){
         parPtr->setParameterValue( GenericToolbox::Json::fetchValue<double>(parValueEntry, "value") );
       }
       else {
-        LogThrow("Unsupported: " << parValueEntry);
+        LogExit("Unsupported: " << parValueEntry);
       }
     }
   }
@@ -849,25 +849,25 @@ void ParameterSet::readParameterDefinitionFile(){
 
   std::string path = GenericToolbox::expandEnvironmentVariables(_parameterDefinitionFilePath_);
   std::unique_ptr<TFile> parDefFile(TFile::Open(path.c_str()));
-  LogThrowIf(parDefFile == nullptr or not parDefFile->IsOpen(), "Could not open: " << path);
+  LogExitIf(parDefFile == nullptr or not parDefFile->IsOpen(), "Could not open: " << path);
 
 
   // define with the covariance matrix size
   if( not _covarianceMatrixPath_.empty() ){
     objBuffer = parDefFile->Get(_covarianceMatrixPath_.c_str());
-    LogThrowIf(objBuffer == nullptr, "Can't find \"" << _covarianceMatrixPath_ << "\" in " << parDefFile->GetPath())
+    LogExitIf(objBuffer == nullptr, "Can't find \"" << _covarianceMatrixPath_ << "\" in " << parDefFile->GetPath())
     _priorCovarianceMatrix_ = std::shared_ptr<TMatrixDSym>((TMatrixDSym*) objBuffer->Clone());
     _priorCorrelationMatrix_ = std::shared_ptr<TMatrixDSym>((TMatrixDSym*) GenericToolbox::convertToCorrelationMatrix((TMatrixD*)_priorCovarianceMatrix_.get()));
-    LogThrowIf(_nbParameterDefinition_ != -1, "Nb of parameter was manually defined but the covariance matrix");
+    LogExitIf(_nbParameterDefinition_ != -1, "Nb of parameter was manually defined but the covariance matrix");
     _nbParameterDefinition_ = _priorCovarianceMatrix_->GetNrows();
   }
 
   // parameterPriorTVectorD
   if(not _parameterPriorValueListPath_.empty()){
     objBuffer = parDefFile->Get(_parameterPriorValueListPath_.c_str());
-    LogThrowIf(objBuffer == nullptr, "Can't find \"" << _parameterPriorValueListPath_ << "\" in " << parDefFile->GetPath())
+    LogExitIf(objBuffer == nullptr, "Can't find \"" << _parameterPriorValueListPath_ << "\" in " << parDefFile->GetPath())
     _parameterPriorList_ = std::shared_ptr<TVectorD>((TVectorD*) objBuffer->Clone());
-    LogThrowIf(_parameterPriorList_->GetNrows() != _nbParameterDefinition_,
+    LogExitIf(_parameterPriorList_->GetNrows() != _nbParameterDefinition_,
       "Parameter prior list don't have the same size("
       << _parameterPriorList_->GetNrows()
       << ") as cov matrix(" << _nbParameterDefinition_ << ")"
@@ -877,17 +877,17 @@ void ParameterSet::readParameterDefinitionFile(){
   // parameterNameTObjArray
   if(not _parameterNameListPath_.empty()){
     objBuffer = parDefFile->Get(_parameterNameListPath_.c_str());
-    LogThrowIf(objBuffer == nullptr, "Can't find \"" << _parameterNameListPath_ << "\" in " << parDefFile->GetPath())
+    LogExitIf(objBuffer == nullptr, "Can't find \"" << _parameterNameListPath_ << "\" in " << parDefFile->GetPath())
     _parameterNamesList_ = std::shared_ptr<TObjArray>((TObjArray*) objBuffer->Clone());
   }
 
   // parameterLowerBoundsTVectorD
   if( not _parameterLowerBoundsTVectorD_.empty() ){
     objBuffer = parDefFile->Get(_parameterLowerBoundsTVectorD_.c_str());
-    LogThrowIf(objBuffer == nullptr, "Can't find \"" << _parameterLowerBoundsTVectorD_ << "\" in " << parDefFile->GetPath())
+    LogExitIf(objBuffer == nullptr, "Can't find \"" << _parameterLowerBoundsTVectorD_ << "\" in " << parDefFile->GetPath())
     _parameterLowerBoundsList_ = std::shared_ptr<TVectorD>((TVectorD*) objBuffer->Clone());
 
-    LogThrowIf(_parameterLowerBoundsList_->GetNrows() != _nbParameterDefinition_,
+    LogExitIf(_parameterLowerBoundsList_->GetNrows() != _nbParameterDefinition_,
                 "Parameter prior list don't have the same size(" << _parameterLowerBoundsList_->GetNrows()
                                                                  << ") as cov matrix(" << _nbParameterDefinition_ << ")" );
   }
@@ -895,16 +895,16 @@ void ParameterSet::readParameterDefinitionFile(){
   // parameterUpperBoundsTVectorD
   if( not _parameterUpperBoundsTVectorD_.empty() ){
     objBuffer = parDefFile->Get(_parameterUpperBoundsTVectorD_.c_str());
-    LogThrowIf(objBuffer == nullptr, "Can't find \"" << _parameterUpperBoundsTVectorD_ << "\" in " << parDefFile->GetPath())
+    LogExitIf(objBuffer == nullptr, "Can't find \"" << _parameterUpperBoundsTVectorD_ << "\" in " << parDefFile->GetPath())
     _parameterUpperBoundsList_ = std::shared_ptr<TVectorD>((TVectorD*) objBuffer->Clone());
-    LogThrowIf(_parameterUpperBoundsList_->GetNrows() != _nbParameterDefinition_,
+    LogExitIf(_parameterUpperBoundsList_->GetNrows() != _nbParameterDefinition_,
                 "Parameter prior list don't have the same size(" << _parameterUpperBoundsList_->GetNrows()
                                                                  << ") as cov matrix(" << _nbParameterDefinition_ << ")" );
   }
 
   if( not _throwEnabledListPath_.empty() ){
     objBuffer = parDefFile->Get(_throwEnabledListPath_.c_str());
-    LogThrowIf(objBuffer == nullptr, "Can't find \"" << _throwEnabledListPath_ << "\" in " << parDefFile->GetPath())
+    LogExitIf(objBuffer == nullptr, "Can't find \"" << _throwEnabledListPath_ << "\" in " << parDefFile->GetPath())
     _throwEnabledList_ = std::shared_ptr<TVectorD>((TVectorD*) objBuffer->Clone());
   }
 
@@ -922,7 +922,7 @@ void ParameterSet::defineParameters(){
       par.setStepSize(TMath::Sqrt((*_priorCovarianceMatrix_)[par.getParameterIndex()][par.getParameterIndex()]));
     }
     else{
-      LogThrowIf(std::isnan(_nominalStepSize_), "Can't define free parameter without a \"nominalStepSize\"");
+      LogExitIf(std::isnan(_nominalStepSize_), "Can't define free parameter without a \"nominalStepSize\"");
       par.setStdDevValue(_nominalStepSize_); // stdDev will only be used for display purpose
       par.setStepSize(_nominalStepSize_);
       par.setPriorType(Parameter::PriorType::Flat);
@@ -978,8 +978,8 @@ void ParameterSet::defineParameters(){
     if( _parameterLowerBoundsList_ != nullptr ){ par.setMinValue((*_parameterLowerBoundsList_)[par.getParameterIndex()]); }
     if( _parameterUpperBoundsList_ != nullptr ){ par.setMaxValue((*_parameterUpperBoundsList_)[par.getParameterIndex()]); }
 
-    LogThrowIf( not std::isnan(par.getMinValue()) and par.getPriorValue() < par.getMinValue(), "PRIOR IS BELLOW MIN: " << par.getSummary() );
-    LogThrowIf( not std::isnan(par.getMaxValue()) and par.getPriorValue() > par.getMaxValue(), "PRIOR IS ABOVE MAX: " << par.getSummary() );
+    LogExitIf( not std::isnan(par.getMinValue()) and par.getPriorValue() < par.getMinValue(), "PRIOR IS BELLOW MIN: " << par.getSummary() );
+    LogExitIf( not std::isnan(par.getMaxValue()) and par.getPriorValue() > par.getMaxValue(), "PRIOR IS ABOVE MAX: " << par.getSummary() );
 
     if( not _parameterDefinitionConfig_.empty() ){
       // Alternative 1: define dials then parameters
@@ -998,7 +998,7 @@ void ParameterSet::defineParameters(){
         // No covariance provided, so find the name based on the order in
         // the parameter set.
         auto configVector = _parameterDefinitionConfig_.get<std::vector<JsonType>>();
-        LogThrowIf(configVector.size() <= par.getParameterIndex());
+        LogExitIf(configVector.size() <= par.getParameterIndex());
         auto parConfig = configVector.at(par.getParameterIndex());
         auto parName = GenericToolbox::Json::fetchValue<std::string>(parConfig, {{"name"}, {"parameterName"}});
         if (not parName.empty()) par.setName(parName);

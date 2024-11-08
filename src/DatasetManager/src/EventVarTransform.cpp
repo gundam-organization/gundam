@@ -21,7 +21,7 @@ void EventVarTransform::configureImpl(){
 }
 void EventVarTransform::initializeImpl(){
   LogInfo << "Loading variable transformation: " << _name_ << std::endl;
-  LogThrowIf(_outputVariableName_.empty(), "output variable name not set.");
+  LogExitIf(_outputVariableName_.empty(), "output variable name not set.");
 }
 
 

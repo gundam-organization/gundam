@@ -50,7 +50,7 @@ void GeneralSpline::buildDial(const std::vector<double>& xPoints,
                               const std::vector<double>& yPoints,
                               const std::vector<double>& deriv,
                               const std::string& option_){
-  LogThrowIf(not _splineData_.empty(), "Spline data already set.");
+  LogExitIf(not _splineData_.empty(), "Spline data already set.");
 
   _splineBounds_.min = xPoints.front();
   _splineBounds_.max = xPoints.back();

@@ -46,11 +46,11 @@ void DataDispenserCache::clear(){
   varsToOverrideList.clear();
 }
 void DataDispenserCache::addVarRequestedForIndexing(const std::string& varName_) {
-  LogThrowIf(varName_.empty(), "no var name provided.");
+  LogExitIf(varName_.empty(), "no var name provided.");
   GenericToolbox::addIfNotInVector(varName_, this->varsRequestedForIndexing);
 }
 void DataDispenserCache::addVarRequestedForStorage(const std::string& varName_){
-  LogThrowIf(varName_.empty(), "no var name provided.");
+  LogExitIf(varName_.empty(), "no var name provided.");
   GenericToolbox::addIfNotInVector(varName_, this->varsRequestedForStorage);
   this->addVarRequestedForIndexing(varName_);
 }

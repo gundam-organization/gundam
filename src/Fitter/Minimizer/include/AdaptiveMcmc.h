@@ -236,7 +236,7 @@ private:
     std::unique_ptr<ROOT::Math::Functor> functor{};
     std::vector<double> x;
     double operator() (const sMCMC::Vector& point) {
-      LogThrowIf(functor == nullptr, "Functor is not initialized");
+      LogExitIf(functor == nullptr, "Functor is not initialized");
       // Copy the point into a local vector since there is no guarrantee that
       // the MCMC will be running on a vector of doubles.  This is paranoia
       // coding.

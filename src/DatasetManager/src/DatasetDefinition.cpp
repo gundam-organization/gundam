@@ -37,7 +37,7 @@ void DatasetDefinition::configureImpl() {
 
   for( auto& dataEntry : GenericToolbox::Json::fetchValue(_config_, "data", JsonType()) ){
     auto name = GenericToolbox::Json::fetchValue<std::string>(dataEntry, "name");
-    LogThrowIf( GenericToolbox::isIn(name, _dataDispenserDict_), "\"" << name << "\" already taken, please use another name." )
+    LogExitIf( GenericToolbox::isIn(name, _dataDispenserDict_), "\"" << name << "\" already taken, please use another name." )
 
     _dataDispenserDict_.emplace(name, DataDispenser(this));
     _dataDispenserDict_.at(name).getParameters().isData = true;
@@ -69,7 +69,7 @@ void DatasetDefinition::initializeImpl() {
   }
 
   if( not GenericToolbox::isIn(_selectedDataEntry_, _dataDispenserDict_) ){
-    LogThrow("selectedDataEntry could not be find in available data: "
+    LogExit("selectedDataEntry could not be find in available data: "
                  << GenericToolbox::toString(_dataDispenserDict_, [](const std::pair<std::string, DataDispenser>& elm){ return elm.first; })
                  << std::endl);
   }

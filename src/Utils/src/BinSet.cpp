@@ -34,7 +34,7 @@ void BinSet::configureImpl() {
     if( GenericToolbox::hasExtension(_filePath_, "txt") ){ this->readTxtBinningDefinition(); }
   }
   else{
-    LogThrow("Unknown binning config entry: " << GenericToolbox::Json::toReadableString(_config_));
+    LogExit("Unknown binning config entry: " << GenericToolbox::Json::toReadableString(_config_));
   }
 
   this->sortBinEdges();
@@ -56,7 +56,7 @@ void BinSet::checkBinning(){
     }
   }
 
-  LogThrowIf(hasErrors);
+  LogExitIf(hasErrors);
 
 }
 std::string BinSet::getSummary() const{
@@ -172,7 +172,7 @@ void BinSet::readTxtBinningDefinition(){
       for( size_t iElement = 1 ; iElement < lineElements.size() ; iElement++ ){
 
         if( not expectedVariableList.empty() and lineElements.at(iElement) == expectedVariableList.back() ){
-          LogThrowIf(
+          LogExitIf(
               expectedVariableIsRangeList.back(),
               "Same variable appear more than 2 times: " << GenericToolbox::toString(lineElements)
           );
@@ -280,7 +280,7 @@ void BinSet::readBinningConfig( const JsonType& binning_){
         auto maxVal( GenericToolbox::Json::fetchValue<double>(binDefEntry, "max") );
 
         double step{(maxVal - minVal)/nBins};
-        LogThrowIf( step <= 0, "Invalid binning: " << GenericToolbox::Json::toReadableString(binDefEntry) );
+        LogExitIf( step <= 0, "Invalid binning: " << GenericToolbox::Json::toReadableString(binDefEntry) );
 
         dim.edgesList.reserve( nBins + 1 );
         double edgeValue{minVal};
@@ -291,13 +291,13 @@ void BinSet::readBinningConfig( const JsonType& binning_){
         dim.edgesList.emplace_back( edgeValue );
       }
       else{
-        LogThrow("Unrecognised binning definition: " << binningDefinition);
+        LogExit("Unrecognised binning definition: " << binningDefinition);
       }
 
       dim.nBins = int( dim.edgesList.size() );
       if( not dim.isEdgesDiscreteValues ){ dim.nBins--; }
 
-      LogThrowIf(dim.nBins == 0, "Invalid edgesList for binEdgeEntry: " << GenericToolbox::Json::toReadableString(binDefEntry));
+      LogExitIf(dim.nBins == 0, "Invalid edgesList for binEdgeEntry: " << GenericToolbox::Json::toReadableString(binDefEntry));
     }
 
     int nBinsTotal{1};

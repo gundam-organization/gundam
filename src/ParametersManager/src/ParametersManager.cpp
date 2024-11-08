@@ -140,7 +140,7 @@ const ParameterSet* ParametersManager::getFitParameterSetPtr(const std::string& 
   std::vector<std::string> parSetNames{};
   parSetNames.reserve( _parameterSetList_.size() );
   for( auto& parSet : _parameterSetList_ ){ parSetNames.emplace_back(parSet.getName()); }
-  LogThrow("Could not find fit parameter set named \"" << name_ << "\" among defined: " << GenericToolbox::toString(parSetNames));
+  LogExit("Could not find fit parameter set named \"" << name_ << "\" among defined: " << GenericToolbox::toString(parSetNames));
   return nullptr;
 }
 
@@ -176,7 +176,7 @@ void ParametersManager::throwParametersFromParSetCovariance(){
 }
 void ParametersManager::initializeStrippedGlobalCov(){
   LogInfo << "Creating stripped global covariance matrix..." << std::endl;
-  LogThrowIf( _globalCovarianceMatrix_ == nullptr, "Global covariance matrix not set." );
+  LogExitIf( _globalCovarianceMatrix_ == nullptr, "Global covariance matrix not set." );
 
   _strippedParameterList_.clear();
   for( int iGlobPar = 0 ; iGlobPar < _globalCovarianceMatrix_->GetNrows() ; iGlobPar++ ){
@@ -270,7 +270,7 @@ void ParametersManager::throwParametersFromGlobalCovariance(bool quietVerbose_){
     }
 
     if( rethrow ) {
-      LogThrowIf( throwNb > 100000, "Too many throw attempts")
+      LogExitIf( throwNb > 100000, "Too many throw attempts")
       // wrap back to the while loop
       LogWarning << "Rethrowing after attempt #" << throwNb << std::endl;
       continue;
@@ -328,7 +328,7 @@ void ParametersManager::injectParameterValues(const JsonType &config_) {
     LogInfo << "Reading injection parameters for parSet: " << parSetName << std::endl;
 
     auto* selectedParSet = this->getFitParameterSetPtr(parSetName );
-    LogThrowIf( selectedParSet == nullptr, "Could not find parSet: " << parSetName );
+    LogExitIf( selectedParSet == nullptr, "Could not find parSet: " << parSetName );
 
     selectedParSet->injectParameterValues(entryParSet);
   }

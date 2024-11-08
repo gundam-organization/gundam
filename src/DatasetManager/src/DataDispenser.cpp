@@ -41,7 +41,7 @@ void DataDispenser::configureImpl(){
   _threadPool_.setNThreads(GundamGlobals::getNbCpuThreads() );
 
   GenericToolbox::Json::fillValue(_config_, _parameters_.name, "name");
-  LogThrowIf(_parameters_.name.empty(), "Dataset name not set.");
+  LogExitIf(_parameters_.name.empty(), "Dataset name not set.");
 
   // histograms don't need other parameters
   if( GenericToolbox::Json::doKeyExist( _config_, "fromHistContent" ) ) {
@@ -121,8 +121,8 @@ void DataDispenser::initializeImpl(){
 
 void DataDispenser::load(Propagator& propagator_){
   LogWarning << "Loading dataset: " << getTitle() << std::endl;
-  LogThrowIf(not this->isInitialized(), "Can't load while not initialized.");
-  LogThrowIf(not propagator_.isInitialized(), "Can't load while propagator_ is not initialized.");
+  LogExitIf(not this->isInitialized(), "Can't load while not initialized.");
+  LogExitIf(not propagator_.isInitialized(), "Can't load while propagator_ is not initialized.");
 
   _cache_.clear();
   _cache_.propagatorPtr = &propagator_;
@@ -150,7 +150,7 @@ void DataDispenser::load(Propagator& propagator_){
 
   for( const auto& file: _parameters_.filePathList){
     std::string path = GenericToolbox::expandEnvironmentVariables(file);
-    LogThrowIf(not GenericToolbox::doesTFileIsValid(path, {_parameters_.treePath}), "Invalid file: " << path);
+    LogExitIf(not GenericToolbox::doesTFileIsValid(path, {_parameters_.treePath}), "Invalid file: " << path);
   }
 
   this->parseStringParameters();
@@ -187,7 +187,7 @@ void DataDispenser::parseStringParameters() {
 
   auto replaceToyIndexFct = [&](std::string& formula_){
     if( GenericToolbox::hasSubStr(formula_, "<I_TOY>") ){
-      LogThrowIf(_cache_.propagatorPtr->getIThrow()==-1, "<I_TOY> not set.");
+      LogExitIf(_cache_.propagatorPtr->getIThrow()==-1, "<I_TOY> not set.");
       GenericToolbox::replaceSubstringInsideInputString(formula_, "<I_TOY>", std::to_string(_cache_.propagatorPtr->getIThrow()));
     }
   };
@@ -238,7 +238,7 @@ void DataDispenser::doEventSelection(){
     auto treeChain{this->openChain(true)};
     nEntries = treeChain->GetEntries();
   }
-  LogThrowIf(nEntries == 0, "TChain is empty.");
+  LogExitIf(nEntries == 0, "TChain is empty.");
   LogInfo << "Will read " << nEntries << " event entries." << std::endl;
 
   _cache_.threadSelectionResults.resize(nThreads);
@@ -547,7 +547,7 @@ void DataDispenser::loadFromHistContent(){
   LogWarning << "Creating dummy PhysicsEvent entries for loading hist content" << std::endl;
 
   // non-trivial as we need to propagate systematics. Need to merge with the original data loader, but not straight forward?
-  LogThrowIf( _parameters_.useReweightEngine, "Hist loader not implemented for MC containers" );
+  LogExitIf( _parameters_.useReweightEngine, "Hist loader not implemented for MC containers" );
 
   // counting events
   _cache_.sampleNbOfEvents.resize(_cache_.samplesToFillList.size());
@@ -593,12 +593,12 @@ void DataDispenser::loadFromHistContent(){
     LogScopeIndent;
 
     auto* sampleHistDef = _parameters_.fromHistContent.getSampleHistPtr(sample->getName());
-    LogThrowIf(sampleHistDef== nullptr, "Could not find sample histogram: " << sample->getName());
+    LogExitIf(sampleHistDef== nullptr, "Could not find sample histogram: " << sample->getName());
 
     LogInfo << "Filling sample \"" << sample->getName() << "\" using hist with name: " << sampleHistDef->hist << std::endl;
 
     auto* hist = fHist->Get<THnD>( sampleHistDef->hist.c_str() );
-    LogThrowIf( hist == nullptr, "Could not find THnD \"" << sampleHistDef->hist << "\" within " << fHist->GetPath() );
+    LogExitIf( hist == nullptr, "Could not find THnD \"" << sampleHistDef->hist << "\" within " << fHist->GetPath() );
 
     int nBins = 1;
     for( int iDim = 0 ; iDim < hist->GetNdimensions() ; iDim++ ){
@@ -1002,7 +1002,7 @@ void DataDispenser::fillFunction(int iThread_){
           LogError << "Leaf: " << nominalWeightTreeFormula->GetLeaf(iLeaf)->GetName() << "[0] = " << nominalWeightTreeFormula->GetLeaf(iLeaf)->GetValue(0) << std::endl;
         }
 
-        LogThrow("Negative nominal weight");
+        LogExit("Negative nominal weight");
       }
       if( eventIndexingBuffer.getWeights().base == 0 ){
         continue;
@@ -1176,7 +1176,7 @@ void DataDispenser::fillFunction(int iThread_){
           }
         }
         else {
-          LogThrow("Invalid dial collection -- not a known dial type");
+          LogExit("Invalid dial collection -- not a known dial type");
         }
 
       } // dial collection loop

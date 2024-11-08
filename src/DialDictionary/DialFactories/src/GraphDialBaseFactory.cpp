@@ -20,7 +20,7 @@ DialBase* GraphDialBaseFactory::makeDial(const std::string& dialTitle_,
 
   TGraph* srcGraph = dynamic_cast<TGraph*>(dialInitializer_);
 
-  LogThrowIf(srcGraph == nullptr, "Graph dial initializer must be a TGraph");
+  LogExitIf(srcGraph == nullptr, "Graph dial initializer must be a TGraph");
 
   // Stuff the created dial into a unique_ptr, so it will be properly deleted
   // in the event of an exception.

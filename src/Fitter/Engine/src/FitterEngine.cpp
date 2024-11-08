@@ -62,7 +62,7 @@ void FitterEngine::configureImpl(){
       this->_minimizer_ = std::make_unique<AdaptiveMcmc>( this );
       break;
     default:
-      LogThrow("Unknown minimizer type selected: " << minimizerTypeStr << std::endl << "Available: " << MinimizerType::generateEnumFieldsAsString());
+      LogExit("Unknown minimizer type selected: " << minimizerTypeStr << std::endl << "Available: " << MinimizerType::generateEnumFieldsAsString());
   }
 
   // now the minimizer is created, forward deprecated options
@@ -116,8 +116,8 @@ void FitterEngine::configureImpl(){
   LogWarning << "FitterEngine configured." << std::endl;
 }
 void FitterEngine::initializeImpl(){
-  LogThrowIf(_config_.empty(), "Config is not set.");
-  LogThrowIf(_saveDir_== nullptr);
+  LogExitIf(_config_.empty(), "Config is not set.");
+  LogExitIf(_saveDir_== nullptr);
 
   if( GundamGlobals::isLightOutputMode() ){
     // TODO: this check should be more universal
@@ -260,7 +260,7 @@ void FitterEngine::initializeImpl(){
 // Core
 void FitterEngine::fit(){
   LogWarning << __METHOD_NAME__ << std::endl;
-  LogThrowIf( not isInitialized() );
+  LogExitIf( not isInitialized() );
 
   LogWarning << "Pre-fit likelihood state:" << std::endl;
 
@@ -651,7 +651,7 @@ void FitterEngine::checkNumericalAccuracy(){
       getLikelihoodInterface().evalLikelihood();
 
       if( responses[iThrow] == responses[iThrow] ){ // not nan
-        LogThrowIf(getLikelihoodInterface().getLastLikelihood() != responses[iThrow], "Not accurate: " << getLikelihoodInterface().getLastLikelihood() - responses[iThrow] << " / "
+        LogExitIf(getLikelihoodInterface().getLastLikelihood() != responses[iThrow], "Not accurate: " << getLikelihoodInterface().getLastLikelihood() - responses[iThrow] << " / "
                                                                                                     << GET_VAR_NAME_VALUE(getLikelihoodInterface().getLastLikelihood()) << " <=> " << GET_VAR_NAME_VALUE(responses[iThrow])
         )
       }

@@ -98,11 +98,11 @@ protected:
 
       [[nodiscard]] int getValueIndex(const std::string& name_) const {
         int idx = GenericToolbox::findElementIndex(name_, valueDefinitionList, [](const ValueDefinition& elm){ return elm.name; });
-        LogThrowIf(idx == -1, "Could not find element " << name_);
+        LogExitIf(idx == -1, "Could not find element " << name_);
         return idx;
       }
       [[nodiscard]] double getLastStepValue(const std::string& name_) const {
-        LogThrowIf(stepPointList.empty());
+        LogExitIf(stepPointList.empty());
         return stepPointList.back().valueMonitorList[getValueIndex(name_)];
       }
       [[nodiscard]] double getLastStepDeltaValue(const std::string& name_) const {

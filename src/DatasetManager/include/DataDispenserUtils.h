@@ -47,7 +47,7 @@ struct DataDispenserParameters{
 
     SampleHist& addSampleHist(const std::string& name_){
       for( auto& sampleHist : sampleHistList ){
-        LogThrowIf(sampleHist.name == name_, "Duplicate sample hist with name: " << name_);
+        LogExitIf(sampleHist.name == name_, "Duplicate sample hist with name: " << name_);
       }
       sampleHistList.emplace_back();
       sampleHistList.back().name = name_;

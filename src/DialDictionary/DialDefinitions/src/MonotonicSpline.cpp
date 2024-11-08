@@ -53,7 +53,7 @@ void MonotonicSpline::buildDial(const std::vector<double>& v1,
                                 const std::vector<double>& v2,
                                 const std::vector<double>& v3,
                                 const std::string& option_) {
-  LogThrowIf(not _splineData_.empty(), "Spline data already set.");
+  LogExitIf(not _splineData_.empty(), "Spline data already set.");
 
   _splineBounds_.min = v1.front();
   _splineBounds_.max = v1.back();
@@ -104,7 +104,7 @@ void MonotonicSpline::buildDial(const std::vector<double>& v1,
                 << " MonotonicSpline: Invalid inputs" << std::endl;
       std::cerr << "ERROR " << __FILE__ << "(" << __LINE__ << "): "
                 << " MonotonicSpline: Invalid inputs -- terminating" << std::endl;
-      LogThrow("MonotonicSpline with invalid inputs");
+      LogExit("MonotonicSpline with invalid inputs");
 #endif
   }
 
@@ -116,7 +116,7 @@ double MonotonicSpline::evalResponse(const DialInputBuffer& input_) const {
   double dialInput{input_.getInputBuffer()[0]};
 
 #ifndef NDEBUG
-  LogThrowIf(not std::isfinite(dialInput), "Invalid input for MonotonicSpline");
+  LogExitIf(not std::isfinite(dialInput), "Invalid input for MonotonicSpline");
 #endif
 
   if( not _allowExtrapolation_ ){

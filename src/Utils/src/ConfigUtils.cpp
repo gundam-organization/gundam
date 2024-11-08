@@ -38,7 +38,7 @@ namespace ConfigUtils {
         output = GenericToolbox::Json::readConfigFile(configFilePath_);
       }
     }
-    catch(...){ LogThrow("Error while reading config file: " << configFilePath_); }
+    catch(...){ LogExit("Error while reading config file: " << configFilePath_); }
 
     // resolve sub-references to other config files
     ConfigUtils::unfoldConfig( output );
@@ -140,7 +140,7 @@ namespace ConfigUtils {
   ConfigHandler::ConfigHandler(const std::string& filePath_){
     if( GenericToolbox::hasExtension( filePath_, "root" ) ){
       LogInfo << "Extracting config file for fitter file: " << filePath_ << std::endl;
-      LogThrowIf( not GenericToolbox::doesTFileIsValid(filePath_), "Invalid root file: " << filePath_ );
+      LogExitIf( not GenericToolbox::doesTFileIsValid(filePath_), "Invalid root file: " << filePath_ );
       auto fitFile = std::shared_ptr<TFile>( GenericToolbox::openExistingTFile( filePath_ ) );
 
       auto* conf = fitFile->Get<TNamed>("gundam/config_TNamed");
@@ -148,7 +148,7 @@ namespace ConfigUtils {
         // legacy
         conf = fitFile->Get<TNamed>("gundamFitter/unfoldedConfig_TNamed");
       }
-      LogThrowIf(conf==nullptr, "no config in ROOT file " << filePath_);
+      LogExitIf(conf==nullptr, "no config in ROOT file " << filePath_);
       config = GenericToolbox::Json::readConfigJsonStr( conf->GetTitle() );
       fitFile->Close();
     }
@@ -163,7 +163,7 @@ namespace ConfigUtils {
   }
   void ConfigHandler::override( const std::string& filePath_ ){
     LogInfo << "Overriding config with \"" << filePath_ << "\"" << std::endl;
-    LogThrowIf(not GenericToolbox::isFile(filePath_), "Could not find " << filePath_);
+    LogExitIf(not GenericToolbox::isFile(filePath_), "Could not find " << filePath_);
     this->override( ConfigUtils::readConfigFile(filePath_) );
   }
   void ConfigHandler::override( const std::vector<std::string>& filesList_ ){

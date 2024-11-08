@@ -52,23 +52,23 @@ Cache::Weight::Bilinear::Bilinear(
     // copied once during initialization so do not pin the CPU memory into
     // the page set.
     fResult = std::make_unique<hemi::Array<int>>(GetReserved(),false);
-    LogThrowIf(not fResult, "Bad SplineResult alloc");
+    LogExitIf(not fResult, "Bad SplineResult alloc");
     fParameter = std::make_unique<hemi::Array<short>>(
         2*GetReserved(),false);
-    LogThrowIf(not fParameter, "Bad SplineParameter alloc");
+    LogExitIf(not fParameter, "Bad SplineParameter alloc");
     fIndex = std::make_unique<hemi::Array<int>>(1+GetReserved(),false);
-    LogThrowIf(not fIndex, "Bad SplineIndex alloc");
+    LogExitIf(not fIndex, "Bad SplineIndex alloc");
 
     // Get the CPU/GPU memory for the spline knots.  This is copied once
     // during initialization so do not pin the CPU memory into the page
     // set.
     fData = std::make_unique<hemi::Array<WEIGHT_BUFFER_FLOAT>>(
         GetSpaceReserved(),false);
-    LogThrowIf(not fData, "Bad SplineSpacealloc");
+    LogExitIf(not fData, "Bad SplineSpacealloc");
   }
   catch (...) {
     LogError << "Failed to allocate memory, so stopping" << std::endl;
-    LogThrow("Not enough memory available");
+    LogExit("Not enough memory available");
   }
 
   // Initialize the caches.  Don't try to zero everything since the
@@ -86,49 +86,49 @@ void Cache::Weight::Bilinear::AddData(int resIndex,
   if (resIndex < 0) {
     LogError << "Invalid result index"
              << std::endl;
-    LogThrow("Negative result index");
+    LogExit("Negative result index");
   }
   if (fWeights.size() <= resIndex) {
     LogError << "Invalid result index"
              << std::endl;
-    LogThrow("Result index out of bounds");
+    LogExit("Result index out of bounds");
   }
   if (par1Index < 0) {
     LogError << "Invalid parameter 1 index"
              << std::endl;
-    LogThrow("Negative parameter 1 index");
+    LogExit("Negative parameter 1 index");
   }
   if (fParameters.size() <= par1Index) {
     LogError << "Invalid parameter 1 index " << par1Index
              << std::endl;
-    LogThrow("Parameter 1 index out of bounds");
+    LogExit("Parameter 1 index out of bounds");
   }
   if (par2Index < 0) {
     LogError << "Invalid parameter 2 index"
              << std::endl;
-    LogThrow("Negative parameter 2 index");
+    LogExit("Negative parameter 2 index");
   }
   if (fParameters.size() <= par2Index) {
     LogError << "Invalid parameter 2 index " << par2Index
              << std::endl;
-    LogThrow("Parameter 2 index out of bounds");
+    LogExit("Parameter 2 index out of bounds");
   }
   if (data.size() < 11) {
     LogError << "Insufficient points in spline " << data.size()
              << std::endl;
-    LogThrow("Invalid number of spline points");
+    LogExit("Invalid number of spline points");
   }
 
   int newIndex = fUsed++;
   if (fUsed > fReserved) {
     LogError << "Not enough space reserved for splines"
              << std::endl;
-    LogThrow("Not enough space reserved for splines");
+    LogExit("Not enough space reserved for splines");
   }
   if (fSpaceUsed + data.size() > fSpaceReserved) {
     LogError << "Not enough space reserved for spline knots"
              << std::endl;
-    LogThrow("Not enough space reserved for spline knots");
+    LogExit("Not enough space reserved for spline knots");
   }
   fResult->hostPtr()[newIndex] = resIndex;
   fParameter->hostPtr()[2*newIndex] = par1Index;
@@ -139,7 +139,7 @@ void Cache::Weight::Bilinear::AddData(int resIndex,
     if (fSpaceUsed > fSpaceReserved) {
       LogError << "Not enough space reserved for spline knots"
                << std::endl;
-      LogThrow("Not enough space reserved for spline knots");
+      LogExit("Not enough space reserved for spline knots");
     }
   }
 }

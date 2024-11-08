@@ -42,7 +42,7 @@ Cache::Weight::MonotonicSpline::MonotonicSpline(
     fSplineSpaceReserved = 2*fSplinesReserved + fSplineSpaceReserved;
   }
   else {
-    LogThrowIf(spaceOption != "space",
+    LogExitIf(spaceOption != "space",
                "Invalid space option for compact splines");
   }
 
@@ -61,23 +61,23 @@ Cache::Weight::MonotonicSpline::MonotonicSpline(
     // copied once during initialization so do not pin the CPU memory into
     // the page set.
     fSplineResult.reset(new hemi::Array<int>(GetSplinesReserved(),false));
-    LogThrowIf(not fSplineResult, "Bad SplineResult alloc");
+    LogExitIf(not fSplineResult, "Bad SplineResult alloc");
     fSplineParameter.reset(
         new hemi::Array<short>(GetSplinesReserved(),false));
-    LogThrowIf(not fSplineParameter, "Bad SplineParameter alloc");
+    LogExitIf(not fSplineParameter, "Bad SplineParameter alloc");
     fSplineIndex.reset(new hemi::Array<int>(1+GetSplinesReserved(),false));
-    LogThrowIf(not fSplineIndex, "Bad SplineIndex alloc");
+    LogExitIf(not fSplineIndex, "Bad SplineIndex alloc");
 
     // Get the CPU/GPU memory for the spline knots.  This is copied once
     // during initialization so do not pin the CPU memory into the page
     // set.
     fSplineSpace.reset(
         new hemi::Array<WEIGHT_BUFFER_FLOAT>(GetSplineSpaceReserved(),false));
-    LogThrowIf(not fSplineSpace, "Bad SplineSpace alloc");
+    LogExitIf(not fSplineSpace, "Bad SplineSpace alloc");
   }
   catch (...) {
     LogError << "Uncaught exception in WeightGraph" << std::endl;
-    LogThrow("WeightGraph -- uncaught exception");
+    LogExit("WeightGraph -- uncaught exception");
   }
 
   // Initialize the caches.  Don't try to zero everything since the
@@ -99,28 +99,28 @@ void Cache::Weight::MonotonicSpline::AddSpline(int resIndex,
   if (resIndex < 0) {
     LogError << "Invalid result index"
              << std::endl;
-    LogThrow("Negative result index");
+    LogExit("Negative result index");
   }
   if (fWeights.size() <= resIndex) {
     LogError << "Invalid result index"
              << std::endl;
-    LogThrow("Result index out of bounds");
+    LogExit("Result index out of bounds");
   }
   if (parIndex < 0) {
     LogError << "Invalid parameter index"
              << std::endl;
-    LogThrow("Negative parameter index");
+    LogExit("Negative parameter index");
   }
   if (fParameters.size() <= parIndex) {
     LogError << "Invalid parameter index: " << parIndex
              << " out of " << fParameters.size()
              << std::endl;
-    LogThrow("Parameter index out of bounds");
+    LogExit("Parameter index out of bounds");
   }
   if (splineData.size() < 5) {
     LogError << "Insufficient points in spline: " << splineData.size()
              << std::endl;
-    LogThrow("Invalid number of spline points");
+    LogExit("Invalid number of spline points");
   }
   int newIndex = fSplinesUsed++;
   if (fSplinesUsed > fSplinesReserved) {
@@ -128,14 +128,14 @@ void Cache::Weight::MonotonicSpline::AddSpline(int resIndex,
              << " Reserved: " << fSplinesReserved
              << " Used: " << fSplinesUsed
              << std::endl;
-    LogThrow("Not enough space reserved for splines");
+    LogExit("Not enough space reserved for splines");
   }
   fSplineResult->hostPtr()[newIndex] = resIndex;
   fSplineParameter->hostPtr()[newIndex] = parIndex;
   if (fSplineIndex->hostPtr()[newIndex] != fSplineSpaceUsed) {
     LogError << "Last spline knot index should be at old end of splines"
              << std::endl;
-    LogThrow("Problem with control indices");
+    LogExit("Problem with control indices");
   }
   int knotIndex = fSplineSpaceUsed;
   fSplineSpaceUsed += splineData.size();
@@ -144,7 +144,7 @@ void Cache::Weight::MonotonicSpline::AddSpline(int resIndex,
              << " Reserved: " << fSplineSpaceReserved
              << " Used: " << fSplineSpaceUsed
              << std::endl;
-    LogThrow("Not enough space reserved for spline knots");
+    LogExit("Not enough space reserved for spline knots");
   }
   fSplineIndex->hostPtr()[newIndex+1] = fSplineSpaceUsed;
   for (std::size_t i = 0; i<splineData.size(); ++i) {
@@ -181,10 +181,10 @@ void Cache::Weight::MonotonicSpline::SetSplineKnot(
 
 int Cache::Weight::MonotonicSpline::GetSplineParameterIndex(int sIndex) {
   if (sIndex < 0) {
-    LogThrow("Spline index invalid");
+    LogExit("Spline index invalid");
   }
   if (GetSplinesUsed() <= sIndex) {
-    LogThrow("Spline index invalid");
+    LogExit("Spline index invalid");
   }
   return fSplineParameter->hostPtr()[sIndex];
 }
@@ -192,30 +192,30 @@ int Cache::Weight::MonotonicSpline::GetSplineParameterIndex(int sIndex) {
 double Cache::Weight::MonotonicSpline::GetSplineParameter(int sIndex) {
   int i = GetSplineParameterIndex(sIndex);
   if (i<0) {
-    LogThrow("Spline parameter index out of bounds");
+    LogExit("Spline parameter index out of bounds");
   }
   if (fParameters.size() <= i) {
-    LogThrow("Spline parameter index out of bounds");
+    LogExit("Spline parameter index out of bounds");
   }
   return fParameters.hostPtr()[i];
 }
 
 int Cache::Weight::MonotonicSpline::GetSplineKnotCount(int sIndex) {
   if (sIndex < 0) {
-    LogThrow("Spline index invalid");
+    LogExit("Spline index invalid");
   }
   if (GetSplinesUsed() <= sIndex) {
-    LogThrow("Spline index invalid");
+    LogExit("Spline index invalid");
   }
   return fSplineIndex->hostPtr()[sIndex+1]-fSplineIndex->hostPtr()[sIndex]-2;
 }
 
 double Cache::Weight::MonotonicSpline::GetSplineLowerBound(int sIndex) {
   if (sIndex < 0) {
-    LogThrow("Spline index invalid");
+    LogExit("Spline index invalid");
   }
   if (GetSplinesUsed() <= sIndex) {
-    LogThrow("Spline index invalid");
+    LogExit("Spline index invalid");
   }
   int knotsIndex = fSplineIndex->hostPtr()[sIndex];
   return fSplineSpace->hostPtr()[knotsIndex];
@@ -223,10 +223,10 @@ double Cache::Weight::MonotonicSpline::GetSplineLowerBound(int sIndex) {
 
 double Cache::Weight::MonotonicSpline::GetSplineUpperBound(int sIndex) {
   if (sIndex < 0) {
-    LogThrow("Spline index invalid");
+    LogExit("Spline index invalid");
   }
   if (GetSplinesUsed() <= sIndex) {
-    LogThrow("Spline index invalid");
+    LogExit("Spline index invalid");
   }
   int knotCount = GetSplineKnotCount(sIndex);
   double lower = GetSplineLowerBound(sIndex);
@@ -238,10 +238,10 @@ double Cache::Weight::MonotonicSpline::GetSplineUpperBound(int sIndex) {
 double Cache::Weight::MonotonicSpline::GetSplineLowerClamp(int sIndex) {
   int i = GetSplineParameterIndex(sIndex);
   if (i<0) {
-    LogThrow("Spline lower clamp index out of bounds");
+    LogExit("Spline lower clamp index out of bounds");
   }
   if (fLowerClamp.size() <= i) {
-    LogThrow("Spline lower clamp index out of bounds");
+    LogExit("Spline lower clamp index out of bounds");
   }
   return fLowerClamp.hostPtr()[i];
 }
@@ -249,28 +249,28 @@ double Cache::Weight::MonotonicSpline::GetSplineLowerClamp(int sIndex) {
 double Cache::Weight::MonotonicSpline::GetSplineUpperClamp(int sIndex) {
   int i = GetSplineParameterIndex(sIndex);
   if (i<0) {
-    LogThrow("Spline upper clamp index out of bounds");
+    LogExit("Spline upper clamp index out of bounds");
   }
   if (fUpperClamp.size() <= i) {
-    LogThrow("Spline upper clamp index out of bounds");
+    LogExit("Spline upper clamp index out of bounds");
   }
   return fUpperClamp.hostPtr()[i];
 }
 
 double Cache::Weight::MonotonicSpline::GetSplineKnot(int sIndex, int knot) {
   if (sIndex < 0) {
-    LogThrow("Spline index invalid");
+    LogExit("Spline index invalid");
   }
   if (GetSplinesUsed() <= sIndex) {
-    LogThrow("Spline index invalid");
+    LogExit("Spline index invalid");
   }
   int knotsIndex = fSplineIndex->hostPtr()[sIndex];
   int count = GetSplineKnotCount(sIndex);
   if (knot < 0) {
-    LogThrow("Knot index invalid");
+    LogExit("Knot index invalid");
   }
   if (count <= knot) {
-    LogThrow("Knot index invalid");
+    LogExit("Knot index invalid");
   }
   return fSplineSpace->hostPtr()[knotsIndex+2+knot];
 }

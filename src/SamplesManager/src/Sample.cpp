@@ -21,7 +21,7 @@ void Sample::configureImpl(){
   GenericToolbox::Json::fillValue(_config_, _selectionCutStr_, {{"selectionCutStr"},{"selectionCuts"}});
   GenericToolbox::Json::fillValue(_config_, _enabledDatasetList_, {{"datasets"},{"dataSets"}});
 
-  LogThrowIf(_name_.empty(), "No name was provided for sample #" << _index_ << std::endl << GenericToolbox::Json::toReadableString(_config_));
+  LogExitIf(_name_.empty(), "No name was provided for sample #" << _index_ << std::endl << GenericToolbox::Json::toReadableString(_config_));
   LogDebugIf(GundamGlobals::isDebug()) << "Defining sample \"" << _name_ << "\"" << std::endl;
   if( not _isEnabled_ ){
     LogDebugIf(GundamGlobals::isDebug()) << "-> disabled" << std::endl;
@@ -78,11 +78,11 @@ void Sample::shrinkEventList(size_t newTotalSize_){
     return;
   }
 
-  LogThrowIf(_eventList_.size() < newTotalSize_,
+  LogExitIf(_eventList_.size() < newTotalSize_,
              "Can't shrink since eventList is too small: " << GET_VAR_NAME_VALUE(newTotalSize_)
                                                            << " > " << GET_VAR_NAME_VALUE(_eventList_.size()));
 
-  LogThrowIf(not _loadedDatasetList_.empty() and _loadedDatasetList_.back().eventNb < (_eventList_.size() - newTotalSize_),
+  LogExitIf(not _loadedDatasetList_.empty() and _loadedDatasetList_.back().eventNb < (_eventList_.size() - newTotalSize_),
              "Can't shrink since eventList of the last dataSet is too small.");
 
   LogInfo << _name_ << ": shrinking event list from " << _eventList_.size() << " to " << newTotalSize_ << "..." << std::endl;

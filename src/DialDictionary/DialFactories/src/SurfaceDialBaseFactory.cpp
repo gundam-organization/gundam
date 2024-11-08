@@ -19,7 +19,7 @@ DialBase* SurfaceDialBaseFactory::makeDial(const std::string& dialTitle_,
 
   TH2* srcObject = dynamic_cast<TH2*>(dialInitializer_);
 
-  LogThrowIf(srcObject == nullptr, "Surface dial initializers must be a TH2");
+  LogExitIf(srcObject == nullptr, "Surface dial initializers must be a TH2");
 
   // Stuff the created dial into a unique_ptr, so it will be properly deleted
   // in the event of an exception.
@@ -41,7 +41,7 @@ DialBase* SurfaceDialBaseFactory::makeDial(const std::string& dialTitle_,
   if (not dialBase) {
     LogError << "Invalid dialSubType value: " << dialSubType_ << std::endl;
     LogError << "Valid dialSubType values are: Bilinear, Bicubic" << std::endl;
-    LogThrow("Invalid Surface dialSubType");
+    LogExit("Invalid Surface dialSubType");
   }
 
   dialBase->buildDial(*srcObject);

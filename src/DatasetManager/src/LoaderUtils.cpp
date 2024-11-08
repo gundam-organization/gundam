@@ -10,8 +10,8 @@
 namespace LoaderUtils{
 
   void allocateMemory(Event& event_, const std::vector<const GenericToolbox::LeafForm*>& leafFormList_){
-    LogThrowIf( event_.getVariables().getNameListPtr() == nullptr, "var name list not set." );
-    LogThrowIf( event_.getVariables().getNameListPtr()->size() != leafFormList_.size(), "size mismatch." );
+    LogExitIf( event_.getVariables().getNameListPtr() == nullptr, "var name list not set." );
+    LogExitIf( event_.getVariables().getNameListPtr()->size() != leafFormList_.size(), "size mismatch." );
 
     auto nLeaf{event_.getVariables().getNameListPtr()->size()};
     for(size_t iVar = 0 ; iVar < nLeaf ; iVar++ ){
@@ -35,7 +35,7 @@ namespace LoaderUtils{
     event_.getIndices().bin = -1;
   }
   double evalFormula(const Event& event_, const TFormula* formulaPtr_, std::vector<int>* indexDict_){
-    LogThrowIf(formulaPtr_ == nullptr, GET_VAR_NAME_VALUE(formulaPtr_));
+    LogExitIf(formulaPtr_ == nullptr, GET_VAR_NAME_VALUE(formulaPtr_));
 
     std::vector<double> parArray(formulaPtr_->GetNpar());
     for( int iPar = 0 ; iPar < formulaPtr_->GetNpar() ; iPar++ ){

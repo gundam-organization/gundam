@@ -472,7 +472,7 @@ void LikelihoodInterface::buildSamplePairList(){
 
   auto nModelSamples{_modelPropagator_.getSampleSet().getSampleList().size()};
   auto nDataSamples{_dataPropagator_.getSampleSet().getSampleList().size()};
-  LogThrowIf(nModelSamples != nDataSamples,
+  LogExitIf(nModelSamples != nDataSamples,
              "Mismatching number of samples for model(" << nModelSamples <<
                                                         ") and data(" << nDataSamples << ") propagators."
   );
