@@ -108,7 +108,12 @@ int main(int argc, char** argv){
   // Init command line args:
   // --------------------------
 
-  if( clParser.isOptionTriggered("debugVerbose") ){ GundamGlobals::setIsDebug(true); }
+  if( clParser.isOptionTriggered("debugVerbose") ){
+    GundamGlobals::setIsDebug(true);
+#ifdef GUNDAM_USING_CACHE_MANAGER
+    Cache::Manager::SetEnableDebugPrintouts(true);
+#endif
+  }
 
   // Is build compatible with GPU option?
   if( clParser.isOptionTriggered("usingGpu") ){

@@ -23,6 +23,8 @@ set( HEADERS
 set( SRCFILES
   ${CMAKE_CURRENT_SOURCE_DIR}/src/CacheManager.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/src/CacheAtomicCAS.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/CacheSampleHistFiller.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/CacheEventWeightFiller.cpp
 )
 
 set( SRC_FILE_EXT "cpp" )       # The C++ extension

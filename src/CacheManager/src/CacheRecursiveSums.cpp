@@ -96,20 +96,29 @@ void Cache::RecursiveSums::Initialize() {
 
   // Zero the number of entries in each bin.  This makes sure that all
   // bins are represented, even if they don't have events.
-  std::map<int,int> binEntryCount;
-  for (int b = 0; b < fSums->size(); ++b) binEntryCount[b] = 0;
+  struct BinEntryCount{
+    int binIdx{-1};
+    int entryCount{0};
+  };
+  std::vector<BinEntryCount> binEntryCountList;
+
+  binEntryCountList.reserve( fSums->size() );
+  for (int b = 0; b < fSums->size(); ++b){
+    binEntryCountList.emplace_back();
+    binEntryCountList.back().binIdx = b;
+  }
 
   // Count the number of entries in each bin
   short* idx = fIndexes->hostPtr();
-  for (int e = 0; e < fIndexes->size(); ++e) {
-    ++binEntryCount[idx[e]];
+  for( int e = 0; e < fIndexes->size(); ++e ){
+    binEntryCountList.at(idx[e]).entryCount += 1;
   }
+
 
   // Find the maximum number of entries in any bin.
   fMaxEntries = 0;
-  for (std::map<int,int>::iterator count = binEntryCount.begin();
-       count != binEntryCount.end(); ++count) {
-    fMaxEntries = std::max(fMaxEntries, count->second);
+  for ( auto& count : binEntryCountList ) {
+    fMaxEntries = std::max(fMaxEntries, count.entryCount);
   }
 
   // Fill the offsets for each histogram bin.  This also makes sure that all
@@ -117,11 +126,10 @@ void Cache::RecursiveSums::Initialize() {
   {
     int bin = 0;
     int offset = 0;
-    for (std::map<int,int>::iterator count = binEntryCount.begin();
-         count != binEntryCount.end(); ++count) {
-      LogThrowIf(bin != count->first, "Bin number mismatch");
+    for ( auto& count : binEntryCountList) {
+      LogThrowIf(bin != count.binIdx, "Bin number mismatch: bin=" << bin << " / count->first=" << count.binIdx);
       fBinOffsets->hostPtr()[bin] = offset;
-      offset += count->second;
+      offset += count.entryCount;
       ++bin;
     }
     fBinOffsets->hostPtr()[bin] = offset;
@@ -137,12 +145,12 @@ void Cache::RecursiveSums::Initialize() {
   }
 
   // Build the map between the work buffer entry and the weight entry.
-  for (int b = 0; b < fSums->size(); ++b) binEntryCount[b] = 0;
+  for (int b = 0; b < fSums->size(); ++b) binEntryCountList[b].entryCount = 0;
   for (int entry = 0; entry < fIndexes->size(); ++entry) {
     int bin = fIndexes->hostPtr()[entry];
-    int offset = fBinOffsets->hostPtr()[bin] + binEntryCount[bin];
+    int offset = fBinOffsets->hostPtr()[bin] + binEntryCountList[bin].entryCount;
     fEventIndexes->hostPtr()[offset] = entry;
-    ++binEntryCount[bin];
+    ++binEntryCountList[bin].entryCount;
   }
 
 }

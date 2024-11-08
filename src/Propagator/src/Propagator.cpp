@@ -133,34 +133,30 @@ void Propagator::buildDialCache(){
   }
 }
 void Propagator::propagateParameters(){
+#ifdef GUNDAM_USING_CACHE_MANAGER
+  bool usedCacheManager{false};
+  // Only real parameters are propagated on the spectra -> need to convert the eigen to original
+  if( _enableEigenToOrigInPropagate_ ){ _parManager_.convertEigenToOrig(); }
+  usedCacheManager = Cache::Manager::PropagateParameters();
+  if( usedCacheManager and not GundamGlobals::isForceCpuCalculation() ){ return; }
+#endif
   this->reweightEvents();
   this->refillHistograms();
 }
 void Propagator::reweightEvents() {
-  reweightTimer.start();
+  // timer start/stop in scope
+  auto s{reweightTimer.scopeTime()};
 
   // Only real parameters are propagated on the spectra -> need to convert the eigen to original
   if( _enableEigenToOrigInPropagate_ ){ _parManager_.convertEigenToOrig(); }
 
   updateDialState();
 
-  bool usedGPU{false};
-#ifdef GUNDAM_USING_CACHE_MANAGER
-  if( GundamGlobals::isCacheManagerEnabled() ) {
-    if (Cache::Manager::Update(getSampleSet(), getEventDialCache())) {
-      usedGPU = Cache::Manager::Fill();
-    }
-    if ( GundamGlobals::isForceCpuCalculation()) usedGPU = false;
+  if( not _devSingleThreadReweight_ ){
+    _threadPool_.runJob("Propagator::reweightEvents");
   }
-#endif
-  if( not usedGPU ){
-    if( not _devSingleThreadReweight_ ){
-      _threadPool_.runJob("Propagator::reweightEvents");
-    }
-    else{ this->reweightEvents(-1); }
-  }
+  else{ this->reweightEvents(-1); }
 
-  reweightTimer.stop();
 }
 
 // misc
@@ -259,6 +255,27 @@ void Propagator::copyEventsFrom(const Propagator& src_){
   _eventDialCache_.fillCacheEntries( _sampleSet_ );
 }
 
+#ifdef GUNDAM_USING_CACHE_MANAGER
+void Propagator::initializeCacheManager(){
+  LogInfo << "Setting up the cache manager..." << std::endl;
+
+  // After all the data has been loaded.  Specifically, this must be after
+  // the MC has been copied for the Asimov fit, or the "data" use the MC
+  // reweighting cache.  This must also be before the first use of
+  // reweightMcEvents that is done using the GPU.
+  Cache::Manager::SetSampleSetPtr( _sampleSet_ );
+  Cache::Manager::SetEventDialSetPtr( _eventDialCache_ );
+
+  Cache::Manager::Build();
+
+  // By default, make sure every data is copied to the CPU part
+  // Some of those part might get disabled for faster calculation
+  Cache::Manager::SetIsEventWeightCopyEnabled( true );
+  Cache::Manager::SetIsHistContentCopyEnabled( true );
+
+  Cache::Manager::PropagateParameters();
+}
+#endif
 
 
 // Protected
@@ -291,12 +308,11 @@ void Propagator::updateDialState(){
                 });
 }
 void Propagator::refillHistograms(){
-  refillHistogramTimer.start();
+  // timer start/stop in scope
+  auto s{refillHistogramTimer.scopeTime()};
 
   if( not _devSingleThreadHistFill_ ){ _threadPool_.runJob("Propagator::refillHistograms"); }
   else{ refillHistogramsFct(-1); }
-
-  refillHistogramTimer.stop();
 }
 
 // multithreading

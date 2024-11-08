@@ -1,6 +1,8 @@
 #ifndef CacheManager_h_seen
 #define CacheManager_h_seen
 
+#include "CacheSampleHistFiller.h"
+#include "CacheEventWeightFiller.h"
 #include "CacheParameters.h"
 #include "CacheWeights.h"
 
@@ -33,9 +35,12 @@ namespace Cache {
 #include "SampleSet.h"
 #include "EventDialCache.h"
 
+#include "GenericToolbox.Time.h"
+
 #include "hemi/array.h"
 
 #include <map>
+#include <vector>
 
 namespace Cache {
   class Manager;
@@ -55,19 +60,32 @@ public:
   /// before the cached weights can be used.  This is used in Propagator.cpp.
   static bool Fill();
 
+  /// Dedicated setter for fUpdateRequired flag
+  static void SetUpdateRequired(bool isUpdateRequired_){ fUpdateRequired = isUpdateRequired_; };
+
+  /// Set addresses of the Propagator objects the CacheManager should take care of
+  static void SetSampleSetPtr(SampleSet& sampleSet_){ fSampleSetPtr = &sampleSet_; }
+  static void SetEventDialSetPtr(EventDialCache& eventDialCache_){ fEventDialCachePtr = &eventDialCache_; }
+  static void SetIsHistContentCopyEnabled(bool fIsHistContentCopyEnabled_){ fIsHistContentCopyEnabled = fIsHistContentCopyEnabled_; }
+  static void SetIsEventWeightCopyEnabled(bool fIsEventWeightCopyEnabled_){ fIsEventWeightCopyEnabled = fIsEventWeightCopyEnabled_; }
+  static void SetEnableDebugPrintouts(bool fEnableDebugPrintouts_){ fEnableDebugPrintouts = fEnableDebugPrintouts_; }
+
+  static const GenericToolbox::Time::AveragedTimer<10>& GetCacheFillTimer() { return cacheFillTimer; }
+  static const GenericToolbox::Time::AveragedTimer<10>& GetPullFromDeviceTimer() { return pullFromDeviceTimer; }
+
   /// Build the cache and load it into the device.  This is used in
   /// Propagator.cpp to fill the constants needed to for the calculations.
-  static bool Build(SampleSet& sampleList, EventDialCache& eventDials);
+  static bool Build();
 
   /// Update the cache with the event and spline information.  This is
   /// called as part of Build, and can be called in other code if the cache
   /// needs to be changed.  It forages all of the information from the
   /// original sample list and event dials.
-  static bool Update(SampleSet& sampleList, EventDialCache& eventDials);
+  static bool Update();
 
   /// Flag that the Cache::Manager internal caches must be updated from the
   /// SampleSet and EventDialCache before it can be used.
-  static void UpdateRequired();
+  static void RequireUpdate(){ SetUpdateRequired(true); }
 
   /// This returns the index of the parameter in the cache.  If the
   /// parameter isn't defined, this will return a negative value.
@@ -82,7 +100,17 @@ public:
   static bool HasGPU(bool dump = false);
 
   /// Return the approximate allocated memory (e.g. on the GPU).
-  std::size_t GetResidentMemory() const {return fTotalBytes;}
+  [[nodiscard]] std::size_t GetResidentMemory() const {return fTotalBytes;}
+
+  /// Same as Propagator::propagateParameters()
+  static bool PropagateParameters();
+
+  /// Drop to CPU
+  static bool CopyEventWeights();
+  static bool CopyHistogramsContent();
+
+  static bool IsBuilt(){ return fIsCacheManagerBuilt; }
+
 
 private:
   // Hold the configuration that will be used to construct the manager
@@ -166,6 +194,18 @@ private:
 
   /// Declare all of the actual GPU caches here.  There is one GPU, so this
   /// is the ONE place that everything is collected together.
+
+  /// pointers to the corresponding Propagator structure
+  static bool fEnableDebugPrintouts;
+  static SampleSet* fSampleSetPtr;
+  static EventDialCache* fEventDialCachePtr;
+  static std::vector<CacheSampleHistFiller> fSampleHistFillerList;
+  static std::vector<CacheEventWeightFiller> fEventWeightFillerList;
+  static bool fIsHistContentCopyEnabled;
+  static bool fIsEventWeightCopyEnabled;
+  static bool fIsCacheManagerBuilt;
+  static GenericToolbox::Time::AveragedTimer<10> cacheFillTimer;
+  static GenericToolbox::Time::AveragedTimer<10> pullFromDeviceTimer;
 
   /// The cache for parameter weights (on the GPU).
   std::unique_ptr<Cache::Parameters> fParameterCache;

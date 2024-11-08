@@ -43,9 +43,19 @@
 LoggerInit([]{ Logger::setUserHeaderStr("[Cache::Manager]"); });
 #endif
 
+bool Cache::Manager::fEnableDebugPrintouts{false};
 Cache::Manager* Cache::Manager::fSingleton = nullptr;
 bool Cache::Manager::fUpdateRequired = true;
 std::map<const Parameter*, int> Cache::Manager::ParameterMap;
+SampleSet* Cache::Manager::fSampleSetPtr{nullptr};
+EventDialCache* Cache::Manager::fEventDialCachePtr{nullptr};
+bool Cache::Manager::fIsHistContentCopyEnabled{false};
+bool Cache::Manager::fIsEventWeightCopyEnabled{false};
+bool Cache::Manager::fIsCacheManagerBuilt{false};
+std::vector<CacheSampleHistFiller> Cache::Manager::fSampleHistFillerList{};
+std::vector<CacheEventWeightFiller> Cache::Manager::fEventWeightFillerList{};
+GenericToolbox::Time::AveragedTimer<10> Cache::Manager::cacheFillTimer{};
+GenericToolbox::Time::AveragedTimer<10> Cache::Manager::pullFromDeviceTimer{};
 
 Cache::Manager::Manager(const Cache::Manager::Configuration& config) {
   LogInfo  << "Creating cache manager" << std::endl;
@@ -179,9 +189,13 @@ bool Cache::Manager::HasGPU(bool dump) {
   return Cache::Parameters::HasGPU(dump);
 }
 
-bool Cache::Manager::Build(SampleSet& sampleList,
-                           EventDialCache& eventDials) {
+bool Cache::Manager::Build() {
   if (not GundamGlobals::isCacheManagerEnabled()) return false;
+
+  if( fSampleSetPtr == nullptr or fEventDialCachePtr == nullptr ){
+    LogError << "fSampleSetPtr or fEventDialCachePtr not set." << std::endl;
+    LogThrow("Can't Build()");
+  }
 
   LogInfo << "Build the internal caches " << std::endl;
 
@@ -201,7 +215,7 @@ bool Cache::Manager::Build(SampleSet& sampleList,
 
   int dialErrorCount = 0;     // This should *stay* zero.
   std::map<std::string, int> useCount;
-  for (EventDialCache::CacheEntry& elem : eventDials.getCache()) {
+  for (EventDialCache::CacheEntry& elem : fEventDialCachePtr->getCache()) {
     if (elem.event->getIndices().bin < 0) {
       LogThrow("Caching event that isn't used");
     }
@@ -292,8 +306,8 @@ bool Cache::Manager::Build(SampleSet& sampleList,
 
   // Count the total number of histogram cells.
   config.histBins = 0;
-  for(const Sample& sample : sampleList.getSampleList() ){
-    int cells = sample.getHistogram().getNbBins() + 2; // GetNcells() of TH1D
+  for(const Sample& sample : fSampleSetPtr->getSampleList() ){
+    int cells = sample.getHistogram().getNbBins(); // GetNcells() of TH1D
     LogInfo  << "Add histogram for " << sample.getName()
              << " with " << cells
              << " cells (includes under/over-flows)" << std::endl;
@@ -417,20 +431,15 @@ bool Cache::Manager::Build(SampleSet& sampleList,
     return false;
   }
 
-  Cache::Manager::UpdateRequired();
+  Cache::Manager::RequireUpdate();
+
+  fIsCacheManagerBuilt = true;
 
   return true;
 }
 
-void Cache::Manager::UpdateRequired() {
-  fUpdateRequired = true;
-}
 
-
-bool Cache::Manager::Update(SampleSet& sampleList,
-                            EventDialCache& eventDials) {
-  if (not fUpdateRequired) return true;
-
+bool Cache::Manager::Update() {
   // In case the cache isn't allocated (usually because it's turned off on
   // the command line), but this is a safety check.
   if (!Cache::Manager::Get()) {
@@ -440,7 +449,7 @@ bool Cache::Manager::Update(SampleSet& sampleList,
   }
 
   // This is the updated that is required!
-  fUpdateRequired = false;
+  SetUpdateRequired( false );
 
   LogInfo << "Update the internal caches" << std::endl;
 
@@ -451,8 +460,11 @@ bool Cache::Manager::Update(SampleSet& sampleList,
 
   int usedResults = 0;
 
+  fEventWeightFillerList.clear();
+  fEventWeightFillerList.reserve( fEventDialCachePtr->getCache().size() );
+
   // Add the dials in the EventDialCache to the internal cache.
-  for (EventDialCache::CacheEntry& elem : eventDials.getCache()) {
+  for (EventDialCache::CacheEntry& elem : fEventDialCachePtr->getCache()) {
     // Skip events that are not in a bin.
     if (elem.event->getIndices().bin < 0) continue;
     Event& event = *elem.event;
@@ -460,19 +472,7 @@ bool Cache::Manager::Update(SampleSet& sampleList,
     // event in the cache.
     int resultIndex = usedResults++;
 
-    event.getCache().index = resultIndex;
-    event.getCache().valuePtr = (Cache::Manager::Get()
-        ->GetWeightsCache()
-        .GetResultPointer(resultIndex));
-    event.getCache().isValidPtr = (Cache::Manager::Get()
-        ->GetWeightsCache()
-        .GetResultValidPointer());
-    event.getCache().updateCallbackPtr = (
-        [](){
-          LogTrace << "Copy event weights from Device to Host"
-                   << std::endl;
-          Cache::Manager::Get()->GetWeightsCache().GetResult(0);
-        });
+    fEventWeightFillerList.emplace_back( elem.event, resultIndex );
 
     // Get the initial value for this event and save it.
     double initialEventWeight = event.getWeights().base;
@@ -677,45 +677,33 @@ bool Cache::Manager::Update(SampleSet& sampleList,
     LogThrow("Probable problem putting dials in cache");
   }
 
+  fSampleHistFillerList.clear();
+  fSampleHistFillerList.reserve( fSampleSetPtr->getSampleList().size() );
+
   // Add the histogram cells to the cache.  THIS CODE IS SUSPECT SINCE IT IS
   // SAVING ADDRESSES OF CLASS FIELDS.  This *will* be OK since the fields
   // are not going to be moved, and is needed for a huge win in efficiency,
   // but is officially "dangerous".
   LogInfo << "Add this histogram cells to the cache." << std::endl;
   int nextHist = 0;
-  for(Sample& sample : sampleList.getSampleList() ) {
+  for(Sample& sample : fSampleSetPtr->getSampleList() ) {
     LogInfo  << "Fill cache for " << sample.getName()
              << " with " << sample.getEventList().size()
              << " events" << std::endl;
-    int thisHist = nextHist;
-    sample.getHistogram().setCacheManagerIndex(thisHist);
-    sample.getHistogram().setCacheManagerValuePointer(
-        Cache::Manager::Get()->GetHistogramsCache()
-            .GetSumsPointer());
-    sample.getHistogram().setCacheManagerValue2Pointer(
-        Cache::Manager::Get()->GetHistogramsCache()
-            .GetSums2Pointer());
-    sample.getHistogram().setCacheManagerValidPointer(
-        Cache::Manager::Get()->GetHistogramsCache()
-            .GetSumsValidPointer());
-    sample.getHistogram().setCacheManagerUpdatePointer(
-        [](){
-          Cache::Manager::Get()->GetHistogramsCache().GetSum(0);
-          Cache::Manager::Get()->GetHistogramsCache().GetSum2(0);
-        });
-    int cells = sample.getHistogram().getNbBins() + 2;
+    int thisHistIndexOffset = nextHist;
+
+    fSampleHistFillerList.emplace_back( &sample.getHistogram(), thisHistIndexOffset );
+
+    int cells = sample.getHistogram().getNbBins();
     nextHist += cells;
-    /// ARE ALL OF THE EVENTS HANDLED?
-    for (Event& event
-        : sample.getEventList()) {
-      int eventIndex = event.getCache().index;
-      int cellIndex = event.getIndices().bin;
-      if (cellIndex < 0 || cells <= cellIndex) {
-        LogThrow("Histogram bin out of range");
+
+    for( auto& eventFiller : fEventWeightFillerList ){
+      if( eventFiller.getEventPtr()->getIndices().sample == sample.getIndex() ){
+        Cache::Manager::Get()->GetHistogramsCache().SetEventIndex(
+            eventFiller.getValueIndex(),
+            thisHistIndexOffset + eventFiller.getEventPtr()->getIndices().bin
+        );
       }
-      int theEntry = thisHist + cellIndex;
-      Cache::Manager::Get()->GetHistogramsCache()
-          .SetEventIndex(eventIndex,theEntry);
     }
   }
 
@@ -725,8 +713,8 @@ bool Cache::Manager::Update(SampleSet& sampleList,
   }
 
   // If the event weight cap has been set, then pass it along
-  if (eventDials.getGlobalEventReweightCap().isEnabled) {
-    double cap = eventDials.getGlobalEventReweightCap().maxReweight;
+  if (fEventDialCachePtr->getGlobalEventReweightCap().isEnabled) {
+    double cap = fEventDialCachePtr->getGlobalEventReweightCap().maxReweight;
     if (std::isfinite(cap)) {
       Cache::Manager::Get()
           ->GetHistogramsCache().SetMaximumEventWeight(cap);
@@ -781,6 +769,82 @@ bool Cache::Manager::Fill() {
   }
   cache->GetWeightsCache().Apply();
   cache->GetHistogramsCache().Apply();
+
+  return true;
+}
+
+bool Cache::Manager::PropagateParameters(){
+
+  bool isSuccess{false};
+
+  {
+    auto s{cacheFillTimer.scopeTime()};
+
+    // if disabled, leave
+    if( Cache::Manager::Get() == nullptr ){ return false; }
+
+    // update the cache if necessary
+    if( fUpdateRequired ){ Cache::Manager::Update(); }
+
+    // do the propagation on the device
+    isSuccess = Cache::Manager::Fill();
+    if( not isSuccess ){ return false; }
+  }
+
+  // now everything is on the device, what info do we need on the CPU?
+
+  {
+    auto s{pullFromDeviceTimer.scopeTime()};
+
+    // do we need to copy every event weight to the CPU structures ?
+    if( Cache::Manager::fIsEventWeightCopyEnabled ){
+      Cache::Manager::CopyEventWeights();
+    }
+
+    // do we need to copy bin content to the CPU structures ?
+    if( Cache::Manager::fIsHistContentCopyEnabled ){
+      Cache::Manager::CopyHistogramsContent();
+    }
+  }
+
+
+  return true;
+}
+bool Cache::Manager::CopyEventWeights(){
+
+  if( not Cache::Manager::Get()->GetWeightsCache().IsResultValid() ){
+    // Trigger this update
+    if( fEnableDebugPrintouts ){ LogDebug << "Copy event weights from Device to Host" << std::endl; }
+    Cache::Manager::Get()->GetWeightsCache().GetResult(0);
+  }
+
+  for( auto& eventFiller : fEventWeightFillerList ){
+    eventFiller.copyCacheToCpu( Cache::Manager::Get()->GetWeightsCache().GetWeights().hostPtr() );
+  }
+
+  return true;
+}
+bool Cache::Manager::CopyHistogramsContent(){
+
+  if( not Cache::Manager::Get()->GetHistogramsCache().IsSumsValid() ){
+    // This can be slow (~10 usec for 5000 bins) when data must be copied
+    // from the device, but it makes sure that the results are copied from
+    // the device when they have changed. The values pointed to by
+    // _CacheManagerValue_ and _CacheManagerValid_ are inside the summed
+    // index cache (a bit of evil coding here), and are updated by the
+    // cache.  The update is triggered by (*_CacheManagerUpdate_)().
+    if( fEnableDebugPrintouts ){ LogDebug << "Copy bin contents from Device to Host" << std::endl; }
+
+    Cache::Manager::Get()->GetHistogramsCache().GetSum(0);
+    Cache::Manager::Get()->GetHistogramsCache().GetSum2(0);
+  }
+
+  for( auto& histFiller : fSampleHistFillerList ){
+    histFiller.pullHistContent(
+        Cache::Manager::Get()->GetHistogramsCache().GetSumsPointer(),
+        Cache::Manager::Get()->GetHistogramsCache().GetSums2Pointer()
+    );
+  }
 
   return true;
 }

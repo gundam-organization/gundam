@@ -326,17 +326,6 @@ void LikelihoodInterface::loadModelPropagator(){
   _modelPropagator_.shrinkDialContainers();
   _modelPropagator_.buildDialCache();
 
-#ifdef GUNDAM_USING_CACHE_MANAGER
-  // After all the data has been loaded.  Specifically, this must be after
-  // the MC has been copied for the Asimov fit, or the "data" use the MC
-  // reweighting cache.  This must also be before the first use of
-  // reweightMcEvents that is done using the GPU.
-  Cache::Manager::Build(
-      _modelPropagator_.getSampleSet(),
-      _modelPropagator_.getEventDialCache()
-  );
-#endif
-
   LogInfo << "Propagating prior parameters on events..." << std::endl;
   _modelPropagator_.reweightEvents();
 
@@ -357,6 +346,12 @@ void LikelihoodInterface::loadModelPropagator(){
       sample.getHistogram().refillHistogram(iThread);
     }
   });
+
+#ifdef GUNDAM_USING_CACHE_MANAGER
+  if( GundamGlobals::isCacheManagerEnabled() ){
+    _modelPropagator_.initializeCacheManager();
+  }
+#endif
 
   _modelPropagator_.printBreakdowns();
 
