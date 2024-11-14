@@ -845,70 +845,45 @@ void ParameterSet::printConfiguration() const {
 // Protected
 void ParameterSet::readParameterDefinitionFile(){
 
-  TObject* objBuffer{nullptr};
+  // new generalised way of defining parameters:
+  // path can be set as: /path/to/rootfile.root:folder/in/tfile/object
 
-  std::string path = GenericToolbox::expandEnvironmentVariables(_parameterDefinitionFilePath_);
-  std::unique_ptr<TFile> parDefFile(TFile::Open(path.c_str()));
-  LogThrowIf(parDefFile == nullptr or not parDefFile->IsOpen(), "Could not open: " << path);
+  std::string parDefFilePathPrefix{};
+
+  // legacy option
+  if( not _parameterDefinitionFilePath_.empty() ){ parDefFilePathPrefix = _parameterDefinitionFilePath_ + ":"; }
+
+  if(not _covarianceMatrixPath_.empty()){ GenericToolbox::fetchObject(parDefFilePathPrefix+_covarianceMatrixPath_, _priorCovarianceMatrix_); }
+  if(not _parameterPriorValueListPath_.empty()){ GenericToolbox::fetchObject(parDefFilePathPrefix+_parameterPriorValueListPath_, _parameterPriorList_); }
+  if(not _parameterNameListPath_.empty()){ GenericToolbox::fetchObject(parDefFilePathPrefix+_parameterNameListPath_, _parameterNamesList_); }
+  if(not _parameterLowerBoundsTVectorD_.empty()){ GenericToolbox::fetchObject(parDefFilePathPrefix+_parameterLowerBoundsTVectorD_, _parameterLowerBoundsList_); }
+  if(not _parameterUpperBoundsTVectorD_.empty()){ GenericToolbox::fetchObject(parDefFilePathPrefix+_parameterUpperBoundsTVectorD_, _parameterUpperBoundsList_); }
+  if(not _throwEnabledListPath_.empty()){ GenericToolbox::fetchObject(parDefFilePathPrefix+_throwEnabledListPath_, _throwEnabledList_); }
 
 
-  // define with the covariance matrix size
-  if( not _covarianceMatrixPath_.empty() ){
-    objBuffer = parDefFile->Get(_covarianceMatrixPath_.c_str());
-    LogThrowIf(objBuffer == nullptr, "Can't find \"" << _covarianceMatrixPath_ << "\" in " << parDefFile->GetPath())
-    _priorCovarianceMatrix_ = std::shared_ptr<TMatrixDSym>((TMatrixDSym*) objBuffer->Clone());
-    _priorCorrelationMatrix_ = std::shared_ptr<TMatrixDSym>((TMatrixDSym*) GenericToolbox::convertToCorrelationMatrix((TMatrixD*)_priorCovarianceMatrix_.get()));
-    LogThrowIf(_nbParameterDefinition_ != -1, "Nb of parameter was manually defined but the covariance matrix");
+  // setups
+  if( _priorCovarianceMatrix_ != nullptr ){
     _nbParameterDefinition_ = _priorCovarianceMatrix_->GetNrows();
+    _priorCorrelationMatrix_ = GenericToolbox::toCorrelationMatrix(_priorCovarianceMatrix_);
   }
 
-  // parameterPriorTVectorD
-  if(not _parameterPriorValueListPath_.empty()){
-    objBuffer = parDefFile->Get(_parameterPriorValueListPath_.c_str());
-    LogThrowIf(objBuffer == nullptr, "Can't find \"" << _parameterPriorValueListPath_ << "\" in " << parDefFile->GetPath())
-    _parameterPriorList_ = std::shared_ptr<TVectorD>((TVectorD*) objBuffer->Clone());
-    LogThrowIf(_parameterPriorList_->GetNrows() != _nbParameterDefinition_,
-      "Parameter prior list don't have the same size("
-      << _parameterPriorList_->GetNrows()
-      << ") as cov matrix(" << _nbParameterDefinition_ << ")"
-    );
-  }
+  // sanity checks
+  LogThrowIf(_parameterPriorList_ != nullptr and _parameterPriorList_->GetNrows() != _nbParameterDefinition_,
+             "Parameter prior list don't have the same size(" << _parameterPriorList_->GetNrows()
+              << ") as cov matrix(" << _nbParameterDefinition_ << ")");
+  LogThrowIf(_parameterNamesList_ != nullptr and _parameterNamesList_->GetEntries() != _nbParameterDefinition_,
+             "_parameterNamesList_ don't have the same size(" << _parameterNamesList_->GetEntries()
+                                                              << ") as cov matrix(" << _nbParameterDefinition_ << ")" );
+  LogThrowIf(_parameterLowerBoundsList_ != nullptr and _parameterLowerBoundsList_->GetNrows() != _nbParameterDefinition_,
+             "Parameter lower bound list don't have the same size(" << _parameterLowerBoundsList_->GetNrows()
+                                                              << ") as cov matrix(" << _nbParameterDefinition_ << ")" );
+  LogThrowIf(_parameterUpperBoundsList_ != nullptr and _parameterUpperBoundsList_->GetNrows() != _nbParameterDefinition_,
+             "Parameter upper bound list don't have the same size(" << _parameterUpperBoundsList_->GetNrows()
+                                                              << ") as cov matrix(" << _nbParameterDefinition_ << ")" );
+  LogThrowIf(_throwEnabledList_ != nullptr and _throwEnabledList_->GetNrows() != _nbParameterDefinition_,
+             "Throw enabled list don't have the same size(" << _throwEnabledList_->GetNrows()
+                                                              << ") as cov matrix(" << _nbParameterDefinition_ << ")" );
 
-  // parameterNameTObjArray
-  if(not _parameterNameListPath_.empty()){
-    objBuffer = parDefFile->Get(_parameterNameListPath_.c_str());
-    LogThrowIf(objBuffer == nullptr, "Can't find \"" << _parameterNameListPath_ << "\" in " << parDefFile->GetPath())
-    _parameterNamesList_ = std::shared_ptr<TObjArray>((TObjArray*) objBuffer->Clone());
-  }
-
-  // parameterLowerBoundsTVectorD
-  if( not _parameterLowerBoundsTVectorD_.empty() ){
-    objBuffer = parDefFile->Get(_parameterLowerBoundsTVectorD_.c_str());
-    LogThrowIf(objBuffer == nullptr, "Can't find \"" << _parameterLowerBoundsTVectorD_ << "\" in " << parDefFile->GetPath())
-    _parameterLowerBoundsList_ = std::shared_ptr<TVectorD>((TVectorD*) objBuffer->Clone());
-
-    LogThrowIf(_parameterLowerBoundsList_->GetNrows() != _nbParameterDefinition_,
-                "Parameter prior list don't have the same size(" << _parameterLowerBoundsList_->GetNrows()
-                                                                 << ") as cov matrix(" << _nbParameterDefinition_ << ")" );
-  }
-
-  // parameterUpperBoundsTVectorD
-  if( not _parameterUpperBoundsTVectorD_.empty() ){
-    objBuffer = parDefFile->Get(_parameterUpperBoundsTVectorD_.c_str());
-    LogThrowIf(objBuffer == nullptr, "Can't find \"" << _parameterUpperBoundsTVectorD_ << "\" in " << parDefFile->GetPath())
-    _parameterUpperBoundsList_ = std::shared_ptr<TVectorD>((TVectorD*) objBuffer->Clone());
-    LogThrowIf(_parameterUpperBoundsList_->GetNrows() != _nbParameterDefinition_,
-                "Parameter prior list don't have the same size(" << _parameterUpperBoundsList_->GetNrows()
-                                                                 << ") as cov matrix(" << _nbParameterDefinition_ << ")" );
-  }
-
-  if( not _throwEnabledListPath_.empty() ){
-    objBuffer = parDefFile->Get(_throwEnabledListPath_.c_str());
-    LogThrowIf(objBuffer == nullptr, "Can't find \"" << _throwEnabledListPath_ << "\" in " << parDefFile->GetPath())
-    _throwEnabledList_ = std::shared_ptr<TVectorD>((TVectorD*) objBuffer->Clone());
-  }
-
-  parDefFile->Close();
 }
 void ParameterSet::defineParameters(){
   _parameterList_.resize(_nbParameterDefinition_, Parameter(this));

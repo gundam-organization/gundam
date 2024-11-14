@@ -525,6 +525,8 @@ bool DialCollection::initializeDialsWithBinningFile(const JsonType& dialsDefinit
   // Get the filename for a file with the object array of dials (graphs)
   // that will be applied based on the binning.
   auto filePath = GenericToolbox::Json::fetchValue<std::string>(dialsDefinition, "dialsFilePath");
+  filePath = GenericToolbox::expandEnvironmentVariables(filePath);
+
   LogThrowIf(not GenericToolbox::doesTFileIsValid(filePath), "Could not open: " << filePath);
   TFile* dialsTFile = TFile::Open(filePath.c_str());
   LogThrowIf(dialsTFile==nullptr, "Could not open: " << filePath);
