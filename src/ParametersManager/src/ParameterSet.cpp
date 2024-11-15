@@ -33,6 +33,8 @@ void ParameterSet::configureImpl(){
     return; // don't go any further
   }
 
+  GenericToolbox::Json::fillValue(_config_, _isScanEnabled_, "isScanEnabled");
+
   GenericToolbox::Json::fillValue(_config_, _nbParameterDefinition_, "numberOfParameters");
   GenericToolbox::Json::fillValue(_config_, _nominalStepSize_, "nominalStepSize");
 

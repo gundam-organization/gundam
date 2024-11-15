@@ -147,6 +147,9 @@ void ParameterScanner::scanParameterList( std::vector<Parameter>& par_, TDirecto
 void ParameterScanner::scanParameter(Parameter& par_, TDirectory* saveDir_) {
   LogThrowIf(not isInitialized());
   LogThrowIf(saveDir_ == nullptr);
+
+  if( not par_.getOwner()->isScanEnabled() ){ return; }
+
   std::vector<double> parPoints(_nbPoints_+1,0);
 
   LogInfo << "Scanning: " << par_.getFullTitle() << " / " << _nbPoints_ << " steps..." << std::endl;
