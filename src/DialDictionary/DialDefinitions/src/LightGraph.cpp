@@ -6,9 +6,6 @@
 
 #include "CalculateGraph.h"
 
-#ifndef DISABLE_USER_HEADER
-LoggerInit([]{ Logger::setUserHeaderStr("[LightGraph]"); });
-#endif
 
 void LightGraph::setAllowExtrapolation(bool allowExtrapolation) {
   _allowExtrapolation_ = allowExtrapolation;

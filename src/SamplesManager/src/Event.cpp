@@ -11,10 +11,6 @@
 
 #include <cmath>
 
-#ifndef DISABLE_USER_HEADER
-LoggerInit([]{ Logger::setUserHeaderStr("[Event]"); });
-#endif
-
 
 // misc
 std::string Event::getSummary() const {

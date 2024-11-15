@@ -39,9 +39,6 @@
 #include <memory>
 #include <set>
 
-#ifndef DISABLE_USER_HEADER
-LoggerInit([]{ Logger::setUserHeaderStr("[Cache::Manager]"); });
-#endif
 
 bool Cache::Manager::fEnableDebugPrintouts{false};
 Cache::Manager* Cache::Manager::fSingleton = nullptr;

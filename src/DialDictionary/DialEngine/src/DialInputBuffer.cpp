@@ -8,10 +8,6 @@
 #include "GundamBacktrace.h"
 
 
-#ifndef DISABLE_USER_HEADER
-LoggerInit([]{ Logger::setUserHeaderStr("[DialInputBuffer]"); });
-#endif
-
 void DialInputBuffer::invalidateBuffers(){
   // invalidate buffer
   for( auto& buf : _inputBuffer_ ){ buf = std::nan("unset"); }

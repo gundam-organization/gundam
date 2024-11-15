@@ -11,11 +11,6 @@
 #include <memory>
 
 
-#ifndef DISABLE_USER_HEADER
-LoggerInit([]{ Logger::setUserHeaderStr("[SampleSet]"); });
-#endif
-
-
 void SampleSet::configureImpl(){
 
   auto sampleListConfig = GenericToolbox::Json::fetchValue(_config_, {{"sampleList"}, {"fitSampleList"}}, JsonType());

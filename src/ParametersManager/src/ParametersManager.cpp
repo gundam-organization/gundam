@@ -13,11 +13,6 @@
 #include <sstream>
 
 
-#ifndef DISABLE_USER_HEADER
-LoggerInit([]{ Logger::setUserHeaderStr("[ParameterManager]"); });
-#endif
-
-
 // logger
 void ParametersManager::muteLogger(){ Logger::setIsMuted( true ); }
 void ParametersManager::unmuteLogger(){ Logger::setIsMuted( false ); }

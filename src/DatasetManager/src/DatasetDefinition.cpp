@@ -12,11 +12,6 @@
 #include "TTreeFormulaManager.h"
 
 
-#ifndef DISABLE_USER_HEADER
-LoggerInit([]{ Logger::setUserHeaderStr("[DataSetLoader]"); });
-#endif
-
-
 void DatasetDefinition::configureImpl() {
 
   // mandatory

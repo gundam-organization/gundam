@@ -15,10 +15,6 @@
 #include "Logger.h"
 
 
-#ifndef DISABLE_USER_HEADER
-LoggerInit([]{ Logger::setUserHeaderStr("[JointProbability]"); });
-#endif
-
 namespace JointProbability{
 
   JointProbabilityBase* makeJointProbability(const std::string& type_){
