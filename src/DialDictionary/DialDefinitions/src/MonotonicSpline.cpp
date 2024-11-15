@@ -8,9 +8,6 @@
 #include "GenericToolbox.Root.h"
 #include "Logger.h"
 
-#ifndef DISABLE_USER_HEADER
-LoggerInit([]{ Logger::setUserHeaderStr("[MonotonicSpline]"); });
-#endif
 
 void MonotonicSpline::setAllowExtrapolation(bool allowExtrapolation) {
   _allowExtrapolation_ = allowExtrapolation;

@@ -21,9 +21,6 @@
 #include "Minuit2/MinuitParameter.h"
 #include "TLegend.h"
 
-#ifndef DISABLE_USER_HEADER
-LoggerInit([]{ Logger::setUserHeaderStr("[RootMinimizer]"); });
-#endif
 
 void RootMinimizer::configureImpl(){
   LogDebugIf(GundamGlobals::isDebug()) << "Configuring RootMinimizer..." << std::endl;

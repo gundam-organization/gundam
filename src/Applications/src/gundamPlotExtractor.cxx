@@ -19,10 +19,6 @@
 #include <cstdlib>
 
 
-#ifndef DISABLE_USER_HEADER
-LoggerInit([]{ Logger::getUserHeader() << "[" << FILENAME << "]"; });
-#endif
-
 std::vector<std::string> outExtensions;
 int nPlots{0};
 

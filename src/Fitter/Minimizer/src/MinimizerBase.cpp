@@ -8,10 +8,6 @@
 
 #include "Logger.h"
 
-#ifndef DISABLE_USER_HEADER
-LoggerInit([]{ Logger::setUserHeaderStr("[MinimizerBase]"); });
-#endif
-
 
 void MinimizerBase::configureImpl(){
 

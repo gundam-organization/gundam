@@ -7,10 +7,6 @@
 
 #include "Logger.h"
 
-#ifndef DISABLE_USER_HEADER
-LoggerInit([]{ Logger::setUserHeaderStr("[EventVarTransform]"); });
-#endif
-
 
 void EventVarTransform::configureImpl(){
   GenericToolbox::Json::fillValue(_config_, _name_, {{"name"}, {"title"}});

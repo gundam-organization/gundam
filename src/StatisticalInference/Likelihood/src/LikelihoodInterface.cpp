@@ -14,9 +14,6 @@
 
 #include "Logger.h"
 
-#ifndef DISABLE_USER_HEADER
-LoggerInit([]{ Logger::setUserHeaderStr("[LikelihoodInterface]"); });
-#endif
 
 void LikelihoodInterface::configureImpl(){
 

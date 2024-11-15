@@ -24,11 +24,6 @@
 #include <memory>
 
 
-#ifndef DISABLE_USER_HEADER
-LoggerInit([]{ Logger::setUserHeaderStr("[FitterEngine]"); });
-#endif
-
-
 void FitterEngine::configureImpl(){
   LogInfo << "Reading FitterEngine config..." << std::endl;
   GenericToolbox::setT2kPalette();

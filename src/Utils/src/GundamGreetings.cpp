@@ -12,10 +12,6 @@
 #include <sstream>
 
 
-#ifndef DISABLE_USER_HEADER
-LoggerInit([]{ Logger::setUserHeaderStr("[GundamGreetings]"); });
-#endif
-
 void GundamGreetings::hello() {
   std::stringstream ss;
   ss << "Welcome to GUNDAM "

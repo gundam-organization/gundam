@@ -5,10 +5,6 @@
 #include "Logger.h"
 
 
-#ifndef DISABLE_USER_HEADER
-LoggerInit([]{ Logger::setUserHeaderStr("[Bilinear]"); });
-#endif
-
 void Bilinear::setAllowExtrapolation(bool allowExtrapolation) {
   _allowExtrapolation_ = allowExtrapolation;
 }

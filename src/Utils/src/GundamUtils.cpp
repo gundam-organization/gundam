@@ -11,10 +11,6 @@
 
 #include <sstream>
 
-#ifndef DISABLE_USER_HEADER
-LoggerInit([]{ Logger::getUserHeader() << "[" << FILENAME << "]"; });
-#endif
-
 
 namespace GundamUtils {
 

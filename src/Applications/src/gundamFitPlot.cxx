@@ -17,11 +17,6 @@
 #include <algorithm>
 
 
-#ifndef DISABLE_USER_HEADER
-LoggerInit([]{ Logger::getUserHeader() << "[" << FILENAME << "]"; });
-#endif
-
-
 int main( int argc, char** argv ){
   GundamApp app{"fit compare tool"};
 
