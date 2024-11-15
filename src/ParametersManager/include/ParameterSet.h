@@ -67,6 +67,7 @@ public:
 
   // Getters
   [[nodiscard]] bool isEnabled() const{ return _isEnabled_; }
+  [[nodiscard]] bool isScanEnabled() const{ return _isScanEnabled_; }
   [[nodiscard]] bool isEnablePca() const{ return _enablePca_; }
   [[nodiscard]] bool isEnableEigenDecomp() const{ return _enableEigenDecomp_; }
   [[nodiscard]] bool isEnabledThrowToyParameters() const{ return _enabledThrowToyParameters_; }
@@ -189,6 +190,7 @@ private:
 
   // configuration
   bool _isEnabled_{false};
+  bool _isScanEnabled_{true};
   bool _useMarkGenerator_{false};
   bool _useEigenDecompForThrows_{false};
   bool _printDialSetsSummary_{false};
