@@ -25,7 +25,6 @@ option( USE_STATIC_LINKS "Use static link of libraries and apps instead of share
 option( CXX_WARNINGS "Enable most C++ warning flags." ON )
 option( CXX_MARCH_FLAG "Enable cpu architecture specific optimisations." OFF )
 option( CMAKE_CXX_EXTENSIONS "Enable GNU extensions to C++ language (-std=gnu++14)." OFF )
-option( DISABLE_MANUAL_LOG_HEADER "Don't rely on the manually set logger user header string." ON )
 option( ENABLE_GOOGLE_TESTS "Build Google tests." OFF )
 
 
