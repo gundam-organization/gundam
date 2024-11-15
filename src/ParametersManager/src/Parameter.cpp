@@ -19,7 +19,11 @@ void Parameter::configureImpl(){
 
   if( GenericToolbox::Json::doKeyExist(_config_, "priorValue") ){
     auto priorValue = GenericToolbox::Json::fetchValue<double>(_config_, "priorValue");
-    if( not std::isnan(priorValue) ){ _priorValue_ = priorValue; }
+    if( not std::isnan(priorValue) and priorValue != _priorValue_ ){
+      LogWarning << "Overriding prior value of " << getFullTitle() << " from " << _priorValue_ << " to " << priorValue << std::endl;
+      _priorValue_ = priorValue;
+      _parameterValue_ = _priorValue_;
+    }
   }
 
   GenericToolbox::Json::fillValue(_config_, _isFixed_, "isFixed");
