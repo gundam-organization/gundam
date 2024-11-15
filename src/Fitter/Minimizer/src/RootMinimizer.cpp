@@ -911,6 +911,7 @@ void RootMinimizer::writePostFitData( TDirectory* saveDir_) {
             "Parameter"
             ,"Prior Value"
             ,"Fit Value"
+            ,"Diff Value"
             ,"Prior Err"
             ,"Fit Err"
             ,"Constraint"
@@ -936,6 +937,7 @@ void RootMinimizer::writePostFitData( TDirectory* saveDir_) {
             lineValues[valIndex++] = par.getFullTitle();
             lineValues[valIndex++] = std::to_string( par.getPriorValue() );
             lineValues[valIndex++] = std::to_string( par.getParameterValue() );
+            lineValues[valIndex++] = std::to_string( par.getParameterValue() - par.getPriorValue() );
             lineValues[valIndex++] = std::to_string( par.getStdDevValue() );
             lineValues[valIndex++] = std::to_string( TMath::Sqrt((*covMatrix_)[par.getParameterIndex()][par.getParameterIndex()]) );
 
