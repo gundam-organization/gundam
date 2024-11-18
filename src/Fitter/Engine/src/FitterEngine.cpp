@@ -396,7 +396,7 @@ void FitterEngine::fit(){
   if( _enablePreFitToPostFitLineScan_ ){
     if( not GundamGlobals::isLightOutputMode() ){
       LogInfo << "Scanning along the line from pre-fit to post-fit points..." << std::endl;
-      _parameterScanner_.scanSegment(GenericToolbox::mkdirTFile(_saveDir_, "postFit/scanConvergence"),
+      _parameterScanner_.scanSegment(GenericToolbox::mkdirTFile(_saveDir_, "postFit/converge"),
                                      _postFitParState_, _preFitParState_);
       GenericToolbox::triggerTFileWrite(_saveDir_);
     }
@@ -449,7 +449,6 @@ void FitterEngine::runPcaCheck(){
   // +1 sigma
   int iFitPar = -1;
   std::stringstream ssPrint;
-  double deltaChi2Stat;
 
   for( auto& parSet : getLikelihoodInterface().getModelPropagator().getParametersManager().getParameterSetsList() ){
 
@@ -493,54 +492,45 @@ void FitterEngine::runPcaCheck(){
 
         getLikelihoodInterface().propagateAndEvalLikelihood();
 
-        deltaChi2Stat = getLikelihoodInterface().getLastStatLikelihood() - baseLlhStat;
-
-        ssPrint << ": diff. stat log-likelihood = " << deltaChi2Stat;
-
-        LogInfo.moveTerminalCursorBack(1);
-        LogInfo << ssPrint.str() << std::endl;
-
+        double criteria{0};
 
         bool fixParPca{false};
         if( _pcaMethod_ == PcaMethod::DeltaChi2Threshold ){
-
-          if( std::abs(deltaChi2Stat) < _pcaThreshold_ ){
-            ssPrint << " < " << _pcaThreshold_ << " -> FIXED";
-            LogInfo.moveTerminalCursorBack(1);
-            fixParPca = true;
-          }
-
+          criteria = std::abs(getLikelihoodInterface().getLastStatLikelihood() - baseLlhStat);
+          ssPrint << ": deltaChi2Stat = " << criteria;
         }
         else if( _pcaMethod_ == PcaMethod::ReducedDeltaChi2Threshold ){
-
-          if( std::abs(deltaChi2Stat)/_minimizer_->fetchNbDegreeOfFreedom() < _pcaThreshold_ ){
-            ssPrint << " < " << _pcaThreshold_*_minimizer_->fetchNbDegreeOfFreedom() << " -> FIXED";
-            LogInfo.moveTerminalCursorBack(1);
-            fixParPca = true;
-          }
-
+          criteria = std::abs(getLikelihoodInterface().getLastStatLikelihood() - baseLlhStat)/_minimizer_->fetchNbDegreeOfFreedom();
+          ssPrint << ": deltaChi2Stat/dof = " << criteria;
         }
         else if( _pcaMethod_ == PcaMethod::SqrtReducedDeltaChi2Threshold ){
-
-          if( std::sqrt( std::abs(deltaChi2Stat)/_minimizer_->fetchNbDegreeOfFreedom() ) < _pcaThreshold_ ){
-            ssPrint << " < " << std::pow( _pcaThreshold_*_minimizer_->fetchNbDegreeOfFreedom(), 2 ) << " -> FIXED";
-            LogInfo.moveTerminalCursorBack(1);
-            fixParPca = true;
-          }
-
+          criteria = std::sqrt( std::abs(getLikelihoodInterface().getLastStatLikelihood() - baseLlhStat)/_minimizer_->fetchNbDegreeOfFreedom() );
+          ssPrint << ": sqrt( deltaChi2Stat/dof ) = " << criteria;
         }
+
+
+        // color str
+        std::string color;
+        std::string rst;
+
+        if( criteria < _pcaThreshold_ ){
+          ssPrint << " < " << _pcaThreshold_ << " -> FIXED";
+          fixParPca = true;
+#ifndef NOCOLOR
+          color = GenericToolbox::ColorCodes::yellowLightText;
+          rst = GenericToolbox::ColorCodes::resetColor;
+#endif
+        }
+        else{
+          fixParPca = false;
+          ssPrint << " >= " << _pcaThreshold_ << " -> OK";
+        }
+
+        LogInfo.moveTerminalCursorBack(1); // clear the old line
+        LogInfo << color << ssPrint.str() << rst << std::endl;
 
         if( fixParPca ){
           par.setIsFixed(true); // ignored in the Chi2 computation of the parSet
-#ifdef NOCOLOR
-          std::string red;
-          std::string rst;
-#else
-          std::string red(GenericToolbox::ColorCodes::yellowLightText);
-          std::string rst(GenericToolbox::ColorCodes::resetColor);
-#endif
-          LogInfo << red << ssPrint.str() << rst << std::endl;
-
           if( parSet.isEnableEigenDecomp() and GenericToolbox::Json::fetchValue(_config_, "fixGhostEigenParametersAfterFirstRejected", false) ){
             fixNextEigenPars = true;
           }

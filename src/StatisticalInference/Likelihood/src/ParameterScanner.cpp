@@ -114,7 +114,7 @@ void ParameterScanner::initializeImpl() {
 #if HAS_CPP_17
       for( auto [binContent, binContext] : sample.getHistogram().loop() ){
 #else
-      for( auto element : sample.getHistogram().loop() ){ auto& binContent = std::get<0>(element); auto& binContext = std::get<1>(element);
+        for( auto element : sample.getHistogram().loop() ){ auto& binContent = std::get<0>(element); auto& binContext = std::get<1>(element);
 #endif
         _scanDataDict_.emplace_back();
         auto& scanEntry = _scanDataDict_.back();
@@ -535,6 +535,9 @@ void ParameterScanner::varyEvenRates(const std::vector<double>& paramVariationLi
     }
 
   }
+}
+void ParameterScanner::setGraphTitles(const std::string& title_){
+  for( auto& scanData : _scanDataDict_ ){ scanData.title = title_; }
 }
 
 // statics

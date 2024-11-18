@@ -31,7 +31,7 @@ public:
   void minimize() override;
   void calcErrors() override;
   void scanParameters( TDirectory* saveDir_ ) override;
-  bool isErrorCalcEnabled() const override { return not disableCalcError(); }
+  [[nodiscard]] bool isErrorCalcEnabled() const override { return not disableCalcError(); }
 
   // c-tor
   explicit RootMinimizer(FitterEngine* owner_): MinimizerBase(owner_) {}
@@ -84,6 +84,7 @@ private:
   std::string _errorAlgo_{"Hesse"};
 
   // internals
+  bool _minimizeDone_{false};
   bool _fitHasConverged_{false};
 
   /// A functor that can be called by Minuit or anybody else.  This wraps
