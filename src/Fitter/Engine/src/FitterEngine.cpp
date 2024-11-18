@@ -508,25 +508,28 @@ void FitterEngine::runPcaCheck(){
           ssPrint << ": sqrt( deltaChi2Stat/dof ) = " << criteria;
         }
 
-        LogInfo.moveTerminalCursorBack(1);
-        LogInfo << ssPrint.str() << std::endl;
+
+        // color str
+        std::string color;
+        std::string rst;
+
         if( criteria < _pcaThreshold_ ){
           ssPrint << " < " << _pcaThreshold_ << " -> FIXED";
-          LogInfo.moveTerminalCursorBack(1);
           fixParPca = true;
+#ifndef NOCOLOR
+          color = GenericToolbox::ColorCodes::yellowLightText;
+          rst = GenericToolbox::ColorCodes::resetColor;
+#endif
         }
+        else{
+          fixParPca = false;
+          ssPrint << " >= " << _pcaThreshold_ << " -> OK";
+        }
+
+        LogInfo << color << ssPrint.str() << rst << std::endl;
 
         if( fixParPca ){
           par.setIsFixed(true); // ignored in the Chi2 computation of the parSet
-#ifdef NOCOLOR
-          std::string red;
-          std::string rst;
-#else
-          std::string red(GenericToolbox::ColorCodes::yellowLightText);
-          std::string rst(GenericToolbox::ColorCodes::resetColor);
-#endif
-          LogInfo << red << ssPrint.str() << rst << std::endl;
-
           if( parSet.isEnableEigenDecomp() and GenericToolbox::Json::fetchValue(_config_, "fixGhostEigenParametersAfterFirstRejected", false) ){
             fixNextEigenPars = true;
           }
