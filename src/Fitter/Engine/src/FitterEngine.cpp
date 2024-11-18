@@ -449,7 +449,6 @@ void FitterEngine::runPcaCheck(){
   // +1 sigma
   int iFitPar = -1;
   std::stringstream ssPrint;
-  double deltaChi2Stat;
 
   for( auto& parSet : getLikelihoodInterface().getModelPropagator().getParametersManager().getParameterSetsList() ){
 
@@ -493,41 +492,28 @@ void FitterEngine::runPcaCheck(){
 
         getLikelihoodInterface().propagateAndEvalLikelihood();
 
-        deltaChi2Stat = getLikelihoodInterface().getLastStatLikelihood() - baseLlhStat;
-
-        ssPrint << ": diff. stat log-likelihood = " << deltaChi2Stat;
-
-        LogInfo.moveTerminalCursorBack(1);
-        LogInfo << ssPrint.str() << std::endl;
-
+        double criteria{0};
 
         bool fixParPca{false};
         if( _pcaMethod_ == PcaMethod::DeltaChi2Threshold ){
-
-          if( std::abs(deltaChi2Stat) < _pcaThreshold_ ){
-            ssPrint << " < " << _pcaThreshold_ << " -> FIXED";
-            LogInfo.moveTerminalCursorBack(1);
-            fixParPca = true;
-          }
-
+          criteria = std::abs(getLikelihoodInterface().getLastStatLikelihood() - baseLlhStat);
+          ssPrint << ": deltaChi2Stat = " << criteria;
         }
         else if( _pcaMethod_ == PcaMethod::ReducedDeltaChi2Threshold ){
-
-          if( std::abs(deltaChi2Stat)/_minimizer_->fetchNbDegreeOfFreedom() < _pcaThreshold_ ){
-            ssPrint << " < " << _pcaThreshold_*_minimizer_->fetchNbDegreeOfFreedom() << " -> FIXED";
-            LogInfo.moveTerminalCursorBack(1);
-            fixParPca = true;
-          }
-
+          criteria = std::abs(getLikelihoodInterface().getLastStatLikelihood() - baseLlhStat)/_minimizer_->fetchNbDegreeOfFreedom();
+          ssPrint << ": deltaChi2Stat/dof = " << criteria;
         }
         else if( _pcaMethod_ == PcaMethod::SqrtReducedDeltaChi2Threshold ){
+          criteria = std::sqrt( std::abs(getLikelihoodInterface().getLastStatLikelihood() - baseLlhStat)/_minimizer_->fetchNbDegreeOfFreedom() );
+          ssPrint << ": sqrt( deltaChi2Stat/dof ) = " << criteria;
+        }
 
-          if( std::sqrt( std::abs(deltaChi2Stat)/_minimizer_->fetchNbDegreeOfFreedom() ) < _pcaThreshold_ ){
-            ssPrint << " < " << std::pow( _pcaThreshold_*_minimizer_->fetchNbDegreeOfFreedom(), 2 ) << " -> FIXED";
-            LogInfo.moveTerminalCursorBack(1);
-            fixParPca = true;
-          }
-
+        LogInfo.moveTerminalCursorBack(1);
+        LogInfo << ssPrint.str() << std::endl;
+        if( criteria < _pcaThreshold_ ){
+          ssPrint << " < " << _pcaThreshold_ << " -> FIXED";
+          LogInfo.moveTerminalCursorBack(1);
+          fixParPca = true;
         }
 
         if( fixParPca ){
