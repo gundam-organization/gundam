@@ -211,6 +211,7 @@ void RootMinimizer::minimize(){
   // dumpFitParameterSettings(); // Dump internal ROOT::Minimizer info
   // dumpMinuit2State();         // Dump internal ROOT::Minuit2Minimizer info
   _fitHasConverged_ = _rootMinimizer_->Minimize();
+  _minimizeDone_ = true;
   getMonitor().isEnabled = false;
 
   int nbMinimizeCalls = getMonitor().nbEvalLikelihoodCalls - nbFitCallOffset;
@@ -426,6 +427,9 @@ void RootMinimizer::calcErrors(){
 }
 void RootMinimizer::scanParameters( TDirectory* saveDir_ ){
   LogThrowIf(not isInitialized());
+
+  getOwner().getParameterScanner().setGraphTitles( _minimizeDone_ ? "Post-fit scan": "Pre-fit scan" );
+
   LogInfo << "Performing scans of fit parameters..." << std::endl;
   for( int iPar = 0 ; iPar < getMinimizer()->NDim() ; iPar++ ){
     if( getMinimizer()->IsFixedVariable(iPar) ){
@@ -445,6 +449,8 @@ void RootMinimizer::scanParameters( TDirectory* saveDir_ ){
       }
     }
   }
+
+  GenericToolbox::triggerTFileWrite(saveDir_);
 }
 
 // const getters
@@ -1286,7 +1292,6 @@ void RootMinimizer::saveGradientSteps(){
       gEntry.scanDataPtr->title = "Minimizer path to minimum";
       ParameterScanner::writeGraphEntry(gEntry, outDir);
     }
-    GenericToolbox::triggerTFileWrite(outDir);
 
     outDir = GenericToolbox::mkdirTFile(getOwner().getSaveDir(), "fit/gradient/globalRelative");
     for( auto& gEntry : globalGraphList ){
@@ -1304,7 +1309,6 @@ void RootMinimizer::saveGradientSteps(){
       gEntry.scanDataPtr->title = "Minimizer path to minimum (difference)";
       ParameterScanner::writeGraphEntry(gEntry, outDir);
     }
-    GenericToolbox::triggerTFileWrite(outDir);
   }
 
 }

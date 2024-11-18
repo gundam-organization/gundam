@@ -47,6 +47,7 @@ public:
   void scanSegment(TDirectory *saveDir_, const JsonType &end_, const JsonType &start_ = JsonType(), int nSteps_=-1);
   void generateOneSigmaPlots(TDirectory* saveDir_);
   void varyEvenRates(const std::vector<double>& paramVariationList_, TDirectory* saveDir_);
+  void setGraphTitles(const std::string& title_);
 
   // Statics
   static void muteLogger();

@@ -396,7 +396,7 @@ void FitterEngine::fit(){
   if( _enablePreFitToPostFitLineScan_ ){
     if( not GundamGlobals::isLightOutputMode() ){
       LogInfo << "Scanning along the line from pre-fit to post-fit points..." << std::endl;
-      _parameterScanner_.scanSegment(GenericToolbox::mkdirTFile(_saveDir_, "postFit/scanConvergence"),
+      _parameterScanner_.scanSegment(GenericToolbox::mkdirTFile(_saveDir_, "postFit/converge"),
                                      _postFitParState_, _preFitParState_);
       GenericToolbox::triggerTFileWrite(_saveDir_);
     }
