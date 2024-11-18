@@ -526,6 +526,7 @@ void FitterEngine::runPcaCheck(){
           ssPrint << " >= " << _pcaThreshold_ << " -> OK";
         }
 
+        LogInfo.moveTerminalCursorBack(1); // clear the old line
         LogInfo << color << ssPrint.str() << rst << std::endl;
 
         if( fixParPca ){
