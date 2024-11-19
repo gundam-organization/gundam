@@ -997,7 +997,7 @@ void RootMinimizer::writePostFitData( TDirectory* saveDir_) {
                              [par.getParameterIndex()]
                              [par.getParameterIndex()])) {
                 LogError << "Parameter error with invalid value: "
-                         << par.getTitle() << std::endl;
+                         << par.getFullTitle() << std::endl;
               }
             }
 
