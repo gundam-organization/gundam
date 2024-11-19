@@ -243,7 +243,7 @@ void ParameterSet::processCovarianceMatrix(){
     _inverseStrippedCovarianceMatrix_ = std::make_shared<TMatrixD>(_strippedCovarianceMatrix_->GetNrows(), _strippedCovarianceMatrix_->GetNrows());
     _projectorMatrix_                 = std::make_shared<TMatrixD>(_strippedCovarianceMatrix_->GetNrows(), _strippedCovarianceMatrix_->GetNrows());
 
-    auto* eigenState = new TVectorD(_eigenValues_->GetNrows());
+    auto eigenState = std::make_unique<TVectorD>(_eigenValues_->GetNrows());
 
     for (int iEigen = 0; iEigen < _eigenValues_->GetNrows(); iEigen++) {
 
@@ -289,8 +289,8 @@ void ParameterSet::processCovarianceMatrix(){
 
     } // iEigen
 
-    TMatrixD* eigenStateMatrix    = GenericToolbox::makeDiagonalMatrix(eigenState);
-    TMatrixD* diagInvMatrix = GenericToolbox::makeDiagonalMatrix(_eigenValuesInv_.get());
+    auto eigenStateMatrix = std::unique_ptr<TMatrixD>(GenericToolbox::makeDiagonalMatrix(eigenState.get()));
+    auto diagInvMatrix = std::unique_ptr<TMatrixD>(GenericToolbox::makeDiagonalMatrix(_eigenValuesInv_.get()));
 
     (*_projectorMatrix_) =  (*_eigenVectors_);
     (*_projectorMatrix_) *= (*eigenStateMatrix);
@@ -299,10 +299,6 @@ void ParameterSet::processCovarianceMatrix(){
     (*_inverseStrippedCovarianceMatrix_) =  (*_eigenVectors_);
     (*_inverseStrippedCovarianceMatrix_) *= (*diagInvMatrix);
     (*_inverseStrippedCovarianceMatrix_) *= (*_eigenVectorsInv_);
-
-    delete eigenState;
-    delete eigenStateMatrix;
-    delete diagInvMatrix;
 
     LogWarning << "Eigen decomposition with " << _nbEnabledEigen_ << " / " << _eigenValues_->GetNrows() << " vectors" << std::endl;
     if(_nbEnabledEigen_ != _eigenValues_->GetNrows() ){
