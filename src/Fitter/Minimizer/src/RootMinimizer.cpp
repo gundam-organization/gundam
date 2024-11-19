@@ -1185,6 +1185,10 @@ void RootMinimizer::writePostFitData( TDirectory* saveDir_) {
       for( auto& eigenPar : *parList ){
         if( eigenPar.isEnabled() and not eigenPar.isFixed() ) continue;
         (*covMatrix)[eigenPar.getParameterIndex()][eigenPar.getParameterIndex()] = eigenPar.getStdDevValue() * eigenPar.getStdDevValue();
+
+        if( std::isnan((*covMatrix)[eigenPar.getParameterIndex()][eigenPar.getParameterIndex()]) ){
+          (*covMatrix)[eigenPar.getParameterIndex()][eigenPar.getParameterIndex()] = 0;
+        }
       }
 
       // The actual base conversion is here
@@ -1209,6 +1213,7 @@ void RootMinimizer::writePostFitData( TDirectory* saveDir_) {
           (*covMatrix)[iPar.getParameterIndex()][jPar.getParameterIndex()] = (*originalStrippedCovMatrix)[iStripped][jStripped];
         }
       }
+
     }
 
     savePostFitObjFct(parSet, *parList, covMatrix.get(), parSetDir);
