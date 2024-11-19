@@ -684,7 +684,7 @@ int main(int argc, char** argv){
       double binVolume = xsec.samplePtr->getHistogram().getBinContextList()[iBin].bin.getVolume();
 
       xsec.histogram.SetBinContent( 1+iBin, (*meanValuesVector)[iBinGlobal] );
-      xsec.histogram.SetBinError( 1+iBin, TMath::Sqrt( (*globalCovMatrix)[iBinGlobal][iBinGlobal] ) );
+      xsec.histogram.SetBinError( 1+iBin, std::sqrt( (*globalCovMatrix)[iBinGlobal][iBinGlobal] ) );
       xsec.histogram.GetXaxis()->SetBinLabel( 1+iBin, binTitle.c_str() );
 
       globalCovMatrixHist->GetXaxis()->SetBinLabel(1+iBinGlobal, GenericToolbox::joinPath(xsec.samplePtr->getName(), binTitle).c_str());

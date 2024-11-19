@@ -921,7 +921,7 @@ void RootMinimizer::writePostFitData( TDirectory* saveDir_) {
         });
         for( const auto& par : parList_ ){
           if( par.isEnabled() and not par.isFixed() ){
-            double priorFraction = TMath::Sqrt((*covMatrix_)[par.getParameterIndex()][par.getParameterIndex()]) / par.getStdDevValue();
+            double priorFraction = std::sqrt((*covMatrix_)[par.getParameterIndex()][par.getParameterIndex()]) / par.getStdDevValue();
             std::stringstream ss;
 #ifndef NOCOLOR
             std::string red(GenericToolbox::ColorCodes::redBackground);
@@ -942,7 +942,7 @@ void RootMinimizer::writePostFitData( TDirectory* saveDir_) {
             lineValues[valIndex++] = std::to_string( par.getParameterValue() );
             lineValues[valIndex++] = std::to_string( par.getParameterValue() - par.getPriorValue() );
             lineValues[valIndex++] = std::to_string( par.getStdDevValue() );
-            lineValues[valIndex++] = std::to_string( TMath::Sqrt((*covMatrix_)[par.getParameterIndex()][par.getParameterIndex()]) );
+            lineValues[valIndex++] = std::to_string( std::sqrt((*covMatrix_)[par.getParameterIndex()][par.getParameterIndex()]) );
 
             std::string colorStr;
             if( par.isFree() ){
@@ -1012,7 +1012,7 @@ void RootMinimizer::writePostFitData( TDirectory* saveDir_) {
                                                  par.getParameterValue());
                 postFitErrorHist->SetBinError(
                   1 + par.getParameterIndex(),
-                  TMath::Sqrt((*covMatrix_)
+                  std::sqrt((*covMatrix_)
                               [par.getParameterIndex()]
                               [par.getParameterIndex()]));
               }
@@ -1030,7 +1030,7 @@ void RootMinimizer::writePostFitData( TDirectory* saveDir_) {
                 postFitErrorHist->SetBinError(
                   1 + par.getParameterIndex(),
                   ParameterSet::toNormalizedParRange(
-                    TMath::Sqrt((*covMatrix_)
+                    std::sqrt((*covMatrix_)
                                 [par.getParameterIndex()]
                                 [par.getParameterIndex()]), par));
               }
@@ -1185,10 +1185,6 @@ void RootMinimizer::writePostFitData( TDirectory* saveDir_) {
       for( auto& eigenPar : *parList ){
         if( eigenPar.isEnabled() and not eigenPar.isFixed() ) continue;
         (*covMatrix)[eigenPar.getParameterIndex()][eigenPar.getParameterIndex()] = eigenPar.getStdDevValue() * eigenPar.getStdDevValue();
-
-        if( std::isnan((*covMatrix)[eigenPar.getParameterIndex()][eigenPar.getParameterIndex()]) ){
-          (*covMatrix)[eigenPar.getParameterIndex()][eigenPar.getParameterIndex()] = 0;
-        }
       }
 
       // The actual base conversion is here

@@ -204,7 +204,7 @@ void PlotGenerator::generateSampleHistograms(TDirectory *saveDir_, int cacheSlot
               for( auto* evtPtr : hist->_binEventPtrList_[iBin-1] ){
                 hist->histPtr->AddBinContent(iBin, evtPtr->getEventWeight());
               }
-              hist->histPtr->SetBinError(iBin, TMath::Sqrt(hist->histPtr->GetBinContent(iBin)));
+              hist->histPtr->SetBinError(iBin, std::sqrt(hist->histPtr->GetBinContent(iBin)));
             }
           }
         };
@@ -223,7 +223,7 @@ void PlotGenerator::generateSampleHistograms(TDirectory *saveDir_, int cacheSlot
 
     for(int iBin = 0 ; iBin <= histHolderCached.histPtr->GetNbinsX() + 1 ; iBin++ ){
       double binContent = histHolderCached.histPtr->GetBinContent(iBin); // this is the real number of counts
-      double errorFraction = TMath::Sqrt(binContent)/binContent; // error fraction will not change with renorm of bin width
+      double errorFraction = std::sqrt(binContent)/binContent; // error fraction will not change with renorm of bin width
 
       if( histHolderCached.rescaleAsBinWidth ) binContent /= histHolderCached.histPtr->GetBinWidth(iBin);
       if(histHolderCached.rescaleBinFactor != 1. ) binContent *= histHolderCached.rescaleBinFactor;

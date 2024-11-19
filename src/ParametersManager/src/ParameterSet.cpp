@@ -229,29 +229,36 @@ void ParameterSet::processCovarianceMatrix(){
     _eigenVectors_    = std::shared_ptr<TMatrixD>( (TMatrixD*) _eigenDecomp_->GetEigenVectors().Clone() );
     _eigenVectorsInv_ = std::make_shared<TMatrixD>(TMatrixD::kTransposed, *_eigenVectors_ );
 
+    if( not std::isnan(_eigenSvdThreshold_) and _eigenValues_->Min()/_eigenValues_->Max() < _eigenSvdThreshold_ ){
+      LogAlert << "Eigen values bellow the threshold(" << _eigenSvdThreshold_ << "). Using SVD..." << std::endl;
+
+      // zero the ruled out eigen values
+      for( int iEigen = 0; iEigen < _eigenValues_->GetNrows(); iEigen++ ){
+        if( (*_eigenValues_)[iEigen]/_eigenValues_->Max() < _eigenSvdThreshold_ ){
+          (*_eigenValues_)[iEigen] = 0;
+        }
+      }
+    }
+
+    // in any case the eigen values should have been cleaned up
+    LogThrowIf(_eigenValues_->Min() < 0, "Input covariance matrix is not positive definite.");
+    LogInfo << "Covariance eigen values are between " << _eigenValues_->Min() << " and " << _eigenValues_->Max() << std::endl;
+
     _nbEnabledEigen_ = 0;
     double eigenTotal = _eigenValues_->Sum();
-
-    LogInfo << "Covariance eigen values are between " << _eigenValues_->Min() << " and " << _eigenValues_->Max() << std::endl;
-    if( std::isnan(_eigenSvdThreshold_) ){
-      LogThrowIf(_eigenValues_->Min() < 0, "Input covariance matrix is not positive definite.");
-    }
-    else if( _eigenValues_->Min()/_eigenValues_->Max() < _eigenSvdThreshold_ ){
-      LogAlert << "Eigen values bellow the threshold(" << _eigenSvdThreshold_ << "). Using SVD..." << std::endl;
-    }
 
     _inverseStrippedCovarianceMatrix_ = std::make_shared<TMatrixD>(_strippedCovarianceMatrix_->GetNrows(), _strippedCovarianceMatrix_->GetNrows());
     _projectorMatrix_                 = std::make_shared<TMatrixD>(_strippedCovarianceMatrix_->GetNrows(), _strippedCovarianceMatrix_->GetNrows());
 
     auto eigenState = std::make_unique<TVectorD>(_eigenValues_->GetNrows());
 
-    for (int iEigen = 0; iEigen < _eigenValues_->GetNrows(); iEigen++) {
+    for( int iEigen = 0; iEigen < _eigenValues_->GetNrows(); iEigen++ ){
 
       _eigenParameterList_[iEigen].setParameterIndex( iEigen );
       _eigenParameterList_[iEigen].setIsEnabled(true);
       _eigenParameterList_[iEigen].setIsEigen(true);
-      _eigenParameterList_[iEigen].setStdDevValue(TMath::Sqrt((*_eigenValues_)[iEigen]));
-      _eigenParameterList_[iEigen].setStepSize(TMath::Sqrt((*_eigenValues_)[iEigen]));
+      _eigenParameterList_[iEigen].setStdDevValue(std::sqrt((*_eigenValues_)[iEigen]));
+      _eigenParameterList_[iEigen].setStepSize(std::sqrt((*_eigenValues_)[iEigen]));
       _eigenParameterList_[iEigen].setName("eigen");
 
       // fixing all of them by default
@@ -269,9 +276,10 @@ void ParameterSet::processCovarianceMatrix(){
 
       if( not std::isnan( _eigenSvdThreshold_ ) ){
         // check the current matrix conditioning
-        if( (*_eigenValues_)[iEigen]/_eigenValues_->Max() < _eigenSvdThreshold_ ){
+        // ruled out values have been set to 0
+        if( (*_eigenValues_)[iEigen] == 0 ){
           LogAlert << "Keeping " << iEigen << " eigen values with SVD." << std::endl;
-          break; // decreasing order
+          break; // as they are in decreasing order
         }
       }
 
@@ -906,8 +914,8 @@ void ParameterSet::defineParameters(){
     par.setParameterIndex(parIndex++);
 
     if( _priorCovarianceMatrix_ != nullptr ){
-      par.setStdDevValue(TMath::Sqrt((*_priorCovarianceMatrix_)[par.getParameterIndex()][par.getParameterIndex()]));
-      par.setStepSize(TMath::Sqrt((*_priorCovarianceMatrix_)[par.getParameterIndex()][par.getParameterIndex()]));
+      par.setStdDevValue(std::sqrt((*_priorCovarianceMatrix_)[par.getParameterIndex()][par.getParameterIndex()]));
+      par.setStepSize(std::sqrt((*_priorCovarianceMatrix_)[par.getParameterIndex()][par.getParameterIndex()]));
     }
     else{
       LogThrowIf(std::isnan(_nominalStepSize_), "Can't define free parameter without a \"nominalStepSize\"");
