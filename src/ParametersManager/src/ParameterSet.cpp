@@ -195,7 +195,26 @@ void ParameterSet::processCovarianceMatrix(){
                << _strippedCovarianceMatrix_->GetNcols() << "x"
                << _strippedCovarianceMatrix_->GetNrows() << std::endl;
     _inverseStrippedCovarianceMatrix_ = std::shared_ptr<TMatrixD>((TMatrixD*)(_strippedCovarianceMatrix_->Clone()));
-    _inverseStrippedCovarianceMatrix_->Invert();
+
+    double det;
+    _inverseStrippedCovarianceMatrix_->Invert(&det);
+
+    bool failed{false};
+    if( det == 0 ){
+      LogError << "Determinant is null." << std::endl;
+      failed = true;
+    }
+
+    TVectorD eigenValues;
+    // https://root-forum.cern.ch/t/tmatrixt-get-eigenvalues/25924
+    _inverseStrippedCovarianceMatrix_->EigenVectors(eigenValues);
+    if( eigenValues.Min() < 0 ){
+      LogError << "Negative eigen values for prior cov matrix: " << eigenValues.Min() << std::endl;
+      failed = true;
+    }
+
+    LogThrowIf(failed, "Failed inverting prior covariance matrix of par set: " << getName() );
+
   }
   else {
     LogWarning << "Decomposing the stripped covariance matrix..." << std::endl;
