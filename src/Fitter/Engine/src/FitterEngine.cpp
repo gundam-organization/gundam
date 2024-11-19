@@ -576,10 +576,10 @@ void FitterEngine::rescaleParametersStepSize(){
 
       // Consider a parabolic approx:
       // only rescale with X2 stat?
-//        double stepSize = TMath::Sqrt(deltaChi2Pulls)/TMath::Sqrt(deltaChi2);
+//        double stepSize = std::sqrt(deltaChi2Pulls)/std::sqrt(deltaChi2);
 
       // full rescale
-      double stepSize = 1./TMath::Sqrt(std::abs(deltaChi2));
+      double stepSize = 1./std::sqrt(std::abs(deltaChi2));
 
       LogInfo << "Step size of " << parSet.getName() + "/" + par.getTitle()
               << " -> σ x " << _parStepGain_ << " x " << stepSize
