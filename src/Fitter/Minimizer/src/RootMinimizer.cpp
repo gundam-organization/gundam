@@ -909,16 +909,16 @@ void RootMinimizer::writePostFitData( TDirectory* saveDir_) {
         GenericToolbox::writeInTFile(GenericToolbox::mkdirTFile(saveSubdir_, "matrices"), corMatrixCanvas.get(), "Correlation");
 
         // Table printout
-        std::vector<std::vector<std::string>> tableLines;
-        tableLines.emplace_back(std::vector<std::string>{
-            "Parameter"
-            ,"Prior Value"
-            ,"Fit Value"
-            ,"Diff Value"
-            ,"Prior Err"
-            ,"Fit Err"
-            ,"Constraint"
-        });
+        GenericToolbox::TablePrinter t;
+
+        t << "Parameter" << GenericToolbox::TablePrinter::NextColumn;
+        t << "Prior Value" << GenericToolbox::TablePrinter::NextColumn;
+        t << "Fit Value" << GenericToolbox::TablePrinter::NextColumn;
+        t << "Diff Value" << GenericToolbox::TablePrinter::NextColumn;
+        t << "Prior Err" << GenericToolbox::TablePrinter::NextColumn;
+        t << "Fit Err" << GenericToolbox::TablePrinter::NextColumn;
+        t << "Prior Fraction" << GenericToolbox::TablePrinter::NextLine;
+
         for( const auto& par : parList_ ){
           if( par.isEnabled() and not par.isFixed() ){
             double priorFraction = std::sqrt((*covMatrix_)[par.getParameterIndex()][par.getParameterIndex()]) / par.getStdDevValue();
@@ -926,50 +926,33 @@ void RootMinimizer::writePostFitData( TDirectory* saveDir_) {
 #ifndef NOCOLOR
             std::string red(GenericToolbox::ColorCodes::redBackground);
             std::string ylw(GenericToolbox::ColorCodes::yellowBackground);
+            std::string blu(GenericToolbox::ColorCodes::blueLightText);
             std::string rst(GenericToolbox::ColorCodes::resetColor);
 #else
             std::string red;
-        std::string ylw;
-        std::string rst;
+            std::string ylw;
+            std::string blu;
+            std::string rst;
 #endif
 
-            if( priorFraction < 1E-2 ) ss << ylw;
-            if( priorFraction > 1 ) ss << red;
-            std::vector<std::string> lineValues(tableLines[0].size());
-            int valIndex{0};
-            lineValues[valIndex++] = par.getFullTitle();
-            lineValues[valIndex++] = std::to_string( par.getPriorValue() );
-            lineValues[valIndex++] = std::to_string( par.getParameterValue() );
-            lineValues[valIndex++] = std::to_string( par.getParameterValue() - par.getPriorValue() );
-            lineValues[valIndex++] = std::to_string( par.getStdDevValue() );
-            lineValues[valIndex++] = std::to_string( std::sqrt((*covMatrix_)[par.getParameterIndex()][par.getParameterIndex()]) );
+            if( priorFraction < 1E-2 ){ t.setColorBuffer(ylw); }
+            if( priorFraction > 1 ){ t.setColorBuffer(red); }
+            if( par.isFree() ){ t.setColorBuffer(blu); }
+
+            t << par.getFullTitle() << GenericToolbox::TablePrinter::NextColumn;
+            t << par.getParameterValue() << GenericToolbox::TablePrinter::NextColumn;
+            t << par.getParameterValue() << GenericToolbox::TablePrinter::NextColumn;
+            t << par.getParameterValue() - par.getPriorValue() << GenericToolbox::TablePrinter::NextColumn;
+            t << par.getStdDevValue() << GenericToolbox::TablePrinter::NextColumn;
+            t << std::sqrt((*covMatrix_)[par.getParameterIndex()][par.getParameterIndex()]) << GenericToolbox::TablePrinter::NextColumn;
 
             std::string colorStr;
-            if( par.isFree() ){
-              lineValues[valIndex++] = "Unconstrained";
-              colorStr = GenericToolbox::ColorCodes::blueLightText;
-            }
-            else{
-              lineValues[valIndex++] = std::to_string( priorFraction*100 ) + " \%";
-              if( priorFraction > 1 ){ colorStr = GenericToolbox::ColorCodes::redBackground; }
-            }
+            if( par.isFree() ){ t << "Unconstrained"; }
+            else{ t << priorFraction*100 << R"( %)"; }
 
-#ifndef NOCOLOR
-            if( not colorStr.empty() ){
-              for( auto& line : lineValues ){
-                if(not line.empty()){
-                  line.insert(0, colorStr);
-                  line += GenericToolbox::ColorCodes::resetColor;
-                }
-              }
-            }
-#endif
-
-            tableLines.emplace_back(lineValues);
+            t << GenericToolbox::TablePrinter::NextLine;
           }
         }
-        GenericToolbox::TablePrinter t;
-        t.fillTable(tableLines);
         t.printTable();
 
         // Parameters plots
