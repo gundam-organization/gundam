@@ -859,12 +859,12 @@ void DataDispenser::fillFunction(int iThread_){
     LogInfo << "Feeding event variables with:" << std::endl;
     GenericToolbox::TablePrinter table;
 
-    table << "Variable" << GenericToolbox::TablePrinter::NextColumn;
-    table << "LeafForm" << GenericToolbox::TablePrinter::NextColumn;
-    table << "Transforms" << GenericToolbox::TablePrinter::NextLine;
-
-
-
+    table << "Variable" ;
+    table << GenericToolbox::TablePrinter::NextColumn << "LeafForm";
+    if(not varTransformForIndexingList.empty()){
+      table << GenericToolbox::TablePrinter::NextColumn << "Transforms";
+    }
+    table << GenericToolbox::TablePrinter::NextLine;
 
     struct VarDisplay{
       std::string varName{};
@@ -923,7 +923,10 @@ void DataDispenser::fillFunction(int iThread_){
       if( not varDisplay.lineColor.empty() ){ table.setColorBuffer( varDisplay.lineColor ); }
       table << varDisplay.varName << GenericToolbox::TablePrinter::NextColumn;
       table << varDisplay.leafName << "/" << varDisplay.leafTypeName << GenericToolbox::TablePrinter::NextColumn;
-      table << varDisplay.transformStr << GenericToolbox::TablePrinter::NextColumn;
+
+      if(not varTransformForIndexingList.empty()){
+        table << varDisplay.transformStr << GenericToolbox::TablePrinter::NextColumn;
+      }
     }
 
     table.printTable();
