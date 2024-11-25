@@ -385,6 +385,30 @@ void DialCollection::readGlobals(const JsonType &config_) {
   }
 
   _allowDialExtrapolation_ = GenericToolbox::Json::fetchValue(config_, "allowDialExtrapolation", _allowDialExtrapolation_);
+
+  // safety: many users ask why do my parameter limits aren't taken into account? -> because the parameters limits should be
+  // handled in the parameter definition section
+  if( GenericToolbox::Json::doKeyExist(config_, "parameterLimits") ){
+    LogError << "\"parameterLimits\" should be set in the parameter definition section. Not the dial definition." << std::endl;
+    LogError << "Please move it to the appropriate section in: ";
+    if( _parameterSetListPtr_ != nullptr and _supervisedParameterSetIndex_ != -1 ){
+
+      if( _supervisedParameterIndex_ != -1 ){
+        LogError << (*_parameterSetListPtr_)[_supervisedParameterSetIndex_].getParameterList()[_supervisedParameterIndex_].getFullTitle();
+      }
+      else{
+        LogError << (*_parameterSetListPtr_)[_supervisedParameterSetIndex_].getName();
+      }
+
+    }
+    else{
+      LogError << "[handled parameter unspecified]";
+    }
+
+    LogError << std::endl;
+    LogThrow("parameterLimits should be specified in the parameter definition.");
+  }
+
 }
 bool DialCollection::initializeNormDialsWithParBinning() {
   auto binning = GenericToolbox::Json::fetchValue(_config_, "parametersBinningPath", JsonType());
