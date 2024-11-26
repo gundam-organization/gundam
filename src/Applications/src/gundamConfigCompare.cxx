@@ -7,6 +7,7 @@
 #include "RootUtils.h"
 
 #include "GenericToolbox.Root.h"
+#include "GenericToolbox.Utils.h"
 #include "CmdLineParser.h"
 #include "Logger.h"
 
@@ -17,10 +18,14 @@
 
 LoggerInit([]{ Logger::setPrefixFormat("{TIME} {SEVERITY}"); });
 
-
+GenericToolbox::TablePrinter t;
 CmdLineParser clp{};
 
 void compareConfigStage(const JsonType& config1_, const JsonType& config2_);
+
+
+std::string config1Name{"config1"};
+std::string config2Name{"config2"};
 
 
 int main( int argc, char** argv ){
@@ -30,6 +35,8 @@ int main( int argc, char** argv ){
 
   clp.addOption("config-1", {"-c1"}, "Path to first config file.", 1);
   clp.addOption("config-2", {"-c2"}, "Path to second config file.", 1);
+  clp.addOption("name-1", {"-n1"}, "Label name for config 1.", 1);
+  clp.addOption("name-2", {"-n2"}, "Label name for config 2.", 1);
   clp.addOption("overrides-1", {"-of1", "--override-files-1"}, "Provide config files that will override keys in config file 1", -1);
   clp.addOption("overrides-2", {"-of2", "--override-files-2"}, "Provide config files that will override keys in config file 2", -1);
 
@@ -83,7 +90,17 @@ int main( int argc, char** argv ){
     }
   }
 
+  if( clp.isOptionTriggered("name-1") ){ config1Name = clp.getOptionVal<std::string>("name-1"); }
+  if( clp.isOptionTriggered("name-2") ){ config2Name = clp.getOptionVal<std::string>("name-2"); }
+
+
+  t << "Key" << GenericToolbox::TablePrinter::NextColumn;
+  t << config1Name << GenericToolbox::TablePrinter::NextColumn;
+  t << config2Name << GenericToolbox::TablePrinter::NextLine;
+
   compareConfigStage( c1.getConfig(), c2.getConfig() );
+
+  t.printTable();
 
 
   g.goodbye();
@@ -94,6 +111,7 @@ int main( int argc, char** argv ){
 
 void compareConfigStage(const JsonType& config1_, const JsonType& config2_){
 
+  const int maxLineLenght{80};
 
   std::vector<std::string> pathBuffer;
 
@@ -105,6 +123,10 @@ void compareConfigStage(const JsonType& config1_, const JsonType& config2_){
 
           if( entry1_.size() != entry2_.size() ){
             LogAlert << path << "Array size mismatch: " << entry1_.size() << " <-> " << entry2_.size() << std::endl;
+            t.setColorBuffer( GenericToolbox::ColorCodes::magentaLightText );
+            t << path.substr((path.size()<=maxLineLenght?0:path.size()-maxLineLenght), path.size()) << GenericToolbox::TablePrinter::NextColumn;
+            t << "size(" << entry1_.size() << ")" << GenericToolbox::TablePrinter::NextColumn;
+            t << "size(" << entry2_.size() << ")" << GenericToolbox::TablePrinter::NextColumn;
           }
 
           if( entry1_.empty() or entry2_.empty() ){ return; }
@@ -128,6 +150,13 @@ void compareConfigStage(const JsonType& config1_, const JsonType& config2_){
               }
               if( not found1 ){
                 LogError << path << ": could not find key with name \"" << name1 << "\" in config2." << std::endl;
+
+                path += "/" + name1;
+                t.setColorBuffer( GenericToolbox::ColorCodes::magentaLightText );
+                t << path.substr((path.size()<=maxLineLenght?0:path.size()-maxLineLenght), path.size()) << GenericToolbox::TablePrinter::NextColumn;
+                t << "key found." << GenericToolbox::TablePrinter::NextColumn;
+                t << "key not found." << GenericToolbox::TablePrinter::NextColumn;
+                path.substr(path.size() - 1 - name1.size());
               }
             }
 
@@ -144,6 +173,13 @@ void compareConfigStage(const JsonType& config1_, const JsonType& config2_){
               }
               if( not found2 ){
                 LogError << path << ": could not find key with name \"" << name2 << "\" in config1." << std::endl;
+                t.setColorBuffer( GenericToolbox::ColorCodes::magentaLightText );
+
+                path += "/" + name2;
+                t << path.substr((path.size()<=maxLineLenght?0:path.size()-maxLineLenght), path.size()) << GenericToolbox::TablePrinter::NextColumn;
+                t << "key not found." << GenericToolbox::TablePrinter::NextColumn;
+                t << "key found." << GenericToolbox::TablePrinter::NextColumn;
+                path.substr(path.size() - 1 - name2.size());
               }
             }
           }
@@ -165,10 +201,24 @@ void compareConfigStage(const JsonType& config1_, const JsonType& config2_){
           for( auto& key : keysToFetch ){
             if     ( not GenericToolbox::Json::doKeyExist(entry1_, key) ){
               LogError << path <<  " -> missing key \"" << key << "\" in c1. Value in c2 is: " << entry2_[key] << std::endl;
+              path += "/" + key;
+              std::stringstream ss; ss << entry2_[key];
+              t.setColorBuffer( GenericToolbox::ColorCodes::redLightText );
+              t << path.substr((path.size()<=maxLineLenght?0:path.size()-maxLineLenght), path.size()) << GenericToolbox::TablePrinter::NextColumn;
+              t << "key not found." << GenericToolbox::TablePrinter::NextColumn;
+              t << ss.str().substr((ss.str().size()<=maxLineLenght?0:ss.str().size()-maxLineLenght), ss.str().size()) << GenericToolbox::TablePrinter::NextColumn;
+              path.substr(path.size() - 1 - key.size());
               continue;
             }
             else if( not GenericToolbox::Json::doKeyExist(entry2_, key ) ){
               LogError << path << " -> missing key \"" << key << "\" in c2. Value in c1 is: " << entry1_[key] << std::endl;
+              std::stringstream ss; ss << entry1_[key];
+              t.setColorBuffer( GenericToolbox::ColorCodes::redLightText );
+              path += "/" + key;
+              t << path.substr((path.size()<=maxLineLenght?0:path.size()-maxLineLenght), path.size()) << GenericToolbox::TablePrinter::NextColumn;
+              t << ss.str().substr((ss.str().size()<=maxLineLenght?0:ss.str().size()-maxLineLenght), ss.str().size()) << GenericToolbox::TablePrinter::NextColumn;
+              t << "key not found." << GenericToolbox::TablePrinter::NextColumn;
+              path.substr(path.size() - 1 - key.size());
               continue;
             }
 
@@ -184,6 +234,14 @@ void compareConfigStage(const JsonType& config1_, const JsonType& config2_){
         else{
           if( entry1_ != entry2_ ){
             LogWarning << path << ": " << entry1_ << " <-> " << entry2_ << std::endl;
+
+            std::stringstream ss1; ss1 << entry1_;
+            std::stringstream ss2; ss2 << entry2_;
+
+            t.setColorBuffer( GenericToolbox::ColorCodes::yellowText );
+            t << path.substr((path.size()<=maxLineLenght?0:path.size()-maxLineLenght), path.size()) << GenericToolbox::TablePrinter::NextColumn;
+            t << ss1.str().substr((ss1.str().size()<=maxLineLenght?0:ss1.str().size()-maxLineLenght), ss1.str().size()) << GenericToolbox::TablePrinter::NextColumn;
+            t << ss2.str().substr((ss2.str().size()<=maxLineLenght?0:ss2.str().size()-maxLineLenght), ss2.str().size()) << GenericToolbox::TablePrinter::NextColumn;
           }
           else if( clp.isOptionTriggered("show-all-keys") ){
             LogInfo << path << ": " << entry1_ << " <-> " << entry2_ << std::endl;
