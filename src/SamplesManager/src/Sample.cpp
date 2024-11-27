@@ -33,7 +33,7 @@ void Sample::configureImpl(){
 }
 
 void Sample::writeEventRates(const GenericToolbox::TFilePath& saveDir_) const{
-  GenericToolbox::writeInTFile(saveDir_.getSubDir(_name_).getDir(), getSumWeights(), "sumWeights");
+  GenericToolbox::writeInTFileWithObjTypeExt(saveDir_.getSubDir(_name_).getDir(), getSumWeights(), "sumWeights");
 }
 bool Sample::isDatasetValid(const std::string& datasetName_) const {
   if( _enabledDatasetList_.empty() ) return true;

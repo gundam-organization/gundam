@@ -230,14 +230,14 @@ void ParameterScanner::scanParameter(Parameter& par_, TDirectory* saveDir_) {
     scanGraph.GetXaxis()->SetTitle(par_.getFullTitle().c_str());
     scanGraph.SetDrawOption("AP");
     scanGraph.SetMarkerStyle(kFullDotLarge);
-    GenericToolbox::writeInTFile(GenericToolbox::mkdirTFile( saveDir_, scanEntry.folder ), &scanGraph, ss.str());
+    GenericToolbox::writeInTFileWithObjTypeExt(GenericToolbox::mkdirTFile( saveDir_, scanEntry.folder ), &scanGraph, ss.str());
   }
 
   std::stringstream ssVal;
   ssVal << par_.getFullTitle() << "_CurrentPar";
 
   // current parameter value / center of the scan:
-  GenericToolbox::writeInTFile(saveDir_, par_.getParameterValue(), ssVal.str());
+  GenericToolbox::writeInTFileWithObjTypeExt(saveDir_, par_.getParameterValue(), ssVal.str());
 }
 void ParameterScanner::scanSegment(TDirectory *saveDir_, const JsonType &end_, const JsonType &start_, int nSteps_) {
   if( nSteps_ == -1 ){ nSteps_ = _nbPointsLineScan_; }
@@ -483,7 +483,7 @@ void ParameterScanner::varyEvenRates(const std::vector<double>& paramVariationLi
       */
       (*variationList_TVectorD)(iVar) = par_.getPriorValue() + variationList_[iVar] * par_.getStdDevValue();
     }
-    GenericToolbox::writeInTFile(saveSubDir_, variationList_TVectorD, "paramValues");
+    GenericToolbox::writeInTFileWithObjTypeExt(saveSubDir_, variationList_TVectorD, "paramValues");
 
     TVectorD* buffVariedEvtRates_TVectorD{nullptr};
 
@@ -495,7 +495,7 @@ void ParameterScanner::varyEvenRates(const std::vector<double>& paramVariationLi
         (*buffVariedEvtRates_TVectorD)(iVar) = buffEvtRatesMap[iVar][iSample];
       }
 
-      GenericToolbox::writeInTFile(
+      GenericToolbox::writeInTFileWithObjTypeExt(
           saveSubDir_, buffVariedEvtRates_TVectorD,
           _likelihoodInterfacePtr_->getModelPropagator().getSampleSet().getSampleList()[iSample].getName()
       );
@@ -561,7 +561,7 @@ void ParameterScanner::writeGraphEntry(GraphEntry& entry_, TDirectory* saveDir_)
     entry_.graph.SetMarkerStyle( kFullTriangleUp );
   }
 
-  GenericToolbox::writeInTFile(
+  GenericToolbox::writeInTFileWithObjTypeExt(
       GenericToolbox::mkdirTFile( saveDir_, entry_.scanDataPtr->folder ),
       entry_.graph,
       GenericToolbox::generateCleanBranchName(entry_.fitParPtr->getFullTitle())

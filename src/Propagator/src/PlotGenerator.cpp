@@ -258,7 +258,7 @@ void PlotGenerator::generateSampleHistograms(TDirectory *saveDir_, int cacheSlot
   // Saving
   if( saveDir_ != nullptr and not _writeGeneratedHistograms_ ){
     for( auto& histHolderCached : _histHolderCacheList_[cacheSlot_] ){
-      GenericToolbox::writeInTFile(
+      GenericToolbox::writeInTFileWithObjTypeExt(
           GenericToolbox::mkdirTFile(saveDir_, histHolderCached.folderPath ),
           histHolderCached.histPtr.get(), histHolderCached.histName, false
           );
@@ -485,7 +485,7 @@ void PlotGenerator::generateCanvas(const std::vector<HistHolder> &histHolderList
       auto pathSplit = GenericToolbox::splitString(canvas.first, "/");
       std::string folderPath = GenericToolbox::joinVectorString(pathSplit, "/", 0, -1);
       std::string canvasName = pathSplit.back();
-      GenericToolbox::writeInTFile(
+      GenericToolbox::writeInTFileWithObjTypeExt(
           GenericToolbox::mkdirTFile(saveDir_, folderPath),
           canvas.second.get(), canvasName, false
           );
@@ -589,7 +589,7 @@ void PlotGenerator::generateComparisonHistograms(const std::vector<HistHolder> &
     compHistPtr->GetYaxis()->SetRangeUser(Ymin, Ymax);
 
     if( saveDir_ != nullptr and not _writeGeneratedHistograms_ ){
-      GenericToolbox::writeInTFile(
+      GenericToolbox::writeInTFileWithObjTypeExt(
           GenericToolbox::mkdirTFile( saveDir_, _comparisonHistHolderList_[iHistComp].folderPath ),
           compHistPtr, _comparisonHistHolderList_[iHistComp].histName, false
           );

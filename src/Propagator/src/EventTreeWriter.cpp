@@ -232,7 +232,7 @@ template<typename T> void EventTreeWriter::writeEventsTemplate(const GenericTool
     _threadPool_.removeJob("buildResponseGraph");
   }
 
-  GenericToolbox::writeInTFile( saveDir_.getDir(), tree );
+  GenericToolbox::writeInTFileWithObjTypeExt( saveDir_.getDir(), tree );
   delete tree;
 
   if(oldDir != nullptr){ oldDir->cd(); }

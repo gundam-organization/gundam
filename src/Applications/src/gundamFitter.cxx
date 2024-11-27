@@ -400,7 +400,7 @@ int main(int argc, char** argv){
 
       auto endPoint = ConfigUtils::readConfigFile(clParser.getOptionVal<std::string>("scanLine", 0));
 
-      GenericToolbox::writeInTFile( outDir, TNamed("endPoint", GenericToolbox::Json::toReadableString(endPoint).c_str()) );
+      GenericToolbox::writeInTFileWithObjTypeExt( outDir, TNamed("endPoint", GenericToolbox::Json::toReadableString(endPoint).c_str()) );
 
       fitter.getParameterScanner().scanSegment( outDir, endPoint );
     }
@@ -411,8 +411,8 @@ int main(int argc, char** argv){
       auto startPoint = ConfigUtils::readConfigFile(clParser.getOptionVal<std::string>("scanLine", 0));
       auto endPoint = ConfigUtils::readConfigFile(clParser.getOptionVal<std::string>("scanLine", 1));
 
-      GenericToolbox::writeInTFile( outDir, TNamed("startPoint", GenericToolbox::Json::toReadableString(startPoint).c_str()) );
-      GenericToolbox::writeInTFile( outDir, TNamed("endPoint", GenericToolbox::Json::toReadableString(endPoint).c_str()) );
+      GenericToolbox::writeInTFileWithObjTypeExt( outDir, TNamed("startPoint", GenericToolbox::Json::toReadableString(startPoint).c_str()) );
+      GenericToolbox::writeInTFileWithObjTypeExt( outDir, TNamed("endPoint", GenericToolbox::Json::toReadableString(endPoint).c_str()) );
 
       fitter.getParameterScanner().scanSegment( outDir, endPoint, startPoint );
     }

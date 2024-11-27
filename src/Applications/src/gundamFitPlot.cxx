@@ -175,7 +175,7 @@ int main( int argc, char** argv ){
         app.getOutfilePtr(),
         GenericToolbox::joinPath("systematics",graphEntry.path)
     );
-    GenericToolbox::writeInTFile(path, outGraph);
+    GenericToolbox::writeInTFileWithObjTypeExt(path, outGraph);
   }
 
   return EXIT_SUCCESS;

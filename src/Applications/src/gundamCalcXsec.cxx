@@ -584,7 +584,7 @@ int main(int argc, char** argv){
     propagator.propagateParameters();
     writeBinDataFct();
     xsecAtBestFitTree->Fill();
-    GenericToolbox::writeInTFile( GenericToolbox::mkdirTFile(calcXsecDir, "throws"), xsecAtBestFitTree );
+    GenericToolbox::writeInTFileWithObjTypeExt( GenericToolbox::mkdirTFile(calcXsecDir, "throws"), xsecAtBestFitTree );
   }
 
 
@@ -660,7 +660,7 @@ int main(int argc, char** argv){
 
 
   LogInfo << "Writing throws..." << std::endl;
-  GenericToolbox::writeInTFile( GenericToolbox::mkdirTFile(calcXsecDir, "throws"), xsecThrowTree );
+  GenericToolbox::writeInTFileWithObjTypeExt( GenericToolbox::mkdirTFile(calcXsecDir, "throws"), xsecThrowTree );
 
   LogInfo << "Calculating mean & covariance matrix..." << std::endl;
   auto* meanValuesVector = GenericToolbox::generateMeanVectorOfTree(
@@ -703,7 +703,7 @@ int main(int argc, char** argv){
     xsec.histogram.GetXaxis()->SetLabelSize(0.02);
     xsec.histogram.GetYaxis()->SetTitle( GenericToolbox::Json::fetchValue(xsec.samplePtr->getConfig(), "yAxis", "#delta#sigma").c_str() );
 
-    GenericToolbox::writeInTFile(
+    GenericToolbox::writeInTFileWithObjTypeExt(
         GenericToolbox::mkdirTFile(calcXsecDir, "histograms"),
         &xsec.histogram, GenericToolbox::generateCleanBranchName( xsec.samplePtr->getName() )
     );
@@ -712,12 +712,12 @@ int main(int argc, char** argv){
 
   globalCovMatrixHist->GetXaxis()->SetLabelSize(0.02);
   globalCovMatrixHist->GetYaxis()->SetLabelSize(0.02);
-  GenericToolbox::writeInTFile(GenericToolbox::mkdirTFile(calcXsecDir, "matrices"), globalCovMatrixHist, "covarianceMatrix");
+  GenericToolbox::writeInTFileWithObjTypeExt(GenericToolbox::mkdirTFile(calcXsecDir, "matrices"), globalCovMatrixHist, "covarianceMatrix");
 
   globalCorMatrixHist->GetXaxis()->SetLabelSize(0.02);
   globalCorMatrixHist->GetYaxis()->SetLabelSize(0.02);
   globalCorMatrixHist->GetZaxis()->SetRangeUser(-1, 1);
-  GenericToolbox::writeInTFile(GenericToolbox::mkdirTFile(calcXsecDir, "matrices"), globalCorMatrixHist, "correlationMatrix");
+  GenericToolbox::writeInTFileWithObjTypeExt(GenericToolbox::mkdirTFile(calcXsecDir, "matrices"), globalCorMatrixHist, "correlationMatrix");
 
   // now propagate to the engine for the plot generator
   LogInfo << "Re-normalizing the samples for the plot generator..." << std::endl;

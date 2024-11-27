@@ -211,7 +211,7 @@ void makeSampleComparePlots(bool usePrefit_){
         hCompValues->SetTitle(Form("Comparing \"%s\"", dir1_->GetListOfKeys()->At(iKey)->GetName()));
         hCompValues->GetYaxis()->SetTitle("Bin content difference");
 
-        GenericToolbox::writeInTFile(
+        GenericToolbox::writeInTFileWithObjTypeExt(
             GenericToolbox::mkdirTFile(outFile, GenericToolbox::joinVectorString(pathBuffer, "/")),
             hCompValues,
             dir1_->GetListOfKeys()->At(iKey)->GetName()
@@ -227,7 +227,7 @@ void makeSampleComparePlots(bool usePrefit_){
         hCompValuesRatio->SetTitle(Form("Comparing \"%s\"", dir1_->GetListOfKeys()->At(iKey)->GetName()));
         hCompValuesRatio->GetYaxis()->SetTitle("Bin content relative difference (%)");
 
-        GenericToolbox::writeInTFile(
+        GenericToolbox::writeInTFileWithObjTypeExt(
             GenericToolbox::mkdirTFile(outFile, GenericToolbox::joinVectorString(pathBuffer, "/")),
             hCompValuesRatio,
             dir1_->GetListOfKeys()->At(iKey)->GetName() + std::string("_Ratio")
@@ -351,7 +351,7 @@ void makeScanComparePlots(bool usePrefit_){
         gPad->SetGridx();
         gPad->SetGridy();
 
-        GenericToolbox::writeInTFile(
+        GenericToolbox::writeInTFileWithObjTypeExt(
             GenericToolbox::mkdirTFile(outFile, GenericToolbox::joinVectorString(pathBuffer, "/")),
             overlayCanvas
             );
@@ -478,7 +478,7 @@ void makeErrorComparePlots(bool usePrefit_, bool useNomVal_) {
     l.Draw();
 
     hist1->SetTitle(Form("Comparing %s parameters: \"%s\"", (usePrefit_? "preFit": "postFit"), parSet.c_str()));
-    GenericToolbox::writeInTFile( GenericToolbox::mkdirTFile(outDir, parSet), overlayCanvas );
+    GenericToolbox::writeInTFileWithObjTypeExt( GenericToolbox::mkdirTFile(outDir, parSet), overlayCanvas );
 
     std::map<std::string, TH1D*> compHist{
         {"ScaledComp", nullptr},
@@ -547,7 +547,7 @@ void makeErrorComparePlots(bool usePrefit_, bool useNomVal_) {
         line2 = new TLine(gPad->GetFrame()->GetX1(), -1, gPad->GetFrame()->GetX2(), -1); line2->SetLineColor(kRed); line2->SetLineStyle(2); line2->Draw();
       }
 
-      GenericToolbox::writeInTFile(
+      GenericToolbox::writeInTFileWithObjTypeExt(
           GenericToolbox::mkdirTFile(outDir, parSet),
           overlayCanvas,
           histEntry.first

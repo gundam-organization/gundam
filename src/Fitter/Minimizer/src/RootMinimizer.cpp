@@ -189,7 +189,7 @@ void RootMinimizer::minimize(){
 
     // export bf point with SIMPLEX
     LogInfo << "Writing " << _minimizerType_ << "/Simplex best fit parameters..." << std::endl;
-    GenericToolbox::writeInTFile(
+    GenericToolbox::writeInTFileWithObjTypeExt(
         GenericToolbox::mkdirTFile( getOwner().getSaveDir(), GenericToolbox::joinPath("postFit", _minimizerAlgo_) ),
         TNamed("parameterStateAfterSimplex", GenericToolbox::Json::toReadableString( getModelPropagator().getParametersManager().exportParameterInjectorConfig() ).c_str() )
     );
@@ -228,14 +228,14 @@ void RootMinimizer::minimize(){
 
   // export bf point
   LogInfo << "Writing " << _minimizerType_ << "/" << _minimizerAlgo_ << " best fit parameters..." << std::endl;
-  GenericToolbox::writeInTFile(
+  GenericToolbox::writeInTFileWithObjTypeExt(
       GenericToolbox::mkdirTFile( getOwner().getSaveDir(), GenericToolbox::joinPath("postFit", _minimizerAlgo_) ),
       TNamed("parameterStateAfterMinimize", GenericToolbox::Json::toReadableString( getModelPropagator().getParametersManager().exportParameterInjectorConfig() ).c_str() )
   );
 
   if( getMonitor().historyTree != nullptr ){
     LogInfo << "Saving LLH history..." << std::endl;
-    GenericToolbox::writeInTFile(getOwner().getSaveDir(), getMonitor().historyTree.get());
+    GenericToolbox::writeInTFileWithObjTypeExt(getOwner().getSaveDir(), getMonitor().historyTree.get());
   }
 
   if( getMonitor().gradientDescentMonitor.isEnabled ){ saveGradientSteps(); }
@@ -469,27 +469,27 @@ double RootMinimizer::getTargetEdm() const{
 void RootMinimizer::saveMinimizerSettings( TDirectory* saveDir_) const {
   LogInfo << "Saving minimizer settings..." << std::endl;
 
-  GenericToolbox::writeInTFile( saveDir_, TNamed("minimizerType", _minimizerType_.c_str()) );
-  GenericToolbox::writeInTFile( saveDir_, TNamed("minimizerAlgo", _minimizerAlgo_.c_str()) );
-  GenericToolbox::writeInTFile( saveDir_, TNamed("strategy", std::to_string(_strategy_).c_str()) );
-  GenericToolbox::writeInTFile( saveDir_, TNamed("printLevel", std::to_string(_printLevel_).c_str()) );
-  GenericToolbox::writeInTFile( saveDir_, TNamed("targetEDM", std::to_string(this->getTargetEdm()).c_str()) );
-  GenericToolbox::writeInTFile( saveDir_, TNamed("maxIterations", std::to_string(_maxIterations_).c_str()) );
-  GenericToolbox::writeInTFile( saveDir_, TNamed("maxFcnCalls", std::to_string(_maxFcnCalls_).c_str()) );
-  GenericToolbox::writeInTFile( saveDir_, TNamed("tolerance", std::to_string(_tolerance_).c_str()) );
-  GenericToolbox::writeInTFile( saveDir_, TNamed("stepSizeScaling", std::to_string(_stepSizeScaling_).c_str()) );
-  GenericToolbox::writeInTFile( saveDir_, TNamed("useNormalizedFitSpace", std::to_string(useNormalizedFitSpace()).c_str()) );
+  GenericToolbox::writeInTFileWithObjTypeExt( saveDir_, TNamed("minimizerType", _minimizerType_.c_str()) );
+  GenericToolbox::writeInTFileWithObjTypeExt( saveDir_, TNamed("minimizerAlgo", _minimizerAlgo_.c_str()) );
+  GenericToolbox::writeInTFileWithObjTypeExt( saveDir_, TNamed("strategy", std::to_string(_strategy_).c_str()) );
+  GenericToolbox::writeInTFileWithObjTypeExt( saveDir_, TNamed("printLevel", std::to_string(_printLevel_).c_str()) );
+  GenericToolbox::writeInTFileWithObjTypeExt( saveDir_, TNamed("targetEDM", std::to_string(this->getTargetEdm()).c_str()) );
+  GenericToolbox::writeInTFileWithObjTypeExt( saveDir_, TNamed("maxIterations", std::to_string(_maxIterations_).c_str()) );
+  GenericToolbox::writeInTFileWithObjTypeExt( saveDir_, TNamed("maxFcnCalls", std::to_string(_maxFcnCalls_).c_str()) );
+  GenericToolbox::writeInTFileWithObjTypeExt( saveDir_, TNamed("tolerance", std::to_string(_tolerance_).c_str()) );
+  GenericToolbox::writeInTFileWithObjTypeExt( saveDir_, TNamed("stepSizeScaling", std::to_string(_stepSizeScaling_).c_str()) );
+  GenericToolbox::writeInTFileWithObjTypeExt( saveDir_, TNamed("useNormalizedFitSpace", std::to_string(useNormalizedFitSpace()).c_str()) );
 
   if( _preFitWithSimplex_ ){
-    GenericToolbox::writeInTFile( saveDir_, TNamed("enableSimplexBeforeMinimize", std::to_string(_preFitWithSimplex_).c_str()) );
-    GenericToolbox::writeInTFile( saveDir_, TNamed("simplexMaxFcnCalls", std::to_string(_simplexMaxFcnCalls_).c_str()) );
-    GenericToolbox::writeInTFile( saveDir_, TNamed("simplexToleranceLoose", std::to_string(_simplexToleranceLoose_).c_str()) );
-    GenericToolbox::writeInTFile( saveDir_, TNamed("simplexStrategy", std::to_string(_simplexStrategy_).c_str()) );
+    GenericToolbox::writeInTFileWithObjTypeExt( saveDir_, TNamed("enableSimplexBeforeMinimize", std::to_string(_preFitWithSimplex_).c_str()) );
+    GenericToolbox::writeInTFileWithObjTypeExt( saveDir_, TNamed("simplexMaxFcnCalls", std::to_string(_simplexMaxFcnCalls_).c_str()) );
+    GenericToolbox::writeInTFileWithObjTypeExt( saveDir_, TNamed("simplexToleranceLoose", std::to_string(_simplexToleranceLoose_).c_str()) );
+    GenericToolbox::writeInTFileWithObjTypeExt( saveDir_, TNamed("simplexStrategy", std::to_string(_simplexStrategy_).c_str()) );
   }
 
   if( isErrorCalcEnabled() ){
-    GenericToolbox::writeInTFile( saveDir_, TNamed("enablePostFitErrorFit", std::to_string(isErrorCalcEnabled()).c_str()) );
-    GenericToolbox::writeInTFile( saveDir_, TNamed("errorAlgo", _errorAlgo_.c_str()) );
+    GenericToolbox::writeInTFileWithObjTypeExt( saveDir_, TNamed("enablePostFitErrorFit", std::to_string(isErrorCalcEnabled()).c_str()) );
+    GenericToolbox::writeInTFileWithObjTypeExt( saveDir_, TNamed("errorAlgo", _errorAlgo_.c_str()) );
   }
 }
 
@@ -527,13 +527,13 @@ void RootMinimizer::writePostFitData( TDirectory* saveDir_) {
       LogInfo << "Writing post-fit matrices" << std::endl;
       auto postFitCovarianceTH2D = std::unique_ptr<TH2D>(GenericToolbox::convertTMatrixDtoTH2D((TMatrixD*) &postfitCovarianceMatrix) );
       applyBinLabels(postFitCovarianceTH2D.get());
-      GenericToolbox::writeInTFile(outDir_, postFitCovarianceTH2D.get(), "postfitCovariance");
+      GenericToolbox::writeInTFileWithObjTypeExt(outDir_, postFitCovarianceTH2D.get(), "postfitCovariance");
 
       auto postfitCorrelationMatrix = std::unique_ptr<TMatrixD>(GenericToolbox::convertToCorrelationMatrix((TMatrixD*) &postfitCovarianceMatrix));
       auto postfitCorrelationTH2D = std::unique_ptr<TH2D>(GenericToolbox::convertTMatrixDtoTH2D(postfitCorrelationMatrix.get()));
       applyBinLabels(postfitCorrelationTH2D.get());
       postfitCorrelationTH2D->GetZaxis()->SetRangeUser(-1,1);
-      GenericToolbox::writeInTFile(outDir_, postfitCorrelationTH2D.get(), "postfitCorrelation");
+      GenericToolbox::writeInTFileWithObjTypeExt(outDir_, postfitCorrelationTH2D.get(), "postfitCorrelation");
     }
 
     // Fitter covariance matrix decomposition
@@ -544,13 +544,13 @@ void RootMinimizer::writePostFitData( TDirectory* saveDir_) {
       auto eigenVectors = std::unique_ptr<TH2D>( GenericToolbox::convertTMatrixDtoTH2D(&decompCovMatrix.GetEigenVectors()) );
       applyBinLabels(eigenVectors.get());
       if( not GundamGlobals::isLightOutputMode() ) {
-        GenericToolbox::writeInTFile(GenericToolbox::mkdirTFile(outDir_, "eigenDecomposition"), eigenVectors.get(), "eigenVectors");
+        GenericToolbox::writeInTFileWithObjTypeExt(GenericToolbox::mkdirTFile(outDir_, "eigenDecomposition"), eigenVectors.get(), "eigenVectors");
       }
 
       auto eigenValues = std::unique_ptr<TH1D>( GenericToolbox::convertTVectorDtoTH1D(&decompCovMatrix.GetEigenValues()) );
       applyBinLabels(eigenValues.get());
       if( not GundamGlobals::isLightOutputMode() ) {
-        GenericToolbox::writeInTFile(GenericToolbox::mkdirTFile(outDir_, "eigenDecomposition"), eigenValues.get(), "eigenValues");
+        GenericToolbox::writeInTFileWithObjTypeExt(GenericToolbox::mkdirTFile(outDir_, "eigenDecomposition"), eigenValues.get(), "eigenValues");
       }
 
       double conditioning = decompCovMatrix.GetEigenValues().Min() / decompCovMatrix.GetEigenValues().Max();
@@ -571,7 +571,7 @@ void RootMinimizer::writePostFitData( TDirectory* saveDir_) {
       TH2D* postfitHessianTH2D = GenericToolbox::convertTMatrixDtoTH2D(&hessianMatrix);
       applyBinLabels(postfitHessianTH2D);
       if( not GundamGlobals::isLightOutputMode() ){
-        GenericToolbox::writeInTFile(outDir_, postfitHessianTH2D, "postfitHessian");
+        GenericToolbox::writeInTFileWithObjTypeExt(outDir_, postfitHessianTH2D, "postfitHessian");
       }
 
       if( _generatedPostFitEigenBreakdown_ ){
@@ -603,7 +603,7 @@ void RootMinimizer::writePostFitData( TDirectory* saveDir_) {
           applyBinLabels(&eigenBreakdownHist);
           applyBinLabels(&eigenBreakdownAccum[iEigen]);
 
-          GenericToolbox::writeInTFile(
+          GenericToolbox::writeInTFileWithObjTypeExt(
               GenericToolbox::mkdirTFile(outDir_, "eigenDecomposition/eigenBreakdown"),
               &eigenBreakdownHist, Form("eigen#%i", iEigen));
 
@@ -658,7 +658,7 @@ void RootMinimizer::writePostFitData( TDirectory* saveDir_) {
 
         if( not GundamGlobals::isLightOutputMode() ) {
           GenericToolbox::cleanupForDisplay(&accumPlot);
-          GenericToolbox::writeInTFile(GenericToolbox::mkdirTFile(outDir_, "eigenDecomposition"), &accumPlot, "eigenBreakdown");
+          GenericToolbox::writeInTFileWithObjTypeExt(GenericToolbox::mkdirTFile(outDir_, "eigenDecomposition"), &accumPlot, "eigenBreakdown");
         }
       }
 
@@ -686,7 +686,7 @@ void RootMinimizer::writePostFitData( TDirectory* saveDir_) {
                 * decompCovMatrix.GetEigenValues()[iEigen]
             );
           }
-          GenericToolbox::writeInTFile(
+          GenericToolbox::writeInTFileWithObjTypeExt(
               GenericToolbox::mkdirTFile(outDir_, "eigenDecomposition/parBreakdown"),
               &parBreakdownHist, Form("par#%i", iPar)
           );
@@ -706,7 +706,7 @@ void RootMinimizer::writePostFitData( TDirectory* saveDir_) {
 
         if( not GundamGlobals::isLightOutputMode() ) {
           GenericToolbox::cleanupForDisplay(&accumPlot);
-          GenericToolbox::writeInTFile(
+          GenericToolbox::writeInTFileWithObjTypeExt(
               GenericToolbox::mkdirTFile(outDir_, "eigenDecomposition"),
               &accumPlot, "parBreakdown"
           );
@@ -825,12 +825,12 @@ void RootMinimizer::writePostFitData( TDirectory* saveDir_) {
 
       TH2D* postfitCovarianceOriginalTH2D = GenericToolbox::convertTMatrixDtoTH2D(originalCovMatrix.get());
       applyBinLabelsOrig(postfitCovarianceOriginalTH2D, parameterNonFixedLabels);
-      GenericToolbox::writeInTFile(outDir_, postfitCovarianceOriginalTH2D, "postfitCovarianceOriginal");
+      GenericToolbox::writeInTFileWithObjTypeExt(outDir_, postfitCovarianceOriginalTH2D, "postfitCovarianceOriginal");
 
       TH2D* postfitCorrelationOriginalTH2D = GenericToolbox::convertTMatrixDtoTH2D(GenericToolbox::convertToCorrelationMatrix(originalCovMatrix.get()));
       applyBinLabelsOrig(postfitCorrelationOriginalTH2D, parameterNonFixedLabels);
       postfitCorrelationOriginalTH2D->GetZaxis()->SetRangeUser(-1,1);
-      GenericToolbox::writeInTFile(outDir_, postfitCorrelationOriginalTH2D, "postfitCorrelationOriginal");
+      GenericToolbox::writeInTFileWithObjTypeExt(outDir_, postfitCorrelationOriginalTH2D, "postfitCorrelationOriginal");
     }
 
   };
@@ -899,9 +899,9 @@ void RootMinimizer::writePostFitData( TDirectory* saveDir_) {
 
         corMatrixTH2D->Draw("COLZ");
 
-        GenericToolbox::writeInTFile(GenericToolbox::mkdirTFile(saveSubdir_, "matrices"), covMatrix_, "Covariance");
-        GenericToolbox::writeInTFile(GenericToolbox::mkdirTFile(saveSubdir_, "matrices"), covMatrixTH2D, "Covariance");
-        GenericToolbox::writeInTFile(GenericToolbox::mkdirTFile(saveSubdir_, "matrices"), corMatrix, "Correlation");
+        GenericToolbox::writeInTFileWithObjTypeExt(GenericToolbox::mkdirTFile(saveSubdir_, "matrices"), covMatrix_, "Covariance");
+        GenericToolbox::writeInTFileWithObjTypeExt(GenericToolbox::mkdirTFile(saveSubdir_, "matrices"), covMatrixTH2D, "Covariance");
+        GenericToolbox::writeInTFileWithObjTypeExt(GenericToolbox::mkdirTFile(saveSubdir_, "matrices"), corMatrix, "Correlation");
         GenericToolbox::writeInTFile(GenericToolbox::mkdirTFile(saveSubdir_, "matrices"), corMatrixTH2D, "Correlation");
         GenericToolbox::writeInTFile(GenericToolbox::mkdirTFile(saveSubdir_, "matrices"), corMatrix, "Correlation");
 
