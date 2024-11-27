@@ -111,7 +111,10 @@ int main( int argc, char** argv ){
 
 void compareConfigStage(const JsonType& config1_, const JsonType& config2_){
 
-  const int maxLineLenght{80};
+  int maxLineLenght{80};
+  if( GenericToolbox::getTerminalWidth() != -1 ){
+    maxLineLenght = GenericToolbox::getTerminalWidth()/3 - 4; // 3 col + 1 trailing line
+  }
 
   std::vector<std::string> pathBuffer;
 
@@ -156,7 +159,7 @@ void compareConfigStage(const JsonType& config1_, const JsonType& config2_){
                 t << path.substr((path.size()<=maxLineLenght?0:path.size()-maxLineLenght), path.size()) << GenericToolbox::TablePrinter::NextColumn;
                 t << "key found." << GenericToolbox::TablePrinter::NextColumn;
                 t << "key not found." << GenericToolbox::TablePrinter::NextColumn;
-                path.substr(path.size() - 1 - name1.size());
+                path = path.substr(0, path.size() - 1 - name1.size());
               }
             }
 
@@ -179,7 +182,7 @@ void compareConfigStage(const JsonType& config1_, const JsonType& config2_){
                 t << path.substr((path.size()<=maxLineLenght?0:path.size()-maxLineLenght), path.size()) << GenericToolbox::TablePrinter::NextColumn;
                 t << "key not found." << GenericToolbox::TablePrinter::NextColumn;
                 t << "key found." << GenericToolbox::TablePrinter::NextColumn;
-                path.substr(path.size() - 1 - name2.size());
+                path = path.substr(0, path.size() - 1 - name2.size());
               }
             }
           }
@@ -207,7 +210,7 @@ void compareConfigStage(const JsonType& config1_, const JsonType& config2_){
               t << path.substr((path.size()<=maxLineLenght?0:path.size()-maxLineLenght), path.size()) << GenericToolbox::TablePrinter::NextColumn;
               t << "key not found." << GenericToolbox::TablePrinter::NextColumn;
               t << ss.str().substr((ss.str().size()<=maxLineLenght?0:ss.str().size()-maxLineLenght), ss.str().size()) << GenericToolbox::TablePrinter::NextColumn;
-              path.substr(path.size() - 1 - key.size());
+              path = path.substr(0, path.size() - 1 - key.size());
               continue;
             }
             else if( not GenericToolbox::Json::doKeyExist(entry2_, key ) ){
@@ -218,7 +221,7 @@ void compareConfigStage(const JsonType& config1_, const JsonType& config2_){
               t << path.substr((path.size()<=maxLineLenght?0:path.size()-maxLineLenght), path.size()) << GenericToolbox::TablePrinter::NextColumn;
               t << ss.str().substr((ss.str().size()<=maxLineLenght?0:ss.str().size()-maxLineLenght), ss.str().size()) << GenericToolbox::TablePrinter::NextColumn;
               t << "key not found." << GenericToolbox::TablePrinter::NextColumn;
-              path.substr(path.size() - 1 - key.size());
+              path = path.substr(0, path.size() - 1 - key.size());
               continue;
             }
 
