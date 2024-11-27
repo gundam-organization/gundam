@@ -79,7 +79,8 @@ void Histogram::throwStatError(bool useGaussThrow_){
     }
     for (auto *eventPtr: binContext.eventPtrList) {
       // make sure refill of the histogram will produce the same hist
-      eventPtr->getWeights().current *= (double) nCounts / binContent.sumWeights;
+      if( binContent.sumWeights == 0 ){ eventPtr->getWeights().current = 0; }
+      else{ eventPtr->getWeights().current *= (double) nCounts / binContent.sumWeights; }
     }
     binContent.sumWeights = nCounts;
   }
