@@ -902,11 +902,11 @@ void RootMinimizer::writePostFitData( TDirectory* saveDir_) {
         GenericToolbox::writeInTFileWithObjTypeExt(GenericToolbox::mkdirTFile(saveSubdir_, "matrices"), covMatrix_, "Covariance");
         GenericToolbox::writeInTFileWithObjTypeExt(GenericToolbox::mkdirTFile(saveSubdir_, "matrices"), covMatrixTH2D, "Covariance");
         GenericToolbox::writeInTFileWithObjTypeExt(GenericToolbox::mkdirTFile(saveSubdir_, "matrices"), corMatrix, "Correlation");
-        GenericToolbox::writeInTFile(GenericToolbox::mkdirTFile(saveSubdir_, "matrices"), corMatrixTH2D, "Correlation");
-        GenericToolbox::writeInTFile(GenericToolbox::mkdirTFile(saveSubdir_, "matrices"), corMatrix, "Correlation");
+        GenericToolbox::writeInTFileWithObjTypeExt(GenericToolbox::mkdirTFile(saveSubdir_, "matrices"), corMatrixTH2D, "Correlation");
+        GenericToolbox::writeInTFileWithObjTypeExt(GenericToolbox::mkdirTFile(saveSubdir_, "matrices"), corMatrix, "Correlation");
 
         GenericToolbox::cleanupForDisplay(corMatrixCanvas.get());
-        GenericToolbox::writeInTFile(GenericToolbox::mkdirTFile(saveSubdir_, "matrices"), corMatrixCanvas.get(), "Correlation");
+        GenericToolbox::writeInTFileWithObjTypeExt(GenericToolbox::mkdirTFile(saveSubdir_, "matrices"), corMatrixCanvas.get(), "Correlation");
 
         // Table printout
         GenericToolbox::TablePrinter t;
@@ -1075,14 +1075,14 @@ void RootMinimizer::writePostFitData( TDirectory* saveDir_) {
           preFitErrorHist->SetTitle(Form("Pre-fit Errors of %s", parSet_.getName().c_str()));
           preFitErrorHist->SetMarkerSize(0);
           preFitErrorHist->GetYaxis()->SetRangeUser(yBounds.min, yBounds.max);
-          GenericToolbox::writeInTFile(saveDir_, preFitErrorHist.get());
+          GenericToolbox::writeInTFileWithObjTypeExt(saveDir_, preFitErrorHist.get());
 
           postFitErrorHist->SetLineColor(9);
           postFitErrorHist->SetLineWidth(2);
           postFitErrorHist->SetMarkerColor(9);
           postFitErrorHist->SetMarkerStyle(kFullDotLarge);
           postFitErrorHist->SetTitle(Form("Post-fit Errors of %s", parSet_.getName().c_str()));
-          GenericToolbox::writeInTFile(saveDir_, postFitErrorHist.get());
+          GenericToolbox::writeInTFileWithObjTypeExt(saveDir_, postFitErrorHist.get());
 
           auto errorsCanvas = std::make_unique<TCanvas>(
               Form("Fit Constraints for %s", parSet_.getName().c_str()),
@@ -1128,7 +1128,7 @@ void RootMinimizer::writePostFitData( TDirectory* saveDir_) {
           if( not isNorm_ ){ preFitErrorHist->SetTitle(Form("Pre-fit/Post-fit comparison for %s", parSet_.getName().c_str())); }
           else             { preFitErrorHist->SetTitle(Form("Pre-fit/Post-fit comparison for %s (normalized)", parSet_.getName().c_str())); }
           GenericToolbox::cleanupForDisplay(errorsCanvas.get());
-          GenericToolbox::writeInTFile(saveDir_, errorsCanvas.get(), "fitConstraints");
+          GenericToolbox::writeInTFileWithObjTypeExt(saveDir_, errorsCanvas.get(), "fitConstraints");
 
         }; // makePrePostFitCompPlot
 
@@ -1245,8 +1245,8 @@ void RootMinimizer::saveGradientSteps(){
 
     if( not GundamGlobals::isLightOutputMode() ) {
       auto outDir = GenericToolbox::mkdirTFile(getOwner().getSaveDir(), Form("fit/gradient/step_%i", int(iGradStep)));
-      GenericToolbox::writeInTFile(outDir, TNamed("parState", GenericToolbox::Json::toReadableString(getMonitor().gradientDescentMonitor.stepPointList[iGradStep].parState).c_str()));
-      GenericToolbox::writeInTFile(outDir, TNamed("llhState", getLikelihoodInterface().getSummary().c_str()));
+      GenericToolbox::writeInTFileWithObjTypeExt(outDir, TNamed("parState", GenericToolbox::Json::toReadableString(getMonitor().gradientDescentMonitor.stepPointList[iGradStep].parState).c_str()));
+      GenericToolbox::writeInTFileWithObjTypeExt(outDir, TNamed("llhState", getLikelihoodInterface().getSummary().c_str()));
     }
 
     // line scan from previous point
