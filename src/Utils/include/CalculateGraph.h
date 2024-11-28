@@ -24,6 +24,8 @@
 #define DEVICE_FLOATING_POINT double
 #endif
 
+#define DEBUG_VAR(var) std::cout << #var << ": " << var << std::endl
+
 // Place in a private name space so it plays nicely with CUDA
 namespace {
     /// Interpolate one point in a graph with non-uniform points.  The graph can
@@ -60,24 +62,36 @@ namespace {
         CHECK_OFFSET(2);
         CHECK_OFFSET(1);
 
-        const double p1 = data[2*ix];
-        const double x1 = data[2*ix+1];
+        const double y1 = data[2 * ix];
+        const double x1 = data[2 * ix + 1];
 
-        const double p2 = data[2*(ix+1)];
-        const double x2 = data[2*(ix+1)+1];
+        const double y2 = data[2 * (ix + 1)];
+        const double x2 = data[2 * (ix + 1) + 1];
 
-        const double step = x2-x1;
+        const double graphStep = x2-x1;
 
-        const double fx = (x - x1)/step;
+        const double xFraction = (x - x1)/graphStep;
 
-        const double m = p2-p1;
+        const double magnitude = y2 - y1;
 
-        double v = p1 + fx*m;
+        double y = y1 + xFraction * magnitude;
 
-        if (v < lowerBound) v = lowerBound;
-        if (v > upperBound) v = upperBound;
+        if ( y < lowerBound ) y = lowerBound;
+        if ( y > upperBound ) y = upperBound;
 
-        return v;
+        if( std::isnan(y) ){
+          DEBUG_VAR(y);
+          DEBUG_VAR(x);
+          DEBUG_VAR(ix);
+          DEBUG_VAR(x1);
+          DEBUG_VAR(x2);
+          DEBUG_VAR(y1);
+          DEBUG_VAR(y2);
+          DEBUG_VAR(magnitude);
+          DEBUG_VAR(xFraction);
+        }
+
+        return y;
     }
 }
 
