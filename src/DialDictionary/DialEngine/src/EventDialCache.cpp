@@ -161,6 +161,10 @@ void EventDialCache::reweightEntry( EventDialCache::CacheEntry& entry_){
   // calculate the dial responses
   for( auto& dialResponseCache : entry_.dialResponseCacheList ){
     tempReweight *= dialResponseCache.getResponse();
+    if( std::isnan(tempReweight) ){
+      LogError << "NAN response for dial: " << entry_.getSummary() << std::endl;
+      LogThrow("NAN dial response.");
+    }
   }
 
   // applying event weight cap if defined
