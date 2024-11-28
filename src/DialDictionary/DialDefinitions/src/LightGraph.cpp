@@ -43,5 +43,13 @@ double LightGraph::evalResponse(const DialInputBuffer& input_) const {
     else if(dialInput >= _Data_.back()) { return _Data_[_Data_.size()-2]; }
   }
 
-  return CalculateGraph(dialInput,-1E20,1E20,_Data_.data(),_Data_.size());
+  double response{CalculateGraph(dialInput,-1E20,1E20,_Data_.data(),_Data_.size())};
+
+  if( std::isnan(response) ){
+    LogError << "NAN RESPONSE of dial " << this << std::endl;
+    LogError << "_Data_: " << GenericToolbox::toString(_Data_) << std::endl;
+    LogError << "dialInput: " << dialInput << std::endl;
+  }
+
+  return response;
 }
