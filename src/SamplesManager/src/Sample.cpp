@@ -47,6 +47,24 @@ bool Sample::isDatasetValid(const std::string& datasetName_) const {
 double Sample::getSumWeights() const{
   double output = std::accumulate(_eventList_.begin(), _eventList_.end(), double(0.),
                                   [](double sum_, const Event& ev_){ return sum_ + ev_.getEventWeight(); });
+
+  if( std::isnan(output) ){
+    LogError << "Sum weights is NAN" << std::endl;
+
+    size_t nCount{0};
+    for( auto& ev : _eventList_ ){ if( std::isnan( ev.getEventWeight() ) ){ nCount++; } }
+
+    for( auto& ev : _eventList_ ){
+      if( std::isnan( ev.getEventWeight() ) ){
+        LogError << ev.getSummary() << std::endl;
+      }
+    }
+
+    LogError << nCount << " event have nan weight (" << nCount << "/" << _eventList_.size() << ")" << std::endl;
+    LogThrow("Nan rate");
+
+  }
+
   return output;
 }
 size_t Sample::getNbBinnedEvents() const{
