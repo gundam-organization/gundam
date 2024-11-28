@@ -26,7 +26,7 @@ namespace JointProbability{
     void printConfiguration() const;
 
     mutable int verboseLevel{0};
-    bool throwIfInfLlh{false};
+    bool throwIfInfLlh{true};
     bool allowZeroMcWhenZeroData{true};
     bool usePoissonLikelihood{false};
     bool BBNoUpdateWeights{false}; // OA 2021 bug reimplementation
@@ -71,6 +71,11 @@ namespace JointProbability{
   double BarlowBeestonBanff2022::eval(const SamplePair& samplePair_, int bin_) const {
     double dataVal = samplePair_.data->getHistogram().getBinContentList()[bin_].sumWeights;
     double predVal = samplePair_.model->getHistogram().getBinContentList()[bin_].sumWeights;
+
+    if( predVal == 0 ){
+      LogError << bin_ << " bin predicting 0 rate -> llh not defined / inf" << std::endl;
+      LogError << samplePair_.model->getSummary() << std::endl;
+    }
 
     {
       /// the first time we reach this point, we assume the predMC is at its nominal value
