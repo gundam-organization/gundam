@@ -244,7 +244,7 @@ namespace JointProbability{
       }
     }
 
-    if( std::isnan(chisq) or ( throwIfInfLlh and not std::isfinite(chisq) ) ) GUNDAM_UNLIKELY_COMPILER_FLAG {
+    if( std::isnan(chisq) or ( throwIfInfLlh and ( not std::isfinite(chisq) or std::isnan(chisq) ) ) ) GUNDAM_UNLIKELY_COMPILER_FLAG {
       LogError << "Infinite chi2: " << chisq << std::endl
                << GET_VAR_NAME_VALUE(samplePair_.model->getName()) << std::endl
                << GET_VAR_NAME_VALUE(bin_) << std::endl
@@ -254,6 +254,17 @@ namespace JointProbability{
                << GET_VAR_NAME_VALUE(stat) << std::endl
                << GET_VAR_NAME_VALUE(penalty) << std::endl
                << GET_VAR_NAME_VALUE(mcuncert) << std::endl;
+
+      auto& binContext{samplePair_.model->getHistogram().getBinContextList()[bin_]};
+
+      for( auto& ev : binContext.eventPtrList ){
+        if( std::isnan( ev->getEventWeight() ) ){
+          LogError << ev->getSummary() << std::endl;
+        }
+      }
+
+
+
       LogThrow("Bad chisq for bin");
     }
 
