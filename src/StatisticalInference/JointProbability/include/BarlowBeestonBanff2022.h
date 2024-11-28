@@ -26,7 +26,7 @@ namespace JointProbability{
     void printConfiguration() const;
 
     mutable int verboseLevel{0};
-    bool throwIfInfLlh{false};
+    bool throwIfInfLlh{true};
     bool allowZeroMcWhenZeroData{true};
     bool usePoissonLikelihood{false};
     bool BBNoUpdateWeights{false}; // OA 2021 bug reimplementation
