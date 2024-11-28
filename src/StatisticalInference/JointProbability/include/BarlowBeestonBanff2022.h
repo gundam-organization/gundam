@@ -239,7 +239,7 @@ namespace JointProbability{
       }
     }
 
-    if( throwIfInfLlh and not std::isfinite(chisq) ) GUNDAM_UNLIKELY_COMPILER_FLAG {
+    if( std::isnan(chisq) or ( throwIfInfLlh and not std::isfinite(chisq) ) ) GUNDAM_UNLIKELY_COMPILER_FLAG {
       LogError << "Infinite chi2: " << chisq << std::endl
                << GET_VAR_NAME_VALUE(samplePair_.model->getName()) << std::endl
                << GET_VAR_NAME_VALUE(bin_) << std::endl
