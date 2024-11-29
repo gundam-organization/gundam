@@ -66,6 +66,26 @@ protected:
   void eventSelectionFunction(int iThread_);
   void fillFunction(int iThread_);
 
+  void loadAndIndex();
+  void runEventFillThreads(int iThread_);
+  void readEntry(int iThread_);
+  void loadEvent(int iThread_);
+
+  struct ThreadSharedData{
+    Long64_t currentEntryIndex{0};
+    Long64_t nbEntries{treeChain->GetEntries()};
+
+    std::unique_ptr<TChain> treeChain;
+
+    std::vector<const GenericToolbox::LeafForm*> leafFormIndexingList{};
+    std::vector<const GenericToolbox::LeafForm*> leafFormStorageList{};
+
+    // has to be hooked to the TChain
+    TTreeFormula* dialIndexTreeFormula{nullptr};
+    TTreeFormula* nominalWeightTreeFormula{nullptr};
+  };
+  std::vector<ThreadSharedData> threadSharedDataList{};
+
 
 private:
   // config
@@ -79,6 +99,7 @@ private:
   const PlotGenerator* _plotGeneratorPtr_{nullptr};
 
   GenericToolbox::ParallelWorker _threadPool_{};
+  GenericToolbox::ParallelWorker _threadPoolEventLoad_{};
 
 };
 
