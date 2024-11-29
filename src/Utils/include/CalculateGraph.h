@@ -55,10 +55,13 @@ namespace {
         const int knotCount = (dim)/2;
         int ix = 0;
 #define CHECK_OFFSET(ioff)  if ((ix+ioff < knotCount) && (x > data[2*(ix+ioff)+1])) ix += ioff
-        CHECK_OFFSET(8);
-        CHECK_OFFSET(4);
-        CHECK_OFFSET(2);
-        CHECK_OFFSET(1);
+      // __builtin_clz(knotCount) counts the number of leading zeros in knotCount (available in GCC/Clang).
+      // sizeof(knotCount) - 1 - __builtin_clz(knotCount) calculates the position of the most significant bit.
+      // 1 << (31 - __builtin_clz(knotCount)) generates the largest power of 2 ≤ knotCount
+      for( int offset = 1 << ( sizeof(knotCount) - 1 - __builtin_clz(knotCount) ) ; offset > 0 ; offset >>= 1 ){
+        CHECK_OFFSET(offset);
+      }
+#undef CHECK_OFFSET
 
         // handle positive extrapolation
         // this ensures that x2 exists in the array
