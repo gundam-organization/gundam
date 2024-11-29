@@ -73,9 +73,9 @@ protected:
 
   struct ThreadSharedData{
     Long64_t currentEntryIndex{0};
-    Long64_t nbEntries{treeChain->GetEntries()};
+    Long64_t nbEntries{0};
 
-    std::unique_ptr<TChain> treeChain;
+    std::unique_ptr<TChain> treeChain{nullptr};
 
     std::vector<const GenericToolbox::LeafForm*> leafFormIndexingList{};
     std::vector<const GenericToolbox::LeafForm*> leafFormStorageList{};
@@ -83,6 +83,12 @@ protected:
     // has to be hooked to the TChain
     TTreeFormula* dialIndexTreeFormula{nullptr};
     TTreeFormula* nominalWeightTreeFormula{nullptr};
+
+    // thread communication
+    GenericToolbox::Atomic<bool> requestReadNextEntry{false};
+    GenericToolbox::Atomic<bool> isNextEntryReady{false};
+    GenericToolbox::Atomic<bool> isDoneReading{false};
+    GenericToolbox::Atomic<bool> isEventFillerReady{false};
   };
   std::vector<ThreadSharedData> threadSharedDataList{};
 

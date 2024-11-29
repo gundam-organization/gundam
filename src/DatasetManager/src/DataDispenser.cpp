@@ -637,13 +637,12 @@ void DataDispenser::eventSelectionFunction(int iThread_){
   int nThreads{GundamGlobals::getNbCpuThreads()};
   if( iThread_ == -1 ){ iThread_ = 0; nThreads = 1; }
 
-  // Opening ROOT file...
+  // Opening ROOT files and make a TChain
   auto treeChain{this->openChain(false)};
 
+  // Create the memory buffer for the TChain
   GenericToolbox::LeafCollection lCollection;
   lCollection.setTreePtr( treeChain.get() );
-
-  LogInfoIf(iThread_ == 0) << "Defining selection formulas..." << std::endl;
 
   // global cut
   int selectionCutLeafFormIndex{-1};
@@ -1183,18 +1182,10 @@ void DataDispenser::fillFunction(int iThread_){
 
 void DataDispenser::loadAndIndex(){
 
-  // prepare the ground...
+  // prepare the ground?
 
 
-  if(not _owner_->isDevSingleThreadEventLoaderAndIndexer() and GundamGlobals::getNbCpuThreads() > 1 ){
-    ROOT::EnableThreadSafety(); // EXTREMELY IMPORTANT
-    _threadPool_.addJob(__METHOD_NAME__, [&](int iThread_){ this->fillFunction(iThread_); });
-    _threadPool_.runJob(__METHOD_NAME__);
-    _threadPool_.removeJob(__METHOD_NAME__);
-  }
-  else{
-    this->fillFunction(-1); // for better debug breakdown
-  }
+
 
 }
 void DataDispenser::runEventFillThreads(int iThread_){
@@ -1204,40 +1195,91 @@ void DataDispenser::runEventFillThreads(int iThread_){
 
   // init shared data
   auto& threadSharedData = threadSharedDataList[iThread_];
+  threadSharedData = ThreadSharedData(); // force reinitialization
 
   // open the TChain now
   threadSharedData.treeChain = this->openChain();
 
-  // Try to read TTree the closest to sequentially possible
-  Long64_t nEvents{threadSharedData.treeChain->GetEntries()};
+  threadSharedData.nbEntries = threadSharedData.treeChain->GetEntries();
 
+  // provide the buffer
+  GenericToolbox::LeafCollection lCollection;
+  lCollection.setTreePtr( threadSharedData.treeChain.get() );
+
+  // nominal weight
+  threadSharedData.nominalWeightTreeFormula = nullptr;
+  if( not _parameters_.nominalWeightFormulaStr.empty() ){
+    auto idx = size_t(lCollection.addLeafExpression( _parameters_.nominalWeightFormulaStr ));
+    threadSharedData.nominalWeightTreeFormula = (TTreeFormula*) idx; // tweaking types. Ptr will be attributed after init
+  }
+
+  // dial array index
+  threadSharedData.dialIndexTreeFormula = nullptr;
+  if( not _parameters_.dialIndexFormula.empty() ){
+    auto idx = size_t(lCollection.addLeafExpression( _parameters_.dialIndexFormula ));
+    threadSharedData.dialIndexTreeFormula = (TTreeFormula*) idx; // tweaking types. Ptr will be attributed after init
+  }
+
+  // variables definition
+  threadSharedData.leafFormIndexingList.clear();
+  threadSharedData.leafFormStorageList.clear();
+  for( auto& var : _cache_.varsRequestedForIndexing ){
+    std::string leafExp{var};
+    if( GenericToolbox::isIn( var, _parameters_.variableDict ) ){
+      leafExp = _parameters_.variableDict[leafExp];
+    }
+    auto idx = size_t(lCollection.addLeafExpression(leafExp));
+    threadSharedData.leafFormIndexingList.emplace_back( (GenericToolbox::LeafForm*) idx ); // tweaking types
+  }
+  for( auto& var : _cache_.varsRequestedForStorage ){
+    std::string leafExp{var};
+    if( GenericToolbox::isIn( var, _parameters_.variableDict ) ){
+      leafExp = _parameters_.variableDict[leafExp];
+    }
+    auto idx = size_t(lCollection.getLeafExpIndex(leafExp));
+    threadSharedData.leafFormStorageList.emplace_back( (GenericToolbox::LeafForm*) idx ); // tweaking types
+  }
+
+  // will hook all variables to the TChain
+  lCollection.initialize();
+
+  // grab ptr address now
+  if( not _parameters_.nominalWeightFormulaStr.empty() ){
+    threadSharedData.nominalWeightTreeFormula = lCollection.getLeafFormList()[(size_t) threadSharedData.nominalWeightTreeFormula].getTreeFormulaPtr().get();
+  }
+  if( not _parameters_.dialIndexFormula.empty() ){
+    threadSharedData.dialIndexTreeFormula = lCollection.getLeafFormList()[(size_t) threadSharedData.dialIndexTreeFormula].getTreeFormulaPtr().get();
+  }
+  for( auto& lfInd: threadSharedData.leafFormIndexingList ){ lfInd = &(lCollection.getLeafFormList()[(size_t) lfInd]); }
+  for( auto& lfSto: threadSharedData.leafFormStorageList ){ lfSto = &(lCollection.getLeafFormList()[(size_t) lfSto]); }
 
   // start event filler
   // create thread
+  std::shared_ptr<std::future<void>> eventFillerThread{nullptr};
+  eventFillerThread = std::make_shared<std::future<void>>(
+      std::async( std::launch::async, [this, iThread_]{ this->loadEvent( iThread_ ); } )
+  );
+
+  threadSharedData.isEventFillerReady.waitUntilEqual( true );
+
+
 
   // start TChain reader
-
-  // wait for the event filler threads to stop
-
-}
-void DataDispenser::readEntry(int iThread_){
-
-  // shared
-  auto& threadSharedData = threadSharedDataList[iThread_];
-
-  // locals
-  int nThreads = GundamGlobals::getNbCpuThreads();
-  if( iThread_ == -1 ){ iThread_ = 0; nThreads = 1; } // special mode
-
   auto bounds = GenericToolbox::ParallelWorker::getThreadBoundIndices( iThread_, nThreads, threadSharedData.nbEntries );
 
-  // Load the branches
+  // Load the first TTree
   threadSharedData.treeChain->LoadTree(bounds.beginIndex);
+
+  // IO speed monitor
+  GenericToolbox::VariableMonitor readSpeed("bytes");
+
+  std::string progressTitle = "Loading and indexing...";
+  std::stringstream ssProgressBar;
 
   for( threadSharedData.currentEntryIndex = bounds.beginIndex ; threadSharedData.currentEntryIndex < bounds.endIndex ; threadSharedData.currentEntryIndex++ ){
 
     if( iThread_ == 0 ){
-      if( GenericToolbox::showProgressBar(threadSharedData.currentEntryIndex*nThreads, nEvents) ){
+      if( GenericToolbox::showProgressBar(threadSharedData.currentEntryIndex*nThreads, threadSharedData.nbEntries) ){
 
         ssProgressBar.str("");
 
@@ -1250,18 +1292,25 @@ void DataDispenser::readEntry(int iThread_){
                       << "% / RAM: " << GenericToolbox::parseSizeUnits( double(GenericToolbox::getProcessMemoryUsage()) ) << std::endl;
 
         ssProgressBar << LogInfo.getPrefixString() << progressTitle;
-        GenericToolbox::displayProgressBar(iEntry*nThreads, nEvents, ssProgressBar.str());
+        GenericToolbox::displayProgressBar(
+            threadSharedData.currentEntryIndex*nThreads,
+            threadSharedData.nbEntries,
+            ssProgressBar.str()
+        );
       }
     }
 
     bool hasSample =
         std::any_of(
-            _cache_.eventIsInSamplesList[iEntry].begin(), _cache_.eventIsInSamplesList[iEntry].end(),
+            _cache_.eventIsInSamplesList[threadSharedData.currentEntryIndex].begin(),
+            _cache_.eventIsInSamplesList[threadSharedData.currentEntryIndex].end(),
             [](bool isInSample_){ return isInSample_; }
         );
     if( not hasSample ){ continue; }
 
-    Int_t nBytes{ treeChain->GetEntry(iEntry) };
+    threadSharedData.requestReadNextEntry.waitUntilEqual( true );
+    Int_t nBytes{ threadSharedData.treeChain->GetEntry(threadSharedData.currentEntryIndex) };
+    threadSharedData.isNextEntryReady.setValue( true );
 
     // monitor
     if( iThread_ == 0 ){
@@ -1270,17 +1319,29 @@ void DataDispenser::readEntry(int iThread_){
 
   }
 
+  threadSharedData.isDoneReading.setValue( true ); // trigger the loop break
+  threadSharedData.isNextEntryReady.setValue( true ); // release
+
+
+
+
+  // wait for the event filler threads to stop
+
+
+  // printout last p-bar
+  if( iThread_ == 0 ){
+    GenericToolbox::displayProgressBar(
+        threadSharedData.nbEntries,
+        threadSharedData.nbEntries,
+        ssProgressBar.str()
+    );
+  }
 
 }
 void DataDispenser::loadEvent(int iThread_){
 
   // shared
   auto& threadSharedData = threadSharedDataList[iThread_];
-
-  // communication
-  GenericToolbox::Atomic<bool> requestReadNextEntry;
-  GenericToolbox::Atomic<bool> isNextEntryReady;
-  GenericToolbox::Atomic<bool> isDoneReading;
 
   // local
   Event eventIndexingBuffer;
@@ -1317,16 +1378,20 @@ void DataDispenser::loadEvent(int iThread_){
   }
 
 
+  // let's tell the TChain reader chain we're ready
+  threadSharedData.isEventFillerReady.setValue( true );
+  threadSharedData.requestReadNextEntry.setValue( true );
+
   while( true ){
 
     // wait for the TFile reader to send the signal
-    isNextEntryReady.waitUntilEqual( true );
+    threadSharedData.isNextEntryReady.waitUntilEqual( true );
 
-    // check if the reader has nothing else to do
-    if( isDoneReading.getValue() ){ break; }
+    // check if the reader has nothing else to do / end of the loop
+    if( threadSharedData.isDoneReading.getValue() ){ break; }
 
     // make sure we wait on the next event
-    isNextEntryReady.setValue( false );
+    threadSharedData.isNextEntryReady.setValue( false );
 
     if( threadSharedData.nominalWeightTreeFormula != nullptr ){
       eventIndexingBuffer.getWeights().base = (threadSharedData.nominalWeightTreeFormula->EvalInstance());
@@ -1392,7 +1457,7 @@ void DataDispenser::loadEvent(int iThread_){
       Event *eventPtr = &(*_cache_.sampleEventListPtrToFill[iSample])[sampleEventIndex];
 
       // fill meta info
-      eventPtr->getIndices().entry = ;
+      eventPtr->getIndices().entry = threadSharedData.currentEntryIndex;
       eventPtr->getIndices().sample = _cache_.samplesToFillList[iSample]->getIndex();
       eventPtr->getIndices().bin = eventIndexingBuffer.getIndices().bin;
       eventPtr->getWeights().base = eventIndexingBuffer.getWeights().base;
@@ -1400,7 +1465,9 @@ void DataDispenser::loadEvent(int iThread_){
 
       // drop the content of the leaves
       LoaderUtils::copyData(*eventPtr, threadSharedData.leafFormStorageList);
-      requestReadNextEntry.setValue(true);
+
+      // let the TChain reader load the next event while we index this event
+      threadSharedData.requestReadNextEntry.setValue(true);
 
 
 
