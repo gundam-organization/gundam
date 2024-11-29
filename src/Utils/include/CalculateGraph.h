@@ -63,7 +63,7 @@ namespace {
         CHECK_OFFSET(1);
 
         // handle positive extrapolation
-        if( 2 * (ix + 1) > dim ){ ix--; }
+        if( ix + 1 >= knotCount ){ ix--; }
 
         const double y1 = data[2 * ix];
         const double x1 = data[2 * ix + 1];
