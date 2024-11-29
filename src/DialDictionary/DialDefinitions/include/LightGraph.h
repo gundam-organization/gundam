@@ -29,13 +29,13 @@ public:
 
   virtual void buildDial(const TGraph& grf, const std::string& option_="") override;
 
-  const std::vector<double>& getDialData() const override {return _Data_;}
+  const std::vector<double>& getDialData() const override {return _data_;}
 
 protected:
   bool _allowExtrapolation_{false};
 
   // The data for the graph packed as {y0,x0,y1,x1,y2,x2,...}
-  std::vector<Double_t> _Data_;
+  std::vector<Double_t> _data_;
 };
 
 typedef CachedDial<LightGraph> LightGraphCache;
