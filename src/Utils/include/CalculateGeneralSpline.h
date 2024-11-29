@@ -128,9 +128,9 @@ namespace {
         int ix = 0;
 #define CHECK_OFFSET(ioff)  if ((ix+ioff < knotCount) && (x > data[2+3*(ix+ioff)+2])) ix += ioff
         // __builtin_clz(knotCount) counts the number of leading zeros in knotCount (available in GCC/Clang).
-        // sizeof(knotCount) - 1 - __builtin_clz(knotCount) calculates the position of the most significant bit.
+        // 31 - __builtin_clz(knotCount) calculates the position of the most significant bit.
         // 1 << (31 - __builtin_clz(knotCount)) generates the largest power of 2 ≤ knotCount
-        for( int offset = 1 << ( sizeof(knotCount) - 1 - __builtin_clz(knotCount) ) ; offset > 0 ; offset >>= 1 ){
+        for( int offset = 1 << ( 31 - __builtin_clz(knotCount) ) ; offset > 0 ; offset >>= 1 ){
           CHECK_OFFSET(offset);
         }
 #undef CHECK_OFFSET
