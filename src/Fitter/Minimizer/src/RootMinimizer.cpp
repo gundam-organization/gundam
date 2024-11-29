@@ -285,7 +285,7 @@ void RootMinimizer::minimize(){
     samplesArrList[iSample].writeRawData( getLikelihoodInterface().evalStatLikelihood( samplePair ) );
 
     int nBins = samplePair.model->getHistogram().getNbBins();
-    for( int iBin = 1 ; iBin <= nBins ; iBin++ ){
+    for( int iBin = 0 ; iBin < nBins ; iBin++ ){
       leavesDict.emplace_back("llhSample_bin" + std::to_string(iBin) + "/D");
       samplesArrList[iSample].writeRawData( getLikelihoodInterface().getJointProbabilityPtr()->eval(samplePair, iBin) );
     }

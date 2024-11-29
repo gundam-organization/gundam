@@ -104,6 +104,14 @@ namespace JointProbability{
                    << std::endl;
           LogError << "nomMC bin " << bin_
                    << " error is " << nomHistErr[bin_];
+
+          DEBUG_VAR(bin_);
+          DEBUG_VAR(mcuncert);
+          DEBUG_VAR(nomHistErr[bin_]);
+          DEBUG_VAR(nomHistErr.size());
+          DEBUG_VAR(nomHistErr.size());
+          DEBUG_VAR(GenericToolbox::toString(nomHistErr));
+
           LogThrow("The mc uncertainty is not a usable number");
         }
         else{
