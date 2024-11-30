@@ -20,6 +20,16 @@ namespace LoaderUtils{
       event_.getVariables().getVarList()[iVar].set(GenericToolbox::leafToAnyType( leafFormList_[iVar]->getLeafTypeName() ));
     }
   }
+  void copyData(const Event& src_, Event& dst_){
+    dst_.getIndices() = src_.getIndices();
+    dst_.getWeights() = src_.getWeights();
+
+    // variables
+    LogThrowIf( dst_.getVariables().getNameListPtr() == nullptr, "var name list not set." );
+    for( size_t iVar = 0 ; iVar < dst_.getVariables().getNameListPtr()->size() ; iVar++ ){
+      dst_.getVariables().getVarList()[iVar].get() = src_.getVariables().fetchVariable((*dst_.getVariables().getNameListPtr())[iVar]).get();
+    }
+  }
   void copyData(Event& event_, const std::vector<const GenericToolbox::LeafForm*>& leafFormList_){
     size_t nLeaf{leafFormList_.size()};
     for( size_t iLeaf = 0 ; iLeaf < nLeaf ; iLeaf++ ){
