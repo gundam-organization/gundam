@@ -1384,6 +1384,91 @@ void DataDispenser::loadEvent(int iThread_){
     }
   }
 
+  if(iThread_ == 0){
+    LogInfo << "Feeding event variables with:" << std::endl;
+    GenericToolbox::TablePrinter table;
+
+    table << "Variable" ;
+    table << GenericToolbox::TablePrinter::NextColumn << "LeafForm";
+    if(not varTransformForIndexingList.empty()){
+      table << GenericToolbox::TablePrinter::NextColumn << "Transforms";
+    }
+    table << GenericToolbox::TablePrinter::NextLine;
+
+    struct VarDisplay{
+      std::string varName{};
+
+      std::string leafName{};
+      std::string leafTypeName{};
+
+      std::string transformStr{};
+
+      std::string lineColor{};
+
+      int priorityIndex{-1};
+    };
+    std::vector<VarDisplay> varDisplayList{};
+
+    varDisplayList.reserve( _cache_.varsRequestedForIndexing.size() );
+    for( size_t iVar = 0 ; iVar < _cache_.varsRequestedForIndexing.size() ; iVar++ ){
+      varDisplayList.emplace_back();
+
+      varDisplayList.back().varName = _cache_.varsRequestedForIndexing[iVar];
+
+      varDisplayList.back().leafName = threadSharedData.leafFormIndexingList[iVar]->getPrimaryExprStr();
+      varDisplayList.back().leafTypeName = threadSharedData.leafFormIndexingList[iVar]->getLeafTypeName();
+
+      std::vector<std::string> transformsList;
+      for( auto* varTransformForIndexing : varTransformForIndexingList ){
+        if( varTransformForIndexing->getOutputVariableName() == _cache_.varsRequestedForIndexing[iVar] ){
+          transformsList.emplace_back(varTransformForIndexing->getName());
+        }
+      }
+      varDisplayList.back().transformStr = GenericToolbox::toString(transformsList);
+      varDisplayList.back().priorityIndex = threadSharedData.leafFormIndexingList[iVar]->isPointerLeaf() ? 999 : int( threadSharedData.leafFormIndexingList[iVar]->getDataSize() );
+
+      // line color?
+      if( GenericToolbox::doesElementIsInVector(_cache_.varsRequestedForIndexing[iVar], _cache_.varsRequestedForStorage)){
+        varDisplayList.back().lineColor = GenericToolbox::ColorCodes::blueBackground;
+      }
+      else if(
+          threadSharedData.leafFormIndexingList[iVar]->getLeafTypeName() == "TClonesArray"
+          or threadSharedData.leafFormIndexingList[iVar]->getLeafTypeName() == "TGraph"
+          ){
+        varDisplayList.back().lineColor =  GenericToolbox::ColorCodes::magentaBackground;
+      }
+    }
+
+    GenericToolbox::sortVector( varDisplayList, [](const VarDisplay& a_, const VarDisplay& b_){
+      if( a_.priorityIndex < b_.priorityIndex ){ return true; }
+      if( a_.priorityIndex > b_.priorityIndex ){ return false; }
+      if( a_.leafTypeName.size() < b_.leafTypeName.size() ){ return true; }
+      if( a_.leafTypeName.size() > b_.leafTypeName.size() ){ return false; }
+      if( a_.varName < b_.varName ){ return true; }
+      return false;
+    } );
+
+    for( auto& varDisplay : varDisplayList ){
+      if( not varDisplay.lineColor.empty() ){ table.setColorBuffer( varDisplay.lineColor ); }
+      table << varDisplay.varName << GenericToolbox::TablePrinter::NextColumn;
+      table << varDisplay.leafName << "/" << varDisplay.leafTypeName << GenericToolbox::TablePrinter::NextColumn;
+
+      if(not varTransformForIndexingList.empty()){
+        table << varDisplay.transformStr << GenericToolbox::TablePrinter::NextColumn;
+      }
+    }
+
+    table.printTable();
+
+    // printing legend
+    LogInfo << LOGGER_STR_COLOR_BLUE_BG    << "      " << LOGGER_STR_COLOR_RESET << " -> Variables stored in RAM" << std::endl;
+    LogInfo << LOGGER_STR_COLOR_MAGENTA_BG << "      " << LOGGER_STR_COLOR_RESET << " -> Dials stored in RAM" << std::endl;
+
+    if( _owner_->isDevSingleThreadEventLoaderAndIndexer() ){
+      LogAlert << "Loading data in single thread (devSingleThreadEventLoaderAndIndexer option set to true)" << std::endl;
+    }
+  }
+
   // let's tell the TChain reader chain we're ready
   threadSharedData.isEventFillerReady.setValue( true );
   threadSharedData.requestReadNextEntry.setValue( true );
