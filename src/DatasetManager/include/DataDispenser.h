@@ -64,7 +64,6 @@ protected:
 
   // multi-thread
   void eventSelectionFunction(int iThread_);
-  void fillFunction(int iThread_);
 
   void runEventFillThreads(int iThread_);
   void loadEvent(int iThread_);
