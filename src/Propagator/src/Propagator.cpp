@@ -237,7 +237,7 @@ void Propagator::printBreakdowns() const {
 
   if( _debugPrintLoadedEvents_ ){
     LogDebug << "Printing " << _debugPrintLoadedEventsNbPerSample_ << " events..." << std::endl;
-    for( int iEvt = 0 ; iEvt < _debugPrintLoadedEventsNbPerSample_ ; iEvt++ ){
+    for( int iEvt = 0 ; iEvt < std::min(_debugPrintLoadedEventsNbPerSample_, int(_eventDialCache_.getCache().size())) ; iEvt++ ){
       LogDebug << "Event #" << iEvt << "{" << std::endl;
       {
         LogScopeIndent;
