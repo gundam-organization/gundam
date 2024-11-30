@@ -860,6 +860,19 @@ void DataDispenser::runEventFillThreads(int iThread_){
 
   for( threadSharedData.currentEntryIndex = bounds.beginIndex ; threadSharedData.currentEntryIndex < bounds.endIndex ; threadSharedData.currentEntryIndex++ ){
 
+    bool hasSample = _cache_.eventIsInSamplesList[threadSharedData.currentEntryIndex] != -1;
+    if( not hasSample ){ continue; }
+
+    threadSharedData.requestReadNextEntry.setValue( false );
+    Int_t nBytes{ threadSharedData.treeChain->GetEntry(threadSharedData.currentEntryIndex) };
+
+
+
+    // monitor
+    if( iThread_ == 0 ){
+      readSpeed.addQuantity(nBytes * nThreads);
+    }
+
     if( iThread_ == 0 ){
       if( GenericToolbox::showProgressBar(threadSharedData.currentEntryIndex*nThreads, threadSharedData.nbEntries) ){
 
@@ -882,22 +895,11 @@ void DataDispenser::runEventFillThreads(int iThread_){
       }
     }
 
-    bool hasSample = _cache_.eventIsInSamplesList[threadSharedData.currentEntryIndex] != -1;
-    if( not hasSample ){ continue; }
-
-    threadSharedData.requestReadNextEntry.setValue( false );
-    Int_t nBytes{ threadSharedData.treeChain->GetEntry(threadSharedData.currentEntryIndex) };
-
     // send the signal then wait for the other thread to toggle back
     threadSharedData.isNextEntryReady.toggleThenWaitUntilEqual( false );
 
     // wait here before updating anything
-    threadSharedData.requestReadNextEntry.waitUntilEqualThenToggle(true);
-
-    // monitor
-    if( iThread_ == 0 ){
-      readSpeed.addQuantity(nBytes * nThreads);
-    }
+    threadSharedData.requestReadNextEntry.waitUntilEqualThenToggle( true );
 
   }
 
