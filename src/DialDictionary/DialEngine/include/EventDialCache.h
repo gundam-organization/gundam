@@ -75,11 +75,13 @@ public:
       std::stringstream ss;
       if( event == nullptr ){ return {"No event attached to this cache entry."}; }
       ss << *event << std::endl;
-      ss << "Dials{";
-      for( auto& dialResponseCache : dialResponseCacheList ){
-        ss << std::endl << "  { " << dialResponseCache.dialInterface->getSummary() << " }";
+      if( not dialResponseCacheList.empty() ){
+        ss << "Dials{";
+        for( auto& dialResponseCache : dialResponseCacheList ){
+          ss << std::endl << "  { " << dialResponseCache.dialInterface->getSummary() << " }";
+        }
+        ss << std::endl << "}";
       }
-      ss << std::endl << "}";
       return ss.str();
     }
   };

@@ -690,7 +690,7 @@ void DataDispenser::eventSelectionFunction(int iThread_){
     tCuts << selectionCut << GenericToolbox::TablePrinter::NextColumn;
   }
 
-  tCuts.printTable();
+  if(iThread_ == 0){ tCuts.printTable(); }
   lCollection.initialize();
 
   GenericToolbox::VariableMonitor readSpeed("bytes");
