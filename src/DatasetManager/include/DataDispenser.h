@@ -60,22 +60,20 @@ protected:
   void loadFromHistContent();
 
   // utils
-  std::unique_ptr<TChain> openChain(bool verbose_ = false);
+  std::shared_ptr<TChain> openChain(bool verbose_ = false);
 
   // multi-thread
   void eventSelectionFunction(int iThread_);
   void fillFunction(int iThread_);
 
-  void loadAndIndex();
   void runEventFillThreads(int iThread_);
-  void readEntry(int iThread_);
   void loadEvent(int iThread_);
 
   struct ThreadSharedData{
     Long64_t currentEntryIndex{0};
     Long64_t nbEntries{0};
 
-    std::unique_ptr<TChain> treeChain{nullptr};
+    std::shared_ptr<TChain> treeChain{nullptr};
 
     std::vector<const GenericToolbox::LeafForm*> leafFormIndexingList{};
     std::vector<const GenericToolbox::LeafForm*> leafFormStorageList{};
