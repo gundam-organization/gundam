@@ -1296,13 +1296,6 @@ void DataDispenser::loadEvent(int iThread_){
 
     } // dial collection loop
 
-    GenericToolbox::sortVector(
-        eventDialCacheEntry->dials,
-        [](const EventDialCache::DialIndexCacheEntry& dial1_, const EventDialCache::DialIndexCacheEntry& dial2_){
-          // does dial1_ goes before dial2_?
-          return dial1_.collectionIndex < dial2_.collectionIndex;
-        });
-
   } // while ok
 
 }
