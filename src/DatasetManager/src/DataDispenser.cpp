@@ -1711,12 +1711,12 @@ void DataDispenser::loadEvent(int iThread_){
       } // dial collection loop
 
       // TODO: sort eventDialCacheEntry->dials by collection index
-//      GenericToolbox::sortVector(
-//          eventDialCacheEntry->dials,
-//          [](const EventDialCache::DialIndexCacheEntry& dial1_, const EventDialCache::DialIndexCacheEntry& dial2_){
-//        // does dial1_ goes before dial2_?
-//        return dial1_.collectionIndex < dial2_.collectionIndex;
-//      });
+      GenericToolbox::sortVector(
+          eventDialCacheEntry->dials,
+          [](const EventDialCache::DialIndexCacheEntry& dial1_, const EventDialCache::DialIndexCacheEntry& dial2_){
+        // does dial1_ goes before dial2_?
+        return dial1_.collectionIndex < dial2_.collectionIndex;
+      });
 
       break;
 
