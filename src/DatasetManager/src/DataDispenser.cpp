@@ -1090,6 +1090,7 @@ void DataDispenser::loadEvent(int iThread_){
 
     // getting loaded variables in tEventBuffer
     LoaderUtils::copyData(eventIndexingBuffer, threadSharedData.leafFormIndexingList);
+    eventIndexingBuffer.getIndices().entry = threadSharedData.currentEntryIndex;
 
     // getting loaded event-by-event dials
     int dialCloneArrayIndex{0};
@@ -1100,14 +1101,10 @@ void DataDispenser::loadEvent(int iThread_){
     // only load event-by-event dials, binned dials etc. will be processed later
     for( auto *dialCollectionRef: _cache_.dialCollectionsRefList ){
 
-      // by default, label as "not event by event"
-      eventByEventDialBuffer[dialCollectionRef->getIndex()] = reinterpret_cast<DialBase *>(0x1);
+      eventByEventDialBuffer[dialCollectionRef->getIndex()] = nullptr;
 
       // if not event-by-event dial -> leave
       if( dialCollectionRef->getGlobalDialLeafName().empty() ){ continue; }
-
-      // nullptr will say that it is "event by event", but not used. No need to reprocess the apply condition formula
-      eventByEventDialBuffer[dialCollectionRef->getIndex()] = nullptr;
 
       // dial collections may come with a condition formula
       if( dialCollectionRef->getApplyConditionFormula() != nullptr ){
@@ -1158,7 +1155,7 @@ void DataDispenser::loadEvent(int iThread_){
       varTransformPtr->evalAndStore(eventIndexingBuffer);
     }
 
-    int iSample = _cache_.eventIsInSamplesList[threadSharedData.currentEntryIndex];
+    int iSample = _cache_.eventIsInSamplesList[eventIndexingBuffer.getIndices().entry];
 
     // Look for the bin index
     LoaderUtils::fillBinIndex(eventIndexingBuffer, _cache_.samplesToFillList[iSample]->getHistogram().getBinContextList());
@@ -1203,8 +1200,6 @@ void DataDispenser::loadEvent(int iThread_){
     // event-by-event dials are store within ROOT internal buffers... :)
     // let's copy them before we load the next entry
 
-    auto *dialEntryPtr = &eventDialCacheEntry->dials[0];
-
     // Propagate transformation for storage -> use the previous results calculated for indexing
     for( auto *varTransformPtr: varTransformForStorageList ){
       varTransformPtr->storeCachedOutput(*eventPtr);
@@ -1216,6 +1211,7 @@ void DataDispenser::loadEvent(int iThread_){
     eventDialCacheEntry->event.sampleIndex = std::size_t(_cache_.samplesToFillList[iSample]->getIndex());
     eventDialCacheEntry->event.eventIndex = sampleEventIndex;
 
+    auto *dialEntryPtr = &eventDialCacheEntry->dials[0];
     for( auto *dialCollectionRef: _cache_.dialCollectionsRefList ){
 
       // leave if event-by-event -> already loaded
@@ -1233,7 +1229,7 @@ void DataDispenser::loadEvent(int iThread_){
           dialEntryPtr++;
         }
 
-        continue;
+        continue; // skip the rest
       }
 
       // dial collections may come with a condition formula
