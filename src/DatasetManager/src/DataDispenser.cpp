@@ -15,6 +15,8 @@
 #include "DialBaseFactory.h"
 #include "TabulatedDialFactory.h"
 
+#include "GundamUtils.h"
+
 #include "GenericToolbox.Utils.h"
 #include "GenericToolbox.Root.h"
 #include "GenericToolbox.Map.h"
@@ -1310,9 +1312,14 @@ void DataDispenser::runEventFillThreads(int iThread_){
         );
     if( not hasSample ){ continue; }
 
-    threadSharedData.requestReadNextEntry.waitUntilEqual( true );
+    threadSharedData.requestReadNextEntry.setValue( false );
     Int_t nBytes{ threadSharedData.treeChain->GetEntry(threadSharedData.currentEntryIndex) };
-    threadSharedData.isNextEntryReady.setValue( true );
+
+    // send the signal then wait for the other thread to toggle back
+    threadSharedData.isNextEntryReady.toggleThenWaitUntilEqual( false );
+
+    // wait here before updating anything
+    threadSharedData.requestReadNextEntry.waitUntilEqualThenToggle(true);
 
     // monitor
     if( iThread_ == 0 ){
@@ -1346,6 +1353,7 @@ void DataDispenser::loadEvent(int iThread_){
   Event eventIndexingBuffer;
   eventIndexingBuffer.getIndices().dataset = _owner_->getDataSetIndex();
   eventIndexingBuffer.getVariables().setVarNameList(std::make_shared<std::vector<std::string>>(_cache_.varsRequestedForIndexing));
+  LoaderUtils::allocateMemory(eventIndexingBuffer, threadSharedData.leafFormIndexingList);
 
   auto eventVarTransformList = _parameters_.eventVarTransformList; // copy for cache
   std::vector<EventVarTransformLib*> varTransformForIndexingList;
@@ -1376,7 +1384,6 @@ void DataDispenser::loadEvent(int iThread_){
     }
   }
 
-
   // let's tell the TChain reader chain we're ready
   threadSharedData.isEventFillerReady.setValue( true );
   threadSharedData.requestReadNextEntry.setValue( true );
@@ -1384,13 +1391,11 @@ void DataDispenser::loadEvent(int iThread_){
   while( true ){
 
     // wait for the TFile reader to send the signal
-    threadSharedData.isNextEntryReady.waitUntilEqual( true );
+    threadSharedData.isNextEntryReady.waitUntilEqualThenToggle( true );
 
     // check if the reader has nothing else to do / end of the loop
     if( threadSharedData.isDoneReading.getValue() ){ break; }
 
-    // make sure we wait on the next event
-    threadSharedData.isNextEntryReady.setValue( false );
 
     if( threadSharedData.nominalWeightTreeFormula != nullptr ){
       eventIndexingBuffer.getWeights().base = (threadSharedData.nominalWeightTreeFormula->EvalInstance());
@@ -1408,6 +1413,7 @@ void DataDispenser::loadEvent(int iThread_){
         LogThrow("Negative nominal weight");
       }
       if( eventIndexingBuffer.getWeights().base == 0 ){
+        threadSharedData.requestReadNextEntry.setValue( true );
         continue;
       } // skip this event
     }
@@ -1417,10 +1423,10 @@ void DataDispenser::loadEvent(int iThread_){
 
     // Propagate variable transformations for indexing
     for( auto* varTransformPtr : varTransformForIndexingList ){
-      LogDebug << "varTransformPtr = " << varTransformPtr << std::endl;
       varTransformPtr->evalAndStore(eventIndexingBuffer);
     }
 
+    // TODO: better handling of multi sample event
     size_t nSample{_cache_.samplesToFillList.size()};
     for( size_t iSample = 0 ; iSample < nSample ; iSample++ ){
 
@@ -1430,7 +1436,10 @@ void DataDispenser::loadEvent(int iThread_){
       LoaderUtils::fillBinIndex(eventIndexingBuffer, _cache_.samplesToFillList[iSample]->getHistogram().getBinContextList());
 
       // No bin found -> next sample
-      if( eventIndexingBuffer.getIndices().bin == -1 ){ break; }
+      if( eventIndexingBuffer.getIndices().bin == -1 ){
+        threadSharedData.requestReadNextEntry.setValue( true );
+        break;
+      }
 
 
       // from this point, we are sure we are going to keep this event for the analysis.
@@ -1623,6 +1632,8 @@ void DataDispenser::loadEvent(int iThread_){
 //        // does dial1_ goes before dial2_?
 //        return dial1_.collectionIndex < dial2_.collectionIndex;
 //      });
+
+      break;
 
     } // sample
 
