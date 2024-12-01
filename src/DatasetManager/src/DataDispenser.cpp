@@ -783,7 +783,6 @@ void DataDispenser::runEventFillThreads(int iThread_){
 
   // open the TChain now
   threadSharedData.treeChain = this->openChain();
-
   threadSharedData.nbEntries = threadSharedData.treeChain->GetEntries();
 
   // provide the buffer
@@ -844,20 +843,23 @@ void DataDispenser::runEventFillThreads(int iThread_){
       std::async( std::launch::async, [this, iThread_]{ this->loadEvent( iThread_ ); } )
   );
 
-  // make sure we're ready to start the loop
-  threadSharedData.isEventFillerReady.waitUntilEqual( true );
+
+  // first entry will be read without any constraint
+  threadSharedData.requestReadNextEntry.setValue( true );
 
   // start TChain reader
   auto bounds = GenericToolbox::ParallelWorker::getThreadBoundIndices( iThread_, nThreads, threadSharedData.nbEntries );
 
-  // Load the first TTree
-  threadSharedData.treeChain->LoadTree(bounds.beginIndex);
-
   // IO speed monitor
   GenericToolbox::VariableMonitor readSpeed("bytes");
-
   std::string progressTitle = "Loading and indexing...";
   std::stringstream ssProgressBar;
+
+  // make sure we're ready to start the loop
+  threadSharedData.isEventFillerReady.waitUntilEqual( true );
+
+  // Load the first TTree / need to wait for the event filler to finish hooking branches
+  threadSharedData.treeChain->LoadTree(bounds.beginIndex);
 
   for( threadSharedData.currentEntryIndex = bounds.beginIndex ; threadSharedData.currentEntryIndex < bounds.endIndex ; threadSharedData.currentEntryIndex++ ){
 
@@ -1037,9 +1039,6 @@ void DataDispenser::loadEvent(int iThread_){
   // buffers
   int iSample{-1};
   size_t sampleEventIndex{};
-
-  // ask for a first entry read
-  threadSharedData.requestReadNextEntry.setValue( true );
 
   // make sure isEventFillerReady flag is true in this scope
   GenericToolbox::ScopedGuard g{
