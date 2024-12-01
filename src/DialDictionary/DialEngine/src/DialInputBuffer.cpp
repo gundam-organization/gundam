@@ -68,6 +68,7 @@ void DialInputBuffer::update(){
       // re-apply the offset
       tempBuffer += inputRef.mirrorEdges.minValue;
     }
+#ifdef DEBUG_BUILD
     if( std::isnan(tempBuffer) ){
         // LogThrowIf is broken, but OK for real error traps, but this is
         // checking user input it's critical that the error message is
@@ -78,6 +79,7 @@ void DialInputBuffer::update(){
         LogError << GundamUtils::Backtrace << std::endl;
         std::exit(EXIT_FAILURE);
     }
+#endif
 
     // has it been updated?
     if( _inputBuffer_[inputRef.bufferIndex] != tempBuffer ){
