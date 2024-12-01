@@ -867,11 +867,7 @@ void DataDispenser::runEventFillThreads(int iThread_){
 
     threadSharedData.requestReadNextEntry.setValue( false );
     Int_t nBytes{ threadSharedData.treeChain->GetEntry(threadSharedData.currentEntryIndex) };
-
-    // monitor
-    if( iThread_ == 0 ){
-      readSpeed.addQuantity(nBytes * nThreads);
-    }
+    readSpeed.addQuantity(nBytes * nThreads);
 
     if( iThread_ == 0 ){
       if( GenericToolbox::showProgressBar(threadSharedData.currentEntryIndex*nThreads, threadSharedData.nbEntries) ){
@@ -935,37 +931,25 @@ void DataDispenser::loadEvent(int iThread_){
 
   auto eventVarTransformList = _parameters_.eventVarTransformList; // copy for cache
   std::vector<EventVarTransformLib*> varTransformForIndexingList;
-  std::vector<EventVarTransformLib*> varTransformForStorageList;
   for( auto& eventVarTransform : eventVarTransformList ){
     if( GenericToolbox::doesElementIsInVector(eventVarTransform.getOutputVariableName(), _cache_.varsRequestedForIndexing) ){
       varTransformForIndexingList.emplace_back(&eventVarTransform);
-    }
-    if( GenericToolbox::doesElementIsInVector(eventVarTransform.getOutputVariableName(), _cache_.varsRequestedForStorage) ){
-      varTransformForStorageList.emplace_back(&eventVarTransform);
     }
   }
 
   std::vector<DialBase*> eventByEventDialBuffer{};
   eventByEventDialBuffer.resize(_cache_.dialCollectionsRefList.size(), nullptr);
 
-  if( iThread_ == 0 ){
+  if(iThread_ == 0){
+
     if( not varTransformForIndexingList.empty() ){
-      LogInfo << "EventVarTransformLib used for indexing: "
+      LogInfo << "EventVarTransformLib used: "
               << GenericToolbox::toString(
                   varTransformForIndexingList,
                   [](const EventVarTransformLib* elm_){ return "\"" + elm_->getName() + "\"";}, false)
               << std::endl;
     }
-    if( not varTransformForStorageList.empty() ){
-      LogInfo << "EventVarTransformLib used for storage: "
-              << GenericToolbox::toString(
-                  varTransformForStorageList,
-                  []( const EventVarTransformLib* elm_){ return "\"" + elm_->getName() + "\""; }, false)
-              << std::endl;
-    }
-  }
 
-  if(iThread_ == 0){
     LogInfo << "Feeding event variables with:" << std::endl;
     GenericToolbox::TablePrinter table;
 
@@ -1050,19 +1034,38 @@ void DataDispenser::loadEvent(int iThread_){
     }
   }
 
-  // let's tell the TChain reader chain we're ready
-  threadSharedData.isEventFillerReady.setValue( true );
+
+  // buffers
+  int iSample{-1};
+  size_t sampleEventIndex{};
+
+  // ask for a first entry read
   threadSharedData.requestReadNextEntry.setValue( true );
+
+  // make sure isEventFillerReady flag is true in this scope
+  GenericToolbox::ScopedGuard g{
+      [&]{ threadSharedData.isEventFillerReady.setValue( true ); },
+      [&]{ threadSharedData.isEventFillerReady.setValue( false ); }
+  };
 
   while( true ){
 
-    // wait for the TFile reader to send the signal
-    threadSharedData.isNextEntryReady.waitUntilEqualThenToggle( true );
+    // make sure we request a new entry and wait once we go for another loop
+    GenericToolbox::ScopedGuard readerGuard{
+        [&]{ threadSharedData.isNextEntryReady.waitUntilEqualThenToggle( true ); },
+        [&]{ threadSharedData.requestReadNextEntry.setValue( true ); }
+    };
 
     // ***** from this point, the TChain reader is waiting *****
 
     // check if the reader has nothing else to do / end of the loop
     if( threadSharedData.isDoneReading.getValue() ){ break; }
+
+    // leafFormIndexingList is modified by the TChain reader
+    LoaderUtils::copyData(eventIndexingBuffer, threadSharedData.leafFormIndexingList);
+
+    // Propagate variable transformations for indexing
+    LoaderUtils::applyVarTransforms(eventIndexingBuffer, varTransformForIndexingList);
 
     // nominalWeightTreeFormula is attached to the TChain
     if( threadSharedData.nominalWeightTreeFormula != nullptr ){
@@ -1080,17 +1083,22 @@ void DataDispenser::loadEvent(int iThread_){
 
         LogThrow("Negative nominal weight");
       }
-      if( eventIndexingBuffer.getWeights().base == 0 ){
-        threadSharedData.requestReadNextEntry.setValue( true );
-        continue;
-      } // skip this event
-    }
 
-    // leafFormIndexingList is modified by the TChain reader
-    LoaderUtils::copyData(eventIndexingBuffer, threadSharedData.leafFormIndexingList);
+      // skip this event
+      if( eventIndexingBuffer.getWeights().base == 0 ){ continue; }
+    }
 
     // currentEntryIndex is modified by the TChain reader
     eventIndexingBuffer.getIndices().entry = threadSharedData.currentEntryIndex;
+
+    // get sample index / all -1 samples have been ruled out by the chain reader
+    iSample = _cache_.entrySampleIndexList[eventIndexingBuffer.getIndices().entry];
+
+    // look for the bin index
+    LoaderUtils::fillBinIndex(eventIndexingBuffer, _cache_.samplesToFillList[iSample]->getHistogram().getBinContextList());
+
+    // No bin found -> next sample
+    if( eventIndexingBuffer.getIndices().bin == -1 ){ continue; }
 
     // dialIndexTreeFormula is modified by the TChain reader
     int dialCloneArrayIndex{0};
@@ -1146,29 +1154,9 @@ void DataDispenser::loadEvent(int iThread_){
 
     }
 
-    threadSharedData.requestReadNextEntry.setValue( true );
     // ***** from this point, the TChain reader is released *****
 
-
-    // Propagate variable transformations for indexing
-    for( auto* varTransformPtr : varTransformForIndexingList ){
-      varTransformPtr->evalAndStore(eventIndexingBuffer);
-    }
-
-    int iSample = _cache_.entrySampleIndexList[eventIndexingBuffer.getIndices().entry];
-
-    // Look for the bin index
-    LoaderUtils::fillBinIndex(eventIndexingBuffer, _cache_.samplesToFillList[iSample]->getHistogram().getBinContextList());
-
-    // No bin found -> next sample
-    if( eventIndexingBuffer.getIndices().bin == -1 ){ continue; }
-
-    // from this point, we are sure we are going to keep this event for the analysis.
-    // let's copy everything we need before letting the TChain reader get the next entry
-
-    // OK, now we have a valid fit bin. Let's claim an index.
-    // Shared index among threads
-    size_t sampleEventIndex{};
+    // Let's claim an index. Indices are shared among threads
     EventDialCache::IndexedCacheEntry *eventDialCacheEntry{nullptr};
     {
       std::unique_lock<std::mutex> lock(GundamGlobals::getMutex());
@@ -1179,9 +1167,6 @@ void DataDispenser::loadEvent(int iThread_){
           LogAlertIf(iThread_ == 0) << std::endl << std::endl; // flush pBar
           LogAlertIf(iThread_ == 0) << "debugNbMaxEventsToLoad: Event number cap reached (";
           LogAlertIf(iThread_ == 0) << _parameters_.debugNbMaxEventsToLoad << ")" << std::endl;
-
-          // tell the chain reader:
-          threadSharedData.isEventFillerReady.setValue(false);
           return;
         }
       }
@@ -1198,14 +1183,6 @@ void DataDispenser::loadEvent(int iThread_){
 
     // copy from the event indexing buffer
     LoaderUtils::copyData(eventIndexingBuffer, *eventPtr);
-
-    // event-by-event dials are store within ROOT internal buffers... :)
-    // let's copy them before we load the next entry
-
-    // Propagate transformation for storage -> use the previous results calculated for indexing
-    for( auto *varTransformPtr: varTransformForStorageList ){
-      varTransformPtr->storeCachedOutput(*eventPtr);
-    }
 
     // Now the event is ready. Let's index the dials:
     // there should always be a cache entry even if no dials are applied.
@@ -1295,8 +1272,6 @@ void DataDispenser::loadEvent(int iThread_){
     } // dial collection loop
 
   } // while ok
-
-  threadSharedData.isEventFillerReady.setValue( false );
 
 }
 

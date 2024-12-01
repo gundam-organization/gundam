@@ -57,6 +57,11 @@ namespace LoaderUtils{
 
     return formulaPtr_->EvalPar(nullptr, &parArray[0]);
   }
+  void applyVarTransforms(Event& event_, const std::vector<EventVarTransformLib*>& transformList_){
+    for( auto* varTransformPtr : transformList_ ){
+      varTransformPtr->evalAndStore(event_);
+    }
+  }
 
 }
 
