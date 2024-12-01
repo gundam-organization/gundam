@@ -74,9 +74,9 @@ public:
     [[nodiscard]] std::string getSummary() const {
       std::stringstream ss;
       if( event == nullptr ){ return {"No event attached to this cache entry."}; }
-      ss << *event << std::endl;
+      ss << *event;
       if( not dialResponseCacheList.empty() ){
-        ss << "Dials{";
+        ss << std::endl << "Dials{";
         for( auto& dialResponseCache : dialResponseCacheList ){
           ss << std::endl << "  { " << dialResponseCache.dialInterface->getSummary() << " }";
         }
