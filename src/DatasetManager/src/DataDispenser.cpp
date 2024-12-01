@@ -242,7 +242,7 @@ void DataDispenser::doEventSelection(){
   _cache_.threadSelectionResults.resize(nThreads);
   for( auto& threadResults : _cache_.threadSelectionResults ){
     threadResults.sampleNbOfEvents.resize(_cache_.samplesToFillList.size(), 0);
-    threadResults.eventIsInSamplesList.resize(nEntries);
+    threadResults.entrySampleIndexList.resize(nEntries, -1);
   }
 
   if( not _owner_->isDevSingleThreadEventSelection() ) {
@@ -256,7 +256,7 @@ void DataDispenser::doEventSelection(){
 
   LogInfo << "Merging thread results..." << std::endl;
   _cache_.sampleNbOfEvents.resize(_cache_.samplesToFillList.size(), 0);
-  _cache_.eventIsInSamplesList.resize(nEntries);
+  _cache_.entrySampleIndexList.resize(nEntries, -1);
   for( auto& threadResults : _cache_.threadSelectionResults ){
     // merging nEvents
 
@@ -264,9 +264,9 @@ void DataDispenser::doEventSelection(){
       _cache_.sampleNbOfEvents[iSample] += threadResults.sampleNbOfEvents[iSample];
     }
 
-    for( size_t iEntry = 0 ; iEntry < int(_cache_.eventIsInSamplesList.size()) ; iEntry++ ){
-      if( threadResults.eventIsInSamplesList[iEntry] != -1 ){
-        _cache_.eventIsInSamplesList[iEntry] = threadResults.eventIsInSamplesList[iEntry];
+    for( size_t iEntry = 0 ; iEntry < int(_cache_.entrySampleIndexList.size()) ; iEntry++ ){
+      if( threadResults.entrySampleIndexList[iEntry] != -1 ){
+        _cache_.entrySampleIndexList[iEntry] = threadResults.entrySampleIndexList[iEntry];
       }
     }
 
@@ -709,6 +709,8 @@ void DataDispenser::eventSelectionFunction(int iThread_){
   std::stringstream ssProgressTitle;
   TFile *lastFilePtr{nullptr};
 
+  auto& threadSelectionResults = _cache_.threadSelectionResults[iThread_];
+
   for ( Long64_t iEntry = bounds.beginIndex ; iEntry < bounds.endIndex ; iEntry++ ) {
     if( iThread_ == 0 ){
       readSpeed.addQuantity(treeChain->GetEntry(iEntry)*nThreads);
@@ -735,7 +737,7 @@ void DataDispenser::eventSelectionFunction(int iThread_){
     if ( selectionCutLeafFormIndex != -1 ){
       if( lCollection.getLeafFormList()[selectionCutLeafFormIndex].evalAsDouble() == 0 ){
         for (size_t iSample = 0; iSample < _cache_.samplesToFillList.size(); iSample++) {
-          _cache_.threadSelectionResults[iThread_].eventIsInSamplesList[iEntry] = -1;
+          threadSelectionResults.entrySampleIndexList[iEntry] = -1;
         }
         continue;
       }
@@ -753,8 +755,8 @@ void DataDispenser::eventSelectionFunction(int iThread_){
           LogThrow("Multi-sample event isn't handled yet by GUNDAM.");
         }
         sampleHasBeenFound = true;
-        _cache_.threadSelectionResults[iThread_].eventIsInSamplesList[iEntry] = sampleCut.sampleIndex;
-        _cache_.threadSelectionResults[iThread_].sampleNbOfEvents[sampleCut.sampleIndex]++;
+        threadSelectionResults.entrySampleIndexList[iEntry] = sampleCut.sampleIndex;
+        threadSelectionResults.sampleNbOfEvents[sampleCut.sampleIndex]++;
       }
       else{
         // don't pass cut?
@@ -860,13 +862,11 @@ void DataDispenser::runEventFillThreads(int iThread_){
 
   for( threadSharedData.currentEntryIndex = bounds.beginIndex ; threadSharedData.currentEntryIndex < bounds.endIndex ; threadSharedData.currentEntryIndex++ ){
 
-    bool hasSample = _cache_.eventIsInSamplesList[threadSharedData.currentEntryIndex] != -1;
+    bool hasSample = _cache_.entrySampleIndexList[threadSharedData.currentEntryIndex] != -1;
     if( not hasSample ){ continue; }
 
     threadSharedData.requestReadNextEntry.setValue( false );
     Int_t nBytes{ threadSharedData.treeChain->GetEntry(threadSharedData.currentEntryIndex) };
-
-
 
     // monitor
     if( iThread_ == 0 ){
@@ -1088,11 +1088,13 @@ void DataDispenser::loadEvent(int iThread_){
       } // skip this event
     }
 
-    // getting loaded variables in tEventBuffer
+    // leafFormIndexingList is modified by the TChain reader
     LoaderUtils::copyData(eventIndexingBuffer, threadSharedData.leafFormIndexingList);
+
+    // currentEntryIndex is modified by the TChain reader
     eventIndexingBuffer.getIndices().entry = threadSharedData.currentEntryIndex;
 
-    // getting loaded event-by-event dials
+    // dialIndexTreeFormula is modified by the TChain reader
     int dialCloneArrayIndex{0};
     if( threadSharedData.dialIndexTreeFormula != nullptr ){
       dialCloneArrayIndex = int(threadSharedData.dialIndexTreeFormula->EvalInstance());
@@ -1155,7 +1157,7 @@ void DataDispenser::loadEvent(int iThread_){
       varTransformPtr->evalAndStore(eventIndexingBuffer);
     }
 
-    int iSample = _cache_.eventIsInSamplesList[eventIndexingBuffer.getIndices().entry];
+    int iSample = _cache_.entrySampleIndexList[eventIndexingBuffer.getIndices().entry];
 
     // Look for the bin index
     LoaderUtils::fillBinIndex(eventIndexingBuffer, _cache_.samplesToFillList[iSample]->getHistogram().getBinContextList());
@@ -1193,6 +1195,14 @@ void DataDispenser::loadEvent(int iThread_){
 
     // Get the next free event in our buffer
     Event *eventPtr = &(*_cache_.sampleEventListPtrToFill[iSample])[sampleEventIndex];
+
+    if( sampleEventIndex+1 >= _cache_.sampleEventListPtrToFill[iSample]->size() ){
+      DEBUG_VAR(iSample);
+      DEBUG_VAR(sampleEventIndex);
+      DEBUG_VAR(_cache_.sampleEventListPtrToFill[iSample]->size());
+      DEBUG_VAR(eventIndexingBuffer);
+      LogThrow("STOP");
+    }
 
     // copy from the event indexing buffer
     LoaderUtils::copyData(eventIndexingBuffer, *eventPtr);
