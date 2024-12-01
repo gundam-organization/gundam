@@ -933,11 +933,6 @@ void DataDispenser::loadEvent(int iThread_){
   eventIndexingBuffer.getVariables().setVarNameList(std::make_shared<std::vector<std::string>>(_cache_.varsRequestedForIndexing));
   LoaderUtils::allocateMemory(eventIndexingBuffer, threadSharedData.leafFormIndexingList);
 
-//  Event eventStoreBuffer;
-//  eventStoreBuffer.getIndices().dataset = _owner_->getDataSetIndex();
-//  eventStoreBuffer.getVariables().setVarNameList(std::make_shared<std::vector<std::string>>(_cache_.varsRequestedForStorage));
-//  LoaderUtils::allocateMemory(eventStoreBuffer, threadSharedData.leafFormStorageList);
-
   auto eventVarTransformList = _parameters_.eventVarTransformList; // copy for cache
   std::vector<EventVarTransformLib*> varTransformForIndexingList;
   std::vector<EventVarTransformLib*> varTransformForStorageList;
