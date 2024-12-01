@@ -208,6 +208,8 @@ void Propagator::printBreakdowns() const {
 
     t << GenericToolbox::TablePrinter::NextLine;
 
+    bool hasNoDial{true};
+
     for( auto& parSet : _parManager_.getParameterSetsList() ){
       if( not parSet.isEnabled() ){ continue; }
       for( auto& par : parSet.getParameterList() ){
@@ -218,6 +220,8 @@ void Propagator::printBreakdowns() const {
 
         t << par.getFullTitle();
         t << GenericToolbox::TablePrinter::NextColumn << nbEventForParameter[ &par ].nbTotal;
+
+        if( hasNoDial and nbEventForParameter[ &par ].nbTotal != 0 ){ hasNoDial = false; }
 
         if( _showNbEventPerSampleParameterBreakdown_ ){
           for( auto& sample : _sampleSet_.getSampleList() ){
@@ -230,8 +234,13 @@ void Propagator::printBreakdowns() const {
       }
     }
 
-    LogInfo << "Nb of event affected by parameters:" << std::endl;
-    t.printTable();
+    if( not hasNoDial ){
+      LogInfo << "Nb of event affected by parameters:" << std::endl;
+      t.printTable();
+    }
+    else{
+      LogInfo << "Events aren't parametrised." << std::endl;
+    }
 
   }
 
