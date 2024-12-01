@@ -83,7 +83,7 @@ protected:
 
     // thread communication
     GenericToolbox::Atomic<bool> requestReadNextEntry{false};
-    GenericToolbox::Atomic<bool> isNextEntryReady{false};
+    GenericToolbox::Atomic<bool> isEntryBufferReady{false};
     GenericToolbox::Atomic<bool> isDoneReading{false};
     GenericToolbox::Atomic<bool> isEventFillerReady{false};
   };

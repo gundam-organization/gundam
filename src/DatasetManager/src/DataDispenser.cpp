@@ -865,7 +865,7 @@ void DataDispenser::runEventFillThreads(int iThread_){
     if( not hasSample ){ continue; }
 
     Int_t nBytes{ threadSharedData.treeChain->GetEntry(threadSharedData.currentEntryIndex) };
-    threadSharedData.isNextEntryReady.setValue(true); // loaded! -> let the other thread get everything it needs
+    threadSharedData.isEntryBufferReady.setValue(true); // loaded! -> let the other thread get everything it needs
 
     if( iThread_ == 0 ){
       readSpeed.addQuantity(nBytes * nThreads);
@@ -891,8 +891,8 @@ void DataDispenser::runEventFillThreads(int iThread_){
       }
     }
 
-    // make sure the indexer thread has received the signal for the last entry
-    threadSharedData.isNextEntryReady.waitUntilEqual( false );
+    // make sure the event filler thread has received the signal for the last entry
+    threadSharedData.isEntryBufferReady.waitUntilEqual( false );
 
     // make sure currentEntryIndex don't get updated while it hasn't been read by the other thread
     threadSharedData.requestReadNextEntry.waitUntilEqualThenToggle( true );
@@ -903,7 +903,7 @@ void DataDispenser::runEventFillThreads(int iThread_){
   }
 
   threadSharedData.isDoneReading.setValue( true ); // trigger the loop break
-  threadSharedData.isNextEntryReady.setValue( true ); // release
+  threadSharedData.isEntryBufferReady.setValue(true ); // release
 
   // wait for the event filler threads to stop
   eventFillerThread->get();
@@ -1049,7 +1049,7 @@ void DataDispenser::loadEvent(int iThread_){
 
     // make sure we request a new entry and wait once we go for another loop
     GenericToolbox::ScopedGuard readerGuard{
-        [&]{ threadSharedData.isNextEntryReady.waitUntilEqual( true ); threadSharedData.isNextEntryReady.setValue( false ); },
+        [&]{ threadSharedData.isEntryBufferReady.waitUntilEqual( true ); threadSharedData.isEntryBufferReady.setValue( false ); },
         [&]{ threadSharedData.requestReadNextEntry.setValue( true ); }
     };
 
