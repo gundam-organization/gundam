@@ -75,7 +75,7 @@ struct DataDispenserCache{
 
   std::vector<Sample*> samplesToFillList{};
   std::vector<size_t> sampleNbOfEvents;
-  std::vector<std::vector<bool>> eventIsInSamplesList{};
+  std::vector<int> entrySampleIndexList{};
   std::vector<size_t> sampleIndexOffsetList;
   std::vector< std::vector<Event>* > sampleEventListPtrToFill;
   std::vector<DialCollection*> dialCollectionsRefList{};
@@ -88,7 +88,7 @@ struct DataDispenserCache{
 
   struct ThreadSelectionResult{
     std::vector<size_t> sampleNbOfEvents;
-    std::vector<std::vector<bool>> eventIsInSamplesList;
+    std::vector<int> entrySampleIndexList;
   };
   std::vector<ThreadSelectionResult> threadSelectionResults;
 

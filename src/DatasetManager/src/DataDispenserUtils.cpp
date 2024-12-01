@@ -30,7 +30,7 @@ void DataDispenserCache::clear(){
 
   samplesToFillList.clear();
   sampleNbOfEvents.clear();
-  eventIsInSamplesList.clear();
+  entrySampleIndexList.clear();
 
   sampleIndexOffsetList.clear();
   sampleEventListPtrToFill.clear();

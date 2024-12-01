@@ -73,12 +73,15 @@ public:
 
     [[nodiscard]] std::string getSummary() const {
       std::stringstream ss;
-      ss << *event << std::endl;
-      ss << "Dials{";
-      for( auto& dialResponseCache : dialResponseCacheList ){
-        ss << std::endl << "  { " << dialResponseCache.dialInterface->getSummary() << " }";
+      if( event == nullptr ){ return {"No event attached to this cache entry."}; }
+      ss << *event;
+      if( not dialResponseCacheList.empty() ){
+        ss << std::endl << "Dials{";
+        for( auto& dialResponseCache : dialResponseCacheList ){
+          ss << std::endl << "  { " << dialResponseCache.dialInterface->getSummary() << " }";
+        }
+        ss << std::endl << "}";
       }
-      ss << std::endl << "}";
       return ss.str();
     }
   };

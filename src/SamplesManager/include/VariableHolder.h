@@ -5,6 +5,8 @@
 #ifndef GUNDAM_VARIABLE_HOLDER_H
 #define GUNDAM_VARIABLE_HOLDER_H
 
+#include "GundamUtils.h"
+
 #include "GenericToolbox.Utils.h"
 
 
