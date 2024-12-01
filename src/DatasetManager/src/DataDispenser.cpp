@@ -844,9 +844,6 @@ void DataDispenser::runEventFillThreads(int iThread_){
   );
 
 
-  // first entry will be read without any constraint
-  threadSharedData.requestReadNextEntry.setValue( true );
-
   // start TChain reader
   auto bounds = GenericToolbox::ParallelWorker::getThreadBoundIndices( iThread_, nThreads, threadSharedData.nbEntries );
 
@@ -863,14 +860,10 @@ void DataDispenser::runEventFillThreads(int iThread_){
 
   for( threadSharedData.currentEntryIndex = bounds.beginIndex ; threadSharedData.currentEntryIndex < bounds.endIndex ; threadSharedData.currentEntryIndex++ ){
 
-    // was the event loader stopped?
-    if( not threadSharedData.isEventFillerReady.getValue() ){ break; }
-
     // before load, check if it has a sample
     bool hasSample = _cache_.entrySampleIndexList[threadSharedData.currentEntryIndex] != -1;
     if( not hasSample ){ continue; }
 
-    threadSharedData.requestReadNextEntry.waitUntilEqualThenToggle( true ); // get ready to load the next one
     Int_t nBytes{ threadSharedData.treeChain->GetEntry(threadSharedData.currentEntryIndex) };
     threadSharedData.isNextEntryReady.setValue(true); // loaded! -> let the other thread get everything it needs
 
@@ -900,6 +893,12 @@ void DataDispenser::runEventFillThreads(int iThread_){
 
     // make sure the indexer thread has received the signal for the last entry
     threadSharedData.isNextEntryReady.waitUntilEqual( false );
+
+    // make sure currentEntryIndex don't get updated while it hasn't been read by the other thread
+    threadSharedData.requestReadNextEntry.waitUntilEqualThenToggle( true );
+
+    // was the event loader stopped?
+    if( not threadSharedData.isEventFillerReady.getValue() ){ break; }
 
   }
 
@@ -1093,9 +1092,12 @@ void DataDispenser::loadEvent(int iThread_){
 
     // get sample index / all -1 samples have been ruled out by the chain reader
     iSample = _cache_.entrySampleIndexList[eventIndexingBuffer.getIndices().entry];
+    Sample& eventSample{*_cache_.samplesToFillList[iSample]};
+
+    eventIndexingBuffer.getIndices().sample = eventSample.getIndex();
 
     // look for the bin index
-    LoaderUtils::fillBinIndex(eventIndexingBuffer, _cache_.samplesToFillList[iSample]->getHistogram().getBinContextList());
+    LoaderUtils::fillBinIndex(eventIndexingBuffer, eventSample.getHistogram().getBinContextList());
 
     // No bin found -> next sample
     if( eventIndexingBuffer.getIndices().bin == -1 ){ continue; }
@@ -1175,8 +1177,6 @@ void DataDispenser::loadEvent(int iThread_){
       sampleEventIndex = _cache_.sampleIndexOffsetList[iSample]++;
     }
 
-    eventIndexingBuffer.getIndices().sample = _cache_.samplesToFillList[iSample]->getIndex();
-
 
     // Get the next free event in our buffer
     Event *eventPtr = &(*_cache_.sampleEventListPtrToFill[iSample])[sampleEventIndex];
@@ -1187,7 +1187,7 @@ void DataDispenser::loadEvent(int iThread_){
     // Now the event is ready. Let's index the dials:
     // there should always be a cache entry even if no dials are applied.
     // This cache is actually used to write MC events with dials in output tree
-    eventDialCacheEntry->event.sampleIndex = std::size_t(_cache_.samplesToFillList[iSample]->getIndex());
+    eventDialCacheEntry->event.sampleIndex = std::size_t(eventIndexingBuffer.getIndices().sample);
     eventDialCacheEntry->event.eventIndex = sampleEventIndex;
 
     auto *dialEntryPtr = &eventDialCacheEntry->dials[0];
