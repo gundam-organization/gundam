@@ -844,9 +844,8 @@ void DataDispenser::runEventFillThreads(int iThread_){
       std::async( std::launch::async, [this, iThread_]{ this->loadEvent( iThread_ ); } )
   );
 
+  // make sure we're ready to start the loop
   threadSharedData.isEventFillerReady.waitUntilEqual( true );
-
-
 
   // start TChain reader
   auto bounds = GenericToolbox::ParallelWorker::getThreadBoundIndices( iThread_, nThreads, threadSharedData.nbEntries );
@@ -862,14 +861,20 @@ void DataDispenser::runEventFillThreads(int iThread_){
 
   for( threadSharedData.currentEntryIndex = bounds.beginIndex ; threadSharedData.currentEntryIndex < bounds.endIndex ; threadSharedData.currentEntryIndex++ ){
 
+    // was the event loader stopped?
+    if( not threadSharedData.isEventFillerReady.getValue() ){ break; }
+
+    // before load, check if it has a sample
     bool hasSample = _cache_.entrySampleIndexList[threadSharedData.currentEntryIndex] != -1;
     if( not hasSample ){ continue; }
 
-    threadSharedData.requestReadNextEntry.setValue( false );
+    threadSharedData.requestReadNextEntry.waitUntilEqualThenToggle( true ); // get ready to load the next one
     Int_t nBytes{ threadSharedData.treeChain->GetEntry(threadSharedData.currentEntryIndex) };
-    readSpeed.addQuantity(nBytes * nThreads);
+    threadSharedData.isNextEntryReady.setValue(true); // loaded! -> let the other thread get everything it needs
 
     if( iThread_ == 0 ){
+      readSpeed.addQuantity(nBytes * nThreads);
+
       if( GenericToolbox::showProgressBar(threadSharedData.currentEntryIndex*nThreads, threadSharedData.nbEntries) ){
 
         ssProgressBar.str("");
@@ -891,14 +896,8 @@ void DataDispenser::runEventFillThreads(int iThread_){
       }
     }
 
-    // send the signal then wait for the other thread to toggle back
-    threadSharedData.isNextEntryReady.toggleThenWaitUntilEqual( false );
-
-    // wait here before updating anything
-    threadSharedData.requestReadNextEntry.waitUntilEqualThenToggle( true );
-
-    // was the event loader stopped?
-    if( not threadSharedData.isEventFillerReady.getValue() ){ break; }
+    // make sure the indexer thread has received the signal for the last entry
+    threadSharedData.isNextEntryReady.waitUntilEqual( false );
 
   }
 
@@ -1052,7 +1051,7 @@ void DataDispenser::loadEvent(int iThread_){
 
     // make sure we request a new entry and wait once we go for another loop
     GenericToolbox::ScopedGuard readerGuard{
-        [&]{ threadSharedData.isNextEntryReady.waitUntilEqualThenToggle( true ); },
+        [&]{ threadSharedData.isNextEntryReady.waitUntilEqual( true ); threadSharedData.isNextEntryReady.setValue( false ); },
         [&]{ threadSharedData.requestReadNextEntry.setValue( true ); }
     };
 
@@ -1070,6 +1069,8 @@ void DataDispenser::loadEvent(int iThread_){
     // nominalWeightTreeFormula is attached to the TChain
     if( threadSharedData.nominalWeightTreeFormula != nullptr ){
       eventIndexingBuffer.getWeights().base = (threadSharedData.nominalWeightTreeFormula->EvalInstance());
+
+      // no negative weights -> error
       if( eventIndexingBuffer.getWeights().base  < 0 ){
         LogError << "Negative nominal weight:" << std::endl;
 
