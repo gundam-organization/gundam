@@ -72,10 +72,12 @@ namespace JointProbability{
     double dataVal = samplePair_.data->getHistogram().getBinContentList()[bin_].sumWeights;
     double predVal = samplePair_.model->getHistogram().getBinContentList()[bin_].sumWeights;
 
+#ifdef DEBUG_BUILD
     if( predVal == 0 ){
       LogError << bin_ << " bin predicting 0 rate -> llh not defined / inf" << std::endl;
       LogError << samplePair_.model->getSummary() << std::endl;
     }
+#endif
 
     {
       /// the first time we reach this point, we assume the predMC is at its nominal value
@@ -241,7 +243,7 @@ namespace JointProbability{
       if( allowZeroMcWhenZeroData and dataVal == 0 ){
         // need to warn the user something is wrong with the binning definition
         // This might indicate that more MC stat would be needed
-        LogErrorOnce << "allowZeroMcWhenZeroData=true: MC bin(s) with 0 as predicted value. "
+        LogAlertOnce << "allowZeroMcWhenZeroData=true: MC bin(s) with 0 as predicted value. "
                      << "Data is also 0, null penalty is applied."
                      << "This is an ill conditioned problem. Please check your inputs."
                      << std::endl;
