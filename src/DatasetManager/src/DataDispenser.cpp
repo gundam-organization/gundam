@@ -901,6 +901,9 @@ void DataDispenser::runEventFillThreads(int iThread_){
     // wait here before updating anything
     threadSharedData.requestReadNextEntry.waitUntilEqualThenToggle( true );
 
+    // was the event loader stopped?
+    if( not threadSharedData.isEventFillerReady.getValue() ){ break; }
+
   }
 
   threadSharedData.isDoneReading.setValue( true ); // trigger the loop break
@@ -1177,11 +1180,13 @@ void DataDispenser::loadEvent(int iThread_){
 
       if( _parameters_.debugNbMaxEventsToLoad != 0 ){
         // check if the limit has been reached
-        // TODO: handle the reader with this
         if( _cache_.propagatorPtr->getEventDialCache().getFillIndex() >= _parameters_.debugNbMaxEventsToLoad ){
           LogAlertIf(iThread_ == 0) << std::endl << std::endl; // flush pBar
           LogAlertIf(iThread_ == 0) << "debugNbMaxEventsToLoad: Event number cap reached (";
           LogAlertIf(iThread_ == 0) << _parameters_.debugNbMaxEventsToLoad << ")" << std::endl;
+
+          // tell the chain reader:
+          threadSharedData.isEventFillerReady.setValue(false);
           return;
         }
       }
@@ -1195,14 +1200,6 @@ void DataDispenser::loadEvent(int iThread_){
 
     // Get the next free event in our buffer
     Event *eventPtr = &(*_cache_.sampleEventListPtrToFill[iSample])[sampleEventIndex];
-
-    if( sampleEventIndex+1 >= _cache_.sampleEventListPtrToFill[iSample]->size() ){
-      DEBUG_VAR(iSample);
-      DEBUG_VAR(sampleEventIndex);
-      DEBUG_VAR(_cache_.sampleEventListPtrToFill[iSample]->size());
-      DEBUG_VAR(eventIndexingBuffer);
-      LogThrow("STOP");
-    }
 
     // copy from the event indexing buffer
     LoaderUtils::copyData(eventIndexingBuffer, *eventPtr);
@@ -1303,6 +1300,8 @@ void DataDispenser::loadEvent(int iThread_){
     } // dial collection loop
 
   } // while ok
+
+  threadSharedData.isEventFillerReady.setValue( false );
 
 }
 
