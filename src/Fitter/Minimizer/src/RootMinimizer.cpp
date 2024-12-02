@@ -541,14 +541,27 @@ void RootMinimizer::writePostFitData( TDirectory* saveDir_) {
       LogInfo << "Eigen decomposition of the post-fit covariance matrix" << std::endl;
       TMatrixDSymEigen decompCovMatrix(postfitCovarianceMatrix);
 
+      DEBUG_VAR(decompCovMatrix.GetEigenValues().GetNrows());
+      DEBUG_VAR(postfitCovarianceMatrix.GetNrows());
+
       auto eigenVectors = std::unique_ptr<TH2D>( GenericToolbox::convertTMatrixDtoTH2D(&decompCovMatrix.GetEigenVectors()) );
+
+      LogDebug << "after eigen vec" << std::endl;
+
       applyBinLabels(eigenVectors.get());
+
+      LogDebug << "after bin label" << std::endl;
+
       if( not GundamGlobals::isLightOutputMode() ) {
         GenericToolbox::writeInTFileWithObjTypeExt(GenericToolbox::mkdirTFile(outDir_, "eigenDecomposition"), eigenVectors.get(), "eigenVectors");
       }
 
       auto eigenValues = std::unique_ptr<TH1D>( GenericToolbox::convertTVectorDtoTH1D(&decompCovMatrix.GetEigenValues()) );
+
+      LogDebug << "after eigen val" << std::endl;
+
       applyBinLabels(eigenValues.get());
+      LogDebug << "after eigen val bin labels" << std::endl;
       if( not GundamGlobals::isLightOutputMode() ) {
         GenericToolbox::writeInTFileWithObjTypeExt(GenericToolbox::mkdirTFile(outDir_, "eigenDecomposition"), eigenValues.get(), "eigenValues");
       }
