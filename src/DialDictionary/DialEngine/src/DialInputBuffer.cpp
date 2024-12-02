@@ -77,7 +77,6 @@ void DialInputBuffer::update(){
                  << inputRef.getParameter(_parSetListPtr_).getTitle()
                  << std::endl;
         LogError << GundamUtils::Backtrace << std::endl;
-        std::exit(EXIT_FAILURE);
     }
 #endif
 
