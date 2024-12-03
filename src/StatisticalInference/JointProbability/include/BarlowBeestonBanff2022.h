@@ -72,12 +72,9 @@ namespace JointProbability{
     double dataVal = samplePair_.data->getHistogram().getBinContentList()[bin_].sumWeights;
     double predVal = samplePair_.model->getHistogram().getBinContentList()[bin_].sumWeights;
 
-#ifdef DEBUG_BUILD
-    if( predVal == 0 ){
-      LogError << bin_ << " bin predicting 0 rate -> llh not defined / inf" << std::endl;
-      LogError << samplePair_.model->getSummary() << std::endl;
+    if( predVal == 0 and dataVal != 0 ){
+      LogError << samplePair_.model->getName() << "/" << samplePair_.model->getHistogram().getBinContextList()[bin_].bin.getSummary() << ": predicting 0 rate in this bin -> llh not defined / inf" << std::endl;
     }
-#endif
 
     {
       /// the first time we reach this point, we assume the predMC is at its nominal value
