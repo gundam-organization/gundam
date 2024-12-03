@@ -531,8 +531,6 @@ void RootMinimizer::writePostFitData( TDirectory* saveDir_) {
       applyBinLabels(postFitCovarianceTH2D.get());
       GenericToolbox::writeInTFileWithObjTypeExt(outDir_, postFitCovarianceTH2D.get(), "postfitCovariance");
 
-
-
       auto postfitCorrelationMatrix = std::unique_ptr<TMatrixD>(GenericToolbox::convertToCorrelationMatrix((TMatrixD*) &postfitCovarianceMatrix));
       auto postfitCorrelationTH2D = std::unique_ptr<TH2D>(GenericToolbox::convertTMatrixDtoTH2D(postfitCorrelationMatrix.get()));
       applyBinLabels(postfitCorrelationTH2D.get());
