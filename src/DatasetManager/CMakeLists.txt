@@ -36,6 +36,7 @@ target_link_libraries( ${LIB_NAME}
     GundamSamplesManager
     GundamDialDictionary
     ${ROOT_LIBRARIES}
+    dl
 )
 
 #set_target_properties(${LIB_NAME} PROPERTIES VERSION "${GUNDAM_VERSION_STRING}")
