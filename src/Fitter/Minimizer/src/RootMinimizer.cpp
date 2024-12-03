@@ -538,6 +538,8 @@ void RootMinimizer::writePostFitData( TDirectory* saveDir_) {
 
     // Fitter covariance matrix decomposition
     {
+      DEBUG_VAR(postfitCovarianceMatrix.GetNrows());
+      postfitCovarianceMatrix.Print("ALL");
       LogInfo << "Eigen decomposition of the post-fit covariance matrix" << std::endl;
       TMatrixDSymEigen decompCovMatrix(postfitCovarianceMatrix);
 
