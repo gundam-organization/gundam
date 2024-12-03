@@ -998,18 +998,6 @@ void RootMinimizer::writePostFitData( TDirectory* saveDir_) {
           legend->AddEntry(postFitErrorHist.get(),"Post-fit values","ep");
 
           for( const auto& par : parList_ ){
-            if (par.isEnabled()) {
-              if (std::isnan(par.getParameterValue())) {
-                LogError << "Parameter with invalid value: "
-                         << par.getTitle() << std::endl;
-              }
-              if (std::isnan((*covMatrix_)
-                             [par.getParameterIndex()]
-                             [par.getParameterIndex()])) {
-                LogError << "Parameter error with invalid value: "
-                         << par.getFullTitle() << std::endl;
-              }
-            }
 
             longestTitleSize = std::max(longestTitleSize, par.getTitle().size());
 
