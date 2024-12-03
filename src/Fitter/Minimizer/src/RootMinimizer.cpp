@@ -563,7 +563,8 @@ void RootMinimizer::writePostFitData( TDirectory* saveDir_) {
     }
 
 
-    if( not hasNan ){
+    if( hasNan ){ LogAlert << "Skipping cov matrix decomposition as NaN values are present." << std::endl; }
+    else{
       LogInfo << "Eigen decomposition of the post-fit covariance matrix" << std::endl;
       TMatrixDSymEigen decompCovMatrix(postfitCovarianceMatrix);
 
