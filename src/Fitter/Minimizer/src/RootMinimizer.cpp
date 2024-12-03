@@ -503,7 +503,9 @@ void RootMinimizer::writePostFitData( TDirectory* saveDir_) {
   auto* matricesDir = GenericToolbox::mkdirTFile(saveDir_, "hessian");
 
   TMatrixDSym postfitCovarianceMatrix(int(_rootMinimizer_->NDim()));
+  TMatrixDSym postfitHessianMatrix(int(_rootMinimizer_->NDim()));
   _rootMinimizer_->GetCovMatrix(postfitCovarianceMatrix.GetMatrixArray());
+  _rootMinimizer_->GetCovMatrix(postfitHessianMatrix.GetMatrixArray());
 
   std::function<void(TDirectory*)> decomposeCovarianceMatrixFct = [&](TDirectory* outDir_){
 
@@ -524,10 +526,12 @@ void RootMinimizer::writePostFitData( TDirectory* saveDir_) {
     };
 
     {
-      LogInfo << "Writing post-fit matrices" << std::endl;
+      LogInfo << "Writing post-fit cov matrices" << std::endl;
       auto postFitCovarianceTH2D = std::unique_ptr<TH2D>(GenericToolbox::convertTMatrixDtoTH2D((TMatrixD*) &postfitCovarianceMatrix) );
       applyBinLabels(postFitCovarianceTH2D.get());
       GenericToolbox::writeInTFileWithObjTypeExt(outDir_, postFitCovarianceTH2D.get(), "postfitCovariance");
+
+
 
       auto postfitCorrelationMatrix = std::unique_ptr<TMatrixD>(GenericToolbox::convertToCorrelationMatrix((TMatrixD*) &postfitCovarianceMatrix));
       auto postfitCorrelationTH2D = std::unique_ptr<TH2D>(GenericToolbox::convertTMatrixDtoTH2D(postfitCorrelationMatrix.get()));
@@ -536,23 +540,35 @@ void RootMinimizer::writePostFitData( TDirectory* saveDir_) {
       GenericToolbox::writeInTFileWithObjTypeExt(outDir_, postfitCorrelationTH2D.get(), "postfitCorrelation");
     }
 
-    // Fitter covariance matrix decomposition
     {
-      DEBUG_VAR(postfitCovarianceMatrix.GetNrows());
-      postfitCovarianceMatrix.Print("ALL");
+      LogInfo << "Writing post-fit hessian matrices" << std::endl;
+      auto postFitHessianTH2D = std::unique_ptr<TH2D>(GenericToolbox::convertTMatrixDtoTH2D((TMatrixD*) &postfitHessianMatrix) );
+      applyBinLabels(postFitHessianTH2D.get());
+      GenericToolbox::writeInTFileWithObjTypeExt(outDir_, postFitHessianTH2D.get(), "postfitHessian");
+
+      auto postfitHessianCorMatrix = std::unique_ptr<TMatrixD>(GenericToolbox::convertToCorrelationMatrix((TMatrixD*) &postfitHessianMatrix));
+      auto postfitHessianCorTH2D = std::unique_ptr<TH2D>(GenericToolbox::convertTMatrixDtoTH2D(postfitHessianCorMatrix.get()));
+      applyBinLabels(postfitHessianCorTH2D.get());
+      postfitHessianCorTH2D->GetZaxis()->SetRangeUser(-1,1);
+      GenericToolbox::writeInTFileWithObjTypeExt(outDir_, postfitHessianCorTH2D.get(), "postfitHessianCorrelation");
+    }
+
+    // Fitter covariance matrix decomposition
+    // first check if the post-cov matrix has NaN -> TMatrixDSymEigen crashes otherwise
+    bool hasNan{false};
+    for( int iRow = 0 ; iRow < postfitCovarianceMatrix.GetNrows() ; iRow++ ){
+      for( int iCol = 0 ; iCol < postfitCovarianceMatrix.GetNcols() ; iCol++ ){
+        if( std::isnan(postfitCovarianceMatrix[iRow][iCol]) ){ hasNan = true; break; }
+      }
+    }
+
+
+    if( not hasNan ){
       LogInfo << "Eigen decomposition of the post-fit covariance matrix" << std::endl;
       TMatrixDSymEigen decompCovMatrix(postfitCovarianceMatrix);
 
-      DEBUG_VAR(decompCovMatrix.GetEigenValues().GetNrows());
-      DEBUG_VAR(postfitCovarianceMatrix.GetNrows());
-
       auto eigenVectors = std::unique_ptr<TH2D>( GenericToolbox::convertTMatrixDtoTH2D(&decompCovMatrix.GetEigenVectors()) );
-
-      LogDebug << "after eigen vec" << std::endl;
-
       applyBinLabels(eigenVectors.get());
-
-      LogDebug << "after bin label" << std::endl;
 
       if( not GundamGlobals::isLightOutputMode() ) {
         GenericToolbox::writeInTFileWithObjTypeExt(GenericToolbox::mkdirTFile(outDir_, "eigenDecomposition"), eigenVectors.get(), "eigenVectors");
@@ -560,10 +576,7 @@ void RootMinimizer::writePostFitData( TDirectory* saveDir_) {
 
       auto eigenValues = std::unique_ptr<TH1D>( GenericToolbox::convertTVectorDtoTH1D(&decompCovMatrix.GetEigenValues()) );
 
-      LogDebug << "after eigen val" << std::endl;
-
       applyBinLabels(eigenValues.get());
-      LogDebug << "after eigen val bin labels" << std::endl;
       if( not GundamGlobals::isLightOutputMode() ) {
         GenericToolbox::writeInTFileWithObjTypeExt(GenericToolbox::mkdirTFile(outDir_, "eigenDecomposition"), eigenValues.get(), "eigenValues");
       }
@@ -586,7 +599,7 @@ void RootMinimizer::writePostFitData( TDirectory* saveDir_) {
       TH2D* postfitHessianTH2D = GenericToolbox::convertTMatrixDtoTH2D(&hessianMatrix);
       applyBinLabels(postfitHessianTH2D);
       if( not GundamGlobals::isLightOutputMode() ){
-        GenericToolbox::writeInTFileWithObjTypeExt(outDir_, postfitHessianTH2D, "postfitHessian");
+        GenericToolbox::writeInTFileWithObjTypeExt(outDir_, postfitHessianTH2D, "postfitHessianReconstructed");
       }
 
       if( _generatedPostFitEigenBreakdown_ ){
