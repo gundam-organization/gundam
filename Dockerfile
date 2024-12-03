@@ -34,6 +34,7 @@ WORKDIR $BUILD_DIR
 RUN cmake \
       -D CMAKE_INSTALL_PREFIX=$INSTALL_DIR \
       -D ENABLE_GOOGLE_TESTS=ON \
+      -D ENABLE_TESTS=ON \
       $REPO_DIR
 RUN make -j3 install
 
