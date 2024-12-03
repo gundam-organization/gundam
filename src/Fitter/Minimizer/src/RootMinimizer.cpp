@@ -503,7 +503,9 @@ void RootMinimizer::writePostFitData( TDirectory* saveDir_) {
   auto* matricesDir = GenericToolbox::mkdirTFile(saveDir_, "hessian");
 
   TMatrixDSym postfitCovarianceMatrix(int(_rootMinimizer_->NDim()));
+  TMatrixDSym postfitHessianMatrix(int(_rootMinimizer_->NDim()));
   _rootMinimizer_->GetCovMatrix(postfitCovarianceMatrix.GetMatrixArray());
+  _rootMinimizer_->GetCovMatrix(postfitHessianMatrix.GetMatrixArray());
 
   std::function<void(TDirectory*)> decomposeCovarianceMatrixFct = [&](TDirectory* outDir_){
 
@@ -524,7 +526,7 @@ void RootMinimizer::writePostFitData( TDirectory* saveDir_) {
     };
 
     {
-      LogInfo << "Writing post-fit matrices" << std::endl;
+      LogInfo << "Writing post-fit cov matrices" << std::endl;
       auto postFitCovarianceTH2D = std::unique_ptr<TH2D>(GenericToolbox::convertTMatrixDtoTH2D((TMatrixD*) &postfitCovarianceMatrix) );
       applyBinLabels(postFitCovarianceTH2D.get());
       GenericToolbox::writeInTFileWithObjTypeExt(outDir_, postFitCovarianceTH2D.get(), "postfitCovariance");
@@ -536,18 +538,43 @@ void RootMinimizer::writePostFitData( TDirectory* saveDir_) {
       GenericToolbox::writeInTFileWithObjTypeExt(outDir_, postfitCorrelationTH2D.get(), "postfitCorrelation");
     }
 
-    // Fitter covariance matrix decomposition
     {
+      LogInfo << "Writing post-fit hessian matrices" << std::endl;
+      auto postFitHessianTH2D = std::unique_ptr<TH2D>(GenericToolbox::convertTMatrixDtoTH2D((TMatrixD*) &postfitHessianMatrix) );
+      applyBinLabels(postFitHessianTH2D.get());
+      GenericToolbox::writeInTFileWithObjTypeExt(outDir_, postFitHessianTH2D.get(), "postfitHessian");
+
+      auto postfitHessianCorMatrix = std::unique_ptr<TMatrixD>(GenericToolbox::convertToCorrelationMatrix((TMatrixD*) &postfitHessianMatrix));
+      auto postfitHessianCorTH2D = std::unique_ptr<TH2D>(GenericToolbox::convertTMatrixDtoTH2D(postfitHessianCorMatrix.get()));
+      applyBinLabels(postfitHessianCorTH2D.get());
+      postfitHessianCorTH2D->GetZaxis()->SetRangeUser(-1,1);
+      GenericToolbox::writeInTFileWithObjTypeExt(outDir_, postfitHessianCorTH2D.get(), "postfitHessianCorrelation");
+    }
+
+    // Fitter covariance matrix decomposition
+    // first check if the post-cov matrix has NaN -> TMatrixDSymEigen crashes otherwise
+    bool hasNan{false};
+    for( int iRow = 0 ; iRow < postfitCovarianceMatrix.GetNrows() ; iRow++ ){
+      for( int iCol = 0 ; iCol < postfitCovarianceMatrix.GetNcols() ; iCol++ ){
+        if( std::isnan(postfitCovarianceMatrix[iRow][iCol]) ){ hasNan = true; break; }
+      }
+    }
+
+
+    if( hasNan ){ LogAlert << "Skipping cov matrix decomposition as NaN values are present." << std::endl; }
+    else{
       LogInfo << "Eigen decomposition of the post-fit covariance matrix" << std::endl;
       TMatrixDSymEigen decompCovMatrix(postfitCovarianceMatrix);
 
       auto eigenVectors = std::unique_ptr<TH2D>( GenericToolbox::convertTMatrixDtoTH2D(&decompCovMatrix.GetEigenVectors()) );
       applyBinLabels(eigenVectors.get());
+
       if( not GundamGlobals::isLightOutputMode() ) {
         GenericToolbox::writeInTFileWithObjTypeExt(GenericToolbox::mkdirTFile(outDir_, "eigenDecomposition"), eigenVectors.get(), "eigenVectors");
       }
 
       auto eigenValues = std::unique_ptr<TH1D>( GenericToolbox::convertTVectorDtoTH1D(&decompCovMatrix.GetEigenValues()) );
+
       applyBinLabels(eigenValues.get());
       if( not GundamGlobals::isLightOutputMode() ) {
         GenericToolbox::writeInTFileWithObjTypeExt(GenericToolbox::mkdirTFile(outDir_, "eigenDecomposition"), eigenValues.get(), "eigenValues");
@@ -571,7 +598,7 @@ void RootMinimizer::writePostFitData( TDirectory* saveDir_) {
       TH2D* postfitHessianTH2D = GenericToolbox::convertTMatrixDtoTH2D(&hessianMatrix);
       applyBinLabels(postfitHessianTH2D);
       if( not GundamGlobals::isLightOutputMode() ){
-        GenericToolbox::writeInTFileWithObjTypeExt(outDir_, postfitHessianTH2D, "postfitHessian");
+        GenericToolbox::writeInTFileWithObjTypeExt(outDir_, postfitHessianTH2D, "postfitHessianReconstructed");
       }
 
       if( _generatedPostFitEigenBreakdown_ ){
@@ -971,18 +998,6 @@ void RootMinimizer::writePostFitData( TDirectory* saveDir_) {
           legend->AddEntry(postFitErrorHist.get(),"Post-fit values","ep");
 
           for( const auto& par : parList_ ){
-            if (par.isEnabled()) {
-              if (std::isnan(par.getParameterValue())) {
-                LogError << "Parameter with invalid value: "
-                         << par.getTitle() << std::endl;
-              }
-              if (std::isnan((*covMatrix_)
-                             [par.getParameterIndex()]
-                             [par.getParameterIndex()])) {
-                LogError << "Parameter error with invalid value: "
-                         << par.getFullTitle() << std::endl;
-              }
-            }
 
             longestTitleSize = std::max(longestTitleSize, par.getTitle().size());
 
