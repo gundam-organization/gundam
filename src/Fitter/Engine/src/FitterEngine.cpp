@@ -380,8 +380,10 @@ void FitterEngine::fit(){
 
 
   if (_savePostfitEventTrees_){
-    LogInfo << "Saving PostFit event Trees" << std::endl;
-    getLikelihoodInterface().writeEvents({_saveDir_, "postFit"});
+    if( not GundamGlobals::isLightOutputMode() ){
+      LogInfo << "Saving PostFit event Trees" << std::endl;
+      getLikelihoodInterface().writeEvents( GenericToolbox::TFilePath(_saveDir_, "postFit") );
+    }
   }
   if( _generateSamplePlots_ and not getLikelihoodInterface().getPlotGenerator().getConfig().empty() ){
     LogInfo << "Generating post-fit sample plots..." << std::endl;
