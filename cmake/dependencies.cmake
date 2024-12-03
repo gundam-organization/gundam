@@ -106,7 +106,7 @@ endif(NOT ROOT_minuit2_FOUND)
 # If we truly don't have minuit2, then stop.
 if (NOT ROOT_minuit2_FOUND)
   cmessage( STATUS "[ROOT]: Use >6.32 or rebuild root with-Dminuit2=on in the cmake command")
-  cmessage(FATAL_ERROR "[ROOT]: minuit2 is required")
+  cmessage( ERROR  "[ROOT]: minuit2 is required.")
 endif(NOT ROOT_minuit2_FOUND)
 
 include_directories( ${ROOT_INCLUDE_DIR} )
