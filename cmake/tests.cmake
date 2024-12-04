@@ -1,6 +1,6 @@
 
 
-if( ENABLE_GOOGLE_TESTS )
+if( ENABLE_TESTS )
   message("")
   cmessage( WARNING "Defining tests...")
   include( CTest )
