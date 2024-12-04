@@ -151,7 +151,7 @@ public:
   // returns the current index
   [[nodiscard]] size_t getFillIndex() const { return _fillIndex_; }
 
-  [[nodiscard]] const std::vector<IndexedCacheEntry> getIndexedCache() const { return _indexedCache_; }
+  [[nodiscard]] const std::vector<IndexedCacheEntry>& getIndexedCache() const { return _indexedCache_; }
 
   /// Provide the event dial cache.  The event dial cache containes a
   /// CacheElem_t object for every dial applied to a physics event.  The
