@@ -111,7 +111,7 @@ int main() {
         spline.SetLineColor(kRed);
         spline.Draw("same");
         const int nKnots = spline.GetNp();
-        const int dim = 3*nKnots + 2;
+        const int dim = 2*nKnots + 2;
         double data[dim];
         data[0] = -3.0;
         data[1] = 1.0;
@@ -132,7 +132,7 @@ int main() {
             double splineValue = spline.Eval(xxx);
             double calcValue
                 = CalculateUniformSpline(xxx,-100.0, 100.0,
-                                       data, dim);
+                                         data, dim);
             uniformSpline.SetPoint(point++, xxx, calcValue);
             TOLERANCE("Test1: Spline Mismatch", splineValue, calcValue, 1E-6);
         }
