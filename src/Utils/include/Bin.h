@@ -47,12 +47,10 @@ public:
 
   // setters
   void setIndex(int index_){ _index_ = index_; }
-  void setIsLowMemoryUsageMode(bool isLowMemoryUsageMode_){ _isLowMemoryUsageMode_ = isLowMemoryUsageMode_; }
   void setIsZeroWideRangesTolerated(bool isZeroWideRangesTolerated_){ _isZeroWideRangesTolerated_ = isZeroWideRangesTolerated_; } // make it explicit! -> double precision might not be enough if you play with long int
   void addBinEdge(const std::string& variableName_, double lowEdge_, double highEdge_);
 
   // const getters
-  [[nodiscard]] bool isLowMemoryUsageMode() const { return _isLowMemoryUsageMode_; }
   [[nodiscard]] bool isZeroWideRangesTolerated() const { return _isZeroWideRangesTolerated_; }
   [[nodiscard]] int getIndex() const { return _index_; }
   [[nodiscard]] const std::string &getFormulaStr() const { return _formulaStr_; }
@@ -81,7 +79,6 @@ public:
   [[nodiscard]] std::vector<double> generateBinTarget(const std::vector<std::string>& varNameList_ = {}) const;
 
 private:
-  bool _isLowMemoryUsageMode_{false};
   bool _isZeroWideRangesTolerated_{false};
   bool _includeLowerBoundVal_{true}; // by default it's [a,b[
   bool _includeHigherBoundVal_{false};

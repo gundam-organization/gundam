@@ -136,10 +136,6 @@ bool Bin::isInBin( const std::vector<double>& valuesList_) const{
   return std::all_of(_binEdgesList_.begin(), _binEdgesList_.end(), [&](const Edges& edge){ return (this->isBetweenEdges(edge, *(buf++))); });
 }
 bool Bin::isVariableSet( const std::string& variableName_) const{
-  if( _isLowMemoryUsageMode_ ){
-    LogError << "Can't fetch variable name while in low memory mode. (var name is not stored)" << std::endl;
-    throw std::logic_error("can't fetch var name while _isLowMemoryUsageMode_");
-  }
   return GenericToolbox::findElementIndex(variableName_, _binEdgesList_, [](const Edges& e_){ return e_.varName; }) != -1;
 }
 bool Bin::isBetweenEdges( const std::string& variableName_, double value_) const {
