@@ -51,7 +51,7 @@ RUN git submodule update --init --recursive
 WORKDIR $BUILD_DIR
 RUN cmake \
       -D CMAKE_INSTALL_PREFIX=$INSTALL_DIR \
-      -D ENABLE_GOOGLE_TESTS=ON \
+      -D SKIP_GOOGLE_TEST=OFF \
       $REPO_DIR 
 RUN make -j3 install
 
