@@ -167,14 +167,7 @@ public:
   /// not fix.  This is true if the parameter should be in the stripped
   /// covariance matrix.
   static bool isValidCorrelatedParameter(const Parameter& par_);
-
-  // Deprecated
-  [[deprecated("use getCustomParThrow()")]] [[nodiscard]] const std::vector<JsonType>& getCustomFitParThrow() const{ return getCustomParThrow(); }
-  [[deprecated("use isEnableEigenDecomp()")]] [[nodiscard]] bool isUseEigenDecompInFit() const{ return isEnableEigenDecomp(); }
-  [[deprecated("use moveParametersToPrior()")]] void moveFitParametersToPrior(){ moveParametersToPrior(); }
-  [[deprecated("use throwParameters()")]] void throwFitParameters( bool rethrowIfNotPhysical_ = true, double gain_ = 1){ throwParameters(rethrowIfNotPhysical_, gain_); }
-  [[deprecated]] [[nodiscard]] bool isUseOnlyOneParameterPerEvent() const{ return _useOnlyOneParameterPerEvent_; }
-
+  
   // print
   void printConfiguration() const;
 

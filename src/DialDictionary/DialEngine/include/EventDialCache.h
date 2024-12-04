@@ -10,8 +10,6 @@
 #include "Event.h"
 #include "DialInterface.h"
 
-
-// DEV
 #include "GundamGlobals.h"
 
 #include "GenericToolbox.Wrappers.h"
@@ -51,11 +49,7 @@ public:
     bool *updateRequested{nullptr};
     void update(){
       // Reevaluate the dial if an update has been requested
-#ifdef EVENT_DIAL_CACHE_SAFE_SLOW_INTERFACE
-      if( dialInterface->getInputBufferRef()->isDialUpdateRequested() ){
-#else
       if( *(this->updateRequested) ) {
-#endif
         response = dialInterface->evalResponse();
       }
     }
@@ -155,7 +149,7 @@ public:
   // returns the current index
   [[nodiscard]] size_t getFillIndex() const { return _fillIndex_; }
 
-  [[nodiscard]] const std::vector<IndexedCacheEntry> getIndexedCache() const { return _indexedCache_; }
+  [[nodiscard]] const std::vector<IndexedCacheEntry>& getIndexedCache() const { return _indexedCache_; }
 
   /// Provide the event dial cache.  The event dial cache containes a
   /// CacheElem_t object for every dial applied to a physics event.  The

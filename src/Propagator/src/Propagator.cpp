@@ -135,7 +135,7 @@ void Propagator::propagateParameters(){
   // Only real parameters are propagated on the spectra -> need to convert the eigen to original
   if( _enableEigenToOrigInPropagate_ ){ _parManager_.convertEigenToOrig(); }
   usedCacheManager = Cache::Manager::PropagateParameters();
-  if( usedCacheManager and not GundamGlobals::isForceCpuCalculation() ){ return; }
+  if( usedCacheManager and not Cache::Manager::isForceCpuCalculation() ){ return; }
 #endif
   this->reweightEvents();
   this->refillHistograms();

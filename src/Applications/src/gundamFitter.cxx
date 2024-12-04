@@ -121,31 +121,28 @@ int main(int argc, char** argv){
     LogWarning << "Using GPU parallelization." << std::endl;
   }
 
-  GundamGlobals::setIsForceCpuCalculation(clParser.isOptionTriggered("forceDirect"));
+  Cache::Manager::setIsForceCpuCalculation(clParser.isOptionTriggered("forceDirect"));
 
   bool useCache = false;
 #ifdef GUNDAM_USING_CACHE_MANAGER
   useCache = Cache::Manager::HasGPU(true);
 #endif
   if (clParser.isOptionTriggered("usingCacheManager")) {
-      int values = clParser.getNbValueSet("usingCacheManager");
-      if (values < 1) useCache = not useCache;
-      else if ("on" == clParser.getOptionVal<std::string>("usingCacheManager",0)) useCache = true;
-      else if ("off" == clParser.getOptionVal<std::string>("usingCacheManager",0)) useCache = false;
-      else {
-          LogThrow("Invalid --cache-manager argument: must be empty, 'on' or 'off'");
-      }
+    int values = clParser.getNbValueSet("usingCacheManager");
+    if (values < 1) useCache = not useCache;
+    else if ("on" == clParser.getOptionVal<std::string>("usingCacheManager",0)) useCache = true;
+    else if ("off" == clParser.getOptionVal<std::string>("usingCacheManager",0)) useCache = false;
+    else {
+      LogThrow("Invalid --cache-manager argument: must be empty, 'on' or 'off'");
+    }
   }
-  if (clParser.isOptionTriggered("usingGpu")) useCache = true;
+  useCache = clParser.isOptionTriggered("usingGpu");
 
 #ifdef GUNDAM_USING_CACHE_MANAGER
-  GundamGlobals::setIsCacheManagerEnabled(useCache);
-    if (not useCache) {
-      LogWarning << "Cache::Manager enabled but turned off for job"
-                 << std::endl;
-    }
+  Cache::Manager::SetIsEnabled(useCache);
+  LogWarningIf(not useCache) << "Cache::Manager enabled but turned off for job" << std::endl;
 #else
-    LogThrowIf(useCache, "GUNDAM compiled without Cache::Manager");
+  LogThrowIf(useCache, "GUNDAM compiled without Cache::Manager");
 #endif
 
   // inject parameter config?

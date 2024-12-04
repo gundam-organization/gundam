@@ -345,7 +345,7 @@ void LikelihoodInterface::loadModelPropagator(){
   });
 
 #ifdef GUNDAM_USING_CACHE_MANAGER
-  if( GundamGlobals::isCacheManagerEnabled() ){
+  if( Cache::Manager::isCacheManagerEnabled() ){
     _modelPropagator_.initializeCacheManager();
   }
 #endif

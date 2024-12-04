@@ -5,34 +5,36 @@
 #ifndef GUNDAM_GUNDAM_GLOBALS_H
 #define GUNDAM_GUNDAM_GLOBALS_H
 
-#include <mutex>
-
 
 class GundamGlobals{
 
 public:
   // setters
-  static void setIsDebug( bool enable){ _isDebug_ = enable; }
-  static void setLightOutputMode(bool enable_){ _lightOutputModeEnabled_ = enable_; }
-  static void setIsCacheManagerEnabled( bool enable){ _useCacheManager_ = enable; }
-  static void setIsForceCpuCalculation( bool enable){ _forceCpuCalculation_ = enable; }
-  static void setNumberOfThreads(int nbCpuThreads_){ _nbCpuThreads_ = nbCpuThreads_; }
+  static void setIsDebug(bool enable_){ _parameters_.isDebug = enable_; }
+  static void setLightOutputMode(bool enable_){ _parameters_.lightOutputModeEnabled = enable_; }
+  static void setNumberOfThreads(int nbCpuThreads_){ _parameters_.nbCpuThreads = nbCpuThreads_; }
 
   // getters
-  static bool isDebug(){ return _isDebug_; }
-  static bool isLightOutputMode(){ return _lightOutputModeEnabled_; }
-  static bool isCacheManagerEnabled(){ return _useCacheManager_; }
-  static bool isForceCpuCalculation(){ return _forceCpuCalculation_; }
-  static int getNbCpuThreads(){ return _nbCpuThreads_; }
-  static std::mutex& getMutex(){ return _threadMutex_; }
+  static bool isDebug(){ return _parameters_.isDebug; }
+  static bool isLightOutputMode(){ return _parameters_.lightOutputModeEnabled; }
+  static int getNbCpuThreads(){ return _parameters_.nbCpuThreads; }
 
 private:
-  static bool _isDebug_; /* enable debug printouts for the config reading */
-  static bool _useCacheManager_; /* enable the use of the cache manager in the propagator (mainly for GPU) */
-  static bool _forceCpuCalculation_; /* force using CPU in the cache manager */
-  static bool _lightOutputModeEnabled_;
-  static int _nbCpuThreads_;
-  static std::mutex _threadMutex_;
+
+  struct Parameters{
+    // Debug mode is set to enable extra printouts during runtime.
+    bool isDebug{false};
+
+    // Light output mode will disable the writing of objects in the output files.
+    // This makes the produced output .root file lighter.
+    bool lightOutputModeEnabled{false};
+
+    // how many parallel threads must be running during the
+    // compatible routines during runtime
+    int nbCpuThreads{1};
+  };
+  static Parameters _parameters_;
+
 
 };
 

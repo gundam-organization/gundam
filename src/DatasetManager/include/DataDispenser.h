@@ -101,8 +101,10 @@ private:
   // needed to check which variables need to be loaded
   const PlotGenerator* _plotGeneratorPtr_{nullptr};
 
+  // multi-threading
   GenericToolbox::ParallelWorker _threadPool_{};
   GenericToolbox::ParallelWorker _threadPoolEventLoad_{};
+  GenericToolbox::NoCopyWrapper<std::mutex> _mutex_{};
 
 };
 
