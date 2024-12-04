@@ -26,10 +26,6 @@ int main(int argc, char** argv){
 
   GundamApp app{"main fitter"};
 
-#ifdef GUNDAM_USING_CACHE_MANAGER
-  if (Cache::Manager::HasCUDA()){ LogInfo << "CUDA inside" << std::endl; }
-#endif
-
   // --------------------------
   // Read Command Line Args:
   // --------------------------
@@ -83,6 +79,8 @@ int main(int argc, char** argv){
   clParser.addDummyOption();
 
 #ifdef GUNDAM_USING_CACHE_MANAGER
+  LogInfoIf( Cache::Manager::HasCUDA() ) << "CUDA inside." << std::endl;
+
   clParser.addDummyOption("GPU/CacheManager options");
   clParser.addTriggerOption("usingGpu", {"--gpu"}, "Use GPU parallelization (will enable the CacheManager)");
   clParser.addTriggerOption("usingCacheManager", {"--cache-manager"}, "Enables the CacheManager even with CPU");
@@ -108,48 +106,38 @@ int main(int argc, char** argv){
   // --------------------------
   // Init command line args:
   // --------------------------
+  GundamGlobals::setIsDebug( clParser.isOptionTriggered("debugVerbose") );
 
-  if( clParser.isOptionTriggered("debugVerbose") ){
-    GundamGlobals::setIsDebug(true);
 #ifdef GUNDAM_USING_CACHE_MANAGER
-    Cache::Manager::SetEnableDebugPrintouts(true);
-#endif
-  }
+  bool useCacheManager{false};
 
   // Is build compatible with GPU option?
   if( clParser.isOptionTriggered("usingGpu") ){
-#ifdef GUNDAM_USING_CACHE_MANAGER
     LogThrowIf( not Cache::Manager::HasCUDA(), "CUDA support not enabled with this GUNDAM build." );
-#else
-    LogThrow("CUDA support not enabled with this GUNDAM build (GUNDAM_USING_CACHE_MANAGER required).")
-#endif
     LogWarning << "Using GPU parallelization." << std::endl;
+    useCacheManager = true;
   }
 
-#ifdef GUNDAM_USING_CACHE_MANAGER
-  Cache::Manager::setIsForceCpuCalculation(clParser.isOptionTriggered("forceDirect"));
-#endif
+  if( clParser.isOptionTriggered("usingCacheManager") ){
 
-  bool useCache = false;
-#ifdef GUNDAM_USING_CACHE_MANAGER
-  useCache = Cache::Manager::HasGPU(true);
-#endif
-  if (clParser.isOptionTriggered("usingCacheManager")) {
-    int values = clParser.getNbValueSet("usingCacheManager");
-    if (values < 1) useCache = not useCache;
-    else if ("on" == clParser.getOptionVal<std::string>("usingCacheManager",0)) useCache = true;
-    else if ("off" == clParser.getOptionVal<std::string>("usingCacheManager",0)) useCache = false;
-    else {
-      LogThrow("Invalid --cache-manager argument: must be empty, 'on' or 'off'");
+    if( clParser.getNbValueSet("usingCacheManager") == 0 ){
+      useCacheManager = true;
+    }
+    else{
+      // value specified explicitly by the user
+      auto useCacheManagerCli = clParser.getOptionVal<std::string>("usingCacheManager");
+
+      if( useCacheManagerCli == "on" ){ useCacheManager = true; }
+      if( useCacheManagerCli == "off" ){ useCacheManager = false; }
+      else{ LogThrow("Invalid --cache-manager argument: must be empty, 'on' or 'off'"); }
     }
   }
-  useCache = clParser.isOptionTriggered("usingGpu");
 
-#ifdef GUNDAM_USING_CACHE_MANAGER
-  Cache::Manager::SetIsEnabled(useCache);
-  LogWarningIf(not useCache) << "Cache::Manager enabled but turned off for job" << std::endl;
-#else
-  LogThrowIf(useCache, "GUNDAM compiled without Cache::Manager");
+  // decision has been made
+  Cache::Manager::SetIsEnabled( useCacheManager );
+
+  Cache::Manager::setIsForceCpuCalculation( clParser.isOptionTriggered("forceDirect") );
+  Cache::Manager::SetEnableDebugPrintouts( clParser.isOptionTriggered("debugVerbose") );
 #endif
 
   // inject parameter config?
@@ -346,18 +334,19 @@ int main(int argc, char** argv){
   // minimization.  This is not changing the prior value, only the starting
   // point of the fit.  The kick is in units of prior standard deviations
   // about the prior point.
-  double kickMc = 0.0;          // Set the default value without an option
   if (clParser.isOptionTriggered("kickMc")) {
-      int values = clParser.getNbValueSet("usingCacheManager");
-      if (values < 1) kickMc = 0.1; // Default without an argument.
-      else kickMc = clParser.getOptionVal<double>("kickMc",0);
-  }
-  if ( kickMc > 0.01 ) {
-      LogAlert << "Fit starting point randomized by " << kickMc << " sigma"
-               << " around prior values."
-               << std::endl;
-      fitter.setThrowMcBeforeFit( true );
-      fitter.setThrowGain( kickMc );
+
+    double kickMc = 0.1;
+    if( clParser.getNbValueSet("kickMc") == 1 ){
+      kickMc = clParser.getOptionVal<double>("kickMc");
+    }
+
+    LogAlert << "Fit starting point randomized by " << kickMc << " sigma"
+             << " around prior values."
+             << std::endl;
+    fitter.setThrowMcBeforeFit( true );
+    fitter.setThrowGain( kickMc );
+
   }
 
   if( clParser.isOptionTriggered("debugMaxNbEventToLoad") ){
