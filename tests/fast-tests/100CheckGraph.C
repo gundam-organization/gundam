@@ -83,7 +83,7 @@ int main() {
         }
         std::unique_ptr<TGraph> graph1(new TGraph());
         int p = 0;
-        for (double x = -2.0; x <= 2.0; x += 0.1) {
+        for (double x = -3.0; x <= 3.0; x += 0.1) {
             double v0 = CalculateGraph(x, -10.0, 10.0, data, 2*nData);
             double v1 = CalculateGraph(-x, -10.0, 10.0, data, 2*nData);
             std::ostringstream tmp;
@@ -139,7 +139,7 @@ int main() {
         }
         std::unique_ptr<TGraph> graph1(new TGraph());
         int p = 0;
-        for (double x = -10.0; x <= 10.0; x += 0.1) {
+        for (double x = -12.0; x <= 12.0; x += 0.1) {
             double v0 = CalculateGraph(x, -50.0, 50.0, data, 2*nData);
             double v1 = CalculateGraph(-x, -50.0, 50.0, data, 2*nData);
             std::ostringstream tmp;
