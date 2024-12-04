@@ -30,13 +30,15 @@ add_test(
 ## Compiled unit tests using GoogleTest.  These are only run if GTest
 ## is found.
 if (NOT SKIP_GOOGLE_TEST)
+  # Use the pre cmake 1.10 interface because we set 3.5 as the minimum cmake
   find_package(GTest)
 else()
   cmessage( WARNING "GTest unit testing explicitly disabled by user")
 endif()
 if (NOT GTEST_FOUND)
-  cmessage( WARNING "GTest package disabled or not found.  Disable unit tests.")
+  cmessage( WARNING "GTest package not available.  Disable developer tests.")
 else()
+  cmessage( WARNING "GTest package enabled for developer unit tests.")
   enable_testing()
 
   # Setup the hemi test suite for the host
