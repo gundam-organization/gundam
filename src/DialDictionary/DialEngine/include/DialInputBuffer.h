@@ -89,10 +89,6 @@ public:
   /// Simple printout function for debug info on error
   [[nodiscard]] std::string getSummary() const;
 
-  // Deprecated
-  [[deprecated("use getParameter()")]] [[nodiscard]] const Parameter& getFitParameter(int i=0) const { return getParameter(i); }
-  [[deprecated("use getParameterSet()")]] [[nodiscard]] const ParameterSet& getFitParameterSet(int i=0) const { return getParameterSet(i); }
-
 private:
   /// Flag if the member can be still edited.
   bool _isInitialized_{false};
