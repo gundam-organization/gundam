@@ -51,11 +51,7 @@ public:
     bool *updateRequested{nullptr};
     void update(){
       // Reevaluate the dial if an update has been requested
-#ifdef EVENT_DIAL_CACHE_SAFE_SLOW_INTERFACE
-      if( dialInterface->getInputBufferRef()->isDialUpdateRequested() ){
-#else
       if( *(this->updateRequested) ) {
-#endif
         response = dialInterface->evalResponse();
       }
     }
