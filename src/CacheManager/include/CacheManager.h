@@ -51,27 +51,87 @@ class Parameter;
 /// Manage the cache calculations on the GPU.  This will work even when there
 /// isn't a GPU, but it's really slow on the CPU.  This is a singleton.
 class Cache::Manager {
+
+private:
+  // Holds static members of the CacheManager in one place
+  struct Parameters{
+
+    // You get one guess...
+    Manager* fSingleton{nullptr};
+
+    // By default, the use of CacheManager is set to false. This parameter replaces the ones that
+    // was present in GundamGlobals.h
+    // This parameter should be set in the front-end applications
+    bool fIsEnabled{false};
+
+    // Enabled printouts when moving data between host and device
+    bool fEnableDebugPrintouts{false};
+
+    // forceCpuCalculation allows to also do the propagation of parameters with the CPU
+    // routine in order to check the accuracy of the CacheManager computation
+    bool fForceCpuCalculation{false};
+
+    // Set to true when the cache needs an update.
+    bool fUpdateRequired{true};
+
+    // Keep track of the state of the CacheManager
+    bool fIsCacheManagerBuilt{false};
+
+    // Pointers to the Propagator member the CacheManger has to take care of
+    SampleSet* fSampleSetPtr{nullptr};
+    EventDialCache* fEventDialCachePtr{nullptr};
+    // A map between the fit parameter pointers and the parameter index used
+    // by the fitter.
+    std::map<const Parameter*, int> ParameterMap{};
+
+    // Keep track of when we want to get back from the GPU once the propagation is complete
+    bool fIsHistContentCopyEnabled{false};
+    bool fIsEventWeightCopyEnabled{false};
+
+    /// Declare all of the actual GPU caches here.  There is one GPU, so this
+    /// is the ONE place that everything is collected together.
+    std::vector<CacheSampleHistFiller> fSampleHistFillerList{};
+    std::vector<CacheEventWeightFiller> fEventWeightFillerList{};
+
+    // Time monitoring
+    GenericToolbox::Time::AveragedTimer<10> cacheFillTimer;
+    GenericToolbox::Time::AveragedTimer<10> pullFromDeviceTimer;
+
+  };
+
+  // instance defined in cpp file
+  static Parameters fParameters;
+
 public:
+
+  // static setters
+  static void SetIsEnabled(bool enable_){ fParameters.fIsEnabled = enable_; }
+  static void setIsForceCpuCalculation(bool enable_){ fParameters.fForceCpuCalculation = enable_; }
+
+  // static getters
+  static bool isCacheManagerEnabled(){ return fParameters.fIsEnabled; }
+  static bool isForceCpuCalculation(){ return fParameters.fForceCpuCalculation; }
+
   // Get the pointer to the cache manager.  This will be a nullptr if the
   // cache is not being used.
-  static Manager* Get() {return fSingleton;}
+  static Manager* Get(){ return fParameters.fSingleton; }
 
   /// Fill the cache for the current iteration.  This needs to be called
   /// before the cached weights can be used.  This is used in Propagator.cpp.
   static bool Fill();
 
   /// Dedicated setter for fUpdateRequired flag
-  static void SetUpdateRequired(bool isUpdateRequired_){ fUpdateRequired = isUpdateRequired_; };
+  static void SetUpdateRequired(bool isUpdateRequired_){ fParameters.fUpdateRequired = isUpdateRequired_; };
 
   /// Set addresses of the Propagator objects the CacheManager should take care of
-  static void SetSampleSetPtr(SampleSet& sampleSet_){ fSampleSetPtr = &sampleSet_; }
-  static void SetEventDialSetPtr(EventDialCache& eventDialCache_){ fEventDialCachePtr = &eventDialCache_; }
-  static void SetIsHistContentCopyEnabled(bool fIsHistContentCopyEnabled_){ fIsHistContentCopyEnabled = fIsHistContentCopyEnabled_; }
-  static void SetIsEventWeightCopyEnabled(bool fIsEventWeightCopyEnabled_){ fIsEventWeightCopyEnabled = fIsEventWeightCopyEnabled_; }
-  static void SetEnableDebugPrintouts(bool fEnableDebugPrintouts_){ fEnableDebugPrintouts = fEnableDebugPrintouts_; }
+  static void SetSampleSetPtr(SampleSet& sampleSet_){ fParameters.fSampleSetPtr = &sampleSet_; }
+  static void SetEventDialSetPtr(EventDialCache& eventDialCache_){ fParameters.fEventDialCachePtr = &eventDialCache_; }
+  static void SetIsHistContentCopyEnabled(bool fIsHistContentCopyEnabled_){ fParameters.fIsHistContentCopyEnabled = fIsHistContentCopyEnabled_; }
+  static void SetIsEventWeightCopyEnabled(bool fIsEventWeightCopyEnabled_){ fParameters.fIsEventWeightCopyEnabled = fIsEventWeightCopyEnabled_; }
+  static void SetEnableDebugPrintouts(bool fEnableDebugPrintouts_){ fParameters.fEnableDebugPrintouts = fEnableDebugPrintouts_; }
 
-  static const GenericToolbox::Time::AveragedTimer<10>& GetCacheFillTimer() { return cacheFillTimer; }
-  static const GenericToolbox::Time::AveragedTimer<10>& GetPullFromDeviceTimer() { return pullFromDeviceTimer; }
+  static const GenericToolbox::Time::AveragedTimer<10>& GetCacheFillTimer() { return fParameters.cacheFillTimer; }
+  static const GenericToolbox::Time::AveragedTimer<10>& GetPullFromDeviceTimer() { return fParameters.pullFromDeviceTimer; }
 
   /// Build the cache and load it into the device.  This is used in
   /// Propagator.cpp to fill the constants needed to for the calculations.
@@ -109,10 +169,12 @@ public:
   static bool CopyEventWeights();
   static bool CopyHistogramsContent();
 
-  static bool IsBuilt(){ return fIsCacheManagerBuilt; }
+  static bool IsBuilt(){ return fParameters.fIsCacheManagerBuilt; }
 
 
 private:
+
+
   // Hold the configuration that will be used to construct the manager
   // (singleton).  This information was originally passed as arguments to
   // the constructor, but it became to complex and prone to mistakes since
@@ -184,28 +246,7 @@ private:
   };
 
   // This is a singleton, so the constructor is private.
-  Manager(const Cache::Manager::Configuration& config);
-  static Manager* fSingleton;  // You get one guess...
-  static bool fUpdateRequired; // Set to true when the cache needs an update.
-
-  // A map between the fit parameter pointers and the parameter index used
-  // by the fitter.
-  static std::map<const Parameter*, int> ParameterMap;
-
-  /// Declare all of the actual GPU caches here.  There is one GPU, so this
-  /// is the ONE place that everything is collected together.
-
-  /// pointers to the corresponding Propagator structure
-  static bool fEnableDebugPrintouts;
-  static SampleSet* fSampleSetPtr;
-  static EventDialCache* fEventDialCachePtr;
-  static std::vector<CacheSampleHistFiller> fSampleHistFillerList;
-  static std::vector<CacheEventWeightFiller> fEventWeightFillerList;
-  static bool fIsHistContentCopyEnabled;
-  static bool fIsEventWeightCopyEnabled;
-  static bool fIsCacheManagerBuilt;
-  static GenericToolbox::Time::AveragedTimer<10> cacheFillTimer;
-  static GenericToolbox::Time::AveragedTimer<10> pullFromDeviceTimer;
+  explicit Manager(const Cache::Manager::Configuration& config);
 
   /// The cache for parameter weights (on the GPU).
   std::unique_ptr<Cache::Parameters> fParameterCache;
