@@ -196,6 +196,18 @@ void Propagator::initializeImpl(){
     if( _throwAsimovToyParameters_ ){
       LogWarning << "Will throw toy parameters..." << std::endl;
 
+      // Handling possible masks
+      // putting before printing out the events
+      for( auto& parSet : _parManager_.getParameterSetsList() ){
+        if( not parSet.isEnabled() ) continue;
+
+        if( parSet.isMaskForToyGeneration() ){
+          LogWarning << parSet.getName() << " will be masked for the toy generation." << std::endl;
+          parSet.setMaskedForPropagation( true );
+        }
+      }
+
+
       if( _showEventBreakdown_ ){
         LogInfo << "Propagating prior parameters on the initially loaded events..." << std::endl;
         bool cacheManagerState = GundamGlobals::getEnableCacheManager();
@@ -224,16 +236,6 @@ void Propagator::initializeImpl(){
       }
 
       _parManager_.throwParameters();
-
-      // Handling possible masks
-      for( auto& parSet : _parManager_.getParameterSetsList() ){
-        if( not parSet.isEnabled() ) continue;
-
-        if( parSet.isMaskForToyGeneration() ){
-          LogWarning << parSet.getName() << " will be masked for the toy generation." << std::endl;
-          parSet.setMaskedForPropagation( true );
-        }
-      }
 
     } // throw asimov?
 
