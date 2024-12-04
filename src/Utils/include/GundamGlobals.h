@@ -12,10 +12,10 @@ class GundamGlobals{
 
 public:
   // setters
-  static void setIsDebug( bool enable){ _isDebug_ = enable; }
+  static void setIsDebug(bool enable_){ _isDebug_ = enable_; }
   static void setLightOutputMode(bool enable_){ _lightOutputModeEnabled_ = enable_; }
-  static void setIsCacheManagerEnabled( bool enable){ _useCacheManager_ = enable; }
-  static void setIsForceCpuCalculation( bool enable){ _forceCpuCalculation_ = enable; }
+  static void setIsCacheManagerEnabled(bool enable_){ _useCacheManager_ = enable_; }
+  static void setIsForceCpuCalculation(bool enable_){ _forceCpuCalculation_ = enable_; }
   static void setNumberOfThreads(int nbCpuThreads_){ _nbCpuThreads_ = nbCpuThreads_; }
 
   // getters
