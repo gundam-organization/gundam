@@ -1161,7 +1161,7 @@ void DataDispenser::loadEvent(int iThread_){
     // Let's claim an index. Indices are shared among threads
     EventDialCache::IndexedCacheEntry *eventDialCacheEntry{nullptr};
     {
-      std::unique_lock<std::mutex> lock(GundamGlobals::getMutex());
+      std::unique_lock<std::mutex> lock(_mutex_);
 
       if( _parameters_.debugNbMaxEventsToLoad != 0 ){
         // check if the limit has been reached

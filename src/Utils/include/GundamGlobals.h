@@ -24,7 +24,6 @@ public:
   static bool isCacheManagerEnabled(){ return _useCacheManager_; }
   static bool isForceCpuCalculation(){ return _forceCpuCalculation_; }
   static int getNbCpuThreads(){ return _nbCpuThreads_; }
-  static std::mutex& getMutex(){ return _threadMutex_; }
 
 private:
   static bool _isDebug_; /* enable debug printouts for the config reading */
@@ -32,7 +31,6 @@ private:
   static bool _forceCpuCalculation_; /* force using CPU in the cache manager */
   static bool _lightOutputModeEnabled_;
   static int _nbCpuThreads_;
-  static std::mutex _threadMutex_;
 
 };
 
