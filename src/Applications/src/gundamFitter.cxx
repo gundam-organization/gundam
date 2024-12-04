@@ -121,7 +121,9 @@ int main(int argc, char** argv){
     LogWarning << "Using GPU parallelization." << std::endl;
   }
 
+#ifdef GUNDAM_USING_CACHE_MANAGER
   Cache::Manager::setIsForceCpuCalculation(clParser.isOptionTriggered("forceDirect"));
+#endif
 
   bool useCache = false;
 #ifdef GUNDAM_USING_CACHE_MANAGER
