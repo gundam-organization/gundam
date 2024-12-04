@@ -10,8 +10,6 @@
 #include "Event.h"
 #include "DialInterface.h"
 
-
-// DEV
 #include "GundamGlobals.h"
 
 #include "GenericToolbox.Wrappers.h"
