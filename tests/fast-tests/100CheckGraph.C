@@ -98,6 +98,7 @@ int main() {
     }
 #endif
 
+#define TEST3
 #ifdef TEST3
     {
         // Test interpolation between six points
@@ -111,13 +112,12 @@ int main() {
         }
         std::unique_ptr<TGraph> graph1(new TGraph());
         int p = 0;
-        for (double x = -1.5; x <= 1.5; x += 0.01) {
-            double v0 = CalculateCompactSpline(x, -10.0, 10.0, data, nData);
-            double v1 = CalculateCompactSpline(-x, -10.0, 10.0, data, nData);
+        for (double x = -12.0; x <= 12.0; x += 0.1) {
+            double v0 = CalculateGraph(x, -50.0, 50.0, data, 2*nData);
+            double v1 = CalculateGraph(-x, -50.0, 50.0, data, 2*nData);
             std::ostringstream tmp;
             tmp << "Symmetric tolerance (test 3) (X=" << x << ")";
             TOLERANCE(tmp.str(), v0, v1, 1E-6);
-            graph1->SetPoint(p++,x,v0);
             graph1->SetPoint(p++,x,v0);
         }
         graph1->Draw("AC");

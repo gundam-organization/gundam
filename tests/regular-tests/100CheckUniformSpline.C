@@ -76,8 +76,8 @@ int main() {
         }
         TGraph uniformSpline;
         int point = 0;
-        for (double xxx = spline.GetXmin();
-             xxx<=spline.GetXmax(); xxx += 0.01) {
+        for (double xxx = spline.GetXmin()-1.0;
+             xxx<=spline.GetXmax()+1.0; xxx += 0.01) {
             double splineValue = spline.Eval(xxx);
             double calcValue
                 = CalculateUniformSpline(xxx,-100.0, 100.0,
@@ -127,8 +127,8 @@ int main() {
         }
         TGraph uniformSpline;
         int point = 0;
-        for (double xxx = spline.GetXmin();
-             xxx<=spline.GetXmax(); xxx += 0.01) {
+        for (double xxx = spline.GetXmin()-1.0;
+             xxx<=spline.GetXmax()+1.0; xxx += 0.01) {
             double splineValue = spline.Eval(xxx);
             double calcValue
                 = CalculateUniformSpline(xxx,-100.0, 100.0,
