@@ -14,7 +14,7 @@ std::string DataDispenserParameters::getSummary() const{
   std::stringstream ss;
   ss << GET_VAR_NAME_VALUE(useReweightEngine);
   ss << std::endl << GET_VAR_NAME_VALUE(name);
-  ss << std::endl << GET_VAR_NAME_VALUE(treePath);
+  ss << std::endl << GET_VAR_NAME_VALUE(globalTreePath);
   ss << std::endl << GET_VAR_NAME_VALUE(nominalWeightFormulaStr);
   ss << std::endl << GET_VAR_NAME_VALUE(selectionCutFormulaStr);
   ss << std::endl << "activeLeafNameList = " << GenericToolbox::toString(activeLeafNameList, true);

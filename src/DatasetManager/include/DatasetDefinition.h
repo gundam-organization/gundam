@@ -52,6 +52,12 @@ public:
       dd.second.getParameters().debugNbMaxEventsToLoad = nbMaxEventToLoad_;
     }
   }
+  void setFractionOfEntriesToLoad(double fraction_){
+    _modelDispenser_.getParameters().fractionOfEntries = fraction_;
+    for( auto& dd : _dataDispenserDict_ ){
+      dd.second.getParameters().fractionOfEntries = fraction_;
+    }
+  }
 
 private:
   // config

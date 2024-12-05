@@ -86,7 +86,7 @@ void DataDispenser::configureImpl(){
   _parameters_.nominalWeightFormulaStr = GenericToolbox::Json::buildFormula(_config_, "nominalWeightFormula", "*", _parameters_.nominalWeightFormulaStr);
 
   // options
-  GenericToolbox::Json::fillValue(_config_, _parameters_.treePath, "tree");
+  GenericToolbox::Json::fillValue(_config_, _parameters_.globalTreePath, "tree");
   GenericToolbox::Json::fillValue(_config_, _parameters_.filePathList, "filePathList");
   GenericToolbox::Json::fillValue(_config_, _parameters_.additionalVarsStorage, {{"additionalLeavesStorage"}, {"additionalVarsStorage"}});
   GenericToolbox::Json::fillValue(_config_, _parameters_.dummyVariablesList, "dummyVariablesList");
@@ -148,7 +148,7 @@ void DataDispenser::load(Propagator& propagator_){
 
   for( const auto& file: _parameters_.filePathList){
     std::string path = GenericToolbox::expandEnvironmentVariables(file);
-    LogThrowIf(not GenericToolbox::doesTFileIsValid(path, {_parameters_.treePath}), "Invalid file: " << path);
+    LogThrowIf(not GenericToolbox::doesTFileIsValid(path, {_parameters_.globalTreePath}), "Invalid file: " << path);
   }
 
   this->parseStringParameters();
@@ -419,22 +419,10 @@ void DataDispenser::preAllocateMemory(){
   /// of a vector memory. This is not thread safe, so better ensure the vector
   /// won't have to do this by allocating the right event size.
 
-  // MEMORY CLAIM?
-  TChain treeChain(_parameters_.treePath.c_str());
-  for( const auto& file: _parameters_.filePathList){
-    std::string name = GenericToolbox::expandEnvironmentVariables(file);
-    std::string treePath{};
-    Long64_t nentries{TTree::kMaxEntries};
-
-    auto chunks = GenericToolbox::splitString(name, ":", true);
-    if( chunks.size() > 1 ){ treePath = chunks[1]; }
-
-    LogWarningIf(name != file) << "Filename expanded to: " << name << std::endl;
-    treeChain.AddFile(name.c_str(), nentries, treePath.c_str());
-  }
+  auto treeChain = openChain();
 
   GenericToolbox::LeafCollection lCollection;
-  lCollection.setTreePtr( &treeChain );
+  lCollection.setTreePtr( treeChain.get() );
   for( auto& var : _cache_.varsRequestedForIndexing ){
     // look for override requests
     lCollection.addLeafExpression(
@@ -631,15 +619,41 @@ void DataDispenser::loadFromHistContent(){
 std::shared_ptr<TChain> DataDispenser::openChain(bool verbose_){
   LogInfoIf(verbose_) << "Opening ROOT files containing events..." << std::endl;
 
-  std::shared_ptr<TChain> treeChain(std::make_unique<TChain>(_parameters_.treePath.c_str()));
+  std::shared_ptr<TChain> treeChain(std::make_unique<TChain>(_parameters_.globalTreePath.c_str()));
   for( const auto& file: _parameters_.filePathList){
     std::string name = GenericToolbox::expandEnvironmentVariables(file);
     GenericToolbox::replaceSubstringInsideInputString(name, "//", "/");
+
     if( verbose_ ){
       LogScopeIndent;
       LogWarning << name << std::endl;
     }
-    treeChain->Add(name.c_str());
+
+    std::string treePath{_parameters_.globalTreePath};
+    auto chunks = GenericToolbox::splitString(name, ":", true);
+    if( chunks.size() > 1 ){ treePath = chunks[1]; name = chunks[0];  }
+
+    LogThrowIf( treePath.empty(), "TTree path not set." );
+
+    LogThrowIf( not GenericToolbox::doesTFileIsValid(name, {treePath}), "Could not open TFile: " << name << " with TTree " << treePath);
+
+    Long64_t nMaxEntries{TTree::kMaxEntries};
+    if( _parameters_.fractionOfEntries != 1. ){
+      std::unique_ptr<TFile> temp{TFile::Open(name.c_str())};
+      LogThrowIf(temp== nullptr, "Error while opening TFile: " << name);
+
+      auto* tree = temp->Get<TTree>(treePath.c_str());
+      LogThrowIf(tree== nullptr, "Error while opening TTree: " << treePath << " in " << name);
+
+      nMaxEntries = Long64_t( double(tree->GetEntries()) * _parameters_.fractionOfEntries );
+
+      if( verbose_ ){
+        LogScopeIndent;
+        LogWarning << "Max entries: " << nMaxEntries << std::endl;
+      }
+    }
+
+    treeChain->AddFile(name.c_str(), nMaxEntries, treePath.c_str());
   }
 
   return treeChain;
@@ -651,7 +665,7 @@ void DataDispenser::eventSelectionFunction(int iThread_){
   if( iThread_ == -1 ){ iThread_ = 0; nThreads = 1; }
 
   // Opening ROOT files and make a TChain
-  auto treeChain{this->openChain(false)};
+  auto treeChain{this->openChain()};
 
   // Create the memory buffer for the TChain
   GenericToolbox::LeafCollection lCollection;
