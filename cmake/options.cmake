@@ -24,8 +24,8 @@ option( USE_STATIC_LINKS "Use static link of libraries and apps instead of share
 option( CXX_WARNINGS "Enable most C++ warning flags." ON )
 option( CXX_MARCH_FLAG "Enable cpu architecture specific optimisations." OFF )
 option( CMAKE_CXX_EXTENSIONS "Enable GNU extensions to C++ language (-std=gnu++14)." OFF )
-option( ENABLE_TESTS "Build CMake tests (optionally uses googletest)." OFF )
-option( SKIP_GOOGLE_TEST "Skip GTest unit tests (other tests enabled)." OFF )
+option( ENABLE_TESTS "Build CMake tests (optionally uses googletest)." ON )
+option( SKIP_GOOGLE_TEST "Skip GTest unit tests (other tests enabled)." ON )
 
 # Reading options
 ##################
