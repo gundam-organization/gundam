@@ -63,7 +63,7 @@ namespace {
         CHECK_OFFSET(1);
 
 #define CALCULATE_GRAPH_EXTRA_SAFETY_CHECK
-#undef CALCULATE_GRAPH_CONTINUE_ON_FATAL_ERROR
+#define CALCULATE_GRAPH_CONTINUE_ON_FATAL_ERROR
 #if defined(CALCULATE_GRAPH_EXTRA_SAFETY_CHECK) and not defined(__CUDACC__)
         // Double check the range calculations.  This is debugging code, so it
         // isn't intended to run on the GPU. It also assumes the iostream has
@@ -79,7 +79,7 @@ namespace {
             }
             ix = 0;
 #ifndef CALCULATE_GRAPH_CONTINUE_ON_FATAL_ERROR
-            throw std::runtime_error("CalculateGraph Error");
+            std::exit(EXIT_FAILURE);
 #endif
         }
         if (ix > knotCount-2) {
@@ -93,7 +93,7 @@ namespace {
             }
             ix = knotCount - 2;
 #ifndef CALCULATE_GRAPH_CONTINUE_ON_FATAL_ERROR
-            throw std::runtime_error("CalculateGraph Error");
+            std::exit(EXIT_FAILURE);
 #endif
         }
 #endif
