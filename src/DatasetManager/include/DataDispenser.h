@@ -69,7 +69,6 @@ protected:
   void loadEvent(int iThread_);
 
   struct ThreadSharedData{
-    Long64_t currentEntryIndex{0};
     Long64_t nbEntries{0};
 
     std::shared_ptr<TChain> treeChain{nullptr};

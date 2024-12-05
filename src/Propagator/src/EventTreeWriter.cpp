@@ -53,11 +53,13 @@ template<typename T> void EventTreeWriter::writeEventsTemplate(const GenericTool
 
   GenericToolbox::RawDataArray privateMemberArr;
   std::map<std::string, std::function<void(GenericToolbox::RawDataArray&, const Event&)>> leafDictionary;
-  leafDictionary["eventWeight/D"] =   [](GenericToolbox::RawDataArray& arr_, const Event& ev_){ arr_.writeRawData(ev_.getWeights().current); };
-  leafDictionary["treeWeight/D"] =    [](GenericToolbox::RawDataArray& arr_, const Event& ev_){ arr_.writeRawData(ev_.getWeights().base); };
-  leafDictionary["sampleBinIndex/I"]= [](GenericToolbox::RawDataArray& arr_, const Event& ev_){ arr_.writeRawData(ev_.getIndices().bin); };
-  leafDictionary["dataSetIndex/I"] =  [](GenericToolbox::RawDataArray& arr_, const Event& ev_){ arr_.writeRawData(ev_.getIndices().dataset); };
-  leafDictionary["entryIndex/L"] =    [](GenericToolbox::RawDataArray& arr_, const Event& ev_){ arr_.writeRawData(ev_.getIndices().entry); };
+  leafDictionary["eventWeight/D"] =    [](GenericToolbox::RawDataArray& arr_, const Event& ev_){ arr_.writeRawData(ev_.getWeights().current); };
+  leafDictionary["treeWeight/D"] =     [](GenericToolbox::RawDataArray& arr_, const Event& ev_){ arr_.writeRawData(ev_.getWeights().base); };
+  leafDictionary["sampleBinIndex/I"]=  [](GenericToolbox::RawDataArray& arr_, const Event& ev_){ arr_.writeRawData(ev_.getIndices().bin); };
+  leafDictionary["dataSetIndex/I"] =   [](GenericToolbox::RawDataArray& arr_, const Event& ev_){ arr_.writeRawData(ev_.getIndices().dataset); };
+  leafDictionary["entryIndex/L"] =     [](GenericToolbox::RawDataArray& arr_, const Event& ev_){ arr_.writeRawData(ev_.getIndices().entry); };
+  leafDictionary["treeEntryIndex/L"] = [](GenericToolbox::RawDataArray& arr_, const Event& ev_){ arr_.writeRawData(ev_.getIndices().treeEntry); };
+  leafDictionary["treeFileIndex/I"] =  [](GenericToolbox::RawDataArray& arr_, const Event& ev_){ arr_.writeRawData(ev_.getIndices().treeFile); };
   std::string branchDefStr;
   for( auto& leafDef : leafDictionary ){
     if( not branchDefStr.empty() ) branchDefStr += ":";
@@ -211,6 +213,13 @@ template<typename T> void EventTreeWriter::writeEventsTemplate(const GenericTool
 
     privateMemberArr.resetCurrentByteOffset();
     for( auto& leafDef : leafDictionary ){ leafDef.second(privateMemberArr, *EventTreeWriter::getEventPtr(cacheEntry)); }
+
+    if( EventTreeWriter::getEventPtr(cacheEntry)->getIndices().treeFile == 0 ){
+      LogDebugOnce << GET_VAR_NAME_VALUE(EventTreeWriter::getEventPtr(cacheEntry)->getIndices().treeFile) << std::endl;
+    }
+    else{
+      LogDebugOnce << GET_VAR_NAME_VALUE(EventTreeWriter::getEventPtr(cacheEntry)->getIndices().treeFile) << std::endl;
+    }
 
     loadedLeavesArr.resetCurrentByteOffset();
     for( int iLeaf = 0 ; iLeaf < lDict.size() ; iLeaf++ ){

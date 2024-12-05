@@ -858,19 +858,20 @@ void DataDispenser::runEventFillThreads(int iThread_){
   // Load the first TTree / need to wait for the event filler to finish hooking branches
   threadSharedData.treeChain->LoadTree(bounds.beginIndex);
 
-  for( threadSharedData.currentEntryIndex = bounds.beginIndex ; threadSharedData.currentEntryIndex < bounds.endIndex ; threadSharedData.currentEntryIndex++ ){
+  for( Long64_t iEntry = bounds.beginIndex ; iEntry < bounds.endIndex ; iEntry++ ){
 
     // before load, check if it has a sample
-    bool hasSample = _cache_.entrySampleIndexList[threadSharedData.currentEntryIndex] != -1;
+    bool hasSample = _cache_.entrySampleIndexList[iEntry] != -1;
     if( not hasSample ){ continue; }
 
-    Int_t nBytes{ threadSharedData.treeChain->GetEntry(threadSharedData.currentEntryIndex) };
+    Int_t nBytes{ threadSharedData.treeChain->GetEntry(iEntry) };
+
     threadSharedData.isEntryBufferReady.setValue(true); // loaded! -> let the other thread get everything it needs
 
     if( iThread_ == 0 ){
       readSpeed.addQuantity(nBytes * nThreads);
 
-      if( GenericToolbox::showProgressBar(threadSharedData.currentEntryIndex*nThreads, threadSharedData.nbEntries) ){
+      if( GenericToolbox::showProgressBar(iEntry*nThreads, threadSharedData.nbEntries) ){
 
         ssProgressBar.str("");
 
@@ -884,7 +885,7 @@ void DataDispenser::runEventFillThreads(int iThread_){
 
         ssProgressBar << LogInfo.getPrefixString() << progressTitle;
         GenericToolbox::displayProgressBar(
-            threadSharedData.currentEntryIndex*nThreads,
+            iEntry*nThreads,
             threadSharedData.nbEntries,
             ssProgressBar.str()
         );
@@ -894,7 +895,7 @@ void DataDispenser::runEventFillThreads(int iThread_){
     // make sure the event filler thread has received the signal for the last entry
     threadSharedData.isEntryBufferReady.waitUntilEqual( false );
 
-    // make sure currentEntryIndex don't get updated while it hasn't been read by the other thread
+    // make sure currentEntry don't get updated while it hasn't been read by the other thread
     threadSharedData.requestReadNextEntry.waitUntilEqualThenToggle( true );
 
     // was the event loader stopped?
@@ -1087,8 +1088,10 @@ void DataDispenser::loadEvent(int iThread_){
       if( eventIndexingBuffer.getWeights().base == 0 ){ continue; }
     }
 
-    // currentEntryIndex is modified by the TChain reader
-    eventIndexingBuffer.getIndices().entry = threadSharedData.currentEntryIndex;
+    // grab data from TChain
+    eventIndexingBuffer.getIndices().entry     = threadSharedData.treeChain->GetReadEntry();
+    eventIndexingBuffer.getIndices().treeFile      = threadSharedData.treeChain->GetTreeNumber();
+    eventIndexingBuffer.getIndices().treeEntry = threadSharedData.treeChain->GetTree()->GetReadEntry();
 
     // get sample index / all -1 samples have been ruled out by the chain reader
     iSample = _cache_.entrySampleIndexList[eventIndexingBuffer.getIndices().entry];

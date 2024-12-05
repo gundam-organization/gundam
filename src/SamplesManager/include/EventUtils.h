@@ -15,13 +15,15 @@ namespace EventUtils{
 
   struct Indices{
 
+    // declaring variables ordered by type (struct 8 bytes lighter because of alignment)
+
     // source
     int dataset{-1}; // which DatasetDefinition?
-    long long entry{-1}; // which entry of the TChain?
-
-    // destination
-    int sample{-1}; // this information is lost in the EventDialCache manager
-    int bin{-1}; // which bin of the sample?
+    int treeFile{-1};    // which file?
+    int sample{-1};  // this information is lost in the EventDialCache manager
+    int bin{-1};     // which bin of the sample?
+    long entry{-1};  // which entry of the TChain?
+    long treeEntry{-1};   // which entry of the TTree?
 
     [[nodiscard]] std::string getSummary() const;
     friend std::ostream& operator <<( std::ostream& o, const Indices& this_ ){ o << this_.getSummary(); return o; }
