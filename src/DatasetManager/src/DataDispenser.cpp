@@ -81,10 +81,6 @@ void DataDispenser::configureImpl(){
     _parameters_.variableDict[ varName ] = varExpr;
   }
 
-  // TODO: better implementation of those
-  _parameters_.selectionCutFormulaStr = GenericToolbox::Json::buildFormula(_config_, "selectionCutFormula", "&&", _parameters_.selectionCutFormulaStr);
-  _parameters_.nominalWeightFormulaStr = GenericToolbox::Json::buildFormula(_config_, "nominalWeightFormula", "*", _parameters_.nominalWeightFormulaStr);
-
   // options
   GenericToolbox::Json::fillValue(_config_, _parameters_.globalTreePath, "tree");
   GenericToolbox::Json::fillValue(_config_, _parameters_.filePathList, "filePathList");
@@ -94,6 +90,9 @@ void DataDispenser::configureImpl(){
   GenericToolbox::Json::fillValue(_config_, _parameters_.debugNbMaxEventsToLoad, "debugNbMaxEventsToLoad");
   GenericToolbox::Json::fillValue(_config_, _parameters_.dialIndexFormula, "dialIndexFormula");
   GenericToolbox::Json::fillValue(_config_, _parameters_.overridePropagatorConfig, "overridePropagatorConfig");
+
+  GenericToolbox::Json::fillFormula(_config_, _parameters_.selectionCutFormulaStr, "selectionCutFormula", "&&");
+  GenericToolbox::Json::fillFormula(_config_, _parameters_.nominalWeightFormulaStr, "nominalWeightFormula", "*");
 
 }
 void DataDispenser::initializeImpl(){
