@@ -7,6 +7,8 @@ root <<EOF
 #include <memory>
 #include <cmath>
 
+#define LogError std::cout
+
 ////////////////////////////////////////////////////////////////////////
 // Test the CalculateCompactSpline routine on the CPU.
 
