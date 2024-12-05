@@ -214,13 +214,6 @@ template<typename T> void EventTreeWriter::writeEventsTemplate(const GenericTool
     privateMemberArr.resetCurrentByteOffset();
     for( auto& leafDef : leafDictionary ){ leafDef.second(privateMemberArr, *EventTreeWriter::getEventPtr(cacheEntry)); }
 
-    if( EventTreeWriter::getEventPtr(cacheEntry)->getIndices().treeFile == 0 ){
-      LogDebugOnce << GET_VAR_NAME_VALUE(EventTreeWriter::getEventPtr(cacheEntry)->getIndices().treeFile) << std::endl;
-    }
-    else{
-      LogDebugOnce << GET_VAR_NAME_VALUE(EventTreeWriter::getEventPtr(cacheEntry)->getIndices().treeFile) << std::endl;
-    }
-
     loadedLeavesArr.resetCurrentByteOffset();
     for( int iLeaf = 0 ; iLeaf < lDict.size() ; iLeaf++ ){
       lDict[iLeaf].dropData(

@@ -423,10 +423,14 @@ void DataDispenser::preAllocateMemory(){
   TChain treeChain(_parameters_.treePath.c_str());
   for( const auto& file: _parameters_.filePathList){
     std::string name = GenericToolbox::expandEnvironmentVariables(file);
-    if (name != file) {
-      LogWarning << "Filename expanded to: " << name << std::endl;
-    }
-    treeChain.Add(name.c_str());
+    std::string treePath{};
+    Long64_t nentries{TTree::kMaxEntries};
+
+    auto chunks = GenericToolbox::splitString(name, ":", true);
+    if( chunks.size() > 1 ){ treePath = chunks[1]; }
+
+    LogWarningIf(name != file) << "Filename expanded to: " << name << std::endl;
+    treeChain.AddFile(name.c_str(), nentries, treePath.c_str());
   }
 
   GenericToolbox::LeafCollection lCollection;
