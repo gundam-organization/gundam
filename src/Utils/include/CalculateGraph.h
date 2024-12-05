@@ -50,7 +50,7 @@ namespace {
         if (dim < 4) return data[0];
 
         // Check to find a point that is less than x.  This is "brute force"
-        // binary search for upto 16 elements.  The "if" has been checked and
+        // binary search for upto 31 elements.  The "if" has been checked and
         // is efficient with CUDA.
         const int knotCount = (dim)/2;
         int ix = 0;
@@ -62,9 +62,41 @@ namespace {
         CHECK_OFFSET(2);
         CHECK_OFFSET(1);
 
-        // handle positive extrapolation
-        // this ensures that x2 exists in the array
-        if( ix + 1 >= knotCount ){ ix--; }
+#define CALCULATE_GRAPH_EXTRA_SAFETY_CHECK
+#undef CALCULATE_GRAPH_CONTINUE_ON_FATAL_ERROR
+#if defined(CALCULATE_GRAPH_EXTRA_SAFETY_CHECK) and not defined(__CUDACC__)
+        // Double check the range calculations.  This is debugging code, so it
+        // isn't intended to run on the GPU. It also assumes the iostream has
+        // already been included.
+        if (ix < 0) {
+            LogError << "CalculateGraph ix below range " << ix << std::endl;
+            LogError << "  X: " << x << std::endl;
+            LogError << "  lowerBound: " << lowerBound << std::endl;
+            LogError << "  upperBound: " << upperBound << std::endl;
+            LogError << "  dim: " << dim << std::endl;
+            for (int i = 0; i < dim; ++i) {
+                LogError << "  data[" << i << "]:" << data[i] << std::endl;
+            }
+            ix = 0;
+#ifndef CALCULATE_GRAPH_CONTINUE_ON_FATAL_ERROR
+            throw std::runtime_error("CalculateGraph Error");
+#endif
+        }
+        if (ix > knotCount-2) {
+            LogError << "CalculateGraph ix above range " << ix << std::endl;
+            LogError << "  X: " << x << std::endl;
+            LogError << "  lowerBound: " << lowerBound << std::endl;
+            LogError << "  upperBound: " << upperBound << std::endl;
+            LogError << "  dim: " << dim << std::endl;
+            for (int i = 0; i < dim; ++i) {
+                LogError << "  data[" << i << "]:" << data[i] << std::endl;
+            }
+            ix = knotCount - 2;
+#ifndef CALCULATE_GRAPH_CONTINUE_ON_FATAL_ERROR
+            throw std::runtime_error("CalculateGraph Error");
+#endif
+        }
+#endif
 
         const double p1 = data[2*ix];
         const double x1 = data[2*ix+1];
