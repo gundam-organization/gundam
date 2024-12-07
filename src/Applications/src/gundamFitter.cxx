@@ -76,6 +76,7 @@ int main(int argc, char** argv){
   clParser.addOption("kickMc", {"--kick-mc"}, "Amount to push the starting parameters away from their prior values (default: 0)", 1, true);
   clParser.addTriggerOption("ignoreVersionCheck", {"--ignore-version"}, "Don't check GUNDAM version with config request");
   clParser.addOption("debugMaxNbEventToLoad", {"-me", "--max-events"}, "Set the maximum number of events to load per dataset", 1);
+  clParser.addOption("debugFracOfEntries", {"-fe", "--fraction-of-entries"}, "Set the fraction of the total entries of each TTree that will be read", 1);
   clParser.addDummyOption();
 
 #ifdef GUNDAM_USING_CACHE_MANAGER
@@ -354,6 +355,19 @@ int main(int argc, char** argv){
     LogDebug << "Load " << clParser.getOptionVal<size_t>("debugMaxNbEventToLoad") << "max events per dataset." << std::endl;
     for( auto& dataset : fitter.getLikelihoodInterface().getDatasetList() ){
       dataset.setNbMaxEventToLoad(clParser.getOptionVal<size_t>("debugMaxNbEventToLoad"));
+    }
+  }
+
+  if( clParser.isOptionTriggered("debugFracOfEntries") ){
+    LogThrowIf(clParser.getNbValueSet("debugFracOfEntries") != 1, "Nb of event not specified.");
+
+    auto fractionOfEntries{clParser.getOptionVal<double>("debugFracOfEntries")};
+    LogThrowIf(fractionOfEntries > 1, "fractionOfEntries should be between 0 and 1");
+    LogThrowIf(fractionOfEntries < 0, "fractionOfEntries should be between 0 and 1");
+
+    LogDebug << "Will load " << fractionOfEntries*100. << "% of the datasets." << std::endl;
+    for( auto& dataset : fitter.getLikelihoodInterface().getDatasetList() ){
+      dataset.setFractionOfEntriesToLoad(fractionOfEntries);
     }
   }
 

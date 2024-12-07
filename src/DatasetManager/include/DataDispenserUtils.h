@@ -21,9 +21,10 @@ struct DataDispenserParameters{
   bool useReweightEngine{false};
   bool isData{false}; // shall fetch slpit vars?
   size_t debugNbMaxEventsToLoad{0};
+  double fractionOfEntries{1.};
 
   std::string name{};
-  std::string treePath{};
+  std::string globalTreePath{};
   std::string dialIndexFormula{};
   std::string nominalWeightFormulaStr{};
   std::string selectionCutFormulaStr{};
