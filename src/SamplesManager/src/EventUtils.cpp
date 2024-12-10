@@ -12,7 +12,7 @@ namespace EventUtils{
   std::string Indices::getSummary() const{
     std::stringstream ss;
     ss << "dataset(" << dataset << ")";
-    ss << ", " << "entry(" << entry << ")";
+    ss << ", " << "entry(" << entry << " / " << treeFile << "-" << treeEntry << ")";
     ss << ", " << "sample(" << sample << ")";
     ss << ", " << "bin(" << bin << ")";
     return ss.str();

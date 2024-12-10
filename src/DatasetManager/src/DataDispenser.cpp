@@ -81,12 +81,8 @@ void DataDispenser::configureImpl(){
     _parameters_.variableDict[ varName ] = varExpr;
   }
 
-  // TODO: better implementation of those
-  _parameters_.selectionCutFormulaStr = GenericToolbox::Json::buildFormula(_config_, "selectionCutFormula", "&&", _parameters_.selectionCutFormulaStr);
-  _parameters_.nominalWeightFormulaStr = GenericToolbox::Json::buildFormula(_config_, "nominalWeightFormula", "*", _parameters_.nominalWeightFormulaStr);
-
   // options
-  GenericToolbox::Json::fillValue(_config_, _parameters_.treePath, "tree");
+  GenericToolbox::Json::fillValue(_config_, _parameters_.globalTreePath, "tree");
   GenericToolbox::Json::fillValue(_config_, _parameters_.filePathList, "filePathList");
   GenericToolbox::Json::fillValue(_config_, _parameters_.additionalVarsStorage, {{"additionalLeavesStorage"}, {"additionalVarsStorage"}});
   GenericToolbox::Json::fillValue(_config_, _parameters_.dummyVariablesList, "dummyVariablesList");
@@ -94,6 +90,9 @@ void DataDispenser::configureImpl(){
   GenericToolbox::Json::fillValue(_config_, _parameters_.debugNbMaxEventsToLoad, "debugNbMaxEventsToLoad");
   GenericToolbox::Json::fillValue(_config_, _parameters_.dialIndexFormula, "dialIndexFormula");
   GenericToolbox::Json::fillValue(_config_, _parameters_.overridePropagatorConfig, "overridePropagatorConfig");
+
+  GenericToolbox::Json::fillFormula(_config_, _parameters_.selectionCutFormulaStr, "selectionCutFormula", "&&");
+  GenericToolbox::Json::fillFormula(_config_, _parameters_.nominalWeightFormulaStr, "nominalWeightFormula", "*");
 
 }
 void DataDispenser::initializeImpl(){
@@ -148,7 +147,7 @@ void DataDispenser::load(Propagator& propagator_){
 
   for( const auto& file: _parameters_.filePathList){
     std::string path = GenericToolbox::expandEnvironmentVariables(file);
-    LogThrowIf(not GenericToolbox::doesTFileIsValid(path, {_parameters_.treePath}), "Invalid file: " << path);
+    LogThrowIf(not GenericToolbox::doesTFileIsValid(path, {_parameters_.globalTreePath}), "Invalid file: " << path);
   }
 
   this->parseStringParameters();
@@ -419,18 +418,10 @@ void DataDispenser::preAllocateMemory(){
   /// of a vector memory. This is not thread safe, so better ensure the vector
   /// won't have to do this by allocating the right event size.
 
-  // MEMORY CLAIM?
-  TChain treeChain(_parameters_.treePath.c_str());
-  for( const auto& file: _parameters_.filePathList){
-    std::string name = GenericToolbox::expandEnvironmentVariables(file);
-    if (name != file) {
-      LogWarning << "Filename expanded to: " << name << std::endl;
-    }
-    treeChain.Add(name.c_str());
-  }
+  auto treeChain = openChain();
 
   GenericToolbox::LeafCollection lCollection;
-  lCollection.setTreePtr( &treeChain );
+  lCollection.setTreePtr( treeChain.get() );
   for( auto& var : _cache_.varsRequestedForIndexing ){
     // look for override requests
     lCollection.addLeafExpression(
@@ -627,15 +618,41 @@ void DataDispenser::loadFromHistContent(){
 std::shared_ptr<TChain> DataDispenser::openChain(bool verbose_){
   LogInfoIf(verbose_) << "Opening ROOT files containing events..." << std::endl;
 
-  std::shared_ptr<TChain> treeChain(std::make_unique<TChain>(_parameters_.treePath.c_str()));
+  std::shared_ptr<TChain> treeChain(std::make_unique<TChain>());
   for( const auto& file: _parameters_.filePathList){
     std::string name = GenericToolbox::expandEnvironmentVariables(file);
     GenericToolbox::replaceSubstringInsideInputString(name, "//", "/");
+
     if( verbose_ ){
       LogScopeIndent;
       LogWarning << name << std::endl;
     }
-    treeChain->Add(name.c_str());
+
+    std::string treePath{_parameters_.globalTreePath};
+    auto chunks = GenericToolbox::splitString(name, ":", true);
+    if( chunks.size() > 1 ){ treePath = chunks[1]; name = chunks[0];  }
+
+    LogThrowIf( treePath.empty(), "TTree path not set." );
+
+    LogThrowIf( not GenericToolbox::doesTFileIsValid(name, {treePath}), "Could not open TFile: " << name << " with TTree " << treePath);
+
+    Long64_t nMaxEntries{TTree::kMaxEntries};
+    if( _parameters_.fractionOfEntries != 1. ){
+      std::unique_ptr<TFile> temp{TFile::Open(name.c_str())};
+      LogThrowIf(temp== nullptr, "Error while opening TFile: " << name);
+
+      auto* tree = temp->Get<TTree>(treePath.c_str());
+      LogThrowIf(tree== nullptr, "Error while opening TTree: " << treePath << " in " << name);
+
+      nMaxEntries = Long64_t( double(tree->GetEntries()) * _parameters_.fractionOfEntries );
+      if( verbose_ ){
+        LogScopeIndent;
+        LogWarning << "Max entries: " << nMaxEntries << std::endl;
+      }
+
+    }
+    treeChain->AddFile(name.c_str(), nMaxEntries, treePath.c_str());
+
   }
 
   return treeChain;
@@ -647,7 +664,7 @@ void DataDispenser::eventSelectionFunction(int iThread_){
   if( iThread_ == -1 ){ iThread_ = 0; nThreads = 1; }
 
   // Opening ROOT files and make a TChain
-  auto treeChain{this->openChain(false)};
+  auto treeChain{this->openChain()};
 
   // Create the memory buffer for the TChain
   GenericToolbox::LeafCollection lCollection;
@@ -858,19 +875,20 @@ void DataDispenser::runEventFillThreads(int iThread_){
   // Load the first TTree / need to wait for the event filler to finish hooking branches
   threadSharedData.treeChain->LoadTree(bounds.beginIndex);
 
-  for( threadSharedData.currentEntryIndex = bounds.beginIndex ; threadSharedData.currentEntryIndex < bounds.endIndex ; threadSharedData.currentEntryIndex++ ){
+  for( Long64_t iEntry = bounds.beginIndex ; iEntry < bounds.endIndex ; iEntry++ ){
 
     // before load, check if it has a sample
-    bool hasSample = _cache_.entrySampleIndexList[threadSharedData.currentEntryIndex] != -1;
+    bool hasSample = _cache_.entrySampleIndexList[iEntry] != -1;
     if( not hasSample ){ continue; }
 
-    Int_t nBytes{ threadSharedData.treeChain->GetEntry(threadSharedData.currentEntryIndex) };
+    Int_t nBytes{ threadSharedData.treeChain->GetEntry(iEntry) };
+
     threadSharedData.isEntryBufferReady.setValue(true); // loaded! -> let the other thread get everything it needs
 
     if( iThread_ == 0 ){
       readSpeed.addQuantity(nBytes * nThreads);
 
-      if( GenericToolbox::showProgressBar(threadSharedData.currentEntryIndex*nThreads, threadSharedData.nbEntries) ){
+      if( GenericToolbox::showProgressBar(iEntry*nThreads, threadSharedData.nbEntries) ){
 
         ssProgressBar.str("");
 
@@ -884,7 +902,7 @@ void DataDispenser::runEventFillThreads(int iThread_){
 
         ssProgressBar << LogInfo.getPrefixString() << progressTitle;
         GenericToolbox::displayProgressBar(
-            threadSharedData.currentEntryIndex*nThreads,
+            iEntry*nThreads,
             threadSharedData.nbEntries,
             ssProgressBar.str()
         );
@@ -894,7 +912,7 @@ void DataDispenser::runEventFillThreads(int iThread_){
     // make sure the event filler thread has received the signal for the last entry
     threadSharedData.isEntryBufferReady.waitUntilEqual( false );
 
-    // make sure currentEntryIndex don't get updated while it hasn't been read by the other thread
+    // make sure currentEntry don't get updated while it hasn't been read by the other thread
     threadSharedData.requestReadNextEntry.waitUntilEqualThenToggle( true );
 
     // was the event loader stopped?
@@ -1087,8 +1105,10 @@ void DataDispenser::loadEvent(int iThread_){
       if( eventIndexingBuffer.getWeights().base == 0 ){ continue; }
     }
 
-    // currentEntryIndex is modified by the TChain reader
-    eventIndexingBuffer.getIndices().entry = threadSharedData.currentEntryIndex;
+    // grab data from TChain
+    eventIndexingBuffer.getIndices().entry     = threadSharedData.treeChain->GetReadEntry();
+    eventIndexingBuffer.getIndices().treeFile      = threadSharedData.treeChain->GetTreeNumber();
+    eventIndexingBuffer.getIndices().treeEntry = threadSharedData.treeChain->GetTree()->GetReadEntry();
 
     // get sample index / all -1 samples have been ruled out by the chain reader
     iSample = _cache_.entrySampleIndexList[eventIndexingBuffer.getIndices().entry];
