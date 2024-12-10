@@ -9,6 +9,10 @@
 #include "EventVarTransformLib.h"
 
 #include "GenericToolbox.Wrappers.h"
+#include "GenericToolbox.Root.h"
+
+#include "TChain.h"
+#include "TTreeFormula.h"
 
 
 #include "string"
@@ -97,6 +101,25 @@ struct DataDispenserCache{
   void addVarRequestedForIndexing(const std::string& varName_);
   void addVarRequestedForStorage(const std::string& varName_);
 
+};
+
+struct ThreadSharedData{
+  Long64_t nbEntries{0};
+
+  std::shared_ptr<TChain> treeChain{nullptr};
+
+  std::vector<const GenericToolbox::LeafForm*> leafFormIndexingList{};
+  std::vector<const GenericToolbox::LeafForm*> leafFormStorageList{};
+
+  // has to be hooked to the TChain
+  TTreeFormula* dialIndexTreeFormula{nullptr};
+  TTreeFormula* nominalWeightTreeFormula{nullptr};
+
+  // thread communication
+  GenericToolbox::Atomic<bool> requestReadNextEntry{false};
+  GenericToolbox::Atomic<bool> isEntryBufferReady{false};
+  GenericToolbox::Atomic<bool> isDoneReading{false};
+  GenericToolbox::Atomic<bool> isEventFillerReady{false};
 };
 
 

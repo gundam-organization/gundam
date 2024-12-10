@@ -618,7 +618,7 @@ void DataDispenser::loadFromHistContent(){
 std::shared_ptr<TChain> DataDispenser::openChain(bool verbose_){
   LogInfoIf(verbose_) << "Opening ROOT files containing events..." << std::endl;
 
-  std::shared_ptr<TChain> treeChain(std::make_unique<TChain>(_parameters_.globalTreePath.c_str()));
+  std::shared_ptr<TChain> treeChain(std::make_unique<TChain>());
   for( const auto& file: _parameters_.filePathList){
     std::string name = GenericToolbox::expandEnvironmentVariables(file);
     GenericToolbox::replaceSubstringInsideInputString(name, "//", "/");
@@ -645,14 +645,14 @@ std::shared_ptr<TChain> DataDispenser::openChain(bool verbose_){
       LogThrowIf(tree== nullptr, "Error while opening TTree: " << treePath << " in " << name);
 
       nMaxEntries = Long64_t( double(tree->GetEntries()) * _parameters_.fractionOfEntries );
-
       if( verbose_ ){
         LogScopeIndent;
         LogWarning << "Max entries: " << nMaxEntries << std::endl;
       }
-    }
 
+    }
     treeChain->AddFile(name.c_str(), nMaxEntries, treePath.c_str());
+
   }
 
   return treeChain;
