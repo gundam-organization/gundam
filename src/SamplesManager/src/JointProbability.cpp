@@ -211,27 +211,35 @@ namespace JointProbability{
     if (not usePoissonLikelihood) chisq += 2.0 * penalty;
 
     // Warn when the expected value for a bin is going to zero.
-    if (predVal == 0.0
+    if (predVal <= 0.0
         and dataVal < std::numeric_limits<double>::epsilon()) [[unlikely]] {
       if( allowZeroMcWhenZeroData ) {
         // Need to warn the user something is wrong with the binning
-        // definition.  This might indicate that more MC stat would be needed,
-        // or the binning needs to be reconsidered..
+        // definition, but they've asked to continue anyway.  This might
+        // indicate that more MC stat would be needed, or the binning needs to
+        // be reconsidered..
         LogErrorOnce
           << "Sample bin with no events in the data and MC bin."
           << "This is an ill conditioned problem. Please check your inputs."
           << std::endl;
       }
       else {
-        LogWarningIf(verboseLevel > 0)
-          << "Infinite statistical LLH --"
-          << " Data: " << dataVal
-          << " / MC: " << predVal
-          << " Adjusted MC: " << newmc
-          << " / Stat: " << stat
-          << " Penalty: " << penalty
-          << " Truncated ChiSq: " << chisq
-          << std::endl;
+        static int messageBrake = 1000;
+        if (messageBrake > 0) {
+          --messageBrake;
+          LogError
+            << "Ill conditioned statistical LLH --"
+            << " Data: " << dataVal
+            << " / MC: " << predVal
+            << " Adjusted MC: " << newmc
+            << " / Stat: " << stat
+            << " Penalty: " << penalty
+            << " Total ChiSq: " << chisq
+            << std::endl;
+          LogErrorOnce
+            << "Define allowZeroMcWhenZeroData in config to mute message"
+            << std::endl;
+        }
       }
     }
 
@@ -247,7 +255,8 @@ namespace JointProbability{
                  << GET_VAR_NAME_VALUE(nomMC->GetBinContent(bin_)) << std::endl
                  << GET_VAR_NAME_VALUE(nomMC->GetBinError(bin_)) << std::endl
                  << GET_VAR_NAME_VALUE(predMC->GetBinError(bin_)) << std::endl
-                 << GET_VAR_NAME_VALUE(predMC->GetBinContent(bin_)) << std::endl;
+                 << GET_VAR_NAME_VALUE(predMC->GetBinContent(bin_)) << std::endl
+                 << "Note: Very small negative values from roundoff are OK" << std::endl;
     }
 
     if(verboseLevel>=3){

@@ -1,3 +1,15 @@
+Fixes relative to 1.8.6
+
+Propagation: Make sure that the event breakdown includes the effect of masking.
+
+JointProbabilty: Flag both infinite and negative chi-squared values.  This is an informational message, but is a better check for problems during the fit.
+
+CalculateGraph: On the CPU only, add careful check of the CalculateGraph inputs and stop if there are invalid inputs. If bad inputs are found, it will indicate a problem elsewhere, so a lot of diagnostics are printed and then GUNDAM exits.
+
+Extended Tests: Add more detailed tests for the interpolation/extrapolation code.  
+
+Build Fixes: Don't require ROOT to declare MINUIT2.  It's not the default modern ROOT. Always build tests, but disable developer tests by default.  Use CMAKE_DL_LIBS so that libdl gets included if it is needed. 
+
 Fixes relative to 1.8.5
 
 Fix (Merge #681): Handle over sized graphs and splines. The number of points that can be handled in a spline/graph has been increased, but that needs to be used carefully since large splines and graphs will make fits run more slowly. Note: Using linear interpolation with more than two knots is explicitly forbidden by MINUIT since it introduces a discontinuous derivative.  MINUIT may still run, but the results are undefined (that means the answer could be useful, or could start a thermonuclear war.  Both outcomes are formally correct).
