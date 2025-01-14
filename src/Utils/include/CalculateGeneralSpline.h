@@ -136,10 +136,6 @@ namespace {
 #undef CHECK_OFFSET
 #endif
 
-        // handle positive extrapolation
-        // this ensures that x2 exists in the array
-        if( ix + 1 >= knotCount ){ ix--; }
-
         const double x1 = data[2+3*ix+2];
         const double x2 = data[2+3*(ix+1)+2];
         const double step = x2-x1;
