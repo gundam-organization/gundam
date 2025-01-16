@@ -967,7 +967,7 @@ void RootMinimizer::writePostFitData( TDirectory* saveDir_) {
             if( par.isFree() ){ t.setColorBuffer(blu); }
 
             t << par.getFullTitle() << GenericToolbox::TablePrinter::NextColumn;
-            t << par.getParameterValue() << GenericToolbox::TablePrinter::NextColumn;
+            t << par.getPriorValue() << GenericToolbox::TablePrinter::NextColumn;
             t << par.getParameterValue() << GenericToolbox::TablePrinter::NextColumn;
             t << par.getParameterValue() - par.getPriorValue() << GenericToolbox::TablePrinter::NextColumn;
             t << par.getStdDevValue() << GenericToolbox::TablePrinter::NextColumn;
