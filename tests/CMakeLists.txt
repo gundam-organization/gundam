@@ -35,9 +35,16 @@ else(SKIP_GOOGLE_TEST)
   # Use the pre cmake 1.10 interface because we set 3.5 as the minimum cmake
   find_package(GTest)
 endif(SKIP_GOOGLE_TEST)
-if (GTEST_FOUND) 
+if (GTEST_FOUND)
   cmessage( STATUS "GTest package enabled for developer unit tests.")
   enable_testing()
+
+  # Setup the GUNDAM specific unit tests.
+  add_executable(gundamGTest_units.exe
+    GTests/unitTest_JointProbability.cpp)
+  target_link_libraries(gundamGTest_units.exe GTest::gtest_main)
+  target_link_libraries(gundamGTest_units.exe GundamStatisticalInference)
+  gtest_discover_tests(gundamGTest_units.exe)
 
   # Setup the hemi test suite for the host
   add_executable(gundamGTest_host.exe
@@ -49,7 +56,7 @@ if (GTEST_FOUND)
   target_link_libraries(gundamGTest_host.exe GundamCacheManager)
   target_compile_definitions(gundamGTest_host.exe PUBLIC HEMI_CUDA_DISABLE)
   gtest_discover_tests(gundamGTest_host.exe)
-  
+
   if(CMAKE_CUDA_COMPILER)
     # Setup the hemi test suite for the device.
     add_executable(gundamGTest_device.exe
