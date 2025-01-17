@@ -16,9 +16,9 @@ namespace JointProbability{
 
   public:
     [[nodiscard]] std::string getType() const override { return "PoissonLogLikelihood"; }
-    [[nodiscard]] double eval(const SamplePair& samplePair_, int bin_) const override {
-      double predVal = samplePair_.model->getHistogram().getBinContentList()[bin_].sumWeights;
-      double dataVal = samplePair_.data->getHistogram().getBinContentList()[bin_].sumWeights;
+    [[nodiscard]] double eval(double data_, double pred_, double err_, int bin_) const override {
+      double predVal = pred_;
+      double dataVal = data_;
 
       double llhValue{0};
 

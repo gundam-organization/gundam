@@ -7,30 +7,25 @@
 
 #include "JointProbabilityBase.h"
 
-
 namespace JointProbability{
 
   class BarlowBeestonBanff2020 : public JointProbabilityBase {
   public:
     [[nodiscard]] std::string getType() const override { return "BarlowBeestonBanff2020"; }
-    [[nodiscard]] double eval(const SamplePair& samplePair_, int bin_) const override;
+    [[nodiscard]] double eval(double data_, double pred_, double err_, int bin_) const override;
   };
 
-  double BarlowBeestonBanff2020::eval(const SamplePair& samplePair_, int bin_) const {
+  double BarlowBeestonBanff2020::eval(double data_, double pred_, double err_, int bin_) const {
     // From BANFF: origin/OA2020 branch -> BANFFBinnedSample::CalcLLRContrib()
-
-    //Loop over all the bins one by one using their unique bin index.
-    //Use the stored nBins value and bins array so avoid trying to calculate
-    //over underflow or overflow bins.
-    double chisq{0};
-
-    double dataVal = samplePair_.data->getHistogram().getBinContentList()[bin_].sumWeights;
-    double predVal = samplePair_.model->getHistogram().getBinContentList()[bin_].sumWeights;
-    double mcuncert = samplePair_.model->getHistogram().getBinContentList()[bin_].sqrtSumSqWeights;
 
     //implementing Barlow-Beeston correction for LH calculation the
     //following comments are inspired/copied from Clarence's comments in the
     //MaCh3 implementation of the same feature
+    double dataVal{data_};
+    double predVal{pred_};
+    double mcuncert{err_};
+
+    double chisq{0.};
 
     // The MC used in the likeliihood calculation
     // Is allowed to be changed by Barlow Beeston beta parameters
@@ -79,17 +74,15 @@ namespace JointProbability{
 
     if(std::isinf(chisq)){
       LogAlert << "Infinite chi2 " << predVal << " " << dataVal << " "
-               << samplePair_.model->getHistogram().getBinContentList()[bin_].sqrtSumSqWeights << " "
-               << samplePair_.model->getHistogram().getBinContentList()[bin_].sumWeights << std::endl;
+               << err_ << " "
+               << pred_ << std::endl;
     }
 
     LogThrowIf(std::isnan(chisq), "NaN chi2 " << predVal << " " << dataVal
-                                              << samplePair_.model->getHistogram().getBinContentList()[bin_].sqrtSumSqWeights << " "
-                                              << samplePair_.model->getHistogram().getBinContentList()[bin_].sumWeights);
+               << err_ << " " << pred_);
 
     return chisq;
   }
-
 }
 
 #endif //GUNDAM_BARLOW_BEESTON_BANFF_2020_H
