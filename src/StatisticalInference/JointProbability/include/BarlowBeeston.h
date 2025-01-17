@@ -7,9 +7,11 @@
 
 #include "JointProbabilityBase.h"
 
-
 namespace JointProbability{
 
+  /// Provide an implementation of the "classic" Barlow-Beeston LLH.  It's not
+  /// suitable for "real" work since it's not numerically stable for all input
+  /// values.
   class BarlowBeeston : public JointProbabilityBase {
   public:
     [[nodiscard]] std::string getType() const override { return "BarlowBeeston"; }
@@ -50,8 +52,7 @@ namespace JointProbability{
     else{
       _buf_.chi2 = 2 * (_buf_.mc_hat - dataVal);
       if(dataVal > 0.0) {
-        _buf_.chi2 += 2 * dataVal *
-                      std::log(dataVal / _buf_.mc_hat);
+          _buf_.chi2 += 2 * dataVal * (TMath::Log(dataVal) - TMath::Log(_buf_.mc_hat));
       }
       _buf_.chi2 += (_buf_.beta - 1) * (_buf_.beta - 1) / _buf_.rel_var;
     }
