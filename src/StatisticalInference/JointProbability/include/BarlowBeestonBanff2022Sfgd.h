@@ -13,6 +13,7 @@ namespace JointProbability{
   class BarlowBeestonBanff2022Sfgd : public JointProbabilityBase {
   public:
     [[nodiscard]] std::string getType() const override { return "BarlowBeestonBanff2022Sfgd"; }
+    [[nodiscard]] double eval(double data_, double pred_, double err_, int bin_) const override;
     [[nodiscard]] double eval(const SamplePair& samplePair_, int bin_) const override;
   };
 
@@ -21,15 +22,6 @@ namespace JointProbability{
     double dataVal = samplePair_.data->getHistogram().getBinContentList()[bin_].sumWeights;
     double predVal = samplePair_.model->getHistogram().getBinContentList()[bin_].sumWeights;
     double mcuncert = samplePair_.model->getHistogram().getBinContentList()[bin_].sqrtSumSqWeights;
-
-    double chisq = 0.0;
-
-    bool usePoissonLikelihood = false;
-
-    double newmc = predVal;
-
-    // The penalty from MC statistics
-    double penalty = 0;
 
     // SFGD detector uncertainty
     double sfgd_det_uncert = 0.;
@@ -70,9 +62,29 @@ namespace JointProbability{
         if(samplePair_.model->getName().find("WG") != std::string::npos) wg_det_uncert = 0.08;
       }
     }
+    // Add SFGD detector uncertainty
+    double sfgUncert = mcuncert
+      + predVal*sfgd_det_uncert
+      + predVal*wg_det_uncert;
+    return eval(dataVal, predVal, sfgUncert, bin_);
+  }
+
+  double BarlowBeestonBanff2022Sfgd::eval(double data_, double pred_, double err_, int bin_) const {
+    double dataVal = data_;
+    double predVal = pred_;
+    double mcuncert = err_;
+
+    double chisq = 0.0;
+
+    bool usePoissonLikelihood = false;
+
+    double newmc = predVal;
+
+    // The penalty from MC statistics
+    double penalty = 0;
 
     // Barlow-Beeston uses fractional uncertainty on MC, so sqrt(sum[w^2])/mc
-    double fractional = mcuncert / predVal + sfgd_det_uncert + wg_det_uncert; // Add SFGD detector uncertainty
+    double fractional = mcuncert / predVal;
     // -b/2a in quadratic equation
     double temp = predVal * fractional * fractional - 1;
     // b^2 - 4ac in quadratic equation
@@ -113,8 +125,8 @@ namespace JointProbability{
     if (std::isinf(chisq))
     {
       LogAlert << "Infinite chi2 " << predVal << " " << dataVal
-               << samplePair_.model->getHistogram().getBinContentList()[bin_].sqrtSumSqWeights << " "
-               << samplePair_.model->getHistogram().getBinContentList()[bin_].sumWeights << std::endl;
+               << err_ << " "
+               << pred_ << std::endl;
     }
 
     return chisq;

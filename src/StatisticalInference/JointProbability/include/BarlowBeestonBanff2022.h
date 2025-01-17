@@ -21,6 +21,7 @@ namespace JointProbability{
   public:
     [[nodiscard]] std::string getType() const override { return "BarlowBeestonBanff2022"; }
     [[nodiscard]] double eval(const SamplePair& samplePair_, int bin_) const override;
+    [[nodiscard]] double eval(double data_, double pred_, double err_, int bin_) const override;
 
     void createNominalMc(const Sample& modelSample_) const;
     void printConfiguration() const;
@@ -134,6 +135,13 @@ namespace JointProbability{
         }
       }
     }
+    return eval(dataVal, predVal, mcuncert, bin_);
+  }
+
+  double BarlowBeestonBanff2022::eval(double data_, double pred_, double err_, int bin_) const {
+    double dataVal = data_;
+    double predVal = pred_;
+    double mcuncert = err_;
 
     // Add the (broken) expected value threshold that we saw in the old
     // likelihood. This is here to help understand the old behavior.
@@ -253,7 +261,6 @@ namespace JointProbability{
 
     if( throwIfInfLlh and not std::isfinite(chisq) ) GUNDAM_UNLIKELY_COMPILER_FLAG {
       LogError << "Infinite chi2: " << chisq << std::endl
-               << GET_VAR_NAME_VALUE(samplePair_.model->getName()) << std::endl
                << GET_VAR_NAME_VALUE(bin_) << std::endl
                << GET_VAR_NAME_VALUE(predVal) << std::endl
                << GET_VAR_NAME_VALUE(dataVal) << std::endl
@@ -300,7 +307,4 @@ namespace JointProbability{
   }
 
 }
-
-
-
 #endif //GUNDAM_BARLOW_BEESTON_BANFF_2022_H

@@ -13,12 +13,12 @@ namespace JointProbability{
   class ChiSquared : public JointProbabilityBase {
   public:
     [[nodiscard]] std::string getType() const override { return "ChiSquared"; }
-    [[nodiscard]] double eval(const SamplePair& samplePair_, int bin_) const override;
+    [[nodiscard]] double eval(double data_, double pred_, double err_, int bin_) const override;
   };
 
-  double ChiSquared::eval(const SamplePair& samplePair_, int bin_) const {
-    double predVal = samplePair_.model->getHistogram().getBinContentList()[bin_].sumWeights;
-    double dataVal = samplePair_.data->getHistogram().getBinContentList()[bin_].sumWeights;
+  double ChiSquared::eval(double data_, double pred_, double err_, int bin_) const {
+    double predVal = pred_;
+    double dataVal = data_;
     if( predVal == 0 ){
       // should not be the case right?
       LogAlert << "Zero MC events in bin " << bin_ << ". predVal = " << predVal << ", dataVal = " << dataVal
