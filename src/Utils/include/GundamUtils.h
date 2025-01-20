@@ -142,7 +142,7 @@ namespace GundamUtils {
               }else{
                   weights.at(iPar) = -TMath::Log((1.0-pedestalEntity) * NormalizingFactor )
                                           + 0.500 * thrownParVec[iPar] * thrownParVec[iPar];
-                  LogInfo<<"{GUndamUtils} weights["<<iPar<<"] = "<<weights.at(iPar)<<"\n";
+                  LogInfo<<"{GundamUtils} weights["<<iPar<<"] = "<<weights.at(iPar)<<"\n";
               }
           }
       }else{

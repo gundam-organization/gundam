@@ -352,15 +352,18 @@ void ParametersManager::throwParametersFromGlobalCovariance(std::vector<double> 
         std::vector<double> weights;
         if(pedestalEntity==0){
             GundamUtils::throwCorrelatedParameters(_choleskyMatrix_.get(),throws, weights);
+            for(int i=0;i<weights.size();i++){
+              LogInfo<<"{ParametersManager::throwParsFromGlobalCov}} weights["<<i<<"] = "<<weights[i]<<std::endl;
+            }
         }else{
             GundamUtils::throwCorrelatedParameters(_choleskyMatrix_.get(),throws, weights,
                                                       pedestalEntity,pedestalLeftEdge,pedestalRightEdge);
         }
         if(throws.size() != weights.size()){
-            LogInfo<<"ERROR: throws.size() != weights.size() "<< throws.size()<<" "<<weights.size()<<std::endl;
+            LogInfo<<"{ParametersManager}ERROR: throws.size() != weights.size() "<< throws.size()<<" "<<weights.size()<<std::endl;
         }
         if(weights.size() != _choleskyMatrix_->GetNrows()){
-            LogInfo<<"ERROR: throws.size() != _choleskyMatrix_->GetNrows() "<< throws.size()<<" "<<_choleskyMatrix_->GetNrows()<<std::endl;
+            LogInfo<<"{ParametersManager}ERROR: throws.size() != _choleskyMatrix_->GetNrows() "<< throws.size()<<" "<<_choleskyMatrix_->GetNrows()<<std::endl;
         }
         for( int iPar = 0 ; iPar < _choleskyMatrix_->GetNrows() ; iPar++ ){
             _strippedParameterList_[iPar]->setParameterValue(
@@ -408,6 +411,9 @@ void ParametersManager::throwParametersFromGlobalCovariance(std::vector<double> 
         // reached this point: all parameters are within bounds
         keepThrowing = false;
     }
+    for{int i=0;i<weightsChiSquare.size();i++){
+        LogInfo<<"{ParametersManager::throwParsFromGlobalCov output} weightsChiSquare["<<i<<"] = "<<weightsChiSquare[i]<<std::endl;
+
 }// end of function
 
 void ParametersManager::throwParametersFromTStudent(std::vector<double> &weightsChiSquare,double nu_){
