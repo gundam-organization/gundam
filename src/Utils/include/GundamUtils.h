@@ -123,14 +123,16 @@ namespace GundamUtils {
       if( thrownParListOut_.size() != choleskyCovMatrix_->GetNcols() ){
           thrownParListOut_.resize(choleskyCovMatrix_->GetNcols(), 0);
       }
-      if( weights.size() != choleskyCovMatrix_->GetNcols() ){
-          weights.resize(choleskyCovMatrix_->GetNcols(), 0);
-          LogInfo << "Resizing weights vector to " << choleskyCovMatrix_->GetNcols() << std::endl;
-      }else{
-          for( int iPar = 0 ; iPar < choleskyCovMatrix_->GetNcols() ; iPar++ ){
-              weights.at(iPar) = 0;
-          }
-      }
+      // clear weights vector
+      weights.clear();
+//      if( weights.size() != choleskyCovMatrix_->GetNcols() ){
+//          weights.resize(choleskyCovMatrix_->GetNcols(), 0);
+//          LogInfo << "Resizing weights vector to " << choleskyCovMatrix_->GetNcols() << std::endl;
+//      }else{
+//          for( int iPar = 0 ; iPar < choleskyCovMatrix_->GetNcols() ; iPar++ ){
+//              weights.at(iPar) = 0;
+//          }
+//      }
 
       TVectorD thrownParVec(choleskyCovMatrix_->GetNcols());
       double choice = gRandom->Uniform(0,1);
