@@ -141,9 +141,8 @@ namespace GundamUtils {
                           pedestalEntity*1.0/pedestalRange + (1.0-pedestalEntity) * NormalizingFactor * TMath::Exp(-0.500 * thrownParVec[iPar] * thrownParVec[iPar])
                   );
               }else{
-                  weights.at(iPar) = -TMath::Log(
-                          (1.0-pedestalEntity) * NormalizingFactor * TMath::Exp(-0.500 * thrownParVec[iPar] * thrownParVec[iPar])
-                  );
+                  weights.at(iPar) = -TMath::Log((1.0-pedestalEntity) * NormalizingFactor )
+                                          + 0.500 * thrownParVec[iPar] * thrownParVec[iPar];
               }
           }
       }else{
