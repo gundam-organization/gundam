@@ -479,6 +479,12 @@ int main(int argc, char** argv){
             }
         }
         // Sanity check on the length of the weights vector. It should be as long as the number of parameters
+        if(weightsChiSquare.size() != nParameters){
+          for(int i=0;i<weightsChiSquare.size();i++){
+            LogInfo<<"weightsChiSquare["<<i<<"]: "<<weightsChiSquare[i]<<std::endl;
+          }
+          std::cout<<"("<<nParameters<<" parameters)"<<std::endl;
+        }
         LogThrowIf(weightsChiSquare.size() != nParameters, "ERROR: The weights vector has a different size than the number of parameters.");
 
         if(injectParamsManually) {
