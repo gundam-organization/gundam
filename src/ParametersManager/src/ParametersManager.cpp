@@ -411,7 +411,7 @@ void ParametersManager::throwParametersFromGlobalCovariance(std::vector<double> 
         // reached this point: all parameters are within bounds
         keepThrowing = false;
     }
-    for{int i=0;i<weightsChiSquare.size();i++){
+    for(int i=0;i<weightsChiSquare.size();i++){
       LogInfo << "{ParametersManager::throwParsFromGlobalCov output} weightsChiSquare[" << i << "] = "
               << weightsChiSquare[i] << std::endl;
     }
