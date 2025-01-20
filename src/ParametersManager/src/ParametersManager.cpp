@@ -405,6 +405,7 @@ void ParametersManager::throwParametersFromGlobalCovariance(std::vector<double> 
         if( rethrow ){
             // wrap back to the while loop
       LogInfo << "RE-THROW " << std::endl;
+          weightsChiSquare.clear();
             continue;
         }
 
