@@ -375,7 +375,7 @@ void ParametersManager::throwParametersFromGlobalCovariance(std::vector<double> 
             if( _reThrowParSetIfOutOfBounds_ ){
                 if( not _strippedParameterList_[iPar]->isValueWithinBounds() ){
                     // re-do the throwing
-//          LogDebug << "Not within bounds: " << _strippedParameterList_[iPar]->getSummary() << std::endl;
+          LogInfo << "Not within bounds: " << _strippedParameterList_[iPar]->getSummary() << std::endl;
                     rethrow = true;
                 }
             }
