@@ -125,6 +125,7 @@ namespace GundamUtils {
       }
       if( weights.size() != choleskyCovMatrix_->GetNcols() ){
           weights.resize(choleskyCovMatrix_->GetNcols(), 0);
+          LogInfo << "Resizing weights vector to " << choleskyCovMatrix_->GetNcols() << std::endl;
       }else{
           for( int iPar = 0 ; iPar < choleskyCovMatrix_->GetNcols() ; iPar++ ){
               weights.at(iPar) = 0;
@@ -140,6 +141,7 @@ namespace GundamUtils {
                   weights.at(iPar) = -TMath::Log(
                           pedestalEntity*1.0/pedestalRange + (1.0-pedestalEntity) * NormalizingFactor * TMath::Exp(-0.500 * thrownParVec[iPar] * thrownParVec[iPar])
                   );
+                  LogInfo<<"weights["<<iPar<<"] = "<<weights.at(iPar)<<"\n";
               }else{
                   weights.at(iPar) = -TMath::Log((1.0-pedestalEntity) * NormalizingFactor )
                                           + 0.500 * thrownParVec[iPar] * thrownParVec[iPar];
