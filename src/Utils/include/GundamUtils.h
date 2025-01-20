@@ -123,16 +123,11 @@ namespace GundamUtils {
       if( thrownParListOut_.size() != choleskyCovMatrix_->GetNcols() ){
           thrownParListOut_.resize(choleskyCovMatrix_->GetNcols(), 0);
       }
-      // clear weights vector
-      weights.clear();
-//      if( weights.size() != choleskyCovMatrix_->GetNcols() ){
-//          weights.resize(choleskyCovMatrix_->GetNcols(), 0);
-//          LogInfo << "Resizing weights vector to " << choleskyCovMatrix_->GetNcols() << std::endl;
-//      }else{
-//          for( int iPar = 0 ; iPar < choleskyCovMatrix_->GetNcols() ; iPar++ ){
-//              weights.at(iPar) = 0;
-//          }
-//      }
+      weights.resize(choleskyCovMatrix_->GetNcols(), 0);
+      LogInfo << "Resizing weights vector to " << choleskyCovMatrix_->GetNcols() << std::endl;
+      for( int iPar = 0 ; iPar < choleskyCovMatrix_->GetNcols() ; iPar++ ){
+          weights.at(iPar) = 0;
+      }
 
       TVectorD thrownParVec(choleskyCovMatrix_->GetNcols());
       double choice = gRandom->Uniform(0,1);
@@ -143,7 +138,7 @@ namespace GundamUtils {
                   weights.at(iPar) = -TMath::Log(
                           pedestalEntity*1.0/pedestalRange + (1.0-pedestalEntity) * NormalizingFactor * TMath::Exp(-0.500 * thrownParVec[iPar] * thrownParVec[iPar])
                   );
-                  LogInfo<<"weights["<<iPar<<"] = "<<weights.at(iPar)<<"\n";
+                  LogInfo<<"{GUndamUtils} weights["<<iPar<<"] = "<<weights.at(iPar)<<"\n";
               }else{
                   weights.at(iPar) = -TMath::Log((1.0-pedestalEntity) * NormalizingFactor )
                                           + 0.500 * thrownParVec[iPar] * thrownParVec[iPar];
