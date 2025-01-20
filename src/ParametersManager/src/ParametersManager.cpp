@@ -412,8 +412,9 @@ void ParametersManager::throwParametersFromGlobalCovariance(std::vector<double> 
         keepThrowing = false;
     }
     for{int i=0;i<weightsChiSquare.size();i++){
-        LogInfo<<"{ParametersManager::throwParsFromGlobalCov output} weightsChiSquare["<<i<<"] = "<<weightsChiSquare[i]<<std::endl;
-
+      LogInfo << "{ParametersManager::throwParsFromGlobalCov output} weightsChiSquare[" << i << "] = "
+              << weightsChiSquare[i] << std::endl;
+    }
 }// end of function
 
 void ParametersManager::throwParametersFromTStudent(std::vector<double> &weightsChiSquare,double nu_){
