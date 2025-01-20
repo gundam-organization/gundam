@@ -125,6 +125,10 @@ namespace GundamUtils {
       }
       if( weights.size() != choleskyCovMatrix_->GetNcols() ){
           weights.resize(choleskyCovMatrix_->GetNcols(), 0);
+      }else{
+          for( int iPar = 0 ; iPar < choleskyCovMatrix_->GetNcols() ; iPar++ ){
+              weights.at(iPar) = 0;
+          }
       }
 
       TVectorD thrownParVec(choleskyCovMatrix_->GetNcols());
