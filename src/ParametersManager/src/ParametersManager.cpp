@@ -404,7 +404,7 @@ void ParametersManager::throwParametersFromGlobalCovariance(std::vector<double> 
 
         if( rethrow ){
             // wrap back to the while loop
-//      LogDebug << "RE-THROW #" << throwNb << std::endl;
+      LogInfo << "RE-THROW " << std::endl;
             continue;
         }
 
