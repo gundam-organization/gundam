@@ -478,7 +478,8 @@ int main(int argc, char** argv){
                 propagator.getParametersManager().throwParametersFromTStudent(weightsChiSquare,tStudentNu);
             }
         }
-
+        // Sanity check on the length of the weights vector. It should be as long as the number of parameters
+        LogThrowIf(weightsChiSquare.size() != nParameters, "ERROR: The weights vector has a different size than the number of parameters.");
 
         if(injectParamsManually) {
             // count the number of parameters to be injected

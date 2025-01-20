@@ -348,7 +348,8 @@ void ParametersManager::throwParametersFromGlobalCovariance(std::vector<double> 
     while( keepThrowing ){
 //    throwNb++;
         bool rethrow{false};
-        std::vector<double> throws,weights;
+        std::vector<double> throws;
+        std::vector<double> weights;
         if(pedestalEntity==0){
             GundamUtils::throwCorrelatedParameters(_choleskyMatrix_.get(),throws, weights);
         }else{
@@ -356,7 +357,10 @@ void ParametersManager::throwParametersFromGlobalCovariance(std::vector<double> 
                                                       pedestalEntity,pedestalLeftEdge,pedestalRightEdge);
         }
         if(throws.size() != weights.size()){
-            LogInfo<<"WARNING: throws.size() != weights.size() "<< throws.size()<<weights.size()<<std::endl;
+            LogInfo<<"ERROR: throws.size() != weights.size() "<< throws.size()<<" "<<weights.size()<<std::endl;
+        }
+        if(weights.size() != _choleskyMatrix_->GetNrows()){
+            LogInfo<<"ERROR: throws.size() != _choleskyMatrix_->GetNrows() "<< throws.size()<<" "<<_choleskyMatrix_->GetNrows()<<std::endl;
         }
         for( int iPar = 0 ; iPar < _choleskyMatrix_->GetNrows() ; iPar++ ){
             _strippedParameterList_[iPar]->setParameterValue(
