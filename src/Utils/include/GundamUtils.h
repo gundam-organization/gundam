@@ -124,7 +124,6 @@ namespace GundamUtils {
           thrownParListOut_.resize(choleskyCovMatrix_->GetNcols(), 0);
       }
       weights.resize(choleskyCovMatrix_->GetNcols(), 0);
-      LogInfo << "Resizing weights vector to " << choleskyCovMatrix_->GetNcols() << std::endl;
       for( int iPar = 0 ; iPar < choleskyCovMatrix_->GetNcols() ; iPar++ ){
           weights.at(iPar) = 0;
       }
