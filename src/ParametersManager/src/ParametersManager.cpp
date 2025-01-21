@@ -352,9 +352,10 @@ void ParametersManager::throwParametersFromGlobalCovariance(std::vector<double> 
         std::vector<double> weights;
         if(pedestalEntity==0){
             GundamUtils::throwCorrelatedParameters(_choleskyMatrix_.get(),throws, weights);
-            for(int i=0;i<weights.size();i++){
-              LogInfo<<"{ParametersManager::throwParsFromGlobalCov}} throws["<<i<<"] = "<<throws[i]<<std::endl;
-            }
+//            DEBUG: print out parameters
+//            for(int i=0;i<weights.size();i++){
+//              LogInfo<<"{ParametersManager::throwParsFromGlobalCov}} throws["<<i<<"] = "<<throws[i]<<std::endl;
+//            }
         }else{
             GundamUtils::throwCorrelatedParameters(_choleskyMatrix_.get(),throws, weights,
                                                       pedestalEntity,pedestalLeftEdge,pedestalRightEdge);
@@ -411,10 +412,6 @@ void ParametersManager::throwParametersFromGlobalCovariance(std::vector<double> 
 
         // reached this point: all parameters are within bounds
         keepThrowing = false;
-    }
-    for(int i=0;i<_strippedParameterList_.size();i++){
-      LogInfo << "{ParametersManager::throwParsFromGlobalCov output} _strippedParameterList_[" << i << "] = "
-              << _strippedParameterList_[i]->getParameterValue() << std::endl;
     }
 }// end of function
 

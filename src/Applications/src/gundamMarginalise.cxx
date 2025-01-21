@@ -487,14 +487,14 @@ int main(int argc, char** argv){
         }
         LogThrowIf(weightsChiSquare.size() != nParameters, "ERROR: The weights vector has a different size than the number of parameters.");
 
-        // Debug: print out parameters
-        for (auto &parSet: propagator.getParametersManager().getParameterSetsList()) {
-            if (not parSet.isEnabled()) { continue; }
-            for (auto &par: parSet.getParameterList()) {
-                if (not par.isEnabled()) continue;
-                LogInfo <<"{gundamMarginalise} " << par.getTitle() << " -> " << par.getParameterValue() << std::endl;
-            }
-        }
+//        // Debug: print out parameters
+//        for (auto &parSet: propagator.getParametersManager().getParameterSetsList()) {
+//            if (not parSet.isEnabled()) { continue; }
+//            for (auto &par: parSet.getParameterList()) {
+//                if (not par.isEnabled()) continue;
+//                LogInfo <<"{gundamMarginalise} " << par.getTitle() << " -> " << par.getParameterValue() << std::endl;
+//            }
+//        }
 
         if(injectParamsManually) {
             // count the number of parameters to be injected
