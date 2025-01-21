@@ -138,11 +138,9 @@ namespace GundamUtils {
                   weights.at(iPar) = -TMath::Log(
                           pedestalEntity*1.0/pedestalRange + (1.0-pedestalEntity) * NormalizingFactor * TMath::Exp(-0.500 * thrownParVec[iPar] * thrownParVec[iPar])
                   );
-                  LogInfo<<"{GUndamUtils} weights["<<iPar<<"] = "<<weights.at(iPar)<<"\n";
               }else{
                   weights.at(iPar) = -TMath::Log((1.0-pedestalEntity) * NormalizingFactor )
                                           + 0.500 * thrownParVec[iPar] * thrownParVec[iPar];
-                  LogInfo<<"{GundamUtils} weights["<<iPar<<"] = "<<weights.at(iPar)<<"\n";
               }
           }
       }else{
@@ -156,6 +154,7 @@ namespace GundamUtils {
       thrownParVec *= (*choleskyCovMatrix_);
       for( int iPar = 0 ; iPar < choleskyCovMatrix_->GetNcols() ; iPar++ ){
           thrownParListOut_.at(iPar) = thrownParVec[iPar];
+          LogInfo<<"{GundamUtils} thrownParVec["<<iPar<<"] = "<<thrownParVec[iPar]<<std::endl;
       }
   }// end of function throwCorrelatedParameters(TMatrixD* choleskyCovMatrix_, std::vector<double>& thrownParListOut_, std::vector<double>& weights, double pedestalEntity, double pedestalLeftEdge, double pedestalRightEdge)
 
