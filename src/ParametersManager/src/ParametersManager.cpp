@@ -414,7 +414,7 @@ void ParametersManager::throwParametersFromGlobalCovariance(std::vector<double> 
     }
     for(int i=0;i<_strippedParameterList_.size();i++){
       LogInfo << "{ParametersManager::throwParsFromGlobalCov output} _strippedParameterList_[" << i << "] = "
-              << _strippedParameterList_[i]->getPriorValue() << std::endl;
+              << _strippedParameterList_[i]->getParameterValue() << std::endl;
     }
 }// end of function
 

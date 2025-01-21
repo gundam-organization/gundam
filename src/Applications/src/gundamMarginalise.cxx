@@ -492,7 +492,7 @@ int main(int argc, char** argv){
             if (not parSet.isEnabled()) { continue; }
             for (auto &par: parSet.getParameterList()) {
                 if (not par.isEnabled()) continue;
-                LogInfo << par.getTitle() << " -> " << par.getParameterValue() << std::endl;
+                LogInfo <<"{gundamMarginalise} " << par.getTitle() << " -> " << par.getParameterValue() << std::endl;
             }
         }
 
