@@ -136,13 +136,13 @@ public:
   // but this provides a handle for collections that precalculate values prior
   // to doing the event reweighting.  An example of that would be the
   // Tabulated dials (which can be used in implement things like oscillation
-  // weights).  Update callbacks are std::function<void(void)>, and can be
-  // added with addUpdate();
+  // weights).  Update callbacks are std::function<void(DialCollection*)>, and
+  // can be added with addUpdate();
   void update();
 
   // Add a dial collection update callback.  These are called in the order
   // that they are added.  They are activated by the "update()" method.
-  void addUpdate(std::function<void(void)> callback);
+  void addUpdate(std::function<void(DialCollection* dc)> callback);
 
   // Check if the dial will need to be recalculated.  A recalculation
   // happens when a parameter value has changed since the last calculation.
@@ -236,7 +236,7 @@ private:
   std::vector<std::shared_ptr<DialCollection::CollectionData>>  _dialCollectionData_;
 
   // The callbacks for this dial collection
-  std::vector<std::function<void(void)>> _dialCollectionCallbacks_;
+  std::vector<std::function<void(DialCollection*)>> _dialCollectionCallbacks_;
 
   // external refs
   std::vector<ParameterSet>* _parameterSetListPtr_{nullptr};
