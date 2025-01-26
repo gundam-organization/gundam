@@ -60,7 +60,7 @@ public:
   void shrinkDialContainers();
   void buildDialCache();
   void propagateParameters();
-  void reweightEvents();
+  void reweightEvents(bool updateDials = true);
 
   // misc
   void copyEventsFrom(const Propagator& src_);
