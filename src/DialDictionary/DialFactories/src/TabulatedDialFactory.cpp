@@ -86,6 +86,10 @@ TabulatedDialFactory::TabulatedDialFactory(const JsonType& config_) {
     }
     _table_.resize(bins);
 
+    // Make sure things are going to fail badly if the table is used before
+    // it is filled.
+    for (auto& t : _table_) t = std::nan("not-set");
+
     // Get the update function
     void* updateFunc = dlsym(library, getUpdateFunction().c_str());
     if( updateFunc == nullptr ){
@@ -138,7 +142,7 @@ DialBase* TabulatedDialFactory::makeDial(const Event& event) {
     // Determine the bin index and the fractional part of the bin.
     int iBin = bin;
     if (iBin < 0) iBin = 0;     // Shouldn't happen, but just in case.
-    if (iBin > _table_.size()-1) iBin = _table_.size()-1;
+    if (iBin > _table_.size()-2) iBin = _table_.size()-2;
     double fracBin = bin - iBin;
     if (fracBin < 0.0) fracBin = 0.0;
     if (fracBin > 1.0) fracBin = 1.0;

@@ -196,12 +196,13 @@ void ParameterSet::processCovarianceMatrix(){
                << _strippedCovarianceMatrix_->GetNrows() << std::endl;
     _inverseStrippedCovarianceMatrix_ = std::shared_ptr<TMatrixD>((TMatrixD*)(_strippedCovarianceMatrix_->Clone()));
 
-    double det;
+    double det{-1};
     _inverseStrippedCovarianceMatrix_->Invert(&det);
 
     bool failed{false};
-    if( det == 0 ){
-      LogError << "Determinant is null." << std::endl;
+    if( det <= 0 ){
+      _strippedCovarianceMatrix_->Print();
+      LogError << "Stripped covariance must be positive definite: " << det << std::endl;
       failed = true;
     }
 

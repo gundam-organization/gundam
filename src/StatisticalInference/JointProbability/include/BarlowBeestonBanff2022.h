@@ -113,11 +113,15 @@ namespace JointProbability{
     if(not std::isfinite(mcuncert) or mcuncert < 0.0) {
       if( throwIfInfLlh ){
         LogError << "The mcuncert is not finite " << mcuncert << std::endl;
-        LogError << " bin " << bin_
+        LogError << samplePair_.model->getName()
+                 << "/" << samplePair_.model->getHistogram().getBinContextList()[bin_].bin.getSummary()
+                 << std::endl;
+        LogError << " Bin number " << bin_
                  << " data is " << samplePair_.data->getHistogram().getBinContentList()[bin_].sumWeights
-                 << " prediction is " << samplePair_.model->getHistogram().getBinContentList()[bin_].sumWeights
-                 << " error is " << samplePair_.model->getHistogram().getBinContentList()[bin_].sqrtSumSqWeights;
-        LogThrow("The mc uncertainty is not a usable number");
+                 << " with prediction " << samplePair_.model->getHistogram().getBinContentList()[bin_].sumWeights
+                 << " +/- " << samplePair_.model->getHistogram().getBinContentList()[bin_].sqrtSumSqWeights
+                 << std::endl;
+        std::exit(EXIT_FAILURE);
       }
       else{
         return std::numeric_limits<double>::infinity();
