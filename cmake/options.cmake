@@ -99,3 +99,9 @@ if( WITH_DOXYGEN )
     cmessage( FATAL_ERROR "Doxygen need to be installed to generate the doxygen documentation." )
   endif()
 endif()
+
+# Ensure the default install prefix is set to the build directory
+if(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
+  cmessage( STATUS "CMAKE_INSTALL_PREFIX not set, install prefix is set to the build dir." )
+  set(CMAKE_INSTALL_PREFIX "${CMAKE_BINARY_DIR}" CACHE PATH "Install path prefix" FORCE)
+endif()
