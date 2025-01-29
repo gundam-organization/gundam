@@ -1,4 +1,5 @@
 #ifndef CALCULATE_MONOTONIC_SPLINE_H_SEEN
+#include <cmath>
 // Calculate a monotonic spline with uniformly space knots.  This adds a
 // function that can be called from CPU (with c++), or a GPU (with CUDA).
 // This is much faster than TSpline3.  This uses the constraint that the slope
@@ -37,8 +38,8 @@ namespace {
     // number of knots in the spline data.  The input data is arrange
     // as
 
-    // data[0] -- spline lower bound (not used)
-    // data[1] -- spline inverse step (not used)
+    // data[0] -- spline lower bound
+    // data[1] -- spline step between X values
     // data[2+n+0] -- The function value for knot n (0 to dim-1)
     //
     // NOTE: CalculateUniformSpline, CalculateGeneralSpline,
@@ -64,32 +65,23 @@ namespace {
 
         // Get the integer part
         const double xx = (x-low)/step;
-        const int ix = xx;
+        const int ix = (xx<0) ? xx-1: xx;
 
-        // Calculate the indices of the two points to calculate d10
-        // int d10_0 = ix-2;             // p0
-        // if (d10_0<0) d10_0 = 0;
-        // int d10_1 = d10_0+1;          // p1
         // Calculate the indices of the two points to calculate d21
         int d21_0 = ix-1;             // p1
         if (d21_0 < 0)     d21_0 = 0;
         if (d21_0 > dim-2) d21_0 = dim-2;
-        int d21_1 = d21_0+1;          // p2
-        // Calculate the indices of the two points to calculate d21
+        const int d21_1 = d21_0+1;          // p2
+        // Calculate the indices of the two points to calculate d32
         int d32_0 = ix;               // p2
         if (d32_0 < 0)     d32_0 = 0;
         if (d32_0 > dim-2) d32_0 = dim-2;
-        int d32_1 = d32_0+1;          // p3
+        const int d32_1 = d32_0+1;          // p3
         // Calculate the indices of the two points to calculate d43;
         int d43_0 = ix+1;             // p3
         if (d43_0 < 0)     d43_0 = 0;
         if (d43_0 > dim-2) d43_0 = dim-2;
-        int d43_1 = d43_0+1;          // p4
-        // Calculate the indices of the two points to calculate d43;
-        int d54_0 = ix+2;             // p4
-        if (d54_0 < 0)     d54_0 = 0;
-        if (d54_0 > dim-2) d54_0 = dim-2;
-        int d54_1 = d54_0+1;          // p5
+        const int d43_1 = d43_0+1;          // p4
 
         // Find the points to use.
         const double p2 = data[2+d32_0];
@@ -99,8 +91,6 @@ namespace {
         // zero or greater than kPointSize-1, this is the distance from the
         // boundary.
         const double fx = xx-d32_0;
-        const double fxx = fx*fx;
-        const double fxxx = fx*fxx;
 
         // Get the values of the deltas
         const double d21 = data[2+d21_1] - data[2+d21_0];
@@ -108,62 +98,48 @@ namespace {
         const double d43 = data[2+d43_1] - data[2+d43_0];
 
         // Find the raw slopes at each point
-        // double m1 = 0.5*(d10+d21);
         double m2 = 0.5*(d21+d32);
         double m3 = 0.5*(d32+d43);
 
-#define COMPACT_SPLINE_MONOTONIC
-#ifdef COMPACT_SPLINE_MONOTONIC
-// #warning Using a MONOTONIC spline
-        const double d54 = data[2+d54_1] - data[2+d54_0];
-        double m4 = 0.5*(d43+d54);
+#define FRITSCH_CARLSON
+#ifdef FRITSCH_CARLSON
+        // Apply the Fritsh-Carlson monotonic condition to the slopes.
+        //
+        // F.N.Fritsch, and R.E.Carlson, "Monotone Piecewise Cubic
+        // Interpolation" SIAM Journal on Numerical Analysis, Vol. 17, Iss. 2
+        // (1980) doi:10.1137/0717021
+        //
 
         // Deal with cusp points and flat areas.
-        // if (d21*d10 < 0.0) m1 = 0.0;
         if (d32*d21 <= 0.0) m2 = 0.0;
         if (d43*d32 <= 0.0) m3 = 0.0;
-        if (d54*d43 <= 0.0) m4 = 0.0;
 
-        // Find the alphas and betas
-        // double a0 = (d10>0) ? m0/d21: 0;
-        // double b0 = (d10>0) ? m1/d21: 0;
-        // double a1 = (d21>0) ? m1/d21: 0;
-        const double b1 = (d21>0) ? m2/d21: 0;
-        const double a2 = (d32>0) ? m2/d32: 0;
-        const double b2 = (d32>0) ? m3/d32: 0;
-        const double a3 = (d43>0) ? m3/d43: 0;
-        const double b3 = (d43>0) ? m4/d43: 0;
-        // double a4 = (d54>0) ? m4/d54: 0;
-        // double b4 = (d54>0) ? m5/d54: 0;
+        const double ad21 = (d21<0) ? -d21: d21;
+        const double ad32 = (d32<0) ? -d32: d32;
+        const double ad43 = (d43<0) ? -d43: d43;
 
-        // Find places where can only be piecewise monotonic.
-        // if (b0 <= 0) m1 = 0.0;
-        if (b1 <= 0) m2 = 0.0;
-        if (b2 <= 0) m3 = 0.0;
-        // if (b3 <= 0) m4 = 0.0;
-        // if (b4 <= 0) m5 = 0.0;
-        // if (a0 <= 0) m0 = 0.0;
-        // if (a1 <= 0) m1 = 0.0;
-        if (a2 <= 0) m2 = 0.0;
-        if (a3 <= 0) m3 = 0.0;
-        // if (a4 <= 0) m4 = 0.0;
+        const double delta2 = 3.0*((ad21 < ad32) ? ad21 : ad32);
+        const double delta3 = 3.0*((ad32 < ad43) ? ad32 : ad43);
 
-        // Limit the slopes so there isn't overshoot.  It might be
-        // possible to handle the zero slope sections here without an
-        // extra conditional.  if (a1 > 3 || b1 > 3) m1 = 3.0*d21;
-        if (a2 > 3 || b2 > 3) m2 = 3.0*d32;
-        if (a3 > 3 || b3 > 3) m3 = 3.0*d43;
-        // if (a4 > 3 || b4 > 3) m4 = 3.0*d54;
+        if (m2 > delta2) m2 = delta2;
+        if (m2 < -delta2) m2 = -delta2;
+        if (m3 > delta3) m3 = delta3;
+        if (m3 < -delta3) m3 = -delta3;
 #endif
 
-        // Cubic spline with the points and slopes.
-        // double v = p2*(2.0*fxxx-3.0*fxx+1.0) + m2*(fxxx-2.0*fxx+fx)
-        //         + p3*(3.0*fxx-2.0*fxxx) + m3*(fxxx-fxx));
+        // Cubic spline with the points and slopes.  This is the formula that
+        // you will find in most text books for a hermitian spline.
 
-        // A more numerically stable calculation
-        const double t = 3.0*fxx-2.0*fxxx;
-        double v = p2 - p2*t + m2*(fxxx-2.0*fxx+fx)
-                    + p3*t + m3*(fxxx-fxx);
+        // const double fxx = fx*fx;
+        // const double fxxx = fx*fxx;
+        // double v = p2*(2.0*fxxx-3.0*fxx+1.0) + m2*(fxxx-2.0*fxx+fx)
+        //     + p3*(3.0*fxx-2.0*fxxx) + m3*(fxxx-fxx);
+
+        // Factored via Horner's method.
+        double v = ((((2.0*p2 - 2.0*p3 + m3 + m2)*fx
+                      + 3.0*p3 - 3.0*p2 - m3 - 2.0*m2)*fx
+                     +m2)*fx
+                    +p2);
 
         if (v < lowerBound) v = lowerBound;
         if (v > upperBound) v = upperBound;

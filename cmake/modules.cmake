@@ -10,6 +10,7 @@ list( APPEND MODULES ParametersManager)
 list( APPEND MODULES SamplesManager)
 list( APPEND MODULES DatasetManager)
 list( APPEND MODULES Propagator)
+list( APPEND MODULES StatisticalInference)
 list( APPEND MODULES Fitter)
 list( APPEND MODULES PythonBinder)
 

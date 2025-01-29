@@ -52,16 +52,16 @@ endif( ENABLE_BATCH_MODE )
 ## Add the Logger
 # Reproduce needed parts of the simple-cpp-logger CMakeLists.txt
 include_directories(submodules/simple-cpp-logger/include)
+add_definitions( -D LOGGER_TIME_FORMAT="\\\"%Y.%m.%d %H:%M:%S"\\\" )
 add_definitions( -D LOGGER_MAX_LOG_LEVEL_PRINTED=6 )
 add_definitions( -D LOGGER_PREFIX_LEVEL=3 )
-add_definitions( -D LOGGER_TIME_FORMAT="\\\"%d/%m/%Y %H:%M:%S"\\\" )
 
-if(${CMAKE_BUILD_TYPE} MATCHES Debug OR ${ENABLE_DEV_MODE})
-  cmessage( STATUS "Logger set in dev mode." )
-  add_definitions( -D LOGGER_PREFIX_FORMAT="\\\"{TIME} {USER_HEADER} {FILELINE}"\\\" )
+if( ${CMAKE_BUILD_TYPE} MATCHES DEBUG OR ${ENABLE_DEV_MODE} )
+  cmessage( STATUS "Logger set in DEBUG mode." )
+  add_definitions( -D LOGGER_PREFIX_FORMAT="\\\"{TIME} {SEVERITY} {FILELINE}"\\\" )
 else()
-  cmessage( STATUS "Logger set in release mode." )
-  add_definitions( -D LOGGER_PREFIX_FORMAT="\\\"{TIME} {USER_HEADER}"\\\" )
+  cmessage( STATUS "Logger set in RELEASE mode." )
+  add_definitions( -D LOGGER_PREFIX_FORMAT="\\\"{TIME} {SEVERITY} {FILENAME}"\\\" )
 endif()
 
 if(NOT ENABLE_COLOR_OUTPUT)
@@ -72,5 +72,4 @@ else()
   add_definitions( -D LOGGER_ENABLE_COLORS=1 )
   add_definitions( -D LOGGER_ENABLE_COLORS_ON_USER_HEADER=1 )
 endif()
-
 

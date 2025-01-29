@@ -2,57 +2,53 @@
 // Created by Adrien BLANCHET on 14/05/2022.
 //
 
-#ifndef GUNDAM_DATADISPENSER_H
-#define GUNDAM_DATADISPENSER_H
+#ifndef GUNDAM_DATA_DISPENSER_H
+#define GUNDAM_DATA_DISPENSER_H
 
-#include "SampleSet.h"
-#include "PlotGenerator.h"
-#include "JsonBaseClass.h"
-#include "DialCollection.h"
-#include "EventDialCache.h"
-#include "ParameterSet.h"
 #include "EventVarTransformLib.h"
 #include "DataDispenserUtils.h"
 
+#include "PlotGenerator.h"
+#include "Propagator.h"
+
+#include "GenericToolbox.Thread.h"
+
 #include "TChain.h"
-#include "nlohmann/json.hpp"
 
 #include <map>
 #include <string>
 #include <vector>
 
 
-class DatasetLoader; // owner
+class DatasetDefinition; // owner
 
 
 class DataDispenser : public JsonBaseClass {
 
 protected:
-  void readConfigImpl() override;
+  void configureImpl() override;
   void initializeImpl() override;
 
 public:
   DataDispenser() = delete; // owner should be set
-  explicit DataDispenser(DatasetLoader* owner_): _owner_(owner_) {}
+  explicit DataDispenser( DatasetDefinition* owner_): _owner_(owner_) {}
 
   // setters
-  void setOwner(DatasetLoader* owner_){ _owner_ = owner_; }
+  void setOwner( DatasetDefinition* owner_){ _owner_ = owner_; }
+  void setPlotGeneratorPtr( const PlotGenerator* plotGeneratorPtr_ ){ _plotGeneratorPtr_ = plotGeneratorPtr_; }
 
   // const getters
+  [[nodiscard]] const DatasetDefinition* getOwner() const{ return _owner_; }
   [[nodiscard]] const DataDispenserParameters &getParameters() const{ return _parameters_; }
 
   // non-const getters
   DataDispenserParameters &getParameters(){ return _parameters_; }
 
-  void setSampleSetPtrToLoad(SampleSet *sampleSetPtrToLoad);
-  void setParSetPtrToLoad(std::vector<ParameterSet> *parSetListPtrToLoad_);
-  void setDialCollectionListPtr(std::vector<DialCollection> *dialCollectionListPtr);
-  void setPlotGenPtr(PlotGenerator *plotGenPtr);
-  void setEventDialCache(EventDialCache* eventDialCache_);
-
+  // misc
   std::string getTitle();
 
-  void load();
+  // core
+  void load(Propagator& propagator_);
 
 protected:
   void buildSampleToFillList();
@@ -64,11 +60,15 @@ protected:
   void loadFromHistContent();
 
   // utils
-  std::unique_ptr<TChain> openChain(bool verbose_ = false);
+  std::shared_ptr<TChain> openChain(bool verbose_ = false);
 
   // multi-thread
   void eventSelectionFunction(int iThread_);
-  void fillFunction(int iThread_);
+
+  void runEventFillThreads(int iThread_);
+  void loadEvent(int iThread_);
+
+  std::vector<ThreadSharedData> threadSharedDataList{};
 
 
 private:
@@ -76,15 +76,18 @@ private:
   DataDispenserParameters _parameters_;
 
   // internals
-  DatasetLoader* _owner_{nullptr};
-  SampleSet* _sampleSetPtrToLoad_{nullptr};
-  PlotGenerator* _plotGenPtr_{nullptr}; // used to know which vars have to be kept in memory
-  EventDialCache* _eventDialCacheRef_{nullptr};
+  DatasetDefinition* _owner_{nullptr};
   DataDispenserCache _cache_;
-  std::vector<ParameterSet>* _parSetListPtrToLoad_{nullptr};
-  std::vector<DialCollection>* _dialCollectionListPtr_{nullptr};
+
+  // needed to check which variables need to be loaded
+  const PlotGenerator* _plotGeneratorPtr_{nullptr};
+
+  // multi-threading
+  GenericToolbox::ParallelWorker _threadPool_{};
+  GenericToolbox::ParallelWorker _threadPoolEventLoad_{};
+  GenericToolbox::NoCopyWrapper<std::mutex> _mutex_{};
 
 };
 
 
-#endif //GUNDAM_DATADISPENSER_H
+#endif //GUNDAM_DATA_DISPENSER_H

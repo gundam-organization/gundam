@@ -2,65 +2,51 @@
 // Created by Nadrino on 22/07/2021.
 //
 
-#ifndef GUNDAM_SAMPLESET_H
-#define GUNDAM_SAMPLESET_H
+#ifndef GUNDAM_SAMPLE_SET_H
+#define GUNDAM_SAMPLE_SET_H
 
 #include "Sample.h"
-#include "ParameterSet.h"
-#include "Likelihoods.hh"
-#include "JointProbability.h"
-#include "JsonBaseClass.h"
-
-#include "GenericToolbox.h"
-
-#include "nlohmann/json.hpp"
 
 #include <string>
 #include <vector>
 
 
-/// Hold a description of all of the event samples (both "data" and the
-/// matching "MC") that are going to be managed by the Propagator.  The
+/// Hold a description of all of the event samples
+/// that are going to be managed by the Propagator.  The
 /// samples in the set can be referred to by their sample set index.
 class SampleSet : public JsonBaseClass {
 
 protected:
-  // called through public JsonBaseClass::readConfig() and JsonBaseClass::initialize()
-  void readConfigImpl() override;
+  // called through JsonBaseClass::configure() and JsonBaseClass::initialize()
+  void configureImpl() override;
   void initializeImpl() override;
 
 public:
   // Post init
-  void copyMcEventListToDataContainer();
-  void clearMcContainers();
+  void clearEventLists();
 
   // const getters
-  const std::vector<Sample> &getFitSampleList() const { return _fitSampleList_; }
-  const std::shared_ptr<JointProbability::JointProbability> &getJointProbabilityFct() const{ return _jointProbabilityPtr_; }
-  const std::vector<std::string>& getAdditionalVariablesForStorage() const { return _additionalVariablesForStorage_; }
+  [[nodiscard]] const std::vector<Sample> &getSampleList() const { return _sampleList_; }
 
-  // non-const getters
-  std::vector<Sample> &getFitSampleList(){ return _fitSampleList_; }
-  std::vector<std::string>& getAdditionalVariablesForStorage() { return _additionalVariablesForStorage_; }
+  // mutable getters
+  std::vector<Sample> &getSampleList(){ return _sampleList_; }
 
-  //Core
-  bool empty() const{ return _fitSampleList_.empty(); }
-  double evalLikelihood();
-  double evalLikelihood(Sample& sample_);
+  // core
+  [[nodiscard]] bool empty() const{ return _sampleList_.empty(); }
+  [[nodiscard]] std::vector<std::string> fetchRequestedVariablesForIndexing() const;
 
-  // Parallel
-  void updateSampleEventBinIndexes() const;
-  void updateSampleBinEventList() const;
-  void updateSampleHistograms() const;
+  void copyEventsFrom(const SampleSet& src_);
+  [[nodiscard]] size_t getNbOfEvents() const;
+
+  // misc
+  void printConfiguration() const;
+  [[nodiscard]] std::string getSampleBreakdown() const;
 
 private:
-  bool _showTimeStats_{false};
-  std::vector<Sample> _fitSampleList_;
-  std::shared_ptr<JointProbability::JointProbability> _jointProbabilityPtr_{nullptr};
-  std::vector<std::string> _eventByEventDialLeafList_;
-  std::vector<std::string> _additionalVariablesForStorage_;
+  // config
+  std::vector<Sample> _sampleList_;
 
 };
 
 
-#endif //GUNDAM_SAMPLESET_H
+#endif //GUNDAM_SAMPLE_SET_H

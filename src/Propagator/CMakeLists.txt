@@ -1,11 +1,13 @@
 set(SRCFILES
-    src/Propagator.cpp
-    src/ParScanner.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/PlotGenerator.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/EventTreeWriter.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/Propagator.cpp
     )
 
 set(HEADERS
-    include/Propagator.h
-    include/ParScanner.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/PlotGenerator.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/EventTreeWriter.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/Propagator.h
 )
 
 #ROOT_GENERATE_DICTIONARY(
@@ -27,17 +29,19 @@ else()
 endif()
 
 
-target_include_directories( GundamPropagator PUBLIC
-  ${CMAKE_CURRENT_SOURCE_DIR}/include)
+target_include_directories( GundamPropagator
+    PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+)
 
 if( WITH_CACHE_MANAGER )
-  set(CACHE_MANAGER_LIBRARIES "GundamCache")
+  set(CACHE_MANAGER_LIBRARIES "GundamCacheManager")
 else()
   set(CACHE_MANAGER_LIBRARIES "")
 endif()
 
-target_link_libraries( GundamPropagator PUBLIC
-    GundamDatasetManager
+target_link_libraries( GundamPropagator
+    PUBLIC
     GundamDialDictionary
     ${CACHE_MANAGER_LIBRARIES}
 )

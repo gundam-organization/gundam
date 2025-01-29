@@ -6,134 +6,115 @@
 #define GUNDAM_PROPAGATOR_H
 
 
-#include "DatasetLoader.h"
-#include "PlotGenerator.h"
-#include "EventTreeWriter.h"
-#include "SampleSet.h"
 #include "ParametersManager.h"
-#include "JsonBaseClass.h"
-#include "ParScanner.h"
 #include "DialCollection.h"
 #include "EventDialCache.h"
+#include "SampleSet.h"
 
-#include "GenericToolbox.CycleTimer.h"
+#include "GenericToolbox.Time.h"
+#include "GenericToolbox.Thread.h"
 
 #include <vector>
 #include <map>
 #include <future>
 
+
 class Propagator : public JsonBaseClass {
 
-
 protected:
-  void readConfigImpl() override;
+  void configureImpl() override;
   void initializeImpl() override;
 
+
 public:
-  Propagator() = default;
-
-  // Setters
-  void setShowTimeStats(bool showTimeStats){ _showTimeStats_ = showTimeStats; }
-  void setThrowAsimovToyParameters(bool throwAsimovToyParameters){ _throwAsimovToyParameters_ = throwAsimovToyParameters; }
-  void setEnableEigenToOrigInPropagate(bool enableEigenToOrigInPropagate){ _enableEigenToOrigInPropagate_ = enableEigenToOrigInPropagate; }
-  void setIThrow(int iThrow){ _iThrow_ = iThrow; }
-  void setLoadAsimovData(bool loadAsimovData){ _loadAsimovData_ = loadAsimovData; }
-  void setParameterInjectorConfig(const nlohmann::json &parameterInjector){ _parameterInjectorMc_ = parameterInjector; }
-
-  // Const getters
-  [[nodiscard]] bool isThrowAsimovToyParameters() const { return _throwAsimovToyParameters_; }
-  [[nodiscard]] int getIThrow() const { return _iThrow_; }
-  [[nodiscard]] double getLlhBuffer() const{ return _llhBuffer_; }
-  [[nodiscard]] double getLlhStatBuffer() const{ return _llhStatBuffer_; }
-  [[nodiscard]] double getLlhPenaltyBuffer() const{ return _llhPenaltyBuffer_; }
-  [[nodiscard]] double getLlhRegBuffer() const{ return _llhRegBuffer_; }
-  [[nodiscard]] const ParametersManager &getParametersManager() const { return _parManager_; }
-  [[nodiscard]] const EventTreeWriter &getTreeWriter() const{ return _treeWriter_; }
-  [[nodiscard]] const std::vector<DatasetLoader> &getDataSetList() const{ return _dataSetList_; }
-  [[nodiscard]] const std::vector<DialCollection> &getDialCollections() const{ return _dialCollections_; }
-
-  // Non-const getters
-  ParScanner& getParScanner(){ return _parScanner_; }
-  SampleSet &getFitSampleSet(){ return _fitSampleSet_; }
-  ParametersManager &getParametersManager(){ return _parManager_; }
-  PlotGenerator &getPlotGenerator(){ return _plotGenerator_; }
-  EventDialCache& getEventDialCache(){ return _eventDialCache_; }
-  std::vector<DatasetLoader> &getDataSetList(){ return _dataSetList_; }
-
-  // Misc getters
-  [[nodiscard]] const double* getLlhBufferPtr() const { return &_llhBuffer_; }
-  [[nodiscard]] const double* getLlhStatBufferPtr() const { return &_llhStatBuffer_; }
-  [[nodiscard]] const double* getLlhPenaltyBufferPtr() const { return &_llhPenaltyBuffer_; }
-  [[nodiscard]] const double* getLlhRegBufferPtr() const { return &_llhRegBuffer_; }
-  [[nodiscard]] std::string getLlhBufferSummary() const;
-  [[nodiscard]] DatasetLoader* getDatasetLoaderPtr(const std::string& name_);
-
-  // Core
-  void updateLlhCache();
-  void propagateParametersOnSamples();
-  void resetReweight();
-  void reweightMcEvents();
-  void refillSampleHistograms();
-
-  // Misc
-  [[nodiscard]] std::string getSampleBreakdownTableStr() const;
-
-  // Logger related
   static void muteLogger();
   static void unmuteLogger();
+
+  Propagator() = default;
+
+  // setters
+  void setShowTimeStats(bool showTimeStats){ _showTimeStats_ = showTimeStats; }
+  void setEnableEigenToOrigInPropagate(bool enableEigenToOrigInPropagate){ _enableEigenToOrigInPropagate_ = enableEigenToOrigInPropagate; }
+  void setIThrow(int iThrow){ _iThrow_ = iThrow; }
+  void setParameterInjectorConfig(const JsonType &parameterInjector){ _parameterInjectorMc_ = parameterInjector; }
+
+  // const getters
+  [[nodiscard]] bool isDebugPrintLoadedEvents() const { return _debugPrintLoadedEvents_; }
+  [[nodiscard]] int getDebugPrintLoadedEventsNbPerSample() const { return _debugPrintLoadedEventsNbPerSample_; }
+  [[nodiscard]] int getIThrow() const { return _iThrow_; }
+  [[nodiscard]] const EventDialCache& getEventDialCache() const { return _eventDialCache_; }
+  [[nodiscard]] const ParametersManager &getParametersManager() const { return _parManager_; }
+  [[nodiscard]] const std::vector<DialCollection> &getDialCollectionList() const{ return _dialCollectionList_; }
+  [[nodiscard]] const SampleSet &getSampleSet() const { return _sampleSet_; }
+  [[nodiscard]] const JsonType &getParameterInjectorMc() const { return _parameterInjectorMc_;; }
+
+  // mutable getters
+  SampleSet &getSampleSet(){ return _sampleSet_; }
+  ParametersManager &getParametersManager(){ return _parManager_; }
+  EventDialCache& getEventDialCache(){ return _eventDialCache_; }
+  std::vector<DialCollection> &getDialCollectionList(){ return _dialCollectionList_; }
+  GenericToolbox::ParallelWorker& getThreadPool(){ return _threadPool_; }
+
+  // Core
+  void clearContent();
+  void shrinkDialContainers();
+  void buildDialCache();
+  void propagateParameters();
+  void reweightEvents(bool updateDials = true);
+
+  // misc
+  void copyEventsFrom(const Propagator& src_);
+  void printConfiguration() const;
+  void printBreakdowns() const;
+  void writeEventRates(const GenericToolbox::TFilePath& saveDir_) const;
+
+#ifdef GUNDAM_USING_CACHE_MANAGER
+  void initializeCacheManager();
+#endif
+
+  // public members
+  GenericToolbox::Time::AveragedTimer<10> reweightTimer;
+  GenericToolbox::Time::AveragedTimer<10> refillHistogramTimer;
 
 protected:
   void initializeThreads();
 
   // multithreading
-  void reweightMcEvents(int iThread_);
-  void refillSampleHistogramsFct(int iThread_);
-  void refillSampleHistogramsPostParallelFct();
+  void reweightEvents( int iThread_);
+  void refillHistogramsFct( int iThread_);
+
+  void updateDialState();
+  void refillHistograms();
 
 private:
+
   // Parameters
   bool _showTimeStats_{false};
-  bool _loadAsimovData_{false};
   bool _debugPrintLoadedEvents_{false};
   bool _devSingleThreadReweight_{false};
   bool _devSingleThreadHistFill_{false};
   int _debugPrintLoadedEventsNbPerSample_{5};
-  nlohmann::json _parameterInjectorMc_;
-  nlohmann::json _parameterInjectorToy_;
+  JsonType _parameterInjectorMc_;
+  JsonType _parameterInjectorToy_;
 
   // Internals
-  bool _throwAsimovToyParameters_{false};
-  bool _enableStatThrowInToys_{true};
-  bool _gaussStatThrowInToys_{false};
-  bool _enableEventMcThrow_{true};
+  bool _showNbEventParameterBreakdown_{true};
+  bool _showNbEventPerSampleParameterBreakdown_{false};
   bool _enableEigenToOrigInPropagate_{true};
   int _iThrow_{-1};
-  double _llhBuffer_{0};
-  double _llhStatBuffer_{0};
-  double _llhPenaltyBuffer_{0};
-  double _llhRegBuffer_{0};
 
   // Sub-layers
-  SampleSet _fitSampleSet_;
-  ParametersManager _parManager_;
-  PlotGenerator _plotGenerator_;
-  EventTreeWriter _treeWriter_;
-  ParScanner _parScanner_{this};
-  std::vector<DatasetLoader> _dataSetList_;
-
-  // Monitoring
-  bool _showEventBreakdown_{true};
+  SampleSet _sampleSet_{};
+  EventDialCache _eventDialCache_{};
+  ParametersManager _parManager_{};
 
   // A vector of all the dial collections used by all the fit samples.
   // Once a dial collection has been added to this vector, it's index becomes
   // the immutable tag for that specific group of dials.
-  std::vector<DialCollection> _dialCollections_{};
-  EventDialCache _eventDialCache_{};
+  std::vector<DialCollection> _dialCollectionList_{};
+  // TODO: create a DialManager
 
-public:
-  GenericToolbox::CycleTimer dialUpdate;
-  GenericToolbox::CycleTimer weightProp;
-  GenericToolbox::CycleTimer fillProp;
+  GenericToolbox::ParallelWorker _threadPool_{};
 
 };
 #endif //GUNDAM_PROPAGATOR_H

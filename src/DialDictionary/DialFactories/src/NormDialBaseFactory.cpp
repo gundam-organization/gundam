@@ -1,9 +1,6 @@
 #include "NormDialBaseFactory.h"
 #include "Norm.h"
 
-LoggerInit([]{
-  Logger::setUserHeaderStr("[NormFactory]");
-});
 
 DialBase* NormDialBaseFactory::makeDial(const std::string& dialTitle_,
                                         const std::string& dialType_,

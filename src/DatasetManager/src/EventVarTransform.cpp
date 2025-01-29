@@ -3,38 +3,25 @@
 //
 
 #include "EventVarTransform.h"
-#include "GenericToolbox.Json.h"
+#include "ConfigUtils.h"
 
-#include "GenericToolbox.h"
 #include "Logger.h"
 
 
-
-LoggerInit([]{
-  Logger::setUserHeaderStr("[EventVarTransform]");
-});
-
-void EventVarTransform::readConfigImpl(){
-  _title_ = GenericToolbox::Json::fetchValue(_config_, "title", _title_);
-  _messageOnError_ = GenericToolbox::Json::fetchValue(_config_, "messageOnError", _messageOnError_);
-  _outputVariableName_ = GenericToolbox::Json::fetchValue(_config_, "outputVariableName", _outputVariableName_);
-  _inputFormulaStrList_ = GenericToolbox::Json::fetchValue(_config_, "inputList", _inputFormulaStrList_);
+void EventVarTransform::configureImpl(){
+  GenericToolbox::Json::fillValue(_config_, _name_, {{"name"}, {"title"}});
+  GenericToolbox::Json::fillValue(_config_, _isEnabled_, "isEnabled");
+  GenericToolbox::Json::fillValue(_config_, _messageOnError_, "messageOnError");
+  GenericToolbox::Json::fillValue(_config_, _outputVariableName_, "outputVariableName");
+  GenericToolbox::Json::fillValue(_config_, _inputFormulaStrList_, "inputList");
 }
 void EventVarTransform::initializeImpl(){
-  LogInfo << "Loading variable transformation: " << _title_ << std::endl;
+  LogInfo << "Loading variable transformation: " << _name_ << std::endl;
   LogThrowIf(_outputVariableName_.empty(), "output variable name not set.");
 }
 
 
-EventVarTransform::EventVarTransform(const nlohmann::json& config_){ this->readConfig(config_); }
-
-void EventVarTransform::setIndex(int index_){ _index_ = index_; }
-void EventVarTransform::setUseCache(bool useCache_) { _useCache_ = useCache_; }
-
-int EventVarTransform::getIndex() const { return _index_; }
-bool EventVarTransform::useCache() const { return _useCache_; }
-const std::string &EventVarTransform::getTitle() const { return _title_; }
-const std::string &EventVarTransform::getOutputVariableName() const { return _outputVariableName_; }
+EventVarTransform::EventVarTransform(const JsonType& config_){ this->configure(config_); }
 
 const std::vector<std::string>& EventVarTransform::fetchRequestedVars() const {
   if( _requestedLeavesForEvalCache_.empty() ){
@@ -47,31 +34,32 @@ const std::vector<std::string>& EventVarTransform::fetchRequestedVars() const {
   return _requestedLeavesForEvalCache_;
 }
 
-double EventVarTransform::eval(const PhysicsEvent& event_){
+double EventVarTransform::eval(const Event& event_){
   if( not _useCache_ ){ return this->evalTransformation(event_); }
   _outputCache_ = this->evalTransformation(event_, _inputBuffer_);
   return _outputCache_;
 }
-void EventVarTransform::storeCachedOutput(PhysicsEvent& event_) const{
+void EventVarTransform::storeCachedOutput( Event& event_) const{
   this->storeOutput(_outputCache_, event_);
 }
-void EventVarTransform::evalAndStore(PhysicsEvent& event_){
+void EventVarTransform::evalAndStore( Event& event_){
   this->storeOutput(this->eval(event_), event_);
 }
-void EventVarTransform::evalAndStore(const PhysicsEvent& evalEvent_, PhysicsEvent& storeEvent_){
+void EventVarTransform::evalAndStore( const Event& evalEvent_, Event& storeEvent_){
   this->storeOutput(this->eval(evalEvent_), storeEvent_);
 }
 
 
 
-double EventVarTransform::evalTransformation(const PhysicsEvent& event_) const {
+double EventVarTransform::evalTransformation(const Event& event_) const {
   std::vector<double> buff(_inputFormulaList_.size());
   return this->evalTransformation(event_, buff);
 }
-double EventVarTransform::evalTransformation(const PhysicsEvent& event_, std::vector<double>& inputBuffer_) const{
+double EventVarTransform::evalTransformation( const Event& event_, std::vector<double>& inputBuffer_) const{
   return std::nan("defaultEvalTransformOutput");
 }
-void EventVarTransform::storeOutput(double output_, PhysicsEvent& storeEvent_) const{
-  storeEvent_.setVariable(output_, this->getOutputVariableName());
+void EventVarTransform::storeOutput( double output_, Event& storeEvent_ ) const{
+  auto& variable = storeEvent_.getVariables().fetchVariable(this->getOutputVariableName());
+  variable.set( output_ );
 }
 

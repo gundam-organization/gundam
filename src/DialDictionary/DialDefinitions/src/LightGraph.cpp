@@ -6,9 +6,6 @@
 
 #include "CalculateGraph.h"
 
-LoggerInit([]{
-  Logger::setUserHeaderStr("[LightGraph]");
-});
 
 void LightGraph::setAllowExtrapolation(bool allowExtrapolation) {
   _allowExtrapolation_ = allowExtrapolation;
@@ -24,27 +21,26 @@ void LightGraph::buildDial(const TGraph &grf, const std::string& option_) {
   graph.Sort();
 
   int nPoints = graph.GetN();
-  LogThrowIf(nPoints>15, "Light graphs must have fewer than 15 points");
 
-  _Data_.reserve(2*nPoints);
-  _Data_.clear();
+  _data_.reserve(2 * nPoints);
+  _data_.clear();
   for (int i=0; i< nPoints; ++i) {
-      _Data_.push_back(graph.GetY()[i]);
-      _Data_.push_back(graph.GetX()[i]);
+      _data_.push_back(graph.GetY()[i]);
+      _data_.push_back(graph.GetX()[i]);
   }
 }
 
 double LightGraph::evalResponse(const DialInputBuffer& input_) const {
-  double dialInput{input_.getBuffer()[0]};
+  double dialInput{input_.getInputBuffer()[0]};
 
 #ifndef NDEBUG
   LogThrowIf(not std::isfinite(dialInput), "Invalid input for LightGraph");
 #endif
 
   if( not _allowExtrapolation_ ){
-    if     (dialInput <= _Data_[1])     { return _Data_[0]; }
-    else if(dialInput >= _Data_.back()) { return _Data_[_Data_.size()-2]; }
+    if     ( dialInput <= _data_[1])     { return _data_[0]; }
+    else if( dialInput >= _data_.back()) { return _data_[_data_.size() - 2]; }
   }
 
-  return CalculateGraph(dialInput,-1E20,1E20,_Data_.data(),_Data_.size());
+  return CalculateGraph(dialInput, -1E20, 1E20, _data_.data(), _data_.size());
 }

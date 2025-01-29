@@ -7,7 +7,6 @@
 #include "CmdLineParser.h"
 #include "Logger.h"
 #include "GenericToolbox.Root.h"
-#include "GenericToolbox.h"
 
 #include "TStyle.h"
 #include "TDirectory.h"
@@ -19,10 +18,6 @@
 #include <vector>
 #include <cstdlib>
 
-
-LoggerInit([]{
-  Logger::getUserHeader() << "[" << FILENAME << "]";
-});
 
 std::vector<std::string> outExtensions;
 int nPlots{0};
@@ -55,7 +50,7 @@ int main( int argc, char** argv ){
   outExtensions = clp.getOptionValList<std::string>("output-plot-extensions");
 
   if( outExtensions.empty() ) outExtensions.emplace_back("pdf");
-  LogInfo << "Output plot extensions: " << GenericToolbox::parseVectorAsString(outExtensions) << std::endl;
+  LogInfo << "Output plot extensions: " << GenericToolbox::toString(outExtensions) << std::endl;
 
   auto* rootFile = GenericToolbox::openExistingTFile(rootFilePath);
 
@@ -105,7 +100,7 @@ void walkAndUnfoldTDirectory(TDirectory* dir_, const std::string &saveFolderPath
 //        std::cin >> WhileBool;
 //      }
 
-      GenericToolbox::mkdirPath(saveFolderPath_);
+      GenericToolbox::mkdir(saveFolderPath_);
       nPlots++;
       for( auto& ext : outExtensions ){
         std::string outPath =
@@ -116,7 +111,7 @@ void walkAndUnfoldTDirectory(TDirectory* dir_, const std::string &saveFolderPath
             );
 
         LogWarning << outPath << std::endl;
-        if( GenericToolbox::doesPathIsFile(outPath) ){
+        if( GenericToolbox::isFile(outPath) ){
           std::remove(outPath.c_str());
         }
 

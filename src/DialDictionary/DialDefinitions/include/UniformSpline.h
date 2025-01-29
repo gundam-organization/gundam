@@ -6,6 +6,7 @@
 #define GUNDAM_UNIFORMSPLINE_H
 
 #include "DialBase.h"
+#include "DialUtils.h"
 #include "DialInputBuffer.h"
 
 #include "TGraph.h"
@@ -39,7 +40,7 @@ public:
                          const std::vector<double>& v3,
                          const std::string& option_="") override;
 
-   const std::vector<double>& getDialData() const override {return _splineData_;}
+   [[nodiscard]] const std::vector<double>& getDialData() const override {return _splineData_;}
 
 protected:
   bool _allowExtrapolation_{false};
@@ -48,7 +49,7 @@ protected:
   // the Cache::Manager to work, and provides the input for spline calculation
   // functions that can be shared between the CPU and the GPU.
   std::vector<double> _splineData_{};
-  std::pair<double, double> _splineBounds_{std::nan("unset"), std::nan("unset")};
+  DialUtils::Range _splineBounds_{std::nan("unset"), std::nan("unset")};
 };
 
 typedef CachedDial<UniformSpline> UniformSplineCache;

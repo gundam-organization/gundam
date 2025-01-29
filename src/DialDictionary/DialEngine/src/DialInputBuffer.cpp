@@ -5,121 +5,113 @@
 #include "DialInputBuffer.h"
 
 #include "Logger.h"
-
-#if USE_ZLIB
-#include "zlib.h"
-#endif
-
-LoggerInit([]{
-  Logger::setUserHeaderStr("[DialInputBuffer]");
-});
+#include "GundamBacktrace.h"
 
 
-const Parameter& DialInputBuffer::getFitParameter(int i) const {
-    return _parSetRef_->at(_inputParameterIndicesList_[i].first).getParameterList().at(_inputParameterIndicesList_[i].second);
-}
-const ParameterSet& DialInputBuffer::getFitParameterSet(int i) const {
-  return _parSetRef_->at(_inputParameterIndicesList_[i].first);
+void DialInputBuffer::invalidateBuffers(){
+  // invalidate buffer
+  for( auto& buf : _inputBuffer_ ){ buf = std::nan("unset"); }
 }
 
-void DialInputBuffer::updateBuffer(){
-  LogThrowIf(_parSetRef_ == nullptr, "parSetRef is not set.");
+void DialInputBuffer::initialise(){
+  LogThrowIf(_parSetListPtr_ == nullptr, "ParameterSet list pointer not set.");
 
-  this->setIsMasked( false );
-  double* bufferPtr{_buffer_.data()};
-  double buffer;
+  // the size won't change anymore
+  _inputParameterReferenceList_.shrink_to_fit();
 
-  // will change if at least one parameter is updated
-  _isDialUpdateRequested_ = false;
+  // this value shouldn't change anymore:
+  _inputArraySize_ = int(_inputParameterReferenceList_.size());
 
-  for( auto& parIndices : _inputParameterIndicesList_ ){
+  // set the buffer to the proper size
+  _inputBuffer_.resize(_inputArraySize_, std::nan("unset"));
 
-    if( (*_parSetRef_)[parIndices.first].isMaskedForPropagation() ){
-      // in that case, the DialInterface will always return 1.
-      this->setIsMasked( true );
-      return;
-    }
+  // sanity checks
+  for( int iInput = 0 ; iInput < _inputArraySize_ ; iInput++ ){
+    LogThrowIf(_inputParameterReferenceList_[iInput].parSetIndex < 0,
+               "Parameter set index invalid: " << _inputParameterReferenceList_[iInput].parSetIndex);
+    LogThrowIf(_inputParameterReferenceList_[iInput].parSetIndex >= _parSetListPtr_->size(),
+               "Parameter set index invalid: " << _inputParameterReferenceList_[iInput].parSetIndex);
 
-    buffer = (*_parSetRef_)[parIndices.first].getParameterList()[parIndices.second].getParameterValue();
-    if( _useParameterMirroring_ ){
-      buffer = std::abs(std::fmod(
-          buffer - _parameterMirrorBounds_[std::distance(_buffer_.data(), bufferPtr)].first,
-          2 * _parameterMirrorBounds_[std::distance(_buffer_.data(), bufferPtr)].second
+    LogThrowIf(_inputParameterReferenceList_[iInput].parIndex < 0,
+               "Parameter index invalid: " << _inputParameterReferenceList_[iInput].parIndex);
+    LogThrowIf(_inputParameterReferenceList_[iInput].parIndex >= getParameterSet(iInput).getParameterList().size(),
+               "Parameter index invalid: " << _inputParameterReferenceList_[iInput].parIndex);
+  }
+
+  _isInitialized_ = true;
+}
+
+void DialInputBuffer::update(){
+  // by default consider we have to update
+  _isDialUpdateRequested_ = true;
+
+  // look for the parameter values
+  double tempBuffer;
+  _isDialUpdateRequested_ = false; // if ANY is different, request the update
+  for( auto& inputRef : _inputParameterReferenceList_ ){
+    // grab the value of the parameter
+    tempBuffer = inputRef.getParameter(_parSetListPtr_).getParameterValue();
+
+    // find the actual parameter value if mirroring is applied
+    if( not std::isnan( inputRef.mirrorEdges.minValue ) ){
+      tempBuffer = std::abs(std::fmod(
+          tempBuffer - inputRef.mirrorEdges.minValue,
+          2 * inputRef.mirrorEdges.range
       ));
 
-      if(buffer > _parameterMirrorBounds_[std::distance(_buffer_.data(), bufferPtr)].second ){
+      if( tempBuffer > inputRef.mirrorEdges.range ){
         // odd pattern  -> mirrored -> decreasing effective X while increasing parameter
-        buffer -= 2 * _parameterMirrorBounds_[std::distance(_buffer_.data(), bufferPtr)].second;
-        buffer = -buffer;
+        tempBuffer -= 2 * inputRef.mirrorEdges.range;
+        tempBuffer = -tempBuffer;
       }
 
       // re-apply the offset
-      buffer += _parameterMirrorBounds_[std::distance(_buffer_.data(), bufferPtr)].first;
+      tempBuffer += inputRef.mirrorEdges.minValue;
     }
-    LogThrowIf(std::isnan(buffer), "NaN while evaluating input buffer of " << (*_parSetRef_)[parIndices.first].getParameterList()[parIndices.second].getTitle());
+#ifdef DEBUG_BUILD
+    if( std::isnan(tempBuffer) ){
+        // LogThrowIf is broken, but OK for real error traps, but this is
+        // checking user input it's critical that the error message is
+        // properly formated so print an error, a backtrace, and then exit.
+        LogError << "NaN while evaluating input buffer of "
+                 << inputRef.getParameter(_parSetListPtr_).getTitle()
+                 << std::endl;
+        LogError << GundamUtils::Backtrace << std::endl;
+    }
+#endif
 
-    if( *bufferPtr != buffer ){
-//      LogTrace << "UPT: " << this->getSummary() << ": " << *bufferPtr << " -> " << buffer << std::endl;
+    // has it been updated?
+    if( _inputBuffer_[inputRef.bufferIndex] != tempBuffer ){
       _isDialUpdateRequested_ = true;
+      _inputBuffer_[inputRef.bufferIndex] = tempBuffer;
     }
-
-    *bufferPtr = buffer;
-    bufferPtr++;
   }
-
-//  if( not _isDialUpdateRequested_ ){
-//    LogDebug << "CACHED: " << this->getSummary() << std::endl;
-//  }
-
-  _currentHash_ = generateHash();
 }
-void DialInputBuffer::addParameterIndices(const std::pair<size_t, size_t>& indices_){
-  _inputParameterIndicesList_.emplace_back(indices_);
-  _buffer_.emplace_back(std::nan("unset"));
-}
-void DialInputBuffer::addMirrorBounds(const std::pair<double, double>& lowEdgeAndRange_){
-  const int p = _parameterMirrorBounds_.size();
-  // Overriding the const to allow the mirroring information to be stored
-  Parameter& par = const_cast<Parameter&>(getFitParameter(p));
-  par.setMinMirror(lowEdgeAndRange_.first);
-  par.setMaxMirror(lowEdgeAndRange_.first + lowEdgeAndRange_.second);
-  _parameterMirrorBounds_.emplace_back(lowEdgeAndRange_);
-}
-const std::pair<double,double>&
-DialInputBuffer::getMirrorBounds(int i) const {
-    return _parameterMirrorBounds_.at(i);
+void DialInputBuffer::addParameterReference( const ParameterReference& parReference_){
+  LogThrowIf(_isInitialized_, "Can't add parameter index while initialized.");
+  _inputParameterReferenceList_.emplace_back(parReference_);
+  auto& parRef = _inputParameterReferenceList_.back();
+  parRef.bufferIndex = int(_inputParameterReferenceList_.size())-1;
 }
 std::string DialInputBuffer::getSummary() const{
   std::stringstream ss;
-  ss << GenericToolbox::iterableToString(_inputParameterIndicesList_, [&](const std::pair<size_t, size_t>& idx_){
+  ss << GenericToolbox::toString(_inputParameterReferenceList_, [&]( const ParameterReference& parRef_){
     std::stringstream ss;
-    if( _parSetRef_ != nullptr ){
-      ss << (*_parSetRef_)[idx_.first].getParameterList()[idx_.second].getFullTitle() << "=";
-      ss << (*_parSetRef_)[idx_.first].getParameterList()[idx_.second].getParameterValue();
+    if( _parSetListPtr_ != nullptr ){
+      ss << parRef_.getParameter(_parSetListPtr_).getFullTitle() << "=";
+      ss << parRef_.getParameter(_parSetListPtr_).getParameterValue();
     }
     else{
-      ss << "{" << idx_.first << ", " << idx_.second << "}";
+      ss << "{" << parRef_.parSetIndex << ", " << parRef_.parIndex << "}";
     }
+
+    if( not std::isnan(parRef_.mirrorEdges.minValue) ){
+      ss << ", mirrorLow=" << parRef_.mirrorEdges.minValue;
+      ss << ", mirrorUp=" << parRef_.mirrorEdges.minValue + parRef_.mirrorEdges.range;
+    }
+
     return ss.str();
   }, false);
-  if( _useParameterMirroring_ ){
-    ss << ", " << GenericToolbox::iterableToString(_parameterMirrorBounds_, [&](const std::pair<double, double>& bounds_){
-      std::stringstream ss;
-      ss << "mirrorLow=" << bounds_.first << ", mirrorUp=" << bounds_.first + bounds_.second;
-      return ss.str();
-    }, false);
-  }
+
   return ss.str();
-}
-uint32_t DialInputBuffer::generateHash(){
-#if USE_ZLIB
-  uint32_t out = crc32(0L, Z_NULL, 0);
-  double* inputPtr = _buffer_.data();
-  while( inputPtr < _buffer_.data() + _buffer_.size() ){
-    out = crc32( out, (const Bytef*) inputPtr, sizeof(double) );
-    inputPtr++;
-  }
-  return out;
-#endif
-  return 0;
 }

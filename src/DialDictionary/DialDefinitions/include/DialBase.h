@@ -76,10 +76,12 @@ public:
   /// over the event L/E.
   virtual void buildDial(double v1, const std::string& option_="") {throw std::runtime_error("Not implemented");}
 
+  /// Build a dial from a TH2 (usually a leaf in the input file).
+  virtual void buildDial(const TH2& h2, const std::string& option_="") {throw std::runtime_error("Not implemented");}
+
   /// Return the data used by the dial to calculate the output values. The
   /// specific data contained in the vector depends on the derived class.
   [[nodiscard]] virtual const std::vector<double>& getDialData() const;
-
 
 };
 

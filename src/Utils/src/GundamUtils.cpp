@@ -4,15 +4,12 @@
 
 #include "GundamUtils.h"
 #include "VersionConfig.h" // the only place it is included
+#include "SourceConfig.h" // the only place it is included
 
+#include "GenericToolbox.Fs.h"
 #include "Logger.h"
-#include "GenericToolbox.h"
 
 #include <sstream>
-
-LoggerInit([]{
-  Logger::getUserHeader() << "[" << FILENAME << "]";
-});
 
 
 namespace GundamUtils {
@@ -27,6 +24,9 @@ namespace GundamUtils {
       ss << "/" << GundamVersionConfig::getVersionBranch();
     }
     return ss.str();
+  }
+  std::string getSourceCodePath(){
+    return {SOURCE_CONFIG_H};
   }
   bool isNewerOrEqualVersion( const std::string& minVersion_ ){
     if( GundamUtils::getVersionStr() == "X.X.X" ){
@@ -53,20 +53,20 @@ namespace GundamUtils {
     return true;
   }
 
-  std::string generateFileName(const CmdLineParser& clp_, const std::vector<std::pair<std::string, std::string>>& appendixDict_){
+  std::string generateFileName(const CmdLineParser& clp_, const std::vector<AppendixEntry>& appendixDict_){
     std::vector<std::string> appendixList{};
 
     int maxArgLength{64};
 
     for( const auto& appendixDictEntry : appendixDict_ ){
-      if( clp_.isOptionTriggered(appendixDictEntry.first) ){
-        appendixList.emplace_back( appendixDictEntry.second );
-        if( clp_.getNbValueSet(appendixDictEntry.first) > 0 ){
+      if( clp_.isOptionTriggered( appendixDictEntry.optionName ) ){
+        appendixList.emplace_back( appendixDictEntry.appendix );
+        if( clp_.getNbValueSet(appendixDictEntry.optionName) > 0 ){
 
-          auto args = clp_.getOptionValList<std::string>(appendixDictEntry.first);
+          auto args = clp_.getOptionValList<std::string>(appendixDictEntry.optionName);
           for( auto& arg : args ){
             // strip potential slashes and extensions
-            arg = GenericToolbox::getFileNameFromFilePath(arg, false);
+            arg = GenericToolbox::getFileName(arg, false);
             if( arg.size() > maxArgLength ){
               // print dotdot if too long
               arg = arg.substr(0, maxArgLength);
@@ -76,25 +76,19 @@ namespace GundamUtils {
             }
 
             // cleanup from special chars
-            arg = GenericToolbox::generateCleanBranchName(arg);
-          }
+            arg = GenericToolbox::generateCleanFileName(arg);
 
-          appendixList.back() = Form(
-              appendixList.back().c_str(),
-              GenericToolbox::joinVectorString(args, "_").c_str()
-          );
+            if( not arg.empty() ){
+              if( not appendixList.back().empty() ){ appendixList.back() += "_"; }
+              appendixList.back() += arg;
+            }
+          }
         }
-        else{
-          appendixList.back() = GenericToolbox::trimString(Form( appendixList.back().c_str(), "" ), "_");
-        }
-      }
+
+      } // option triggered?
     }
 
     return GenericToolbox::joinVectorString(appendixList, "_");
   }
-
-  bool ObjectReader::quiet{false};
-  bool ObjectReader::throwIfNotFound{false};
-  bool ObjectReader::readObject( TDirectory* f_, const std::string& objPath_){ return readObject<TObject>(f_, objPath_); }
 
 }

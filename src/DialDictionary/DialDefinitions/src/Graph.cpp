@@ -4,9 +4,6 @@
 
 #include "Graph.h"
 
-LoggerInit([]{
-  Logger::setUserHeaderStr("[Graph]");
-});
 
 void Graph::setAllowExtrapolation(bool allowExtrapolation) {
   _allowExtrapolation_ = allowExtrapolation;
@@ -24,7 +21,7 @@ void Graph::buildDial(const TGraph &graph, const std::string& option_) {
 }
 
 double Graph::evalResponse(const DialInputBuffer& input_) const {
-  double dialInput{input_.getBuffer()[0]};
+  double dialInput{input_.getInputBuffer()[0]};
 
 #ifndef NDEBUG
   LogThrowIf(not std::isfinite(dialInput), "Invalid input for Graph");

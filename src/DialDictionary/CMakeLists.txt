@@ -19,15 +19,21 @@ set( SRCFILES
     DialDefinitions/src/UniformSpline.cpp
     DialDefinitions/src/CompactSpline.cpp
     DialDefinitions/src/MonotonicSpline.cpp
+    DialDefinitions/src/Bilinear.cpp
+    DialDefinitions/src/Bicubic.cpp
 
+    DialDefinitions/src/CompiledLibDial.cpp
     DialDefinitions/src/RootFormula.cpp
     DialDefinitions/src/Polynomial.cpp
+
 
     # DialFactories
     DialFactories/src/DialBaseFactory.cpp
     DialFactories/src/NormDialBaseFactory.cpp
     DialFactories/src/GraphDialBaseFactory.cpp
     DialFactories/src/SplineDialBaseFactory.cpp
+    DialFactories/src/SurfaceDialBaseFactory.cpp
+    DialFactories/src/TabulatedDialFactory.cpp
     )
 
 set( HEADERS
@@ -39,10 +45,10 @@ set( HEADERS
 
     # DialDefinitions
     DialDefinitions/include/DialBase.h
-    DialDefinitions/include/DialTypes.h
 
     DialDefinitions/include/Norm.h
     DialDefinitions/include/Shift.h
+    DialDefinitions/include/Tabulated.h
 
     DialDefinitions/include/Graph.h
     DialDefinitions/include/LightGraph.h
@@ -53,6 +59,8 @@ set( HEADERS
     DialDefinitions/include/UniformSpline.h
     DialDefinitions/include/CompactSpline.h
     DialDefinitions/include/MonotonicSpline.h
+    DialDefinitions/include/Bilinear.h
+    DialDefinitions/include/Bicubic.h
 
     DialDefinitions/include/RootFormula.h
     DialDefinitions/include/Polynomial.h
@@ -62,6 +70,8 @@ set( HEADERS
     DialFactories/include/NormDialBaseFactory.h
     DialFactories/include/GraphDialBaseFactory.h
     DialFactories/include/SplineDialBaseFactory.h
+    DialFactories/include/SurfaceDialBaseFactory.h
+    DialFactories/include/TabulatedDialFactory.h
     )
 
 if( USE_STATIC_LINKS )
@@ -77,13 +87,8 @@ target_include_directories(
     DialDefinitions/include
 )
 
-#target_include_directories(
-#    ${LIB_NAME} PRIVATE
-#    ${ZLIB_INCLUDE_DIRS}
-#)
-
-target_link_libraries( ${LIB_NAME} PUBLIC
-    GundamParametersManager
+target_link_libraries( ${LIB_NAME}
+    PUBLIC
     GundamSamplesManager
 )
 
@@ -91,7 +96,7 @@ target_link_libraries( ${LIB_NAME} PUBLIC
 
 #set_target_properties(${LIB_NAME} PROPERTIES VERSION "${GUNDAM_VERSION_STRING}")
 
-install(TARGETS ${LIB_NAME} DESTINATION lib)
+install( TARGETS ${LIB_NAME} DESTINATION lib )
 #Can uncomment this to install the headers... but is it really neccessary?
 # install(FILES ${HEADERS} DESTINATION include)
 

@@ -2,18 +2,14 @@
 // Created by Nadrino on 17/06/2021.
 //
 
+#include "GenericToolbox.Thread.h"
+
 #include "Logger.h"
-#include "GenericToolbox.h"
 
 #include <string>
 #include <vector>
 #include <memory>
 #include <future>
-
-
-LoggerInit([]{
-  Logger::getUserHeader() << "[" << FILENAME << "]";
-});
 
 
 int main(int argc, char** argv){

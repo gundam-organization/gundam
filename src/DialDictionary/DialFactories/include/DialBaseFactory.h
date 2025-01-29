@@ -3,6 +3,8 @@
 
 #include <DialBase.h>
 
+
+
 #include <TObject.h>
 
 #include <string>
@@ -32,6 +34,8 @@ public:
                      const std::string& dialSubType_,
                      TObject* dialInitializer_,
                      bool useCachedDial_);
+
+  DialBase* makeDial(const JsonType& config_);
 };
 
 //  A Lesser GNU Public License

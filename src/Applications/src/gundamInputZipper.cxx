@@ -6,19 +6,14 @@
 #include "GundamUtils.h"
 #include "ConfigUtils.h"
 
-#include "GenericToolbox.h"
-#include "GenericToolbox.Json.h"
+#include "GenericToolbox.Os.h"
+
 #include "CmdLineParser.h"
 #include "Logger.h"
 
 #include <string>
 #include <vector>
 #include <cstdlib>
-
-
-LoggerInit([]{
-  Logger::getUserHeader() << "[" << FILENAME << "]";
-});
 
 
 int main(int argc, char** argv) {
@@ -68,32 +63,32 @@ int main(int argc, char** argv) {
   if( not clParser.isOptionTriggered("outputFolder") ){
     // appendixDict["optionName"] = "Appendix"
     // this list insure all appendices will appear in the same order
-    std::vector<std::pair<std::string, std::string>> appendixDict{
-        {"configFile", "%s"},
-        {"overrideFiles", "With_%s"},
-        {"maxFileSizeInMb", "MaxInputSize_%sMB"},
+    std::vector<GundamUtils::AppendixEntry> appendixDict{
+        {"configFile", ""},
+        {"overrideFiles", "With"},
+        {"maxFileSizeInMb", "MaxInputSizeInMB"},
     };
 
-    outFolder = {GundamUtils::generateFileName(clParser, appendixDict)};
+    outFolder = {"gundamInputZipper_" + GundamUtils::generateFileName(clParser, appendixDict)};
   }
   else{
     outFolder = clParser.getOptionVal<std::string>("outputFolder");
   }
 
   LogInfo << "Output files will be written in: " << outFolder << std::endl;
-  GenericToolbox::mkdirPath( outFolder );
+  GenericToolbox::mkdir( outFolder );
 
   LogInfo << "Now copying input src files..." << std::endl;
   std::string pathBuffer;
   std::vector<std::string> recursivePathBufferList;
-  std::function<void(nlohmann::json&)> recursive = [&](nlohmann::json& config_){
+  std::function<void(JsonType&)> recursive = [&](JsonType& config_){
 
     if( config_.is_string() ){
       std::string srcPath = GenericToolbox::expandEnvironmentVariables(config_.get<std::string>());
-      if( GenericToolbox::doesPathIsFile( srcPath ) ){
+      if( GenericToolbox::isFile( srcPath ) ){
 
-        double fSize{double( GenericToolbox::getFileSizeInBytes(srcPath) )};
-        LogInfo << "Copying local file and overriding entry: " << GenericToolbox::getFileNameFromFilePath(srcPath)
+        double fSize{double( GenericToolbox::getFileSize( srcPath ) )};
+        LogInfo << "Copying local file and overriding entry: " << GenericToolbox::getFileName(srcPath)
         << " ( " << GenericToolbox::parseSizeUnits(fSize) << " )" << std::endl;
 
         if( clParser.isOptionTriggered("maxFileSizeInMb") ){
@@ -105,10 +100,10 @@ int main(int argc, char** argv) {
           }
         }
         auto localFolder{GenericToolbox::joinPath(recursivePathBufferList)};
-        auto localPath{GenericToolbox::joinPath(localFolder, GenericToolbox::getFileNameFromFilePath(srcPath))};
+        auto localPath{GenericToolbox::joinPath(localFolder, GenericToolbox::getFileName(srcPath))};
 
-        GenericToolbox::mkdirPath( GenericToolbox::joinPath(outFolder, localFolder) );
-        GenericToolbox::copyFile( srcPath, GenericToolbox::joinPath(outFolder, localPath) );
+        GenericToolbox::mkdir( GenericToolbox::joinPath(outFolder, localFolder) );
+        GenericToolbox::cp( srcPath, GenericToolbox::joinPath(outFolder, localPath) );
 
         config_ = localPath;
       }

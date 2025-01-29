@@ -7,23 +7,22 @@
 
 #include "EventVarTransform.h"
 
-class EventVarTransformLib : public EventVarTransform{
+class EventVarTransformLib : public EventVarTransform {
 
 public:
   EventVarTransformLib() = default;
-  explicit EventVarTransformLib(const nlohmann::json& config_){ this->readConfig(config_); }
+  explicit EventVarTransformLib(const JsonType& config_){ this->configure(config_); }
 
   void reload();
 
 protected:
   void initializeImpl() override;
-  void readConfigImpl() override;
+  void configureImpl() override;
 
   void loadLibrary();
   void initInputFormulas();
 
-
-  double evalTransformation(const PhysicsEvent& event_, std::vector<double>& inputBuffer_) const override;
+  double evalTransformation( const Event& event_, std::vector<double>& inputBuffer_) const override;
 
 private:
   std::string _libraryFile_{};

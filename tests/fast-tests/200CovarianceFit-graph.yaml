@@ -20,6 +20,7 @@ fitterEngineConfig:
     algorithm: "Migrad"
     errors: "Hesse"
     print_level: 2
+    tolerance: 1E-6
 
   propagatorConfig:
     throwAsimovFitParameters: false
@@ -85,7 +86,7 @@ fitterEngineConfig:
             isEnabled: true
             dialSetDefinitions:
               - dialsType: Graph
-                dialSubType: ROOT
+                # dialSubType intentionally missing
                 dialLeafName: "spline_C"
                 applyOnDataSets: [ "TestSample" ]
                 applyCondition: "[C] > 0"
