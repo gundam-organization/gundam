@@ -7,7 +7,6 @@
 
 
 #include "FitterEngine.h"
-#include "DataBin.h"
 #include "ConfigUtils.h"
 #include "GundamApp.h"
 
@@ -44,8 +43,10 @@ public:
 
     fitter = new FitterEngine{GenericToolbox::mkdirTFile(app.getOutfilePtr(), "FitterEngine")};
 
-    fitter->readConfig(GenericToolbox::Json::fetchSubEntry(configHandler.getConfig(), {"fitterEngineConfig"}));
-    fitter->getPropagator().setLoadAsimovData( true );
+    fitter->setConfig( GenericToolbox::Json::fetchValue<JsonType>(configHandler.getConfig(), "fitterEngineConfig") );
+    fitter->configure();
+
+    fitter->getLikelihoodInterface().setForceAsimovData( true );
     fitter->initialize();
   }
 

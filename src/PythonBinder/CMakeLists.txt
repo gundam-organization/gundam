@@ -7,6 +7,7 @@ set( SRC_FILE_LIST
 
 set( PYBIND11_PYTHON_VERSION 3.11.6 )
 
+set(PYBIND11_FINDPYTHON ON)
 find_package(pybind11 REQUIRED)
 
 pybind11_add_module( ${LIB_NAME} ${SRC_FILE_LIST} )
