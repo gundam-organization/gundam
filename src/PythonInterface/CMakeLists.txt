@@ -1,5 +1,5 @@
 
-set( LIB_NAME "GundamPythonInterface" )
+set( LIB_NAME "PyGundam" )
 
 set( SRC_FILE_LIST
     src/PythonInterface.cpp

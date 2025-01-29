@@ -14,7 +14,7 @@
 #include <string>
 
 
-class PythonBinder{
+class PyGundam{
 
   std::string filePath{};
 
@@ -26,8 +26,8 @@ public:
   std::vector<double> v_data{};
   std::vector<double> v_gamma{};
 
-  PythonBinder() = default;
-  explicit PythonBinder( std::string  filePath_ ) : filePath(std::move(filePath_)) {
+  PyGundam() = default;
+  explicit PyGundam( std::string  filePath_ ) : filePath(std::move(filePath_)) {
     ConfigUtils::ConfigHandler configHandler(filePath);
     configHandler.override( std::vector<std::string>{{"./override/onlyRun4and5.yaml"}} );
 
