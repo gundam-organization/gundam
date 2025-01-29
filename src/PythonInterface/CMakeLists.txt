@@ -1,8 +1,8 @@
 
-set( LIB_NAME "PythonBinder" )
+set( LIB_NAME "GundamPythonInterface" )
 
 set( SRC_FILE_LIST
-    src/PythonBinder.cpp
+    src/PythonInterface.cpp
 )
 
 set( PYBIND11_PYTHON_VERSION 3.11.6 )

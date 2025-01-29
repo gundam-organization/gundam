@@ -2,22 +2,15 @@
 // Created by Adrien Blanchet on 05/12/2023.
 //
 
-#ifndef GUNDAM_PYTHONBINDER_H
-#define GUNDAM_PYTHONBINDER_H
+#ifndef GUNDAM_PYTHON_INTERFACE_H
+#define GUNDAM_PYTHON_INTERFACE_H
 
 
 #include "FitterEngine.h"
 #include "ConfigUtils.h"
 #include "GundamApp.h"
 
-#include "GenericToolbox.h"
-
-#include <pybind11/stl.h> // support for vectors
-
-#include <cmath>
-#include <utility>
 #include <vector>
-#include <iostream>
 #include <string>
 
 
@@ -57,4 +50,4 @@ public:
 };
 
 
-#endif //GUNDAM_PYTHONBINDER_H
+#endif //GUNDAM_PYTHON_INTERFACE_H

@@ -2,18 +2,14 @@
 // Created by Adrien Blanchet on 05/12/2023.
 //
 
-#include "Logger.h"
+#include "PythonInterface.h"
 
-#include "PythonBinder.h"
+#include "Logger.h"
 
 #include <pybind11/pybind11.h>
 
 #include <string>
 
-
-LoggerInit([]{
-  Logger::getUserHeader() << "[PythonBinder]";
-});
 
 namespace py = pybind11;
 constexpr auto byref = py::return_value_policy::reference_internal;
