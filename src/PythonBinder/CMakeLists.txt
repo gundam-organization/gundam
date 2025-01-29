@@ -32,7 +32,7 @@ target_link_libraries( ${LIB_NAME} PUBLIC
 #    ${ROOT_LIBRARIES}
 #)
 #
-#install( TARGETS ${LIB_NAME} DESTINATION lib )
+install( TARGETS ${LIB_NAME} DESTINATION lib )
 
 
 
