@@ -10,42 +10,36 @@
 #include "ConfigUtils.h"
 #include "GundamApp.h"
 
-#include <vector>
 #include <string>
 
 
 class PyGundam{
 
-  std::string filePath{};
+  GundamApp app{"PyGundam"};
+  ConfigUtils::ConfigHandler _configHandler_;
+  std::string _outRootFilePath_{};
 
-  GundamApp app{"test fitter"};
-  FitterEngine* fitter{nullptr};
+  FitterEngine _fitter_;
+
+
 
 public:
-
-  std::vector<double> v_data{};
-  std::vector<double> v_gamma{};
-
   PyGundam() = default;
-  explicit PyGundam( std::string  filePath_ ) : filePath(std::move(filePath_)) {
-    ConfigUtils::ConfigHandler configHandler(filePath);
-    configHandler.override( std::vector<std::string>{{"./override/onlyRun4and5.yaml"}} );
 
-    app.openOutputFile("test.root");
-    app.writeAppInfo();
+  // configure stage
+  void setConfig(const std::string& configPath_){ _configHandler_ = ConfigUtils::ConfigHandler(configPath_); }
+  void addConfigOverride(const std::string& configPath_){ _configHandler_.override(configPath_); }
 
-    fitter = new FitterEngine{GenericToolbox::mkdirTFile(app.getOutfilePtr(), "FitterEngine")};
+  // load
+  void load(){
+    _fitter_.setConfig( GenericToolbox::Json::fetchValue<JsonType>(_configHandler_.getConfig(), "fitterEngineConfig") );
+    _fitter_.configure();
 
-    fitter->setConfig( GenericToolbox::Json::fetchValue<JsonType>(configHandler.getConfig(), "fitterEngineConfig") );
-    fitter->configure();
-
-    fitter->getLikelihoodInterface().setForceAsimovData( true );
-    fitter->initialize();
+    _fitter_.getLikelihoodInterface().setForceAsimovData( true );
+    _fitter_.initialize();
   }
 
-  void run() {
-    fitter->fit();
-  }
+  void fit(){ _fitter_.fit(); }
 
 };
 
