@@ -27,6 +27,7 @@ public:
   PyGundam() = default;
 
   // configure stage
+  void setOutputRootFilePath(const std::string& outRootFilePath_){ app.openOutputFile(outRootFilePath_); }
   void setConfig(const std::string& configPath_){ _configHandler_ = ConfigUtils::ConfigHandler(configPath_); }
   void addConfigOverride(const std::string& configPath_){ _configHandler_.override(configPath_); }
 

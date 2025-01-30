@@ -12,7 +12,10 @@ list( APPEND MODULES DatasetManager)
 list( APPEND MODULES Propagator)
 list( APPEND MODULES StatisticalInference)
 list( APPEND MODULES Fitter)
-list( APPEND MODULES PythonInterface)
+
+if(WITH_PYTHON_INTERFACE)
+  list( APPEND MODULES PythonInterface)
+endif()
 
 if(WITH_CACHE_MANAGER)
   list( APPEND MODULES CacheManager )
