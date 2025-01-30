@@ -27,6 +27,8 @@ PYBIND11_MODULE(PyGundam, m) {
 }
 
 void PyGundam::load(){
+  _fitter_.setSaveDir( app.getOutfilePtr() );
+  
   _fitter_.setConfig( GenericToolbox::Json::fetchValue<JsonType>(_configHandler_.getConfig(), "fitterEngineConfig") );
   _fitter_.configure();
 
