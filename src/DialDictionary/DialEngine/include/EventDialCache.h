@@ -65,14 +65,14 @@ public:
     Event* event;
     std::vector<DialResponseCache> dialResponseCacheList{};
 
-    [[nodiscard]] std::string getSummary() const {
+    [[nodiscard]] std::string getSummary(bool shallow_ = true) const {
       std::stringstream ss;
       if( event == nullptr ){ return {"No event attached to this cache entry."}; }
       ss << *event;
       if( not dialResponseCacheList.empty() ){
         ss << std::endl << "Dials{";
         for( auto& dialResponseCache : dialResponseCacheList ){
-          ss << std::endl << "  { " << dialResponseCache.dialInterface->getSummary() << " }";
+          ss << std::endl << "  { " << dialResponseCache.dialInterface->getSummary(shallow_) << " }";
         }
         ss << std::endl << "}";
       }
@@ -90,7 +90,7 @@ public:
     /// associated with the event.
     std::size_t interfaceIndex {std::size_t(-1)};
 
-    [[nodiscard]] std::string getSummary() const{
+    [[nodiscard]] std::string getSummary(bool shallow_ = true) const{
       std::stringstream ss;
       ss << "collection: " << collectionIndex << ", interface: " << interfaceIndex;
       return ss.str();
@@ -113,7 +113,7 @@ public:
     /// by Sample::getMcContainer()
     std::size_t eventIndex {std::size_t(-1)};
 
-    [[nodiscard]] std::string getSummary() const{
+    [[nodiscard]] std::string getSummary(bool shallow_ = true) const{
       std::stringstream ss;
       ss << "sample: " << sampleIndex << ", idx: " << eventIndex;
       return ss.str();
@@ -131,7 +131,7 @@ public:
     EventIndexCacheEntry event;
     std::vector<DialIndexCacheEntry> dials;
 
-    [[nodiscard]] std::string getSummary() const{
+    [[nodiscard]] std::string getSummary(bool shallow_ = true) const{
       std::stringstream ss;
       ss << "Event{" << event << "}";
       ss << " -> Dials" << GenericToolbox::toString(dials);
