@@ -147,6 +147,28 @@ DialBase* TabulatedDialFactory::makeDial(const Event& event) {
     if (fracBin < 0.0) fracBin = 0.0;
     if (fracBin > 1.0) fracBin = 1.0;
 
+#ifdef TABULATED_DIAL_FACTORY_DUMP
+    // Summarize which table is being applied to the event.  This can be quite
+    // useful for debugging parameter configurations, but is not compiled by
+    // default since it will dominate the debug output.  We need to implement
+    // different debug levels, and conditions.
+    if (GundamGlobals::isDebug()) {
+        std::ostringstream out;
+        out << getName()
+            << " " << iBin
+            << " " << fracBin;
+        std::size_t j = 0;
+        for (const std::string& varName : getBinningVariables()) {
+            out << " [" << j
+                << "] " << varName
+                << "=" << _binningVariableCache_[j];
+            ++j;
+        }
+        out << std::endl;
+        LogDebug << out.str() << std::endl;
+    }
+#endif
+
     // Do the unique_ptr dance in case there are exceptions.
     std::unique_ptr<Tabulated> dialBase = std::make_unique<Tabulated>(&_table_, iBin, fracBin);
     return dialBase.release();
