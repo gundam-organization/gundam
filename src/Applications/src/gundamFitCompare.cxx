@@ -9,7 +9,6 @@
 #include "CmdLineParser.h"
 #include "GenericToolbox.Root.h"
 
-#include "nlohmann/json.hpp"
 #include "TKey.h"
 #include "TFile.h"
 #include <TLegend.h>
@@ -18,11 +17,6 @@
 #include <vector>
 #include <memory>
 #include <utility>
-
-
-LoggerInit([]{
-  Logger::getUserHeader() << "[" << FILENAME << "]";
-});
 
 
 CmdLineParser clp;
@@ -87,19 +81,19 @@ int main( int argc, char** argv ){
   if( clp.isOptionTriggered("output") ){ outPath = clp.getOptionVal<std::string>("output"); }
   else{
     // auto generate
-    std::vector<std::pair<std::string, std::string>> appendixDict;
+    std::vector<GundamUtils::AppendixEntry> appendixDict;
 
     // file1
-    if( clp.isOptionTriggered("name-1") ){ appendixDict.emplace_back("name-1", "%s"); }
-    else                                 { appendixDict.emplace_back("file-1", "%s"); }
+    if( clp.isOptionTriggered("name-1") ){ appendixDict.emplace_back("name-1", ""); }
+    else                                 { appendixDict.emplace_back("file-1", ""); }
     if( clp.isOptionTriggered("use-prefit-1") ){ appendixDict.emplace_back("use-prefit-1", "PreFit"); }
 
     // file2
-    if( clp.isOptionTriggered("name-2") ){ appendixDict.emplace_back("name-2", "vs_%s"); }
-    else                                 { appendixDict.emplace_back("file-2", "vs_%s"); }
+    if( clp.isOptionTriggered("name-2") ){ appendixDict.emplace_back("name-2", "vs"); }
+    else                                 { appendixDict.emplace_back("file-2", "vs"); }
     if( clp.isOptionTriggered("use-prefit-2") ){ appendixDict.emplace_back("use-prefit-2", "PreFit"); }
 
-    outPath = "fitCompare_" + GundamUtils::generateFileName(clp, appendixDict) + ".root";
+    outPath = "gundamFitCompare_" + GundamUtils::generateFileName(clp, appendixDict) + ".root";
     LogWarning << "Output file: " << outPath << std::endl;
   }
   outFile = TFile::Open(outPath.c_str(), "RECREATE");
@@ -217,7 +211,7 @@ void makeSampleComparePlots(bool usePrefit_){
         hCompValues->SetTitle(Form("Comparing \"%s\"", dir1_->GetListOfKeys()->At(iKey)->GetName()));
         hCompValues->GetYaxis()->SetTitle("Bin content difference");
 
-        GenericToolbox::writeInTFile(
+        GenericToolbox::writeInTFileWithObjTypeExt(
             GenericToolbox::mkdirTFile(outFile, GenericToolbox::joinVectorString(pathBuffer, "/")),
             hCompValues,
             dir1_->GetListOfKeys()->At(iKey)->GetName()
@@ -233,7 +227,7 @@ void makeSampleComparePlots(bool usePrefit_){
         hCompValuesRatio->SetTitle(Form("Comparing \"%s\"", dir1_->GetListOfKeys()->At(iKey)->GetName()));
         hCompValuesRatio->GetYaxis()->SetTitle("Bin content relative difference (%)");
 
-        GenericToolbox::writeInTFile(
+        GenericToolbox::writeInTFileWithObjTypeExt(
             GenericToolbox::mkdirTFile(outFile, GenericToolbox::joinVectorString(pathBuffer, "/")),
             hCompValuesRatio,
             dir1_->GetListOfKeys()->At(iKey)->GetName() + std::string("_Ratio")
@@ -314,18 +308,18 @@ void makeScanComparePlots(bool usePrefit_){
 
         gr1->SetTitle( dir1_->GetListOfKeys()->At(iKey)->GetName() );
 
-        std::pair<double, double> xBounds{
+        GenericToolbox::Range xBounds{
             std::min( gr1->GetXaxis()->GetXmin(), gr2->GetXaxis()->GetXmin() ),
             std::max( gr1->GetXaxis()->GetXmax(), gr2->GetXaxis()->GetXmax() )
         };
-        std::pair<double, double> yBounds{
+        GenericToolbox::Range yBounds{
           std::min( gr1->GetMinimum(), gr2->GetMinimum() ),
           std::max( gr1->GetMaximum(), gr2->GetMaximum() )
         };
 
-        gr1->GetXaxis()->SetLimits( xBounds.first - ( xBounds.second - xBounds.first )*0.1, xBounds.second + ( xBounds.second - xBounds.first )*0.1 );
-        gr1->SetMinimum( yBounds.first - ( yBounds.second - yBounds.first )*0.1 ); // not working
-        gr1->SetMaximum( yBounds.second + ( yBounds.second - yBounds.first )*0.2 ); // not working
+        gr1->GetXaxis()->SetLimits( xBounds.min - ( xBounds.max - xBounds.min )*0.1, xBounds.max + ( xBounds.max - xBounds.min )*0.1 );
+        gr1->SetMinimum( yBounds.min - ( yBounds.max - yBounds.min )*0.1 ); // not working
+        gr1->SetMaximum( yBounds.max + ( yBounds.max - yBounds.min )*0.2 ); // not working
 
         gr1->Draw();
         gr2->Draw("LPSAME");
@@ -357,7 +351,7 @@ void makeScanComparePlots(bool usePrefit_){
         gPad->SetGridx();
         gPad->SetGridy();
 
-        GenericToolbox::writeInTFile(
+        GenericToolbox::writeInTFileWithObjTypeExt(
             GenericToolbox::mkdirTFile(outFile, GenericToolbox::joinVectorString(pathBuffer, "/")),
             overlayCanvas
             );
@@ -445,7 +439,7 @@ void makeErrorComparePlots(bool usePrefit_, bool useNomVal_) {
     hist1->SetTitle(Form("%s (%s)", name1.c_str(), algo1.c_str()));
     hist1->GetXaxis()->SetLabelSize(0.03);
     hist1->GetXaxis()->LabelsOption("v");
-    hist1->GetYaxis()->SetRangeUser(yBounds.first, yBounds.second);
+    hist1->GetYaxis()->SetRangeUser(yBounds.min, yBounds.max);
     useNomVal_ ? hist1->GetYaxis()->SetTitle("Parameter values (normalized to the prior)"): hist1->GetYaxis()->SetTitle("Parameter values (a.u.)");
     hist1->Draw("E2");
 
@@ -484,7 +478,7 @@ void makeErrorComparePlots(bool usePrefit_, bool useNomVal_) {
     l.Draw();
 
     hist1->SetTitle(Form("Comparing %s parameters: \"%s\"", (usePrefit_? "preFit": "postFit"), parSet.c_str()));
-    GenericToolbox::writeInTFile( GenericToolbox::mkdirTFile(outDir, parSet), overlayCanvas );
+    GenericToolbox::writeInTFileWithObjTypeExt( GenericToolbox::mkdirTFile(outDir, parSet), overlayCanvas );
 
     std::map<std::string, TH1D*> compHist{
         {"ScaledComp", nullptr},
@@ -553,7 +547,7 @@ void makeErrorComparePlots(bool usePrefit_, bool useNomVal_) {
         line2 = new TLine(gPad->GetFrame()->GetX1(), -1, gPad->GetFrame()->GetX2(), -1); line2->SetLineColor(kRed); line2->SetLineStyle(2); line2->Draw();
       }
 
-      GenericToolbox::writeInTFile(
+      GenericToolbox::writeInTFileWithObjTypeExt(
           GenericToolbox::mkdirTFile(outDir, parSet),
           overlayCanvas,
           histEntry.first

@@ -15,10 +15,6 @@
 #include <cstdlib>
 #include <iostream>
 
-LoggerInit([]{
-  Logger::getUserHeader() << "[" << FILENAME << "]";
-});
-
 
 int main(int argc, char **argv) {
 

@@ -8,7 +8,6 @@
 
 #include "ParameterSet.h"
 #include "MinimizerBase.h"
-#include "JsonBaseClass.h"
 
 #include "GenericToolbox.Utils.h"
 #include "GenericToolbox.Time.h"
@@ -16,7 +15,6 @@
 #include "Math/Minimizer.h"
 #include "Math/Functor.h"
 #include "TDirectory.h"
-#include "nlohmann/json.hpp"
 
 #include <memory>
 #include <vector>
@@ -25,7 +23,7 @@
 class RootMinimizer : public MinimizerBase {
 
 protected:
-  void readConfigImpl() override;
+  void configureImpl() override;
   void initializeImpl() override;
 
 public:
@@ -33,7 +31,7 @@ public:
   void minimize() override;
   void calcErrors() override;
   void scanParameters( TDirectory* saveDir_ ) override;
-  bool isErrorCalcEnabled() const override { return not disableCalcError(); }
+  [[nodiscard]] bool isErrorCalcEnabled() const override { return not disableCalcError(); }
 
   // c-tor
   explicit RootMinimizer(FitterEngine* owner_): MinimizerBase(owner_) {}
@@ -54,6 +52,14 @@ protected:
   void saveGradientSteps();
 
 private:
+
+  // Dump the Math::Minimizer table of parameter settings.  This is mostly
+  // useful for debugging.
+  void dumpFitParameterSettings();
+
+  // Dump the ROOT::Minuit2::MnUserParameterState.  This is mostly useful
+  // for debugging.
+  void dumpMinuit2State();
 
   // Parameters
   bool _preFitWithSimplex_{false};
@@ -78,6 +84,7 @@ private:
   std::string _errorAlgo_{"Hesse"};
 
   // internals
+  bool _minimizeDone_{false};
   bool _fitHasConverged_{false};
 
   /// A functor that can be called by Minuit or anybody else.  This wraps

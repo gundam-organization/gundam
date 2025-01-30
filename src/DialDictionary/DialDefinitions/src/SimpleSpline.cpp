@@ -11,9 +11,6 @@
 #include "Logger.h"
 #include "GenericToolbox.Root.h"
 
-LoggerInit([]{
-  Logger::setUserHeaderStr("[SimpleSpline]");
-});
 
 void SimpleSpline::setAllowExtrapolation(bool allowExtrapolation) {
   _allowExtrapolation_ = allowExtrapolation;
@@ -32,15 +29,15 @@ void SimpleSpline::buildDial(const TGraph& grf, const std::string& option_){
 
   if( GenericToolbox::hasUniformlySpacedKnots(&graph_) ){
     _isUniform_ = true;
-    _splineBounds_.first = graph_.GetX()[0];
-    _splineBounds_.second = graph_.GetX()[graph_.GetN()-1];
+    _splineBounds_.min = graph_.GetX()[0];
+    _splineBounds_.max = graph_.GetX()[graph_.GetN()-1];
 
     // If FAKE_UNIFORM_SPLINE is undefined, then reproduce TSpline3 assuming
     // uniform point spacing.
 #ifndef FAKE_UNIFORM_SPLINE
     TSpline3 sp(Form("%p", &graph_), &graph_);
-    _splineBounds_.first = sp.GetXmin();
-    _splineBounds_.second = sp.GetXmax();
+    _splineBounds_.min = sp.GetXmin();
+    _splineBounds_.max = sp.GetXmax();
 
     _splineData_.resize(2 + sp.GetNp() * 2);
     _splineData_[0] = sp.GetXmin();
@@ -57,8 +54,8 @@ void SimpleSpline::buildDial(const TGraph& grf, const std::string& option_){
 #else
     // If FAKE_UNIFORM_SPLINE is defined, then use a compact spline
     // representation.
-    _splineBounds_.first = graph_.GetX()[0];
-    _splineBounds_.second = graph_.GetX()[graph_.GetN()-1];
+    _splineBounds_.min = graph_.GetX()[0];
+    _splineBounds_.max = graph_.GetX()[graph_.GetN()-1];
 
     _splineData_.resize(2 + graph_.GetN());
     _splineData_[0] = graph_.GetX()[0];
@@ -69,8 +66,8 @@ void SimpleSpline::buildDial(const TGraph& grf, const std::string& option_){
   }
   else{
     TSpline3 sp(Form("%p", &graph_), &graph_);
-    _splineBounds_.first = sp.GetXmin();
-    _splineBounds_.second = sp.GetXmax();
+    _splineBounds_.min = sp.GetXmin();
+    _splineBounds_.max = sp.GetXmax();
 
     _splineData_.resize(2 + sp.GetNp() * 3);
     _splineData_[0] = sp.GetXmin();
@@ -106,8 +103,8 @@ double SimpleSpline::evalResponse(const DialInputBuffer& input_) const {
 #endif
 
   if( not _allowExtrapolation_ ){
-    if     (dialInput <= _splineBounds_.first) { dialInput = _splineBounds_.first; }
-    else if(dialInput >= _splineBounds_.second){ dialInput = _splineBounds_.second; }
+    if     (dialInput <= _splineBounds_.min) { dialInput = _splineBounds_.min; }
+    else if(dialInput >= _splineBounds_.max){ dialInput = _splineBounds_.max; }
   }
 
   if( _isUniform_ ){

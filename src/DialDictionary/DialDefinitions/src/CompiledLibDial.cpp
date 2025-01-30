@@ -9,10 +9,6 @@
 #include <dlfcn.h>
 
 
-LoggerInit([]{
-  Logger::getUserHeader() << "[CompiledLibDial]";
-});
-
 double CompiledLibDial::evalResponse( const DialInputBuffer &input_ ) const{
   // Eval with dynamic function
   return reinterpret_cast<double(*)(double*)>(_evalFct_)((double*) &input_.getInputBuffer()[0]);

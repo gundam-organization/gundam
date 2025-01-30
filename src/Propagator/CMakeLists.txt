@@ -1,9 +1,13 @@
 set(SRCFILES
-    src/Propagator.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/PlotGenerator.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/EventTreeWriter.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/Propagator.cpp
     )
 
 set(HEADERS
-    include/Propagator.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/PlotGenerator.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/EventTreeWriter.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/Propagator.h
 )
 
 #ROOT_GENERATE_DICTIONARY(
@@ -31,7 +35,7 @@ target_include_directories( GundamPropagator
 )
 
 if( WITH_CACHE_MANAGER )
-  set(CACHE_MANAGER_LIBRARIES "GundamCache")
+  set(CACHE_MANAGER_LIBRARIES "GundamCacheManager")
 else()
   set(CACHE_MANAGER_LIBRARIES "")
 endif()

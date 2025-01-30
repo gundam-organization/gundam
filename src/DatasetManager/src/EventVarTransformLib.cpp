@@ -3,19 +3,17 @@
 //
 
 #include "EventVarTransformLib.h"
+#include "LoaderUtils.h"
+#include "ConfigUtils.h"
 
-#include "GenericToolbox.Json.h"
+#include "Logger.h"
 
 #include <dlfcn.h>
 
-LoggerInit([]{
-  Logger::setUserHeaderStr("[EventVarTransformLib]");
-});
 
-
-void EventVarTransformLib::readConfigImpl(){
-  this->EventVarTransform::readConfigImpl();
-  _libraryFile_ = GenericToolbox::Json::fetchValue(_config_, "libraryFile", _libraryFile_);
+void EventVarTransformLib::configureImpl(){
+  this->EventVarTransform::configureImpl();
+  GenericToolbox::Json::fillValue(_config_, _libraryFile_, "libraryFile");
 }
 void EventVarTransformLib::initializeImpl(){
   LogInfo << "Loading variable transformation: " << _name_ << std::endl;
@@ -49,7 +47,7 @@ double EventVarTransformLib::evalTransformation( const Event& event_, std::vecto
   // Eval the requested variables
   size_t nFormula{_inputFormulaList_.size()};
   for( size_t iFormula = 0 ; iFormula < nFormula ; iFormula++ ){
-    inputBuffer_[iFormula] = event_.getVariables().evalFormula(&(_inputFormulaList_[iFormula]));
+    inputBuffer_[iFormula] = LoaderUtils::evalFormula(event_, &(_inputFormulaList_[iFormula]));
   }
   // Eval with dynamic function
   return reinterpret_cast<double(*)(double*)>(_evalVariable_)(&inputBuffer_[0]);

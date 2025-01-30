@@ -4,23 +4,13 @@
 
 #include "Event.h"
 
-#include "GenericToolbox.Root.h"
+#include "GundamGlobals.h"
+#include "GundamAlmostEqual.h"
+
 #include "Logger.h"
 
 #include <cmath>
 
-LoggerInit([]{
-  Logger::setUserHeaderStr("[Event]");
-});
-
-
-// const getters
-double Event::getEventWeight() const {
-#ifdef GUNDAM_USING_CACHE_MANAGER
-  if( _cache_.valuePtr != nullptr ){ return _cache_.getWeight(); }
-#endif
-  return _weights_.current;
-}
 
 // misc
 std::string Event::getSummary() const {
@@ -30,7 +20,6 @@ std::string Event::getSummary() const {
   ss << std::endl << "Variables{" << std::endl << _variables_ << std::endl << "}";
   return ss.str();
 }
-
 
 //  A Lesser GNU Public License
 
@@ -56,5 +45,4 @@ std::string Event::getSummary() const {
 // Local Variables:
 // mode:c++
 // c-basic-offset:2
-// compile-command:"$(git rev-parse --show-toplevel)/cmake/gundam-build.sh"
 // End:

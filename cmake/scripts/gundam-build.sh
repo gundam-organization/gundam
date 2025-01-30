@@ -8,7 +8,8 @@
 #     force -- Force cmake to ignore the cache
 #     cmake -- Don't compile the source (only run cmake).
 #     clean -- Run clean the build area after running cmake (run make clean)
-#     keep  -- Keep going when there is a compilation error (add -k to make)
+#     keep-going  -- Continue after compilation errors (add -k to make)
+#     ctest -- Run tests directly with ctest
 #     test  -- Run tests after the build
 #     verbose -- Run make with verbose turned on.
 #     help  -- This message
@@ -48,6 +49,9 @@ if [ ${#GUNDAM_BUILD} == 0 ]; then
     fi
 else
     BUILD_LOCATION=${GUNDAM_BUILD}
+    echo GUNDAM will be built use specified location
+    echo Build Location: ${BUILD_LOCATION}
+    echo The location must be created before gundam can be built.
 fi
 
 # Make sure the build directory exists (safety check).
@@ -104,24 +108,32 @@ while [ "x${1}" != "x" ]; do
             echo Continue on errors
             MAKE_OPTIONS=" -k ${MAKE_OPTIONS}"
             ;;
-        te*) # test
+        ctest*) # test
+            shift
+            echo Run ctest
+            RUN_TEST="ctest"
+            ;;
+        test*) # test
             shift
             echo Run tests
-            RUN_TEST="yes"
+            RUN_TEST="make-test"
             ;;
         ve*) # verbose
             shift
             export VERBOSE=true
             ;;
         he*) # help
-            echo "gundam-build [force] [cmake] [clean] [help] [-D<cmake-define>]"
+            echo 
+            echo "gundam-build [help|force|...] [-D<cmake-definitions>]"
             echo "   force -- Force cmake to ignore the cache"
             echo "   cmake -- Don't build the package (only run cmake)"
             echo "   clean -- Run make clean after cmake"
             echo "   keep  -- Keep going on a compilation error (make -k)"
+            echo "   ctest <ctest-arguments> -- Run ctest on the build"
             echo "   test  -- Run tests after the build"
             echo "   verbose -- Run make with verbose turned on."
             echo "   help  -- This message"
+            echo 
             exit 0
             ;;
         -D*) # Add definitions
@@ -130,21 +142,25 @@ while [ "x${1}" != "x" ]; do
             shift
             ;;
         *)
-            shift
             break
             ;;
     esac
 done
 
-if [ ! -f CMakeCache.txt ]; then
-    echo cmake ${DEFINES} ${GUNDAM_ROOT}
-    cmake ${DEFINES} ${GUNDAM_ROOT}
-fi
-
 if [ ${RUN_CLEAN} = "yes" ]; then
+    if [ ! -f Makefile ]; then
+        echo ERROR: Makefile does not exist -- cannot clean.
+        exit 1;
+    fi
     echo make clean
     make ${MAKE_OPTIONS} clean
     echo Source cleaned.
+    exit 0
+fi
+
+if [ ! -f CMakeCache.txt ]; then
+    echo cmake ${DEFINES} ${GUNDAM_ROOT}
+    cmake ${DEFINES} ${GUNDAM_ROOT}
 fi
 
 if [ ${ONLY_CMAKE} = "yes" ]; then
@@ -156,8 +172,13 @@ make ${MAKE_OPTIONS} || exit 1
 echo make install
 make ${MAKE_OPTIONS} install || exit 1
 
-if [ ${RUN_TEST} = "yes" ]; then
-    echo make test
+if [ ${RUN_TEST} = "ctest" ]; then
+    echo Run ctest $*
+    ctest $* || exit 1
+fi
+
+if [ ${RUN_TEST} = "make-test" ]; then
+    echo Run make test
     make ${MAKE_OPTIONS} test || exit 1
 fi
 

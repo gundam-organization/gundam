@@ -24,6 +24,7 @@ target_link_libraries(
     PUBLIC
     GundamDatasetManager
     GundamPropagator
+    dl # used for dlsym@@GLIBC_2.2.5
 )
 
 #set_target_properties( ${LIB_NAME} PROPERTIES VERSION "${GUNDAM_VERSION_STRING}" )

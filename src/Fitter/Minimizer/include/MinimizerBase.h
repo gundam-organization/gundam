@@ -9,7 +9,7 @@
 #include "ParameterScanner.h"
 #include "LikelihoodInterface.h"
 #include "Parameter.h"
-#include "JsonBaseClass.h"
+
 
 #include "GenericToolbox.Utils.h"
 
@@ -39,12 +39,12 @@ protected:
   /// Implement the methods required by JsonBaseClass.  These MinimizerBase
   /// methods may be overridden by the derived class, but if overriden, the
   /// derived class must run these instantiations (i.e. call
-  /// MinimizerBase::readConfigImpl() and MinimizerBase::initializeImpl in the
+  /// MinimizerBase::configureImpl() and MinimizerBase::initializeImpl in the
   /// respective methods).
-  void readConfigImpl() override;
+  void configureImpl() override;
   void initializeImpl() override;
 
-  // Internal struct that hold infos on the minimizer state
+  // Internal struct that hold info about the minimizer state
   struct Monitor{
     bool isEnabled{false};
     bool showParameters{false};
@@ -64,12 +64,53 @@ protected:
 
     struct GradientDescentMonitor{
       bool isEnabled{false};
-      int lastGradientFall{-2};
-      struct GradientStepPoint {
-        JsonType parState;
-        double llh;
+
+      struct ValueDefinition{
+        std::string name{};
+        std::function<double(const MinimizerBase* this_)> getValueFct{};
+
+        ValueDefinition(const std::string& name_, const std::function<double(const MinimizerBase* this_)>& getValueFct_){
+          name = name_;
+          getValueFct = getValueFct_;
+        }
       };
-      std::vector<GradientStepPoint> stepPointList{};
+      std::vector<ValueDefinition> valueDefinitionList{};
+
+      struct StepPoint{
+        JsonType parState;
+        double fitCallNb{0};
+        std::vector<double> valueMonitorList{}; // .size() = valueDefinitionList.size()
+      };
+      std::vector<StepPoint> stepPointList{};
+
+      void addStep(const MinimizerBase* this_){
+        stepPointList.emplace_back();
+        stepPointList.back().valueMonitorList.reserve( valueDefinitionList.size() );
+        fillLastStep(this_);
+      }
+      void fillLastStep(const MinimizerBase* this_){
+        stepPointList.back().parState = this_->getModelPropagator().getParametersManager().exportParameterInjectorConfig();
+        stepPointList.back().fitCallNb = this_->getMonitor().nbEvalLikelihoodCalls;
+        for( auto& valueDefinition : valueDefinitionList ){
+          stepPointList.back().valueMonitorList.emplace_back( valueDefinition.getValueFct(this_) );
+        }
+      }
+
+      [[nodiscard]] int getValueIndex(const std::string& name_) const {
+        int idx = GenericToolbox::findElementIndex(name_, valueDefinitionList, [](const ValueDefinition& elm){ return elm.name; });
+        LogThrowIf(idx == -1, "Could not find element " << name_);
+        return idx;
+      }
+      [[nodiscard]] double getLastStepValue(const std::string& name_) const {
+        LogThrowIf(stepPointList.empty());
+        return stepPointList.back().valueMonitorList[getValueIndex(name_)];
+      }
+      [[nodiscard]] double getLastStepDeltaValue(const std::string& name_) const {
+        if( stepPointList.size() < 2 ){ return 0; }
+        auto idx = getValueIndex(name_);
+        return stepPointList[stepPointList.size()-2].valueMonitorList[idx] - stepPointList.back().valueMonitorList[idx];
+      }
+
     };
     GradientDescentMonitor gradientDescentMonitor{};
   };
@@ -105,18 +146,23 @@ public:
   explicit MinimizerBase(FitterEngine* owner_): _owner_(owner_){}
 
   /// Set if the calcErrors method should be called by the FitterEngine.
-  void setDisableCalcError(bool disableCalcError_){ _disableCalcError_ = disableCalcError_; }
+  void setDisableCalcError(bool disableCalcError_){ _isEnabledCalcError_ = not disableCalcError_; }
 
   // const getters
-  [[nodiscard]] bool disableCalcError() const{ return _disableCalcError_; }
+  [[nodiscard]] bool disableCalcError() const{ return not _isEnabledCalcError_; }
+
+  // Get the return status for the fitter.  The return value is specific
+  // to the instantiated fitter, but is mostly centered around MINUIT
   [[nodiscard]] int getMinimizerStatus() const { return _minimizerStatus_; }
+  void setMinimizerStatus(int s) {_minimizerStatus_ = s;}
 
   // mutable getters
   Monitor& getMonitor(){ return _monitor_; }
+  [[nodiscard]] const Monitor& getMonitor() const { return _monitor_; }
 
   // core
   void printParameters();
-  int fetchNbDegreeOfFreedom(){ return getLikelihoodInterface().getNbSampleBins() - _nbFreeParameters_; }
+  [[nodiscard]] int fetchNbDegreeOfFreedom() const { return getLikelihoodInterface().getNbSampleBins() - _nbFreeParameters_; }
 
 
 protected:
@@ -126,8 +172,8 @@ protected:
 
   // Get the propagator being used to calculate the likelihood.  This is a
   // local convenience function to get the propagator from the owner.
-  Propagator& getPropagator();
-  [[nodiscard]] const Propagator& getPropagator() const;
+  Propagator& getModelPropagator();
+  [[nodiscard]] const Propagator& getModelPropagator() const;
 
   // Get the parameter scanner object owned by the LikelihoodInterface.
   ParameterScanner& getParameterScanner();
@@ -142,23 +188,30 @@ protected:
   // function to get the vector of fit parameter pointers.  The actual vector
   // lives in the likelihood.
   std::vector<Parameter *> &getMinimizerFitParameterPtr(){ return _minimizerParameterPtrList_; }
+  const std::vector<Parameter *> &getMinimizerFitParameterPtr() const{ return _minimizerParameterPtrList_; }
 
-protected:
-  // config
-  bool _throwOnBadLlh_{false};
-  bool _useNormalizedFitSpace_{true};
+  // The minimizer evalFit function won't explicitly check the parameter
+  // validity without setting this to true.
+  void setCheckParameterValidity(bool c) {_checkParameterValidity_ = c;}
 
-  // internals
-  bool _disableCalcError_{false};
-  int _minimizerStatus_{-1}; // -1: invalid, 0: success, >0: errors
-  int _nbFreeParameters_{0};
-  std::vector<Parameter*> _minimizerParameterPtrList_{};
-  Monitor _monitor_{};
-
+  // Query if a normalized fit space is being used.
+  bool useNormalizedFitSpace() const {return _useNormalizedFitSpace_;}
+  int* getNbFreeParametersPtr() {return &_nbFreeParameters_;}
 
 private:
   /// Save a copy of the address of the engine that owns this object.
   FitterEngine* _owner_{nullptr};
+
+  std::vector<Parameter*> _minimizerParameterPtrList_{};
+  int _minimizerStatus_{-1}; // -1: invalid, 0: success, >0: errors
+  int _nbFreeParameters_{0};
+
+  // config
+  bool _throwOnBadLlh_{false};
+  bool _useNormalizedFitSpace_{true};
+  bool _checkParameterValidity_{false};
+  bool _isEnabledCalcError_{true};
+  Monitor _monitor_{};
 
 };
 
@@ -188,5 +241,4 @@ private:
 // Local Variables:
 // mode:c++
 // c-basic-offset:2
-// compile-command:"$(git rev-parse --show-toplevel)/cmake/gundam-build.sh"
 // End:

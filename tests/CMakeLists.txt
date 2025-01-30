@@ -1,17 +1,76 @@
-# Run the gundam-tests.sh script for the test target (i.e. make test)
+# Define tests.  These are run via `CTest', or by hand.  The "make
+# test" target will also run ctest so the tests can be easily added to the build
 #
 #  This places the output of the test script in
 #  ${CMAKE_BINARY_DIR}/Testing/Temporary/LastTest.log and the output
 #  of the individual gundam tests in to
-#  ${CMAKE_BINARY_DIR}/tests/output.<date>
-#
-# The COMMAND is a little complicated since the testing script needs
-# to run in the source directory, but puts the output in a
-# sub-directory of the binary directory.
+#  ${CMAKE_BINARY_DIR}/Testing/gundam-tests.<date>
 #
 
-cmessage( STATUS "Setting up test command..." )
+cmessage( STATUS "Setting up tests..." )
+
+# Run the gundam-tests.sh script which runs scripted tests.  The
+# COMMAND is a little complicated since the testing script needs to
+# run in the source directory, but puts the output in a sub-directory
+# of the binary directory.  The variable GUNDAM_TESTS_ARGUMENT may be
+# set from the CMAKE (i.e. -DGUNDAM_TESTS_ARGUMENT="value") command
+# line, or it will take a default value of "-f".  The useful values
+# are "-f" for fast test, "-r" for regular tests, "-e" for extended
+# tests, and "-s" for slow tests.
+#
+if(NOT DEFINED GUNDAM_TESTS_ARGUMENT OR GUNDAM_TESTS_ARGUMENT STREQUAL "")
+  set(GUNDAM_TESTS_ARGUMENT "-f")
+endif(NOT DEFINED GUNDAM_TESTS_ARGUMENT OR GUNDAM_TESTS_ARGUMENT STREQUAL "")
+
 add_test(
     NAME gundam-tests
-    COMMAND "sh" "-c" "(cd ${CMAKE_SOURCE_DIR}/tests && ./gundam-tests.sh -f -a ${CMAKE_CURRENT_BINARY_DIR}/output.$(date +%Y-%m-%d-%H%M%S) )"
+    COMMAND "sh" "-c" "(cd ${CMAKE_SOURCE_DIR}/tests && ./gundam-tests.sh ${GUNDAM_TESTS_ARGUMENT} -a ${CMAKE_BINARY_DIR}/Testing/gundam-tests.$(date +%Y-%m-%d-%H%M%S) )"
 )
+
+## Compiled unit tests using GoogleTest.  These are only run if GTest
+## is found.
+if (SKIP_GOOGLE_TEST)
+  cmessage( WARNING "GTest unit testing explicitly disabled by user")
+else(SKIP_GOOGLE_TEST)
+  # Use the pre cmake 1.10 interface because we set 3.5 as the minimum cmake
+  find_package(GTest)
+endif(SKIP_GOOGLE_TEST)
+if (GTEST_FOUND)
+  cmessage( STATUS "GTest package enabled for developer unit tests.")
+  enable_testing()
+
+  # Setup the GUNDAM specific unit tests.
+  add_executable(gundamGTest_units.exe
+    GTests/unitTest_JointProbability.cpp)
+  target_link_libraries(gundamGTest_units.exe GTest::gtest_main)
+  target_link_libraries(gundamGTest_units.exe GundamStatisticalInference)
+  gtest_discover_tests(gundamGTest_units.exe)
+
+  # Setup the hemi test suite for the host
+  add_executable(gundamGTest_host.exe
+    GTests/hemiArrayTest.cpp
+    GTests/hemiExecutionPolicyTest.cpp
+    GTests/cachedSumsTest.cpp
+    GTests/hemiExternals.cpp)
+  target_link_libraries(gundamGTest_host.exe GTest::gtest_main)
+  target_link_libraries(gundamGTest_host.exe GundamCacheManager)
+  target_compile_definitions(gundamGTest_host.exe PUBLIC HEMI_CUDA_DISABLE)
+  gtest_discover_tests(gundamGTest_host.exe)
+
+  if(CMAKE_CUDA_COMPILER)
+    # Setup the hemi test suite for the device.
+    add_executable(gundamGTest_device.exe
+      GTests/hemiArrayTest.cu
+      GTests/hemiExecutionPolicyTest.cu
+      GTests/hemiLaunch.cu
+      GTests/cachedSumsTest.cu
+      GTests/hemiExternals.cpp)
+    target_link_libraries(gundamGTest_device.exe GTest::gtest_main)
+    target_link_libraries(gundamGTest_device.exe GundamCacheManager)
+    gtest_discover_tests(gundamGTest_device.exe)
+  else(CMAKE_CUDA_COMPILER)
+    cmessage( WARNING "CUDA compiler not available. Skip CUDA unit tests.")
+  endif(CMAKE_CUDA_COMPILER)
+else(GTEST_FOUND)
+  cmessage( WARNING "GTest package not available. Developer tests disabled.")
+endif(GTEST_FOUND)

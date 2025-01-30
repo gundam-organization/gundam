@@ -7,14 +7,12 @@
 
 #include "ParameterSet.h"
 #include "MinimizerBase.h"
-#include "JsonBaseClass.h"
 
 #include "GenericToolbox.Utils.h"
 #include "GenericToolbox.Time.h"
 
 #include "Math/Functor.h"
 #include "TDirectory.h"
-#include "nlohmann/json.hpp"
 
 #include <memory>
 #include <vector>
@@ -34,7 +32,7 @@ class FitterEngine;
 class AdaptiveMcmc : public MinimizerBase {
 
 protected:
-  void readConfigImpl() override;
+  void configureImpl() override;
   void initializeImpl() override;
 
 public:
@@ -89,6 +87,9 @@ private:
   // "mirror" value means that the parameter needs to be between the mirror
   // bounds too.
   std::string _likelihoodValidity_{"range,mirror,physical"};
+
+  //Choose the start point of MCMC is a random point (true) or the prior point (false).
+  bool _randomStart_{false};
 
   // Save or dump the raw (fitter space) points.  This can save about half the
   // output file space.  About the only time these would ever need to be saved
@@ -234,7 +235,7 @@ private:
     /// evalFit.
     std::unique_ptr<ROOT::Math::Functor> functor{};
     std::vector<double> x;
-    double operator() (const Vector& point) {
+    double operator() (const sMCMC::Vector& point) {
       LogThrowIf(functor == nullptr, "Functor is not initialized");
       // Copy the point into a local vector since there is no guarrantee that
       // the MCMC will be running on a vector of doubles.  This is paranoia
@@ -257,14 +258,13 @@ private:
 
   /// The implementation with the simple step is used.  This is mostly an
   /// example of how to setup an alternate stepping proposal.
-  typedef TSimpleMCMC<PrivateProxyLikelihood,TProposeSimpleStep> SimpleStepMCMC;
-  void setupAndRunSimpleStep(
-      SimpleStepMCMC& mcmc);
+  typedef sMCMC::TSimpleMCMC<PrivateProxyLikelihood,sMCMC::TProposeSimpleStep> SimpleStepMCMC;
+  void setupAndRunSimpleStep(SimpleStepMCMC& mcmc);
 
   /// The implementation when the adaptive step is used.  This is the default
   /// proposal for TSimpleMCMC, but is also dangerous for "unpleasant"
   /// likelihoods that have a lot of correlations between parameters.
-  typedef TSimpleMCMC<PrivateProxyLikelihood,TProposeAdaptiveStep> AdaptiveStepMCMC;
+  typedef sMCMC::TSimpleMCMC<PrivateProxyLikelihood,sMCMC::TProposeAdaptiveStep> AdaptiveStepMCMC;
   void setupAndRunAdaptiveStep(AdaptiveStepMCMC& mcmc);
 
   /////////////////////////////////////////////////////////////////
@@ -279,12 +279,12 @@ private:
   /// Set the covariance of the proposal based on a TH2D histogram in a file.
   /// This returns true if the parameter correlations have been set.
   bool adaptiveLoadProposalCovariance(AdaptiveStepMCMC& mcmc,
-                                      Vector& prior,
+                                      sMCMC::Vector& prior,
                                       const std::string& fileName,
                                       const std::string& histName);
 
   /// Set the default proposal based on the FitParameter values and steps.
-  bool adaptiveDefaultProposalCovariance(AdaptiveStepMCMC& mcmc,Vector& prior);
+  bool adaptiveDefaultProposalCovariance(AdaptiveStepMCMC& mcmc,sMCMC::Vector& prior);
 };
 #endif // GUNDAM_ADAPTIVE_MCMC_H
 
@@ -312,5 +312,5 @@ private:
 // Local Variables:
 // mode:c++
 // c-basic-offset:2
-// compile-command:"$(git rev-parse --show-toplevel)/cmake/gundam-build.sh"
+// compile-command:"$(git rev-parse --show-toplevel)/cmake/scripts/gundam-build.sh"
 // End:

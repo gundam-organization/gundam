@@ -7,10 +7,6 @@
 
 #include "Logger.h"
 
-LoggerInit([]{
-  Logger::setUserHeaderStr("[DialInterface]");
-});
-
 
 double DialInterface::evalResponse() const {
   return DialInterface::evalResponse(_inputBufferRef_, _dialBaseRef_, _responseSupervisorRef_);
@@ -20,18 +16,7 @@ std::string DialInterface::getSummary(bool shallow_) const {
   ss << _dialBaseRef_->getDialTypeName() << ":";
 
   if( _inputBufferRef_ != nullptr ){
-
-    ss << " ";
-
-    if( _inputBufferRef_->isMasked() ){
-      ss << GenericToolbox::ColorCodes::redBackground;
-    }
-
-    ss << "input(" << _inputBufferRef_->getSummary() << ")";
-
-    if( _inputBufferRef_->isMasked() ){
-      ss << "/MASKED" << GenericToolbox::ColorCodes::resetColor;
-    }
+    ss << " input(" << _inputBufferRef_->getSummary() << ")";
   }
 
   // apply on?
@@ -57,6 +42,5 @@ double DialInterface::evalResponse(
     DialInputBuffer *inputBufferPtr_, DialBase *dialBaseRef_,
     const DialResponseSupervisor *responseSupervisorRef_
     ) {
-  if( inputBufferPtr_->isMasked() ){ return 1; }
   return responseSupervisorRef_->process( dialBaseRef_->evalResponse( *inputBufferPtr_ ) );
 }

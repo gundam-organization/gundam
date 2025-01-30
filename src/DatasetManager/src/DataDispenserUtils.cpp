@@ -9,16 +9,12 @@
 
 #include "sstream"
 
-LoggerInit([]{
-  Logger::setUserHeaderStr("[DataDispenserUtils]");
-});
-
 
 std::string DataDispenserParameters::getSummary() const{
   std::stringstream ss;
-  ss << GET_VAR_NAME_VALUE(useMcContainer);
+  ss << GET_VAR_NAME_VALUE(useReweightEngine);
   ss << std::endl << GET_VAR_NAME_VALUE(name);
-  ss << std::endl << GET_VAR_NAME_VALUE(treePath);
+  ss << std::endl << GET_VAR_NAME_VALUE(globalTreePath);
   ss << std::endl << GET_VAR_NAME_VALUE(nominalWeightFormulaStr);
   ss << std::endl << GET_VAR_NAME_VALUE(selectionCutFormulaStr);
   ss << std::endl << "activeLeafNameList = " << GenericToolbox::toString(activeLeafNameList, true);
@@ -34,7 +30,7 @@ void DataDispenserCache::clear(){
 
   samplesToFillList.clear();
   sampleNbOfEvents.clear();
-  eventIsInSamplesList.clear();
+  entrySampleIndexList.clear();
 
   sampleIndexOffsetList.clear();
   sampleEventListPtrToFill.clear();
@@ -44,8 +40,6 @@ void DataDispenserCache::clear(){
   varToLeafDict.clear();
 
   varsToOverrideList.clear();
-
-  eventVarTransformList.clear();
 }
 void DataDispenserCache::addVarRequestedForIndexing(const std::string& varName_) {
   LogThrowIf(varName_.empty(), "no var name provided.");

@@ -4,9 +4,6 @@
 
 #include "Graph.h"
 
-LoggerInit([]{
-  Logger::setUserHeaderStr("[Graph]");
-});
 
 void Graph::setAllowExtrapolation(bool allowExtrapolation) {
   _allowExtrapolation_ = allowExtrapolation;

@@ -6,6 +6,7 @@
 #define GUNDAM_POLYNOMIAL_H
 
 #include "DialBase.h"
+#include "DialUtils.h"
 
 #include <vector>
 
@@ -22,11 +23,11 @@ public:
   void setAllowExtrapolation(bool allowExtrapolation_) override { _allowExtrapolation_ = allowExtrapolation_; }
 
   void setCoefficientList(const std::vector<double> &coefficientList_){ _coefficientList_ = coefficientList_; }
-  void setSplineBounds(const std::pair<double, double>& splineBounds_){ _splineBounds_ = splineBounds_; }
+  void setSplineBounds(const DialUtils::Range& splineBounds_){ _splineBounds_ = splineBounds_; }
 
 private:
   std::vector<double> _coefficientList_{};
-  std::pair<double, double> _splineBounds_{std::nan("unset"), std::nan("unset")};
+  DialUtils::Range _splineBounds_{std::nan("unset"), std::nan("unset")};
   bool _allowExtrapolation_{false};
 
 };

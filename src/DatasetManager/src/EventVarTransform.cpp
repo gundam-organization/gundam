@@ -3,28 +3,17 @@
 //
 
 #include "EventVarTransform.h"
-#include "GenericToolbox.Json.h"
+#include "ConfigUtils.h"
 
 #include "Logger.h"
 
 
-
-LoggerInit([]{
-  Logger::setUserHeaderStr("[EventVarTransform]");
-});
-
-void EventVarTransform::readConfigImpl(){
-  _isEnabled_ = GenericToolbox::Json::fetchValue(_config_, "isEnabled", _isEnabled_);
-  _name_ = GenericToolbox::Json::fetchValue(_config_, {{"name"}, {"title"}}, _name_);
-
-  if( not _isEnabled_ ){
-    LogWarning << "EventVarTransform is disabled for: " << _name_ << std::endl;
-    return;
-  }
-
-  _messageOnError_ = GenericToolbox::Json::fetchValue(_config_, "messageOnError", _messageOnError_);
-  _outputVariableName_ = GenericToolbox::Json::fetchValue(_config_, "outputVariableName", _outputVariableName_);
-  _inputFormulaStrList_ = GenericToolbox::Json::fetchValue(_config_, "inputList", _inputFormulaStrList_);
+void EventVarTransform::configureImpl(){
+  GenericToolbox::Json::fillValue(_config_, _name_, {{"name"}, {"title"}});
+  GenericToolbox::Json::fillValue(_config_, _isEnabled_, "isEnabled");
+  GenericToolbox::Json::fillValue(_config_, _messageOnError_, "messageOnError");
+  GenericToolbox::Json::fillValue(_config_, _outputVariableName_, "outputVariableName");
+  GenericToolbox::Json::fillValue(_config_, _inputFormulaStrList_, "inputList");
 }
 void EventVarTransform::initializeImpl(){
   LogInfo << "Loading variable transformation: " << _name_ << std::endl;
@@ -32,7 +21,7 @@ void EventVarTransform::initializeImpl(){
 }
 
 
-EventVarTransform::EventVarTransform(const JsonType& config_){ this->readConfig(config_); }
+EventVarTransform::EventVarTransform(const JsonType& config_){ this->configure(config_); }
 
 const std::vector<std::string>& EventVarTransform::fetchRequestedVars() const {
   if( _requestedLeavesForEvalCache_.empty() ){
