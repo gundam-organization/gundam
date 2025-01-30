@@ -31,15 +31,9 @@ public:
   void addConfigOverride(const std::string& configPath_){ _configHandler_.override(configPath_); }
 
   // load
-  void load(){
-    _fitter_.setConfig( GenericToolbox::Json::fetchValue<JsonType>(_configHandler_.getConfig(), "fitterEngineConfig") );
-    _fitter_.configure();
+  void load();
 
-    _fitter_.getLikelihoodInterface().setForceAsimovData( true );
-    _fitter_.initialize();
-  }
-
-  void fit(){ _fitter_.fit(); }
+  void minimize(){ _fitter_.getMinimizer().minimize(); }
 
 };
 

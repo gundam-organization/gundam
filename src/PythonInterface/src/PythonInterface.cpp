@@ -22,6 +22,14 @@ PYBIND11_MODULE(PyGundam, m) {
   .def("setConfig", &PyGundam::setConfig, py::call_guard<py::gil_scoped_release>())
   .def("addConfigOverride", &PyGundam::addConfigOverride, py::call_guard<py::gil_scoped_release>())
   .def("load", &PyGundam::load, py::call_guard<py::gil_scoped_release>())
-  .def("fit", &PyGundam::fit, py::call_guard<py::gil_scoped_release>())
+  .def("minimize", &PyGundam::minimize, py::call_guard<py::gil_scoped_release>())
   ;
+}
+
+void PyGundam::load(){
+  _fitter_.setConfig( GenericToolbox::Json::fetchValue<JsonType>(_configHandler_.getConfig(), "fitterEngineConfig") );
+  _fitter_.configure();
+
+  _fitter_.getLikelihoodInterface().setForceAsimovData( true );
+  _fitter_.initialize();
 }
