@@ -10,6 +10,7 @@
 
 #include "Logger.h"
 #include "GundamUtils.h"
+#include "GundamCustomThrower.h"
 
 #include <sstream>
 
@@ -193,6 +194,9 @@ void ParametersManager::initializeStrippedGlobalCov(){
   }
 }
 void ParametersManager::throwParametersFromGlobalCovariance(bool quietVerbose_){
+  if (not _defaultSystematicThrows_){
+    LogThrow("ParametersManager::throwParametersFromGlobalCovariance(bool quietVerbose_) is not compatible with the custom thrower. Must use default thrower.")
+  }
 
   if( _strippedCovarianceMatrix_ == nullptr ){
     initializeStrippedGlobalCov();
@@ -219,7 +223,7 @@ void ParametersManager::throwParametersFromGlobalCovariance(bool quietVerbose_){
   while( true ) {
     throwNb++;
     bool rethrow{false};
-    auto throws = GundamUtils::throwCorrelatedParameters(_choleskyMatrix_.get());
+    auto throws = CustomThrower::throwCorrelatedParameters(_choleskyMatrix_.get());
     for( int iPar = 0 ; iPar < _choleskyMatrix_->GetNrows() ; iPar++ ){
       auto* parPtr = _strippedParameterList_[iPar];
       parPtr->setThrowValue(parPtr->getPriorValue() + throws[iPar]);
@@ -299,6 +303,10 @@ void ParametersManager::throwParametersFromGlobalCovariance(bool quietVerbose_){
 }
 
 void ParametersManager::throwParametersFromGlobalCovariance(std::vector<double> &weightsChiSquare){
+  if (_defaultSystematicThrows_){
+    LogThrow("ParametersManager::throwParametersFromGlobalCovariance(std::vector<double> &weightsChiSquare) is not compatible with the default thrower. Must use custom thrower.")
+  }
+
     throwParametersFromGlobalCovariance(weightsChiSquare,0,0,0);
 }// end of function
 
@@ -358,13 +366,13 @@ void ParametersManager::throwParametersFromGlobalCovariance(std::vector<double> 
         std::vector<double> throws;
         std::vector<double> weights;
         if(pedestalEntity==0){
-            GundamUtils::throwCorrelatedParameters(_choleskyMatrix_.get(),throws, weights);
+          CustomThrower::throwCorrelatedParameters(_choleskyMatrix_.get(),throws, weights);
 //            DEBUG: print out parameters
 //            for(int i=0;i<weights.size();i++){
 //              LogInfo<<"{ParametersManager::throwParsFromGlobalCov}} throws["<<i<<"] = "<<throws[i]<<std::endl;
 //            }
         }else{
-            GundamUtils::throwCorrelatedParameters(_choleskyMatrix_.get(),throws, weights,
+          CustomThrower::throwCorrelatedParameters(_choleskyMatrix_.get(),throws, weights,
                                                       pedestalEntity,pedestalLeftEdge,pedestalRightEdge);
         }
         if(throws.size() != weights.size()){
@@ -380,7 +388,7 @@ void ParametersManager::throwParametersFromGlobalCovariance(std::vector<double> 
             );
             weightsChiSquare.push_back(weights[iPar]);
 
-            if( _reThrowParSetIfOutOfBounds_ ){
+            if( _reThrowParSetIfOutOfPhysical_ ){
                 if( not _strippedParameterList_[iPar]->isValueWithinBounds() ){
                     // re-do the throwing
           LogInfo << "Not within bounds: " << _strippedParameterList_[iPar]->getSummary() << std::endl;
@@ -392,11 +400,11 @@ void ParametersManager::throwParametersFromGlobalCovariance(std::vector<double> 
         // Making sure eigen decomposed parameters get the conversion done
         for( auto& parSet : _parameterSetList_ ){
             if( not parSet.isEnabled() ) continue;
-            if( parSet.isUseEigenDecompInFit() ){
+            if( parSet.isEnableEigenDecomp() ){
                 parSet.propagateOriginalToEigen();
 
                 // also check the bounds of real parameter space
-                if( _reThrowParSetIfOutOfBounds_ ){
+                if( _reThrowParSetIfOutOfPhysical_ ){
                     for( auto& par : parSet.getEigenParameterList() ){
                         if( not par.isEnabled() ) continue;
                         if( not par.isValueWithinBounds() ){
@@ -423,6 +431,10 @@ void ParametersManager::throwParametersFromGlobalCovariance(std::vector<double> 
 }// end of function
 
 void ParametersManager::throwParametersFromTStudent(std::vector<double> &weightsChiSquare,double nu_){
+  if (_defaultSystematicThrows_){
+    LogThrow("ParametersManager::throwParametersFromTStudent(std::vector<double> &weightsChiSquare,double nu_) is not compatible with the default thrower. Must use custom thrower.")
+  }
+
     // check that weightsChiSquare is an empty vector
     LogThrowIf( not weightsChiSquare.empty(), "ERROR: argument weightsChiSquare is not empty" );
 
@@ -474,7 +486,7 @@ void ParametersManager::throwParametersFromTStudent(std::vector<double> &weights
         bool rethrow{false};
         std::vector<double> throws,weights;
         // calling Toolbox function to throw random parameters
-        GundamUtils::throwTStudentParameters(_choleskyMatrix_.get(),nu_,throws, weights);
+      CustomThrower::throwTStudentParameters(_choleskyMatrix_.get(),nu_,throws, weights);
         ///////
         if(throws.size() != weights.size()){
             LogInfo<<"WARNING: throws.size() != weights.size() "<< throws.size()<<weights.size()<<std::endl;
@@ -486,7 +498,7 @@ void ParametersManager::throwParametersFromTStudent(std::vector<double> &weights
             );
             weightsChiSquare.push_back(weights[iPar]);
 
-            if( _reThrowParSetIfOutOfBounds_ ){
+            if( _reThrowParSetIfOutOfPhysical_ ){
                 if( not _strippedParameterList_[iPar]->isValueWithinBounds() ){
                     // re-do the throwing
 //          LogDebug << "Not within bounds: " << _strippedParameterList_[iPar]->getSummary() << std::endl;
@@ -498,11 +510,11 @@ void ParametersManager::throwParametersFromTStudent(std::vector<double> &weights
         // Making sure eigen decomposed parameters get the conversion done
         for( auto& parSet : _parameterSetList_ ){
             if( not parSet.isEnabled() ) continue;
-            if( parSet.isUseEigenDecompInFit() ){
+            if( parSet.isEnableEigenDecomp() ){
                 parSet.propagateOriginalToEigen();
 
                 // also check the bounds of real parameter space
-                if( _reThrowParSetIfOutOfBounds_ ){
+                if( _reThrowParSetIfOutOfPhysical_ ){
                     for( auto& par : parSet.getEigenParameterList() ){
                         if( not par.isEnabled() ) continue;
                         if( not par.isValueWithinBounds() ){

@@ -27,6 +27,8 @@ public:
   void setReThrowParSetIfOutOfPhysical(bool reThrowParSetIfOutOfPhysical_){ _reThrowParSetIfOutOfPhysical_ = reThrowParSetIfOutOfPhysical_; }
   void setThrowToyParametersWithGlobalCov(bool throwToyParametersWithGlobalCov_){ _throwToyParametersWithGlobalCov_ = throwToyParametersWithGlobalCov_; }
   void setGlobalCovarianceMatrix(const std::shared_ptr<TMatrixD> &globalCovarianceMatrix){ _globalCovarianceMatrix_ = globalCovarianceMatrix; }
+  void setThrowerAsCustom(){ _defaultSystematicThrows_ = false; }
+  void setThrowerAsDefault(){ _defaultSystematicThrows_ = true; }
 
   // const getters
   [[nodiscard]] const std::shared_ptr<TMatrixD> &getGlobalCovarianceMatrix() const{ return _globalCovarianceMatrix_; }
@@ -85,6 +87,9 @@ private:
   bool _reThrowParSetIfOutOfPhysical_{true};
   bool _throwToyParametersWithGlobalCov_{false};
   JsonType _parameterSetListConfig_{};
+
+  // select how to do the throwing
+  bool _defaultSystematicThrows_{true}; //  if true, uses the syst throws from GenericToolbox. If false, uses the GundamCustomThrower
 
   // internals
   std::vector<ParameterSet> _parameterSetList_{};
