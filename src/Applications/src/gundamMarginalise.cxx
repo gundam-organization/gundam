@@ -5,6 +5,7 @@
 #include "GundamGlobals.h"
 #include "GundamApp.h"
 #include "GundamUtils.h"
+#include "RootUtils.h"
 #include "Propagator.h"
 #include "ConfigUtils.h"
 
@@ -102,8 +103,8 @@ int main(int argc, char** argv){
         gRandom->SetSeed(seed);
     }
 
-    GundamGlobals::getParallelWorker().setNThreads(clParser.getOptionVal("nbThreads", 1));
-    LogInfo << "Running the fitter with " << GundamGlobals::getParallelWorker().getNbThreads() << " parallel threads." << std::endl;
+    GundamGlobals::setNumberOfThreads(clParser.getOptionVal("nbThreads", 1));
+    LogInfo << "Running the fitter with " << GundamGlobals::getNbCpuThreads()<< " parallel threads." << std::endl;
 
     // Reading fitter file
     LogInfo << "Opening fitter output file: " << clParser.getOptionVal<std::string>("fitterOutputFile") << std::endl;
@@ -111,12 +112,12 @@ int main(int argc, char** argv){
     LogThrowIf( fitterFile == nullptr, "Could not open fitter output file." );
 
     using namespace GundamUtils;
-    ObjectReader::throwIfNotFound = true;
+    RootUtils::ObjectReader::throwIfNotFound = true;
 
 
 
     JsonType fitterConfig;
-    ObjectReader::readObject<TNamed>(fitterFile.get(), {{"gundam/config_TNamed"}, {"gundamFitter/unfoldedConfig_TNamed"}}, [&](TNamed* config_){
+    RootUtils::ObjectReader::readObject<TNamed>(fitterFile.get(), {{"gundam/config_TNamed"}, {"gundamFitter/unfoldedConfig_TNamed"}}, [&](TNamed* config_){
         fitterConfig = GenericToolbox::Json::readConfigJsonStr( config_->GetTitle() );
     });
     // Check if the config is an array (baobab compatibility)
@@ -198,25 +199,29 @@ int main(int argc, char** argv){
         tStudent = true;
     }
 
-    auto configPropagator = GenericToolbox::Json::fetchValuePath<nlohmann::json>( cHandler.getConfig(), "fitterEngineConfig/propagatorConfig" );
+    auto configPropagator = GenericToolbox::Json::fetchValue<nlohmann::json>( cHandler.getConfig(), "fitterEngineConfig/propagatorConfig" );
 
     // Initialize the fitterEngine
     LogInfo << "FitterEngine setup..." << std::endl;
     FitterEngine fitter{nullptr};
-    fitter.readConfig(GenericToolbox::Json::fetchSubEntry((JsonType)cHandler.getConfig(), {"fitterEngineConfig"}));
+    auto gundamFitterConfig(cHandler.getConfig());
 
-    DataSetManager& dataSetManager{fitter.getLikelihoodInterface().getDataSetManager()};
+    GenericToolbox::Json::fillValue(gundamFitterConfig, fitter.getConfig(), "fitterEngineConfig");
+    fitter.configure();
 
     // We are only interested in our MC. Data has already been used to get the post-fit error/values
-    dataSetManager.getPropagator().setLoadAsimovData( true );
+    fitter.getLikelihoodInterface().setForceAsimovData( true );
 
     // Disabling eigen decomposed parameters
-    dataSetManager.getPropagator().setEnableEigenToOrigInPropagate( false );
+    fitter.getLikelihoodInterface().getModelPropagator().setEnableEigenToOrigInPropagate( false );
 
     // Load everything
-    dataSetManager.initialize();
-    Propagator& propagator{dataSetManager.getPropagator()};
+    fitter.getLikelihoodInterface().initialize();
 
+    Propagator& propagator = fitter.getLikelihoodInterface().getModelPropagator();
+
+    // you need this to use the custom systematic throwers
+    propagator.getParametersManager().setThrowerAsCustom();
     propagator.getParametersManager().getParameterSetsList();
 
     std::vector<std::string> parameterNames;
@@ -225,7 +230,7 @@ int main(int argc, char** argv){
     std::vector<double> priorSigmas;
     // Load post-fit parameters as "prior" so we can reset the weight to this point when throwing toys
     // also save the values in a vector so we can use them to compute the LLH at the best fit point
-    ObjectReader::readObject<TNamed>( fitterFile.get(), "FitterEngine/postFit/parState_TNamed", [&](TNamed* parState_){
+    RootUtils::ObjectReader::readObject<TNamed>( fitterFile.get(), "FitterEngine/postFit/parState_TNamed", [&](TNamed* parState_){
         propagator.getParametersManager().injectParameterValues( GenericToolbox::Json::readConfigJsonStr( parState_->GetTitle() ) );
         for( auto& parSet : propagator.getParametersManager().getParameterSetsList() ){
             if( not parSet.isEnabled() ){ continue; }
@@ -249,7 +254,7 @@ int main(int argc, char** argv){
     else {
         // appendixDict["optionName"] = "Appendix"
         // this list insure all appendices will appear in the same order
-        std::vector<std::pair<std::string, std::string>> appendixDict{
+        std::vector<GundamUtils::AppendixEntry> appendixDict{
                 {"configFile",       "%s"},
                 {"fitterOutputFile", "Fit_%s"},
                 {"nToys",            "nToys_%s"},
@@ -268,16 +273,16 @@ int main(int argc, char** argv){
 
 
     // Load the post-fit covariance matrix
-    ObjectReader::readObject<TH2D>(
-            fitterFile.get(), "FitterEngine/postFit/Hesse/hessian/postfitCovarianceOriginal_TH2D",
-            [&](TH2D* hCovPostFit_){
-                propagator.getParametersManager().setGlobalCovarianceMatrix(std::make_shared<TMatrixD>(hCovPostFit_->GetNbinsX(), hCovPostFit_->GetNbinsX()));
-                for( int iBin = 0 ; iBin < hCovPostFit_->GetNbinsX() ; iBin++ ){
-                    for( int jBin = 0 ; jBin < hCovPostFit_->GetNbinsX() ; jBin++ ){
-                        (*propagator.getParametersManager().getGlobalCovarianceMatrix())[iBin][jBin] = hCovPostFit_->GetBinContent(1 + iBin, 1 + jBin);
-                    }
-                }
-            });
+    RootUtils::ObjectReader::readObject<TH2D>(
+          fitterFile.get(), "FitterEngine/postFit/Hesse/hessian/postfitCovarianceOriginal_TH2D",
+          [&](TH2D* hCovPostFit_){
+              propagator.getParametersManager().setGlobalCovarianceMatrix(std::make_shared<TMatrixD>(hCovPostFit_->GetNbinsX(), hCovPostFit_->GetNbinsX()));
+              for( int iBin = 0 ; iBin < hCovPostFit_->GetNbinsX() ; iBin++ ){
+                  for( int jBin = 0 ; jBin < hCovPostFit_->GetNbinsX() ; jBin++ ){
+                      (*propagator.getParametersManager().getGlobalCovarianceMatrix())[iBin][jBin] = hCovPostFit_->GetBinContent(1 + iBin, 1 + jBin);
+                  }
+              }
+          });
 
 
 
@@ -295,14 +300,14 @@ int main(int argc, char** argv){
     // write the post fit covariance matrix in the output file
     TDirectory* postFitInfo = app.getOutfilePtr()->mkdir("postFitInfo");
     postFitInfo->cd();
-    ObjectReader::readObject<TH2D>(
+    RootUtils::ObjectReader::readObject<TH2D>(
             fitterFile.get(), "FitterEngine/postFit/Hesse/hessian/postfitCovarianceOriginal_TH2D",
             [&](TH2D* hCovPostFit_) {
                 hCovPostFit_->SetName("postFitCovarianceOriginal_TH2D");
                 hCovPostFit_->Write();// save the TH2D cov. matrix also in the output file
             });
     // write the best fit parameters vector to the output file
-    ObjectReader::readObject<TNamed>( fitterFile.get(), "FitterEngine/postFit/parState_TNamed", [&](TNamed* parState_){
+    RootUtils::ObjectReader::readObject<TNamed>( fitterFile.get(), "FitterEngine/postFit/parState_TNamed", [&](TNamed* parState_){
         parState_->SetName("postFitParameters_TNamed");
         parState_->Write();
     });
