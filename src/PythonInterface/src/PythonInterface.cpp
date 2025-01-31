@@ -26,6 +26,7 @@ PYBIND11_MODULE(PyGundam, module) {
 
   auto& likelihoodInterfaceClass = pybind11::class_<LikelihoodInterface>(module, "LikelihoodInterface").def(pybind11::init());
   likelihoodInterfaceClass.def("evalLikelihood", &LikelihoodInterface::evalLikelihood, pybind11::call_guard<pybind11::gil_scoped_release>());
+  likelihoodInterfaceClass.def("setForceAsimovData", &LikelihoodInterface::setForceAsimovData, pybind11::call_guard<pybind11::gil_scoped_release>());
   likelihoodInterfaceClass.def("throwToyParameters", &LikelihoodInterface::throwToyParameters, pybind11::call_guard<pybind11::gil_scoped_release>());
   likelihoodInterfaceClass.def("throwStatErrors", &LikelihoodInterface::throwStatErrors, pybind11::call_guard<pybind11::gil_scoped_release>());
   likelihoodInterfaceClass.def("getModelPropagator", static_cast<Propagator& (LikelihoodInterface::*)()>(&LikelihoodInterface::getModelPropagator), pybind11::return_value_policy::reference);
@@ -47,8 +48,6 @@ void PyGundam::load(){
 
   _fitter_.setConfig( GenericToolbox::Json::fetchValue<JsonType>(_configHandler_.getConfig(), "fitterEngineConfig") );
   _fitter_.configure();
-
-  _fitter_.getLikelihoodInterface().setForceAsimovData( true );
 
   _fitter_.initialize();
 }
