@@ -22,9 +22,6 @@ class PyGundam{
 public:
   PyGundam() = default;
 
-  // static
-  static void setNbThreads(int nThreads_){ GundamGlobals::setNumberOfThreads(nThreads_); }
-
   // configure stage
   void setOutputRootFilePath(const std::string& outRootFilePath_){ app.openOutputFile(outRootFilePath_); }
   void setConfig(const std::string& configPath_){ _configHandler_ = ConfigUtils::ConfigHandler(configPath_); }

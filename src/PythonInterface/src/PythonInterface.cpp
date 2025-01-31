@@ -14,6 +14,10 @@
 PYBIND11_MODULE(PyGundam, module) {
   module.doc() = "GUNDAM engine interface for python";
 
+  module.def("setNumberOfThreads", &GundamGlobals::setNumberOfThreads, "Set the number of threads for Gundam");
+  module.def("setLightOutputMode", &GundamGlobals::setLightOutputMode, "Reduce the amount of outputs in the root files");
+  module.def("setIsDebug", &GundamGlobals::setIsDebug, "Enables debug printouts");
+
   auto& parametersManagerClass = pybind11::class_<ParametersManager>(module, "ParametersManager").def(pybind11::init());
   parametersManagerClass.def("throwParameters", &ParametersManager::throwParameters);
 
@@ -35,7 +39,6 @@ PYBIND11_MODULE(PyGundam, module) {
   pyGundamClass.def("addConfigOverride", &PyGundam::addConfigOverride, pybind11::call_guard<pybind11::gil_scoped_release>());
   pyGundamClass.def("load", &PyGundam::load, pybind11::call_guard<pybind11::gil_scoped_release>());
   pyGundamClass.def("minimize", &PyGundam::minimize, pybind11::call_guard<pybind11::gil_scoped_release>());
-  pyGundamClass.def("setNbThreads", &PyGundam::setNbThreads, pybind11::call_guard<pybind11::gil_scoped_release>());
   pyGundamClass.def("getFitterEngine", &PyGundam::getFitterEngine, pybind11::return_value_policy::reference);
 }
 
