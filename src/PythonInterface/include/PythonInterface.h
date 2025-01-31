@@ -17,14 +17,13 @@ class PyGundam{
 
   GundamApp app{"PyGundam"};
   ConfigUtils::ConfigHandler _configHandler_;
-  std::string _outRootFilePath_{};
-
   FitterEngine _fitter_;
-
-
 
 public:
   PyGundam() = default;
+
+  // static
+  static void setNbThreads(int nThreads_){ GundamGlobals::setNumberOfThreads(nThreads_); }
 
   // configure stage
   void setOutputRootFilePath(const std::string& outRootFilePath_){ app.openOutputFile(outRootFilePath_); }
@@ -35,6 +34,13 @@ public:
   void load();
 
   void minimize(){ _fitter_.getMinimizer().minimize(); }
+
+  double getVal(){
+    return _fitter_.getLikelihoodInterface().evalLikelihood();
+  }
+
+  // getters
+  FitterEngine& getFitterEngine(){ return _fitter_; }
 
 };
 

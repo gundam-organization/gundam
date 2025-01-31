@@ -16,10 +16,6 @@
 #include "GenericToolbox.Root.h"
 #include "Logger.h"
 
-#include <Math/Factory.h>
-#include "TGraph.h"
-#include "TLegend.h"
-
 #include <cmath>
 #include <memory>
 
