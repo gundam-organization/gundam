@@ -25,7 +25,7 @@ public:
   [[nodiscard]] double getMaxResponse() const{ return _maxResponse_; }
 
   [[nodiscard]] double process(double reponse_) const;
-  [[nodiscard]] std::string getSummary() const;
+  [[nodiscard]] std::string getSummary(bool shallow_ = true) const;
 
 
 private:

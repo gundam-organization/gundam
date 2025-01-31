@@ -16,16 +16,16 @@ std::string DialInterface::getSummary(bool shallow_) const {
   ss << _dialBaseRef_->getDialTypeName() << ":";
 
   if( _inputBufferRef_ != nullptr ){
-    ss << " input(" << _inputBufferRef_->getSummary() << ")";
+    ss << " input(" << _inputBufferRef_->getSummary(shallow_) << ")";
   }
 
   // apply on?
   if( _dialBinRef_ != nullptr ){
-    ss << " applyOn(" << _dialBinRef_->getSummary() << ")";
+    ss << " applyOn(" << _dialBinRef_->getSummary(shallow_) << ")";
   }
 
   if( _responseSupervisorRef_ != nullptr ){
-    ss << " supervisor(" << _responseSupervisorRef_->getSummary() << ")";
+    ss << " supervisor(" << _responseSupervisorRef_->getSummary(shallow_) << ")";
   }
 
   ss << " response=" << this->evalResponse();
