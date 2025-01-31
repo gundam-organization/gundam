@@ -11,25 +11,22 @@
 #include <string>
 
 
-// constexpr auto byref = pybind11::return_value_policy::reference_internal;
-
 PYBIND11_MODULE(PyGundam, module) {
   module.doc() = "GUNDAM engine interface for python";
 
-  pybind11::class_<FitterEngine>(module, "FitterEngine")
-  .def(pybind11::init())
-  .def("setConfig", &FitterEngine::setConfig, pybind11::call_guard<pybind11::gil_scoped_release>())
-  ;
+  auto& likelihoodInterfaceClass = pybind11::class_<LikelihoodInterface>(module, "LikelihoodInterface").def(pybind11::init());
+  likelihoodInterfaceClass.def("evalLikelihood", &LikelihoodInterface::evalLikelihood, pybind11::call_guard<pybind11::gil_scoped_release>());
 
-  pybind11::class_<PyGundam>(module, "PyGundam")
-  .def(pybind11::init())
-  .def("setConfig", &PyGundam::setConfig, pybind11::call_guard<pybind11::gil_scoped_release>())
-  .def("addConfigOverride", &PyGundam::addConfigOverride, pybind11::call_guard<pybind11::gil_scoped_release>())
-  .def("load", &PyGundam::load, pybind11::call_guard<pybind11::gil_scoped_release>())
-  .def("minimize", &PyGundam::minimize, pybind11::call_guard<pybind11::gil_scoped_release>())
-  .def("setNbThreads", &PyGundam::setNbThreads, pybind11::call_guard<pybind11::gil_scoped_release>())
-  .def("getFitterEngine", &PyGundam::getFitterEngine, pybind11::return_value_policy::reference)
-  ;
+  auto& fitterEngineClass = pybind11::class_<FitterEngine>(module, "FitterEngine").def(pybind11::init());
+  fitterEngineClass.def("getLikelihoodInterface", static_cast<LikelihoodInterface& (FitterEngine::*)()>(&FitterEngine::getLikelihoodInterface), pybind11::return_value_policy::reference);
+
+  auto& pyGundamClass = pybind11::class_<PyGundam>(module, "PyGundam").def(pybind11::init());
+  pyGundamClass.def("setConfig", &PyGundam::setConfig, pybind11::call_guard<pybind11::gil_scoped_release>());
+  pyGundamClass.def("addConfigOverride", &PyGundam::addConfigOverride, pybind11::call_guard<pybind11::gil_scoped_release>());
+  pyGundamClass.def("load", &PyGundam::load, pybind11::call_guard<pybind11::gil_scoped_release>());
+  pyGundamClass.def("minimize", &PyGundam::minimize, pybind11::call_guard<pybind11::gil_scoped_release>());
+  pyGundamClass.def("setNbThreads", &PyGundam::setNbThreads, pybind11::call_guard<pybind11::gil_scoped_release>());
+  pyGundamClass.def("getFitterEngine", &PyGundam::getFitterEngine, pybind11::return_value_policy::reference);
 }
 
 void PyGundam::load(){
