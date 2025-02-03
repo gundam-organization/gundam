@@ -1,5 +1,22 @@
 # PyGundam - A python interface for GUNDAM
 
+## Building
+
+With the CMake command, you need to enable the compilation of the
+python extension:
+
+```bash
+cd $BUILD_DIR/gundam
+cmake -D WITH_PYTHON_INTERFACE=ON ./
+```
+
+You need to have `pybind11` installed on your computer. On macOS, you
+can install it via:
+
+```bash
+brew install pybind11
+```
+
 ## Setup
 
 Make sure the lib folder of GUNDAM is listed under $PYTHONPATH:
