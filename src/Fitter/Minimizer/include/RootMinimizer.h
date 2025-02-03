@@ -46,6 +46,8 @@ public:
   // core
   void saveMinimizerSettings(TDirectory* saveDir_) const;
 
+  void runSequence();
+
 protected:
   void writePostFitData(TDirectory* saveDir_);
   void updateCacheToBestfitPoint();

@@ -33,7 +33,7 @@ void RootMinimizer::configureImpl(){
   GenericToolbox::Json::fillValue(_config_, _minimizerAlgo_, "algorithm");
 
   GenericToolbox::Json::fillValue(_config_, _strategy_, "strategy");
-  GenericToolbox::Json::fillValue(_config_, _printLevel_, "print_level");
+  GenericToolbox::Json::fillValue(_config_, _printLevel_, {{"printLevel"}, {"print_level"}});
   GenericToolbox::Json::fillValue(_config_, _tolerance_, "tolerance");
   GenericToolbox::Json::fillValue(_config_, _maxIterations_, {{"maxIterations"},{"max_iter"}});
   GenericToolbox::Json::fillValue(_config_, _maxFcnCalls_, {{"maxFcnCalls"},{"max_fcn"}});
@@ -51,7 +51,6 @@ void RootMinimizer::configureImpl(){
   // old -- should flag as dev or deprecated?
   GenericToolbox::Json::fillValue(_config_, _stepSizeScaling_, "stepSizeScaling");
   GenericToolbox::Json::fillValue(_config_, _restoreStepSizeBeforeHesse_, "restoreStepSizeBeforeHesse");
-
 }
 void RootMinimizer::initializeImpl(){
   MinimizerBase::initializeImpl();
@@ -491,6 +490,13 @@ void RootMinimizer::saveMinimizerSettings( TDirectory* saveDir_) const {
     GenericToolbox::writeInTFileWithObjTypeExt( saveDir_, TNamed("enablePostFitErrorFit", std::to_string(isErrorCalcEnabled()).c_str()) );
     GenericToolbox::writeInTFileWithObjTypeExt( saveDir_, TNamed("errorAlgo", _errorAlgo_.c_str()) );
   }
+}
+
+void RootMinimizer::runSequence(){
+
+  // TODO: this is a placeholder
+  // read the sequence
+
 }
 
 // protected
