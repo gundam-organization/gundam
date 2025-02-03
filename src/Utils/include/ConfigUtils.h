@@ -37,6 +37,7 @@ namespace ConfigUtils {
   class ConfigHandler{
 
   public:
+    ConfigHandler() = default;
     explicit ConfigHandler(const std::string& filePath_);
     explicit ConfigHandler(JsonType  config_): config(std::move(config_)) {}
 

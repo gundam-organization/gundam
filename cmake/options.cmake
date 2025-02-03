@@ -17,6 +17,7 @@ option( WITH_CACHE_MANAGER "Enable compiling of the cache manager (required for 
 option( WITH_CUDA_LIB "Enable CUDA language check (Cache::Manager requires a GPU if CUDA is found)." OFF )
 option( WITH_MINUIT2_MISSING "Allow MINUIT2 to be missing" OFF )
 option( WITH_PYTORCH "Enable using PyTorch to sample likelihood from pytorch model." OFF )
+option( WITH_PYTHON_INTERFACE "Compile the python interface modules" OFF )
 
 # compile helper
 option( YAMLCPP_DIR "Set custom path to yaml-cpp lib." OFF )
