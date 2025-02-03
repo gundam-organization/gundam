@@ -16,7 +16,7 @@ option( WITH_GUNDAM_ROOT_APP "Build app gundamRoot." ON )
 option( WITH_CACHE_MANAGER "Enable compiling of the cache manager (required for GPU computing)." ON )
 option( WITH_CUDA_LIB "Enable CUDA language check (Cache::Manager requires a GPU if CUDA is found)." OFF )
 option( WITH_MINUIT2_MISSING "Allow MINUIT2 to be missing" OFF )
-option( WITH_PYTHON_INTERFACE "Compile the python interface modules" ON )
+option( WITH_PYTHON_INTERFACE "Compile the python interface modules" OFF )
 
 # compile helper
 option( YAMLCPP_DIR "Set custom path to yaml-cpp lib." OFF )
@@ -109,7 +109,7 @@ endif()
 
 if(WITH_PYTHON_INTERFACE)
   set( PYBIND11_PYTHON_VERSION 3.11.6 )
-  set(PYBIND11_FINDPYTHON ON)
-  find_package(pybind11 REQUIRED)
+  set( PYBIND11_FINDPYTHON ON )
+  find_package( pybind11 REQUIRED )
 endif()
 
