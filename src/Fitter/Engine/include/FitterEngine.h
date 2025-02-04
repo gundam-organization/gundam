@@ -9,7 +9,7 @@
 #include "Propagator.h"
 #include "LikelihoodInterface.h"
 #include "MinimizerBase.h"
-
+#include "FitterTask.h"
 
 #include "GenericToolbox.Utils.h"
 #include "GenericToolbox.Time.h"
@@ -72,6 +72,7 @@ public:
 
   // mutable-getters
   MinimizerBase& getMinimizer(){ return *_minimizer_; }
+  MinimizerBase* getMinimizerPtr(){ return _minimizer_.get(); }
   LikelihoodInterface& getLikelihoodInterface(){ return _likelihoodInterface_; }
   ParameterScanner& getParameterScanner(){ return _parameterScanner_; }
   TDirectory* getSaveDir(){ return _saveDir_; }
@@ -111,6 +112,7 @@ private:
   ParameterScanner _parameterScanner_{};
   MinimizerType _minimizerType_{};
   std::unique_ptr<MinimizerBase> _minimizer_{}; // a virtual class in charge of driving the LikelihoodInterface
+  std::vector<FitterTask> _taskList_{};
 
 };
 #endif //GUNDAM_FITTER_ENGINE_H

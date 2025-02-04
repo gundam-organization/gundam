@@ -46,7 +46,8 @@ public:
   // core
   void saveMinimizerSettings(TDirectory* saveDir_) const;
 
-  void runSequence();
+  // dev
+  void createMinimizer(const std::string& minimizerType_);
 
 protected:
   void writePostFitData(TDirectory* saveDir_);

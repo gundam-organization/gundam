@@ -57,32 +57,37 @@ void RootMinimizer::initializeImpl(){
 
   LogWarning << "Initializing RootMinimizer..." << std::endl;
 
-  LogInfo << "Defining minimizer as: " << _minimizerType_ << "/" << _minimizerAlgo_ << std::endl;
-  _rootMinimizer_ = std::unique_ptr<ROOT::Math::Minimizer>(
-      ROOT::Math::Factory::CreateMinimizer(_minimizerType_, _minimizerAlgo_)
-  );
-  LogThrowIf(_rootMinimizer_ == nullptr, "Could not create minimizer: " << _minimizerType_ << "/" << _minimizerAlgo_);
+  if( _functor_.NDim() != getMinimizerFitParameterPtr().size() ) {
+    LogWarning << "Defining the llh function..." << std::endl;
+    _functor_ = ROOT::Math::Functor(this, &RootMinimizer::evalFit, getMinimizerFitParameterPtr().size());
+  }
+
+  // either not set or the type changed
+  if( _rootMinimizer_ == nullptr or _rootMinimizer_->Options().MinimizerType() != _minimizerType_ ) {
+    createMinimizer( _minimizerType_ );
+  }
 
   if( _minimizerAlgo_.empty() ){
     _minimizerAlgo_ = _rootMinimizer_->Options().MinimizerAlgorithm();
     LogWarning << "Using default minimizer algo: " << _minimizerAlgo_ << std::endl;
   }
+  else {
+    _rootMinimizer_->Options().SetMinimizerAlgorithm( _minimizerAlgo_.c_str() );
+  }
 
-  _functor_ = ROOT::Math::Functor(this, &RootMinimizer::evalFit, getMinimizerFitParameterPtr().size());
   _rootMinimizer_->SetFunction( _functor_ );
-  _rootMinimizer_->SetStrategy(_strategy_);
-  _rootMinimizer_->SetPrintLevel(_printLevel_);
-  _rootMinimizer_->SetTolerance(_tolerance_);
-  _rootMinimizer_->SetMaxIterations(_maxIterations_);
-  _rootMinimizer_->SetMaxFunctionCalls(_maxFcnCalls_);
+  _rootMinimizer_->SetStrategy( _strategy_ );
+  _rootMinimizer_->SetPrintLevel( _printLevel_ );
+  _rootMinimizer_->SetTolerance( _tolerance_ );
+  _rootMinimizer_->SetMaxIterations( _maxIterations_ );
+  _rootMinimizer_->SetMaxFunctionCalls( _maxFcnCalls_ );
 
   for( std::size_t iFitPar = 0 ; iFitPar < getMinimizerFitParameterPtr().size() ; iFitPar++ ){
     auto& fitPar = *(getMinimizerFitParameterPtr()[iFitPar]);
 
     if( not useNormalizedFitSpace() ){
       _rootMinimizer_->SetVariable(iFitPar, fitPar.getFullTitle(), fitPar.getParameterValue(), fitPar.getStepSize() * _stepSizeScaling_);
-      if (not std::isnan(fitPar.getMinValue())
-          and not std::isnan(fitPar.getMaxValue())) {
+      if (not std::isnan(fitPar.getMinValue()) and not std::isnan(fitPar.getMaxValue())) {
         _rootMinimizer_->SetVariableLimits(iFitPar, fitPar.getMinValue(), fitPar.getMaxValue());
       }
       else if (not std::isnan(fitPar.getMinValue())) {
@@ -492,10 +497,15 @@ void RootMinimizer::saveMinimizerSettings( TDirectory* saveDir_) const {
   }
 }
 
-void RootMinimizer::runSequence(){
+void RootMinimizer::createMinimizer(const std::string& minimizerType_){
 
-  // TODO: this is a placeholder
-  // read the sequence
+  LogInfo << "Defining ROOT minimizer as: " << minimizerType_ << std::endl;
+  _rootMinimizer_ = std::unique_ptr<ROOT::Math::Minimizer>(
+      ROOT::Math::Factory::CreateMinimizer(minimizerType_)
+  );
+  LogThrowIf(_rootMinimizer_ == nullptr, "Could not create minimizer: " << minimizerType_);
+
+  _rootMinimizer_->SetFunction( _functor_ );
 
 }
 
