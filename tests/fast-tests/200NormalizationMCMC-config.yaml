@@ -18,7 +18,7 @@ fitterEngineConfig:
     algorithm: metropolis
     proposal: adaptive
     adaptiveRestore: none
-    
+
     burninCycles: 4
     burninSteps: 1000
     burninResets: 1
@@ -31,7 +31,7 @@ fitterEngineConfig:
     cycles: 4
     steps: 10000
     adaptiveWindow: 400
-    adaptiveCovWindow: 100000
+    adaptiveCovWindow: 1000000
     burninCovDeweighting: 0.0
     adaptiveFreezeAfter: 1
 
@@ -56,7 +56,8 @@ fitterEngineConfig:
 
 
     fitSampleSetConfig:
-      # PoissonLLH is used for tests because it is mathematically simple
+      # LeastSquares is used for tests because it is mathematically simple
+      # and numerically stable.
       llhStatFunction: LeastSquares
       dataEventType: TestData
 
