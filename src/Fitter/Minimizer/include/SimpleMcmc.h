@@ -2,8 +2,8 @@
 // Created by Clark McGrew
 //
 
-#ifndef GUNDAM_ADAPTIVE_MCMC_H
-#define GUNDAM_ADAPTIVE_MCMC_H
+#ifndef GUNDAM_SIMPLE_MCMC_H
+#define GUNDAM_SIMPLE_MCMC_H
 
 #include "ParameterSet.h"
 #include "MinimizerBase.h"
@@ -29,7 +29,7 @@ class FitterEngine;
 /// parameters are assumed to have a uniform metric, and the priors are
 /// defined as part of the propagator (i.e. included in the
 /// LikelihoodInterface).
-class AdaptiveMcmc : public MinimizerBase {
+class SimpleMcmc : public MinimizerBase {
 
 protected:
   void configureImpl() override;
@@ -40,7 +40,7 @@ public:
   void minimize() override; /// Generate a chain.
 
   // c-tor
-  explicit AdaptiveMcmc(FitterEngine* owner_): MinimizerBase(owner_) {}
+  explicit SimpleMcmc(FitterEngine* owner_): MinimizerBase(owner_) {}
 
   // core
 

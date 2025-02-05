@@ -4,7 +4,7 @@ set(SRCFILES
     ${CMAKE_CURRENT_SOURCE_DIR}/Engine/src/FitterEngine.cpp
 
     ${CMAKE_CURRENT_SOURCE_DIR}/Minimizer/src/MinimizerBase.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/Minimizer/src/AdaptiveMcmc.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/Minimizer/src/SimpleMcmc.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/Minimizer/src/RootMinimizer.cpp
   )
 

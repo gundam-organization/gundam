@@ -2,7 +2,7 @@
 // Created by Clark McGrew on 26/01/2023.
 //
 
-#include "AdaptiveMcmc.h"
+#include "SimpleMcmc.h"
 #include "LikelihoodInterface.h"
 #include "FitterEngine.h"
 #include "GundamGlobals.h"
@@ -15,7 +15,7 @@
 #include <locale>
 
 
-void AdaptiveMcmc::configureImpl(){
+void SimpleMcmc::configureImpl(){
   this->MinimizerBase::configureImpl();
   LogInfo << "Configure MCMC: " << _config_ << std::endl;
 
@@ -182,7 +182,7 @@ void AdaptiveMcmc::configureImpl(){
   GenericToolbox::Json::fillValue(_config_, _simpleSigma_, "fixedSigma");
 }
 
-void AdaptiveMcmc::initializeImpl(){
+void SimpleMcmc::initializeImpl(){
   MinimizerBase::initializeImpl();
   LogInfo << "Initializing the MCMC Integration..." << std::endl;
 
@@ -191,7 +191,7 @@ void AdaptiveMcmc::initializeImpl(){
 }
 
 /// Copy the current parameter values to the tree.
-void AdaptiveMcmc::fillPoint( bool fillModel) {
+void SimpleMcmc::fillPoint( bool fillModel) {
   int count = 0;
   for (const ParameterSet& parSet: getModelPropagator().getParametersManager().getParameterSetsList()) {
     for (const Parameter& iPar : parSet.getParameterList()) {
@@ -223,7 +223,7 @@ void AdaptiveMcmc::fillPoint( bool fillModel) {
   }
 }
 
-bool AdaptiveMcmc::adaptiveRestoreState( AdaptiveStepMCMC& mcmc,
+bool SimpleMcmc::adaptiveRestoreState( AdaptiveStepMCMC& mcmc,
                                          const std::string& fileName,
                                          const std::string& treeName) {
 
@@ -271,7 +271,7 @@ bool AdaptiveMcmc::adaptiveRestoreState( AdaptiveStepMCMC& mcmc,
 
   return true;
 }
-bool AdaptiveMcmc::adaptiveDefaultProposalCovariance( AdaptiveStepMCMC& mcmc,
+bool SimpleMcmc::adaptiveDefaultProposalCovariance( AdaptiveStepMCMC& mcmc,
                                                       sMCMC::Vector& prior) {
 
   /// Set the diagonal elements for the parameters.
@@ -359,7 +359,7 @@ bool AdaptiveMcmc::adaptiveDefaultProposalCovariance( AdaptiveStepMCMC& mcmc,
 
   return true;
 }
-bool AdaptiveMcmc::adaptiveLoadProposalCovariance( AdaptiveStepMCMC& mcmc,
+bool SimpleMcmc::adaptiveLoadProposalCovariance( AdaptiveStepMCMC& mcmc,
                                                    sMCMC::Vector& prior,
                                                    const std::string& fileName,
                                                    const std::string& histName) {
@@ -465,10 +465,10 @@ bool AdaptiveMcmc::adaptiveLoadProposalCovariance( AdaptiveStepMCMC& mcmc,
   return true;
 }
 
-void AdaptiveMcmc::setupAndRunAdaptiveStep( AdaptiveStepMCMC& mcmc) {
+void SimpleMcmc::setupAndRunAdaptiveStep( AdaptiveStepMCMC& mcmc) {
 
   mcmc.GetProposeStep().SetDim(getMinimizerFitParameterPtr().size());
-  mcmc.GetLogLikelihood().functor = std::make_unique<ROOT::Math::Functor>(this, &AdaptiveMcmc::evalFitValid, getMinimizerFitParameterPtr().size());
+  mcmc.GetLogLikelihood().functor = std::make_unique<ROOT::Math::Functor>(this, &SimpleMcmc::evalFitValid, getMinimizerFitParameterPtr().size());
   mcmc.GetProposeStep().SetCovarianceUpdateDeweighting(0.0);
   mcmc.GetProposeStep().SetCovarianceFrozen(false);
 
@@ -733,10 +733,10 @@ void AdaptiveMcmc::setupAndRunAdaptiveStep( AdaptiveStepMCMC& mcmc) {
   LogInfo << "Finished running chains" << std::endl;
 
 }
-void AdaptiveMcmc::setupAndRunFixedStep( FixedStepMCMC& mcmc) {
+void SimpleMcmc::setupAndRunFixedStep( FixedStepMCMC& mcmc) {
 
   mcmc.GetProposeStep().SetDim(getMinimizerFitParameterPtr().size());
-  mcmc.GetLogLikelihood().functor = std::make_unique<ROOT::Math::Functor>(this, &AdaptiveMcmc::evalFitValid, getMinimizerFitParameterPtr().size());
+  mcmc.GetLogLikelihood().functor = std::make_unique<ROOT::Math::Functor>(this, &SimpleMcmc::evalFitValid, getMinimizerFitParameterPtr().size());
   mcmc.GetProposeStep().fSigma = _simpleSigma_;
 
   sMCMC::Vector prior;
@@ -802,7 +802,7 @@ void AdaptiveMcmc::setupAndRunFixedStep( FixedStepMCMC& mcmc) {
 
 }
 
-void AdaptiveMcmc::minimize() {
+void SimpleMcmc::minimize() {
   this->MinimizerBase::minimize();
 
   GenericToolbox::mkdirTFile( getOwner().getSaveDir(), "fit" )->cd();
@@ -940,7 +940,7 @@ void AdaptiveMcmc::minimize() {
   setMinimizerStatus(0);
 }
 
-double AdaptiveMcmc::evalFitValid(const double* parArray_) {
+double SimpleMcmc::evalFitValid(const double* parArray_) {
 
   double value = this->evalFit( parArray_ );
   if (hasValidParameterValues()) return value;
@@ -951,7 +951,7 @@ double AdaptiveMcmc::evalFitValid(const double* parArray_) {
   const double RBN = std::numeric_limits<double>::infinity();
   return RBN;
 }
-void AdaptiveMcmc::setParameterValidity(const std::string& validity) {
+void SimpleMcmc::setParameterValidity(const std::string& validity) {
 
 
   LogWarning << "Set parameter validity to " << validity << std::endl;
@@ -967,7 +967,7 @@ void AdaptiveMcmc::setParameterValidity(const std::string& validity) {
 
   LogWarning << "Set parameter validity to " << validity << " (" << _validFlags_ << ")" << std::endl;
 }
-bool AdaptiveMcmc::hasValidParameterValues() const {
+bool SimpleMcmc::hasValidParameterValues() const {
 
 
   int invalid = 0;

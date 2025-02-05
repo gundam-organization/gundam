@@ -5,7 +5,7 @@
 #include "FitterEngine.h"
 #include "GundamGlobals.h"
 #include "RootMinimizer.h"
-#include "AdaptiveMcmc.h"
+#include "SimpleMcmc.h"
 
 #ifdef GUNDAM_USING_CACHE_MANAGER
 #include "CacheManager.h"
@@ -50,7 +50,7 @@ void FitterEngine::configureImpl(){
       this->_minimizer_ = std::make_unique<RootMinimizer>( this );
       break;
     case MinimizerType::SimpleMCMC:
-      this->_minimizer_ = std::make_unique<AdaptiveMcmc>( this );
+      this->_minimizer_ = std::make_unique<SimpleMcmc>( this );
       break;
     default:
       LogExit("Unknown minimizer type selected: " << minimizerTypeStr << std::endl << "Available: " << MinimizerType::generateEnumFieldsAsString());
