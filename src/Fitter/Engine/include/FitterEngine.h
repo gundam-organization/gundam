@@ -29,7 +29,7 @@ public:
 #define ENUM_NAME MinimizerType
 #define ENUM_FIELDS \
   ENUM_FIELD( RootMinimizer, 0 ) \
-  ENUM_FIELD( AdaptiveMCMC )
+  ENUM_FIELD( SimpleMCMC )
 #include "GenericToolbox.MakeEnum.h"
 
 #define ENUM_NAME PcaMethod

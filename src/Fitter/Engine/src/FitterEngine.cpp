@@ -39,7 +39,7 @@ void FitterEngine::configureImpl(){
 
     // handle deprecated types
     if     ( minimizerTypeStr == "minimizer" ){ minimizerTypeStr = "RootMinimizer"; }
-    else if( minimizerTypeStr == "mcmc" )     { minimizerTypeStr = "AdaptiveMCMC"; }
+    else if( minimizerTypeStr == "mcmc" )     { minimizerTypeStr = "SimpleMCMC"; }
   });
 
   GenericToolbox::Json::fillValue(_config_, minimizerConfig, "minimizerConfig");
@@ -49,11 +49,11 @@ void FitterEngine::configureImpl(){
     case MinimizerType::RootMinimizer:
       this->_minimizer_ = std::make_unique<RootMinimizer>( this );
       break;
-    case MinimizerType::AdaptiveMCMC:
+    case MinimizerType::SimpleMCMC:
       this->_minimizer_ = std::make_unique<AdaptiveMcmc>( this );
       break;
     default:
-      LogThrow("Unknown minimizer type selected: " << minimizerTypeStr << std::endl << "Available: " << MinimizerType::generateEnumFieldsAsString());
+      LogExit("Unknown minimizer type selected: " << minimizerTypeStr << std::endl << "Available: " << MinimizerType::generateEnumFieldsAsString());
   }
 
   // now the minimizer is created, forward deprecated options
