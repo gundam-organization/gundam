@@ -3,6 +3,9 @@
 //
 
 #include "PythonInterface.h"
+#include "FitterEngine.h"
+#include "ConfigUtils.h"
+#include "GundamApp.h"
 
 #include "Logger.h"
 
@@ -14,9 +17,40 @@
 PYBIND11_MODULE(PyGundam, module) {
   module.doc() = "GUNDAM engine interface for python";
 
+  // GundamGlobals namespace
   module.def("setNumberOfThreads", &GundamGlobals::setNumberOfThreads, "Set the number of threads for Gundam");
   module.def("setLightOutputMode", &GundamGlobals::setLightOutputMode, "Reduce the amount of outputs in the root files");
   module.def("setIsDebug", &GundamGlobals::setIsDebug, "Enables debug printouts");
+
+  // JsonType for the return type
+  pybind11::class_<JsonType>(module, "JsonType")
+  .def(pybind11::init())
+  ;
+
+  // basic function to get sub-parts of Json
+  auto gtModule = module.def_submodule("GenericToolbox");
+  gtModule.def_submodule("Json")
+  .def("cd", &GenericToolbox::Json::cd)
+  ;
+
+  // ConfigUtils namespace
+  auto configUtilsModule = module.def_submodule("ConfigUtils");
+  pybind11::class_<ConfigUtils::ConfigHandler>(configUtilsModule, "ConfigHandler")
+  .def(pybind11::init())
+  .def(pybind11::init<const std::string&>())
+  .def(pybind11::init<const JsonType&>())
+  .def("setConfig", pybind11::overload_cast<const std::string&>(&ConfigUtils::ConfigHandler::setConfig))
+  .def("setConfig", pybind11::overload_cast<const JsonType&>(&ConfigUtils::ConfigHandler::setConfig))
+  .def("setConfig", pybind11::overload_cast<const JsonType&>(&ConfigUtils::ConfigHandler::setConfig))
+  .def("getConfig", pybind11::overload_cast<>(&ConfigUtils::ConfigHandler::getConfig, pybind11::const_))
+  .def("flatOverride", pybind11::overload_cast<const std::string&>(&ConfigUtils::ConfigHandler::flatOverride))
+  .def("flatOverride", pybind11::overload_cast<const std::vector<std::string>&>(&ConfigUtils::ConfigHandler::flatOverride))
+  .def("override", pybind11::overload_cast<const std::string&>(&ConfigUtils::ConfigHandler::override))
+  .def("override", pybind11::overload_cast<const std::vector<std::string>&>(&ConfigUtils::ConfigHandler::override))
+  .def("override", pybind11::overload_cast<const JsonType&>(&ConfigUtils::ConfigHandler::override))
+  .def("toString", &ConfigUtils::ConfigHandler::toString)
+  .def("exportToJsonFile", &ConfigUtils::ConfigHandler::exportToJsonFile)
+  ;
 
   auto& parametersManagerClass = pybind11::class_<ParametersManager>(module, "ParametersManager").def(pybind11::init());
   parametersManagerClass.def("throwParameters", &ParametersManager::throwParameters);
@@ -32,22 +66,19 @@ PYBIND11_MODULE(PyGundam, module) {
   likelihoodInterfaceClass.def("getModelPropagator", static_cast<Propagator& (LikelihoodInterface::*)()>(&LikelihoodInterface::getModelPropagator), pybind11::return_value_policy::reference);
   likelihoodInterfaceClass.def("getDataPropagator", static_cast<Propagator& (LikelihoodInterface::*)()>(&LikelihoodInterface::getDataPropagator), pybind11::return_value_policy::reference);
 
-  auto& fitterEngineClass = pybind11::class_<FitterEngine>(module, "FitterEngine").def(pybind11::init());
-  fitterEngineClass.def("getLikelihoodInterface", static_cast<LikelihoodInterface& (FitterEngine::*)()>(&FitterEngine::getLikelihoodInterface), pybind11::return_value_policy::reference);
+  pybind11::class_<MinimizerBase>(module, "MinimizerBase")
+  .def("minimize", &MinimizerBase::minimize)
+  ;
 
-  auto& pyGundamClass = pybind11::class_<PyGundam>(module, "PyGundam").def(pybind11::init());
-  pyGundamClass.def("setConfig", &PyGundam::setConfig, pybind11::call_guard<pybind11::gil_scoped_release>());
-  pyGundamClass.def("addConfigOverride", &PyGundam::addConfigOverride, pybind11::call_guard<pybind11::gil_scoped_release>());
-  pyGundamClass.def("load", &PyGundam::load, pybind11::call_guard<pybind11::gil_scoped_release>());
-  pyGundamClass.def("minimize", &PyGundam::minimize, pybind11::call_guard<pybind11::gil_scoped_release>());
-  pyGundamClass.def("getFitterEngine", &PyGundam::getFitterEngine, pybind11::return_value_policy::reference);
+  pybind11::class_<FitterEngine>(module, "FitterEngine")
+  .def(pybind11::init())
+  .def("setSaveDir", pybind11::overload_cast<TDirectory*>(&FitterEngine::setSaveDir))
+  .def("setConfig", pybind11::overload_cast<const JsonType&>(&FitterEngine::setConfig))
+  .def("configure", pybind11::overload_cast<const JsonType&>(&FitterEngine::configure))
+  .def("configure", pybind11::overload_cast<>(&FitterEngine::configure))
+  .def("initialize", &FitterEngine::initialize)
+  .def("getMinimizer", pybind11::overload_cast<>(&FitterEngine::getMinimizer), pybind11::return_value_policy::reference)
+  .def("getLikelihoodInterface", pybind11::overload_cast<>(&FitterEngine::getLikelihoodInterface))
+  ;
 }
 
-void PyGundam::load(){
-  _fitter_.setSaveDir( app.getOutfilePtr() );
-
-  _fitter_.setConfig( GenericToolbox::Json::fetchValue<JsonType>(_configHandler_.getConfig(), "fitterEngineConfig") );
-  _fitter_.configure();
-
-  _fitter_.initialize();
-}

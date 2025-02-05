@@ -38,8 +38,12 @@ namespace ConfigUtils {
 
   public:
     ConfigHandler() = default;
-    explicit ConfigHandler(const std::string& filePath_);
-    explicit ConfigHandler(JsonType  config_): config(std::move(config_)) {}
+    explicit ConfigHandler(const std::string& filePath_){ setConfig(filePath_); }
+    explicit ConfigHandler(const JsonType& config_): config(config_) {}
+
+    // setters
+    void setConfig(const std::string& filePath_);
+    void setConfig(const JsonType& config_){ config = config_; }
 
     // const-getters
     [[nodiscard]] std::string toString() const{ return GenericToolbox::Json::toReadableString( config ); }
