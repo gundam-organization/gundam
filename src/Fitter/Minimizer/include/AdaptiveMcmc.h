@@ -78,7 +78,7 @@ private:
   int _validFlags_{7};
 
   std::string _algorithmName_{"metropolis"};
-  std::string _proposalName_{"adaptive"};
+  std::string _proposalName_{"not-set"};
   std::string _outTreeName_{"MCMC"};
 
   // Define what sort of validity the parameters have to have for a finite
@@ -96,19 +96,19 @@ private:
   // is during a burn-in run when the proposal covariance is being tuned.
   bool _saveRawSteps_{false};
 
-  // The number of burn-in cylces to use.
+  // The number of burn-in cycles to use.
   int _burninCycles_{0};
 
   // The number of cycles to dump during burn-in
   int _burninResets_{0};
 
   // The length of each burn-in cycle
-  int _burninLength_{10000};
+  int _burninSteps_{10000};
 
   // Save the burnin (true) or dump it (false)
   bool _saveBurnin_{true};
 
-  // The number of run cycles to use (each cycle will have _runLength_ steps.
+  // The number of run cycles to use (each cycle will have _steps_ steps.
   int _cycles_{1};
 
   // The number of steps in each run cycle.
@@ -256,10 +256,10 @@ private:
   // handle the differences.  Notice that the actual "chain" code is very
   // similar.
 
-  /// The implementation with the simple step is used.  This is mostly an
+  /// The implementation with a fixed step is used.  This is mostly an
   /// example of how to setup an alternate stepping proposal.
-  typedef sMCMC::TSimpleMCMC<PrivateProxyLikelihood,sMCMC::TProposeSimpleStep> SimpleStepMCMC;
-  void setupAndRunSimpleStep(SimpleStepMCMC& mcmc);
+  typedef sMCMC::TSimpleMCMC<PrivateProxyLikelihood,sMCMC::TProposeSimpleStep> FixedStepMCMC;
+  void setupAndRunFixedStep(FixedStepMCMC& mcmc);
 
   /// The implementation when the adaptive step is used.  This is the default
   /// proposal for TSimpleMCMC, but is also dangerous for "unpleasant"

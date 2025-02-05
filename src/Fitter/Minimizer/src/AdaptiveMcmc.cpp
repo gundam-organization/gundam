@@ -16,15 +16,14 @@
 
 
 void AdaptiveMcmc::configureImpl(){
-
   this->MinimizerBase::configureImpl();
+  LogInfo << "Configure MCMC: " << _config_ << std::endl;
 
   // The type of algorithm to be using.  It should be left at the default
   // value (metropolis is the only supported MCMC algorithm right now).
   GenericToolbox::Json::fillValue(_config_, _algorithmName_, "algorithm");
 
-  // The step proposal algorithm.  This should usually be left at the default
-  // value.
+  // The step proposal algorithm.
   GenericToolbox::Json::fillValue(_config_, _proposalName_, "proposal");
 
   // The name of the MCMC result tree in the output file.  This doesn't need
@@ -62,7 +61,7 @@ void AdaptiveMcmc::configureImpl(){
   GenericToolbox::Json::fillValue(_config_, _burninCycles_, "burninCycles");
 
   // The number of steps to run in each burn in cycle
-  GenericToolbox::Json::fillValue(_config_, _burninLength_, "burninSteps");
+  GenericToolbox::Json::fillValue(_config_, _burninSteps_, "burninSteps");
 
   // If this is set to false, the burn-in steps will not be saved to disk.
   // This should usually be true since it lets you see the progress of the
@@ -180,8 +179,9 @@ void AdaptiveMcmc::configureImpl(){
   // Get parameters for the simple proposal.
 
   // Set the step size for the simple proposal.
-  GenericToolbox::Json::fillValue(_config_, _simpleSigma_, "simpleSigma");
+  GenericToolbox::Json::fillValue(_config_, _simpleSigma_, "fixedSigma");
 }
+
 void AdaptiveMcmc::initializeImpl(){
   MinimizerBase::initializeImpl();
   LogInfo << "Initializing the MCMC Integration..." << std::endl;
@@ -559,7 +559,7 @@ void AdaptiveMcmc::setupAndRunAdaptiveStep( AdaptiveStepMCMC& mcmc) {
 
   // Check if there should be some burn-in cycles.  Burn-in in this context is
   // mainly about moving the current point away from the default.
-  if (not restored and _burninCycles_ > 0 and _burninLength_ > 0) {
+  if (not restored and _burninCycles_ > 0 and _burninSteps_ > 0) {
     // Burn-In cycles
     mcmc.GetProposeStep().SetCovarianceWindow(_burninCovWindow_);
     mcmc.GetProposeStep().SetAcceptanceWindow(_burninWindow_);
@@ -573,7 +573,7 @@ void AdaptiveMcmc::setupAndRunAdaptiveStep( AdaptiveStepMCMC& mcmc) {
       // Override default number of steps until the next automatic
       // UpdateProposal call.  This disables automatic updates during adaptive
       // burn-in.
-      mcmc.GetProposeStep().SetNextUpdate(2*_burninLength_*_burninCycles_);
+      mcmc.GetProposeStep().SetNextUpdate(2*_burninSteps_*_burninCycles_);
       mcmc.GetProposeStep()
           .SetCovarianceUpdateDeweighting(_burninCovDeweighting_);
       if (chain < _burninFreezeAfter_) {
@@ -585,7 +585,7 @@ void AdaptiveMcmc::setupAndRunAdaptiveStep( AdaptiveStepMCMC& mcmc) {
         mcmc.GetProposeStep().SetAcceptanceRigidity(-1);
       }
       // Burn-In chain in each cycle
-      for (int i = 0; i < _burninLength_; ++i) {
+      for (int i = 0; i < _burninSteps_; ++i) {
         // Run the burn-in step.
         if (mcmc.Step(false)) fillPoint(false);
         if (_modelStride_ > 0
@@ -598,11 +598,11 @@ void AdaptiveMcmc::setupAndRunAdaptiveStep( AdaptiveStepMCMC& mcmc) {
         }
         // Now save the step.  Check to see if this is the last step of the
         // run, and if it is, then save the full state.
-        if (_saveBurnin_) mcmc.SaveStep(_burninLength_ <= (i+1));
-        if(_burninLength_ > 100 && !(i%(_burninLength_/100))){
+        if (_saveBurnin_) mcmc.SaveStep(_burninSteps_ <= (i+1));
+        if(_burninSteps_ > 100 && !(i%(_burninSteps_/100))){
           LogInfo << "Burn-in: " << chain
-                  << " step: " << i << "/" << _burninLength_ << " "
-                  << i*100./_burninLength_ << "%"
+                  << " step: " << i << "/" << _burninSteps_ << " "
+                  << i*100./_burninSteps_ << "%"
                   << " Trials: "
                   << mcmc.GetProposeStep().GetSuccesses()
                   << "/" << mcmc.GetProposeStep().GetTrials()
@@ -733,7 +733,7 @@ void AdaptiveMcmc::setupAndRunAdaptiveStep( AdaptiveStepMCMC& mcmc) {
   LogInfo << "Finished running chains" << std::endl;
 
 }
-void AdaptiveMcmc::setupAndRunSimpleStep( SimpleStepMCMC& mcmc) {
+void AdaptiveMcmc::setupAndRunFixedStep( FixedStepMCMC& mcmc) {
 
   mcmc.GetProposeStep().SetDim(getMinimizerFitParameterPtr().size());
   mcmc.GetLogLikelihood().functor = std::make_unique<ROOT::Math::Functor>(this, &AdaptiveMcmc::evalFitValid, getMinimizerFitParameterPtr().size());
@@ -754,16 +754,16 @@ void AdaptiveMcmc::setupAndRunSimpleStep( SimpleStepMCMC& mcmc) {
   for (int chain = 0; chain < _burninCycles_; ++chain){
     LogInfo << "Start Burn-In Cycle " << chain << std::endl;
     // Burn-In chain in each cycle
-    for (int i = 0; i < _burninLength_; ++i) {
+    for (int i = 0; i < _burninSteps_; ++i) {
       // Run step
       if (mcmc.Step(false)) fillPoint();
       // Save the step if burn-in steps are being saved..  Check to see if this
       // is the last step of the run, and if it is, then save the full state.
-      if (_saveBurnin_) mcmc.SaveStep(_burninLength_ <= (i+1));
-      if(_burninLength_ > 100 && !(i%(_burninLength_/100))){
+      if (_saveBurnin_) mcmc.SaveStep(_burninSteps_ <= (i+1));
+      if(_burninSteps_ > 100 && !(i%(_burninSteps_/100))){
         LogInfo << "Burn-in: " << chain
-                << " step: " << i << "/" << _burninLength_ << " "
-                << i*100./_burninLength_ << "%"
+                << " step: " << i << "/" << _burninSteps_ << " "
+                << i*100./_burninSteps_ << "%"
                 << std::endl;
       }
     }
@@ -919,9 +919,12 @@ void AdaptiveMcmc::minimize() {
     sMCMC::TSimpleMCMC<PrivateProxyLikelihood,sMCMC::TProposeAdaptiveStep> mcmc(outputTree);
     setupAndRunAdaptiveStep(mcmc);
   }
-  else if (_proposalName_ == "simple") {
+  else if (_proposalName_ == "fixed") {
     sMCMC::TSimpleMCMC<PrivateProxyLikelihood,sMCMC::TProposeSimpleStep> mcmc(outputTree);
-    setupAndRunSimpleStep(mcmc);
+    setupAndRunFixedStep(mcmc);
+  }
+  else {
+    LogExit("Invalid proposal type for MCMC: " << _proposalName_)
   }
 
   int nbMCMCCalls = getMonitor().nbEvalLikelihoodCalls - nbFitCallOffset;
