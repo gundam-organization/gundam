@@ -52,20 +52,27 @@ PYBIND11_MODULE(PyGundam, module) {
   .def("exportToJsonFile", &ConfigUtils::ConfigHandler::exportToJsonFile)
   ;
 
-  auto& parametersManagerClass = pybind11::class_<ParametersManager>(module, "ParametersManager").def(pybind11::init());
-  parametersManagerClass.def("throwParameters", &ParametersManager::throwParameters);
+  pybind11::class_<ParametersManager>(module, "ParametersManager")
+  .def(pybind11::init())
+  .def("throwParameters", &ParametersManager::throwParameters)
+  ;
 
-  auto& propagatorClass = pybind11::class_<Propagator>(module, "Propagator").def(pybind11::init());
-  propagatorClass.def("getParametersManager", static_cast<ParametersManager& (Propagator::*)()>(&Propagator::getParametersManager), pybind11::return_value_policy::reference);
+  pybind11::class_<Propagator>(module, "Propagator")
+  .def(pybind11::init())
+  .def("getParametersManager", pybind11::overload_cast<>(&Propagator::getParametersManager), pybind11::return_value_policy::reference)
+  ;
 
-  auto& likelihoodInterfaceClass = pybind11::class_<LikelihoodInterface>(module, "LikelihoodInterface").def(pybind11::init());
-  likelihoodInterfaceClass.def("evalLikelihood", &LikelihoodInterface::evalLikelihood, pybind11::call_guard<pybind11::gil_scoped_release>());
-  likelihoodInterfaceClass.def("setForceAsimovData", &LikelihoodInterface::setForceAsimovData, pybind11::call_guard<pybind11::gil_scoped_release>());
-  likelihoodInterfaceClass.def("throwToyParameters", &LikelihoodInterface::throwToyParameters, pybind11::call_guard<pybind11::gil_scoped_release>());
-  likelihoodInterfaceClass.def("throwStatErrors", &LikelihoodInterface::throwStatErrors, pybind11::call_guard<pybind11::gil_scoped_release>());
-  likelihoodInterfaceClass.def("getModelPropagator", static_cast<Propagator& (LikelihoodInterface::*)()>(&LikelihoodInterface::getModelPropagator), pybind11::return_value_policy::reference);
-  likelihoodInterfaceClass.def("getDataPropagator", static_cast<Propagator& (LikelihoodInterface::*)()>(&LikelihoodInterface::getDataPropagator), pybind11::return_value_policy::reference);
+  pybind11::class_<LikelihoodInterface>(module, "LikelihoodInterface")
+  .def(pybind11::init())
+  .def("evalLikelihood", &LikelihoodInterface::evalLikelihood, pybind11::call_guard<pybind11::gil_scoped_release>())
+  .def("setForceAsimovData", &LikelihoodInterface::setForceAsimovData, pybind11::call_guard<pybind11::gil_scoped_release>())
+  .def("throwToyParameters", &LikelihoodInterface::throwToyParameters, pybind11::call_guard<pybind11::gil_scoped_release>())
+  .def("throwStatErrors", &LikelihoodInterface::throwStatErrors, pybind11::call_guard<pybind11::gil_scoped_release>())
+  .def("getModelPropagator", pybind11::overload_cast<>(&LikelihoodInterface::getModelPropagator), pybind11::return_value_policy::reference)
+  .def("getDataPropagator", pybind11::overload_cast<>(&LikelihoodInterface::getDataPropagator), pybind11::return_value_policy::reference)
+  ;
 
+  // no CTOR here
   pybind11::class_<MinimizerBase>(module, "MinimizerBase")
   .def("minimize", &MinimizerBase::minimize)
   ;
