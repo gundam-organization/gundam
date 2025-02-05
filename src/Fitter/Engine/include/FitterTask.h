@@ -10,16 +10,19 @@
 
 class FitterEngine;
 
-class FitterTask {
+class FitterTask : JsonBaseClass {
 
 public:
   FitterTask() = default;
 
-  void setConfig(const JsonType& config_){ _config_ = config_; }
-
   void run(FitterEngine *owner_);
 
+protected:
+  void configureImpl() override;
+
 private:
+  bool _isEnabled_{true};
+  std::string _name_{};
   JsonType _config_{};
 
 };

@@ -52,21 +52,33 @@ void FitterEngine::configureImpl(){
   switch( _minimizerType_.value ){
     case MinimizerType::RootMinimizer:
       this->_minimizer_ = std::make_unique<RootMinimizer>( this );
-      break;
+    break;
     case MinimizerType::AdaptiveMCMC:
       this->_minimizer_ = std::make_unique<AdaptiveMcmc>( this );
-      break;
+    break;
     default:
       LogThrow("Unknown minimizer type selected: " << minimizerTypeStr << std::endl << "Available: " << MinimizerType::generateEnumFieldsAsString());
   }
 
-  // now the minimizer is created, forward deprecated options
-  GenericToolbox::Json::deprecatedAction(_config_, "monitorRefreshRateInMs", [&]{
-    LogAlert << "Forwarding the option to Propagator. Consider moving it into \"minimizerConfig:\"" << std::endl;
-    _minimizer_->getMonitor().convergenceMonitor.setMaxRefreshRateInMs(GenericToolbox::Json::fetchValue<int>(_config_, "monitorRefreshRateInMs"));
-  });
-  _minimizer_->setConfig( minimizerConfig );
-  _minimizer_->configure();
+  if( GenericToolbox::Json::doKeyExist(minimizerConfig, "minimizerTaskList") ){
+    std::vector<JsonType> minimizerTaskConfigList;
+    GenericToolbox::Json::fillValue(minimizerConfig, minimizerTaskConfigList, "minimizerTaskList");
+    _taskList_.reserve(minimizerTaskConfigList.size());
+
+    for( auto& minimizerTaskConfig: minimizerTaskConfigList ){
+      _taskList_.emplace_back();
+      _taskList_.back().setConfig( minimizerTaskConfig );
+    }
+  }
+  else {
+    // now the minimizer is created, forward deprecated options
+    GenericToolbox::Json::deprecatedAction(_config_, "monitorRefreshRateInMs", [&]{
+      LogAlert << "Forwarding the option to Propagator. Consider moving it into \"minimizerConfig:\"" << std::endl;
+      _minimizer_->getMonitor().convergenceMonitor.setMaxRefreshRateInMs(GenericToolbox::Json::fetchValue<int>(_config_, "monitorRefreshRateInMs"));
+    });
+    _minimizer_->setConfig( minimizerConfig );
+    _minimizer_->configure();
+  }
 
   GenericToolbox::Json::deprecatedAction(_config_, "propagatorConfig", [&]{
     LogAlert << R"("propagatorConfig" should now be set within "likelihoodInterfaceConfig".)" << std::endl;
@@ -82,8 +94,6 @@ void FitterEngine::configureImpl(){
   });
   GenericToolbox::Json::fillValue(_config_, _parameterScanner_.getConfig(), {{"parameterScannerConfig"},{"scanConfig"}});
   _parameterScanner_.configure();
-
-  LogInfo << "Convergence monitor will be refreshed every " << _minimizer_->getMonitor().convergenceMonitor.getMaxRefreshRateInMs() << "ms." << std::endl;
 
   // local config
   GenericToolbox::Json::fillValue(_config_, _enablePca_, {{"enablePca"},{"runPcaCheck"},{"fixGhostFitParameters"}});
@@ -647,4 +657,12 @@ void FitterEngine::checkNumericalAccuracy(){
     LogDebug << GenericToolbox::toString(responses) << std::endl;
   }
   LogInfo << "OK" << std::endl;
+}
+
+void FitterEngine::runFitterTaskList(){
+
+  for( auto& task : _taskList_ ) {
+    task.run( this );
+  }
+
 }

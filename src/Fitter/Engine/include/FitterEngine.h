@@ -83,6 +83,9 @@ public:
   void rescaleParametersStepSize();
   void checkNumericalAccuracy();
 
+protected:
+  void runFitterTaskList();
+
 private:
   // Parameters
   bool _isDryRun_{false};

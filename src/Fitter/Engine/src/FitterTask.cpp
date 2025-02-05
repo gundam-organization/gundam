@@ -6,8 +6,20 @@
 #include "FitterEngine.h"
 #include "RootMinimizer.h"
 
+#include "Logger.h"
+
 
 void FitterTask::run(FitterEngine *owner_){
+
+  LogInfo << std::endl;
+  LogInfo << "Running fitter task: " << _name_ << std::endl;
+
+
+  if( not _isEnabled_ ){
+    LogWarning << "Task is disabled. Skipping..." << std::endl;
+    return;
+  }
+
 
   // ---------------------
   // First handle every request about the Likelihood interface
@@ -35,6 +47,18 @@ void FitterTask::run(FitterEngine *owner_){
   GenericToolbox::Json::fillValue(_config_, actionStr, "action");
   if     ( actionStr == "minimize" )  { owner_->getMinimizer().minimize(); }
   else if( actionStr == "calcErrors" ){ owner_->getMinimizer().calcErrors(); }
+
+  // outputs -> file write?
+
+}
+
+void FitterTask::configureImpl(){
+
+  GenericToolbox::Json::fillValue(_config_, _name_, "name");
+  LogExitIf(_name_.empty());
+
+  GenericToolbox::Json::fillValue(_config_, _isEnabled_, "isEnabled");
+  if( not _isEnabled_ ){ return; }
 
 
 }
