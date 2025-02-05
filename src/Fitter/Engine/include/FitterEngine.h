@@ -44,6 +44,7 @@ protected:
   void initializeImpl() override;
 
 public:
+  FitterEngine() = default;
   explicit FitterEngine(TDirectory *saveDir_) : _saveDir_(saveDir_) {};
 
   // Setters

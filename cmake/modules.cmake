@@ -13,6 +13,10 @@ list( APPEND MODULES Propagator)
 list( APPEND MODULES StatisticalInference)
 list( APPEND MODULES Fitter)
 
+if(WITH_PYTHON_INTERFACE)
+  list( APPEND MODULES PythonInterface)
+endif()
+
 if(WITH_CACHE_MANAGER)
   list( APPEND MODULES CacheManager )
 endif()

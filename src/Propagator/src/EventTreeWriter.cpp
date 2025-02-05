@@ -43,6 +43,7 @@ void EventTreeWriter::writeEvents(const GenericToolbox::TFilePath& saveDir_, con
 
 template<typename T> void EventTreeWriter::writeEventsTemplate(const GenericToolbox::TFilePath& saveDir_, const T& eventList_) const {
   LogReturnIf(eventList_.empty(), "No event to be written. Leaving...");
+  LogReturnIf(saveDir_.getDir() == nullptr, "No valid saveDir provided. Skipping event writing.");
 
   const std::vector<EventDialCache::DialResponseCache>* dialElements{getDialElementsPtr(eventList_[0])};
   bool writeDials{dialElements != nullptr};

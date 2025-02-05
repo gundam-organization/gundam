@@ -16,10 +16,6 @@
 #include "GenericToolbox.Root.h"
 #include "Logger.h"
 
-#include <Math/Factory.h>
-#include "TGraph.h"
-#include "TLegend.h"
-
 #include <cmath>
 #include <memory>
 
@@ -112,7 +108,6 @@ void FitterEngine::configureImpl(){
 }
 void FitterEngine::initializeImpl(){
   LogThrowIf(_config_.empty(), "Config is not set.");
-  LogThrowIf(_saveDir_== nullptr);
 
   if( GundamGlobals::isLightOutputMode() ){
     // TODO: this check should be more universal
