@@ -106,6 +106,9 @@ public:
   // statics
   [[nodiscard]] static double evalPenaltyLikelihood(const ParameterSet& parSet_);
 
+  void throwToyParameters(Propagator& propagator_);
+  void throwStatErrors(Propagator& propagator_);
+
 protected:
   void load();
   void loadModelPropagator();
@@ -113,9 +116,6 @@ protected:
   void buildSamplePairList();
 
   DataDispenser* getDataDispenser( DatasetDefinition& dataset_ );
-  void throwToyParameters(Propagator& propagator_);
-  void throwStatErrors(Propagator& propagator_);
-
 
 private:
   // parameters

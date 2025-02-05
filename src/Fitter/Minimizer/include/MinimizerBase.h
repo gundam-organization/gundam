@@ -143,6 +143,7 @@ public:
   [[nodiscard]] virtual bool isErrorCalcEnabled() const { return false; }
 
   // c-tor
+  MinimizerBase(){} // for the python interface
   explicit MinimizerBase(FitterEngine* owner_): _owner_(owner_){}
 
   /// Set if the calcErrors method should be called by the FitterEngine.
