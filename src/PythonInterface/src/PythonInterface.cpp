@@ -42,7 +42,7 @@ PYBIND11_MODULE(PyGundam, module) {
   .def("setConfig", pybind11::overload_cast<const std::string&>(&ConfigUtils::ConfigHandler::setConfig))
   .def("setConfig", pybind11::overload_cast<const JsonType&>(&ConfigUtils::ConfigHandler::setConfig))
   .def("setConfig", pybind11::overload_cast<const JsonType&>(&ConfigUtils::ConfigHandler::setConfig))
-  .def("getConfig", pybind11::overload_cast<>(&ConfigUtils::ConfigHandler::getConfig, pybind11::const_))
+  .def("getConfig", pybind11::overload_cast<>(&ConfigUtils::ConfigHandler::getConfig, pybind11::const_), pybind11::return_value_policy::reference)
   .def("flatOverride", pybind11::overload_cast<const std::string&>(&ConfigUtils::ConfigHandler::flatOverride))
   .def("flatOverride", pybind11::overload_cast<const std::vector<std::string>&>(&ConfigUtils::ConfigHandler::flatOverride))
   .def("override", pybind11::overload_cast<const std::string&>(&ConfigUtils::ConfigHandler::override))
@@ -78,7 +78,7 @@ PYBIND11_MODULE(PyGundam, module) {
   .def("configure", pybind11::overload_cast<>(&FitterEngine::configure))
   .def("initialize", &FitterEngine::initialize)
   .def("getMinimizer", pybind11::overload_cast<>(&FitterEngine::getMinimizer), pybind11::return_value_policy::reference)
-  .def("getLikelihoodInterface", pybind11::overload_cast<>(&FitterEngine::getLikelihoodInterface))
+  .def("getLikelihoodInterface", pybind11::overload_cast<>(&FitterEngine::getLikelihoodInterface), pybind11::return_value_policy::reference)
   ;
 }
 
