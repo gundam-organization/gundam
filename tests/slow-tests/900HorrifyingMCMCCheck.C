@@ -100,7 +100,7 @@ int main() {
     TOLERANCE("Check MCMC matches expected value for #0_Positive_C",
               normA.GetMean(),
               1.0, allowedSigma*relativeSigma);
-    TOLERANCE("Check MCMC matches expected value for #0_Positive_C",
+    TOLERANCE("Check MCMC RMS matches expected value for #0_Positive_C",
               normA.GetRMS(),
               0.577, allowedSigma*relativeSigma);
     TOLERANCE("Check MCMC matches expected value for #1_Negative_C",

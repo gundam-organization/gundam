@@ -14,30 +14,26 @@ scanParameters: false        # can be triggered with --scan
 generateOneSigmaPlots: false # can be enabled with --one-sigma
 
 fitterEngineConfig:
-  engineType: mcmc
-
-  mcmcConfig:
-    algorithm: metropolis
-    proposal: adaptive
-    burninCycles: 8
-    burninSteps: 2000
-    burninResets: 0
-    saveBurnin: true
-    burninWindow: 100
-    burninCovWindow: 10000
-
-    cycles: 4
-    steps: 10000
-    adaptiveWindow: 400
-    adaptiveCovWindow: 1000000
-    adaptiveFreezeAfter: 1
 
   minimizerConfig:
-    minimizer: "Minuit2"
-    algorithm: "Migrad"
-    errors: "Hesse"
-    print_level: 2
-    tolerance: 1E-6
+    type: SimpleMcmc
+    algorithm: metropolis
+    proposal: adaptive
+    adaptiveRestore: none
+
+    burninCycles: 8
+    burninSteps: 10000
+    burninResets: 1
+    saveBurnin: false
+    burninWindow: 100
+    burninCovWindow: 100000000
+
+    cycles: 8
+    steps: 10000
+    adaptiveWindow: 400
+    adaptiveCovWindow: 1000000000
+    burninCovDeweighting: 0.0
+    adaptiveFreezeAfter: 1
 
   propagatorConfig:
     throwAsimovFitParameters: false
