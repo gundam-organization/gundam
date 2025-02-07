@@ -656,8 +656,8 @@ void FitterEngine::checkNumericalAccuracy(){
 
 void FitterEngine::runFitterTaskList(){
 
-  for( auto& task : _taskList_ ) {
-    task.run( this );
-  }
+  LogInfo << std::endl << "Running fitter tasks..." << std::endl;
+  for( auto& task : _taskList_ ) { task.run( this ); }
 
+  LogInfo << "End of fitter tasks..." << std::endl << std::endl;
 }
