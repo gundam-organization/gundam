@@ -259,13 +259,13 @@ private:
   /// The implementation with a fixed step is used.  This is mostly an
   /// example of how to setup an alternate stepping proposal.
   typedef sMCMC::TSimpleMCMC<PrivateProxyLikelihood,sMCMC::TProposeSimpleStep> FixedStepMCMC;
-  void setupAndRunFixedStep(FixedStepMCMC& mcmc);
+  void fixedSetupAndRun(FixedStepMCMC& mcmc);
 
   /// The implementation when the adaptive step is used.  This is the default
   /// proposal for TSimpleMCMC, but is also dangerous for "unpleasant"
   /// likelihoods that have a lot of correlations between parameters.
   typedef sMCMC::TSimpleMCMC<PrivateProxyLikelihood,sMCMC::TProposeAdaptiveStep> AdaptiveStepMCMC;
-  void setupAndRunAdaptiveStep(AdaptiveStepMCMC& mcmc);
+  void adaptiveSetupAndRun(AdaptiveStepMCMC& mcmc);
 
   /////////////////////////////////////////////////////////////////
   // Support routines for the adaptive step.
@@ -285,6 +285,23 @@ private:
 
   /// Set the default proposal based on the FitParameter values and steps.
   bool adaptiveDefaultProposalCovariance(AdaptiveStepMCMC& mcmc,sMCMC::Vector& prior);
+
+  /// Fun an adaptive cycle with the current configuration.
+  bool adaptiveRunCycle(AdaptiveStepMCMC& mcmc,
+                        std::string chainName,
+                        int chainId,
+                        int steps,
+                        int adaptiveWindow,
+                        int adaptiveCovWindow,
+                        bool freezeStep,
+                        bool freezeCov,
+                        bool resetCov,
+                        double adaptiveCovDeweighting);
+
+  void adaptiveStart(AdaptiveStepMCMC& mcmc,
+                     sMCMC::Vector prior,
+                     bool randomize);
+
 };
 #endif // GUNDAM_ADAPTIVE_MCMC_H
 

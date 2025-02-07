@@ -13,7 +13,7 @@
 #include "Logger.h"
 
 #include <locale>
-
+#include <string>
 
 void SimpleMcmc::configureImpl(){
   this->MinimizerBase::configureImpl();
@@ -465,10 +465,191 @@ bool SimpleMcmc::adaptiveLoadProposalCovariance( AdaptiveStepMCMC& mcmc,
   return true;
 }
 
-void SimpleMcmc::setupAndRunAdaptiveStep( AdaptiveStepMCMC& mcmc) {
+bool SimpleMcmc::adaptiveRunCycle(AdaptiveStepMCMC& mcmc,
+                                  std::string chainName,
+                                  int chainId,
+                                  int steps,
+                                  int adaptiveWindow,
+                                  int adaptiveCovWindow,
+                                  bool freezeStep,
+                                  bool freezeCov,
+                                  bool resetCov,
+                                  double adaptiveCovDeweighting) {
+  mcmc.SetStepRMSWindow(adaptiveWindow);
+  mcmc.GetProposeStep().SetAcceptanceWindow(adaptiveWindow);
+  mcmc.GetProposeStep().SetCovarianceWindow(adaptiveCovWindow);
+
+  LogInfo << "Run " << chainName << " " << chainId << std::endl;
+
+  // Update the covariance with the steps from the last cycle.  This starts
+  // a new "reversible-chain".  The update always happens at the start of a
+  // cycle, even if the sigma and covariance are frozen.
+  mcmc.GetProposeStep().UpdateProposal();
+
+  // Reset the covariance to the initial state.  This forgets the path of
+  // the previous cycle.  This only happens a few times to let it forget
+  // about the very first burn-in cycles
+  if (resetCov) {
+    sMCMC::Vector saveCenter{mcmc.GetProposeStep().GetEstimatedCenter()};
+    mcmc.GetProposeStep().ResetProposal();
+    // After the reset, set how many trials the prior covariance counts
+    // for.  This needs to be done by hand since the extra weight lives
+    // here, and not in TSimpleMCMC.h (TSimpleMCMC doesn't, and shouldn't,
+    // know about this burn-in process).
+    if (_adaptiveCovTrials_ > 0) {
+      mcmc.GetProposeStep().SetCovarianceTrials(_adaptiveCovTrials_);
+      // We have a good prior (usually based on a previous MINUIT fit), so
+      // restore the current estimate of the centeral value.
+      mcmc.GetProposeStep().SetEstimatedCenter(saveCenter);
+      mcmc.GetProposeStep().SetEstimatedCenterTrials(_adaptiveCovTrials_);
+    }
+  }
+
+  // Set whether the running covariance will be updated based on the new
+  // steps.  This freezes right after the last update that will be called.
+  if (freezeCov) {
+    LogInfo << "Step correlations are frozen" << std::endl;
+    mcmc.GetProposeStep().SetCovarianceFrozen(true);
+  }
+  else {
+    LogInfo << "Step correlations are being updated" << std::endl;
+    mcmc.GetProposeStep().SetCovarianceFrozen(false);
+  }
+
+  // Override default number of steps until the next automatic
+  // UpdateProposal call.  This disables automatic updates during normal
+  // chains.
+  mcmc.GetProposeStep().SetNextUpdate(1E+32);
+
+  // Set the adaptive covariance deweighting after the first update so that
+  // the previous deweighting is used for the first update.  This is a very
+  // cheap call so set it on every iteration.
+  mcmc.GetProposeStep()
+    .SetCovarianceUpdateDeweighting(adaptiveCovDeweighting);
+
+  // Set whether the step size is going to be tuned to deliver the target
+  // acceptance.
+  if (freezeStep) {
+    LogInfo << "Step length is frozen" << std::endl;
+    mcmc.GetProposeStep().SetAcceptanceRigidity(-1);
+  }
+  else {
+    LogWarning << "Step length will be updated" << std::endl;
+    mcmc.GetProposeStep().SetAcceptanceRigidity(2.0);
+  }
+
+  ////////////////////////////////
+  // Run the steps for this chain
+  for (int i = 0; i < steps; ++i) {
+    // Run step, but do not save the step.  The step isn't saved so the
+    // accepted step can be copied into the points (which will have
+    // any decomposition removed).
+    if (mcmc.Step(false)) fillPoint();
+    // Zero the size of the raw accepted points and only save the filled
+    // points (which are in likelihood space).
+    if (not _saveRawSteps_) mcmc.ClearSavedAccepted();
+    // Limit the number of times that the model histogram data is saved to
+    // the output file.  It won't be saved if the _modelStride_ is less than
+    // one.  Otherwise it will be saved every _modelStride_ steps.
+    if (_modelStride_ > 0
+        and 0 == (mcmc.GetProposeStep().GetTrials()%_modelStride_)) {
+      _saveModel_.resize(_model_.size());
+      std::copy(_model_.begin(), _model_.end(), _saveModel_.begin());
+      _saveUncertainty_.resize(_uncertainty_.size());
+      std::copy(_uncertainty_.begin(), _uncertainty_.end(),
+                _saveUncertainty_.begin());
+    }
+    // Now save the step.  This is going to write the points in the
+    // "likelihood" space.  If "_saveRawSteps_" is true, then this also
+    // saves the accepted point in the (possibly) decomposed state.
+    mcmc.SaveStep(false);
+    if(steps > 100 && !(i%(steps/100))){
+      LogInfo << chainName << ": " << chainId
+              << " step: " << i << "/" << steps << " "
+              << i*100./steps << "%"
+              << " Trials: "
+              << mcmc.GetProposeStep().GetSuccesses()
+              << "/" << mcmc.GetProposeStep().GetTrials()
+              << " (acc " << mcmc.GetProposeStep().GetAcceptance()
+              << ", sig " << mcmc.GetProposeStep().GetSigma()
+              << ", rms " << mcmc.GetStepRMS()
+              << ")"
+              << std::endl;
+    }
+  }
+  // Make a final step and then save it with the covariance information.
+  // These steps can be identified since the covariance is not empty, but
+  // they should be real independent steps.
+  if (mcmc.Step(false)) fillPoint();
+  // This is not resetting the "SaveAccepted" size so the step is actually
+  // saved.
+  mcmc.SaveStep(true);
+  LogInfo << chainName << ": " << chainId << " complete"
+          << " Run Length: " << steps
+          << " -- Saving state"
+          << std::endl;
+  return true;
+}
+
+void SimpleMcmc::adaptiveStart(AdaptiveStepMCMC& mcmc,
+                               sMCMC::Vector prior,
+                               bool randomize) {
+  int throttle{100};
+  bool startStatus{false};
+  do{
+    for (const Parameter* par : getMinimizerFitParameterPtr() ) {
+      double val = par->getPriorValue();
+      if (randomize) {
+        double err = par->getStdDevValue();
+        double r = gRandom->Uniform(0.0,1.0);
+        double lowBound = val-1.0*err;
+        double highBound = val+1.0*err;
+
+        if(not std::isnan(par->getMinValue())) {
+          lowBound = std::max(lowBound, par->getMinValue());
+        }
+        if(not std::isnan(par->getMinMirror())) {
+          lowBound = std::max(lowBound, par->getMinMirror());
+        }
+        if(not std::isnan(par->getMinPhysical())) {
+          lowBound = std::max(lowBound, par->getMinPhysical());
+        }
+
+        if(not std::isnan(par->getMaxValue())) {
+          highBound = std::min(highBound, par->getMaxValue());
+        }
+        if(not std::isnan(par->getMaxMirror())) {
+          highBound = std::min(highBound, par->getMaxMirror());
+        }
+        if(not std::isnan(par->getMaxPhysical())) {
+          highBound = std::min(highBound, par->getMaxPhysical());
+        }
+
+        val = lowBound + r*(highBound-lowBound);
+      }
+      if (not useNormalizedFitSpace()) {
+        prior.push_back(val);
+      }
+      else {
+        prior.push_back(ParameterSet::toNormalizedParValue(val, *par));
+      }
+    }
+    try {startStatus = mcmc.Start(prior, false);}
+    catch (...) {startStatus = false;}
+    if (not startStatus and not randomize) {
+      LogExit("Invalid initial point for chain");
+    }
+    if(!startStatus) prior.clear();
+  } while (not startStatus and 0 < throttle--);
+}
+
+void SimpleMcmc::adaptiveSetupAndRun(AdaptiveStepMCMC& mcmc) {
 
   mcmc.GetProposeStep().SetDim(getMinimizerFitParameterPtr().size());
-  mcmc.GetLogLikelihood().functor = std::make_unique<ROOT::Math::Functor>(this, &SimpleMcmc::evalFitValid, getMinimizerFitParameterPtr().size());
+  mcmc.GetLogLikelihood().functor
+    = std::make_unique<ROOT::Math::Functor>(
+      this, &SimpleMcmc::evalFitValid,
+      getMinimizerFitParameterPtr().size());
   mcmc.GetProposeStep().SetCovarianceUpdateDeweighting(0.0);
   mcmc.GetProposeStep().SetCovarianceFrozen(false);
 
@@ -476,79 +657,20 @@ void SimpleMcmc::setupAndRunAdaptiveStep( AdaptiveStepMCMC& mcmc) {
   // about resizing it or it moving, so be lazy and just use push_back.
   sMCMC::Vector prior;
 
-  bool StartStatus = false;
-  if (_randomStart_==true){
-    LogInfo<<"MCMC chain starts from a random point"<<std::endl;
-    int throttle =10;
-    do{
-    for (const Parameter* par : getMinimizerFitParameterPtr() ) {
-      double val = par->getPriorValue();
-      double err = par->getStdDevValue();
-      double r = gRandom->Uniform(0.0,1.0);
-      double lowBound = val-1.0*err;
-      double highBound = val+1.0*err;
-      if(not std::isnan(par->getMinValue())) {
-        lowBound = std::max(lowBound, par->getMinValue());
-      }
-      if(not std::isnan(par->getMinMirror())) {
-        lowBound = std::max(lowBound, par->getMinMirror());
-      }
-      if(not std::isnan(par->getMinPhysical())) {
-        lowBound = std::max(lowBound, par->getMinPhysical());
-      }
-
-      if(not std::isnan(par->getMaxValue())) {
-        highBound = std::min(highBound, par->getMaxValue());
-      }
-      if(not std::isnan(par->getMaxMirror())) {
-        highBound = std::min(highBound, par->getMaxMirror());
-      }
-      if(not std::isnan(par->getMaxPhysical())) {
-        highBound = std::min(highBound, par->getMaxPhysical());
-      }
-      val = lowBound + r*(highBound-lowBound);
-      if (not useNormalizedFitSpace()) {
-        prior.push_back(val);
-      }
-      else {
-         prior.push_back(ParameterSet::toNormalizedParValue(val, *par));
-      }
-
-    }
-    StartStatus = mcmc.Start(prior, false);
-    if(!StartStatus) prior.clear();
-    LogInfo<<"The size of prior is "<<prior.size()<<std::endl;
-    } while (!StartStatus&&--throttle>0);
-  }
-  else{
-    LogInfo<<"MCMC chain starts from the prior"<<std::endl;
-    for (const Parameter* par : getMinimizerFitParameterPtr() ) {
-      double val = par->getParameterValue();
-      if (not useNormalizedFitSpace()) {
-        prior.push_back(val);
-      }
-      else {
-         prior.push_back(ParameterSet::toNormalizedParValue(val, *par));
-      }
-    }
-  }
-  StartStatus = mcmc.Start(prior, false);
-  if (StartStatus!=true || prior.size()==0) LogThrow("The initial point is bad. MCMC chain cannot start.");
+  adaptiveStart(mcmc,prior,_randomStart_);
 
   // Set the correlations in the default step proposal.
-  if (not adaptiveLoadProposalCovariance(
-      mcmc,prior,_adaptiveCovFile_,_adaptiveCovName_)) {;
+  if (not adaptiveLoadProposalCovariance(mcmc,
+                                         prior,
+                                         _adaptiveCovFile_,
+                                         _adaptiveCovName_)) {;
+    // The correlations were not loaded from a predefined covariance. Set up
+    // a default set of correlations.
     adaptiveDefaultProposalCovariance(mcmc,prior);
   }
 
   // Fill the initial point.
   fillPoint();
-
-  // Initializing the mcmc sampler
-  LogInfo << "Start with " << prior.size() << " parameters" << std::endl;
-  mcmc.Start(prior, _saveBurnin_);
-  mcmc.GetProposeStep().SetAcceptanceWindow(_adaptiveWindow_);
-  mcmc.SetStepRMSWindow(_adaptiveWindow_);
 
   // Restore the chain if a file is provided.  The covariance is
   // updated during the restore, so the proposal is updated.  That means that
@@ -560,180 +682,46 @@ void SimpleMcmc::setupAndRunAdaptiveStep( AdaptiveStepMCMC& mcmc) {
   // Check if there should be some burn-in cycles.  Burn-in in this context is
   // mainly about moving the current point away from the default.
   if (not restored and _burninCycles_ > 0 and _burninSteps_ > 0) {
-    // Burn-In cycles
-    mcmc.GetProposeStep().SetCovarianceWindow(_burninCovWindow_);
-    mcmc.GetProposeStep().SetAcceptanceWindow(_burninWindow_);
-    mcmc.SetStepRMSWindow(_burninWindow_);
-    mcmc.GetProposeStep()
-        .SetCovarianceUpdateDeweighting(_burninCovDeweighting_);
-    mcmc.GetProposeStep().UpdateProposal();
-    mcmc.GetProposeStep().SetCovarianceFrozen(false);
     for (int chain = 0; chain < _burninCycles_; ++chain) {
-      LogInfo << "Start burn-In chain " << chain << std::endl;
-      // Override default number of steps until the next automatic
-      // UpdateProposal call.  This disables automatic updates during adaptive
-      // burn-in.
-      mcmc.GetProposeStep().SetNextUpdate(2*_burninSteps_*_burninCycles_);
-      mcmc.GetProposeStep()
-          .SetCovarianceUpdateDeweighting(_burninCovDeweighting_);
-      if (chain < _burninFreezeAfter_) {
-        LogInfo << "Burn-in step length will be updated" << std::endl;
-        mcmc.GetProposeStep().SetAcceptanceRigidity(2.0);
-      }
-      else {
-        LogInfo << "Burn-in step length is frozen" << std::endl;
-        mcmc.GetProposeStep().SetAcceptanceRigidity(-1);
-      }
-      // Burn-In chain in each cycle
-      for (int i = 0; i < _burninSteps_; ++i) {
-        // Run the burn-in step.
-        if (mcmc.Step(false)) fillPoint(false);
-        if (_modelStride_ > 0
-            and 0 == (mcmc.GetProposeStep().GetTrials()%_modelStride_)) {
-          _saveModel_.resize(_model_.size());
-          std::copy(_model_.begin(), _model_.end(), _saveModel_.begin());
-          _saveUncertainty_.resize(_uncertainty_.size());
-          std::copy(_uncertainty_.begin(), _uncertainty_.end(),
-                    _saveUncertainty_.begin());
-        }
-        // Now save the step.  Check to see if this is the last step of the
-        // run, and if it is, then save the full state.
-        if (_saveBurnin_) mcmc.SaveStep(_burninSteps_ <= (i+1));
-        if(_burninSteps_ > 100 && !(i%(_burninSteps_/100))){
-          LogInfo << "Burn-in: " << chain
-                  << " step: " << i << "/" << _burninSteps_ << " "
-                  << i*100./_burninSteps_ << "%"
-                  << " Trials: "
-                  << mcmc.GetProposeStep().GetSuccesses()
-                  << "/" << mcmc.GetProposeStep().GetTrials()
-                  << " (acc " << mcmc.GetProposeStep().GetAcceptance()
-                  << ", sig " << mcmc.GetProposeStep().GetSigma()
-                  << ", rms " << mcmc.GetStepRMS()
-                  << ")"
-                  << std::endl;
-        }
-      }
-      // Do an update at the *END* of the burn-in step.
-      mcmc.GetProposeStep().UpdateProposal();
-      // Reset the covariance to the initial state.  This forgets the path of
-      // the previous cycle.  This only happens a few times to let it forget
-      // about the very first burn-in cycles
-      if (chain < _burninResets_) {
-        sMCMC::Vector saveCenter{mcmc.GetProposeStep().GetEstimatedCenter()};
-        mcmc.GetProposeStep().ResetProposal();
-        // After the reset, set how many trials the prior covariance counts
-        // for.  This needs to be done by hand since the extra weight lives
-        // here, and not in TSimpleMCMC.h (TSimpleMCMC doesn't, and shouldn't,
-        // know about this burn-in process).
-        if (_adaptiveCovTrials_ > 0) {
-          mcmc.GetProposeStep().SetCovarianceTrials(_adaptiveCovTrials_);
-          // We have a good prior (usually based on a previous MINUIT fit), so
-          // restore the current estimate of the centeral value.
-          mcmc.GetProposeStep().SetEstimatedCenter(saveCenter);
-          mcmc.GetProposeStep().SetEstimatedCenterTrials(_adaptiveCovTrials_);
-        }
-      }
+      bool freezeStep = true;
+      if (chain < _burninFreezeAfter_) freezeStep = false;
+      bool freezeCov = false;
+      bool resetCov = false;
+      if (chain < _burninResets_) resetCov = true;
+      adaptiveRunCycle(mcmc,
+                       "Burn-in", chain,
+                       _burninSteps_,
+                       _burninWindow_,
+                       _burninCovWindow_,
+                       freezeStep,
+                       freezeCov,
+                       resetCov,
+                       _burninCovDeweighting_);
     }
     LogInfo << "Finished burn-in chains" << std::endl;
   }
 
   ////////////////////////////////////////////////////////////////
   // Run the main cycles.
-  mcmc.GetProposeStep().SetCovarianceWindow(_adaptiveCovWindow_);
-  mcmc.GetProposeStep().SetAcceptanceWindow(_adaptiveWindow_);
-  mcmc.SetStepRMSWindow(_adaptiveWindow_);
-  mcmc.GetProposeStep()
-      .SetCovarianceUpdateDeweighting(_adaptiveCovDeweighting_);
-  for (int chain = 0; chain < _cycles_; ++chain){
-    LogInfo << "Start run chain " << chain << std::endl;
-    // Update the covariance with the steps from the last cycle.  This starts
-    // a new "reversible-chain".  The update always happens at the start of a
-    // cycle, even if the sigma and covariance are frozen.
-    mcmc.GetProposeStep().UpdateProposal();
-    // Set whether the running covariance will be updated based on the new
-    // steps.  This freezes right after the last update that will be called.
-    if (chain < _adaptiveFreezeCorrelations_) {
-      LogInfo << "Step correlations are being updated" << std::endl;
-      mcmc.GetProposeStep().SetCovarianceFrozen(false);
-    }
-    else {
-      LogInfo << "Step correlations are frozen" << std::endl;
-      mcmc.GetProposeStep().SetCovarianceFrozen(true);
-    }
-    // Override default number of steps until the next automatic
-    // UpdateProposal call.  This disables automatic updates during normal
-    // chains.
-    mcmc.GetProposeStep().SetNextUpdate(2*_steps_*_cycles_);
-    // Set the adaptive covariance deweighting after the first update so that
-    // the previous deweighting is used for the first update.  This is a very
-    // cheap call so set it on every iteration.
-    mcmc.GetProposeStep()
-        .SetCovarianceUpdateDeweighting(_adaptiveCovDeweighting_);
-    // Set whether the step size is going to be tuned to deliver the target
-    // acceptance.
-    if (chain < _adaptiveFreezeAfter_) {
-      LogWarning << "Step length will be updated" << std::endl;
-      mcmc.GetProposeStep().SetAcceptanceRigidity(2.0);
-    }
-    else {
-      LogInfo << "Step length is frozen" << std::endl;
-      mcmc.GetProposeStep().SetAcceptanceRigidity(-1);
-    }
-    ////////////////////////////////
-    // Run the steps for this chain
-    for (int i = 0; i < _steps_; ++i) {
-      // Run step, but do not save the step.  The step isn't saved so the
-      // accepted step can be copied into the points (which will have
-      // any decomposition removed).
-      if (mcmc.Step(false)) fillPoint();
-      // Zero the size of the raw accepted points and only save the filled
-      // points (which are in likelihood space).
-      if (not _saveRawSteps_) mcmc.ClearSavedAccepted();
-      // Limit the number of times that the model histogram data is saved to
-      // the output file.  It won't be saved if the _modelStride_ is less than
-      // one.  Otherwise it will be saved every _modelStride_ steps.
-      if (_modelStride_ > 0
-          and 0 == (mcmc.GetProposeStep().GetTrials()%_modelStride_)) {
-        _saveModel_.resize(_model_.size());
-        std::copy(_model_.begin(), _model_.end(), _saveModel_.begin());
-        _saveUncertainty_.resize(_uncertainty_.size());
-        std::copy(_uncertainty_.begin(), _uncertainty_.end(),
-                  _saveUncertainty_.begin());
-      }
-      // Now save the step.  This is going to write the points in the
-      // "likelihood" space.  If "_saveRawSteps_" is true, then this also
-      // saves the accepted point in the (possibly) decomposed state.
-      mcmc.SaveStep(false);
-      if(_steps_ > 100 && !(i%(_steps_/100))){
-        LogInfo << "Chain: " << chain
-                << " step: " << i << "/" << _steps_ << " "
-                << i*100./_steps_ << "%"
-                << " Trials: "
-                << mcmc.GetProposeStep().GetSuccesses()
-                << "/" << mcmc.GetProposeStep().GetTrials()
-                << " (acc " << mcmc.GetProposeStep().GetAcceptance()
-                << ", sig " << mcmc.GetProposeStep().GetSigma()
-                << ", rms " << mcmc.GetStepRMS()
-                << ")"
-                << std::endl;
-      }
-    }
-    // Make a final step and then save it with the covariance information.
-    // These steps can be identified since the covariance is not empty, but
-    // they should be real independent steps.
-    if (mcmc.Step(false)) fillPoint();
-    // This is not resetting the "SaveAccepted" size so the step is actually
-    // saved.
-    mcmc.SaveStep(true);
-    LogInfo << "Chain: " << chain << " complete"
-            << " Run Length: " << _steps_
-            << " -- Saving state"
-            << std::endl;
+  for (int chain = 0; chain < _cycles_; ++chain) {
+    bool freezeStep = true;
+    if (chain < _adaptiveFreezeAfter_) freezeStep = false;
+    bool freezeCov = true;
+    if (chain < _adaptiveFreezeCorrelations_) freezeCov = false;
+    adaptiveRunCycle(mcmc,
+                     "Chain", chain,
+                     _steps_,
+                     _adaptiveWindow_,
+                     _adaptiveCovWindow_,
+                     freezeStep,
+                     freezeCov,
+                     false,
+                     _adaptiveCovDeweighting_);
   }
   LogInfo << "Finished running chains" << std::endl;
 
 }
-void SimpleMcmc::setupAndRunFixedStep( FixedStepMCMC& mcmc) {
+void SimpleMcmc::fixedSetupAndRun( FixedStepMCMC& mcmc) {
 
   mcmc.GetProposeStep().SetDim(getMinimizerFitParameterPtr().size());
   mcmc.GetLogLikelihood().functor = std::make_unique<ROOT::Math::Functor>(this, &SimpleMcmc::evalFitValid, getMinimizerFitParameterPtr().size());
@@ -917,11 +905,11 @@ void SimpleMcmc::minimize() {
   // Create the TSimpleMCMC object and call the specific runner.
   if (_proposalName_ == "adaptive") {
     sMCMC::TSimpleMCMC<PrivateProxyLikelihood,sMCMC::TProposeAdaptiveStep> mcmc(outputTree);
-    setupAndRunAdaptiveStep(mcmc);
+    adaptiveSetupAndRun(mcmc);
   }
   else if (_proposalName_ == "fixed") {
     sMCMC::TSimpleMCMC<PrivateProxyLikelihood,sMCMC::TProposeSimpleStep> mcmc(outputTree);
-    setupAndRunFixedStep(mcmc);
+    fixedSetupAndRun(mcmc);
   }
   else {
     LogExit("Invalid proposal type for MCMC: " << _proposalName_)
