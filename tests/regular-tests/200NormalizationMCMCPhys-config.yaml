@@ -66,7 +66,7 @@ fitterEngineConfig:
       fitSampleList:
         - name: AB
           isEnabled: true
-          binning: "${CONFIG_DIR}/200NormalizationMCMC-binning.txt"
+          binning: "${CONFIG_DIR}/200NormalizationMCMCPhys-binning.txt"
           dataSets: [ "TestSample" ]
 
     parameterSetListConfig:
