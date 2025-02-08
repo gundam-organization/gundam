@@ -19,7 +19,7 @@ public:
   // getters
   static bool isDebug(){ return _parameters_.isDebug; }
   static bool isLightOutputMode(){ return _parameters_.lightOutputModeEnabled; }
-  static int getNbCpuThreads(int nbMax_ = 0){ return nbMax_ == 0 ? _parameters_.nbCpuThreads : std::max(nbMax_, _parameters_.nbCpuThreads); }
+  static int getNbCpuThreads(int nbMax_ = 0){ return nbMax_ == 0 ? _parameters_.nbCpuThreads : std::min(nbMax_, _parameters_.nbCpuThreads); }
 
 private:
 
