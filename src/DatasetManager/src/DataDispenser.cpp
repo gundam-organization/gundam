@@ -900,7 +900,8 @@ void DataDispenser::runEventFillThreads(int iThread_){
         ssProgressBar << " / CPU efficiency: " << GenericToolbox::padString(std::to_string(cpuPercent/nThreads), 3,' ')
                       << "% / RAM: " << GenericToolbox::parseSizeUnits( double(GenericToolbox::getProcessMemoryUsage()) ) << std::endl;
 
-        ssProgressBar << "Data size per entry: " << readSpeed.getLastValue() << " / Using " << nThreads << " threads" << std::endl;
+        ssProgressBar << LogInfo.getPrefixString() << "Data size per entry: " << GenericToolbox::parseSizeUnits(readSpeed.getLastValue());
+        ssProgressBar << " / Using " << nThreads << " threads" << std::endl;
 
         ssProgressBar << LogInfo.getPrefixString() << progressTitle;
         GenericToolbox::displayProgressBar(
