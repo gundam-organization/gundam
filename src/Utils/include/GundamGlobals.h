@@ -5,6 +5,8 @@
 #ifndef GUNDAM_GUNDAM_GLOBALS_H
 #define GUNDAM_GUNDAM_GLOBALS_H
 
+#include <algorithm>
+
 
 class GundamGlobals{
 
@@ -17,7 +19,7 @@ public:
   // getters
   static bool isDebug(){ return _parameters_.isDebug; }
   static bool isLightOutputMode(){ return _parameters_.lightOutputModeEnabled; }
-  static int getNbCpuThreads(){ return _parameters_.nbCpuThreads; }
+  static int getNbCpuThreads(int nbMax_ = 0){ return nbMax_ == 0 ? _parameters_.nbCpuThreads : std::max(nbMax_, _parameters_.nbCpuThreads); }
 
 private:
 
