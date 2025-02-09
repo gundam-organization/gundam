@@ -36,7 +36,7 @@
 void DataDispenser::configureImpl(){
 
   // first of all
-  _threadPool_.setNThreads(GundamGlobals::getNbCpuThreads() );
+  _threadPool_.setNThreads(GundamGlobals::getNbCpuThreads(4) );
 
   GenericToolbox::Json::fillValue(_config_, _parameters_.name, "name");
   LogExitIf(_parameters_.name.empty(), "Dataset name not set.");
@@ -227,7 +227,7 @@ void DataDispenser::doEventSelection(){
   ROOT::EnableThreadSafety();
 
   // how meaning buffers?
-  int nThreads{GundamGlobals::getNbCpuThreads()};
+  int nThreads{GundamGlobals::getNbCpuThreads(4)};
   if( _owner_->isDevSingleThreadEventSelection() ) { nThreads = 1; }
 
   Long64_t nEntries{0};
@@ -513,8 +513,8 @@ void DataDispenser::readAndFill(){
   }
 
   LogWarning << "Loading and indexing..." << std::endl;
-  if(not _owner_->isDevSingleThreadEventLoaderAndIndexer() and GundamGlobals::getNbCpuThreads() > 1 ){
-    threadSharedDataList.resize(GundamGlobals::getNbCpuThreads());
+  if(not _owner_->isDevSingleThreadEventLoaderAndIndexer() and GundamGlobals::getNbCpuThreads(4) > 1 ){
+    threadSharedDataList.resize(GundamGlobals::getNbCpuThreads(4));
     ROOT::EnableThreadSafety(); // EXTREMELY IMPORTANT
     _threadPool_.addJob(__METHOD_NAME__, [&](int iThread_){ this->runEventFillThreads(iThread_); });
     _threadPool_.runJob(__METHOD_NAME__);
@@ -660,7 +660,7 @@ std::shared_ptr<TChain> DataDispenser::openChain(bool verbose_){
 
 void DataDispenser::eventSelectionFunction(int iThread_){
 
-  int nThreads{GundamGlobals::getNbCpuThreads()};
+  int nThreads{GundamGlobals::getNbCpuThreads(4)};
   if( iThread_ == -1 ){ iThread_ = 0; nThreads = 1; }
 
   // Opening ROOT files and make a TChain
@@ -791,7 +791,7 @@ void DataDispenser::eventSelectionFunction(int iThread_){
 
 void DataDispenser::runEventFillThreads(int iThread_){
 
-  int nThreads = GundamGlobals::getNbCpuThreads();
+  int nThreads = GundamGlobals::getNbCpuThreads(4);
   if( iThread_ == -1 ){ iThread_ = 0; nThreads = 1; } // special mode
 
   // init shared data
@@ -899,6 +899,9 @@ void DataDispenser::runEventFillThreads(int iThread_){
         int cpuPercent = int(GenericToolbox::getCpuUsageByProcess());
         ssProgressBar << " / CPU efficiency: " << GenericToolbox::padString(std::to_string(cpuPercent/nThreads), 3,' ')
                       << "% / RAM: " << GenericToolbox::parseSizeUnits( double(GenericToolbox::getProcessMemoryUsage()) ) << std::endl;
+
+        ssProgressBar << LogInfo.getPrefixString() << "Data size per entry: " << GenericToolbox::parseSizeUnits(readSpeed.getLastValue());
+        ssProgressBar << " / Using " << nThreads << " threads" << std::endl;
 
         ssProgressBar << LogInfo.getPrefixString() << progressTitle;
         GenericToolbox::displayProgressBar(
