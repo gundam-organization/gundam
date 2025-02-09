@@ -243,19 +243,17 @@ std::string LikelihoodInterface::getSampleBreakdownTable() const{
   t << "Sample" << GenericToolbox::TablePrinter::NextColumn;
   t << "Model (# binned)" << GenericToolbox::TablePrinter::NextColumn;
   t << "Data (# binned)" << GenericToolbox::TablePrinter::NextColumn;
-  t << "Diff." << GenericToolbox::TablePrinter::NextColumn;
   t << "Model (weighted)" << GenericToolbox::TablePrinter::NextColumn;
   t << "Data (weighted)" << GenericToolbox::TablePrinter::NextColumn;
-  t << "Diff." << GenericToolbox::TablePrinter::NextLine;
+  t << "Diff. (%)" << GenericToolbox::TablePrinter::NextLine;
 
   for( auto& samplePair : _samplePairList_ ){
     t << samplePair.model->getName() << GenericToolbox::TablePrinter::NextColumn;
     t << samplePair.model->getNbBinnedEvents() << GenericToolbox::TablePrinter::NextColumn;
     t << samplePair.data->getNbBinnedEvents() << GenericToolbox::TablePrinter::NextColumn;
-    t << long(samplePair.data->getNbBinnedEvents()) - long(samplePair.model->getNbBinnedEvents()) << GenericToolbox::TablePrinter::NextColumn;
     t << samplePair.model->getSumWeights() << GenericToolbox::TablePrinter::NextColumn;
     t << samplePair.data->getSumWeights() << GenericToolbox::TablePrinter::NextColumn;
-    t << samplePair.data->getSumWeights() - samplePair.model->getSumWeights() << GenericToolbox::TablePrinter::NextLine;
+    t << 100*(samplePair.data->getSumWeights() - samplePair.model->getSumWeights())/samplePair.model->getSumWeights() << GenericToolbox::TablePrinter::NextLine;
   }
 
   return t.generateTableString();
