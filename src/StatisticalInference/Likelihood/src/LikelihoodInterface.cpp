@@ -29,10 +29,6 @@ void LikelihoodInterface::configureImpl(){
   std::string jointProbabilityTypeStr{"PoissonLLH"};
 
   // prior to this version a few parameters were set in the propagator itself
-  GenericToolbox::Json::deprecatedAction(_modelPropagator_.getConfig(), "throwAsimovFitParameters", [&]{
-    LogAlert << R"("throwAsimovFitParameters" should now be set under "likelihoodInterfaceConfig" instead of "propagatorConfig".)" << std::endl;
-    GenericToolbox::Json::fillValue(_modelPropagator_.getConfig(), _throwAsimovToyParameters_, "throwAsimovFitParameters");
-  });
   GenericToolbox::Json::deprecatedAction(_modelPropagator_.getConfig(), "enableStatThrowInToys", [&]{
     LogAlert << R"("enableStatThrowInToys" should now be set under "likelihoodInterfaceConfig" instead of "propagatorConfig".)" << std::endl;
     GenericToolbox::Json::fillValue(_modelPropagator_.getConfig(), _enableStatThrowInToys_, "enableStatThrowInToys");
@@ -83,7 +79,6 @@ void LikelihoodInterface::configureImpl(){
   _plotGenerator_.configure();
 
   // reading local parameters
-  GenericToolbox::Json::fillValue(_config_, _throwAsimovToyParameters_, "throwAsimovFitParameters");
   GenericToolbox::Json::fillValue(_config_, _enableStatThrowInToys_, "enableStatThrowInToys");
   GenericToolbox::Json::fillValue(_config_, _gaussStatThrowInToys_, "gaussStatThrowInToys");
   GenericToolbox::Json::fillValue(_config_, _enableEventMcThrow_, "enableEventMcThrow");
@@ -376,7 +371,7 @@ void LikelihoodInterface::loadDataPropagator(){
 
   if( isAsimov ){
     // don't reload, just use the _modelPropagator_
-    if( _dataType_ == DataType::Toy and _throwAsimovToyParameters_ ){
+    if( _dataType_ == DataType::Toy ){
       throwToyParameters(_modelPropagator_);
     }
 
@@ -387,7 +382,7 @@ void LikelihoodInterface::loadDataPropagator(){
     _dataPropagator_.buildDialCache();
 
     // move the model back to the prior
-    if( _dataType_ == DataType::Toy and _throwAsimovToyParameters_ ){
+    if( _dataType_ == DataType::Toy ){
       _modelPropagator_.getParametersManager().moveParametersToPrior();
       _modelPropagator_.reweightEvents();
     }
@@ -436,7 +431,7 @@ void LikelihoodInterface::loadDataPropagator(){
     _dataPropagator_.shrinkDialContainers();
     _dataPropagator_.buildDialCache();
 
-    if( _throwAsimovToyParameters_ ){
+    if( _dataType_ == DataType::Toy ){
       throwToyParameters(_dataPropagator_);
     } // throw asimov?
 

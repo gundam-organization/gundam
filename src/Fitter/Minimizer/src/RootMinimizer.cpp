@@ -1043,17 +1043,21 @@ void RootMinimizer::writePostFitData( TDirectory* saveDir_) {
             } // norm
           } // par
 
-          if( getLikelihoodInterface().isThrowAsimovToyParameters() ){
+          if( getLikelihoodInterface().getDataType() == LikelihoodInterface::DataType::Toy ){
             bool draw{false};
 
             for( auto& par : parList_ ){
               double val{par.getThrowValue()};
-              val == val ? draw = true : val = par.getPriorValue();
-              if( isNorm_ ) val = ParameterSet::toNormalizedParValue(val, par);
+
+              if( not std::isnan(val) ){ draw = true; }
+              else{ val = par.getPriorValue(); }
+
+              if( isNorm_ ){ val = ParameterSet::toNormalizedParValue(val, par);}
               toyParametersLine->SetBinContent(1+par.getParameterIndex(), val);
             }
 
-            if( !draw ) toyParametersLine = nullptr;
+            // don't draw the throw line if none is valid
+            if( not draw ){ toyParametersLine = nullptr;}
           }
 
           auto yBounds = GenericToolbox::getYBounds({preFitErrorHist.get(), postFitErrorHist.get(), toyParametersLine.get()});
