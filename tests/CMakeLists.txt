@@ -28,10 +28,11 @@ add_test(
     COMMAND "sh" "-c" "(cd ${CMAKE_SOURCE_DIR}/tests && ./gundam-tests.sh ${GUNDAM_TESTS_ARGUMENT} -a ${CMAKE_BINARY_DIR}/Testing/gundam-tests.$(date +%Y-%m-%d-%H%M%S) )"
 )
 
-if( NOT SKIP_GOOGLE_TEST )
+if( WITH_GOOGLE_TEST )
   ## Compiled unit tests using GoogleTest.  These are only run if GTest
   ## is found.
   find_package(GTest QUIET)
+
   if(GTEST_FOUND)
     if( WITH_CACHE_MANAGER )
 
@@ -68,7 +69,7 @@ if( NOT SKIP_GOOGLE_TEST )
     endif( WITH_CACHE_MANAGER )
 
   else(GTEST_FOUND)
-    cmessage( FATAL_ERROR "Google test is not available. Use -D SKIP_GOOGLE_TEST=ON to skip it" )
+    cmessage( FATAL_ERROR "Google test is not available." )
   endif(GTEST_FOUND)
 
 endif()

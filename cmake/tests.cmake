@@ -1,10 +1,10 @@
 #######################################################################
 # Handle the testing infrastructure in the "tests" directory.  By
-# default, ENABLE_TESTS only enables the most basic testing.
+# default, WITH_TESTS only enables the most basic testing.
 #######################################################################
 
 
-if( ENABLE_TESTS )
+if( WITH_TESTS )
   message("")
   cmessage( WARNING "Defining tests...")
   include( CTest )
