@@ -130,24 +130,38 @@ void Propagator::buildDialCache(){
   }
 }
 void Propagator::propagateParameters(){
+  // Make sure the dial state is updated before reweighting and filling the
+  // histograms.  This has to be done before the GPU and CPU calculations, and
+  // should be shared for both.
+  if( _enableEigenToOrigInPropagate_ ){ _parManager_.convertEigenToOrig(); }
+  updateDialState();
+
 #ifdef GUNDAM_USING_CACHE_MANAGER
   bool usedCacheManager{false};
-  // Only real parameters are propagated on the spectra -> need to convert the eigen to original
-  if( _enableEigenToOrigInPropagate_ ){ _parManager_.convertEigenToOrig(); }
+  // Trigger the reweight on the GPU.  This will fill the histograms, but most
+  // of the time, leaves the event weights on the GPU.
   usedCacheManager = Cache::Manager::PropagateParameters();
   if( usedCacheManager and not Cache::Manager::isForceCpuCalculation() ){ return; }
 #endif
-  this->reweightEvents();
+
+  // Trigger the reweight on the CPU.  Override the dial update inside of
+  // reweight event, or the CPU code will decide that the update is already
+  // done.
+  this->reweightEvents(false);
   this->refillHistograms();
 }
-void Propagator::reweightEvents() {
+
+void Propagator::reweightEvents(bool updateDials) {
   // timer start/stop in scope
   auto s{reweightTimer.scopeTime()};
 
-  // Only real parameters are propagated on the spectra -> need to convert the eigen to original
-  if( _enableEigenToOrigInPropagate_ ){ _parManager_.convertEigenToOrig(); }
-
-  updateDialState();
+  if (updateDials) {
+    // Make sure the dial state is updated before pulling the trigger on the
+    // reweight.  will duplicate work when running with GPU
+    // isForceCpuCalculation is true.
+    if( _enableEigenToOrigInPropagate_ ){ _parManager_.convertEigenToOrig(); }
+    updateDialState();
+  }
 
   if( not _devSingleThreadReweight_ ){
     _threadPool_.runJob("Propagator::reweightEvents");

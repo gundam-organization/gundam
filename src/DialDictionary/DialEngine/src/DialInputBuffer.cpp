@@ -93,7 +93,7 @@ void DialInputBuffer::addParameterReference( const ParameterReference& parRefere
   auto& parRef = _inputParameterReferenceList_.back();
   parRef.bufferIndex = int(_inputParameterReferenceList_.size())-1;
 }
-std::string DialInputBuffer::getSummary() const{
+std::string DialInputBuffer::getSummary(bool shallow_) const{
   std::stringstream ss;
   ss << GenericToolbox::toString(_inputParameterReferenceList_, [&]( const ParameterReference& parRef_){
     std::stringstream ss;

@@ -16,6 +16,7 @@ option( WITH_GUNDAM_ROOT_APP "Build app gundamRoot." ON )
 option( WITH_CACHE_MANAGER "Enable compiling of the cache manager (required for GPU computing)." ON )
 option( WITH_CUDA_LIB "Enable CUDA language check (Cache::Manager requires a GPU if CUDA is found)." OFF )
 option( WITH_MINUIT2_MISSING "Allow MINUIT2 to be missing" OFF )
+option( WITH_PYTHON_INTERFACE "Compile the python interface modules" OFF )
 
 # compile helper
 option( YAMLCPP_DIR "Set custom path to yaml-cpp lib." OFF )
@@ -92,10 +93,10 @@ if( WITH_DOXYGEN )
 
     # note the option ALL which allows to build the docs together with the application
     add_custom_target( doxygen ALL
-        COMMAND ${DOXYGEN_EXECUTABLE} ${DOXYGEN_OUT}
-        WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
-        COMMENT "Generating API documentation with Doxygen"
-        VERBATIM )
+      COMMAND ${DOXYGEN_EXECUTABLE} ${DOXYGEN_OUT}
+      WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+      COMMENT "Generating API documentation with Doxygen"
+      VERBATIM )
   else()
     cmessage( FATAL_ERROR "Doxygen need to be installed to generate the doxygen documentation." )
   endif()

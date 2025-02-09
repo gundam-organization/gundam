@@ -103,7 +103,7 @@ std::string DialCollection::getSummary(bool shallow_){
     // print parameters
     for( auto& dialInterface : _dialInterfaceList_ ){
       if( not isEventByEvent() ){
-        ss << std::endl << "  " << dialInterface.getSummary();
+        ss << std::endl << "  " << dialInterface.getSummary(shallow_);
       }
     }
   }
@@ -514,17 +514,22 @@ bool DialCollection::initializeDialsWithTabulation(const JsonType& dialsDefiniti
   std::unique_ptr<TabulatedDialFactory> tabulated
       = std::make_unique<TabulatedDialFactory>(dialsDefinition_);
 
-  // Save the new object.
+  // Save the new object (the move releases the pointer).
   _dialCollectionData_.emplace_back(std::move(tabulated));
 
+  // Get the index of the new dial collection data entry.  This is "back()",
+  // but the index will be needed for the update closure, so use that instead.
+  int index = _dialCollectionData_.size()-1;
+
   for (const std::string& var :
-      getCollectionData<TabulatedDialFactory>()->getBinningVariables()) {
+       getCollectionData<TabulatedDialFactory>(index)->getBinningVariables()) {
     addExtraLeafName(var);
   }
 
   addUpdate(
-      [this]{getCollectionData<TabulatedDialFactory>()->updateTable(
-          getDialInputBufferList().front());
+      [index](DialCollection* dc){
+        dc->getCollectionData<TabulatedDialFactory>(index)
+        ->updateTable(dc->getDialInputBufferList().front());
       });
 
   return true;
@@ -794,12 +799,12 @@ JsonType DialCollection::fetchDialsDefinition(const JsonType &definitionsList_) 
 }
 
 void DialCollection::update() {
-  for (std::function<void(void)>& func : _dialCollectionCallbacks_) {
-    func();
+  for (std::function<void(DialCollection*)>& func : _dialCollectionCallbacks_) {
+    func(this);
   }
 }
 
-void DialCollection::addUpdate(std::function<void(void)> callback) {
+void DialCollection::addUpdate(std::function<void(DialCollection*)> callback) {
   _dialCollectionCallbacks_.emplace_back(callback);
 }
 

@@ -21,6 +21,7 @@ namespace JointProbability{
   public:
     [[nodiscard]] std::string getType() const override { return "BarlowBeestonBanff2022"; }
     [[nodiscard]] double eval(const SamplePair& samplePair_, int bin_) const override;
+    [[nodiscard]] double eval(double data_, double pred_, double err_, int bin_) const override;
 
     void createNominalMc(const Sample& modelSample_) const;
     void printConfiguration() const;
@@ -29,26 +30,31 @@ namespace JointProbability{
     bool throwIfInfLlh{true};
     bool allowZeroMcWhenZeroData{true};
     bool usePoissonLikelihood{false};
-    bool BBNoUpdateWeights{false}; // OA 2021 bug reimplementation
-    // OA2021 and BANFF fractional error limitation is only relevent with
-    // BBNoUpdateWeights is true, and is needed to reproduce bugs when it is
-    // true.  When BBNoUpdateWeights is false, the fractional error will
-    // naturally be limited to less than 100%.  Physically, the fractional
-    // uncertainty should be less than 100% since one MC event in a bin would
-    // have 100% fractional uncertainty [under the "Gaussian" approximation,
-    // so sqrt(1.0)/1.0].  The OA2021 behavior lets the fractional error grow,
-    // but the entire likelihood became discontinuous around a predicted value
-    // of 1E-16. Setting fractionalErrorLimit to 1E+19 matches OA2021 before
-    // the discontinuity.  The BANFF behavior has the likelihood failed around
-    // 1E-154.  Setting fractionalErrorLimit to 1E+150 matchs BANFF.  In both
-    // cases, the new likelihood behaves reasonably all the way to zero.
+    /// BANFF OA 2021 bug reimplementation -- Used to validate against the T2K
+    /// BANFF OA2021 fit.
+    bool BBNoUpdateWeights{false};
+    /// OA2021 and BANFF fractional error limitation is only relevent with
+    /// BBNoUpdateWeights is true, and is needed to reproduce bugs when it is
+    /// true.  When BBNoUpdateWeights is false, the fractional error will
+    /// naturally be limited to less than 100%.  Physically, the fractional
+    /// uncertainty should be less than 100% since one MC event in a bin would
+    /// have 100% fractional uncertainty [under the "Gaussian" approximation,
+    /// so sqrt(1.0)/1.0].  The OA2021 behavior lets the fractional error
+    /// grow, but the entire likelihood became discontinuous around a
+    /// predicted value of 1E-16. Setting fractionalErrorLimit to 1E+19
+    /// matches OA2021 before the discontinuity.  The BANFF behavior has the
+    /// likelihood failed around 1E-154.  Setting fractionalErrorLimit to
+    /// 1E+150 matchs BANFF.  In both cases, the new likelihood behaves
+    /// reasonably all the way to zero.
     double fractionalErrorLimit{1.0E+150};
-    // OA2021 bug reimplmentation (set to numeric_limits::min() to reproduce
-    // the bug).
+    /// BANFF OA2021 bug reimplmentation -- Used to validate against the T2K
+    /// BANFF OA2021 fit (set to numeric_limits::min() to reproduce the bug)
     double expectedValueMinimum{-1.};
 
-    mutable std::map<const Sample*, std::vector<double>> nomMcUncertList{}; // OA 2021 bug reimplementation
-    mutable GenericToolbox::NoCopyWrapper<std::mutex> _mutex_{}; // for creating the nomMC
+    /// OA 2021 bug reimplementation -- Used when BBNoUpdateWeights is true.
+    mutable std::map<const Sample*, std::vector<double>> nomMcUncertList{};
+    /// For creating the nomMC
+    mutable GenericToolbox::NoCopyWrapper<std::mutex> _mutex_{};
   };
 
   void BarlowBeestonBanff2022::configureImpl(){
@@ -76,14 +82,6 @@ namespace JointProbability{
       LogError << samplePair_.model->getName() << "/" << samplePair_.model->getHistogram().getBinContextList()[bin_].bin.getSummary() << ": predicting 0 rate in this bin -> llh not defined / inf" << std::endl;
     }
 
-    {
-      /// the first time we reach this point, we assume the predMC is at its nominal value
-      std::lock_guard<std::mutex> g(_mutex_);
-      if( not GenericToolbox::isIn((const Sample*) samplePair_.model, nomMcUncertList) ){ createNominalMc(*samplePair_.model); }
-    }
-
-    // it should exist past this point
-    auto& nomHistErr = nomMcUncertList[samplePair_.model];
     double mcuncert{0.0};
 
     // From OA2021_Eb branch -> BANFFBinnedSample::CalcLLRContrib
@@ -93,47 +91,50 @@ namespace JointProbability{
     // let the BBH make the sqrt
     // https://github.com/t2k-software/BANFF/blob/9140ec11bd74606c10ab4af9ec525352de119c06/src/BANFFSample/BANFFBinnedSample.cxx#L374
     if (BBNoUpdateWeights) {
+      {
+        // the first time we reach this point, we assume the predMC is at its
+        // nominal value
+        std::lock_guard<std::mutex> g(_mutex_);
+        if( not GenericToolbox::isIn((const Sample*) samplePair_.model, nomMcUncertList) ){ createNominalMc(*samplePair_.model); }
+      }
+
+      // it should exist past this point
+      auto& nomHistErr = nomMcUncertList[samplePair_.model];
+
       mcuncert = nomHistErr[bin_];
       mcuncert *= mcuncert;
 
-      if (not std::isfinite(mcuncert) or mcuncert < 0.0) {
-        if( throwIfInfLlh ){
-          LogError << "BBNoUpdateWeights mcuncert is not valid "
-                   << mcuncert
-                   << std::endl;
-          LogError << "nomMC bin " << bin_
-                   << " error is " << nomHistErr[bin_];
-
-          DEBUG_VAR(bin_);
-          DEBUG_VAR(mcuncert);
-          DEBUG_VAR(nomHistErr[bin_]);
-          DEBUG_VAR(nomHistErr.size());
-          DEBUG_VAR(nomHistErr.size());
-          DEBUG_VAR(GenericToolbox::toString(nomHistErr));
-
-          LogThrow("The mc uncertainty is not a usable number");
-        }
-        else{
-          return std::numeric_limits<double>::infinity();
-        }
-      }
     }
     else {
       mcuncert = samplePair_.model->getHistogram().getBinContentList()[bin_].sqrtSumSqWeights;
       mcuncert *= mcuncert;
+    }
 
-      if(not std::isfinite(mcuncert) or mcuncert < 0.0) {
-        if( throwIfInfLlh ){
-          LogError << "The mcuncert is not finite " << mcuncert << std::endl;
-          LogError << "predMC bin " << bin_
-                   << " error is " << samplePair_.model->getHistogram().getBinContentList()[bin_].sqrtSumSqWeights;
-          LogThrow("The mc uncertainty is not a usable number");
-        }
-        else{
-          return std::numeric_limits<double>::infinity();
-        }
+    if(not std::isfinite(mcuncert) or mcuncert < 0.0) {
+      if( throwIfInfLlh ){
+        LogError << "The mcuncert is not finite " << mcuncert << std::endl;
+        LogError << samplePair_.model->getName()
+                 << "/" << samplePair_.model->getHistogram().getBinContextList()[bin_].bin.getSummary()
+                 << std::endl;
+        LogError << " Bin number " << bin_
+                 << " data is " << samplePair_.data->getHistogram().getBinContentList()[bin_].sumWeights
+                 << " with prediction " << samplePair_.model->getHistogram().getBinContentList()[bin_].sumWeights
+                 << " +/- " << samplePair_.model->getHistogram().getBinContentList()[bin_].sqrtSumSqWeights
+                 << std::endl;
+        std::exit(EXIT_FAILURE);
+      }
+      else{
+        return std::numeric_limits<double>::infinity();
       }
     }
+
+    return eval(dataVal, predVal, mcuncert, bin_);
+  }
+
+  double BarlowBeestonBanff2022::eval(double data_, double pred_, double err_, int bin_) const {
+    double dataVal = data_;
+    double predVal = pred_;
+    double mcuncert = err_;
 
     // Add the (broken) expected value threshold that we saw in the old
     // likelihood. This is here to help understand the old behavior.
@@ -188,7 +189,7 @@ namespace JointProbability{
 
       // Solve for the positive beta
       double beta = (-1 * temp + sqrt(temp2)) / 2.;
-      newmc = predVal * beta;
+      newmc = std::max(predVal * beta, std::numeric_limits<double>::min());
       // And penalise the movement in beta relative the mc uncertainty
       penalty = (beta - 1) * (beta - 1) / (2 * fractional * fractional);
     }
@@ -201,11 +202,11 @@ namespace JointProbability{
       // equivalent to "dataVal == 0"
       stat = newmc;
     }
-    else if (newmc > std::numeric_limits<double>::epsilon()) {
+    else if (newmc > std::numeric_limits<double>::min()) {
       // The newMC value should not be a lot less than O(1), This protects
       // against small values (intentionally use epsilon() instead of min()
       // since this is relative to 1.0).
-      stat = newmc - dataVal + dataVal * TMath::Log(dataVal / newmc);
+      stat = newmc - dataVal + dataVal*(TMath::Log(dataVal)-TMath::Log(newmc));
     }
     else {
       // The mc predicted value is zero, and the data value is not zero.
@@ -214,46 +215,51 @@ namespace JointProbability{
                                   << "Data: " << dataVal
                                   << " / Barlow Beeston adjusted MC: " << newmc
                                   << std::endl;
+      const double mc = std::numeric_limits<double>::min();
+      stat = mc - dataVal + dataVal*(TMath::Log(dataVal) - TMath::Log(mc));
     }
 
-    double chisq = 0.0;
-    if ((predVal > 0.0) && (dataVal > 0.0)) GUNDAM_LIKELY_COMPILER_FLAG {
-      if (usePoissonLikelihood) GUNDAM_UNLIKELY_COMPILER_FLAG {
-        // Not quite safe, but not used much, so don't protect
-        chisq += 2.0*(predVal - dataVal + dataVal*TMath::Log( dataVal/predVal));
+    // Build the chisq value based on previous calculations.
+    double chisq =  2.0*stat;
+
+    // Possibly apply the Barlow-Beeston penalty.
+    if (not usePoissonLikelihood) chisq += 2.0 * penalty;
+
+    // Warn when the expected value for a bin is going to zero.
+    if (predVal <= 0.0
+        and dataVal < std::numeric_limits<double>::epsilon()) [[unlikely]] {
+      if( allowZeroMcWhenZeroData ) {
+        // Need to warn the user something is wrong with the binning
+        // definition, but they've asked to continue anyway.  This might
+        // indicate that more MC stat would be needed, or the binning needs to
+        // be reconsidered..
+        LogErrorOnce
+          << "Sample bin with no events in the data and MC bin."
+          << "This is an ill conditioned problem. Please check your inputs."
+          << std::endl;
       }
-      else GUNDAM_LIKELY_COMPILER_FLAG {
-        // Barlow-Beeston likelihood.
-        chisq += 2.0 * (stat + penalty);
-      }
-    }
-    else if( predVal > 0.0 ) {
-      if (usePoissonLikelihood) GUNDAM_UNLIKELY_COMPILER_FLAG {
-        chisq += 2.0*predVal;
-      }
-      else GUNDAM_LIKELY_COMPILER_FLAG {
-        // Barlow-Beeston likelihood
-        chisq += 2.0 * (stat + penalty);
-      }
-    }
-    else { // predVal == 0
-      if( allowZeroMcWhenZeroData and dataVal == 0 ){
-        // need to warn the user something is wrong with the binning definition
-        // This might indicate that more MC stat would be needed
-        LogAlertOnce << "allowZeroMcWhenZeroData=true: MC bin(s) with 0 as predicted value. "
-                     << "Data is also 0, null penalty is applied."
-                     << "This is an ill conditioned problem. Please check your inputs."
-                     << std::endl;
-        chisq = 0.;
-      }
-      else{
-        chisq = std::numeric_limits<double>::infinity();
+      else {
+        static int messageBrake = 1000;
+        if (messageBrake > 0) {
+          --messageBrake;
+          LogError
+            << "Ill conditioned statistical LLH --"
+            << " Data: " << dataVal
+            << " / MC: " << predVal
+            << " Adjusted MC: " << newmc
+            << " / Stat: " << stat
+            << " Penalty: " << penalty
+            << " Total ChiSq: " << chisq
+            << std::endl;
+          LogErrorOnce
+            << "Define allowZeroMcWhenZeroData in config to mute message"
+            << std::endl;
+        }
       }
     }
 
     if( throwIfInfLlh and not std::isfinite(chisq) ) GUNDAM_UNLIKELY_COMPILER_FLAG {
       LogError << "Infinite chi2: " << chisq << std::endl
-               << GET_VAR_NAME_VALUE(samplePair_.model->getName()) << std::endl
                << GET_VAR_NAME_VALUE(bin_) << std::endl
                << GET_VAR_NAME_VALUE(predVal) << std::endl
                << GET_VAR_NAME_VALUE(dataVal) << std::endl
@@ -300,7 +306,4 @@ namespace JointProbability{
   }
 
 }
-
-
-
 #endif //GUNDAM_BARLOW_BEESTON_BANFF_2022_H

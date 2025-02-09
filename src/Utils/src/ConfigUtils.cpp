@@ -133,7 +133,7 @@ namespace ConfigUtils {
   }
 
   // class impl
-  ConfigHandler::ConfigHandler(const std::string& filePath_){
+  void ConfigHandler::setConfig(const std::string& filePath_){
     if( GenericToolbox::hasExtension( filePath_, "root" ) ){
       LogInfo << "Extracting config file for fitter file: " << filePath_ << std::endl;
       LogThrowIf( not GenericToolbox::doesTFileIsValid(filePath_), "Invalid root file: " << filePath_ );

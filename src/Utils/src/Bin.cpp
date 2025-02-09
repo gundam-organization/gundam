@@ -45,7 +45,7 @@ bool Bin::Edges::isOverlapping( const Edges& other_) const{
 
   return false;
 }
-std::string Bin::Edges::getSummary() const {
+std::string Bin::Edges::getSummary(bool shallow_) const {
   std::stringstream ss;
   if( not this->varName.empty() ){ ss << this->varName << ": "; }
   ss << "[" << this->min;
@@ -175,14 +175,14 @@ std::vector<std::string> Bin::buildVariableNameList() const{
 }
 
 // Misc
-std::string Bin::getSummary() const{
+std::string Bin::getSummary(bool shallow_) const{
   std::stringstream ss;
 
   if( _binEdgesList_.empty() ) ss << "bin not set.";
   else{
     for( auto& edges : _binEdgesList_ ){
       if( edges.index != 0 ){ ss << ", "; }
-      ss << edges.getSummary();
+      ss << edges.getSummary(shallow_);
     }
   }
   return ss.str();
@@ -196,4 +196,3 @@ std::vector<double> Bin::generateBinTarget( const std::vector<std::string>& varN
   }
   return out;
 }
-

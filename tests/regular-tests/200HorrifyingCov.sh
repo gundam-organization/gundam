@@ -1,4 +1,9 @@
 #!/bin/bash
+#
+# Do a fit where two normalization parameters are have a 100% negative
+# correlation.  The priors for the normalization parameters are
+# uncorrelated.
+#
 
 # Set the base name for this test (should match the script name)
 BASE=200HorrifyingCov
