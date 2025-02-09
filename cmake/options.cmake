@@ -17,6 +17,8 @@ option( WITH_CACHE_MANAGER "Enable compiling of the cache manager (required for 
 option( WITH_CUDA_LIB "Enable CUDA language check (Cache::Manager requires a GPU if CUDA is found)." OFF )
 option( WITH_MINUIT2_MISSING "Allow MINUIT2 to be missing" OFF )
 option( WITH_PYTHON_INTERFACE "Compile the python interface modules" OFF )
+option( WITH_TESTS "Build CMake tests." ON )
+option( WITH_GOOGLE_TEST "Enables GoogleTest unit tests." OFF )
 
 # compile helper
 option( YAMLCPP_DIR "Set custom path to yaml-cpp lib." OFF )
@@ -24,10 +26,7 @@ option( YAMLCPP_DIR "Set custom path to yaml-cpp lib." OFF )
 # dev options
 option( USE_STATIC_LINKS "Use static link of libraries and apps instead of shared." OFF )
 option( CXX_WARNINGS "Enable most C++ warning flags." ON )
-option( CXX_MARCH_FLAG "Enable cpu architecture specific optimisations." OFF )
-option( CMAKE_CXX_EXTENSIONS "Enable GNU extensions to C++ language (-std=gnu++14)." OFF )
-option( ENABLE_TESTS "Build CMake tests (optionally uses googletest)." ON )
-option( SKIP_GOOGLE_TEST "Skip GTest unit tests (other tests enabled)." ON )
+
 
 # Reading options
 ##################
@@ -112,4 +111,3 @@ if(WITH_PYTHON_INTERFACE)
   set( PYBIND11_FINDPYTHON ON )
   find_package( pybind11 REQUIRED )
 endif()
-
