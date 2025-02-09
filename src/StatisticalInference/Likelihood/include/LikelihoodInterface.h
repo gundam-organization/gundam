@@ -76,6 +76,7 @@ public:
   [[nodiscard]] const std::vector<DatasetDefinition>& getDatasetList() const { return _datasetList_; }
   [[nodiscard]] const std::vector<SamplePair>& getSamplePairList() const { return _samplePairList_; }
   [[nodiscard]] const Buffer& getBuffer() const { return _buffer_; }
+  [[nodiscard]] const DataType& getDataType() const { return _dataType_; }
 
   // mutable getters
   Buffer& getBuffer(){ return _buffer_; }
