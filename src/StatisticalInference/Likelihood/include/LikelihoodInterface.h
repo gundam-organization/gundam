@@ -64,7 +64,6 @@ public:
   void setToyParameterInjector(const JsonType& toyParameterInjector_){ _toyParameterInjector_ = toyParameterInjector_; }
 
   // const getters
-  [[nodiscard]] bool isThrowAsimovToyParameters() const{ return _throwAsimovToyParameters_; }
   [[nodiscard]] int getNbParameters() const{ return _nbParameters_; }
   [[nodiscard]] int getNbSampleBins() const{ return _nbSampleBins_; }
   [[nodiscard]] double getLastLikelihood() const{ return _buffer_.totalLikelihood; }
@@ -120,7 +119,6 @@ protected:
 private:
   // parameters
   bool _forceAsimovData_{false};
-  bool _throwAsimovToyParameters_{true};
   bool _enableStatThrowInToys_{true};
   bool _gaussStatThrowInToys_{false};
   bool _enableEventMcThrow_{true};
