@@ -196,7 +196,7 @@ void RootMinimizer::minimize(){
     _rootMinimizer_->SetStrategy(0);
 
     getMonitor().minimizerTitle = _minimizerType_ + "/" + "Simplex";
-    getMonitor().stateTitleMonitor = "Running Simplex...";
+    getMonitor().stateTitleMonitor = "Running Simplex";
 
     // SIMPLEX
     getMonitor().isEnabled = true;
@@ -226,7 +226,7 @@ void RootMinimizer::minimize(){
   }
 
   getMonitor().minimizerTitle = _minimizerType_ + "/" + _minimizerAlgo_;
-  getMonitor().stateTitleMonitor = "Running " + _rootMinimizer_->Options().MinimizerAlgorithm() + "...";
+  getMonitor().stateTitleMonitor = "Running " + _rootMinimizer_->Options().MinimizerAlgorithm();
 
   getMonitor().isEnabled = true;
   // dumpFitParameterSettings(); // Dump internal ROOT::Minimizer info
@@ -409,7 +409,7 @@ void RootMinimizer::calcErrors(){
     updateCacheToBestfitPoint();
 
     getMonitor().minimizerTitle = _minimizerType_ + "/" + _errorAlgo_;
-    getMonitor().stateTitleMonitor = "Running HESSE...";
+    getMonitor().stateTitleMonitor = "Running HESSE";
 
     getMonitor().isEnabled = true;
     _fitHasConverged_ = _rootMinimizer_->Hesse();

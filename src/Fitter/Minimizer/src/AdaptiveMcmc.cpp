@@ -907,7 +907,7 @@ void AdaptiveMcmc::minimize() {
   outputTree->Branch("Models",&_saveModel_);
   outputTree->Branch("ModelUncertainty",&_saveUncertainty_);
 
-  getMonitor().stateTitleMonitor = "Running MCMC chain...";
+  getMonitor().stateTitleMonitor = "Running MCMC chain";
   getMonitor().minimizerTitle = _algorithmName_ + "/" + _proposalName_;
 
   // Run a chain.

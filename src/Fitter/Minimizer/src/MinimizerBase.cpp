@@ -165,10 +165,10 @@ double MinimizerBase::evalFit( const double* parArray_ ){
 
       std::stringstream ssHeader;
       ssHeader << std::endl << __METHOD_NAME__ << ": call #" << _monitor_.nbEvalLikelihoodCalls;
-      ssHeader << std::endl << _monitor_.stateTitleMonitor << " -> nb fit parameters: " << nbValidPars;
+      ssHeader << std::endl << _monitor_.stateTitleMonitor << " / Nb of parameters to fit: " << nbValidPars;
       ssHeader << std::endl << "RAM: " << GenericToolbox::parseSizeUnits(double(GenericToolbox::getProcessMemoryUsage()));
       double cpuPercent = GenericToolbox::getCpuUsageByProcess();
-      ssHeader << " / CPU: " << cpuPercent << "% (" << cpuPercent / GundamGlobals::getNbCpuThreads() << "% efficiency)";
+      ssHeader << " / CPU: " << cpuPercent << "% / " << cpuPercent / GundamGlobals::getNbCpuThreads() << "% efficiency";
       ssHeader << std::endl << "Avg log-likelihood computation time: " << _monitor_.evalLlhTimer;
       ssHeader << std::endl;
 
