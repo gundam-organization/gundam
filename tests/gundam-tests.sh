@@ -103,13 +103,13 @@ echo ' See gundam-tests.sh for more usage documentation.'
 TESTS="fast-tests"
 
 # Handle any input arguments
-if [[ -t 0 && -t 1 ]]; then
-    echo "Running in interactive mode"
-    TEMP=$(getopt "$0" "$@")
-else
-    echo "Running in non-interactive mode"
+#if [[ -t 0 && -t 1 ]]; then
+#    echo "Running in interactive mode"
+#    TEMP=$(getopt "$0" "$@")
+#else
+#    echo "Running in non-interactive mode"
     TEMP=$(getopt -o 'afres' -n "$0" -- "$@")
-fi
+#fi
 
 if [ $? -ne 0 ]; then
     echo "Error ..."
