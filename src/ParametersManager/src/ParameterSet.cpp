@@ -249,7 +249,7 @@ void ParameterSet::processCovarianceMatrix(){
     double eigenTotal = _eigenValues_->Sum();
 
     _inverseCovarianceMatrix_ = std::make_shared<TMatrixD>(_priorCovarianceMatrix_->GetNrows(), _priorCovarianceMatrix_->GetNrows());
-    _projectorMatrix_                 = std::make_shared<TMatrixD>(_priorCovarianceMatrix_->GetNrows(), _priorCovarianceMatrix_->GetNrows());
+    _projectorMatrix_         = std::make_shared<TMatrixD>(_priorCovarianceMatrix_->GetNrows(), _priorCovarianceMatrix_->GetNrows());
 
     auto eigenState = std::make_unique<TVectorD>(_eigenValues_->GetNrows());
 

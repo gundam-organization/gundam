@@ -194,6 +194,10 @@ void FitterEngine::initializeImpl(){
         GenericToolbox::toCorrelationMatrix(parSet.getPriorCovarianceMatrix().get()),
         "correlationMatrix"
     );
+    GenericToolbox::writeInTFileWithObjTypeExt(
+        GenericToolbox::mkdirTFile( _saveDir_, saveFolder ),
+        parSet.getInverseCovarianceMatrix().get(), "invCovarianceMatrix"
+    );
 
     auto parsSaveFolder = GenericToolbox::joinPath( saveFolder, "parameters" );
     for( auto& par : parSet.getParameterList() ){
