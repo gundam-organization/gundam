@@ -103,7 +103,14 @@ echo ' See gundam-tests.sh for more usage documentation.'
 TESTS="fast-tests"
 
 # Handle any input arguments
-  TEMP=$(getopt -o 'afres' -n "$0" -- "$@")
+if [[ -t 0 && -t 1 ]]; then
+    echo "Running in interactive mode"
+    TEMP=$(getopt "$0" "$@")
+else
+    echo "Running in non-interactive mode"
+    TEMP=$(getopt -o 'afres' -n "$0" -- "$@")
+fi
+
 if [ $? -ne 0 ]; then
     echo "Error ..."
     exit 1
@@ -260,7 +267,7 @@ for d in ${TESTS}; do
     done
 done
 
-if [ ${#EXPECTED} -gt 0 ]; then
+if [ ${#EXPECTED[@]} -gt 0 ]; then
     echo
     echo Expected Failures:
     for i in ${EXPECTED}; do
@@ -268,7 +275,7 @@ if [ ${#EXPECTED} -gt 0 ]; then
     done
 fi
 
-if [ ${#FAILURES} -gt 0 ]; then
+if [ ${#FAILURES[@]} -gt 0 ]; then
     echo
     echo Failed Jobs:
     for i in ${FAILURES}; do
