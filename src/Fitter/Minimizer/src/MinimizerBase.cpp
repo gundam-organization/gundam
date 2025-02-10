@@ -183,12 +183,21 @@ double MinimizerBase::evalFit( const double* parArray_ ){
 
       // When gradient descent base minimizer probe a point toward the
       // minimum, every parameter get updated
-      bool isGradientDescentStep =
-          std::all_of(
+      size_t nbValidPars = std::count_if(
               _minimizerParameterPtrList_.begin(), _minimizerParameterPtrList_.end(),
-              [](const Parameter* par_){
-                return ( par_->gotUpdated() or par_->isFixed() or not par_->isEnabled() );
-              } );
+              [](const Parameter* par_){ return not ( par_->isFixed() or not par_->isEnabled() ); } );
+      size_t nParUpdated = std::count_if(
+              _minimizerParameterPtrList_.begin(), _minimizerParameterPtrList_.end(),
+              [](const Parameter* par_){ return par_->gotUpdated(); } );
+
+      bool isGradientDescentStep = (nParUpdated == nbValidPars);
+
+      if( nParUpdated >= 5 ) {
+        // It's a partial gradient step (should be more than 5 since HESSE can change 4 params at a time)
+        // Some parameters can be left unchanged by the minimizer: could indicate some problems in the parametrization
+        isGradientDescentStep = true;
+      }
+
       if( isGradientDescentStep or gradient.stepPointList.empty() ){
 
         if( gradient.stepPointList.empty() ){
@@ -202,7 +211,9 @@ double MinimizerBase::evalFit( const double* parArray_ ){
             gradient.fillLastStep( this );
           }
           else{
-            LogWarning << "Gradient step detected at iteration #" << _monitor_.nbEvalLikelihoodCalls << ": ";
+            LogWarning << "Gradient step detected at iteration #" << _monitor_.nbEvalLikelihoodCalls;
+            if(nParUpdated != nbValidPars){ LogWarning << " (PARTIAL: " << nParUpdated << "/" << nbValidPars << ")"; }
+            LogWarning << ": ";
             gradient.addStep( this );
           }
         }
@@ -217,10 +228,13 @@ double MinimizerBase::evalFit( const double* parArray_ ){
 
       _monitor_.iterationCounterClock.count( _monitor_.nbEvalLikelihoodCalls );
 
+      size_t nbValidPars = std::count_if(
+              _minimizerParameterPtrList_.begin(), _minimizerParameterPtrList_.end(),
+              [](const Parameter* par_){ return not ( par_->isFixed() or not par_->isEnabled() ); } );
+
       std::stringstream ssHeader;
       ssHeader << std::endl << __METHOD_NAME__ << ": call #" << _monitor_.nbEvalLikelihoodCalls;
-      ssHeader << std::endl << _monitor_.stateTitleMonitor;
-//    ssHeader << std::endl << "Target EDM: " << getMinimizer().get;
+      ssHeader << std::endl << _monitor_.stateTitleMonitor << " -> nb fit parameters: " << nbValidPars;
       ssHeader << std::endl << "RAM: " << GenericToolbox::parseSizeUnits(double(GenericToolbox::getProcessMemoryUsage()));
       double cpuPercent = GenericToolbox::getCpuUsageByProcess();
       ssHeader << " / CPU: " << cpuPercent << "% (" << cpuPercent / GundamGlobals::getNbCpuThreads() << "% efficiency)";
