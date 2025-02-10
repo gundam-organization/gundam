@@ -191,7 +191,8 @@ void FitterEngine::initializeImpl(){
     );
     GenericToolbox::writeInTFileWithObjTypeExt(
         GenericToolbox::mkdirTFile(_saveDir_, saveFolder ),
-        parSet.getPriorCorrelationMatrix().get(), "correlationMatrix"
+        GenericToolbox::toCorrelationMatrix(parSet.getPriorCovarianceMatrix().get()),
+        "correlationMatrix"
     );
 
     auto parsSaveFolder = GenericToolbox::joinPath( saveFolder, "parameters" );

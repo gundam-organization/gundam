@@ -232,9 +232,7 @@ int main(int argc, char** argv){
       LogScopeIndent;
 
       RootUtils::ObjectReader::readObject<TNamed>(f.get(), GenericToolbox::joinPath(pathPreFit, "llhState_TNamed"), [&](TNamed* injectorStr){
-        if( clParser.isOptionTriggered("verbose") ){
-          LogInfo << blueLightText << "Pre-fit Likelihood state: " << resetColor << injectorStr->GetTitle() << std::endl;
-        }
+        LogInfo << blueLightText << "Pre-fit Likelihood state: " << resetColor << injectorStr->GetTitle() << std::endl;
         if( clParser.isOptionTriggered("extractDataToDisk") ){
           auto outSubDir{GenericToolbox::joinPath( outDir, pathPreFit)};
           if( not GenericToolbox::isDir( outSubDir ) ){ GenericToolbox::mkdir( outSubDir ); }
