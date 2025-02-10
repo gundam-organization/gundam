@@ -17,6 +17,11 @@ endif()
 cmessage( STATUS "CMAKE_INSTALL_PREFIX: \"${CMAKE_INSTALL_PREFIX}\"")
 
 
+# disable RPATH handling by CMake.
+# Binaries and libs should be set manually (check the tutorial)
+set(CMAKE_SKIP_INSTALL_RPATH TRUE)
+
+
 if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU" )
   if(CMAKE_CXX_COMPILER_VERSION VERSION_LESS 4.8.5)
     cmessage(STATUS "Detected GCC version: ${CMAKE_CXX_COMPILER_VERSION}")

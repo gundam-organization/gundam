@@ -14,8 +14,12 @@ public:
     ~Tabulated() = default;
     Tabulated() = delete;
     Tabulated(const std::vector<double>* table_, int index_, double fraction_,
-        const std::string& options_="")
-        : _table_{table_}, _fraction_{(float) fraction_}, _index_{index_} {};
+              const std::string& options_="")
+        : _table_{table_}, _fraction_{(float) fraction_}, _index_{index_} {
+#ifdef TABULATED_DEBUG_DIAL
+        _options_ = options_;
+#endif
+    };
 
     [[nodiscard]] std::unique_ptr<DialBase> clone() const override { return std::make_unique<Tabulated>(*this); }
     [[nodiscard]] std::string getDialTypeName() const override { return {"Tabulated"}; }
@@ -28,6 +32,12 @@ public:
     const std::vector<double>* getTable() const { return _table_; }
     int getIndex() const { return _index_; }
     double getFraction() const { return _fraction_; }
+
+#ifdef TABULATED_DEBUG_DIAL
+    [[nodiscard]] virtual std::string getSummary() const override {
+        return _options_;
+    };
+#endif
 
 private:
     // A pointer to the table being used.  The table is owned by the
@@ -45,5 +55,9 @@ private:
 
     // The precalculated point in the table to use for interpolation.
     int _index_{0};
+
+#ifdef TABULATED_DEBUG_DIAL
+    std::string _options_;
+#endif
 };
 #endif //GUNDAM_TABULATED_H

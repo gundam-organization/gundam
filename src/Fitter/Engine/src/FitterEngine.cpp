@@ -16,10 +16,6 @@
 #include "GenericToolbox.Root.h"
 #include "Logger.h"
 
-#include <Math/Factory.h>
-#include "TGraph.h"
-#include "TLegend.h"
-
 #include <cmath>
 #include <memory>
 
@@ -112,7 +108,6 @@ void FitterEngine::configureImpl(){
 }
 void FitterEngine::initializeImpl(){
   LogThrowIf(_config_.empty(), "Config is not set.");
-  LogThrowIf(_saveDir_== nullptr);
 
   if( GundamGlobals::isLightOutputMode() ){
     // TODO: this check should be more universal
@@ -125,7 +120,7 @@ void FitterEngine::initializeImpl(){
   _parameterScanner_.setLikelihoodInterfacePtr( &getLikelihoodInterface() );
   _parameterScanner_.initialize();
 
-  if( getLikelihoodInterface().isThrowAsimovToyParameters() ){
+  if( _likelihoodInterface_.getDataType() == LikelihoodInterface::DataType::Toy ){
     LogInfo << "Writing throws in TTree..." << std::endl;
     auto* throwsTree = new TTree("throws", "throws");
 
@@ -196,7 +191,12 @@ void FitterEngine::initializeImpl(){
     );
     GenericToolbox::writeInTFileWithObjTypeExt(
         GenericToolbox::mkdirTFile(_saveDir_, saveFolder ),
-        parSet.getPriorCorrelationMatrix().get(), "correlationMatrix"
+        GenericToolbox::toCorrelationMatrix(parSet.getPriorCovarianceMatrix().get()),
+        "correlationMatrix"
+    );
+    GenericToolbox::writeInTFileWithObjTypeExt(
+        GenericToolbox::mkdirTFile( _saveDir_, saveFolder ),
+        parSet.getInverseCovarianceMatrix().get(), "invCovarianceMatrix"
     );
 
     auto parsSaveFolder = GenericToolbox::joinPath( saveFolder, "parameters" );
@@ -354,6 +354,9 @@ void FitterEngine::fit(){
 
   LogInfo << "Minimizing LLH..." << std::endl;
   this->_minimizer_->minimize();
+
+  // re-evaluating since the minimizer could have not triggered an eval of the llh
+  getLikelihoodInterface().propagateAndEvalLikelihood();
 
 #ifdef GUNDAM_USING_CACHE_MANAGER
   if( Cache::Manager::IsBuilt() ){
