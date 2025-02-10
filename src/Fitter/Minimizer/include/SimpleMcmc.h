@@ -8,6 +8,8 @@
 #include "ParameterSet.h"
 #include "MinimizerBase.h"
 
+#include "ConfigurationValue.h"
+
 #include "GenericToolbox.Utils.h"
 #include "GenericToolbox.Time.h"
 
@@ -77,150 +79,177 @@ private:
   /// "4" -- require in the physical range
   int _validFlags_{7};
 
+  /// The basic algorithm used.  The only implemented algorithm is the
+  /// metropolis step, but this may be extended to support Gibbs and other
+  /// algorithms (Gibbs needs to know the conditional probabilities, which we
+  /// will probably never know).
   std::string _algorithmName_{"metropolis"};
+
+  /// The type of proposal used by the MCMC algorithm. The currently available
+  /// proposals are "adaptive", and "fixed".
   std::string _proposalName_{"not-set"};
+
+  /// The name of the output tree in the file.  While it can be changed, you
+  /// probably shouldn't touch this.
   std::string _outTreeName_{"MCMC"};
 
-  // Define what sort of validity the parameters have to have for a finite
-  // likelihood.  The "range" value means that the parameter needs to be
-  // between the allowed minimum and maximum values for the parameter.  The
-  // "mirror" value means that the parameter needs to be between the mirror
-  // bounds too.
+  /// Define what sort of validity the parameters have to have for a finite
+  /// likelihood.  The "range" value means that the parameter needs to be
+  /// between the allowed minimum and maximum values for the parameter.  The
+  /// "mirror" value means that the parameter needs to be between the mirror
+  /// bounds too.
   std::string _likelihoodValidity_{"range,mirror,physical"};
 
-  //Choose the start point of MCMC is a random point (true) or the prior point (false).
-  bool _randomStart_{false};
+  /// Choose the start point of MCMC is a random point (true) or the prior point
+  /// (false).
+  ConfigurationValue<bool> _randomStart_;
 
-  // Save or dump the raw (fitter space) points.  This can save about half the
-  // output file space.  About the only time these would ever need to be saved
-  // is during a burn-in run when the proposal covariance is being tuned.
+  /// Save or dump the raw (fitter space) points.  This can save about half the
+  /// output file space.  About the only time these would ever need to be saved
+  /// is during a burn-in run when the proposal covariance is being tuned.
   bool _saveRawSteps_{false};
 
-  // The number of burn-in cycles to use.
+  /// The number of burn-in cycles to use.
   int _burninCycles_{0};
 
-  // The number of cycles to dump during burn-in
+  /// The number of cycles to dump during burn-in
   int _burninResets_{0};
 
-  // The length of each burn-in cycle
+  /// The length of each burn-in cycle
   int _burninSteps_{10000};
 
-  // Save the burnin (true) or dump it (false)
+  /// Save the burnin (true) or dump it (false)
   bool _saveBurnin_{true};
 
-  // The number of run cycles to use (each cycle will have _steps_ steps.
+  /// The number of run cycles to use (each cycle will have _steps_ steps.
   int _cycles_{1};
 
-  // The number of steps in each run cycle.
-  int _steps_{10000};
+  /// The number of steps in each run cycle.
+  ConfigurationValue<int> _steps_{10000};
 
-  // The model for the likelihood takes up quite a bit of space, so it should
-  // NOT be saved most of the time.  The _modelStride_ sets the number of
-  // steps between when the model is saved to the output file.  The model is a
-  // copy of the predicted sample histogram and can be used to calculate the
-  // posterior predictive p-value.  The stride should be large(ish) compared
-  // to the autocorrelation lag, or zero (if not saving the model).
-  int _modelStride_{5000};
+  /// The model for the likelihood takes up quite a bit of space, so it should
+  /// NOT be saved most of the time.  The _modelStride_ sets the number of
+  /// steps between when the model is saved to the output file.  The model is a
+  /// copy of the predicted sample histogram and can be used to calculate the
+  /// posterior predictive p-value.  The stride should be large(ish) compared
+  /// to the autocorrelation lag, or zero (if not saving the model).
+  ConfigurationValue<int> _modelStride_{5000};
 
   //////////////////////////////////////////
   // Parameters for the adaptive stepper.
 
-  // An input file name that contains a chain.  This causes the previous state
-  // to be restored.  If the state is restored, then the burn-in will be
-  // skipped.
+  /// An input file name that contains a chain.  This causes the previous state
+  /// to be restored.  If the state is restored, then the burn-in will be
+  /// skipped.
   std::string _adaptiveRestore_{"none"};
 
-  // An input file name that contains a TH2D with the covariance matrix that
-  // will be used by the default proposal distribution.  If it's provided, it
-  // will usually be the result of a previous MINUIT asimov fit.
+  /// An input file name that contains a TH2D with the covariance matrix that
+  /// will be used by the default proposal distribution.  If it's provided, it
+  /// will usually be the result of a previous MINUIT asimov fit.
   std::string _adaptiveCovFile_{"none"};
 
-  // The name of a TH2D with a covariance matrix describing the proposal
-  // distribution.  The default value is where GUNDAM puts the covariance for
-  // from MINUIT.  If decomposition was used during the fit, this will be in
-  // the decomposed space.
-  std::string _adaptiveCovName_{"FitterEngine/postFit/Hesse/hessian/postfitCovariance_TH2D"};
+  /// The name of a TH2D with a covariance matrix describing the proposal
+  /// distribution.  The default value is where GUNDAM puts the covariance for
+  /// from MINUIT.  If decomposition was used during the fit, this will be in
+  /// the decomposed space.
+  std::string _adaptiveCovName_{
+    "FitterEngine/postFit/Hesse/hessian/postfitCovariance_TH2D"
+  };
 
-  // The number of effective trials that the input covariance will count for.
-  // This should typically be about 0.5*N^2 where N is the dimension of the
-  // covariance.  That works out to the approximate number of function
-  // calculations that were used to estimate the covariance.  The default
-  // value of zero triggers the interface to make it's own estimate.
+  /// The number of effective trials that the input covariance will count for.
+  /// This should typically be about 0.5*N^2 where N is the dimension of the
+  /// covariance.  That works out to the approximate number of function
+  /// calculations that were used to estimate the covariance.  The default
+  /// value of zero triggers the interface to make it's own estimate.
   double _adaptiveCovTrials_{500000.0};
 
-  // Freeze the burn-in step after this many cycles.
+  /// Freeze the burn-in step after this many cycles.
   int _burninFreezeAfter_{1000000000}; // Never freeze except by request
 
-  // The window to calculate the covariance during burn-in
+  /// The window to calculate the covariance during burn-in
   int _burninCovWindow_{1000000};
 
-  // The amount of deweighting during burning updates.
+  /// The amount of deweighting during burning updates.
   double _burninCovDeweighting_{0.0};
 
-  // The acceptance window during burn-in.
+  /// The acceptance window during burn-in.
   int _burninWindow_{1000};
 
-  // Freeze the step after this many cycles by fixing the `sigma` parameter.
-  // the proposal will be update when the state is restore, the sigma should
-  // be adjusted when the state is restore, or the acceptance will generally
-  // increase.  The default is one greater than _adaptiveFreezeCorrelations_
+  /// Freeze the step after this many cycles by fixing the `sigma` parameter.
+  /// the proposal will be update when the state is restore, the sigma should
+  /// be adjusted when the state is restore, or the acceptance will generally
+  /// increase.  The default is one greater than _adaptiveFreezeCorrelations_
   int _adaptiveFreezeAfter_{0};
 
-  // Stop updating the running covariance after this many cycles.
-  int _adaptiveFreezeCorrelations_{100000000}; // Default: Never freeze
+  /// Stop updating the running covariance after this many cycles.
+  int _adaptiveFreezeCorrelationsAfter_{100000000}; // Default: Never freeze
 
-  // The window to calculate the covariance during normal chains.
-  int _adaptiveCovWindow_{1000000};
+  /// Control whether the step is updated during an adaptive cycle.
+  ConfigurationValue<bool> _adaptiveFreezeStep_{false};
 
-  // The covariance deweighting while the chain is running.  This should
-  // usually be left at zero so the entire chain history is used after an
-  // update and more recent points don't get a heavier weight (within the
-  // covariance window).
-  double _adaptiveCovDeweighting_{0.0};
+  /// Control whether the covariance is updated during an adaptive cycle.
+  ConfigurationValue<bool> _adaptiveFreezeCov_{false};
 
-  // The window used to calculate the current acceptance value.
-  int _adaptiveWindow_{1000};
+  /// Control whether the covariance should be reset to the value set during
+  /// configuration.
+  ConfigurationValue<bool> _adaptiveResetCov_{false};
+
+  /// The window to calculate the covariance during normal chains.
+  ConfigurationValue<int> _adaptiveCovWindow_{1000000};
+
+  /// The covariance deweighting while the chain is running.  This should
+  /// usually be left at zero so the entire chain history is used after an
+  /// update and more recent points don't get a heavier weight (within the
+  /// covariance window).
+  ConfigurationValue<double> _adaptiveCovDeweighting_{0.0};
+
+  /// The window used to calculate the current acceptance value.
+  ConfigurationValue<int> _adaptiveWindow_{1000};
+
+  /// The acceptance for steps to be used.  The valid values are 0)
+  /// metropolis, 1) downhill-only, and 2) accept every step.
+  ConfigurationValue<int> _adaptiveAcceptanceAlgorithm_{0};
 
   //////////////////////////////////////////
   // Parameters for the simple stepper
 
-  // The "sigma" of the Gaussian along each axis for the simple step.
+  /// The "sigma" of the Gaussian along each axis for the simple step.
   double _simpleSigma_{0.01};
 
   //////////////////////////////////////////
   // Manage the running of the MCMC
 
-  // The full set of parameter values that are associated with the accepted
-  // point
+  /// The full set of parameter values that are associated with the accepted
+  /// point
   std::vector<float> _point_;
 
-  // The predicted values from the reweighted MC (histogram) for the last
-  // accepted step.
+  /// The predicted values from the reweighted MC (histogram) for the last
+  /// accepted step.
   std::vector<float> _model_;
 
-  // The predicted values from the reweighted MC (histogram) to be saved to
-  // the output file. This will often be empty to reduce the size of the
-  // output file.
+  /// The predicted values from the reweighted MC (histogram) to be saved to
+  /// the output file. This will often be empty to reduce the size of the
+  /// output file.
   std::vector<float> _saveModel_;
 
-  // The uncertainty for the predicted values from the reweighted MC
-  // (histogram) for the last accepted step.
+  /// The uncertainty for the predicted values from the reweighted MC
+  /// (histogram) for the last accepted step.
   std::vector<float> _uncertainty_;
 
-  // The uncertainty for the predicted values from the MC (histogram) to be
-  // saved to the output file. This will often be empty to reduce the size of
-  // the output file.
+  /// The uncertainty for the predicted values from the MC (histogram) to be
+  /// saved to the output file. This will often be empty to reduce the size of
+  /// the output file.
   std::vector<float> _saveUncertainty_;
 
-  // The statistical part of the likelihood
+  /// The statistical part of the likelihood
   float _llhStatistical_{0.0};
 
-  // The penalty part of the likelihood
+  /// The penalty part of the likelihood
   float _llhPenalty_{0.0};
 
-  // Fill the point that will be saved to the output tree with the current set
-  // of parameters.  If fillModel is true, this will also fill the model of
-  // the expected data for this set of parametrs.
+  /// Fill the point that will be saved to the output tree with the current set
+  /// of parameters.  If fillModel is true, this will also fill the model of
+  /// the expected data for this set of parametrs.
   void fillPoint(bool fillModel = true);
 
   /// A local proxy so the likelihood uses a ROOT::Math::Functor provided by
@@ -231,10 +260,13 @@ private:
   /// mcmc.GetLogLikelihood().functor = getLikelihoodInterface().getFunctor()
   ///
   struct PrivateProxyLikelihood {
-    /// A functor that can be called by Minuit or anybody else.  This wraps
-    /// evalFit.
+    /// A functor that can be called by Minuit or anybody else.  This usually
+    /// wraps evalFit.
     std::unique_ptr<ROOT::Math::Functor> functor{};
+    /// An internal variable to copy the TSimpleMCMC point into.  This matches
+    /// what the functor is expecting.
     std::vector<double> x;
+    /// This is what TSimpleMCMC will see.
     double operator() (const sMCMC::Vector& point) {
       LogThrowIf(functor == nullptr, "Functor is not initialized");
       // Copy the point into a local vector since there is no guarrantee that
@@ -249,22 +281,36 @@ private:
     }
   };
 
-  ///////////////////////////////////////////////////////////////////
-  // The different MCMC proposals have different idiosyncrasies and need
-  // slightly different handling to have the chain become (quickly) stable.
-  // Rather than trying to over-generalize (and fight reality), these methods
-  // handle the differences.  Notice that the actual "chain" code is very
-  // similar.
+  /// Restore the configuration to what was setup in the YAML file
+  void restoreConfiguration();
 
-  /// The implementation with a fixed step is used.  This is mostly an
-  /// example of how to setup an alternate stepping proposal.
-  typedef sMCMC::TSimpleMCMC<PrivateProxyLikelihood,sMCMC::TProposeSimpleStep> FixedStepMCMC;
+  ///////////////////////////////////////////////////////////////////
+  // Handle the different stepper special cases.
+
+  /// TSimpleMCMC class for the FixedStepMCMC.
+  typedef sMCMC::TSimpleMCMC<PrivateProxyLikelihood,
+                             sMCMC::TProposeSimpleStep> FixedStepMCMC;
+
+  /// The implementation with a fixed step is used.  This is mostly an example
+  /// of how to setup an alternate stepping proposal. The different MCMC
+  /// proposals have different idiosyncrasies and need slightly different
+  /// handling to have the chain become (quickly) stable.  Rather than
+  /// trying to over-generalize (and fight reality), these methods handle
+  /// the differences.  Notice that the actual "chain" code is very
+  /// similar.
   void fixedSetupAndRun(FixedStepMCMC& mcmc);
+
+  /// TSimpleMCMC class for the AdaptiveStepMCMC.
+  typedef sMCMC::TSimpleMCMC<PrivateProxyLikelihood,
+                             sMCMC::TProposeAdaptiveStep> AdaptiveStepMCMC;
 
   /// The implementation when the adaptive step is used.  This is the default
   /// proposal for TSimpleMCMC, but is also dangerous for "unpleasant"
-  /// likelihoods that have a lot of correlations between parameters.
-  typedef sMCMC::TSimpleMCMC<PrivateProxyLikelihood,sMCMC::TProposeAdaptiveStep> AdaptiveStepMCMC;
+  /// likelihoods that have a lot of correlations between parameters. The
+  /// different MCMC proposals have different idiosyncrasies and need slightly
+  /// different handling to have the chain become (quickly) stable.  Rather
+  /// than trying to over-generalize (and fight reality), these methods handle
+  /// the differences.  Notice that the actual "chain" code is very similar.
   void adaptiveSetupAndRun(AdaptiveStepMCMC& mcmc);
 
   /////////////////////////////////////////////////////////////////
@@ -284,23 +330,26 @@ private:
                                       const std::string& histName);
 
   /// Set the default proposal based on the FitParameter values and steps.
-  bool adaptiveDefaultProposalCovariance(AdaptiveStepMCMC& mcmc,sMCMC::Vector& prior);
+  bool adaptiveDefaultProposalCovariance(AdaptiveStepMCMC& mcmc,
+                                         sMCMC::Vector& prior);
 
-  /// Fun an adaptive cycle with the current configuration.
+  /// Run an adaptive cycle with the current configuration.
   bool adaptiveRunCycle(AdaptiveStepMCMC& mcmc,
                         std::string chainName,
-                        int chainId,
-                        int steps,
-                        int adaptiveWindow,
-                        int adaptiveCovWindow,
-                        bool freezeStep,
-                        bool freezeCov,
-                        bool resetCov,
-                        double adaptiveCovDeweighting);
+                        int chainId);
 
+
+  /// Start the MCMC and setup the prior.  This creates the prior using
+  /// adaptiveMakePrior() which will randomize the prior if requested.
   void adaptiveStart(AdaptiveStepMCMC& mcmc,
-                     sMCMC::Vector prior,
+                     sMCMC::Vector& prior,
                      bool randomize);
+
+  /// Create a new point for the prior and then randomizes the starting
+  /// point if `randomize` is true.
+  void adaptiveMakePrior(AdaptiveStepMCMC& mcmc,
+                         sMCMC::Vector& prior,
+                         bool randomize);
 
 };
 #endif // GUNDAM_ADAPTIVE_MCMC_H

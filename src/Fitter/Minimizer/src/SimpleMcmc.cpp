@@ -39,7 +39,11 @@ void SimpleMcmc::configureImpl(){
   GenericToolbox::Json::fillValue(_config_, _likelihoodValidity_, "likelihoodValidity");
 
   //Set whether MCMC chain start from a random point or the prior point.
-  GenericToolbox::Json::fillValue(_config_, _randomStart_, "randomStart");
+  {
+    bool tmp{_randomStart_};
+    GenericToolbox::Json::fillValue(_config_, tmp, "randomStart");
+    _randomStart_.set(tmp);
+  }
 
   // Set whether the raw step should be saved, or only the step translated
   // into the likelihood space.
@@ -50,7 +54,11 @@ void SimpleMcmc::configureImpl(){
   // with the parameterSampleData vector to calculate the PPP for the chain.
   // Note that the model is what the MC is predicting, so for a PPP
   // calculation, the data will need to be fluctuated around the prediction.
-  GenericToolbox::Json::fillValue(_config_, _modelStride_, "modelSaveStride");
+  {
+    int tmp{_modelStride_};
+    GenericToolbox::Json::fillValue(_config_, tmp, "modelSaveStride");
+    _modelStride_.set(tmp);
+  }
 
   // Get the MCMC chain parameters to be used during burn-in.  The burn-in will
   // be skipped if the state has been restored from a file.  The burn-in can be
@@ -70,9 +78,15 @@ void SimpleMcmc::configureImpl(){
 
   // Get the MCMC chain parameters.  A run is broken into "mini-Chains"
   // called a "cycle" where the posterior covariance information is updated
-  // after each mini-chain.  Each cycle will have "steps" steps.
+  // after each mini-chain.
   GenericToolbox::Json::fillValue(_config_, _cycles_, "cycles");
-  GenericToolbox::Json::fillValue(_config_, _steps_, "steps");
+
+  // Get the number of steps to be taken in each "mini-chain".
+  {
+    int tmp{_steps_};
+    GenericToolbox::Json::fillValue(_config_, tmp, "steps");
+    _steps_.set(tmp);
+  }
 
   ///////////////////////////////////////////////////////////////
   // Get parameters for the adaptive proposal.
@@ -149,31 +163,43 @@ void SimpleMcmc::configureImpl(){
   // is set to short, the covariance will not sample the entire posterior.
   // Generally, the window should be long compared to the number of steps
   // required to get to an uncorrelated point.
-  GenericToolbox::Json::fillValue(_config_, _adaptiveCovWindow_, "adaptiveCovWindow");
+  {
+    int tmp{_adaptiveCovWindow_};
+    GenericToolbox::Json::fillValue(_config_, tmp, "adaptiveCovWindow");
+    _adaptiveCovWindow_.set(tmp);
+  }
 
   // The covariance deweighting while the chain is running.  This should
   // usually be left at zero so the entire chain history is used after an
   // update and more recent points don't get a heavier weight (within the
   // covariance window).
-  GenericToolbox::Json::fillValue(_config_, _adaptiveCovDeweighting_, "adaptiveCovDeweighting");
+  {
+    double tmp{_adaptiveCovDeweighting_};
+    GenericToolbox::Json::fillValue(_config_, tmp, "adaptiveCovDeweighting");
+    _adaptiveCovDeweighting_.set(tmp);
+  }
 
   // Stop updating the correlations between the steps after this many cycles.
   // If this is negative, the step size is never updated.  This freeze the
   // running covariance calculation.
-  GenericToolbox::Json::fillValue(_config_, _adaptiveFreezeCorrelations_, "adaptiveFreezeCorrelations");
+  GenericToolbox::Json::fillValue(_config_, _adaptiveFreezeCorrelationsAfter_, "adaptiveFreezeCorrelations");
 
   // Stop updating the step length after this many cycles.  If this is
   // negative, the step size is never updated.  Take the default from one more
   // than the number of steps to freeze the correlations.  An explicit value
   // in the config file will always override the default.
-  _adaptiveFreezeAfter_ = _adaptiveFreezeCorrelations_+1;
+  _adaptiveFreezeAfter_ = _adaptiveFreezeCorrelationsAfter_+1;
   GenericToolbox::Json::fillValue(_config_, _adaptiveFreezeAfter_, "adaptiveFreezeLength");
 
   // Set the window to calculate the current acceptance value over.  If this
   // is set to short, the step size will fluctuate a lot.  If this is set to
   // long, the step size won't be adjusted to match the target acceptance.
   // Make this very large effectively locks the step size.
-  GenericToolbox::Json::fillValue(_config_, _adaptiveWindow_, "adaptiveWindow");
+  {
+    int tmp{_adaptiveWindow_};
+    GenericToolbox::Json::fillValue(_config_, tmp, "adaptiveWindow");
+    _adaptiveWindow_.set(tmp);
+  }
 
   ///////////////////////////////////////////////////////////////
   // Get parameters for the simple proposal.
@@ -188,6 +214,16 @@ void SimpleMcmc::initializeImpl(){
 
   // Set how the parameter values are handled (outside of different validity ranges)
   this->setParameterValidity( _likelihoodValidity_ );
+}
+
+/// Restore the configuration to the default.
+void SimpleMcmc::restoreConfiguration() {
+  _randomStart_.restore();
+  _steps_.restore();
+  _modelStride_.restore();
+  _adaptiveCovWindow_.restore();
+  _adaptiveCovDeweighting_.restore();
+  _adaptiveWindow_.restore();
 }
 
 /// Copy the current parameter values to the tree.
@@ -230,11 +266,13 @@ bool SimpleMcmc::adaptiveRestoreState( AdaptiveStepMCMC& mcmc,
   // No filename so, no restoration.
   if (fileName.empty()) return false;
 
-  // Filename is "null"
-  std::string tmp = fileName;
-  std::use_facet<std::ctype<std::string::value_type>>(std::locale())
+  // Check if the filename is "none", and exit if it is.
+  {
+    std::string tmp{fileName};
+    std::use_facet<std::ctype<std::string::value_type>>(std::locale())
       .tolower(&tmp[0],&tmp[0]+tmp.size());
-  if (tmp == "none") return false;
+    if (tmp == "none") return false;
+  }
 
   // Open the file with the state.
   TFile* saveFile = gFile;
@@ -366,11 +404,13 @@ bool SimpleMcmc::adaptiveLoadProposalCovariance( AdaptiveStepMCMC& mcmc,
   // No filename so, no restoration.
   if (fileName.empty()) return false;
 
-  // Filename is "null"
-  std::string tmp = fileName;
-  std::use_facet<std::ctype<std::string::value_type>>(std::locale())
+  // Check if the filename is "none", and exit if it is.
+  {
+    std::string tmp{fileName};
+    std::use_facet<std::ctype<std::string::value_type>>(std::locale())
       .tolower(&tmp[0],&tmp[0]+tmp.size());
-  if (tmp == "none") return false;
+    if (tmp == "none") return false;
+  }
 
   TFile* saveFile = gFile;
   std::unique_ptr<TFile> restoreFile
@@ -467,17 +507,10 @@ bool SimpleMcmc::adaptiveLoadProposalCovariance( AdaptiveStepMCMC& mcmc,
 
 bool SimpleMcmc::adaptiveRunCycle(AdaptiveStepMCMC& mcmc,
                                   std::string chainName,
-                                  int chainId,
-                                  int steps,
-                                  int adaptiveWindow,
-                                  int adaptiveCovWindow,
-                                  bool freezeStep,
-                                  bool freezeCov,
-                                  bool resetCov,
-                                  double adaptiveCovDeweighting) {
-  mcmc.SetStepRMSWindow(adaptiveWindow);
-  mcmc.GetProposeStep().SetAcceptanceWindow(adaptiveWindow);
-  mcmc.GetProposeStep().SetCovarianceWindow(adaptiveCovWindow);
+                                  int chainId) {
+  mcmc.SetStepRMSWindow(_adaptiveWindow_);
+  mcmc.GetProposeStep().SetAcceptanceWindow(_adaptiveWindow_);
+  mcmc.GetProposeStep().SetCovarianceWindow(_adaptiveCovWindow_);
 
   LogInfo << "Run " << chainName << " " << chainId << std::endl;
 
@@ -489,7 +522,7 @@ bool SimpleMcmc::adaptiveRunCycle(AdaptiveStepMCMC& mcmc,
   // Reset the covariance to the initial state.  This forgets the path of
   // the previous cycle.  This only happens a few times to let it forget
   // about the very first burn-in cycles
-  if (resetCov) {
+  if (_adaptiveResetCov_) {
     sMCMC::Vector saveCenter{mcmc.GetProposeStep().GetEstimatedCenter()};
     mcmc.GetProposeStep().ResetProposal();
     // After the reset, set how many trials the prior covariance counts
@@ -507,7 +540,7 @@ bool SimpleMcmc::adaptiveRunCycle(AdaptiveStepMCMC& mcmc,
 
   // Set whether the running covariance will be updated based on the new
   // steps.  This freezes right after the last update that will be called.
-  if (freezeCov) {
+  if (_adaptiveFreezeCov_) {
     LogInfo << "Step correlations are frozen" << std::endl;
     mcmc.GetProposeStep().SetCovarianceFrozen(true);
   }
@@ -525,11 +558,11 @@ bool SimpleMcmc::adaptiveRunCycle(AdaptiveStepMCMC& mcmc,
   // the previous deweighting is used for the first update.  This is a very
   // cheap call so set it on every iteration.
   mcmc.GetProposeStep()
-    .SetCovarianceUpdateDeweighting(adaptiveCovDeweighting);
+    .SetCovarianceUpdateDeweighting(_adaptiveCovDeweighting_);
 
   // Set whether the step size is going to be tuned to deliver the target
   // acceptance.
-  if (freezeStep) {
+  if (_adaptiveFreezeStep_) {
     LogInfo << "Step length is frozen" << std::endl;
     mcmc.GetProposeStep().SetAcceptanceRigidity(-1);
   }
@@ -540,11 +573,11 @@ bool SimpleMcmc::adaptiveRunCycle(AdaptiveStepMCMC& mcmc,
 
   ////////////////////////////////
   // Run the steps for this chain
-  for (int i = 0; i < steps; ++i) {
+  for (int i = 0; i < _steps_; ++i) {
     // Run step, but do not save the step.  The step isn't saved so the
     // accepted step can be copied into the points (which will have
     // any decomposition removed).
-    if (mcmc.Step(false)) fillPoint();
+    if (mcmc.Step(false,_adaptiveAcceptanceAlgorithm_)) fillPoint();
     // Zero the size of the raw accepted points and only save the filled
     // points (which are in likelihood space).
     if (not _saveRawSteps_) mcmc.ClearSavedAccepted();
@@ -563,10 +596,10 @@ bool SimpleMcmc::adaptiveRunCycle(AdaptiveStepMCMC& mcmc,
     // "likelihood" space.  If "_saveRawSteps_" is true, then this also
     // saves the accepted point in the (possibly) decomposed state.
     mcmc.SaveStep(false);
-    if(steps > 100 && !(i%(steps/100))){
+    if(_steps_ > 100 && !(i%(_steps_/100))){
       LogInfo << chainName << ": " << chainId
-              << " step: " << i << "/" << steps << " "
-              << i*100./steps << "%"
+              << " step: " << i << "/" << _steps_ << " "
+              << i*100./_steps_ << "%"
               << " Trials: "
               << mcmc.GetProposeStep().GetSuccesses()
               << "/" << mcmc.GetProposeStep().GetTrials()
@@ -580,60 +613,67 @@ bool SimpleMcmc::adaptiveRunCycle(AdaptiveStepMCMC& mcmc,
   // Make a final step and then save it with the covariance information.
   // These steps can be identified since the covariance is not empty, but
   // they should be real independent steps.
-  if (mcmc.Step(false)) fillPoint();
+  if (mcmc.Step(false,_adaptiveAcceptanceAlgorithm_)) fillPoint();
   // This is not resetting the "SaveAccepted" size so the step is actually
   // saved.
   mcmc.SaveStep(true);
   LogInfo << chainName << ": " << chainId << " complete"
-          << " Run Length: " << steps
+          << " Run Length: " << _steps_
           << " -- Saving state"
           << std::endl;
+
   return true;
 }
 
+void SimpleMcmc::adaptiveMakePrior(AdaptiveStepMCMC& mcmc,
+                                   sMCMC::Vector& prior,
+                                   bool randomize) {
+  for (const Parameter* par : getMinimizerFitParameterPtr() ) {
+    double val = par->getPriorValue();
+    if (randomize) {
+      double err = par->getStdDevValue();
+      double r = gRandom->Uniform(0.0,1.0);
+      double lowBound = val-1.0*err;
+      double highBound = val+1.0*err;
+
+      if(not std::isnan(par->getMinValue())) {
+        lowBound = std::max(lowBound, par->getMinValue());
+      }
+      if(not std::isnan(par->getMinMirror())) {
+        lowBound = std::max(lowBound, par->getMinMirror());
+      }
+      if(not std::isnan(par->getMinPhysical())) {
+        lowBound = std::max(lowBound, par->getMinPhysical());
+      }
+
+      if(not std::isnan(par->getMaxValue())) {
+        highBound = std::min(highBound, par->getMaxValue());
+      }
+      if(not std::isnan(par->getMaxMirror())) {
+        highBound = std::min(highBound, par->getMaxMirror());
+      }
+      if(not std::isnan(par->getMaxPhysical())) {
+        highBound = std::min(highBound, par->getMaxPhysical());
+      }
+
+      val = lowBound + r*(highBound-lowBound);
+    }
+    if (not useNormalizedFitSpace()) {
+      prior.push_back(val);
+    }
+    else {
+      prior.push_back(ParameterSet::toNormalizedParValue(val, *par));
+    }
+  }
+}
+
 void SimpleMcmc::adaptiveStart(AdaptiveStepMCMC& mcmc,
-                               sMCMC::Vector prior,
+                               sMCMC::Vector& prior,
                                bool randomize) {
   int throttle{100};
   bool startStatus{false};
   do{
-    for (const Parameter* par : getMinimizerFitParameterPtr() ) {
-      double val = par->getPriorValue();
-      if (randomize) {
-        double err = par->getStdDevValue();
-        double r = gRandom->Uniform(0.0,1.0);
-        double lowBound = val-1.0*err;
-        double highBound = val+1.0*err;
-
-        if(not std::isnan(par->getMinValue())) {
-          lowBound = std::max(lowBound, par->getMinValue());
-        }
-        if(not std::isnan(par->getMinMirror())) {
-          lowBound = std::max(lowBound, par->getMinMirror());
-        }
-        if(not std::isnan(par->getMinPhysical())) {
-          lowBound = std::max(lowBound, par->getMinPhysical());
-        }
-
-        if(not std::isnan(par->getMaxValue())) {
-          highBound = std::min(highBound, par->getMaxValue());
-        }
-        if(not std::isnan(par->getMaxMirror())) {
-          highBound = std::min(highBound, par->getMaxMirror());
-        }
-        if(not std::isnan(par->getMaxPhysical())) {
-          highBound = std::min(highBound, par->getMaxPhysical());
-        }
-
-        val = lowBound + r*(highBound-lowBound);
-      }
-      if (not useNormalizedFitSpace()) {
-        prior.push_back(val);
-      }
-      else {
-        prior.push_back(ParameterSet::toNormalizedParValue(val, *par));
-      }
-    }
+    adaptiveMakePrior(mcmc,prior,randomize);
     try {startStatus = mcmc.Start(prior, false);}
     catch (...) {startStatus = false;}
     if (not startStatus and not randomize) {
@@ -683,20 +723,15 @@ void SimpleMcmc::adaptiveSetupAndRun(AdaptiveStepMCMC& mcmc) {
   // mainly about moving the current point away from the default.
   if (not restored and _burninCycles_ > 0 and _burninSteps_ > 0) {
     for (int chain = 0; chain < _burninCycles_; ++chain) {
-      bool freezeStep = true;
-      if (chain < _burninFreezeAfter_) freezeStep = false;
-      bool freezeCov = false;
-      bool resetCov = false;
-      if (chain < _burninResets_) resetCov = true;
-      adaptiveRunCycle(mcmc,
-                       "Burn-in", chain,
-                       _burninSteps_,
-                       _burninWindow_,
-                       _burninCovWindow_,
-                       freezeStep,
-                       freezeCov,
-                       resetCov,
-                       _burninCovDeweighting_);
+      _steps_ = _burninSteps_;
+      _adaptiveWindow_ = _burninWindow_;
+      _adaptiveCovWindow_ = _burninCovWindow_;
+      _adaptiveCovDeweighting_ = _burninCovDeweighting_;
+      _adaptiveFreezeStep_ = (chain >= _burninFreezeAfter_);
+      _adaptiveFreezeCov_ = false;
+      _adaptiveResetCov_ = (chain < _burninResets_);
+      adaptiveRunCycle(mcmc,"Burn-in", chain);
+      restoreConfiguration();
     }
     LogInfo << "Finished burn-in chains" << std::endl;
   }
@@ -704,19 +739,10 @@ void SimpleMcmc::adaptiveSetupAndRun(AdaptiveStepMCMC& mcmc) {
   ////////////////////////////////////////////////////////////////
   // Run the main cycles.
   for (int chain = 0; chain < _cycles_; ++chain) {
-    bool freezeStep = true;
-    if (chain < _adaptiveFreezeAfter_) freezeStep = false;
-    bool freezeCov = true;
-    if (chain < _adaptiveFreezeCorrelations_) freezeCov = false;
-    adaptiveRunCycle(mcmc,
-                     "Chain", chain,
-                     _steps_,
-                     _adaptiveWindow_,
-                     _adaptiveCovWindow_,
-                     freezeStep,
-                     freezeCov,
-                     false,
-                     _adaptiveCovDeweighting_);
+    _adaptiveFreezeStep_ = (chain >= _adaptiveFreezeAfter_);
+    _adaptiveFreezeCov_ = (chain >= _adaptiveFreezeCorrelationsAfter_);
+    adaptiveRunCycle(mcmc,"Chain", chain);
+    restoreConfiguration();
   }
   LogInfo << "Finished running chains" << std::endl;
 
@@ -724,7 +750,11 @@ void SimpleMcmc::adaptiveSetupAndRun(AdaptiveStepMCMC& mcmc) {
 void SimpleMcmc::fixedSetupAndRun( FixedStepMCMC& mcmc) {
 
   mcmc.GetProposeStep().SetDim(getMinimizerFitParameterPtr().size());
-  mcmc.GetLogLikelihood().functor = std::make_unique<ROOT::Math::Functor>(this, &SimpleMcmc::evalFitValid, getMinimizerFitParameterPtr().size());
+  mcmc.GetLogLikelihood().functor
+    = std::make_unique<ROOT::Math::Functor>(
+      this,
+      &SimpleMcmc::evalFitValid,
+      getMinimizerFitParameterPtr().size());
   mcmc.GetProposeStep().fSigma = _simpleSigma_;
 
   sMCMC::Vector prior;
