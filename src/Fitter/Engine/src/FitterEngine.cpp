@@ -191,7 +191,12 @@ void FitterEngine::initializeImpl(){
     );
     GenericToolbox::writeInTFileWithObjTypeExt(
         GenericToolbox::mkdirTFile(_saveDir_, saveFolder ),
-        parSet.getPriorCorrelationMatrix().get(), "correlationMatrix"
+        GenericToolbox::toCorrelationMatrix(parSet.getPriorCovarianceMatrix().get()),
+        "correlationMatrix"
+    );
+    GenericToolbox::writeInTFileWithObjTypeExt(
+        GenericToolbox::mkdirTFile( _saveDir_, saveFolder ),
+        parSet.getInverseCovarianceMatrix().get(), "invCovarianceMatrix"
     );
 
     auto parsSaveFolder = GenericToolbox::joinPath( saveFolder, "parameters" );
@@ -349,6 +354,9 @@ void FitterEngine::fit(){
 
   LogInfo << "Minimizing LLH..." << std::endl;
   this->_minimizer_->minimize();
+
+  // re-evaluating since the minimizer could have not triggered an eval of the llh
+  getLikelihoodInterface().propagateAndEvalLikelihood();
 
 #ifdef GUNDAM_USING_CACHE_MANAGER
   if( Cache::Manager::IsBuilt() ){

@@ -66,28 +66,6 @@ void MinimizerBase::initializeImpl(){
   _monitor_.convergenceMonitor.addVariable("Stat");
   _monitor_.convergenceMonitor.addVariable("Syst");
 
-  if( _monitor_.gradientDescentMonitor.isEnabled ){
-    _monitor_.convergenceMonitor.defineNewQuantity({ "LastStep", "Last step descent", [&](GenericToolbox::VariableMonitor& v){
-      return GenericToolbox::parseUnitPrefix(_monitor_.gradientDescentMonitor.getLastStepDeltaValue(v.getName()), 8); }
-    });
-    _monitor_.convergenceMonitor.addDisplayedQuantity("LastStep");
-    _monitor_.convergenceMonitor.getQuantity("LastStep").title = "Last step descent";
-
-    _monitor_.gradientDescentMonitor.valueDefinitionList.emplace_back(
-        "Total/dof", [](const MinimizerBase* this_){ return this_->getLikelihoodInterface().getLastLikelihood() / this_->fetchNbDegreeOfFreedom(); }
-    );
-    _monitor_.gradientDescentMonitor.valueDefinitionList.emplace_back(
-        "Total", [](const MinimizerBase* this_){ return this_->getLikelihoodInterface().getBuffer().totalLikelihood; }
-    );
-    _monitor_.gradientDescentMonitor.valueDefinitionList.emplace_back(
-        "Stat", [](const MinimizerBase* this_){ return this_->getLikelihoodInterface().getBuffer().statLikelihood; }
-    );
-    _monitor_.gradientDescentMonitor.valueDefinitionList.emplace_back(
-        "Syst", [](const MinimizerBase* this_){ return this_->getLikelihoodInterface().getBuffer().penaltyLikelihood; }
-    );
-  }
-
-
   LogWarning << "MinimizerBase initialized." << std::endl;
 }
 
@@ -177,50 +155,17 @@ double MinimizerBase::evalFit( const double* parArray_ ){
     _monitor_.nbEvalLikelihoodCalls++;
 
     if( _monitor_.historyTree != nullptr ){ _monitor_.historyTree->Fill(); }
-    if( _monitor_.gradientDescentMonitor.isEnabled ){
-
-      auto& gradient = _monitor_.gradientDescentMonitor;
-
-      // When gradient descent base minimizer probe a point toward the
-      // minimum, every parameter get updated
-      bool isGradientDescentStep =
-          std::all_of(
-              _minimizerParameterPtrList_.begin(), _minimizerParameterPtrList_.end(),
-              [](const Parameter* par_){
-                return ( par_->gotUpdated() or par_->isFixed() or not par_->isEnabled() );
-              } );
-      if( isGradientDescentStep or gradient.stepPointList.empty() ){
-
-        if( gradient.stepPointList.empty() ){
-          // add the initial point
-          LogWarning << "Adding initial point of the gradient monitor: ";
-          gradient.addStep( this );
-        }
-        else{
-          if( gradient.stepPointList.back().fitCallNb == _monitor_.nbEvalLikelihoodCalls - 1 ){
-            LogWarning << "Minimizer is adjusting the step size: ";
-            gradient.fillLastStep( this );
-          }
-          else{
-            LogWarning << "Gradient step detected at iteration #" << _monitor_.nbEvalLikelihoodCalls << ": ";
-            gradient.addStep( this );
-          }
-        }
-
-        if( gradient.stepPointList.size() >= 2 ){
-          LogWarning << gradient.getLastStepValue("Total") + gradient.getLastStepDeltaValue("Total") << " -> ";
-        }
-        LogWarning << gradient.getLastStepValue("Total") << std::endl;
-      }
-    }
     if( _monitor_.convergenceMonitor.isGenerateMonitorStringOk() ){
 
       _monitor_.iterationCounterClock.count( _monitor_.nbEvalLikelihoodCalls );
 
+      size_t nbValidPars = std::count_if(
+              _minimizerParameterPtrList_.begin(), _minimizerParameterPtrList_.end(),
+              [](const Parameter* par_){ return not ( par_->isFixed() or not par_->isEnabled() ); } );
+
       std::stringstream ssHeader;
       ssHeader << std::endl << __METHOD_NAME__ << ": call #" << _monitor_.nbEvalLikelihoodCalls;
-      ssHeader << std::endl << _monitor_.stateTitleMonitor;
-//    ssHeader << std::endl << "Target EDM: " << getMinimizer().get;
+      ssHeader << std::endl << _monitor_.stateTitleMonitor << " -> nb fit parameters: " << nbValidPars;
       ssHeader << std::endl << "RAM: " << GenericToolbox::parseSizeUnits(double(GenericToolbox::getProcessMemoryUsage()));
       double cpuPercent = GenericToolbox::getCpuUsageByProcess();
       ssHeader << " / CPU: " << cpuPercent << "% (" << cpuPercent / GundamGlobals::getNbCpuThreads() << "% efficiency)";
