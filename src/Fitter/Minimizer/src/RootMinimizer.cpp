@@ -85,9 +85,8 @@ void RootMinimizer::initializeImpl(){
   }
 
   LogInfo << "Tolerance is set to: " << _tolerance_ << std::endl;
-  double edm{0.001*_tolerance_*0.5};
-  LogInfo << "The minimizer will run until it reaches an Estimated Distance to Minimum (EDM) of: " << edm << std::endl;
-  LogInfo << "EDM per degree of freedom is: " << edm/fetchNbDegreeOfFreedom() << std::endl;
+  LogInfo << "The minimizer will run until it reaches an Estimated Distance to Minimum (EDM) of: " << getTargetEdm() << std::endl;
+  LogInfo << "EDM per degree of freedom is: " << getTargetEdm()/fetchNbDegreeOfFreedom() << std::endl;
 
 
   LogInfo << "Defining minimizer as: " << _minimizerType_ << "/" << _minimizerAlgo_ << std::endl;
@@ -208,6 +207,7 @@ void RootMinimizer::minimize(){
 
     getMonitor().minimizerTitle = _minimizerType_ + "/" + "Simplex";
     getMonitor().stateTitleMonitor = "Running Simplex";
+    getMonitor().stateTitleMonitor += " / Target EDM: " + std::to_string(getTargetEdm());
 
     // SIMPLEX
     getMonitor().isEnabled = true;
@@ -238,6 +238,7 @@ void RootMinimizer::minimize(){
 
   getMonitor().minimizerTitle = _minimizerType_ + "/" + _minimizerAlgo_;
   getMonitor().stateTitleMonitor = "Running " + _rootMinimizer_->Options().MinimizerAlgorithm();
+  getMonitor().stateTitleMonitor += " / Target EDM: " + std::to_string(getTargetEdm());
 
   getMonitor().isEnabled = true;
   // dumpFitParameterSettings(); // Dump internal ROOT::Minimizer info
