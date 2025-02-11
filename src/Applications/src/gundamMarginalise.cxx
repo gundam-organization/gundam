@@ -210,6 +210,8 @@ int main(int argc, char** argv){
 
     GenericToolbox::Json::fillValue(gundamFitterConfig, fitter.getConfig(), "fitterEngineConfig");
     fitter.configure();
+    // Manually set allowEigenDecompWithBounds to true
+    fitter.getLikelihoodInterface().;
 
     // We are only interested in our MC. Data has already been used to get the post-fit error/values
     fitter.getLikelihoodInterface().setForceAsimovData( true );
