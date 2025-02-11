@@ -11,7 +11,7 @@ set( APPLICATION_LIST
     gundamConfigCompare
     gundamPlotExtractor
     gundamConfigUnfolder
-    gundamMarginalise
+        gundamSystematicsThrower
 )
 
 
