@@ -547,6 +547,12 @@ void ParameterScanner::writeGraphEntry(GraphEntry& entry_, TDirectory* saveDir_)
   entry_.graph.GetXaxis()->SetTitle(entry_.fitParPtr->getFullTitle().c_str());
   entry_.graph.SetDrawOption("AP");
 
+  double yMin{entry_.graph.GetMinimum()};
+  double yMax{entry_.graph.GetMaximum()};
+  // enabling the log scale
+  if( yMin == 0 ){ yMin = yMax/1e-12; }
+  entry_.graph.GetYaxis()->SetRangeUser(yMin, yMax);
+
   // marker indicates the direction
   if( entry_.graph.GetY()[0] == entry_.graph.GetY()[entry_.graph.GetN()-1] ){
     // Did not move
