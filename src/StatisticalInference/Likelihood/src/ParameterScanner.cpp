@@ -568,8 +568,10 @@ void ParameterScanner::writeGraphEntry(GraphEntry& entry_, TDirectory* saveDir_)
   }
 
   GenericToolbox::writeInTFileWithObjTypeExt(
-      GenericToolbox::mkdirTFile( saveDir_, entry_.scanDataPtr->folder ),
+      GenericToolbox::mkdirTFile( saveDir_,
+          entry_.scanDataPtr->folder + "/" + GenericToolbox::generateCleanBranchName(entry_.fitParPtr->getOwner()->getName())
+        ),
       entry_.graph,
-      GenericToolbox::generateCleanBranchName(entry_.fitParPtr->getFullTitle())
+      GenericToolbox::generateCleanBranchName(entry_.fitParPtr->getTitle())
   );
 }
