@@ -155,6 +155,7 @@ namespace ConfigUtils {
   }
 
   void ConfigHandler::override( const JsonType& overrideConfig_ ){
+    LogScopeIndent;
     LogWarning << GenericToolbox::Json::applyOverrides(config, overrideConfig_);
   }
   void ConfigHandler::override( const std::string& filePath_ ){
