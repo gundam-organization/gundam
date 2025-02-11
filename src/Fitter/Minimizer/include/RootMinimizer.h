@@ -73,6 +73,7 @@ private:
   int _simplexStrategy_{1};
 
   double _tolerance_{1E-4};
+  double _tolerancePerDegreeOfFreedom_{std::nan("unset")};
   double _stepSizeScaling_{1};
   double _simplexToleranceLoose_{1000.};
 

@@ -35,6 +35,7 @@ void RootMinimizer::configureImpl(){
   GenericToolbox::Json::fillValue(_config_, _strategy_, "strategy");
   GenericToolbox::Json::fillValue(_config_, _printLevel_, "print_level");
   GenericToolbox::Json::fillValue(_config_, _tolerance_, "tolerance");
+  GenericToolbox::Json::fillValue(_config_, _tolerancePerDegreeOfFreedom_, "tolerancePerDegreeOfFreedom");
   GenericToolbox::Json::fillValue(_config_, _maxIterations_, {{"maxIterations"},{"max_iter"}});
   GenericToolbox::Json::fillValue(_config_, _maxFcnCalls_, {{"maxFcnCalls"},{"max_fcn"}});
 
@@ -78,6 +79,15 @@ void RootMinimizer::initializeImpl(){
   }
 
   LogWarning << "Initializing RootMinimizer..." << std::endl;
+  if( not std::isnan(_tolerancePerDegreeOfFreedom_) ) {
+    LogWarning << "Using tolerance per degree of freedom: " << _tolerancePerDegreeOfFreedom_ << std::endl;
+    _tolerance_ = _tolerancePerDegreeOfFreedom_ * fetchNbDegreeOfFreedom();
+  }
+
+  LogInfo << "Tolerance is set to: " << _tolerance_ << std::endl;
+  LogInfo << "The minimizer will run until it reaches an Estimated Distance to Minimum (EDM) of: " << 0.001*_tolerance_*0.5 << std::endl;
+  LogInfo << "EDM per degree of freedom is: " << 0.001*_tolerance_*0.5/fetchNbDegreeOfFreedom() << std::endl;
+
 
   LogInfo << "Defining minimizer as: " << _minimizerType_ << "/" << _minimizerAlgo_ << std::endl;
   _rootMinimizer_ = std::unique_ptr<ROOT::Math::Minimizer>(
