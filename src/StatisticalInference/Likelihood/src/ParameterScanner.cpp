@@ -550,7 +550,7 @@ void ParameterScanner::writeGraphEntry(GraphEntry& entry_, TDirectory* saveDir_)
   double yMin{*std::min_element(entry_.graph.GetY(), entry_.graph.GetY() + entry_.graph.GetN())};
   double yMax{*std::max_element(entry_.graph.GetY(), entry_.graph.GetY() + entry_.graph.GetN())};
   // enabling the log scale
-  if( yMin == 0 ){ yMin = yMax/1e-12; }
+  if( yMin == 0 ){ yMin = yMax*1e-10; }
   entry_.graph.GetYaxis()->SetRangeUser(yMin, yMax);
 
   // marker indicates the direction
@@ -572,6 +572,6 @@ void ParameterScanner::writeGraphEntry(GraphEntry& entry_, TDirectory* saveDir_)
           entry_.scanDataPtr->folder + "/" + GenericToolbox::generateCleanBranchName(entry_.fitParPtr->getOwner()->getName())
         ),
       entry_.graph,
-      GenericToolbox::generateCleanBranchName(entry_.fitParPtr->getTitle())
+      GenericToolbox::generateCleanBranchName("n" + entry_.fitParPtr->getTitle())
   );
 }
