@@ -96,6 +96,9 @@ private:
 
   struct GradientDescentMonitor{
     bool isEnabled{false};
+    bool writeGradientSteps{false};
+    bool writeDescentPaths{false};
+    bool writeDescentPathsRelative{true};
 
     struct ValueDefinition{
       std::string name{};

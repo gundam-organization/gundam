@@ -1356,7 +1356,7 @@ void RootMinimizer::saveGradientSteps(){
 
     getLikelihoodInterface().propagateAndEvalLikelihood();
 
-    if( not GundamGlobals::isLightOutputMode() ) {
+    if( not GundamGlobals::isLightOutputMode() and gradientDescentMonitor.writeGradientSteps ) {
       auto outDir = GenericToolbox::mkdirTFile(getOwner().getSaveDir(), Form("fit/gradient/steps/step_%i", int(iGradStep)));
       GenericToolbox::writeInTFileWithObjTypeExt(outDir, TNamed("parState", GenericToolbox::Json::toReadableString(gradientDescentMonitor.stepPointList[iGradStep].parState).c_str()));
       GenericToolbox::writeInTFileWithObjTypeExt(outDir, TNamed("llhState", getLikelihoodInterface().getSummary().c_str()));
@@ -1384,28 +1384,32 @@ void RootMinimizer::saveGradientSteps(){
   }
 
   if( not globalGraphList.empty() ){
-    auto outDir = GenericToolbox::mkdirTFile(getOwner().getSaveDir(), "fit/gradient/global");
     for( auto& gEntry : globalGraphList ){
       gEntry.scanDataPtr->title = "Minimizer path to minimum";
-      ParameterScanner::writeGraphEntry(gEntry, outDir);
-    }
-
-    outDir = GenericToolbox::mkdirTFile(getOwner().getSaveDir(), "fit/gradient/globalRelative");
-    for( auto& gEntry : globalGraphList ){
-      if( gEntry.graph.GetN() == 0 ){ continue; }
-
-      double minY{gEntry.graph.GetY()[gEntry.graph.GetN()-1]};
-      double maxY{gEntry.graph.GetY()[0]};
-      double delta{1E-6*std::abs( maxY - minY )};
-      // allow log scale
-      minY += delta;
-
-      for( int iPt = 0 ; iPt < gEntry.graph.GetN() ; iPt++ ){
-        gEntry.graph.GetY()[iPt] -= minY;
+      if( gradientDescentMonitor.writeDescentPaths ) {
+        ParameterScanner::writeGraphEntry(gEntry, GenericToolbox::mkdirTFile(getOwner().getSaveDir(), "fit/gradient/global") );
       }
-      gEntry.scanDataPtr->title = "Minimizer path to minimum (difference)";
-      ParameterScanner::writeGraphEntry(gEntry, outDir);
     }
+
+    if( gradientDescentMonitor.writeDescentPathsRelative ) {
+      auto* outDir = GenericToolbox::mkdirTFile(getOwner().getSaveDir(), "fit/gradient/globalRelative");
+      for( auto& gEntry : globalGraphList ){
+        if( gEntry.graph.GetN() == 0 ){ continue; }
+
+        double minY{gEntry.graph.GetY()[gEntry.graph.GetN()-1]};
+        double maxY{gEntry.graph.GetY()[0]};
+        double delta{1E-6*std::abs( maxY - minY )};
+        // allow log scale
+        minY += delta;
+
+        for( int iPt = 0 ; iPt < gEntry.graph.GetN() ; iPt++ ){
+          gEntry.graph.GetY()[iPt] -= minY;
+        }
+        gEntry.scanDataPtr->title = "Minimizer path to minimum (difference)";
+        ParameterScanner::writeGraphEntry(gEntry, outDir);
+      }
+    }
+
   }
 
 }
