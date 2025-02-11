@@ -36,10 +36,10 @@
 void DataDispenser::configureImpl(){
 
   // first of all
-  _threadPool_.setNThreads(GundamGlobals::getNbCpuThreads() );
+  _threadPool_.setNThreads(GundamGlobals::getNbCpuThreads(4) );
 
   GenericToolbox::Json::fillValue(_config_, _parameters_.name, "name");
-  LogThrowIf(_parameters_.name.empty(), "Dataset name not set.");
+  LogExitIf(_parameters_.name.empty(), "Dataset name not set.");
 
   // histograms don't need other parameters
   if( GenericToolbox::Json::doKeyExist( _config_, "fromHistContent" ) ) {
@@ -147,7 +147,7 @@ void DataDispenser::load(Propagator& propagator_){
 
   for( const auto& file: _parameters_.filePathList){
     std::string path = GenericToolbox::expandEnvironmentVariables(file);
-    LogThrowIf(not GenericToolbox::doesTFileIsValid(path, {_parameters_.globalTreePath}), "Invalid file: " << path);
+    LogExitIf(not GenericToolbox::doesTFileIsValid(path, {_parameters_.globalTreePath}), "Invalid file: " << path);
   }
 
   this->parseStringParameters();
@@ -184,7 +184,7 @@ void DataDispenser::parseStringParameters() {
 
   auto replaceToyIndexFct = [&](std::string& formula_){
     if( GenericToolbox::hasSubStr(formula_, "<I_TOY>") ){
-      LogThrowIf(_cache_.propagatorPtr->getIThrow()==-1, "<I_TOY> not set.");
+      LogExitIf(_cache_.propagatorPtr->getIThrow()==-1, "<I_TOY> not set.");
       GenericToolbox::replaceSubstringInsideInputString(formula_, "<I_TOY>", std::to_string(_cache_.propagatorPtr->getIThrow()));
     }
   };
@@ -227,7 +227,7 @@ void DataDispenser::doEventSelection(){
   ROOT::EnableThreadSafety();
 
   // how meaning buffers?
-  int nThreads{GundamGlobals::getNbCpuThreads()};
+  int nThreads{GundamGlobals::getNbCpuThreads(4)};
   if( _owner_->isDevSingleThreadEventSelection() ) { nThreads = 1; }
 
   Long64_t nEntries{0};
@@ -235,7 +235,7 @@ void DataDispenser::doEventSelection(){
     auto treeChain{this->openChain(true)};
     nEntries = treeChain->GetEntries();
   }
-  LogThrowIf(nEntries == 0, "TChain is empty.");
+  LogExitIf(nEntries == 0, "TChain is empty.");
   LogInfo << "Will read " << nEntries << " event entries." << std::endl;
 
   _cache_.threadSelectionResults.resize(nThreads);
@@ -513,8 +513,8 @@ void DataDispenser::readAndFill(){
   }
 
   LogWarning << "Loading and indexing..." << std::endl;
-  if(not _owner_->isDevSingleThreadEventLoaderAndIndexer() and GundamGlobals::getNbCpuThreads() > 1 ){
-    threadSharedDataList.resize(GundamGlobals::getNbCpuThreads());
+  if(not _owner_->isDevSingleThreadEventLoaderAndIndexer() and GundamGlobals::getNbCpuThreads(4) > 1 ){
+    threadSharedDataList.resize(GundamGlobals::getNbCpuThreads(4));
     ROOT::EnableThreadSafety(); // EXTREMELY IMPORTANT
     _threadPool_.addJob(__METHOD_NAME__, [&](int iThread_){ this->runEventFillThreads(iThread_); });
     _threadPool_.runJob(__METHOD_NAME__);
@@ -581,12 +581,12 @@ void DataDispenser::loadFromHistContent(){
     LogScopeIndent;
 
     auto* sampleHistDef = _parameters_.fromHistContent.getSampleHistPtr(sample->getName());
-    LogThrowIf(sampleHistDef== nullptr, "Could not find sample histogram: " << sample->getName());
+    LogExitIf(sampleHistDef== nullptr, "Could not find sample histogram: " << sample->getName());
 
     LogInfo << "Filling sample \"" << sample->getName() << "\" using hist with name: " << sampleHistDef->hist << std::endl;
 
     auto* hist = fHist->Get<THnD>( sampleHistDef->hist.c_str() );
-    LogThrowIf( hist == nullptr, "Could not find THnD \"" << sampleHistDef->hist << "\" within " << fHist->GetPath() );
+    LogExitIf( hist == nullptr, "Could not find THnD \"" << sampleHistDef->hist << "\" within " << fHist->GetPath() );
 
     int nBins = 1;
     for( int iDim = 0 ; iDim < hist->GetNdimensions() ; iDim++ ){
@@ -632,17 +632,17 @@ std::shared_ptr<TChain> DataDispenser::openChain(bool verbose_){
     auto chunks = GenericToolbox::splitString(name, ":", true);
     if( chunks.size() > 1 ){ treePath = chunks[1]; name = chunks[0];  }
 
-    LogThrowIf( treePath.empty(), "TTree path not set." );
+    LogExitIf( treePath.empty(), "TTree path not set." );
 
-    LogThrowIf( not GenericToolbox::doesTFileIsValid(name, {treePath}), "Could not open TFile: " << name << " with TTree " << treePath);
+    LogExitIf( not GenericToolbox::doesTFileIsValid(name, {treePath}), "Could not open TFile: " << name << " with TTree " << treePath);
 
     Long64_t nMaxEntries{TTree::kMaxEntries};
     if( _parameters_.fractionOfEntries != 1. ){
       std::unique_ptr<TFile> temp{TFile::Open(name.c_str())};
-      LogThrowIf(temp== nullptr, "Error while opening TFile: " << name);
+      LogExitIf(temp== nullptr, "Error while opening TFile: " << name);
 
       auto* tree = temp->Get<TTree>(treePath.c_str());
-      LogThrowIf(tree== nullptr, "Error while opening TTree: " << treePath << " in " << name);
+      LogExitIf(tree== nullptr, "Error while opening TTree: " << treePath << " in " << name);
 
       nMaxEntries = Long64_t( double(tree->GetEntries()) * _parameters_.fractionOfEntries );
       if( verbose_ ){
@@ -660,7 +660,7 @@ std::shared_ptr<TChain> DataDispenser::openChain(bool verbose_){
 
 void DataDispenser::eventSelectionFunction(int iThread_){
 
-  int nThreads{GundamGlobals::getNbCpuThreads()};
+  int nThreads{GundamGlobals::getNbCpuThreads(4)};
   if( iThread_ == -1 ){ iThread_ = 0; nThreads = 1; }
 
   // Opening ROOT files and make a TChain
@@ -791,7 +791,7 @@ void DataDispenser::eventSelectionFunction(int iThread_){
 
 void DataDispenser::runEventFillThreads(int iThread_){
 
-  int nThreads = GundamGlobals::getNbCpuThreads();
+  int nThreads = GundamGlobals::getNbCpuThreads(4);
   if( iThread_ == -1 ){ iThread_ = 0; nThreads = 1; } // special mode
 
   // init shared data
@@ -899,6 +899,9 @@ void DataDispenser::runEventFillThreads(int iThread_){
         int cpuPercent = int(GenericToolbox::getCpuUsageByProcess());
         ssProgressBar << " / CPU efficiency: " << GenericToolbox::padString(std::to_string(cpuPercent/nThreads), 3,' ')
                       << "% / RAM: " << GenericToolbox::parseSizeUnits( double(GenericToolbox::getProcessMemoryUsage()) ) << std::endl;
+
+        ssProgressBar << LogInfo.getPrefixString() << "Data size per entry: " << GenericToolbox::parseSizeUnits(readSpeed.getLastValue());
+        ssProgressBar << " / Using " << nThreads << " threads" << std::endl;
 
         ssProgressBar << LogInfo.getPrefixString() << progressTitle;
         GenericToolbox::displayProgressBar(

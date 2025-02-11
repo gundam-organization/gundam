@@ -28,7 +28,7 @@ void RootMinimizer::configureImpl(){
   // read general parameters first
   this->MinimizerBase::configureImpl();
 
-  GenericToolbox::Json::fillValue(_config_, getMonitor().gradientDescentMonitor.isEnabled, "monitorGradientDescent");
+  GenericToolbox::Json::fillValue(_config_, gradientDescentMonitor.isEnabled, "monitorGradientDescent");
   GenericToolbox::Json::fillValue(_config_, _minimizerType_, "minimizer");
   GenericToolbox::Json::fillValue(_config_, _minimizerAlgo_, "algorithm");
 
@@ -55,6 +55,27 @@ void RootMinimizer::configureImpl(){
 }
 void RootMinimizer::initializeImpl(){
   MinimizerBase::initializeImpl();
+
+  if( gradientDescentMonitor.isEnabled ){
+    _monitor_.convergenceMonitor.defineNewQuantity({ "LastStep", "Last step descent", [&](GenericToolbox::VariableMonitor& v){
+      return GenericToolbox::parseUnitPrefix(gradientDescentMonitor.getLastStepDeltaValue(v.getName()), 8); }
+    });
+    _monitor_.convergenceMonitor.addDisplayedQuantity("LastStep");
+    _monitor_.convergenceMonitor.getQuantity("LastStep").title = "Last step descent";
+
+    gradientDescentMonitor.valueDefinitionList.emplace_back(
+        "Total/dof", [](const RootMinimizer* this_){ return this_->getLikelihoodInterface().getLastLikelihood() / this_->fetchNbDegreeOfFreedom(); }
+    );
+    gradientDescentMonitor.valueDefinitionList.emplace_back(
+        "Total", [](const RootMinimizer* this_){ return this_->getLikelihoodInterface().getBuffer().totalLikelihood; }
+    );
+    gradientDescentMonitor.valueDefinitionList.emplace_back(
+        "Stat", [](const RootMinimizer* this_){ return this_->getLikelihoodInterface().getBuffer().statLikelihood; }
+    );
+    gradientDescentMonitor.valueDefinitionList.emplace_back(
+        "Syst", [](const RootMinimizer* this_){ return this_->getLikelihoodInterface().getBuffer().penaltyLikelihood; }
+    );
+  }
 
   LogWarning << "Initializing RootMinimizer..." << std::endl;
 
@@ -238,7 +259,7 @@ void RootMinimizer::minimize(){
     GenericToolbox::writeInTFileWithObjTypeExt(getOwner().getSaveDir(), getMonitor().historyTree.get());
   }
 
-  if( getMonitor().gradientDescentMonitor.isEnabled ){ saveGradientSteps(); }
+  if( gradientDescentMonitor.isEnabled ){ saveGradientSteps(); }
 
   if( _fitHasConverged_ ){ LogInfo << "Minimization has converged!" << std::endl; }
   else{ LogError << "Minimization did not converged." << std::endl; }
@@ -455,6 +476,64 @@ void RootMinimizer::scanParameters( TDirectory* saveDir_ ){
 
   GenericToolbox::triggerTFileWrite(saveDir_);
 }
+double RootMinimizer::evalFit(const double *parArray_){
+  auto out = MinimizerBase::evalFit(parArray_);
+
+  // check the gradient steps
+  if( GenericToolbox::toLowerCase(_minimizerType_) == "minuit2" ){
+
+    if( gradientDescentMonitor.isEnabled ){
+
+      auto& gradient = gradientDescentMonitor;
+
+      // When gradient descent base minimizer probe a point toward the
+      // minimum, every parameter get updated
+      size_t nbValidPars = std::count_if(
+              _minimizerParameterPtrList_.begin(), _minimizerParameterPtrList_.end(),
+              [](const Parameter* par_){ return not ( par_->isFixed() or not par_->isEnabled() ); } );
+      size_t nParUpdated = std::count_if(
+              _minimizerParameterPtrList_.begin(), _minimizerParameterPtrList_.end(),
+              [](const Parameter* par_){ return par_->gotUpdated(); } );
+
+      bool isGradientDescentStep = (nParUpdated == nbValidPars);
+
+      if( nParUpdated >= 5 ) {
+        // It's a partial gradient step (should be more than 5 since HESSE can change 4 params at a time)
+        // Some parameters can be left unchanged by the minimizer: could indicate some problems in the parametrization
+        isGradientDescentStep = true;
+      }
+
+      if( isGradientDescentStep or gradient.stepPointList.empty() ){
+
+        if( gradient.stepPointList.empty() ){
+          // add the initial point
+          LogWarning << "Adding initial point of the gradient monitor: ";
+          gradient.addStep( this );
+        }
+        else{
+          if( gradient.stepPointList.back().fitCallNb == _monitor_.nbEvalLikelihoodCalls - 1 ){
+            LogWarning << "Minimizer is adjusting the step size: ";
+            gradient.fillLastStep( this );
+          }
+          else{
+            LogWarning << "Gradient step detected at iteration #" << _monitor_.nbEvalLikelihoodCalls;
+            if(nParUpdated != nbValidPars){ LogWarning << " (PARTIAL: " << nParUpdated << "/" << nbValidPars << ")"; }
+            LogWarning << ": ";
+            gradient.addStep( this );
+          }
+        }
+
+        if( gradient.stepPointList.size() >= 2 ){
+          LogWarning << gradient.getLastStepValue("Total") + gradient.getLastStepDeltaValue("Total") << " -> ";
+        }
+        LogWarning << gradient.getLastStepValue("Total") << std::endl;
+      }
+    }
+  }
+
+  return out;
+}
+
 
 // const getters
 double RootMinimizer::getTargetEdm() const{
@@ -1043,17 +1122,21 @@ void RootMinimizer::writePostFitData( TDirectory* saveDir_) {
             } // norm
           } // par
 
-          if( getLikelihoodInterface().isThrowAsimovToyParameters() ){
+          if( getLikelihoodInterface().getDataType() == LikelihoodInterface::DataType::Toy ){
             bool draw{false};
 
             for( auto& par : parList_ ){
               double val{par.getThrowValue()};
-              val == val ? draw = true : val = par.getPriorValue();
-              if( isNorm_ ) val = ParameterSet::toNormalizedParValue(val, par);
+
+              if( not std::isnan(val) ){ draw = true; }
+              else{ val = par.getPriorValue(); }
+
+              if( isNorm_ ){ val = ParameterSet::toNormalizedParValue(val, par);}
               toyParametersLine->SetBinContent(1+par.getParameterIndex(), val);
             }
 
-            if( !draw ) toyParametersLine = nullptr;
+            // don't draw the throw line if none is valid
+            if( not draw ){ toyParametersLine = nullptr;}
           }
 
           auto yBounds = GenericToolbox::getYBounds({preFitErrorHist.get(), postFitErrorHist.get(), toyParametersLine.get()});
@@ -1230,7 +1313,7 @@ void RootMinimizer::saveGradientSteps(){
     return;
   }
 
-  LogInfo << "Saving " << getMonitor().gradientDescentMonitor.stepPointList.size() << " gradient steps..." << std::endl;
+  LogInfo << "Saving " << gradientDescentMonitor.stepPointList.size() << " gradient steps..." << std::endl;
 
   // make sure the parameter states get restored as we leave
   auto currentParState = getModelPropagator().getParametersManager().exportParameterInjectorConfig();
@@ -1252,24 +1335,24 @@ void RootMinimizer::saveGradientSteps(){
   auto lastParStep{getOwner().getPreFitParState()};
 
   std::vector<ParameterScanner::GraphEntry> globalGraphList;
-  for(size_t iGradStep = 0 ; iGradStep < getMonitor().gradientDescentMonitor.stepPointList.size() ; iGradStep++ ){
-    GenericToolbox::displayProgressBar(iGradStep, getMonitor().gradientDescentMonitor.stepPointList.size(), LogInfo.getPrefixString() + "Saving gradient steps...");
+  for(size_t iGradStep = 0 ; iGradStep < gradientDescentMonitor.stepPointList.size() ; iGradStep++ ){
+    GenericToolbox::displayProgressBar(iGradStep, gradientDescentMonitor.stepPointList.size(), LogInfo.getPrefixString() + "Saving gradient steps...");
 
     // why do we need to remute the logger at each loop??
     ParameterSet::muteLogger(); Propagator::muteLogger(); ParametersManager::muteLogger();
-    getModelPropagator().getParametersManager().injectParameterValues(getMonitor().gradientDescentMonitor.stepPointList[iGradStep].parState );
+    getModelPropagator().getParametersManager().injectParameterValues(gradientDescentMonitor.stepPointList[iGradStep].parState );
 
     getLikelihoodInterface().propagateAndEvalLikelihood();
 
     if( not GundamGlobals::isLightOutputMode() ) {
       auto outDir = GenericToolbox::mkdirTFile(getOwner().getSaveDir(), Form("fit/gradient/step_%i", int(iGradStep)));
-      GenericToolbox::writeInTFileWithObjTypeExt(outDir, TNamed("parState", GenericToolbox::Json::toReadableString(getMonitor().gradientDescentMonitor.stepPointList[iGradStep].parState).c_str()));
+      GenericToolbox::writeInTFileWithObjTypeExt(outDir, TNamed("parState", GenericToolbox::Json::toReadableString(gradientDescentMonitor.stepPointList[iGradStep].parState).c_str()));
       GenericToolbox::writeInTFileWithObjTypeExt(outDir, TNamed("llhState", getLikelihoodInterface().getSummary().c_str()));
     }
 
     // line scan from previous point
-    getParameterScanner().scanSegment( nullptr, getMonitor().gradientDescentMonitor.stepPointList[iGradStep].parState, lastParStep, 8 );
-    lastParStep = getMonitor().gradientDescentMonitor.stepPointList[iGradStep].parState;
+    getParameterScanner().scanSegment( nullptr, gradientDescentMonitor.stepPointList[iGradStep].parState, lastParStep, 8 );
+    lastParStep = gradientDescentMonitor.stepPointList[iGradStep].parState;
 
     if( globalGraphList.empty() ){
       // copy

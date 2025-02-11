@@ -27,7 +27,7 @@ public:
     // utils
     [[nodiscard]] bool isOverlapping(const Edges& other_) const;
     [[nodiscard]] double getCenterValue() const { return min + (max-min)/2.; }
-    [[nodiscard]] std::string getSummary() const;
+    [[nodiscard]] std::string getSummary(bool shallow_ = true) const;
 
     bool isConditionVar{false};
     int index{-1};
@@ -75,7 +75,7 @@ public:
   [[nodiscard]] std::vector<std::string> buildVariableNameList() const;
 
   // Misc
-  [[nodiscard]] std::string getSummary() const;
+  [[nodiscard]] std::string getSummary(bool shallow_ = true) const;
   [[nodiscard]] std::vector<double> generateBinTarget(const std::vector<std::string>& varNameList_ = {}) const;
 
 private:

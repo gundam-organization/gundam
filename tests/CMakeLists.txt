@@ -8,6 +8,7 @@
 #
 
 cmessage( STATUS "Setting up tests..." )
+enable_testing()
 
 # Run the gundam-tests.sh script which runs scripted tests.  The
 # COMMAND is a little complicated since the testing script needs to
@@ -27,50 +28,48 @@ add_test(
     COMMAND "sh" "-c" "(cd ${CMAKE_SOURCE_DIR}/tests && ./gundam-tests.sh ${GUNDAM_TESTS_ARGUMENT} -a ${CMAKE_BINARY_DIR}/Testing/gundam-tests.$(date +%Y-%m-%d-%H%M%S) )"
 )
 
-## Compiled unit tests using GoogleTest.  These are only run if GTest
-## is found.
-if (SKIP_GOOGLE_TEST)
-  cmessage( WARNING "GTest unit testing explicitly disabled by user")
-else(SKIP_GOOGLE_TEST)
-  # Use the pre cmake 1.10 interface because we set 3.5 as the minimum cmake
-  find_package(GTest)
-endif(SKIP_GOOGLE_TEST)
-if (GTEST_FOUND)
-  cmessage( STATUS "GTest package enabled for developer unit tests.")
-  enable_testing()
+if( WITH_GOOGLE_TEST )
+  ## Compiled unit tests using GoogleTest.  These are only run if GTest
+  ## is found.
+  find_package(GTest QUIET)
 
-  # Setup the GUNDAM specific unit tests.
-  add_executable(gundamGTest_units.exe
-    GTests/unitTest_JointProbability.cpp)
-  target_link_libraries(gundamGTest_units.exe GTest::gtest_main)
-  target_link_libraries(gundamGTest_units.exe GundamStatisticalInference)
-  gtest_discover_tests(gundamGTest_units.exe)
+  if(GTEST_FOUND)
+    if( WITH_CACHE_MANAGER )
 
-  # Setup the hemi test suite for the host
-  add_executable(gundamGTest_host.exe
-    GTests/hemiArrayTest.cpp
-    GTests/hemiExecutionPolicyTest.cpp
-    GTests/cachedSumsTest.cpp
-    GTests/hemiExternals.cpp)
-  target_link_libraries(gundamGTest_host.exe GTest::gtest_main)
-  target_link_libraries(gundamGTest_host.exe GundamCacheManager)
-  target_compile_definitions(gundamGTest_host.exe PUBLIC HEMI_CUDA_DISABLE)
-  gtest_discover_tests(gundamGTest_host.exe)
+      cmessage( STATUS "Compiling google tests..." )
+      # Setup the hemi test suite for the host
 
-  if(CMAKE_CUDA_COMPILER)
-    # Setup the hemi test suite for the device.
-    add_executable(gundamGTest_device.exe
-      GTests/hemiArrayTest.cu
-      GTests/hemiExecutionPolicyTest.cu
-      GTests/hemiLaunch.cu
-      GTests/cachedSumsTest.cu
-      GTests/hemiExternals.cpp)
-    target_link_libraries(gundamGTest_device.exe GTest::gtest_main)
-    target_link_libraries(gundamGTest_device.exe GundamCacheManager)
-    gtest_discover_tests(gundamGTest_device.exe)
-  else(CMAKE_CUDA_COMPILER)
-    cmessage( WARNING "CUDA compiler not available. Skip CUDA unit tests.")
-  endif(CMAKE_CUDA_COMPILER)
-else(GTEST_FOUND)
-  cmessage( WARNING "GTest package not available. Developer tests disabled.")
-endif(GTEST_FOUND)
+      add_executable(gundamGTest_host.exe
+          GTests/hemiArrayTest.cpp
+          GTests/hemiExecutionPolicyTest.cpp
+          GTests/cachedSumsTest.cpp
+          GTests/hemiExternals.cpp)
+      target_link_libraries(gundamGTest_host.exe GTest::gtest_main)
+      target_link_libraries(gundamGTest_host.exe GundamCacheManager)
+      target_compile_definitions(gundamGTest_host.exe PUBLIC HEMI_CUDA_DISABLE)
+      gtest_discover_tests(gundamGTest_host.exe)
+
+      if(CMAKE_CUDA_COMPILER)
+        # Setup the hemi test suite for the device.
+        add_executable(gundamGTest_device.exe
+            GTests/hemiArrayTest.cu
+            GTests/hemiExecutionPolicyTest.cu
+            GTests/hemiLaunch.cu
+            GTests/cachedSumsTest.cu
+            GTests/hemiExternals.cpp)
+        target_link_libraries(gundamGTest_device.exe GTest::gtest_main)
+        target_link_libraries(gundamGTest_device.exe GundamCacheManager)
+        gtest_discover_tests(gundamGTest_device.exe)
+      endif(CMAKE_CUDA_COMPILER)
+
+    else( WITH_CACHE_MANAGER )
+
+      cmessage( WARNING "WITH_CACHE_MANAGER is set to false. Skipping Google test executables." )
+
+    endif( WITH_CACHE_MANAGER )
+
+  else(GTEST_FOUND)
+    cmessage( FATAL_ERROR "Google test is not available." )
+  endif(GTEST_FOUND)
+
+endif()

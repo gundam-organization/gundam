@@ -103,7 +103,7 @@ std::string DialCollection::getSummary(bool shallow_){
     // print parameters
     for( auto& dialInterface : _dialInterfaceList_ ){
       if( not isEventByEvent() ){
-        ss << std::endl << "  " << dialInterface.getSummary();
+        ss << std::endl << "  " << dialInterface.getSummary(shallow_);
       }
     }
   }

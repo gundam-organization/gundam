@@ -87,7 +87,7 @@ public:
   void addParameterReference( const ParameterReference& parReference_);
 
   /// Simple printout function for debug info on error
-  [[nodiscard]] std::string getSummary() const;
+  [[nodiscard]] std::string getSummary(bool shallow_ = true) const;
 
 private:
   /// Flag if the member can be still edited.

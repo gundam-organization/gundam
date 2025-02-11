@@ -79,11 +79,10 @@ public:
   [[nodiscard]] const JsonType &getDialSetDefinitions() const{ return _dialSetDefinitions_; }
   [[nodiscard]] const TMatrixD* getInvertedEigenVectors() const{ return _eigenVectorsInv_.get(); }
   [[nodiscard]] const TMatrixD* getEigenVectors() const{ return _eigenVectors_.get(); }
-  [[nodiscard]] const TMatrixD* getInverseStrippedCovarianceMatrix() const{ return _inverseStrippedCovarianceMatrix_.get(); }
   [[nodiscard]] const TVectorD* getDeltaVectorPtr() const{ return _deltaVectorPtr_.get(); }
   [[nodiscard]] const std::vector<JsonType>& getCustomParThrow() const{ return _customParThrow_; }
-  [[nodiscard]] const std::shared_ptr<TMatrixDSym> &getPriorCorrelationMatrix() const{ return _priorCorrelationMatrix_; }
   [[nodiscard]] const std::shared_ptr<TMatrixDSym> &getPriorCovarianceMatrix() const { return _priorCovarianceMatrix_; }
+  [[nodiscard]] const std::shared_ptr<TMatrixD> &getInverseCovarianceMatrix() const{ return _inverseCovarianceMatrix_; }
 
   /// True if all of the enabled parameters have valid values.
   [[nodiscard]] bool isValid() const;
@@ -115,7 +114,7 @@ public:
 
   void updateDeltaVector() const;
 
-  /// Set all of the parameters to their prior values.
+  /// Set all the parameters to their prior values.
   void moveParametersToPrior();
 
   /// Set the parameter values based on a random throw with fluctuations
@@ -243,11 +242,11 @@ private:
   std::shared_ptr<TVectorD> _originalParBuffer_{nullptr};
   std::shared_ptr<TMatrixD> _projectorMatrix_{nullptr};
 
-
-  std::shared_ptr<TMatrixDSym> _priorCovarianceMatrix_{nullptr};        // matrix coming from the file
-  std::shared_ptr<TMatrixDSym> _priorCorrelationMatrix_{nullptr};        // matrix coming from the file
-  std::shared_ptr<TMatrixDSym> _strippedCovarianceMatrix_{nullptr};        // matrix stripped from fixed/freed parameters
-  std::shared_ptr<TMatrixD>    _inverseStrippedCovarianceMatrix_{nullptr}; // inverse matrix used for chi2
+  // original loaded from file
+  std::shared_ptr<TMatrixDSym> _priorFullCovarianceMatrix_{nullptr};
+  // matrices stripped from fixed/freed parameters
+  std::shared_ptr<TMatrixDSym> _priorCovarianceMatrix_{nullptr};
+  std::shared_ptr<TMatrixD> _inverseCovarianceMatrix_{nullptr}; // inverse matrix used for chi2
 
   std::shared_ptr<TVectorD>  _parameterPriorList_{nullptr};
   std::shared_ptr<TVectorD>  _parameterLowerBoundsList_{nullptr};

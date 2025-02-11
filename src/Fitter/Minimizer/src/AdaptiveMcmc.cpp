@@ -337,7 +337,7 @@ bool AdaptiveMcmc::adaptiveDefaultProposalCovariance( AdaptiveStepMCMC& mcmc,
       int in2 = par2->getParameterIndex();
       if (in2 <= in1) continue;
       const std::shared_ptr<TMatrixDSym>& corr
-          = set1->getPriorCorrelationMatrix();
+          = GenericToolbox::toCorrelationMatrix(set1->getPriorCovarianceMatrix());
       if (!corr) continue;
       double correlation = (*corr)(in1,in2);
       // Don't impose very small correlations, let them be discovered.

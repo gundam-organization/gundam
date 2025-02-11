@@ -23,7 +23,7 @@ double DialResponseSupervisor::process(double reponse_) const {
 
   return reponse_;
 }
-std::string DialResponseSupervisor::getSummary() const{
+std::string DialResponseSupervisor::getSummary(bool shallow_ ) const{
   std::stringstream ss;
 
   if(not std::isnan(_minResponse_)){
