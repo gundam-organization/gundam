@@ -8,12 +8,22 @@
 #include "GundamGlobals.h"
 #include "GundamUtils.h"
 
-
 #include "GenericToolbox.Root.h"
 #include "Logger.h"
 
+#include "TROOT.h"
+#include "TPython.h"
+
 #include <locale>
 #include <string>
+
+// Add a mostly hidden global declaration of the SimpleMcmcmSequencer class
+// so that it can be used to define the sequence used for the MCMC.
+SimpleMcmcSequencer gMCMC;
+
+SimpleMcmc::SimpleMcmc(FitterEngine* owner_): MinimizerBase(owner_) {
+  gMCMC.setEngine(owner_);
+}
 
 void SimpleMcmc::configureImpl(){
   this->MinimizerBase::configureImpl();
@@ -76,6 +86,12 @@ void SimpleMcmc::configureImpl(){
   // burn-in.
   GenericToolbox::Json::fillValue(_config_, _saveBurnin_, "saveBurnin");
 
+  // Get the sequence for the burn-in.
+  _burninSequence_
+    = R"cxx(for (int chain = 0; chain < gMCMC.Burning(); ++chain) {
+      gMCMC.RunChain("Burn-in chain", chain);})cxx";
+  GenericToolbox::Json::fillValue(_config_,_burninSequence_,"burninSequence");
+
   // Get the MCMC chain parameters.  A run is broken into "mini-Chains"
   // called a "cycle" where the posterior covariance information is updated
   // after each mini-chain.
@@ -87,6 +103,12 @@ void SimpleMcmc::configureImpl(){
     GenericToolbox::Json::fillValue(_config_, tmp, "steps");
     _steps_.set(tmp);
   }
+
+  // Get the sequence for the chain.
+  _sequence_
+    = R"cxx(for (int chain = 0; chain < gMCMC.Cycles(); ++chain) {
+      gMCMC.RunCycle("Chain", chain);})cxx";
+  GenericToolbox::Json::fillValue(_config_,_sequence_,"sequence");
 
   ///////////////////////////////////////////////////////////////
   // Get parameters for the adaptive proposal.
@@ -165,7 +187,8 @@ void SimpleMcmc::configureImpl(){
   // required to get to an uncorrelated point.
   {
     int tmp{_adaptiveCovWindow_};
-    GenericToolbox::Json::fillValue(_config_, tmp, "adaptiveCovWindow");
+    GenericToolbox::Json::fillValue(
+      _config_, tmp, {{"covarianceWindow"}, {"adaptiveCovWindow"}});
     _adaptiveCovWindow_.set(tmp);
   }
 
@@ -175,7 +198,8 @@ void SimpleMcmc::configureImpl(){
   // covariance window).
   {
     double tmp{_adaptiveCovDeweighting_};
-    GenericToolbox::Json::fillValue(_config_, tmp, "adaptiveCovDeweighting");
+    GenericToolbox::Json::fillValue(
+      _config_, tmp, {{"covarianceDeweighting"}, {"adaptiveCovDeweighting"}});
     _adaptiveCovDeweighting_.set(tmp);
   }
 
@@ -197,7 +221,8 @@ void SimpleMcmc::configureImpl(){
   // Make this very large effectively locks the step size.
   {
     int tmp{_adaptiveWindow_};
-    GenericToolbox::Json::fillValue(_config_, tmp, "adaptiveWindow");
+    GenericToolbox::Json::fillValue(_config_, tmp,
+                                    {{"acceptanceWindow"}, {"adaptiveWindow"}});
     _adaptiveWindow_.set(tmp);
   }
 
@@ -221,9 +246,13 @@ void SimpleMcmc::restoreConfiguration() {
   _randomStart_.restore();
   _steps_.restore();
   _modelStride_.restore();
+  _adaptiveFreezeStep_.restore();
+  _adaptiveFreezeCov_.restore();
+  _adaptiveResetCov_.restore();
   _adaptiveCovWindow_.restore();
   _adaptiveCovDeweighting_.restore();
   _adaptiveWindow_.restore();
+  _adaptiveAcceptanceAlgorithm_.restore();
 }
 
 /// Copy the current parameter values to the tree.
@@ -685,6 +714,8 @@ void SimpleMcmc::adaptiveStart(AdaptiveStepMCMC& mcmc,
 
 void SimpleMcmc::adaptiveSetupAndRun(AdaptiveStepMCMC& mcmc) {
 
+  _adaptiveMCMC_ = &mcmc;
+
   mcmc.GetProposeStep().SetDim(getMinimizerFitParameterPtr().size());
   mcmc.GetLogLikelihood().functor
     = std::make_unique<ROOT::Math::Functor>(
@@ -719,31 +750,43 @@ void SimpleMcmc::adaptiveSetupAndRun(AdaptiveStepMCMC& mcmc) {
   std::string restorationTree = "FitterEngine/fit/" + _outTreeName_;
   bool restored = adaptiveRestoreState(mcmc,_adaptiveRestore_, restorationTree);
 
-  // Check if there should be some burn-in cycles.  Burn-in in this context is
-  // mainly about moving the current point away from the default.
-  if (not restored and _burninCycles_ > 0 and _burninSteps_ > 0) {
-    for (int chain = 0; chain < _burninCycles_; ++chain) {
-      _steps_ = _burninSteps_;
-      _adaptiveWindow_ = _burninWindow_;
-      _adaptiveCovWindow_ = _burninCovWindow_;
-      _adaptiveCovDeweighting_ = _burninCovDeweighting_;
-      _adaptiveFreezeStep_ = (chain >= _burninFreezeAfter_);
-      _adaptiveFreezeCov_ = false;
-      _adaptiveResetCov_ = (chain < _burninResets_);
-      adaptiveRunCycle(mcmc,"Burn-in", chain);
-      restoreConfiguration();
+  // Check if there should be some burn-in cycles.
+  if (not restored and _burninCycles_ > 0) {
+    gMCMC.SetSequencerState(true);
+#ifdef HARD_CODE_BURNIN_SEQUENCE
+    for (int chain = 0; chain < gMCMC.Burnin(); ++chain) {
+      gMCMC.Steps(_burninSteps_);
+      gMCMC.AcceptanceWindow(_burninWindow_);
+      gMCMC.CovarianceWindow(_burninCovWindow_);
+      gMCMC.CovarianceDeweighting(_burninCovDeweighting_);
+      gMCMC.FreezeStep((chain >= _burninFreezeAfter_));
+      gMCMC.FreezeCovariance(false);
+      gMCMC.ResetCovariance((chain < _burninResets_));
+      gMCMC.RunCycle("Burn-in", chain);
     }
+#else
+    LogInfo << "Burn-in MCMC with sequence:" << std::endl << _burninSequence_ << std::endl;
+    gROOT->ProcessLineSync(_burninSequence_.c_str());
+    LogInfo << "Burn-in line processed" << std::endl;
+#endif
+    gMCMC.SetSequencerState(false);
     LogInfo << "Finished burn-in chains" << std::endl;
   }
 
   ////////////////////////////////////////////////////////////////
   // Run the main cycles.
-  for (int chain = 0; chain < _cycles_; ++chain) {
-    _adaptiveFreezeStep_ = (chain >= _adaptiveFreezeAfter_);
-    _adaptiveFreezeCov_ = (chain >= _adaptiveFreezeCorrelationsAfter_);
-    adaptiveRunCycle(mcmc,"Chain", chain);
-    restoreConfiguration();
+  gMCMC.SetSequencerState(true);
+#ifdef HARD_CODE_SEQUENCE
+  for (int chain = 0; chain < gMCMC.Cycles(); ++chain) {
+    gMCMC.FreezeStep((chain >= _adaptiveFreezeAfter_));
+    gMCMC.FreezeCovariance((chain >= _adaptiveFreezeCorrelationsAfter_));
+    gMCMC.RunCycle("Chain", chain);
   }
+#else
+  LogInfo << "Run MCMC with Sequence" << std::endl << _sequence_ << std::endl;
+  gROOT->ProcessLineSync(_sequence_.c_str());
+#endif
+  gMCMC.SetSequencerState(false);
   LogInfo << "Finished running chains" << std::endl;
 
 }
@@ -1027,6 +1070,34 @@ bool SimpleMcmc::hasValidParameterValues() const {
   return (invalid == 0);
 }
 
+SimpleMcmcSequencer::SimpleMcmcSequencer() {};
+SimpleMcmcSequencer::~SimpleMcmcSequencer() {};
+void SimpleMcmcSequencer::setEngine(FitterEngine* engine) {_engine_ = engine;}
+SimpleMcmc& SimpleMcmcSequencer::Owner() {
+  SimpleMcmc* mcmc
+    = dynamic_cast<SimpleMcmc*>(&(_engine_->getMinimizer()));
+  LogThrowIf(not mcmc, "SimpleMcmcSequencer with wrong type of minimizer");
+  LogThrowIf(not _validState_,
+             "SimpleMcmcSequencer used outside of a valid SimpleMcmc state");
+  return *mcmc;
+}
+void SimpleMcmcSequencer::SetSequencerState(bool s) {_validState_ = s;}
+void SimpleMcmcSequencer::RandomStart(bool v) {Owner()._randomStart_ = v;}
+void SimpleMcmcSequencer::Steps(int v) {Owner()._steps_ = v;}
+void SimpleMcmcSequencer::ModelStride(int v) {Owner()._modelStride_ = v;}
+void SimpleMcmcSequencer::FreezeStep(bool v) {Owner()._adaptiveFreezeStep_ = v;}
+void SimpleMcmcSequencer::FreezeCovariance(bool v) {Owner()._adaptiveFreezeCov_ = v;}
+void SimpleMcmcSequencer::ResetCovariance(bool v) {Owner()._adaptiveResetCov_ = v;}
+void SimpleMcmcSequencer::CovarianceWindow(int v) {Owner()._adaptiveCovWindow_ = v;}
+void SimpleMcmcSequencer::CovarianceDeweighting(double v) {Owner()._adaptiveCovDeweighting_ = v;}
+void SimpleMcmcSequencer::AcceptanceWindow(int v) {Owner()._adaptiveWindow_ = v;}
+void SimpleMcmcSequencer::AcceptanceAlgorithm(int v) {Owner()._adaptiveAcceptanceAlgorithm_ = v;}
+int SimpleMcmcSequencer::Burnin() {return Owner()._burninCycles_;}
+int SimpleMcmcSequencer::Cycles() {return Owner()._cycles_;}
+void SimpleMcmcSequencer::RunCycle(std::string name, int id) {
+  Owner().adaptiveRunCycle(*Owner()._adaptiveMCMC_, name, id);
+  Owner().restoreConfiguration();
+}
 
 //  A Lesser GNU Public License
 

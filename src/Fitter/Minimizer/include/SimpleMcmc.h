@@ -7,6 +7,7 @@
 
 #include "ParameterSet.h"
 #include "MinimizerBase.h"
+#include "FitterEngine.h"
 
 #include "ConfigurationValue.h"
 
@@ -32,6 +33,7 @@ class FitterEngine;
 /// defined as part of the propagator (i.e. included in the
 /// LikelihoodInterface).
 class SimpleMcmc : public MinimizerBase {
+  friend class SimpleMcmcSequencer;
 
 protected:
   void configureImpl() override;
@@ -42,7 +44,7 @@ public:
   void minimize() override; /// Generate a chain.
 
   // c-tor
-  explicit SimpleMcmc(FitterEngine* owner_): MinimizerBase(owner_) {}
+  explicit SimpleMcmc(FitterEngine* owner_);
 
   // core
 
@@ -109,24 +111,6 @@ private:
   /// is during a burn-in run when the proposal covariance is being tuned.
   bool _saveRawSteps_{false};
 
-  /// The number of burn-in cycles to use.
-  int _burninCycles_{0};
-
-  /// The number of cycles to dump during burn-in
-  int _burninResets_{0};
-
-  /// The length of each burn-in cycle
-  int _burninSteps_{10000};
-
-  /// Save the burnin (true) or dump it (false)
-  bool _saveBurnin_{true};
-
-  /// The number of run cycles to use (each cycle will have _steps_ steps.
-  int _cycles_{1};
-
-  /// The number of steps in each run cycle.
-  ConfigurationValue<int> _steps_{10000};
-
   /// The model for the likelihood takes up quite a bit of space, so it should
   /// NOT be saved most of the time.  The _modelStride_ sets the number of
   /// steps between when the model is saved to the output file.  The model is a
@@ -134,6 +118,32 @@ private:
   /// posterior predictive p-value.  The stride should be large(ish) compared
   /// to the autocorrelation lag, or zero (if not saving the model).
   ConfigurationValue<int> _modelStride_{5000};
+
+  /// The number of run cycles to use (each cycle will have _steps_ steps.
+  int _cycles_{1};
+
+  /// The sequence used for the MCMC.
+  std::string _sequence_;
+
+  /// The number of burn-in cycles to use.
+  int _burninCycles_{0};
+
+  /// The sequence used for the burn-in stage of the MCMC.  This is only used
+  /// when the state has not been restored from a previous chain, and the
+  /// number of burn-in cycles has been set to more than zero.
+  std::string _burninSequence_;
+
+  /// The number of steps in each run cycle.
+  ConfigurationValue<int> _steps_{10000};
+
+  /// The length of each burn-in cycle
+  int _burninSteps_{10000};
+
+  /// Save the burnin (true) or dump it (false)
+  bool _saveBurnin_{true};
+
+  /// The number of cycles to dump during burn-in
+  int _burninResets_{0};
 
   //////////////////////////////////////////
   // Parameters for the adaptive stepper.
@@ -287,6 +297,10 @@ private:
   ///////////////////////////////////////////////////////////////////
   // Handle the different stepper special cases.
 
+  ///////////////////////////////////////////////////////////////////
+  // Fixed Step Support
+  ///////////////////////////////////////////////////////////////////
+
   /// TSimpleMCMC class for the FixedStepMCMC.
   typedef sMCMC::TSimpleMCMC<PrivateProxyLikelihood,
                              sMCMC::TProposeSimpleStep> FixedStepMCMC;
@@ -300,9 +314,14 @@ private:
   /// similar.
   void fixedSetupAndRun(FixedStepMCMC& mcmc);
 
+  ///////////////////////////////////////////////////////////////////
+  // Adaptive Step Support
+  ///////////////////////////////////////////////////////////////////
+
   /// TSimpleMCMC class for the AdaptiveStepMCMC.
   typedef sMCMC::TSimpleMCMC<PrivateProxyLikelihood,
                              sMCMC::TProposeAdaptiveStep> AdaptiveStepMCMC;
+  AdaptiveStepMCMC* _adaptiveMCMC_{nullptr};
 
   /// The implementation when the adaptive step is used.  This is the default
   /// proposal for TSimpleMCMC, but is also dangerous for "unpleasant"
@@ -338,7 +357,6 @@ private:
                         std::string chainName,
                         int chainId);
 
-
   /// Start the MCMC and setup the prior.  This creates the prior using
   /// adaptiveMakePrior() which will randomize the prior if requested.
   void adaptiveStart(AdaptiveStepMCMC& mcmc,
@@ -352,7 +370,75 @@ private:
                          bool randomize);
 
 };
-#endif // GUNDAM_ADAPTIVE_MCMC_H
+
+/// A class to implement the MCMC sequencer used to define the order of
+/// operations.  This implements the functions that are available for the
+/// sequence: and burninSequence: directives.  None of these methods should be
+/// called from C++ code.
+class SimpleMcmcSequencer {
+  friend SimpleMcmc;
+
+private:
+  FitterEngine* _engine_{nullptr};
+  bool _validState_{false};
+
+  /// Make the engine available to the sequencer.
+  void setEngine(FitterEngine* engine);
+
+  /// Get the MCMC class.  This will throw if there is a problem
+  SimpleMcmc& Owner();
+
+  /// Used by SimpleMcmc to flag that it is (or isn't) in a state where the
+  /// SimpleMcmcSequencer commands can be used.
+  void SetSequencerState(bool s);
+
+public:
+  SimpleMcmcSequencer();
+  virtual ~SimpleMcmcSequencer();
+
+  /// Start the MCMC from a random position.
+  void RandomStart(bool v);
+
+  /// Override the number of steps in the next cycle.  This is reset to the
+  /// default value after the cycle is run
+  void Steps(int v);
+
+  /// Override the number of steps between saving the model in the next cycle.
+  /// This is reset to the default value after the cycle is run.
+  void ModelStride(int v);
+
+  /// Freeze the step size for the next cycle.
+  void FreezeStep(bool v);
+
+  /// Freeze the covariance for the next cycle.
+  void FreezeCovariance(bool v);
+
+  /// Reset the covariance before the next cycle
+  void ResetCovariance(bool v);
+
+  /// Set the covariance averaging window for the next cycle.
+  void CovarianceWindow(int v);
+
+  /// Set the covariance deweighting for the next cycle.
+  void CovarianceDeweighting(double v);
+
+  /// Set the window used to calculate the acceptance during the next cycle.
+  void AcceptanceWindow(int v);
+
+  /// Low level control of how the step proposal works for the next cycle.
+  void AcceptanceAlgorithm(int v);
+
+  /// The expected number of burn-in cycles
+  int Burnin();
+
+  /// The expected number of cycles.
+  int Cycles();
+
+  /// Run a cycle with the current parameters.
+  void RunCycle(std::string name, int id);
+};
+
+#endif // GUNDAM_SIMPLE_MCMC_H
 
 //  A Lesser GNU Public License
 
