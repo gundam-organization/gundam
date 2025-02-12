@@ -35,6 +35,7 @@ void RootMinimizer::configureImpl(){
   GenericToolbox::Json::fillValue(_config_, _strategy_, "strategy");
   GenericToolbox::Json::fillValue(_config_, _printLevel_, "print_level");
   GenericToolbox::Json::fillValue(_config_, _tolerance_, "tolerance");
+  GenericToolbox::Json::fillValue(_config_, _tolerancePerDegreeOfFreedom_, "tolerancePerDegreeOfFreedom");
   GenericToolbox::Json::fillValue(_config_, _maxIterations_, {{"maxIterations"},{"max_iter"}});
   GenericToolbox::Json::fillValue(_config_, _maxFcnCalls_, {{"maxFcnCalls"},{"max_fcn"}});
 
@@ -78,6 +79,15 @@ void RootMinimizer::initializeImpl(){
   }
 
   LogWarning << "Initializing RootMinimizer..." << std::endl;
+  if( not std::isnan(_tolerancePerDegreeOfFreedom_) ) {
+    LogWarning << "Using tolerance per degree of freedom: " << _tolerancePerDegreeOfFreedom_ << std::endl;
+    _tolerance_ = _tolerancePerDegreeOfFreedom_ * fetchNbDegreeOfFreedom();
+  }
+
+  LogInfo << "Tolerance is set to: " << _tolerance_ << std::endl;
+  LogInfo << "The minimizer will run until it reaches an Estimated Distance to Minimum (EDM) of: " << getTargetEdm() << std::endl;
+  LogInfo << "EDM per degree of freedom is: " << getTargetEdm()/fetchNbDegreeOfFreedom() << std::endl;
+
 
   LogInfo << "Defining minimizer as: " << _minimizerType_ << "/" << _minimizerAlgo_ << std::endl;
   _rootMinimizer_ = std::unique_ptr<ROOT::Math::Minimizer>(
@@ -197,6 +207,7 @@ void RootMinimizer::minimize(){
 
     getMonitor().minimizerTitle = _minimizerType_ + "/" + "Simplex";
     getMonitor().stateTitleMonitor = "Running Simplex";
+    getMonitor().stateTitleMonitor += " / Target EDM: " + std::to_string(getTargetEdm());
 
     // SIMPLEX
     getMonitor().isEnabled = true;
@@ -227,6 +238,7 @@ void RootMinimizer::minimize(){
 
   getMonitor().minimizerTitle = _minimizerType_ + "/" + _minimizerAlgo_;
   getMonitor().stateTitleMonitor = "Running " + _rootMinimizer_->Options().MinimizerAlgorithm();
+  getMonitor().stateTitleMonitor += " / Target EDM: " + std::to_string(getTargetEdm());
 
   getMonitor().isEnabled = true;
   // dumpFitParameterSettings(); // Dump internal ROOT::Minimizer info
@@ -1344,8 +1356,8 @@ void RootMinimizer::saveGradientSteps(){
 
     getLikelihoodInterface().propagateAndEvalLikelihood();
 
-    if( not GundamGlobals::isLightOutputMode() ) {
-      auto outDir = GenericToolbox::mkdirTFile(getOwner().getSaveDir(), Form("fit/gradient/step_%i", int(iGradStep)));
+    if( not GundamGlobals::isLightOutputMode() and gradientDescentMonitor.writeGradientSteps ) {
+      auto outDir = GenericToolbox::mkdirTFile(getOwner().getSaveDir(), Form("fit/gradient/steps/step_%i", int(iGradStep)));
       GenericToolbox::writeInTFileWithObjTypeExt(outDir, TNamed("parState", GenericToolbox::Json::toReadableString(gradientDescentMonitor.stepPointList[iGradStep].parState).c_str()));
       GenericToolbox::writeInTFileWithObjTypeExt(outDir, TNamed("llhState", getLikelihoodInterface().getSummary().c_str()));
     }
@@ -1372,28 +1384,32 @@ void RootMinimizer::saveGradientSteps(){
   }
 
   if( not globalGraphList.empty() ){
-    auto outDir = GenericToolbox::mkdirTFile(getOwner().getSaveDir(), "fit/gradient/global");
     for( auto& gEntry : globalGraphList ){
       gEntry.scanDataPtr->title = "Minimizer path to minimum";
-      ParameterScanner::writeGraphEntry(gEntry, outDir);
-    }
-
-    outDir = GenericToolbox::mkdirTFile(getOwner().getSaveDir(), "fit/gradient/globalRelative");
-    for( auto& gEntry : globalGraphList ){
-      if( gEntry.graph.GetN() == 0 ){ continue; }
-
-      double minY{gEntry.graph.GetY()[gEntry.graph.GetN()-1]};
-      double maxY{gEntry.graph.GetY()[0]};
-      double delta{1E-6*std::abs( maxY - minY )};
-      // allow log scale
-      minY += delta;
-
-      for( int iPt = 0 ; iPt < gEntry.graph.GetN() ; iPt++ ){
-        gEntry.graph.GetY()[iPt] -= minY;
+      if( gradientDescentMonitor.writeDescentPaths ) {
+        ParameterScanner::writeGraphEntry(gEntry, GenericToolbox::mkdirTFile(getOwner().getSaveDir(), "fit/gradient/global") );
       }
-      gEntry.scanDataPtr->title = "Minimizer path to minimum (difference)";
-      ParameterScanner::writeGraphEntry(gEntry, outDir);
     }
+
+    if( gradientDescentMonitor.writeDescentPathsRelative ) {
+      auto* outDir = GenericToolbox::mkdirTFile(getOwner().getSaveDir(), "fit/gradient/globalRelative");
+      for( auto& gEntry : globalGraphList ){
+        if( gEntry.graph.GetN() == 0 ){ continue; }
+
+        double minY{gEntry.graph.GetY()[gEntry.graph.GetN()-1]};
+        double maxY{gEntry.graph.GetY()[0]};
+        double delta{1E-6*std::abs( maxY - minY )};
+        // allow log scale
+        minY += delta;
+
+        for( int iPt = 0 ; iPt < gEntry.graph.GetN() ; iPt++ ){
+          gEntry.graph.GetY()[iPt] -= minY;
+        }
+        gEntry.scanDataPtr->title = "Minimizer path to minimum (difference)";
+        ParameterScanner::writeGraphEntry(gEntry, outDir);
+      }
+    }
+
   }
 
 }

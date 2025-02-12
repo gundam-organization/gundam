@@ -561,9 +561,21 @@ void ParameterScanner::writeGraphEntry(GraphEntry& entry_, TDirectory* saveDir_)
     entry_.graph.SetMarkerStyle( kFullTriangleUp );
   }
 
+  // TODO: seem to not work
+  double yMin{*std::min_element(entry_.graph.GetY(), entry_.graph.GetY() + entry_.graph.GetN())};
+  double yMax{*std::max_element(entry_.graph.GetY(), entry_.graph.GetY() + entry_.graph.GetN())};
+  // enabling the log scale
+  if( yMin == 0 ){ yMin = yMax*1e-10; }
+  entry_.graph.SetMinimum(yMin);
+  entry_.graph.SetMaximum(yMax);
+  entry_.graph.GetYaxis()->SetRangeUser(yMin, yMax);
+  entry_.graph.GetYaxis()->SetLimits(yMin, yMax);
+
   GenericToolbox::writeInTFileWithObjTypeExt(
-      GenericToolbox::mkdirTFile( saveDir_, entry_.scanDataPtr->folder ),
+      GenericToolbox::mkdirTFile( saveDir_,
+          entry_.scanDataPtr->folder + "/" + GenericToolbox::generateCleanBranchName(entry_.fitParPtr->getOwner()->getName())
+        ),
       entry_.graph,
-      GenericToolbox::generateCleanBranchName(entry_.fitParPtr->getFullTitle())
+      GenericToolbox::generateCleanBranchName("n" + entry_.fitParPtr->getTitle())
   );
 }
