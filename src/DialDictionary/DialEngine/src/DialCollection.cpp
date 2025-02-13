@@ -418,6 +418,7 @@ bool DialCollection::initializeNormDialsWithParBinning() {
   this->readGlobals(_config_);
 
   // Read the binning
+  LogInfo << "Defining binned dials for " << getTitle() << std::endl;
   _dialBinSet_ = BinSet();
   _dialBinSet_.setName("parameterBinning");
   _dialBinSet_.configure( binning );
@@ -544,6 +545,7 @@ bool DialCollection::initializeDialsWithBinningFile(const JsonType& dialsDefinit
   // events in DataDispenser.
   auto binningFilePath = GenericToolbox::Json::fetchValue(dialsDefinition, "binningFilePath", JsonType());
 
+  LogInfo << "Defining binned dials for " << getTitle() << std::endl;
   _dialBinSet_ = BinSet();
   _dialBinSet_.setName(binningFilePath);
   _dialBinSet_.configure(binningFilePath);
@@ -709,6 +711,7 @@ bool DialCollection::initializeDialsWithDefinition() {
     if( GenericToolbox::Json::doKeyExist(dialsDefinition, "binning") ){
       auto binning = GenericToolbox::Json::fetchValue(dialsDefinition, "binning", JsonType());
 
+      LogInfo << "Defining binned dials for " << getTitle() << std::endl;
       _dialBinSet_ = BinSet();
       _dialBinSet_.setName( "formula binning" );
       _dialBinSet_.configure(binning);
