@@ -35,5 +35,14 @@ ROOT_GENERATE_DICTIONARY(
 )
 
 install(TARGETS ${LIB_NAME} DESTINATION lib)
-#Can uncomment this to install the headers... but is it really neccessary?
-# install(FILES ${HEADERS} DESTINATION include)
+
+# Install the ROOT pcm and rootmap files
+install(
+  FILES
+  ${CMAKE_CURRENT_BINARY_DIR}/libGundamFitter_rdict.pcm
+  ${CMAKE_CURRENT_BINARY_DIR}/libGundamFitter.rootmap
+  DESTINATION
+  ${CMAKE_INSTALL_PREFIX}/lib
+  COMPONENT
+  libraries
+)
