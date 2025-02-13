@@ -1019,6 +1019,8 @@ void DataDispenser::loadEvent(int iThread_){
     };
     std::vector<VarDisplay> varDisplayList{};
 
+    bool hasEventDials{false};
+
     varDisplayList.reserve( _cache_.varsRequestedForIndexing.size() );
     for( size_t iVar = 0 ; iVar < _cache_.varsRequestedForIndexing.size() ; iVar++ ){
       varDisplayList.emplace_back();
@@ -1045,6 +1047,7 @@ void DataDispenser::loadEvent(int iThread_){
           threadSharedData.leafFormIndexingList[iVar]->getLeafTypeName() == "TClonesArray"
           or threadSharedData.leafFormIndexingList[iVar]->getLeafTypeName() == "TGraph"
           ){
+        hasEventDials = true;
         varDisplayList.back().lineColor =  GenericToolbox::ColorCodes::magentaBackground;
       }
     }
@@ -1071,8 +1074,8 @@ void DataDispenser::loadEvent(int iThread_){
     table.printTable();
 
     // printing legend
-    LogInfo << LOGGER_STR_COLOR_BLUE_BG    << "      " << LOGGER_STR_COLOR_RESET << " -> Variables stored in RAM" << std::endl;
-    LogInfo << LOGGER_STR_COLOR_MAGENTA_BG << "      " << LOGGER_STR_COLOR_RESET << " -> Dials stored in RAM" << std::endl;
+    LogInfoIf(not _cache_.varsRequestedForStorage.empty()) << LOGGER_STR_COLOR_BLUE_BG    << "      " << LOGGER_STR_COLOR_RESET << " -> Variables stored in RAM" << std::endl;
+    LogInfoIf(hasEventDials) << LOGGER_STR_COLOR_MAGENTA_BG << "      " << LOGGER_STR_COLOR_RESET << " -> Dials stored in RAM" << std::endl;
 
     if( _owner_->isDevSingleThreadEventLoaderAndIndexer() ){
       LogAlert << "Loading data in single thread (devSingleThreadEventLoaderAndIndexer option set to true)" << std::endl;
