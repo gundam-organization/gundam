@@ -113,8 +113,10 @@ export LD_LIBRARY_PATH="$INSTALL_DIR/gundam/lib:$LD_LIBRARY_PATH";
 - [Compiling on CCLyon ](guides/installOnCCLyon.md)
 - [Compiling on HPC cluster (University of Geneva)](guides/installOnHpc.md)
 - [Compiling on LXPLUS](guides/installOnLXPLUS.md)
-- Compiling on HPC cluster (Stony Brook University)
-- Compiling on Cedar (Digital Research Alliance of Canada)
+- [Compiling on HPC cluster (Stony Brook University)](guides/installOnSeawulfSBU.md)
+- [Compiling on Cedar (Digital Research Alliance of Canada)](guides/installOnCedar.md)
+- [Compiling on the machine of NN group of SBU](guides/installOnNNhome.md)
+- [Compiling on DUNEgpvm on FNAL](guides/installOnDUNEGPVM.md)
 
 # Alternative installation procedure
 
