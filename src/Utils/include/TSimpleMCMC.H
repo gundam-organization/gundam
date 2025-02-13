@@ -190,7 +190,7 @@ public:
     /// Make the likelihood class available as TSimpleMCMC::LogLikelihood.
     typedef UserLikelihood LogLikelihood;
 
-    /// Make the step proposal cclass available as TSimpleMCMC::ProposeStep.
+    /// Make the step proposal class available as TSimpleMCMC::ProposeStep.
     typedef UserProposal ProposeStep;
 
     /// Declare an object to run an MCMC.  The resulting MCMC normally uses
@@ -362,8 +362,8 @@ public:
     ///
     ///     * 0 : Do a normal metropolis step.
     ///
-    ///     * 1 : Only take "down hill" steps.  This turns the algorythm into
-    ///           a very slow way to maximize the likelihood..
+    ///     * 1 : Only take "down hill" steps.  This turns the algorithm into
+    ///           a very slow way to maximize the likelihood.
     ///
     ///     * 2 : Accept every step.  This can be used to scan the likelihood.
     ///
@@ -420,7 +420,7 @@ public:
             std::copy(fProposed.begin(), fProposed.end(),
                       fSaveAccepted.begin());
             fAcceptedLogLikelihood = fProposedLogLikelihood;
-            // Check to see if it gest written.
+            // Check to see if it gets written.
             if (save) SaveStep(false);
             return true;
         }
@@ -439,7 +439,7 @@ public:
         // negative, the proposed point is less probable than the accepted
         // point.
         double delta = fProposedLogLikelihood - fAcceptedLogLikelihood;
-        if (delta < 0.0 ) {
+        if (delta < 0.0) {
             // If the metropolis method parameter is false, then don't apply
             // the Metropolis algorithm and only take steps that increase the
             // probability.  Setting metropolis to false turns this into an
@@ -466,17 +466,17 @@ public:
         // print the new step when one is found.
         if (metropolis == 1) {
             static int localCount = 0;
-            MCMC_DEBUG(1) << localCount
+            MCMC_DEBUG(2) << "Minimizing step " << localCount
                           << " L: "   << fProposedLogLikelihood;
             const std::size_t elems = 4;
             for (std::size_t i = 0;
                  i < std::min(elems,fProposed.size()); ++i) {
-                MCMC_DEBUG(1) << " [" << i << "]=" << fProposed[i];
+                MCMC_DEBUG(2) << " [" << i << "]=" << fProposed[i];
             }
             if (elems < fProposed.size()) {
-                MCMC_DEBUG(1) << " [..." << fProposed.size() << "]";
+                MCMC_DEBUG(2) << " [..." << fProposed.size() << "]";
             }
-            MCMC_DEBUG(1) << std::endl;
+            MCMC_DEBUG(2) << std::endl;
             ++localCount;
         }
 
@@ -651,6 +651,7 @@ public:
         fScanDimension(-1) {
         fMaxCorrelation = std::numeric_limits<Parameter>::epsilon();
         fMaxCorrelation = 1.0 - std::sqrt(fMaxCorrelation);
+        fForcedStep.clear();
     }
 
     /// Take a proposed trial point to fill, the current point, and the
@@ -663,6 +664,17 @@ public:
             MCMC_ERROR << "Proposal and current vectors must be same size."
                        << std::endl;
             throw std::logic_error("Proposal and current length mismatch");
+        }
+
+        /// If there is a forced step, then that is the proposal.  This does
+        /// not update the proposal internal information.
+        if (fForcedStep.size() > 0) {
+            if (fForcedStep.size() != proposal.size()) {
+                throw std::logic_error("Proposal and forced length mismatch");
+            }
+            std::copy(fForcedStep.begin(), fForcedStep.end(), proposal.begin());
+            fForcedStep.clear();
+            return;
         }
 
         /// If the "scan" variable is set, then only change that variable.
@@ -693,9 +705,8 @@ public:
 
         UpdateState(current,value);
 
+        // Making a regular proposal.  Start from the current step.
         std::copy(current.begin(), current.end(), proposal.begin());
-
-        // Make the proposal.
         for (std::size_t i = 0; i < proposal.size(); ++i) {
             if (fProposalType[i].type == 1) {
                 // Make a uniform proposal.
@@ -778,6 +789,27 @@ public:
         fProposalType.resize(dim);
     }
     int GetDim() const {return fLastPoint.size();}
+
+    /// Force a step to a new position.  After this has been used, the next
+    /// step may have an invalid likelihood.  The caller should loop until a
+    /// step with a valid likelihood is accepted.  The correct way to use this
+    /// with a random step is:
+    /// \code
+    /// for(int throttle = 0; trottle < 1000; ++throttle) {
+    ///     -> choose a random point
+    ///     mcmc.GetProposeStep().ForceStep(prior);
+    ///     mcmc.Step(false,2);
+    ///     if (std::isfinite(mcmc.GetAcceptedLogLikelihood())
+    ///         and mcmc.GetAcceptedLogLikelihood() > -1.0E+10) break;
+    /// };
+    /// \endcode
+    bool ForceStep(const Vector& forceStep) {
+        if (forceStep.size() != fLastPoint.size()) {
+            throw std::invalid_argument("Invalid forced step point.");
+        }
+        fForcedStep = forceStep;
+        return true;
+    }
 
     /// Set the dimension to be scanned (only use for debugging the likelihood)
     void SetScanDimension(int dim) {
@@ -1933,6 +1965,10 @@ private:
     // point.  If the value is outside the range of parameter indices, it's
     // skipped (it must be between 0 and dim to scan).
     int fScanDimension;
+
+    /// A vector to save the value of a forced step.  This will have a zero
+    /// size if there isn't a forced step.
+    Vector fForcedStep;
 };
 
 // MIT License
