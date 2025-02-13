@@ -489,11 +489,11 @@ void DataDispenser::preAllocateMemory(){
     }
   }
 
-  LogInfo << "Creating " << _cache_.totalNbEvents << " slots for event-by-event dials..." << std::endl;
   GenericToolbox::TablePrinter t;
   t << "Parameter" << GenericToolbox::TablePrinter::NextColumn;
   t << "Dial type" << GenericToolbox::TablePrinter::NextLine;
 
+  size_t nTotalSlots{0};
   size_t nDialsMaxPerEvent{0};
   for( auto& dialCollection : _cache_.dialCollectionsRefList ){
     LogScopeIndent;
@@ -511,6 +511,7 @@ void DataDispenser::preAllocateMemory(){
           dialCollection->getDialBaseList().size()
           + _cache_.totalNbEvents
       );
+      nTotalSlots += _cache_.totalNbEvents;
     }
     else {
       // Filling var indexes for faster eval with PhysicsEvent:
@@ -522,9 +523,12 @@ void DataDispenser::preAllocateMemory(){
     }
   }
 
-  t.printTable();
+  if( nTotalSlots != 0 ) {
+    LogInfo << "Created "  << nTotalSlots << " slots (" << _cache_.totalNbEvents << " per set) for event-by-event dials:" << std::endl;
+    t.printTable();
+  }
 
-  LogInfo << "Creating " << _cache_.totalNbEvents << " event cache slots." << std::endl;
+
   _cache_.propagatorPtr->getEventDialCache().allocateCacheEntries(_cache_.totalNbEvents, nDialsMaxPerEvent);
 
 }
