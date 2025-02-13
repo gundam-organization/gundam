@@ -47,6 +47,7 @@ public:
   [[nodiscard]] int findBinIndex(const std::vector<Bin>& binList_) const;
 
   // printouts
+  [[nodiscard]] bool empty() const { return _varList_.empty(); }
   [[nodiscard]] std::string getSummary() const;
   friend std::ostream& operator <<( std::ostream& o, const VariableCollection& this_ ){ o << this_.getSummary(); return o; }
 

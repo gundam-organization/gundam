@@ -28,7 +28,9 @@ std::string Event::getSummary() const {
   std::stringstream ss;
   ss << "Indices{" << _indices_ << "}";
   ss << std::endl << "Weights{" << _weights_ << "}";
-  ss << std::endl << "Variables{" << std::endl << _variables_ << std::endl << "}";
+  ss << std::endl << "Variables{";
+  if(not _variables_.empty()){ ss << std::endl << _variables_ << std::endl; }
+  ss << "}";
   return ss.str();
 }
 
