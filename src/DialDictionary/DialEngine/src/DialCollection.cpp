@@ -538,6 +538,9 @@ bool DialCollection::initializeDialsWithTabulation(const JsonType& dialsDefiniti
 bool DialCollection::initializeDialsWithBinningFile(const JsonType& dialsDefinition) {
   if(not GenericToolbox::Json::doKeyExist(dialsDefinition, "binningFilePath") ) return false;
 
+
+  LogInfo << "Loading binned dials for " << getTitle() << std::endl;
+
   DialBaseFactory dialBaseFactory;
   // A binning file has been provided, so this is a binned dial.  Create
   // the dials for each bin here.  The dials will be assigned to the
@@ -696,7 +699,7 @@ bool DialCollection::initializeDialsWithDefinition() {
   this->readGlobals( dialsDefinition );
   DialBaseFactory dialBaseFactory;
 
-  if( _globalDialType_ == "Norm" or _globalDialType_ == "Normalization" ) {
+  if     ( _globalDialType_ == "Norm" or _globalDialType_ == "Normalization" ) {
     // This dial collection is a normalization, so there is a single dial.
     // Create it here.
     _isEventByEvent_ = false;
@@ -740,7 +743,7 @@ bool DialCollection::initializeDialsWithDefinition() {
     DialBaseFactory f;
     _dialBaseList_.emplace_back( DialBaseObject( f.makeDial( dialsDefinition ) ) );
   }
-  else if ( _globalDialType_ == "Tabulated" ) {
+  else if( _globalDialType_ == "Tabulated" ) {
     // This dial uses a precalculated table to apply weight to each event (e.g. it
     // might be used to implement neutrino osillations).  It has a different
     // weight for each event.
