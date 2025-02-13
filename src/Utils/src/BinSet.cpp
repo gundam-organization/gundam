@@ -38,7 +38,7 @@ void BinSet::configureImpl() {
   this->sortBinEdges();
   this->checkBinning();
 }
-void BinSet::checkBinning(){
+void BinSet::checkBinning() const{
 
   bool hasErrors{false};
 

@@ -35,7 +35,7 @@ public:
   std::vector<Bin> &getBinList() { return _binList_; }
 
   // core
-  void checkBinning();
+  void checkBinning() const;
   [[nodiscard]] std::string getSummary() const;
 
   // utils
