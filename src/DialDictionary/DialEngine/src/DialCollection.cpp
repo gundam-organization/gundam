@@ -422,6 +422,7 @@ bool DialCollection::initializeNormDialsWithParBinning() {
   _dialBinSet_ = BinSet();
   _dialBinSet_.setName("parameterBinning");
   _dialBinSet_.configure( binning );
+  _dialBinSet_.sortBins(); // norm dials can be sorted
 
   // By default use min dial response for norm dials
   _dialResponseSupervisorList_.resize( 1 );
@@ -549,6 +550,7 @@ bool DialCollection::initializeDialsWithBinningFile(const JsonType& dialsDefinit
   _dialBinSet_ = BinSet();
   _dialBinSet_.setName(binningFilePath);
   _dialBinSet_.configure(binningFilePath);
+  // NOTE: DON'T SORT THE DIALS AS THE ORDERING IS MATCHING THE SPLINE FILE!
 
   // Get the filename for a file with the object array of dials (graphs)
   // that will be applied based on the binning.
@@ -715,6 +717,7 @@ bool DialCollection::initializeDialsWithDefinition() {
       _dialBinSet_ = BinSet();
       _dialBinSet_.setName( "formula binning" );
       _dialBinSet_.configure(binning);
+      _dialBinSet_.sortBins();
 
       _dialBaseList_.reserve( _dialBinSet_.getBinList().size() );
       for( auto& bin : _dialBinSet_.getBinList() ){
