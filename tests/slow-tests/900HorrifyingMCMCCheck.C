@@ -70,13 +70,16 @@ int main() {
 
     TH1F normA("normA", "The first parameter",100, -1.0, 3.0);
     TH1F normB("normB", "The second parameter",100, -1.0, 3.0);
-    TH1F sumAB("sumAB", "Sum of first and second parameters", 100, 1.95, 2.10);
+    TH1F sumAB("sumAB", "Sum of first and second parameters", 100, 1.95, 2.05);
+    TH1F diffAB("diffAB", "Difference of first and second parameters",
+                100, -2.5, 2.5);
 
-    for (int i=10000; i < tree->GetEntries(); ++i) {
+    for (int i=30000; i < tree->GetEntries(); ++i) {
         tree->GetEntry(i);
         normA.Fill(points[0]);
         normB.Fill(points[1]);
         sumAB.Fill(points[0]+points[1]);
+        diffAB.Fill(points[0]-points[1]);
     }
 
     normA.Draw();
@@ -84,6 +87,8 @@ int main() {
     normB.Draw();
     gPad->Print("900HorrifyingMCMCCheck.pdf");
     sumAB.Draw();
+    gPad->Print("900HorrifyingMCMCCheck.pdf");
+    diffAB.Draw();
     gPad->Print("900HorrifyingMCMCCheck.pdf)");
 
     // Expected accuracy.  This is based on assuming an assumed effective
@@ -111,6 +116,10 @@ int main() {
               0.577, allowedSigma*relativeSigma);
     TOLERANCE("Check the sum matchs expected value",
               sumAB.GetMean(), 2.0, allowedSigma*relativeSigma);
+    TOLERANCE("Check the difference matchs expected value",
+              diffAB.GetMean(), 0.0, allowedSigma*relativeSigma);
+    TOLERANCE("Check the difference RMS matchs expected value",
+              diffAB.GetRMS(), 1.154, allowedSigma*relativeSigma);
 
     mcmc->Close();
 

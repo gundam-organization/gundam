@@ -19,19 +19,28 @@ fitterEngineConfig:
     proposal: adaptive
     adaptiveRestore: none
 
-    burninCycles: 8
-    burninSteps: 2000
-    burninResets: 1
-    saveBurnin: false
-    burninWindow: 100
-    burninCovWindow: 10000
-
     cycles: 4
     steps: 10000
-    adaptiveWindow: 400
-    adaptiveCovWindow: 1000000
-    burninCovDeweighting: 0.0
-    adaptiveFreezeAfter: 1
+    acceptanceWindow: 400
+    covarianceWindow: 100000
+    covarianceDeweighting: 0.0
+    sequence: |
+      for (int chain = 0; chain < gMCMC.Cycles(); ++chain) {
+        gMCMC.RunCycle("Chain",chain);
+      }
+
+    burninCycles: 8
+    saveBurnin: false
+    burninSequence: |
+      for (int chain = 0; chain < gMCMC.Burnin(); ++chain) {
+        gMCMC.Steps(2000);
+        gMCMC.AcceptanceWindow(100);
+        gMCMC.CovarianceWindow(10000);
+        gMCMC.CovarianceDeweighting(0.5);
+        gMCMC.FreezeCovariance(false);
+        gMCMC.ResetCovariance((chain < 2));
+        gMCMC.RunCycle("Burn-in",chain);
+      }
 
   propagatorConfig:
     throwAsimovFitParameters: false
