@@ -113,8 +113,13 @@ void BinSet::sortBinEdges(){
     std::sort(
         bin.getEdgesList().begin(), bin.getEdgesList().end(),
         []( const Bin::Edges& edges1_, const Bin::Edges& edges2_){
+          // returns true if edges1_ goes first.
+
+          // the conditional vars go first
           if( edges1_.isConditionVar and not edges2_.isConditionVar ){ return true; }
           if( not edges1_.isConditionVar and edges2_.isConditionVar ){ return false; }
+
+          // otherwise classify by var name
           return GenericToolbox::toLowerCase(edges1_.varName) < GenericToolbox::toLowerCase(edges2_.varName);
         }
     );
