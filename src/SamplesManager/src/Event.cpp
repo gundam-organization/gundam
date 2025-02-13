@@ -4,13 +4,6 @@
 
 #include "Event.h"
 
-#include "GundamGlobals.h"
-#include "GundamAlmostEqual.h"
-
-#include "Logger.h"
-
-#include <cmath>
-
 
 // misc
 size_t Event::getSize() const{
