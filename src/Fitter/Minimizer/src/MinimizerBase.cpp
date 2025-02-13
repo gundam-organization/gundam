@@ -164,6 +164,7 @@ double MinimizerBase::evalFit( const double* parArray_ ){
               [](const Parameter* par_){ return not ( par_->isFixed() or not par_->isEnabled() ); } );
 
       std::stringstream ssHeader;
+      ssHeader << std::endl << GenericToolbox::getNowDateString("%Y.%m.%d %H:%M:%S");
       ssHeader << std::endl << __METHOD_NAME__ << ": call #" << _monitor_.nbEvalLikelihoodCalls;
       ssHeader << std::endl << _monitor_.stateTitleMonitor << " / Nb of parameters to fit: " << nbValidPars;
       ssHeader << std::endl << "RAM: " << GenericToolbox::parseSizeUnits(double(GenericToolbox::getProcessMemoryUsage()));
@@ -254,7 +255,7 @@ double MinimizerBase::evalFit( const double* parArray_ ){
         LogWarning << _monitor_.convergenceMonitor.generateMonitorString(false, true);
       }
       else{
-        LogInfo << _monitor_.convergenceMonitor.generateMonitorString(
+        std::cout << _monitor_.convergenceMonitor.generateMonitorString(
             GenericToolbox::getTerminalWidth() != 0, // trail back if not in batch mode
             true // force generate
         );
