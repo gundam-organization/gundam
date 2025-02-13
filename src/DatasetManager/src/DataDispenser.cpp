@@ -489,7 +489,11 @@ void DataDispenser::preAllocateMemory(){
     }
   }
 
-  LogInfo << "Creating slots for event-by-event dials..." << std::endl;
+  LogInfo << "Creating " << _cache_.totalNbEvents << " slots for event-by-event dials..." << std::endl;
+  GenericToolbox::TablePrinter t;
+  t << "Parameter" << GenericToolbox::TablePrinter::NextColumn;
+  t << "Dial type" << GenericToolbox::TablePrinter::NextLine;
+
   size_t nDialsMaxPerEvent{0};
   for( auto& dialCollection : _cache_.dialCollectionsRefList ){
     LogScopeIndent;
@@ -498,12 +502,8 @@ void DataDispenser::preAllocateMemory(){
     if (dialCollection->isEventByEvent()) {
       // Reserve enough space for all the event-by-event dials
       // that might be added.  This size may be reduced later.
-      auto& dialType = dialCollection->getGlobalDialType();
-      size_t origSize = dialCollection->getDialBaseList().size();
-      LogInfo << dialCollection->getTitle()
-              << ": adding " << _cache_.totalNbEvents
-              << " (was " << origSize << ")"
-              << " " << dialType << " slots"<< std::endl;
+      t << dialCollection->getTitle() << GenericToolbox::TablePrinter::NextColumn;
+      t << dialCollection->getGlobalDialType() << GenericToolbox::TablePrinter::NextLine;
 
       // Only increase the size.  It's probably zero before
       // starting, but add the original size... just in case.
@@ -521,6 +521,8 @@ void DataDispenser::preAllocateMemory(){
       }
     }
   }
+
+  t.printTable();
 
   LogInfo << "Creating " << _cache_.totalNbEvents << " event cache slots." << std::endl;
   _cache_.propagatorPtr->getEventDialCache().allocateCacheEntries(_cache_.totalNbEvents, nDialsMaxPerEvent);
