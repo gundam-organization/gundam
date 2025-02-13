@@ -42,9 +42,9 @@ void BinSet::checkBinning(){
 
   bool hasErrors{false};
 
-  for (size_t i = 0; i < _binList_.size(); ++i) {
-    for (size_t j = i + 1; j < _binList_.size(); ++j) {
-      if ( _binList_[i].isOverlapping(_binList_[j])) {
+  for( size_t i = 0; i < _binList_.size(); i++ ){
+    for( size_t j = i + 1; j < _binList_.size(); j++ ){
+      if( _binList_[i].isOverlapping(_binList_[j]) ){
         LogError << "BIN OVERLAP DETECTED" << std::endl;
         LogError << _binList_[i].getSummary() << std::endl;
         LogError << _binList_[j].getSummary() << std::endl;
