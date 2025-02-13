@@ -19,8 +19,7 @@ fitterEngineConfig:
     proposal: fixed
     fixedSigma: 0.05
 
-    burninCycles: 4
-    burninSteps: 1000
+    burninCycles: 2
     saveBurnin: false
 
     cycles: 4

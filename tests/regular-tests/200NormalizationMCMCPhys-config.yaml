@@ -18,23 +18,33 @@ fitterEngineConfig:
     algorithm: metropolis
     proposal: adaptive
     adaptiveRestore: none
-    
-    burninCycles: 4
-    burninSteps: 1000
-    burninResets: 1
-    saveBurnin: false
-    burninWindow: 100
-    burninCovWindow: 10000
-    burninCovDeweighting: 0.5
-    burninFreezeAfter: 2
 
     cycles: 4
     steps: 10000
-    adaptiveWindow: 400
-    adaptiveCovWindow: 100000
-    burninCovDeweighting: 0.0
-    adaptiveFreezeAfter: 1
-    
+    acceptanceWindow: 400
+    covarianceWindow: 100000
+    covarianceDeweighting: 0.0
+    sequence: |
+      for (int chain = 0; chain < gMCMC.Cycles(); ++chain) {
+        gMCMC.FreezeStep((chain > 1));
+        gMCMC.FreezeCovariance((chain > 2));
+        gMCMC.RunCycle("Chain",chain);
+      }
+      
+    burninCycles: 4
+    saveBurnin: false
+    burninSequence: |
+      for (int chain = 0; chain < gMCMC.Burnin(); ++chain) {
+        gMCMC.Steps(1000);
+        gMCMC.AcceptanceWindow(100);
+        gMCMC.CovarianceWindow(10000);
+        gMCMC.CovarianceDeweighting(0.5);
+        gMCMC.FreezeStep((chain > 2));
+        gMCMC.FreezeCovariance(false);
+        gMCMC.ResetCovariance((chain < 2));
+        gMCMC.RunCycle("Burn-in",chain);
+      }
+
   propagatorConfig:
     throwAsimovFitParameters: false
 
@@ -56,7 +66,8 @@ fitterEngineConfig:
 
 
     fitSampleSetConfig:
-      # PoissonLLH is used for tests because it is mathematically simple
+      # LeastSquares is used for tests because it is mathematically simple
+      # and numerically stable.
       llhStatFunction: LeastSquares
       dataEventType: TestData
 
