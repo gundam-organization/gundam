@@ -379,7 +379,7 @@ void DataDispenser::fetchRequestedLeaves(){
     for( auto& var : indexRequests ){ _cache_.addVarRequestedForIndexing(var); }
   }
 
-  LogInfo << "Vars requested for indexing: " << GenericToolbox::toString(_cache_.varsRequestedForIndexing, false) << std::endl;
+  // LogInfo << "Vars requested for indexing: " << GenericToolbox::toString(_cache_.varsRequestedForIndexing, false) << std::endl;
   LogInfo << "Vars requested for storage: " << GenericToolbox::toString(_cache_.varsRequestedForStorage, false) << std::endl;
 
   // Now build the var to leaf translation
