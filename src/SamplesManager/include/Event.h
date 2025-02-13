@@ -10,11 +10,8 @@
 
 #include "GenericToolbox.Utils.h"
 
-#include <map>
-#include <mutex>
-#include <vector>
 #include <string>
-#include <sstream>
+#include <ostream>
 
 
 namespace Cache { class Manager; }

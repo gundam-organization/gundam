@@ -4,6 +4,8 @@
 
 #include "Event.h"
 
+#include <sstream>
+
 
 // misc
 size_t Event::getSize() const{
