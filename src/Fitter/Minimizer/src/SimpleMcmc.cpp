@@ -624,7 +624,7 @@ bool SimpleMcmc::adaptiveRunCycle(AdaptiveStepMCMC& mcmc,
     // Now save the step.  This is going to write the points in the
     // "likelihood" space.  If "_saveRawSteps_" is true, then this also
     // saves the accepted point in the (possibly) decomposed state.
-    mcmc.SaveStep(false);
+    if (_saveSteps_) mcmc.SaveStep(false);
     if(_steps_ > 100 && !(i%(_steps_/100))){
       LogInfo << chainName << ": " << chainId
               << " step: " << i << "/" << _steps_ << " "
@@ -645,7 +645,7 @@ bool SimpleMcmc::adaptiveRunCycle(AdaptiveStepMCMC& mcmc,
   if (mcmc.Step(false,_adaptiveAcceptanceAlgorithm_)) fillPoint();
   // This is not resetting the "SaveAccepted" size so the step is actually
   // saved.
-  mcmc.SaveStep(true);
+  if (_saveSteps_) mcmc.SaveStep(true);
   LogInfo << chainName << ": " << chainId << " complete"
           << " Run Length: " << _steps_
           << " -- Saving state"
@@ -657,6 +657,7 @@ bool SimpleMcmc::adaptiveRunCycle(AdaptiveStepMCMC& mcmc,
 void SimpleMcmc::adaptiveMakePrior(AdaptiveStepMCMC& mcmc,
                                    sMCMC::Vector& prior,
                                    bool randomize) {
+  prior.clear();
   for (const Parameter* par : getMinimizerFitParameterPtr() ) {
     double val = par->getPriorValue();
     if (randomize) {
@@ -712,6 +713,21 @@ void SimpleMcmc::adaptiveStart(AdaptiveStepMCMC& mcmc,
   } while (not startStatus and 0 < throttle--);
 }
 
+void SimpleMcmc::adaptiveRestart(AdaptiveStepMCMC& mcmc,
+                                 bool randomize) {
+  sMCMC::Vector prior;
+  int throttle{0};
+  while (throttle++ < 1000) {
+    LogInfo << "Restart at a new point (trial: " << throttle << ")"
+            << std::endl;
+    adaptiveMakePrior(mcmc, prior, true);
+    mcmc.GetProposeStep().ForceStep(prior);
+    mcmc.Step(false,2);
+    // Stop if the proposed step has a non-zero (and finite) likelihood
+    if (std::isfinite(mcmc.GetAcceptedLogLikelihood())
+        and mcmc.GetAcceptedLogLikelihood() > -1.0E+10) break;
+  };
+}
 void SimpleMcmc::adaptiveSetupAndRun(AdaptiveStepMCMC& mcmc) {
 
   _adaptiveMCMC_ = &mcmc;
@@ -1084,6 +1100,7 @@ SimpleMcmc& SimpleMcmcSequencer::Owner() {
 void SimpleMcmcSequencer::SetSequencerState(bool s) {_validState_ = s;}
 void SimpleMcmcSequencer::RandomStart(bool v) {Owner()._randomStart_ = v;}
 void SimpleMcmcSequencer::Steps(int v) {Owner()._steps_ = v;}
+void SimpleMcmcSequencer::SaveSteps(bool v) {Owner()._saveSteps_ = v;}
 void SimpleMcmcSequencer::ModelStride(int v) {Owner()._modelStride_ = v;}
 void SimpleMcmcSequencer::FreezeStep(bool v) {Owner()._adaptiveFreezeStep_ = v;}
 void SimpleMcmcSequencer::FreezeCovariance(bool v) {Owner()._adaptiveFreezeCov_ = v;}
@@ -1097,6 +1114,10 @@ int SimpleMcmcSequencer::Cycles() {return Owner()._cycles_;}
 void SimpleMcmcSequencer::RunCycle(std::string name, int id) {
   Owner().adaptiveRunCycle(*Owner()._adaptiveMCMC_, name, id);
   Owner().restoreConfiguration();
+}
+void SimpleMcmcSequencer::Restart() {
+  sMCMC::Vector prior;
+  Owner().adaptiveRestart(*Owner()._adaptiveMCMC_, true);
 }
 
 //  A Lesser GNU Public License

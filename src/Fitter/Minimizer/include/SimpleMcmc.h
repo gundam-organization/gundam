@@ -136,6 +136,9 @@ private:
   /// The number of steps in each run cycle.
   ConfigurationValue<int> _steps_{10000};
 
+  /// Flag for if the steps in the cycle should be saved.
+  ConfigurationValue<bool> _saveSteps_{true};
+
   /// The length of each burn-in cycle
   int _burninSteps_{10000};
 
@@ -363,6 +366,11 @@ private:
                      sMCMC::Vector& prior,
                      bool randomize);
 
+  /// Start the MCMC and setup the prior.  This creates the prior using
+  /// adaptiveMakePrior() which will randomize the prior if requested.
+  void adaptiveRestart(AdaptiveStepMCMC& mcmc,
+                       bool randomize);
+
   /// Create a new point for the prior and then randomizes the starting
   /// point if `randomize` is true.
   void adaptiveMakePrior(AdaptiveStepMCMC& mcmc,
@@ -403,6 +411,10 @@ public:
   /// default value after the cycle is run
   void Steps(int v);
 
+  /// Set to false to prevent the steps from being saved during the next
+  /// cycle.  This is reset to true after the cycle is run
+  void SaveSteps(bool v);
+
   /// Override the number of steps between saving the model in the next cycle.
   /// This is reset to the default value after the cycle is run.
   void ModelStride(int v);
@@ -436,6 +448,18 @@ public:
 
   /// Run a cycle with the current parameters.
   void RunCycle(std::string name, int id);
+
+  /// Choose a new random starting point for the next chain.  The random
+  /// starting point will be chose based on the prior.  This is roughly like
+  /// starting a new chain and is useful during burn-in to build a better
+  /// starting covariance.  This should usually be followed by a cycle with
+  /// `AcceptanceAlgorithm(1)` (a downhill only step to get a point in the
+  /// bulk of the posterior distribution) and `FreezeCovariance(true)` to
+  /// return to a point in the bulk of the posterior distribution before
+  /// updating the covariance.  An example of the usage can be seen in the
+  /// `200HorrifyingMCMCCov-config.yaml` used during testing.
+  void Restart();
+
 };
 
 #endif // GUNDAM_SIMPLE_MCMC_H
