@@ -102,9 +102,6 @@ void BinSet::sortBins(){
 
   std::sort(_binList_.begin(), _binList_.end(), sortFct);
 
-  // auto p = GenericToolbox::getSortPermutation(_binList_, sortFct);
-  // GenericToolbox::applyPermutation(_binList_, p);
-
   // update indices
   for( int iBin = 0 ; iBin < int(_binList_.size()) ; iBin++ ){
     _binList_[iBin].setIndex( iBin );
