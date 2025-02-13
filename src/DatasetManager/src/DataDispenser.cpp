@@ -446,15 +446,39 @@ void DataDispenser::preAllocateMemory(){
   LoaderUtils::allocateMemory(eventPlaceholder, leafFormToVarList);
 
   LogInfo << "Reserving event memory..." << std::endl;
-  _cache_.sampleIndexOffsetList.resize(_cache_.samplesToFillList.size());
-  _cache_.sampleEventListPtrToFill.resize(_cache_.samplesToFillList.size());
-  for( size_t iSample = 0 ; iSample < _cache_.sampleNbOfEvents.size() ; iSample++ ){
-    _cache_.sampleEventListPtrToFill[iSample] = &_cache_.samplesToFillList[iSample]->getEventList();
-    _cache_.sampleIndexOffsetList[iSample] = _cache_.sampleEventListPtrToFill[iSample]->size();
-    _cache_.samplesToFillList[iSample]->reserveEventMemory(
-        _owner_->getDataSetIndex(), _cache_.sampleNbOfEvents[iSample], eventPlaceholder
-    );
+  {
+    GenericToolbox::TablePrinter t;
+    t << "Sample" << GenericToolbox::TablePrinter::NextColumn
+    << "# of events" << GenericToolbox::TablePrinter::NextColumn
+    << "Memory" << GenericToolbox::TablePrinter::NextLine;
+
+    size_t nTotal{0};
+
+    _cache_.sampleIndexOffsetList.resize(_cache_.samplesToFillList.size());
+    _cache_.sampleEventListPtrToFill.resize(_cache_.samplesToFillList.size());
+    for( size_t iSample = 0 ; iSample < _cache_.sampleNbOfEvents.size() ; iSample++ ){
+      _cache_.sampleEventListPtrToFill[iSample] = &_cache_.samplesToFillList[iSample]->getEventList();
+      _cache_.sampleIndexOffsetList[iSample] = _cache_.sampleEventListPtrToFill[iSample]->size();
+      _cache_.samplesToFillList[iSample]->reserveEventMemory(
+          _owner_->getDataSetIndex(), _cache_.sampleNbOfEvents[iSample], eventPlaceholder
+      );
+
+      nTotal += _cache_.sampleNbOfEvents[iSample];
+
+      t << _cache_.samplesToFillList[iSample]->getName() << GenericToolbox::TablePrinter::NextColumn
+      << _cache_.sampleNbOfEvents[iSample] << GenericToolbox::TablePrinter::NextColumn
+      << GenericToolbox::parseSizeUnits(static_cast<double>(eventPlaceholder.getSize() * _cache_.sampleNbOfEvents[iSample]))
+      << GenericToolbox::TablePrinter::NextLine;
+    }
+
+    t << "Total" << GenericToolbox::TablePrinter::NextColumn
+      << nTotal << GenericToolbox::TablePrinter::NextColumn
+      << GenericToolbox::parseSizeUnits(static_cast<double>(eventPlaceholder.getSize()) * nTotal)
+      << GenericToolbox::TablePrinter::NextLine;
+
+    t.printTable();
   }
+
 
   LogInfo << "Filling var index cache for bin edges..." << std::endl;
   for( auto* samplePtr : _cache_.samplesToFillList ){

@@ -13,6 +13,17 @@
 
 
 // misc
+size_t Event::getSize() const{
+  size_t staticSize = sizeof(Event);
+
+  size_t dynamicSize = sizeof(VariableHolder) * _variables_.getVarList().capacity();
+
+  for( auto& var : _variables_.getVarList() ){
+    dynamicSize += var.get().getStoredSize();
+  }
+
+  return staticSize + dynamicSize;
+}
 std::string Event::getSummary() const {
   std::stringstream ss;
   ss << "Indices{" << _indices_ << "}";
