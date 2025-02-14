@@ -126,7 +126,7 @@ int main() {
               postFitErrorsHesse->GetBinContent(2), allowedSigma*relativeSigma);
     TOLERANCE("Check MCMC RMS matches HESSE value for #1_Negative_C",
               negativeC.GetRMS(),
-              postFitErrorsHesse->GetBinError(2), allowed*relativeSigma);
+              postFitErrorsHesse->GetBinError(2), allowedSigma*relativeSigma);
 
     fit->Close();
     mcmc->Close();

@@ -1,10 +1,10 @@
 # A test yaml file for GUNDAM.
 #
-# Do a data fit to the tree_dt tree in 100HorrifyingTree.root.  This
+# Do a data fit to the tree_dt tree in 100NormalizationTree.root.  This
 # fits the (A,B) distribution with two free normalization variables.
 #
-#   Positive_C : Horrifying for events where the C truth variable is >0
-#   Negative_C : Horrifying for events where the C truth variable is <=0
+#   Positive_C : Normalization for events where the C truth variable is >0
+#   Negative_C : Normalization for events where the C truth variable is <=0
 #
 
 fit: true                    # can be disabled with -d
@@ -26,17 +26,20 @@ fitterEngineConfig:
     covarianceDeweighting: 0.0
     sequence: |
       for (int chain = 0; chain < gMCMC.Cycles(); ++chain) {
+        gMCMC.FreezeStep((chain > 1));
+        gMCMC.FreezeCovariance((chain > 2));
         gMCMC.RunCycle("Chain",chain);
       }
-
-    burninCycles: 8
+      
+    burninCycles: 4
     saveBurnin: false
     burninSequence: |
       for (int chain = 0; chain < gMCMC.Burnin(); ++chain) {
-        gMCMC.Steps(2000);
+        gMCMC.Steps(1000);
         gMCMC.AcceptanceWindow(100);
         gMCMC.CovarianceWindow(10000);
         gMCMC.CovarianceDeweighting(0.5);
+        gMCMC.FreezeStep((chain > 2));
         gMCMC.FreezeCovariance(false);
         gMCMC.ResetCovariance((chain < 2));
         gMCMC.RunCycle("Burn-in",chain);
@@ -54,12 +57,13 @@ fitterEngineConfig:
           selectionCutFormula: "(1)"
           nominalWeightFormula: "(1.0)"
           filePathList:
-            - "${DATA_DIR}/100HorrifyingTree.root"
+            - "${DATA_DIR}/100NormalizationTree.root"
         data:
           - name: "TestData"
             tree: tree_dt
             filePathList:
-              - "${DATA_DIR}/100HorrifyingTree.root"
+              - "${DATA_DIR}/100NormalizationTree.root"
+
 
     fitSampleSetConfig:
       # LeastSquares is used for tests because it is mathematically simple
@@ -73,11 +77,11 @@ fitterEngineConfig:
       fitSampleList:
         - name: AB
           isEnabled: true
-          binning: "${CONFIG_DIR}/200HorrifyingMCMC-binning.txt"
+          binning: "${CONFIG_DIR}/200NormalizationMCMC-binning.txt"
           dataSets: [ "TestSample" ]
 
     parameterSetListConfig:
-      - name: Horrifying
+      - name: Normalizations
         isEnabled: true
         nominalStepSize: 0.1
 
@@ -87,7 +91,6 @@ fitterEngineConfig:
             isEnabled: true
             priorValue: 1.0
             priorType: Flat
-            parameterLimits: [0.0, 10.0]
             dialSetDefinitions:
               - dialsType: Normalization
                 applyCondition: "[C] > 0"
@@ -96,7 +99,6 @@ fitterEngineConfig:
             isEnabled: true
             priorValue: 1.0
             priorType: Flat
-            parameterLimits: [0.0, 10.0]
             dialSetDefinitions:
               - dialsType: Normalization
                 applyCondition: "[C] <= 0"

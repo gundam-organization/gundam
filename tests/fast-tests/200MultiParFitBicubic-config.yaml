@@ -43,7 +43,7 @@ fitterEngineConfig:
       fitSampleList:
         - name: AB
           isEnabled: true
-          binning: "${CONFIG_DIR}/200MultiParFit-binning.txt"
+          binning: "${CONFIG_DIR}/200MultiParFitBicubic-binning.txt"
           dataSets: [ "TestSample" ]
 
     parameterSetListConfig:
