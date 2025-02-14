@@ -50,6 +50,7 @@ protected:
   void readBinningConfig(const JsonType& binning_); // yaml/json
 
 private:
+  bool _sortBins_{false};
   std::string _name_;
   std::string _filePath_;
   std::vector<Bin> _binList_{};

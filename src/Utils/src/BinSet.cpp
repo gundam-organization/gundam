@@ -36,6 +36,7 @@ void BinSet::configureImpl() {
   }
 
   this->sortBinEdges();
+  if( _sortBins_ ){ this->sortBins(); }
   this->checkBinning();
 }
 void BinSet::checkBinning() const{
@@ -253,6 +254,8 @@ void BinSet::readTxtBinningDefinition(){
 }
 
 void BinSet::readBinningConfig( const JsonType& binning_){
+
+  GenericToolbox::Json::fillValue(binning_, _sortBins_, "sortBins");
 
   if( GenericToolbox::Json::doKeyExist(binning_, {"binningDefinition"}) ){
 
