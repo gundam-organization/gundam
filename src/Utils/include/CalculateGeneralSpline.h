@@ -32,15 +32,17 @@ namespace {
     // about forty times faster than TSpline3.
     //
     // This takes the "index" of the point in the data, the parameter value
-    // (that made the index), a minimum and maximum bound, the buffer of data
-    // for this spline, and the number of data elements in the spline data.
-    // The input data is arrange as
+    // (x) (that made the index), a minimum (lowerBound) and maximum
+    // (upperBound) bound, the buffer of data for this spline, and the number
+    // of data elements in the spline data (dim).  The input data is arrange as
     //
     // data[0] -- spline lower bound (not used, kept to match other splines)
     // data[1] -- spline step (not used, kept to match other splines)
-    // data[2+3*n+0] -- The function value for knot n
-    // data[2+3*n+1] -- The function slope for knot n
-    // data[2+3*n+2] -- The point for knot n
+    // data[2+3*n+0] -- The function value for knot n (i.e. "Y")
+    // data[2+3*n+1] -- The function slope for knot n (i.e. "dYdX")
+    // data[2+3*n+2] -- The point for knot n (i.e. "X")
+    //
+    // There will be "dim" elements in the data[] array.
     //
     // NOTE: CalculateUniformSpline, CalculateGeneralSpline,
     // CalculateCompactSpline, and CalculateMonotonicSpline have very similar,
@@ -57,14 +59,15 @@ namespace {
         // Check to find a point that is less than x.  This is "brute force",
         // but since we know that the splines will usually have 7 or fewer
         // points, this may be faster, or comparable, to a binary search.
+        // This is benchmarked at 1.276 ms per call.
         const int knotCount = (dim-2)/3;
-// PROFILED aspen 2024/05/26 -- 7am (~195 it/sec)
-// LTS/Issue510/AtomicOperationsOnHosts w/ GundamInputsOA2021
-// commit 5e9415e55b258d3d82d562942f03ac07c9937528
-//
-// ==1060642== Profiling result:
-//             Type  Time(%)      Time     Calls       Avg       Min       Max  Name
-//  GPU activities:   38.10%  334.242s    261994  1.2758ms  1.2493ms  1.3344ms  _ZN4hemi6KernelIN78_GLOBAL__N__54_tmpxft_003dc161_00000000_7_WeightGeneralSpline_cpp1_ii_220155e217HEMISplinesKernelEJPdPKdS5_S5_S5_PKiPKsS7_mEEEvT_DpT0_
+        // PROFILED aspen 2024/05/26 -- 7am (~195 it/sec)
+        // LTS/Issue510/AtomicOperationsOnHosts w/ GundamInputsOA2021
+        // commit 5e9415e55b258d3d82d562942f03ac07c9937528
+        //
+        // ==1060642== Profiling result:
+        //             Type  Time(%)      Time     Calls       Avg       Min       Max  Name
+        //  GPU activities:   38.10%  334.242s    261994  1.2758ms  1.2493ms  1.3344ms  _ZN4hemi6KernelIN78_GLOBAL__N__54_tmpxft_003dc161_00000000_7_WeightGeneralSpline_cpp1_ii_220155e217HEMISplinesKernelEJPdPKdS5_S5_S5_PKiPKsS7_mEEEvT_DpT0_
         int ix = 0;
         if (x > data[2+3*(ix+1)+2] && ix < knotCount-2) ++ix; // 1
         if (x > data[2+3*(ix+1)+2] && ix < knotCount-2) ++ix; // 2
@@ -87,14 +90,15 @@ namespace {
         // but since we know that the splines will usually have 7 or fewer
         // points, this may be faster, or comparable, to a binary search.
         // This does the calculation without ifs (which can be slower for
-        // SIMD).
-// PROFILED aspen 2024/05/26 -- 7:30am (~180 it/sec)
-// LTS/Issue510/AtomicOperationsOnHosts w/ GundamInputsOA2021
-// commit 5e9415e55b258d3d82d562942f03ac07c9937528
-//
-// ==1062228== Profiling result:
-//             Type  Time(%)      Time     Calls       Avg       Min       Max  Name
-//  GPU activities:   38.08%  334.068s    262010  1.2750ms  1.2527ms  1.3348ms  _ZN4hemi6KernelIN78_GLOBAL__N__54_tmpxft_001031e3_00000000_7_WeightGeneralSpline_cpp1_ii_220155e217HEMISplinesKernelEJPdPKdS5_S5_S5_PKiPKsS7_mEEEvT_DpT0_
+        // SIMD). This is benchmarked at 1.275 ms per call.
+        //
+        // PROFILED aspen 2024/05/26 -- 7:30am (~180 it/sec)
+        // LTS/Issue510/AtomicOperationsOnHosts w/ GundamInputsOA2021
+        // commit 5e9415e55b258d3d82d562942f03ac07c9937528
+        //
+        // ==1062228== Profiling result:
+        //             Type  Time(%)      Time     Calls       Avg       Min       Max  Name
+        //  GPU activities:   38.08%  334.068s    262010  1.2750ms  1.2527ms  1.3348ms  _ZN4hemi6KernelIN78_GLOBAL__N__54_tmpxft_001031e3_00000000_7_WeightGeneralSpline_cpp1_ii_220155e217HEMISplinesKernelEJPdPKdS5_S5_S5_PKiPKsS7_mEEEvT_DpT0_
         const int knotCount = (dim-2)/3 - 2;
         int ix = 0;
         ix += (x > data[2+3*(ix+1)+2]) * (ix < knotCount); // 1
@@ -112,26 +116,49 @@ namespace {
         ix += (x > data[2+3*(ix+1)+2]) * (ix < knotCount); // 13
         ix += (x > data[2+3*(ix+1)+2]) * (ix < knotCount); // 14
         ix += (x > data[2+3*(ix+1)+2]) * (ix < knotCount); // 15
+#elif defined(CALCULATE_GENERAL_SPLINE_LOOPED_CHECK)
+        const int knotCount = (dim-2)/3 - 2;
+        int ix = 0;
+        // Define a non-branching conditional to update the offset.
+#define CHECK_OFFSET(ioff)  if ((ix+ioff < knotCount) && (x > data[2+3*(ix+ioff)+2])) ix += ioff
+        // __builtin_clz(knotCount) counts the number of leading zeros in
+        // knotCount (available in GCC/Clang).  31 - __builtin_clz(knotCount)
+        // calculates the position of the most significant bit.  1 << (31 -
+        // __builtin_clz(knotCount)) generates the largest power of 2 <=
+        // knotCount Not benchmarked, but adds extra branching loop to every
+        // iteration.  It assumes that knotCount is represented by a 32 bit
+        // integer.
+        for( int offset = 1 << ( 31 - __builtin_clz(knotCount) ) ; offset > 0 ; offset >>= 1 ){
+            CHECK_OFFSET(offset);
+        }
+#undef CHECK_OFFSET
 #else /* CALCULATE_GENERAL_SPLINE_BINARY_IF */
         // Check to find a point that is less than x.  This is a "brute force"
         // binary search, and the "if" has been checked and is efficient with
-        // CUDA.
-// PROFILED aspen 2024/05/26 -- 8:00am (~190 it/sec)
-// LTS/Issue510/AtomicOperationsOnHosts w/ GundamInputsOA2021
-// commit 5e9415e55b258d3d82d562942f03ac07c9937528
-//
-// ==1063988== Profiling result:
-//             Type  Time(%)      Time     Calls       Avg       Min       Max  Name
-//                    20.26%  137.925s    262004  526.42us  517.37us  550.90us  _ZN4hemi6KernelIN78_GLOBAL__N__54_tmpxft_00103aad_00000000_7_WeightGeneralSpline_cpp1_ii_220155e217HEMISplinesKernelEJPdPKdS5_S5_S5_PKiPKsS7_mEEEvT_DpT0_
-//
+        // CUDA.  This is benchmarked at 0.526 ms per call.
+        //
+        // PROFILED aspen 2024/05/26 -- 8:00am (~190 it/sec)
+        // LTS/Issue510/AtomicOperationsOnHosts w/ GundamInputsOA2021
+        // commit 5e9415e55b258d3d82d562942f03ac07c9937528
+        //
+        // ==1063988== Profiling result:
+        //             Type  Time(%)      Time     Calls       Avg       Min       Max  Name
+        //                    20.26%  137.925s    262004  526.42us  517.37us  550.90us  _ZN4hemi6KernelIN78_GLOBAL__N__54_tmpxft_00103aad_00000000_7_WeightGeneralSpline_cpp1_ii_220155e217HEMISplinesKernelEJPdPKdS5_S5_S5_PKiPKsS7_mEEEvT_DpT0_
+        //
         const int knotCount = (dim-2)/3 - 2;
         int ix = 0;
+        // Define a non-branching conditional to update the offset.  The &&
+        // becomes a "multiplication", and the conditional update becomes a
+        // "swap-if-true" (which doesn't branch).
 #define CHECK_OFFSET(ioff)  if ((ix+ioff < knotCount) && (x > data[2+3*(ix+ioff)+2])) ix += ioff
+        CHECK_OFFSET(16);
         CHECK_OFFSET(8);
         CHECK_OFFSET(4);
         CHECK_OFFSET(2);
         CHECK_OFFSET(1);
+#undef CHECK_OFFSET
 #endif
+
         const double x1 = data[2+3*ix+2];
         const double x2 = data[2+3*(ix+1)+2];
         const double step = x2-x1;
@@ -143,15 +170,25 @@ namespace {
         const double p2 = data[2+3*(ix+1)];
         const double m2 = data[2+3*(ix+1)+1]*step;
 
+#ifdef DO_NOT_USE_HORNER_FACTORIZATION
+        const double fxx = fx*fx;
+        const double fxxx = fx*fxx;
+
         // Cubic spline with the points and slopes.
         // double v = p1*(2.0*fxxx-3.0*fxx+1.0) + m1*(fxxx-2.0*fxx+fx)
         //         + p2*(3.0*fxx-2.0*fxxx) + m2*(fxxx-fxx));
 
+        // A more numerically stable calculation
+        const double t = 3.0*fxx-2.0*fxxx;
+        double v = p1 - p1*t + m1*(fxxx-2.0*fxx+fx)
+                    + p2*t + m2*(fxxx-fxx);
+#else
         // Factored via Horner's method.
         double v = ((((2.0*p1 - 2.0*p2 + m2 + m1)*fx
                       + 3.0*p2 - 3.0*p1 - m2 - 2.0*m1)*fx
                      +m1)*fx
                     +p1);
+#endif
 
         if (v < lowerBound) v = lowerBound;
         if (v > upperBound) v = upperBound;
@@ -185,6 +222,6 @@ namespace {
 // Local Variables:
 // mode:c++
 // c-basic-offset:4
-// compile-command:"$(git rev-parse --show-toplevel)/cmake/gundam-build.sh"
+// compile-command:"$(git rev-parse --show-toplevel)/cmake/scripts/gundam-build.sh"
 // End:
 #endif

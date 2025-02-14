@@ -5,14 +5,8 @@
 #include "DialInputBuffer.h"
 
 #include "Logger.h"
+#include "GundamBacktrace.h"
 
-#if USE_ZLIB
-#include "zlib.h"
-#endif
-
-LoggerInit([]{
-  Logger::setUserHeaderStr("[DialInputBuffer]");
-});
 
 void DialInputBuffer::invalidateBuffers(){
   // invalidate buffer
@@ -51,14 +45,6 @@ void DialInputBuffer::update(){
   // by default consider we have to update
   _isDialUpdateRequested_ = true;
 
-  // check the mask
-  this->setIsMasked( std::any_of(
-      _inputParameterReferenceList_.begin(), _inputParameterReferenceList_.end(),
-      [this](ParameterReference& parRef_){
-        return parRef_.getParameterSet(_parSetListPtr_).isMaskedForPropagation();
-  } ) );
-  if( _isMasked_ ){ this->invalidateBuffers(); return; }
-
   // look for the parameter values
   double tempBuffer;
   _isDialUpdateRequested_ = false; // if ANY is different, request the update
@@ -82,6 +68,17 @@ void DialInputBuffer::update(){
       // re-apply the offset
       tempBuffer += inputRef.mirrorEdges.minValue;
     }
+#ifdef DEBUG_BUILD
+    if( std::isnan(tempBuffer) ){
+        // LogThrowIf is broken, but OK for real error traps, but this is
+        // checking user input it's critical that the error message is
+        // properly formated so print an error, a backtrace, and then exit.
+        LogError << "NaN while evaluating input buffer of "
+                 << inputRef.getParameter(_parSetListPtr_).getTitle()
+                 << std::endl;
+        LogError << GundamUtils::Backtrace << std::endl;
+    }
+#endif
 
     // has it been updated?
     if( _inputBuffer_[inputRef.bufferIndex] != tempBuffer ){
@@ -89,10 +86,6 @@ void DialInputBuffer::update(){
       _inputBuffer_[inputRef.bufferIndex] = tempBuffer;
     }
   }
-
-#if USE_ZLIB
-  _currentHash_ = generateHash();
-#endif
 }
 void DialInputBuffer::addParameterReference( const ParameterReference& parReference_){
   LogThrowIf(_isInitialized_, "Can't add parameter index while initialized.");
@@ -100,7 +93,7 @@ void DialInputBuffer::addParameterReference( const ParameterReference& parRefere
   auto& parRef = _inputParameterReferenceList_.back();
   parRef.bufferIndex = int(_inputParameterReferenceList_.size())-1;
 }
-std::string DialInputBuffer::getSummary() const{
+std::string DialInputBuffer::getSummary(bool shallow_) const{
   std::stringstream ss;
   ss << GenericToolbox::toString(_inputParameterReferenceList_, [&]( const ParameterReference& parRef_){
     std::stringstream ss;
@@ -122,15 +115,3 @@ std::string DialInputBuffer::getSummary() const{
 
   return ss.str();
 }
-
-#if USE_ZLIB
-uint32_t DialInputBuffer::generateHash(){
-  uint32_t out = crc32(0L, Z_NULL, 0);
-  double* inputPtr = _inputBuffer_.data();
-  while( inputPtr < _inputBuffer_.data() + _inputBuffer_.size() ){
-    out = crc32( out, (const Bytef*) inputPtr, sizeof(double) );
-    inputPtr++;
-  }
-  return out;
-}
-#endif

@@ -5,10 +5,6 @@
 #include "Logger.h"
 
 
-LoggerInit([]{
-  Logger::setUserHeaderStr("[Bilinear]");
-});
-
 void Bilinear::setAllowExtrapolation(bool allowExtrapolation) {
   _allowExtrapolation_ = allowExtrapolation;
 }
@@ -36,13 +32,11 @@ void Bilinear::buildDial(const TH2& h2_, const std::string& option_){
     for (int i=1; i<=nx; ++i) {
         _splineData_.emplace_back(h2_.GetXaxis()->GetBinCenter(i));
     }
-    _splineBounds_.push_back(std::make_pair(h2_.GetXaxis()->GetBinCenter(1),
-                                            h2_.GetXaxis()->GetBinCenter(nx)));
+    _splineBounds_.emplace_back(h2_.GetXaxis()->GetBinCenter(1), h2_.GetXaxis()->GetBinCenter(nx));
     for (int i=1; i<=ny; ++i) {
         _splineData_.emplace_back(h2_.GetYaxis()->GetBinCenter(i));
     }
-    _splineBounds_.push_back(std::make_pair(h2_.GetYaxis()->GetBinCenter(1),
-                                            h2_.GetYaxis()->GetBinCenter(nx)));
+    _splineBounds_.emplace_back(h2_.GetYaxis()->GetBinCenter(1), h2_.GetYaxis()->GetBinCenter(nx));
     for (int i = 1; i <= nx; ++i) {
         for (int j = 1; j <= ny; ++j) {
             _splineData_.emplace_back(h2_.GetBinContent(i,j));
@@ -56,10 +50,10 @@ double Bilinear::evalResponse(const DialInputBuffer& input_) const {
     double input1{input_.getInputBuffer()[1]};
 
     if( not _allowExtrapolation_ ){
-        if (input0 < _splineBounds_[0].first) input0 = _splineBounds_[0].first;
-        if (input0 > _splineBounds_[0].second) input0 = _splineBounds_[0].second;
-        if (input1 < _splineBounds_[1].first) input1 = _splineBounds_[1].first;
-        if (input1 > _splineBounds_[1].second) input1 = _splineBounds_[1].second;
+        if (input0 < _splineBounds_[0].min) input0 = _splineBounds_[0].min;
+        if (input0 > _splineBounds_[0].max) input0 = _splineBounds_[0].max;
+        if (input1 < _splineBounds_[1].min) input1 = _splineBounds_[1].min;
+        if (input1 > _splineBounds_[1].max) input1 = _splineBounds_[1].max;
     }
 
     const double *data = _splineData_.data();

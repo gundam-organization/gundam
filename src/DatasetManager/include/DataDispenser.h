@@ -8,11 +8,12 @@
 #include "EventVarTransformLib.h"
 #include "DataDispenserUtils.h"
 
+#include "PlotGenerator.h"
 #include "Propagator.h"
-#include "JsonBaseClass.h"
+
+#include "GenericToolbox.Thread.h"
 
 #include "TChain.h"
-#include "nlohmann/json.hpp"
 
 #include <map>
 #include <string>
@@ -25,7 +26,7 @@ class DatasetDefinition; // owner
 class DataDispenser : public JsonBaseClass {
 
 protected:
-  void readConfigImpl() override;
+  void configureImpl() override;
   void initializeImpl() override;
 
 public:
@@ -34,8 +35,10 @@ public:
 
   // setters
   void setOwner( DatasetDefinition* owner_){ _owner_ = owner_; }
+  void setPlotGeneratorPtr( const PlotGenerator* plotGeneratorPtr_ ){ _plotGeneratorPtr_ = plotGeneratorPtr_; }
 
   // const getters
+  [[nodiscard]] const DatasetDefinition* getOwner() const{ return _owner_; }
   [[nodiscard]] const DataDispenserParameters &getParameters() const{ return _parameters_; }
 
   // non-const getters
@@ -57,11 +60,15 @@ protected:
   void loadFromHistContent();
 
   // utils
-  std::unique_ptr<TChain> openChain(bool verbose_ = false);
+  std::shared_ptr<TChain> openChain(bool verbose_ = false);
 
   // multi-thread
   void eventSelectionFunction(int iThread_);
-  void fillFunction(int iThread_);
+
+  void runEventFillThreads(int iThread_);
+  void loadEvent(int iThread_);
+
+  std::vector<ThreadSharedData> threadSharedDataList{};
 
 
 private:
@@ -71,6 +78,14 @@ private:
   // internals
   DatasetDefinition* _owner_{nullptr};
   DataDispenserCache _cache_;
+
+  // needed to check which variables need to be loaded
+  const PlotGenerator* _plotGeneratorPtr_{nullptr};
+
+  // multi-threading
+  GenericToolbox::ParallelWorker _threadPool_{};
+  GenericToolbox::ParallelWorker _threadPoolEventLoad_{};
+  GenericToolbox::NoCopyWrapper<std::mutex> _mutex_{};
 
 };
 

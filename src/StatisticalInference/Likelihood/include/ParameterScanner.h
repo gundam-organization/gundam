@@ -7,9 +7,7 @@
 
 #include "LikelihoodInterface.h"
 #include "Parameter.h"
-#include "JsonBaseClass.h"
 
-#include "nlohmann/json.hpp"
 #include "TDirectory.h"
 #include "TGraph.h"
 
@@ -27,7 +25,7 @@ public:
   struct GraphEntry;
 
 protected:
-  void readConfigImpl() override;
+  void configureImpl() override;
   void initializeImpl() override;
 
 public:
@@ -39,7 +37,7 @@ public:
   // const getters
   [[nodiscard]] bool isUseParameterLimits() const{ return _useParameterLimits_; }
   [[nodiscard]] int getNbPoints() const{ return _nbPoints_; }
-  [[nodiscard]] const std::pair<double, double> &getParameterSigmaRange() const{ return _parameterSigmaRange_; }
+  [[nodiscard]] const GenericToolbox::Range &getParameterSigmaRange() const{ return _parameterSigmaRange_; }
   [[nodiscard]] const JsonType &getVarsConfig() const { return _varsConfig_; };
   [[nodiscard]] const std::vector<GraphEntry> &getGraphEntriesBuf() const { return _graphEntriesBuf_; };
 
@@ -49,6 +47,7 @@ public:
   void scanSegment(TDirectory *saveDir_, const JsonType &end_, const JsonType &start_ = JsonType(), int nSteps_=-1);
   void generateOneSigmaPlots(TDirectory* saveDir_);
   void varyEvenRates(const std::vector<double>& paramVariationList_, TDirectory* saveDir_);
+  void setGraphTitles(const std::string& title_);
 
   // Statics
   static void muteLogger();
@@ -74,7 +73,7 @@ private:
   bool _useParameterLimits_{true};
   int _nbPoints_{100};
   int _nbPointsLineScan_{_nbPoints_};
-  std::pair<double, double> _parameterSigmaRange_{-3,3};
+  GenericToolbox::Range _parameterSigmaRange_{-3.,3.};
   JsonType _varsConfig_{};
 
   // Internals

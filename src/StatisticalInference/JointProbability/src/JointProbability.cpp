@@ -15,24 +15,16 @@
 #include "Logger.h"
 
 
-LoggerInit([]{
-  Logger::setUserHeaderStr("[JointProbability]");
-});
-
 namespace JointProbability{
 
   JointProbabilityBase* makeJointProbability(const std::string& type_){
 
     std::string enumTypeStr{type_};
 
-    // TODO: possible backward compatibility
-//    if(  ){ }
-
-
     auto jType{JointProbabilityType::toEnum( type_, true )};
 
     if( jType == JointProbabilityType::EnumOverflow  ){
-      LogThrow( "Unknown JointProbabilityType: " << type_ );
+      LogThrow( "Unknown JointProbabilityType: " << type_ << std::endl << "Available: " << JointProbabilityType::generateEnumStrList() );
     }
 
     return makeJointProbability( jType );

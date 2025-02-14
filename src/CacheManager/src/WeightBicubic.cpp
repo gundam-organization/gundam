@@ -13,9 +13,7 @@
 #include <hemi/grid_stride_range.h>
 
 #include "Logger.h"
-LoggerInit([]{
-  Logger::setUserHeaderStr("[Cache::Weight::Bicubic]");
-});
+
 
 // The constructor
 Cache::Weight::Bicubic::Bicubic(
@@ -29,51 +27,51 @@ Cache::Weight::Bicubic::Bicubic(
       fReserved(splines), fUsed(0),
       fSpaceReserved(space), fSpaceUsed(0) {
 
-    LogInfo << "Reserved " << GetName() << " Splines: "
-            << GetReserved() << std::endl;
-    if (GetReserved() < 1) return;
+  LogInfo << "Reserved " << GetName() << " Splines: "
+          << GetReserved() << std::endl;
+  if (GetReserved() < 1) return;
 
-    fTotalBytes += GetReserved()*sizeof(int);        // fResult
-    fTotalBytes += 2*GetReserved()*sizeof(short);    // fParameter
-    fTotalBytes += (1+GetReserved())*sizeof(int);    // fIndex
+  fTotalBytes += GetReserved()*sizeof(int);        // fResult
+  fTotalBytes += 2*GetReserved()*sizeof(short);    // fParameter
+  fTotalBytes += (1+GetReserved())*sizeof(int);    // fIndex
 
-    LogInfo << "Reserved " << GetName()
-            << " Spline Space: " << GetSpaceReserved()
-            << std::endl;
-    fTotalBytes += GetSpaceReserved()*sizeof(WEIGHT_BUFFER_FLOAT);  // fData
+  LogInfo << "Reserved " << GetName()
+          << " Spline Space: " << GetSpaceReserved()
+          << std::endl;
+  fTotalBytes += GetSpaceReserved()*sizeof(WEIGHT_BUFFER_FLOAT);  // fData
 
-    LogInfo << "Approximate Memory Size for " << GetName()
-            << ": " << fTotalBytes/1E+9
-            << " GB" << std::endl;
+  LogInfo << "Approximate Memory Size for " << GetName()
+          << ": " << fTotalBytes/1E+9
+          << " GB" << std::endl;
 
-    try {
-        // Get the CPU/GPU memory for the spline index tables.  These are
-        // copied once during initialization so do not pin the CPU memory into
-        // the page set.
-        fResult.reset(new hemi::Array<int>(GetReserved(),false));
-        LogThrowIf(not fResult, "Bad Result alloc");
-        fParameter.reset(
-            new hemi::Array<short>(2*GetReserved(),false));
-        LogThrowIf(not fParameter, "Bad SplineParameter alloc");
-        fIndex.reset(new hemi::Array<int>(1+GetReserved(),false));
-        LogThrowIf(not fIndex, "Bad Index alloc");
+  try {
+    // Get the CPU/GPU memory for the spline index tables.  These are
+    // copied once during initialization so do not pin the CPU memory into
+    // the page set.
+    fResult.reset(new hemi::Array<int>(GetReserved(),false));
+    LogThrowIf(not fResult, "Bad Result alloc");
+    fParameter.reset(
+        new hemi::Array<short>(2*GetReserved(),false));
+    LogThrowIf(not fParameter, "Bad SplineParameter alloc");
+    fIndex.reset(new hemi::Array<int>(1+GetReserved(),false));
+    LogThrowIf(not fIndex, "Bad Index alloc");
 
-        // Get the CPU/GPU memory for the spline knots.  This is copied once
-        // during initialization so do not pin the CPU memory into the page
-        // set.
-        fData.reset(
-            new hemi::Array<WEIGHT_BUFFER_FLOAT>(GetSpaceReserved(),false));
-        LogThrowIf(not fData, "Bad Data alloc");
-    }
-    catch (...) {
-        LogError << "Failed to allocate memory, so stopping" << std::endl;
-        LogThrow("Not enough memory available");
-    }
+    // Get the CPU/GPU memory for the spline knots.  This is copied once
+    // during initialization so do not pin the CPU memory into the page
+    // set.
+    fData.reset(
+        new hemi::Array<WEIGHT_BUFFER_FLOAT>(GetSpaceReserved(),false));
+    LogThrowIf(not fData, "Bad Data alloc");
+  }
+  catch (...) {
+    LogError << "Failed to allocate memory, so stopping" << std::endl;
+    LogThrow("Not enough memory available");
+  }
 
-    // Initialize the caches.  Don't try to zero everything since the
-    // caches can be huge.
-    Reset();
-    fIndex->hostPtr()[0] = 0;
+  // Initialize the caches.  Don't try to zero everything since the
+  // caches can be huge.
+  Reset();
+  fIndex->hostPtr()[0] = 0;
 }
 
 // The destructor
@@ -82,65 +80,65 @@ Cache::Weight::Bicubic::~Bicubic() {}
 void Cache::Weight::Bicubic::AddData(int resIndex,
                                      int par1Index, int par2Index,
                                      const std::vector<double>& splineData) {
-    if (resIndex < 0) {
-        LogError << "Invalid result index"
-               << std::endl;
-        LogThrow("Negative result index");
-    }
-    if (fWeights.size() <= resIndex) {
-        LogError << "Invalid result index"
-               << std::endl;
-        LogThrow("Result index out of bounds");
-    }
-    if (par1Index < 0) {
-        LogError << "Invalid parameter 1 index"
-               << std::endl;
-        LogThrow("Negative parameter 1 index");
-    }
-    if (fParameters.size() <= par1Index) {
-        LogError << "Invalid parameter 1 index " << par1Index
-               << std::endl;
-        LogThrow("Parameter 1 index out of bounds");
-    }
-    if (par2Index < 0) {
-        LogError << "Invalid parameter 2 index"
-               << std::endl;
-        LogThrow("Negative parameter 2 index");
-    }
-    if (fParameters.size() <= par2Index) {
-        LogError << "Invalid parameter 2 index " << par2Index
-               << std::endl;
-        LogThrow("Parameter 2 index out of bounds");
-    }
-    if (splineData.size() < 11) {
-        LogError << "Insufficient points in spline " << splineData.size()
-               << std::endl;
-        LogThrow("Invalid number of spline points");
-    }
+  if (resIndex < 0) {
+    LogError << "Invalid result index"
+             << std::endl;
+    LogThrow("Negative result index");
+  }
+  if (fWeights.size() <= resIndex) {
+    LogError << "Invalid result index"
+             << std::endl;
+    LogThrow("Result index out of bounds");
+  }
+  if (par1Index < 0) {
+    LogError << "Invalid parameter 1 index"
+             << std::endl;
+    LogThrow("Negative parameter 1 index");
+  }
+  if (fParameters.size() <= par1Index) {
+    LogError << "Invalid parameter 1 index " << par1Index
+             << std::endl;
+    LogThrow("Parameter 1 index out of bounds");
+  }
+  if (par2Index < 0) {
+    LogError << "Invalid parameter 2 index"
+             << std::endl;
+    LogThrow("Negative parameter 2 index");
+  }
+  if (fParameters.size() <= par2Index) {
+    LogError << "Invalid parameter 2 index " << par2Index
+             << std::endl;
+    LogThrow("Parameter 2 index out of bounds");
+  }
+  if (splineData.size() < 11) {
+    LogError << "Insufficient points in spline " << splineData.size()
+             << std::endl;
+    LogThrow("Invalid number of spline points");
+  }
 
-    int newIndex = fUsed++;
-    if (fUsed > fReserved) {
-        LogError << "Not enough space reserved for splines"
-                  << std::endl;
-        LogThrow("Not enough space reserved for splines");
-    }
-    if (fSpaceUsed + splineData.size() > fSpaceReserved) {
-        LogError << "Not enough space reserved for spline knots"
+  int newIndex = fUsed++;
+  if (fUsed > fReserved) {
+    LogError << "Not enough space reserved for splines"
+             << std::endl;
+    LogThrow("Not enough space reserved for splines");
+  }
+  if (fSpaceUsed + splineData.size() > fSpaceReserved) {
+    LogError << "Not enough space reserved for spline knots"
+             << std::endl;
+    LogThrow("Not enough space reserved for spline knots");
+  }
+  fResult->hostPtr()[newIndex] = resIndex;
+  fParameter->hostPtr()[2*newIndex] = par1Index;
+  fParameter->hostPtr()[2*newIndex+1] = par2Index;
+  fIndex->hostPtr()[newIndex] = fSpaceUsed;
+  for (double d : splineData) {
+    fData->hostPtr()[fSpaceUsed++] = d;
+    if (fSpaceUsed > fSpaceReserved) {
+      LogError << "Not enough space reserved for spline knots"
                << std::endl;
-        LogThrow("Not enough space reserved for spline knots");
+      LogThrow("Not enough space reserved for spline knots");
     }
-    fResult->hostPtr()[newIndex] = resIndex;
-    fParameter->hostPtr()[2*newIndex] = par1Index;
-    fParameter->hostPtr()[2*newIndex+1] = par2Index;
-    fIndex->hostPtr()[newIndex] = fSpaceUsed;
-    for (double d : splineData) {
-        fData->hostPtr()[fSpaceUsed++] = d;
-        if (fSpaceUsed > fSpaceReserved) {
-            LogError << "Not enough space reserved for spline knots"
-                     << std::endl;
-            LogThrow("Not enough space reserved for spline knots");
-        }
-    }
+  }
 }
 
 #include "CalculateBicubicSpline.h"
@@ -148,65 +146,65 @@ void Cache::Weight::Bicubic::AddData(int resIndex,
 
 namespace {
 
-    // A function to be used as the kernel on either the CPU or GPU.  This
-    // must be valid CUDA coda.
-    HEMI_KERNEL_FUNCTION(HEMIBicubicKernel,
-                         double* results,
-                         const double* params,
-                         const double* lowerClamp,
-                         const double* upperClamp,
-                         const WEIGHT_BUFFER_FLOAT* dataTable,
-                         const int* rIndex,
-                         const short* pIndex,
-                         const int* sIndex,
-                         const int nData) {
+  // A function to be used as the kernel on either the CPU or GPU.  This
+  // must be valid CUDA coda.
+  HEMI_KERNEL_FUNCTION(HEMIBicubicKernel,
+                       double* results,
+                       const double* params,
+                       const double* lowerClamp,
+                       const double* upperClamp,
+                       const WEIGHT_BUFFER_FLOAT* dataTable,
+                       const int* rIndex,
+                       const short* pIndex,
+                       const int* sIndex,
+                       const int nData) {
 
-        for (int i : hemi::grid_stride_range(0,nData)) {
-            const int id0 = sIndex[i];
-            const double x = params[pIndex[2*i]];
-            const double y = params[pIndex[2*i+1]];
-            const double lClamp = lowerClamp[pIndex[i]];
-            const double uClamp = upperClamp[pIndex[i]];
-            const WEIGHT_BUFFER_FLOAT* splineData = dataTable + id0;
-            const int nx = *(splineData++);
-            const int ny = *(splineData++);
-            const double* xx = splineData; splineData += nx;
-            const double* yy = splineData; splineData += ny;
-            const double* knots = splineData;
+    for (int i : hemi::grid_stride_range(0,nData)) {
+      const int id0 = sIndex[i];
+      const double x = params[pIndex[2*i]];
+      const double y = params[pIndex[2*i+1]];
+      const double lClamp = lowerClamp[pIndex[i]];
+      const double uClamp = upperClamp[pIndex[i]];
+      const WEIGHT_BUFFER_FLOAT* splineData = dataTable + id0;
+      const int nx = *(splineData++);
+      const int ny = *(splineData++);
+      const double* xx = splineData; splineData += nx;
+      const double* yy = splineData; splineData += ny;
+      const double* knots = splineData;
 
-            double v = CalculateBicubicSpline(
-                x, y, lClamp, uClamp, knots, nx, ny, xx, nx, yy, ny);
+      double v = CalculateBicubicSpline(
+          x, y, lClamp, uClamp, knots, nx, ny, xx, nx, yy, ny);
 
-            CacheAtomicMult(&results[rIndex[i]], v);
-        }
+      CacheAtomicMult(&results[rIndex[i]], v);
     }
+  }
 }
 
 void Cache::Weight::Bicubic::Reset() {
-    // Use the parent reset.
-    Cache::Weight::Base::Reset();
-    // Reset this class
-    fUsed = 0;
-    fSpaceUsed = 0;
+  // Use the parent reset.
+  Cache::Weight::Base::Reset();
+  // Reset this class
+  fUsed = 0;
+  fSpaceUsed = 0;
 }
 
 bool Cache::Weight::Bicubic::Apply() {
-    if (GetUsed() < 1) return false;
+  if (GetUsed() < 1) return false;
 
-    HEMIBicubicKernel bicubicKernel;
-    hemi::launch(bicubicKernel,
-                 fWeights.writeOnlyPtr(),
-                 fParameters.readOnlyPtr(),
-                 fLowerClamp.readOnlyPtr(),
-                 fUpperClamp.readOnlyPtr(),
-                 fData->readOnlyPtr(),
-                 fResult->readOnlyPtr(),
-                 fParameter->readOnlyPtr(),
-                 fIndex->readOnlyPtr(),
-                 GetUsed()
-        );
+  HEMIBicubicKernel bicubicKernel;
+  hemi::launch(bicubicKernel,
+               fWeights.writeOnlyPtr(),
+               fParameters.readOnlyPtr(),
+               fLowerClamp.readOnlyPtr(),
+               fUpperClamp.readOnlyPtr(),
+               fData->readOnlyPtr(),
+               fResult->readOnlyPtr(),
+               fParameter->readOnlyPtr(),
+               fIndex->readOnlyPtr(),
+               GetUsed()
+  );
 
-    return true;
+  return true;
 }
 
 // An MIT Style License

@@ -2,7 +2,7 @@
 // Created by Nadrino on 21/04/2021.
 //
 
-#include "GenericToolbox.Json.h"
+
 #include "ConfigUtils.h"
 #include "GundamGreetings.h"
 #include "GundamUtils.h"
@@ -11,15 +11,9 @@
 #include "CmdLineParser.h"
 #include "GenericToolbox.Root.h"
 
-#include "nlohmann/json.hpp"
 
 #include <string>
 
-
-
-LoggerInit([]{
-  Logger::getUserHeader() << "[" << FILENAME << "]";
-});
 
 int main( int argc, char** argv ){
 
@@ -53,7 +47,7 @@ int main( int argc, char** argv ){
 
     // appendixDict["optionName"] = "Appendix"
     // this list insure all appendices will appear in the same order
-    std::vector<std::pair<std::string, std::string>> appendixDict{
+    std::vector<GundamUtils::AppendixEntry> appendixDict{
         {"configFile", ""},
         {"overrideFiles", "With"},
         {"appendix", ""},

@@ -5,59 +5,60 @@
 #include "DatasetDefinition.h"
 
 #include "GenericToolbox.Utils.h"
-#include "GenericToolbox.Json.h"
+
 #include "GenericToolbox.Map.h"
 #include "Logger.h"
 
 #include "TTreeFormulaManager.h"
 
 
-LoggerInit([]{
-  Logger::setUserHeaderStr("[DataSetLoader]");
-});
+void DatasetDefinition::configureImpl() {
 
-
-void DatasetDefinition::readConfigImpl() {
-  LogThrowIf(_config_.empty(), "Config not set.");
+  // mandatory
   _name_ = GenericToolbox::Json::fetchValue<std::string>(_config_, "name");
-  LogInfo << "Reading config for dataset: \"" << _name_ << "\"" << std::endl;
 
-  _isEnabled_ = GenericToolbox::Json::fetchValue(_config_, "isEnabled", bool(true));
+  // optional
+  GenericToolbox::Json::fillValue(_config_, _isEnabled_, "isEnabled");
   LogReturnIf(not _isEnabled_, "\"" << _name_ << "\" is disabled.");
 
-  _selectedDataEntry_ = GenericToolbox::Json::fetchValue<std::string>(_config_, "selectedDataEntry", "Asimov");
-  _selectedToyEntry_ = GenericToolbox::Json::fetchValue<std::string>(_config_, "selectedToyEntry", "Asimov");
+  _modelDispenser_ = DataDispenser(this);
+  _modelDispenser_.getParameters().name = "Asimov";
+  _modelDispenser_.getParameters().useReweightEngine = true;
+  GenericToolbox::Json::fillValue<JsonType>(_config_, _modelDispenser_.getConfig(), {{"model"},{"mc"}});
+  _modelDispenser_.configure();
 
-  _showSelectedEventCount_ = GenericToolbox::Json::fetchValue(_config_, "showSelectedEventCount", _showSelectedEventCount_);
-
-  _mcDispenser_ = DataDispenser(this);
-  _mcDispenser_.readConfig(GenericToolbox::Json::fetchValue<JsonType>(_config_, {{"model"}, {"mc"}}));
-  _mcDispenser_.getParameters().name = "Asimov";
-  _mcDispenser_.getParameters().useMcContainer = true;
-
-  // Always loaded by default
-  _dataDispenserDict_.emplace("Asimov", DataDispenser(_mcDispenser_));
+  // Always put the Asimov as a data entry
+  _dataDispenserDict_.emplace("Asimov", DataDispenser(_modelDispenser_));
 
   for( auto& dataEntry : GenericToolbox::Json::fetchValue(_config_, "data", JsonType()) ){
-    std::string name = GenericToolbox::Json::fetchValue(dataEntry, "name", "data");
-    LogThrowIf( GenericToolbox::isIn(name, _dataDispenserDict_),
-                "\"" << name << "\" already taken, please use another name." )
+    auto name = GenericToolbox::Json::fetchValue<std::string>(dataEntry, "name");
+    LogThrowIf( GenericToolbox::isIn(name, _dataDispenserDict_), "\"" << name << "\" already taken, please use another name." )
 
-    if( GenericToolbox::Json::fetchValue(dataEntry, "fromMc", bool(false)) ){ _dataDispenserDict_.emplace(name, _mcDispenser_); }
-    else{ _dataDispenserDict_.emplace(name, DataDispenser(this)); }
-    _dataDispenserDict_.at(name).readConfig(dataEntry);
+    _dataDispenserDict_.emplace(name, DataDispenser(this));
+    _dataDispenserDict_.at(name).getParameters().isData = true;
+
+    if( GenericToolbox::Json::fetchValue(dataEntry, "fromMc", bool(false)) ){
+      _dataDispenserDict_.at(name).setConfig( _modelDispenser_.getConfig() );
+    }
+
+    // use override
+    GenericToolbox::Json::applyOverrides( _dataDispenserDict_.at(name).getConfig(), dataEntry );
+    _dataDispenserDict_.at(name).configure();
   }
 
-  _devSingleThreadEventLoaderAndIndexer_ = GenericToolbox::Json::fetchValue(_config_, "devSingleThreadEventLoaderAndIndexer", _devSingleThreadEventLoaderAndIndexer_);
-  _devSingleThreadEventSelection_ = GenericToolbox::Json::fetchValue(_config_, "devSingleThreadEventSelection", _devSingleThreadEventSelection_);
-  _sortLoadedEvents_ = GenericToolbox::Json::fetchValue(_config_, "sortLoadedEvents", _sortLoadedEvents_);
+  GenericToolbox::Json::fillValue(_config_, _selectedDataEntry_, "selectedDataEntry");
+  GenericToolbox::Json::fillValue(_config_, _selectedToyEntry_, "selectedToyEntry");
+  GenericToolbox::Json::fillValue(_config_, _showSelectedEventCount_, "showSelectedEventCount");
+  GenericToolbox::Json::fillValue(_config_, _devSingleThreadEventLoaderAndIndexer_, "devSingleThreadEventLoaderAndIndexer");
+  GenericToolbox::Json::fillValue(_config_, _devSingleThreadEventSelection_, "devSingleThreadEventSelection");
+  GenericToolbox::Json::fillValue(_config_, _sortLoadedEvents_, "sortLoadedEvents");
 
 }
 void DatasetDefinition::initializeImpl() {
   if( not _isEnabled_ ) return;
   LogInfo << "Initializing dataset: \"" << _name_ << "\"" << std::endl;
 
-  _mcDispenser_.initialize();
+  _modelDispenser_.initialize();
   for( auto& dataDispenser : _dataDispenserDict_ ){
     dataDispenser.second.initialize();
   }
@@ -70,7 +71,7 @@ void DatasetDefinition::initializeImpl() {
 }
 
 void DatasetDefinition::updateDispenserOwnership(){
-  _mcDispenser_.setOwner(this);
+  _modelDispenser_.setOwner(this);
   for( auto& dispenser : _dataDispenserDict_ ){
     dispenser.second.setOwner(this);
   }

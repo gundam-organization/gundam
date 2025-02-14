@@ -9,17 +9,26 @@
 #include "EventVarTransformLib.h"
 
 #include "GenericToolbox.Wrappers.h"
+#include "GenericToolbox.Root.h"
 
-#include "nlohmann/json.hpp"
+#include "TChain.h"
+#include "TTreeFormula.h"
+
 
 #include "string"
 #include "map"
 
 
 struct DataDispenserParameters{
-  bool useMcContainer{false}; // define the container to fill -> could get rid of it?
+
+  // should be load dials and request the associate variables?
+  bool useReweightEngine{false};
+  bool isData{false}; // shall fetch slpit vars?
+  size_t debugNbMaxEventsToLoad{0};
+  double fractionOfEntries{1.};
+
   std::string name{};
-  std::string treePath{};
+  std::string globalTreePath{};
   std::string dialIndexFormula{};
   std::string nominalWeightFormulaStr{};
   std::string selectionCutFormulaStr{};
@@ -28,9 +37,38 @@ struct DataDispenserParameters{
   std::map<std::string, std::string> variableDict{};
   std::vector<std::string> additionalVarsStorage{};
   std::vector<std::string> dummyVariablesList;
-  size_t debugNbMaxEventsToLoad{0};
+  std::vector<EventVarTransformLib> eventVarTransformList;
 
-  JsonType fromHistContent{};
+  struct FromHistContent{
+    bool isEnabled{false};
+    std::string rootFilePath{};
+
+    struct SampleHist{
+      std::string name{};
+      std::string hist{};
+      std::vector<std::string> axisList{};
+    };
+    std::vector<SampleHist> sampleHistList{};
+
+    SampleHist& addSampleHist(const std::string& name_){
+      for( auto& sampleHist : sampleHistList ){
+        LogThrowIf(sampleHist.name == name_, "Duplicate sample hist with name: " << name_);
+      }
+      sampleHistList.emplace_back();
+      sampleHistList.back().name = name_;
+      return sampleHistList.back();
+    }
+    SampleHist* getSampleHistPtr(const std::string& name_){
+      for( auto& sampleHist : sampleHistList ){
+        if( sampleHist.name == name_ ){ return &sampleHist; }
+      }
+      return nullptr;
+    }
+  };
+  FromHistContent fromHistContent;
+
+//  JsonType fromHistContent{};
+  JsonType overridePropagatorConfig{};
 
   [[nodiscard]] std::string getSummary() const;
 };
@@ -42,7 +80,7 @@ struct DataDispenserCache{
 
   std::vector<Sample*> samplesToFillList{};
   std::vector<size_t> sampleNbOfEvents;
-  std::vector<std::vector<bool>> eventIsInSamplesList{};
+  std::vector<int> entrySampleIndexList{};
   std::vector<size_t> sampleIndexOffsetList;
   std::vector< std::vector<Event>* > sampleEventListPtrToFill;
   std::vector<DialCollection*> dialCollectionsRefList{};
@@ -53,12 +91,9 @@ struct DataDispenserCache{
 
   std::vector<std::string> varsToOverrideList; // stores the leaves names to override in the right order
 
-  // Variable transformations
-  std::vector<EventVarTransformLib> eventVarTransformList;
-
   struct ThreadSelectionResult{
     std::vector<size_t> sampleNbOfEvents;
-    std::vector<std::vector<bool>> eventIsInSamplesList;
+    std::vector<int> entrySampleIndexList;
   };
   std::vector<ThreadSelectionResult> threadSelectionResults;
 
@@ -66,6 +101,25 @@ struct DataDispenserCache{
   void addVarRequestedForIndexing(const std::string& varName_);
   void addVarRequestedForStorage(const std::string& varName_);
 
+};
+
+struct ThreadSharedData{
+  Long64_t nbEntries{0};
+
+  std::shared_ptr<TChain> treeChain{nullptr};
+
+  std::vector<const GenericToolbox::LeafForm*> leafFormIndexingList{};
+  std::vector<const GenericToolbox::LeafForm*> leafFormStorageList{};
+
+  // has to be hooked to the TChain
+  TTreeFormula* dialIndexTreeFormula{nullptr};
+  TTreeFormula* nominalWeightTreeFormula{nullptr};
+
+  // thread communication
+  GenericToolbox::Atomic<bool> requestReadNextEntry{false};
+  GenericToolbox::Atomic<bool> isEntryBufferReady{false};
+  GenericToolbox::Atomic<bool> isDoneReading{false};
+  GenericToolbox::Atomic<bool> isEventFillerReady{false};
 };
 
 

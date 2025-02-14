@@ -14,9 +14,6 @@
 
 #include "Logger.h"
 
-LoggerInit([]{
-  Logger::setUserHeaderStr("[Cache::Weight::Tabulated]");
-});
 
 // The constructor
 Cache::Weight::Tabulated::Tabulated(
@@ -29,55 +26,55 @@ Cache::Weight::Tabulated::Tabulated(
       fDataReserved(tableSpace), fDataUsed(0),
       fTables(tables) {
 
-    LogInfo << "Reserved " << GetName() << " Tabulated Dials: "
-            << GetReserved() << std::endl;
-    if (GetReserved() < 1) return;
+  LogInfo << "Reserved " << GetName() << " Tabulated Dials: "
+          << GetReserved() << std::endl;
+  if (GetReserved() < 1) return;
 
-    fTotalBytes += GetReserved()*sizeof(int);        // fResult
-    fTotalBytes += GetReserved()*sizeof(int);        // fIndex
-    fTotalBytes += GetReserved()*sizeof(float);      // fFraction
-    fTotalBytes += GetDataReserved()*sizeof(WEIGHT_BUFFER_FLOAT); // fData;
+  fTotalBytes += GetReserved()*sizeof(int);        // fResult
+  fTotalBytes += GetReserved()*sizeof(int);        // fIndex
+  fTotalBytes += GetReserved()*sizeof(float);      // fFraction
+  fTotalBytes += GetDataReserved()*sizeof(WEIGHT_BUFFER_FLOAT); // fData;
 
-    LogInfo << "Reserved " << GetName()
-            << " Table Space: " << GetDataReserved()
-            << std::endl;
+  LogInfo << "Reserved " << GetName()
+          << " Table Space: " << GetDataReserved()
+          << std::endl;
 
-    LogInfo << "Approximate Memory Size for " << GetName()
-            << ": " << GetResidentMemory()/1E+9
-            << " GB" << std::endl;
+  LogInfo << "Approximate Memory Size for " << GetName()
+          << ": " << GetResidentMemory()/1E+9
+          << " GB" << std::endl;
 
-    try {
-        // Get the CPU/GPU memory for the spline index tables.  These are
-        // copied once during initialization so do not pin the CPU memory into
-        // the page set.
-        fResult.reset(new hemi::Array<int>(GetReserved(),false));
-        LogThrowIf(not fResult, "Bad Result alloc");
+  try {
+    // Get the CPU/GPU memory for the spline index tables.  These are
+    // copied once during initialization so do not pin the CPU memory into
+    // the page set.
+    fResult.reset(new hemi::Array<int>(GetReserved(),false));
+    LogThrowIf(not fResult, "Bad Result alloc");
 
-        fIndex.reset(new hemi::Array<int>(GetReserved(),false));
-        LogThrowIf(not fIndex, "Bad Index alloc");
+    fIndex.reset(new hemi::Array<int>(GetReserved(),false));
+    LogThrowIf(not fIndex, "Bad Index alloc");
 
-        fFraction.reset(
-            new hemi::Array<WEIGHT_BUFFER_FLOAT>(GetReserved(),false));
-        LogThrowIf(not fFraction, "Bad Fraction alloc");
+    fFraction.reset(
+        new hemi::Array<WEIGHT_BUFFER_FLOAT>(GetReserved(),false));
+    LogThrowIf(not fFraction, "Bad Fraction alloc");
 
-        // Get the CPU/GPU memory for the tables.  This is copied for each
-        // evaluation.  The table is filled before this class is used.
-        fData.reset(
-            new hemi::Array<WEIGHT_BUFFER_FLOAT>(fDataReserved,false));
-        LogThrowIf(not fData, "Bad Table alloc");
-    }
-    catch (...) {
-        LogError << "Failed to allocate memory, so stopping" << std::endl;
-        LogThrow("Not enough memory available");
-    }
+    // Get the CPU/GPU memory for the tables.  This is copied for each
+    // evaluation.  The table is filled before this class is used.
+    fData.reset(
+        new hemi::Array<WEIGHT_BUFFER_FLOAT>(fDataReserved,false));
+    LogThrowIf(not fData, "Bad Table alloc");
+  }
+  catch (...) {
+    LogError << "Failed to allocate memory, so stopping" << std::endl;
+    LogThrow("Not enough memory available");
+  }
 
-    // Initialize the caches.  Don't try to zero everything since the
-    // caches can be huge.
-    Reset();
-    fResult->hostPtr()[0] = 0;
-    fIndex->hostPtr()[0] = 0;
-    fFraction->hostPtr()[0] = 0;
-    fData->hostPtr()[0] = 0;
+  // Initialize the caches.  Don't try to zero everything since the
+  // caches can be huge.
+  Reset();
+  fResult->hostPtr()[0] = 0;
+  fIndex->hostPtr()[0] = 0;
+  fFraction->hostPtr()[0] = 0;
+  fData->hostPtr()[0] = 0;
 }
 
 void Cache::Weight::Tabulated::AddData(int resIndex,
@@ -85,39 +82,39 @@ void Cache::Weight::Tabulated::AddData(int resIndex,
                                        int index,
                                        double fraction) {
 
-    if (resIndex < 0) {
-        LogError << "Invalid result index"
-               << std::endl;
-        LogThrow("Negative result index");
-    }
-    if (fWeights.size() <= resIndex) {
-        LogError << "Invalid result index"
-               << std::endl;
-        LogThrow("Result index out of bounds");
-    }
+  if (resIndex < 0) {
+    LogError << "Invalid result index"
+             << std::endl;
+    LogThrow("Negative result index");
+  }
+  if (fWeights.size() <= resIndex) {
+    LogError << "Invalid result index"
+             << std::endl;
+    LogThrow("Result index out of bounds");
+  }
 
-    int newIndex = fUsed++;
-    if (fUsed > fReserved) {
-        LogError << "Not enough space reserved for dials"
-                  << std::endl;
-        LogThrow("Not enough space reserved for dials");
-    }
+  int newIndex = fUsed++;
+  if (fUsed > fReserved) {
+    LogError << "Not enough space reserved for dials"
+             << std::endl;
+    LogThrow("Not enough space reserved for dials");
+  }
 
-    auto tableEntry = fTables.find(table);
-    if (tableEntry == fTables.end()) {
-        LogError << "Request to create Tabulated weight for invalid table"
-                 << std::endl;
-        LogThrow("Invalid table request");
-    }
-    int offset = tableEntry->second + index;
-    if (fData->size() <= offset) {
-        LogError << "Insufficent table space" << std::endl;
-        LogThrow("Insufficient table space");
-    }
+  auto tableEntry = fTables.find(table);
+  if (tableEntry == fTables.end()) {
+    LogError << "Request to create Tabulated weight for invalid table"
+             << std::endl;
+    LogThrow("Invalid table request");
+  }
+  int offset = tableEntry->second + index;
+  if (fData->size() <= offset) {
+    LogError << "Insufficent table space" << std::endl;
+    LogThrow("Insufficient table space");
+  }
 
-    fResult->hostPtr()[newIndex] = resIndex;
-    fIndex->hostPtr()[newIndex] = offset;
-    fFraction->hostPtr()[newIndex] = fraction;
+  fResult->hostPtr()[newIndex] = resIndex;
+  fIndex->hostPtr()[newIndex] = offset;
+  fFraction->hostPtr()[newIndex] = fraction;
 
 }
 
@@ -125,57 +122,57 @@ void Cache::Weight::Tabulated::AddData(int resIndex,
 
 namespace {
 
-    // A function to be used as the kernel on either the CPU or GPU.  This
-    // must be valid CUDA coda.
-    HEMI_KERNEL_FUNCTION(HEMITabulatedKernel,
-                         double* results,
-                         const int* rIndex,
-                         const int* index,
-                         const WEIGHT_BUFFER_FLOAT* frac,
-                         const WEIGHT_BUFFER_FLOAT* dataTable,
-                         const int nData) {
+  // A function to be used as the kernel on either the CPU or GPU.  This
+  // must be valid CUDA coda.
+  HEMI_KERNEL_FUNCTION(HEMITabulatedKernel,
+                       double* results,
+                       const int* rIndex,
+                       const int* index,
+                       const WEIGHT_BUFFER_FLOAT* frac,
+                       const WEIGHT_BUFFER_FLOAT* dataTable,
+                       const int nData) {
 
-        for (int i : hemi::grid_stride_range(0,nData)) {
-            const WEIGHT_BUFFER_FLOAT* data = dataTable + index[i];
-            const double f = frac[i];
-            double v = (*data)*f;
-            ++data;
-            v += (*data)*(1.0-f);
-            CacheAtomicMult(&results[rIndex[i]], v);
-        }
+    for (int i : hemi::grid_stride_range(0,nData)) {
+      const WEIGHT_BUFFER_FLOAT* data = dataTable + index[i];
+      const double f = frac[i];
+      double v = (*data)*f;
+      ++data;
+      v += (*data)*(1.0-f);
+      CacheAtomicMult(&results[rIndex[i]], v);
     }
+  }
 }
 
 void Cache::Weight::Tabulated::Reset() {
-    // Use the parent reset.
-    Cache::Weight::Base::Reset();
-    // Reset this class
-    fUsed = 0;
-    fDataUsed = 0;
+  // Use the parent reset.
+  Cache::Weight::Base::Reset();
+  // Reset this class
+  fUsed = 0;
+  fDataUsed = 0;
 }
 
 bool Cache::Weight::Tabulated::Apply() {
-    if (GetUsed() < 1) return false;
+  if (GetUsed() < 1) return false;
 
-    // Fill the table.
-    for (auto table : fTables) {
-        int offset = table.second;
-        for (double entry : (*table.first)) {
-            fData->hostPtr()[offset++] = entry;
-        }
+  // Fill the table.
+  for (auto table : fTables) {
+    int offset = table.second;
+    for (double entry : (*table.first)) {
+      fData->hostPtr()[offset++] = entry;
     }
+  }
 
-    HEMITabulatedKernel tabulatedKernel;
-    hemi::launch(tabulatedKernel,
-                 fWeights.writeOnlyPtr(),
-                 fResult->readOnlyPtr(),
-                 fIndex->readOnlyPtr(),
-                 fFraction->readOnlyPtr(),
-                 fData->readOnlyPtr(),
-                 GetUsed()
-        );
+  HEMITabulatedKernel tabulatedKernel;
+  hemi::launch(tabulatedKernel,
+               fWeights.writeOnlyPtr(),
+               fResult->readOnlyPtr(),
+               fIndex->readOnlyPtr(),
+               fFraction->readOnlyPtr(),
+               fData->readOnlyPtr(),
+               GetUsed()
+  );
 
-    return true;
+  return true;
 }
 
 // An MIT Style License

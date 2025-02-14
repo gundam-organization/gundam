@@ -23,6 +23,8 @@ set( HEADERS
 set( SRCFILES
   ${CMAKE_CURRENT_SOURCE_DIR}/src/CacheManager.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/src/CacheAtomicCAS.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/CacheSampleHistFiller.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/CacheEventWeightFiller.cpp
 )
 
 set( SRC_FILE_EXT "cpp" )       # The C++ extension
@@ -50,17 +52,17 @@ list( APPEND SRCFILES ${CMAKE_CURRENT_SOURCE_DIR}/src/CacheIndexedSums.${SRC_FIL
 list( APPEND SRCFILES ${CMAKE_CURRENT_SOURCE_DIR}/src/CacheRecursiveSums.${SRC_FILE_EXT} )
 
 if( USE_STATIC_LINKS )
-  add_library(GundamCache STATIC ${SRCFILES})
+  add_library(GundamCacheManager STATIC ${SRCFILES})
 else()
-  add_library(GundamCache SHARED ${SRCFILES})
+  add_library(GundamCacheManager SHARED ${SRCFILES})
 endif( USE_STATIC_LINKS )
 
 # Make sure the current directories are available for the later
 # compilation.
-target_include_directories( GundamCache PUBLIC
+target_include_directories( GundamCacheManager PUBLIC
   ${CMAKE_CURRENT_SOURCE_DIR}/include)
 
-target_link_libraries( GundamCache PUBLIC
+target_link_libraries( GundamCacheManager PUBLIC
   GundamDialDictionary
   GundamParametersManager
   GundamSamplesManager
@@ -74,11 +76,11 @@ if(NOT CMAKE_CUDA_COMPILER)
   # everything except the actual kernel launches and so the CUDA
   # routines need to be explicitly marked as "do not call" during C++
   # compilation.
-  target_compile_definitions( GundamCache PUBLIC
+  target_compile_definitions( GundamCacheManager PUBLIC
     HEMI_CUDA_DISABLE)
 else()
   # Specific definitions when using a CUDA compiler (e.g. NVCC)
   # Nothing yet!
 endif(NOT CMAKE_CUDA_COMPILER)
 
-install(TARGETS GundamCache DESTINATION lib)
+install(TARGETS GundamCacheManager DESTINATION lib)

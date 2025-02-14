@@ -9,17 +9,12 @@
 
 #include "Logger.h"
 #include "CmdLineParser.h"
-#include "GenericToolbox.Json.h"
+
 #include "GenericToolbox.Root.h"
 
 #include <vector>
 #include <utility>
 #include <algorithm>
-
-
-LoggerInit([]{
-  Logger::getUserHeader() << "[" << FILENAME << "]";
-});
 
 
 int main( int argc, char** argv ){
@@ -65,7 +60,7 @@ int main( int argc, char** argv ){
 
     // appendixDict["optionName"] = "Appendix"
     // this list insure all appendices will appear in the same order
-    std::vector<std::pair<std::string, std::string>> appendixDict{
+    std::vector<GundamUtils::AppendixEntry> appendixDict{
         {"configFile", ""},
         {"overrideFiles", "With"},
         {"appendix", ""}
@@ -180,7 +175,7 @@ int main( int argc, char** argv ){
         app.getOutfilePtr(),
         GenericToolbox::joinPath("systematics",graphEntry.path)
     );
-    GenericToolbox::writeInTFile(path, outGraph);
+    GenericToolbox::writeInTFileWithObjTypeExt(path, outGraph);
   }
 
   return EXIT_SUCCESS;

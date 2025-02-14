@@ -9,40 +9,36 @@
 #include "ParametersManager.h"
 #include "DialCollection.h"
 #include "EventDialCache.h"
-#include "PlotGenerator.h"
-#include "JsonBaseClass.h"
 #include "SampleSet.h"
 
 #include "GenericToolbox.Time.h"
+#include "GenericToolbox.Thread.h"
 
 #include <vector>
 #include <map>
 #include <future>
 
+
 class Propagator : public JsonBaseClass {
 
 protected:
-  void readConfigImpl() override;
+  void configureImpl() override;
   void initializeImpl() override;
 
+
 public:
+  static void muteLogger();
+  static void unmuteLogger();
+
   Propagator() = default;
 
-  // Setters
+  // setters
   void setShowTimeStats(bool showTimeStats){ _showTimeStats_ = showTimeStats; }
-  void setThrowAsimovToyParameters(bool throwAsimovToyParameters){ _throwAsimovToyParameters_ = throwAsimovToyParameters; }
   void setEnableEigenToOrigInPropagate(bool enableEigenToOrigInPropagate){ _enableEigenToOrigInPropagate_ = enableEigenToOrigInPropagate; }
   void setIThrow(int iThrow){ _iThrow_ = iThrow; }
-  void setLoadAsimovData(bool loadAsimovData){ _loadAsimovData_ = loadAsimovData; }
   void setParameterInjectorConfig(const JsonType &parameterInjector){ _parameterInjectorMc_ = parameterInjector; }
 
-  // Const getters
-  [[nodiscard]] bool isThrowAsimovToyParameters() const { return _throwAsimovToyParameters_; }
-  [[nodiscard]] bool isEnableStatThrowInToys() const { return _enableStatThrowInToys_; }
-  [[nodiscard]] bool isEnableEventMcThrow() const { return _enableEventMcThrow_; }
-  [[nodiscard]] bool isGaussStatThrowInToys() const { return _gaussStatThrowInToys_; }
-  [[nodiscard]] bool isLoadAsimovData() const { return _loadAsimovData_; }
-  [[nodiscard]] bool isShowEventBreakdown() const { return _showEventBreakdown_; }
+  // const getters
   [[nodiscard]] bool isDebugPrintLoadedEvents() const { return _debugPrintLoadedEvents_; }
   [[nodiscard]] int getDebugPrintLoadedEventsNbPerSample() const { return _debugPrintLoadedEventsNbPerSample_; }
   [[nodiscard]] int getIThrow() const { return _iThrow_; }
@@ -52,40 +48,48 @@ public:
   [[nodiscard]] const SampleSet &getSampleSet() const { return _sampleSet_; }
   [[nodiscard]] const JsonType &getParameterInjectorMc() const { return _parameterInjectorMc_;; }
 
-  // Non-const getters
+  // mutable getters
   SampleSet &getSampleSet(){ return _sampleSet_; }
   ParametersManager &getParametersManager(){ return _parManager_; }
-  PlotGenerator &getPlotGenerator(){ return _plotGenerator_; }
   EventDialCache& getEventDialCache(){ return _eventDialCache_; }
   std::vector<DialCollection> &getDialCollectionList(){ return _dialCollectionList_; }
+  GenericToolbox::ParallelWorker& getThreadPool(){ return _threadPool_; }
 
   // Core
+  void clearContent();
+  void shrinkDialContainers();
   void buildDialCache();
   void propagateParameters();
-  void reweightMcEvents();
-  void clearContent();
+  void reweightEvents(bool updateDials = true);
 
-  // Misc
-  [[nodiscard]] std::string getSampleBreakdownTableStr() const;
-  void printBreakdowns();
+  // misc
+  void copyEventsFrom(const Propagator& src_);
+  void printConfiguration() const;
+  void printBreakdowns() const;
+  void writeEventRates(const GenericToolbox::TFilePath& saveDir_) const;
 
-  // Logger related
-  static void muteLogger();
-  static void unmuteLogger();
+#ifdef GUNDAM_USING_CACHE_MANAGER
+  void initializeCacheManager();
+#endif
 
-private:
+  // public members
+  GenericToolbox::Time::AveragedTimer<10> reweightTimer;
+  GenericToolbox::Time::AveragedTimer<10> refillHistogramTimer;
+
+protected:
   void initializeThreads();
 
   // multithreading
-  void reweightMcEvents(int iThread_);
-  void refillMcHistogramsFct( int iThread_);
+  void reweightEvents( int iThread_);
+  void refillHistogramsFct( int iThread_);
 
   void updateDialState();
-  void refillMcHistograms();
+  void refillHistograms();
+
+private:
 
   // Parameters
   bool _showTimeStats_{false};
-  bool _loadAsimovData_{false};
   bool _debugPrintLoadedEvents_{false};
   bool _devSingleThreadReweight_{false};
   bool _devSingleThreadHistFill_{false};
@@ -94,17 +98,13 @@ private:
   JsonType _parameterInjectorToy_;
 
   // Internals
-  bool _throwAsimovToyParameters_{false};
-  bool _enableStatThrowInToys_{true};
-  bool _gaussStatThrowInToys_{false};
-  bool _enableEventMcThrow_{true};
-  bool _showEventBreakdown_{true};
+  bool _showNbEventParameterBreakdown_{true};
+  bool _showNbEventPerSampleParameterBreakdown_{false};
   bool _enableEigenToOrigInPropagate_{true};
   int _iThrow_{-1};
 
   // Sub-layers
   SampleSet _sampleSet_{};
-  PlotGenerator _plotGenerator_{};
   EventDialCache _eventDialCache_{};
   ParametersManager _parManager_{};
 
@@ -112,10 +112,9 @@ private:
   // Once a dial collection has been added to this vector, it's index becomes
   // the immutable tag for that specific group of dials.
   std::vector<DialCollection> _dialCollectionList_{};
+  // TODO: create a DialManager
 
-public:
-  GenericToolbox::Time::AveragedTimer<10> reweightTimer;
-  GenericToolbox::Time::AveragedTimer<10> refillHistogramTimer;
+  GenericToolbox::ParallelWorker _threadPool_{};
 
 };
 #endif //GUNDAM_PROPAGATOR_H

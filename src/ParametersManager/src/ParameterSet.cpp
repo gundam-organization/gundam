@@ -3,121 +3,113 @@
 //
 
 #include "ParameterSet.h"
-#include "DataBinSet.h"
+#include "BinSet.h"
 
 #include "GundamGlobals.h"
 #include "ParameterThrowerMarkHarz.h"
 #include "ConfigUtils.h"
 
 #include "GenericToolbox.Root.h"
-#include "GenericToolbox.Json.h"
+
 #include "GenericToolbox.Utils.h"
 #include "Logger.h"
 
 #include <memory>
 
-LoggerInit([]{
-  Logger::setUserHeaderStr("[ParameterSet]");
-} );
 
+void ParameterSet::configureImpl(){
 
-void ParameterSet::readConfigImpl(){
-  LogThrowIf(_config_.empty(), "ParameterSet config not set.");
+  GenericToolbox::Json::fillValue(_config_, _name_, "name");
+  LogThrowIf(_name_.empty(), "ParameterSet have no name.");
+  LogDebugIf(GundamGlobals::isDebug()) << "Reading config for parameter set: " << _name_ << std::endl;
 
-  _name_ = GenericToolbox::Json::fetchValue<std::string>(_config_, "name");
-  LogInfo << std::endl << "Initializing parameter set: " << _name_ << std::endl;
-
-  _isEnabled_ = GenericToolbox::Json::fetchValue<bool>(_config_, "isEnabled");
-  LogReturnIf(not _isEnabled_, _name_ << " parameters are disabled.");
-
-  _nbParameterDefinition_ = GenericToolbox::Json::fetchValue(_config_, "numberOfParameters", _nbParameterDefinition_);
-  _nominalStepSize_ = GenericToolbox::Json::fetchValue(_config_, "nominalStepSize", _nominalStepSize_);
-
-  _useOnlyOneParameterPerEvent_ = GenericToolbox::Json::fetchValue<bool>(_config_, "useOnlyOneParameterPerEvent", false);
-  _printDialSetsSummary_ = GenericToolbox::Json::fetchValue<bool>(_config_, "printDialSetsSummary", _printDialSetsSummary_);
-  _printParametersSummary_ = GenericToolbox::Json::fetchValue<bool>(_config_, "printParametersSummary", _printDialSetsSummary_);
-
-  if( GenericToolbox::Json::doKeyExist(_config_, "parameterLimits") ){
-    auto parLimits = GenericToolbox::Json::fetchValue(_config_, "parameterLimits", JsonType());
-    _globalParameterMinValue_ = GenericToolbox::Json::fetchValue(parLimits, "minValue", _globalParameterMinValue_);
-    _globalParameterMaxValue_ = GenericToolbox::Json::fetchValue(parLimits, "maxValue", _globalParameterMaxValue_);
+  GenericToolbox::Json::fillValue(_config_, _isEnabled_, "isEnabled");
+  if( not _isEnabled_ ){
+    LogDebugIf(GundamGlobals::isDebug()) << " -> marked as disabled." << std::endl;
+    return; // don't go any further
   }
 
-  _enableEigenDecomp_ = GenericToolbox::Json::fetchValue(_config_ , {{"enableEigenDecomp"}, {"useEigenDecompInFit"}}, false);
-  if( _enableEigenDecomp_ ){
-    LogWarning << "Using eigen decomposition in fit." << std::endl;
+  GenericToolbox::Json::fillValue(_config_, _isScanEnabled_, "isScanEnabled");
 
-    _maxNbEigenParameters_ = GenericToolbox::Json::fetchValue(_config_ , "maxNbEigenParameters", -1);
-    if( _maxNbEigenParameters_ != -1 ){
-      LogInfo << "Maximum nb of eigen parameters is set to " << _maxNbEigenParameters_ << std::endl;
-    }
-    _maxEigenFraction_ = GenericToolbox::Json::fetchValue(_config_ , "maxEigenFraction", double(1.));
-    if( _maxEigenFraction_ != 1 ){
-      LogInfo << "Max eigen fraction set to: " << _maxEigenFraction_*100 << "%" << std::endl;
-    }
+  GenericToolbox::Json::fillValue(_config_, _nbParameterDefinition_, "numberOfParameters");
+  GenericToolbox::Json::fillValue(_config_, _nominalStepSize_, "nominalStepSize");
 
-    if( GenericToolbox::Json::doKeyExist(_config_, "eigenParBounds") ){
-      auto eigenLimits = GenericToolbox::Json::fetchValue(_config_, "eigenParBounds", JsonType());
-      _eigenParBounds_.first = GenericToolbox::Json::fetchValue(eigenLimits, "minValue", _eigenParBounds_.first);
-      _eigenParBounds_.second = GenericToolbox::Json::fetchValue(eigenLimits, "maxValue", _eigenParBounds_.second);
-      LogInfo << "Using eigen parameter limits: [ " << _eigenParBounds_.first << ", " << _eigenParBounds_.first << "]" << std::endl;
-    }
+  GenericToolbox::Json::fillValue(_config_, _useOnlyOneParameterPerEvent_, "useOnlyOneParameterPerEvent");
+  GenericToolbox::Json::fillValue(_config_, _printDialSetsSummary_, "printDialSetsSummary");
+  GenericToolbox::Json::fillValue(_config_, _printParametersSummary_, "printParametersSummary");
 
-    _devUseParLimitsOnEigen_ = GenericToolbox::Json::fetchValue(_config_, "devUseParLimitsOnEigen", _devUseParLimitsOnEigen_);
-    if( _devUseParLimitsOnEigen_ ){ LogAlert << "USING DEV OPTION: _devUseParLimitsOnEigen_ = true" << std::endl; }
+  GenericToolbox::Json::fillValue(_config_, _globalParRange_.min, "parameterLimits/minValue");
+  GenericToolbox::Json::fillValue(_config_, _globalParRange_.max, "parameterLimits/maxValue");
 
-    _eigenSvdThreshold_ = GenericToolbox::Json::fetchValue(_config_, "eigenSvdThreshold", _eigenSvdThreshold_);
-    LogInfoIf(not std::isnan(_eigenSvdThreshold_)) << "Setting SVD eigen value threshold to: " << _eigenSvdThreshold_ << std::endl;
+  GenericToolbox::Json::fillValue(_config_, _enablePca_, {{"enablePca"},{"allowPca"},{"fixGhostFitParameters"}});
+  GenericToolbox::Json::fillValue(_config_, _enabledThrowToyParameters_, "enabledThrowToyParameters");
+  GenericToolbox::Json::fillValue(_config_, _customParThrow_, {{"customParThrow"},{"customFitParThrow"}});
+  GenericToolbox::Json::fillValue(_config_, _releaseFixedParametersOnHesse_, "releaseFixedParametersOnHesse");
 
-  }
+  GenericToolbox::Json::fillValue(_config_, _parameterDefinitionFilePath_, {{"parameterDefinitionFilePath"},{"covarianceMatrixFilePath"}});
+  GenericToolbox::Json::fillValue(_config_, _covarianceMatrixPath_, {{"covarianceMatrix"},{"covarianceMatrixTMatrixD"}});
+  GenericToolbox::Json::fillValue(_config_, _parameterNameListPath_, {{"parameterNameList"},{"parameterNameTObjArray"}});
+  GenericToolbox::Json::fillValue(_config_, _parameterPriorValueListPath_, {{"parameterPriorValueList"},{"parameterPriorTVectorD"}});
 
-  _enablePca_ = GenericToolbox::Json::fetchValue(_config_, std::vector<std::string>{"allowPca", "fixGhostFitParameters", "enablePca"}, _enablePca_);
-  _enabledThrowToyParameters_ = GenericToolbox::Json::fetchValue(_config_, "enabledThrowToyParameters", _enabledThrowToyParameters_);
-  _maskForToyGeneration_ = GenericToolbox::Json::fetchValue(_config_, "maskForToyGeneration", _maskForToyGeneration_);
-  _customParThrow_ = GenericToolbox::Json::fetchValue(_config_, {{"customParThrow"}, {"customFitParThrow"}}, std::vector<JsonType>());
-  _releaseFixedParametersOnHesse_ = GenericToolbox::Json::fetchValue(_config_, "releaseFixedParametersOnHesse", _releaseFixedParametersOnHesse_);
+  GenericToolbox::Json::fillValue(_config_, _parameterLowerBoundsTVectorD_, "parameterLowerBoundsTVectorD");
+  GenericToolbox::Json::fillValue(_config_, _parameterUpperBoundsTVectorD_, "parameterUpperBoundsTVectorD");
+  GenericToolbox::Json::fillValue(_config_, _throwEnabledListPath_, "throwEnabledList");
 
-  _parameterDefinitionFilePath_ = GenericToolbox::Json::fetchValue( _config_,
-    { {"parameterDefinitionFilePath"}, {"covarianceMatrixFilePath"} }, _parameterDefinitionFilePath_
-  );
-  _covarianceMatrixPath_ = GenericToolbox::Json::fetchValue(_config_, {{"covarianceMatrix"}, {"covarianceMatrixTMatrixD"}}, _covarianceMatrixPath_);
-  _parameterNameListPath_ = GenericToolbox::Json::fetchValue(_config_, {{"parameterNameList"}, {"parameterNameTObjArray"}}, _parameterNameListPath_);
-  _parameterPriorValueListPath_ = GenericToolbox::Json::fetchValue(_config_, {{"parameterPriorValueList"}, {"parameterPriorTVectorD"}}, _parameterPriorValueListPath_);
+  GenericToolbox::Json::fillValue(_config_, _parameterDefinitionConfig_, "parameterDefinitions");
+  GenericToolbox::Json::fillValue(_config_, _dialSetDefinitions_, "dialSetDefinitions");
+  GenericToolbox::Json::fillValue(_config_, _enableOnlyParameters_, "enableOnlyParameters");
+  GenericToolbox::Json::fillValue(_config_, _disableParameters_, "disableParameters");
 
-  _parameterLowerBoundsTVectorD_ = GenericToolbox::Json::fetchValue(_config_, "parameterLowerBoundsTVectorD", _parameterLowerBoundsTVectorD_);
-  _parameterUpperBoundsTVectorD_ = GenericToolbox::Json::fetchValue(_config_, "parameterUpperBoundsTVectorD", _parameterUpperBoundsTVectorD_);
-  _throwEnabledListPath_ = GenericToolbox::Json::fetchValue(_config_, "throwEnabledList", _throwEnabledListPath_);
+  // throws options
+  GenericToolbox::Json::fillValue(_config_, _useMarkGenerator_, "useMarkGenerator");
+  GenericToolbox::Json::fillValue(_config_, _useEigenDecompForThrows_, "useEigenDecompForThrows");
 
-  _parameterDefinitionConfig_ = GenericToolbox::Json::fetchValue(_config_, "parameterDefinitions", _parameterDefinitionConfig_);
-  _dialSetDefinitions_ = GenericToolbox::Json::fetchValue(_config_, "dialSetDefinitions", _dialSetDefinitions_);
-  _enableOnlyParameters_ = GenericToolbox::Json::fetchValue(_config_, "enableOnlyParameters", _enableOnlyParameters_);
-  _disableParameters_ = GenericToolbox::Json::fetchValue(_config_, "disableParameters", _disableParameters_);
+  // eigen related parameters
+  GenericToolbox::Json::fillValue(_config_, _enableEigenDecomp_, {{"enableEigenDecomp"},{"useEigenDecompInFit"}});
+  GenericToolbox::Json::fillValue(_config_, _allowEigenDecompWithBounds_, "allowEigenDecompWithBounds");
+  GenericToolbox::Json::fillValue(_config_, _maxNbEigenParameters_, "maxNbEigenParameters");
+  GenericToolbox::Json::fillValue(_config_, _maxEigenFraction_, "maxEigenFraction");
+  GenericToolbox::Json::fillValue(_config_, _eigenSvdThreshold_, "eigenSvdThreshold");
+
+  GenericToolbox::Json::fillValue(_config_, _eigenParRange_.min, "eigenParBounds/minValue");
+  GenericToolbox::Json::fillValue(_config_, _eigenParRange_.max, "eigenParBounds/maxValue");
+
+  // legacy
+  GenericToolbox::Json::fillValue(_config_, _maskForToyGeneration_, "maskForToyGeneration");
+
+  // dev option -> was used for validation
+  GenericToolbox::Json::fillValue(_config_, _devUseParLimitsOnEigen_, "devUseParLimitsOnEigen");
 
 
-  // MISC / DEV
-  _useMarkGenerator_ = GenericToolbox::Json::fetchValue(_config_, "useMarkGenerator", _useMarkGenerator_);
-  _useEigenDecompForThrows_ = GenericToolbox::Json::fetchValue(_config_, "useEigenDecompForThrows", _useEigenDecompForThrows_);
-
-  this->readParameterDefinitionFile();
+  // individual parameter definitions:
+  if( not _parameterDefinitionFilePath_.empty() ){ readParameterDefinitionFile(); }
 
   if( _nbParameterDefinition_ == -1 ){
-    LogWarning << "No number of parameter provided. Looking for alternative definitions..." << std::endl;
+    // no number of parameter provided -> parameters were not defined
+    // looking for alternative/legacy definitions...
 
     if( not _dialSetDefinitions_.empty() ){
       for( auto& dialSetDef : _dialSetDefinitions_ ){
-        if( GenericToolbox::Json::doKeyExist(dialSetDef, "parametersBinningPath") ){
-          LogInfo << "Found parameter binning within dialSetDefinition. Defining parameters number..." << std::endl;
-          DataBinSet b;
-          b.readBinningDefinition( GenericToolbox::Json::fetchValue(dialSetDef, "parametersBinningPath", JsonType()) );
-          // DON'T SORT THE BINNING -> tide to the cov matrix
-          _nbParameterDefinition_ = int(b.getBinList().size());
-          break;
-        }
+
+        JsonType parameterBinning;
+        GenericToolbox::Json::fillValue(dialSetDef, parameterBinning, {{"binning"}, {"parametersBinningPath"}});
+
+        if( parameterBinning.empty() ){ continue;}
+
+        LogInfo << "Found parameter binning within dialSetDefinition. Defining parameters number..." << std::endl;
+        BinSet b;
+        b.configure( parameterBinning );
+        // DON'T SORT THE BINNING -> tide to the cov matrix
+        _nbParameterDefinition_ = int(b.getBinList().size());
+
+        // don't fetch other dataset as they should always have the same assumption
+        break;
+
       }
     }
 
     if( _nbParameterDefinition_ == -1 and not _parameterDefinitionConfig_.empty() ){
-      LogInfo << "Using parameter definition config list to determine the number of parameters..." << std::endl;
+      LogDebugIf(GundamGlobals::isDebug()) << "Using parameter definition config list to determine the number of parameters..." << std::endl;
       _nbParameterDefinition_ = int(_parameterDefinitionConfig_.get<std::vector<JsonType>>().size());
     }
 
@@ -127,15 +119,11 @@ void ParameterSet::readConfigImpl(){
   this->defineParameters();
 }
 void ParameterSet::initializeImpl() {
-  LogInfo << "Initializing \"" << this->getName() << "\"" << std::endl;
-
-  LogReturnIf(not _isEnabled_, this->getName() << " is not enabled. Skipping.");
-
   for( auto& par : _parameterList_ ){
     par.initialize();
-    if( _printParametersSummary_ and par.isEnabled() ){
-      LogInfo << par.getSummary(not _printDialSetsSummary_) << std::endl;
-    }
+//    if( _printParametersSummary_ and par.isEnabled() ){
+//      LogInfo << par.getSummary(not _printDialSetsSummary_) << std::endl;
+//    }
   }
 
   // Make the matrix inversion
@@ -149,21 +137,44 @@ void ParameterSet::unmuteLogger(){ Logger::setIsMuted(false ); }
 // Post-init
 void ParameterSet::processCovarianceMatrix(){
 
-  if( _priorCovarianceMatrix_ == nullptr ){ return; } // nothing to do
+  if( _priorFullCovarianceMatrix_ == nullptr ){ return; } // nothing to do
 
   LogInfo << "Stripping the matrix from fixed/disabled parameters..." << std::endl;
   int nbParameters{0};
+  int configWarnings{0};
   for( const auto& par : _parameterList_ ){
-    if( ParameterSet::isValidCorrelatedParameter(par) ) nbParameters++;
+    if( not ParameterSet::isValidCorrelatedParameter(par) ) continue;
+    nbParameters++;
+    if( not isEnableEigenDecomp() ) continue;
+    // Warn if using eigen decomposition with bounded parameters.
+    if ( std::isnan(par.getMinValue()) and std::isnan(par.getMaxValue())) continue;
+    LogAlert << "Undefined behavior: Eigen-decomposition of a bounded parameter: "
+               << par.getFullTitle()
+               << std::endl;
+    ++configWarnings;
   }
+  LogInfo << nbParameters << " effective parameters were defined in set: " << getName() << std::endl;
+
   if( nbParameters == 0 ){
     LogAlert << "No parameter is enabled. Disabling the parameter set." << std::endl;
     _isEnabled_ = false;
     return;
   }
+
+  if (configWarnings > 0) {
+    LogError << "Undefined behavior: Using bounded parameters with eigendecomposition"
+             << std::endl;
+    if ( not _allowEigenDecompWithBounds_ ) {
+      LogError << "Eigendecomposition not allowed with parameter bounds"
+               << std::endl;
+      LogError << "Add 'allowEigenDecompWithBounds' to config file to enable"
+               << std::endl;
+      std::exit(1);
+    }
+  }
   LogInfo << nbParameters << " effective parameters were defined in set: " << getName() << std::endl;
 
-  _strippedCovarianceMatrix_ = std::make_shared<TMatrixDSym>(nbParameters);
+  _priorCovarianceMatrix_ = std::make_shared<TMatrixDSym>(nbParameters);
   int iStrippedPar = -1;
   for( int iPar = 0 ; iPar < int(_parameterList_.size()) ; iPar++ ){
     if( not ParameterSet::isValidCorrelatedParameter(_parameterList_[iPar]) ) continue;
@@ -172,26 +183,46 @@ void ParameterSet::processCovarianceMatrix(){
     for( int jPar = 0 ; jPar < int(_parameterList_.size()) ; jPar++ ){
       if( not ParameterSet::isValidCorrelatedParameter(_parameterList_[jPar]) ) continue;
       jStrippedPar++;
-      (*_strippedCovarianceMatrix_)[iStrippedPar][jStrippedPar] = (*_priorCovarianceMatrix_)[iPar][jPar];
+      (*_priorCovarianceMatrix_)[iStrippedPar][jStrippedPar] = (*_priorFullCovarianceMatrix_)[iPar][jPar];
     }
   }
-  _deltaVectorPtr_ = std::make_shared<TVectorD>(_strippedCovarianceMatrix_->GetNrows());
+  _deltaVectorPtr_ = std::make_shared<TVectorD>(_priorCovarianceMatrix_->GetNrows());
 
-  LogThrowIf(not _strippedCovarianceMatrix_->IsSymmetric(), "Covariance matrix is not symmetric");
+  LogThrowIf(not _priorCovarianceMatrix_->IsSymmetric(), "Covariance matrix is not symmetric");
 
-  if( not _enableEigenDecomp_ ){
+  if( not isEnableEigenDecomp() ){
     LogWarning << "Computing inverse of the stripped covariance matrix: "
-               << _strippedCovarianceMatrix_->GetNcols() << "x"
-               << _strippedCovarianceMatrix_->GetNrows() << std::endl;
-    _inverseStrippedCovarianceMatrix_ = std::shared_ptr<TMatrixD>((TMatrixD*)(_strippedCovarianceMatrix_->Clone()));
-    _inverseStrippedCovarianceMatrix_->Invert();
+               << _priorCovarianceMatrix_->GetNcols() << "x"
+               << _priorCovarianceMatrix_->GetNrows() << std::endl;
+    _inverseCovarianceMatrix_ = std::shared_ptr<TMatrixD>((TMatrixD*)(_priorCovarianceMatrix_->Clone()));
+
+    double det{-1};
+    _inverseCovarianceMatrix_->Invert(&det);
+
+    bool failed{false};
+    if( det <= 0 ){
+      _priorCovarianceMatrix_->Print();
+      LogError << "Stripped covariance must be positive definite: " << det << std::endl;
+      failed = true;
+    }
+
+    TVectorD eigenValues;
+    // https://root-forum.cern.ch/t/tmatrixt-get-eigenvalues/25924
+    _inverseCovarianceMatrix_->EigenVectors(eigenValues);
+    if( eigenValues.Min() < 0 ){
+      LogError << "Negative eigen values for prior cov matrix: " << eigenValues.Min() << std::endl;
+      failed = true;
+    }
+
+    LogThrowIf(failed, "Failed inverting prior covariance matrix of par set: " << getName() );
+
   }
   else {
     LogWarning << "Decomposing the stripped covariance matrix..." << std::endl;
-    _eigenParameterList_.resize(_strippedCovarianceMatrix_->GetNrows(), Parameter(this));
+    _eigenParameterList_.resize(_priorCovarianceMatrix_->GetNrows(), Parameter(this));
 
-    LogAlertIf(_strippedCovarianceMatrix_->GetNrows() > 1000) << "Decomposing matrix with " << _strippedCovarianceMatrix_->GetNrows() << " dim might take a while..." << std::endl;
-    _eigenDecomp_     = std::make_shared<TMatrixDSymEigen>(*_strippedCovarianceMatrix_);
+    LogAlertIf(_priorCovarianceMatrix_->GetNrows() > 1000) << "Decomposing matrix with " << _priorCovarianceMatrix_->GetNrows() << " dim might take a while..." << std::endl;
+    _eigenDecomp_     = std::make_shared<TMatrixDSymEigen>(*_priorCovarianceMatrix_);
 
     // Used for base swapping
     _eigenValues_     = std::shared_ptr<TVectorD>( (TVectorD*) _eigenDecomp_->GetEigenValues().Clone() );
@@ -199,29 +230,36 @@ void ParameterSet::processCovarianceMatrix(){
     _eigenVectors_    = std::shared_ptr<TMatrixD>( (TMatrixD*) _eigenDecomp_->GetEigenVectors().Clone() );
     _eigenVectorsInv_ = std::make_shared<TMatrixD>(TMatrixD::kTransposed, *_eigenVectors_ );
 
+    if( not std::isnan(_eigenSvdThreshold_) and _eigenValues_->Min()/_eigenValues_->Max() < _eigenSvdThreshold_ ){
+      LogAlert << "Eigen values bellow the threshold(" << _eigenSvdThreshold_ << "). Using SVD..." << std::endl;
+
+      // zero the ruled out eigen values
+      for( int iEigen = 0; iEigen < _eigenValues_->GetNrows(); iEigen++ ){
+        if( (*_eigenValues_)[iEigen]/_eigenValues_->Max() < _eigenSvdThreshold_ ){
+          (*_eigenValues_)[iEigen] = 0;
+        }
+      }
+    }
+
+    // in any case the eigen values should have been cleaned up
+    LogThrowIf(_eigenValues_->Min() < 0, "Input covariance matrix is not positive definite.");
+    LogInfo << "Covariance eigen values are between " << _eigenValues_->Min() << " and " << _eigenValues_->Max() << std::endl;
+
     _nbEnabledEigen_ = 0;
     double eigenTotal = _eigenValues_->Sum();
 
-    LogInfo << "Covariance eigen values are between " << _eigenValues_->Min() << " and " << _eigenValues_->Max() << std::endl;
-    if( std::isnan(_eigenSvdThreshold_) ){
-      LogThrowIf(_eigenValues_->Min() < 0, "Input covariance matrix is not positive definite.");
-    }
-    else if( _eigenValues_->Min()/_eigenValues_->Max() < _eigenSvdThreshold_ ){
-      LogAlert << "Eigen values bellow the threshold(" << _eigenSvdThreshold_ << "). Using SVD..." << std::endl;
-    }
+    _inverseCovarianceMatrix_ = std::make_shared<TMatrixD>(_priorCovarianceMatrix_->GetNrows(), _priorCovarianceMatrix_->GetNrows());
+    _projectorMatrix_         = std::make_shared<TMatrixD>(_priorCovarianceMatrix_->GetNrows(), _priorCovarianceMatrix_->GetNrows());
 
-    _inverseStrippedCovarianceMatrix_ = std::make_shared<TMatrixD>(_strippedCovarianceMatrix_->GetNrows(), _strippedCovarianceMatrix_->GetNrows());
-    _projectorMatrix_                 = std::make_shared<TMatrixD>(_strippedCovarianceMatrix_->GetNrows(), _strippedCovarianceMatrix_->GetNrows());
+    auto eigenState = std::make_unique<TVectorD>(_eigenValues_->GetNrows());
 
-    auto* eigenState = new TVectorD(_eigenValues_->GetNrows());
-
-    for (int iEigen = 0; iEigen < _eigenValues_->GetNrows(); iEigen++) {
+    for( int iEigen = 0; iEigen < _eigenValues_->GetNrows(); iEigen++ ){
 
       _eigenParameterList_[iEigen].setParameterIndex( iEigen );
       _eigenParameterList_[iEigen].setIsEnabled(true);
       _eigenParameterList_[iEigen].setIsEigen(true);
-      _eigenParameterList_[iEigen].setStdDevValue(TMath::Sqrt((*_eigenValues_)[iEigen]));
-      _eigenParameterList_[iEigen].setStepSize(TMath::Sqrt((*_eigenValues_)[iEigen]));
+      _eigenParameterList_[iEigen].setStdDevValue(std::sqrt((*_eigenValues_)[iEigen]));
+      _eigenParameterList_[iEigen].setStepSize(std::sqrt((*_eigenValues_)[iEigen]));
       _eigenParameterList_[iEigen].setName("eigen");
 
       // fixing all of them by default
@@ -236,12 +274,13 @@ void ParameterSet::processCovarianceMatrix(){
 
     // this loop assumes all eigen values are stored in decreasing order
     for (int iEigen = 0; iEigen < _eigenValues_->GetNrows(); iEigen++) {
-      
+
       if( not std::isnan( _eigenSvdThreshold_ ) ){
         // check the current matrix conditioning
-        if( (*_eigenValues_)[iEigen]/_eigenValues_->Max() < _eigenSvdThreshold_ ){
+        // ruled out values have been set to 0
+        if( (*_eigenValues_)[iEigen] == 0 ){
           LogAlert << "Keeping " << iEigen << " eigen values with SVD." << std::endl;
-          break; // decreasing order
+          break; // as they are in decreasing order
         }
       }
 
@@ -259,20 +298,16 @@ void ParameterSet::processCovarianceMatrix(){
 
     } // iEigen
 
-    TMatrixD* eigenStateMatrix    = GenericToolbox::makeDiagonalMatrix(eigenState);
-    TMatrixD* diagInvMatrix = GenericToolbox::makeDiagonalMatrix(_eigenValuesInv_.get());
+    auto eigenStateMatrix = std::unique_ptr<TMatrixD>(GenericToolbox::makeDiagonalMatrix(eigenState.get()));
+    auto diagInvMatrix = std::unique_ptr<TMatrixD>(GenericToolbox::makeDiagonalMatrix(_eigenValuesInv_.get()));
 
     (*_projectorMatrix_) =  (*_eigenVectors_);
     (*_projectorMatrix_) *= (*eigenStateMatrix);
     (*_projectorMatrix_) *= (*_eigenVectorsInv_);
 
-    (*_inverseStrippedCovarianceMatrix_) =  (*_eigenVectors_);
-    (*_inverseStrippedCovarianceMatrix_) *= (*diagInvMatrix);
-    (*_inverseStrippedCovarianceMatrix_) *= (*_eigenVectorsInv_);
-
-    delete eigenState;
-    delete eigenStateMatrix;
-    delete diagInvMatrix;
+    (*_inverseCovarianceMatrix_) =  (*_eigenVectors_);
+    (*_inverseCovarianceMatrix_) *= (*diagInvMatrix);
+    (*_inverseCovarianceMatrix_) *= (*_eigenVectorsInv_);
 
     LogWarning << "Eigen decomposition with " << _nbEnabledEigen_ << " / " << _eigenValues_->GetNrows() << " vectors" << std::endl;
     if(_nbEnabledEigen_ != _eigenValues_->GetNrows() ){
@@ -280,8 +315,8 @@ void ParameterSet::processCovarianceMatrix(){
       LogInfo << "Fraction taken: " << eigenCumulative / eigenTotal*100 << "%" << std::endl;
     }
 
-    _originalParBuffer_ = std::make_shared<TVectorD>(_strippedCovarianceMatrix_->GetNrows() );
-    _eigenParBuffer_    = std::make_shared<TVectorD>(_strippedCovarianceMatrix_->GetNrows() );
+    _originalParBuffer_ = std::make_shared<TVectorD>(_priorCovarianceMatrix_->GetNrows() );
+    _eigenParBuffer_    = std::make_shared<TVectorD>(_priorCovarianceMatrix_->GetNrows() );
 
 //    LogAlert << "Disabling par/dial limits" << std::endl;
 //    for( auto& par : _parameterList_ ){
@@ -309,15 +344,15 @@ void ParameterSet::processCovarianceMatrix(){
         eigenPar.setMinValue( _parameterList_[eigenPar.getParameterIndex()].getMinValue() );
         eigenPar.setMaxValue( _parameterList_[eigenPar.getParameterIndex()].getMaxValue() );
 
-        LogThrowIf( not std::isnan(eigenPar.getMinValue()) and eigenPar.getPriorValue() < eigenPar.getMinValue(), "PRIOR IS BELLOW MIN: " << eigenPar.getSummary(true) );
-        LogThrowIf( not std::isnan(eigenPar.getMaxValue()) and eigenPar.getPriorValue() > eigenPar.getMaxValue(), "PRIOR IS ABOVE MAX: " << eigenPar.getSummary(true) );
+        LogThrowIf( not std::isnan(eigenPar.getMinValue()) and eigenPar.getPriorValue() < eigenPar.getMinValue(), "PRIOR IS BELLOW MIN: " << eigenPar.getSummary() );
+        LogThrowIf( not std::isnan(eigenPar.getMaxValue()) and eigenPar.getPriorValue() > eigenPar.getMaxValue(), "PRIOR IS ABOVE MAX: " << eigenPar.getSummary() );
       }
       else{
-        eigenPar.setMinValue( _eigenParBounds_.first );
-        eigenPar.setMaxValue( _eigenParBounds_.second );
+        eigenPar.setMinValue( _eigenParRange_.min );
+        eigenPar.setMaxValue( _eigenParRange_.max );
 
-        LogThrowIf( not std::isnan(eigenPar.getMinValue()) and eigenPar.getPriorValue() < eigenPar.getMinValue(), "Prior value is bellow min: " << eigenPar.getSummary(true) );
-        LogThrowIf( not std::isnan(eigenPar.getMaxValue()) and eigenPar.getPriorValue() > eigenPar.getMaxValue(), "Prior value is above max: " << eigenPar.getSummary(true) );
+        LogThrowIf( not std::isnan(eigenPar.getMinValue()) and eigenPar.getPriorValue() < eigenPar.getMinValue(), "Prior value is bellow min: " << eigenPar.getSummary() );
+        LogThrowIf( not std::isnan(eigenPar.getMaxValue()) and eigenPar.getPriorValue() > eigenPar.getMaxValue(), "Prior value is above max: " << eigenPar.getSummary() );
       }
     }
 
@@ -327,14 +362,22 @@ void ParameterSet::processCovarianceMatrix(){
 
 // Getters
 const std::vector<Parameter>& ParameterSet::getEffectiveParameterList() const{
-  if( _enableEigenDecomp_ ) return _eigenParameterList_;
-  return _parameterList_;
+  if( isEnableEigenDecomp() ) return getEigenParameterList();
+  return getParameterList();
+}
+
+bool ParameterSet::isValid() const {
+  for (const Parameter& par : getParameterList()) {
+    if (not par.isEnabled()) continue;
+    if (not par.isValidValue(par.getParameterValue())) return false;
+  }
+  return true;
 }
 
 // non const getters
 std::vector<Parameter>& ParameterSet::getEffectiveParameterList(){
-  if( _enableEigenDecomp_ ) return _eigenParameterList_;
-  return _parameterList_;
+  if( isEnableEigenDecomp() ) return getEigenParameterList();
+  return getParameterList();
 }
 
 // Core
@@ -347,11 +390,16 @@ void ParameterSet::updateDeltaVector() const{
   }
 }
 
+void ParameterSet::setValidity(const std::string& validity) {
+  for (Parameter& par : getParameterList()) {
+    par.setValidity(validity);
+  }
+  LogWarning << "Set parameter set validity to " << validity << std::endl;
+}
+
 // Parameter throw
 void ParameterSet::moveParametersToPrior(){
-  LogInfo << "Moving back parameters to their prior value in set: " << getName() << std::endl;
-
-  if( not _enableEigenDecomp_ ){
+  if( not isEnableEigenDecomp() ){
     for( auto& par : _parameterList_ ){
       if( par.isFixed() or not par.isEnabled() ){ continue; }
       par.setParameterValue(par.getPriorValue());
@@ -364,87 +412,113 @@ void ParameterSet::moveParametersToPrior(){
     }
     this->propagateEigenToOriginal();
   }
-
 }
-void ParameterSet::throwParameters( bool rethrowIfNotInbounds_, double gain_){
+void ParameterSet::throwParameters(bool rethrowIfNotInPhysical_, double gain_){
 
-  LogThrowIf(_strippedCovarianceMatrix_==nullptr, "No covariance matrix provided");
+  LogThrowIf(_priorCovarianceMatrix_==nullptr, "No covariance matrix provided");
 
-
-  TVectorD throwsList{_strippedCovarianceMatrix_->GetNrows()};
+  TVectorD throwsList{_priorCovarianceMatrix_->GetNrows()};
 
   // generic function to handle multiple throws
   std::function<void(std::function<void()>)> throwParsFct =
       [&](const std::function<void()>& throwFct_){
 
         int nTries{0};
-        bool throwIsValid{false};
-        while( not throwIsValid ){
-
+        while( true ){
+          ++nTries;
           throwFct_();
 
           // throws with this function are always done in real space.
-          int iPar{-1};
+          int iFit{-1};
           for( auto& par : this->getParameterList() ){
             if( ParameterSet::isValidCorrelatedParameter(par) ){
-              iPar++;
-              par.setThrowValue( par.getPriorValue() + gain_ * throwsList[iPar] );
-              par.setParameterValue( par.getThrowValue() );
+              iFit++;
+              par.setThrowValue( par.getPriorValue() + gain_*throwsList[iFit] );
             }
           }
-          if( _enableEigenDecomp_ ){
+
+          bool throwIsValid = true; // default case
+          LogInfo << "Check that thrown parameters are within bounds..."
+                  << std::endl;
+
+          for( auto& par : this->getParameterList() ){
+            if( not ParameterSet::isValidCorrelatedParameter(par) ) continue;
+            if( not std::isnan(par.getMinValue())
+                and par.getThrowValue() < par.getMinValue() ){
+              throwIsValid = false;
+              LogAlert << "thrown value lower than min bound -> "
+                       << par.getSummary() << std::endl;
+              break;
+            }
+            if( not std::isnan(par.getMaxValue())
+                and par.getThrowValue() > par.getMaxValue() ){
+              throwIsValid = false;
+              LogAlert <<"thrown value higher than max bound -> "
+                       << par.getSummary() << std::endl;
+              break;
+            }
+
+            if ( not rethrowIfNotInPhysical_ ) continue;
+            if( not std::isnan(par.getMinPhysical())
+                and par.getThrowValue() < par.getMinPhysical() ){
+              throwIsValid = false;
+              LogAlert << "thrown value lower than min physical bound -> "
+                       << par.getSummary() << std::endl;
+              break;
+            }
+            if( not std::isnan(par.getMaxPhysical())
+                and par.getThrowValue() > par.getMaxPhysical() ){
+              throwIsValid = false;
+              LogAlert <<"thrown value higher than max physical bound -> "
+                       << par.getSummary() << std::endl;
+              break;
+            }
+          }
+
+          if (not throwIsValid) {
+            LogAlert << "Rethrowing \"" << this->getName() << "\"... try #" << nTries+1 << std::endl;
+            LogThrowIf(nTries > 10000, "Failed to find valid throw");
+            continue;
+          }
+
+          // Throw looks OK, so set the parameter values.
+          for( auto& par : this->getParameterList() ){
+            if( ParameterSet::isValidCorrelatedParameter(par) ){
+              par.setParameterValue(par.getThrowValue());
+            }
+          }
+
+          // Copy the throws to the eigen space and set the throw value in
+          // eigenspace too.
+          if( isEnableEigenDecomp() ){
             this->propagateOriginalToEigen();
             for( auto& eigenPar : _eigenParameterList_ ){
               eigenPar.setThrowValue( eigenPar.getParameterValue() );
             }
           }
 
-          throwIsValid = true; // default case
-          if( rethrowIfNotInbounds_ ){
-            LogInfo << "Checking if the thrown parameters of the set are within bounds..." << std::endl;
-
-            for( auto& par : this->getEffectiveParameterList() ){
-              if      ( not std::isnan(par.getMinValue()) and par.getParameterValue() < par.getMinValue() ){
-                throwIsValid = false;
-                LogAlert << GenericToolbox::ColorCodes::redLightText << "thrown value lower than min bound -> " << GenericToolbox::ColorCodes::resetColor
-                         << par.getSummary(true) << std::endl;
-              }
-              else if( not std::isnan(par.getMaxValue()) and par.getParameterValue() > par.getMaxValue() ){
-                throwIsValid = false;
-                LogAlert << GenericToolbox::ColorCodes::redLightText <<"thrown value higher than max bound -> " << GenericToolbox::ColorCodes::resetColor
-                         << par.getSummary(true) << std::endl;
-              }
-            }
-
-            if( not throwIsValid ){
-              LogAlert << "Rethrowing \"" << this->getName() << "\"... try #" << nTries+1 << std::endl;
-              nTries++;
-              continue;
-            }
-            else{
-              LogInfo << "Keeping throw after " << nTries+1 << " attempt(s)." << std::endl;
-            }
-          } // check bounds?
-
           // alright at this point it's fine, print them
           for( auto& par : _parameterList_ ){
             if( ParameterSet::isValidCorrelatedParameter(par) ){
               LogInfo << "Thrown par " << par.getTitle() << ": " << par.getPriorValue();
-              LogInfo << " → " << par.getParameterValue() << std::endl;
+              LogInfo << " becomes " << par.getParameterValue() << std::endl;
             }
           }
-          if( _enableEigenDecomp_ ){
+          if( isEnableEigenDecomp() ){
             LogInfo << "Translated to eigen space:" << std::endl;
             for( auto& eigenPar : _eigenParameterList_ ){
               LogInfo << "Eigen par " << eigenPar.getTitle() << ": " << eigenPar.getPriorValue();
-              LogInfo << " → " << eigenPar.getParameterValue() << std::endl;
+              LogInfo << " becomes " << eigenPar.getParameterValue() << std::endl;
             }
           }
+          break;
         }
-
-  };
+      }; // End of generic function handling multiple throws
 
   if( _useMarkGenerator_ ){
+    // Throw using an alternative method that was copied from BANFF
+    LogAlert << "Alternative toy generator used: Mark Hartz Generator"
+             << std::endl;
     int iPar{0};
     for( auto& par : _parameterList_ ){
       if( ParameterSet::isValidCorrelatedParameter(par) ){ throwsList[iPar++] = par.getPriorValue(); }
@@ -452,11 +526,11 @@ void ParameterSet::throwParameters( bool rethrowIfNotInbounds_, double gain_){
 
     if( _markHartzGen_ == nullptr ){
       LogInfo << "Generating Cholesky matrix in set: " << getName() << std::endl;
-      _markHartzGen_ = std::make_shared<ParameterThrowerMarkHarz>(throwsList, *_strippedCovarianceMatrix_);
+      _markHartzGen_ = std::make_shared<ParameterThrowerMarkHarz>(throwsList, *_priorCovarianceMatrix_);
     }
-    TVectorD throws(_strippedCovarianceMatrix_->GetNrows());
+    TVectorD throws(_priorCovarianceMatrix_->GetNrows());
 
-    std::vector<double> throwPars(_strippedCovarianceMatrix_->GetNrows());
+    std::vector<double> throwPars(_priorCovarianceMatrix_->GetNrows());
     std::function<void()> markScottThrowFct = [&](){
       _markHartzGen_->ThrowSet(throwPars);
       // THROWS ARE CENTERED AROUND 1!!
@@ -470,60 +544,60 @@ void ParameterSet::throwParameters( bool rethrowIfNotInbounds_, double gain_){
 
     throwParsFct( markScottThrowFct );
   }
-  else{
-    if( _useEigenDecompForThrows_ and _enableEigenDecomp_ ){
-      LogInfo << "Throwing eigen parameters for " << _name_ << std::endl;
+  else if( _useEigenDecompForThrows_ and isEnableEigenDecomp() ){
+    // Throw using a deprecated alternative method.  Do not use.
+    LogAlert << "Alternative toy generator used: Eigen Decomposition Generator"
+             << std::endl;
+    LogInfo << "Throwing eigen parameters for " << _name_ << std::endl;
 
-      int nTries{0};
-      bool throwIsValid{false};
-      while( not throwIsValid ){
-        for( auto& eigenPar : _eigenParameterList_ ){
-          eigenPar.setThrowValue(eigenPar.getPriorValue() + gain_ * gRandom->Gaus(0, eigenPar.getStdDevValue()));
-          eigenPar.setParameterValue( eigenPar.getThrowValue() );
-        }
-        this->propagateEigenToOriginal();
-
-        throwIsValid = true;
-        if( rethrowIfNotInbounds_ ){
-          LogInfo << "Checking if the thrown parameters of the set are within bounds..." << std::endl;
-
-          for( auto& par : this->getEffectiveParameterList() ){
-            if( not std::isnan(par.getMinValue()) and par.getParameterValue() < par.getMinValue() ){
-              throwIsValid = false;
-              LogAlert << GenericToolbox::ColorCodes::redLightText << "thrown value lower than min bound -> " << GenericToolbox::ColorCodes::resetColor
-                       << par.getSummary(true) << std::endl;
-            }
-            else if( not std::isnan(par.getMaxValue()) and par.getParameterValue() > par.getMaxValue() ){
-              throwIsValid = false;
-              LogAlert << GenericToolbox::ColorCodes::redLightText <<"thrown value higher than max bound -> " << GenericToolbox::ColorCodes::resetColor
-                       << par.getSummary(true) << std::endl;
-            }
-          }
-
-          if( not throwIsValid ){
-            LogAlert << "Rethrowing \"" << this->getName() << "\"... try #" << nTries+1 << std::endl;
-            nTries++;
-            continue;
-          }
-          else{
-            LogInfo << "Keeping throw after " << nTries << " attempt(s)." << std::endl;
-          }
-        } // check bounds?
-
-        for( auto& par : _parameterList_ ){
-          LogInfo << "Thrown par (through eigen decomp) " << par.getTitle() << ": " << par.getPriorValue();
-          par.setThrowValue(par.getParameterValue());
-          LogInfo << " → " << par.getParameterValue() << std::endl;
-        }
+    int nTries{0};
+    bool throwIsValid{false};
+    while( not throwIsValid ){
+      for( auto& eigenPar : _eigenParameterList_ ){
+        eigenPar.setThrowValue(eigenPar.getPriorValue() + gain_ * gRandom->Gaus(0, eigenPar.getStdDevValue()));
+        eigenPar.setParameterValue( eigenPar.getThrowValue() );
       }
+      this->propagateEigenToOriginal();
 
+      throwIsValid = true;
+      if( true ){
+        LogInfo << "Checking if the thrown parameters of the set are within bounds..." << std::endl;
 
+        for( auto& par : this->getEffectiveParameterList() ){
+          if( not std::isnan(par.getMinValue()) and par.getParameterValue() < par.getMinValue() ){
+            throwIsValid = false;
+            LogAlert << GenericToolbox::ColorCodes::redLightText << "thrown value lower than min bound -> " << GenericToolbox::ColorCodes::resetColor
+                     << par.getSummary() << std::endl;
+          }
+          else if( not std::isnan(par.getMaxValue()) and par.getParameterValue() > par.getMaxValue() ){
+            throwIsValid = false;
+            LogAlert << GenericToolbox::ColorCodes::redLightText <<"thrown value higher than max bound -> " << GenericToolbox::ColorCodes::resetColor
+                     << par.getSummary() << std::endl;
+          }
+        }
+
+        if( not throwIsValid ){
+          LogAlert << "Rethrowing \"" << this->getName() << "\"... try #" << nTries+1 << std::endl;
+          nTries++;
+          continue;
+        }
+        else{
+          LogInfo << "Keeping throw after " << nTries << " attempt(s)." << std::endl;
+        }
+      } // check bounds?
+
+      for( auto& par : _parameterList_ ){
+        LogInfo << "Thrown par (through eigen decomp) " << par.getTitle() << ": " << par.getPriorValue();
+        par.setThrowValue(par.getParameterValue());
+        LogInfo << " → " << par.getParameterValue() << std::endl;
+      }
     }
-    else{
+  }
+  else {
       LogInfo << "Throwing parameters for " << _name_ << " using Cholesky matrix" << std::endl;
 
       if( not _correlatedVariableThrower_.isInitialized() ){
-        _correlatedVariableThrower_.setCovarianceMatrixPtr(_strippedCovarianceMatrix_.get());
+        _correlatedVariableThrower_.setCovarianceMatrixPtr(_priorCovarianceMatrix_.get());
         _correlatedVariableThrower_.initialize();
       }
 
@@ -533,9 +607,7 @@ void ParameterSet::throwParameters( bool rethrowIfNotInbounds_, double gain_){
 
       throwParsFct( gundamThrowFct );
 
-    }
   }
-
 }
 
 void ParameterSet::propagateOriginalToEigen(){
@@ -552,7 +624,7 @@ void ParameterSet::propagateOriginalToEigen(){
 
   // Propagate back to eigen parameters
   for( int iEigen = 0 ; iEigen < _eigenParBuffer_->GetNrows() ; iEigen++ ){
-    _eigenParameterList_[iEigen].setParameterValue((*_eigenParBuffer_)[iEigen]);
+    _eigenParameterList_[iEigen].setParameterValue((*_eigenParBuffer_)[iEigen], true);
   }
 }
 void ParameterSet::propagateEigenToOriginal(){
@@ -569,7 +641,7 @@ void ParameterSet::propagateEigenToOriginal(){
   int iParOffSet{0};
   for( auto& par : _parameterList_ ){
     if( par.isFixed() or not par.isEnabled() ) continue;
-    par.setParameterValue((*_originalParBuffer_)[iParOffSet++]);
+    par.setParameterValue((*_originalParBuffer_)[iParOffSet++], true);
   }
 }
 
@@ -595,10 +667,10 @@ std::string ParameterSet::getSummary() const {
           std::string colorStr;
           std::string statusStr;
 
-          if( not par.isEnabled() ) { statusStr = "Disabled"; colorStr = GenericToolbox::ColorCodes::yellowBackground; }
-          else if( par.isFixed() )  { statusStr = "Fixed (prior applied)";    colorStr = GenericToolbox::ColorCodes::redBackground; }
-          else if( par.isFree() )   { statusStr = "Free";     colorStr = GenericToolbox::ColorCodes::blueBackground; }
-          else                      { statusStr = "Enabled"; }
+          if( not par.isEnabled() ) { continue; }
+          else if( par.isFixed() )  { statusStr = "Fixed (prior applied)";    colorStr = GenericToolbox::ColorCodes::yellowLightText; }
+          else if( par.isFree() )   { statusStr = "Free";     colorStr = GenericToolbox::ColorCodes::blueLightText; }
+          else                      { statusStr = "Constrained"; }
 
 #ifdef NOCOLOR
           colorStr = "";
@@ -606,7 +678,9 @@ std::string ParameterSet::getSummary() const {
 
           t.addTableLine({
                              par.getTitle(),
-                             std::to_string( par.getParameterValue() ),
+                             std::to_string( par.isValueWithinBounds() ?
+                                             par.getParameterValue()
+                                             : std::nan("Invalid") ),
                              std::to_string( par.getPriorValue() ),
                              std::to_string( par.getStdDevValue() ),
                              std::to_string( par.getMinValue() ),
@@ -618,7 +692,6 @@ std::string ParameterSet::getSummary() const {
         t.printTable();
       }
     }
-
   }
 
   return ss.str();
@@ -758,6 +831,13 @@ Parameter* ParameterSet::getParameterPtrWithTitle(const std::string& parTitle_){
   return nullptr;
 }
 
+void ParameterSet::nullify(){
+  // TODO: reimplement toy disabling
+  std::string name{_name_};
+  (*this) = ParameterSet();
+  this->setName(name);
+}
+
 // Static
 double ParameterSet::toNormalizedParRange(double parRange, const Parameter& par){
   return (parRange)/par.getStdDevValue();
@@ -775,105 +855,67 @@ bool ParameterSet::isValidCorrelatedParameter(const Parameter& par_){
   return ( par_.isEnabled() and not par_.isFixed() and not par_.isFree() );
 }
 
+void ParameterSet::printConfiguration() const {
+  LogInfo << "name(" << _name_ << ")";
+  LogInfo << ", nPars(" << _nbParameterDefinition_ << ")";
+  LogInfo << std::endl;
+
+  for( auto& par : _parameterList_ ){ par.printConfiguration(); }
+}
+
 
 // Protected
 void ParameterSet::readParameterDefinitionFile(){
 
-  if( _parameterDefinitionFilePath_.empty() ) return;
+  // new generalised way of defining parameters:
+  // path can be set as: /path/to/rootfile.root:folder/in/tfile/object
 
-  std::string path = GenericToolbox::expandEnvironmentVariables(_parameterDefinitionFilePath_);
-  if (path != _parameterDefinitionFilePath_) {
-    LogInfo << "Using parameter definition file " << path
-            << std::endl;
+  std::string parDefFilePathPrefix{};
+
+  // legacy option
+  if( not _parameterDefinitionFilePath_.empty() ){ parDefFilePathPrefix = _parameterDefinitionFilePath_ + ":"; }
+
+  if(not _covarianceMatrixPath_.empty()){ GenericToolbox::fetchObject(parDefFilePathPrefix+_covarianceMatrixPath_, _priorFullCovarianceMatrix_); }
+  if(not _parameterPriorValueListPath_.empty()){ GenericToolbox::fetchObject(parDefFilePathPrefix+_parameterPriorValueListPath_, _parameterPriorList_); }
+  if(not _parameterNameListPath_.empty()){ GenericToolbox::fetchObject(parDefFilePathPrefix+_parameterNameListPath_, _parameterNamesList_); }
+  if(not _parameterLowerBoundsTVectorD_.empty()){ GenericToolbox::fetchObject(parDefFilePathPrefix+_parameterLowerBoundsTVectorD_, _parameterLowerBoundsList_); }
+  if(not _parameterUpperBoundsTVectorD_.empty()){ GenericToolbox::fetchObject(parDefFilePathPrefix+_parameterUpperBoundsTVectorD_, _parameterUpperBoundsList_); }
+  if(not _throwEnabledListPath_.empty()){ GenericToolbox::fetchObject(parDefFilePathPrefix+_throwEnabledListPath_, _throwEnabledList_); }
+
+
+  // setups
+  if( _priorFullCovarianceMatrix_ != nullptr ){
+    _nbParameterDefinition_ = _priorFullCovarianceMatrix_->GetNrows();
   }
 
-  std::unique_ptr<TFile> parDefFile(TFile::Open(path.c_str()));
-  LogThrowIf(parDefFile == nullptr or not parDefFile->IsOpen(), "Could not open: " << path);
+  // sanity checks
+  LogThrowIf(_parameterPriorList_ != nullptr and _parameterPriorList_->GetNrows() != _nbParameterDefinition_,
+             "Parameter prior list don't have the same size(" << _parameterPriorList_->GetNrows()
+              << ") as cov matrix(" << _nbParameterDefinition_ << ")");
+  LogThrowIf(_parameterNamesList_ != nullptr and _parameterNamesList_->GetEntries() != _nbParameterDefinition_,
+             "_parameterNamesList_ don't have the same size(" << _parameterNamesList_->GetEntries()
+                                                              << ") as cov matrix(" << _nbParameterDefinition_ << ")" );
+  LogThrowIf(_parameterLowerBoundsList_ != nullptr and _parameterLowerBoundsList_->GetNrows() != _nbParameterDefinition_,
+             "Parameter lower bound list don't have the same size(" << _parameterLowerBoundsList_->GetNrows()
+                                                              << ") as cov matrix(" << _nbParameterDefinition_ << ")" );
+  LogThrowIf(_parameterUpperBoundsList_ != nullptr and _parameterUpperBoundsList_->GetNrows() != _nbParameterDefinition_,
+             "Parameter upper bound list don't have the same size(" << _parameterUpperBoundsList_->GetNrows()
+                                                              << ") as cov matrix(" << _nbParameterDefinition_ << ")" );
+  LogThrowIf(_throwEnabledList_ != nullptr and _throwEnabledList_->GetNrows() != _nbParameterDefinition_,
+             "Throw enabled list don't have the same size(" << _throwEnabledList_->GetNrows()
+                                                              << ") as cov matrix(" << _nbParameterDefinition_ << ")" );
 
-  TObject* objBuffer{nullptr};
-
-  if( _covarianceMatrixPath_.empty() ){
-    LogWarning << "No covariance matrix provided. Free parameter definition expected." << std::endl;
-  }
-  else{
-    objBuffer = parDefFile->Get(_covarianceMatrixPath_.c_str());
-    LogThrowIf(objBuffer == nullptr, "Can't find \"" << _covarianceMatrixPath_ << "\" in " << parDefFile->GetPath())
-    _priorCovarianceMatrix_ = std::shared_ptr<TMatrixDSym>((TMatrixDSym*) objBuffer->Clone());
-    _priorCorrelationMatrix_ = std::shared_ptr<TMatrixDSym>((TMatrixDSym*) GenericToolbox::convertToCorrelationMatrix((TMatrixD*)_priorCovarianceMatrix_.get()));
-    LogThrowIf(_nbParameterDefinition_ != -1, "Nb of parameter was manually defined but the covariance matrix");
-    _nbParameterDefinition_ = _priorCovarianceMatrix_->GetNrows();
-  }
-
-  // parameterPriorTVectorD
-  if(not _parameterPriorValueListPath_.empty()){
-    LogInfo << "Reading provided parameterPriorTVectorD: \"" << _parameterPriorValueListPath_ << "\"" << std::endl;
-
-    objBuffer = parDefFile->Get(_parameterPriorValueListPath_.c_str());
-    LogThrowIf(objBuffer == nullptr, "Can't find \"" << _parameterPriorValueListPath_ << "\" in " << parDefFile->GetPath())
-    _parameterPriorList_ = std::shared_ptr<TVectorD>((TVectorD*) objBuffer->Clone());
-
-    LogThrowIf(_parameterPriorList_->GetNrows() != _nbParameterDefinition_,
-      "Parameter prior list don't have the same size("
-      << _parameterPriorList_->GetNrows()
-      << ") as cov matrix(" << _nbParameterDefinition_ << ")"
-    );
-  }
-
-  // parameterNameTObjArray
-  if(not _parameterNameListPath_.empty()){
-    LogInfo << "Reading provided parameterNameTObjArray: \"" << _parameterNameListPath_ << "\"" << std::endl;
-
-    objBuffer = parDefFile->Get(_parameterNameListPath_.c_str());
-    LogThrowIf(objBuffer == nullptr, "Can't find \"" << _parameterNameListPath_ << "\" in " << parDefFile->GetPath())
-    _parameterNamesList_ = std::shared_ptr<TObjArray>((TObjArray*) objBuffer->Clone());
-  }
-
-  // parameterLowerBoundsTVectorD
-  if( not _parameterLowerBoundsTVectorD_.empty() ){
-    LogInfo << "Reading provided parameterLowerBoundsTVectorD: \"" << _parameterLowerBoundsTVectorD_ << "\"" << std::endl;
-
-    objBuffer = parDefFile->Get(_parameterLowerBoundsTVectorD_.c_str());
-    LogThrowIf(objBuffer == nullptr, "Can't find \"" << _parameterLowerBoundsTVectorD_ << "\" in " << parDefFile->GetPath())
-    _parameterLowerBoundsList_ = std::shared_ptr<TVectorD>((TVectorD*) objBuffer->Clone());
-
-    LogThrowIf(_parameterLowerBoundsList_->GetNrows() != _nbParameterDefinition_,
-                "Parameter prior list don't have the same size(" << _parameterLowerBoundsList_->GetNrows()
-                                                                 << ") as cov matrix(" << _nbParameterDefinition_ << ")" );
-  }
-
-  // parameterUpperBoundsTVectorD
-  if( not _parameterUpperBoundsTVectorD_.empty() ){
-    LogInfo << "Reading provided parameterUpperBoundsTVectorD: \"" << _parameterUpperBoundsTVectorD_ << "\"" << std::endl;
-
-    objBuffer = parDefFile->Get(_parameterUpperBoundsTVectorD_.c_str());
-    LogThrowIf(objBuffer == nullptr, "Can't find \"" << _parameterUpperBoundsTVectorD_ << "\" in " << parDefFile->GetPath())
-    _parameterUpperBoundsList_ = std::shared_ptr<TVectorD>((TVectorD*) objBuffer->Clone());
-    LogThrowIf(_parameterUpperBoundsList_->GetNrows() != _nbParameterDefinition_,
-                "Parameter prior list don't have the same size(" << _parameterUpperBoundsList_->GetNrows()
-                                                                 << ") as cov matrix(" << _nbParameterDefinition_ << ")" );
-  }
-
-  if( not _throwEnabledListPath_.empty() ){
-    LogInfo << "Reading provided throwEnabledList: \"" << _throwEnabledListPath_ << "\"" << std::endl;
-
-    objBuffer = parDefFile->Get(_throwEnabledListPath_.c_str());
-    LogThrowIf(objBuffer == nullptr, "Can't find \"" << _throwEnabledListPath_ << "\" in " << parDefFile->GetPath())
-    _throwEnabledList_ = std::shared_ptr<TVectorD>((TVectorD*) objBuffer->Clone());
-  }
-
-  parDefFile->Close();
 }
 void ParameterSet::defineParameters(){
-  LogInfo << "Defining " << _nbParameterDefinition_ << " parameters for the set: " << getName() << std::endl;
   _parameterList_.resize(_nbParameterDefinition_, Parameter(this));
   int parIndex{0};
 
   for( auto& par : _parameterList_ ){
     par.setParameterIndex(parIndex++);
 
-    if( _priorCovarianceMatrix_ != nullptr ){
-      par.setStdDevValue(TMath::Sqrt((*_priorCovarianceMatrix_)[par.getParameterIndex()][par.getParameterIndex()]));
-      par.setStepSize(TMath::Sqrt((*_priorCovarianceMatrix_)[par.getParameterIndex()][par.getParameterIndex()]));
+    if( _priorFullCovarianceMatrix_ != nullptr ){
+      par.setStdDevValue(std::sqrt((*_priorFullCovarianceMatrix_)[par.getParameterIndex()][par.getParameterIndex()]));
+      par.setStepSize(std::sqrt((*_priorFullCovarianceMatrix_)[par.getParameterIndex()][par.getParameterIndex()]));
     }
     else{
       LogThrowIf(std::isnan(_nominalStepSize_), "Can't define free parameter without a \"nominalStepSize\"");
@@ -901,7 +943,7 @@ void ParameterSet::defineParameters(){
         par.setIsEnabled( false );
       }
       else{
-        LogInfo << "Enabling parameter \"" << par.getFullTitle() << "\" as it is set in enableOnlyParameters" << std::endl;
+        LogDebugIf(GundamGlobals::isDebug()) << "Enabling parameter \"" << par.getFullTitle() << "\" as it is set in enableOnlyParameters" << std::endl;
       }
     }
     if( not _disableParameters_.empty() ){
@@ -915,26 +957,25 @@ void ParameterSet::defineParameters(){
       }
 
       if( not isEnabled ){
-        LogWarning << "Skipping parameter \"" << par.getFullTitle() << "\" as it is set in disableParameters" << std::endl;
+        LogDebugIf(GundamGlobals::isDebug()) << "Skipping parameter \"" << par.getFullTitle() << "\" as it is set in disableParameters" << std::endl;
         par.setIsEnabled( false );
         continue;
       }
     }
-
 
     if( _parameterPriorList_ != nullptr ){ par.setPriorValue((*_parameterPriorList_)[par.getParameterIndex()]); }
     else{ par.setPriorValue(1); }
 
     par.setParameterValue(par.getPriorValue());
 
-    if( not std::isnan(_globalParameterMinValue_) ){ par.setMinValue(_globalParameterMinValue_); }
-    if( not std::isnan(_globalParameterMaxValue_) ){ par.setMaxValue(_globalParameterMaxValue_); }
+    if( not std::isnan(_globalParRange_.min) ){ par.setMinValue(_globalParRange_.min); }
+    if( not std::isnan(_globalParRange_.max) ){ par.setMaxValue(_globalParRange_.max); }
 
     if( _parameterLowerBoundsList_ != nullptr ){ par.setMinValue((*_parameterLowerBoundsList_)[par.getParameterIndex()]); }
     if( _parameterUpperBoundsList_ != nullptr ){ par.setMaxValue((*_parameterUpperBoundsList_)[par.getParameterIndex()]); }
 
-    LogThrowIf( not std::isnan(par.getMinValue()) and par.getPriorValue() < par.getMinValue(), "PRIOR IS BELLOW MIN: " << par.getSummary(true) );
-    LogThrowIf( not std::isnan(par.getMaxValue()) and par.getPriorValue() > par.getMaxValue(), "PRIOR IS ABOVE MAX: " << par.getSummary(true) );
+    LogThrowIf( not std::isnan(par.getMinValue()) and par.getPriorValue() < par.getMinValue(), "PRIOR IS BELLOW MIN: " << par.getSummary() );
+    LogThrowIf( not std::isnan(par.getMaxValue()) and par.getPriorValue() > par.getMaxValue(), "PRIOR IS ABOVE MAX: " << par.getSummary() );
 
     if( not _parameterDefinitionConfig_.empty() ){
       // Alternative 1: define dials then parameters
@@ -947,7 +988,7 @@ void ParameterSet::defineParameters(){
             // try with par index
           parConfig = GenericToolbox::Json::fetchMatchingEntry(_parameterDefinitionConfig_, "parameterIndex", par.getParameterIndex());
         }
-        par.setParameterDefinitionConfig(parConfig);
+        par.setConfig(parConfig);
       }
       else {
         // No covariance provided, so find the name based on the order in
@@ -957,7 +998,7 @@ void ParameterSet::defineParameters(){
         auto parConfig = configVector.at(par.getParameterIndex());
         auto parName = GenericToolbox::Json::fetchValue<std::string>(parConfig, {{"name"}, {"parameterName"}});
         if (not parName.empty()) par.setName(parName);
-        par.setParameterDefinitionConfig(parConfig);
+        par.setConfig(parConfig);
         LogWarning << "Parameter #" << par.getParameterIndex()
                    << " (name \"" << par.getName() << "\")"
                    << " not defined by covariance matrix file"
@@ -968,7 +1009,6 @@ void ParameterSet::defineParameters(){
       // Alternative 2: define dials then parameters
       par.setDialSetConfig( _dialSetDefinitions_ );
     }
-    par.readConfig();
+    par.configure();
   }
 }
-

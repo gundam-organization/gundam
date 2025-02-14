@@ -2,12 +2,12 @@
 #include "GundamGlobals.h"
 #include "GundamApp.h"
 #include "GundamUtils.h"
+#include "RootUtils.h"
 #include "FitterEngine.h"
 #include "ConfigUtils.h"
 
 #include "Logger.h"
 #include "CmdLineParser.h"
-#include "GenericToolbox.Json.h"
 #include "GenericToolbox.Root.h"
 #include "GenericToolbox.Utils.h"
 
@@ -19,14 +19,7 @@
 #include <vector>
 
 
-LoggerInit([]{
-  Logger::getUserHeader() << "[" << FILENAME << "]";
-});
-
-
 int main(int argc, char** argv){
-
-  using namespace GundamUtils;
 
   GundamApp app{"cross-section calculator tool"};
 
@@ -47,6 +40,7 @@ int main(int argc, char** argv){
   clParser.addTriggerOption("dryRun", {"-d", "--dry-run"}, "Only overrides fitter config and print it.");
   clParser.addTriggerOption("useBfAsXsec", {"--use-bf-as-xsec"}, "Use best-fit as x-sec value instead of mean of toys.");
   clParser.addTriggerOption("usePreFit", {"--use-prefit"}, "Use prefit covariance matrices for the toy throws.");
+  clParser.addTriggerOption("debugVerbose", {"--debug"}, "Add debug verbose.");
 
   LogInfo << "Usage: " << std::endl;
   LogInfo << clParser.getConfigSummary() << std::endl << std::endl;
@@ -58,6 +52,8 @@ int main(int argc, char** argv){
   LogInfo << "Provided arguments: " << std::endl;
   LogInfo << clParser.getValueSummary() << std::endl << std::endl;
 
+
+  GundamGlobals::setIsDebug(clParser.isOptionTriggered("debugVerbose"));
 
   // Sanity checks
   LogThrowIf(not clParser.isOptionTriggered("configFile"), "Xsec calculator config file not provided.");
@@ -77,8 +73,8 @@ int main(int argc, char** argv){
     gRandom->SetSeed(seed);
   }
 
-  GundamGlobals::getParallelWorker().setNThreads( clParser.getOptionVal("nbThreads", 1) );
-  LogInfo << "Running the fitter with " << GundamGlobals::getParallelWorker().getNbThreads() << " parallel threads." << std::endl;
+  GundamGlobals::setNumberOfThreads( clParser.getOptionVal("nbThreads", 1) );
+  LogInfo << "Running the fitter with " << GundamGlobals::getNbCpuThreads() << " parallel threads." << std::endl;
 
   // Reading fitter file
   std::string fitterFile{clParser.getOptionVal<std::string>("fitterFile")};
@@ -90,9 +86,14 @@ int main(int argc, char** argv){
     fitterRootFile = std::unique_ptr<TFile>( TFile::Open( fitterFile.c_str() ) );
     LogThrowIf( fitterRootFile == nullptr, "Could not open fitter output file." );
 
-    ObjectReader::throwIfNotFound = true;
+    RootUtils::ObjectReader::throwIfNotFound = true;
 
-    ObjectReader::readObject<TNamed>(fitterRootFile.get(), {{"gundam/config_TNamed"}, {"gundamFitter/unfoldedConfig_TNamed"}}, [&](TNamed* config_){
+    RootUtils::ObjectReader::readObject<TNamed>(
+        fitterRootFile.get(),
+        {{"gundam/config/unfoldedJson_TNamed"},
+         {"gundam/config_TNamed"},
+         {"gundamFitter/unfoldedConfig_TNamed"}},
+        [&](TNamed* config_){
       fitterConfig = GenericToolbox::Json::readConfigJsonStr( config_->GetTitle() );
     });
   }
@@ -109,17 +110,19 @@ int main(int argc, char** argv){
 
   // Disabling defined fit samples:
   LogInfo << "Removing defined samples..." << std::endl;
-  ConfigUtils::clearEntry( cHandler.getConfig(), "fitterEngineConfig/likelihoodInterfaceConfig/dataSetManagerConfig/propagatorConfig/sampleSetConfig/sampleList" );
-  ConfigUtils::clearEntry( cHandler.getConfig(), "fitterEngineConfig/likelihoodInterfaceConfig/dataSetManagerConfig/propagatorConfig/fitSampleSetConfig/fitSampleList" );
-  ConfigUtils::clearEntry( cHandler.getConfig(), "fitterEngineConfig/propagatorConfig/fitSampleSetConfig/fitSampleList" );
+  GenericToolbox::Json::clearEntry( cHandler.getConfig(), "fitterEngineConfig/likelihoodInterfaceConfig/propagatorConfig/sampleSetConfig/sampleList" );
+  GenericToolbox::Json::clearEntry( cHandler.getConfig(), "fitterEngineConfig/likelihoodInterfaceConfig/dataSetManagerConfig/propagatorConfig/sampleSetConfig/sampleList" );
+  GenericToolbox::Json::clearEntry( cHandler.getConfig(), "fitterEngineConfig/likelihoodInterfaceConfig/dataSetManagerConfig/propagatorConfig/fitSampleSetConfig/fitSampleList" );
+  GenericToolbox::Json::clearEntry( cHandler.getConfig(), "fitterEngineConfig/propagatorConfig/fitSampleSetConfig/fitSampleList" );
 
   // Disabling defined plots:
   LogInfo << "Removing defined plots..." << std::endl;
-  ConfigUtils::clearEntry( cHandler.getConfig(), "fitterEngineConfig/likelihoodInterfaceConfig/dataSetManagerConfig/propagatorConfig/plotGeneratorConfig" );
-  ConfigUtils::clearEntry( cHandler.getConfig(), "fitterEngineConfig/propagatorConfig/plotGeneratorConfig" );
+  GenericToolbox::Json::clearEntry( cHandler.getConfig(), "fitterEngineConfig/likelihoodInterfaceConfig/propagatorConfig/plotGeneratorConfig" );
+  GenericToolbox::Json::clearEntry( cHandler.getConfig(), "fitterEngineConfig/likelihoodInterfaceConfig/dataSetManagerConfig/propagatorConfig/plotGeneratorConfig" );
+  GenericToolbox::Json::clearEntry( cHandler.getConfig(), "fitterEngineConfig/propagatorConfig/plotGeneratorConfig" );
 
   // Defining signal samples
-  JsonType xsecConfig{ ConfigUtils::readConfigFile( clParser.getOptionVal<std::string>("configFile") ) };
+  auto xsecConfig( ConfigUtils::readConfigFile( clParser.getOptionVal<std::string>("configFile") ) );
   cHandler.override( xsecConfig );
   LogInfo << "Override done." << std::endl;
 
@@ -128,18 +131,16 @@ int main(int argc, char** argv){
 
   // it will handle all the deprecated config options and names properly
   FitterEngine fitter{nullptr};
-  fitter.readConfig( GenericToolbox::Json::fetchValuePath<JsonType>( cHandler.getConfig(), "fitterEngineConfig" ) );
-
-  DataSetManager& dataSetManager{fitter.getLikelihoodInterface().getDataSetManager()};
+  fitter.configure( GenericToolbox::Json::fetchValue<JsonType>( cHandler.getConfig(), "fitterEngineConfig" ) );
 
   // We are only interested in our MC. Data has already been used to get the post-fit error/values
-  dataSetManager.getPropagator().setLoadAsimovData( true );
+  fitter.getLikelihoodInterface().setForceAsimovData( true );
 
   // Disabling eigen decomposed parameters
-  dataSetManager.getPropagator().setEnableEigenToOrigInPropagate( false );
+  fitter.getLikelihoodInterface().getModelPropagator().setEnableEigenToOrigInPropagate( false );
 
   // Sample binning using parameterSetName
-  for( auto& sample : dataSetManager.getPropagator().getSampleSet().getSampleList() ){
+  for( auto& sample : fitter.getLikelihoodInterface().getModelPropagator().getSampleSet().getSampleList() ){
 
     if( clParser.isOptionTriggered("usePreFit") ){
       sample.setName( sample.getName() + " (pre-fit)" );
@@ -160,17 +161,17 @@ int main(int argc, char** argv){
 
     // Looking for parSet
     auto foundDialCollection = std::find_if(
-        dataSetManager.getPropagator().getDialCollectionList().begin(),
-        dataSetManager.getPropagator().getDialCollectionList().end(),
+        fitter.getLikelihoodInterface().getModelPropagator().getDialCollectionList().begin(),
+        fitter.getLikelihoodInterface().getModelPropagator().getDialCollectionList().end(),
         [&](const DialCollection& dialCollection_){
           auto* parSetPtr{dialCollection_.getSupervisedParameterSet()};
           if( parSetPtr == nullptr ){ return false; }
           return ( parSetPtr->getName() == associatedParSet );
         });
     LogThrowIf(
-        foundDialCollection == dataSetManager.getPropagator().getDialCollectionList().end(),
+        foundDialCollection == fitter.getLikelihoodInterface().getModelPropagator().getDialCollectionList().end(),
         "Could not find " << associatedParSet << " among fit dial collections: "
-                          << GenericToolbox::toString(dataSetManager.getPropagator().getDialCollectionList(),
+                          << GenericToolbox::toString(fitter.getLikelihoodInterface().getModelPropagator().getDialCollectionList(),
                                                       [](const DialCollection& dialCollection_){
                                                         return dialCollection_.getTitle();
                                                       }
@@ -182,9 +183,9 @@ int main(int argc, char** argv){
   }
 
   // Load everything
-  dataSetManager.initialize();
+  fitter.getLikelihoodInterface().initialize();
 
-  Propagator& propagator{dataSetManager.getPropagator()};
+  Propagator& propagator{fitter.getLikelihoodInterface().getModelPropagator()};
 
 
   if( clParser.isOptionTriggered("dryRun") ){
@@ -199,7 +200,7 @@ int main(int argc, char** argv){
 
     // Load post-fit parameters as "prior" so we can reset the weight to this point when throwing toys
     LogWarning << std::endl << GenericToolbox::addUpDownBars("Injecting post-fit parameters...") << std::endl;
-    ObjectReader::readObject<TNamed>( fitterRootFile.get(), "FitterEngine/postFit/parState_TNamed", [&](TNamed* parState_){
+    RootUtils::ObjectReader::readObject<TNamed>( fitterRootFile.get(), "FitterEngine/postFit/parState_TNamed", [&](TNamed* parState_){
       propagator.getParametersManager().injectParameterValues( GenericToolbox::Json::readConfigJsonStr( parState_->GetTitle() ) );
       for( auto& parSet : propagator.getParametersManager().getParameterSetsList() ){
         if( not parSet.isEnabled() ){ continue; }
@@ -212,7 +213,7 @@ int main(int argc, char** argv){
 
     // Load the post-fit covariance matrix
     LogWarning << std::endl << GenericToolbox::addUpDownBars("Injecting post-fit covariance matrix...") << std::endl;
-    ObjectReader::readObject<TH2D>(
+    RootUtils::ObjectReader::readObject<TH2D>(
         fitterRootFile.get(), "FitterEngine/postFit/Hesse/hessian/postfitCovarianceOriginal_TH2D",
         [&](TH2D* hCovPostFit_){
           propagator.getParametersManager().setGlobalCovarianceMatrix(std::make_shared<TMatrixD>(hCovPostFit_->GetNbinsX(), hCovPostFit_->GetNbinsX()));
@@ -233,7 +234,7 @@ int main(int argc, char** argv){
   else{
     // appendixDict["optionName"] = "Appendix"
     // this list insure all appendices will appear in the same order
-    std::vector<std::pair<std::string, std::string>> appendixDict{
+    std::vector<GundamUtils::AppendixEntry> appendixDict{
         {"configFile", ""},
         {"fitterFile", "Fit"},
         {"nToys", "nToys"},
@@ -243,7 +244,7 @@ int main(int argc, char** argv){
 
     outFilePath = "gundamCalcXsec_" + GundamUtils::generateFileName(clParser, appendixDict) + ".root";
 
-    std::string outFolder{GenericToolbox::Json::fetchValue<std::string>(xsecConfig, "outputFolder", "./")};
+    auto outFolder(GenericToolbox::Json::fetchValue<std::string>(xsecConfig, "outputFolder", "./"));
     outFilePath = GenericToolbox::joinPath(outFolder, outFilePath);
   }
 
@@ -268,7 +269,7 @@ int main(int argc, char** argv){
   LogInfo << "Creating normalizer objects..." << std::endl;
   // flux renorm with toys
   struct ParSetNormaliser{
-    void readConfig(const JsonType& config_){
+    void configure(const JsonType& config_){
       LogScopeIndent;
 
       name = GenericToolbox::Json::fetchValue<std::string>(config_, "name");
@@ -280,12 +281,11 @@ int main(int argc, char** argv){
       axisVariable = GenericToolbox::Json::fetchValue<std::string>(config_, "axisVariable");
 
       // optionals
-      for( auto& parSelConfig : GenericToolbox::Json::fetchValue<JsonType>(config_, "parSelections") ){
-        parSelections.emplace_back();
-        parSelections.back().first = GenericToolbox::Json::fetchValue<std::string>(parSelConfig, "name");
-        parSelections.back().second = GenericToolbox::Json::fetchValue<double>(parSelConfig, "value");
+      for( auto& parSelConfig : GenericToolbox::Json::fetchValue(config_, "parSelections", JsonType()) ){
+        parSelectionList.emplace_back();
+        GenericToolbox::Json::fillValue(parSelConfig, parSelectionList.back().name, "name");
+        GenericToolbox::Json::fillValue(parSelConfig, parSelectionList.back().value, "value");
       }
-      parSelections = GenericToolbox::Json::fetchValue(config_, "parSelections", parSelections);
 
       // init
       LogScopeIndent;
@@ -293,11 +293,11 @@ int main(int argc, char** argv){
       LogInfo << GET_VAR_NAME_VALUE(histogramPath) << std::endl;
       LogInfo << GET_VAR_NAME_VALUE(axisVariable) << std::endl;
 
-      if( not parSelections.empty() ){
+      if( not parSelectionList.empty() ){
         LogInfo << "parSelections:" << std::endl;
-        for( auto& parSelection : parSelections ){
+        for( auto& parSelection : parSelectionList ){
           LogScopeIndent;
-          LogInfo << parSelection.first << " -> " << parSelection.second << std::endl;
+          LogInfo << parSelection.name << " -> " << parSelection.value << std::endl;
         }
       }
 
@@ -323,13 +323,13 @@ int main(int argc, char** argv){
         // do we skip this bin? if not, apply coefficient
         bool skipBin{true};
         for( size_t iParBin = 0 ; iParBin < dialCollectionPtr->getDialBinSet().getBinList().size() ; iParBin++ ){
-          const DataBin& parBin = dialCollectionPtr->getDialBinSet().getBinList()[iParBin];
+          const Bin& parBin = dialCollectionPtr->getDialBinSet().getBinList()[iParBin];
 
           bool isParBinValid{true};
 
           // first check the conditions
-          for( auto& selection : parSelections ){
-            if( parBin.isVariableSet(selection.first) and not parBin.isBetweenEdges(selection.first, selection.second) ){
+          for( auto& selection : parSelectionList ){
+            if( parBin.isVariableSet(selection.name) and not parBin.isBetweenEdges(selection.name, selection.value) ){
               isParBinValid = false;
               break;
             }
@@ -362,7 +362,12 @@ int main(int argc, char** argv){
     std::string filePath{};
     std::string histogramPath{};
     std::string axisVariable{};
-    std::vector<std::pair<std::string, double>> parSelections{};
+
+    struct ParSelection{
+      std::string name{};
+      double value{};
+    };
+    std::vector<ParSelection> parSelectionList{};
 
     // internals
     std::shared_ptr<TFile> file{nullptr};
@@ -371,20 +376,18 @@ int main(int argc, char** argv){
   };
   std::vector<ParSetNormaliser> parSetNormList;
   for( auto& parSet : propagator.getParametersManager().getParameterSetsList() ){
-    if( GenericToolbox::Json::doKeyExist(parSet.getConfig(), "normalisations") ){
-      for( auto& parSetNormConfig : GenericToolbox::Json::fetchValue<JsonType>(parSet.getConfig(), "normalisations") ){
-        parSetNormList.emplace_back();
-        parSetNormList.back().readConfig( parSetNormConfig );
+    for( auto& parSetNormConfig : GenericToolbox::Json::fetchValue(parSet.getConfig(), "normalisations", JsonType()) ){
+      parSetNormList.emplace_back();
+      parSetNormList.back().configure( parSetNormConfig );
 
-        for( auto& dialCollection : propagator.getDialCollectionList() ){
-          if( dialCollection.getSupervisedParameterSet() == &parSet ){
-            parSetNormList.back().dialCollectionPtr = &dialCollection;
-            break;
-          }
+      for( auto& dialCollection : propagator.getDialCollectionList() ){
+        if( dialCollection.getSupervisedParameterSet() == &parSet ){
+          parSetNormList.back().dialCollectionPtr = &dialCollection;
+          break;
         }
-
-        parSetNormList.back().initialize();
       }
+
+      parSetNormList.back().initialize();
     }
   }
 
@@ -392,7 +395,7 @@ int main(int argc, char** argv){
 
   // to be filled up
   struct BinNormaliser{
-    void readConfig(const JsonType& config_){
+    void configure(const JsonType& config_){
       LogScopeIndent;
 
       name = GenericToolbox::Json::fetchValue<std::string>(config_, "name");
@@ -405,9 +408,9 @@ int main(int argc, char** argv){
       LogInfo << "Re-normalization config \"" << name << "\": ";
 
       if     ( GenericToolbox::Json::doKeyExist( config_, "meanValue" ) ){
-        normParameter.first  = GenericToolbox::Json::fetchValue<double>(config_, "meanValue");
-        normParameter.second = GenericToolbox::Json::fetchValue(config_, "stdDev", double(0.));
-        LogInfo << "mean ± sigma = " << normParameter.first << " ± " << normParameter.second;
+        normParameter.min  = GenericToolbox::Json::fetchValue<double>(config_, "meanValue");
+        normParameter.max = GenericToolbox::Json::fetchValue(config_, "stdDev", double(0.));
+        LogInfo << "mean ± sigma = " << normParameter.min << " ± " << normParameter.max;
       }
       else if( GenericToolbox::Json::doKeyExist( config_, "disabledBinDim" ) ){
         disabledBinDim = GenericToolbox::Json::fetchValue<std::string>(config_, "disabledBinDim");
@@ -426,7 +429,7 @@ int main(int argc, char** argv){
     }
 
     std::string name{};
-    std::pair<double, double> normParameter{std::nan("mean unset"), std::nan("stddev unset")};
+    GenericToolbox::Range normParameter{};
     std::string disabledBinDim{};
     std::string parSetNormaliserName{};
 
@@ -454,8 +457,8 @@ int main(int argc, char** argv){
     xsecEntry.config = sample.getConfig();
     xsecEntry.branchBinsData.resetCurrentByteOffset();
     std::vector<std::string> leafNameList{};
-    leafNameList.reserve( sample.getMcContainer().getHistogram().nBins );
-    for( int iBin = 0 ; iBin < sample.getMcContainer().getHistogram().nBins; iBin++ ){
+    leafNameList.reserve( sample.getHistogram().getNbBins() );
+    for( int iBin = 0 ; iBin < sample.getHistogram().getNbBins(); iBin++ ){
       leafNameList.emplace_back(Form("bin_%i/D", iBin));
       xsecEntry.branchBinsData.writeRawData( double(0) );
     }
@@ -476,15 +479,15 @@ int main(int argc, char** argv){
     xsecEntry.normList.reserve( normConfigList.size() );
     for( auto& normConfig : normConfigList ){
       xsecEntry.normList.emplace_back();
-      xsecEntry.normList.back().readConfig( normConfig );
+      xsecEntry.normList.back().configure( normConfig );
     }
 
     xsecEntry.histogram = TH1D(
         sample.getName().c_str(),
         sample.getName().c_str(),
-        sample.getMcContainer().getHistogram().nBins,
+        sample.getHistogram().getNbBins(),
         0,
-        sample.getMcContainer().getHistogram().nBins
+        sample.getHistogram().getNbBins()
     );
   }
 
@@ -493,13 +496,13 @@ int main(int argc, char** argv){
   // no bin volume of events -> use the current weight container
   for( auto& xsec : crossSectionDataList ){
     {
-      auto& mcEvList{xsec.samplePtr->getMcContainer().getEventList()};
+      auto& mcEvList{xsec.samplePtr->getEventList()};
       std::for_each(mcEvList.begin(), mcEvList.end(), []( Event& ev_){ ev_.getWeights().current = 0; });
     }
-    {
-      auto& dataEvList{xsec.samplePtr->getDataContainer().getEventList()};
-      std::for_each(dataEvList.begin(), dataEvList.end(), []( Event& ev_){ ev_.getWeights().current = 0; });
-    }
+//    {
+//      auto& dataEvList{xsec.samplePtr->getDataContainer().getEventList()};
+//      std::for_each(dataEvList.begin(), dataEvList.end(), []( Event& ev_){ ev_.getWeights().current = 0; });
+//    }
   }
 
   bool enableEventMcThrow{true};
@@ -512,14 +515,14 @@ int main(int argc, char** argv){
     for( auto& xsec : crossSectionDataList ){
 
       xsec.branchBinsData.resetCurrentByteOffset();
-      for( int iBin = 0 ; iBin < xsec.samplePtr->getMcContainer().getHistogram().nBins ; iBin++ ){
-        double binData{ xsec.samplePtr->getMcContainer().getHistogram().binList[iBin].content };
+      for( int iBin = 0 ; iBin < xsec.samplePtr->getHistogram().getNbBins() ; iBin++ ){
+        double binData{ xsec.samplePtr->getHistogram().getBinContentList()[iBin].sumWeights };
 
         // special re-norm
         for( auto& normData : xsec.normList ){
-          if( not std::isnan( normData.normParameter.first ) ){
-            double norm{normData.normParameter.first};
-            if( normData.normParameter.second != 0 ){ norm += normData.normParameter.second * gRandom->Gaus(); }
+          if( not std::isnan( normData.normParameter.min ) ){
+            double norm{normData.normParameter.min};
+            if( normData.normParameter.max != 0 ){ norm += normData.normParameter.max * gRandom->Gaus(); }
             binData /= norm;
           }
           else if( not normData.parSetNormaliserName.empty() ){
@@ -538,7 +541,7 @@ int main(int argc, char** argv){
 
         // no bin volume of events
         {
-          auto& mcEvList{xsec.samplePtr->getMcContainer().getEventList()};
+          auto& mcEvList{xsec.samplePtr->getEventList()};
           std::for_each(mcEvList.begin(), mcEvList.end(), [&]( Event& ev_){
             if( iBin != ev_.getIndices().bin ){ return; }
             ev_.getWeights().current += binData;
@@ -546,16 +549,16 @@ int main(int argc, char** argv){
         }
 
         // set event weight
-        {
-          auto& dataEvList{xsec.samplePtr->getDataContainer().getEventList()};
-          std::for_each(dataEvList.begin(), dataEvList.end(), [&]( Event& ev_){
-            if( iBin != ev_.getIndices().bin ){ return; }
-            ev_.getWeights().current = binData;
-          });
-        }
+//        {
+//          auto& dataEvList{xsec.samplePtr->getDataContainer().getEventList()};
+//          std::for_each(dataEvList.begin(), dataEvList.end(), [&]( Event& ev_){
+//            if( iBin != ev_.getIndices().bin ){ return; }
+//            ev_.getWeights().current = binData;
+//          });
+//        }
 
         // bin volume
-        auto& bin = xsec.samplePtr->getBinning().getBinList()[iBin];
+        auto& bin = xsec.samplePtr->getHistogram().getBinContextList()[iBin].bin;
         double binVolume{1};
 
         for( auto& edges : bin.getEdgesList() ){
@@ -581,7 +584,7 @@ int main(int argc, char** argv){
     propagator.propagateParameters();
     writeBinDataFct();
     xsecAtBestFitTree->Fill();
-    GenericToolbox::writeInTFile( GenericToolbox::mkdirTFile(calcXsecDir, "throws"), xsecAtBestFitTree );
+    GenericToolbox::writeInTFileWithObjTypeExt( GenericToolbox::mkdirTFile(calcXsecDir, "throws"), xsecAtBestFitTree );
   }
 
 
@@ -589,37 +592,75 @@ int main(int argc, char** argv){
   // THROWS LOOP
   /////////////////////////////////////
   LogWarning << std::endl << GenericToolbox::addUpDownBars( "Generating toys..." ) << std::endl;
+  propagator.getParametersManager().initializeStrippedGlobalCov();
 
+  // stats printing
+  GenericToolbox::Time::AveragedTimer<1> totalTimer{};
+  GenericToolbox::Time::AveragedTimer<1> throwTimer{};
+  GenericToolbox::Time::AveragedTimer<1> propagateTimer{};
+  GenericToolbox::Time::AveragedTimer<1> otherTimer{};
+  GenericToolbox::Time::AveragedTimer<1> writeTimer{};
+  GenericToolbox::TablePrinter t{};
+  std::stringstream progressSs;
   std::stringstream ss; ss << LogWarning.getPrefixString() << "Generating " << nToys << " toys...";
   for( int iToy = 0 ; iToy < nToys ; iToy++ ){
 
+    t.reset();
+    t << "Total time" << GenericToolbox::TablePrinter::NextColumn;
+    t << "Throw toys" << GenericToolbox::TablePrinter::NextColumn;
+    t << "Propagate pars" << GenericToolbox::TablePrinter::NextColumn;
+    t << "Re-normalize" << GenericToolbox::TablePrinter::NextColumn;
+    t << "Write throws" << GenericToolbox::TablePrinter::NextLine;
+
+    t << totalTimer << GenericToolbox::TablePrinter::NextColumn;
+    t << throwTimer << GenericToolbox::TablePrinter::NextColumn;
+    t << propagateTimer << GenericToolbox::TablePrinter::NextColumn;
+    t << otherTimer << GenericToolbox::TablePrinter::NextColumn;
+    t << writeTimer << GenericToolbox::TablePrinter::NextLine;
+
+    totalTimer.stop();
+    totalTimer.start();
+
     // loading...
-    GenericToolbox::displayProgressBar( iToy+1, nToys, ss.str() );
+    progressSs.str("");
+    progressSs << t.generateTableString() << std::endl;
+    progressSs << ss.str();
+    GenericToolbox::displayProgressBar( iToy+1, nToys, progressSs.str() );
 
     // Do the throwing:
-    propagator.getParametersManager().throwParametersFromGlobalCovariance();
+    throwTimer.start();
+    propagator.getParametersManager().throwParametersFromGlobalCovariance( not GundamGlobals::isDebug() );
+    throwTimer.stop();
+
+    propagateTimer.start();
     propagator.propagateParameters();
 
     if( enableStatThrowInToys ){
       for( auto& xsec : crossSectionDataList ){
-        if( enableEventMcThrow ){
+        if( enableEventMcThrow and not xsec.samplePtr->isEventMcThrowDisabled() ){
           // Take into account the finite amount of event in MC
-          xsec.samplePtr->getMcContainer().throwEventMcError();
+          xsec.samplePtr->getHistogram().throwEventMcError();
         }
         // Asimov bin content -> toy data
-        xsec.samplePtr->getMcContainer().throwStatError();
+        xsec.samplePtr->getHistogram().throwStatError();
       }
     }
+    propagateTimer.stop();
 
+    otherTimer.start();
+    // TODO: parallelize this
     writeBinDataFct();
+    otherTimer.stop();
 
     // Write the branches
+    writeTimer.start();
     xsecThrowTree->Fill();
+    writeTimer.stop();
   }
 
 
   LogInfo << "Writing throws..." << std::endl;
-  GenericToolbox::writeInTFile( GenericToolbox::mkdirTFile(calcXsecDir, "throws"), xsecThrowTree );
+  GenericToolbox::writeInTFileWithObjTypeExt( GenericToolbox::mkdirTFile(calcXsecDir, "throws"), xsecThrowTree );
 
   LogInfo << "Calculating mean & covariance matrix..." << std::endl;
   auto* meanValuesVector = GenericToolbox::generateMeanVectorOfTree(
@@ -636,14 +677,14 @@ int main(int argc, char** argv){
 
   for( auto& xsec : crossSectionDataList ){
 
-    for( int iBin = 0 ; iBin < xsec.samplePtr->getMcContainer().getHistogram().nBins ; iBin++ ){
+    for( int iBin = 0 ; iBin < xsec.samplePtr->getHistogram().getNbBins() ; iBin++ ){
       iBinGlobal++;
 
-      std::string binTitle = xsec.samplePtr->getBinning().getBinList()[iBin].getSummary();
-      double binVolume = xsec.samplePtr->getBinning().getBinList()[iBin].getVolume();
+      std::string binTitle = xsec.samplePtr->getHistogram().getBinContextList()[iBin].bin.getSummary();
+      double binVolume = xsec.samplePtr->getHistogram().getBinContextList()[iBin].bin.getVolume();
 
       xsec.histogram.SetBinContent( 1+iBin, (*meanValuesVector)[iBinGlobal] );
-      xsec.histogram.SetBinError( 1+iBin, TMath::Sqrt( (*globalCovMatrix)[iBinGlobal][iBinGlobal] ) );
+      xsec.histogram.SetBinError( 1+iBin, std::sqrt( (*globalCovMatrix)[iBinGlobal][iBinGlobal] ) );
       xsec.histogram.GetXaxis()->SetBinLabel( 1+iBin, binTitle.c_str() );
 
       globalCovMatrixHist->GetXaxis()->SetBinLabel(1+iBinGlobal, GenericToolbox::joinPath(xsec.samplePtr->getName(), binTitle).c_str());
@@ -662,7 +703,7 @@ int main(int argc, char** argv){
     xsec.histogram.GetXaxis()->SetLabelSize(0.02);
     xsec.histogram.GetYaxis()->SetTitle( GenericToolbox::Json::fetchValue(xsec.samplePtr->getConfig(), "yAxis", "#delta#sigma").c_str() );
 
-    GenericToolbox::writeInTFile(
+    GenericToolbox::writeInTFileWithObjTypeExt(
         GenericToolbox::mkdirTFile(calcXsecDir, "histograms"),
         &xsec.histogram, GenericToolbox::generateCleanBranchName( xsec.samplePtr->getName() )
     );
@@ -671,19 +712,19 @@ int main(int argc, char** argv){
 
   globalCovMatrixHist->GetXaxis()->SetLabelSize(0.02);
   globalCovMatrixHist->GetYaxis()->SetLabelSize(0.02);
-  GenericToolbox::writeInTFile(GenericToolbox::mkdirTFile(calcXsecDir, "matrices"), globalCovMatrixHist, "covarianceMatrix");
+  GenericToolbox::writeInTFileWithObjTypeExt(GenericToolbox::mkdirTFile(calcXsecDir, "matrices"), globalCovMatrixHist, "covarianceMatrix");
 
   globalCorMatrixHist->GetXaxis()->SetLabelSize(0.02);
   globalCorMatrixHist->GetYaxis()->SetLabelSize(0.02);
   globalCorMatrixHist->GetZaxis()->SetRangeUser(-1, 1);
-  GenericToolbox::writeInTFile(GenericToolbox::mkdirTFile(calcXsecDir, "matrices"), globalCorMatrixHist, "correlationMatrix");
+  GenericToolbox::writeInTFileWithObjTypeExt(GenericToolbox::mkdirTFile(calcXsecDir, "matrices"), globalCorMatrixHist, "correlationMatrix");
 
   // now propagate to the engine for the plot generator
   LogInfo << "Re-normalizing the samples for the plot generator..." << std::endl;
   for( auto& xsec : crossSectionDataList ){
     // this gives the average as the event weights were summed together
     {
-      auto &mcEvList{xsec.samplePtr->getMcContainer().getEventList()};
+      auto &mcEvList{xsec.samplePtr->getEventList()};
       std::vector<size_t> nEventInBin(xsec.histogram.GetNbinsX(), 0);
       for( size_t iBin = 0 ; iBin < nEventInBin.size() ; iBin++ ){
         nEventInBin[iBin] = std::count_if(mcEvList.begin(), mcEvList.end(), [iBin]( Event &ev_) {
@@ -696,35 +737,41 @@ int main(int argc, char** argv){
         ev_.getWeights().current /= double(nEventInBin[ev_.getIndices().bin]);
       });
     }
-    {
-      auto &dataEvList{xsec.samplePtr->getDataContainer().getEventList()};
-      std::vector<size_t> nEventInBin(xsec.histogram.GetNbinsX(), 0);
-      for( size_t iBin = 0 ; iBin < nEventInBin.size() ; iBin++ ){
-        nEventInBin[iBin] = std::count_if(dataEvList.begin(), dataEvList.end(), [iBin]( Event &ev_) {
-          return ev_.getIndices().bin== iBin;
-        });
-      }
-
-      std::for_each(dataEvList.begin(), dataEvList.end(), [&]( Event &ev_) {
-        ev_.getWeights().current /= nToys;
-        ev_.getWeights().current /= double(nEventInBin[ev_.getIndices().bin]);
-      });
-    }
+//    {
+//      auto &dataEvList{xsec.samplePtr->getDataContainer().getEventList()};
+//      std::vector<size_t> nEventInBin(xsec.histogram.GetNbinsX(), 0);
+//      for( size_t iBin = 0 ; iBin < nEventInBin.size() ; iBin++ ){
+//        nEventInBin[iBin] = std::count_if(dataEvList.begin(), dataEvList.end(), [iBin]( Event &ev_) {
+//          return ev_.getIndices().bin== iBin;
+//        });
+//      }
+//
+//      std::for_each(dataEvList.begin(), dataEvList.end(), [&]( Event &ev_) {
+//        ev_.getWeights().current /= nToys;
+//        ev_.getWeights().current /= double(nEventInBin[ev_.getIndices().bin]);
+//      });
+//    }
   }
 
   LogInfo << "Generating xsec sample plots..." << std::endl;
   // manual trigger to tweak the error bars
-  propagator.getPlotGenerator().generateSampleHistograms( GenericToolbox::mkdirTFile(calcXsecDir, "plots/histograms") );
+  fitter.getLikelihoodInterface().getPlotGenerator().generateSampleHistograms( GenericToolbox::mkdirTFile(calcXsecDir, "plots/histograms") );
 
-  for( auto& histHolder : propagator.getPlotGenerator().getHistHolderList(0) ){
+  for( auto& histHolder : fitter.getLikelihoodInterface().getPlotGenerator().getHistHolderList(0) ){
     if( not histHolder.isData ){ continue; } // only data will print errors
 
     const CrossSectionData* xsecDataPtr{nullptr};
     for( auto& xsecData : crossSectionDataList ){
+      /*
       if( xsecData.samplePtr  == histHolder.samplePtr){
         xsecDataPtr = &xsecData;
         break;
       }
+      */
+      if( (xsecData.samplePtr)->getName()  == (histHolder.samplePtr)->getName()){
+        xsecDataPtr = &xsecData;
+        break;
+      }      
     }
     LogThrowIf(xsecDataPtr==nullptr, "corresponding data not found");
 
@@ -740,16 +787,13 @@ int main(int argc, char** argv){
     }
   }
 
-  propagator.getPlotGenerator().generateCanvas(
-      propagator.getPlotGenerator().getHistHolderList(0),
+  fitter.getLikelihoodInterface().getPlotGenerator().generateCanvas(
+      fitter.getLikelihoodInterface().getPlotGenerator().getHistHolderList(0),
       GenericToolbox::mkdirTFile(calcXsecDir, "plots/canvas")
   );
 
 
   LogInfo << "Writing event samples in TTrees..." << std::endl;
-  dataSetManager.getTreeWriter().writeSamples(
-      GenericToolbox::mkdirTFile(calcXsecDir, "events"),
-      dataSetManager.getPropagator()
-  );
+  fitter.getLikelihoodInterface().writeEvents({calcXsecDir, "events"});
 
 }

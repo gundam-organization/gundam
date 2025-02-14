@@ -105,7 +105,7 @@ fitterEngineConfig:
                 - "FLUX ${DATA_DIR}/nutaubar.txt"
               updateFunction: "updateTable"
               binningFunction: "binTable"
-              variables: ["At", "Bt"]
+              binningVariables: ["At", "Bt"]
 
 
 

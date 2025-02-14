@@ -9,7 +9,7 @@
 #include "ParameterScanner.h"
 #include "LikelihoodInterface.h"
 #include "Parameter.h"
-#include "JsonBaseClass.h"
+
 
 #include "GenericToolbox.Utils.h"
 
@@ -39,12 +39,12 @@ protected:
   /// Implement the methods required by JsonBaseClass.  These MinimizerBase
   /// methods may be overridden by the derived class, but if overriden, the
   /// derived class must run these instantiations (i.e. call
-  /// MinimizerBase::readConfigImpl() and MinimizerBase::initializeImpl in the
+  /// MinimizerBase::configureImpl() and MinimizerBase::initializeImpl in the
   /// respective methods).
-  void readConfigImpl() override;
+  void configureImpl() override;
   void initializeImpl() override;
 
-  // Internal struct that hold infos on the minimizer state
+  // Internal struct that hold info about the minimizer state
   struct Monitor{
     bool isEnabled{false};
     bool showParameters{false};
@@ -61,17 +61,6 @@ protected:
     GenericToolbox::VariablesMonitor convergenceMonitor;
 
     std::unique_ptr<TTree> historyTree{nullptr};
-
-    struct GradientDescentMonitor{
-      bool isEnabled{false};
-      int lastGradientFall{-2};
-      struct GradientStepPoint {
-        JsonType parState;
-        double llh;
-      };
-      std::vector<GradientStepPoint> stepPointList{};
-    };
-    GradientDescentMonitor gradientDescentMonitor{};
   };
 
 public:
@@ -102,21 +91,27 @@ public:
   [[nodiscard]] virtual bool isErrorCalcEnabled() const { return false; }
 
   // c-tor
+  MinimizerBase(){} // for the python interface
   explicit MinimizerBase(FitterEngine* owner_): _owner_(owner_){}
 
   /// Set if the calcErrors method should be called by the FitterEngine.
-  void setDisableCalcError(bool disableCalcError_){ _disableCalcError_ = disableCalcError_; }
+  void setDisableCalcError(bool disableCalcError_){ _isEnabledCalcError_ = not disableCalcError_; }
 
   // const getters
-  [[nodiscard]] bool disableCalcError() const{ return _disableCalcError_; }
+  [[nodiscard]] bool disableCalcError() const{ return not _isEnabledCalcError_; }
+
+  // Get the return status for the fitter.  The return value is specific
+  // to the instantiated fitter, but is mostly centered around MINUIT
   [[nodiscard]] int getMinimizerStatus() const { return _minimizerStatus_; }
+  void setMinimizerStatus(int s) {_minimizerStatus_ = s;}
 
   // mutable getters
   Monitor& getMonitor(){ return _monitor_; }
+  [[nodiscard]] const Monitor& getMonitor() const { return _monitor_; }
 
   // core
   void printParameters();
-  int fetchNbDegreeOfFreedom(){ return getLikelihoodInterface().getNbSampleBins() - _nbFreeParameters_; }
+  [[nodiscard]] int fetchNbDegreeOfFreedom() const { return getLikelihoodInterface().getNbSampleBins() - _nbFreeParameters_; }
 
 
 protected:
@@ -126,8 +121,8 @@ protected:
 
   // Get the propagator being used to calculate the likelihood.  This is a
   // local convenience function to get the propagator from the owner.
-  Propagator& getPropagator();
-  [[nodiscard]] const Propagator& getPropagator() const;
+  Propagator& getModelPropagator();
+  [[nodiscard]] const Propagator& getModelPropagator() const;
 
   // Get the parameter scanner object owned by the LikelihoodInterface.
   ParameterScanner& getParameterScanner();
@@ -142,23 +137,32 @@ protected:
   // function to get the vector of fit parameter pointers.  The actual vector
   // lives in the likelihood.
   std::vector<Parameter *> &getMinimizerFitParameterPtr(){ return _minimizerParameterPtrList_; }
+  const std::vector<Parameter *> &getMinimizerFitParameterPtr() const{ return _minimizerParameterPtrList_; }
+
+  // The minimizer evalFit function won't explicitly check the parameter
+  // validity without setting this to true.
+  void setCheckParameterValidity(bool c) {_checkParameterValidity_ = c;}
+
+  // Query if a normalized fit space is being used.
+  bool useNormalizedFitSpace() const {return _useNormalizedFitSpace_;}
+  int* getNbFreeParametersPtr() {return &_nbFreeParameters_;}
 
 protected:
-  // config
-  bool _throwOnBadLlh_{false};
-  bool _useNormalizedFitSpace_{true};
-
-  // internals
-  bool _disableCalcError_{false};
-  int _minimizerStatus_{-1}; // -1: invalid, 0: success, >0: errors
-  int _nbFreeParameters_{0};
   std::vector<Parameter*> _minimizerParameterPtrList_{};
   Monitor _monitor_{};
-
 
 private:
   /// Save a copy of the address of the engine that owns this object.
   FitterEngine* _owner_{nullptr};
+
+  int _minimizerStatus_{-1}; // -1: invalid, 0: success, >0: errors
+  int _nbFreeParameters_{0};
+
+  // config
+  bool _throwOnBadLlh_{false};
+  bool _useNormalizedFitSpace_{true};
+  bool _checkParameterValidity_{false};
+  bool _isEnabledCalcError_{true};
 
 };
 
@@ -188,5 +192,4 @@ private:
 // Local Variables:
 // mode:c++
 // c-basic-offset:2
-// compile-command:"$(git rev-parse --show-toplevel)/cmake/gundam-build.sh"
 // End:

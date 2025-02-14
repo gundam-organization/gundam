@@ -3,29 +3,21 @@
 //
 
 #include "ConfigUtils.h"
+#include "GundamUtils.h"
 
-#include "GenericToolbox.Json.h"
 #include "GenericToolbox.Root.h"
 #include "GenericToolbox.Yaml.h"
 #include "Logger.h"
 
-#include "nlohmann/json.hpp"
-
 #include <string>
-#include <utility>
 #include <vector>
-#include <utility>
 #include <sstream>
 #include <iostream>
 
 
-LoggerInit([]{
-  Logger::setUserHeaderStr("[ConfigUtils]");
-} );
-
-
 namespace ConfigUtils {
 
+  // open file
   JsonType readConfigFile(const std::string& configFilePath_){
     if( not GenericToolbox::isFile(configFilePath_) ){
       LogError << "\"" << configFilePath_ << "\" could not be found." << std::endl;
@@ -50,6 +42,7 @@ namespace ConfigUtils {
     return output;
   }
 
+  // YAML to JSON converting
   JsonType convertYamlToJson(const std::string& configFilePath_){
     return ConfigUtils::convertYamlToJson(GenericToolbox::Yaml::readConfigFile(configFilePath_));
   }
@@ -101,15 +94,13 @@ namespace ConfigUtils {
     return output;
   }
 
+  // unfolding
   JsonType getForwardedConfig(const JsonType& config_){
     JsonType out = config_;
     while( out.is_string() ){
       out = ConfigUtils::readConfigFile(out.get<std::string>());
     }
     return out;
-  }
-  JsonType getForwardedConfig(const JsonType& config_, const std::string& keyName_){
-    return ConfigUtils::getForwardedConfig(GenericToolbox::Json::fetchValue<JsonType>(config_, keyName_));
   }
   void forwardConfig(JsonType& config_){
     while( config_.is_string() and
@@ -141,199 +132,8 @@ namespace ConfigUtils {
 
   }
 
-  void applyOverrides(JsonType& outConfig_, const JsonType& overrideConfig_){
-
-    // dev options
-    bool debug{false};
-    bool allowAddMissingKey{true};
-
-    // specific keys like "name" might help reference the lists
-    std::vector<std::string> listOfIdentifiers{{"name"}, {"__INDEX__"}};
-
-    std::vector<std::string> jsonPath{};
-    std::function<void(JsonType&, const JsonType&)> overrideRecursive =
-        [&](JsonType& outEntry_, const JsonType& overrideEntry_){
-      LogDebug(debug) << GET_VAR_NAME_VALUE(GenericToolbox::joinPath( jsonPath )) << std::endl;
-
-      if( overrideEntry_.is_array() ){
-        // entry is list
-        LogThrowIf( not outEntry_.is_array(), GenericToolbox::joinPath( jsonPath ) << " is not an array: " << std::endl << outEntry_ << std::endl << std::endl << overrideEntry_ );
-
-        // is it empty? -> erase
-        if( overrideEntry_.empty() ){
-          LogWarning << "Overriding list: " << GenericToolbox::joinPath(jsonPath) << std::endl;
-          outEntry_ = overrideEntry_;
-          return;
-        }
-
-        // is it an array of primitive type? like std::vector<std::string>?
-        bool isStructured{false};
-        for( auto& outListEntry : outEntry_.items() ){ if( outListEntry.value().is_structured() ){ isStructured = true; break; } }
-        if( not isStructured ){
-          LogWarning << "Overriding list: " << GenericToolbox::joinPath(jsonPath) << std::endl;
-          outEntry_ = overrideEntry_;
-          return;
-        }
-
-        // loop over to find the right entry
-        for( auto& overrideListEntry: overrideEntry_.items() ){
-
-          // fetch identifier if available using override
-          std::string identifier{};
-          for( auto& identifierCandidate : listOfIdentifiers ){
-            if( GenericToolbox::Json::doKeyExist( overrideListEntry.value(), identifierCandidate ) ){
-              identifier = identifierCandidate;
-            }
-          }
-
-          if( not identifier.empty() ){
-            // will i
-            LogDebug(debug) << "Will identify override list item with key \"" << identifier << "\" = " << overrideListEntry.value()[identifier] << std::endl;
-
-            JsonType* outListEntryMatch{nullptr};
-
-            if( identifier == "__INDEX__" ){
-              if     ( overrideListEntry.value()[identifier].is_string() and overrideListEntry.value()[identifier].get<std::string>() == "*" ){
-                // applying on every entry
-                for( auto& outSubEntry : outEntry_ ){
-                  jsonPath.emplace_back(GenericToolbox::joinAsString("",overrideListEntry.key(),"(",identifier,":",overrideListEntry.value()[identifier],")"));
-                  overrideRecursive(outSubEntry, overrideListEntry.value());
-                  jsonPath.pop_back();
-                }
-              }
-              else if( overrideListEntry.value()[identifier].get<int>() == -1 ){
-                // add entry
-                if( allowAddMissingKey ){
-                  LogAlert << "Adding: " << GenericToolbox::joinPath(jsonPath, outEntry_.size());
-                  if( overrideListEntry.value().is_primitive() ){ LogAlert << " -> " << overrideListEntry.value(); }
-                  LogAlert << std::endl;
-                  outEntry_.emplace_back(overrideListEntry.value());
-                }
-              }
-              else if( overrideListEntry.value()[identifier].get<size_t>() < outEntry_.size() ){
-                jsonPath.emplace_back( overrideListEntry.key() );
-                overrideRecursive( outEntry_[overrideListEntry.value()[identifier].get<size_t>()], overrideListEntry.value() );
-                jsonPath.pop_back();
-              }
-              else{
-                LogThrow("Invalid __INDEX__: " << overrideListEntry.value()[identifier].get<int>());
-              }
-            }
-            else{
-              for( auto& outListEntry : outEntry_ ){
-                if( GenericToolbox::Json::doKeyExist( outListEntry, identifier )
-                and outListEntry[identifier] == overrideListEntry.value()[identifier] ){
-                  outListEntryMatch = &outListEntry;
-                  break;
-                }
-              }
-
-              if( outListEntryMatch == nullptr ){
-                if( allowAddMissingKey ) {
-                  LogAlert << "Adding: " << GenericToolbox::joinPath(jsonPath, outEntry_.size()) << "(" << identifier
-                           << ":" << overrideListEntry.value()[identifier] << ")" << std::endl;
-                  outEntry_.emplace_back(overrideListEntry.value());
-                  continue;
-                }
-              }
-              jsonPath.emplace_back(GenericToolbox::joinAsString("",overrideListEntry.key(),"(",identifier,":",overrideListEntry.value()[identifier],")"));
-              overrideRecursive(*outListEntryMatch, overrideListEntry.value());
-              jsonPath.pop_back();
-            }
-          }
-          else{
-            LogAlert << "No identifier found for list def in " << GenericToolbox::joinPath(jsonPath) << std::endl;
-            continue;
-          }
-        }
-      }
-      else{
-        LogDebug(debug) << "Not array: " << overrideEntry_.empty() << std::endl;
-
-        if( overrideEntry_.empty() ){
-          LogWarning << "Removing entry: " << GenericToolbox::joinPath(jsonPath) << std::endl;
-          outEntry_ = overrideEntry_;
-          return;
-        }
-
-        // entry is dictionary
-        for( auto& overrideEntry : overrideEntry_.items() ){
-          LogDebug(debug) << GET_VAR_NAME_VALUE(overrideEntry.key()) << std::endl;
-
-          // addition mode:
-          if( not GenericToolbox::Json::doKeyExist(outEntry_, overrideEntry.key()) ){
-            if( overrideEntry.key() != "__INDEX__" ){
-              if( allowAddMissingKey ){
-                LogAlert << "Adding: " << GenericToolbox::joinPath(jsonPath, overrideEntry.key());
-                if( overrideEntry.value().is_primitive() ){ LogAlert << " -> " << overrideEntry.value(); }
-                LogAlert << std::endl;
-                outEntry_[overrideEntry.key()] = overrideEntry.value();
-              }
-              else{
-                LogThrow("Could not edit missing key \"" << GenericToolbox::joinPath(jsonPath, overrideEntry.key()) << "\" ("
-                << GET_VAR_NAME_VALUE(allowAddMissingKey) << ")"
-                );
-              }
-            }
-            else{
-              LogDebug(debug) << "skipping __INDEX__ entry" << std::endl;
-            }
-            continue;
-          }
-
-          // override
-          auto& outSubEntry = outEntry_[overrideEntry.key()];
-
-          if( overrideEntry.value().is_structured() ){
-            LogDebug(debug) << "Is structured... going recursive..." << std::endl;
-            // recursive candidate
-            jsonPath.emplace_back(overrideEntry.key());
-            overrideRecursive(outSubEntry, overrideEntry.value());
-            jsonPath.pop_back();
-          }
-          else{
-            // override
-            LogWarning << "Overriding: " << GenericToolbox::joinPath(jsonPath, overrideEntry.key()) << ": "
-                       << outSubEntry << " -> " << overrideEntry.value() << std::endl;
-            outSubEntry = overrideEntry.value();
-          }
-        }
-      }
-
-    };
-
-    // recursive
-    if( overrideConfig_.is_array() ){
-      // old nlohmann json version -> can be defined as array
-      overrideRecursive(outConfig_, overrideConfig_[0]);
-    }
-    else{
-      overrideRecursive(outConfig_, overrideConfig_);
-    }
-
-  }
-  void clearEntry(JsonType& jsonConfig_, const std::string& path_){
-
-    auto pathEntries{ GenericToolbox::splitString(path_, "/") };
-    auto* configEntry{&jsonConfig_};
-
-    for( auto& pathEntry : pathEntries ){
-      if( GenericToolbox::Json::doKeyExist( *configEntry, pathEntry ) ){
-        // next
-        configEntry = &( configEntry->find(pathEntry).value() );
-      }
-      else{
-        // no need to override. The key does not exist in the config
-        return;
-      }
-    }
-
-    // clearing up
-    configEntry->clear();
-  }
-
   // class impl
-  ConfigHandler::ConfigHandler(const std::string& filePath_){
+  void ConfigHandler::setConfig(const std::string& filePath_){
     if( GenericToolbox::hasExtension( filePath_, "root" ) ){
       LogInfo << "Extracting config file for fitter file: " << filePath_ << std::endl;
       LogThrowIf( not GenericToolbox::doesTFileIsValid(filePath_), "Invalid root file: " << filePath_ );
@@ -353,30 +153,15 @@ namespace ConfigUtils {
       config = ConfigUtils::readConfigFile(filePath_ ); // works with yaml
     }
   }
-  ConfigHandler::ConfigHandler(JsonType config_) : config(std::move(config_)) {}
-
-  std::string ConfigHandler::toString() const{
-    return GenericToolbox::Json::toReadableString( config );
-  }
-  const JsonType &ConfigHandler::getConfig() const {
-    return config;
-  }
-
-  JsonType &ConfigHandler::getConfig(){
-    return config;
-  }
-
 
   void ConfigHandler::override( const JsonType& overrideConfig_ ){
-    ConfigUtils::applyOverrides(config, overrideConfig_);
+    LogScopeIndent;
+    LogWarning << GenericToolbox::Json::applyOverrides(config, overrideConfig_);
   }
   void ConfigHandler::override( const std::string& filePath_ ){
     LogInfo << "Overriding config with \"" << filePath_ << "\"" << std::endl;
     LogThrowIf(not GenericToolbox::isFile(filePath_), "Could not find " << filePath_);
-
-    LogScopeIndent;
-    auto override{ConfigUtils::readConfigFile(filePath_)};
-    ConfigHandler::override(override);
+    this->override( ConfigUtils::readConfigFile(filePath_) );
   }
   void ConfigHandler::override( const std::vector<std::string>& filesList_ ){
     for( auto& file : filesList_ ){ this->override( file ); }
@@ -410,8 +195,6 @@ namespace ConfigUtils {
   void ConfigHandler::flatOverride( const std::vector<std::string>& flattenEntryList_ ){
     for( auto& flattenEntry : flattenEntryList_ ){ this->flatOverride( flattenEntry ); }
   }
-
-
   void ConfigHandler::exportToJsonFile(const std::string &filePath_) const {
     auto outPath{filePath_};
 
@@ -424,7 +207,5 @@ namespace ConfigUtils {
     GenericToolbox::dumpStringInFile(outPath, this->toString());
     LogInfo << "Unfolded config written as: " << outPath << std::endl;
   }
-
-
 
 }

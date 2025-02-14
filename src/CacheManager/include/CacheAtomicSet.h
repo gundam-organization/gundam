@@ -6,21 +6,21 @@
 #endif
 
 namespace {
-    /// Do an atomic set for doubles.  On the GPU this uses
-    /// compare-and-set.  On the CPU, this leverages CacheAtomicSet.
-    HEMI_DEV_CALLABLE_INLINE
-    double CacheAtomicSet(double* address, const double v) {
+  /// Do an atomic set for doubles.  On the GPU this uses
+  /// compare-and-set.  On the CPU, this leverages CacheAtomicSet.
+  HEMI_DEV_CALLABLE_INLINE
+  double CacheAtomicSet(double* address, const double v) {
 #ifndef HEMI_DEV_CODE
-        // C++ is a little funky on it's support for atomic operations, so
-        // give it a little help.
-        double expect = *address;
-        double update;
-        do {
-             update = v;
-        } while (not CacheAtomicCAS(address,&expect,update));
-        return expect;
+    // C++ is a little funky on it's support for atomic operations, so
+    // give it a little help.
+    double expect = *address;
+    double update;
+    do {
+      update = v;
+    } while (not CacheAtomicCAS(address,&expect,update));
+    return expect;
 #else
-        // When using CUDA use atomic compare-and-set to do an atomic
+    // When using CUDA use atomic compare-and-set to do an atomic
         // set value.  This only sets the result if the value at address_as_ull
         // is equal to "assumed" after the addition.  The comparison is done
         // with integers because of CUDA.  The return value of atomicCAS is
@@ -46,7 +46,7 @@ namespace {
         } while (not (assumed == old));
         return __longlong_as_double(old);
 #endif
-    }
+  }
 }
 #endif
 // Local Variables:

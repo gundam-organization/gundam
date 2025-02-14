@@ -7,9 +7,6 @@
 
 #include <TH2.h>
 
-LoggerInit([]{
-  Logger::setUserHeaderStr("[SurfaceFactory]");
-});
 
 DialBase* SurfaceDialBaseFactory::makeDial(const std::string& dialTitle_,
                                            const std::string& dialType_,

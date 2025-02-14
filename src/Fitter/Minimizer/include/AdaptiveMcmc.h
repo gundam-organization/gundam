@@ -7,14 +7,12 @@
 
 #include "ParameterSet.h"
 #include "MinimizerBase.h"
-#include "JsonBaseClass.h"
 
 #include "GenericToolbox.Utils.h"
 #include "GenericToolbox.Time.h"
 
 #include "Math/Functor.h"
 #include "TDirectory.h"
-#include "nlohmann/json.hpp"
 
 #include <memory>
 #include <vector>
@@ -34,7 +32,7 @@ class FitterEngine;
 class AdaptiveMcmc : public MinimizerBase {
 
 protected:
-  void readConfigImpl() override;
+  void configureImpl() override;
   void initializeImpl() override;
 
 public:

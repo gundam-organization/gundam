@@ -1,6 +1,6 @@
 #! /bin/bash
 
-PROJECT_NAME="GUNDAM"
+PROJECT_NAME=$(basename "$(pwd)")
 
 THIS_SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 builtin cd ${THIS_SCRIPT_DIR} || exit 1;

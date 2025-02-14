@@ -1,5 +1,5 @@
 #ifndef CALCULATE_BICUBIC_SPLINE_H_SEEN
-#include <stdio.h>
+#include <cstdio>
 
 // Calculate a Bicubic (2D) spline interpolation specified by the position,
 // and value at each knot.  This is implemented using the Catmull-Rom spline.

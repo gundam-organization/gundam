@@ -16,9 +16,9 @@ class SplineDial;
 
 
 namespace Cache {
-    namespace Weight {
-        class UniformSpline;
-    }
+  namespace Weight {
+    class UniformSpline;
+  }
 }
 
 /// A class apply a splined weight parameter to the cached event weights.
@@ -28,100 +28,100 @@ namespace Cache {
 class Cache::Weight::UniformSpline:
     public Cache::Weight::Base {
 private:
-    Cache::Parameters::Clamps& fLowerClamp;
-    Cache::Parameters::Clamps& fUpperClamp;
+  Cache::Parameters::Clamps& fLowerClamp;
+  Cache::Parameters::Clamps& fUpperClamp;
 
-    ///////////////////////////////////////////////////////////////////////
-    /// An array of indices into the results that go for each spline.
-    /// This is copied from the CPU to the GPU once, and is then constant.
-    std::size_t fSplinesReserved;
-    std::size_t fSplinesUsed;
-    std::unique_ptr<hemi::Array<int>> fSplineResult;
+  ///////////////////////////////////////////////////////////////////////
+  /// An array of indices into the results that go for each spline.
+  /// This is copied from the CPU to the GPU once, and is then constant.
+  std::size_t fSplinesReserved;
+  std::size_t fSplinesUsed;
+  std::unique_ptr<hemi::Array<int>> fSplineResult;
 
-    /// An array of indices into the parameters that go for each spline.  This
-    /// is copied from the CPU to the GPU once, and is then constant.
-    std::unique_ptr<hemi::Array<short>> fSplineParameter;
+  /// An array of indices into the parameters that go for each spline.  This
+  /// is copied from the CPU to the GPU once, and is then constant.
+  std::unique_ptr<hemi::Array<short>> fSplineParameter;
 
-    /// An array of indices for the first knot of each spline.  This is copied
-    /// from the CPU to the GPU once, and is then constant.
-    std::unique_ptr<hemi::Array<int>> fSplineIndex;
+  /// An array of indices for the first knot of each spline.  This is copied
+  /// from the CPU to the GPU once, and is then constant.
+  std::unique_ptr<hemi::Array<int>> fSplineIndex;
 
-    /// An array of the knots to calculate the splines.  This is copied from
-    /// the CPU to the GPU once, and is then constant.
-    std::size_t    fSplineSpaceReserved;
-    std::size_t    fSplineSpaceUsed;
-    std::unique_ptr<hemi::Array<WEIGHT_BUFFER_FLOAT>> fSplineSpace;
+  /// An array of the knots to calculate the splines.  This is copied from
+  /// the CPU to the GPU once, and is then constant.
+  std::size_t    fSplineSpaceReserved;
+  std::size_t    fSplineSpaceUsed;
+  std::unique_ptr<hemi::Array<WEIGHT_BUFFER_FLOAT>> fSplineSpace;
 
 public:
-    // A static method to return the number of knots that will be used by this
-    // spline.
-    static int FindPoints(const TSpline3* s);
+  // A static method to return the number of knots that will be used by this
+  // spline.
+  static int FindPoints(const TSpline3* s);
 
-    // Construct the class.  This should allocate all the memory on the host
-    // and on the GPU.  The "results" are the total number of results to be
-    // calculated (one result per event, often >1E+6).  The "parameters" are
-    // the number of input parameters that are used (often ~1000).  The norms
-    // are the total number of normalization parameters (typically a few per
-    // event) used to calculate the results.  The splines are the total number
-    // of spline parameters (with uniform knot spacing) used to calculate the
-    // results (typically a few per event).  The knots are the total number of
-    // knots in all of the uniform splines (e.g. For 1000 splines with 7
-    // knots for each spline, knots is 7000).
-    UniformSpline(Cache::Weights::Results& results,
-                  Cache::Parameters::Values& parameters,
-                  Cache::Parameters::Clamps& lowerClamps,
-                  Cache::Parameters::Clamps& upperClamps,
-                  std::size_t splines,std::size_t knots,
-                  std::string spaceOption);
+  // Construct the class.  This should allocate all the memory on the host
+  // and on the GPU.  The "results" are the total number of results to be
+  // calculated (one result per event, often >1E+6).  The "parameters" are
+  // the number of input parameters that are used (often ~1000).  The norms
+  // are the total number of normalization parameters (typically a few per
+  // event) used to calculate the results.  The splines are the total number
+  // of spline parameters (with uniform knot spacing) used to calculate the
+  // results (typically a few per event).  The knots are the total number of
+  // knots in all of the uniform splines (e.g. For 1000 splines with 7
+  // knots for each spline, knots is 7000).
+  UniformSpline(Cache::Weights::Results& results,
+                Cache::Parameters::Values& parameters,
+                Cache::Parameters::Clamps& lowerClamps,
+                Cache::Parameters::Clamps& upperClamps,
+                std::size_t splines,std::size_t knots,
+                std::string spaceOption);
 
-    // Deconstruct the class.  This should deallocate all the memory
-    // everyplace.
-    virtual ~UniformSpline();
+  // Deconstruct the class.  This should deallocate all the memory
+  // everyplace.
+  virtual ~UniformSpline();
 
-    /// Reinitialize the cache.  This puts it into a state to be refilled, but
-    /// does not deallocate any memory.
-    virtual void Reset() override;
+  /// Reinitialize the cache.  This puts it into a state to be refilled, but
+  /// does not deallocate any memory.
+  virtual void Reset() override;
 
-    // Apply the kernel to the event weights.
-    virtual bool Apply() override;
+  // Apply the kernel to the event weights.
+  virtual bool Apply() override;
 
-    /// Return the number of parameters using a spline with uniform knots that
-    /// are reserved.
-    std::size_t GetSplinesReserved() {return fSplinesReserved;}
+  /// Return the number of parameters using a spline with uniform knots that
+  /// are reserved.
+  std::size_t GetSplinesReserved() {return fSplinesReserved;}
 
-    /// Return the number of parameters using a spline with uniform knots that
-    /// are used.
-    std::size_t GetSplinesUsed() {return fSplinesUsed;}
+  /// Return the number of parameters using a spline with uniform knots that
+  /// are used.
+  std::size_t GetSplinesUsed() {return fSplinesUsed;}
 
-    /// Return the number of elements reserved to hold knots.
-    std::size_t GetSplineSpaceReserved() const {return fSplineSpaceReserved;}
+  /// Return the number of elements reserved to hold knots.
+  std::size_t GetSplineSpaceReserved() const {return fSplineSpaceReserved;}
 
-    /// Return the number of elements currently used to hold knots.
-    std::size_t GetSplineSpaceUsed() const {return fSplineSpaceUsed;}
+  /// Return the number of elements currently used to hold knots.
+  std::size_t GetSplineSpaceUsed() const {return fSplineSpaceUsed;}
 
-    /// Add a spline data.
-    void AddSpline(int resultIndex, int parIndex, const std::vector<double>& splineData);
+  /// Add a spline data.
+  void AddSpline(int resultIndex, int parIndex, const std::vector<double>& splineData);
 
-    // Get the index of the parameter for the spline at sIndex.
-    int GetSplineParameterIndex(int sIndex);
+  // Get the index of the parameter for the spline at sIndex.
+  int GetSplineParameterIndex(int sIndex);
 
-    // Get the parameter value for the spline at sIndex.
-    double GetSplineParameter(int sIndex);
+  // Get the parameter value for the spline at sIndex.
+  double GetSplineParameter(int sIndex);
 
-    // Get the lower (upper) bound for the spline at sIndex.
-    double GetSplineLowerBound(int sIndex);
-    double GetSplineUpperBound(int sIndex);
+  // Get the lower (upper) bound for the spline at sIndex.
+  double GetSplineLowerBound(int sIndex);
+  double GetSplineUpperBound(int sIndex);
 
-    // Get the lower (upper) clamp for the spline at sIndex.
-    double GetSplineLowerClamp(int sIndex);
-    double GetSplineUpperClamp(int sIndex);
+  // Get the lower (upper) clamp for the spline at sIndex.
+  double GetSplineLowerClamp(int sIndex);
+  double GetSplineUpperClamp(int sIndex);
 
-    // Get the number of knots in the spline at sIndex.
-    int GetSplineKnotCount(int sIndex);
+  // Get the number of knots in the spline at sIndex.
+  int GetSplineKnotCount(int sIndex);
 
-    // Get the function value for a knot in the spline at sIndex
-    double GetSplineKnotValue(int sIndex,int knot);
-    double GetSplineKnotSlope(int sIndex,int knot);
+  // Get the function value for a knot in the spline at sIndex
+  double GetSplineKnotValue(int sIndex,int knot);
+  double GetSplineKnotSlope(int sIndex,int knot);
 
 };
 

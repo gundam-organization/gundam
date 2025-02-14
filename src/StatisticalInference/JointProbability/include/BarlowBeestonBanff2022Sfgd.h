@@ -13,14 +13,66 @@ namespace JointProbability{
   class BarlowBeestonBanff2022Sfgd : public JointProbabilityBase {
   public:
     [[nodiscard]] std::string getType() const override { return "BarlowBeestonBanff2022Sfgd"; }
-    [[nodiscard]] double eval(const Sample& sample_, int bin_) const override;
+    [[nodiscard]] double eval(double data_, double pred_, double err_, int bin_) const override;
+    [[nodiscard]] double eval(const SamplePair& samplePair_, int bin_) const override;
   };
 
-  double BarlowBeestonBanff2022Sfgd::eval(const Sample& sample_, int bin_) const {
+  double BarlowBeestonBanff2022Sfgd::eval(const SamplePair& samplePair_, int bin_) const {
 
-    double dataVal = sample_.getDataContainer().getHistogram().binList[bin_].content;
-    double predVal = sample_.getMcContainer().getHistogram().binList[bin_].content;
-    double mcuncert = sample_.getMcContainer().getHistogram().binList[bin_].error;
+    double dataVal = samplePair_.data->getHistogram().getBinContentList()[bin_].sumWeights;
+    double predVal = samplePair_.model->getHistogram().getBinContentList()[bin_].sumWeights;
+    double mcuncert = samplePair_.model->getHistogram().getBinContentList()[bin_].sqrtSumSqWeights;
+
+    // SFGD detector uncertainty
+    double sfgd_det_uncert = 0.;
+    if (samplePair_.model->getName().find("SFGD") != std::string::npos){
+      // to be applied on SFGD samples only
+      sfgd_det_uncert = 0.;
+      if (samplePair_.model->getName().find("FHC") != std::string::npos){
+        if (samplePair_.model->getName().find("0p") != std::string::npos){
+          sfgd_det_uncert = 0.02;
+        }
+        else if (samplePair_.model->getName().find("Np") != std::string::npos){
+          sfgd_det_uncert = 0.04;
+        }
+      }
+      else if (samplePair_.model->getName().find("RHC") != std::string::npos){
+        if (samplePair_.model->getName().find("0n") != std::string::npos){
+          sfgd_det_uncert = 0.025;
+        }
+        else if (samplePair_.model->getName().find("Nn") != std::string::npos){
+          sfgd_det_uncert = 0.05;
+        }
+      }
+    }
+
+    // DETECTOR UNCERTAINTY FOR WAGASCI
+    double wg_det_uncert = 0.;
+    if (samplePair_.model->getName().find("WAGASCI") != std::string::npos){
+      wg_det_uncert = 0.;
+      if(samplePair_.model->getName().find("#0pi") != std::string::npos) {
+        if(samplePair_.model->getName().find("PM-BM") != std::string::npos) wg_det_uncert = 0.05;
+        if(samplePair_.model->getName().find("PM-WMRD") != std::string::npos) wg_det_uncert = 0.1;
+        if(samplePair_.model->getName().find("DWG-BM") != std::string::npos) wg_det_uncert = 0.1;
+        if(samplePair_.model->getName().find("UWG-BM") != std::string::npos) wg_det_uncert = 0.12;
+        if(samplePair_.model->getName().find("UWG-WMRD") != std::string::npos) wg_det_uncert = 0.1;
+      }
+      if(samplePair_.model->getName().find("#1pi") != std::string::npos)  {
+        if(samplePair_.model->getName().find("PM") != std::string::npos) wg_det_uncert = 0.1;
+        if(samplePair_.model->getName().find("WG") != std::string::npos) wg_det_uncert = 0.08;
+      }
+    }
+    // Add SFGD detector uncertainty
+    double sfgUncert = mcuncert
+      + predVal*sfgd_det_uncert
+      + predVal*wg_det_uncert;
+    return eval(dataVal, predVal, sfgUncert, bin_);
+  }
+
+  double BarlowBeestonBanff2022Sfgd::eval(double data_, double pred_, double err_, int bin_) const {
+    double dataVal = data_;
+    double predVal = pred_;
+    double mcuncert = err_;
 
     double chisq = 0.0;
 
@@ -31,48 +83,8 @@ namespace JointProbability{
     // The penalty from MC statistics
     double penalty = 0;
 
-    // SFGD detector uncertainty
-    double sfgd_det_uncert = 0.;
-    if (sample_.getName().find("SFGD") != std::string::npos){
-      // to be applied on SFGD samples only
-      sfgd_det_uncert = 0.;
-      if (sample_.getName().find("FHC") != std::string::npos){
-        if (sample_.getName().find("0p") != std::string::npos){
-          sfgd_det_uncert = 0.02;
-        }
-        else if (sample_.getName().find("Np") != std::string::npos){
-          sfgd_det_uncert = 0.04;
-        }
-      }
-      else if (sample_.getName().find("RHC") != std::string::npos){
-        if (sample_.getName().find("0n") != std::string::npos){
-          sfgd_det_uncert = 0.025;
-        }
-        else if (sample_.getName().find("Nn") != std::string::npos){
-          sfgd_det_uncert = 0.05;
-        }
-      }
-    }
-
-    // DETECTOR UNCERTAINTY FOR WAGASCI
-    double wg_det_uncert = 0.;
-    if (sample_.getName().find("WAGASCI") != std::string::npos){
-      wg_det_uncert = 0.;
-      if(sample_.getName().find("#0pi") != std::string::npos) {
-        if(sample_.getName().find("PM-BM") != std::string::npos) wg_det_uncert = 0.05;
-        if(sample_.getName().find("PM-WMRD") != std::string::npos) wg_det_uncert = 0.1;
-        if(sample_.getName().find("DWG-BM") != std::string::npos) wg_det_uncert = 0.1;
-        if(sample_.getName().find("UWG-BM") != std::string::npos) wg_det_uncert = 0.12;
-        if(sample_.getName().find("UWG-WMRD") != std::string::npos) wg_det_uncert = 0.1;
-      }
-      if(sample_.getName().find("#1pi") != std::string::npos)  {
-        if(sample_.getName().find("PM") != std::string::npos) wg_det_uncert = 0.1;
-        if(sample_.getName().find("WG") != std::string::npos) wg_det_uncert = 0.08;
-      }
-    }
-
     // Barlow-Beeston uses fractional uncertainty on MC, so sqrt(sum[w^2])/mc
-    double fractional = mcuncert / predVal + sfgd_det_uncert + wg_det_uncert; // Add SFGD detector uncertainty
+    double fractional = mcuncert / predVal;
     // -b/2a in quadratic equation
     double temp = predVal * fractional * fractional - 1;
     // b^2 - 4ac in quadratic equation
@@ -113,8 +125,8 @@ namespace JointProbability{
     if (std::isinf(chisq))
     {
       LogAlert << "Infinite chi2 " << predVal << " " << dataVal
-               << sample_.getMcContainer().getHistogram().binList[bin_].error << " "
-               << sample_.getMcContainer().getHistogram().binList[bin_].content << std::endl;
+               << err_ << " "
+               << pred_ << std::endl;
     }
 
     return chisq;

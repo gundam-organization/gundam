@@ -18,12 +18,7 @@ public:
 protected:
   mutable double _cachedResponse_{std::nan("unset")}; // + 8 bytes
   mutable GenericToolbox::NoCopyWrapper<std::mutex> _evalLock_{}; // + 64 bytes
-#if USE_ZLIB
-  // + 4 bytes (keeping a vector empty is already 24...)
-  mutable uint32_t _cachedInputHash_{0};
-#else
   mutable std::vector<double> _cachedInputs_{}; // + 24 bytes
-#endif
 };
 
 

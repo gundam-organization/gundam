@@ -10,9 +10,6 @@
 
 #include <dlfcn.h>
 
-LoggerInit([]{
-  Logger::setUserHeaderStr("[Tabulated]");
-});
 
 TabulatedDialFactory::TabulatedDialFactory(const JsonType& config_) {
     auto tableConfig = GenericToolbox::Json::fetchValue<JsonType>(config_, "tableConfig");
@@ -30,8 +27,8 @@ TabulatedDialFactory::TabulatedDialFactory(const JsonType& config_) {
 
     int bins =  GenericToolbox::Json::fetchValue<int>(tableConfig, "bins", -1);
 
-    _variableNames_ = GenericToolbox::Json::fetchValue(tableConfig, "variables", _variableNames_);
-    _variables_.resize(_variableNames_.size());
+    _binningVariableNames_ = GenericToolbox::Json::fetchValue(tableConfig, "binningVariables", _binningVariableNames_);
+    _binningVariableCache_.resize(_binningVariableNames_.size());
 
     std::string expandedPath = GenericToolbox::expandEnvironmentVariables(getLibraryPath());
 
@@ -42,7 +39,7 @@ TabulatedDialFactory::TabulatedDialFactory(const JsonType& config_) {
     LogInfo << "  Bin events function:     " << getBinningFunction() << std::endl;
     {
         int i{0};
-        for (const std::string& var: getVariables()) {
+        for (const std::string& var: getBinningVariables()) {
             LogInfo << "      Variable[" << i++ << "]: " << var << std::endl;
         }
     }
@@ -89,6 +86,10 @@ TabulatedDialFactory::TabulatedDialFactory(const JsonType& config_) {
     }
     _table_.resize(bins);
 
+    // Make sure things are going to fail badly if the table is used before
+    // it is filled.
+    for (auto& t : _table_) t = std::nan("not-set");
+
     // Get the update function
     void* updateFunc = dlsym(library, getUpdateFunction().c_str());
     if( updateFunc == nullptr ){
@@ -118,7 +119,6 @@ TabulatedDialFactory::TabulatedDialFactory(const JsonType& config_) {
 }
 
 void TabulatedDialFactory::updateTable(DialInputBuffer& inputBuffer) {
-    if (inputBuffer.isMasked()) return;
     _updateFunc_(_name_.c_str(),
                  _table_.data(),
                  (int) _table_.size(),
@@ -128,12 +128,13 @@ void TabulatedDialFactory::updateTable(DialInputBuffer& inputBuffer) {
 
 DialBase* TabulatedDialFactory::makeDial(const Event& event) {
     int i=0;
-    for (const std::string& varName : getVariables()) {
+    for (const std::string& varName : getBinningVariables()) {
         double v = event.getVariables().fetchVariable(varName).getVarAsDouble();
-        _variables_[i++] = v;
+        _binningVariableCache_[i++] = v;
     }
     double bin = _binningFunc_(getName().c_str(),
-                               (int) _variables_.size(), _variables_.data(),
+                               (int) _binningVariableCache_.size(),
+                               _binningVariableCache_.data(),
                                (int) _table_.size());
 
     if (bin < 0.0) return nullptr;
@@ -141,10 +142,32 @@ DialBase* TabulatedDialFactory::makeDial(const Event& event) {
     // Determine the bin index and the fractional part of the bin.
     int iBin = bin;
     if (iBin < 0) iBin = 0;     // Shouldn't happen, but just in case.
-    if (iBin > _table_.size()-1) iBin = _table_.size()-1;
+    if (iBin > _table_.size()-2) iBin = _table_.size()-2;
     double fracBin = bin - iBin;
     if (fracBin < 0.0) fracBin = 0.0;
     if (fracBin > 1.0) fracBin = 1.0;
+
+#ifdef TABULATED_DIAL_FACTORY_DUMP
+    // Summarize which table is being applied to the event.  This can be quite
+    // useful for debugging parameter configurations, but is not compiled by
+    // default since it will dominate the debug output.  We need to implement
+    // different debug levels, and conditions.
+    if (GundamGlobals::isDebug()) {
+        std::ostringstream out;
+        out << getName()
+            << " " << iBin
+            << " " << fracBin;
+        std::size_t j = 0;
+        for (const std::string& varName : getBinningVariables()) {
+            out << " [" << j
+                << "] " << varName
+                << "=" << _binningVariableCache_[j];
+            ++j;
+        }
+        out << std::endl;
+        LogDebug << out.str() << std::endl;
+    }
+#endif
 
     // Do the unique_ptr dance in case there are exceptions.
     std::unique_ptr<Tabulated> dialBase = std::make_unique<Tabulated>(&_table_, iBin, fracBin);

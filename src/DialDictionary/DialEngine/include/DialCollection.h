@@ -13,7 +13,6 @@
 
 #include "GenericToolbox.Wrappers.h"
 
-#include "nlohmann/json.hpp"
 
 #include <vector>
 #include <string>
@@ -88,7 +87,7 @@ public:
   // (e.g. it might be an tabulated event-by-event dial).
   [[nodiscard]] const std::string &getGlobalDialLeafName() const{ return _globalDialLeafName_; }
 
-  [[nodiscard]] const DataBinSet &getDialBinSet() const{ return _dialBinSet_; }
+  [[nodiscard]] const BinSet &getDialBinSet() const{ return _dialBinSet_; }
   [[nodiscard]] const std::vector<std::string> &getDataSetNameList() const{ return _dataSetNameList_; }
 
   // A formula to decide if the dial should be applied to an event.  The dial
@@ -96,7 +95,7 @@ public:
   [[nodiscard]] const std::shared_ptr<TFormula> &getApplyConditionFormula() const{ return _applyConditionFormula_; }
 
   // non-const getters
-  DataBinSet &getDialBinSet(){ return _dialBinSet_; }
+  BinSet &getDialBinSet(){ return _dialBinSet_; }
 
   // Vector of object to calculate the response for this dial.  There will be
   // one DialBaseObject per event, or one DialBaseObject for each bin (for
@@ -137,13 +136,13 @@ public:
   // but this provides a handle for collections that precalculate values prior
   // to doing the event reweighting.  An example of that would be the
   // Tabulated dials (which can be used in implement things like oscillation
-  // weights).  Update callbacks are std::function<void(void)>, and can be
-  // added with addUpdate();
+  // weights).  Update callbacks are std::function<void(DialCollection*)>, and
+  // can be added with addUpdate();
   void update();
 
   // Add a dial collection update callback.  These are called in the order
   // that they are added.  They are activated by the "update()" method.
-  void addUpdate(std::function<void(void)> callback);
+  void addUpdate(std::function<void(DialCollection* dc)> callback);
 
   // Check if the dial will need to be recalculated.  A recalculation
   // happens when a parameter value has changed since the last calculation.
@@ -155,6 +154,7 @@ public:
   // Return the next slot in the DialBaseList that can b filled. Its
   // thread safe, so multiple threads can fill the list.
   size_t getNextDialFreeSlot(){ return _dialFreeSlot_++; }
+  size_t getDialFreeSlotIndex() const { return _dialFreeSlot_.getValue(); }
 
   // Provide access to a the collection data.  The ownership is retained by
   // the collection.
@@ -166,14 +166,18 @@ public:
 
   std::vector<std::string>& getExtraLeafNames() {return _globalDialExtraLeafNames_;}
 
+  void invalidateCachedInputBuffers(){ for( auto& inputBuffer : _dialInputBufferList_ ){ inputBuffer.invalidateBuffers(); }}
+
+  void printConfiguration() const;
+
 protected:
-  void readConfigImpl() override;
+  void configureImpl() override;
   void initializeImpl() override;
 
   bool initializeNormDialsWithParBinning();
   bool initializeDialsWithDefinition();
-  bool initializeDialsWithBinningFile(JsonType dialsDefinition);
-  bool initializeDialsWithTabulation(JsonType dialsDefinition);
+  bool initializeDialsWithBinningFile(const JsonType& dialsDefinition);
+  bool initializeDialsWithTabulation(const JsonType& dialsDefinition);
 
   void readGlobals(const JsonType &config_);
   JsonType fetchDialsDefinition(const JsonType &definitionsList_);
@@ -183,7 +187,6 @@ private:
   bool _isEventByEvent_{false};
   bool _isEnabled_{true};
   bool _useMirrorDial_{false};
-  bool _disableDialCache_{false};
   bool _enableDialsSummary_{false};
   bool _allowDialExtrapolation_{true};
   int _index_{-1};
@@ -202,7 +205,7 @@ private:
   // internal
   int _supervisedParameterIndex_{-1};
   int _supervisedParameterSetIndex_{-1};
-  DataBinSet _dialBinSet_{};
+  BinSet _dialBinSet_{};
 
   // One interface per DialBase.  The interface groups the input buffer,
   // response supervisor, dialBase (what actually calculates the weight) into
@@ -233,7 +236,7 @@ private:
   std::vector<std::shared_ptr<DialCollection::CollectionData>>  _dialCollectionData_;
 
   // The callbacks for this dial collection
-  std::vector<std::function<void(void)>> _dialCollectionCallbacks_;
+  std::vector<std::function<void(DialCollection*)>> _dialCollectionCallbacks_;
 
   // external refs
   std::vector<ParameterSet>* _parameterSetListPtr_{nullptr};

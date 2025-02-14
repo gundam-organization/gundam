@@ -9,10 +9,6 @@
 
 #include "Logger.h"
 
-LoggerInit([]{
-  Logger::setUserHeaderStr("[DialBaseFactory]");
-});
-
 
 DialBase* DialBaseFactory::makeDial(const std::string& dialTitle_,
                                     const std::string& dialType_,
@@ -97,7 +93,7 @@ DialBase* DialBaseFactory::makeDial(const JsonType& config_){
     dialBase = std::make_unique<RootFormula>();
     auto* rootFormulaPtr{(RootFormula*) dialBase.get()};
 
-    auto formulaConfig{GenericToolbox::Json::fetchValue<JsonType>(config_, "dialConfig")};
+    auto formulaConfig(GenericToolbox::Json::fetchValue<JsonType>(config_, "dialConfig"));
 
     rootFormulaPtr->setFormulaStr( GenericToolbox::Json::fetchValue<std::string>(formulaConfig, "formulaStr") );
   }
@@ -105,7 +101,7 @@ DialBase* DialBaseFactory::makeDial(const JsonType& config_){
     dialBase = std::make_unique<CompiledLibDial>();
     auto* compiledLibDialPtr{(CompiledLibDial*) dialBase.get()};
 
-    auto formulaConfig{GenericToolbox::Json::fetchValue<JsonType>(config_, "dialConfig")};
+    auto formulaConfig(GenericToolbox::Json::fetchValue<JsonType>(config_, "dialConfig"));
 
     bool success = compiledLibDialPtr->loadLibrary( GenericToolbox::Json::fetchValue<std::string>(formulaConfig, "libraryFile") );
     if( not success ){

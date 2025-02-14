@@ -4,7 +4,11 @@
 # be only one!
 
 # ROOT generally distributes docker for the latest ubuntu LTS release
-FROM rootproject/root:latest as base
+# let the option to change this with `--build-arg ROOT_IMAGE=rootproject/root:6.24.06-ubuntu20.04`
+# by default, we use:
+ARG ROOT_IMAGE=rootproject/root:latest
+
+FROM $ROOT_IMAGE as base
 
 # FROM rootproject/root:6.32.00-ubuntu24.04 as base
 # FROM rootproject/root:6.30.06-ubuntu22.04 as base

@@ -163,8 +163,8 @@ find_package( YAMLCPP REQUIRED HINTS ${YAMLCPP_DIR} )
 if( NOT YAMLCPP_FOUND )
   cmessage(FATAL_ERROR "yaml-cpp library not found.")
 endif()
-cmessage( STATUS " - yaml-cpp include directory: ${YAMLCPP_INCLUDE_DIR}")
-cmessage( STATUS " - yaml-cpp lib: ${YAMLCPP_LIBRARY}")
+  cmessage( STATUS " - yaml-cpp include directory: ${YAMLCPP_INCLUDE_DIR}")
+  cmessage( STATUS " - yaml-cpp lib: ${YAMLCPP_LIBRARY}")
 if( "${YAMLCPP_INCLUDE_DIR} " STREQUAL " ")
   cmessage(FATAL_ERROR "empty YAMLCPP_INCLUDE_DIR returned.")
 endif()
@@ -172,30 +172,6 @@ set(YAML_CPP_LIBRARIES ${YAMLCPP_LIBRARY})
 include_directories( ${YAMLCPP_INCLUDE_DIR} )
 link_libraries( ${YAML_CPP_LIBRARIES} )
 
-
-####################
-# ZLIB (optional)
-####################
-
-if( ${DISABLE_ZLIB} )
-  cmessage( WARNING "DISABLE_ZLIB=ON. Not using Zlib." )
-else()
-  cmessage( STATUS "Looking for optional ZLib install..." )
-  find_package(ZLIB)
-endif()
-
-if( ZLIB_FOUND )
-  cmessage( STATUS "ZLIB found : ${ZLIB_VERSION_STRING}")
-  cmessage( STATUS "ZLIB_INCLUDE_DIRS = ${ZLIB_INCLUDE_DIRS}")
-  cmessage( STATUS "ZLIB_LIBRARIES = ${ZLIB_LIBRARIES}")
-
-  add_definitions( -D USE_ZLIB=1 )
-  include_directories( ${ZLIB_INCLUDE_DIRS} )
-  link_libraries( ${ZLIB_LIBRARIES} )
-else()
-  cmessage( WARNING "ZLib not found. Will compile without the associated features." )
-  add_definitions( -D USE_ZLIB=0 )
-endif()
 
 
 ####################

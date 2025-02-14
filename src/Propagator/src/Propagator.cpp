@@ -13,92 +13,49 @@
 #include "ConfigUtils.h"
 
 #include "GenericToolbox.Utils.h"
-#include "GenericToolbox.Json.h"
+
 
 #include <memory>
 #include <vector>
 
-LoggerInit([]{
-  Logger::setUserHeaderStr("[Propagator]");
-});
 
 void Propagator::muteLogger(){ Logger::setIsMuted( true ); }
 void Propagator::unmuteLogger(){ Logger::setIsMuted( false ); }
 
-using namespace GenericToolbox::ColorCodes;
+void Propagator::configureImpl(){
 
-void Propagator::readConfigImpl(){
-  LogWarning << __METHOD_NAME__ << std::endl;
+  // nested objects
+  GenericToolbox::Json::fillValue(_config_, _sampleSet_.getConfig(), {{"sampleSetConfig"}, {"fitSampleSetConfig"}});
+  _sampleSet_.configure();
 
-  // legacy -- option within propagator -> should be defined elsewhere
   GenericToolbox::Json::deprecatedAction(_config_, "parameterSetListConfig", [&]{
     LogAlert << R"("parameterSetListConfig" should now be set under "parametersManagerConfig/parameterSetList".)" << std::endl;
     auto parameterSetListConfig = GenericToolbox::Json::fetchValue<JsonType>(_config_, "parameterSetListConfig");
-    _parManager_.setParameterSetListConfig( ConfigUtils::getForwardedConfig( parameterSetListConfig ) );
-  });
-  GenericToolbox::Json::deprecatedAction(_config_, "reThrowParSetIfOutOfBounds", [&]{
-    LogAlert << "Forwarding the option to ParametersManager. Consider moving it into \"parametersManagerConfig:\"" << std::endl;
-    _parManager_.setReThrowParSetIfOutOfBounds(GenericToolbox::Json::fetchValue<bool>(_config_, "reThrowParSetIfOutOfBounds"));
+    _parManager_.setParameterSetListConfig( parameterSetListConfig );
   });
   GenericToolbox::Json::deprecatedAction(_config_, "throwToyParametersWithGlobalCov", [&]{
     LogAlert << "Forwarding the option to ParametersManager. Consider moving it into \"parametersManagerConfig:\"" << std::endl;
     _parManager_.setThrowToyParametersWithGlobalCov(GenericToolbox::Json::fetchValue<bool>(_config_, "throwToyParametersWithGlobalCov"));
   });
+  GenericToolbox::Json::fillValue(_config_, _parManager_.getConfig(), "parametersManagerConfig");
+  _parManager_.configure();
 
-  // nested objects
-  _parManager_.readConfig( GenericToolbox::Json::fetchValue( _config_, "parametersManagerConfig", _parManager_.getConfig()) );
-
-  // Monitoring parameters
-  _showEventBreakdown_ = GenericToolbox::Json::fetchValue(_config_, "showEventBreakdown", _showEventBreakdown_);
-  _throwAsimovToyParameters_ = GenericToolbox::Json::fetchValue(_config_, "throwAsimovFitParameters", _throwAsimovToyParameters_);
-  _enableStatThrowInToys_ = GenericToolbox::Json::fetchValue(_config_, "enableStatThrowInToys", _enableStatThrowInToys_);
-  _gaussStatThrowInToys_ = GenericToolbox::Json::fetchValue(_config_, "gaussStatThrowInToys", _gaussStatThrowInToys_);
-  _enableEventMcThrow_ = GenericToolbox::Json::fetchValue(_config_, "enableEventMcThrow", _enableEventMcThrow_);
-  _parameterInjectorMc_ = GenericToolbox::Json::fetchValue(_config_, "parameterInjection", _parameterInjectorMc_);
-
-  // debug/dev parameters
-  _debugPrintLoadedEvents_ = GenericToolbox::Json::fetchValue(_config_, "debugPrintLoadedEvents", _debugPrintLoadedEvents_);
-  _debugPrintLoadedEventsNbPerSample_ = GenericToolbox::Json::fetchValue(_config_, "debugPrintLoadedEventsNbPerSample", _debugPrintLoadedEventsNbPerSample_);
-  _devSingleThreadReweight_ = GenericToolbox::Json::fetchValue(_config_, "devSingleThreadReweight", _devSingleThreadReweight_);
-  _devSingleThreadHistFill_ = GenericToolbox::Json::fetchValue(_config_, "devSingleThreadHistFill", _devSingleThreadHistFill_);
-
-  // EventDialCache parameters
-  if( GenericToolbox::Json::doKeyExist(_config_, "globalEventReweightCap") ){
-    _eventDialCache_.getGlobalEventReweightCap().isEnabled = true;
-    _eventDialCache_.getGlobalEventReweightCap().maxReweight = GenericToolbox::Json::fetchValue<double>(_config_, "globalEventReweightCap");
-  }
-
-
-  LogInfo << "Reading samples configuration..." << std::endl;
-  auto fitSampleSetConfig = GenericToolbox::Json::fetchValue(_config_, {{"sampleSetConfig"}, {"fitSampleSetConfig"}}, JsonType());
-  _sampleSet_.setConfig(fitSampleSetConfig);
-  _sampleSet_.readConfig();
-
-  LogInfo << "Reading PlotGenerator configuration..." << std::endl;
-  auto plotGeneratorConfig = ConfigUtils::getForwardedConfig(GenericToolbox::Json::fetchValue(_config_, "plotGeneratorConfig", JsonType()));
-  _plotGenerator_.setConfig(plotGeneratorConfig);
-  _plotGenerator_.readConfig();
-
-  LogInfo << "Reading DialCollection configurations..." << std::endl;
-  _dialCollectionList_.clear(); // make sure it's empty in case readConfig() is called more than once
+  _dialCollectionList_.clear();
   for(size_t iParSet = 0 ; iParSet < _parManager_.getParameterSetsList().size() ; iParSet++ ){
-    LogScopeIndent;
-    LogInfo << "Reading dial definitions for " << _parManager_.getParameterSetsList()[iParSet].getName() << std::endl;
-
-    if( not _parManager_.getParameterSetsList()[iParSet].isEnabled() ) continue;
+    if( not _parManager_.getParameterSetsList()[iParSet].isEnabled() ){ continue; }
     // DEV / DialCollections
     if( not _parManager_.getParameterSetsList()[iParSet].getDialSetDefinitions().empty() ){
       for( auto& dialSetDef : _parManager_.getParameterSetsList()[iParSet].getDialSetDefinitions().get<std::vector<JsonType>>() ){
         _dialCollectionList_.emplace_back(&_parManager_.getParameterSetsList());
         _dialCollectionList_.back().setIndex(int(_dialCollectionList_.size()) - 1);
         _dialCollectionList_.back().setSupervisedParameterSetIndex(int(iParSet) );
-        _dialCollectionList_.back().readConfig(dialSetDef );
+        _dialCollectionList_.back().configure(dialSetDef );
       }
     }
     else{
 
       for( auto& par : _parManager_.getParameterSetsList()[iParSet].getParameterList() ){
-        if( not par.isEnabled() ) continue;
+        if( not par.isEnabled() ){ continue; }
 
         // Check if no definition is present -> disable the parameter in that case
         if( par.getDialDefinitionsList().empty() ) {
@@ -112,198 +69,198 @@ void Propagator::readConfigImpl(){
           _dialCollectionList_.back().setIndex(int(_dialCollectionList_.size()) - 1);
           _dialCollectionList_.back().setSupervisedParameterSetIndex(int(iParSet) );
           _dialCollectionList_.back().setSupervisedParameterIndex(par.getParameterIndex() );
-          _dialCollectionList_.back().readConfig(dialDefinitionConfig );
+          _dialCollectionList_.back().configure( dialDefinitionConfig );
         }
       }
     }
   }
 
-  LogInfo << "Reading config of the Propagator done." << std::endl;
+  // Monitoring parameters
+  GenericToolbox::Json::fillValue(_config_, _showNbEventParameterBreakdown_, "showNbEventParameterBreakdown");
+  GenericToolbox::Json::fillValue(_config_, _showNbEventPerSampleParameterBreakdown_, "showNbEventPerSampleParameterBreakdown");
+  GenericToolbox::Json::fillValue(_config_, _parameterInjectorMc_, "parameterInjection");
+  GenericToolbox::Json::fillValue(_config_, _debugPrintLoadedEvents_, "debugPrintLoadedEvents");
+  GenericToolbox::Json::fillValue(_config_, _debugPrintLoadedEventsNbPerSample_, "debugPrintLoadedEventsNbPerSample");
+  GenericToolbox::Json::fillValue(_config_, _devSingleThreadReweight_, "devSingleThreadReweight");
+  GenericToolbox::Json::fillValue(_config_, _devSingleThreadHistFill_, "devSingleThreadHistFill");
+  GenericToolbox::Json::fillValue(_config_, _eventDialCache_.getGlobalEventReweightCap().maxReweight, "globalEventReweightCap");
+
 }
 void Propagator::initializeImpl(){
   LogWarning << __METHOD_NAME__ << std::endl;
 
-  LogInfo << std::endl << GenericToolbox::addUpDownBars("Initializing parameters...") << std::endl;
   _parManager_.initialize();
-
-  LogInfo << std::endl << GenericToolbox::addUpDownBars("Initializing samples...") << std::endl;
   _sampleSet_.initialize();
-
-  LogInfo << std::endl << GenericToolbox::addUpDownBars("Initializing dials...") << std::endl;
   for( auto& dialCollection : _dialCollectionList_ ){ dialCollection.initialize(); }
 
-  LogInfo << "Initializing propagation threads..." << std::endl;
   initializeThreads();
 
-  // will set it off when the Propagator will be loaded
-  GundamGlobals::getParallelWorker().setCpuTimeSaverIsEnabled(true);
+  _eventDialCache_.getGlobalEventReweightCap().isEnabled = not std::isnan(_eventDialCache_.getGlobalEventReweightCap().maxReweight);
 }
 
-// Core
-void Propagator::buildDialCache(){
-  _eventDialCache_.shrinkIndexedCache();
-  _eventDialCache_.buildReferenceCache(_sampleSet_, _dialCollectionList_);
-
-  // be extra sure the dial input will request an update
-  for( auto& dialCollection : _dialCollectionList_ ){
-    for( auto& dialInput : dialCollection.getDialInputBufferList() ){
-      dialInput.invalidateBuffers();
-    }
-  }
-}
-void Propagator::propagateParameters(){
-
-  if( _enableEigenToOrigInPropagate_ ){
-    // Only real parameters are propagated on the spectra -> need to convert the eigen to original
-    for( auto& parSet : _parManager_.getParameterSetsList() ){
-      if( parSet.isEnableEigenDecomp() ){ parSet.propagateEigenToOriginal(); }
-    }
-  }
-
-  this->reweightMcEvents();
-  this->refillMcHistograms();
-
-}
-void Propagator::updateDialState(){
-  std::for_each(_dialCollectionList_.begin(), _dialCollectionList_.end(),
-                [&]( DialCollection& dc_){
-                  dc_.updateInputBuffers();
-  });
-  std::for_each(_dialCollectionList_.begin(), _dialCollectionList_.end(),
-                [&]( DialCollection& dc_){
-                  dc_.update();
-                });
-}
-void Propagator::reweightMcEvents() {
-  reweightTimer.start();
-
-  updateDialState();
-
-  bool usedGPU{false};
-#ifdef GUNDAM_USING_CACHE_MANAGER
-  if( GundamGlobals::getEnableCacheManager() ) {
-    if (Cache::Manager::Update(getSampleSet(), getEventDialCache())) {
-      usedGPU = Cache::Manager::Fill();
-    }
-    if (GundamGlobals::getForceDirectCalculation()) usedGPU = false;
-  }
-#endif
-  if( not usedGPU ){
-    if( not _devSingleThreadReweight_ ){
-      GundamGlobals::getParallelWorker().runJob("Propagator::reweightMcEvents");
-    }
-    else{ this->reweightMcEvents(-1); }
-  }
-
-  reweightTimer.stop();
-}
-void Propagator::refillMcHistograms(){
-  refillHistogramTimer.start();
-
-  if( not _devSingleThreadHistFill_ ){ GundamGlobals::getParallelWorker().runJob("Propagator::refillMcHistograms"); }
-  else{ refillMcHistogramsFct(-1); }
-
-  refillHistogramTimer.stop();
-}
+// core
 void Propagator::clearContent(){
-  LogInfo << "Clearing Propagator content..." << std::endl;
 
   // clearing events in MC containers
-  _sampleSet_.clearMcContainers();
+  _sampleSet_.clearEventLists();
 
   // also wiping event-by-event dials...
   for( auto& dialCollection: _dialCollectionList_ ) {
     if( not dialCollection.getGlobalDialLeafName().empty() ) { dialCollection.clear(); }
 
     // clear input buffer cache to trigger the cache eval
-    for( auto& dialInput : dialCollection.getDialInputBufferList() ){
-      dialInput.invalidateBuffers();
-    }
+    dialCollection.invalidateCachedInputBuffers();
   }
   _eventDialCache_ = EventDialCache();
 
 }
+void Propagator::shrinkDialContainers(){
+  LogInfo << "Resizing dial containers..." << std::endl;
+  for( auto& dialCollection : _dialCollectionList_ ) {
+    if( dialCollection.isEventByEvent() ){ dialCollection.resizeContainers(); }
+  }
+}
+void Propagator::buildDialCache(){
+  _eventDialCache_.shrinkIndexedCache();
+  _eventDialCache_.buildReferenceCache(_sampleSet_, _dialCollectionList_);
 
-// Misc
-std::string Propagator::getSampleBreakdownTableStr() const{
-  GenericToolbox::TablePrinter t;
+  // be extra sure the dial input will request an update
+  for( auto& dialCollection : _dialCollectionList_ ){
+    dialCollection.invalidateCachedInputBuffers();
+  }
+}
+void Propagator::propagateParameters(){
+  // Make sure the dial state is updated before reweighting and filling the
+  // histograms.  This has to be done before the GPU and CPU calculations, and
+  // should be shared for both.
+  if( _enableEigenToOrigInPropagate_ ){ _parManager_.convertEigenToOrig(); }
+  updateDialState();
 
-  t << "Sample" << GenericToolbox::TablePrinter::NextColumn;
-  t << "MC (# binned event)" << GenericToolbox::TablePrinter::NextColumn;
-  t << "Data (# binned event)" << GenericToolbox::TablePrinter::NextColumn;
-  t << "MC (weighted)" << GenericToolbox::TablePrinter::NextColumn;
-  t << "Data (weighted)" << GenericToolbox::TablePrinter::NextLine;
+#ifdef GUNDAM_USING_CACHE_MANAGER
+  bool usedCacheManager{false};
+  // Trigger the reweight on the GPU.  This will fill the histograms, but most
+  // of the time, leaves the event weights on the GPU.
+  usedCacheManager = Cache::Manager::PropagateParameters();
+  if( usedCacheManager and not Cache::Manager::isForceCpuCalculation() ){ return; }
+#endif
 
-  for( auto& sample : _sampleSet_.getSampleList() ){
-    t << sample.getName() << GenericToolbox::TablePrinter::NextColumn;
-    t << sample.getMcContainer().getNbBinnedEvents() << GenericToolbox::TablePrinter::NextColumn;
-    t << sample.getDataContainer().getNbBinnedEvents() << GenericToolbox::TablePrinter::NextColumn;
-    t << sample.getMcContainer().getSumWeights() << GenericToolbox::TablePrinter::NextColumn;
-    t << sample.getDataContainer().getSumWeights() << GenericToolbox::TablePrinter::NextLine;
+  // Trigger the reweight on the CPU.  Override the dial update inside of
+  // reweight event, or the CPU code will decide that the update is already
+  // done.
+  this->reweightEvents(false);
+  this->refillHistograms();
+}
+
+void Propagator::reweightEvents(bool updateDials) {
+  // timer start/stop in scope
+  auto s{reweightTimer.scopeTime()};
+
+  if (updateDials) {
+    // Make sure the dial state is updated before pulling the trigger on the
+    // reweight.  will duplicate work when running with GPU
+    // isForceCpuCalculation is true.
+    if( _enableEigenToOrigInPropagate_ ){ _parManager_.convertEigenToOrig(); }
+    updateDialState();
   }
 
-  std::stringstream ss;
-  ss << t.generateTableString();
-  return ss.str();
+  if( not _devSingleThreadReweight_ ){
+    _threadPool_.runJob("Propagator::reweightEvents");
+  }
+  else{ this->reweightEvents(-1); }
+
 }
-void Propagator::printBreakdowns(){
-  if( _showEventBreakdown_ ){
 
-    // STAGED MASK
-    LogWarning << "Staged event breakdown:" << std::endl;
-    std::vector<std::vector<double>> stageBreakdownList(
-        _sampleSet_.getSampleList().size(),
-        std::vector<double>(_parManager_.getParameterSetsList().size() + 1, 0)
-    ); // [iSample][iStage]
-    std::vector<std::string> stageTitles;
-    stageTitles.emplace_back("Sample");
-    stageTitles.emplace_back("No reweight");
-    for( auto& parSet : _parManager_.getParameterSetsList() ){
-      if( not parSet.isEnabled() ){ continue; }
-      stageTitles.emplace_back("+ " + parSet.getName());
-    }
+// misc
+void Propagator::writeEventRates(const GenericToolbox::TFilePath& saveDir_) const {
+  for( auto& sample : _sampleSet_.getSampleList() ){ sample.writeEventRates(saveDir_); }
+}
+void Propagator::printConfiguration() const {
+  LogInfo << std::endl << "Printing propagator configuration:" << std::endl;
 
-    int iStage{0};
-    std::vector<ParameterSet*> maskedParSetList;
-    for( auto& parSet : _parManager_.getParameterSetsList() ){
-      if( not parSet.isEnabled() ){ continue; }
-      maskedParSetList.emplace_back( &parSet );
-      parSet.setMaskedForPropagation( true );
-    }
+  _sampleSet_.printConfiguration();
+  _parManager_.printConfiguration();
 
-    this->reweightMcEvents();
-    for( size_t iSample = 0 ; iSample < _sampleSet_.getSampleList().size() ; iSample++ ){
-      stageBreakdownList[iSample][iStage] = _sampleSet_.getSampleList()[iSample].getMcContainer().getSumWeights();
-    }
+  for( auto& dialCollection : _dialCollectionList_ ){ dialCollection.printConfiguration(); }
 
-    for( auto* parSetPtr : maskedParSetList ){
-      parSetPtr->setMaskedForPropagation(false);
-      reweightMcEvents();
-      iStage++;
-      for( size_t iSample = 0 ; iSample < _sampleSet_.getSampleList().size() ; iSample++ ){
-        stageBreakdownList[iSample][iStage] = _sampleSet_.getSampleList()[iSample].getMcContainer().getSumWeights();
+  LogInfo << std::endl;
+}
+void Propagator::printBreakdowns() const {
+
+  LogInfo << std::endl << "Breaking down samples..." << std::endl;
+
+  if( _showNbEventParameterBreakdown_ ){
+
+    struct NbEventBreakdown{
+      size_t nbTotal{0};
+      std::map<int, int> nbForSample{};
+    };
+
+    std::map<const Parameter*, NbEventBreakdown> nbEventForParameter{}; // assuming int = 0 by default
+    for( auto& cache: _eventDialCache_.getCache() ){
+      for( auto& dial : cache.dialResponseCacheList ){
+        for( int iInput = 0 ; iInput < dial.dialInterface->getInputBufferRef()->getInputSize() ; iInput++ ){
+          nbEventForParameter[ &dial.dialInterface->getInputBufferRef()->getParameter(iInput) ].nbTotal += 1;
+
+          if( _showNbEventPerSampleParameterBreakdown_ ){
+            nbEventForParameter[ &dial.dialInterface->getInputBufferRef()->getParameter(iInput) ]
+                .nbForSample[cache.event->getIndices().sample] += 1;
+          }
+        }
       }
     }
 
     GenericToolbox::TablePrinter t;
-    t.setColTitles(stageTitles);
-    for( size_t iSample = 0 ; iSample < _sampleSet_.getSampleList().size() ; iSample++ ) {
-      std::vector<std::string> tableLine;
-      tableLine.emplace_back(_sampleSet_.getSampleList()[iSample].getName());
-      for( iStage = 0 ; iStage < stageBreakdownList[iSample].size() ; iStage++ ){
-        tableLine.emplace_back( std::to_string(stageBreakdownList[iSample][iStage]) );
-      }
-      t.addTableLine(tableLine);
-    }
-    t.printTable();
+    t << "Parameter";
+    t << GenericToolbox::TablePrinter::NextColumn << "All samples";
 
-    LogWarning << "Sample breakdown:" << std::endl;
-    std::cout << this->getSampleBreakdownTableStr() << std::endl;
+    if( _showNbEventPerSampleParameterBreakdown_ ){
+      for( auto& sample : _sampleSet_.getSampleList() ){
+        if( not sample.isEnabled() ){ continue; }
+        t << GenericToolbox::TablePrinter::NextColumn << sample.getName();
+      }
+    }
+
+    t << GenericToolbox::TablePrinter::NextLine;
+
+    bool hasNoDial{true};
+
+    for( auto& parSet : _parManager_.getParameterSetsList() ){
+      if( not parSet.isEnabled() ){ continue; }
+      for( auto& par : parSet.getParameterList() ){
+        if( not par.isEnabled() ){ continue; }
+
+        t.setColorBuffer( GenericToolbox::ColorCodes::resetColor );
+        if( nbEventForParameter[ &par ].nbTotal == 0 ){ t.setColorBuffer( GenericToolbox::ColorCodes::redBackground ); }
+
+        t << par.getFullTitle();
+        t << GenericToolbox::TablePrinter::NextColumn << nbEventForParameter[ &par ].nbTotal;
+
+        if( hasNoDial and nbEventForParameter[ &par ].nbTotal != 0 ){ hasNoDial = false; }
+
+        if( _showNbEventPerSampleParameterBreakdown_ ){
+          for( auto& sample : _sampleSet_.getSampleList() ){
+            if( not sample.isEnabled() ){ continue; }
+            t << GenericToolbox::TablePrinter::NextColumn << nbEventForParameter[ &par ].nbForSample[sample.getIndex()];
+          }
+        }
+
+        t << GenericToolbox::TablePrinter::NextLine;
+      }
+    }
+
+    if( not hasNoDial ){
+      LogInfo << "Nb of event affected by parameters:" << std::endl;
+      t.printTable();
+    }
+    else{
+      LogInfo << "Events aren't parametrised." << std::endl;
+    }
 
   }
+
   if( _debugPrintLoadedEvents_ ){
     LogDebug << "Printing " << _debugPrintLoadedEventsNbPerSample_ << " events..." << std::endl;
-    for( int iEvt = 0 ; iEvt < _debugPrintLoadedEventsNbPerSample_ ; iEvt++ ){
+    for( int iEvt = 0 ; iEvt < std::min(_debugPrintLoadedEventsNbPerSample_, int(_eventDialCache_.getCache().size())) ; iEvt++ ){
       LogDebug << "Event #" << iEvt << "{" << std::endl;
       {
         LogScopeIndent;
@@ -313,30 +270,79 @@ void Propagator::printBreakdowns(){
     }
   }
 }
+void Propagator::copyEventsFrom(const Propagator& src_){
+  _sampleSet_.copyEventsFrom( src_.getSampleSet() );
+  _eventDialCache_.fillCacheEntries( _sampleSet_ );
+}
+
+#ifdef GUNDAM_USING_CACHE_MANAGER
+void Propagator::initializeCacheManager(){
+  LogInfo << "Setting up the cache manager..." << std::endl;
+
+  // After all the data has been loaded.  Specifically, this must be after
+  // the MC has been copied for the Asimov fit, or the "data" use the MC
+  // reweighting cache.  This must also be before the first use of
+  // reweightMcEvents that is done using the GPU.
+  Cache::Manager::SetSampleSetPtr( _sampleSet_ );
+  Cache::Manager::SetEventDialSetPtr( _eventDialCache_ );
+
+  Cache::Manager::Build();
+
+  // By default, make sure every data is copied to the CPU part
+  // Some of those part might get disabled for faster calculation
+  Cache::Manager::SetIsEventWeightCopyEnabled( true );
+  Cache::Manager::SetIsHistContentCopyEnabled( true );
+
+  Cache::Manager::PropagateParameters();
+}
+#endif
+
 
 // Protected
 void Propagator::initializeThreads() {
 
-  GundamGlobals::getParallelWorker().addJob(
-      "Propagator::reweightMcEvents",
-      [this](int iThread){ this->reweightMcEvents(iThread); }
+  _threadPool_ = GenericToolbox::ParallelWorker();
+  _threadPool_.setNThreads(GundamGlobals::getNbCpuThreads() );
+
+  _threadPool_.addJob(
+      "Propagator::reweightEvents",
+      [this](int iThread){ this->reweightEvents(iThread); }
   );
 
-  GundamGlobals::getParallelWorker().addJob(
-      "Propagator::refillMcHistograms",
-      [this](int iThread){ this->refillMcHistogramsFct(iThread); }
+  _threadPool_.addJob(
+      "Propagator::refillHistograms",
+      [this](int iThread){ this->refillHistogramsFct(iThread); }
   );
 
 }
 
+// private
+void Propagator::updateDialState(){
+  std::for_each(_dialCollectionList_.begin(), _dialCollectionList_.end(),
+                [&]( DialCollection& dc_){
+                  dc_.updateInputBuffers();
+                });
+  std::for_each(_dialCollectionList_.begin(), _dialCollectionList_.end(),
+                [&]( DialCollection& dc_){
+                  dc_.update();
+                });
+}
+void Propagator::refillHistograms(){
+  // timer start/stop in scope
+  auto s{refillHistogramTimer.scopeTime()};
+
+  if( not _devSingleThreadHistFill_ ){ _threadPool_.runJob("Propagator::refillHistograms"); }
+  else{ refillHistogramsFct(-1); }
+}
+
 // multithreading
-void Propagator::reweightMcEvents(int iThread_) {
+void Propagator::reweightEvents( int iThread_) {
 
   //! Warning: everything you modify here, may significantly slow down the
   //! fitter
 
   auto bounds = GenericToolbox::ParallelWorker::getThreadBoundIndices(
-      iThread_, GundamGlobals::getParallelWorker().getNbThreads(),
+      iThread_, _threadPool_.getNbThreads(),
       int(_eventDialCache_.getCache().size())
   );
 
@@ -347,9 +353,9 @@ void Propagator::reweightMcEvents(int iThread_) {
   );
 
 }
-void Propagator::refillMcHistogramsFct( int iThread_){
+void Propagator::refillHistogramsFct( int iThread_){
   for( auto& sample : _sampleSet_.getSampleList() ){
-    sample.getMcContainer().refillHistogram(iThread_);
+    sample.getHistogram().refillHistogram(iThread_);
   }
 }
 

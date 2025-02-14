@@ -18,9 +18,6 @@
 
 #include <limits>
 
-LoggerInit([]{
-  Logger::setUserHeaderStr("[SplineFactory]");
-});
 
 bool SplineDialBaseFactory::FillFromGraph(std::vector<double>& xPoint,
                                           std::vector<double>& yPoint,

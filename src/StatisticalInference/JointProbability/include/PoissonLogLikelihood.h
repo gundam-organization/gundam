@@ -7,6 +7,8 @@
 
 #include "JointProbabilityBase.h"
 
+#include "Logger.h"
+
 
 namespace JointProbability{
 
@@ -14,23 +16,40 @@ namespace JointProbability{
 
   public:
     [[nodiscard]] std::string getType() const override { return "PoissonLogLikelihood"; }
-    [[nodiscard]] double eval(const Sample& sample_, int bin_) const override {
-      double predVal = sample_.getMcContainer().getHistogram().binList[bin_].content;
-      double dataVal = sample_.getDataContainer().getHistogram().binList[bin_].content;
+    [[nodiscard]] double eval(double data_, double pred_, double err_, int bin_) const override {
+      double predVal = pred_;
+      double dataVal = data_;
+
+      double llhValue{0};
+
 
       if(predVal <= 0){
         LogAlert << "Zero MC events in bin " << bin_ << ". predVal = " << predVal << ", dataVal = " << dataVal
                  << ". Setting llh = +inf for this bin." << std::endl;
-        return std::numeric_limits<double>::infinity();
+        llhValue = std::numeric_limits<double>::infinity();
       }
-
-      if(dataVal <= 0){
+      else if(dataVal <= 0){
         // lim x -> 0 : x ln(x) = 0
-        return 2.0 * predVal;
+        llhValue = 2.0 * predVal;
+      }
+      else{
+        // LLH calculation
+        llhValue = 2.0 * (predVal - dataVal + dataVal * TMath::Log(dataVal / predVal));
+
+//        if( llhValue < 0 and std::abs(llhValue) < 1E-12 ){
+//          llhValue = -llhValue;
+//        }
       }
 
-      // LLH calculation
-      return 2.0 * (predVal - dataVal + dataVal * TMath::Log(dataVal / predVal));
+//      LogThrowIf(
+//          llhValue < 0,
+//          "Negative poisson llh: " << llhValue << " / "
+//          << GET_VAR_NAME_VALUE(predVal) << " / "
+//          << GET_VAR_NAME_VALUE(dataVal) << " / "
+//          << GET_VAR_NAME_VALUE(dataVal-predVal)
+//      );
+
+      return llhValue;
     }
   };
 
