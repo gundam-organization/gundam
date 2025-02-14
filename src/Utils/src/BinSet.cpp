@@ -3,6 +3,7 @@
 //
 
 #include "BinSet.h"
+#include "GundamUtils.h"
 #include "ConfigUtils.h"
 
 #include "Logger.h"
@@ -35,19 +36,19 @@ void BinSet::configureImpl() {
   }
 
   this->sortBinEdges();
+  if( _sortBins_ ){ this->sortBins(); }
   this->checkBinning();
 }
-void BinSet::checkBinning(){
+void BinSet::checkBinning() const{
 
   bool hasErrors{false};
 
-  for( auto& bin : _binList_ ){
-    for( auto& otherBin : _binList_ ) {
-      if( &otherBin == &bin ){ continue; } // skip if it's the same bin
-      if( bin.isOverlapping( otherBin ) ){
+  for( size_t i = 0; i < _binList_.size(); i++ ){
+    for( size_t j = i + 1; j < _binList_.size(); j++ ){
+      if( _binList_[i].isOverlapping(_binList_[j]) ){
         LogError << "BIN OVERLAP DETECTED" << std::endl;
-        LogError << bin.getSummary() << std::endl;
-        LogError << otherBin.getSummary() << std::endl;
+        LogError << _binList_[i].getSummary() << std::endl;
+        LogError << _binList_[j].getSummary() << std::endl;
         hasErrors = true;
       }
     }
@@ -75,31 +76,36 @@ void BinSet::sortBins(){
 
   /// DON'T SORT THE BINS FOR DIALS!!! THE ORDER MIGHT REFER TO THE COV MATRIX DEFINITION
 
-//  // weird things going on if uncommented...
-//  std::vector<std::string> varNameList{this->buildVariableNameList()};
-//  std::sort(
-//      _binList_.begin(), _binList_.end(),
-//      [&](const DataBin& bin1_, const DataBin& bin2_){
-//        // returns: does bin1 goes first?
-//        for( auto& varName : varNameList ){
-//          auto* edges1 = bin1_.getVarEdgesPtr(varName);
-//          if( edges1 == nullptr ){ return true; } // missing variable bins goes first
-//
-//          auto* edges2 = bin2_.getVarEdgesPtr(varName);
-//          if( edges2 == nullptr ){ return false; } // missing variable bins goes first
-//
-//          if( edges1->min < edges2->min ){ return true; } // lowest bins first
-//        }
-//
-//        return false; // default
-//      }
-//  );
-//
-//  // update indices
-//  for( int iBin = 0 ; iBin < int(_binList_.size()) ; iBin++ ){
-//    _binList_[iBin].setIndex( iBin );
-//  }
+  auto varNameList{this->buildVariableNameList()};
+  std::function<bool(const Bin&, const Bin&)> sortFct = [&](const Bin& bin1_, const Bin& bin2_){
 
+    // returns: does bin1 goes first?
+    for( auto& varName : varNameList ){
+      auto* edges1 = bin1_.getVarEdgesPtr(varName);
+      auto* edges2 = bin2_.getVarEdgesPtr(varName);
+
+      // Ensure a consistent order when one bin is missing a variable
+      if( edges1 == nullptr and edges2 == nullptr ){ continue; }
+
+      // Only one is missing?
+      if( edges1 == nullptr ){ return true; } // missing variable bins goes first
+      if( edges2 == nullptr ){ return false; } // missing variable bins goes first
+
+      if( edges1->min < edges2->min ){ return true; } // edges1 goes first
+      if( edges1->min > edges2->min ){ return false; } // edges2 goes first
+
+      // otherwise, they are equal, get to another var
+    }
+
+    return false; // default (edges2 goes first)
+  };
+
+  std::sort(_binList_.begin(), _binList_.end(), sortFct);
+
+  // update indices
+  for( int iBin = 0 ; iBin < int(_binList_.size()) ; iBin++ ){
+    _binList_[iBin].setIndex( iBin );
+  }
 }
 
 
@@ -108,8 +114,13 @@ void BinSet::sortBinEdges(){
     std::sort(
         bin.getEdgesList().begin(), bin.getEdgesList().end(),
         []( const Bin::Edges& edges1_, const Bin::Edges& edges2_){
+          // returns true if edges1_ goes first.
+
+          // the conditional vars go first
           if( edges1_.isConditionVar and not edges2_.isConditionVar ){ return true; }
           if( not edges1_.isConditionVar and edges2_.isConditionVar ){ return false; }
+
+          // otherwise classify by var name
           return GenericToolbox::toLowerCase(edges1_.varName) < GenericToolbox::toLowerCase(edges2_.varName);
         }
     );
@@ -243,6 +254,8 @@ void BinSet::readTxtBinningDefinition(){
 }
 
 void BinSet::readBinningConfig( const JsonType& binning_){
+
+  GenericToolbox::Json::fillValue(binning_, _sortBins_, "sortBins");
 
   if( GenericToolbox::Json::doKeyExist(binning_, {"binningDefinition"}) ){
 

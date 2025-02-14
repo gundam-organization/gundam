@@ -379,7 +379,7 @@ void DataDispenser::fetchRequestedLeaves(){
     for( auto& var : indexRequests ){ _cache_.addVarRequestedForIndexing(var); }
   }
 
-  LogInfo << "Vars requested for indexing: " << GenericToolbox::toString(_cache_.varsRequestedForIndexing, false) << std::endl;
+  // LogInfo << "Vars requested for indexing: " << GenericToolbox::toString(_cache_.varsRequestedForIndexing, false) << std::endl;
   LogInfo << "Vars requested for storage: " << GenericToolbox::toString(_cache_.varsRequestedForStorage, false) << std::endl;
 
   // Now build the var to leaf translation
@@ -446,15 +446,39 @@ void DataDispenser::preAllocateMemory(){
   LoaderUtils::allocateMemory(eventPlaceholder, leafFormToVarList);
 
   LogInfo << "Reserving event memory..." << std::endl;
-  _cache_.sampleIndexOffsetList.resize(_cache_.samplesToFillList.size());
-  _cache_.sampleEventListPtrToFill.resize(_cache_.samplesToFillList.size());
-  for( size_t iSample = 0 ; iSample < _cache_.sampleNbOfEvents.size() ; iSample++ ){
-    _cache_.sampleEventListPtrToFill[iSample] = &_cache_.samplesToFillList[iSample]->getEventList();
-    _cache_.sampleIndexOffsetList[iSample] = _cache_.sampleEventListPtrToFill[iSample]->size();
-    _cache_.samplesToFillList[iSample]->reserveEventMemory(
-        _owner_->getDataSetIndex(), _cache_.sampleNbOfEvents[iSample], eventPlaceholder
-    );
+  {
+    GenericToolbox::TablePrinter t;
+    t << "Sample" << GenericToolbox::TablePrinter::NextColumn
+    << "# of events" << GenericToolbox::TablePrinter::NextColumn
+    << "Memory" << GenericToolbox::TablePrinter::NextLine;
+
+    size_t nTotal{0};
+
+    _cache_.sampleIndexOffsetList.resize(_cache_.samplesToFillList.size());
+    _cache_.sampleEventListPtrToFill.resize(_cache_.samplesToFillList.size());
+    for( size_t iSample = 0 ; iSample < _cache_.sampleNbOfEvents.size() ; iSample++ ){
+      _cache_.sampleEventListPtrToFill[iSample] = &_cache_.samplesToFillList[iSample]->getEventList();
+      _cache_.sampleIndexOffsetList[iSample] = _cache_.sampleEventListPtrToFill[iSample]->size();
+      _cache_.samplesToFillList[iSample]->reserveEventMemory(
+          _owner_->getDataSetIndex(), _cache_.sampleNbOfEvents[iSample], eventPlaceholder
+      );
+
+      nTotal += _cache_.sampleNbOfEvents[iSample];
+
+      t << _cache_.samplesToFillList[iSample]->getName() << GenericToolbox::TablePrinter::NextColumn
+      << _cache_.sampleNbOfEvents[iSample] << GenericToolbox::TablePrinter::NextColumn
+      << GenericToolbox::parseSizeUnits(static_cast<double>(eventPlaceholder.getSize() * _cache_.sampleNbOfEvents[iSample]))
+      << GenericToolbox::TablePrinter::NextLine;
+    }
+
+    t << "Total" << GenericToolbox::TablePrinter::NextColumn
+      << nTotal << GenericToolbox::TablePrinter::NextColumn
+      << GenericToolbox::parseSizeUnits(static_cast<double>(eventPlaceholder.getSize()) * nTotal)
+      << GenericToolbox::TablePrinter::NextLine;
+
+    t.printTable();
   }
+
 
   LogInfo << "Filling var index cache for bin edges..." << std::endl;
   for( auto* samplePtr : _cache_.samplesToFillList ){
@@ -465,7 +489,11 @@ void DataDispenser::preAllocateMemory(){
     }
   }
 
-  LogInfo << "Creating slots for event-by-event dials..." << std::endl;
+  GenericToolbox::TablePrinter t;
+  t << "Parameter" << GenericToolbox::TablePrinter::NextColumn;
+  t << "Dial type" << GenericToolbox::TablePrinter::NextLine;
+
+  size_t nTotalSlots{0};
   size_t nDialsMaxPerEvent{0};
   for( auto& dialCollection : _cache_.dialCollectionsRefList ){
     LogScopeIndent;
@@ -474,12 +502,8 @@ void DataDispenser::preAllocateMemory(){
     if (dialCollection->isEventByEvent()) {
       // Reserve enough space for all the event-by-event dials
       // that might be added.  This size may be reduced later.
-      auto& dialType = dialCollection->getGlobalDialType();
-      size_t origSize = dialCollection->getDialBaseList().size();
-      LogInfo << dialCollection->getTitle()
-              << ": adding " << _cache_.totalNbEvents
-              << " (was " << origSize << ")"
-              << " " << dialType << " slots"<< std::endl;
+      t << dialCollection->getTitle() << GenericToolbox::TablePrinter::NextColumn;
+      t << dialCollection->getGlobalDialType() << GenericToolbox::TablePrinter::NextLine;
 
       // Only increase the size.  It's probably zero before
       // starting, but add the original size... just in case.
@@ -487,6 +511,7 @@ void DataDispenser::preAllocateMemory(){
           dialCollection->getDialBaseList().size()
           + _cache_.totalNbEvents
       );
+      nTotalSlots += _cache_.totalNbEvents;
     }
     else {
       // Filling var indexes for faster eval with PhysicsEvent:
@@ -498,7 +523,12 @@ void DataDispenser::preAllocateMemory(){
     }
   }
 
-  LogInfo << "Creating " << _cache_.totalNbEvents << " event cache slots." << std::endl;
+  if( nTotalSlots != 0 ) {
+    LogInfo << "Created "  << nTotalSlots << " slots (" << _cache_.totalNbEvents << " per set) for event-by-event dials:" << std::endl;
+    t.printTable();
+  }
+
+
   _cache_.propagatorPtr->getEventDialCache().allocateCacheEntries(_cache_.totalNbEvents, nDialsMaxPerEvent);
 
 }
@@ -995,6 +1025,8 @@ void DataDispenser::loadEvent(int iThread_){
     };
     std::vector<VarDisplay> varDisplayList{};
 
+    bool hasEventDials{false};
+
     varDisplayList.reserve( _cache_.varsRequestedForIndexing.size() );
     for( size_t iVar = 0 ; iVar < _cache_.varsRequestedForIndexing.size() ; iVar++ ){
       varDisplayList.emplace_back();
@@ -1021,6 +1053,7 @@ void DataDispenser::loadEvent(int iThread_){
           threadSharedData.leafFormIndexingList[iVar]->getLeafTypeName() == "TClonesArray"
           or threadSharedData.leafFormIndexingList[iVar]->getLeafTypeName() == "TGraph"
           ){
+        hasEventDials = true;
         varDisplayList.back().lineColor =  GenericToolbox::ColorCodes::magentaBackground;
       }
     }
@@ -1047,8 +1080,8 @@ void DataDispenser::loadEvent(int iThread_){
     table.printTable();
 
     // printing legend
-    LogInfo << LOGGER_STR_COLOR_BLUE_BG    << "      " << LOGGER_STR_COLOR_RESET << " -> Variables stored in RAM" << std::endl;
-    LogInfo << LOGGER_STR_COLOR_MAGENTA_BG << "      " << LOGGER_STR_COLOR_RESET << " -> Dials stored in RAM" << std::endl;
+    LogInfoIf(not _cache_.varsRequestedForStorage.empty()) << LOGGER_STR_COLOR_BLUE_BG    << "      " << LOGGER_STR_COLOR_RESET << " -> Variables stored in RAM" << std::endl;
+    LogInfoIf(hasEventDials) << LOGGER_STR_COLOR_MAGENTA_BG << "      " << LOGGER_STR_COLOR_RESET << " -> Dials stored in RAM" << std::endl;
 
     if( _owner_->isDevSingleThreadEventLoaderAndIndexer() ){
       LogAlert << "Loading data in single thread (devSingleThreadEventLoaderAndIndexer option set to true)" << std::endl;

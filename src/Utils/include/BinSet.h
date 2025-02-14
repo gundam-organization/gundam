@@ -35,21 +35,22 @@ public:
   std::vector<Bin> &getBinList() { return _binList_; }
 
   // core
-  void checkBinning();
+  void checkBinning() const;
   [[nodiscard]] std::string getSummary() const;
 
   // utils
   void sortBinEdges();
   [[nodiscard]] std::vector<std::string> buildVariableNameList() const;
 
-  // caused a lot of problem
-  [[deprecated("don't sort bins. let the user ordering.")]] void sortBins();
+  // careful with this one: the ordering might refer to a dial list... So don't sort in that case
+  void sortBins();
 
 protected:
   void readTxtBinningDefinition();    // original txt
   void readBinningConfig(const JsonType& binning_); // yaml/json
 
 private:
+  bool _sortBins_{false};
   std::string _name_;
   std::string _filePath_;
   std::vector<Bin> _binList_{};

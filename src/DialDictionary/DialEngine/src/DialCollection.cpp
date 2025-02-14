@@ -418,6 +418,7 @@ bool DialCollection::initializeNormDialsWithParBinning() {
   this->readGlobals(_config_);
 
   // Read the binning
+  LogInfo << "Defining binned dials for " << getTitle() << std::endl;
   _dialBinSet_ = BinSet();
   _dialBinSet_.setName("parameterBinning");
   _dialBinSet_.configure( binning );
@@ -537,16 +538,18 @@ bool DialCollection::initializeDialsWithTabulation(const JsonType& dialsDefiniti
 
 bool DialCollection::initializeDialsWithBinningFile(const JsonType& dialsDefinition) {
   if(not GenericToolbox::Json::doKeyExist(dialsDefinition, "binningFilePath") ) return false;
-
+  
   DialBaseFactory dialBaseFactory;
   // A binning file has been provided, so this is a binned dial.  Create
   // the dials for each bin here.  The dials will be assigned to the
   // events in DataDispenser.
   auto binningFilePath = GenericToolbox::Json::fetchValue(dialsDefinition, "binningFilePath", JsonType());
 
+  LogInfo << "Defining binned dials for " << getTitle() << std::endl;
   _dialBinSet_ = BinSet();
   _dialBinSet_.setName(binningFilePath);
   _dialBinSet_.configure(binningFilePath);
+  // NOTE: DON'T SORT THE DIALS AS THE ORDERING IS MATCHING THE SPLINE FILE!
 
   // Get the filename for a file with the object array of dials (graphs)
   // that will be applied based on the binning.
@@ -554,7 +557,7 @@ bool DialCollection::initializeDialsWithBinningFile(const JsonType& dialsDefinit
   filePath = GenericToolbox::expandEnvironmentVariables(filePath);
 
   LogThrowIf(not GenericToolbox::doesTFileIsValid(filePath), "Could not open: " << filePath);
-  TFile* dialsTFile = TFile::Open(filePath.c_str());
+  std::unique_ptr<TFile> dialsTFile{TFile::Open(filePath.c_str())};
   LogThrowIf(dialsTFile==nullptr, "Could not open: " << filePath);
 
   if      ( GenericToolbox::Json::doKeyExist(dialsDefinition, "dialsList") ) {
@@ -570,9 +573,9 @@ bool DialCollection::initializeDialsWithBinningFile(const JsonType& dialsDefinit
                          << ") don't match the number of bins " << _dialBinSet_.getBinList().size()
     );
 
-    std::vector<int> excludedBins{};
-    for( int iBin = 0 ;
-         iBin < int(_dialBinSet_.getBinList().size()) ; ++iBin ) {
+      std::vector<int> excludedBins{};
+    int nBins(static_cast<int>(_dialBinSet_.getBinList().size()));
+    for( int iBin = 0 ; iBin < nBins ; iBin++ ){
       TObject* binnedInitializer = dialsList->At(iBin);
 
       DialBase *dialBase = dialBaseFactory.makeDial(
@@ -592,16 +595,14 @@ bool DialCollection::initializeDialsWithBinningFile(const JsonType& dialsDefinit
       _dialBaseList_.emplace_back(DialBaseObject(dialBase));
     }
 
-    if( not excludedBins.empty() ){
+      if( not excludedBins.empty() ){
       LogInfo << "Removing invalid bin dials..." << std::endl;
-      for( int iBin = int(_dialBinSet_.getBinList().size()) ; iBin >= 0 ; iBin-- ){
+      for( int iBin = nBins ; iBin >= 0 ; iBin-- ){
         if( GenericToolbox::doesElementIsInVector(iBin, excludedBins) ){
           _dialBinSet_.getBinList().erase(_dialBinSet_.getBinList().begin() + iBin);
         }
       }
     }
-
-    dialsTFile->Close();
 
   }
 
@@ -669,7 +670,6 @@ bool DialCollection::initializeDialsWithBinningFile(const JsonType& dialsDefinit
           false);
       if (dialBase) _dialBaseList_.emplace_back(DialBaseObject(dialBase));
     } // iSpline (in TTree)
-    dialsTFile->Close();
   } // Splines in TTree
   else{
     LogError << "Neither dialsTreePath nor dialsList are provided..." << std::endl;
@@ -696,7 +696,7 @@ bool DialCollection::initializeDialsWithDefinition() {
   this->readGlobals( dialsDefinition );
   DialBaseFactory dialBaseFactory;
 
-  if( _globalDialType_ == "Norm" or _globalDialType_ == "Normalization" ) {
+  if     ( _globalDialType_ == "Norm" or _globalDialType_ == "Normalization" ) {
     // This dial collection is a normalization, so there is a single dial.
     // Create it here.
     _isEventByEvent_ = false;
@@ -712,6 +712,7 @@ bool DialCollection::initializeDialsWithDefinition() {
     if( GenericToolbox::Json::doKeyExist(dialsDefinition, "binning") ){
       auto binning = GenericToolbox::Json::fetchValue(dialsDefinition, "binning", JsonType());
 
+      LogInfo << "Defining binned dials for " << getTitle() << std::endl;
       _dialBinSet_ = BinSet();
       _dialBinSet_.setName( "formula binning" );
       _dialBinSet_.configure(binning);
@@ -740,7 +741,7 @@ bool DialCollection::initializeDialsWithDefinition() {
     DialBaseFactory f;
     _dialBaseList_.emplace_back( DialBaseObject( f.makeDial( dialsDefinition ) ) );
   }
-  else if ( _globalDialType_ == "Tabulated" ) {
+  else if( _globalDialType_ == "Tabulated" ) {
     // This dial uses a precalculated table to apply weight to each event (e.g. it
     // might be used to implement neutrino osillations).  It has a different
     // weight for each event.
@@ -752,9 +753,10 @@ bool DialCollection::initializeDialsWithDefinition() {
     // This dial collection is binned with different weights for each bin.
     // Create the dials here.
     _isEventByEvent_ = false;
-    LogThrowIf(not initializeDialsWithBinningFile(dialsDefinition),
+
+      LogThrowIf(not initializeDialsWithBinningFile(dialsDefinition),
                "Error initializing dials with binning file");
-  }
+    }
   else if (not _globalDialLeafName_.empty()) {
     // None of the other dial types are matched, and a dialLeafName field has
     // been provided, so this is an event by event dial with one TGraph (or

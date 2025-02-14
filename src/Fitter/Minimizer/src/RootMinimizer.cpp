@@ -191,6 +191,9 @@ void RootMinimizer::minimize(){
   // calling the common routine
   this->MinimizerBase::minimize();
 
+  GenericToolbox::Time::Timer minimizationStopWatch;
+  minimizationStopWatch.start();
+
   int nbFitCallOffset = getMonitor().nbEvalLikelihoodCalls;
   LogInfo << "Fit call offset: " << nbFitCallOffset << std::endl;
 
@@ -247,6 +250,9 @@ void RootMinimizer::minimize(){
   _minimizeDone_ = true;
   getMonitor().isEnabled = false;
 
+  minimizationStopWatch.stop();
+  LogInfo << "Minimization stopped after " << GenericToolbox::toString(minimizationStopWatch.eval()) << std::endl;
+
   int nbMinimizeCalls = getMonitor().nbEvalLikelihoodCalls - nbFitCallOffset;
 
   LogInfo << getMonitor().convergenceMonitor.generateMonitorString(); // lasting printout
@@ -285,6 +291,8 @@ void RootMinimizer::minimize(){
     double fitStatus = _rootMinimizer_->Status();
     double covStatus = _rootMinimizer_->CovMatrixStatus();
     double chi2MinFitter = _rootMinimizer_->MinValue();
+    double minimizationTimeInSec = minimizationStopWatch.eval().count();
+
     int nDof = fetchNbDegreeOfFreedom();
     int nbFitBins = getLikelihoodInterface().getNbSampleBins();
 
@@ -302,6 +310,7 @@ void RootMinimizer::minimize(){
     bestFitStats->Branch("nFitPars", &nFitPars);
     bestFitStats->Branch("nbDegreeOfFreedom", &nDof);
 
+    bestFitStats->Branch("minimizationTimeInSec", &minimizationTimeInSec);
     bestFitStats->Branch("nCallsAtBestFit", &getMonitor().nbEvalLikelihoodCalls);
     bestFitStats->Branch("totalLikelihoodAtBestFit", &getLikelihoodInterface().getBuffer().totalLikelihood );
     bestFitStats->Branch("statLikelihoodAtBestFit",  &getLikelihoodInterface().getBuffer().statLikelihood );
@@ -423,9 +432,15 @@ void RootMinimizer::calcErrors(){
     getMonitor().minimizerTitle = _minimizerType_ + "/" + _errorAlgo_;
     getMonitor().stateTitleMonitor = "Running HESSE";
 
+    GenericToolbox::Time::Timer errorStopWatch;
+    errorStopWatch.start();
+
     getMonitor().isEnabled = true;
     _fitHasConverged_ = _rootMinimizer_->Hesse();
     getMonitor().isEnabled = false;
+
+    errorStopWatch.stop();
+    LogInfo << "Error calculation took: " << GenericToolbox::toString(errorStopWatch.eval()) << std::endl;
 
     LogInfo << "Hesse ended after " << getMonitor().nbEvalLikelihoodCalls - nbFitCallOffset << " calls." << std::endl;
     LogWarning << "HESSE status code: " << GundamUtils::hesseStatusCodeStr.at(_rootMinimizer_->Status()) << std::endl;
@@ -449,6 +464,9 @@ void RootMinimizer::calcErrors(){
     hesseStats->SetDirectory(nullptr);
     hesseStats->Branch("hesseSuccess", &_fitHasConverged_);
     hesseStats->Branch("covStatusCode", &covStatus);
+
+    double errorTimeInSec = errorStopWatch.eval().count();
+    hesseStats->Branch("errorTimeInSec", &errorTimeInSec);
 
     hesseStats->Fill();
     GenericToolbox::mkdirTFile( getOwner().getSaveDir(), "postFit")->WriteObject(hesseStats.get(), hesseStats->GetName());
