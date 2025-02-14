@@ -45,9 +45,8 @@ void MinimizerBase::initializeImpl(){
   LogInfo << "Nb minimizer parameters: " << _minimizerParameterPtrList_.size() << std::endl;
 
   if( not GundamGlobals::isLightOutputMode() and _writeLlhHistory_ ){
-    _monitor_.historyTree = std::make_unique<TTree>( "chi2History", "chi2History");
+    _monitor_.historyTree = std::make_unique<TTree>( "llhHistory", "llhHistory");
     _monitor_.historyTree->SetDirectory( nullptr ); // will be saved later
-    _monitor_.historyTree->Branch("nbEvalLikelihoodCalls", &_monitor_.nbEvalLikelihoodCalls);
     _monitor_.historyTree->Branch("totalLikelihood", &getLikelihoodInterface().getBuffer().totalLikelihood);
     _monitor_.historyTree->Branch("statLikelihood", &getLikelihoodInterface().getBuffer().statLikelihood);
     _monitor_.historyTree->Branch("penaltyLikelihood", &getLikelihoodInterface().getBuffer().penaltyLikelihood);
