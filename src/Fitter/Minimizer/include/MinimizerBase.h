@@ -165,7 +165,7 @@ private:
   bool _isEnabledCalcError_{true};
 
   // output
-  bool _writeChi2History_{false};
+  bool _writeLlhHistory_{false};
 
 };
 

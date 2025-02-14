@@ -9,6 +9,7 @@
 | minimizer                      | string | [engine name](https://root.cern.ch/doc/master/NumericalMinimization_8C.html) | Minuit2             |
 | algorithm                      | string | algorithm name                                                               | default from engine |
 | useNormalizedFitSpace          | bool   | use fit parameter interface to provide prior mean at 0 and stddev at 1       | true                |
+| writeLlhHistory                | bool   | write a ttree registering all the llh evaluations                            | false               |
 | errorAlgo / errors             | string | algorithm to run after the fit (HESSE or MINOS)                              | Hesse               |
 | enablePostFitErrorFit          | bool   | enable errorAlgo after fit has succeeded                                     | true                |
 | tolerance                      | double | defines the required Estimated Distance from the Minimum stopping the fit    | 1E-4                |

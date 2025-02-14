@@ -23,7 +23,7 @@ void MinimizerBase::configureImpl(){
   GenericToolbox::Json::fillValue(_config_, _monitor_.maxNbParametersPerLine, "maxNbParametersPerLineOnMonitor");
   GenericToolbox::Json::fillValue(_config_, _isEnabledCalcError_, "enablePostFitErrorFit");
   GenericToolbox::Json::fillValue(_config_, _useNormalizedFitSpace_, "useNormalizedFitSpace");
-  GenericToolbox::Json::fillValue(_config_, _writeChi2History_, "writeChi2History");
+  GenericToolbox::Json::fillValue(_config_, _writeLlhHistory_, "writeLlhHistory");
 
 }
 void MinimizerBase::initializeImpl(){
@@ -44,7 +44,7 @@ void MinimizerBase::initializeImpl(){
   }
   LogInfo << "Nb minimizer parameters: " << _minimizerParameterPtrList_.size() << std::endl;
 
-  if( not GundamGlobals::isLightOutputMode() and _writeChi2History_ ){
+  if( not GundamGlobals::isLightOutputMode() and _writeLlhHistory_ ){
     _monitor_.historyTree = std::make_unique<TTree>( "chi2History", "chi2History");
     _monitor_.historyTree->SetDirectory( nullptr ); // will be saved later
     _monitor_.historyTree->Branch("nbEvalLikelihoodCalls", &_monitor_.nbEvalLikelihoodCalls);
