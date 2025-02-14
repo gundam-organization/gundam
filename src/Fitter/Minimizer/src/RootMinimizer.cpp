@@ -432,9 +432,15 @@ void RootMinimizer::calcErrors(){
     getMonitor().minimizerTitle = _minimizerType_ + "/" + _errorAlgo_;
     getMonitor().stateTitleMonitor = "Running HESSE";
 
+    GenericToolbox::Time::Timer errorStopWatch;
+    errorStopWatch.start();
+
     getMonitor().isEnabled = true;
     _fitHasConverged_ = _rootMinimizer_->Hesse();
     getMonitor().isEnabled = false;
+
+    errorStopWatch.stop();
+    LogInfo << "Error calculation took: " << GenericToolbox::toString(errorStopWatch.eval()) << std::endl;
 
     LogInfo << "Hesse ended after " << getMonitor().nbEvalLikelihoodCalls - nbFitCallOffset << " calls." << std::endl;
     LogWarning << "HESSE status code: " << GundamUtils::hesseStatusCodeStr.at(_rootMinimizer_->Status()) << std::endl;
@@ -458,6 +464,9 @@ void RootMinimizer::calcErrors(){
     hesseStats->SetDirectory(nullptr);
     hesseStats->Branch("hesseSuccess", &_fitHasConverged_);
     hesseStats->Branch("covStatusCode", &covStatus);
+
+    double errorTimeInSec = errorStopWatch.eval().count();
+    hesseStats->Branch("errorTimeInSec", &errorTimeInSec);
 
     hesseStats->Fill();
     GenericToolbox::mkdirTFile( getOwner().getSaveDir(), "postFit")->WriteObject(hesseStats.get(), hesseStats->GetName());
