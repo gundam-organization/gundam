@@ -81,9 +81,10 @@ int main(int argc, char** argv){
   app.writeAppInfo();
 
   GenericToolbox::TFilePath out(app.getOutfilePtr(), "gundamToysReader");
-  out.getSubDir("fitResults").getDir()->cd();
+  out.getDir()->cd();
   LogWarning << "Writing fit results..." << std::endl;
-  toysChain->CloneTree(-1, "fast");
+  auto* outToyChain = toysChain->CloneTree(-1, "fast");
+  outToyChain->Write();
 
   // --------------------------------------------
   // define histograms
@@ -103,10 +104,10 @@ void openInputFiles(const std::vector<std::string>& filesList_){
   std::function<void(const std::vector<std::string>&)> unfoldFilePathList = [&](const std::vector<std::string>& inputFileList_){
     for( auto& inputFile : inputFileList_ ){
 
-      if( GenericToolbox::hasExtension(inputFile, ".root") ) {
+      if( GenericToolbox::endsWith(inputFile, ".root") ) {
         filePathList.emplace_back(inputFile);
       }
-      else if( GenericToolbox::hasExtension(inputFile, ".txt") ){
+      else if( GenericToolbox::endsWith(inputFile, ".txt") ){
         unfoldFilePathList( GenericToolbox::dumpFileAsVectorString(inputFile) );
       }
       else{
