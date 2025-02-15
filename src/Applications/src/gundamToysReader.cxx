@@ -72,8 +72,8 @@ int main(int argc, char** argv){
 
   // --------------------------------------------
   // open output file
-  std::string outFileName = "gundamToysReader_";
-  outFileName += GenericToolbox::getNowDateString("%Y%m%d_%H%M%S");
+  std::string outFileName = "gundamToysReader";
+  // outFileName += "_" + GenericToolbox::getNowDateString("%Y%m%d_%H%M%S");
   outFileName += ".root";
 
   app.openOutputFile(outFileName);
