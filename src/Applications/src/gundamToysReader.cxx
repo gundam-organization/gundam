@@ -12,6 +12,7 @@
 
 #include "TChain.h"
 
+#include <functional>
 #include <ostream>
 #include <memory>
 
@@ -80,6 +81,9 @@ int main(int argc, char** argv){
   app.writeAppInfo();
 
   GenericToolbox::TFilePath out(app.getOutfilePtr(), "gundamToysReader");
+  out.getSubDir("fitResults").getDir()->cd();
+  LogWarning << "Writing fit results..." << std::endl;
+  toysChain->CloneTree(-1, "fast");
 
   // --------------------------------------------
   // define histograms
@@ -96,7 +100,7 @@ void openInputFiles(const std::vector<std::string>& filesList_){
 
   // unfold the files list
   std::vector<std::string> filePathList;
-  auto unfoldFilePathList = [&](const std::vector<std::string>& inputFileList_){
+  std::function<void(const std::vector<std::string>&)> unfoldFilePathList = [&](const std::vector<std::string>& inputFileList_){
     for( auto& inputFile : inputFileList_ ){
 
       if( GenericToolbox::hasExtension(inputFile, ".root") ) {
@@ -111,6 +115,7 @@ void openInputFiles(const std::vector<std::string>& filesList_){
 
     }
   };
+  unfoldFilePathList(filesList_);
 
   // sort files
   auto aGoesFirst = [](const std::string& a_, const std::string& b_){
@@ -162,8 +167,8 @@ void openInputFiles(const std::vector<std::string>& filesList_){
     LogInfo << "Adding "<< file << std::endl;
     toysChain->AddFile(file.c_str());
   }
+  LogExitIf(toysChain->GetEntries() == 0, "No input file opened.");
   LogInfo << "Loaded " << toysChain->GetEntries() << " toy files." << std::endl;
-
 
 
 }
