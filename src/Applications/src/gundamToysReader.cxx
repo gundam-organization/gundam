@@ -4,6 +4,7 @@
 
 #include "GundamApp.h"
 #include "GundamGlobals.h"
+#include "ConfigUtils.h"
 
 #include "CmdLineParser.h"
 #include "GenericToolbox.Time.h"
@@ -21,6 +22,7 @@ std::unique_ptr<TChain> toysChain{nullptr};
 
 
 void openInputFiles(const std::vector<std::string>& filesList_);
+void drawHistogram(const JsonType& config_);
 
 
 int main(int argc, char** argv){
@@ -86,12 +88,6 @@ int main(int argc, char** argv){
   auto* outToyChain = toysChain->CloneTree(-1, "fast");
   outToyChain->Write();
 
-  // --------------------------------------------
-  // define histograms
-
-
-  // --------------------------------------------
-  // read data
 
 
 }
@@ -173,4 +169,8 @@ void openInputFiles(const std::vector<std::string>& filesList_){
 
 
 }
+void drawHistogram(const JsonType& config_){
 
+
+
+}
