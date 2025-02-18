@@ -918,8 +918,8 @@ void ParameterSet::defineParameters(){
       par.setStepSize(std::sqrt((*_priorFullCovarianceMatrix_)[par.getParameterIndex()][par.getParameterIndex()]));
     }
     else{
-      LogThrowIf(std::isnan(_nominalStepSize_), "Can't define free parameter without a \"nominalStepSize\"");
-      par.setStdDevValue(_nominalStepSize_); // stdDev will only be used for display purpose
+      // stdDev will only be used for display purpose
+      par.setStdDevValue(_nominalStepSize_);
       par.setStepSize(_nominalStepSize_);
       par.setPriorType(Parameter::PriorType::Flat);
       par.setIsFree(true);
