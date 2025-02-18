@@ -81,6 +81,8 @@ void DataDispenser::configureImpl(){
     _parameters_.variableDict[ varName ] = varExpr;
   }
 
+  GenericToolbox::Json::fillValue(_config_, _parameters_.eventVariableAsWeight, "eventVariableAsWeight");
+
   // options
   GenericToolbox::Json::fillValue(_config_, _parameters_.globalTreePath, "tree");
   GenericToolbox::Json::fillValue(_config_, _parameters_.filePathList, "filePathList");
@@ -336,6 +338,12 @@ void DataDispenser::fetchRequestedLeaves(){
     varForIndexingListBuffer = _cache_.propagatorPtr->getSampleSet().fetchRequestedVariablesForIndexing();
     LogInfo << "Samples variable request for indexing: " << GenericToolbox::toString(varForIndexingListBuffer) << std::endl;
     for( auto &var: varForIndexingListBuffer ){ _cache_.addVarRequestedForIndexing(var); }
+  }
+
+  // for event weight
+  if( not _parameters_.eventVariableAsWeight.empty() ){
+    LogInfo << "Variable for event weight: " << _parameters_.eventVariableAsWeight << std::endl;
+    _cache_.addVarRequestedForIndexing(_parameters_.eventVariableAsWeight);
   }
 
   // plotGen -> for storage as we need those in prefit and postfit
@@ -883,6 +891,17 @@ void DataDispenser::runEventFillThreads(int iThread_){
   for( auto& lfInd: threadSharedData.leafFormIndexingList ){ lfInd = &(lCollection.getLeafFormList()[(size_t) lfInd]); }
   for( auto& lfSto: threadSharedData.leafFormStorageList ){ lfSto = &(lCollection.getLeafFormList()[(size_t) lfSto]); }
 
+  if( not _parameters_.eventVariableAsWeight.empty() ){
+    for( size_t iVar = 0 ; iVar < _cache_.varsRequestedForIndexing.size() ; iVar++ ){
+      if( _cache_.varsRequestedForIndexing[iVar] == _parameters_.eventVariableAsWeight ) {
+        threadSharedData.eventVariableAsWeightLeafPtr = threadSharedData.leafFormIndexingList[iVar];
+        break;
+      }
+    }
+
+    LogThrowIf(threadSharedData.eventVariableAsWeightLeafPtr==nullptr, "Could not find variable: " << _parameters_.eventVariableAsWeight);
+  }
+
   // start event filler
   // create thread
   std::shared_ptr<std::future<void>> eventFillerThread{nullptr};
@@ -1121,24 +1140,29 @@ void DataDispenser::loadEvent(int iThread_){
     // nominalWeightTreeFormula is attached to the TChain
     if( threadSharedData.nominalWeightTreeFormula != nullptr ){
       eventIndexingBuffer.getWeights().base = (threadSharedData.nominalWeightTreeFormula->EvalInstance());
+    }
 
-      // no negative weights -> error
-      if( eventIndexingBuffer.getWeights().base  < 0 ){
-        LogError << "Negative nominal weight:" << std::endl;
+    // additional weight with an event variable
+    if( threadSharedData.eventVariableAsWeightLeafPtr != nullptr ){
+      eventIndexingBuffer.getWeights().base *= threadSharedData.eventVariableAsWeightLeafPtr->evalAsDouble();
+    }
 
-        LogError << "Event buffer is: " << eventIndexingBuffer.getSummary() << std::endl;
 
-        LogError << "Formula leaves:" << std::endl;
-        for( int iLeaf = 0 ; iLeaf < threadSharedData.nominalWeightTreeFormula->GetNcodes() ; iLeaf++ ){
-          if( threadSharedData.nominalWeightTreeFormula->GetLeaf(iLeaf) == nullptr ) continue; // for "Entry$" like dummy leaves
-          LogError << "Leaf: " << threadSharedData.nominalWeightTreeFormula->GetLeaf(iLeaf)->GetName() << "[0] = " << threadSharedData.nominalWeightTreeFormula->GetLeaf(iLeaf)->GetValue(0) << std::endl;
-        }
+    // skip this event if 0
+    if( eventIndexingBuffer.getWeights().base == 0 ){ continue; }
+    // no negative weights -> error
+    if( eventIndexingBuffer.getWeights().base  < 0 ){
+      LogError << "Negative nominal weight:" << std::endl;
 
-        LogThrow("Negative nominal weight");
+      LogError << "Event buffer is: " << eventIndexingBuffer.getSummary() << std::endl;
+
+      LogError << "Formula leaves:" << std::endl;
+      for( int iLeaf = 0 ; iLeaf < threadSharedData.nominalWeightTreeFormula->GetNcodes() ; iLeaf++ ){
+        if( threadSharedData.nominalWeightTreeFormula->GetLeaf(iLeaf) == nullptr ) continue; // for "Entry$" like dummy leaves
+        LogError << "Leaf: " << threadSharedData.nominalWeightTreeFormula->GetLeaf(iLeaf)->GetName() << "[0] = " << threadSharedData.nominalWeightTreeFormula->GetLeaf(iLeaf)->GetValue(0) << std::endl;
       }
 
-      // skip this event
-      if( eventIndexingBuffer.getWeights().base == 0 ){ continue; }
+      LogThrow("Negative nominal weight");
     }
 
     // grab data from TChain
