@@ -1,5 +1,5 @@
 //
-// Created by Adrien Blanchet on 07/12/2022.
+// Created by Adrien Blanchet on 19/01/2023.
 //
 
 #ifndef GUNDAM_ROOT_GRAPH_H
@@ -31,6 +31,5 @@ protected:
   bool _allowExtrapolation_{false};
   TGraph _graph_{};
 };
-
 
 #endif //GUNDAM_ROOT_GRAPH_H
