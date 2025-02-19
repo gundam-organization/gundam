@@ -2,14 +2,14 @@
 // Created by Adrien Blanchet on 30/11/2022.
 //
 
-#include "Spline.h"
+#include "RootSpline.h"
 
 
-void Spline::setAllowExtrapolation(bool allowExtrapolation) {
+void RootSpline::setAllowExtrapolation(bool allowExtrapolation) {
   _allowExtrapolation_ = allowExtrapolation;
 }
 
-void Spline::buildDial(const TSpline3& spline, const std::string& option_) {
+void RootSpline::buildDial(const TSpline3& spline, const std::string& option_) {
   std::vector<double> xPoint(spline.GetNp());
   std::vector<double> yPoint(spline.GetNp());
   std::vector<double> dummy;
@@ -24,7 +24,7 @@ void Spline::buildDial(const TSpline3& spline, const std::string& option_) {
   _spline_.SetTitle(spline.GetTitle());
 }
 
-void Spline::buildDial(const TGraph& grf, const std::string& option_) {
+void RootSpline::buildDial(const TGraph& grf, const std::string& option_) {
   std::vector<double> xPoint(grf.GetN());
   std::vector<double> yPoint(grf.GetN());
   std::vector<double> dummy;
@@ -39,7 +39,7 @@ void Spline::buildDial(const TGraph& grf, const std::string& option_) {
   _spline_.SetTitle(grf.GetName());
 }
 
-void Spline::buildDial(const std::vector<double>& v1,
+void RootSpline::buildDial(const std::vector<double>& v1,
                        const std::vector<double>& v2,
                        const std::vector<double>& v3,
                        const std::string& option_) {
@@ -47,9 +47,9 @@ void Spline::buildDial(const std::vector<double>& v1,
                       const_cast<double*>(v2.data()), v1.size());
 }
 
-const TSpline3 &Spline::getSpline() const {return _spline_;}
+const TSpline3 &RootSpline::getSpline() const {return _spline_;}
 
-double Spline::evalResponse(const DialInputBuffer& input_) const {
+double RootSpline::evalResponse(const DialInputBuffer& input_) const {
   const double dialInput{input_.getInputBuffer()[0]};
 
 #ifndef NDEBUG

@@ -17,7 +17,7 @@ public:
   RootGraph() = default;
 
   [[nodiscard]] std::unique_ptr<DialBase> clone() const override { return std::make_unique<RootGraph>(*this); }
-  [[nodiscard]] std::string getDialTypeName() const override { return {"TGraph"}; }
+  [[nodiscard]] std::string getDialTypeName() const override { return {"RootGraph"}; }
   [[nodiscard]] double evalResponse(const DialInputBuffer& input_) const override;
 
   void setAllowExtrapolation(bool allowExtrapolation) override;

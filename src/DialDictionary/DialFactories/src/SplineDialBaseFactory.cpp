@@ -2,7 +2,7 @@
 
 // Explicitly list the headers that are actually needed.  Do not include
 // others.
-#include "Spline.h"
+#include "RootSpline.h"
 #include "SimpleSpline.h"
 #include "CompactSpline.h"
 #include "UniformSpline.h"

@@ -17,7 +17,7 @@
 #include "CompactSpline.h"
 #include "UniformSpline.h"
 #include "GeneralSpline.h"
-#include "Spline.h"
+#include "RootSpline.h"
 #include "Bilinear.h"
 #include "Bicubic.h"
 #include "CompiledLibDial.h"
@@ -1091,7 +1091,7 @@ std::unique_ptr<DialBase> DialCollection::makeSplineDial(const TObject* src_) co
   if (splType == "ROOT") {
     // The ROOT implementation of the spline has been explicitly requested, so
     // use it.
-    dialBase = std::make_unique<Spline>();
+    dialBase = std::make_unique<RootSpline>();
   }
   else if (splType == "catmull-rom" and isMonotonic) {
     // Catmull-Rom is handled as a special case because it ignores the slopes,

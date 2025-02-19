@@ -2,20 +2,20 @@
 // Created by Adrien Blanchet on 30/11/2022.
 //
 
-#ifndef GUNDAM_SPLINE_H
-#define GUNDAM_SPLINE_H
+#ifndef GUNDAM_ROOT_SPLINE_H
+#define GUNDAM_ROOT_SPLINE_H
 
 #include "DialBase.h"
 #include "DialInputBuffer.h"
 #include "TSpline.h"
 
-class Spline : public DialBase {
+class RootSpline : public DialBase {
 
 public:
-  Spline() = default;
+  RootSpline() = default;
 
-  [[nodiscard]] std::unique_ptr<DialBase> clone() const override { return std::make_unique<Spline>(*this); }
-  [[nodiscard]] std::string getDialTypeName() const override { return {"Spline"}; }
+  [[nodiscard]] std::unique_ptr<DialBase> clone() const override { return std::make_unique<RootSpline>(*this); }
+  [[nodiscard]] std::string getDialTypeName() const override { return {"RootSpline"}; }
   [[nodiscard]] double evalResponse(const DialInputBuffer& input_) const override;
 
   void setAllowExtrapolation(bool allowExtrapolation) override;
@@ -43,4 +43,4 @@ protected:
 
 };
 
-#endif //GUNDAM_SPLINE_H
+#endif // GUNDAM_ROOT_SPLINE_H

@@ -34,7 +34,7 @@ double Graph::evalResponse(const DialInputBuffer& input_) const {
   double dialInput{input_.getInputBuffer()[0]};
 
 #ifndef NDEBUG
-  LogThrowIf(not std::isfinite(dialInput), "Invalid input for LightGraph");
+  LogThrowIf(not std::isfinite(dialInput), "Invalid input for Graph");
 #endif
 
   if( not _allowExtrapolation_ ){

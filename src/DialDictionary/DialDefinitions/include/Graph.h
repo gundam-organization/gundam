@@ -21,7 +21,7 @@ public:
   Graph() = default;
 
   [[nodiscard]] std::unique_ptr<DialBase> clone() const override { return std::make_unique<Graph>(*this); }
-  [[nodiscard]] std::string getDialTypeName() const override { return {"LightGraph"}; }
+  [[nodiscard]] std::string getDialTypeName() const override { return {"Graph"}; }
   [[nodiscard]] double evalResponse(const DialInputBuffer& input_) const override;
 
   void setAllowExtrapolation(bool allowExtrapolation) override;

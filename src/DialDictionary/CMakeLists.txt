@@ -13,7 +13,7 @@ set( SRCFILES
     DialDefinitions/src/RootGraph.cpp
     DialDefinitions/src/Graph.cpp
 
-    DialDefinitions/src/Spline.cpp
+    DialDefinitions/src/RootSpline.cpp
     DialDefinitions/src/SimpleSpline.cpp
     DialDefinitions/src/GeneralSpline.cpp
     DialDefinitions/src/UniformSpline.cpp
@@ -48,7 +48,7 @@ set( HEADERS
     DialDefinitions/include/RootGraph.h
     DialDefinitions/include/Graph.h
 
-    DialDefinitions/include/Spline.h
+    DialDefinitions/include/RootSpline.h
     DialDefinitions/include/SimpleSpline.h
     DialDefinitions/include/GeneralSpline.h
     DialDefinitions/include/UniformSpline.h

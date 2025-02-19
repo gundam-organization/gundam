@@ -242,7 +242,7 @@ bool Cache::Manager::Build() {
         ++config.compactSplines;
         config.compactPoints += dial->getDialData().size();
       }
-      else if (dialType.find("LightGraph") == 0) {
+      else if (dialType.find("Graph") == 0) {
         ++config.graphs;
         config.graphPoints += dial->getDialData().size();
       }
