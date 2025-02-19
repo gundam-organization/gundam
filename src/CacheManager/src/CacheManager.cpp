@@ -30,7 +30,7 @@
 #include "UniformSpline.h"
 #include "CompactSpline.h"
 #include "MonotonicSpline.h"
-#include "LightGraph.h"
+#include "Graph.h"
 #include "Bilinear.h"
 #include "Bicubic.h"
 #include "Shift.h"
@@ -565,7 +565,7 @@ bool Cache::Manager::Update() {
             ->AddSpline(resultIndex,parIndex,
                         baseDial->getDialData());
       }
-      auto* lightGraph = dynamic_cast<const LightGraph*>(baseDial);
+      auto* lightGraph = dynamic_cast<const Graph*>(baseDial);
       if (lightGraph) {
         ++dialUsed;
         const Parameter* fp = &(dialInputs->getParameter(0));

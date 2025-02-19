@@ -10,8 +10,8 @@ set( SRCFILES
     # DialDefinitions
     DialDefinitions/src/DialBase.cpp
 
+    DialDefinitions/src/RootGraph.cpp
     DialDefinitions/src/Graph.cpp
-    DialDefinitions/src/LightGraph.cpp
 
     DialDefinitions/src/Spline.cpp
     DialDefinitions/src/SimpleSpline.cpp
@@ -45,8 +45,8 @@ set( HEADERS
     DialDefinitions/include/Shift.h
     DialDefinitions/include/Tabulated.h
 
+    DialDefinitions/include/RootGraph.h
     DialDefinitions/include/Graph.h
-    DialDefinitions/include/LightGraph.h
 
     DialDefinitions/include/Spline.h
     DialDefinitions/include/SimpleSpline.h

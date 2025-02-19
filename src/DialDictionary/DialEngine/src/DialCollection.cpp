@@ -10,8 +10,8 @@
 #include "RootFormula.h"
 
 #include "Shift.h"
+#include "RootGraph.h"
 #include "Graph.h"
-#include "LightGraph.h"
 #include "Norm.h"
 #include "Spline.h"
 #include "SimpleSpline.h"
@@ -867,7 +867,7 @@ std::unique_ptr<DialBase> DialCollection::makeGraphDial(const TObject* src_) con
   if( srcGraph->GetN() == 0 ) { return {}; }
 
   if( _globalDialSubType_ == "root" ) {
-    auto dial = std::make_unique<Graph>();
+    auto dial = std::make_unique<RootGraph>();
     dial->buildDial(*srcGraph);
     return dial;
   }
@@ -886,7 +886,7 @@ std::unique_ptr<DialBase> DialCollection::makeGraphDial(const TObject* src_) con
   }
 
   // srcGraph->GetN() >= 2, default
-  auto dial = std::make_unique<LightGraph>();
+  auto dial = std::make_unique<Graph>();
   dial->buildDial(*srcGraph);
   return dial;
 }
