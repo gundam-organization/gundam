@@ -507,8 +507,8 @@ void DataDispenser::preAllocateMemory(){
 
       // Only increase the size.  It's probably zero before
       // starting, but add the original size... just in case.
-      dialCollection->getDialBaseList().resize(
-          dialCollection->getDialBaseList().size()
+      dialCollection->getDialInterfaceList().resize(
+          dialCollection->getDialInterfaceList().size()
           + _cache_.totalNbEvents
       );
       nTotalSlots += _cache_.totalNbEvents;
@@ -1194,21 +1194,7 @@ void DataDispenser::loadEvent(int iThread_){
         dialObjectPtr = ((TClonesArray *) dialObjectPtr)->At(dialCloneArrayIndex);
       }
 
-      // Do the unique_ptr dance so that memory gets deleted if
-      // there is an exception (being stupidly paranoid).
-      DialBaseFactory factory{};
-      std::unique_ptr<DialBase> dialBase(
-          factory.makeDial(
-              dialCollectionRef->getTitle(),
-              dialCollectionRef->getGlobalDialType(),
-              dialCollectionRef->getGlobalDialSubType(),
-              dialObjectPtr,
-              false
-          )
-      );
-
-      eventByEventDialBuffer[dialCollectionRef->getIndex()] = dialBase.release();
-
+      eventByEventDialBuffer[dialCollectionRef->getIndex()] = dialCollectionRef->makeDial(dialObjectPtr).release();
 
     }
 
@@ -1256,8 +1242,8 @@ void DataDispenser::loadEvent(int iThread_){
         if( eventByEventDialBuffer[dialCollectionRef->getIndex()] != nullptr ){
           size_t freeSlotDial = dialCollectionRef->getNextDialFreeSlot();
           eventByEventDialBuffer[dialCollectionRef->getIndex()]->setAllowExtrapolation(dialCollectionRef->isAllowDialExtrapolation());
-          dialCollectionRef->getDialBaseList()[freeSlotDial] = DialCollection::DialBaseObject(
-              eventByEventDialBuffer[dialCollectionRef->getIndex()]);
+          dialCollectionRef->getDialInterfaceList()[freeSlotDial].getDial().dialPtr
+            = std::unique_ptr<DialBase>(eventByEventDialBuffer[dialCollectionRef->getIndex()]);
 
           dialEntryPtr->collectionIndex = dialCollectionRef->getIndex();
           dialEntryPtr->interfaceIndex = freeSlotDial;
@@ -1290,8 +1276,8 @@ void DataDispenser::loadEvent(int iThread_){
         if( dialBase != nullptr ){
           size_t freeSlotDial = dialCollectionRef->getNextDialFreeSlot();
           dialBase->setAllowExtrapolation(dialCollectionRef->isAllowDialExtrapolation());
-          dialCollectionRef->getDialBaseList()[freeSlotDial] = DialCollection::DialBaseObject(
-              dialBase.release());
+          dialCollectionRef->getDialInterfaceList()[freeSlotDial].getDial().dialPtr =
+            std::unique_ptr<DialBase>(dialBase.release());
 
           dialEntryPtr->collectionIndex = iCollection;
           dialEntryPtr->interfaceIndex = freeSlotDial;
@@ -1300,7 +1286,7 @@ void DataDispenser::loadEvent(int iThread_){
       }
       else{
 
-        if( dialCollectionRef->getDialBaseList().size() == 1
+        if( dialCollectionRef->getDialInterfaceList().size() == 1
             and dialCollectionRef->getDialBinSet().getBinList().empty()){
           // There isn't any binning, and there is only one dial.
           // In this case we don't need to check if the dial is in

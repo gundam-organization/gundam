@@ -26,10 +26,12 @@ class DialInterface {
 public:
   DialInterface() = default;
 
-  void setDial(const GenericToolbox::PolymorphicObjectWrapper<DialBase>& dial_){ _dial_ = dial_; }
+  void setDial(const DialBaseObj& dial_){ _dial_ = dial_; }
   void setInputBufferRef(DialInputBuffer *inputBufferRef){ _inputBufferPtr_ = inputBufferRef; }
   void setResponseSupervisorRef(const DialResponseSupervisor *responseSupervisorRef){ _responseSupervisorPtr_ = responseSupervisorRef; }
   void setDialBinRef(const Bin *dialBinRef){ _dialBinRef_ = dialBinRef; }
+
+  auto& getDial(){ return _dial_; }
 
   /// Return the input buffer containing the connection to the Parameter(s)
   /// used by this dial.  The number of Parameters contained in the input

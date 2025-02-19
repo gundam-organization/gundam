@@ -39,7 +39,7 @@ public:
     DialResponseCache() = delete; // prevent not setting up the interface ptr
     explicit DialResponseCache( DialInterface& interface_ )
       : dialInterface(&interface_) {
-      this->updateRequested = dialInterface->getInputBufferRef()->isDialUpdateRequestedPtr();
+      this->updateRequested = (bool*) dialInterface->getInputBufferRef()->isDialUpdateRequestedPtr();
     }
     // The dial interface to be used with the Event.
     DialInterface* dialInterface{nullptr};

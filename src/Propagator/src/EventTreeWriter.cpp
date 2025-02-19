@@ -193,12 +193,7 @@ template<typename T> void EventTreeWriter::writeEventsTemplate(const GenericTool
             for( double xPoint : parameterXvalues[iGlobalPar] ){
               inputBuf.getInputBuffer()[0] = xPoint;
               grPtr->AddPoint(
-                  xPoint,
-                  DialInterface::evalResponse(
-                      &inputBuf,
-                      dial.dialInterface->getDialBaseRef(),
-                      dial.dialInterface->getResponseSupervisorRef()
-                  )
+                xPoint, dial.dialInterface->evalResponse()
               );
             }
 

@@ -465,7 +465,7 @@ bool Cache::Manager::Update() {
     int dialErrorCount = 0;
     // Add each dial for the event to the GPU caches.
     for( auto& dialElem : elem.dialResponseCacheList ){
-      DialInputBuffer* dialInputs
+      auto* dialInputs
           = dialElem.dialInterface->getInputBufferRef();
 
       // Make sure all the used parameters are in the parameter
