@@ -176,6 +176,16 @@ protected:
   void readGlobals(const JsonType &config_);
   JsonType fetchDialsDefinition(const JsonType &definitionsList_);
 
+  // methods to generate dials with factory
+  std::unique_ptr<DialBase> makeDial() const;
+  std::unique_ptr<DialBase> makeDial(const TObject* src_) const;
+  std::unique_ptr<DialBase> makeDial(const JsonType& config_) const;
+
+protected:
+  std::unique_ptr<DialBase> makeGraphDial(const TObject* src_) const;
+  std::unique_ptr<DialBase> makeSplineDial(const TObject* src_) const;
+  std::unique_ptr<DialBase> makeSurfaceDial(const TObject* src_) const;
+
 private:
   // parameters
   bool _isEventByEvent_{false};
@@ -230,20 +240,6 @@ private:
 
   // external refs
   std::vector<ParameterSet>* _parameterSetListPtr_{nullptr};
-
-
-  // dev
-public:
-  // methods to generate dials with factory
-  std::unique_ptr<DialBase> makeDial() const;
-  std::unique_ptr<DialBase> makeDial(const TObject* src_) const;
-  std::unique_ptr<DialBase> makeDial(const JsonType& config_) const;
-
-protected:
-  std::unique_ptr<DialBase> makeGraphDial(const TObject* src_) const;
-  std::unique_ptr<DialBase> makeSplineDial(const TObject* src_) const;
-  std::unique_ptr<DialBase> makeSurfaceDial(const TObject* src_) const;
-
 
 };
 #endif //GUNDAM_DIALCOLLECTION_H
