@@ -820,17 +820,18 @@ std::unique_ptr<DialBase> DialCollection::makeDial() const{
   return std::make_unique<Norm>();
 }
 std::unique_ptr<DialBase> DialCollection::makeDial(const TObject* src_) const {
+  std::unique_ptr<DialBase> out{nullptr};
 
   // always returns an invalid ptr if
-  if( src_ == nullptr ){ return nullptr; }
+  if( src_ == nullptr ){ return out; }
 
-  if( _globalDialType_ == "Graph"  ){ return makeGraphDial(src_); }
-  if( _globalDialType_ == "Spline" ){ return makeSplineDial(src_); }
-  if( _globalDialType_ == "surface" ){ return makeSurfaceDial(src_); }
+  if     ( _globalDialType_ == "Graph"   ){ return makeGraphDial(src_); }
+  else if( _globalDialType_ == "Spline"  ){ return makeSplineDial(src_); }
+  else if( _globalDialType_ == "surface" ){ return makeSurfaceDial(src_); }
+  else{ LogThrow("Invalid dial type to init with TObject: " << _globalDialType_); }
 
-  // should not be there
-  LogThrow("Invalid dial type to init with TObject: " << _globalDialType_);
-  return nullptr;
+  out->setAllowExtrapolation( _allowDialExtrapolation_ );
+  return out;
 }
 std::unique_ptr<DialBase> DialCollection::makeDial(const JsonType& config_) const{
   std::unique_ptr<DialBase> dialBase{nullptr};

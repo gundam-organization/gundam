@@ -1241,7 +1241,6 @@ void DataDispenser::loadEvent(int iThread_){
         // dialBase is valid -> store it
         if( eventByEventDialBuffer[dialCollectionRef->getIndex()] != nullptr ){
           size_t freeSlotDial = dialCollectionRef->getNextDialFreeSlot();
-          eventByEventDialBuffer[dialCollectionRef->getIndex()]->setAllowExtrapolation(dialCollectionRef->isAllowDialExtrapolation());
           dialCollectionRef->getDialInterfaceList()[freeSlotDial].getDial().dialPtr
             = std::unique_ptr<DialBase>(eventByEventDialBuffer[dialCollectionRef->getIndex()]);
 
@@ -1275,7 +1274,6 @@ void DataDispenser::loadEvent(int iThread_){
         // dialBase is valid -> store it
         if( dialBase != nullptr ){
           size_t freeSlotDial = dialCollectionRef->getNextDialFreeSlot();
-          dialBase->setAllowExtrapolation(dialCollectionRef->isAllowDialExtrapolation());
           dialCollectionRef->getDialInterfaceList()[freeSlotDial].getDial().dialPtr =
             std::unique_ptr<DialBase>(dialBase.release());
 
