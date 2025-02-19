@@ -814,11 +814,7 @@ void DialCollection::printConfiguration() const {
 
 
 
-std::unique_ptr<DialBase> DialCollection::makeDial() const{
-  GenericToolbox::PolymorphicObjectWrapper<DialBase> out;
-  out.dialPtr = std::make_unique<Norm>();
-  return std::make_unique<Norm>();
-}
+std::unique_ptr<DialBase> DialCollection::makeDial() const{ return std::make_unique<Norm>(); }
 std::unique_ptr<DialBase> DialCollection::makeDial(const TObject* src_) const {
   std::unique_ptr<DialBase> out{nullptr};
 
