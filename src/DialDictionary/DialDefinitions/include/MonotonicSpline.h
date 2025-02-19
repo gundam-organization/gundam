@@ -50,6 +50,5 @@ protected:
   DialUtils::Range _splineBounds_{};
 };
 
-typedef CachedDial<MonotonicSpline> MonotonicSplineCache;
 
 #endif //GUNDAM_MONOTONICSPLINE_H

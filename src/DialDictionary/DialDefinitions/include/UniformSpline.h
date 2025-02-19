@@ -52,7 +52,5 @@ protected:
   DialUtils::Range _splineBounds_{std::nan("unset"), std::nan("unset")};
 };
 
-typedef CachedDial<UniformSpline> UniformSplineCache;
-
 
 #endif //GUNDAM_UNIFORMSPLINE_H

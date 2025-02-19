@@ -48,7 +48,5 @@ protected:
   std::vector<DialUtils::Range> _splineBounds_;
 };
 
-typedef CachedDial<Bilinear> BilinearCache;
-
 
 #endif //GUNDAM_COMPACTSPLINE_H

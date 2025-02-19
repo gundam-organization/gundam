@@ -51,7 +51,5 @@ protected:
   DialUtils::Range _splineBounds_{std::nan("unset"), std::nan("unset")};
 };
 
-typedef CachedDial<GeneralSpline> GeneralSplineCache;
-
 
 #endif //GUNDAM_GENERALSPLINE_H

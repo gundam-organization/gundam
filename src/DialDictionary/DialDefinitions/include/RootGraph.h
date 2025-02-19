@@ -32,7 +32,5 @@ protected:
   TGraph _graph_{};
 };
 
-typedef CachedDial<RootGraph> GraphCache;
-
 
 #endif //GUNDAM_ROOT_GRAPH_H

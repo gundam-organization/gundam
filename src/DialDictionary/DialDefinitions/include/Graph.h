@@ -38,5 +38,4 @@ protected:
   std::vector<Double_t> _data_;
 };
 
-typedef CachedDial<Graph> LightGraphCache;
 #endif //GUNDAM_GRAPH_H

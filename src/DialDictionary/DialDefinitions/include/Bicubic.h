@@ -48,7 +48,4 @@ protected:
   std::vector<DialUtils::Range> _splineBounds_;
 };
 
-typedef CachedDial<Bicubic> BicubicCache;
-
-
 #endif //GUNDAM_BICUBIC_SPLINE_H

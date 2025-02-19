@@ -85,9 +85,6 @@ public:
 
 };
 
-// extensions
-#include "CachedDial.h"
-
 #endif //GUNDAM_DIALBASE_H
 // Local Variables:
 // mode:c++

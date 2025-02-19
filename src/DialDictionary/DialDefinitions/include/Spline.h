@@ -43,7 +43,4 @@ protected:
 
 };
 
-typedef CachedDial<Spline> SplineCache;
-
-
 #endif //GUNDAM_SPLINE_H
