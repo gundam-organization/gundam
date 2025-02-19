@@ -13,10 +13,7 @@
 // (see DialBaseFactory).  The ownership of the object is passed to the caller
 // so the pointer should be put into a managed pointer (e.g. unique_ptr, or
 // shared_ptr).
-class SplineDialBaseFactory {
-public:
-  SplineDialBaseFactory() = default;
-  ~SplineDialBaseFactory() = default;
+namespace SplineDialBaseFactory {
 
   /// Fill the points starting from a TObject that needs to be pointing to a
   /// graph.  This returns false if it can't get the points.
@@ -45,11 +42,6 @@ public:
   void FillAkimaSlopes(const std::vector<double>& X,
                        const std::vector<double>& Y,
                        std::vector<double>& slope);
-
-private:
-  std::vector<double> _xPointListBuffer_{};
-  std::vector<double> _yPointListBuffer_{};
-  std::vector<double> _slopeListBuffer_{};
 
 };
 

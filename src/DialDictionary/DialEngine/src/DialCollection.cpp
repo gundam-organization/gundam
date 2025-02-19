@@ -5,10 +5,9 @@
 #include "DialCollection.h"
 
 #include "SplineDialBaseFactory.h"
-
 #include "TabulatedDialFactory.h"
-#include "RootFormula.h"
 
+#include "RootFormula.h"
 #include "Shift.h"
 #include "RootGraph.h"
 #include "Graph.h"
@@ -939,8 +938,6 @@ std::unique_ptr<DialBase> DialCollection::makeSplineDial(const TObject* src_) co
   _yPointListBuffer_.clear();
   _slopeListBuffer_.clear();
 
-  SplineDialBaseFactory factory{};
-
   ///////////////////////////////////////////////////////////////////////
   // Side-effect programming alert.  The conditionals are doing the actual
   // work and setting xPoint, yPoint and slopePoint.  We only have a couple
@@ -948,11 +945,11 @@ std::unique_ptr<DialBase> DialCollection::makeSplineDial(const TObject* src_) co
   // if-then-elseif-elseif-elseif-elseif idiom.  Change this to do-while-false
   // if the number of kinds of initializers is more than a few.
   ///////////////////////////////////////////////////////////////////////
-  if( factory.FillFromGraph(_xPointListBuffer_, _yPointListBuffer_, _slopeListBuffer_, (TObject*) src_, splType) ) {
+  if( SplineDialBaseFactory::FillFromGraph(_xPointListBuffer_, _yPointListBuffer_, _slopeListBuffer_, (TObject*) src_, splType) ) {
     // The points were from a ROOT graph like object and the points were
     // filled, don't check any further.
   }
-  else if ( factory.FillFromSpline(_xPointListBuffer_, _yPointListBuffer_, _slopeListBuffer_,
+  else if ( SplineDialBaseFactory::FillFromSpline(_xPointListBuffer_, _yPointListBuffer_, _slopeListBuffer_,
                           (TObject*) src_, splType) ) {
     // The points were from a ROOT TSpline3 like object and the points were
     // filled, don't check any further.
@@ -1037,13 +1034,13 @@ std::unique_ptr<DialBase> DialCollection::makeSplineDial(const TObject* src_) co
   // slopes for the other types ("catmull-rom", "akima")
   if (splType == "catmull-rom") {
     // Fill the slopes according to the Catmull-Rom prescription.
-    factory.FillCatmullRomSlopes(_xPointListBuffer_,
+    SplineDialBaseFactory::FillCatmullRomSlopes(_xPointListBuffer_,
                          _yPointListBuffer_,
                          _slopeListBuffer_);
   }
   else if (splType == "akima") {
     // Fill the slopes according to the Akima prescription.
-    factory.FillAkimaSlopes(_xPointListBuffer_, _yPointListBuffer_, _slopeListBuffer_);
+    SplineDialBaseFactory::FillAkimaSlopes(_xPointListBuffer_, _yPointListBuffer_, _slopeListBuffer_);
   }
 
   ////////////////////////////////////////////////////////////////
