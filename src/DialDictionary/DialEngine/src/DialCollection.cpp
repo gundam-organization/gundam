@@ -825,9 +825,9 @@ std::unique_ptr<DialBase> DialCollection::makeDial(const TObject* src_) const {
   // always returns an invalid ptr if
   if( src_ == nullptr ){ return out; }
 
-  if     ( _globalDialType_ == "Graph"   ){ return makeGraphDial(src_); }
-  else if( _globalDialType_ == "Spline"  ){ return makeSplineDial(src_); }
-  else if( _globalDialType_ == "surface" ){ return makeSurfaceDial(src_); }
+  if     ( _globalDialType_ == "Graph"   ){ out = makeGraphDial(src_); }
+  else if( _globalDialType_ == "Spline"  ){ out = makeSplineDial(src_); }
+  else if( _globalDialType_ == "surface" ){ out = makeSurfaceDial(src_); }
   else{ LogThrow("Invalid dial type to init with TObject: " << _globalDialType_); }
 
   out->setAllowExtrapolation( _allowDialExtrapolation_ );
