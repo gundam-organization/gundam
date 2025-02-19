@@ -830,7 +830,10 @@ std::unique_ptr<DialBase> DialCollection::makeDial(const TObject* src_) const {
   else if( _globalDialType_ == "surface" ){ out = makeSurfaceDial(src_); }
   else{ LogThrow("Invalid dial type to init with TObject: " << _globalDialType_); }
 
-  out->setAllowExtrapolation( _allowDialExtrapolation_ );
+  if( out != nullptr ){
+    out->setAllowExtrapolation( _allowDialExtrapolation_ );
+  }
+
   return out;
 }
 std::unique_ptr<DialBase> DialCollection::makeDial(const JsonType& config_) const{
