@@ -274,9 +274,6 @@ void DialCollection::readGlobals(const JsonType &config_) {
   GenericToolbox::Json::fillValue(config_, _allowDialExtrapolation_, "allowDialExtrapolation");
   GenericToolbox::Json::fillValue(config_, _applyConditionStr_, "applyCondition");
 
-  _globalDialType_ = GenericToolbox::toLowerCase(_globalDialType_);
-  _globalDialSubType_ = GenericToolbox::toLowerCase(_globalDialSubType_);
-
   if( GenericToolbox::Json::doKeyExist(config_, "applyConditions") ){
     std::vector<std::string> conditionsList;
 
