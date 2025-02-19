@@ -46,18 +46,6 @@ public:
                        const std::vector<double>& Y,
                        std::vector<double>& slope);
 
-  /// Implement the factory that constructs a pointer to the correct
-  /// DialBase.  This uses the dialType and dialSubType to figure out the
-  /// correct class, and then uses the object pointed to by the
-  /// dialInitializer to fill the dial.  The ownership of the pointer is
-  /// passed to the caller, so it should be put in a managed variable (e.g. a
-  /// unique_ptr, or shared_ptr).
-  DialBase* makeDial(const std::string& dialTitle_,
-                     const std::string& dialType_,
-                     const std::string& dialSubType_,
-                     TObject* dialInitializer_,
-                     bool useCachedDial_);
-
 private:
   std::vector<double> _xPointListBuffer_{};
   std::vector<double> _yPointListBuffer_{};

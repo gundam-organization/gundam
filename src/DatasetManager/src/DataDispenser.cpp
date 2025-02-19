@@ -12,7 +12,6 @@
 #include "ConfigUtils.h"
 
 #include "DialCollection.h"
-#include "DialBaseFactory.h"
 #include "TabulatedDialFactory.h"
 
 #include "GundamUtils.h"

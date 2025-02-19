@@ -4,10 +4,8 @@
 
 #include "DialCollection.h"
 
-#include <GraphDialBaseFactory.h>
 #include <SplineDialBaseFactory.h>
 
-#include "DialBaseFactory.h"
 #include "TabulatedDialFactory.h"
 #include "RootFormula.h"
 
@@ -535,7 +533,6 @@ bool DialCollection::initializeDialsWithTabulation(const JsonType& dialsDefiniti
 bool DialCollection::initializeDialsWithBinningFile(const JsonType& dialsDefinition) {
   if(not GenericToolbox::Json::doKeyExist(dialsDefinition, "binningFilePath") ) return false;
   
-  DialBaseFactory dialBaseFactory;
   // A binning file has been provided, so this is a binned dial.  Create
   // the dials for each bin here.  The dials will be assigned to the
   // events in DataDispenser.
@@ -687,7 +684,6 @@ bool DialCollection::initializeDialsWithDefinition() {
   }
 
   this->readGlobals( dialsDefinition );
-  DialBaseFactory dialBaseFactory;
 
   if     ( _globalDialType_ == "Norm" or _globalDialType_ == "Normalization" ) {
     // This dial collection is a normalization, so there is a single dial.
@@ -1025,13 +1021,7 @@ std::unique_ptr<DialBase> DialCollection::makeSplineDial(const TObject* src_) co
 
 #define SHORT_CIRCUIT_SMALL_SPLINES
 #ifdef  SHORT_CIRCUIT_SMALL_SPLINES
-  if (_xPointListBuffer_.size() <= 2) {
-    GraphDialBaseFactory grapher;
-    return std::unique_ptr<DialBase>(grapher.makeDial(getTitle(),
-                                                      "Graph", "",
-                                                      (TObject*) src_,
-                                                      false));
-  }
+  if (_xPointListBuffer_.size() <= 2) { return this->makeGraphDial(src_); }
 #endif
 
   // Sanity check.  By the time we get here, there can't be fewer than two

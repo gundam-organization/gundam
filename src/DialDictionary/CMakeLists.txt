@@ -26,13 +26,8 @@ set( SRCFILES
     DialDefinitions/src/RootFormula.cpp
     DialDefinitions/src/Polynomial.cpp
 
-
     # DialFactories
-    DialFactories/src/DialBaseFactory.cpp
-    DialFactories/src/NormDialBaseFactory.cpp
-    DialFactories/src/GraphDialBaseFactory.cpp
     DialFactories/src/SplineDialBaseFactory.cpp
-    DialFactories/src/SurfaceDialBaseFactory.cpp
     DialFactories/src/TabulatedDialFactory.cpp
     )
 
