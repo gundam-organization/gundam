@@ -13,7 +13,6 @@
 
 #include "GenericToolbox.Wrappers.h"
 
-
 #include <vector>
 #include <string>
 #include <memory>
@@ -236,8 +235,13 @@ private:
   // dev
 public:
   // methods to generate dials with factory
-  GenericToolbox::PolymorphicObjectWrapper<DialBase> makeDial() const;
-  GenericToolbox::PolymorphicObjectWrapper<DialBase> makeDial(TObject* src_) const;
+  std::unique_ptr<DialBase> makeDial() const;
+  std::unique_ptr<DialBase> makeDial(TObject* src_) const;
+
+protected:
+  std::unique_ptr<DialBase> makeGraphDial(TObject* src_) const;
+  std::unique_ptr<DialBase> makeSplineDial(TObject* src_) const;
+  std::unique_ptr<DialBase> makeSurfaceDial(TObject* src_) const;
 
 
 };

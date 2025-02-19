@@ -34,6 +34,18 @@ public:
                       TObject* dialInitializer,
                       const std::string& splType);
 
+  // Take vectors of X and Y values and fill anothera vector with the slopes
+  // according to the Catmull-Rom prescription.
+  void FillCatmullRomSlopes(const std::vector<double>& X,
+                            const std::vector<double>& Y,
+                            std::vector<double>& slope);
+
+  // Take vectors of X and Y values and fill anothera vector with the slopes
+  // according to the Akima prescription.
+  void FillAkimaSlopes(const std::vector<double>& X,
+                       const std::vector<double>& Y,
+                       std::vector<double>& slope);
+
   /// Implement the factory that constructs a pointer to the correct
   /// DialBase.  This uses the dialType and dialSubType to figure out the
   /// correct class, and then uses the object pointed to by the
@@ -51,17 +63,6 @@ private:
   std::vector<double> _yPointListBuffer_{};
   std::vector<double> _slopeListBuffer_{};
 
-  // Take vectors of X and Y values and fill anothera vector with the slopes
-  // according to the Catmull-Rom prescription.
-  void FillCatmullRomSlopes(const std::vector<double>& X,
-                            const std::vector<double>& Y,
-                            std::vector<double>& slope);
-
-  // Take vectors of X and Y values and fill anothera vector with the slopes
-  // according to the Akima prescription.
-  void FillAkimaSlopes(const std::vector<double>& X,
-                       const std::vector<double>& Y,
-                       std::vector<double>& slope);
 };
 
 //  A Lesser GNU Public License

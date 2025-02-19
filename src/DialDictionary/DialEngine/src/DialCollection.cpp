@@ -4,13 +4,26 @@
 
 #include "DialCollection.h"
 
-#include "Norm.h"
-#include "Graph.h"
-#include "LightGraph.h"
+#include <GraphDialBaseFactory.h>
+#include <SplineDialBaseFactory.h>
 
 #include "DialBaseFactory.h"
 #include "TabulatedDialFactory.h"
 #include "RootFormula.h"
+
+#include "Shift.h"
+#include "Graph.h"
+#include "LightGraph.h"
+#include "Norm.h"
+#include "Spline.h"
+#include "SimpleSpline.h"
+#include "CompactSpline.h"
+#include "UniformSpline.h"
+#include "GeneralSpline.h"
+#include "MonotonicSpline.h"
+#include "MakeMonotonicSpline.h"
+#include "Bilinear.h"
+#include "Bicubic.h"
 
 #include "GundamGlobals.h"
 
@@ -817,59 +830,362 @@ void DialCollection::printConfiguration() const {
 
 
 
-GenericToolbox::PolymorphicObjectWrapper<DialBase> DialCollection::makeDial() const{
+std::unique_ptr<DialBase> DialCollection::makeDial() const{
   GenericToolbox::PolymorphicObjectWrapper<DialBase> out;
   out.dialPtr = std::make_unique<Norm>();
-  return out;
+  return std::make_unique<Norm>();
 }
-GenericToolbox::PolymorphicObjectWrapper<DialBase> DialCollection::makeDial(TObject* src_) const {
-  GenericToolbox::PolymorphicObjectWrapper<DialBase> out{};
+std::unique_ptr<DialBase> DialCollection::makeDial(TObject* src_) const {
 
   // always returns an invalid ptr if
-  if( src_ == nullptr ){ return {}; }
+  if( src_ == nullptr ){ return nullptr; }
 
-  if( _globalDialType_ == "graph" ){
-
-    auto* srcGraph = dynamic_cast<TGraph*>(src_);
-
-    if( srcGraph->GetN() == 0 ) { return {}; }
-
-    if( _globalDialSubType_ == "root" ) {
-      auto dial = std::make_unique<Graph>();
-      dial->buildDial(*srcGraph);
-      out.dialPtr = std::unique_ptr<DialBase>(dial.release());
-    }
-    else if( srcGraph->GetN() == 1 ){
-      // For one point graph, just use a scale. Do the unique_ptr dance in case
-      // there are exceptions.
-      double value = srcGraph->GetY()[0];
-
-      // is flat?
-      if (std::abs(value-1.0) < 2*std::numeric_limits<float>::epsilon()) { return {}; }
-
-      auto dial = std::make_unique<Shift>();
-      dial->buildDial(value);
-      out.dialPtr = std::unique_ptr<DialBase>(dial.release());
-    }
-
-    // srcGraph->GetN() >= 2
-    auto dial = std::make_unique<LightGraph>();
-    dial->buildDial(*srcGraph);
-    out.dialPtr = std::unique_ptr<DialBase>(dial.release());
-  }
-
-  if( _globalDialType_ == "spline" ){
-    SplineDialBaseFactory factory;
-    dialBase.reset(factory.makeDial(dialTitle_, dialType_, dialSubType_, dialInitializer_, useCachedDial_));
-  }
-  else if( _globalDialType_ == "Surface" ){
-    SurfaceDialBaseFactory factory;
-    dialBase.reset(factory.makeDial(dialTitle_, dialType_, dialSubType_, dialInitializer_, useCachedDial_));
-  }
+  if( _globalDialType_ == "graph"  ){ return makeGraphDial(src_); }
+  if( _globalDialType_ == "spline" ){ return makeSplineDial(src_); }
+  if( _globalDialType_ == "surface" ){ return makeSurfaceDial(src_); }
 
   // should not be there
   LogThrow("Invalid dial type to init with TObject: " << _globalDialType_);
-  return {};
+  return nullptr;
+}
+
+std::unique_ptr<DialBase> DialCollection::makeGraphDial(TObject* src_) const {
+  // always returns an invalid ptr if
+  if( src_ == nullptr ){ return nullptr; }
+
+  auto* srcGraph = dynamic_cast<const TGraph*>(src_);
+
+  if( srcGraph->GetN() == 0 ) { return {}; }
+
+  if( _globalDialSubType_ == "root" ) {
+    auto dial = std::make_unique<Graph>();
+    dial->buildDial(*srcGraph);
+    return dial;
+  }
+
+  if( srcGraph->GetN() == 1 ){
+    // For one point graph, just use a scale. Do the unique_ptr dance in case
+    // there are exceptions.
+    double value = srcGraph->GetY()[0];
+
+    // is flat?
+    if (std::abs(value-1.0) < 2*std::numeric_limits<float>::epsilon()) { return {}; }
+
+    auto dial = std::make_unique<Shift>();
+    dial->buildDial(value);
+    return dial;
+  }
+
+  // srcGraph->GetN() >= 2, default
+  auto dial = std::make_unique<LightGraph>();
+  dial->buildDial(*srcGraph);
+  return dial;
+}
+std::unique_ptr<DialBase> DialCollection::makeSplineDial(TObject* src_) const{
+  // always returns an invalid ptr if
+  if( src_ == nullptr ){ return nullptr; }
+
+// The types of cubic splines are "not-a-knot", "natural", "catmull-rom",
+  // and "ROOT".  The "not-a-knot" spline will give the same curve as ROOT
+  // (and might be implemented with at TSpline3).  The "ROOT" spline will use
+  // an actual TSpline3 (and is slow).  The "natural" and "catmull-rom"
+  // splines are just as expected (you can see the underlying math on
+  // Wikipedia or another source).  Be careful about the order since later
+  // conditionals can override earlier ones.
+  std::string splType = "not-a-knot";  // The default.
+  if( _globalDialSubType_.find("akima") != std::string::npos ) splType = "akima";
+  if( _globalDialSubType_.find("catmull") != std::string::npos) splType = "catmull-rom";
+  if( _globalDialSubType_.find("natural") != std::string::npos) splType = "natural";
+  if( _globalDialSubType_.find("not-a-knot") != std::string::npos) splType = "not-a-knot";
+  if( _globalDialSubType_.find("pixar") != std::string::npos) {
+    splType = "catmull-rom";
+    // sneaky output... logger would tattle on me.
+    static bool woody=true;
+    if (woody) std::cout << std::endl << std::endl << "You got a friend in me!" << std::endl;
+    woody=false;
+  }
+  if( _globalDialSubType_.find("ROOT") != std::string::npos) splType = "ROOT";
+
+  // Get the numeric tolerance for when a uniform spline can be used.  We
+  // should be able to set this in the DialSubType.
+  const double defUniformityTolerance{16*std::numeric_limits<float>::epsilon()};
+  double uniformityTolerance{defUniformityTolerance};
+  if (_globalDialSubType_.find("uniformity(") != std::string::npos) {
+    std::size_t bg = _globalDialSubType_.find("uniformity(");
+    bg = _globalDialSubType_.find('(',bg);
+    std::size_t en = _globalDialSubType_.find(')',bg);
+    LogThrowIf(en == std::string::npos,
+               "Invalid spline uniformity with dialSubType: " << _globalDialSubType_
+               << " dial: " << getTitle());
+    en = en - bg;
+    std::string uniformityString = _globalDialSubType_.substr(bg+1,en-1);
+    std::istringstream unif(uniformityString);
+    unif >> uniformityTolerance;
+  }
+
+  std::vector<double> _xPointListBuffer_;
+  std::vector<double> _yPointListBuffer_;
+  std::vector<double> _slopeListBuffer_;
+
+  _xPointListBuffer_.clear();
+  _yPointListBuffer_.clear();
+  _slopeListBuffer_.clear();
+
+  SplineDialBaseFactory factory{};
+
+  ///////////////////////////////////////////////////////////////////////
+  // Side-effect programming alert.  The conditionals are doing the actual
+  // work and setting xPoint, yPoint and slopePoint.  We only have a couple
+  // of types of input for now, but watch out for the evil
+  // if-then-elseif-elseif-elseif-elseif idiom.  Change this to do-while-false
+  // if the number of kinds of initializers is more than a few.
+  ///////////////////////////////////////////////////////////////////////
+  if( factory.FillFromGraph(_xPointListBuffer_, _yPointListBuffer_, _slopeListBuffer_, src_, splType) ) {
+    // The points were from a ROOT graph like object and the points were
+    // filled, don't check any further.
+  }
+  else if ( factory.FillFromSpline(_xPointListBuffer_, _yPointListBuffer_, _slopeListBuffer_,
+                          src_, splType) ) {
+    // The points were from a ROOT TSpline3 like object and the points were
+    // filled, don't check any further.
+  }
+  else {
+    // If we get to this point, we don't know how to grab the spline points
+    // out of the initializer, so flag this as an invalid dial.
+    return nullptr;
+  }
+
+  // Check that we got at least some points!  A single point will be treated
+  // as a constant value, but it's not an error.
+  if (_xPointListBuffer_.empty()) {
+    LogAlertOnce << "Splines must have at least one point." << std::endl;
+    return nullptr;
+  }
+
+  // Check that there are equal numbers of X and Y.  There have to be an equal
+  // number of points or something is very wrong.
+  LogThrowIf( _xPointListBuffer_.size() != _yPointListBuffer_.size(),
+              "INVALID Spline Input: "
+              << "must have the same number of X and Y points "
+              << "for dial " << getTitle() );
+
+  // Check that the X points are in strictly increasing order (sorted order is
+  // not sufficient) with explicit comparisons in case we want to add more
+  // detailed logic.  This shouldn't happen, and indicates there is a problem
+  // with the inputs.  Don't try to continue!
+  for (int i = 1; i<_xPointListBuffer_.size(); ++i) {
+    LogThrowIf(_xPointListBuffer_[i] <= _xPointListBuffer_[i-1],
+               "INVALID Spline Input: points are not in increasing order "
+               << " for dial " << getTitle());
+  }
+
+  // Check if the spline is flat.  Flat functions won't be handled with
+  // splines.
+  bool isFlat{true};
+  for (double y : _yPointListBuffer_) {
+    // Use a tolerance based on float in case the data when through a float.
+    // Keep this inside the loop so it has the right scope, and depend on the
+    // compiler to do the right thing.
+    const double toler{2*std::numeric_limits<float>::epsilon()};
+    const double delta{std::abs(y-_yPointListBuffer_[0])};
+    if (delta > toler) isFlat = false;
+  }
+
+  // If the function is flat AND equal to one, the drop it.  Compare against
+  // float accuracy in case the value was actually calculated against with a
+  // float.
+  if (std::abs(_yPointListBuffer_[0]-1.0)
+      < 2*std::numeric_limits<float>::epsilon()
+      and isFlat) {
+    return nullptr;
+  }
+
+  // If the function is equal to a constant (but not to one) then we don't
+  // need a Spline so use the faster "Shift" dial (which applies a "scale"
+  // factor, and not an additive shift).
+  if (isFlat) {
+    // Do the unique_ptr dance in case there are exceptions.
+    std::unique_ptr<DialBase> dialBase = std::make_unique<Shift>();
+    dialBase->buildDial(_yPointListBuffer_[0]);
+    return dialBase;
+  }
+
+#define SHORT_CIRCUIT_SMALL_SPLINES
+#ifdef  SHORT_CIRCUIT_SMALL_SPLINES
+  if (_xPointListBuffer_.size() <= 2) {
+    GraphDialBaseFactory grapher;
+    return std::unique_ptr<DialBase>(grapher.makeDial(getTitle(),
+                                                      "Graph", "",
+                                                      src_,
+                                                      false));
+  }
+#endif
+
+  // Sanity check.  By the time we get here, there can't be fewer than two
+  // points, and it should have been trapped above by other conditionals
+  // (e.g. a single point "spline" should have been flagged as flat).
+  LogThrowIf((_xPointListBuffer_.size() < 2),
+             "Input data logic error: two few points "
+             << "for dial " << getTitle() );
+
+  ////////////////////////////////////////////////////////////////
+  // Check if the spline slope calculation should be updated.  The slopes for
+  // not-a-knot and natural splines are calculated by FillFromGraph and
+  // FillFromSpoline using ROOT code.  That means we need to fill in the
+  // slopes for the other types ("catmull-rom", "akima")
+  if (splType == "catmull-rom") {
+    // Fill the slopes according to the Catmull-Rom prescription.
+    factory.FillCatmullRomSlopes(_xPointListBuffer_,
+                         _yPointListBuffer_,
+                         _slopeListBuffer_);
+  }
+  else if (splType == "akima") {
+    // Fill the slopes according to the Akima prescription.
+    factory.FillAkimaSlopes(_xPointListBuffer_, _yPointListBuffer_, _slopeListBuffer_);
+  }
+
+  ////////////////////////////////////////////////////////////////
+  // Check if the spline can be treated as having uniformly spaced knots.
+  ////////////////////////////////////////////////////////////////
+  bool isUniform = true;
+  for (int i=0; i<_xPointListBuffer_.size()-1; ++i) {
+    // Could be precalculated, but this only gets run once per dial so go for
+    // clarity instead.  The compiler probably optimizes it out of the loop.
+    const double avgSpace = (_xPointListBuffer_.back()-_xPointListBuffer_.front())/(_xPointListBuffer_.size()-1.0);
+    // Find out how far the point is from the expected lattice point
+    const double delta = std::abs(_xPointListBuffer_[i] - _xPointListBuffer_[0] - i*avgSpace)/avgSpace;
+    if (delta < uniformityTolerance) continue;
+    // Point isn't in the right place so this is not uniform and break out of
+    // the loop.
+    isUniform = false;
+    break;
+  }
+
+  ////////////////////////////////////////////////////////////////
+  // Check if the spline is suppose to be monotonic and condition the slopes
+  // if necessary.  This is ignored by "ROOT" splines.  The Catmull-Rom
+  // splines have a special implementation for monotonic splines, so save a
+  // flag that can be checked later.
+  ////////////////////////////////////////////////////////////////
+  bool isMonotonic = ( _globalDialSubType_.find("monotonic") != std::string::npos );
+  if ( isMonotonic ) { ::util::MakeMonotonicSpline(_xPointListBuffer_, _yPointListBuffer_, _slopeListBuffer_); }
+
+  // If there are only two points, then force a catmull-rom.  This could be
+  // handled using a graph, but Catmull-Rom is fast, and works better with the
+  // GPU.  The isMonotonic is forced to false so that this uses CompactSpline
+  // instead of MonotonicSpline.
+  if (_xPointListBuffer_.size() < 3) {
+    splType = "catmull-rom";
+    isMonotonic = false;
+  }
+
+  ///////////////////////////////////////////////////////////
+  // Create the right kind low level spline class base on all of the previous
+  // queries.  This is pushing the if-elseif-elseif limit so watch for when it
+  // should change to the do-while-false idiom.  Make sure the individual
+  // conditionals are less than 10 lines.
+  ///////////////////////////////////////////////////////////
+  std::unique_ptr<DialBase> dialBase;
+  if (splType == "ROOT") {
+    // The ROOT implementation of the spline has been explicitly requested, so
+    // use it.
+    dialBase = std::make_unique<Spline>();
+  }
+  else if (splType == "catmull-rom" and isMonotonic) {
+    // Catmull-Rom is handled as a special case because it ignores the slopes,
+    // and has an explicit monotonic implementatino.  It also must have
+    // uniformly spaced knots.
+    if (not isUniform) {
+      LogError << "Monotonic Catmull-rom splines need a uniformly spaced points"
+               << " Dial: " << getTitle()
+               << std::endl;
+      double step = (_xPointListBuffer_.back()-_xPointListBuffer_.front())/(_xPointListBuffer_.size()-1);
+      for (int i = 0; i<_xPointListBuffer_.size()-1; ++i) {
+        LogError << i << " --  X: " << _xPointListBuffer_[i]
+                 << " X+1: " << _xPointListBuffer_[i+1]
+                 << " step: " << step
+                 << " error: " << _xPointListBuffer_[i+1] - _xPointListBuffer_[i] - step
+                 << std::endl;
+      }
+      // If the user specified a tolerance then crash, otherwise trust the
+      // user knows that it's not uniform and continue.
+      LogThrowIf(uniformityTolerance != defUniformityTolerance,
+                 "Invalid catmull-rom inputs -- Nonuniform spacing");
+    }
+    dialBase = std::make_unique<MonotonicSpline>();
+  }
+  else if (splType == "catmull-rom") {
+    // Catmull-Rom is handled as a special case because it ignores the slopes.
+    // This is the version when the spline doesn't need to be monotonic.
+    if (not isUniform) {
+      LogError << "Catmull-rom splines need a uniformly spaced points"
+               << " Dial: " << getTitle()
+               << std::endl;
+      double step = (_xPointListBuffer_.back()-_xPointListBuffer_.front())/(_xPointListBuffer_.size()-1);
+      for (int i = 0; i<_xPointListBuffer_.size()-1; ++i) {
+        LogError << i << " --  X: " << _xPointListBuffer_[i]
+                 << " X+1: " << _xPointListBuffer_[i+1]
+                 << " step: " << step
+                 << " error: " << _xPointListBuffer_[i+1] - _xPointListBuffer_[i] - step
+                 << std::endl;
+      }
+      // If the user specified a tolerance then crash, otherwise trust the
+      // user knows that it's not uniform and continue.
+      LogThrowIf(uniformityTolerance != defUniformityTolerance,
+                 "Invalid catmull-rom inputs -- Nonuniform spacing");
+    }
+    dialBase = std::make_unique<CompactSpline>();
+  }
+  else if (isUniform) {
+    // Haven't matched a specific special case, but we have uniformly spaced
+    // knots so we can use the faster UniformSpline implementation.
+    dialBase = std::make_unique<UniformSpline>();
+  }
+  else {
+    // Haven't matched a specific special case, and the knots are not
+    // uniformly spaced, so we have to use the GeneralSpline implemenatation
+    // which can handle any kind of cubic spline.
+    dialBase = std::make_unique<GeneralSpline>();
+  }
+
+  // Initialize the spline from the slopes
+  dialBase->buildDial(_xPointListBuffer_, _yPointListBuffer_, _slopeListBuffer_);
+
+  // Pass the ownership without any constraints!
+  return dialBase;
+
+}
+std::unique_ptr<DialBase> DialCollection::makeSurfaceDial(TObject* src_) const{
+  // always returns an invalid ptr if
+  if( src_ == nullptr ){ return nullptr; }
+
+  TH2* srcObject = dynamic_cast<TH2*>(src_);
+
+  LogThrowIf(srcObject == nullptr, "Surface dial initializers must be a TH2");
+
+  // Stuff the created dial into a unique_ptr, so it will be properly deleted
+  // in the event of an exception.
+  std::unique_ptr<DialBase> dialBase;
+
+  if (_globalDialSubType_ == "Bilinear") {
+    // Basic coding: Give a hint to the reader and put likely branch "first".
+    // Do we really expect the cached version more than the uncached?
+    dialBase = std::make_unique<Bilinear>();
+  }
+  else if (_globalDialSubType_ == "Bicubic") {
+    dialBase = std::make_unique<Bicubic>();
+  }
+
+  if (not dialBase) {
+    LogError << "Invalid dialSubType value: " << _globalDialSubType_ << std::endl;
+    LogError << "Valid dialSubType values are: Bilinear, Bicubic" << std::endl;
+    LogThrow("Invalid Surface dialSubType");
+  }
+
+  dialBase->buildDial(*srcObject);
+
+  // Pass the ownership without any constraints!
+  return dialBase;
 }
 
 //  A Lesser GNU Public License
