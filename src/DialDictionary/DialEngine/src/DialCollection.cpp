@@ -817,7 +817,7 @@ std::unique_ptr<DialBase> DialCollection::makeDial(const TObject* src_) const {
 
   if     ( _globalDialType_ == "Graph"   ){ out = makeGraphDial(src_); }
   else if( _globalDialType_ == "Spline"  ){ out = makeSplineDial(src_); }
-  else if( _globalDialType_ == "surface" ){ out = makeSurfaceDial(src_); }
+  else if( _globalDialType_ == "Surface" ){ out = makeSurfaceDial(src_); }
   else{ LogThrow("Invalid dial type to init with TObject: " << _globalDialType_); }
 
   if( out != nullptr ){
