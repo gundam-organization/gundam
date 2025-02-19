@@ -111,6 +111,8 @@ void RootMinimizer::initializeImpl(){
   for( std::size_t iFitPar = 0 ; iFitPar < getMinimizerFitParameterPtr().size() ; iFitPar++ ){
     auto& fitPar = *(getMinimizerFitParameterPtr()[iFitPar]);
 
+    LogThrowIf(std::isnan(fitPar.getStepSize()), "No step size provided for: " << fitPar.getFullTitle());
+
     if( not useNormalizedFitSpace() ){
       _rootMinimizer_->SetVariable(iFitPar, fitPar.getFullTitle(), fitPar.getParameterValue(), fitPar.getStepSize() * _stepSizeScaling_);
       if (not std::isnan(fitPar.getMinValue())
