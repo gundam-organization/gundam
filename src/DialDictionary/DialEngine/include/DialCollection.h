@@ -164,6 +164,11 @@ public:
 
   void printConfiguration() const;
 
+  // methods to generate dials with factory
+  std::unique_ptr<DialBase> makeDial() const;
+  std::unique_ptr<DialBase> makeDial(const TObject* src_) const;
+  std::unique_ptr<DialBase> makeDial(const JsonType& config_) const;
+
 protected:
   void configureImpl() override;
   void initializeImpl() override;
@@ -176,12 +181,7 @@ protected:
   void readGlobals(const JsonType &config_);
   JsonType fetchDialsDefinition(const JsonType &definitionsList_);
 
-  // methods to generate dials with factory
-  std::unique_ptr<DialBase> makeDial() const;
-  std::unique_ptr<DialBase> makeDial(const TObject* src_) const;
-  std::unique_ptr<DialBase> makeDial(const JsonType& config_) const;
-
-protected:
+  // factory
   std::unique_ptr<DialBase> makeGraphDial(const TObject* src_) const;
   std::unique_ptr<DialBase> makeSplineDial(const TObject* src_) const;
   std::unique_ptr<DialBase> makeSurfaceDial(const TObject* src_) const;
