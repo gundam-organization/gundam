@@ -4,7 +4,7 @@
 
 #include "DialCollection.h"
 
-#include <SplineDialBaseFactory.h>
+#include "SplineDialBaseFactory.h"
 
 #include "TabulatedDialFactory.h"
 #include "RootFormula.h"
@@ -13,16 +13,15 @@
 #include "RootGraph.h"
 #include "Graph.h"
 #include "Norm.h"
-#include "Spline.h"
-#include "SimpleSpline.h"
+#include "MonotonicSpline.h"
 #include "CompactSpline.h"
 #include "UniformSpline.h"
 #include "GeneralSpline.h"
-#include "MonotonicSpline.h"
-#include "MakeMonotonicSpline.h"
+#include "Spline.h"
 #include "Bilinear.h"
 #include "Bicubic.h"
 #include "CompiledLibDial.h"
+#include "MakeMonotonicSpline.h"
 
 #include "GundamGlobals.h"
 
