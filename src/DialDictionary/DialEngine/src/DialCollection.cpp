@@ -24,6 +24,7 @@
 #include "MakeMonotonicSpline.h"
 #include "Bilinear.h"
 #include "Bicubic.h"
+#include "CompiledLibDial.h"
 
 #include "GundamGlobals.h"
 
@@ -429,7 +430,7 @@ bool DialCollection::initializeNormDialsWithParBinning() {
   _dialInterfaceList_.reserve( _dialBinSet_.getBinList().size() );
   for(const auto & bin : _dialBinSet_.getBinList()) {
     _dialInterfaceList_.emplace_back();
-    _dialInterfaceList_.back().setDial( this->makeDial() );
+    _dialInterfaceList_.back().setDial( DialBaseObj(this->makeDial()) );
   }
 
   return true;
@@ -577,7 +578,7 @@ bool DialCollection::initializeDialsWithBinningFile(const JsonType& dialsDefinit
     for( int iBin = 0 ; iBin < nBins ; iBin++ ){
       TObject* binnedInitializer = dialsList->At(iBin);
 
-      auto dial = makeDial( dialsList->At(iBin) );
+      auto dial = DialBaseObj( this->makeDial( dialsList->At(iBin) ) );
       if( dial.get() == nullptr ) {
         LogAlert << "Invalid dial for " << getTitle() << " -> "
                  << _dialBinSet_.getBinList()[iBin].getSummary()
@@ -588,23 +589,6 @@ bool DialCollection::initializeDialsWithBinningFile(const JsonType& dialsDefinit
 
       _dialInterfaceList_.emplace_back();
       _dialInterfaceList_.back().setDial( dial );
-
-      DialBase *dialBase = dialBaseFactory.makeDial(
-          getTitle(),
-          getGlobalDialType(),
-          getGlobalDialSubType(),
-          binnedInitializer,
-          false);
-      if (dialBase == nullptr) {
-        LogAlert << "Invalid dial for " << getTitle() << " -> "
-                 << _dialBinSet_.getBinList()[iBin].getSummary()
-                 << std::endl;
-        excludedBins.emplace_back(iBin);
-        continue;
-      }
-      dialBase->setAllowExtrapolation(_allowDialExtrapolation_);
-
-      _dialBaseList_.emplace_back(DialBaseObject(dialBase));
     }
 
       if( not excludedBins.empty() ){
@@ -635,7 +619,7 @@ bool DialCollection::initializeDialsWithBinningFile(const JsonType& dialsDefinit
     std::vector<std::string> splitVarNameList;
     for( int iKey = 0 ; iKey < dialsTTree->GetListOfLeaves()->GetEntries() ; iKey++ ){
       std::string leafName = dialsTTree->GetListOfLeaves()->At(iKey)->GetName();
-      if(leafName != "kinematicBin" and leafName != "spline" and leafName != "graph"){
+      if(leafName != "kinematicBin" and leafName != "Spline" and leafName != "Graph"){
         splitVarNameList.emplace_back(leafName);
       }
     }
@@ -645,8 +629,8 @@ bool DialCollection::initializeDialsWithBinningFile(const JsonType& dialsDefinit
     std::vector<std::pair<int, int>> splitVarBoundariesList(splitVarNameList.size(), std::pair<int, int>());
     std::vector<std::vector<int>> splitVarValuesList(splitVarNameList.size(), std::vector<int>());
     dialsTTree->SetBranchAddress("kinematicBin", &kinematicBin);
-    if( _globalDialType_ == "spline" ) dialsTTree->SetBranchAddress("spline", &splinePtr);
-    if( _globalDialType_ == "graph" ) dialsTTree->SetBranchAddress("graph", &graphPtr);
+    if( _globalDialType_ == "Spline" ) dialsTTree->SetBranchAddress("Spline", &splinePtr);
+    if( _globalDialType_ == "Graph" ) dialsTTree->SetBranchAddress("Graph", &graphPtr);
     for( size_t iSplitVar = 0 ; iSplitVar < splitVarNameList.size() ; iSplitVar++ ){
       dialsTTree->SetBranchAddress(splitVarNameList[iSplitVar].c_str(), &splitVarValueList[iSplitVar]);
     }
@@ -671,16 +655,16 @@ bool DialCollection::initializeDialsWithBinningFile(const JsonType& dialsDefinit
       }
 
       TObject* dialInitializer{nullptr};
-      if (getGlobalDialType() == "spline") dialInitializer = splinePtr;
-      if (getGlobalDialType() == "graph") dialInitializer = graphPtr;
-      DialBaseFactory factory;
-      DialBase *dialBase = factory.makeDial(
-          getTitle(),
-          getGlobalDialType(),
-          getGlobalDialSubType(),
-          dialInitializer,
-          false);
-      if (dialBase) _dialBaseList_.emplace_back(DialBaseObject(dialBase));
+      if (getGlobalDialType() == "Spline") dialInitializer = splinePtr;
+      if (getGlobalDialType() == "Graph") dialInitializer = graphPtr;
+
+      auto dial = makeDial(dialInitializer);
+      if( dial != nullptr ){
+        _dialInterfaceList_.emplace_back();
+        DialBaseObj obj;
+        obj.dialPtr = std::unique_ptr<DialBase>(dial.release());
+        _dialInterfaceList_.back().setDial( obj );
+      }
     } // iSpline (in TTree)
   } // Splines in TTree
   else{
@@ -712,14 +696,13 @@ bool DialCollection::initializeDialsWithDefinition() {
     // This dial collection is a normalization, so there is a single dial.
     // Create it here.
     _isEventByEvent_ = false;
-    _dialBaseList_.emplace_back(
-        DialBaseObject(dialBaseFactory.makeDial(getTitle(),"Normalization","",nullptr,false)));
+    _dialInterfaceList_.emplace_back();
+    _dialInterfaceList_.back().setDial( DialBaseObj(makeDial()) );
   }
   else if( _globalDialType_ == "Formula" or _globalDialType_ == "RootFormula" ){
     // This dial collection calculates a function of the parameter values, so it
     // is a single dial for all events.  Create the dial here.
     _isEventByEvent_ = false;
-    DialBaseFactory f;
 
     if( GenericToolbox::Json::doKeyExist(dialsDefinition, "binning") ){
       auto binning = GenericToolbox::Json::fetchValue(dialsDefinition, "binning", JsonType());
@@ -731,10 +714,12 @@ bool DialCollection::initializeDialsWithDefinition() {
 
       _dialInterfaceList_.reserve( _dialBinSet_.getBinList().size() );
       for( auto& bin : _dialBinSet_.getBinList() ){
-        _dialBaseList_.emplace_back( DialBaseObject( f.makeDial( dialsDefinition ) ) );
+
+        _dialInterfaceList_.emplace_back();
+        _dialInterfaceList_.back().setDial( DialBaseObj(makeDial( dialsDefinition )) );
 
         for( auto& var : bin.getEdgesList() ){
-          ((RootFormula*) _dialBaseList_.back().get())->getFormula().SetParameter(
+          ((RootFormula*) _dialInterfaceList_.back().getDialBaseRef())->getFormula().SetParameter(
               var.varName.c_str(), var.getCenterValue()
           );
         }
@@ -742,7 +727,8 @@ bool DialCollection::initializeDialsWithDefinition() {
 
     }
     else{
-      _dialBaseList_.emplace_back( DialBaseObject( f.makeDial( dialsDefinition ) ) );
+      _dialInterfaceList_.emplace_back();
+      _dialInterfaceList_.back().setDial( DialBaseObj(makeDial( dialsDefinition )) );
     }
 
   }
@@ -750,8 +736,9 @@ bool DialCollection::initializeDialsWithDefinition() {
     // This dial collection calculates a function of the parameter values so it
     // is a single dial for all events.  Create the dial here.
     _isEventByEvent_ = false;
-    DialBaseFactory f;
-    _dialBaseList_.emplace_back( DialBaseObject( f.makeDial( dialsDefinition ) ) );
+
+    _dialInterfaceList_.emplace_back();
+    _dialInterfaceList_.back().setDial( DialBaseObj(makeDial( dialsDefinition )) );
   }
   else if( _globalDialType_ == "Tabulated" ) {
     // This dial uses a precalculated table to apply weight to each event (e.g. it
@@ -835,21 +822,50 @@ std::unique_ptr<DialBase> DialCollection::makeDial() const{
   out.dialPtr = std::make_unique<Norm>();
   return std::make_unique<Norm>();
 }
-std::unique_ptr<DialBase> DialCollection::makeDial(TObject* src_) const {
+std::unique_ptr<DialBase> DialCollection::makeDial(const TObject* src_) const {
 
   // always returns an invalid ptr if
   if( src_ == nullptr ){ return nullptr; }
 
-  if( _globalDialType_ == "graph"  ){ return makeGraphDial(src_); }
-  if( _globalDialType_ == "spline" ){ return makeSplineDial(src_); }
+  if( _globalDialType_ == "Graph"  ){ return makeGraphDial(src_); }
+  if( _globalDialType_ == "Spline" ){ return makeSplineDial(src_); }
   if( _globalDialType_ == "surface" ){ return makeSurfaceDial(src_); }
 
   // should not be there
   LogThrow("Invalid dial type to init with TObject: " << _globalDialType_);
   return nullptr;
 }
+std::unique_ptr<DialBase> DialCollection::makeDial(const JsonType& config_) const{
+  std::unique_ptr<DialBase> dialBase{nullptr};
+  std::string dialType{};
 
-std::unique_ptr<DialBase> DialCollection::makeGraphDial(TObject* src_) const {
+  dialType = GenericToolbox::Json::fetchValue(config_, {{"dialType"}, {"dialsType"}}, dialType);
+
+  if( dialType == "Formula" or dialType == "RootFormula" ){
+    dialBase = std::make_unique<RootFormula>();
+    auto* rootFormulaPtr{(RootFormula*) dialBase.get()};
+
+    auto formulaConfig(GenericToolbox::Json::fetchValue<JsonType>(config_, "dialConfig"));
+
+    rootFormulaPtr->setFormulaStr( GenericToolbox::Json::fetchValue<std::string>(formulaConfig, "formulaStr") );
+  }
+  else if( dialType == "CompiledLibDial" ){
+    dialBase = std::make_unique<CompiledLibDial>();
+    auto* compiledLibDialPtr{(CompiledLibDial*) dialBase.get()};
+
+    auto formulaConfig(GenericToolbox::Json::fetchValue<JsonType>(config_, "dialConfig"));
+
+    bool success = compiledLibDialPtr->loadLibrary( GenericToolbox::Json::fetchValue<std::string>(formulaConfig, "libraryFile") );
+    if( not success ){
+      LogThrow("Could not load CompiledLibDial. " << GenericToolbox::Json::fetchValue(formulaConfig, "messageOnError", std::string("")) );
+    }
+  }
+  else{ LogThrow("Unknown dial type: " << dialType); }
+
+  return dialBase;
+}
+
+std::unique_ptr<DialBase> DialCollection::makeGraphDial(const TObject* src_) const {
   // always returns an invalid ptr if
   if( src_ == nullptr ){ return nullptr; }
 
@@ -881,7 +897,7 @@ std::unique_ptr<DialBase> DialCollection::makeGraphDial(TObject* src_) const {
   dial->buildDial(*srcGraph);
   return dial;
 }
-std::unique_ptr<DialBase> DialCollection::makeSplineDial(TObject* src_) const{
+std::unique_ptr<DialBase> DialCollection::makeSplineDial(const TObject* src_) const{
   // always returns an invalid ptr if
   if( src_ == nullptr ){ return nullptr; }
 
@@ -940,12 +956,12 @@ std::unique_ptr<DialBase> DialCollection::makeSplineDial(TObject* src_) const{
   // if-then-elseif-elseif-elseif-elseif idiom.  Change this to do-while-false
   // if the number of kinds of initializers is more than a few.
   ///////////////////////////////////////////////////////////////////////
-  if( factory.FillFromGraph(_xPointListBuffer_, _yPointListBuffer_, _slopeListBuffer_, src_, splType) ) {
+  if( factory.FillFromGraph(_xPointListBuffer_, _yPointListBuffer_, _slopeListBuffer_, (TObject*) src_, splType) ) {
     // The points were from a ROOT graph like object and the points were
     // filled, don't check any further.
   }
   else if ( factory.FillFromSpline(_xPointListBuffer_, _yPointListBuffer_, _slopeListBuffer_,
-                          src_, splType) ) {
+                          (TObject*) src_, splType) ) {
     // The points were from a ROOT TSpline3 like object and the points were
     // filled, don't check any further.
   }
@@ -1016,14 +1032,14 @@ std::unique_ptr<DialBase> DialCollection::makeSplineDial(TObject* src_) const{
     GraphDialBaseFactory grapher;
     return std::unique_ptr<DialBase>(grapher.makeDial(getTitle(),
                                                       "Graph", "",
-                                                      src_,
+                                                      (TObject*) src_,
                                                       false));
   }
 #endif
 
   // Sanity check.  By the time we get here, there can't be fewer than two
   // points, and it should have been trapped above by other conditionals
-  // (e.g. a single point "spline" should have been flagged as flat).
+  // (e.g. a single point "Spline" should have been flagged as flat).
   LogThrowIf((_xPointListBuffer_.size() < 2),
              "Input data logic error: two few points "
              << "for dial " << getTitle() );
@@ -1155,11 +1171,11 @@ std::unique_ptr<DialBase> DialCollection::makeSplineDial(TObject* src_) const{
   return dialBase;
 
 }
-std::unique_ptr<DialBase> DialCollection::makeSurfaceDial(TObject* src_) const{
+std::unique_ptr<DialBase> DialCollection::makeSurfaceDial(const TObject* src_) const{
   // always returns an invalid ptr if
   if( src_ == nullptr ){ return nullptr; }
 
-  TH2* srcObject = dynamic_cast<TH2*>(src_);
+  auto* srcObject = dynamic_cast<const TH2*>(src_);
 
   LogThrowIf(srcObject == nullptr, "Surface dial initializers must be a TH2");
 

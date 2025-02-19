@@ -16,6 +16,8 @@
 #include <memory>
 #include <vector>
 
+typedef GenericToolbox::PolymorphicObjectWrapper<DialBase> DialBaseObj;
+
 
 /// This class is size critical and should not be used as a base class (no
 /// virtual methods.
@@ -52,7 +54,7 @@ public:
 
 private:
   // owner of
-  GenericToolbox::PolymorphicObjectWrapper<DialBase> _dial_{};
+  DialBaseObj _dial_{};
 
   // non owner of
   const DialInputBuffer* _inputBufferPtr_{nullptr};

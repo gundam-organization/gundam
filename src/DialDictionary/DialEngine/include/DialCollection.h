@@ -236,12 +236,13 @@ private:
 public:
   // methods to generate dials with factory
   std::unique_ptr<DialBase> makeDial() const;
-  std::unique_ptr<DialBase> makeDial(TObject* src_) const;
+  std::unique_ptr<DialBase> makeDial(const TObject* src_) const;
+  std::unique_ptr<DialBase> makeDial(const JsonType& config_) const;
 
 protected:
-  std::unique_ptr<DialBase> makeGraphDial(TObject* src_) const;
-  std::unique_ptr<DialBase> makeSplineDial(TObject* src_) const;
-  std::unique_ptr<DialBase> makeSurfaceDial(TObject* src_) const;
+  std::unique_ptr<DialBase> makeGraphDial(const TObject* src_) const;
+  std::unique_ptr<DialBase> makeSplineDial(const TObject* src_) const;
+  std::unique_ptr<DialBase> makeSurfaceDial(const TObject* src_) const;
 
 
 };
