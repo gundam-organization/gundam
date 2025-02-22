@@ -1,5 +1,8 @@
-## gundamConfigCompare
-[< back to parent (GettingStarted)](../GettingStarted.md)
+---
+layout: default
+title: gundamConfigCompare
+---
+
 ### Description 
 
 The `gundamConfigCompare` app compares the elements in two config files. This app will output the differences it finds in the respective files and print out warnings if certain elements are present in one and not the other.

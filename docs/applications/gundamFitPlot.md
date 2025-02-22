@@ -1,5 +1,8 @@
-## gundamFitPlot
-[< back to parent (GettingStarted)](../GettingStarted.md)
+---
+layout: default
+title: gundamFitPlot
+---
+
 ### Description 
 
 The `gundamFitPlot` app is used to compare the constraints of several fits.

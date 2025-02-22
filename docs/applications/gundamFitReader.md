@@ -1,5 +1,8 @@
-## gundamFitReader
-[< back to parent (GettingStarted)](../GettingStarted.md)
+---
+layout: default
+title: gundamFitReader
+---
+
 ### Description 
 
 The `gundamFitReader` app reads the fit output file from [gundamFitter](gundamFitter.md) and prints out relevant fit information. 

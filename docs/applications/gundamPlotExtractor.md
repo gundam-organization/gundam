@@ -1,5 +1,8 @@
-## gundamPlotExtractor
-[< back to parent (GettingStarted)](../GettingStarted.md)
+---
+layout: default
+title: gundamPlotExtractor
+---
+
 ### Description 
 
 The `gundamPlotExtractor` app extracts plots from the output of [gundamFitter](gundamFitter.md) into a designated diretory. 

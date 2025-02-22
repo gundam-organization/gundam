@@ -1,0 +1,22 @@
+<script>
+  document.addEventListener("DOMContentLoaded", function() {
+    const headers = document.querySelectorAll('.header-title');
+
+    headers.forEach(header => {
+      header.addEventListener('click', function() {
+        const content = this.nextElementSibling;
+
+        // If the content is already shown, collapse it
+        if (content.style.height && content.style.height !== '0px') {
+          content.style.height = '0px';
+        } else {
+          // Otherwise, expand the content
+          content.style.height = content.scrollHeight + 'px';
+        }
+
+        // Toggle the "collapsed" class for the arrow
+        this.classList.toggle('collapsed');
+      });
+    });
+  });
+</script>

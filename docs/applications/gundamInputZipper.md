@@ -1,5 +1,8 @@
-## gundamInputZipper
-[< back to parent (GettingStarted)](../GettingStarted.md)
+---
+layout: default
+title: gundamInputZipper
+---
+
 ### Description 
 
 The `gundamInputZipper` app reads in the config inputs and copies the inputs into a unified ZIP file. 
