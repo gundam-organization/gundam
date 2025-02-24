@@ -207,8 +207,16 @@ void ParameterSet::processCovarianceMatrix(){
     }
 
     TVectorD eigenValues;
-    // https://root-forum.cern.ch/t/tmatrixt-get-eigenvalues/25924
-    _inverseCovarianceMatrix_->EigenVectors(eigenValues);
+
+    if(_inverseCovarianceMatrix_->GetNrows() == 1) {
+      eigenValues.ResizeTo(1);
+      eigenValues[0] = (*_inverseCovarianceMatrix_)[0][0];
+    }
+    else {
+      // https://root-forum.cern.ch/t/tmatrixt-get-eigenvalues/25924
+      _inverseCovarianceMatrix_->EigenVectors(eigenValues);
+    }
+
     if( eigenValues.Min() < 0 ){
       LogError << "Negative eigen values for prior cov matrix: " << eigenValues.Min() << std::endl;
       failed = true;
