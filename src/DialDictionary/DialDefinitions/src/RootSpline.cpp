@@ -5,40 +5,6 @@
 #include "RootSpline.h"
 
 
-void RootSpline::setAllowExtrapolation(bool allowExtrapolation) {
-  _allowExtrapolation_ = allowExtrapolation;
-}
-
-void RootSpline::buildDial(const TSpline3& spline, const std::string& option_) {
-  std::vector<double> xPoint(spline.GetNp());
-  std::vector<double> yPoint(spline.GetNp());
-  std::vector<double> dummy;
-  xPoint.clear(); yPoint.clear();
-  for (int i = 0; i<spline.GetNp(); ++i) {
-    double x; double y;
-    spline.GetKnot(i,x,y);
-    xPoint.push_back(x);
-    yPoint.push_back(y);
-  }
-  buildDial(xPoint,yPoint,dummy,option_);
-  _spline_.SetTitle(spline.GetTitle());
-}
-
-void RootSpline::buildDial(const TGraph& grf, const std::string& option_) {
-  std::vector<double> xPoint(grf.GetN());
-  std::vector<double> yPoint(grf.GetN());
-  std::vector<double> dummy;
-  xPoint.clear(); yPoint.clear();
-  for (int i = 0; i<grf.GetN(); ++i) {
-      double x; double y;
-      grf.GetPoint(i,x,y);
-      xPoint.push_back(x);
-      yPoint.push_back(y);
-  }
-  buildDial(xPoint,yPoint,dummy,option_);
-  _spline_.SetTitle(grf.GetName());
-}
-
 void RootSpline::buildDial(const std::vector<SplineUtils::SplinePoint>& splinePointList_){
   std::vector<double> x;
   std::vector<double> y;
@@ -59,8 +25,6 @@ void RootSpline::buildDial(const std::vector<SplineUtils::SplinePoint>& splinePo
     nPoints
   );
 }
-
-const TSpline3 &RootSpline::getSpline() const {return _spline_;}
 
 double RootSpline::evalResponse(const DialInputBuffer& input_) const {
   const double dialInput{input_.getInputBuffer()[0]};

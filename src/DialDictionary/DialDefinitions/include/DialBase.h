@@ -52,24 +52,6 @@ public:
   // (e.g. multi-dimensional dials).
   /////////////////////////////////////////////////////////////////////////
 
-  /// Build the dial with no input arguments.  This is mostly for competeness!
-  virtual void buildDial(const std::string& option_="") {throw std::runtime_error("Not implemented");}
-
-  /// Build the dial using a graph (usually a leaf in the input file).
-  virtual void buildDial(const TGraph& grf, const std::string& option_="") {throw std::runtime_error("Not implemented");}
-
-  /// Build the dial using a TSpline3 (usually a leaf in the input file).
-  virtual void buildDial(const TSpline3& spl, const std::string& option_="") {throw std::runtime_error("Not implemented");}
-
-  /// Build the dial using a double.  This is used on a "constant" dial like
-  /// Shift, but can also be used in a dial that might do something like
-  /// calculate the oscillation probability where the value could be closing
-  /// over the event L/E.
-  virtual void buildDial(double v1, const std::string& option_="") {throw std::runtime_error("Not implemented");}
-
-  /// Build a dial from a TH2 (usually a leaf in the input file).
-  virtual void buildDial(const TH2& h2, const std::string& option_="") {throw std::runtime_error("Not implemented");}
-
   /// Return the data used by the dial to calculate the output values. The
   /// specific data contained in the vector depends on the derived class.
   [[nodiscard]] virtual const std::vector<double>& getDialData() const;

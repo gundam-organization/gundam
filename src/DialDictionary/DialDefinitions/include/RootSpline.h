@@ -17,28 +17,24 @@ class RootSpline : public DialBase {
 public:
   RootSpline() = default;
 
+  // mandatory overrides
   [[nodiscard]] std::unique_ptr<DialBase> clone() const override { return std::make_unique<RootSpline>(*this); }
   [[nodiscard]] std::string getDialTypeName() const override { return {"RootSpline"}; }
   [[nodiscard]] double evalResponse(const DialInputBuffer& input_) const override;
 
-  void setAllowExtrapolation(bool allowExtrapolation) override;
+  // other overrides
+  void setAllowExtrapolation(bool allowExtrapolation) override{ _allowExtrapolation_ = allowExtrapolation; }
 
-  /// Pass information to the dial so that it can build it's
-  /// internal information.  New build overloads should be
-  /// added as we have classes of dials
-  /// (e.g. multi-dimensional dials).
-  virtual void buildDial(const TGraph& grf, const std::string& option_="") override;
-  virtual void buildDial(const TSpline3& spl, const std::string& option_="") override;
+  // setters
+  void setSpline(const TSpline3 &spline_){ _spline_ = spline_; }
 
+  // getters
+  [[nodiscard]] const TSpline3 &getSpline() const { return _spline_; }
+
+  // methods
   void buildDial(const std::vector<SplineUtils::SplinePoint>& splinePointList_);
 
 protected:
-  void setSpline(const TSpline3 &spline);
-  [[nodiscard]] const TSpline3 &getSpline() const;
-
-  void copySpline(const TSpline3* splinePtr_);
-  void createSpline(TGraph* grPtr_);
-
   bool _allowExtrapolation_{false};
   TSpline3 _spline_{};
 

@@ -36,10 +36,6 @@ public:
   /// (e.g. multi-dimensional dials).
   virtual void buildDial(const TGraph& grf, const std::string& option_="") override;
   virtual void buildDial(const TSpline3& spl, const std::string& option_="") override;
-  virtual void buildDial(const std::vector<double>& v1,
-                         const std::vector<double>& v2,
-                         const std::vector<double>& v3,
-                         const std::string& option_="") override;
   void buildDial(const std::vector<SplineUtils::SplinePoint>& splinePointList_);
 
   const std::vector<double>& getDialData() const override {return _splineData_;}
