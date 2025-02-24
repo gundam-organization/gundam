@@ -19,7 +19,7 @@ void UniformSpline::buildDial(const std::vector<SplineUtils::SplinePoint>& splin
 
   _splineData_.resize(2 + splinePointList_.size()*2);
   _splineData_[0] = splinePointList_.front().x;
-  _splineData_[1] = (splinePointList_.back().x-splinePointList_.front().y)/(splinePointList_.size()-1.0);
+  _splineData_[1] = (splinePointList_.back().x-splinePointList_.front().x)/(splinePointList_.size()-1.0);
 
   /// Apply a very loose check that the point spacing is uniform to catch
   /// mistakes.  This only flags clear problems and isn't an accuracy
@@ -27,9 +27,11 @@ void UniformSpline::buildDial(const std::vector<SplineUtils::SplinePoint>& splin
   /// knots may have been saved or calculated using floats.
   const double tolerance{std::sqrt(std::numeric_limits<float>::epsilon())};
   for (int i=0; i<splinePointList_.size()-1; ++i) {
-      double d = std::abs(splinePointList_[i].x - _splineData_[0] - i*_splineData_[1]);
-      LogThrowIf((d/_splineData_[1])>tolerance,
-                 "UniformSplines require uniformly spaced knots");
+    double d = std::abs(splinePointList_[i].x - _splineData_[0] - i*_splineData_[1]);
+
+    if( (d/_splineData_[1])>tolerance ) {
+      LogThrow("UniformSplines require uniformly spaced knots");
+    }
   }
 
   // Copy the spline data into local storage.
