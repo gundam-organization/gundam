@@ -1206,19 +1206,17 @@ void DataDispenser::loadEvent(int iThread_){
       int iCollection = dialCollectionRef->getIndex();
 
       // grab as a general TObject, then let the factory figure out what to do with it
-      auto *dialObjectPtr = (TObject *) *(
-          (TObject **) eventIndexingBuffer.getVariables().fetchVariable(
-              dialCollectionRef->getGlobalDialLeafName()
-          ).get().getPlaceHolderPtr()->getVariableAddress()
+      auto *dialObjectPtr = *static_cast<const TObject **>(
+        eventIndexingBuffer.getVariables().fetchVariable( dialCollectionRef->getGlobalDialLeafName() )
+        .get().getPlaceHolderPtr()->getVariableAddress()
       );
 
       // Extra-step for selecting the right dial with TClonesArray
       if( not strcmp(dialObjectPtr->ClassName(), "TClonesArray")){
-        dialObjectPtr = ((TClonesArray *) dialObjectPtr)->At(dialCloneArrayIndex);
+        dialObjectPtr = ((const TClonesArray *) dialObjectPtr)->At(dialCloneArrayIndex);
       }
 
       eventByEventDialBuffer[dialCollectionRef->getIndex()] = dialCollectionRef->makeDial(dialObjectPtr).release();
-
     }
 
     // ***** from this point, the TChain reader is released *****
@@ -1241,7 +1239,6 @@ void DataDispenser::loadEvent(int iThread_){
       eventDialCacheEntry = _cache_.propagatorPtr->getEventDialCache().fetchNextCacheEntry();
       sampleEventIndex = _cache_.sampleIndexOffsetList[iSample]++;
     }
-
 
     // Get the next free event in our buffer
     Event *eventPtr = &(*_cache_.sampleEventListPtrToFill[iSample])[sampleEventIndex];

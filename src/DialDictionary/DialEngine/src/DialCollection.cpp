@@ -815,7 +815,9 @@ std::unique_ptr<DialBase> DialCollection::makeDial(const TObject* src_) const {
   if     ( _globalDialType_ == "Graph"   ){ out = makeGraphDial(src_); }
   else if( _globalDialType_ == "Spline"  ){ out = makeSplineDial(src_); }
   else if( _globalDialType_ == "Surface" ){ out = makeSurfaceDial(src_); }
-  else{ LogThrow("Invalid dial type to init with TObject: " << _globalDialType_); }
+  else {
+    LogThrow("Invalid dial type to init with TObject: " << _globalDialType_);
+  }
 
   if( out != nullptr ){
     out->setAllowExtrapolation( _allowDialExtrapolation_ );
@@ -930,6 +932,13 @@ std::unique_ptr<DialBase> DialCollection::makeSplineDial(const TObject* src_) co
   }
 
   auto splinePointList = SplineUtils::getSplinePointList(src_, splType);
+  return nullptr;
+
+  for( auto& point: splinePointList ) {
+    DEBUG_VAR(point.x);
+    DEBUG_VAR(point.y);
+    DEBUG_VAR(point.slope);
+  }
 
   // invalid, return
   if( splinePointList.empty() ){ return nullptr; }
@@ -938,6 +947,7 @@ std::unique_ptr<DialBase> DialCollection::makeSplineDial(const TObject* src_) co
     // it's flat, let's shortcut
     if( std::abs( splinePointList[0].y - 1.0 ) < 2 * std::numeric_limits<float>::epsilon() ){
       // one! no need for a dial
+      LogDebug << "AND ONE" << std::endl;
       return nullptr;
     }
 
@@ -954,7 +964,9 @@ std::unique_ptr<DialBase> DialCollection::makeSplineDial(const TObject* src_) co
 
 #define SHORT_CIRCUIT_SMALL_SPLINES
 #ifdef  SHORT_CIRCUIT_SMALL_SPLINES
-  if( splinePointList.size() <= 2 ){ return this->makeGraphDial(src_); }
+  if( splinePointList.size() <= 2 ) {
+    return this->makeGraphDial(src_);
+  }
 #endif
 
   // If there are only two points, then force a catmull-rom.  This could be

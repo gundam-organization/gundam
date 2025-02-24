@@ -19,20 +19,19 @@ namespace SplineUtils{
   std::vector<SplinePoint> getSplinePointList(const TGraph* src_, const std::string& opt_){
     if( src_ == nullptr ) return {};
 
-    // Turn the graph into a spline.  This is where we can handle getting the
-    // slopes for not-a-knot and natural splines (by using ROOT TSpline3
-    // boundary conditions).
-    std::string rootOpt{};
+    std::vector<SplinePoint> out;
+    out.reserve(src_->GetN());
 
-    // fix second derivative.
-    if( opt_ == "natural" ){ rootOpt = "b2,e2"; }
+    for( int iPt = 0 ; iPt < src_->GetN(); iPt ++ ) {
+      out.emplace_back();
+      auto& point = out.back();
 
-    // not used yet
-    double valBeg = 0;
-    double valEnd = 0;
-    TSpline3 spline(Form("%p", src_), src_, rootOpt.c_str(), valBeg, valEnd);
+      point.x = src_->GetX()[iPt];
+      point.y = src_->GetY()[iPt];
+    }
 
-    return getSplinePointList(&spline);
+    fillCatmullRomSlopes(out);
+    return out;
   }
   std::vector<SplinePoint> getSplinePointList(const TSpline3* src_){
     if( src_ == nullptr ) return {};

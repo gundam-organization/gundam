@@ -91,8 +91,9 @@ public:
     std::size_t interfaceIndex {std::size_t(-1)};
 
     [[nodiscard]] std::string getSummary(bool shallow_ = true) const{
+      if( collectionIndex == std::size_t(-1) and interfaceIndex == std::size_t(-1) ){ return {}; }
       std::stringstream ss;
-      ss << "collection: " << collectionIndex << ", interface: " << interfaceIndex;
+      ss << "{ collection: " << collectionIndex << ", interface: " << interfaceIndex << "}";
       return ss.str();
     }
     friend std::ostream& operator <<( std::ostream& o, const DialIndexCacheEntry& this_ ){
