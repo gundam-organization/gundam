@@ -932,13 +932,6 @@ std::unique_ptr<DialBase> DialCollection::makeSplineDial(const TObject* src_) co
   }
 
   auto splinePointList = SplineUtils::getSplinePointList(src_, splType);
-  return nullptr;
-
-  for( auto& point: splinePointList ) {
-    DEBUG_VAR(point.x);
-    DEBUG_VAR(point.y);
-    DEBUG_VAR(point.slope);
-  }
 
   // invalid, return
   if( splinePointList.empty() ){ return nullptr; }
@@ -947,7 +940,6 @@ std::unique_ptr<DialBase> DialCollection::makeSplineDial(const TObject* src_) co
     // it's flat, let's shortcut
     if( std::abs( splinePointList[0].y - 1.0 ) < 2 * std::numeric_limits<float>::epsilon() ){
       // one! no need for a dial
-      LogDebug << "AND ONE" << std::endl;
       return nullptr;
     }
 
