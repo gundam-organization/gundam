@@ -8,15 +8,12 @@
 #include "Logger.h"
 
 
-double DialInterface::evalResponse() const {
-  return DialInterface::evalResponse(_inputBufferRef_, _dialBaseRef_, _responseSupervisorRef_);
-}
 std::string DialInterface::getSummary(bool shallow_) const {
   std::stringstream ss;
-  ss << _dialBaseRef_->getDialTypeName() << ":";
+  ss << _dial_->getDialTypeName() << ":";
 
-  if( _inputBufferRef_ != nullptr ){
-    ss << " input(" << _inputBufferRef_->getSummary(shallow_) << ")";
+  if( _inputBufferPtr_ != nullptr ){
+    ss << " input(" << _inputBufferPtr_->getSummary(shallow_) << ")";
   }
 
   // apply on?
@@ -24,23 +21,16 @@ std::string DialInterface::getSummary(bool shallow_) const {
     ss << " applyOn(" << _dialBinRef_->getSummary(shallow_) << ")";
   }
 
-  if( _responseSupervisorRef_ != nullptr ){
-    ss << " supervisor(" << _responseSupervisorRef_->getSummary(shallow_) << ")";
+  if( _responseSupervisorPtr_ != nullptr ){
+    ss << " supervisor(" << _responseSupervisorPtr_->getSummary(shallow_) << ")";
   }
 
   ss << " response=" << this->evalResponse();
 
   if( not shallow_ ){
     ss << std::endl;
-    ss << _dialBaseRef_->getSummary();
+    ss << _dial_->getSummary();
   }
 
   return ss.str();
-}
-
-double DialInterface::evalResponse(
-    DialInputBuffer *inputBufferPtr_, DialBase *dialBaseRef_,
-    const DialResponseSupervisor *responseSupervisorRef_
-    ) {
-  return responseSupervisorRef_->process( dialBaseRef_->evalResponse( *inputBufferPtr_ ) );
 }

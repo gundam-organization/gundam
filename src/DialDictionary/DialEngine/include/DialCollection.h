@@ -13,7 +13,6 @@
 
 #include "GenericToolbox.Wrappers.h"
 
-
 #include <vector>
 #include <string>
 #include <memory>
@@ -97,11 +96,6 @@ public:
   // non-const getters
   BinSet &getDialBinSet(){ return _dialBinSet_; }
 
-  // Vector of object to calculate the response for this dial.  There will be
-  // one DialBaseObject per event, or one DialBaseObject for each bin (for
-  // binned dials), or a single DialBaseObject.
-  std::vector<DialBaseObject> &getDialBaseList(){ return _dialBaseList_; }
-
   // One interface per DialBase.  The interface groups the input buffer,
   // response supervisor, dialBase (what actually calculates the weight) into
   // a single object and provide the methods to calculate the dial weight.
@@ -116,7 +110,7 @@ public:
   // non-trivial getters
   [[nodiscard]] bool isDatasetValid(const std::string& datasetName_) const;
   std::string getTitle() const;
-  std::string getSummary(bool shallow_ = true);
+  std::string getSummary(bool shallow_ = true) const;
   Parameter* getSupervisedParameter() const;
   ParameterSet* getSupervisedParameterSet() const;
 
@@ -156,7 +150,7 @@ public:
   size_t getNextDialFreeSlot(){ return _dialFreeSlot_++; }
   size_t getDialFreeSlotIndex() const { return _dialFreeSlot_.getValue(); }
 
-  // Provide access to a the collection data.  The ownership is retained by
+  // Provide access to a collection data.  The ownership is retained by
   // the collection.
   template <typename T>
   T* getCollectionData(int i=0) const {return dynamic_cast<T*>(_dialCollectionData_[i].get());}
@@ -170,6 +164,11 @@ public:
 
   void printConfiguration() const;
 
+  // methods to generate dials with factory
+  std::unique_ptr<DialBase> makeDial() const;
+  std::unique_ptr<DialBase> makeDial(const TObject* src_) const;
+  std::unique_ptr<DialBase> makeDial(const JsonType& config_) const;
+
 protected:
   void configureImpl() override;
   void initializeImpl() override;
@@ -180,7 +179,12 @@ protected:
   bool initializeDialsWithTabulation(const JsonType& dialsDefinition);
 
   void readGlobals(const JsonType &config_);
-  JsonType fetchDialsDefinition(const JsonType &definitionsList_);
+  JsonType fetchDialsDefinition(const JsonType &definitionsList_) const;
+
+  // factory
+  std::unique_ptr<DialBase> makeGraphDial(const TObject* src_) const;
+  std::unique_ptr<DialBase> makeSplineDial(const TObject* src_) const;
+  std::unique_ptr<DialBase> makeSurfaceDial(const TObject* src_) const;
 
 private:
   // parameters
@@ -219,14 +223,10 @@ private:
   std::vector<DialInputBuffer> _dialInputBufferList_{};
 
   // The response supervisors (which apply an upper and lower clamp).  There
-  // is a single supervisor for all of the interfaces, or one for each
+  // is a single supervisor for all the interfaces, or one for each
   // DialBase object in the collection (just like for the
-  // _DialInputBuffferList_.
+  // _dialInputBufferList_.
   std::vector<DialResponseSupervisor> _dialResponseSupervisorList_{};
-
-  // Calculate the response for this dial.  There will be one DialBase per
-  // event, or one DialBase per bin (for binned dials), or a single DialBase.
-  std::vector<DialBaseObject> _dialBaseList_{};
 
   // A formula to decide if the dial should be applied to an event.
   std::shared_ptr<TFormula> _applyConditionFormula_{nullptr};

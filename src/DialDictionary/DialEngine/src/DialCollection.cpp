@@ -2,12 +2,26 @@
 // Created by Adrien Blanchet on 29/11/2022.
 //
 
-#include "GundamGlobals.h"
 #include "DialCollection.h"
-#include "DialBaseFactory.h"
-#include "TabulatedDialFactory.h"
-#include "RootFormula.h"
 
+#include "TabulatedDialFactory.h"
+
+#include "RootFormula.h"
+#include "Shift.h"
+#include "RootGraph.h"
+#include "Graph.h"
+#include "Norm.h"
+#include "MonotonicSpline.h"
+#include "CompactSpline.h"
+#include "UniformSpline.h"
+#include "GeneralSpline.h"
+#include "RootSpline.h"
+#include "Bilinear.h"
+#include "Bicubic.h"
+#include "CompiledLibDial.h"
+
+#include "SplineUtils.h"
+#include "GundamGlobals.h"
 
 #include "Logger.h"
 
@@ -58,7 +72,6 @@ void DialCollection::configureImpl() {
   }
 
 }
-
 void DialCollection::initializeImpl() {
   LogThrowIf(_index_==-1, "Index not set.");
   this->setupDialInterfaceReferences();
@@ -90,13 +103,11 @@ std::string DialCollection::getTitle() const {
 
   return {"UnsetParameterSuperVision"};
 }
-
-std::string DialCollection::getSummary(bool shallow_){
+std::string DialCollection::getSummary(bool shallow_) const{
   std::stringstream ss;
   ss << "DialCollection: ";
   ss << this->getTitle();
   ss << " / nDialInterfaces=" << _dialInterfaceList_.size();
-  ss << " / nDialBases=" << _dialBaseList_.size();
   ss << " / lastDialFreeSlot=" << getDialFreeSlotIndex();
 
   if( not shallow_ ){
@@ -127,12 +138,8 @@ ParameterSet* DialCollection::getSupervisedParameterSet() const{
 
 // core
 void DialCollection::clear(){
-  _dialBaseList_.clear();
-  _dialBaseList_.shrink_to_fit();
-
   _dialInterfaceList_.clear();
   _dialInterfaceList_.shrink_to_fit();
-
   _dialFreeSlot_.setValue(0);
 }
 
@@ -140,12 +147,8 @@ void DialCollection::resizeContainers(){
   LogDebugIf(GundamGlobals::isDebug()) << "Resizing containers of the dial collection \"" << this->getTitle() << "\" from "
                                        << _dialInterfaceList_.size() << " to " << _dialFreeSlot_.getValue() << std::endl;
 
-  _dialBaseList_.resize(_dialFreeSlot_.getValue());
-  _dialBaseList_.shrink_to_fit();
-
   _dialInterfaceList_.resize(_dialFreeSlot_.getValue());
   _dialInterfaceList_.shrink_to_fit();
-
   this->setupDialInterfaceReferences();
 }
 
@@ -163,14 +166,14 @@ void DialCollection::setupDialInterfaceReferences(){
   if( _dialInputBufferList_.empty() ){
     if( _supervisedParameterIndex_ == -1 ){
       // one dial interface per parameter
-      LogThrowIf(_dialBaseList_.size() != _parameterSetListPtr_->at(_supervisedParameterSetIndex_).getParameterList().size(),
+      LogThrowIf(_dialInterfaceList_.size() != _parameterSetListPtr_->at(_supervisedParameterSetIndex_).getParameterList().size(),
                  "Nb of dial base don't match the number of parameters of the selected set: nDials="
-                     << _dialBaseList_.size() << " != " << "nPars="
+                     << _dialInterfaceList_.size() << " != " << "nPars="
                      << _parameterSetListPtr_->at(_supervisedParameterSetIndex_).getParameterList().size()
                      << std::endl << "is the defined dial binning matching the number of parameters?"
       );
-      _dialInputBufferList_.resize(_dialBaseList_.size());
-      for( int iDial = 0 ; iDial < int(_dialBaseList_.size()) ; iDial++ ){
+      _dialInputBufferList_.resize(_dialInterfaceList_.size());
+      for( int iDial = 0 ; iDial < int(_dialInterfaceList_.size()) ; iDial++ ){
         DialInputBuffer::ParameterReference p{};
         p.parSetIndex = _supervisedParameterSetIndex_;
         p.parIndex = iDial;
@@ -202,14 +205,7 @@ void DialCollection::setupDialInterfaceReferences(){
   for( auto& inputBuffer : _dialInputBufferList_ ){ inputBuffer.initialise(); }
 
   // Initializing dial interfaces:
-  if( _dialInterfaceList_.size() != _dialBaseList_.size() ){
-    _dialInterfaceList_.clear();
-    _dialInterfaceList_.resize( _dialBaseList_.size() );
-  }
-  for( size_t iDial = 0 ; iDial < _dialBaseList_.size() ; iDial++ ){
-    // Dial base reference
-    _dialInterfaceList_[iDial].setDialBaseRef( _dialBaseList_[iDial].get() );
-
+  for( size_t iDial = 0 ; iDial < _dialInterfaceList_.size() ; iDial++ ){
     // Input buffers
     if( _dialInputBufferList_.size() == 1 ){
       _dialInterfaceList_[iDial].setInputBufferRef( &_dialInputBufferList_[0] );
@@ -259,24 +255,26 @@ void DialCollection::setupDialInterfaceReferences(){
 // init protected
 void DialCollection::readGlobals(const JsonType &config_) {
   // globals for the dialSet
-  _enableDialsSummary_ = GenericToolbox::Json::fetchValue<bool>(_config_, "printDialsSummary", _enableDialsSummary_);
+  GenericToolbox::Json::fillValue(config_, _enableDialsSummary_, "printDialsSummary");
+  GenericToolbox::Json::fillValue(config_, _globalDialType_, {{"dialsType"}, {"dialType"}});
+  GenericToolbox::Json::fillValue(config_, _globalDialSubType_, "dialSubType");
+  GenericToolbox::Json::fillValue(config_, _globalDialLeafName_, "dialLeafName");
+  GenericToolbox::Json::fillValue(config_, _minDialResponse_, {{"minDialResponse"}, {"minimumSplineResponse"}});
+  GenericToolbox::Json::fillValue(config_, _maxDialResponse_, "maxDialResponse");
+  GenericToolbox::Json::fillValue(config_, _useMirrorDial_, "useMirrorDial");
+  GenericToolbox::Json::fillValue(config_, _mirrorLowEdge_, "mirrorLowEdge");
+  GenericToolbox::Json::fillValue(config_, _mirrorHighEdge_, "mirrorHighEdge");
+  GenericToolbox::Json::fillValue(config_, _allowDialExtrapolation_, "allowDialExtrapolation");
+  GenericToolbox::Json::fillValue(config_, _applyConditionStr_, "applyCondition");
 
-  _globalDialType_ = GenericToolbox::Json::fetchValue(config_, {{"dialsType"}, {"dialType"}}, _globalDialType_);
-
-  _globalDialSubType_ =  GenericToolbox::Json::fetchValue<std::string>(config_, "dialSubType", _globalDialSubType_);
-
-  _globalDialLeafName_ = GenericToolbox::Json::fetchValue<std::string>(config_, "dialLeafName", _globalDialLeafName_);
-
-  if (GenericToolbox::Json::doKeyExist(config_, "applyCondition")) {
-    _applyConditionStr_ = GenericToolbox::Json::fetchValue<std::string>(config_, "applyCondition");
-  }
-  else if (GenericToolbox::Json::doKeyExist(config_, "applyConditions")) {
+  if( GenericToolbox::Json::doKeyExist(config_, "applyConditions") ){
     std::vector<std::string> conditionsList;
 
     for (auto &condEntry: GenericToolbox::Json::fetchValue<std::vector<JsonType>>(config_, "applyConditions")) {
       if (condEntry.is_string()) {
         conditionsList.emplace_back(condEntry.get<std::string>());
-      } else if (condEntry.is_structured()) {
+      }
+      else if (condEntry.is_structured()) {
         auto expression = GenericToolbox::Json::fetchValue<std::string>(condEntry, {{"exp"},{"expression"},{"var"},{"variable"}});
         std::stringstream ssCondEntry;
 
@@ -373,18 +371,10 @@ void DialCollection::readGlobals(const JsonType &config_) {
                "\"" << _applyConditionStr_ << "\": could not be parsed as formula expression.")
   }
 
-  _minDialResponse_ = GenericToolbox::Json::fetchValue(config_, {{"minDialResponse"}, {"minimumSplineResponse"}}, _minDialResponse_);
-  _maxDialResponse_ = GenericToolbox::Json::fetchValue(config_, "maxDialResponse", _maxDialResponse_);
-
-  _useMirrorDial_ = GenericToolbox::Json::fetchValue(config_, "useMirrorDial", _useMirrorDial_);
   if (_useMirrorDial_) {
-    _mirrorLowEdge_ = GenericToolbox::Json::fetchValue(config_, "mirrorLowEdge", _mirrorLowEdge_);
-    _mirrorHighEdge_ = GenericToolbox::Json::fetchValue(config_, "mirrorHighEdge", _mirrorHighEdge_);
     _mirrorRange_ = _mirrorHighEdge_ - _mirrorLowEdge_;
     LogThrowIf(_mirrorRange_ < 0, GET_VAR_NAME_VALUE(_mirrorHighEdge_) << " < " << GET_VAR_NAME_VALUE(_mirrorLowEdge_))
   }
-
-  _allowDialExtrapolation_ = GenericToolbox::Json::fetchValue(config_, "allowDialExtrapolation", _allowDialExtrapolation_);
 
   // safety: many users ask why do my parameter limits aren't taken into account? -> because the parameters limits should be
   // handled in the parameter definition section
@@ -408,7 +398,6 @@ void DialCollection::readGlobals(const JsonType &config_) {
     LogError << std::endl;
     LogThrow("parameterLimits should be specified in the parameter definition.");
   }
-
 }
 bool DialCollection::initializeNormDialsWithParBinning() {
   auto binning = GenericToolbox::Json::fetchValue(_config_, "parametersBinningPath", JsonType());
@@ -428,10 +417,10 @@ bool DialCollection::initializeNormDialsWithParBinning() {
   _dialResponseSupervisorList_[0].setMinResponse( GenericToolbox::Json::fetchValue(_config_, {{"minDialResponse"}, {"minimumSplineResponse"}}, double(0.)) );
   _dialResponseSupervisorList_[0].setMaxResponse( GenericToolbox::Json::fetchValue(_config_, "maxDialResponse", _maxDialResponse_) );
 
-  _dialBaseList_.reserve( _dialBinSet_.getBinList().size() );
-  DialBaseFactory factory;
+  _dialInterfaceList_.reserve( _dialBinSet_.getBinList().size() );
   for(const auto & bin : _dialBinSet_.getBinList()) {
-    _dialBaseList_.emplace_back(DialBaseObject(factory.makeDial(getTitle(), "Normalization","",nullptr,false)));
+    _dialInterfaceList_.emplace_back();
+    _dialInterfaceList_.back().setDial( DialBaseObj(this->makeDial()) );
   }
 
   return true;
@@ -539,7 +528,6 @@ bool DialCollection::initializeDialsWithTabulation(const JsonType& dialsDefiniti
 bool DialCollection::initializeDialsWithBinningFile(const JsonType& dialsDefinition) {
   if(not GenericToolbox::Json::doKeyExist(dialsDefinition, "binningFilePath") ) return false;
   
-  DialBaseFactory dialBaseFactory;
   // A binning file has been provided, so this is a binned dial.  Create
   // the dials for each bin here.  The dials will be assigned to the
   // events in DataDispenser.
@@ -573,26 +561,23 @@ bool DialCollection::initializeDialsWithBinningFile(const JsonType& dialsDefinit
                          << ") don't match the number of bins " << _dialBinSet_.getBinList().size()
     );
 
-      std::vector<int> excludedBins{};
+    std::vector<int> excludedBins{};
     int nBins(static_cast<int>(_dialBinSet_.getBinList().size()));
+    _dialInterfaceList_.reserve( nBins ); // at most
     for( int iBin = 0 ; iBin < nBins ; iBin++ ){
       TObject* binnedInitializer = dialsList->At(iBin);
 
-      DialBase *dialBase = dialBaseFactory.makeDial(
-          getTitle(),
-          getGlobalDialType(),
-          getGlobalDialSubType(),
-          binnedInitializer,
-          false);
-      if (dialBase == nullptr) {
+      auto dial = DialBaseObj( this->makeDial( dialsList->At(iBin) ) );
+      if( dial.get() == nullptr ) {
         LogAlert << "Invalid dial for " << getTitle() << " -> "
                  << _dialBinSet_.getBinList()[iBin].getSummary()
                  << std::endl;
         excludedBins.emplace_back(iBin);
         continue;
       }
-      dialBase->setAllowExtrapolation(_allowDialExtrapolation_);
-      _dialBaseList_.emplace_back(DialBaseObject(dialBase));
+
+      _dialInterfaceList_.emplace_back();
+      _dialInterfaceList_.back().setDial( dial );
     }
 
       if( not excludedBins.empty() ){
@@ -623,7 +608,7 @@ bool DialCollection::initializeDialsWithBinningFile(const JsonType& dialsDefinit
     std::vector<std::string> splitVarNameList;
     for( int iKey = 0 ; iKey < dialsTTree->GetListOfLeaves()->GetEntries() ; iKey++ ){
       std::string leafName = dialsTTree->GetListOfLeaves()->At(iKey)->GetName();
-      if(leafName != "kinematicBin" and leafName != "spline" and leafName != "graph"){
+      if(leafName != "kinematicBin" and leafName != "Spline" and leafName != "Graph"){
         splitVarNameList.emplace_back(leafName);
       }
     }
@@ -633,8 +618,8 @@ bool DialCollection::initializeDialsWithBinningFile(const JsonType& dialsDefinit
     std::vector<std::pair<int, int>> splitVarBoundariesList(splitVarNameList.size(), std::pair<int, int>());
     std::vector<std::vector<int>> splitVarValuesList(splitVarNameList.size(), std::vector<int>());
     dialsTTree->SetBranchAddress("kinematicBin", &kinematicBin);
-    if( _globalDialType_ == "Spline" ) dialsTTree->SetBranchAddress("spline", &splinePtr);
-    if( _globalDialType_ == "Graph" ) dialsTTree->SetBranchAddress("graph", &graphPtr);
+    if( _globalDialType_ == "Spline" ) dialsTTree->SetBranchAddress("Spline", &splinePtr);
+    if( _globalDialType_ == "Graph" ) dialsTTree->SetBranchAddress("Graph", &graphPtr);
     for( size_t iSplitVar = 0 ; iSplitVar < splitVarNameList.size() ; iSplitVar++ ){
       dialsTTree->SetBranchAddress(splitVarNameList[iSplitVar].c_str(), &splitVarValueList[iSplitVar]);
     }
@@ -661,14 +646,14 @@ bool DialCollection::initializeDialsWithBinningFile(const JsonType& dialsDefinit
       TObject* dialInitializer{nullptr};
       if (getGlobalDialType() == "Spline") dialInitializer = splinePtr;
       if (getGlobalDialType() == "Graph") dialInitializer = graphPtr;
-      DialBaseFactory factory;
-      DialBase *dialBase = factory.makeDial(
-          getTitle(),
-          getGlobalDialType(),
-          getGlobalDialSubType(),
-          dialInitializer,
-          false);
-      if (dialBase) _dialBaseList_.emplace_back(DialBaseObject(dialBase));
+
+      auto dial = makeDial(dialInitializer);
+      if( dial != nullptr ){
+        _dialInterfaceList_.emplace_back();
+        DialBaseObj obj;
+        obj.dialPtr = std::move(dial);
+        _dialInterfaceList_.back().setDial( obj );
+      }
     } // iSpline (in TTree)
   } // Splines in TTree
   else{
@@ -694,20 +679,18 @@ bool DialCollection::initializeDialsWithDefinition() {
   }
 
   this->readGlobals( dialsDefinition );
-  DialBaseFactory dialBaseFactory;
 
   if     ( _globalDialType_ == "Norm" or _globalDialType_ == "Normalization" ) {
     // This dial collection is a normalization, so there is a single dial.
     // Create it here.
     _isEventByEvent_ = false;
-    _dialBaseList_.emplace_back(
-        DialBaseObject(dialBaseFactory.makeDial(getTitle(),"Normalization","",nullptr,false)));
+    _dialInterfaceList_.emplace_back();
+    _dialInterfaceList_.back().setDial( DialBaseObj(makeDial()) );
   }
   else if( _globalDialType_ == "Formula" or _globalDialType_ == "RootFormula" ){
     // This dial collection calculates a function of the parameter values, so it
     // is a single dial for all events.  Create the dial here.
     _isEventByEvent_ = false;
-    DialBaseFactory f;
 
     if( GenericToolbox::Json::doKeyExist(dialsDefinition, "binning") ){
       auto binning = GenericToolbox::Json::fetchValue(dialsDefinition, "binning", JsonType());
@@ -717,12 +700,14 @@ bool DialCollection::initializeDialsWithDefinition() {
       _dialBinSet_.setName( "formula binning" );
       _dialBinSet_.configure(binning);
 
-      _dialBaseList_.reserve( _dialBinSet_.getBinList().size() );
+      _dialInterfaceList_.reserve( _dialBinSet_.getBinList().size() );
       for( auto& bin : _dialBinSet_.getBinList() ){
-        _dialBaseList_.emplace_back( DialBaseObject( f.makeDial( dialsDefinition ) ) );
+
+        _dialInterfaceList_.emplace_back();
+        _dialInterfaceList_.back().setDial( DialBaseObj(makeDial( dialsDefinition )) );
 
         for( auto& var : bin.getEdgesList() ){
-          ((RootFormula*) _dialBaseList_.back().get())->getFormula().SetParameter(
+          ((RootFormula*) _dialInterfaceList_.back().getDialBaseRef())->getFormula().SetParameter(
               var.varName.c_str(), var.getCenterValue()
           );
         }
@@ -730,7 +715,8 @@ bool DialCollection::initializeDialsWithDefinition() {
 
     }
     else{
-      _dialBaseList_.emplace_back( DialBaseObject( f.makeDial( dialsDefinition ) ) );
+      _dialInterfaceList_.emplace_back();
+      _dialInterfaceList_.back().setDial( DialBaseObj(makeDial( dialsDefinition )) );
     }
 
   }
@@ -738,8 +724,9 @@ bool DialCollection::initializeDialsWithDefinition() {
     // This dial collection calculates a function of the parameter values so it
     // is a single dial for all events.  Create the dial here.
     _isEventByEvent_ = false;
-    DialBaseFactory f;
-    _dialBaseList_.emplace_back( DialBaseObject( f.makeDial( dialsDefinition ) ) );
+
+    _dialInterfaceList_.emplace_back();
+    _dialInterfaceList_.back().setDial( DialBaseObj(makeDial( dialsDefinition )) );
   }
   else if( _globalDialType_ == "Tabulated" ) {
     // This dial uses a precalculated table to apply weight to each event (e.g. it
@@ -783,7 +770,7 @@ bool DialCollection::initializeDialsWithDefinition() {
   return true;
 }
 
-JsonType DialCollection::fetchDialsDefinition(const JsonType &definitionsList_) {
+JsonType DialCollection::fetchDialsDefinition(const JsonType &definitionsList_) const {
   auto* parSetPtr = this->getSupervisedParameterSet();
   LogThrowIf(parSetPtr == nullptr, "Can't fetch dial definition of parameter: par ref not set.");
   auto* par = &parSetPtr->getParameterList()[_supervisedParameterIndex_];
@@ -814,6 +801,284 @@ void DialCollection::printConfiguration() const {
 
   LogInfo << "DialCollection: " << this->getTitle() << std::endl;
 
+}
+
+
+
+std::unique_ptr<DialBase> DialCollection::makeDial() const{ return std::make_unique<Norm>(); }
+std::unique_ptr<DialBase> DialCollection::makeDial(const TObject* src_) const {
+  std::unique_ptr<DialBase> out{nullptr};
+
+  // always returns an invalid ptr if
+  if( src_ == nullptr ){ return out; }
+
+  if     ( _globalDialType_ == "Graph"   ){ out = makeGraphDial(src_); }
+  else if( _globalDialType_ == "Spline"  ){ out = makeSplineDial(src_); }
+  else if( _globalDialType_ == "Surface" ){ out = makeSurfaceDial(src_); }
+  else{ LogThrow("Invalid dial type to init with TObject: " << _globalDialType_); }
+
+  if( out != nullptr ){
+    out->setAllowExtrapolation( _allowDialExtrapolation_ );
+  }
+
+  return out;
+}
+std::unique_ptr<DialBase> DialCollection::makeDial(const JsonType& config_) const{
+  std::unique_ptr<DialBase> dialBase{nullptr};
+  std::string dialType{};
+
+  dialType = GenericToolbox::Json::fetchValue(config_, {{"dialType"}, {"dialsType"}}, dialType);
+
+  if( dialType == "Formula" or dialType == "RootFormula" ){
+    dialBase = std::make_unique<RootFormula>();
+    auto* rootFormulaPtr{(RootFormula*) dialBase.get()};
+
+    auto formulaConfig(GenericToolbox::Json::fetchValue<JsonType>(config_, "dialConfig"));
+
+    rootFormulaPtr->setFormulaStr( GenericToolbox::Json::fetchValue<std::string>(formulaConfig, "formulaStr") );
+  }
+  else if( dialType == "CompiledLibDial" ){
+    dialBase = std::make_unique<CompiledLibDial>();
+    auto* compiledLibDialPtr{(CompiledLibDial*) dialBase.get()};
+
+    auto formulaConfig(GenericToolbox::Json::fetchValue<JsonType>(config_, "dialConfig"));
+
+    bool success = compiledLibDialPtr->loadLibrary( GenericToolbox::Json::fetchValue<std::string>(formulaConfig, "libraryFile") );
+    if( not success ){
+      LogThrow("Could not load CompiledLibDial. " << GenericToolbox::Json::fetchValue(formulaConfig, "messageOnError", std::string("")) );
+    }
+  }
+  else{ LogThrow("Unknown dial type: " << dialType); }
+
+  return dialBase;
+}
+
+std::unique_ptr<DialBase> DialCollection::makeGraphDial(const TObject* src_) const {
+  // always returns an invalid ptr if
+  if( src_ == nullptr ){ return nullptr; }
+
+  auto* srcGraph = dynamic_cast<const TGraph*>(src_);
+
+  if( srcGraph->GetN() == 0 ) { return {}; }
+
+  if( _globalDialSubType_ == "root" ) {
+    auto dial = std::make_unique<RootGraph>();
+    dial->setGraph(*srcGraph);
+    return dial;
+  }
+
+  if( srcGraph->GetN() == 1 ){
+    // For one point graph, just use a scale. Do the unique_ptr dance in case
+    // there are exceptions.
+    double value = srcGraph->GetY()[0];
+
+    // is flat?
+    if (std::abs(value-1.0) < 2*std::numeric_limits<float>::epsilon()) { return {}; }
+
+    auto dial = std::make_unique<Shift>();
+    dial->setShiftValue(value);
+    return dial;
+  }
+
+  // srcGraph->GetN() >= 2, default
+  auto dial = std::make_unique<Graph>();
+  dial->buildDial(*srcGraph);
+  return dial;
+}
+std::unique_ptr<DialBase> DialCollection::makeSplineDial(const TObject* src_) const{
+  // always returns an invalid ptr if
+  if( src_ == nullptr ){ return nullptr; }
+
+  // The types of cubic splines are "not-a-knot", "natural", "catmull-rom",
+  // and "ROOT".  The "not-a-knot" spline will give the same curve as ROOT
+  // (and might be implemented with at TSpline3).  The "ROOT" spline will use
+  // an actual TSpline3 (and is slow).  The "natural" and "catmull-rom"
+  // splines are just as expected (you can see the underlying math on
+  // Wikipedia or another source).  Be careful about the order since later
+  // conditionals can override earlier ones.
+  std::string splType = "not-a-knot";  // The default.
+  if( _globalDialSubType_.find("akima") != std::string::npos ) splType = "akima";
+  if( _globalDialSubType_.find("catmull") != std::string::npos) splType = "catmull-rom";
+  if( _globalDialSubType_.find("natural") != std::string::npos) splType = "natural";
+  if( _globalDialSubType_.find("not-a-knot") != std::string::npos) splType = "not-a-knot";
+  if( _globalDialSubType_.find("pixar") != std::string::npos) {
+    splType = "catmull-rom";
+    // sneaky output... logger would tattle on me.
+    static bool woody=true;
+    if (woody) std::cout << std::endl << std::endl << "You got a friend in me!" << std::endl;
+    woody=false;
+  }
+  if( _globalDialSubType_.find("ROOT") != std::string::npos) splType = "ROOT";
+
+  bool isMonotonic = ( _globalDialSubType_.find("monotonic") != std::string::npos );
+
+  // Get the numeric tolerance for when a uniform spline can be used.  We
+  // should be able to set this in the DialSubType.
+  const double defUniformityTolerance{16*std::numeric_limits<float>::epsilon()};
+  double uniformityTolerance{defUniformityTolerance};
+  if (_globalDialSubType_.find("uniformity(") != std::string::npos) {
+    std::size_t bg = _globalDialSubType_.find("uniformity(");
+    bg = _globalDialSubType_.find('(',bg);
+    std::size_t en = _globalDialSubType_.find(')',bg);
+    LogThrowIf(en == std::string::npos,
+               "Invalid spline uniformity with dialSubType: " << _globalDialSubType_
+               << " dial: " << getTitle());
+    en = en - bg;
+    std::string uniformityString = _globalDialSubType_.substr(bg+1,en-1);
+    std::istringstream unif(uniformityString);
+    unif >> uniformityTolerance;
+  }
+
+  auto splinePointList = SplineUtils::getSplinePointList(src_, splType);
+
+  // invalid, return
+  if( splinePointList.empty() ){ return nullptr; }
+
+  if( splinePointList.size() == 1 or SplineUtils::isFlat(splinePointList) ){
+    // it's flat, let's shortcut
+    if( std::abs( splinePointList[0].y - 1.0 ) < 2 * std::numeric_limits<float>::epsilon() ){
+      // one! no need for a dial
+      return nullptr;
+    }
+
+    // Do the unique_ptr dance in case there are exceptions.
+    auto dialBase = std::make_unique<Shift>();
+    dialBase->setShiftValue(splinePointList[0].y);
+    return dialBase;
+  }
+
+  std::sort(splinePointList.begin(), splinePointList.end(),
+    [](const SplineUtils::SplinePoint& a_, const SplineUtils::SplinePoint& b_){
+      return a_.x < b_.x; // a goes first?
+    });
+
+#define SHORT_CIRCUIT_SMALL_SPLINES
+#ifdef  SHORT_CIRCUIT_SMALL_SPLINES
+  if( splinePointList.size() <= 2 ){ return this->makeGraphDial(src_); }
+#endif
+
+  // If there are only two points, then force a catmull-rom.  This could be
+  // handled using a graph, but Catmull-Rom is fast, and works better with the
+  // GPU.  The isMonotonic is forced to false so that this uses CompactSpline
+  // instead of MonotonicSpline.
+  if( splinePointList.size() <= 2 ){ splType = "catmull-rom"; isMonotonic = false; }
+
+  ////////////////////////////////////////////////////////////////
+  // Check if the spline slope calculation should be updated.  The slopes for
+  // not-a-knot and natural splines are calculated by FillFromGraph and
+  // FillFromSpoline using ROOT code.  That means we need to fill in the
+  // slopes for the other types ("catmull-rom", "akima")
+  if     ( splType == "catmull-rom" ){ SplineUtils::fillCatmullRomSlopes(splinePointList); }
+  else if( splType == "akima" ){ SplineUtils::fillAkimaSlopes(splinePointList); }
+
+  ////////////////////////////////////////////////////////////////
+  // Check if the spline is supposed to be monotonic and condition the slopes
+  // if necessary.  This is ignored by "ROOT" splines.  The Catmull-Rom
+  // splines have a special implementation for monotonic splines, so save a
+  // flag that can be checked later.
+  ////////////////////////////////////////////////////////////////
+  if( isMonotonic ){ SplineUtils::applyMonotonicCondition(splinePointList); }
+
+  ///////////////////////////////////////////////////////////
+  // Create the right kind low level spline class base on all of the previous
+  // queries.  This is pushing the if-elseif-elseif limit so watch for when it
+  // should change to the do-while-false idiom.  Make sure the individual
+  // conditionals are less than 10 lines.
+  ///////////////////////////////////////////////////////////
+  std::unique_ptr<DialBase> dialBase;
+  if      ( splType == "ROOT" ){
+    // The ROOT implementation of the spline has been explicitly requested, so
+    // use it.
+    auto rootSpline = std::make_unique<RootSpline>();
+    rootSpline->buildDial(splinePointList);
+    dialBase = std::move(rootSpline);
+  }
+  else if( splType == "catmull-rom" ){
+    // Catmull-Rom is handled as a special case because it ignores the slopes,
+    // and has an explicit monotonic implementatino.  It also must have
+    // uniformly spaced knots.
+    if( not SplineUtils::isUniform(splinePointList, uniformityTolerance) ){
+      LogError << "Catmull-rom splines need a uniformly spaced points"
+               << " Dial: " << getTitle()
+               << std::endl;
+      double step = (splinePointList.back().x-splinePointList.front().x)/(splinePointList.size()-1);
+      for (int i = 0; i<splinePointList.size()-1; ++i) {
+        LogError << i << " --  X: " << splinePointList[i].x
+                 << " X+1: " << splinePointList[i+1].x
+                 << " step: " << step
+                 << " error: " << splinePointList[i+1].x - splinePointList[i].x - step
+                 << std::endl;
+      }
+      // If the user specified a tolerance then crash, otherwise trust the
+      // user knows that it's not uniform and continue.
+      LogThrowIf(uniformityTolerance != defUniformityTolerance, "Invalid catmull-rom inputs -- Nonuniform spacing");
+    }
+
+    if( isMonotonic ) {
+      auto monotonicSpline = std::make_unique<MonotonicSpline>();
+      monotonicSpline->buildDial(splinePointList);
+      dialBase = std::move(monotonicSpline);
+    }
+    else {
+      auto compactSpline = std::make_unique<CompactSpline>();
+      compactSpline->buildDial(splinePointList);
+      dialBase = std::move(compactSpline);
+    }
+
+  }
+  else if( SplineUtils::isUniform(splinePointList, uniformityTolerance) ){
+    // Haven't matched a specific special case, but we have uniformly spaced
+    // knots so we can use the faster UniformSpline implementation.
+    auto uniformSpline = std::make_unique<UniformSpline>();
+    uniformSpline->buildDial(splinePointList);
+    dialBase = std::move(uniformSpline);
+  }
+  else {
+    // Haven't matched a specific special case, and the knots are not
+    // uniformly spaced, so we have to use the GeneralSpline implemenatation
+    // which can handle any kind of cubic spline.
+    auto generalSpline = std::make_unique<GeneralSpline>();
+    generalSpline->buildDial(splinePointList);
+    dialBase = std::move(generalSpline);
+  }
+
+  // Pass the ownership without any constraints!
+  return dialBase;
+
+}
+std::unique_ptr<DialBase> DialCollection::makeSurfaceDial(const TObject* src_) const{
+  // always returns an invalid ptr if
+  if( src_ == nullptr ){ return nullptr; }
+
+  auto* srcObject = dynamic_cast<const TH2*>(src_);
+
+  LogThrowIf(srcObject == nullptr, "Surface dial initializers must be a TH2");
+
+  // Stuff the created dial into a unique_ptr, so it will be properly deleted
+  // in the event of an exception.
+  std::unique_ptr<DialBase> dialBase;
+
+  if (_globalDialSubType_ == "Bilinear") {
+    // Basic coding: Give a hint to the reader and put likely branch "first".
+    // Do we really expect the cached version more than the uncached?
+    auto bilinear = std::make_unique<Bilinear>();
+    bilinear->buildDial(*srcObject);
+    dialBase = std::move(bilinear);
+  }
+  else if (_globalDialSubType_ == "Bicubic") {
+    auto bicubic = std::make_unique<Bicubic>();
+    bicubic->buildDial(*srcObject);
+    dialBase = std::move(bicubic);
+  }
+
+  if (not dialBase) {
+    LogError << "Invalid dialSubType value: " << _globalDialSubType_ << std::endl;
+    LogError << "Valid dialSubType values are: Bilinear, Bicubic" << std::endl;
+    LogThrow("Invalid Surface dialSubType");
+  }
+
+  // Pass the ownership without any constraints!
+  return dialBase;
 }
 
 //  A Lesser GNU Public License

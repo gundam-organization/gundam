@@ -5,12 +5,12 @@
 #ifndef GUNDAM_UNIFORMSPLINE_H
 #define GUNDAM_UNIFORMSPLINE_H
 
+
 #include "DialBase.h"
 #include "DialUtils.h"
 #include "DialInputBuffer.h"
 
-#include "TGraph.h"
-#include "TSpline.h"
+#include "SplineUtils.h"
 
 #include <vector>
 #include <utility>
@@ -20,27 +20,18 @@ class UniformSpline : public DialBase {
 
 public:
   UniformSpline() = default;
-  ~UniformSpline() override = default;
 
+  // mandatory overrides
   [[nodiscard]] std::unique_ptr<DialBase> clone() const override { return std::make_unique<UniformSpline>(*this); }
   [[nodiscard]] std::string getDialTypeName() const override { return {"UniformSpline"}; }
   [[nodiscard]] double evalResponse(const DialInputBuffer& input_) const override;
 
-  void setAllowExtrapolation(bool allowExtrapolation) override;
-  [[nodiscard]] bool getAllowExtrapolation() const override;
+  // other overrides
+  void setAllowExtrapolation(bool allowExtrapolation) override { _allowExtrapolation_ = allowExtrapolation; }
+  [[nodiscard]] bool getAllowExtrapolation() const override { return _allowExtrapolation_; }
+  [[nodiscard]] const std::vector<double>& getDialData() const override { return _splineData_; }
 
-  /// Pass information to the dial so that it can build it's
-  /// internal information.  New build overloads should be
-  /// added as we have classes of dials
-  /// (e.g. multi-dimensional dials).
-  virtual void buildDial(const TGraph& grf, const std::string& option_="") override;
-  virtual void buildDial(const TSpline3& spl, const std::string& option_="") override;
-  virtual void buildDial(const std::vector<double>& v1,
-                         const std::vector<double>& v2,
-                         const std::vector<double>& v3,
-                         const std::string& option_="") override;
-
-   [[nodiscard]] const std::vector<double>& getDialData() const override {return _splineData_;}
+  void buildDial(const std::vector<SplineUtils::SplinePoint>& splinePointList_);
 
 protected:
   bool _allowExtrapolation_{false};
@@ -51,8 +42,6 @@ protected:
   std::vector<double> _splineData_{};
   DialUtils::Range _splineBounds_{std::nan("unset"), std::nan("unset")};
 };
-
-typedef CachedDial<UniformSpline> UniformSplineCache;
 
 
 #endif //GUNDAM_UNIFORMSPLINE_H
