@@ -128,8 +128,7 @@ int main(int argc, char** argv){
     // Check if the config is an array (baobab compatibility)
 
     ConfigUtils::ConfigHandler cHandler{ fitterConfig };
-
-
+    LogInfo << "Fitter config loaded." << std::endl;
     // Reading marginaliser config file
     nlohmann::json margConfig{ ConfigUtils::readConfigFile( clParser.getOptionVal<std::string>("configFile") ) };
     if(margConfig.size()==1) {
@@ -138,7 +137,7 @@ int main(int argc, char** argv){
         margConfig = margConfig[0];
     }
     cHandler.override( (JsonType)margConfig );
-    LogInfo << "Override done." << std::endl;
+    LogInfo << "Override config done." << std::endl;
 
 
 
@@ -199,8 +198,6 @@ int main(int argc, char** argv){
 
     GenericToolbox::Json::fillValue(gundamFitterConfig, fitter.getConfig(), "fitterEngineConfig");
     fitter.configure();
-    // Manually set allowEigenDecompWithBounds
-
 
     fitter.getLikelihoodInterface();
 
