@@ -40,7 +40,7 @@ double getParameterValueFromTextFile(std::string fileName, std::string parameter
 int main(int argc, char** argv){
 
 
-    GundamApp app{"contours marginalisation tool"};
+    GundamApp app{"Systematics thrower/marginaliser"};
 
     // --------------------------
     // Read Command Line Args:
@@ -113,32 +113,21 @@ int main(int argc, char** argv){
 
     using namespace GundamUtils;
     RootUtils::ObjectReader::throwIfNotFound = true;
-
-
-
+    std::unique_ptr<TFile> fitterRootFile{nullptr};
     JsonType fitterConfig;
-    RootUtils::ObjectReader::readObject<TNamed>(fitterFile.get(), {{"gundam/config_TNamed"}, {"gundamFitter/unfoldedConfig_TNamed"}}, [&](TNamed* config_){
-        fitterConfig = GenericToolbox::Json::readConfigJsonStr( config_->GetTitle() );
-    });
+
+      RootUtils::ObjectReader::readObject<TNamed>(
+              fitterRootFile.get(),
+              {{"gundam/config/unfoldedJson_TNamed"},
+               {"gundam/config_TNamed"},
+               {"gundamFitter/unfoldedConfig_TNamed"}},
+              [&](TNamed* config_){
+                  fitterConfig = GenericToolbox::Json::readConfigJsonStr( config_->GetTitle() );
+              });
+
     // Check if the config is an array (baobab compatibility)
 
     ConfigUtils::ConfigHandler cHandler{ fitterConfig };
-
-
-//    // Disabling defined samples:
-//    LogInfo << "Removing defined samples..." << std::endl;
-//    ConfigUtils::applyOverrides(
-//            cHandler.getConfig(),
-//            GenericToolbox::Json::readConfigJsonStr(R"({"fitterEngineConfig":{"propagatorConfig":{"fitSampleSetConfig":{"fitSampleList":[]}}}})")
-//    );
-
-//    // Disabling defined plots:
-//    LogInfo << "Removing defined plots..." << std::endl;
-//    ConfigUtils::applyOverrides(
-//            cHandler.getConfig(),
-//            GenericToolbox::Json::readConfigJsonStr(R"({"fitterEngineConfig":{"propagatorConfig":{"plotGeneratorConfig":{}}}})")
-//    );
-
 
 
     // Reading marginaliser config file
@@ -210,7 +199,9 @@ int main(int argc, char** argv){
 
     GenericToolbox::Json::fillValue(gundamFitterConfig, fitter.getConfig(), "fitterEngineConfig");
     fitter.configure();
-    // Manually set allowEigenDecompWithBounds to true
+    // Manually set allowEigenDecompWithBounds
+
+
     fitter.getLikelihoodInterface();
 
     // We are only interested in our MC. Data has already been used to get the post-fit error/values
@@ -226,6 +217,7 @@ int main(int argc, char** argv){
 
     // you need this to use the custom systematic throwers
     propagator.getParametersManager().setThrowerAsCustom();
+
     propagator.getParametersManager().getParameterSetsList();
 
     std::vector<std::string> parameterNames;
@@ -345,7 +337,6 @@ int main(int argc, char** argv){
     std::vector<bool> margThis;
     std::vector<double> prior;
     std::vector<double> weightsChiSquare;
-    std::vector<double> dialResponse;
 //    weightsChiSquare.reserve(1000);
     double LLH, gLLH, priorSum, LLHwrtBestFit;
     double totalWeight; // use in the pedestal case, just as a placeholder
@@ -357,7 +348,6 @@ int main(int argc, char** argv){
     margThrowTree->Branch("gLLH", &gLLH);
     margThrowTree->Branch("priorSum", &priorSum);
     margThrowTree->Branch("weightsChiSquare", &weightsChiSquare);
-    margThrowTree->Branch("dialResponse", &dialResponse);
 
     // branches for ThrowsPThetaFormat
     std::vector<double> survivingParameterValues;
@@ -445,11 +435,6 @@ int main(int argc, char** argv){
 
     // write the list of parameters that will not be marginalised to the output file
     app.getOutfilePtr()->WriteObject(marg_param_list, "marg_param_list");
-//    LogInfo << par.getFullTitle() << " -> type: " << par.getPriorType() << " mu=" << par.getPriorValue()
-//            << " sigma= " << par.getStdDevValue() << " limits: " << par.getMinValue() << " - "
-//            << par.getMaxValue() << " limits (phys): " << par.getMinPhysical() << " - "
-//            << par.getMaxPhysical() << " limits (mirr): " << par.getMinMirror() << " - "
-//            << par.getMaxMirror() <<" --- marg? "<<par.isMarginalised() << std::endl;
 
     // print marg_param_list for debug
     LogInfo<<"Number of parameter in marg_param_list: "<<marg_param_list->GetEntries()<<std::endl;
