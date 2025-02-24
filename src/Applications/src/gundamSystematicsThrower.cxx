@@ -113,11 +113,10 @@ int main(int argc, char** argv){
 
     using namespace GundamUtils;
     RootUtils::ObjectReader::throwIfNotFound = true;
-    std::unique_ptr<TFile> fitterRootFile{nullptr};
     JsonType fitterConfig;
 
       RootUtils::ObjectReader::readObject<TNamed>(
-              fitterRootFile.get(),
+              fitterFile.get(),
               {{"gundam/config/unfoldedJson_TNamed"},
                {"gundam/config_TNamed"},
                {"gundamFitter/unfoldedConfig_TNamed"}},
