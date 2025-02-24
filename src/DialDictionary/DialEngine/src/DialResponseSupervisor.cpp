@@ -3,14 +3,21 @@
 //
 
 #include "DialResponseSupervisor.h"
+#include "Logger.h"
 
 #include <sstream>
 
 
 double DialResponseSupervisor::process(double reponse_) const {
   // apply cap?
-  if     ( not std::isnan(_minResponse_) and reponse_ < _minResponse_ ){ return _minResponse_; }
-  else if( not std::isnan(_maxResponse_) and reponse_ > _maxResponse_ ){ return _maxResponse_; }
+  // print out info
+
+  if     ( not std::isnan(_minResponse_) and reponse_ < _minResponse_ ){
+      return _minResponse_;
+  }
+  else if( not std::isnan(_maxResponse_) and reponse_ > _maxResponse_ ){
+      return _maxResponse_;
+  }
 
   // else?
 
