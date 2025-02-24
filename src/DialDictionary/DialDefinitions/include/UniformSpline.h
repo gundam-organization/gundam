@@ -5,9 +5,12 @@
 #ifndef GUNDAM_UNIFORMSPLINE_H
 #define GUNDAM_UNIFORMSPLINE_H
 
+
 #include "DialBase.h"
 #include "DialUtils.h"
 #include "DialInputBuffer.h"
+
+#include "SplineUtils.h"
 
 #include "TGraph.h"
 #include "TSpline.h"
@@ -39,8 +42,9 @@ public:
                          const std::vector<double>& v2,
                          const std::vector<double>& v3,
                          const std::string& option_="") override;
+  void buildDial(const std::vector<SplineUtils::SplinePoint>& splinePointList_);
 
-   [[nodiscard]] const std::vector<double>& getDialData() const override {return _splineData_;}
+  [[nodiscard]] const std::vector<double>& getDialData() const override {return _splineData_;}
 
 protected:
   bool _allowExtrapolation_{false};

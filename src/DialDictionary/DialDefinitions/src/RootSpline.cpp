@@ -39,12 +39,25 @@ void RootSpline::buildDial(const TGraph& grf, const std::string& option_) {
   _spline_.SetTitle(grf.GetName());
 }
 
-void RootSpline::buildDial(const std::vector<double>& v1,
-                       const std::vector<double>& v2,
-                       const std::vector<double>& v3,
-                       const std::string& option_) {
-  _spline_ = TSpline3("",const_cast<double*>(v1.data()),
-                      const_cast<double*>(v2.data()), v1.size());
+void RootSpline::buildDial(const std::vector<SplineUtils::SplinePoint>& splinePointList_){
+  std::vector<double> x;
+  std::vector<double> y;
+
+  auto nPoints = splinePointList_.size();
+  x.reserve(nPoints);
+  y.reserve(nPoints);
+
+  for( auto splinePoint : splinePointList_ ) {
+    x.emplace_back( splinePoint.x );
+    y.emplace_back( splinePoint.y );
+  }
+
+  _spline_ = TSpline3(
+    "",
+    const_cast<double*>(x.data()),
+    const_cast<double*>(y.data()),
+    nPoints
+  );
 }
 
 const TSpline3 &RootSpline::getSpline() const {return _spline_;}

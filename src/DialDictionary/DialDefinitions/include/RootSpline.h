@@ -7,6 +7,9 @@
 
 #include "DialBase.h"
 #include "DialInputBuffer.h"
+
+#include "SplineUtils.h"
+
 #include "TSpline.h"
 
 class RootSpline : public DialBase {
@@ -26,10 +29,8 @@ public:
   /// (e.g. multi-dimensional dials).
   virtual void buildDial(const TGraph& grf, const std::string& option_="") override;
   virtual void buildDial(const TSpline3& spl, const std::string& option_="") override;
-  virtual void buildDial(const std::vector<double>& v1,
-                         const std::vector<double>& v2,
-                         const std::vector<double>& v3,
-                         const std::string& option_="") override;
+
+  void buildDial(const std::vector<SplineUtils::SplinePoint>& splinePointList_);
 
 protected:
   void setSpline(const TSpline3 &spline);

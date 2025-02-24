@@ -9,6 +9,8 @@
 #include "DialUtils.h"
 #include "DialInputBuffer.h"
 
+#include "SplineUtils.h"
+
 #include "TGraph.h"
 
 #include <vector>
@@ -42,6 +44,7 @@ public:
                          const std::vector<double>& v2,
                          const std::vector<double>& v3,
                          const std::string& option_="") override;
+  void buildDial(const std::vector<SplineUtils::SplinePoint>& splinePointList_);
 
   [[nodiscard]] const std::vector<double>& getDialData() const override {return _splineData_;}
 

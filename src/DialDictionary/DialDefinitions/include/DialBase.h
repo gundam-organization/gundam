@@ -55,15 +55,6 @@ public:
   /// Build the dial with no input arguments.  This is mostly for competeness!
   virtual void buildDial(const std::string& option_="") {throw std::runtime_error("Not implemented");}
 
-  /// Build the dial using up to three vectors of doubles.  This is how to add
-  /// an array of one, two or three values to a dial (if only one or two
-  /// vectors are needed, then the classes buildDial should just ignore the
-  /// extra vectors).
-  virtual void buildDial(const std::vector<double>& v1,
-                         const std::vector<double>& v2,
-                         const std::vector<double>& v3,
-                         const std::string& option_="") {throw std::runtime_error("Not implemented");}
-
   /// Build the dial using a graph (usually a leaf in the input file).
   virtual void buildDial(const TGraph& grf, const std::string& option_="") {throw std::runtime_error("Not implemented");}
 

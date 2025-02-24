@@ -27,7 +27,6 @@ set( SRCFILES
     DialDefinitions/src/Polynomial.cpp
 
     # DialFactories
-    DialFactories/src/SplineDialBaseFactory.cpp
     DialFactories/src/TabulatedDialFactory.cpp
     )
 

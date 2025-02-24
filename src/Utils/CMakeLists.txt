@@ -8,6 +8,7 @@ set(SRCFILES
     ${CMAKE_CURRENT_SOURCE_DIR}/src/GundamUtils.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/RootUtils.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/GundamApp.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/SplineUtils.cpp
     )
 
 set(HEADERS

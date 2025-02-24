@@ -110,7 +110,7 @@ public:
   // non-trivial getters
   [[nodiscard]] bool isDatasetValid(const std::string& datasetName_) const;
   std::string getTitle() const;
-  std::string getSummary(bool shallow_ = true);
+  std::string getSummary(bool shallow_ = true) const;
   Parameter* getSupervisedParameter() const;
   ParameterSet* getSupervisedParameterSet() const;
 
@@ -179,7 +179,7 @@ protected:
   bool initializeDialsWithTabulation(const JsonType& dialsDefinition);
 
   void readGlobals(const JsonType &config_);
-  JsonType fetchDialsDefinition(const JsonType &definitionsList_);
+  JsonType fetchDialsDefinition(const JsonType &definitionsList_) const;
 
   // factory
   std::unique_ptr<DialBase> makeGraphDial(const TObject* src_) const;
