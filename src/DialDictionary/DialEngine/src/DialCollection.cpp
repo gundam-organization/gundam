@@ -863,7 +863,7 @@ std::unique_ptr<DialBase> DialCollection::makeGraphDial(const TObject* src_) con
 
   if( _globalDialSubType_ == "root" ) {
     auto dial = std::make_unique<RootGraph>();
-    dial->buildDial(*srcGraph);
+    dial->setGraph(*srcGraph);
     return dial;
   }
 
@@ -876,7 +876,7 @@ std::unique_ptr<DialBase> DialCollection::makeGraphDial(const TObject* src_) con
     if (std::abs(value-1.0) < 2*std::numeric_limits<float>::epsilon()) { return {}; }
 
     auto dial = std::make_unique<Shift>();
-    dial->buildDial(value);
+    dial->setShiftValue(value);
     return dial;
   }
 
@@ -936,14 +936,14 @@ std::unique_ptr<DialBase> DialCollection::makeSplineDial(const TObject* src_) co
 
   if( splinePointList.size() == 1 or SplineUtils::isFlat(splinePointList) ){
     // it's flat, let's shortcut
-    if( std::abs( splinePointList[0].y - 1.0 < 2 * std::numeric_limits<float>::epsilon() ) ){
+    if( std::abs( splinePointList[0].y - 1.0 ) < 2 * std::numeric_limits<float>::epsilon() ){
       // one! no need for a dial
       return nullptr;
     }
 
     // Do the unique_ptr dance in case there are exceptions.
-    std::unique_ptr<DialBase> dialBase = std::make_unique<Shift>();
-    dialBase->buildDial(splinePointList[0].y);
+    auto dialBase = std::make_unique<Shift>();
+    dialBase->setShiftValue(splinePointList[0].y);
     return dialBase;
   }
 
@@ -1061,10 +1061,14 @@ std::unique_ptr<DialBase> DialCollection::makeSurfaceDial(const TObject* src_) c
   if (_globalDialSubType_ == "Bilinear") {
     // Basic coding: Give a hint to the reader and put likely branch "first".
     // Do we really expect the cached version more than the uncached?
-    dialBase = std::make_unique<Bilinear>();
+    auto bilinear = std::make_unique<Bilinear>();
+    bilinear->buildDial(*srcObject);
+    dialBase = std::move(bilinear);
   }
   else if (_globalDialSubType_ == "Bicubic") {
-    dialBase = std::make_unique<Bicubic>();
+    auto bicubic = std::make_unique<Bicubic>();
+    bicubic->buildDial(*srcObject);
+    dialBase = std::move(bicubic);
   }
 
   if (not dialBase) {
@@ -1072,8 +1076,6 @@ std::unique_ptr<DialBase> DialCollection::makeSurfaceDial(const TObject* src_) c
     LogError << "Valid dialSubType values are: Bilinear, Bicubic" << std::endl;
     LogThrow("Invalid Surface dialSubType");
   }
-
-  dialBase->buildDial(*srcObject);
 
   // Pass the ownership without any constraints!
   return dialBase;
