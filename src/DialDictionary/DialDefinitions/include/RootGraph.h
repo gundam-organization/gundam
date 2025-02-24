@@ -16,18 +16,18 @@ class RootGraph : public DialBase {
 public:
   RootGraph() = default;
 
+  // mandatory overrides
   [[nodiscard]] std::unique_ptr<DialBase> clone() const override { return std::make_unique<RootGraph>(*this); }
   [[nodiscard]] std::string getDialTypeName() const override { return {"RootGraph"}; }
   [[nodiscard]] double evalResponse(const DialInputBuffer& input_) const override;
 
-  void setAllowExtrapolation(bool allowExtrapolation) override;
-  [[nodiscard]] bool getAllowExtrapolation() const override;
+  // other overrides
+  void setAllowExtrapolation(bool allowExtrapolation) override { _allowExtrapolation_ = allowExtrapolation; }
+  [[nodiscard]] bool getAllowExtrapolation() const override { return _allowExtrapolation_; }
 
-  virtual void buildDial(const TGraph& grf, const std::string& option_="") override;
+  void setGraph(const TGraph &graph){ _graph_ = graph; }
 
-protected:
-  [[nodiscard]] double evaluateGraph(const DialInputBuffer& input_) const;
-
+private:
   bool _allowExtrapolation_{false};
   TGraph _graph_{};
 };

@@ -9,22 +9,6 @@
 #include "Logger.h"
 
 
-void GeneralSpline::setAllowExtrapolation(bool allowExtrapolation) {
-  _allowExtrapolation_ = allowExtrapolation;
-}
-
-bool GeneralSpline::getAllowExtrapolation() const {
-  return _allowExtrapolation_;
-}
-
-void GeneralSpline::buildDial(const TGraph& graph_, const std::string& option_){
-  buildDial(SplineUtils::getSplinePointList(&graph_, option_));
-}
-
-void GeneralSpline::buildDial(const TSpline3& sp_, const std::string& option_){
-  buildDial(SplineUtils::getSplinePointList(&sp_, option_));
-}
-
 void GeneralSpline::buildDial(const std::vector<SplineUtils::SplinePoint>& splinePointList_){
   LogThrowIf(not _splineData_.empty(), "Spline data already set.");
 

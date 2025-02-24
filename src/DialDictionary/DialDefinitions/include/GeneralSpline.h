@@ -11,9 +11,6 @@
 
 #include "SplineUtils.h"
 
-#include "TGraph.h"
-#include "TSpline.h"
-
 #include <vector>
 #include <utility>
 
@@ -23,22 +20,18 @@ class GeneralSpline : public DialBase {
 public:
   GeneralSpline() = default;
 
+  // mandatory overrides
   [[nodiscard]] std::unique_ptr<DialBase> clone() const override { return std::make_unique<GeneralSpline>(*this); }
   [[nodiscard]] std::string getDialTypeName() const override { return {"GeneralSpline"}; }
   [[nodiscard]] double evalResponse(const DialInputBuffer& input_) const override;
 
-  void setAllowExtrapolation(bool allowExtrapolation) override;
-  [[nodiscard]] bool getAllowExtrapolation() const override;
+  // other overrides
+  void setAllowExtrapolation(bool allowExtrapolation) override { _allowExtrapolation_ = allowExtrapolation; }
+  [[nodiscard]] bool getAllowExtrapolation() const override { return _allowExtrapolation_; }
+  [[nodiscard]] const std::vector<double>& getDialData() const override { return _splineData_; }
 
-  /// Pass information to the dial so that it can build it's
-  /// internal information.  New build overloads should be
-  /// added as we have classes of dials
-  /// (e.g. multi-dimensional dials).
-  virtual void buildDial(const TGraph& grf, const std::string& option_="") override;
-  virtual void buildDial(const TSpline3& spl, const std::string& option_="") override;
+  // methods
   void buildDial(const std::vector<SplineUtils::SplinePoint>& splinePointList_);
-
-  const std::vector<double>& getDialData() const override {return _splineData_;}
 
 protected:
   bool _allowExtrapolation_{false};

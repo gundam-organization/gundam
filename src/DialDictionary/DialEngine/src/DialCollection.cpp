@@ -19,7 +19,6 @@
 #include "Bilinear.h"
 #include "Bicubic.h"
 #include "CompiledLibDial.h"
-#include "MakeMonotonicSpline.h"
 
 #include "SplineUtils.h"
 #include "GundamGlobals.h"

@@ -34,13 +34,11 @@ public:
   // Return the name of the dial type (simple local RTTI).
   [[nodiscard]] virtual std::string getDialTypeName() const = 0;
 
-  /// Evaluate the the dial response at the set of parameter values in
-  /// DialInputBuffer.
+  /// Evaluate the dial response at the set of parameter values in DialInputBuffer.
   [[nodiscard]] virtual double evalResponse(const DialInputBuffer& input_) const = 0;
 
-  /// Allow extrapolation of the data.  The default is to
-  /// forbid extrapolation.
-  virtual void setAllowExtrapolation(bool allow_) {}
+  /// Allow extrapolation of the data. The default should be to forbid extrapolation.
+  virtual void setAllowExtrapolation(bool allow_){}
   [[nodiscard]] virtual bool getAllowExtrapolation() const {return false;}
 
   /// Dial summary describing its content
