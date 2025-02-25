@@ -13,7 +13,7 @@ void MonotonicSpline::buildDial(const std::vector<SplineUtils::SplinePoint>& spl
   LogThrowIf(not _splineData_.empty(), "Spline data already set.");
 
   _splineBounds_.min = splinePointList_.front().x;
-  _splineBounds_.max = splinePointList_.back().y;
+  _splineBounds_.max = splinePointList_.back().x;
 
   _splineData_.resize(2 + splinePointList_.size());
   _splineData_[0] = splinePointList_.front().x;
