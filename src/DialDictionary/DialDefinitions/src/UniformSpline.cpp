@@ -36,7 +36,6 @@ void UniformSpline::buildDial(const std::vector<SplineUtils::SplinePoint>& splin
 
   // Copy the spline data into local storage.
   for (int i = 0; i < splinePointList_.size(); ++i) {
-    double x = splinePointList_[i].x;
     double y = splinePointList_[i].y;
     double d = splinePointList_[i].slope;
     _splineData_[2 + 2*i + 0] = y;

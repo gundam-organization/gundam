@@ -6,24 +6,7 @@
 
 
 void RootSpline::buildDial(const std::vector<SplineUtils::SplinePoint>& splinePointList_){
-  std::vector<double> x;
-  std::vector<double> y;
-
-  auto nPoints = splinePointList_.size();
-  x.reserve(nPoints);
-  y.reserve(nPoints);
-
-  for( auto splinePoint : splinePointList_ ) {
-    x.emplace_back( splinePoint.x );
-    y.emplace_back( splinePoint.y );
-  }
-
-  _spline_ = TSpline3(
-    "",
-    const_cast<double*>(x.data()),
-    const_cast<double*>(y.data()),
-    nPoints
-  );
+  _spline_ = SplineUtils::buildTSpline3(splinePointList_);
 }
 
 double RootSpline::evalResponse(const DialInputBuffer& input_) const {

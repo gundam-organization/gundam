@@ -27,6 +27,7 @@ namespace SplineUtils{
   std::vector<SplinePoint> getSplinePointList(const TGraph* graph_);
   std::vector<SplinePoint> getSplinePointList(const TSpline3* spline_);
 
+  void fillTSpline3Slopes(std::vector<SplinePoint>& splinePointList_, const std::string& opt_="");
   void fillCatmullRomSlopes(std::vector<SplinePoint>& splinePointList_);
   void fillAkimaSlopes(std::vector<SplinePoint>& splinePointList_);
   void applyMonotonicCondition(std::vector<SplinePoint>& splinePointList_);
@@ -34,6 +35,8 @@ namespace SplineUtils{
   bool isFlat(const std::vector<SplinePoint>& splinePointList_, double tolerance_ = 2*std::numeric_limits<float>::epsilon());
   bool isUniform(const std::vector<SplinePoint>& splinePointList_, double tolerance_ = 16*std::numeric_limits<float>::epsilon());
   double getSlope(const SplinePoint& start_, const SplinePoint& end_);
+
+  TSpline3 buildTSpline3(const std::vector<SplinePoint>& splinePointList_);
 
 }
 
