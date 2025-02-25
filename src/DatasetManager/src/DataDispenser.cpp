@@ -1119,104 +1119,106 @@ void DataDispenser::loadEvent(int iThread_){
 
   while( true ){
 
-    // make sure we request a new entry and wait once we go for another loop
-    GenericToolbox::ScopedGuard readerGuard{
+    {
+      // make sure we request a new entry and wait once we go for another loop
+      GenericToolbox::ScopedGuard readerGuard{
         [&]{ threadSharedData.isEntryBufferReady.waitUntilEqual( true ); threadSharedData.isEntryBufferReady.setValue( false ); },
         [&]{ threadSharedData.requestReadNextEntry.setValue( true ); }
-    };
+      };
 
-    // ***** from this point, the TChain reader is waiting *****
+      // ***** from this point, the TChain reader is waiting *****
 
-    // check if the reader has nothing else to do / end of the loop
-    if( threadSharedData.isDoneReading.getValue() ){ break; }
+      // check if the reader has nothing else to do / end of the loop
+      if( threadSharedData.isDoneReading.getValue() ){ break; }
 
-    // leafFormIndexingList is modified by the TChain reader
-    LoaderUtils::copyData(eventIndexingBuffer, threadSharedData.leafFormIndexingList);
+      // leafFormIndexingList is modified by the TChain reader
+      LoaderUtils::copyData(eventIndexingBuffer, threadSharedData.leafFormIndexingList);
 
-    // Propagate variable transformations for indexing
-    LoaderUtils::applyVarTransforms(eventIndexingBuffer, varTransformForIndexingList);
+      // Propagate variable transformations for indexing
+      LoaderUtils::applyVarTransforms(eventIndexingBuffer, varTransformForIndexingList);
 
-    // nominalWeightTreeFormula is attached to the TChain
-    if( threadSharedData.nominalWeightTreeFormula != nullptr ){
-      eventIndexingBuffer.getWeights().base = (threadSharedData.nominalWeightTreeFormula->EvalInstance());
-    }
-
-    // additional weight with an event variable
-    if( threadSharedData.eventVariableAsWeightLeafPtr != nullptr ){
-      eventIndexingBuffer.getWeights().base *= threadSharedData.eventVariableAsWeightLeafPtr->evalAsDouble();
-    }
-
-
-    // skip this event if 0
-    if( eventIndexingBuffer.getWeights().base == 0 ){ continue; }
-    // no negative weights -> error
-    if( eventIndexingBuffer.getWeights().base  < 0 ){
-      LogError << "Negative nominal weight:" << std::endl;
-
-      LogError << "Event buffer is: " << eventIndexingBuffer.getSummary() << std::endl;
-
-      LogError << "Formula leaves:" << std::endl;
-      for( int iLeaf = 0 ; iLeaf < threadSharedData.nominalWeightTreeFormula->GetNcodes() ; iLeaf++ ){
-        if( threadSharedData.nominalWeightTreeFormula->GetLeaf(iLeaf) == nullptr ) continue; // for "Entry$" like dummy leaves
-        LogError << "Leaf: " << threadSharedData.nominalWeightTreeFormula->GetLeaf(iLeaf)->GetName() << "[0] = " << threadSharedData.nominalWeightTreeFormula->GetLeaf(iLeaf)->GetValue(0) << std::endl;
+      // nominalWeightTreeFormula is attached to the TChain
+      if( threadSharedData.nominalWeightTreeFormula != nullptr ){
+        eventIndexingBuffer.getWeights().base = (threadSharedData.nominalWeightTreeFormula->EvalInstance());
       }
 
-      LogThrow("Negative nominal weight");
-    }
+      // additional weight with an event variable
+      if( threadSharedData.eventVariableAsWeightLeafPtr != nullptr ){
+        eventIndexingBuffer.getWeights().base *= threadSharedData.eventVariableAsWeightLeafPtr->evalAsDouble();
+      }
 
-    // grab data from TChain
-    eventIndexingBuffer.getIndices().entry     = threadSharedData.treeChain->GetReadEntry();
-    eventIndexingBuffer.getIndices().treeFile      = threadSharedData.treeChain->GetTreeNumber();
-    eventIndexingBuffer.getIndices().treeEntry = threadSharedData.treeChain->GetTree()->GetReadEntry();
 
-    // get sample index / all -1 samples have been ruled out by the chain reader
-    iSample = _cache_.entrySampleIndexList[eventIndexingBuffer.getIndices().entry];
-    Sample& eventSample{*_cache_.samplesToFillList[iSample]};
+      // skip this event if 0
+      if( eventIndexingBuffer.getWeights().base == 0 ){ continue; }
+      // no negative weights -> error
+      if( eventIndexingBuffer.getWeights().base  < 0 ){
+        LogError << "Negative nominal weight:" << std::endl;
 
-    eventIndexingBuffer.getIndices().sample = eventSample.getIndex();
+        LogError << "Event buffer is: " << eventIndexingBuffer.getSummary() << std::endl;
 
-    // look for the bin index
-    LoaderUtils::fillBinIndex(eventIndexingBuffer, eventSample.getHistogram().getBinContextList());
-
-    // No bin found -> next sample
-    if( eventIndexingBuffer.getIndices().bin == -1 ){ continue; }
-
-    // dialIndexTreeFormula is modified by the TChain reader
-    int dialCloneArrayIndex{0};
-    if( threadSharedData.dialIndexTreeFormula != nullptr ){
-      dialCloneArrayIndex = int(threadSharedData.dialIndexTreeFormula->EvalInstance());
-    }
-
-    // only load event-by-event dials, binned dials etc. will be processed later
-    for( auto *dialCollectionRef: _cache_.dialCollectionsRefList ){
-
-      eventByEventDialBuffer[dialCollectionRef->getIndex()] = nullptr;
-
-      // if not event-by-event dial -> leave
-      if( dialCollectionRef->getGlobalDialLeafName().empty() ){ continue; }
-
-      // dial collections may come with a condition formula
-      if( dialCollectionRef->getApplyConditionFormula() != nullptr ){
-        if( LoaderUtils::evalFormula(eventIndexingBuffer, dialCollectionRef->getApplyConditionFormula().get()) == 0 ){
-          // next dialSet
-          continue;
+        LogError << "Formula leaves:" << std::endl;
+        for( int iLeaf = 0 ; iLeaf < threadSharedData.nominalWeightTreeFormula->GetNcodes() ; iLeaf++ ){
+          if( threadSharedData.nominalWeightTreeFormula->GetLeaf(iLeaf) == nullptr ) continue; // for "Entry$" like dummy leaves
+          LogError << "Leaf: " << threadSharedData.nominalWeightTreeFormula->GetLeaf(iLeaf)->GetName() << "[0] = " << threadSharedData.nominalWeightTreeFormula->GetLeaf(iLeaf)->GetValue(0) << std::endl;
         }
+
+        LogThrow("Negative nominal weight");
       }
 
-      int iCollection = dialCollectionRef->getIndex();
+      // grab data from TChain
+      eventIndexingBuffer.getIndices().entry     = threadSharedData.treeChain->GetReadEntry();
+      eventIndexingBuffer.getIndices().treeFile      = threadSharedData.treeChain->GetTreeNumber();
+      eventIndexingBuffer.getIndices().treeEntry = threadSharedData.treeChain->GetTree()->GetReadEntry();
 
-      // grab as a general TObject, then let the factory figure out what to do with it
-      auto *dialObjectPtr = *static_cast<const TObject **>(
-        eventIndexingBuffer.getVariables().fetchVariable( dialCollectionRef->getGlobalDialLeafName() )
-        .get().getPlaceHolderPtr()->getVariableAddress()
-      );
+      // get sample index / all -1 samples have been ruled out by the chain reader
+      iSample = _cache_.entrySampleIndexList[eventIndexingBuffer.getIndices().entry];
+      Sample& eventSample{*_cache_.samplesToFillList[iSample]};
 
-      // Extra-step for selecting the right dial with TClonesArray
-      if( not strcmp(dialObjectPtr->ClassName(), "TClonesArray")){
-        dialObjectPtr = ((const TClonesArray *) dialObjectPtr)->At(dialCloneArrayIndex);
+      eventIndexingBuffer.getIndices().sample = eventSample.getIndex();
+
+      // look for the bin index
+      LoaderUtils::fillBinIndex(eventIndexingBuffer, eventSample.getHistogram().getBinContextList());
+
+      // No bin found -> next sample
+      if( eventIndexingBuffer.getIndices().bin == -1 ){ continue; }
+
+      // dialIndexTreeFormula is modified by the TChain reader
+      int dialCloneArrayIndex{0};
+      if( threadSharedData.dialIndexTreeFormula != nullptr ){
+        dialCloneArrayIndex = int(threadSharedData.dialIndexTreeFormula->EvalInstance());
       }
 
-      eventByEventDialBuffer[dialCollectionRef->getIndex()] = dialCollectionRef->makeDial(dialObjectPtr).release();
+      // only load event-by-event dials, binned dials etc. will be processed later
+      for( auto *dialCollectionRef: _cache_.dialCollectionsRefList ){
+
+        eventByEventDialBuffer[dialCollectionRef->getIndex()] = nullptr;
+
+        // if not event-by-event dial -> leave
+        if( dialCollectionRef->getGlobalDialLeafName().empty() ){ continue; }
+
+        // dial collections may come with a condition formula
+        if( dialCollectionRef->getApplyConditionFormula() != nullptr ){
+          if( LoaderUtils::evalFormula(eventIndexingBuffer, dialCollectionRef->getApplyConditionFormula().get()) == 0 ){
+            // next dialSet
+            continue;
+          }
+        }
+
+        int iCollection = dialCollectionRef->getIndex();
+
+        // grab as a general TObject, then let the factory figure out what to do with it
+        auto *dialObjectPtr = *static_cast<const TObject **>(
+          eventIndexingBuffer.getVariables().fetchVariable( dialCollectionRef->getGlobalDialLeafName() )
+          .get().getPlaceHolderPtr()->getVariableAddress()
+        );
+
+        // Extra-step for selecting the right dial with TClonesArray
+        if( not strcmp(dialObjectPtr->ClassName(), "TClonesArray")){
+          dialObjectPtr = ((const TClonesArray *) dialObjectPtr)->At(dialCloneArrayIndex);
+        }
+
+        eventByEventDialBuffer[dialCollectionRef->getIndex()] = dialCollectionRef->makeDial(dialObjectPtr).release();
+      }
     }
 
     // ***** from this point, the TChain reader is released *****
