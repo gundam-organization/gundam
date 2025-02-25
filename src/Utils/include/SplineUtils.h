@@ -23,8 +23,8 @@ namespace SplineUtils{
     double slope{std::nan("unset")};
   };
 
-  std::vector<SplinePoint> getSplinePointList(const TObject* src_, const std::string& opt_);
-  std::vector<SplinePoint> getSplinePointList(const TGraph* graph_, const std::string& opt_);
+  std::vector<SplinePoint> getSplinePointList(const TObject* src_);
+  std::vector<SplinePoint> getSplinePointList(const TGraph* graph_);
   std::vector<SplinePoint> getSplinePointList(const TSpline3* spline_);
 
   void fillCatmullRomSlopes(std::vector<SplinePoint>& splinePointList_);

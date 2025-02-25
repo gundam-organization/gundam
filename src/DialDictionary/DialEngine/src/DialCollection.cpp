@@ -931,7 +931,7 @@ std::unique_ptr<DialBase> DialCollection::makeSplineDial(const TObject* src_) co
     unif >> uniformityTolerance;
   }
 
-  auto splinePointList = SplineUtils::getSplinePointList(src_, splType);
+  auto splinePointList = SplineUtils::getSplinePointList(src_);
 
   // invalid, return
   if( splinePointList.empty() ){ return nullptr; }

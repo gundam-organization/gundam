@@ -8,15 +8,15 @@
 
 namespace SplineUtils{
 
-  std::vector<SplinePoint> getSplinePointList(const TObject* src_, const std::string& opt_){
+  std::vector<SplinePoint> getSplinePointList(const TObject* src_){
     if( src_ == nullptr ) return {};
 
-    if( src_->InheritsFrom( TGraph::Class() ) ) { return getSplinePointList((TGraph*) src_, opt_); }
+    if( src_->InheritsFrom( TGraph::Class() ) ) { return getSplinePointList((TGraph*) src_); }
     if( src_->InheritsFrom( TSpline3::Class() ) ) { return getSplinePointList((TSpline3*) src_); }
 
     return {};
   }
-  std::vector<SplinePoint> getSplinePointList(const TGraph* src_, const std::string& opt_){
+  std::vector<SplinePoint> getSplinePointList(const TGraph* src_){
     if( src_ == nullptr ) return {};
 
     std::vector<SplinePoint> out;
