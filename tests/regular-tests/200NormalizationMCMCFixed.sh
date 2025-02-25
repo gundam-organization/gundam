@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Set the base name for this test (should match the script name)
-BASE=200MultiParFit-bilinear
+BASE=200NormalizationMCMCFixed
 
 # Get the directory containing the script from the command line
 # parameters (avoids bash trickery).  Use the current directory as the
@@ -21,12 +21,12 @@ fi
 export CONFIG_DIR=${DIR}
 export DATA_DIR=${PWD}
 
-CONFIG_FILE=${CONFIG_DIR}/${BASE}.yaml
+CONFIG_FILE=${CONFIG_DIR}/${BASE}-config.yaml
 OUTPUT_FILE=${DATA_DIR}/${BASE}.root
 
 echo ${OUTPUT_FILE}
 echo ${CONFIG_FILE}
 
-gundamFitter --cpu -t 1 --scan -s 10000 -c ${CONFIG_FILE} -o ${OUTPUT_FILE}
+gundamFitter -t 1 -s 10000 -c ${CONFIG_FILE} -o ${OUTPUT_FILE}
 
 # End of the script

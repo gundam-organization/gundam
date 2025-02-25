@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Set the base name for this test (should match the script name)
-BASE=200CovarianceFit
+BASE=200MultiParFitBicubic
 
 # Get the directory containing the script from the command line
 # parameters (avoids bash trickery).  Use the current directory as the

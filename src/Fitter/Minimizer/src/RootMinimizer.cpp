@@ -35,6 +35,7 @@ void RootMinimizer::configureImpl(){
   GenericToolbox::Json::fillValue(_config_, _strategy_, "strategy");
   GenericToolbox::Json::fillValue(_config_, _printLevel_, "print_level");
   GenericToolbox::Json::fillValue(_config_, _tolerance_, "tolerance");
+  GenericToolbox::Json::fillValue(_config_, _tolerancePerDegreeOfFreedom_, "tolerancePerDegreeOfFreedom");
   GenericToolbox::Json::fillValue(_config_, _maxIterations_, {{"maxIterations"},{"max_iter"}});
   GenericToolbox::Json::fillValue(_config_, _maxFcnCalls_, {{"maxFcnCalls"},{"max_fcn"}});
 
@@ -78,6 +79,15 @@ void RootMinimizer::initializeImpl(){
   }
 
   LogWarning << "Initializing RootMinimizer..." << std::endl;
+  if( not std::isnan(_tolerancePerDegreeOfFreedom_) ) {
+    LogWarning << "Using tolerance per degree of freedom: " << _tolerancePerDegreeOfFreedom_ << std::endl;
+    _tolerance_ = _tolerancePerDegreeOfFreedom_ * fetchNbDegreeOfFreedom();
+  }
+
+  LogInfo << "Tolerance is set to: " << _tolerance_ << std::endl;
+  LogInfo << "The minimizer will run until it reaches an Estimated Distance to Minimum (EDM) of: " << getTargetEdm() << std::endl;
+  LogInfo << "EDM per degree of freedom is: " << getTargetEdm()/fetchNbDegreeOfFreedom() << std::endl;
+
 
   LogInfo << "Defining minimizer as: " << _minimizerType_ << "/" << _minimizerAlgo_ << std::endl;
   _rootMinimizer_ = std::unique_ptr<ROOT::Math::Minimizer>(
@@ -100,6 +110,8 @@ void RootMinimizer::initializeImpl(){
 
   for( std::size_t iFitPar = 0 ; iFitPar < getMinimizerFitParameterPtr().size() ; iFitPar++ ){
     auto& fitPar = *(getMinimizerFitParameterPtr()[iFitPar]);
+
+    LogThrowIf(std::isnan(fitPar.getStepSize()), "No step size provided for: " << fitPar.getFullTitle());
 
     if( not useNormalizedFitSpace() ){
       _rootMinimizer_->SetVariable(iFitPar, fitPar.getFullTitle(), fitPar.getParameterValue(), fitPar.getStepSize() * _stepSizeScaling_);
@@ -181,6 +193,9 @@ void RootMinimizer::minimize(){
   // calling the common routine
   this->MinimizerBase::minimize();
 
+  GenericToolbox::Time::Timer minimizationStopWatch;
+  minimizationStopWatch.start();
+
   int nbFitCallOffset = getMonitor().nbEvalLikelihoodCalls;
   LogInfo << "Fit call offset: " << nbFitCallOffset << std::endl;
 
@@ -196,7 +211,8 @@ void RootMinimizer::minimize(){
     _rootMinimizer_->SetStrategy(0);
 
     getMonitor().minimizerTitle = _minimizerType_ + "/" + "Simplex";
-    getMonitor().stateTitleMonitor = "Running Simplex...";
+    getMonitor().stateTitleMonitor = "Running Simplex";
+    getMonitor().stateTitleMonitor += " / Target EDM: " + std::to_string(getTargetEdm());
 
     // SIMPLEX
     getMonitor().isEnabled = true;
@@ -226,7 +242,8 @@ void RootMinimizer::minimize(){
   }
 
   getMonitor().minimizerTitle = _minimizerType_ + "/" + _minimizerAlgo_;
-  getMonitor().stateTitleMonitor = "Running " + _rootMinimizer_->Options().MinimizerAlgorithm() + "...";
+  getMonitor().stateTitleMonitor = "Running " + _rootMinimizer_->Options().MinimizerAlgorithm();
+  getMonitor().stateTitleMonitor += " / Target EDM: " + std::to_string(getTargetEdm());
 
   getMonitor().isEnabled = true;
   // dumpFitParameterSettings(); // Dump internal ROOT::Minimizer info
@@ -234,6 +251,9 @@ void RootMinimizer::minimize(){
   _fitHasConverged_ = _rootMinimizer_->Minimize();
   _minimizeDone_ = true;
   getMonitor().isEnabled = false;
+
+  minimizationStopWatch.stop();
+  LogInfo << "Minimization stopped after " << GenericToolbox::toString(minimizationStopWatch.eval()) << std::endl;
 
   int nbMinimizeCalls = getMonitor().nbEvalLikelihoodCalls - nbFitCallOffset;
 
@@ -273,6 +293,8 @@ void RootMinimizer::minimize(){
     double fitStatus = _rootMinimizer_->Status();
     double covStatus = _rootMinimizer_->CovMatrixStatus();
     double chi2MinFitter = _rootMinimizer_->MinValue();
+    double minimizationTimeInSec = minimizationStopWatch.eval().count();
+
     int nDof = fetchNbDegreeOfFreedom();
     int nbFitBins = getLikelihoodInterface().getNbSampleBins();
 
@@ -290,6 +312,7 @@ void RootMinimizer::minimize(){
     bestFitStats->Branch("nFitPars", &nFitPars);
     bestFitStats->Branch("nbDegreeOfFreedom", &nDof);
 
+    bestFitStats->Branch("minimizationTimeInSec", &minimizationTimeInSec);
     bestFitStats->Branch("nCallsAtBestFit", &getMonitor().nbEvalLikelihoodCalls);
     bestFitStats->Branch("totalLikelihoodAtBestFit", &getLikelihoodInterface().getBuffer().totalLikelihood );
     bestFitStats->Branch("statLikelihoodAtBestFit",  &getLikelihoodInterface().getBuffer().statLikelihood );
@@ -409,11 +432,17 @@ void RootMinimizer::calcErrors(){
     updateCacheToBestfitPoint();
 
     getMonitor().minimizerTitle = _minimizerType_ + "/" + _errorAlgo_;
-    getMonitor().stateTitleMonitor = "Running HESSE...";
+    getMonitor().stateTitleMonitor = "Running HESSE";
+
+    GenericToolbox::Time::Timer errorStopWatch;
+    errorStopWatch.start();
 
     getMonitor().isEnabled = true;
     _fitHasConverged_ = _rootMinimizer_->Hesse();
     getMonitor().isEnabled = false;
+
+    errorStopWatch.stop();
+    LogInfo << "Error calculation took: " << GenericToolbox::toString(errorStopWatch.eval()) << std::endl;
 
     LogInfo << "Hesse ended after " << getMonitor().nbEvalLikelihoodCalls - nbFitCallOffset << " calls." << std::endl;
     LogWarning << "HESSE status code: " << GundamUtils::hesseStatusCodeStr.at(_rootMinimizer_->Status()) << std::endl;
@@ -437,6 +466,9 @@ void RootMinimizer::calcErrors(){
     hesseStats->SetDirectory(nullptr);
     hesseStats->Branch("hesseSuccess", &_fitHasConverged_);
     hesseStats->Branch("covStatusCode", &covStatus);
+
+    double errorTimeInSec = errorStopWatch.eval().count();
+    hesseStats->Branch("errorTimeInSec", &errorTimeInSec);
 
     hesseStats->Fill();
     GenericToolbox::mkdirTFile( getOwner().getSaveDir(), "postFit")->WriteObject(hesseStats.get(), hesseStats->GetName());
@@ -1344,8 +1376,8 @@ void RootMinimizer::saveGradientSteps(){
 
     getLikelihoodInterface().propagateAndEvalLikelihood();
 
-    if( not GundamGlobals::isLightOutputMode() ) {
-      auto outDir = GenericToolbox::mkdirTFile(getOwner().getSaveDir(), Form("fit/gradient/step_%i", int(iGradStep)));
+    if( not GundamGlobals::isLightOutputMode() and gradientDescentMonitor.writeGradientSteps ) {
+      auto outDir = GenericToolbox::mkdirTFile(getOwner().getSaveDir(), Form("fit/gradient/steps/step_%i", int(iGradStep)));
       GenericToolbox::writeInTFileWithObjTypeExt(outDir, TNamed("parState", GenericToolbox::Json::toReadableString(gradientDescentMonitor.stepPointList[iGradStep].parState).c_str()));
       GenericToolbox::writeInTFileWithObjTypeExt(outDir, TNamed("llhState", getLikelihoodInterface().getSummary().c_str()));
     }
@@ -1372,28 +1404,32 @@ void RootMinimizer::saveGradientSteps(){
   }
 
   if( not globalGraphList.empty() ){
-    auto outDir = GenericToolbox::mkdirTFile(getOwner().getSaveDir(), "fit/gradient/global");
     for( auto& gEntry : globalGraphList ){
       gEntry.scanDataPtr->title = "Minimizer path to minimum";
-      ParameterScanner::writeGraphEntry(gEntry, outDir);
-    }
-
-    outDir = GenericToolbox::mkdirTFile(getOwner().getSaveDir(), "fit/gradient/globalRelative");
-    for( auto& gEntry : globalGraphList ){
-      if( gEntry.graph.GetN() == 0 ){ continue; }
-
-      double minY{gEntry.graph.GetY()[gEntry.graph.GetN()-1]};
-      double maxY{gEntry.graph.GetY()[0]};
-      double delta{1E-6*std::abs( maxY - minY )};
-      // allow log scale
-      minY += delta;
-
-      for( int iPt = 0 ; iPt < gEntry.graph.GetN() ; iPt++ ){
-        gEntry.graph.GetY()[iPt] -= minY;
+      if( gradientDescentMonitor.writeDescentPaths ) {
+        ParameterScanner::writeGraphEntry(gEntry, GenericToolbox::mkdirTFile(getOwner().getSaveDir(), "fit/gradient/global") );
       }
-      gEntry.scanDataPtr->title = "Minimizer path to minimum (difference)";
-      ParameterScanner::writeGraphEntry(gEntry, outDir);
     }
+
+    if( gradientDescentMonitor.writeDescentPathsRelative ) {
+      auto* outDir = GenericToolbox::mkdirTFile(getOwner().getSaveDir(), "fit/gradient/globalRelative");
+      for( auto& gEntry : globalGraphList ){
+        if( gEntry.graph.GetN() == 0 ){ continue; }
+
+        double minY{gEntry.graph.GetY()[gEntry.graph.GetN()-1]};
+        double maxY{gEntry.graph.GetY()[0]};
+        double delta{1E-6*std::abs( maxY - minY )};
+        // allow log scale
+        minY += delta;
+
+        for( int iPt = 0 ; iPt < gEntry.graph.GetN() ; iPt++ ){
+          gEntry.graph.GetY()[iPt] -= minY;
+        }
+        gEntry.scanDataPtr->title = "Minimizer path to minimum (difference)";
+        ParameterScanner::writeGraphEntry(gEntry, outDir);
+      }
+    }
+
   }
 
 }

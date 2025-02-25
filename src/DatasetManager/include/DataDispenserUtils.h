@@ -32,6 +32,7 @@ struct DataDispenserParameters{
   std::string dialIndexFormula{};
   std::string nominalWeightFormulaStr{};
   std::string selectionCutFormulaStr{};
+  std::string eventVariableAsWeight{};
   std::vector<std::string> activeLeafNameList{};
   std::vector<std::string> filePathList{};
   std::map<std::string, std::string> variableDict{};
@@ -106,14 +107,16 @@ struct DataDispenserCache{
 struct ThreadSharedData{
   Long64_t nbEntries{0};
 
-  std::shared_ptr<TChain> treeChain{nullptr};
-
-  std::vector<const GenericToolbox::LeafForm*> leafFormIndexingList{};
-  std::vector<const GenericToolbox::LeafForm*> leafFormStorageList{};
+  const GenericToolbox::LeafForm* eventVariableAsWeightLeafPtr{nullptr};
 
   // has to be hooked to the TChain
   TTreeFormula* dialIndexTreeFormula{nullptr};
   TTreeFormula* nominalWeightTreeFormula{nullptr};
+
+  std::shared_ptr<TChain> treeChain{nullptr};
+
+  std::vector<const GenericToolbox::LeafForm*> leafFormIndexingList{};
+  std::vector<const GenericToolbox::LeafForm*> leafFormStorageList{};
 
   // thread communication
   GenericToolbox::Atomic<bool> requestReadNextEntry{false};

@@ -23,6 +23,7 @@ void MinimizerBase::configureImpl(){
   GenericToolbox::Json::fillValue(_config_, _monitor_.maxNbParametersPerLine, "maxNbParametersPerLineOnMonitor");
   GenericToolbox::Json::fillValue(_config_, _isEnabledCalcError_, "enablePostFitErrorFit");
   GenericToolbox::Json::fillValue(_config_, _useNormalizedFitSpace_, "useNormalizedFitSpace");
+  GenericToolbox::Json::fillValue(_config_, _writeLlhHistory_, "writeLlhHistory");
 
 }
 void MinimizerBase::initializeImpl(){
@@ -43,10 +44,9 @@ void MinimizerBase::initializeImpl(){
   }
   LogInfo << "Nb minimizer parameters: " << _minimizerParameterPtrList_.size() << std::endl;
 
-  if( not GundamGlobals::isLightOutputMode() ){
-    _monitor_.historyTree = std::make_unique<TTree>( "chi2History", "chi2History");
+  if( not GundamGlobals::isLightOutputMode() and _writeLlhHistory_ ){
+    _monitor_.historyTree = std::make_unique<TTree>( "llhHistory", "llhHistory");
     _monitor_.historyTree->SetDirectory( nullptr ); // will be saved later
-    _monitor_.historyTree->Branch("nbEvalLikelihoodCalls", &_monitor_.nbEvalLikelihoodCalls);
     _monitor_.historyTree->Branch("totalLikelihood", &getLikelihoodInterface().getBuffer().totalLikelihood);
     _monitor_.historyTree->Branch("statLikelihood", &getLikelihoodInterface().getBuffer().statLikelihood);
     _monitor_.historyTree->Branch("penaltyLikelihood", &getLikelihoodInterface().getBuffer().penaltyLikelihood);
@@ -164,11 +164,12 @@ double MinimizerBase::evalFit( const double* parArray_ ){
               [](const Parameter* par_){ return not ( par_->isFixed() or not par_->isEnabled() ); } );
 
       std::stringstream ssHeader;
+      ssHeader << std::endl << GenericToolbox::getNowDateString("%Y.%m.%d %H:%M:%S");
       ssHeader << std::endl << __METHOD_NAME__ << ": call #" << _monitor_.nbEvalLikelihoodCalls;
-      ssHeader << std::endl << _monitor_.stateTitleMonitor << " -> nb fit parameters: " << nbValidPars;
+      ssHeader << std::endl << _monitor_.stateTitleMonitor << " / Nb of parameters to fit: " << nbValidPars;
       ssHeader << std::endl << "RAM: " << GenericToolbox::parseSizeUnits(double(GenericToolbox::getProcessMemoryUsage()));
       double cpuPercent = GenericToolbox::getCpuUsageByProcess();
-      ssHeader << " / CPU: " << cpuPercent << "% (" << cpuPercent / GundamGlobals::getNbCpuThreads() << "% efficiency)";
+      ssHeader << " / CPU: " << cpuPercent << "% / " << cpuPercent / GundamGlobals::getNbCpuThreads() << "% efficiency";
       ssHeader << std::endl << "Avg log-likelihood computation time: " << _monitor_.evalLlhTimer;
       ssHeader << std::endl;
 
@@ -254,7 +255,7 @@ double MinimizerBase::evalFit( const double* parArray_ ){
         LogWarning << _monitor_.convergenceMonitor.generateMonitorString(false, true);
       }
       else{
-        LogInfo << _monitor_.convergenceMonitor.generateMonitorString(
+        std::cout << _monitor_.convergenceMonitor.generateMonitorString(
             GenericToolbox::getTerminalWidth() != 0, // trail back if not in batch mode
             true // force generate
         );

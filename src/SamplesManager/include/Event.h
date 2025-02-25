@@ -10,11 +10,8 @@
 
 #include "GenericToolbox.Utils.h"
 
-#include <map>
-#include <mutex>
-#include <vector>
 #include <string>
-#include <sstream>
+#include <ostream>
 
 
 namespace Cache { class Manager; }
@@ -35,6 +32,7 @@ public:
   VariableCollection& getVariables(){ return _variables_; }
 
   // const core
+  [[nodiscard]] size_t getSize() const;
   [[nodiscard]] double getEventWeight() const { return _weights_.current; }
   [[nodiscard]] std::string getSummary() const;
   friend std::ostream& operator <<( std::ostream& o, const Event& this_ ){ o << this_.getSummary(); return o; }

@@ -164,6 +164,9 @@ private:
   bool _checkParameterValidity_{false};
   bool _isEnabledCalcError_{true};
 
+  // output
+  bool _writeLlhHistory_{false};
+
 };
 
 #endif //GUNDAM_MINIMIZER_BASE_H

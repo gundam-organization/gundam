@@ -178,6 +178,8 @@ std::vector<std::string> Bin::buildVariableNameList() const{
 std::string Bin::getSummary(bool shallow_) const{
   std::stringstream ss;
 
+  ss << "#" << _index_ << ": ";
+
   if( _binEdgesList_.empty() ) ss << "bin not set.";
   else{
     for( auto& edges : _binEdgesList_ ){

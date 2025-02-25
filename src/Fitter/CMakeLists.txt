@@ -4,7 +4,7 @@ set(SRCFILES
     ${CMAKE_CURRENT_SOURCE_DIR}/Engine/src/FitterEngine.cpp
 
     ${CMAKE_CURRENT_SOURCE_DIR}/Minimizer/src/MinimizerBase.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/Minimizer/src/AdaptiveMcmc.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/Minimizer/src/SimpleMcmc.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/Minimizer/src/RootMinimizer.cpp
   )
 
@@ -24,10 +24,25 @@ target_link_libraries(
     ${LIB_NAME}
     PUBLIC
     GundamStatisticalInference
+    SimpleMcmc_Dict
 )
 
-#set_target_properties( ${LIB_NAME} PROPERTIES VERSION "${GUNDAM_VERSION_STRING}" )
+ROOT_GENERATE_DICTIONARY(
+  SimpleMcmc_Dict
+  ${CMAKE_CURRENT_SOURCE_DIR}/Minimizer/include/SimpleMcmc.h
+  MODULE ${LIB_NAME}
+  LINKDEF ${CMAKE_CURRENT_SOURCE_DIR}/Minimizer/src/SimpleMcmc_LinkDef.h
+)
 
 install(TARGETS ${LIB_NAME} DESTINATION lib)
-#Can uncomment this to install the headers... but is it really neccessary?
-# install(FILES ${HEADERS} DESTINATION include)
+
+# Install the ROOT pcm and rootmap files
+install(
+  FILES
+  ${CMAKE_CURRENT_BINARY_DIR}/libGundamFitter_rdict.pcm
+  ${CMAKE_CURRENT_BINARY_DIR}/libGundamFitter.rootmap
+  DESTINATION
+  ${CMAKE_INSTALL_PREFIX}/lib
+  COMPONENT
+  libraries
+)
