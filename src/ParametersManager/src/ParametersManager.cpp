@@ -347,7 +347,7 @@ void ParametersManager::throwParametersFromGlobalCovariance(std::vector<double> 
                 _strippedParameterList_.emplace_back(&par);
             }
         }
-        LogThrowIf( _strippedParameterList_.size() != nStripped, "Enabled parameters list don't correspond to the matrix" );
+        LogThrowIf( _strippedParameterList_.size() != nStripped, "Enabled parameters list don't correspond to the matrix. " << _strippedParameterList_.size() << " != " << nStripped );
     }
 
     if( _choleskyMatrix_ == nullptr ){
