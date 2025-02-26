@@ -232,8 +232,8 @@ int main(int argc, char** argv){
 //            LogInfo<< parSet.getName()<<std::endl;
             for( auto& par : parSet.getParameterList() ){
                 if( not par.isEnabled() ){ continue; }
+                LogInfo<<debug_enabled_params<<" "<<par.getTitle()<<std::endl;
                 debug_enabled_params++;
-//                LogInfo<<"  "<<par.getTitle()<<" -> "<<par.getParameterValue()<<std::endl;
                 parameterNames.emplace_back(par.getFullTitle());
                 bestFitValues.emplace_back(par.getParameterValue());
                 priorValues.emplace_back(par.getPriorValue());
@@ -278,6 +278,7 @@ int main(int argc, char** argv){
                   for( int jBin = 0 ; jBin < hCovPostFit_->GetNbinsX() ; jBin++ ){
                       (*propagator.getParametersManager().getGlobalCovarianceMatrix())[iBin][jBin] = hCovPostFit_->GetBinContent(1 + iBin, 1 + jBin);
                   }
+                  LogInfo<<iBin<<" "<<hCovPostFit_->GetXaxis()->GetBinLabel(1 + iBin)<<std::endl;
               }
               debug_cov_rows = hCovPostFit_->GetNbinsX();
           });
@@ -286,7 +287,7 @@ int main(int argc, char** argv){
 
 
 
-          app.setCmdLinePtr( &clParser );
+    app.setCmdLinePtr( &clParser );
     app.setConfigString( ConfigUtils::ConfigHandler{(JsonType)margConfig}.toString()  );
     app.openOutputFile( outFilePath );
     app.writeAppInfo();
