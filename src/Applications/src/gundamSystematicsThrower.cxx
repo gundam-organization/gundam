@@ -220,6 +220,9 @@ int main(int argc, char** argv){
     std::vector<double> bestFitValues;
     std::vector<double> priorValues;
     std::vector<double> priorSigmas;
+    int debug_enabled_params{0};
+    int debug_cov_rows{0};
+
     // Load post-fit parameters as "prior" so we can reset the weight to this point when throwing toys
     // also save the values in a vector so we can use them to compute the LLH at the best fit point
     RootUtils::ObjectReader::readObject<TNamed>( fitterFile.get(), "FitterEngine/postFit/parState_TNamed", [&](TNamed* parState_){
@@ -229,6 +232,7 @@ int main(int argc, char** argv){
 //            LogInfo<< parSet.getName()<<std::endl;
             for( auto& par : parSet.getParameterList() ){
                 if( not par.isEnabled() ){ continue; }
+                debug_enabled_params++;
 //                LogInfo<<"  "<<par.getTitle()<<" -> "<<par.getParameterValue()<<std::endl;
                 parameterNames.emplace_back(par.getFullTitle());
                 bestFitValues.emplace_back(par.getParameterValue());
@@ -239,6 +243,7 @@ int main(int argc, char** argv){
             }
         }
     });
+
 
     // Creating output file
     std::string outFilePath{};
@@ -274,11 +279,14 @@ int main(int argc, char** argv){
                       (*propagator.getParametersManager().getGlobalCovarianceMatrix())[iBin][jBin] = hCovPostFit_->GetBinContent(1 + iBin, 1 + jBin);
                   }
               }
+              debug_cov_rows = hCovPostFit_->GetNbinsX();
           });
 
+  LogInfo << "DEBUG: Number of enabled parameters: " << debug_enabled_params << "\nNumber of rows in the covariance matrix: " << debug_cov_rows << std::endl;
 
 
-    app.setCmdLinePtr( &clParser );
+
+          app.setCmdLinePtr( &clParser );
     app.setConfigString( ConfigUtils::ConfigHandler{(JsonType)margConfig}.toString()  );
     app.openOutputFile( outFilePath );
     app.writeAppInfo();
