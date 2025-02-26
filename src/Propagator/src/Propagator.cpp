@@ -149,6 +149,16 @@ void Propagator::propagateParameters(){
   // done.
   this->reweightEvents(false);
   this->refillHistograms();
+
+#ifdef GUNDAM_USING_CACHE_MANAGER
+  if (usedCacheManager and Cache::Manager::isForceCpuCalculation()) {
+    bool valid = Cache::Manager::ValidateHistogramContents();
+    if (not valid) {
+      LogError << "GPU and CPU histogram calculations disagree" << std::endl;
+      std::exit(EXIT_FAILURE);
+    }
+  }
+#endif
 }
 
 void Propagator::reweightEvents(bool updateDials) {
