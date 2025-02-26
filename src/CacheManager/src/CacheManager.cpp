@@ -779,11 +779,9 @@ bool Cache::Manager::PropagateParameters(){
 
     // do we need to copy bin content to the CPU structures ?
     if( fParameters.fIsHistContentCopyEnabled ){
-      Cache::Manager::CopyHistogramsContent();
+      Cache::Manager::CopyHistogramContents();
     }
   }
-
-
   return true;
 }
 bool Cache::Manager::CopyEventWeights(){
@@ -800,7 +798,7 @@ bool Cache::Manager::CopyEventWeights(){
 
   return true;
 }
-bool Cache::Manager::CopyHistogramsContent(){
+bool Cache::Manager::CopyHistogramContents(){
 
   if( not Cache::Manager::Get()->GetHistogramsCache().IsSumsValid() ){
     // This can be slow (~10 usec for 5000 bins) when data must be copied
@@ -816,10 +814,38 @@ bool Cache::Manager::CopyHistogramsContent(){
   }
 
   for( auto& histFiller : fParameters.fSampleHistFillerList ){
-    histFiller.pullHistContent(
+    histFiller.copyHistogram(
         Cache::Manager::Get()->GetHistogramsCache().GetSumsPointer(),
         Cache::Manager::Get()->GetHistogramsCache().GetSums2Pointer()
     );
+  }
+
+  return true;
+}
+
+bool Cache::Manager::ValidateHistogramContents(){
+
+  if( not Cache::Manager::Get()->GetHistogramsCache().IsSumsValid() ){
+    // This can be slow (~10 usec for 5000 bins) when data must be copied
+    // from the device, but it makes sure that the results are copied from
+    // the device when they have changed. The values pointed to by
+    // _CacheManagerValue_ and _CacheManagerValid_ are inside the summed
+    // index cache (a bit of evil coding here), and are updated by the
+    // cache.  The update is triggered by (*_CacheManagerUpdate_)().
+    if( fParameters.fEnableDebugPrintouts ){ LogDebug << "Copy bin contents from Device to Host" << std::endl; }
+
+    Cache::Manager::Get()->GetHistogramsCache().GetSum(0);
+    Cache::Manager::Get()->GetHistogramsCache().GetSum2(0);
+  }
+
+  for( auto& histFiller : fParameters.fSampleHistFillerList ){
+    if (not histFiller.validateHistogram(
+            Cache::Manager::Get()->GetHistogramsCache().GetSumsPointer(),
+            Cache::Manager::Get()->GetHistogramsCache().GetSums2Pointer()
+        )) {
+      LogError << "Histograms are not valid" << std::endl;
+      return false;
+    }
   }
 
   return true;
