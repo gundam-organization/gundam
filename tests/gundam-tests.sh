@@ -103,11 +103,10 @@ echo ' See gundam-tests.sh for more usage documentation.'
 TESTS="fast-tests"
 
 # Handle any input arguments
-if [[ -t 0 && -t 1 ]]; then
-    echo "Running in interactive mode"
-    TEMP=$(getopt -o 'afres' -n "$0" -- "$@")
+if [ $(uname) == "Darwin" ]; then
+    # Work around MacOS bug
+    TEMP=$(getopt "$0" "$@")
 else
-    echo "Running in non-interactive mode"
     TEMP=$(getopt -o 'afres' -n "$0" -- "$@")
 fi
 
