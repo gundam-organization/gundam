@@ -105,7 +105,7 @@ TESTS="fast-tests"
 # Handle any input arguments
 if [[ -t 0 && -t 1 ]]; then
     echo "Running in interactive mode"
-    TEMP=$(getopt "$0" "$@")
+    TEMP=$(getopt -o 'afres' -n "$0" -- "$@")
 else
     echo "Running in non-interactive mode"
     TEMP=$(getopt -o 'afres' -n "$0" -- "$@")
