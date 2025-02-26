@@ -30,7 +30,7 @@ bool CacheSampleHistFiller::validateHistogram(const double* fSumHostPtr_, const 
 
     if (not GundamUtils::almostEqual(binContent.sumWeights,hSum)
         or not GundamUtils::almostEqual(binContent.sqrtSumSqWeights,hErr)) {
-      LogWarning << "INVALID BIN Bin[" << binContext.bin.getIndex() << "] --"
+        LogError << "INVALID BIN Bin[" << binContext.bin.getIndex() << "] --"
                  << " GPU: " << hSum << " +/- " << hErr
                  << " CPU: " << binContent.sumWeights
                  << " +/- " << binContent.sqrtSumSqWeights

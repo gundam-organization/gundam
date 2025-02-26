@@ -843,7 +843,6 @@ bool Cache::Manager::ValidateHistogramContents(){
             Cache::Manager::Get()->GetHistogramsCache().GetSumsPointer(),
             Cache::Manager::Get()->GetHistogramsCache().GetSums2Pointer()
         )) {
-      LogError << "Histograms are not valid" << std::endl;
       return false;
     }
   }

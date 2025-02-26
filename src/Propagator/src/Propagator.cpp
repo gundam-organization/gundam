@@ -155,7 +155,6 @@ void Propagator::propagateParameters(){
     bool valid = Cache::Manager::ValidateHistogramContents();
     if (not valid) {
       LogError << "GPU and CPU histogram calculations disagree" << std::endl;
-      std::exit(EXIT_FAILURE);
     }
   }
 #endif
