@@ -753,23 +753,30 @@ bool Cache::Manager::PropagateParameters(){
 
   bool isSuccess{false};
 
+  // Copy updated information to the device and start the kernels
   {
     auto s{fParameters.cacheFillTimer.scopeTime()};
 
     // if disabled, leave
-    if( Cache::Manager::Get() == nullptr ){ return false; }
+    if (Cache::Manager::Get() == nullptr) {
+      return false;
+    }
 
     // update the cache if necessary
-    if( fParameters.fUpdateRequired ){ Cache::Manager::Update(); }
+    if (fParameters.fUpdateRequired) {
+      Cache::Manager::Update();
+    }
 
     // do the propagation on the device
     isSuccess = Cache::Manager::Fill();
-    if( not isSuccess ){ return false; }
+    if (not isSuccess) return false;
   }
 
-  // now everything is on the device, what info do we need on the CPU?
-
   {
+    // This section should be delayed as long as possible, and the current
+    // serialization is wasting the GPU parallization.  For efficiency, the
+    // logic needs to follow LTS version where the back copy is delayed until
+    // the results are actually needed.
     auto s{fParameters.pullFromDeviceTimer.scopeTime()};
 
     // do we need to copy every event weight to the CPU structures ?
@@ -779,11 +786,9 @@ bool Cache::Manager::PropagateParameters(){
 
     // do we need to copy bin content to the CPU structures ?
     if( fParameters.fIsHistContentCopyEnabled ){
-      Cache::Manager::CopyHistogramsContent();
+      Cache::Manager::CopyHistogramContents();
     }
   }
-
-
   return true;
 }
 bool Cache::Manager::CopyEventWeights(){
@@ -800,26 +805,27 @@ bool Cache::Manager::CopyEventWeights(){
 
   return true;
 }
-bool Cache::Manager::CopyHistogramsContent(){
-
-  if( not Cache::Manager::Get()->GetHistogramsCache().IsSumsValid() ){
-    // This can be slow (~10 usec for 5000 bins) when data must be copied
-    // from the device, but it makes sure that the results are copied from
-    // the device when they have changed. The values pointed to by
-    // _CacheManagerValue_ and _CacheManagerValid_ are inside the summed
-    // index cache (a bit of evil coding here), and are updated by the
-    // cache.  The update is triggered by (*_CacheManagerUpdate_)().
-    if( fParameters.fEnableDebugPrintouts ){ LogDebug << "Copy bin contents from Device to Host" << std::endl; }
-
-    Cache::Manager::Get()->GetHistogramsCache().GetSum(0);
-    Cache::Manager::Get()->GetHistogramsCache().GetSum2(0);
-  }
+bool Cache::Manager::CopyHistogramContents(){
 
   for( auto& histFiller : fParameters.fSampleHistFillerList ){
-    histFiller.pullHistContent(
+    histFiller.copyHistogram(
         Cache::Manager::Get()->GetHistogramsCache().GetSumsPointer(),
         Cache::Manager::Get()->GetHistogramsCache().GetSums2Pointer()
     );
+  }
+
+  return true;
+}
+
+bool Cache::Manager::ValidateHistogramContents(){
+
+  for( auto& histFiller : fParameters.fSampleHistFillerList ){
+    if (not histFiller.validateHistogram(
+            Cache::Manager::Get()->GetHistogramsCache().GetSumsPointer(),
+            Cache::Manager::Get()->GetHistogramsCache().GetSums2Pointer()
+        )) {
+      return false;
+    }
   }
 
   return true;

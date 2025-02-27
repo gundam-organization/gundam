@@ -121,18 +121,28 @@ public:
   /// results from the GPU to the CPU.
   virtual bool Apply();
 
-  /// Get the sum for index i from host memory.  This might trigger a copy
-  /// from the device if that is necessary.
+  /// Get the sum for index i from host memory. This might trigger a
+  /// copy from the device if that is necessary and can be slow (~10 usec for
+  /// 5000 bins) when data must be copied from the device, but it makes sure
+  /// that the results are copied from the device when they have changed.
   double GetSum(int i);
 
-  /// Get the sum squared for index i from host memory.  This might trigger
-  /// a copy from the device if that is necessary.
+  /// Get the sum squared for index i from host memory.  This might trigger a
+  /// copy from the device if that is necessary and can be slow (~10 usec for
+  /// 5000 bins) when data must be copied from the device, but it makes sure
+  /// that the results are copied from the device when they have changed.
   double GetSum2(int i);
 
-  /// The pointer to the array of sums on the host.
+  /// The pointer to the array of sums on the host. This might trigger a
+  /// copy from the device if that is necessary and can be slow (~10 usec for
+  /// 5000 bins) when data must be copied from the device, but it makes sure
+  /// that the results are copied from the device when they have changed.
   const double* GetSumsPointer();
 
-  /// The pointer to the array of sums squared on the host.
+  /// The pointer to the array of sums squared on the host. This might trigger a
+  /// copy from the device if that is necessary and can be slow (~10 usec for
+  /// 5000 bins) when data must be copied from the device, but it makes sure
+  /// that the results are copied from the device when they have changed.
   const double* GetSums2Pointer();
 
   /// A pointer to the validity flag.

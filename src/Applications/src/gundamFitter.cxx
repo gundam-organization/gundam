@@ -112,7 +112,7 @@ int main(int argc, char** argv){
 
 #ifdef GUNDAM_USING_CACHE_MANAGER
   bool hasGPU{Cache::Manager::HasGPU(true)};
-  bool useCacheManager{false};
+  bool useCacheManager{hasGPU};
 
   // Is build compatible with GPU option?
   if( clParser.isOptionTriggered("usingGpu") ){
