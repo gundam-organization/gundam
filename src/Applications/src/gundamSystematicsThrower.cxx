@@ -252,13 +252,13 @@ int main(int argc, char** argv){
         // appendixDict["optionName"] = "Appendix"
         // this list insure all appendices will appear in the same order
         std::vector<GundamUtils::AppendixEntry> appendixDict{
-                {"configFile",       "%s"},
-                {"fitterOutputFile", "Fit_%s"},
-                {"nToys",            "nToys_%s"},
-                {"randomSeed",       "Seed_%s"},
-                {"parInject",        "parInject_%s"},
-                {"pedestal",        "ped_%s_percent"},
-                {"tStudent",               "tStudentNu_%s"}
+                {"configFile",       ""},
+                {"fitterOutputFile", "Fit"},
+                {"nToys",            "nToys"},
+                {"randomSeed",       "Seed"},
+                {"parInject",        "parInject"},
+                {"pedestal",        "pedestal"},
+                {"tStudent",               "tStudentNu"}
         };
         outFilePath = GundamUtils::generateFileName(clParser, appendixDict) + ".root";
 
