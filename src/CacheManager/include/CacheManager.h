@@ -300,8 +300,7 @@ private:
 public:
   virtual ~Manager() = default;
 
-  // Provide "internal" references to the GPU cache.  This is used in the
-  // implementation, and should be ignored by most people.
+  // Provide "internal" references to the GPU cache.
   Cache::Parameters& GetParameterCache() {return *fParameterCache;}
   Cache::Weights&    GetWeightsCache() {return *fWeightsCache;}
   Cache::HistogramSum& GetHistogramsCache() {return *fHistogramsCache;}
