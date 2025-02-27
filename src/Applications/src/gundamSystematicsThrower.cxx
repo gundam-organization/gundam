@@ -369,6 +369,7 @@ int main(int argc, char** argv){
         marginalisedParameters = GenericToolbox::Json::fetchValue<std::vector<std::string>>(margConfig, "parameterList");
         marginalisedParameterSets = GenericToolbox::Json::fetchValue<std::vector<std::string>>(margConfig, "parameterSetList");
 
+    LogInfo<<"----------------------- INFO ABOUT PTheta marginalised TTree -----------------------"<<std::endl;
     LogInfo<<"Marginalised parameters: "<<GenericToolbox::parseVectorAsString(marginalisedParameters,true,true)<<std::endl;
     LogInfo<<"Marginalised parameter Sets: "<<GenericToolbox::parseVectorAsString(marginalisedParameterSets,true,true)<<std::endl;
     // object array with the names of the parameters that "survive" the marginalisation
@@ -437,12 +438,14 @@ int main(int argc, char** argv){
             }
         }
     }
+    LogInfo<<"----------------------- END of INFO ABOUT PTheta marginalised TTree -----------------------"<<std::endl;
+
 
     // write the list of parameters that will not be marginalised to the output file
     app.getOutfilePtr()->WriteObject(marg_param_list, "marg_param_list");
 
     // print marg_param_list for debug
-    LogInfo<<"Number of parameter in marg_param_list: "<<marg_param_list->GetEntries()<<std::endl;
+//    LogInfo<<" DEBUG: Number of parameter in marg_param_list: "<<marg_param_list->GetEntries()<<std::endl;
 
     // initializing variables for "parametersInject" mode
     double LLH_sum{0};// needed when injecting parameters manually
