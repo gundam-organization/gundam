@@ -9,6 +9,8 @@
 #include "GenericToolbox.Utils.h"
 
 #include "Logger.h"
+#include "GundamUtils.h"
+#include "GundamCustomThrower.h"
 
 #include <sstream>
 
@@ -192,6 +194,9 @@ void ParametersManager::initializeStrippedGlobalCov(){
   }
 }
 void ParametersManager::throwParametersFromGlobalCovariance(bool quietVerbose_){
+  if (not _defaultSystematicThrows_){
+    LogThrow("ParametersManager::throwParametersFromGlobalCovariance(bool quietVerbose_) is not compatible with the custom thrower. Must use default thrower.")
+  }
 
   if( _strippedCovarianceMatrix_ == nullptr ){
     initializeStrippedGlobalCov();
@@ -218,7 +223,7 @@ void ParametersManager::throwParametersFromGlobalCovariance(bool quietVerbose_){
   while( true ) {
     throwNb++;
     bool rethrow{false};
-    auto throws = GenericToolbox::throwCorrelatedParameters(_choleskyMatrix_.get());
+    auto throws = CustomThrower::throwCorrelatedParameters(_choleskyMatrix_.get());
     for( int iPar = 0 ; iPar < _choleskyMatrix_->GetNrows() ; iPar++ ){
       auto* parPtr = _strippedParameterList_[iPar];
       parPtr->setThrowValue(parPtr->getPriorValue() + throws[iPar]);
@@ -296,6 +301,244 @@ void ParametersManager::throwParametersFromGlobalCovariance(bool quietVerbose_){
     break;
   }
 }
+
+void ParametersManager::throwParametersFromGlobalCovariance(std::vector<double> &weightsChiSquare){
+  if (_defaultSystematicThrows_){
+    LogThrow("ParametersManager::throwParametersFromGlobalCovariance(std::vector<double> &weightsChiSquare) is not compatible with the default thrower. Must use custom thrower.")
+  }
+
+    throwParametersFromGlobalCovariance(weightsChiSquare,0,0,0);
+}// end of function
+
+void ParametersManager::throwParametersFromGlobalCovariance(std::vector<double> &weightsChiSquare,
+                                                            double pedestalEntity, double pedestalLeftEdge, double pedestalRightEdge
+                                                            ){
+
+    // check that weightsChiSquare is an empty vector
+    LogThrowIf( not weightsChiSquare.empty(), "ERROR: argument weightsChiSquare is not empty" );
+
+    if( _strippedCovarianceMatrix_ == nullptr ){
+        LogInfo << "Creating stripped global covariance matrix..." << std::endl;
+        LogThrowIf( _globalCovarianceMatrix_ == nullptr, "Global covariance matrix not set." );
+        int nStripped{0};
+        for( int iDiag = 0 ; iDiag < _globalCovarianceMatrix_->GetNrows() ; iDiag++ ){
+            if( (*_globalCovarianceMatrix_)[iDiag][iDiag] != 0 ){ nStripped++; }
+        }
+
+        LogInfo << "Stripped global covariance matrix is " << nStripped << "x" << nStripped << std::endl;
+        _strippedCovarianceMatrix_ = std::make_shared<TMatrixD>(nStripped, nStripped);
+        int iStrippedBin{-1};
+        for( int iBin = 0 ; iBin < _globalCovarianceMatrix_->GetNrows() ; iBin++ ){
+            if( (*_globalCovarianceMatrix_)[iBin][iBin] == 0 ){ continue; }
+            iStrippedBin++;
+            int jStrippedBin{-1};
+            for( int jBin = 0 ; jBin < _globalCovarianceMatrix_->GetNrows() ; jBin++ ){
+                if( (*_globalCovarianceMatrix_)[jBin][jBin] == 0 ){ continue; }
+                jStrippedBin++;
+                (*_strippedCovarianceMatrix_)[iStrippedBin][jStrippedBin] = (*_globalCovarianceMatrix_)[iBin][jBin];
+            }
+        }
+
+        _strippedParameterList_.reserve( nStripped );
+        for( auto& parSet : _parameterSetList_ ){
+            if( not parSet.isEnabled() ) continue;
+            for( auto& par : parSet.getParameterList() ){
+                if( not par.isEnabled() ) continue;
+                _strippedParameterList_.emplace_back(&par);
+            }
+        }
+        LogThrowIf( _strippedParameterList_.size() != nStripped, "Enabled parameters list don't correspond to the matrix. " << _strippedParameterList_.size() << " != " << nStripped );
+    }
+
+    if( _choleskyMatrix_ == nullptr ){
+        LogInfo << "Generating global cholesky matrix" << std::endl;
+        _choleskyMatrix_ = std::shared_ptr<TMatrixD>(
+                GenericToolbox::getCholeskyMatrix(_strippedCovarianceMatrix_.get())
+        );
+    }
+
+    bool keepThrowing{true};
+//  int throwNb{0};
+
+    while( keepThrowing ){
+//    throwNb++;
+        bool rethrow{false};
+        std::vector<double> throws;
+        std::vector<double> weights;
+        if(pedestalEntity==0){
+          CustomThrower::throwCorrelatedParameters(_choleskyMatrix_.get(),throws, weights);
+//            DEBUG: print out parameters
+//            for(int i=0;i<weights.size();i++){
+//              LogInfo<<"{ParametersManager::throwParsFromGlobalCov}} throws["<<i<<"] = "<<throws[i]<<std::endl;
+//            }
+        }else{
+          CustomThrower::throwCorrelatedParameters(_choleskyMatrix_.get(),throws, weights,
+                                                      pedestalEntity,pedestalLeftEdge,pedestalRightEdge);
+        }
+        if(throws.size() != weights.size()){
+            LogInfo<<"{ParametersManager}ERROR: throws.size() != weights.size() "<< throws.size()<<" "<<weights.size()<<std::endl;
+        }
+        if(weights.size() != _choleskyMatrix_->GetNrows()){
+            LogInfo<<"{ParametersManager}ERROR: throws.size() != _choleskyMatrix_->GetNrows() "<< throws.size()<<" "<<_choleskyMatrix_->GetNrows()<<std::endl;
+        }
+        for( int iPar = 0 ; iPar < _choleskyMatrix_->GetNrows() ; iPar++ ){
+            _strippedParameterList_[iPar]->setParameterValue(
+                    _strippedParameterList_[iPar]->getPriorValue()
+                    + throws[iPar]
+            );
+            weightsChiSquare.push_back(weights[iPar]);
+
+            if( _reThrowParSetIfOutOfPhysical_ ){
+                if( not _strippedParameterList_[iPar]->isValueWithinBounds() ){
+                    // re-do the throwing
+          LogInfo << "Not within bounds: " << _strippedParameterList_[iPar]->getSummary() << std::endl;
+                    rethrow = true;
+                }
+            }
+        }
+
+        // Making sure eigen decomposed parameters get the conversion done
+        for( auto& parSet : _parameterSetList_ ){
+            if( not parSet.isEnabled() ) continue;
+            if( parSet.isEnableEigenDecomp() ){
+                parSet.propagateOriginalToEigen();
+
+                // also check the bounds of real parameter space
+                if( _reThrowParSetIfOutOfPhysical_ ){
+                    for( auto& par : parSet.getEigenParameterList() ){
+                        if( not par.isEnabled() ) continue;
+                        if( not par.isValueWithinBounds() ){
+                            // re-do the throwing
+                            rethrow = true;
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+
+
+        if( rethrow ){
+            // wrap back to the while loop
+      LogInfo << "RE-THROW " << std::endl;
+          weightsChiSquare.clear();
+            continue;
+        }
+
+        // reached this point: all parameters are within bounds
+        keepThrowing = false;
+    }
+}// end of function
+
+void ParametersManager::throwParametersFromTStudent(std::vector<double> &weightsChiSquare,double nu_){
+  if (_defaultSystematicThrows_){
+    LogThrow("ParametersManager::throwParametersFromTStudent(std::vector<double> &weightsChiSquare,double nu_) is not compatible with the default thrower. Must use custom thrower.")
+  }
+
+    // check that weightsChiSquare is an empty vector
+    LogThrowIf( not weightsChiSquare.empty(), "ERROR: argument weightsChiSquare is not empty" );
+
+    if( _strippedCovarianceMatrix_ == nullptr ){
+        LogInfo << "Creating stripped global covariance matrix..." << std::endl;
+        LogThrowIf( _globalCovarianceMatrix_ == nullptr, "Global covariance matrix not set." );
+        int nStripped{0};
+        for( int iDiag = 0 ; iDiag < _globalCovarianceMatrix_->GetNrows() ; iDiag++ ){
+            if( (*_globalCovarianceMatrix_)[iDiag][iDiag] != 0 ){ nStripped++; }
+        }
+
+        LogInfo << "Stripped global covariance matrix is " << nStripped << "x" << nStripped << std::endl;
+        _strippedCovarianceMatrix_ = std::make_shared<TMatrixD>(nStripped, nStripped);
+        int iStrippedBin{-1};
+        for( int iBin = 0 ; iBin < _globalCovarianceMatrix_->GetNrows() ; iBin++ ){
+            if( (*_globalCovarianceMatrix_)[iBin][iBin] == 0 ){ continue; }
+            iStrippedBin++;
+            int jStrippedBin{-1};
+            for( int jBin = 0 ; jBin < _globalCovarianceMatrix_->GetNrows() ; jBin++ ){
+                if( (*_globalCovarianceMatrix_)[jBin][jBin] == 0 ){ continue; }
+                jStrippedBin++;
+                (*_strippedCovarianceMatrix_)[iStrippedBin][jStrippedBin] = (*_globalCovarianceMatrix_)[iBin][jBin];
+            }
+        }
+
+        _strippedParameterList_.reserve( nStripped );
+        for( auto& parSet : _parameterSetList_ ){
+            if( not parSet.isEnabled() ) continue;
+            for( auto& par : parSet.getParameterList() ){
+                if( not par.isEnabled() ) continue;
+                _strippedParameterList_.emplace_back(&par);
+            }
+        }
+        LogThrowIf( _strippedParameterList_.size() != nStripped, "Enabled parameters list don't correspond to the matrix" );
+    }
+
+    if( _choleskyMatrix_ == nullptr ){
+        LogInfo << "Generating global cholesky matrix" << std::endl;
+        _choleskyMatrix_ = std::shared_ptr<TMatrixD>(
+                GenericToolbox::getCholeskyMatrix(_strippedCovarianceMatrix_.get())
+        );
+    }
+
+    bool keepThrowing{true};
+//  int throwNb{0};
+
+    while( keepThrowing ){
+//    throwNb++;
+        bool rethrow{false};
+        std::vector<double> throws,weights;
+        // calling Toolbox function to throw random parameters
+      CustomThrower::throwTStudentParameters(_choleskyMatrix_.get(),nu_,throws, weights);
+        ///////
+        if(throws.size() != weights.size()){
+            LogInfo<<"WARNING: throws.size() != weights.size() "<< throws.size()<<weights.size()<<std::endl;
+        }
+        for( int iPar = 0 ; iPar < _choleskyMatrix_->GetNrows() ; iPar++ ){
+            _strippedParameterList_[iPar]->setParameterValue(
+                    _strippedParameterList_[iPar]->getPriorValue()
+                    + throws[iPar]
+            );
+            weightsChiSquare.push_back(weights[iPar]);
+
+            if( _reThrowParSetIfOutOfPhysical_ ){
+                if( not _strippedParameterList_[iPar]->isValueWithinBounds() ){
+                    // re-do the throwing
+//          LogDebug << "Not within bounds: " << _strippedParameterList_[iPar]->getSummary() << std::endl;
+                    rethrow = true;
+                }
+            }
+        }
+
+        // Making sure eigen decomposed parameters get the conversion done
+        for( auto& parSet : _parameterSetList_ ){
+            if( not parSet.isEnabled() ) continue;
+            if( parSet.isEnableEigenDecomp() ){
+                parSet.propagateOriginalToEigen();
+
+                // also check the bounds of real parameter space
+                if( _reThrowParSetIfOutOfPhysical_ ){
+                    for( auto& par : parSet.getEigenParameterList() ){
+                        if( not par.isEnabled() ) continue;
+                        if( not par.isValueWithinBounds() ){
+                            // re-do the throwing
+                            rethrow = true;
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+
+
+        if( rethrow ){
+            // wrap back to the while loop
+//      LogDebug << "RE-THROW #" << throwNb << std::endl;
+            continue;
+        }
+
+        // reached this point: all parameters are within bounds
+        keepThrowing = false;
+    }
+}
+
 
 void ParametersManager::moveParametersToPrior(){
   for( auto& parSet : _parameterSetList_ ){
