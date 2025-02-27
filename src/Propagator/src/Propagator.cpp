@@ -154,7 +154,8 @@ void Propagator::propagateParameters(){
   if (usedCacheManager and Cache::Manager::isForceCpuCalculation()) {
     bool valid = Cache::Manager::ValidateHistogramContents();
     if (not valid) {
-      LogError << "GPU and CPU histogram calculations disagree" << std::endl;
+      LogError << "Parallel GPU and CPU calculations disagree" << std::endl;
+      std::exit(EXIT_FAILURE);
     }
   }
 #endif
@@ -392,5 +393,4 @@ void Propagator::refillHistogramsFct( int iThread_){
 // Local Variables:
 // mode:c++
 // c-basic-offset:2
-// compile-command:"$(git rev-parse --show-toplevel)/cmake/gundam-build.sh"
 // End:
