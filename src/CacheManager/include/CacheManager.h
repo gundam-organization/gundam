@@ -59,30 +59,37 @@ private:
     // You get one guess...
     Manager* fSingleton{nullptr};
 
-    // By default, the use of CacheManager is set to false. This parameter replaces the ones that
-    // was present in GundamGlobals.h
-    // This parameter should be set in the front-end applications
+    /// Control whether the Cache::Manager should be constructed.  This
+    /// parameter should be set in the front-end applications.  This replaces a
+    /// flag that was in GundamGlobals.h
     bool fIsEnabled{false};
 
-    // Enabled printouts when moving data between host and device
+    /// Enabled printouts when moving data between host and device
     bool fEnableDebugPrintouts{false};
 
-    // forceCpuCalculation allows to also do the propagation of parameters with the CPU
-    // routine in order to check the accuracy of the CPU computation
+    /// Control if a propagator should fill the histograms with the GPU (when
+    /// avavailable), or force a parallel CPU calculation.  This really
+    /// belongs in the propagator, but it's dynamic object, so put it here.
+    /// The parallel calculation is used to check the accuracy of the CPU
+    /// computation
     bool fForceCpuCalculation{false};
-
-    // Set to true when the cache needs an update.
-    bool fUpdateRequired{true};
 
     // Pointers to the Propagator member the CacheManger has to take care of
     SampleSet* fSampleSetPtr{nullptr};
     EventDialCache* fEventDialCachePtr{nullptr};
-    // A map between the fit parameter pointers and the parameter index used
-    // by the fitter.
+
+    /// A map between the fit parameter pointers and the parameter index used
+    /// by the fitter.
     std::map<const Parameter*, int> ParameterMap{};
 
-    // Keep track of when we want to get back from the GPU once the propagation is complete
-    bool fIsHistContentCopyEnabled{false};
+    /// True if the histogram content should be copied back from the GPU.
+    /// This should almost always be true.  This should be a private class
+    /// field.
+    bool fIsHistContentCopyEnabled{true};
+
+    /// True if the individual event weights should be copied back from the
+    /// GPU.  This should almost always be false.  This should be a private
+    /// class field.
     bool fIsEventWeightCopyEnabled{false};
 
     /// Declare all of the actual GPU caches here.  There is one GPU, so this
@@ -93,7 +100,6 @@ private:
     // Time monitoring
     GenericToolbox::Time::AveragedTimer<10> cacheFillTimer;
     GenericToolbox::Time::AveragedTimer<10> pullFromDeviceTimer;
-
   };
 
   // instance defined in cpp file
@@ -117,9 +123,6 @@ public:
   /// before the cached weights can be used.  This is used in Propagator.cpp.
   static bool Fill();
 
-  /// Dedicated setter for fUpdateRequired flag
-  static void SetUpdateRequired(bool isUpdateRequired_){ fParameters.fUpdateRequired = isUpdateRequired_; };
-
   /// Set addresses of the Propagator objects the CacheManager should take care of
   static void SetSampleSetPtr(SampleSet& sampleSet_){ fParameters.fSampleSetPtr = &sampleSet_; }
   static void SetEventDialSetPtr(EventDialCache& eventDialCache_){ fParameters.fEventDialCachePtr = &eventDialCache_; }
@@ -139,10 +142,6 @@ public:
   /// needs to be changed.  It forages all of the information from the
   /// original sample list and event dials.
   static bool Update();
-
-  /// Flag that the Cache::Manager internal caches must be updated from the
-  /// SampleSet and EventDialCache before it can be used.
-  static void RequireUpdate(){ SetUpdateRequired(true); }
 
   /// This returns the index of the parameter in the cache.  If the
   /// parameter isn't defined, this will return a negative value.
@@ -293,6 +292,9 @@ private:
 
   // The rough size of all the caches.
   std::size_t fTotalBytes;
+
+  // Set to true when the cache needs an update.
+  bool fUpdateRequired{true};
 
 public:
   virtual ~Manager() = default;

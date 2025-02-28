@@ -416,7 +416,7 @@ bool Cache::Manager::Build() {
     return false;
   }
 
-  Cache::Manager::RequireUpdate();
+  Cache::Manager::Get()->fUpdateRequired = true;
 
   return true;
 }
@@ -431,8 +431,14 @@ bool Cache::Manager::Update() {
     return false;
   }
 
-  // This is the updated that is required!
-  SetUpdateRequired( false );
+  if (!Cache::Manager::Get()->fUpdateRequired) {
+    // This is not the update that you are looking for.
+    LogError << "Update called when not required" << std::endl;
+    LogThrow("Invalid Cache::Manager::Update()");
+  }
+
+  // This is the update that is required!
+  Cache::Manager::Get()->fUpdateRequired = false;
 
   LogInfo << "Update the internal caches" << std::endl;
 
@@ -705,7 +711,7 @@ bool Cache::Manager::Update() {
 bool Cache::Manager::Fill() {
   Cache::Manager* cache = Cache::Manager::Get();
   if (!cache) return false;
-  if (fParameters.fUpdateRequired) {
+  if (cache->fUpdateRequired) {
     LogError << "Fill while an update is required" << std::endl;
     LogThrow("Fill while an update is required");
   }
@@ -758,11 +764,6 @@ bool Cache::Manager::PropagateParameters(){
     // if disabled, leave
     if (Cache::Manager::Get() == nullptr) {
       return false;
-    }
-
-    // update the cache if necessary
-    if (fParameters.fUpdateRequired) {
-      Cache::Manager::Update();
     }
 
     // do the propagation on the device
