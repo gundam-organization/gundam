@@ -21,7 +21,7 @@
 // some (peculiar) data sets.
 #include "CacheIndexedSums.h"
 namespace Cache {
-    using HistogramSum = Cache::IndexedSums;
+  using HistogramSum = Cache::IndexedSums;
 }
 #else
 // A GPU optimized implementation of histogram summing that will be faster
@@ -73,9 +73,6 @@ private:
 
     // Set to true when the cache needs an update.
     bool fUpdateRequired{true};
-
-    // Keep track of the state of the CacheManager
-    bool fIsCacheManagerBuilt{false};
 
     // Pointers to the Propagator member the CacheManger has to take care of
     SampleSet* fSampleSetPtr{nullptr};
@@ -180,7 +177,7 @@ public:
   /// Check if the caches for the manager have been built.  This will only be
   /// true when the Cache::Manager is enabled, and the Cache::Manager::Build()
   /// method has been called.
-  static bool IsBuilt(){ return fParameters.fIsCacheManagerBuilt; }
+  static bool IsBuilt() {return Cache::Manager::Get() != nullptr;;}
 
 private:
 

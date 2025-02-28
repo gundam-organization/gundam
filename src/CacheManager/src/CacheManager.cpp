@@ -418,8 +418,6 @@ bool Cache::Manager::Build() {
 
   Cache::Manager::RequireUpdate();
 
-  fParameters.fIsCacheManagerBuilt = true;
-
   return true;
 }
 
