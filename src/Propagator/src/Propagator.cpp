@@ -11,13 +11,12 @@
 #include "ParameterSet.h"
 #include "GundamGlobals.h"
 #include "ConfigUtils.h"
+#include "GundamBacktrace.h"
 
 #include "GenericToolbox.Utils.h"
 
-
 #include <memory>
 #include <vector>
-
 
 void Propagator::muteLogger(){ Logger::setIsMuted( true ); }
 void Propagator::unmuteLogger(){ Logger::setIsMuted( false ); }
@@ -141,7 +140,7 @@ void Propagator::propagateParameters(){
   // Trigger the reweight on the GPU.  This will fill the histograms, but most
   // of the time, leaves the event weights on the GPU.
   usedCacheManager = Cache::Manager::PropagateParameters();
-  if( usedCacheManager and not Cache::Manager::isForceCpuCalculation() ){ return; }
+  if(usedCacheManager and not Cache::Manager::isForceCpuCalculation()) return;
 #endif
 
   // Trigger the reweight on the CPU.  Override the dial update inside of
@@ -154,8 +153,8 @@ void Propagator::propagateParameters(){
   if (usedCacheManager and Cache::Manager::isForceCpuCalculation()) {
     bool valid = Cache::Manager::ValidateHistogramContents();
     if (not valid) {
+      LogError << GundamUtils::Backtrace;
       LogError << "Parallel GPU and CPU calculations disagree" << std::endl;
-      std::exit(EXIT_FAILURE);
     }
   }
 #endif
