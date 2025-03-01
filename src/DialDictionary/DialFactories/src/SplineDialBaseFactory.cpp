@@ -122,7 +122,7 @@ void SplineDialBaseFactory::FillCatmullRomSlopes(
   // doi:10.1016/B978-0-12-079050-0.50020-5
 
   if (xPoint.size() < 1) return;
-  if (xPoint.size() < 2) slope.front() = 0.0;
+  if (xPoint.size() < 2){ slope.front() = 0.0; return; }
 
   int k = 0;
   slope[k] = (yPoint[k+1]-yPoint[k])/(xPoint[k+1]-xPoint[k]);
@@ -144,7 +144,7 @@ void SplineDialBaseFactory::FillAkimaSlopes(
   // doi:10.1145/321607.321609
 
   if (xPoint.size() < 1) return;
-  if (xPoint.size() < 2) slope.front() = 0.0;
+  if (xPoint.size() < 2){ slope.front() = 0.0; return; }
 
   int k = 0;
   slope[k] = (yPoint[k+1]-yPoint[k])/(xPoint[k+1]-xPoint[k]);
