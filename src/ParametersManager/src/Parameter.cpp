@@ -44,6 +44,11 @@ void Parameter::initializeImpl() {
   LogThrowIf(std::isnan(_priorValue_), "Prior value is not set: " << getFullTitle());
   LogThrowIf(std::isnan(_stdDevValue_), "Std dev value is not set: " << getFullTitle());
   LogThrowIf(std::isnan(_parameterValue_), "Parameter value is not set: " << getFullTitle());
+
+  if( _priorValue_ == _parameterLimits_.min or _priorValue_ == _parameterLimits_.max ) {
+    // the user should know. This will prevent Asimov fits to converge
+    LogAlert << "Prior value of \"" << getFullTitle() << "\" is set on the defined limits: " << _priorValue_ << " -> " << _parameterLimits_ << std::endl;
+  }
 }
 
 void Parameter::setMinMirror(double minMirror) {
@@ -185,13 +190,7 @@ std::string Parameter::getSummary() const {
   ss << ": value=" << _parameterValue_;
   ss << ", prior=" << _priorValue_;
   ss << ", stdDev=" << _stdDevValue_;
-  ss << ", bounds=[ ";
-  if( std::isnan(_parameterLimits_.min) ) ss << "-inf";
-  else ss << _parameterLimits_.min;
-  ss << ", ";
-  if( std::isnan(_parameterLimits_.max) ) ss << "+inf";
-  else ss << _parameterLimits_.max;
-  ss << " ]";
+  ss << ", bounds=" << _parameterLimits_;
   if (not isValueWithinBounds()){
     ss << GenericToolbox::ColorCodes::redBackground << " out of bounds" << GenericToolbox::ColorCodes::resetColor;
   }
