@@ -25,7 +25,7 @@ public:
 
   // setters
   template<typename T>void set(const T& value_){ var = value_; updateCache(); }
-  void set(void *src_, size_t size_);
+  void set(const void *src_, size_t size_);
 
   // const-getters
   [[nodiscard]] const GenericToolbox::AnyType& get() const { return var; }
@@ -45,7 +45,7 @@ private:
 };
 
 
-inline void VariableHolder::set(void *src_, size_t size_){
+inline void VariableHolder::set(const void *src_, size_t size_){
   memcpy(var.getPlaceHolderPtr()->getVariableAddress(), src_, size_);
   updateCache();
 }
