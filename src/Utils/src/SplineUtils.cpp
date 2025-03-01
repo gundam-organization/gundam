@@ -21,20 +21,23 @@ namespace SplineUtils{
   std::vector<SplinePoint> getSplinePointList(const TGraph *src_){
     if( src_ == nullptr ) return {};
 
-    std::vector<SplinePoint> out;
-    out.reserve(src_->GetN());
+    int nPt{src_->GetN()};
 
-    for( int iPt = 0; iPt < src_->GetN(); iPt++ ) {
+    if( nPt == 0 ){ return {};}
+    if( nPt == 1 ){
+      // with 1 pt don't compute SLOPES with TSpline3...
+      // -> snick segfault, thank you ROOT :)
+      std::vector<SplinePoint> out;
       out.emplace_back();
       auto &point = out.back();
-
-      point.x = src_->GetX()[iPt];
-      point.y = src_->GetY()[iPt];
+      point.x = src_->GetX()[0];
+      point.y = src_->GetY()[0];
+      point.slope = 0; // init
+      return out;
     }
 
-    fillTSpline3Slopes(out);
-
-    return out;
+    TSpline3 spline("", src_);
+    return getSplinePointList( &spline );
   }
   std::vector<SplinePoint> getSplinePointList(const TSpline3 *src_){
     if( src_ == nullptr ) return {};
