@@ -38,7 +38,7 @@ protected:
   std::vector<double> _splineData_{};
 
   // The vector of input parameter bounds.
-  std::vector<DialUtils::Range> _splineBounds_;
+  std::vector<GenericToolbox::Range> _splineBounds_;
 };
 
 #endif //GUNDAM_BICUBIC_SPLINE_H

@@ -11,7 +11,7 @@
 #include <limits>
 
 
-void UniformSpline::buildDial(const std::vector<SplineUtils::SplinePoint>& splinePointList_){
+void UniformSpline::buildDial(const std::vector<DialUtils::DialPoint>& splinePointList_){
   LogThrowIf(not _splineData_.empty(), "Spline data already set.");
 
   _splineBounds_.min = splinePointList_.front().x;

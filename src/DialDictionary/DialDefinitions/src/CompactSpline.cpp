@@ -8,7 +8,7 @@
 #include "GenericToolbox.Root.h"
 #include "Logger.h"
 
-void CompactSpline::buildDial(const std::vector<SplineUtils::SplinePoint>& splinePointList_){
+void CompactSpline::buildDial(const std::vector<DialUtils::DialPoint>& splinePointList_){
   LogThrowIf(not _splineData_.empty(), "Spline data already set.");
 
   _splineBounds_.min = splinePointList_.front().x;

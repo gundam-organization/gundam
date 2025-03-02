@@ -5,8 +5,8 @@
 #include "RootSpline.h"
 
 
-void RootSpline::buildDial(const std::vector<SplineUtils::SplinePoint>& splinePointList_){
-  _spline_ = SplineUtils::buildTSpline3(splinePointList_);
+void RootSpline::buildDial(const std::vector<DialUtils::DialPoint>& splinePointList_){
+  _spline_ = DialUtils::buildTSpline3(splinePointList_);
 }
 
 double RootSpline::evalResponse(const DialInputBuffer& input_) const {

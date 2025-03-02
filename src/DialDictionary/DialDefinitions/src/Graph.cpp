@@ -29,6 +29,14 @@ void Graph::buildDial(const TGraph &grf, const std::string& option_) {
       _data_.push_back(graph.GetX()[i]);
   }
 }
+void Graph::buildDial(const std::vector<DialUtils::DialPoint>& pointList_){
+  _data_.reserve(2 * pointList_.size());
+  _data_.clear();
+  for( auto& point : pointList_){
+    _data_.emplace_back(point.y);
+    _data_.emplace_back(point.x);
+  }
+}
 
 double Graph::evalResponse(const DialInputBuffer& input_) const {
   double dialInput{input_.getInputBuffer()[0]};

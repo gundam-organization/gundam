@@ -8,7 +8,7 @@
 #include "DialBase.h"
 #include "DialInputBuffer.h"
 
-#include "SplineUtils.h"
+#include "DialUtils.h"
 
 #include "TSpline.h"
 
@@ -32,7 +32,7 @@ public:
   [[nodiscard]] const TSpline3 &getSpline() const { return _spline_; }
 
   // methods
-  void buildDial(const std::vector<SplineUtils::SplinePoint>& splinePointList_);
+  void buildDial(const std::vector<DialUtils::DialPoint>& splinePointList_);
 
 protected:
   bool _allowExtrapolation_{false};

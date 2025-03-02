@@ -9,7 +9,7 @@
 #include "DialUtils.h"
 #include "DialInputBuffer.h"
 
-#include "SplineUtils.h"
+#include "DialUtils.h"
 
 #include "TGraph.h"
 
@@ -35,7 +35,7 @@ public:
   void buildSplineData(TGraph& graph_);
   [[nodiscard]] double evaluateSpline(const DialInputBuffer& input_) const;
 
-  void buildDial(const std::vector<SplineUtils::SplinePoint>& splinePointList_);
+  void buildDial(const std::vector<DialUtils::DialPoint>& splinePointList_);
 
 
 protected:
@@ -45,7 +45,7 @@ protected:
   // the Cache::Manager to work, and provides the input for spline calculation
   // functions that can be shared between the CPU and the GPU.
   std::vector<double> _splineData_{};
-  DialUtils::Range _splineBounds_{std::nan("unset"), std::nan("unset")};
+  GenericToolbox::Range _splineBounds_{std::nan("unset"), std::nan("unset")};
 };
 
 

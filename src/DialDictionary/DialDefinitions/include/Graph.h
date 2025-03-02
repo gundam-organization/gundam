@@ -6,6 +6,7 @@
 #define GUNDAM_GRAPH_H
 
 #include "DialBase.h"
+#include "DialUtils.h"
 
 #include "TGraph.h"
 
@@ -28,6 +29,7 @@ public:
   [[nodiscard]] bool getAllowExtrapolation() const override;
 
   void buildDial(const TGraph& grf, const std::string& option_="");
+  void buildDial(const std::vector<DialUtils::DialPoint>& pointList_);
 
   [[nodiscard]] const std::vector<double>& getDialData() const override {return _data_;}
 
