@@ -8,6 +8,7 @@ set( SRCFILES
     DialEngine/src/EventDialCache.cpp
 
     # DialDefinitions
+    DialDefinitions/src/DialUtils.cpp
     DialDefinitions/src/DialBase.cpp
 
     DialDefinitions/src/RootGraph.cpp

@@ -5,17 +5,38 @@
 #ifndef GUNDAM_DIALUTILS_H
 #define GUNDAM_DIALUTILS_H
 
+#include "TSpline.h"
+#include "TGraph.h"
+#include "TObject.h"
+
+#include <vector>
+#include <string>
+#include <limits>
 #include <cmath>
+
 
 namespace DialUtils{
 
-  struct Range{
-    double min{std::nan("")};
-    double max{std::nan("")};
-
-    Range() = default;
-    Range(double min_, double max_) : min(min_), max(max_) {}
+  struct DialPoint{
+    double x{std::nan("unset")};
+    double y{std::nan("unset")};
+    double slope{std::nan("unset")};
   };
+
+  std::vector<DialPoint> getSplinePointList(const TObject* src_);
+  std::vector<DialPoint> getSplinePointList(const TGraph* src_);
+  std::vector<DialPoint> getSplinePointList(const TSpline3* src_);
+  std::vector<DialPoint> getSplinePointListNoSlope(const TGraph* src_);
+
+  void fillCatmullRomSlopes(std::vector<DialPoint>& splinePointList_);
+  void fillAkimaSlopes(std::vector<DialPoint>& splinePointList_);
+  void applyMonotonicCondition(std::vector<DialPoint>& splinePointList_);
+
+  bool isFlat(const std::vector<DialPoint>& splinePointList_, double tolerance_ = 2*std::numeric_limits<float>::epsilon());
+  bool isUniform(const std::vector<DialPoint>& splinePointList_, double tolerance_ = 16*std::numeric_limits<float>::epsilon());
+  double getSlope(const DialPoint& start_, const DialPoint& end_);
+
+  TSpline3 buildTSpline3(const std::vector<DialPoint>& splinePointList_);
 
 }
 

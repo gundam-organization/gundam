@@ -2,15 +2,16 @@
 // Created by Nadrino on 23/02/2025.
 //
 
-#include "SplineUtils.h"
+#include "DialUtils.h"
 
-#include <GundamUtils.h>
 #include <Logger.h>
+
 #include <TDirectory.h>
 
 
-namespace SplineUtils{
-  std::vector<SplinePoint> getSplinePointList(const TObject *src_){
+namespace DialUtils{
+
+  std::vector<DialPoint> getSplinePointList(const TObject *src_){
     if( src_ == nullptr ) return {};
 
     if( src_->InheritsFrom(TGraph::Class()) ) { return getSplinePointList((TGraph *)src_); }
@@ -18,7 +19,7 @@ namespace SplineUtils{
 
     return {};
   }
-  std::vector<SplinePoint> getSplinePointList(const TGraph *src_){
+  std::vector<DialPoint> getSplinePointList(const TGraph *src_){
     if( src_ == nullptr ) return {};
 
     int nPt{src_->GetN()};
@@ -27,7 +28,7 @@ namespace SplineUtils{
     if( nPt == 1 ){
       // with 1 pt don't compute SLOPES with TSpline3...
       // -> snick segfault, thank you ROOT :)
-      std::vector<SplinePoint> out;
+      std::vector<DialPoint> out;
       out.emplace_back();
       auto &point = out.back();
       point.x = src_->GetX()[0];
@@ -39,11 +40,11 @@ namespace SplineUtils{
     TSpline3 spline("", src_);
     return getSplinePointList( &spline );
   }
-  std::vector<SplinePoint> getSplinePointList(const TSpline3 *src_){
+  std::vector<DialPoint> getSplinePointList(const TSpline3 *src_){
     if( src_ == nullptr ) return {};
     if( src_->GetNp() == 0 ) return {};
 
-    std::vector<SplinePoint> out;
+    std::vector<DialPoint> out;
     out.reserve(src_->GetNp());
 
     for( int iPt = 0; iPt < src_->GetNp(); iPt++ ) {
@@ -71,8 +72,27 @@ namespace SplineUtils{
 
     return out;
   }
+  std::vector<DialPoint> getSplinePointListNoSlope(const TGraph* src_){
+    if( src_ == nullptr ) { return {}; }
 
-  void fillCatmullRomSlopes(std::vector<SplinePoint> &splinePointList_){
+    int nPt{src_->GetN()};
+
+    if( nPt == 0 ){ return {};}
+
+    std::vector<DialPoint> out;
+    out.reserve(nPt);
+    for( int iPt = 0; iPt < nPt; iPt++ ){
+      out.emplace_back();
+      auto &point = out.back();
+      point.x = src_->GetX()[iPt];
+      point.y = src_->GetY()[iPt];
+      point.slope = 0;
+    }
+
+    return out;
+  }
+
+  void fillCatmullRomSlopes(std::vector<DialPoint> &splinePointList_){
     // Fill the slopes with the values for a Catmull-Rom spline.
     //
     // E. Catmull and R.Rom, "A class of local interpolating splines", in
@@ -103,7 +123,7 @@ namespace SplineUtils{
       splinePointList_[iPt].slope = getSlope(splinePointList_[iPt - 1], splinePointList_[iPt + 1]);
     }
   }
-  void fillAkimaSlopes(std::vector<SplinePoint> &splinePointList_){
+  void fillAkimaSlopes(std::vector<DialPoint> &splinePointList_){
     // Fill the slopes with the values for an Akima spline.
     //
     // H.Akima, A New Method of Interpolation and Smooth Curve Fitting Based on
@@ -150,7 +170,7 @@ namespace SplineUtils{
       }
     }
   }
-  void applyMonotonicCondition(std::vector<SplinePoint> &splinePointList_){
+  void applyMonotonicCondition(std::vector<DialPoint> &splinePointList_){
     // Apply the Fritsh-Carlson monotonic condition to the slopes.  This
     // adjusts the slopes (when necessary), however, with Catmull-Rom the
     // modified slopes will be ignored and the monotonic criteria is
@@ -184,7 +204,7 @@ namespace SplineUtils{
     }
   }
 
-  bool isFlat(const std::vector<SplinePoint> &splinePointList_, double tolerance_){
+  bool isFlat(const std::vector<DialPoint> &splinePointList_, double tolerance_){
     // Check if the spline is flat.  Flat functions won't be handled with
     // splines.
     if( splinePointList_.empty() or splinePointList_.size() == 1 ) return true;
@@ -198,7 +218,7 @@ namespace SplineUtils{
 
     return true;
   }
-  bool isUniform(const std::vector<SplinePoint> &splinePointList_, double tolerance_){
+  bool isUniform(const std::vector<DialPoint> &splinePointList_, double tolerance_){
     if( splinePointList_.empty() or splinePointList_.size() == 1 ) return true;
 
     const double avgSpace =
@@ -214,11 +234,11 @@ namespace SplineUtils{
 
     return true;
   }
-  double getSlope(const SplinePoint &start_, const SplinePoint &end_){
+  double getSlope(const DialPoint &start_, const DialPoint &end_){
     return (end_.y - start_.y) / (end_.x - start_.x);
   }
 
-  TSpline3 buildTSpline3(const std::vector<SplinePoint> &splinePointList_){
+  TSpline3 buildTSpline3(const std::vector<DialPoint> &splinePointList_){
     std::vector<double> x;
     std::vector<double> y;
 
