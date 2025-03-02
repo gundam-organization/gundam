@@ -149,6 +149,16 @@ void Propagator::propagateParameters(){
   // done.
   this->reweightEvents(false);
   this->refillHistograms();
+
+#ifdef GUNDAM_USING_CACHE_MANAGER
+  if (usedCacheManager and Cache::Manager::isForceCpuCalculation()) {
+    bool valid = Cache::Manager::ValidateHistogramContents();
+    if (not valid) {
+      LogError << "Parallel GPU and CPU calculations disagree" << std::endl;
+      std::exit(EXIT_FAILURE);
+    }
+  }
+#endif
 }
 
 void Propagator::reweightEvents(bool updateDials) {
@@ -383,5 +393,4 @@ void Propagator::refillHistogramsFct( int iThread_){
 // Local Variables:
 // mode:c++
 // c-basic-offset:2
-// compile-command:"$(git rev-parse --show-toplevel)/cmake/gundam-build.sh"
 // End:

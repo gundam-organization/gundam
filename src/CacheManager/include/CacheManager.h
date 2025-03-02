@@ -68,7 +68,7 @@ private:
     bool fEnableDebugPrintouts{false};
 
     // forceCpuCalculation allows to also do the propagation of parameters with the CPU
-    // routine in order to check the accuracy of the CacheManager computation
+    // routine in order to check the accuracy of the CPU computation
     bool fForceCpuCalculation{false};
 
     // Set to true when the cache needs an update.
@@ -155,22 +155,32 @@ public:
   /// running a GPU.
   static bool HasCUDA();
 
-  /// Return true if a GPU is available at runtime.  Must have also been
-  // compiled using CUDA
+  /// Return true if a GPU is available at runtime.  This checks if a device
+  /// exists, is accessible, and has sufficient capabilities to run the
+  /// Cache::Manager.
   static bool HasGPU(bool dump = false);
 
-  /// Return the approximate allocated memory (e.g. on the GPU).
+  /// Return the approximate allocated memory used by the Cache.  This memory
+  /// is mirrored on both the CPU and GPU.
   [[nodiscard]] std::size_t GetResidentMemory() const {return fTotalBytes;}
 
   /// Same as Propagator::propagateParameters()
   static bool PropagateParameters();
 
-  /// Drop to CPU
+  /// Copy the event weights from the GPU to the CPU
   static bool CopyEventWeights();
-  static bool CopyHistogramsContent();
 
+  /// Copy the histogram contents from the GPU to the CPU.
+  static bool CopyHistogramContents();
+
+  /// Validate local copy of the histogram contents against the last GPU
+  /// calculation.
+  static bool ValidateHistogramContents();
+
+  /// Check if the caches for the manager have been built.  This will only be
+  /// true when the Cache::Manager is enabled, and the Cache::Manager::Build()
+  /// method has been called.
   static bool IsBuilt(){ return fParameters.fIsCacheManagerBuilt; }
-
 
 private:
 
@@ -290,8 +300,7 @@ private:
 public:
   virtual ~Manager() = default;
 
-  // Provide "internal" references to the GPU cache.  This is used in the
-  // implementation, and should be ignored by most people.
+  // Provide "internal" references to the GPU cache.
   Cache::Parameters& GetParameterCache() {return *fParameterCache;}
   Cache::Weights&    GetWeightsCache() {return *fWeightsCache;}
   Cache::HistogramSum& GetHistogramsCache() {return *fHistogramsCache;}
@@ -318,9 +327,4 @@ public:
 // LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
-
-// Local Variables:
-// mode:c++
-// c-basic-offset:4
-// End:
 #endif
