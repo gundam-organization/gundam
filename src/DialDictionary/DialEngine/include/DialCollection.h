@@ -6,6 +6,7 @@
 #define GUNDAM_DIALCOLLECTION_H
 
 #include "DialBase.h"
+#include "DialUtils.h"
 #include "DialInterface.h"
 #include "DialInputBuffer.h"
 #include "DialResponseSupervisor.h"
@@ -16,6 +17,7 @@
 #include <vector>
 #include <string>
 #include <memory>
+#include <sstream>
 
 class DialCollection : public JsonBaseClass {
 public:
@@ -186,6 +188,10 @@ protected:
   std::unique_ptr<DialBase> makeSplineDial(const TObject* src_) const;
   std::unique_ptr<DialBase> makeSurfaceDial(const TObject* src_) const;
 
+  std::vector<DialUtils::DialPoint> getSplinePointList(const TObject* src_) const;
+  bool makeDialShortCircuit(const std::vector<DialUtils::DialPoint>& pointList_, std::unique_ptr<DialBase>& dial_) const;
+  std::unique_ptr<DialBase> makeGraphDial(const std::vector<DialUtils::DialPoint>& pointList_) const;
+
 private:
   // parameters
   bool _isEventByEvent_{false};
@@ -205,8 +211,11 @@ private:
   std::string _globalDialSubType_{};
   std::vector<std::string> _dataSetNameList_{};
   std::vector<std::string> _globalDialExtraLeafNames_{};
+  GenericToolbox::Range _definitionRange_{std::nan("unset"),std::nan("unset")};
 
   // internal
+  bool _verboseShortCircuit_{false};
+  mutable std::string _verboseShortCircuitStr_{};
   int _supervisedParameterIndex_{-1};
   int _supervisedParameterSetIndex_{-1};
   BinSet _dialBinSet_{};

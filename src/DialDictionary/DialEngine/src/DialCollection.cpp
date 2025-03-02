@@ -20,7 +20,7 @@
 #include "Bicubic.h"
 #include "CompiledLibDial.h"
 
-#include "SplineUtils.h"
+#include "DialUtils.h"
 #include "GundamGlobals.h"
 
 #include "Logger.h"
@@ -256,9 +256,9 @@ void DialCollection::setupDialInterfaceReferences(){
 void DialCollection::readGlobals(const JsonType &config_) {
   // globals for the dialSet
   GenericToolbox::Json::fillValue(config_, _enableDialsSummary_, "printDialsSummary");
-  GenericToolbox::Json::fillValue(config_, _globalDialType_, {{"dialsType"}, {"dialType"}});
-  GenericToolbox::Json::fillValue(config_, _globalDialSubType_, "dialSubType");
-  GenericToolbox::Json::fillValue(config_, _globalDialLeafName_, "dialLeafName");
+  GenericToolbox::Json::fillValue(config_, _globalDialType_, {{"type"}, {"dialsType"}, {"dialType"}});
+  GenericToolbox::Json::fillValue(config_, _globalDialSubType_, {{"options"}, {"dialSubType"}});
+  GenericToolbox::Json::fillValue(config_, _globalDialLeafName_, {{"treeExpression"}, {"dialLeafName"}});
   GenericToolbox::Json::fillValue(config_, _minDialResponse_, {{"minDialResponse"}, {"minimumSplineResponse"}});
   GenericToolbox::Json::fillValue(config_, _maxDialResponse_, "maxDialResponse");
   GenericToolbox::Json::fillValue(config_, _useMirrorDial_, "useMirrorDial");
@@ -266,6 +266,7 @@ void DialCollection::readGlobals(const JsonType &config_) {
   GenericToolbox::Json::fillValue(config_, _mirrorHighEdge_, "mirrorHighEdge");
   GenericToolbox::Json::fillValue(config_, _allowDialExtrapolation_, "allowDialExtrapolation");
   GenericToolbox::Json::fillValue(config_, _applyConditionStr_, "applyCondition");
+  GenericToolbox::Json::fillValue(config_, _definitionRange_, "definitionRange");
 
   if( GenericToolbox::Json::doKeyExist(config_, "applyConditions") ){
     std::vector<std::string> conditionsList;
@@ -567,11 +568,14 @@ bool DialCollection::initializeDialsWithBinningFile(const JsonType& dialsDefinit
     for( int iBin = 0 ; iBin < nBins ; iBin++ ){
       TObject* binnedInitializer = dialsList->At(iBin);
 
+      _verboseShortCircuit_ = true;
       auto dial = DialBaseObj( this->makeDial( dialsList->At(iBin) ) );
+      _verboseShortCircuit_ = false;
+
       if( dial.get() == nullptr ) {
-        LogAlert << "Invalid dial for " << getTitle() << " -> "
+        LogDebugIf(GundamGlobals::isDebug()) << getTitle() << " -> "
                  << _dialBinSet_.getBinList()[iBin].getSummary()
-                 << std::endl;
+                 << " -> " << _verboseShortCircuitStr_ << std::endl;
         excludedBins.emplace_back(iBin);
         continue;
       }
@@ -581,7 +585,7 @@ bool DialCollection::initializeDialsWithBinningFile(const JsonType& dialsDefinit
     }
 
       if( not excludedBins.empty() ){
-      LogInfo << "Removing invalid bin dials..." << std::endl;
+      LogInfo << "Removing " << excludedBins.size() << " null dials... (--debug for more info)" << std::endl;
       for( int iBin = nBins ; iBin >= 0 ; iBin-- ){
         if( GenericToolbox::doesElementIsInVector(iBin, excludedBins) ){
           _dialBinSet_.getBinList().erase(_dialBinSet_.getBinList().begin() + iBin);
@@ -859,33 +863,19 @@ std::unique_ptr<DialBase> DialCollection::makeGraphDial(const TObject* src_) con
   // always returns an invalid ptr if
   if( src_ == nullptr ){ return nullptr; }
 
-  auto* srcGraph = dynamic_cast<const TGraph*>(src_);
-
-  if( srcGraph->GetN() == 0 ) { return {}; }
-
-  if( _globalDialSubType_ == "root" ) {
-    auto dial = std::make_unique<RootGraph>();
-    dial->setGraph(*srcGraph);
-    return dial;
+  std::vector<DialUtils::DialPoint> splinePointList{};
+  if( src_->InheritsFrom(TGraph::Class()) ){
+    splinePointList = DialUtils::getSplinePointListNoSlope((TGraph *)src_);
+  }
+  else{
+    // try something else (from TSpline3 for instance):
+    splinePointList = DialUtils::getSplinePointList(src_);
   }
 
-  if( srcGraph->GetN() == 1 ){
-    // For one point graph, just use a scale. Do the unique_ptr dance in case
-    // there are exceptions.
-    double value = srcGraph->GetY()[0];
+  std::unique_ptr<DialBase> out{nullptr};
+  if( makeDialShortCircuit(splinePointList, out) ){ return out; }
 
-    // is flat?
-    if (std::abs(value-1.0) < 2*std::numeric_limits<float>::epsilon()) { return {}; }
-
-    auto dial = std::make_unique<Shift>();
-    dial->setShiftValue(value);
-    return dial;
-  }
-
-  // srcGraph->GetN() >= 2, default
-  auto dial = std::make_unique<Graph>();
-  dial->buildDial(*srcGraph);
-  return dial;
+  return makeGraphDial(splinePointList);
 }
 std::unique_ptr<DialBase> DialCollection::makeSplineDial(const TObject* src_) const{
   // always returns an invalid ptr if
@@ -931,35 +921,14 @@ std::unique_ptr<DialBase> DialCollection::makeSplineDial(const TObject* src_) co
     unif >> uniformityTolerance;
   }
 
-  auto splinePointList = SplineUtils::getSplinePointList(src_);
+  auto splinePointList = this->getSplinePointList(src_);
 
-  // invalid, return
-  if( splinePointList.empty() ){ return nullptr; }
+  std::unique_ptr<DialBase> out;
 
-  if( splinePointList.size() == 1 or SplineUtils::isFlat(splinePointList) ){
-    // it's flat, let's shortcut
-    if( std::abs( splinePointList[0].y - 1.0 ) < 2 * std::numeric_limits<float>::epsilon() ){
-      // one! no need for a dial
-      return nullptr;
-    }
-
-    // Do the unique_ptr dance in case there are exceptions.
-    auto dialBase = std::make_unique<Shift>();
-    dialBase->setShiftValue(splinePointList[0].y);
-    return dialBase;
+  if( makeDialShortCircuit(splinePointList, out) ) {
+    // dial short circuit has been processed
+    return out;
   }
-
-  std::sort(splinePointList.begin(), splinePointList.end(),
-    [](const SplineUtils::SplinePoint& a_, const SplineUtils::SplinePoint& b_){
-      return a_.x < b_.x; // a goes first?
-    });
-
-#define SHORT_CIRCUIT_SMALL_SPLINES
-#ifdef  SHORT_CIRCUIT_SMALL_SPLINES
-  if( splinePointList.size() <= 2 ) {
-    return this->makeGraphDial(src_);
-  }
-#endif
 
   // If there are only two points, then force a catmull-rom.  This could be
   // handled using a graph, but Catmull-Rom is fast, and works better with the
@@ -972,8 +941,8 @@ std::unique_ptr<DialBase> DialCollection::makeSplineDial(const TObject* src_) co
   // not-a-knot and natural splines are calculated by FillFromGraph and
   // FillFromSpoline using ROOT code.  That means we need to fill in the
   // slopes for the other types ("catmull-rom", "akima")
-  if     ( splType == "catmull-rom" ){ SplineUtils::fillCatmullRomSlopes(splinePointList); }
-  else if( splType == "akima" ){ SplineUtils::fillAkimaSlopes(splinePointList); }
+  if     ( splType == "catmull-rom" ){ DialUtils::fillCatmullRomSlopes(splinePointList); }
+  else if( splType == "akima" ){ DialUtils::fillAkimaSlopes(splinePointList); }
 
   ////////////////////////////////////////////////////////////////
   // Check if the spline is supposed to be monotonic and condition the slopes
@@ -981,7 +950,7 @@ std::unique_ptr<DialBase> DialCollection::makeSplineDial(const TObject* src_) co
   // splines have a special implementation for monotonic splines, so save a
   // flag that can be checked later.
   ////////////////////////////////////////////////////////////////
-  if( isMonotonic ){ SplineUtils::applyMonotonicCondition(splinePointList); }
+  if( isMonotonic ){ DialUtils::applyMonotonicCondition(splinePointList); }
 
   ///////////////////////////////////////////////////////////
   // Create the right kind low level spline class base on all of the previous
@@ -989,23 +958,22 @@ std::unique_ptr<DialBase> DialCollection::makeSplineDial(const TObject* src_) co
   // should change to the do-while-false idiom.  Make sure the individual
   // conditionals are less than 10 lines.
   ///////////////////////////////////////////////////////////
-  std::unique_ptr<DialBase> dialBase;
   if      ( splType == "ROOT" ){
     // The ROOT implementation of the spline has been explicitly requested, so
     // use it.
     auto rootSpline = std::make_unique<RootSpline>();
     rootSpline->buildDial(splinePointList);
-    dialBase = std::move(rootSpline);
+    out = std::move(rootSpline);
   }
   else if( splType == "catmull-rom" ){
     // Catmull-Rom is handled as a special case because it ignores the slopes,
     // and has an explicit monotonic implementatino.  It also must have
     // uniformly spaced knots.
-    if( not SplineUtils::isUniform(splinePointList, uniformityTolerance) ){
+    if( not DialUtils::isUniform(splinePointList, uniformityTolerance) ){
       LogError << "Catmull-rom splines need a uniformly spaced points"
                << " Dial: " << getTitle()
                << std::endl;
-      double step = (splinePointList.back().x-splinePointList.front().x)/(splinePointList.size()-1);
+      double step = (splinePointList.back().x-splinePointList.front().x)/(static_cast<double>(splinePointList.size())-1.);
       for (int i = 0; i<splinePointList.size()-1; ++i) {
         LogError << i << " --  X: " << splinePointList[i].x
                  << " X+1: " << splinePointList[i+1].x
@@ -1021,21 +989,21 @@ std::unique_ptr<DialBase> DialCollection::makeSplineDial(const TObject* src_) co
     if( isMonotonic ) {
       auto monotonicSpline = std::make_unique<MonotonicSpline>();
       monotonicSpline->buildDial(splinePointList);
-      dialBase = std::move(monotonicSpline);
+      out = std::move(monotonicSpline);
     }
     else {
       auto compactSpline = std::make_unique<CompactSpline>();
       compactSpline->buildDial(splinePointList);
-      dialBase = std::move(compactSpline);
+      out = std::move(compactSpline);
     }
 
   }
-  else if( SplineUtils::isUniform(splinePointList, uniformityTolerance) ){
+  else if( DialUtils::isUniform(splinePointList, uniformityTolerance) ){
     // Haven't matched a specific special case, but we have uniformly spaced
     // knots so we can use the faster UniformSpline implementation.
     auto uniformSpline = std::make_unique<UniformSpline>();
     uniformSpline->buildDial(splinePointList);
-    dialBase = std::move(uniformSpline);
+    out = std::move(uniformSpline);
   }
   else {
     // Haven't matched a specific special case, and the knots are not
@@ -1043,11 +1011,11 @@ std::unique_ptr<DialBase> DialCollection::makeSplineDial(const TObject* src_) co
     // which can handle any kind of cubic spline.
     auto generalSpline = std::make_unique<GeneralSpline>();
     generalSpline->buildDial(splinePointList);
-    dialBase = std::move(generalSpline);
+    out = std::move(generalSpline);
   }
 
   // Pass the ownership without any constraints!
-  return dialBase;
+  return out;
 
 }
 std::unique_ptr<DialBase> DialCollection::makeSurfaceDial(const TObject* src_) const{
@@ -1083,6 +1051,77 @@ std::unique_ptr<DialBase> DialCollection::makeSurfaceDial(const TObject* src_) c
 
   // Pass the ownership without any constraints!
   return dialBase;
+}
+
+std::vector<DialUtils::DialPoint> DialCollection::getSplinePointList(const TObject* src_) const{
+  auto out = DialUtils::getSplinePointList(src_);
+
+  if( not std::isnan(_definitionRange_.min) or not std::isnan(_definitionRange_.max) ){
+    auto temp{out}; temp.clear();
+    for( auto& point : out ) {
+      if( point.x < _definitionRange_.min ){ continue; }
+      if( point.y > _definitionRange_.max ){ continue; }
+      temp.emplace_back(point);
+    }
+    out = std::move(temp);
+  }
+
+  std::sort(out.begin(), out.end(),
+    [](const DialUtils::DialPoint& a_, const DialUtils::DialPoint& b_){
+      return a_.x < b_.x; // a goes first?
+    });
+
+  // TODO: process mirroring options
+  // if(  ){
+  // }
+
+  return out;
+}
+bool DialCollection::makeDialShortCircuit(const std::vector<DialUtils::DialPoint>& pointList_, std::unique_ptr<DialBase>& dial_) const{
+  dial_ = nullptr;
+
+  if( pointList_.empty() ){ return true; }
+
+  if( pointList_.size() == 1 or DialUtils::isFlat(pointList_) ){
+    // it's flat, let's shortcut
+
+    if( std::abs( pointList_[0].y - 1.0 ) < 2 * std::numeric_limits<float>::epsilon() ){
+      // one! no need for a dial
+      if(_verboseShortCircuit_){ _verboseShortCircuitStr_ = "No dial: response is always 1."; }
+      return true;
+    }
+
+    // Do the unique_ptr dance in case there are exceptions.
+    auto dialBase = std::make_unique<Shift>();
+    dialBase->setShiftValue(pointList_[0].y);
+    dial_ = std::move(dialBase);
+    if(_verboseShortCircuit_){ _verboseShortCircuitStr_ = "Shift dial: response is flat."; }
+    return true;
+  }
+
+#define SHORT_CIRCUIT_SMALL_SPLINES
+#ifdef  SHORT_CIRCUIT_SMALL_SPLINES
+  if( pointList_.size() <= 2 ) {
+    if(_verboseShortCircuit_){ _verboseShortCircuitStr_ = "Graph dial: 2 points dial."; }
+    dial_ = makeGraphDial(pointList_);
+    return true;
+  }
+#endif
+
+  return false;
+}
+std::unique_ptr<DialBase> DialCollection::makeGraphDial(const std::vector<DialUtils::DialPoint>& pointList_) const{
+
+  if( pointList_.empty() or pointList_.size() == 1 ){
+    // for sure, it's a short circuit
+    std::unique_ptr<DialBase> out{nullptr};
+    makeDialShortCircuit(pointList_, out);
+    return out;
+  }
+
+  auto dial = std::make_unique<Graph>();
+  dial->buildDial(pointList_);
+  return dial;
 }
 
 //  A Lesser GNU Public License
