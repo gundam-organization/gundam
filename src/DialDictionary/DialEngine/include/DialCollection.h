@@ -212,6 +212,7 @@ private:
   std::vector<std::string> _dataSetNameList_{};
   std::vector<std::string> _globalDialExtraLeafNames_{};
   GenericToolbox::Range _definitionRange_{std::nan("unset"),std::nan("unset")};
+  GenericToolbox::Range _mirrorDefinitionRange_{std::nan("unset"),std::nan("unset")};
 
   // internal
   bool _verboseShortCircuit_{false};

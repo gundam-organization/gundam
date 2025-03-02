@@ -267,6 +267,7 @@ void DialCollection::readGlobals(const JsonType &config_) {
   GenericToolbox::Json::fillValue(config_, _allowDialExtrapolation_, "allowDialExtrapolation");
   GenericToolbox::Json::fillValue(config_, _applyConditionStr_, "applyCondition");
   GenericToolbox::Json::fillValue(config_, _definitionRange_, "definitionRange");
+  GenericToolbox::Json::fillValue(config_, _mirrorDefinitionRange_, "mirrorDefinitionRange");
 
   if( GenericToolbox::Json::doKeyExist(config_, "applyConditions") ){
     std::vector<std::string> conditionsList;
@@ -1059,7 +1060,7 @@ std::vector<DialUtils::DialPoint> DialCollection::getSplinePointList(const TObje
   if( not _definitionRange_.isUnbounded() ){
     auto temp{out}; temp.clear();
     for( auto& point : out ) {
-      if( _definitionRange_.isInBounds(point.x) ){ continue; }
+      if( not _definitionRange_.isInBounds(point.x) ){ continue; }
       temp.emplace_back(point);
     }
     out = std::move(temp);
@@ -1070,9 +1071,11 @@ std::vector<DialUtils::DialPoint> DialCollection::getSplinePointList(const TObje
       return a_.x < b_.x; // a goes first?
     });
 
-  // TODO: process mirroring options
-  // if(  ){
-  // }
+
+  if( not _mirrorDefinitionRange_.isUnbounded() ){
+    // TODO: process mirroring options
+    LogExit("_mirrorDefinitionRange_ not implemented yet.");
+  }
 
   return out;
 }
