@@ -1056,11 +1056,10 @@ std::unique_ptr<DialBase> DialCollection::makeSurfaceDial(const TObject* src_) c
 std::vector<DialUtils::DialPoint> DialCollection::getSplinePointList(const TObject* src_) const{
   auto out = DialUtils::getSplinePointList(src_);
 
-  if( not std::isnan(_definitionRange_.min) or not std::isnan(_definitionRange_.max) ){
+  if( not _definitionRange_.isUnbounded() ){
     auto temp{out}; temp.clear();
     for( auto& point : out ) {
-      if( point.x < _definitionRange_.min ){ continue; }
-      if( point.y > _definitionRange_.max ){ continue; }
+      if( _definitionRange_.isInBounds(point.x) ){ continue; }
       temp.emplace_back(point);
     }
     out = std::move(temp);
