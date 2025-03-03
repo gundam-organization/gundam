@@ -607,6 +607,14 @@ void ParameterSet::throwParameters(bool rethrowIfNotInPhysical_, double gain_){
       if( not _correlatedVariableThrower_.isInitialized() ){
         _correlatedVariableThrower_.setCovarianceMatrixPtr(_priorCovarianceMatrix_.get());
         _correlatedVariableThrower_.initialize();
+        int iFit{-1};
+        for( auto& par : this->getParameterList() ){
+          if( ParameterSet::isValidCorrelatedParameter(par) ){
+            iFit++;
+            _correlatedVariableThrower_.getParLimitList().at(iFit) = par.getParameterLimits();
+          }
+        }
+        _correlatedVariableThrower_.extractBlocks();
       }
 
       std::function<void()> gundamThrowFct = [&](){

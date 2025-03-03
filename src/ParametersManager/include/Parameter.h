@@ -131,6 +131,7 @@ public:
   [[nodiscard]] int getParameterIndex() const{ return _parameterIndex_; }
   [[nodiscard]] double getStepSize() const{ return _stepSize_; }
   /// See setMinValue() for documentation.
+  [[nodiscard]] const GenericToolbox::Range& getParameterLimits() const{ return _parameterLimits_; }
   [[nodiscard]] double getMinValue() const{ return _parameterLimits_.min; }
   /// See setMaxValue() for documentation.
   [[nodiscard]] double getMaxValue() const{ return _parameterLimits_.max; }
