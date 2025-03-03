@@ -42,7 +42,7 @@ public:
   void setParameterIndex(int parameterIndex){ _parameterIndex_ = parameterIndex; }
   void setStepSize(double stepSize){ _stepSize_ = stepSize; }
 
-  /// Set the minimum value for this parameter.  Parameter values less than
+  /// Set the limits for this parameter.  Parameter values less than
   /// this value are illegal, and the likelihood is undefined.  The job will
   /// terminate when it encounters an illegal parameter value.  Note: Using a
   /// minimum value when also using eigenvalue decomposition, or PCA results
@@ -50,17 +50,7 @@ public:
   /// boundaries and may set take values that are out of bounds.  In this
   /// case, the job will stop.  Note: If the minimum value is not set, then
   /// the bound is a negative infinity.
-  void setMinValue(double minValue){ _parameterLimits_.min = minValue; }
-
-  /// Set the maximum value for this parameter.  Parameter values more than
-  /// this value are illegal, and the likelihood is undefined. The job will
-  /// terminate when it encounters an illegal parameter value.  Note: Using a
-  /// minimum value when also using eigenvalue decomposition, or PCA results
-  /// in undefined behavior because the decomposition will not honor the
-  /// boundaries and may set take values that are out of bounds.  In this
-  /// case, the job will stop.  Note: If the maximum value is not set, then
-  /// the bound is at positive infinity.
-  void setMaxValue(double maxValue){ _parameterLimits_.max = maxValue; }
+  void setLimits(const GenericToolbox::Range& limits_){ _parameterLimits_ = limits_; }
 
   /// Record the minimum mirroring boundary being used by any dials for this
   /// parameter.  If this is set, then GUNDAM will constrain the parameter
@@ -133,19 +123,12 @@ public:
   /// See setMinValue() for documentation.
   [[nodiscard]] const GenericToolbox::Range& getParameterLimits() const{ return _parameterLimits_; }
   [[nodiscard]] const GenericToolbox::Range& getThrowLimits() const{ return _throwLimits_; }
-  [[nodiscard]] double getMinValue() const{ return _parameterLimits_.min; }
-  /// See setMaxValue() for documentation.
-  [[nodiscard]] double getMaxValue() const{ return _parameterLimits_.max; }
-  /// See setMinMirror for documentation.
+  [[nodiscard]] const GenericToolbox::Range& getPhysicalLimits() const{ return _physicalLimits_; }
   [[nodiscard]] double getMinMirror() const{ return _mirrorRange_.min; }
   /// See setMaxMirror for documentation.
   [[nodiscard]] double getMaxMirror() const{ return _mirrorRange_.max; }
   [[nodiscard]] double getPriorValue() const{ return _priorValue_; }
   [[nodiscard]] double getThrowValue() const{ return _throwValue_; }
-  /// See setMinPhysical for documentation.
-  [[nodiscard]] double getMinPhysical() const{ return _physicalLimits_.min; }
-  /// See setMinPhysical for documentation.
-  [[nodiscard]] double getMaxPhysical() const{ return _physicalLimits_.max; }
   [[nodiscard]] double getStdDevValue() const{ return _stdDevValue_; }
   [[nodiscard]] double getParameterValue() const;
   [[nodiscard]] const std::string &getName() const{ return _name_; }

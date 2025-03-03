@@ -115,15 +115,16 @@ void RootMinimizer::initializeImpl(){
 
     if( not useNormalizedFitSpace() ){
       _rootMinimizer_->SetVariable(iFitPar, fitPar.getFullTitle(), fitPar.getParameterValue(), fitPar.getStepSize() * _stepSizeScaling_);
-      if (not std::isnan(fitPar.getMinValue())
-          and not std::isnan(fitPar.getMaxValue())) {
-        _rootMinimizer_->SetVariableLimits(iFitPar, fitPar.getMinValue(), fitPar.getMaxValue());
+
+      // strange ROOT parameter setting...
+      if( fitPar.getParameterLimits().hasBothBounds() ){
+        _rootMinimizer_->SetVariableLimits(iFitPar, fitPar.getParameterLimits().min, fitPar.getParameterLimits().max);
       }
-      else if (not std::isnan(fitPar.getMinValue())) {
-        _rootMinimizer_->SetVariableLowerLimit(iFitPar, fitPar.getMinValue());
+      else if( fitPar.getParameterLimits().hasLowerBound() ){
+        _rootMinimizer_->SetVariableLowerLimit(iFitPar, fitPar.getParameterLimits().min);
       }
-      else if (not std::isnan(fitPar.getMaxValue()) ) {
-        _rootMinimizer_->SetVariableUpperLimit(iFitPar, fitPar.getMaxValue());
+      else if( fitPar.getParameterLimits().hasUpperBound() ){
+        _rootMinimizer_->SetVariableUpperLimit(iFitPar, fitPar.getParameterLimits().max);
       }
     }
     else{
@@ -131,18 +132,18 @@ void RootMinimizer::initializeImpl(){
                                    ParameterSet::toNormalizedParValue(fitPar.getParameterValue(), fitPar),
                                    ParameterSet::toNormalizedParRange(fitPar.getStepSize() * _stepSizeScaling_, fitPar)
       );
-      if (not std::isnan(fitPar.getMinValue())
-          and not std::isnan(fitPar.getMaxValue())) {
+      // strange ROOT parameter setting...
+      if( fitPar.getParameterLimits().hasBothBounds() ) {
         _rootMinimizer_->SetVariableLimits(
           iFitPar,
-          ParameterSet::toNormalizedParValue(fitPar.getMinValue(), fitPar),
-          ParameterSet::toNormalizedParValue(fitPar.getMaxValue(), fitPar));
+          ParameterSet::toNormalizedParValue(fitPar.getParameterLimits().min, fitPar),
+          ParameterSet::toNormalizedParValue(fitPar.getParameterLimits().max, fitPar));
       }
-      else if (not std::isnan(fitPar.getMinValue())) {
-        _rootMinimizer_->SetVariableLowerLimit(iFitPar, ParameterSet::toNormalizedParValue(fitPar.getMinValue(), fitPar));
+      else if( fitPar.getParameterLimits().hasLowerBound() ){
+        _rootMinimizer_->SetVariableLowerLimit(iFitPar, ParameterSet::toNormalizedParValue(fitPar.getParameterLimits().min, fitPar));
       }
-      else if (not std::isnan(fitPar.getMaxValue()) ) {
-        _rootMinimizer_->SetVariableUpperLimit(iFitPar, ParameterSet::toNormalizedParValue(fitPar.getMaxValue(), fitPar));
+      else if( fitPar.getParameterLimits().hasUpperBound() ){
+        _rootMinimizer_->SetVariableUpperLimit(iFitPar, ParameterSet::toNormalizedParValue(fitPar.getParameterLimits().max, fitPar));
       }
     }
   }

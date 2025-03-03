@@ -112,8 +112,8 @@ std::string DialCollection::getSummary(bool shallow_) const{
   if( _dialType_ != DialType::Unset ){ ss << " / " << _dialType_; }
   if( not _dialOptions_.empty() ){ ss << ":\"" << _dialOptions_ << "\""; }
   if( not _dialLeafName_.empty() ){ ss << " / dialLeafName:" << _dialLeafName_; }
-  if( _definitionRange_.isBounded() ){ ss << " / definitionRange:" << _definitionRange_; }
-  if( _mirrorDefinitionRange_.isBounded() ){ ss << " / mirrorDefinitionRange:" << _mirrorDefinitionRange_; }
+  if( _definitionRange_.hasBound() ){ ss << " / definitionRange:" << _definitionRange_; }
+  if( _mirrorDefinitionRange_.hasBound() ){ ss << " / mirrorDefinitionRange:" << _mirrorDefinitionRange_; }
 
   if( not shallow_ ){
     // print parameters
@@ -1064,7 +1064,7 @@ std::unique_ptr<DialBase> DialCollection::makeSurfaceDial(const TObject* src_) c
 
 void DialCollection::checkDialPointList(std::vector<DialUtils::DialPoint>& pointList_) const{
 
-  if( _definitionRange_.isBounded() and not std::all_of(pointList_.begin(), pointList_.end(), [&](DialUtils::DialPoint dialPoint){ return _definitionRange_.isInBounds(dialPoint.x); }) ){
+  if( _definitionRange_.hasBound() and not std::all_of(pointList_.begin(), pointList_.end(), [&](DialUtils::DialPoint dialPoint){ return _definitionRange_.isInBounds(dialPoint.x); }) ){
     auto temp{pointList_}; temp.clear();
     for( auto& point : pointList_ ) {
       if( not _definitionRange_.isInBounds(point.x) ){ continue; }
@@ -1078,7 +1078,7 @@ void DialCollection::checkDialPointList(std::vector<DialUtils::DialPoint>& point
       return a_.x < b_.x; // a goes first?
     });
 
-  if( _mirrorDefinitionRange_.isBounded() ){
+  if( _mirrorDefinitionRange_.hasBound() ){
     // TODO: process mirroring options
     LogExit("_mirrorDefinitionRange_ not implemented yet.");
   }

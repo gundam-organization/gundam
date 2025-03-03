@@ -147,7 +147,7 @@ void ParameterSet::processCovarianceMatrix(){
     nbParameters++;
     if( not isEnableEigenDecomp() ) continue;
     // Warn if using eigen decomposition with bounded parameters.
-    if ( std::isnan(par.getMinValue()) and std::isnan(par.getMaxValue())) continue;
+    if( par.getParameterLimits().isUnbounded() ){ continue; }
     LogAlert << "Undefined behavior: Eigen-decomposition of a bounded parameter: "
                << par.getFullTitle()
                << std::endl;
@@ -349,19 +349,12 @@ void ParameterSet::processCovarianceMatrix(){
       eigenPar.setCurrentValueAsPrior();
 
       if( _devUseParLimitsOnEigen_ ){
-        eigenPar.setMinValue( _parameterList_[eigenPar.getParameterIndex()].getMinValue() );
-        eigenPar.setMaxValue( _parameterList_[eigenPar.getParameterIndex()].getMaxValue() );
-
-        LogThrowIf( not std::isnan(eigenPar.getMinValue()) and eigenPar.getPriorValue() < eigenPar.getMinValue(), "PRIOR IS BELLOW MIN: " << eigenPar.getSummary() );
-        LogThrowIf( not std::isnan(eigenPar.getMaxValue()) and eigenPar.getPriorValue() > eigenPar.getMaxValue(), "PRIOR IS ABOVE MAX: " << eigenPar.getSummary() );
+        eigenPar.setLimits( _parameterList_[eigenPar.getParameterIndex()].getParameterLimits() );
       }
       else{
-        eigenPar.setMinValue( _eigenParRange_.min );
-        eigenPar.setMaxValue( _eigenParRange_.max );
-
-        LogThrowIf( not std::isnan(eigenPar.getMinValue()) and eigenPar.getPriorValue() < eigenPar.getMinValue(), "Prior value is bellow min: " << eigenPar.getSummary() );
-        LogThrowIf( not std::isnan(eigenPar.getMaxValue()) and eigenPar.getPriorValue() > eigenPar.getMaxValue(), "Prior value is above max: " << eigenPar.getSummary() );
+        eigenPar.setLimits( _eigenParRange_ );
       }
+      LogThrowIf( not eigenPar.getParameterLimits().isInBounds(eigenPar.getPriorValue()), "PRIOR ISN'T IN BOUNDS: " << eigenPar.getSummary() );
     }
 
   }
@@ -451,33 +444,17 @@ void ParameterSet::throwParameters(bool rethrowIfNotInPhysical_, double gain_){
 
           for( auto& par : this->getParameterList() ){
             if( not ParameterSet::isValidCorrelatedParameter(par) ) continue;
-            if( not std::isnan(par.getMinValue())
-                and par.getThrowValue() < par.getMinValue() ){
+            if( not par.getThrowLimits().isInBounds(par.getThrowValue()) ){
               throwIsValid = false;
-              LogAlert << "Thrown value lower than min bound -> " << par.getThrowValue() << " -> "
-                       << par.getSummary() << std::endl;
-              break;
-            }
-            if( not std::isnan(par.getMaxValue())
-                and par.getThrowValue() > par.getMaxValue() ){
-              throwIsValid = false;
-              LogAlert <<"Thrown value higher than max bound -> " << par.getThrowValue() << " -> "
+              LogAlert << "Thrown value isn't within limits -> " << par.getThrowValue() << " -> "
                        << par.getSummary() << std::endl;
               break;
             }
 
-            if ( not rethrowIfNotInPhysical_ ) continue;
-            if( not std::isnan(par.getMinPhysical())
-                and par.getThrowValue() < par.getMinPhysical() ){
+            if( not rethrowIfNotInPhysical_ ) continue;
+            if( not par.getPhysicalLimits().isInBounds(par.getThrowValue()) ) {
               throwIsValid = false;
-              LogAlert << "thrown value lower than min physical bound -> "
-                       << par.getSummary() << std::endl;
-              break;
-            }
-            if( not std::isnan(par.getMaxPhysical())
-                and par.getThrowValue() > par.getMaxPhysical() ){
-              throwIsValid = false;
-              LogAlert <<"thrown value higher than max physical bound -> "
+              LogAlert << "Thrown value isn't within physical limits -> " << par.getThrowValue() << " -> "
                        << par.getSummary() << std::endl;
               break;
             }
@@ -572,14 +549,9 @@ void ParameterSet::throwParameters(bool rethrowIfNotInPhysical_, double gain_){
         LogInfo << "Checking if the thrown parameters of the set are within bounds..." << std::endl;
 
         for( auto& par : this->getEffectiveParameterList() ){
-          if( not std::isnan(par.getMinValue()) and par.getParameterValue() < par.getMinValue() ){
+          if( not par.getParameterLimits().isInBounds(par.getParameterValue()) ) {
             throwIsValid = false;
-            LogAlert << GenericToolbox::ColorCodes::redLightText << "thrown value lower than min bound -> " << GenericToolbox::ColorCodes::resetColor
-                     << par.getSummary() << std::endl;
-          }
-          else if( not std::isnan(par.getMaxValue()) and par.getParameterValue() > par.getMaxValue() ){
-            throwIsValid = false;
-            LogAlert << GenericToolbox::ColorCodes::redLightText <<"thrown value higher than max bound -> " << GenericToolbox::ColorCodes::resetColor
+            LogAlert << GenericToolbox::ColorCodes::redLightText << "Thrown value not within limits -> " << par.getParameterValue() << GenericToolbox::ColorCodes::resetColor
                      << par.getSummary() << std::endl;
           }
         }
@@ -611,7 +583,7 @@ void ParameterSet::throwParameters(bool rethrowIfNotInPhysical_, double gain_){
         for( auto& par : this->getParameterList() ){
           if( ParameterSet::isValidCorrelatedParameter(par) ){
             iFit++;
-            if( par.getThrowLimits().isBounded() ){ _correlatedVariableThrower_.getParLimitList().at(iFit) = par.getThrowLimits(); }
+            if( par.getThrowLimits().hasBound() ){ _correlatedVariableThrower_.getParLimitList().at(iFit) = par.getThrowLimits(); }
             else{ _correlatedVariableThrower_.getParLimitList().at(iFit) = par.getParameterLimits(); }
           }
         }
@@ -677,7 +649,7 @@ std::string ParameterSet::getSummary() const {
       if( not _parameterList_.empty() ){
 
         GenericToolbox::TablePrinter t;
-        t.setColTitles({ {"Title"}, {"Value"}, {"Prior"}, {"StdDev"}, {"Min"}, {"Max"}, {"Status"} });
+        t.setColTitles({ {"Title"}, {"Value"}, {"Prior"}, {"StdDev"}, {"Limits"}, {"Status"} });
 
 
         for( const auto& par : _parameterList_ ){
@@ -700,8 +672,7 @@ std::string ParameterSet::getSummary() const {
                                              : std::nan("Invalid") ),
                              std::to_string( par.getPriorValue() ),
                              std::to_string( par.getStdDevValue() ),
-                             std::to_string( par.getMinValue() ),
-                             std::to_string( par.getMaxValue() ),
+                             par.getParameterLimits().toString(),
                              statusStr
                          }, colorStr);
         }
@@ -985,14 +956,14 @@ void ParameterSet::defineParameters(){
 
     par.setParameterValue(par.getPriorValue());
 
-    if( not std::isnan(_globalParRange_.min) ){ par.setMinValue(_globalParRange_.min); }
-    if( not std::isnan(_globalParRange_.max) ){ par.setMaxValue(_globalParRange_.max); }
+    par.setLimits(_globalParRange_);
 
-    if( _parameterLowerBoundsList_ != nullptr ){ par.setMinValue((*_parameterLowerBoundsList_)[par.getParameterIndex()]); }
-    if( _parameterUpperBoundsList_ != nullptr ){ par.setMaxValue((*_parameterUpperBoundsList_)[par.getParameterIndex()]); }
+    GenericToolbox::Range rootBounds{};
+    if( _parameterLowerBoundsList_ != nullptr ){ rootBounds.min = ((*_parameterLowerBoundsList_)[par.getParameterIndex()]); }
+    if( _parameterUpperBoundsList_ != nullptr ){ rootBounds.max = ((*_parameterUpperBoundsList_)[par.getParameterIndex()]); }
+    par.setLimits( rootBounds );
 
-    LogThrowIf( not std::isnan(par.getMinValue()) and par.getPriorValue() < par.getMinValue(), "PRIOR IS BELLOW MIN: " << par.getSummary() );
-    LogThrowIf( not std::isnan(par.getMaxValue()) and par.getPriorValue() > par.getMaxValue(), "PRIOR IS ABOVE MAX: " << par.getSummary() );
+    LogThrowIf( not par.getParameterLimits().isInBounds(par.getPriorValue()), "PRIOR IS NOT IN BOUNDS: " << par.getSummary() );
 
     if( not _parameterDefinitionConfig_.empty() ){
       // Alternative 1: define dials then parameters
