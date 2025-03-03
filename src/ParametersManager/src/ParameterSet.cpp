@@ -461,7 +461,7 @@ void ParameterSet::throwParameters(bool rethrowIfNotInPhysical_, double gain_){
             if( not std::isnan(par.getMaxValue())
                 and par.getThrowValue() > par.getMaxValue() ){
               throwIsValid = false;
-              LogAlert <<"thrown value higher than max bound -> "
+              LogAlert <<"Thrown value higher than max bound -> " << par.getThrowValue() << " -> "
                        << par.getSummary() << std::endl;
               break;
             }

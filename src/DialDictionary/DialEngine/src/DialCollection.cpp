@@ -112,8 +112,8 @@ std::string DialCollection::getSummary(bool shallow_) const{
   if( _dialType_ != DialType::Unset ){ ss << " / " << _dialType_; }
   if( not _dialOptions_.empty() ){ ss << ":\"" << _dialOptions_ << "\""; }
   if( not _dialLeafName_.empty() ){ ss << " / dialLeafName:" << _dialLeafName_; }
-  if( not _definitionRange_.isUnbounded() ){ ss << " / definitionRange:" << _definitionRange_; }
-  if( not _mirrorDefinitionRange_.isUnbounded() ){ ss << " / mirrorDefinitionRange:" << _mirrorDefinitionRange_; }
+  if( _definitionRange_.isBounded() ){ ss << " / definitionRange:" << _definitionRange_; }
+  if( _mirrorDefinitionRange_.isBounded() ){ ss << " / mirrorDefinitionRange:" << _mirrorDefinitionRange_; }
 
   if( not shallow_ ){
     // print parameters
@@ -591,7 +591,7 @@ bool DialCollection::initializeDialsWithBinningFile(const JsonType& dialsDefinit
     }
 
       if( not excludedBins.empty() ){
-      LogInfo << "Removing " << excludedBins.size() << " null dials out of " << nBins << "... (--debug for more info)" << std::endl;
+      LogInfo << "Removing " << excludedBins.size() << " null dials out of " << nBins << " / " << 100*double(excludedBins.size())/double(nBins) << "%... (--debug for more info)" << std::endl;
       for( int iBin = nBins ; iBin >= 0 ; iBin-- ){
         if( GenericToolbox::doesElementIsInVector(iBin, excludedBins) ){
           _dialBinSet_.getBinList().erase(_dialBinSet_.getBinList().begin() + iBin);
@@ -878,6 +878,8 @@ std::unique_ptr<DialBase> DialCollection::makeGraphDial(const TObject* src_) con
     splinePointList = DialUtils::getSplinePointList(src_);
   }
 
+  checkDialPointList(splinePointList);
+
   std::unique_ptr<DialBase> out{nullptr};
   if( makeDialShortCircuit(splinePointList, out) ){ return out; }
 
@@ -927,7 +929,8 @@ std::unique_ptr<DialBase> DialCollection::makeSplineDial(const TObject* src_) co
     unif >> uniformityTolerance;
   }
 
-  auto splinePointList = this->getSplinePointList(src_);
+  auto splinePointList = DialUtils::getSplinePointList(src_);
+  checkDialPointList(splinePointList);
 
   std::unique_ptr<DialBase> out;
 
@@ -1059,30 +1062,27 @@ std::unique_ptr<DialBase> DialCollection::makeSurfaceDial(const TObject* src_) c
   return dialBase;
 }
 
-std::vector<DialUtils::DialPoint> DialCollection::getSplinePointList(const TObject* src_) const{
-  auto out = DialUtils::getSplinePointList(src_);
+void DialCollection::checkDialPointList(std::vector<DialUtils::DialPoint>& pointList_) const{
 
-  if( not _definitionRange_.isUnbounded() ){
-    auto temp{out}; temp.clear();
-    for( auto& point : out ) {
+  if( _definitionRange_.isBounded() and not std::all_of(pointList_.begin(), pointList_.end(), [&](DialUtils::DialPoint dialPoint){ return _definitionRange_.isInBounds(dialPoint.x); }) ){
+    auto temp{pointList_}; temp.clear();
+    for( auto& point : pointList_ ) {
       if( not _definitionRange_.isInBounds(point.x) ){ continue; }
       temp.emplace_back(point);
     }
-    out = std::move(temp);
+    pointList_ = std::move(temp);
   }
 
-  std::sort(out.begin(), out.end(),
+  std::sort(pointList_.begin(), pointList_.end(),
     [](const DialUtils::DialPoint& a_, const DialUtils::DialPoint& b_){
       return a_.x < b_.x; // a goes first?
     });
 
-
-  if( not _mirrorDefinitionRange_.isUnbounded() ){
+  if( _mirrorDefinitionRange_.isBounded() ){
     // TODO: process mirroring options
     LogExit("_mirrorDefinitionRange_ not implemented yet.");
   }
 
-  return out;
 }
 bool DialCollection::makeDialShortCircuit(const std::vector<DialUtils::DialPoint>& pointList_, std::unique_ptr<DialBase>& dial_) const{
   dial_ = nullptr;

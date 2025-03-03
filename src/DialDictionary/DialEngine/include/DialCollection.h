@@ -192,7 +192,7 @@ protected:
   std::unique_ptr<DialBase> makeSplineDial(const TObject* src_) const;
   std::unique_ptr<DialBase> makeSurfaceDial(const TObject* src_) const;
 
-  std::vector<DialUtils::DialPoint> getSplinePointList(const TObject* src_) const;
+  void checkDialPointList(std::vector<DialUtils::DialPoint>& pointList_) const;
   bool makeDialShortCircuit(const std::vector<DialUtils::DialPoint>& pointList_, std::unique_ptr<DialBase>& dial_) const;
   std::unique_ptr<DialBase> makeGraphDial(const std::vector<DialUtils::DialPoint>& pointList_) const;
 
