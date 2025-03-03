@@ -132,6 +132,7 @@ public:
   [[nodiscard]] double getStepSize() const{ return _stepSize_; }
   /// See setMinValue() for documentation.
   [[nodiscard]] const GenericToolbox::Range& getParameterLimits() const{ return _parameterLimits_; }
+  [[nodiscard]] const GenericToolbox::Range& getThrowLimits() const{ return _throwLimits_; }
   [[nodiscard]] double getMinValue() const{ return _parameterLimits_.min; }
   /// See setMaxValue() for documentation.
   [[nodiscard]] double getMaxValue() const{ return _parameterLimits_.max; }
@@ -206,6 +207,7 @@ private:
   double _stdDevValue_{std::nan("unset")};
 
   GenericToolbox::Range _parameterLimits_;
+  GenericToolbox::Range _throwLimits_;
   GenericToolbox::Range _physicalLimits_;
   GenericToolbox::Range _mirrorRange_;
 

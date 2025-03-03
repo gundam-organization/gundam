@@ -29,6 +29,7 @@ void Parameter::configureImpl(){
   GenericToolbox::Json::fillValue(_config_, _stepSize_, "parameterStepSize");
   GenericToolbox::Json::fillValue(_config_, _parameterLimits_, "parameterLimits");
   GenericToolbox::Json::fillValue(_config_, _physicalLimits_, "physicalLimits");
+  GenericToolbox::Json::fillValue(_config_, _throwLimits_, "throwLimits");
   GenericToolbox::Json::fillValue(_config_, _mirrorRange_, "mirrorRange");
   GenericToolbox::Json::fillValue(_config_, _dialDefinitionsList_, "dialSetDefinitions");
 
