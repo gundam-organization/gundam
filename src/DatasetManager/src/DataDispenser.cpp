@@ -1202,6 +1202,18 @@ void DataDispenser::loadEvent(int iThread_){
         auto dial = dialCollectionRef->makeDial(dialObjectPtr);
         eventByEventDialBuffer[dialCollectionRef->getIndex()] = dial.release();
       }
+
+      if( _parameters_.debugNbMaxEventsToLoad != 0 ){
+        // check if the limit has been reached
+        std::unique_lock<std::mutex> lock(_mutex_);
+        if( _cache_.propagatorPtr->getEventDialCache().getFillIndex() >= _parameters_.debugNbMaxEventsToLoad ){
+          LogAlertIf(iThread_ == 0) << std::endl << std::endl; // flush pBar
+          LogAlertIf(iThread_ == 0) << "debugNbMaxEventsToLoad: Event number cap reached (";
+          LogAlertIf(iThread_ == 0) << _parameters_.debugNbMaxEventsToLoad << ")" << std::endl;
+          threadSharedData.isDoneReading.setValue( true );
+          return;
+        }
+      }
     }
 
     // ***** from this point, the TChain reader is released *****
@@ -1210,17 +1222,6 @@ void DataDispenser::loadEvent(int iThread_){
     EventDialCache::IndexedCacheEntry *eventDialCacheEntry{nullptr};
     {
       std::unique_lock<std::mutex> lock(_mutex_);
-
-      if( _parameters_.debugNbMaxEventsToLoad != 0 ){
-        // check if the limit has been reached
-        if( _cache_.propagatorPtr->getEventDialCache().getFillIndex() >= _parameters_.debugNbMaxEventsToLoad ){
-          LogAlertIf(iThread_ == 0) << std::endl << std::endl; // flush pBar
-          LogAlertIf(iThread_ == 0) << "debugNbMaxEventsToLoad: Event number cap reached (";
-          LogAlertIf(iThread_ == 0) << _parameters_.debugNbMaxEventsToLoad << ")" << std::endl;
-          return;
-        }
-      }
-
       eventDialCacheEntry = _cache_.propagatorPtr->getEventDialCache().fetchNextCacheEntry();
       sampleEventIndex = _cache_.sampleIndexOffsetList[iSample]++;
     }
