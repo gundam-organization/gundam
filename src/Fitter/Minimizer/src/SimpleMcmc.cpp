@@ -666,23 +666,23 @@ void SimpleMcmc::adaptiveMakePrior(AdaptiveStepMCMC& mcmc,
       double lowBound = val-1.0*err;
       double highBound = val+1.0*err;
 
-      if(not std::isnan(par->getParameterLimits().min)) {
+      if( par->getParameterLimits().hasLowerBound() ) {
         lowBound = std::max(lowBound, par->getParameterLimits().min);
       }
-      if(not std::isnan(par->getMinMirror())) {
-        lowBound = std::max(lowBound, par->getMinMirror());
+      if( par->getMirrorRange().hasLowerBound() ){
+        lowBound = std::max(lowBound, par->getMirrorRange().min);
       }
-      if(not std::isnan(par->getPhysicalLimits().min)) {
+      if( par->getPhysicalLimits().hasLowerBound() ){
         lowBound = std::max(lowBound, par->getPhysicalLimits().min);
       }
 
-      if(not std::isnan(par->getParameterLimits().max)) {
+      if( par->getParameterLimits().hasUpperBound() ) {
         highBound = std::min(highBound, par->getParameterLimits().max);
       }
-      if(not std::isnan(par->getMaxMirror())) {
-        highBound = std::min(highBound, par->getMaxMirror());
+      if( par->getMirrorRange().hasUpperBound() ){
+        highBound = std::min(highBound, par->getMirrorRange().max);
       }
-      if(not std::isnan(par->getPhysicalLimits().max)) {
+      if( par->getPhysicalLimits().hasUpperBound() ){
         highBound = std::min(highBound, par->getPhysicalLimits().max);
       }
 
@@ -1061,13 +1061,13 @@ bool SimpleMcmc::hasValidParameterValues() const {
         ++invalid;
       }
       if ((_validFlags_ & 0b0010) != 0
-          and std::isfinite(par.getMinMirror())
-          and par.getParameterValue() < par.getMinMirror()) GUNDAM_UNLIKELY_COMPILER_FLAG {
+          and std::isfinite(par.getMirrorRange().min)
+          and par.getParameterValue() < par.getMirrorRange().min) GUNDAM_UNLIKELY_COMPILER_FLAG {
         ++invalid;
       }
       if ((_validFlags_ & 0b0010) != 0
-          and std::isfinite(par.getMaxMirror())
-          and par.getParameterValue() > par.getMaxMirror()) GUNDAM_UNLIKELY_COMPILER_FLAG {
+          and std::isfinite(par.getMirrorRange().max)
+          and par.getParameterValue() > par.getMirrorRange().max) GUNDAM_UNLIKELY_COMPILER_FLAG {
         ++invalid;
       }
       if ((_validFlags_ & 0b0100) != 0

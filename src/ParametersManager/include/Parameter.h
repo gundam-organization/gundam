@@ -92,6 +92,28 @@ public:
   void setOwner(const ParameterSet *owner_){ _owner_ = owner_; }
   void setPriorType(PriorType priorType){ _priorType_ = priorType; }
 
+  // const getters
+  [[nodiscard]] bool isFree() const{ return _isFree_; }
+  [[nodiscard]] bool isFixed() const{ return _isFixed_; }
+  [[nodiscard]] bool isEigen() const{ return _isEigen_; }
+  [[nodiscard]] bool isEnabled() const{ return _isEnabled_; }
+  [[nodiscard]] bool gotUpdated() const { return _gotUpdated_; }
+  [[nodiscard]] int getParameterIndex() const{ return _parameterIndex_; }
+  [[nodiscard]] double getStepSize() const{ return _stepSize_; }
+  [[nodiscard]] const GenericToolbox::Range& getParameterLimits() const{ return _parameterLimits_; }
+  [[nodiscard]] const GenericToolbox::Range& getMirrorRange() const{ return _mirrorRange_; }
+  [[nodiscard]] const GenericToolbox::Range& getThrowLimits() const{ return _throwLimits_; }
+  [[nodiscard]] const GenericToolbox::Range& getPhysicalLimits() const{ return _physicalLimits_; }
+  [[nodiscard]] double getPriorValue() const{ return _priorValue_; }
+  [[nodiscard]] double getThrowValue() const{ return _throwValue_; }
+  [[nodiscard]] double getStdDevValue() const{ return _stdDevValue_; }
+  [[nodiscard]] double getParameterValue() const;
+  [[nodiscard]] const std::string &getName() const{ return _name_; }
+  [[nodiscard]] const JsonType &getDialDefinitionsList() const{ return _dialDefinitionsList_; }
+  [[nodiscard]] const ParameterSet *getOwner() const{ return _owner_; }
+  [[nodiscard]] PriorType getPriorType() const{ return _priorType_; }
+
+
   /// Query if a value is in the domain of likelihood for this parameter.  Math
   /// remediation for those of us (including myself) who don't recall grammar
   /// school math: The DOMAIN of a function is the range over which it is
@@ -112,29 +134,6 @@ public:
 
   /// Query if a value matchs the validity requirements.
   [[nodiscard]] bool isValidValue(double value) const;
-
-  [[nodiscard]] bool isFree() const{ return _isFree_; }
-  [[nodiscard]] bool isFixed() const{ return _isFixed_; }
-  [[nodiscard]] bool isEigen() const{ return _isEigen_; }
-  [[nodiscard]] bool isEnabled() const{ return _isEnabled_; }
-  [[nodiscard]] bool gotUpdated() const { return _gotUpdated_; }
-  [[nodiscard]] int getParameterIndex() const{ return _parameterIndex_; }
-  [[nodiscard]] double getStepSize() const{ return _stepSize_; }
-  /// See setMinValue() for documentation.
-  [[nodiscard]] const GenericToolbox::Range& getParameterLimits() const{ return _parameterLimits_; }
-  [[nodiscard]] const GenericToolbox::Range& getThrowLimits() const{ return _throwLimits_; }
-  [[nodiscard]] const GenericToolbox::Range& getPhysicalLimits() const{ return _physicalLimits_; }
-  [[nodiscard]] double getMinMirror() const{ return _mirrorRange_.min; }
-  /// See setMaxMirror for documentation.
-  [[nodiscard]] double getMaxMirror() const{ return _mirrorRange_.max; }
-  [[nodiscard]] double getPriorValue() const{ return _priorValue_; }
-  [[nodiscard]] double getThrowValue() const{ return _throwValue_; }
-  [[nodiscard]] double getStdDevValue() const{ return _stdDevValue_; }
-  [[nodiscard]] double getParameterValue() const;
-  [[nodiscard]] const std::string &getName() const{ return _name_; }
-  [[nodiscard]] const JsonType &getDialDefinitionsList() const{ return _dialDefinitionsList_; }
-  [[nodiscard]] const ParameterSet *getOwner() const{ return _owner_; }
-  [[nodiscard]] PriorType getPriorType() const{ return _priorType_; }
 
   /// Copy the prior value of the parameter into the current value.  This will
   /// fail if the prior value has not been set.
