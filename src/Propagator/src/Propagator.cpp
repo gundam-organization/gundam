@@ -106,7 +106,7 @@ void Propagator::clearContent(){
 
   // also wiping event-by-event dials...
   for( auto& dialCollection: _dialCollectionList_ ) {
-    if( not dialCollection.getGlobalDialLeafName().empty() ) { dialCollection.clear(); }
+    if( not dialCollection.getDialLeafName().empty() ) { dialCollection.clear(); }
 
     // clear input buffer cache to trigger the cache eval
     dialCollection.invalidateCachedInputBuffers();

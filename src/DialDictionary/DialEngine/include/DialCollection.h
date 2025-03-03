@@ -20,6 +20,24 @@
 #include <sstream>
 
 class DialCollection : public JsonBaseClass {
+
+public:
+#define ENUM_NAME DialType
+#define ENUM_FIELDS \
+  ENUM_FIELD( Unset, 0 ) \
+  ENUM_FIELD( Norm ) \
+  ENUM_FIELD( Graph ) \
+  ENUM_FIELD( Spline ) \
+  ENUM_FIELD( Surface ) \
+  ENUM_FIELD( Formula ) \
+  ENUM_FIELD( CompiledLibDial ) \
+  ENUM_FIELD( Tabulated )
+#define ENUM_DICT \
+   ENUM_DICT_ENTRY("Normalization", "Norm") \
+   ENUM_DICT_ENTRY("RootFormula", "Formula")
+#include "GenericToolbox.MakeEnum.h"
+  MAKE_ENUM_JSON_INTERFACE(DialType);
+
 public:
   DialCollection() = delete;
   explicit DialCollection(std::vector<ParameterSet> *targetParameterSetListPtr): _parameterSetListPtr_(targetParameterSetListPtr) {}
@@ -31,16 +49,6 @@ public:
     CollectionData() = default;
     virtual ~CollectionData() = default;
   };
-
-  //  The PolymorphicObjectWrapper doesn't have the correct semantics since it
-  // clones the payload when it's copied.  We want to leave the pointee alone
-  // and just move the pointers around.
-  //
-  // Temporarily replace specialty class with shared_ptr.  The shared_ptr
-  // class has the correct semantics (copyable, and deletes the object), but
-  // we don't need the reference counting since we can only have one of each
-  // object.  Also shared_ptr is a bit to memory hungry.
-  typedef std::shared_ptr<DialBase> DialBaseObject;
 
   // setters
   void setIndex(int index){ _index_ = index; }
@@ -76,17 +84,11 @@ public:
   // indentify the collection.
   [[nodiscard]] int getIndex() const{ return _index_; }
 
-  // The value for dialType: in the yaml file.
-  [[nodiscard]] const std::string &getGlobalDialType() const{return _globalDialType_; }
-
-  // The value for dialSubType: in the yaml file
-  [[nodiscard]] const std::string &getGlobalDialSubType() const{ return _globalDialSubType_; }
-
   // If it exists, then this is the name of a leaf in the input file
   // containing data to weight the event in the entry.  This is empty if the
   // dial is not event-by-event, or if the dial is not based on a "spline"
   // (e.g. it might be an tabulated event-by-event dial).
-  [[nodiscard]] const std::string &getGlobalDialLeafName() const{ return _globalDialLeafName_; }
+  [[nodiscard]] const std::string &getDialLeafName() const{ return _dialLeafName_; }
 
   [[nodiscard]] const BinSet &getDialBinSet() const{ return _dialBinSet_; }
   [[nodiscard]] const std::vector<std::string> &getDataSetNameList() const{ return _dataSetNameList_; }
@@ -95,7 +97,9 @@ public:
   // should be applied if this returns a non-zero value.
   [[nodiscard]] const std::shared_ptr<TFormula> &getApplyConditionFormula() const{ return _applyConditionFormula_; }
 
-  // non-const getters
+  const DialType& getDialType() const{ return _dialType_; }
+
+  // mutable getters
   BinSet &getDialBinSet(){ return _dialBinSet_; }
 
   // One interface per DialBase.  The interface groups the input buffer,
@@ -123,7 +127,7 @@ public:
   // any unused space.
   void resizeContainers();
 
-  // After the DialCollection is fully initialized, setup all of the pointers
+  // After the DialCollection is fully initialized, setup all the pointers
   // in the DialInterface objects.  This is used after the size of the
   // DialCollection has changed to fix any pointer issues.
   void setupDialInterfaceReferences();
@@ -206,9 +210,10 @@ private:
   double _mirrorHighEdge_{std::nan("unset")};
   double _mirrorRange_{std::nan("unset")};
   std::string _applyConditionStr_{};
-  std::string _globalDialLeafName_{};
-  std::string _globalDialType_{};
-  std::string _globalDialSubType_{};
+  std::string _dialLeafName_{};
+
+  DialType _dialType_{DialType::Norm}; // Graph, Spline...
+  std::string _dialOptions_{}; // monotonic, catmull-rom...
   std::vector<std::string> _dataSetNameList_{};
   std::vector<std::string> _globalDialExtraLeafNames_{};
   GenericToolbox::Range _definitionRange_{std::nan("unset"),std::nan("unset")};

@@ -314,8 +314,8 @@ void DataDispenser::fetchRequestedLeaves(){
           GenericToolbox::addIfNotInVector(dialCollection->getApplyConditionFormula()->GetParName(iPar), indexRequests);
         }
       }
-      if( not dialCollection->getGlobalDialLeafName().empty() ){
-        GenericToolbox::addIfNotInVector(dialCollection->getGlobalDialLeafName(), indexRequests);
+      if( not dialCollection->getDialLeafName().empty() ){
+        GenericToolbox::addIfNotInVector(dialCollection->getDialLeafName(), indexRequests);
       }
       for( auto& bin : dialCollection->getDialBinSet().getBinList() ) {
         for( auto& edges : bin.getEdgesList() ){
@@ -508,7 +508,7 @@ void DataDispenser::preAllocateMemory(){
       // Reserve enough space for all the event-by-event dials
       // that might be added.  This size may be reduced later.
       t << dialCollection->getTitle() << GenericToolbox::TablePrinter::NextColumn;
-      t << dialCollection->getGlobalDialType() << GenericToolbox::TablePrinter::NextLine;
+      t << dialCollection->getDialType() << GenericToolbox::TablePrinter::NextLine;
 
       // Only increase the size.  It's probably zero before
       // starting, but add the original size... just in case.
@@ -1179,7 +1179,7 @@ void DataDispenser::loadEvent(int iThread_){
         eventByEventDialBuffer[dialCollectionRef->getIndex()] = nullptr;
 
         // if not event-by-event dial -> leave
-        if( dialCollectionRef->getGlobalDialLeafName().empty() ){ continue; }
+        if( dialCollectionRef->getDialLeafName().empty() ){ continue; }
 
         // dial collections may come with a condition formula
         if( dialCollectionRef->getApplyConditionFormula() != nullptr ){
@@ -1190,7 +1190,7 @@ void DataDispenser::loadEvent(int iThread_){
         }
 
         // grab as a general TObject, then let the factory figure out what to do with it
-        auto* dialExpression = threadSharedData.treeBuffer.getExpressionBuffer( dialCollectionRef->getGlobalDialLeafName() );
+        auto* dialExpression = threadSharedData.treeBuffer.getExpressionBuffer( dialCollectionRef->getDialLeafName() );
         if( dialExpression == nullptr ){ continue; }
         auto *dialObjectPtr = dialExpression->getBuffer().getValue<const TObject*>();
 
@@ -1241,7 +1241,7 @@ void DataDispenser::loadEvent(int iThread_){
     for( auto *dialCollectionRef: _cache_.dialCollectionsRefList ){
 
       // leave if event-by-event -> already loaded
-      if( not dialCollectionRef->getGlobalDialLeafName().empty() ){
+      if( not dialCollectionRef->getDialLeafName().empty() ){
 
         // dialBase is valid -> store it
         if( eventByEventDialBuffer[dialCollectionRef->getIndex()] != nullptr ){
@@ -1267,7 +1267,7 @@ void DataDispenser::loadEvent(int iThread_){
 
       int iCollection = dialCollectionRef->getIndex();
 
-      if( dialCollectionRef->getGlobalDialType() == "Tabulated" ){
+      if( dialCollectionRef->getDialType() == DialCollection::DialType::Tabulated ){
         // Event-by-event dial for a precalculated table.  The table
         // can hold things like oscillation weights and is filled before
         // the event weighting is done.
