@@ -454,7 +454,7 @@ void ParameterSet::throwParameters(bool rethrowIfNotInPhysical_, double gain_){
             if( not std::isnan(par.getMinValue())
                 and par.getThrowValue() < par.getMinValue() ){
               throwIsValid = false;
-              LogAlert << "thrown value lower than min bound -> "
+              LogAlert << "Thrown value lower than min bound -> " << par.getThrowValue() << " -> "
                        << par.getSummary() << std::endl;
               break;
             }
