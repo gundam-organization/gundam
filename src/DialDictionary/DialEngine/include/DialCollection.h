@@ -142,7 +142,7 @@ public:
 
   // Add a dial collection update callback.  These are called in the order
   // that they are added.  They are activated by the "update()" method.
-  void addUpdate(std::function<void(DialCollection* dc)> callback);
+  void addUpdate(const std::function<void(DialCollection* dc)>& callback);
 
   // Check if the dial will need to be recalculated.  A recalculation
   // happens when a parameter value has changed since the last calculation.
@@ -184,7 +184,7 @@ protected:
   bool initializeDialsWithBinningFile(const JsonType& dialsDefinition);
   bool initializeDialsWithTabulation(const JsonType& dialsDefinition);
 
-  void readGlobals(const JsonType &config_);
+  void readParametersFromConfig(const JsonType &config_);
   JsonType fetchDialsDefinition(const JsonType &definitionsList_) const;
 
   // factory

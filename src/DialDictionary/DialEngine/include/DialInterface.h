@@ -16,7 +16,7 @@
 #include <memory>
 #include <vector>
 
-typedef GenericToolbox::PolymorphicObjectWrapper<DialBase> DialBaseObj;
+typedef GenericToolbox::PolymorphicObjectWrapper<DialBase> DialBaseObject;
 
 
 /// This class is size critical and should not be used as a base class (no
@@ -26,7 +26,7 @@ class DialInterface {
 public:
   DialInterface() = default;
 
-  void setDial(const DialBaseObj& dial_){ _dial_ = dial_; }
+  void setDial(const DialBaseObject& dial_){ _dial_ = dial_; }
   void setInputBufferRef(DialInputBuffer *inputBufferRef){ _inputBufferPtr_ = inputBufferRef; }
   void setResponseSupervisorRef(const DialResponseSupervisor *responseSupervisorRef){ _responseSupervisorPtr_ = responseSupervisorRef; }
   void setDialBinRef(const Bin *dialBinRef){ _dialBinRef_ = dialBinRef; }
@@ -56,7 +56,7 @@ public:
 
 private:
   // owner of
-  DialBaseObj _dial_{};
+  DialBaseObject _dial_{};
 
   // non owner of
   const DialInputBuffer* _inputBufferPtr_{nullptr};

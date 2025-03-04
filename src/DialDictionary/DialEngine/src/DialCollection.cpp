@@ -258,7 +258,7 @@ void DialCollection::setupDialInterfaceReferences(){
 }
 
 // init protected
-void DialCollection::readGlobals(const JsonType &config_) {
+void DialCollection::readParametersFromConfig(const JsonType &config_) {
   // globals for the dialSet
   GenericToolbox::Json::fillValue(config_, _enableDialsSummary_, "printDialsSummary");
   GenericToolbox::Json::fillValue(config_, _dialType_, {{"type"}, {"dialsType"}, {"dialType"}});
@@ -411,7 +411,7 @@ bool DialCollection::initializeNormDialsWithParBinning() {
   if( binning.empty() ){ return false; } // not defined
 
   // Get global parameters from the main config
-  this->readGlobals(_config_);
+  this->readParametersFromConfig(_config_);
 
   // Read the binning
   LogInfo << "Defining binned dials for " << getTitle() << std::endl;
@@ -427,7 +427,7 @@ bool DialCollection::initializeNormDialsWithParBinning() {
   _dialInterfaceList_.reserve( _dialBinSet_.getBinList().size() );
   for(const auto & bin : _dialBinSet_.getBinList()) {
     _dialInterfaceList_.emplace_back();
-    _dialInterfaceList_.back().setDial( DialBaseObj(this->makeDial()) );
+    _dialInterfaceList_.back().setDial( DialBaseObject(this->makeDial()) );
   }
 
   return true;
@@ -575,7 +575,7 @@ bool DialCollection::initializeDialsWithBinningFile(const JsonType& dialsDefinit
       TObject* binnedInitializer = dialsList->At(iBin);
 
       _verboseShortCircuit_ = true;
-      auto dial = DialBaseObj( this->makeDial( dialsList->At(iBin) ) );
+      auto dial = DialBaseObject( this->makeDial( dialsList->At(iBin) ) );
       _verboseShortCircuit_ = false;
 
       if( dial.get() == nullptr ) {
@@ -660,7 +660,7 @@ bool DialCollection::initializeDialsWithBinningFile(const JsonType& dialsDefinit
       auto dial = makeDial(dialInitializer);
       if( dial != nullptr ){
         _dialInterfaceList_.emplace_back();
-        DialBaseObj obj;
+        DialBaseObject obj;
         obj.dialPtr = std::move(dial);
         _dialInterfaceList_.back().setDial( obj );
       }
@@ -688,14 +688,14 @@ bool DialCollection::initializeDialsWithDefinition() {
     return true;
   }
 
-  this->readGlobals( dialsDefinition );
+  this->readParametersFromConfig( dialsDefinition );
 
   if     ( _dialType_ == DialType::Norm ) {
     // This dial collection is a normalization, so there is a single dial.
     // Create it here.
     _isEventByEvent_ = false;
     _dialInterfaceList_.emplace_back();
-    _dialInterfaceList_.back().setDial( DialBaseObj(makeDial()) );
+    _dialInterfaceList_.back().setDial( DialBaseObject(makeDial()) );
   }
   else if( _dialType_ == DialType::Formula ){
     // This dial collection calculates a function of the parameter values, so it
@@ -714,7 +714,7 @@ bool DialCollection::initializeDialsWithDefinition() {
       for( auto& bin : _dialBinSet_.getBinList() ){
 
         _dialInterfaceList_.emplace_back();
-        _dialInterfaceList_.back().setDial( DialBaseObj(makeDial( dialsDefinition )) );
+        _dialInterfaceList_.back().setDial( DialBaseObject(makeDial( dialsDefinition )) );
 
         for( auto& var : bin.getEdgesList() ){
           ((RootFormula*) _dialInterfaceList_.back().getDialBaseRef())->getFormula().SetParameter(
@@ -726,7 +726,7 @@ bool DialCollection::initializeDialsWithDefinition() {
     }
     else{
       _dialInterfaceList_.emplace_back();
-      _dialInterfaceList_.back().setDial( DialBaseObj(makeDial( dialsDefinition )) );
+      _dialInterfaceList_.back().setDial( DialBaseObject(makeDial( dialsDefinition )) );
     }
 
   }
@@ -736,7 +736,7 @@ bool DialCollection::initializeDialsWithDefinition() {
     _isEventByEvent_ = false;
 
     _dialInterfaceList_.emplace_back();
-    _dialInterfaceList_.back().setDial( DialBaseObj(makeDial( dialsDefinition )) );
+    _dialInterfaceList_.back().setDial( DialBaseObject(makeDial( dialsDefinition )) );
   }
   else if( _dialType_ == DialType::Tabulated ) {
     // This dial uses a precalculated table to apply weight to each event (e.g. it
@@ -803,7 +803,7 @@ void DialCollection::update() {
   }
 }
 
-void DialCollection::addUpdate(std::function<void(DialCollection*)> callback) {
+void DialCollection::addUpdate(const std::function<void(DialCollection* dc)>& callback) {
   _dialCollectionCallbacks_.emplace_back(callback);
 }
 
