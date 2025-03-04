@@ -156,9 +156,6 @@ void Propagator::propagateParameters(){
       LogError << GundamUtils::Backtrace;
       LogError << "Parallel GPU and CPU calculations disagree" << std::endl;
     }
-    else {
-      LogError << "Success: Parallel GPU and CPU calculations OK" << std::endl;
-    }
   }
 #endif
 }
