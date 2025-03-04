@@ -648,8 +648,7 @@ std::string ParameterSet::getSummary() const {
       if( not _parameterList_.empty() ){
 
         GenericToolbox::TablePrinter t;
-        t.setColTitles({ {"Title"}, {"Value"}, {"Prior"}, {"StdDev"}, {"Limits"}, {"Status"} });
-
+        t.setColTitles({ {"Title"}, {"Current"}, {"Prior"}, {"StdDev"}, {"Limits"}, {"Property"} });
 
         for( const auto& par : _parameterList_ ){
           std::string colorStr;
