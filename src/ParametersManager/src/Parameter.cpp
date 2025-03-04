@@ -38,6 +38,7 @@ void Parameter::configureImpl(){
 
   // make sure the throws will always give parameters in bounds
   _throwLimits_.fillMostConstrainingBounds(_parameterLimits_);
+  _throwLimits_.fillMostConstrainingBounds(_physicalLimits_);
 
 }
 void Parameter::initializeImpl() {
@@ -142,14 +143,12 @@ bool Parameter::isInDomain(double value_, bool verbose_) const {
   return true;
 }
 bool Parameter::isPhysical(double value_) const {
-  if (not isInDomain(value_)) return false;
-  if ( not std::isnan(_physicalLimits_.min) and value_ < _physicalLimits_.min ) return false;
-  if ( not std::isnan(_physicalLimits_.max) and value_ > _physicalLimits_.max ) return false;
+  if( not isInDomain(value_) ){ return false; }
+  if( not _parameterLimits_.isInBounds(value_) ){ return false; }
   return true;
 }
 bool Parameter::isMirrored(double value_) const {
-  if ( not std::isnan(_mirrorRange_.min) and value_ < _mirrorRange_.min ) return true;
-  if ( not std::isnan(_mirrorRange_.max) and value_ > _mirrorRange_.max ) return true;
+  if( not _mirrorRange_.isInBounds(value_) ){ return true; }
   return false;
 }
 bool Parameter::isValidValue(double value) const {
