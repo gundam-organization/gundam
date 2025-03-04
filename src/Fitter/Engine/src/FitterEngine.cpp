@@ -251,9 +251,9 @@ void FitterEngine::initializeImpl(){
           samplePtr_->getHistogram().getNbBins(),
           0, samplePtr_->getHistogram().getNbBins()
         );
-    for( int iBin = 1 ; iBin <= hist->GetNbinsX()+1 ; iBin++ ){
-      hist->SetBinContent( iBin, samplePtr_->getHistogram().getBinContentList()[iBin].sumWeights );
-      hist->SetBinError( iBin, samplePtr_->getHistogram().getBinContentList()[iBin].sqrtSumSqWeights );
+    for( int iBin = 1 ; iBin < hist->GetNbinsX()+1 ; iBin++ ){
+      hist->SetBinContent( iBin, samplePtr_->getHistogram().getBinContentList()[iBin-1].sumWeights );
+      hist->SetBinError( iBin, samplePtr_->getHistogram().getBinContentList()[iBin-1].sqrtSumSqWeights );
     }
     hist->GetXaxis()->SetTitle("Bin index");
     hist->GetYaxis()->SetTitle("Rate");
