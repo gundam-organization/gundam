@@ -77,25 +77,26 @@ public:
   void setDialSetConfig(const JsonType &jsonConfig_);
 
   // const getters
-  [[nodiscard]] bool isFree() const{ return _isFree_; }
-  [[nodiscard]] bool isFixed() const{ return _isFixed_; }
-  [[nodiscard]] bool isEigen() const{ return _isEigen_; }
-  [[nodiscard]] bool isEnabled() const{ return _isEnabled_; }
-  [[nodiscard]] bool gotUpdated() const { return _gotUpdated_; }
-  [[nodiscard]] int getParameterIndex() const{ return _parameterIndex_; }
-  [[nodiscard]] double getStepSize() const{ return _stepSize_; }
-  [[nodiscard]] const GenericToolbox::Range& getParameterLimits() const{ return _parameterLimits_; }
-  [[nodiscard]] const GenericToolbox::Range& getMirrorRange() const{ return _mirrorRange_; }
-  [[nodiscard]] const GenericToolbox::Range& getThrowLimits() const{ return _throwLimits_; }
-  [[nodiscard]] const GenericToolbox::Range& getPhysicalLimits() const{ return _physicalLimits_; }
-  [[nodiscard]] double getPriorValue() const{ return _priorValue_; }
-  [[nodiscard]] double getThrowValue() const{ return _throwValue_; }
-  [[nodiscard]] double getStdDevValue() const{ return _stdDevValue_; }
+  [[nodiscard]] auto isFree() const{ return _isFree_; }
+  [[nodiscard]] auto isFixed() const{ return _isFixed_; }
+  [[nodiscard]] auto isEigen() const{ return _isEigen_; }
+  [[nodiscard]] auto isEnabled() const{ return _isEnabled_; }
+  [[nodiscard]] auto gotUpdated() const { return _gotUpdated_; }
+  [[nodiscard]] auto getParameterIndex() const{ return _parameterIndex_; }
+  [[nodiscard]] auto getStepSize() const{ return _stepSize_; }
+  [[nodiscard]] auto getPriorValue() const{ return _priorValue_; }
+  [[nodiscard]] auto getThrowValue() const{ return _throwValue_; }
+  [[nodiscard]] auto getStdDevValue() const{ return _stdDevValue_; }
+  [[nodiscard]] auto getOwner() const{ return _owner_; }
+  [[nodiscard]] auto getPriorType() const{ return _priorType_; }
+  [[nodiscard]] auto& getParameterLimits() const{ return _parameterLimits_; }
+  [[nodiscard]] auto& getMirrorRange() const{ return _mirrorRange_; }
+  [[nodiscard]] auto& getThrowLimits() const{ return _throwLimits_; }
+  [[nodiscard]] auto& getPhysicalLimits() const{ return _physicalLimits_; }
+  [[nodiscard]] auto& getName() const{ return _name_; }
+  [[nodiscard]] auto& getDialDefinitionsList() const{ return _dialDefinitionsList_; }
+
   [[nodiscard]] double getParameterValue() const;
-  [[nodiscard]] const std::string &getName() const{ return _name_; }
-  [[nodiscard]] const JsonType &getDialDefinitionsList() const{ return _dialDefinitionsList_; }
-  [[nodiscard]] const ParameterSet *getOwner() const{ return _owner_; }
-  [[nodiscard]] PriorType getPriorType() const{ return _priorType_; }
 
 
   /// Query if a value is in the domain of likelihood for this parameter.  Math
