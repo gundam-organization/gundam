@@ -17,7 +17,8 @@ public:
 
   /// Check that the GUNDAM Histogram contents matches the Cache::Manager
   /// histogram cache.
-  bool validateHistogram(const double* fSumHostPtr_, const double* fSum2HostPtr_);
+  bool validateHistogram(bool quiet, const double* fSumHostPtr_, const double* fSum2HostPtr_);
+
 private:
   Histogram* histPtr{nullptr};
   int cacheManagerIndexOffset{-1};

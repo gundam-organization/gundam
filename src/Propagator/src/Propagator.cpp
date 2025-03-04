@@ -156,6 +156,9 @@ void Propagator::propagateParameters(){
       LogError << GundamUtils::Backtrace;
       LogError << "Parallel GPU and CPU calculations disagree" << std::endl;
     }
+    else {
+      LogError << "Success: Parallel GPU and CPU calculations OK" << std::endl;
+    }
   }
 #endif
 }
@@ -295,8 +298,7 @@ void Propagator::initializeCacheManager(){
   Cache::Manager::SetSampleSetPtr( _sampleSet_ );
   Cache::Manager::SetEventDialSetPtr( _eventDialCache_ );
 
-  Cache::Manager::Build();
-  Cache::Manager::Update();
+  Cache::Manager::Build(_sampleSet_, _eventDialCache_);
 
   // By default, make sure every data is copied to the CPU part
   // Some of those part might get disabled for faster calculation

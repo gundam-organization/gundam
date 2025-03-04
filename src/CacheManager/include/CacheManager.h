@@ -124,8 +124,16 @@ public:
   static bool Fill();
 
   /// Set addresses of the Propagator objects the CacheManager should take care of
-  static void SetSampleSetPtr(SampleSet& sampleSet_){ fParameters.fSampleSetPtr = &sampleSet_; }
-  static void SetEventDialSetPtr(EventDialCache& eventDialCache_){ fParameters.fEventDialCachePtr = &eventDialCache_; }
+  static void SetSampleSetPtr(SampleSet& sampleSet_) {
+    LogThrowIf(fParameters.fSampleSetPtr != nullptr,
+               "Cache::Manager attempt to reset SampleSetPtr");
+    fParameters.fSampleSetPtr = &sampleSet_;
+  }
+  static void SetEventDialSetPtr(EventDialCache& eventDialCache_) {
+    LogThrowIf(fParameters.fEventDialCachePtr != nullptr,
+               "Cache::Manager attempt to reset EventDialCachePtr");
+    fParameters.fEventDialCachePtr = &eventDialCache_;
+  }
   static void SetIsHistContentCopyEnabled(bool fIsHistContentCopyEnabled_){ fParameters.fIsHistContentCopyEnabled = fIsHistContentCopyEnabled_; }
   static void SetIsEventWeightCopyEnabled(bool fIsEventWeightCopyEnabled_){ fParameters.fIsEventWeightCopyEnabled = fIsEventWeightCopyEnabled_; }
   static void SetEnableDebugPrintouts(bool fEnableDebugPrintouts_){ fParameters.fEnableDebugPrintouts = fEnableDebugPrintouts_; }
@@ -133,15 +141,15 @@ public:
   static const GenericToolbox::Time::AveragedTimer<10>& GetCacheFillTimer() { return fParameters.cacheFillTimer; }
   static const GenericToolbox::Time::AveragedTimer<10>& GetPullFromDeviceTimer() { return fParameters.pullFromDeviceTimer; }
 
-  /// Build the cache and load it into the device.  This is used in
-  /// Propagator.cpp to fill the constants needed to for the calculations.
-  static bool Build();
+  /// Build the cache and load it into the device.  This is used to construct
+  /// the Cache::Manager singleton, and copy the event information to the
+  /// device.  This will use Update to fill the event and spline information.
+  static bool Build(SampleSet& sampleSet, EventDialCache& eventDialCache);
 
-  /// Update the cache with the event and spline information.  This is
-  /// called as part of Build, and can be called in other code if the cache
-  /// needs to be changed.  It forages all of the information from the
-  /// original sample list and event dials.
-  static bool Update();
+  /// Update the cache with the event and spline information.  This is called
+  /// as part of Build.  It forages all of the information from the original
+  /// sample list and event dials.
+  bool Update(SampleSet& sampleSet, EventDialCache& eventDialCache);
 
   /// This returns the index of the parameter in the cache.  If the
   /// parameter isn't defined, this will return a negative value.
@@ -171,7 +179,7 @@ public:
 
   /// Validate local copy of the histogram contents against the last GPU
   /// calculation.
-  static bool ValidateHistogramContents();
+  static bool ValidateHistogramContents(int quiet=1);
 
   /// Check if the caches for the manager have been built.  This will only be
   /// true when the Cache::Manager is enabled, and the Cache::Manager::Build()
@@ -179,7 +187,6 @@ public:
   static bool IsBuilt() {return Cache::Manager::Get() != nullptr;;}
 
 private:
-
 
   // Hold the configuration that will be used to construct the manager
   // (singleton).  This information was originally passed as arguments to
@@ -295,6 +302,14 @@ private:
 
   // Set to true when the cache needs an update.
   bool fUpdateRequired{true};
+
+  // Keep track of the SampleSet and EventDialCache that are part of the
+  // cache. This cannot be changed.
+  SampleSet* fSampleSet{nullptr};
+
+  // Keep track of the SampleSet and EventDialCache that are part of the
+  // cache.  This cannot be changed.
+  EventDialCache* fEventDialCache{nullptr};
 
 public:
   virtual ~Manager() = default;
