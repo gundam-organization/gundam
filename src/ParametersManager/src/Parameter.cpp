@@ -36,10 +36,6 @@ void Parameter::configureImpl(){
   GenericToolbox::Json::fillEnum(_config_, _priorType_, "priorType");
   if( _priorType_ == PriorType::Flat ){ _isFree_ = true; }
 
-  // make sure the throws will always give parameters in bounds
-  _throwLimits_.fillMostConstrainingBounds(_parameterLimits_);
-  _throwLimits_.fillMostConstrainingBounds(_physicalLimits_);
-
 }
 void Parameter::initializeImpl() {
   LogThrowIf(_owner_ == nullptr, "Parameter set ref is not set.");
@@ -54,6 +50,10 @@ void Parameter::initializeImpl() {
     // the user should know. This will prevent Asimov fits to converge
     LogAlert << "Prior value of \"" << getFullTitle() << "\" is set on the defined limits: " << _priorValue_ << " -> " << _parameterLimits_ << std::endl;
   }
+
+  // make sure the throws will always give parameters in bounds
+  _throwLimits_.fillMostConstrainingBounds(_parameterLimits_);
+  _throwLimits_.fillMostConstrainingBounds(_physicalLimits_);
 }
 
 void Parameter::setMinMirror(double minMirror) {
