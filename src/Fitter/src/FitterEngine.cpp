@@ -141,7 +141,7 @@ void FitterEngine::initializeImpl(){
   // and other properties)
   getMinimizer().initialize();
 
-  if(GundamGlobals::getVerboseLevel() >= MORE_PRINTOUT) checkNumericalAccuracy();
+  // if(GundamGlobals::getVerboseLevel() >= MORE_PRINTOUT) checkNumericalAccuracy();
 
   // Write data
   LogInfo << "Writing propagator objects..." << std::endl;

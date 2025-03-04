@@ -610,33 +610,55 @@ void DataDispenser::loadFromHistContent(){
     auto histName = GenericToolbox::Json::fetchValue<std::string>( entry, "hist" );
     LogInfo << "Filling sample \"" << sample->getName() << "\" using hist with name: " << histName << std::endl;
 
-    LogThrowIf( not GenericToolbox::Json::doKeyExist( entry, "axis" ), "No axis names provided for " << sample->getName() );
-    auto axisNameList = GenericToolbox::Json::fetchValue<std::vector<std::string>>(entry, "axis");
+    auto* histObject = fHist->Get( histName.c_str() );
 
-    auto* hist = fHist->Get<THnD>( histName.c_str() );
-    LogThrowIf( hist == nullptr, "Could not find THnD \"" << histName << "\" within " << fHist->GetPath() );
+    if( histObject->InheritsFrom("THnD") ) {
+      auto* hist = fHist->Get<THnD>( histName.c_str() );
+      LogThrowIf( hist == nullptr, "Could not find THnD \"" << histName << "\" within " << fHist->GetPath() );
 
-    int nBins = 1;
-    for( int iDim = 0 ; iDim < hist->GetNdimensions() ; iDim++ ){
-      nBins *= hist->GetAxis(iDim)->GetNbins();
-    }
+      LogThrowIf( not GenericToolbox::Json::doKeyExist( entry, "axis" ), "No axis names provided for " << sample->getName() );
+      auto axisNameList = GenericToolbox::Json::fetchValue<std::vector<std::string>>(entry, "axis");
 
-    LogAlertIf( nBins != int( sample->getBinning().getBinList().size() ) ) <<
-                                                                           "Mismatching bin number for " << sample->getName() << ":" << std::endl
-                                                                           << GET_VAR_NAME_VALUE(nBins) << std::endl
-                                                                           << GET_VAR_NAME_VALUE(sample->getBinning().getBinList().size()) << std::endl;
-
-    auto* container = &sample->getDataContainer();
-    for( size_t iBin = 0 ; iBin < sample->getBinning().getBinList().size() ; iBin++ ){
-      auto target = sample->getBinning().getBinList()[iBin].generateBinTarget( axisNameList );
-      auto histBinIndex = hist->GetBin( target.data() ); // bad fetch..?
-
-      container->eventList[iBin].setSampleIndex( sample->getIndex() );
-      for( size_t iVar = 0 ; iVar < target.size() ; iVar++ ){
-        container->eventList[iBin].setVariable( target[iVar], axisNameList[iVar] );
+      int nBins = 1;
+      for( int iDim = 0 ; iDim < hist->GetNdimensions() ; iDim++ ){
+        nBins *= hist->GetAxis(iDim)->GetNbins();
       }
-      container->eventList[iBin].setBaseWeight(hist->GetBinContent(histBinIndex));
-      container->eventList[iBin].resetEventWeight();
+
+      LogAlertIf( nBins != int( sample->getBinning().getBinList().size() ) ) <<
+                                                                             "Mismatching bin number for " << sample->getName() << ":" << std::endl
+                                                                             << GET_VAR_NAME_VALUE(nBins) << std::endl
+                                                                             << GET_VAR_NAME_VALUE(sample->getBinning().getBinList().size()) << std::endl;
+
+      auto* container = &sample->getDataContainer();
+      for( size_t iBin = 0 ; iBin < sample->getBinning().getBinList().size() ; iBin++ ){
+        auto target = sample->getBinning().getBinList()[iBin].generateBinTarget( axisNameList );
+        auto histBinIndex = hist->GetBin( target.data() ); // bad fetch..?
+
+        container->eventList[iBin].setSampleIndex( sample->getIndex() );
+        for( size_t iVar = 0 ; iVar < target.size() ; iVar++ ){
+          container->eventList[iBin].setVariable( target[iVar], axisNameList[iVar] );
+        }
+        container->eventList[iBin].setBaseWeight(hist->GetBinContent(histBinIndex));
+        container->eventList[iBin].resetEventWeight();
+      }
+    }
+    else if( histObject->InheritsFrom("TH1D") ){
+
+      auto* hist = fHist->Get<TH1D>( histName.c_str() );
+      LogThrowIf( hist == nullptr, "Could not find TH1D \"" << histName << "\" within " << fHist->GetPath() );
+
+      int nBins = hist->GetNbinsX();
+      LogAlertIf( nBins != int( sample->getBinning().getBinList().size() ) )
+      << "Mismatching bin number for " << sample->getName() << ":" << std::endl
+      << GET_VAR_NAME_VALUE(nBins) << std::endl
+      << GET_VAR_NAME_VALUE(sample->getBinning().getBinList().size()) << std::endl;
+
+      auto* container = &sample->getDataContainer();
+      for( size_t iBin = 0 ; iBin < sample->getBinning().getBinList().size() ; iBin++ ){
+        container->eventList[iBin].setSampleIndex( sample->getIndex() );
+        container->eventList[iBin].setBaseWeight(hist->GetBinContent(iBin+1));
+        container->eventList[iBin].resetEventWeight();
+      }
     }
 
   }
