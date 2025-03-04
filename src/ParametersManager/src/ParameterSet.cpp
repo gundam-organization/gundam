@@ -424,10 +424,22 @@ void ParameterSet::throwParameters(bool rethrowIfNotInPhysical_, double gain_){
   std::function<void(std::function<void()>)> throwParsFct =
       [&](const std::function<void()>& throwFct_){
 
+        LogInfo << "Throwing parameters for: " << getName() << std::endl;
+        LogWarningIf(gain_!=1) << "Throw gain is " << gain_ << std::endl;
+
         int nTries{0};
         while( true ){
           ++nTries;
+
+          if( nTries > 1000 ){
+            LogExit("Failed to find valid throw");
+          }
+
           throwFct_();
+
+          // assuming
+          int nThrowsOutOfBounds{0};
+          LogInfo << "Check that thrown parameters are within bounds..." << std::endl;
 
           // throws with this function are always done in real space.
           int iFit{-1};
@@ -435,38 +447,22 @@ void ParameterSet::throwParameters(bool rethrowIfNotInPhysical_, double gain_){
             if( ParameterSet::isValidCorrelatedParameter(par) ){
               iFit++;
               par.setThrowValue( par.getPriorValue() + gain_*throwsList[iFit] );
+              if( not par.getThrowLimits().isInBounds(par.getThrowValue()) ){
+                nThrowsOutOfBounds++;
+                LogWarning << par.getTitle() << " was thrown out of limits: "
+                << par.getThrowValue() << " -> " << par.getThrowLimits() << std::endl;
+              }
             }
           }
 
-          bool throwIsValid = true; // default case
-          LogInfo << "Check that thrown parameters are within bounds..."
-                  << std::endl;
-
-          for( auto& par : this->getParameterList() ){
-            if( not ParameterSet::isValidCorrelatedParameter(par) ) continue;
-            if( not par.getThrowLimits().isInBounds(par.getThrowValue()) ){
-              throwIsValid = false;
-              LogAlert << "Thrown value isn't within limits -> " << par.getThrowValue() << " -> "
-                       << par.getSummary() << std::endl;
-              break;
-            }
-
-            if( not rethrowIfNotInPhysical_ ) continue;
-            if( not par.getPhysicalLimits().isInBounds(par.getThrowValue()) ) {
-              throwIsValid = false;
-              LogAlert << "Thrown value isn't within physical limits -> " << par.getThrowValue() << " -> "
-                       << par.getSummary() << std::endl;
-              break;
-            }
-          }
-
-          if (not throwIsValid) {
-            LogAlert << "Rethrowing \"" << this->getName() << "\"... try #" << nTries+1 << std::endl;
-            LogThrowIf(nTries > 10000, "Failed to find valid throw");
+          if( nThrowsOutOfBounds != 0 ){
+            LogAlert << nThrowsOutOfBounds << " parameter were found out of set limits."
+            << " Rethrowing \"" << this->getName() << "\"... try #" << nTries+1 << std::endl;
             continue;
           }
 
           // Throw looks OK, so set the parameter values.
+          LogInfoIf(nTries!=1) << "Keeping throw after " << nTries << " tries." << std::endl;
           for( auto& par : this->getParameterList() ){
             if( ParameterSet::isValidCorrelatedParameter(par) ){
               par.setParameterValue(par.getThrowValue());
@@ -483,18 +479,35 @@ void ParameterSet::throwParameters(bool rethrowIfNotInPhysical_, double gain_){
           }
 
           // alright at this point it's fine, print them
+          GenericToolbox::TablePrinter t;
+          t.setColTitles({{"Parameter"}, {"Prior"}, {"StdDev"}, {"ThrowLimits"}, {"Thrown"}});
           for( auto& par : _parameterList_ ){
             if( ParameterSet::isValidCorrelatedParameter(par) ){
-              LogInfo << "Thrown par " << par.getTitle() << ": " << par.getPriorValue();
-              LogInfo << " becomes " << par.getParameterValue() << std::endl;
+              t.addTableLine({
+                par.getTitle(),
+                std::to_string(par.getPriorValue()),
+                std::to_string(par.getStdDevValue()),
+                par.getThrowLimits().toString(),
+                std::to_string(par.getThrowValue())
+              });
             }
           }
+          t.printTable();
+
           if( isEnableEigenDecomp() ){
             LogInfo << "Translated to eigen space:" << std::endl;
+            t.reset();
+            t.setColTitles({{"Eigen"}, {"Prior"}, {"StdDev"}, {"ThrowLimits"}, {"Thrown"}});
             for( auto& eigenPar : _eigenParameterList_ ){
-              LogInfo << "Eigen par " << eigenPar.getTitle() << ": " << eigenPar.getPriorValue();
-              LogInfo << " becomes " << eigenPar.getParameterValue() << std::endl;
+              t.addTableLine({
+                eigenPar.getTitle(),
+                std::to_string(eigenPar.getPriorValue()),
+                std::to_string(eigenPar.getStdDevValue()),
+                eigenPar.getThrowLimits().toString(),
+                std::to_string(eigenPar.getThrowValue())
+              });
             }
+            t.printTable();
           }
           break;
         }
@@ -584,8 +597,11 @@ void ParameterSet::throwParameters(bool rethrowIfNotInPhysical_, double gain_){
           if( ParameterSet::isValidCorrelatedParameter(par) ){
             iFit++;
             _correlatedVariableThrower_.getParLimitList().at(iFit) = par.getThrowLimits();
+            // cancel the prior
+            _correlatedVariableThrower_.getParLimitList().at(iFit) -= par.getPriorValue();
           }
         }
+        _correlatedVariableThrower_.setNbMaxTries(100);
         _correlatedVariableThrower_.extractBlocks();
       }
 
