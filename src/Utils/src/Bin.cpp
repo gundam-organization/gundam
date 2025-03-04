@@ -109,20 +109,18 @@ double Bin::getVolume() const{
 
 // Management
 bool Bin::isOverlapping( const Bin& other_) const{
-  std::vector<std::string> varNameList{this->buildVariableNameList()};
-  GenericToolbox::mergeInVector(varNameList, other_.buildVariableNameList());
 
-  // is overlapping only if all edges report "true"
+  // a bin is overlapping only if all matching edges are overlapping
+  // so we look for a pair of edges that don't overlap
 
-  for( auto& var : varNameList ){
-    auto* edgesPtr = this->getVarEdgesPtr(var);
-    if( edgesPtr == nullptr ){ continue; } // no condition, considered as a possible overlap
-
-    auto* edgesOtherPtr = other_.getVarEdgesPtr(var);
-    if( edgesOtherPtr == nullptr ){ continue; } // no condition, considered as a possible overlap
-
-    if( not edgesPtr->isOverlapping(*edgesOtherPtr) ){ return false; }
+  for( auto& edges : _binEdgesList_ ){
+    auto* otherEdgesPtr = other_.getVarEdgesPtr(edges.varName);
+    if( otherEdgesPtr == nullptr ){ continue; } // no condition, considered as a possible overlap
+    if( not edges.isOverlapping( *otherEdgesPtr ) ){ return false; }
   }
+
+  // why not looping over the other_._binEdgesList_ ?
+  // no use since we are only interested when there is matching
 
   // if reached this point, all edges reported an overlap
   return true;
@@ -168,6 +166,7 @@ bool Bin::isBetweenEdges( const Edges& edges_, double value_) const {
 }
 std::vector<std::string> Bin::buildVariableNameList() const{
   std::vector<std::string> out;
+  out.reserve( _binEdgesList_.size() );
   for( auto& edges : this->getEdgesList() ){
     GenericToolbox::addIfNotInVector(edges.varName, out);
   }

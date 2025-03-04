@@ -52,6 +52,7 @@ void DatasetDefinition::configureImpl() {
   GenericToolbox::Json::fillValue(_config_, _devSingleThreadEventLoaderAndIndexer_, "devSingleThreadEventLoaderAndIndexer");
   GenericToolbox::Json::fillValue(_config_, _devSingleThreadEventSelection_, "devSingleThreadEventSelection");
   GenericToolbox::Json::fillValue(_config_, _sortLoadedEvents_, "sortLoadedEvents");
+  GenericToolbox::Json::fillValue(_config_, _nbMaxThreadsForLoad_, "nbMaxThreadsForLoad");
 
 }
 void DatasetDefinition::initializeImpl() {
