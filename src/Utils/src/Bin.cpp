@@ -168,6 +168,7 @@ bool Bin::isBetweenEdges( const Edges& edges_, double value_) const {
 }
 std::vector<std::string> Bin::buildVariableNameList() const{
   std::vector<std::string> out;
+  out.reserve( _binEdgesList_.size() );
   for( auto& edges : this->getEdgesList() ){
     GenericToolbox::addIfNotInVector(edges.varName, out);
   }

@@ -33,9 +33,6 @@
 
 void DataDispenser::configureImpl(){
 
-  // first of all
-  _threadPool_.setNThreads(GundamGlobals::getNbCpuThreads(4) );
-
   GenericToolbox::Json::fillValue(_config_, _parameters_.name, "name");
   LogExitIf(_parameters_.name.empty(), "Dataset name not set.");
 
@@ -113,6 +110,8 @@ void DataDispenser::initializeImpl(){
     // default -> won't change the order
     return false;
   });
+
+  _threadPool_.setNThreads( GundamGlobals::getNbCpuThreads(_owner_->getNbMaxThreadsForLoad()) );
 
 }
 
@@ -227,7 +226,7 @@ void DataDispenser::doEventSelection(){
   ROOT::EnableThreadSafety();
 
   // how meaning buffers?
-  int nThreads{GundamGlobals::getNbCpuThreads(4)};
+  int nThreads{GundamGlobals::getNbCpuThreads(_owner_->getNbMaxThreadsForLoad())};
   if( _owner_->isDevSingleThreadEventSelection() ) { nThreads = 1; }
 
   Long64_t nEntries{0};
@@ -548,8 +547,8 @@ void DataDispenser::readAndFill(){
   }
 
   LogWarning << "Loading and indexing..." << std::endl;
-  if(not _owner_->isDevSingleThreadEventLoaderAndIndexer() and GundamGlobals::getNbCpuThreads(4) > 1 ){
-    threadSharedDataList.resize(GundamGlobals::getNbCpuThreads(4));
+  if(not _owner_->isDevSingleThreadEventLoaderAndIndexer() and GundamGlobals::getNbCpuThreads(_owner_->getNbMaxThreadsForLoad()) > 1 ){
+    threadSharedDataList.resize(GundamGlobals::getNbCpuThreads(_owner_->getNbMaxThreadsForLoad()));
     ROOT::EnableThreadSafety(); // EXTREMELY IMPORTANT
     _threadPool_.addJob(__METHOD_NAME__, [&](int iThread_){ this->runEventFillThreads(iThread_); });
     _threadPool_.runJob(__METHOD_NAME__);
@@ -729,7 +728,7 @@ std::shared_ptr<TChain> DataDispenser::openChain(bool verbose_){
 
 void DataDispenser::eventSelectionFunction(int iThread_){
 
-  int nThreads{GundamGlobals::getNbCpuThreads(4)};
+  int nThreads{GundamGlobals::getNbCpuThreads(_owner_->getNbMaxThreadsForLoad())};
   if( iThread_ == -1 ){ iThread_ = 0; nThreads = 1; }
 
   // Opening ROOT files and make a TChain
@@ -860,7 +859,7 @@ void DataDispenser::eventSelectionFunction(int iThread_){
 
 void DataDispenser::runEventFillThreads(int iThread_){
 
-  int nThreads = GundamGlobals::getNbCpuThreads(4);
+  int nThreads = GundamGlobals::getNbCpuThreads(_owner_->getNbMaxThreadsForLoad());
   if( iThread_ == -1 ){ iThread_ = 0; nThreads = 1; } // special mode
 
   // init shared data
@@ -1143,6 +1142,13 @@ void DataDispenser::loadEvent(int iThread_){
       [&]{ threadSharedData.isEventFillerReady.setValue( false ); }
   };
 
+  std::vector<const TObject**> dialAddressList{};
+  int maxIdx{-1};
+  for( auto *dialCollectionRef: _cache_.dialCollectionsRefList ) {
+    maxIdx = std::max(dialCollectionRef->getIndex(), maxIdx);
+  }
+  dialAddressList.resize(maxIdx + 1, nullptr);
+
   while( true ){
 
     {
@@ -1223,9 +1229,13 @@ void DataDispenser::loadEvent(int iThread_){
         }
 
         // grab as a general TObject, then let the factory figure out what to do with it
-        auto* dialExpression = threadSharedData.treeBuffer.getExpressionBuffer( dialCollectionRef->getDialLeafName() );
-        if( dialExpression == nullptr ){ continue; }
-        auto *dialObjectPtr = dialExpression->getBuffer().getValue<const TObject*>();
+        if( dialAddressList[dialCollectionRef->getIndex()] == nullptr ) {
+          // this takes time, buffering
+          auto* dialExpression = threadSharedData.treeBuffer.getExpressionBuffer( dialCollectionRef->getDialLeafName() );
+          LogThrowIf( dialExpression == nullptr );
+          dialAddressList[dialCollectionRef->getIndex()] = (const TObject**) dialExpression->getBuffer().getPlaceHolderPtr()->getVariableAddress();
+        }
+        const TObject* dialObjectPtr = *dialAddressList[dialCollectionRef->getIndex()];
 
         // Extra-step for selecting the right dial with TClonesArray
         if( not strcmp(dialObjectPtr->ClassName(), "TClonesArray")){
