@@ -121,9 +121,6 @@ void ParameterSet::configureImpl(){
 void ParameterSet::initializeImpl() {
   for( auto& par : _parameterList_ ){
     par.initialize();
-//    if( _printParametersSummary_ and par.isEnabled() ){
-//      LogInfo << par.getSummary(not _printDialSetsSummary_) << std::endl;
-//    }
   }
 
   // Make the matrix inversion
@@ -326,16 +323,6 @@ void ParameterSet::processCovarianceMatrix(){
     _originalParBuffer_ = std::make_shared<TVectorD>(_priorCovarianceMatrix_->GetNrows() );
     _eigenParBuffer_    = std::make_shared<TVectorD>(_priorCovarianceMatrix_->GetNrows() );
 
-//    LogAlert << "Disabling par/dial limits" << std::endl;
-//    for( auto& par : _parameterList_ ){
-//      par.setMinValue(std::nan(""));
-//      par.setMaxValue(std::nan(""));
-//      for( auto& dialSet : par.getDialSetList() ){
-//        dialSet.setMinDialResponse(std::nan(""));
-//        dialSet.setMaxDialResponse(std::nan(""));
-//      }
-//    }
-
     // Put original parameters to the prior
     for( auto& par : _parameterList_ ){
       par.setValueAtPrior();
@@ -424,7 +411,6 @@ void ParameterSet::throwParameters(bool rethrowIfNotInPhysical_, double gain_){
   std::function<void(std::function<void()>)> throwParsFct =
       [&](const std::function<void()>& throwFct_){
 
-        LogInfo << "Throwing parameters for: " << getName() << std::endl;
         LogWarningIf(gain_!=1) << "Throw gain is " << gain_ << std::endl;
 
         int nTries{0};
@@ -601,7 +587,7 @@ void ParameterSet::throwParameters(bool rethrowIfNotInPhysical_, double gain_){
             _correlatedVariableThrower_.getParLimitList().at(iFit) -= par.getPriorValue();
           }
         }
-        _correlatedVariableThrower_.setNbMaxTries(10000);
+        _correlatedVariableThrower_.setNbMaxTries(100000); // could be a user parameter
         _correlatedVariableThrower_.extractBlocks();
       }
 
