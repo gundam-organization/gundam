@@ -74,22 +74,16 @@ private:
     /// computation
     bool fForceCpuCalculation{false};
 
-    // Pointers to the Propagator member the CacheManger has to take care of
-    SampleSet* fSampleSetPtr{nullptr};
-    EventDialCache* fEventDialCachePtr{nullptr};
-
     /// A map between the fit parameter pointers and the parameter index used
     /// by the fitter.
     std::map<const Parameter*, int> ParameterMap{};
 
     /// True if the histogram content should be copied back from the GPU.
-    /// This should almost always be true.  This should be a private class
-    /// field.
+    /// This should almost always be true.
     bool fIsHistContentCopyEnabled{true};
 
     /// True if the individual event weights should be copied back from the
-    /// GPU.  This should almost always be false.  This should be a private
-    /// class field.
+    /// Cache::Manager.  This should almost always be false.
     bool fIsEventWeightCopyEnabled{false};
 
     /// Declare all of the actual GPU caches here.  There is one GPU, so this
@@ -107,56 +101,19 @@ private:
 
 public:
 
-  // static setters
-  static void SetIsEnabled(bool enable_){ fParameters.fIsEnabled = enable_; }
-  static void setIsForceCpuCalculation(bool enable_){ fParameters.fForceCpuCalculation = enable_; }
-
-  // static getters
-  static bool isCacheManagerEnabled(){ return fParameters.fIsEnabled; }
-  static bool isForceCpuCalculation(){ return fParameters.fForceCpuCalculation; }
-
-  // Get the pointer to the cache manager.  This will be a nullptr if the
-  // cache is not being used.
+  /// Get the pointer to the cache manager.  This will be a nullptr if the
+  /// cache is not being used or hasn't been constructed.
   static Manager* Get(){ return fParameters.fSingleton; }
 
-  /// Fill the cache for the current iteration.  This needs to be called
-  /// before the cached weights can be used.  This is used in Propagator.cpp.
-  static bool Fill();
+  ///////////////////////////////////////////////////////////////
+  // Static functions to set control parameters.  These are static since they
+  // may be called during the program configuration before the Cache::Manager
+  // is constructed.
+  ///////////////////////////////////////////////////////////////
 
-  /// Set addresses of the Propagator objects the CacheManager should take care of
-  static void SetSampleSetPtr(SampleSet& sampleSet_) {
-    LogThrowIf(fParameters.fSampleSetPtr != nullptr,
-               "Cache::Manager attempt to reset SampleSetPtr");
-    fParameters.fSampleSetPtr = &sampleSet_;
-  }
-  static void SetEventDialSetPtr(EventDialCache& eventDialCache_) {
-    LogThrowIf(fParameters.fEventDialCachePtr != nullptr,
-               "Cache::Manager attempt to reset EventDialCachePtr");
-    fParameters.fEventDialCachePtr = &eventDialCache_;
-  }
-  static void SetIsHistContentCopyEnabled(bool fIsHistContentCopyEnabled_){ fParameters.fIsHistContentCopyEnabled = fIsHistContentCopyEnabled_; }
-  static void SetIsEventWeightCopyEnabled(bool fIsEventWeightCopyEnabled_){ fParameters.fIsEventWeightCopyEnabled = fIsEventWeightCopyEnabled_; }
-  static void SetEnableDebugPrintouts(bool fEnableDebugPrintouts_){ fParameters.fEnableDebugPrintouts = fEnableDebugPrintouts_; }
-
-  static const GenericToolbox::Time::AveragedTimer<10>& GetCacheFillTimer() { return fParameters.cacheFillTimer; }
-  static const GenericToolbox::Time::AveragedTimer<10>& GetPullFromDeviceTimer() { return fParameters.pullFromDeviceTimer; }
-
-  /// Build the cache and load it into the device.  This is used to construct
-  /// the Cache::Manager singleton, and copy the event information to the
-  /// device.  This will use Update to fill the event and spline information.
-  static bool Build(SampleSet& sampleSet, EventDialCache& eventDialCache);
-
-  /// Update the cache with the event and spline information.  This is called
-  /// as part of Build.  It forages all of the information from the original
-  /// sample list and event dials.
-  bool Update(SampleSet& sampleSet, EventDialCache& eventDialCache);
-
-  /// This returns the index of the parameter in the cache.  If the
-  /// parameter isn't defined, this will return a negative value.
-  static int ParameterIndex(const Parameter* fp);
-
-  /// Return true if CUDA was used during compilation.  Necessary for
-  /// running a GPU.
+  /// Return true if CUDA was used during compilation.  CUDA is required to
+  /// run on the GPU, but the Cache::Manager does not require a GPU to run the
+  /// calculation (slowly).
   static bool HasCUDA();
 
   /// Return true if a GPU is available at runtime.  This checks if a device
@@ -164,27 +121,103 @@ public:
   /// Cache::Manager.
   static bool HasGPU(bool dump = false);
 
+  /// Check if the caches for the manager have been built and the
+  /// Cache::Manager will be used to fill the weights and histograms.  This
+  /// will only be true when the Cache::Manager is enabled, and the
+  /// Cache::Manager::Build() method has been called.
+  static bool IsBuilt() {
+    if (Cache::Manager::Get() == nullptr) return false;
+    if (Cache::Manager::Get()->fUpdateRequired) return false;
+    return true;
+  }
+
+  /// The Cache::Manager has been enabled (usually based on command line, or
+  /// compilation options), and should be built.
+  static void SetIsEnabled(bool enable_){ fParameters.fIsEnabled = enable_; }
+
+  /// Provide a convenient place to save that the CPU event weight calculation
+  /// should be run, even if the GPU has already calculated the event weights
+  /// and filled the histograms.  This doesn't change the behavior of the
+  /// Cache::Manager.
+  static void SetIsForceCpuCalculation(bool enable_){ fParameters.fForceCpuCalculation = enable_; }
+
+  /// Predicate to check if the Cache::Manager is enabled and should be built.
+  /// This is only used in the Cache::Manager.  User code should use
+  /// Cache::Manager::IsBuilt() which checks if the manager is ready to run.
+  static bool IsCacheManagerEnabled(){ return fParameters.fIsEnabled; }
+
+  /// Predicate to check if the Propagator should also calculate the weights
+  /// using the CPU.
+  static bool IsForceCpuCalculation(){ return fParameters.fForceCpuCalculation; }
+
+  /// Used to set the flag that the histogram results should be copied from
+  /// the Cache::Manager into the GUNDAM histogram object.
+  static void SetIsHistContentCopyEnabled(bool fIsHistContentCopyEnabled_){ fParameters.fIsHistContentCopyEnabled = fIsHistContentCopyEnabled_; }
+
+  /// Use to set the flag that the event weight results should be copied from
+  /// the Cache::Manager into GUNDAM event weights.
+  static void SetIsEventWeightCopyEnabled(bool fIsEventWeightCopyEnabled_){ fParameters.fIsEventWeightCopyEnabled = fIsEventWeightCopyEnabled_; }
+
+  /// Set the debug output.
+  static void SetEnableDebugPrintouts(bool fEnableDebugPrintouts_){ fParameters.fEnableDebugPrintouts = fEnableDebugPrintouts_; }
+
+  /// Get the timer for the time that Cache::Manager spends passing
+  /// information needed to fill the histograms, and triggering the
+  /// propagation.
+  static const GenericToolbox::Time::AveragedTimer<10>& GetCacheFillTimer() { return fParameters.cacheFillTimer; }
+
+  /// Get the timer for the time spent waiting for the Cache::Manager to
+  /// finish the calculation.
+  static const GenericToolbox::Time::AveragedTimer<10>& GetPullFromDeviceTimer() { return fParameters.pullFromDeviceTimer; }
+
+  /////////////////////////////////////////////////////////////////////
+  // Methods used to run the Cache::Manager during the calculation.
+  /////////////////////////////////////////////////////////////////////
+
+  /// Build the cache and load it into the device.  This is used to construct
+  /// the Cache::Manager singleton, and copy the event information to the
+  /// device.  This will use Update to fill the event and spline information.
+  static bool Build(SampleSet& sampleSet, EventDialCache& eventDialCache);
+
+  /// Same as Propagator::propagateParameters().  This is a convenient way to
+  /// fill the event weights and the histograms, but it will block until the
+  /// Cache::Manager calculation is completed.
+  static bool PropagateParameters();
+
+  /// Copy the event weights from the Cache::Manager into the GUNDAM event
+  /// weight classes.  This will block if the Cache::Manager calculation
+  /// has not finished.
+  static bool CopyEventWeights();
+
+  /// Copy the histogram contents from the Cache::Manager into the GUNDAM
+  /// histogram objects.  This will block if the Cache::Manager calculation
+  /// has not finished.
+  static bool CopyHistogramContents();
+
+  /// Validate the local copy of the histogram contents against the last
+  /// weight calculation.  The quiet parameter controls how much output
+  /// happens during the dump.  The default is pretty loud when there is a
+  /// problem.
+  static bool ValidateHistogramContents(int quiet=1);
+
+  /// This returns the index of the parameter in the cache.  If the parameter
+  /// isn't defined, this will return a negative value.  This is meant as a
+  /// convenience function for use outside of Cache::Manager (and probably
+  /// isn't used).
+  static int ParameterIndex(const Parameter* fp);
+
+  /// Update the cache with the event and spline information.  This is called
+  /// as part of Build.  It forages all of the information from the original
+  /// sample list and event dials.
+  bool Update(SampleSet& sampleSet, EventDialCache& eventDialCache);
+
+  /// Fill the cache for the current iteration.  This needs to be called
+  /// before the cached weights can be used.  This is used in Propagator.cpp.
+  bool Fill();
+
   /// Return the approximate allocated memory used by the Cache.  This memory
   /// is mirrored on both the CPU and GPU.
   [[nodiscard]] std::size_t GetResidentMemory() const {return fTotalBytes;}
-
-  /// Same as Propagator::propagateParameters()
-  static bool PropagateParameters();
-
-  /// Copy the event weights from the GPU to the CPU
-  static bool CopyEventWeights();
-
-  /// Copy the histogram contents from the GPU to the CPU.
-  static bool CopyHistogramContents();
-
-  /// Validate local copy of the histogram contents against the last GPU
-  /// calculation.
-  static bool ValidateHistogramContents(int quiet=1);
-
-  /// Check if the caches for the manager have been built.  This will only be
-  /// true when the Cache::Manager is enabled, and the Cache::Manager::Build()
-  /// method has been called.
-  static bool IsBuilt() {return Cache::Manager::Get() != nullptr;;}
 
 private:
 

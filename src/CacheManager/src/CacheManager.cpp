@@ -177,19 +177,13 @@ bool Cache::Manager::HasGPU(bool dump) {
 
 bool Cache::Manager::Build(SampleSet& sampleSet,
                            EventDialCache& eventDialCache) {
-  if (not isCacheManagerEnabled()) return false;
+  if (not IsCacheManagerEnabled()) return false;
 
   // Make sure that the Cache::Manager hasn't already been built.  Rebuilding
   // isn't supported since we are talking about GB blocks of memory on the GPU
   // and this should only be used with static initialization.
   LogThrowIf(Cache::Manager::Get() != nullptr,
              "Overwriting Cache::Manager");
-
-  LogThrowIf(fParameters.fSampleSetPtr != &sampleSet,
-             "fSampleSetPtr has changed or is null");
-
-  LogThrowIf(fParameters.fEventDialCachePtr != &eventDialCache,
-             "fEventDialCachePtr has changed or is null");
 
   LogInfo << "Build the internal caches " << std::endl;
 
@@ -400,7 +394,7 @@ bool Cache::Manager::Build(SampleSet& sampleSet,
 
   // Try to allocate the Cache::Manager memory (including for the GPU if
   // it's being used).
-  if( Cache::Manager::Get() == nullptr and isCacheManagerEnabled() ){
+  if( Cache::Manager::Get() == nullptr and IsCacheManagerEnabled() ){
     LogInfo << "Creating the Cache::Manager" << std::endl;
     if (!Cache::Manager::HasCUDA()) {
       LogInfo << "    GPU Not enabled with Cache::Manager"
@@ -426,11 +420,11 @@ bool Cache::Manager::Build(SampleSet& sampleSet,
 
   LogThrowIf(Cache::Manager::Get()->fSampleSet != nullptr,
              "Cannot change Cache::Manager SampleSet");
-  Cache::Manager::Get()->fSampleSet = fParameters.fSampleSetPtr;
+  Cache::Manager::Get()->fSampleSet = &sampleSet;
 
   LogThrowIf(Cache::Manager::Get()->fEventDialCache != nullptr,
              "Cannot change Cache::Manager EventDialCache");
-  Cache::Manager::Get()->fEventDialCache = fParameters.fEventDialCachePtr;
+  Cache::Manager::Get()->fEventDialCache = &eventDialCache;
 
   Cache::Manager::Get()->fUpdateRequired = true;
 
@@ -440,14 +434,6 @@ bool Cache::Manager::Build(SampleSet& sampleSet,
 }
 
 bool Cache::Manager::Update(SampleSet& sampleSet, EventDialCache& eventDialCache) {
-  LogThrowIf(
-      fSampleSet != fParameters.fSampleSetPtr,
-      "Cannot change Cache::Manager SampleSet");
-
-  LogThrowIf(
-      fEventDialCache != fParameters.fEventDialCachePtr,
-      "Cannot change Cache::Manager EventDialCache");
-
   LogThrowIf(
       fSampleSet != &sampleSet,
       "Cannot change Cache::Manager SampleSet");
@@ -704,19 +690,11 @@ bool Cache::Manager::Update(SampleSet& sampleSet, EventDialCache& eventDialCache
 }
 
 bool Cache::Manager::Fill() {
-  Cache::Manager* cache = Cache::Manager::Get();
-  if (!cache) return false;
-  if (cache->fUpdateRequired) {
+  if (fUpdateRequired) {
     LogError << "Fill while an update is required" << std::endl;
     LogThrow("Fill while an update is required");
   }
   LogTraceIf(GundamGlobals::isDebug() ) << "Cache::Manager::Fill -- Fill the GPU cache" << std::endl;
-  LogThrowIf(
-      Cache::Manager::Get()->fSampleSet != fParameters.fSampleSetPtr,
-      "Cannot change Cache::Manager SampleSet");
-  LogThrowIf(
-      Cache::Manager::Get()->fEventDialCache != cache->fEventDialCache,
-      "Cannot change Cache::Manager EventDialCache");
 #define DUMP_FILL_INPUT_PARAMETERS
 #ifdef DUMP_FILL_INPUT_PARAMETERS
   do {
@@ -734,8 +712,8 @@ bool Cache::Manager::Fill() {
     }
   } while(false);
 #endif
-  cache->GetWeightsCache().Invalidate();
-  cache->GetHistogramsCache().Invalidate();
+  GetWeightsCache().Invalidate();
+  GetHistogramsCache().Invalidate();
   for (auto& par : fParameters.ParameterMap ) {
     if (not par.first->isEnabled()) {
       LogWarning << "WARNING: Disabled parameter: "
@@ -745,11 +723,11 @@ bool Cache::Manager::Fill() {
                  << std::endl;
       return false;
     }
-    cache->GetParameterCache().SetParameter(
+    GetParameterCache().SetParameter(
         par.second, par.first->getParameterValue());
   }
-  cache->GetWeightsCache().Apply();
-  cache->GetHistogramsCache().Apply();
+  GetWeightsCache().Apply();
+  GetHistogramsCache().Apply();
 
   return true;
 }
@@ -768,7 +746,7 @@ bool Cache::Manager::PropagateParameters(){
     }
 
     // do the propagation on the device
-    isSuccess = Cache::Manager::Fill();
+    isSuccess = Cache::Manager::Get()->Fill();
     if (not isSuccess) return false;
   }
 
@@ -791,6 +769,7 @@ bool Cache::Manager::PropagateParameters(){
   }
   return true;
 }
+
 bool Cache::Manager::CopyEventWeights(){
 
   if( not Cache::Manager::Get()->GetWeightsCache().IsResultValid() ){
@@ -805,6 +784,7 @@ bool Cache::Manager::CopyEventWeights(){
 
   return true;
 }
+
 bool Cache::Manager::CopyHistogramContents(){
 
   for( auto& histFiller : fParameters.fSampleHistFillerList ){

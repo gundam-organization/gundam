@@ -140,7 +140,7 @@ void Propagator::propagateParameters(){
   // Trigger the reweight on the GPU.  This will fill the histograms, but most
   // of the time, leaves the event weights on the GPU.
   usedCacheManager = Cache::Manager::PropagateParameters();
-  if(usedCacheManager and not Cache::Manager::isForceCpuCalculation()) return;
+  if(usedCacheManager and not Cache::Manager::IsForceCpuCalculation()) return;
 #endif
 
   // Trigger the reweight on the CPU.  Override the dial update inside of
@@ -150,7 +150,7 @@ void Propagator::propagateParameters(){
   this->refillHistograms();
 
 #ifdef GUNDAM_USING_CACHE_MANAGER
-  if (usedCacheManager and Cache::Manager::isForceCpuCalculation()) {
+  if (usedCacheManager and Cache::Manager::IsForceCpuCalculation()) {
     bool valid = Cache::Manager::ValidateHistogramContents();
     if (not valid) {
       LogError << GundamUtils::Backtrace;
@@ -295,9 +295,6 @@ void Propagator::initializeCacheManager(){
   // the MC has been copied for the Asimov fit, or the "data" use the MC
   // reweighting cache.  This must also be before the first use of
   // reweightMcEvents that is done using the GPU.
-  Cache::Manager::SetSampleSetPtr( _sampleSet_ );
-  Cache::Manager::SetEventDialSetPtr( _eventDialCache_ );
-
   Cache::Manager::Build(_sampleSet_, _eventDialCache_);
 
   // By default, make sure every data is copied to the CPU part

@@ -142,7 +142,7 @@ int main(int argc, char** argv){
   // decision has been made
   Cache::Manager::SetIsEnabled( useCacheManager );
 
-  Cache::Manager::setIsForceCpuCalculation( clParser.isOptionTriggered("forceDirect") );
+  Cache::Manager::SetIsForceCpuCalculation( clParser.isOptionTriggered("forceDirect") );
   Cache::Manager::SetEnableDebugPrintouts( clParser.isOptionTriggered("debugVerbose") );
 #endif
 
