@@ -23,10 +23,10 @@ namespace DialUtils{
     double slope{std::nan("unset")};
   };
 
-  std::vector<DialPoint> getSplinePointList(const TObject* src_);
-  std::vector<DialPoint> getSplinePointList(const TGraph* src_);
-  std::vector<DialPoint> getSplinePointList(const TSpline3* src_);
-  std::vector<DialPoint> getSplinePointListNoSlope(const TGraph* src_);
+  std::vector<DialPoint> getPointList(const TObject* src_);
+  std::vector<DialPoint> getPointList(const TGraph* src_);
+  std::vector<DialPoint> getPointList(const TSpline3* src_);
+  std::vector<DialPoint> getPointListNoSlope(const TGraph* src_);
 
   void fillCatmullRomSlopes(std::vector<DialPoint>& splinePointList_);
   void fillAkimaSlopes(std::vector<DialPoint>& splinePointList_);

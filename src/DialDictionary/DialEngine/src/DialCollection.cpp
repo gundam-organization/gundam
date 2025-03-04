@@ -871,11 +871,11 @@ std::unique_ptr<DialBase> DialCollection::makeGraphDial(const TObject* src_) con
 
   std::vector<DialUtils::DialPoint> splinePointList{};
   if( src_->InheritsFrom(TGraph::Class()) ){
-    splinePointList = DialUtils::getSplinePointListNoSlope((TGraph *)src_);
+    splinePointList = DialUtils::getPointListNoSlope((TGraph *)src_);
   }
   else{
     // try something else (from TSpline3 for instance):
-    splinePointList = DialUtils::getSplinePointList(src_);
+    splinePointList = DialUtils::getPointList(src_);
   }
 
   checkDialPointList(splinePointList);
@@ -929,7 +929,7 @@ std::unique_ptr<DialBase> DialCollection::makeSplineDial(const TObject* src_) co
     unif >> uniformityTolerance;
   }
 
-  auto splinePointList = DialUtils::getSplinePointList(src_);
+  auto splinePointList = DialUtils::getPointList(src_);
   checkDialPointList(splinePointList);
 
   std::unique_ptr<DialBase> out;

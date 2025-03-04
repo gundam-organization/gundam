@@ -11,15 +11,15 @@
 
 namespace DialUtils{
 
-  std::vector<DialPoint> getSplinePointList(const TObject *src_){
+  std::vector<DialPoint> getPointList(const TObject *src_){
     if( src_ == nullptr ) return {};
 
-    if( src_->InheritsFrom(TGraph::Class()) ) { return getSplinePointList((TGraph *)src_); }
-    if( src_->InheritsFrom(TSpline3::Class()) ) { return getSplinePointList((TSpline3 *)src_); }
+    if( src_->InheritsFrom(TGraph::Class()) ) { return getPointList((TGraph *)src_); }
+    if( src_->InheritsFrom(TSpline3::Class()) ) { return getPointList((TSpline3 *)src_); }
 
     return {};
   }
-  std::vector<DialPoint> getSplinePointList(const TGraph *src_){
+  std::vector<DialPoint> getPointList(const TGraph *src_){
     if( src_ == nullptr ) return {};
 
     int nPt{src_->GetN()};
@@ -38,9 +38,9 @@ namespace DialUtils{
     }
 
     TSpline3 spline("", src_);
-    return getSplinePointList( &spline );
+    return getPointList( &spline );
   }
-  std::vector<DialPoint> getSplinePointList(const TSpline3 *src_){
+  std::vector<DialPoint> getPointList(const TSpline3 *src_){
     if( src_ == nullptr ) return {};
     if( src_->GetNp() == 0 ) return {};
 
@@ -72,7 +72,7 @@ namespace DialUtils{
 
     return out;
   }
-  std::vector<DialPoint> getSplinePointListNoSlope(const TGraph* src_){
+  std::vector<DialPoint> getPointListNoSlope(const TGraph* src_){
     if( src_ == nullptr ) { return {}; }
 
     int nPt{src_->GetN()};
