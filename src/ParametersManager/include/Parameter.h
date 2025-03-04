@@ -35,6 +35,9 @@ public:
   explicit Parameter(const ParameterSet* owner_): _owner_(owner_) {}
   Parameter() = delete; // Cannot be independently constructed.
 
+  void setOwner(const ParameterSet *owner_){ _owner_ = owner_; }
+  void setName(const std::string &name){ _name_ = name; }
+  void setPriorType(PriorType priorType){ _priorType_ = priorType; }
   void setIsEnabled(bool isEnabled){ _isEnabled_ = isEnabled; }
   void setIsFixed(bool isFixed){ _isFixed_ = isFixed; }
   void setIsEigen(bool isEigen){ _isEigen_ = isEigen; }
@@ -58,7 +61,7 @@ public:
   /// Record the minimum mirroring boundary being used by any dials for this
   /// parameter.  If this is set, then GUNDAM will constrain the parameter
   /// value passed to the likelihood to be greater than the mirror boundary,
-  /// while the input parameter value can continue outside of the bounds.
+  /// while the input parameter value can continue outside the bounds.
   void setMinMirror(double minMirror);
 
   /// Record the maximum mirroring boundary being used by any dials for this
@@ -71,10 +74,7 @@ public:
   /// if force is true, then it will only print warnings, otherwise it stops
   /// with EXIT_FAILURE.
   void setParameterValue(double parameterValue, bool force=false);
-  void setName(const std::string &name){ _name_ = name; }
   void setDialSetConfig(const JsonType &jsonConfig_);
-  void setOwner(const ParameterSet *owner_){ _owner_ = owner_; }
-  void setPriorType(PriorType priorType){ _priorType_ = priorType; }
 
   // const getters
   [[nodiscard]] bool isFree() const{ return _isFree_; }
