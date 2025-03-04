@@ -617,33 +617,50 @@ void DataDispenser::loadFromHistContent(){
     LogScopeIndent;
 
     auto* sampleHistDef = _parameters_.fromHistContent.getSampleHistPtr(sample->getName());
-    LogExitIf(sampleHistDef== nullptr, "Could not find sample histogram: " << sample->getName());
+    LogContinueIf(sampleHistDef== nullptr, "Could not find sample histogram: " << sample->getName());
 
     LogInfo << "Filling sample \"" << sample->getName() << "\" using hist with name: " << sampleHistDef->hist << std::endl;
 
-    auto* hist = fHist->Get<THnD>( sampleHistDef->hist.c_str() );
-    LogExitIf( hist == nullptr, "Could not find THnD \"" << sampleHistDef->hist << "\" within " << fHist->GetPath() );
+    auto* histObj = fHist->Get( sampleHistDef->hist.c_str() );
+    LogExitIf( histObj == nullptr, "Could not find TObject \"" << sampleHistDef->hist << "\" within " << fHist->GetPath() );
 
-    int nBins = 1;
-    for( int iDim = 0 ; iDim < hist->GetNdimensions() ; iDim++ ){
-      nBins *= hist->GetAxis(iDim)->GetNbins();
-    }
-
-    LogAlertIf( nBins != sample->getHistogram().getNbBins() )
-        << "Mismatching bin number for " << sample->getName() << ":" << std::endl
-        << GET_VAR_NAME_VALUE(nBins) << std::endl
-        << GET_VAR_NAME_VALUE(sample->getHistogram().getNbBins()) << std::endl;
-
-    for( int iBin = 0 ; iBin < sample->getHistogram().getNbBins() ; iBin++ ){
-      auto target = sample->getHistogram().getBinContextList()[iBin].bin.generateBinTarget( sampleHistDef->axisList );
-      auto histBinIndex = hist->GetBin( target.data() ); // bad fetch..?
-
-      sample->getEventList()[iBin].getIndices().sample = sample->getIndex();
-      for( size_t iVar = 0 ; iVar < target.size() ; iVar++ ){
-        sample->getEventList()[iBin].getVariables().fetchVariable(sampleHistDef->axisList[iVar]).set(target[iVar]);
+    if( histObj->InheritsFrom("THnD") ){
+      auto* hist = (THnD*) histObj;
+      int nBins = 1;
+      for( int iDim = 0 ; iDim < hist->GetNdimensions() ; iDim++ ){
+        nBins *= hist->GetAxis(iDim)->GetNbins();
       }
-      sample->getEventList()[iBin].getWeights().base = (hist->GetBinContent(histBinIndex));
-      sample->getEventList()[iBin].getWeights().resetCurrentWeight();
+
+      LogAlertIf( nBins != sample->getHistogram().getNbBins() )
+          << "Mismatching bin number for " << sample->getName() << ":" << std::endl
+          << GET_VAR_NAME_VALUE(nBins) << std::endl
+          << GET_VAR_NAME_VALUE(sample->getHistogram().getNbBins()) << std::endl;
+
+      for( int iBin = 0 ; iBin < sample->getHistogram().getNbBins() ; iBin++ ){
+        auto target = sample->getHistogram().getBinContextList()[iBin].bin.generateBinTarget( sampleHistDef->axisList );
+        auto histBinIndex = hist->GetBin( target.data() ); // bad fetch..?
+
+        sample->getEventList()[iBin].getIndices().sample = sample->getIndex();
+        for( size_t iVar = 0 ; iVar < target.size() ; iVar++ ){
+          sample->getEventList()[iBin].getVariables().fetchVariable(sampleHistDef->axisList[iVar]).set(target[iVar]);
+        }
+        sample->getEventList()[iBin].getWeights().base = (hist->GetBinContent(histBinIndex));
+        sample->getEventList()[iBin].getWeights().resetCurrentWeight();
+      }
+    }
+    else if(histObj->InheritsFrom("TH1D")){
+      auto* hist = (TH1D*) histObj;
+      int nBins = hist->GetNbinsX();
+      LogAlertIf( nBins != sample->getHistogram().getNbBins() )
+          << "Mismatching bin number for " << sample->getName() << ":" << std::endl
+          << GET_VAR_NAME_VALUE(nBins) << std::endl
+          << GET_VAR_NAME_VALUE(sample->getHistogram().getNbBins()) << std::endl;
+
+      for( int iBin = 0 ; iBin < sample->getHistogram().getNbBins() ; iBin++ ){
+        sample->getEventList()[iBin].getIndices().sample = sample->getIndex();
+        sample->getEventList()[iBin].getWeights().base = (hist->GetBinContent(iBin+1));
+        sample->getEventList()[iBin].getWeights().resetCurrentWeight();
+      }
     }
 
   }
