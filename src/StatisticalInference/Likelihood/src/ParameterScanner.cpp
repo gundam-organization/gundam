@@ -160,8 +160,8 @@ void ParameterScanner::scanParameter(Parameter& par_, TDirectory* saveDir_) {
   double highBound = origVal + _parameterSigmaRange_.max * par_.getStdDevValue();
 
   if( _useParameterLimits_ ){
-    lowBound = std::max(lowBound, par_.getMinValue());
-    highBound = std::min(highBound, par_.getMaxValue());
+    lowBound = std::max(lowBound, par_.getParameterLimits().min);
+    highBound = std::min(highBound, par_.getParameterLimits().max);
   }
 
   int offSet{0}; // offset help make sure the first point
@@ -457,8 +457,8 @@ void ParameterScanner::varyEvenRates(const std::vector<double>& paramVariationLi
       buffEvtRatesMap.emplace_back();
 
       double cappedParValue{par_.getPriorValue() + variationList_[iVar] * par_.getStdDevValue()};
-      cappedParValue = std::min(cappedParValue, par_.getMaxValue());
-      cappedParValue = std::max(cappedParValue, par_.getMinValue());
+      cappedParValue = std::min(cappedParValue, par_.getParameterLimits().max);
+      cappedParValue = std::max(cappedParValue, par_.getParameterLimits().min);
 
       par_.setParameterValue( cappedParValue );
       _likelihoodInterfacePtr_->getModelPropagator().propagateParameters();

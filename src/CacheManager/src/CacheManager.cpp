@@ -30,7 +30,7 @@
 #include "UniformSpline.h"
 #include "CompactSpline.h"
 #include "MonotonicSpline.h"
-#include "LightGraph.h"
+#include "Graph.h"
 #include "Bilinear.h"
 #include "Bicubic.h"
 #include "Shift.h"
@@ -242,7 +242,7 @@ bool Cache::Manager::Build() {
         ++config.compactSplines;
         config.compactPoints += dial->getDialData().size();
       }
-      else if (dialType.find("LightGraph") == 0) {
+      else if (dialType.find("Graph") == 0) {
         ++config.graphs;
         config.graphPoints += dial->getDialData().size();
       }
@@ -465,7 +465,7 @@ bool Cache::Manager::Update() {
     int dialErrorCount = 0;
     // Add each dial for the event to the GPU caches.
     for( auto& dialElem : elem.dialResponseCacheList ){
-      DialInputBuffer* dialInputs
+      auto* dialInputs
           = dialElem.dialInterface->getInputBufferRef();
 
       // Make sure all the used parameters are in the parameter
@@ -565,7 +565,7 @@ bool Cache::Manager::Update() {
             ->AddSpline(resultIndex,parIndex,
                         baseDial->getDialData());
       }
-      auto* lightGraph = dynamic_cast<const LightGraph*>(baseDial);
+      auto* lightGraph = dynamic_cast<const Graph*>(baseDial);
       if (lightGraph) {
         ++dialUsed;
         const Parameter* fp = &(dialInputs->getParameter(0));

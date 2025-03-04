@@ -666,24 +666,24 @@ void SimpleMcmc::adaptiveMakePrior(AdaptiveStepMCMC& mcmc,
       double lowBound = val-1.0*err;
       double highBound = val+1.0*err;
 
-      if(not std::isnan(par->getMinValue())) {
-        lowBound = std::max(lowBound, par->getMinValue());
+      if( par->getParameterLimits().hasLowerBound() ) {
+        lowBound = std::max(lowBound, par->getParameterLimits().min);
       }
-      if(not std::isnan(par->getMinMirror())) {
-        lowBound = std::max(lowBound, par->getMinMirror());
+      if( par->getMirrorRange().hasLowerBound() ){
+        lowBound = std::max(lowBound, par->getMirrorRange().min);
       }
-      if(not std::isnan(par->getMinPhysical())) {
-        lowBound = std::max(lowBound, par->getMinPhysical());
+      if( par->getPhysicalLimits().hasLowerBound() ){
+        lowBound = std::max(lowBound, par->getPhysicalLimits().min);
       }
 
-      if(not std::isnan(par->getMaxValue())) {
-        highBound = std::min(highBound, par->getMaxValue());
+      if( par->getParameterLimits().hasUpperBound() ) {
+        highBound = std::min(highBound, par->getParameterLimits().max);
       }
-      if(not std::isnan(par->getMaxMirror())) {
-        highBound = std::min(highBound, par->getMaxMirror());
+      if( par->getMirrorRange().hasUpperBound() ){
+        highBound = std::min(highBound, par->getMirrorRange().max);
       }
-      if(not std::isnan(par->getMaxPhysical())) {
-        highBound = std::min(highBound, par->getMaxPhysical());
+      if( par->getPhysicalLimits().hasUpperBound() ){
+        highBound = std::min(highBound, par->getPhysicalLimits().max);
       }
 
       val = lowBound + r*(highBound-lowBound);
@@ -945,8 +945,8 @@ void SimpleMcmc::minimize() {
       parameterName.push_back(iPar.getTitle());
       parameterPrior.push_back(iPar.getPriorValue());
       parameterSigma.push_back(iPar.getStdDevValue());
-      parameterMin.push_back(iPar.getMinValue());
-      parameterMax.push_back(iPar.getMaxValue());
+      parameterMin.push_back(iPar.getParameterLimits().min);
+      parameterMax.push_back(iPar.getParameterLimits().max);
     }
     parameterSetCounts.push_back(countParameters);
   }
@@ -1051,33 +1051,33 @@ bool SimpleMcmc::hasValidParameterValues() const {
   for( auto& parSet: getModelPropagator().getParametersManager().getParameterSetsList() ){
     for( auto& par : parSet.getParameterList() ){
       if ( (_validFlags_ & 0b0001) != 0
-           and std::isfinite(par.getMinValue())
-           and par.getParameterValue() < par.getMinValue()) GUNDAM_UNLIKELY_COMPILER_FLAG {
+           and std::isfinite(par.getParameterLimits().min)
+           and par.getParameterValue() < par.getParameterLimits().min) GUNDAM_UNLIKELY_COMPILER_FLAG {
         ++invalid;
       }
       if ((_validFlags_ & 0b0001) != 0
-          and std::isfinite(par.getMaxValue())
-          and par.getParameterValue() > par.getMaxValue()) GUNDAM_UNLIKELY_COMPILER_FLAG {
+          and std::isfinite(par.getParameterLimits().max)
+          and par.getParameterValue() > par.getParameterLimits().max) GUNDAM_UNLIKELY_COMPILER_FLAG {
         ++invalid;
       }
       if ((_validFlags_ & 0b0010) != 0
-          and std::isfinite(par.getMinMirror())
-          and par.getParameterValue() < par.getMinMirror()) GUNDAM_UNLIKELY_COMPILER_FLAG {
+          and std::isfinite(par.getMirrorRange().min)
+          and par.getParameterValue() < par.getMirrorRange().min) GUNDAM_UNLIKELY_COMPILER_FLAG {
         ++invalid;
       }
       if ((_validFlags_ & 0b0010) != 0
-          and std::isfinite(par.getMaxMirror())
-          and par.getParameterValue() > par.getMaxMirror()) GUNDAM_UNLIKELY_COMPILER_FLAG {
+          and std::isfinite(par.getMirrorRange().max)
+          and par.getParameterValue() > par.getMirrorRange().max) GUNDAM_UNLIKELY_COMPILER_FLAG {
         ++invalid;
       }
       if ((_validFlags_ & 0b0100) != 0
-          and std::isfinite(par.getMinPhysical())
-          and par.getParameterValue() < par.getMinPhysical()) GUNDAM_UNLIKELY_COMPILER_FLAG {
+          and std::isfinite(par.getPhysicalLimits().min)
+          and par.getParameterValue() < par.getPhysicalLimits().min) GUNDAM_UNLIKELY_COMPILER_FLAG {
         ++invalid;
       }
       if ((_validFlags_ & 0b0100) != 0
-          and std::isfinite(par.getMaxPhysical())
-          and par.getParameterValue() > par.getMaxPhysical()) GUNDAM_UNLIKELY_COMPILER_FLAG {
+          and std::isfinite(par.getPhysicalLimits().max)
+          and par.getParameterValue() > par.getPhysicalLimits().max) GUNDAM_UNLIKELY_COMPILER_FLAG {
         ++invalid;
       }
 

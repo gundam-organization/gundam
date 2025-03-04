@@ -212,8 +212,8 @@ void FitterEngine::initializeImpl(){
       GenericToolbox::writeInTFileWithObjTypeExt( outDir, TNamed( "prior", std::to_string( par.getPriorValue() ).c_str() ) );
       GenericToolbox::writeInTFileWithObjTypeExt( outDir, TNamed( "stdDev", std::to_string( par.getStdDevValue() ).c_str() ) );
       GenericToolbox::writeInTFileWithObjTypeExt( outDir, TNamed( "priorType", std::to_string( par.getPriorType().value ).c_str() ) );
-      GenericToolbox::writeInTFileWithObjTypeExt( outDir, TNamed( "min", std::to_string( par.getMinValue() ).c_str() ) );
-      GenericToolbox::writeInTFileWithObjTypeExt( outDir, TNamed( "max", std::to_string( par.getMaxValue() ).c_str() ) );
+      GenericToolbox::writeInTFileWithObjTypeExt( outDir, TNamed( "min", std::to_string( par.getParameterLimits().min ).c_str() ) );
+      GenericToolbox::writeInTFileWithObjTypeExt( outDir, TNamed( "max", std::to_string( par.getParameterLimits().max ).c_str() ) );
     }
 
     if( parSet.isEnableEigenDecomp() ){
@@ -230,8 +230,8 @@ void FitterEngine::initializeImpl(){
         GenericToolbox::writeInTFileWithObjTypeExt( outDir, TNamed( "prior", std::to_string( eigen.getPriorValue() ).c_str() ) );
         GenericToolbox::writeInTFileWithObjTypeExt( outDir, TNamed( "stdDev", std::to_string( eigen.getStdDevValue() ).c_str() ) );
         GenericToolbox::writeInTFileWithObjTypeExt( outDir, TNamed( "priorType", std::to_string( eigen.getPriorType().value ).c_str() ) );
-        GenericToolbox::writeInTFileWithObjTypeExt( outDir, TNamed( "min", std::to_string( eigen.getMinValue() ).c_str() ) );
-        GenericToolbox::writeInTFileWithObjTypeExt( outDir, TNamed( "max", std::to_string( eigen.getMaxValue() ).c_str() ) );
+        GenericToolbox::writeInTFileWithObjTypeExt( outDir, TNamed( "min", std::to_string( eigen.getParameterLimits().min ).c_str() ) );
+        GenericToolbox::writeInTFileWithObjTypeExt( outDir, TNamed( "max", std::to_string( eigen.getParameterLimits().max ).c_str() ) );
       }
     }
   }
@@ -242,6 +242,31 @@ void FitterEngine::initializeImpl(){
   }
 
   getLikelihoodInterface().propagateAndEvalLikelihood();
+
+  LogInfo << "Writing sample histograms..." << std::endl;
+  auto writeSampleHistFct = [&](const Sample* samplePtr_, const std::string& tag_){
+    auto hist = std::make_unique<TH1D>(
+          "histogram",
+          Form("%s sample \"%s\"", tag_.c_str(), samplePtr_->getName().c_str()),
+          samplePtr_->getHistogram().getNbBins(),
+          0, samplePtr_->getHistogram().getNbBins()
+        );
+    for( int iBin = 1 ; iBin < hist->GetNbinsX()+1 ; iBin++ ){
+      hist->SetBinContent( iBin, samplePtr_->getHistogram().getBinContentList()[iBin-1].sumWeights );
+      hist->SetBinError( iBin, samplePtr_->getHistogram().getBinContentList()[iBin-1].sqrtSumSqWeights );
+    }
+    hist->GetXaxis()->SetTitle("Bin index");
+    hist->GetYaxis()->SetTitle("Rate");
+    hist->SetLineWidth(3);
+    GenericToolbox::writeInTFile(
+      GenericToolbox::TFilePath(_saveDir_, "preFit").getSubDir(tag_).getSubDir(samplePtr_->getName()).getDir(),
+      hist.get()
+    );
+  };
+  for( auto& samplePair : getLikelihoodInterface().getSamplePairList() ){
+    writeSampleHistFct(samplePair.model, "model");
+    writeSampleHistFct(samplePair.data, "data");
+  }
 
   if( not GundamGlobals::isLightOutputMode() ){
     getLikelihoodInterface().writeEvents( GenericToolbox::TFilePath(_saveDir_, "preFit") );

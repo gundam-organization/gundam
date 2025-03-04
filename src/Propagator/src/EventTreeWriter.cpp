@@ -90,12 +90,12 @@ template<typename T> void EventTreeWriter::writeEventsTemplate(const GenericTool
   auto* evPtr = EventTreeWriter::getEventPtr(eventList_[0]);
   if( evPtr != nullptr and evPtr->getVariables().getNameListPtr() != nullptr ){
     for( auto& varName : *EventTreeWriter::getEventPtr(eventList_[0])->getVariables().getNameListPtr() ){
-      lDict.emplace_back();
-      lDict.back().disableArray = true;
-
       auto& var = evPtr->getVariables().fetchVariable( varName ).get();
       char typeTag = GenericToolbox::findOriginalVariableType(var);
-      LogThrowIf( typeTag == 0 or typeTag == char(0xFF), varName << " has an invalid leaf type." );
+      LogContinueIf( typeTag == 0 or typeTag == char(0xFF), varName << " has an invalid leaf type." );
+
+      lDict.emplace_back();
+      lDict.back().disableArray = true;
 
       std::string leafDefStr{ varName };
 //      if(not disableArrays_ and lH.size() > 1){ leafDefStr += "[" + std::to_string(lH.size()) + "]"; }
@@ -193,12 +193,7 @@ template<typename T> void EventTreeWriter::writeEventsTemplate(const GenericTool
             for( double xPoint : parameterXvalues[iGlobalPar] ){
               inputBuf.getInputBuffer()[0] = xPoint;
               grPtr->AddPoint(
-                  xPoint,
-                  DialInterface::evalResponse(
-                      &inputBuf,
-                      dial.dialInterface->getDialBaseRef(),
-                      dial.dialInterface->getResponseSupervisorRef()
-                  )
+                xPoint, dial.dialInterface->evalResponse()
               );
             }
 

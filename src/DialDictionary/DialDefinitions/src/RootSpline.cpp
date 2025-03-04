@@ -1,22 +1,30 @@
-#include "NormDialBaseFactory.h"
-#include "Norm.h"
+//
+// Created by Adrien Blanchet on 30/11/2022.
+//
+
+#include "RootSpline.h"
 
 
-DialBase* NormDialBaseFactory::makeDial(const std::string& dialTitle_,
-                                        const std::string& dialType_,
-                                        const std::string& dialSubType_,
-                                        TObject* dialInitializer_,
-                                        bool useCachedDial_) {
-  // Stuff the created dial into a unique_ptr, so it will be properly deleted
-  // in the event of an exception.
-  std::unique_ptr<DialBase> dialBase;
+void RootSpline::buildDial(const std::vector<DialUtils::DialPoint>& splinePointList_){
+  _spline_ = DialUtils::buildTSpline3(splinePointList_);
+}
 
-  // Nothing much to do for a normalization dial!
-  dialBase = std::make_unique<Norm>();
-  dialBase->buildDial();
+double RootSpline::evalResponse(const DialInputBuffer& input_) const {
+  const double dialInput{input_.getInputBuffer()[0]};
 
-  // Pass the ownership without any constraints!
-  return dialBase.release();
+#ifndef NDEBUG
+  LogThrowIf(not std::isfinite(dialInput), "Invalid input for Spline");
+#endif
+
+  if( not _allowExtrapolation_ ){
+    if (dialInput <= _spline_.GetXmin()) {
+      return _spline_.Eval( _spline_.GetXmin() );
+    }
+    else if (dialInput >= _spline_.GetXmax()) {
+      return _spline_.Eval( _spline_.GetXmax() );
+    }
+  }
+  return _spline_.Eval( dialInput );
 }
 
 //  A Lesser GNU Public License

@@ -70,6 +70,13 @@ protected:
 
   std::vector<ThreadSharedData> threadSharedDataList{};
 
+  [[nodiscard]] const std::string& getVariableExpression(const std::string& variable_) const {
+    try {
+      return _parameters_.variableDict.at(variable_);
+    }
+    catch( ... ) {}
+    return variable_;
+  }
 
 private:
   // config

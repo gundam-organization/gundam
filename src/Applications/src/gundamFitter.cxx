@@ -362,7 +362,7 @@ int main(int argc, char** argv){
 
   if( clParser.isOptionTriggered("debugMaxNbEventToLoad") ){
     LogExitIf(clParser.getNbValueSet("debugMaxNbEventToLoad") != 1, "Nb of event not specified.");
-    LogDebug << "Load " << clParser.getOptionVal<size_t>("debugMaxNbEventToLoad") << "max events per dataset." << std::endl;
+    LogAlert << "Will load " << clParser.getOptionVal<size_t>("debugMaxNbEventToLoad") << " events per dataset." << std::endl;
     for( auto& dataset : fitter.getLikelihoodInterface().getDatasetList() ){
       dataset.setNbMaxEventToLoad(clParser.getOptionVal<size_t>("debugMaxNbEventToLoad"));
     }

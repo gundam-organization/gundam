@@ -5,15 +5,7 @@
 #include "Logger.h"
 
 
-void Bicubic::setAllowExtrapolation(bool allowExtrapolation) {
-  _allowExtrapolation_ = allowExtrapolation;
-}
-
-bool Bicubic::getAllowExtrapolation() const {
-  return _allowExtrapolation_;
-}
-
-void Bicubic::buildDial(const TH2& h2_, const std::string& option_){
+void Bicubic::buildDial(const TH2& h2_){
     // Copy the spline data into local storage.  The local storage should be
     // easily packable for the GPU.
     //

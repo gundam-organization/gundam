@@ -11,30 +11,22 @@
 
 namespace LoaderUtils{
 
-  void allocateMemory(Event& event_, const std::vector<const GenericToolbox::LeafForm*>& leafFormList_){
-    LogThrowIf( event_.getVariables().getNameListPtr() == nullptr, "var name list not set." );
-    LogThrowIf( event_.getVariables().getNameListPtr()->size() != leafFormList_.size(), "size mismatch." );
-
-    auto nLeaf{event_.getVariables().getNameListPtr()->size()};
-    for(size_t iVar = 0 ; iVar < nLeaf ; iVar++ ){
-      event_.getVariables().getVarList()[iVar].set(GenericToolbox::leafToAnyType( leafFormList_[iVar]->getLeafTypeName() ));
-    }
-  }
   void copyData(const Event& src_, Event& dst_){
     dst_.getIndices() = src_.getIndices();
     dst_.getWeights() = src_.getWeights();
 
     // variables
     LogThrowIf( dst_.getVariables().getNameListPtr() == nullptr, "var name list not set." );
-    for( size_t iVar = 0 ; iVar < dst_.getVariables().getNameListPtr()->size() ; iVar++ ){
-      dst_.getVariables().getVarList()[iVar].get() = src_.getVariables().fetchVariable((*dst_.getVariables().getNameListPtr())[iVar]).get();
+    size_t nVars{dst_.getVariables().getNameListPtr()->size()};
+    for( size_t iVar = 0 ; iVar < nVars ; iVar++ ){
+      auto& var{src_.getVariables().fetchVariable( dst_.getVariables().getNameListPtr()->at(iVar) )};
+      dst_.getVariables().getVarList()[iVar].set( var.get() );
     }
   }
-  void copyData(Event& event_, const std::vector<const GenericToolbox::LeafForm*>& leafFormList_){
-    size_t nLeaf{leafFormList_.size()};
+  void copyData(Event& event_, const std::vector<const GenericToolbox::TreeBuffer::ExpressionBuffer*>& expList_){
+    size_t nLeaf{expList_.size()};
     for( size_t iLeaf = 0 ; iLeaf < nLeaf ; iLeaf++ ){
-      if( leafFormList_[iLeaf]->getTreeFormulaPtr() != nullptr ){ leafFormList_[iLeaf]->fillLocalBuffer(); }
-      event_.getVariables().getVarList()[iLeaf].set( leafFormList_[iLeaf]->getDataAddress(), leafFormList_[iLeaf]->getDataSize() );
+      event_.getVariables().getVarList()[iLeaf].set( expList_[iLeaf]->getBuffer() );
     }
   }
   void fillBinIndex(Event& event_, const std::vector<Histogram::BinContext>& binList_){

@@ -11,7 +11,7 @@
 #include <vector>
 
 
-/// Hold a description of all of the event samples
+/// Hold a description of all the event samples
 /// that are going to be managed by the Propagator.  The
 /// samples in the set can be referred to by their sample set index.
 class SampleSet : public JsonBaseClass {
@@ -26,10 +26,12 @@ public:
   void clearEventLists();
 
   // const getters
-  [[nodiscard]] const std::vector<Sample> &getSampleList() const { return _sampleList_; }
+  [[nodiscard]] const std::vector<Sample> &getSampleList() const{ return _sampleList_; }
+  [[nodiscard]] const std::vector<std::string>& getEventVariableNameList() const{ return _eventVariableNameList_; }
 
   // mutable getters
   std::vector<Sample> &getSampleList(){ return _sampleList_; }
+  std::vector<std::string>& getEventVariableNameList(){ return _eventVariableNameList_; }
 
   // core
   [[nodiscard]] bool empty() const{ return _sampleList_.empty(); }
@@ -45,6 +47,9 @@ public:
 private:
   // config
   std::vector<Sample> _sampleList_;
+
+  // cache -- shared
+  std::vector<std::string> _eventVariableNameList_;
 
 };
 

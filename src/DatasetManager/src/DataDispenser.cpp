@@ -12,7 +12,6 @@
 #include "ConfigUtils.h"
 
 #include "DialCollection.h"
-#include "DialBaseFactory.h"
 #include "TabulatedDialFactory.h"
 
 #include "GundamUtils.h"
@@ -23,7 +22,6 @@
 #include "Logger.h"
 
 #include "TTreeFormulaManager.h"
-#include "TChainElement.h"
 #include "TClonesArray.h"
 #include "TChain.h"
 #include "THn.h"
@@ -316,8 +314,8 @@ void DataDispenser::fetchRequestedLeaves(){
           GenericToolbox::addIfNotInVector(dialCollection->getApplyConditionFormula()->GetParName(iPar), indexRequests);
         }
       }
-      if( not dialCollection->getGlobalDialLeafName().empty() ){
-        GenericToolbox::addIfNotInVector(dialCollection->getGlobalDialLeafName(), indexRequests);
+      if( not dialCollection->getDialLeafName().empty() ){
+        GenericToolbox::addIfNotInVector(dialCollection->getDialLeafName(), indexRequests);
       }
       for( auto& bin : dialCollection->getDialBinSet().getBinList() ) {
         for( auto& edges : bin.getEdgesList() ){
@@ -356,7 +354,10 @@ void DataDispenser::fetchRequestedLeaves(){
       }
     }
     LogInfo << "PlotGenerator variable request for storage: " << GenericToolbox::toString(varForStorageListBuffer) << std::endl;
-    for( auto& var : varForStorageListBuffer ){ _cache_.addVarRequestedForStorage(var); }
+    for( auto& var : varForStorageListBuffer ) {
+      _cache_.addVarRequestedForIndexing(var);
+      GenericToolbox::addIfNotInVector(var, _cache_.propagatorPtr->getSampleSet().getEventVariableNameList());
+    }
   }
 
   // storage requested by user
@@ -364,7 +365,10 @@ void DataDispenser::fetchRequestedLeaves(){
     std::vector<std::string> varForStorageListBuffer{};
     varForStorageListBuffer = _parameters_.additionalVarsStorage;
     LogInfo << "Additional var requests for storage:" << GenericToolbox::toString(varForStorageListBuffer) << std::endl;
-    for (auto &var: varForStorageListBuffer) { _cache_.addVarRequestedForStorage(var); }
+    for (auto &var: varForStorageListBuffer) {
+      _cache_.addVarRequestedForIndexing(var);
+      GenericToolbox::addIfNotInVector(var, _cache_.propagatorPtr->getSampleSet().getEventVariableNameList());
+    }
   }
 
   // transforms inputs
@@ -388,7 +392,7 @@ void DataDispenser::fetchRequestedLeaves(){
   }
 
   // LogInfo << "Vars requested for indexing: " << GenericToolbox::toString(_cache_.varsRequestedForIndexing, false) << std::endl;
-  LogInfo << "Vars requested for storage: " << GenericToolbox::toString(_cache_.varsRequestedForStorage, false) << std::endl;
+  LogInfo << "Vars requested for storage: " << GenericToolbox::toString(_cache_.propagatorPtr->getSampleSet().getEventVariableNameList(), false) << std::endl;
 
   // Now build the var to leaf translation
   for( auto& var : _cache_.varsRequestedForIndexing ){
@@ -427,31 +431,24 @@ void DataDispenser::preAllocateMemory(){
   /// won't have to do this by allocating the right event size.
 
   auto treeChain = openChain();
+  GenericToolbox::TreeBuffer treeBuffer;
+  treeBuffer.setTree(treeChain.get());
 
-  GenericToolbox::LeafCollection lCollection;
-  lCollection.setTreePtr( treeChain.get() );
   for( auto& var : _cache_.varsRequestedForIndexing ){
-    // look for override requests
-    lCollection.addLeafExpression(
-        GenericToolbox::isIn(var, _parameters_.variableDict) ?
-        _parameters_.variableDict[var] : var
-    );
+    treeBuffer.addExpression( getVariableExpression( var ) );
   }
-  lCollection.initialize();
+  treeBuffer.initialize();
 
   Event eventPlaceholder;
   eventPlaceholder.getIndices().dataset = _owner_->getDataSetIndex();
-  eventPlaceholder.getVariables().setVarNameList( std::make_shared<std::vector<std::string>>(_cache_.varsRequestedForStorage) );
+  eventPlaceholder.getVariables().setVarNameList( _cache_.propagatorPtr->getSampleSet().getEventVariableNameList() );
 
-  std::vector<const GenericToolbox::LeafForm*> leafFormToVarList{};
+  std::vector<const GenericToolbox::TreeBuffer::ExpressionBuffer*> expList{};
   for( auto& storageVar : *eventPlaceholder.getVariables().getNameListPtr() ){
-    leafFormToVarList.emplace_back( lCollection.getLeafFormPtr(
-        GenericToolbox::isIn(storageVar, _parameters_.variableDict) ?
-        _parameters_.variableDict[storageVar] : storageVar
-    ));
+    expList.emplace_back( treeBuffer.getExpressionBuffer(getVariableExpression( storageVar )) );
   }
 
-  LoaderUtils::allocateMemory(eventPlaceholder, leafFormToVarList);
+  LoaderUtils::copyData(eventPlaceholder, expList);
 
   LogInfo << "Reserving event memory..." << std::endl;
   {
@@ -511,12 +508,12 @@ void DataDispenser::preAllocateMemory(){
       // Reserve enough space for all the event-by-event dials
       // that might be added.  This size may be reduced later.
       t << dialCollection->getTitle() << GenericToolbox::TablePrinter::NextColumn;
-      t << dialCollection->getGlobalDialType() << GenericToolbox::TablePrinter::NextLine;
+      t << dialCollection->getDialType() << GenericToolbox::TablePrinter::NextLine;
 
       // Only increase the size.  It's probably zero before
       // starting, but add the original size... just in case.
-      dialCollection->getDialBaseList().resize(
-          dialCollection->getDialBaseList().size()
+      dialCollection->getDialInterfaceList().resize(
+          dialCollection->getDialInterfaceList().size()
           + _cache_.totalNbEvents
       );
       nTotalSlots += _cache_.totalNbEvents;
@@ -591,9 +588,10 @@ void DataDispenser::loadFromHistContent(){
     for( auto& binContext : _cache_.samplesToFillList[iSample]->getHistogram().getBinContextList() ){
       GenericToolbox::mergeInVector(varNameList, binContext.bin.buildVariableNameList(), false);
     }
+    _cache_.propagatorPtr->getSampleSet().getEventVariableNameList() = varNameList;
 
     eventPlaceholder.getVariables().setVarNameList(
-        std::make_shared<std::vector<std::string>>( varNameList )
+      _cache_.propagatorPtr->getSampleSet().getEventVariableNameList()
     );
 
     // one event per bin
@@ -616,36 +614,69 @@ void DataDispenser::loadFromHistContent(){
   auto* fHist = GenericToolbox::openExistingTFile(_parameters_.fromHistContent.rootFilePath);
 
   for( auto& sample : _cache_.samplesToFillList ){
+    _cache_.propagatorPtr->getEventDialCache().allocateCacheEntries(sample->getHistogram().getNbBins(), 0);
+  }
+
+  for( auto& sample : _cache_.samplesToFillList ){
     LogScopeIndent;
 
     auto* sampleHistDef = _parameters_.fromHistContent.getSampleHistPtr(sample->getName());
-    LogExitIf(sampleHistDef== nullptr, "Could not find sample histogram: " << sample->getName());
+    LogContinueIf(sampleHistDef== nullptr, "Could not find sample histogram: " << sample->getName());
 
     LogInfo << "Filling sample \"" << sample->getName() << "\" using hist with name: " << sampleHistDef->hist << std::endl;
 
-    auto* hist = fHist->Get<THnD>( sampleHistDef->hist.c_str() );
-    LogExitIf( hist == nullptr, "Could not find THnD \"" << sampleHistDef->hist << "\" within " << fHist->GetPath() );
+    auto* histObj = fHist->Get( sampleHistDef->hist.c_str() );
+    LogExitIf( histObj == nullptr, "Could not find TObject \"" << sampleHistDef->hist << "\" within " << fHist->GetPath() );
 
-    int nBins = 1;
-    for( int iDim = 0 ; iDim < hist->GetNdimensions() ; iDim++ ){
-      nBins *= hist->GetAxis(iDim)->GetNbins();
-    }
-
-    LogAlertIf( nBins != sample->getHistogram().getNbBins() )
-        << "Mismatching bin number for " << sample->getName() << ":" << std::endl
-        << GET_VAR_NAME_VALUE(nBins) << std::endl
-        << GET_VAR_NAME_VALUE(sample->getHistogram().getNbBins()) << std::endl;
-
-    for( int iBin = 0 ; iBin < sample->getHistogram().getNbBins() ; iBin++ ){
-      auto target = sample->getHistogram().getBinContextList()[iBin].bin.generateBinTarget( sampleHistDef->axisList );
-      auto histBinIndex = hist->GetBin( target.data() ); // bad fetch..?
-
-      sample->getEventList()[iBin].getIndices().sample = sample->getIndex();
-      for( size_t iVar = 0 ; iVar < target.size() ; iVar++ ){
-        sample->getEventList()[iBin].getVariables().fetchVariable(sampleHistDef->axisList[iVar]).set(target[iVar]);
+    if( histObj->InheritsFrom("THnD") ){
+      auto* hist = (THnD*) histObj;
+      int nBins = 1;
+      for( int iDim = 0 ; iDim < hist->GetNdimensions() ; iDim++ ){
+        nBins *= hist->GetAxis(iDim)->GetNbins();
       }
-      sample->getEventList()[iBin].getWeights().base = (hist->GetBinContent(histBinIndex));
-      sample->getEventList()[iBin].getWeights().resetCurrentWeight();
+
+      LogAlertIf( nBins != sample->getHistogram().getNbBins() )
+          << "Mismatching bin number for " << sample->getName() << ":" << std::endl
+          << GET_VAR_NAME_VALUE(nBins) << std::endl
+          << GET_VAR_NAME_VALUE(sample->getHistogram().getNbBins()) << std::endl;
+
+      for( int iBin = 0 ; iBin < sample->getHistogram().getNbBins() ; iBin++ ){
+        auto target = sample->getHistogram().getBinContextList()[iBin].bin.generateBinTarget( sampleHistDef->axisList );
+        auto histBinIndex = hist->GetBin( target.data() ); // bad fetch..?
+
+        sample->getEventList()[iBin].getIndices().sample = sample->getIndex();
+        for( size_t iVar = 0 ; iVar < target.size() ; iVar++ ){
+          sample->getEventList()[iBin].getVariables().fetchVariable(sampleHistDef->axisList[iVar]).set(target[iVar]);
+        }
+        sample->getEventList()[iBin].getWeights().base = (hist->GetBinContent(histBinIndex));
+        sample->getEventList()[iBin].getWeights().resetCurrentWeight();
+      }
+    }
+    else if(histObj->InheritsFrom("TH1D")){
+      auto* hist = (TH1D*) histObj;
+      int nBins = hist->GetNbinsX();
+      LogAlertIf( nBins != sample->getHistogram().getNbBins() )
+          << "Mismatching bin number for " << sample->getName() << ":" << std::endl
+          << GET_VAR_NAME_VALUE(nBins) << std::endl
+          << GET_VAR_NAME_VALUE(sample->getHistogram().getNbBins()) << std::endl;
+
+      for( int iBin = 0 ; iBin < sample->getHistogram().getNbBins() ; iBin++ ){
+        sample->getEventList()[iBin].getIndices().sample = sample->getIndex();
+        sample->getEventList()[iBin].getWeights().base = (hist->GetBinContent(iBin+1));
+        sample->getEventList()[iBin].getWeights().resetCurrentWeight();
+
+        auto* eventDialCacheEntry = _cache_.propagatorPtr->getEventDialCache().fetchNextCacheEntry();
+        auto sampleEventIndex = _cache_.sampleIndexOffsetList[sample->getIndex()]++;
+
+        // Get the next free event in our buffer
+        Event *eventPtr = &(*_cache_.sampleEventListPtrToFill[sample->getIndex()])[sampleEventIndex];
+
+        // Now the event is ready. Let's index the dials:
+        // there should always be a cache entry even if no dials are applied.
+        // This cache is actually used to write MC events with dials in output tree
+        eventDialCacheEntry->event.sampleIndex = std::size_t(sample->getIndex());
+        eventDialCacheEntry->event.eventIndex = sampleEventIndex;
+      }
     }
 
   }
@@ -656,7 +687,7 @@ void DataDispenser::loadFromHistContent(){
 std::shared_ptr<TChain> DataDispenser::openChain(bool verbose_){
   LogInfoIf(verbose_) << "Opening ROOT files containing events..." << std::endl;
 
-  std::shared_ptr<TChain> treeChain(std::make_unique<TChain>());
+  std::shared_ptr<TChain> treeChain(std::make_shared<TChain>());
   for( const auto& file: _parameters_.filePathList){
     std::string name = GenericToolbox::expandEnvironmentVariables(file);
     GenericToolbox::replaceSubstringInsideInputString(name, "//", "/");
@@ -840,66 +871,58 @@ void DataDispenser::runEventFillThreads(int iThread_){
   threadSharedData.treeChain = this->openChain();
   threadSharedData.nbEntries = threadSharedData.treeChain->GetEntries();
 
-  // provide the buffer
-  GenericToolbox::LeafCollection lCollection;
-  lCollection.setTreePtr( threadSharedData.treeChain.get() );
+  threadSharedData.treeBuffer.setTree(threadSharedData.treeChain.get());
 
   // nominal weight
-  threadSharedData.nominalWeightTreeFormula = nullptr;
   if( not _parameters_.nominalWeightFormulaStr.empty() ){
-    auto idx = size_t(lCollection.addLeafExpression( _parameters_.nominalWeightFormulaStr ));
-    threadSharedData.nominalWeightTreeFormula = (TTreeFormula*) idx; // tweaking types. Ptr will be attributed after init
+    ThreadSharedData::VariableBuffer::storeTempIndex(
+          threadSharedData.buffer.nominalWeight,
+          threadSharedData.treeBuffer.addExpression(_parameters_.nominalWeightFormulaStr)
+        );
   }
 
   // dial array index
-  threadSharedData.dialIndexTreeFormula = nullptr;
   if( not _parameters_.dialIndexFormula.empty() ){
-    auto idx = size_t(lCollection.addLeafExpression( _parameters_.dialIndexFormula ));
-    threadSharedData.dialIndexTreeFormula = (TTreeFormula*) idx; // tweaking types. Ptr will be attributed after init
+    ThreadSharedData::VariableBuffer::storeTempIndex(
+          threadSharedData.buffer.dialIndex,
+          threadSharedData.treeBuffer.addExpression(_parameters_.dialIndexFormula)
+        );
   }
 
   // variables definition
-  threadSharedData.leafFormIndexingList.clear();
-  threadSharedData.leafFormStorageList.clear();
   for( auto& var : _cache_.varsRequestedForIndexing ){
-    std::string leafExp{var};
-    if( GenericToolbox::isIn( var, _parameters_.variableDict ) ){
-      leafExp = _parameters_.variableDict[leafExp];
-    }
-    auto idx = size_t(lCollection.addLeafExpression(leafExp));
-    threadSharedData.leafFormIndexingList.emplace_back( (GenericToolbox::LeafForm*) idx ); // tweaking types
+    threadSharedData.buffer.varIndexingList.emplace_back();
+    ThreadSharedData::VariableBuffer::storeTempIndex(
+      threadSharedData.buffer.varIndexingList.back(),
+      threadSharedData.treeBuffer.addExpression(getVariableExpression(var))
+    );
   }
-  for( auto& var : _cache_.varsRequestedForStorage ){
-    std::string leafExp{var};
-    if( GenericToolbox::isIn( var, _parameters_.variableDict ) ){
-      leafExp = _parameters_.variableDict[leafExp];
-    }
-    auto idx = size_t(lCollection.getLeafExpIndex(leafExp));
-    threadSharedData.leafFormStorageList.emplace_back( (GenericToolbox::LeafForm*) idx ); // tweaking types
+  for( auto& var : _cache_.propagatorPtr->getSampleSet().getEventVariableNameList() ){
+    threadSharedData.buffer.varStorageList.emplace_back();
+    ThreadSharedData::VariableBuffer::storeTempIndex(
+      threadSharedData.buffer.varStorageList.back(),
+      threadSharedData.treeBuffer.addExpression(getVariableExpression(var))
+    );
   }
 
-  // will hook all variables to the TChain
-  lCollection.initialize();
+  threadSharedData.treeBuffer.initialize();
 
   // grab ptr address now
-  if( not _parameters_.nominalWeightFormulaStr.empty() ){
-    threadSharedData.nominalWeightTreeFormula = lCollection.getLeafFormList()[(size_t) threadSharedData.nominalWeightTreeFormula].getTreeFormulaPtr().get();
-  }
-  if( not _parameters_.dialIndexFormula.empty() ){
-    threadSharedData.dialIndexTreeFormula = lCollection.getLeafFormList()[(size_t) threadSharedData.dialIndexTreeFormula].getTreeFormulaPtr().get();
-  }
-  for( auto& lfInd: threadSharedData.leafFormIndexingList ){ lfInd = &(lCollection.getLeafFormList()[(size_t) lfInd]); }
-  for( auto& lfSto: threadSharedData.leafFormStorageList ){ lfSto = &(lCollection.getLeafFormList()[(size_t) lfSto]); }
+  if( not _parameters_.nominalWeightFormulaStr.empty() ){ ThreadSharedData::VariableBuffer::unfoldTempIndex(threadSharedData.buffer.nominalWeight, threadSharedData.treeBuffer.getExpressionBufferList()); }
+  if( not _parameters_.dialIndexFormula.empty() ){ ThreadSharedData::VariableBuffer::unfoldTempIndex(threadSharedData.buffer.dialIndex, threadSharedData.treeBuffer.getExpressionBufferList()); }
+  for( auto& varInd: threadSharedData.buffer.varIndexingList ){ ThreadSharedData::VariableBuffer::unfoldTempIndex(varInd, threadSharedData.treeBuffer.getExpressionBufferList()); }
+  for( auto& varSto: threadSharedData.buffer.varStorageList ){ ThreadSharedData::VariableBuffer::unfoldTempIndex(varSto, threadSharedData.treeBuffer.getExpressionBufferList()); }
 
+  // event variable as weight
   if( not _parameters_.eventVariableAsWeight.empty() ){
     for( size_t iVar = 0 ; iVar < _cache_.varsRequestedForIndexing.size() ; iVar++ ){
       if( _cache_.varsRequestedForIndexing[iVar] == _parameters_.eventVariableAsWeight ) {
-        threadSharedData.eventVariableAsWeightLeafPtr = threadSharedData.leafFormIndexingList[iVar];
+        threadSharedData.buffer.eventVarAsWeight = threadSharedData.buffer.varIndexingList[iVar];
         break;
       }
     }
 
-    LogThrowIf(threadSharedData.eventVariableAsWeightLeafPtr==nullptr, "Could not find variable: " << _parameters_.eventVariableAsWeight);
+    LogThrowIf(threadSharedData.buffer.eventVarAsWeight==nullptr, "Could not find variable: " << _parameters_.eventVariableAsWeight);
   }
 
   // start event filler
@@ -931,6 +954,7 @@ void DataDispenser::runEventFillThreads(int iThread_){
     if( not hasSample ){ continue; }
 
     Int_t nBytes{ threadSharedData.treeChain->GetEntry(iEntry) };
+    threadSharedData.treeBuffer.saveExpressions();
 
     threadSharedData.isEntryBufferReady.setValue(true); // loaded! -> let the other thread get everything it needs
 
@@ -996,8 +1020,8 @@ void DataDispenser::loadEvent(int iThread_){
   // local
   Event eventIndexingBuffer;
   eventIndexingBuffer.getIndices().dataset = _owner_->getDataSetIndex();
-  eventIndexingBuffer.getVariables().setVarNameList(std::make_shared<std::vector<std::string>>(_cache_.varsRequestedForIndexing));
-  LoaderUtils::allocateMemory(eventIndexingBuffer, threadSharedData.leafFormIndexingList);
+
+  eventIndexingBuffer.getVariables().setVarNameList(_cache_.varsRequestedForIndexing);
 
   auto eventVarTransformList = _parameters_.eventVarTransformList; // copy for cache
   std::vector<EventVarTransformLib*> varTransformForIndexingList;
@@ -1024,7 +1048,7 @@ void DataDispenser::loadEvent(int iThread_){
     GenericToolbox::TablePrinter table;
 
     table << "Variable" ;
-    table << GenericToolbox::TablePrinter::NextColumn << "LeafForm";
+    table << GenericToolbox::TablePrinter::NextColumn << "Expression";
     if(not varTransformForIndexingList.empty()){
       table << GenericToolbox::TablePrinter::NextColumn << "Transforms";
     }
@@ -1052,8 +1076,8 @@ void DataDispenser::loadEvent(int iThread_){
 
       varDisplayList.back().varName = _cache_.varsRequestedForIndexing[iVar];
 
-      varDisplayList.back().leafName = threadSharedData.leafFormIndexingList[iVar]->getPrimaryExprStr();
-      varDisplayList.back().leafTypeName = threadSharedData.leafFormIndexingList[iVar]->getLeafTypeName();
+      varDisplayList.back().leafName = threadSharedData.buffer.varIndexingList[iVar]->getExpression();
+      varDisplayList.back().leafTypeName = GenericToolbox::findOriginalVariableType(threadSharedData.buffer.varIndexingList[iVar]->getBuffer());
 
       std::vector<std::string> transformsList;
       for( auto* varTransformForIndexing : varTransformForIndexingList ){
@@ -1062,16 +1086,17 @@ void DataDispenser::loadEvent(int iThread_){
         }
       }
       varDisplayList.back().transformStr = GenericToolbox::toString(transformsList);
-      varDisplayList.back().priorityIndex = threadSharedData.leafFormIndexingList[iVar]->isPointerLeaf() ? 999 : int( threadSharedData.leafFormIndexingList[iVar]->getDataSize() );
+      varDisplayList.back().priorityIndex = 999;
+      if( varDisplayList.back().leafTypeName != "\xFF" ){
+        varDisplayList.back().priorityIndex = int( threadSharedData.buffer.varIndexingList[iVar]->getBuffer().getStoredSize() );
+      }
 
       // line color?
-      if( GenericToolbox::doesElementIsInVector(_cache_.varsRequestedForIndexing[iVar], _cache_.varsRequestedForStorage)){
+      if( GenericToolbox::doesElementIsInVector(_cache_.varsRequestedForIndexing[iVar], _cache_.propagatorPtr->getSampleSet().getEventVariableNameList())){
         varDisplayList.back().lineColor = GenericToolbox::ColorCodes::blueBackground;
       }
-      else if(
-          threadSharedData.leafFormIndexingList[iVar]->getLeafTypeName() == "TClonesArray"
-          or threadSharedData.leafFormIndexingList[iVar]->getLeafTypeName() == "TGraph"
-          ){
+      else if( varDisplayList.back().leafTypeName == "\xFF" ){
+        varDisplayList.back().leafTypeName = "p";
         hasEventDials = true;
         varDisplayList.back().lineColor =  GenericToolbox::ColorCodes::magentaBackground;
       }
@@ -1099,7 +1124,7 @@ void DataDispenser::loadEvent(int iThread_){
     table.printTable();
 
     // printing legend
-    LogInfoIf(not _cache_.varsRequestedForStorage.empty()) << LOGGER_STR_COLOR_BLUE_BG    << "      " << LOGGER_STR_COLOR_RESET << " -> Variables stored in RAM" << std::endl;
+    LogInfoIf(not _cache_.propagatorPtr->getSampleSet().getEventVariableNameList().empty()) << LOGGER_STR_COLOR_BLUE_BG    << "      " << LOGGER_STR_COLOR_RESET << " -> Variables stored in RAM" << std::endl;
     LogInfoIf(hasEventDials) << LOGGER_STR_COLOR_MAGENTA_BG << "      " << LOGGER_STR_COLOR_RESET << " -> Dials stored in RAM" << std::endl;
 
     if( _owner_->isDevSingleThreadEventLoaderAndIndexer() ){
@@ -1120,120 +1145,108 @@ void DataDispenser::loadEvent(int iThread_){
 
   while( true ){
 
-    // make sure we request a new entry and wait once we go for another loop
-    GenericToolbox::ScopedGuard readerGuard{
+    {
+      // make sure we request a new entry and wait once we go for another loop
+      GenericToolbox::ScopedGuard readerGuard{
         [&]{ threadSharedData.isEntryBufferReady.waitUntilEqual( true ); threadSharedData.isEntryBufferReady.setValue( false ); },
         [&]{ threadSharedData.requestReadNextEntry.setValue( true ); }
-    };
+      };
 
-    // ***** from this point, the TChain reader is waiting *****
+      // ***** from this point, the TChain reader is waiting *****
 
-    // check if the reader has nothing else to do / end of the loop
-    if( threadSharedData.isDoneReading.getValue() ){ break; }
+      // check if the reader has nothing else to do / end of the loop
+      if( threadSharedData.isDoneReading.getValue() ){ break; }
 
-    // leafFormIndexingList is modified by the TChain reader
-    LoaderUtils::copyData(eventIndexingBuffer, threadSharedData.leafFormIndexingList);
+      // leafFormIndexingList is modified by the TChain reader
+      LoaderUtils::copyData(eventIndexingBuffer, threadSharedData.buffer.varIndexingList);
 
-    // Propagate variable transformations for indexing
-    LoaderUtils::applyVarTransforms(eventIndexingBuffer, varTransformForIndexingList);
+      // Propagate variable transformations for indexing
+      LoaderUtils::applyVarTransforms(eventIndexingBuffer, varTransformForIndexingList);
 
-    // nominalWeightTreeFormula is attached to the TChain
-    if( threadSharedData.nominalWeightTreeFormula != nullptr ){
-      eventIndexingBuffer.getWeights().base = (threadSharedData.nominalWeightTreeFormula->EvalInstance());
-    }
-
-    // additional weight with an event variable
-    if( threadSharedData.eventVariableAsWeightLeafPtr != nullptr ){
-      eventIndexingBuffer.getWeights().base *= threadSharedData.eventVariableAsWeightLeafPtr->evalAsDouble();
-    }
-
-
-    // skip this event if 0
-    if( eventIndexingBuffer.getWeights().base == 0 ){ continue; }
-    // no negative weights -> error
-    if( eventIndexingBuffer.getWeights().base  < 0 ){
-      LogError << "Negative nominal weight:" << std::endl;
-
-      LogError << "Event buffer is: " << eventIndexingBuffer.getSummary() << std::endl;
-
-      LogError << "Formula leaves:" << std::endl;
-      for( int iLeaf = 0 ; iLeaf < threadSharedData.nominalWeightTreeFormula->GetNcodes() ; iLeaf++ ){
-        if( threadSharedData.nominalWeightTreeFormula->GetLeaf(iLeaf) == nullptr ) continue; // for "Entry$" like dummy leaves
-        LogError << "Leaf: " << threadSharedData.nominalWeightTreeFormula->GetLeaf(iLeaf)->GetName() << "[0] = " << threadSharedData.nominalWeightTreeFormula->GetLeaf(iLeaf)->GetValue(0) << std::endl;
+      // nominalWeightTreeFormula is attached to the TChain
+      if( threadSharedData.buffer.nominalWeight != nullptr ){
+        eventIndexingBuffer.getWeights().base = threadSharedData.buffer.nominalWeight->getBuffer().getValueAsDouble();
       }
 
-      LogThrow("Negative nominal weight");
-    }
+      // additional weight with an event variable
+      if( threadSharedData.buffer.eventVarAsWeight != nullptr ){
+        eventIndexingBuffer.getWeights().base *= threadSharedData.buffer.eventVarAsWeight->getBuffer().getValueAsDouble();
+      }
 
-    // grab data from TChain
-    eventIndexingBuffer.getIndices().entry     = threadSharedData.treeChain->GetReadEntry();
-    eventIndexingBuffer.getIndices().treeFile      = threadSharedData.treeChain->GetTreeNumber();
-    eventIndexingBuffer.getIndices().treeEntry = threadSharedData.treeChain->GetTree()->GetReadEntry();
 
-    // get sample index / all -1 samples have been ruled out by the chain reader
-    iSample = _cache_.entrySampleIndexList[eventIndexingBuffer.getIndices().entry];
-    Sample& eventSample{*_cache_.samplesToFillList[iSample]};
+      // skip this event if 0
+      if( eventIndexingBuffer.getWeights().base == 0 ){ continue; }
+      // no negative weights -> error
+      if( eventIndexingBuffer.getWeights().base  < 0 ){
+        LogError << "Negative nominal weight:" << std::endl;
+        LogError << "Event buffer is: " << eventIndexingBuffer.getSummary() << std::endl;
+        LogThrow("Negative nominal weight");
+      }
 
-    eventIndexingBuffer.getIndices().sample = eventSample.getIndex();
+      // grab data from TChain
+      eventIndexingBuffer.getIndices().entry     = threadSharedData.treeChain->GetReadEntry();
+      eventIndexingBuffer.getIndices().treeFile      = threadSharedData.treeChain->GetTreeNumber();
+      eventIndexingBuffer.getIndices().treeEntry = threadSharedData.treeChain->GetTree()->GetReadEntry();
 
-    // look for the bin index
-    LoaderUtils::fillBinIndex(eventIndexingBuffer, eventSample.getHistogram().getBinContextList());
+      // get sample index / all -1 samples have been ruled out by the chain reader
+      iSample = _cache_.entrySampleIndexList[eventIndexingBuffer.getIndices().entry];
+      Sample& eventSample{*_cache_.samplesToFillList[iSample]};
 
-    // No bin found -> next sample
-    if( eventIndexingBuffer.getIndices().bin == -1 ){ continue; }
+      eventIndexingBuffer.getIndices().sample = eventSample.getIndex();
 
-    // dialIndexTreeFormula is modified by the TChain reader
-    int dialCloneArrayIndex{0};
-    if( threadSharedData.dialIndexTreeFormula != nullptr ){
-      dialCloneArrayIndex = int(threadSharedData.dialIndexTreeFormula->EvalInstance());
-    }
+      // look for the bin index
+      LoaderUtils::fillBinIndex(eventIndexingBuffer, eventSample.getHistogram().getBinContextList());
 
-    // only load event-by-event dials, binned dials etc. will be processed later
-    for( auto *dialCollectionRef: _cache_.dialCollectionsRefList ){
+      // No bin found -> next sample
+      if( eventIndexingBuffer.getIndices().bin == -1 ){ continue; }
 
-      eventByEventDialBuffer[dialCollectionRef->getIndex()] = nullptr;
+      // dialIndexTreeFormula is modified by the TChain reader
+      int dialCloneArrayIndex{0};
+      if( threadSharedData.buffer.dialIndex != nullptr ){
+        dialCloneArrayIndex = static_cast<int>(threadSharedData.buffer.dialIndex->getBuffer().getValueAsLong());
+      }
 
-      // if not event-by-event dial -> leave
-      if( dialCollectionRef->getGlobalDialLeafName().empty() ){ continue; }
+      // only load event-by-event dials, binned dials etc. will be processed later
+      for( auto *dialCollectionRef: _cache_.dialCollectionsRefList ){
 
-      // dial collections may come with a condition formula
-      if( dialCollectionRef->getApplyConditionFormula() != nullptr ){
-        if( LoaderUtils::evalFormula(eventIndexingBuffer, dialCollectionRef->getApplyConditionFormula().get()) == 0 ){
-          // next dialSet
-          continue;
+        eventByEventDialBuffer[dialCollectionRef->getIndex()] = nullptr;
+
+        // if not event-by-event dial -> leave
+        if( dialCollectionRef->getDialLeafName().empty() ){ continue; }
+
+        // dial collections may come with a condition formula
+        if( dialCollectionRef->getApplyConditionFormula() != nullptr ){
+          if( LoaderUtils::evalFormula(eventIndexingBuffer, dialCollectionRef->getApplyConditionFormula().get()) == 0 ){
+            // next dialSet
+            continue;
+          }
+        }
+
+        // grab as a general TObject, then let the factory figure out what to do with it
+        auto* dialExpression = threadSharedData.treeBuffer.getExpressionBuffer( dialCollectionRef->getDialLeafName() );
+        if( dialExpression == nullptr ){ continue; }
+        auto *dialObjectPtr = dialExpression->getBuffer().getValue<const TObject*>();
+
+        // Extra-step for selecting the right dial with TClonesArray
+        if( not strcmp(dialObjectPtr->ClassName(), "TClonesArray")){
+          dialObjectPtr = ((const TClonesArray *) dialObjectPtr)->At(dialCloneArrayIndex);
+        }
+
+        auto dial = dialCollectionRef->makeDial(dialObjectPtr);
+        eventByEventDialBuffer[dialCollectionRef->getIndex()] = dial.release();
+      }
+
+      if( _parameters_.debugNbMaxEventsToLoad != 0 ){
+        // check if the limit has been reached
+        std::unique_lock<std::mutex> lock(_mutex_);
+        if( _cache_.propagatorPtr->getEventDialCache().getFillIndex() >= _parameters_.debugNbMaxEventsToLoad ){
+          LogAlertIf(iThread_ == 0) << std::endl << std::endl; // flush pBar
+          LogAlertIf(iThread_ == 0) << "debugNbMaxEventsToLoad: Event number cap reached (";
+          LogAlertIf(iThread_ == 0) << _parameters_.debugNbMaxEventsToLoad << ")" << std::endl;
+          threadSharedData.isDoneReading.setValue( true );
+          return;
         }
       }
-
-      int iCollection = dialCollectionRef->getIndex();
-
-      // grab as a general TObject, then let the factory figure out what to do with it
-      auto *dialObjectPtr = (TObject *) *(
-          (TObject **) eventIndexingBuffer.getVariables().fetchVariable(
-              dialCollectionRef->getGlobalDialLeafName()
-          ).get().getPlaceHolderPtr()->getVariableAddress()
-      );
-
-      // Extra-step for selecting the right dial with TClonesArray
-      if( not strcmp(dialObjectPtr->ClassName(), "TClonesArray")){
-        dialObjectPtr = ((TClonesArray *) dialObjectPtr)->At(dialCloneArrayIndex);
-      }
-
-      // Do the unique_ptr dance so that memory gets deleted if
-      // there is an exception (being stupidly paranoid).
-      DialBaseFactory factory{};
-      std::unique_ptr<DialBase> dialBase(
-          factory.makeDial(
-              dialCollectionRef->getTitle(),
-              dialCollectionRef->getGlobalDialType(),
-              dialCollectionRef->getGlobalDialSubType(),
-              dialObjectPtr,
-              false
-          )
-      );
-
-      eventByEventDialBuffer[dialCollectionRef->getIndex()] = dialBase.release();
-
-
     }
 
     // ***** from this point, the TChain reader is released *****
@@ -1242,21 +1255,9 @@ void DataDispenser::loadEvent(int iThread_){
     EventDialCache::IndexedCacheEntry *eventDialCacheEntry{nullptr};
     {
       std::unique_lock<std::mutex> lock(_mutex_);
-
-      if( _parameters_.debugNbMaxEventsToLoad != 0 ){
-        // check if the limit has been reached
-        if( _cache_.propagatorPtr->getEventDialCache().getFillIndex() >= _parameters_.debugNbMaxEventsToLoad ){
-          LogAlertIf(iThread_ == 0) << std::endl << std::endl; // flush pBar
-          LogAlertIf(iThread_ == 0) << "debugNbMaxEventsToLoad: Event number cap reached (";
-          LogAlertIf(iThread_ == 0) << _parameters_.debugNbMaxEventsToLoad << ")" << std::endl;
-          return;
-        }
-      }
-
       eventDialCacheEntry = _cache_.propagatorPtr->getEventDialCache().fetchNextCacheEntry();
       sampleEventIndex = _cache_.sampleIndexOffsetList[iSample]++;
     }
-
 
     // Get the next free event in our buffer
     Event *eventPtr = &(*_cache_.sampleEventListPtrToFill[iSample])[sampleEventIndex];
@@ -1274,14 +1275,13 @@ void DataDispenser::loadEvent(int iThread_){
     for( auto *dialCollectionRef: _cache_.dialCollectionsRefList ){
 
       // leave if event-by-event -> already loaded
-      if( not dialCollectionRef->getGlobalDialLeafName().empty() ){
+      if( not dialCollectionRef->getDialLeafName().empty() ){
 
         // dialBase is valid -> store it
         if( eventByEventDialBuffer[dialCollectionRef->getIndex()] != nullptr ){
           size_t freeSlotDial = dialCollectionRef->getNextDialFreeSlot();
-          eventByEventDialBuffer[dialCollectionRef->getIndex()]->setAllowExtrapolation(dialCollectionRef->isAllowDialExtrapolation());
-          dialCollectionRef->getDialBaseList()[freeSlotDial] = DialCollection::DialBaseObject(
-              eventByEventDialBuffer[dialCollectionRef->getIndex()]);
+          dialCollectionRef->getDialInterfaceList()[freeSlotDial].getDial().dialPtr
+            = std::unique_ptr<DialBase>(eventByEventDialBuffer[dialCollectionRef->getIndex()]);
 
           dialEntryPtr->collectionIndex = dialCollectionRef->getIndex();
           dialEntryPtr->interfaceIndex = freeSlotDial;
@@ -1301,7 +1301,7 @@ void DataDispenser::loadEvent(int iThread_){
 
       int iCollection = dialCollectionRef->getIndex();
 
-      if( dialCollectionRef->getGlobalDialType() == "Tabulated" ){
+      if( dialCollectionRef->getDialType() == DialCollection::DialType::Tabulated ){
         // Event-by-event dial for a precalculated table.  The table
         // can hold things like oscillation weights and is filled before
         // the event weighting is done.
@@ -1313,9 +1313,8 @@ void DataDispenser::loadEvent(int iThread_){
         // dialBase is valid -> store it
         if( dialBase != nullptr ){
           size_t freeSlotDial = dialCollectionRef->getNextDialFreeSlot();
-          dialBase->setAllowExtrapolation(dialCollectionRef->isAllowDialExtrapolation());
-          dialCollectionRef->getDialBaseList()[freeSlotDial] = DialCollection::DialBaseObject(
-              dialBase.release());
+          dialCollectionRef->getDialInterfaceList()[freeSlotDial].getDial().dialPtr =
+            std::unique_ptr<DialBase>(dialBase.release());
 
           dialEntryPtr->collectionIndex = iCollection;
           dialEntryPtr->interfaceIndex = freeSlotDial;
@@ -1324,7 +1323,7 @@ void DataDispenser::loadEvent(int iThread_){
       }
       else{
 
-        if( dialCollectionRef->getDialBaseList().size() == 1
+        if( dialCollectionRef->getDialInterfaceList().size() == 1
             and dialCollectionRef->getDialBinSet().getBinList().empty()){
           // There isn't any binning, and there is only one dial.
           // In this case we don't need to check if the dial is in

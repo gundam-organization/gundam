@@ -53,7 +53,7 @@ public:
 
   // const getters
   [[nodiscard]] bool isDialUpdateRequested() const{ return _isDialUpdateRequested_; }
-  [[nodiscard]] bool* isDialUpdateRequestedPtr() { return &_isDialUpdateRequested_; }
+  [[nodiscard]] const bool* isDialUpdateRequestedPtr() const{ return &_isDialUpdateRequested_; }
   [[nodiscard]] int getBufferSize() const{ return _inputArraySize_; }
   [[nodiscard]] size_t getInputSize() const{ return _inputParameterReferenceList_.size(); }
   [[nodiscard]] const std::vector<double>& getInputBuffer() const { return _inputBuffer_; }
