@@ -346,10 +346,9 @@ void FitterEngine::fit(){
   }
 
 #ifdef GUNDAM_USING_CACHE_MANAGER
-  if( Cache::Manager::IsBuilt() ){
-    // To calculate the llh, we only need to grab the bin content, not individual weight
-    Cache::Manager::SetIsEventWeightCopyEnabled( false );
-  }
+  // To calculate the llh, we only need to grab the bin content, not
+  // individual weight
+  bool origCopy = Cache::Manager::SetIsEventWeightCopyEnabled( false );
 #endif
 
   LogInfo << "Minimizing LLH..." << std::endl;
@@ -361,9 +360,9 @@ void FitterEngine::fit(){
 #ifdef GUNDAM_USING_CACHE_MANAGER
   if( Cache::Manager::IsBuilt() ){
     LogWarning << "Pulling back individual weight from device..." << std::endl;
-    Cache::Manager::CopyEventWeights();
-    Cache::Manager::SetIsEventWeightCopyEnabled( true );
+    Cache::Manager::Get()->CopyEventWeights();
   }
+  Cache::Manager::SetIsEventWeightCopyEnabled(origCopy);
 #endif
 
   LogWarning << "Saving post-fit par state..." << std::endl;
@@ -414,10 +413,9 @@ void FitterEngine::fit(){
   else{
     if( _minimizer_->isErrorCalcEnabled() ){
 #ifdef GUNDAM_USING_CACHE_MANAGER
-      if( Cache::Manager::IsBuilt() ){
-        // To calculate the llh, we only need to grab the bin content, not individual weight
-        Cache::Manager::SetIsEventWeightCopyEnabled( false );
-      }
+      // To calculate the llh, we only need to grab the bin content, not
+      // individual weight
+      bool origCopy = Cache::Manager::SetIsEventWeightCopyEnabled( false );
 #endif
 
       LogInfo << "Computing post-fit errors..." << std::endl;
@@ -425,12 +423,11 @@ void FitterEngine::fit(){
 
 #ifdef GUNDAM_USING_CACHE_MANAGER
       if( Cache::Manager::IsBuilt() ){
-        LogWarning << "Pulling back individual weight from device..." << std::endl;
-        Cache::Manager::CopyEventWeights();
-
-        // return to default behavior
-        Cache::Manager::SetIsEventWeightCopyEnabled( true );
+        LogWarning << "Copy event weights from device..." << std::endl;
+        Cache::Manager::Get()->CopyEventWeights();
       }
+      // return to default behavior
+      Cache::Manager::SetIsEventWeightCopyEnabled( origCopy);
 #endif
     }
   }

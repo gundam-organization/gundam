@@ -52,53 +52,6 @@ class Parameter;
 /// isn't a GPU, but it's really slow on the CPU.  This is a singleton.
 class Cache::Manager {
 
-private:
-  // Holds static members of the CacheManager in one place
-  struct Parameters{
-
-    // You get one guess...
-    Manager* fSingleton{nullptr};
-
-    /// Control whether the Cache::Manager should be constructed.  This
-    /// parameter should be set in the front-end applications.  This replaces a
-    /// flag that was in GundamGlobals.h
-    bool fIsEnabled{false};
-
-    /// Enabled printouts when moving data between host and device
-    bool fEnableDebugPrintouts{false};
-
-    /// Control if a propagator should fill the histograms with the GPU (when
-    /// avavailable), or force a parallel CPU calculation.  This really
-    /// belongs in the propagator, but it's dynamic object, so put it here.
-    /// The parallel calculation is used to check the accuracy of the CPU
-    /// computation
-    bool fForceCpuCalculation{false};
-
-    /// A map between the fit parameter pointers and the parameter index used
-    /// by the fitter.
-    std::map<const Parameter*, int> ParameterMap{};
-
-    /// True if the histogram content should be copied back from the GPU.
-    /// This should almost always be true.
-    bool fIsHistContentCopyEnabled{true};
-
-    /// True if the individual event weights should be copied back from the
-    /// Cache::Manager.  This should almost always be false.
-    bool fIsEventWeightCopyEnabled{false};
-
-    /// Declare all of the actual GPU caches here.  There is one GPU, so this
-    /// is the ONE place that everything is collected together.
-    std::vector<CacheSampleHistFiller> fSampleHistFillerList{};
-    std::vector<CacheEventWeightFiller> fEventWeightFillerList{};
-
-    // Time monitoring
-    GenericToolbox::Time::AveragedTimer<10> cacheFillTimer;
-    GenericToolbox::Time::AveragedTimer<10> pullFromDeviceTimer;
-  };
-
-  // instance defined in cpp file
-  static Parameters fParameters;
-
 public:
 
   /// Get the pointer to the cache manager.  This will be a nullptr if the
@@ -152,11 +105,19 @@ public:
 
   /// Used to set the flag that the histogram results should be copied from
   /// the Cache::Manager into the GUNDAM histogram object.
-  static void SetIsHistContentCopyEnabled(bool fIsHistContentCopyEnabled_){ fParameters.fIsHistContentCopyEnabled = fIsHistContentCopyEnabled_; }
+  static bool SetIsHistContentCopyEnabled(bool fIsHistContentCopyEnabled_) {
+    bool orig = fParameters.fIsHistContentCopyEnabled;
+    fParameters.fIsHistContentCopyEnabled = fIsHistContentCopyEnabled_;
+    return orig;
+  }
 
   /// Use to set the flag that the event weight results should be copied from
   /// the Cache::Manager into GUNDAM event weights.
-  static void SetIsEventWeightCopyEnabled(bool fIsEventWeightCopyEnabled_){ fParameters.fIsEventWeightCopyEnabled = fIsEventWeightCopyEnabled_; }
+  static bool SetIsEventWeightCopyEnabled(bool fIsEventWeightCopyEnabled_) {
+    bool orig = fParameters.fIsEventWeightCopyEnabled;
+    fParameters.fIsEventWeightCopyEnabled = fIsEventWeightCopyEnabled_;
+    return orig;
+  }
 
   /// Set the debug output.
   static void SetEnableDebugPrintouts(bool fEnableDebugPrintouts_){ fParameters.fEnableDebugPrintouts = fEnableDebugPrintouts_; }
@@ -184,16 +145,6 @@ public:
   /// Cache::Manager calculation is completed.
   static bool PropagateParameters();
 
-  /// Copy the event weights from the Cache::Manager into the GUNDAM event
-  /// weight classes.  This will block if the Cache::Manager calculation
-  /// has not finished.
-  static bool CopyEventWeights();
-
-  /// Copy the histogram contents from the Cache::Manager into the GUNDAM
-  /// histogram objects.  This will block if the Cache::Manager calculation
-  /// has not finished.
-  static bool CopyHistogramContents();
-
   /// Validate the local copy of the histogram contents against the last
   /// weight calculation.  The quiet parameter controls how much output
   /// happens during the dump.  The default is pretty loud when there is a
@@ -215,11 +166,87 @@ public:
   /// before the cached weights can be used.  This is used in Propagator.cpp.
   bool Fill();
 
+  /// Copy the event weights from the Cache::Manager into the GUNDAM event
+  /// weight classes.  This will block if the Cache::Manager calculation
+  /// has not finished.
+  bool CopyEventWeights();
+
+  /// Copy the histogram contents from the Cache::Manager into the GUNDAM
+  /// histogram objects.  This will block if the Cache::Manager calculation
+  /// has not finished.
+  bool CopyHistogramContents();
+
   /// Return the approximate allocated memory used by the Cache.  This memory
   /// is mirrored on both the CPU and GPU.
   [[nodiscard]] std::size_t GetResidentMemory() const {return fTotalBytes;}
 
 private:
+
+private:
+
+  // Hold static members of the CacheManager in one place
+  struct Parameters{
+    // You get one guess...
+    Manager* fSingleton{nullptr};
+
+    /// Control whether the Cache::Manager should be constructed.  This
+    /// parameter should be set in the front-end applications.  This replaces a
+    /// flag that was in GundamGlobals.h
+    bool fIsEnabled{false};
+
+    /// Control if a propagator should fill the histograms with the GPU (when
+    /// avavailable), or force a parallel CPU calculation.  This really
+    /// belongs in the propagator, but it's dynamic object, so put it here.
+    /// The parallel calculation is used to check the accuracy of the CPU
+    /// computation
+    bool fForceCpuCalculation{false};
+
+    /// True if the histogram content should be copied back from the GPU.
+    /// This should almost always be true.
+    bool fIsHistContentCopyEnabled{true};
+
+    /// True if the individual event weights should be copied back from the
+    /// Cache::Manager.  This should almost always be false.
+    bool fIsEventWeightCopyEnabled{false};
+
+    /// Control the level of debugging information from the Cache::Manager
+    bool fEnableDebugPrintouts{false};
+
+    /// A vector of "filler" classes to copy the information out of the
+    /// Cache::Manager, and into the GUNDAM histogram classes.  This is the
+    /// ONE place where the histograms are actually moved from the manager to
+    /// GUNDAM.  The copy will happen when fIsHistContentCopyEnabled is true
+    /// (it should almost always be true).
+    std::vector<CacheSampleHistFiller> fSampleHistFillerList{};
+
+    /// A vector of "filler" classes to copy the information out of the
+    /// Cache::Manager, and into the GUNDAM event weights.  This is the ONE
+    /// place where the event weights are actually moved from the manager to
+    /// GUNDAM.  The copy will happen if fIsEventWeightCopyEnabled is true (it
+    /// should almost always be false).
+    std::vector<CacheEventWeightFiller> fEventWeightFillerList{};
+
+    /// A map between the fit parameter pointers and the parameter index used
+    /// by the Cache::Manager.  The index tends to follow the index used by
+    /// Minuit, but that isn't required, or guarranteed.  Note: The
+    /// Cache::Manager uses an index since the values have to exist in arrays
+    /// on the CPU and GPU.
+    std::map<const Parameter*, int> ParameterMap{};
+
+    /// Time monitoring. This tracks the amount of time that the
+    /// Cache::Manager spends setting up the calculation, and filling the input
+    /// caches.
+    GenericToolbox::Time::AveragedTimer<10> cacheFillTimer;
+
+    /// Time monitoring. This tracks the amount of time that is spent waiting
+    /// for the Cache::Manager to finish the calculation (reducible by doing
+    /// something else with the CPU), and copy the results back to from the
+    /// GPU (not easilyreducible with the current tool set).
+    GenericToolbox::Time::AveragedTimer<10> pullFromDeviceTimer;
+  };
+
+  /// Expose the static parameters to the class (defined in CacheManager.cpp).
+  static Parameters fParameters;
 
   // Hold the configuration that will be used to construct the manager
   // (singleton).  This information was originally passed as arguments to

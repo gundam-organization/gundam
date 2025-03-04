@@ -286,7 +286,7 @@ bool Cache::Manager::Build(SampleSet& sampleSet,
   // Finish filling the configuration for the tabulated dials
   {
     config.tabulatedPoints = 0;
-    for (auto table : config.tables) {
+    for (auto& table : config.tables) {
       table.second = config.tabulatedPoints;
       config.tabulatedPoints += table.first->size();
     }
@@ -505,7 +505,8 @@ bool Cache::Manager::Update(SampleSet& sampleSet, EventDialCache& eventDialCache
         if( not std::isnan(bounds.minValue) ){
           int parIndex = fParameters.ParameterMap[fp];
           GetParameterCache().SetLowerMirror(parIndex, bounds.minValue);
-          GetParameterCache().SetUpperMirror(parIndex, bounds.minValue+bounds.range);
+          GetParameterCache().SetUpperMirror(parIndex,
+                                             bounds.minValue+bounds.range);
         }
       }
 
@@ -759,12 +760,12 @@ bool Cache::Manager::PropagateParameters(){
 
     // do we need to copy every event weight to the CPU structures ?
     if( fParameters.fIsEventWeightCopyEnabled ){
-      Cache::Manager::CopyEventWeights();
+      Cache::Manager::Get()->CopyEventWeights();
     }
 
     // do we need to copy bin content to the CPU structures ?
     if( fParameters.fIsHistContentCopyEnabled ){
-      Cache::Manager::CopyHistogramContents();
+      Cache::Manager::Get()->CopyHistogramContents();
     }
   }
   return true;
@@ -772,14 +773,22 @@ bool Cache::Manager::PropagateParameters(){
 
 bool Cache::Manager::CopyEventWeights(){
 
-  if( not Cache::Manager::Get()->GetWeightsCache().IsResultValid() ){
-    // Trigger this update
-    if( fParameters.fEnableDebugPrintouts ){ LogDebug << "Copy event weights from Device to Host" << std::endl; }
-    Cache::Manager::Get()->GetWeightsCache().GetResult(0);
+  if (not GetWeightsCache().IsResultValid()) {
+    /// Add debugging output that the event weights are being copied.  The
+    /// hostPtr() call below would be sufficient, but doesn't allow the
+    /// debugging info.  The copy can be slow since this moves a lot of
+    /// information (~1M doubles).
+    if (fParameters.fEnableDebugPrintouts) {
+        LogDebug << "Copy event weights from Device to Host" << std::endl;
+    }
+    GetWeightsCache().GetResult(0);
   }
 
+  /// Move the information into the right places.  The hostPtr() method would
+  /// trigger a GPU->CPU copy, but that will have been done by GetResults()
+  /// above.
   for( auto& eventFiller : fParameters.fEventWeightFillerList ){
-    eventFiller.copyCacheToCpu( Cache::Manager::Get()->GetWeightsCache().GetWeights().hostPtr() );
+    eventFiller.copyCacheToCpu(GetWeightsCache().GetWeights().hostPtr());
   }
 
   return true;
@@ -787,6 +796,7 @@ bool Cache::Manager::CopyEventWeights(){
 
 bool Cache::Manager::CopyHistogramContents(){
 
+  /// This will trigger a GPU->CPU copy if necessary.
   for( auto& histFiller : fParameters.fSampleHistFillerList ){
     histFiller.copyHistogram(
         Cache::Manager::Get()->GetHistogramsCache().GetSumsPointer(),
@@ -801,6 +811,7 @@ bool Cache::Manager::ValidateHistogramContents(int quiet){
 
   int count = 0;
   int failed = 0;
+  /// This will trigger a GPU->CPU copy if necessary.
   for( auto& histFiller : fParameters.fSampleHistFillerList ){
     if (not histFiller.validateHistogram(
             (quiet < 2),
