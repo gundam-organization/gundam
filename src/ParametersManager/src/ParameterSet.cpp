@@ -597,11 +597,11 @@ void ParameterSet::throwParameters(bool rethrowIfNotInPhysical_, double gain_){
           if( ParameterSet::isValidCorrelatedParameter(par) ){
             iFit++;
             _correlatedVariableThrower_.getParLimitList().at(iFit) = par.getThrowLimits();
-            // cancel the prior
+            // cancel the prior, thrown values are centered around 0
             _correlatedVariableThrower_.getParLimitList().at(iFit) -= par.getPriorValue();
           }
         }
-        _correlatedVariableThrower_.setNbMaxTries(100);
+        _correlatedVariableThrower_.setNbMaxTries(10000);
         _correlatedVariableThrower_.extractBlocks();
       }
 
