@@ -41,6 +41,9 @@ public:
   void setIsFree(bool isFree){ _isFree_ = isFree; }
   void setParameterIndex(int parameterIndex){ _parameterIndex_ = parameterIndex; }
   void setStepSize(double stepSize){ _stepSize_ = stepSize; }
+  void setPriorValue(double priorValue){ _priorValue_ = priorValue; }
+  void setThrowValue(double throwValue){ _throwValue_ = throwValue; }
+  void setStdDevValue(double stdDevValue){ _stdDevValue_ = stdDevValue; }
 
   /// Set the limits for this parameter.  Parameter values less than
   /// this value are illegal, and the likelihood is undefined.  The job will
@@ -63,25 +66,6 @@ public:
   /// value passed to the likelihood to be less than the mirror boundary,
   /// while the input parameter value can continue outside of the bounds.
   void setMaxMirror(double maxMirror);
-
-  /// Record the physical minimum bound for the parameter.  This is the range
-  /// where the parameter has a physically meaningful value.  Because of
-  /// numeric continuation, the likelihood may have a finite value outside of
-  /// the physical range.  From a mathmatical perspective, the value of the
-  /// LLH is infinite below the physical minimum.  This can be enforced
-  /// using the Likelihood::SetParameterValidity() method.
-  void setMinPhysical(double minPhysical){ _physicalLimits_.min = minPhysical; }
-
-  /// Record the physical maximum bound for the parameter.  This is the range
-  /// where the parameter has a physically meaningful value.  Because of
-  /// numeric continuation, the likelihood may have a finite value outside of
-  /// the physical range.  From a mathmatical perspective, the value of the
-  /// LLH is infinite below the physical minimum.  This can be enforced
-  /// using the Likelihood::SetParameterValidity() method.
-  void setMaxPhysical(double maxPhysical){ _physicalLimits_.max = maxPhysical; }
-  void setPriorValue(double priorValue){ _priorValue_ = priorValue; }
-  void setThrowValue(double throwValue){ _throwValue_ = throwValue; }
-  void setStdDevValue(double stdDevValue){ _stdDevValue_ = stdDevValue; }
 
   /// Set the parameter value.  This always checks the parameter validity, but
   /// if force is true, then it will only print warnings, otherwise it stops
