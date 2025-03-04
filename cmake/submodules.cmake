@@ -61,7 +61,7 @@ if( ${CMAKE_BUILD_TYPE} MATCHES DEBUG OR ${ENABLE_DEV_MODE} )
   add_definitions( -D LOGGER_PREFIX_FORMAT="\\\"{TIME} {SEVERITY} {FILELINE}"\\\" )
 else()
   cmessage( STATUS "Logger set in RELEASE mode." )
-  add_definitions( -D LOGGER_PREFIX_FORMAT="\\\"{TIME} {SEVERITY} {FILELINE}"\\\" )
+  add_definitions( -D LOGGER_PREFIX_FORMAT="\\\"{TIME} {SEVERITY} {FILENAME}"\\\" )
 endif()
 
 if(NOT ENABLE_COLOR_OUTPUT)
