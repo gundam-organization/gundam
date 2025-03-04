@@ -36,6 +36,9 @@ void Parameter::configureImpl(){
   GenericToolbox::Json::fillEnum(_config_, _priorType_, "priorType");
   if( _priorType_ == PriorType::Flat ){ _isFree_ = true; }
 
+  // make sure the throws will always give parameters in bounds
+  _throwLimits_.fillMostConstrainingBounds(_parameterLimits_);
+
 }
 void Parameter::initializeImpl() {
   LogThrowIf(_owner_ == nullptr, "Parameter set ref is not set.");

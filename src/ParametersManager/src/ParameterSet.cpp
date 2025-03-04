@@ -583,8 +583,7 @@ void ParameterSet::throwParameters(bool rethrowIfNotInPhysical_, double gain_){
         for( auto& par : this->getParameterList() ){
           if( ParameterSet::isValidCorrelatedParameter(par) ){
             iFit++;
-            if( par.getThrowLimits().hasBound() ){ _correlatedVariableThrower_.getParLimitList().at(iFit) = par.getThrowLimits(); }
-            else{ _correlatedVariableThrower_.getParLimitList().at(iFit) = par.getParameterLimits(); }
+            _correlatedVariableThrower_.getParLimitList().at(iFit) = par.getThrowLimits();
           }
         }
         _correlatedVariableThrower_.extractBlocks();
