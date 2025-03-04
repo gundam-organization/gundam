@@ -26,6 +26,7 @@
 #include "TChain.h"
 #include "THn.h"
 
+#include <unordered_map>
 #include <string>
 #include <vector>
 #include <sstream>
@@ -1142,12 +1143,7 @@ void DataDispenser::loadEvent(int iThread_){
       [&]{ threadSharedData.isEventFillerReady.setValue( false ); }
   };
 
-  std::vector<const TObject**> dialAddressList{};
-  int maxIdx{-1};
-  for( auto *dialCollectionRef: _cache_.dialCollectionsRefList ) {
-    maxIdx = std::max(dialCollectionRef->getIndex(), maxIdx);
-  }
-  dialAddressList.resize(maxIdx + 1, nullptr);
+  std::unordered_map<int, const TObject**> dialAddressMap;
 
   while( true ){
 
@@ -1229,13 +1225,16 @@ void DataDispenser::loadEvent(int iThread_){
         }
 
         // grab as a general TObject, then let the factory figure out what to do with it
-        if( dialAddressList[dialCollectionRef->getIndex()] == nullptr ) {
-          // this takes time, buffering
+        try {
+          dialAddressMap.at(dialCollectionRef->getIndex());
+        }
+        catch( ... ) {
           auto* dialExpression = threadSharedData.treeBuffer.getExpressionBuffer( dialCollectionRef->getDialLeafName() );
           LogThrowIf( dialExpression == nullptr );
-          dialAddressList[dialCollectionRef->getIndex()] = (const TObject**) dialExpression->getBuffer().getPlaceHolderPtr()->getVariableAddress();
+          dialAddressMap[dialCollectionRef->getIndex()] = (const TObject**) dialExpression->getBuffer().getPlaceHolderPtr()->getVariableAddress();
         }
-        const TObject* dialObjectPtr = *dialAddressList[dialCollectionRef->getIndex()];
+
+        const TObject* dialObjectPtr = *dialAddressMap[dialCollectionRef->getIndex()];
 
         // Extra-step for selecting the right dial with TClonesArray
         if( not strcmp(dialObjectPtr->ClassName(), "TClonesArray")){
