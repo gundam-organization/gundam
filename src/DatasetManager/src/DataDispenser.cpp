@@ -614,6 +614,10 @@ void DataDispenser::loadFromHistContent(){
   auto* fHist = GenericToolbox::openExistingTFile(_parameters_.fromHistContent.rootFilePath);
 
   for( auto& sample : _cache_.samplesToFillList ){
+    _cache_.propagatorPtr->getEventDialCache().allocateCacheEntries(sample->getHistogram().getNbBins(), 0);
+  }
+
+  for( auto& sample : _cache_.samplesToFillList ){
     LogScopeIndent;
 
     auto* sampleHistDef = _parameters_.fromHistContent.getSampleHistPtr(sample->getName());
@@ -660,6 +664,18 @@ void DataDispenser::loadFromHistContent(){
         sample->getEventList()[iBin].getIndices().sample = sample->getIndex();
         sample->getEventList()[iBin].getWeights().base = (hist->GetBinContent(iBin+1));
         sample->getEventList()[iBin].getWeights().resetCurrentWeight();
+
+        auto* eventDialCacheEntry = _cache_.propagatorPtr->getEventDialCache().fetchNextCacheEntry();
+        auto sampleEventIndex = _cache_.sampleIndexOffsetList[sample->getIndex()]++;
+
+        // Get the next free event in our buffer
+        Event *eventPtr = &(*_cache_.sampleEventListPtrToFill[sample->getIndex()])[sampleEventIndex];
+
+        // Now the event is ready. Let's index the dials:
+        // there should always be a cache entry even if no dials are applied.
+        // This cache is actually used to write MC events with dials in output tree
+        eventDialCacheEntry->event.sampleIndex = std::size_t(sample->getIndex());
+        eventDialCacheEntry->event.eventIndex = sampleEventIndex;
       }
     }
 
