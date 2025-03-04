@@ -243,6 +243,31 @@ void FitterEngine::initializeImpl(){
 
   getLikelihoodInterface().propagateAndEvalLikelihood();
 
+  LogInfo << "Writing sample histograms..." << std::endl;
+  auto writeSampleHistFct = [&](const Sample* samplePtr_, const std::string& tag_){
+    auto hist = std::make_unique<TH1D>(
+          "histogram",
+          Form("%s sample \"%s\"", tag_.c_str(), samplePtr_->getName().c_str()),
+          samplePtr_->getHistogram().getNbBins(),
+          0, samplePtr_->getHistogram().getNbBins()
+        );
+    for( int iBin = 1 ; iBin <= hist->GetNbinsX()+1 ; iBin++ ){
+      hist->SetBinContent( iBin, samplePtr_->getHistogram().getBinContentList()[iBin].sumWeights );
+      hist->SetBinError( iBin, samplePtr_->getHistogram().getBinContentList()[iBin].sqrtSumSqWeights );
+    }
+    hist->GetXaxis()->SetTitle("Bin index");
+    hist->GetYaxis()->SetTitle("Rate");
+    hist->SetLineWidth(3);
+    GenericToolbox::writeInTFile(
+      GenericToolbox::TFilePath(_saveDir_, "preFit").getSubDir(tag_).getSubDir(samplePtr_->getName()).getDir(),
+      hist.get()
+    );
+  };
+  for( auto& samplePair : getLikelihoodInterface().getSamplePairList() ){
+    writeSampleHistFct(samplePair.model, "model");
+    writeSampleHistFct(samplePair.data, "data");
+  }
+
   if( not GundamGlobals::isLightOutputMode() ){
     getLikelihoodInterface().writeEvents( GenericToolbox::TFilePath(_saveDir_, "preFit") );
     getLikelihoodInterface().writeEventRates( GenericToolbox::TFilePath(_saveDir_, "preFit") );
