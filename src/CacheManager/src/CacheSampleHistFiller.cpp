@@ -18,7 +18,9 @@ void CacheSampleHistFiller::copyHistogram(const double* fSumHostPtr_, const doub
   }
 }
 
-bool CacheSampleHistFiller::validateHistogram(const double* fSumHostPtr_, const double* fSum2HostPtr_) {
+bool CacheSampleHistFiller::validateHistogram(bool quiet,
+                                              const double* fSumHostPtr_,
+                                              const double* fSum2HostPtr_) {
   bool ok{true};
 #if HAS_CPP_17
   for( auto [binContent, binContext] : histPtr->loop() ){
@@ -32,12 +34,15 @@ bool CacheSampleHistFiller::validateHistogram(const double* fSumHostPtr_, const 
         or not GundamUtils::almostEqual(binContent.sqrtSumSqWeights,hErr)) {
       double dSum = binContent.sumWeights - hSum;
       double dErr = binContent.sqrtSumSqWeights - hErr;
-      LogError << "Invalid bin[" << binContext.bin.getIndex() << "] --"
-               << " GPU: " << hSum << " +/- " << hErr
-               << " CPU: " << binContent.sumWeights
-               << " +/- " << binContent.sqrtSumSqWeights
-               << " Difference: " << dSum << " +/- " << dErr
-               << std::endl;
+      if (not quiet) {
+        LogError << "Invalid bin[" << binContext.bin.getIndex()
+                 << "+" << cacheManagerIndexOffset << "] --"
+                 << " GPU: " << hSum << " +/- " << hErr
+                 << " CPU: " << binContent.sumWeights
+                 << " +/- " << binContent.sqrtSumSqWeights
+                 << " Difference: " << dSum << " +/- " << dErr
+                 << std::endl;
+      }
       ok = false;
     }
   }
