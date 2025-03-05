@@ -1,3 +1,9 @@
+Fixes relative to 1.8.7
+
+Feature (Merge #767): Expose an interface to load the data from a histogram to the user YAML file.
+
+Issue #760 (Slopes with single point graphs): There was an unprotected array access when the slope was calculated for a single point graph.  The slope is now correctly set to zero.
+
 Fixes relative to 1.8.6
 
 Propagation: Make sure that the event breakdown includes the effect of masking.
