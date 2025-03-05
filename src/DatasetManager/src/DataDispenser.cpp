@@ -736,14 +736,14 @@ void DataDispenser::eventSelectionFunction(int iThread_){
   auto treeChain{this->openChain()};
 
   // Create the memory buffer for the TChain
-  GenericToolbox::LeafCollection lCollection;
-  lCollection.setTreePtr( treeChain.get() );
+  GenericToolbox::TreeBuffer tb;
+  tb.setTree( treeChain.get() );
 
   // global cut
   int selectionCutLeafFormIndex{-1};
   if( not _parameters_.selectionCutFormulaStr.empty() ){
     LogInfoIf(iThread_ == 0) << "Global selection cut: \"" << _parameters_.selectionCutFormulaStr << "\"" << std::endl;
-    selectionCutLeafFormIndex = lCollection.addLeafExpression( _parameters_.selectionCutFormulaStr );
+    selectionCutLeafFormIndex = tb.addExpression( _parameters_.selectionCutFormulaStr );
   }
 
   // sample cuts
@@ -771,13 +771,13 @@ void DataDispenser::eventSelectionFunction(int iThread_){
 
     if( selectionCut.empty() ){ continue; }
 
-    sampleCutList.back().cutIndex = lCollection.addLeafExpression( selectionCut );
+    sampleCutList.back().cutIndex = tb.addExpression( selectionCut );
     tCuts << samplePtr->getName() << GenericToolbox::TablePrinter::NextColumn;
     tCuts << selectionCut << GenericToolbox::TablePrinter::NextColumn;
   }
 
   if(iThread_ == 0){ tCuts.printTable(); }
-  lCollection.initialize();
+  tb.initialize();
 
   GenericToolbox::VariableMonitor readSpeed("bytes");
 
@@ -819,9 +819,10 @@ void DataDispenser::eventSelectionFunction(int iThread_){
     else{
       treeChain->GetEntry(iEntry);
     }
+    tb.saveExpressions();
 
     if ( selectionCutLeafFormIndex != -1 ){
-      if( lCollection.getLeafFormList()[selectionCutLeafFormIndex].evalAsDouble() == 0 ){
+      if( tb.getExpressionBufferList()[selectionCutLeafFormIndex]->getBuffer().getValueAsDouble() == 0 ){
         for (size_t iSample = 0; iSample < _cache_.samplesToFillList.size(); iSample++) {
           threadSelectionResults.entrySampleIndexList[iEntry] = -1;
         }
@@ -834,7 +835,7 @@ void DataDispenser::eventSelectionFunction(int iThread_){
 
 
       if(  sampleCut.cutIndex == -1  // no cut?
-           or lCollection.getLeafFormList()[sampleCut.cutIndex].evalAsDouble() != 0 // pass cut?
+           or tb.getExpressionBufferList()[sampleCut.cutIndex]->getBuffer().getValueAsDouble() != 0 // pass cut?
           ){
         if( sampleHasBeenFound ){
           LogError << "Entry #" << iEntry << "already has a sample." << std::endl;
