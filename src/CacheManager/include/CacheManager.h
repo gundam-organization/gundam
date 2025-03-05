@@ -16,6 +16,8 @@
 #include "WeightBicubic.h"
 #include "WeightTabulated.h"
 
+#include <future>
+
 #ifdef CACHE_MANAGER_USE_INDEXED_SUMS
 // An older implementation of the histogram summing that may be faster for
 // some (peculiar) data sets.
@@ -142,8 +144,10 @@ public:
 
   /// Same as Propagator::propagateParameters().  This is a convenient way to
   /// fill the event weights and the histograms, but it will block until the
-  /// Cache::Manager calculation is completed.
-  static bool PropagateParameters();
+  /// Cache::Manager calculation is completed.  You should usually use
+  /// Cache::Manager::Fill() which returns a future.
+  static bool PropagateParameters(SampleSet& sampleSet,
+                                  EventDialCache& eventDialCache);
 
   /// Validate the local copy of the histogram contents against the last
   /// weight calculation.  The quiet parameter controls how much output
@@ -162,9 +166,15 @@ public:
   /// sample list and event dials.
   bool Update(SampleSet& sampleSet, EventDialCache& eventDialCache);
 
-  /// Fill the cache for the current iteration.  This needs to be called
-  /// before the cached weights can be used.  This is used in Propagator.cpp.
-  bool Fill();
+  /// Fill the cache for the current iteration.  This returns a future<bool>
+  /// that is used to actually get the result of the calculation.  The future
+  /// will be valid if the calculation was started, and invalid if the
+  /// Cache::Manager doesn't exist, or the Cache::Manager calculation is
+  /// turned off. Accessing the future will block until the Cache::Manager is
+  /// finished, and it will return the status of the calculation.  If the
+  /// result is true, the results will have been placed in the GUNDAM memory.
+  /// This is used in Propagator.cpp.
+  static std::future<bool> Fill(SampleSet& sampleSet, EventDialCache& eventDialCache);
 
   /// Copy the event weights from the Cache::Manager into the GUNDAM event
   /// weight classes.  This will block if the Cache::Manager calculation
@@ -182,7 +192,9 @@ public:
 
 private:
 
-private:
+  /// Get the results of the last call to Cache::Manager::Fill().  This is
+  /// used to implement the future returned by Fill().
+  bool CopyResults();
 
   // Hold static members of the CacheManager in one place
   struct Parameters{

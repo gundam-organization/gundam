@@ -136,11 +136,13 @@ void Propagator::propagateParameters(){
   updateDialState();
 
 #ifdef GUNDAM_USING_CACHE_MANAGER
-  bool usedCacheManager{false};
   // Trigger the reweight on the GPU.  This will fill the histograms, but most
   // of the time, leaves the event weights on the GPU.
-  usedCacheManager = Cache::Manager::PropagateParameters();
-  if(usedCacheManager and not Cache::Manager::IsForceCpuCalculation()) return;
+  auto cacheManager = Cache::Manager::Fill(getSampleSet(),getEventDialCache());
+  if (cacheManager.valid() and not Cache::Manager::IsForceCpuCalculation()) {
+    cacheManager.get();  // The cacheManager future could be returned.
+    return;
+  }
 #endif
 
   // Trigger the reweight on the CPU.  Override the dial update inside of
@@ -150,7 +152,7 @@ void Propagator::propagateParameters(){
   this->refillHistograms();
 
 #ifdef GUNDAM_USING_CACHE_MANAGER
-  if (usedCacheManager and Cache::Manager::IsForceCpuCalculation()) {
+  if (cacheManager.valid() and Cache::Manager::IsForceCpuCalculation()) {
     bool valid = Cache::Manager::ValidateHistogramContents();
     if (not valid) {
       LogError << GundamUtils::Backtrace;
@@ -158,6 +160,8 @@ void Propagator::propagateParameters(){
     }
   }
 #endif
+
+  // This could return a future with a fixed "true" value.
 }
 
 void Propagator::reweightEvents(bool updateDials) {
@@ -298,7 +302,7 @@ void Propagator::initializeCacheManager(){
   // Some of those part might get disabled for faster calculation
   Cache::Manager::SetIsEventWeightCopyEnabled( true );
   Cache::Manager::SetIsHistContentCopyEnabled( true );
-  Cache::Manager::PropagateParameters();
+  Cache::Manager::PropagateParameters(_sampleSet_,_eventDialCache_);
 }
 #endif
 
