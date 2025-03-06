@@ -52,19 +52,19 @@ public:
   void setParSetRef(std::vector<ParameterSet> *parSetRef_){ _parSetListPtr_ = parSetRef_; }
 
   // const getters
-  [[nodiscard]] bool isDialUpdateRequested() const{ return _isDialUpdateRequested_; }
-  [[nodiscard]] const bool* isDialUpdateRequestedPtr() const{ return &_isDialUpdateRequested_; }
-  [[nodiscard]] int getBufferSize() const{ return _inputArraySize_; }
-  [[nodiscard]] size_t getInputSize() const{ return _inputParameterReferenceList_.size(); }
-  [[nodiscard]] const std::vector<double>& getInputBuffer() const { return _inputBuffer_; }
-  [[nodiscard]] const std::vector<ParameterReference> &getInputParameterIndicesList() const{ return _inputParameterReferenceList_; }
+  [[nodiscard]] auto isDialUpdateRequested() const{ return _isDialUpdateRequested_; }
+  [[nodiscard]] auto isDialUpdateRequestedPtr() const{ return &_isDialUpdateRequested_; }
+  [[nodiscard]] auto getBufferSize() const{ return _inputArraySize_; }
+  [[nodiscard]] auto getInputSize() const{ return _inputParameterReferenceList_.size(); }
+  [[nodiscard]] auto& getInputBuffer() const { return _inputBuffer_; }
+  [[nodiscard]] auto& getInputParameterIndicesList() const{ return _inputParameterReferenceList_; }
 
   // mutable getters
 
   /// Function that allow to tweak the buffer from the inside. Used for
   /// individual spline evaluation.
-  std::vector<double>& getInputBuffer(){ return _inputBuffer_; }
-  std::vector<ParameterReference> &getInputParameterIndicesList(){ return _inputParameterReferenceList_; }
+  auto& getInputBuffer(){ return _inputBuffer_; }
+  auto& getInputParameterIndicesList(){ return _inputParameterReferenceList_; }
 
   // core
   void invalidateBuffers();

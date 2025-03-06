@@ -31,11 +31,11 @@ public:
   void setVarNameList(const std::vector<std::string>& nameListPtr_);
 
   // const-getters
-  [[nodiscard]] const std::vector<std::string>* getNameListPtr() const{ return _nameListPtr_; }
-  [[nodiscard]] const std::vector<VariableHolder>& getVarList() const{ return _varList_; }
+  [[nodiscard]] auto getNameListPtr() const{ return _nameListPtr_; }
+  [[nodiscard]] auto& getVarList() const{ return _varList_; }
 
   // mutable-getters
-  std::vector<VariableHolder>& getVarList(){ return _varList_; }
+  auto& getVarList(){ return _varList_; }
 
   // fetch
   [[nodiscard]] int findVarIndex( const std::string& leafName_, bool throwIfNotFound_ = true) const;

@@ -29,13 +29,13 @@ public:
   void setGlobalCovarianceMatrix(const std::shared_ptr<TMatrixD> &globalCovarianceMatrix){ _globalCovarianceMatrix_ = globalCovarianceMatrix; }
 
   // const getters
-  [[nodiscard]] const std::shared_ptr<TMatrixD> &getGlobalCovarianceMatrix() const{ return _globalCovarianceMatrix_; }
-  [[nodiscard]] const std::shared_ptr<TMatrixD> &getStrippedCovarianceMatrix() const{ return _strippedCovarianceMatrix_; }
-  [[nodiscard]] const std::vector<ParameterSet> &getParameterSetsList() const{ return _parameterSetList_; }
+  [[nodiscard]] auto& getGlobalCovarianceMatrix() const{ return _globalCovarianceMatrix_; }
+  [[nodiscard]] auto& getStrippedCovarianceMatrix() const{ return _strippedCovarianceMatrix_; }
+  [[nodiscard]] auto& getParameterSetsList() const{ return _parameterSetList_; }
 
   // getters
-  std::shared_ptr<TMatrixD> &getGlobalCovarianceMatrix(){ return _globalCovarianceMatrix_; }
-  std::vector<ParameterSet> &getParameterSetsList(){ return _parameterSetList_; }
+  auto& getGlobalCovarianceMatrix(){ return _globalCovarianceMatrix_; }
+  auto& getParameterSetsList(){ return _parameterSetList_; }
 
   // const core
   [[nodiscard]] std::string getParametersSummary( bool showEigen_ = true ) const;

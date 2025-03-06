@@ -40,18 +40,18 @@ public:
   void setBinningFilePath(const JsonType &binningFilePath_){ _binningConfig_ = binningFilePath_; }
 
   // const getters
-  [[nodiscard]] bool isEnabled() const{ return _isEnabled_; }
-  [[nodiscard]] bool isEventMcThrowDisabled() const{ return _disableEventMcThrow_; }
-  [[nodiscard]] int getIndex() const{ return _index_; }
-  [[nodiscard]] const std::string &getName() const{ return _name_; }
-  [[nodiscard]] const std::string &getSelectionCutsStr() const{ return _selectionCutStr_; }
-  [[nodiscard]] const JsonType &getBinningFilePath() const{ return _binningConfig_; }
-  [[nodiscard]] const Histogram &getHistogram() const{ return _histogram_; }
-  [[nodiscard]] const std::vector<Event> &getEventList() const{ return _eventList_; }
+  [[nodiscard]] auto isEnabled() const{ return _isEnabled_; }
+  [[nodiscard]] auto isEventMcThrowDisabled() const{ return _disableEventMcThrow_; }
+  [[nodiscard]] auto getIndex() const{ return _index_; }
+  [[nodiscard]] auto& getName() const{ return _name_; }
+  [[nodiscard]] auto& getSelectionCutsStr() const{ return _selectionCutStr_; }
+  [[nodiscard]] auto& getBinningFilePath() const{ return _binningConfig_; }
+  [[nodiscard]] auto& getHistogram() const{ return _histogram_; }
+  [[nodiscard]] auto& getEventList() const{ return _eventList_; }
 
   // mutable getters
-  Histogram &getHistogram(){ return _histogram_; }
-  std::vector<Event> &getEventList(){ return _eventList_; }
+  auto& getHistogram(){ return _histogram_; }
+  auto& getEventList(){ return _eventList_; }
 
   // const core
   void writeEventRates(const GenericToolbox::TFilePath& saveDir_) const;

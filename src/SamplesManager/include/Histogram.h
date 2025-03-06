@@ -27,13 +27,13 @@ public:
   };
 
   // const getters
-  [[nodiscard]] int getNbBins() const { return nBins; }
-  [[nodiscard]] const std::vector<BinContent>& getBinContentList() const { return binContentList; }
-  [[nodiscard]] const std::vector<BinContext>& getBinContextList() const { return binContextList; }
+  [[nodiscard]] auto getNbBins() const { return nBins; }
+  [[nodiscard]] auto& getBinContentList() const { return binContentList; }
+  [[nodiscard]] auto& getBinContextList() const { return binContextList; }
 
   // mutable getters
-  std::vector<BinContent>& getBinContentList(){ return binContentList; }
-  std::vector<BinContext>& getBinContextList(){ return binContextList; }
+  auto& getBinContentList(){ return binContentList; }
+  auto& getBinContextList(){ return binContextList; }
 
   // core
   void build(const JsonType& binningConfig_);
