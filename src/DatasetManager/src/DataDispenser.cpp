@@ -112,8 +112,6 @@ void DataDispenser::initializeImpl(){
     return false;
   });
 
-  _threadPool_.setNThreads( GundamGlobals::getNbCpuThreads(_owner_->getNbMaxThreadsForLoad()) );
-
 }
 
 void DataDispenser::load(Propagator& propagator_){
@@ -227,7 +225,7 @@ void DataDispenser::doEventSelection(){
   ROOT::EnableThreadSafety();
 
   // how meaning buffers?
-  int nThreads{GundamGlobals::getNbCpuThreads(_owner_->getNbMaxThreadsForLoad())};
+  int nThreads{getNbParallelCpu()};
   if( _owner_->isDevSingleThreadEventSelection() ) { nThreads = 1; }
 
   Long64_t nEntries{0};
@@ -245,9 +243,11 @@ void DataDispenser::doEventSelection(){
   }
 
   if( not _owner_->isDevSingleThreadEventSelection() ) {
-    _threadPool_.addJob(__METHOD_NAME__, [this](int iThread_){ this->eventSelectionFunction(iThread_); });
-    _threadPool_.runJob(__METHOD_NAME__);
-    _threadPool_.removeJob(__METHOD_NAME__);
+    GenericToolbox::ParallelWorker threadPool;
+    threadPool.setNThreads( getNbParallelCpu() );
+    threadPool.addJob(__METHOD_NAME__, [this](int iThread_){ this->eventSelectionFunction(iThread_); });
+    threadPool.runJob(__METHOD_NAME__);
+    threadPool.removeJob(__METHOD_NAME__);
   }
   else {
     this->eventSelectionFunction(-1);
@@ -548,12 +548,14 @@ void DataDispenser::readAndFill(){
   }
 
   LogWarning << "Loading and indexing..." << std::endl;
-  if(not _owner_->isDevSingleThreadEventLoaderAndIndexer() and GundamGlobals::getNbCpuThreads(_owner_->getNbMaxThreadsForLoad()) > 1 ){
-    threadSharedDataList.resize(GundamGlobals::getNbCpuThreads(_owner_->getNbMaxThreadsForLoad()));
+  if(not _owner_->isDevSingleThreadEventLoaderAndIndexer() and getNbParallelCpu() > 1 ){
+    threadSharedDataList.resize(getNbParallelCpu() );
     ROOT::EnableThreadSafety(); // EXTREMELY IMPORTANT
-    _threadPool_.addJob(__METHOD_NAME__, [&](int iThread_){ this->runEventFillThreads(iThread_); });
-    _threadPool_.runJob(__METHOD_NAME__);
-    _threadPool_.removeJob(__METHOD_NAME__);
+    GenericToolbox::ParallelWorker threadPool;
+    threadPool.setNThreads( getNbParallelCpu() );
+    threadPool.addJob(__METHOD_NAME__, [&](int iThread_){ this->runEventFillThreads(iThread_); });
+    threadPool.runJob(__METHOD_NAME__);
+    threadPool.removeJob(__METHOD_NAME__);
   }
   else{
     threadSharedDataList.resize(1);
@@ -684,7 +686,14 @@ void DataDispenser::loadFromHistContent(){
   fHist->Close();
 }
 
-std::shared_ptr<TChain> DataDispenser::openChain(bool verbose_){
+int DataDispenser::getNbParallelCpu() const{
+  return GundamGlobals::getNbCpuThreads(_owner_->getNbMaxThreadsForLoad());
+}
+const std::string& DataDispenser::getVariableExpression(const std::string& variable_) const {
+  try{ return _parameters_.variableDict.at(variable_); } catch( ... ) {}
+  return variable_; // if not found
+}
+std::shared_ptr<TChain> DataDispenser::openChain(bool verbose_) const{
   LogInfoIf(verbose_) << "Opening ROOT files containing events..." << std::endl;
 
   std::shared_ptr<TChain> treeChain(std::make_shared<TChain>());
@@ -729,7 +738,7 @@ std::shared_ptr<TChain> DataDispenser::openChain(bool verbose_){
 
 void DataDispenser::eventSelectionFunction(int iThread_){
 
-  int nThreads{GundamGlobals::getNbCpuThreads(_owner_->getNbMaxThreadsForLoad())};
+  int nThreads{getNbParallelCpu()};
   if( iThread_ == -1 ){ iThread_ = 0; nThreads = 1; }
 
   // Opening ROOT files and make a TChain
@@ -861,7 +870,7 @@ void DataDispenser::eventSelectionFunction(int iThread_){
 
 void DataDispenser::runEventFillThreads(int iThread_){
 
-  int nThreads = GundamGlobals::getNbCpuThreads(_owner_->getNbMaxThreadsForLoad());
+  int nThreads = getNbParallelCpu();
   if( iThread_ == -1 ){ iThread_ = 0; nThreads = 1; } // special mode
 
   // init shared data
