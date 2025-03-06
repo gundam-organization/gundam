@@ -1,6 +1,6 @@
 # GUNDAM — 風をあつめて (Long Term Support Branch)
 
-![](./resources/images/bannerv2.png)
+![](./resources/images/title.001.png)
 
 [![Generic badge](https://img.shields.io/badge/Example_of_inputs-OA2020-GREEN.svg)](https://github.com/nadrino/gundamInputOa2020)  [![GitHub forks](https://badgen.net/github/forks/nadrino/gundam/)](https://github.com/nadrino/gundam/network/members) [![GitHub release](https://img.shields.io/github/release/nadrino/gundam.svg)](https://github.com/nadrino/gundam/releases/)
 
@@ -44,7 +44,7 @@ The goals for this branch are:
 
 </details>
 
-![bannerStyle.001.png](resources/images/bannerStyle/bannerStyle.001.png)
+![bannerStyle.001.png](resources/images/bannerStyle/sections.001.png)
 
 ### There are several requirements for building the fitter:
 
@@ -91,7 +91,7 @@ mkdir -p $REPO_DIR
 ```
 
 
-![bannerStyle.001.png](resources/images/bannerStyle/bannerStyle.002.png)
+![bannerStyle.001.png](resources/images/bannerStyle/sections.002.png)
 
 ### Cloning the source code
 
@@ -120,7 +120,7 @@ a new release is available, simply use the same command.
 
 
 
-![bannerStyle.001.png](resources/images/bannerStyle/bannerStyle.003.png)
+![bannerStyle.001.png](resources/images/bannerStyle/sections.003.png)
 
 ### Compiling on macOS:
 
@@ -156,14 +156,14 @@ this will create the build directory `gundam-${compiler}_${compiler_version}-${c
 
 ## How do I use GUNDAM?
 
-![bannerStyle.001.png](resources/images/bannerStyle/bannerStyle.004.png)
+![bannerStyle.001.png](resources/images/bannerStyle/sections.004.png)
 
 [gundamFitter options](./documentation/applications/gundamFitter.md)
 
 
 ## I want to contribute!
 
-![bannerStyle.001.png](resources/images/bannerStyle/bannerStyle.005.png)
+![bannerStyle.001.png](resources/images/bannerStyle/sections.005.png)
 
 ### Development policy
 
@@ -186,6 +186,5 @@ GUNDAM has originally been developed as an new fitter to perform T2K oscillation
 analysis, and provide an expandable base on which future studies with the *Upgraded
 ND280 Detectors* will be performed.
 
-![](./resources/images/ride.png)
 
 
