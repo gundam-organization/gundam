@@ -659,8 +659,8 @@ void FitterEngine::checkNumericalAccuracy(){
           parSet.getParameterList()[iPar].setParameterValue( throws[iThrow][iParSet][iPar] );
         }
       }
-      getLikelihoodInterface().getModelPropagator().propagateParameters();
-      getLikelihoodInterface().evalLikelihood();
+      std::future<bool> eventually = getLikelihoodInterface().getModelPropagator().applyParameters();
+      getLikelihoodInterface().evalLikelihood(eventually);
 
       if( responses[iThrow] == responses[iThrow] ){ // not nan
         LogThrowIf(getLikelihoodInterface().getLastLikelihood() != responses[iThrow], "Not accurate: " << getLikelihoodInterface().getLastLikelihood() - responses[iThrow] << " / "

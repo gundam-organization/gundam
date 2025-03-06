@@ -143,7 +143,7 @@ std::future<bool> Propagator::applyParameters(){
 #ifdef GUNDAM_USING_CACHE_MANAGER
   // Trigger the reweight on the GPU.  This will fill the histograms, but most
   // of the time, leaves the event weights on the GPU.
-  auto cacheManager = Cache::Manager::Fill(getSampleSet(),getEventDialCache());
+  std::future<bool> cacheManager = Cache::Manager::Fill(getSampleSet(),getEventDialCache());
   if (cacheManager.valid() and not Cache::Manager::IsForceCpuCalculation()) {
     return cacheManager;  // The cacheManager future could be returned.
   }
