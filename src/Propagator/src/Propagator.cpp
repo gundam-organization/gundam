@@ -129,6 +129,11 @@ void Propagator::buildDialCache(){
   }
 }
 void Propagator::propagateParameters(){
+  std::future<bool> result = applyParameters();
+  result.get();
+}
+
+std::future<bool> Propagator::applyParameters(){
   // Make sure the dial state is updated before reweighting and filling the
   // histograms.  This has to be done before the GPU and CPU calculations, and
   // should be shared for both.
@@ -140,8 +145,7 @@ void Propagator::propagateParameters(){
   // of the time, leaves the event weights on the GPU.
   auto cacheManager = Cache::Manager::Fill(getSampleSet(),getEventDialCache());
   if (cacheManager.valid() and not Cache::Manager::IsForceCpuCalculation()) {
-    cacheManager.get();  // The cacheManager future could be returned.
-    return;
+    return cacheManager;  // The cacheManager future could be returned.
   }
 #endif
 
@@ -161,7 +165,12 @@ void Propagator::propagateParameters(){
   }
 #endif
 
-  // This could return a future with a fixed "true" value.
+  // The CPU has already finished filling the data structures by the time we
+  // get here, so this could be done with a std::promise<bool> and set the
+  // value before returning the future.  It's done with a deferred std::async
+  // since the code is a little cleaner to my eye, and the lambda mostly
+  // optimizes into oblivion.
+  return std::async(std::launch::deferred, []{return true;});
 }
 
 void Propagator::reweightEvents(bool updateDials) {
