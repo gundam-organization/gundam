@@ -26,15 +26,15 @@ public:
   void clearEventLists();
 
   // const getters
-  [[nodiscard]] const std::vector<Sample> &getSampleList() const{ return _sampleList_; }
-  [[nodiscard]] const std::vector<std::string>& getEventVariableNameList() const{ return _eventVariableNameList_; }
+  [[nodiscard]] auto& getSampleList() const{ return _sampleList_; }
+  [[nodiscard]] auto& getEventVariableNameList() const{ return _eventVariableNameList_; }
 
   // mutable getters
-  std::vector<Sample> &getSampleList(){ return _sampleList_; }
-  std::vector<std::string>& getEventVariableNameList(){ return _eventVariableNameList_; }
+  auto& getSampleList(){ return _sampleList_; }
+  auto& getEventVariableNameList(){ return _eventVariableNameList_; }
 
   // core
-  [[nodiscard]] bool empty() const{ return _sampleList_.empty(); }
+  [[nodiscard]] auto empty() const{ return _sampleList_.empty(); }
   [[nodiscard]] std::vector<std::string> fetchRequestedVariablesForIndexing() const;
 
   void copyEventsFrom(const SampleSet& src_);
