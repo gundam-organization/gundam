@@ -10,7 +10,6 @@
 #include <vector>
 #include <string>
 
-
 class ParameterSet;
 
 /// Hold a Parameter that is a member of a ParameterSet to be used in the fit.
@@ -42,6 +41,7 @@ public:
   void setIsFixed(bool isFixed){ _isFixed_ = isFixed; }
   void setIsEigen(bool isEigen){ _isEigen_ = isEigen; }
   void setIsFree(bool isFree){ _isFree_ = isFree; }
+  void setIfThrown(bool isThrown){ _isThrown_ = isThrown; }
   void setParameterIndex(int parameterIndex){ _parameterIndex_ = parameterIndex; }
   void setStepSize(double stepSize){ _stepSize_ = stepSize; }
   void setPriorValue(double priorValue){ _priorValue_ = priorValue; }
@@ -81,6 +81,7 @@ public:
   [[nodiscard]] auto isFixed() const{ return _isFixed_; }
   [[nodiscard]] auto isEigen() const{ return _isEigen_; }
   [[nodiscard]] auto isEnabled() const{ return _isEnabled_; }
+  [[nodiscard]] auto isThrown() const{ return _isThrown_ and _isEnabled_ and not _isFixed_; }
   [[nodiscard]] auto gotUpdated() const { return _gotUpdated_; }
   [[nodiscard]] auto getParameterIndex() const{ return _parameterIndex_; }
   [[nodiscard]] auto getStepSize() const{ return _stepSize_; }
@@ -166,6 +167,7 @@ private:
   bool _isFixed_{false};
   bool _isEigen_{false};
   bool _isFree_{false};
+  bool _isThrown_{true};
   bool _gotUpdated_{false};
   int _parameterIndex_{-1}; // to get the right definition in the json config (in case "name" is not specified)
   double _parameterValue_{std::nan("unset")};

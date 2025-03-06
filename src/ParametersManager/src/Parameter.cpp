@@ -26,6 +26,7 @@ void Parameter::configureImpl(){
   }
 
   GenericToolbox::Json::fillValue(_config_, _isFixed_, "isFixed");
+  GenericToolbox::Json::fillValue(_config_, _isThrown_, "isThrown");
   GenericToolbox::Json::fillValue(_config_, _stepSize_, "parameterStepSize");
   GenericToolbox::Json::fillValue(_config_, _parameterLimits_, "parameterLimits");
   GenericToolbox::Json::fillValue(_config_, _physicalLimits_, "physicalLimits");
