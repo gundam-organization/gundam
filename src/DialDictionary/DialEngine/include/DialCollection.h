@@ -97,7 +97,8 @@ public:
   // should be applied if this returns a non-zero value.
   [[nodiscard]] const std::shared_ptr<TFormula> &getApplyConditionFormula() const{ return _applyConditionFormula_; }
 
-  const DialType& getDialType() const{ return _dialType_; }
+  [[nodiscard]] auto& getDialType() const{ return _dialType_; }
+  [[nodiscard]] auto& getDialOptions() const{ return _dialOptions_; }
 
   // mutable getters
   BinSet &getDialBinSet(){ return _dialBinSet_; }
