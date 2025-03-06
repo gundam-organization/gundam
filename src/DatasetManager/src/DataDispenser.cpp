@@ -509,7 +509,7 @@ void DataDispenser::preAllocateMemory(){
       // Reserve enough space for all the event-by-event dials
       // that might be added.  This size may be reduced later.
       t << dialCollection->getTitle() << GenericToolbox::TablePrinter::NextColumn;
-      t << dialCollection->getDialType() << GenericToolbox::TablePrinter::NextLine;
+      t << dialCollection->getDialType() << GenericToolbox::TablePrinter::NextColumn;
       t << dialCollection->getDialOptions() << GenericToolbox::TablePrinter::NextLine;
 
       // Only increase the size.  It's probably zero before
