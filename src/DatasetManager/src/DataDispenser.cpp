@@ -611,6 +611,7 @@ void DataDispenser::loadFromHistContent(){
     LogInfo << "Filling sample \"" << sample->getName() << "\" using hist with name: " << histName << std::endl;
 
     auto* histObject = fHist->Get( histName.c_str() );
+    LogThrowIf(histObject == nullptr, "Could not find " << filePath << ":" << histName);
 
     if( histObject->InheritsFrom("THnD") ) {
       auto* hist = fHist->Get<THnD>( histName.c_str() );
