@@ -66,30 +66,23 @@ public:
   void setValidity(int validity);
 
   // Getters
-  [[nodiscard]] bool isEnabled() const{ return _isEnabled_; }
-  [[nodiscard]] bool isScanEnabled() const{ return _isScanEnabled_; }
-  [[nodiscard]] bool isEnablePca() const{ return _enablePca_; }
-  [[nodiscard]] bool isEnableEigenDecomp() const{ return _enableEigenDecomp_; }
-  [[nodiscard]] bool isEnabledThrowToyParameters() const{ return _enabledThrowToyParameters_; }
-  [[nodiscard]] bool isMaskForToyGeneration() const{ return _maskForToyGeneration_; }
-  [[nodiscard]] int getNbEnabledEigenParameters() const{ return _nbEnabledEigen_; }
-  [[nodiscard]] double getPenaltyChi2Buffer() const{ return _penaltyChi2Buffer_; }
-  [[nodiscard]] size_t getNbParameters() const{ return _parameterList_.size(); }
-  [[nodiscard]] const std::string &getName() const{ return _name_; }
-  [[nodiscard]] const JsonType &getDialSetDefinitions() const{ return _dialSetDefinitions_; }
-  [[nodiscard]] const TMatrixD* getInvertedEigenVectors() const{ return _eigenVectorsInv_.get(); }
-  [[nodiscard]] const TMatrixD* getEigenVectors() const{ return _eigenVectors_.get(); }
-  [[nodiscard]] const TVectorD* getDeltaVectorPtr() const{ return _deltaVectorPtr_.get(); }
-  [[nodiscard]] const std::vector<JsonType>& getCustomParThrow() const{ return _customParThrow_; }
-  [[nodiscard]] const std::shared_ptr<TMatrixDSym> &getPriorCovarianceMatrix() const { return _priorCovarianceMatrix_; }
-  [[nodiscard]] const std::shared_ptr<TMatrixD> &getInverseCovarianceMatrix() const{ return _inverseCovarianceMatrix_; }
-
-  /// True if all of the enabled parameters have valid values.
-  [[nodiscard]] bool isValid() const;
-
-  /// Convenience method to check if a value will be valid for a particular
-  /// parameter.
-  [[nodiscard]] bool isValidParameterValue(const Parameter& p, double v) const;
+  [[nodiscard]] auto isEnabled() const{ return _isEnabled_; }
+  [[nodiscard]] auto isScanEnabled() const{ return _isScanEnabled_; }
+  [[nodiscard]] auto isEnablePca() const{ return _enablePca_; }
+  [[nodiscard]] auto isEnableEigenDecomp() const{ return _enableEigenDecomp_; }
+  [[nodiscard]] auto isEnabledThrowToyParameters() const{ return _enabledThrowToyParameters_; }
+  [[nodiscard]] auto isMaskForToyGeneration() const{ return _maskForToyGeneration_; }
+  [[nodiscard]] auto getNbEnabledEigenParameters() const{ return _nbEnabledEigen_; }
+  [[nodiscard]] auto getPenaltyChi2Buffer() const{ return _penaltyChi2Buffer_; }
+  [[nodiscard]] auto getNbParameters() const{ return _parameterList_.size(); }
+  [[nodiscard]] auto getInvertedEigenVectors() const{ return _eigenVectorsInv_.get(); }
+  [[nodiscard]] auto getEigenVectors() const{ return _eigenVectors_.get(); }
+  [[nodiscard]] auto getDeltaVectorPtr() const{ return _deltaVectorPtr_.get(); }
+  [[nodiscard]] auto& getName() const{ return _name_; }
+  [[nodiscard]] auto& getDialSetDefinitions() const{ return _dialSetDefinitions_; }
+  [[nodiscard]] auto& getCustomParThrow() const{ return _customParThrow_; }
+  [[nodiscard]] auto& getPriorCovarianceMatrix() const { return _priorCovarianceMatrix_; }
+  [[nodiscard]] auto& getInverseCovarianceMatrix() const{ return _inverseCovarianceMatrix_; }
 
   /// Get the vector of parameters for this parameter set in the real
   /// parameter space.  These parameters are not eigendecomposed.  WARNING:
@@ -97,13 +90,20 @@ public:
   /// added or removed from the vector.  But, the value of the elements may be
   /// changed, so `getParameterList().front().setParameterValue(0)' is OK, but
   /// 'getParameterList().emplace_back(Parameter())' is NOT OK.
-  [[nodiscard]] const std::vector<Parameter> &getParameterList() const{ return _parameterList_; }
-  [[nodiscard]] std::vector<Parameter> &getParameterList(){ return _parameterList_; }
+  [[nodiscard]] auto& getParameterList() const{ return _parameterList_; }
+  auto& getParameterList(){ return _parameterList_; }
 
   /// Get the vector of parameters for this parameter set in the
   /// eigendecomposed basis.  WARNING: See warning for getParameterList().
-  [[nodiscard]] const std::vector<Parameter> &getEigenParameterList() const{ return _eigenParameterList_; }
-  [[nodiscard]] std::vector<Parameter> &getEigenParameterList(){ return _eigenParameterList_; }
+  [[nodiscard]] auto& getEigenParameterList() const{ return _eigenParameterList_; }
+  auto& getEigenParameterList(){ return _eigenParameterList_; }
+
+  /// True if all of the enabled parameters have valid values.
+  [[nodiscard]] bool isValid() const;
+
+  /// Convenience method to check if a value will be valid for a particular
+  /// parameter.
+  [[nodiscard]] bool isValidParameterValue(const Parameter& p, double v) const;
 
   /// Get the vector of parameters for this parameter set that is applicable
   /// for the current stage of the fit.  This will either be the
