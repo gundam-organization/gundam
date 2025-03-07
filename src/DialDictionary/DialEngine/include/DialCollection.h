@@ -55,18 +55,8 @@ public:
   void setSupervisedParameterIndex(int supervisedParameterIndex){ _supervisedParameterIndex_ = supervisedParameterIndex; }
   void setSupervisedParameterSetIndex(int supervisedParameterSetIndex){ _supervisedParameterSetIndex_ = supervisedParameterSetIndex; }
 
-  // DEPRECATED: Replace with 'not isEventByEvent()' -- When GUNDAM
-  // started, there were three types of dials that could be applied to
-  // events (normalization, event-by-event splines, and binned
-  // splines).  Since normalization didn't have a "real" dial, we only
-  // needed to distinguish between binned and unbinned splines.  Now
-  // we have event-by-event splines, and "everything else"
-  // (Normalization, Formula, "binned", &c).  This may be
-  // "undeprecated" as soon as we start adding different queries for
-  // dial types.
-  [[deprecated("Replace with 'not isEventByEvent()'")]] bool isBinned() const {return not isEventByEvent();}
-
   // const getters
+  auto getSupervisedParameterSetIndex() const{ return _supervisedParameterSetIndex_; }
 
   // Query if this has one DialBaseObject per event, or if DialBaseObjects are
   // shared between events.  Used to decide how to attach to events in

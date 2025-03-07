@@ -86,11 +86,31 @@ void Propagator::configureImpl(){
 
 }
 void Propagator::initializeImpl(){
-  LogWarning << __METHOD_NAME__ << std::endl;
+  LogWarning << "Initializing propagator..." << std::endl;
 
   _parManager_.initialize();
   _sampleSet_.initialize();
-  for( auto& dialCollection : _dialCollectionList_ ){ dialCollection.initialize(); }
+
+  GenericToolbox::TablePrinter t;
+  t << "Dial Collection" << GenericToolbox::TablePrinter::NextColumn;
+  t << "Type" << GenericToolbox::TablePrinter::NextColumn;
+  t << "Options" << GenericToolbox::TablePrinter::NextLine;
+  int parSetIdx{-1};
+  for( auto& dialCollection : _dialCollectionList_ ) {
+    dialCollection.initialize();
+    if( dialCollection.isEventByEvent() ){ t.setColorBuffer(LOGGER_STR_COLOR_BLUE_BG); }
+    else{ t.setColorBuffer(""); }
+
+    if( parSetIdx != dialCollection.getSupervisedParameterSetIndex() ) {
+      t.addSeparatorLine();
+      parSetIdx = dialCollection.getSupervisedParameterSetIndex();
+    }
+    t << dialCollection.getTitle() << GenericToolbox::TablePrinter::NextColumn;
+    t << dialCollection.getDialType() << GenericToolbox::TablePrinter::NextColumn;
+    t << dialCollection.getDialOptions() << GenericToolbox::TablePrinter::NextColumn;
+  }
+  t.printTable();
+  LogInfo << LOGGER_STR_COLOR_BLUE_BG << "      " << LOGGER_STR_COLOR_RESET << ": Event-by-event dials." << std::endl;
 
   initializeThreads();
 
@@ -188,8 +208,6 @@ void Propagator::printConfiguration() const {
 
   _sampleSet_.printConfiguration();
   _parManager_.printConfiguration();
-
-  for( auto& dialCollection : _dialCollectionList_ ){ dialCollection.printConfiguration(); }
 
   LogInfo << std::endl;
 }
