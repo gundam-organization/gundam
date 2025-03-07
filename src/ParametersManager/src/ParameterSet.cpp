@@ -868,7 +868,6 @@ void ParameterSet::printConfiguration() const {
 
 // Protected
 void ParameterSet::readParameterDefinitionFile(){
-
   // new generalised way of defining parameters:
   // path can be set as: /path/to/rootfile.root:folder/in/tfile/object
 
@@ -906,7 +905,6 @@ void ParameterSet::readParameterDefinitionFile(){
   LogThrowIf(_throwEnabledList_ != nullptr and _throwEnabledList_->GetNrows() != _nbParameterDefinition_,
              "Throw enabled list don't have the same size(" << _throwEnabledList_->GetNrows()
                                                               << ") as cov matrix(" << _nbParameterDefinition_ << ")" );
-
 }
 void ParameterSet::defineParameters(){
   _parameterList_.resize(_nbParameterDefinition_, Parameter(this));

@@ -38,11 +38,9 @@ public:
   void updateDialState();
   void printSummaryTable() const;
 
-
 private:
   ParametersManager* _parametersManagerPtr_{nullptr};
   std::vector<DialCollection> _dialCollectionList_;
-
 };
 
 

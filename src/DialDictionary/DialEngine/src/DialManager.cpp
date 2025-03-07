@@ -42,14 +42,11 @@ void DialManager::configureImpl(){
       }
     }
   }
-
 }
 void DialManager::initializeImpl(){
-
   for( auto& dialCollection : _dialCollectionList_ ){
     dialCollection.initialize();
   }
-
 }
 
 void DialManager::invalidateInputBuffers(){
@@ -77,7 +74,6 @@ void DialManager::updateDialState(){
   }
 }
 void DialManager::printSummaryTable() const{
-
   GenericToolbox::TablePrinter t;
   t << "Dial Collection" << GenericToolbox::TablePrinter::NextColumn;
   t << "Type" << GenericToolbox::TablePrinter::NextColumn;
@@ -99,5 +95,4 @@ void DialManager::printSummaryTable() const{
   LogInfo << "Dial manager has " << _dialCollectionList_.size() << " dial collections:" << std::endl;
   t.printTable();
   LogInfo << LOGGER_STR_COLOR_BLUE_BG << "      " << LOGGER_STR_COLOR_RESET << ": Event-by-event dials." << std::endl;
-
 }
