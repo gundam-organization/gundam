@@ -5,6 +5,7 @@
 
 #include "SampleSet.h"
 #include "GundamGlobals.h"
+#include "GundamBacktrace.h"
 
 #include "Logger.h"
 
@@ -50,6 +51,13 @@ void SampleSet::configureImpl(){
       if( not GenericToolbox::Json::fetchValue(sampleListConfig[iSample], "isEnabled", true) ) continue;
       _sampleList_[ iSample ].configure( sampleListConfig[iSample] ); // read the config again
     }
+  }
+
+  if (sampleListConfig.size() < 1) {
+      LogError << "No sample sets defined" << std::endl;
+      LogError << "Must be defined under /fitterEngineConfig/likelihoodInterfaceConfig/propagatorConfig/sampleSetConfig"
+               << std::endl;
+      std::exit(1);
   }
 
   LogDebugIf(GundamGlobals::isDebug()) << sampleListConfig.size() << " samples were defined." << std::endl;
