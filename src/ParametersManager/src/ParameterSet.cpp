@@ -844,11 +844,26 @@ bool ParameterSet::isValidCorrelatedParameter(const Parameter& par_){
 }
 
 void ParameterSet::printConfiguration() const {
-  LogInfo << "name(" << _name_ << ")";
-  LogInfo << ", nPars(" << _nbParameterDefinition_ << ")";
-  LogInfo << std::endl;
 
-  for( auto& par : _parameterList_ ){ par.printConfiguration(); }
+  GenericToolbox::TablePrinter t;
+  t << "Title" << GenericToolbox::TablePrinter::NextColumn;
+  t << "Prior" << GenericToolbox::TablePrinter::NextColumn;
+  t << "StdDev" << GenericToolbox::TablePrinter::NextColumn;
+  t << "Limits" << GenericToolbox::TablePrinter::NextLine;
+
+  int nPars{0};
+  for( auto& par : _parameterList_ ){
+    if( not par.isEnabled() ){ continue; }
+    t << par.getTitle() << GenericToolbox::TablePrinter::NextColumn;
+    t << par.getPriorValue() << GenericToolbox::TablePrinter::NextColumn;
+    t << (par.getPriorType() == Parameter::PriorType::Flat ? "Free": std::to_string(par.getStdDevValue())) << GenericToolbox::TablePrinter::NextColumn;
+    t << par.getParameterLimits() << GenericToolbox::TablePrinter::NextLine;
+    nPars++;
+  }
+
+  LogInfo << getName() << " has " << nPars << " defined parameters:" << std::endl;
+  t.printTable();
+
 }
 
 

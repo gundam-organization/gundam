@@ -89,6 +89,7 @@ void LikelihoodInterface::initializeImpl() {
   for( auto& dataSet : _datasetList_ ){ dataSet.initialize(); }
 
   _modelPropagator_.initialize();
+  _modelPropagator_.printConfiguration();
   _dataPropagator_ = _modelPropagator_; // avoid tons of printouts
 
   _plotGenerator_.setModelSampleSetPtr( &_modelPropagator_.getSampleSet().getSampleList() );

@@ -95,6 +95,8 @@ void DialManager::printSummaryTable() const{
     t << dialCollection.getDialType() << GenericToolbox::TablePrinter::NextColumn;
     t << dialCollection.getDialOptions() << GenericToolbox::TablePrinter::NextColumn;
   }
+
+  LogInfo << "Dial manager has " << _dialCollectionList_.size() << " dial collections:" << std::endl;
   t.printTable();
   LogInfo << LOGGER_STR_COLOR_BLUE_BG << "      " << LOGGER_STR_COLOR_RESET << ": Event-by-event dials." << std::endl;
 

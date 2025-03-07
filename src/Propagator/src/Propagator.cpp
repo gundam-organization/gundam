@@ -143,6 +143,7 @@ void Propagator::printConfiguration() const {
 
   _sampleSet_.printConfiguration();
   _parManager_.printConfiguration();
+  _dialManager_.printSummaryTable();
 
   LogInfo << std::endl;
 }
