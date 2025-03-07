@@ -138,7 +138,7 @@ void FitterEngine::initializeImpl(){
         thrownParameterValues.back().writeRawData(par.getThrowValue());
       }
 
-      thrownParameterValues.back().lockArraySize();
+      thrownParameterValues.back().lock();
       throwsTree->Branch(
           GenericToolbox::generateCleanBranchName(parSet.getName()).c_str(),
           &thrownParameterValues.back().getRawDataArray()[0],
