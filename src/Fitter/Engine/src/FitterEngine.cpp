@@ -34,7 +34,7 @@ void FitterEngine::configureImpl(){
     GenericToolbox::Json::fillValue(_config_, minimizerConfig, "mcmcConfig");
   });
   GenericToolbox::Json::deprecatedAction(_config_, "engineType", [&]{
-    LogAlert << R"("engineType" should now be specified withing "minimizerConfig/minimizerType")" << std::endl;
+    LogAlert << R"("engineType" should set using "minimizerConfig/type")" << std::endl;
     GenericToolbox::Json::fillValue(_config_, minimizerTypeStr, "engineType");
 
     // handle deprecated types
