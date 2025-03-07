@@ -166,7 +166,7 @@ public:
   /// not fix.  This is true if the parameter should be in the stripped
   /// covariance matrix.
   static bool isValidCorrelatedParameter(const Parameter& par_);
-  
+
   // print
   void printConfiguration() const;
 
