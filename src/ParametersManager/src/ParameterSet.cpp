@@ -150,7 +150,6 @@ void ParameterSet::processCovarianceMatrix(){
                << std::endl;
     ++configWarnings;
   }
-  LogInfo << nbParameters << " effective parameters were defined in set: " << getName() << std::endl;
 
   if( nbParameters == 0 ){
     LogAlert << "No parameter is enabled. Disabling the parameter set." << std::endl;
