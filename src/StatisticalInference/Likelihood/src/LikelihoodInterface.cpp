@@ -146,17 +146,18 @@ void LikelihoodInterface::initializeImpl() {
 }
 
 void LikelihoodInterface::propagateAndEvalLikelihood(){
-  _modelPropagator_.propagateParameters();
-  this->evalLikelihood();
+  std::future<bool> eventually = _modelPropagator_.applyParameters();
+  this->evalLikelihood(eventually);
 }
 
-double LikelihoodInterface::evalLikelihood() const {
-  this->evalStatLikelihood();
+double LikelihoodInterface::evalLikelihood(std::future<bool>& propagation) const {
   this->evalPenaltyLikelihood();
+  this->evalStatLikelihood(propagation);
   _buffer_.updateTotal();
   return _buffer_.totalLikelihood;
 }
-double LikelihoodInterface::evalStatLikelihood() const {
+double LikelihoodInterface::evalStatLikelihood(std::future<bool>& propagation) const {
+  if (propagation.valid()) propagation.get();
   _buffer_.statLikelihood = 0.;
   for( auto &samplePair: _samplePairList_ ){
     _buffer_.statLikelihood += this->evalStatLikelihood( samplePair );
@@ -176,7 +177,8 @@ double LikelihoodInterface::evalStatLikelihood(const SamplePair& samplePair_) co
 std::string LikelihoodInterface::getSummary() const {
   std::stringstream ss;
 
-  this->evalLikelihood(); // make sure the buffer is up-to-date
+  std::future<bool> invalid;
+  this->evalLikelihood(invalid); // make sure the buffer is up-to-date
 
   ss << "Total likelihood = " << _buffer_.totalLikelihood;
   ss << std::endl << "Stat likelihood = " << _buffer_.statLikelihood;

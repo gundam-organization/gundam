@@ -129,6 +129,11 @@ void Propagator::buildDialCache(){
   }
 }
 void Propagator::propagateParameters(){
+  std::future<bool> result = applyParameters();
+  result.get();
+}
+
+std::future<bool> Propagator::applyParameters(){
   // Make sure the dial state is updated before reweighting and filling the
   // histograms.  This has to be done before the GPU and CPU calculations, and
   // should be shared for both.
@@ -136,11 +141,12 @@ void Propagator::propagateParameters(){
   updateDialState();
 
 #ifdef GUNDAM_USING_CACHE_MANAGER
-  bool usedCacheManager{false};
   // Trigger the reweight on the GPU.  This will fill the histograms, but most
   // of the time, leaves the event weights on the GPU.
-  usedCacheManager = Cache::Manager::PropagateParameters();
-  if(usedCacheManager and not Cache::Manager::IsForceCpuCalculation()) return;
+  std::future<bool> cacheManager = Cache::Manager::Fill(getSampleSet(),getEventDialCache());
+  if (cacheManager.valid() and not Cache::Manager::IsForceCpuCalculation()) {
+    return cacheManager;  // The cacheManager future could be returned.
+  }
 #endif
 
   // Trigger the reweight on the CPU.  Override the dial update inside of
@@ -150,7 +156,7 @@ void Propagator::propagateParameters(){
   this->refillHistograms();
 
 #ifdef GUNDAM_USING_CACHE_MANAGER
-  if (usedCacheManager and Cache::Manager::IsForceCpuCalculation()) {
+  if (cacheManager.valid() and Cache::Manager::IsForceCpuCalculation()) {
     bool valid = Cache::Manager::ValidateHistogramContents();
     if (not valid) {
       LogError << GundamUtils::Backtrace;
@@ -158,6 +164,13 @@ void Propagator::propagateParameters(){
     }
   }
 #endif
+
+  // The CPU has already finished filling the data structures by the time we
+  // get here, so this could be done with a std::promise<bool> and set the
+  // value before returning the future.  It's done with a deferred std::async
+  // since the code is a little cleaner to my eye, and the lambda mostly
+  // optimizes into oblivion.
+  return std::async(std::launch::deferred, []{return true;});
 }
 
 void Propagator::reweightEvents(bool updateDials) {
@@ -298,7 +311,7 @@ void Propagator::initializeCacheManager(){
   // Some of those part might get disabled for faster calculation
   Cache::Manager::SetIsEventWeightCopyEnabled( true );
   Cache::Manager::SetIsHistContentCopyEnabled( true );
-  Cache::Manager::PropagateParameters();
+  Cache::Manager::PropagateParameters(_sampleSet_,_eventDialCache_);
 }
 #endif
 

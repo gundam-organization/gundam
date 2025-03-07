@@ -90,8 +90,8 @@ public:
   void propagateAndEvalLikelihood();
 
   // core
-  double evalLikelihood() const;
-  double evalStatLikelihood() const;
+  double evalLikelihood(std::future<bool>& propagation) const;
+  double evalStatLikelihood(std::future<bool>& propagation) const;
   double evalPenaltyLikelihood() const;
   [[nodiscard]] double evalStatLikelihood(const SamplePair& samplePair_) const;
   [[nodiscard]] std::string getSummary() const;
