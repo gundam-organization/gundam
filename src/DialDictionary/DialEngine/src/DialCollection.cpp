@@ -75,8 +75,6 @@ void DialCollection::configureImpl() {
 void DialCollection::initializeImpl() {
   LogThrowIf(_index_==-1, "Index not set.");
   this->setupDialInterfaceReferences();
-
-  LogInfo << getSummary() << std::endl;
 }
 
 // non-trivial getters
