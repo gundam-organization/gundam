@@ -41,7 +41,7 @@ public:
   void setIsFixed(bool isFixed){ _isFixed_ = isFixed; }
   void setIsEigen(bool isEigen){ _isEigen_ = isEigen; }
   void setIsFree(bool isFree){ _isFree_ = isFree; }
-  void setIfThrown(bool isThrown){ _isThrown_ = isThrown; }
+  void setIsThrown(bool isThrown){ _isThrown_ = isThrown; }
   void setParameterIndex(int parameterIndex){ _parameterIndex_ = parameterIndex; }
   void setStepSize(double stepSize){ _stepSize_ = stepSize; }
   void setPriorValue(double priorValue){ _priorValue_ = priorValue; }
