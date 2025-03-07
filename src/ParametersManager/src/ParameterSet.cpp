@@ -402,9 +402,10 @@ void ParameterSet::moveParametersToPrior(){
 }
 void ParameterSet::throwParameters(bool rethrowIfNotInPhysical_, double gain_){
 
-  LogThrowIf(_priorCovarianceMatrix_==nullptr, "No covariance matrix provided");
-
-  TVectorD throwsList{_priorCovarianceMatrix_->GetNrows()};
+  TVectorD throwsList;
+  if (_priorCovarianceMatrix_) {
+    throwsList.ResizeTo(_priorCovarianceMatrix_->GetNrows());
+  }
 
   // generic function to handle multiple throws
   std::function<void(std::function<void()>)> throwParsFct =
@@ -431,12 +432,48 @@ void ParameterSet::throwParameters(bool rethrowIfNotInPhysical_, double gain_){
           for( auto& par : this->getParameterList() ){
             if( ParameterSet::isValidCorrelatedParameter(par) ){
               iFit++;
-              par.setThrowValue( par.getPriorValue() + gain_*throwsList[iFit] );
-              if( not par.getThrowLimits().isInBounds(par.getThrowValue()) ){
-                nThrowsOutOfBounds++;
-                LogWarning << par.getTitle() << " was thrown out of limits: "
-                << par.getThrowValue() << " -> " << par.getThrowLimits() << std::endl;
+              if (par.isThrown()) {
+                  par.setThrowValue( par.getPriorValue() + gain_*throwsList[iFit] );
               }
+            }
+            else if (par.isThrown() and par.isFree()) {
+              double aMin = par.getThrowLimits().min;
+              double aMax = par.getThrowLimits().max;
+              if (not std::isfinite(aMin)) {
+                aMin = par.getPriorValue() - gain_*par.getStepSize();
+                LogWarning << "Free parameter " << par.getName()
+                         << " thrown without lower bound (new: " << aMin << ")"
+                         << std::endl;
+              }
+              if (not std::isfinite(aMax)) {
+                aMax = par.getPriorValue() + gain_*par.getStepSize();
+                LogWarning << "Free parameter " << par.getName()
+                         << " thrown without upper bound (new: " << aMax << ")"
+                         << std::endl;
+              }
+              par.setThrowValue(gRandom->Uniform(aMin,aMax));
+            }
+            else if (par.isThrown()) {
+              double stdDev = par.getStdDevValue();
+              if (not std::isfinite(stdDev) and stdDev <= 0) {
+                // No standard deviation, so use the step size.
+                stdDev = par.getStepSize();
+              }
+              if (std::isfinite(stdDev) and stdDev > 0) {
+                par.setThrowValue(par.getPriorValue()
+                                  + gRandom->Gaus(0, gain_*stdDev));
+              }
+              else {
+                LogError << "Thrown parameter " << par.getName()
+                         << " without standard deviation"
+                         << std::endl;
+                LogExit("Bad thrown parameter");
+              }
+            }
+            if( not par.getThrowLimits().isInBounds(par.getThrowValue()) ){
+              nThrowsOutOfBounds++;
+              LogWarning << par.getTitle() << " was thrown out of limits: "
+                       << par.getThrowValue() << " -> " << par.getThrowLimits() << std::endl;
             }
           }
 
@@ -467,7 +504,7 @@ void ParameterSet::throwParameters(bool rethrowIfNotInPhysical_, double gain_){
           GenericToolbox::TablePrinter t;
           t.setColTitles({{"Parameter"}, {"Prior"}, {"StdDev"}, {"ThrowLimits"}, {"Thrown"}});
           for( auto& par : _parameterList_ ){
-            if( ParameterSet::isValidCorrelatedParameter(par) ){
+            if(par.isThrown() and ParameterSet::isValidCorrelatedParameter(par) ){
               t.addTableLine({
                 par.getTitle(),
                 std::to_string(par.getPriorValue()),
@@ -475,6 +512,19 @@ void ParameterSet::throwParameters(bool rethrowIfNotInPhysical_, double gain_){
                 par.getThrowLimits().toString(),
                 std::to_string(par.getThrowValue())
               });
+            }
+            else if (par.isThrown()) {
+              double sd = par.getStdDevValue();
+              if (not std::isfinite(sd) or sd <= 0) sd = par.getStepSize();
+              std::string tmp = std::to_string(sd);
+              if (par.isFree()) tmp = "free";
+              t.addTableLine({
+                par.getTitle(),
+                std::to_string(par.getPriorValue()),
+                tmp,
+                par.getThrowLimits().toString(),
+                std::to_string(par.getThrowValue())
+                });
             }
           }
           t.printTable();
@@ -511,10 +561,14 @@ void ParameterSet::throwParameters(bool rethrowIfNotInPhysical_, double gain_){
       LogInfo << "Generating Cholesky matrix in set: " << getName() << std::endl;
       _markHartzGen_ = std::make_shared<ParameterThrowerMarkHarz>(throwsList, *_priorCovarianceMatrix_);
     }
-    TVectorD throws(_priorCovarianceMatrix_->GetNrows());
+    // TVectorD throws(_priorCovarianceMatrix_->GetNrows());
 
-    std::vector<double> throwPars(_priorCovarianceMatrix_->GetNrows());
+    std::vector<double> throwPars;
     std::function<void()> markScottThrowFct = [&](){
+      if ( _markHartzGen_ == nullptr) return;
+
+      throwPars.resize(_priorCovarianceMatrix_->GetNrows());
+
       _markHartzGen_->ThrowSet(throwPars);
       // THROWS ARE CENTERED AROUND 1!!
 
@@ -574,7 +628,8 @@ void ParameterSet::throwParameters(bool rethrowIfNotInPhysical_, double gain_){
   else {
       LogInfo << "Throwing parameters for " << _name_ << " using Cholesky matrix" << std::endl;
 
-      if( not _correlatedVariableThrower_.isInitialized() ){
+      if( not _correlatedVariableThrower_.isInitialized()
+          and _priorCovarianceMatrix_ != nullptr){
         _correlatedVariableThrower_.setCovarianceMatrixPtr(_priorCovarianceMatrix_.get());
         _correlatedVariableThrower_.initialize();
         int iFit{-1};
@@ -591,6 +646,7 @@ void ParameterSet::throwParameters(bool rethrowIfNotInPhysical_, double gain_){
       }
 
       std::function<void()> gundamThrowFct = [&](){
+        if ( _priorCovarianceMatrix_ == nullptr) return;
         _correlatedVariableThrower_.throwCorrelatedVariables(throwsList);
       };
 

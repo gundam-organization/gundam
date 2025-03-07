@@ -690,10 +690,32 @@ bool Cache::Manager::Update(SampleSet& sampleSet, EventDialCache& eventDialCache
   return true;
 }
 
-bool Cache::Manager::Fill() {
-  if (fUpdateRequired) {
+bool Cache::Manager::PropagateParameters(SampleSet& samples,
+                                         EventDialCache& dials) {
+  // Copy updated information to the device and start the kernels
+  std::future<bool> result = Cache::Manager::Fill(samples,dials);
+  if (not result.valid()) return false;
+  return result.get();
+}
+
+std::future<bool> Cache::Manager::Fill(SampleSet& samples,
+                                       EventDialCache& dials) {
+  auto s{fParameters.cacheFillTimer.scopeTime()};
+  Cache::Manager* cache = Cache::Manager::Get();
+  if (cache == nullptr) return std::future<bool>();
+  if (cache->fUpdateRequired) {
     LogError << "Fill while an update is required" << std::endl;
     LogThrow("Fill while an update is required");
+  }
+  if (cache->fSampleSet != &samples) {
+    LogError << "Using Cache::Manager with an unknown sample set."
+             << std::endl;
+    return std::future<bool>();
+  }
+  if (cache->fEventDialCache != &dials) {
+    LogError << "Using Cache::Manager with an unknown event dial cache."
+             << std::endl;
+    return std::future<bool>();
   }
   LogTraceIf(GundamGlobals::isDebug() ) << "Cache::Manager::Fill -- Fill the GPU cache" << std::endl;
 #define DUMP_FILL_INPUT_PARAMETERS
@@ -713,8 +735,8 @@ bool Cache::Manager::Fill() {
     }
   } while(false);
 #endif
-  GetWeightsCache().Invalidate();
-  GetHistogramsCache().Invalidate();
+  cache->GetWeightsCache().Invalidate();
+  cache->GetHistogramsCache().Invalidate();
   for (auto& par : fParameters.ParameterMap ) {
     if (not par.first->isEnabled()) {
       LogWarning << "WARNING: Disabled parameter: "
@@ -722,52 +744,39 @@ bool Cache::Manager::Fill() {
                  << std::endl;
       LogWarning << "WARNING: Cache::Manager will not be used"
                  << std::endl;
-      return false;
+      return  std::future<bool>();
     }
-    GetParameterCache().SetParameter(
+    cache->GetParameterCache().SetParameter(
         par.second, par.first->getParameterValue());
   }
-  GetWeightsCache().Apply();
-  GetHistogramsCache().Apply();
+  cache->GetWeightsCache().Apply();
+  cache->GetHistogramsCache().Apply();
 
-  return true;
+  return std::async(
+      std::launch::deferred,
+      []{
+        if (Cache::Manager::Get() == nullptr) return false;
+        return Cache::Manager::Get()->CopyResults();
+      });
 }
 
-bool Cache::Manager::PropagateParameters(){
+bool Cache::Manager::CopyResults() {
+  // This section should be delayed as long as possible, and the current
+  // serialization is wasting the GPU parallization.  For efficiency, the
+  // logic needs to follow LTS version where the back copy is delayed until
+  // the results are actually needed.
+  auto s{fParameters.pullFromDeviceTimer.scopeTime()};
 
-  bool isSuccess{false};
-
-  // Copy updated information to the device and start the kernels
-  {
-    auto s{fParameters.cacheFillTimer.scopeTime()};
-
-    // if disabled, leave
-    if (Cache::Manager::Get() == nullptr) {
-      return false;
-    }
-
-    // do the propagation on the device
-    isSuccess = Cache::Manager::Get()->Fill();
-    if (not isSuccess) return false;
+  // do we need to copy every event weight to the CPU structures ?
+  if( fParameters.fIsEventWeightCopyEnabled ){
+    CopyEventWeights();
   }
 
-  {
-    // This section should be delayed as long as possible, and the current
-    // serialization is wasting the GPU parallization.  For efficiency, the
-    // logic needs to follow LTS version where the back copy is delayed until
-    // the results are actually needed.
-    auto s{fParameters.pullFromDeviceTimer.scopeTime()};
-
-    // do we need to copy every event weight to the CPU structures ?
-    if( fParameters.fIsEventWeightCopyEnabled ){
-      Cache::Manager::Get()->CopyEventWeights();
-    }
-
-    // do we need to copy bin content to the CPU structures ?
-    if( fParameters.fIsHistContentCopyEnabled ){
-      Cache::Manager::Get()->CopyHistogramContents();
-    }
+  // do we need to copy bin content to the CPU structures ?
+  if( fParameters.fIsHistContentCopyEnabled ){
+    CopyHistogramContents();
   }
+
   return true;
 }
 

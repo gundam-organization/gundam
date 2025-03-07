@@ -20,13 +20,11 @@
 #include <map>
 #include <future>
 
-
 class Propagator : public JsonBaseClass {
 
 protected:
   void configureImpl() override;
   void initializeImpl() override;
-
 
 public:
   static void muteLogger();
@@ -62,7 +60,22 @@ public:
   // Core
   void clearContent();
   void buildDialCache();
+
+  /// Apply the current parameters and wait for it to finish.  This reweights
+  /// the events, and refills the histograms.  This is a convenience wrapper
+  /// around applyParameters().get().
   void propagateParameters();
+
+  /// Promise to eventually apply the current parameters.  This returns a
+  /// future that becomes available after reweighting and the histograms are
+  /// refilled.  With The CPU, the parameters are applied synchronously so the
+  /// future is basically a "dummy".  When a GPU is used, the promise is
+  /// returned before the information is copied from the GPU, so accessing it
+  /// may cause a wait.  The future will be valid if the calculation was
+  /// successfully started, true if the calculation has completed correctly,
+  /// and false if the calculation started correctly, but failed.
+  std::future<bool> applyParameters();
+
   void reweightEvents(bool updateDials = true);
 
   // misc

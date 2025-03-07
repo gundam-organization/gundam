@@ -27,6 +27,6 @@ OUTPUT_FILE=${DATA_DIR}/${BASE}.root
 echo ${OUTPUT_FILE}
 echo ${CONFIG_FILE}
 
-gundamFitter --cpu -t 1 -s 10000 -c ${CONFIG_FILE} -o ${OUTPUT_FILE}
+gundamFitter --kick-mc 0.2 --cpu -t 1 -s 10000 -c ${CONFIG_FILE} -o ${OUTPUT_FILE}
 
 # End of the script
