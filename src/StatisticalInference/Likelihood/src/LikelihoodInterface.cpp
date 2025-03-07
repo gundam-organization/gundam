@@ -309,7 +309,7 @@ void LikelihoodInterface::loadModelPropagator(){
     dataSet.getModelDispenser().load( _modelPropagator_ );
   }
 
-  _modelPropagator_.shrinkDialContainers();
+  _modelPropagator_.getDialManager().shrinkDialContainers();
   _modelPropagator_.buildDialCache();
 
   LogInfo << "Propagating prior parameters on events..." << std::endl;
@@ -372,7 +372,7 @@ void LikelihoodInterface::loadDataPropagator(){
     // copy the events directly from the model
     LogInfo << "Copying events from the model..." << std::endl;
     _dataPropagator_.copyEventsFrom( _modelPropagator_ );
-    _dataPropagator_.shrinkDialContainers();
+    _dataPropagator_.getDialManager().shrinkDialContainers();
     _dataPropagator_.buildDialCache();
 
     // move the model back to the prior
@@ -415,6 +415,7 @@ void LikelihoodInterface::loadDataPropagator(){
 
       // make sure the config is from scratch each time we read a new dataset
       if( not dataDispenser->getParameters().overridePropagatorConfig.empty() ){
+        LogExit("NOT IMPLEMENTED YET!");
         // TODO: handle multiple datasets loading when editing the configuration
 //        LogWarning << "Restoring propagator config overrides..." << std::endl;
 //        _dataPropagator_.configure( _modelPropagator_.getConfig() );
@@ -422,7 +423,7 @@ void LikelihoodInterface::loadDataPropagator(){
       }
     }
 
-    _dataPropagator_.shrinkDialContainers();
+    _dataPropagator_.getDialManager().shrinkDialContainers();
     _dataPropagator_.buildDialCache();
 
     if( _dataType_ == DataType::Toy ){

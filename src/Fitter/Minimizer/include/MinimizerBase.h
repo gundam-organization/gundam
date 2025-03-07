@@ -107,7 +107,7 @@ public:
 
   // mutable getters
   Monitor& getMonitor(){ return _monitor_; }
-  [[nodiscard]] const Monitor& getMonitor() const { return _monitor_; }
+  [[nodiscard]] auto& getMonitor() const { return _monitor_; }
 
   // core
   void printParameters();
@@ -117,7 +117,7 @@ public:
 protected:
   /// Get a reference to the FitterEngine that owns this minimizer.
   FitterEngine& getOwner() { return *_owner_; }
-  [[nodiscard]] const FitterEngine& getOwner() const { return *_owner_; }
+  [[nodiscard]] auto& getOwner() const { return *_owner_; }
 
   // Get the propagator being used to calculate the likelihood.  This is a
   // local convenience function to get the propagator from the owner.
