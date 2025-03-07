@@ -75,8 +75,6 @@ void DialCollection::configureImpl() {
 void DialCollection::initializeImpl() {
   LogThrowIf(_index_==-1, "Index not set.");
   this->setupDialInterfaceReferences();
-
-  LogInfo << getSummary() << std::endl;
 }
 
 // non-trivial getters
@@ -158,9 +156,7 @@ void DialCollection::resizeContainers(){
 }
 
 void DialCollection::updateInputBuffers(){
-  std::for_each(_dialInputBufferList_.begin(), _dialInputBufferList_.end(), [](DialInputBuffer& i_){
-    i_.update();
-  });
+  for( auto& inputBuffer : _dialInputBufferList_ ){ inputBuffer.update(); }
 }
 
 void DialCollection::setupDialInterfaceReferences(){
@@ -798,7 +794,7 @@ JsonType DialCollection::fetchDialsDefinition(const JsonType &definitionsList_) 
 }
 
 void DialCollection::update() {
-  for (std::function<void(DialCollection*)>& func : _dialCollectionCallbacks_) {
+  for( auto& func : _dialCollectionCallbacks_ ){
     func(this);
   }
 }

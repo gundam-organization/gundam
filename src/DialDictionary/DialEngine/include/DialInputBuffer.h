@@ -35,12 +35,8 @@ public:
     };
     MirrorEdges mirrorEdges{};
 
-    [[nodiscard]] const ParameterSet& getParameterSet(std::vector<ParameterSet>* parSetListPtr_) const {
-      return (*parSetListPtr_)[parSetIndex];
-    }
-    [[nodiscard]] const Parameter& getParameter(std::vector<ParameterSet>* parSetListPtr_) const {
-      return this->getParameterSet(parSetListPtr_).getParameterList()[parIndex];
-    }
+    [[nodiscard]] auto& getParameterSet(std::vector<ParameterSet>* parSetListPtr_) const { return (*parSetListPtr_)[parSetIndex]; }
+    [[nodiscard]] auto& getParameter(std::vector<ParameterSet>* parSetListPtr_) const { return this->getParameterSet(parSetListPtr_).getParameterList()[parIndex]; }
   };
 
 public:
@@ -77,9 +73,9 @@ public:
   void update();
 
   // nested getters
-  [[nodiscard]] const ParameterSet& getParameterSet(int iInput_) const{ return _inputParameterReferenceList_[iInput_].getParameterSet(_parSetListPtr_); }
-  [[nodiscard]] const Parameter& getParameter(int iInput_) const { return _inputParameterReferenceList_[iInput_].getParameter(_parSetListPtr_); }
-  [[nodiscard]] const ParameterReference::MirrorEdges& getMirrorEdges(int iInput_) const{ return _inputParameterReferenceList_[iInput_].mirrorEdges; }
+  [[nodiscard]] auto& getParameterSet(int iInput_) const{ return _inputParameterReferenceList_[iInput_].getParameterSet(_parSetListPtr_); }
+  [[nodiscard]] auto& getParameter(int iInput_) const { return _inputParameterReferenceList_[iInput_].getParameter(_parSetListPtr_); }
+  [[nodiscard]] auto& getMirrorEdges(int iInput_) const{ return _inputParameterReferenceList_[iInput_].mirrorEdges; }
 
   /// Push the index of a ParameterSet and Parameter in the set onto the
   /// vector of parameters.  This must be used in the order that the dial will

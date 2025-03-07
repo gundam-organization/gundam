@@ -331,9 +331,6 @@ bool ParametersManager::hasValidParameterSets() const {
 }
 void ParametersManager::printConfiguration() const {
 
-  LogInfo << GET_VAR_NAME_VALUE(_throwToyParametersWithGlobalCov_) << std::endl;
-  LogInfo << GET_VAR_NAME_VALUE(_reThrowParSetIfOutOfPhysical_) << std::endl;
-
   LogInfo << _parameterSetList_.size() << " parameter sets defined." << std::endl;
   for( auto& parSet : _parameterSetList_ ){ parSet.printConfiguration(); }
 

@@ -336,7 +336,7 @@ void RootMinimizer::minimize(){
         samplesArrList[iSample].writeRawData( getLikelihoodInterface().getJointProbabilityPtr()->eval(samplePair, iBin) );
       }
 
-      samplesArrList[iSample].lockArraySize();
+      samplesArrList[iSample].lock();
       bestFitStats->Branch(
           GenericToolbox::generateCleanBranchName(samplePair.model->getName()).c_str(),
           &samplesArrList[iSample].getRawDataArray()[0],

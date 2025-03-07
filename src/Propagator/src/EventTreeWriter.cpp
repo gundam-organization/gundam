@@ -67,7 +67,7 @@ template<typename T> void EventTreeWriter::writeEventsTemplate(const GenericTool
     branchDefStr += leafDef.first;
     leafDef.second(privateMemberArr, *EventTreeWriter::getEventPtr(eventList_[0])); // resize buffer
   }
-  privateMemberArr.lockArraySize();
+  privateMemberArr.lock();
   tree->Branch("Event", &privateMemberArr.getRawDataArray()[0], branchDefStr.c_str());
 
   GenericToolbox::RawDataArray loadedLeavesArr;
@@ -115,7 +115,7 @@ template<typename T> void EventTreeWriter::writeEventsTemplate(const GenericTool
           lDict[iLeaf].leafDefinitionStr.substr(0,lDict[iLeaf].leafDefinitionStr.find("[")).substr(0, lDict[iLeaf].leafDefinitionStr.find("/")));
       lDict[iLeaf].dropData(loadedLeavesArr, EventTreeWriter::getEventPtr(eventList_[0])->getVariables().getVarList()[iLeaf].get()); // resize buffer
     }
-    loadedLeavesArr.lockArraySize();
+    loadedLeavesArr.lock();
     tree->Branch("Leaves", &loadedLeavesArr.getRawDataArray()[0], branchDefStr.c_str());
   }
 
@@ -207,10 +207,10 @@ template<typename T> void EventTreeWriter::writeEventsTemplate(const GenericTool
   size_t iEvent{0}; size_t nEvents = (eventList_.size());
   for( auto& cacheEntry : eventList_ ){
 
-    privateMemberArr.resetCurrentByteOffset();
+    privateMemberArr.resetCursor();
     for( auto& leafDef : leafDictionary ){ leafDef.second(privateMemberArr, *EventTreeWriter::getEventPtr(cacheEntry)); }
 
-    loadedLeavesArr.resetCurrentByteOffset();
+    loadedLeavesArr.resetCursor();
     for( int iLeaf = 0 ; iLeaf < lDict.size() ; iLeaf++ ){
       lDict[iLeaf].dropData(
           loadedLeavesArr,

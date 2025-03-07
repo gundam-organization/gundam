@@ -282,14 +282,18 @@ void DataDispenser::doEventSelection(){
   if( _owner_->isShowSelectedEventCount() ){
     LogWarning << "Events passing selection cuts:" << std::endl;
     GenericToolbox::TablePrinter t;
-    t.setColTitles({{"Sample"}, {"# of events"}});
+    t << "Sample" << GenericToolbox::TablePrinter::NextColumn;
+    t << "Selection" << GenericToolbox::TablePrinter::NextColumn;
+    t << "# of events" << GenericToolbox::TablePrinter::NextLine;
     for(size_t iSample = 0 ; iSample < _cache_.samplesToFillList.size() ; iSample++ ){
-      t.addTableLine({
-                         _cache_.samplesToFillList[iSample]->getName(),
-                         std::to_string(_cache_.sampleNbOfEvents[iSample])
-                     });
+      t << _cache_.samplesToFillList[iSample]->getName() << GenericToolbox::TablePrinter::NextColumn;
+      t << _cache_.samplesToFillList[iSample]->getSelectionCutsStr() << GenericToolbox::TablePrinter::NextColumn;
+      t << _cache_.sampleNbOfEvents[iSample] << GenericToolbox::TablePrinter::NextLine;
     }
-    t.addTableLine({"Total", std::to_string(_cache_.totalNbEvents)});
+    t.addSeparatorLine();
+    t << "Total" << GenericToolbox::TablePrinter::NextColumn;
+    t << "" << GenericToolbox::TablePrinter::NextColumn;
+    t << _cache_.totalNbEvents << GenericToolbox::TablePrinter::NextLine;
     t.printTable();
   }
 
@@ -475,7 +479,7 @@ void DataDispenser::preAllocateMemory(){
       << GenericToolbox::parseSizeUnits(static_cast<double>(eventPlaceholder.getSize() * _cache_.sampleNbOfEvents[iSample]))
       << GenericToolbox::TablePrinter::NextLine;
     }
-
+    t.addSeparatorLine();
     t << "Total" << GenericToolbox::TablePrinter::NextColumn
       << nTotal << GenericToolbox::TablePrinter::NextColumn
       << GenericToolbox::parseSizeUnits(static_cast<double>(eventPlaceholder.getSize()) * nTotal)
@@ -494,10 +498,6 @@ void DataDispenser::preAllocateMemory(){
     }
   }
 
-  GenericToolbox::TablePrinter t;
-  t << "Parameter" << GenericToolbox::TablePrinter::NextColumn;
-  t << "Dial type" << GenericToolbox::TablePrinter::NextLine;
-
   size_t nTotalSlots{0};
   size_t nDialsMaxPerEvent{0};
   for( auto& dialCollection : _cache_.dialCollectionsRefList ){
@@ -505,11 +505,6 @@ void DataDispenser::preAllocateMemory(){
     nDialsMaxPerEvent += 1;
 
     if (dialCollection->isEventByEvent()) {
-      // Reserve enough space for all the event-by-event dials
-      // that might be added.  This size may be reduced later.
-      t << dialCollection->getTitle() << GenericToolbox::TablePrinter::NextColumn;
-      t << dialCollection->getDialType() << GenericToolbox::TablePrinter::NextLine;
-
       // Only increase the size.  It's probably zero before
       // starting, but add the original size... just in case.
       dialCollection->getDialInterfaceList().resize(
@@ -530,12 +525,9 @@ void DataDispenser::preAllocateMemory(){
 
   if( nTotalSlots != 0 ) {
     LogInfo << "Created "  << nTotalSlots << " slots (" << _cache_.totalNbEvents << " per set) for event-by-event dials:" << std::endl;
-    t.printTable();
   }
 
-
   _cache_.propagatorPtr->getEventDialCache().allocateCacheEntries(_cache_.totalNbEvents, nDialsMaxPerEvent);
-
 }
 void DataDispenser::readAndFill(){
   LogWarning << "Reading dataset and loading..." << std::endl;
@@ -763,9 +755,6 @@ void DataDispenser::eventSelectionFunction(int iThread_){
   std::vector<SampleCut> sampleCutList;
   sampleCutList.reserve( _cache_.samplesToFillList.size() );
 
-  GenericToolbox::TablePrinter tCuts;
-  tCuts << "Sample" << GenericToolbox::TablePrinter::NextColumn;
-  tCuts << "Selection cut" << GenericToolbox::TablePrinter::NextLine;
   for( int iSample = 0; iSample < int(_cache_.samplesToFillList.size()) ; iSample++ ){
     auto* samplePtr = _cache_.samplesToFillList[iSample];
     sampleCutList.emplace_back();
@@ -781,11 +770,7 @@ void DataDispenser::eventSelectionFunction(int iThread_){
     if( selectionCut.empty() ){ continue; }
 
     sampleCutList.back().cutIndex = tb.addExpression( selectionCut );
-    tCuts << samplePtr->getName() << GenericToolbox::TablePrinter::NextColumn;
-    tCuts << selectionCut << GenericToolbox::TablePrinter::NextColumn;
   }
-
-  if(iThread_ == 0){ tCuts.printTable(); }
   tb.initialize();
 
   GenericToolbox::VariableMonitor readSpeed("bytes");

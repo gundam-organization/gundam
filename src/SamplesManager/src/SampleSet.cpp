@@ -90,8 +90,17 @@ size_t SampleSet::getNbOfEvents() const {
 
 void SampleSet::printConfiguration() const {
 
-  LogInfo << _sampleList_.size() << " samples defined." << std::endl;
-  for( auto& sample : _sampleList_ ){ sample.printConfiguration(); }
+  LogInfo << _sampleList_.size() << " samples are defined:" << std::endl;
+  GenericToolbox::TablePrinter t;
+  t << "Name" << GenericToolbox::TablePrinter::NextColumn;
+  t << "Selection" << GenericToolbox::TablePrinter::NextColumn;
+  t << "Nb of bins" << GenericToolbox::TablePrinter::NextLine;
+  for( auto& sample : _sampleList_ ){
+    t << sample.getName() << GenericToolbox::TablePrinter::NextColumn;
+    t << sample.getSelectionCutsStr() << GenericToolbox::TablePrinter::NextColumn;
+    t << sample.getHistogram().getNbBins() << GenericToolbox::TablePrinter::NextLine;
+  }
+  t.printTable();
 
 }
 std::string SampleSet::getSampleBreakdown() const{

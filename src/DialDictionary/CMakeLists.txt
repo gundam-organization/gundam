@@ -1,6 +1,7 @@
 set( LIB_NAME GundamDialDictionary )
 
 set( SRCFILES
+    DialEngine/src/DialManager.cpp
     DialEngine/src/DialInputBuffer.cpp
     DialEngine/src/DialInterface.cpp
     DialEngine/src/DialResponseSupervisor.cpp

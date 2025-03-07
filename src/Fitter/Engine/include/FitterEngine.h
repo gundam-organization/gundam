@@ -64,12 +64,12 @@ public:
   void setPcaMethod(PcaMethod pcaMethod_){ _pcaMethod_ = pcaMethod_; }
 
   // const-getters
-  [[nodiscard]] const auto& getPreFitParState() const{ return _preFitParState_; }
-  [[nodiscard]] const auto& getPostFitParState() const{ return _postFitParState_; }
+  [[nodiscard]] auto& getPreFitParState() const{ return _preFitParState_; }
+  [[nodiscard]] auto& getPostFitParState() const{ return _postFitParState_; }
   [[nodiscard]] MinimizerType getMinimizerType() const{ return _minimizerType_; }
-  [[nodiscard]] const MinimizerBase& getMinimizer() const{ return *_minimizer_; }
-  [[nodiscard]] const LikelihoodInterface& getLikelihoodInterface() const{ return _likelihoodInterface_; }
-  [[nodiscard]] const ParameterScanner& getParameterScanner() const{ return _parameterScanner_; }
+  [[nodiscard]] auto& getMinimizer() const{ return *_minimizer_; }
+  [[nodiscard]] auto& getLikelihoodInterface() const{ return _likelihoodInterface_; }
+  [[nodiscard]] auto& getParameterScanner() const{ return _parameterScanner_; }
 
   // mutable-getters
   MinimizerBase& getMinimizer(){ return *_minimizer_; }

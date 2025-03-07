@@ -150,7 +150,6 @@ void ParameterSet::processCovarianceMatrix(){
                << std::endl;
     ++configWarnings;
   }
-  LogInfo << nbParameters << " effective parameters were defined in set: " << getName() << std::endl;
 
   if( nbParameters == 0 ){
     LogAlert << "No parameter is enabled. Disabling the parameter set." << std::endl;
@@ -900,17 +899,31 @@ bool ParameterSet::isValidCorrelatedParameter(const Parameter& par_){
 }
 
 void ParameterSet::printConfiguration() const {
-  LogInfo << "name(" << _name_ << ")";
-  LogInfo << ", nPars(" << _nbParameterDefinition_ << ")";
-  LogInfo << std::endl;
 
-  for( auto& par : _parameterList_ ){ par.printConfiguration(); }
+  GenericToolbox::TablePrinter t;
+  t << "Title" << GenericToolbox::TablePrinter::NextColumn;
+  t << "Prior" << GenericToolbox::TablePrinter::NextColumn;
+  t << "StdDev" << GenericToolbox::TablePrinter::NextColumn;
+  t << "Limits" << GenericToolbox::TablePrinter::NextLine;
+
+  int nPars{0};
+  for( auto& par : _parameterList_ ){
+    if( not par.isEnabled() ){ continue; }
+    t << par.getTitle() << GenericToolbox::TablePrinter::NextColumn;
+    t << par.getPriorValue() << GenericToolbox::TablePrinter::NextColumn;
+    t << (par.getPriorType() == Parameter::PriorType::Flat ? "Free": std::to_string(par.getStdDevValue())) << GenericToolbox::TablePrinter::NextColumn;
+    t << par.getParameterLimits() << GenericToolbox::TablePrinter::NextLine;
+    nPars++;
+  }
+
+  LogInfo << getName() << " has " << nPars << " defined parameters:" << std::endl;
+  t.printTable();
+
 }
 
 
 // Protected
 void ParameterSet::readParameterDefinitionFile(){
-
   // new generalised way of defining parameters:
   // path can be set as: /path/to/rootfile.root:folder/in/tfile/object
 
@@ -948,7 +961,6 @@ void ParameterSet::readParameterDefinitionFile(){
   LogThrowIf(_throwEnabledList_ != nullptr and _throwEnabledList_->GetNrows() != _nbParameterDefinition_,
              "Throw enabled list don't have the same size(" << _throwEnabledList_->GetNrows()
                                                               << ") as cov matrix(" << _nbParameterDefinition_ << ")" );
-
 }
 void ParameterSet::defineParameters(){
   _parameterList_.resize(_nbParameterDefinition_, Parameter(this));

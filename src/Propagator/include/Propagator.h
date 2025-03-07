@@ -6,6 +6,8 @@
 #define GUNDAM_PROPAGATOR_H
 
 
+#include <DialManager.h>
+
 #include "ParametersManager.h"
 #include "DialCollection.h"
 #include "EventDialCache.h"
@@ -37,25 +39,26 @@ public:
   void setParameterInjectorConfig(const JsonType &parameterInjector){ _parameterInjectorMc_ = parameterInjector; }
 
   // const getters
-  [[nodiscard]] bool isDebugPrintLoadedEvents() const { return _debugPrintLoadedEvents_; }
-  [[nodiscard]] int getDebugPrintLoadedEventsNbPerSample() const { return _debugPrintLoadedEventsNbPerSample_; }
-  [[nodiscard]] int getIThrow() const { return _iThrow_; }
-  [[nodiscard]] const EventDialCache& getEventDialCache() const { return _eventDialCache_; }
-  [[nodiscard]] const ParametersManager &getParametersManager() const { return _parManager_; }
-  [[nodiscard]] const std::vector<DialCollection> &getDialCollectionList() const{ return _dialCollectionList_; }
-  [[nodiscard]] const SampleSet &getSampleSet() const { return _sampleSet_; }
-  [[nodiscard]] const JsonType &getParameterInjectorMc() const { return _parameterInjectorMc_;; }
+  [[nodiscard]] auto getIThrow() const { return _iThrow_; }
+  [[nodiscard]] auto isDebugPrintLoadedEvents() const { return _debugPrintLoadedEvents_; }
+  [[nodiscard]] auto getDebugPrintLoadedEventsNbPerSample() const { return _debugPrintLoadedEventsNbPerSample_; }
+  [[nodiscard]] auto& getSampleSet() const { return _sampleSet_; }
+  [[nodiscard]] auto& getDialManager() const { return _dialManager_; }
+  [[nodiscard]] auto& getEventDialCache() const { return _eventDialCache_; }
+  [[nodiscard]] auto& getParametersManager() const { return _parManager_; }
+  [[nodiscard]] auto& getDialCollectionList() const{ return _dialManager_.getDialCollectionList(); }
+  [[nodiscard]] auto& getParameterInjectorMc() const { return _parameterInjectorMc_;; }
 
   // mutable getters
-  SampleSet &getSampleSet(){ return _sampleSet_; }
-  ParametersManager &getParametersManager(){ return _parManager_; }
-  EventDialCache& getEventDialCache(){ return _eventDialCache_; }
-  std::vector<DialCollection> &getDialCollectionList(){ return _dialCollectionList_; }
-  GenericToolbox::ParallelWorker& getThreadPool(){ return _threadPool_; }
+  auto& getSampleSet(){ return _sampleSet_; }
+  auto& getThreadPool(){ return _threadPool_; }
+  auto& getDialManager(){ return _dialManager_; }
+  auto& getEventDialCache(){ return _eventDialCache_; }
+  auto& getParametersManager(){ return _parManager_; }
+  auto& getDialCollectionList(){ return _dialManager_.getDialCollectionList(); }
 
   // Core
   void clearContent();
-  void shrinkDialContainers();
   void buildDialCache();
 
   /// Apply the current parameters and wait for it to finish.  This reweights
@@ -96,7 +99,6 @@ protected:
   void reweightEvents( int iThread_);
   void refillHistogramsFct( int iThread_);
 
-  void updateDialState();
   void refillHistograms();
 
 private:
@@ -120,12 +122,7 @@ private:
   SampleSet _sampleSet_{};
   EventDialCache _eventDialCache_{};
   ParametersManager _parManager_{};
-
-  // A vector of all the dial collections used by all the fit samples.
-  // Once a dial collection has been added to this vector, it's index becomes
-  // the immutable tag for that specific group of dials.
-  std::vector<DialCollection> _dialCollectionList_{};
-  // TODO: create a DialManager
+  DialManager _dialManager_{};
 
   GenericToolbox::ParallelWorker _threadPool_{};
 
