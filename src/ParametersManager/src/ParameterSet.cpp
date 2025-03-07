@@ -20,7 +20,7 @@
 void ParameterSet::configureImpl(){
 
   GenericToolbox::Json::fillValue(_config_, _name_, "name");
-  LogThrowIf(_name_.empty(), "ParameterSet have no name.");
+  LogThrowIf(_name_.empty(), "Parameter set has no name.");
   LogDebugIf(GundamGlobals::isDebug()) << "Reading config for parameter set: " << _name_ << std::endl;
 
   GenericToolbox::Json::fillValue(_config_, _isEnabled_, "isEnabled");
