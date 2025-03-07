@@ -6,70 +6,71 @@
 #   Positive_C : Normalization for events where the C truth variable is >0
 #   Negative_C : Normalization for events where the C truth variable is <=0
 #
-
-fit: true                    # can be disabled with -d
-scanParameters: false        # can be triggered with --scan
-generateOneSigmaPlots: false # can be enabled with --one-sigma
+# This file uses the "new" format suggested by 1.9+
+minGundamVersion: 1.9.0
 
 fitterEngineConfig:
 
   minimizerConfig:
+    type: RootMinimizer
     minimizer: "Minuit2"
     algorithm: "Migrad"
     errors: "Hesse"
     print_level: 2
     tolerance: 1E-6
 
-  propagatorConfig:
-    throwAsimovFitParameters: false
+  likelihoodInterfaceConfig:
 
+    jointProbabilityConfig:
+      type: LeastSquares
+      lsqPoissonianApproximation: true
+      
     dataSetList:
       - name: "TestSample"
         isEnabled: true
-        mc:
+        model:
           tree: tree_mc
           selectionCutFormula: "(1)"
           nominalWeightFormula: "(1.0)"
           filePathList:
             - "${DATA_DIR}/100NormalizationTree.root"
 
-    fitSampleSetConfig:
-      # LeastSquares is used for tests because it is mathematically simple
-      # and numerically stable.
-      llhStatFunction: LeastSquares
-      dataEventType: Asimov
+    propagatorConfig:
+      showNbEventParameterBreakdown: true
+      showNbEventPerSampleParameterBreakdown: true
 
-      llhConfig:
-        lsqPoissonianApproximation: true
-
-      fitSampleList:
-        - name: AB
-          isEnabled: true
-          binning: "${CONFIG_DIR}/200NormalizationAsimov-binning.txt"
-          dataSets: [ "TestSample" ]
-
-    parameterSetListConfig:
-      - name: Normalizations
-        isEnabled: true
-        nominalStepSize: 0.1
-
-        parameterDefinitions:
-
-          - parameterName: "Positive_C"
+      sampleSetConfig:
+        sampleList:
+          - name: AB
             isEnabled: true
-            priorValue: 1.0
-            priorType: Flat
+            binning: "${CONFIG_DIR}/200NormalizationAsimov-binning.txt"
+            dataSets: [ "TestSample" ]
+
+      parametersManagerConfig:
+        parameterSetList:
+          - name: Normalizations
+            isEnabled: true
+            nominalStepSize: 0.1
+
+            parameterDefinitions:
+              - parameterName: "Positive_C"
+                isEnabled: true
+                priorValue: 1.0
+                priorType: Flat
+              - parameterName: "Negative_C"
+                isEnabled: true
+                priorValue: 1.0
+                priorType: Flat
+
             dialSetDefinitions:
-              - dialsType: Normalization
+              - dialType: Normalization
                 applyCondition: "[C] > 0"
-
-          - parameterName: "Negative_C"
-            isEnabled: true
-            priorValue: 1.0
-            priorType: Flat
-            dialSetDefinitions:
-              - dialsType: Normalization
+                dialInputList:
+                  - name: "Positive_C"
+              - dialType: Normalization
                 applyCondition: "[C] <= 0"
+                dialInputList:
+                  - name: "Negative_C"
 
 # End of the yaml file
 # Local Variables:
