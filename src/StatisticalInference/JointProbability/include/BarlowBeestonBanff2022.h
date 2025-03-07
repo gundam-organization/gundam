@@ -57,7 +57,7 @@ namespace JointProbability{
     mutable GenericToolbox::NoCopyWrapper<std::mutex> _mutex_{};
   };
 
-  void BarlowBeestonBanff2022::configureImpl(){
+  inline void BarlowBeestonBanff2022::configureImpl(){
 
     GenericToolbox::Json::fillValue(_config_, allowZeroMcWhenZeroData, "allowZeroMcWhenZeroData");
     GenericToolbox::Json::fillValue(_config_, usePoissonLikelihood, "usePoissonLikelihood");
@@ -74,7 +74,8 @@ namespace JointProbability{
     }
 
   }
-  double BarlowBeestonBanff2022::eval(const SamplePair& samplePair_, int bin_) const {
+
+  inline double BarlowBeestonBanff2022::eval(const SamplePair& samplePair_, int bin_) const {
     double dataVal = samplePair_.data->getHistogram().getBinContentList()[bin_].sumWeights;
     double predVal = samplePair_.model->getHistogram().getBinContentList()[bin_].sumWeights;
 
@@ -131,7 +132,7 @@ namespace JointProbability{
     return eval(dataVal, predVal, mcuncert, bin_);
   }
 
-  double BarlowBeestonBanff2022::eval(double data_, double pred_, double err_, int bin_) const {
+  inline double BarlowBeestonBanff2022::eval(double data_, double pred_, double err_, int bin_) const {
     double dataVal = data_;
     double predVal = pred_;
     double mcuncert = err_;
