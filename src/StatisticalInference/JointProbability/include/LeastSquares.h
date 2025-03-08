@@ -32,7 +32,12 @@ namespace JointProbability{
   void LeastSquares::configureImpl(){
     LogWarning << "Using LeastSquaresLLH: NOT A REAL LIKELIHOOD" << std::endl;
     GenericToolbox::Json::fillValue(_config_, lsqPoissonianApproximation, "lsqPoissonianApproximation");
-    LogWarning << "Using Least Squares Poissonian Approximation" << std::endl;
+    if (lsqPoissonianApproximation) {
+      LogWarning << "Using Least Squares Poissonian Approximation" << std::endl;
+    }
+    else {
+      LogWarning << "Using Least Square Differences" << std::endl;
+    }
   }
 
   double LeastSquares::eval(double data_, double pred_, double err_, int bin_) const {
