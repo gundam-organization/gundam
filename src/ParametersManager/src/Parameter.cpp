@@ -26,9 +26,11 @@ void Parameter::configureImpl(){
   }
 
   GenericToolbox::Json::fillValue(_config_, _isFixed_, "isFixed");
+  GenericToolbox::Json::fillValue(_config_, _isThrown_, "isThrown");
   GenericToolbox::Json::fillValue(_config_, _stepSize_, "parameterStepSize");
   GenericToolbox::Json::fillValue(_config_, _parameterLimits_, "parameterLimits");
   GenericToolbox::Json::fillValue(_config_, _physicalLimits_, "physicalLimits");
+  GenericToolbox::Json::fillValue(_config_, _throwLimits_, "throwLimits");
   GenericToolbox::Json::fillValue(_config_, _mirrorRange_, "mirrorRange");
   GenericToolbox::Json::fillValue(_config_, _dialDefinitionsList_, "dialSetDefinitions");
 
@@ -44,6 +46,15 @@ void Parameter::initializeImpl() {
   LogThrowIf(std::isnan(_priorValue_), "Prior value is not set: " << getFullTitle());
   LogThrowIf(std::isnan(_stdDevValue_), "Std dev value is not set: " << getFullTitle());
   LogThrowIf(std::isnan(_parameterValue_), "Parameter value is not set: " << getFullTitle());
+
+  if( _priorValue_ == _parameterLimits_.min or _priorValue_ == _parameterLimits_.max ) {
+    // the user should know. This will prevent Asimov fits to converge
+    LogAlert << "Prior value of \"" << getFullTitle() << "\" is set on the defined limits: " << _priorValue_ << " -> " << _parameterLimits_ << std::endl;
+  }
+
+  // make sure the throws will always give parameters in bounds
+  _throwLimits_.fillMostConstrainingBounds(_parameterLimits_);
+  _throwLimits_.fillMostConstrainingBounds(_physicalLimits_);
 }
 
 void Parameter::setMinMirror(double minMirror) {
@@ -133,14 +144,12 @@ bool Parameter::isInDomain(double value_, bool verbose_) const {
   return true;
 }
 bool Parameter::isPhysical(double value_) const {
-  if (not isInDomain(value_)) return false;
-  if ( not std::isnan(_physicalLimits_.min) and value_ < _physicalLimits_.min ) return false;
-  if ( not std::isnan(_physicalLimits_.max) and value_ > _physicalLimits_.max ) return false;
+  if( not isInDomain(value_) ){ return false; }
+  if( not _parameterLimits_.isInBounds(value_) ){ return false; }
   return true;
 }
 bool Parameter::isMirrored(double value_) const {
-  if ( not std::isnan(_mirrorRange_.min) and value_ < _mirrorRange_.min ) return true;
-  if ( not std::isnan(_mirrorRange_.max) and value_ > _mirrorRange_.max ) return true;
+  if( not _mirrorRange_.isInBounds(value_) ){ return true; }
   return false;
 }
 bool Parameter::isValidValue(double value) const {
@@ -185,13 +194,7 @@ std::string Parameter::getSummary() const {
   ss << ": value=" << _parameterValue_;
   ss << ", prior=" << _priorValue_;
   ss << ", stdDev=" << _stdDevValue_;
-  ss << ", bounds=[ ";
-  if( std::isnan(_parameterLimits_.min) ) ss << "-inf";
-  else ss << _parameterLimits_.min;
-  ss << ", ";
-  if( std::isnan(_parameterLimits_.max) ) ss << "+inf";
-  else ss << _parameterLimits_.max;
-  ss << " ]";
+  ss << ", bounds=" << _parameterLimits_;
   if (not isValueWithinBounds()){
     ss << GenericToolbox::ColorCodes::redBackground << " out of bounds" << GenericToolbox::ColorCodes::resetColor;
   }

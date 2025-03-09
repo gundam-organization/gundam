@@ -286,7 +286,7 @@ void MinimizerBase::printParameters(){
   for( const auto& parSet : getModelPropagator().getParametersManager().getParameterSetsList() ){
 
     GenericToolbox::TablePrinter t;
-    t.setColTitles({ {"Title"}, {"Starting"}, {"Prior"}, {"StdDev"}, {"Min"}, {"Max"}, {"Status"} });
+    t.setColTitles({ {"Title"}, {"Starting"}, {"Prior"}, {"StdDev"}, {"Limits"}, {"Status"} });
 
     auto& parList = parSet.getEffectiveParameterList();
     LogWarning << parSet.getName() << ": " << parList.size() << " parameters" << std::endl;
@@ -312,8 +312,7 @@ void MinimizerBase::printParameters(){
                          std::to_string( par.getParameterValue() ),
                          std::to_string( par.getPriorValue() ),
                          std::to_string( par.getStdDevValue() ),
-                         std::to_string( par.getMinValue() ),
-                         std::to_string( par.getMaxValue() ),
+                         par.getParameterLimits().toString(),
                          statusStr
                      }, colorStr);
     }

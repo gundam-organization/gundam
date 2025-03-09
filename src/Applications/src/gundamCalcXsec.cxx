@@ -455,14 +455,14 @@ int main(int argc, char** argv){
     LogInfo << "Defining xsec entry: " << sample.getName() << std::endl;
     xsecEntry.samplePtr = &sample;
     xsecEntry.config = sample.getConfig();
-    xsecEntry.branchBinsData.resetCurrentByteOffset();
+    xsecEntry.branchBinsData.resetCursor();
     std::vector<std::string> leafNameList{};
     leafNameList.reserve( sample.getHistogram().getNbBins() );
     for( int iBin = 0 ; iBin < sample.getHistogram().getNbBins(); iBin++ ){
       leafNameList.emplace_back(Form("bin_%i/D", iBin));
       xsecEntry.branchBinsData.writeRawData( double(0) );
     }
-    xsecEntry.branchBinsData.lockArraySize();
+    xsecEntry.branchBinsData.lock();
 
     xsecThrowTree->Branch(
         GenericToolbox::generateCleanBranchName( sample.getName() ).c_str(),
@@ -514,7 +514,7 @@ int main(int argc, char** argv){
   auto writeBinDataFct = std::function<void()>([&]{
     for( auto& xsec : crossSectionDataList ){
 
-      xsec.branchBinsData.resetCurrentByteOffset();
+      xsec.branchBinsData.resetCursor();
       for( int iBin = 0 ; iBin < xsec.samplePtr->getHistogram().getNbBins() ; iBin++ ){
         double binData{ xsec.samplePtr->getHistogram().getBinContentList()[iBin].sumWeights };
 

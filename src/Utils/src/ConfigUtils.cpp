@@ -21,7 +21,7 @@ namespace ConfigUtils {
   JsonType readConfigFile(const std::string& configFilePath_){
     if( not GenericToolbox::isFile(configFilePath_) ){
       LogError << "\"" << configFilePath_ << "\" could not be found." << std::endl;
-      throw std::runtime_error("file not found.");
+      std::exit(EXIT_FAILURE);
     }
 
     JsonType output;
@@ -34,7 +34,11 @@ namespace ConfigUtils {
         output = GenericToolbox::Json::readConfigFile(configFilePath_);
       }
     }
-    catch(...){ LogThrow("Error while reading config file: " << configFilePath_); }
+    catch(...){
+        LogError << "Error while reading config file: " << configFilePath_
+                 << std::endl;
+        std::exit(EXIT_FAILURE);
+    }
 
     // resolve sub-references to other config files
     ConfigUtils::unfoldConfig( output );
@@ -136,7 +140,10 @@ namespace ConfigUtils {
   void ConfigHandler::setConfig(const std::string& filePath_){
     if( GenericToolbox::hasExtension( filePath_, "root" ) ){
       LogInfo << "Extracting config file for fitter file: " << filePath_ << std::endl;
-      LogThrowIf( not GenericToolbox::doesTFileIsValid(filePath_), "Invalid root file: " << filePath_ );
+      if (not GenericToolbox::doesTFileIsValid(filePath_)) {
+        LogError << "Invalid root file: " << filePath_ << std::endl;
+        std::exit(EXIT_FAILURE);
+      }
       auto fitFile = std::shared_ptr<TFile>( GenericToolbox::openExistingTFile( filePath_ ) );
 
       auto* conf = fitFile->Get<TNamed>("gundam/config_TNamed");
@@ -144,7 +151,10 @@ namespace ConfigUtils {
         // legacy
         conf = fitFile->Get<TNamed>("gundamFitter/unfoldedConfig_TNamed");
       }
-      LogThrowIf(conf==nullptr, "no config in ROOT file " << filePath_);
+      if (conf == nullptr) {
+        LogError << "Noo config in ROOT file " << filePath_ << std::endl;
+        std::exit(EXIT_FAILURE);
+      }
       config = GenericToolbox::Json::readConfigJsonStr( conf->GetTitle() );
       fitFile->Close();
     }
@@ -160,7 +170,10 @@ namespace ConfigUtils {
   }
   void ConfigHandler::override( const std::string& filePath_ ){
     LogInfo << "Overriding config with \"" << filePath_ << "\"" << std::endl;
-    LogThrowIf(not GenericToolbox::isFile(filePath_), "Could not find " << filePath_);
+    if (not GenericToolbox::isFile(filePath_)) {
+      LogError << "Could not find " << filePath_ << std::endl;
+      std::exit(EXIT_FAILURE);
+    }
     this->override( ConfigUtils::readConfigFile(filePath_) );
   }
   void ConfigHandler::override( const std::vector<std::string>& filesList_ ){

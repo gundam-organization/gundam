@@ -121,9 +121,6 @@ void ParameterSet::configureImpl(){
 void ParameterSet::initializeImpl() {
   for( auto& par : _parameterList_ ){
     par.initialize();
-//    if( _printParametersSummary_ and par.isEnabled() ){
-//      LogInfo << par.getSummary(not _printDialSetsSummary_) << std::endl;
-//    }
   }
 
   // Make the matrix inversion
@@ -147,13 +144,12 @@ void ParameterSet::processCovarianceMatrix(){
     nbParameters++;
     if( not isEnableEigenDecomp() ) continue;
     // Warn if using eigen decomposition with bounded parameters.
-    if ( std::isnan(par.getMinValue()) and std::isnan(par.getMaxValue())) continue;
+    if( par.getParameterLimits().isUnbounded() ){ continue; }
     LogAlert << "Undefined behavior: Eigen-decomposition of a bounded parameter: "
                << par.getFullTitle()
                << std::endl;
     ++configWarnings;
   }
-  LogInfo << nbParameters << " effective parameters were defined in set: " << getName() << std::endl;
 
   if( nbParameters == 0 ){
     LogAlert << "No parameter is enabled. Disabling the parameter set." << std::endl;
@@ -207,8 +203,16 @@ void ParameterSet::processCovarianceMatrix(){
     }
 
     TVectorD eigenValues;
-    // https://root-forum.cern.ch/t/tmatrixt-get-eigenvalues/25924
-    _inverseCovarianceMatrix_->EigenVectors(eigenValues);
+
+    if(_inverseCovarianceMatrix_->GetNrows() == 1) {
+      eigenValues.ResizeTo(1);
+      eigenValues[0] = (*_inverseCovarianceMatrix_)[0][0];
+    }
+    else {
+      // https://root-forum.cern.ch/t/tmatrixt-get-eigenvalues/25924
+      _inverseCovarianceMatrix_->EigenVectors(eigenValues);
+    }
+
     if( eigenValues.Min() < 0 ){
       LogError << "Negative eigen values for prior cov matrix: " << eigenValues.Min() << std::endl;
       failed = true;
@@ -318,16 +322,6 @@ void ParameterSet::processCovarianceMatrix(){
     _originalParBuffer_ = std::make_shared<TVectorD>(_priorCovarianceMatrix_->GetNrows() );
     _eigenParBuffer_    = std::make_shared<TVectorD>(_priorCovarianceMatrix_->GetNrows() );
 
-//    LogAlert << "Disabling par/dial limits" << std::endl;
-//    for( auto& par : _parameterList_ ){
-//      par.setMinValue(std::nan(""));
-//      par.setMaxValue(std::nan(""));
-//      for( auto& dialSet : par.getDialSetList() ){
-//        dialSet.setMinDialResponse(std::nan(""));
-//        dialSet.setMaxDialResponse(std::nan(""));
-//      }
-//    }
-
     // Put original parameters to the prior
     for( auto& par : _parameterList_ ){
       par.setValueAtPrior();
@@ -341,19 +335,12 @@ void ParameterSet::processCovarianceMatrix(){
       eigenPar.setCurrentValueAsPrior();
 
       if( _devUseParLimitsOnEigen_ ){
-        eigenPar.setMinValue( _parameterList_[eigenPar.getParameterIndex()].getMinValue() );
-        eigenPar.setMaxValue( _parameterList_[eigenPar.getParameterIndex()].getMaxValue() );
-
-        LogThrowIf( not std::isnan(eigenPar.getMinValue()) and eigenPar.getPriorValue() < eigenPar.getMinValue(), "PRIOR IS BELLOW MIN: " << eigenPar.getSummary() );
-        LogThrowIf( not std::isnan(eigenPar.getMaxValue()) and eigenPar.getPriorValue() > eigenPar.getMaxValue(), "PRIOR IS ABOVE MAX: " << eigenPar.getSummary() );
+        eigenPar.setLimits( _parameterList_[eigenPar.getParameterIndex()].getParameterLimits() );
       }
       else{
-        eigenPar.setMinValue( _eigenParRange_.min );
-        eigenPar.setMaxValue( _eigenParRange_.max );
-
-        LogThrowIf( not std::isnan(eigenPar.getMinValue()) and eigenPar.getPriorValue() < eigenPar.getMinValue(), "Prior value is bellow min: " << eigenPar.getSummary() );
-        LogThrowIf( not std::isnan(eigenPar.getMaxValue()) and eigenPar.getPriorValue() > eigenPar.getMaxValue(), "Prior value is above max: " << eigenPar.getSummary() );
+        eigenPar.setLimits( _eigenParRange_ );
       }
+      LogThrowIf( not eigenPar.getParameterLimits().isInBounds(eigenPar.getPriorValue()), "PRIOR ISN'T IN BOUNDS: " << eigenPar.getSummary() );
     }
 
   }
@@ -415,73 +402,89 @@ void ParameterSet::moveParametersToPrior(){
 }
 void ParameterSet::throwParameters(bool rethrowIfNotInPhysical_, double gain_){
 
-  LogThrowIf(_priorCovarianceMatrix_==nullptr, "No covariance matrix provided");
-
-  TVectorD throwsList{_priorCovarianceMatrix_->GetNrows()};
+  TVectorD throwsList;
+  if (_priorCovarianceMatrix_) {
+    throwsList.ResizeTo(_priorCovarianceMatrix_->GetNrows());
+  }
 
   // generic function to handle multiple throws
   std::function<void(std::function<void()>)> throwParsFct =
       [&](const std::function<void()>& throwFct_){
 
+        LogWarningIf(gain_!=1) << "Throw gain is " << gain_ << std::endl;
+
         int nTries{0};
         while( true ){
           ++nTries;
+
+          if( nTries > 1000 ){
+            LogExit("Failed to find valid throw");
+          }
+
           throwFct_();
+
+          // assuming
+          int nThrowsOutOfBounds{0};
+          LogInfo << "Check that thrown parameters are within bounds..." << std::endl;
 
           // throws with this function are always done in real space.
           int iFit{-1};
           for( auto& par : this->getParameterList() ){
             if( ParameterSet::isValidCorrelatedParameter(par) ){
               iFit++;
-              par.setThrowValue( par.getPriorValue() + gain_*throwsList[iFit] );
+              if (par.isThrown()) {
+                  par.setThrowValue( par.getPriorValue() + gain_*throwsList[iFit] );
+              }
+            }
+            else if (par.isThrown() and par.isFree()) {
+              double aMin = par.getThrowLimits().min;
+              double aMax = par.getThrowLimits().max;
+              if (not std::isfinite(aMin)) {
+                aMin = par.getPriorValue() - gain_*par.getStepSize();
+                LogWarning << "Free parameter " << par.getName()
+                         << " thrown without lower bound (new: " << aMin << ")"
+                         << std::endl;
+              }
+              if (not std::isfinite(aMax)) {
+                aMax = par.getPriorValue() + gain_*par.getStepSize();
+                LogWarning << "Free parameter " << par.getName()
+                         << " thrown without upper bound (new: " << aMax << ")"
+                         << std::endl;
+              }
+              par.setThrowValue(gRandom->Uniform(aMin,aMax));
+            }
+            else if (par.isThrown()) {
+              double stdDev = par.getStdDevValue();
+              if (not std::isfinite(stdDev) and stdDev <= 0) {
+                // No standard deviation, so use the step size.
+                stdDev = par.getStepSize();
+              }
+              if (std::isfinite(stdDev) and stdDev > 0) {
+                par.setThrowValue(par.getPriorValue()
+                                  + gRandom->Gaus(0, gain_*stdDev));
+              }
+              else {
+                LogError << "Thrown parameter " << par.getName()
+                         << " without standard deviation"
+                         << std::endl;
+                LogExit("Bad thrown parameter");
+              }
+            }
+            if( not par.getThrowLimits().isInBounds(par.getThrowValue()) ){
+              nThrowsOutOfBounds++;
+              LogWarning << par.getTitle() << " was thrown out of limits: "
+                       << par.getThrowValue() << " -> " << par.getThrowLimits() << std::endl;
             }
           }
 
-          bool throwIsValid = true; // default case
-          LogInfo << "Check that thrown parameters are within bounds..."
-                  << std::endl;
-
-          for( auto& par : this->getParameterList() ){
-            if( not ParameterSet::isValidCorrelatedParameter(par) ) continue;
-            if( not std::isnan(par.getMinValue())
-                and par.getThrowValue() < par.getMinValue() ){
-              throwIsValid = false;
-              LogAlert << "thrown value lower than min bound -> "
-                       << par.getSummary() << std::endl;
-              break;
-            }
-            if( not std::isnan(par.getMaxValue())
-                and par.getThrowValue() > par.getMaxValue() ){
-              throwIsValid = false;
-              LogAlert <<"thrown value higher than max bound -> "
-                       << par.getSummary() << std::endl;
-              break;
-            }
-
-            if ( not rethrowIfNotInPhysical_ ) continue;
-            if( not std::isnan(par.getMinPhysical())
-                and par.getThrowValue() < par.getMinPhysical() ){
-              throwIsValid = false;
-              LogAlert << "thrown value lower than min physical bound -> "
-                       << par.getSummary() << std::endl;
-              break;
-            }
-            if( not std::isnan(par.getMaxPhysical())
-                and par.getThrowValue() > par.getMaxPhysical() ){
-              throwIsValid = false;
-              LogAlert <<"thrown value higher than max physical bound -> "
-                       << par.getSummary() << std::endl;
-              break;
-            }
-          }
-
-          if (not throwIsValid) {
-            LogAlert << "Rethrowing \"" << this->getName() << "\"... try #" << nTries+1 << std::endl;
-            LogThrowIf(nTries > 10000, "Failed to find valid throw");
+          if( nThrowsOutOfBounds != 0 ){
+            LogAlert << nThrowsOutOfBounds << " parameter were found out of set limits."
+            << " Rethrowing \"" << this->getName() << "\"... try #" << nTries+1 << std::endl;
             continue;
           }
 
           // Throw looks OK, so set the parameter values.
+          LogInfoIf(nTries!=1) << "Keeping throw after " << nTries << " tries." << std::endl;
           for( auto& par : this->getParameterList() ){
             if( ParameterSet::isValidCorrelatedParameter(par) ){
               par.setParameterValue(par.getThrowValue());
@@ -498,18 +501,48 @@ void ParameterSet::throwParameters(bool rethrowIfNotInPhysical_, double gain_){
           }
 
           // alright at this point it's fine, print them
+          GenericToolbox::TablePrinter t;
+          t.setColTitles({{"Parameter"}, {"Prior"}, {"StdDev"}, {"ThrowLimits"}, {"Thrown"}});
           for( auto& par : _parameterList_ ){
-            if( ParameterSet::isValidCorrelatedParameter(par) ){
-              LogInfo << "Thrown par " << par.getTitle() << ": " << par.getPriorValue();
-              LogInfo << " becomes " << par.getParameterValue() << std::endl;
+            if(par.isThrown() and ParameterSet::isValidCorrelatedParameter(par) ){
+              t.addTableLine({
+                par.getTitle(),
+                std::to_string(par.getPriorValue()),
+                std::to_string(par.getStdDevValue()),
+                par.getThrowLimits().toString(),
+                std::to_string(par.getThrowValue())
+              });
+            }
+            else if (par.isThrown()) {
+              double sd = par.getStdDevValue();
+              if (not std::isfinite(sd) or sd <= 0) sd = par.getStepSize();
+              std::string tmp = std::to_string(sd);
+              if (par.isFree()) tmp = "free";
+              t.addTableLine({
+                par.getTitle(),
+                std::to_string(par.getPriorValue()),
+                tmp,
+                par.getThrowLimits().toString(),
+                std::to_string(par.getThrowValue())
+                });
             }
           }
+          t.printTable();
+
           if( isEnableEigenDecomp() ){
             LogInfo << "Translated to eigen space:" << std::endl;
+            t.reset();
+            t.setColTitles({{"Eigen"}, {"Prior"}, {"StdDev"}, {"ThrowLimits"}, {"Thrown"}});
             for( auto& eigenPar : _eigenParameterList_ ){
-              LogInfo << "Eigen par " << eigenPar.getTitle() << ": " << eigenPar.getPriorValue();
-              LogInfo << " becomes " << eigenPar.getParameterValue() << std::endl;
+              t.addTableLine({
+                eigenPar.getTitle(),
+                std::to_string(eigenPar.getPriorValue()),
+                std::to_string(eigenPar.getStdDevValue()),
+                eigenPar.getThrowLimits().toString(),
+                std::to_string(eigenPar.getThrowValue())
+              });
             }
+            t.printTable();
           }
           break;
         }
@@ -528,10 +561,14 @@ void ParameterSet::throwParameters(bool rethrowIfNotInPhysical_, double gain_){
       LogInfo << "Generating Cholesky matrix in set: " << getName() << std::endl;
       _markHartzGen_ = std::make_shared<ParameterThrowerMarkHarz>(throwsList, *_priorCovarianceMatrix_);
     }
-    TVectorD throws(_priorCovarianceMatrix_->GetNrows());
+    // TVectorD throws(_priorCovarianceMatrix_->GetNrows());
 
-    std::vector<double> throwPars(_priorCovarianceMatrix_->GetNrows());
+    std::vector<double> throwPars;
     std::function<void()> markScottThrowFct = [&](){
+      if ( _markHartzGen_ == nullptr) return;
+
+      throwPars.resize(_priorCovarianceMatrix_->GetNrows());
+
       _markHartzGen_->ThrowSet(throwPars);
       // THROWS ARE CENTERED AROUND 1!!
 
@@ -564,14 +601,9 @@ void ParameterSet::throwParameters(bool rethrowIfNotInPhysical_, double gain_){
         LogInfo << "Checking if the thrown parameters of the set are within bounds..." << std::endl;
 
         for( auto& par : this->getEffectiveParameterList() ){
-          if( not std::isnan(par.getMinValue()) and par.getParameterValue() < par.getMinValue() ){
+          if( not par.getParameterLimits().isInBounds(par.getParameterValue()) ) {
             throwIsValid = false;
-            LogAlert << GenericToolbox::ColorCodes::redLightText << "thrown value lower than min bound -> " << GenericToolbox::ColorCodes::resetColor
-                     << par.getSummary() << std::endl;
-          }
-          else if( not std::isnan(par.getMaxValue()) and par.getParameterValue() > par.getMaxValue() ){
-            throwIsValid = false;
-            LogAlert << GenericToolbox::ColorCodes::redLightText <<"thrown value higher than max bound -> " << GenericToolbox::ColorCodes::resetColor
+            LogAlert << GenericToolbox::ColorCodes::redLightText << "Thrown value not within limits -> " << par.getParameterValue() << GenericToolbox::ColorCodes::resetColor
                      << par.getSummary() << std::endl;
           }
         }
@@ -596,12 +628,25 @@ void ParameterSet::throwParameters(bool rethrowIfNotInPhysical_, double gain_){
   else {
       LogInfo << "Throwing parameters for " << _name_ << " using Cholesky matrix" << std::endl;
 
-      if( not _correlatedVariableThrower_.isInitialized() ){
+      if( not _correlatedVariableThrower_.isInitialized()
+          and _priorCovarianceMatrix_ != nullptr){
         _correlatedVariableThrower_.setCovarianceMatrixPtr(_priorCovarianceMatrix_.get());
         _correlatedVariableThrower_.initialize();
+        int iFit{-1};
+        for( auto& par : this->getParameterList() ){
+          if( ParameterSet::isValidCorrelatedParameter(par) ){
+            iFit++;
+            _correlatedVariableThrower_.getParLimitList().at(iFit) = par.getThrowLimits();
+            // cancel the prior, thrown values are centered around 0
+            _correlatedVariableThrower_.getParLimitList().at(iFit) -= par.getPriorValue();
+          }
+        }
+        _correlatedVariableThrower_.setNbMaxTries(100000); // could be a user parameter
+        _correlatedVariableThrower_.extractBlocks();
       }
 
       std::function<void()> gundamThrowFct = [&](){
+        if ( _priorCovarianceMatrix_ == nullptr) return;
         _correlatedVariableThrower_.throwCorrelatedVariables(throwsList);
       };
 
@@ -660,8 +705,7 @@ std::string ParameterSet::getSummary() const {
       if( not _parameterList_.empty() ){
 
         GenericToolbox::TablePrinter t;
-        t.setColTitles({ {"Title"}, {"Value"}, {"Prior"}, {"StdDev"}, {"Min"}, {"Max"}, {"Status"} });
-
+        t.setColTitles({ {"Title"}, {"Current"}, {"Prior"}, {"StdDev"}, {"Limits"}, {"Property"} });
 
         for( const auto& par : _parameterList_ ){
           std::string colorStr;
@@ -683,8 +727,7 @@ std::string ParameterSet::getSummary() const {
                                              : std::nan("Invalid") ),
                              std::to_string( par.getPriorValue() ),
                              std::to_string( par.getStdDevValue() ),
-                             std::to_string( par.getMinValue() ),
-                             std::to_string( par.getMaxValue() ),
+                             par.getParameterLimits().toString(),
                              statusStr
                          }, colorStr);
         }
@@ -856,17 +899,31 @@ bool ParameterSet::isValidCorrelatedParameter(const Parameter& par_){
 }
 
 void ParameterSet::printConfiguration() const {
-  LogInfo << "name(" << _name_ << ")";
-  LogInfo << ", nPars(" << _nbParameterDefinition_ << ")";
-  LogInfo << std::endl;
 
-  for( auto& par : _parameterList_ ){ par.printConfiguration(); }
+  GenericToolbox::TablePrinter t;
+  t << "Title" << GenericToolbox::TablePrinter::NextColumn;
+  t << "Prior" << GenericToolbox::TablePrinter::NextColumn;
+  t << "StdDev" << GenericToolbox::TablePrinter::NextColumn;
+  t << "Limits" << GenericToolbox::TablePrinter::NextLine;
+
+  int nPars{0};
+  for( auto& par : _parameterList_ ){
+    if( not par.isEnabled() ){ continue; }
+    t << par.getTitle() << GenericToolbox::TablePrinter::NextColumn;
+    t << par.getPriorValue() << GenericToolbox::TablePrinter::NextColumn;
+    t << (par.getPriorType() == Parameter::PriorType::Flat ? "Free": std::to_string(par.getStdDevValue())) << GenericToolbox::TablePrinter::NextColumn;
+    t << par.getParameterLimits() << GenericToolbox::TablePrinter::NextLine;
+    nPars++;
+  }
+
+  LogInfo << getName() << " has " << nPars << " defined parameters:" << std::endl;
+  t.printTable();
+
 }
 
 
 // Protected
 void ParameterSet::readParameterDefinitionFile(){
-
   // new generalised way of defining parameters:
   // path can be set as: /path/to/rootfile.root:folder/in/tfile/object
 
@@ -904,7 +961,6 @@ void ParameterSet::readParameterDefinitionFile(){
   LogThrowIf(_throwEnabledList_ != nullptr and _throwEnabledList_->GetNrows() != _nbParameterDefinition_,
              "Throw enabled list don't have the same size(" << _throwEnabledList_->GetNrows()
                                                               << ") as cov matrix(" << _nbParameterDefinition_ << ")" );
-
 }
 void ParameterSet::defineParameters(){
   _parameterList_.resize(_nbParameterDefinition_, Parameter(this));
@@ -918,8 +974,8 @@ void ParameterSet::defineParameters(){
       par.setStepSize(std::sqrt((*_priorFullCovarianceMatrix_)[par.getParameterIndex()][par.getParameterIndex()]));
     }
     else{
-      LogThrowIf(std::isnan(_nominalStepSize_), "Can't define free parameter without a \"nominalStepSize\"");
-      par.setStdDevValue(_nominalStepSize_); // stdDev will only be used for display purpose
+      // stdDev will only be used for display purpose
+      par.setStdDevValue(_nominalStepSize_);
       par.setStepSize(_nominalStepSize_);
       par.setPriorType(Parameter::PriorType::Flat);
       par.setIsFree(true);
@@ -968,14 +1024,14 @@ void ParameterSet::defineParameters(){
 
     par.setParameterValue(par.getPriorValue());
 
-    if( not std::isnan(_globalParRange_.min) ){ par.setMinValue(_globalParRange_.min); }
-    if( not std::isnan(_globalParRange_.max) ){ par.setMaxValue(_globalParRange_.max); }
+    par.setLimits(_globalParRange_);
 
-    if( _parameterLowerBoundsList_ != nullptr ){ par.setMinValue((*_parameterLowerBoundsList_)[par.getParameterIndex()]); }
-    if( _parameterUpperBoundsList_ != nullptr ){ par.setMaxValue((*_parameterUpperBoundsList_)[par.getParameterIndex()]); }
+    GenericToolbox::Range rootBounds{};
+    if( _parameterLowerBoundsList_ != nullptr ){ rootBounds.min = ((*_parameterLowerBoundsList_)[par.getParameterIndex()]); }
+    if( _parameterUpperBoundsList_ != nullptr ){ rootBounds.max = ((*_parameterUpperBoundsList_)[par.getParameterIndex()]); }
+    par.setLimits( rootBounds );
 
-    LogThrowIf( not std::isnan(par.getMinValue()) and par.getPriorValue() < par.getMinValue(), "PRIOR IS BELLOW MIN: " << par.getSummary() );
-    LogThrowIf( not std::isnan(par.getMaxValue()) and par.getPriorValue() > par.getMaxValue(), "PRIOR IS ABOVE MAX: " << par.getSummary() );
+    LogThrowIf( not par.getParameterLimits().isInBounds(par.getPriorValue()), "PRIOR IS NOT IN BOUNDS: " << par.getSummary() );
 
     if( not _parameterDefinitionConfig_.empty() ){
       // Alternative 1: define dials then parameters

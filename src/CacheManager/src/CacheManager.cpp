@@ -30,7 +30,7 @@
 #include "UniformSpline.h"
 #include "CompactSpline.h"
 #include "MonotonicSpline.h"
-#include "LightGraph.h"
+#include "Graph.h"
 #include "Bilinear.h"
 #include "Bicubic.h"
 #include "Shift.h"
@@ -175,13 +175,15 @@ bool Cache::Manager::HasGPU(bool dump) {
   return Cache::Parameters::HasGPU(dump);
 }
 
-bool Cache::Manager::Build() {
-  if( not isCacheManagerEnabled() ){ return false; }
+bool Cache::Manager::Build(SampleSet& sampleSet,
+                           EventDialCache& eventDialCache) {
+  if (not IsCacheManagerEnabled()) return false;
 
-  if( fParameters.fSampleSetPtr == nullptr or fParameters.fEventDialCachePtr == nullptr ){
-    LogError << "fSampleSetPtr or fEventDialCachePtr not set." << std::endl;
-    LogThrow("Can't Build()");
-  }
+  // Make sure that the Cache::Manager hasn't already been built.  Rebuilding
+  // isn't supported since we are talking about GB blocks of memory on the GPU
+  // and this should only be used with static initialization.
+  LogThrowIf(Cache::Manager::Get() != nullptr,
+             "Overwriting Cache::Manager");
 
   LogInfo << "Build the internal caches " << std::endl;
 
@@ -201,7 +203,7 @@ bool Cache::Manager::Build() {
 
   int dialErrorCount = 0;     // This should *stay* zero.
   std::map<std::string, int> useCount;
-  for (EventDialCache::CacheEntry& elem : fParameters.fEventDialCachePtr->getCache()) {
+  for (EventDialCache::CacheEntry& elem : eventDialCache.getCache()) {
     if (elem.event->getIndices().bin < 0) {
       LogThrow("Caching event that isn't used");
     }
@@ -242,7 +244,7 @@ bool Cache::Manager::Build() {
         ++config.compactSplines;
         config.compactPoints += dial->getDialData().size();
       }
-      else if (dialType.find("LightGraph") == 0) {
+      else if (dialType.find("Graph") == 0) {
         ++config.graphs;
         config.graphPoints += dial->getDialData().size();
       }
@@ -284,7 +286,7 @@ bool Cache::Manager::Build() {
   // Finish filling the configuration for the tabulated dials
   {
     config.tabulatedPoints = 0;
-    for (auto table : config.tables) {
+    for (auto& table : config.tables) {
       table.second = config.tabulatedPoints;
       config.tabulatedPoints += table.first->size();
     }
@@ -292,7 +294,7 @@ bool Cache::Manager::Build() {
 
   // Count the total number of histogram cells.
   config.histBins = 0;
-  for(const Sample& sample : fParameters.fSampleSetPtr->getSampleList() ){
+  for(const Sample& sample : sampleSet.getSampleList() ){
     int cells = sample.getHistogram().getNbBins(); // GetNcells() of TH1D
     LogInfo  << "Add histogram for " << sample.getName()
              << " with " << cells
@@ -392,7 +394,7 @@ bool Cache::Manager::Build() {
 
   // Try to allocate the Cache::Manager memory (including for the GPU if
   // it's being used).
-  if( Cache::Manager::Get() == nullptr and isCacheManagerEnabled() ){
+  if( Cache::Manager::Get() == nullptr and IsCacheManagerEnabled() ){
     LogInfo << "Creating the Cache::Manager" << std::endl;
     if (!Cache::Manager::HasCUDA()) {
       LogInfo << "    GPU Not enabled with Cache::Manager"
@@ -416,40 +418,53 @@ bool Cache::Manager::Build() {
     return false;
   }
 
-  Cache::Manager::RequireUpdate();
+  LogThrowIf(Cache::Manager::Get()->fSampleSet != nullptr,
+             "Cannot change Cache::Manager SampleSet");
+  Cache::Manager::Get()->fSampleSet = &sampleSet;
 
-  fParameters.fIsCacheManagerBuilt = true;
+  LogThrowIf(Cache::Manager::Get()->fEventDialCache != nullptr,
+             "Cannot change Cache::Manager EventDialCache");
+  Cache::Manager::Get()->fEventDialCache = &eventDialCache;
 
+  Cache::Manager::Get()->fUpdateRequired = true;
+
+  Cache::Manager::Get()->Update(*Cache::Manager::Get()->fSampleSet,
+                                *Cache::Manager::Get()->fEventDialCache);
   return true;
 }
 
+bool Cache::Manager::Update(SampleSet& sampleSet, EventDialCache& eventDialCache) {
+  LogThrowIf(
+      fSampleSet != &sampleSet,
+      "Cannot change Cache::Manager SampleSet");
 
-bool Cache::Manager::Update() {
-  // In case the cache isn't allocated (usually because it's turned off on
-  // the command line), but this is a safety check.
-  if (!Cache::Manager::Get()) {
-    LogWarning << "Cache will not be used"
-               << std::endl;
-    return false;
+  LogThrowIf(
+      fEventDialCache != &eventDialCache,
+      "Cannot change Cache::Manager EventDialCache");
+
+  if (!fUpdateRequired) {
+    // This is not the update that you are looking for.
+    LogError << "Update called when not required" << std::endl;
+    LogThrow("Invalid Cache::Manager::Update()");
   }
 
-  // This is the updated that is required!
-  SetUpdateRequired( false );
+  // This is the update that is required!
+  fUpdateRequired = false;
 
   LogInfo << "Update the internal caches" << std::endl;
 
   // Initialize the internal caches so they are in the default state.
-  Cache::Manager::Get()->GetParameterCache().Reset();
-  Cache::Manager::Get()->GetHistogramsCache().Reset();
-  Cache::Manager::Get()->GetWeightsCache().Reset();
+  GetParameterCache().Reset();
+  GetHistogramsCache().Reset();
+  GetWeightsCache().Reset();
 
   int usedResults = 0;
 
   fParameters.fEventWeightFillerList.clear();
-  fParameters.fEventWeightFillerList.reserve( fParameters.fEventDialCachePtr->getCache().size() );
+  fParameters.fEventWeightFillerList.reserve(eventDialCache.getCache().size());
 
   // Add the dials in the EventDialCache to the internal cache.
-  for (EventDialCache::CacheEntry& elem : fParameters.fEventDialCachePtr->getCache()) {
+  for (EventDialCache::CacheEntry& elem : eventDialCache.getCache()) {
     // Skip events that are not in a bin.
     if (elem.event->getIndices().bin < 0) continue;
     Event& event = *elem.event;
@@ -465,7 +480,7 @@ bool Cache::Manager::Update() {
     int dialErrorCount = 0;
     // Add each dial for the event to the GPU caches.
     for( auto& dialElem : elem.dialResponseCacheList ){
-      DialInputBuffer* dialInputs
+      auto* dialInputs
           = dialElem.dialInterface->getInputBufferRef();
 
       // Make sure all the used parameters are in the parameter
@@ -489,10 +504,9 @@ bool Cache::Manager::Update() {
         auto& bounds = dialInputs->getMirrorEdges(i);
         if( not std::isnan(bounds.minValue) ){
           int parIndex = fParameters.ParameterMap[fp];
-          Cache::Manager::Get()->GetParameterCache()
-              .SetLowerMirror(parIndex, bounds.minValue);
-          Cache::Manager::Get()->GetParameterCache()
-              .SetUpperMirror(parIndex, bounds.minValue+bounds.range);
+          GetParameterCache().SetLowerMirror(parIndex, bounds.minValue);
+          GetParameterCache().SetUpperMirror(parIndex,
+                                             bounds.minValue+bounds.range);
         }
       }
 
@@ -506,11 +520,9 @@ bool Cache::Manager::Update() {
         if (std::isfinite(resp->getMinResponse())) {
           minResponse = resp->getMinResponse();
         }
-        Cache::Manager::Get()->GetParameterCache()
-            .SetLowerClamp(parIndex,minResponse);
+        GetParameterCache().SetLowerClamp(parIndex,minResponse);
         if (not std::isfinite(resp->getMaxResponse())) continue;
-        Cache::Manager::Get()->GetParameterCache()
-            .SetUpperClamp(parIndex,resp->getMaxResponse());
+        GetParameterCache().SetUpperClamp(parIndex,resp->getMaxResponse());
       }
 
       // Add the dial information to the appropriate caches
@@ -521,59 +533,46 @@ bool Cache::Manager::Update() {
         ++dialUsed;
         const Parameter* fp = &(dialInputs->getParameter(0));
         int parIndex = fParameters.ParameterMap[fp];
-        Cache::Manager::Get()
-            ->fNormalizations
-            ->ReserveNorm(resultIndex,parIndex);
+        fNormalizations->ReserveNorm(resultIndex,parIndex);
       }
       auto* compactSpline = dynamic_cast<const CompactSpline*>(baseDial);
       if (compactSpline) {
         ++dialUsed;
         const Parameter* fp = &(dialInputs->getParameter(0));
         int parIndex = fParameters.ParameterMap[fp];
-        Cache::Manager::Get()
-            ->fCompactSplines
-            ->AddSpline(resultIndex,parIndex,
-                        baseDial->getDialData());
+        fCompactSplines->AddSpline(resultIndex,parIndex,
+                                            baseDial->getDialData());
       }
       auto* monotonicSpline = dynamic_cast<const MonotonicSpline*>(baseDial);
       if (monotonicSpline) {
         ++dialUsed;
         const Parameter* fp = &(dialInputs->getParameter(0));
         int parIndex = fParameters.ParameterMap[fp];
-        Cache::Manager::Get()
-            ->fMonotonicSplines
-            ->AddSpline(resultIndex,parIndex,
-                        baseDial->getDialData());
+        fMonotonicSplines->AddSpline(resultIndex,parIndex,
+                                            baseDial->getDialData());
       }
       auto* uniformSpline = dynamic_cast<const UniformSpline*>(baseDial);
       if (uniformSpline) {
         ++dialUsed;
         const Parameter* fp = &(dialInputs->getParameter(0));
         int parIndex = fParameters.ParameterMap[fp];
-        Cache::Manager::Get()
-            ->fUniformSplines
-            ->AddSpline(resultIndex,parIndex,
-                        baseDial->getDialData());
+        fUniformSplines->AddSpline(resultIndex,parIndex,
+                                   baseDial->getDialData());
       }
       auto* generalSpline = dynamic_cast<const GeneralSpline*>(baseDial);
       if (generalSpline) {
         ++dialUsed;
         const Parameter* fp = &(dialInputs->getParameter(0));
         int parIndex = fParameters.ParameterMap[fp];
-        Cache::Manager::Get()
-            ->fGeneralSplines
-            ->AddSpline(resultIndex,parIndex,
-                        baseDial->getDialData());
+        fGeneralSplines->AddSpline(resultIndex,parIndex,
+                                   baseDial->getDialData());
       }
-      auto* lightGraph = dynamic_cast<const LightGraph*>(baseDial);
+      auto* lightGraph = dynamic_cast<const Graph*>(baseDial);
       if (lightGraph) {
         ++dialUsed;
         const Parameter* fp = &(dialInputs->getParameter(0));
         int parIndex = fParameters.ParameterMap[fp];
-        Cache::Manager::Get()
-            ->fGraphs
-            ->AddGraph(resultIndex,parIndex,
-                       baseDial->getDialData());
+        fGraphs->AddGraph(resultIndex,parIndex,baseDial->getDialData());
       }
       auto* bilinear = dynamic_cast<const Bilinear*>(baseDial);
       if (bilinear) {
@@ -582,10 +581,8 @@ bool Cache::Manager::Update() {
         int parIndex1 = fParameters.ParameterMap[fp1];
         const Parameter* fp2 = &(dialInputs->getParameter(1));
         int parIndex2 = fParameters.ParameterMap[fp2];
-        Cache::Manager::Get()
-            ->fBilinear
-            ->AddData(resultIndex,parIndex1,parIndex2,
-                      baseDial->getDialData());
+        fBilinear->AddData(resultIndex,parIndex1,parIndex2,
+                           baseDial->getDialData());
       }
       auto* bicubic = dynamic_cast<const Bicubic*>(baseDial);
       if (bicubic) {
@@ -594,10 +591,8 @@ bool Cache::Manager::Update() {
         int parIndex1 = fParameters.ParameterMap[fp1];
         const Parameter* fp2 = &(dialInputs->getParameter(1));
         int parIndex2 = fParameters.ParameterMap[fp2];
-        Cache::Manager::Get()
-            ->fBicubic
-            ->AddData(resultIndex,parIndex1,parIndex2,
-                      baseDial->getDialData());
+        fBicubic->AddData(resultIndex,parIndex1,parIndex2,
+                          baseDial->getDialData());
       }
       auto* shift = dynamic_cast<const Shift*>(baseDial);
       if (shift) {
@@ -607,12 +602,10 @@ bool Cache::Manager::Update() {
       auto* tabulated = dynamic_cast<const Tabulated*>(baseDial);
       if (tabulated) {
         ++dialUsed;
-        Cache::Manager::Get()
-            ->fTabulated
-            ->AddData(resultIndex,
-                      tabulated->getTable(),
-                      tabulated->getIndex(),
-                      tabulated->getFraction());
+        fTabulated->AddData(resultIndex,
+                            tabulated->getTable(),
+                            tabulated->getIndex(),
+                            tabulated->getFraction());
       }
 
       if (dialUsed != 1) {
@@ -634,27 +627,24 @@ bool Cache::Manager::Update() {
 
     // Set the initial weight for the event.  This is done here since the
     // raw tree weight may get rescaled by "Shift" dials
-    Cache::Manager::Get()
-        ->GetWeightsCache()
-        .SetInitialValue(resultIndex,initialEventWeight);
+    GetWeightsCache().SetInitialValue(resultIndex,initialEventWeight);
 
   }
 
   LogInfo << "Error checking for cache" << std::endl;
 
   // Error checking adding the dials to the cache!
-  if (usedResults != Cache::Manager::Get()
-      ->GetWeightsCache().GetResultCount()) {
+  if (usedResults != GetWeightsCache().GetResultCount()) {
     LogError << "Cache Manager -- used Results:     "
              << usedResults << std::endl;
     LogError << "Cache Manager -- expected Results: "
-             << Cache::Manager::Get()->GetWeightsCache().GetResultCount()
+             << GetWeightsCache().GetResultCount()
              << std::endl;
     LogThrow("Probable problem putting dials in cache");
   }
 
   fParameters.fSampleHistFillerList.clear();
-  fParameters.fSampleHistFillerList.reserve( fParameters.fSampleSetPtr->getSampleList().size() );
+  fParameters.fSampleHistFillerList.reserve(sampleSet.getSampleList().size());
 
   // Add the histogram cells to the cache.  THIS CODE IS SUSPECT SINCE IT IS
   // SAVING ADDRESSES OF CLASS FIELDS.  This *will* be OK since the fields
@@ -662,7 +652,7 @@ bool Cache::Manager::Update() {
   // but is officially "dangerous".
   LogInfo << "Add this histogram cells to the cache." << std::endl;
   int nextHist = 0;
-  for(Sample& sample : fParameters.fSampleSetPtr->getSampleList() ) {
+  for(Sample& sample : sampleSet.getSampleList() ) {
     LogInfo  << "Fill cache for " << sample.getName()
              << " with " << sample.getEventList().size()
              << " events" << std::endl;
@@ -675,7 +665,7 @@ bool Cache::Manager::Update() {
 
     for( auto& eventFiller : fParameters.fEventWeightFillerList ){
       if( eventFiller.getEventPtr()->getIndices().sample == sample.getIndex() ){
-        Cache::Manager::Get()->GetHistogramsCache().SetEventIndex(
+        GetHistogramsCache().SetEventIndex(
             eventFiller.getValueIndex(),
             thisHistIndexOffset + eventFiller.getEventPtr()->getIndices().bin
         );
@@ -683,33 +673,49 @@ bool Cache::Manager::Update() {
     }
   }
 
-  if (Cache::Manager::Get()->GetHistogramsCache().GetSumCount()
-      != nextHist) {
+  if (GetHistogramsCache().GetSumCount() != nextHist) {
     LogThrow("Histogram cells are missing");
   }
 
   // If the event weight cap has been set, then pass it along
-  if (fParameters.fEventDialCachePtr->getGlobalEventReweightCap().isEnabled) {
-    double cap = fParameters.fEventDialCachePtr->getGlobalEventReweightCap().maxReweight;
-    if (std::isfinite(cap)) {
-      Cache::Manager::Get()
-          ->GetHistogramsCache().SetMaximumEventWeight(cap);
-    }
+  if (eventDialCache.getGlobalEventReweightCap().isEnabled) {
+    double c = eventDialCache.getGlobalEventReweightCap().maxReweight;
+    if (std::isfinite(c)) GetHistogramsCache().SetMaximumEventWeight(c);
   }
 
   // Notify all of the internal caches (mostly the CacheRecursiveSums) that
   // the internal buffers should be update
-  Cache::Manager::Get()->GetHistogramsCache().Initialize();
+  GetHistogramsCache().Initialize();
 
   return true;
 }
 
-bool Cache::Manager::Fill() {
+bool Cache::Manager::PropagateParameters(SampleSet& samples,
+                                         EventDialCache& dials) {
+  // Copy updated information to the device and start the kernels
+  std::future<bool> result = Cache::Manager::Fill(samples,dials);
+  if (not result.valid()) return false;
+  return result.get();
+}
+
+std::future<bool> Cache::Manager::Fill(SampleSet& samples,
+                                       EventDialCache& dials) {
+  auto s{fParameters.cacheFillTimer.scopeTime()};
   Cache::Manager* cache = Cache::Manager::Get();
-  if (!cache) return false;
-  if (fParameters.fUpdateRequired) {
+  if (cache == nullptr) return std::future<bool>();
+  if (cache->fUpdateRequired) {
     LogError << "Fill while an update is required" << std::endl;
     LogThrow("Fill while an update is required");
+  }
+  if (cache->fSampleSet != &samples) {
+    LogError << "Using Cache::Manager with an unknown sample set."
+             << std::endl;
+    return std::future<bool>();
+  }
+  if (cache->fEventDialCache != &dials) {
+    LogError << "Using Cache::Manager with an unknown event dial cache."
+             << std::endl;
+    return std::future<bool>();
   }
   LogTraceIf(GundamGlobals::isDebug() ) << "Cache::Manager::Fill -- Fill the GPU cache" << std::endl;
 #define DUMP_FILL_INPUT_PARAMETERS
@@ -738,7 +744,7 @@ bool Cache::Manager::Fill() {
                  << std::endl;
       LogWarning << "WARNING: Cache::Manager will not be used"
                  << std::endl;
-      return false;
+      return  std::future<bool>();
     }
     cache->GetParameterCache().SetParameter(
         par.second, par.first->getParameterValue());
@@ -746,83 +752,89 @@ bool Cache::Manager::Fill() {
   cache->GetWeightsCache().Apply();
   cache->GetHistogramsCache().Apply();
 
+  return std::async(
+      std::launch::deferred,
+      []{
+        if (Cache::Manager::Get() == nullptr) return false;
+        return Cache::Manager::Get()->CopyResults();
+      });
+}
+
+bool Cache::Manager::CopyResults() {
+  // This section should be delayed as long as possible, and the current
+  // serialization is wasting the GPU parallization.  For efficiency, the
+  // logic needs to follow LTS version where the back copy is delayed until
+  // the results are actually needed.
+  auto s{fParameters.pullFromDeviceTimer.scopeTime()};
+
+  // do we need to copy every event weight to the CPU structures ?
+  if( fParameters.fIsEventWeightCopyEnabled ){
+    CopyEventWeights();
+  }
+
+  // do we need to copy bin content to the CPU structures ?
+  if( fParameters.fIsHistContentCopyEnabled ){
+    CopyHistogramContents();
+  }
+
   return true;
 }
 
-bool Cache::Manager::PropagateParameters(){
-
-  bool isSuccess{false};
-
-  {
-    auto s{fParameters.cacheFillTimer.scopeTime()};
-
-    // if disabled, leave
-    if( Cache::Manager::Get() == nullptr ){ return false; }
-
-    // update the cache if necessary
-    if( fParameters.fUpdateRequired ){ Cache::Manager::Update(); }
-
-    // do the propagation on the device
-    isSuccess = Cache::Manager::Fill();
-    if( not isSuccess ){ return false; }
-  }
-
-  // now everything is on the device, what info do we need on the CPU?
-
-  {
-    auto s{fParameters.pullFromDeviceTimer.scopeTime()};
-
-    // do we need to copy every event weight to the CPU structures ?
-    if( fParameters.fIsEventWeightCopyEnabled ){
-      Cache::Manager::CopyEventWeights();
-    }
-
-    // do we need to copy bin content to the CPU structures ?
-    if( fParameters.fIsHistContentCopyEnabled ){
-      Cache::Manager::CopyHistogramsContent();
-    }
-  }
-
-
-  return true;
-}
 bool Cache::Manager::CopyEventWeights(){
 
-  if( not Cache::Manager::Get()->GetWeightsCache().IsResultValid() ){
-    // Trigger this update
-    if( fParameters.fEnableDebugPrintouts ){ LogDebug << "Copy event weights from Device to Host" << std::endl; }
-    Cache::Manager::Get()->GetWeightsCache().GetResult(0);
+  if (not GetWeightsCache().IsResultValid()) {
+    /// Add debugging output that the event weights are being copied.  The
+    /// hostPtr() call below would be sufficient, but doesn't allow the
+    /// debugging info.  The copy can be slow since this moves a lot of
+    /// information (~1M doubles).
+    if (fParameters.fEnableDebugPrintouts) {
+        LogDebug << "Copy event weights from Device to Host" << std::endl;
+    }
+    GetWeightsCache().GetResult(0);
   }
 
+  /// Move the information into the right places.  The hostPtr() method would
+  /// trigger a GPU->CPU copy, but that will have been done by GetResults()
+  /// above.
   for( auto& eventFiller : fParameters.fEventWeightFillerList ){
-    eventFiller.copyCacheToCpu( Cache::Manager::Get()->GetWeightsCache().GetWeights().hostPtr() );
+    eventFiller.copyCacheToCpu(GetWeightsCache().GetWeights().hostPtr());
   }
 
   return true;
 }
-bool Cache::Manager::CopyHistogramsContent(){
 
-  if( not Cache::Manager::Get()->GetHistogramsCache().IsSumsValid() ){
-    // This can be slow (~10 usec for 5000 bins) when data must be copied
-    // from the device, but it makes sure that the results are copied from
-    // the device when they have changed. The values pointed to by
-    // _CacheManagerValue_ and _CacheManagerValid_ are inside the summed
-    // index cache (a bit of evil coding here), and are updated by the
-    // cache.  The update is triggered by (*_CacheManagerUpdate_)().
-    if( fParameters.fEnableDebugPrintouts ){ LogDebug << "Copy bin contents from Device to Host" << std::endl; }
+bool Cache::Manager::CopyHistogramContents(){
 
-    Cache::Manager::Get()->GetHistogramsCache().GetSum(0);
-    Cache::Manager::Get()->GetHistogramsCache().GetSum2(0);
-  }
-
+  /// This will trigger a GPU->CPU copy if necessary.
   for( auto& histFiller : fParameters.fSampleHistFillerList ){
-    histFiller.pullHistContent(
+    histFiller.copyHistogram(
         Cache::Manager::Get()->GetHistogramsCache().GetSumsPointer(),
         Cache::Manager::Get()->GetHistogramsCache().GetSums2Pointer()
     );
   }
 
   return true;
+}
+
+bool Cache::Manager::ValidateHistogramContents(int quiet){
+
+  int count = 0;
+  int failed = 0;
+  /// This will trigger a GPU->CPU copy if necessary.
+  for( auto& histFiller : fParameters.fSampleHistFillerList ){
+    if (not histFiller.validateHistogram(
+            (quiet < 2),
+            Cache::Manager::Get()->GetHistogramsCache().GetSumsPointer(),
+            Cache::Manager::Get()->GetHistogramsCache().GetSums2Pointer()
+        )) {
+      if (quiet < 3) LogError << "Histogram " << count++ << " FAILED" << std::endl;
+      ++failed;
+      continue;
+    }
+    if (quiet < 1) LogError << "Histogram " << count++ << " OK" << std::endl;
+  }
+
+  return failed < 1;
 }
 
 int Cache::Manager::ParameterIndex(const Parameter* fp) {

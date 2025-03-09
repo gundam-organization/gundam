@@ -222,27 +222,18 @@ void ParametersManager::throwParametersFromGlobalCovariance(bool quietVerbose_){
     for( int iPar = 0 ; iPar < _choleskyMatrix_->GetNrows() ; iPar++ ){
       auto* parPtr = _strippedParameterList_[iPar];
       parPtr->setThrowValue(parPtr->getPriorValue() + throws[iPar]);
-      if ( not std::isnan(parPtr->getMinValue()) and parPtr->getThrowValue() < parPtr->getMinValue()) {
-        LogAlert << "Thrown value lower than min bound -> " << parPtr->getThrowValue() << " < min(" << parPtr->getMinValue() << ") " << parPtr->getFullTitle() << std::endl;
-        rethrow = true;
-        break;
+      if( not parPtr->getThrowLimits().isInBounds(parPtr->getThrowValue()) ){
+        LogAlert << "Thrown value out of bounds -> " << parPtr->getThrowValue() << " not in: " << parPtr->getThrowLimits() << " for " << parPtr->getFullTitle() << std::endl;
+        rethrow = true; break;
       }
-      if ( not std::isnan(parPtr->getMaxValue()) and parPtr->getThrowValue() > parPtr->getMaxValue()) {
-        LogAlert << "Thrown value greater than max bound -> " << parPtr->getThrowValue() << " > max(" << parPtr->getMaxValue() << ") " << parPtr->getFullTitle() << std::endl;
-        rethrow = true;
-        break;
-      }
+
+      // ok, set the parameter
       parPtr->setParameterValue( parPtr->getThrowValue() );
       if( not _reThrowParSetIfOutOfPhysical_ ) continue;
-      if( not std::isnan(parPtr->getMinPhysical()) and parPtr->getParameterValue() < parPtr->getMinPhysical() ){
+
+      if( not parPtr->getPhysicalLimits().isInBounds( parPtr->getParameterValue() ) ) {
         rethrow = true;
-        LogAlert << "thrown value lower than physical min bound -> "
-                 << parPtr->getSummary() << std::endl;
-        break;
-      }
-      if( not std::isnan(parPtr->getMaxPhysical()) and parPtr->getParameterValue() > parPtr->getMaxPhysical() ){
-        rethrow = true;
-        LogAlert << "thrown value higher than physical max bound -> "
+        LogAlert << "Thrown value out of physical bounds -> " << parPtr->getParameterValue() << " -> "
                  << parPtr->getSummary() << std::endl;
         break;
       }
@@ -339,9 +330,6 @@ bool ParametersManager::hasValidParameterSets() const {
   return true;
 }
 void ParametersManager::printConfiguration() const {
-
-  LogInfo << GET_VAR_NAME_VALUE(_throwToyParametersWithGlobalCov_) << std::endl;
-  LogInfo << GET_VAR_NAME_VALUE(_reThrowParSetIfOutOfPhysical_) << std::endl;
 
   LogInfo << _parameterSetList_.size() << " parameter sets defined." << std::endl;
   for( auto& parSet : _parameterSetList_ ){ parSet.printConfiguration(); }

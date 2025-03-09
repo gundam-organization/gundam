@@ -16,6 +16,8 @@
 #include <memory>
 #include <vector>
 
+typedef GenericToolbox::PolymorphicObjectWrapper<DialBase> DialBaseObject;
+
 
 /// This class is size critical and should not be used as a base class (no
 /// virtual methods.
@@ -24,40 +26,42 @@ class DialInterface {
 public:
   DialInterface() = default;
 
-  void setDialBaseRef(DialBase *dialBasePtr){ _dialBaseRef_ = dialBasePtr; }
-  void setInputBufferRef(DialInputBuffer *inputBufferRef){ _inputBufferRef_ = inputBufferRef; }
-  void setResponseSupervisorRef(const DialResponseSupervisor *responseSupervisorRef){ _responseSupervisorRef_ = responseSupervisorRef; }
+  void setDial(const DialBaseObject& dial_){ _dial_ = dial_; }
+  void setInputBufferRef(DialInputBuffer *inputBufferRef){ _inputBufferPtr_ = inputBufferRef; }
+  void setResponseSupervisorRef(const DialResponseSupervisor *responseSupervisorRef){ _responseSupervisorPtr_ = responseSupervisorRef; }
   void setDialBinRef(const Bin *dialBinRef){ _dialBinRef_ = dialBinRef; }
+
+  auto& getDial(){ return _dial_; }
 
   /// Return the input buffer containing the connection to the Parameter(s)
   /// used by this dial.  The number of Parameters contained in the input
   /// buffer musts mach the number expected by the specialization of the
   /// DialBase.
-  [[nodiscard]] inline DialInputBuffer *getInputBufferRef() const {return _inputBufferRef_;}
+  [[nodiscard]] const DialInputBuffer *getInputBufferRef() const {return _inputBufferPtr_;}
 
   /// Get the dial calculation method.  The dial will need one or more
   /// Parameter inputs, and the number *must* match the number and order of
   /// the Parameters in the DialInputBuffer.
-  [[nodiscard]] inline DialBase* getDialBaseRef() const {return _dialBaseRef_;}
+  [[nodiscard]] DialBase* getDialBaseRef() const {return _dial_.get();}
 
   /// Get the DialResponseSupervisor. This conditions the return value of the
   /// dial (normally truncates between zero and the maximum response).
-  [[nodiscard]] inline const DialResponseSupervisor* getResponseSupervisorRef() const {return _responseSupervisorRef_;}
+  [[nodiscard]] const DialResponseSupervisor* getResponseSupervisorRef() const {return _responseSupervisorPtr_;}
 
   /// Get the data bin definition for the dial.
-  [[nodiscard]] inline const Bin* getDialBinRef() const {return _dialBinRef_;}
+  [[nodiscard]] const Bin* getDialBinRef() const {return _dialBinRef_;}
 
-  [[nodiscard]] double evalResponse() const;
+  [[nodiscard]] double evalResponse() const { return _responseSupervisorPtr_->process(_dial_->evalResponse(*_inputBufferPtr_)); }
   [[nodiscard]] std::string getSummary(bool shallow_=true) const;
 
 private:
-  DialBase* _dialBaseRef_{nullptr}; // should be filled while init
-  DialInputBuffer* _inputBufferRef_{nullptr};
-  const DialResponseSupervisor* _responseSupervisorRef_{nullptr};
-  const Bin* _dialBinRef_{nullptr}; // for printout
+  // owner of
+  DialBaseObject _dial_{};
 
-public:
-  [[nodiscard]] static double evalResponse(DialInputBuffer* inputBufferPtr_, DialBase* dialBaseRef_, const DialResponseSupervisor* responseSupervisorRef_);
+  // non owner of
+  const DialInputBuffer* _inputBufferPtr_{nullptr};
+  const DialResponseSupervisor* _responseSupervisorPtr_{nullptr};
+  const Bin* _dialBinRef_{nullptr}; // for printout
 
 };
 
