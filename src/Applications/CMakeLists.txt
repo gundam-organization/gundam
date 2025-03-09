@@ -12,6 +12,7 @@ set(
     gundamConfigCompare
     gundamPlotExtractor
     gundamConfigUnfolder
+    gundamToysReader
 )
 
 
@@ -74,6 +75,7 @@ endforeach()
 # Dependencies
 target_link_libraries( gundamFitter GundamFitter )
 target_link_libraries( gundamCalcXsec GundamFitter ) # using the fitter engine to parse back the config file
+target_link_libraries( gundamToysReader GundamUtils )
 target_link_libraries( gundamFitReader GundamUtils )
 target_link_libraries( gundamInputZipper GundamUtils )
 target_link_libraries( gundamFitCompare GundamUtils )
