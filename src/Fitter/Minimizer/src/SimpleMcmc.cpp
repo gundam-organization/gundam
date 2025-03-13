@@ -26,6 +26,7 @@ SimpleMcmc::SimpleMcmc(FitterEngine* owner_): MinimizerBase(owner_) {
 }
 
 void SimpleMcmc::configureImpl(){
+  setCheckParameterValidity(true);
   this->MinimizerBase::configureImpl();
   LogInfo << "Configure MCMC: " << _config_ << std::endl;
 
