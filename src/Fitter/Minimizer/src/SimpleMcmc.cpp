@@ -148,7 +148,7 @@ void SimpleMcmc::configureImpl(){
   // The value is settable from the command line (setting from the command
   // line is the better option) using the override option
   //
-  // "-O /fitterEngineConfig/mcmcConfig/adaptiveRestore=<filename>"
+  // "-O /fitterEngineConfig/minimizerConfig/adaptiveRestore=<filename>"
   //
   // If restore is going to be used, the adaptiveRestore value must exist in
   // the configuration file (with a NULL value)
