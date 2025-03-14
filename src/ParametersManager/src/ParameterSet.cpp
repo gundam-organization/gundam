@@ -604,7 +604,10 @@ void ParameterSet::throwParameters(bool rethrowIfNotInPhysical_, double gain_){
     throwParsFct( markScottThrowFct );
   }
   else if( _useEigenDecompForThrows_ and isEnableEigenDecomp() ){
-    // Throw using a deprecated alternative method.  Do not use.
+    // Throw using eigen value decomposition.  This will work with degenerate
+    // "covariance matrices", even if they are not positive definite (ouch),
+    // so it provides an alternative to Cholesky decomposition, but is not the
+    // best throwing method.
     LogAlert << "Throwing parameters for " << _name_
              << " using alternate generator: Eigen Decomposition Generator"
              << std::endl;
