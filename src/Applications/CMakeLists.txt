@@ -2,7 +2,7 @@
 
 set(
     APPLICATION_LIST
-    # GUNDAM apps
+    # GUNDAM C++ apps
     gundamFitter
     gundamFitReader
     gundamCalcXsec
@@ -14,6 +14,10 @@ set(
     gundamConfigUnfolder
 )
 
+set(SCRIPT_LIST
+  # GUNDAM scripts (not compiled)
+  gundamContinue
+)
 
 if( ENABLE_DEV_MODE )
     list(APPEND APPLICATION_LIST Sandbox)
@@ -90,3 +94,8 @@ target_link_libraries( gundamRoot
     #    GundamPropagator
     )
 endif ()
+
+foreach( script ${SCRIPT_LIST} )
+  cmessage( STATUS "Adding script: ${script}" )
+  install(PROGRAMS src/${script} DESTINATION bin)
+endforeach()
