@@ -26,6 +26,11 @@ void ParametersManager::configureImpl(){
 
   LogDebugIf(GundamGlobals::isDebug()) << _parameterSetListConfig_.size() << " parameter sets are defined." << std::endl;
 
+  if (_parameterSetListConfig_.size() < 1) {
+    LogError << "No parameters have been defined" << std::endl;
+    LogExit("Must define parameters for the fit");
+  }
+
   _parameterSetList_.clear(); // make sure there nothing in case readConfig is called more than once
   _parameterSetList_.reserve( _parameterSetListConfig_.size() );
   for( const auto& parameterSetConfig : _parameterSetListConfig_ ){

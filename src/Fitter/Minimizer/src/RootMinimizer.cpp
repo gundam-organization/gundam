@@ -1334,7 +1334,14 @@ void RootMinimizer::writePostFitData( TDirectory* saveDir_) {
   } // parSet
 }
 void RootMinimizer::updateCacheToBestfitPoint(){
-  LogThrowIf(_rootMinimizer_->X() == nullptr, "No best fit point provided by the minimizer.");
+  LogThrowIf(_rootMinimizer_ == nullptr, "Invalid root minimizer");
+  if (_rootMinimizer_->X() == nullptr) {
+    LogError << "Minimizer error with "
+             << _rootMinimizer_->Options().MinimizerType()
+             << ":" << _rootMinimizer_->Options().MinimizerAlgorithm()
+             << std::endl;
+    LogThrow("No best fit point provided by the minimizer.");
+  }
 
   LogWarning << "Updating propagator cache to the best fit point..." << std::endl;
   this->evalFit(_rootMinimizer_->X() );

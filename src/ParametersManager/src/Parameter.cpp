@@ -76,16 +76,20 @@ void Parameter::setMaxMirror(double maxMirror) {
   _mirrorRange_.max = maxMirror;
 }
 void Parameter::setParameterValue(double parameterValue, bool force) {
-#ifdef DEBUG_BUILD
-  // those printouts will only show if the CMAKE_BUILD_TYPE is set to DEBUG
   if (not isInDomain(parameterValue, true)) {
     LogError << "New parameter value is not in domain: " << parameterValue
              << std::endl;
-    LogError << GundamUtils::Backtrace;
-    if (not force) std::exit(EXIT_FAILURE);
-    else LogAlert << "Forced continuation with invalid parameter" << std::endl;
-  }
+    if (not force) {
+      LogError << GundamUtils::Backtrace;
+      std::exit(EXIT_FAILURE);
+    }
+    else {
+#ifdef DEBUG_BUILD
+      LogDebug << GundamUtils::Backtrace;
 #endif
+      LogAlert << "Forced continuation with invalid parameter" << std::endl;
+    }
+  }
   if( _parameterValue_ != parameterValue ){
     _gotUpdated_ = true;
     _parameterValue_ = parameterValue;
@@ -93,13 +97,13 @@ void Parameter::setParameterValue(double parameterValue, bool force) {
   else{ _gotUpdated_ = false; }
 }
 double Parameter::getParameterValue() const {
-#ifdef DEBUG_BUILD
   if ( isEnabled() and not isValueWithinBounds() ) {
     LogWarning << "Getting out of bounds parameter: "
                << getSummary() << std::endl;
+#ifdef DEBUG_BUILD
     LogDebug << GundamUtils::Backtrace;
-  }
 #endif
+  }
   return _parameterValue_;
 }
 void Parameter::setDialSetConfig(const JsonType &jsonConfig_) {

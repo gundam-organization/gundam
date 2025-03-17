@@ -769,6 +769,11 @@ public:
     /// have an acceptance (approximately) equal to the target acceptance.
     double GetSigma() const {return fSigma;}
 
+    /// Explicitly set the current step size in standard deviations.  This is
+    /// a dangerous operation, but can be helpful during the initial burnin of
+    /// a chain.
+    void SetSigma(double s) {fSigma = s;}
+
     /// Get the current acceptance (averaged over the acceptance window).  The
     /// step size will be adjusted so that this asymtotically approaches the
     /// target acceptance.  The usual target acceptance is about 23% (when
