@@ -440,11 +440,14 @@ public:
   /// Low level control of how the step proposal works for the next cycle.
   void AcceptanceAlgorithm(int v);
 
-  /// The expected number of burn-in cycles
+  /// The number of burn-in cycles
   int Burnin();
 
-  /// The expected number of cycles.
+  /// The number of cycles.
   int Cycles();
+
+  /// The number of steps in a cycle.
+  int Steps();
 
   /// Run a cycle with the current parameters.
   void RunCycle(std::string name, int id);
@@ -460,6 +463,9 @@ public:
   /// `200HorrifyingMCMCCov-config.yaml` used during testing.
   void Restart();
 
+  /// Force the step size in standard deviations.  This can help during
+  /// burnin, but should be used with extreme caution.
+  void SetSigma(double s);
 };
 
 #endif // GUNDAM_SIMPLE_MCMC_H

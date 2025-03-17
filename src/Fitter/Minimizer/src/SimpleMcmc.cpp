@@ -1110,8 +1110,10 @@ void SimpleMcmcSequencer::CovarianceWindow(int v) {Owner()._adaptiveCovWindow_ =
 void SimpleMcmcSequencer::CovarianceDeweighting(double v) {Owner()._adaptiveCovDeweighting_ = v;}
 void SimpleMcmcSequencer::AcceptanceWindow(int v) {Owner()._adaptiveWindow_ = v;}
 void SimpleMcmcSequencer::AcceptanceAlgorithm(int v) {Owner()._adaptiveAcceptanceAlgorithm_ = v;}
+void SimpleMcmcSequencer::SetSigma(double s) {Owner()._adaptiveMCMC_->GetProposeStep().SetSigma(s);}
 int SimpleMcmcSequencer::Burnin() {return Owner()._burninCycles_;}
 int SimpleMcmcSequencer::Cycles() {return Owner()._cycles_;}
+int SimpleMcmcSequencer::Steps() {return Owner()._steps_;}
 void SimpleMcmcSequencer::RunCycle(std::string name, int id) {
   Owner().adaptiveRunCycle(*Owner()._adaptiveMCMC_, name, id);
   Owner().restoreConfiguration();
