@@ -81,7 +81,7 @@ public:
   void fit();
   void runPcaCheck();
   void rescaleParametersStepSize();
-  void checkNumericalAccuracy();
+  bool checkNumericalAccuracy();
 
 private:
   // Parameters
