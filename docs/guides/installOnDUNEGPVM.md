@@ -4,11 +4,11 @@ For those who don’t want to waste time installing multiple packages on their d
 ### 0. Setup
 ```bash
 source /exp/dune/app/users/flynnguo/spack_install/setup-env.sh
-spack load yaml-cpp
-spack load root@6.28.12
-spack load cmake@3.27.7
 spack load gcc@12.2.0
-spack load jsoncpp@1.9.5
+spack load root@6.28.12
+spack load yaml-cpp@0.7.0%gcc@12.2.0
+spack load cmake@3.27.7%gcc@12.2.0
+spack load jsoncpp@1.9.5%gcc@12.2.0
 ```
 ### 1. Shell setup 
 ```bash
@@ -33,7 +33,7 @@ To copy the code on your computer or cluster, we recommend to use GIT.
 We assume 
 ```bash
 cd $REPO_DIR
-git clone --recursive -b LTS/1.8.x https://github.com/gundam-organization/gundam.git
+git clone --recursive -b main https://github.com/gundam-organization/gundam.git
 cd gundam
 ```
 For GUNDAM users, it is recommended for you to check out the latest
@@ -51,19 +51,25 @@ cmake \
 -D CMAKE_INSTALL_PREFIX:PATH=$INSTALL_DIR/gundam \
 -D CMAKE_BUILD_TYPE=Release \
 $REPO_DIR/gundam/.
-make install -j$(nproc)         #make install -j4
-#Add lib path
-export LD_LIBRARY_PATH=/exp/dune/app/users/flynnguo/spack_install/__spack_path_placeholder__/__spack_path_placeholder__/__spack_path_placeholder__/__spack_path_placeholder__/__spack_path_placeholder__/__spack_path_placeholder__/__spack_path_placeholder__/__spack_path_placeholde/yaml-cpp/0.7.0/linux-almalinux9-x86_64_v3-gcc-12.2.0-tkehcjd266veu3oj3hupgrbewiimoe4s/lib64:$LD_LIBRARY_PATH 
+make install -j$(nproc)         
 ```
-### 4. Next time login 
+### 4. Future login and Run the code 
+Save these aliases in ```~/.bashrc```:
 ```bash
-source /exp/dune/app/users/flynnguo/.bashrc
+alias myspack='. /exp/dune/app/users/flynnguo/spack_install/setup-env.sh' # here do want to used pre-installed packages under Flynn's area
+alias setgundam='source /exp/dune/app/users/$USER/GUNDAM/Install/gundam/setup.sh'
+alias yamllib_gundam='export LD_LIBRARY_PATH=/exp/dune/app/users/flynnguo/spack_install/__spack_path_placeholder__/__spack_path_placeholder__/__spack_path_placeholder__/__spack_path_placeholder__/__spack_path_placeholder__/__spack_path_placeholder__/__spack_path_placeholder__/__spack_path_placeholde/yaml-cpp/0.7.0/linux-almalinux9-x86_64_v3-gcc-12.2.0-tkehcjd266veu3oj3hupgrbewiimoe4s/lib64:$LD_LIBRARY_PATH'
+```
+
+Exit and relogin:
+```bash
+source ~/.bashrc
 myspack
 setgundam
 yamllib_gundam
 gundamFitter
 ```
-### 5. Update Gundam
+### 6. Update Gundam
 If you updated any gundam codes, you need to rebuild and reinstall
 ```bash
 cd $BUILD_DIR/gundam
