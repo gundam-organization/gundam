@@ -6,8 +6,11 @@
 
 if( WITH_TESTS )
   message("")
-  cmessage( WARNING "Defining tests...")
+  cmessage( STATUS "Defining tests...")
   include( CTest )
   add_subdirectory( ${CMAKE_SOURCE_DIR}/tests )
+else()
+  message("")
+  cmessage( WARNING "Skipping tests...")
 endif()
 
