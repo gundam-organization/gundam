@@ -1,5 +1,3 @@
-## gundamCalcXsec
-[< back to parent (GettingStarted)](../GettingStarted.md)
 ### Description 
 
 The `gundamCalcXsec` app is an interface to the `FitterEngine` which is in charge of performing a Cross Section calculation by taking the output of `gundamFitter` as input. 

@@ -1,5 +1,8 @@
-## gundamRoot
-[< back to parent (GettingStarted)](../GettingStarted.md)
+---
+layout: default
+title: gundamRoot
+---
+
 ### Description 
 
 The `gundamRoot` app is an interactive ROOT session that includes `GUNDAM`'s funcionality.

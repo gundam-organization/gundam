@@ -1,5 +1,8 @@
-## gundamConfigUnfolder
-[< back to parent (GettingStarted)](../GettingStarted.md)
+---
+layout: default
+title: gundamConfigUnfolder
+---
+
 ### Description 
 
 The `gundamConfigUnfolder` app takes a config file and and exports all related config files into one `.json` that can be used as an input for other apps that use said input.
