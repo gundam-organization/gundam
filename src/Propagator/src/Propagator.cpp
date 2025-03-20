@@ -23,6 +23,32 @@ void Propagator::unmuteLogger(){ Logger::setIsMuted( false ); }
 
 void Propagator::configureImpl(){
 
+  ConfigUtils::checkFields(_config_,
+                           "/fitterEngineConfig/likelihoodInterfaceConfig"
+                           "/propagatorConfig",
+                           // Allowed fields (don't need to list fields in
+                           // expected, or deprecated).
+                           {{"showNbEventParameterBreakdown"},
+                            {"showNbEventPerSampleParameterBreakdown"},
+                            {"parameterInjection"},
+                            {"debugPrintLoadedEvents"},
+                            {"debugPrintLoadedEventsNbPerSample"},
+                            {"devSingleThreadReweight"},
+                            {"devSingleThreadHistFill"},
+                            {"globalEventReweightCap"},
+                           },
+                           // Expected fields (must be present)
+                           {{"sampleSetConfig"},
+                            {"parametersManagerConfig"},
+                           },
+                           // Deprecated fields (allowed, but cause a warning)
+                           {{"fitSampleSetConfig"},
+                            {"parameterSetListConfig"},
+                            {"throwToyParametersWithGlobalCov"},
+                           },
+                           // Replaced field names (allowed, but case a warning)
+                           {});
+
   // nested objects
   GenericToolbox::Json::fillValue(_config_, _sampleSet_.getConfig(), {{"sampleSetConfig"}, {"fitSampleSetConfig"}});
   _sampleSet_.configure();
