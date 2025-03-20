@@ -69,7 +69,10 @@ void RootMinimizer::configureImpl(){
                              {"max_fcn"},
                            },
                            // Replaced fields (allowed, but cause a warning}
-                           {});
+                           {
+                             {{"max_iter"}, {"maxIterations"}},
+                             {{"max_fcn"}, {"maxFcnCalls"}},
+                           });
 
   // read general parameters first
   this->MinimizerBase::configureImpl();
