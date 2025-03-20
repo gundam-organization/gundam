@@ -18,6 +18,70 @@
 
 
 void ParameterSet::configureImpl(){
+  // All of the fields that should (or may) be at this level in the YAML.
+  // This provides a rudimentary syntax check for user inputs.
+  ConfigUtils::checkFields(_config_,
+                           "/fitterEngineConfig/likelihoodInterfaceConfig"
+                           "/propagatorConfig/parametersManagerConfig"
+                           "/parameterSetList",
+                           // Allowed fields (don't need to list fields in
+                           // expected, or deprecated).
+                           {
+                             {"isEnabled"},
+                             {"isScanEnabled"},
+                             {"numberOfParameters"},
+                             {"nominalStepSize"},
+                             {"printDialSetsSummary"},
+                             {"useOnlyOneParameterPerEvent"},
+                             {"printParametersSummary"},
+                             {"parameterLimits"},
+                             {"enablePca"},
+                             {"enableThrowToyParameters"},
+                             {"customFitParThrow"},
+                             {"releaseFixedParametersOnHess"},
+                             {"parameterDefinitionFilePath"},
+                             {"covarianceMatrixFilePath"},
+                             {"covarianceMatrix"},
+                             {"covarianceMatrixTMatrixD"},
+                             {"parameterNameList"},
+                             {"parameterPriorValueList"},
+                             {"parameterLowerBoundsList"},
+                             {"parameterUpperBoundsList"},
+                             {"throwEnabledList"},
+                             {"parameterDefinitions"},
+                             {"dialSetDefinitions"},
+                             {"enableOnlyParameters"},
+                             {"disableParameters"},
+                             {"useMarkGenerator"},
+                             {"useEigenDecompForThrows"},
+                             {"enableEigenDecomp"},
+                             {"allowEigenDecompWithBounds"},
+                             {"maxNbEigenParameters"},
+                             {"maxEigenFraction"},
+                             {"eigenSvdThreshold"},
+                             {"eigenParBounds"},
+                           },
+                           // Expected fields (must be present)
+                           {
+                             {"name"},
+                           },
+                           // Deprecated fields (allowed, but cause a warning)
+                           {
+                             {"maskForToyGeneration"},
+                             {"devUseParLimitsOnEigen"},
+                             {"allowPca"},
+                             {"fixGhostFitParameters"},
+                             {"parameterNameTObjArray"},
+                             {"parameterPriorTVectorD"},
+                             {"parameterLowerBoundsTVectorD"},
+                             {"parameterUpperBoundsTVectorD"},
+                             {"useEigenDecompInFit"},
+                           },
+                           // Field names that got replaced.
+                           {
+                             {{"allowPca"},{"enablePca"}},
+                           });
+
 
   GenericToolbox::Json::fillValue(_config_, _name_, "name");
   LogExitIf(_name_.empty(), "Config error -- parameter set without a name.");
@@ -51,8 +115,8 @@ void ParameterSet::configureImpl(){
   GenericToolbox::Json::fillValue(_config_, _parameterNameListPath_, {{"parameterNameList"},{"parameterNameTObjArray"}});
   GenericToolbox::Json::fillValue(_config_, _parameterPriorValueListPath_, {{"parameterPriorValueList"},{"parameterPriorTVectorD"}});
 
-  GenericToolbox::Json::fillValue(_config_, _parameterLowerBoundsTVectorD_, "parameterLowerBoundsTVectorD");
-  GenericToolbox::Json::fillValue(_config_, _parameterUpperBoundsTVectorD_, "parameterUpperBoundsTVectorD");
+  GenericToolbox::Json::fillValue(_config_, _parameterLowerBoundsTVectorD_, {{"parameterLowerBoundsList"}, {"parameterLowerBoundsTVectorD"}});
+  GenericToolbox::Json::fillValue(_config_, _parameterUpperBoundsTVectorD_, {{"parameterUpperBoundsList"}, {"parameterUpperBoundsTVectorD"}});
   GenericToolbox::Json::fillValue(_config_, _throwEnabledListPath_, "throwEnabledList");
 
   GenericToolbox::Json::fillValue(_config_, _parameterDefinitionConfig_, "parameterDefinitions");

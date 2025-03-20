@@ -19,6 +19,24 @@ void ParametersManager::unmuteLogger(){ Logger::setIsMuted( false ); }
 
 // config
 void ParametersManager::configureImpl(){
+  ConfigUtils::checkFields(_config_,
+                           "/fitterEngineConfig/likelihoodInterfaceConfig"
+                           "/propagatorConfig/parametersManagerConfig",
+                           // Allowed fields (don't need to list fields in
+                           // expected, or deprecated).
+                           {{"throwToyParametersWithGlobalCov"},
+                            {"reThrowParSetIfOutOfBounds"},
+                            {"reThrowParSetIfOutOfPhysical"},
+                           },
+                           // Expected fields (must be present)
+                           {{"parameterSetList"},
+                           },
+                           // Deprecated fields (allowed, but cause a warning)
+                           {
+                           },
+                           // Renamed fields  (allowed, but cause a warning)
+                           {
+                           });
 
   GenericToolbox::Json::fillValue(_config_, _throwToyParametersWithGlobalCov_, "throwToyParametersWithGlobalCov");
   GenericToolbox::Json::fillValue(_config_, _reThrowParSetIfOutOfPhysical_, {{"reThrowParSetIfOutOfBounds"},{"reThrowParSetIfOutOfPhysical"}});
