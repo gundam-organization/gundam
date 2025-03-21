@@ -1,5 +1,8 @@
-## gundamFitCompare
-[< back to parent (GettingStarted)](../GettingStarted.md)
+---
+layout: default
+title: gundamFitCompare
+---
+
 ### Description 
 
 The `gundamFitCompare` app that takes as input the output of [gundamFitter](gundamFitter.md) to produce comparison plots of the respective fit results. 

@@ -1,5 +1,4 @@
-![](./images/lxplusLogo.png)
-
+[![](images/lxplusLogo.png)]
 
 This is a rough guide to get going on LXPlus. 
 GUNDAM has pretty modern dependencies so we’ll need to pick these up

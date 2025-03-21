@@ -105,22 +105,22 @@ before 2.0 may have issues to checkout the correct submodules (see issue #429)
 
 ### Compiling on macOS:
 
-[![](resources/doc/guides/images/macOsLogo.png)](resources/doc/guides/installOnMacOs.md)
+[![](docs/guides/images/macOsLogo.png)](docs/guides/installOnMacOs.md)
 
 
 ### Compiling on CCLyon:
 
-[![](resources/doc/guides/images/cc_in2p3_logo.png)](resources/doc/guides/installOnCCLyon.md)
+[![](docs/guides/images/cc_in2p3_logo.png)](docs/guides/installOnCCLyon.md)
 
 
 ### Compiling on HPC:
 
-[![](resources/doc/guides/images/hpcLogo.png)](resources/doc/guides/installOnHpc.md)
+[![](docs/guides/images/hpcLogo.png)](docs/guides/installOnHpc.md)
 
 
 ### Compiling on LXPLUS:
 
-[![](resources/doc/guides/images/lxplusLogo.png)](resources/doc/guides/installOnLXPLUS.md)
+[![](docs/guides/images/lxplusLogo.png)](docs/guides/installOnLXPLUS.md)
 
 
 ### Alternative installation procedure
@@ -145,8 +145,7 @@ this will create the build directory `gundam-${compiler}_${compiler_version}-${c
 
 ## Documentation 
 
-- gundamFitter options: [link to page](resources/doc/GettingStarted.md)
-
+- Gundam [User Documentation](https://gundam-organization.github.io/gundam/) is growing daily.  You can also find examples and other interesting materials under the [resources](resources/) hierarchy in this repository.
 
 ![Developers banner](resources/images/README/sections/sections.005.png)
 
