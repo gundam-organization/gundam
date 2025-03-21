@@ -27,6 +27,7 @@ void ParameterSet::configureImpl(){
                            // Allowed fields (don't need to list fields in
                            // expected, or deprecated).
                            {
+                             {"parameterDefinitions"},
                              {"isEnabled"},
                              {"isScanEnabled"},
                              {"numberOfParameters"},
@@ -48,7 +49,6 @@ void ParameterSet::configureImpl(){
                              {"parameterLowerBoundsList"},
                              {"parameterUpperBoundsList"},
                              {"throwEnabledList"},
-                             {"parameterDefinitions"},
                              {"dialSetDefinitions"},
                              {"enableOnlyParameters"},
                              {"disableParameters"},
@@ -69,17 +69,17 @@ void ParameterSet::configureImpl(){
                            {
                              {"maskForToyGeneration"},
                              {"devUseParLimitsOnEigen"},
-                             {"allowPca"},
-                             {"fixGhostFitParameters"},
-                             {"parameterNameTObjArray"},
-                             {"parameterPriorTVectorD"},
-                             {"parameterLowerBoundsTVectorD"},
-                             {"parameterUpperBoundsTVectorD"},
-                             {"useEigenDecompInFit"},
                            },
                            // Field names that got replaced.
                            {
                              {{"allowPca"},{"enablePca"}},
+                             {{"fixGhostFitParameters"},{"enablePca"}},
+                             {{"parameterNameTObjArray"},{"parameterNameList"}},
+                             {{"parameterPriorTVectorD"},{"parameterPriorValueList"}},
+
+                             {{"parameterLowerBoundsTVectorD"},{"parameterLowerBoundsList"}},
+                             {{"parameterUpperBoundsTVectorD"},{"parameterUpperBoundsList"}},
+                             {{"useEigenDecompInFit"},{"enableEigenDecomp"}},
                            });
 
 
@@ -144,7 +144,6 @@ void ParameterSet::configureImpl(){
   // dev option -> was used for validation
   GenericToolbox::Json::fillValue(_config_, _devUseParLimitsOnEigen_, "devUseParLimitsOnEigen");
 
-
   // individual parameter definitions:
   if( not _parameterDefinitionFilePath_.empty() ){ readParameterDefinitionFile(); }
 
@@ -178,6 +177,10 @@ void ParameterSet::configureImpl(){
     }
 
     LogExitIf(_nbParameterDefinition_==-1, "Could not figure out the number of parameters to be defined for the set: " << _name_ );
+  }
+
+  if (_nbParameterDefinition_ < 1) {
+    LogError << "CONFIG ERROR: Parameter set \"" << getName() << "\" without parameters." << std::endl;
   }
 
   this->defineParameters();
@@ -1055,6 +1058,10 @@ void ParameterSet::readParameterDefinitionFile(){
 void ParameterSet::defineParameters(){
   _parameterList_.resize(_nbParameterDefinition_, Parameter(this));
   int parIndex{0};
+
+  if (_parameterList_.size() < 1) {
+    LogError << "CONFIG ERROR: Parameter set \"" << getName() << "\"<< defined without any parameters" << std::endl;
+  }
 
   for( auto& par : _parameterList_ ){
     par.setParameterIndex(parIndex++);
