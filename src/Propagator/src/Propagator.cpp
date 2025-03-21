@@ -42,12 +42,18 @@ void Propagator::configureImpl(){
                             {"parametersManagerConfig"},
                            },
                            // Deprecated fields (allowed, but cause a warning)
-                           {{"fitSampleSetConfig"},
-                            {"parameterSetListConfig"},
-                            {"throwToyParametersWithGlobalCov"},
+                           {
                            },
-                           // Replaced field names (allowed, but case a warning)
-                           {});
+                           // Replaced fields (allowed, but case a warning)
+                           {
+                             {{"fitSampleSetConfig"},{"sampleSetConfig"}},
+                             {{"parameterSetListConfig"},
+                              {"parametersManagerConfig"
+                               "/parameterSetList"}},
+                             {{"throwToyParametersWithGlobalCov"},
+                              {"parametersManagerConfig"
+                               "/throwToyParametersWithGlobalCov"}},
+                           });
 
   // nested objects
   GenericToolbox::Json::fillValue(_config_, _sampleSet_.getConfig(), {{"sampleSetConfig"}, {"fitSampleSetConfig"}});
