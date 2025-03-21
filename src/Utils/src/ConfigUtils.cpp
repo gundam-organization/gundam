@@ -146,19 +146,7 @@ namespace ConfigUtils {
                    std::vector<std::pair<std::string,std::string>> replaced_) {
     bool ok = true;
 
-    // Check that all of the expected items exist
-    for (std::string& expect : expected_) {
-      try {
-        GenericToolbox::Json::fetchValue<JsonType>(config_, expect);
-      }
-      catch (...) {
-        LogError << "CONFIG ERROR: Required field \"" << expect
-                 << "\" is missing for " << parent_ <<std::endl;
-        ok = false;
-      }
-    }
-
-    // Check that all of the items are in allowed, expected, or deprecated
+    // Check that only items in allowed, expected, or deprecated are found.
     int index{0};
     for (auto& entry : config_.items()) {
       bool found = false;
@@ -182,9 +170,9 @@ namespace ConfigUtils {
       if (found) continue;
       for (std::pair<std::string,std::string> target : replaced_) {
         if (target.first == key) {
-          LogWarning << "CONFIG WARNING: \"" << target.first
-                     << "\" is replaced by \"" << target.second
-                     << "\" for " << parent_
+          LogWarning << "CONFIG WARNING: Deprecated field \"" << target.first
+                     << "\" replaced by \"" << target.second
+                     << "\" in " << parent_
                      << std::endl;
           found = true;
           break;
@@ -193,22 +181,34 @@ namespace ConfigUtils {
       if (found) continue;
       for (std::string target : deprecated_) {
         if (target == key) {
-          LogWarning << "CONFIG WARNING: \"" << target
-                     << "\" is deprecated for " << parent_
+          LogWarning << "CONFIG WARNING: Deprecated field \"" << target
+                     << "\" in " << parent_
                      << std::endl;
           found = true;
           break;
         }
       }
       if (found) continue;
-      LogError << "CONFIG ERROR: field \"" << key
-               << "\" not supported for " << parent_
+      LogError << "CONFIG ERROR: Unsupported field \"" << key
+               << "\" in " << parent_
                << std::endl;
       ok = false;
     }
 
+    // Check that all of the expected items exist
+    for (std::string& expect : expected_) {
+      try {
+        GenericToolbox::Json::fetchValue<JsonType>(config_, expect);
+      }
+      catch (...) {
+        LogError << "CONFIG ERROR: Missing field \"" << expect
+                 << "\" required in " << parent_ <<std::endl;
+        ok = false;
+      }
+    }
+
     if (not ok) {
-      LogError << "CONFIG ERROR: \"" << parent_ << "\" YAML record is invalid"
+      LogError << "CONFIG ERROR: Invalid YAML record for \"" << parent_
                << std::endl;
     }
 
