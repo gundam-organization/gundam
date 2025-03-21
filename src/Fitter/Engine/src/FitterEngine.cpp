@@ -26,6 +26,44 @@ void FitterEngine::configureImpl(){
   LogInfo << "Reading FitterEngine config..." << std::endl;
   GenericToolbox::setT2kPalette();
 
+  // All of the fields that should (or may) be at this level in the YAML.
+  // This provides a rudimentary syntax check for user inputs.
+  ConfigUtils::checkFields(_config_,"/fitterEngineConfig",
+                           // Allowed fields (don't need to list fields in
+                           // expected, or deprecated).
+                           {{"enablePCA"},
+                            {"runPcaCheck"},
+                            {"fixGhostFitParameters"},
+                            {"pcaThreshold"},
+                            {"scanConfig"},
+                            {"parameterScanner"},
+                            {"pcaThreshold"},
+                            {"enablePreFitScan"},
+                            {"enablePostFitScan"},
+                            {"enablePreFitToPostFitScan"},
+                            {"generateSamplePlots"},
+                            {"generateOneSigmaPlots"},
+                            {"enableParamVariations"},
+                            {"paramVariationsSigmas"},
+                            {"scaleParStepWithChi2Response"},
+                            {"parStepGain"},
+                            {"throwMcBeforeFit"},
+                            {"throwMcBeforeFitGain"},
+                            {"savePostfitEventTrees"},
+                           },
+                           // Expected fields (must be present)
+                           {{"minimizerConfig"},
+                            {"likelihoodInterfaceConfig"},
+                           },
+                           // Deprecated fields (allowed, but cause a warning)
+                           {{"mcmcConfig"},
+                            {"engineType"},
+                            {"propagatorConfig"},
+                            {"monitorRefreshRateInMs"},
+                           },
+                           // Replaced fields (allowed, but cause a warning)
+                           {});
+
   // need to determine the type before defining the minimizer
   JsonType minimizerConfig{};
   std::string minimizerTypeStr{"RootMinimizer"};
@@ -343,7 +381,7 @@ void FitterEngine::fit(){
               + parList[parIndex].getStdDevValue()
                 * GenericToolbox::Json::fetchValue<double>(entry, "nbSigmaAway");
 
-          LogWarning << "Pushing #" << parIndex << " to " << pushVal << std::endl;
+          LogAlert << "Pushing #" << parIndex << " to " << pushVal << std::endl;
           parList[parIndex].setParameterValue( pushVal );
 
           if( parSet.isEnableEigenDecomp() ){
@@ -360,10 +398,10 @@ void FitterEngine::fit(){
     } // parSet
 
 
-    LogAlert << "Current LLH state:" << std::endl;
+    LogInfo << "Current LLH state:" << std::endl;
     getLikelihoodInterface().propagateAndEvalLikelihood();
 
-    LogAlert << getLikelihoodInterface().getSummary() << std::endl;
+    LogInfo << getLikelihoodInterface().getSummary() << std::endl;
   }
 
   // Leaving now?

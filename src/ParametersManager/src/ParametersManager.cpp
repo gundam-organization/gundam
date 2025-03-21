@@ -19,6 +19,24 @@ void ParametersManager::unmuteLogger(){ Logger::setIsMuted( false ); }
 
 // config
 void ParametersManager::configureImpl(){
+  ConfigUtils::checkFields(_config_,
+                           "/fitterEngineConfig/likelihoodInterfaceConfig"
+                           "/propagatorConfig/parametersManagerConfig",
+                           // Allowed fields (don't need to list fields in
+                           // expected, or deprecated).
+                           {{"throwToyParametersWithGlobalCov"},
+                            {"reThrowParSetIfOutOfBounds"},
+                            {"reThrowParSetIfOutOfPhysical"},
+                           },
+                           // Expected fields (must be present)
+                           {{"parameterSetList"},
+                           },
+                           // Deprecated fields (allowed, but cause a warning)
+                           {
+                           },
+                           // Renamed fields  (allowed, but cause a warning)
+                           {
+                           });
 
   GenericToolbox::Json::fillValue(_config_, _throwToyParametersWithGlobalCov_, "throwToyParametersWithGlobalCov");
   GenericToolbox::Json::fillValue(_config_, _reThrowParSetIfOutOfPhysical_, {{"reThrowParSetIfOutOfBounds"},{"reThrowParSetIfOutOfPhysical"}});
@@ -59,6 +77,10 @@ void ParametersManager::initializeImpl(){
     LogInfo << nPars << " enabled parameters in " << parSet.getName() << std::endl;
   }
   LogInfo << "Total number of parameters: " << nEnabledPars << std::endl;
+
+  if (nEnabledPars < 1) {
+    LogError << "CONFIG ERROR: No parameters have been defined" << std::endl;
+  }
 
   LogInfo << "Building global covariance matrix (" << nEnabledPars << "x" << nEnabledPars << ")" << std::endl;
   _globalCovarianceMatrix_ = std::make_shared<TMatrixD>(nEnabledPars, nEnabledPars );

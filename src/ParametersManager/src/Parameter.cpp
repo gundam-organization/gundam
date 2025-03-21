@@ -13,6 +13,35 @@
 
 
 void Parameter::configureImpl(){
+  ConfigUtils::checkFields(_config_,
+                           "/fitterEngineConfig/likelihoodInterfaceConfig"
+                           "/propagatorConfig/parametersManagerConfig"
+                           "/parameterDefinitions/(parameter)",
+                           // Allowed fields (don't need to list fields in
+                           // expected, or deprecated).
+                           {{"parameterName"}, // handled in parameter set.
+                            {"isEnabled"},
+                            {"isFixed"},
+                            {"priorValue"},
+                            {"isThrown"},
+                            {"parameterStepSize"},
+                            {"parameterLimits"},
+                            {"throwLimits"},
+                            {"mirrorRange"},
+                            {"dialSetDefinitions"},
+                            {"priorType"},
+                           },
+                           // Expected fields (must be present)
+                           {
+                           },
+                           // Deprecated fields (allowed, but cause a warning)
+                           {
+                           },
+                           // Replaced field names (allowed, but warn)
+                           {
+                             {{"name"}, {"parameterName"}},
+                           }
+);
 
   GenericToolbox::Json::fillValue(_config_, _isEnabled_, "isEnabled");
   if( not _isEnabled_ ) { return; }

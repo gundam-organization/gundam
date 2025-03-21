@@ -34,6 +34,39 @@
 
 void DataDispenser::configureImpl(){
 
+  // All of the fields that should (or may) be at this level in the YAML.
+  // This provides a rudimentary syntax check for user inputs.
+  ConfigUtils::checkFields(_config_,
+                           "/fitterEngineConfig/likelihoodInterfaceConfig"
+                           "/datasetList(DataDispenser)",
+                           // Allowed fields (don't need to list fields in
+                           // expected, or deprecated).
+                           {
+                             {"name"},
+                             {"fromHistContent"},
+                             {"variablesTransform"},
+                             {"variableDict"},
+                             {"eventVariableAsWeight"},
+                             {"tree"},
+                             {"filePathList"},
+                             {"additionalLeavesStorage"},
+                             {"dummyVariablesList"},
+                             {"useReweightEngine"},
+                             {"dialIndexFormula"},
+                             {"overridePropagatorConfig"},
+                             {"selectionCutFormula"},
+                             {"nominalWeightFormula"},
+                           },
+                           // Expected fields (must be present)
+                           {
+                           },
+                           // Deprecated fields (allowed, but cause a warning)
+                           {
+                           },
+                           // Replaced fields (allowed, but cause a warning)
+                           {
+                           });
+
   GenericToolbox::Json::fillValue(_config_, _parameters_.name, "name");
   LogExitIf(_parameters_.name.empty(), "Dataset name not set.");
 

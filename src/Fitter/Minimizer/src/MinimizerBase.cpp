@@ -11,6 +11,9 @@
 
 void MinimizerBase::configureImpl(){
 
+  // Do not use checkFields here.  All of the fields should be checked in the
+  // derived classes.
+
   // nested objects first
   int monitorRefreshRateInMs(5000);
   GenericToolbox::Json::fillValue(_config_, monitorRefreshRateInMs, "monitorRefreshRateInMs");

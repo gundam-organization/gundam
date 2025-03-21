@@ -13,6 +13,29 @@
 
 TabulatedDialFactory::TabulatedDialFactory(const JsonType& config_) {
     auto tableConfig = GenericToolbox::Json::fetchValue<JsonType>(config_, "tableConfig");
+    ConfigUtils::checkFields(tableConfig,
+                             "tableConfig",
+                             // Allowed fields (don't need to list fields in
+                             // expected, or deprecated).
+                             {
+                             },
+                             // Expected fields (must be present)
+                             {
+                                 {"name"},
+                                 {"libraryPath"},
+                                 {"initFunction"},
+                                 {"initArguments"},
+                                 {"updateFunction"},
+                                 {"binningFunction"},
+                                 {"binningVariables"},
+                             },
+                             // Deprecated fields (allowed, but cause a warning)
+                             {
+                             },
+                             // Replaced fields (allowed, but cause a warning)
+                             {
+                             });
+
 
     _name_ =  GenericToolbox::Json::fetchValue<std::string>(tableConfig, "name", _name_);
 

@@ -19,6 +19,29 @@ void LikelihoodInterface::configureImpl(){
 
   _threadPool_.setNThreads(GundamGlobals::getNbCpuThreads() );
 
+  ConfigUtils::checkFields(_config_,
+                           "/fitterEngineConfig/likelihoodInterfaceConfig",
+                           // Allowed fields (don't need to list fields in
+                           // expected, or deprecated).
+                           {
+                             {"plotGeneratorConfig"},
+                             {"enableStatThrowInToys"},
+                             {"gaussStatThrowInToys"},
+                             {"enableEventMcThrow"},
+                           },
+                           // Expected fields (must be present)
+                           {
+                             {"propagatorConfig"},
+                             {"dataSetList"},
+                             {"jointProbabilityConfig"},
+                           },
+                           // Deprecated fields (allowed, but cause a warning)
+                           {
+                           },
+                           {
+                             {{"datasetList"}, {"dataSetList"}},
+                           });
+
   // reading the configuration of the propagator
   // allows to implement
   GenericToolbox::Json::fillValue(_config_, _modelPropagator_.getConfig(), "propagatorConfig");
@@ -60,7 +83,7 @@ void LikelihoodInterface::configureImpl(){
 
 
   // defining datasets:
-  GenericToolbox::Json::fillValue(_config_, datasetListConfig, {{"datasetList"}, {"dataSetList"}});
+  GenericToolbox::Json::fillValue(_config_, datasetListConfig, {{"dataSetList"}, {"datasetList"}});
   _datasetList_.reserve(datasetListConfig.size() );
   for( const auto& dataSetConfig : datasetListConfig ){
     _datasetList_.emplace_back(dataSetConfig, int(_datasetList_.size()));

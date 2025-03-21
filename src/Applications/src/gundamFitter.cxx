@@ -181,6 +181,25 @@ int main(int argc, char** argv){
 
   auto gundamFitterConfig(configHandler.getConfig());
 
+  // All of the fields that should (or may) be at this level in the YAML.
+  // This provides a rudimentary syntax check for user inputs.
+  ConfigUtils::checkFields(gundamFitterConfig,
+                           "TOP LEVEL",
+                           // Allowed fields (don't need to list fields in
+                           // expected, or deprecated).
+                           {{"outputFolder"},
+                            {"minGundamVersion"},
+                           },
+                           // Expected fields (must be present)
+                           {{"fitterEngineConfig"},
+                           },
+                           // Deprecated fields (allowed, but cause a warning)
+                           {{"generateSamplePlots"},
+                            {"allParameterVariations"},
+                           },
+                           // Replaced field (allowed, but cause a warning)
+                           {});
+
   // Output file path
   std::string outFileName;
   if( clParser.isOptionTriggered("outputFilePath") ){

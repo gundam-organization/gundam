@@ -14,6 +14,36 @@
 
 void DatasetDefinition::configureImpl() {
 
+  // All of the fields that should (or may) be at this level in the YAML.
+  // This provides a rudimentary syntax check for user inputs.
+  ConfigUtils::checkFields(_config_,
+                           "/fitterEngineConfig/likelihoodInterfaceConfig"
+                           "/datasetList/(dataset)",
+                           // Allowed fields (don't need to list fields in
+                           // expected, or deprecated).
+                           {
+                             {"isEnabled"},
+                             {"selectedDataEntry"},
+                             {"selectedToyEntry"},
+                             {"showSelectedEventCount"},
+                             {"devSingleThreadEventLoaderAndIndexer"},
+                             {"devSingleThreadEventSelection"},
+                             {"sortLoadedEvents"},
+                             {"nbMaxThreadsForLoad"},
+                           },
+                           // Expected fields (must be present)
+                           {
+                             {"name"},
+                             {"model"},
+                             {"data"},
+                           },
+                           // Deprecated fields (allowed, but cause a warning)
+                           {},
+                           // Replaced fields (allowed, but cause a warning)
+                           {
+                             {{"mc"}, {"model"}}
+                           });
+
   // mandatory
   _name_ = GenericToolbox::Json::fetchValue<std::string>(_config_, "name");
 

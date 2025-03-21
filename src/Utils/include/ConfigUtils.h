@@ -5,13 +5,11 @@
 #ifndef GUNDAM_CONFIG_UTILS_H
 #define GUNDAM_CONFIG_UTILS_H
 
-
 #include "GenericToolbox.Json.h"
 
 #include "yaml-cpp/yaml.h"
 
 #include <string>
-
 
 // shortcuts
 typedef GenericToolbox::Json::JsonType JsonType;
@@ -32,6 +30,17 @@ namespace ConfigUtils {
   void forwardConfig(JsonType& config_);
   void unfoldConfig(JsonType& config_);
 
+  /// Check that the config only contains fields in the allowed_ vector, and
+  /// has all of the fields in the expected_ vector.  Fields that are in the
+  /// "deprecated_ vector will generate an warning, but are still considered
+  /// valid.
+  bool checkFields(JsonType& config_,
+                   std::string parent_,
+                   std::vector<std::string> allowed_,
+                   std::vector<std::string> expected_ = {},
+                   std::vector<std::string> deprecated_ = {},
+                   std::vector<std::pair<std::string,std::string>>
+                   replaced_ = {});
 
   // handle all the hard work for us
   class ConfigHandler{
