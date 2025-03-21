@@ -78,6 +78,10 @@ void ParametersManager::initializeImpl(){
   }
   LogInfo << "Total number of parameters: " << nEnabledPars << std::endl;
 
+  if (nEnabledPars < 1) {
+    LogError << "CONFIG ERROR: No parameters have been defined" << std::endl;
+  }
+
   LogInfo << "Building global covariance matrix (" << nEnabledPars << "x" << nEnabledPars << ")" << std::endl;
   _globalCovarianceMatrix_ = std::make_shared<TMatrixD>(nEnabledPars, nEnabledPars );
   int parSetOffset = 0;
