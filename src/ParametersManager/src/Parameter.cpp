@@ -19,7 +19,7 @@ void Parameter::configureImpl(){
                            "/parameterDefinitions/(parameter)",
                            // Allowed fields (don't need to list fields in
                            // expected, or deprecated).
-                           {{"name"},          // handled in parameter set.
+                           {{"parameterName"}, // handled in parameter set.
                             {"isEnabled"},
                             {"isFixed"},
                             {"priorValue"},
@@ -39,7 +39,7 @@ void Parameter::configureImpl(){
                            },
                            // Replaced field names (allowed, but warn)
                            {
-                             {{"parameterName"}, {"name"}},
+                             {{"name"}, {"parameterName"}},
                            }
 );
 
