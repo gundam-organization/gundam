@@ -56,6 +56,8 @@ void DialCollection::configureImpl() {
                              {"dialInputList"},
                              {"binningFilePath"},
                              {"tableConfig"},
+                             {"parametersBinningPath"},
+                             {"printDialSummary"},
                            },
                            // Expected fields (must be present)
                            {
@@ -69,7 +71,8 @@ void DialCollection::configureImpl() {
                            // Replaced fields (allowed, but cause a warning)
                            {
                              {{"dialsType"}, {"dialType"}},
-                             {{"type"}, {"dialType"}}
+                             {{"type"}, {"dialType"}},
+                             {{"printDialsSummary"}, {"printDialSummary"}}
                            });
 
   _dataSetNameList_ = GenericToolbox::Json::fetchValue<std::vector<std::string>>(
@@ -209,12 +212,14 @@ void DialCollection::setupDialInterfaceReferences(){
   if( _dialInputBufferList_.empty() ){
     if( _supervisedParameterIndex_ == -1 ){
       // one dial interface per parameter
-      LogThrowIf(_dialInterfaceList_.size() != _parameterSetListPtr_->at(_supervisedParameterSetIndex_).getParameterList().size(),
-                 "Nb of dial base don't match the number of parameters of the selected set: nDials="
-                     << _dialInterfaceList_.size() << " != " << "nPars="
-                     << _parameterSetListPtr_->at(_supervisedParameterSetIndex_).getParameterList().size()
-                     << std::endl << "is the defined dial binning matching the number of parameters?"
-      );
+      if (_dialInterfaceList_.size() != _parameterSetListPtr_->at(_supervisedParameterSetIndex_).getParameterList().size()) {
+        LogError << "Nb of dial base don't match the number of parameters of the selected set: nDials="
+                 << _dialInterfaceList_.size() << " != " << "nPars="
+                 << _parameterSetListPtr_->at(_supervisedParameterSetIndex_).getParameterList().size()
+                 << std::endl << "is the defined dial binning matching the number of parameters?" << std::endl;
+        LogExit("Bad dial definition");
+      }
+
       _dialInputBufferList_.resize(_dialInterfaceList_.size());
       for( int iDial = 0 ; iDial < int(_dialInterfaceList_.size()) ; iDial++ ){
         DialInputBuffer::ParameterReference p{};
@@ -298,7 +303,7 @@ void DialCollection::setupDialInterfaceReferences(){
 // init protected
 void DialCollection::readParametersFromConfig(const JsonType &config_) {
   // globals for the dialSet
-  GenericToolbox::Json::fillValue(config_, _enableDialsSummary_, "printDialsSummary");
+  GenericToolbox::Json::fillValue(config_, _enableDialsSummary_, {{"printDialSummary"}, {"printDialsSummary"}});
   GenericToolbox::Json::fillValue(config_, _dialType_, {{"dialType"}, {"type"},  {"dialsType"}});
   GenericToolbox::Json::fillValue(config_, _dialOptions_, {{"options"}, {"dialSubType"}});
   GenericToolbox::Json::fillValue(config_, _dialLeafName_, {{"treeExpression"}, {"dialLeafName"}});
