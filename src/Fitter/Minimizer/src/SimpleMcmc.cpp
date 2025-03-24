@@ -30,6 +30,61 @@ void SimpleMcmc::configureImpl(){
   this->MinimizerBase::configureImpl();
   LogInfo << "Configure MCMC: " << _config_ << std::endl;
 
+
+  ConfigUtils::checkFields(_config_,
+                           "/fitterEngineConfig/minimizerConfig(SimpleMcmc)",
+                           // Allowed fields (don't need to list fields in
+                           // expected, or deprecated).
+                           {// fields handled by MinimizerBase
+                             {"monitorRefreshRateInMs"},
+                             {"showParametersOnFitMonitor"},
+                             {"maxNbParametersPerLineOnMonitor"},
+                             {"enablePostFitErrorFit"},
+                             {"useNormalizedFitSpace"},
+                             {"writeLlhHistory"},
+                             {"checkParameterValidity"},
+                             // Fields handled here
+                             {"algorithm"},
+                             {"proposal"},
+                             {"mcmcOutputTree"},
+                             {"likelihoodValidity"},
+                             {"randomStart"},
+                             {"saveRawSteps"},
+                             {"modelSaveStride"},
+                             {"burninCycles"},
+                             {"burninSteps"},
+                             {"saveBurnin"},
+                             {"burninSequence"},
+                             {"sequence"},
+                             {"burninCovWindow"},
+                             {"burninCovDeweight"},
+                             {"burninWindow"},
+                             {"adaptiveRestore"},
+                             {"adaptiveCovFile"},
+                             {"adaptiveCovName"},
+                             {"adaptiveCovTrials"},
+                             {"adaptiveCovWindow"},
+                             {"covarianceDeweighting"},
+                             {"adaptiveFreezeCorrelations"},
+                             {"adaptiveFreezeLength"},
+                             {"acceptanceWindow"},
+                             {"fixedSigma"},
+                           },
+                           // Expected fields (must be present)
+                           {
+                             {"type"},
+                             {"cycles"},
+                             {"steps"},
+                           },
+                           // Deprecated fields (allowed, but cause a warning)
+                           {
+                             {"burninResets"},
+                             {"burninFreezeAfter"},
+                             {"adaptiveWindow"},
+                           },
+                           // Replaced fields (allowed, but cause a warning}
+                           {});
+
   // The type of algorithm to be using.  It should be left at the default
   // value (metropolis is the only supported MCMC algorithm right now).
   GenericToolbox::Json::fillValue(_config_, _algorithmName_, "algorithm");

@@ -14,7 +14,6 @@
 #include <sstream>
 #include <iostream>
 
-
 namespace ConfigUtils {
 
   // open file
@@ -106,6 +105,7 @@ namespace ConfigUtils {
     }
     return out;
   }
+
   void forwardConfig(JsonType& config_){
     while( config_.is_string() and
          ( GenericToolbox::endsWith(config_.get<std::string>(), ".yaml", true)
@@ -116,6 +116,7 @@ namespace ConfigUtils {
       config_ = ConfigUtils::readConfigFile(expand);
     }
   }
+
   void unfoldConfig(JsonType& config_){
 
     std::function<void(JsonType&)> unfoldRecursive = [&](JsonType& outEntry_){
@@ -134,6 +135,84 @@ namespace ConfigUtils {
     };
     unfoldRecursive(config_);
 
+  }
+
+  /// Check that the configuration has the anticipated fields.
+  bool checkFields(JsonType& config_,
+                   std::string parent_,
+                   std::vector<std::string> allowed_,
+                   std::vector<std::string> expected_,
+                   std::vector<std::string> deprecated_,
+                   std::vector<std::pair<std::string,std::string>> replaced_) {
+    bool ok = true;
+
+    // Check that only items in allowed, expected, or deprecated are found.
+    int index{0};
+    for (auto& entry : config_.items()) {
+      bool found = false;
+      std::string key = entry.key();
+      // LogDebug << "Check YAML index: " << index++
+      //          << " key: " << key
+      //          << " in parent: " << parent_ << std::endl;
+      for (std::string target : expected_) {
+        if (target == key) {
+          found = true;
+          break;
+        }
+      }
+      if (found) continue;
+      for (std::string target : allowed_) {
+        if (target == key) {
+          found = true;
+          break;
+        }
+      }
+      if (found) continue;
+      for (std::pair<std::string,std::string> target : replaced_) {
+        if (target.first == key) {
+          LogWarning << "CONFIG WARNING: Deprecated field \"" << target.first
+                     << "\" replaced by \"" << target.second
+                     << "\" in " << parent_
+                     << std::endl;
+          found = true;
+          break;
+        }
+      }
+      if (found) continue;
+      for (std::string target : deprecated_) {
+        if (target == key) {
+          LogWarning << "CONFIG WARNING: Deprecated field \"" << target
+                     << "\" in " << parent_
+                     << std::endl;
+          found = true;
+          break;
+        }
+      }
+      if (found) continue;
+      LogError << "CONFIG ERROR: Unsupported field \"" << key
+               << "\" in " << parent_
+               << std::endl;
+      ok = false;
+    }
+
+    // Check that all of the expected items exist
+    for (std::string& expect : expected_) {
+      try {
+        GenericToolbox::Json::fetchValue<JsonType>(config_, expect);
+      }
+      catch (...) {
+        LogError << "CONFIG ERROR: Missing field \"" << expect
+                 << "\" required in " << parent_ <<std::endl;
+        ok = false;
+      }
+    }
+
+    if (not ok) {
+      LogError << "CONFIG ERROR: Invalid YAML record for \"" << parent_
+               << std::endl;
+    }
+
+    return ok;
   }
 
   // class impl

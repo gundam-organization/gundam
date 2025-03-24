@@ -25,6 +25,55 @@
 void RootMinimizer::configureImpl(){
   LogDebugIf(GundamGlobals::isDebug()) << "Configuring RootMinimizer..." << std::endl;
 
+  ConfigUtils::checkFields(_config_,
+                           "/fitterEngineConfig/minimizerConfig(RootMinimizer)",
+                           // Allowed fields (don't need to list fields in
+                           // expected, or deprecated).
+                           {// fields handled by MinimizerBase
+                             {"monitorRefreshRateInMs"},
+                             {"showParametersOnFitMonitor"},
+                             {"maxNbParametersPerLineOnMonitor"},
+                             {"enablePostFitErrorFit"},
+                             {"useNormalizedFitSpace"},
+                             {"writeLlhHistory"},
+                             {"checkParameterValidity"},
+                             // Fields handled here
+                             {"monitorGradientDescent"},
+                             {"strategy"},
+                             {"print_level"},
+                             {"tolerance"},
+                             {"tolerancePerDegreeOfFreedom"},
+                             {"maxIterations"},
+                             {"maxFcnCalls"},
+                             {"enableSimplexBeforeMinimize"},
+                             {"simplexMaxFcnCalls"},
+                             {"simplexToleranceLoose"},
+                             {"simplexStrategy"},
+                             {"errors"},
+                             {"generatePostFitParBreakdown"},
+                             {"generatePostFitEigenBreakdown"},
+
+                           },
+                           // Expected fields (must be present)
+                           {
+                             {"type"},
+                             {"minimizer"},
+                             {"algorithm"},
+                           },
+                           // Deprecated fields (allowed, but cause a warning)
+                           {
+                             {"stepSizeScaling"},
+                             {"errorsAlgo"},
+                             {"restoreStepSizeBeforeHesse"},
+                             {"max_iter"},
+                             {"max_fcn"},
+                           },
+                           // Replaced fields (allowed, but cause a warning}
+                           {
+                             {{"max_iter"}, {"maxIterations"}},
+                             {{"max_fcn"}, {"maxFcnCalls"}},
+                           });
+
   // read general parameters first
   this->MinimizerBase::configureImpl();
 
@@ -44,7 +93,7 @@ void RootMinimizer::configureImpl(){
   GenericToolbox::Json::fillValue(_config_, _simplexToleranceLoose_, "simplexToleranceLoose");
   GenericToolbox::Json::fillValue(_config_, _simplexStrategy_, "simplexStrategy");
 
-  GenericToolbox::Json::fillValue(_config_, _errorAlgo_, {{"errorsAlgo"},{"errors"}});
+  GenericToolbox::Json::fillValue(_config_, _errorAlgo_, {{"errors"},{"errorsAlgo"}});
 
   GenericToolbox::Json::fillValue(_config_, _generatedPostFitParBreakdown_, "generatedPostFitParBreakdown");
   GenericToolbox::Json::fillValue(_config_, _generatedPostFitEigenBreakdown_, "generatedPostFitEigenBreakdown");
