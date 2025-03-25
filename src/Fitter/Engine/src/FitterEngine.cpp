@@ -31,16 +31,12 @@ void FitterEngine::configureImpl(){
   ConfigUtils::checkFields(_config_,"/fitterEngineConfig",
                            // Allowed fields (don't need to list fields in
                            // expected, or deprecated).
-                           {{"enablePCA"},
-                            {"runPcaCheck"},
-                            {"fixGhostFitParameters"},
+                           {{"enablePca"},
                             {"pcaThreshold"},
-                            {"scanConfig"},
-                            {"parameterScanner"},
-                            {"pcaThreshold"},
+                            {"parameterScannerConfig"},
                             {"enablePreFitScan"},
                             {"enablePostFitScan"},
-                            {"enablePreFitToPostFitScan"},
+                            {"enablePreFitToPostFitLineScan"},
                             {"generateSamplePlots"},
                             {"generateOneSigmaPlots"},
                             {"enableParamVariations"},
@@ -60,9 +56,18 @@ void FitterEngine::configureImpl(){
                             {"engineType"},
                             {"propagatorConfig"},
                             {"monitorRefreshRateInMs"},
+                            {"fixGhostEigenParametersAfterFirstRejected"},
                            },
                            // Replaced fields (allowed, but cause a warning)
-                           {});
+                           {
+                             {{"fixGhostFitParameters"},{"enablePca"}},
+                             {{"fixGhostFitParameters"},{"runPcaCheck"}},
+                             {{"pcaDeltaLlhThreshold"},{"pcaThreshold"}},
+                             {{"pcaDeltaChi2Threshold"},{"pcaThreshold"}},
+                             {{"ghostParameterDeltaChi2"},{"pcaThreshold"}},
+                             {{"scanConfig"},{"parameterScannerConfig"}},
+                             {{"allParamVariations"},{"paramVariationsSigmas"}},
+                           });
 
   // need to determine the type before defining the minimizer
   JsonType minimizerConfig{};
