@@ -1,6 +1,6 @@
-## Propagator
+## Propagator Configuration
 
-[< back to parent (FitterEngine)](FitterEngine.md)
+[< back to parent (likelihoodInterfaceConfig)](LikelihoodInterface.md)
 
 ### Description
 
