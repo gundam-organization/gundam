@@ -11,13 +11,13 @@ using `jointProbabilityConfig`.
 
 ### Config options
 
-| Likelihood Interface Options | Type | Descriptions                                | default   |
-|------------------------------|------|---------------------------------------------|-----------|
-| propagatorConfig             | Json | Configure the parameter propagation         |           |
-| dataSetList                  | Json | Configure the input data sets               |           |
-| jointProbabilityConfig       | Json | Configure the joint probability calculation | BarlowLLH |
-| plotGeneratorConfig          | Json |                                             |           |
-| enableStatThrowInToys        | bool |                                             |           |
-| gaussStatThrowInToys         | bool |                                             |           |
-| enableEventMcThrow           | bool |                                             |           |
+| Likelihood Interface Options        | Type | Descriptions                                | default   |
+|-------------------------------------|------|---------------------------------------------|-----------|
+| [propagatorConfig](./Propagator.md) | Json | Configure the parameter propagation         |           |
+| dataSetList                         | Json | Configure the input data sets               |           |
+| jointProbabilityConfig              | Json | Configure the joint probability calculation | BarlowLLH |
+| plotGeneratorConfig                 | Json |                                             |           |
+| enableStatThrowInToys               | bool |                                             |           |
+| gaussStatThrowInToys                | bool |                                             |           |
+| enableEventMcThrow                  | bool |                                             |           |
 
