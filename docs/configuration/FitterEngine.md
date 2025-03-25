@@ -10,8 +10,8 @@
 |-----------------------------------------------------|--------------|-------------------------------------------------------------------------------|----------|
 | [likelihoodInterfaceConfig](LikelihoodInterface.md) | json         | Configure the likelihood calculation.                                         | required |
 | [minimizerConfig](MinimizerInterface.md)            | json         | MinimizerInterface config                                                     | required |
-| [parameterScannerConfig](./ParScanner.md)           | json         | Scan parameters config                                                        |          |
-| [scanConfig](./ParScanner.md)                       | json         | Deprecated. See parameterScannerConfig.                                       |          |
+| [parameterScannerConfig](./ParameterScanner.md)     | json         | Scan parameters config                                                        |          |
+| [scanConfig](./ParameterScanner.md)                       | json         | Deprecated. See parameterScannerConfig.                                       |          |
 | [propagatorConfig](Propagator.md)                   | json         | Deprecated. See likelihoodInterfaceConfig.                                    |          |
 | [mcmcConfig](MCMCInterface.md)                      | json         | Deprecated. See minimizerConfig                                               |          |
 | engineType                                          | string       | Deprecated. See minimizerConfig                                               |          |
