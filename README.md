@@ -237,10 +237,10 @@ mkdir -p $REPO_DIR
 - All the CI tests must be successful before merging.
 
 
-#### Licence and rights
+#### License and rights
 
 - Usage of the code is regulated by the code license.
-- Sharing of the code is regulated by the code [license](./LICENSE). Files
+- Sharing of the code is regulated by the code [license](./LICENCE). Files
   without a specific license are shared under LGPL 2.1, but certain files
   may have other compatible licenses (e.g. MIT).
 
