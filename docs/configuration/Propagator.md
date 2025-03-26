@@ -1,6 +1,6 @@
-## Propagator
+## Propagator Configuration
 
-[< back to parent (FitterEngine)](FitterEngine.md)
+[< back to parent (likelihoodInterfaceConfig)](LikelihoodInterface.md)
 
 ### Description
 
@@ -12,7 +12,7 @@ It owns the parameters, the samples, and the data loader.
 
 | Option                                      | Type   | Description                                                                                | Default |
 |---------------------------------------------|--------|--------------------------------------------------------------------------------------------|---------|
-| [fitSampleSetConfig](./SampleSet.md)        | json   | SampleSet config                                                                           |         |
+| [sampleSetConfig](./SampleSet.md)           | json   | SampleSet config                                                                           |         |
 | [parameterSetListConfig](./ParameterSet.md) | json   | ParameterSetList config                                                                    |         |
 | [dataSetList](./DatasetDefinition.md)       | json   | DatasetManager config                                                                      |         |
 | [plotGeneratorConfig](PlotGenerator.md)     | json   | PlotGenerator config                                                                       |         |

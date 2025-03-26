@@ -1,4 +1,4 @@
-## FitterEngine
+## FitterEngineConfig
 
 [< back to parent (gundamFitter)](../applications/gundamFitter.md)
 
@@ -6,29 +6,29 @@
 
 ### Config options
 
-| FitterEngine Options                                     | Type         | Description                                                                   | Default |
-|----------------------------------------------------------|--------------|-------------------------------------------------------------------------------|---------|
-| [propagatorConfig](Propagator.md)                      | json         | Propagator config                                                             |         |
-| [minimizerConfig](MinimizerInterface.md)               | json         | MinimizerInterface config                                                     |         |
-| [mcmcConfig](MCMCInterface.md)                         | json         | MinimizerInterface config                                                     |         |
-| [scanConfig](./ParScanner.md)                            | json         | Scan config                                                                   |         |
-| engineType                                               | string       | The fitter engine to use ("minimizer" or "mcmc")                            | minimizer |
-| enablePreFitScan                                         | bool         | Run fit parameter scan right before the minimization                          | false   |
-| enablePostFitScan                                        | bool         | Run fit parameter scan right after the minimization                           | false   |
-| generateSamplePlots                                      | bool         | Draw sample histograms according to the PlotGenerator config                  | true    |
-| allParamVariations                                       | list(double) | List of points to perform individual parameter variation                      |         |
-| enablePca / fixGhostFitParameters                        | bool         | Fix parameter if the effect on stat LHH is lower than `pcaDeltaChi2Threshold` | false   |
-| pcaDeltaChi2Threshold / ghostParameterDeltaChi2Threshold | double       | LLH threshold for PCA                                                         | 1E-6    |
-| fixGhostEigenParametersAfterFirstRejected                | bool         | Fix all next parameters once PCA has been triggered (dev)                     | false   |
-| throwMcBeforeFit                                         | bool         | Push MC parameter away from their prior before fitting (dev)                  | false   |
-| throwMcBeforeFitGain                                     | int          | Scale throws for MC parameters (dev)                                          | 1       |
-| customFitParThrow*                                       | list         | Use the custom thrown values for parameters (dev)                             |         |
-| scaleParStepWithChi2Response                             | bool         | Use LLH profile to scale parameter step size (dev)                            | false   |
-| parStepGain                                              | bool         | Boost step value with `scaleParStepWithChi2Response` (dev)                    | 0.1     |
-| restoreStepSizeBeforeHesse                               | bool         | Use back original step size for error calculation                             | false   |
-| debugPrintLoadedEvents                                   | bool         | Printout `_debugPrintLoadedEventsNbPerSample_` loaded events  (dev)           | false   |
-| debugPrintLoadedEventsNbPerSample                        | int          | Number of event to print for each sample (dev)                                | 10      |
-
+| FitterEngine Options                                | Type         | Description                                                                   | Default  |
+|-----------------------------------------------------|--------------|-------------------------------------------------------------------------------|----------|
+| [likelihoodInterfaceConfig](LikelihoodInterface.md) | json         | Configure the likelihood calculation.                                         | required |
+| [minimizerConfig](MinimizerInterface.md)            | json         | MinimizerInterface config                                                     | required |
+| [parameterScannerConfig](./ParameterScanner.md)     | json         | Scan parameters config                                                        |          |
+| [scanConfig](./ParameterScanner.md)                       | json         | Deprecated. See parameterScannerConfig.                                       |          |
+| [propagatorConfig](Propagator.md)                   | json         | Deprecated. See likelihoodInterfaceConfig.                                    |          |
+| [mcmcConfig](MCMCInterface.md)                      | json         | Deprecated. See minimizerConfig                                               |          |
+| engineType                                          | string       | Deprecated. See minimizerConfig                                               |          |
+| enablePreFitScan                                    | bool         | Run fit parameter scan right before the minimization                          | false    |
+| enablePostFitScan                                   | bool         | Run fit parameter scan right after the minimization                           | false    |
+| enablePreFitToPostFitLineScan                       | bool         | Run scan between the prefit and postfit parameters                            | false    |
+| generateSamplePlots                                 | bool         | Draw sample histograms according to the PlotGenerator config                  | true     |
+| allParamVariations                                  | list(double) | List of points to perform individual parameter variation                      |          |
+| enablePca / runPcaCheck / fixGhostFitParameters     | bool         | Fix parameter if the effect on stat LHH is lower than `pcaDeltaChi2Threshold` | false    |
+| pcaThreshold                                        | double       | LLH threshold for PCA                                                         | 1E-6     |
+| fixGhostEigenParametersAfterFirstRejected           | bool         | Fix all next parameters once PCA has been triggered (dev)                     | false    |
+| throwMcBeforeFit                                    | bool         | Push MC parameter away from their prior before fitting                        | false    |
+| throwMcBeforeFitGain                                | int          | Scale throws for MC parameters                                                | 1        |
+| customFitParThrow*                                  | list         | Use the custom thrown values for parameters (dev)                             |          |
+| scaleParStepWithChi2Response                        | bool         | Use LLH profile to scale parameter step size (dev)                            | false    |
+| parStepGain                                         | bool         | Boost step value with `scaleParStepWithChi2Response` (dev)                    | 0.1      |
+| savePostfitEventTrees                               | bool         | Save event tree after the fit.                                                | false    |
 
 ### JSON sub-structures
 

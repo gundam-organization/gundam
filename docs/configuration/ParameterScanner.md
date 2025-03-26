@@ -1,7 +1,6 @@
-## ScanConfig
+## Parameter Scanner Config
 
 [< back to parent (FitterEngine)](FitterEngine.md)
-
 
 #### Scan options
 
