@@ -37,8 +37,37 @@ debugging benefit all analyses.
 - [JSON for Modern C++](https://github.com/nlohmann/json)
 - [yaml-cpp](https://github.com/jbeder/yaml-cpp)
 
+![Clone & Update banner](resources/images/README/sections/sections.002.png)
 
-### Building and Using
+#### Cloning and updating GUNDAM
+
+GUNDAM source code is officially available under the
+[GUNDAM-organization on GitHub](https://github.com/gundam-organization/gundam).
+To copy the code on your computer or cluster, we recommend to use GIT.
+
+```bash
+cd $REPO_DIR
+git clone --recurse-submodules https://github.com/gundam-organization/gundam.git
+cd gundam
+```
+
+For GUNDAM users, it is recommended for you to check out the latest
+tagged version of this repository. A simple bash script allows you to
+check out the latest tagged version by tapping:
+
+```bash
+./update.sh --latest
+```
+
+Note that this command will also automatically check out the submodule
+included in the project. Therefore, in order to update your code when
+a new release is available, simply use the same command. Note that git versions
+before 2.0 may have issues to checkout the correct submodules (see issue #429).  If you run the `update.sh` script without any options, it will provide a help message.  Useful variants are
+
+- `./update.sh --up` : Update to the head of the current branch.  Make sure all of the submodules are also updated.
+- `./update.sh --head` : Checkout the main branch.  Make sure all of the submodules are also updated.
+
+### Using and Building GUNDAM
 
 GUNDAM uses a standard git and cmake setup. This section will assume that you are putting your files in:
 
@@ -51,22 +80,27 @@ GUNDAM uses a standard git and cmake setup. This section will assume that you ar
 - `$INSTALL_DIR`: the path where the binaries are installed and used by the shell.
   Same here: this guide will work under `$INSTALL_DIR/gundam`.
 
-#### Generic user setup.
+#### User setup.
 
-Once GUNDAM is compiled and installed, the current installation can be configured using
+If GUNDAM has already been compiled and installed, the current installation
+can be configured using
 ```bash
 source ${INSTALL_DIR}/gundam/setup.sh
 ```
-This will setup the environment for GUNDAM, including the version of ROOT that was used to compile and install the project.
+This will setup the environment for GUNDAM, including the version of ROOT
+that was used to compile and install the project.
 
 #### Development setup
 
 A setup optimized for development in a bash shell is provided with the
 GUNDAM cmake build system. This is optimized for working on several
-parallel versions of gundam, possibly using different compilers, and
-processors.  It keeps the installation and build directories inside the top
-level repository with machine/system specific names.  The naming scheme is
-`gundam-${compiler}_${compiler_version}-${compiler_machine}
+parallel versions (and branches) of gundam, possibly using different
+compilers, and processors.  It keeps the installation and build directories
+inside the top level repository with machine/system specific names and
+implicitly assumes that you will be working on (and testing) several
+branches simultaneously.  The naming scheme is
+`gundam-${compiler}_${compiler_version}-${compiler_machine}`
+
 ```bash
 cd ${REPO_DIR}/gundam
 source ${ROOTSYS}/bin/thisroot.sh
@@ -90,6 +124,14 @@ After setting up using `gundam-setup.sh`, two commands will be added to your env
 - gundam-setup [extra] : Redo the environment setup. The `extra` argument is added to the `GUNDAM_TARGET` directory name.
 
 The `gundam-build` command provides a standardized, location invariant, interface to the build system.  It can be run from any place and will recompile a new version into the gundam build directory.
+
+When using this type of setup, it is a good idea to clone each major version, or branch, into a separate sub-directory.  It this case, the tops of the repos will be organized something like this:
+```
+${REPO_DIR}/gundam/main/
+${REPO_DIR}/gundam/myWork/
+${REPO_DIR/gundam/lts_1.8.x/
+```
+This allows you to easily keep and test several independent versions of gundams and to compare the behavior.
 
 #### Manual Shell setup
 
@@ -123,37 +165,10 @@ mkdir -p $BUILD_DIR
 mkdir -p $REPO_DIR
 ```
 
-![Clone & Update banner](resources/images/README/sections/sections.002.png)
-
-### Cloning and updating the source code
-
-GUNDAM source code is officially available under the
-[GUNDAM-organization on GitHub](https://github.com/gundam-organization/gundam).
-To copy the code on your computer or cluster, we recommend to use GIT.
-
-```bash
-cd $REPO_DIR
-git clone --recurse-submodules https://github.com/gundam-organization/gundam.git
-cd gundam
-```
-
-For GUNDAM users, it is recommended for you to check out the latest
-tagged version of this repository. A simple bash script allows you to
-check out the latest tagged version by tapping:
-
-```bash
-./update.sh --latest
-```
-
-Note that this command will also automatically check out the submodule
-included in the project. Therefore, in order to update your code when
-a new release is available, simply use the same command. Note that git versions
-before 2.0 may have issues to checkout the correct submodules (see issue #429).  If you run the `update.sh` script without any options, it will provide a help message.  Useful variants are
-
-- `./update.sh --up` : Update to the head of the current branch.  Make sure all of the submodules are also updated.
-- `./update.sh --head` : Checkout the main branch.  Make sure all of the submodules are also updated.
 
 ![Install banner](resources/images/README/sections/sections.003.png)
+
+### Specific Installation Instructions.
 
 #### Compiling on macOS:
 
@@ -224,16 +239,21 @@ before 2.0 may have issues to checkout the correct submodules (see issue #429). 
 
 #### Licence and rights
 
-- Usage of the forked code is regulated by the code license.
-- Share of the code is regulated by the code license.
-
+- Usage of the code is regulated by the code license.
+- Sharing of the code is regulated by the code [license](./LICENSE). Files
+  without a specific license are shared under LGPL 2.1, but certain files
+  may have other compatible licenses (e.g. MIT).
 
 ![Lineage & Legacy banner](resources/images/README/sections/sections.006.png)
 
-GUNDAM was born as a fork of the *xsllhFitter* project which was developped and used by
-the cross-section working group of T2K. The original project can be found on *gitlab*:
+GUNDAM was born as a fork of the *xsllhFitter* project which was developed
+and used by the cross-section working group of T2K. The original project
+can be found on *gitlab*:
 [https://gitlab.com/cuddandr/xsLLhFitter](https://gitlab.com/cuddandr/xsLLhFitter).
 
-GUNDAM has originally been developed as an new fitter to perform T2K
-oscillation analysis, and provide an expandable base on which future
-studies with the *Upgraded ND280 Detectors* will be performed.
+GUNDAM was originally developed as a fitter to perform near detector fits
+for the T2K oscillation analysis, and provided an expandable base on which
+studies of the *Upgraded ND280 Detectors* were performed.  It was later
+expanded adopted for use in T2K ND280 cross section analysises.  It's
+lineage includes strong influences from the xsllhFitter, as well as the T2K
+BANFF near detector beam and neutrino flux fitter.
