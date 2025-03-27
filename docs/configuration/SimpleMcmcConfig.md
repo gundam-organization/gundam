@@ -1,6 +1,6 @@
 ## Simple MCMC Configuration
 
-[< back to parent (MinimizerConfig)](MinimizerConfig.md)
+[< back to parent (minimizerConfig)](MinimizerInterface.md)
 
 The SimpleMcmc uses TSimpleMCMC to generate a MCMC that maps out the
 likelihood.  The TSimpleMCMC templates implement several stepping
@@ -102,7 +102,7 @@ the default values after each call to `RunCycle()`.
   
 - `gMCMC.Steps(int s)` : Set the number of steps for the next `RunCycle()`.
 
-- `int Burnin()` : Get the number of cycles to be used for burn-in.
+- `int gMCMC.Burnin()` : Get the number of cycles to be used for burn-in.
 
 - `gMCMC.RandomStart(bool s)` : If true, the next `RunCycle()` will start
   from a random position.
@@ -142,7 +142,9 @@ the default values after each call to `RunCycle()`.
   
 - `gMCMC.AcceptanceAlgorithm(int i)` : This should always be zero, unless
   you know what you are doing, and don't need the documentation.  That
-  explicitly means, "read the code to understand what it does".
+  explicitly means, "read the code to understand what it does". [Calling it
+  with zero is a normal MCMC, calling it with one is a downhill only step,
+  but, seriously, look at the code].
     
 - `gMCMC.SetSigma(double s)` : Set the current step size in standard
   deviations of the current proposal covariance.

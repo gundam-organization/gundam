@@ -1,6 +1,6 @@
 ## Root Minimizer Configuration
 
-[< back to parent (MinimizerConfig)](MinimizerConfig.md)
+[< back to parent (minimizerConfig)](MinimizerInterface.md)
 
 The RootMinimizer uses ROOT to apply numeric minimization to the
 likelihood and find the best fit point.
@@ -33,7 +33,7 @@ the minimizer type is set to `RootMinimizer`.
 | enableSimplexBeforeMinimize     | bool   | run SIMPLEX before the real fit (can help to find the minimum)               | false               |
 | enablePostFitErrorFit           | bool   | Evaluate the Hessian after the fit                                           | true                |
 | simplexMaxFcnCalls              | int    | stop SIMPLEX after N calls                                                   | 1000                |
-o| simplexToleranceLoose           | int    | loosing up minimizer by this factor during SIMPLEX                           | 1000                |
+| simplexToleranceLoose           | int    | loosen the minimizer tolerance by this factor during SIMPLEX                           | 1000                |
 | simplexStrategy                 | int    | strategy for SIMPLEX                                                         | 1                   |
 | generatedPostFitParBreakdown    | bool   | Generate figures showing hessian eigen decomp breakdown by parameter         | false               |
 | generatedPostFitEigenBreakdown  | bool   | Generate figures showing parameter breakdown by hessian eigen                | false               |
