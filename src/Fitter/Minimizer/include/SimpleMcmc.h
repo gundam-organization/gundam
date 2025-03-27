@@ -449,6 +449,11 @@ public:
   /// The number of steps in a cycle.
   int Steps();
 
+  /// The total number of trials that have been run in the chain.  This is the
+  /// total number of steps that have been taken over the history of the
+  /// chain, and may include steps taken before the current job was run.
+  int Trials();
+
   /// Run a cycle with the current parameters.
   void RunCycle(std::string name, int id);
 
