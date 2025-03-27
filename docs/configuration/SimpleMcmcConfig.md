@@ -1,10 +1,16 @@
-## MCMCInterface
+## Simple MCMC Configuration
 
-[< back to parent (FitterEngine)](FitterEngine.md)
+[< back to parent (MinimizerConfig)](MinimizerConfig.md)
+
+The SimpleMcmc uses TSimpleMCMC to generate a MCMC that maps out the
+likelihood.
 
 ### Config options
 
-All of the options have usable default values.  The options marked "EX" are expert options and can usually be left at the default value.  The other options control basic running.
+These are the minimizerInterfaceConfig fields that are supported by when
+the minimizer type is set to `SimpleMcmc`. All of the options have usable
+default values.  The options marked "EX" are expert options and can usually
+be left at the default value.  The other options control basic running.
 
 | mcmcConfig Options       | Type   | Description                                                                 | Default             |
 |--------------------------|--------|-----------------------------------------------------------------------------|---------------------|
