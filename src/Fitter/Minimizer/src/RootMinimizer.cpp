@@ -63,13 +63,13 @@ void RootMinimizer::configureImpl(){
                            // Deprecated fields (allowed, but cause a warning)
                            {
                              {"stepSizeScaling"},
-                             {"errorsAlgo"},
                              {"restoreStepSizeBeforeHesse"},
                              {"max_iter"},
                              {"max_fcn"},
                            },
                            // Replaced fields (allowed, but cause a warning}
                            {
+                             {{"errorsAlgo"}, {"errors"}},
                              {{"max_iter"}, {"maxIterations"}},
                              {{"max_fcn"}, {"maxFcnCalls"}},
                            });
