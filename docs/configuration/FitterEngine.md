@@ -10,11 +10,11 @@
 |-----------------------------------------------------|--------------|-------------------------------------------------------------------------------|----------|
 | [likelihoodInterfaceConfig](LikelihoodInterface.md) | json         | Configure the likelihood calculation.                                         | required |
 | [minimizerConfig](MinimizerInterface.md)            | json         | MinimizerInterface config                                                     | required |
-| [parameterScannerConfig](./ParameterScanner.md)     | json         | Scan parameters config                                                        |          |
-| [scanConfig](./ParameterScanner.md)                       | json         | Deprecated. See parameterScannerConfig.                                       |          |
-| [propagatorConfig](Propagator.md)                   | json         | Deprecated. See likelihoodInterfaceConfig.                                    |          |
-| [mcmcConfig](MCMCInterface.md)                      | json         | Deprecated. See minimizerConfig                                               |          |
-| engineType                                          | string       | Deprecated. See minimizerConfig                                               |          |
+| [parameterScannerConfig](ParameterScanner.md)       | json         | Scan parameters config                                                        |          |
+| scanConfig                                          | json         | Deprecated. See parameterScannerConfig.                                       |          |
+| propagatorConfig                                    | json         | Deprecated. See likelihoodInterfaceConfig/propagatorConfig                    |          |
+| mcmcConfig                                          | json         | Deprecated. See minimizerConfig                                               |          |
+| engineType                                          | string       | Deprecated. See minimizerConfig/type                                          |          |
 | enablePreFitScan                                    | bool         | Run fit parameter scan right before the minimization                          | false    |
 | enablePostFitScan                                   | bool         | Run fit parameter scan right after the minimization                           | false    |
 | enablePreFitToPostFitLineScan                       | bool         | Run scan between the prefit and postfit parameters                            | false    |
