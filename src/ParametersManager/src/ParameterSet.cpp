@@ -28,13 +28,13 @@ void ParameterSet::configureImpl(){
                            // expected, or deprecated).
                            {
                              {"parameterDefinitions"},
+                             {"dialSetDefinitions"},
                              {"isEnabled"},
                              {"isScanEnabled"},
                              {"numberOfParameters"},
                              {"nominalStepSize"},
-                             {"printDialSetsSummary"},
-                             {"useOnlyOneParameterPerEvent"},
-                             {"printParametersSummary"},
+                             {"printDialSetSummary"},
+                             {"printParameterSummary"},
                              {"parameterLimits"},
                              {"enablePca"},
                              {"enableThrowToyParameters"},
@@ -49,7 +49,6 @@ void ParameterSet::configureImpl(){
                              {"parameterLowerBoundsList"},
                              {"parameterUpperBoundsList"},
                              {"throwEnabledList"},
-                             {"dialSetDefinitions"},
                              {"enableOnlyParameters"},
                              {"disableParameters"},
                              {"useMarkGenerator"},
@@ -58,7 +57,7 @@ void ParameterSet::configureImpl(){
                              {"allowEigenDecompWithBounds"},
                              {"maxNbEigenParameters"},
                              {"maxEigenFraction"},
-                             {"eigenSvdThreshold"},
+                             {"eigenValueThreshold"},
                              {"eigenParBounds"},
                            },
                            // Expected fields (must be present)
@@ -76,10 +75,13 @@ void ParameterSet::configureImpl(){
                              {{"fixGhostFitParameters"},{"enablePca"}},
                              {{"parameterNameTObjArray"},{"parameterNameList"}},
                              {{"parameterPriorTVectorD"},{"parameterPriorValueList"}},
-
+                             {{"printParametersSummary"},{"printParameterSummary"}},
                              {{"parameterLowerBoundsTVectorD"},{"parameterLowerBoundsList"}},
                              {{"parameterUpperBoundsTVectorD"},{"parameterUpperBoundsList"}},
                              {{"useEigenDecompInFit"},{"enableEigenDecomp"}},
+                             {{"printDialSetsSummary"},{"printDialSetSummary"}},
+                             {{"enabledThrowToyParameters"},{"enableThrowToyParameters"}},
+                             {{"eigenSvdThreshold"},{"eigenValueThreshold"}},
                            });
 
 
@@ -98,15 +100,14 @@ void ParameterSet::configureImpl(){
   GenericToolbox::Json::fillValue(_config_, _nbParameterDefinition_, "numberOfParameters");
   GenericToolbox::Json::fillValue(_config_, _nominalStepSize_, "nominalStepSize");
 
-  GenericToolbox::Json::fillValue(_config_, _useOnlyOneParameterPerEvent_, "useOnlyOneParameterPerEvent");
-  GenericToolbox::Json::fillValue(_config_, _printDialSetsSummary_, "printDialSetsSummary");
-  GenericToolbox::Json::fillValue(_config_, _printParametersSummary_, "printParametersSummary");
+  GenericToolbox::Json::fillValue(_config_, _printDialSetsSummary_, {{"printDialSetSummary"}, {"printDialSetsSummary"}});
+  GenericToolbox::Json::fillValue(_config_, _printParametersSummary_, {{"printParameterSummary"},{"printParametersSummary"}});
 
   GenericToolbox::Json::fillValue(_config_, _globalParRange_.min, "parameterLimits/minValue");
   GenericToolbox::Json::fillValue(_config_, _globalParRange_.max, "parameterLimits/maxValue");
 
-  GenericToolbox::Json::fillValue(_config_, _enablePca_, {{"enablePca"},{"allowPca"},{"fixGhostFitParameters"}});
-  GenericToolbox::Json::fillValue(_config_, _enabledThrowToyParameters_, "enabledThrowToyParameters");
+  // GenericToolbox::Json::fillValue(_config_, _enablePca_, {{"enablePca"},{"allowPca"},{"fixGhostFitParameters"}});
+  GenericToolbox::Json::fillValue(_config_, _enabledThrowToyParameters_, {{"enableThrowToyParameters"},{"enabledThrowToyParameters"}});
   GenericToolbox::Json::fillValue(_config_, _customParThrow_, {{"customParThrow"},{"customFitParThrow"}});
   GenericToolbox::Json::fillValue(_config_, _releaseFixedParametersOnHesse_, "releaseFixedParametersOnHesse");
 
@@ -133,7 +134,7 @@ void ParameterSet::configureImpl(){
   GenericToolbox::Json::fillValue(_config_, _allowEigenDecompWithBounds_, "allowEigenDecompWithBounds");
   GenericToolbox::Json::fillValue(_config_, _maxNbEigenParameters_, "maxNbEigenParameters");
   GenericToolbox::Json::fillValue(_config_, _maxEigenFraction_, "maxEigenFraction");
-  GenericToolbox::Json::fillValue(_config_, _eigenSvdThreshold_, "eigenSvdThreshold");
+  GenericToolbox::Json::fillValue(_config_, _eigenSvdThreshold_, {{"eigenValueThreshold"},{"eigenSvdThreshold"}});
 
   GenericToolbox::Json::fillValue(_config_, _eigenParRange_.min, "eigenParBounds/minValue");
   GenericToolbox::Json::fillValue(_config_, _eigenParRange_.max, "eigenParBounds/maxValue");
@@ -1092,7 +1093,7 @@ void ParameterSet::defineParameters(){
       }
 
       if( not isEnabled ){
-        // set it of
+        // set it off
         par.setIsEnabled( false );
       }
       else{
