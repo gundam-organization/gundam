@@ -20,7 +20,7 @@
 | enablePreFitToPostFitLineScan                       | bool         | Run scan between the prefit and postfit parameters                            | false    |
 | generateSamplePlots                                 | bool         | Draw sample histograms according to the PlotGenerator config                  | true     |
 | allParamVariations                                  | list(double) | List of points to perform individual parameter variation                      |          |
-| enablePca / runPcaCheck / fixGhostFitParameters     | bool         | Fix parameter if the effect on stat LHH is lower than `pcaDeltaChi2Threshold` | false    |
+| enablePca / runPcaCheck / fixGhostFitParameters     | bool         | Dangerous: Fix parameter if the effect on stat LHH is lower than `pcaDeltaChi2Threshold` | false    |
 | pcaThreshold                                        | double       | LLH threshold for PCA                                                         | 1E-6     |
 | fixGhostEigenParametersAfterFirstRejected           | bool         | Fix all next parameters once PCA has been triggered (dev)                     | false    |
 | throwMcBeforeFit                                    | bool         | Push MC parameter away from their prior before fitting                        | false    |
