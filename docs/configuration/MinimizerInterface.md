@@ -1,28 +1,31 @@
-## MinimizerInterface
+## configMinimizerInterface
 
 [< back to parent (FitterEngine)](FitterEngine.md)
 
-### Config options
+The minimizer interface can be configured to use either an MCMC to estimate
+the Bayesian posterior, or a maximum likelihood optimization to find
+frequentist estimators for the parameters (i.e. the maximum likelihood best
+fit point), and the covering region (i.e. the Covariance at the best fit
+point).  The maximum likelihood optimization is controlled using the
+RootMinimizer object, while the MCMC is produced using the SimpleMcmc
+object.  Both objects are configured using the configMinimizerInterface,
+and are described separately.
 
-| minimizerConfig Options        | Type   | Description                                                                  | Default             |
-|--------------------------------|--------|------------------------------------------------------------------------------|---------------------|
-| minimizer                      | string | [engine name](https://root.cern.ch/doc/master/NumericalMinimization_8C.html) | Minuit2             |
-| algorithm                      | string | algorithm name                                                               | default from engine |
-| useNormalizedFitSpace          | bool   | use fit parameter interface to provide prior mean at 0 and stddev at 1       | true                |
-| writeLlhHistory                | bool   | write a ttree registering all the llh evaluations                            | false               |
-| errorAlgo / errors             | string | algorithm to run after the fit (HESSE or MINOS)                              | Hesse               |
-| enablePostFitErrorFit          | bool   | enable errorAlgo after fit has succeeded                                     | true                |
-| tolerance                      | double | defines the required Estimated Distance from the Minimum stopping the fit    | 1E-4                |
-| maxFcnCalls / max_fcn          | int    | maximum number of function calls before stopping fit                         | 1E9                 |
-| maxIterations / max_iter       | int    | maximum number of minimizer iterations before stopping fit                   | 500                 |
-| strategy                       | int    | [fitter strategy (sec. 1.3)](https://root.cern.ch/download/minuit.pdf)       | 1                   |
-| print_level                    | int    | [minimizer verbose level (p.23)](https://root.cern.ch/download/minuit.pdf)   | 1                   |
-| enableSimplexBeforeMinimize    | bool   | run SIMPLEX before the real fit (can help to find the minimum)               | false               |
-| simplexMaxFcnCalls             | int    | stop SIMPLEX after N calls                                                   | 1000                |
-| simplexToleranceLoose          | int    | loosing up minimizer by this factor                                          | 1000                |
-| simplexStrategy                | int    | strategy for SIMPLEX                                                         | 1                   |
-| generatedPostFitParBreakdown   | bool   | Generate figures showing hessian eigen decomp breakdown by parameter         | false               |
-| generatedPostFitEigenBreakdown | bool   | Generate figures showing parameter breakdown by hessian eigen                | false               |
-| monitorRefreshRateInMs         | int    | Max refresh rate for the fit monitor in milliseconds                         | 5000                |
-| monitorBashModeRefreshRateInS  | int    | Max refresh rate for the fit monitor in second when running in batch mode    | 30                  |
-| showParametersOnFitMonitor     | bool   | Display fit parameter parameter values on the monitor                        | false               |
+### Config options for both minimizers
+
+| minimizerConfig Options         | Type   | Description                                                            | Default       |
+|---------------------------------|--------|------------------------------------------------------------------------|---------------|
+| type                            | string | Choose the SimpleMcmc or RootMinimizer                                 | RootMinimizer |
+| checkParameterValidity          | bool   | Turn on parameter validity checks (in physical, in domain, etc)        | false         |
+| showParametersOnFitMonitor      | bool   | Display fit parameter parameter values on the monitor                  | false         |
+| enablePostFitErrorFit           | bool   | Apply error evaluation after the minimization (may not be implemented) | true          |
+| maxNbParametersPerLineOnMonitor | int    | Number of parameters on a monitor line                                 | 15            |
+| useNormalizedFitSpace           | bool   | use fit parameter interface to provide prior mean at 0 and stddev at 1 | true          |
+| writeLlhHistory                 | bool   | write a ttree registering all the llh evaluations                      | false         |
+
+The rest of the fields are specific to the specific minimizer type being used.
+
+- The [ROOT Minimizer](RootMinimizerConfig.md) provides a maximum likelihood optimization to find the best fit point of the likelihood and provides ways to calculate the Hessian at the best fit point.
+
+- The [Simple MCMC](SimpleMcmcConfig.md) generates an MCMC chain of points drawn from the likelihood that characterizes the multi-dimension likelihood distribution (mostly used in Bayesian analysis).
+

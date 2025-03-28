@@ -49,16 +49,13 @@ void SimpleMcmc::configureImpl(){
                              {"mcmcOutputTree"},
                              {"likelihoodValidity"},
                              {"randomStart"},
-                             {"saveRawSteps"},
-                             {"modelSaveStride"},
+                             {"sequence"},
+                             {"burninSequence"},
                              {"burninCycles"},
                              {"burninSteps"},
                              {"saveBurnin"},
-                             {"burninSequence"},
-                             {"sequence"},
-                             {"burninCovWindow"},
-                             {"burninCovDeweight"},
-                             {"burninWindow"},
+                             {"saveRawSteps"},
+                             {"modelSaveStride"},
                              {"adaptiveRestore"},
                              {"adaptiveCovFile"},
                              {"adaptiveCovName"},
@@ -80,6 +77,9 @@ void SimpleMcmc::configureImpl(){
                            {
                              {"burninResets"},
                              {"burninFreezeAfter"},
+                             {"burninCovWindow"},
+                             {"burninWindow"},
+                             {"burninCovDeweight"},
                              {"adaptiveWindow"},
                            },
                            // Replaced fields (allowed, but cause a warning}
@@ -1169,6 +1169,7 @@ void SimpleMcmcSequencer::SetSigma(double s) {Owner()._adaptiveMCMC_->GetPropose
 int SimpleMcmcSequencer::Burnin() {return Owner()._burninCycles_;}
 int SimpleMcmcSequencer::Cycles() {return Owner()._cycles_;}
 int SimpleMcmcSequencer::Steps() {return Owner()._steps_;}
+int SimpleMcmcSequencer::Trials() {return Owner()._adaptiveMCMC_->GetProposeStep().GetTrials();}
 void SimpleMcmcSequencer::RunCycle(std::string name, int id) {
   Owner().adaptiveRunCycle(*Owner()._adaptiveMCMC_, name, id);
   Owner().restoreConfiguration();
