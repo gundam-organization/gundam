@@ -55,8 +55,8 @@ so an `eigenValueThreshold` of 1E-12 is usually appropriate.
 | Field                                | Type   | Description                                                  | Default |
 |--------------------------------------|--------|--------------------------------------------------------------|---------|
 | name                                 | string | Required: The parameter set name                             |         |
-| [parameterDefinitions](Parameter.md) | Json   | The list parameters that are part of this set                |         |
-| [dialSetDefinitions](Dial.md)        | Json   | The list of "dials" that modify the model                    |         |
+| [parameterDefinitions](Parameter.md) | list(Json)   | The list parameters that are part of this set                |         |
+| [dialSetDefinitions](Dial.md)        | list(Json)   | The list of "dials" that modify the model                    |         |
 | isEnabled                            | bool   | Is the set is enabled for the fit                            |         |
 | isScanEnabled                        | bool   | Should the set be "scanned" by the parameter scanner         |         |
 | nominalStepSize                      | double | The step scale used by the minimizer                         | 1.0     |
@@ -81,3 +81,12 @@ so an `eigenValueThreshold` of 1E-12 is usually appropriate.
 | maxNbEigenParameters                 | int    | Only use this many eigen parameters                          | inf     |
 | maxEigenFraction                     | double | Fraction of total "eigen" power to use                       | 1.0     |
 | eigenValueThreshold                  | double | Ignore eigenvectors with eigenvalues below this threshold    | 0.0     |
+
+### JSON sub-structures
+
+#### parameterLimits options
+
+| Options  | Type   | Description                          | Default |
+|----------|--------|--------------------------------------|---------|
+| minValue | double | min value of parameters from the set | -inf    |
+| maxValue | double | max value of parameters from the set | +inf    |
