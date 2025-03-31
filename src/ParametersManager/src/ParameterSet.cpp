@@ -1151,7 +1151,7 @@ void ParameterSet::defineParameters(){
         LogThrowIf(configVector.size() <= par.getParameterIndex(),
                    "Parameter index out of range");
         auto parConfig = configVector.at(par.getParameterIndex());
-        auto parName = GenericToolbox::Json::fetchValue<std::string>(parConfig, {{"name"}, {"parameterName"}});
+        auto parName = GenericToolbox::Json::fetchValue<std::string>(parConfig, {{"parameterName"}, {"name"}});
         if (not parName.empty()) par.setName(parName);
         par.setConfig(parConfig);
         LogWarning << "Parameter #" << par.getParameterIndex()

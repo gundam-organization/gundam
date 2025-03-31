@@ -19,20 +19,21 @@ void Parameter::configureImpl(){
                            "/parameterDefinitions/(parameter)",
                            // Allowed fields (don't need to list fields in
                            // expected, or deprecated).
-                           {{"parameterName"}, // handled in parameter set.
+                           {
                             {"isEnabled"},
                             {"isFixed"},
-                            {"priorValue"},
                             {"isThrown"},
+                            {"priorType"},
+                            {"priorValue"},
                             {"parameterStepSize"},
                             {"parameterLimits"},
                             {"throwLimits"},
                             {"mirrorRange"},
                             {"dialSetDefinitions"},
-                            {"priorType"},
                            },
                            // Expected fields (must be present)
                            {
+                             {"parameterName"}, // handled in parameter set.
                            },
                            // Deprecated fields (allowed, but cause a warning)
                            {
