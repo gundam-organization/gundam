@@ -54,7 +54,7 @@ external libraries to calculate weights.
 |------------------------|--------------|------------------------------------------------------------------------|---------|
 | parametersBinningPath  | string       | create a dedicated norm dial according to the parameter binning        |         |
 
-Treat the parameter as a simple weight.  In this case, the parameter must be bounded to always be positive.  
+Treat the parameter as a simple weight.  In this case, the parameter must be bounded to always be positive.
 
 #### `dialType: Spline`
 
@@ -90,7 +90,7 @@ The `Spline` dial type can have several `dialSubType` values
   spacing when the point spacing stays within this tolerance.  For example,
   `uniformity(1E-3)` means that the difference between the point to point
   spacings must stay below `1E-3`.
-    
+
 #### `dialType: Graph`
 
 | Option                 | Type         | Description                                                            | Default |
@@ -148,7 +148,3 @@ cannot be efficiently applied with GPU acceleration.
 | excludedRanges                    | list(pair(double)) | list of ranges (min, max) where the dials of the set don't apply |         |
 | allowedValues                     | list(double)       | list of values where the dials of the set apply                  |         |
 | excludedValues                    | list(double)       | list of values where the dials of the set apply                  |         |
-
-
-
-
