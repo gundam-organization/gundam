@@ -222,7 +222,6 @@ private:
   bool _enablePca_{false};
   bool _enableEigenDecomp_{false};
   bool _allowEigenDecompWithBounds_{false};
-  bool _useOnlyOneParameterPerEvent_{false};
   std::vector<Parameter> _eigenParameterList_{};
   std::shared_ptr<TMatrixDSymEigen> _eigenDecomp_{nullptr};
 

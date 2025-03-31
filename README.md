@@ -17,7 +17,7 @@ code is officially available at the
 [GUNDAM-organization on GitHub](https://github.com/gundam-organization/gundam).
 
 The applications are configurable with a set of YAML/JSON files (see the
-[configuration](./docs/configuration/TopLevel.md) documetation) so users do
+[configuration](./docs/configuration/TopLevel.md) documentation) so users do
 not need to modify the code for each new study.  A lot of time and efforts
 are usually invested by various working groups to debug and optimize pieces
 of codes doing generic tasks, and GUNDAM lets that work be distributed to
@@ -25,9 +25,13 @@ all users. As GUNDAM is designed for maximize flexibility to accommodate
 various physics fitting needs and makes sure that optimizations and
 debugging benefit all analyses.
 
+## Documentation
+
+GUNDAM [User Documentation](https://gundam-organization.github.io/gundam/) is growing daily.  You can also find examples and other interesting materials under the [resources/](resources/) hierarchy in this repository.  All of the web documentation is available in the source tree under the [docs/](docs/) hierarcy in this repository (see the [index](docs/index.md).)
+
 ![Dependencies banner](resources/images/README/sections/sections.001.png)
 
-### There are several requirements for building the fitter:
+## There are several requirements for building the fitter:
 
 - CMake 3.12+
 - A C++14 enabled compiler (C++17 is preferred)
@@ -39,7 +43,7 @@ debugging benefit all analyses.
 
 ![Clone & Update banner](resources/images/README/sections/sections.002.png)
 
-#### Cloning and updating GUNDAM
+## Cloning and updating GUNDAM
 
 GUNDAM source code is officially available under the
 [GUNDAM-organization on GitHub](https://github.com/gundam-organization/gundam).
@@ -59,7 +63,7 @@ check out the latest tagged version by tapping:
 ./update.sh --latest
 ```
 
-Note that this command will also automatically check out the submodule
+Note that this command will also automatically check out the submodules
 included in the project. Therefore, in order to update your code when
 a new release is available, simply use the same command. Note that git versions
 before 2.0 may have issues to checkout the correct submodules (see issue #429).  If you run the `update.sh` script without any options, it will provide a help message.  Useful variants are
@@ -67,7 +71,7 @@ before 2.0 may have issues to checkout the correct submodules (see issue #429). 
 - `./update.sh --up` : Update to the head of the current branch.  Make sure all of the submodules are also updated.
 - `./update.sh --head` : Checkout the main branch.  Make sure all of the submodules are also updated.
 
-### Using and Building GUNDAM
+## Using and Building GUNDAM
 
 GUNDAM uses a standard git and cmake setup. This section will assume that you are putting your files in:
 
@@ -80,7 +84,7 @@ GUNDAM uses a standard git and cmake setup. This section will assume that you ar
 - `$INSTALL_DIR`: the path where the binaries are installed and used by the shell.
   Same here: this guide will work under `$INSTALL_DIR/gundam`.
 
-#### User setup.
+### User setup.
 
 If GUNDAM has already been compiled and installed, the current installation
 can be configured using
@@ -90,7 +94,7 @@ source ${INSTALL_DIR}/gundam/setup.sh
 This will setup the environment for GUNDAM, including the version of ROOT
 that was used to compile and install the project.
 
-#### Development setup
+### Development setup
 
 A setup optimized for development in a bash shell is provided with the
 GUNDAM cmake build system. This is optimized for working on several
@@ -131,9 +135,9 @@ ${REPO_DIR}/gundam/main/
 ${REPO_DIR}/gundam/myWork/
 ${REPO_DIR/gundam/lts_1.8.x/
 ```
-This allows you to easily keep and test several independent versions of gundams and to compare the behavior.
+This allows you to easily keep and test several independent versions of GUNDAM and to compare the behavior.
 
-#### Manual Shell setup
+### Manual Shell setup
 
 GUNDAM uses a standard cmake build system, so it can be configured by hand.
 
@@ -168,24 +172,24 @@ mkdir -p $REPO_DIR
 
 ![Install banner](resources/images/README/sections/sections.003.png)
 
-### Specific Installation Instructions.
+## Specific Installation Instructions.
 
-#### Compiling on macOS:
+### Compiling on macOS:
 
 [![](docs/guides/images/macOsLogo.png)](docs/guides/installOnMacOs.md)
 
 
-#### Compiling on CCLyon:
+### Compiling on CCLyon:
 
 [![](docs/guides/images/cc_in2p3_logo.png)](docs/guides/installOnCCLyon.md)
 
 
-#### Compiling on HPC:
+### Compiling on HPC:
 
 [![](docs/guides/images/hpcLogo.png)](docs/guides/installOnHpc.md)
 
 
-#### Compiling on LXPLUS:
+### Compiling on LXPLUS:
 
 [![](docs/guides/images/lxplusLogo.png)](docs/guides/installOnLXPLUS.md)
 
@@ -198,16 +202,12 @@ mkdir -p $REPO_DIR
 - Official input examples: [link to repo](https://github.com/gundam-organization/gundam-input-tutorial/tree/main)
 
 
-## Documentation
-
-- Gundam [User Documentation](https://gundam-organization.github.io/gundam/) is growing daily.  You can also find examples and other interesting materials under the [resources](resources/) hierarchy in this repository.
-
 ![Developers banner](resources/images/README/sections/sections.005.png)
 
-### Development policy
+## Development policy
 
 
-#### Editing the code
+### Editing the code
 
 - The `main` branch is the official HEAD of GUNDAM.
 - Developers might make a [fork](https://github.com/gundam-organization/gundam/fork) of the `main` branch on their own GitHub account.
@@ -229,7 +229,7 @@ mkdir -p $REPO_DIR
   has been documented on by the gundam [issue
   tracker](https://github.com/gundam-organization/gundam/issues)
 
-#### Merging to the official repository
+### Merging to the official repository
 
 - First of all, create a dedicated entry on the [Issue tracking page](https://github.com/gundam-organization/gundam/issues).
 - Create a pull request (PR) of the branch from your fork into `main`.
@@ -237,7 +237,7 @@ mkdir -p $REPO_DIR
 - All the CI tests must be successful before merging.
 
 
-#### License and rights
+## License and rights
 
 - Usage of the code is regulated by the code license.
 - Sharing of the code is regulated by the code [license](./LICENCE). Files
@@ -254,6 +254,6 @@ can be found on *gitlab*:
 GUNDAM was originally developed as a fitter to perform near detector fits
 for the T2K oscillation analysis, and provided an expandable base on which
 studies of the *Upgraded ND280 Detectors* were performed.  It was later
-expanded adopted for use in T2K ND280 cross section analysises.  It's
+expanded adopted for use in T2K ND280 cross section analyses.  It's
 lineage includes strong influences from the xsllhFitter, as well as the T2K
 BANFF near detector beam and neutrino flux fitter.

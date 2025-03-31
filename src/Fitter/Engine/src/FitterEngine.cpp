@@ -197,7 +197,7 @@ void FitterEngine::initializeImpl(){
 
   // This moves the parameters
   if( _enablePca_ ) {
-    LogInfo << "PCA is enabled. Polling parameters..." << std::endl;
+    LogAlert << "PCA is enabled. Polling parameters..." << std::endl;
     this->runPcaCheck();
   }
 
@@ -512,7 +512,7 @@ void FitterEngine::runPcaCheck(){
 
   getLikelihoodInterface().propagateAndEvalLikelihood();
 
-  LogInfo << "Using PCA method: " << _pcaMethod_.toString() << " / threshold = " << _pcaThreshold_ << std::endl;
+  LogAlert << "Using PCA method: " << _pcaMethod_.toString() << " / threshold = " << _pcaThreshold_ << std::endl;
 
   double baseLlh = getLikelihoodInterface().getLastLikelihood();
   double baseLlhStat = getLikelihoodInterface().getLastStatLikelihood();
@@ -533,7 +533,7 @@ void FitterEngine::runPcaCheck(){
       continue;
     }
     else{
-      LogInfo << "Performing PCA on " << parSet.getName() << "..." << std::endl;
+      LogAlert << "Performing PCA on " << parSet.getName() << "..." << std::endl;
     }
 
     bool fixNextEigenPars{false};
@@ -553,7 +553,7 @@ void FitterEngine::runPcaCheck(){
         std::string red;
         std::string rst;
 #endif
-//        LogInfo << red << ssPrint.str() << " -> FIXED AS NEXT EIGEN." << rst << std::endl;
+        LogAlert << red << ssPrint.str() << " -> FIXED" << rst << std::endl;
         continue;
       }
 
@@ -582,7 +582,6 @@ void FitterEngine::runPcaCheck(){
           ssPrint << ": sqrt( deltaChi2Stat/dof ) = " << criteria;
         }
 
-
         // color str
         std::string color;
         std::string rst;
@@ -601,7 +600,7 @@ void FitterEngine::runPcaCheck(){
         }
 
         LogInfo.moveTerminalCursorBack(1); // clear the old line
-        LogInfo << color << ssPrint.str() << rst << std::endl;
+        LogAlert << color << ssPrint.str() << rst << std::endl;
 
         if( fixParPca ){
           par.setIsFixed(true); // ignored in the Chi2 computation of the parSet
