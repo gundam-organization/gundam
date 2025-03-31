@@ -37,11 +37,8 @@ void DialCollection::configureImpl() {
                            // Allowed fields (don't need to list fields in
                            // expected, or deprecated).
                            {
-                             {"dialType"},
-                             {"options"},
                              {"dialSubType"},
                              {"isEnabled"},
-                             {"treeExpression"},
                              {"dialLeafName"},
                              {"minDialResponse"},
                              {"maxDialResponse"},
@@ -49,8 +46,9 @@ void DialCollection::configureImpl() {
                              {"mirrorLowEdge"},
                              {"mirrorHighEdge"},
                              {"allowDialExtrapolation"},
-                             {"applyCondition"},
                              {"applyOnDataSets"},
+                             {"applyCondition"},
+                             {"applyConditions"},
                              {"definitionRange"},
                              {"mirrorDefinitionRange"},
                              {"dialInputList"},
@@ -58,21 +56,23 @@ void DialCollection::configureImpl() {
                              {"tableConfig"},
                              {"parametersBinningPath"},
                              {"printDialSummary"},
+                             {"dialsList"},
                            },
                            // Expected fields (must be present)
                            {
+                             {"dialType"},
                            },
                            // Deprecated fields (allowed, but cause a warning)
                            {
                              {"parameterLimits"},
-                             {"dialsType"},
-                             {"type"},
                            },
                            // Replaced fields (allowed, but cause a warning)
                            {
                              {{"dialsType"}, {"dialType"}},
                              {{"type"}, {"dialType"}},
-                             {{"printDialsSummary"}, {"printDialSummary"}}
+                             {{"options"}, {"dialSubType"}},
+                             {{"printDialsSummary"}, {"printDialSummary"}},
+                             {{"treeExpression"}, {"dialLeafName"}},
                            });
 
   _dataSetNameList_ = GenericToolbox::Json::fetchValue<std::vector<std::string>>(
