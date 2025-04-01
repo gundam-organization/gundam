@@ -67,7 +67,7 @@ int main(int argc, char** argv){
 
     clParser.addDummyOption("Trigger options:");
     clParser.addTriggerOption("dryRun", {"-d", "--dry-run"}, "Only overrides fitter config and print it.");
-
+    clParser.addTriggerOption("throwStats", {"--throw-stats"}, "Throw statistical errors in the toys.");
 
     // I probably don't need this
     //clParser.addTriggerOption("useBfAsXsec", {"--use-bf-as-xsec"}, "Use best-fit as x-sec value instead of mean of toys.");
@@ -186,6 +186,17 @@ int main(int argc, char** argv){
         tStudent = false;
     }else{
         tStudent = true;
+    }
+    bool enableStatThrowInToys;
+    bool enableEventMcThrow;
+    if(clParser.isOptionTriggered("throwStats")) {
+      enableStatThrowInToys = true;
+      LogInfo << "Throwing statistical errors in the toys." << std::endl;
+      enableEventMcThrow = true; // default
+      if(GenericToolbox::Json::fetchValue<bool>(margConfig, "disableEventMcThrow", false)){
+          enableEventMcThrow = false;
+          LogInfo << "Disabling event MC throw." << std::endl;
+      }
     }
 
     auto configPropagator = GenericToolbox::Json::fetchValue<nlohmann::json>( cHandler.getConfig(), "fitterEngineConfig/propagatorConfig" );
@@ -455,6 +466,7 @@ int main(int argc, char** argv){
         LogInfo<< "Injecting parameters from file: " << parInjectFile << std::endl;
     }
 
+
     double weightSum = 0, weightSquareSum = 0, ESS = 0;
     int weightSumE50 = 0, weightSquareSumE50 = 0;
     std::stringstream ss; ss << LogWarning.getPrefixString() << "Generating " << nToys << " toys...";
@@ -545,10 +557,29 @@ int main(int argc, char** argv){
 
         }// end if(injectParamsManually)
 
+        // Propagate the parameters
+        fitter.getLikelihoodInterface().getModelPropagator().propagateParameters();
+
+        // Throw the statistical errors
+        if( enableStatThrowInToys ){
+          for( auto& sample : fitter.getLikelihoodInterface().getSamplePairList() ){
+            if( enableEventMcThrow ){
+              // Take into account the finite amount of event in MC
+              sample.model->getHistogram().throwEventMcError();
+            }
+            // Asimov bin content -> toy data
+            sample.model->getHistogram().throwStatError();
+          }
+        }
+
+        // Compute the likelihood
         // LogInfo<<"Computing LH... ";
-        fitter.getLikelihoodInterface().propagateAndEvalLikelihood();
+        double LH_stats = fitter.getLikelihoodInterface().evalStatLikelihood();
+        double LH_syst = fitter.getLikelihoodInterface().evalPenaltyLikelihood();
+        fitter.getLikelihoodInterface().evalLikelihood();
         // LogInfo<<"Done.  ";
         LLH = fitter.getLikelihoodInterface().getBuffer().totalLikelihood;
+        LogInfo << "LH_stats: " << LH_stats << " LH_syst: " << LH_syst << " LH tot: " << LLH << std::endl;
         // LogInfo<<"LLH: "<<LLH<<std::endl;
         // make the LH a probability distribution (but still work with the log)
         // This is an approximation, it works only in case of gaussian LH
@@ -591,14 +622,14 @@ int main(int argc, char** argv){
         }
         LhOverGauss = exp(LLH-gLLH);
         if ( LLH-gLLH > log(weightCap)) {
-            LogInfo << "Throw " << iToy << " over weight cap: LLH-gLLH = " << LLH - gLLH << std::endl;
+//            LogInfo << "Throw " << iToy << " over weight cap: LLH-gLLH = " << LLH - gLLH << std::endl;
             countBigThrows++;
         }else{
             weightSum += LhOverGauss;
             weightSquareSum += LhOverGauss*LhOverGauss;
         }
         //debug
-        LogInfo<<"LogLH: "<<LLH<<" sampl: "<<gLLH<<" weight: "<<LhOverGauss <<std::endl    ;
+//        LogInfo<<"LogLH: "<<LLH<<" sampl: "<<gLLH<<" weight: "<<LhOverGauss <<std::endl    ;
 
         while(weightSum>1.e50){
             weightSum /= 1.e50;
