@@ -253,7 +253,7 @@ int main(int argc, char** argv){
         // this list insure all appendices will appear in the same order
         std::vector<GundamUtils::AppendixEntry> appendixDict{
                 {"configFile",       ""},
-                {"fitterOutputFile", "Fit"},
+                {"fitterOutputFile", ""},
                 {"nToys",            "nToys"},
                 {"randomSeed",       "Seed"},
                 {"parInject",        "parInject"},
