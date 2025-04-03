@@ -268,8 +268,9 @@ int main(int argc, char** argv){
                 {"nToys",            "nToys"},
                 {"randomSeed",       "Seed"},
                 {"parInject",        "parInject"},
-                {"pedestal",        "pedestal"},
-                {"tStudent",               "tStudentNu"}
+                {"pedestal",         "pedestal"},
+                {"tStudent",         "tStudentNu"},
+                {"throwStats",       "stats"}
         };
         outFilePath = GundamUtils::generateFileName(clParser, appendixDict) + ".root";
 
