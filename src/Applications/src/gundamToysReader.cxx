@@ -135,17 +135,9 @@ void openInputFiles(const std::vector<std::string>& filesList_){
     }
     else{ bCut = GenericToolbox::splitString(bCut, "_").back(); }
 
-    int aIndex;
-    int bIndex;
-    try{
-      aIndex = std::stoi(aCut);
-      bIndex = std::stoi(bCut);
-    }
-    catch (...){
-      return false;
-    }
-
-    return aIndex < bIndex;
+    try{ return std::stoi(aCut) < std::stoi(bCut); }
+    catch (...){} // if one of the two aren't convertible to in
+    return false;
   };
   std::sort(filePathList.begin(), filePathList.end(), aGoesFirst);
 
