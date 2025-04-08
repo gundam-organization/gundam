@@ -146,6 +146,8 @@ namespace ConfigUtils {
                    std::vector<std::pair<std::string,std::string>> replaced_) {
     bool ok = true;
 
+    bool quiet{true};
+
     // Check that only items in allowed, expected, or deprecated are found.
     int index{0};
     for (auto& entry : config_.items()) {
@@ -170,7 +172,7 @@ namespace ConfigUtils {
       if (found) continue;
       for (std::pair<std::string,std::string> target : replaced_) {
         if (target.first == key) {
-          LogWarning << "CONFIG WARNING: Deprecated field \"" << target.first
+          LogWarningIf(not quiet) << "CONFIG WARNING: Deprecated field \"" << target.first
                      << "\" replaced by \"" << target.second
                      << "\" in " << parent_
                      << std::endl;
@@ -181,7 +183,7 @@ namespace ConfigUtils {
       if (found) continue;
       for (std::string target : deprecated_) {
         if (target == key) {
-          LogWarning << "CONFIG WARNING: Deprecated field \"" << target
+          LogWarningIf(not quiet) << "CONFIG WARNING: Deprecated field \"" << target
                      << "\" in " << parent_
                      << std::endl;
           found = true;
@@ -189,7 +191,7 @@ namespace ConfigUtils {
         }
       }
       if (found) continue;
-      LogError << "CONFIG ERROR: Unsupported field \"" << key
+      LogErrorIf(not quiet) << "CONFIG ERROR: Unsupported field \"" << key
                << "\" in " << parent_
                << std::endl;
       ok = false;
@@ -201,14 +203,14 @@ namespace ConfigUtils {
         GenericToolbox::Json::fetchValue<JsonType>(config_, expect);
       }
       catch (...) {
-        LogError << "CONFIG ERROR: Missing field \"" << expect
+        LogErrorIf(not quiet) << "CONFIG ERROR: Missing field \"" << expect
                  << "\" required in " << parent_ <<std::endl;
         ok = false;
       }
     }
 
     if (not ok) {
-      LogError << "CONFIG ERROR: Invalid YAML record for \"" << parent_
+      LogErrorIf(not quiet) << "CONFIG ERROR: Invalid YAML record for \"" << parent_
                << std::endl;
     }
 
@@ -234,18 +236,18 @@ namespace ConfigUtils {
         LogError << "Noo config in ROOT file " << filePath_ << std::endl;
         std::exit(EXIT_FAILURE);
       }
-      config = GenericToolbox::Json::readConfigJsonStr( conf->GetTitle() );
+      _config_ = GenericToolbox::Json::readConfigJsonStr( conf->GetTitle() );
       fitFile->Close();
     }
     else{
       LogInfo << "Reading config file: " << filePath_ << std::endl;
-      config = ConfigUtils::readConfigFile(filePath_ ); // works with yaml
+      _config_ = ConfigUtils::readConfigFile(filePath_ ); // works with yaml
     }
   }
 
   void ConfigHandler::override( const JsonType& overrideConfig_ ){
     LogScopeIndent;
-    LogWarning << GenericToolbox::Json::applyOverrides(config, overrideConfig_);
+    LogWarning << GenericToolbox::Json::applyOverrides(_config_, overrideConfig_);
   }
   void ConfigHandler::override( const std::string& filePath_ ){
     LogInfo << "Overriding config with \"" << filePath_ << "\"" << std::endl;
@@ -275,14 +277,14 @@ namespace ConfigUtils {
     std::vector<std::string> split = GenericToolbox::splitString( flattenEntry_,"=" );
     LogWarning << "Override " << split[0] << " with " << split[1]
                << std::endl;
-    JsonType flat = config.flatten();
+    JsonType flat = _config_.flatten();
     LogWarning << "    Original value: " << flat.at(split[0])
                << std::endl;
     if (flat.at(split[0]).is_string()) flat.at(split[0]) = split[1];
     else flat.at(split[0]) = JsonType::parse(split[1]);
     LogWarning << "         New value: " << flat.at(split[0])
                << std::endl;
-    config = flat.unflatten();
+    _config_ = flat.unflatten();
   }
   void ConfigHandler::flatOverride( const std::vector<std::string>& flattenEntryList_ ){
     for( auto& flattenEntry : flattenEntryList_ ){ this->flatOverride( flattenEntry ); }
@@ -298,6 +300,21 @@ namespace ConfigUtils {
     LogInfo << "Writing as: " << outPath << std::endl;
     GenericToolbox::dumpStringInFile(outPath, this->toString());
     LogInfo << "Unfolded config written as: " << outPath << std::endl;
+  }
+
+  void ConfigHandler::printUnusedOptions() const{
+
+    int count{0};
+    for (auto it = _config_.begin(); it != _config_.end(); ++it) {
+      if( not GenericToolbox::isIn(it.key(), _usedKeyList_) ) {
+        count++;
+        LogScopeIndent; LogAlert << it.key() << " was not used in the config reading." << std::endl;
+      }
+    }
+
+    // don't throw an error, those could be compatibility
+    if( count != 0 ){ LogAlert << count << " were not used in the config reading. Are they backward compatibility options?" << std::endl; }
+
   }
 
 }
