@@ -17,7 +17,7 @@
 void Histogram::build(const JsonType& binningConfig_){
 
   BinSet binning;
-  binning.configure( binningConfig_ );
+  binning.configure( ConfigUtils::ConfigReader(binningConfig_) );
 
   nBins = int( binning.getBinList().size() );
   binContentList.resize( nBins );

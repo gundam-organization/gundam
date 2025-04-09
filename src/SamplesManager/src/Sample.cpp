@@ -14,14 +14,14 @@
 
 
 void Sample::configureImpl(){
-  GenericToolbox::Json::fillValue(_config_, _name_, "name");
-  GenericToolbox::Json::fillValue(_config_, _isEnabled_, "isEnabled");
-  GenericToolbox::Json::fillValue(_config_, _disableEventMcThrow_, "disableEventMcThrow");
-  GenericToolbox::Json::fillValue(_config_, _binningConfig_, {{"binningFilePath"},{"binningFile"},{"binning"}});
-  GenericToolbox::Json::fillValue(_config_, _selectionCutStr_, {{"selectionCutStr"},{"selectionCuts"}});
-  GenericToolbox::Json::fillValue(_config_, _enabledDatasetList_, {{"datasets"},{"dataSets"}});
+  _config_.fillValue(_name_, "name");
+  _config_.fillValue(_isEnabled_, "isEnabled");
+  _config_.fillValue(_disableEventMcThrow_, "disableEventMcThrow");
+  _config_.fillValue(_binningConfig_, {{"binningFilePath"},{"binningFile"},{"binning"}});
+  _config_.fillValue(_selectionCutStr_, {{"selectionCutStr"},{"selectionCuts"}});
+  _config_.fillValue(_enabledDatasetList_, {{"datasets"},{"dataSets"}});
 
-  LogThrowIf(_name_.empty(), "No name was provided for sample #" << _index_ << std::endl << GenericToolbox::Json::toReadableString(_config_));
+  LogThrowIf(_name_.empty(), "No name was provided for sample #" << _index_ << std::endl << _config_);
   LogDebugIf(GundamGlobals::isDebug()) << "Defining sample \"" << _name_ << "\"" << std::endl;
   if( not _isEnabled_ ){
     LogDebugIf(GundamGlobals::isDebug()) << "-> disabled" << std::endl;
