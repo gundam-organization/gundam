@@ -94,7 +94,7 @@ class TabulatedDialFactory : public DialCollection::CollectionData {
 public:
     TabulatedDialFactory() = default;
     ~TabulatedDialFactory() = default;
-    TabulatedDialFactory(const JsonType& config_);
+    TabulatedDialFactory(const ConfigUtils::ConfigReader& config_);
 
     /// Create an event-by-event weighting dial for this table.
     [[nodiscard]] DialBase* makeDial(const Event& event);

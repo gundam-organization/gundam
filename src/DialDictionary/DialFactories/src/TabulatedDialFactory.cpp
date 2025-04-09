@@ -11,46 +11,21 @@
 #include <dlfcn.h>
 
 
-TabulatedDialFactory::TabulatedDialFactory(const JsonType& config_) {
-    auto tableConfig = GenericToolbox::Json::fetchValue<JsonType>(config_, "tableConfig");
-    ConfigUtils::checkFields(tableConfig,
-                             "tableConfig",
-                             // Allowed fields (don't need to list fields in
-                             // expected, or deprecated).
-                             {
-                             },
-                             // Expected fields (must be present)
-                             {
-                                 {"name"},
-                                 {"libraryPath"},
-                                 {"initFunction"},
-                                 {"initArguments"},
-                                 {"updateFunction"},
-                                 {"binningFunction"},
-                                 {"binningVariables"},
-                             },
-                             // Deprecated fields (allowed, but cause a warning)
-                             {
-                             },
-                             // Replaced fields (allowed, but cause a warning)
-                             {
-                             });
+TabulatedDialFactory::TabulatedDialFactory(const ConfigUtils::ConfigReader& config_) {
+    auto tableConfig = config_.fetchSubConfig("tableConfig");
 
+    // mandatory options
+    _name_ =  tableConfig.fetchValue<std::string>("name");
+    _libraryPath_ =  tableConfig.fetchValue<std::string>("libraryPath");
+    _initFuncName_ = tableConfig.fetchValue<std::string>("initFunction");
+    _updateFuncName_ = tableConfig.fetchValue<std::string>("updateFunction");
+    _binningFuncName_ = tableConfig.fetchValue<std::string>("binningFunction");
+    _initArguments_ = tableConfig.fetchValue<std::vector<std::string>>("initArguments");
+    _binningVariableNames_ = tableConfig.fetchValue<std::vector<std::string>>("binningVariables");
 
-    _name_ =  GenericToolbox::Json::fetchValue<std::string>(tableConfig, "name", _name_);
+    // optional
+    int bins =  tableConfig.fetchValue<int>("bins", -1);
 
-    _libraryPath_ =  GenericToolbox::Json::fetchValue<std::string>(tableConfig, "libraryPath");
-
-    _initFuncName_ = GenericToolbox::Json::fetchValue<std::string>(tableConfig, "initFunction", _initFuncName_);
-    _initArguments_ = GenericToolbox::Json::fetchValue(tableConfig, "initArguments", _initArguments_);
-
-    _updateFuncName_ = GenericToolbox::Json::fetchValue<std::string>(tableConfig, "updateFunction");
-
-    _binningFuncName_ = GenericToolbox::Json::fetchValue<std::string>(tableConfig, "binningFunction");
-
-    int bins =  GenericToolbox::Json::fetchValue<int>(tableConfig, "bins", -1);
-
-    _binningVariableNames_ = GenericToolbox::Json::fetchValue(tableConfig, "binningVariables", _binningVariableNames_);
     _binningVariableCache_.resize(_binningVariableNames_.size());
 
     std::string expandedPath = GenericToolbox::expandEnvironmentVariables(getLibraryPath());

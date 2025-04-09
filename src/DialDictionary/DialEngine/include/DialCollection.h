@@ -164,7 +164,7 @@ public:
   // methods to generate dials with factory
   std::unique_ptr<DialBase> makeDial() const;
   std::unique_ptr<DialBase> makeDial(const TObject* src_) const;
-  std::unique_ptr<DialBase> makeDial(const JsonType& config_) const;
+  std::unique_ptr<DialBase> makeDial(const ConfigUtils::ConfigReader& config_) const;
 
 protected:
   void configureImpl() override;
@@ -172,11 +172,11 @@ protected:
 
   bool initializeNormDialsWithParBinning();
   bool initializeDialsWithDefinition();
-  bool initializeDialsWithBinningFile(const JsonType& dialsDefinition);
-  bool initializeDialsWithTabulation(const JsonType& dialsDefinition);
+  bool initializeDialsWithBinningFile(const ConfigUtils::ConfigReader& dialsDefinition);
+  bool initializeDialsWithTabulation(const ConfigUtils::ConfigReader& dialsDefinition);
 
-  void readParametersFromConfig(const JsonType &config_);
-  JsonType fetchDialsDefinition(const JsonType &definitionsList_) const;
+  void readParametersFromConfig(const ConfigUtils::ConfigReader &config_);
+  JsonType fetchDialsDefinition(const ConfigUtils::ConfigReader &definitionsList_) const;
 
   // factory
   std::unique_ptr<DialBase> makeGraphDial(const TObject* src_) const;
