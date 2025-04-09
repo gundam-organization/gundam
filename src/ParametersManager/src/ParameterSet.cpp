@@ -18,136 +18,66 @@
 
 
 void ParameterSet::configureImpl(){
-  // All of the fields that should (or may) be at this level in the YAML.
-  // This provides a rudimentary syntax check for user inputs.
-  ConfigUtils::checkFields(_config_,
-                           "/fitterEngineConfig/likelihoodInterfaceConfig"
-                           "/propagatorConfig/parametersManagerConfig"
-                           "/parameterSetList",
-                           // Allowed fields (don't need to list fields in
-                           // expected, or deprecated).
-                           {
-                             {"parameterDefinitions"},
-                             {"dialSetDefinitions"},
-                             {"isEnabled"},
-                             {"isScanEnabled"},
-                             {"numberOfParameters"},
-                             {"nominalStepSize"},
-                             {"printDialSetSummary"},
-                             {"printParameterSummary"},
-                             {"parameterLimits"},
-                             {"enablePca"},
-                             {"enableThrowToyParameters"},
-                             {"customFitParThrow"},
-                             {"releaseFixedParametersOnHess"},
-                             {"parameterDefinitionFilePath"},
-                             {"covarianceMatrixFilePath"},
-                             {"covarianceMatrix"},
-                             {"covarianceMatrixTMatrixD"},
-                             {"parameterNameList"},
-                             {"parameterPriorValueList"},
-                             {"parameterLowerBoundsList"},
-                             {"parameterUpperBoundsList"},
-                             {"throwEnabledList"},
-                             {"enableOnlyParameters"},
-                             {"disableParameters"},
-                             {"useMarkGenerator"},
-                             {"useEigenDecompForThrows"},
-                             {"enableEigenDecomp"},
-                             {"allowEigenDecompWithBounds"},
-                             {"maxNbEigenParameters"},
-                             {"maxEigenFraction"},
-                             {"eigenValueThreshold"},
-                             {"eigenParBounds"},
-                           },
-                           // Expected fields (must be present)
-                           {
-                             {"name"},
-                           },
-                           // Deprecated fields (allowed, but cause a warning)
-                           {
-                             {"maskForToyGeneration"},
-                             {"devUseParLimitsOnEigen"},
-                           },
-                           // Field names that got replaced.
-                           {
-                             {{"allowPca"},{"enablePca"}},
-                             {{"fixGhostFitParameters"},{"enablePca"}},
-                             {{"parameterNameTObjArray"},{"parameterNameList"}},
-                             {{"parameterPriorTVectorD"},{"parameterPriorValueList"}},
-                             {{"printParametersSummary"},{"printParameterSummary"}},
-                             {{"parameterLowerBoundsTVectorD"},{"parameterLowerBoundsList"}},
-                             {{"parameterUpperBoundsTVectorD"},{"parameterUpperBoundsList"}},
-                             {{"useEigenDecompInFit"},{"enableEigenDecomp"}},
-                             {{"printDialSetsSummary"},{"printDialSetSummary"}},
-                             {{"enabledThrowToyParameters"},{"enableThrowToyParameters"}},
-                             {{"eigenSvdThreshold"},{"eigenValueThreshold"}},
-                           });
 
-
-  ConfigUtils::ConfigHandler c(_config_);
-
-  c.fillValue(_name_, "name");
+  _config_.fillValue(_name_, "name");
   LogExitIf(_name_.empty(), "Config error -- parameter set without a name.");
   LogDebugIf(GundamGlobals::isDebug()) << "Reading config for parameter set: " << _name_ << std::endl;
 
-  c.fillValue(_isEnabled_, "isEnabled");
+  _config_.fillValue(_isEnabled_, "isEnabled");
   if( not _isEnabled_ ){
     LogDebugIf(GundamGlobals::isDebug()) << " -> marked as disabled." << std::endl;
     return; // don't go any further
   }
 
-  c.fillValue(_isScanEnabled_, "isScanEnabled");
+  _config_.fillValue(_isScanEnabled_, "isScanEnabled");
 
-  c.fillValue(_nbParameterDefinition_, "numberOfParameters");
-  c.fillValue(_nominalStepSize_, "nominalStepSize");
+  _config_.fillValue(_nbParameterDefinition_, "numberOfParameters");
+  _config_.fillValue(_nominalStepSize_, "nominalStepSize");
 
-  c.fillValue(_printDialSetsSummary_, {{"printDialSetSummary"}, {"printDialSetsSummary"}});
-  c.fillValue(_printParametersSummary_, {{"printParameterSummary"},{"printParametersSummary"}});
+  _config_.fillValue(_printDialSetsSummary_, {{"printDialSetSummary"}, {"printDialSetsSummary"}});
+  _config_.fillValue(_printParametersSummary_, {{"printParameterSummary"},{"printParametersSummary"}});
 
-  c.fillValue(_globalParRange_.min, "parameterLimits/minValue");
-  c.fillValue(_globalParRange_.max, "parameterLimits/maxValue");
+  _config_.fillValue(_globalParRange_.min, "parameterLimits/minValue");
+  _config_.fillValue(_globalParRange_.max, "parameterLimits/maxValue");
 
-  c.fillValue(_enablePca_, {{"enablePca"},{"allowPca"},{"fixGhostFitParameters"}});
-  c.fillValue(_enabledThrowToyParameters_, {{"enableThrowToyParameters"},{"enabledThrowToyParameters"}});
-  c.fillValue(_customParThrow_, {{"customParThrow"},{"customFitParThrow"}});
-  c.fillValue(_releaseFixedParametersOnHesse_, "releaseFixedParametersOnHesse");
+  _config_.fillValue(_enablePca_, {{"enablePca"},{"allowPca"},{"fixGhostFitParameters"}});
+  _config_.fillValue(_enabledThrowToyParameters_, {{"enableThrowToyParameters"},{"enabledThrowToyParameters"}});
+  _config_.fillValue(_customParThrow_, {{"customParThrow"},{"customFitParThrow"}});
+  _config_.fillValue(_releaseFixedParametersOnHesse_, "releaseFixedParametersOnHesse");
 
-  c.fillValue(_parameterDefinitionFilePath_, {{"parameterDefinitionFilePath"},{"covarianceMatrixFilePath"}});
-  c.fillValue(_covarianceMatrixPath_, {{"covarianceMatrix"},{"covarianceMatrixTMatrixD"}});
-  c.fillValue(_parameterNameListPath_, {{"parameterNameList"},{"parameterNameTObjArray"}});
-  c.fillValue(_parameterPriorValueListPath_, {{"parameterPriorValueList"},{"parameterPriorTVectorD"}});
+  _config_.fillValue(_parameterDefinitionFilePath_, {{"parameterDefinitionFilePath"},{"covarianceMatrixFilePath"}});
+  _config_.fillValue(_covarianceMatrixPath_, {{"covarianceMatrix"},{"covarianceMatrixTMatrixD"}});
+  _config_.fillValue(_parameterNameListPath_, {{"parameterNameList"},{"parameterNameTObjArray"}});
+  _config_.fillValue(_parameterPriorValueListPath_, {{"parameterPriorValueList"},{"parameterPriorTVectorD"}});
 
-  c.fillValue(_parameterLowerBoundsTVectorD_, {{"parameterLowerBoundsList"}, {"parameterLowerBoundsTVectorD"}});
-  c.fillValue(_parameterUpperBoundsTVectorD_, {{"parameterUpperBoundsList"}, {"parameterUpperBoundsTVectorD"}});
-  c.fillValue(_throwEnabledListPath_, "throwEnabledList");
+  _config_.fillValue(_parameterLowerBoundsTVectorD_, {{"parameterLowerBoundsList"}, {"parameterLowerBoundsTVectorD"}});
+  _config_.fillValue(_parameterUpperBoundsTVectorD_, {{"parameterUpperBoundsList"}, {"parameterUpperBoundsTVectorD"}});
+  _config_.fillValue(_throwEnabledListPath_, "throwEnabledList");
 
-  c.fillValue(_parameterDefinitionConfig_, "parameterDefinitions");
-  c.fillValue(_dialSetDefinitions_, "dialSetDefinitions");
-  c.fillValue(_enableOnlyParameters_, "enableOnlyParameters");
-  c.fillValue(_disableParameters_, "disableParameters");
+  _config_.fillValue(_parameterDefinitionConfig_, "parameterDefinitions");
+  _config_.fillValue(_dialSetDefinitions_, "dialSetDefinitions");
+  _config_.fillValue(_enableOnlyParameters_, "enableOnlyParameters");
+  _config_.fillValue(_disableParameters_, "disableParameters");
 
   // throws options
-  c.fillValue(_useMarkGenerator_, "useMarkGenerator");
-  c.fillValue(_useEigenDecompForThrows_, "useEigenDecompForThrows");
+  _config_.fillValue(_useMarkGenerator_, "useMarkGenerator");
+  _config_.fillValue(_useEigenDecompForThrows_, "useEigenDecompForThrows");
 
   // eigen related parameters
-  c.fillValue(_enableEigenDecomp_, {{"enableEigenDecomp"},{"useEigenDecompInFit"}});
-  c.fillValue(_allowEigenDecompWithBounds_, "allowEigenDecompWithBounds");
-  c.fillValue(_maxNbEigenParameters_, "maxNbEigenParameters");
-  c.fillValue(_maxEigenFraction_, "maxEigenFraction");
-  c.fillValue(_eigenSvdThreshold_, {{"eigenValueThreshold"},{"eigenSvdThreshold"}});
+  _config_.fillValue(_enableEigenDecomp_, {{"enableEigenDecomp"},{"useEigenDecompInFit"}});
+  _config_.fillValue(_allowEigenDecompWithBounds_, "allowEigenDecompWithBounds");
+  _config_.fillValue(_maxNbEigenParameters_, "maxNbEigenParameters");
+  _config_.fillValue(_maxEigenFraction_, "maxEigenFraction");
+  _config_.fillValue(_eigenSvdThreshold_, {{"eigenValueThreshold"},{"eigenSvdThreshold"}});
 
-  c.fillValue(_eigenParRange_.min, "eigenParBounds/minValue");
-  c.fillValue(_eigenParRange_.max, "eigenParBounds/maxValue");
+  _config_.fillValue(_eigenParRange_.min, "eigenParBounds/minValue");
+  _config_.fillValue(_eigenParRange_.max, "eigenParBounds/maxValue");
 
   // legacy
-  c.fillValue(_maskForToyGeneration_, "maskForToyGeneration");
+  _config_.fillValue(_maskForToyGeneration_, "maskForToyGeneration");
 
   // dev option -> was used for validation
-  c.fillValue(_devUseParLimitsOnEigen_, "devUseParLimitsOnEigen");
-
-  c.printUnusedOptions();
+  _config_.fillValue(_devUseParLimitsOnEigen_, "devUseParLimitsOnEigen");
 
   // individual parameter definitions:
   if( not _parameterDefinitionFilePath_.empty() ){ readParameterDefinitionFile(); }
@@ -166,7 +96,7 @@ void ParameterSet::configureImpl(){
 
         LogInfo << "Found parameter binning within dialSetDefinition. Defining parameters number..." << std::endl;
         BinSet b;
-        b.configure( parameterBinning );
+        b.configure( ConfigUtils::ConfigReader(parameterBinning) );
         // DON'T SORT THE BINNING -> tide to the cov matrix
         _nbParameterDefinition_ = int(b.getBinList().size());
 
@@ -1146,7 +1076,7 @@ void ParameterSet::defineParameters(){
             // try with par index
           parConfig = GenericToolbox::Json::fetchMatchingEntry(_parameterDefinitionConfig_, "parameterIndex", par.getParameterIndex());
         }
-        par.setConfig(parConfig);
+        par.setConfig( ConfigUtils::ConfigReader(parConfig) );
       }
       else {
         // No covariance provided, so find the name based on the order in
@@ -1157,7 +1087,7 @@ void ParameterSet::defineParameters(){
         auto parConfig = configVector.at(par.getParameterIndex());
         auto parName = GenericToolbox::Json::fetchValue<std::string>(parConfig, {{"parameterName"}, {"name"}});
         if (not parName.empty()) par.setName(parName);
-        par.setConfig(parConfig);
+        par.setConfig( ConfigUtils::ConfigReader(parConfig) );
         LogWarning << "Parameter #" << par.getParameterIndex()
                    << " (name \"" << par.getName() << "\")"
                    << " not defined by covariance matrix file"

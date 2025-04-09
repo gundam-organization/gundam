@@ -19,41 +19,18 @@ void ParametersManager::unmuteLogger(){ Logger::setIsMuted( false ); }
 
 // config
 void ParametersManager::configureImpl(){
-  ConfigUtils::checkFields(_config_,
-                           "/fitterEngineConfig/likelihoodInterfaceConfig"
-                           "/propagatorConfig/parametersManagerConfig",
-                           // Allowed fields (don't need to list fields in
-                           // expected, or deprecated).
-                           {{"throwToyParametersWithGlobalCov"},
-                            {"reThrowParSetIfOutOfBounds"},
-                            {"reThrowParSetIfOutOfPhysical"},
-                           },
-                           // Expected fields (must be present)
-                           {{"parameterSetList"},
-                           },
-                           // Deprecated fields (allowed, but cause a warning)
-                           {
-                           },
-                           // Renamed fields  (allowed, but cause a warning)
-                           {
-                           });
 
-  GenericToolbox::Json::fillValue(_config_, _throwToyParametersWithGlobalCov_, "throwToyParametersWithGlobalCov");
-  GenericToolbox::Json::fillValue(_config_, _reThrowParSetIfOutOfPhysical_, {{"reThrowParSetIfOutOfBounds"},{"reThrowParSetIfOutOfPhysical"}});
-  GenericToolbox::Json::fillValue(_config_, _parameterSetListConfig_, "parameterSetList");
+  _config_.fillValue(_throwToyParametersWithGlobalCov_, "throwToyParametersWithGlobalCov");
+  _config_.fillValue(_reThrowParSetIfOutOfPhysical_, {{"reThrowParSetIfOutOfBounds"},{"reThrowParSetIfOutOfPhysical"}});
+  _config_.fillValue(_parameterSetListConfig_, "parameterSetList");
 
   LogDebugIf(GundamGlobals::isDebug()) << _parameterSetListConfig_.size() << " parameter sets are defined." << std::endl;
-
-  if (_parameterSetListConfig_.size() < 1) {
-    LogError << "No parameters have been defined" << std::endl;
-    LogExit("Must define parameters for the fit");
-  }
 
   _parameterSetList_.clear(); // make sure there nothing in case readConfig is called more than once
   _parameterSetList_.reserve( _parameterSetListConfig_.size() );
   for( const auto& parameterSetConfig : _parameterSetListConfig_ ){
     _parameterSetList_.emplace_back();
-    _parameterSetList_.back().configure( parameterSetConfig );
+    _parameterSetList_.back().configure( ConfigUtils::ConfigReader(parameterSetConfig) );
 
     // clear the parameter sets that have been disabled
     if( not _parameterSetList_.back().isEnabled() ){
