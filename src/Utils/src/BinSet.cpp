@@ -18,12 +18,12 @@ void BinSet::setVerbosity( int maxLogLevel_){ Logger::setMaxLogLevel(maxLogLevel
 void BinSet::configureImpl() {
   _binList_.clear();
 
-  if( _config_.is_structured() ){
+  if( _config_.getConfig().is_structured() ){
     // config like -> should already be unfolded
     this->readBinningConfig( _config_ );
   }
-  else if( _config_.is_string() ){
-    _filePath_ = GenericToolbox::expandEnvironmentVariables( _config_.get<std::string>() );
+  else if( _config_.getConfig().is_string() ){
+    _filePath_ = GenericToolbox::expandEnvironmentVariables( _config_.getConfig().get<std::string>() );
     if( not GenericToolbox::isFile(_filePath_) ){
       LogError << GET_VAR_NAME_VALUE(_filePath_) << ": file not found." << std::endl;
       throw std::runtime_error(GET_VAR_NAME_VALUE(_filePath_) + ": file not found.");
@@ -32,7 +32,7 @@ void BinSet::configureImpl() {
     if( GenericToolbox::hasExtension(_filePath_, "txt") ){ this->readTxtBinningDefinition(); }
   }
   else{
-    LogThrow("Unknown binning config entry: " << GenericToolbox::Json::toReadableString(_config_));
+    LogThrow("Unknown binning config entry: " << _config_);
   }
 
   this->sortBinEdges();
@@ -253,13 +253,13 @@ void BinSet::readTxtBinningDefinition(){
 
 }
 
-void BinSet::readBinningConfig( const JsonType& binning_){
+void BinSet::readBinningConfig( const ConfigUtils::ConfigReader& binning_){
 
-  GenericToolbox::Json::fillValue(binning_, _sortBins_, "sortBins");
+  binning_.fillValue(_sortBins_, "sortBins");
 
-  if( GenericToolbox::Json::doKeyExist(binning_, {"binningDefinition"}) ){
+  if( binning_.hasKey("binningDefinition") ){
 
-    auto binningDefinition = GenericToolbox::Json::fetchValue<JsonType>(binning_, "binningDefinition");
+    auto binningDefinition = binning_.fetchValue<JsonType>("binningDefinition");
     struct Dimension{
       int nBins{0};
       int nModulo{1};
@@ -337,14 +337,14 @@ void BinSet::readBinningConfig( const JsonType& binning_){
       }
 
       _binList_.emplace_back( _binList_.size() );
-      _binList_.back().configure( binDefConfig );
+      _binList_.back().configure( ConfigUtils::ConfigReader(binDefConfig) );
     }
 
   }
 
-  for( auto& binDef : GenericToolbox::Json::fetchValue(binning_, "binList", JsonType()) ){
+  for( auto& binDef : binning_.fetchValue("binList", JsonType()) ){
     _binList_.emplace_back( _binList_.size() );
-    _binList_.back().configure( binDef );
+    _binList_.back().configure( ConfigUtils::ConfigReader(binDef) );
   }
 
 

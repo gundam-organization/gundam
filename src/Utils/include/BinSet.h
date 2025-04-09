@@ -47,7 +47,7 @@ public:
 
 protected:
   void readTxtBinningDefinition();    // original txt
-  void readBinningConfig(const JsonType& binning_); // yaml/json
+  void readBinningConfig(const ConfigUtils::ConfigReader& binning_); // yaml/json
 
 private:
   bool _sortBins_{false};

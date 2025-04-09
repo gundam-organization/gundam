@@ -12,17 +12,17 @@
 
 void Bin::Edges::configureImpl(){
 
-  varName = GenericToolbox::Json::fetchValue<std::string>(_config_, "name");
+  varName = _config_.fetchValue<std::string>("name");
 
-  if( GenericToolbox::Json::doKeyExist(_config_, "bounds") ){
+  if( _config_.hasKey("bounds") ){
     GenericToolbox::Range bounds{};
-    GenericToolbox::Json::fillValue(_config_, bounds, "bounds");
+    _config_.fillValue(bounds, "bounds");
     min = bounds.min;
     max = bounds.max;
     if( min == max ){ isConditionVar = true; }
   }
-  else if( GenericToolbox::Json::doKeyExist(_config_, "value") ){
-    GenericToolbox::Json::fillValue(_config_, min, "value");
+  else if( _config_.hasKey("value") ){
+    _config_.fillValue(min, "value");
     max = min;
     isConditionVar = true;
   }
@@ -60,9 +60,9 @@ std::string Bin::Edges::getSummary(bool shallow_) const {
 // configure
 void Bin::configureImpl(){
 
-  for( auto& edgeConfig : GenericToolbox::Json::fetchValue(_config_, "edgesList", JsonType()) ){
+  for( auto& edgeConfig : _config_.fetchValue("edgesList", JsonType()) ){
     _binEdgesList_.emplace_back( _binEdgesList_.size() );
-    _binEdgesList_.back().configure( edgeConfig );
+    _binEdgesList_.back().configure( ConfigUtils::ConfigReader(edgeConfig) );
   }
 
 }

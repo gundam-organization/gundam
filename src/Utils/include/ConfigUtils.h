@@ -121,7 +121,7 @@ namespace ConfigUtils {
     bool hasBeenFound{false};
     for( auto& keyPath : keyPathList_ ){
       try{
-        auto temp = GenericToolbox::Json::fetchValue<T>(_config_, keyPath);
+        T temp = GenericToolbox::Json::fetchValue<T>(_config_, keyPath);
         // pass this point it won't return an error
 
         // tag the found option
