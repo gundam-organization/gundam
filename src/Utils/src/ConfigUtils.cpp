@@ -222,9 +222,9 @@ namespace ConfigUtils {
     LogInfo << "Unfolded config written as: " << outPath << std::endl;
   }
 
-  ConfigReader ConfigReader::fetchSubConfig(const std::string& keyPath_) const{
+  ConfigReader ConfigReader::fetchSubConfig(const std::vector<std::string>& keyPathList_) const{
     JsonType subConfig;
-    this->fillValue(subConfig, keyPath_);
+    this->fillValue(subConfig, keyPathList_);
     return ConfigReader(subConfig);
   }
   std::string ConfigReader::getUnusedOptionsMessage() const{

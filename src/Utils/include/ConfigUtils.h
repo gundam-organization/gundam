@@ -86,12 +86,14 @@ namespace ConfigUtils {
 
     // read options
     [[nodiscard]] bool hasKey(const std::string& keyPath_) const{ return GenericToolbox::Json::doKeyExist(_config_, keyPath_); }
-    ConfigReader fetchSubConfig(const std::string& keyPath_) const;
+    ConfigReader fetchSubConfig(const std::vector<std::string>& keyPath_) const;
+    ConfigReader fetchSubConfig(const std::string& keyPath_) const{ return fetchSubConfig( std::vector<std::string>({keyPath_}) ); }
     [[nodiscard]] std::string getUnusedOptionsMessage() const;
 
 
     // templates
     template<typename T> T fetchValue(const std::vector<std::string>& keyPathList_) const; // source
+    template<typename F> bool deprecatedAction(const std::vector<std::string>& keyPathList_, const F& action_) const;
 
     // nested template
     template<typename T> T fetchValue(const std::vector<std::string>& keyPathList_, const T& defaultValue_) const{ try{ return fetchValue<T>(keyPathList_); } catch( ... ) { return defaultValue_; } }
@@ -103,6 +105,7 @@ namespace ConfigUtils {
     template<typename T> T fetchValue(const std::string& keyPath_, const T& defaultValue_) const{ return fetchValue(std::vector<std::string>({keyPath_}), defaultValue_); }
     template<typename T> void fillValue(T& object_, const std::string& keyPath_) const{ fillValue(object_, std::vector<std::string>({keyPath_})); }
     template<typename T> void fillEnum(T& enum_, const std::string& keyPath_) const{ fillEnum(enum_, std::vector<std::string>({keyPath_})); }
+    template<typename F> bool deprecatedAction(const std::string& keyPath_, const F& action_) const{ if( hasKey(keyPath_) ){ action_(); return true; } return false; }
 
     friend std::ostream& operator <<( std::ostream& o, const ConfigReader& this_ ){ o << this_.toString(); return o; }
 
@@ -158,6 +161,10 @@ namespace ConfigUtils {
     }
 
     return out;
+  }
+  template<typename F> bool ConfigReader::deprecatedAction(const std::vector<std::string>& keyPathList_, const F& action_) const {
+    for( auto& keyPath : keyPathList_ ){ if( hasKey(keyPath) ){ action_( keyPath ); return true; } }
+    return false;
   }
   template<typename T> void ConfigReader::fillEnum(T& enum_, const std::vector<std::string>& keyPathList_) const{
     std::string enumName;

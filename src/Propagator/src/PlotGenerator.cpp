@@ -29,11 +29,11 @@ void PlotGenerator::configureImpl(){
   _histHolderCacheList_.resize(1);
   _threadPool_.setNThreads(GundamGlobals::getNbCpuThreads() );
 
-  GenericToolbox::Json::fillValue(_config_, _isEnabled_, "isEnabled");
+  _config_.fillValue(_isEnabled_, "isEnabled");
   if( not _isEnabled_ ){ return; }
 
   // nested first
-  for( auto& varDictConfig : GenericToolbox::Json::fetchValue(_config_, {{"varDictionaries"}, {"varDictionnaries"}}, JsonType())){
+  for( auto& varDictConfig : _config_.fetchValue({{"varDictionaries"}, {"varDictionnaries"}}, JsonType())){
     _varDictionaryList_.emplace_back(); auto& varDict = _varDictionaryList_.back();
     GenericToolbox::Json::fillValue(varDictConfig, varDict.name, "name");
 
@@ -50,7 +50,7 @@ void PlotGenerator::configureImpl(){
     }
   }
 
-  for( auto& histDefConfig : GenericToolbox::Json::fetchValue(_config_, "histogramsDefinition", JsonType()) ){
+  for( auto& histDefConfig : _config_.fetchValue("histogramsDefinition", JsonType()) ){
     if( not GenericToolbox::Json::fetchValue(histDefConfig, "isEnabled", true) ){ continue; }
     _histDefList_.emplace_back(); auto& histDef = _histDefList_.back();
 
@@ -73,18 +73,18 @@ void PlotGenerator::configureImpl(){
     GenericToolbox::Json::fillValue(histDefConfig, histDef.useSampleBinningOfVar, {{"useSampleBinningOfVar"}, {"useSampleBinningOfObservable"}});
 
     auto binning = GenericToolbox::Json::fetchValue(histDefConfig, {{"binning"}, {"binningFile"}}, JsonType());
-    if( not binning.empty() ){ histDef.binning.configure( binning ); }
+    if( not binning.empty() ){ histDef.binning.configure( ConfigUtils::ConfigReader(binning) ); }
 
     GenericToolbox::addIfNotInVector("", histDef.splitVarList);
   }
 
   // options
-  GenericToolbox::Json::fillValue(_config_, _canvasParameters_.height, "canvasParameters/height");
-  GenericToolbox::Json::fillValue(_config_, _canvasParameters_.width, "canvasParameters/width");
-  GenericToolbox::Json::fillValue(_config_, _canvasParameters_.nbXplots, "canvasParameters/nbXplots");
-  GenericToolbox::Json::fillValue(_config_, _canvasParameters_.nbYplots, "canvasParameters/nbYplots");
+  _config_.fillValue(_canvasParameters_.height, "canvasParameters/height");
+  _config_.fillValue(_canvasParameters_.width, "canvasParameters/width");
+  _config_.fillValue(_canvasParameters_.nbXplots, "canvasParameters/nbXplots");
+  _config_.fillValue(_canvasParameters_.nbYplots, "canvasParameters/nbYplots");
+  _config_.fillValue(_writeGeneratedHistograms_, "writeGeneratedHistograms");
 
-  GenericToolbox::Json::fillValue(_config_, _writeGeneratedHistograms_, "writeGeneratedHistograms");
 }
 void PlotGenerator::initializeImpl() {
   LogWarning << __METHOD_NAME__ << std::endl;
