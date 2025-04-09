@@ -137,88 +137,8 @@ namespace ConfigUtils {
 
   }
 
-  /// Check that the configuration has the anticipated fields.
-  bool checkFields(JsonType& config_,
-                   std::string parent_,
-                   std::vector<std::string> allowed_,
-                   std::vector<std::string> expected_,
-                   std::vector<std::string> deprecated_,
-                   std::vector<std::pair<std::string,std::string>> replaced_) {
-    bool ok = true;
-
-    bool quiet{true};
-
-    // Check that only items in allowed, expected, or deprecated are found.
-    int index{0};
-    for (auto& entry : config_.items()) {
-      bool found = false;
-      std::string key = entry.key();
-      // LogDebug << "Check YAML index: " << index++
-      //          << " key: " << key
-      //          << " in parent: " << parent_ << std::endl;
-      for (std::string target : expected_) {
-        if (target == key) {
-          found = true;
-          break;
-        }
-      }
-      if (found) continue;
-      for (std::string target : allowed_) {
-        if (target == key) {
-          found = true;
-          break;
-        }
-      }
-      if (found) continue;
-      for (std::pair<std::string,std::string> target : replaced_) {
-        if (target.first == key) {
-          LogWarningIf(not quiet) << "CONFIG WARNING: Deprecated field \"" << target.first
-                     << "\" replaced by \"" << target.second
-                     << "\" in " << parent_
-                     << std::endl;
-          found = true;
-          break;
-        }
-      }
-      if (found) continue;
-      for (std::string target : deprecated_) {
-        if (target == key) {
-          LogWarningIf(not quiet) << "CONFIG WARNING: Deprecated field \"" << target
-                     << "\" in " << parent_
-                     << std::endl;
-          found = true;
-          break;
-        }
-      }
-      if (found) continue;
-      LogErrorIf(not quiet) << "CONFIG ERROR: Unsupported field \"" << key
-               << "\" in " << parent_
-               << std::endl;
-      ok = false;
-    }
-
-    // Check that all of the expected items exist
-    for (std::string& expect : expected_) {
-      try {
-        GenericToolbox::Json::fetchValue<JsonType>(config_, expect);
-      }
-      catch (...) {
-        LogErrorIf(not quiet) << "CONFIG ERROR: Missing field \"" << expect
-                 << "\" required in " << parent_ <<std::endl;
-        ok = false;
-      }
-    }
-
-    if (not ok) {
-      LogErrorIf(not quiet) << "CONFIG ERROR: Invalid YAML record for \"" << parent_
-               << std::endl;
-    }
-
-    return ok;
-  }
-
   // class impl
-  void ConfigHandler::setConfig(const std::string& filePath_){
+  void ConfigBuilder::setConfig(const std::string& filePath_){
     if( GenericToolbox::hasExtension( filePath_, "root" ) ){
       LogInfo << "Extracting config file for fitter file: " << filePath_ << std::endl;
       if (not GenericToolbox::doesTFileIsValid(filePath_)) {
@@ -245,11 +165,11 @@ namespace ConfigUtils {
     }
   }
 
-  void ConfigHandler::override( const JsonType& overrideConfig_ ){
+  void ConfigBuilder::override( const JsonType& overrideConfig_ ){
     LogScopeIndent;
     LogWarning << GenericToolbox::Json::applyOverrides(_config_, overrideConfig_);
   }
-  void ConfigHandler::override( const std::string& filePath_ ){
+  void ConfigBuilder::override( const std::string& filePath_ ){
     LogInfo << "Overriding config with \"" << filePath_ << "\"" << std::endl;
     if (not GenericToolbox::isFile(filePath_)) {
       LogError << "Could not find " << filePath_ << std::endl;
@@ -257,10 +177,10 @@ namespace ConfigUtils {
     }
     this->override( ConfigUtils::readConfigFile(filePath_) );
   }
-  void ConfigHandler::override( const std::vector<std::string>& filesList_ ){
+  void ConfigBuilder::override( const std::vector<std::string>& filesList_ ){
     for( auto& file : filesList_ ){ this->override( file ); }
   }
-  void ConfigHandler::flatOverride( const std::string& flattenEntry_ ){
+  void ConfigBuilder::flatOverride( const std::string& flattenEntry_ ){
     // Override the configuration values.  If the old value was a string then
     // replace with the new string. Otherwise, the input value is parsed.  The
     // configuration value are references like path names
@@ -286,10 +206,10 @@ namespace ConfigUtils {
                << std::endl;
     _config_ = flat.unflatten();
   }
-  void ConfigHandler::flatOverride( const std::vector<std::string>& flattenEntryList_ ){
+  void ConfigBuilder::flatOverride( const std::vector<std::string>& flattenEntryList_ ){
     for( auto& flattenEntry : flattenEntryList_ ){ this->flatOverride( flattenEntry ); }
   }
-  void ConfigHandler::exportToJsonFile(const std::string &filePath_) const {
+  void ConfigBuilder::exportToJsonFile(const std::string &filePath_) const {
     auto outPath{filePath_};
 
     if( not GenericToolbox::endsWith(outPath, ".json") ){
@@ -302,19 +222,30 @@ namespace ConfigUtils {
     LogInfo << "Unfolded config written as: " << outPath << std::endl;
   }
 
-  void ConfigHandler::printUnusedOptions() const{
+  ConfigReader ConfigReader::fetchSubConfig(const std::string& keyPath_) const{
+    JsonType subConfig;
+    this->fillValue(subConfig, keyPath_);
+    return ConfigReader(subConfig);
+  }
+  std::string ConfigReader::getUnusedOptionsMessage() const{
 
-    int count{0};
+    std::stringstream ss;
+
+    std::vector<std::string> unusedKeyList{};
     for (auto it = _config_.begin(); it != _config_.end(); ++it) {
       if( not GenericToolbox::isIn(it.key(), _usedKeyList_) ) {
-        count++;
-        LogScopeIndent; LogAlert << it.key() << " was not used in the config reading." << std::endl;
+        unusedKeyList.emplace_back(it.key());
       }
     }
 
-    // don't throw an error, those could be compatibility
-    if( count != 0 ){ LogAlert << count << " were not used in the config reading. Are they backward compatibility options?" << std::endl; }
+    if( not unusedKeyList.empty() ){
+      ss << unusedKeyList.size() << " were not used in the config reading. Are they backward compatibility options?" << std::endl;
+      for( auto& unusedKey : unusedKeyList ){
+        ss << "  > \"" << unusedKey << "\" was not used." << std::endl;
+      }
+    }
 
+    return ss.str();
   }
 
 }

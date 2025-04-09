@@ -16,7 +16,10 @@
 
 // shortcuts
 typedef GenericToolbox::Json::JsonType JsonType;
-typedef GenericToolbox::Json::ConfigBaseClass JsonBaseClass;
+// typedef GenericToolbox::Json::ConfigBaseClass JsonBaseClass;
+
+namespace ConfigUtils{ class ConfigReader; }
+typedef GenericToolbox::ConfigClass<ConfigUtils::ConfigReader> JsonBaseClass;
 
 
 namespace ConfigUtils {
@@ -33,25 +36,13 @@ namespace ConfigUtils {
   void forwardConfig(JsonType& config_);
   void unfoldConfig(JsonType& config_);
 
-  /// Check that the config only contains fields in the allowed_ vector, and
-  /// has all of the fields in the expected_ vector.  Fields that are in the
-  /// "deprecated_ vector will generate an warning, but are still considered
-  /// valid.
-  bool checkFields(JsonType& config_,
-                   std::string parent_,
-                   std::vector<std::string> allowed_,
-                   std::vector<std::string> expected_ = {},
-                   std::vector<std::string> deprecated_ = {},
-                   std::vector<std::pair<std::string,std::string>>
-                   replaced_ = {});
-
   // handle all the hard work for us
-  class ConfigHandler{
+  class ConfigBuilder{
 
   public:
-    ConfigHandler() = default;
-    explicit ConfigHandler(const std::string& filePath_){ setConfig(filePath_); }
-    explicit ConfigHandler(JsonType config_): _config_(std::move(config_)) {}
+    ConfigBuilder() = default;
+    explicit ConfigBuilder(const std::string& filePath_){ setConfig(filePath_); }
+    explicit ConfigBuilder(JsonType config_): _config_(std::move(config_)) {}
 
     // setters
     void setConfig(const std::string& filePath_);
@@ -72,51 +63,107 @@ namespace ConfigUtils {
     void flatOverride( const std::vector<std::string>& flattenEntryList_ );
     void exportToJsonFile( const std::string& filePath_ ) const;
 
-    // read options
-    template<typename T> void fillValue(T& object_, const std::string& keyPath_);
-    template<typename T> void fillValue(T& object_, const std::vector<std::string> &keyPathList_);
+  private:
+    JsonType _config_{};
 
-    void printUnusedOptions() const;
+  };
+
+  class ConfigReader{
+
+  public:
+    ConfigReader() = default;
+    explicit ConfigReader(JsonType config_): _config_(std::move(config_)) {}
+
+    // setters
+    void setConfig(const JsonType& config_){ _config_ = config_; }
+
+    // const getters
+    [[nodiscard]] std::string toString() const{ return GenericToolbox::Json::toReadableString( _config_ ); }
+    [[nodiscard]] const JsonType &getConfig() const{ return _config_; }
+
+    // mutable getters
+    JsonType &getConfig(){ return _config_; }
+
+    // read options
+    [[nodiscard]] bool hasKey(const std::string& keyPath_) const{ return GenericToolbox::Json::doKeyExist(_config_, keyPath_); }
+    ConfigReader fetchSubConfig(const std::string& keyPath_) const;
+    [[nodiscard]] std::string getUnusedOptionsMessage() const;
+
+
+    // templates
+    template<typename T> T fetchValue(const std::vector<std::string>& keyPathList_) const; // source
+
+    // nested template
+    template<typename T> T fetchValue(const std::vector<std::string>& keyPathList_, const T& defaultValue_) const{ try{ return fetchValue<T>(keyPathList_); } catch( ... ) { return defaultValue_; } }
+    template<typename T> void fillValue(T& object_, const std::vector<std::string> &keyPathList_) const{ try{ object_ = this->fetchValue<T>(keyPathList_); } catch(...){} }
+    template<typename T> void fillEnum(T& enum_, const std::vector<std::string>& keyPath_) const;
+
+    // nested template (string to vector<string>)
+    template<typename T> T fetchValue(const std::string& keyPath_) const{ return this->fetchValue<T>(std::vector<std::string>({keyPath_})); }
+    template<typename T> T fetchValue(const std::string& keyPath_, const T& defaultValue_) const{ return fetchValue(std::vector<std::string>({keyPath_}), defaultValue_); }
+    template<typename T> void fillValue(T& object_, const std::string& keyPath_) const{ fillValue(object_, std::vector<std::string>({keyPath_})); }
+    template<typename T> void fillEnum(T& enum_, const std::string& keyPath_) const{ fillEnum(enum_, std::vector<std::string>({keyPath_})); }
+
+    friend std::ostream& operator <<( std::ostream& o, const ConfigReader& this_ ){ o << this_.toString(); return o; }
 
   private:
     JsonType _config_{};
 
     // keep track of fields that have been red
-    std::vector<std::string> _usedKeyList_{};
+    mutable std::vector<std::string> _usedKeyList_{};
 
   };
 
-
-  template<typename T> void ConfigHandler::fillValue(T& object_, const std::string& keyPath_){
-    if( GenericToolbox::Json::doKeyExist(_config_, keyPath_) ) {
-      object_ = GenericToolbox::Json::fetchValue<T>(_config_, keyPath_);
-      _usedKeyList_.emplace_back(keyPath_);
-    }
-  }
-  template<typename T> void ConfigHandler::fillValue(T& object_, const std::vector<std::string> &keyPathList_){
-
+  template<typename T> T ConfigReader::fetchValue(const std::vector<std::string>& keyPathList_) const{
     // keyPathList_ has all the possible names for a given option
     // the first one is the official one, when others are set a message will appear telling the user it's deprecated
-
-    bool alreadyFound{false};
-    for( auto& keyPath : keyPathList_ ) {
-      if( GenericToolbox::Json::doKeyExist(_config_, keyPath) ) {
-        if( keyPath != keyPathList_.front() ) {
-          LogAlert << "\"" << keyPath << "\" is a deprecated field name, use \"" << keyPathList_.front() << "\" instead." << std::endl;
-        }
-
+    T out;
+    bool hasBeenFound{false};
+    for( auto& keyPath : keyPathList_ ){
+      try{
         auto temp = GenericToolbox::Json::fetchValue<T>(_config_, keyPath);
-        _usedKeyList_.emplace_back(keyPath);
+        // pass this point it won't return an error
 
-        if( alreadyFound and temp != object_ ){
-          LogError << "\"" << keyPath << "\" returned: " << temp << std::endl;
-          LogError << "while it has been already set with: " << _usedKeyList_[_usedKeyList_.size()-2] << " -> " << object_ << std::endl;
-          LogExit("Two config options with different values.");
+        // tag the found option
+        GenericToolbox::addIfNotInVector(keyPath, _usedKeyList_);
+
+        // already found?
+        if( hasBeenFound ){
+          // check if the two values are matching
+          if(out != temp){
+            LogError << "\"" << keyPath << "\" has a different value than \"" << _usedKeyList_[_usedKeyList_.size()-2] << "\"" << std::endl;
+            LogError << this->toString() << std::endl;
+            LogExit("Two config options with different values.");
+          }
+        }
+        else{
+          if( keyPath != keyPathList_.front() ) {
+            // printing the deprecation only if not already found -> could be an old option present for compatibility
+            LogAlert << "\"" << keyPath << "\" is a deprecated field name, use \"" << keyPathList_.front() << "\" instead." << std::endl;
+          }
+
+          out = temp;
+          hasBeenFound = true;
         }
 
-        alreadyFound = true;
+
       }
+      catch(...){}
     }
+
+    if( not hasBeenFound ) {
+      // let this one return the error
+      GenericToolbox::Json::fetchValue<T>(_config_, keyPathList_);
+      throw std::logic_error("SHOULD NOT GET THERE. CALL A DEV");
+    }
+
+    return out;
+  }
+  template<typename T> void ConfigReader::fillEnum(T& enum_, const std::vector<std::string>& keyPathList_) const{
+    std::string enumName;
+    this->fillValue(enumName, keyPathList_);
+    if( enumName.empty() ){ return; }
+    enum_ = enum_.toEnum( enumName, true );
   }
 
 }
