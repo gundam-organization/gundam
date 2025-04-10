@@ -85,6 +85,7 @@ namespace ConfigUtils {
     JsonType &getConfig(){ return _config_; }
 
     // read options
+    [[nodiscard]] bool empty() const{ return _config_.empty(); }
     [[nodiscard]] bool hasKey(const std::string& keyPath_) const{ return GenericToolbox::Json::doKeyExist(_config_, keyPath_); }
     ConfigReader fetchSubConfig(const std::vector<std::string>& keyPath_) const;
     void fillFormula(std::string& formulaToFill_, const std::string& keyPath_, const std::string& joinStr_) const;
@@ -99,7 +100,7 @@ namespace ConfigUtils {
     // nested template
     template<typename T> T fetchValue(const std::vector<std::string>& keyPathList_, const T& defaultValue_) const{ try{ return fetchValue<T>(keyPathList_); } catch( ... ) { return defaultValue_; } }
     template<typename T> void fillValue(T& object_, const std::vector<std::string> &keyPathList_) const{ try{ object_ = this->fetchValue<T>(keyPathList_); } catch(...){} }
-    template<typename T> void fillEnum(T& enum_, const std::vector<std::string>& keyPath_) const;
+    template<typename T> void fillEnum(T& enum_, const std::vector<std::string>& keyPathList_) const;
 
     // nested template (string to vector<string>)
     template<typename T> T fetchValue(const std::string& keyPath_) const{ return this->fetchValue<T>(std::vector<std::string>({keyPath_})); }
@@ -163,7 +164,7 @@ namespace ConfigUtils {
 
     return out;
   }
-  template<> ConfigReader ConfigReader::fetchValue<ConfigReader>(const std::vector<std::string>& keyPathList_) const{
+  template<> inline ConfigReader ConfigReader::fetchValue<ConfigReader>(const std::vector<std::string>& keyPathList_) const{
     auto conf = fetchValue<JsonType>(keyPathList_);
     return ConfigReader(conf);
   }

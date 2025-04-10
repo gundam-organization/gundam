@@ -63,8 +63,8 @@ int main( int argc, char** argv ){
   }
 
   LogInfo << "Reading config..." << std::endl;
-  ConfigUtils::ConfigHandler c1{clp.getOptionVal<std::string>("config-1")};
-  ConfigUtils::ConfigHandler c2{clp.getOptionVal<std::string>("config-2")};
+  ConfigUtils::ConfigBuilder c1{clp.getOptionVal<std::string>("config-1")};
+  ConfigUtils::ConfigBuilder c2{clp.getOptionVal<std::string>("config-2")};
 
   c1.override( clp.getOptionValList<std::string>("overrides-1") );
   c2.override( clp.getOptionValList<std::string>("overrides-2") );

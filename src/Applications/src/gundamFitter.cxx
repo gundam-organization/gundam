@@ -175,30 +175,11 @@ int main(int argc, char** argv){
   auto configFilePath = clParser.getOptionVal("configFile", "");
   LogExitIf(configFilePath.empty(), "Config file not provided.");
 
-  ConfigUtils::ConfigHandler configHandler(configFilePath);
+  ConfigUtils::ConfigBuilder configHandler(configFilePath);
   configHandler.override( clParser.getOptionValList<std::string>("overrideFiles") );
   configHandler.flatOverride( clParser.getOptionValList<std::string>("overrides") );
 
-  auto gundamFitterConfig(configHandler.getConfig());
-
-  // All of the fields that should (or may) be at this level in the YAML.
-  // This provides a rudimentary syntax check for user inputs.
-  ConfigUtils::checkFields(gundamFitterConfig,
-                           "TOP LEVEL",
-                           // Allowed fields (don't need to list fields in
-                           // expected, or deprecated).
-                           {{"outputFolder"},
-                            {"minGundamVersion"},
-                           },
-                           // Expected fields (must be present)
-                           {{"fitterEngineConfig"},
-                           },
-                           // Deprecated fields (allowed, but cause a warning)
-                           {{"generateSamplePlots"},
-                            {"allParameterVariations"},
-                           },
-                           // Replaced field (allowed, but cause a warning)
-                           {});
+  ConfigUtils::ConfigReader gundamFitterConfig(configHandler.getConfig());
 
   // Output file path
   std::string outFileName;
@@ -208,7 +189,7 @@ int main(int argc, char** argv){
   else{
 
     std::string outFolder{"./"};
-    GenericToolbox::Json::fillValue(gundamFitterConfig, outFolder, "outputFolder");
+    gundamFitterConfig.fillValue(outFolder, "outputFolder");
     if( clParser.isOptionTriggered("outputDir") ){ outFolder = clParser.getOptionVal<std::string>("outputDir"); }
 
     // appendixDict["optionName"] = "Appendix"
@@ -253,7 +234,7 @@ int main(int argc, char** argv){
   }
   else{
     std::string minGundamVersion("0.0.0");
-    GenericToolbox::Json::fillValue(gundamFitterConfig, minGundamVersion, "minGundamVersion");
+    gundamFitterConfig.fillValue(minGundamVersion, "minGundamVersion");
     LogExitIf(
         not GundamUtils::isNewerOrEqualVersion( minGundamVersion ),
         "Version check FAILED: " << GundamUtils::getVersionStr() << " < " << minGundamVersion
@@ -266,7 +247,7 @@ int main(int argc, char** argv){
   app.setCmdLinePtr( &clParser );
 
   // unfolded config
-  app.setConfigString( GenericToolbox::Json::toReadableString(gundamFitterConfig) );
+  app.setConfigString( gundamFitterConfig.toString() );
 
   // Ok, we should run. Create the out file.
   app.openOutputFile(outFileName);
@@ -284,7 +265,7 @@ int main(int argc, char** argv){
   LogInfo << "FitterEngine setup..." << std::endl;
   FitterEngine fitter(GenericToolbox::mkdirTFile(app.getOutfilePtr(), "FitterEngine"));
 
-  GenericToolbox::Json::fillValue(gundamFitterConfig, fitter.getConfig(), "fitterEngineConfig");
+  gundamFitterConfig.fillValue(fitter.getConfig(), "fitterEngineConfig");
   fitter.configure();
 
   // -a
@@ -349,15 +330,15 @@ int main(int argc, char** argv){
   }
 
   // Also check app level config options
-  GenericToolbox::Json::deprecatedAction(gundamFitterConfig, "generateSamplePlots", [&]{
+  gundamFitterConfig.deprecatedAction("generateSamplePlots", [&]{
     LogAlert << "Forwarding the option to FitterEngine. Consider moving it into \"fitterEngineConfig:\"" << std::endl;
-    fitter.setGenerateSamplePlots( GenericToolbox::Json::fetchValue<bool>(gundamFitterConfig, "generateSamplePlots") );
+    fitter.setGenerateSamplePlots( gundamFitterConfig.fetchValue<bool>("generateSamplePlots") );
   });
 
-  GenericToolbox::Json::deprecatedAction(gundamFitterConfig, "allParamVariations", [&]{
+  gundamFitterConfig.deprecatedAction("allParamVariations", [&]{
     LogAlert << "Forwarding the option to FitterEngine. Consider moving it into \"fitterEngineConfig:\"" << std::endl;
     fitter.setDoAllParamVariations(true);
-    fitter.setAllParamVariationsSigmas(GenericToolbox::Json::fetchValue<std::vector<double>>(gundamFitterConfig, "allParamVariations"));
+    fitter.setAllParamVariationsSigmas(gundamFitterConfig.fetchValue<std::vector<double>>("allParamVariations"));
   });
 
   // Check if the first point of the fit should be moved before the

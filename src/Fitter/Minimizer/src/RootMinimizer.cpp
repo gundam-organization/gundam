@@ -25,82 +25,33 @@
 void RootMinimizer::configureImpl(){
   LogDebugIf(GundamGlobals::isDebug()) << "Configuring RootMinimizer..." << std::endl;
 
-  ConfigUtils::checkFields(_config_,
-                           "/fitterEngineConfig/minimizerConfig(RootMinimizer)",
-                           // Allowed fields (don't need to list fields in
-                           // expected, or deprecated).
-                           {// fields handled by MinimizerBase
-                             {"monitorRefreshRateInMs"},
-                             {"showParametersOnFitMonitor"},
-                             {"maxNbParametersPerLineOnMonitor"},
-                             {"enablePostFitErrorFit"},
-                             {"useNormalizedFitSpace"},
-                             {"writeLlhHistory"},
-                             {"checkParameterValidity"},
-                             // Fields handled here
-                             {"monitorGradientDescent"},
-                             {"strategy"},
-                             {"print_level"},
-                             {"tolerance"},
-                             {"tolerancePerDegreeOfFreedom"},
-                             {"maxIterations"},
-                             {"maxFcnCalls"},
-                             {"enableSimplexBeforeMinimize"},
-                             {"simplexMaxFcnCalls"},
-                             {"simplexToleranceLoose"},
-                             {"simplexStrategy"},
-                             {"errors"},
-                             {"generatePostFitParBreakdown"},
-                             {"generatePostFitEigenBreakdown"},
-
-                           },
-                           // Expected fields (must be present)
-                           {
-                             {"type"},
-                             {"minimizer"},
-                             {"algorithm"},
-                           },
-                           // Deprecated fields (allowed, but cause a warning)
-                           {
-                             {"stepSizeScaling"},
-                             {"restoreStepSizeBeforeHesse"},
-                             {"max_iter"},
-                             {"max_fcn"},
-                           },
-                           // Replaced fields (allowed, but cause a warning}
-                           {
-                             {{"errorsAlgo"}, {"errors"}},
-                             {{"max_iter"}, {"maxIterations"}},
-                             {{"max_fcn"}, {"maxFcnCalls"}},
-                           });
-
   // read general parameters first
   this->MinimizerBase::configureImpl();
 
-  GenericToolbox::Json::fillValue(_config_, gradientDescentMonitor.isEnabled, "monitorGradientDescent");
-  GenericToolbox::Json::fillValue(_config_, _minimizerType_, "minimizer");
-  GenericToolbox::Json::fillValue(_config_, _minimizerAlgo_, "algorithm");
+  _config_.fillValue(gradientDescentMonitor.isEnabled, "monitorGradientDescent");
+  _config_.fillValue(_minimizerType_, "minimizer");
+  _config_.fillValue(_minimizerAlgo_, "algorithm");
 
-  GenericToolbox::Json::fillValue(_config_, _strategy_, "strategy");
-  GenericToolbox::Json::fillValue(_config_, _printLevel_, "print_level");
-  GenericToolbox::Json::fillValue(_config_, _tolerance_, "tolerance");
-  GenericToolbox::Json::fillValue(_config_, _tolerancePerDegreeOfFreedom_, "tolerancePerDegreeOfFreedom");
-  GenericToolbox::Json::fillValue(_config_, _maxIterations_, {{"maxIterations"},{"max_iter"}});
-  GenericToolbox::Json::fillValue(_config_, _maxFcnCalls_, {{"maxFcnCalls"},{"max_fcn"}});
+  _config_.fillValue(_strategy_, "strategy");
+  _config_.fillValue(_printLevel_, "print_level");
+  _config_.fillValue(_tolerance_, "tolerance");
+  _config_.fillValue(_tolerancePerDegreeOfFreedom_, "tolerancePerDegreeOfFreedom");
+  _config_.fillValue(_maxIterations_, {{"maxIterations"},{"max_iter"}});
+  _config_.fillValue(_maxFcnCalls_, {{"maxFcnCalls"},{"max_fcn"}});
 
-  GenericToolbox::Json::fillValue(_config_, _preFitWithSimplex_, "enableSimplexBeforeMinimize");
-  GenericToolbox::Json::fillValue(_config_, _simplexMaxFcnCalls_, "simplexMaxFcnCalls");
-  GenericToolbox::Json::fillValue(_config_, _simplexToleranceLoose_, "simplexToleranceLoose");
-  GenericToolbox::Json::fillValue(_config_, _simplexStrategy_, "simplexStrategy");
+  _config_.fillValue(_preFitWithSimplex_, "enableSimplexBeforeMinimize");
+  _config_.fillValue(_simplexMaxFcnCalls_, "simplexMaxFcnCalls");
+  _config_.fillValue(_simplexToleranceLoose_, "simplexToleranceLoose");
+  _config_.fillValue(_simplexStrategy_, "simplexStrategy");
 
-  GenericToolbox::Json::fillValue(_config_, _errorAlgo_, {{"errors"},{"errorsAlgo"}});
+  _config_.fillValue(_errorAlgo_, {{"errors"},{"errorsAlgo"}});
 
-  GenericToolbox::Json::fillValue(_config_, _generatedPostFitParBreakdown_, "generatedPostFitParBreakdown");
-  GenericToolbox::Json::fillValue(_config_, _generatedPostFitEigenBreakdown_, "generatedPostFitEigenBreakdown");
+  _config_.fillValue(_generatedPostFitParBreakdown_, "generatedPostFitParBreakdown");
+  _config_.fillValue(_generatedPostFitEigenBreakdown_, "generatedPostFitEigenBreakdown");
 
   // old -- should flag as dev or deprecated?
-  GenericToolbox::Json::fillValue(_config_, _stepSizeScaling_, "stepSizeScaling");
-  GenericToolbox::Json::fillValue(_config_, _restoreStepSizeBeforeHesse_, "restoreStepSizeBeforeHesse");
+  _config_.fillValue(_stepSizeScaling_, "stepSizeScaling");
+  _config_.fillValue(_restoreStepSizeBeforeHesse_, "restoreStepSizeBeforeHesse");
 
 }
 void RootMinimizer::initializeImpl(){

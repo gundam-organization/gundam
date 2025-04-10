@@ -16,18 +16,18 @@ void MinimizerBase::configureImpl(){
 
   // nested objects first
   int monitorRefreshRateInMs(5000);
-  GenericToolbox::Json::fillValue(_config_, monitorRefreshRateInMs, "monitorRefreshRateInMs");
+  _config_.fillValue(monitorRefreshRateInMs, "monitorRefreshRateInMs");
   // slow down the refresh rate if in batch mode
   monitorRefreshRateInMs *= ( GenericToolbox::getTerminalWidth() != 0 ? 1 : 10 );
   _monitor_.convergenceMonitor.setMaxRefreshRateInMs( monitorRefreshRateInMs );
 
   // members
-  GenericToolbox::Json::fillValue(_config_, _monitor_.showParameters, "showParametersOnFitMonitor");
-  GenericToolbox::Json::fillValue(_config_, _monitor_.maxNbParametersPerLine, "maxNbParametersPerLineOnMonitor");
-  GenericToolbox::Json::fillValue(_config_, _isEnabledCalcError_, "enablePostFitErrorFit");
-  GenericToolbox::Json::fillValue(_config_, _useNormalizedFitSpace_, "useNormalizedFitSpace");
-  GenericToolbox::Json::fillValue(_config_, _writeLlhHistory_, "writeLlhHistory");
-  GenericToolbox::Json::fillValue(_config_, _checkParameterValidity_, "checkParameterValidity");
+  _config_.fillValue(_monitor_.showParameters, "showParametersOnFitMonitor");
+  _config_.fillValue(_monitor_.maxNbParametersPerLine, "maxNbParametersPerLineOnMonitor");
+  _config_.fillValue(_isEnabledCalcError_, "enablePostFitErrorFit");
+  _config_.fillValue(_useNormalizedFitSpace_, "useNormalizedFitSpace");
+  _config_.fillValue(_writeLlhHistory_, "writeLlhHistory");
+  _config_.fillValue(_checkParameterValidity_, "checkParameterValidity");
 }
 void MinimizerBase::initializeImpl(){
   LogWarning << "Initializing MinimizerBase..." << std::endl;
