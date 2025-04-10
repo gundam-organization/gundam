@@ -87,6 +87,7 @@ namespace ConfigUtils {
     // read options
     [[nodiscard]] bool hasKey(const std::string& keyPath_) const{ return GenericToolbox::Json::doKeyExist(_config_, keyPath_); }
     ConfigReader fetchSubConfig(const std::vector<std::string>& keyPath_) const;
+    void fillFormula(std::string& formulaToFill_, const std::string& keyPath_, const std::string& joinStr_) const;
     ConfigReader fetchSubConfig(const std::string& keyPath_) const{ return fetchSubConfig( std::vector<std::string>({keyPath_}) ); }
     [[nodiscard]] std::string getUnusedOptionsMessage() const;
 

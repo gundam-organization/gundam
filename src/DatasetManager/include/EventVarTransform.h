@@ -17,7 +17,7 @@ class EventVarTransform : public JsonBaseClass {
 
 public:
   EventVarTransform() = default;
-  explicit EventVarTransform(const JsonType& config_);
+  explicit EventVarTransform(const ConfigUtils::ConfigReader& config_);
 
   void setIsEnabled(bool isEnabled_){ _isEnabled_=isEnabled_; }
   void setIndex(int index_){ _index_ = index_; }

@@ -34,46 +34,13 @@
 
 void DataDispenser::configureImpl(){
 
-  // All of the fields that should (or may) be at this level in the YAML.
-  // This provides a rudimentary syntax check for user inputs.
-  ConfigUtils::checkFields(_config_,
-                           "/fitterEngineConfig/likelihoodInterfaceConfig"
-                           "/datasetList(DataDispenser)",
-                           // Allowed fields (don't need to list fields in
-                           // expected, or deprecated).
-                           {
-                             {"name"},
-                             {"fromHistContent"},
-                             {"variablesTransform"},
-                             {"variableDict"},
-                             {"eventVariableAsWeight"},
-                             {"tree"},
-                             {"filePathList"},
-                             {"additionalLeavesStorage"},
-                             {"dummyVariablesList"},
-                             {"useReweightEngine"},
-                             {"dialIndexFormula"},
-                             {"overridePropagatorConfig"},
-                             {"selectionCutFormula"},
-                             {"nominalWeightFormula"},
-                           },
-                           // Expected fields (must be present)
-                           {
-                           },
-                           // Deprecated fields (allowed, but cause a warning)
-                           {
-                           },
-                           // Replaced fields (allowed, but cause a warning)
-                           {
-                           });
-
-  GenericToolbox::Json::fillValue(_config_, _parameters_.name, "name");
+  _config_.fillValue(_parameters_.name, "name");
   LogExitIf(_parameters_.name.empty(), "Dataset name not set.");
 
   // histograms don't need other parameters
-  if( GenericToolbox::Json::doKeyExist( _config_, "fromHistContent" ) ) {
+  if( _config_.hasKey("fromHistContent" ) ) {
     LogDebugIf(GundamGlobals::isDebug()) << "Dataset \"" << _parameters_.name << "\" will be defined with histogram data." << std::endl;
-    auto fromHistConfig( GenericToolbox::Json::fetchValue<JsonType>(_config_, "fromHistContent") );
+    auto fromHistConfig( _config_.fetchValue<JsonType>("fromHistContent") );
 
     _parameters_.fromHistContent.isEnabled = true;
     _parameters_.fromHistContent.rootFilePath = GenericToolbox::Json::fetchValue<std::string>(fromHistConfig, "fromRootFile");
@@ -93,8 +60,8 @@ void DataDispenser::configureImpl(){
   // nested
   // load transformations
   int index{0};
-  for( auto& varTransform : GenericToolbox::Json::fetchValue(_config_, "variablesTransform", std::vector<JsonType>()) ){
-    _parameters_.eventVarTransformList.emplace_back( varTransform );
+  for( auto& varTransform : _config_.fetchValue("variablesTransform", std::vector<JsonType>()) ){
+    _parameters_.eventVarTransformList.emplace_back( ConfigUtils::ConfigReader(varTransform) );
     _parameters_.eventVarTransformList.back().setIndex(index++);
     _parameters_.eventVarTransformList.back().configure();
     if( not _parameters_.eventVarTransformList.back().isEnabled() ){
@@ -104,26 +71,26 @@ void DataDispenser::configureImpl(){
   }
 
   _parameters_.variableDict.clear();
-  for( auto& entry : GenericToolbox::Json::fetchValue(_config_, {{"variableDict"}, {"overrideLeafDict"}}, JsonType()) ){
+  for( auto& entry : _config_.fetchValue({{"variableDict"}, {"overrideLeafDict"}}, JsonType()) ){
     auto varName = GenericToolbox::Json::fetchValue<std::string>(entry, {{"name"}, {"eventVar"}});
     auto varExpr = GenericToolbox::Json::fetchValue<std::string>(entry, {{"expr"}, {"expression"}, {"leafVar"}});
     _parameters_.variableDict[ varName ] = varExpr;
   }
 
-  GenericToolbox::Json::fillValue(_config_, _parameters_.eventVariableAsWeight, "eventVariableAsWeight");
+  _config_.fillValue(_parameters_.eventVariableAsWeight, "eventVariableAsWeight");
 
   // options
-  GenericToolbox::Json::fillValue(_config_, _parameters_.globalTreePath, "tree");
-  GenericToolbox::Json::fillValue(_config_, _parameters_.filePathList, "filePathList");
-  GenericToolbox::Json::fillValue(_config_, _parameters_.additionalVarsStorage, {{"additionalLeavesStorage"}, {"additionalVarsStorage"}});
-  GenericToolbox::Json::fillValue(_config_, _parameters_.dummyVariablesList, "dummyVariablesList");
-  GenericToolbox::Json::fillValue(_config_, _parameters_.useReweightEngine, {{"useReweightEngine"}, {"useMcContainer"}});
-  GenericToolbox::Json::fillValue(_config_, _parameters_.debugNbMaxEventsToLoad, "debugNbMaxEventsToLoad");
-  GenericToolbox::Json::fillValue(_config_, _parameters_.dialIndexFormula, "dialIndexFormula");
-  GenericToolbox::Json::fillValue(_config_, _parameters_.overridePropagatorConfig, "overridePropagatorConfig");
+  _config_.fillValue(_parameters_.globalTreePath, "tree");
+  _config_.fillValue(_parameters_.filePathList, "filePathList");
+  _config_.fillValue(_parameters_.additionalVarsStorage, {{"additionalLeavesStorage"}, {"additionalVarsStorage"}});
+  _config_.fillValue(_parameters_.dummyVariablesList, "dummyVariablesList");
+  _config_.fillValue(_parameters_.useReweightEngine, {{"useReweightEngine"}, {"useMcContainer"}});
+  _config_.fillValue(_parameters_.debugNbMaxEventsToLoad, "debugNbMaxEventsToLoad");
+  _config_.fillValue(_parameters_.dialIndexFormula, "dialIndexFormula");
+  _config_.fillValue(_parameters_.overridePropagatorConfig, "overridePropagatorConfig");
 
-  GenericToolbox::Json::fillFormula(_config_, _parameters_.selectionCutFormulaStr, "selectionCutFormula", "&&");
-  GenericToolbox::Json::fillFormula(_config_, _parameters_.nominalWeightFormulaStr, "nominalWeightFormula", "*");
+  _config_.fillFormula(_parameters_.selectionCutFormulaStr, "selectionCutFormula", "&&");
+  _config_.fillFormula(_parameters_.nominalWeightFormulaStr, "nominalWeightFormula", "*");
 
 }
 void DataDispenser::initializeImpl(){
@@ -158,9 +125,9 @@ void DataDispenser::load(Propagator& propagator_){
 
   if( not _parameters_.overridePropagatorConfig.empty() ){
     LogWarning << "Reload the propagator config with override options" << std::endl;
-    ConfigUtils::ConfigHandler configHandler( _cache_.propagatorPtr->getConfig() );
+    ConfigUtils::ConfigBuilder configHandler( _cache_.propagatorPtr->getConfig().getConfig() );
     configHandler.override( _parameters_.overridePropagatorConfig );
-    _cache_.propagatorPtr->configure( configHandler.getConfig() );
+    _cache_.propagatorPtr->configure( ConfigUtils::ConfigReader(configHandler.getConfig()) );
     _cache_.propagatorPtr->initialize();
   }
 

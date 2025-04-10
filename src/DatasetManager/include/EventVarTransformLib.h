@@ -11,7 +11,7 @@ class EventVarTransformLib : public EventVarTransform {
 
 public:
   EventVarTransformLib() = default;
-  explicit EventVarTransformLib(const JsonType& config_){ this->configure(config_); }
+  explicit EventVarTransformLib(const ConfigUtils::ConfigReader& config_){ this->configure(config_); }
 
   void reload();
 

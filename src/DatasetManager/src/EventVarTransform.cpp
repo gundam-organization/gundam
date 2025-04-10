@@ -9,11 +9,11 @@
 
 
 void EventVarTransform::configureImpl(){
-  GenericToolbox::Json::fillValue(_config_, _name_, {{"name"}, {"title"}});
-  GenericToolbox::Json::fillValue(_config_, _isEnabled_, "isEnabled");
-  GenericToolbox::Json::fillValue(_config_, _messageOnError_, "messageOnError");
-  GenericToolbox::Json::fillValue(_config_, _outputVariableName_, "outputVariableName");
-  GenericToolbox::Json::fillValue(_config_, _inputFormulaStrList_, "inputList");
+  _config_.fillValue(_name_, {{"name"}, {"title"}});
+  _config_.fillValue(_isEnabled_, "isEnabled");
+  _config_.fillValue(_messageOnError_, "messageOnError");
+  _config_.fillValue(_outputVariableName_, "outputVariableName");
+  _config_.fillValue(_inputFormulaStrList_, "inputList");
 }
 void EventVarTransform::initializeImpl(){
   LogInfo << "Loading variable transformation: " << _name_ << std::endl;
@@ -21,7 +21,7 @@ void EventVarTransform::initializeImpl(){
 }
 
 
-EventVarTransform::EventVarTransform(const JsonType& config_){ this->configure(config_); }
+EventVarTransform::EventVarTransform(const ConfigUtils::ConfigReader& config_){ this->configure(config_); }
 
 const std::vector<std::string>& EventVarTransform::fetchRequestedVars() const {
   if( _requestedLeavesForEvalCache_.empty() ){

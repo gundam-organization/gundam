@@ -227,6 +227,12 @@ namespace ConfigUtils {
     this->fillValue(subConfig, keyPathList_);
     return ConfigReader(subConfig);
   }
+  void ConfigReader::fillFormula(std::string& formulaToFill_, const std::string& keyPath_, const std::string& joinStr_) const{
+    if( not hasKey(keyPath_) ){ return; }
+    // tag the found option
+    GenericToolbox::addIfNotInVector(keyPath_, _usedKeyList_);
+    formulaToFill_ = GenericToolbox::Json::buildFormula(_config_, keyPath_, joinStr_, formulaToFill_);
+  }
   std::string ConfigReader::getUnusedOptionsMessage() const{
 
     std::stringstream ss;

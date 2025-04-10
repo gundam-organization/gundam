@@ -13,7 +13,7 @@
 
 void EventVarTransformLib::configureImpl(){
   this->EventVarTransform::configureImpl();
-  GenericToolbox::Json::fillValue(_config_, _libraryFile_, "libraryFile");
+  _config_.fillValue(_libraryFile_, "libraryFile");
 }
 void EventVarTransformLib::initializeImpl(){
   LogInfo << "Loading variable transformation: " << _name_ << std::endl;
