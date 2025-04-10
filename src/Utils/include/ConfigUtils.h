@@ -19,7 +19,8 @@ typedef GenericToolbox::Json::JsonType JsonType;
 // typedef GenericToolbox::Json::ConfigBaseClass JsonBaseClass;
 
 namespace ConfigUtils{ class ConfigReader; }
-typedef GenericToolbox::ConfigClass<ConfigUtils::ConfigReader> JsonBaseClass;
+typedef ConfigUtils::ConfigReader ConfigReader;
+typedef GenericToolbox::ConfigClass<ConfigReader> JsonBaseClass;
 
 
 namespace ConfigUtils {
@@ -76,6 +77,7 @@ namespace ConfigUtils {
 
     // setters
     void setConfig(const JsonType& config_){ _config_ = config_; }
+    void setParentPath(const std::string& parentPath_){ _parentPath_ = parentPath_; }
 
     // const getters
     [[nodiscard]] std::string toString() const{ return GenericToolbox::Json::toReadableString( _config_ ); }
@@ -87,9 +89,7 @@ namespace ConfigUtils {
     // read options
     [[nodiscard]] bool empty() const{ return _config_.empty(); }
     [[nodiscard]] bool hasKey(const std::string& keyPath_) const{ return GenericToolbox::Json::doKeyExist(_config_, keyPath_); }
-    ConfigReader fetchSubConfig(const std::vector<std::string>& keyPath_) const;
     void fillFormula(std::string& formulaToFill_, const std::string& keyPath_, const std::string& joinStr_) const;
-    ConfigReader fetchSubConfig(const std::string& keyPath_) const{ return fetchSubConfig( std::vector<std::string>({keyPath_}) ); }
     [[nodiscard]] std::string getUnusedOptionsMessage() const;
 
 
@@ -112,6 +112,7 @@ namespace ConfigUtils {
     friend std::ostream& operator <<( std::ostream& o, const ConfigReader& this_ ){ o << this_.toString(); return o; }
 
   private:
+    std::string _parentPath_{"/"};
     JsonType _config_{};
 
     // keep track of fields that have been red
@@ -136,7 +137,7 @@ namespace ConfigUtils {
         if( hasBeenFound ){
           // check if the two values are matching
           if(out != temp){
-            LogError << "\"" << keyPath << "\" has a different value than \"" << _usedKeyList_[_usedKeyList_.size()-2] << "\"" << std::endl;
+            LogError << _parentPath_ << ":\"" << keyPath << "\" has a different value than \"" << _usedKeyList_[_usedKeyList_.size()-2] << "\"" << std::endl;
             LogError << this->toString() << std::endl;
             LogExit("Two config options with different values.");
           }
@@ -144,7 +145,7 @@ namespace ConfigUtils {
         else{
           if( keyPath != keyPathList_.front() ) {
             // printing the deprecation only if not already found -> could be an old option present for compatibility
-            LogAlert << "\"" << keyPath << "\" is a deprecated field name, use \"" << keyPathList_.front() << "\" instead." << std::endl;
+            LogAlert << _parentPath_ << ": \"" << keyPath << "\" is a deprecated field name, use \"" << keyPathList_.front() << "\" instead." << std::endl;
           }
 
           out = temp;
@@ -166,7 +167,9 @@ namespace ConfigUtils {
   }
   template<> inline ConfigReader ConfigReader::fetchValue<ConfigReader>(const std::vector<std::string>& keyPathList_) const{
     auto conf = fetchValue<JsonType>(keyPathList_);
-    return ConfigReader(conf);
+    auto out = ConfigReader(conf);
+    out.setParentPath(GenericToolbox::joinPath(_parentPath_, _usedKeyList_.back()));
+    return out;
   }
   template<typename F> bool ConfigReader::deprecatedAction(const std::vector<std::string>& keyPathList_, const F& action_) const {
     for( auto& keyPath : keyPathList_ ){ if( hasKey(keyPath) ){ action_( keyPath ); return true; } }

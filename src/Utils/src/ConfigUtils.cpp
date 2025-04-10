@@ -222,11 +222,6 @@ namespace ConfigUtils {
     LogInfo << "Unfolded config written as: " << outPath << std::endl;
   }
 
-  ConfigReader ConfigReader::fetchSubConfig(const std::vector<std::string>& keyPathList_) const{
-    JsonType subConfig;
-    this->fillValue(subConfig, keyPathList_);
-    return ConfigReader(subConfig);
-  }
   void ConfigReader::fillFormula(std::string& formulaToFill_, const std::string& keyPath_, const std::string& joinStr_) const{
     if( not hasKey(keyPath_) ){ return; }
     // tag the found option
