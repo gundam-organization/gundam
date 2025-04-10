@@ -163,6 +163,10 @@ namespace ConfigUtils {
 
     return out;
   }
+  template<> ConfigReader ConfigReader::fetchValue<ConfigReader>(const std::vector<std::string>& keyPathList_) const{
+    auto conf = fetchValue<JsonType>(keyPathList_);
+    return ConfigReader(conf);
+  }
   template<typename F> bool ConfigReader::deprecatedAction(const std::vector<std::string>& keyPathList_, const F& action_) const {
     for( auto& keyPath : keyPathList_ ){ if( hasKey(keyPath) ){ action_( keyPath ); return true; } }
     return false;

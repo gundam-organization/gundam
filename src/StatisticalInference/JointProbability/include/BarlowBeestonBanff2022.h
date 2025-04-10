@@ -59,13 +59,13 @@ namespace JointProbability{
 
   inline void BarlowBeestonBanff2022::configureImpl(){
 
-    GenericToolbox::Json::fillValue(_config_, allowZeroMcWhenZeroData, "allowZeroMcWhenZeroData");
-    GenericToolbox::Json::fillValue(_config_, usePoissonLikelihood, "usePoissonLikelihood");
-    GenericToolbox::Json::fillValue(_config_, BBNoUpdateWeights, "BBNoUpdateWeights");
-    GenericToolbox::Json::fillValue(_config_, fractionalErrorLimit, "fractionalErrorLimit");
-    GenericToolbox::Json::fillValue(_config_, expectedValueMinimum, "expectedValueMinimum");
-    GenericToolbox::Json::fillValue(_config_, verboseLevel, {{"verboseLevel"},{"isVerbose"}});
-    GenericToolbox::Json::fillValue(_config_, throwIfInfLlh, "throwIfInfLlh");
+    _config_.fillValue(allowZeroMcWhenZeroData, "allowZeroMcWhenZeroData");
+    _config_.fillValue(usePoissonLikelihood, "usePoissonLikelihood");
+    _config_.fillValue(BBNoUpdateWeights, "BBNoUpdateWeights");
+    _config_.fillValue(fractionalErrorLimit, "fractionalErrorLimit");
+    _config_.fillValue(expectedValueMinimum, "expectedValueMinimum");
+    _config_.fillValue(verboseLevel, {{"verboseLevel"},{"isVerbose"}});
+    _config_.fillValue(throwIfInfLlh, "throwIfInfLlh");
 
     // Place a hard limit on the fractional error to prevent numeric issues.
     if( fractionalErrorLimit > 1.0E+152 ){

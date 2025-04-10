@@ -21,11 +21,11 @@ void ParameterScanner::unmuteLogger(){ Logger::setIsMuted(false); }
 
 void ParameterScanner::configureImpl() {
 
-  GenericToolbox::Json::fillValue(_config_, _nbPoints_, "nbPoints");
-  GenericToolbox::Json::fillValue(_config_, _varsConfig_, "varsConfig");
-  GenericToolbox::Json::fillValue(_config_, _nbPointsLineScan_, "nbPointsLineScan");
-  GenericToolbox::Json::fillValue(_config_, _useParameterLimits_, "useParameterLimits");
-  GenericToolbox::Json::fillValue(_config_, _parameterSigmaRange_, "parameterSigmaRange");
+  _config_.fillValue(_nbPoints_, "nbPoints");
+  _config_.fillValue(_varsConfig_, "varsConfig");
+  _config_.fillValue(_nbPointsLineScan_, "nbPointsLineScan");
+  _config_.fillValue(_useParameterLimits_, "useParameterLimits");
+  _config_.fillValue(_parameterSigmaRange_, "parameterSigmaRange");
 
 }
 void ParameterScanner::initializeImpl() {
@@ -366,7 +366,7 @@ void ParameterScanner::generateOneSigmaPlots(TDirectory* saveDir_){
 
     if( not parSet.isEnabled() ) continue;
 
-    if( GenericToolbox::Json::fetchValue(parSet.getConfig(), "disableOneSigmaPlots", false) ){
+    if( parSet.getConfig().fetchValue("disableOneSigmaPlots", false) ){
       LogInfo << "+1σ plots disabled for \"" << parSet.getName() << "\"" << std::endl;
       continue;
     }
@@ -510,7 +510,7 @@ void ParameterScanner::varyEvenRates(const std::vector<double>& paramVariationLi
   for( auto& parSet : _likelihoodInterfacePtr_->getModelPropagator().getParametersManager().getParameterSetsList() ){
 
     if( not parSet.isEnabled() ) continue;
-    if( GenericToolbox::Json::fetchValue(parSet.getConfig(), "skipVariedEventRates", false) ){
+    if( parSet.getConfig().fetchValue("skipVariedEventRates", false) ){
       LogInfo << "Event rate variation skipped for \"" << parSet.getName() << "\"" << std::endl;
       continue;
     }
