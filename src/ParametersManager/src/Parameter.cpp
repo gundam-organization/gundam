@@ -106,14 +106,6 @@ double Parameter::getParameterValue() const {
   }
   return _parameterValue_;
 }
-void Parameter::setDialSetConfig(const JsonType &jsonConfig_) {
-  auto jsonConfig = jsonConfig_;
-  while( jsonConfig.is_string() ){
-    LogWarning << "Forwarding FitParameterSet config to: \"" << jsonConfig.get<std::string>() << "\"..." << std::endl;
-    jsonConfig = ConfigUtils::readConfigFile(jsonConfig.get<std::string>());
-  }
-  _dialDefinitionsList_ = jsonConfig.get<std::vector<JsonType>>();
-}
 
 void Parameter::setValueAtPrior(){
   setParameterValue(getPriorValue());

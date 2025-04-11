@@ -202,8 +202,8 @@ private:
   std::string _parameterLowerBoundsTVectorD_{};
   std::string _parameterUpperBoundsTVectorD_{};
   std::string _throwEnabledListPath_{};
-  JsonType _parameterDefinitionConfig_{};
-  JsonType _dialSetDefinitions_{};
+  ConfigReader _parameterDefinitionConfig_{};
+  ConfigReader _dialSetDefinitions_{};
 
   GenericToolbox::Range _globalParRange_{};
   GenericToolbox::Range _eigenParRange_{};
@@ -213,9 +213,9 @@ private:
 
   double _penaltyChi2Buffer_{std::nan("unset")};
 
-  std::vector<JsonType> _enableOnlyParameters_{};
-  std::vector<JsonType> _disableParameters_{};
-  std::vector<JsonType> _customParThrow_{};
+  std::vector<ConfigReader> _enableOnlyParameters_{};
+  std::vector<ConfigReader> _disableParameters_{};
+  std::vector<ConfigReader> _customParThrow_{};
 
   // Eigen objects
   int _nbEnabledEigen_{0};

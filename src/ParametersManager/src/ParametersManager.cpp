@@ -24,11 +24,11 @@ void ParametersManager::configureImpl(){
   _config_.fillValue(_reThrowParSetIfOutOfPhysical_, {{"reThrowParSetIfOutOfBounds"},{"reThrowParSetIfOutOfPhysical"}});
   _config_.fillValue(_parameterSetListConfig_, "parameterSetList");
 
-  LogDebugIf(GundamGlobals::isDebug()) << _parameterSetListConfig_.size() << " parameter sets are defined." << std::endl;
+  LogDebugIf(GundamGlobals::isDebug()) << _parameterSetListConfig_.getConfig().size() << " parameter sets are defined." << std::endl;
 
   _parameterSetList_.clear(); // make sure there nothing in case readConfig is called more than once
-  _parameterSetList_.reserve( _parameterSetListConfig_.size() );
-  for( const auto& parameterSetConfig : _parameterSetListConfig_ ){
+  _parameterSetList_.reserve( _parameterSetListConfig_.getConfig().size() );
+  for( const auto& parameterSetConfig : _parameterSetListConfig_.loop() ){
     _parameterSetList_.emplace_back();
     _parameterSetList_.back().configure( ConfigUtils::ConfigReader(parameterSetConfig) );
 

@@ -29,7 +29,7 @@ void Propagator::configureImpl(){
 
   _config_.deprecatedAction("parameterSetListConfig", [&]{
     LogAlert << R"("parameterSetListConfig" should now be set under "parametersManagerConfig/parameterSetList".)" << std::endl;
-    auto parameterSetListConfig = _config_.fetchValue<JsonType>("parameterSetListConfig");
+    auto parameterSetListConfig = _config_.fetchValue<ConfigReader>("parameterSetListConfig");
     _parManager_.setParameterSetListConfig( parameterSetListConfig );
   });
   _config_.deprecatedAction("throwToyParametersWithGlobalCov", [&]{

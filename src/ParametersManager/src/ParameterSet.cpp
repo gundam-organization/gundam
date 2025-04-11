@@ -42,8 +42,8 @@ void ParameterSet::configureImpl(){
 
   _config_.fillValue(_enablePca_, {{"enablePca"},{"allowPca"},{"fixGhostFitParameters"}});
   _config_.fillValue(_enabledThrowToyParameters_, {{"enableThrowToyParameters"},{"enabledThrowToyParameters"}});
-  _config_.fillValue(_customParThrow_, {{"customParThrow"},{"customFitParThrow"}});
   _config_.fillValue(_releaseFixedParametersOnHesse_, "releaseFixedParametersOnHesse");
+  _config_.fillValue(_customParThrow_, {{"customParThrow"},{"customFitParThrow"}});
 
   _config_.fillValue(_parameterDefinitionFilePath_, {{"parameterDefinitionFilePath"},{"covarianceMatrixFilePath"}});
   _config_.fillValue(_covarianceMatrixPath_, {{"covarianceMatrix"},{"covarianceMatrixTMatrixD"}});
@@ -87,16 +87,16 @@ void ParameterSet::configureImpl(){
     // looking for alternative/legacy definitions...
 
     if( not _dialSetDefinitions_.empty() ){
-      for( auto& dialSetDef : _dialSetDefinitions_ ){
+      for( auto& dialSetDef : _dialSetDefinitions_.loop() ){
 
-        JsonType parameterBinning;
-        GenericToolbox::Json::fillValue(dialSetDef, parameterBinning, {{"binning"}, {"parametersBinningPath"}});
+        ConfigReader parameterBinning;
+        dialSetDef.fillValue(parameterBinning, {{"binning"}, {"parametersBinningPath"}});
 
         if( parameterBinning.empty() ){ continue;}
 
         LogInfo << "Found parameter binning within dialSetDefinition. Defining parameters number..." << std::endl;
         BinSet b;
-        b.configure( ConfigUtils::ConfigReader(parameterBinning) );
+        b.configure( parameterBinning );
         // DON'T SORT THE BINNING -> tide to the cov matrix
         _nbParameterDefinition_ = int(b.getBinList().size());
 
@@ -108,7 +108,7 @@ void ParameterSet::configureImpl(){
 
     if( _nbParameterDefinition_ == -1 and not _parameterDefinitionConfig_.empty() ){
       LogDebugIf(GundamGlobals::isDebug()) << "Using parameter definition config list to determine the number of parameters..." << std::endl;
-      _nbParameterDefinition_ = int(_parameterDefinitionConfig_.get<std::vector<JsonType>>().size());
+      _nbParameterDefinition_ = int(_parameterDefinitionConfig_.getConfig().size());
     }
 
     LogExitIf(_nbParameterDefinition_==-1, "Could not figure out the number of parameters to be defined for the set: " << _name_ );
@@ -1019,8 +1019,8 @@ void ParameterSet::defineParameters(){
     if( not _enableOnlyParameters_.empty() ){
       bool isEnabled = false;
       for( auto& enableEntry : _enableOnlyParameters_ ){
-        if( GenericToolbox::Json::doKeyExist(enableEntry, "name")
-            and par.getName() == GenericToolbox::Json::fetchValue<std::string>(enableEntry, "name") ){
+        if( enableEntry.hasKey("name")
+            and par.getName() == enableEntry.fetchValue<std::string>("name") ){
           isEnabled = true;
           break;
         }
@@ -1037,8 +1037,8 @@ void ParameterSet::defineParameters(){
     if( not _disableParameters_.empty() ){
       bool isEnabled = true;
       for( auto& disableEntry : _disableParameters_ ){
-        if( GenericToolbox::Json::doKeyExist(disableEntry, "name")
-            and par.getName() == GenericToolbox::Json::fetchValue<std::string>(disableEntry, "name") ){
+        if( disableEntry.hasKey("name")
+            and par.getName() == disableEntry.fetchValue<std::string>("name") ){
           isEnabled = false;
           break;
         }
@@ -1070,24 +1070,36 @@ void ParameterSet::defineParameters(){
       if (_parameterNamesList_ != nullptr) {
         // Find the parameter using the name from the vector of names for
         // the covariance.
-        auto parConfig = GenericToolbox::Json::fetchMatchingEntry(_parameterDefinitionConfig_, "name", std::string(_parameterNamesList_->At(par.getParameterIndex())->GetName()));
-        if( parConfig.empty() ) parConfig = GenericToolbox::Json::fetchMatchingEntry(_parameterDefinitionConfig_, "parameterName", std::string(_parameterNamesList_->At(par.getParameterIndex())->GetName()));
-        if( parConfig.empty() ){
-            // try with par index
-          parConfig = GenericToolbox::Json::fetchMatchingEntry(_parameterDefinitionConfig_, "parameterIndex", par.getParameterIndex());
+
+        ConfigReader selectedParConfig;
+
+        // search with name
+        std::string parName = _parameterNamesList_->At(par.getParameterIndex())->GetName();
+        for( auto& parConfig : _parameterDefinitionConfig_.loop() ){
+          std::string name = parConfig.fetchValue({{"name"}, {"parameterName"}}, std::string());
+          if( parName == name ){ selectedParConfig = parConfig; break; }
         }
-        par.setConfig( ConfigUtils::ConfigReader(parConfig) );
+
+        // not found? try with the index
+        if( selectedParConfig.empty() ) {
+          for( auto& parConfig : _parameterDefinitionConfig_.loop() ){
+            int idx = parConfig.fetchValue("parameterIndex", int());
+            if( idx == par.getParameterIndex() ){ selectedParConfig = parConfig; break; }
+          }
+        }
+
+        par.setConfig( selectedParConfig );
       }
       else {
         // No covariance provided, so find the name based on the order in
         // the parameter set.
-        auto configVector = _parameterDefinitionConfig_.get<std::vector<JsonType>>();
+        auto configVector = _parameterDefinitionConfig_.loop();
         LogThrowIf(configVector.size() <= par.getParameterIndex(),
                    "Parameter index out of range");
-        auto parConfig = configVector.at(par.getParameterIndex());
-        auto parName = GenericToolbox::Json::fetchValue<std::string>(parConfig, {{"parameterName"}, {"name"}});
+        auto& parConfig = configVector.at(par.getParameterIndex());
+        auto parName = parConfig.fetchValue<std::string>({{"parameterName"}, {"name"}});
         if (not parName.empty()) par.setName(parName);
-        par.setConfig( ConfigUtils::ConfigReader(parConfig) );
+        par.setConfig( parConfig );
         LogWarning << "Parameter #" << par.getParameterIndex()
                    << " (name \"" << par.getName() << "\")"
                    << " not defined by covariance matrix file"
@@ -1096,7 +1108,7 @@ void ParameterSet::defineParameters(){
     }
     else if( not _dialSetDefinitions_.empty() ){
       // Alternative 2: define dials then parameters
-      par.setDialSetConfig( _dialSetDefinitions_ );
+      par.setDialSetConfig( _dialSetDefinitions_.loop() );
     }
     par.configure();
   }
