@@ -49,13 +49,6 @@ void SampleSet::configureImpl(){
     LogThrowIf(iSample != _sampleList_.size(), "Can't reload config with different number of samples");
   }
 
-  if (sampleListConfig.size() < 1) {
-      LogError << "No sample sets defined" << std::endl;
-      LogError << "Must be defined under /fitterEngineConfig/likelihoodInterfaceConfig/propagatorConfig/sampleSetConfig"
-               << std::endl;
-      std::exit(1);
-  }
-
   LogDebugIf(GundamGlobals::isDebug()) << sampleListConfig.size() << " samples were defined." << std::endl;
 }
 void SampleSet::initializeImpl() {
