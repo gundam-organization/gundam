@@ -30,7 +30,7 @@ void ParametersManager::configureImpl(){
   _parameterSetList_.reserve( _parameterSetListConfig_.getConfig().size() );
   for( const auto& parameterSetConfig : _parameterSetListConfig_.loop() ){
     _parameterSetList_.emplace_back();
-    _parameterSetList_.back().configure( ConfigUtils::ConfigReader(parameterSetConfig) );
+    _parameterSetList_.back().configure( parameterSetConfig );
 
     // clear the parameter sets that have been disabled
     if( not _parameterSetList_.back().isEnabled() ){

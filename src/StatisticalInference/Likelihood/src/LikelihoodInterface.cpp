@@ -62,8 +62,8 @@ void LikelihoodInterface::configureImpl(){
   // defining datasets:
   _config_.fillValue(datasetListConfig, {{"dataSetList"}, {"datasetList"}});
   _datasetList_.reserve(datasetListConfig.getConfig().size() );
-  for( const auto& dataSetConfig : datasetListConfig.getConfig() ){
-    _datasetList_.emplace_back(ConfigUtils::ConfigReader(dataSetConfig), int(_datasetList_.size()));
+  for( const auto& dataSetConfig : datasetListConfig.loop() ){
+    _datasetList_.emplace_back(dataSetConfig, int(_datasetList_.size()));
   }
 
   // new config structure
@@ -71,7 +71,7 @@ void LikelihoodInterface::configureImpl(){
   jointProbabilityConfig.fillValue(jointProbabilityTypeStr, "type");
   LogDebugIf(GundamGlobals::isDebug()) << "Using \"" << jointProbabilityTypeStr << "\" JointProbabilityType." << std::endl;
   _jointProbabilityPtr_ = std::shared_ptr<JointProbability::JointProbabilityBase>( JointProbability::makeJointProbability( jointProbabilityTypeStr ) );
-  _jointProbabilityPtr_->configure( ConfigUtils::ConfigReader(jointProbabilityConfig) );
+  _jointProbabilityPtr_->configure( jointProbabilityConfig );
 
   // nested configurations
   _config_.fillValue(_plotGenerator_.getConfig(), "plotGeneratorConfig");

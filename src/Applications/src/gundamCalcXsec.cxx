@@ -486,7 +486,7 @@ int main(int argc, char** argv){
     xsecEntry.normList.reserve( normConfigList.size() );
     for( auto& normConfig : normConfigList ){
       xsecEntry.normList.emplace_back();
-      xsecEntry.normList.back().configure( ConfigUtils::ConfigReader(normConfig) );
+      xsecEntry.normList.back().configure( normConfig );
     }
 
     xsecEntry.histogram = TH1D(
