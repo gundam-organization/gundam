@@ -288,10 +288,10 @@ int main(int argc, char** argv){
       axisVariable = config_.fetchValue<std::string>("axisVariable");
 
       // optionals
-      for( auto& parSelConfig : config_.fetchValue("parSelections", JsonType()) ){
+      for( auto& parSelConfig : config_.loop("parSelections") ){
         parSelectionList.emplace_back();
-        GenericToolbox::Json::fillValue(parSelConfig, parSelectionList.back().name, "name");
-        GenericToolbox::Json::fillValue(parSelConfig, parSelectionList.back().value, "value");
+        parSelConfig.fillValue(parSelectionList.back().name, "name");
+        parSelConfig.fillValue(parSelectionList.back().value, "value");
       }
 
       // init
@@ -383,9 +383,9 @@ int main(int argc, char** argv){
   };
   std::vector<ParSetNormaliser> parSetNormList;
   for( auto& parSet : propagator.getParametersManager().getParameterSetsList() ){
-    for( auto& parSetNormConfig : parSet.getConfig().fetchValue("normalisations", JsonType()) ){
+    for( auto& parSetNormConfig : parSet.getConfig().loop("normalisations") ){
       parSetNormList.emplace_back();
-      parSetNormList.back().configure( ConfigUtils::ConfigReader(parSetNormConfig) );
+      parSetNormList.back().configure( parSetNormConfig );
 
       for( auto& dialCollection : propagator.getDialCollectionList() ){
         if( dialCollection.getSupervisedParameterSet() == &parSet ){
@@ -482,7 +482,7 @@ int main(int argc, char** argv){
         GenericToolbox::joinVectorString(leafNameList, ":").c_str()
     );
 
-    auto normConfigList = xsecEntry.config.fetchValue("normaliseParameterList", JsonType() );
+    auto normConfigList = xsecEntry.config.loop("normaliseParameterList");
     xsecEntry.normList.reserve( normConfigList.size() );
     for( auto& normConfig : normConfigList ){
       xsecEntry.normList.emplace_back();
@@ -514,9 +514,9 @@ int main(int argc, char** argv){
 
   bool enableEventMcThrow{true};
   bool enableStatThrowInToys{true};
-  auto xsecCalcConfig   = xsecConfig.fetchValue( "xsecCalcConfig", JsonType() );
-  enableStatThrowInToys = GenericToolbox::Json::fetchValue( xsecCalcConfig, "enableStatThrowInToys", enableStatThrowInToys);
-  enableEventMcThrow    = GenericToolbox::Json::fetchValue( xsecCalcConfig, "enableEventMcThrow", enableEventMcThrow);
+  auto xsecCalcConfig   = xsecConfig.fetchValue( "xsecCalcConfig", ConfigReader() );
+  enableStatThrowInToys = xsecCalcConfig.fetchValue("enableStatThrowInToys", enableStatThrowInToys);
+  enableEventMcThrow    = xsecCalcConfig.fetchValue("enableEventMcThrow", enableEventMcThrow);
 
   auto writeBinDataFct = std::function<void()>([&]{
     for( auto& xsec : crossSectionDataList ){

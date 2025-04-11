@@ -24,8 +24,8 @@ void LikelihoodInterface::configureImpl(){
   _config_.fillValue(_modelPropagator_.getConfig(), "propagatorConfig");
   _modelPropagator_.configure();
 
-  JsonType datasetListConfig{};
-  JsonType jointProbabilityConfig{};
+  ConfigReader datasetListConfig{};
+  ConfigReader jointProbabilityConfig{};
   std::string jointProbabilityTypeStr{"PoissonLLH"};
 
   // prior to this version a few parameters were set in the propagator itself
@@ -61,14 +61,14 @@ void LikelihoodInterface::configureImpl(){
 
   // defining datasets:
   _config_.fillValue(datasetListConfig, {{"dataSetList"}, {"datasetList"}});
-  _datasetList_.reserve(datasetListConfig.size() );
-  for( const auto& dataSetConfig : datasetListConfig ){
+  _datasetList_.reserve(datasetListConfig.getConfig().size() );
+  for( const auto& dataSetConfig : datasetListConfig.getConfig() ){
     _datasetList_.emplace_back(ConfigUtils::ConfigReader(dataSetConfig), int(_datasetList_.size()));
   }
 
   // new config structure
   _config_.fillValue(jointProbabilityConfig, "jointProbabilityConfig");
-  GenericToolbox::Json::fillValue(jointProbabilityConfig, jointProbabilityTypeStr, "type");
+  jointProbabilityConfig.fillValue(jointProbabilityTypeStr, "type");
   LogDebugIf(GundamGlobals::isDebug()) << "Using \"" << jointProbabilityTypeStr << "\" JointProbabilityType." << std::endl;
   _jointProbabilityPtr_ = std::shared_ptr<JointProbability::JointProbabilityBase>( JointProbability::makeJointProbability( jointProbabilityTypeStr ) );
   _jointProbabilityPtr_->configure( ConfigUtils::ConfigReader(jointProbabilityConfig) );

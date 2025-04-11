@@ -40,18 +40,17 @@ void DataDispenser::configureImpl(){
   // histograms don't need other parameters
   if( _config_.hasKey("fromHistContent" ) ) {
     LogDebugIf(GundamGlobals::isDebug()) << "Dataset \"" << _parameters_.name << "\" will be defined with histogram data." << std::endl;
-    auto fromHistConfig( _config_.fetchValue<JsonType>("fromHistContent") );
+    auto fromHistConfig( _config_.fetchValue<ConfigReader>("fromHistContent") );
 
     _parameters_.fromHistContent.isEnabled = true;
-    _parameters_.fromHistContent.rootFilePath = GenericToolbox::Json::fetchValue<std::string>(fromHistConfig, "fromRootFile");
+    _parameters_.fromHistContent.rootFilePath = fromHistConfig.fetchValue<std::string>("fromRootFile");
 
-    auto sampleListConfig(GenericToolbox::Json::fetchValue<std::vector<JsonType>>(fromHistConfig, "sampleList"));
+    auto sampleListConfig(fromHistConfig.loop("sampleList"));
     _parameters_.fromHistContent.sampleHistList.reserve(sampleListConfig.size());
     for( auto& sampleConfig : sampleListConfig ){
-
-      auto& sampleHist = _parameters_.fromHistContent.addSampleHist(GenericToolbox::Json::fetchValue<std::string>(sampleConfig, "name"));
-      GenericToolbox::Json::fillValue(sampleConfig, sampleHist.hist, "hist");
-      GenericToolbox::Json::fillValue(sampleConfig, sampleHist.axisList, {{"axisList"},{"axis"}});
+      auto& sampleHist = _parameters_.fromHistContent.addSampleHist(sampleConfig.fetchValue<std::string>("name"));
+      sampleConfig.fillValue(sampleHist.hist, "hist");
+      sampleConfig.fillValue(sampleHist.axisList, {{"axisList"},{"axis"}});
     }
 
     return;
@@ -60,8 +59,8 @@ void DataDispenser::configureImpl(){
   // nested
   // load transformations
   int index{0};
-  for( auto& varTransform : _config_.fetchValue("variablesTransform", std::vector<JsonType>()) ){
-    _parameters_.eventVarTransformList.emplace_back( ConfigUtils::ConfigReader(varTransform) );
+  for( auto& varTransform : _config_.loop("variablesTransform") ){
+    _parameters_.eventVarTransformList.emplace_back( varTransform );
     _parameters_.eventVarTransformList.back().setIndex(index++);
     _parameters_.eventVarTransformList.back().configure();
     if( not _parameters_.eventVarTransformList.back().isEnabled() ){
@@ -71,9 +70,9 @@ void DataDispenser::configureImpl(){
   }
 
   _parameters_.variableDict.clear();
-  for( auto& entry : _config_.fetchValue({{"variableDict"}, {"overrideLeafDict"}}, JsonType()) ){
-    auto varName = GenericToolbox::Json::fetchValue<std::string>(entry, {{"name"}, {"eventVar"}});
-    auto varExpr = GenericToolbox::Json::fetchValue<std::string>(entry, {{"expr"}, {"expression"}, {"leafVar"}});
+  for( auto& entry : _config_.loop({{"variableDict"}, {"overrideLeafDict"}}) ){
+    auto varName = entry.fetchValue<std::string>({{"name"}, {"eventVar"}});
+    auto varExpr = entry.fetchValue<std::string>({{"expr"}, {"expression"}, {"leafVar"}});
     _parameters_.variableDict[ varName ] = varExpr;
   }
 

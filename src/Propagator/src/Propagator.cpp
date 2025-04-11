@@ -24,7 +24,8 @@ void Propagator::unmuteLogger(){ Logger::setIsMuted( false ); }
 void Propagator::configureImpl(){
 
   // nested objects
-  _sampleSet_.configure( _config_.fetchSubConfig({{"sampleSetConfig"}, {"fitSampleSetConfig"}}) );
+  _config_.fillValue(_sampleSet_.getConfig(), {{"sampleSetConfig"}, {"fitSampleSetConfig"}});
+  _sampleSet_.configure();
 
   _config_.deprecatedAction("parameterSetListConfig", [&]{
     LogAlert << R"("parameterSetListConfig" should now be set under "parametersManagerConfig/parameterSetList".)" << std::endl;
@@ -35,7 +36,8 @@ void Propagator::configureImpl(){
     LogAlert << "Forwarding the option to ParametersManager. Consider moving it into \"parametersManagerConfig:\"" << std::endl;
     _parManager_.setThrowToyParametersWithGlobalCov(_config_.fetchValue<bool>("throwToyParametersWithGlobalCov"));
   });
-  _parManager_.configure( _config_.fetchSubConfig("parametersManagerConfig") );
+  _config_.fillValue(_parManager_.getConfig(), "parametersManagerConfig");
+  _parManager_.configure();
 
   _dialManager_.setParametersManager(&_parManager_);
   _dialManager_.configure();

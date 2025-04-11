@@ -259,7 +259,7 @@ void BinSet::readBinningConfig( const ConfigUtils::ConfigReader& binning_){
 
   if( binning_.hasKey("binningDefinition") ){
 
-    auto binningDefinition = binning_.fetchValue<JsonType>("binningDefinition");
+    auto binningDefinition = binning_.fetchValue<ConfigReader>("binningDefinition");
     struct Dimension{
       int nBins{0};
       int nModulo{1};
@@ -268,9 +268,9 @@ void BinSet::readBinningConfig( const ConfigUtils::ConfigReader& binning_){
       std::vector<double> edgesList{};
     };
     std::vector<Dimension> dimensionList{};
-    dimensionList.reserve( binningDefinition.size() );
+    dimensionList.reserve( binningDefinition.getConfig().size() );
 
-    for( auto& binDefEntry : binningDefinition ){
+    for( auto& binDefEntry : binningDefinition.getConfig() ){
       dimensionList.emplace_back();
       auto& dim = dimensionList.back();
 

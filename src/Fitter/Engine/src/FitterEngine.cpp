@@ -25,27 +25,22 @@
 void FitterEngine::configureImpl(){
   LogInfo << "Reading FitterEngine config..." << std::endl;
   GenericToolbox::setT2kPalette();
-  
-  // need to determine the type before defining the minimizer
-  JsonType minimizerConfig{};
-  std::string minimizerTypeStr{"RootMinimizer"};
 
-  // legacy configs:
-  _config_.deprecatedAction("mcmcConfig", [&]{
-    LogAlert << "mcmcConfig should now be set as minimizerConfig" << std::endl;
-    _config_.fillValue(minimizerConfig, "mcmcConfig");
-  });
+  // setting up the minimizer
+  ConfigReader minimizerConfig{};
+  _config_.fillValue(minimizerConfig, {{"minimizerConfig"}, {"mcmcConfig"}});
+
+  std::string minimizerTypeStr{"RootMinimizer"};
   _config_.deprecatedAction("engineType", [&]{
-    LogAlert << R"("engineType" should set using "minimizerConfig/type")" << std::endl;
+    LogAlert << _config_.getParentPath() << R"(:"engineType" should set using "minimizerConfig/type")" << std::endl;
     _config_.fillValue(minimizerTypeStr, "engineType");
 
     // handle deprecated types
     if     ( minimizerTypeStr == "minimizer" ){ minimizerTypeStr = "RootMinimizer"; }
     else if( minimizerTypeStr == "mcmc" )     { minimizerTypeStr = "SimpleMCMC"; }
   });
+  minimizerConfig.fillValue(minimizerTypeStr, "type");
 
-  _config_.fillValue(minimizerConfig, "minimizerConfig");
-  GenericToolbox::Json::fillValue(minimizerConfig, minimizerTypeStr, "type");
   _minimizerType_ = MinimizerType::toEnum( minimizerTypeStr, true );
   switch( _minimizerType_.value ){
     case MinimizerType::RootMinimizer:
@@ -60,15 +55,15 @@ void FitterEngine::configureImpl(){
 
   // now the minimizer is created, forward deprecated options
   _config_.deprecatedAction("monitorRefreshRateInMs", [&]{
-    LogAlert << "Forwarding the option to Propagator. Consider moving it into \"minimizerConfig:\"" << std::endl;
+    LogAlert << _config_.getParentPath() << R"(:"monitorRefreshRateInMs" should now be set within "/fitterEngineConfig/minimizerConfig".)" << std::endl;
     _minimizer_->getMonitor().convergenceMonitor.setMaxRefreshRateInMs(_config_.fetchValue<int>("monitorRefreshRateInMs"));
   });
-  _minimizer_->configure( ConfigUtils::ConfigReader(minimizerConfig) );
+  _minimizer_->configure( minimizerConfig );
 
   _config_.deprecatedAction("propagatorConfig", [&]{
-    LogAlert << R"("propagatorConfig" should now be set within "likelihoodInterfaceConfig".)" << std::endl;
+    LogAlert << _config_.getParentPath() << R"(:"propagatorConfig" should now be set within "/fitterEngineConfig/likelihoodInterfaceConfig".)" << std::endl;
     // reading the config already since nested objects need to be filled up for handling further deprecation
-    getLikelihoodInterface().getModelPropagator().setConfig( _config_.fetchValue<ConfigUtils::ConfigReader>("propagatorConfig") );
+    getLikelihoodInterface().getModelPropagator().setConfig( _config_.fetchValue<ConfigReader>("propagatorConfig") );
   });
   _config_.fillValue(_likelihoodInterface_.getConfig(), "likelihoodInterfaceConfig");
   _likelihoodInterface_.configure();

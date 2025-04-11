@@ -248,5 +248,17 @@ namespace ConfigUtils {
 
     return ss.str();
   }
+  std::vector<ConfigReader> ConfigReader::loop() const {
+    std::vector<ConfigReader> out;
+    out.reserve( _config_.size() );
+    for( auto& entry : _config_ ) {
+      out.emplace_back(entry);
+      out.back().setParentPath(GenericToolbox::joinPath(_parentPath_, out.size()-1));
+    }
+    return out;
+  }
+  std::vector<ConfigReader> ConfigReader::loop(const std::vector<std::string>& keyPathList_) const{
+    return fetchValue(keyPathList_, ConfigReader()).loop();
+  }
 
 }

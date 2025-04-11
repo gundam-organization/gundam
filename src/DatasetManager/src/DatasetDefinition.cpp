@@ -24,24 +24,25 @@ void DatasetDefinition::configureImpl() {
   _modelDispenser_ = DataDispenser(this);
   _modelDispenser_.getParameters().name = "Asimov";
   _modelDispenser_.getParameters().useReweightEngine = true;
-  _modelDispenser_.configure(_config_.fetchSubConfig({{"model"},{"mc"}}));
+  _config_.fillValue(_modelDispenser_.getConfig(), {{"model"},{"mc"}});
+  _modelDispenser_.configure();
 
   // Always put the Asimov as a data entry
   _dataDispenserDict_.emplace("Asimov", DataDispenser(_modelDispenser_));
 
-  for( auto& dataEntry : _config_.fetchValue("data", JsonType()) ){
-    auto name = GenericToolbox::Json::fetchValue<std::string>(dataEntry, "name");
+  for( auto& dataEntry : _config_.loop("data") ){
+    auto name = dataEntry.fetchValue<std::string>("name");
     LogThrowIf( GenericToolbox::isIn(name, _dataDispenserDict_), "\"" << name << "\" already taken, please use another name." )
 
     _dataDispenserDict_.emplace(name, DataDispenser(this));
     _dataDispenserDict_.at(name).getParameters().isData = true;
 
-    if( GenericToolbox::Json::fetchValue(dataEntry, "fromMc", bool(false)) ){
+    if( dataEntry.fetchValue("fromMc", false) ){
       _dataDispenserDict_.at(name).setConfig( _modelDispenser_.getConfig() );
     }
 
     // use override
-    GenericToolbox::Json::applyOverrides( _dataDispenserDict_.at(name).getConfig().getConfig(), dataEntry );
+    GenericToolbox::Json::applyOverrides( _dataDispenserDict_.at(name).getConfig().getConfig(), dataEntry.getConfig() );
     _dataDispenserDict_.at(name).configure();
   }
 

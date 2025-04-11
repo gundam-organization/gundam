@@ -33,47 +33,47 @@ void PlotGenerator::configureImpl(){
   if( not _isEnabled_ ){ return; }
 
   // nested first
-  for( auto& varDictConfig : _config_.fetchValue({{"varDictionaries"}, {"varDictionnaries"}}, JsonType())){
+  for( auto& varDictConfig : _config_.loop({{"varDictionaries"}, {"varDictionnaries"}})){
     _varDictionaryList_.emplace_back(); auto& varDict = _varDictionaryList_.back();
-    GenericToolbox::Json::fillValue(varDictConfig, varDict.name, "name");
+    varDictConfig.fillValue(varDict.name, "name");
 
-    for( auto& dictEntryConfig : GenericToolbox::Json::fetchValue(varDictConfig, "dictionary", JsonType())){
+    for( auto& dictEntryConfig : varDictConfig.loop("dictionary")){
       varDict.dictEntryList.emplace_back(); auto& dictEntry = varDict.dictEntryList.back();
-      GenericToolbox::Json::fillValue(dictEntryConfig, dictEntry.value, "value");
-      GenericToolbox::Json::fillValue(dictEntryConfig, dictEntry.title, "title");
-      GenericToolbox::Json::fillValue(dictEntryConfig, dictEntry.fillStyle, "fillStyle");
-      GenericToolbox::Json::fillValue(dictEntryConfig, dictEntry.color, {{"colorRoot"},{"color"}});
-      if( GenericToolbox::Json::doKeyExist(dictEntryConfig, "colorHex") ){
+      dictEntryConfig.fillValue(dictEntry.value, "value");
+      dictEntryConfig.fillValue(dictEntry.title, "title");
+      dictEntryConfig.fillValue(dictEntry.fillStyle, "fillStyle");
+      dictEntryConfig.fillValue(dictEntry.color, {{"colorRoot"},{"color"}});
+      if( dictEntryConfig.hasKey("colorHex") ){
         TColor::SetColorThreshold(0.1); // will fetch the closest color
-        dictEntry.color = short( TColor::GetColor( GenericToolbox::Json::fetchValue<std::string>(dictEntryConfig, "colorHex").c_str() ) );
+        dictEntry.color = short( TColor::GetColor( dictEntryConfig.fetchValue<std::string>("colorHex").c_str() ) );
       }
     }
   }
 
-  for( auto& histDefConfig : _config_.fetchValue("histogramsDefinition", JsonType()) ){
-    if( not GenericToolbox::Json::fetchValue(histDefConfig, "isEnabled", true) ){ continue; }
+  for( auto& histDefConfig : _config_.loop("histogramsDefinition") ){
+    if( not histDefConfig.fetchValue("isEnabled", true) ){ continue; }
     _histDefList_.emplace_back(); auto& histDef = _histDefList_.back();
 
-    GenericToolbox::Json::fillValue(histDefConfig, histDef.noData, "noData");
-    GenericToolbox::Json::fillValue(histDefConfig, histDef.useSampleBinning, "useSampleBinning");
-    GenericToolbox::Json::fillValue(histDefConfig, histDef.rescaleAsBinWidth, "rescaleAsBinWidth");
-    GenericToolbox::Json::fillValue(histDefConfig, histDef.rescaleBinFactor, "rescaleBinFactor");
-    GenericToolbox::Json::fillValue(histDefConfig, histDef.xMin, "xMin");
-    GenericToolbox::Json::fillValue(histDefConfig, histDef.xMax, "xMax");
-    GenericToolbox::Json::fillValue(histDefConfig, histDef.prefix, "prefix");
-    GenericToolbox::Json::fillValue(histDefConfig, histDef.varToPlot, "varToPlot");
-    GenericToolbox::Json::fillValue(histDefConfig, histDef.yTitle, "yTitle");
-    GenericToolbox::Json::fillValue(histDefConfig, histDef.splitVarList, {{"splitVarList"}, {"splitVars"}});
-    GenericToolbox::Json::fillValue(histDefConfig, histDef.sampleVariableIfNotAvailable, "sampleVariableIfNotAvailable");
+    histDefConfig.fillValue(histDef.noData, "noData");
+    histDefConfig.fillValue(histDef.useSampleBinning, "useSampleBinning");
+    histDefConfig.fillValue(histDef.rescaleAsBinWidth, "rescaleAsBinWidth");
+    histDefConfig.fillValue(histDef.rescaleBinFactor, "rescaleBinFactor");
+    histDefConfig.fillValue(histDef.xMin, "xMin");
+    histDefConfig.fillValue(histDef.xMax, "xMax");
+    histDefConfig.fillValue(histDef.prefix, "prefix");
+    histDefConfig.fillValue(histDef.varToPlot, "varToPlot");
+    histDefConfig.fillValue(histDef.yTitle, "yTitle");
+    histDefConfig.fillValue(histDef.splitVarList, {{"splitVarList"}, {"splitVars"}});
+    histDefConfig.fillValue(histDef.sampleVariableIfNotAvailable, "sampleVariableIfNotAvailable");
 
     histDef.xTitle = histDef.varToPlot;
     histDef.useSampleBinningOfVar = histDef.varToPlot;
 
-    GenericToolbox::Json::fillValue(histDefConfig, histDef.xTitle, "xTitle");
-    GenericToolbox::Json::fillValue(histDefConfig, histDef.useSampleBinningOfVar, {{"useSampleBinningOfVar"}, {"useSampleBinningOfObservable"}});
+    histDefConfig.fillValue(histDef.xTitle, "xTitle");
+    histDefConfig.fillValue(histDef.useSampleBinningOfVar, {{"useSampleBinningOfVar"}, {"useSampleBinningOfObservable"}});
 
-    auto binning = GenericToolbox::Json::fetchValue(histDefConfig, {{"binning"}, {"binningFile"}}, JsonType());
-    if( not binning.empty() ){ histDef.binning.configure( ConfigUtils::ConfigReader(binning) ); }
+    auto binning = histDefConfig.fetchValue({{"binning"}, {"binningFile"}}, ConfigReader());
+    if( not binning.empty() ){ histDef.binning.configure( binning ); }
 
     GenericToolbox::addIfNotInVector("", histDef.splitVarList);
   }

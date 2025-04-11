@@ -60,9 +60,9 @@ std::string Bin::Edges::getSummary(bool shallow_) const {
 // configure
 void Bin::configureImpl(){
 
-  for( auto& edgeConfig : _config_.fetchValue("edgesList", JsonType()) ){
+  for( auto& edgeConfig : _config_.loop("edgesList") ){
     _binEdgesList_.emplace_back( _binEdgesList_.size() );
-    _binEdgesList_.back().configure( ConfigUtils::ConfigReader(edgeConfig) );
+    _binEdgesList_.back().configure( edgeConfig );
   }
 
 }

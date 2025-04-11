@@ -80,8 +80,8 @@ namespace ConfigUtils {
     void setParentPath(const std::string& parentPath_){ _parentPath_ = parentPath_; }
 
     // const getters
-    [[nodiscard]] std::string toString() const{ return GenericToolbox::Json::toReadableString( _config_ ); }
     [[nodiscard]] const JsonType &getConfig() const{ return _config_; }
+    [[nodiscard]] const std::string& getParentPath() const{ return _parentPath_; }
 
     // mutable getters
     JsonType &getConfig(){ return _config_; }
@@ -89,8 +89,14 @@ namespace ConfigUtils {
     // read options
     [[nodiscard]] bool empty() const{ return _config_.empty(); }
     [[nodiscard]] bool hasKey(const std::string& keyPath_) const{ return GenericToolbox::Json::doKeyExist(_config_, keyPath_); }
+    [[nodiscard]] std::string toString() const{ return GenericToolbox::Json::toReadableString( _config_ ); }
     void fillFormula(std::string& formulaToFill_, const std::string& keyPath_, const std::string& joinStr_) const;
     [[nodiscard]] std::string getUnusedOptionsMessage() const;
+
+    // for loops
+    std::vector<ConfigReader> loop() const;
+    std::vector<ConfigReader> loop(const std::vector<std::string>& keyPathList_) const;
+    std::vector<ConfigReader> loop(const std::string& keyPath_) const{ return loop(std::vector<std::string>({keyPath_})); }
 
 
     // templates
@@ -113,7 +119,7 @@ namespace ConfigUtils {
 
   private:
     std::string _parentPath_{"/"};
-    JsonType _config_{};
+    JsonType _config_;
 
     // keep track of fields that have been red
     mutable std::vector<std::string> _usedKeyList_{};

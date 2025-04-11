@@ -12,7 +12,9 @@
 
 
 TabulatedDialFactory::TabulatedDialFactory(const ConfigUtils::ConfigReader& config_) {
-    auto tableConfig = config_.fetchSubConfig("tableConfig");
+
+    // mandatory
+    auto tableConfig = config_.fetchValue<ConfigReader>("tableConfig");
 
     // mandatory options
     _name_ =  tableConfig.fetchValue<std::string>("name");
