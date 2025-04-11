@@ -14,7 +14,7 @@
 
 void SampleSet::configureImpl(){
 
-  auto sampleListConfig = _config_.fetchValue({{"sampleList"}, {"fitSampleList"}}, JsonType());
+  auto sampleListConfig = _config_.loop({{"sampleList"}, {"fitSampleList"}});
   LogDebugIf(GundamGlobals::isDebug()) << sampleListConfig.size() << " samples defined in the config." << std::endl;
 
   if( _sampleList_.empty() ){
@@ -24,7 +24,7 @@ void SampleSet::configureImpl(){
     for( auto& sampleConfig : sampleListConfig ){
       _sampleList_.emplace_back();
       _sampleList_.back().setIndex( iSample++ );
-      _sampleList_.back().configure( ConfigUtils::ConfigReader(sampleConfig) );
+      _sampleList_.back().configure( sampleConfig );
 
       LogDebugIf(GundamGlobals::isDebug()) << "Defined sample: " << _sampleList_.back().getName() << std::endl;
 
@@ -40,17 +40,13 @@ void SampleSet::configureImpl(){
     // we want to read the config without removing the content of the samples
 
     // need to check how many samples are enabled. It should match the list.
-    size_t nSamples{0};
+    size_t iSample = 0;
     for(const auto & sampleConfig : sampleListConfig){
-      if( not GenericToolbox::Json::fetchValue(sampleConfig, "isEnabled", true) ) continue;
-      nSamples++;
+      if( not sampleConfig.fetchValue("isEnabled", true) ) continue;
+      if( iSample >= _sampleList_.size() ){ continue; }
+      _sampleList_[ iSample++ ].configure( sampleConfig ); // read the config again
     }
-    LogThrowIf(nSamples != _sampleList_.size(), "Can't reload config with different number of samples");
-
-    for( size_t iSample = 0 ; iSample < _sampleList_.size() ; iSample++ ){
-      if( not GenericToolbox::Json::fetchValue(sampleListConfig[iSample], "isEnabled", true) ) continue;
-      _sampleList_[ iSample ].configure( ConfigUtils::ConfigReader(sampleListConfig[iSample]) ); // read the config again
-    }
+    LogThrowIf(iSample != _sampleList_.size(), "Can't reload config with different number of samples");
   }
 
   if (sampleListConfig.size() < 1) {
