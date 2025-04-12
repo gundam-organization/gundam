@@ -252,7 +252,6 @@ namespace ConfigUtils {
     }
 
     if( not unusedKeyList.empty() ){
-
       LogAlert << _parentPath_ << ": " << unusedKeyList.size() << " were not used in the config reading. Are they backward compatibility options?" << std::endl;
       for( auto& unusedKey : unusedKeyList ){
         LogAlert << "  > \"" << unusedKey << "\" was not used." << std::endl;

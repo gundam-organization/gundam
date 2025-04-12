@@ -16,7 +16,6 @@ void EventVarTransform::configureImpl(){
   _config_.fillValue(_inputFormulaStrList_, "inputList");
 }
 void EventVarTransform::initializeImpl(){
-
   _config_.printUnusedKeys();
 
   LogInfo << "Loading variable transformation: " << _name_ << std::endl;

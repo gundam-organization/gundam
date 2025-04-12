@@ -548,7 +548,6 @@ void LikelihoodInterface::throwToyParameters(Propagator& propagator_){
 
   // reweighting the events accordingly
   propagator_.reweightEvents();
-
 }
 void LikelihoodInterface::throwStatErrors(Propagator& propagator_){
   LogInfo << "Throwing statistical error..." << std::endl;

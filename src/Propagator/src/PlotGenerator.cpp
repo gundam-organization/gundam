@@ -968,6 +968,5 @@ void PlotGenerator::buildEventBinCache( const std::vector<HistHolder *> &histPtr
   _threadPool_.setPostParallelJob("fillEventHistCache", shrinkAllocationsFct);
   _threadPool_.runJob("fillEventHistCache");
   _threadPool_.removeJob("fillEventHistCache");
-
 }
 

@@ -290,7 +290,6 @@ void MinimizerBase::printParameters(){
 
   LogWarning << std::endl << GenericToolbox::addUpDownBars("Summary of the fit parameters:") << std::endl;
   for( const auto& parSet : getModelPropagator().getParametersManager().getParameterSetsList() ){
-
     GenericToolbox::TablePrinter t;
     t.setColTitles({ {"Title"}, {"Starting"}, {"Prior"}, {"StdDev"}, {"Limits"}, {"Status"} });
 

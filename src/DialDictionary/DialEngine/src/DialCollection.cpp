@@ -1114,7 +1114,6 @@ bool DialCollection::makeDialShortCircuit(const std::vector<DialUtils::DialPoint
   return false;
 }
 std::unique_ptr<DialBase> DialCollection::makeGraphDial(const std::vector<DialUtils::DialPoint>& pointList_) const{
-
   if( pointList_.empty() or pointList_.size() == 1 ){
     // for sure, it's a short circuit
     std::unique_ptr<DialBase> out{nullptr};

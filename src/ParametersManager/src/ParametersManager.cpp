@@ -336,10 +336,8 @@ bool ParametersManager::hasValidParameterSets() const {
   return true;
 }
 void ParametersManager::printConfiguration() const {
-
   LogInfo << _parameterSetList_.size() << " parameter sets defined." << std::endl;
   for( auto& parSet : _parameterSetList_ ){ parSet.printConfiguration(); }
-
 }
 
 void ParametersManager::setParameterValidity(const std::string& v) {

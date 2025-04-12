@@ -536,7 +536,6 @@ void ParameterScanner::varyEvenRates(const std::vector<double>& paramVariationLi
 
       }
     }
-
   }
 }
 void ParameterScanner::setGraphTitles(const std::string& title_){
