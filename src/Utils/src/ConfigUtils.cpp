@@ -16,6 +16,7 @@
 
 namespace ConfigUtils {
 
+
   // open file
   JsonType readConfigFile(const std::string& configFilePath_){
     if( not GenericToolbox::isFile(configFilePath_) ){
@@ -222,6 +223,9 @@ namespace ConfigUtils {
     LogInfo << "Unfolded config written as: " << outPath << std::endl;
   }
 
+
+  std::vector<std::string> ConfigReader::_deprecatedList_{};
+
   bool ConfigReader::hasKey(const std::string& keyPath_) const{
     if( GenericToolbox::Json::doKeyExist(_config_, keyPath_) ){
       // tag the found option
@@ -267,6 +271,30 @@ namespace ConfigUtils {
   }
   std::vector<ConfigReader> ConfigReader::loop(const std::vector<std::string>& keyPathList_) const{
     return fetchValue(keyPathList_, ConfigReader()).loop();
+  }
+
+  std::string ConfigReader::getStrippedParentPath() const{
+    std::string out{_parentPath_};
+    out.erase(
+      std::remove_if(
+        out.begin(), out.end(),
+        [](char c) { return std::isdigit(static_cast<unsigned char>(c)); }
+        ),
+      out.end()
+    );
+
+    GenericToolbox::removeRepeatedCharInsideInputStr(out, "/");
+    return out;
+  }
+  void ConfigReader::printDeprecatedMessage(const std::string& oldKey_, const std::string& newKey_) const {
+
+    // only print it once
+    std::string referenceStr{GenericToolbox::joinPath(getStrippedParentPath(), oldKey_)};
+    if( not GenericToolbox::isIn(referenceStr, _deprecatedList_) ) {
+      _deprecatedList_.emplace_back(referenceStr);
+      LogAlert << _parentPath_ << ": \"" << oldKey_ << "\" is a deprecated field name, use \"" << newKey_ << "\" instead." << std::endl;
+    }
+
   }
 
 }

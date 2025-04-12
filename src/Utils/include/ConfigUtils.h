@@ -16,12 +16,6 @@
 
 // shortcuts
 typedef GenericToolbox::Json::JsonType JsonType;
-// typedef GenericToolbox::Json::ConfigBaseClass JsonBaseClass;
-
-namespace ConfigUtils{ class ConfigReader; }
-typedef ConfigUtils::ConfigReader ConfigReader;
-typedef GenericToolbox::ConfigClass<ConfigReader> JsonBaseClass;
-
 
 namespace ConfigUtils {
 
@@ -118,12 +112,18 @@ namespace ConfigUtils {
 
     friend std::ostream& operator <<( std::ostream& o, const ConfigReader& this_ ){ o << this_.toString(); return o; }
 
+  protected:
+    std::string getStrippedParentPath() const;
+    void printDeprecatedMessage(const std::string& oldKey_, const std::string& newKey_) const;
+
   private:
     std::string _parentPath_{"/"};
     JsonType _config_;
 
     // keep track of fields that have been red
     mutable std::vector<std::string> _usedKeyList_{};
+
+    static std::vector<std::string> _deprecatedList_;
 
   };
 
@@ -150,7 +150,7 @@ namespace ConfigUtils {
         else{
           if( keyPath != keyPathList_.front() ) {
             // printing the deprecation only if not already found -> could be an old option present for compatibility
-            LogAlert << _parentPath_ << ": \"" << keyPath << "\" is a deprecated field name, use \"" << keyPathList_.front() << "\" instead." << std::endl;
+            printDeprecatedMessage(keyPath, keyPathList_.front());
           }
 
           out = temp;
@@ -185,5 +185,10 @@ namespace ConfigUtils {
   }
 
 }
+
+
+typedef ConfigUtils::ConfigReader ConfigReader;
+typedef GenericToolbox::ConfigClass<ConfigReader> JsonBaseClass;
+
 
 #endif //GUNDAM_CONFIG_UTILS_H
