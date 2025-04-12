@@ -39,6 +39,9 @@ void Parameter::configureImpl(){
 
 }
 void Parameter::initializeImpl() {
+
+  _config_.printUnusedKeys();
+
   LogThrowIf(_owner_ == nullptr, "Parameter set ref is not set.");
   LogThrowIf(_parameterIndex_ == -1, "Parameter index is not set.");
 

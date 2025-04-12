@@ -121,6 +121,9 @@ void ParameterSet::configureImpl(){
   this->defineParameters();
 }
 void ParameterSet::initializeImpl() {
+
+  _config_.printUnusedKeys();
+
   for( auto& par : _parameterList_ ){
     par.initialize();
   }
