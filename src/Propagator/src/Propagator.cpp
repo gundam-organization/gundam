@@ -52,6 +52,7 @@ void Propagator::configureImpl(){
   _config_.fillValue(_devSingleThreadHistFill_, "devSingleThreadHistFill");
   _config_.fillValue(_eventDialCache_.getGlobalEventReweightCap().maxReweight, "globalEventReweightCap");
 
+  LogAlert << _config_.getUnusedOptionsMessage();
 }
 void Propagator::initializeImpl(){
   LogWarning << "Initializing propagator..." << std::endl;

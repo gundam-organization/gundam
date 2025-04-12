@@ -100,6 +100,8 @@ void FitterEngine::configureImpl(){
   _config_.fillValue(_throwGain_, "throwMcBeforeFitGain");
   _config_.fillValue(_savePostfitEventTrees_, "savePostfitEventTrees");
 
+  LogAlert << _config_.getUnusedOptionsMessage();
+
   LogInfo << "FitterEngine configured." << std::endl;
 }
 void FitterEngine::initializeImpl(){

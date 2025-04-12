@@ -36,7 +36,7 @@ public:
   auto& getBinContextList(){ return binContextList; }
 
   // core
-  void build(const JsonType& binningConfig_);
+  void build(const ConfigReader& binningConfig_);
   void throwEventMcError();
   void throwStatError(bool useGaussThrow_ = false);
 

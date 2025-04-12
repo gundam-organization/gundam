@@ -37,7 +37,7 @@ public:
   // setters
   void setIndex(int index){ _index_ = index; }
   void setName(const std::string &name){ _name_ = name; }
-  void setBinningFilePath(const JsonType &binningFilePath_){ _binningConfig_ = binningFilePath_; }
+  void setBinningFilePath(const ConfigReader &binningFilePath_){ _binningConfig_ = binningFilePath_; }
 
   // const getters
   [[nodiscard]] auto isEnabled() const{ return _isEnabled_; }
@@ -78,7 +78,7 @@ private:
   int _index_{-1};
   std::string _name_;
   std::string _selectionCutStr_;
-  JsonType _binningConfig_;
+  ConfigReader _binningConfig_;
   std::vector<std::string> _enabledDatasetList_;
 
   // Internals

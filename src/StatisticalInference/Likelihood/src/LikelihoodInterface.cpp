@@ -81,6 +81,8 @@ void LikelihoodInterface::configureImpl(){
   _config_.fillValue(_enableStatThrowInToys_, "enableStatThrowInToys");
   _config_.fillValue(_gaussStatThrowInToys_, "gaussStatThrowInToys");
   _config_.fillValue(_enableEventMcThrow_, "enableEventMcThrow");
+
+  LogAlert << _config_.getUnusedOptionsMessage();
 }
 void LikelihoodInterface::initializeImpl() {
   LogWarning << "Initializing LikelihoodInterface..." << std::endl;

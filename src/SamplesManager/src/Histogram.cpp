@@ -14,10 +14,10 @@
 
 
 
-void Histogram::build(const JsonType& binningConfig_){
+void Histogram::build(const ConfigReader& binningConfig_){
 
   BinSet binning;
-  binning.configure( ConfigUtils::ConfigReader(binningConfig_) );
+  binning.configure( binningConfig_ );
 
   nBins = int( binning.getBinList().size() );
   binContentList.resize( nBins );

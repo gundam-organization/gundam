@@ -185,7 +185,8 @@ int main(int argc, char** argv){
                           ));
 
     LogThrowIf(foundDialCollection->getDialBinSet().getBinList().empty(), "Could not find binning");
-    sample.setBinningFilePath( foundDialCollection->getDialBinSet().getFilePath() );
+    JsonType json(foundDialCollection->getDialBinSet().getFilePath());
+    sample.setBinningFilePath( ConfigReader(json) );
 
   }
 

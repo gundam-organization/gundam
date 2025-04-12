@@ -39,6 +39,8 @@ void ParametersManager::configureImpl(){
     }
   }
 
+  LogAlert << _config_.getUnusedOptionsMessage();
+
 }
 void ParametersManager::initializeImpl(){
   int nEnabledPars = 0;

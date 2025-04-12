@@ -152,7 +152,7 @@ namespace ConfigUtils {
         else{
           if( keyPath != keyPathList_.front() ) {
             // printing the deprecation only if not already found -> could be an old option present for compatibility
-            LogAlert << _parentPath_ << ": \"" << keyPath << "\" is a deprecated field name, use \"" << keyPathList_.front() << "\" instead." << std::endl;
+            LogWarning << _parentPath_ << ": \"" << keyPath << "\" is a deprecated field name, use \"" << keyPathList_.front() << "\" instead." << std::endl;
           }
 
           out = temp;

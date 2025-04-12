@@ -240,7 +240,7 @@ namespace ConfigUtils {
     }
 
     if( not unusedKeyList.empty() ){
-      ss << unusedKeyList.size() << " were not used in the config reading. Are they backward compatibility options?" << std::endl;
+      ss << _parentPath_ << ": " << unusedKeyList.size() << " were not used in the config reading. Are they backward compatibility options?" << std::endl;
       for( auto& unusedKey : unusedKeyList ){
         ss << "  > \"" << unusedKey << "\" was not used." << std::endl;
       }
