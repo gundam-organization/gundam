@@ -341,8 +341,6 @@ int main(int argc, char** argv){
     fitter.setAllParamVariationsSigmas(gundamFitterConfig.fetchValue<std::vector<double>>("allParamVariations"));
   });
 
-  LogAlert << gundamFitterConfig.getUnusedOptionsMessage();
-
   // Check if the first point of the fit should be moved before the
   // minimization.  This is not changing the prior value, only the starting
   // point of the fit.  The kick is in units of prior standard deviations
@@ -382,6 +380,8 @@ int main(int argc, char** argv){
       dataset.setFractionOfEntriesToLoad(fractionOfEntries);
     }
   }
+
+  gundamFitterConfig.printUnusedKeys();
 
   // --------------------------
   // Load:

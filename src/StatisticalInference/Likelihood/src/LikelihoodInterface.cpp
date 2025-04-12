@@ -58,7 +58,6 @@ void LikelihoodInterface::configureImpl(){
     _modelPropagator_.getSampleSet().getConfig().fillValue(jointProbabilityConfig, "llhConfig");
   });
 
-
   // defining datasets:
   _config_.fillValue(datasetListConfig, {{"dataSetList"}, {"datasetList"}});
   _datasetList_.reserve(datasetListConfig.getConfig().size() );
@@ -82,9 +81,11 @@ void LikelihoodInterface::configureImpl(){
   _config_.fillValue(_gaussStatThrowInToys_, "gaussStatThrowInToys");
   _config_.fillValue(_enableEventMcThrow_, "enableEventMcThrow");
 
-  LogAlert << _config_.getUnusedOptionsMessage();
 }
 void LikelihoodInterface::initializeImpl() {
+
+  _config_.printUnusedKeys();
+
   LogWarning << "Initializing LikelihoodInterface..." << std::endl;
 
   for( auto& dataSet : _datasetList_ ){ dataSet.initialize(); }

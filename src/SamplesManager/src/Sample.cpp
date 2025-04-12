@@ -30,8 +30,6 @@ void Sample::configureImpl(){
 
   LogDebugIf(GundamGlobals::isDebug()) << "Reading binning: " << _config_ << std::endl;
   _histogram_.build(_binningConfig_);
-
-  LogAlert << _config_.getUnusedOptionsMessage();
 }
 
 void Sample::writeEventRates(const GenericToolbox::TFilePath& saveDir_) const{

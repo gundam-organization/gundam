@@ -16,6 +16,9 @@ void EventVarTransformLib::configureImpl(){
   _config_.fillValue(_libraryFile_, "libraryFile");
 }
 void EventVarTransformLib::initializeImpl(){
+
+  _config_.printUnusedKeys();
+
   LogInfo << "Loading variable transformation: " << _name_ << std::endl;
   LogThrowIf(_outputVariableName_.empty(), "output variable name not set.");
 

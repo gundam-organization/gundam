@@ -30,6 +30,9 @@ void MinimizerBase::configureImpl(){
   _config_.fillValue(_checkParameterValidity_, "checkParameterValidity");
 }
 void MinimizerBase::initializeImpl(){
+
+  _config_.printUnusedKeys();
+
   LogWarning << "Initializing MinimizerBase..." << std::endl;
 
   LogThrowIf(_owner_ == nullptr, "FitterEngine owner not set.");

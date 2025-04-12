@@ -93,6 +93,9 @@ void DataDispenser::configureImpl(){
 
 }
 void DataDispenser::initializeImpl(){
+
+  _config_.printUnusedKeys();
+
   // Nothing else to do other than read config?
   LogWarning << "Initialized data dispenser: " << getTitle() << std::endl;
 

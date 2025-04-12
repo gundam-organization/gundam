@@ -29,6 +29,9 @@ void ParameterScanner::configureImpl() {
 
 }
 void ParameterScanner::initializeImpl() {
+
+  _config_.printUnusedKeys();
+
   LogWarning << "Initializing ParameterScanner..." << std::endl;
 
   LogThrowIf(_likelihoodInterfacePtr_ == nullptr, "_likelihoodInterfacePtr_ not set.");

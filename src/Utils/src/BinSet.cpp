@@ -347,7 +347,4 @@ void BinSet::readBinningConfig( const ConfigUtils::ConfigReader& binning_){
     _binList_.back().configure( ConfigUtils::ConfigReader(binDef) );
   }
 
-
-  LogAlert << binning_.getUnusedOptionsMessage();
-
 }

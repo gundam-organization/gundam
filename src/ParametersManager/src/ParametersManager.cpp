@@ -38,11 +38,11 @@ void ParametersManager::configureImpl(){
       _parameterSetList_.pop_back();
     }
   }
-
-  LogAlert << _config_.getUnusedOptionsMessage();
-
 }
 void ParametersManager::initializeImpl(){
+
+  _config_.printUnusedKeys();
+
   int nEnabledPars = 0;
   for( auto& parSet : _parameterSetList_ ){
     parSet.initialize();

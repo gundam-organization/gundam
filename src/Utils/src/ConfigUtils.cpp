@@ -240,25 +240,26 @@ namespace ConfigUtils {
     GenericToolbox::addIfNotInVector(keyPath_, _usedKeyList_);
     formulaToFill_ = GenericToolbox::Json::buildFormula(_config_, keyPath_, joinStr_, formulaToFill_);
   }
-  std::string ConfigReader::getUnusedOptionsMessage() const{
-
-    std::stringstream ss;
-
+  void ConfigReader::printUnusedKeys() const{
     std::vector<std::string> unusedKeyList{};
     for (auto it = _config_.begin(); it != _config_.end(); ++it) {
-      if( not GenericToolbox::isIn(it.key(), _usedKeyList_) ) {
-        unusedKeyList.emplace_back(it.key());
-      }
+      if( GenericToolbox::isIn(it.key(), _usedKeyList_) ){ continue; }
+
+      // already printed out?
+      std::string referenceStr{GenericToolbox::joinPath(getStrippedParentPath(), it.key())};
+      if( GenericToolbox::isIn(referenceStr, _deprecatedList_) ){ continue; }
+      _deprecatedList_.emplace_back(referenceStr);
+
+      unusedKeyList.emplace_back(it.key());
     }
 
     if( not unusedKeyList.empty() ){
-      ss << _parentPath_ << ": " << unusedKeyList.size() << " were not used in the config reading. Are they backward compatibility options?" << std::endl;
+
+      LogAlert << _parentPath_ << ": " << unusedKeyList.size() << " were not used in the config reading. Are they backward compatibility options?" << std::endl;
       for( auto& unusedKey : unusedKeyList ){
-        ss << "  > \"" << unusedKey << "\" was not used." << std::endl;
+        LogAlert << "  > \"" << unusedKey << "\" was not used." << std::endl;
       }
     }
-
-    return ss.str();
   }
   std::vector<ConfigReader> ConfigReader::loop() const {
     std::vector<ConfigReader> out;

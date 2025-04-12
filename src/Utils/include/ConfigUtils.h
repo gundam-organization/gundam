@@ -85,7 +85,8 @@ namespace ConfigUtils {
     [[nodiscard]] bool hasKey(const std::string& keyPath_) const;
     [[nodiscard]] std::string toString() const{ return GenericToolbox::Json::toReadableString( _config_ ); }
     void fillFormula(std::string& formulaToFill_, const std::string& keyPath_, const std::string& joinStr_) const;
-    [[nodiscard]] std::string getUnusedOptionsMessage() const;
+
+    void printUnusedKeys() const;
 
     // for loops
     std::vector<ConfigReader> loop() const;
