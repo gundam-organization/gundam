@@ -88,7 +88,7 @@ namespace ConfigUtils {
 
     // read options
     [[nodiscard]] bool empty() const{ return _config_.empty(); }
-    [[nodiscard]] bool hasKey(const std::string& keyPath_) const{ return GenericToolbox::Json::doKeyExist(_config_, keyPath_); }
+    [[nodiscard]] bool hasKey(const std::string& keyPath_) const;
     [[nodiscard]] std::string toString() const{ return GenericToolbox::Json::toReadableString( _config_ ); }
     void fillFormula(std::string& formulaToFill_, const std::string& keyPath_, const std::string& joinStr_) const;
     [[nodiscard]] std::string getUnusedOptionsMessage() const;
@@ -132,13 +132,11 @@ namespace ConfigUtils {
     // the first one is the official one, when others are set a message will appear telling the user it's deprecated
     T out;
     bool hasBeenFound{false};
-    for( auto& keyPath : keyPathList_ ){
-      try{
-        T temp = GenericToolbox::Json::fetchValue<T>(_config_, keyPath);
-        // pass this point it won't return an error
+    for( auto& keyPath : keyPathList_ ) {
 
-        // tag the found option
-        GenericToolbox::addIfNotInVector(keyPath, _usedKeyList_);
+      // hasKey will tag the key
+      if( this->hasKey(keyPath) ){
+        T temp = GenericToolbox::Json::fetchValue<T>(_config_, keyPath);
 
         // already found?
         if( hasBeenFound ){
@@ -152,16 +150,13 @@ namespace ConfigUtils {
         else{
           if( keyPath != keyPathList_.front() ) {
             // printing the deprecation only if not already found -> could be an old option present for compatibility
-            LogWarning << _parentPath_ << ": \"" << keyPath << "\" is a deprecated field name, use \"" << keyPathList_.front() << "\" instead." << std::endl;
+            LogAlert << _parentPath_ << ": \"" << keyPath << "\" is a deprecated field name, use \"" << keyPathList_.front() << "\" instead." << std::endl;
           }
 
           out = temp;
           hasBeenFound = true;
         }
-
-
       }
-      catch(...){}
     }
 
     if( not hasBeenFound ) {

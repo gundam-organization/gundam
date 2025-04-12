@@ -222,6 +222,14 @@ namespace ConfigUtils {
     LogInfo << "Unfolded config written as: " << outPath << std::endl;
   }
 
+  bool ConfigReader::hasKey(const std::string& keyPath_) const{
+    if( GenericToolbox::Json::doKeyExist(_config_, keyPath_) ){
+      // tag the found option
+      GenericToolbox::addIfNotInVector(keyPath_, _usedKeyList_);
+      return true;
+    }
+    return false;
+  }
   void ConfigReader::fillFormula(std::string& formulaToFill_, const std::string& keyPath_, const std::string& joinStr_) const{
     if( not hasKey(keyPath_) ){ return; }
     // tag the found option
