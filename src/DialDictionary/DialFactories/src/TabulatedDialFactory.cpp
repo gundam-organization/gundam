@@ -115,7 +115,6 @@ TabulatedDialFactory::TabulatedDialFactory(const ConfigUtils::ConfigReader& conf
         = reinterpret_cast<
             double(*)(const char* name,
                    int varc, double varv[], int bins)>(binningFunc);
-
 }
 
 void TabulatedDialFactory::updateTable(DialInputBuffer& inputBuffer) {
