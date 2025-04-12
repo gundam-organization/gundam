@@ -27,13 +27,11 @@ void Propagator::configureImpl(){
   _config_.fillValue(_sampleSet_.getConfig(), {{"sampleSetConfig"}, {"fitSampleSetConfig"}});
   _sampleSet_.configure();
 
-  _config_.deprecatedAction("parameterSetListConfig", [&]{
-    LogAlert << R"("parameterSetListConfig" should now be set under "parametersManagerConfig/parameterSetList".)" << std::endl;
+  _config_.deprecatedAction("parameterSetListConfig", "parametersManagerConfig/parameterSetList", [&]{
     auto parameterSetListConfig = _config_.fetchValue<ConfigReader>("parameterSetListConfig");
     _parManager_.setParameterSetListConfig( parameterSetListConfig );
   });
-  _config_.deprecatedAction("throwToyParametersWithGlobalCov", [&]{
-    LogAlert << "Forwarding the option to ParametersManager. Consider moving it into \"parametersManagerConfig:\"" << std::endl;
+  _config_.deprecatedAction("throwToyParametersWithGlobalCov", "parametersManagerConfig", [&]{
     _parManager_.setThrowToyParametersWithGlobalCov(_config_.fetchValue<bool>("throwToyParametersWithGlobalCov"));
   });
   _config_.fillValue(_parManager_.getConfig(), "parametersManagerConfig");

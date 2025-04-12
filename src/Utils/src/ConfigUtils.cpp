@@ -246,11 +246,9 @@ namespace ConfigUtils {
       if( GenericToolbox::isIn(it.key(), _usedKeyList_) ){ continue; }
 
       // already printed out?
-      std::string referenceStr{GenericToolbox::joinPath(getStrippedParentPath(), it.key())};
-      if( GenericToolbox::isIn(referenceStr, _deprecatedList_) ){ continue; }
-      _deprecatedList_.emplace_back(referenceStr);
-
-      unusedKeyList.emplace_back(it.key());
+      if( doShowWarning(it.key()) ){
+        unusedKeyList.emplace_back(it.key());
+      }
     }
 
     if( not unusedKeyList.empty() ){
@@ -288,14 +286,18 @@ namespace ConfigUtils {
     return out;
   }
   void ConfigReader::printDeprecatedMessage(const std::string& oldKey_, const std::string& newKey_) const {
-
     // only print it once
-    std::string referenceStr{GenericToolbox::joinPath(getStrippedParentPath(), oldKey_)};
-    if( not GenericToolbox::isIn(referenceStr, _deprecatedList_) ) {
-      _deprecatedList_.emplace_back(referenceStr);
+    if( doShowWarning(oldKey_) ) {
       LogAlert << _parentPath_ << ": \"" << oldKey_ << "\" is a deprecated field name, use \"" << newKey_ << "\" instead." << std::endl;
     }
-
+  }
+  bool ConfigReader::doShowWarning(const std::string& key_) const{
+    std::string referenceStr{GenericToolbox::joinPath(getStrippedParentPath(), key_)};
+    if( not GenericToolbox::isIn(referenceStr, _deprecatedList_) ){
+      _deprecatedList_.emplace_back(referenceStr);
+      return true;
+    }
+    return false;
   }
 
 }

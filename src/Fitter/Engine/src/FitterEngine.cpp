@@ -31,8 +31,7 @@ void FitterEngine::configureImpl(){
   _config_.fillValue(minimizerConfig, {{"minimizerConfig"}, {"mcmcConfig"}});
 
   std::string minimizerTypeStr{"RootMinimizer"};
-  _config_.deprecatedAction("engineType", [&]{
-    LogAlert << _config_.getParentPath() << R"(:"engineType" should set using "minimizerConfig/type")" << std::endl;
+  _config_.deprecatedAction("engineType", "minimizerConfig/type", [&]{
     _config_.fillValue(minimizerTypeStr, "engineType");
 
     // handle deprecated types
@@ -54,22 +53,19 @@ void FitterEngine::configureImpl(){
   }
 
   // now the minimizer is created, forward deprecated options
-  _config_.deprecatedAction("monitorRefreshRateInMs", [&]{
-    LogAlert << _config_.getParentPath() << R"(:"monitorRefreshRateInMs" should now be set within "/fitterEngineConfig/minimizerConfig".)" << std::endl;
+  _config_.deprecatedAction("monitorRefreshRateInMs", "fitterEngineConfig/minimizerConfig", [&]{
     _minimizer_->getMonitor().convergenceMonitor.setMaxRefreshRateInMs(_config_.fetchValue<int>("monitorRefreshRateInMs"));
   });
   _minimizer_->configure( minimizerConfig );
 
-  _config_.deprecatedAction("propagatorConfig", [&]{
-    LogAlert << _config_.getParentPath() << R"(:"propagatorConfig" should now be set within "/fitterEngineConfig/likelihoodInterfaceConfig".)" << std::endl;
+  _config_.deprecatedAction("propagatorConfig", "fitterEngineConfig/likelihoodInterfaceConfig", [&]{
     // reading the config already since nested objects need to be filled up for handling further deprecation
     getLikelihoodInterface().getModelPropagator().setConfig( _config_.fetchValue<ConfigReader>("propagatorConfig") );
   });
   _config_.fillValue(_likelihoodInterface_.getConfig(), "likelihoodInterfaceConfig");
   _likelihoodInterface_.configure();
 
-  getLikelihoodInterface().getModelPropagator().getConfig().deprecatedAction("scanConfig", [&]{
-    LogAlert << R"("scanConfig" should now be set within "fitterEngineConfig".)" << std::endl;
+  getLikelihoodInterface().getModelPropagator().getConfig().deprecatedAction("scanConfig", "fitterEngineConfig", [&]{
     _parameterScanner_.setConfig( getLikelihoodInterface().getModelPropagator().getConfig().fetchValue<ConfigUtils::ConfigReader>("scanConfig") );
   });
   _config_.fillValue(_parameterScanner_.getConfig(), {{"parameterScannerConfig"},{"scanConfig"}});

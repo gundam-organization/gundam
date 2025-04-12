@@ -330,13 +330,11 @@ int main(int argc, char** argv){
   }
 
   // Also check app level config options
-  gundamFitterConfig.deprecatedAction("generateSamplePlots", [&]{
-    LogAlert << "Forwarding the option to FitterEngine. Consider moving it into \"fitterEngineConfig:\"" << std::endl;
+  gundamFitterConfig.deprecatedAction("generateSamplePlots", "fitterEngineConfig", [&]{
     fitter.setGenerateSamplePlots( gundamFitterConfig.fetchValue<bool>("generateSamplePlots") );
   });
 
-  gundamFitterConfig.deprecatedAction("allParamVariations", [&]{
-    LogAlert << "Forwarding the option to FitterEngine. Consider moving it into \"fitterEngineConfig:\"" << std::endl;
+  gundamFitterConfig.deprecatedAction("allParamVariations", "fitterEngineConfig", [&]{
     fitter.setDoAllParamVariations(true);
     fitter.setAllParamVariationsSigmas(gundamFitterConfig.fetchValue<std::vector<double>>("allParamVariations"));
   });

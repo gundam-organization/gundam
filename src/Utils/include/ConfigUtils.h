@@ -96,7 +96,7 @@ namespace ConfigUtils {
 
     // templates
     template<typename T> T fetchValue(const std::vector<std::string>& keyPathList_) const; // source
-    template<typename F> bool deprecatedAction(const std::vector<std::string>& keyPathList_, const F& action_) const;
+    template<typename F> void deprecatedAction(const std::vector<std::string>& keyPathList_, const std::string& newPath_, const F& action_) const;
 
     // nested template
     template<typename T> T fetchValue(const std::vector<std::string>& keyPathList_, const T& defaultValue_) const{ try{ return fetchValue<T>(keyPathList_); } catch( ... ) { return defaultValue_; } }
@@ -109,13 +109,14 @@ namespace ConfigUtils {
     template<typename T> T fetchValue(const std::string& keyPath_, const T& defaultValue_) const{ return fetchValue(std::vector<std::string>({keyPath_}), defaultValue_); }
     template<typename T> void fillValue(T& object_, const std::string& keyPath_) const{ fillValue(object_, std::vector<std::string>({keyPath_})); }
     template<typename T> void fillEnum(T& enum_, const std::string& keyPath_) const{ fillEnum(enum_, std::vector<std::string>({keyPath_})); }
-    template<typename F> bool deprecatedAction(const std::string& keyPath_, const F& action_) const{ if( hasKey(keyPath_) ){ action_(); return true; } return false; }
+    template<typename F> void deprecatedAction(const std::string& keyPath_, const std::string& newPath_, const F& action_) const{ deprecatedAction(std::vector<std::string>({keyPath_}), newPath_, [&](const std::string& unused_){ action_(); }); }
 
     friend std::ostream& operator <<( std::ostream& o, const ConfigReader& this_ ){ o << this_.toString(); return o; }
 
   protected:
     std::string getStrippedParentPath() const;
     void printDeprecatedMessage(const std::string& oldKey_, const std::string& newKey_) const;
+    bool doShowWarning(const std::string& key_) const;
 
   private:
     std::string _parentPath_{"/"};
@@ -124,6 +125,7 @@ namespace ConfigUtils {
     // keep track of fields that have been red
     mutable std::vector<std::string> _usedKeyList_{};
 
+    // handling printing only once
     static std::vector<std::string> _deprecatedList_;
 
   };
@@ -174,9 +176,16 @@ namespace ConfigUtils {
     out.setParentPath(GenericToolbox::joinPath(_parentPath_, _usedKeyList_.back()));
     return out;
   }
-  template<typename F> bool ConfigReader::deprecatedAction(const std::vector<std::string>& keyPathList_, const F& action_) const {
-    for( auto& keyPath : keyPathList_ ){ if( hasKey(keyPath) ){ action_( keyPath ); return true; } }
-    return false;
+  template<typename F> void ConfigReader::deprecatedAction(const std::vector<std::string>& keyPathList_, const std::string& newPath_, const F& action_) const {
+    for( auto& keyPath : keyPathList_ ) {
+      if( hasKey(keyPath) ) {
+        if( doShowWarning(keyPath) ){
+          LogAlert << _parentPath_ << ": \"" << keyPath << "\" should be set under \"" << newPath_ << "\"" << std::endl;
+        }
+        action_( keyPath );
+        return;
+      }
+    }
   }
   template<typename T> void ConfigReader::fillEnum(T& enum_, const std::vector<std::string>& keyPathList_) const{
     std::string enumName;

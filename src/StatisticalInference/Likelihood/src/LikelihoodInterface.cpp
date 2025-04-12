@@ -29,32 +29,25 @@ void LikelihoodInterface::configureImpl(){
   std::string jointProbabilityTypeStr{"PoissonLLH"};
 
   // prior to this version a few parameters were set in the propagator itself
-  _modelPropagator_.getConfig().deprecatedAction("enableStatThrowInToys", [&]{
-    LogAlert << R"("enableStatThrowInToys" should now be set under "likelihoodInterfaceConfig" instead of "propagatorConfig".)" << std::endl;
+  _modelPropagator_.getConfig().deprecatedAction("enableStatThrowInToys", "likelihoodInterfaceConfig", [&]{
     _modelPropagator_.getConfig().fillValue(_enableStatThrowInToys_, "enableStatThrowInToys");
   });
-  _modelPropagator_.getConfig().deprecatedAction("gaussStatThrowInToys", [&]{
-    LogAlert << R"("gaussStatThrowInToys" should now be set under "likelihoodInterfaceConfig" instead of "propagatorConfig".)" << std::endl;
+  _modelPropagator_.getConfig().deprecatedAction("gaussStatThrowInToys", "likelihoodInterfaceConfig", [&]{
     _modelPropagator_.getConfig().fillValue(_gaussStatThrowInToys_, "gaussStatThrowInToys");
   });
-  _modelPropagator_.getConfig().deprecatedAction("enableEventMcThrow", [&]{
-    LogAlert << R"("enableEventMcThrow" should now be set under "likelihoodInterfaceConfig" instead of "propagatorConfig".)" << std::endl;
+  _modelPropagator_.getConfig().deprecatedAction("enableEventMcThrow", "likelihoodInterfaceConfig", [&]{
     _modelPropagator_.getConfig().fillValue(_enableEventMcThrow_, "enableEventMcThrow");
   });
-  _modelPropagator_.getConfig().deprecatedAction("plotGeneratorConfig", [&]{
-    LogAlert << R"("plotGeneratorConfig" should now be set under "likelihoodInterfaceConfig".)" << std::endl;
+  _modelPropagator_.getConfig().deprecatedAction("plotGeneratorConfig", "likelihoodInterfaceConfig", [&]{
     _modelPropagator_.getConfig().fillValue(_plotGenerator_.getConfig(), "plotGeneratorConfig");
   });
-  _modelPropagator_.getConfig().deprecatedAction({{"dataSetList"}, {"fitSampleSetConfig/dataSetList"}}, [&](const std::string& path_){
-    LogAlert << "\"" << path_ << R"(" should now be set under "likelihoodInterfaceConfig".)" << std::endl;
+  _modelPropagator_.getConfig().deprecatedAction({{"dataSetList"}, {"fitSampleSetConfig/dataSetList"}}, "likelihoodInterfaceConfig", [&](const std::string& path_){
     _modelPropagator_.getConfig().fillValue(datasetListConfig, path_);
   });
-  _modelPropagator_.getSampleSet().getConfig().deprecatedAction("llhStatFunction", [&]{
-    LogAlert << R"("llhStatFunction" should now be set under "likelihoodInterfaceConfig/jointProbabilityConfig/type".)" << std::endl;
+  _modelPropagator_.getSampleSet().getConfig().deprecatedAction("llhStatFunction", "likelihoodInterfaceConfig/jointProbabilityConfig/type", [&]{
     _modelPropagator_.getSampleSet().getConfig().fillValue(jointProbabilityTypeStr, "llhStatFunction");
   });
-  _modelPropagator_.getSampleSet().getConfig().deprecatedAction("llhConfig", [&]{
-    LogAlert << R"("llhConfig" should now be set under "likelihoodInterfaceConfig/jointProbabilityConfig".)" << std::endl;
+  _modelPropagator_.getSampleSet().getConfig().deprecatedAction("llhConfig", "likelihoodInterfaceConfig/jointProbabilityConfig", [&]{
     _modelPropagator_.getSampleSet().getConfig().fillValue(jointProbabilityConfig, "llhConfig");
   });
 
