@@ -100,8 +100,7 @@ namespace ConfigUtils {
 
     // nested template
     template<typename T> T fetchValue(const std::vector<std::string>& keyPathList_, const T& defaultValue_) const{ try{ return fetchValue<T>(keyPathList_); } catch( ... ) { return defaultValue_; } }
-    template<typename T> void fillValue(T& object_, const std::vector<std::string> &keyPathList_) const{ try{ object_ = this->fetchValue<T>(keyPathList_); } catch(...){} }
-    template<> void fillValue(std::vector<ConfigReader>& object_, const std::vector<std::string> &keyPathList_) const{ try{ object_ = this->loop(keyPathList_); } catch(...){} }
+    template<typename T> void fillValue(T& object_, const std::vector<std::string> &keyPathList_) const;
     template<typename T> void fillEnum(T& enum_, const std::vector<std::string>& keyPathList_) const;
 
     // nested template (string to vector<string>)
@@ -193,6 +192,9 @@ namespace ConfigUtils {
     if( enumName.empty() ){ return; }
     enum_ = enum_.toEnum( enumName, true );
   }
+
+  template<typename T> void ConfigReader::fillValue(T& object_, const std::vector<std::string> &keyPathList_) const{ try{ object_ = this->fetchValue<T>(keyPathList_); } catch(...){} }
+  template<> inline void ConfigReader::fillValue(std::vector<ConfigReader>& object_, const std::vector<std::string> &keyPathList_) const{ try{ object_ = this->loop(keyPathList_); } catch(...){} }
 
 }
 
