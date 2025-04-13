@@ -79,7 +79,7 @@ int main(int argc, char** argv){
   // Reading fitter file
   std::string fitterFile{clParser.getOptionVal<std::string>("fitterFile")};
   std::unique_ptr<TFile> fitterRootFile{nullptr};
-  JsonType fitterConfig; // will be used to load the propagator
+  ConfigReader fitterConfig; // will be used to load the propagator
 
   if( GenericToolbox::hasExtension(fitterFile, "root") ){
     LogWarning << "Opening fitter output file: " << fitterFile << std::endl;
@@ -94,12 +94,12 @@ int main(int argc, char** argv){
          {"gundam/config_TNamed"},
          {"gundamFitter/unfoldedConfig_TNamed"}},
         [&](TNamed* config_){
-      fitterConfig = GenericToolbox::Json::readConfigJsonStr( config_->GetTitle() );
+      fitterConfig = ConfigReader(GenericToolbox::Json::readConfigJsonStr( config_->GetTitle() ));
     });
   }
   else{
     LogWarning << "Reading fitter config file: " << fitterFile << std::endl;
-    fitterConfig = GenericToolbox::Json::readConfigFile( fitterFile );
+    fitterConfig = ConfigReader(GenericToolbox::Json::readConfigFile( fitterFile ));
 
     clParser.getOptionPtr("usePreFit")->setIsTriggered( true );
   }
@@ -110,7 +110,7 @@ int main(int argc, char** argv){
 
   ConfigReader engineConfig;
   {
-    ConfigUtils::ConfigBuilder cHandler{ fitterConfig };
+    ConfigUtils::ConfigBuilder cHandler{ fitterConfig.getConfig() };
 
     // Disabling defined fit samples:
     LogInfo << "Removing defined samples..." << std::endl;
