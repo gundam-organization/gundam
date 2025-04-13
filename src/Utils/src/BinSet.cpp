@@ -307,7 +307,7 @@ void BinSet::readBinningConfig( const ConfigReader& binning_){
       dim.nBins = int( dim.edgesList.size() );
       if( not dim.isEdgesDiscreteValues ){ dim.nBins--; }
 
-      LogThrowIf(dim.nBins == 0, "Invalid edgesList for binEdgeEntry: " << GenericToolbox::Json::toReadableString(binDefEntry));
+      LogThrowIf(dim.nBins == 0, "Invalid edgesList for binEdgeEntry: " << binDefEntry);
     }
 
     int nBinsTotal{1};
