@@ -23,7 +23,7 @@ void EventVarTransform::initializeImpl(){
 }
 
 
-EventVarTransform::EventVarTransform(const ConfigUtils::ConfigReader& config_){ this->configure(config_); }
+EventVarTransform::EventVarTransform(const ConfigReader& config_){ this->configure(config_); }
 
 const std::vector<std::string>& EventVarTransform::fetchRequestedVars() const {
   if( _requestedLeavesForEvalCache_.empty() ){

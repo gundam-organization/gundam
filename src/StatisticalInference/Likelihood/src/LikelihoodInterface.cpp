@@ -397,7 +397,7 @@ void LikelihoodInterface::loadDataPropagator(){
         LogWarning << "Reload the data propagator config with override options..." << std::endl;
         ConfigUtils::ConfigBuilder configHandler( _modelPropagator_.getConfig().getConfig() );
         configHandler.override( dataDispenser->getParameters().overridePropagatorConfig );
-        _dataPropagator_.configure( ConfigUtils::ConfigReader( configHandler.getConfig() ) );
+        _dataPropagator_.configure( ConfigReader( configHandler.getConfig() ) );
         _dataPropagator_.initialize();
       }
 

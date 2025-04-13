@@ -66,7 +66,7 @@ void FitterEngine::configureImpl(){
   _likelihoodInterface_.configure();
 
   getLikelihoodInterface().getModelPropagator().getConfig().deprecatedAction("scanConfig", "fitterEngineConfig", [&]{
-    _parameterScanner_.setConfig( getLikelihoodInterface().getModelPropagator().getConfig().fetchValue<ConfigUtils::ConfigReader>("scanConfig") );
+    _parameterScanner_.setConfig( getLikelihoodInterface().getModelPropagator().getConfig().fetchValue<ConfigReader>("scanConfig") );
   });
   _config_.fillValue(_parameterScanner_.getConfig(), {{"parameterScannerConfig"},{"scanConfig"}});
   _parameterScanner_.configure();
@@ -105,7 +105,7 @@ void FitterEngine::initializeImpl(){
   if( GundamGlobals::isLightOutputMode() ){
     // TODO: this check should be more universal
     LogWarning << "Light mode enabled, wiping plot gen config..." << std::endl;
-    getLikelihoodInterface().getPlotGenerator().configure(ConfigUtils::ConfigReader());
+    getLikelihoodInterface().getPlotGenerator().configure(ConfigReader());
   }
 
   getLikelihoodInterface().initialize();

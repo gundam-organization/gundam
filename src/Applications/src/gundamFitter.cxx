@@ -179,7 +179,7 @@ int main(int argc, char** argv){
   configHandler.override( clParser.getOptionValList<std::string>("overrideFiles") );
   configHandler.flatOverride( clParser.getOptionValList<std::string>("overrides") );
 
-  ConfigUtils::ConfigReader gundamFitterConfig(configHandler.getConfig());
+  ConfigReader gundamFitterConfig(configHandler.getConfig());
 
   // Output file path
   std::string outFileName;

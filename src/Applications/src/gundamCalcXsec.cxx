@@ -106,9 +106,9 @@ int main(int argc, char** argv){
 
   LogAlertIf(clParser.isOptionTriggered("usePreFit")) << "Pre-fit mode enabled: will throw toys according to the prior covariance matrices..." << std::endl;
 
-  ConfigUtils::ConfigReader xsecConfig(ConfigUtils::readConfigFile( clParser.getOptionVal<std::string>("configFile") ));
+  ConfigReader xsecConfig(ConfigUtils::readConfigFile( clParser.getOptionVal<std::string>("configFile") ));
 
-  ConfigUtils::ConfigReader engineConfig;
+  ConfigReader engineConfig;
   {
     ConfigUtils::ConfigBuilder cHandler{ fitterConfig };
 
@@ -140,7 +140,7 @@ int main(int argc, char** argv){
 
   // it will handle all the deprecated config options and names properly
   FitterEngine fitter{nullptr};
-  fitter.configure( engineConfig.fetchValue<ConfigUtils::ConfigReader>( "fitterEngineConfig" ) );
+  fitter.configure( engineConfig.fetchValue<ConfigReader>( "fitterEngineConfig" ) );
 
   // We are only interested in our MC. Data has already been used to get the post-fit error/values
   fitter.getLikelihoodInterface().setForceAsimovData( true );
@@ -277,7 +277,7 @@ int main(int argc, char** argv){
   LogInfo << "Creating normalizer objects..." << std::endl;
   // flux renorm with toys
   struct ParSetNormaliser{
-    void configure(const ConfigUtils::ConfigReader& config_){
+    void configure(const ConfigReader& config_){
       LogScopeIndent;
 
       name = config_.fetchValue<std::string>("name");
@@ -403,7 +403,7 @@ int main(int argc, char** argv){
 
   // to be filled up
   struct BinNormaliser{
-    void configure(const ConfigUtils::ConfigReader& config_){
+    void configure(const ConfigReader& config_){
       LogScopeIndent;
 
       name = config_.fetchValue<std::string>("name");
@@ -445,7 +445,7 @@ int main(int argc, char** argv){
 
   struct CrossSectionData{
     Sample* samplePtr{nullptr};
-    ConfigUtils::ConfigReader config{};
+    ConfigReader config{};
     GenericToolbox::RawDataArray branchBinsData{};
 
     TH1D histogram{};

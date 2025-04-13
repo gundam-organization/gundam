@@ -11,7 +11,7 @@
 #include <dlfcn.h>
 
 
-TabulatedDialFactory::TabulatedDialFactory(const ConfigUtils::ConfigReader& config_) {
+TabulatedDialFactory::TabulatedDialFactory(const ConfigReader& config_) {
 
     // mandatory
     auto tableConfig = config_.fetchValue<ConfigReader>("tableConfig");

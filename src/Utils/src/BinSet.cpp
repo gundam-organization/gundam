@@ -253,7 +253,7 @@ void BinSet::readTxtBinningDefinition(){
 
 }
 
-void BinSet::readBinningConfig( const ConfigUtils::ConfigReader& binning_){
+void BinSet::readBinningConfig( const ConfigReader& binning_){
 
   binning_.fillValue(_sortBins_, "sortBins");
 
@@ -342,9 +342,9 @@ void BinSet::readBinningConfig( const ConfigUtils::ConfigReader& binning_){
 
   }
 
-  for( auto& binDef : binning_.fetchValue("binList", JsonType()) ){
+  for( auto& binDef : binning_.loop("binList") ){
     _binList_.emplace_back( _binList_.size() );
-    _binList_.back().configure( ConfigUtils::ConfigReader(binDef) );
+    _binList_.back().configure( binDef );
   }
 
 }
