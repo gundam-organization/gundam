@@ -270,27 +270,27 @@ void BinSet::readBinningConfig( const ConfigReader& binning_){
     std::vector<Dimension> dimensionList{};
     dimensionList.reserve( binningDefinition.getConfig().size() );
 
-    for( auto& binDefEntry : binningDefinition.getConfig() ){
+    for( auto& binDefEntry : binningDefinition.loop() ){
       dimensionList.emplace_back();
       auto& dim = dimensionList.back();
 
-      dim.var = GenericToolbox::Json::fetchValue<std::string>(binDefEntry, "name");
+      dim.var = binDefEntry.fetchValue<std::string>("name");
 
-      if( GenericToolbox::Json::doKeyExist(binDefEntry, "edges") ){
-        dim.edgesList = GenericToolbox::Json::fetchValue(binDefEntry, "edges", dim.edgesList);
+      if( binDefEntry.hasKey("edges") ){
+        dim.edgesList = binDefEntry.fetchValue("edges", dim.edgesList);
       }
-      else if( GenericToolbox::Json::doKeyExist(binDefEntry, "values") ){
-        dim.edgesList = GenericToolbox::Json::fetchValue(binDefEntry, "values", dim.edgesList);
+      else if( binDefEntry.hasKey("values") ){
+        dim.edgesList = binDefEntry.fetchValue("values", dim.edgesList);
         dim.isEdgesDiscreteValues = true;
       }
-      else if( GenericToolbox::Json::doKeyExist(binDefEntry, "nBins") ){
+      else if( binDefEntry.hasKey("nBins") ){
         // TH1D-like definition
-        auto nBins( GenericToolbox::Json::fetchValue<int>(binDefEntry, "nBins") );
-        auto minVal( GenericToolbox::Json::fetchValue<double>(binDefEntry, "min") );
-        auto maxVal( GenericToolbox::Json::fetchValue<double>(binDefEntry, "max") );
+        auto nBins( binDefEntry.fetchValue<int>("nBins") );
+        auto minVal( binDefEntry.fetchValue<double>("min") );
+        auto maxVal( binDefEntry.fetchValue<double>("max") );
 
         double step{(maxVal - minVal)/nBins};
-        LogThrowIf( step <= 0, "Invalid binning: " << GenericToolbox::Json::toReadableString(binDefEntry) );
+        LogThrowIf( step <= 0, "Invalid binning: " << binDefEntry.toString() );
 
         dim.edgesList.reserve( nBins + 1 );
         double edgeValue{minVal};
