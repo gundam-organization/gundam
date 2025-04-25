@@ -130,8 +130,12 @@ int main(int argc, char** argv){
       auto useCacheManagerCli = clParser.getOptionVal<std::string>("usingCacheManager");
 
       if( useCacheManagerCli == "on" ){ useCacheManager = true; }
-      if( useCacheManagerCli == "off" ){ useCacheManager = false; }
-      else{ LogExit("Invalid --cache-manager argument: must be empty, 'on' or 'off'"); }
+      else if( useCacheManagerCli == "off" ){ useCacheManager = false; }
+      else{
+        LogError << "Invalid --cache-manager argument: \""
+                 << useCacheManagerCli << "\""
+                 << std::endl;
+        LogExit("Invalid --cache-manager argument: must be empty, 'on' or 'off'"); }
     }
   }
 
