@@ -13,6 +13,7 @@
 #include <vector>
 #include <sstream>
 #include <iostream>
+#include <map>
 
 namespace ConfigUtils {
 
@@ -144,16 +145,19 @@ namespace ConfigUtils {
                    std::vector<std::string> expected_,
                    std::vector<std::string> deprecated_,
                    std::vector<std::pair<std::string,std::string>> replaced_) {
+    // Track the number of times a field name has produced output.  This is
+    // static so that successive calls don't report the same message.
+    static std::map<std::string, int> messageCount;
+    // The number of times a message can be printed.  Ideally this would be
+    // controlled by a command line option verbosity option, or an executable
+    // wide log level.
+    const int messageLimit{1};
     bool ok = true;
 
     // Check that only items in allowed, expected, or deprecated are found.
-    int index{0};
     for (auto& entry : config_.items()) {
       bool found = false;
       std::string key = entry.key();
-      // LogDebug << "Check YAML index: " << index++
-      //          << " key: " << key
-      //          << " in parent: " << parent_ << std::endl;
       for (std::string target : expected_) {
         if (target == key) {
           found = true;
@@ -170,29 +174,32 @@ namespace ConfigUtils {
       if (found) continue;
       for (std::pair<std::string,std::string> target : replaced_) {
         if (target.first == key) {
-          LogWarning << "CONFIG WARNING: Deprecated field \"" << target.first
+          found = true;
+          if (++messageCount[parent_+"/"+key] > messageLimit) break;
+          LogWarning << "CONFIG -- Deprecated field \"" << target.first
                      << "\" replaced by \"" << target.second
                      << "\" in " << parent_
                      << std::endl;
-          found = true;
           break;
         }
       }
       if (found) continue;
       for (std::string target : deprecated_) {
         if (target == key) {
-          LogWarning << "CONFIG WARNING: Deprecated field \"" << target
+          found = true;
+          if (++messageCount[parent_+"/"+key] > messageLimit) break;
+          LogWarning << "CONFIG -- Deprecated field \"" << target
                      << "\" in " << parent_
                      << std::endl;
-          found = true;
           break;
         }
       }
       if (found) continue;
-      LogError << "CONFIG ERROR: Unsupported field \"" << key
+      ok = false;
+      if (++messageCount[parent_+"/"+key] > messageLimit) continue;
+      LogError << "CONFIG -- Unsupported field \"" << key
                << "\" in " << parent_
                << std::endl;
-      ok = false;
     }
 
     // Check that all of the expected items exist
@@ -201,15 +208,17 @@ namespace ConfigUtils {
         GenericToolbox::Json::fetchValue<JsonType>(config_, expect);
       }
       catch (...) {
-        LogError << "CONFIG ERROR: Missing field \"" << expect
-                 << "\" required in " << parent_ <<std::endl;
         ok = false;
+        if (++messageCount[parent_+"/"+expect] > messageLimit) continue;
+        LogError << "CONFIG -- Missing field \"" << expect
+                 << "\" required in " << parent_ <<std::endl;
       }
     }
 
-    if (not ok) {
-      LogError << "CONFIG ERROR: Invalid YAML record for \"" << parent_
-               << std::endl;
+    if (not ok and not (++messageCount["TOP LEVEL"] > messageLimit)) {
+        LogError << "CONFIG -- Invalid configuration inputs."
+                 << " Results may be incorrect."
+                 << std::endl;
     }
 
     return ok;
@@ -231,7 +240,7 @@ namespace ConfigUtils {
         conf = fitFile->Get<TNamed>("gundamFitter/unfoldedConfig_TNamed");
       }
       if (conf == nullptr) {
-        LogError << "Noo config in ROOT file " << filePath_ << std::endl;
+        LogError << "No config in ROOT file " << filePath_ << std::endl;
         std::exit(EXIT_FAILURE);
       }
       config = GenericToolbox::Json::readConfigJsonStr( conf->GetTitle() );
