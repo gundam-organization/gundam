@@ -243,6 +243,14 @@ mkdir -p $REPO_DIR
 - Sharing of the code is regulated by the code [license](./LICENCE). Files
   without a specific license are shared under LGPL 2.1, but certain files
   may have other compatible licenses (e.g. MIT).
+- The name GUNDAM is not protected by copyright law. The name is associated
+  with several registered trademarks globally, however these trademarks are
+  associated with goods such as clothing, toys, and video games. Therefore
+  we do not believe that use of the name GUNDAM as an acronym for
+  Generalized and Unified Neutrino Data Analysis Methods could reasonably
+  be confused with those trademarks. Therefore use of the name GUNDAM does
+  not in this case, we believe, constitute trademark infringement based on
+  the regulations.
 
 ![Lineage & Legacy banner](resources/images/README/sections/sections.006.png)
 
