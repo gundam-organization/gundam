@@ -13,6 +13,7 @@
 #include <vector>
 #include <sstream>
 #include <iostream>
+#include <map>
 
 namespace ConfigUtils {
 
@@ -154,7 +155,7 @@ namespace ConfigUtils {
         conf = fitFile->Get<TNamed>("gundamFitter/unfoldedConfig_TNamed");
       }
       if (conf == nullptr) {
-        LogError << "Noo config in ROOT file " << filePath_ << std::endl;
+        LogError << "No config in ROOT file " << filePath_ << std::endl;
         std::exit(EXIT_FAILURE);
       }
       _config_ = GenericToolbox::Json::readConfigJsonStr( conf->GetTitle() );
