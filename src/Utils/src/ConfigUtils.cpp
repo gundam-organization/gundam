@@ -13,7 +13,7 @@
 #include <vector>
 #include <sstream>
 #include <iostream>
-
+#include <map>
 
 namespace ConfigUtils {
 
@@ -106,6 +106,7 @@ namespace ConfigUtils {
     }
     return out;
   }
+
   void forwardConfig(JsonType& config_){
     while( config_.is_string() and
          ( GenericToolbox::endsWith(config_.get<std::string>(), ".yaml", true)
@@ -116,6 +117,7 @@ namespace ConfigUtils {
       config_ = ConfigUtils::readConfigFile(expand);
     }
   }
+
   void unfoldConfig(JsonType& config_){
 
     std::function<void(JsonType&)> unfoldRecursive = [&](JsonType& outEntry_){
@@ -136,6 +138,92 @@ namespace ConfigUtils {
 
   }
 
+  /// Check that the configuration has the anticipated fields.
+  bool checkFields(JsonType& config_,
+                   std::string parent_,
+                   std::vector<std::string> allowed_,
+                   std::vector<std::string> expected_,
+                   std::vector<std::string> deprecated_,
+                   std::vector<std::pair<std::string,std::string>> replaced_) {
+    // Track the number of times a field name has produced output.  This is
+    // static so that successive calls don't report the same message.
+    static std::map<std::string, int> messageCount;
+    // The number of times a message can be printed.  Ideally this would be
+    // controlled by a command line option verbosity option, or an executable
+    // wide log level.
+    const int messageLimit{1};
+    bool ok = true;
+
+    // Check that only items in allowed, expected, or deprecated are found.
+    for (auto& entry : config_.items()) {
+      bool found = false;
+      std::string key = entry.key();
+      for (std::string target : expected_) {
+        if (target == key) {
+          found = true;
+          break;
+        }
+      }
+      if (found) continue;
+      for (std::string target : allowed_) {
+        if (target == key) {
+          found = true;
+          break;
+        }
+      }
+      if (found) continue;
+      for (std::pair<std::string,std::string> target : replaced_) {
+        if (target.first == key) {
+          found = true;
+          if (++messageCount[parent_+"/"+key] > messageLimit) break;
+          LogWarning << "CONFIG -- Deprecated field \"" << target.first
+                     << "\" replaced by \"" << target.second
+                     << "\" in " << parent_
+                     << std::endl;
+          break;
+        }
+      }
+      if (found) continue;
+      for (std::string target : deprecated_) {
+        if (target == key) {
+          found = true;
+          if (++messageCount[parent_+"/"+key] > messageLimit) break;
+          LogWarning << "CONFIG -- Deprecated field \"" << target
+                     << "\" in " << parent_
+                     << std::endl;
+          break;
+        }
+      }
+      if (found) continue;
+      ok = false;
+      if (++messageCount[parent_+"/"+key] > messageLimit) continue;
+      LogError << "CONFIG -- Unsupported field \"" << key
+               << "\" in " << parent_
+               << std::endl;
+    }
+
+    // Check that all of the expected items exist
+    for (std::string& expect : expected_) {
+      try {
+        GenericToolbox::Json::fetchValue<JsonType>(config_, expect);
+      }
+      catch (...) {
+        ok = false;
+        if (++messageCount[parent_+"/"+expect] > messageLimit) continue;
+        LogError << "CONFIG -- Missing field \"" << expect
+                 << "\" required in " << parent_ <<std::endl;
+      }
+    }
+
+    if (not ok and not (++messageCount["TOP LEVEL"] > messageLimit)) {
+        LogError << "CONFIG -- Invalid configuration inputs."
+                 << " Results may be incorrect."
+                 << std::endl;
+    }
+
+    return ok;
+  }
+
   // class impl
   void ConfigHandler::setConfig(const std::string& filePath_){
     if( GenericToolbox::hasExtension( filePath_, "root" ) ){
@@ -152,7 +240,7 @@ namespace ConfigUtils {
         conf = fitFile->Get<TNamed>("gundamFitter/unfoldedConfig_TNamed");
       }
       if (conf == nullptr) {
-        LogError << "Noo config in ROOT file " << filePath_ << std::endl;
+        LogError << "No config in ROOT file " << filePath_ << std::endl;
         std::exit(EXIT_FAILURE);
       }
       config = GenericToolbox::Json::readConfigJsonStr( conf->GetTitle() );

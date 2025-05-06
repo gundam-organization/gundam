@@ -16,6 +16,8 @@
 #include "GenericToolbox.Root.h"
 #include "Logger.h"
 
+#include "GundamAlmostEqual.h"
+
 #include <cmath>
 #include <memory>
 
@@ -23,6 +25,49 @@
 void FitterEngine::configureImpl(){
   LogInfo << "Reading FitterEngine config..." << std::endl;
   GenericToolbox::setT2kPalette();
+
+  // All of the fields that should (or may) be at this level in the YAML.
+  // This provides a rudimentary syntax check for user inputs.
+  ConfigUtils::checkFields(_config_,"/fitterEngineConfig",
+                           // Allowed fields (don't need to list fields in
+                           // expected, or deprecated).
+                           {{"enablePca"},
+                            {"pcaThreshold"},
+                            {"parameterScannerConfig"},
+                            {"enablePreFitScan"},
+                            {"enablePostFitScan"},
+                            {"enablePreFitToPostFitLineScan"},
+                            {"generateSamplePlots"},
+                            {"generateOneSigmaPlots"},
+                            {"enableParamVariations"},
+                            {"paramVariationsSigmas"},
+                            {"scaleParStepWithChi2Response"},
+                            {"parStepGain"},
+                            {"throwMcBeforeFit"},
+                            {"throwMcBeforeFitGain"},
+                            {"savePostfitEventTrees"},
+                           },
+                           // Expected fields (must be present)
+                           {{"minimizerConfig"},
+                            {"likelihoodInterfaceConfig"},
+                           },
+                           // Deprecated fields (allowed, but cause a warning)
+                           {{"mcmcConfig"},
+                            {"engineType"},
+                            {"propagatorConfig"},
+                            {"monitorRefreshRateInMs"},
+                            {"fixGhostEigenParametersAfterFirstRejected"},
+                           },
+                           // Replaced fields (allowed, but cause a warning)
+                           {
+                             {{"fixGhostFitParameters"},{"enablePca"}},
+                             {{"fixGhostFitParameters"},{"runPcaCheck"}},
+                             {{"pcaDeltaLlhThreshold"},{"pcaThreshold"}},
+                             {{"pcaDeltaChi2Threshold"},{"pcaThreshold"}},
+                             {{"ghostParameterDeltaChi2"},{"pcaThreshold"}},
+                             {{"scanConfig"},{"parameterScannerConfig"}},
+                             {{"allParamVariations"},{"paramVariationsSigmas"}},
+                           });
 
   // need to determine the type before defining the minimizer
   JsonType minimizerConfig{};
@@ -34,7 +79,7 @@ void FitterEngine::configureImpl(){
     GenericToolbox::Json::fillValue(_config_, minimizerConfig, "mcmcConfig");
   });
   GenericToolbox::Json::deprecatedAction(_config_, "engineType", [&]{
-    LogAlert << R"("engineType" should now be specified withing "minimizerConfig/minimizerType")" << std::endl;
+    LogAlert << R"("engineType" should set using "minimizerConfig/type")" << std::endl;
     GenericToolbox::Json::fillValue(_config_, minimizerTypeStr, "engineType");
 
     // handle deprecated types
@@ -104,7 +149,7 @@ void FitterEngine::configureImpl(){
   GenericToolbox::Json::fillValue(_config_, _throwGain_, "throwMcBeforeFitGain");
   GenericToolbox::Json::fillValue(_config_, _savePostfitEventTrees_, "savePostfitEventTrees");
 
-  LogWarning << "FitterEngine configured." << std::endl;
+  LogInfo << "FitterEngine configured." << std::endl;
 }
 void FitterEngine::initializeImpl(){
   LogThrowIf(_config_.empty(), "Config is not set.");
@@ -152,7 +197,7 @@ void FitterEngine::initializeImpl(){
 
   // This moves the parameters
   if( _enablePca_ ) {
-    LogWarning << "PCA is enabled. Polling parameters..." << std::endl;
+    LogAlert << "PCA is enabled. Polling parameters..." << std::endl;
     this->runPcaCheck();
   }
 
@@ -273,16 +318,16 @@ void FitterEngine::initializeImpl(){
     getLikelihoodInterface().writeEventRates( GenericToolbox::TFilePath(_saveDir_, "preFit") );
   }
 
-  LogWarning << "Saving all objects to disk..." << std::endl;
+  LogInfo << "Saving all objects to disk..." << std::endl;
   GenericToolbox::triggerTFileWrite(_saveDir_);
 }
 
 // Core
 void FitterEngine::fit(){
-  LogWarning << __METHOD_NAME__ << std::endl;
+  LogInfo << __METHOD_NAME__ << std::endl;
   LogThrowIf( not isInitialized() );
 
-  LogWarning << "Pre-fit likelihood state:" << std::endl;
+  LogInfo << "Pre-fit likelihood state:" << std::endl;
 
   auto preFitDir(GenericToolbox::mkdirTFile( _saveDir_, "preFit" ));
 
@@ -341,7 +386,7 @@ void FitterEngine::fit(){
               + parList[parIndex].getStdDevValue()
                 * GenericToolbox::Json::fetchValue<double>(entry, "nbSigmaAway");
 
-          LogWarning << "Pushing #" << parIndex << " to " << pushVal << std::endl;
+          LogAlert << "Pushing #" << parIndex << " to " << pushVal << std::endl;
           parList[parIndex].setParameterValue( pushVal );
 
           if( parSet.isEnableEigenDecomp() ){
@@ -358,10 +403,10 @@ void FitterEngine::fit(){
     } // parSet
 
 
-    LogAlert << "Current LLH state:" << std::endl;
+    LogInfo << "Current LLH state:" << std::endl;
     getLikelihoodInterface().propagateAndEvalLikelihood();
 
-    LogAlert << getLikelihoodInterface().getSummary() << std::endl;
+    LogInfo << getLikelihoodInterface().getSummary() << std::endl;
   }
 
   // Leaving now?
@@ -379,25 +424,26 @@ void FitterEngine::fit(){
   LogInfo << "Minimizing LLH..." << std::endl;
   this->_minimizer_->minimize();
 
-  // re-evaluating since the minimizer could have not triggered an eval of the llh
+  // re-evaluating since the minimizer might not have triggered an eval of the
+  // LLH.  And guarantee that the weights were copied if that was enabled.
   getLikelihoodInterface().propagateAndEvalLikelihood();
 
 #ifdef GUNDAM_USING_CACHE_MANAGER
   if( Cache::Manager::IsBuilt() ){
-    LogWarning << "Pulling back individual weight from device..." << std::endl;
+    LogInfo << "Copy Cache::Manager weights after minimizer" << std::endl;
     Cache::Manager::Get()->CopyEventWeights();
   }
   Cache::Manager::SetIsEventWeightCopyEnabled(origCopy);
 #endif
 
-  LogWarning << "Saving post-fit par state..." << std::endl;
+  LogInfo << "Saving post-fit par state..." << std::endl;
   _postFitParState_ = getLikelihoodInterface().getModelPropagator().getParametersManager().exportParameterInjectorConfig();
   GenericToolbox::writeInTFileWithObjTypeExt(
       GenericToolbox::mkdirTFile( _saveDir_, "postFit" ),
       TNamed("parState", GenericToolbox::Json::toReadableString(_postFitParState_).c_str())
   );
 
-  LogWarning << "Post-fit likelihood state:" << std::endl;
+  LogInfo << "Post-fit likelihood state:" << std::endl;
   llhState = getLikelihoodInterface().getSummary();
   LogInfo << llhState << std::endl;
   GenericToolbox::writeInTFileWithObjTypeExt(
@@ -448,7 +494,8 @@ void FitterEngine::fit(){
 
 #ifdef GUNDAM_USING_CACHE_MANAGER
       if( Cache::Manager::IsBuilt() ){
-        LogWarning << "Copy event weights from device..." << std::endl;
+        LogInfo << "Copy Cache::Manager weights after computing post fit error"
+                << std::endl;
         Cache::Manager::Get()->CopyEventWeights();
       }
       // return to default behavior
@@ -457,7 +504,7 @@ void FitterEngine::fit(){
     }
   }
 
-  LogWarning << "Fit is done." << std::endl;
+  LogInfo << "Fit is done." << std::endl;
 }
 
 // protected
@@ -465,7 +512,7 @@ void FitterEngine::runPcaCheck(){
 
   getLikelihoodInterface().propagateAndEvalLikelihood();
 
-  LogInfo << "Using PCA method: " << _pcaMethod_.toString() << " / threshold = " << _pcaThreshold_ << std::endl;
+  LogAlert << "Using PCA method: " << _pcaMethod_.toString() << " / threshold = " << _pcaThreshold_ << std::endl;
 
   double baseLlh = getLikelihoodInterface().getLastLikelihood();
   double baseLlhStat = getLikelihoodInterface().getLastStatLikelihood();
@@ -482,11 +529,11 @@ void FitterEngine::runPcaCheck(){
     if( not parSet.isEnabled() ){ continue; }
 
     if( not parSet.isEnablePca() ){
-      LogWarning << "PCA disabled on " << parSet.getName() << ". Skipping..." << std::endl;
+      LogInfo << "PCA disabled on " << parSet.getName() << ". Skipping..." << std::endl;
       continue;
     }
     else{
-      LogInfo << "Performing PCA on " << parSet.getName() << "..." << std::endl;
+      LogAlert << "Performing PCA on " << parSet.getName() << "..." << std::endl;
     }
 
     bool fixNextEigenPars{false};
@@ -506,7 +553,7 @@ void FitterEngine::runPcaCheck(){
         std::string red;
         std::string rst;
 #endif
-//        LogInfo << red << ssPrint.str() << " -> FIXED AS NEXT EIGEN." << rst << std::endl;
+        LogAlert << red << ssPrint.str() << " -> FIXED" << rst << std::endl;
         continue;
       }
 
@@ -535,7 +582,6 @@ void FitterEngine::runPcaCheck(){
           ssPrint << ": sqrt( deltaChi2Stat/dof ) = " << criteria;
         }
 
-
         // color str
         std::string color;
         std::string rst;
@@ -554,7 +600,7 @@ void FitterEngine::runPcaCheck(){
         }
 
         LogInfo.moveTerminalCursorBack(1); // clear the old line
-        LogInfo << color << ssPrint.str() << rst << std::endl;
+        LogAlert << color << ssPrint.str() << rst << std::endl;
 
         if( fixParPca ){
           par.setIsFixed(true); // ignored in the Chi2 computation of the parSet
@@ -625,14 +671,16 @@ void FitterEngine::rescaleParametersStepSize(){
 
   getLikelihoodInterface().propagateAndEvalLikelihood();
 }
-void FitterEngine::checkNumericalAccuracy(){
-  LogWarning << __METHOD_NAME__ << std::endl;
+bool FitterEngine::checkNumericalAccuracy(){
+  LogAlert << __METHOD_NAME__ << std::endl;
   int nTest{100}; int nThrows{10}; double gain{20};
   std::vector<std::vector<std::vector<double>>> throws(nThrows); // saved throws [throw][parSet][par]
   std::vector<double> responses(nThrows, std::nan("unset"));
   // stability/numerical accuracy test
 
-  LogInfo << "Throwing..." << std::endl;
+  bool accurate = true;
+
+  LogAlert << "Throwing..." << std::endl;
   for(auto& throwEntry : throws ){
     for( auto& parSet : getLikelihoodInterface().getModelPropagator().getParametersManager().getParameterSetsList() ){
       if(not parSet.isEnabled()) continue;
@@ -646,7 +694,7 @@ void FitterEngine::checkNumericalAccuracy(){
     }
   }
 
-  LogInfo << "Testing..." << std::endl;
+  LogAlert << "Testing..." << std::endl;
   for( int iTest = 0 ; iTest < nTest ; iTest++ ){
     GenericToolbox::displayProgressBar(iTest, nTest, "Testing computational accuracy...");
     for( size_t iThrow = 0 ; iThrow < throws.size() ; iThrow++ ){
@@ -663,13 +711,23 @@ void FitterEngine::checkNumericalAccuracy(){
       getLikelihoodInterface().evalLikelihood(eventually);
 
       if( responses[iThrow] == responses[iThrow] ){ // not nan
-        LogThrowIf(getLikelihoodInterface().getLastLikelihood() != responses[iThrow], "Not accurate: " << getLikelihoodInterface().getLastLikelihood() - responses[iThrow] << " / "
-                                                                                                    << GET_VAR_NAME_VALUE(getLikelihoodInterface().getLastLikelihood()) << " <=> " << GET_VAR_NAME_VALUE(responses[iThrow])
-        )
+        if (not GundamUtils::almostEqual(
+                getLikelihoodInterface().getLastLikelihood(),
+                responses[iThrow], 0.02)) {
+          accurate = false;
+          // Check for 50 bits (out of 53 bits) of equality
+          LogError << "Throw " << iThrow << " not accurate: "
+                  << getLikelihoodInterface().getLastLikelihood() - responses[iThrow]
+                  << " for " << GET_VAR_NAME_VALUE(getLikelihoodInterface().getLastLikelihood())
+                  << " <=> " << GET_VAR_NAME_VALUE(responses[iThrow])
+                  << std::endl;
+        }
       }
       responses[iThrow] = getLikelihoodInterface().getLastLikelihood();
     }
     LogDebug << GenericToolbox::toString(responses) << std::endl;
   }
-  LogInfo << "OK" << std::endl;
+  if (accurate) LogAlert  << "Numeric accuracy test passed" << std::endl;
+
+  return accurate;
 }

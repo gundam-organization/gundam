@@ -130,8 +130,12 @@ int main(int argc, char** argv){
       auto useCacheManagerCli = clParser.getOptionVal<std::string>("usingCacheManager");
 
       if( useCacheManagerCli == "on" ){ useCacheManager = true; }
-      if( useCacheManagerCli == "off" ){ useCacheManager = false; }
-      else{ LogExit("Invalid --cache-manager argument: must be empty, 'on' or 'off'"); }
+      else if( useCacheManagerCli == "off" ){ useCacheManager = false; }
+      else{
+        LogError << "Invalid --cache-manager argument: \""
+                 << useCacheManagerCli << "\""
+                 << std::endl;
+        LogExit("Invalid --cache-manager argument: must be empty, 'on' or 'off'"); }
     }
   }
 
@@ -180,6 +184,25 @@ int main(int argc, char** argv){
   configHandler.flatOverride( clParser.getOptionValList<std::string>("overrides") );
 
   auto gundamFitterConfig(configHandler.getConfig());
+
+  // All of the fields that should (or may) be at this level in the YAML.
+  // This provides a rudimentary syntax check for user inputs.
+  ConfigUtils::checkFields(gundamFitterConfig,
+                           "TOP LEVEL",
+                           // Allowed fields (don't need to list fields in
+                           // expected, or deprecated).
+                           {{"outputFolder"},
+                            {"minGundamVersion"},
+                           },
+                           // Expected fields (must be present)
+                           {{"fitterEngineConfig"},
+                           },
+                           // Deprecated fields (allowed, but cause a warning)
+                           {{"generateSamplePlots"},
+                            {"allParameterVariations"},
+                           },
+                           // Replaced field (allowed, but cause a warning)
+                           {});
 
   // Output file path
   std::string outFileName;

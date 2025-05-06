@@ -19,12 +19,35 @@ void ParametersManager::unmuteLogger(){ Logger::setIsMuted( false ); }
 
 // config
 void ParametersManager::configureImpl(){
+  ConfigUtils::checkFields(_config_,
+                           "/fitterEngineConfig/likelihoodInterfaceConfig"
+                           "/propagatorConfig/parametersManagerConfig",
+                           // Allowed fields (don't need to list fields in
+                           // expected, or deprecated).
+                           {{"throwToyParametersWithGlobalCov"},
+                            {"reThrowParSetIfOutOfBounds"},
+                            {"reThrowParSetIfOutOfPhysical"},
+                           },
+                           // Expected fields (must be present)
+                           {{"parameterSetList"},
+                           },
+                           // Deprecated fields (allowed, but cause a warning)
+                           {
+                           },
+                           // Renamed fields  (allowed, but cause a warning)
+                           {
+                           });
 
   GenericToolbox::Json::fillValue(_config_, _throwToyParametersWithGlobalCov_, "throwToyParametersWithGlobalCov");
   GenericToolbox::Json::fillValue(_config_, _reThrowParSetIfOutOfPhysical_, {{"reThrowParSetIfOutOfBounds"},{"reThrowParSetIfOutOfPhysical"}});
   GenericToolbox::Json::fillValue(_config_, _parameterSetListConfig_, "parameterSetList");
 
   LogDebugIf(GundamGlobals::isDebug()) << _parameterSetListConfig_.size() << " parameter sets are defined." << std::endl;
+
+  if (_parameterSetListConfig_.size() < 1) {
+    LogError << "No parameters have been defined" << std::endl;
+    LogExit("Must define parameters for the fit");
+  }
 
   _parameterSetList_.clear(); // make sure there nothing in case readConfig is called more than once
   _parameterSetList_.reserve( _parameterSetListConfig_.size() );
@@ -54,6 +77,10 @@ void ParametersManager::initializeImpl(){
     LogInfo << nPars << " enabled parameters in " << parSet.getName() << std::endl;
   }
   LogInfo << "Total number of parameters: " << nEnabledPars << std::endl;
+
+  if (nEnabledPars < 1) {
+    LogError << "CONFIG ERROR: No parameters have been defined" << std::endl;
+  }
 
   LogInfo << "Building global covariance matrix (" << nEnabledPars << "x" << nEnabledPars << ")" << std::endl;
   _globalCovarianceMatrix_ = std::make_shared<TMatrixD>(nEnabledPars, nEnabledPars );

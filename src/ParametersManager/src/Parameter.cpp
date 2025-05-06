@@ -13,6 +13,36 @@
 
 
 void Parameter::configureImpl(){
+  ConfigUtils::checkFields(_config_,
+                           "/fitterEngineConfig/likelihoodInterfaceConfig"
+                           "/propagatorConfig/parametersManagerConfig"
+                           "/parameterDefinitions/(parameter)",
+                           // Allowed fields (don't need to list fields in
+                           // expected, or deprecated).
+                           {
+                            {"isEnabled"},
+                            {"isFixed"},
+                            {"isThrown"},
+                            {"priorType"},
+                            {"priorValue"},
+                            {"parameterStepSize"},
+                            {"parameterLimits"},
+                            {"throwLimits"},
+                            {"mirrorRange"},
+                            {"dialSetDefinitions"},
+                           },
+                           // Expected fields (must be present)
+                           {
+                             {"parameterName"}, // handled in parameter set.
+                           },
+                           // Deprecated fields (allowed, but cause a warning)
+                           {
+                           },
+                           // Replaced field names (allowed, but warn)
+                           {
+                             {{"name"}, {"parameterName"}},
+                           }
+);
 
   GenericToolbox::Json::fillValue(_config_, _isEnabled_, "isEnabled");
   if( not _isEnabled_ ) { return; }
@@ -76,16 +106,20 @@ void Parameter::setMaxMirror(double maxMirror) {
   _mirrorRange_.max = maxMirror;
 }
 void Parameter::setParameterValue(double parameterValue, bool force) {
-#ifdef DEBUG_BUILD
-  // those printouts will only show if the CMAKE_BUILD_TYPE is set to DEBUG
   if (not isInDomain(parameterValue, true)) {
     LogError << "New parameter value is not in domain: " << parameterValue
              << std::endl;
-    LogError << GundamUtils::Backtrace;
-    if (not force) std::exit(EXIT_FAILURE);
-    else LogAlert << "Forced continuation with invalid parameter" << std::endl;
-  }
+    if (not force) {
+      LogError << GundamUtils::Backtrace;
+      std::exit(EXIT_FAILURE);
+    }
+    else {
+#ifdef DEBUG_BUILD
+      LogDebug << GundamUtils::Backtrace;
 #endif
+      LogAlert << "Forced continuation with invalid parameter" << std::endl;
+    }
+  }
   if( _parameterValue_ != parameterValue ){
     _gotUpdated_ = true;
     _parameterValue_ = parameterValue;
@@ -93,13 +127,13 @@ void Parameter::setParameterValue(double parameterValue, bool force) {
   else{ _gotUpdated_ = false; }
 }
 double Parameter::getParameterValue() const {
-#ifdef DEBUG_BUILD
   if ( isEnabled() and not isValueWithinBounds() ) {
     LogWarning << "Getting out of bounds parameter: "
                << getSummary() << std::endl;
+#ifdef DEBUG_BUILD
     LogDebug << GundamUtils::Backtrace;
-  }
 #endif
+  }
   return _parameterValue_;
 }
 void Parameter::setDialSetConfig(const JsonType &jsonConfig_) {

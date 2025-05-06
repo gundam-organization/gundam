@@ -27,8 +27,53 @@
 
 #include <sstream>
 
-
 void DialCollection::configureImpl() {
+  // All of the fields that should (or may) be at this level in the YAML.
+  // This provides a rudimentary syntax check for user inputs.
+  ConfigUtils::checkFields(_config_,
+                           "/fitterEngineConfig/likelihoodInterfaceConfig"
+                           "/propagatorConfig/parametersManagerConfig"
+                           "/dialSetDefinitions",
+                           // Allowed fields (don't need to list fields in
+                           // expected, or deprecated).
+                           {
+                             {"dialSubType"},
+                             {"isEnabled"},
+                             {"dialLeafName"},
+                             {"minDialResponse"},
+                             {"maxDialResponse"},
+                             {"useMirrorDial"},
+                             {"mirrorLowEdge"},
+                             {"mirrorHighEdge"},
+                             {"allowDialExtrapolation"},
+                             {"applyOnDataSets"},
+                             {"applyCondition"},
+                             {"applyConditions"},
+                             {"definitionRange"},
+                             {"mirrorDefinitionRange"},
+                             {"dialInputList"},
+                             {"binningFilePath"},
+                             {"tableConfig"},
+                             {"parametersBinningPath"},
+                             {"printDialSummary"},
+                             {"dialsList"},
+                           },
+                           // Expected fields (must be present)
+                           {
+                             {"dialType"},
+                           },
+                           // Deprecated fields (allowed, but cause a warning)
+                           {
+                             {"parameterLimits"},
+                           },
+                           // Replaced fields (allowed, but cause a warning)
+                           {
+                             {{"dialsType"}, {"dialType"}},
+                             {{"type"}, {"dialType"}},
+                             {{"options"}, {"dialSubType"}},
+                             {{"printDialsSummary"}, {"printDialSummary"}},
+                             {{"treeExpression"}, {"dialLeafName"}},
+                           });
 
   _dataSetNameList_ = GenericToolbox::Json::fetchValue<std::vector<std::string>>(
       _config_, "applyOnDataSets", std::vector<std::string>());
@@ -167,12 +212,14 @@ void DialCollection::setupDialInterfaceReferences(){
   if( _dialInputBufferList_.empty() ){
     if( _supervisedParameterIndex_ == -1 ){
       // one dial interface per parameter
-      LogThrowIf(_dialInterfaceList_.size() != _parameterSetListPtr_->at(_supervisedParameterSetIndex_).getParameterList().size(),
-                 "Nb of dial base don't match the number of parameters of the selected set: nDials="
-                     << _dialInterfaceList_.size() << " != " << "nPars="
-                     << _parameterSetListPtr_->at(_supervisedParameterSetIndex_).getParameterList().size()
-                     << std::endl << "is the defined dial binning matching the number of parameters?"
-      );
+      if (_dialInterfaceList_.size() != _parameterSetListPtr_->at(_supervisedParameterSetIndex_).getParameterList().size()) {
+        LogError << "Nb of dial base don't match the number of parameters of the selected set: nDials="
+                 << _dialInterfaceList_.size() << " != " << "nPars="
+                 << _parameterSetListPtr_->at(_supervisedParameterSetIndex_).getParameterList().size()
+                 << std::endl << "is the defined dial binning matching the number of parameters?" << std::endl;
+        LogExit("Bad dial definition");
+      }
+
       _dialInputBufferList_.resize(_dialInterfaceList_.size());
       for( int iDial = 0 ; iDial < int(_dialInterfaceList_.size()) ; iDial++ ){
         DialInputBuffer::ParameterReference p{};
@@ -256,8 +303,8 @@ void DialCollection::setupDialInterfaceReferences(){
 // init protected
 void DialCollection::readParametersFromConfig(const JsonType &config_) {
   // globals for the dialSet
-  GenericToolbox::Json::fillValue(config_, _enableDialsSummary_, "printDialsSummary");
-  GenericToolbox::Json::fillValue(config_, _dialType_, {{"type"}, {"dialsType"}, {"dialType"}});
+  GenericToolbox::Json::fillValue(config_, _enableDialsSummary_, {{"printDialSummary"}, {"printDialsSummary"}});
+  GenericToolbox::Json::fillValue(config_, _dialType_, {{"dialType"}, {"type"},  {"dialsType"}});
   GenericToolbox::Json::fillValue(config_, _dialOptions_, {{"options"}, {"dialSubType"}});
   GenericToolbox::Json::fillValue(config_, _dialLeafName_, {{"treeExpression"}, {"dialLeafName"}});
   GenericToolbox::Json::fillValue(config_, _minDialResponse_, {{"minDialResponse"}, {"minimumSplineResponse"}});
@@ -530,7 +577,7 @@ bool DialCollection::initializeDialsWithTabulation(const JsonType& dialsDefiniti
 
 bool DialCollection::initializeDialsWithBinningFile(const JsonType& dialsDefinition) {
   if(not GenericToolbox::Json::doKeyExist(dialsDefinition, "binningFilePath") ) return false;
-  
+
   // A binning file has been provided, so this is a binned dial.  Create
   // the dials for each bin here.  The dials will be assigned to the
   // events in DataDispenser.

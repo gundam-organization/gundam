@@ -26,8 +26,64 @@ SimpleMcmc::SimpleMcmc(FitterEngine* owner_): MinimizerBase(owner_) {
 }
 
 void SimpleMcmc::configureImpl(){
+  setCheckParameterValidity(true);
   this->MinimizerBase::configureImpl();
   LogInfo << "Configure MCMC: " << _config_ << std::endl;
+
+
+  ConfigUtils::checkFields(_config_,
+                           "/fitterEngineConfig/minimizerConfig(SimpleMcmc)",
+                           // Allowed fields (don't need to list fields in
+                           // expected, or deprecated).
+                           {// fields handled by MinimizerBase
+                             {"monitorRefreshRateInMs"},
+                             {"showParametersOnFitMonitor"},
+                             {"maxNbParametersPerLineOnMonitor"},
+                             {"enablePostFitErrorFit"},
+                             {"useNormalizedFitSpace"},
+                             {"writeLlhHistory"},
+                             {"checkParameterValidity"},
+                             // Fields handled here
+                             {"algorithm"},
+                             {"proposal"},
+                             {"mcmcOutputTree"},
+                             {"likelihoodValidity"},
+                             {"randomStart"},
+                             {"sequence"},
+                             {"burninSequence"},
+                             {"burninCycles"},
+                             {"burninSteps"},
+                             {"saveBurnin"},
+                             {"saveRawSteps"},
+                             {"modelSaveStride"},
+                             {"adaptiveRestore"},
+                             {"adaptiveCovFile"},
+                             {"adaptiveCovName"},
+                             {"adaptiveCovTrials"},
+                             {"adaptiveCovWindow"},
+                             {"covarianceDeweighting"},
+                             {"adaptiveFreezeCorrelations"},
+                             {"adaptiveFreezeLength"},
+                             {"acceptanceWindow"},
+                             {"fixedSigma"},
+                           },
+                           // Expected fields (must be present)
+                           {
+                             {"type"},
+                             {"cycles"},
+                             {"steps"},
+                           },
+                           // Deprecated fields (allowed, but cause a warning)
+                           {
+                             {"burninResets"},
+                             {"burninFreezeAfter"},
+                             {"burninCovWindow"},
+                             {"burninWindow"},
+                             {"burninCovDeweight"},
+                             {"adaptiveWindow"},
+                           },
+                           // Replaced fields (allowed, but cause a warning}
+                           {});
 
   // The type of algorithm to be using.  It should be left at the default
   // value (metropolis is the only supported MCMC algorithm right now).
@@ -147,7 +203,7 @@ void SimpleMcmc::configureImpl(){
   // The value is settable from the command line (setting from the command
   // line is the better option) using the override option
   //
-  // "-O /fitterEngineConfig/mcmcConfig/adaptiveRestore=<filename>"
+  // "-O /fitterEngineConfig/minimizerConfig/adaptiveRestore=<filename>"
   //
   // If restore is going to be used, the adaptiveRestore value must exist in
   // the configuration file (with a NULL value)
@@ -1109,8 +1165,11 @@ void SimpleMcmcSequencer::CovarianceWindow(int v) {Owner()._adaptiveCovWindow_ =
 void SimpleMcmcSequencer::CovarianceDeweighting(double v) {Owner()._adaptiveCovDeweighting_ = v;}
 void SimpleMcmcSequencer::AcceptanceWindow(int v) {Owner()._adaptiveWindow_ = v;}
 void SimpleMcmcSequencer::AcceptanceAlgorithm(int v) {Owner()._adaptiveAcceptanceAlgorithm_ = v;}
+void SimpleMcmcSequencer::SetSigma(double s) {Owner()._adaptiveMCMC_->GetProposeStep().SetSigma(s);}
 int SimpleMcmcSequencer::Burnin() {return Owner()._burninCycles_;}
 int SimpleMcmcSequencer::Cycles() {return Owner()._cycles_;}
+int SimpleMcmcSequencer::Steps() {return Owner()._steps_;}
+int SimpleMcmcSequencer::Trials() {return Owner()._adaptiveMCMC_->GetProposeStep().GetTrials();}
 void SimpleMcmcSequencer::RunCycle(std::string name, int id) {
   Owner().adaptiveRunCycle(*Owner()._adaptiveMCMC_, name, id);
   Owner().restoreConfiguration();

@@ -11,6 +11,9 @@
 
 void MinimizerBase::configureImpl(){
 
+  // Do not use checkFields here.  All of the fields should be checked in the
+  // derived classes.
+
   // nested objects first
   int monitorRefreshRateInMs(5000);
   GenericToolbox::Json::fillValue(_config_, monitorRefreshRateInMs, "monitorRefreshRateInMs");
@@ -24,7 +27,7 @@ void MinimizerBase::configureImpl(){
   GenericToolbox::Json::fillValue(_config_, _isEnabledCalcError_, "enablePostFitErrorFit");
   GenericToolbox::Json::fillValue(_config_, _useNormalizedFitSpace_, "useNormalizedFitSpace");
   GenericToolbox::Json::fillValue(_config_, _writeLlhHistory_, "writeLlhHistory");
-
+  GenericToolbox::Json::fillValue(_config_, _checkParameterValidity_, "checkParameterValidity");
 }
 void MinimizerBase::initializeImpl(){
   LogWarning << "Initializing MinimizerBase..." << std::endl;
