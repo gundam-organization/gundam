@@ -96,9 +96,6 @@ void DataDispenser::initializeImpl(){
 
   _config_.printUnusedKeys();
 
-  // Nothing else to do other than read config?
-  LogWarning << "Initialized data dispenser: " << getTitle() << std::endl;
-
   for( auto& eventVarTransform: _parameters_.eventVarTransformList ){
     eventVarTransform.initialize();
   }

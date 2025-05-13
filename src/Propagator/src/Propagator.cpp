@@ -55,8 +55,6 @@ void Propagator::initializeImpl(){
 
   _config_.printUnusedKeys();
 
-  LogWarning << "Initializing propagator..." << std::endl;
-
   _parManager_.initialize();
   _sampleSet_.initialize();
   _dialManager_.initialize();

@@ -57,7 +57,6 @@ void DatasetDefinition::configureImpl() {
 }
 void DatasetDefinition::initializeImpl() {
   if( not _isEnabled_ ) return;
-  LogInfo << "Initializing dataset: \"" << _name_ << "\"" << std::endl;
 
   _modelDispenser_.initialize();
   for( auto& dataDispenser : _dataDispenserDict_ ){

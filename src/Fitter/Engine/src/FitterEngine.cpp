@@ -23,7 +23,6 @@
 
 
 void FitterEngine::configureImpl(){
-  LogInfo << "Reading FitterEngine config..." << std::endl;
   GenericToolbox::setT2kPalette();
 
   // setting up the minimizer
@@ -71,8 +70,6 @@ void FitterEngine::configureImpl(){
   _config_.fillValue(_parameterScanner_.getConfig(), {{"parameterScannerConfig"},{"scanConfig"}});
   _parameterScanner_.configure();
 
-  LogInfo << "Convergence monitor will be refreshed every " << _minimizer_->getMonitor().convergenceMonitor.getMaxRefreshRateInMs() << "ms." << std::endl;
-
   // local config
   _config_.fillValue(_enablePca_, {{"enablePca"},{"runPcaCheck"},{"fixGhostFitParameters"}});
 
@@ -95,8 +92,6 @@ void FitterEngine::configureImpl(){
   _config_.fillValue(_throwMcBeforeFit_, "throwMcBeforeFit");
   _config_.fillValue(_throwGain_, "throwMcBeforeFitGain");
   _config_.fillValue(_savePostfitEventTrees_, "savePostfitEventTrees");
-
-  LogInfo << "FitterEngine configured." << std::endl;
 }
 void FitterEngine::initializeImpl(){
 

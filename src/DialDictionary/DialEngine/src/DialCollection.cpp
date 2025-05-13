@@ -410,7 +410,7 @@ bool DialCollection::initializeNormDialsWithParBinning() {
   this->readParametersFromConfig(_config_);
 
   // Read the binning
-  LogInfo << "Defining binned dials for " << getTitle() << std::endl;
+  LogDebugIf(GundamGlobals::isDebug()) << "Defining binned dials for " << getTitle() << std::endl;
   _dialBinSet_ = BinSet();
   _dialBinSet_.setName("parameterBinning");
   _dialBinSet_.configure( binning );
@@ -587,7 +587,7 @@ bool DialCollection::initializeDialsWithBinningFile(const ConfigReader& dialsDef
     }
 
       if( not excludedBins.empty() ){
-      LogInfo << "Removing " << excludedBins.size() << " null dials out of " << nBins << " / " << 100*double(excludedBins.size())/double(nBins) << "%... (--debug for more info)" << std::endl;
+      LogWarning << "Removing " << excludedBins.size() << " null dials out of " << nBins << " / " << 100*double(excludedBins.size())/double(nBins) << "%... (--debug for more info)" << std::endl;
       for( int iBin = nBins ; iBin >= 0 ; iBin-- ){
         if( GenericToolbox::doesElementIsInVector(iBin, excludedBins) ){
           _dialBinSet_.getBinList().erase(_dialBinSet_.getBinList().begin() + iBin);

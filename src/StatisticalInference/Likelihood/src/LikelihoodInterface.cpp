@@ -79,8 +79,6 @@ void LikelihoodInterface::initializeImpl() {
 
   _config_.printUnusedKeys();
 
-  LogWarning << "Initializing LikelihoodInterface..." << std::endl;
-
   for( auto& dataSet : _datasetList_ ){ dataSet.initialize(); }
 
   _modelPropagator_.initialize();
