@@ -227,6 +227,16 @@ namespace ConfigUtils {
 
   std::vector<std::string> ConfigReader::_deprecatedList_{};
 
+  void ConfigReader::defineField(const FieldDefinition& fieldDefinition_){
+    LogThrowIf( GenericToolbox::Json::doKeyExist(_config_, fieldDefinition_.name) ) {
+      throw std::logic_error("Field \"" + fieldDefinition_.name + "\" already defined.");
+    }
+    _fieldKeysDict_[fieldDefinition_.name] = fieldDefinition_.keyList;
+  }
+  void ConfigReader::defineFields(const std::vector<FieldDefinition>& fieldDefinition_){
+    for( auto& field : fieldDefinition_ ){ defineField(field); }
+  }
+
   bool ConfigReader::hasKey(const std::string& keyPath_) const{
     if( GenericToolbox::Json::doKeyExist(_config_, keyPath_) ){
       // tag the found option
