@@ -239,7 +239,56 @@ namespace ConfigUtils {
   }
   void ConfigReader::checkConfiguration() const{
 
-    // first, look for invalid key names
+    // 1 - check for missing compulsory fields
+    std::vector<std::string> missingFieldList{};
+    for( auto& field : _fieldDefinitionList_ ){
+      if( not field.isMandatory ){ continue; }
+      auto* entry = getConfigEntry(field);
+      if(entry == nullptr){ missingFieldList.emplace_back(field.name); }
+    }
+    if( not missingFieldList.empty() ){
+      LogError << _parentPath_ << ": found " << missingFieldList.size() << " missing compulsory fields." << std::endl;
+      for( auto& missingField : missingFieldList ){
+        LogAlert << "  > \"" << missingField << "\" is a mandatory field." << std::endl;
+      }
+      LogExit("Invalid configuration");
+    }
+
+    // 2 - check if some config keys have some collisions
+    // 2.1 - if they do, do they carry the same value?
+    // -> should allow collisions since some configs are meant to be handled by older versions of GUNDAM as well
+    std::map<const FieldDefinition*, std::vector<std::string>> collisionDict{};
+    for( auto& field : _fieldDefinitionList_ ){
+      std::vector<std::string> keyCollisionList{};
+      if( _config_.contains(field.name) ){ keyCollisionList.emplace_back(field.name); }
+      for( auto& altFieldName : field.altNameList ){
+        if( _config_.contains(altFieldName) ){ keyCollisionList.emplace_back(altFieldName); }
+      }
+      if( keyCollisionList.size() >= 2 ){
+        collisionDict[&field] = keyCollisionList;
+      }
+    }
+    if( not collisionDict.empty() ){
+      LogAlert << _parentPath_ << ": found " << collisionDict.size() << " key collisions. Are they backward compatibility options?" << std::endl;
+      for( const auto& collision : collisionDict ){
+        LogAlert << "  > Field \"" << collision.first->name << "\" has collisions: " << GenericToolbox::toString(collision.second) << std::endl;
+      }
+      // check if they carry the same value?
+      bool unmatchingCollisionFound = false;
+      for( const auto& collision : collisionDict ){
+        auto val = _config_.at(collision.second[0]);
+        for( auto& key : collision.second ){
+          if(_config_.at(key) != val){
+            unmatchingCollisionFound = true;
+            LogError << _parentPath_ << ": found unmatching values for field \"" << collision.first->name << "\". Make sure they have the same value." << std::endl;
+          }
+        }
+      }
+      if( unmatchingCollisionFound ){ LogExit("Invalid configuration"); }
+    }
+
+    // 3 - look for invalid key names
+    // just a warning
     std::vector<std::string> invalidKeyList{};
     for(auto it = _config_.begin(); it != _config_.end(); ++it){
       if(not GenericToolbox::isIn(GenericToolbox::toLowerCase(it.key()), _definedFieldNameList_)){
@@ -253,24 +302,6 @@ namespace ConfigUtils {
       for( auto& unusedKey : invalidKeyList ){
         LogAlert << "  > \"" << unusedKey << "\" won't be recognized by GUNDAM." << std::endl;
       }
-    }
-
-    // second, check for missing compulsory fields
-    std::vector<std::string> missingFieldList{};
-    for( auto& field : _fieldDefinitionList_ ){
-      if( not field.isMandatory ){ continue; }
-
-      auto* entry = getConfigEntry(field);
-      if(entry == nullptr) {
-        missingFieldList.emplace_back(field.name);
-      }
-    }
-    if( not missingFieldList.empty() ){
-      LogError << _parentPath_ << ": found " << missingFieldList.size() << " missing compulsory fields." << std::endl;
-      for( auto& missingField : missingFieldList ){
-        LogAlert << "  > \"" << missingField << "\" is a mandatory field." << std::endl;
-      }
-      LogExit("Invalid configuration");
     }
 
   }
