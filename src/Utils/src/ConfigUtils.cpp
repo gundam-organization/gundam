@@ -322,18 +322,16 @@ namespace ConfigUtils {
     return nullptr;
   }
 
-  bool ConfigReader::hasKey(const std::string& keyPath_) const{
-    if( GenericToolbox::Json::doKeyExist(_config_, keyPath_) ){
-      // tag the found option
-      _usedKeyList_.insert(keyPath_);
+  bool ConfigReader::hasKey(const std::string& key_) const{
+    if( _config_.contains(key_) ){
+      // register the key
+      _usedKeyList_.insert(key_);
       return true;
     }
     return false;
   }
   void ConfigReader::fillFormula(std::string& formulaToFill_, const std::string& keyPath_, const std::string& joinStr_) const{
     if( not hasKey(keyPath_) ){ return; }
-    // tag the found option
-    _usedKeyList_.insert(keyPath_);
     formulaToFill_ = GenericToolbox::Json::buildFormula(_config_, keyPath_, joinStr_, formulaToFill_);
   }
   void ConfigReader::printUnusedKeys() const{
