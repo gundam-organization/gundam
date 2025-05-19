@@ -230,7 +230,7 @@ namespace ConfigUtils {
   void ConfigReader::defineField(const FieldDefinition& fieldDefinition_){
     // Check collision on name
     LogThrowIf(
-      not _usedFieldNameList_.insert(GenericToolbox::toLowerCase(fieldDefinition_.name)).second,
+      not _definedFieldNameList_.insert(GenericToolbox::toLowerCase(fieldDefinition_.name)).second,
       "[DEV] Collision on name: " << fieldDefinition_.name
     );
     _fieldDefinitionList_.emplace_back(fieldDefinition_);
@@ -239,20 +239,17 @@ namespace ConfigUtils {
     for(auto& field : fieldDefinition_){ defineField(field); }
   }
   void ConfigReader::checkConfiguration() const{
-    std::vector<std::string> unusedKeyList{};
+    std::vector<std::string> invalidKeyList{};
     for(auto it = _config_.begin(); it != _config_.end(); ++it){
-      if(_usedFieldNameList_.find(it.key()) == _usedFieldNameList_.end()){
+      if(not GenericToolbox::isIn(GenericToolbox::toLowerCase(it.key()), _definedFieldNameList_)){
         // already printed out? regardless of indexed path
         if( not doShowWarning(it.key()) ){ continue; }
-
-        unusedKeyList.emplace_back(it.key());
-
-        LogAlert << "Invalid field in configuration: " + it.key() << std::endl;;
+        invalidKeyList.emplace_back(it.key());
       }
     }
-    if( not unusedKeyList.empty() ){
-      LogAlert << _parentPath_ << ": found " << unusedKeyList.size() << " invalid option names. Are they backward compatibility options?" << std::endl;
-      for( auto& unusedKey : unusedKeyList ){
+    if( not invalidKeyList.empty() ){
+      LogAlert << _parentPath_ << ": found " << invalidKeyList.size() << " invalid option names. Are they backward compatibility options?" << std::endl;
+      for( auto& unusedKey : invalidKeyList ){
         LogAlert << "  > \"" << unusedKey << "\" won't be recognized by GUNDAM." << std::endl;
       }
     }

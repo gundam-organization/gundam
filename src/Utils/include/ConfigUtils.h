@@ -82,7 +82,6 @@ namespace ConfigUtils {
 
     // define fields
     struct FieldDefinition{ std::string name{}; bool isMandatory{false}; std::vector<std::string> altNameList{}; };
-    bool hasField(const std::string& fieldName_) const;
     void defineField(const FieldDefinition& fieldDefinition_);
     void defineFields(const std::vector<FieldDefinition>& fieldDefinition_);
     void checkConfiguration() const;
@@ -102,6 +101,7 @@ namespace ConfigUtils {
 
 
     // templates
+    template<typename T> void fillValue(T& object_, const std::string& fieldName_) const;
     template<typename T> T fetchValue(const std::vector<std::string>& keyPathList_) const; // source
     template<typename F> void deprecatedAction(const std::vector<std::string>& keyPathList_, const std::string& newPath_, const F& action_) const;
 
@@ -113,7 +113,6 @@ namespace ConfigUtils {
     // nested template (string to vector<string>)
     template<typename T> T fetchValue(const std::string& keyPath_) const{ return this->fetchValue<T>(std::vector<std::string>({keyPath_})); }
     template<typename T> T fetchValue(const std::string& keyPath_, const T& defaultValue_) const{ return fetchValue(std::vector<std::string>({keyPath_}), defaultValue_); }
-    template<typename T> void fillValue(T& object_, const std::string& keyPath_) const{ fillValue(object_, std::vector<std::string>({keyPath_})); }
     template<typename T> void fillEnum(T& enum_, const std::string& keyPath_) const{ fillEnum(enum_, std::vector<std::string>({keyPath_})); }
     template<typename F> void deprecatedAction(const std::string& keyPath_, const std::string& newPath_, const F& action_) const{ deprecatedAction(std::vector<std::string>({keyPath_}), newPath_, [&](const std::string& unused_){ action_(); }); }
 
@@ -130,16 +129,19 @@ namespace ConfigUtils {
 
     // defining fields before reading the config
     std::vector<FieldDefinition> _fieldDefinitionList_{};
-    std::unordered_set<std::string> _usedFieldNameList_{};
+    std::unordered_set<std::string> _definedFieldNameList_{};
 
-    // keep track of fields that have been red
-    mutable std::vector<std::string> _usedKeyList_{};
+    // keep track of fields that have been red in runtime
+    mutable std::unordered_set<std::string> _usedKeyList_{};
 
     // handling printing only once
     static std::vector<std::string> _deprecatedList_;
 
   };
 
+  template<typename T> void ConfigReader::fillValue(T& object_, const std::string& fieldName_) const{
+
+  }
   template<typename T> T ConfigReader::fetchValue(const std::vector<std::string>& keyPathList_) const{
     // keyPathList_ has all the possible names for a given option
     // the first one is the official one, when others are set a message will appear telling the user it's deprecated
