@@ -81,9 +81,11 @@ namespace ConfigUtils {
     JsonType &getConfig(){ return _config_; }
 
     // define fields
-    struct FieldDefinition{ std::string name{}; std::vector<std::string> keyList{}; };
+    struct FieldDefinition{ std::string name{}; bool isMandatory{false}; std::vector<std::string> altNameList{}; };
+    bool hasField(const std::string& fieldName_) const;
     void defineField(const FieldDefinition& fieldDefinition_);
     void defineFields(const std::vector<FieldDefinition>& fieldDefinition_);
+    void checkConfiguration() const;
 
     // read options
     [[nodiscard]] bool empty() const{ return _config_.empty(); }
@@ -126,8 +128,9 @@ namespace ConfigUtils {
     std::string _parentPath_{"/"};
     JsonType _config_;
 
-    // defining fields prior to reading the config
-    std::map<std::string, std::vector<std::string>> _fieldKeysDict_{}; // _fieldKeysDict_["field"] -> list of config keys
+    // defining fields before reading the config
+    std::vector<FieldDefinition> _fieldDefinitionList_{};
+    std::unordered_set<std::string> _usedFieldNameList_{};
 
     // keep track of fields that have been red
     mutable std::vector<std::string> _usedKeyList_{};

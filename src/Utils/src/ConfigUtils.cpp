@@ -227,14 +227,35 @@ namespace ConfigUtils {
 
   std::vector<std::string> ConfigReader::_deprecatedList_{};
 
+  bool ConfigReader::hasField(const std::string& fieldName_) const{
+    return std::any_of( _fieldDefinitionList_.begin(), _fieldDefinitionList_.end(), [&](auto& f_){ return f_.fieldName == fieldName_; } );
+  }
   void ConfigReader::defineField(const FieldDefinition& fieldDefinition_){
-    LogThrowIf( GenericToolbox::Json::doKeyExist(_config_, fieldDefinition_.name) ) {
-      throw std::logic_error("Field \"" + fieldDefinition_.name + "\" already defined.");
-    }
-    _fieldKeysDict_[fieldDefinition_.name] = fieldDefinition_.keyList;
+    // Check collision on name
+    LogThrowIf(not _usedFieldNameList_.insert(fieldDefinition_.name).second, "[DEV] Collision on name: " << fieldDefinition_.name);
+    _fieldDefinitionList_.emplace_back(fieldDefinition_);
   }
   void ConfigReader::defineFields(const std::vector<FieldDefinition>& fieldDefinition_){
-    for( auto& field : fieldDefinition_ ){ defineField(field); }
+    for(auto& field : fieldDefinition_){ defineField(field); }
+  }
+  void ConfigReader::checkConfiguration() const{
+    std::vector<std::string> unusedKeyList{};
+    for(auto it = _config_.begin(); it != _config_.end(); ++it){
+      if(_usedFieldNameList_.find(it.key()) == _usedFieldNameList_.end()){
+        // already printed out? regardless of indexed path
+        if( not doShowWarning(it.key()) ){ continue; }
+
+        unusedKeyList.emplace_back(it.key());
+
+        LogAlert << "Invalid field in configuration: " + it.key() << std::endl;;
+      }
+    }
+    if( not unusedKeyList.empty() ){
+      LogAlert << _parentPath_ << ": found " << unusedKeyList.size() << " invalid option names. Are they backward compatibility options?" << std::endl;
+      for( auto& unusedKey : unusedKeyList ){
+        LogAlert << "  > \"" << unusedKey << "\" won't be recognized by GUNDAM." << std::endl;
+      }
+    }
   }
 
   bool ConfigReader::hasKey(const std::string& keyPath_) const{
@@ -252,6 +273,7 @@ namespace ConfigUtils {
     formulaToFill_ = GenericToolbox::Json::buildFormula(_config_, keyPath_, joinStr_, formulaToFill_);
   }
   void ConfigReader::printUnusedKeys() const{
+    // for context dependent options
     std::vector<std::string> unusedKeyList{};
     for (auto it = _config_.begin(); it != _config_.end(); ++it) {
       if( GenericToolbox::isIn(it.key(), _usedKeyList_) ){ continue; }
@@ -265,7 +287,7 @@ namespace ConfigUtils {
     if( not unusedKeyList.empty() ){
       LogAlert << _parentPath_ << ": " << unusedKeyList.size() << " were not used in the config reading. Are they backward compatibility options?" << std::endl;
       for( auto& unusedKey : unusedKeyList ){
-        LogAlert << "  > \"" << unusedKey << "\" was not used." << std::endl;
+        LogAlert << "  > \"" << unusedKey << "\" was not red." << std::endl;
       }
     }
   }
