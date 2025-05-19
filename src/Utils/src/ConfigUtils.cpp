@@ -238,6 +238,8 @@ namespace ConfigUtils {
     for(auto& field : fieldDefinition_){ defineField(field); }
   }
   void ConfigReader::checkConfiguration() const{
+
+    // first, look for invalid key names
     std::vector<std::string> invalidKeyList{};
     for(auto it = _config_.begin(); it != _config_.end(); ++it){
       if(not GenericToolbox::isIn(GenericToolbox::toLowerCase(it.key()), _definedFieldNameList_)){
@@ -252,6 +254,25 @@ namespace ConfigUtils {
         LogAlert << "  > \"" << unusedKey << "\" won't be recognized by GUNDAM." << std::endl;
       }
     }
+
+    // second, check for missing compulsory fields
+    std::vector<std::string> missingFieldList{};
+    for( auto& field : _fieldDefinitionList_ ){
+      if( not field.isMandatory ){ continue; }
+
+      auto* entry = getConfigEntry(field);
+      if(entry == nullptr) {
+        missingFieldList.emplace_back(field.name);
+      }
+    }
+    if( not missingFieldList.empty() ){
+      LogError << _parentPath_ << ": found " << missingFieldList.size() << " missing compulsory fields." << std::endl;
+      for( auto& missingField : missingFieldList ){
+        LogAlert << "  > \"" << missingField << "\" is a mandatory field." << std::endl;
+      }
+      LogExit("Invalid configuration");
+    }
+
   }
   const ConfigReader::FieldDefinition& ConfigReader::getFieldDefinition(const std::string& fieldName_) const{
     for(const auto& field : _fieldDefinitionList_){
