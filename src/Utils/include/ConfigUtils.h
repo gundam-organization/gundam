@@ -71,16 +71,8 @@ namespace ConfigUtils {
       bool isMandatory{false};
       std::vector<std::string> altNameList{};
 
-      friend std::ostream& operator<< (std::ostream& stream, const FieldDefinition& obj_){
-        stream << obj_.toString(); return stream;
-      }
-      [[nodiscard]] std::string toString() const{
-        std::stringstream ss;
-        ss << "name=" << name;
-        ss << ", isMandatory=" << isMandatory;
-        if(not altNameList.empty()) ss << ", altNameList=" << GenericToolbox::toString(altNameList);
-        return ss.str();
-      }
+      friend std::ostream& operator<< (std::ostream& stream, const FieldDefinition& obj_){ stream << obj_.toString(); return stream; }
+      [[nodiscard]] std::string toString() const;
     };
 
   public:
@@ -103,11 +95,12 @@ namespace ConfigUtils {
     void defineFields(const std::vector<FieldDefinition>& fieldDefinition_);
     void checkConfiguration() const;
     const FieldDefinition& getFieldDefinition(const std::string& fieldName_) const;
-    const JsonType* getConfigEntry(const FieldDefinition& field_) const;
+    std::pair<std::string, const JsonType*> getConfigEntry(const FieldDefinition& field_) const;
+    std::pair<std::string, const JsonType*> getConfigEntry(const std::string& fieldName_) const;
 
     // read options
     [[nodiscard]] bool empty() const{ return _config_.empty(); }
-    [[nodiscard]] bool hasKey(const std::string& keyPath_) const;
+    [[nodiscard]] bool hasKey(const std::string& key_) const;
     [[nodiscard]] std::string toString() const{ return GenericToolbox::Json::toReadableString( _config_ ); }
     void fillFormula(std::string& formulaToFill_, const std::string& keyPath_, const std::string& joinStr_) const;
 
@@ -120,17 +113,17 @@ namespace ConfigUtils {
 
 
     // templates
+    template<typename T> T fetchValue(const std::string& fieldName_) const;
+    template<> ConfigReader fetchValue(const std::string& fieldName_) const;
     template<typename T> void fillValue(T& object_, const std::string& fieldName_) const;
     template<typename T> T fetchValue(const std::vector<std::string>& keyPathList_) const; // source
     template<typename F> void deprecatedAction(const std::vector<std::string>& keyPathList_, const std::string& newPath_, const F& action_) const;
 
     // nested template
-    template<typename T> T fetchValue(const std::vector<std::string>& keyPathList_, const T& defaultValue_) const{ try{ return fetchValue<T>(keyPathList_); } catch( ... ) { return defaultValue_; } }
     template<typename T> void fillValue(T& object_, const std::vector<std::string> &keyPathList_) const;
     template<typename T> void fillEnum(T& enum_, const std::vector<std::string>& keyPathList_) const;
 
     // nested template (string to vector<string>)
-    template<typename T> T fetchValue(const std::string& keyPath_) const{ return this->fetchValue<T>(std::vector<std::string>({keyPath_})); }
     template<typename T> T fetchValue(const std::string& keyPath_, const T& defaultValue_) const{ return fetchValue(std::vector<std::string>({keyPath_}), defaultValue_); }
     template<typename T> void fillEnum(T& enum_, const std::string& keyPath_) const{ fillEnum(enum_, std::vector<std::string>({keyPath_})); }
     template<typename F> void deprecatedAction(const std::string& keyPath_, const std::string& newPath_, const F& action_) const{ deprecatedAction(std::vector<std::string>({keyPath_}), newPath_, [&](const std::string& unused_){ action_(); }); }
@@ -161,21 +154,35 @@ namespace ConfigUtils {
   };
 
   // inline definitions
-  template<typename T> void ConfigReader::fillValue(T& object_, const std::string& fieldName_) const{
-    auto& fieldDefinition = getFieldDefinition(fieldName_);
-    auto* jsonField = getConfigEntry(fieldDefinition);
-    if( jsonField == nullptr ) {
-      LogThrowIf(fieldDefinition.isMandatory, "Could not find field=" << fieldName_ << " in config " << toString());
-      return;
+  template<typename T> T ConfigReader::fetchValue(const std::string& fieldName_) const{
+    auto* jsonField = getConfigEntry(fieldName_).second;
+    if(jsonField == nullptr){
+      throw std::runtime_error("Could not get field value \"" + fieldName_ + "\" in config " + toString());
+      return {};
     }
-    object_ = GenericToolbox::Json::get<T>(*jsonField);
+    return GenericToolbox::Json::get<T>(*jsonField);
+  }
+  template<> inline ConfigReader ConfigReader::fetchValue<ConfigReader>(const std::string& fieldName_) const{
+    auto keyValuePair = getConfigEntry(fieldName_);
+    if(keyValuePair.second == nullptr){
+      throw std::runtime_error("Could not get field value \"" + fieldName_ + "\" in config " + toString());
+      return {};
+    }
+    auto out = GenericToolbox::Json::get<ConfigReader>(*keyValuePair.second);
+    // using config key so users can retrieve the path in their config
+    out.setParentPath(GenericToolbox::joinPath(_parentPath_, keyValuePair.first));
+    return out;
+  }
+  template<typename T> void ConfigReader::fillValue(T& object_, const std::string& fieldName_) const{
+    try{ object_ = fetchValue<T>(fieldName_); }
+    catch(...){}
   }
   template<typename T> T ConfigReader::fetchValue(const std::vector<std::string>& keyPathList_) const{
     // keyPathList_ has all the possible names for a given option
     // the first one is the official one, when others are set a message will appear telling the user it's deprecated
     T out;
     bool hasBeenFound{false};
-    for( auto& keyPath : keyPathList_ ) {
+    for( auto& keyPath : keyPathList_ ){
 
       // hasKey will tag the key
       if( this->hasKey(keyPath) ){

@@ -226,6 +226,14 @@ namespace ConfigUtils {
     LogInfo << "Unfolded config written as: " << outPath << std::endl;
   }
 
+  std::string ConfigReader::FieldDefinition::toString() const{
+    std::stringstream ss;
+    ss << "name=" << name;
+    ss << ", isMandatory=" << isMandatory;
+    if(not altNameList.empty()) ss << ", altNameList=" << GenericToolbox::toString(altNameList);
+    return ss.str();
+  }
+
   void ConfigReader::defineField(const FieldDefinition& fieldDefinition_){
     // Check collision on name
     LogThrowIf(
@@ -243,7 +251,7 @@ namespace ConfigUtils {
     std::vector<std::string> missingFieldList{};
     for( auto& field : _fieldDefinitionList_ ){
       if( not field.isMandatory ){ continue; }
-      auto* entry = getConfigEntry(field);
+      auto* entry = getConfigEntry(field).second;
       if(entry == nullptr){ missingFieldList.emplace_back(field.name); }
     }
     if( not missingFieldList.empty() ){
@@ -310,16 +318,21 @@ namespace ConfigUtils {
       if( field.name == fieldName_ ){ return field; }
     }
     LogExit("[DEV] Unknown field name \"" << fieldName_ << "\" among list: " << _fieldDefinitionList_);
+    return {};
   }
-  const JsonType* ConfigReader::getConfigEntry(const ConfigReader::FieldDefinition& field_) const{
-    if( hasKey(field_.name) ){ return &_config_.at(field_.name); }
+  std::pair<std::string, const JsonType*> ConfigReader::getConfigEntry(const ConfigReader::FieldDefinition& field_) const{
+    if( hasKey(field_.name) ){ return {field_.name, &_config_.at(field_.name)}; }
     for( auto& altFieldName : field_.altNameList ){
       if( hasKey(altFieldName) ){
         printDeprecatedMessage(altFieldName, field_.name);
-        return &_config_.at(altFieldName);
+        return {altFieldName, &_config_.at(altFieldName)};
       }
     }
-    return nullptr;
+    return {"", nullptr};
+  }
+  std::pair<std::string, const JsonType*> ConfigReader::getConfigEntry(const std::string& fieldName_) const{
+    auto& field = getFieldDefinition(fieldName_);
+    return getConfigEntry(field);
   }
 
   bool ConfigReader::hasKey(const std::string& key_) const{
