@@ -227,12 +227,12 @@ namespace ConfigUtils {
 
   std::vector<std::string> ConfigReader::_deprecatedList_{};
 
-  bool ConfigReader::hasField(const std::string& fieldName_) const{
-    return std::any_of( _fieldDefinitionList_.begin(), _fieldDefinitionList_.end(), [&](auto& f_){ return f_.fieldName == fieldName_; } );
-  }
   void ConfigReader::defineField(const FieldDefinition& fieldDefinition_){
     // Check collision on name
-    LogThrowIf(not _usedFieldNameList_.insert(fieldDefinition_.name).second, "[DEV] Collision on name: " << fieldDefinition_.name);
+    LogThrowIf(
+      not _usedFieldNameList_.insert(GenericToolbox::toLowerCase(fieldDefinition_.name)).second,
+      "[DEV] Collision on name: " << fieldDefinition_.name
+    );
     _fieldDefinitionList_.emplace_back(fieldDefinition_);
   }
   void ConfigReader::defineFields(const std::vector<FieldDefinition>& fieldDefinition_){
@@ -285,7 +285,7 @@ namespace ConfigUtils {
     }
 
     if( not unusedKeyList.empty() ){
-      LogAlert << _parentPath_ << ": " << unusedKeyList.size() << " were not used in the config reading. Are they backward compatibility options?" << std::endl;
+      LogAlert << _parentPath_ << ": " << unusedKeyList.size() << " were not red in the config reading. Are they context dependent options?" << std::endl;
       for( auto& unusedKey : unusedKeyList ){
         LogAlert << "  > \"" << unusedKey << "\" was not red." << std::endl;
       }
