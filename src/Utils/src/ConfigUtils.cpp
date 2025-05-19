@@ -17,6 +17,8 @@
 
 namespace ConfigUtils {
 
+  // static
+  std::vector<std::string> ConfigReader::_deprecatedList_{};
 
   // open file
   JsonType readConfigFile(const std::string& configFilePath_){
@@ -224,9 +226,6 @@ namespace ConfigUtils {
     LogInfo << "Unfolded config written as: " << outPath << std::endl;
   }
 
-
-  std::vector<std::string> ConfigReader::_deprecatedList_{};
-
   void ConfigReader::defineField(const FieldDefinition& fieldDefinition_){
     // Check collision on name
     LogThrowIf(
@@ -254,11 +253,27 @@ namespace ConfigUtils {
       }
     }
   }
+  const ConfigReader::FieldDefinition& ConfigReader::getFieldDefinition(const std::string& fieldName_) const{
+    for(const auto& field : _fieldDefinitionList_){
+      if( field.name == fieldName_ ){ return field; }
+    }
+    LogExit("[DEV] Unknown field name \"" << fieldName_ << "\" among list: " << _fieldDefinitionList_);
+  }
+  const JsonType* ConfigReader::getConfigEntry(const ConfigReader::FieldDefinition& field_) const{
+    if( hasKey(field_.name) ){ return &_config_.at(field_.name); }
+    for( auto& altFieldName : field_.altNameList ){
+      if( hasKey(altFieldName) ){
+        printDeprecatedMessage(altFieldName, field_.name);
+        return &_config_.at(altFieldName);
+      }
+    }
+    return nullptr;
+  }
 
   bool ConfigReader::hasKey(const std::string& keyPath_) const{
     if( GenericToolbox::Json::doKeyExist(_config_, keyPath_) ){
       // tag the found option
-      GenericToolbox::addIfNotInVector(keyPath_, _usedKeyList_);
+      _usedKeyList_.insert(keyPath_);
       return true;
     }
     return false;
@@ -266,7 +281,7 @@ namespace ConfigUtils {
   void ConfigReader::fillFormula(std::string& formulaToFill_, const std::string& keyPath_, const std::string& joinStr_) const{
     if( not hasKey(keyPath_) ){ return; }
     // tag the found option
-    GenericToolbox::addIfNotInVector(keyPath_, _usedKeyList_);
+    _usedKeyList_.insert(keyPath_);
     formulaToFill_ = GenericToolbox::Json::buildFormula(_config_, keyPath_, joinStr_, formulaToFill_);
   }
   void ConfigReader::printUnusedKeys() const{

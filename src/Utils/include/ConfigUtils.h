@@ -66,6 +66,24 @@ namespace ConfigUtils {
   class ConfigReader{
 
   public:
+    struct FieldDefinition{
+      std::string name{};
+      bool isMandatory{false};
+      std::vector<std::string> altNameList{};
+
+      friend std::ostream& operator<< (std::ostream& stream, const FieldDefinition& obj_){
+        stream << obj_.toString(); return stream;
+      }
+      [[nodiscard]] std::string toString() const{
+        std::stringstream ss;
+        ss << "name=" << name;
+        ss << ", isMandatory=" << isMandatory;
+        if(not altNameList.empty()) ss << ", altNameList=" << GenericToolbox::toString(altNameList);
+        return ss.str();
+      }
+    };
+
+  public:
     ConfigReader() = default;
     explicit ConfigReader(JsonType config_): _config_(std::move(config_)) {}
 
@@ -81,10 +99,11 @@ namespace ConfigUtils {
     JsonType &getConfig(){ return _config_; }
 
     // define fields
-    struct FieldDefinition{ std::string name{}; bool isMandatory{false}; std::vector<std::string> altNameList{}; };
     void defineField(const FieldDefinition& fieldDefinition_);
     void defineFields(const std::vector<FieldDefinition>& fieldDefinition_);
     void checkConfiguration() const;
+    const FieldDefinition& getFieldDefinition(const std::string& fieldName_) const;
+    const JsonType* getConfigEntry(const FieldDefinition& field_) const;
 
     // read options
     [[nodiscard]] bool empty() const{ return _config_.empty(); }
@@ -129,6 +148,8 @@ namespace ConfigUtils {
 
     // defining fields before reading the config
     std::vector<FieldDefinition> _fieldDefinitionList_{};
+
+    // check for field name collisions
     std::unordered_set<std::string> _definedFieldNameList_{};
 
     // keep track of fields that have been red in runtime
@@ -139,8 +160,15 @@ namespace ConfigUtils {
 
   };
 
+  // inline definitions
   template<typename T> void ConfigReader::fillValue(T& object_, const std::string& fieldName_) const{
-
+    auto& fieldDefinition = getFieldDefinition(fieldName_);
+    auto* jsonField = getConfigEntry(fieldDefinition);
+    if( jsonField == nullptr ) {
+      LogThrowIf(fieldDefinition.isMandatory, "Could not find field=" << fieldName_ << " in config " << toString());
+      return;
+    }
+    object_ = GenericToolbox::Json::get<T>(*jsonField);
   }
   template<typename T> T ConfigReader::fetchValue(const std::vector<std::string>& keyPathList_) const{
     // keyPathList_ has all the possible names for a given option
