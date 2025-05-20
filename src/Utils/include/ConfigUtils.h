@@ -75,7 +75,6 @@ namespace ConfigUtils {
       [[nodiscard]] std::string toString() const;
     };
 
-  public:
     ConfigReader() = default;
     explicit ConfigReader(JsonType config_): _config_(std::move(config_)) {}
 
@@ -112,25 +111,15 @@ namespace ConfigUtils {
     std::vector<ConfigReader> loop(const std::vector<std::string>& keyPathList_) const;
     std::vector<ConfigReader> loop(const std::string& keyPath_) const{ return loop(std::vector<std::string>({keyPath_})); }
 
+    friend std::ostream& operator <<( std::ostream& o, const ConfigReader& this_ ){ o << this_.toString(); return o; }
 
     // new templates
     template<typename T> T fetchValue(const std::string& fieldName_) const;
-    template<> ConfigReader fetchValue(const std::string& fieldName_) const;
     template<typename T> void fillValue(T& object_, const std::string& fieldName_) const;
     template<typename T> void fillEnum(T& enum_, const std::string& fieldName_) const;
 
-    template<typename T> T fetchValue(const std::vector<std::string>& keyPathList_) const; // source
+    // ---- old templates ----
     template<typename F> void deprecatedAction(const std::vector<std::string>& keyPathList_, const std::string& newPath_, const F& action_) const;
-
-    // nested template
-    template<typename T> void fillValue(T& object_, const std::vector<std::string> &keyPathList_) const;
-    template<typename T> void fillEnum(T& enum_, const std::vector<std::string>& keyPathList_) const;
-
-    // nested template (string to vector<string>)
-    template<typename T> T fetchValue(const std::string& keyPath_, const T& defaultValue_) const{ return fetchValue(std::vector<std::string>({keyPath_}), defaultValue_); }
-    template<typename F> void deprecatedAction(const std::string& keyPath_, const std::string& newPath_, const F& action_) const{ deprecatedAction(std::vector<std::string>({keyPath_}), newPath_, [&](const std::string& unused_){ action_(); }); }
-
-    friend std::ostream& operator <<( std::ostream& o, const ConfigReader& this_ ){ o << this_.toString(); return o; }
 
   protected:
     std::string getStrippedParentPath() const;
@@ -186,55 +175,9 @@ namespace ConfigUtils {
     enum_ = enum_.toEnum( enumName, true );
   }
 
-
-  template<typename T> T ConfigReader::fetchValue(const std::vector<std::string>& keyPathList_) const{
-    // keyPathList_ has all the possible names for a given option
-    // the first one is the official one, when others are set a message will appear telling the user it's deprecated
-    T out;
-    bool hasBeenFound{false};
-    for( auto& keyPath : keyPathList_ ){
-
-      // hasKey will tag the key
-      if( this->hasKey(keyPath) ){
-        T temp = GenericToolbox::Json::fetchValue<T>(_config_, keyPath);
-
-        // already found?
-        if( hasBeenFound ){
-          // check if the two values are matching
-          if(out != temp){
-            LogError << _parentPath_ << ":\"" << keyPath << "\" has a different value than \"" << _usedKeyList_[_usedKeyList_.size()-2] << "\"" << std::endl;
-            LogError << this->toString() << std::endl;
-            LogExit("Two config options with different values.");
-          }
-        }
-        else{
-          if( keyPath != keyPathList_.front() ) {
-            // printing the deprecation only if not already found -> could be an old option present for compatibility
-            printDeprecatedMessage(keyPath, keyPathList_.front());
-          }
-
-          out = temp;
-          hasBeenFound = true;
-        }
-      }
-    }
-
-    if( not hasBeenFound ) {
-      // let this one return the error
-      GenericToolbox::Json::fetchValue<T>(_config_, keyPathList_);
-      throw std::logic_error("SHOULD NOT GET THERE. CALL A DEV");
-    }
-
-    return out;
-  }
-  template<> inline ConfigReader ConfigReader::fetchValue<ConfigReader>(const std::vector<std::string>& keyPathList_) const{
-    auto conf = fetchValue<JsonType>(keyPathList_);
-    auto out = ConfigReader(conf);
-    out.setParentPath(GenericToolbox::joinPath(_parentPath_, _usedKeyList_.back()));
-    return out;
-  }
+  // TODO:
   template<typename F> void ConfigReader::deprecatedAction(const std::vector<std::string>& keyPathList_, const std::string& newPath_, const F& action_) const {
-    for( auto& keyPath : keyPathList_ ) {
+    for( auto& keyPath : keyPathList_ ){
       if( hasKey(keyPath) ) {
         if( doShowWarning(keyPath) ){
           LogAlert << _parentPath_ << ": \"" << keyPath << "\" should be set under \"" << newPath_ << "\"" << std::endl;
@@ -244,15 +187,6 @@ namespace ConfigUtils {
       }
     }
   }
-  template<typename T> void ConfigReader::fillEnum(T& enum_, const std::vector<std::string>& keyPathList_) const{
-    std::string enumName;
-    this->fillValue(enumName, keyPathList_);
-    if( enumName.empty() ){ return; }
-    enum_ = enum_.toEnum( enumName, true );
-  }
-
-  template<typename T> void ConfigReader::fillValue(T& object_, const std::vector<std::string> &keyPathList_) const{ try{ object_ = this->fetchValue<T>(keyPathList_); } catch(...){} }
-  template<> inline void ConfigReader::fillValue(std::vector<ConfigReader>& object_, const std::vector<std::string> &keyPathList_) const{ try{ object_ = this->loop(keyPathList_); } catch(...){} }
 
 }
 

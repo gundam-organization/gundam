@@ -320,7 +320,7 @@ namespace ConfigUtils {
     LogExit("[DEV] Unknown field name \"" << fieldName_ << "\" among list: " << _fieldDefinitionList_);
     return {};
   }
-  std::pair<std::string, const JsonType*> ConfigReader::getConfigEntry(const ConfigReader::FieldDefinition& field_) const{
+  std::pair<std::string, const JsonType*> ConfigReader::getConfigEntry(const FieldDefinition& field_) const{
     auto temp = getJsonEntry(field_.name);
     if( temp != nullptr ){ return {field_.name, temp}; }
     for( auto& altFieldName : field_.altNameList ){
