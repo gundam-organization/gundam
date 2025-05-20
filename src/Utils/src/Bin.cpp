@@ -12,7 +12,14 @@
 
 void Bin::Edges::configureImpl(){
 
-  varName = _config_.fetchValue<std::string>("name");
+  _config_.defineFields({
+    {{"name"}, true},
+    {{"bounds"}},
+    {{"value"}},
+  });
+  _config_.checkConfiguration();
+
+  _config_.fillValue(varName, "name");
 
   if( _config_.hasKey("bounds") ){
     GenericToolbox::Range bounds{};
