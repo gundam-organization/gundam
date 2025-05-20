@@ -19,6 +19,42 @@
 
 void ParameterSet::configureImpl(){
 
+  _config_.defineFields(std::vector<ConfigReader::FieldDefinition>{
+    {"name", true},
+    {"isEnabled"},
+    {"isScanEnabled"},
+    {"numberOfParameters"},
+    {"nominalStepSize"},
+    {"parametersRange", {"parameterLimits"}},
+    {"enablePca", {"allowPca", "fixGhostFitParameters"}},
+    {"enableThrowToyParameters",{"enabledThrowToyParameters"}},
+    {"printDialSetSummary", {"printDialSetsSummary"}},
+    {"customParThrow", {"customFitParThrow"}},
+    {"printParameterSummary", {"printParametersSummary"}},
+    {"parameterDefinitionFilePath", {"covarianceMatrixFilePath"}},
+    {"covarianceMatrix", {"covarianceMatrixTMatrixD"}},
+    {"parameterNameList", {"parameterNameTObjArray"}},
+    {"parameterPriorValueList", {"parameterPriorTVectorD"}},
+    {"parameterLowerBoundsList", {"parameterLowerBoundsTVectorD"}},
+    {"parameterUpperBoundsList", {"parameterUpperBoundsTVectorD"}},
+    {"throwEnabledList"},
+    {"parameterDefinitions"},
+    {"dialSetDefinitions"},
+    {"enableOnlyParameters"},
+    {"disableParameters"},
+    {"useMarkGenerator"},
+    {"useEigenDecompForThrows"},
+    {"enableEigenDecomp",{"useEigenDecompInFit"}},
+    {"allowEigenDecompWithBounds"},
+    {"maxNbEigenParameters"},
+    {"maxEigenFraction"},
+    {"eigenValueThreshold",{"eigenSvdThreshold"}},
+    {"eigenParBounds"},
+    {"maskForToyGeneration"},
+    {"devUseParLimitsOnEigen"},
+  });
+  _config_.checkConfiguration();
+
   _config_.fillValue(_name_, "name");
   LogExitIf(_name_.empty(), "Config error -- parameter set without a name.");
   LogDebugIf(GundamGlobals::isDebug()) << "Reading config for parameter set: " << _name_ << std::endl;
@@ -34,24 +70,25 @@ void ParameterSet::configureImpl(){
   _config_.fillValue(_nbParameterDefinition_, "numberOfParameters");
   _config_.fillValue(_nominalStepSize_, "nominalStepSize");
 
-  _config_.fillValue(_printDialSetsSummary_, {{"printDialSetSummary"}, {"printDialSetsSummary"}});
-  _config_.fillValue(_printParametersSummary_, {{"printParameterSummary"},{"printParametersSummary"}});
+  _config_.fillValue(_printDialSetsSummary_, "printDialSetSummary");
+  _config_.fillValue(_printParametersSummary_, "printParametersSummary");
 
-  _config_.fillValue(_globalParRange_.min, "parameterLimits/minValue");
-  _config_.fillValue(_globalParRange_.max, "parameterLimits/maxValue");
+  _config_.fillValue(_globalParRange_, "parameterLimits");
 
-  _config_.fillValue(_enablePca_, {{"enablePca"},{"allowPca"},{"fixGhostFitParameters"}});
-  _config_.fillValue(_enabledThrowToyParameters_, {{"enableThrowToyParameters"},{"enabledThrowToyParameters"}});
+  _config_.fillValue(_enablePca_, "enablePca");
+
+  // throw related
+  _config_.fillValue(_enabledThrowToyParameters_, "enableThrowToyParameters");
+  _config_.fillValue(_customParThrow_, "customParThrow");
   _config_.fillValue(_releaseFixedParametersOnHesse_, "releaseFixedParametersOnHesse");
-  _config_.fillValue(_customParThrow_, {{"customParThrow"},{"customFitParThrow"}});
 
-  _config_.fillValue(_parameterDefinitionFilePath_, {{"parameterDefinitionFilePath"},{"covarianceMatrixFilePath"}});
-  _config_.fillValue(_covarianceMatrixPath_, {{"covarianceMatrix"},{"covarianceMatrixTMatrixD"}});
-  _config_.fillValue(_parameterNameListPath_, {{"parameterNameList"},{"parameterNameTObjArray"}});
-  _config_.fillValue(_parameterPriorValueListPath_, {{"parameterPriorValueList"},{"parameterPriorTVectorD"}});
+  _config_.fillValue(_parameterDefinitionFilePath_, "parameterDefinitionFilePath");
+  _config_.fillValue(_covarianceMatrixPath_, "covarianceMatrix");
+  _config_.fillValue(_parameterNameListPath_, "parameterNameList");
+  _config_.fillValue(_parameterPriorValueListPath_, "parameterPriorValueList");
 
-  _config_.fillValue(_parameterLowerBoundsTVectorD_, {{"parameterLowerBoundsList"}, {"parameterLowerBoundsTVectorD"}});
-  _config_.fillValue(_parameterUpperBoundsTVectorD_, {{"parameterUpperBoundsList"}, {"parameterUpperBoundsTVectorD"}});
+  _config_.fillValue(_parameterLowerBoundsTVectorD_, "parameterLowerBoundsList");
+  _config_.fillValue(_parameterUpperBoundsTVectorD_, "parameterUpperBoundsList");
   _config_.fillValue(_throwEnabledListPath_, "throwEnabledList");
 
   _config_.fillValue(_parameterDefinitionConfig_, "parameterDefinitions");
@@ -59,19 +96,17 @@ void ParameterSet::configureImpl(){
   _config_.fillValue(_enableOnlyParameters_, "enableOnlyParameters");
   _config_.fillValue(_disableParameters_, "disableParameters");
 
-  // throws options
+  // throw options
   _config_.fillValue(_useMarkGenerator_, "useMarkGenerator");
   _config_.fillValue(_useEigenDecompForThrows_, "useEigenDecompForThrows");
 
   // eigen related parameters
-  _config_.fillValue(_enableEigenDecomp_, {{"enableEigenDecomp"},{"useEigenDecompInFit"}});
+  _config_.fillValue(_enableEigenDecomp_, "enableEigenDecomp");
   _config_.fillValue(_allowEigenDecompWithBounds_, "allowEigenDecompWithBounds");
   _config_.fillValue(_maxNbEigenParameters_, "maxNbEigenParameters");
   _config_.fillValue(_maxEigenFraction_, "maxEigenFraction");
-  _config_.fillValue(_eigenSvdThreshold_, {{"eigenValueThreshold"},{"eigenSvdThreshold"}});
-
-  _config_.fillValue(_eigenParRange_.min, "eigenParBounds/minValue");
-  _config_.fillValue(_eigenParRange_.max, "eigenParBounds/maxValue");
+  _config_.fillValue(_eigenSvdThreshold_, "eigenValueThreshold");
+  _config_.fillValue(_eigenParRange_, "eigenParBounds");
 
   // legacy
   _config_.fillValue(_maskForToyGeneration_, "maskForToyGeneration");
@@ -83,7 +118,7 @@ void ParameterSet::configureImpl(){
   if( not _parameterDefinitionFilePath_.empty() ){ readParameterDefinitionFile(); }
 
   if( _nbParameterDefinition_ == -1 ){
-    // no number of parameter provided -> parameters were not defined
+    // no number of parameters provided -> parameters were not defined
     // looking for alternative/legacy definitions...
 
     if( not _dialSetDefinitions_.empty() ){
@@ -100,7 +135,7 @@ void ParameterSet::configureImpl(){
         // DON'T SORT THE BINNING -> tide to the cov matrix
         _nbParameterDefinition_ = int(b.getBinList().size());
 
-        // don't fetch other dataset as they should always have the same assumption
+        // don't fetch another dataset as they should always have the same assumption
         break;
 
       }
