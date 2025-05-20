@@ -71,6 +71,15 @@ namespace ConfigUtils {
       bool isMandatory{false};
       std::vector<std::string> altNameList{};
 
+      FieldDefinition() = default;
+      FieldDefinition(std::string name_, bool isMandatory_ = false, std::vector<std::string> altList_ = {})
+        : name(std::move(name_)), isMandatory(isMandatory_), altNameList(std::move(altList_)) {}
+      FieldDefinition(std::string name_, std::initializer_list<const char*> altList_)
+        : name(std::move(name_)){
+        altNameList.reserve(altList_.size());
+        for(const char* s : altList_){ altNameList.emplace_back(s); }
+      }
+
       friend std::ostream& operator<< (std::ostream& stream, const FieldDefinition& obj_){ stream << obj_.toString(); return stream; }
       [[nodiscard]] std::string toString() const;
     };
