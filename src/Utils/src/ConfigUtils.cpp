@@ -321,11 +321,13 @@ namespace ConfigUtils {
     return {};
   }
   std::pair<std::string, const JsonType*> ConfigReader::getConfigEntry(const ConfigReader::FieldDefinition& field_) const{
-    if( hasKey(field_.name) ){ return {field_.name, &_config_.at(field_.name)}; }
+    auto temp = getJsonEntry(field_.name);
+    if( temp != nullptr ){ return {field_.name, temp}; }
     for( auto& altFieldName : field_.altNameList ){
-      if( hasKey(altFieldName) ){
+      temp = getJsonEntry(field_.name);
+      if( temp != nullptr ){
         printDeprecatedMessage(altFieldName, field_.name);
-        return {altFieldName, &_config_.at(altFieldName)};
+        return {altFieldName, temp};
       }
     }
     return {"", nullptr};
@@ -335,14 +337,17 @@ namespace ConfigUtils {
     return getConfigEntry(field);
   }
 
-  bool ConfigReader::hasKey(const std::string& key_) const{
-    if( _config_.contains(key_) ){
-      // register the key
-      _usedKeyList_.insert(key_);
-      return true;
+  const JsonType* ConfigReader::getJsonEntry(const std::string& key_) const{
+    for (auto it = _config_.begin(); it != _config_.end(); ++it) {
+      if (strcasecmp(it.key().c_str(), key_.c_str()) == 0) {
+        // register the key found
+        _usedKeyList_.insert(it.key());
+        return &it.value();
+      }
     }
-    return false;
+    return nullptr;
   }
+  bool ConfigReader::hasKey(const std::string& key_) const{ return getJsonEntry(key_) != nullptr; }
   void ConfigReader::fillFormula(std::string& formulaToFill_, const std::string& keyPath_, const std::string& joinStr_) const{
     if( not hasKey(keyPath_) ){ return; }
     formulaToFill_ = GenericToolbox::Json::buildFormula(_config_, keyPath_, joinStr_, formulaToFill_);

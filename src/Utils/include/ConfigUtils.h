@@ -101,6 +101,7 @@ namespace ConfigUtils {
     // read options
     [[nodiscard]] bool empty() const{ return _config_.empty(); }
     [[nodiscard]] bool hasKey(const std::string& key_) const;
+    const JsonType* getJsonEntry(const std::string& key_) const; // perform key registration if exists + case insensitive
     [[nodiscard]] std::string toString() const{ return GenericToolbox::Json::toReadableString( _config_ ); }
     void fillFormula(std::string& formulaToFill_, const std::string& keyPath_, const std::string& joinStr_) const;
 
@@ -112,10 +113,12 @@ namespace ConfigUtils {
     std::vector<ConfigReader> loop(const std::string& keyPath_) const{ return loop(std::vector<std::string>({keyPath_})); }
 
 
-    // templates
+    // new templates
     template<typename T> T fetchValue(const std::string& fieldName_) const;
     template<> ConfigReader fetchValue(const std::string& fieldName_) const;
     template<typename T> void fillValue(T& object_, const std::string& fieldName_) const;
+    template<typename T> void fillEnum(T& enum_, const std::string& fieldName_) const;
+
     template<typename T> T fetchValue(const std::vector<std::string>& keyPathList_) const; // source
     template<typename F> void deprecatedAction(const std::vector<std::string>& keyPathList_, const std::string& newPath_, const F& action_) const;
 
@@ -125,7 +128,6 @@ namespace ConfigUtils {
 
     // nested template (string to vector<string>)
     template<typename T> T fetchValue(const std::string& keyPath_, const T& defaultValue_) const{ return fetchValue(std::vector<std::string>({keyPath_}), defaultValue_); }
-    template<typename T> void fillEnum(T& enum_, const std::string& keyPath_) const{ fillEnum(enum_, std::vector<std::string>({keyPath_})); }
     template<typename F> void deprecatedAction(const std::string& keyPath_, const std::string& newPath_, const F& action_) const{ deprecatedAction(std::vector<std::string>({keyPath_}), newPath_, [&](const std::string& unused_){ action_(); }); }
 
     friend std::ostream& operator <<( std::ostream& o, const ConfigReader& this_ ){ o << this_.toString(); return o; }
@@ -169,7 +171,7 @@ namespace ConfigUtils {
       return {};
     }
     auto out = GenericToolbox::Json::get<ConfigReader>(*keyValuePair.second);
-    // using config key so users can retrieve the path in their config
+    // using a config key so users can retrieve the path in their config
     out.setParentPath(GenericToolbox::joinPath(_parentPath_, keyValuePair.first));
     return out;
   }
@@ -177,6 +179,14 @@ namespace ConfigUtils {
     try{ object_ = fetchValue<T>(fieldName_); }
     catch(...){}
   }
+  template<typename T> void ConfigReader::fillEnum(T& enum_, const std::string& fieldName_) const{
+    std::string enumName;
+    this->fillValue(enumName, fieldName_);
+    if( enumName.empty() ){ return; }
+    enum_ = enum_.toEnum( enumName, true );
+  }
+
+
   template<typename T> T ConfigReader::fetchValue(const std::vector<std::string>& keyPathList_) const{
     // keyPathList_ has all the possible names for a given option
     // the first one is the official one, when others are set a message will appear telling the user it's deprecated
