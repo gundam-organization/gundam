@@ -99,17 +99,15 @@ namespace ConfigUtils {
 
     // read options
     [[nodiscard]] bool empty() const{ return _config_.empty(); }
-    [[nodiscard]] bool hasKey(const std::string& key_) const;
+    [[nodiscard]] bool hasField(const std::string& fieldName_) const;
     const JsonType* getJsonEntry(const std::string& key_) const; // perform key registration if exists + case insensitive
     [[nodiscard]] std::string toString() const{ return GenericToolbox::Json::toReadableString( _config_ ); }
-    void fillFormula(std::string& formulaToFill_, const std::string& keyPath_, const std::string& joinStr_) const;
 
     void printUnusedKeys() const;
 
     // for loops
     std::vector<ConfigReader> loop() const;
-    std::vector<ConfigReader> loop(const std::vector<std::string>& keyPathList_) const;
-    std::vector<ConfigReader> loop(const std::string& keyPath_) const{ return loop(std::vector<std::string>({keyPath_})); }
+    std::vector<ConfigReader> loop(const std::string& fieldName_) const;
 
     friend std::ostream& operator <<( std::ostream& o, const ConfigReader& this_ ){ o << this_.toString(); return o; }
 
@@ -118,7 +116,8 @@ namespace ConfigUtils {
     template<typename T> void fillValue(T& object_, const std::string& fieldName_) const;
     template<typename T> void fillEnum(T& enum_, const std::string& fieldName_) const;
 
-    // ---- old templates ----
+    // ---- old methods to adapt ----
+    void fillFormula(std::string& formulaToFill_, const std::string& keyPath_, const std::string& joinStr_) const;
     template<typename F> void deprecatedAction(const std::vector<std::string>& keyPathList_, const std::string& newPath_, const F& action_) const;
 
   protected:
@@ -159,7 +158,7 @@ namespace ConfigUtils {
       throw std::runtime_error("Could not get field value \"" + fieldName_ + "\" in config " + toString());
       return {};
     }
-    auto out = GenericToolbox::Json::get<ConfigReader>(*keyValuePair.second);
+    auto out = ConfigReader(GenericToolbox::Json::get<JsonType>(*keyValuePair.second));
     // using a config key so users can retrieve the path in their config
     out.setParentPath(GenericToolbox::joinPath(_parentPath_, keyValuePair.first));
     return out;
@@ -178,7 +177,7 @@ namespace ConfigUtils {
   // TODO:
   template<typename F> void ConfigReader::deprecatedAction(const std::vector<std::string>& keyPathList_, const std::string& newPath_, const F& action_) const {
     for( auto& keyPath : keyPathList_ ){
-      if( hasKey(keyPath) ) {
+      if( hasField(keyPath) ) {
         if( doShowWarning(keyPath) ){
           LogAlert << _parentPath_ << ": \"" << keyPath << "\" should be set under \"" << newPath_ << "\"" << std::endl;
         }

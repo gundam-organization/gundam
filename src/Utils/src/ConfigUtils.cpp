@@ -317,8 +317,9 @@ namespace ConfigUtils {
     for(const auto& field : _fieldDefinitionList_){
       if( field.name == fieldName_ ){ return field; }
     }
-    LogExit("[DEV] Unknown field name \"" << fieldName_ << "\" among list: " << _fieldDefinitionList_);
-    return {};
+
+    LogError << "[DEV] Unknown field name \"" << fieldName_ << "\" among list: " << GenericToolbox::toString(_fieldDefinitionList_) << std::endl;
+    exit(EXIT_FAILURE);
   }
   std::pair<std::string, const JsonType*> ConfigReader::getConfigEntry(const FieldDefinition& field_) const{
     auto temp = getJsonEntry(field_.name);
@@ -347,9 +348,11 @@ namespace ConfigUtils {
     }
     return nullptr;
   }
-  bool ConfigReader::hasKey(const std::string& key_) const{ return getJsonEntry(key_) != nullptr; }
+  bool ConfigReader::hasField(const std::string& fieldName_) const{
+    return getConfigEntry(fieldName_).second != nullptr;
+  }
   void ConfigReader::fillFormula(std::string& formulaToFill_, const std::string& keyPath_, const std::string& joinStr_) const{
-    if( not hasKey(keyPath_) ){ return; }
+    if( not hasField(keyPath_) ){ return; }
     formulaToFill_ = GenericToolbox::Json::buildFormula(_config_, keyPath_, joinStr_, formulaToFill_);
   }
   void ConfigReader::printUnusedKeys() const{
@@ -380,8 +383,10 @@ namespace ConfigUtils {
     }
     return out;
   }
-  std::vector<ConfigReader> ConfigReader::loop(const std::vector<std::string>& keyPathList_) const{
-    return fetchValue(keyPathList_, ConfigReader()).loop();
+  std::vector<ConfigReader> ConfigReader::loop(const std::string& fieldName_) const{
+    ConfigReader c;
+    fillValue(c, fieldName_);
+    return c.loop();
   }
 
   std::string ConfigReader::getStrippedParentPath() const{
