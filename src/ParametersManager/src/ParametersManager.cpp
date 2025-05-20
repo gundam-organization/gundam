@@ -20,8 +20,15 @@ void ParametersManager::unmuteLogger(){ Logger::setIsMuted( false ); }
 // config
 void ParametersManager::configureImpl(){
 
+  _config_.defineFields({
+    {"throwToyParametersWithGlobalCov"},
+    {"reThrowParSetIfOutOfBounds",{"reThrowParSetIfOutOfPhysical"}}
+    {"parameterSetList"},
+  });
+  _config_.checkConfiguration();
+
   _config_.fillValue(_throwToyParametersWithGlobalCov_, "throwToyParametersWithGlobalCov");
-  _config_.fillValue(_reThrowParSetIfOutOfPhysical_, {{"reThrowParSetIfOutOfBounds"},{"reThrowParSetIfOutOfPhysical"}});
+  _config_.fillValue(_reThrowParSetIfOutOfPhysical_, "reThrowParSetIfOutOfBounds");
   _config_.fillValue(_parameterSetListConfig_, "parameterSetList");
 
   LogDebugIf(GundamGlobals::isDebug()) << _parameterSetListConfig_.getConfig().size() << " parameter sets are defined." << std::endl;
