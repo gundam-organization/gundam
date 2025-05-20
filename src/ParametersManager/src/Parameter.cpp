@@ -14,10 +14,25 @@
 
 void Parameter::configureImpl(){
 
+  _config_.defineFields({
+    {"isEnabled"},
+    {"priorValue"},
+    {"isFixed"},
+    {"isThrown"},
+    {"parameterStepSize"},
+    {"parameterLimits"},
+    {"physicalLimits"},
+    {"throwLimits"},
+    {"mirrorRange"},
+    {"dialSetDefinitions"},
+    {"priorType"},
+  });
+  _config_.checkConfiguration();
+
   _config_.fillValue(_isEnabled_, "isEnabled");
   if( not _isEnabled_ ) { return; }
 
-  if( _config_.hasKey("priorValue") ){
+  if( _config_.hasField("priorValue") ){
     auto priorValue = _config_.fetchValue<double>("priorValue");
     if( not std::isnan(priorValue) and priorValue != _priorValue_ ){
       _priorValue_ = priorValue;
