@@ -20,6 +20,7 @@ public:
 
 protected:
   void configureImpl() override;
+  void initializeImpl() override;
 
 public:
   BinSet() = default;

@@ -39,6 +39,9 @@ void BinSet::configureImpl() {
   if( _sortBins_ ){ this->sortBins(); }
   this->checkBinning();
 }
+void BinSet::initializeImpl(){
+  _config_.printUnusedKeys();
+}
 void BinSet::checkBinning() const{
 
   bool hasErrors{false};
