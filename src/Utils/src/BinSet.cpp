@@ -257,7 +257,7 @@ void BinSet::readBinningConfig( const ConfigReader& binning_){
 
   binning_.fillValue(_sortBins_, "sortBins");
 
-  if( binning_.hasKey("binningDefinition") ){
+  if( binning_.hasField("binningDefinition") ){
 
     auto binningDefinition = binning_.fetchValue<ConfigReader>("binningDefinition");
     struct Dimension{
@@ -274,17 +274,28 @@ void BinSet::readBinningConfig( const ConfigReader& binning_){
       dimensionList.emplace_back();
       auto& dim = dimensionList.back();
 
-      dim.var = binDefEntry.fetchValue<std::string>("name");
+      binDefEntry.defineFields({
+        {{"name"}, true},
+        {{"edges"}},
+        {{"values"}},
+        {{"nBins"}},
+        {{"min"}},
+        {{"max"}},
+      });
+      binDefEntry.checkConfiguration();
 
-      if( binDefEntry.hasKey("edges") ){
-        dim.edgesList = binDefEntry.fetchValue("edges", dim.edgesList);
+      binDefEntry.fillValue(dim.var, "name");
+
+      if( binDefEntry.hasField("edges") ){
+        binDefEntry.fillValue(dim.edgesList, "edges");
       }
-      else if( binDefEntry.hasKey("values") ){
-        dim.edgesList = binDefEntry.fetchValue("values", dim.edgesList);
+      else if( binDefEntry.hasField("values") ){
+        binDefEntry.fillValue(dim.edgesList, "values");
         dim.isEdgesDiscreteValues = true;
       }
-      else if( binDefEntry.hasKey("nBins") ){
+      else if( binDefEntry.hasField("nBins") ){
         // TH1D-like definition
+        // those config options are mandatory in that context
         auto nBins( binDefEntry.fetchValue<int>("nBins") );
         auto minVal( binDefEntry.fetchValue<double>("min") );
         auto maxVal( binDefEntry.fetchValue<double>("max") );

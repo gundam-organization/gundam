@@ -21,14 +21,14 @@ void Bin::Edges::configureImpl(){
 
   _config_.fillValue(varName, "name");
 
-  if( _config_.hasKey("bounds") ){
+  if( _config_.hasField("bounds") ){
     GenericToolbox::Range bounds{};
     _config_.fillValue(bounds, "bounds");
     min = bounds.min;
     max = bounds.max;
     if( min == max ){ isConditionVar = true; }
   }
-  else if( _config_.hasKey("value") ){
+  else if( _config_.hasField("value") ){
     _config_.fillValue(min, "value");
     max = min;
     isConditionVar = true;
