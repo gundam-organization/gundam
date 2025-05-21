@@ -34,8 +34,16 @@ void Propagator::configureImpl(){
     {"devSingleThreadReweight"},
     {"devSingleThreadHistFill"},
     {"globalEventReweightCap"},
-    {"parameterSetListConfig"}, // deprecated
-    {"throwToyParametersWithGlobalCov"}, // deprecated
+    // relocated:
+    {"parameterSetListConfig"},
+    {"throwToyParametersWithGlobalCov"},
+    {"enableStatThrowInToys"},
+    {"gaussStatThrowInToys"},
+    {"enableEventMcThrow"},
+    {"plotGeneratorConfig"},
+    {"llhStatFunction"},
+    {"llhConfig"},
+    {"dataSetList", {"fitSampleSetConfig/dataSetList"}},
   });
   _config_.checkConfiguration();
 
