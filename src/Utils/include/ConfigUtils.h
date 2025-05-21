@@ -123,6 +123,7 @@ namespace ConfigUtils {
 
     // new templates
     template<typename T> T fetchValue(const std::string& fieldName_) const;
+    template<typename T> T fetchValue(const std::string& fieldName_, const T& default_) const;
     template<typename T> void fillValue(T& object_, const std::string& fieldName_) const;
     template<typename T> void fillEnum(T& enum_, const std::string& fieldName_) const;
 
@@ -161,6 +162,11 @@ namespace ConfigUtils {
       return {};
     }
     return GenericToolbox::Json::get<T>(*jsonField);
+  }
+  template<typename T> T ConfigReader::fetchValue(const std::string& fieldName_, const T& default_) const{
+    auto out = default_;
+    fillValue(out, fieldName_);
+    return out;
   }
   template<> inline ConfigReader ConfigReader::fetchValue<ConfigReader>(const std::string& fieldName_) const{
     auto keyValuePair = getConfigEntry(fieldName_);
