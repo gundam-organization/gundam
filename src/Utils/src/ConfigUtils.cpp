@@ -257,7 +257,7 @@ namespace ConfigUtils {
     if( not missingFieldList.empty() ){
       LogError << _parentPath_ << ": found " << missingFieldList.size() << " missing compulsory fields." << std::endl;
       for( auto& missingField : missingFieldList ){
-        LogAlert << "  > \"" << missingField << "\" is a mandatory field." << std::endl;
+        LogError << "  > \"" << missingField << "\" is a mandatory field." << std::endl;
       }
       LogExit("Invalid configuration");
     }
@@ -306,9 +306,10 @@ namespace ConfigUtils {
       }
     }
     if( not invalidKeyList.empty() ){
-      LogAlert << _parentPath_ << ": found " << invalidKeyList.size() << " invalid option names. Are they backward compatibility options?" << std::endl;
-      for( auto& unusedKey : invalidKeyList ){
-        LogAlert << "  > \"" << unusedKey << "\" won't be recognized by GUNDAM." << std::endl;
+      for( auto& invalidKey : invalidKeyList ){
+        if( doShowWarning(invalidKey) ) {
+          LogAlert << "  > \"" << invalidKey << "\" has an invalid name. It won't be recognized by GUNDAM." << std::endl;
+        }
       }
     }
 
@@ -339,14 +340,25 @@ namespace ConfigUtils {
   }
 
   const JsonType* ConfigReader::getJsonEntry(const std::string& key_) const{
-    for (auto it = _config_.begin(); it != _config_.end(); ++it) {
-      if (strcasecmp(it.key().c_str(), key_.c_str()) == 0) {
-        // register the key found
-        _usedKeyList_.insert(it.key());
-        return &it.value();
+    const JsonType* current = &_config_;
+    auto keys = GenericToolbox::splitString(key_, "/");
+
+    for(const auto& subKey : keys){
+      if(not current->is_object()){ return nullptr; }
+
+      bool found = false;
+      for(auto it = current->begin(); it != current->end(); ++it){
+        if(strcasecmp(it.key().c_str(), subKey.c_str()) == 0){
+          current = &it.value();
+          found = true;
+          break;
+        }
       }
+      if(not found){ return nullptr; }
     }
-    return nullptr;
+
+    _usedKeyList_.insert(key_);
+    return current;
   }
   bool ConfigReader::hasField(const std::string& fieldName_) const{
     return getConfigEntry(fieldName_).second != nullptr;

@@ -129,7 +129,7 @@ namespace ConfigUtils {
 
     // ---- old methods to adapt ----
     void fillFormula(std::string& formulaToFill_, const std::string& keyPath_, const std::string& joinStr_) const;
-    template<typename F> void deprecatedAction(const std::vector<std::string>& keyPathList_, const std::string& newPath_, const F& action_) const;
+    template<typename F> void deprecatedAction(const std::string& fieldName_, const std::string& newPath_, const F& action_) const;
 
   protected:
     std::string getStrippedParentPath() const;
@@ -191,16 +191,12 @@ namespace ConfigUtils {
     enum_ = enum_.toEnum( enumName, true );
   }
 
-  // TODO:
-  template<typename F> void ConfigReader::deprecatedAction(const std::vector<std::string>& keyPathList_, const std::string& newPath_, const F& action_) const {
-    for( auto& keyPath : keyPathList_ ){
-      if( hasField(keyPath) ) {
-        if( doShowWarning(keyPath) ){
-          LogAlert << _parentPath_ << ": \"" << keyPath << "\" should be set under \"" << newPath_ << "\"" << std::endl;
-        }
-        action_( keyPath );
-        return;
+  template<typename F> void ConfigReader::deprecatedAction(const std::string& fieldName_, const std::string& newPath_, const F& action_) const {
+    if( hasField(fieldName_) ) {
+      if( doShowWarning(fieldName_) ){
+        LogAlert << _parentPath_ << ": \"" << fieldName_ << "\" should be set under \"" << newPath_ << "\"" << std::endl;
       }
+      action_();
     }
   }
 
