@@ -22,7 +22,7 @@ void ParametersManager::configureImpl(){
 
   _config_.defineFields({
     {"throwToyParametersWithGlobalCov"},
-    {"reThrowParSetIfOutOfBounds",{"reThrowParSetIfOutOfPhysical"}}
+    {"reThrowParSetIfOutOfBounds",{"reThrowParSetIfOutOfPhysical"}},
     {"parameterSetList"},
   });
   _config_.checkConfiguration();
