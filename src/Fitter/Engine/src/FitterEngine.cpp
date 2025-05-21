@@ -25,9 +25,35 @@
 void FitterEngine::configureImpl(){
   GenericToolbox::setT2kPalette();
 
+  _config_.defineFields({
+    {"minimizerConfig", {"mcmcConfig"}},
+    {"enablePca"},
+    {"pcaMethod"},
+    {"parStepGain"},
+    {"pcaThreshold"},
+    {"throwMcBeforeFit"},
+    {"throwMcBeforeFitGain"},
+    {"savePostfitEventTrees"},
+    {"enablePreFitScan"},
+    {"enablePostFitScan"},
+    {"enablePreFitToPostFitLineScan"},
+    {"generateSamplePlots"},
+    {"generateOneSigmaPlots"},
+    {"enableParamVariations"},
+    {"paramVariationsSigmas"},
+    {"scaleParStepWithChi2Response"},
+    // relocated
+    {"parameterScannerConfig", {"scanConfig"}},
+    {"engineType"},
+    {"monitorRefreshRateInMs"},
+    {"propagatorConfig"},
+    {"likelihoodInterfaceConfig"},
+  });
+  _config_.checkConfiguration();
+
   // setting up the minimizer
   ConfigReader minimizerConfig{};
-  _config_.fillValue(minimizerConfig, {{"minimizerConfig"}, {"mcmcConfig"}});
+  _config_.fillValue(minimizerConfig, "minimizerConfig");
 
   std::string minimizerTypeStr{"RootMinimizer"};
   _config_.deprecatedAction("engineType", "minimizerConfig/type", [&]{
@@ -67,14 +93,14 @@ void FitterEngine::configureImpl(){
   getLikelihoodInterface().getModelPropagator().getConfig().deprecatedAction("scanConfig", "fitterEngineConfig", [&]{
     _parameterScanner_.setConfig( getLikelihoodInterface().getModelPropagator().getConfig().fetchValue<ConfigReader>("scanConfig") );
   });
-  _config_.fillValue(_parameterScanner_.getConfig(), {{"parameterScannerConfig"},{"scanConfig"}});
+  _config_.fillValue(_parameterScanner_.getConfig(), "parameterScannerConfig");
   _parameterScanner_.configure();
 
   // local config
-  _config_.fillValue(_enablePca_, {{"enablePca"},{"runPcaCheck"},{"fixGhostFitParameters"}});
+  _config_.fillValue(_enablePca_, "enablePca");
 
   _config_.fillEnum(_pcaMethod_, "pcaMethod");
-  _config_.fillValue(_pcaThreshold_, {{"pcaThreshold"},{"pcaDeltaLlhThreshold"},{"pcaDeltaChi2Threshold"},{"ghostParameterDeltaChi2Threshold"}});
+  _config_.fillValue(_pcaThreshold_, "pcaThreshold");
 
   _config_.fillValue(_enablePreFitScan_, "enablePreFitScan");
   _config_.fillValue(_enablePostFitScan_, "enablePostFitScan");
@@ -84,7 +110,7 @@ void FitterEngine::configureImpl(){
   _config_.fillValue(_generateOneSigmaPlots_, "generateOneSigmaPlots");
 
   _config_.fillValue(_doAllParamVariations_, "enableParamVariations");
-  _config_.fillValue(_allParamVariationsSigmas_, {{"paramVariationsSigmas"},{"allParamVariations"}});
+  _config_.fillValue(_allParamVariationsSigmas_, "paramVariationsSigmas");
 
   _config_.fillValue(_scaleParStepWithChi2Response_, "scaleParStepWithChi2Response");
   _config_.fillValue(_parStepGain_, "parStepGain");
@@ -315,7 +341,7 @@ void FitterEngine::fit(){
         LogWarning << "\"" << parSet.getName() << "\" has marked disabled throwMcBeforeFit: skipping." << std::endl;
         continue;
       }
-      if( parSet.getConfig().hasKey("customFitParThrow") ){
+      if( not parSet.getCustomParThrow().empty() ){
 
         LogAlert << "Using custom mc parameter push for " << parSet.getName() << std::endl;
 
