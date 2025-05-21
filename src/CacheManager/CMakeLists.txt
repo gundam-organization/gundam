@@ -64,8 +64,6 @@ target_include_directories( GundamCacheManager PUBLIC
 
 target_link_libraries( GundamCacheManager PUBLIC
   GundamDialDictionary
-  GundamParametersManager
-  GundamSamplesManager
   ${ROOT_LIBRARIES})
 
 # Add extra compilation flags.  The commented flags are as reminders
