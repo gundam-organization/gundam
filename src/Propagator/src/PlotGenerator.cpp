@@ -24,6 +24,18 @@
 
 
 void PlotGenerator::configureImpl(){
+  _config_.clearFields();
+  _config_.defineFields({
+    {"isEnabled"},
+    {"histogramsDefinition"},
+    {"canvasParameters/height"},
+    {"canvasParameters/width"},
+    {"canvasParameters/nbXplots"},
+    {"canvasParameters/nbYplots"},
+    {"writeGeneratedHistograms"},
+    {"varDictionaries", {"varDictionnaries"}},
+  });
+  _config_.checkConfiguration();
 
   gStyle->SetOptStat(0);
   _histHolderCacheList_.resize(1);
@@ -33,17 +45,29 @@ void PlotGenerator::configureImpl(){
   if( not _isEnabled_ ){ return; }
 
   // nested first
-  for( auto& varDictConfig : _config_.loop({{"varDictionaries"}, {"varDictionnaries"}})){
+  for( auto& varDictConfig : _config_.loop("varDictionaries")){
     _varDictionaryList_.emplace_back(); auto& varDict = _varDictionaryList_.back();
+
+    varDictConfig.defineFields({{"name"}, {"dictionary"}});
     varDictConfig.fillValue(varDict.name, "name");
 
     for( auto& dictEntryConfig : varDictConfig.loop("dictionary")){
       varDict.dictEntryList.emplace_back(); auto& dictEntry = varDict.dictEntryList.back();
+
+      dictEntryConfig.defineFields({
+        {"value"},
+        {"title"},
+        {"fillStyle"},
+        {"colorRoot", {"color"}},
+        {"colorHex"},
+      });
+      dictEntryConfig.checkConfiguration();
+
       dictEntryConfig.fillValue(dictEntry.value, "value");
       dictEntryConfig.fillValue(dictEntry.title, "title");
       dictEntryConfig.fillValue(dictEntry.fillStyle, "fillStyle");
-      dictEntryConfig.fillValue(dictEntry.color, {{"colorRoot"},{"color"}});
-      if( dictEntryConfig.hasKey("colorHex") ){
+      dictEntryConfig.fillValue(dictEntry.color, "colorRoot");
+      if( dictEntryConfig.hasField("colorHex") ){
         TColor::SetColorThreshold(0.1); // will fetch the closest color
         dictEntry.color = short( TColor::GetColor( dictEntryConfig.fetchValue<std::string>("colorHex").c_str() ) );
       }
@@ -54,6 +78,23 @@ void PlotGenerator::configureImpl(){
     if( not histDefConfig.fetchValue("isEnabled", true) ){ continue; }
     _histDefList_.emplace_back(); auto& histDef = _histDefList_.back();
 
+    histDefConfig.defineFields({
+      {"noData"},
+      {"useSampleBinning"},
+      {"rescaleAsBinWidth"},
+      {"rescaleBinFactor"},
+      {"xMin"},
+      {"xMax"},
+      {"prefix"},
+      {"varToPlot"},
+      {"xTitle"},
+      {"yTitle"},
+      {"binning"},
+      {"sampleVariableIfNotAvailable"},
+      {"splitVarList", {"splitVars"}},
+      {"useSampleBinningOfVar", {"useSampleBinningOfObservable"}},
+    });
+
     histDefConfig.fillValue(histDef.noData, "noData");
     histDefConfig.fillValue(histDef.useSampleBinning, "useSampleBinning");
     histDefConfig.fillValue(histDef.rescaleAsBinWidth, "rescaleAsBinWidth");
@@ -63,16 +104,16 @@ void PlotGenerator::configureImpl(){
     histDefConfig.fillValue(histDef.prefix, "prefix");
     histDefConfig.fillValue(histDef.varToPlot, "varToPlot");
     histDefConfig.fillValue(histDef.yTitle, "yTitle");
-    histDefConfig.fillValue(histDef.splitVarList, {{"splitVarList"}, {"splitVars"}});
+    histDefConfig.fillValue(histDef.splitVarList, "splitVarList");
     histDefConfig.fillValue(histDef.sampleVariableIfNotAvailable, "sampleVariableIfNotAvailable");
 
     histDef.xTitle = histDef.varToPlot;
     histDef.useSampleBinningOfVar = histDef.varToPlot;
 
     histDefConfig.fillValue(histDef.xTitle, "xTitle");
-    histDefConfig.fillValue(histDef.useSampleBinningOfVar, {{"useSampleBinningOfVar"}, {"useSampleBinningOfObservable"}});
+    histDefConfig.fillValue(histDef.useSampleBinningOfVar, "useSampleBinningOfVar");
 
-    auto binning = histDefConfig.fetchValue({{"binning"}, {"binningFile"}}, ConfigReader());
+    auto binning = histDefConfig.fetchValue("binning", ConfigReader());
     if( not binning.empty() ){ histDef.binning.configure( binning ); }
 
     GenericToolbox::addIfNotInVector("", histDef.splitVarList);

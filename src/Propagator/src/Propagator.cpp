@@ -22,9 +22,25 @@ void Propagator::muteLogger(){ Logger::setIsMuted( true ); }
 void Propagator::unmuteLogger(){ Logger::setIsMuted( false ); }
 
 void Propagator::configureImpl(){
+  _config_.clearFields();
+  _config_.defineFields({
+    {"sampleSetConfig", {"fitSampleSetConfig"}},
+    {"parametersManagerConfig"},
+    {"parameterInjection"},
+    {"showNbEventParameterBreakdown"},
+    {"showNbEventPerSampleParameterBreakdown"},
+    {"debugPrintLoadedEvents"},
+    {"debugPrintLoadedEventsNbPerSample"},
+    {"devSingleThreadReweight"},
+    {"devSingleThreadHistFill"},
+    {"globalEventReweightCap"},
+    {"parameterSetListConfig"}, // deprecated
+    {"throwToyParametersWithGlobalCov"}, // deprecated
+  });
+  _config_.checkConfiguration();
 
   // nested objects
-  _config_.fillValue(_sampleSet_.getConfig(), {{"sampleSetConfig"}, {"fitSampleSetConfig"}});
+  _config_.fillValue(_sampleSet_.getConfig(), "sampleSetConfig");
   _sampleSet_.configure();
 
   _config_.deprecatedAction("parameterSetListConfig", "parametersManagerConfig/parameterSetList", [&]{

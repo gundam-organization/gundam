@@ -13,6 +13,13 @@
 
 
 void EventTreeWriter::configureImpl() {
+  _config_.clearFields();
+  _config_.defineFields({
+    {"isEnabled"},
+    {"writeDials"},
+    {"nPointsPerDial"},
+  });
+  _config_.checkConfiguration();
 
   _config_.fillValue(_isEnabled_, "isEnabled");
   LogReturnIf(not _isEnabled_, "Disabled EventTreeWriter.");
