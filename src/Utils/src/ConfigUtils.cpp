@@ -363,9 +363,9 @@ namespace ConfigUtils {
   bool ConfigReader::hasField(const std::string& fieldName_) const{
     return getConfigEntry(fieldName_).second != nullptr;
   }
-  void ConfigReader::fillFormula(std::string& formulaToFill_, const std::string& keyPath_, const std::string& joinStr_) const{
-    if( not hasField(keyPath_) ){ return; }
-    formulaToFill_ = GenericToolbox::Json::buildFormula(_config_, keyPath_, joinStr_, formulaToFill_);
+  void ConfigReader::fillFormula(std::string& formulaToFill_, const std::string& fieldName_, const std::string& joinStr_) const{
+    if( not hasField(fieldName_) ){ return; }
+    formulaToFill_ = GenericToolbox::Json::buildFormula(_config_, fieldName_, joinStr_, formulaToFill_);
   }
   void ConfigReader::printUnusedKeys() const{
     // for context dependent options
