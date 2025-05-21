@@ -16,9 +16,18 @@
 
 
 void LikelihoodInterface::configureImpl(){
-
   _threadPool_.setNThreads(GundamGlobals::getNbCpuThreads() );
-  
+
+  _config_.defineFields({
+    {"propagatorConfig"},
+    {"datasetList"},
+    {"jointProbabilityConfig"},
+    {"plotGeneratorConfig"},
+    {"enableStatThrowInToys"},
+    {"gaussStatThrowInToys"},
+    {"enableEventMcThrow"},
+  });
+
   // reading the configuration of the propagator
   // allows to implement
   _config_.fillValue(_modelPropagator_.getConfig(), "propagatorConfig");
@@ -41,8 +50,8 @@ void LikelihoodInterface::configureImpl(){
   _modelPropagator_.getConfig().deprecatedAction("plotGeneratorConfig", "likelihoodInterfaceConfig", [&]{
     _modelPropagator_.getConfig().fillValue(_plotGenerator_.getConfig(), "plotGeneratorConfig");
   });
-  _modelPropagator_.getConfig().deprecatedAction({{"dataSetList"}, {"fitSampleSetConfig/dataSetList"}}, "likelihoodInterfaceConfig", [&](const std::string& path_){
-    _modelPropagator_.getConfig().fillValue(datasetListConfig, path_);
+  _modelPropagator_.getConfig().deprecatedAction("dataSetList", "likelihoodInterfaceConfig", [&]{
+    _modelPropagator_.getConfig().fillValue(datasetListConfig, "dataSetList");
   });
   _modelPropagator_.getSampleSet().getConfig().deprecatedAction("llhStatFunction", "likelihoodInterfaceConfig/jointProbabilityConfig/type", [&]{
     _modelPropagator_.getSampleSet().getConfig().fillValue(jointProbabilityTypeStr, "llhStatFunction");
@@ -52,7 +61,7 @@ void LikelihoodInterface::configureImpl(){
   });
 
   // defining datasets:
-  _config_.fillValue(datasetListConfig, {{"dataSetList"}, {"datasetList"}});
+  _config_.fillValue(datasetListConfig, "datasetList");
   _datasetList_.reserve(datasetListConfig.getConfig().size() );
   for( const auto& dataSetConfig : datasetListConfig.loop() ){
     _datasetList_.emplace_back(dataSetConfig, int(_datasetList_.size()));

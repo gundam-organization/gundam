@@ -58,13 +58,23 @@ namespace JointProbability{
   };
 
   inline void BarlowBeestonBanff2022::configureImpl(){
+    _config_.defineFields({
+      {"allowZeroMcWhenZeroData"},
+      {"usePoissonLikelihood"},
+      {"BBNoUpdateWeights"},
+      {"fractionalErrorLimit"},
+      {"expectedValueMinimum"},
+      {"verboseLevel", {"isVerbose"}},
+      {"throwIfInfLlh"}
+    });
+    _config_.checkConfiguration();
 
     _config_.fillValue(allowZeroMcWhenZeroData, "allowZeroMcWhenZeroData");
     _config_.fillValue(usePoissonLikelihood, "usePoissonLikelihood");
     _config_.fillValue(BBNoUpdateWeights, "BBNoUpdateWeights");
     _config_.fillValue(fractionalErrorLimit, "fractionalErrorLimit");
     _config_.fillValue(expectedValueMinimum, "expectedValueMinimum");
-    _config_.fillValue(verboseLevel, {{"verboseLevel"},{"isVerbose"}});
+    _config_.fillValue(verboseLevel, "verboseLevel");
     _config_.fillValue(throwIfInfLlh, "throwIfInfLlh");
 
     // Place a hard limit on the fractional error to prevent numeric issues.
