@@ -9,7 +9,17 @@
 
 
 void EventVarTransform::configureImpl(){
-  _config_.fillValue(_name_, {{"name"}, {"title"}});
+  _config_.defineFields({
+    {"name", true, {"title"}},
+    {"outputVariableName", true},
+    {"isEnabled"},
+    {"inputList"},
+    {"messageOnError"},
+    {"outputVariableName"},
+  });
+  _config_.checkConfiguration();
+
+  _config_.fillValue(_name_, "name");
   _config_.fillValue(_isEnabled_, "isEnabled");
   _config_.fillValue(_messageOnError_, "messageOnError");
   _config_.fillValue(_outputVariableName_, "outputVariableName");

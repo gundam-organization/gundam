@@ -34,13 +34,33 @@
 
 void DataDispenser::configureImpl(){
 
+  _config_.clearFields();
+  _config_.defineFields({
+    {"name", true},
+    {"tree"},
+    {"filePathList"},
+    {"debugNbMaxEventsToLoad"},
+    {"fromHistContent"},
+    {"dummyVariablesList"},
+    {"useReweightEngine", {"useMcContainer"}},
+    {"variablesTransform"},
+    {"eventVariableAsWeight"},
+    {"additionalLeavesStorage"},
+    {"dialIndexFormula"},
+    {"overridePropagatorConfig"},
+    {"selectionCutFormula"},
+    {"nominalWeightFormula"},
+    {"variableDict", {"overrideLeafDict"}},
+    {"fromMc"},
+  });
+  _config_.checkConfiguration();
+
   _config_.fillValue(_parameters_.name, "name");
-  LogExitIf(_parameters_.name.empty(), "Dataset name not set.");
 
   // histograms don't need other parameters
-  if( _config_.hasKey("fromHistContent" ) ) {
+  if( _config_.hasField("fromHistContent" ) ) {
     LogDebugIf(GundamGlobals::isDebug()) << "Dataset \"" << _parameters_.name << "\" will be defined with histogram data." << std::endl;
-    auto fromHistConfig( _config_.fetchValue<ConfigReader>("fromHistContent") );
+    auto fromHistConfig(_config_.fetchValue<ConfigReader>("fromHistContent"));
 
     _parameters_.fromHistContent.isEnabled = true;
     _parameters_.fromHistContent.rootFilePath = fromHistConfig.fetchValue<std::string>("fromRootFile");
@@ -48,9 +68,15 @@ void DataDispenser::configureImpl(){
     auto sampleListConfig(fromHistConfig.loop("sampleList"));
     _parameters_.fromHistContent.sampleHistList.reserve(sampleListConfig.size());
     for( auto& sampleConfig : sampleListConfig ){
+      sampleConfig.defineFields({
+        {"name", true},
+        {"hist", true},
+        {"axisList", {"axis"}},
+      });
+
       auto& sampleHist = _parameters_.fromHistContent.addSampleHist(sampleConfig.fetchValue<std::string>("name"));
       sampleConfig.fillValue(sampleHist.hist, "hist");
-      sampleConfig.fillValue(sampleHist.axisList, {{"axisList"},{"axis"}});
+      sampleConfig.fillValue(sampleHist.axisList, "axisList");
     }
 
     return;
@@ -70,9 +96,14 @@ void DataDispenser::configureImpl(){
   }
 
   _parameters_.variableDict.clear();
-  for( auto& entry : _config_.loop({{"variableDict"}, {"overrideLeafDict"}}) ){
-    auto varName = entry.fetchValue<std::string>({{"name"}, {"eventVar"}});
-    auto varExpr = entry.fetchValue<std::string>({{"expr"}, {"expression"}, {"leafVar"}});
+  for( auto& entry : _config_.loop("variableDict") ){
+    entry.defineFields({
+      {"name", true, {"eventVar"}},
+      {"expr", true, {"expression", "leafVar"}},
+    });
+    entry.checkConfiguration();
+    auto varName = entry.fetchValue<std::string>("name");
+    auto varExpr = entry.fetchValue<std::string>("expr");
     _parameters_.variableDict[ varName ] = varExpr;
   }
 
@@ -81,9 +112,9 @@ void DataDispenser::configureImpl(){
   // options
   _config_.fillValue(_parameters_.globalTreePath, "tree");
   _config_.fillValue(_parameters_.filePathList, "filePathList");
-  _config_.fillValue(_parameters_.additionalVarsStorage, {{"additionalLeavesStorage"}, {"additionalVarsStorage"}});
+  _config_.fillValue(_parameters_.additionalVarsStorage, "additionalLeavesStorage");
   _config_.fillValue(_parameters_.dummyVariablesList, "dummyVariablesList");
-  _config_.fillValue(_parameters_.useReweightEngine, {{"useReweightEngine"}, {"useMcContainer"}});
+  _config_.fillValue(_parameters_.useReweightEngine, "useReweightEngine");
   _config_.fillValue(_parameters_.debugNbMaxEventsToLoad, "debugNbMaxEventsToLoad");
   _config_.fillValue(_parameters_.dialIndexFormula, "dialIndexFormula");
   _config_.fillValue(_parameters_.overridePropagatorConfig, "overridePropagatorConfig");
