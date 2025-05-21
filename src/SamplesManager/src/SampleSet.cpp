@@ -14,7 +14,12 @@
 
 void SampleSet::configureImpl(){
 
-  auto sampleListConfig = _config_.loop({{"sampleList"}, {"fitSampleList"}});
+  _config_.defineFields({
+    {"sampleList", {"fitSampleList"}},
+  });
+  _config_.checkConfiguration();
+
+  auto sampleListConfig = _config_.loop("sampleList");
   LogDebugIf(GundamGlobals::isDebug()) << sampleListConfig.size() << " samples defined in the config." << std::endl;
 
   if( _sampleList_.empty() ){
@@ -41,8 +46,11 @@ void SampleSet::configureImpl(){
 
     // need to check how many samples are enabled. It should match the list.
     size_t iSample = 0;
-    for(const auto & sampleConfig : sampleListConfig){
-      if( not sampleConfig.fetchValue("isEnabled", true) ) continue;
+    for(auto & sampleConfig : sampleListConfig){
+      Sample::prepareConfig(sampleConfig);
+      if( sampleConfig.hasField("isEnabled") and not sampleConfig.fetchValue<bool>("isEnabled") ) {
+        continue;
+      }
       if( iSample >= _sampleList_.size() ){ continue; }
       _sampleList_[ iSample++ ].configure( sampleConfig ); // read the config again
     }

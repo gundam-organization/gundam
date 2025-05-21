@@ -13,13 +13,27 @@
 #include <memory>
 
 
+void Sample::prepareConfig(ConfigReader &config_){
+  config_.clearFields();
+  config_.defineFields({
+    {"name", true},
+    {"isEnabled"},
+    {"disableEventMcThrow"},
+    {"binning", {"binningFile", "binningFilePath"}},
+    {"selectionCutStr", {"selectionCuts"}},
+    {"datasets"},
+  });
+  config_.checkConfiguration();
+}
 void Sample::configureImpl(){
+  prepareConfig(_config_);
+
   _config_.fillValue(_name_, "name");
   _config_.fillValue(_isEnabled_, "isEnabled");
   _config_.fillValue(_disableEventMcThrow_, "disableEventMcThrow");
-  _config_.fillValue(_binningConfig_, {{"binningFilePath"},{"binningFile"},{"binning"}});
-  _config_.fillValue(_selectionCutStr_, {{"selectionCutStr"},{"selectionCuts"}});
-  _config_.fillValue(_enabledDatasetList_, {{"datasets"},{"dataSets"}});
+  _config_.fillValue(_binningConfig_, "binning");
+  _config_.fillValue(_selectionCutStr_, "selectionCutStr");
+  _config_.fillValue(_enabledDatasetList_, "datasets");
 
   LogThrowIf(_name_.empty(), "No name was provided for sample #" << _index_ << std::endl << _config_);
   LogDebugIf(GundamGlobals::isDebug()) << "Defining sample \"" << _name_ << "\"" << std::endl;

@@ -29,6 +29,8 @@ public:
     size_t eventNb{0};
   };
 
+  static void prepareConfig(ConfigReader &config_);
+
 protected:
   // called through JsonBaseClass::configure() and JsonBaseClass::initialize()
   void configureImpl() override;
