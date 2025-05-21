@@ -38,6 +38,8 @@ public:
 #include "GenericToolbox.MakeEnum.h"
   MAKE_ENUM_JSON_INTERFACE(DialType);
 
+  static void prepareConfig(ConfigReader &config_);
+
 public:
   DialCollection() = delete;
   explicit DialCollection(std::vector<ParameterSet> *targetParameterSetListPtr): _parameterSetListPtr_(targetParameterSetListPtr) {}
