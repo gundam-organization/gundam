@@ -124,10 +124,12 @@ void ParameterSet::configureImpl(){
     if( not _dialSetDefinitions_.empty() ){
       for( auto& dialSetDef : _dialSetDefinitions_.loop() ){
 
-        ConfigReader parameterBinning;
-        dialSetDef.fillValue(parameterBinning, {{"binning"}, {"parametersBinningPath"}});
+        // dial library is top level, so using simple field def here
+        dialSetDef.defineFields({{"binning", {"parametersBinningPath"}}});
+        if( not dialSetDef.hasField("binning") ){ continue; }
 
-        if( parameterBinning.empty() ){ continue;}
+        auto parameterBinning = dialSetDef.fetchValue<ConfigReader>("binning");
+        if( parameterBinning.empty() ){ continue; }
 
         LogInfo << "Found parameter binning within dialSetDefinition. Defining parameters number..." << std::endl;
         BinSet b;
@@ -144,6 +146,7 @@ void ParameterSet::configureImpl(){
     if( _nbParameterDefinition_ == -1 and not _parameterDefinitionConfig_.empty() ){
       LogDebugIf(GundamGlobals::isDebug()) << "Using parameter definition config list to determine the number of parameters..." << std::endl;
       _nbParameterDefinition_ = int(_parameterDefinitionConfig_.getConfig().size());
+      for(auto& parDef : _parameterDefinitionConfig_.loop() ){ Parameter::prepareConfig(parDef); }
     }
 
     LogExitIf(_nbParameterDefinition_==-1, "Could not figure out the number of parameters to be defined for the set: " << _name_ );
@@ -1057,7 +1060,7 @@ void ParameterSet::defineParameters(){
     if( not _enableOnlyParameters_.empty() ){
       bool isEnabled = false;
       for( auto& enableEntry : _enableOnlyParameters_ ){
-        if( enableEntry.hasKey("name")
+        if( enableEntry.hasField("name")
             and par.getName() == enableEntry.fetchValue<std::string>("name") ){
           isEnabled = true;
           break;
@@ -1075,7 +1078,7 @@ void ParameterSet::defineParameters(){
     if( not _disableParameters_.empty() ){
       bool isEnabled = true;
       for( auto& disableEntry : _disableParameters_ ){
-        if( disableEntry.hasKey("name")
+        if( disableEntry.hasField("name")
             and par.getName() == disableEntry.fetchValue<std::string>("name") ){
           isEnabled = false;
           break;
@@ -1114,32 +1117,38 @@ void ParameterSet::defineParameters(){
         // search with name
         std::string parName = _parameterNamesList_->At(par.getParameterIndex())->GetName();
         for( auto& parConfig : _parameterDefinitionConfig_.loop() ){
-          std::string name = parConfig.fetchValue({{"name"}, {"parameterName"}}, std::string());
-          if( parName == name ){ selectedParConfig = parConfig; break; }
+          if( parConfig.hasField("name") ){
+            if( parName == parConfig.fetchValue<std::string>("name") ){
+              selectedParConfig = parConfig;
+              break;
+            }
+          }
         }
 
         // not found? try with the index
-        if( selectedParConfig.empty() ) {
+        if( selectedParConfig.empty() ){
           for( auto& parConfig : _parameterDefinitionConfig_.loop() ){
-            int idx = parConfig.fetchValue("parameterIndex", int());
-            if( idx == par.getParameterIndex() ){ selectedParConfig = parConfig; break; }
+            if( parConfig.hasField("parameterIndex") ){
+              if( par.getParameterIndex() == parConfig.fetchValue<int>("parameterIndex") ){
+                selectedParConfig = parConfig;
+                break;
+              }
+            }
           }
         }
 
         par.setConfig( selectedParConfig );
       }
-      else {
+      else{
         // No covariance provided, so find the name based on the order in
         // the parameter set.
         auto configVector = _parameterDefinitionConfig_.loop();
         LogThrowIf(configVector.size() <= par.getParameterIndex(),
                    "Parameter index out of range");
         auto& parConfig = configVector.at(par.getParameterIndex());
-        auto parName = parConfig.fetchValue<std::string>({{"parameterName"}, {"name"}});
-        if (not parName.empty()) par.setName(parName);
         par.setConfig( parConfig );
+
         LogWarning << "Parameter #" << par.getParameterIndex()
-                   << " (name \"" << par.getName() << "\")"
                    << " not defined by covariance matrix file"
                    << std::endl;
       }
