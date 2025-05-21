@@ -128,7 +128,7 @@ namespace ConfigUtils {
     template<typename T> void fillEnum(T& enum_, const std::string& fieldName_) const;
 
     // ---- old methods to adapt ----
-    void fillFormula(std::string& formulaToFill_, const std::string& keyPath_, const std::string& joinStr_) const;
+    void fillFormula(std::string& formulaToFill_, const std::string& fieldName_, const std::string& joinStr_) const;
     template<typename F> void deprecatedAction(const std::string& fieldName_, const std::string& newPath_, const F& action_) const;
 
   protected:
