@@ -129,6 +129,13 @@ void readParameterSets() {
     std::vector<double> *parSigma = 0;
     std::vector<double> *parMin = 0;
     std::vector<double> *parMax = 0;
+
+    if (not parSets) {
+        std::cout << "FitterEngine/fit/parameterSets not found in "
+                  << gFile->GetName() << std::endl;
+        std::exit(EXIT_FAILURE);
+    }
+
     parSets->SetBranchAddress("parameterSetNames", &parSetNames);
     parSets->SetBranchAddress("parameterSetOffsets", &parSetOffsets);
     parSets->SetBranchAddress("parameterSetCounts", &parSetCounts);
