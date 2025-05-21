@@ -326,7 +326,7 @@ namespace ConfigUtils {
     auto temp = getJsonEntry(field_.name);
     if( temp != nullptr ){ return {field_.name, temp}; }
     for( auto& altFieldName : field_.altNameList ){
-      temp = getJsonEntry(field_.name);
+      temp = getJsonEntry(altFieldName);
       if( temp != nullptr ){
         printDeprecatedMessage(altFieldName, field_.name);
         return {altFieldName, temp};
