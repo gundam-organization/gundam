@@ -99,6 +99,7 @@ namespace ConfigUtils {
     JsonType &getConfig(){ return _config_; }
 
     // define fields
+    void clearFields(){ _fieldDefinitionList_.clear(); }
     void defineField(const FieldDefinition& fieldDefinition_);
     void defineFields(const std::vector<FieldDefinition>& fieldDefinition_);
     void checkConfiguration() const;
@@ -172,6 +173,7 @@ namespace ConfigUtils {
     out.setParentPath(GenericToolbox::joinPath(_parentPath_, keyValuePair.first));
     return out;
   }
+  template<> inline std::vector<ConfigReader> ConfigReader::fetchValue<std::vector<ConfigReader>>(const std::string& fieldName_) const{ return fetchValue<ConfigReader>(fieldName_).loop(); }
   template<typename T> void ConfigReader::fillValue(T& object_, const std::string& fieldName_) const{
     try{ object_ = fetchValue<T>(fieldName_); }
     catch(...){}
