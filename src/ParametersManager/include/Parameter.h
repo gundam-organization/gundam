@@ -24,6 +24,7 @@ public:
   ENUM_FIELD(Gaussian) \
   ENUM_FIELD(Flat)
 #include "GenericToolbox.MakeEnum.h"
+  static void prepareConfig(ConfigReader& config_);
 
 protected:
   // called through JsonBaseClass::configure() and JsonBaseClass::initialize()

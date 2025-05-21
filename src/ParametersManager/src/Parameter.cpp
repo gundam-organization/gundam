@@ -12,14 +12,15 @@
 #include <sstream>
 
 
-void Parameter::configureImpl(){
-
-  _config_.defineFields({
+void Parameter::prepareConfig(ConfigReader& config_){
+  config_.clearFields();
+  config_.defineFields({
     {"isEnabled"},
     {"priorValue"},
     {"isFixed"},
     {"isThrown"},
     {"parameterStepSize"},
+    {"parameterIndex"},
     {"parameterLimits"},
     {"physicalLimits"},
     {"throwLimits"},
@@ -27,7 +28,11 @@ void Parameter::configureImpl(){
     {"dialSetDefinitions"},
     {"priorType"},
   });
-  _config_.checkConfiguration();
+  config_.checkConfiguration();
+}
+void Parameter::configureImpl(){
+
+  prepareConfig(_config_);
 
   _config_.fillValue(_isEnabled_, "isEnabled");
   if( not _isEnabled_ ) { return; }
