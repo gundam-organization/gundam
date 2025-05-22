@@ -1,4 +1,3 @@
 # Tests that are expected to fail.  This file can be empty.
-fast-tests/200KrigedAsimov.sh
 fast-tests/090ExpectedFailure.sh
 #end of file
