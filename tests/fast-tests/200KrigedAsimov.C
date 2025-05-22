@@ -79,7 +79,7 @@ int weightTable(const char* name, int bins,
                 int varc, double varv[],
                 int maxEntries, int index[], double weight[]) {
 
-#define LOUD_AND_PROUD
+#undef LOUD_AND_PROUD
 #ifdef LOUD_AND_PROUD
     std::cout << LIB_NAME << "WEIGHT TABLE" << std::endl;
     std::cout << LIB_NAME << "name: " << name << std::endl;
