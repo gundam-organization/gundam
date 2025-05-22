@@ -31,7 +31,8 @@ public:
   ENUM_FIELD( Surface ) \
   ENUM_FIELD( Formula ) \
   ENUM_FIELD( CompiledLibDial ) \
-  ENUM_FIELD( Tabulated )
+  ENUM_FIELD( Tabulated ) \
+  ENUM_FIELD( Kriged )
 #define ENUM_DICT \
    ENUM_DICT_ENTRY("Normalization", "Norm") \
    ENUM_DICT_ENTRY("RootFormula", "Formula")
@@ -174,6 +175,7 @@ protected:
   bool initializeDialsWithDefinition();
   bool initializeDialsWithBinningFile(const JsonType& dialsDefinition);
   bool initializeDialsWithTabulation(const JsonType& dialsDefinition);
+  bool initializeDialsWithKriging(const JsonType& dialsDefinition);
 
   void readParametersFromConfig(const JsonType &config_);
   JsonType fetchDialsDefinition(const JsonType &definitionsList_) const;
