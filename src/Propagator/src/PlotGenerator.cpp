@@ -75,25 +75,26 @@ void PlotGenerator::configureImpl(){
   }
 
   for( auto& histDefConfig : _config_.loop("histogramsDefinition") ){
+    histDefConfig.defineFields({
+          {"isEnabled"},
+          {"noData"},
+          {"useSampleBinning"},
+          {"rescaleAsBinWidth"},
+          {"rescaleBinFactor"},
+          {"xMin"},
+          {"xMax"},
+          {"prefix"},
+          {"varToPlot"},
+          {"xTitle"},
+          {"yTitle"},
+          {"binning"},
+          {"sampleVariableIfNotAvailable"},
+          {"splitVarList", {"splitVars"}},
+          {"useSampleBinningOfVar", {"useSampleBinningOfObservable"}},
+        });
+
     if( not histDefConfig.fetchValue("isEnabled", true) ){ continue; }
     _histDefList_.emplace_back(); auto& histDef = _histDefList_.back();
-
-    histDefConfig.defineFields({
-      {"noData"},
-      {"useSampleBinning"},
-      {"rescaleAsBinWidth"},
-      {"rescaleBinFactor"},
-      {"xMin"},
-      {"xMax"},
-      {"prefix"},
-      {"varToPlot"},
-      {"xTitle"},
-      {"yTitle"},
-      {"binning"},
-      {"sampleVariableIfNotAvailable"},
-      {"splitVarList", {"splitVars"}},
-      {"useSampleBinningOfVar", {"useSampleBinningOfObservable"}},
-    });
 
     histDefConfig.fillValue(histDef.noData, "noData");
     histDefConfig.fillValue(histDef.useSampleBinning, "useSampleBinning");
