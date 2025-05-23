@@ -99,7 +99,7 @@ namespace ConfigUtils {
     JsonType &getConfig(){ return _config_; }
 
     // define fields
-    void clearFields(){ _fieldDefinitionList_.clear(); }
+    void clearFields(){ _fieldDefinitionList_.clear(); _definedFieldNameList_.clear(); }
     void defineField(const FieldDefinition& fieldDefinition_);
     void defineFields(const std::vector<FieldDefinition>& fieldDefinition_);
     void checkConfiguration() const;
