@@ -280,7 +280,7 @@ namespace ConfigUtils {
     if( not collisionDict.empty() ){
       LogAlert << _parentPath_ << ": found " << collisionDict.size() << " key collisions. Are they backward compatibility options?" << std::endl;
       for( const auto& collision : collisionDict ){
-        LogAlert << "  > Field \"" << collision.first->name << "\" has collisions: " << GenericToolbox::toString(collision.second) << std::endl;
+        LogAlert << "  > Field \"" << collision.first->name << "\" has collisions with different keys: " << GenericToolbox::toString(collision.second) << std::endl;
       }
       // check if they carry the same value?
       bool unmatchingCollisionFound = false;
@@ -418,7 +418,7 @@ namespace ConfigUtils {
   void ConfigReader::printDeprecatedMessage(const std::string& oldKey_, const std::string& newKey_) const {
     // only print it once
     if( doShowWarning(oldKey_) ) {
-      LogAlert << _parentPath_ << ": \"" << oldKey_ << "\" is a deprecated field name, use \"" << newKey_ << "\" instead." << std::endl;
+      LogAlert << _parentPath_ << ": \"" << oldKey_ << "\" is a deprecated key, use \"" << newKey_ << "\" instead." << std::endl;
     }
   }
   bool ConfigReader::doShowWarning(const std::string& key_) const{
