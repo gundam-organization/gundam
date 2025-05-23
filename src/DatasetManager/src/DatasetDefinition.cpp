@@ -19,6 +19,13 @@ void DatasetDefinition::configureImpl() {
     {"isEnabled"},
     {"model", true, {"mc"}},
     {"data"},
+    {"selectedDataEntry"},
+    {"selectedToyEntry"},
+    {"showSelectedEventCount"},
+    {"devSingleThreadEventLoaderAndIndexer"},
+    {"devSingleThreadEventSelection"},
+    {"sortLoadedEvents"},
+    {"nbMaxThreadsForLoad"},
   });
   _config_.checkConfiguration();
 
