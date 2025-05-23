@@ -1123,7 +1123,9 @@ void ParameterSet::defineParameters(){
         // search with name
         std::string parName = _parameterNamesList_->At(par.getParameterIndex())->GetName();
         for( auto& parConfig : _parameterDefinitionConfig_.loop() ){
-          parConfig.defineFields({{"name"}});
+          parConfig.defineFields({
+            {"name", {"parameterName"}},
+          });
           if( parConfig.hasField("name") ){
             if( parName == parConfig.fetchValue<std::string>("name") ){
               selectedParConfig = parConfig;
