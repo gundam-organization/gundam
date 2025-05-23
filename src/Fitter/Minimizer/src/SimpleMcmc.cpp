@@ -28,6 +28,39 @@ SimpleMcmc::SimpleMcmc(FitterEngine* owner_): MinimizerBase(owner_) {
 void SimpleMcmc::configureImpl(){
   setCheckParameterValidity(true);
   this->MinimizerBase::configureImpl();
+
+  _config_.defineFields({
+      {"algorithm"},
+      {"proposal"},
+      {"mcmcOutputTree"},
+      {"likelihoodValidity"},
+      {"randomStart"},
+      {"saveRawSteps"},
+      {"modelSaveStride"},
+      {"burninCycles"},
+      {"burninSteps"},
+      {"saveBurnin"},
+      {"cycles"},
+      {"steps"},
+      {"sequence"},
+      {"burninCovWindow"},
+      {"burninCovDeweighting"},
+      {"burninResets"},
+      {"burninFreezeAfter"},
+      {"burninWindow"},
+      {"adaptiveRestore"},
+      {"adaptiveCovFile"},
+      {"adaptiveCovName"},
+      {"adaptiveCovTrials"},
+      {"covarianceWindow", {"adaptiveCovWindow"}},
+      {"covarianceDeweighting", {"adaptiveCovDeweighting"}},
+      {"adaptiveFreezeCorrelations"},
+      {"adaptiveFreezeLength"},
+      {"acceptanceWindow", {"adaptiveWindow"}},
+      {"fixedSigma"},
+  });
+  _config_.checkConfiguration();
+
   LogInfo << "Configure MCMC: " << _config_ << std::endl;
 
   // The type of algorithm to be using.  It should be left at the default
