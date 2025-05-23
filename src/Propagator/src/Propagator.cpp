@@ -43,6 +43,7 @@ void Propagator::configureImpl(){
     {"plotGeneratorConfig"},
     {"llhStatFunction"},
     {"llhConfig"},
+    {"scanConfig"},
     {"dataSetList", {"fitSampleSetConfig/dataSetList"}},
   });
   _config_.checkConfiguration();
