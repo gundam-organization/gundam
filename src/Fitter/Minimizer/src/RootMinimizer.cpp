@@ -48,6 +48,7 @@ void RootMinimizer::configureImpl(){
     {"stepSizeScaling"},
     {"restoreStepSizeBeforeHesse"},
   });
+  _config_.checkConfiguration();
 
   _config_.fillValue(gradientDescentMonitor.isEnabled, "monitorGradientDescent");
   _config_.fillValue(_minimizerType_, "minimizer");

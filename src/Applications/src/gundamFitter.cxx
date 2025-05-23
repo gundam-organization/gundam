@@ -184,6 +184,15 @@ int main(int argc, char** argv){
   configHandler.flatOverride( clParser.getOptionValList<std::string>("overrides") );
 
   ConfigReader gundamFitterConfig(configHandler.getConfig());
+  gundamFitterConfig.defineFields({
+    {"outputFolder"},
+    {"minGundamVersion"},
+    {"fitterEngineConfig"},
+    // deprecated
+    {"generateSamplePlots"},
+    {"allParamVariations"},
+  });
+  gundamFitterConfig.checkConfiguration();
 
   // Output file path
   std::string outFileName;
