@@ -52,6 +52,7 @@ void SimpleMcmc::configureImpl(){
       {"adaptiveCovFile"},
       {"adaptiveCovName"},
       {"adaptiveCovTrials"},
+      {"burninSequence"},
       {"covarianceWindow", {"adaptiveCovWindow"}},
       {"covarianceDeweighting", {"adaptiveCovDeweighting"}},
       {"adaptiveFreezeCorrelations"},
