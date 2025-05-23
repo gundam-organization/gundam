@@ -28,6 +28,27 @@ void RootMinimizer::configureImpl(){
   // read general parameters first
   this->MinimizerBase::configureImpl();
 
+  _config_.defineFields({
+    {"monitorGradientDescent"},
+    {"minimizer"},
+    {"algorithm"},
+    {"strategy"},
+    {"print_level"},
+    {"tolerance"},
+    {"tolerancePerDegreeOfFreedom"},
+    {"maxIterations", {"max_iter"}},
+    {"maxFcnCalls", {"max_fcn"}},
+    {"enableSimplexBeforeMinimize"},
+    {"simplexMaxFcnCalls"},
+    {"simplexToleranceLoose"},
+    {"simplexStrategy"},
+    {"errors", {"errorsAlgo"}},
+    {"generatedPostFitParBreakdown"},
+    {"generatedPostFitEigenBreakdown"},
+    {"stepSizeScaling"},
+    {"restoreStepSizeBeforeHesse"},
+  });
+
   _config_.fillValue(gradientDescentMonitor.isEnabled, "monitorGradientDescent");
   _config_.fillValue(_minimizerType_, "minimizer");
   _config_.fillValue(_minimizerAlgo_, "algorithm");
@@ -36,15 +57,15 @@ void RootMinimizer::configureImpl(){
   _config_.fillValue(_printLevel_, "print_level");
   _config_.fillValue(_tolerance_, "tolerance");
   _config_.fillValue(_tolerancePerDegreeOfFreedom_, "tolerancePerDegreeOfFreedom");
-  _config_.fillValue(_maxIterations_, {{"maxIterations"},{"max_iter"}});
-  _config_.fillValue(_maxFcnCalls_, {{"maxFcnCalls"},{"max_fcn"}});
+  _config_.fillValue(_maxIterations_, "maxIterations");
+  _config_.fillValue(_maxFcnCalls_, "maxFcnCalls");
 
   _config_.fillValue(_preFitWithSimplex_, "enableSimplexBeforeMinimize");
   _config_.fillValue(_simplexMaxFcnCalls_, "simplexMaxFcnCalls");
   _config_.fillValue(_simplexToleranceLoose_, "simplexToleranceLoose");
   _config_.fillValue(_simplexStrategy_, "simplexStrategy");
 
-  _config_.fillValue(_errorAlgo_, {{"errors"},{"errorsAlgo"}});
+  _config_.fillValue(_errorAlgo_, "errors");
 
   _config_.fillValue(_generatedPostFitParBreakdown_, "generatedPostFitParBreakdown");
   _config_.fillValue(_generatedPostFitEigenBreakdown_, "generatedPostFitEigenBreakdown");

@@ -11,8 +11,15 @@
 
 void MinimizerBase::configureImpl(){
 
-  // Do not use checkFields here.  All of the fields should be checked in the
-  // derived classes.
+  _config_.defineFields({
+    {"monitorRefreshRateInMs"},
+    {"showParametersOnFitMonitor"},
+    {"maxNbParametersPerLineOnMonitor"},
+    {"enablePostFitErrorFit"},
+    {"useNormalizedFitSpace"},
+    {"writeLlhHistory"},
+    {"checkParameterValidity"},
+  });
 
   // nested objects first
   int monitorRefreshRateInMs(5000);

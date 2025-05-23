@@ -220,7 +220,7 @@ void SimpleMcmc::configureImpl(){
   // Generally, the window should be long compared to the number of steps
   // required to get to an uncorrelated point.
   {
-    _adaptiveCovWindow_.set( _config_.fetchValue({{"covarianceWindow"}, {"adaptiveCovWindow"}}, _adaptiveCovWindow_.get()) );
+    _adaptiveCovWindow_.set( _config_.fetchValue("covarianceWindow", _adaptiveCovWindow_.get()) );
   }
 
   // The covariance deweighting while the chain is running.  This should
@@ -229,8 +229,7 @@ void SimpleMcmc::configureImpl(){
   // covariance window).
   {
     _adaptiveCovDeweighting_.set(
-      _config_.fetchValue(
-        {{"covarianceDeweighting"}, {"adaptiveCovDeweighting"}},
+      _config_.fetchValue("covarianceDeweighting",
         _adaptiveCovDeweighting_.get()
       )
     );
@@ -254,8 +253,7 @@ void SimpleMcmc::configureImpl(){
   // Make this very large effectively locks the step size.
   {
     int tmp{_adaptiveWindow_};
-    _config_.fillValue(tmp,
-                                    {{"acceptanceWindow"}, {"adaptiveWindow"}});
+    _config_.fillValue(tmp, "acceptanceWindow");
     _adaptiveWindow_.set(tmp);
   }
 
