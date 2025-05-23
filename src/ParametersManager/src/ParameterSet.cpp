@@ -30,7 +30,7 @@ void ParameterSet::configureImpl(){
     {"enableThrowToyParameters",{"enabledThrowToyParameters"}},
     {"printDialSetSummary", {"printDialSetsSummary"}},
     {"customParThrow", {"customFitParThrow"}},
-    {"printParameterSummary", {"printParametersSummary"}},
+    {"printParametersSummary", {"printParameterSummary"}},
     {"parameterDefinitionFilePath", {"covarianceMatrixFilePath"}},
     {"covarianceMatrix", {"covarianceMatrixTMatrixD"}},
     {"parameterNameList", {"parameterNameTObjArray"}},
@@ -52,6 +52,7 @@ void ParameterSet::configureImpl(){
     {"eigenParBounds"},
     {"maskForToyGeneration"},
     {"devUseParLimitsOnEigen"},
+    {"releaseFixedParametersOnHesse"},
   });
   _config_.checkConfiguration();
 
@@ -73,7 +74,7 @@ void ParameterSet::configureImpl(){
   _config_.fillValue(_printDialSetsSummary_, "printDialSetSummary");
   _config_.fillValue(_printParametersSummary_, "printParametersSummary");
 
-  _config_.fillValue(_globalParRange_, "parameterLimits");
+  _config_.fillValue(_globalParRange_, "parametersRange");
 
   _config_.fillValue(_enablePca_, "enablePca");
 
