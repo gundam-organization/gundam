@@ -53,6 +53,7 @@ void ParameterSet::configureImpl(){
     {"maskForToyGeneration"},
     {"devUseParLimitsOnEigen"},
     {"releaseFixedParametersOnHesse"},
+    {"skipVariedEventRates"},
   });
   _config_.checkConfiguration();
 
