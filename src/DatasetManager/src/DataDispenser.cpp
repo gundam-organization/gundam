@@ -36,7 +36,7 @@ void DataDispenser::configureImpl(){
 
   _config_.clearFields();
   _config_.defineFields({
-    {"name", true},
+    {"name"},
     {"tree"},
     {"filePathList"},
     {"debugNbMaxEventsToLoad"},
@@ -61,6 +61,11 @@ void DataDispenser::configureImpl(){
   if( _config_.hasField("fromHistContent" ) ) {
     LogDebugIf(GundamGlobals::isDebug()) << "Dataset \"" << _parameters_.name << "\" will be defined with histogram data." << std::endl;
     auto fromHistConfig(_config_.fetchValue<ConfigReader>("fromHistContent"));
+
+    fromHistConfig.defineFields({
+      {"fromRootFile"},
+      {"sampleList"},
+    });
 
     _parameters_.fromHistContent.isEnabled = true;
     _parameters_.fromHistContent.rootFilePath = fromHistConfig.fetchValue<std::string>("fromRootFile");
