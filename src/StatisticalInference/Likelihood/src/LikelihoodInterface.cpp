@@ -69,6 +69,7 @@ void LikelihoodInterface::configureImpl(){
 
   // new config structure
   _config_.fillValue(jointProbabilityConfig, "jointProbabilityConfig");
+  jointProbabilityConfig.defineFields({{"type"}});
   jointProbabilityConfig.fillValue(jointProbabilityTypeStr, "type");
   LogDebugIf(GundamGlobals::isDebug()) << "Using \"" << jointProbabilityTypeStr << "\" JointProbabilityType." << std::endl;
   _jointProbabilityPtr_ = std::shared_ptr<JointProbability::JointProbabilityBase>( JointProbability::makeJointProbability( jointProbabilityTypeStr ) );
