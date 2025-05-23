@@ -131,6 +131,9 @@ int main(int argc, char** argv){
     engineConfig.setConfig(cHandler.getConfig());
   }
 
+  engineConfig.defineFields({
+    {"fitterEngineConfig"},
+  });
 
 
   LogInfo << "Override done." << std::endl;
@@ -160,9 +163,7 @@ int main(int argc, char** argv){
 
     LogScopeIndent;
     LogInfo << sample.getName() << ": binning not set, looking for parSetBinning..." << std::endl;
-    auto associatedParSet = sample.getConfig().fetchValue(
-      {{"parSetBinning"}, {"parameterSetName"}}, std::string()
-    );
+    auto associatedParSet = sample.getConfig().fetchValue("parSetBinning", std::string());
 
     LogThrowIf(associatedParSet.empty(), "Could not find parSetBinning.");
 
@@ -277,8 +278,17 @@ int main(int argc, char** argv){
   LogInfo << "Creating normalizer objects..." << std::endl;
   // flux renorm with toys
   struct ParSetNormaliser{
-    void configure(const ConfigReader& config_){
+    void configure(ConfigReader& config_){
       LogScopeIndent;
+      config_.defineFields({
+        {"name"},
+        {"filePath"},
+        {"histogramPath"},
+        {"axisVariable"},
+        {"parSelections"},
+
+      });
+      config_.checkConfiguration();
 
       name = config_.fetchValue<std::string>("name");
       LogInfo << "ParSetNormaliser config \"" << name << "\": " << std::endl;
@@ -291,6 +301,7 @@ int main(int argc, char** argv){
       // optionals
       for( auto& parSelConfig : config_.loop("parSelections") ){
         parSelectionList.emplace_back();
+        parSelConfig.defineFields({{"name"}, {"value"}});
         parSelConfig.fillValue(parSelectionList.back().name, "name");
         parSelConfig.fillValue(parSelectionList.back().value, "value");
       }
@@ -403,8 +414,16 @@ int main(int argc, char** argv){
 
   // to be filled up
   struct BinNormaliser{
-    void configure(const ConfigReader& config_){
+    void configure(ConfigReader& config_){
       LogScopeIndent;
+      config_.defineFields({
+        {"name", true},
+        {"isEnabled"},
+        {"meanValue"},
+        {"disabledBinDim"},
+        {"parSetNormName"},
+      });
+      config_.checkConfiguration();
 
       name = config_.fetchValue<std::string>("name");
 
@@ -415,16 +434,16 @@ int main(int argc, char** argv){
 
       LogInfo << "Re-normalization config \"" << name << "\": ";
 
-      if     ( config_.hasKey( "meanValue" ) ){
+      if     ( config_.hasField( "meanValue" ) ){
         normParameter.min  = config_.fetchValue<double>("meanValue");
         normParameter.max = config_.fetchValue("stdDev", double(0.));
         LogInfo << "mean ± sigma = " << normParameter.min << " ± " << normParameter.max;
       }
-      else if( config_.hasKey("disabledBinDim" ) ){
+      else if( config_.hasField("disabledBinDim" ) ){
         disabledBinDim = config_.fetchValue<std::string>("disabledBinDim");
         LogInfo << "disabledBinDim = " << disabledBinDim;
       }
-      else if( config_.hasKey("parSetNormName" ) ){
+      else if( config_.hasField("parSetNormName" ) ){
         parSetNormaliserName = config_.fetchValue<std::string>("parSetNormName");
         LogInfo << "parSetNormName = " << parSetNormaliserName;
       }
