@@ -12,7 +12,9 @@
 
 
 void EventVarTransformLib::configureImpl(){
+  _config_.clearFields();
   this->EventVarTransform::configureImpl();
+  _config_.defineFields({{"libraryFile"}});
   _config_.fillValue(_libraryFile_, "libraryFile");
 }
 void EventVarTransformLib::initializeImpl(){
