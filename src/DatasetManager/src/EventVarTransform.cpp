@@ -9,13 +9,13 @@
 
 
 void EventVarTransform::configureImpl(){
+  _config_.clearFields();
   _config_.defineFields({
     {"name", true, {"title"}},
     {"outputVariableName", true},
     {"isEnabled"},
     {"inputList"},
     {"messageOnError"},
-    {"outputVariableName"},
   });
   _config_.checkConfiguration();
 
