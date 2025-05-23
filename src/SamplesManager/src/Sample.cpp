@@ -22,6 +22,7 @@ void Sample::prepareConfig(ConfigReader &config_){
     {"binning", {"binningFile", "binningFilePath"}},
     {"selectionCutStr", {"selectionCuts"}},
     {"datasets"},
+    {"parSetBinning", {"parameterSetName"}}, // for xsec
   });
   config_.checkConfiguration();
 }
