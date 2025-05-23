@@ -20,6 +20,14 @@ void ParameterScanner::muteLogger(){ Logger::setIsMuted(true); }
 void ParameterScanner::unmuteLogger(){ Logger::setIsMuted(false); }
 
 void ParameterScanner::configureImpl() {
+  _config_.defineFields({
+    {"nbPoints"},
+    {"varsConfig"},
+    {"nbPointsLineScan"},
+    {"useParameterLimits"},
+    {"parameterSigmaRange"},
+  });
+  _config_.checkConfiguration();
 
   _config_.fillValue(_nbPoints_, "nbPoints");
   _config_.fillValue(_varsConfig_, "varsConfig");
