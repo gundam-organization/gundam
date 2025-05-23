@@ -1061,6 +1061,8 @@ void ParameterSet::defineParameters(){
     if( not _enableOnlyParameters_.empty() ){
       bool isEnabled = false;
       for( auto& enableEntry : _enableOnlyParameters_ ){
+        enableEntry.clearFields();
+        enableEntry.defineFields({{"name"}});
         if( enableEntry.hasField("name")
             and par.getName() == enableEntry.fetchValue<std::string>("name") ){
           isEnabled = true;
@@ -1079,6 +1081,8 @@ void ParameterSet::defineParameters(){
     if( not _disableParameters_.empty() ){
       bool isEnabled = true;
       for( auto& disableEntry : _disableParameters_ ){
+        disableEntry.clearFields();
+        disableEntry.defineFields({{"name"}});
         if( disableEntry.hasField("name")
             and par.getName() == disableEntry.fetchValue<std::string>("name") ){
           isEnabled = false;
@@ -1118,6 +1122,7 @@ void ParameterSet::defineParameters(){
         // search with name
         std::string parName = _parameterNamesList_->At(par.getParameterIndex())->GetName();
         for( auto& parConfig : _parameterDefinitionConfig_.loop() ){
+          parConfig.defineFields({{"name"}});
           if( parConfig.hasField("name") ){
             if( parName == parConfig.fetchValue<std::string>("name") ){
               selectedParConfig = parConfig;
@@ -1129,6 +1134,7 @@ void ParameterSet::defineParameters(){
         // not found? try with the index
         if( selectedParConfig.empty() ){
           for( auto& parConfig : _parameterDefinitionConfig_.loop() ){
+            parConfig.defineFields({{"parameterIndex"}});
             if( parConfig.hasField("parameterIndex") ){
               if( par.getParameterIndex() == parConfig.fetchValue<int>("parameterIndex") ){
                 selectedParConfig = parConfig;
