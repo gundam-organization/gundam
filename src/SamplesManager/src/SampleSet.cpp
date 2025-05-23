@@ -16,6 +16,9 @@ void SampleSet::configureImpl(){
 
   _config_.defineFields({
     {"sampleList", {"fitSampleList"}},
+    // deprecated
+    {"llhStatFunction"},
+    {"llhConfig"},
   });
   _config_.checkConfiguration();
 
