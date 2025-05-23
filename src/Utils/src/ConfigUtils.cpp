@@ -259,6 +259,7 @@ namespace ConfigUtils {
       for( auto& missingField : missingFieldList ){
         LogError << "  > \"" << missingField << "\" is a mandatory field." << std::endl;
       }
+      LogError << toString() << std::endl;
       LogExit("Invalid configuration");
     }
 
