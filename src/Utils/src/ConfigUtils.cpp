@@ -319,7 +319,7 @@ namespace ConfigUtils {
       if( field.name == fieldName_ ){ return field; }
     }
 
-    LogError << "[DEV] Unknown field name \"" << fieldName_ << "\" among list: " << GenericToolbox::toString(_fieldDefinitionList_) << std::endl;
+    LogError << "[DEV] (" << _parentPath_ << ") Unknown field name \"" << fieldName_ << "\" among list: " << GenericToolbox::toString(_fieldDefinitionList_) << std::endl;
     exit(EXIT_FAILURE);
   }
   std::pair<std::string, const JsonType*> ConfigReader::getConfigEntry(const FieldDefinition& field_) const{
