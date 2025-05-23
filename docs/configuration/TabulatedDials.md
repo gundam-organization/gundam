@@ -1,9 +1,13 @@
 # Tabulated Dials
 
-An external library can be used to fill a weight table that is
-queried based on the event-by-event value of truth variable.  For
-instance, this can be used for near detector exotics fits
-(e.g. short baseline oscillation fits).
+A tabulated dial provides an efficient way to do an event-by-event reweight
+of an event based on a truth variable and fitting parameters.  It is an
+efficient way to handle a one-dimensional lookup table. For instance, this
+can be used for long and short baseline oscillation fits that are dependent
+on the true neutrino energy.  The table will be refilled for each set of
+oscillation parameters.  An external library is used declare a look up
+table, to fill the table for each iteration, and look up the position of
+each event in the table based on truth variables.
 
 The yaml for a Tabulated Dial is
 
@@ -27,9 +31,8 @@ dialSetDefinitions:
                                                input file names)
           updateFunction: <update-func-name> Function called to update table
           binningFunction: <bin-func-name>  Function to find bin index
-          variables: [<var1>, <var2>, ... ] Variables used for binning the
-                                               table "X" coordinate by the
-                                               binning function.
+          binningVariables: [<var1>, <var2>, ... ] Variables used for binning
+                                               the table "X" coordinates
 ```
 
 # Function to initialize the library
@@ -47,7 +50,7 @@ If `initFunction` is provided it will be called before calling the update or the
 * argv -- argument strings.  The arguments are defined by the library, but are usually things like input file names for the lookup table information.
 * bins -- The suggested size the table.  The library must choose an appropriate binning that will be used for the table.
 
-The function should return less than or equal to zero for failure, and otherwise, the number of elements needed to store the table (usually, the  same as the input value of "bins").
+The function should less than or equal to zero for failure, and otherwise, the number of elements needed to store the table (usually, the same as the input value of "bins").
 
 # Library function to update the table
 
@@ -80,7 +83,7 @@ While the update can (in principle) be done directly on the GPU, and have the ta
 
 # Library function to index events
 
-The binning function is called as the MC events are read into the internal structues, and return an index into the lookup table for an event.  The `binningFunction` signature is:
+The binning function is called as the MC events are read into the internal structures, and return an index into the lookup table for an event.  The `binningFunction` signature is:
 ```
     extern "C"
     double binFunc(const char* name,
