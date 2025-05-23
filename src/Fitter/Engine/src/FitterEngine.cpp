@@ -63,6 +63,7 @@ void FitterEngine::configureImpl(){
     if     ( minimizerTypeStr == "minimizer" ){ minimizerTypeStr = "RootMinimizer"; }
     else if( minimizerTypeStr == "mcmc" )     { minimizerTypeStr = "SimpleMCMC"; }
   });
+  minimizerConfig.defineFields({{"type"}});
   minimizerConfig.fillValue(minimizerTypeStr, "type");
 
   _minimizerType_ = MinimizerType::toEnum( minimizerTypeStr, true );
