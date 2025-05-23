@@ -15,6 +15,7 @@
 void Parameter::prepareConfig(ConfigReader& config_){
   config_.clearFields();
   config_.defineFields({
+    {"name"},
     {"isEnabled"},
     {"priorValue"},
     {"isFixed"},
