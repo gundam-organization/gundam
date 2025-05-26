@@ -46,11 +46,9 @@ void DatasetDefinition::configureImpl() {
   _dataDispenserDict_.emplace("Asimov", DataDispenser(_modelDispenser_));
 
   for( auto& dataEntry : _config_.loop("data") ){
-    dataEntry.defineFields({
-      {"name", true},
-      {"fromMc"}
-    });
+    DataDispenser::prepareConfig(dataEntry);
 
+    LogThrowIf(not dataEntry.hasField("name"), "name of a dataset is mandatory for \"data\".");
     auto name = dataEntry.fetchValue<std::string>("name");
     LogThrowIf( GenericToolbox::isIn(name, _dataDispenserDict_), "\"" << name << "\" already taken, please use another name." )
 

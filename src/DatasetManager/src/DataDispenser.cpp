@@ -32,10 +32,9 @@
 #include <sstream>
 
 
-void DataDispenser::configureImpl(){
-
-  _config_.clearFields();
-  _config_.defineFields({
+void DataDispenser::prepareConfig(ConfigReader &config_){
+  config_.clearFields();
+  config_.defineFields({
     {"name"},
     {"tree"},
     {"filePathList"},
@@ -53,7 +52,10 @@ void DataDispenser::configureImpl(){
     {"variableDict", {"overrideLeafDict"}},
     {"fromMc"},
   });
-  _config_.checkConfiguration();
+  config_.checkConfiguration();
+}
+void DataDispenser::configureImpl(){
+  DataDispenser::prepareConfig(_config_);
 
   _config_.fillValue(_parameters_.name, "name");
 
