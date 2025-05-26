@@ -54,6 +54,7 @@ void ParameterSet::configureImpl(){
     {"devUseParLimitsOnEigen"},
     {"releaseFixedParametersOnHesse"},
     {"skipVariedEventRates"},
+    {"disableOneSigmaPlots"},
   });
   _config_.checkConfiguration();
 
@@ -69,6 +70,7 @@ void ParameterSet::configureImpl(){
 
   _config_.fillValue(_isScanEnabled_, "isScanEnabled");
   _config_.fillValue(_skipVariedEventRates_, "skipVariedEventRates");
+  _config_.fillValue(_disableOneSigmaPlots_, "disableOneSigmaPlots");
 
   _config_.fillValue(_nbParameterDefinition_, "numberOfParameters");
   _config_.fillValue(_nominalStepSize_, "nominalStepSize");

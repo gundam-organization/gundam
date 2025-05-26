@@ -377,7 +377,7 @@ void ParameterScanner::generateOneSigmaPlots(TDirectory* saveDir_){
 
     if( not parSet.isEnabled() ) continue;
 
-    if( parSet.getConfig().fetchValue("disableOneSigmaPlots", false) ){
+    if( parSet.isDisableOneSigmaPlots() ){
       LogInfo << "+1σ plots disabled for \"" << parSet.getName() << "\"" << std::endl;
       continue;
     }
