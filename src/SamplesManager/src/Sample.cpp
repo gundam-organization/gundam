@@ -45,6 +45,8 @@ void Sample::configureImpl(){
 
   LogDebugIf(GundamGlobals::isDebug()) << "Reading binning: " << _binningConfig_ << std::endl;
   _histogram_.build(_binningConfig_);
+
+  LogDebugIf(GundamGlobals::isDebug()) << "Histogram has " << _histogram_.getNbBins() << " bins." << std::endl;
 }
 
 void Sample::writeEventRates(const GenericToolbox::TFilePath& saveDir_) const{
