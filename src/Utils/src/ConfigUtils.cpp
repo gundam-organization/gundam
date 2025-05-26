@@ -357,7 +357,7 @@ namespace ConfigUtils {
       if(not found){ return nullptr; }
     }
 
-    _usedKeyList_.insert(key_);
+    _usedKeyList_.insert(GenericToolbox::toLowerCase(key_));
     return current;
   }
   bool ConfigReader::hasField(const std::string& fieldName_) const{
@@ -371,7 +371,7 @@ namespace ConfigUtils {
     // for context dependent options
     std::vector<std::string> unusedKeyList{};
     for (auto it = _config_.begin(); it != _config_.end(); ++it) {
-      if( GenericToolbox::isIn(it.key(), _usedKeyList_) ){ continue; }
+      if( GenericToolbox::isIn(GenericToolbox::toLowerCase(it.key()), _usedKeyList_) ){ continue; }
 
       // already printed out?
       if( doShowWarning(it.key()) ){
@@ -417,7 +417,7 @@ namespace ConfigUtils {
   void ConfigReader::printDeprecatedMessage(const std::string& oldKey_, const std::string& newKey_) const {
     // only print it once
     if( doShowWarning(oldKey_) ) {
-      LogAlert << _parentPath_ << ": \"" << oldKey_ << "\" is a deprecated key, use \"" << newKey_ << "\" instead." << std::endl;
+      LogWarning << _parentPath_ << ": \"" << oldKey_ << "\" is a deprecated key, use \"" << newKey_ << "\" instead." << std::endl;
     }
   }
   bool ConfigReader::doShowWarning(const std::string& key_) const{
