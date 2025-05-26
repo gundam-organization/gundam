@@ -16,6 +16,18 @@ TabulatedDialFactory::TabulatedDialFactory(const ConfigReader& config_) {
     // mandatory
     auto tableConfig = config_.fetchValue<ConfigReader>("tableConfig");
 
+    tableConfig.defineFields({
+        {"name", true},
+        {"libraryPath", true},
+        {"initFunction", true},
+        {"updateFunction", true},
+        {"binningFunction", true},
+        {"initArguments", true},
+        {"binningVariables", true},
+        {"bins"},
+    });
+    tableConfig.checkConfiguration();
+
     // mandatory options
     _name_ =  tableConfig.fetchValue<std::string>("name");
     _libraryPath_ =  tableConfig.fetchValue<std::string>("libraryPath");
