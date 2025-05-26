@@ -71,6 +71,7 @@ public:
   [[nodiscard]] auto isEnablePca() const{ return _enablePca_; }
   [[nodiscard]] auto isEnableEigenDecomp() const{ return _enableEigenDecomp_; }
   [[nodiscard]] auto isEnabledThrowToyParameters() const{ return _enabledThrowToyParameters_; }
+  [[nodiscard]] auto isSkipVariedEventRates() const{ return _skipVariedEventRates_; }
   [[nodiscard]] auto isMaskForToyGeneration() const{ return _maskForToyGeneration_; }
   [[nodiscard]] auto getNbEnabledEigenParameters() const{ return _nbEnabledEigen_; }
   [[nodiscard]] auto getPenaltyChi2Buffer() const{ return _penaltyChi2Buffer_; }
@@ -189,6 +190,7 @@ private:
   bool _printParametersSummary_{false};
   bool _releaseFixedParametersOnHesse_{false};
   bool _devUseParLimitsOnEigen_{false};
+  bool _skipVariedEventRates_{false};
   int _nbParameterDefinition_{-1};
   int _maxNbEigenParameters_{-1};
   double _nominalStepSize_{std::nan("unset")};

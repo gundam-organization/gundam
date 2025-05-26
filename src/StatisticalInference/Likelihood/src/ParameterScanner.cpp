@@ -521,7 +521,7 @@ void ParameterScanner::varyEvenRates(const std::vector<double>& paramVariationLi
   for( auto& parSet : _likelihoodInterfacePtr_->getModelPropagator().getParametersManager().getParameterSetsList() ){
 
     if( not parSet.isEnabled() ) continue;
-    if( parSet.getConfig().fetchValue("skipVariedEventRates", false) ){
+    if( parSet.isSkipVariedEventRates() ){
       LogInfo << "Event rate variation skipped for \"" << parSet.getName() << "\"" << std::endl;
       continue;
     }
