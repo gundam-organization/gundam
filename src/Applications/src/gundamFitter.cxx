@@ -73,6 +73,7 @@ int main(int argc, char** argv){
   clParser.addDummyOption("Debug options");
   clParser.addTriggerOption("dry-run", {"-d", "--dry-run"},"Perform the full sequence of initialization, but don't do the actual fit.");
   clParser.addTriggerOption("super-dry-run", {"-dd", "--super-dry-run"},"Only reads the config files.");
+  clParser.addTriggerOption("hyper-dry-run", {"-ddd", "--hyper-dry-run"},"Only unfolds the config files.");
   clParser.addOption("debugVerbose", {"--debug"}, "Enable debug verbose (can provide verbose level arg)", 1, true);
   clParser.addOption("kickMc", {"--kick-mc"}, "Amount to push the starting parameters away from their prior values (default: 0)", 1, true);
   clParser.addTriggerOption("ignoreVersionCheck", {"--ignore-version"}, "Don't check GUNDAM version with config request");
@@ -266,8 +267,8 @@ int main(int argc, char** argv){
   app.openOutputFile(outFileName);
   app.writeAppInfo();
 
-  if( clParser.isOptionTriggered("super-dry-run") ) {
-    LogInfo << "Super-dry-run enabled. Stopping here." << std::endl;
+  if( clParser.isOptionTriggered("hyper-dry-run") ) {
+    LogInfo << "Hyper-dry-run enabled. Stopping here." << std::endl;
     std::exit(EXIT_SUCCESS);
   }
 
@@ -398,6 +399,12 @@ int main(int argc, char** argv){
   }
 
   gundamFitterConfig.printUnusedKeys();
+
+
+  if( clParser.isOptionTriggered("super-dry-run") ) {
+    LogInfo << "Super-dry-run enabled. Stopping here." << std::endl;
+    std::exit(EXIT_SUCCESS);
+  }
 
   // --------------------------
   // Load:
