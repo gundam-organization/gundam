@@ -28,10 +28,7 @@ void PlotGenerator::configureImpl(){
   _config_.defineFields({
     {"isEnabled"},
     {"histogramsDefinition"},
-    {"canvasParameters/height"},
-    {"canvasParameters/width"},
-    {"canvasParameters/nbXplots"},
-    {"canvasParameters/nbYplots"},
+    {"canvasParameters"},
     {"writeGeneratedHistograms"},
     {"varDictionaries", {"varDictionnaries"}},
   });
@@ -121,11 +118,20 @@ void PlotGenerator::configureImpl(){
   }
 
   // options
-  _config_.fillValue(_canvasParameters_.height, "canvasParameters/height");
-  _config_.fillValue(_canvasParameters_.width, "canvasParameters/width");
-  _config_.fillValue(_canvasParameters_.nbXplots, "canvasParameters/nbXplots");
-  _config_.fillValue(_canvasParameters_.nbYplots, "canvasParameters/nbYplots");
   _config_.fillValue(_writeGeneratedHistograms_, "writeGeneratedHistograms");
+
+  auto canvasConfig = _config_.fetchValue("canvasParameters", ConfigReader());
+  canvasConfig.defineFields({
+      {"height"},
+      {"width"},
+      {"nbXplots"},
+      {"nbYplots"},
+  });
+  canvasConfig.checkConfiguration();
+  canvasConfig.fillValue(_canvasParameters_.height, "height");
+  canvasConfig.fillValue(_canvasParameters_.width, "width");
+  canvasConfig.fillValue(_canvasParameters_.nbXplots, "nbXplots");
+  canvasConfig.fillValue(_canvasParameters_.nbYplots, "nbYplots");
 
 }
 void PlotGenerator::initializeImpl() {
