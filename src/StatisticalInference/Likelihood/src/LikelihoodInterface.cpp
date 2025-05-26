@@ -42,6 +42,9 @@ void LikelihoodInterface::configureImpl(){
   _modelPropagator_.getConfig().deprecatedAction("enableStatThrowInToys", "likelihoodInterfaceConfig", [&]{
     _modelPropagator_.getConfig().fillValue(_enableStatThrowInToys_, "enableStatThrowInToys");
   });
+  _modelPropagator_.getConfig().deprecatedAction("eventTreeWriter", "likelihoodInterfaceConfig", [&]{
+    _modelPropagator_.getConfig().fillValue(_eventTreeWriter_.getConfig(), "eventTreeWriter");
+  });
   _modelPropagator_.getConfig().deprecatedAction("gaussStatThrowInToys", "likelihoodInterfaceConfig", [&]{
     _modelPropagator_.getConfig().fillValue(_gaussStatThrowInToys_, "gaussStatThrowInToys");
   });

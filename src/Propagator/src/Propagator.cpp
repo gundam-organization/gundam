@@ -44,6 +44,7 @@ void Propagator::configureImpl(){
     {"llhStatFunction"},
     {"llhConfig"},
     {"scanConfig"},
+    {"eventTreeWriter"},
     {"dataSetList", {"fitSampleSetConfig/dataSetList"}},
   });
   _config_.checkConfiguration();
