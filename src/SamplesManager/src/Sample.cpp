@@ -43,7 +43,7 @@ void Sample::configureImpl(){
     return;
   }
 
-  LogDebugIf(GundamGlobals::isDebug()) << "Reading binning: " << _config_ << std::endl;
+  LogDebugIf(GundamGlobals::isDebug()) << "Reading binning: " << _binningConfig_ << std::endl;
   _histogram_.build(_binningConfig_);
 }
 
