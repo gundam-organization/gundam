@@ -278,11 +278,10 @@ namespace ConfigUtils {
       }
     }
     if( not collisionDict.empty() ){
-      LogAlert << _parentPath_ << ": found " << collisionDict.size() << " key collisions. Are they backward compatibility options?" << std::endl;
       for( const auto& collision : collisionDict ){
-        LogAlert << "  > Field \"" << collision.first->name << "\" has collisions with different keys: " << GenericToolbox::toString(collision.second) << std::endl;
+        LogAlertIf(doShowWarning(collision.first->name)) << _parentPath_ << ": field \"" << collision.first->name << "\" has collisions with different keys: " << GenericToolbox::toString(collision.second) << std::endl;
       }
-      // check if they carry the same value?
+      // check if they carry the same value? -> if NOT -> ERROR
       bool unmatchingCollisionFound = false;
       for( const auto& collision : collisionDict ){
         auto val = _config_.at(collision.second[0]);
