@@ -15,7 +15,7 @@
 void Parameter::prepareConfig(ConfigReader& config_){
   config_.clearFields();
   config_.defineFields({
-    {"name"},
+    {"name", {"parameterName"}},
     {"isEnabled"},
     {"priorValue"},
     {"isFixed"},
@@ -35,6 +35,7 @@ void Parameter::configureImpl(){
 
   prepareConfig(_config_);
 
+  _config_.fillValue(_name_, "name");
   _config_.fillValue(_isEnabled_, "isEnabled");
   if( not _isEnabled_ ) { return; }
 
