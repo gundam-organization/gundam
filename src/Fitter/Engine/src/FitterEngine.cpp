@@ -40,7 +40,7 @@ void FitterEngine::configureImpl(){
     {"generateSamplePlots"},
     {"generateOneSigmaPlots"},
     {"enableParamVariations"},
-    {"paramVariationsSigmas"},
+    {"paramVariationsSigmas", {"allParamVariations"}},
     {"scaleParStepWithChi2Response"},
     // relocated
     {"parameterScannerConfig", {"scanConfig"}},
@@ -112,6 +112,11 @@ void FitterEngine::configureImpl(){
 
   _config_.fillValue(_doAllParamVariations_, "enableParamVariations");
   _config_.fillValue(_allParamVariationsSigmas_, "paramVariationsSigmas");
+
+  // enableParamVariations option didn't exist in the past
+  if( _config_.hasField("paramVariationsSigmas") and not _doAllParamVariations_ ){
+    _doAllParamVariations_ = true;
+  }
 
   _config_.fillValue(_scaleParStepWithChi2Response_, "scaleParStepWithChi2Response");
   _config_.fillValue(_parStepGain_, "parStepGain");
