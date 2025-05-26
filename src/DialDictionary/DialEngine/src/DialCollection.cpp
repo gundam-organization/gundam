@@ -53,6 +53,7 @@ void DialCollection::prepareConfig(ConfigReader &config_){
       {"dialsList"},
       {"dialsTreePath"},
       {"dialsDefinitions"},
+      {"tableConfig"},
       {"DEPRECATED_parameterLimits", {"parameterLimits"}},
     });
   config_.checkConfiguration();
