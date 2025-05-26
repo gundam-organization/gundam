@@ -369,7 +369,10 @@ namespace ConfigUtils {
   }
   void ConfigReader::fillFormula(std::string& formulaToFill_, const std::string& fieldName_, const std::string& joinStr_) const{
     if( not hasField(fieldName_) ){ return; }
-    formulaToFill_ = GenericToolbox::Json::buildFormula(_config_, fieldName_, joinStr_, formulaToFill_);
+    formulaToFill_ = GenericToolbox::joinVectorString(
+      fetchValue<std::vector<std::string>>(fieldName_),
+      joinStr_
+    );
   }
   void ConfigReader::printUnusedKeys() const{
     // for context dependent options
@@ -382,9 +385,8 @@ namespace ConfigUtils {
     }
 
     if( not unusedKeyList.empty() ){
-      LogAlert << _parentPath_ << ": " << unusedKeyList.size() << " were not red in the config reading. Are they context dependent options?" << std::endl;
       for( auto& unusedKey : unusedKeyList ){
-        LogAlert << "  > \"" << unusedKey << "\" was not red." << std::endl;
+        LogAlert << _parentPath_ << ": key \"" << unusedKey << "\" was ignored while parsing config. Is is context dependent option?" << std::endl;
       }
     }
   }
