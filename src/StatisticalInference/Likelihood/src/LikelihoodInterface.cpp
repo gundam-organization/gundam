@@ -23,6 +23,7 @@ void LikelihoodInterface::configureImpl(){
     {"datasetList"},
     {"jointProbabilityConfig"},
     {"plotGeneratorConfig"},
+    {"eventTreeWriter"},
     {"enableStatThrowInToys"},
     {"gaussStatThrowInToys"},
     {"enableEventMcThrow"},
@@ -78,6 +79,9 @@ void LikelihoodInterface::configureImpl(){
   // nested configurations
   _config_.fillValue(_plotGenerator_.getConfig(), "plotGeneratorConfig");
   _plotGenerator_.configure();
+
+  _config_.fillValue(_eventTreeWriter_.getConfig(), "eventTreeWriter");
+  _eventTreeWriter_.configure();
 
   // reading local parameters
   _config_.fillValue(_enableStatThrowInToys_, "enableStatThrowInToys");
