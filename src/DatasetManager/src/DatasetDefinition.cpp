@@ -50,7 +50,6 @@ void DatasetDefinition::configureImpl() {
       {"name", true},
       {"fromMc"}
     });
-    dataEntry.checkConfiguration();
 
     auto name = dataEntry.fetchValue<std::string>("name");
     LogThrowIf( GenericToolbox::isIn(name, _dataDispenserDict_), "\"" << name << "\" already taken, please use another name." )
