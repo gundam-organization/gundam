@@ -240,6 +240,12 @@ namespace ConfigUtils {
       not _definedFieldNameList_.insert(GenericToolbox::toLowerCase(fieldDefinition_.name)).second,
       "[DEV] Collision on name: " << fieldDefinition_.name
     );
+    for( auto& altName : fieldDefinition_.altNameList ){
+      LogThrowIf(
+        not _definedFieldNameList_.insert(GenericToolbox::toLowerCase(altName)).second,
+        "[DEV] Collision on altname: " << altName
+      );
+    }
     _fieldDefinitionList_.emplace_back(fieldDefinition_);
   }
   void ConfigReader::defineFields(const std::vector<FieldDefinition>& fieldDefinition_){
@@ -278,9 +284,6 @@ namespace ConfigUtils {
       }
     }
     if( not collisionDict.empty() ){
-      for( const auto& collision : collisionDict ){
-        LogAlertIf(doShowWarning(collision.first->name)) << _parentPath_ << ": field \"" << collision.first->name << "\" has collisions with different keys: " << GenericToolbox::toString(collision.second) << std::endl;
-      }
       // check if they carry the same value? -> if NOT -> ERROR
       bool unmatchingCollisionFound = false;
       for( const auto& collision : collisionDict ){
@@ -289,6 +292,9 @@ namespace ConfigUtils {
           if(_config_.at(key) != val){
             unmatchingCollisionFound = true;
             LogError << _parentPath_ << ": found unmatching values for field \"" << collision.first->name << "\". Make sure they have the same value." << std::endl;
+          }
+          else{
+            LogAlertIf(doShowWarning(collision.first->name)) << _parentPath_ << ": field \"" << collision.first->name << "\" has collisions with different keys: " << GenericToolbox::toString(collision.second) << std::endl;
           }
         }
       }
@@ -307,9 +313,7 @@ namespace ConfigUtils {
     }
     if( not invalidKeyList.empty() ){
       for( auto& invalidKey : invalidKeyList ){
-        if( doShowWarning(invalidKey) ) {
-          LogAlert << "  > \"" << invalidKey << "\" has an invalid name. It won't be recognized by GUNDAM." << std::endl;
-        }
+        LogAlert << _parentPath_ << ": key \"" << invalidKey << "\" has an invalid name. It won't be recognized by GUNDAM." << std::endl;
       }
     }
 
@@ -374,9 +378,7 @@ namespace ConfigUtils {
       if( GenericToolbox::isIn(GenericToolbox::toLowerCase(it.key()), _usedKeyList_) ){ continue; }
 
       // already printed out?
-      if( doShowWarning(it.key()) ){
-        unusedKeyList.emplace_back(it.key());
-      }
+      if( doShowWarning(it.key()) ){ unusedKeyList.emplace_back(it.key()); }
     }
 
     if( not unusedKeyList.empty() ){
@@ -417,7 +419,7 @@ namespace ConfigUtils {
   void ConfigReader::printDeprecatedMessage(const std::string& oldKey_, const std::string& newKey_) const {
     // only print it once
     if( doShowWarning(oldKey_) ) {
-      LogWarning << _parentPath_ << ": \"" << oldKey_ << "\" is a deprecated key, use \"" << newKey_ << "\" instead." << std::endl;
+      LogWarning << _parentPath_ << ": key \"" << oldKey_ << "\" is deprecated. Use \"" << newKey_ << "\" instead." << std::endl;
     }
   }
   bool ConfigReader::doShowWarning(const std::string& key_) const{
