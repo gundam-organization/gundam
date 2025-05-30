@@ -13,6 +13,7 @@
 
 #include "DialCollection.h"
 #include "TabulatedDialFactory.h"
+#include "KrigedDialFactory.h"
 
 #include "GundamUtils.h"
 
@@ -1338,13 +1339,13 @@ void DataDispenser::loadEvent(int iThread_){
 
       int iCollection = dialCollectionRef->getIndex();
 
-      if( dialCollectionRef->getDialType() == DialCollection::DialType::Tabulated ){
-        // Event-by-event dial for a precalculated table.  The table
-        // can hold things like oscillation weights and is filled before
-        // the event weighting is done.
+      if( dialCollectionRef->getDialType() == DialCollection::DialType::Tabulated
+          or dialCollectionRef->getDialType() == DialCollection::DialType::Kriged ){
+
+        // Event-by-event dial with a factory.
 
         std::unique_ptr<DialBase> dialBase(
-            dialCollectionRef->getCollectionData<TabulatedDialFactory>(0)
+            dialCollectionRef->getCollectionData<DialFactoryBase>(0)
                 ->makeDial(eventIndexingBuffer));
 
         // dialBase is valid -> store it

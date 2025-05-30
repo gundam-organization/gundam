@@ -1,8 +1,9 @@
-
 #ifndef TABULATED_FACTORY_H_SEEN
 #define TABULATED_FACTORY_H_SEEN
 #include <ConfigUtils.h>
 #include <DialCollection.h>
+
+#include "DialFactoryBase.h"
 
 class Event;
 class DialBase;
@@ -90,7 +91,7 @@ class DialBase;
 ///
 /// gcc -fPIC -rdynamic --shared -o <LibraryName>.so <source>
 ///
-class TabulatedDialFactory : public DialCollection::CollectionData {
+class TabulatedDialFactory : public DialFactoryBase {
 public:
     TabulatedDialFactory() = default;
     ~TabulatedDialFactory() = default;

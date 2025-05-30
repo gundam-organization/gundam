@@ -1,0 +1,106 @@
+# A test yaml file for GUNDAM.
+#
+# Do an Asimov fit to the tree_mc tree in 100NormalizationTree.root.  This
+# fits the (A,B) distribution with two free normalization variables.
+#
+#   Positive_C : Normalization for events where the C truth variable is >0
+#   Negative_C : Normalization for events where the C truth variable is <=0
+#
+
+fitterEngineConfig:
+
+  minimizerConfig:
+    type: "RootMinimizer"
+    minimizer: "Minuit2"
+    algorithm: "Migrad"
+    errors: "Hesse"
+    print_level: 2
+
+  likelihoodInterfaceConfig:
+    jointProbabilityConfig:
+      llhStatFunction: LeastSquares
+
+    dataSetList:
+      - name: "TestSample"
+        isEnabled: true
+        model:
+          tree: tree_mc
+          selectionCutFormula: "(1)"
+          nominalWeightFormula: "(1.0)"
+          filePathList:
+            - "${DATA_DIR}/100NormalizationTree.root"
+      
+    propagatorConfig:
+      debugPrintLoadedEvents: true
+
+      sampleSetConfig:
+        # LeastSquares is used for tests because it is mathematically simple
+        # and numerically stable.
+        dataEventType: Asimov
+
+        fitSampleList:
+          - name: AB
+            isEnabled: true
+            binning: "${CONFIG_DIR}/200KrigedAsimov-binning.txt"
+            dataSets: [ "TestSample" ]
+
+      parametersManagerConfig:
+        parameterSetList:
+          - name: Normalizations
+            isEnabled: true
+            nominalStepSize: 0.1
+
+            parameterDefinitions:
+
+              - parameterName: "Positive_C"
+                isEnabled: true
+                priorValue: 1.0
+                priorType: Flat
+
+              - parameterName: "Negative_C"
+                isEnabled: true
+                priorValue: 1.0
+                priorType: Flat
+
+              - parameterName: "Oscillation_Amplitude"
+                isEnabled: true
+                priorValue: 0.0
+                priorType: Flat
+                parameterLimits: [-0.5, 0.5]
+
+            dialSetDefinitions:
+              - dialType: Normalization
+                printDialSummary: true
+                dialInputList:
+                  - name: "Positive_C"
+                    applyCondition: "[C] > 0"
+
+              - dialType: Normalization
+                printDialSummary: true
+                dialInputList:
+                  - name: "Negative_C"
+                    applyCondition: "[C] <= 0"
+
+              - dialType: Kriged
+                printDialSummary: true
+                dialInputList:
+                  - name: "Oscillation_Amplitude"
+                tableConfig:
+                  name: "AB Oscillation"
+                  libraryPath: "${DATA_DIR}/200KrigedAsimov.so"
+                  initFunction: "initializeTable"
+                  initArguments:
+                    - "NEUTRINO_TYPES 6"
+                    - "BINS 100"
+                    - "MIN_ENERGY 0.05"
+                    - "MAX_PATH 295.0"
+                  updateFunction: "updateTable"
+                  weightFunction: "weightTable"
+                  weightVariables: ["At", "Bt"]
+
+
+
+# End of the yaml file
+# Local Variables:
+# mode:yaml
+# End:

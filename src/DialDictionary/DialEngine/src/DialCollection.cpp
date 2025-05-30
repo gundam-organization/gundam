@@ -5,6 +5,7 @@
 #include "DialCollection.h"
 
 #include "TabulatedDialFactory.h"
+#include "KrigedDialFactory.h"
 
 #include "RootFormula.h"
 #include "Shift.h"
@@ -534,7 +535,7 @@ bool DialCollection::initializeDialsWithTabulation(const JsonType& dialsDefiniti
   //       values calculated at 1.0, 3.5, and 6.0
   //
   //    extern "C"
-  //    double binFunc(char* name, int nvar, double varv[]);
+  //    double binFunc(char* name, int nvar, double varv[], int bins);
   //        name -- table name
   //        nvar -- number of (truth) variables used to find bin
   //        varv -- array of (truth) variables used to find bin
@@ -571,6 +572,111 @@ bool DialCollection::initializeDialsWithTabulation(const JsonType& dialsDefiniti
         dc->getCollectionData<TabulatedDialFactory>(index)
         ->updateTable(dc->getDialInputBufferList().front());
       });
+
+  return true;
+}
+
+bool DialCollection::initializeDialsWithKriging(const JsonType& dialsDefinition_) {
+  // Initialize the Tabulated type.  That yaml for this is
+  // tableConfig:
+  //    - name: <table-name>                A table name passed to the library.
+  //      libraryPath: <path-to-library>    Location of the library
+  //      initFunction: <init-func-name>    Function called for initialization
+  //      updateFunction: <update-func-name>    Function called to update table
+  //      binningFunction: <bin-func-name>  Function to find bin index
+  //      initArguments: [<arg1>, ...]      List of argument strings (e.g.
+  //                                           input file names)
+  //      bins:  <number>                   Number of bins in the table
+  //      variables: [<var1>, <var2>, ... ] Variables used for binning the
+  //                                           table "X" coordinate by the
+  //                                           binning function.
+  //
+  //
+  // If initFunction is provided it will be called with the signature:
+  //
+  //    extern "C"
+  //    int initFunc(char* name, int argc, char* argv[], int bins)
+  //
+  //        name -- The name of the table
+  //        argc -- number of arguments
+  //        argv -- argument strings (0 is table name)
+  //                arguments 1+ are defined by the library
+  //        bins -- The size of the table.
+  //
+  // The function should return 0 for success, and any other value for failure
+  //
+  // The updateFunction signature is:
+  //
+  //    extern "C"
+  //    int updateFunc(char* name,
+  //                 double table[], int bins,
+  //                 double par[], int npar)
+  //
+  //        name  -- table name
+  //        table -- address of the table to update
+  //        bins  -- The size of the table
+  //        par   -- The parameters.  Must match parameters
+  //                   define in the dial definition.
+  //        npar  -- number of parameters
+  //
+  // The function should return 0 for success, and any other value for failure
+  //
+  // The table will be filled with "bins" values calculated with uniform
+  // spacing between "low" and "high".  If bins is one, there must be one
+  // value calculated for "low", if bins is two or more, then the first point
+  // is located at "low", and the last point is located at "high".  The step
+  // between the bins is (high-low)/(bins-1).  Examples:
+  //
+  //    bins = 2, low = 1.0, high = 6.0
+  //       values calculated at 1.0 and 6.0
+  //
+  //    bins = 3, low = 1.0, high = 6.0
+  //       values calculated at 1.0, 3.5, and 6.0
+  //
+  //    extern "C"
+  //    double weightFunc(char* name, int bins,
+  //                      int nvar, double varv[],
+  //                      int maxEntries,
+  //                      int indices[], double weights[]);
+  //        name -- table name
+  //        bins -- The number of bins in the table.
+  //        nvar -- number of (truth) variables used to find bin
+  //        varv -- array of (truth) variables used to find bin
+  //        maxEntries -- size of the indices and weights arrays
+  //        indices -- array of returned indices
+  //        weights -- array of returned weights.
+  //
+  // The function should fill the indices and weights arrays with the
+  // kriging weights.  The indices should always be inside the table since
+  // the dial won't do bounds checking (for efficiency).
+  //
+  // The code should be compiled with
+  // gcc -fPIC -rdynamic --shared -o libLibraryName.so
+
+  // Create a unique copy of this dial data so that it gets deleted if
+  // there is a problem during initialization.
+  std::unique_ptr<KrigedDialFactory> kriged
+      = std::make_unique<KrigedDialFactory>(dialsDefinition_);
+
+  // Save the new object (the move releases the pointer).
+  _dialCollectionData_.emplace_back(std::move(kriged));
+
+  // Get the index of the new dial collection data entry.  This is "back()",
+  // but the index will be needed for the update closure, so use that instead.
+  int index = _dialCollectionData_.size()-1;
+
+  for (const std::string& var :
+       getCollectionData<KrigedDialFactory>(index)->getWeightVariables()) {
+    addExtraLeafName(var);
+  }
+
+  addUpdate(
+      [index](DialCollection* dc){
+        dc->getCollectionData<KrigedDialFactory>(index)
+        ->updateTable(dc->getDialInputBufferList().front());
+      });
+
+  LogDebug << "Initialize dial with kriging" << std::endl;
 
   return true;
 }
@@ -782,12 +888,20 @@ bool DialCollection::initializeDialsWithDefinition() {
     _dialInterfaceList_.back().setDial( DialBaseObject(makeDial( dialsDefinition )) );
   }
   else if( _dialType_ == DialType::Tabulated ) {
-    // This dial uses a precalculated table to apply weight to each event (e.g. it
-    // might be used to implement neutrino osillations).  It has a different
-    // weight for each event.
+    // This dial uses a precalculated table to apply weight to each event
+    // (e.g. it might be used to implement neutrino osillations).  It has a
+    // different weight for each event.
     _isEventByEvent_ = true;
     LogThrowIf(not initializeDialsWithTabulation(dialsDefinition),
                "Error initializing dials with tabulation");
+  }
+  else if( _dialType_ == DialType::Kriged ) {
+    // This dial uses a precalculated table to apply weight to each event
+    // (e.g. it might be used to implement neutrino osillations).  It has a
+    // different weight for each event.
+    _isEventByEvent_ = true;
+    LogThrowIf(not initializeDialsWithKriging(dialsDefinition),
+               "Error initializing dials with kriging");
   }
   else if( GenericToolbox::Json::doKeyExist(dialsDefinition, "binningFilePath") ) {
     // This dial collection is binned with different weights for each bin.
