@@ -48,7 +48,7 @@ int main( int argc, char** argv ){
   auto configFilePath = clp.getOptionVal("configFile", "");
   LogThrowIf(configFilePath.empty(), "Config file not provided.");
 
-  ConfigUtils::ConfigHandler configHandler(configFilePath);
+  ConfigUtils::ConfigBuilder configHandler(configFilePath);
   configHandler.override( clp.getOptionValList<std::string>("overrideFiles") );
 
   // Output file path

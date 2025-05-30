@@ -39,6 +39,6 @@ if ! $(root-config --cxx) $(root-config --cflags) \
    exit 1
 fi
 
-gundamFitter --cpu -t 1 -s 10000 -c ${CONFIG_FILE} -o ${OUTPUT_FILE}
+gundamFitter --debug --cpu -t 1 -s 10000 -c ${CONFIG_FILE} -o ${OUTPUT_FILE}
 
 # End of the script

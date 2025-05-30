@@ -71,6 +71,8 @@ public:
   [[nodiscard]] auto isEnablePca() const{ return _enablePca_; }
   [[nodiscard]] auto isEnableEigenDecomp() const{ return _enableEigenDecomp_; }
   [[nodiscard]] auto isEnabledThrowToyParameters() const{ return _enabledThrowToyParameters_; }
+  [[nodiscard]] auto isSkipVariedEventRates() const{ return _skipVariedEventRates_; }
+  [[nodiscard]] auto isDisableOneSigmaPlots() const{ return _disableOneSigmaPlots_; }
   [[nodiscard]] auto isMaskForToyGeneration() const{ return _maskForToyGeneration_; }
   [[nodiscard]] auto getNbEnabledEigenParameters() const{ return _nbEnabledEigen_; }
   [[nodiscard]] auto getPenaltyChi2Buffer() const{ return _penaltyChi2Buffer_; }
@@ -189,6 +191,8 @@ private:
   bool _printParametersSummary_{false};
   bool _releaseFixedParametersOnHesse_{false};
   bool _devUseParLimitsOnEigen_{false};
+  bool _skipVariedEventRates_{false};
+  bool _disableOneSigmaPlots_{false};
   int _nbParameterDefinition_{-1};
   int _maxNbEigenParameters_{-1};
   double _nominalStepSize_{std::nan("unset")};
@@ -202,8 +206,8 @@ private:
   std::string _parameterLowerBoundsTVectorD_{};
   std::string _parameterUpperBoundsTVectorD_{};
   std::string _throwEnabledListPath_{};
-  JsonType _parameterDefinitionConfig_{};
-  JsonType _dialSetDefinitions_{};
+  ConfigReader _parameterDefinitionConfig_{};
+  ConfigReader _dialSetDefinitions_{};
 
   GenericToolbox::Range _globalParRange_{};
   GenericToolbox::Range _eigenParRange_{};
@@ -213,9 +217,9 @@ private:
 
   double _penaltyChi2Buffer_{std::nan("unset")};
 
-  std::vector<JsonType> _enableOnlyParameters_{};
-  std::vector<JsonType> _disableParameters_{};
-  std::vector<JsonType> _customParThrow_{};
+  std::vector<ConfigReader> _enableOnlyParameters_{};
+  std::vector<ConfigReader> _disableParameters_{};
+  std::vector<ConfigReader> _customParThrow_{};
 
   // Eigen objects
   int _nbEnabledEigen_{0};

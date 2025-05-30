@@ -13,11 +13,11 @@ void DialManager::configureImpl(){
     if( not _parametersManagerPtr_->getParameterSetsList()[iParSet].isEnabled() ){ continue; }
     // DEV / DialCollections
     if( not _parametersManagerPtr_->getParameterSetsList()[iParSet].getDialSetDefinitions().empty() ){
-      for( auto& dialSetDef : _parametersManagerPtr_->getParameterSetsList()[iParSet].getDialSetDefinitions().get<std::vector<JsonType>>() ){
+      for( auto& dialSetDef : _parametersManagerPtr_->getParameterSetsList()[iParSet].getDialSetDefinitions().loop() ){
         _dialCollectionList_.emplace_back(&_parametersManagerPtr_->getParameterSetsList());
         _dialCollectionList_.back().setIndex(int(_dialCollectionList_.size()) - 1);
         _dialCollectionList_.back().setSupervisedParameterSetIndex(int(iParSet) );
-        _dialCollectionList_.back().configure(dialSetDef );
+        _dialCollectionList_.back().configure( dialSetDef );
       }
     }
     else{

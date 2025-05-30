@@ -25,6 +25,9 @@ class DatasetDefinition; // owner
 
 class DataDispenser : public JsonBaseClass {
 
+public:
+  static void prepareConfig(ConfigReader &config_);
+
 protected:
   void configureImpl() override;
   void initializeImpl() override;
