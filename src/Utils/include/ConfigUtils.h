@@ -155,7 +155,6 @@ namespace ConfigUtils {
 
   protected:
     std::string getStrippedParentPath() const;
-    void printDeprecatedMessage(const std::string& oldKey_, const std::string& newKey_) const;
     bool doShowWarning(const std::string& key_) const;
 
   private:

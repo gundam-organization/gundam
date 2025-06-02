@@ -324,21 +324,33 @@ namespace ConfigUtils {
     for(const auto& field : _fieldDefinitionList_){
       if( field.name == fieldName_ ){ return field; }
     }
-
     LogError << "[DEV] (" << _parentPath_ << ") Unknown field name \"" << fieldName_ << "\" among list: " << GenericToolbox::toString(_fieldDefinitionList_) << std::endl;
     exit(EXIT_FAILURE);
   }
   std::pair<std::string, const JsonType*> ConfigReader::getConfigEntry(const FieldDefinition& field_) const{
-    auto temp = getJsonEntry(field_.name);
-    if( temp != nullptr ){ return {field_.name, temp}; }
-    for( auto& altKeyName : field_.altNameList ){
-      temp = getJsonEntry(altKeyName);
-      if( temp != nullptr ){
-        printDeprecatedMessage(altKeyName, field_.name);
-        return {altKeyName, temp};
+    std::pair<std::string, const JsonType*> out{"", nullptr};
+    out = {field_.name, getJsonEntry(field_.name)};
+
+    // not found? look for alt name
+    if( out.second == nullptr ){
+      for( auto& altKeyName : field_.altNameList ){
+        out = {altKeyName, getJsonEntry(altKeyName)};
+        break;
       }
     }
-    return {"", nullptr};
+
+    // found? check additional warnings
+    if( out.second != nullptr ) {
+      if( field_.name != out.first and doShowWarning(out.first) ){
+        LogWarning << _parentPath_ << ": key \"" << out.first << "\" has been renamed. Use \"" << field_.name << "\" instead." << std::endl;
+      }
+
+      if( field_.isRelocated() and doShowWarning(field_.name) ){
+        LogAlert << _parentPath_ << ": field \"" << field_.name << "\" should be moved to: " << field_.message << std::endl;
+      }
+    }
+
+    return out;
   }
   std::pair<std::string, const JsonType*> ConfigReader::getConfigEntry(const std::string& fieldName_) const{
     auto& field = getFieldDefinition(fieldName_);
@@ -419,12 +431,6 @@ namespace ConfigUtils {
 
     GenericToolbox::removeRepeatedCharInsideInputStr(out, "/");
     return out;
-  }
-  void ConfigReader::printDeprecatedMessage(const std::string& oldKey_, const std::string& newKey_) const {
-    // only print it once
-    if( doShowWarning(oldKey_) ) {
-      LogWarning << _parentPath_ << ": key \"" << oldKey_ << "\" is deprecated. Use \"" << newKey_ << "\" instead." << std::endl;
-    }
   }
   bool ConfigReader::doShowWarning(const std::string& key_) const{
     std::string referenceStr{GenericToolbox::joinPath(getStrippedParentPath(), key_)};
