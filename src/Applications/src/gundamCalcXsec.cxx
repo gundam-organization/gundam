@@ -417,7 +417,7 @@ int main(int argc, char** argv){
     void configure(ConfigReader& config_){
       LogScopeIndent;
       config_.defineFields({
-        {"name", true},
+        {FieldFlag::MANDATORY, "name"},
         {"isEnabled"},
         {"meanValue"},
         {"disabledBinDim"},

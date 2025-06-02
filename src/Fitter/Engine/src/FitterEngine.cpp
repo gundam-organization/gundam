@@ -27,6 +27,7 @@ void FitterEngine::configureImpl(){
 
   _config_.defineFields({
     {"minimizerConfig", {"mcmcConfig"}},
+    {"likelihoodInterfaceConfig"},
     {"enablePca"},
     {"pcaMethod"},
     {"parStepGain"},
@@ -46,7 +47,7 @@ void FitterEngine::configureImpl(){
     // relocated
     {FieldFlag::RELOCATED, "engineType", "minimizerConfig/type"},
     {FieldFlag::RELOCATED, "monitorRefreshRateInMs", "fitterEngineConfig/minimizerConfig"},
-    {FieldFlag::RELOCATED, "propagatorConfig", "fitterEngineConfig/likelihoodInterfaceConfig"},
+    {FieldFlag::RELOCATED, "propagatorConfig", "fitterEngineConfig/likelihoodInterfaceConfig/propagatorConfig"},
   });
   _config_.checkConfiguration();
 
