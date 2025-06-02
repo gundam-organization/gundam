@@ -11,8 +11,8 @@
 void EventVarTransform::configureImpl(){
   _config_.clearFields();
   _config_.defineFields({
-    {"name", true, {"title"}},
-    {"outputVariableName", true},
+    {FieldFlag::MANDATORY, "name", {"title"}},
+    {FieldFlag::MANDATORY, "outputVariableName"},
     {"isEnabled"},
     {"inputList"},
     {"messageOnError"},

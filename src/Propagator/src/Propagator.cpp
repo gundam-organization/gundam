@@ -37,15 +37,15 @@ void Propagator::configureImpl(){
     // relocated:
     {FieldFlag::RELOCATED, "parameterSetListConfig", "parametersManagerConfig/parameterSetList"},
     {FieldFlag::RELOCATED, "throwToyParametersWithGlobalCov", "parametersManagerConfig"},
-    {FieldFlag::RELOCATED, "enableStatThrowInToys"},
-    {FieldFlag::RELOCATED, "gaussStatThrowInToys"},
-    {FieldFlag::RELOCATED, "enableEventMcThrow"},
-    {FieldFlag::RELOCATED, "plotGeneratorConfig"},
-    {FieldFlag::RELOCATED, "llhStatFunction"},
-    {FieldFlag::RELOCATED, "llhConfig"},
-    {FieldFlag::RELOCATED, "scanConfig"},
-    {FieldFlag::RELOCATED, "eventTreeWriter"},
-    {FieldFlag::RELOCATED, "dataSetList", {"fitSampleSetConfig/dataSetList"}},
+    {FieldFlag::RELOCATED, "enableStatThrowInToys", "likelihoodInterfaceConfig/enableStatThrowInToys"},
+    {FieldFlag::RELOCATED, "gaussStatThrowInToys", "likelihoodInterfaceConfig/gaussStatThrowInToys"},
+    {FieldFlag::RELOCATED, "enableEventMcThrow", "likelihoodInterfaceConfig/enableEventMcThrow"},
+    {FieldFlag::RELOCATED, "plotGeneratorConfig", "likelihoodInterfaceConfig/plotGeneratorConfig"},
+    {FieldFlag::RELOCATED, "llhStatFunction", "likelihoodInterfaceConfig/jointProbabilityConfig/type"},
+    {FieldFlag::RELOCATED, "llhConfig", "likelihoodInterfaceConfig/jointProbabilityConfig"},
+    {FieldFlag::RELOCATED, "scanConfig", "fitterEngineConfig/scanConfig"},
+    {FieldFlag::RELOCATED, "eventTreeWriter", "likelihoodInterfaceConfig/eventTreeWriter"},
+    {FieldFlag::RELOCATED, "dataSetList", {"fitSampleSetConfig/dataSetList"}, "likelihoodInterfaceConfig/dataSetList"},
   });
   _config_.checkConfiguration();
 

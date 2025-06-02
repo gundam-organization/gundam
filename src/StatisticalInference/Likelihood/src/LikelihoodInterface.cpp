@@ -40,30 +40,30 @@ void LikelihoodInterface::configureImpl(){
   std::string jointProbabilityTypeStr{"PoissonLLH"};
 
   // prior to this version a few parameters were set in the propagator itself
-  _modelPropagator_.getConfig().deprecatedAction("enableStatThrowInToys", "likelihoodInterfaceConfig", [&]{
+  if( _modelPropagator_.getConfig().hasField("enableStatThrowInToys") ){
     _modelPropagator_.getConfig().fillValue(_enableStatThrowInToys_, "enableStatThrowInToys");
-  });
-  _modelPropagator_.getConfig().deprecatedAction("eventTreeWriter", "likelihoodInterfaceConfig", [&]{
+  }
+  if( _modelPropagator_.getConfig().hasField("eventTreeWriter") ) {
     _modelPropagator_.getConfig().fillValue(_eventTreeWriter_.getConfig(), "eventTreeWriter");
-  });
-  _modelPropagator_.getConfig().deprecatedAction("gaussStatThrowInToys", "likelihoodInterfaceConfig", [&]{
-    _modelPropagator_.getConfig().fillValue(_gaussStatThrowInToys_, "gaussStatThrowInToys");
-  });
-  _modelPropagator_.getConfig().deprecatedAction("enableEventMcThrow", "likelihoodInterfaceConfig", [&]{
+  }
+  if( _modelPropagator_.getConfig().hasField("gaussStatThrowInToys") ) {
+     _modelPropagator_.getConfig().fillValue(_gaussStatThrowInToys_, "gaussStatThrowInToys");
+  }
+  if( _modelPropagator_.getConfig().hasField("enableEventMcThrow") ) {
     _modelPropagator_.getConfig().fillValue(_enableEventMcThrow_, "enableEventMcThrow");
-  });
-  _modelPropagator_.getConfig().deprecatedAction("plotGeneratorConfig", "likelihoodInterfaceConfig", [&]{
+  }
+  if( _modelPropagator_.getConfig().hasField("plotGeneratorConfig") ) {
     _modelPropagator_.getConfig().fillValue(_plotGenerator_.getConfig(), "plotGeneratorConfig");
-  });
-  _modelPropagator_.getConfig().deprecatedAction("dataSetList", "likelihoodInterfaceConfig", [&]{
+  }
+  if( _modelPropagator_.getConfig().hasField("dataSetList") ) {
     _modelPropagator_.getConfig().fillValue(datasetListConfig, "dataSetList");
-  });
-  _modelPropagator_.getSampleSet().getConfig().deprecatedAction("llhStatFunction", "likelihoodInterfaceConfig/jointProbabilityConfig/type", [&]{
-    _modelPropagator_.getSampleSet().getConfig().fillValue(jointProbabilityTypeStr, "llhStatFunction");
-  });
-  _modelPropagator_.getSampleSet().getConfig().deprecatedAction("llhConfig", "likelihoodInterfaceConfig/jointProbabilityConfig", [&]{
-    _modelPropagator_.getSampleSet().getConfig().fillValue(jointProbabilityConfig, "llhConfig");
-  });
+  }
+  if( _modelPropagator_.getConfig().hasField("llhStatFunction") ) {
+    _modelPropagator_.getConfig().fillValue(jointProbabilityTypeStr, "llhStatFunction");
+  }
+  if( _modelPropagator_.getConfig().hasField("llhConfig") ) {
+    _modelPropagator_.getConfig().fillValue(jointProbabilityConfig, "llhConfig");
+  }
 
   // defining datasets:
   _config_.fillValue(datasetListConfig, "datasetList");

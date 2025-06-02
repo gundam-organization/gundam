@@ -76,8 +76,8 @@ void DataDispenser::configureImpl(){
     _parameters_.fromHistContent.sampleHistList.reserve(sampleListConfig.size());
     for( auto& sampleConfig : sampleListConfig ){
       sampleConfig.defineFields({
-        {"name", true},
-        {"hist", true},
+        {FieldFlag::MANDATORY, "name"},
+        {FieldFlag::MANDATORY, "hist"},
         {"axisList", {"axis"}},
       });
 
@@ -105,8 +105,8 @@ void DataDispenser::configureImpl(){
   _parameters_.variableDict.clear();
   for( auto& entry : _config_.loop("variableDict") ){
     entry.defineFields({
-      {"name", true, {"eventVar"}},
-      {"expr", true, {"expression", "leafVar"}},
+      {FieldFlag::MANDATORY, "name", {"eventVar"}},
+      {FieldFlag::MANDATORY, "expr", {"expression", "leafVar"}},
     });
     entry.checkConfiguration();
     auto varName = entry.fetchValue<std::string>("name");

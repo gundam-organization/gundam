@@ -17,13 +17,13 @@ TabulatedDialFactory::TabulatedDialFactory(const ConfigReader& config_) {
     auto tableConfig = config_.fetchValue<ConfigReader>("tableConfig");
 
     tableConfig.defineFields({
-        {"name", true},
-        {"libraryPath", true},
-        {"initFunction", true},
-        {"updateFunction", true},
-        {"binningFunction", true},
-        {"initArguments", true},
-        {"binningVariables", true},
+        {FieldFlag::MANDATORY, "name"},
+        {FieldFlag::MANDATORY, "libraryPath"},
+        {FieldFlag::MANDATORY, "initFunction"},
+        {FieldFlag::MANDATORY, "updateFunction"},
+        {FieldFlag::MANDATORY, "binningFunction"},
+        {FieldFlag::MANDATORY, "initArguments"},
+        {FieldFlag::MANDATORY, "binningVariables"},
         {"bins"},
     });
     tableConfig.checkConfiguration();

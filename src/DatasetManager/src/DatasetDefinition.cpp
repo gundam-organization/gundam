@@ -15,9 +15,9 @@
 void DatasetDefinition::configureImpl() {
 
   _config_.defineFields({
-    {"name", true},
+    {FieldFlag::MANDATORY, "name"},
+    {FieldFlag::MANDATORY, "model", {"mc"}},
     {"isEnabled"},
-    {"model", true, {"mc"}},
     {"data"},
     {"selectedDataEntry"},
     {"selectedToyEntry"},

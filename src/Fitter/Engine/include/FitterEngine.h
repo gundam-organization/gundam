@@ -76,6 +76,7 @@ public:
   LikelihoodInterface& getLikelihoodInterface(){ return _likelihoodInterface_; }
   ParameterScanner& getParameterScanner(){ return _parameterScanner_; }
   TDirectory* getSaveDir(){ return _saveDir_; }
+  bool& getGenerateSamplePlots(){ return _generateSamplePlots_; }
 
   // Core
   void fit();

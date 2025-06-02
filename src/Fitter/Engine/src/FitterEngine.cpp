@@ -42,12 +42,11 @@ void FitterEngine::configureImpl(){
     {"enableParamVariations"},
     {"paramVariationsSigmas", {"allParamVariations"}},
     {"scaleParStepWithChi2Response"},
-    // relocated
     {"parameterScannerConfig", {"scanConfig"}},
-    {"engineType"},
-    {"monitorRefreshRateInMs"},
-    {"propagatorConfig"},
-    {"likelihoodInterfaceConfig"},
+    // relocated
+    {FieldFlag::RELOCATED, "engineType", "minimizerConfig/type"},
+    {FieldFlag::RELOCATED, "monitorRefreshRateInMs", "fitterEngineConfig/minimizerConfig"},
+    {FieldFlag::RELOCATED, "propagatorConfig", "fitterEngineConfig/likelihoodInterfaceConfig"},
   });
   _config_.checkConfiguration();
 
@@ -56,13 +55,14 @@ void FitterEngine::configureImpl(){
   _config_.fillValue(minimizerConfig, "minimizerConfig");
 
   std::string minimizerTypeStr{"RootMinimizer"};
-  _config_.deprecatedAction("engineType", "minimizerConfig/type", [&]{
+
+  if( _config_.hasField("engineType") ) {
     _config_.fillValue(minimizerTypeStr, "engineType");
 
     // handle deprecated types
     if     ( minimizerTypeStr == "minimizer" ){ minimizerTypeStr = "RootMinimizer"; }
     else if( minimizerTypeStr == "mcmc" )     { minimizerTypeStr = "SimpleMCMC"; }
-  });
+  }
   minimizerConfig.defineFields({{"type"}});
   minimizerConfig.fillValue(minimizerTypeStr, "type");
 
@@ -79,21 +79,23 @@ void FitterEngine::configureImpl(){
   }
 
   // now the minimizer is created, forward deprecated options
-  _config_.deprecatedAction("monitorRefreshRateInMs", "fitterEngineConfig/minimizerConfig", [&]{
-    _minimizer_->getMonitor().convergenceMonitor.setMaxRefreshRateInMs(_config_.fetchValue<int>("monitorRefreshRateInMs"));
-  });
+  if( _config_.hasField("monitorRefreshRateInMs") ){
+    _minimizer_->getMonitor().convergenceMonitor.setMaxRefreshRateInMs(
+      _config_.fetchValue<int>("monitorRefreshRateInMs")
+    );
+  }
   _minimizer_->configure( minimizerConfig );
 
-  _config_.deprecatedAction("propagatorConfig", "fitterEngineConfig/likelihoodInterfaceConfig", [&]{
+  if( _config_.hasField("propagatorConfig") ){
     // reading the config already since nested objects need to be filled up for handling further deprecation
     getLikelihoodInterface().getModelPropagator().setConfig( _config_.fetchValue<ConfigReader>("propagatorConfig") );
-  });
+  }
   _config_.fillValue(_likelihoodInterface_.getConfig(), "likelihoodInterfaceConfig");
   _likelihoodInterface_.configure();
 
-  getLikelihoodInterface().getModelPropagator().getConfig().deprecatedAction("scanConfig", "fitterEngineConfig", [&]{
+  if( getLikelihoodInterface().getModelPropagator().getConfig().hasField("scanConfig") ){
     _parameterScanner_.setConfig( getLikelihoodInterface().getModelPropagator().getConfig().fetchValue<ConfigReader>("scanConfig") );
-  });
+  }
   _config_.fillValue(_parameterScanner_.getConfig(), "parameterScannerConfig");
   _parameterScanner_.configure();
 

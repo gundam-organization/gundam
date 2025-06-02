@@ -190,8 +190,8 @@ int main(int argc, char** argv){
     {"minGundamVersion"},
     {"fitterEngineConfig"},
     // deprecated
-    {"generateSamplePlots"},
-    {"allParamVariations"},
+    {FieldFlag::RELOCATED, "generateSamplePlots", "fitterEngineConfig/generateSamplePlots"},
+    {FieldFlag::RELOCATED, "allParamVariations", "fitterEngineConfig/allParamVariations"},
   });
   gundamFitterConfig.checkConfiguration();
 
@@ -349,14 +349,13 @@ int main(int argc, char** argv){
   }
 
   // Also check app level config options
-  gundamFitterConfig.deprecatedAction("generateSamplePlots", "fitterEngineConfig", [&]{
-    fitter.setGenerateSamplePlots( gundamFitterConfig.fetchValue<bool>("generateSamplePlots") );
-  });
 
-  gundamFitterConfig.deprecatedAction("allParamVariations", "fitterEngineConfig", [&]{
+  // relocated options
+  gundamFitterConfig.fillValue(fitter.getGenerateSamplePlots(), "generateSamplePlots");
+  if( gundamFitterConfig.hasField("allParamVariations") ){
     fitter.setDoAllParamVariations(true);
     fitter.setAllParamVariationsSigmas(gundamFitterConfig.fetchValue<std::vector<double>>("allParamVariations"));
-  });
+  }
 
   // Check if the first point of the fit should be moved before the
   // minimization.  This is not changing the prior value, only the starting

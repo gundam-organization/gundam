@@ -17,8 +17,8 @@ void SampleSet::configureImpl(){
   _config_.defineFields({
     {"sampleList", {"fitSampleList"}},
     // deprecated
-    {"llhStatFunction"},
-    {"llhConfig"},
+    {FieldFlag::RELOCATED, "llhStatFunction", "likelihoodInterfaceConfig/jointProbabilityConfig/type"},
+    {FieldFlag::RELOCATED, "llhConfig", "likelihoodInterfaceConfig/jointProbabilityConfig"},
   });
   _config_.checkConfiguration();
 
