@@ -229,7 +229,9 @@ namespace ConfigUtils {
   std::string ConfigReader::FieldDefinition::toString() const{
     std::stringstream ss;
     ss << "name=" << name;
-    ss << ", isMandatory=" << isMandatory;
+    if(isMandatory()) ss << ", isMandatory";
+    if(isDeprecated()) ss << ", isDeprecated";
+    if(isRelocated()) ss << ", isRelocated";
     if(not altNameList.empty()) ss << ", altNameList=" << GenericToolbox::toString(altNameList);
     return ss.str();
   }
