@@ -214,9 +214,11 @@ namespace ConfigUtils {
   }
 
   template<typename F> void ConfigReader::deprecatedAction(const std::string& fieldName_, const F& action_) const {
-    if( hasField(fieldName_) ) {
+    auto& field = getFieldDefinition(fieldName_);
+    auto entry = getConfigEntry(field);
+    if( entry.second != nullptr ) {
       if( doShowWarning(fieldName_) ){
-        LogAlert << _parentPath_ << ": \"" << fieldName_ << "\" should be set under \"" << newPath_ << "\"" << std::endl;
+        LogAlert << _parentPath_ << ": \"" << fieldName_ << "\" should be set under \"" << field.message << "\"" << std::endl;
       }
       action_();
     }
