@@ -16,7 +16,7 @@
 void Sample::prepareConfig(ConfigReader &config_){
   config_.clearFields();
   config_.defineFields({
-    {"name", true},
+    {FieldFlag::MANDATORY, "name"},
     {"isEnabled"},
     {"disableEventMcThrow"},
     {"binning", {"binningFile", "binningFilePath"}},

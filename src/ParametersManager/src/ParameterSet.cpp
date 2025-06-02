@@ -20,7 +20,7 @@
 void ParameterSet::configureImpl(){
 
   _config_.defineFields(std::vector<ConfigReader::FieldDefinition>{
-    {"name", true},
+    {FieldFlag::MANDATORY, "name"},
     {"isEnabled"},
     {"isScanEnabled"},
     {"numberOfParameters"},
@@ -157,7 +157,7 @@ void ParameterSet::configureImpl(){
     LogExitIf(_nbParameterDefinition_==-1, "Could not figure out the number of parameters to be defined for the set: " << _name_ );
   }
 
-  if (_nbParameterDefinition_ < 1) {
+  if (_nbParameterDefinition_ < 1){
     LogError << "CONFIG ERROR: Parameter set \"" << getName() << "\" without parameters." << std::endl;
   }
 
