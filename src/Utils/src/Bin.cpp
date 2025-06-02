@@ -13,9 +13,9 @@
 void Bin::Edges::configureImpl(){
 
   _config_.defineFields({
-    {{"name"}, true},
-    {{"bounds"}},
-    {{"value"}},
+    {FieldFlag::MANDATORY, "name"},
+    {"bounds"},
+    {"value"},
   });
   _config_.checkConfiguration();
 
