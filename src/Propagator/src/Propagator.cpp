@@ -35,17 +35,17 @@ void Propagator::configureImpl(){
     {"devSingleThreadHistFill"},
     {"globalEventReweightCap"},
     // relocated:
-    {"parameterSetListConfig"},
-    {"throwToyParametersWithGlobalCov"},
-    {"enableStatThrowInToys"},
-    {"gaussStatThrowInToys"},
-    {"enableEventMcThrow"},
-    {"plotGeneratorConfig"},
-    {"llhStatFunction"},
-    {"llhConfig"},
-    {"scanConfig"},
-    {"eventTreeWriter"},
-    {"dataSetList", {"fitSampleSetConfig/dataSetList"}},
+    {FieldFlag::RELOCATED, "parameterSetListConfig", "parametersManagerConfig/parameterSetList"},
+    {FieldFlag::RELOCATED, "throwToyParametersWithGlobalCov", "parametersManagerConfig"},
+    {FieldFlag::RELOCATED, "enableStatThrowInToys"},
+    {FieldFlag::RELOCATED, "gaussStatThrowInToys"},
+    {FieldFlag::RELOCATED, "enableEventMcThrow"},
+    {FieldFlag::RELOCATED, "plotGeneratorConfig"},
+    {FieldFlag::RELOCATED, "llhStatFunction"},
+    {FieldFlag::RELOCATED, "llhConfig"},
+    {FieldFlag::RELOCATED, "scanConfig"},
+    {FieldFlag::RELOCATED, "eventTreeWriter"},
+    {FieldFlag::RELOCATED, "dataSetList", {"fitSampleSetConfig/dataSetList"}},
   });
   _config_.checkConfiguration();
 
@@ -53,11 +53,11 @@ void Propagator::configureImpl(){
   _config_.fillValue(_sampleSet_.getConfig(), "sampleSetConfig");
   _sampleSet_.configure();
 
-  _config_.deprecatedAction("parameterSetListConfig", "parametersManagerConfig/parameterSetList", [&]{
+  _config_.deprecatedAction("parameterSetListConfig", [&]{
     auto parameterSetListConfig = _config_.fetchValue<ConfigReader>("parameterSetListConfig");
     _parManager_.setParameterSetListConfig( parameterSetListConfig );
   });
-  _config_.deprecatedAction("throwToyParametersWithGlobalCov", "parametersManagerConfig", [&]{
+  _config_.deprecatedAction("throwToyParametersWithGlobalCov", [&]{
     _parManager_.setThrowToyParametersWithGlobalCov(_config_.fetchValue<bool>("throwToyParametersWithGlobalCov"));
   });
   _config_.fillValue(_parManager_.getConfig(), "parametersManagerConfig");
