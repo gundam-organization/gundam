@@ -278,7 +278,7 @@ void BinSet::readBinningConfig( const ConfigReader& binning_){
       auto& dim = dimensionList.back();
 
       binDefEntry.defineFields({
-        {{"name"}, true},
+        {FieldFlag::MANDATORY, {"name"}},
         {{"edges"}},
         {{"values"}},
         {{"nBins"}},
