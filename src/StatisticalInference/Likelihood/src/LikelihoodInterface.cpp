@@ -28,6 +28,7 @@ void LikelihoodInterface::configureImpl(){
     {"gaussStatThrowInToys"},
     {"enableEventMcThrow"},
   });
+  _config_.checkConfiguration();
 
   // reading the configuration of the propagator
   // allows to implement
