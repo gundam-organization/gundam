@@ -258,7 +258,7 @@ namespace ConfigUtils {
     // 1 - check for missing compulsory fields
     std::vector<std::string> missingFieldList{};
     for( auto& field : _fieldDefinitionList_ ){
-      if( not field.isMandatory ){ continue; }
+      if( not field.isMandatory() ){ continue; }
       auto* entry = getConfigEntry(field).second;
       if(entry == nullptr){ missingFieldList.emplace_back(field.name); }
     }
