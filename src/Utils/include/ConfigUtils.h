@@ -67,18 +67,35 @@ namespace ConfigUtils {
 
   public:
     struct FieldDefinition{
+      enum Flag: uint8_t{
+        DEFAULT    = 0b00000000,
+        MANDATORY  = 0b00000001,
+        RELOCATED  = 0b00000010,
+        DEPRECATED = 0b00000100,
+      };
+
+      uint8_t flags{0x0};
       std::string name{};
-      bool isMandatory{false};
+      std::string message{};
       std::vector<std::string> altNameList{};
 
       FieldDefinition() = default;
-      FieldDefinition(std::string name_, bool isMandatory_ = false, std::vector<std::string> altList_ = {})
-        : name(std::move(name_)), isMandatory(isMandatory_), altNameList(std::move(altList_)) {}
+      FieldDefinition(uint8_t flags_, std::string name_, std::vector<std::string> altList_ = {}, std::string message_={})
+        : flags(flags_), name(std::move(name_)), message(std::move(message_)), altNameList(std::move(altList_)) {}
+      FieldDefinition(uint8_t flags_, std::string name_, std::initializer_list<const char*> altList_, std::string message_={})
+        : flags(flags_), name(std::move(name_)), message(std::move(message_)){
+        altNameList.reserve(altList_.size());
+        for(const char* s : altList_){ altNameList.emplace_back(s); }
+      }
       FieldDefinition(std::string name_, std::initializer_list<const char*> altList_)
         : name(std::move(name_)){
         altNameList.reserve(altList_.size());
         for(const char* s : altList_){ altNameList.emplace_back(s); }
       }
+      FieldDefinition(std::string name_, std::vector<std::string> altList_ = {}, std::string message_={})
+        : name(std::move(name_)), message(std::move(message_)), altNameList(std::move(altList_)){}
+      FieldDefinition(uint8_t flags_, std::string name_, std::string message_={})
+        : flags(flags_), name(std::move(name_)), message(std::move(message_)){}
 
       friend std::ostream& operator<< (std::ostream& stream, const FieldDefinition& obj_){ stream << obj_.toString(); return stream; }
       [[nodiscard]] std::string toString() const;
@@ -126,7 +143,7 @@ namespace ConfigUtils {
     template<typename T> T fetchValue(const std::string& fieldName_, const T& default_) const;
     template<typename T> void fillValue(T& object_, const std::string& fieldName_) const;
     template<typename T> void fillEnum(T& enum_, const std::string& fieldName_) const;
-    template<typename F> void deprecatedAction(const std::string& fieldName_, const std::string& newPath_, const F& action_) const;
+    template<typename F> void deprecatedAction(const std::string& fieldName_, const F& action_) const;
 
     void fillFormula(std::string& formulaToFill_, const std::string& fieldName_, const std::string& joinStr_) const;
 
@@ -190,7 +207,7 @@ namespace ConfigUtils {
     enum_ = enum_.toEnum( enumName, true );
   }
 
-  template<typename F> void ConfigReader::deprecatedAction(const std::string& fieldName_, const std::string& newPath_, const F& action_) const {
+  template<typename F> void ConfigReader::deprecatedAction(const std::string& fieldName_, const F& action_) const {
     if( hasField(fieldName_) ) {
       if( doShowWarning(fieldName_) ){
         LogAlert << _parentPath_ << ": \"" << fieldName_ << "\" should be set under \"" << newPath_ << "\"" << std::endl;
@@ -203,6 +220,7 @@ namespace ConfigUtils {
 
 
 typedef ConfigUtils::ConfigReader ConfigReader;
+typedef ConfigUtils::ConfigReader::FieldDefinition::Flag FieldFlag;
 typedef GenericToolbox::ConfigClass<ConfigReader> JsonBaseClass;
 
 

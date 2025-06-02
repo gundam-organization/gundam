@@ -43,7 +43,7 @@ namespace ConfigUtils {
         std::exit(EXIT_FAILURE);
     }
 
-    // resolve sub-references to other config files
+    // resolve subreferences to other config files
     ConfigUtils::unfoldConfig( output );
 
     return output;
@@ -329,11 +329,11 @@ namespace ConfigUtils {
   std::pair<std::string, const JsonType*> ConfigReader::getConfigEntry(const FieldDefinition& field_) const{
     auto temp = getJsonEntry(field_.name);
     if( temp != nullptr ){ return {field_.name, temp}; }
-    for( auto& altFieldName : field_.altNameList ){
-      temp = getJsonEntry(altFieldName);
+    for( auto& altKeyName : field_.altNameList ){
+      temp = getJsonEntry(altKeyName);
       if( temp != nullptr ){
-        printDeprecatedMessage(altFieldName, field_.name);
-        return {altFieldName, temp};
+        printDeprecatedMessage(altKeyName, field_.name);
+        return {altKeyName, temp};
       }
     }
     return {"", nullptr};
