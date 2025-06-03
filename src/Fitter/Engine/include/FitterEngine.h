@@ -104,6 +104,7 @@ private:
   GenericToolbox::Json::JsonType _postFitParState_{};
 
   // dev
+  bool _fixGhostEigenParametersAfterFirstRejected_{false};
   double _pcaThreshold_{0};
   PcaMethod _pcaMethod_{PcaMethod::DeltaChi2Threshold};
 

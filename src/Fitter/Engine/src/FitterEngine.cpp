@@ -32,6 +32,7 @@ void FitterEngine::configureImpl(){
     {"pcaMethod"},
     {"parStepGain"},
     {"pcaThreshold"},
+    {"fixGhostEigenParametersAfterFirstRejected"},
     {"throwMcBeforeFit"},
     {"throwMcBeforeFitGain"},
     {"savePostfitEventTrees"},
@@ -105,6 +106,7 @@ void FitterEngine::configureImpl(){
 
   _config_.fillEnum(_pcaMethod_, "pcaMethod");
   _config_.fillValue(_pcaThreshold_, "pcaThreshold");
+  _config_.fillValue(_fixGhostEigenParametersAfterFirstRejected_, "fixGhostEigenParametersAfterFirstRejected");
 
   _config_.fillValue(_enablePreFitScan_, "enablePreFitScan");
   _config_.fillValue(_enablePostFitScan_, "enablePostFitScan");
@@ -582,7 +584,7 @@ void FitterEngine::runPcaCheck(){
 
         if( fixParPca ){
           par.setIsFixed(true); // ignored in the Chi2 computation of the parSet
-          if( parSet.isEnableEigenDecomp() and _config_.fetchValue("fixGhostEigenParametersAfterFirstRejected", false) ){
+          if( parSet.isEnableEigenDecomp() and _fixGhostEigenParametersAfterFirstRejected_ ){
             fixNextEigenPars = true;
           }
         }
