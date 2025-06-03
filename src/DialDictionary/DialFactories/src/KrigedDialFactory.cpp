@@ -11,55 +11,38 @@
 #include <dlfcn.h>
 
 
-KrigedDialFactory::KrigedDialFactory(const JsonType& config_) {
-    auto tableConfig = GenericToolbox::Json::fetchValue<JsonType>(config_, "tableConfig");
-    ConfigUtils::checkFields(tableConfig,
-                             "tableConfig",
-                             // Allowed fields (don't need to list fields in
-                             // expected, or deprecated).
-                             {
-                                 {"maxWeights"},
-                                 {"weightNormalization"},
-                             },
-                             // Expected fields (must be present)
-                             {
-                                 {"name"},
-                                 {"libraryPath"},
-                                 {"initFunction"},
-                                 {"initArguments"},
-                                 {"updateFunction"},
-                                 {"weightFunction"},
-                                 {"weightVariables"},
-                             },
-                             // Deprecated fields (allowed, but cause a warning)
-                             {
-                             },
-                             // Replaced fields (allowed, but cause a warning)
-                             {
-                             });
+KrigedDialFactory::KrigedDialFactory(const ConfigReader& config_){
 
+    LogThrowIf(not config_.hasField("tableConfig"), "tableConfig must be defined in:" << config_.toString(true));
 
-    _name_ =  GenericToolbox::Json::fetchValue<std::string>(tableConfig, "name", _name_);
+    auto tableConfig = config_.fetchValue<ConfigReader>("tableConfig");
+    tableConfig.defineFields({
+        {FieldFlag::MANDATORY, "name"},
+        {FieldFlag::MANDATORY, "libraryPath"},
+        {FieldFlag::MANDATORY, "initFunction"},
+        {FieldFlag::MANDATORY, "initArguments"},
+        {FieldFlag::MANDATORY, "updateFunction"},
+        {FieldFlag::MANDATORY, "weightFunction"},
+        {FieldFlag::MANDATORY, "weightVariables"},
+        {"maxWeights"},
+        {"weightNormalization"},
+        {"bins"},
+    });
+    tableConfig.checkConfiguration();
 
-    _libraryPath_ =  GenericToolbox::Json::fetchValue<std::string>(tableConfig, "libraryPath");
+    tableConfig.fillValue(_name_, "name");
+    tableConfig.fillValue(_libraryPath_, "libraryPath");
+    tableConfig.fillValue(_initFuncName_, "initFunction");
+    tableConfig.fillValue(_initArguments_, "initArguments");
+    tableConfig.fillValue(_updateFuncName_, "updateFunction");
+    tableConfig.fillValue(_weightFuncName_, "weightFunction");
+    tableConfig.fillValue(_weightVariableNames_, "weightVariables");
+    tableConfig.fillValue(_minimumWeightSpace_, "maxWeights");
+    tableConfig.fillValue(_weightNormalization_, "weightNormalization");
+    int bins =  tableConfig.fetchValue<int>("bins", -1);
 
-    _initFuncName_ = GenericToolbox::Json::fetchValue<std::string>(tableConfig, "initFunction", _initFuncName_);
-    _initArguments_ = GenericToolbox::Json::fetchValue(tableConfig, "initArguments", _initArguments_);
-
-    _updateFuncName_ = GenericToolbox::Json::fetchValue<std::string>(tableConfig, "updateFunction");
-
-    _weightFuncName_ = GenericToolbox::Json::fetchValue<std::string>(tableConfig, "weightFunction");
-
-    int bins =  GenericToolbox::Json::fetchValue<int>(tableConfig, "bins", -1);
-
-    _weightVariableNames_ = GenericToolbox::Json::fetchValue(tableConfig, "weightVariables", _weightVariableNames_);
     _weightVariableCache_.resize(_weightVariableNames_.size());
-
-    GenericToolbox::Json::fillValue(tableConfig,_minimumWeightSpace_,"maxWeights");
     if (_minimumWeightSpace_ < 10000) _minimumWeightSpace_ = 10000;
-
-    GenericToolbox::Json::fillValue(tableConfig,_weightNormalization_,"weightNormalization");
-
     std::string expandedPath = GenericToolbox::expandEnvironmentVariables(getLibraryPath());
 
     LogInfo << "Create table: " << getName() << std::endl;

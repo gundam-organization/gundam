@@ -645,7 +645,7 @@ bool DialCollection::initializeDialsWithKriging(const ConfigReader& dialsDefinit
   // Create a unique copy of this dial data so that it gets deleted if
   // there is a problem during initialization.
   std::unique_ptr<KrigedDialFactory> kriged
-      = std::make_unique<KrigedDialFactory>(dialsDefinition_.getConfig());
+      = std::make_unique<KrigedDialFactory>(dialsDefinition_);
 
   // Save the new object (the move releases the pointer).
   _dialCollectionData_.emplace_back(std::move(kriged));
