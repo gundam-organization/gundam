@@ -12,6 +12,8 @@ set( SRCFILES
     DialDefinitions/src/DialUtils.cpp
     DialDefinitions/src/DialBase.cpp
 
+    DialDefinitions/src/Kriged.cpp
+
     DialDefinitions/src/RootGraph.cpp
     DialDefinitions/src/Graph.cpp
 
@@ -29,6 +31,7 @@ set( SRCFILES
 
     # DialFactories
     DialFactories/src/TabulatedDialFactory.cpp
+    DialFactories/src/KrigedDialFactory.cpp
     )
 
 set( HEADERS
@@ -44,6 +47,7 @@ set( HEADERS
     DialDefinitions/include/Norm.h
     DialDefinitions/include/Shift.h
     DialDefinitions/include/Tabulated.h
+    DialDefinitions/include/Kriged.h
 
     DialDefinitions/include/RootGraph.h
     DialDefinitions/include/Graph.h
@@ -60,12 +64,8 @@ set( HEADERS
     DialDefinitions/include/Polynomial.h
 
     # DialFactories
-    DialFactories/include/DialBaseFactory.h
-    DialFactories/include/NormDialBaseFactory.h
-    DialFactories/include/GraphDialBaseFactory.h
-    DialFactories/include/SplineDialBaseFactory.h
-    DialFactories/include/SurfaceDialBaseFactory.h
     DialFactories/include/TabulatedDialFactory.h
+    DialFactories/include/KrigedDialFactory.h
     )
 
 if( USE_STATIC_LINKS )

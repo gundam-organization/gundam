@@ -31,7 +31,8 @@ public:
   ENUM_FIELD( Surface ) \
   ENUM_FIELD( Formula ) \
   ENUM_FIELD( CompiledLibDial ) \
-  ENUM_FIELD( Tabulated )
+  ENUM_FIELD( Tabulated ) \
+  ENUM_FIELD( Kriged )
 #define ENUM_DICT \
    ENUM_DICT_ENTRY("Normalization", "Norm") \
    ENUM_DICT_ENTRY("RootFormula", "Formula")
@@ -166,7 +167,7 @@ public:
   // methods to generate dials with factory
   std::unique_ptr<DialBase> makeDial() const;
   std::unique_ptr<DialBase> makeDial(const TObject* src_) const;
-  std::unique_ptr<DialBase> makeDial(const ConfigReader& config_) const;
+  std::unique_ptr<DialBase> makeDial(const JsonType& config_) const;
 
 protected:
   void configureImpl() override;
@@ -176,6 +177,7 @@ protected:
   bool initializeDialsWithDefinition();
   bool initializeDialsWithBinningFile(const ConfigReader& dialsDefinition);
   bool initializeDialsWithTabulation(const ConfigReader& dialsDefinition);
+  bool initializeDialsWithKriging(const ConfigReader& dialsDefinition);
 
   void readParametersFromConfig(const ConfigReader &config_);
   ConfigReader fetchDialsDefinition(const ConfigReader &definitionsList_) const;

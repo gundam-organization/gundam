@@ -128,11 +128,21 @@ can have the following sub type fields
 
 | Option                 | Type         | Description                                                            | Default |
 |------------------------|--------------|------------------------------------------------------------------------|---------|
-| tableConfig            | json         | Definition of functions to call for Tabular dials                      | empty   |
+| tableConfig            | json         | Definition of functions to call for Tabulate dials                      | empty   |
 
 Use a precalculated table of weights.  The table may be refilled for each
 iteration of the fitter. The method of filling the table is defined using
 the [tableConfig](TabulatedDials.md) option.
+
+#### `dialType: Kriged`
+
+| Option                 | Type         | Description                                                            | Default |
+|------------------------|--------------|------------------------------------------------------------------------|---------|
+| tableConfig            | json         | Definition of functions to call for Kriged dials                      | empty   |
+
+Use a precalculated table of weights.  The table may be refilled for each
+iteration of the fitter. The method of filling the table is defined using
+the [tableConfig](KrigedDials.md) option.
 
 #### `dialType: Formula`
 
