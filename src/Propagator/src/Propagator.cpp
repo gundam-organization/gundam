@@ -53,13 +53,11 @@ void Propagator::configureImpl(){
   _config_.fillValue(_sampleSet_.getConfig(), "sampleSetConfig");
   _sampleSet_.configure();
 
-  _config_.deprecatedAction("parameterSetListConfig", [&]{
-    auto parameterSetListConfig = _config_.fetchValue<ConfigReader>("parameterSetListConfig");
-    _parManager_.setParameterSetListConfig( parameterSetListConfig );
-  });
-  _config_.deprecatedAction("throwToyParametersWithGlobalCov", [&]{
-    _parManager_.setThrowToyParametersWithGlobalCov(_config_.fetchValue<bool>("throwToyParametersWithGlobalCov"));
-  });
+  // relocated
+  _config_.fillValue(_parManager_.getParameterSetListConfig(), "parameterSetListConfig");
+  _config_.fillValue(_parManager_.getThrowToyParametersWithGlobalCov(), "throwToyParametersWithGlobalCov");
+
+
   _config_.fillValue(_parManager_.getConfig(), "parametersManagerConfig");
   _parManager_.configure();
 

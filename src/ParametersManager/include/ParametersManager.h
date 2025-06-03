@@ -36,6 +36,8 @@ public:
   // getters
   auto& getGlobalCovarianceMatrix(){ return _globalCovarianceMatrix_; }
   auto& getParameterSetsList(){ return _parameterSetList_; }
+  auto& getParameterSetListConfig(){ return _parameterSetListConfig_; }
+  auto& getThrowToyParametersWithGlobalCov(){ return _throwToyParametersWithGlobalCov_; }
 
   // const core
   [[nodiscard]] std::string getParametersSummary( bool showEigen_ = true ) const;

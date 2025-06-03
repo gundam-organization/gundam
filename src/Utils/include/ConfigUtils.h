@@ -142,7 +142,6 @@ namespace ConfigUtils {
     template<typename T> T fetchValue(const std::string& fieldName_, const T& default_) const;
     template<typename T> void fillValue(T& object_, const std::string& fieldName_) const;
     template<typename T> void fillEnum(T& enum_, const std::string& fieldName_) const;
-    template<typename F> void deprecatedAction(const std::string& fieldName_, const F& action_) const;
 
     void fillFormula(std::string& formulaToFill_, const std::string& fieldName_, const std::string& joinStr_) const;
 
@@ -203,17 +202,6 @@ namespace ConfigUtils {
     this->fillValue(enumName, fieldName_);
     if( enumName.empty() ){ return; }
     enum_ = enum_.toEnum( enumName, true );
-  }
-
-  template<typename F> void ConfigReader::deprecatedAction(const std::string& fieldName_, const F& action_) const {
-    auto& field = getFieldDefinition(fieldName_);
-    auto entry = getConfigEntry(field);
-    if( entry.second != nullptr ) {
-      if( doShowWarning(fieldName_) ){
-        LogAlert << _parentPath_ << ": \"" << fieldName_ << "\" should be set under \"" << field.message << "\"" << std::endl;
-      }
-      action_();
-    }
   }
 
 }
