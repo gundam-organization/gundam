@@ -55,7 +55,7 @@ void DialCollection::prepareConfig(ConfigReader &config_){
       {"dialsTreePath"},
       {"dialsDefinitions"},
       {"tableConfig"},
-      {"DEPRECATED_parameterLimits", {"parameterLimits"}},
+      {FieldFlag::DEPRECATED, "parameterLimits", "\"parameterLimits\" should be set in the parameter definition section. Not the dial definition. Support has been removed."},
     });
   config_.checkConfiguration();
 }
@@ -417,7 +417,7 @@ void DialCollection::readParametersFromConfig(const ConfigReader &config_) {
 
   // safety: many users ask why do my parameter limits aren't taken into account? -> because the parameters limits should be
   // handled in the parameter definition section
-  if( config_.hasField("DEPRECATED_parameterLimits") ){
+  if( config_.hasField("parameterLimits") ){
     LogError << "\"parameterLimits\" should be set in the parameter definition section. Not the dial definition." << std::endl;
     LogError << "Please move it to the appropriate section in: ";
     if( _parameterSetListPtr_ != nullptr and _supervisedParameterSetIndex_ != -1 ){

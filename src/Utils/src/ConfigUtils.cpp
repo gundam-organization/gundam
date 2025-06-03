@@ -256,20 +256,33 @@ namespace ConfigUtils {
   void ConfigReader::checkConfiguration() const{
 
     // 1 - check for missing compulsory fields
-    std::vector<std::string> missingFieldList{};
-    for( auto& field : _fieldDefinitionList_ ){
-      if( not field.isMandatory() ){ continue; }
-      auto* entry = getConfigEntry(field).second;
-      if(entry == nullptr){ missingFieldList.emplace_back(field.name); }
-    }
-    if( not missingFieldList.empty() ){
-      LogError << _parentPath_ << ": found " << missingFieldList.size() << " missing compulsory fields." << std::endl;
-      for( auto& missingField : missingFieldList ){
-        LogError << "  > \"" << missingField << "\" is a mandatory field." << std::endl;
+    {
+      std::vector<std::string> missingFieldList{};
+      for( auto &field: _fieldDefinitionList_ ) {
+        if( not field.isMandatory() ) { continue; }
+        auto *entry = getConfigEntry(field).second;
+        if( entry == nullptr ) { missingFieldList.emplace_back(field.name); }
       }
-      LogError << toString() << std::endl;
-      LogExit("Invalid configuration");
+      if( not missingFieldList.empty() ) {
+        LogError << _parentPath_ << ": found " << missingFieldList.size() << " missing compulsory fields." << std::endl;
+        for( auto &missingField: missingFieldList ) {
+          LogError << "  > \"" << missingField << "\" is a mandatory field." << std::endl;
+        }
+        LogError << toString() << std::endl;
+        LogExit("Invalid configuration: required field not provided.");
+      }
     }
+
+    // 1.1 - deprecated/removed fields
+    bool deprecatedFound{false};
+    for( auto& field : _fieldDefinitionList_ ){
+      if( not field.isDeprecated() ){ continue; }
+      if( not hasField(field.name) ){ continue; }
+      deprecatedFound = true;
+      auto entry = getConfigEntry(field.name);
+      LogError << "Found a deprecated key " << _parentPath_ << "/" << entry.first << ": " << field.message << std::endl;
+    }
+    if(deprecatedFound){ LogExit("Invalid configuration: deprecated field found."); }
 
     // 2 - check if some config keys have some collisions
     // 2.1 - if they do, do they carry the same value?
@@ -300,7 +313,7 @@ namespace ConfigUtils {
           }
         }
       }
-      if( unmatchingCollisionFound ){ LogExit("Invalid configuration"); }
+      if( unmatchingCollisionFound ){ LogExit("Invalid configuration: collisions with different values."); }
     }
 
     // 3 - look for invalid key names
