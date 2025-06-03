@@ -134,7 +134,7 @@ namespace ConfigUtils {
     [[nodiscard]] bool empty() const{ return _config_.empty(); }
     [[nodiscard]] bool hasField(const std::string& fieldName_) const;
     const JsonType* getJsonEntry(const std::string& key_) const; // perform key registration if exists + case insensitive
-    [[nodiscard]] std::string toString() const{ return GenericToolbox::Json::toReadableString( _config_ ); }
+    [[nodiscard]] std::string toString(bool shallow_=false) const{ return GenericToolbox::Json::toReadableString( _config_, shallow_ ); }
 
     void printUnusedKeys() const;
 

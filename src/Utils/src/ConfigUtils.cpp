@@ -335,7 +335,7 @@ namespace ConfigUtils {
     if( out.second == nullptr ){
       for( auto& altKeyName : field_.altNameList ){
         out = {altKeyName, getJsonEntry(altKeyName)};
-        break;
+        if(out.second != nullptr){ break; }
       }
     }
 
