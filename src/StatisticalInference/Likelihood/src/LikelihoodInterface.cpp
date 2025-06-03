@@ -40,30 +40,17 @@ void LikelihoodInterface::configureImpl(){
   std::string jointProbabilityTypeStr{"PoissonLLH"};
 
   // prior to this version a few parameters were set in the propagator itself
-  if( _modelPropagator_.getConfig().hasField("enableStatThrowInToys") ){
-    _modelPropagator_.getConfig().fillValue(_enableStatThrowInToys_, "enableStatThrowInToys");
-  }
-  if( _modelPropagator_.getConfig().hasField("eventTreeWriter") ) {
-    _modelPropagator_.getConfig().fillValue(_eventTreeWriter_.getConfig(), "eventTreeWriter");
-  }
-  if( _modelPropagator_.getConfig().hasField("gaussStatThrowInToys") ) {
-     _modelPropagator_.getConfig().fillValue(_gaussStatThrowInToys_, "gaussStatThrowInToys");
-  }
-  if( _modelPropagator_.getConfig().hasField("enableEventMcThrow") ) {
-    _modelPropagator_.getConfig().fillValue(_enableEventMcThrow_, "enableEventMcThrow");
-  }
-  if( _modelPropagator_.getConfig().hasField("plotGeneratorConfig") ) {
-    _modelPropagator_.getConfig().fillValue(_plotGenerator_.getConfig(), "plotGeneratorConfig");
-  }
-  if( _modelPropagator_.getConfig().hasField("dataSetList") ) {
-    _modelPropagator_.getConfig().fillValue(datasetListConfig, "dataSetList");
-  }
-  if( _modelPropagator_.getConfig().hasField("llhStatFunction") ) {
-    _modelPropagator_.getConfig().fillValue(jointProbabilityTypeStr, "llhStatFunction");
-  }
-  if( _modelPropagator_.getConfig().hasField("llhConfig") ) {
-    _modelPropagator_.getConfig().fillValue(jointProbabilityConfig, "llhConfig");
-  }
+  // relocated
+  _modelPropagator_.getConfig().fillValue(_enableStatThrowInToys_, "enableStatThrowInToys");
+  _modelPropagator_.getConfig().fillValue(_eventTreeWriter_.getConfig(), "eventTreeWriter");
+  _modelPropagator_.getConfig().fillValue(_gaussStatThrowInToys_, "gaussStatThrowInToys");
+  _modelPropagator_.getConfig().fillValue(_enableEventMcThrow_, "enableEventMcThrow");
+  _modelPropagator_.getConfig().fillValue(_plotGenerator_.getConfig(), "plotGeneratorConfig");
+  _modelPropagator_.getConfig().fillValue(datasetListConfig, "dataSetList");
+  _modelPropagator_.getSampleSet().getConfig().fillValue(jointProbabilityTypeStr, "llhStatFunction");
+  _modelPropagator_.getConfig().fillValue(jointProbabilityTypeStr, "llhStatFunction");
+  _modelPropagator_.getSampleSet().getConfig().fillValue(jointProbabilityConfig, "llhConfig");
+  _modelPropagator_.getConfig().fillValue(jointProbabilityConfig, "llhConfig");
 
   // defining datasets:
   _config_.fillValue(datasetListConfig, "datasetList");
