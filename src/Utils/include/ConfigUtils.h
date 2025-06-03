@@ -89,13 +89,6 @@ namespace ConfigUtils {
       }
       FieldDefinition(uint8_t flags_, std::string name_, std::string message_)
         : flags(flags_), name(std::move(name_)), message(std::move(message_)){}
-      // FieldDefinition(std::string name_, std::initializer_list<const char*> altList_)
-      //   : name(std::move(name_)){
-      //   altNameList.reserve(altList_.size());
-      //   for(const char* s : altList_){ altNameList.emplace_back(s); }
-      // }
-      // FieldDefinition(std::string name_, std::vector<std::string> altList_)
-        // : name(std::move(name_)), altNameList(std::move(altList_)){}
       FieldDefinition(std::string name_, std::vector<std::string> altList_ = {}, std::string message_={})
         : name(std::move(name_)), message(std::move(message_)), altNameList(std::move(altList_)){}
 
