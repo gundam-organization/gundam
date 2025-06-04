@@ -274,61 +274,90 @@ namespace ConfigUtils {
     }
 
     // 1.1 - deprecated/removed fields
-    bool deprecatedFound{false};
-    for( auto& field : _fieldDefinitionList_ ){
-      if( not field.isDeprecated() ){ continue; }
-      if( not hasField(field.name) ){ continue; }
-      deprecatedFound = true;
-      auto entry = getConfigEntry(field.name);
-      LogError << "Found a deprecated key " << _parentPath_ << "/" << entry.first << ": " << field.message << std::endl;
+    {
+      bool deprecatedFound{false};
+      for( auto& field : _fieldDefinitionList_ ){
+        if( not field.isDeprecated() ){ continue; }
+        if( not hasField(field.name) ){ continue; }
+        deprecatedFound = true;
+        auto entry = getConfigEntry(field.name);
+        LogError << "Found a deprecated key " << _parentPath_ << "/" << entry.first << ": " << field.message << std::endl;
+      }
+      if(deprecatedFound){ LogExit("Invalid configuration: deprecated field found."); }
     }
-    if(deprecatedFound){ LogExit("Invalid configuration: deprecated field found."); }
 
     // 2 - check if some config keys have some collisions
     // 2.1 - if they do, do they carry the same value?
     // -> should allow collisions since some configs are meant to be handled by older versions of GUNDAM as well
-    std::map<const FieldDefinition*, std::vector<std::string>> collisionDict{};
-    for( auto& field : _fieldDefinitionList_ ){
-      std::vector<std::string> keyCollisionList{};
-      if( _config_.contains(field.name) ){ keyCollisionList.emplace_back(field.name); }
-      for( auto& altFieldName : field.altNameList ){
-        if( _config_.contains(altFieldName) ){ keyCollisionList.emplace_back(altFieldName); }
-      }
-      if( keyCollisionList.size() >= 2 ){
-        collisionDict[&field] = keyCollisionList;
-      }
-    }
-    if( not collisionDict.empty() ){
-      // check if they carry the same value? -> if NOT -> ERROR
-      bool unmatchingCollisionFound = false;
-      for( const auto& collision : collisionDict ){
-        auto val = _config_.at(collision.second[0]);
-        for( auto& key : collision.second ){
-          if(_config_.at(key) != val){
-            unmatchingCollisionFound = true;
-            LogError << _parentPath_ << ": found unmatching values for field \"" << collision.first->name << "\". Make sure they have the same value." << std::endl;
-          }
-          else{
-            LogAlertIf(doShowWarning(collision.first->name)) << _parentPath_ << ": field \"" << collision.first->name << "\" has collisions with different keys: " << GenericToolbox::toString(collision.second) << std::endl;
-          }
+    {
+      std::map<const FieldDefinition*, std::vector<std::string>> collisionDict{};
+      for( auto& field : _fieldDefinitionList_ ){
+        std::vector<std::string> keyCollisionList{};
+        if( _config_.contains(field.name) ){ keyCollisionList.emplace_back(field.name); }
+        for( auto& altFieldName : field.altNameList ){
+          if( _config_.contains(altFieldName) ){ keyCollisionList.emplace_back(altFieldName); }
+        }
+        if( keyCollisionList.size() >= 2 ){
+          collisionDict[&field] = keyCollisionList;
         }
       }
-      if( unmatchingCollisionFound ){ LogExit("Invalid configuration: collisions with different values."); }
+      if( not collisionDict.empty() ){
+        // check if they carry the same value? -> if NOT -> ERROR
+        bool unmatchingCollisionFound = false;
+        for( const auto& collision : collisionDict ){
+          auto val = _config_.at(collision.second[0]);
+          for( auto& key : collision.second ){
+            if(_config_.at(key) != val){
+              unmatchingCollisionFound = true;
+              LogError << _parentPath_ << ": found unmatching values for field \"" << collision.first->name << "\". Make sure they have the same value." << std::endl;
+            }
+            else{
+              LogAlertIf(doShowWarning(collision.first->name+":COLLISION")) << _parentPath_ << ": field \"" << collision.first->name << "\" has collisions with different keys: " << GenericToolbox::toString(collision.second) << std::endl;
+            }
+          }
+        }
+        if( unmatchingCollisionFound ){ LogExit("Invalid configuration: collisions with different values."); }
+      }
     }
 
     // 3 - look for invalid key names
     // just a warning
-    std::vector<std::string> invalidKeyList{};
-    for(auto it = _config_.begin(); it != _config_.end(); ++it){
-      if(not GenericToolbox::isIn(GenericToolbox::toLowerCase(it.key()), _definedFieldNameList_)){
-        // already printed out? regardless of indexed path
-        if( not doShowWarning(it.key()) ){ continue; }
-        invalidKeyList.emplace_back(it.key());
+    {
+      std::vector<std::string> invalidKeyList{};
+      for(auto it = _config_.begin(); it != _config_.end(); ++it){
+        if(not GenericToolbox::isIn(GenericToolbox::toLowerCase(it.key()), _definedFieldNameList_)){
+          // already printed out? regardless of indexed path
+          if( not doShowWarning(it.key()+":INVALID") ){ continue; }
+          invalidKeyList.emplace_back(it.key());
+        }
+      }
+      if( not invalidKeyList.empty() ){
+        for( auto& invalidKey : invalidKeyList ){
+          LogAlert << _parentPath_ << ": key \"" << invalidKey << "\" has an invalid name. It won't be recognized by GUNDAM." << std::endl;
+        }
       }
     }
-    if( not invalidKeyList.empty() ){
-      for( auto& invalidKey : invalidKeyList ){
-        LogAlert << _parentPath_ << ": key \"" << invalidKey << "\" has an invalid name. It won't be recognized by GUNDAM." << std::endl;
+
+
+    // 4 - check alternative names (renamed fields)
+    {
+      for( auto& field : _fieldDefinitionList_ ){
+        for( auto& altKeyName : field.altNameList ){
+          if( getJsonEntry(altKeyName) == nullptr ){ continue; }
+          if( doShowWarning(altKeyName+":RENAMED") ) {
+            LogWarning << _parentPath_ << ": key \"" << altKeyName << "\" has been renamed. Use \"" << field.name << "\" instead." << std::endl;
+          }
+        }
+      }
+    }
+
+    // 5 - check relocated fields
+    {
+      for( auto& field : _fieldDefinitionList_ ) {
+        if( not hasField(field.name) ){ continue; }
+        if( field.isRelocated() and doShowWarning(field.name+":RELOCATED") ){
+          LogAlert << _parentPath_ << ": field \"" << field.name << "\" should be moved to: " << field.message << std::endl;
+        }
       }
     }
 
@@ -341,29 +370,17 @@ namespace ConfigUtils {
     exit(EXIT_FAILURE);
   }
   std::pair<std::string, const JsonType*> ConfigReader::getConfigEntry(const FieldDefinition& field_) const{
-    std::pair<std::string, const JsonType*> out{"", nullptr};
+    std::pair<std::string, const JsonType*> out;
     out = {field_.name, getJsonEntry(field_.name)};
+    if(out.second != nullptr){ return out; }
 
     // not found? look for alt name
-    if( out.second == nullptr ){
-      for( auto& altKeyName : field_.altNameList ){
-        out = {altKeyName, getJsonEntry(altKeyName)};
-        if(out.second != nullptr){ break; }
-      }
+    for( auto& altKeyName : field_.altNameList ){
+      out = {altKeyName, getJsonEntry(altKeyName)};
+      if(out.second != nullptr){ return out; }
     }
 
-    // found? check additional warnings
-    if( out.second != nullptr ) {
-      if( field_.name != out.first and doShowWarning(out.first) ){
-        LogWarning << _parentPath_ << ": key \"" << out.first << "\" has been renamed. Use \"" << field_.name << "\" instead." << std::endl;
-      }
-
-      if( field_.isRelocated() and doShowWarning(field_.name) ){
-        LogAlert << _parentPath_ << ": field \"" << field_.name << "\" should be moved to: " << field_.message << std::endl;
-      }
-    }
-
-    return out;
+    return {"", nullptr};
   }
   std::pair<std::string, const JsonType*> ConfigReader::getConfigEntry(const std::string& fieldName_) const{
     auto& field = getFieldDefinition(fieldName_);
@@ -408,7 +425,7 @@ namespace ConfigUtils {
       if( GenericToolbox::isIn(GenericToolbox::toLowerCase(it.key()), _usedKeyList_) ){ continue; }
 
       // already printed out?
-      if( doShowWarning(it.key()) ){ unusedKeyList.emplace_back(it.key()); }
+      if( doShowWarning(it.key()+":UNREAD") ){ unusedKeyList.emplace_back(it.key()); }
     }
 
     if( not unusedKeyList.empty() ){
