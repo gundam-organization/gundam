@@ -271,6 +271,8 @@ void MinimizerInterface::minimize(){
   if( _fitHasConverged_ ){ LogInfo << "Minimization has converged!" << std::endl; }
   else{ LogError << "Minimization did not converged." << std::endl; }
 
+  LogInfo << "Post-fit event rates:" << std::endl;
+  LogInfo << getPropagator().getSampleBreakdownTableStr() << std::endl;
 
   LogInfo << "Writing convergence stats..." << std::endl;
   int toyIndex = getPropagator().getIThrow();
