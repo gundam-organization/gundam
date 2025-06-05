@@ -307,6 +307,9 @@ void RootMinimizer::minimize(){
   if( _fitHasConverged_ ){ LogInfo << "Minimization has converged!" << std::endl; }
   else{ LogError << "Minimization did not converged." << std::endl; }
 
+  LogInfo << "Post-fit event-rates:" << std::endl;
+  LogInfo << getLikelihoodInterface().getSampleBreakdownTable() << std::endl;
+
   if( getOwner().getSaveDir() != nullptr ) {
     LogInfo << "Writing convergence stats..." << std::endl;
     int toyIndex = getModelPropagator().getIThrow();
