@@ -39,6 +39,8 @@ public:
 #include "GenericToolbox.MakeEnum.h"
   MAKE_ENUM_JSON_INTERFACE(DialType);
 
+  static void prepareConfig(ConfigReader &config_);
+
 public:
   DialCollection() = delete;
   explicit DialCollection(std::vector<ParameterSet> *targetParameterSetListPtr): _parameterSetListPtr_(targetParameterSetListPtr) {}
@@ -165,7 +167,7 @@ public:
   // methods to generate dials with factory
   std::unique_ptr<DialBase> makeDial() const;
   std::unique_ptr<DialBase> makeDial(const TObject* src_) const;
-  std::unique_ptr<DialBase> makeDial(const JsonType& config_) const;
+  std::unique_ptr<DialBase> makeDial(const ConfigReader& config_) const;
 
 protected:
   void configureImpl() override;
@@ -173,12 +175,12 @@ protected:
 
   bool initializeNormDialsWithParBinning();
   bool initializeDialsWithDefinition();
-  bool initializeDialsWithBinningFile(const JsonType& dialsDefinition);
-  bool initializeDialsWithTabulation(const JsonType& dialsDefinition);
-  bool initializeDialsWithKriging(const JsonType& dialsDefinition);
+  bool initializeDialsWithBinningFile(const ConfigReader& dialsDefinition);
+  bool initializeDialsWithTabulation(const ConfigReader& dialsDefinition);
+  bool initializeDialsWithKriging(const ConfigReader& dialsDefinition);
 
-  void readParametersFromConfig(const JsonType &config_);
-  JsonType fetchDialsDefinition(const JsonType &definitionsList_) const;
+  void readParametersFromConfig(const ConfigReader &config_);
+  ConfigReader fetchDialsDefinition(const ConfigReader &definitionsList_) const;
 
   // factory
   std::unique_ptr<DialBase> makeGraphDial(const TObject* src_) const;

@@ -105,7 +105,7 @@ class KrigedDialFactory : public DialFactoryBase {
 public:
     KrigedDialFactory() = default;
     ~KrigedDialFactory() = default;
-    KrigedDialFactory(const JsonType& config_);
+    KrigedDialFactory(const ConfigReader& config_);
 
     /// Create an event-by-event weighting dial for this table.
     [[nodiscard]] DialBase* makeDial(const Event& event) override;

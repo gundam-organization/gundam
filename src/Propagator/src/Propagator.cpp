@@ -22,71 +22,62 @@ void Propagator::muteLogger(){ Logger::setIsMuted( true ); }
 void Propagator::unmuteLogger(){ Logger::setIsMuted( false ); }
 
 void Propagator::configureImpl(){
-
-  ConfigUtils::checkFields(_config_,
-                           "/fitterEngineConfig/likelihoodInterfaceConfig"
-                           "/propagatorConfig",
-                           // Allowed fields (don't need to list fields in
-                           // expected, or deprecated).
-                           {{"showNbEventParameterBreakdown"},
-                            {"showNbEventPerSampleParameterBreakdown"},
-                            {"parameterInjection"},
-                            {"debugPrintLoadedEvents"},
-                            {"debugPrintLoadedEventsNbPerSample"},
-                            {"devSingleThreadReweight"},
-                            {"devSingleThreadHistFill"},
-                            {"globalEventReweightCap"},
-                           },
-                           // Expected fields (must be present)
-                           {{"sampleSetConfig"},
-                            {"parametersManagerConfig"},
-                           },
-                           // Deprecated fields (allowed, but cause a warning)
-                           {
-                           },
-                           // Replaced fields (allowed, but case a warning)
-                           {
-                             {{"fitSampleSetConfig"},{"sampleSetConfig"}},
-                             {{"parameterSetListConfig"},
-                              {"parametersManagerConfig"
-                               "/parameterSetList"}},
-                             {{"throwToyParametersWithGlobalCov"},
-                              {"parametersManagerConfig"
-                               "/throwToyParametersWithGlobalCov"}},
-                           });
+  _config_.clearFields();
+  _config_.defineFields({
+    {"sampleSetConfig", {"fitSampleSetConfig"}},
+    {"parametersManagerConfig"},
+    {"parameterInjection"},
+    {"showNbEventParameterBreakdown"},
+    {"showNbEventPerSampleParameterBreakdown"},
+    {"debugPrintLoadedEvents"},
+    {"debugPrintLoadedEventsNbPerSample"},
+    {"devSingleThreadReweight"},
+    {"devSingleThreadHistFill"},
+    {"globalEventReweightCap"},
+    // relocated:
+    {FieldFlag::RELOCATED, "parameterSetListConfig", "parametersManagerConfig/parameterSetList"},
+    {FieldFlag::RELOCATED, "throwToyParametersWithGlobalCov", "parametersManagerConfig"},
+    {FieldFlag::RELOCATED, "enableStatThrowInToys", "likelihoodInterfaceConfig/enableStatThrowInToys"},
+    {FieldFlag::RELOCATED, "gaussStatThrowInToys", "likelihoodInterfaceConfig/gaussStatThrowInToys"},
+    {FieldFlag::RELOCATED, "enableEventMcThrow", "likelihoodInterfaceConfig/enableEventMcThrow"},
+    {FieldFlag::RELOCATED, "plotGeneratorConfig", "likelihoodInterfaceConfig/plotGeneratorConfig"},
+    {FieldFlag::RELOCATED, "llhStatFunction", "likelihoodInterfaceConfig/jointProbabilityConfig/type"},
+    {FieldFlag::RELOCATED, "llhConfig", "likelihoodInterfaceConfig/jointProbabilityConfig"},
+    {FieldFlag::RELOCATED, "scanConfig", "fitterEngineConfig/scanConfig"},
+    {FieldFlag::RELOCATED, "eventTreeWriter", "likelihoodInterfaceConfig/eventTreeWriter"},
+    {FieldFlag::RELOCATED, "dataSetList", {"fitSampleSetConfig/dataSetList"}, "likelihoodInterfaceConfig/dataSetList"},
+  });
+  _config_.checkConfiguration();
 
   // nested objects
-  GenericToolbox::Json::fillValue(_config_, _sampleSet_.getConfig(), {{"sampleSetConfig"}, {"fitSampleSetConfig"}});
+  _config_.fillValue(_sampleSet_.getConfig(), "sampleSetConfig");
   _sampleSet_.configure();
 
-  GenericToolbox::Json::deprecatedAction(_config_, "parameterSetListConfig", [&]{
-    LogAlert << R"("parameterSetListConfig" should now be set under "parametersManagerConfig/parameterSetList".)" << std::endl;
-    auto parameterSetListConfig = GenericToolbox::Json::fetchValue<JsonType>(_config_, "parameterSetListConfig");
-    _parManager_.setParameterSetListConfig( parameterSetListConfig );
-  });
-  GenericToolbox::Json::deprecatedAction(_config_, "throwToyParametersWithGlobalCov", [&]{
-    LogAlert << "Forwarding the option to ParametersManager. Consider moving it into \"parametersManagerConfig:\"" << std::endl;
-    _parManager_.setThrowToyParametersWithGlobalCov(GenericToolbox::Json::fetchValue<bool>(_config_, "throwToyParametersWithGlobalCov"));
-  });
-  GenericToolbox::Json::fillValue(_config_, _parManager_.getConfig(), "parametersManagerConfig");
+  // relocated
+  _config_.fillValue(_parManager_.getParameterSetListConfig(), "parameterSetListConfig");
+  _config_.fillValue(_parManager_.getThrowToyParametersWithGlobalCov(), "throwToyParametersWithGlobalCov");
+
+
+  _config_.fillValue(_parManager_.getConfig(), "parametersManagerConfig");
   _parManager_.configure();
 
   _dialManager_.setParametersManager(&_parManager_);
   _dialManager_.configure();
 
   // Monitoring parameters
-  GenericToolbox::Json::fillValue(_config_, _showNbEventParameterBreakdown_, "showNbEventParameterBreakdown");
-  GenericToolbox::Json::fillValue(_config_, _showNbEventPerSampleParameterBreakdown_, "showNbEventPerSampleParameterBreakdown");
-  GenericToolbox::Json::fillValue(_config_, _parameterInjectorMc_, "parameterInjection");
-  GenericToolbox::Json::fillValue(_config_, _debugPrintLoadedEvents_, "debugPrintLoadedEvents");
-  GenericToolbox::Json::fillValue(_config_, _debugPrintLoadedEventsNbPerSample_, "debugPrintLoadedEventsNbPerSample");
-  GenericToolbox::Json::fillValue(_config_, _devSingleThreadReweight_, "devSingleThreadReweight");
-  GenericToolbox::Json::fillValue(_config_, _devSingleThreadHistFill_, "devSingleThreadHistFill");
-  GenericToolbox::Json::fillValue(_config_, _eventDialCache_.getGlobalEventReweightCap().maxReweight, "globalEventReweightCap");
+  _config_.fillValue(_showNbEventParameterBreakdown_, "showNbEventParameterBreakdown");
+  _config_.fillValue(_showNbEventPerSampleParameterBreakdown_, "showNbEventPerSampleParameterBreakdown");
+  _config_.fillValue(_parameterInjectorMc_, "parameterInjection");
+  _config_.fillValue(_debugPrintLoadedEvents_, "debugPrintLoadedEvents");
+  _config_.fillValue(_debugPrintLoadedEventsNbPerSample_, "debugPrintLoadedEventsNbPerSample");
+  _config_.fillValue(_devSingleThreadReweight_, "devSingleThreadReweight");
+  _config_.fillValue(_devSingleThreadHistFill_, "devSingleThreadHistFill");
+  _config_.fillValue(_eventDialCache_.getGlobalEventReweightCap().maxReweight, "globalEventReweightCap");
 
 }
 void Propagator::initializeImpl(){
-  LogWarning << "Initializing propagator..." << std::endl;
+
+  _config_.printUnusedKeys();
 
   _parManager_.initialize();
   _sampleSet_.initialize();

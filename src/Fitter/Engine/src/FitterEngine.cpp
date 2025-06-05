@@ -23,72 +23,51 @@
 
 
 void FitterEngine::configureImpl(){
-  LogInfo << "Reading FitterEngine config..." << std::endl;
   GenericToolbox::setT2kPalette();
 
-  // All of the fields that should (or may) be at this level in the YAML.
-  // This provides a rudimentary syntax check for user inputs.
-  ConfigUtils::checkFields(_config_,"/fitterEngineConfig",
-                           // Allowed fields (don't need to list fields in
-                           // expected, or deprecated).
-                           {{"enablePca"},
-                            {"pcaThreshold"},
-                            {"parameterScannerConfig"},
-                            {"enablePreFitScan"},
-                            {"enablePostFitScan"},
-                            {"enablePreFitToPostFitLineScan"},
-                            {"generateSamplePlots"},
-                            {"generateOneSigmaPlots"},
-                            {"enableParamVariations"},
-                            {"paramVariationsSigmas"},
-                            {"scaleParStepWithChi2Response"},
-                            {"parStepGain"},
-                            {"throwMcBeforeFit"},
-                            {"throwMcBeforeFitGain"},
-                            {"savePostfitEventTrees"},
-                           },
-                           // Expected fields (must be present)
-                           {{"minimizerConfig"},
-                            {"likelihoodInterfaceConfig"},
-                           },
-                           // Deprecated fields (allowed, but cause a warning)
-                           {{"mcmcConfig"},
-                            {"engineType"},
-                            {"propagatorConfig"},
-                            {"monitorRefreshRateInMs"},
-                            {"fixGhostEigenParametersAfterFirstRejected"},
-                           },
-                           // Replaced fields (allowed, but cause a warning)
-                           {
-                             {{"fixGhostFitParameters"},{"enablePca"}},
-                             {{"fixGhostFitParameters"},{"runPcaCheck"}},
-                             {{"pcaDeltaLlhThreshold"},{"pcaThreshold"}},
-                             {{"pcaDeltaChi2Threshold"},{"pcaThreshold"}},
-                             {{"ghostParameterDeltaChi2"},{"pcaThreshold"}},
-                             {{"scanConfig"},{"parameterScannerConfig"}},
-                             {{"allParamVariations"},{"paramVariationsSigmas"}},
-                           });
+  _config_.defineFields({
+    {"minimizerConfig", {"mcmcConfig"}},
+    {"likelihoodInterfaceConfig"},
+    {"enablePca"},
+    {"pcaMethod"},
+    {"parStepGain"},
+    {"pcaThreshold"},
+    {"fixGhostEigenParametersAfterFirstRejected"},
+    {"throwMcBeforeFit"},
+    {"throwMcBeforeFitGain"},
+    {"savePostfitEventTrees"},
+    {"enablePreFitScan"},
+    {"enablePostFitScan"},
+    {"enablePreFitToPostFitLineScan"},
+    {"generateSamplePlots"},
+    {"generateOneSigmaPlots"},
+    {"enableParamVariations"},
+    {"paramVariationsSigmas", {"allParamVariations"}},
+    {"scaleParStepWithChi2Response"},
+    {"parameterScannerConfig", {"scanConfig"}},
+    // relocated
+    {FieldFlag::RELOCATED, "engineType", "minimizerConfig/type"},
+    {FieldFlag::RELOCATED, "monitorRefreshRateInMs", "fitterEngineConfig/minimizerConfig"},
+    {FieldFlag::RELOCATED, "propagatorConfig", "fitterEngineConfig/likelihoodInterfaceConfig/propagatorConfig"},
+  });
+  _config_.checkConfiguration();
 
-  // need to determine the type before defining the minimizer
-  JsonType minimizerConfig{};
+  // setting up the minimizer
+  ConfigReader minimizerConfig{};
+  _config_.fillValue(minimizerConfig, "minimizerConfig");
+
   std::string minimizerTypeStr{"RootMinimizer"};
 
-  // legacy configs:
-  GenericToolbox::Json::deprecatedAction(_config_, "mcmcConfig", [&]{
-    LogAlert << "mcmcConfig should now be set as minimizerConfig" << std::endl;
-    GenericToolbox::Json::fillValue(_config_, minimizerConfig, "mcmcConfig");
-  });
-  GenericToolbox::Json::deprecatedAction(_config_, "engineType", [&]{
-    LogAlert << R"("engineType" should set using "minimizerConfig/type")" << std::endl;
-    GenericToolbox::Json::fillValue(_config_, minimizerTypeStr, "engineType");
+  if( _config_.hasField("engineType") ) {
+    _config_.fillValue(minimizerTypeStr, "engineType");
 
     // handle deprecated types
     if     ( minimizerTypeStr == "minimizer" ){ minimizerTypeStr = "RootMinimizer"; }
     else if( minimizerTypeStr == "mcmc" )     { minimizerTypeStr = "SimpleMCMC"; }
-  });
+  }
+  minimizerConfig.defineFields({{"type"}});
+  minimizerConfig.fillValue(minimizerTypeStr, "type");
 
-  GenericToolbox::Json::fillValue(_config_, minimizerConfig, "minimizerConfig");
-  GenericToolbox::Json::fillValue(minimizerConfig, minimizerTypeStr, "type");
   _minimizerType_ = MinimizerType::toEnum( minimizerTypeStr, true );
   switch( _minimizerType_.value ){
     case MinimizerType::RootMinimizer:
@@ -102,62 +81,63 @@ void FitterEngine::configureImpl(){
   }
 
   // now the minimizer is created, forward deprecated options
-  GenericToolbox::Json::deprecatedAction(_config_, "monitorRefreshRateInMs", [&]{
-    LogAlert << "Forwarding the option to Propagator. Consider moving it into \"minimizerConfig:\"" << std::endl;
-    _minimizer_->getMonitor().convergenceMonitor.setMaxRefreshRateInMs(GenericToolbox::Json::fetchValue<int>(_config_, "monitorRefreshRateInMs"));
-  });
-  _minimizer_->setConfig( minimizerConfig );
-  _minimizer_->configure();
+  if( _config_.hasField("monitorRefreshRateInMs") ){
+    _minimizer_->getMonitor().convergenceMonitor.setMaxRefreshRateInMs(
+      _config_.fetchValue<int>("monitorRefreshRateInMs")
+    );
+  }
+  _minimizer_->configure( minimizerConfig );
 
-  GenericToolbox::Json::deprecatedAction(_config_, "propagatorConfig", [&]{
-    LogAlert << R"("propagatorConfig" should now be set within "likelihoodInterfaceConfig".)" << std::endl;
+  if( _config_.hasField("propagatorConfig") ){
     // reading the config already since nested objects need to be filled up for handling further deprecation
-    getLikelihoodInterface().getModelPropagator().setConfig( GenericToolbox::Json::fetchValue<JsonType>(_config_, "propagatorConfig") );
-  });
-  GenericToolbox::Json::fillValue(_config_, _likelihoodInterface_.getConfig(), "likelihoodInterfaceConfig");
+    getLikelihoodInterface().getModelPropagator().setConfig( _config_.fetchValue<ConfigReader>("propagatorConfig") );
+  }
+  _config_.fillValue(_likelihoodInterface_.getConfig(), "likelihoodInterfaceConfig");
   _likelihoodInterface_.configure();
 
-  GenericToolbox::Json::deprecatedAction(getLikelihoodInterface().getModelPropagator().getConfig(), "scanConfig", [&]{
-    LogAlert << R"("scanConfig" should now be set within "fitterEngineConfig".)" << std::endl;
-    _parameterScanner_.setConfig( GenericToolbox::Json::fetchValue<JsonType>(getLikelihoodInterface().getModelPropagator().getConfig(), "scanConfig") );
-  });
-  GenericToolbox::Json::fillValue(_config_, _parameterScanner_.getConfig(), {{"parameterScannerConfig"},{"scanConfig"}});
+  if( getLikelihoodInterface().getModelPropagator().getConfig().hasField("scanConfig") ){
+    _parameterScanner_.setConfig( getLikelihoodInterface().getModelPropagator().getConfig().fetchValue<ConfigReader>("scanConfig") );
+  }
+  _config_.fillValue(_parameterScanner_.getConfig(), "parameterScannerConfig");
   _parameterScanner_.configure();
 
-  LogInfo << "Convergence monitor will be refreshed every " << _minimizer_->getMonitor().convergenceMonitor.getMaxRefreshRateInMs() << "ms." << std::endl;
-
   // local config
-  GenericToolbox::Json::fillValue(_config_, _enablePca_, {{"enablePca"},{"runPcaCheck"},{"fixGhostFitParameters"}});
+  _config_.fillValue(_enablePca_, "enablePca");
 
-  GenericToolbox::Json::fillEnum(_config_, _pcaMethod_, "pcaMethod");
-  GenericToolbox::Json::fillValue(_config_, _pcaThreshold_, {{"pcaThreshold"},{"pcaDeltaLlhThreshold"},{"pcaDeltaChi2Threshold"},{"ghostParameterDeltaChi2Threshold"}});
+  _config_.fillEnum(_pcaMethod_, "pcaMethod");
+  _config_.fillValue(_pcaThreshold_, "pcaThreshold");
+  _config_.fillValue(_fixGhostEigenParametersAfterFirstRejected_, "fixGhostEigenParametersAfterFirstRejected");
 
-  GenericToolbox::Json::fillValue(_config_, _enablePreFitScan_, "enablePreFitScan");
-  GenericToolbox::Json::fillValue(_config_, _enablePostFitScan_, "enablePostFitScan");
-  GenericToolbox::Json::fillValue(_config_, _enablePreFitToPostFitLineScan_, "enablePreFitToPostFitLineScan");
+  _config_.fillValue(_enablePreFitScan_, "enablePreFitScan");
+  _config_.fillValue(_enablePostFitScan_, "enablePostFitScan");
+  _config_.fillValue(_enablePreFitToPostFitLineScan_, "enablePreFitToPostFitLineScan");
 
-  GenericToolbox::Json::fillValue(_config_, _generateSamplePlots_, "generateSamplePlots");
-  GenericToolbox::Json::fillValue(_config_, _generateOneSigmaPlots_, "generateOneSigmaPlots");
+  _config_.fillValue(_generateSamplePlots_, "generateSamplePlots");
+  _config_.fillValue(_generateOneSigmaPlots_, "generateOneSigmaPlots");
 
-  GenericToolbox::Json::fillValue(_config_, _doAllParamVariations_, "enableParamVariations");
-  GenericToolbox::Json::fillValue(_config_, _allParamVariationsSigmas_, {{"paramVariationsSigmas"},{"allParamVariations"}});
+  _config_.fillValue(_doAllParamVariations_, "enableParamVariations");
+  _config_.fillValue(_allParamVariationsSigmas_, "paramVariationsSigmas");
 
-  GenericToolbox::Json::fillValue(_config_, _scaleParStepWithChi2Response_, "scaleParStepWithChi2Response");
-  GenericToolbox::Json::fillValue(_config_, _parStepGain_, "parStepGain");
+  // enableParamVariations option didn't exist in the past
+  if( _config_.hasField("paramVariationsSigmas") and not _doAllParamVariations_ ){
+    _doAllParamVariations_ = true;
+  }
 
-  GenericToolbox::Json::fillValue(_config_, _throwMcBeforeFit_, "throwMcBeforeFit");
-  GenericToolbox::Json::fillValue(_config_, _throwGain_, "throwMcBeforeFitGain");
-  GenericToolbox::Json::fillValue(_config_, _savePostfitEventTrees_, "savePostfitEventTrees");
+  _config_.fillValue(_scaleParStepWithChi2Response_, "scaleParStepWithChi2Response");
+  _config_.fillValue(_parStepGain_, "parStepGain");
 
-  LogInfo << "FitterEngine configured." << std::endl;
+  _config_.fillValue(_throwMcBeforeFit_, "throwMcBeforeFit");
+  _config_.fillValue(_throwGain_, "throwMcBeforeFitGain");
+  _config_.fillValue(_savePostfitEventTrees_, "savePostfitEventTrees");
 }
 void FitterEngine::initializeImpl(){
-  LogThrowIf(_config_.empty(), "Config is not set.");
+
+  _config_.printUnusedKeys();
 
   if( GundamGlobals::isLightOutputMode() ){
     // TODO: this check should be more universal
     LogWarning << "Light mode enabled, wiping plot gen config..." << std::endl;
-    getLikelihoodInterface().getPlotGenerator().configure(JsonType());
+    getLikelihoodInterface().getPlotGenerator().configure(ConfigReader());
   }
 
   getLikelihoodInterface().initialize();
@@ -372,11 +352,11 @@ void FitterEngine::fit(){
         LogWarning << "\"" << parSet.getName() << "\" has marked disabled throwMcBeforeFit: skipping." << std::endl;
         continue;
       }
-      if( GenericToolbox::Json::doKeyExist(parSet.getConfig(), "customFitParThrow") ){
+      if( not parSet.getCustomParThrow().empty() ){
 
         LogAlert << "Using custom mc parameter push for " << parSet.getName() << std::endl;
 
-        for(auto& entry : GenericToolbox::Json::fetchValue(parSet.getConfig(), "customFitParThrow", std::vector<JsonType>())){
+        for(auto& entry : parSet.getConfig().fetchValue("customFitParThrow", std::vector<JsonType>())){
 
           int parIndex = GenericToolbox::Json::fetchValue<int>(entry, "parIndex");
 
@@ -604,7 +584,7 @@ void FitterEngine::runPcaCheck(){
 
         if( fixParPca ){
           par.setIsFixed(true); // ignored in the Chi2 computation of the parSet
-          if( parSet.isEnableEigenDecomp() and GenericToolbox::Json::fetchValue(_config_, "fixGhostEigenParametersAfterFirstRejected", false) ){
+          if( parSet.isEnableEigenDecomp() and _fixGhostEigenParametersAfterFirstRejected_ ){
             fixNextEigenPars = true;
           }
         }

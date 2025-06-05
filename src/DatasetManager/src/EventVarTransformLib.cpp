@@ -12,10 +12,15 @@
 
 
 void EventVarTransformLib::configureImpl(){
+  _config_.clearFields();
   this->EventVarTransform::configureImpl();
-  GenericToolbox::Json::fillValue(_config_, _libraryFile_, "libraryFile");
+  _config_.defineFields({{"libraryFile"}});
+  _config_.fillValue(_libraryFile_, "libraryFile");
 }
 void EventVarTransformLib::initializeImpl(){
+
+  _config_.printUnusedKeys();
+
   LogInfo << "Loading variable transformation: " << _name_ << std::endl;
   LogThrowIf(_outputVariableName_.empty(), "output variable name not set.");
 

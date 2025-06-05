@@ -79,7 +79,7 @@ int main(int argc, char** argv){
   // Reading fitter file
   std::string fitterFile{clParser.getOptionVal<std::string>("fitterFile")};
   std::unique_ptr<TFile> fitterRootFile{nullptr};
-  JsonType fitterConfig; // will be used to load the propagator
+  ConfigReader fitterConfig; // will be used to load the propagator
 
   if( GenericToolbox::hasExtension(fitterFile, "root") ){
     LogWarning << "Opening fitter output file: " << fitterFile << std::endl;
@@ -94,36 +94,48 @@ int main(int argc, char** argv){
          {"gundam/config_TNamed"},
          {"gundamFitter/unfoldedConfig_TNamed"}},
         [&](TNamed* config_){
-      fitterConfig = GenericToolbox::Json::readConfigJsonStr( config_->GetTitle() );
+      fitterConfig = ConfigReader(GenericToolbox::Json::readConfigJsonStr( config_->GetTitle() ));
     });
   }
   else{
     LogWarning << "Reading fitter config file: " << fitterFile << std::endl;
-    fitterConfig = GenericToolbox::Json::readConfigFile( fitterFile );
+    fitterConfig = ConfigReader(GenericToolbox::Json::readConfigFile( fitterFile ));
 
     clParser.getOptionPtr("usePreFit")->setIsTriggered( true );
   }
 
   LogAlertIf(clParser.isOptionTriggered("usePreFit")) << "Pre-fit mode enabled: will throw toys according to the prior covariance matrices..." << std::endl;
 
-  ConfigUtils::ConfigHandler cHandler{ fitterConfig };
+  ConfigReader xsecConfig(ConfigUtils::readConfigFile( clParser.getOptionVal<std::string>("configFile") ));
 
-  // Disabling defined fit samples:
-  LogInfo << "Removing defined samples..." << std::endl;
-  GenericToolbox::Json::clearEntry( cHandler.getConfig(), "fitterEngineConfig/likelihoodInterfaceConfig/propagatorConfig/sampleSetConfig/sampleList" );
-  GenericToolbox::Json::clearEntry( cHandler.getConfig(), "fitterEngineConfig/likelihoodInterfaceConfig/dataSetManagerConfig/propagatorConfig/sampleSetConfig/sampleList" );
-  GenericToolbox::Json::clearEntry( cHandler.getConfig(), "fitterEngineConfig/likelihoodInterfaceConfig/dataSetManagerConfig/propagatorConfig/fitSampleSetConfig/fitSampleList" );
-  GenericToolbox::Json::clearEntry( cHandler.getConfig(), "fitterEngineConfig/propagatorConfig/fitSampleSetConfig/fitSampleList" );
+  ConfigReader engineConfig;
+  {
+    ConfigUtils::ConfigBuilder cHandler{ fitterConfig.getConfig() };
 
-  // Disabling defined plots:
-  LogInfo << "Removing defined plots..." << std::endl;
-  GenericToolbox::Json::clearEntry( cHandler.getConfig(), "fitterEngineConfig/likelihoodInterfaceConfig/propagatorConfig/plotGeneratorConfig" );
-  GenericToolbox::Json::clearEntry( cHandler.getConfig(), "fitterEngineConfig/likelihoodInterfaceConfig/dataSetManagerConfig/propagatorConfig/plotGeneratorConfig" );
-  GenericToolbox::Json::clearEntry( cHandler.getConfig(), "fitterEngineConfig/propagatorConfig/plotGeneratorConfig" );
+    // Disabling defined fit samples:
+    LogInfo << "Removing defined samples..." << std::endl;
+    GenericToolbox::Json::clearEntry( cHandler.getConfig(), "fitterEngineConfig/likelihoodInterfaceConfig/propagatorConfig/sampleSetConfig/sampleList" );
+    GenericToolbox::Json::clearEntry( cHandler.getConfig(), "fitterEngineConfig/likelihoodInterfaceConfig/dataSetManagerConfig/propagatorConfig/sampleSetConfig/sampleList" );
+    GenericToolbox::Json::clearEntry( cHandler.getConfig(), "fitterEngineConfig/likelihoodInterfaceConfig/dataSetManagerConfig/propagatorConfig/fitSampleSetConfig/fitSampleList" );
+    GenericToolbox::Json::clearEntry( cHandler.getConfig(), "fitterEngineConfig/propagatorConfig/fitSampleSetConfig/fitSampleList" );
 
-  // Defining signal samples
-  auto xsecConfig( ConfigUtils::readConfigFile( clParser.getOptionVal<std::string>("configFile") ) );
-  cHandler.override( xsecConfig );
+    // Disabling defined plots:
+    LogInfo << "Removing defined plots..." << std::endl;
+    GenericToolbox::Json::clearEntry( cHandler.getConfig(), "fitterEngineConfig/likelihoodInterfaceConfig/propagatorConfig/plotGeneratorConfig" );
+    GenericToolbox::Json::clearEntry( cHandler.getConfig(), "fitterEngineConfig/likelihoodInterfaceConfig/dataSetManagerConfig/propagatorConfig/plotGeneratorConfig" );
+    GenericToolbox::Json::clearEntry( cHandler.getConfig(), "fitterEngineConfig/propagatorConfig/plotGeneratorConfig" );
+
+    // Defining signal samples
+    cHandler.override( xsecConfig.getConfig() );
+
+    engineConfig.setConfig(cHandler.getConfig());
+  }
+
+  engineConfig.defineFields({
+    {"fitterEngineConfig"},
+  });
+
+
   LogInfo << "Override done." << std::endl;
 
 
@@ -131,7 +143,7 @@ int main(int argc, char** argv){
 
   // it will handle all the deprecated config options and names properly
   FitterEngine fitter{nullptr};
-  fitter.configure( GenericToolbox::Json::fetchValue<JsonType>( cHandler.getConfig(), "fitterEngineConfig" ) );
+  fitter.configure( engineConfig.fetchValue<ConfigReader>( "fitterEngineConfig" ) );
 
   // We are only interested in our MC. Data has already been used to get the post-fit error/values
   fitter.getLikelihoodInterface().setForceAsimovData( true );
@@ -151,11 +163,7 @@ int main(int argc, char** argv){
 
     LogScopeIndent;
     LogInfo << sample.getName() << ": binning not set, looking for parSetBinning..." << std::endl;
-    auto associatedParSet = GenericToolbox::Json::fetchValue(
-        sample.getConfig(),
-        {{"parSetBinning"}, {"parameterSetName"}},
-        std::string()
-    );
+    auto associatedParSet = sample.getConfig().fetchValue("parSetBinning", std::string());
 
     LogThrowIf(associatedParSet.empty(), "Could not find parSetBinning.");
 
@@ -178,7 +186,8 @@ int main(int argc, char** argv){
                           ));
 
     LogThrowIf(foundDialCollection->getDialBinSet().getBinList().empty(), "Could not find binning");
-    sample.setBinningFilePath( foundDialCollection->getDialBinSet().getFilePath() );
+    JsonType json(foundDialCollection->getDialBinSet().getFilePath());
+    sample.setBinningFilePath( ConfigReader(json) );
 
   }
 
@@ -189,7 +198,7 @@ int main(int argc, char** argv){
 
 
   if( clParser.isOptionTriggered("dryRun") ){
-    std::cout << cHandler.toString() << std::endl;
+    std::cout << engineConfig.toString() << std::endl;
 
     LogAlert << "Exiting as dry-run is set." << std::endl;
     return EXIT_SUCCESS;
@@ -244,19 +253,19 @@ int main(int argc, char** argv){
 
     outFilePath = "gundamCalcXsec_" + GundamUtils::generateFileName(clParser, appendixDict) + ".root";
 
-    auto outFolder(GenericToolbox::Json::fetchValue<std::string>(xsecConfig, "outputFolder", "./"));
+    auto outFolder(xsecConfig.fetchValue<std::string>("outputFolder", "./"));
     outFilePath = GenericToolbox::joinPath(outFolder, outFilePath);
   }
 
   app.setCmdLinePtr( &clParser );
-  app.setConfigString( ConfigUtils::ConfigHandler{xsecConfig}.toString() );
+  app.setConfigString( xsecConfig.toString() );
   app.openOutputFile( outFilePath );
   app.writeAppInfo();
 
   auto* calcXsecDir{ GenericToolbox::mkdirTFile(app.getOutfilePtr(), "calcXsec") };
   bool useBestFitAsCentralValue{
     clParser.isOptionTriggered("useBfAsXsec")
-    or GenericToolbox::Json::fetchValue<bool>(xsecConfig, "useBestFitAsCentralValue", false)
+    or xsecConfig.fetchValue<bool>("useBestFitAsCentralValue", false)
   };
 
   LogInfo << "Creating throws tree" << std::endl;
@@ -269,22 +278,32 @@ int main(int argc, char** argv){
   LogInfo << "Creating normalizer objects..." << std::endl;
   // flux renorm with toys
   struct ParSetNormaliser{
-    void configure(const JsonType& config_){
+    void configure(ConfigReader& config_){
       LogScopeIndent;
+      config_.defineFields({
+        {"name"},
+        {"filePath"},
+        {"histogramPath"},
+        {"axisVariable"},
+        {"parSelections"},
 
-      name = GenericToolbox::Json::fetchValue<std::string>(config_, "name");
+      });
+      config_.checkConfiguration();
+
+      name = config_.fetchValue<std::string>("name");
       LogInfo << "ParSetNormaliser config \"" << name << "\": " << std::endl;
 
       // mandatory
-      filePath = GenericToolbox::Json::fetchValue<std::string>(config_, "filePath");
-      histogramPath = GenericToolbox::Json::fetchValue<std::string>(config_, "histogramPath");
-      axisVariable = GenericToolbox::Json::fetchValue<std::string>(config_, "axisVariable");
+      filePath = config_.fetchValue<std::string>("filePath");
+      histogramPath = config_.fetchValue<std::string>("histogramPath");
+      axisVariable = config_.fetchValue<std::string>("axisVariable");
 
       // optionals
-      for( auto& parSelConfig : GenericToolbox::Json::fetchValue(config_, "parSelections", JsonType()) ){
+      for( auto& parSelConfig : config_.loop("parSelections") ){
         parSelectionList.emplace_back();
-        GenericToolbox::Json::fillValue(parSelConfig, parSelectionList.back().name, "name");
-        GenericToolbox::Json::fillValue(parSelConfig, parSelectionList.back().value, "value");
+        parSelConfig.defineFields({{"name"}, {"value"}});
+        parSelConfig.fillValue(parSelectionList.back().name, "name");
+        parSelConfig.fillValue(parSelectionList.back().value, "value");
       }
 
       // init
@@ -376,7 +395,7 @@ int main(int argc, char** argv){
   };
   std::vector<ParSetNormaliser> parSetNormList;
   for( auto& parSet : propagator.getParametersManager().getParameterSetsList() ){
-    for( auto& parSetNormConfig : GenericToolbox::Json::fetchValue(parSet.getConfig(), "normalisations", JsonType()) ){
+    for( auto& parSetNormConfig : parSet.getConfig().loop("normalisations") ){
       parSetNormList.emplace_back();
       parSetNormList.back().configure( parSetNormConfig );
 
@@ -395,29 +414,37 @@ int main(int argc, char** argv){
 
   // to be filled up
   struct BinNormaliser{
-    void configure(const JsonType& config_){
+    void configure(ConfigReader& config_){
       LogScopeIndent;
+      config_.defineFields({
+        {FieldFlag::MANDATORY, "name"},
+        {"isEnabled"},
+        {"meanValue"},
+        {"disabledBinDim"},
+        {"parSetNormName"},
+      });
+      config_.checkConfiguration();
 
-      name = GenericToolbox::Json::fetchValue<std::string>(config_, "name");
+      name = config_.fetchValue<std::string>("name");
 
-      if( not GenericToolbox::Json::fetchValue(config_, "isEnabled", bool(true)) ){
+      if( not config_.fetchValue("isEnabled", bool(true)) ){
         LogWarning << "Skipping disabled re-normalization config \"" << name << "\"" << std::endl;
         return;
       }
 
       LogInfo << "Re-normalization config \"" << name << "\": ";
 
-      if     ( GenericToolbox::Json::doKeyExist( config_, "meanValue" ) ){
-        normParameter.min  = GenericToolbox::Json::fetchValue<double>(config_, "meanValue");
-        normParameter.max = GenericToolbox::Json::fetchValue(config_, "stdDev", double(0.));
+      if     ( config_.hasField( "meanValue" ) ){
+        normParameter.min  = config_.fetchValue<double>("meanValue");
+        normParameter.max = config_.fetchValue("stdDev", double(0.));
         LogInfo << "mean ± sigma = " << normParameter.min << " ± " << normParameter.max;
       }
-      else if( GenericToolbox::Json::doKeyExist( config_, "disabledBinDim" ) ){
-        disabledBinDim = GenericToolbox::Json::fetchValue<std::string>(config_, "disabledBinDim");
+      else if( config_.hasField("disabledBinDim" ) ){
+        disabledBinDim = config_.fetchValue<std::string>("disabledBinDim");
         LogInfo << "disabledBinDim = " << disabledBinDim;
       }
-      else if( GenericToolbox::Json::doKeyExist( config_, "parSetNormName" ) ){
-        parSetNormaliserName = GenericToolbox::Json::fetchValue<std::string>(config_, "parSetNormName");
+      else if( config_.hasField("parSetNormName" ) ){
+        parSetNormaliserName = config_.fetchValue<std::string>("parSetNormName");
         LogInfo << "parSetNormName = " << parSetNormaliserName;
       }
       else{
@@ -437,7 +464,7 @@ int main(int argc, char** argv){
 
   struct CrossSectionData{
     Sample* samplePtr{nullptr};
-    JsonType config{};
+    ConfigReader config{};
     GenericToolbox::RawDataArray branchBinsData{};
 
     TH1D histogram{};
@@ -475,7 +502,7 @@ int main(int argc, char** argv){
         GenericToolbox::joinVectorString(leafNameList, ":").c_str()
     );
 
-    auto normConfigList = GenericToolbox::Json::fetchValue( xsecEntry.config, "normaliseParameterList", JsonType() );
+    auto normConfigList = xsecEntry.config.loop("normaliseParameterList");
     xsecEntry.normList.reserve( normConfigList.size() );
     for( auto& normConfig : normConfigList ){
       xsecEntry.normList.emplace_back();
@@ -507,9 +534,9 @@ int main(int argc, char** argv){
 
   bool enableEventMcThrow{true};
   bool enableStatThrowInToys{true};
-  auto xsecCalcConfig   = GenericToolbox::Json::fetchValue( cHandler.getConfig(), "xsecCalcConfig", JsonType() );
-  enableStatThrowInToys = GenericToolbox::Json::fetchValue( xsecCalcConfig, "enableStatThrowInToys", enableStatThrowInToys);
-  enableEventMcThrow    = GenericToolbox::Json::fetchValue( xsecCalcConfig, "enableEventMcThrow", enableEventMcThrow);
+  auto xsecCalcConfig   = xsecConfig.fetchValue( "xsecCalcConfig", ConfigReader() );
+  enableStatThrowInToys = xsecCalcConfig.fetchValue("enableStatThrowInToys", enableStatThrowInToys);
+  enableEventMcThrow    = xsecCalcConfig.fetchValue("enableEventMcThrow", enableEventMcThrow);
 
   auto writeBinDataFct = std::function<void()>([&]{
     for( auto& xsec : crossSectionDataList ){
@@ -701,7 +728,7 @@ int main(int argc, char** argv){
     xsec.histogram.SetDrawOption("E1");
     xsec.histogram.GetXaxis()->LabelsOption("v");
     xsec.histogram.GetXaxis()->SetLabelSize(0.02);
-    xsec.histogram.GetYaxis()->SetTitle( GenericToolbox::Json::fetchValue(xsec.samplePtr->getConfig(), "yAxis", "#delta#sigma").c_str() );
+    xsec.histogram.GetYaxis()->SetTitle( xsec.samplePtr->getConfig().fetchValue("yAxis", std::string("#delta#sigma")).c_str() );
 
     GenericToolbox::writeInTFileWithObjTypeExt(
         GenericToolbox::mkdirTFile(calcXsecDir, "histograms"),

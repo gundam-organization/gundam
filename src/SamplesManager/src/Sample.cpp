@@ -13,23 +13,40 @@
 #include <memory>
 
 
+void Sample::prepareConfig(ConfigReader &config_){
+  config_.clearFields();
+  config_.defineFields({
+    {FieldFlag::MANDATORY, "name"},
+    {"isEnabled"},
+    {"disableEventMcThrow"},
+    {"binning", {"binningFile", "binningFilePath"}},
+    {"selectionCutStr", {"selectionCuts"}},
+    {"datasets"},
+    {"parSetBinning", {"parameterSetName"}}, // for xsec
+  });
+  config_.checkConfiguration();
+}
 void Sample::configureImpl(){
-  GenericToolbox::Json::fillValue(_config_, _name_, "name");
-  GenericToolbox::Json::fillValue(_config_, _isEnabled_, "isEnabled");
-  GenericToolbox::Json::fillValue(_config_, _disableEventMcThrow_, "disableEventMcThrow");
-  GenericToolbox::Json::fillValue(_config_, _binningConfig_, {{"binningFilePath"},{"binningFile"},{"binning"}});
-  GenericToolbox::Json::fillValue(_config_, _selectionCutStr_, {{"selectionCutStr"},{"selectionCuts"}});
-  GenericToolbox::Json::fillValue(_config_, _enabledDatasetList_, {{"datasets"},{"dataSets"}});
+  prepareConfig(_config_);
 
-  LogThrowIf(_name_.empty(), "No name was provided for sample #" << _index_ << std::endl << GenericToolbox::Json::toReadableString(_config_));
+  _config_.fillValue(_name_, "name");
+  _config_.fillValue(_isEnabled_, "isEnabled");
+  _config_.fillValue(_disableEventMcThrow_, "disableEventMcThrow");
+  _config_.fillValue(_binningConfig_, "binning");
+  _config_.fillValue(_selectionCutStr_, "selectionCutStr");
+  _config_.fillValue(_enabledDatasetList_, "datasets");
+
+  LogThrowIf(_name_.empty(), "No name was provided for sample #" << _index_ << std::endl << _config_);
   LogDebugIf(GundamGlobals::isDebug()) << "Defining sample \"" << _name_ << "\"" << std::endl;
   if( not _isEnabled_ ){
     LogDebugIf(GundamGlobals::isDebug()) << "-> disabled" << std::endl;
     return;
   }
 
-  LogDebugIf(GundamGlobals::isDebug()) << "Reading binning: " << _config_ << std::endl;
+  LogDebugIf(GundamGlobals::isDebug()) << "Reading binning: " << _binningConfig_ << std::endl;
   _histogram_.build(_binningConfig_);
+
+  LogDebugIf(GundamGlobals::isDebug()) << "Histogram has " << _histogram_.getNbBins() << " bins." << std::endl;
 }
 
 void Sample::writeEventRates(const GenericToolbox::TFilePath& saveDir_) const{

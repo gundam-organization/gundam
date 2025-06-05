@@ -33,59 +33,58 @@
 #include <sstream>
 
 
+void DataDispenser::prepareConfig(ConfigReader &config_){
+  config_.clearFields();
+  config_.defineFields({
+    {"name"},
+    {"tree"},
+    {"filePathList"},
+    {"debugNbMaxEventsToLoad"},
+    {"fromHistContent"},
+    {"dummyVariablesList"},
+    {"useReweightEngine", {"useMcContainer"}},
+    {"variablesTransform"},
+    {"eventVariableAsWeight"},
+    {"additionalLeavesStorage"},
+    {"dialIndexFormula"},
+    {"overridePropagatorConfig"},
+    {"selectionCutFormula"},
+    {"nominalWeightFormula"},
+    {"variableDict", {"overrideLeafDict"}},
+    {"fromMc"},
+  });
+  config_.checkConfiguration();
+}
 void DataDispenser::configureImpl(){
+  DataDispenser::prepareConfig(_config_);
 
-  // All of the fields that should (or may) be at this level in the YAML.
-  // This provides a rudimentary syntax check for user inputs.
-  ConfigUtils::checkFields(_config_,
-                           "/fitterEngineConfig/likelihoodInterfaceConfig"
-                           "/datasetList(DataDispenser)",
-                           // Allowed fields (don't need to list fields in
-                           // expected, or deprecated).
-                           {
-                             {"name"},
-                             {"fromHistContent"},
-                             {"variablesTransform"},
-                             {"variableDict"},
-                             {"eventVariableAsWeight"},
-                             {"tree"},
-                             {"filePathList"},
-                             {"additionalLeavesStorage"},
-                             {"dummyVariablesList"},
-                             {"useReweightEngine"},
-                             {"dialIndexFormula"},
-                             {"overridePropagatorConfig"},
-                             {"selectionCutFormula"},
-                             {"nominalWeightFormula"},
-                           },
-                           // Expected fields (must be present)
-                           {
-                           },
-                           // Deprecated fields (allowed, but cause a warning)
-                           {
-                           },
-                           // Replaced fields (allowed, but cause a warning)
-                           {
-                           });
-
-  GenericToolbox::Json::fillValue(_config_, _parameters_.name, "name");
-  LogExitIf(_parameters_.name.empty(), "Dataset name not set.");
+  _config_.fillValue(_parameters_.name, "name");
 
   // histograms don't need other parameters
-  if( GenericToolbox::Json::doKeyExist( _config_, "fromHistContent" ) ) {
+  if( _config_.hasField("fromHistContent" ) ) {
     LogDebugIf(GundamGlobals::isDebug()) << "Dataset \"" << _parameters_.name << "\" will be defined with histogram data." << std::endl;
-    auto fromHistConfig( GenericToolbox::Json::fetchValue<JsonType>(_config_, "fromHistContent") );
+    auto fromHistConfig(_config_.fetchValue<ConfigReader>("fromHistContent"));
+
+    fromHistConfig.defineFields({
+      {"fromRootFile"},
+      {"sampleList"},
+    });
 
     _parameters_.fromHistContent.isEnabled = true;
-    _parameters_.fromHistContent.rootFilePath = GenericToolbox::Json::fetchValue<std::string>(fromHistConfig, "fromRootFile");
+    _parameters_.fromHistContent.rootFilePath = fromHistConfig.fetchValue<std::string>("fromRootFile");
 
-    auto sampleListConfig(GenericToolbox::Json::fetchValue<std::vector<JsonType>>(fromHistConfig, "sampleList"));
+    auto sampleListConfig(fromHistConfig.loop("sampleList"));
     _parameters_.fromHistContent.sampleHistList.reserve(sampleListConfig.size());
     for( auto& sampleConfig : sampleListConfig ){
+      sampleConfig.defineFields({
+        {FieldFlag::MANDATORY, "name"},
+        {FieldFlag::MANDATORY, "hist"},
+        {"axisList", {"axis"}},
+      });
 
-      auto& sampleHist = _parameters_.fromHistContent.addSampleHist(GenericToolbox::Json::fetchValue<std::string>(sampleConfig, "name"));
-      GenericToolbox::Json::fillValue(sampleConfig, sampleHist.hist, "hist");
-      GenericToolbox::Json::fillValue(sampleConfig, sampleHist.axisList, {{"axisList"},{"axis"}});
+      auto& sampleHist = _parameters_.fromHistContent.addSampleHist(sampleConfig.fetchValue<std::string>("name"));
+      sampleConfig.fillValue(sampleHist.hist, "hist");
+      sampleConfig.fillValue(sampleHist.axisList, "axisList");
     }
 
     return;
@@ -94,7 +93,7 @@ void DataDispenser::configureImpl(){
   // nested
   // load transformations
   int index{0};
-  for( auto& varTransform : GenericToolbox::Json::fetchValue(_config_, "variablesTransform", std::vector<JsonType>()) ){
+  for( auto& varTransform : _config_.loop("variablesTransform") ){
     _parameters_.eventVarTransformList.emplace_back( varTransform );
     _parameters_.eventVarTransformList.back().setIndex(index++);
     _parameters_.eventVarTransformList.back().configure();
@@ -105,31 +104,36 @@ void DataDispenser::configureImpl(){
   }
 
   _parameters_.variableDict.clear();
-  for( auto& entry : GenericToolbox::Json::fetchValue(_config_, {{"variableDict"}, {"overrideLeafDict"}}, JsonType()) ){
-    auto varName = GenericToolbox::Json::fetchValue<std::string>(entry, {{"name"}, {"eventVar"}});
-    auto varExpr = GenericToolbox::Json::fetchValue<std::string>(entry, {{"expr"}, {"expression"}, {"leafVar"}});
+  for( auto& entry : _config_.loop("variableDict") ){
+    entry.defineFields({
+      {FieldFlag::MANDATORY, "name", {"eventVar"}},
+      {FieldFlag::MANDATORY, "expr", {"expression", "leafVar"}},
+    });
+    entry.checkConfiguration();
+    auto varName = entry.fetchValue<std::string>("name");
+    auto varExpr = entry.fetchValue<std::string>("expr");
     _parameters_.variableDict[ varName ] = varExpr;
   }
 
-  GenericToolbox::Json::fillValue(_config_, _parameters_.eventVariableAsWeight, "eventVariableAsWeight");
+  _config_.fillValue(_parameters_.eventVariableAsWeight, "eventVariableAsWeight");
 
   // options
-  GenericToolbox::Json::fillValue(_config_, _parameters_.globalTreePath, "tree");
-  GenericToolbox::Json::fillValue(_config_, _parameters_.filePathList, "filePathList");
-  GenericToolbox::Json::fillValue(_config_, _parameters_.additionalVarsStorage, {{"additionalLeavesStorage"}, {"additionalVarsStorage"}});
-  GenericToolbox::Json::fillValue(_config_, _parameters_.dummyVariablesList, "dummyVariablesList");
-  GenericToolbox::Json::fillValue(_config_, _parameters_.useReweightEngine, {{"useReweightEngine"}, {"useMcContainer"}});
-  GenericToolbox::Json::fillValue(_config_, _parameters_.debugNbMaxEventsToLoad, "debugNbMaxEventsToLoad");
-  GenericToolbox::Json::fillValue(_config_, _parameters_.dialIndexFormula, "dialIndexFormula");
-  GenericToolbox::Json::fillValue(_config_, _parameters_.overridePropagatorConfig, "overridePropagatorConfig");
+  _config_.fillValue(_parameters_.globalTreePath, "tree");
+  _config_.fillValue(_parameters_.filePathList, "filePathList");
+  _config_.fillValue(_parameters_.additionalVarsStorage, "additionalLeavesStorage");
+  _config_.fillValue(_parameters_.dummyVariablesList, "dummyVariablesList");
+  _config_.fillValue(_parameters_.useReweightEngine, "useReweightEngine");
+  _config_.fillValue(_parameters_.debugNbMaxEventsToLoad, "debugNbMaxEventsToLoad");
+  _config_.fillValue(_parameters_.dialIndexFormula, "dialIndexFormula");
+  _config_.fillValue(_parameters_.overridePropagatorConfig, "overridePropagatorConfig");
 
-  GenericToolbox::Json::fillFormula(_config_, _parameters_.selectionCutFormulaStr, "selectionCutFormula", "&&");
-  GenericToolbox::Json::fillFormula(_config_, _parameters_.nominalWeightFormulaStr, "nominalWeightFormula", "*");
+  _config_.fillFormula(_parameters_.selectionCutFormulaStr, "selectionCutFormula", "&&");
+  _config_.fillFormula(_parameters_.nominalWeightFormulaStr, "nominalWeightFormula", "*");
 
 }
 void DataDispenser::initializeImpl(){
-  // Nothing else to do other than read config?
-  LogWarning << "Initialized data dispenser: " << getTitle() << std::endl;
+
+  _config_.printUnusedKeys();
 
   for( auto& eventVarTransform: _parameters_.eventVarTransformList ){
     eventVarTransform.initialize();
@@ -159,9 +163,11 @@ void DataDispenser::load(Propagator& propagator_){
 
   if( not _parameters_.overridePropagatorConfig.empty() ){
     LogWarning << "Reload the propagator config with override options" << std::endl;
-    ConfigUtils::ConfigHandler configHandler( _cache_.propagatorPtr->getConfig() );
+    ConfigUtils::ConfigBuilder configHandler( _cache_.propagatorPtr->getConfig().getConfig() );
     configHandler.override( _parameters_.overridePropagatorConfig );
-    _cache_.propagatorPtr->configure( configHandler.getConfig() );
+    _cache_.propagatorPtr->getConfig().setConfig(configHandler.getConfig());
+
+    _cache_.propagatorPtr->configure();
     _cache_.propagatorPtr->initialize();
   }
 

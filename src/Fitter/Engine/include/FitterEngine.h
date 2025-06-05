@@ -76,6 +76,7 @@ public:
   LikelihoodInterface& getLikelihoodInterface(){ return _likelihoodInterface_; }
   ParameterScanner& getParameterScanner(){ return _parameterScanner_; }
   TDirectory* getSaveDir(){ return _saveDir_; }
+  bool& getGenerateSamplePlots(){ return _generateSamplePlots_; }
 
   // Core
   void fit();
@@ -103,6 +104,7 @@ private:
   GenericToolbox::Json::JsonType _postFitParState_{};
 
   // dev
+  bool _fixGhostEigenParametersAfterFirstRejected_{false};
   double _pcaThreshold_{0};
   PcaMethod _pcaMethod_{PcaMethod::DeltaChi2Threshold};
 

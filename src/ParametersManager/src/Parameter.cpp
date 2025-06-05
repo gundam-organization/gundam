@@ -12,63 +12,58 @@
 #include <sstream>
 
 
+void Parameter::prepareConfig(ConfigReader& config_){
+  config_.clearFields();
+  config_.defineFields({
+    {"name", {"parameterName"}},
+    {"isEnabled"},
+    {"priorValue"},
+    {"isFixed"},
+    {"isThrown"},
+    {"parameterStepSize"},
+    {"parameterIndex"},
+    {"parameterLimits"},
+    {"physicalLimits"},
+    {"throwLimits"},
+    {"mirrorRange"},
+    {"dialSetDefinitions"},
+    {"priorType"},
+  });
+  config_.checkConfiguration();
+}
 void Parameter::configureImpl(){
-  ConfigUtils::checkFields(_config_,
-                           "/fitterEngineConfig/likelihoodInterfaceConfig"
-                           "/propagatorConfig/parametersManagerConfig"
-                           "/parameterDefinitions/(parameter)",
-                           // Allowed fields (don't need to list fields in
-                           // expected, or deprecated).
-                           {
-                            {"isEnabled"},
-                            {"isFixed"},
-                            {"isThrown"},
-                            {"priorType"},
-                            {"priorValue"},
-                            {"parameterStepSize"},
-                            {"parameterLimits"},
-                            {"throwLimits"},
-                            {"mirrorRange"},
-                            {"dialSetDefinitions"},
-                           },
-                           // Expected fields (must be present)
-                           {
-                             {"parameterName"}, // handled in parameter set.
-                           },
-                           // Deprecated fields (allowed, but cause a warning)
-                           {
-                           },
-                           // Replaced field names (allowed, but warn)
-                           {
-                             {{"name"}, {"parameterName"}},
-                           }
-);
 
-  GenericToolbox::Json::fillValue(_config_, _isEnabled_, "isEnabled");
+  prepareConfig(_config_);
+
+  _config_.fillValue(_name_, "name");
+  _config_.fillValue(_isEnabled_, "isEnabled");
   if( not _isEnabled_ ) { return; }
 
-  if( GenericToolbox::Json::doKeyExist(_config_, "priorValue") ){
-    auto priorValue = GenericToolbox::Json::fetchValue<double>(_config_, "priorValue");
+  if( _config_.hasField("priorValue") ){
+    auto priorValue = _config_.fetchValue<double>("priorValue");
     if( not std::isnan(priorValue) and priorValue != _priorValue_ ){
       _priorValue_ = priorValue;
       _parameterValue_ = _priorValue_;
     }
   }
 
-  GenericToolbox::Json::fillValue(_config_, _isFixed_, "isFixed");
-  GenericToolbox::Json::fillValue(_config_, _isThrown_, "isThrown");
-  GenericToolbox::Json::fillValue(_config_, _stepSize_, "parameterStepSize");
-  GenericToolbox::Json::fillValue(_config_, _parameterLimits_, "parameterLimits");
-  GenericToolbox::Json::fillValue(_config_, _physicalLimits_, "physicalLimits");
-  GenericToolbox::Json::fillValue(_config_, _throwLimits_, "throwLimits");
-  GenericToolbox::Json::fillValue(_config_, _mirrorRange_, "mirrorRange");
-  GenericToolbox::Json::fillValue(_config_, _dialDefinitionsList_, "dialSetDefinitions");
+  _config_.fillValue(_isFixed_, "isFixed");
+  _config_.fillValue(_isThrown_, "isThrown");
+  _config_.fillValue(_stepSize_, "parameterStepSize");
+  _config_.fillValue(_parameterLimits_, "parameterLimits");
+  _config_.fillValue(_physicalLimits_, "physicalLimits");
+  _config_.fillValue(_throwLimits_, "throwLimits");
+  _config_.fillValue(_mirrorRange_, "mirrorRange");
+  _config_.fillValue(_dialDefinitionsList_, "dialSetDefinitions");
 
-  GenericToolbox::Json::fillEnum(_config_, _priorType_, "priorType");
+  _config_.fillEnum(_priorType_, "priorType");
   if( _priorType_ == PriorType::Flat ){ _isFree_ = true; }
 
 }
 void Parameter::initializeImpl() {
+
+  _config_.printUnusedKeys();
+
   LogThrowIf(_owner_ == nullptr, "Parameter set ref is not set.");
   LogThrowIf(_parameterIndex_ == -1, "Parameter index is not set.");
 
@@ -135,14 +130,6 @@ double Parameter::getParameterValue() const {
 #endif
   }
   return _parameterValue_;
-}
-void Parameter::setDialSetConfig(const JsonType &jsonConfig_) {
-  auto jsonConfig = jsonConfig_;
-  while( jsonConfig.is_string() ){
-    LogWarning << "Forwarding FitParameterSet config to: \"" << jsonConfig.get<std::string>() << "\"..." << std::endl;
-    jsonConfig = ConfigUtils::readConfigFile(jsonConfig.get<std::string>());
-  }
-  _dialDefinitionsList_ = jsonConfig.get<std::vector<JsonType>>();
 }
 
 void Parameter::setValueAtPrior(){
