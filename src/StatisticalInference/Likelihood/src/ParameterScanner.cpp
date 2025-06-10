@@ -571,7 +571,6 @@ void ParameterScanner::writeGraphEntry(GraphEntry& entry_, TDirectory* saveDir_)
     entry_.graph.SetMarkerStyle( kFullTriangleUp );
   }
 
-  // TODO: seem to not work
   double yMin{*std::min_element(entry_.graph.GetY(), entry_.graph.GetY() + entry_.graph.GetN())};
   double yMax{*std::max_element(entry_.graph.GetY(), entry_.graph.GetY() + entry_.graph.GetN())};
   // enabling the log scale
@@ -583,7 +582,7 @@ void ParameterScanner::writeGraphEntry(GraphEntry& entry_, TDirectory* saveDir_)
 
   GenericToolbox::writeInTFileWithObjTypeExt(
       GenericToolbox::mkdirTFile( saveDir_,
-          entry_.scanDataPtr->folder + "/" + GenericToolbox::generateCleanBranchName(entry_.fitParPtr->getOwner()->getName())
+          GenericToolbox::generateCleanBranchName(entry_.scanDataPtr->folder) + "/" + GenericToolbox::generateCleanBranchName(entry_.fitParPtr->getOwner()->getName())
         ),
       entry_.graph,
       GenericToolbox::generateCleanBranchName("n" + entry_.fitParPtr->getTitle())
