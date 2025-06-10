@@ -23,6 +23,8 @@ void Parameter::prepareConfig(ConfigReader& config_){
     {"parameterStepSize"},
     {"parameterIndex"},
     {"parameterLimits"},
+    {"parameterLimits/minValue"},
+    {"parameterLimits/maxValue"},
     {"physicalLimits"},
     {"throwLimits"},
     {"mirrorRange"},
@@ -50,11 +52,20 @@ void Parameter::configureImpl(){
   _config_.fillValue(_isFixed_, "isFixed");
   _config_.fillValue(_isThrown_, "isThrown");
   _config_.fillValue(_stepSize_, "parameterStepSize");
-  _config_.fillValue(_parameterLimits_, "parameterLimits");
   _config_.fillValue(_physicalLimits_, "physicalLimits");
   _config_.fillValue(_throwLimits_, "throwLimits");
   _config_.fillValue(_mirrorRange_, "mirrorRange");
   _config_.fillValue(_dialDefinitionsList_, "dialSetDefinitions");
+
+  if( _config_.hasField("parameterLimits/minValue") or _config_.hasField("parameterLimits/maxValue") ){
+    // legacy
+    _config_.fillValue(_parameterLimits_.min, "parameterLimits/minValue");
+    _config_.fillValue(_parameterLimits_.max, "parameterLimits/maxValue");
+  }
+  else{
+    // use range definition instead `parameterLimits: [0, 1]`
+    _config_.fillValue(_parameterLimits_, "parameterLimits");
+  }
 
   _config_.fillEnum(_priorType_, "priorType");
   if( _priorType_ == PriorType::Flat ){ _isFree_ = true; }
