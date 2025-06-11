@@ -107,6 +107,11 @@ int main(int argc, char** argv){
   LogAlertIf(clParser.isOptionTriggered("usePreFit")) << "Pre-fit mode enabled: will throw toys according to the prior covariance matrices..." << std::endl;
 
   ConfigReader xsecConfig(ConfigUtils::readConfigFile( clParser.getOptionVal<std::string>("configFile") ));
+  xsecConfig.defineFields({
+    {"outputFolder"},
+    {"useBestFitAsCentralValue"},
+    {"xsecCalcConfig"},
+  });
 
   ConfigReader engineConfig;
   {
@@ -420,6 +425,7 @@ int main(int argc, char** argv){
         {FieldFlag::MANDATORY, "name"},
         {"isEnabled"},
         {"meanValue"},
+        {"stdDev"},
         {"disabledBinDim"},
         {"parSetNormName"},
       });
@@ -464,6 +470,7 @@ int main(int argc, char** argv){
 
   struct CrossSectionData{
     Sample* samplePtr{nullptr};
+    Sample* sampleDataPtr{nullptr};
     ConfigReader config{};
     GenericToolbox::RawDataArray branchBinsData{};
 
@@ -535,6 +542,12 @@ int main(int argc, char** argv){
   bool enableEventMcThrow{true};
   bool enableStatThrowInToys{true};
   auto xsecCalcConfig   = xsecConfig.fetchValue( "xsecCalcConfig", ConfigReader() );
+
+  xsecCalcConfig.defineFields({
+    {"enableStatThrowInToys"},
+    {"enableEventMcThrow"}
+  });
+
   enableStatThrowInToys = xsecCalcConfig.fetchValue("enableStatThrowInToys", enableStatThrowInToys);
   enableEventMcThrow    = xsecCalcConfig.fetchValue("enableEventMcThrow", enableEventMcThrow);
 
