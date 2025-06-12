@@ -22,34 +22,38 @@ Cache::Weight::Kriged::Kriged(
     std::size_t weights,
     std::size_t tableSpace,
     const std::map<const std::vector<double>*, int>& tables)
-    : Cache::Weight::Base("tabulated",results,parameters),
+    : Cache::Weight::Base("kriged",results,parameters),
       fReserved(dials), fUsed(0),
       fWeightsReserved(weights), fWeightsUsed(0),
-      fDataReserved(tableSpace), fDataUsed(0),
-      fTables(tables) {
+      fTableReserved(tableSpace), fTableUsed(0),
+      fTableOffsets(tables) {
 
-    LogInfo << "Reserved " << GetName() << " Kriged Dials: "
-            << GetReserved() << std::endl;
+    LogInfo << "Reserved " << GetName()
+            << " Kriged Dials: " << GetReserved()
+            << " Weight Space: " << GetWeightsReserved()
+            << " (" << 1.0*GetWeightsReserved()/GetReserved() << " per dial)"
+            << " Table Space: " << GetTableReserved()
+            << " (" << 1.0*GetTableReserved()/GetReserved() << " per dial)"
+            << std::endl;
+
     if (GetReserved() < 1) return;
 
     fTotalBytes += GetReserved()*sizeof(int);        // fResults
     fTotalBytes += GetReserved()*sizeof(int);        // fOffsets
     fTotalBytes += GetReserved()*sizeof(int);        // fIndices
     fTotalBytes += GetReserved()*sizeof(float);      // fConstants
-    fTotalBytes += GetDataReserved()*sizeof(WEIGHT_BUFFER_FLOAT); // fData;
+    fTotalBytes += GetWeightsReserved()*sizeof(WEIGHT_BUFFER_FLOAT); // fTable;
+    fTotalBytes += GetTableReserved()*sizeof(WEIGHT_BUFFER_FLOAT); // fTable;
 
-    LogInfo << "Reserved " << GetName()
-            << " Table Space: " << GetDataReserved()
-            << std::endl;
-
-    LogInfo << "Approximate Memory Size for " << GetName()
+    LogInfo << "  Approximate Memory Size for " << GetName()
             << ": " << GetResidentMemory()/1E+9
             << " GB" << std::endl;
-    LogInfo << "  Tables " << std::endl;
-    for (const auto& table : fTables) {
-        LogInfo << "    Table: " << (void*) table.first
+
+    LogInfo << "    Tables " << std::endl;
+    for (const auto& table : fTableOffsets) {
+        LogInfo << "      Table: " << (void*) table.first
+                << " Offset: " << table.second
                 << " Size: " << table.first->size()
-                << " Start: " << table.second
                 << std::endl;
     }
 
@@ -73,9 +77,9 @@ Cache::Weight::Kriged::Kriged(
 
         // Get the CPU/GPU memory for the tables.  This is copied for each
         // evaluation.  The table is filled before this class is used.
-        fData.reset(
-            new hemi::Array<WEIGHT_BUFFER_FLOAT>(fDataReserved,false));
-        LogThrowIf(not fData, "Bad Table alloc");
+        fTable.reset(
+            new hemi::Array<WEIGHT_BUFFER_FLOAT>(fTableReserved,false));
+        LogThrowIf(not fTable, "Bad Table alloc");
     }
     catch (...) {
         LogError << "Failed to allocate memory, so stopping" << std::endl;
@@ -89,7 +93,7 @@ Cache::Weight::Kriged::Kriged(
     fOffsets->hostPtr()[0] = 0;
     fIndices->hostPtr()[0] = 0;
     fConstants->hostPtr()[0] = 0;
-    fData->hostPtr()[0] = 0;
+    fTable->hostPtr()[0] = 0;
 }
 
 void Cache::Weight::Kriged::AddData(
@@ -115,8 +119,8 @@ void Cache::Weight::Kriged::AddData(
         LogThrow("Not enough space reserved for dials");
     }
 
-    auto tableEntry = fTables.find(table);
-    if (tableEntry == fTables.end()) {
+    auto tableEntry = fTableOffsets.find(table);
+    if (tableEntry == fTableOffsets.end()) {
         LogError << "Request to create Kriged weight for invalid table"
                  << std::endl;
         LogThrow("Invalid table request");
@@ -126,7 +130,7 @@ void Cache::Weight::Kriged::AddData(
     // Fill the offsets, indices, and weights here.
     for (const std::pair<int,float>& weight: weights) {
         int offset = tableEntry->second + weight.first;
-        if (fData->size() <= offset) {
+        if (fTable->size() <= offset) {
             LogError << "Insufficent table space" << std::endl;
             LogThrow("Insufficient table space");
         }
@@ -175,18 +179,18 @@ void Cache::Weight::Kriged::Reset() {
     Cache::Weight::Base::Reset();
     // Reset this class
     fUsed = 0;
-    fDataUsed = 0;
+    fTableUsed = 0;
 }
 
 bool Cache::Weight::Kriged::Apply() {
     if (GetUsed() < 1) return false;
 
     // Fill the tables.
-    for (const auto& table : fTables) {
+    for (const auto& table : fTableOffsets) {
         int offset = table.second;
         for (const double entry : (*table.first)) {
             LogThrowIf(not std::isfinite(entry),"Table entry is not finite");
-            fData->hostPtr()[offset++] = entry;
+            fTable->hostPtr()[offset++] = entry;
         }
     }
 
@@ -197,7 +201,7 @@ bool Cache::Weight::Kriged::Apply() {
                  fOffsets->readOnlyPtr(),
                  fIndices->readOnlyPtr(),
                  fConstants->readOnlyPtr(),
-                 fData->readOnlyPtr(),
+                 fTable->readOnlyPtr(),
                  GetUsed()
         );
 
