@@ -62,6 +62,7 @@ TabulatedDialFactory::TabulatedDialFactory(const ConfigReader& config_) {
         std::exit(EXIT_FAILURE); // Exit, not throw!
     }
 
+    std::lock_guard<std::mutex> guard(GundamGlobals::getGlobalMutEx());
     void* library = dlopen(expandedPath.c_str(), RTLD_LAZY );
     if( library == nullptr ){
         LogError << "Cannot load library: " << dlerror() << std::endl;
@@ -130,6 +131,7 @@ TabulatedDialFactory::TabulatedDialFactory(const ConfigReader& config_) {
 }
 
 void TabulatedDialFactory::updateTable(DialInputBuffer& inputBuffer) {
+    std::lock_guard<std::mutex> guard(GundamGlobals::getGlobalMutEx());
     _updateFunc_(_name_.c_str(),
                  _table_.data(),
                  (int) _table_.size(),
@@ -138,6 +140,7 @@ void TabulatedDialFactory::updateTable(DialInputBuffer& inputBuffer) {
 }
 
 DialBase* TabulatedDialFactory::makeDial(const Event& event) {
+    std::lock_guard<std::mutex> guard(GundamGlobals::getGlobalMutEx());
     int i=0;
     for (const std::string& varName : getBinningVariables()) {
         double v = event.getVariables().fetchVariable(varName).getVarAsDouble();
