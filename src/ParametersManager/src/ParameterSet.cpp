@@ -57,6 +57,7 @@ void ParameterSet::configureImpl(){
     {"releaseFixedParametersOnHesse"},
     {"skipVariedEventRates"},
     {"disableOneSigmaPlots"},
+    {"normalisations"},
   });
   _config_.checkConfiguration();
 
