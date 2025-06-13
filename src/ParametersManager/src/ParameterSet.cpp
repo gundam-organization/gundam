@@ -50,6 +50,8 @@ void ParameterSet::configureImpl(){
     {"maxEigenFraction"},
     {"eigenValueThreshold",{"eigenSvdThreshold"}},
     {"eigenParBounds"},
+    {"eigenParBounds/minValue"},
+    {"eigenParBounds/maxValue"},
     {"maskForToyGeneration"},
     {"devUseParLimitsOnEigen"},
     {"releaseFixedParametersOnHesse"},
@@ -111,7 +113,16 @@ void ParameterSet::configureImpl(){
   _config_.fillValue(_maxNbEigenParameters_, "maxNbEigenParameters");
   _config_.fillValue(_maxEigenFraction_, "maxEigenFraction");
   _config_.fillValue(_eigenSvdThreshold_, "eigenValueThreshold");
-  _config_.fillValue(_eigenParRange_, "eigenParBounds");
+
+  if( _config_.hasField("eigenParBounds/minValue") or _config_.hasField("eigenParBounds/maxValue") ){
+    // legacy
+    _config_.fillValue(_eigenParRange_.min, "eigenParBounds/minValue");
+    _config_.fillValue(_eigenParRange_.max, "eigenParBounds/maxValue");
+  }
+  else{
+    // use range definition instead `eigenParBounds: [0, 1]`
+    _config_.fillValue(_eigenParRange_, "eigenParBounds");
+  }
 
   // legacy
   _config_.fillValue(_maskForToyGeneration_, "maskForToyGeneration");
