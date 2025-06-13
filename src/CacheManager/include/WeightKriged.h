@@ -73,10 +73,10 @@ public:
     std::size_t GetWeightsUsed() const {return fWeightsUsed;}
 
     /// Get the space reserved for the tables.
-    std::size_t GetDataReserved() const { return fDataReserved; }
+    std::size_t GetTableReserved() const { return fTableReserved; }
 
     /// Get the space used by the the tables.
-    std::size_t GetDataUsed() const { return fDataUsed; }
+    std::size_t GetTableUsed() const { return fTableUsed; }
 
 private:
 
@@ -105,13 +105,13 @@ private:
 
     /// An array for the data in the tables.  This is copied from the CPU to
     /// the GPU for each iteration.
-    std::size_t    fDataReserved;
-    std::size_t    fDataUsed;
-    std::unique_ptr<hemi::Array<WEIGHT_BUFFER_FLOAT>> fData;
+    std::size_t    fTableReserved;
+    std::size_t    fTableUsed;
+    std::unique_ptr<hemi::Array<WEIGHT_BUFFER_FLOAT>> fTable;
 
-    /// The offsets for each table in the data. This is used whill filling the
-    /// fIndices, fConstants, and fData tables, but not for the calculation.
-    const std::map<const std::vector<double>*, int> fTables;
+    /// The offsets for each table in the data. This is used while filling the
+    /// fIndices, fConstants, and fTable tables, but not for the calculation.
+    const std::map<const std::vector<double>*, int> fTableOffsets;
 };
 
 // An MIT Style License

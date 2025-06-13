@@ -49,6 +49,7 @@ void EventVarTransformLib::initInputFormulas(){
   _inputBuffer_.resize(_inputFormulaList_.size(), std::nan("unset"));
 }
 double EventVarTransformLib::evalTransformation( const Event& event_, std::vector<double>& inputBuffer_) const{
+  std::lock_guard<std::mutex> guard(GundamGlobals::getGlobalMutEx());
   // Eval the requested variables
   size_t nFormula{_inputFormulaList_.size()};
   for( size_t iFormula = 0 ; iFormula < nFormula ; iFormula++ ){

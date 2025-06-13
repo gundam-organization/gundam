@@ -16,7 +16,7 @@ public:
     ~Kriged() = default;
     Kriged() = delete;
     Kriged(const std::vector<double>* table_,
-           std::vector<int> index_, std::vector<double> weight_,
+           int entries_, std::vector<int> index_, std::vector<double> weight_,
            const std::string& options_="");
 
     [[nodiscard]] std::unique_ptr<DialBase> clone() const override { return std::make_unique<Kriged>(*this); }

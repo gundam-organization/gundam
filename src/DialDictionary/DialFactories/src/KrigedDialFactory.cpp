@@ -10,9 +10,7 @@
 
 #include <dlfcn.h>
 
-
 KrigedDialFactory::KrigedDialFactory(const ConfigReader& config_){
-
     LogThrowIf(not config_.hasField("tableConfig"), "tableConfig must be defined in:" << config_.toString(true));
 
     auto tableConfig = config_.fetchValue<ConfigReader>("tableConfig");
@@ -71,6 +69,7 @@ KrigedDialFactory::KrigedDialFactory(const ConfigReader& config_){
 
     // Get the initialization function.
     if (not getInitializationFunction().empty()) {
+        std::lock_guard<std::mutex> guard(GundamGlobals::getGlobalMutEx());
         void* initFunc = dlsym(library, getInitializationFunction().c_str());
         if( initFunc == nullptr ){
             LogError << "Initialization function symbol not found: "
@@ -134,6 +133,7 @@ KrigedDialFactory::KrigedDialFactory(const ConfigReader& config_){
 }
 
 void KrigedDialFactory::updateTable(DialInputBuffer& inputBuffer) {
+    std::lock_guard<std::mutex> guard(GundamGlobals::getGlobalMutEx());
     _updateFunc_(_name_.c_str(),
                  _table_.data(),
                  (int) _table_.size(),
@@ -142,6 +142,7 @@ void KrigedDialFactory::updateTable(DialInputBuffer& inputBuffer) {
 }
 
 DialBase* KrigedDialFactory::makeDial(const Event& event) {
+    std::lock_guard<std::mutex> guard(GundamGlobals::getGlobalMutEx());
     int i=0;
     for (const std::string& varName : getWeightVariables()) {
         double v = event.getVariables().fetchVariable(varName).getVarAsDouble();
@@ -191,14 +192,18 @@ DialBase* KrigedDialFactory::makeDial(const Event& event) {
             sum += _weightCache_[i];
         }
         if (std::abs(sum-_weightNormalization_) > 1E-6*_weightNormalization_) {
-            LogWarning << "Denormalized Kriging dial for: "
-                       << event << std::endl;
+            LogWarning << "Denormalized Kriging dial -- "
+                       << " sum: " << sum
+                       << " Normalization: " << _weightNormalization_
+                       << " Difference: " << std::abs(sum-_weightNormalization_)
+                       << std::endl;
+            LogWarning << "Denormalized Event Summary: " << event << std::endl;
         }
     }
 
     // Do the unique_ptr dance in case there are exceptions.
     std::unique_ptr<Kriged> dialBase
-        = std::make_unique<Kriged>(&_table_, _indexCache_, _weightCache_);
+        = std::make_unique<Kriged>(&_table_, entries, _indexCache_, _weightCache_);
 
     return dialBase.release();
 }

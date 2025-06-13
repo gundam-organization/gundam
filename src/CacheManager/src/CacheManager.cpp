@@ -361,7 +361,7 @@ bool Cache::Manager::Build(SampleSet& sampleSet,
              <<" ("<< 1.0*config.tabulated/config.events <<" per event)"
              << std::endl;
     LogInfo  << "    Kriged:    " << config.kriged
-             <<" ("<< 1.0*config.tabulated/config.events <<" per event)"
+             <<" ("<< 1.0*config.kriged/config.events <<" per event)"
              << std::endl;
     LogInfo  << "    Bilinear: " << config.bilinear
              <<" ("<< 1.0*config.bilinear/config.events <<" per event)"
