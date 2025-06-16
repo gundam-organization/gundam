@@ -181,6 +181,7 @@ void RootMinimizer::dumpFitParameterSettings() {
   t << "#" << GenericToolbox::TablePrinter::NextColumn;
   t << "Name" << GenericToolbox::TablePrinter::NextColumn;
   t << "Value" << GenericToolbox::TablePrinter::NextColumn;
+  t << "Step" << GenericToolbox::TablePrinter::NextColumn;
   t << "Fixed?" << GenericToolbox::TablePrinter::NextColumn;
   t << "Bounds" << GenericToolbox::TablePrinter::NextLine;
 
@@ -191,6 +192,7 @@ void RootMinimizer::dumpFitParameterSettings() {
     t << iFitPar << GenericToolbox::TablePrinter::NextColumn;
     t << parSettings.Name() << GenericToolbox::TablePrinter::NextColumn;
     t << parSettings.Value() << GenericToolbox::TablePrinter::NextColumn;
+    t << parSettings.StepSize() << GenericToolbox::TablePrinter::NextColumn;
     t << (parSettings.IsFixed() ? "Yes" : "No") << GenericToolbox::TablePrinter::NextColumn;
 
     GenericToolbox::Range r{std::nan("unset"), std::nan("unset")};
