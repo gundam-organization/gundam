@@ -151,7 +151,11 @@ namespace ConfigUtils {
       }
       auto fitFile = std::shared_ptr<TFile>( GenericToolbox::openExistingTFile( filePath_ ) );
 
-      auto* conf = fitFile->Get<TNamed>("gundam/config_TNamed");
+      auto* conf = fitFile->Get<TNamed>("gundam/config/unfoldedJson_TNamed");
+      if( conf == nullptr ){
+        // legacy
+        conf = fitFile->Get<TNamed>("gundam/config_TNamed");
+      }
       if( conf == nullptr ){
         // legacy
         conf = fitFile->Get<TNamed>("gundamFitter/unfoldedConfig_TNamed");

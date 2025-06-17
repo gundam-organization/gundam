@@ -174,21 +174,35 @@ void RootMinimizer::initializeImpl(){
 }
 
 void RootMinimizer::dumpFitParameterSettings() {
-  for( std::size_t iFitPar = 0 ;
-       iFitPar < getMinimizerFitParameterPtr().size() ; ++iFitPar ) {
+  LogInfo << "RootMinimizer fit parameters:" << std::endl;
+
+  GenericToolbox::TablePrinter t;
+
+  t << "#" << GenericToolbox::TablePrinter::NextColumn;
+  t << "Name" << GenericToolbox::TablePrinter::NextColumn;
+  t << "Value" << GenericToolbox::TablePrinter::NextColumn;
+  t << "Step" << GenericToolbox::TablePrinter::NextColumn;
+  t << "Fixed?" << GenericToolbox::TablePrinter::NextColumn;
+  t << "Bounds" << GenericToolbox::TablePrinter::NextLine;
+
+  for( std::size_t iFitPar = 0 ; iFitPar < getMinimizerFitParameterPtr().size() ; ++iFitPar ) {
     ROOT::Fit::ParameterSettings parSettings;
     _rootMinimizer_->GetVariableSettings(iFitPar,parSettings);
-    LogDebug << "MINIMIZER #" << iFitPar;
-    LogDebug << " Fixed: " << parSettings.IsFixed();
-    if (parSettings.HasLowerLimit()) {
-      LogDebug << " Lower: " << parSettings.LowerLimit();
-    }
-    if (parSettings.HasUpperLimit()) {
-      LogDebug << " Upper: " << parSettings.UpperLimit();
-    }
-    LogDebug << " Name" << parSettings.Name();
-    LogDebug  << std::endl;
+
+    t << iFitPar << GenericToolbox::TablePrinter::NextColumn;
+    t << parSettings.Name() << GenericToolbox::TablePrinter::NextColumn;
+    t << parSettings.Value() << GenericToolbox::TablePrinter::NextColumn;
+    t << parSettings.StepSize() << GenericToolbox::TablePrinter::NextColumn;
+    t << (parSettings.IsFixed() ? "Yes" : "No") << GenericToolbox::TablePrinter::NextColumn;
+
+    GenericToolbox::Range r{std::nan("unset"), std::nan("unset")};
+    if(parSettings.HasLowerLimit()) r.min = parSettings.LowerLimit();
+    if(parSettings.HasUpperLimit()) r.max = parSettings.UpperLimit();
+
+    t << r << GenericToolbox::TablePrinter::NextLine;
   }
+
+  t.printTable();
 }
 
 void RootMinimizer::dumpMinuit2State() {
@@ -221,6 +235,8 @@ void RootMinimizer::minimize(){
 
   int nbFitCallOffset = getMonitor().nbEvalLikelihoodCalls;
   LogInfo << "Fit call offset: " << nbFitCallOffset << std::endl;
+
+  dumpFitParameterSettings();
 
   if( _preFitWithSimplex_ ){
     LogWarning << "Running simplex algo before the minimizer" << std::endl;
