@@ -561,17 +561,7 @@ int main(int argc, char** argv){
         // Propagate the parameters
         fitter.getLikelihoodInterface().getModelPropagator().propagateParameters();
 
-        // Throw the statistical errors
-        if( enableStatThrowInToys ){
-          for( auto& sample : fitter.getLikelihoodInterface().getSamplePairList() ){
-            if( enableEventMcThrow ){
-              // Take into account the finite amount of event in MC
-              sample.model->getHistogram().throwEventMcError();
-            }
-            // Asimov bin content -> toy data
-            sample.model->getHistogram().throwStatError();
-          }
-        }
+
 
         // Compute the likelihood
         // LogInfo<<"Computing LH... ";
