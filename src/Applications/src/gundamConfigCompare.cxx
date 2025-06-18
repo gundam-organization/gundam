@@ -203,9 +203,11 @@ void compareConfigStage(const JsonType& config1_, const JsonType& config2_){
 
           for( auto& key : keysToFetch ){
             if     ( not GenericToolbox::Json::doKeyExist(entry1_, key) ){
-              LogError << path <<  " -> missing key \"" << key << "\" in c1. Value in c2 is: " << entry2_[key] << std::endl;
+              std::string value2{};
+              try{ value2 = entry2_[key]; } catch(...){ try{ value2 = entry2_[std::atoi(key.c_str())]; } catch(...){} }
+              LogError << path <<  " -> missing key \"" << key << "\" in c1. Value in c2 is: " << value2 << std::endl;
               path += "/" + key;
-              std::stringstream ss; ss << entry2_[key];
+              std::stringstream ss; ss << value2;
               t.setColorBuffer( GenericToolbox::ColorCodes::redLightText );
               t << path.substr((path.size()<=maxLineLenght?0:path.size()-maxLineLenght), path.size()) << GenericToolbox::TablePrinter::NextColumn;
               t << "key not found." << GenericToolbox::TablePrinter::NextColumn;
@@ -214,8 +216,10 @@ void compareConfigStage(const JsonType& config1_, const JsonType& config2_){
               continue;
             }
             else if( not GenericToolbox::Json::doKeyExist(entry2_, key ) ){
-              LogError << path << " -> missing key \"" << key << "\" in c2. Value in c1 is: " << entry1_[key] << std::endl;
-              std::stringstream ss; ss << entry1_[key];
+              std::string value1{};
+              try{ value1 = entry1_[key]; } catch(...){ try{ value1 = entry1_[std::atoi(key.c_str())]; } catch(...){} }
+              LogError << path << " -> missing key \"" << key << "\" in c2. Value in c1 is: " << value1 << std::endl;
+              std::stringstream ss; ss << value1;
               t.setColorBuffer( GenericToolbox::ColorCodes::redLightText );
               path += "/" + key;
               t << path.substr((path.size()<=maxLineLenght?0:path.size()-maxLineLenght), path.size()) << GenericToolbox::TablePrinter::NextColumn;
