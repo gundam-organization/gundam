@@ -579,18 +579,20 @@ int main(int argc, char** argv){
 
         // Compute the likelihood
         // LogInfo<<"Computing LH... ";
+        LLH = fitter.getLikelihoodInterface().getBuffer().totalLikelihood;
+
         double LH_stats = fitter.getLikelihoodInterface().evalStatLikelihood();
         double LH_syst = fitter.getLikelihoodInterface().evalPenaltyLikelihood();
         fitter.getLikelihoodInterface().evalLikelihood();
         // LogInfo<<"Done.  ";
-        LLH = fitter.getLikelihoodInterface().getBuffer().totalLikelihood;
         LogInfo << "LH_stats: " << LH_stats << " LH_syst: " << LH_syst << " LH tot: " << LLH << std::endl;
         // LogInfo<<"LLH: "<<LLH<<std::endl;
         // make the LH a probability distribution (but still work with the log)
         // This is an approximation, it works only in case of gaussian LH
-        LLH /= -2.0;
-        LLH += nParameters/2.*log(1.0/(2.0*TMath::Pi()));
-        LLH = -LLH;
+        // LLH /= -2.0;
+        // LLH += nParameters/2.*log(1.0/(2.0*TMath::Pi()));
+        // LLH = -LLH;
+
 
         LLH_sum += LLH;
         if(iToy==0 and injectParamsManually){
