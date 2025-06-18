@@ -188,7 +188,7 @@ int main(int argc, char** argv){
         tStudent = true;
     }
     bool enableStatThrowInToys = false;
-    bool enableEventMcThrow;
+    bool enableEventMcThrow = false;
     if(clParser.isOptionTriggered("throwStats")) {
       enableStatThrowInToys = true;
       LogInfo << "Throwing statistical errors in the toys." << std::endl;
@@ -197,6 +197,10 @@ int main(int argc, char** argv){
           enableEventMcThrow = false;
           LogInfo << "Disabling event MC throw." << std::endl;
       }
+    }else{
+      LogInfo << "Statistical errors will not be thrown in the toys." << std::endl;
+      enableStatThrowInToys = false;
+      enableEventMcThrow = false; // default
     }
 
     auto configPropagator = GenericToolbox::Json::fetchValue<nlohmann::json>( cHandler.getConfig(), "fitterEngineConfig/propagatorConfig" );
