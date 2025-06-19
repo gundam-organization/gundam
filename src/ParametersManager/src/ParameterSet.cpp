@@ -50,8 +50,6 @@ void ParameterSet::configureImpl(){
     {"maxEigenFraction"},
     {"eigenValueThreshold",{"eigenSvdThreshold"}},
     {"eigenParBounds"},
-    {"eigenParBounds/minValue"},
-    {"eigenParBounds/maxValue"},
     {"maskForToyGeneration"},
     {"devUseParLimitsOnEigen"},
     {"releaseFixedParametersOnHesse"},
@@ -115,15 +113,7 @@ void ParameterSet::configureImpl(){
   _config_.fillValue(_maxEigenFraction_, "maxEigenFraction");
   _config_.fillValue(_eigenSvdThreshold_, "eigenValueThreshold");
 
-  if( _config_.hasField("eigenParBounds/minValue") or _config_.hasField("eigenParBounds/maxValue") ){
-    // legacy
-    _config_.fillValue(_eigenParRange_.min, "eigenParBounds/minValue");
-    _config_.fillValue(_eigenParRange_.max, "eigenParBounds/maxValue");
-  }
-  else{
-    // use range definition instead `eigenParBounds: [0, 1]`
-    _config_.fillValue(_eigenParRange_, "eigenParBounds");
-  }
+  _config_.fillValue(_eigenParRange_, "eigenParBounds");
 
   // legacy
   _config_.fillValue(_maskForToyGeneration_, "maskForToyGeneration");
@@ -257,9 +247,9 @@ void ParameterSet::processCovarianceMatrix(){
     _inverseCovarianceMatrix_->Invert(&det);
 
     bool failed{false};
-    if( det <= 0 ){
+    if( det < 0 ){
       _priorCovarianceMatrix_->Print();
-      LogError << "Stripped covariance must be positive definite: " << det << std::endl;
+      LogError << "Stripped covariance must be positive definite. Determinant is: " << det << std::endl;
       failed = true;
     }
 
@@ -1118,12 +1108,15 @@ void ParameterSet::defineParameters(){
 
     par.setParameterValue(par.getPriorValue());
 
-    par.setLimits(_globalParRange_);
-
-    GenericToolbox::Range rootBounds{};
-    if( _parameterLowerBoundsList_ != nullptr ){ rootBounds.min = ((*_parameterLowerBoundsList_)[par.getParameterIndex()]); }
-    if( _parameterUpperBoundsList_ != nullptr ){ rootBounds.max = ((*_parameterUpperBoundsList_)[par.getParameterIndex()]); }
-    par.setLimits( rootBounds );
+    if( _globalParRange_.hasBound() ){
+      par.setLimits(_globalParRange_);
+    }
+    else {
+      GenericToolbox::Range rootBounds{};
+      if( _parameterLowerBoundsList_ != nullptr ){ rootBounds.min = ((*_parameterLowerBoundsList_)[par.getParameterIndex()]); }
+      if( _parameterUpperBoundsList_ != nullptr ){ rootBounds.max = ((*_parameterUpperBoundsList_)[par.getParameterIndex()]); }
+      par.setLimits( rootBounds );
+    }
 
     LogExitIf( not par.getParameterLimits().isInBounds(par.getPriorValue()), "PRIOR IS NOT IN BOUNDS: " << par.getSummary() );
 
