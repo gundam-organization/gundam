@@ -31,6 +31,7 @@
 void DialCollection::prepareConfig(ConfigReader &config_){
   config_.clearFields();
   config_.defineFields({
+      {"name"},
       {"isEnabled"},
       {"applyOnDataSets"},
       {"dialInputList"},
