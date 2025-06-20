@@ -438,6 +438,21 @@ std::vector<Parameter>& ParameterSet::getEffectiveParameterList(){
 }
 
 // Core
+bool ParameterSet::hasOutOfBoundsParameters() const{
+  bool out{false};
+
+  out = std::any_of(getParameterList().begin(), getParameterList().end(), [](const Parameter& par){
+    return not par.isValueWithinBounds();
+  });
+
+  if( _eigenDecomp_ and not out ) {
+    out = std::any_of(getEigenParameterList().begin(), getEigenParameterList().end(), [](const Parameter& par){
+      return not par.isValueWithinBounds();
+    });
+  }
+
+  return out;
+}
 void ParameterSet::updateDeltaVector() const{
   int iFit{0};
   for( const auto& par : _parameterList_ ){
