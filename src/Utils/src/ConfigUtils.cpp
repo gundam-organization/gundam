@@ -417,10 +417,11 @@ namespace ConfigUtils {
   }
   void ConfigReader::fillFormula(std::string& formulaToFill_, const std::string& fieldName_, const std::string& joinStr_) const{
     if( not hasField(fieldName_) ){ return; }
-    formulaToFill_ = GenericToolbox::joinVectorString(
-      fetchValue<std::vector<std::string>>(fieldName_),
-      joinStr_
-    );
+
+    auto formulaList = fetchValue<std::vector<std::string>>(fieldName_);
+    for( auto& formula : formulaList ){ formula += ")"; formula.insert(0, "("); }
+
+    formulaToFill_ = GenericToolbox::joinVectorString(formulaList, joinStr_);
   }
   void ConfigReader::printUnusedKeys() const{
     // for context dependent options
