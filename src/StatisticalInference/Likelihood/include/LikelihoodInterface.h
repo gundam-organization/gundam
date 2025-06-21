@@ -93,6 +93,7 @@ public:
   double evalLikelihood(std::future<bool>& propagation) const;
   double evalStatLikelihood(std::future<bool>& propagation) const;
   double evalPenaltyLikelihood() const;
+  [[nodiscard]] double evalPenaltyLikelihood(const ParameterSet& parSet_) const;
   [[nodiscard]] double evalStatLikelihood(const SamplePair& samplePair_) const;
   [[nodiscard]] std::string getSummary() const;
 
@@ -103,8 +104,6 @@ public:
   void printBreakdowns() const;
   std::string getSampleBreakdownTable() const;
 
-  // statics
-  [[nodiscard]] static double evalPenaltyLikelihood(const ParameterSet& parSet_);
 
   void throwToyParameters(Propagator& propagator_);
   void throwStatErrors(Propagator& propagator_);
@@ -123,6 +122,7 @@ private:
   bool _enableStatThrowInToys_{true};
   bool _gaussStatThrowInToys_{false};
   bool _enableEventMcThrow_{true};
+  bool _applyInfinitePenaltyOnOutOfBoundPar_{false};
   DataType _dataType_{DataType::Asimov};
   JsonType _toyParameterInjector_{};
 

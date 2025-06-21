@@ -27,6 +27,7 @@ void LikelihoodInterface::configureImpl(){
     {"enableStatThrowInToys"},
     {"gaussStatThrowInToys"},
     {"enableEventMcThrow"},
+    {"applyInfinitePenaltyOnOutOfBoundPar"},
   });
   _config_.checkConfiguration();
 
@@ -78,6 +79,7 @@ void LikelihoodInterface::configureImpl(){
   _config_.fillValue(_enableStatThrowInToys_, "enableStatThrowInToys");
   _config_.fillValue(_gaussStatThrowInToys_, "gaussStatThrowInToys");
   _config_.fillValue(_enableEventMcThrow_, "enableEventMcThrow");
+  _config_.fillValue(_applyInfinitePenaltyOnOutOfBoundPar_, "applyInfinitePenaltyOnOutOfBoundPar");
 
 }
 void LikelihoodInterface::initializeImpl() {
@@ -165,6 +167,37 @@ double LikelihoodInterface::evalPenaltyLikelihood() const {
     _buffer_.penaltyLikelihood += LikelihoodInterface::evalPenaltyLikelihood( parSet );
   }
   return _buffer_.penaltyLikelihood;
+}
+double LikelihoodInterface::evalPenaltyLikelihood(const ParameterSet& parSet_) const{
+  if( not parSet_.isEnabled() ){ return 0; }
+
+  double buffer = 0;
+
+  if( parSet_.getPriorCovarianceMatrix() != nullptr ){
+    if( parSet_.isEnableEigenDecomp() ){
+      for( const auto& eigenPar : parSet_.getEigenParameterList() ){
+        if( eigenPar.isFixed() ){ continue; }
+        buffer += TMath::Sq( (eigenPar.getParameterValue() - eigenPar.getPriorValue()) / eigenPar.getStdDevValue() ) ;
+      }
+    }
+    else{
+      // make delta vector
+      parSet_.updateDeltaVector();
+
+      // compute penalty term with covariance
+      buffer =
+          (*parSet_.getDeltaVectorPtr())
+          * ( (*parSet_.getInverseCovarianceMatrix()) * (*parSet_.getDeltaVectorPtr()) );
+    }
+  }
+
+  if( _applyInfinitePenaltyOnOutOfBoundPar_ and parSet_.hasOutOfBoundsParameters() ) {
+    LogError << "Returning an +inf penalty for out-of-bounds parameters in: " << parSet_.getName() << std::endl;
+    return std::numeric_limits<double>::infinity();
+    // return buffer * 1000.;
+  }
+
+  return buffer;
 }
 double LikelihoodInterface::evalStatLikelihood(const SamplePair& samplePair_) const {
   return _jointProbabilityPtr_->eval( samplePair_ );
@@ -254,33 +287,6 @@ std::string LikelihoodInterface::getSampleBreakdownTable() const{
   }
 
   return t.generateTableString();
-}
-
-// static
-double LikelihoodInterface::evalPenaltyLikelihood(const ParameterSet& parSet_) {
-  if( not parSet_.isEnabled() ){ return 0; }
-
-  double buffer = 0;
-
-  if( parSet_.getPriorCovarianceMatrix() != nullptr ){
-    if( parSet_.isEnableEigenDecomp() ){
-      for( const auto& eigenPar : parSet_.getEigenParameterList() ){
-        if( eigenPar.isFixed() ){ continue; }
-        buffer += TMath::Sq( (eigenPar.getParameterValue() - eigenPar.getPriorValue()) / eigenPar.getStdDevValue() ) ;
-      }
-    }
-    else{
-      // make delta vector
-      parSet_.updateDeltaVector();
-
-      // compute penalty term with covariance
-      buffer =
-          (*parSet_.getDeltaVectorPtr())
-          * ( (*parSet_.getInverseCovarianceMatrix()) * (*parSet_.getDeltaVectorPtr()) );
-    }
-  }
-
-  return buffer;
 }
 
 void LikelihoodInterface::load(){
