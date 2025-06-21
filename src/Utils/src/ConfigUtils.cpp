@@ -4,6 +4,7 @@
 
 #include "ConfigUtils.h"
 #include "GundamUtils.h"
+#include "GundamBacktrace.h"
 
 #include "GenericToolbox.Root.h"
 #include "GenericToolbox.Yaml.h"
@@ -338,6 +339,11 @@ namespace ConfigUtils {
       if( not invalidKeyList.empty() ){
         for( auto& invalidKey : invalidKeyList ){
           LogAlert << _parentPath_ << ": key \"" << invalidKey << "\" has an invalid name. It won't be recognized by GUNDAM." << std::endl;
+#ifdef DEBUG_BUILD
+          LogError << "Possible missing key declaration: " << invalidKey << std::endl;
+          LogError << "BackTrace: " << std::endl
+                   << GundamUtils::Backtrace << std::endl;
+#endif
         }
       }
     }
