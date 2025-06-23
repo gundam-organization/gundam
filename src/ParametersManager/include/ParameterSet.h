@@ -114,6 +114,7 @@ public:
   [[nodiscard]] const std::vector<Parameter>& getEffectiveParameterList() const;
   [[nodiscard]] std::vector<Parameter>& getEffectiveParameterList();
 
+  bool hasOutOfBoundsParameters() const;
   void updateDeltaVector() const;
 
   /// Set all the parameters to their prior values.
