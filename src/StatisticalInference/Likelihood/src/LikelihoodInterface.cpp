@@ -419,15 +419,6 @@ void LikelihoodInterface::loadDataPropagator(){
       // otherwise load the dataset
       dataDispenser->getParameters().isData = true;
       dataDispenser->load( _dataPropagator_ );
-
-      // make sure the config is from scratch each time we read a new dataset
-      if( not dataDispenser->getParameters().overridePropagatorConfig.empty() ){
-        LogExit("NOT IMPLEMENTED YET!");
-        // TODO: handle multiple datasets loading when editing the configuration
-//        LogWarning << "Restoring propagator config overrides..." << std::endl;
-//        _dataPropagator_.configure( _modelPropagator_.getConfig() );
-//        _dataPropagator_.initialize();
-      }
     }
 
     _dataPropagator_.getDialManager().shrinkDialContainers();
