@@ -1396,6 +1396,11 @@ void RootMinimizer::saveGradientSteps(){
 
   LogInfo << "Saving " << gradientDescentMonitor.stepPointList.size() << " gradient steps..." << std::endl;
 
+  int nPointsPerStep{8};
+  int maxNbPoints{1000}; // don't spend too much time eval the steps
+  nPointsPerStep = std::min(nPointsPerStep, maxNbPoints/int(gradientDescentMonitor.stepPointList.size()));
+  if( nPointsPerStep <= 1 ){ nPointsPerStep = 2; }
+
   // make sure the parameter states get restored as we leave
   auto currentParState = getModelPropagator().getParametersManager().exportParameterInjectorConfig();
   GenericToolbox::ScopedGuard g{
@@ -1432,7 +1437,7 @@ void RootMinimizer::saveGradientSteps(){
     }
 
     // line scan from previous point
-    getParameterScanner().scanSegment( nullptr, gradientDescentMonitor.stepPointList[iGradStep].parState, lastParStep, 8 );
+    getParameterScanner().scanSegment( nullptr, gradientDescentMonitor.stepPointList[iGradStep].parState, lastParStep, nPointsPerStep );
     lastParStep = gradientDescentMonitor.stepPointList[iGradStep].parState;
 
     if( globalGraphList.empty() ){
