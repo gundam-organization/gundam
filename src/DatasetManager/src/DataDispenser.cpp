@@ -165,8 +165,12 @@ void DataDispenser::load(Propagator& propagator_){
     LogWarning << "Reload the propagator config with override options" << std::endl;
     ConfigUtils::ConfigBuilder configHandler( _cache_.propagatorPtr->getConfig().getConfig() );
     configHandler.override( _parameters_.overridePropagatorConfig );
-    _cache_.propagatorPtr->getConfig().setConfig(configHandler.getConfig());
 
+    ConfigReader ch( configHandler.getConfig() );
+    ch.setParentPath(_cache_.propagatorPtr->getConfig().getParentPath());
+    _cache_.propagatorPtr->setConfig(ch);
+
+    LogWarning << "Re-configuring the propagator with overriden parameters..." << std::endl;
     _cache_.propagatorPtr->configure();
     _cache_.propagatorPtr->initialize();
   }

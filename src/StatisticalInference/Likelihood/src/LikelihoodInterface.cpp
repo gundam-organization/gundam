@@ -401,18 +401,6 @@ void LikelihoodInterface::loadDataPropagator(){
       // Is it better to do the fetching here and provide it to the dispenser?
       dataDispenser->setPlotGeneratorPtr( &_plotGenerator_ );
 
-      // handling override of the propagator config
-      if( not dataDispenser->getParameters().overridePropagatorConfig.empty() ){
-        LogWarning << "Reload the data propagator config with override options..." << std::endl;
-        ConfigUtils::ConfigBuilder configHandler( _modelPropagator_.getConfig().getConfig() );
-        configHandler.override( dataDispenser->getParameters().overridePropagatorConfig );
-        ConfigReader ch( configHandler.getConfig() );
-        ch.setParentPath(_modelPropagator_.getConfig().getParentPath());
-        LogWarning << "Re-configuring data propagator..." << std::endl;
-        _dataPropagator_.configure( ch );
-        _dataPropagator_.initialize();
-      }
-
       // legacy: replacing the parameterSet option "maskForToyGeneration" -> now should use the config override above
       for( auto& parSet : _dataPropagator_.getParametersManager().getParameterSetsList() ){
         if( parSet.isMaskForToyGeneration() ){ parSet.nullify(); }
