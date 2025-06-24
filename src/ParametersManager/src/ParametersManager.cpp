@@ -20,6 +20,7 @@ void ParametersManager::unmuteLogger(){ Logger::setIsMuted( false ); }
 // config
 void ParametersManager::configureImpl(){
 
+  _config_.clearFields();
   _config_.defineFields({
     {"throwToyParametersWithGlobalCov"},
     {"reThrowParSetIfOutOfBounds",{"reThrowParSetIfOutOfPhysical"}},

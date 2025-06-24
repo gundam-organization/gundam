@@ -401,15 +401,6 @@ void LikelihoodInterface::loadDataPropagator(){
       // Is it better to do the fetching here and provide it to the dispenser?
       dataDispenser->setPlotGeneratorPtr( &_plotGenerator_ );
 
-      // handling override of the propagator config
-      if( not dataDispenser->getParameters().overridePropagatorConfig.empty() ){
-        LogWarning << "Reload the data propagator config with override options..." << std::endl;
-        ConfigUtils::ConfigBuilder configHandler( _modelPropagator_.getConfig().getConfig() );
-        configHandler.override( dataDispenser->getParameters().overridePropagatorConfig );
-        _dataPropagator_.configure( ConfigReader( configHandler.getConfig() ) );
-        _dataPropagator_.initialize();
-      }
-
       // legacy: replacing the parameterSet option "maskForToyGeneration" -> now should use the config override above
       for( auto& parSet : _dataPropagator_.getParametersManager().getParameterSetsList() ){
         if( parSet.isMaskForToyGeneration() ){ parSet.nullify(); }
@@ -419,15 +410,6 @@ void LikelihoodInterface::loadDataPropagator(){
       // otherwise load the dataset
       dataDispenser->getParameters().isData = true;
       dataDispenser->load( _dataPropagator_ );
-
-      // make sure the config is from scratch each time we read a new dataset
-      if( not dataDispenser->getParameters().overridePropagatorConfig.empty() ){
-        LogExit("NOT IMPLEMENTED YET!");
-        // TODO: handle multiple datasets loading when editing the configuration
-//        LogWarning << "Restoring propagator config overrides..." << std::endl;
-//        _dataPropagator_.configure( _modelPropagator_.getConfig() );
-//        _dataPropagator_.initialize();
-      }
     }
 
     _dataPropagator_.getDialManager().shrinkDialContainers();
