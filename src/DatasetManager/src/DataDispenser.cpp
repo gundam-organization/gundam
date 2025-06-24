@@ -51,7 +51,8 @@ void DataDispenser::prepareConfig(ConfigReader &config_){
     {"selectionCutFormula"},
     {"nominalWeightFormula"},
     {"variableDict", {"overrideLeafDict"}},
-    {"fromMc"},
+    {"fromModel", {"fromMc"}},
+    {"evalModelAt"},
   });
   config_.checkConfiguration();
 }
@@ -126,6 +127,7 @@ void DataDispenser::configureImpl(){
   _config_.fillValue(_parameters_.debugNbMaxEventsToLoad, "debugNbMaxEventsToLoad");
   _config_.fillValue(_parameters_.dialIndexFormula, "dialIndexFormula");
   _config_.fillValue(_parameters_.overridePropagatorConfig, "overridePropagatorConfig");
+  _config_.fillValue(_parameters_.evalModelAt, "evalModelAt");
 
   _config_.fillFormula(_parameters_.selectionCutFormulaStr, "selectionCutFormula", "&&");
   _config_.fillFormula(_parameters_.nominalWeightFormulaStr, "nominalWeightFormula", "*");
@@ -159,7 +161,6 @@ void DataDispenser::load(Propagator& propagator_){
 
   _cache_.clear();
   _cache_.propagatorPtr = &propagator_;
-
 
   if( not _parameters_.overridePropagatorConfig.empty() ){
     LogWarning << "Reload the propagator config with override options" << std::endl;
