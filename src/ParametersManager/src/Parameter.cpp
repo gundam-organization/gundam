@@ -102,20 +102,20 @@ void Parameter::setMaxMirror(double maxMirror) {
   _mirrorRange_.max = maxMirror;
 }
 void Parameter::setParameterValue(double parameterValue, bool force) {
-  if (not isInDomain(parameterValue, true)) {
-    LogError << "New parameter value is not in domain: " << parameterValue
-             << std::endl;
-    if (not force) {
-      LogError << GundamUtils::Backtrace;
-      std::exit(EXIT_FAILURE);
-    }
-    else {
 #ifdef DEBUG_BUILD
-      LogDebug << GundamUtils::Backtrace;
+  if (not isInDomain(parameterValue, true)) {
+#else
+  if (not isInDomain(parameterValue, false)) {
 #endif
-      LogAlert << "Forced continuation with invalid parameter" << std::endl;
-    }
+    LogError << "New parameter value is not in domain: " << parameterValue << std::endl;
+    if( not force ){ LogError << GundamUtils::Backtrace; std::exit(EXIT_FAILURE); }
+#ifdef DEBUG_BUILD
+    LogDebug << GundamUtils::Backtrace;
+    LogAlert << "Forced continuation with invalid parameter" << std::endl;
+#endif
   }
+
+  // update and flag parameter
   if( _parameterValue_ != parameterValue ){
     _gotUpdated_ = true;
     _parameterValue_ = parameterValue;
