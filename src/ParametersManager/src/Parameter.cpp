@@ -123,13 +123,12 @@ void Parameter::setParameterValue(double parameterValue, bool force) {
   else{ _gotUpdated_ = false; }
 }
 double Parameter::getParameterValue() const {
-  if ( isEnabled() and not isValueWithinBounds() ) {
-    LogWarning << "Getting out of bounds parameter: "
-               << getSummary() << std::endl;
 #ifdef DEBUG_BUILD
+  if ( isEnabled() and not isValueWithinBounds() ) {
+    LogAlert << "Getting out of bounds parameter: " << getSummary() << std::endl;
     LogDebug << GundamUtils::Backtrace;
-#endif
   }
+#endif
   return _parameterValue_;
 }
 
