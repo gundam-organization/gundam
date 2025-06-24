@@ -27,6 +27,7 @@ namespace JointProbability{
     void printConfiguration() const;
 
     mutable int verboseLevel{0};
+    bool muteZeroPredBinWarn{false};
     bool throwIfInfLlh{true};
     bool allowZeroMcWhenZeroData{true};
     bool usePoissonLikelihood{false};
@@ -59,6 +60,7 @@ namespace JointProbability{
 
   inline void BarlowBeestonBanff2022::configureImpl(){
     _config_.defineFields({
+      {"muteZeroPredBinWarn"},
       {"allowZeroMcWhenZeroData"},
       {"usePoissonLikelihood"},
       {"BBNoUpdateWeights"},
@@ -69,6 +71,7 @@ namespace JointProbability{
     });
     _config_.checkConfiguration();
 
+    _config_.fillValue(muteZeroPredBinWarn, "muteZeroPredBinWarn");
     _config_.fillValue(allowZeroMcWhenZeroData, "allowZeroMcWhenZeroData");
     _config_.fillValue(usePoissonLikelihood, "usePoissonLikelihood");
     _config_.fillValue(BBNoUpdateWeights, "BBNoUpdateWeights");
@@ -89,7 +92,7 @@ namespace JointProbability{
     double dataVal = samplePair_.data->getHistogram().getBinContentList()[bin_].sumWeights;
     double predVal = samplePair_.model->getHistogram().getBinContentList()[bin_].sumWeights;
 
-    if( predVal == 0 and dataVal != 0 ){
+    if( not muteZeroPredBinWarn and verboseLevel >= 0 and predVal == 0 and dataVal != 0 ){
       LogError << samplePair_.model->getName() << "/" << samplePair_.model->getHistogram().getBinContextList()[bin_].bin.getSummary() << ": predicting 0 rate in this bin -> llh not defined / inf" << std::endl;
     }
 
