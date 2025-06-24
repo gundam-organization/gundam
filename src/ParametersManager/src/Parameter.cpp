@@ -153,14 +153,17 @@ bool Parameter::isInDomain(double value_, bool verbose_) const {
     }
     return false;
   }
-  if ( not std::isnan(_parameterLimits_.min) and value_ < _parameterLimits_.min ) {
+
+  if( not _parameterLimits_.hasBound() ){ return true; }
+
+  if( _parameterLimits_.isBellowMin(value_) ){
     if (verbose_) {
       LogError << "Value is below minimum: " << value_ << std::endl;
       LogError << "Summary: " << getSummary() << std::endl;
     }
     return false;
   }
-  if ( not std::isnan(_parameterLimits_.max) and value_ > _parameterLimits_.max ) {
+  if ( _parameterLimits_.isAboveMax(value_) ) {
     if (verbose_) {
       LogError << "Attempting to set parameter above the maximum"
                << " -- New value: " << value_
