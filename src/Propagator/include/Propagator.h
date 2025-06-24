@@ -47,7 +47,7 @@ public:
   [[nodiscard]] auto& getEventDialCache() const { return _eventDialCache_; }
   [[nodiscard]] auto& getParametersManager() const { return _parManager_; }
   [[nodiscard]] auto& getDialCollectionList() const{ return _dialManager_.getDialCollectionList(); }
-  [[nodiscard]] auto& getParameterInjectorMc() const { return _parameterInjectorMc_;; }
+  [[nodiscard]] auto& getParameterInjectorMc() const { return _parameterInjectorMc_; }
 
   // mutable getters
   auto& getSampleSet(){ return _sampleSet_; }
