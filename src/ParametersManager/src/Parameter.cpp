@@ -113,6 +113,13 @@ void Parameter::setParameterValue(double parameterValue, bool force) {
     if (not isInDomain(parameterValue, false)) {
 #endif
       LogError << getFullTitle() << ": value is not in domain. " << _parameterValue_ << " not in " << _parameterLimits_ << std::endl;
+
+      static bool once{false};
+      if( not once and _owner_->isEnableEigenDecomp() and not this->isEigen() ){
+        once = true;
+        LogAlert << "Not in domain error will appears since par limits can't directly be applied when using eigen decomp." << std::endl;
+      }
+
       if( not force ){ LogError << GundamUtils::Backtrace; std::exit(EXIT_FAILURE); }
 #ifdef DEBUG_BUILD
       LogDebug << GundamUtils::Backtrace;
