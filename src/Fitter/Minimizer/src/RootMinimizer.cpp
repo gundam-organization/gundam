@@ -1134,6 +1134,7 @@ void RootMinimizer::writePostFitData( TDirectory* saveDir_) {
             else{ t << priorFraction*100 << R"( %)"; }
 
             t << GenericToolbox::TablePrinter::NextLine;
+            t.setColorBuffer(rst);
           }
         }
         t.printTable();
