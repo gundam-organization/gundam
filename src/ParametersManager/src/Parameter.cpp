@@ -112,7 +112,7 @@ void Parameter::setParameterValue(double parameterValue, bool force) {
 #else
     if (not isInDomain(parameterValue, false)) {
 #endif
-      LogError << "Parameter::setParameterValue: " << getFullTitle() << ": value is not in domain. " << parameterValue << " not in " << _parameterLimits_ << std::endl;
+      LogError << getFullTitle() << ": value is not in domain. " << _parameterValue_ << " not in " << _parameterLimits_ << std::endl;
       if( not force ){ LogError << GundamUtils::Backtrace; std::exit(EXIT_FAILURE); }
 #ifdef DEBUG_BUILD
       LogDebug << GundamUtils::Backtrace;
