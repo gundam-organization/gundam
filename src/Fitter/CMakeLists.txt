@@ -2,6 +2,8 @@ set( LIB_NAME GundamFitter )
 
 set(SRCFILES
     ${CMAKE_CURRENT_SOURCE_DIR}/Engine/src/FitterEngine.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/Engine/src/FitSequencer.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/Engine/src/FitTask.cpp
 
     ${CMAKE_CURRENT_SOURCE_DIR}/Minimizer/src/MinimizerBase.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/Minimizer/src/SimpleMcmc.cpp
