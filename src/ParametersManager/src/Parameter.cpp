@@ -124,10 +124,10 @@ void Parameter::setParameterValue(double parameterValue, bool force) {
       LogDebug << GundamUtils::Backtrace;
       LogAlert << "Forced continuation with invalid parameter" << std::endl;
 #endif
-
-      // setting the parameter
-      _parameterValue_ = parameterValue;
     }
+
+    // setting the parameter
+    _parameterValue_ = parameterValue;
   }
   else{ _gotUpdated_ = false; }
 }
