@@ -409,9 +409,31 @@ void LikelihoodInterface::loadDataPropagator(){
 
       // otherwise load the dataset
       dataDispenser->getParameters().isData = true;
-      dataDispenser->load( _dataPropagator_ );
+
+      if( not dataDispenser->getParameters().evalModelAt.empty() ){
+        LogWarning << "Generating data histograms using model evaluated with a set of parameters" << std::endl;
+
+        LogInfo << "Injecting parameters to the model..." << std::endl;
+        _modelPropagator_.getParametersManager().injectParameterValues(dataDispenser->getParameters().evalModelAt);
+        _modelPropagator_.reweightEvents();
+
+        LogInfo << "Copying events to data histograms..." << std::endl;
+        _dataPropagator_.copyEventsFrom( _modelPropagator_ );
+
+        LogInfo << "Restoring model parameters..." << std::endl;
+        _modelPropagator_.getParametersManager().moveParametersToPrior();
+        _modelPropagator_.reweightEvents();
+
+        // histograms are filled afterward
+      }
+      else {
+        LogWarning << "Loading data propagator..." << std::endl;
+        dataDispenser->load( _dataPropagator_ );
+      }
+
     }
 
+    LogWarning << "Setting dial cache for data..." << std::endl;
     _dataPropagator_.getDialManager().shrinkDialContainers();
     _dataPropagator_.buildDialCache();
 
