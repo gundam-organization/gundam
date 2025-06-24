@@ -282,9 +282,9 @@ int main(int argc, char** argv){
   gundamFitterConfig.fillValue(fitter.getConfig(), "fitterEngineConfig");
 
   LogInfo << std::endl;
-  LogInfo << "----------------------------------" << std::endl;
+  LogInfo << "──────────────────────────────────" << std::endl;
   LogInfo << "Reading fitter configuration..." << std::endl;
-  LogInfo << "----------------------------------" << std::endl;
+  LogInfo << "──────────────────────────────────" << std::endl;
   fitter.configure();
 
   // -a
@@ -409,9 +409,9 @@ int main(int argc, char** argv){
   // Load:
   // --------------------------
   LogInfo << std::endl;
-  LogInfo << "----------------------------------" << std::endl;
+  LogInfo << "──────────────────────────────────" << std::endl;
   LogInfo << "Initializing fitter..." << std::endl;
-  LogInfo << "----------------------------------" << std::endl;
+  LogInfo << "──────────────────────────────────" << std::endl;
   fitter.initialize();
 
   // show initial conditions
@@ -450,9 +450,9 @@ int main(int argc, char** argv){
   }
 
   LogInfo << std::endl;
-  LogInfo << "----------------------------------" << std::endl;
+  LogInfo << "──────────────────────────────────" << std::endl;
   LogInfo << "Running the fitter..." << std::endl;
-  LogInfo << "----------------------------------" << std::endl;
+  LogInfo << "──────────────────────────────────" << std::endl;
   fitter.fit();
 
 }
