@@ -55,7 +55,7 @@ void DatasetDefinition::configureImpl() {
     _dataDispenserDict_.emplace(name, DataDispenser(this));
     _dataDispenserDict_.at(name).getParameters().isData = true;
 
-    if( dataEntry.fetchValue("fromMc", false) ){
+    if( dataEntry.fetchValue("fromModel", false) ){
       _dataDispenserDict_.at(name).setConfig( _modelDispenser_.getConfig() );
     }
 
