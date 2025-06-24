@@ -105,14 +105,13 @@ void Parameter::setParameterValue(double parameterValue, bool force) {
   // update and flag parameter
   if( _parameterValue_ != parameterValue ){
     _gotUpdated_ = true;
-    _parameterValue_ = parameterValue;
 
 #ifdef DEBUG_BUILD
     if (not isInDomain(parameterValue, true)) {
 #else
     if (not isInDomain(parameterValue, false)) {
 #endif
-      LogError << getFullTitle() << ": value is not in domain. " << _parameterValue_ << " not in " << _parameterLimits_ << std::endl;
+      LogError << getFullTitle() << ": setting new value out of domain. " << parameterValue << " is not in " << _parameterLimits_ << std::endl;
 
       static bool once{false};
       if( not once and _owner_->isEnableEigenDecomp() and not this->isEigen() ){
@@ -125,6 +124,9 @@ void Parameter::setParameterValue(double parameterValue, bool force) {
       LogDebug << GundamUtils::Backtrace;
       LogAlert << "Forced continuation with invalid parameter" << std::endl;
 #endif
+
+      // setting the parameter
+      _parameterValue_ = parameterValue;
     }
   }
   else{ _gotUpdated_ = false; }
