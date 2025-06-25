@@ -42,8 +42,11 @@ As an entry list
 
 All options from MC
 
-| Option | Type   | Description                                                               | Default |
-|--------|--------|---------------------------------------------------------------------------|---------|
-| name   | string | Name of the data/toy entry                                                |         |
-| fromMc | bool   | Inherit all parameter from MC. All other entries are treated as overrides | false   |
+| Option                   | Type   | Description                                                                                                                     | Default |
+|--------------------------|--------|---------------------------------------------------------------------------------------------------------------------------------|---------|
+| name                     | string | Name of the data/toy entry                                                                                                      |         |
+| fromModel                | bool   | Use config from model as a base for a data entry                                                                                | false   |
+| useReweightEngine        | bool   | Force to load the dials while loading the data. Used for custom toys that use the reweight engine for generating the histograms | false   |
+| evalModelAt              | json   | Specify which sets of parameters to eval the model and copy the events from. Parameter injector format                          |         |
+| overridePropagatorConfig | json   | Use a custom set of config option that will override the propagator config. Any parameter can be changed from here              |         |
 
