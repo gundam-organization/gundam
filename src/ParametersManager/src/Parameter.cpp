@@ -102,34 +102,42 @@ void Parameter::setMaxMirror(double maxMirror) {
   _mirrorRange_.max = maxMirror;
 }
 void Parameter::setParameterValue(double parameterValue, bool force) {
-  if (not isInDomain(parameterValue, true)) {
-    LogError << "New parameter value is not in domain: " << parameterValue
-             << std::endl;
-    if (not force) {
-      LogError << GundamUtils::Backtrace;
-      std::exit(EXIT_FAILURE);
-    }
-    else {
-#ifdef DEBUG_BUILD
-      LogDebug << GundamUtils::Backtrace;
-#endif
-      LogAlert << "Forced continuation with invalid parameter" << std::endl;
-    }
-  }
+  // update and flag parameter
   if( _parameterValue_ != parameterValue ){
     _gotUpdated_ = true;
+
+#ifdef DEBUG_BUILD
+    if (not isInDomain(parameterValue, true)) {
+#else
+    if (not isInDomain(parameterValue, false)) {
+#endif
+      LogError << getFullTitle() << ": setting new value out of domain. " << parameterValue << " is not in " << _parameterLimits_ << std::endl;
+
+      static bool once{false};
+      if( not once and _owner_->isEnableEigenDecomp() and not this->isEigen() ){
+        once = true;
+        LogAlert << "Not in domain error will appears since par limits can't directly be applied when using eigen decomp." << std::endl;
+      }
+
+      if( not force ){ LogError << GundamUtils::Backtrace; std::exit(EXIT_FAILURE); }
+#ifdef DEBUG_BUILD
+      LogDebug << GundamUtils::Backtrace;
+      LogAlert << "Forced continuation with invalid parameter" << std::endl;
+#endif
+    }
+
+    // setting the parameter
     _parameterValue_ = parameterValue;
   }
   else{ _gotUpdated_ = false; }
 }
 double Parameter::getParameterValue() const {
-  if ( isEnabled() and not isValueWithinBounds() ) {
-    LogWarning << "Getting out of bounds parameter: "
-               << getSummary() << std::endl;
 #ifdef DEBUG_BUILD
+  if ( isEnabled() and not isValueWithinBounds() ) {
+    LogAlert << "Getting out of bounds parameter: " << getSummary() << std::endl;
     LogDebug << GundamUtils::Backtrace;
-#endif
   }
+#endif
   return _parameterValue_;
 }
 
@@ -147,14 +155,17 @@ bool Parameter::isInDomain(double value_, bool verbose_) const {
     }
     return false;
   }
-  if ( not std::isnan(_parameterLimits_.min) and value_ < _parameterLimits_.min ) {
+
+  if( not _parameterLimits_.hasBound() ){ return true; }
+
+  if( _parameterLimits_.isBellowMin(value_) ){
     if (verbose_) {
       LogError << "Value is below minimum: " << value_ << std::endl;
       LogError << "Summary: " << getSummary() << std::endl;
     }
     return false;
   }
-  if ( not std::isnan(_parameterLimits_.max) and value_ > _parameterLimits_.max ) {
+  if ( _parameterLimits_.isAboveMax(value_) ) {
     if (verbose_) {
       LogError << "Attempting to set parameter above the maximum"
                << " -- New value: " << value_
