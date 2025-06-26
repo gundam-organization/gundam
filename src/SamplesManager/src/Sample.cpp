@@ -23,9 +23,9 @@ void Sample::prepareConfig(ConfigReader &config_){
     {"selectionCutStr", {"selectionCuts"}},
     {"datasets"},
     // for xsec
-    {"parSetBinning", {"parameterSetName"}},
     {"normaliseParameterList"},
     {"yAxis"},
+    {FieldFlag::DEPRECATED, "parSetBinning", {"parameterSetName"}, "-> Provide the binning definition instead."},
   });
   config_.checkConfiguration();
 }

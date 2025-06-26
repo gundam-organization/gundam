@@ -18,6 +18,8 @@
 #include <string>
 #include <vector>
 
+#include "CrossSectionCalculator.h"
+
 
 int main(int argc, char** argv){
 
@@ -81,201 +83,50 @@ int main(int argc, char** argv){
   std::unique_ptr<TFile> fitterRootFile{nullptr};
   ConfigReader fitterConfig; // will be used to load the propagator
 
-  if( GenericToolbox::hasExtension(fitterFile, "root") ){
-    LogWarning << "Opening fitter output file: " << fitterFile << std::endl;
-    fitterRootFile = std::unique_ptr<TFile>( TFile::Open( fitterFile.c_str() ) );
-    LogThrowIf( fitterRootFile == nullptr, "Could not open fitter output file." );
-
-    RootUtils::ObjectReader::throwIfNotFound = true;
-
-    RootUtils::ObjectReader::readObject<TNamed>(
-        fitterRootFile.get(),
-        {{"gundam/config/unfoldedJson_TNamed"},
-         {"gundam/config_TNamed"},
-         {"gundamFitter/unfoldedConfig_TNamed"}},
-        [&](TNamed* config_){
-      fitterConfig = ConfigReader(GenericToolbox::Json::readConfigJsonStr( config_->GetTitle() ));
-    });
-  }
-  else{
-    LogWarning << "Reading fitter config file: " << fitterFile << std::endl;
-    fitterConfig = ConfigReader(GenericToolbox::Json::readConfigFile( fitterFile ));
-
-    clParser.getOptionPtr("usePreFit")->setIsTriggered( true );
-  }
-
   LogAlertIf(clParser.isOptionTriggered("usePreFit")) << "Pre-fit mode enabled: will throw toys according to the prior covariance matrices..." << std::endl;
 
-  ConfigReader xsecConfig(ConfigUtils::readConfigFile( clParser.getOptionVal<std::string>("configFile") ));
-  xsecConfig.defineFields({
-    {"outputFolder"},
-    {"useBestFitAsCentralValue"},
-    {"xsecCalcConfig"},
-  });
+  CrossSectionCalculator csc;
+  csc.setFitterRootFilePath(clParser.getOptionVal<std::string>("fitterFile"));
+  csc.setUsePrefit(clParser.isOptionTriggered("usePreFit"));
+  csc.setUseBestFitAsCentralValue( clParser.isOptionTriggered("useBfAsXsec") );
 
-  ConfigReader engineConfig;
-  {
-    ConfigUtils::ConfigBuilder cHandler{ fitterConfig.getConfig() };
+  csc.setConfig( ConfigReader(ConfigUtils::readConfigFile( clParser.getOptionVal<std::string>("configFile") )) );
 
-    // Disabling defined fit samples:
-    LogInfo << "Removing defined samples..." << std::endl;
-    GenericToolbox::Json::clearEntry( cHandler.getConfig(), "fitterEngineConfig/likelihoodInterfaceConfig/propagatorConfig/sampleSetConfig/sampleList" );
-    GenericToolbox::Json::clearEntry( cHandler.getConfig(), "fitterEngineConfig/likelihoodInterfaceConfig/dataSetManagerConfig/propagatorConfig/sampleSetConfig/sampleList" );
-    GenericToolbox::Json::clearEntry( cHandler.getConfig(), "fitterEngineConfig/likelihoodInterfaceConfig/dataSetManagerConfig/propagatorConfig/fitSampleSetConfig/fitSampleList" );
-    GenericToolbox::Json::clearEntry( cHandler.getConfig(), "fitterEngineConfig/propagatorConfig/fitSampleSetConfig/fitSampleList" );
-
-    // Disabling defined plots:
-    LogInfo << "Removing defined plots..." << std::endl;
-    GenericToolbox::Json::clearEntry( cHandler.getConfig(), "fitterEngineConfig/likelihoodInterfaceConfig/propagatorConfig/plotGeneratorConfig" );
-    GenericToolbox::Json::clearEntry( cHandler.getConfig(), "fitterEngineConfig/likelihoodInterfaceConfig/dataSetManagerConfig/propagatorConfig/plotGeneratorConfig" );
-    GenericToolbox::Json::clearEntry( cHandler.getConfig(), "fitterEngineConfig/propagatorConfig/plotGeneratorConfig" );
-
-    // Defining signal samples
-    cHandler.override( xsecConfig.getConfig() );
-
-    engineConfig.setConfig(cHandler.getConfig());
-  }
-
-  engineConfig.defineFields({
-    {"fitterEngineConfig"},
-  });
+  csc.configure();
 
 
-  LogInfo << "Override done." << std::endl;
-
-
-  LogInfo << "Fetching propagator config into fitter config..." << std::endl;
-
-  // it will handle all the deprecated config options and names properly
-  FitterEngine fitter{nullptr};
-  fitter.configure( engineConfig.fetchValue<ConfigReader>( "fitterEngineConfig" ) );
-
-  // We are only interested in our MC. Data has already been used to get the post-fit error/values
-  fitter.getLikelihoodInterface().setForceAsimovData( true );
-
-  // Disabling eigen decomposed parameters
-  fitter.getLikelihoodInterface().getModelPropagator().setEnableEigenToOrigInPropagate( false );
-
-  // Sample binning using parameterSetName
-  for( auto& sample : fitter.getLikelihoodInterface().getModelPropagator().getSampleSet().getSampleList() ){
-
-    if( clParser.isOptionTriggered("usePreFit") ){
-      sample.setName( sample.getName() + " (pre-fit)" );
-    }
-
-    // binning already set?
-    if( not sample.getBinningFilePath().empty() ){ continue; }
-
-    LogScopeIndent;
-    LogInfo << sample.getName() << ": binning not set, looking for parSetBinning..." << std::endl;
-    auto associatedParSet = sample.getConfig().fetchValue("parSetBinning", std::string());
-
-    LogThrowIf(associatedParSet.empty(), "Could not find parSetBinning.");
-
-    // Looking for parSet
-    auto foundDialCollection = std::find_if(
-        fitter.getLikelihoodInterface().getModelPropagator().getDialCollectionList().begin(),
-        fitter.getLikelihoodInterface().getModelPropagator().getDialCollectionList().end(),
-        [&](const DialCollection& dialCollection_){
-          auto* parSetPtr{dialCollection_.getSupervisedParameterSet()};
-          if( parSetPtr == nullptr ){ return false; }
-          return ( parSetPtr->getName() == associatedParSet );
-        });
-    LogThrowIf(
-        foundDialCollection == fitter.getLikelihoodInterface().getModelPropagator().getDialCollectionList().end(),
-        "Could not find " << associatedParSet << " among fit dial collections: "
-                          << GenericToolbox::toString(fitter.getLikelihoodInterface().getModelPropagator().getDialCollectionList(),
-                                                      [](const DialCollection& dialCollection_){
-                                                        return dialCollection_.getTitle();
-                                                      }
-                          ));
-
-    LogThrowIf(foundDialCollection->getDialBinSet().getBinList().empty(), "Could not find binning");
-    JsonType json(foundDialCollection->getDialBinSet().getFilePath());
-    sample.setBinningFilePath( ConfigReader(json) );
-
-  }
-
-  // Load everything
-  fitter.getLikelihoodInterface().initialize();
-
-  Propagator& propagator{fitter.getLikelihoodInterface().getModelPropagator()};
-
-
-  if( clParser.isOptionTriggered("dryRun") ){
-    std::cout << engineConfig.toString() << std::endl;
-
-    LogAlert << "Exiting as dry-run is set." << std::endl;
-    return EXIT_SUCCESS;
-  }
-
-
-  if( not clParser.isOptionTriggered("usePreFit") and fitterRootFile != nullptr ){
-
-    // Load post-fit parameters as "prior" so we can reset the weight to this point when throwing toys
-    LogWarning << std::endl << GenericToolbox::addUpDownBars("Injecting post-fit parameters...") << std::endl;
-    RootUtils::ObjectReader::readObject<TNamed>( fitterRootFile.get(), "FitterEngine/postFit/parState_TNamed", [&](TNamed* parState_){
-      propagator.getParametersManager().injectParameterValues( GenericToolbox::Json::readConfigJsonStr( parState_->GetTitle() ) );
-      for( auto& parSet : propagator.getParametersManager().getParameterSetsList() ){
-        if( not parSet.isEnabled() ){ continue; }
-        for( auto& par : parSet.getParameterList() ){
-          if( not par.isEnabled() ){ continue; }
-          par.setPriorValue( par.getParameterValue() );
-        }
-      }
-    });
-
-    // Load the post-fit covariance matrix
-    LogWarning << std::endl << GenericToolbox::addUpDownBars("Injecting post-fit covariance matrix...") << std::endl;
-    RootUtils::ObjectReader::readObject<TH2D>(
-        fitterRootFile.get(), "FitterEngine/postFit/Hesse/hessian/postfitCovarianceOriginal_TH2D",
-        [&](TH2D* hCovPostFit_){
-          propagator.getParametersManager().setGlobalCovarianceMatrix(std::make_shared<TMatrixD>(hCovPostFit_->GetNbinsX(), hCovPostFit_->GetNbinsX()));
-          for( int iBin = 0 ; iBin < hCovPostFit_->GetNbinsX() ; iBin++ ){
-            for( int jBin = 0 ; jBin < hCovPostFit_->GetNbinsX() ; jBin++ ){
-              (*propagator.getParametersManager().getGlobalCovarianceMatrix())[iBin][jBin] = hCovPostFit_->GetBinContent(1 + iBin, 1 + jBin);
-            }
-          }
-        }
-    );
-  }
-
-
-
-  // Creating output file
+  // Creating the output file
   std::string outFilePath{};
   if( clParser.isOptionTriggered("outputFile") ){ outFilePath = clParser.getOptionVal<std::string>("outputFile"); }
   else{
     // appendixDict["optionName"] = "Appendix"
     // this list insure all appendices will appear in the same order
     std::vector<GundamUtils::AppendixEntry> appendixDict{
-        {"configFile", ""},
-        {"fitterFile", "Fit"},
-        {"nToys", "nToys"},
-        {"randomSeed", "Seed"},
-        {"usePreFit", "PreFit"},
-    };
+          {"configFile", ""},
+          {"fitterFile", "Fit"},
+          {"nToys", "nToys"},
+          {"randomSeed", "Seed"},
+          {"usePreFit", "PreFit"},
+      };
 
     outFilePath = "gundamCalcXsec_" + GundamUtils::generateFileName(clParser, appendixDict) + ".root";
-
-    auto outFolder(xsecConfig.fetchValue<std::string>("outputFolder", "./"));
-    outFilePath = GenericToolbox::joinPath(outFolder, outFilePath);
+    outFilePath = GenericToolbox::joinPath(csc.getOutputFolder(), outFilePath);
   }
 
   app.setCmdLinePtr( &clParser );
-  app.setConfigString( xsecConfig.toString() );
+  app.setConfigString( csc.getConfig().toString() );
   app.openOutputFile( outFilePath );
   app.writeAppInfo();
 
-  auto* calcXsecDir{ GenericToolbox::mkdirTFile(app.getOutfilePtr(), "calcXsec") };
-  bool useBestFitAsCentralValue{
-    clParser.isOptionTriggered("useBfAsXsec")
-    or xsecConfig.fetchValue<bool>("useBestFitAsCentralValue", false)
-  };
+  csc.initialize();
 
-  LogInfo << "Creating throws tree" << std::endl;
-  auto* xsecThrowTree = new TTree("xsecThrow", "xsecThrow");
-  xsecThrowTree->SetDirectory( GenericToolbox::mkdirTFile(calcXsecDir, "throws") ); // temp saves will be done here
+  if( clParser.isOptionTriggered("dryRun") ){
+    LogAlert << "Exiting as dry-run is set." << std::endl;
+    return EXIT_SUCCESS;
+  }
+
+  auto* calcXsecDir{ GenericToolbox::mkdirTFile(app.getOutfilePtr(), "calcXsec") };
+
 
   auto* xsecAtBestFitTree = new TTree("xsecAtBestFitTree", "xsecAtBestFitTree");
   xsecAtBestFitTree->SetDirectory( GenericToolbox::mkdirTFile(calcXsecDir, "throws") ); // temp saves will be done here
@@ -399,6 +250,8 @@ int main(int argc, char** argv){
     const DialCollection* dialCollectionPtr{nullptr}; // where the binning is defined
   };
   std::vector<ParSetNormaliser> parSetNormList;
+
+
   for( auto& parSet : propagator.getParametersManager().getParameterSetsList() ){
     for( auto& parSetNormConfig : parSet.getConfig().loop("normalisations") ){
       parSetNormList.emplace_back();
@@ -414,70 +267,6 @@ int main(int argc, char** argv){
       parSetNormList.back().initialize();
     }
   }
-
-
-
-  // to be filled up
-  struct BinNormaliser{
-    void configure(ConfigReader& config_){
-      LogScopeIndent;
-      config_.defineFields({
-        {FieldFlag::MANDATORY, "name"},
-        {"isEnabled"},
-        {"meanValue"},
-        {"stdDev"},
-        {"disabledBinDim"},
-        {"parSetNormName"},
-      });
-      config_.checkConfiguration();
-
-      name = config_.fetchValue<std::string>("name");
-
-      if( not config_.fetchValue("isEnabled", bool(true)) ){
-        LogWarning << "Skipping disabled re-normalization config \"" << name << "\"" << std::endl;
-        return;
-      }
-
-      LogInfo << "Re-normalization config \"" << name << "\": ";
-
-      if     ( config_.hasField( "meanValue" ) ){
-        normParameter.min  = config_.fetchValue<double>("meanValue");
-        normParameter.max = config_.fetchValue("stdDev", double(0.));
-        LogInfo << "mean ± sigma = " << normParameter.min << " ± " << normParameter.max;
-      }
-      else if( config_.hasField("disabledBinDim" ) ){
-        disabledBinDim = config_.fetchValue<std::string>("disabledBinDim");
-        LogInfo << "disabledBinDim = " << disabledBinDim;
-      }
-      else if( config_.hasField("parSetNormName" ) ){
-        parSetNormaliserName = config_.fetchValue<std::string>("parSetNormName");
-        LogInfo << "parSetNormName = " << parSetNormaliserName;
-      }
-      else{
-        LogInfo << std::endl;
-        LogThrow("Unrecognized config.");
-      }
-
-      LogInfo << std::endl;
-    }
-
-    std::string name{};
-    GenericToolbox::Range normParameter{};
-    std::string disabledBinDim{};
-    std::string parSetNormaliserName{};
-
-  };
-
-  struct CrossSectionData{
-    Sample* samplePtr{nullptr};
-    Sample* sampleDataPtr{nullptr};
-    ConfigReader config{};
-    GenericToolbox::RawDataArray branchBinsData{};
-
-    TH1D histogram{};
-    std::vector<BinNormaliser> normList{};
-  };
-  std::vector<CrossSectionData> crossSectionDataList{};
 
   LogInfo << "Initializing xsec samples..." << std::endl;
   crossSectionDataList.reserve(propagator.getSampleSet().getSampleList().size() );
@@ -538,18 +327,6 @@ int main(int argc, char** argv){
 //      std::for_each(dataEvList.begin(), dataEvList.end(), []( Event& ev_){ ev_.getWeights().current = 0; });
 //    }
   }
-
-  bool enableEventMcThrow{true};
-  bool enableStatThrowInToys{true};
-  auto xsecCalcConfig   = xsecConfig.fetchValue( "xsecCalcConfig", ConfigReader() );
-
-  xsecCalcConfig.defineFields({
-    {"enableStatThrowInToys"},
-    {"enableEventMcThrow"}
-  });
-
-  enableStatThrowInToys = xsecCalcConfig.fetchValue("enableStatThrowInToys", enableStatThrowInToys);
-  enableEventMcThrow    = xsecCalcConfig.fetchValue("enableEventMcThrow", enableEventMcThrow);
 
   auto writeBinDataFct = std::function<void()>([&]{
     for( auto& xsec : crossSectionDataList ){
@@ -631,76 +408,6 @@ int main(int argc, char** argv){
   //////////////////////////////////////
   // THROWS LOOP
   /////////////////////////////////////
-  LogWarning << std::endl << GenericToolbox::addUpDownBars( "Generating toys..." ) << std::endl;
-  propagator.getParametersManager().initializeStrippedGlobalCov();
-
-  // stats printing
-  GenericToolbox::Time::AveragedTimer<1> totalTimer{};
-  GenericToolbox::Time::AveragedTimer<1> throwTimer{};
-  GenericToolbox::Time::AveragedTimer<1> propagateTimer{};
-  GenericToolbox::Time::AveragedTimer<1> otherTimer{};
-  GenericToolbox::Time::AveragedTimer<1> writeTimer{};
-  GenericToolbox::TablePrinter t{};
-  std::stringstream progressSs;
-  std::stringstream ss; ss << LogWarning.getPrefixString() << "Generating " << nToys << " toys...";
-  for( int iToy = 0 ; iToy < nToys ; iToy++ ){
-
-    t.reset();
-    t << "Total time" << GenericToolbox::TablePrinter::NextColumn;
-    t << "Throw toys" << GenericToolbox::TablePrinter::NextColumn;
-    t << "Propagate pars" << GenericToolbox::TablePrinter::NextColumn;
-    t << "Re-normalize" << GenericToolbox::TablePrinter::NextColumn;
-    t << "Write throws" << GenericToolbox::TablePrinter::NextLine;
-
-    t << totalTimer << GenericToolbox::TablePrinter::NextColumn;
-    t << throwTimer << GenericToolbox::TablePrinter::NextColumn;
-    t << propagateTimer << GenericToolbox::TablePrinter::NextColumn;
-    t << otherTimer << GenericToolbox::TablePrinter::NextColumn;
-    t << writeTimer << GenericToolbox::TablePrinter::NextLine;
-
-    totalTimer.stop();
-    totalTimer.start();
-
-    // loading...
-    progressSs.str("");
-    progressSs << t.generateTableString() << std::endl;
-    progressSs << ss.str();
-    GenericToolbox::displayProgressBar( iToy+1, nToys, progressSs.str() );
-
-    // Do the throwing:
-    throwTimer.start();
-    propagator.getParametersManager().throwParametersFromGlobalCovariance( not GundamGlobals::isDebug() );
-    throwTimer.stop();
-
-    propagateTimer.start();
-    propagator.propagateParameters();
-
-    if( enableStatThrowInToys ){
-      for( auto& xsec : crossSectionDataList ){
-        if( enableEventMcThrow and not xsec.samplePtr->isEventMcThrowDisabled() ){
-          // Take into account the finite amount of event in MC
-          xsec.samplePtr->getHistogram().throwEventMcError();
-        }
-        // Asimov bin content -> toy data
-        xsec.samplePtr->getHistogram().throwStatError();
-      }
-    }
-    propagateTimer.stop();
-
-    otherTimer.start();
-    // TODO: parallelize this
-    writeBinDataFct();
-    otherTimer.stop();
-
-    // Write the branches
-    writeTimer.start();
-    xsecThrowTree->Fill();
-    writeTimer.stop();
-  }
-
-
-  LogInfo << "Writing throws..." << std::endl;
-  GenericToolbox::writeInTFileWithObjTypeExt( GenericToolbox::mkdirTFile(calcXsecDir, "throws"), xsecThrowTree );
 
   LogInfo << "Calculating mean & covariance matrix..." << std::endl;
   auto* meanValuesVector = GenericToolbox::generateMeanVectorOfTree(
