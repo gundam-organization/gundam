@@ -55,6 +55,8 @@ void GundamApp::writeAppInfo(){
   if( _cmdLinePtr_ != nullptr ){
     GenericToolbox::writeInTFileWithObjTypeExt( runtimeDir, TNamed("commandLine", _cmdLinePtr_->getCommandLineString().c_str()) );
   }
+  auto cwdGitStatus = GenericToolbox::joinVectorString(GenericToolbox::getOutputOfShellCommand("git status"), "\n");
+  GenericToolbox::writeInTFileWithObjTypeExt( runtimeDir, TNamed("git", cwdGitStatus.c_str()) );
 
   auto* buildDir = GenericToolbox::mkdirTFile(dir, "build");
   GenericToolbox::writeInTFileWithObjTypeExt( buildDir, TNamed("version", GundamUtils::getVersionFullStr().c_str()) );
