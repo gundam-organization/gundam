@@ -18,147 +18,125 @@
 
 
 void ParameterSet::configureImpl(){
-  // All of the fields that should (or may) be at this level in the YAML.
-  // This provides a rudimentary syntax check for user inputs.
-  ConfigUtils::checkFields(_config_,
-                           "/fitterEngineConfig/likelihoodInterfaceConfig"
-                           "/propagatorConfig/parametersManagerConfig"
-                           "/parameterSetList",
-                           // Allowed fields (don't need to list fields in
-                           // expected, or deprecated).
-                           {
-                             {"parameterDefinitions"},
-                             {"dialSetDefinitions"},
-                             {"isEnabled"},
-                             {"isScanEnabled"},
-                             {"numberOfParameters"},
-                             {"nominalStepSize"},
-                             {"printDialSetSummary"},
-                             {"printParameterSummary"},
-                             {"parameterLimits"},
-                             {"enablePca"},
-                             {"enableThrowToyParameters"},
-                             {"customFitParThrow"},
-                             {"releaseFixedParametersOnHess"},
-                             {"parameterDefinitionFilePath"},
-                             {"covarianceMatrixFilePath"},
-                             {"covarianceMatrix"},
-                             {"covarianceMatrixTMatrixD"},
-                             {"parameterNameList"},
-                             {"parameterPriorValueList"},
-                             {"parameterLowerBoundsList"},
-                             {"parameterUpperBoundsList"},
-                             {"throwEnabledList"},
-                             {"enableOnlyParameters"},
-                             {"disableParameters"},
-                             {"useMarkGenerator"},
-                             {"useEigenDecompForThrows"},
-                             {"enableEigenDecomp"},
-                             {"allowEigenDecompWithBounds"},
-                             {"maxNbEigenParameters"},
-                             {"maxEigenFraction"},
-                             {"eigenValueThreshold"},
-                             {"eigenParBounds"},
-                           },
-                           // Expected fields (must be present)
-                           {
-                             {"name"},
-                           },
-                           // Deprecated fields (allowed, but cause a warning)
-                           {
-                             {"maskForToyGeneration"},
-                             {"devUseParLimitsOnEigen"},
-                           },
-                           // Field names that got replaced.
-                           {
-                             {{"allowPca"},{"enablePca"}},
-                             {{"fixGhostFitParameters"},{"enablePca"}},
-                             {{"parameterNameTObjArray"},{"parameterNameList"}},
-                             {{"parameterPriorTVectorD"},{"parameterPriorValueList"}},
-                             {{"printParametersSummary"},{"printParameterSummary"}},
-                             {{"parameterLowerBoundsTVectorD"},{"parameterLowerBoundsList"}},
-                             {{"parameterUpperBoundsTVectorD"},{"parameterUpperBoundsList"}},
-                             {{"useEigenDecompInFit"},{"enableEigenDecomp"}},
-                             {{"printDialSetsSummary"},{"printDialSetSummary"}},
-                             {{"enabledThrowToyParameters"},{"enableThrowToyParameters"}},
-                             {{"eigenSvdThreshold"},{"eigenValueThreshold"}},
-                           });
 
+  _config_.defineFields(std::vector<ConfigReader::FieldDefinition>{
+    {FieldFlag::MANDATORY, "name"},
+    {"isEnabled"},
+    {"isScanEnabled"},
+    {"numberOfParameters"},
+    {"nominalStepSize"},
+    {"parametersRange", {"parameterLimits"}},
+    {"enablePca", {"allowPca", "fixGhostFitParameters"}},
+    {"enableThrowToyParameters",{"enabledThrowToyParameters"}},
+    {"printDialSetSummary", {"printDialSetsSummary"}},
+    {"customParThrow", {"customFitParThrow"}},
+    {"printParametersSummary", {"printParameterSummary"}},
+    {"parameterDefinitionFilePath", {"covarianceMatrixFilePath"}},
+    {"covarianceMatrix", {"covarianceMatrixTMatrixD"}},
+    {"parameterNameList", {"parameterNameTObjArray"}},
+    {"parameterPriorValueList", {"parameterPriorTVectorD"}},
+    {"parameterLowerBoundsList", {"parameterLowerBoundsTVectorD"}},
+    {"parameterUpperBoundsList", {"parameterUpperBoundsTVectorD"}},
+    {"throwEnabledList"},
+    {"parameterDefinitions"},
+    {"dialSetDefinitions"},
+    {"enableOnlyParameters"},
+    {"disableParameters"},
+    {"useMarkGenerator"},
+    {"useEigenDecompForThrows"},
+    {"enableEigenDecomp",{"useEigenDecompInFit"}},
+    {"allowEigenDecompWithBounds"},
+    {"maxNbEigenParameters"},
+    {"maxEigenFraction"},
+    {"eigenValueThreshold",{"eigenSvdThreshold"}},
+    {"eigenParBounds"},
+    {"maskForToyGeneration"},
+    {"devUseParLimitsOnEigen"},
+    {"releaseFixedParametersOnHesse"},
+    {"skipVariedEventRates"},
+    {"disableOneSigmaPlots"},
+    {"normalisations"},
+  });
+  _config_.checkConfiguration();
 
-  GenericToolbox::Json::fillValue(_config_, _name_, "name");
+  _config_.fillValue(_name_, "name");
   LogExitIf(_name_.empty(), "Config error -- parameter set without a name.");
   LogDebugIf(GundamGlobals::isDebug()) << "Reading config for parameter set: " << _name_ << std::endl;
 
-  GenericToolbox::Json::fillValue(_config_, _isEnabled_, "isEnabled");
+  _config_.fillValue(_isEnabled_, "isEnabled");
   if( not _isEnabled_ ){
     LogDebugIf(GundamGlobals::isDebug()) << " -> marked as disabled." << std::endl;
     return; // don't go any further
   }
 
-  GenericToolbox::Json::fillValue(_config_, _isScanEnabled_, "isScanEnabled");
+  _config_.fillValue(_isScanEnabled_, "isScanEnabled");
+  _config_.fillValue(_skipVariedEventRates_, "skipVariedEventRates");
+  _config_.fillValue(_disableOneSigmaPlots_, "disableOneSigmaPlots");
 
-  GenericToolbox::Json::fillValue(_config_, _nbParameterDefinition_, "numberOfParameters");
-  GenericToolbox::Json::fillValue(_config_, _nominalStepSize_, "nominalStepSize");
+  _config_.fillValue(_nbParameterDefinition_, "numberOfParameters");
+  _config_.fillValue(_nominalStepSize_, "nominalStepSize");
 
-  GenericToolbox::Json::fillValue(_config_, _printDialSetsSummary_, {{"printDialSetSummary"}, {"printDialSetsSummary"}});
-  GenericToolbox::Json::fillValue(_config_, _printParametersSummary_, {{"printParameterSummary"},{"printParametersSummary"}});
+  _config_.fillValue(_printDialSetsSummary_, "printDialSetSummary");
+  _config_.fillValue(_printParametersSummary_, "printParametersSummary");
 
-  GenericToolbox::Json::fillValue(_config_, _globalParRange_.min, "parameterLimits/minValue");
-  GenericToolbox::Json::fillValue(_config_, _globalParRange_.max, "parameterLimits/maxValue");
+  _config_.fillValue(_globalParRange_, "parametersRange");
 
-  // GenericToolbox::Json::fillValue(_config_, _enablePca_, {{"enablePca"},{"allowPca"},{"fixGhostFitParameters"}});
-  GenericToolbox::Json::fillValue(_config_, _enabledThrowToyParameters_, {{"enableThrowToyParameters"},{"enabledThrowToyParameters"}});
-  GenericToolbox::Json::fillValue(_config_, _customParThrow_, {{"customParThrow"},{"customFitParThrow"}});
-  GenericToolbox::Json::fillValue(_config_, _releaseFixedParametersOnHesse_, "releaseFixedParametersOnHesse");
+  _config_.fillValue(_enablePca_, "enablePca");
 
-  GenericToolbox::Json::fillValue(_config_, _parameterDefinitionFilePath_, {{"parameterDefinitionFilePath"},{"covarianceMatrixFilePath"}});
-  GenericToolbox::Json::fillValue(_config_, _covarianceMatrixPath_, {{"covarianceMatrix"},{"covarianceMatrixTMatrixD"}});
-  GenericToolbox::Json::fillValue(_config_, _parameterNameListPath_, {{"parameterNameList"},{"parameterNameTObjArray"}});
-  GenericToolbox::Json::fillValue(_config_, _parameterPriorValueListPath_, {{"parameterPriorValueList"},{"parameterPriorTVectorD"}});
+  // throw related
+  _config_.fillValue(_enabledThrowToyParameters_, "enableThrowToyParameters");
+  _config_.fillValue(_customParThrow_, "customParThrow");
+  _config_.fillValue(_releaseFixedParametersOnHesse_, "releaseFixedParametersOnHesse");
 
-  GenericToolbox::Json::fillValue(_config_, _parameterLowerBoundsTVectorD_, {{"parameterLowerBoundsList"}, {"parameterLowerBoundsTVectorD"}});
-  GenericToolbox::Json::fillValue(_config_, _parameterUpperBoundsTVectorD_, {{"parameterUpperBoundsList"}, {"parameterUpperBoundsTVectorD"}});
-  GenericToolbox::Json::fillValue(_config_, _throwEnabledListPath_, "throwEnabledList");
+  _config_.fillValue(_parameterDefinitionFilePath_, "parameterDefinitionFilePath");
+  _config_.fillValue(_covarianceMatrixPath_, "covarianceMatrix");
+  _config_.fillValue(_parameterNameListPath_, "parameterNameList");
+  _config_.fillValue(_parameterPriorValueListPath_, "parameterPriorValueList");
 
-  GenericToolbox::Json::fillValue(_config_, _parameterDefinitionConfig_, "parameterDefinitions");
-  GenericToolbox::Json::fillValue(_config_, _dialSetDefinitions_, "dialSetDefinitions");
-  GenericToolbox::Json::fillValue(_config_, _enableOnlyParameters_, "enableOnlyParameters");
-  GenericToolbox::Json::fillValue(_config_, _disableParameters_, "disableParameters");
+  _config_.fillValue(_parameterLowerBoundsTVectorD_, "parameterLowerBoundsList");
+  _config_.fillValue(_parameterUpperBoundsTVectorD_, "parameterUpperBoundsList");
+  _config_.fillValue(_throwEnabledListPath_, "throwEnabledList");
 
-  // throws options
-  GenericToolbox::Json::fillValue(_config_, _useMarkGenerator_, "useMarkGenerator");
-  GenericToolbox::Json::fillValue(_config_, _useEigenDecompForThrows_, "useEigenDecompForThrows");
+  _config_.fillValue(_parameterDefinitionConfig_, "parameterDefinitions");
+  _config_.fillValue(_dialSetDefinitions_, "dialSetDefinitions");
+  _config_.fillValue(_enableOnlyParameters_, "enableOnlyParameters");
+  _config_.fillValue(_disableParameters_, "disableParameters");
+
+  // throw options
+  _config_.fillValue(_useMarkGenerator_, "useMarkGenerator");
+  _config_.fillValue(_useEigenDecompForThrows_, "useEigenDecompForThrows");
 
   // eigen related parameters
-  GenericToolbox::Json::fillValue(_config_, _enableEigenDecomp_, {{"enableEigenDecomp"},{"useEigenDecompInFit"}});
-  GenericToolbox::Json::fillValue(_config_, _allowEigenDecompWithBounds_, "allowEigenDecompWithBounds");
-  GenericToolbox::Json::fillValue(_config_, _maxNbEigenParameters_, "maxNbEigenParameters");
-  GenericToolbox::Json::fillValue(_config_, _maxEigenFraction_, "maxEigenFraction");
-  GenericToolbox::Json::fillValue(_config_, _eigenSvdThreshold_, {{"eigenValueThreshold"},{"eigenSvdThreshold"}});
+  _config_.fillValue(_enableEigenDecomp_, "enableEigenDecomp");
+  _config_.fillValue(_allowEigenDecompWithBounds_, "allowEigenDecompWithBounds");
+  _config_.fillValue(_maxNbEigenParameters_, "maxNbEigenParameters");
+  _config_.fillValue(_maxEigenFraction_, "maxEigenFraction");
+  _config_.fillValue(_eigenSvdThreshold_, "eigenValueThreshold");
 
-  GenericToolbox::Json::fillValue(_config_, _eigenParRange_.min, "eigenParBounds/minValue");
-  GenericToolbox::Json::fillValue(_config_, _eigenParRange_.max, "eigenParBounds/maxValue");
+  _config_.fillValue(_eigenParRange_, "eigenParBounds");
 
   // legacy
-  GenericToolbox::Json::fillValue(_config_, _maskForToyGeneration_, "maskForToyGeneration");
+  _config_.fillValue(_maskForToyGeneration_, "maskForToyGeneration");
 
   // dev option -> was used for validation
-  GenericToolbox::Json::fillValue(_config_, _devUseParLimitsOnEigen_, "devUseParLimitsOnEigen");
+  _config_.fillValue(_devUseParLimitsOnEigen_, "devUseParLimitsOnEigen");
 
   // individual parameter definitions:
   if( not _parameterDefinitionFilePath_.empty() ){ readParameterDefinitionFile(); }
 
   if( _nbParameterDefinition_ == -1 ){
-    // no number of parameter provided -> parameters were not defined
+    // no number of parameters provided -> parameters were not defined
     // looking for alternative/legacy definitions...
 
     if( not _dialSetDefinitions_.empty() ){
-      for( auto& dialSetDef : _dialSetDefinitions_ ){
+      for( auto& dialSetDef : _dialSetDefinitions_.loop() ){
 
-        JsonType parameterBinning;
-        GenericToolbox::Json::fillValue(dialSetDef, parameterBinning, {{"binning"}, {"parametersBinningPath"}});
+        // dial library is top level, so using simple field def here
+        dialSetDef.defineFields({{"binning", {"parametersBinningPath"}}});
+        if( not dialSetDef.hasField("binning") ){ continue; }
 
-        if( parameterBinning.empty() ){ continue;}
+        auto parameterBinning = dialSetDef.fetchValue<ConfigReader>("binning");
+        if( parameterBinning.empty() ){ continue; }
 
         LogInfo << "Found parameter binning within dialSetDefinition. Defining parameters number..." << std::endl;
         BinSet b;
@@ -166,7 +144,7 @@ void ParameterSet::configureImpl(){
         // DON'T SORT THE BINNING -> tide to the cov matrix
         _nbParameterDefinition_ = int(b.getBinList().size());
 
-        // don't fetch other dataset as they should always have the same assumption
+        // don't fetch another dataset as they should always have the same assumption
         break;
 
       }
@@ -174,19 +152,23 @@ void ParameterSet::configureImpl(){
 
     if( _nbParameterDefinition_ == -1 and not _parameterDefinitionConfig_.empty() ){
       LogDebugIf(GundamGlobals::isDebug()) << "Using parameter definition config list to determine the number of parameters..." << std::endl;
-      _nbParameterDefinition_ = int(_parameterDefinitionConfig_.get<std::vector<JsonType>>().size());
+      _nbParameterDefinition_ = int(_parameterDefinitionConfig_.getConfig().size());
+      for(auto& parDef : _parameterDefinitionConfig_.loop() ){ Parameter::prepareConfig(parDef); }
     }
 
     LogExitIf(_nbParameterDefinition_==-1, "Could not figure out the number of parameters to be defined for the set: " << _name_ );
   }
 
-  if (_nbParameterDefinition_ < 1) {
+  if (_nbParameterDefinition_ < 1){
     LogError << "CONFIG ERROR: Parameter set \"" << getName() << "\" without parameters." << std::endl;
   }
 
   this->defineParameters();
 }
 void ParameterSet::initializeImpl() {
+
+  _config_.printUnusedKeys();
+
   for( auto& par : _parameterList_ ){
     par.initialize();
   }
@@ -265,9 +247,9 @@ void ParameterSet::processCovarianceMatrix(){
     _inverseCovarianceMatrix_->Invert(&det);
 
     bool failed{false};
-    if( det <= 0 ){
+    if( det < 0 ){
       _priorCovarianceMatrix_->Print();
-      LogError << "Stripped covariance must be positive definite: " << det << std::endl;
+      LogError << "Stripped covariance must be positive definite. Determinant is: " << det << std::endl;
       failed = true;
     }
 
@@ -456,6 +438,21 @@ std::vector<Parameter>& ParameterSet::getEffectiveParameterList(){
 }
 
 // Core
+bool ParameterSet::hasOutOfBoundsParameters() const{
+  bool out{false};
+
+  out = std::any_of(getParameterList().begin(), getParameterList().end(), [](const Parameter& par){
+    return not par.isValueWithinBounds();
+  });
+
+  if( _eigenDecomp_ and not out ) {
+    out = std::any_of(getEigenParameterList().begin(), getEigenParameterList().end(), [](const Parameter& par){
+      return not par.isValueWithinBounds();
+    });
+  }
+
+  return out;
+}
 void ParameterSet::updateDeltaVector() const{
   int iFit{0};
   for( const auto& par : _parameterList_ ){
@@ -1085,8 +1082,10 @@ void ParameterSet::defineParameters(){
     if( not _enableOnlyParameters_.empty() ){
       bool isEnabled = false;
       for( auto& enableEntry : _enableOnlyParameters_ ){
-        if( GenericToolbox::Json::doKeyExist(enableEntry, "name")
-            and par.getName() == GenericToolbox::Json::fetchValue<std::string>(enableEntry, "name") ){
+        enableEntry.clearFields();
+        enableEntry.defineFields({{"name"}});
+        if( enableEntry.hasField("name")
+            and par.getName() == enableEntry.fetchValue<std::string>("name") ){
           isEnabled = true;
           break;
         }
@@ -1103,8 +1102,10 @@ void ParameterSet::defineParameters(){
     if( not _disableParameters_.empty() ){
       bool isEnabled = true;
       for( auto& disableEntry : _disableParameters_ ){
-        if( GenericToolbox::Json::doKeyExist(disableEntry, "name")
-            and par.getName() == GenericToolbox::Json::fetchValue<std::string>(disableEntry, "name") ){
+        disableEntry.clearFields();
+        disableEntry.defineFields({{"name"}});
+        if( disableEntry.hasField("name")
+            and par.getName() == disableEntry.fetchValue<std::string>("name") ){
           isEnabled = false;
           break;
         }
@@ -1122,12 +1123,15 @@ void ParameterSet::defineParameters(){
 
     par.setParameterValue(par.getPriorValue());
 
-    par.setLimits(_globalParRange_);
-
-    GenericToolbox::Range rootBounds{};
-    if( _parameterLowerBoundsList_ != nullptr ){ rootBounds.min = ((*_parameterLowerBoundsList_)[par.getParameterIndex()]); }
-    if( _parameterUpperBoundsList_ != nullptr ){ rootBounds.max = ((*_parameterUpperBoundsList_)[par.getParameterIndex()]); }
-    par.setLimits( rootBounds );
+    if( _globalParRange_.hasBound() ){
+      par.setLimits(_globalParRange_);
+    }
+    else {
+      GenericToolbox::Range rootBounds{};
+      if( _parameterLowerBoundsList_ != nullptr ){ rootBounds.min = ((*_parameterLowerBoundsList_)[par.getParameterIndex()]); }
+      if( _parameterUpperBoundsList_ != nullptr ){ rootBounds.max = ((*_parameterUpperBoundsList_)[par.getParameterIndex()]); }
+      par.setLimits( rootBounds );
+    }
 
     LogExitIf( not par.getParameterLimits().isInBounds(par.getPriorValue()), "PRIOR IS NOT IN BOUNDS: " << par.getSummary() );
 
@@ -1136,33 +1140,55 @@ void ParameterSet::defineParameters(){
       if (_parameterNamesList_ != nullptr) {
         // Find the parameter using the name from the vector of names for
         // the covariance.
-        auto parConfig = GenericToolbox::Json::fetchMatchingEntry(_parameterDefinitionConfig_, "name", std::string(_parameterNamesList_->At(par.getParameterIndex())->GetName()));
-        if( parConfig.empty() ) parConfig = GenericToolbox::Json::fetchMatchingEntry(_parameterDefinitionConfig_, "parameterName", std::string(_parameterNamesList_->At(par.getParameterIndex())->GetName()));
-        if( parConfig.empty() ){
-            // try with par index
-          parConfig = GenericToolbox::Json::fetchMatchingEntry(_parameterDefinitionConfig_, "parameterIndex", par.getParameterIndex());
+
+        ConfigReader selectedParConfig;
+
+        // search with name
+        std::string parName = _parameterNamesList_->At(par.getParameterIndex())->GetName();
+        for( auto& parConfig : _parameterDefinitionConfig_.loop() ){
+          parConfig.defineFields({
+            {"name", {"parameterName"}},
+          });
+          if( parConfig.hasField("name") ){
+            if( parName == parConfig.fetchValue<std::string>("name") ){
+              selectedParConfig = parConfig;
+              break;
+            }
+          }
         }
-        par.setConfig(parConfig);
+
+        // not found? try with the index
+        if( selectedParConfig.empty() ){
+          for( auto& parConfig : _parameterDefinitionConfig_.loop() ){
+            parConfig.defineFields({{"parameterIndex"}});
+            if( parConfig.hasField("parameterIndex") ){
+              if( par.getParameterIndex() == parConfig.fetchValue<int>("parameterIndex") ){
+                selectedParConfig = parConfig;
+                break;
+              }
+            }
+          }
+        }
+
+        par.setConfig( selectedParConfig );
       }
-      else {
+      else{
         // No covariance provided, so find the name based on the order in
         // the parameter set.
-        auto configVector = _parameterDefinitionConfig_.get<std::vector<JsonType>>();
+        auto configVector = _parameterDefinitionConfig_.loop();
         LogThrowIf(configVector.size() <= par.getParameterIndex(),
                    "Parameter index out of range");
-        auto parConfig = configVector.at(par.getParameterIndex());
-        auto parName = GenericToolbox::Json::fetchValue<std::string>(parConfig, {{"parameterName"}, {"name"}});
-        if (not parName.empty()) par.setName(parName);
-        par.setConfig(parConfig);
+        auto& parConfig = configVector.at(par.getParameterIndex());
+        par.setConfig( parConfig );
+
         LogWarning << "Parameter #" << par.getParameterIndex()
-                   << " (name \"" << par.getName() << "\")"
                    << " not defined by covariance matrix file"
                    << std::endl;
       }
     }
     else if( not _dialSetDefinitions_.empty() ){
       // Alternative 2: define dials then parameters
-      par.setDialSetConfig( _dialSetDefinitions_ );
+      par.setDialSetConfig( _dialSetDefinitions_.loop() );
     }
     par.configure();
   }

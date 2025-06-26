@@ -50,6 +50,19 @@ Cache::Weights::Weights(std::size_t results)
   Reset();
 }
 
+int Cache::Weights::AddWeightCalculator(Cache::Weight::Base* v) {
+    int index = fWeightCalculators++;
+    if (fWeightCalculator.size() < fWeightCalculators) {
+        std::cout << "CacheWeights: Overflow --"
+                  << " Increase size of fWeightCalculator std::array. "
+                  << " Current Size: " << fWeightCalculator.size()
+                  << std::endl;
+        std::exit(EXIT_FAILURE);
+    }
+    fWeightCalculator.at(index) = v;
+    return index;
+}
+
 void Cache::Weights::Reset() {
   Invalidate();
   std::fill(fInitialValues->hostPtr(),

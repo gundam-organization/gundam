@@ -14,7 +14,15 @@
 
 void SampleSet::configureImpl(){
 
-  auto sampleListConfig = GenericToolbox::Json::fetchValue(_config_, {{"sampleList"}, {"fitSampleList"}}, JsonType());
+  _config_.defineFields({
+    {"sampleList", {"fitSampleList"}},
+    // deprecated
+    {FieldFlag::RELOCATED, "llhStatFunction", "likelihoodInterfaceConfig/jointProbabilityConfig/type"},
+    {FieldFlag::RELOCATED, "llhConfig", "likelihoodInterfaceConfig/jointProbabilityConfig"},
+  });
+  _config_.checkConfiguration();
+
+  auto sampleListConfig = _config_.loop("sampleList");
   LogDebugIf(GundamGlobals::isDebug()) << sampleListConfig.size() << " samples defined in the config." << std::endl;
 
   if( _sampleList_.empty() ){
@@ -40,24 +48,16 @@ void SampleSet::configureImpl(){
     // we want to read the config without removing the content of the samples
 
     // need to check how many samples are enabled. It should match the list.
-    size_t nSamples{0};
-    for(const auto & sampleConfig : sampleListConfig){
-      if( not GenericToolbox::Json::fetchValue(sampleConfig, "isEnabled", true) ) continue;
-      nSamples++;
+    size_t iSample = 0;
+    for(auto & sampleConfig : sampleListConfig){
+      Sample::prepareConfig(sampleConfig);
+      if( sampleConfig.hasField("isEnabled") and not sampleConfig.fetchValue<bool>("isEnabled") ) {
+        continue;
+      }
+      if( iSample >= _sampleList_.size() ){ continue; }
+      _sampleList_[ iSample++ ].configure( sampleConfig ); // read the config again
     }
-    LogThrowIf(nSamples != _sampleList_.size(), "Can't reload config with different number of samples");
-
-    for( size_t iSample = 0 ; iSample < _sampleList_.size() ; iSample++ ){
-      if( not GenericToolbox::Json::fetchValue(sampleListConfig[iSample], "isEnabled", true) ) continue;
-      _sampleList_[ iSample ].configure( sampleListConfig[iSample] ); // read the config again
-    }
-  }
-
-  if (sampleListConfig.size() < 1) {
-      LogError << "No sample sets defined" << std::endl;
-      LogError << "Must be defined under /fitterEngineConfig/likelihoodInterfaceConfig/propagatorConfig/sampleSetConfig"
-               << std::endl;
-      std::exit(1);
+    LogThrowIf(iSample != _sampleList_.size(), "Can't reload config with different number of samples");
   }
 
   LogDebugIf(GundamGlobals::isDebug()) << sampleListConfig.size() << " samples were defined." << std::endl;

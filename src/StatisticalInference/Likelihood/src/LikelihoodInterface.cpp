@@ -16,98 +16,75 @@
 
 
 void LikelihoodInterface::configureImpl(){
-
   _threadPool_.setNThreads(GundamGlobals::getNbCpuThreads() );
 
-  ConfigUtils::checkFields(_config_,
-                           "/fitterEngineConfig/likelihoodInterfaceConfig",
-                           // Allowed fields (don't need to list fields in
-                           // expected, or deprecated).
-                           {
-                             {"plotGeneratorConfig"},
-                             {"enableStatThrowInToys"},
-                             {"gaussStatThrowInToys"},
-                             {"enableEventMcThrow"},
-                           },
-                           // Expected fields (must be present)
-                           {
-                             {"propagatorConfig"},
-                             {"dataSetList"},
-                             {"jointProbabilityConfig"},
-                           },
-                           // Deprecated fields (allowed, but cause a warning)
-                           {
-                           },
-                           {
-                             {{"datasetList"}, {"dataSetList"}},
-                           });
+  _config_.defineFields({
+    {"propagatorConfig"},
+    {"datasetList"},
+    {"jointProbabilityConfig"},
+    {"plotGeneratorConfig"},
+    {"eventTreeWriter"},
+    {"enableStatThrowInToys"},
+    {"gaussStatThrowInToys"},
+    {"enableEventMcThrow"},
+    {"applyInfinitePenaltyOnOutOfBoundPar"},
+  });
+  _config_.checkConfiguration();
 
   // reading the configuration of the propagator
   // allows to implement
-  GenericToolbox::Json::fillValue(_config_, _modelPropagator_.getConfig(), "propagatorConfig");
+  _config_.fillValue(_modelPropagator_.getConfig(), "propagatorConfig");
   _modelPropagator_.configure();
 
-  JsonType datasetListConfig{};
-  JsonType jointProbabilityConfig{};
+  ConfigReader datasetListConfig{};
+  ConfigReader jointProbabilityConfig{};
   std::string jointProbabilityTypeStr{"PoissonLLH"};
 
   // prior to this version a few parameters were set in the propagator itself
-  GenericToolbox::Json::deprecatedAction(_modelPropagator_.getConfig(), "enableStatThrowInToys", [&]{
-    LogAlert << R"("enableStatThrowInToys" should now be set under "likelihoodInterfaceConfig" instead of "propagatorConfig".)" << std::endl;
-    GenericToolbox::Json::fillValue(_modelPropagator_.getConfig(), _enableStatThrowInToys_, "enableStatThrowInToys");
-  });
-  GenericToolbox::Json::deprecatedAction(_modelPropagator_.getConfig(), "gaussStatThrowInToys", [&]{
-    LogAlert << R"("gaussStatThrowInToys" should now be set under "likelihoodInterfaceConfig" instead of "propagatorConfig".)" << std::endl;
-    GenericToolbox::Json::fillValue(_modelPropagator_.getConfig(), _gaussStatThrowInToys_, "gaussStatThrowInToys");
-  });
-  GenericToolbox::Json::deprecatedAction(_modelPropagator_.getConfig(), "enableEventMcThrow", [&]{
-    LogAlert << R"("enableEventMcThrow" should now be set under "likelihoodInterfaceConfig" instead of "propagatorConfig".)" << std::endl;
-    GenericToolbox::Json::fillValue(_modelPropagator_.getConfig(), _enableEventMcThrow_, "enableEventMcThrow");
-  });
-  GenericToolbox::Json::deprecatedAction(_modelPropagator_.getConfig(), "plotGeneratorConfig", [&]{
-    LogAlert << R"("plotGeneratorConfig" should now be set under "likelihoodInterfaceConfig".)" << std::endl;
-    GenericToolbox::Json::fillValue(_modelPropagator_.getConfig(), _plotGenerator_.getConfig(), "plotGeneratorConfig");
-  });
-  GenericToolbox::Json::deprecatedAction(_modelPropagator_.getConfig(), {{"dataSetList"}, {"fitSampleSetConfig/dataSetList"}}, [&](const std::string& path_){
-    LogAlert << "\"" << path_ << R"(" should now be set under "likelihoodInterfaceConfig".)" << std::endl;
-    GenericToolbox::Json::fillValue(_modelPropagator_.getConfig(), datasetListConfig, path_);
-  });
-  GenericToolbox::Json::deprecatedAction(_modelPropagator_.getSampleSet().getConfig(), "llhStatFunction", [&]{
-    LogAlert << R"("llhStatFunction" should now be set under "likelihoodInterfaceConfig/jointProbabilityConfig/type".)" << std::endl;
-    GenericToolbox::Json::fillValue(_modelPropagator_.getSampleSet().getConfig(), jointProbabilityTypeStr, "llhStatFunction");
-  });
-  GenericToolbox::Json::deprecatedAction(_modelPropagator_.getSampleSet().getConfig(), "llhConfig", [&]{
-    LogAlert << R"("llhConfig" should now be set under "likelihoodInterfaceConfig/jointProbabilityConfig".)" << std::endl;
-    GenericToolbox::Json::fillValue(_modelPropagator_.getSampleSet().getConfig(), jointProbabilityConfig, "llhConfig");
-  });
-
+  // relocated
+  _modelPropagator_.getConfig().fillValue(_enableStatThrowInToys_, "enableStatThrowInToys");
+  _modelPropagator_.getConfig().fillValue(_eventTreeWriter_.getConfig(), "eventTreeWriter");
+  _modelPropagator_.getConfig().fillValue(_gaussStatThrowInToys_, "gaussStatThrowInToys");
+  _modelPropagator_.getConfig().fillValue(_enableEventMcThrow_, "enableEventMcThrow");
+  _modelPropagator_.getConfig().fillValue(_plotGenerator_.getConfig(), "plotGeneratorConfig");
+  _modelPropagator_.getConfig().fillValue(datasetListConfig, "dataSetList");
+  _modelPropagator_.getSampleSet().getConfig().fillValue(jointProbabilityTypeStr, "llhStatFunction");
+  _modelPropagator_.getConfig().fillValue(jointProbabilityTypeStr, "llhStatFunction");
+  _modelPropagator_.getSampleSet().getConfig().fillValue(jointProbabilityConfig, "llhConfig");
+  _modelPropagator_.getConfig().fillValue(jointProbabilityConfig, "llhConfig");
 
   // defining datasets:
-  GenericToolbox::Json::fillValue(_config_, datasetListConfig, {{"dataSetList"}, {"datasetList"}});
-  _datasetList_.reserve(datasetListConfig.size() );
-  for( const auto& dataSetConfig : datasetListConfig ){
+  _config_.fillValue(datasetListConfig, "datasetList");
+  _datasetList_.reserve(datasetListConfig.getConfig().size() );
+  for( const auto& dataSetConfig : datasetListConfig.loop() ){
     _datasetList_.emplace_back(dataSetConfig, int(_datasetList_.size()));
   }
 
   // new config structure
-  GenericToolbox::Json::fillValue(_config_, jointProbabilityConfig, "jointProbabilityConfig");
-  GenericToolbox::Json::fillValue(jointProbabilityConfig, jointProbabilityTypeStr, "type");
+  _config_.fillValue(jointProbabilityConfig, "jointProbabilityConfig");
+  jointProbabilityConfig.defineFields({{"type"}});
+  jointProbabilityConfig.fillValue(jointProbabilityTypeStr, "type");
   LogDebugIf(GundamGlobals::isDebug()) << "Using \"" << jointProbabilityTypeStr << "\" JointProbabilityType." << std::endl;
   _jointProbabilityPtr_ = std::shared_ptr<JointProbability::JointProbabilityBase>( JointProbability::makeJointProbability( jointProbabilityTypeStr ) );
-  _jointProbabilityPtr_->setConfig( jointProbabilityConfig );
-  _jointProbabilityPtr_->configure();
+  _jointProbabilityPtr_->configure( jointProbabilityConfig );
 
   // nested configurations
-  GenericToolbox::Json::fillValue(_config_, _plotGenerator_.getConfig(), "plotGeneratorConfig");
+  _config_.fillValue(_plotGenerator_.getConfig(), "plotGeneratorConfig");
   _plotGenerator_.configure();
 
+  _config_.fillValue(_eventTreeWriter_.getConfig(), "eventTreeWriter");
+  _eventTreeWriter_.configure();
+
   // reading local parameters
-  GenericToolbox::Json::fillValue(_config_, _enableStatThrowInToys_, "enableStatThrowInToys");
-  GenericToolbox::Json::fillValue(_config_, _gaussStatThrowInToys_, "gaussStatThrowInToys");
-  GenericToolbox::Json::fillValue(_config_, _enableEventMcThrow_, "enableEventMcThrow");
+  _config_.fillValue(_enableStatThrowInToys_, "enableStatThrowInToys");
+  _config_.fillValue(_gaussStatThrowInToys_, "gaussStatThrowInToys");
+  _config_.fillValue(_enableEventMcThrow_, "enableEventMcThrow");
+  _config_.fillValue(_applyInfinitePenaltyOnOutOfBoundPar_, "applyInfinitePenaltyOnOutOfBoundPar");
+
 }
 void LikelihoodInterface::initializeImpl() {
-  LogWarning << "Initializing LikelihoodInterface..." << std::endl;
+
+  _config_.printUnusedKeys();
 
   for( auto& dataSet : _datasetList_ ){ dataSet.initialize(); }
 
@@ -190,6 +167,37 @@ double LikelihoodInterface::evalPenaltyLikelihood() const {
     _buffer_.penaltyLikelihood += LikelihoodInterface::evalPenaltyLikelihood( parSet );
   }
   return _buffer_.penaltyLikelihood;
+}
+double LikelihoodInterface::evalPenaltyLikelihood(const ParameterSet& parSet_) const{
+  if( not parSet_.isEnabled() ){ return 0; }
+
+  double buffer = 0;
+
+  if( parSet_.getPriorCovarianceMatrix() != nullptr ){
+    if( parSet_.isEnableEigenDecomp() ){
+      for( const auto& eigenPar : parSet_.getEigenParameterList() ){
+        if( eigenPar.isFixed() ){ continue; }
+        buffer += TMath::Sq( (eigenPar.getParameterValue() - eigenPar.getPriorValue()) / eigenPar.getStdDevValue() ) ;
+      }
+    }
+    else{
+      // make delta vector
+      parSet_.updateDeltaVector();
+
+      // compute penalty term with covariance
+      buffer =
+          (*parSet_.getDeltaVectorPtr())
+          * ( (*parSet_.getInverseCovarianceMatrix()) * (*parSet_.getDeltaVectorPtr()) );
+    }
+  }
+
+  if( _applyInfinitePenaltyOnOutOfBoundPar_ and parSet_.hasOutOfBoundsParameters() ) {
+    LogError << "Returning an +inf penalty for out-of-bounds parameters in: " << parSet_.getName() << std::endl;
+    return std::numeric_limits<double>::infinity();
+    // return buffer * 1000.;
+  }
+
+  return buffer;
 }
 double LikelihoodInterface::evalStatLikelihood(const SamplePair& samplePair_) const {
   return _jointProbabilityPtr_->eval( samplePair_ );
@@ -279,33 +287,6 @@ std::string LikelihoodInterface::getSampleBreakdownTable() const{
   }
 
   return t.generateTableString();
-}
-
-// static
-double LikelihoodInterface::evalPenaltyLikelihood(const ParameterSet& parSet_) {
-  if( not parSet_.isEnabled() ){ return 0; }
-
-  double buffer = 0;
-
-  if( parSet_.getPriorCovarianceMatrix() != nullptr ){
-    if( parSet_.isEnableEigenDecomp() ){
-      for( const auto& eigenPar : parSet_.getEigenParameterList() ){
-        if( eigenPar.isFixed() ){ continue; }
-        buffer += TMath::Sq( (eigenPar.getParameterValue() - eigenPar.getPriorValue()) / eigenPar.getStdDevValue() ) ;
-      }
-    }
-    else{
-      // make delta vector
-      parSet_.updateDeltaVector();
-
-      // compute penalty term with covariance
-      buffer =
-          (*parSet_.getDeltaVectorPtr())
-          * ( (*parSet_.getInverseCovarianceMatrix()) * (*parSet_.getDeltaVectorPtr()) );
-    }
-  }
-
-  return buffer;
 }
 
 void LikelihoodInterface::load(){
@@ -420,15 +401,6 @@ void LikelihoodInterface::loadDataPropagator(){
       // Is it better to do the fetching here and provide it to the dispenser?
       dataDispenser->setPlotGeneratorPtr( &_plotGenerator_ );
 
-      // handling override of the propagator config
-      if( not dataDispenser->getParameters().overridePropagatorConfig.empty() ){
-        LogWarning << "Reload the data propagator config with override options..." << std::endl;
-        ConfigUtils::ConfigHandler configHandler( _modelPropagator_.getConfig() );
-        configHandler.override( dataDispenser->getParameters().overridePropagatorConfig );
-        _dataPropagator_.configure( configHandler.getConfig() );
-        _dataPropagator_.initialize();
-      }
-
       // legacy: replacing the parameterSet option "maskForToyGeneration" -> now should use the config override above
       for( auto& parSet : _dataPropagator_.getParametersManager().getParameterSetsList() ){
         if( parSet.isMaskForToyGeneration() ){ parSet.nullify(); }
@@ -437,18 +409,31 @@ void LikelihoodInterface::loadDataPropagator(){
 
       // otherwise load the dataset
       dataDispenser->getParameters().isData = true;
-      dataDispenser->load( _dataPropagator_ );
 
-      // make sure the config is from scratch each time we read a new dataset
-      if( not dataDispenser->getParameters().overridePropagatorConfig.empty() ){
-        LogExit("NOT IMPLEMENTED YET!");
-        // TODO: handle multiple datasets loading when editing the configuration
-//        LogWarning << "Restoring propagator config overrides..." << std::endl;
-//        _dataPropagator_.configure( _modelPropagator_.getConfig() );
-//        _dataPropagator_.initialize();
+      if( not dataDispenser->getParameters().evalModelAt.empty() ){
+        LogWarning << "Generating data histograms using model evaluated with a set of parameters" << std::endl;
+
+        LogInfo << "Injecting parameters to the model..." << std::endl;
+        _modelPropagator_.getParametersManager().injectParameterValues(dataDispenser->getParameters().evalModelAt);
+        _modelPropagator_.reweightEvents();
+
+        LogInfo << "Copying events to data histograms..." << std::endl;
+        _dataPropagator_.copyEventsFrom( _modelPropagator_ );
+
+        LogInfo << "Restoring model parameters..." << std::endl;
+        _modelPropagator_.getParametersManager().moveParametersToPrior();
+        _modelPropagator_.reweightEvents();
+
+        // histograms are filled afterward
       }
+      else {
+        LogWarning << "Loading data propagator..." << std::endl;
+        dataDispenser->load( _dataPropagator_ );
+      }
+
     }
 
+    LogWarning << "Setting dial cache for data..." << std::endl;
     _dataPropagator_.getDialManager().shrinkDialContainers();
     _dataPropagator_.buildDialCache();
 
@@ -576,7 +561,6 @@ void LikelihoodInterface::throwToyParameters(Propagator& propagator_){
 
   // reweighting the events accordingly
   propagator_.reweightEvents();
-
 }
 void LikelihoodInterface::throwStatErrors(Propagator& propagator_){
   LogInfo << "Throwing statistical error..." << std::endl;

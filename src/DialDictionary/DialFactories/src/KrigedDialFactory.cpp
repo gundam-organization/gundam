@@ -1,8 +1,8 @@
-#include "TabulatedDialFactory.h"
+#include "KrigedDialFactory.h"
 
 #include <GundamGlobals.h>
 #include <DialBase.h>
-#include <Tabulated.h>
+#include <Kriged.h>
 #include <Event.h>
 
 #include <GenericToolbox.Json.h>
@@ -10,48 +10,47 @@
 
 #include <dlfcn.h>
 
+KrigedDialFactory::KrigedDialFactory(const ConfigReader& config_){
+    LogThrowIf(not config_.hasField("tableConfig"), "tableConfig must be defined in:" << config_.toString(true));
 
-TabulatedDialFactory::TabulatedDialFactory(const ConfigReader& config_) {
-
-    // mandatory
     auto tableConfig = config_.fetchValue<ConfigReader>("tableConfig");
-
     tableConfig.defineFields({
         {FieldFlag::MANDATORY, "name"},
         {FieldFlag::MANDATORY, "libraryPath"},
         {FieldFlag::MANDATORY, "initFunction"},
-        {FieldFlag::MANDATORY, "updateFunction"},
-        {FieldFlag::MANDATORY, "binningFunction"},
         {FieldFlag::MANDATORY, "initArguments"},
-        {FieldFlag::MANDATORY, "binningVariables"},
+        {FieldFlag::MANDATORY, "updateFunction"},
+        {FieldFlag::MANDATORY, "weightFunction"},
+        {FieldFlag::MANDATORY, "weightVariables"},
+        {"maxWeights"},
+        {"weightNormalization"},
         {"bins"},
     });
     tableConfig.checkConfiguration();
 
-    // mandatory options
-    _name_ =  tableConfig.fetchValue<std::string>("name");
-    _libraryPath_ =  tableConfig.fetchValue<std::string>("libraryPath");
-    _initFuncName_ = tableConfig.fetchValue<std::string>("initFunction");
-    _updateFuncName_ = tableConfig.fetchValue<std::string>("updateFunction");
-    _binningFuncName_ = tableConfig.fetchValue<std::string>("binningFunction");
-    _initArguments_ = tableConfig.fetchValue<std::vector<std::string>>("initArguments");
-    _binningVariableNames_ = tableConfig.fetchValue<std::vector<std::string>>("binningVariables");
-
-    // optional
+    tableConfig.fillValue(_name_, "name");
+    tableConfig.fillValue(_libraryPath_, "libraryPath");
+    tableConfig.fillValue(_initFuncName_, "initFunction");
+    tableConfig.fillValue(_initArguments_, "initArguments");
+    tableConfig.fillValue(_updateFuncName_, "updateFunction");
+    tableConfig.fillValue(_weightFuncName_, "weightFunction");
+    tableConfig.fillValue(_weightVariableNames_, "weightVariables");
+    tableConfig.fillValue(_minimumWeightSpace_, "maxWeights");
+    tableConfig.fillValue(_weightNormalization_, "weightNormalization");
     int bins =  tableConfig.fetchValue<int>("bins", -1);
 
-    _binningVariableCache_.resize(_binningVariableNames_.size());
-
+    _weightVariableCache_.resize(_weightVariableNames_.size());
+    if (_minimumWeightSpace_ < 10000) _minimumWeightSpace_ = 10000;
     std::string expandedPath = GenericToolbox::expandEnvironmentVariables(getLibraryPath());
 
     LogInfo << "Create table: " << getName() << std::endl;
     LogInfo << "  Library path: " << getLibraryPath() << std::endl;
     LogInfo << "  Initialization function: " << getInitializationFunction() << std::endl;
     LogInfo << "  Update table function:   " << getUpdateFunction() << std::endl;
-    LogInfo << "  Bin events function:     " << getBinningFunction() << std::endl;
+    LogInfo << "  Weight events function:     " << getWeightFunction() << std::endl;
     {
         int i{0};
-        for (const std::string& var: getBinningVariables()) {
+        for (const std::string& var: getWeightVariables()) {
             LogInfo << "      Variable[" << i++ << "]: " << var << std::endl;
         }
     }
@@ -62,7 +61,6 @@ TabulatedDialFactory::TabulatedDialFactory(const ConfigReader& config_) {
         std::exit(EXIT_FAILURE); // Exit, not throw!
     }
 
-    std::lock_guard<std::mutex> guard(GundamGlobals::getGlobalMutEx());
     void* library = dlopen(expandedPath.c_str(), RTLD_LAZY );
     if( library == nullptr ){
         LogError << "Cannot load library: " << dlerror() << std::endl;
@@ -71,6 +69,7 @@ TabulatedDialFactory::TabulatedDialFactory(const ConfigReader& config_) {
 
     // Get the initialization function.
     if (not getInitializationFunction().empty()) {
+        std::lock_guard<std::mutex> guard(GundamGlobals::getGlobalMutEx());
         void* initFunc = dlsym(library, getInitializationFunction().c_str());
         if( initFunc == nullptr ){
             LogError << "Initialization function symbol not found: "
@@ -116,21 +115,24 @@ TabulatedDialFactory::TabulatedDialFactory(const ConfigReader& config_) {
             int(*)(const char* name, double table[],
                    int bins, const double par[], int npar)>(updateFunc);
 
-    // Get the binning function
-    void* binningFunc = dlsym(library, getBinningFunction().c_str());
-    if( binningFunc == nullptr ){
-        LogError << "Binning function symbol not found: "
-                 << getBinningFunction()
+    // Get the weight function
+    void* weightFunc = dlsym(library, getWeightFunction().c_str());
+    if( weightFunc == nullptr ){
+        LogError << "Weight function symbol not found: "
+                 << getWeightFunction()
                  << std::endl;
         std::exit(EXIT_FAILURE); // Exit, not throw!
     }
-    _binningFunc_
+    _weightFunc_
         = reinterpret_cast<
-            double(*)(const char* name,
-                   int varc, double varv[], int bins)>(binningFunc);
+            int(*)(const char* name, int bins,
+                   int varc, double varv[],
+                   int maxEntries,
+                   int index[], double weight[])>(weightFunc);
+
 }
 
-void TabulatedDialFactory::updateTable(DialInputBuffer& inputBuffer) {
+void KrigedDialFactory::updateTable(DialInputBuffer& inputBuffer) {
     std::lock_guard<std::mutex> guard(GundamGlobals::getGlobalMutEx());
     _updateFunc_(_name_.c_str(),
                  _table_.data(),
@@ -139,29 +141,28 @@ void TabulatedDialFactory::updateTable(DialInputBuffer& inputBuffer) {
                  (int) inputBuffer.getInputBuffer().size());
 }
 
-DialBase* TabulatedDialFactory::makeDial(const Event& event) {
+DialBase* KrigedDialFactory::makeDial(const Event& event) {
     std::lock_guard<std::mutex> guard(GundamGlobals::getGlobalMutEx());
     int i=0;
-    for (const std::string& varName : getBinningVariables()) {
+    for (const std::string& varName : getWeightVariables()) {
         double v = event.getVariables().fetchVariable(varName).getVarAsDouble();
-        _binningVariableCache_[i++] = v;
+        _weightVariableCache_[i++] = v;
     }
-    double bin = _binningFunc_(getName().c_str(),
-                               (int) _binningVariableCache_.size(),
-                               _binningVariableCache_.data(),
-                               (int) _table_.size());
+    if (_indexCache_.size() < _minimumWeightSpace_) {
+        _indexCache_.resize(_minimumWeightSpace_);
+    }
+    if (_weightCache_.size() != _indexCache_.size()) {
+        _weightCache_.resize(_indexCache_.size());
+    }
+    int entries = _weightFunc_(getName().c_str(), _table_.size(),
+                               (int) _weightVariableCache_.size(),
+                               _weightVariableCache_.data(),
+                               (int) _indexCache_.size(),
+                               _indexCache_.data(),
+                               _weightCache_.data());
 
-    if (bin < 0.0) return nullptr;
-
-    // Determine the bin index and the fractional part of the bin.
-    int iBin = bin;
-    if (iBin < 0) iBin = 0;     // Shouldn't happen, but just in case.
-    if (iBin > _table_.size()-2) iBin = _table_.size()-2;
-    double fracBin = bin - iBin;
-    if (fracBin < 0.0) fracBin = 0.0;
-    if (fracBin > 1.0) fracBin = 1.0;
-
-#ifdef TABULATED_DIAL_FACTORY_DUMP
+#undef KRIGED_DIAL_FACTORY_DUMP
+#ifdef KRIGED_DIAL_FACTORY_DUMP
     // Summarize which table is being applied to the event.  This can be quite
     // useful for debugging parameter configurations, but is not compiled by
     // default since it will dominate the debug output.  We need to implement
@@ -169,21 +170,40 @@ DialBase* TabulatedDialFactory::makeDial(const Event& event) {
     if (GundamGlobals::isDebug()) {
         std::ostringstream out;
         out << getName()
-            << " " << iBin
-            << " " << fracBin;
+            << " entries: " << entries;
         std::size_t j = 0;
-        for (const std::string& varName : getBinningVariables()) {
+        for (const std::string& varName : getWeightVariables()) {
             out << " [" << j
                 << "] " << varName
-                << "=" << _binningVariableCache_[j];
+                << "=" << _weightVariableCache_[j];
             ++j;
         }
         out << std::endl;
         LogDebug << out.str() << std::endl;
     }
 #endif
+#undef KRIGED_DIAL_FACTORY_DUMP
+
+    if (entries < 1) return nullptr;
+
+    if (_weightNormalization_ > 0.0) {
+        double sum = 0.0;
+        for (int i = 0; i < entries; ++i) {
+            sum += _weightCache_[i];
+        }
+        if (std::abs(sum-_weightNormalization_) > 1E-6*_weightNormalization_) {
+            LogWarning << "Denormalized Kriging dial -- "
+                       << " sum: " << sum
+                       << " Normalization: " << _weightNormalization_
+                       << " Difference: " << std::abs(sum-_weightNormalization_)
+                       << std::endl;
+            LogWarning << "Denormalized Event Summary: " << event << std::endl;
+        }
+    }
 
     // Do the unique_ptr dance in case there are exceptions.
-    std::unique_ptr<Tabulated> dialBase = std::make_unique<Tabulated>(&_table_, iBin, fracBin);
+    std::unique_ptr<Kriged> dialBase
+        = std::make_unique<Kriged>(&_table_, entries, _indexCache_, _weightCache_);
+
     return dialBase.release();
 }

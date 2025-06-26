@@ -68,8 +68,9 @@ struct DataDispenserParameters{
   };
   FromHistContent fromHistContent;
 
-//  JsonType fromHistContent{};
-  JsonType overridePropagatorConfig{};
+//  JsonType fromHistContent;
+  JsonType overridePropagatorConfig;
+  JsonType evalModelAt;
 
   [[nodiscard]] std::string getSummary() const;
 };

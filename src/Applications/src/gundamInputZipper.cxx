@@ -56,7 +56,7 @@ int main(int argc, char** argv) {
 
   LogThrowIf( not clParser.isOptionTriggered("configFile") );
 
-  ConfigUtils::ConfigHandler configHandler( clParser.getOptionVal<std::string>("configFile") );
+  ConfigUtils::ConfigBuilder configHandler( clParser.getOptionVal<std::string>("configFile") );
   configHandler.override( clParser.getOptionValList<std::string>("overrideFiles") );
 
   std::string outFolder;

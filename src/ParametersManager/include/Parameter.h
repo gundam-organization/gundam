@@ -24,6 +24,7 @@ public:
   ENUM_FIELD(Gaussian) \
   ENUM_FIELD(Flat)
 #include "GenericToolbox.MakeEnum.h"
+  static void prepareConfig(ConfigReader& config_);
 
 protected:
   // called through JsonBaseClass::configure() and JsonBaseClass::initialize()
@@ -47,6 +48,7 @@ public:
   void setPriorValue(double priorValue){ _priorValue_ = priorValue; }
   void setThrowValue(double throwValue){ _throwValue_ = throwValue; }
   void setStdDevValue(double stdDevValue){ _stdDevValue_ = stdDevValue; }
+  void setDialSetConfig(const std::vector<ConfigReader>& dialDefinitionsList_){ _dialDefinitionsList_ = dialDefinitionsList_; }
 
   /// Set the limits for this parameter.  Parameter values less than
   /// this value are illegal, and the likelihood is undefined.  The job will
@@ -74,7 +76,6 @@ public:
   /// if force is true, then it will only print warnings, otherwise it stops
   /// with EXIT_FAILURE.
   void setParameterValue(double parameterValue, bool force=false);
-  void setDialSetConfig(const JsonType &jsonConfig_);
 
   // const getters
   [[nodiscard]] auto isFree() const{ return _isFree_; }
@@ -183,8 +184,8 @@ private:
   double _stepSize_{std::nan("unset")};
   std::string _name_{};
   std::string _dialsWorkingDirectory_{"."};
-  JsonType _parameterConfig_{};
-  JsonType _dialDefinitionsList_{};
+  ConfigReader _parameterConfig_{};
+  std::vector<ConfigReader> _dialDefinitionsList_{};
 
   // Internals
   const ParameterSet* _owner_{nullptr};

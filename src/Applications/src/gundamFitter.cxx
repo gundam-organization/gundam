@@ -73,6 +73,7 @@ int main(int argc, char** argv){
   clParser.addDummyOption("Debug options");
   clParser.addTriggerOption("dry-run", {"-d", "--dry-run"},"Perform the full sequence of initialization, but don't do the actual fit.");
   clParser.addTriggerOption("super-dry-run", {"-dd", "--super-dry-run"},"Only reads the config files.");
+  clParser.addTriggerOption("hyper-dry-run", {"-ddd", "--hyper-dry-run"},"Only unfolds the config files.");
   clParser.addOption("debugVerbose", {"--debug"}, "Enable debug verbose (can provide verbose level arg)", 1, true);
   clParser.addOption("kickMc", {"--kick-mc"}, "Amount to push the starting parameters away from their prior values (default: 0)", 1, true);
   clParser.addTriggerOption("ignoreVersionCheck", {"--ignore-version"}, "Don't check GUNDAM version with config request");
@@ -179,30 +180,20 @@ int main(int argc, char** argv){
   auto configFilePath = clParser.getOptionVal("configFile", "");
   LogExitIf(configFilePath.empty(), "Config file not provided.");
 
-  ConfigUtils::ConfigHandler configHandler(configFilePath);
+  ConfigUtils::ConfigBuilder configHandler(configFilePath);
   configHandler.override( clParser.getOptionValList<std::string>("overrideFiles") );
   configHandler.flatOverride( clParser.getOptionValList<std::string>("overrides") );
 
-  auto gundamFitterConfig(configHandler.getConfig());
-
-  // All of the fields that should (or may) be at this level in the YAML.
-  // This provides a rudimentary syntax check for user inputs.
-  ConfigUtils::checkFields(gundamFitterConfig,
-                           "TOP LEVEL",
-                           // Allowed fields (don't need to list fields in
-                           // expected, or deprecated).
-                           {{"outputFolder"},
-                            {"minGundamVersion"},
-                           },
-                           // Expected fields (must be present)
-                           {{"fitterEngineConfig"},
-                           },
-                           // Deprecated fields (allowed, but cause a warning)
-                           {{"generateSamplePlots"},
-                            {"allParameterVariations"},
-                           },
-                           // Replaced field (allowed, but cause a warning)
-                           {});
+  ConfigReader gundamFitterConfig(configHandler.getConfig());
+  gundamFitterConfig.defineFields({
+    {"outputFolder"},
+    {"minGundamVersion"},
+    {"fitterEngineConfig"},
+    // deprecated
+    {FieldFlag::RELOCATED, "generateSamplePlots", "fitterEngineConfig/generateSamplePlots"},
+    {FieldFlag::RELOCATED, "allParamVariations", "fitterEngineConfig/allParamVariations"},
+  });
+  gundamFitterConfig.checkConfiguration();
 
   // Output file path
   std::string outFileName;
@@ -212,7 +203,7 @@ int main(int argc, char** argv){
   else{
 
     std::string outFolder{"./"};
-    GenericToolbox::Json::fillValue(gundamFitterConfig, outFolder, "outputFolder");
+    gundamFitterConfig.fillValue(outFolder, "outputFolder");
     if( clParser.isOptionTriggered("outputDir") ){ outFolder = clParser.getOptionVal<std::string>("outputDir"); }
 
     // appendixDict["optionName"] = "Appendix"
@@ -257,7 +248,7 @@ int main(int argc, char** argv){
   }
   else{
     std::string minGundamVersion("0.0.0");
-    GenericToolbox::Json::fillValue(gundamFitterConfig, minGundamVersion, "minGundamVersion");
+    gundamFitterConfig.fillValue(minGundamVersion, "minGundamVersion");
     LogExitIf(
         not GundamUtils::isNewerOrEqualVersion( minGundamVersion ),
         "Version check FAILED: " << GundamUtils::getVersionStr() << " < " << minGundamVersion
@@ -270,14 +261,14 @@ int main(int argc, char** argv){
   app.setCmdLinePtr( &clParser );
 
   // unfolded config
-  app.setConfigString( GenericToolbox::Json::toReadableString(gundamFitterConfig) );
+  app.setConfigString( gundamFitterConfig.toString() );
 
   // Ok, we should run. Create the out file.
   app.openOutputFile(outFileName);
   app.writeAppInfo();
 
-  if( clParser.isOptionTriggered("super-dry-run") ) {
-    LogInfo << "Super-dry-run enabled. Stopping here." << std::endl;
+  if( clParser.isOptionTriggered("hyper-dry-run") ) {
+    LogInfo << "Hyper-dry-run enabled. Stopping here." << std::endl;
     std::exit(EXIT_SUCCESS);
   }
 
@@ -288,7 +279,12 @@ int main(int argc, char** argv){
   LogInfo << "FitterEngine setup..." << std::endl;
   FitterEngine fitter(GenericToolbox::mkdirTFile(app.getOutfilePtr(), "FitterEngine"));
 
-  GenericToolbox::Json::fillValue(gundamFitterConfig, fitter.getConfig(), "fitterEngineConfig");
+  gundamFitterConfig.fillValue(fitter.getConfig(), "fitterEngineConfig");
+
+  LogInfo << std::endl;
+  LogInfo << "──────────────────────────────────" << std::endl;
+  LogInfo << "Reading fitter configuration..." << std::endl;
+  LogInfo << "──────────────────────────────────" << std::endl;
   fitter.configure();
 
   // -a
@@ -353,16 +349,13 @@ int main(int argc, char** argv){
   }
 
   // Also check app level config options
-  GenericToolbox::Json::deprecatedAction(gundamFitterConfig, "generateSamplePlots", [&]{
-    LogAlert << "Forwarding the option to FitterEngine. Consider moving it into \"fitterEngineConfig:\"" << std::endl;
-    fitter.setGenerateSamplePlots( GenericToolbox::Json::fetchValue<bool>(gundamFitterConfig, "generateSamplePlots") );
-  });
 
-  GenericToolbox::Json::deprecatedAction(gundamFitterConfig, "allParamVariations", [&]{
-    LogAlert << "Forwarding the option to FitterEngine. Consider moving it into \"fitterEngineConfig:\"" << std::endl;
+  // relocated options
+  gundamFitterConfig.fillValue(fitter.getGenerateSamplePlots(), "generateSamplePlots");
+  if( gundamFitterConfig.hasField("allParamVariations") ){
     fitter.setDoAllParamVariations(true);
-    fitter.setAllParamVariationsSigmas(GenericToolbox::Json::fetchValue<std::vector<double>>(gundamFitterConfig, "allParamVariations"));
-  });
+    fitter.setAllParamVariationsSigmas(gundamFitterConfig.fetchValue<std::vector<double>>("allParamVariations"));
+  }
 
   // Check if the first point of the fit should be moved before the
   // minimization.  This is not changing the prior value, only the starting
@@ -404,9 +397,21 @@ int main(int argc, char** argv){
     }
   }
 
+  gundamFitterConfig.printUnusedKeys();
+
+
+  if( clParser.isOptionTriggered("super-dry-run") ) {
+    LogInfo << "Super-dry-run enabled. Stopping here." << std::endl;
+    std::exit(EXIT_SUCCESS);
+  }
+
   // --------------------------
   // Load:
   // --------------------------
+  LogInfo << std::endl;
+  LogInfo << "──────────────────────────────────" << std::endl;
+  LogInfo << "Initializing fitter..." << std::endl;
+  LogInfo << "──────────────────────────────────" << std::endl;
   fitter.initialize();
 
   // show initial conditions
@@ -444,9 +449,10 @@ int main(int argc, char** argv){
     }
   }
 
-  // --------------------------
-  // Run the fitter:
-  // --------------------------
+  LogInfo << std::endl;
+  LogInfo << "──────────────────────────────────" << std::endl;
+  LogInfo << "Running the fitter..." << std::endl;
+  LogInfo << "──────────────────────────────────" << std::endl;
   fitter.fit();
 
 }

@@ -27,6 +27,7 @@ namespace JointProbability{
     void printConfiguration() const;
 
     mutable int verboseLevel{0};
+    bool muteZeroPredBinWarn{false};
     bool throwIfInfLlh{true};
     bool allowZeroMcWhenZeroData{true};
     bool usePoissonLikelihood{false};
@@ -58,14 +59,26 @@ namespace JointProbability{
   };
 
   inline void BarlowBeestonBanff2022::configureImpl(){
+    _config_.defineFields({
+      {"muteZeroPredBinWarn"},
+      {"allowZeroMcWhenZeroData"},
+      {"usePoissonLikelihood"},
+      {"BBNoUpdateWeights"},
+      {"fractionalErrorLimit"},
+      {"expectedValueMinimum"},
+      {"verboseLevel", {"isVerbose"}},
+      {"throwIfInfLlh"}
+    });
+    _config_.checkConfiguration();
 
-    GenericToolbox::Json::fillValue(_config_, allowZeroMcWhenZeroData, "allowZeroMcWhenZeroData");
-    GenericToolbox::Json::fillValue(_config_, usePoissonLikelihood, "usePoissonLikelihood");
-    GenericToolbox::Json::fillValue(_config_, BBNoUpdateWeights, "BBNoUpdateWeights");
-    GenericToolbox::Json::fillValue(_config_, fractionalErrorLimit, "fractionalErrorLimit");
-    GenericToolbox::Json::fillValue(_config_, expectedValueMinimum, "expectedValueMinimum");
-    GenericToolbox::Json::fillValue(_config_, verboseLevel, {{"verboseLevel"},{"isVerbose"}});
-    GenericToolbox::Json::fillValue(_config_, throwIfInfLlh, "throwIfInfLlh");
+    _config_.fillValue(muteZeroPredBinWarn, "muteZeroPredBinWarn");
+    _config_.fillValue(allowZeroMcWhenZeroData, "allowZeroMcWhenZeroData");
+    _config_.fillValue(usePoissonLikelihood, "usePoissonLikelihood");
+    _config_.fillValue(BBNoUpdateWeights, "BBNoUpdateWeights");
+    _config_.fillValue(fractionalErrorLimit, "fractionalErrorLimit");
+    _config_.fillValue(expectedValueMinimum, "expectedValueMinimum");
+    _config_.fillValue(verboseLevel, "verboseLevel");
+    _config_.fillValue(throwIfInfLlh, "throwIfInfLlh");
 
     // Place a hard limit on the fractional error to prevent numeric issues.
     if( fractionalErrorLimit > 1.0E+152 ){
@@ -79,7 +92,7 @@ namespace JointProbability{
     double dataVal = samplePair_.data->getHistogram().getBinContentList()[bin_].sumWeights;
     double predVal = samplePair_.model->getHistogram().getBinContentList()[bin_].sumWeights;
 
-    if( predVal == 0 and dataVal != 0 ){
+    if( not muteZeroPredBinWarn and verboseLevel >= 0 and predVal == 0 and dataVal != 0 ){
       LogError << samplePair_.model->getName() << "/" << samplePair_.model->getHistogram().getBinContextList()[bin_].bin.getSummary() << ": predicting 0 rate in this bin -> llh not defined / inf" << std::endl;
     }
 

@@ -19,39 +19,24 @@ void ParametersManager::unmuteLogger(){ Logger::setIsMuted( false ); }
 
 // config
 void ParametersManager::configureImpl(){
-  ConfigUtils::checkFields(_config_,
-                           "/fitterEngineConfig/likelihoodInterfaceConfig"
-                           "/propagatorConfig/parametersManagerConfig",
-                           // Allowed fields (don't need to list fields in
-                           // expected, or deprecated).
-                           {{"throwToyParametersWithGlobalCov"},
-                            {"reThrowParSetIfOutOfBounds"},
-                            {"reThrowParSetIfOutOfPhysical"},
-                           },
-                           // Expected fields (must be present)
-                           {{"parameterSetList"},
-                           },
-                           // Deprecated fields (allowed, but cause a warning)
-                           {
-                           },
-                           // Renamed fields  (allowed, but cause a warning)
-                           {
-                           });
 
-  GenericToolbox::Json::fillValue(_config_, _throwToyParametersWithGlobalCov_, "throwToyParametersWithGlobalCov");
-  GenericToolbox::Json::fillValue(_config_, _reThrowParSetIfOutOfPhysical_, {{"reThrowParSetIfOutOfBounds"},{"reThrowParSetIfOutOfPhysical"}});
-  GenericToolbox::Json::fillValue(_config_, _parameterSetListConfig_, "parameterSetList");
+  _config_.clearFields();
+  _config_.defineFields({
+    {"throwToyParametersWithGlobalCov"},
+    {"reThrowParSetIfOutOfBounds",{"reThrowParSetIfOutOfPhysical"}},
+    {"parameterSetList"},
+  });
+  _config_.checkConfiguration();
 
-  LogDebugIf(GundamGlobals::isDebug()) << _parameterSetListConfig_.size() << " parameter sets are defined." << std::endl;
+  _config_.fillValue(_throwToyParametersWithGlobalCov_, "throwToyParametersWithGlobalCov");
+  _config_.fillValue(_reThrowParSetIfOutOfPhysical_, "reThrowParSetIfOutOfBounds");
+  _config_.fillValue(_parameterSetListConfig_, "parameterSetList");
 
-  if (_parameterSetListConfig_.size() < 1) {
-    LogError << "No parameters have been defined" << std::endl;
-    LogExit("Must define parameters for the fit");
-  }
+  LogDebugIf(GundamGlobals::isDebug()) << _parameterSetListConfig_.getConfig().size() << " parameter sets are defined." << std::endl;
 
   _parameterSetList_.clear(); // make sure there nothing in case readConfig is called more than once
-  _parameterSetList_.reserve( _parameterSetListConfig_.size() );
-  for( const auto& parameterSetConfig : _parameterSetListConfig_ ){
+  _parameterSetList_.reserve( _parameterSetListConfig_.getConfig().size() );
+  for( const auto& parameterSetConfig : _parameterSetListConfig_.loop() ){
     _parameterSetList_.emplace_back();
     _parameterSetList_.back().configure( parameterSetConfig );
 
@@ -61,9 +46,11 @@ void ParametersManager::configureImpl(){
       _parameterSetList_.pop_back();
     }
   }
-
 }
 void ParametersManager::initializeImpl(){
+
+  _config_.printUnusedKeys();
+
   int nEnabledPars = 0;
   for( auto& parSet : _parameterSetList_ ){
     parSet.initialize();
@@ -357,10 +344,8 @@ bool ParametersManager::hasValidParameterSets() const {
   return true;
 }
 void ParametersManager::printConfiguration() const {
-
   LogInfo << _parameterSetList_.size() << " parameter sets defined." << std::endl;
   for( auto& parSet : _parameterSetList_ ){ parSet.printConfiguration(); }
-
 }
 
 void ParametersManager::setParameterValidity(const std::string& v) {

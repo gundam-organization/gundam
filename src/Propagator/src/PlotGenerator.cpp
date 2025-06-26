@@ -24,67 +24,115 @@
 
 
 void PlotGenerator::configureImpl(){
+  _config_.clearFields();
+  _config_.defineFields({
+    {"isEnabled"},
+    {"histogramsDefinition"},
+    {"canvasParameters"},
+    {"writeGeneratedHistograms"},
+    {"varDictionaries", {"varDictionnaries"}},
+  });
+  _config_.checkConfiguration();
 
   gStyle->SetOptStat(0);
   _histHolderCacheList_.resize(1);
   _threadPool_.setNThreads(GundamGlobals::getNbCpuThreads() );
 
-  GenericToolbox::Json::fillValue(_config_, _isEnabled_, "isEnabled");
+  _config_.fillValue(_isEnabled_, "isEnabled");
   if( not _isEnabled_ ){ return; }
 
   // nested first
-  for( auto& varDictConfig : GenericToolbox::Json::fetchValue(_config_, {{"varDictionaries"}, {"varDictionnaries"}}, JsonType())){
+  for( auto& varDictConfig : _config_.loop("varDictionaries")){
     _varDictionaryList_.emplace_back(); auto& varDict = _varDictionaryList_.back();
-    GenericToolbox::Json::fillValue(varDictConfig, varDict.name, "name");
 
-    for( auto& dictEntryConfig : GenericToolbox::Json::fetchValue(varDictConfig, "dictionary", JsonType())){
+    varDictConfig.defineFields({{"name"}, {"dictionary"}});
+    varDictConfig.fillValue(varDict.name, "name");
+
+    for( auto& dictEntryConfig : varDictConfig.loop("dictionary")){
       varDict.dictEntryList.emplace_back(); auto& dictEntry = varDict.dictEntryList.back();
-      GenericToolbox::Json::fillValue(dictEntryConfig, dictEntry.value, "value");
-      GenericToolbox::Json::fillValue(dictEntryConfig, dictEntry.title, "title");
-      GenericToolbox::Json::fillValue(dictEntryConfig, dictEntry.fillStyle, "fillStyle");
-      GenericToolbox::Json::fillValue(dictEntryConfig, dictEntry.color, {{"colorRoot"},{"color"}});
-      if( GenericToolbox::Json::doKeyExist(dictEntryConfig, "colorHex") ){
+
+      dictEntryConfig.defineFields({
+        {"value"},
+        {"title"},
+        {"fillStyle"},
+        {"colorRoot", {"color"}},
+        {"colorHex"},
+      });
+      dictEntryConfig.checkConfiguration();
+
+      dictEntryConfig.fillValue(dictEntry.value, "value");
+      dictEntryConfig.fillValue(dictEntry.title, "title");
+      dictEntryConfig.fillValue(dictEntry.fillStyle, "fillStyle");
+      dictEntryConfig.fillValue(dictEntry.color, "colorRoot");
+      if( dictEntryConfig.hasField("colorHex") ){
         TColor::SetColorThreshold(0.1); // will fetch the closest color
-        dictEntry.color = short( TColor::GetColor( GenericToolbox::Json::fetchValue<std::string>(dictEntryConfig, "colorHex").c_str() ) );
+        dictEntry.color = short( TColor::GetColor( dictEntryConfig.fetchValue<std::string>("colorHex").c_str() ) );
       }
     }
   }
 
-  for( auto& histDefConfig : GenericToolbox::Json::fetchValue(_config_, "histogramsDefinition", JsonType()) ){
-    if( not GenericToolbox::Json::fetchValue(histDefConfig, "isEnabled", true) ){ continue; }
+  for( auto& histDefConfig : _config_.loop("histogramsDefinition") ){
+    histDefConfig.defineFields({
+          {"isEnabled"},
+          {"noData"},
+          {"useSampleBinning"},
+          {"rescaleAsBinWidth"},
+          {"rescaleBinFactor"},
+          {"xMin"},
+          {"xMax"},
+          {"prefix"},
+          {"varToPlot"},
+          {"xTitle"},
+          {"yTitle"},
+          {"binning"},
+          {"sampleVariableIfNotAvailable"},
+          {"splitVarList", {"splitVars"}},
+          {"useSampleBinningOfVar", {"useSampleBinningOfObservable"}},
+        });
+
+    if( not histDefConfig.fetchValue("isEnabled", true) ){ continue; }
     _histDefList_.emplace_back(); auto& histDef = _histDefList_.back();
 
-    GenericToolbox::Json::fillValue(histDefConfig, histDef.noData, "noData");
-    GenericToolbox::Json::fillValue(histDefConfig, histDef.useSampleBinning, "useSampleBinning");
-    GenericToolbox::Json::fillValue(histDefConfig, histDef.rescaleAsBinWidth, "rescaleAsBinWidth");
-    GenericToolbox::Json::fillValue(histDefConfig, histDef.rescaleBinFactor, "rescaleBinFactor");
-    GenericToolbox::Json::fillValue(histDefConfig, histDef.xMin, "xMin");
-    GenericToolbox::Json::fillValue(histDefConfig, histDef.xMax, "xMax");
-    GenericToolbox::Json::fillValue(histDefConfig, histDef.prefix, "prefix");
-    GenericToolbox::Json::fillValue(histDefConfig, histDef.varToPlot, "varToPlot");
-    GenericToolbox::Json::fillValue(histDefConfig, histDef.yTitle, "yTitle");
-    GenericToolbox::Json::fillValue(histDefConfig, histDef.splitVarList, {{"splitVarList"}, {"splitVars"}});
-    GenericToolbox::Json::fillValue(histDefConfig, histDef.sampleVariableIfNotAvailable, "sampleVariableIfNotAvailable");
+    histDefConfig.fillValue(histDef.noData, "noData");
+    histDefConfig.fillValue(histDef.useSampleBinning, "useSampleBinning");
+    histDefConfig.fillValue(histDef.rescaleAsBinWidth, "rescaleAsBinWidth");
+    histDefConfig.fillValue(histDef.rescaleBinFactor, "rescaleBinFactor");
+    histDefConfig.fillValue(histDef.xMin, "xMin");
+    histDefConfig.fillValue(histDef.xMax, "xMax");
+    histDefConfig.fillValue(histDef.prefix, "prefix");
+    histDefConfig.fillValue(histDef.varToPlot, "varToPlot");
+    histDefConfig.fillValue(histDef.yTitle, "yTitle");
+    histDefConfig.fillValue(histDef.splitVarList, "splitVarList");
+    histDefConfig.fillValue(histDef.sampleVariableIfNotAvailable, "sampleVariableIfNotAvailable");
 
     histDef.xTitle = histDef.varToPlot;
     histDef.useSampleBinningOfVar = histDef.varToPlot;
 
-    GenericToolbox::Json::fillValue(histDefConfig, histDef.xTitle, "xTitle");
-    GenericToolbox::Json::fillValue(histDefConfig, histDef.useSampleBinningOfVar, {{"useSampleBinningOfVar"}, {"useSampleBinningOfObservable"}});
+    histDefConfig.fillValue(histDef.xTitle, "xTitle");
+    histDefConfig.fillValue(histDef.useSampleBinningOfVar, "useSampleBinningOfVar");
 
-    auto binning = GenericToolbox::Json::fetchValue(histDefConfig, {{"binning"}, {"binningFile"}}, JsonType());
+    auto binning = histDefConfig.fetchValue("binning", ConfigReader());
     if( not binning.empty() ){ histDef.binning.configure( binning ); }
 
     GenericToolbox::addIfNotInVector("", histDef.splitVarList);
   }
 
   // options
-  GenericToolbox::Json::fillValue(_config_, _canvasParameters_.height, "canvasParameters/height");
-  GenericToolbox::Json::fillValue(_config_, _canvasParameters_.width, "canvasParameters/width");
-  GenericToolbox::Json::fillValue(_config_, _canvasParameters_.nbXplots, "canvasParameters/nbXplots");
-  GenericToolbox::Json::fillValue(_config_, _canvasParameters_.nbYplots, "canvasParameters/nbYplots");
+  _config_.fillValue(_writeGeneratedHistograms_, "writeGeneratedHistograms");
 
-  GenericToolbox::Json::fillValue(_config_, _writeGeneratedHistograms_, "writeGeneratedHistograms");
+  auto canvasConfig = _config_.fetchValue("canvasParameters", ConfigReader());
+  canvasConfig.defineFields({
+      {"height"},
+      {"width"},
+      {"nbXplots"},
+      {"nbYplots"},
+  });
+  canvasConfig.checkConfiguration();
+  canvasConfig.fillValue(_canvasParameters_.height, "height");
+  canvasConfig.fillValue(_canvasParameters_.width, "width");
+  canvasConfig.fillValue(_canvasParameters_.nbXplots, "nbXplots");
+  canvasConfig.fillValue(_canvasParameters_.nbYplots, "nbYplots");
+
 }
 void PlotGenerator::initializeImpl() {
   LogWarning << __METHOD_NAME__ << std::endl;
@@ -968,6 +1016,5 @@ void PlotGenerator::buildEventBinCache( const std::vector<HistHolder *> &histPtr
   _threadPool_.setPostParallelJob("fillEventHistCache", shrinkAllocationsFct);
   _threadPool_.runJob("fillEventHistCache");
   _threadPool_.removeJob("fillEventHistCache");
-
 }
 
