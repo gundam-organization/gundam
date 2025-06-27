@@ -136,9 +136,6 @@ double Parameter::getParameterValue() const {
 void Parameter::setCurrentValueAsPrior(){
   setParameterValue(getPriorValue());
 }
-void Parameter::setCurrentValueAsPrior(){
-  setPriorValue(getParameterValue());
-}
 bool Parameter::isInDomain(double value_, bool verbose_) const {
   if( std::isnan(value_) ) {
     if (verbose_) {

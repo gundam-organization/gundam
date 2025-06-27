@@ -128,9 +128,6 @@ public:
   /// fail if the prior value has not been set.
   void setCurrentValueAsPrior();
 
-  /// Copy the current value of the parameter into the prior value.
-  void setCurrentValueAsPrior();
-
   /// Check that the parameter value is between the minimum and maximum bound
   /// for the parameter (could be +/- infinity).  Note: Since a NaN is not a
   /// number, it is not within the bounds.
