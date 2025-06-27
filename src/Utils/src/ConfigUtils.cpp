@@ -340,9 +340,9 @@ namespace ConfigUtils {
         for( auto& invalidKey : invalidKeyList ){
           LogAlert << _parentPath_ << ": key \"" << invalidKey << "\" has an invalid name. It won't be recognized by GUNDAM." << std::endl;
 #ifdef DEBUG_BUILD
-          LogError << "Possible missing key declaration: " << invalidKey << std::endl;
-          LogError << "BackTrace: " << std::endl
-                   << GundamUtils::Backtrace << std::endl;
+          LogWarning << "Possible missing key declaration: " << invalidKey << std::endl;
+          LogWarning << "BackTrace: " << std::endl
+                     << GundamUtils::Backtrace << std::endl;
 #endif
         }
       }
