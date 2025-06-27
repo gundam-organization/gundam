@@ -389,7 +389,7 @@ void ParameterSet::processCovarianceMatrix(){
 
     // Put original parameters to the prior
     for( auto& par : _parameterList_ ){
-      par.setValueAtPrior();
+      par.setCurrentValueAsPrior();
     }
 
     // Original parameter values are already set -> need to propagate to Eigen parameter list
@@ -483,6 +483,14 @@ void ParameterSet::moveParametersToPrior(){
       eigenPar.setParameterValue(eigenPar.getPriorValue());
     }
     this->propagateEigenToOriginal();
+  }
+}
+void ParameterSet::setParametersPriorWithCurrentValue(){
+  for( auto& par : _parameterList_ ){
+    par.setCurrentValueAsPrior();
+  }
+  for( auto& eigenPar : _eigenParameterList_ ) {
+    eigenPar.setCurrentValueAsPrior();
   }
 }
 void ParameterSet::throwParameters(bool rethrowIfNotInPhysical_, double gain_){

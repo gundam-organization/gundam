@@ -100,7 +100,7 @@ public:
   [[nodiscard]] auto& getEigenParameterList() const{ return _eigenParameterList_; }
   auto& getEigenParameterList(){ return _eigenParameterList_; }
 
-  /// True if all of the enabled parameters have valid values.
+  /// True if all the enabled parameters have valid values.
   [[nodiscard]] bool isValid() const;
 
   /// Convenience method to check if a value will be valid for a particular
@@ -119,6 +119,9 @@ public:
 
   /// Set all the parameters to their prior values.
   void moveParametersToPrior();
+
+  /// Set the prior value to be the current value of the parameters
+  void setParametersPriorWithCurrentValue();
 
   /// Set the parameter values based on a random throw with fluctuations
   /// determined by the striped covariance matrix.  If the first parameter,

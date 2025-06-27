@@ -50,6 +50,8 @@ public:
   void setStdDevValue(double stdDevValue){ _stdDevValue_ = stdDevValue; }
   void setDialSetConfig(const std::vector<ConfigReader>& dialDefinitionsList_){ _dialDefinitionsList_ = dialDefinitionsList_; }
 
+  void setValueAsPrior(){ _priorValue_ = _parameterValue_; }
+
   /// Set the limits for this parameter.  Parameter values less than
   /// this value are illegal, and the likelihood is undefined.  The job will
   /// terminate when it encounters an illegal parameter value.  Note: Using a
@@ -124,7 +126,7 @@ public:
 
   /// Copy the prior value of the parameter into the current value.  This will
   /// fail if the prior value has not been set.
-  void setValueAtPrior();
+  void setCurrentValueAsPrior();
 
   /// Copy the current value of the parameter into the prior value.
   void setCurrentValueAsPrior();

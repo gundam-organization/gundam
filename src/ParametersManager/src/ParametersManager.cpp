@@ -205,6 +205,11 @@ void ParametersManager::initializeStrippedGlobalCov(){
     }
   }
 }
+void ParametersManager::setParametersPriorWithCurrentValue(){
+  for( auto& parSet : _parameterSetList_ ) {
+    parSet.setParametersPriorWithCurrentValue();
+  }
+}
 void ParametersManager::throwParametersFromGlobalCovariance(bool quietVerbose_){
 
   if( _strippedCovarianceMatrix_ == nullptr ){

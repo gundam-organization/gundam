@@ -133,7 +133,7 @@ double Parameter::getParameterValue() const {
   return _parameterValue_;
 }
 
-void Parameter::setValueAtPrior(){
+void Parameter::setCurrentValueAsPrior(){
   setParameterValue(getPriorValue());
 }
 void Parameter::setCurrentValueAsPrior(){

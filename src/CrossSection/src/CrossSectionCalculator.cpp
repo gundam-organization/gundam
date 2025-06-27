@@ -28,6 +28,7 @@ void CrossSectionCalculator::configureImpl(){
 
   if( GenericToolbox::hasExtension(_fitterFilePath_, "root") ){
     LogWarning << "Opening fitter output file: " << _fitterFilePath_ << std::endl;
+    std::unique_ptr<TFile> fitterRootFile{nullptr};
     fitterRootFile = std::unique_ptr<TFile>( TFile::Open( _fitterFilePath_.c_str() ) );
     LogThrowIf( fitterRootFile == nullptr, "Could not open fitter output file." );
 
@@ -41,6 +42,28 @@ void CrossSectionCalculator::configureImpl(){
         [&](TNamed* config_){
       _fitterEngineConfig_ = ConfigReader(GenericToolbox::Json::readConfigJsonStr( config_->GetTitle() )).getConfig();
     });
+
+    if( not _usePrefit_ and fitterRootFile != nullptr ){
+
+      // Load post-fit parameters as "prior" so we can reset the weight to this point when throwing toys
+      RootUtils::ObjectReader::readObject<TNamed>( fitterRootFile.get(), "FitterEngine/postFit/parState_TNamed", [&](TNamed* parState_){
+        _postFitParState_ = GenericToolbox::Json::readConfigJsonStr( parState_->GetTitle() );
+      });
+
+      // Load the post-fit covariance matrix
+      LogWarning << std::endl << GenericToolbox::addUpDownBars("Injecting post-fit covariance matrix...") << std::endl;
+      RootUtils::ObjectReader::readObject<TH2D>(
+          fitterRootFile.get(), "FitterEngine/postFit/Hesse/hessian/postfitCovarianceOriginal_TH2D",
+          [&](TH2D* hCovPostFit_){
+            propagator.getParametersManager().setGlobalCovarianceMatrix(std::make_shared<TMatrixD>(hCovPostFit_->GetNbinsX(), hCovPostFit_->GetNbinsX()));
+            for( int iBin = 0 ; iBin < hCovPostFit_->GetNbinsX() ; iBin++ ){
+              for( int jBin = 0 ; jBin < hCovPostFit_->GetNbinsX() ; jBin++ ){
+                (*propagator.getParametersManager().getGlobalCovarianceMatrix())[iBin][jBin] = hCovPostFit_->GetBinContent(1 + iBin, 1 + jBin);
+              }
+            }
+          }
+      );
+    }
   }
   else{
     LogWarning << "Reading fitter config file (no-post-fit will be available): " << _fitterFilePath_ << std::endl;
@@ -87,11 +110,6 @@ void CrossSectionCalculator::configureImpl(){
   // Disabling eigen decomposed parameters
   _fitterEngine_.getLikelihoodInterface().getModelPropagator().setEnableEigenToOrigInPropagate( false );
 
-  // adding a suffix for prefit
-  for( auto& sample : _fitterEngine_.getLikelihoodInterface().getModelPropagator().getSampleSet().getSampleList() ) {
-    if( _usePrefit_ ){ sample.setName( sample.getName() + " (pre-fit)" ); }
-  }
-
   // LEGACY: If we want to define the sample binning using template parameters
   for( auto& sample : _fitterEngine_.getLikelihoodInterface().getModelPropagator().getSampleSet().getSampleList() ){
 
@@ -137,33 +155,53 @@ void CrossSectionCalculator::initializeImpl(){
 
   auto& propagator{_fitterEngine_.getLikelihoodInterface().getModelPropagator()};
 
-  if( not _usePrefit_ and fitterRootFile != nullptr ){
-
-    // Load post-fit parameters as "prior" so we can reset the weight to this point when throwing toys
+  if( not _usePrefit_ ){
     LogWarning << std::endl << GenericToolbox::addUpDownBars("Injecting post-fit parameters...") << std::endl;
-    RootUtils::ObjectReader::readObject<TNamed>( fitterRootFile.get(), "FitterEngine/postFit/parState_TNamed", [&](TNamed* parState_){
-      propagator.getParametersManager().injectParameterValues( GenericToolbox::Json::readConfigJsonStr( parState_->GetTitle() ) );
-      for( auto& parSet : propagator.getParametersManager().getParameterSetsList() ){
-        if( not parSet.isEnabled() ){ continue; }
-        for( auto& par : parSet.getParameterList() ){
-          if( not par.isEnabled() ){ continue; }
-          par.setPriorValue( par.getParameterValue() );
-        }
-      }
-    });
+    propagator.getParametersManager().injectParameterValues( _postFitParState_ );
 
-    // Load the post-fit covariance matrix
-    LogWarning << std::endl << GenericToolbox::addUpDownBars("Injecting post-fit covariance matrix...") << std::endl;
-    RootUtils::ObjectReader::readObject<TH2D>(
-        fitterRootFile.get(), "FitterEngine/postFit/Hesse/hessian/postfitCovarianceOriginal_TH2D",
-        [&](TH2D* hCovPostFit_){
-          propagator.getParametersManager().setGlobalCovarianceMatrix(std::make_shared<TMatrixD>(hCovPostFit_->GetNbinsX(), hCovPostFit_->GetNbinsX()));
-          for( int iBin = 0 ; iBin < hCovPostFit_->GetNbinsX() ; iBin++ ){
-            for( int jBin = 0 ; jBin < hCovPostFit_->GetNbinsX() ; jBin++ ){
-              (*propagator.getParametersManager().getGlobalCovarianceMatrix())[iBin][jBin] = hCovPostFit_->GetBinContent(1 + iBin, 1 + jBin);
-            }
-          }
-        }
+    LogInfo << "Anchoring parameter prior with the current value..." << std::endl;
+    propagator.getParametersManager().setParametersPriorWithCurrentValue();
+  }
+
+  LogInfo << "Initializing xsec samples..." << std::endl;
+  crossSectionDataList.reserve(propagator.getSampleSet().getSampleList().size() );
+  for( auto& sample : propagator.getSampleSet().getSampleList() ){
+    crossSectionDataList.emplace_back();
+    auto& xsecEntry = crossSectionDataList.back();
+
+    LogScopeIndent;
+    LogInfo << "Defining xsec entry: " << sample.getName() << std::endl;
+    xsecEntry.samplePtr = &sample;
+    xsecEntry.config = sample.getConfig();
+    xsecEntry.branchBinsData.resetCursor();
+    std::vector<std::string> leafNameList{};
+    leafNameList.reserve( sample.getHistogram().getNbBins() );
+    for( int iBin = 0 ; iBin < sample.getHistogram().getNbBins(); iBin++ ){
+      leafNameList.emplace_back(Form("bin_%i/D", iBin));
+      xsecEntry.branchBinsData.writeRawData( double(0) );
+    }
+    xsecEntry.branchBinsData.lock();
+
+
+    xsecAtBestFitTree->Branch(
+        GenericToolbox::generateCleanBranchName( sample.getName() ).c_str(),
+        xsecEntry.branchBinsData.getRawDataArray().data(),
+        GenericToolbox::joinVectorString(leafNameList, ":").c_str()
+    );
+
+    auto normConfigList = xsecEntry.config.loop("normaliseParameterList");
+    xsecEntry.normList.reserve( normConfigList.size() );
+    for( auto& normConfig : normConfigList ){
+      xsecEntry.normList.emplace_back();
+      xsecEntry.normList.back().configure( normConfig );
+    }
+
+    xsecEntry.histogram = TH1D(
+        sample.getName().c_str(),
+        sample.getName().c_str(),
+        sample.getHistogram().getNbBins(),
+        0,
+        sample.getHistogram().getNbBins()
     );
   }
 
@@ -179,6 +217,14 @@ void CrossSectionCalculator::throwToys(int nToys_){
   LogInfo << "Creating throws tree" << std::endl;
   auto* xsecThrowTree = new TTree("xsecThrow", "xsecThrow");
   xsecThrowTree->SetDirectory( _savePath_.getSubDir("throws").getDir() ); // temp saves will be done here
+
+  for( auto& xsecEntry : crossSectionDataList ) {
+    xsecThrowTree->Branch(
+        GenericToolbox::generateCleanBranchName( xsecEntry.samplePtr->getName() ).c_str(),
+        xsecEntry.branchBinsData.getRawDataArray().data(),
+        GenericToolbox::joinVectorString(leafNameList, ":").c_str()
+    );
+  }
 
   // stats printing
   GenericToolbox::Time::AveragedTimer<1> totalTimer{};

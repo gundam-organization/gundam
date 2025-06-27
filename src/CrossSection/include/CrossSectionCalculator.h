@@ -24,6 +24,7 @@ public:
   void setFitterRootFilePath(const std::string& fitterFilePath_){ _fitterFilePath_ = fitterFilePath_; }
   void setUsePrefit(bool usePrefit_){ _usePrefit_ = usePrefit_; }
   void setUseBestFitAsCentralValue(bool useBestFitAsCentralValue_){ _useBestFitAsCentralValue_ = useBestFitAsCentralValue_; }
+  void setSavePath(const GenericToolbox::TFilePath& savePath_){ _savePath_ = savePath_; }
 
   const auto& getOutputFolder(){ return _outputFolder_; }
 
@@ -37,10 +38,11 @@ private:
   std::string _outputFolder_{};
   std::string _fitterFilePath_{};
 
-  std::unique_ptr<TFile> fitterRootFile{nullptr};
   JsonType _fitterEngineConfig_;
   FitterEngine _fitterEngine_{nullptr};
   GenericToolbox::TFilePath _savePath_{nullptr};
+
+  JsonType _postFitParState_;
 
   std::vector<CrossSectionHistogramData> crossSectionDataList{};
 

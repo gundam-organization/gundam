@@ -118,12 +118,19 @@ int main(int argc, char** argv){
   app.openOutputFile( outFilePath );
   app.writeAppInfo();
 
+  csc.setSavePath( GenericToolbox::TFilePath(app.getOutfilePtr()) );
+
   csc.initialize();
 
   if( clParser.isOptionTriggered("dryRun") ){
     LogAlert << "Exiting as dry-run is set." << std::endl;
     return EXIT_SUCCESS;
   }
+
+  csc.throwToys( clParser.getOptionVal<int>("nToys") );
+  csc.writeHistograms();
+
+
 
   auto* calcXsecDir{ GenericToolbox::mkdirTFile(app.getOutfilePtr(), "calcXsec") };
 
@@ -267,54 +274,6 @@ int main(int argc, char** argv){
       parSetNormList.back().initialize();
     }
   }
-
-  LogInfo << "Initializing xsec samples..." << std::endl;
-  crossSectionDataList.reserve(propagator.getSampleSet().getSampleList().size() );
-  for( auto& sample : propagator.getSampleSet().getSampleList() ){
-    crossSectionDataList.emplace_back();
-    auto& xsecEntry = crossSectionDataList.back();
-
-    LogScopeIndent;
-    LogInfo << "Defining xsec entry: " << sample.getName() << std::endl;
-    xsecEntry.samplePtr = &sample;
-    xsecEntry.config = sample.getConfig();
-    xsecEntry.branchBinsData.resetCursor();
-    std::vector<std::string> leafNameList{};
-    leafNameList.reserve( sample.getHistogram().getNbBins() );
-    for( int iBin = 0 ; iBin < sample.getHistogram().getNbBins(); iBin++ ){
-      leafNameList.emplace_back(Form("bin_%i/D", iBin));
-      xsecEntry.branchBinsData.writeRawData( double(0) );
-    }
-    xsecEntry.branchBinsData.lock();
-
-    xsecThrowTree->Branch(
-        GenericToolbox::generateCleanBranchName( sample.getName() ).c_str(),
-        xsecEntry.branchBinsData.getRawDataArray().data(),
-        GenericToolbox::joinVectorString(leafNameList, ":").c_str()
-    );
-    xsecAtBestFitTree->Branch(
-        GenericToolbox::generateCleanBranchName( sample.getName() ).c_str(),
-        xsecEntry.branchBinsData.getRawDataArray().data(),
-        GenericToolbox::joinVectorString(leafNameList, ":").c_str()
-    );
-
-    auto normConfigList = xsecEntry.config.loop("normaliseParameterList");
-    xsecEntry.normList.reserve( normConfigList.size() );
-    for( auto& normConfig : normConfigList ){
-      xsecEntry.normList.emplace_back();
-      xsecEntry.normList.back().configure( normConfig );
-    }
-
-    xsecEntry.histogram = TH1D(
-        sample.getName().c_str(),
-        sample.getName().c_str(),
-        sample.getHistogram().getNbBins(),
-        0,
-        sample.getHistogram().getNbBins()
-    );
-  }
-
-  int nToys{ clParser.getOptionVal<int>("nToys") };
 
   // no bin volume of events -> use the current weight container
   for( auto& xsec : crossSectionDataList ){

@@ -52,6 +52,7 @@ public:
   void throwParametersFromParSetCovariance();
   void throwParametersFromGlobalCovariance(bool quietVerbose_ = true);
   void initializeStrippedGlobalCov();
+  void setParametersPriorWithCurrentValue();
   ParameterSet* getFitParameterSetPtr(const std::string& name_);
 
   // Logger related
