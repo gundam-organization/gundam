@@ -68,6 +68,7 @@ void DialManager::clearEventByEventDials(){
   invalidateInputBuffers();
 }
 void DialManager::updateDialState(){
+  auto s{_updateTimer_.scopeTime()};
   for( auto& dialCollection : _dialCollectionList_ ) {
     dialCollection.updateInputBuffers();
     dialCollection.update();
