@@ -56,6 +56,36 @@ Cache::Manager::Manager(const Cache::Manager::Configuration& config) {
         LogThrowIf(not fWeightsCache, "Bad WeightsCache alloc");
         fTotalBytes += fWeightsCache->GetResidentMemory();
 
+        /// Put the weight calculators that need to have data transferred from
+        /// the host to the device at the beginning of the calculation so that
+        /// they don't trigger a device sync (which is slow).  This allows
+        /// the calculation to proceed asynchronously.
+        fTabulated = std::make_unique<Cache::Weight::Tabulated>(
+            fWeightsCache->GetWeights(),
+            fParameterCache->GetParameters(),
+            config.tabulated,
+            config.tabulatedPoints,
+            config.tables);
+        LogThrowIf(not fTabulated, "Bad Tabulated alloc");
+        fWeightsCache->AddWeightCalculator(fTabulated.get());
+        fTotalBytes += fTabulated->GetResidentMemory();
+
+        // Kriged after Tabulated since kriged usually has more data and
+        // a longer calculation.
+        fKriged = std::make_unique<Cache::Weight::Kriged>(
+            fWeightsCache->GetWeights(),
+            fParameterCache->GetParameters(),
+            config.kriged,
+            config.krigedWeights,
+            config.krigedPoints,
+            config.krigs);
+        LogThrowIf(not fKriged, "Bad Kriged alloc");
+        fWeightsCache->AddWeightCalculator(fKriged.get());
+        fTotalBytes += fKriged->GetResidentMemory();
+
+        /// Add the *normal* weight calculators. All of the weight calculators
+        /// below this point are fully preinitialized and do not require data
+        /// that is copied from the host to device (after initialization).
         fNormalizations = std::make_unique<Cache::Weight::Normalization>(
             fWeightsCache->GetWeights(),
             fParameterCache->GetParameters(),
@@ -137,27 +167,6 @@ Cache::Manager::Manager(const Cache::Manager::Configuration& config) {
         LogThrowIf(not fBicubic, "Bad Bicubic alloc");
         fWeightsCache->AddWeightCalculator(fBicubic.get());
         fTotalBytes += fBicubic->GetResidentMemory();
-
-        fTabulated = std::make_unique<Cache::Weight::Tabulated>(
-            fWeightsCache->GetWeights(),
-            fParameterCache->GetParameters(),
-            config.tabulated,
-            config.tabulatedPoints,
-            config.tables);
-        LogThrowIf(not fTabulated, "Bad Tabulated alloc");
-        fWeightsCache->AddWeightCalculator(fTabulated.get());
-        fTotalBytes += fTabulated->GetResidentMemory();
-
-        fKriged = std::make_unique<Cache::Weight::Kriged>(
-            fWeightsCache->GetWeights(),
-            fParameterCache->GetParameters(),
-            config.kriged,
-            config.krigedWeights,
-            config.krigedPoints,
-            config.krigs);
-        LogThrowIf(not fKriged, "Bad Kriged alloc");
-        fWeightsCache->AddWeightCalculator(fKriged.get());
-        fTotalBytes += fKriged->GetResidentMemory();
 
         fHistogramsCache = std::make_unique<Cache::HistogramSum>(
             fWeightsCache->GetWeights(),
