@@ -12,6 +12,7 @@
 
 #include <vector>
 
+#include "GenericToolbox.Time.h"
 
 class DialManager : public JsonBaseClass {
 
@@ -37,10 +38,12 @@ public:
   void invalidateInputBuffers();
   void updateDialState();
   void printSummaryTable() const;
+  auto& getUpdateTimer() const {return _updateTimer_;}
 
 private:
   ParametersManager* _parametersManagerPtr_{nullptr};
   std::vector<DialCollection> _dialCollectionList_;
+  GenericToolbox::Time::AveragedTimer<10> _updateTimer_;
 };
 
 
