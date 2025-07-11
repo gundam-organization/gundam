@@ -18,6 +18,9 @@ protected:
   void configureImpl() override;
   void initializeImpl() override;
 
+public:
+  void run();
+
 private:
   std::unique_ptr<MinimizerBase> _minimizer_{nullptr};
 

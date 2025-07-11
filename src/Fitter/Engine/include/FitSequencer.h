@@ -20,6 +20,9 @@ protected:
 private:
   std::vector<FitTask> taskList{};
 
+  // shared among the tasks
+  std::unique_ptr<MinimizerBase> _minimizer_{};
+
 };
 
 

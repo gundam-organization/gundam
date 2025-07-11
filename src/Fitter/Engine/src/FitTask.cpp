@@ -10,7 +10,14 @@ void FitTask::configureImpl(){
     {FieldFlag::MANDATORY, "name"},
     {"minimizerType"}
   });
+
+
+
 }
 void FitTask::initializeImpl(){
+
+}
+
+void FitTask::run(){
 
 }
