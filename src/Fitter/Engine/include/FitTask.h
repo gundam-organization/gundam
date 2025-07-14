@@ -22,7 +22,11 @@ public:
   void run();
 
 private:
-  std::unique_ptr<MinimizerBase> _minimizer_{nullptr};
+  // config
+  bool _isEnabled_{true};
+  std::string _name_{};
+  std::string _outputFolder_{};
+  std::vector<std::string> _actionList_{};
 
 };
 

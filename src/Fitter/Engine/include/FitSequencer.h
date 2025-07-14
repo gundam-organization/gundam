@@ -18,7 +18,7 @@ protected:
   void initializeImpl() override;
 
 private:
-  std::vector<FitTask> taskList{};
+  std::vector<FitTask> _taskList_{};
 
   // shared among the tasks
   std::unique_ptr<MinimizerBase> _minimizer_{};
