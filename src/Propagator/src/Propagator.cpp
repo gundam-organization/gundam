@@ -152,8 +152,6 @@ std::future<bool> Propagator::applyParameters(){
 }
 
 void Propagator::reweightEvents(bool updateDials) {
-  // timer start/stop in scope
-  auto s{reweightTimer.scopeTime()};
 
   if (updateDials) {
     // Make sure the dial state is updated before pulling the trigger on the
@@ -162,6 +160,9 @@ void Propagator::reweightEvents(bool updateDials) {
     if( _enableEigenToOrigInPropagate_ ){ _parManager_.convertEigenToOrig(); }
     _dialManager_.updateDialState();
   }
+
+  // timer start/stop after the dials are updated.
+  auto s{reweightTimer.scopeTime()};
 
   if( not _devSingleThreadReweight_ ){
     _threadPool_.runJob("Propagator::reweightEvents");

@@ -19,7 +19,7 @@ set(SCRIPT_LIST
   gundamContinue
 )
 
-if( ENABLE_DEV_MODE )
+if( WITH_GUNDAM_SANDBOX_APP )
     list(APPEND APPLICATION_LIST Sandbox)
 endif()
 

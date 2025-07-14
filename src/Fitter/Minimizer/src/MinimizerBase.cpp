@@ -191,6 +191,7 @@ double MinimizerBase::evalFit( const double* parArray_ ){
       t << "" << GenericToolbox::TablePrinter::NextColumn;
       t << "Propagator" << GenericToolbox::TablePrinter::NextColumn;
 
+      t << "Dial Update" << GenericToolbox::TablePrinter::NextColumn;
 #ifdef GUNDAM_USING_CACHE_MANAGER
       if( Cache::Manager::Get() != nullptr ){
         t << "Cache::Fill" << GenericToolbox::TablePrinter::NextColumn;
@@ -208,6 +209,7 @@ double MinimizerBase::evalFit( const double* parArray_ ){
       t << "Speed" << GenericToolbox::TablePrinter::NextColumn;
       t << _monitor_.iterationCounterClock.evalTickSpeed() << " it/s" << GenericToolbox::TablePrinter::NextColumn;
 
+      t << getModelPropagator().getDialManager().getUpdateTimer() << GenericToolbox::TablePrinter::NextColumn;
 
 #ifdef GUNDAM_USING_CACHE_MANAGER
       if( Cache::Manager::Get() != nullptr ){

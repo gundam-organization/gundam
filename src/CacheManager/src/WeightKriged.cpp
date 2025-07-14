@@ -63,6 +63,7 @@ Cache::Weight::Kriged::Kriged(
         // the page set.
         fResults.reset(new hemi::Array<int>(GetReserved(),false));
         LogThrowIf(not fResults, "Bad Results alloc");
+        LogThrowIf(fResults->size() != GetReserved(), "Incorrect result size");
 
         fOffsets.reset(new hemi::Array<int>(GetReserved(),false));
         LogThrowIf(not fOffsets, "Bad Offsets alloc");
@@ -104,26 +105,36 @@ void Cache::Weight::Kriged::AddData(
     if (resIndex < 0) {
         LogError << "Invalid result index"
                  << std::endl;
-        LogThrow("Negative result index");
+        LogExit("Negative result index");
     }
-    if (fResults->size() <= resIndex) {
+
+    if (fWeights.size() <= resIndex) {
         LogError << "Invalid result index"
+                 << fWeights.size() << " <= " << resIndex
                  << std::endl;
-        LogThrow("Result index out of bounds");
+        LogExit("Result index out of bounds");
     }
 
     int newIndex = fUsed++;
     if (fUsed > fReserved) {
         LogError << "Not enough space reserved for dials"
+                 << fUsed << " < " << fReserved
                  << std::endl;
-        LogThrow("Not enough space reserved for dials");
+        LogExit("Not enough space reserved for dials");
+    }
+
+    if (fResults->size() <= newIndex) {
+        LogError << "Invalid new index"
+                 << fResults->size() << " <= " << newIndex
+                 << std::endl;
+        LogExit("Result index out of bounds");
     }
 
     auto tableEntry = fTableOffsets.find(table);
     if (tableEntry == fTableOffsets.end()) {
         LogError << "Request to create Kriged weight for invalid table"
                  << std::endl;
-        LogThrow("Invalid table request");
+        LogExit("Invalid table request");
     }
 
     fResults->hostPtr()[newIndex] = resIndex;
@@ -131,11 +142,16 @@ void Cache::Weight::Kriged::AddData(
     for (const std::pair<int,float>& weight: weights) {
         int offset = tableEntry->second + weight.first;
         if (fTable->size() <= offset) {
-            LogError << "Insufficent table space" << std::endl;
-            LogThrow("Insufficient table space");
+            LogError << "Insufficent table space"
+                     << fTable->size() << " <= " << offset
+                     << std::endl;
+            LogExit("Insufficient table space");
         }
         if (fWeightsUsed >= fWeightsReserved) {
-            LogThrow("Invalid fWeightsUsed");
+            LogError << "Weights used more than reserved "
+                     << fWeightsUsed << " >= " << fWeightsReserved
+                     << std::endl;
+            LogExit("Invalid fWeightsUsed");
         }
         fIndices->hostPtr()[fWeightsUsed] = offset;
         fConstants->hostPtr()[fWeightsUsed] = weight.second;
