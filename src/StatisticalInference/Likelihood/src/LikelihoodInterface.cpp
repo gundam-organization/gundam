@@ -371,6 +371,9 @@ void LikelihoodInterface::loadDataPropagator(){
   }
 
   if( isAsimov ){
+
+    auto _PropagatorBuffer_ = _modelPropagator_;
+
     // don't reload, just use the _modelPropagator_
     if( _dataType_ == DataType::Toy ){
       throwToyParameters(_modelPropagator_);
@@ -387,6 +390,9 @@ void LikelihoodInterface::loadDataPropagator(){
       _modelPropagator_.getParametersManager().moveParametersToPrior();
       _modelPropagator_.reweightEvents();
     }
+    
+    _modelPropagator_ = _PropagatorBuffer_;
+
   }
   else{
     LogInfo << "Loading datasets..." << std::endl;
