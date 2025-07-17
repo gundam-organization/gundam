@@ -311,7 +311,7 @@ void ParameterSet::processCovarianceMatrix(){
 
     // In any case the eigen values should have been cleaned up
     LogInfo << "Covariance eigen values are between " << _eigenValues_->Min() << " and " << _eigenValues_->Max() << std::endl;
-    LogExitIf(_eigenValues_->Min() < 0, "Input covariance matrix is not positive definite.");
+    LogAlertIf(_eigenValues_->Min() < 0) << "Input covariance matrix is not positive definite. Numerical noise might affect the best-fit." << std::endl;
 
     _nbEnabledEigen_ = 0;
     double eigenTotal = _eigenValues_->Sum();
@@ -326,8 +326,8 @@ void ParameterSet::processCovarianceMatrix(){
       _eigenParameterList_[iEigen].setParameterIndex( iEigen );
       _eigenParameterList_[iEigen].setIsEnabled(true);
       _eigenParameterList_[iEigen].setIsEigen(true);
-      _eigenParameterList_[iEigen].setStdDevValue(std::sqrt((*_eigenValues_)[iEigen]));
-      _eigenParameterList_[iEigen].setStepSize(std::sqrt((*_eigenValues_)[iEigen]));
+      _eigenParameterList_[iEigen].setStdDevValue((*_eigenValues_)[iEigen] > 0 ? std::sqrt((*_eigenValues_)[iEigen]) : 0);
+      _eigenParameterList_[iEigen].setStepSize(_eigenParameterList_[iEigen].getStdDevValue());
       _eigenParameterList_[iEigen].setName("eigen");
 
       // fixing all of them by default
@@ -370,6 +370,8 @@ void ParameterSet::processCovarianceMatrix(){
     auto eigenStateMatrix = std::unique_ptr<TMatrixD>(GenericToolbox::makeDiagonalMatrix(eigenState.get()));
     auto diagInvMatrix = std::unique_ptr<TMatrixD>(GenericToolbox::makeDiagonalMatrix(_eigenValuesInv_.get()));
 
+    LogWarningIf(_projectorMatrix_->GetNrows() >= 1000) << "Calculating projector matrix and inverse matrix with a dimension of "
+    << _projectorMatrix_->GetNrows() << "x" << _projectorMatrix_->GetNrows() << ". This might take a while...";
     (*_projectorMatrix_) =  (*_eigenVectors_);
     (*_projectorMatrix_) *= (*eigenStateMatrix);
     (*_projectorMatrix_) *= (*_eigenVectorsInv_);
@@ -1066,12 +1068,12 @@ void ParameterSet::defineParameters(){
 
     if( _priorFullCovarianceMatrix_ != nullptr ){
       par.setStdDevValue(std::sqrt((*_priorFullCovarianceMatrix_)[par.getParameterIndex()][par.getParameterIndex()]));
-      par.setStepSize(std::sqrt((*_priorFullCovarianceMatrix_)[par.getParameterIndex()][par.getParameterIndex()]));
+      par.setStepSize(par.getStdDevValue());
     }
     else{
       // stdDev will only be used for display purpose
-      par.setStdDevValue(_nominalStepSize_);
       par.setStepSize(_nominalStepSize_);
+      par.setStdDevValue(par.getStepSize());
       par.setPriorType(Parameter::PriorType::Flat);
       par.setIsFree(true);
     }
