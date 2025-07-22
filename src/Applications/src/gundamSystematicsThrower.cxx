@@ -596,8 +596,8 @@ int main(int argc, char** argv){
         LH_statWrtBestFit = LH_stat - bestFit_statLH;
         LH_systWrtBestFit = LH_syst - bestFit_systLH;
         // LogInfo<<"Done.  ";
-        LogInfo << iToy << "\t: LH_stat: " << LH_stat << " LH_syst: " << LH_syst << " LH tot: " << LLH << std::endl;
-        LogInfo << "BF\t: LH_stat: " << LH_statWrtBestFit << " LH_syst: " << LH_systWrtBestFit << " LH tot: " << LLHwrtBestFit << std::endl;
+        LogInfo << iToy << "\t: LH_stat:  " << LH_stat     << "  LH_syst:  " << LH_syst           << "  LH tot:  " << LLH << std::endl;
+        LogInfo << "BF\t: LH_stat: (" << LH_statWrtBestFit << ") LH_syst: (" << LH_systWrtBestFit << ") LH tot: (" << LLHwrtBestFit << ")" << std::endl;
 
         // LogInfo<<"LLH: "<<LLH<<std::endl;
         // make the LH a probability distribution (but still work with the log)
