@@ -299,7 +299,7 @@ int main(int argc, char** argv){
               debug_cov_rows = hCovPostFit_->GetNbinsX();
           });
 
-  LogInfo << "DEBUG: Number of enabled parameters: " << debug_enabled_params << "\nNumber of rows in the covariance matrix: " << debug_cov_rows << std::endl;
+    LogInfo << "DEBUG: Number of enabled parameters: " << debug_enabled_params << "\nNumber of rows in the covariance matrix: " << debug_cov_rows << std::endl;
 
 
 
@@ -313,7 +313,11 @@ int main(int argc, char** argv){
     propagator.propagateParameters();
     fitter.getLikelihoodInterface().propagateAndEvalLikelihood();
     double bestFitLLH = fitter.getLikelihoodInterface().getBuffer().totalLikelihood;
-    LogInfo<<"LLH (computed on injected parameters): "<<bestFitLLH<<std::endl;
+    double bestFit_statLH = fitter.getLikelihoodInterface().evalStatLikelihood();
+    double bestFit_systLH = fitter.getLikelihoodInterface().evalPenaltyLikelihood();;
+    LogInfo<<" Best fit Likelihood:\nLH_stat="<<bestFit_statLH
+           <<"\nLH_syst="<<bestFit_systLH
+           <<"\nTotal LH="<<bestFitLLH<<std::endl;
     // write the post fit covariance matrix in the output file
     TDirectory* postFitInfo = app.getOutfilePtr()->mkdir("postFitInfo");
     postFitInfo->cd();
@@ -360,12 +364,17 @@ int main(int argc, char** argv){
     std::vector<double> weightsChiSquare;
 //    weightsChiSquare.reserve(1000);
     double LLH, gLLH, priorSum, LLHwrtBestFit;
+    double LH_stat, LH_syst, LH_systWrtBestFit, LH_statWrtBestFit;
     double totalWeight; // use in the pedestal case, just as a placeholder
     margThrowTree->Branch("Parameters", &parameters);
     margThrowTree->Branch("Marginalise", &margThis);
     margThrowTree->Branch("prior", &prior);
     margThrowTree->Branch("LLH", &LLH);
+    margThrowTree->Branch("LH_stat", &LH_stat);
+    margThrowTree->Branch("LH_syst", &LH_syst);
     margThrowTree->Branch("LLHwrtBestFit", &LLHwrtBestFit);
+    margThrowTree->Branch("LH_statWrtBestFit", &LH_statWrtBestFit);
+    margThrowTree->Branch("LH_systWrtBestFit", &LH_systWrtBestFit);
     margThrowTree->Branch("gLLH", &gLLH);
     margThrowTree->Branch("priorSum", &priorSum);
     margThrowTree->Branch("weightsChiSquare", &weightsChiSquare);
@@ -581,11 +590,15 @@ int main(int argc, char** argv){
         // LogInfo<<"Computing LH... ";
         fitter.getLikelihoodInterface().evalLikelihood();
         LLH = fitter.getLikelihoodInterface().getBuffer().totalLikelihood;
-
-        double LH_stats = fitter.getLikelihoodInterface().evalStatLikelihood();
-        double LH_syst = fitter.getLikelihoodInterface().evalPenaltyLikelihood();
+        LH_stat = fitter.getLikelihoodInterface().evalStatLikelihood();
+        LH_syst = fitter.getLikelihoodInterface().evalPenaltyLikelihood();
+        LLHwrtBestFit = LLH - bestFitLLH;
+        LH_statWrtBestFit = LH_stat - bestFit_statLH;
+        LH_systWrtBestFit = LH_syst - bestFit_systLH;
         // LogInfo<<"Done.  ";
-        LogInfo << iToy << ": LH_stats: " << LH_stats << " LH_syst: " << LH_syst << " LH tot: " << LLH << std::endl;
+        LogInfo << iToy << "\t: LH_stat: " << LH_stat << " LH_syst: " << LH_syst << " LH tot: " << LLH << std::endl;
+        LogInfo << "BF\t: LH_stat: " << LH_statWrtBestFit << " LH_syst: " << LH_systWrtBestFit << " LH tot: " << LLHwrtBestFit << std::endl;
+
         // LogInfo<<"LLH: "<<LLH<<std::endl;
         // make the LH a probability distribution (but still work with the log)
         // This is an approximation, it works only in case of gaussian LH
@@ -602,7 +615,6 @@ int main(int argc, char** argv){
             LogInfo<<" dLLH: "<<LLH-injectedLLH<<std::endl;
 
         //LogInfo<<"LLH: "<<LLH;
-        LLHwrtBestFit = LLH - bestFitLLH;
         gLLH = 0;
         priorSum = 0;
 
