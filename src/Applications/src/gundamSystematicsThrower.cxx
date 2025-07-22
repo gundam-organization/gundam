@@ -253,6 +253,9 @@ int main(int argc, char** argv){
                 bestFitValues.emplace_back(par.getParameterValue());
                 priorValues.emplace_back(par.getPriorValue());
                 priorSigmas.emplace_back(par.getStdDevValue());
+                LogInfo <<" DEBUG: Parameter: " << par.getFullTitle()
+                        << " | Best fit value: " << par.getParameterValue()
+                        << " | Prior value: " << par.getPriorValue() << std::endl;
                 // set prior to best fit
                 par.setPriorValue(par.getParameterValue());
             }
@@ -312,6 +315,24 @@ int main(int argc, char** argv){
     // also save the value of the LLH at the best fit point:
     propagator.propagateParameters();
     fitter.getLikelihoodInterface().propagateAndEvalLikelihood();
+    for( auto& parSet : propagator.getParametersManager().getParameterSetsList() ){
+      if( not parSet.isEnabled() ){ continue; }
+  //            LogInfo<< parSet.getName()<<std::endl;
+      for( auto& par : parSet.getParameterList() ){
+        if( not par.isEnabled() ){ continue; }
+  //                LogInfo<<debug_enabled_params<<" "<<par.getFullTitle()<<std::endl;
+        debug_enabled_params++;
+        parameterNames.emplace_back(par.getFullTitle());
+        bestFitValues.emplace_back(par.getParameterValue());
+        priorValues.emplace_back(par.getPriorValue());
+        priorSigmas.emplace_back(par.getStdDevValue());
+        LogInfo <<" DEBUG: Parameter: " << par.getFullTitle()
+                << " | Best fit value: " << par.getParameterValue()
+                << " | Prior value: " << par.getPriorValue() << std::endl;
+        // set prior to best fit
+        par.setPriorValue(par.getParameterValue());
+      }
+    }
     double bestFitLLH = fitter.getLikelihoodInterface().getBuffer().totalLikelihood;
     double bestFit_statLH = fitter.getLikelihoodInterface().evalStatLikelihood();
     double bestFit_systLH = fitter.getLikelihoodInterface().evalPenaltyLikelihood();;
@@ -332,6 +353,7 @@ int main(int argc, char** argv){
         parState_->SetName("postFitParameters_TNamed");
         parState_->Write();
     });
+
     unsigned int nParameters = parameterNames.size();
     TVectorD bestFitParameters_TVectorD(nParameters,bestFitValues.data());
     TVectorD priorParameters_TVectorD(nParameters,priorValues.data());
@@ -574,17 +596,7 @@ int main(int argc, char** argv){
         // Propagate the parameters
         fitter.getLikelihoodInterface().getModelPropagator().propagateParameters();
 
-        // Throw the statistical errors
-        if( enableStatThrowInToys ){
-          for( auto& sample : fitter.getLikelihoodInterface().getSamplePairList() ){
-            if( enableEventMcThrow ){
-              // Take into account the finite amount of event in MC
-              sample.model->getHistogram().throwEventMcError();
-            }
-            // Asimov bin content -> toy data
-            sample.model->getHistogram().throwStatError();
-          }
-        }
+
 
         // Compute the likelihood
         // LogInfo<<"Computing LH... ";
