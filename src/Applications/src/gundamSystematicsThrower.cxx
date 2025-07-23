@@ -316,8 +316,9 @@ int main(int argc, char** argv){
 
 
     // also save the value of the LLH at the best fit point:
-    propagator.propagateParameters();
-    fitter.getLikelihoodInterface().propagateAndEvalLikelihood();
+    fitter.getLikelihoodInterface().getModelPropagator().propagateParameters();
+    fitter.getLikelihoodInterface().evalLikelihood();
+
     for( auto& parSet : propagator.getParametersManager().getParameterSetsList() ){
       if( not parSet.isEnabled() ){ continue; }
       for( auto& par : parSet.getParameterList() ){
@@ -588,13 +589,8 @@ int main(int argc, char** argv){
 
         }// end if(injectParamsManually)
 
-        // Propagate the parameters
+        // Propagate the parameters and compute the LH
         fitter.getLikelihoodInterface().getModelPropagator().propagateParameters();
-
-
-
-        // Compute the likelihood
-        // LogInfo<<"Computing LH... ";
         fitter.getLikelihoodInterface().evalLikelihood();
         LLH = fitter.getLikelihoodInterface().getBuffer().totalLikelihood;
         LH_stat = fitter.getLikelihoodInterface().evalStatLikelihood();
