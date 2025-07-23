@@ -240,6 +240,7 @@ int main(int argc, char** argv){
 
     // Load post-fit parameters as "prior" so we can reset the weight to this point when throwing toys
     // also save the values in a vector so we can use them to compute the LLH at the best fit point
+    int NParametersFromFitterFile = 0;
     RootUtils::ObjectReader::readObject<TNamed>( fitterFile.get(), "FitterEngine/postFit/parState_TNamed", [&](TNamed* parState_){
         propagator.getParametersManager().injectParameterValues( GenericToolbox::Json::readConfigJsonStr( parState_->GetTitle() ) );
         for( auto& parSet : propagator.getParametersManager().getParameterSetsList() ){
@@ -258,9 +259,11 @@ int main(int argc, char** argv){
                         << " | Prior value: " << par.getPriorValue() << std::endl;
                 // set prior to best fit
                 par.setPriorValue(par.getParameterValue());
+                NParametersFromFitterFile++;
             }
         }
     });
+    LogInfo << "DEBUG: Number of parameters read from the fitter file: " << NParametersFromFitterFile << std::endl;
 
 
     // Creating output file
@@ -317,10 +320,8 @@ int main(int argc, char** argv){
     fitter.getLikelihoodInterface().propagateAndEvalLikelihood();
     for( auto& parSet : propagator.getParametersManager().getParameterSetsList() ){
       if( not parSet.isEnabled() ){ continue; }
-  //            LogInfo<< parSet.getName()<<std::endl;
       for( auto& par : parSet.getParameterList() ){
         if( not par.isEnabled() ){ continue; }
-  //                LogInfo<<debug_enabled_params<<" "<<par.getFullTitle()<<std::endl;
         debug_enabled_params++;
         LogInfo <<" DEBUG: Parameter: " << par.getFullTitle()
                 << " | current value: " << par.getParameterValue()
