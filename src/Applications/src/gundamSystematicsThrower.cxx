@@ -510,27 +510,27 @@ int main(int argc, char** argv){
         GenericToolbox::displayProgressBar( iToy+1, nToys, ss.str() );
 
         // reset weights vector
-        weightsChiSquare.clear();
+        weightsChiSquare->clear();
         // Do the throwing
         if (usePedestal){
             // if the pedestal option is enabled, a uniform distribution is added to the gaussian sampling distribution
-            propagator.getParametersManager().throwParametersFromGlobalCovariance(weightsChiSquare, pedestalEntity, pedestalLeftEdge, pedestalRightEdge);
+            propagator.getParametersManager().throwParametersFromGlobalCovariance(*weightsChiSquare, pedestalEntity, pedestalLeftEdge, pedestalRightEdge);
         }else{
             if(!tStudent) {
                 // standard case: throw according to the covariance matrix
                 propagator.getParametersManager().throwParametersFromGlobalCovariance(weightsChiSquare);
             }else{
-                propagator.getParametersManager().throwParametersFromTStudent(weightsChiSquare,tStudentNu);
+                propagator.getParametersManager().throwParametersFromTStudent(*weightsChiSquare,tStudentNu);
             }
         }
         // Sanity check on the length of the weights vector. It should be as long as the number of parameters
-        if(weightsChiSquare.size() != nParameters){
-          for(int i=0;i<weightsChiSquare.size();i++){
-            LogInfo<<"weightsChiSquare["<<i<<"]: "<<weightsChiSquare[i]<<std::endl;
+        if(weightsChiSquare->size() != nParameters){
+          for(int i=0;i<weightsChiSquare->size();i++){
+            LogInfo<<"weightsChiSquare["<<i<<"]: "<<weightsChiSquare->at(i)<<std::endl;
           }
           std::cout<<"("<<nParameters<<" parameters)"<<std::endl;
         }
-        LogThrowIf(weightsChiSquare.size() != nParameters, "ERROR: The weights vector has a different size than the number of parameters.");
+        LogThrowIf(weightsChiSquare->size() != nParameters, "ERROR: The weights vector has a different size than the number of parameters.");
 
 //        // Debug: print out parameters
 //        for (auto &parSet: propagator.getParametersManager().getParameterSetsList()) {
@@ -625,9 +625,9 @@ int main(int argc, char** argv){
         gLLH = 0;
         priorSum = 0;
 
-        parameters.clear();
-        margThis.clear();
-        prior.clear();
+        parameters->clear();
+        margThis->clear();
+        prior->clear();
         survivingParameterValues.clear();
         int iPar=0;
         for( auto& parSet : propagator.getParametersManager().getParameterSetsList() ) {
@@ -636,11 +636,11 @@ int main(int argc, char** argv){
             for (auto &par: parSet.getParameterList()) {
                 if (not par.isEnabled()) continue;
 //                LogInfo<<"  "<<par.getTitle()<<" -> "<<par.getParameterValue()<<std::endl;
-                parameters.push_back(par.getParameterValue());
-                margThis.push_back(par.isMarginalised());
-                prior.push_back(par.getDistanceFromNominal() * par.getDistanceFromNominal());
-                priorSum += prior.back();
-                gLLH += weightsChiSquare[iPar];
+                parameters->push_back(par.getParameterValue());
+                margThis->push_back(par.isMarginalised());
+                prior->push_back(par.getDistanceFromNominal() * par.getDistanceFromNominal());
+                priorSum += prior->back();
+                gLLH += weightsChiSquare->at(iPar);
                 if(not par.isMarginalised())
                     survivingParameterValues.push_back(par.getParameterValue());
                 iPar++;
@@ -666,10 +666,10 @@ int main(int argc, char** argv){
             weightSquareSumE50++;
         }
         // Write the ttrees
-        LogInfo << parameters.size() << std::endl;
-        LogInfo << margThis.size() << std::endl;
-        LogInfo << prior.size() << std::endl;
-        LogInfo << weightsChiSquare.size() << std::endl;
+        LogInfo << parameters->size() << std::endl;
+        LogInfo << margThis->size() << std::endl;
+        LogInfo << prior->size() << std::endl;
+        LogInfo << weightsChiSquare->size() << std::endl;
         margThrowTree->Fill();
         ThrowsPThetaFormat->Fill();
 
