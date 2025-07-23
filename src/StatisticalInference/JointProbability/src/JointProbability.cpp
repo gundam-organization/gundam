@@ -24,7 +24,8 @@ namespace JointProbability{
     auto jType{JointProbabilityType::toEnum( type_, true )};
 
     if( jType == JointProbabilityType::EnumOverflow  ){
-      LogThrow( "Unknown JointProbabilityType: " << type_ << std::endl << "Available: " << JointProbabilityType::generateEnumStrList() );
+      LogError << "Unknown JointProbabilityType: " << type_ << std::endl << "Available: " << JointProbabilityType::generateEnumStrList() << std::endl;
+      std::exit(EXIT_FAILURE);
     }
 
     return makeJointProbability( jType );

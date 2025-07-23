@@ -68,8 +68,9 @@ struct DataDispenserParameters{
   };
   FromHistContent fromHistContent;
 
-//  JsonType fromHistContent{};
-  JsonType overridePropagatorConfig{};
+//  JsonType fromHistContent;
+  JsonType overridePropagatorConfig;
+  JsonType evalModelAt;
 
   [[nodiscard]] std::string getSummary() const;
 };
@@ -87,7 +88,6 @@ struct DataDispenserCache{
   std::vector<DialCollection*> dialCollectionsRefList{};
 
   std::vector<std::string> varsRequestedForIndexing{};
-  std::vector<std::string> varsRequestedForStorage{};
   std::map<std::string, std::pair<std::string, bool>> varToLeafDict; // varToLeafDict[EVENT_VAR_NAME] = {LEAF_NAME, IS_DUMMY}
 
   std::vector<std::string> varsToOverrideList; // stores the leaves names to override in the right order
@@ -100,23 +100,33 @@ struct DataDispenserCache{
 
   void clear();
   void addVarRequestedForIndexing(const std::string& varName_);
-  void addVarRequestedForStorage(const std::string& varName_);
 
 };
 
 struct ThreadSharedData{
+  // I/O
   Long64_t nbEntries{0};
-
-  const GenericToolbox::LeafForm* eventVariableAsWeightLeafPtr{nullptr};
-
-  // has to be hooked to the TChain
-  TTreeFormula* dialIndexTreeFormula{nullptr};
-  TTreeFormula* nominalWeightTreeFormula{nullptr};
-
   std::shared_ptr<TChain> treeChain{nullptr};
+  GenericToolbox::TreeBuffer treeBuffer{};
 
-  std::vector<const GenericToolbox::LeafForm*> leafFormIndexingList{};
-  std::vector<const GenericToolbox::LeafForm*> leafFormStorageList{};
+  // buffer
+  struct VariableBuffer{
+    const GenericToolbox::TreeBuffer::ExpressionBuffer* nominalWeight{nullptr};
+    const GenericToolbox::TreeBuffer::ExpressionBuffer* dialIndex{nullptr};
+    const GenericToolbox::TreeBuffer::ExpressionBuffer* eventVarAsWeight{nullptr};
+    std::vector<const GenericToolbox::TreeBuffer::ExpressionBuffer*> varIndexingList{};
+    std::vector<const GenericToolbox::TreeBuffer::ExpressionBuffer*> varStorageList{};
+
+    static void storeTempIndex(const GenericToolbox::TreeBuffer::ExpressionBuffer*& var_, int idx_){
+      var_ = reinterpret_cast<const GenericToolbox::TreeBuffer::ExpressionBuffer *>(static_cast<size_t>(idx_));
+    }
+    static void unfoldTempIndex(const GenericToolbox::TreeBuffer::ExpressionBuffer*& var_, const std::vector<std::shared_ptr<GenericToolbox::TreeBuffer::ExpressionBuffer>>& list_){
+      int idx = static_cast<int>(reinterpret_cast<size_t>(var_));
+      if( idx == -1 ){ var_ = nullptr; }
+      var_ = list_[idx].get();
+    }
+  };
+  VariableBuffer buffer{};
 
   // thread communication
   GenericToolbox::Atomic<bool> requestReadNextEntry{false};

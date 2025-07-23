@@ -1,9 +1,9 @@
 # Directories
-test/
+tests/output*
 build/
 site/
 # inputs
-cmake-build-debug/
+cmake-build-*/
 workDir/
 work/
 

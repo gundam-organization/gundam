@@ -26,19 +26,54 @@ SimpleMcmc::SimpleMcmc(FitterEngine* owner_): MinimizerBase(owner_) {
 }
 
 void SimpleMcmc::configureImpl(){
+  setCheckParameterValidity(true);
   this->MinimizerBase::configureImpl();
+
+  _config_.defineFields({
+      {"algorithm"},
+      {"proposal"},
+      {"mcmcOutputTree"},
+      {"likelihoodValidity"},
+      {"randomStart"},
+      {"saveRawSteps"},
+      {"modelSaveStride"},
+      {"burninCycles"},
+      {"burninSteps"},
+      {"saveBurnin"},
+      {"cycles"},
+      {"steps"},
+      {"sequence"},
+      {"burninCovWindow"},
+      {"burninCovDeweighting"},
+      {"burninResets"},
+      {"burninFreezeAfter"},
+      {"burninWindow"},
+      {"adaptiveRestore"},
+      {"adaptiveCovFile"},
+      {"adaptiveCovName"},
+      {"adaptiveCovTrials"},
+      {"burninSequence"},
+      {"covarianceWindow", {"adaptiveCovWindow"}},
+      {"covarianceDeweighting", {"adaptiveCovDeweighting"}},
+      {"adaptiveFreezeCorrelations"},
+      {"adaptiveFreezeLength"},
+      {"acceptanceWindow", {"adaptiveWindow"}},
+      {"fixedSigma"},
+  });
+  _config_.checkConfiguration();
+
   LogInfo << "Configure MCMC: " << _config_ << std::endl;
 
   // The type of algorithm to be using.  It should be left at the default
   // value (metropolis is the only supported MCMC algorithm right now).
-  GenericToolbox::Json::fillValue(_config_, _algorithmName_, "algorithm");
+  _config_.fillValue(_algorithmName_, "algorithm");
 
   // The step proposal algorithm.
-  GenericToolbox::Json::fillValue(_config_, _proposalName_, "proposal");
+  _config_.fillValue(_proposalName_, "proposal");
 
   // The name of the MCMC result tree in the output file.  This doesn't need
   // to be changed.  Generally, leave it alone.
-  GenericToolbox::Json::fillValue(_config_, _outTreeName_, "mcmcOutputTree");
+  _config_.fillValue(_outTreeName_, "mcmcOutputTree");
 
   // Define what sort of validity the parameters have to have for a finite
   // likelihood.  The "range" value means that the parameter needs to be
@@ -46,18 +81,18 @@ void SimpleMcmc::configureImpl(){
   // "mirror" value means that the parameter needs to be between the mirror
   // bounds too.  The "physical" value means that the parameter has to be in
   // the physically allowed range.
-  GenericToolbox::Json::fillValue(_config_, _likelihoodValidity_, "likelihoodValidity");
+  _config_.fillValue(_likelihoodValidity_, "likelihoodValidity");
 
   //Set whether MCMC chain start from a random point or the prior point.
   {
     bool tmp{_randomStart_};
-    GenericToolbox::Json::fillValue(_config_, tmp, "randomStart");
+    _config_.fillValue(tmp, "randomStart");
     _randomStart_.set(tmp);
   }
 
   // Set whether the raw step should be saved, or only the step translated
   // into the likelihood space.
-  GenericToolbox::Json::fillValue(_config_, _saveRawSteps_, "saveRawSteps");
+  _config_.fillValue(_saveRawSteps_, "saveRawSteps");
 
   // The number of steps between when the predicted sample histograms should
   // be saved into the output file.  The sample histograms can then be used
@@ -66,7 +101,7 @@ void SimpleMcmc::configureImpl(){
   // calculation, the data will need to be fluctuated around the prediction.
   {
     int tmp{_modelStride_};
-    GenericToolbox::Json::fillValue(_config_, tmp, "modelSaveStride");
+    _config_.fillValue(tmp, "modelSaveStride");
     _modelStride_.set(tmp);
   }
 
@@ -76,31 +111,31 @@ void SimpleMcmc::configureImpl(){
   // (usually a better option).  A run is broken into "mini-Chains" called a
   // "cycle" where the posterior covariance information is updated after each
   // mini-chain.  Each cycle will have "steps" steps.
-  GenericToolbox::Json::fillValue(_config_, _burninCycles_, "burninCycles");
+  _config_.fillValue(_burninCycles_, "burninCycles");
 
   // The number of steps to run in each burn in cycle
-  GenericToolbox::Json::fillValue(_config_, _burninSteps_, "burninSteps");
+  _config_.fillValue(_burninSteps_, "burninSteps");
 
   // If this is set to false, the burn-in steps will not be saved to disk.
   // This should usually be true since it lets you see the progress of the
   // burn-in.
-  GenericToolbox::Json::fillValue(_config_, _saveBurnin_, "saveBurnin");
+  _config_.fillValue(_saveBurnin_, "saveBurnin");
 
   // Get the sequence for the burn-in.
   _burninSequence_
     = R"cxx(for (int chain = 0; chain < gMCMC.Burning(); ++chain) {
       gMCMC.RunChain("Burn-in chain", chain);})cxx";
-  GenericToolbox::Json::fillValue(_config_,_burninSequence_,"burninSequence");
+  _config_.fillValue(_burninSequence_,"burninSequence");
 
   // Get the MCMC chain parameters.  A run is broken into "mini-Chains"
   // called a "cycle" where the posterior covariance information is updated
   // after each mini-chain.
-  GenericToolbox::Json::fillValue(_config_, _cycles_, "cycles");
+  _config_.fillValue(_cycles_, "cycles");
 
   // Get the number of steps to be taken in each "mini-chain".
   {
     int tmp{_steps_};
-    GenericToolbox::Json::fillValue(_config_, tmp, "steps");
+    _config_.fillValue(tmp, "steps");
     _steps_.set(tmp);
   }
 
@@ -108,7 +143,7 @@ void SimpleMcmc::configureImpl(){
   _sequence_
     = R"cxx(for (int chain = 0; chain < gMCMC.Cycles(); ++chain) {
       gMCMC.RunCycle("Chain", chain);})cxx";
-  GenericToolbox::Json::fillValue(_config_,_sequence_,"sequence");
+  _config_.fillValue(_sequence_,"sequence");
 
   ///////////////////////////////////////////////////////////////
   // Get parameters for the adaptive proposal.
@@ -117,29 +152,29 @@ void SimpleMcmc::configureImpl(){
   // burn-in.  If this is set to short, the step size will fluctuate.  If this
   // is set to long, the step size won't be adjusted to match the target
   // acceptance.  Make this very large to lock the step size.
-  GenericToolbox::Json::fillValue(_config_, _burninCovWindow_, "burninCovWindow");
+  _config_.fillValue(_burninCovWindow_, "burninCovWindow");
 
   // The covariance deweighting during burn-in.  This should usually be left
   // at the default value.  This sets how much extra influence new points
   // should have on the covariance.
-  GenericToolbox::Json::fillValue(_config_, _burninCovDeweighting_, "burninCovDeweighting");
+  _config_.fillValue(_burninCovDeweighting_, "burninCovDeweighting");
 
   // The number of times that the burn-in state will be reset.  If this is
   // zero, then there are no resets (one means reset after the first cycle,
   // &c).  Resets are sometimes needed if the initial conditions are far from
   // the main probability in the posterior and the "best fit" parameters need
   // to be found.
-  GenericToolbox::Json::fillValue(_config_, _burninResets_, "burninResets");
+  _config_.fillValue(_burninResets_, "burninResets");
 
   // Freeze the step size after this many burn-in chains.  This stops
   // adaptively adjusting the step size.
-  GenericToolbox::Json::fillValue(_config_, _burninFreezeAfter_, "burninFreezeAfter");
+  _config_.fillValue(_burninFreezeAfter_, "burninFreezeAfter");
 
   // Set the window to calculate the current acceptance value over during
   // burn-in.  If this is set to short, the step size will fluctuate.  If this
   // is set to long, the step size won't be adjusted to match the target
   // acceptance.  Make this very large to lock the step size.
-  GenericToolbox::Json::fillValue(_config_, _burninWindow_, "burninWindow");
+  _config_.fillValue(_burninWindow_, "burninWindow");
 
   // Set the name of a file containing an existing Markov chain to be
   // extended.  If this is set, then the burn-in will be skipped.
@@ -147,11 +182,11 @@ void SimpleMcmc::configureImpl(){
   // The value is settable from the command line (setting from the command
   // line is the better option) using the override option
   //
-  // "-O /fitterEngineConfig/mcmcConfig/adaptiveRestore=<filename>"
+  // "-O /fitterEngineConfig/minimizerConfig/adaptiveRestore=<filename>"
   //
   // If restore is going to be used, the adaptiveRestore value must exist in
   // the configuration file (with a NULL value)
-  GenericToolbox::Json::fillValue(_config_, _adaptiveRestore_, "adaptiveRestore");
+  _config_.fillValue(_adaptiveRestore_, "adaptiveRestore");
   _adaptiveRestore_ = GenericToolbox::expandEnvironmentVariables(_adaptiveRestore_);
 
   // Set the name of a file containing a TH2D that describes the covariance of
@@ -165,13 +200,13 @@ void SimpleMcmc::configureImpl(){
   // For this to be used the adaptiveCovFile value must exist in the
   // configuration file (with a value of "none" to be ignored, or a default
   // value if a default should be loaded)
-  GenericToolbox::Json::fillValue(_config_, _adaptiveCovFile_, "adaptiveCovFile");
+  _config_.fillValue(_adaptiveCovFile_, "adaptiveCovFile");
   _adaptiveCovFile_ = GenericToolbox::expandEnvironmentVariables(_adaptiveCovFile_);
 
   // Set the name of a ROOT TH2D that will be used as the covariance of the
   // step proposal.  If adaptiveCovFile is not set, or has a value of "none",
   // this will be ignored.
-  GenericToolbox::Json::fillValue(_config_, _adaptiveCovName_, "adaptiveCovName");
+  _config_.fillValue(_adaptiveCovName_, "adaptiveCovName");
 
   // Get the effective number of trials for a proposal covariance that is
   // being read from a file. This should typically be about 0.5*N^2 where N is
@@ -179,17 +214,14 @@ void SimpleMcmc::configureImpl(){
   // number of function calculations that were used to estimate the
   // covariance.  The default value of zero triggers the interface to make
   // it's own estimate.
-  GenericToolbox::Json::fillValue(_config_, _adaptiveCovTrials_, "adaptiveCovTrials");
+  _config_.fillValue(_adaptiveCovTrials_, "adaptiveCovTrials");
 
   // Set the window to calculate the current covariance value over.  If this
   // is set to short, the covariance will not sample the entire posterior.
   // Generally, the window should be long compared to the number of steps
   // required to get to an uncorrelated point.
   {
-    int tmp{_adaptiveCovWindow_};
-    GenericToolbox::Json::fillValue(
-      _config_, tmp, {{"covarianceWindow"}, {"adaptiveCovWindow"}});
-    _adaptiveCovWindow_.set(tmp);
+    _adaptiveCovWindow_.set( _config_.fetchValue("covarianceWindow", _adaptiveCovWindow_.get()) );
   }
 
   // The covariance deweighting while the chain is running.  This should
@@ -197,23 +229,24 @@ void SimpleMcmc::configureImpl(){
   // update and more recent points don't get a heavier weight (within the
   // covariance window).
   {
-    double tmp{_adaptiveCovDeweighting_};
-    GenericToolbox::Json::fillValue(
-      _config_, tmp, {{"covarianceDeweighting"}, {"adaptiveCovDeweighting"}});
-    _adaptiveCovDeweighting_.set(tmp);
+    _adaptiveCovDeweighting_.set(
+      _config_.fetchValue("covarianceDeweighting",
+        _adaptiveCovDeweighting_.get()
+      )
+    );
   }
 
   // Stop updating the correlations between the steps after this many cycles.
   // If this is negative, the step size is never updated.  This freeze the
   // running covariance calculation.
-  GenericToolbox::Json::fillValue(_config_, _adaptiveFreezeCorrelationsAfter_, "adaptiveFreezeCorrelations");
+  _config_.fillValue(_adaptiveFreezeCorrelationsAfter_, "adaptiveFreezeCorrelations");
 
   // Stop updating the step length after this many cycles.  If this is
   // negative, the step size is never updated.  Take the default from one more
   // than the number of steps to freeze the correlations.  An explicit value
   // in the config file will always override the default.
   _adaptiveFreezeAfter_ = _adaptiveFreezeCorrelationsAfter_+1;
-  GenericToolbox::Json::fillValue(_config_, _adaptiveFreezeAfter_, "adaptiveFreezeLength");
+  _config_.fillValue(_adaptiveFreezeAfter_, "adaptiveFreezeLength");
 
   // Set the window to calculate the current acceptance value over.  If this
   // is set to short, the step size will fluctuate a lot.  If this is set to
@@ -221,8 +254,7 @@ void SimpleMcmc::configureImpl(){
   // Make this very large effectively locks the step size.
   {
     int tmp{_adaptiveWindow_};
-    GenericToolbox::Json::fillValue(_config_, tmp,
-                                    {{"acceptanceWindow"}, {"adaptiveWindow"}});
+    _config_.fillValue(tmp, "acceptanceWindow");
     _adaptiveWindow_.set(tmp);
   }
 
@@ -230,7 +262,7 @@ void SimpleMcmc::configureImpl(){
   // Get parameters for the simple proposal.
 
   // Set the step size for the simple proposal.
-  GenericToolbox::Json::fillValue(_config_, _simpleSigma_, "fixedSigma");
+  _config_.fillValue(_simpleSigma_, "fixedSigma");
 }
 
 void SimpleMcmc::initializeImpl(){
@@ -666,24 +698,24 @@ void SimpleMcmc::adaptiveMakePrior(AdaptiveStepMCMC& mcmc,
       double lowBound = val-1.0*err;
       double highBound = val+1.0*err;
 
-      if(not std::isnan(par->getMinValue())) {
-        lowBound = std::max(lowBound, par->getMinValue());
+      if( par->getParameterLimits().hasLowerBound() ) {
+        lowBound = std::max(lowBound, par->getParameterLimits().min);
       }
-      if(not std::isnan(par->getMinMirror())) {
-        lowBound = std::max(lowBound, par->getMinMirror());
+      if( par->getMirrorRange().hasLowerBound() ){
+        lowBound = std::max(lowBound, par->getMirrorRange().min);
       }
-      if(not std::isnan(par->getMinPhysical())) {
-        lowBound = std::max(lowBound, par->getMinPhysical());
+      if( par->getPhysicalLimits().hasLowerBound() ){
+        lowBound = std::max(lowBound, par->getPhysicalLimits().min);
       }
 
-      if(not std::isnan(par->getMaxValue())) {
-        highBound = std::min(highBound, par->getMaxValue());
+      if( par->getParameterLimits().hasUpperBound() ) {
+        highBound = std::min(highBound, par->getParameterLimits().max);
       }
-      if(not std::isnan(par->getMaxMirror())) {
-        highBound = std::min(highBound, par->getMaxMirror());
+      if( par->getMirrorRange().hasUpperBound() ){
+        highBound = std::min(highBound, par->getMirrorRange().max);
       }
-      if(not std::isnan(par->getMaxPhysical())) {
-        highBound = std::min(highBound, par->getMaxPhysical());
+      if( par->getPhysicalLimits().hasUpperBound() ){
+        highBound = std::min(highBound, par->getPhysicalLimits().max);
       }
 
       val = lowBound + r*(highBound-lowBound);
@@ -945,8 +977,8 @@ void SimpleMcmc::minimize() {
       parameterName.push_back(iPar.getTitle());
       parameterPrior.push_back(iPar.getPriorValue());
       parameterSigma.push_back(iPar.getStdDevValue());
-      parameterMin.push_back(iPar.getMinValue());
-      parameterMax.push_back(iPar.getMaxValue());
+      parameterMin.push_back(iPar.getParameterLimits().min);
+      parameterMax.push_back(iPar.getParameterLimits().max);
     }
     parameterSetCounts.push_back(countParameters);
   }
@@ -1051,33 +1083,33 @@ bool SimpleMcmc::hasValidParameterValues() const {
   for( auto& parSet: getModelPropagator().getParametersManager().getParameterSetsList() ){
     for( auto& par : parSet.getParameterList() ){
       if ( (_validFlags_ & 0b0001) != 0
-           and std::isfinite(par.getMinValue())
-           and par.getParameterValue() < par.getMinValue()) GUNDAM_UNLIKELY_COMPILER_FLAG {
+           and std::isfinite(par.getParameterLimits().min)
+           and par.getParameterValue() < par.getParameterLimits().min) GUNDAM_UNLIKELY_COMPILER_FLAG {
         ++invalid;
       }
       if ((_validFlags_ & 0b0001) != 0
-          and std::isfinite(par.getMaxValue())
-          and par.getParameterValue() > par.getMaxValue()) GUNDAM_UNLIKELY_COMPILER_FLAG {
+          and std::isfinite(par.getParameterLimits().max)
+          and par.getParameterValue() > par.getParameterLimits().max) GUNDAM_UNLIKELY_COMPILER_FLAG {
         ++invalid;
       }
       if ((_validFlags_ & 0b0010) != 0
-          and std::isfinite(par.getMinMirror())
-          and par.getParameterValue() < par.getMinMirror()) GUNDAM_UNLIKELY_COMPILER_FLAG {
+          and std::isfinite(par.getMirrorRange().min)
+          and par.getParameterValue() < par.getMirrorRange().min) GUNDAM_UNLIKELY_COMPILER_FLAG {
         ++invalid;
       }
       if ((_validFlags_ & 0b0010) != 0
-          and std::isfinite(par.getMaxMirror())
-          and par.getParameterValue() > par.getMaxMirror()) GUNDAM_UNLIKELY_COMPILER_FLAG {
+          and std::isfinite(par.getMirrorRange().max)
+          and par.getParameterValue() > par.getMirrorRange().max) GUNDAM_UNLIKELY_COMPILER_FLAG {
         ++invalid;
       }
       if ((_validFlags_ & 0b0100) != 0
-          and std::isfinite(par.getMinPhysical())
-          and par.getParameterValue() < par.getMinPhysical()) GUNDAM_UNLIKELY_COMPILER_FLAG {
+          and std::isfinite(par.getPhysicalLimits().min)
+          and par.getParameterValue() < par.getPhysicalLimits().min) GUNDAM_UNLIKELY_COMPILER_FLAG {
         ++invalid;
       }
       if ((_validFlags_ & 0b0100) != 0
-          and std::isfinite(par.getMaxPhysical())
-          and par.getParameterValue() > par.getMaxPhysical()) GUNDAM_UNLIKELY_COMPILER_FLAG {
+          and std::isfinite(par.getPhysicalLimits().max)
+          and par.getParameterValue() > par.getPhysicalLimits().max) GUNDAM_UNLIKELY_COMPILER_FLAG {
         ++invalid;
       }
 
@@ -1109,8 +1141,11 @@ void SimpleMcmcSequencer::CovarianceWindow(int v) {Owner()._adaptiveCovWindow_ =
 void SimpleMcmcSequencer::CovarianceDeweighting(double v) {Owner()._adaptiveCovDeweighting_ = v;}
 void SimpleMcmcSequencer::AcceptanceWindow(int v) {Owner()._adaptiveWindow_ = v;}
 void SimpleMcmcSequencer::AcceptanceAlgorithm(int v) {Owner()._adaptiveAcceptanceAlgorithm_ = v;}
+void SimpleMcmcSequencer::SetSigma(double s) {Owner()._adaptiveMCMC_->GetProposeStep().SetSigma(s);}
 int SimpleMcmcSequencer::Burnin() {return Owner()._burninCycles_;}
 int SimpleMcmcSequencer::Cycles() {return Owner()._cycles_;}
+int SimpleMcmcSequencer::Steps() {return Owner()._steps_;}
+int SimpleMcmcSequencer::Trials() {return Owner()._adaptiveMCMC_->GetProposeStep().GetTrials();}
 void SimpleMcmcSequencer::RunCycle(std::string name, int id) {
   Owner().adaptiveRunCycle(*Owner()._adaptiveMCMC_, name, id);
   Owner().restoreConfiguration();

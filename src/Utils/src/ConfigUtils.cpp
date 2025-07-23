@@ -4,6 +4,7 @@
 
 #include "ConfigUtils.h"
 #include "GundamUtils.h"
+#include "GundamBacktrace.h"
 
 #include "GenericToolbox.Root.h"
 #include "GenericToolbox.Yaml.h"
@@ -13,15 +14,18 @@
 #include <vector>
 #include <sstream>
 #include <iostream>
-
+#include <map>
 
 namespace ConfigUtils {
+
+  // static
+  std::vector<std::string> ConfigReader::_deprecatedList_{};
 
   // open file
   JsonType readConfigFile(const std::string& configFilePath_){
     if( not GenericToolbox::isFile(configFilePath_) ){
       LogError << "\"" << configFilePath_ << "\" could not be found." << std::endl;
-      throw std::runtime_error("file not found.");
+      std::exit(EXIT_FAILURE);
     }
 
     JsonType output;
@@ -34,9 +38,13 @@ namespace ConfigUtils {
         output = GenericToolbox::Json::readConfigFile(configFilePath_);
       }
     }
-    catch(...){ LogThrow("Error while reading config file: " << configFilePath_); }
+    catch(...){
+        LogError << "Error while reading config file: " << configFilePath_
+                 << std::endl;
+        std::exit(EXIT_FAILURE);
+    }
 
-    // resolve sub-references to other config files
+    // resolve subreferences to other config files
     ConfigUtils::unfoldConfig( output );
 
     return output;
@@ -102,6 +110,7 @@ namespace ConfigUtils {
     }
     return out;
   }
+
   void forwardConfig(JsonType& config_){
     while( config_.is_string() and
          ( GenericToolbox::endsWith(config_.get<std::string>(), ".yaml", true)
@@ -112,6 +121,7 @@ namespace ConfigUtils {
       config_ = ConfigUtils::readConfigFile(expand);
     }
   }
+
   void unfoldConfig(JsonType& config_){
 
     std::function<void(JsonType&)> unfoldRecursive = [&](JsonType& outEntry_){
@@ -133,40 +143,53 @@ namespace ConfigUtils {
   }
 
   // class impl
-  void ConfigHandler::setConfig(const std::string& filePath_){
+  void ConfigBuilder::setConfig(const std::string& filePath_){
     if( GenericToolbox::hasExtension( filePath_, "root" ) ){
       LogInfo << "Extracting config file for fitter file: " << filePath_ << std::endl;
-      LogThrowIf( not GenericToolbox::doesTFileIsValid(filePath_), "Invalid root file: " << filePath_ );
+      if (not GenericToolbox::doesTFileIsValid(filePath_)) {
+        LogError << "Invalid root file: " << filePath_ << std::endl;
+        std::exit(EXIT_FAILURE);
+      }
       auto fitFile = std::shared_ptr<TFile>( GenericToolbox::openExistingTFile( filePath_ ) );
 
-      auto* conf = fitFile->Get<TNamed>("gundam/config_TNamed");
+      auto* conf = fitFile->Get<TNamed>("gundam/config/unfoldedJson_TNamed");
+      if( conf == nullptr ){
+        // legacy
+        conf = fitFile->Get<TNamed>("gundam/config_TNamed");
+      }
       if( conf == nullptr ){
         // legacy
         conf = fitFile->Get<TNamed>("gundamFitter/unfoldedConfig_TNamed");
       }
-      LogThrowIf(conf==nullptr, "no config in ROOT file " << filePath_);
-      config = GenericToolbox::Json::readConfigJsonStr( conf->GetTitle() );
+      if (conf == nullptr) {
+        LogError << "No config in ROOT file " << filePath_ << std::endl;
+        std::exit(EXIT_FAILURE);
+      }
+      _config_ = GenericToolbox::Json::readConfigJsonStr( conf->GetTitle() );
       fitFile->Close();
     }
     else{
       LogInfo << "Reading config file: " << filePath_ << std::endl;
-      config = ConfigUtils::readConfigFile(filePath_ ); // works with yaml
+      _config_ = ConfigUtils::readConfigFile(filePath_ ); // works with yaml
     }
   }
 
-  void ConfigHandler::override( const JsonType& overrideConfig_ ){
+  void ConfigBuilder::override( const JsonType& overrideConfig_ ){
     LogScopeIndent;
-    LogWarning << GenericToolbox::Json::applyOverrides(config, overrideConfig_);
+    LogWarning << GenericToolbox::Json::applyOverrides(_config_, overrideConfig_);
   }
-  void ConfigHandler::override( const std::string& filePath_ ){
+  void ConfigBuilder::override( const std::string& filePath_ ){
     LogInfo << "Overriding config with \"" << filePath_ << "\"" << std::endl;
-    LogThrowIf(not GenericToolbox::isFile(filePath_), "Could not find " << filePath_);
+    if (not GenericToolbox::isFile(filePath_)) {
+      LogError << "Could not find " << filePath_ << std::endl;
+      std::exit(EXIT_FAILURE);
+    }
     this->override( ConfigUtils::readConfigFile(filePath_) );
   }
-  void ConfigHandler::override( const std::vector<std::string>& filesList_ ){
+  void ConfigBuilder::override( const std::vector<std::string>& filesList_ ){
     for( auto& file : filesList_ ){ this->override( file ); }
   }
-  void ConfigHandler::flatOverride( const std::string& flattenEntry_ ){
+  void ConfigBuilder::flatOverride( const std::string& flattenEntry_ ){
     // Override the configuration values.  If the old value was a string then
     // replace with the new string. Otherwise, the input value is parsed.  The
     // configuration value are references like path names
@@ -183,19 +206,19 @@ namespace ConfigUtils {
     std::vector<std::string> split = GenericToolbox::splitString( flattenEntry_,"=" );
     LogWarning << "Override " << split[0] << " with " << split[1]
                << std::endl;
-    JsonType flat = config.flatten();
+    JsonType flat = _config_.flatten();
     LogWarning << "    Original value: " << flat.at(split[0])
                << std::endl;
     if (flat.at(split[0]).is_string()) flat.at(split[0]) = split[1];
     else flat.at(split[0]) = JsonType::parse(split[1]);
     LogWarning << "         New value: " << flat.at(split[0])
                << std::endl;
-    config = flat.unflatten();
+    _config_ = flat.unflatten();
   }
-  void ConfigHandler::flatOverride( const std::vector<std::string>& flattenEntryList_ ){
+  void ConfigBuilder::flatOverride( const std::vector<std::string>& flattenEntryList_ ){
     for( auto& flattenEntry : flattenEntryList_ ){ this->flatOverride( flattenEntry ); }
   }
-  void ConfigHandler::exportToJsonFile(const std::string &filePath_) const {
+  void ConfigBuilder::exportToJsonFile(const std::string &filePath_) const {
     auto outPath{filePath_};
 
     if( not GenericToolbox::endsWith(outPath, ".json") ){
@@ -206,6 +229,257 @@ namespace ConfigUtils {
     LogInfo << "Writing as: " << outPath << std::endl;
     GenericToolbox::dumpStringInFile(outPath, this->toString());
     LogInfo << "Unfolded config written as: " << outPath << std::endl;
+  }
+
+  std::string ConfigReader::FieldDefinition::toString() const{
+    std::stringstream ss;
+    ss << "name=" << name;
+    if(isMandatory()) ss << ", isMandatory";
+    if(isDeprecated()) ss << ", isDeprecated";
+    if(isRelocated()) ss << ", isRelocated";
+    if(not altNameList.empty()) ss << ", altNameList=" << GenericToolbox::toString(altNameList);
+    return ss.str();
+  }
+
+  void ConfigReader::defineField(const FieldDefinition& fieldDefinition_){
+    // Check collision on name
+    LogThrowIf(
+      not _definedFieldNameList_.insert(GenericToolbox::toLowerCase(fieldDefinition_.name)).second,
+      "[DEV] Collision on name: " << fieldDefinition_.name
+    );
+    for( auto& altName : fieldDefinition_.altNameList ){
+      LogThrowIf(
+        not _definedFieldNameList_.insert(GenericToolbox::toLowerCase(altName)).second,
+        "[DEV] Collision on altname: " << altName
+      );
+    }
+    _fieldDefinitionList_.emplace_back(fieldDefinition_);
+  }
+  void ConfigReader::defineFields(const std::vector<FieldDefinition>& fieldDefinition_){
+    for(auto& field : fieldDefinition_){ defineField(field); }
+  }
+  void ConfigReader::checkConfiguration() const{
+
+    // 1 - check for missing compulsory fields
+    {
+      std::vector<std::string> missingFieldList{};
+      for( auto &field: _fieldDefinitionList_ ) {
+        if( not field.isMandatory() ) { continue; }
+        auto *entry = getConfigEntry(field).second;
+        if( entry == nullptr ) { missingFieldList.emplace_back(field.name); }
+      }
+      if( not missingFieldList.empty() ) {
+        LogError << _parentPath_ << ": found " << missingFieldList.size() << " missing compulsory fields." << std::endl;
+        for( auto &missingField: missingFieldList ) {
+          LogError << "  > \"" << missingField << "\" is a mandatory field." << std::endl;
+        }
+        LogError << toString() << std::endl;
+        LogExit("Invalid configuration: required field not provided.");
+      }
+    }
+
+    // 1.1 - deprecated/removed fields
+    {
+      bool deprecatedFound{false};
+      for( auto& field : _fieldDefinitionList_ ){
+        if( not field.isDeprecated() ){ continue; }
+        if( not hasField(field.name) ){ continue; }
+        deprecatedFound = true;
+        auto entry = getConfigEntry(field.name);
+        LogError << "Found a deprecated key " << _parentPath_ << "/" << entry.first << ": " << field.message << std::endl;
+      }
+      if(deprecatedFound){ LogExit("Invalid configuration: deprecated field found."); }
+    }
+
+    // 2 - check if some config keys have some collisions
+    // 2.1 - if they do, do they carry the same value?
+    // -> should allow collisions since some configs are meant to be handled by older versions of GUNDAM as well
+    {
+      std::map<const FieldDefinition*, std::vector<std::string>> collisionDict{};
+      for( auto& field : _fieldDefinitionList_ ){
+        std::vector<std::string> keyCollisionList{};
+        if( _config_.contains(field.name) ){ keyCollisionList.emplace_back(field.name); }
+        for( auto& altFieldName : field.altNameList ){
+          if( _config_.contains(altFieldName) ){ keyCollisionList.emplace_back(altFieldName); }
+        }
+        if( keyCollisionList.size() >= 2 ){
+          collisionDict[&field] = keyCollisionList;
+        }
+      }
+      if( not collisionDict.empty() ){
+        // check if they carry the same value? -> if NOT -> ERROR
+        bool unmatchingCollisionFound = false;
+        for( const auto& collision : collisionDict ){
+          auto val = _config_.at(collision.second[0]);
+          for( auto& key : collision.second ){
+            if(_config_.at(key) != val){
+              unmatchingCollisionFound = true;
+              LogError << _parentPath_ << ": found unmatching values for field \"" << collision.first->name << "\". Make sure they have the same value." << std::endl;
+            }
+            else{
+              LogAlertIf(doShowWarning(collision.first->name+":COLLISION")) << _parentPath_ << ": field \"" << collision.first->name << "\" has collisions with different keys: " << GenericToolbox::toString(collision.second) << std::endl;
+            }
+          }
+        }
+        if( unmatchingCollisionFound ){ LogExit("Invalid configuration: collisions with different values."); }
+      }
+    }
+
+    // 3 - look for invalid key names
+    // just a warning
+    {
+      std::vector<std::string> invalidKeyList{};
+      for(auto it = _config_.begin(); it != _config_.end(); ++it){
+        if(not GenericToolbox::isIn(GenericToolbox::toLowerCase(it.key()), _definedFieldNameList_)){
+          // already printed out? regardless of indexed path
+          if( not doShowWarning(it.key()+":INVALID") ){ continue; }
+          invalidKeyList.emplace_back(it.key());
+        }
+      }
+      if( not invalidKeyList.empty() ){
+        for( auto& invalidKey : invalidKeyList ){
+          LogAlert << _parentPath_ << ": key \"" << invalidKey << "\" has an invalid name. It won't be recognized by GUNDAM." << std::endl;
+#ifdef DEBUG_BUILD
+          LogWarning << "Possible missing key declaration: " << invalidKey << std::endl;
+          LogWarning << "BackTrace: " << std::endl
+                     << GundamUtils::Backtrace << std::endl;
+#endif
+        }
+      }
+    }
+
+
+    // 4 - check alternative names (renamed fields)
+    {
+      for( auto& field : _fieldDefinitionList_ ){
+        for( auto& altKeyName : field.altNameList ){
+          if( getJsonEntry(altKeyName) == nullptr ){ continue; }
+          if( doShowWarning(altKeyName+":RENAMED") ) {
+            LogWarning << _parentPath_ << ": key \"" << altKeyName << "\" has been renamed. Use \"" << field.name << "\" instead." << std::endl;
+          }
+        }
+      }
+    }
+
+    // 5 - check relocated fields
+    {
+      for( auto& field : _fieldDefinitionList_ ) {
+        if( not hasField(field.name) ){ continue; }
+        if( field.isRelocated() and doShowWarning(field.name+":RELOCATED") ){
+          LogAlert << _parentPath_ << ": field \"" << field.name << "\" should be moved to: " << field.message << std::endl;
+        }
+      }
+    }
+
+  }
+  const ConfigReader::FieldDefinition& ConfigReader::getFieldDefinition(const std::string& fieldName_) const{
+    for(const auto& field : _fieldDefinitionList_){
+      if( field.name == fieldName_ ){ return field; }
+    }
+    LogError << "[DEV] (" << _parentPath_ << ") Unknown field name \"" << fieldName_ << "\" among list: " << GenericToolbox::toString(_fieldDefinitionList_) << std::endl;
+    exit(EXIT_FAILURE);
+  }
+  std::pair<std::string, const JsonType*> ConfigReader::getConfigEntry(const FieldDefinition& field_) const{
+    std::pair<std::string, const JsonType*> out;
+    out = {field_.name, getJsonEntry(field_.name)};
+    if(out.second != nullptr){ return out; }
+
+    // not found? look for alt name
+    for( auto& altKeyName : field_.altNameList ){
+      out = {altKeyName, getJsonEntry(altKeyName)};
+      if(out.second != nullptr){ return out; }
+    }
+
+    return {"", nullptr};
+  }
+  std::pair<std::string, const JsonType*> ConfigReader::getConfigEntry(const std::string& fieldName_) const{
+    auto& field = getFieldDefinition(fieldName_);
+    return getConfigEntry(field);
+  }
+
+  const JsonType* ConfigReader::getJsonEntry(const std::string& key_) const{
+    const JsonType* current = &_config_;
+    auto keys = GenericToolbox::splitString(key_, "/");
+
+    for(const auto& subKey : keys){
+      if(not current->is_object()){ return nullptr; }
+
+      bool found = false;
+      for(auto it = current->begin(); it != current->end(); ++it){
+        if(strcasecmp(it.key().c_str(), subKey.c_str()) == 0){
+          current = &it.value();
+          found = true;
+          break;
+        }
+      }
+      if(not found){ return nullptr; }
+    }
+
+    _usedKeyList_.insert(GenericToolbox::toLowerCase(key_));
+    return current;
+  }
+  bool ConfigReader::hasField(const std::string& fieldName_) const{
+    return getConfigEntry(fieldName_).second != nullptr;
+  }
+  void ConfigReader::fillFormula(std::string& formulaToFill_, const std::string& fieldName_, const std::string& joinStr_) const{
+    if( not hasField(fieldName_) ){ return; }
+
+    auto formulaList = fetchValue<std::vector<std::string>>(fieldName_);
+    for( auto& formula : formulaList ){ formula += ")"; formula.insert(0, "("); }
+
+    formulaToFill_ = GenericToolbox::joinVectorString(formulaList, joinStr_);
+  }
+  void ConfigReader::printUnusedKeys() const{
+    // for context dependent options
+    std::vector<std::string> unusedKeyList{};
+    for (auto it = _config_.begin(); it != _config_.end(); ++it) {
+      if( GenericToolbox::isIn(GenericToolbox::toLowerCase(it.key()), _usedKeyList_) ){ continue; }
+
+      // already printed out?
+      if( doShowWarning(it.key()+":UNREAD") ){ unusedKeyList.emplace_back(it.key()); }
+    }
+
+    if( not unusedKeyList.empty() ){
+      for( auto& unusedKey : unusedKeyList ){
+        LogAlert << _parentPath_ << ": key \"" << unusedKey << "\" was ignored while parsing config. Is is context dependent option?" << std::endl;
+      }
+    }
+  }
+  std::vector<ConfigReader> ConfigReader::loop() const {
+    std::vector<ConfigReader> out;
+    out.reserve( _config_.size() );
+    for( auto& entry : _config_ ) {
+      out.emplace_back(entry);
+      out.back().setParentPath(GenericToolbox::joinPath(_parentPath_, out.size()-1));
+    }
+    return out;
+  }
+  std::vector<ConfigReader> ConfigReader::loop(const std::string& fieldName_) const{
+    ConfigReader c;
+    fillValue(c, fieldName_);
+    return c.loop();
+  }
+
+  std::string ConfigReader::getStrippedParentPath() const{
+    std::string out{_parentPath_};
+    out.erase(
+      std::remove_if(
+        out.begin(), out.end(),
+        [](char c) { return std::isdigit(static_cast<unsigned char>(c)); }
+        ),
+      out.end()
+    );
+
+    GenericToolbox::removeRepeatedCharInsideInputStr(out, "/");
+    return out;
+  }
+  bool ConfigReader::doShowWarning(const std::string& key_) const{
+    std::string referenceStr{GenericToolbox::joinPath(getStrippedParentPath(), key_)};
+    if( not GenericToolbox::isIn(referenceStr, _deprecatedList_) ){
+      _deprecatedList_.emplace_back(referenceStr);
+      return true;
+    }
+    return false;
   }
 
 }

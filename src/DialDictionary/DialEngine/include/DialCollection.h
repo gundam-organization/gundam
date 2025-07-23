@@ -6,6 +6,7 @@
 #define GUNDAM_DIALCOLLECTION_H
 
 #include "DialBase.h"
+#include "DialUtils.h"
 #include "DialInterface.h"
 #include "DialInputBuffer.h"
 #include "DialResponseSupervisor.h"
@@ -13,12 +14,33 @@
 
 #include "GenericToolbox.Wrappers.h"
 
-
 #include <vector>
 #include <string>
 #include <memory>
+#include <sstream>
 
 class DialCollection : public JsonBaseClass {
+
+public:
+#define ENUM_NAME DialType
+#define ENUM_FIELDS \
+  ENUM_FIELD( Unset, 0 ) \
+  ENUM_FIELD( Norm ) \
+  ENUM_FIELD( Graph ) \
+  ENUM_FIELD( Spline ) \
+  ENUM_FIELD( Surface ) \
+  ENUM_FIELD( Formula ) \
+  ENUM_FIELD( CompiledLibDial ) \
+  ENUM_FIELD( Tabulated ) \
+  ENUM_FIELD( Kriged )
+#define ENUM_DICT \
+   ENUM_DICT_ENTRY("Normalization", "Norm") \
+   ENUM_DICT_ENTRY("RootFormula", "Formula")
+#include "GenericToolbox.MakeEnum.h"
+  MAKE_ENUM_JSON_INTERFACE(DialType);
+
+  static void prepareConfig(ConfigReader &config_);
+
 public:
   DialCollection() = delete;
   explicit DialCollection(std::vector<ParameterSet> *targetParameterSetListPtr): _parameterSetListPtr_(targetParameterSetListPtr) {}
@@ -31,33 +53,13 @@ public:
     virtual ~CollectionData() = default;
   };
 
-  //  The PolymorphicObjectWrapper doesn't have the correct semantics since it
-  // clones the payload when it's copied.  We want to leave the pointee alone
-  // and just move the pointers around.
-  //
-  // Temporarily replace specialty class with shared_ptr.  The shared_ptr
-  // class has the correct semantics (copyable, and deletes the object), but
-  // we don't need the reference counting since we can only have one of each
-  // object.  Also shared_ptr is a bit to memory hungry.
-  typedef std::shared_ptr<DialBase> DialBaseObject;
-
   // setters
   void setIndex(int index){ _index_ = index; }
   void setSupervisedParameterIndex(int supervisedParameterIndex){ _supervisedParameterIndex_ = supervisedParameterIndex; }
   void setSupervisedParameterSetIndex(int supervisedParameterSetIndex){ _supervisedParameterSetIndex_ = supervisedParameterSetIndex; }
 
-  // DEPRECATED: Replace with 'not isEventByEvent()' -- When GUNDAM
-  // started, there were three types of dials that could be applied to
-  // events (normalization, event-by-event splines, and binned
-  // splines).  Since normalization didn't have a "real" dial, we only
-  // needed to distinguish between binned and unbinned splines.  Now
-  // we have event-by-event splines, and "everything else"
-  // (Normalization, Formula, "binned", &c).  This may be
-  // "undeprecated" as soon as we start adding different queries for
-  // dial types.
-  [[deprecated("Replace with 'not isEventByEvent()'")]] bool isBinned() const {return not isEventByEvent();}
-
   // const getters
+  auto getSupervisedParameterSetIndex() const{ return _supervisedParameterSetIndex_; }
 
   // Query if this has one DialBaseObject per event, or if DialBaseObjects are
   // shared between events.  Used to decide how to attach to events in
@@ -75,17 +77,11 @@ public:
   // indentify the collection.
   [[nodiscard]] int getIndex() const{ return _index_; }
 
-  // The value for dialType: in the yaml file.
-  [[nodiscard]] const std::string &getGlobalDialType() const{return _globalDialType_; }
-
-  // The value for dialSubType: in the yaml file
-  [[nodiscard]] const std::string &getGlobalDialSubType() const{ return _globalDialSubType_; }
-
   // If it exists, then this is the name of a leaf in the input file
   // containing data to weight the event in the entry.  This is empty if the
   // dial is not event-by-event, or if the dial is not based on a "spline"
   // (e.g. it might be an tabulated event-by-event dial).
-  [[nodiscard]] const std::string &getGlobalDialLeafName() const{ return _globalDialLeafName_; }
+  [[nodiscard]] const std::string &getDialLeafName() const{ return _dialLeafName_; }
 
   [[nodiscard]] const BinSet &getDialBinSet() const{ return _dialBinSet_; }
   [[nodiscard]] const std::vector<std::string> &getDataSetNameList() const{ return _dataSetNameList_; }
@@ -94,13 +90,11 @@ public:
   // should be applied if this returns a non-zero value.
   [[nodiscard]] const std::shared_ptr<TFormula> &getApplyConditionFormula() const{ return _applyConditionFormula_; }
 
-  // non-const getters
-  BinSet &getDialBinSet(){ return _dialBinSet_; }
+  [[nodiscard]] auto& getDialType() const{ return _dialType_; }
+  [[nodiscard]] auto& getDialOptions() const{ return _dialOptions_; }
 
-  // Vector of object to calculate the response for this dial.  There will be
-  // one DialBaseObject per event, or one DialBaseObject for each bin (for
-  // binned dials), or a single DialBaseObject.
-  std::vector<DialBaseObject> &getDialBaseList(){ return _dialBaseList_; }
+  // mutable getters
+  BinSet &getDialBinSet(){ return _dialBinSet_; }
 
   // One interface per DialBase.  The interface groups the input buffer,
   // response supervisor, dialBase (what actually calculates the weight) into
@@ -116,7 +110,7 @@ public:
   // non-trivial getters
   [[nodiscard]] bool isDatasetValid(const std::string& datasetName_) const;
   std::string getTitle() const;
-  std::string getSummary(bool shallow_ = true);
+  std::string getSummary(bool shallow_ = true) const;
   Parameter* getSupervisedParameter() const;
   ParameterSet* getSupervisedParameterSet() const;
 
@@ -127,7 +121,7 @@ public:
   // any unused space.
   void resizeContainers();
 
-  // After the DialCollection is fully initialized, setup all of the pointers
+  // After the DialCollection is fully initialized, setup all the pointers
   // in the DialInterface objects.  This is used after the size of the
   // DialCollection has changed to fix any pointer issues.
   void setupDialInterfaceReferences();
@@ -142,7 +136,7 @@ public:
 
   // Add a dial collection update callback.  These are called in the order
   // that they are added.  They are activated by the "update()" method.
-  void addUpdate(std::function<void(DialCollection* dc)> callback);
+  void addUpdate(const std::function<void(DialCollection* dc)>& callback);
 
   // Check if the dial will need to be recalculated.  A recalculation
   // happens when a parameter value has changed since the last calculation.
@@ -156,7 +150,7 @@ public:
   size_t getNextDialFreeSlot(){ return _dialFreeSlot_++; }
   size_t getDialFreeSlotIndex() const { return _dialFreeSlot_.getValue(); }
 
-  // Provide access to a the collection data.  The ownership is retained by
+  // Provide access to a collection data.  The ownership is retained by
   // the collection.
   template <typename T>
   T* getCollectionData(int i=0) const {return dynamic_cast<T*>(_dialCollectionData_[i].get());}
@@ -170,17 +164,32 @@ public:
 
   void printConfiguration() const;
 
+  // methods to generate dials with factory
+  std::unique_ptr<DialBase> makeDial() const;
+  std::unique_ptr<DialBase> makeDial(const TObject* src_) const;
+  std::unique_ptr<DialBase> makeDial(const ConfigReader& config_) const;
+
 protected:
   void configureImpl() override;
   void initializeImpl() override;
 
   bool initializeNormDialsWithParBinning();
   bool initializeDialsWithDefinition();
-  bool initializeDialsWithBinningFile(const JsonType& dialsDefinition);
-  bool initializeDialsWithTabulation(const JsonType& dialsDefinition);
+  bool initializeDialsWithBinningFile(const ConfigReader& dialsDefinition);
+  bool initializeDialsWithTabulation(const ConfigReader& dialsDefinition);
+  bool initializeDialsWithKriging(const ConfigReader& dialsDefinition);
 
-  void readGlobals(const JsonType &config_);
-  JsonType fetchDialsDefinition(const JsonType &definitionsList_);
+  void readParametersFromConfig(const ConfigReader &config_);
+  ConfigReader fetchDialsDefinition(const ConfigReader &definitionsList_) const;
+
+  // factory
+  std::unique_ptr<DialBase> makeGraphDial(const TObject* src_) const;
+  std::unique_ptr<DialBase> makeSplineDial(const TObject* src_) const;
+  std::unique_ptr<DialBase> makeSurfaceDial(const TObject* src_) const;
+
+  void checkDialPointList(std::vector<DialUtils::DialPoint>& pointList_) const;
+  bool makeDialShortCircuit(const std::vector<DialUtils::DialPoint>& pointList_, std::unique_ptr<DialBase>& dial_) const;
+  std::unique_ptr<DialBase> makeGraphDial(const std::vector<DialUtils::DialPoint>& pointList_) const;
 
 private:
   // parameters
@@ -196,13 +205,18 @@ private:
   double _mirrorHighEdge_{std::nan("unset")};
   double _mirrorRange_{std::nan("unset")};
   std::string _applyConditionStr_{};
-  std::string _globalDialLeafName_{};
-  std::string _globalDialType_{};
-  std::string _globalDialSubType_{};
+  std::string _dialLeafName_{};
+
+  DialType _dialType_{DialType::Norm}; // Graph, Spline...
+  std::string _dialOptions_{}; // monotonic, catmull-rom...
   std::vector<std::string> _dataSetNameList_{};
   std::vector<std::string> _globalDialExtraLeafNames_{};
+  GenericToolbox::Range _definitionRange_{std::nan("unset"),std::nan("unset")};
+  GenericToolbox::Range _mirrorDefinitionRange_{std::nan("unset"),std::nan("unset")};
 
   // internal
+  bool _verboseShortCircuit_{false};
+  mutable std::string _verboseShortCircuitStr_{};
   int _supervisedParameterIndex_{-1};
   int _supervisedParameterSetIndex_{-1};
   BinSet _dialBinSet_{};
@@ -219,14 +233,10 @@ private:
   std::vector<DialInputBuffer> _dialInputBufferList_{};
 
   // The response supervisors (which apply an upper and lower clamp).  There
-  // is a single supervisor for all of the interfaces, or one for each
+  // is a single supervisor for all the interfaces, or one for each
   // DialBase object in the collection (just like for the
-  // _DialInputBuffferList_.
+  // _dialInputBufferList_.
   std::vector<DialResponseSupervisor> _dialResponseSupervisorList_{};
-
-  // Calculate the response for this dial.  There will be one DialBase per
-  // event, or one DialBase per bin (for binned dials), or a single DialBase.
-  std::vector<DialBaseObject> _dialBaseList_{};
 
   // A formula to decide if the dial should be applied to an event.
   std::shared_ptr<TFormula> _applyConditionFormula_{nullptr};

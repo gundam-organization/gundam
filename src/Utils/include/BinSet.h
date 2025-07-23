@@ -20,6 +20,7 @@ public:
 
 protected:
   void configureImpl() override;
+  void initializeImpl() override;
 
 public:
   BinSet() = default;
@@ -47,7 +48,7 @@ public:
 
 protected:
   void readTxtBinningDefinition();    // original txt
-  void readBinningConfig(const JsonType& binning_); // yaml/json
+  void readBinningConfig(const ConfigReader& binning_); // yaml/json
 
 private:
   bool _sortBins_{false};

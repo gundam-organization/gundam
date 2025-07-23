@@ -3,6 +3,7 @@
 //
 
 #include "CompiledLibDial.h"
+#include "GundamGlobals.h"
 
 #include "Logger.h"
 
@@ -11,6 +12,7 @@
 
 double CompiledLibDial::evalResponse( const DialInputBuffer &input_ ) const{
   // Eval with dynamic function
+  std::lock_guard<std::mutex> guard(GundamGlobals::getGlobalMutEx());
   return reinterpret_cast<double(*)(double*)>(_evalFct_)((double*) &input_.getInputBuffer()[0]);
 }
 
@@ -35,7 +37,3 @@ bool CompiledLibDial::loadLibrary(const std::string& path_){
 
   return true;
 }
-
-
-
-

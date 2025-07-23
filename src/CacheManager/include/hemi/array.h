@@ -25,6 +25,13 @@
 #define HEMI_ARRAY_OUTPUT(arg) /* nothing */
 #endif
 
+#ifdef HEMI_COPY_DEBUG
+#include <iostream>
+#define HEMI_COPY_OUTPUT(arg) std::cout << arg << std::endl
+#else
+#define HEMI_COPY_OUTPUT(arg) /* nothing */
+#endif
+
 #ifndef HEMI_ARRAY_DEFAULT_LOCATION
 #ifdef HEMI_CUDA_COMPILER
 #define HEMI_ARRAY_DEFAULT_LOCATION hemi::device
@@ -309,7 +316,7 @@ namespace hemi {
 #ifndef HEMI_CUDA_DISABLE
                assert(isHostAlloced);
                if (!isDeviceAlloced) allocateDevice();
-               HEMI_ARRAY_OUTPUT("copyHostToDevice");
+               HEMI_COPY_OUTPUT("copyHostToDevice: " << (void*) hPtr << " bytes: " << nSize*sizeof(T));
                checkCuda( cudaMemcpy(dPtr,
                                      hPtr,
                                      nSize * sizeof(T),
@@ -329,7 +336,7 @@ namespace hemi {
 #ifndef HEMI_DISABLE_THREADS
                if (isHostValid) return; // done while waiting for lock
 #endif
-               HEMI_ARRAY_OUTPUT("copyDeviceToHost");
+               HEMI_COPY_OUTPUT("copyDeviceToHost: " << (void*) hPtr << " bytes: " << nSize*sizeof(T));
                checkCuda( cudaMemcpy(hPtr,
                                      dPtr,
                                      nSize * sizeof(T),

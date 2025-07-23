@@ -42,6 +42,13 @@ Cache::Weight::Tabulated::Tabulated(
   LogInfo << "Approximate Memory Size for " << GetName()
           << ": " << GetResidentMemory()/1E+9
           << " GB" << std::endl;
+  LogInfo << "  Tables " << std::endl;
+  for (const auto& table : fTables) {
+    LogInfo << "    Table: " << (void*) table.first
+            << " Size: " << table.first->size()
+            << " Start: " << table.second
+            << std::endl;
+  }
 
   try {
     // Get the CPU/GPU memory for the spline index tables.  These are
@@ -155,9 +162,10 @@ bool Cache::Weight::Tabulated::Apply() {
   if (GetUsed() < 1) return false;
 
   // Fill the table.
-  for (auto table : fTables) {
+  for (const auto& table : fTables) {
     int offset = table.second;
-    for (double entry : (*table.first)) {
+    for (const double entry : (*table.first)) {
+      LogThrowIf(not std::isfinite(entry),"Table entry is not finite");
       fData->hostPtr()[offset++] = entry;
     }
   }

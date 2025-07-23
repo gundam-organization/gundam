@@ -18,12 +18,12 @@ void BinSet::setVerbosity( int maxLogLevel_){ Logger::setMaxLogLevel(maxLogLevel
 void BinSet::configureImpl() {
   _binList_.clear();
 
-  if( _config_.is_structured() ){
+  if( _config_.getConfig().is_structured() ){
     // config like -> should already be unfolded
     this->readBinningConfig( _config_ );
   }
-  else if( _config_.is_string() ){
-    _filePath_ = GenericToolbox::expandEnvironmentVariables( _config_.get<std::string>() );
+  else if( _config_.getConfig().is_string() ){
+    _filePath_ = GenericToolbox::expandEnvironmentVariables( _config_.getConfig().get<std::string>() );
     if( not GenericToolbox::isFile(_filePath_) ){
       LogError << GET_VAR_NAME_VALUE(_filePath_) << ": file not found." << std::endl;
       throw std::runtime_error(GET_VAR_NAME_VALUE(_filePath_) + ": file not found.");
@@ -32,12 +32,15 @@ void BinSet::configureImpl() {
     if( GenericToolbox::hasExtension(_filePath_, "txt") ){ this->readTxtBinningDefinition(); }
   }
   else{
-    LogThrow("Unknown binning config entry: " << GenericToolbox::Json::toReadableString(_config_));
+    LogThrow("Unknown binning config entry: " << _config_);
   }
 
   this->sortBinEdges();
   if( _sortBins_ ){ this->sortBins(); }
   this->checkBinning();
+}
+void BinSet::initializeImpl(){
+  _config_.printUnusedKeys();
 }
 void BinSet::checkBinning() const{
 
@@ -253,13 +256,13 @@ void BinSet::readTxtBinningDefinition(){
 
 }
 
-void BinSet::readBinningConfig( const JsonType& binning_){
+void BinSet::readBinningConfig( const ConfigReader& binning_){
 
-  GenericToolbox::Json::fillValue(binning_, _sortBins_, "sortBins");
+  binning_.fillValue(_sortBins_, "sortBins");
 
-  if( GenericToolbox::Json::doKeyExist(binning_, {"binningDefinition"}) ){
+  if( binning_.hasField("binningDefinition") ){
 
-    auto binningDefinition = GenericToolbox::Json::fetchValue<JsonType>(binning_, "binningDefinition");
+    auto binningDefinition = binning_.fetchValue<ConfigReader>("binningDefinition");
     struct Dimension{
       int nBins{0};
       int nModulo{1};
@@ -268,29 +271,40 @@ void BinSet::readBinningConfig( const JsonType& binning_){
       std::vector<double> edgesList{};
     };
     std::vector<Dimension> dimensionList{};
-    dimensionList.reserve( binningDefinition.size() );
+    dimensionList.reserve( binningDefinition.getConfig().size() );
 
-    for( auto& binDefEntry : binningDefinition ){
+    for( auto& binDefEntry : binningDefinition.loop() ){
       dimensionList.emplace_back();
       auto& dim = dimensionList.back();
 
-      dim.var = GenericToolbox::Json::fetchValue<std::string>(binDefEntry, "name");
+      binDefEntry.defineFields({
+        {FieldFlag::MANDATORY, {"name"}},
+        {{"edges"}},
+        {{"values"}},
+        {{"nBins"}},
+        {{"min"}},
+        {{"max"}},
+      });
+      binDefEntry.checkConfiguration();
 
-      if( GenericToolbox::Json::doKeyExist(binDefEntry, "edges") ){
-        dim.edgesList = GenericToolbox::Json::fetchValue(binDefEntry, "edges", dim.edgesList);
+      binDefEntry.fillValue(dim.var, "name");
+
+      if( binDefEntry.hasField("edges") ){
+        binDefEntry.fillValue(dim.edgesList, "edges");
       }
-      else if( GenericToolbox::Json::doKeyExist(binDefEntry, "values") ){
-        dim.edgesList = GenericToolbox::Json::fetchValue(binDefEntry, "values", dim.edgesList);
+      else if( binDefEntry.hasField("values") ){
+        binDefEntry.fillValue(dim.edgesList, "values");
         dim.isEdgesDiscreteValues = true;
       }
-      else if( GenericToolbox::Json::doKeyExist(binDefEntry, "nBins") ){
+      else if( binDefEntry.hasField("nBins") ){
         // TH1D-like definition
-        auto nBins( GenericToolbox::Json::fetchValue<int>(binDefEntry, "nBins") );
-        auto minVal( GenericToolbox::Json::fetchValue<double>(binDefEntry, "min") );
-        auto maxVal( GenericToolbox::Json::fetchValue<double>(binDefEntry, "max") );
+        // those config options are mandatory in that context
+        auto nBins( binDefEntry.fetchValue<int>("nBins") );
+        auto minVal( binDefEntry.fetchValue<double>("min") );
+        auto maxVal( binDefEntry.fetchValue<double>("max") );
 
         double step{(maxVal - minVal)/nBins};
-        LogThrowIf( step <= 0, "Invalid binning: " << GenericToolbox::Json::toReadableString(binDefEntry) );
+        LogThrowIf( step <= 0, "Invalid binning: " << binDefEntry.toString() );
 
         dim.edgesList.reserve( nBins + 1 );
         double edgeValue{minVal};
@@ -307,7 +321,7 @@ void BinSet::readBinningConfig( const JsonType& binning_){
       dim.nBins = int( dim.edgesList.size() );
       if( not dim.isEdgesDiscreteValues ){ dim.nBins--; }
 
-      LogThrowIf(dim.nBins == 0, "Invalid edgesList for binEdgeEntry: " << GenericToolbox::Json::toReadableString(binDefEntry));
+      LogThrowIf(dim.nBins == 0, "Invalid edgesList for binEdgeEntry: " << binDefEntry);
     }
 
     int nBinsTotal{1};
@@ -337,15 +351,14 @@ void BinSet::readBinningConfig( const JsonType& binning_){
       }
 
       _binList_.emplace_back( _binList_.size() );
-      _binList_.back().configure( binDefConfig );
+      _binList_.back().configure( ConfigUtils::ConfigReader(binDefConfig) );
     }
 
   }
 
-  for( auto& binDef : GenericToolbox::Json::fetchValue(binning_, "binList", JsonType()) ){
+  for( auto& binDef : binning_.loop("binList") ){
     _binList_.emplace_back( _binList_.size() );
     _binList_.back().configure( binDef );
   }
-
 
 }

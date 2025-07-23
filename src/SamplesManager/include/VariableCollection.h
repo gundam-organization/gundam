@@ -28,14 +28,14 @@ public:
   VariableCollection() = default;
 
   // setters
-  void setVarNameList(const std::shared_ptr<std::vector<std::string>>& nameListPtr_);
+  void setVarNameList(const std::vector<std::string>& nameListPtr_);
 
   // const-getters
-  [[nodiscard]] const std::shared_ptr<std::vector<std::string>>& getNameListPtr() const{ return _nameListPtr_; }
-  [[nodiscard]] const std::vector<VariableHolder>& getVarList() const{ return _varList_; }
+  [[nodiscard]] auto getNameListPtr() const{ return _nameListPtr_; }
+  [[nodiscard]] auto& getVarList() const{ return _varList_; }
 
   // mutable-getters
-  std::vector<VariableHolder>& getVarList(){ return _varList_; }
+  auto& getVarList(){ return _varList_; }
 
   // fetch
   [[nodiscard]] int findVarIndex( const std::string& leafName_, bool throwIfNotFound_ = true) const;
@@ -54,7 +54,7 @@ public:
 private:
   std::vector<VariableHolder> _varList_{};
   // keep only one list of name in memory -> shared_ptr is used to make sure it gets properly deleted
-  std::shared_ptr<std::vector<std::string>> _nameListPtr_{nullptr};
+  const std::vector<std::string>* _nameListPtr_{nullptr};
 
 };
 

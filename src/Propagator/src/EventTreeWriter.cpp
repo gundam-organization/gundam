@@ -13,12 +13,19 @@
 
 
 void EventTreeWriter::configureImpl() {
+  _config_.clearFields();
+  _config_.defineFields({
+    {"isEnabled"},
+    {"writeDials"},
+    {"nPointsPerDial"},
+  });
+  _config_.checkConfiguration();
 
-  GenericToolbox::Json::fillValue(_config_, _isEnabled_, "isEnabled");
+  _config_.fillValue(_isEnabled_, "isEnabled");
   LogReturnIf(not _isEnabled_, "Disabled EventTreeWriter.");
 
-  GenericToolbox::Json::fillValue(_config_, _writeDials_, "writeDials");
-  GenericToolbox::Json::fillValue(_config_, _nPointsPerDial_, "nPointsPerDial");
+  _config_.fillValue(_writeDials_, "writeDials");
+  _config_.fillValue(_nPointsPerDial_, "nPointsPerDial");
 
   if( _writeDials_ ){
     LogInfo << "EventTreeWriter configured as:" << std::endl;
@@ -67,7 +74,7 @@ template<typename T> void EventTreeWriter::writeEventsTemplate(const GenericTool
     branchDefStr += leafDef.first;
     leafDef.second(privateMemberArr, *EventTreeWriter::getEventPtr(eventList_[0])); // resize buffer
   }
-  privateMemberArr.lockArraySize();
+  privateMemberArr.lock();
   tree->Branch("Event", &privateMemberArr.getRawDataArray()[0], branchDefStr.c_str());
 
   GenericToolbox::RawDataArray loadedLeavesArr;
@@ -90,12 +97,12 @@ template<typename T> void EventTreeWriter::writeEventsTemplate(const GenericTool
   auto* evPtr = EventTreeWriter::getEventPtr(eventList_[0]);
   if( evPtr != nullptr and evPtr->getVariables().getNameListPtr() != nullptr ){
     for( auto& varName : *EventTreeWriter::getEventPtr(eventList_[0])->getVariables().getNameListPtr() ){
-      lDict.emplace_back();
-      lDict.back().disableArray = true;
-
       auto& var = evPtr->getVariables().fetchVariable( varName ).get();
       char typeTag = GenericToolbox::findOriginalVariableType(var);
-      LogThrowIf( typeTag == 0 or typeTag == char(0xFF), varName << " has an invalid leaf type." );
+      LogContinueIf( typeTag == 0 or typeTag == char(0xFF), varName << " has an invalid leaf type." );
+
+      lDict.emplace_back();
+      lDict.back().disableArray = true;
 
       std::string leafDefStr{ varName };
 //      if(not disableArrays_ and lH.size() > 1){ leafDefStr += "[" + std::to_string(lH.size()) + "]"; }
@@ -115,7 +122,7 @@ template<typename T> void EventTreeWriter::writeEventsTemplate(const GenericTool
           lDict[iLeaf].leafDefinitionStr.substr(0,lDict[iLeaf].leafDefinitionStr.find("[")).substr(0, lDict[iLeaf].leafDefinitionStr.find("/")));
       lDict[iLeaf].dropData(loadedLeavesArr, EventTreeWriter::getEventPtr(eventList_[0])->getVariables().getVarList()[iLeaf].get()); // resize buffer
     }
-    loadedLeavesArr.lockArraySize();
+    loadedLeavesArr.lock();
     tree->Branch("Leaves", &loadedLeavesArr.getRawDataArray()[0], branchDefStr.c_str());
   }
 
@@ -193,12 +200,7 @@ template<typename T> void EventTreeWriter::writeEventsTemplate(const GenericTool
             for( double xPoint : parameterXvalues[iGlobalPar] ){
               inputBuf.getInputBuffer()[0] = xPoint;
               grPtr->AddPoint(
-                  xPoint,
-                  DialInterface::evalResponse(
-                      &inputBuf,
-                      dial.dialInterface->getDialBaseRef(),
-                      dial.dialInterface->getResponseSupervisorRef()
-                  )
+                xPoint, dial.dialInterface->evalResponse()
               );
             }
 
@@ -212,10 +214,10 @@ template<typename T> void EventTreeWriter::writeEventsTemplate(const GenericTool
   size_t iEvent{0}; size_t nEvents = (eventList_.size());
   for( auto& cacheEntry : eventList_ ){
 
-    privateMemberArr.resetCurrentByteOffset();
+    privateMemberArr.resetCursor();
     for( auto& leafDef : leafDictionary ){ leafDef.second(privateMemberArr, *EventTreeWriter::getEventPtr(cacheEntry)); }
 
-    loadedLeavesArr.resetCurrentByteOffset();
+    loadedLeavesArr.resetCursor();
     for( int iLeaf = 0 ; iLeaf < lDict.size() ; iLeaf++ ){
       lDict[iLeaf].dropData(
           loadedLeavesArr,
