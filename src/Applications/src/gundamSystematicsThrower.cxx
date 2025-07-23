@@ -519,7 +519,7 @@ int main(int argc, char** argv){
         }else{
             if(!tStudent) {
                 // standard case: throw according to the covariance matrix
-                propagator.getParametersManager().throwParametersFromGlobalCovariance(weightsChiSquare);
+                propagator.getParametersManager().throwParametersFromGlobalCovariance(*weightsChiSquare);
             }else{
                 propagator.getParametersManager().throwParametersFromTStudent(*weightsChiSquare,tStudentNu);
             }
