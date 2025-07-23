@@ -187,21 +187,21 @@ int main(int argc, char** argv){
     }else{
         tStudent = true;
     }
-    bool enableStatThrowInToys = false;
-    bool enableEventMcThrow = false;
-    if(clParser.isOptionTriggered("throwStats")) {
-      enableStatThrowInToys = true;
-      LogInfo << "Throwing statistical errors in the toys." << std::endl;
-      enableEventMcThrow = true; // default
-      if(GenericToolbox::Json::fetchValue<bool>(margConfig, "disableEventMcThrow", false)){
-          enableEventMcThrow = false;
-          LogInfo << "Disabling event MC throw." << std::endl;
-      }
-    }else{
-      LogInfo << "Statistical errors will not be thrown in the toys." << std::endl;
-      enableStatThrowInToys = false;
-      enableEventMcThrow = false; // default
-    }
+//    bool enableStatThrowInToys = false;
+//    bool enableEventMcThrow = false;
+//    if(clParser.isOptionTriggered("throwStats")) {
+//      enableStatThrowInToys = true;
+//      LogInfo << "Throwing statistical errors in the toys." << std::endl;
+//      enableEventMcThrow = true; // default
+//      if(GenericToolbox::Json::fetchValue<bool>(margConfig, "disableEventMcThrow", false)){
+//          enableEventMcThrow = false;
+//          LogInfo << "Disabling event MC throw." << std::endl;
+//      }
+//    }else{
+//      LogInfo << "Statistical errors will not be thrown in the toys." << std::endl;
+//      enableStatThrowInToys = false;
+//      enableEventMcThrow = false; // default
+//    }
 
     auto configPropagator = GenericToolbox::Json::fetchValue<nlohmann::json>( cHandler.getConfig(), "fitterEngineConfig/propagatorConfig" );
 
@@ -666,6 +666,10 @@ int main(int argc, char** argv){
             weightSquareSumE50++;
         }
         // Write the ttrees
+        LogInfo << parameters.size() << std::endl;
+        LogInfo << margThis.size() << std::endl;
+        LogInfo << prior.size() << std::endl;
+        LogInfo << weightsChiSquare.size() << std::endl;
         margThrowTree->Fill();
         ThrowsPThetaFormat->Fill();
 
