@@ -375,10 +375,10 @@ int main(int argc, char** argv){
     // 5. value of the priors for the marginalised parameters: vector<double>
 
     // branches for margThrowTree
-    std::vector<double> parameters;
-    std::vector<bool> margThis;
-    std::vector<double> prior;
-    std::vector<double> weightsChiSquare;
+    std::vector<double> *parameters = 0;
+    std::vector<bool> *margThis = 0;
+    std::vector<double> *prior = 0;
+    std::vector<double> *weightsChiSquare = 0;
 //    weightsChiSquare.reserve(1000);
     double LLH, gLLH, priorSum, LLHwrtBestFit;
     double LH_stat, LH_syst, LH_systWrtBestFit, LH_statWrtBestFit;
