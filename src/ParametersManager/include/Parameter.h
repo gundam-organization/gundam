@@ -49,6 +49,7 @@ public:
   void setThrowValue(double throwValue){ _throwValue_ = throwValue; }
   void setStdDevValue(double stdDevValue){ _stdDevValue_ = stdDevValue; }
   void setDialSetConfig(const std::vector<ConfigReader>& dialDefinitionsList_){ _dialDefinitionsList_ = dialDefinitionsList_; }
+  void setMarginalised(bool isMarginalised){ _isMarginalised_ = isMarginalised; }
 
   /// Set the limits for this parameter.  Parameter values less than
   /// this value are illegal, and the likelihood is undefined.  The job will
@@ -76,11 +77,6 @@ public:
   /// if force is true, then it will only print warnings, otherwise it stops
   /// with EXIT_FAILURE.
   void setParameterValue(double parameterValue, bool force=false);
-  void setName(const std::string &name){ _name_ = name; }
-  void setDialSetConfig(const JsonType &jsonConfig_);
-  void setOwner(const ParameterSet *owner_){ _owner_ = owner_; }
-  void setPriorType(PriorType priorType){ _priorType_ = priorType; }
-  void setMarginalised(bool isMarginalised){ _isMarginalised_ = isMarginalised; }
 
   // const getters
   [[nodiscard]] auto isFree() const{ return _isFree_; }
