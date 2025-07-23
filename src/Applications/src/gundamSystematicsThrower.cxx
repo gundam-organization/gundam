@@ -322,15 +322,9 @@ int main(int argc, char** argv){
         if( not par.isEnabled() ){ continue; }
   //                LogInfo<<debug_enabled_params<<" "<<par.getFullTitle()<<std::endl;
         debug_enabled_params++;
-        parameterNames.emplace_back(par.getFullTitle());
-        bestFitValues.emplace_back(par.getParameterValue());
-        priorValues.emplace_back(par.getPriorValue());
-        priorSigmas.emplace_back(par.getStdDevValue());
         LogInfo <<" DEBUG: Parameter: " << par.getFullTitle()
-                << " | Best fit value: " << par.getParameterValue()
-                << " | Prior value: " << par.getPriorValue() << std::endl;
-        // set prior to best fit
-        par.setPriorValue(par.getParameterValue());
+                << " | current value: " << par.getParameterValue()
+                << " | best fit value: " << par.getPriorValue() << std::endl;
       }
     }
     double bestFitLLH = fitter.getLikelihoodInterface().getBuffer().totalLikelihood;
