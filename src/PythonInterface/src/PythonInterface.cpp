@@ -89,6 +89,7 @@ PYBIND11_MODULE(PyGundam, module) {
   pybind11::class_<Propagator>(module, "Propagator")
   .def(pybind11::init())
   .def("getParametersManager", pybind11::overload_cast<>(&Propagator::getParametersManager), pybind11::return_value_policy::reference)
+  .def("copyHistBinContentFrom", pybind11::overload_cast<const Propagator&>(&Propagator::copyHistBinContentFrom), pybind11::return_value_policy::reference)
   ;
 
   pybind11::class_<LikelihoodInterface>(module, "LikelihoodInterface")
