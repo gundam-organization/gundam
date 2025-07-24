@@ -108,34 +108,47 @@ int main(int argc, char** argv){
 
     // Reading fitter file
     LogInfo << "Opening fitter output file: " << clParser.getOptionVal<std::string>("fitterOutputFile") << std::endl;
-    auto fitterFile = std::unique_ptr<TFile>( TFile::Open( clParser.getOptionVal<std::string>("fitterOutputFile").c_str() ) );
-    LogThrowIf( fitterFile == nullptr, "Could not open fitter output file." );
+    std::string fitterFile{clParser.getOptionVal<std::string>("fitterOutputFile")};
+    std::unique_ptr<TFile> fitterRootFile{nullptr};
+    ConfigReader fitterConfig; // will be used to load the propagator
 
-    using namespace GundamUtils;
-    RootUtils::ObjectReader::throwIfNotFound = true;
-    JsonType fitterConfig;
+    if( GenericToolbox::hasExtension(fitterFile, "root") ){
+      LogWarning << "Opening fitter output file: " << fitterFile << std::endl;
+      fitterRootFile = std::unique_ptr<TFile>( TFile::Open( fitterFile.c_str() ) );
+      LogThrowIf( fitterRootFile == nullptr, "Could not open fitter output file." );
+
+      RootUtils::ObjectReader::throwIfNotFound = true;
 
       RootUtils::ObjectReader::readObject<TNamed>(
-              fitterFile.get(),
+              fitterRootFile.get(),
               {{"gundam/config/unfoldedJson_TNamed"},
                {"gundam/config_TNamed"},
                {"gundamFitter/unfoldedConfig_TNamed"}},
               [&](TNamed* config_){
-                  fitterConfig = GenericToolbox::Json::readConfigJsonStr( config_->GetTitle() );
+                  fitterConfig = ConfigReader(GenericToolbox::Json::readConfigJsonStr( config_->GetTitle() ));
               });
+    }else{
+      LogError << "Fitter output file is not a ROOT file: " << fitterFile << std::endl;
+      LogExit("Fitter output file must be a ROOT file.");
+    }
 
-    // Check if the config is an array (baobab compatibility)
+    // Print out the config
+    LogInfo << "Fitter config loaded: " << std::endl;
+    LogInfo << fitterConfig.toString() << std::endl;
 
-    ConfigUtils::ConfigHandler cHandler{ fitterConfig };
+
+
+    ConfigUtils::ConfigBuilder cHandler{ fitterConfig.getConfig() };
     LogInfo << "Fitter config loaded." << std::endl;
     // Reading marginaliser config file
-    nlohmann::json margConfig{ ConfigUtils::readConfigFile( clParser.getOptionVal<std::string>("configFile") ) };
-    if(margConfig.size()==1) {
-        // broken json library puts everything in the same level
-        // normal behavior
-        margConfig = margConfig[0];
-    }
-    cHandler.override( (JsonType)margConfig );
+    ConfigReader margConfig{ ConfigUtils::readConfigFile( clParser.getOptionVal<std::string>("configFile") ) };
+  // Check if the config is an array (baobab compatibility)
+//    if(margConfig.size()==1) {
+//        // broken json library puts everything in the same level
+//        // normal behavior
+//        margConfig = margConfig[0];
+//    }
+    cHandler.override( margConfig.getConfig() );
     LogInfo << "Override config done." << std::endl;
 
 
@@ -208,10 +221,12 @@ int main(int argc, char** argv){
     // Initialize the fitterEngine
     LogInfo << "FitterEngine setup..." << std::endl;
     FitterEngine fitter{nullptr};
-    auto gundamFitterConfig(cHandler.getConfig());
+    fitterConfig.defineFields({
+                                    {"fitterEngineConfig"},
+                            });
 
-    GenericToolbox::Json::fillValue(gundamFitterConfig, fitter.getConfig(), "fitterEngineConfig");
-    fitter.configure();
+
+    fitter.configure( fitterConfig.fetchValue<ConfigReader>( "fitterEngineConfig" ) );
 
     fitter.getLikelihoodInterface();
 
@@ -237,7 +252,7 @@ int main(int argc, char** argv){
         Histogram hist = sample.getHistogram();
         // Load the histogram from the fitter output file
         RootUtils::ObjectReader::readObject<TH1D>(
-            fitterFile.get(), samplePath,
+                fitterRootFile.get(), samplePath,
             [&](TH1D* hist_) {
                 LogInfo << "Loaded histogram: " << hist_->GetName() << std::endl;
                 // Copy the histogram content to the sample histogram
@@ -271,9 +286,10 @@ int main(int argc, char** argv){
     int debug_cov_rows{0};
 
     fitter.getLikelihoodInterface().getModelPropagator().propagateParameters();
-    fitter.getLikelihoodInterface().evalLikelihood();
+    std::future<bool> propagated = fitter.getLikelihoodInterface().getModelPropagator().applyParameters();
+    fitter.getLikelihoodInterface().evalLikelihood(propagated);
     double priorLLH = fitter.getLikelihoodInterface().getBuffer().totalLikelihood;
-    double prior_statLH = fitter.getLikelihoodInterface().evalStatLikelihood();
+    double prior_statLH = fitter.getLikelihoodInterface().evalStatLikelihood(propagated);
     double prior_systLH = fitter.getLikelihoodInterface().evalPenaltyLikelihood();;
     LogInfo<<" LH at prior:\nLH_stat="<<prior_statLH
            <<"\nLH_syst="<<prior_systLH
@@ -282,7 +298,7 @@ int main(int argc, char** argv){
     // Load post-fit parameters as "prior" so we can reset the weight to this point when throwing toys
     // also save the values in a vector so we can use them to compute the LLH at the best fit point
     int NParametersFromFitterFile = 0;
-    RootUtils::ObjectReader::readObject<TNamed>( fitterFile.get(), "FitterEngine/postFit/parState_TNamed", [&](TNamed* parState_){
+    RootUtils::ObjectReader::readObject<TNamed>( fitterRootFile.get(), "FitterEngine/postFit/parState_TNamed", [&](TNamed* parState_){
         propagator.getParametersManager().injectParameterValues( GenericToolbox::Json::readConfigJsonStr( parState_->GetTitle() ) );
         for( auto& parSet : propagator.getParametersManager().getParameterSetsList() ){
             if( not parSet.isEnabled() ){ continue; }
@@ -327,7 +343,7 @@ int main(int argc, char** argv){
         };
         outFilePath = GundamUtils::generateFileName(clParser, appendixDict) + ".root";
 
-        std::string outFolder{GenericToolbox::Json::fetchValue<std::string>(margConfig, "outputFolder", "./")};
+        auto outFolder(margConfig.fetchValue<std::string>("outputFolder", "./"));
         outFilePath = GenericToolbox::joinPath(outFolder, outFilePath);
     }
 
@@ -336,7 +352,7 @@ int main(int argc, char** argv){
 
     // Load the post-fit covariance matrix
     RootUtils::ObjectReader::readObject<TH2D>(
-          fitterFile.get(), "FitterEngine/postFit/Hesse/hessian/postfitCovarianceOriginal_TH2D",
+          fitterRootFile.get(), "FitterEngine/postFit/Hesse/hessian/postfitCovarianceOriginal_TH2D",
           [&](TH2D* hCovPostFit_){
               propagator.getParametersManager().setGlobalCovarianceMatrix(std::make_shared<TMatrixD>(hCovPostFit_->GetNbinsX(), hCovPostFit_->GetNbinsX()));
               for( int iBin = 0 ; iBin < hCovPostFit_->GetNbinsX() ; iBin++ ){
@@ -353,7 +369,7 @@ int main(int argc, char** argv){
 
 
     app.setCmdLinePtr( &clParser );
-    app.setConfigString( ConfigUtils::ConfigHandler{(JsonType)margConfig}.toString()  );
+    app.setConfigString( ConfigUtils::ConfigBuilder{margConfig.getConfig()}.toString()  );
     app.openOutputFile( outFilePath );
     app.writeAppInfo();
 
@@ -370,9 +386,10 @@ int main(int argc, char** argv){
       }
     }
     fitter.getLikelihoodInterface().getModelPropagator().propagateParameters();
-    fitter.getLikelihoodInterface().evalLikelihood();
+    propagated = fitter.getLikelihoodInterface().getModelPropagator().applyParameters();
+    fitter.getLikelihoodInterface().evalLikelihood(propagated);
     double bestFitLLH = fitter.getLikelihoodInterface().getBuffer().totalLikelihood;
-    double bestFit_statLH = fitter.getLikelihoodInterface().evalStatLikelihood();
+    double bestFit_statLH = fitter.getLikelihoodInterface().evalStatLikelihood(propagated);
     double bestFit_systLH = fitter.getLikelihoodInterface().evalPenaltyLikelihood();;
     LogInfo<<" Best fit Likelihood:\nLH_stat="<<bestFit_statLH
            <<"\nLH_syst="<<bestFit_systLH
@@ -381,13 +398,13 @@ int main(int argc, char** argv){
     TDirectory* postFitInfo = app.getOutfilePtr()->mkdir("postFitInfo");
     postFitInfo->cd();
     RootUtils::ObjectReader::readObject<TH2D>(
-            fitterFile.get(), "FitterEngine/postFit/Hesse/hessian/postfitCovarianceOriginal_TH2D",
+            fitterRootFile.get(), "FitterEngine/postFit/Hesse/hessian/postfitCovarianceOriginal_TH2D",
             [&](TH2D* hCovPostFit_) {
                 hCovPostFit_->SetName("postFitCovarianceOriginal_TH2D");
                 hCovPostFit_->Write();// save the TH2D cov. matrix also in the output file
             });
     // write the best fit parameters vector to the output file
-    RootUtils::ObjectReader::readObject<TNamed>( fitterFile.get(), "FitterEngine/postFit/parState_TNamed", [&](TNamed* parState_){
+    RootUtils::ObjectReader::readObject<TNamed>( fitterRootFile.get(), "FitterEngine/postFit/parState_TNamed", [&](TNamed* parState_){
         parState_->SetName("postFitParameters_TNamed");
         parState_->Write();
     });
@@ -451,8 +468,8 @@ int main(int argc, char** argv){
     // Get parameters to be marginalised
     std::vector<std::string> marginalisedParameters;
     std::vector<std::string> marginalisedParameterSets;
-        marginalisedParameters = GenericToolbox::Json::fetchValue<std::vector<std::string>>(margConfig, "parameterList");
-        marginalisedParameterSets = GenericToolbox::Json::fetchValue<std::vector<std::string>>(margConfig, "parameterSetList");
+    marginalisedParameters = margConfig.fetchValue<std::vector<std::string>>("parameterList");
+    marginalisedParameterSets = margConfig.fetchValue<std::vector<std::string>>("parameterSetList");
 
     LogInfo<<"----------------------- INFO ABOUT PTheta marginalised TTree -----------------------"<<std::endl;
     LogInfo<<"Marginalised parameters: "<<GenericToolbox::parseVectorAsString(marginalisedParameters,true,true)<<std::endl;
@@ -511,14 +528,14 @@ int main(int argc, char** argv){
             if(par.isMarginalised()){
                 LogInfo << "Parameter " << par.getFullTitle()
                 << " -> type: " << par.getPriorType() << " mu=" << par.getPriorValue()
-                << " sigma= " << par.getStdDevValue() << " limits: " << par.getMinValue() << " - "
-                << par.getMaxValue()
+                << " sigma= " << par.getStdDevValue() << " limits: "<< par.getPhysicalLimits().min << " - "
+                                                                    << par.getPhysicalLimits().max
                 <<" -> will be marg. out\n";
             }else{
                 LogInfo << "Parameter " << par.getFullTitle()
                         << " -> type: " << par.getPriorType() << " mu=" << par.getPriorValue()
-                        << " sigma= " << par.getStdDevValue() << " limits: " << par.getMinValue() << " - "
-                        << par.getMaxValue()
+                        << " sigma= " << par.getStdDevValue() << " limits: " << par.getPhysicalLimits().min << " - "
+                                                                             << par.getPhysicalLimits().max
                 <<" -> will NOT be marg. out\n";
             }
         }
@@ -633,9 +650,10 @@ int main(int argc, char** argv){
 
         // Propagate the parameters and compute the LH
         fitter.getLikelihoodInterface().getModelPropagator().propagateParameters();
-        fitter.getLikelihoodInterface().evalLikelihood();
+        propagated = fitter.getLikelihoodInterface().getModelPropagator().applyParameters();
+        fitter.getLikelihoodInterface().evalLikelihood(propagated);
         LLH = fitter.getLikelihoodInterface().getBuffer().totalLikelihood;
-        LH_stat = fitter.getLikelihoodInterface().evalStatLikelihood();
+        LH_stat = fitter.getLikelihoodInterface().evalStatLikelihood(propagated);
         LH_syst = fitter.getLikelihoodInterface().evalPenaltyLikelihood();
         LLHwrtBestFit = LLH - bestFitLLH;
         LH_statWrtBestFit = LH_stat - bestFit_statLH;

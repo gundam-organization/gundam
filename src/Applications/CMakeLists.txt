@@ -12,6 +12,7 @@ set(
     gundamConfigCompare
     gundamPlotExtractor
     gundamConfigUnfolder
+    gundamSystematicsThrower
 )
 
 
@@ -81,6 +82,8 @@ target_link_libraries( gundamFitPlot GundamUtils )
 target_link_libraries( gundamConfigUnfolder GundamUtils )
 target_link_libraries( gundamConfigCompare GundamUtils )
 target_link_libraries( gundamPlotExtractor GundamUtils )
+target_link_libraries( gundamSystematicsThrower GundamUtils GundamFitter )
+
 
 if( WITH_GUNDAM_ROOT_APP )
 #target_sources( gundamRoot PRIVATE G__GundamRootDict.cxx )
