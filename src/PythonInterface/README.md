@@ -14,7 +14,7 @@ You need to have `pybind11` installed on your computer. On macOS, you
 can install it via:
 
 ```bash
-brew install pybind11
+brew install pybind11 # make sure you're using the right `python`
 ```
 
 ## Setup
@@ -35,7 +35,32 @@ Go to the OA input folder, and run:
 python
 Python 3.13.1 (main, Dec  3 2024, 17:59:52) [Clang 16.0.0 (clang-1600.0.26.4)] on darwin
 Type "help", "copyright", "credits" or "license" for more information.
->>> import PyGundam
->>> g = PyGundam.PyGundam("configOa2021.yaml")
+>>> import GUNDAM
+>>> GUNDAM.setLightOutputMode(True)
+>>> GUNDAM.setNumberOfThreads(2)
+...
+```
+
+Example for an Asymov fit
+
+```python
+import GUNDAM
+GUNDAM.setLightOutputMode(True)
+GUNDAM.setNumberOfThreads(2)
+
+cb = GUNDAM.ConfigUtils.ConfigBuilder("config.yaml")
+cr = GUNDAM.ConfigUtils.ConfigReader(cb.getConfig())
+cr.defineField(GUNDAM.ConfigUtils.ConfigReader.FieldDefinition("fitterEngineConfig"))
+fitterEngineConfig = cr.fetchValueConfigReader("fitterEngineConfig")
+
+e = GUNDAM.FitterEngine()
+e.setConfig(fitterEngineConfig)
+e.configure()
+
+e.getLikelihoodInterface().setForceAsimovData(True)
+
+e.initialize()
+
+e.fit()
 ```
 
