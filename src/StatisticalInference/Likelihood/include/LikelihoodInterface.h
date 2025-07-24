@@ -64,35 +64,36 @@ public:
   void setToyParameterInjector(const JsonType& toyParameterInjector_){ _toyParameterInjector_ = toyParameterInjector_; }
 
   // const getters
-  [[nodiscard]] int getNbParameters() const{ return _nbParameters_; }
-  [[nodiscard]] int getNbSampleBins() const{ return _nbSampleBins_; }
-  [[nodiscard]] double getLastLikelihood() const{ return _buffer_.totalLikelihood; }
-  [[nodiscard]] double getLastStatLikelihood() const{ return _buffer_.statLikelihood; }
-  [[nodiscard]] double getLastPenaltyLikelihood() const{ return _buffer_.penaltyLikelihood; }
-  [[nodiscard]] const Propagator& getModelPropagator() const{ return _modelPropagator_; }
-  [[nodiscard]] const Propagator& getDataPropagator() const{ return _dataPropagator_; }
-  [[nodiscard]] const PlotGenerator& getPlotGenerator() const{ return _plotGenerator_; }
-  [[nodiscard]] const JointProbability::JointProbabilityBase* getJointProbabilityPtr() const { return _jointProbabilityPtr_.get(); }
-  [[nodiscard]] const std::vector<DatasetDefinition>& getDatasetList() const { return _datasetList_; }
-  [[nodiscard]] const std::vector<SamplePair>& getSamplePairList() const { return _samplePairList_; }
-  [[nodiscard]] const Buffer& getBuffer() const { return _buffer_; }
-  [[nodiscard]] const DataType& getDataType() const { return _dataType_; }
+  [[nodiscard]] auto getNbParameters() const{ return _nbParameters_; }
+  [[nodiscard]] auto getNbSampleBins() const{ return _nbSampleBins_; }
+  [[nodiscard]] auto getLastLikelihood() const{ return _buffer_.totalLikelihood; }
+  [[nodiscard]] auto getLastStatLikelihood() const{ return _buffer_.statLikelihood; }
+  [[nodiscard]] auto getLastPenaltyLikelihood() const{ return _buffer_.penaltyLikelihood; }
+  [[nodiscard]] auto getJointProbabilityPtr() const { return _jointProbabilityPtr_.get(); }
+  [[nodiscard]] auto& getModelPropagator() const{ return _modelPropagator_; }
+  [[nodiscard]] auto& getDataPropagator() const{ return _dataPropagator_; }
+  [[nodiscard]] auto& getPlotGenerator() const{ return _plotGenerator_; }
+  [[nodiscard]] auto& getDatasetList() const { return _datasetList_; }
+  [[nodiscard]] auto& getSamplePairList() const { return _samplePairList_; }
+  [[nodiscard]] auto& getBuffer() const { return _buffer_; }
+  [[nodiscard]] auto& getDataType() const { return _dataType_; }
 
   // mutable getters
-  Buffer& getBuffer(){ return _buffer_; }
-  Propagator& getModelPropagator(){ return _modelPropagator_; }
-  Propagator& getDataPropagator(){ return _dataPropagator_; }
-  PlotGenerator& getPlotGenerator(){ return _plotGenerator_; }
-  std::vector<DatasetDefinition>& getDatasetList(){ return _datasetList_; }
-  std::vector<SamplePair>& getSamplePairList(){ return _samplePairList_; }
+  auto& getBuffer(){ return _buffer_; }
+  auto& getModelPropagator(){ return _modelPropagator_; }
+  auto& getDataPropagator(){ return _dataPropagator_; }
+  auto& getPlotGenerator(){ return _plotGenerator_; }
+  auto& getDatasetList(){ return _datasetList_; }
+  auto& getSamplePairList(){ return _samplePairList_; }
 
   // mutable core
   void propagateAndEvalLikelihood();
 
   // core
-  double evalLikelihood() const;
-  double evalStatLikelihood() const;
+  double evalLikelihood(std::future<bool>& propagation) const;
+  double evalStatLikelihood(std::future<bool>& propagation) const;
   double evalPenaltyLikelihood() const;
+  [[nodiscard]] double evalPenaltyLikelihood(const ParameterSet& parSet_) const;
   [[nodiscard]] double evalStatLikelihood(const SamplePair& samplePair_) const;
   [[nodiscard]] std::string getSummary() const;
 
@@ -103,8 +104,6 @@ public:
   void printBreakdowns() const;
   std::string getSampleBreakdownTable() const;
 
-  // statics
-  [[nodiscard]] static double evalPenaltyLikelihood(const ParameterSet& parSet_);
 
   void throwToyParameters(Propagator& propagator_);
   void throwStatErrors(Propagator& propagator_);
@@ -123,6 +122,7 @@ private:
   bool _enableStatThrowInToys_{true};
   bool _gaussStatThrowInToys_{false};
   bool _enableEventMcThrow_{true};
+  bool _applyInfinitePenaltyOnOutOfBoundPar_{false};
   DataType _dataType_{DataType::Asimov};
   JsonType _toyParameterInjector_{};
 

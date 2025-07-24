@@ -12,31 +12,59 @@
 #include <sstream>
 
 
+void Parameter::prepareConfig(ConfigReader& config_){
+  config_.clearFields();
+  config_.defineFields({
+    {"name", {"parameterName"}},
+    {"isEnabled"},
+    {"priorValue"},
+    {"isFixed"},
+    {"isThrown"},
+    {"parameterStepSize"},
+    {"parameterIndex"},
+    {"parameterLimits"},
+    {"physicalLimits"},
+    {"throwLimits"},
+    {"mirrorRange"},
+    {"dialSetDefinitions"},
+    {"priorType"},
+  });
+  config_.checkConfiguration();
+}
 void Parameter::configureImpl(){
 
-  GenericToolbox::Json::fillValue(_config_, _isEnabled_, "isEnabled");
+  prepareConfig(_config_);
+
+  _config_.fillValue(_name_, "name");
+  _config_.fillValue(_isEnabled_, "isEnabled");
   if( not _isEnabled_ ) { return; }
 
-  if( GenericToolbox::Json::doKeyExist(_config_, "priorValue") ){
-    auto priorValue = GenericToolbox::Json::fetchValue<double>(_config_, "priorValue");
+  if( _config_.hasField("priorValue") ){
+    auto priorValue = _config_.fetchValue<double>("priorValue");
     if( not std::isnan(priorValue) and priorValue != _priorValue_ ){
       _priorValue_ = priorValue;
       _parameterValue_ = _priorValue_;
     }
   }
 
-  GenericToolbox::Json::fillValue(_config_, _isFixed_, "isFixed");
-  GenericToolbox::Json::fillValue(_config_, _stepSize_, "parameterStepSize");
-  GenericToolbox::Json::fillValue(_config_, _parameterLimits_, "parameterLimits");
-  GenericToolbox::Json::fillValue(_config_, _physicalLimits_, "physicalLimits");
-  GenericToolbox::Json::fillValue(_config_, _mirrorRange_, "mirrorRange");
-  GenericToolbox::Json::fillValue(_config_, _dialDefinitionsList_, "dialSetDefinitions");
+  _config_.fillValue(_isFixed_, "isFixed");
+  _config_.fillValue(_isThrown_, "isThrown");
+  _config_.fillValue(_stepSize_, "parameterStepSize");
+  _config_.fillValue(_physicalLimits_, "physicalLimits");
+  _config_.fillValue(_throwLimits_, "throwLimits");
+  _config_.fillValue(_mirrorRange_, "mirrorRange");
+  _config_.fillValue(_dialDefinitionsList_, "dialSetDefinitions");
 
-  GenericToolbox::Json::fillEnum(_config_, _priorType_, "priorType");
+  _config_.fillValue(_parameterLimits_, "parameterLimits");
+
+  _config_.fillEnum(_priorType_, "priorType");
   if( _priorType_ == PriorType::Flat ){ _isFree_ = true; }
 
 }
 void Parameter::initializeImpl() {
+
+  _config_.printUnusedKeys();
+
   LogThrowIf(_owner_ == nullptr, "Parameter set ref is not set.");
   LogThrowIf(_parameterIndex_ == -1, "Parameter index is not set.");
 
@@ -44,6 +72,15 @@ void Parameter::initializeImpl() {
   LogThrowIf(std::isnan(_priorValue_), "Prior value is not set: " << getFullTitle());
   LogThrowIf(std::isnan(_stdDevValue_), "Std dev value is not set: " << getFullTitle());
   LogThrowIf(std::isnan(_parameterValue_), "Parameter value is not set: " << getFullTitle());
+
+  if( _priorValue_ == _parameterLimits_.min or _priorValue_ == _parameterLimits_.max ) {
+    // the user should know. This will prevent Asimov fits to converge
+    LogAlert << "Prior value of \"" << getFullTitle() << "\" is set on the defined limits: " << _priorValue_ << " -> " << _parameterLimits_ << std::endl;
+  }
+
+  // make sure the throws will always give parameters in bounds
+  _throwLimits_.fillMostConstrainingBounds(_parameterLimits_);
+  _throwLimits_.fillMostConstrainingBounds(_physicalLimits_);
 }
 
 void Parameter::setMinMirror(double minMirror) {
@@ -65,18 +102,31 @@ void Parameter::setMaxMirror(double maxMirror) {
   _mirrorRange_.max = maxMirror;
 }
 void Parameter::setParameterValue(double parameterValue, bool force) {
-#ifdef DEBUG_BUILD
-  // those printouts will only show if the CMAKE_BUILD_TYPE is set to DEBUG
-  if (not isInDomain(parameterValue, true)) {
-    LogError << "New parameter value is not in domain: " << parameterValue
-             << std::endl;
-    LogError << GundamUtils::Backtrace;
-    if (not force) std::exit(EXIT_FAILURE);
-    else LogAlert << "Forced continuation with invalid parameter" << std::endl;
-  }
-#endif
+  // update and flag parameter
   if( _parameterValue_ != parameterValue ){
     _gotUpdated_ = true;
+
+#ifdef DEBUG_BUILD
+    if (not isInDomain(parameterValue, true)) {
+#else
+    if (not isInDomain(parameterValue, false)) {
+#endif
+      LogError << getFullTitle() << ": setting new value out of domain. " << parameterValue << " is not in " << _parameterLimits_ << std::endl;
+
+      static bool once{false};
+      if( not once and _owner_->isEnableEigenDecomp() and not this->isEigen() ){
+        once = true;
+        LogAlert << "Not in domain error will appears since par limits can't directly be applied when using eigen decomp." << std::endl;
+      }
+
+      if( not force ){ LogError << GundamUtils::Backtrace; std::exit(EXIT_FAILURE); }
+#ifdef DEBUG_BUILD
+      LogDebug << GundamUtils::Backtrace;
+      LogAlert << "Forced continuation with invalid parameter" << std::endl;
+#endif
+    }
+
+    // setting the parameter
     _parameterValue_ = parameterValue;
   }
   else{ _gotUpdated_ = false; }
@@ -84,20 +134,11 @@ void Parameter::setParameterValue(double parameterValue, bool force) {
 double Parameter::getParameterValue() const {
 #ifdef DEBUG_BUILD
   if ( isEnabled() and not isValueWithinBounds() ) {
-    LogWarning << "Getting out of bounds parameter: "
-               << getSummary() << std::endl;
+    LogAlert << "Getting out of bounds parameter: " << getSummary() << std::endl;
     LogDebug << GundamUtils::Backtrace;
   }
 #endif
   return _parameterValue_;
-}
-void Parameter::setDialSetConfig(const JsonType &jsonConfig_) {
-  auto jsonConfig = jsonConfig_;
-  while( jsonConfig.is_string() ){
-    LogWarning << "Forwarding FitParameterSet config to: \"" << jsonConfig.get<std::string>() << "\"..." << std::endl;
-    jsonConfig = ConfigUtils::readConfigFile(jsonConfig.get<std::string>());
-  }
-  _dialDefinitionsList_ = jsonConfig.get<std::vector<JsonType>>();
 }
 
 void Parameter::setValueAtPrior(){
@@ -114,14 +155,17 @@ bool Parameter::isInDomain(double value_, bool verbose_) const {
     }
     return false;
   }
-  if ( not std::isnan(_parameterLimits_.min) and value_ < _parameterLimits_.min ) {
+
+  if( not _parameterLimits_.hasBound() ){ return true; }
+
+  if( _parameterLimits_.isBellowMin(value_) ){
     if (verbose_) {
       LogError << "Value is below minimum: " << value_ << std::endl;
       LogError << "Summary: " << getSummary() << std::endl;
     }
     return false;
   }
-  if ( not std::isnan(_parameterLimits_.max) and value_ > _parameterLimits_.max ) {
+  if ( _parameterLimits_.isAboveMax(value_) ) {
     if (verbose_) {
       LogError << "Attempting to set parameter above the maximum"
                << " -- New value: " << value_
@@ -133,14 +177,12 @@ bool Parameter::isInDomain(double value_, bool verbose_) const {
   return true;
 }
 bool Parameter::isPhysical(double value_) const {
-  if (not isInDomain(value_)) return false;
-  if ( not std::isnan(_physicalLimits_.min) and value_ < _physicalLimits_.min ) return false;
-  if ( not std::isnan(_physicalLimits_.max) and value_ > _physicalLimits_.max ) return false;
+  if( not isInDomain(value_) ){ return false; }
+  if( not _parameterLimits_.isInBounds(value_) ){ return false; }
   return true;
 }
 bool Parameter::isMirrored(double value_) const {
-  if ( not std::isnan(_mirrorRange_.min) and value_ < _mirrorRange_.min ) return true;
-  if ( not std::isnan(_mirrorRange_.max) and value_ > _mirrorRange_.max ) return true;
+  if( not _mirrorRange_.isInBounds(value_) ){ return true; }
   return false;
 }
 bool Parameter::isValidValue(double value) const {
@@ -185,13 +227,7 @@ std::string Parameter::getSummary() const {
   ss << ": value=" << _parameterValue_;
   ss << ", prior=" << _priorValue_;
   ss << ", stdDev=" << _stdDevValue_;
-  ss << ", bounds=[ ";
-  if( std::isnan(_parameterLimits_.min) ) ss << "-inf";
-  else ss << _parameterLimits_.min;
-  ss << ", ";
-  if( std::isnan(_parameterLimits_.max) ) ss << "+inf";
-  else ss << _parameterLimits_.max;
-  ss << " ]";
+  ss << ", bounds=" << _parameterLimits_;
   if (not isValueWithinBounds()){
     ss << GenericToolbox::ColorCodes::redBackground << " out of bounds" << GenericToolbox::ColorCodes::resetColor;
   }

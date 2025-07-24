@@ -14,6 +14,7 @@ set( HEADERS
     ${CMAKE_CURRENT_SOURCE_DIR}/include/WeightBilinear.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/WeightBicubic.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/WeightTabulated.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/WeightKriged.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/WeightBase.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/CacheIndexedSums.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/CacheRecursiveSums.h
@@ -45,6 +46,7 @@ list( APPEND SRCFILES ${CMAKE_CURRENT_SOURCE_DIR}/src/WeightGraph.${SRC_FILE_EXT
 list( APPEND SRCFILES ${CMAKE_CURRENT_SOURCE_DIR}/src/WeightBilinear.${SRC_FILE_EXT} )
 list( APPEND SRCFILES ${CMAKE_CURRENT_SOURCE_DIR}/src/WeightBicubic.${SRC_FILE_EXT} )
 list( APPEND SRCFILES ${CMAKE_CURRENT_SOURCE_DIR}/src/WeightTabulated.${SRC_FILE_EXT} )
+list( APPEND SRCFILES ${CMAKE_CURRENT_SOURCE_DIR}/src/WeightKriged.${SRC_FILE_EXT} )
 list( APPEND SRCFILES ${CMAKE_CURRENT_SOURCE_DIR}/src/WeightBase.${SRC_FILE_EXT} )
 list( APPEND SRCFILES ${CMAKE_CURRENT_SOURCE_DIR}/src/CacheParameters.${SRC_FILE_EXT} )
 list( APPEND SRCFILES ${CMAKE_CURRENT_SOURCE_DIR}/src/CacheWeights.${SRC_FILE_EXT} )
@@ -64,8 +66,6 @@ target_include_directories( GundamCacheManager PUBLIC
 
 target_link_libraries( GundamCacheManager PUBLIC
   GundamDialDictionary
-  GundamParametersManager
-  GundamSamplesManager
   ${ROOT_LIBRARIES})
 
 # Add extra compilation flags.  The commented flags are as reminders

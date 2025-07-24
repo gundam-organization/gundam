@@ -64,24 +64,25 @@ public:
   void setPcaMethod(PcaMethod pcaMethod_){ _pcaMethod_ = pcaMethod_; }
 
   // const-getters
-  [[nodiscard]] const auto& getPreFitParState() const{ return _preFitParState_; }
-  [[nodiscard]] const auto& getPostFitParState() const{ return _postFitParState_; }
+  [[nodiscard]] auto& getPreFitParState() const{ return _preFitParState_; }
+  [[nodiscard]] auto& getPostFitParState() const{ return _postFitParState_; }
   [[nodiscard]] MinimizerType getMinimizerType() const{ return _minimizerType_; }
-  [[nodiscard]] const MinimizerBase& getMinimizer() const{ return *_minimizer_; }
-  [[nodiscard]] const LikelihoodInterface& getLikelihoodInterface() const{ return _likelihoodInterface_; }
-  [[nodiscard]] const ParameterScanner& getParameterScanner() const{ return _parameterScanner_; }
+  [[nodiscard]] auto& getMinimizer() const{ return *_minimizer_; }
+  [[nodiscard]] auto& getLikelihoodInterface() const{ return _likelihoodInterface_; }
+  [[nodiscard]] auto& getParameterScanner() const{ return _parameterScanner_; }
 
   // mutable-getters
   MinimizerBase& getMinimizer(){ return *_minimizer_; }
   LikelihoodInterface& getLikelihoodInterface(){ return _likelihoodInterface_; }
   ParameterScanner& getParameterScanner(){ return _parameterScanner_; }
   TDirectory* getSaveDir(){ return _saveDir_; }
+  bool& getGenerateSamplePlots(){ return _generateSamplePlots_; }
 
   // Core
   void fit();
   void runPcaCheck();
   void rescaleParametersStepSize();
-  void checkNumericalAccuracy();
+  bool checkNumericalAccuracy();
 
 private:
   // Parameters
@@ -90,7 +91,7 @@ private:
   bool _throwMcBeforeFit_{false};
   bool _enablePreFitScan_{false};
   bool _enablePostFitScan_{false};
-  bool _enablePreFitToPostFitLineScan_{true};
+  bool _enablePreFitToPostFitLineScan_{false};
   bool _generateSamplePlots_{true};
   bool _generateOneSigmaPlots_{false};
   bool _doAllParamVariations_{false};
@@ -103,6 +104,7 @@ private:
   GenericToolbox::Json::JsonType _postFitParState_{};
 
   // dev
+  bool _fixGhostEigenParametersAfterFirstRejected_{false};
   double _pcaThreshold_{0};
   PcaMethod _pcaMethod_{PcaMethod::DeltaChi2Threshold};
 

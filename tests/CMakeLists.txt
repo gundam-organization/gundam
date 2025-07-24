@@ -34,9 +34,14 @@ if( WITH_GOOGLE_TEST )
   find_package(GTest QUIET)
 
   if(GTEST_FOUND)
-    if( WITH_CACHE_MANAGER )
+    cmessage( STATUS "Compiling google tests" )
+    add_executable(gundamGTest_unitTest.exe
+      GTests/unitTest_JointProbability.cpp)
+    target_link_libraries(gundamGTest_unitTest.exe GTest::gtest_main)
+    target_link_libraries(gundamGTest_unitTest.exe GundamFitter)
+    gtest_discover_tests(gundamGTest_unitTest.exe)
 
-      cmessage( STATUS "Compiling google tests..." )
+    if( WITH_CACHE_MANAGER )
       # Setup the hemi test suite for the host
 
       add_executable(gundamGTest_host.exe
@@ -64,12 +69,14 @@ if( WITH_GOOGLE_TEST )
 
     else( WITH_CACHE_MANAGER )
 
-      cmessage( WARNING "WITH_CACHE_MANAGER is set to false. Skipping Google test executables." )
+      cmessage( WARNING "WITH_CACHE_MANAGER is set to false. Skipping Cache::Manager test executables." )
 
     endif( WITH_CACHE_MANAGER )
 
   else(GTEST_FOUND)
-    cmessage( FATAL_ERROR "Google test is not available." )
+    cmessage( WARNING "Google test is not available." )
   endif(GTEST_FOUND)
 
+else(WITH_GOOGLE_TEST)
+  cmessage( STATUS "Unit tests will not be used")
 endif()

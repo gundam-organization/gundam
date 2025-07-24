@@ -1,7 +1,8 @@
 # Applications
 
-set( APPLICATION_LIST
-    # GUNDAM apps
+set(
+    APPLICATION_LIST
+    # GUNDAM C++ apps
     gundamFitter
     gundamFitReader
     gundamCalcXsec
@@ -11,7 +12,6 @@ set( APPLICATION_LIST
     gundamConfigCompare
     gundamPlotExtractor
     gundamConfigUnfolder
-        gundamSystematicsThrower
 )
 
 
@@ -81,7 +81,6 @@ target_link_libraries( gundamFitPlot GundamUtils )
 target_link_libraries( gundamConfigUnfolder GundamUtils )
 target_link_libraries( gundamConfigCompare GundamUtils )
 target_link_libraries( gundamPlotExtractor GundamUtils )
-target_link_libraries( gundamSystematicsThrower GundamPropagator GundamFitter GundamUtils )
 
 if( WITH_GUNDAM_ROOT_APP )
 #target_sources( gundamRoot PRIVATE G__GundamRootDict.cxx )

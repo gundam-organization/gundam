@@ -27,11 +27,13 @@ target_link_libraries(
     SimpleMcmc_Dict
 )
 
+set(CMAKE_CXX_FLAGS_DICT "-Wno-nonportable-include-path")
 ROOT_GENERATE_DICTIONARY(
   SimpleMcmc_Dict
   ${CMAKE_CURRENT_SOURCE_DIR}/Minimizer/include/SimpleMcmc.h
   MODULE ${LIB_NAME}
   LINKDEF ${CMAKE_CURRENT_SOURCE_DIR}/Minimizer/src/SimpleMcmc_LinkDef.h
+  OPTIONS "${CMAKE_CXX_FLAGS_DICT}"
 )
 
 install(TARGETS ${LIB_NAME} DESTINATION lib)

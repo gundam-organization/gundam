@@ -7,6 +7,8 @@
 #   Negative_C : Normalization for events where the C truth variable is <=0
 #
 
+minGundamVersion: 1.9.0
+
 fit: true                    # can be disabled with -d
 scanParameters: false        # can be triggered with --scan
 generateOneSigmaPlots: false # can be enabled with --one-sigma
@@ -20,6 +22,8 @@ fitterEngineConfig:
 
   propagatorConfig:
     throwAsimovFitParameters: false
+    showNbEventParameterBreakdown: true
+    showNbEventPerSampleParameterBreakdown: true
 
     dataSetList:
       - name: "TestSample"

@@ -66,23 +66,39 @@ public:
   void setValidity(int validity);
 
   // Getters
-  [[nodiscard]] bool isEnabled() const{ return _isEnabled_; }
-  [[nodiscard]] bool isScanEnabled() const{ return _isScanEnabled_; }
-  [[nodiscard]] bool isEnablePca() const{ return _enablePca_; }
-  [[nodiscard]] bool isEnableEigenDecomp() const{ return _enableEigenDecomp_; }
-  [[nodiscard]] bool isEnabledThrowToyParameters() const{ return _enabledThrowToyParameters_; }
-  [[nodiscard]] bool isMaskForToyGeneration() const{ return _maskForToyGeneration_; }
-  [[nodiscard]] int getNbEnabledEigenParameters() const{ return _nbEnabledEigen_; }
-  [[nodiscard]] double getPenaltyChi2Buffer() const{ return _penaltyChi2Buffer_; }
-  [[nodiscard]] size_t getNbParameters() const{ return _parameterList_.size(); }
-  [[nodiscard]] const std::string &getName() const{ return _name_; }
-  [[nodiscard]] const JsonType &getDialSetDefinitions() const{ return _dialSetDefinitions_; }
-  [[nodiscard]] const TMatrixD* getInvertedEigenVectors() const{ return _eigenVectorsInv_.get(); }
-  [[nodiscard]] const TMatrixD* getEigenVectors() const{ return _eigenVectors_.get(); }
-  [[nodiscard]] const TVectorD* getDeltaVectorPtr() const{ return _deltaVectorPtr_.get(); }
-  [[nodiscard]] const std::vector<JsonType>& getCustomParThrow() const{ return _customParThrow_; }
-  [[nodiscard]] const std::shared_ptr<TMatrixDSym> &getPriorCovarianceMatrix() const { return _priorCovarianceMatrix_; }
-  [[nodiscard]] const std::shared_ptr<TMatrixD> &getInverseCovarianceMatrix() const{ return _inverseCovarianceMatrix_; }
+  [[nodiscard]] auto isEnabled() const{ return _isEnabled_; }
+  [[nodiscard]] auto isScanEnabled() const{ return _isScanEnabled_; }
+  [[nodiscard]] auto isEnablePca() const{ return _enablePca_; }
+  [[nodiscard]] auto isEnableEigenDecomp() const{ return _enableEigenDecomp_; }
+  [[nodiscard]] auto isEnabledThrowToyParameters() const{ return _enabledThrowToyParameters_; }
+  [[nodiscard]] auto isSkipVariedEventRates() const{ return _skipVariedEventRates_; }
+  [[nodiscard]] auto isDisableOneSigmaPlots() const{ return _disableOneSigmaPlots_; }
+  [[nodiscard]] auto isMaskForToyGeneration() const{ return _maskForToyGeneration_; }
+  [[nodiscard]] auto getNbEnabledEigenParameters() const{ return _nbEnabledEigen_; }
+  [[nodiscard]] auto getPenaltyChi2Buffer() const{ return _penaltyChi2Buffer_; }
+  [[nodiscard]] auto getNbParameters() const{ return _parameterList_.size(); }
+  [[nodiscard]] auto getInvertedEigenVectors() const{ return _eigenVectorsInv_.get(); }
+  [[nodiscard]] auto getEigenVectors() const{ return _eigenVectors_.get(); }
+  [[nodiscard]] auto getDeltaVectorPtr() const{ return _deltaVectorPtr_.get(); }
+  [[nodiscard]] auto& getName() const{ return _name_; }
+  [[nodiscard]] auto& getDialSetDefinitions() const{ return _dialSetDefinitions_; }
+  [[nodiscard]] auto& getCustomParThrow() const{ return _customParThrow_; }
+  [[nodiscard]] auto& getPriorCovarianceMatrix() const { return _priorCovarianceMatrix_; }
+  [[nodiscard]] auto& getInverseCovarianceMatrix() const{ return _inverseCovarianceMatrix_; }
+
+  /// Get the vector of parameters for this parameter set in the real
+  /// parameter space.  These parameters are not eigendecomposed.  WARNING:
+  /// While the parameters are provided as a vector, elements must not be
+  /// added or removed from the vector.  But, the value of the elements may be
+  /// changed, so `getParameterList().front().setParameterValue(0)' is OK, but
+  /// 'getParameterList().emplace_back(Parameter())' is NOT OK.
+  [[nodiscard]] auto& getParameterList() const{ return _parameterList_; }
+  auto& getParameterList(){ return _parameterList_; }
+
+  /// Get the vector of parameters for this parameter set in the
+  /// eigendecomposed basis.  WARNING: See warning for getParameterList().
+  [[nodiscard]] auto& getEigenParameterList() const{ return _eigenParameterList_; }
+  auto& getEigenParameterList(){ return _eigenParameterList_; }
 
   /// True if all of the enabled parameters have valid values.
   [[nodiscard]] bool isValid() const;
@@ -91,20 +107,6 @@ public:
   /// parameter.
   [[nodiscard]] bool isValidParameterValue(const Parameter& p, double v) const;
 
-  /// Get the vector of parameters for this parameter set in the real
-  /// parameter space.  These parameters are not eigendecomposed.  WARNING:
-  /// While the parameters are provided as a vector, elements must not be
-  /// added or removed from the vector.  But, the value of the elements may be
-  /// changed, so `getParameterList().front().setParameterValue(0)' is OK, but
-  /// 'getParameterList().emplace_back(Parameter())' is NOT OK.
-  [[nodiscard]] const std::vector<Parameter> &getParameterList() const{ return _parameterList_; }
-  [[nodiscard]] std::vector<Parameter> &getParameterList(){ return _parameterList_; }
-
-  /// Get the vector of parameters for this parameter set in the
-  /// eigendecomposed basis.  WARNING: See warning for getParameterList().
-  [[nodiscard]] const std::vector<Parameter> &getEigenParameterList() const{ return _eigenParameterList_; }
-  [[nodiscard]] std::vector<Parameter> &getEigenParameterList(){ return _eigenParameterList_; }
-
   /// Get the vector of parameters for this parameter set that is applicable
   /// for the current stage of the fit.  This will either be the
   /// eigendecomposed parameters, or the parameters in the non-decomposed
@@ -112,6 +114,7 @@ public:
   [[nodiscard]] const std::vector<Parameter>& getEffectiveParameterList() const;
   [[nodiscard]] std::vector<Parameter>& getEffectiveParameterList();
 
+  bool hasOutOfBoundsParameters() const;
   void updateDeltaVector() const;
 
   /// Set all the parameters to their prior values.
@@ -166,7 +169,7 @@ public:
   /// not fix.  This is true if the parameter should be in the stripped
   /// covariance matrix.
   static bool isValidCorrelatedParameter(const Parameter& par_);
-  
+
   // print
   void printConfiguration() const;
 
@@ -189,6 +192,8 @@ private:
   bool _printParametersSummary_{false};
   bool _releaseFixedParametersOnHesse_{false};
   bool _devUseParLimitsOnEigen_{false};
+  bool _skipVariedEventRates_{false};
+  bool _disableOneSigmaPlots_{false};
   int _nbParameterDefinition_{-1};
   int _maxNbEigenParameters_{-1};
   double _nominalStepSize_{std::nan("unset")};
@@ -202,8 +207,8 @@ private:
   std::string _parameterLowerBoundsTVectorD_{};
   std::string _parameterUpperBoundsTVectorD_{};
   std::string _throwEnabledListPath_{};
-  JsonType _parameterDefinitionConfig_{};
-  JsonType _dialSetDefinitions_{};
+  ConfigReader _parameterDefinitionConfig_{};
+  ConfigReader _dialSetDefinitions_{};
 
   GenericToolbox::Range _globalParRange_{};
   GenericToolbox::Range _eigenParRange_{};
@@ -213,16 +218,15 @@ private:
 
   double _penaltyChi2Buffer_{std::nan("unset")};
 
-  std::vector<JsonType> _enableOnlyParameters_{};
-  std::vector<JsonType> _disableParameters_{};
-  std::vector<JsonType> _customParThrow_{};
+  std::vector<ConfigReader> _enableOnlyParameters_{};
+  std::vector<ConfigReader> _disableParameters_{};
+  std::vector<ConfigReader> _customParThrow_{};
 
   // Eigen objects
   int _nbEnabledEigen_{0};
   bool _enablePca_{false};
   bool _enableEigenDecomp_{false};
   bool _allowEigenDecompWithBounds_{false};
-  bool _useOnlyOneParameterPerEvent_{false};
   std::vector<Parameter> _eigenParameterList_{};
   std::shared_ptr<TMatrixDSymEigen> _eigenDecomp_{nullptr};
 

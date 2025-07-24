@@ -11,22 +11,35 @@
 
 void MinimizerBase::configureImpl(){
 
+  _config_.defineFields({
+    {"monitorRefreshRateInMs"},
+    {"showParametersOnFitMonitor"},
+    {"maxNbParametersPerLineOnMonitor"},
+    {"enablePostFitErrorFit"},
+    {"useNormalizedFitSpace"},
+    {"writeLlhHistory"},
+    {"checkParameterValidity"},
+  });
+
   // nested objects first
   int monitorRefreshRateInMs(5000);
-  GenericToolbox::Json::fillValue(_config_, monitorRefreshRateInMs, "monitorRefreshRateInMs");
+  _config_.fillValue(monitorRefreshRateInMs, "monitorRefreshRateInMs");
   // slow down the refresh rate if in batch mode
   monitorRefreshRateInMs *= ( GenericToolbox::getTerminalWidth() != 0 ? 1 : 10 );
   _monitor_.convergenceMonitor.setMaxRefreshRateInMs( monitorRefreshRateInMs );
 
   // members
-  GenericToolbox::Json::fillValue(_config_, _monitor_.showParameters, "showParametersOnFitMonitor");
-  GenericToolbox::Json::fillValue(_config_, _monitor_.maxNbParametersPerLine, "maxNbParametersPerLineOnMonitor");
-  GenericToolbox::Json::fillValue(_config_, _isEnabledCalcError_, "enablePostFitErrorFit");
-  GenericToolbox::Json::fillValue(_config_, _useNormalizedFitSpace_, "useNormalizedFitSpace");
-  GenericToolbox::Json::fillValue(_config_, _writeLlhHistory_, "writeLlhHistory");
-
+  _config_.fillValue(_monitor_.showParameters, "showParametersOnFitMonitor");
+  _config_.fillValue(_monitor_.maxNbParametersPerLine, "maxNbParametersPerLineOnMonitor");
+  _config_.fillValue(_isEnabledCalcError_, "enablePostFitErrorFit");
+  _config_.fillValue(_useNormalizedFitSpace_, "useNormalizedFitSpace");
+  _config_.fillValue(_writeLlhHistory_, "writeLlhHistory");
+  _config_.fillValue(_checkParameterValidity_, "checkParameterValidity");
 }
 void MinimizerBase::initializeImpl(){
+
+  _config_.printUnusedKeys();
+
   LogWarning << "Initializing MinimizerBase..." << std::endl;
 
   LogThrowIf(_owner_ == nullptr, "FitterEngine owner not set.");
@@ -178,6 +191,7 @@ double MinimizerBase::evalFit( const double* parArray_ ){
       t << "" << GenericToolbox::TablePrinter::NextColumn;
       t << "Propagator" << GenericToolbox::TablePrinter::NextColumn;
 
+      t << "Dial Update" << GenericToolbox::TablePrinter::NextColumn;
 #ifdef GUNDAM_USING_CACHE_MANAGER
       if( Cache::Manager::Get() != nullptr ){
         t << "Cache::Fill" << GenericToolbox::TablePrinter::NextColumn;
@@ -195,6 +209,7 @@ double MinimizerBase::evalFit( const double* parArray_ ){
       t << "Speed" << GenericToolbox::TablePrinter::NextColumn;
       t << _monitor_.iterationCounterClock.evalTickSpeed() << " it/s" << GenericToolbox::TablePrinter::NextColumn;
 
+      t << getModelPropagator().getDialManager().getUpdateTimer() << GenericToolbox::TablePrinter::NextColumn;
 
 #ifdef GUNDAM_USING_CACHE_MANAGER
       if( Cache::Manager::Get() != nullptr ){
@@ -284,9 +299,8 @@ void MinimizerBase::printParameters(){
 
   LogWarning << std::endl << GenericToolbox::addUpDownBars("Summary of the fit parameters:") << std::endl;
   for( const auto& parSet : getModelPropagator().getParametersManager().getParameterSetsList() ){
-
     GenericToolbox::TablePrinter t;
-    t.setColTitles({ {"Title"}, {"Starting"}, {"Prior"}, {"StdDev"}, {"Min"}, {"Max"}, {"Status"} });
+    t.setColTitles({ {"Title"}, {"Starting"}, {"Prior"}, {"StdDev"}, {"Limits"}, {"Status"} });
 
     auto& parList = parSet.getEffectiveParameterList();
     LogWarning << parSet.getName() << ": " << parList.size() << " parameters" << std::endl;
@@ -312,8 +326,7 @@ void MinimizerBase::printParameters(){
                          std::to_string( par.getParameterValue() ),
                          std::to_string( par.getPriorValue() ),
                          std::to_string( par.getStdDevValue() ),
-                         std::to_string( par.getMinValue() ),
-                         std::to_string( par.getMaxValue() ),
+                         par.getParameterLimits().toString(),
                          statusStr
                      }, colorStr);
     }

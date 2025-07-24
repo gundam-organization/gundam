@@ -1,7 +1,7 @@
 # CMake options
 
 message("")
-cmessage( WARNING "Setting up options...")
+cmessage( STATUS "Setting up options...")
 
 
 # general options
@@ -13,6 +13,7 @@ option( ENABLE_DEV_MODE "Enable specific dev related printouts." OFF  )
 # extensions
 option( WITH_DOXYGEN "Build documentation with doxygen." OFF )
 option( WITH_GUNDAM_ROOT_APP "Build app gundamRoot." ON )
+option( WITH_GUNDAM_SANDBOX_APP "Build app gundamRoot." OFF )
 option( WITH_CACHE_MANAGER "Enable compiling of the cache manager (required for GPU computing)." ON )
 option( WITH_CUDA_LIB "Enable CUDA language check (Cache::Manager requires a GPU if CUDA is found)." OFF )
 option( WITH_MINUIT2_MISSING "Allow MINUIT2 to be missing" OFF )
@@ -40,9 +41,9 @@ if( NOT DEFINED CMAKE_BUILD_TYPE OR CMAKE_BUILD_TYPE STREQUAL "")
   set( CMAKE_BUILD_TYPE "RELEASE" )
   cmessage( STATUS "Build type not set. Using default build type: RELEASE." )
 elseif( CMAKE_BUILD_TYPE STREQUAL "RELEASE" )
-  cmessage( STATUS "Build type manually specified to: RELEASE." )
+  cmessage( WARNING "Build type manually specified to: RELEASE." )
 elseif( CMAKE_BUILD_TYPE STREQUAL "DEBUG" )
-  cmessage( STATUS "Build type manually specified to: DEBUG." )
+  cmessage( WARNING "Build type manually specified to: DEBUG." )
   add_definitions( -D DEBUG_BUILD )
 else()
   cmessage( WARNING "Build type not recognised: ${CMAKE_BUILD_TYPE}. Using default build type: RELEASE." )
@@ -52,7 +53,7 @@ endif()
 cmessage( STATUS "Using build type: ${CMAKE_BUILD_TYPE}" )
 
 if( ENABLE_BATCH_MODE )
-  cmessage( STATUS "-D ENABLE_BATCH_MODE=ON: defining appropriate compile options..." )
+  cmessage( WARNING "-D ENABLE_BATCH_MODE=ON: defining appropriate compile options..." )
   set( ENABLE_COLOR_OUTPUT NO )
   set( ENABLE_TTY_CHECK NO )
   add_definitions( -D GUNDAM_BATCH )
@@ -66,12 +67,14 @@ if( WITH_CACHE_MANAGER )
   # or normal running).  These are whole code validations and are
   # extremely slow.
   if( CACHE_MANAGER_SLOW_VALIDATION )
-    cmessage( STATUS "  Using slow validation for debugging" )
-    cmessage( STATUS "  Using slow validation so runs will be very slow" )
+    cmessage( WARNING "  Using slow validation for debugging" )
+    cmessage( WARNING "  Using slow validation so runs will be very slow" )
     add_definitions( -D CACHE_MANAGER_SLOW_VALIDATION )
   endif( CACHE_MANAGER_SLOW_VALIDATION )
 
-  cmessage( STATUS "Cache manager is enabled. GPU support can be enabled using WITH_CUDA_LIB option." )
+  if( NOT WITH_CUDA_LIB )
+    cmessage( WARNING "Cache manager on without GPU support.  Use -D WITH_CUDA_LIB=ON to enable." )
+  endif( NOT WITH_CUDA_LIB )
 else()
   cmessage( STATUS "Cache manager is disabled. Use -D WITH_CACHE_MANAGER=ON if needed." )
 endif()

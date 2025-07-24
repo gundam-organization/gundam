@@ -12,10 +12,10 @@
 #include <iostream>
 
 namespace Cache {
-  class Weights;
-  namespace Weight {
-    class Base;
-  }
+    class Weights;
+    namespace Weight {
+        class Base;
+    }
 };
 
 /// A class to calculate and cache a bunch of events weights.  This is where
@@ -23,105 +23,102 @@ namespace Cache {
 /// manager when the GPU needs to be fired up.
 class Cache::Weights {
 public:
-  typedef hemi::Array<double> Results;
+    typedef hemi::Array<double> Results;
 
 private:
-  /// The (approximate) amount of memory required on the GPU.
-  std::size_t fTotalBytes;
+    /// The (approximate) amount of memory required on the GPU.
+    std::size_t fTotalBytes;
 
-  /// An array of the calculated results that will be copied out of the
-  /// class.  This is copied from the GPU to the CPU once per iteration.
-  std::size_t    fResultCount;
-  std::unique_ptr<Results> fResults;
+    /// An array of the calculated results that will be copied out of the
+    /// class.  This is copied from the GPU to the CPU once per iteration.
+    std::size_t    fResultCount;
+    std::unique_ptr<Results> fResults;
 
-  // Cache of whether the result values in memory are valid.
-  bool fResultsValid;
+    /// Cache of whether the result values in memory are valid.
+    bool fResultsValid;
 
-  /// Flag that the kernels have been started.
-  bool fKernelApplied;
+    /// Flag that the kernels have been started.
+    bool fKernelApplied;
 
-  /// An array of the initial value for each result.  It's copied from the
-  /// CPU to the GPU once at the beginning.
-  std::unique_ptr<hemi::Array<double>> fInitialValues;
+    /// An array of the initial value for each result.  It's copied from the
+    /// CPU to the GPU once at the beginning.
+    std::unique_ptr<hemi::Array<double>> fInitialValues;
 
-  /// An array of pointers to objects that will calculate the weights
-  /// (e.g. WeightNormalization and WeightUniformSpline).  The objects are
-  /// NOT owned by this array (they are owned by a unique_ptr's elsewyr in
-  /// the code), but pointers are needed for efficiency.  This is an array
-  /// because vectors cause trouble with some versions of the nvcc cuda
-  /// compiler.
-  int fWeightCalculators{0};
-  std::array<Cache::Weight::Base*,16> fWeightCalculator;
+    /// An array of pointers to objects that will calculate the weights
+    /// (e.g. WeightNormalization and WeightUniformSpline).  The objects are
+    /// NOT owned by this array (they are owned by a unique_ptr's elsewyr in
+    /// the code), but pointers are needed for efficiency.  This is an array
+    /// because vectors cause trouble with some versions of the nvcc cuda
+    /// compiler, and must be large enough to hold all of the defined
+    /// calculators.
+    int fWeightCalculators{0};
+    std::array<Cache::Weight::Base*,16> fWeightCalculator;
 
 public:
-  // Construct the class.  This should allocate all the memory on the host
-  // and on the GPU.  The "results" are the total number of results to be
-  // calculated (one result per event, often >1E+6).  The "parameters" are
-  // the number of input parameters that are used (often ~1000).  The norms
-  // are the total number of normalization parameters (typically a few per
-  // event) used to calculate the results.  The splines are the total number
-  // of spline parameters (with uniform not spacing) used to calculate the
-  // results (typically a few per event).  The knots are the total number of
-  // knots in all of the uniform splines (e.g. For 1000 splines with 7
-  // knots for each spline, knots is 7000).
-  Weights(std::size_t results);
+    /// Construct the class.  This should allocate all the memory on the host
+    /// and on the GPU.  The "results" are the total number of results to be
+    /// calculated (one result per event, often >1E+6).  The "parameters" are
+    /// the number of input parameters that are used (often ~1000).  The norms
+    /// are the total number of normalization parameters (typically a few per
+    /// event) used to calculate the results.  The splines are the total number
+    /// of spline parameters (with uniform not spacing) used to calculate the
+    /// results (typically a few per event).  The knots are the total number of
+    /// knots in all of the uniform splines (e.g. For 1000 splines with 7
+    /// knots for each spline, knots is 7000).
+    Weights(std::size_t results);
 
-  // Deconstruct the class.  This should deallocate all the memory
-  // everyplace.
-  virtual ~Weights() = default;
+    /// Deconstruct the class.  This should deallocate all the memory
+    /// everyplace.
+    virtual ~Weights() = default;
 
-  /// Reinitialize the cache.  This puts it into a state to be refilled, but
-  /// does not deallocate any memory.
-  virtual void Reset();
+    /// Reinitialize the cache.  This puts it into a state to be refilled, but
+    /// does not deallocate any memory.
+    virtual void Reset();
 
-  Results& GetWeights() {return *fResults;}
+    Results& GetWeights() {return *fResults;}
 
-  /// Return the approximate allocated memory (e.g. on the GPU).
-  std::size_t GetResidentMemory() const {return fTotalBytes;}
+    /// Return the approximate allocated memory (e.g. on the GPU).
+    std::size_t GetResidentMemory() const {return fTotalBytes;}
 
-  /// Return the number of results that are used, and will be returned.
-  std::size_t GetResultCount() const {return fResultCount;}
+    /// Return the number of results that are used, and will be returned.
+    std::size_t GetResultCount() const {return fResultCount;}
 
-  int AddWeightCalculator(Cache::Weight::Base* v) {
-    int index = fWeightCalculators++;
-    if (fWeightCalculator.size() < fWeightCalculators) {
-      std::cout << "CacheWeights: Overflow --"
-                << " Increase size of fWeightCalculator std::array. "
-                << " Current Size: " << fWeightCalculator.size()
-                << std::endl;
-    }
-    fWeightCalculator.at(index) = v;
-    return index;
-  }
+    /// Add a new Weight<Blah> class to the weight calculation.  The total
+    /// number is limited by the size of the fWeightCalculator array, and this
+    /// will core dump if that array is not large enough (with an error
+    /// message).  That would need to be fixed by increasing the size of the
+    /// fWeightCalculator array.
+    int AddWeightCalculator(Cache::Weight::Base* v);
 
-  /// Mark that the results on the CPU are no longer valid. This
-  /// is used by the Cache::Manager::Fill method to note that the input
-  /// parameters have changed.  The results will become valid after the
-  /// kernel finishes (asynchronously).
-  virtual void Invalidate() {fKernelApplied = false; fResultsValid = false;}
+    /// Mark that the results on the CPU are no longer valid. This
+    /// is used by the Cache::Manager::Fill method to note that the input
+    /// parameters have changed.  The results will become valid after the
+    /// kernel finishes (asynchronously).
+    virtual void Invalidate() {fKernelApplied = false; fResultsValid = false;}
 
-  /// Calculate the results and save them for later use.  This copies the
-  /// results from the GPU to the CPU.
-  virtual bool Apply();
+    /// Calculate the results and save them for later use.  This copies the
+    /// results from the GPU to the CPU.
+    virtual bool Apply();
 
-  // const getters
-  [[nodiscard]] bool IsResultValid() const{ return fResultsValid; }
+    /// Return true if all of the results are valid.  The results are 
+    /// marked invalid at the start of a calculation.
+    [[nodiscard]] bool IsResultValid() const{ return fResultsValid; }
 
-  /// Get the result for index i from host memory.  This will trigger copying
-  /// the results from the device if that is necessary.
-  double GetResult(int i);
-  double GetResultFast(int i);  // No checks
-  double* GetResultPointer(int i);
-  bool* GetResultValidPointer();
+    /// Get the result for index i from host memory.  This will trigger copying
+    /// the results from the device if that is necessary.
+    double GetResult(int i);
+    double GetResultFast(int i);  // No checks
+    double* GetResultPointer(int i);
+    bool* GetResultValidPointer();
 
-  /// Set the result for index i in the host memory.  The results are NEVER
-  /// copied to the device, so this will be overwritten as soon as the
-  /// results are updated.  This is here for debugging.
-  void SetResult(int i, double v);
+    /// Set the result for index i in the host memory.  The results are NEVER
+    /// copied to the device, so this will be overwritten as soon as the
+    /// results are updated.  This is here for debugging.
+    void SetResult(int i, double v);
 
-  /// Get/Set the initial value for result i.
-  double  GetInitialValue(int i);
-  void SetInitialValue(int i, double v);
+    /// Get/Set the initial value for result i.
+    double  GetInitialValue(int i);
+    void SetInitialValue(int i, double v);
 };
 
 // An MIT Style License
