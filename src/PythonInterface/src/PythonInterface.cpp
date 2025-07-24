@@ -82,6 +82,8 @@ PYBIND11_MODULE(PyGundam, module) {
   pybind11::class_<ParametersManager>(module, "ParametersManager")
   .def(pybind11::init())
   .def("throwParameters", &ParametersManager::throwParameters)
+  .def("exportParameterInjectorConfig", &ParametersManager::exportParameterInjectorConfig)
+  .def("injectParameterValues", &ParametersManager::injectParameterValues)
   ;
 
   pybind11::class_<Propagator>(module, "Propagator")
