@@ -72,6 +72,13 @@ PYBIND11_MODULE(PyGundam, module) {
        pybind11::arg("defaultValue") = "")
   ;
 
+  pybind11::class_<GundamApp>(module, "GundamApp")
+  .def(pybind11::init<std::string>())
+  .def("openOutputFile", &GundamApp::openOutputFile)
+  .def("writeAppInfo", &GundamApp::writeAppInfo)
+  // .def("getOutfilePtr", &GundamApp::getOutfilePtr) // CAN'T EXPOSE ROOT PTRs
+  ;
+
   pybind11::class_<ParametersManager>(module, "ParametersManager")
   .def(pybind11::init())
   .def("throwParameters", &ParametersManager::throwParameters)
@@ -84,6 +91,8 @@ PYBIND11_MODULE(PyGundam, module) {
 
   pybind11::class_<LikelihoodInterface>(module, "LikelihoodInterface")
   .def(pybind11::init())
+  .def("getSummary", &LikelihoodInterface::getSummary, pybind11::call_guard<pybind11::gil_scoped_release>())
+  .def("propagateAndEvalLikelihood", &LikelihoodInterface::propagateAndEvalLikelihood, pybind11::call_guard<pybind11::gil_scoped_release>())
   .def("evalLikelihood", &LikelihoodInterface::evalLikelihood, pybind11::call_guard<pybind11::gil_scoped_release>())
   .def("setForceAsimovData", &LikelihoodInterface::setForceAsimovData, pybind11::call_guard<pybind11::gil_scoped_release>())
   .def("throwToyParameters", &LikelihoodInterface::throwToyParameters, pybind11::call_guard<pybind11::gil_scoped_release>())
@@ -100,11 +109,13 @@ PYBIND11_MODULE(PyGundam, module) {
 
   pybind11::class_<FitterEngine>(module, "FitterEngine")
   .def(pybind11::init())
-  .def("setSaveDir", pybind11::overload_cast<TDirectory*>(&FitterEngine::setSaveDir))
+  // .def("setSaveDir", pybind11::overload_cast<TDirectory*>(&FitterEngine::setSaveDir)) // CAN'T EXPOSE ROOT PTRs
+  .def("setSaveDir", pybind11::overload_cast<GundamApp&, const std::string&>(&FitterEngine::setSaveDir))
   .def("setConfig", pybind11::overload_cast<const ConfigReader&>(&FitterEngine::setConfig))
   .def("configure", pybind11::overload_cast<const ConfigReader&>(&FitterEngine::configure))
   .def("configure", pybind11::overload_cast<>(&FitterEngine::configure))
   .def("initialize", &FitterEngine::initialize)
+  .def("fit", &FitterEngine::fit)
   .def("getMinimizer", pybind11::overload_cast<>(&FitterEngine::getMinimizer), pybind11::return_value_policy::reference)
   .def("getLikelihoodInterface", pybind11::overload_cast<>(&FitterEngine::getLikelihoodInterface), pybind11::return_value_policy::reference)
   ;
