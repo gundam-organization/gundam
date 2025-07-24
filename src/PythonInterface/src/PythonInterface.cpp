@@ -18,7 +18,7 @@
 #include <string>
 
 
-PYBIND11_MODULE(PyGundam, module) {
+PYBIND11_MODULE(GUNDAM, module) {
   module.doc() = "GUNDAM engine interface for python";
 
   // GundamGlobals namespace
@@ -30,6 +30,7 @@ PYBIND11_MODULE(PyGundam, module) {
   pybind11::class_<JsonType>(module, "JsonType")
   .def(pybind11::init())
   ;
+
 
   // basic function to get sub-parts of Json
   auto gtModule = module.def_submodule("GenericToolbox");
