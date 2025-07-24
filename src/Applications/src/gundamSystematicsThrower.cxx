@@ -215,7 +215,7 @@ int main(int argc, char** argv){
 
     fitter.getLikelihoodInterface();
 
-    // We are only interested in our MC. Data has already been used to get the post-fit error/values
+    // We load the Asimov (prior) histograms. Then the histograms will be filled manually with the histos in the fitter output file
     fitter.getLikelihoodInterface().setForceAsimovData( true );
 
     // Disabling eigen decomposed parameters
@@ -223,6 +223,38 @@ int main(int argc, char** argv){
 
     // Load everything
     fitter.getLikelihoodInterface().initialize();
+
+    // At this point the "data" histograms are just built with Asimov priors.
+    // We have to replace the bin contents based on the actual data from teh fitter output file.
+    // The easiest way is to grab the histograms from the fitter output file for each sample, and
+    // overwrite the histograms in the propagator.
+    LogInfo << "Loading DATA histograms from fitter output file..." << std::endl;
+    // Loop through the samples
+    for( auto& sample : fitter.getLikelihoodInterface().getModelPropagator().getSampleSet().getSampleList() ){
+
+        std::string samplePath = "FitterEngine/preFit/data/" + sample.getName();
+        LogInfo << "Loading data histogram for sample: " << sample.getName() << std::endl;
+        Histogram hist = sample.getHistogram();
+        // Load the histogram from the fitter output file
+        RootUtils::ObjectReader::readObject<TH1D>(
+            fitterFile.get(), samplePath,
+            [&](TH1D* hist_) {
+                LogInfo << "Loaded histogram: " << hist_->GetName() << std::endl;
+                // Copy the histogram content to the sample histogram
+                // check number of bins
+                LogThrowIf(hist_->GetNbinsX() != hist.getBinContentList().size(),
+                           "Histogram " + std::string(hist_->GetName()) +
+                           " has different number of bins than the sample histogram.");
+                LogIndent;
+                for (int iBin = 0; iBin < hist.getBinContentList().size(); iBin++) {
+                  LogInfo << "Bin " << iBin << " from " <<hist.getBinContentList().at(iBin).sumWeights << " to " << hist_->GetBinContent(1 + iBin) << std::endl;
+                  hist.getBinContentList().at(iBin).sumWeights = hist_->GetBinContent(1 + iBin);
+                  // bin error = ?
+                }
+                LogUnIndent;
+            }
+        );
+    }
 
     Propagator& propagator = fitter.getLikelihoodInterface().getModelPropagator();
 
@@ -237,6 +269,15 @@ int main(int argc, char** argv){
     std::vector<double> priorSigmas;
     int debug_enabled_params{0};
     int debug_cov_rows{0};
+
+    fitter.getLikelihoodInterface().getModelPropagator().propagateParameters();
+    fitter.getLikelihoodInterface().evalLikelihood();
+    double priorLLH = fitter.getLikelihoodInterface().getBuffer().totalLikelihood;
+    double prior_statLH = fitter.getLikelihoodInterface().evalStatLikelihood();
+    double prior_systLH = fitter.getLikelihoodInterface().evalPenaltyLikelihood();;
+    LogInfo<<" LH at prior:\nLH_stat="<<prior_statLH
+           <<"\nLH_syst="<<prior_systLH
+           <<"\nTotal LH="<<priorLLH<<std::endl;
 
     // Load post-fit parameters as "prior" so we can reset the weight to this point when throwing toys
     // also save the values in a vector so we can use them to compute the LLH at the best fit point
@@ -268,7 +309,9 @@ int main(int argc, char** argv){
 
     // Creating output file
     std::string outFilePath{};
-    if( clParser.isOptionTriggered("outputFile") ){ outFilePath = clParser.getOptionVal<std::string>("outputFile"); }
+    if( clParser.isOptionTriggered("outputFile") ){
+      outFilePath = clParser.getOptionVal<std::string>("outputFile");
+    }
     else {
         // appendixDict["optionName"] = "Appendix"
         // this list insure all appendices will appear in the same order
@@ -316,9 +359,6 @@ int main(int argc, char** argv){
 
 
     // also save the value of the LLH at the best fit point:
-    fitter.getLikelihoodInterface().getModelPropagator().propagateParameters();
-    fitter.getLikelihoodInterface().evalLikelihood();
-
     for( auto& parSet : propagator.getParametersManager().getParameterSetsList() ){
       if( not parSet.isEnabled() ){ continue; }
       for( auto& par : parSet.getParameterList() ){
@@ -329,6 +369,8 @@ int main(int argc, char** argv){
                 << " | best fit value: " << par.getPriorValue() << std::endl;
       }
     }
+    fitter.getLikelihoodInterface().getModelPropagator().propagateParameters();
+    fitter.getLikelihoodInterface().evalLikelihood();
     double bestFitLLH = fitter.getLikelihoodInterface().getBuffer().totalLikelihood;
     double bestFit_statLH = fitter.getLikelihoodInterface().evalStatLikelihood();
     double bestFit_systLH = fitter.getLikelihoodInterface().evalPenaltyLikelihood();;
@@ -600,7 +642,7 @@ int main(int argc, char** argv){
         LH_systWrtBestFit = LH_syst - bestFit_systLH;
         // LogInfo<<"Done.  ";
         LogInfo << iToy << "\t: LH_stat:  " << LH_stat     << "  LH_syst:  " << LH_syst           << "  LH tot:  " << LLH << std::endl;
-        LogInfo << "BF\t: LH_stat: (" << LH_statWrtBestFit << ") LH_syst: (" << LH_systWrtBestFit << ") LH tot: (" << LLHwrtBestFit << ")" << std::endl;
+        LogInfo << "wrtBF\t: LH_stat: (" << LH_statWrtBestFit << ") LH_syst: (" << LH_systWrtBestFit << ") LH tot: (" << LLHwrtBestFit << ")" << std::endl;
 
         // LogInfo<<"LLH: "<<LLH<<std::endl;
         // make the LH a probability distribution (but still work with the log)
@@ -661,11 +703,7 @@ int main(int argc, char** argv){
             weightSquareSum /= 1.e50;
             weightSquareSumE50++;
         }
-        // Write the ttrees
-        LogInfo << parameters->size() << std::endl;
-        LogInfo << margThis->size() << std::endl;
-        LogInfo << prior->size() << std::endl;
-        LogInfo << weightsChiSquare->size() << std::endl;
+        // Fill the TTrees
         margThrowTree->Fill();
         ThrowsPThetaFormat->Fill();
 
