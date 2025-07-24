@@ -134,8 +134,10 @@ int main(int argc, char** argv){
 
     // Print out the config
     LogInfo << "Fitter config loaded: " << std::endl;
+    fitterConfig.defineFields({
+                                    {"fitterEngineConfig"},
+                            });
     LogInfo << fitterConfig.toString() << std::endl;
-
 
 
     ConfigUtils::ConfigBuilder cHandler{ fitterConfig.getConfig() };
@@ -221,21 +223,58 @@ int main(int argc, char** argv){
     // Initialize the fitterEngine
     LogInfo << "FitterEngine setup..." << std::endl;
     FitterEngine fitter{nullptr};
-    fitterConfig.defineFields({
-                                    {"fitterEngineConfig"},
-                            });
-
-
     fitter.configure( fitterConfig.fetchValue<ConfigReader>( "fitterEngineConfig" ) );
-
-    fitter.getLikelihoodInterface();
 
     // We load the Asimov (prior) histograms. Then the histograms will be filled manually with the histos in the fitter output file
     fitter.getLikelihoodInterface().setForceAsimovData( true );
 
+    LogInfo<< "setForceAsimovData - done." << std::endl;
+
     // Disabling eigen decomposed parameters
     fitter.getLikelihoodInterface().getModelPropagator().setEnableEigenToOrigInPropagate( false );
 
+
+    // Sample binning using parameterSetName
+    for( auto& sample : fitter.getLikelihoodInterface().getModelPropagator().getSampleSet().getSampleList() ){
+
+      if( clParser.isOptionTriggered("usePreFit") ){
+        sample.setName( sample.getName() + " (pre-fit)" );
+      }
+
+      // binning already set?
+      if( not sample.getBinningFilePath().empty() ){ continue; }
+
+      LogScopeIndent;
+      LogInfo << sample.getName() << ": binning not set, looking for parSetBinning..." << std::endl;
+      auto associatedParSet = sample.getConfig().fetchValue("parSetBinning", std::string());
+
+      LogThrowIf(associatedParSet.empty(), "Could not find parSetBinning.");
+
+      // Looking for parSet
+      auto foundDialCollection = std::find_if(
+              fitter.getLikelihoodInterface().getModelPropagator().getDialCollectionList().begin(),
+              fitter.getLikelihoodInterface().getModelPropagator().getDialCollectionList().end(),
+              [&](const DialCollection& dialCollection_){
+                  auto* parSetPtr{dialCollection_.getSupervisedParameterSet()};
+                  if( parSetPtr == nullptr ){ return false; }
+                  return ( parSetPtr->getName() == associatedParSet );
+              });
+      LogThrowIf(
+              foundDialCollection == fitter.getLikelihoodInterface().getModelPropagator().getDialCollectionList().end(),
+              "Could not find " << associatedParSet << " among fit dial collections: "
+                                << GenericToolbox::toString(fitter.getLikelihoodInterface().getModelPropagator().getDialCollectionList(),
+                                                            [](const DialCollection& dialCollection_){
+                                                                return dialCollection_.getTitle();
+                                                            }
+                                ));
+
+      LogThrowIf(foundDialCollection->getDialBinSet().getBinList().empty(), "Could not find binning");
+      JsonType json(foundDialCollection->getDialBinSet().getFilePath());
+      sample.setBinningFilePath( ConfigReader(json) );
+
+    }
+
+    LogInfo<< "Initializing the fitter ..." << std::endl;
     // Load everything
     fitter.getLikelihoodInterface().initialize();
 
