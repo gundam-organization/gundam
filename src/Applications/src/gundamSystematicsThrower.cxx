@@ -151,6 +151,7 @@ int main(int argc, char** argv){
 //        margConfig = margConfig[0];
 //    }
     cHandler.override( margConfig.getConfig() );
+    fitterConfig.setConfig(cHandler.getConfig());
     LogInfo << "Override config done." << std::endl;
 
 
