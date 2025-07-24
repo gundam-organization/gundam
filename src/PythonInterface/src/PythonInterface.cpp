@@ -10,6 +10,10 @@
 #include "Logger.h"
 
 #include <pybind11/pybind11.h>
+#include <pybind11/stl.h>
+#include <pybind11/complex.h>
+#include <pybind11/functional.h>
+#include <pybind11/chrono.h>
 
 #include <string>
 
@@ -50,6 +54,22 @@ PYBIND11_MODULE(PyGundam, module) {
   .def("override", pybind11::overload_cast<const JsonType&>(&ConfigUtils::ConfigBuilder::override))
   .def("toString", &ConfigUtils::ConfigBuilder::toString)
   .def("exportToJsonFile", &ConfigUtils::ConfigBuilder::exportToJsonFile)
+  ;
+
+  auto configReaderClass = pybind11::class_<ConfigUtils::ConfigReader>(configUtilsModule, "ConfigReader")
+  .def(pybind11::init())
+  .def(pybind11::init<const JsonType&>())
+  .def("defineField", &ConfigUtils::ConfigReader::defineField)
+  .def("fetchValueConfigReader", static_cast<ConfigUtils::ConfigReader (ConfigUtils::ConfigReader::*)(const std::string&) const>(
+    &ConfigUtils::ConfigReader::fetchValue<ConfigUtils::ConfigReader>))
+  ;
+
+  pybind11::class_<ConfigUtils::ConfigReader::FieldDefinition>(configReaderClass, "FieldDefinition")
+  .def(pybind11::init())
+  .def(pybind11::init<std::string, std::vector<std::string>, std::string>(),
+       pybind11::arg("name"),
+       pybind11::arg("path") = std::vector<std::string>{},
+       pybind11::arg("defaultValue") = "")
   ;
 
   pybind11::class_<ParametersManager>(module, "ParametersManager")
