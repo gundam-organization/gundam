@@ -2,6 +2,13 @@
 
 ## Building
 
+You need to have `pybind11` installed on your computer. On macOS, you
+can install it via:
+
+```bash
+brew install pybind11 # make sure you're using the right `python`
+```
+
 With the CMake command, you need to enable the compilation of the
 python extension:
 
@@ -10,12 +17,13 @@ cd $BUILD_DIR/gundam
 cmake -D WITH_PYTHON_INTERFACE=ON ./
 ```
 
-You need to have `pybind11` installed on your computer. On macOS, you
-can install it via:
+On certain computing clusters, CMake won't be able to find the `pybind11` library. You can do so with the following
+option:
 
-```bash
-brew install pybind11 # make sure you're using the right `python`
 ```
+-D WITH_PYTHON_INTERFACE=ON -D pybind11_DIR=/path/to/pybind11/cmake/files
+```
+
 
 ## Setup
 
