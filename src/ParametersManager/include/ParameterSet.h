@@ -173,6 +173,8 @@ public:
   // print
   void printConfiguration() const;
 
+  void setCurrentValuesAsPrior();
+
 protected:
   void readParameterDefinitionFile();
   void defineParameters();

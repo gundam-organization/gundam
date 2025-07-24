@@ -87,6 +87,7 @@ public:
   auto& getSamplePairList(){ return _samplePairList_; }
 
   // mutable core
+  void setCurrentParameterValuesAsPrior();
   void propagateAndEvalLikelihood();
 
   // core
