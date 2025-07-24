@@ -1,4 +1,4 @@
-# PyGundam - A python interface for GUNDAM
+# A python interface for GUNDAM
 
 ## Building
 
