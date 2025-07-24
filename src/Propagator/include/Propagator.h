@@ -80,6 +80,7 @@ public:
 
   // misc
   void copyEventsFrom(const Propagator& src_);
+  void copyHistBinContentFrom(const Propagator& src_);
   void printConfiguration() const;
   void printBreakdowns() const;
   void writeEventRates(const GenericToolbox::TFilePath& saveDir_) const;

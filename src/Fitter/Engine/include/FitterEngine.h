@@ -9,6 +9,7 @@
 #include "Propagator.h"
 #include "LikelihoodInterface.h"
 #include "MinimizerBase.h"
+#include "GundamApp.h"
 
 
 #include "GenericToolbox.Utils.h"
@@ -49,6 +50,7 @@ public:
 
   // Setters
   void setSaveDir(TDirectory *saveDir){ _saveDir_ = saveDir; }
+  void setSaveDir(GundamApp& app_, const std::string& subFolder_){ _saveDir_ = GenericToolbox::mkdirTFile(app_.getOutfilePtr(), subFolder_); }
   void setIsDryRun(bool isDryRun_){ _isDryRun_ = isDryRun_; }
   void setEnablePca(bool enablePca_){ _enablePca_ = enablePca_; }
   void setEnablePreFitScan(bool enablePreFitScan){ _enablePreFitScan_ = enablePreFitScan; }

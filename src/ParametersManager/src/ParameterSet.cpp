@@ -1012,6 +1012,12 @@ void ParameterSet::printConfiguration() const {
 
 }
 
+void ParameterSet::setCurrentValuesAsPrior(){
+  for( auto& par : getEffectiveParameterList() ) {
+    if( not par.isEnabled() ){ continue; }
+    par.setCurrentValueAsPrior();
+  }
+}
 
 // Protected
 void ParameterSet::readParameterDefinitionFile(){
