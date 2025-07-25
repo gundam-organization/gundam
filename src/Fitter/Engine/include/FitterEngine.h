@@ -48,6 +48,9 @@ public:
   FitterEngine() = default;
   explicit FitterEngine(TDirectory *saveDir_) : _saveDir_(saveDir_) {};
 
+  // static
+  static void setRandomSeed(int seed_){ gRandom->SetSeed(seed_); }
+
   // Setters
   void setSaveDir(TDirectory *saveDir){ _saveDir_ = saveDir; }
   void setSaveDir(GundamApp& app_, const std::string& subFolder_){ _saveDir_ = GenericToolbox::mkdirTFile(app_.getOutfilePtr(), subFolder_); }

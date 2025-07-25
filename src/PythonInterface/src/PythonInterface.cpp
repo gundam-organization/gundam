@@ -18,7 +18,7 @@
 #include <string>
 
 
-PYBIND11_MODULE(PyGundam, module) {
+PYBIND11_MODULE(GUNDAM, module) {
   module.doc() = "GUNDAM engine interface for python";
 
   // GundamGlobals namespace
@@ -30,6 +30,7 @@ PYBIND11_MODULE(PyGundam, module) {
   pybind11::class_<JsonType>(module, "JsonType")
   .def(pybind11::init())
   ;
+
 
   // basic function to get sub-parts of Json
   auto gtModule = module.def_submodule("GenericToolbox");
@@ -118,6 +119,7 @@ PYBIND11_MODULE(PyGundam, module) {
   .def("configure", pybind11::overload_cast<const ConfigReader&>(&FitterEngine::configure))
   .def("configure", pybind11::overload_cast<>(&FitterEngine::configure))
   .def("initialize", &FitterEngine::initialize)
+  .def("setRandomSeed", &FitterEngine::setRandomSeed)
   .def("fit", &FitterEngine::fit)
   .def("getMinimizer", pybind11::overload_cast<>(&FitterEngine::getMinimizer), pybind11::return_value_policy::reference)
   .def("getLikelihoodInterface", pybind11::overload_cast<>(&FitterEngine::getLikelihoodInterface), pybind11::return_value_policy::reference)
