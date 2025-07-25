@@ -238,7 +238,14 @@ bool Cache::Weight::Kriged::Apply() {
 
 std::string Cache::Weight::Kriged::DumpSummary() const {
     std::ostringstream out;
+    if (fResults == nullptr) {
+        out << "Krige Summary: Not used";
+        return out.str();
+    }
+
     double norm = fResults->size();
+    if (norm < 1.0) norm = 1.0;
+
     double avg = fSumWeightsPerResult / norm;
     double sig = fSum2WeightsPerResult / norm;
     sig = std::sqrt(sig - avg*avg);
