@@ -38,6 +38,7 @@ public:
   [[nodiscard]] std::vector<std::string> fetchRequestedVariablesForIndexing() const;
 
   void copyEventsFrom(const SampleSet& src_);
+  void copyHistBinContentFrom(const SampleSet& src_);
   [[nodiscard]] size_t getNbOfEvents() const;
 
   // misc

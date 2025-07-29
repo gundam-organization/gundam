@@ -90,6 +90,17 @@ void SampleSet::copyEventsFrom(const SampleSet& src_){
     this->getSampleList()[iSample].getEventList() = src_.getSampleList()[iSample].getEventList();
   }
 }
+void SampleSet::copyHistBinContentFrom(const SampleSet& src_){
+  LogThrowIf(
+      src_.getSampleList().size() != this->getSampleList().size(),
+      "Can't copy events from mismatching sample lists. src(" << src_.getSampleList().size() << ")"
+      << "dst(" << this->getSampleList().size() << ")."
+  );
+
+  for( size_t iSample = 0 ; iSample < src_.getSampleList().size() ; iSample++ ){
+    this->getSampleList()[iSample].getHistogram() = src_.getSampleList()[iSample].getHistogram();
+  }
+}
 size_t SampleSet::getNbOfEvents() const {
   return std::accumulate(
       _sampleList_.begin(), _sampleList_.end(), size_t(0),

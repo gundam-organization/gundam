@@ -142,6 +142,13 @@ void LikelihoodInterface::initializeImpl() {
   LogInfo << "LikelihoodInterface initialized." << std::endl;
 }
 
+void LikelihoodInterface::setCurrentParameterValuesAsPrior(){
+  auto& pm = _modelPropagator_.getParametersManager();
+  for( auto& parSet : _modelPropagator_.getParametersManager().getParameterSetsList() ){
+    if( not parSet.isEnabled() ){ continue; }
+    parSet.setCurrentValuesAsPrior();
+  }
+}
 void LikelihoodInterface::propagateAndEvalLikelihood(){
   std::future<bool> eventually = _modelPropagator_.applyParameters();
   this->evalLikelihood(eventually);

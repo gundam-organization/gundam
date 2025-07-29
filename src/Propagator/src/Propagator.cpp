@@ -274,6 +274,9 @@ void Propagator::copyEventsFrom(const Propagator& src_){
   _sampleSet_.copyEventsFrom( src_.getSampleSet() );
   _eventDialCache_.fillCacheEntries( _sampleSet_ );
 }
+void Propagator::copyHistBinContentFrom(const Propagator& src_){
+  _sampleSet_.copyHistBinContentFrom(src_.getSampleSet());
+}
 
 #ifdef GUNDAM_USING_CACHE_MANAGER
 void Propagator::initializeCacheManager(){
