@@ -311,11 +311,10 @@ void SimpleMcmc::fillPoint( bool fillModel) {
   if (not fillModel) return;
   for (const Sample& sample
       : getModelPropagator().getSampleSet().getSampleList()) {
-    auto& hist = sample.getHistogram();
-    /// Adrien: isn't it a bug?? i from 1 to nBins ? Should be from 0 ? or until nBins+1 ?
-    for (int i = 1; i < hist.getNbBins(); ++i) {
-      _model_.push_back( hist.getBinContentList()[i-1].sumWeights );
-      _uncertainty_.push_back( hist.getBinContentList()[i-1].sqrtSumSqWeights );
+    const Histogram& hist = sample.getHistogram();
+    for (int i = 0; i < hist.getNbBins(); ++i) {
+      _model_.push_back( hist.getBinContentList()[i].sumWeights );
+      _uncertainty_.push_back( hist.getBinContentList()[i].sqrtSumSqWeights );
     }
   }
 }
@@ -456,6 +455,8 @@ bool SimpleMcmc::adaptiveDefaultProposalCovariance( AdaptiveStepMCMC& mcmc,
     }
   }
 
+  mcmc.GetProposeStep().ResetProposal();
+
   return true;
 }
 bool SimpleMcmc::adaptiveLoadProposalCovariance( AdaptiveStepMCMC& mcmc,
@@ -547,6 +548,8 @@ bool SimpleMcmc::adaptiveLoadProposalCovariance( AdaptiveStepMCMC& mcmc,
       mcmc.GetProposeStep().SetCorrelation(count1-1,count2-1,corr);
     }
   }
+
+  mcmc.GetProposeStep().ResetProposal();
 
   // Set the effective number of trials for the covariance that was loaded.
   // The covariance is usually calculated by HESSE.  Empirically, HESSE calls
