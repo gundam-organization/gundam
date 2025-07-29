@@ -26,7 +26,9 @@ Cache::Weight::Kriged::Kriged(
       fReserved(dials), fUsed(0),
       fWeightsReserved(weights), fWeightsUsed(0),
       fTableReserved(tableSpace), fTableUsed(0),
-      fTableOffsets(tables) {
+      fTableOffsets(tables),
+      fMinWeightsPerResult(0), fMaxWeightsPerResult(0),
+      fSumWeightsPerResult(0), fSum2WeightsPerResult(0) {
 
     LogInfo << "Reserved " << GetName()
             << " Kriged Dials: " << GetReserved()
@@ -137,6 +139,15 @@ void Cache::Weight::Kriged::AddData(
         LogExit("Invalid table request");
     }
 
+    if (fMinWeightsPerResult == 0 || fMinWeightsPerResult > weights.size()) {
+        fMinWeightsPerResult = weights.size();
+    }
+    if (fMaxWeightsPerResult < weights.size()) {
+        fMaxWeightsPerResult = weights.size();
+    }
+    fSumWeightsPerResult += weights.size();
+    fSum2WeightsPerResult += weights.size()*weights.size();
+
     fResults->hostPtr()[newIndex] = resIndex;
     // Fill the offsets, indices, and weights here.
     for (const std::pair<int,float>& weight: weights) {
@@ -177,10 +188,11 @@ namespace {
             int begin = i>0 ? offsets[i-1]: 0;
             const int end = offsets[i];
             double v = 0;
-            // Oh noes!  An internal loop!  Each event might have a different number
-            // of kriging weights, but the maximum number of weights per dial should
-            // (hopefully) be pretty small, and most dials should (mostly) have the
-            // same number of weights. That is the hope anyway.
+            // Oh noes!  An internal loop!  Each event might have a different
+            // number of kriging weights, but the maximum number of weights
+            // per dial should (hopefully) be pretty small, and most dials
+            // should (mostly) have the same number of weights. That is the
+            // hope anyway.
             while (begin < end) {
                 v += dataTable[indices[begin]]*weights[begin];
                 ++begin;
@@ -222,6 +234,28 @@ bool Cache::Weight::Kriged::Apply() {
         );
 
     return true;
+}
+
+std::string Cache::Weight::Kriged::DumpSummary() const {
+    std::ostringstream out;
+    if (fResults == nullptr) {
+        out << "Krige Summary: Not used";
+        return out.str();
+    }
+
+    double norm = fResults->size();
+    if (norm < 1.0) norm = 1.0;
+
+    double avg = fSumWeightsPerResult / norm;
+    double sig = fSum2WeightsPerResult / norm;
+    sig = std::sqrt(sig - avg*avg);
+
+    out << "Krige Summary: "
+        << "Min/Max: " << fMinWeightsPerResult
+        << "/" << fMaxWeightsPerResult
+        << " Average: " << avg << "+/-" << sig;
+
+    return out.str();
 }
 
 // An MIT Style License

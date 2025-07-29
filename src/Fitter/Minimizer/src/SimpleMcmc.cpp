@@ -670,13 +670,13 @@ bool SimpleMcmc::adaptiveRunCycle(AdaptiveStepMCMC& mcmc,
               << " (acc " << mcmc.GetProposeStep().GetAcceptance()
               << ", sig " << mcmc.GetProposeStep().GetSigma()
               << ", rms " << mcmc.GetStepRMS()
-              << ")"
+              << ", t " << getMonitor().evalLlhTimer << ")"
               << std::endl;
     }
   }
   // Make a final step and then save it with the covariance information.
   // These steps can be identified since the covariance is not empty, but
-  // they should be real independent steps.
+  // they are real independent steps.
   if (mcmc.Step(false,_adaptiveAcceptanceAlgorithm_)) fillPoint();
   // This is not resetting the "SaveAccepted" size so the step is actually
   // saved.

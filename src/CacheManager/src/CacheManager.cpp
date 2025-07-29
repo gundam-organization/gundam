@@ -680,6 +680,7 @@ bool Cache::Manager::Update(SampleSet& sampleSet, EventDialCache& eventDialCache
     }
 
     LogInfo << "Error checking for cache" << std::endl;
+    LogInfo << fKriged->DumpSummary() << std::endl;
 
     // Error checking adding the dials to the cache!
     if (usedResults != GetWeightsCache().GetResultCount()) {
