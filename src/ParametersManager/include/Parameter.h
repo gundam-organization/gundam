@@ -49,6 +49,7 @@ public:
   void setThrowValue(double throwValue){ _throwValue_ = throwValue; }
   void setStdDevValue(double stdDevValue){ _stdDevValue_ = stdDevValue; }
   void setDialSetConfig(const std::vector<ConfigReader>& dialDefinitionsList_){ _dialDefinitionsList_ = dialDefinitionsList_; }
+  void setMarginalised(bool isMarginalised){ _isMarginalised_ = isMarginalised; }
 
   /// Set the limits for this parameter.  Parameter values less than
   /// this value are illegal, and the likelihood is undefined.  The job will
@@ -100,7 +101,6 @@ public:
 
   [[nodiscard]] double getParameterValue() const;
 
-
   /// Query if a value is in the domain of likelihood for this parameter.  Math
   /// remediation for those of us (including myself) who don't recall grammar
   /// school math: The DOMAIN of a function is the range over which it is
@@ -121,6 +121,8 @@ public:
 
   /// Query if a value matchs the validity requirements.
   [[nodiscard]] bool isValidValue(double value) const;
+
+  [[nodiscard]] bool isMarginalised() const{ return _isMarginalised_; }
 
   /// Copy the prior value of the parameter into the current value.  This will
   /// fail if the prior value has not been set.
@@ -184,6 +186,7 @@ private:
   double _stepSize_{std::nan("unset")};
   std::string _name_{};
   std::string _dialsWorkingDirectory_{"."};
+  bool _isMarginalised_{false};
   ConfigReader _parameterConfig_{};
   std::vector<ConfigReader> _dialDefinitionsList_{};
 
