@@ -49,7 +49,7 @@ public:
   // core
   void moveParametersToPrior();
   void convertEigenToOrig();
-  void injectParameterValues(const JsonType &config_);
+  void injectParameterValues(const JsonType &config_, bool quietVerbose_ = false);
   void throwParameters();
   void throwParametersFromParSetCovariance();
   void throwParametersFromGlobalCovariance(bool quietVerbose_ = true);

@@ -52,14 +52,26 @@ void ParametersManager::configureImpl(){
 void ParametersManager::initializeImpl(){
 
   _config_.printUnusedKeys();
-
+  int iParSet = 0;
   int nEnabledPars = 0;
   for( auto& parSet : _parameterSetList_ ){
     parSet.initialize();
-
+    iParSet++;
     int nPars{0};
     for( auto& par : parSet.getParameterList() ){
-      if( par.isEnabled() ){ nPars++; }
+      if( par.isEnabled() ){
+        if( iParSet>2 ) LogInfo << par.getTitle() << std::endl;
+        _globalCovParList_.emplace_back(&par);
+        nPars++;
+      }
+      else {
+        LogInfo << "Parameter " << par.getTitle() << " is disabled, skipping." << std::endl;
+        continue;
+      }
+      if( par.isFixed() ) { LogInfo << "Parameter " << par.getTitle() << " is fixed, not thrown." << std::endl; }
+      if( par.getPriorType() == Parameter::PriorType::Flat   ){
+        LogWarning << "Parameter " << par.getTitle() << " is defined as Flat prior. " << std::endl;
+      }
     }
 
     nEnabledPars += nPars;
@@ -74,10 +86,14 @@ void ParametersManager::initializeImpl(){
   LogInfo << "Building global covariance matrix (" << nEnabledPars << "x" << nEnabledPars << ")" << std::endl;
   _globalCovarianceMatrix_ = std::make_shared<TMatrixD>(nEnabledPars, nEnabledPars );
   int parSetOffset = 0;
+  iParSet = 0;
   for( auto& parSet : _parameterSetList_ ){
+    iParSet++;
     if( parSet.getPriorCovarianceMatrix() != nullptr ){
       int iGlobalOffset{-1};
       bool hasZero{false};
+      LogInfo << "Parameter set: " << parSet.getName() << " with covariance matrix of size "
+              << parSet.getPriorCovarianceMatrix()->GetNrows() << "x" << parSet.getPriorCovarianceMatrix()->GetNcols() << std::endl;
       for(int iCov = 0 ; iCov < parSet.getPriorCovarianceMatrix()->GetNrows() ; iCov++ ){
         if( not parSet.getParameterList()[iCov].isEnabled() ){ continue; }
         iGlobalOffset++;
@@ -90,12 +106,16 @@ void ParametersManager::initializeImpl(){
         }
       }
       parSetOffset += (iGlobalOffset+1);
+      LogInfo <<"Enabled: " << iGlobalOffset + 1 << " parameters in " << parSet.getName() << std::endl;
     }
     else{
       // diagonal
+      LogInfo<< "Parameter set: " << parSet.getName() << " with no covariance matrix, using diagonal." << std::endl;
       for( auto& par : parSet.getParameterList() ){
-        if( not par.isEnabled() ){ continue; }
-        _globalCovParList_.emplace_back(&par);
+        if( not par.isEnabled() ){
+          LogInfo << "Parameter " << par.getTitle() << " is disabled, skipping." << std::endl;
+          continue;
+        }
         if( par.isFree() ){
           (*_globalCovarianceMatrix_)[parSetOffset][parSetOffset] = 0;
         }
@@ -104,8 +124,11 @@ void ParametersManager::initializeImpl(){
         }
         parSetOffset++;
       }
+      LogInfo << "Enabled: " << parSet.getParameterList().size() << " parameters in " << parSet.getName() << std::endl;
     }
   }
+  LogInfo<<"Size of _globalCovParList_: "<<_globalCovParList_.size()<<std::endl;
+
 
 }
 
@@ -323,36 +346,7 @@ void ParametersManager::throwParametersFromGlobalCovariance(std::vector<double> 
     LogThrowIf( not weightsChiSquare.empty(), "ERROR: argument weightsChiSquare is not empty" );
 
     if( _strippedCovarianceMatrix_ == nullptr ){
-        LogInfo << "Creating stripped global covariance matrix..." << std::endl;
-        LogThrowIf( _globalCovarianceMatrix_ == nullptr, "Global covariance matrix not set." );
-        int nStripped{0};
-        for( int iDiag = 0 ; iDiag < _globalCovarianceMatrix_->GetNrows() ; iDiag++ ){
-            if( (*_globalCovarianceMatrix_)[iDiag][iDiag] != 0 ){ nStripped++; }
-        }
-
-        LogInfo << "Stripped global covariance matrix is " << nStripped << "x" << nStripped << std::endl;
-        _strippedCovarianceMatrix_ = std::make_shared<TMatrixD>(nStripped, nStripped);
-        int iStrippedBin{-1};
-        for( int iBin = 0 ; iBin < _globalCovarianceMatrix_->GetNrows() ; iBin++ ){
-            if( (*_globalCovarianceMatrix_)[iBin][iBin] == 0 ){ continue; }
-            iStrippedBin++;
-            int jStrippedBin{-1};
-            for( int jBin = 0 ; jBin < _globalCovarianceMatrix_->GetNrows() ; jBin++ ){
-                if( (*_globalCovarianceMatrix_)[jBin][jBin] == 0 ){ continue; }
-                jStrippedBin++;
-                (*_strippedCovarianceMatrix_)[iStrippedBin][jStrippedBin] = (*_globalCovarianceMatrix_)[iBin][jBin];
-            }
-        }
-
-        _strippedParameterList_.reserve( nStripped );
-        for( auto& parSet : _parameterSetList_ ){
-            if( not parSet.isEnabled() ) continue;
-            for( auto& par : parSet.getParameterList() ){
-                if( not par.isEnabled() ) continue;
-                _strippedParameterList_.emplace_back(&par);
-            }
-        }
-        LogThrowIf( _strippedParameterList_.size() != nStripped, "Enabled parameters list don't correspond to the matrix. " << _strippedParameterList_.size() << " != " << nStripped );
+      initializeStrippedGlobalCov();
     }
 
     if( _choleskyMatrix_ == nullptr ){
@@ -372,10 +366,6 @@ void ParametersManager::throwParametersFromGlobalCovariance(std::vector<double> 
         std::vector<double> weights;
         if(pedestalEntity==0){
           CustomThrower::throwCorrelatedParameters(_choleskyMatrix_.get(),throws, weights);
-//            DEBUG: print out parameters
-//            for(int i=0;i<weights.size();i++){
-//              LogInfo<<"{ParametersManager::throwParsFromGlobalCov}} throws["<<i<<"] = "<<throws[i]<<std::endl;
-//            }
         }else{
           CustomThrower::throwCorrelatedParameters(_choleskyMatrix_.get(),throws, weights,
                                                       pedestalEntity,pedestalLeftEdge,pedestalRightEdge);
@@ -387,16 +377,19 @@ void ParametersManager::throwParametersFromGlobalCovariance(std::vector<double> 
             LogInfo<<"{ParametersManager}ERROR: throws.size() != _choleskyMatrix_->GetNrows() "<< throws.size()<<" "<<_choleskyMatrix_->GetNrows()<<std::endl;
         }
         for( int iPar = 0 ; iPar < _choleskyMatrix_->GetNrows() ; iPar++ ){
-            _strippedParameterList_[iPar]->setParameterValue(
-                    _strippedParameterList_[iPar]->getPriorValue()
-                    + throws[iPar]
-            );
+            auto* parPtr = _strippedParameterList_[iPar];
+            parPtr->setThrowValue(parPtr->getPriorValue() + throws[iPar]);
+            if( not parPtr->getThrowLimits().isInBounds(parPtr->getThrowValue()) ){
+//              LogAlert << "Thrown value out of bounds -> " << parPtr->getThrowValue() << " not in: " << parPtr->getThrowLimits() << " for " << parPtr->getFullTitle() << std::endl;
+              rethrow = true; break;
+            }
+            parPtr->setParameterValue(parPtr->getThrowValue());
             weightsChiSquare.push_back(weights[iPar]);
 
             if( _reThrowParSetIfOutOfPhysical_ ){
                 if( not _strippedParameterList_[iPar]->isValueWithinBounds() ){
                     // re-do the throwing
-          LogInfo << "Not within bounds: " << _strippedParameterList_[iPar]->getSummary() << std::endl;
+                    LogInfo << "Not within bounds: " << _strippedParameterList_[iPar]->getSummary() << std::endl;
                     rethrow = true;
                 }
             }
@@ -425,7 +418,7 @@ void ParametersManager::throwParametersFromGlobalCovariance(std::vector<double> 
 
         if( rethrow ){
             // wrap back to the while loop
-      LogInfo << "RE-THROW " << std::endl;
+//          LogInfo << "Clearing weights vector and re-throwing..." << std::endl;
           weightsChiSquare.clear();
             continue;
         }
@@ -557,8 +550,10 @@ void ParametersManager::convertEigenToOrig(){
     if( parSet.isEnableEigenDecomp() ){ parSet.propagateEigenToOriginal(); }
   }
 }
-void ParametersManager::injectParameterValues(const JsonType &config_) {
-  LogWarning << "Injecting parameters..." << std::endl;
+void ParametersManager::injectParameterValues(const JsonType &config_, bool quietVerbose_){
+  if(not quietVerbose_) {
+    LogWarning << "Injecting parameters..." << std::endl;
+  }
 
   if( not GenericToolbox::Json::doKeyExist(config_, "parameterSetList") ){
     LogError << "Bad parameter injector config: missing \"parameterSetList\" entry" << std::endl;
@@ -568,12 +563,12 @@ void ParametersManager::injectParameterValues(const JsonType &config_) {
 
   for( auto& entryParSet : GenericToolbox::Json::fetchValue<JsonType>( config_, "parameterSetList" ) ){
     auto parSetName = GenericToolbox::Json::fetchValue<std::string>(entryParSet, "name");
-    LogInfo << "Reading injection parameters for parSet: " << parSetName << std::endl;
+    if(not quietVerbose_) LogInfo << "Reading injection parameters for parSet: " << parSetName << std::endl;
 
     auto* selectedParSet = this->getFitParameterSetPtr(parSetName );
     LogThrowIf( selectedParSet == nullptr, "Could not find parSet: " << parSetName );
 
-    selectedParSet->injectParameterValues(entryParSet);
+    selectedParSet->injectParameterValues(entryParSet, quietVerbose_);
   }
 }
 ParameterSet* ParametersManager::getFitParameterSetPtr(const std::string& name_){
