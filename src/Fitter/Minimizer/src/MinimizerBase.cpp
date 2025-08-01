@@ -5,9 +5,7 @@
 #include "CacheManager.h"
 #endif
 
-
 #include "Logger.h"
-
 
 void MinimizerBase::configureImpl(){
 
@@ -18,6 +16,7 @@ void MinimizerBase::configureImpl(){
     {"enablePostFitErrorFit"},
     {"useNormalizedFitSpace"},
     {"writeLlhHistory"},
+    {"likelihoodValidity"},
     {"checkParameterValidity"},
   });
 
@@ -34,13 +33,25 @@ void MinimizerBase::configureImpl(){
   _config_.fillValue(_isEnabledCalcError_, "enablePostFitErrorFit");
   _config_.fillValue(_useNormalizedFitSpace_, "useNormalizedFitSpace");
   _config_.fillValue(_writeLlhHistory_, "writeLlhHistory");
+
+  // Define what sort of validity the parameters have to have for a finite
+  // likelihood.  The "range" value means that the parameter needs to be
+  // between the allowed minimum and maximum values for the parameter.  The
+  // "mirror" value means that the parameter needs to be between the mirror
+  // bounds too.  The "physical" value means that the parameter has to be in
+  // the physically allowed range.
+  _config_.fillValue(_likelihoodValidity_, "likelihoodValidity");
+
+  // Determine if the validity will be checked when the function is evaluated.
+  // This must be true for the likelihoodValidity checks to be applied.
   _config_.fillValue(_checkParameterValidity_, "checkParameterValidity");
 }
+
 void MinimizerBase::initializeImpl(){
 
   _config_.printUnusedKeys();
 
-  LogWarning << "Initializing MinimizerBase..." << std::endl;
+  LogInfo << "Initializing MinimizerBase..." << std::endl;
 
   LogThrowIf(_owner_ == nullptr, "FitterEngine owner not set.");
 
@@ -79,7 +90,11 @@ void MinimizerBase::initializeImpl(){
   _monitor_.convergenceMonitor.addVariable("Stat");
   _monitor_.convergenceMonitor.addVariable("Syst");
 
-  LogWarning << "MinimizerBase initialized." << std::endl;
+  // Set how the parameter values are handled (outside of different validity
+  // ranges)
+  this->setParameterValidity( _likelihoodValidity_ );
+
+  LogInfo << "MinimizerBase initialized." << std::endl;
 }
 
 void MinimizerBase::minimize(){
@@ -106,12 +121,14 @@ void MinimizerBase::minimize(){
           << "Number of degree of freedom: " << fetchNbDegreeOfFreedom()
           << std::endl;
 
-  LogWarning << std::endl << GenericToolbox::addUpDownBars("Calling minimize()...") << std::endl;
+  LogInfo << std::endl << GenericToolbox::addUpDownBars("Calling minimize()...") << std::endl;
 }
+
 void MinimizerBase::calcErrors(){
   /// A virtual method that is called by the FiterEngine to calculate the
   /// errors at best fit point. By default it does nothing.
 }
+
 void MinimizerBase::scanParameters(TDirectory* saveDir_){
   /// A virtual method that by default scans the parameters used by the minimizer.
   /// This provides a view of the parameters seen by the minimizer, which may
@@ -121,6 +138,7 @@ void MinimizerBase::scanParameters(TDirectory* saveDir_){
   LogThrowIf( not isInitialized() );
   for( auto& parPtr : _minimizerParameterPtrList_ ) { getParameterScanner().scanParameter( *parPtr, saveDir_ ); }
 }
+
 double MinimizerBase::evalFit( const double* parArray_ ){
 /// The main access is through the evalFit method which takes an array of
 /// floating point values and returns the likelihood. The meaning of the
@@ -132,7 +150,7 @@ double MinimizerBase::evalFit( const double* parArray_ ){
 
   // Check the fit parameter values.  Do this first so that the parameters
   // don't change when a bad set of values is tried with evalFit.  This will
-  // only be enabled if the derived class has requested it.
+  // only be enabled if it is requested.
   if (_checkParameterValidity_) {
     const double* v = parArray_;
     for( auto* par : _minimizerParameterPtrList_ ){
@@ -140,6 +158,9 @@ double MinimizerBase::evalFit( const double* parArray_ ){
       if (_useNormalizedFitSpace_) val = ParameterSet::toRealParValue(val,*par);
       if (par->isValidValue(val)) continue;
       _monitor_.evalLlhTimer.stop();
+      /// A "Really Big Number".  This needs to be an appropriate value to
+      /// safely represent an impossible chi-squared value "representing"
+      /// -log(0.0)/2.
       return std::numeric_limits<double>::infinity();
     }
   }
@@ -267,7 +288,7 @@ double MinimizerBase::evalFit( const double* parArray_ ){
 
       if( _monitor_.nbEvalLikelihoodCalls == 1 ){
         // don't erase these lines
-        LogWarning << _monitor_.convergenceMonitor.generateMonitorString(false, true);
+        LogInfo << _monitor_.convergenceMonitor.generateMonitorString(false, true);
       }
       else{
         std::cout << _monitor_.convergenceMonitor.generateMonitorString(
@@ -292,18 +313,32 @@ double MinimizerBase::evalFit( const double* parArray_ ){
   return getLikelihoodInterface().getLastLikelihood();
 }
 
+void MinimizerBase::setParameterValidity(const std::string& validity) {
+  if (validity.empty()) return;
+  _likelihoodValidity_ = validity;
+  if (not _checkParameterValidity_) {
+    LogWarning << "Parameter validity requirement set, but not checked."
+               << std::endl;
+    LogWarning << "Add 'checkParameterValidity: true' to check validity"
+               << std::endl;
+  }
+  for( auto* par : _minimizerParameterPtrList_ ){
+    par->setValidity(_likelihoodValidity_);
+  }
+}
+
 void MinimizerBase::printParameters(){
   // This prints the same set of parameters as are in the vector returned by
   // getMinimizerFitParameterPtr(), but does it by parameter set so that the
   // output is a little more clear.
 
-  LogWarning << std::endl << GenericToolbox::addUpDownBars("Summary of the fit parameters:") << std::endl;
+  LogInfo << std::endl << GenericToolbox::addUpDownBars("Summary of the fit parameters:") << std::endl;
   for( const auto& parSet : getModelPropagator().getParametersManager().getParameterSetsList() ){
     GenericToolbox::TablePrinter t;
     t.setColTitles({ {"Title"}, {"Starting"}, {"Prior"}, {"StdDev"}, {"Limits"}, {"Status"} });
 
     auto& parList = parSet.getEffectiveParameterList();
-    LogWarning << parSet.getName() << ": " << parList.size() << " parameters" << std::endl;
+    LogInfo << parSet.getName() << ": " << parList.size() << " parameters" << std::endl;
     if( parList.empty() ) continue;
 
     for( const auto& par : parList ){
@@ -334,7 +369,6 @@ void MinimizerBase::printParameters(){
     t.printTable();
   }
 }
-
 
 Propagator& MinimizerBase::getModelPropagator(){ return _owner_->getLikelihoodInterface().getModelPropagator(); }
 [[nodiscard]] const Propagator& MinimizerBase::getModelPropagator() const { return _owner_->getLikelihoodInterface().getModelPropagator(); }

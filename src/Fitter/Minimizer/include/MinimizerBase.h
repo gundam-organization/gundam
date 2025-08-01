@@ -105,6 +105,21 @@ public:
   [[nodiscard]] int getMinimizerStatus() const { return _minimizerStatus_; }
   void setMinimizerStatus(int s) {_minimizerStatus_ = s;}
 
+  /// Define the type of validity that needs to be required by
+  /// hasValidParameterValues.  This accepts a string with the possible values
+  /// being:
+  ///
+  ///  "range"           -- Between the parameter minimum and maximum values.
+  ///  "norange"         -- Do not require parameters in the valid range
+  ///  "mirror"          -- Between the mirrored values (if parameter has
+  ///                       mirroring).
+  ///  "nomirror"        -- Do not require parameters in the mirrored range
+  ///  "physical"        -- Only physically meaningful values.
+  ///  "nophysical"      -- Do not require parameters in the physical range.
+  ///
+  /// Example: setParameterValidity("range,mirror,physical")
+  void setParameterValidity(const std::string& validity);
+
   // mutable getters
   Monitor& getMonitor(){ return _monitor_; }
   [[nodiscard]] auto& getMonitor() const { return _monitor_; }
@@ -163,6 +178,14 @@ private:
   bool _useNormalizedFitSpace_{true};
   bool _checkParameterValidity_{false};
   bool _isEnabledCalcError_{true};
+
+  /// Define what sort of validity the parameters have to have for a finite
+  /// likelihood.  The "range" value means that the parameter needs to be
+  /// between the allowed minimum and maximum values for the parameter.  The
+  /// "mirror" value means that the parameter needs to be between the mirror
+  /// bounds too.  The specific definitions (and the default) is defined by
+  /// Parameter.
+  std::string _likelihoodValidity_{""};
 
   // output
   bool _writeLlhHistory_{false};
