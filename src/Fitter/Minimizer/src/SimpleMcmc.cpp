@@ -33,7 +33,6 @@ void SimpleMcmc::configureImpl(){
       {"algorithm"},
       {"proposal"},
       {"mcmcOutputTree"},
-      {"likelihoodValidity"},
       {"randomStart"},
       {"saveRawSteps"},
       {"modelSaveStride"},
@@ -74,14 +73,6 @@ void SimpleMcmc::configureImpl(){
   // The name of the MCMC result tree in the output file.  This doesn't need
   // to be changed.  Generally, leave it alone.
   _config_.fillValue(_outTreeName_, "mcmcOutputTree");
-
-  // Define what sort of validity the parameters have to have for a finite
-  // likelihood.  The "range" value means that the parameter needs to be
-  // between the allowed minimum and maximum values for the parameter.  The
-  // "mirror" value means that the parameter needs to be between the mirror
-  // bounds too.  The "physical" value means that the parameter has to be in
-  // the physically allowed range.
-  _config_.fillValue(_likelihoodValidity_, "likelihoodValidity");
 
   //Set whether MCMC chain start from a random point or the prior point.
   {
@@ -269,8 +260,6 @@ void SimpleMcmc::initializeImpl(){
   MinimizerBase::initializeImpl();
   LogInfo << "Initializing the MCMC Integration..." << std::endl;
 
-  // Set how the parameter values are handled (outside of different validity ranges)
-  this->setParameterValidity( _likelihoodValidity_ );
 }
 
 /// Restore the configuration to the default.
@@ -1053,72 +1042,8 @@ void SimpleMcmc::minimize() {
 }
 
 double SimpleMcmc::evalFitValid(const double* parArray_) {
-
   double value = this->evalFit( parArray_ );
-  if (hasValidParameterValues()) return value;
-  /// A "Really Big Number".  This is nominally just infinity, but is done as
-  /// a defined constant to make the code easier to understand.  This needs to
-  /// be an appropriate value to safely represent an impossible chi-squared
-  /// value "representing" -log(0.0)/2 and should should be larger than 5E+30.
-  const double RBN = std::numeric_limits<double>::infinity();
-  return RBN;
-}
-void SimpleMcmc::setParameterValidity(const std::string& validity) {
-
-
-  LogWarning << "Set parameter validity to " << validity << std::endl;
-
-  if      ( GenericToolbox::hasSubStr(validity, "noran") ){ _validFlags_ &= ~0b0001; }
-  else if ( GenericToolbox::hasSubStr(validity, "ran")   ){ _validFlags_ |= 0b0001; }
-
-  if (validity.find("nomir") != std::string::npos) _validFlags_ &= ~0b0010;
-  else if (validity.find("mir") != std::string::npos) _validFlags_ |= 0b0010;
-
-  if (validity.find("nophy") != std::string::npos) _validFlags_ &= ~0b0100;
-  else if (validity.find("phy") != std::string::npos) _validFlags_ |= 0b0100;
-
-  LogWarning << "Set parameter validity to " << validity << " (" << _validFlags_ << ")" << std::endl;
-}
-bool SimpleMcmc::hasValidParameterValues() const {
-
-
-  int invalid = 0;
-  for( auto& parSet: getModelPropagator().getParametersManager().getParameterSetsList() ){
-    for( auto& par : parSet.getParameterList() ){
-      if ( (_validFlags_ & 0b0001) != 0
-           and std::isfinite(par.getParameterLimits().min)
-           and par.getParameterValue() < par.getParameterLimits().min) GUNDAM_UNLIKELY_COMPILER_FLAG {
-        ++invalid;
-      }
-      if ((_validFlags_ & 0b0001) != 0
-          and std::isfinite(par.getParameterLimits().max)
-          and par.getParameterValue() > par.getParameterLimits().max) GUNDAM_UNLIKELY_COMPILER_FLAG {
-        ++invalid;
-      }
-      if ((_validFlags_ & 0b0010) != 0
-          and std::isfinite(par.getMirrorRange().min)
-          and par.getParameterValue() < par.getMirrorRange().min) GUNDAM_UNLIKELY_COMPILER_FLAG {
-        ++invalid;
-      }
-      if ((_validFlags_ & 0b0010) != 0
-          and std::isfinite(par.getMirrorRange().max)
-          and par.getParameterValue() > par.getMirrorRange().max) GUNDAM_UNLIKELY_COMPILER_FLAG {
-        ++invalid;
-      }
-      if ((_validFlags_ & 0b0100) != 0
-          and std::isfinite(par.getPhysicalLimits().min)
-          and par.getParameterValue() < par.getPhysicalLimits().min) GUNDAM_UNLIKELY_COMPILER_FLAG {
-        ++invalid;
-      }
-      if ((_validFlags_ & 0b0100) != 0
-          and std::isfinite(par.getPhysicalLimits().max)
-          and par.getParameterValue() > par.getPhysicalLimits().max) GUNDAM_UNLIKELY_COMPILER_FLAG {
-        ++invalid;
-      }
-
-    }
-  }
-  return (invalid == 0);
+  return value;
 }
 
 SimpleMcmcSequencer::SimpleMcmcSequencer() {};
