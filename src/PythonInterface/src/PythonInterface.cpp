@@ -127,6 +127,7 @@ PYBIND11_MODULE(GUNDAM, module) {
   .def("getPriorValue", &Parameter::getPriorValue)
   .def("getStdDevValue", &Parameter::getStdDevValue)
   .def("setPriorValue", &Parameter::setPriorValue)
+  .def("setParameterValue", &Parameter::setParameterValue)
   .def("getPhysicalLimits", &Parameter::getPhysicalLimits, pybind11::return_value_policy::reference)
 ;
 
