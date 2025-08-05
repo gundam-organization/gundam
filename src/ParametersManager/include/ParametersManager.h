@@ -27,6 +27,8 @@ public:
   void setReThrowParSetIfOutOfPhysical(bool reThrowParSetIfOutOfPhysical_){ _reThrowParSetIfOutOfPhysical_ = reThrowParSetIfOutOfPhysical_; }
   void setThrowToyParametersWithGlobalCov(bool throwToyParametersWithGlobalCov_){ _throwToyParametersWithGlobalCov_ = throwToyParametersWithGlobalCov_; }
   void setGlobalCovarianceMatrix(const std::shared_ptr<TMatrixD> &globalCovarianceMatrix){ _globalCovarianceMatrix_ = globalCovarianceMatrix; }
+  void setThrowerAsCustom(){ _defaultSystematicThrows_ = false; }
+  void setThrowerAsDefault(){ _defaultSystematicThrows_ = true; }
 
   // const getters
   [[nodiscard]] auto& getGlobalCovarianceMatrix() const{ return _globalCovarianceMatrix_; }
@@ -47,10 +49,13 @@ public:
   // core
   void moveParametersToPrior();
   void convertEigenToOrig();
-  void injectParameterValues(const JsonType &config_);
+  void injectParameterValues(const JsonType &config_, bool quietVerbose_ = false);
   void throwParameters();
   void throwParametersFromParSetCovariance();
   void throwParametersFromGlobalCovariance(bool quietVerbose_ = true);
+  void throwParametersFromGlobalCovariance(std::vector<double> &weightsChiSquare);
+  void throwParametersFromGlobalCovariance(std::vector<double> &weightsChiSquare, double pedestalEntity, double pedestalLeftEdge, double pedestalRightEdge);
+  void throwParametersFromTStudent(std::vector<double> &weightsChiSquare,double nu_);
   void initializeStrippedGlobalCov();
   ParameterSet* getFitParameterSetPtr(const std::string& name_);
 
@@ -84,6 +89,9 @@ private:
   bool _reThrowParSetIfOutOfPhysical_{true};
   bool _throwToyParametersWithGlobalCov_{false};
   ConfigReader _parameterSetListConfig_{};
+
+  // select how to do the throwing
+  bool _defaultSystematicThrows_{true}; //  if true, uses the syst throws from GenericToolbox. If false, uses the GundamCustomThrower
 
   // internals
   std::vector<ParameterSet> _parameterSetList_{};

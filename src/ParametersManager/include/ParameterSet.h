@@ -149,7 +149,7 @@ public:
 
   /// Set the parameter set parameter values from a JSON object that was written
   /// by hand or exportInjectorConfig.
-  void injectParameterValues(const JsonType& config_);
+  void injectParameterValues(const JsonType& config_, bool quietVerbose_ = false);
 
   Parameter* getParameterPtr(const std::string& parName_);
   Parameter* getParameterPtrWithTitle(const std::string& parTitle_);
