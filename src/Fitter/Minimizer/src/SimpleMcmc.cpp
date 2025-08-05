@@ -433,8 +433,8 @@ bool SimpleMcmc::adaptiveDefaultProposalCovariance( AdaptiveStepMCMC& mcmc,
 
       double correlation = (*corr)(in1,in2);
       if (not std::isfinite(correlation)) {
-        LogError << "Invalid correlation" << std::endl;
-        corr->Print();
+        LogError << "Invalid correlation for set " << set1->getName()
+                 << std::endl;
         LogExit("Bad correlation");
       }
       // Don't impose very small correlations, let them be discovered.
@@ -460,6 +460,10 @@ bool SimpleMcmc::adaptiveDefaultProposalCovariance( AdaptiveStepMCMC& mcmc,
 
   return true;
 }
+
+// Load the proposal covariance from an input file.  The input
+// file will usually contain the result of a MLL fit, and we load
+// the covariance calculated by HESSE.
 bool SimpleMcmc::adaptiveLoadProposalCovariance( AdaptiveStepMCMC& mcmc,
                                                    sMCMC::Vector& prior,
                                                    const std::string& fileName,
@@ -509,7 +513,7 @@ bool SimpleMcmc::adaptiveLoadProposalCovariance( AdaptiveStepMCMC& mcmc,
              << std::endl;
     LogError << "   Proposal Y Bins:     " << proposalCov->GetNbinsY()
              << std::endl;
-    LogThrow("Mismatched proposal covariance matrix");
+    LogExit("Mismatched proposal covariance matrix");
   }
 
   // Dump all of the previous correlations.
@@ -525,7 +529,7 @@ bool SimpleMcmc::adaptiveLoadProposalCovariance( AdaptiveStepMCMC& mcmc,
       LogError << "Mismatch of parameter and covariance names" << std::endl;
       LogError << "Parameter:  " << parName << std::endl;
       LogError << "Covariance: " << covName << std::endl;
-      LogThrow("Mismatched covariance histogram");
+      LogExit("Mismatched covariance histogram");
     }
     double sig1 = std::sqrt(proposalCov->GetBinContent(count1,count1));
     int count2 = 0;
