@@ -26,6 +26,7 @@ void Parameter::prepareConfig(ConfigReader& config_){
     {"physicalLimits"},
     {"throwLimits"},
     {"mirrorRange"},
+    {"cyclicRange"},
     {"dialSetDefinitions"},
     {"priorType"},
   });
@@ -53,6 +54,7 @@ void Parameter::configureImpl(){
   _config_.fillValue(_physicalLimits_, "physicalLimits");
   _config_.fillValue(_throwLimits_, "throwLimits");
   _config_.fillValue(_mirrorRange_, "mirrorRange");
+  _config_.fillValue(_cyclicRange_, "cyclicRange");
   _config_.fillValue(_dialDefinitionsList_, "dialSetDefinitions");
 
   _config_.fillValue(_parameterLimits_, "parameterLimits");
@@ -101,6 +103,32 @@ void Parameter::setMaxMirror(double maxMirror) {
   }
   _mirrorRange_.max = maxMirror;
 }
+
+bool Parameter::isCyclic() const {
+  if (!std::isfinite(_cyclicRange_.min)) return false;
+  if (!std::isfinite(_cyclicRange_.max)) return false;
+  if (_cyclicRange_.max <= _cyclicRange_.min) return false;
+  return true;
+}
+
+void Parameter::setMinCyclic(double minCyclic) {
+  if (std::isfinite(_cyclicRange_.min) and std::abs(_cyclicRange_.min-minCyclic) > 1E-6) {
+    LogWarning << "Minimum cyclic bound changed for " << getFullTitle()
+               << " old: " << _cyclicRange_.min
+               << " new: " << minCyclic
+               << std::endl;
+  }
+  _cyclicRange_.min = minCyclic;
+}
+void Parameter::setMaxCyclic(double maxCyclic) {
+  if (std::isfinite(_cyclicRange_.max) and std::abs(_cyclicRange_.max-maxCyclic) > 1E-6) {
+    LogWarning << "Maximum cyclic bound changed for " << getFullTitle()
+               << " old: " << _cyclicRange_.max
+               << " new: " << maxCyclic
+               << std::endl;
+  }
+  _cyclicRange_.max = maxCyclic;
+}
 void Parameter::setParameterValue(double parameterValue, bool force) {
   // update and flag parameter
   if( _parameterValue_ != parameterValue ){
@@ -140,7 +168,25 @@ double Parameter::getParameterValue() const {
 #endif
   return _parameterValue_;
 }
-
+double Parameter::getRegularizedValue() const {
+  double v = getParameterValue();
+  if (isCyclic()) {
+    double r = _cyclicRange_.max - _cyclicRange_.min;
+    while (v < _cyclicRange_.min) v += r;
+    while (v >= _cyclicRange_.max) v -= r;
+  }
+  if (_mirrorRange_.hasBound()) {
+    while (not _mirrorRange_.isInBounds(v)) {
+      if (_mirrorRange_.hasLowerBound() and v < _mirrorRange_.min) {
+        v = 2.0*_mirrorRange_.min - v;
+      }
+      if (_mirrorRange_.hasUpperBound() and v > _mirrorRange_.max) {
+        v = 2.0*_mirrorRange_.max - v;
+      }
+    }
+  }
+  return v;
+}
 void Parameter::setValueAtPrior(){
   setParameterValue(getPriorValue());
 }
