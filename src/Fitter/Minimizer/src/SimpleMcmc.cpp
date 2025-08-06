@@ -1,7 +1,3 @@
-//
-// Created by Clark McGrew on 26/01/2023.
-//
-
 #include "SimpleMcmc.h"
 #include "LikelihoodInterface.h"
 #include "FitterEngine.h"
@@ -391,7 +387,7 @@ bool SimpleMcmc::adaptiveDefaultProposalCovariance( AdaptiveStepMCMC& mcmc,
   mcmc.GetProposeStep().ResetCorrelations();
 
   // Set up the correlations in the priors.
-  int count1 = 0;
+  int count1 = 0;             // The index in the parameter array
   for (const Parameter* par1 : getMinimizerFitParameterPtr() ) {
     ++count1;
     const ParameterSet* set1 = par1->getOwner();
@@ -401,11 +397,12 @@ bool SimpleMcmc::adaptiveDefaultProposalCovariance( AdaptiveStepMCMC& mcmc,
               << std::endl;
       continue;
     }
+
     if ( set1->isEnableEigenDecomp()) {
       continue;
     }
 
-    int count2 = 0;
+    int count2 = 0;             // The index in the parameter array
     for (const Parameter* par2 : getMinimizerFitParameterPtr()) {
       ++count2;
       const ParameterSet* set2 = par2->getOwner();
@@ -415,32 +412,47 @@ bool SimpleMcmc::adaptiveDefaultProposalCovariance( AdaptiveStepMCMC& mcmc,
                 << std::endl;
         continue;
       }
+
       if ( set2->isEnableEigenDecomp()) {
         continue;
       }
 
+      // Parameters have to be in the same set to have a prior correlation.
+      // If they are in different sets, then, by definition, they are not
+      // correlated.
       if (set1 != set2) continue;
+
+      // Only use the "lower half" to get the correlations.
       int in1 = par1->getParameterIndex();
       int in2 = par2->getParameterIndex();
       if (in2 <= in1) continue;
+
       const std::shared_ptr<TMatrixDSym>& corr
-          = GenericToolbox::toCorrelationMatrix(set1->getPriorCovarianceMatrix());
+          = GenericToolbox::toCorrelationMatrix(set1->getPriorFullCovarianceMatrix());
       if (!corr) continue;
+
       double correlation = (*corr)(in1,in2);
+      if (not std::isfinite(correlation)) {
+        LogError << "Invalid correlation for set " << set1->getName()
+                 << std::endl;
+        LogExit("Bad correlation");
+      }
       // Don't impose very small correlations, let them be discovered.
       if (std::abs(correlation) < 0.01) continue;
       // Complain about large correlations.  When a correlation is this
       // large, then the user should (but probably won't) rethink the
       // parameter definitions!
       if (std::abs(correlation) > 0.98) {
-        LogInfo << "VERY LARGE CORRELATION (" << correlation
-                << ") BETWEEN"
-                << " " << set1->getName() << "/" << par1->getName()
-                << " & " << set2->getName() << "/" << par2->getName()
-                << std::endl;
+        LogWarning << "Very large prior correlation (" << correlation
+                   << ") between"
+                   << " " << set1->getName() << "/" << par1->getName()
+                   << " & " << set2->getName() << "/" << par2->getName()
+                   << std::endl
+                   << "Consider using eigendecomposition for parameter set: "
+                   << set1->getName()
+                   << std::endl;
       }
-      mcmc.GetProposeStep().SetCorrelation(count1-1,count2-1,
-                                           (*corr)(in1,in2));
+      mcmc.GetProposeStep().SetCorrelation(count1-1,count2-1,correlation);
     }
   }
 
@@ -448,6 +460,10 @@ bool SimpleMcmc::adaptiveDefaultProposalCovariance( AdaptiveStepMCMC& mcmc,
 
   return true;
 }
+
+// Load the proposal covariance from an input file.  The input
+// file will usually contain the result of a MLL fit, and we load
+// the covariance calculated by HESSE.
 bool SimpleMcmc::adaptiveLoadProposalCovariance( AdaptiveStepMCMC& mcmc,
                                                    sMCMC::Vector& prior,
                                                    const std::string& fileName,
@@ -497,7 +513,7 @@ bool SimpleMcmc::adaptiveLoadProposalCovariance( AdaptiveStepMCMC& mcmc,
              << std::endl;
     LogError << "   Proposal Y Bins:     " << proposalCov->GetNbinsY()
              << std::endl;
-    LogThrow("Mismatched proposal covariance matrix");
+    LogExit("Mismatched proposal covariance matrix");
   }
 
   // Dump all of the previous correlations.
@@ -513,7 +529,7 @@ bool SimpleMcmc::adaptiveLoadProposalCovariance( AdaptiveStepMCMC& mcmc,
       LogError << "Mismatch of parameter and covariance names" << std::endl;
       LogError << "Parameter:  " << parName << std::endl;
       LogError << "Covariance: " << covName << std::endl;
-      LogThrow("Mismatched covariance histogram");
+      LogExit("Mismatched covariance histogram");
     }
     double sig1 = std::sqrt(proposalCov->GetBinContent(count1,count1));
     int count2 = 0;
