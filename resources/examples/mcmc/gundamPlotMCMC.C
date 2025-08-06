@@ -796,13 +796,13 @@ void gundamPlotMCMC() {
                               << std::endl;
                     continue;
                 }
-                if (std::isfinite(ess[iPar])) {
+                if (not std::isfinite(ess[iPar])) {
                     std::cout << "Parameter " << iPar
                               << " ESS is not finite:" << ess[iPar]
                               << std::endl;
                     continue;
                 }
-                if (ess[iPar] < 0.0) {
+                if (ess[iPar] <= 0.0) {
                     std::cout << "Parameter " << iPar
                               << " ESS is invalid: " << ess[iPar]
                               << std::endl;
