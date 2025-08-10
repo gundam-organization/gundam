@@ -119,16 +119,22 @@ PYBIND11_MODULE(GUNDAM, module) {
   ;
 
   pybind11::class_<Parameter>(module, "Parameter")
-  .def("getName", &Parameter::getName)
+  // Queries
   .def("isEnabled", &Parameter::isEnabled)
   .def("isValueWithinBounds", &Parameter::isValueWithinBounds)
+  .def("isInDomain", &Parameter::isInDomain)
+  // Getters
+  .def("getName", &Parameter::getName)
+  .def("getSummary", &Parameter::getSummary)
   .def("getFullTitle", &Parameter::getFullTitle)
   .def("getParameterValue", &Parameter::getParameterValue)
+  .def("getParameterLimits", &Parameter::getParameterLimits, pybind11::return_value_policy::reference)
   .def("getPriorValue", &Parameter::getPriorValue)
   .def("getStdDevValue", &Parameter::getStdDevValue)
+  .def("getPhysicalLimits", &Parameter::getPhysicalLimits, pybind11::return_value_policy::reference)
+  // Setters
   .def("setPriorValue", &Parameter::setPriorValue)
   .def("setParameterValue", &Parameter::setParameterValue)
-  .def("getPhysicalLimits", &Parameter::getPhysicalLimits, pybind11::return_value_policy::reference)
 ;
 
   pybind11::class_<ParameterSet>(module, "ParameterSet")
