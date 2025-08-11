@@ -52,26 +52,14 @@ void ParametersManager::configureImpl(){
 void ParametersManager::initializeImpl(){
 
   _config_.printUnusedKeys();
-  int iParSet = 0;
+
   int nEnabledPars = 0;
   for( auto& parSet : _parameterSetList_ ){
     parSet.initialize();
-    iParSet++;
+
     int nPars{0};
     for( auto& par : parSet.getParameterList() ){
-      if( par.isEnabled() ){
-        if( iParSet>2 ) LogInfo << par.getTitle() << std::endl;
-        _globalCovParList_.emplace_back(&par);
-        nPars++;
-      }
-      else {
-        LogInfo << "Parameter " << par.getTitle() << " is disabled, skipping." << std::endl;
-        continue;
-      }
-      if( par.isFixed() ) { LogInfo << "Parameter " << par.getTitle() << " is fixed, not thrown." << std::endl; }
-      if( par.getPriorType() == Parameter::PriorType::Flat   ){
-        LogWarning << "Parameter " << par.getTitle() << " is defined as Flat prior. " << std::endl;
-      }
+      if( par.isEnabled() ){ nPars++; }
     }
 
     nEnabledPars += nPars;
@@ -86,14 +74,10 @@ void ParametersManager::initializeImpl(){
   LogInfo << "Building global covariance matrix (" << nEnabledPars << "x" << nEnabledPars << ")" << std::endl;
   _globalCovarianceMatrix_ = std::make_shared<TMatrixD>(nEnabledPars, nEnabledPars );
   int parSetOffset = 0;
-  iParSet = 0;
   for( auto& parSet : _parameterSetList_ ){
-    iParSet++;
     if( parSet.getPriorCovarianceMatrix() != nullptr ){
       int iGlobalOffset{-1};
       bool hasZero{false};
-      LogInfo << "Parameter set: " << parSet.getName() << " with covariance matrix of size "
-              << parSet.getPriorCovarianceMatrix()->GetNrows() << "x" << parSet.getPriorCovarianceMatrix()->GetNcols() << std::endl;
       for(int iCov = 0 ; iCov < parSet.getPriorCovarianceMatrix()->GetNrows() ; iCov++ ){
         if( not parSet.getParameterList()[iCov].isEnabled() ){ continue; }
         iGlobalOffset++;
@@ -106,16 +90,12 @@ void ParametersManager::initializeImpl(){
         }
       }
       parSetOffset += (iGlobalOffset+1);
-      LogInfo <<"Enabled: " << iGlobalOffset + 1 << " parameters in " << parSet.getName() << std::endl;
     }
     else{
       // diagonal
-      LogInfo<< "Parameter set: " << parSet.getName() << " with no covariance matrix, using diagonal." << std::endl;
       for( auto& par : parSet.getParameterList() ){
-        if( not par.isEnabled() ){
-          LogInfo << "Parameter " << par.getTitle() << " is disabled, skipping." << std::endl;
-          continue;
-        }
+        if( not par.isEnabled() ){ continue; }
+        _globalCovParList_.emplace_back(&par);
         if( par.isFree() ){
           (*_globalCovarianceMatrix_)[parSetOffset][parSetOffset] = 0;
         }
@@ -124,11 +104,8 @@ void ParametersManager::initializeImpl(){
         }
         parSetOffset++;
       }
-      LogInfo << "Enabled: " << parSet.getParameterList().size() << " parameters in " << parSet.getName() << std::endl;
     }
   }
-  LogInfo<<"Size of _globalCovParList_: "<<_globalCovParList_.size()<<std::endl;
-
 
 }
 
