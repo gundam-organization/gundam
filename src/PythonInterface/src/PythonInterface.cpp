@@ -141,6 +141,8 @@ PYBIND11_MODULE(GUNDAM, module) {
   .def("getName", &ParameterSet::getName)
   .def("isEnabled", &ParameterSet::isEnabled)
   .def("getParameterList", static_cast<std::vector<Parameter>& (ParameterSet::*)()>(&ParameterSet::getParameterList),pybind11::return_value_policy::reference)
+  .def("isEnableEigenDecomp", &ParameterSet::isEnableEigenDecomp)
+  .def("propagateOriginalToEigen", &ParameterSet::propagateOriginalToEigen)
   ;
 
   pybind11::class_<ParametersManager>(module, "ParametersManager")
