@@ -37,6 +37,7 @@ PYBIND11_MODULE(GUNDAM, module) {
   // Normal pyROOT is not compatible with pybind11, because it uses cppyy.
   pybind11::class_<TMatrixD, std::shared_ptr<TMatrixD>>(module, "TMatrixD")
   .def(pybind11::init<int, int>())
+  .def(pybind11::init<const TMatrixD&>())
   .def("operator()", [](TMatrixD& m, int i, int j) -> double& { return m[i][j]; })
   .def("GetNrows", &TMatrixD::GetNrows, "Get the number of rows in the matrix")
   .def("GetNcols", &TMatrixD::GetNcols, "Get the number of columns in the matrix")
@@ -169,6 +170,7 @@ PYBIND11_MODULE(GUNDAM, module) {
   .def("getBinningFilePath", &Sample::getBinningFilePath) // returns a ConfigReader object
   .def("getName", &Sample::getName, pybind11::return_value_policy::reference)
   .def("getHistogram", static_cast<Histogram& (Sample::*)()>(&Sample::getHistogram), pybind11::return_value_policy::reference)
+  .def("getSummary", &Sample::getSummary)
   ;
   pybind11::class_<Histogram>(module, "Histogram")
   .def(pybind11::init())
@@ -198,7 +200,7 @@ PYBIND11_MODULE(GUNDAM, module) {
   .def_readwrite("statLikelihood", &LikelihoodInterface::Buffer::statLikelihood)
   .def_readwrite("penaltyLikelihood", &LikelihoodInterface::Buffer::penaltyLikelihood)
   .def("updateTotal", &LikelihoodInterface::Buffer::updateTotal)
-  .def("isValid", &LikelihoodInterface::Buffer::isValid);
+  .def("isValid", &LikelihoodInterface::Buffer::isValid)
   ;
 
   pybind11::class_<LikelihoodInterface>(module, "LikelihoodInterface")
@@ -212,7 +214,15 @@ PYBIND11_MODULE(GUNDAM, module) {
   .def("setCurrentParameterValuesAsPrior", &LikelihoodInterface::setCurrentParameterValuesAsPrior, pybind11::call_guard<pybind11::gil_scoped_release>())
   .def("getModelPropagator", pybind11::overload_cast<>(&LikelihoodInterface::getModelPropagator), pybind11::return_value_policy::reference)
   .def("getDataPropagator", pybind11::overload_cast<>(&LikelihoodInterface::getDataPropagator), pybind11::return_value_policy::reference)
+  .def("getSamplePairList", static_cast<std::vector<SamplePair>& (LikelihoodInterface::*)()>(&LikelihoodInterface::getSamplePairList), pybind11::return_value_policy::reference)
+  .def("getSampleBreakdownTable", &LikelihoodInterface::getSampleBreakdownTable)
   .def("getBuffer", pybind11::overload_cast<>(&LikelihoodInterface::getBuffer), pybind11::return_value_policy::reference)
+  ;
+
+  pybind11::class_<SamplePair>(module, "SamplePair")
+  .def(pybind11::init())
+  .def_readwrite("data", &SamplePair::data)
+  .def_readwrite("model", &SamplePair::model)
   ;
 
   // no CTOR here
