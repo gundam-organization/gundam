@@ -84,6 +84,7 @@ public:
   [[nodiscard]] auto& getDialSetDefinitions() const{ return _dialSetDefinitions_; }
   [[nodiscard]] auto& getCustomParThrow() const{ return _customParThrow_; }
   [[nodiscard]] auto& getPriorCovarianceMatrix() const { return _priorCovarianceMatrix_; }
+  [[nodiscard]] auto& getPriorFullCovarianceMatrix() const { return _priorFullCovarianceMatrix_; }
   [[nodiscard]] auto& getInverseCovarianceMatrix() const{ return _inverseCovarianceMatrix_; }
 
   /// Get the vector of parameters for this parameter set in the real

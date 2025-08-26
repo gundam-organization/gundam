@@ -235,6 +235,7 @@ PYBIND11_MODULE(GUNDAM, module) {
   // .def("setSaveDir", pybind11::overload_cast<TDirectory*>(&FitterEngine::setSaveDir)) // CAN'T EXPOSE ROOT PTRs
   .def("setSaveDir", pybind11::overload_cast<GundamApp&, const std::string&>(&FitterEngine::setSaveDir))
   .def("setConfig", pybind11::overload_cast<const ConfigReader&>(&FitterEngine::setConfig))
+  .def("setDoAllParamVariations", &FitterEngine::setDoAllParamVariations)
   .def("configure", pybind11::overload_cast<const ConfigReader&>(&FitterEngine::configure))
   .def("configure", pybind11::overload_cast<>(&FitterEngine::configure))
   .def("initialize", &FitterEngine::initialize)

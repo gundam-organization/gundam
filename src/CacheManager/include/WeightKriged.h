@@ -78,6 +78,8 @@ public:
     /// Get the space used by the the tables.
     std::size_t GetTableUsed() const { return fTableUsed; }
 
+    std::string DumpSummary() const;
+
 private:
 
     /// The number of kriged dials that have been reserved, and used.
@@ -112,6 +114,13 @@ private:
     /// The offsets for each table in the data. This is used while filling the
     /// fIndices, fConstants, and fTable tables, but not for the calculation.
     const std::map<const std::vector<double>*, int> fTableOffsets;
+
+    /// Usage monitoring
+    int fMinWeightsPerResult;
+    int fMaxWeightsPerResult;
+    double fSumWeightsPerResult;
+    double fSum2WeightsPerResult;
+
 };
 
 // An MIT Style License

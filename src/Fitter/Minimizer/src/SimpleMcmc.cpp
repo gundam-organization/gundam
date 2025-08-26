@@ -1,7 +1,3 @@
-//
-// Created by Clark McGrew on 26/01/2023.
-//
-
 #include "SimpleMcmc.h"
 #include "LikelihoodInterface.h"
 #include "FitterEngine.h"
@@ -33,7 +29,6 @@ void SimpleMcmc::configureImpl(){
       {"algorithm"},
       {"proposal"},
       {"mcmcOutputTree"},
-      {"likelihoodValidity"},
       {"randomStart"},
       {"saveRawSteps"},
       {"modelSaveStride"},
@@ -74,14 +69,6 @@ void SimpleMcmc::configureImpl(){
   // The name of the MCMC result tree in the output file.  This doesn't need
   // to be changed.  Generally, leave it alone.
   _config_.fillValue(_outTreeName_, "mcmcOutputTree");
-
-  // Define what sort of validity the parameters have to have for a finite
-  // likelihood.  The "range" value means that the parameter needs to be
-  // between the allowed minimum and maximum values for the parameter.  The
-  // "mirror" value means that the parameter needs to be between the mirror
-  // bounds too.  The "physical" value means that the parameter has to be in
-  // the physically allowed range.
-  _config_.fillValue(_likelihoodValidity_, "likelihoodValidity");
 
   //Set whether MCMC chain start from a random point or the prior point.
   {
@@ -269,8 +256,6 @@ void SimpleMcmc::initializeImpl(){
   MinimizerBase::initializeImpl();
   LogInfo << "Initializing the MCMC Integration..." << std::endl;
 
-  // Set how the parameter values are handled (outside of different validity ranges)
-  this->setParameterValidity( _likelihoodValidity_ );
 }
 
 /// Restore the configuration to the default.
@@ -311,11 +296,10 @@ void SimpleMcmc::fillPoint( bool fillModel) {
   if (not fillModel) return;
   for (const Sample& sample
       : getModelPropagator().getSampleSet().getSampleList()) {
-    auto& hist = sample.getHistogram();
-    /// Adrien: isn't it a bug?? i from 1 to nBins ? Should be from 0 ? or until nBins+1 ?
-    for (int i = 1; i < hist.getNbBins(); ++i) {
-      _model_.push_back( hist.getBinContentList()[i-1].sumWeights );
-      _uncertainty_.push_back( hist.getBinContentList()[i-1].sqrtSumSqWeights );
+    const Histogram& hist = sample.getHistogram();
+    for (int i = 0; i < hist.getNbBins(); ++i) {
+      _model_.push_back( hist.getBinContentList()[i].sumWeights );
+      _uncertainty_.push_back( hist.getBinContentList()[i].sqrtSumSqWeights );
     }
   }
 }
@@ -403,7 +387,7 @@ bool SimpleMcmc::adaptiveDefaultProposalCovariance( AdaptiveStepMCMC& mcmc,
   mcmc.GetProposeStep().ResetCorrelations();
 
   // Set up the correlations in the priors.
-  int count1 = 0;
+  int count1 = 0;             // The index in the parameter array
   for (const Parameter* par1 : getMinimizerFitParameterPtr() ) {
     ++count1;
     const ParameterSet* set1 = par1->getOwner();
@@ -413,11 +397,12 @@ bool SimpleMcmc::adaptiveDefaultProposalCovariance( AdaptiveStepMCMC& mcmc,
               << std::endl;
       continue;
     }
+
     if ( set1->isEnableEigenDecomp()) {
       continue;
     }
 
-    int count2 = 0;
+    int count2 = 0;             // The index in the parameter array
     for (const Parameter* par2 : getMinimizerFitParameterPtr()) {
       ++count2;
       const ParameterSet* set2 = par2->getOwner();
@@ -427,37 +412,58 @@ bool SimpleMcmc::adaptiveDefaultProposalCovariance( AdaptiveStepMCMC& mcmc,
                 << std::endl;
         continue;
       }
+
       if ( set2->isEnableEigenDecomp()) {
         continue;
       }
 
+      // Parameters have to be in the same set to have a prior correlation.
+      // If they are in different sets, then, by definition, they are not
+      // correlated.
       if (set1 != set2) continue;
+
+      // Only use the "lower half" to get the correlations.
       int in1 = par1->getParameterIndex();
       int in2 = par2->getParameterIndex();
       if (in2 <= in1) continue;
+
       const std::shared_ptr<TMatrixDSym>& corr
-          = GenericToolbox::toCorrelationMatrix(set1->getPriorCovarianceMatrix());
+          = GenericToolbox::toCorrelationMatrix(set1->getPriorFullCovarianceMatrix());
       if (!corr) continue;
+
       double correlation = (*corr)(in1,in2);
+      if (not std::isfinite(correlation)) {
+        LogError << "Invalid correlation for set " << set1->getName()
+                 << std::endl;
+        LogExit("Bad correlation");
+      }
       // Don't impose very small correlations, let them be discovered.
       if (std::abs(correlation) < 0.01) continue;
       // Complain about large correlations.  When a correlation is this
       // large, then the user should (but probably won't) rethink the
       // parameter definitions!
       if (std::abs(correlation) > 0.98) {
-        LogInfo << "VERY LARGE CORRELATION (" << correlation
-                << ") BETWEEN"
-                << " " << set1->getName() << "/" << par1->getName()
-                << " & " << set2->getName() << "/" << par2->getName()
-                << std::endl;
+        LogWarning << "Very large prior correlation (" << correlation
+                   << ") between"
+                   << " " << set1->getName() << "/" << par1->getName()
+                   << " & " << set2->getName() << "/" << par2->getName()
+                   << std::endl
+                   << "Consider using eigendecomposition for parameter set: "
+                   << set1->getName()
+                   << std::endl;
       }
-      mcmc.GetProposeStep().SetCorrelation(count1-1,count2-1,
-                                           (*corr)(in1,in2));
+      mcmc.GetProposeStep().SetCorrelation(count1-1,count2-1,correlation);
     }
   }
 
+  mcmc.GetProposeStep().ResetProposal();
+
   return true;
 }
+
+// Load the proposal covariance from an input file.  The input
+// file will usually contain the result of a MLL fit, and we load
+// the covariance calculated by HESSE.
 bool SimpleMcmc::adaptiveLoadProposalCovariance( AdaptiveStepMCMC& mcmc,
                                                    sMCMC::Vector& prior,
                                                    const std::string& fileName,
@@ -507,7 +513,7 @@ bool SimpleMcmc::adaptiveLoadProposalCovariance( AdaptiveStepMCMC& mcmc,
              << std::endl;
     LogError << "   Proposal Y Bins:     " << proposalCov->GetNbinsY()
              << std::endl;
-    LogThrow("Mismatched proposal covariance matrix");
+    LogExit("Mismatched proposal covariance matrix");
   }
 
   // Dump all of the previous correlations.
@@ -523,7 +529,7 @@ bool SimpleMcmc::adaptiveLoadProposalCovariance( AdaptiveStepMCMC& mcmc,
       LogError << "Mismatch of parameter and covariance names" << std::endl;
       LogError << "Parameter:  " << parName << std::endl;
       LogError << "Covariance: " << covName << std::endl;
-      LogThrow("Mismatched covariance histogram");
+      LogExit("Mismatched covariance histogram");
     }
     double sig1 = std::sqrt(proposalCov->GetBinContent(count1,count1));
     int count2 = 0;
@@ -547,6 +553,8 @@ bool SimpleMcmc::adaptiveLoadProposalCovariance( AdaptiveStepMCMC& mcmc,
       mcmc.GetProposeStep().SetCorrelation(count1-1,count2-1,corr);
     }
   }
+
+  mcmc.GetProposeStep().ResetProposal();
 
   // Set the effective number of trials for the covariance that was loaded.
   // The covariance is usually calculated by HESSE.  Empirically, HESSE calls
@@ -667,13 +675,13 @@ bool SimpleMcmc::adaptiveRunCycle(AdaptiveStepMCMC& mcmc,
               << " (acc " << mcmc.GetProposeStep().GetAcceptance()
               << ", sig " << mcmc.GetProposeStep().GetSigma()
               << ", rms " << mcmc.GetStepRMS()
-              << ")"
+              << ", t " << getMonitor().evalLlhTimer << ")"
               << std::endl;
     }
   }
   // Make a final step and then save it with the covariance information.
   // These steps can be identified since the covariance is not empty, but
-  // they should be real independent steps.
+  // they are real independent steps.
   if (mcmc.Step(false,_adaptiveAcceptanceAlgorithm_)) fillPoint();
   // This is not resetting the "SaveAccepted" size so the step is actually
   // saved.
@@ -1050,72 +1058,8 @@ void SimpleMcmc::minimize() {
 }
 
 double SimpleMcmc::evalFitValid(const double* parArray_) {
-
   double value = this->evalFit( parArray_ );
-  if (hasValidParameterValues()) return value;
-  /// A "Really Big Number".  This is nominally just infinity, but is done as
-  /// a defined constant to make the code easier to understand.  This needs to
-  /// be an appropriate value to safely represent an impossible chi-squared
-  /// value "representing" -log(0.0)/2 and should should be larger than 5E+30.
-  const double RBN = std::numeric_limits<double>::infinity();
-  return RBN;
-}
-void SimpleMcmc::setParameterValidity(const std::string& validity) {
-
-
-  LogWarning << "Set parameter validity to " << validity << std::endl;
-
-  if      ( GenericToolbox::hasSubStr(validity, "noran") ){ _validFlags_ &= ~0b0001; }
-  else if ( GenericToolbox::hasSubStr(validity, "ran")   ){ _validFlags_ |= 0b0001; }
-
-  if (validity.find("nomir") != std::string::npos) _validFlags_ &= ~0b0010;
-  else if (validity.find("mir") != std::string::npos) _validFlags_ |= 0b0010;
-
-  if (validity.find("nophy") != std::string::npos) _validFlags_ &= ~0b0100;
-  else if (validity.find("phy") != std::string::npos) _validFlags_ |= 0b0100;
-
-  LogWarning << "Set parameter validity to " << validity << " (" << _validFlags_ << ")" << std::endl;
-}
-bool SimpleMcmc::hasValidParameterValues() const {
-
-
-  int invalid = 0;
-  for( auto& parSet: getModelPropagator().getParametersManager().getParameterSetsList() ){
-    for( auto& par : parSet.getParameterList() ){
-      if ( (_validFlags_ & 0b0001) != 0
-           and std::isfinite(par.getParameterLimits().min)
-           and par.getParameterValue() < par.getParameterLimits().min) GUNDAM_UNLIKELY_COMPILER_FLAG {
-        ++invalid;
-      }
-      if ((_validFlags_ & 0b0001) != 0
-          and std::isfinite(par.getParameterLimits().max)
-          and par.getParameterValue() > par.getParameterLimits().max) GUNDAM_UNLIKELY_COMPILER_FLAG {
-        ++invalid;
-      }
-      if ((_validFlags_ & 0b0010) != 0
-          and std::isfinite(par.getMirrorRange().min)
-          and par.getParameterValue() < par.getMirrorRange().min) GUNDAM_UNLIKELY_COMPILER_FLAG {
-        ++invalid;
-      }
-      if ((_validFlags_ & 0b0010) != 0
-          and std::isfinite(par.getMirrorRange().max)
-          and par.getParameterValue() > par.getMirrorRange().max) GUNDAM_UNLIKELY_COMPILER_FLAG {
-        ++invalid;
-      }
-      if ((_validFlags_ & 0b0100) != 0
-          and std::isfinite(par.getPhysicalLimits().min)
-          and par.getParameterValue() < par.getPhysicalLimits().min) GUNDAM_UNLIKELY_COMPILER_FLAG {
-        ++invalid;
-      }
-      if ((_validFlags_ & 0b0100) != 0
-          and std::isfinite(par.getPhysicalLimits().max)
-          and par.getParameterValue() > par.getPhysicalLimits().max) GUNDAM_UNLIKELY_COMPILER_FLAG {
-        ++invalid;
-      }
-
-    }
-  }
-  return (invalid == 0);
+  return value;
 }
 
 SimpleMcmcSequencer::SimpleMcmcSequencer() {};

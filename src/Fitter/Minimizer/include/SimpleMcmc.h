@@ -53,33 +53,11 @@ public:
   /// "infinite" likelihood.
   double evalFitValid( const double* parArray_ );
 
-  /// Define the type of validity that needs to be required by
-  /// hasValidParameterValues.  This accepts a string with the possible values
-  /// being:
-  ///
-  ///  "range" (default) -- Between the parameter minimum and maximum values.
-  ///  "norange"         -- Do not require parameters in the valid range
-  ///  "mirror"          -- Between the mirrored values (if parameter has
-  ///                       mirroring).
-  ///  "nomirror"        -- Do not require parameters in the mirrored range
-  ///  "physical"        -- Only physically meaningful values.
-  ///  "nophysical"      -- Do not require parameters in the physical range.
-  ///
-  /// Example: setParameterValidity("range,mirror,physical")
-  void setParameterValidity(const std::string& validity);
-
   /// Check that the parameters for the last time the propagator was used are
   /// all within the allowed ranges.
   [[nodiscard]] bool hasValidParameterValues() const;
 
 private:
-
-  /// A set of flags used by the evalFitValid method to determine the function
-  /// validity.  The flaggs are:
-  /// "1" -- require valid parameters
-  /// "2" -- require in the mirrored range
-  /// "4" -- require in the physical range
-  int _validFlags_{7};
 
   /// The basic algorithm used.  The only implemented algorithm is the
   /// metropolis step, but this may be extended to support Gibbs and other
@@ -94,13 +72,6 @@ private:
   /// The name of the output tree in the file.  While it can be changed, you
   /// probably shouldn't touch this.
   std::string _outTreeName_{"MCMC"};
-
-  /// Define what sort of validity the parameters have to have for a finite
-  /// likelihood.  The "range" value means that the parameter needs to be
-  /// between the allowed minimum and maximum values for the parameter.  The
-  /// "mirror" value means that the parameter needs to be between the mirror
-  /// bounds too.
-  std::string _likelihoodValidity_{"range,mirror,physical"};
 
   /// Choose the start point of MCMC is a random point (true) or the prior point
   /// (false).
