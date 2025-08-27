@@ -15,17 +15,20 @@ covariance.
 
 | Option                           | Type         | Description                           | Default      |
 |----------------------------------|--------------|---------------------------------------|--------------|
-| parameterName                    | string       | define parameter with name (expected) |              |
+| name                             | string       | define parameter with name (expected) |              |
 | parameterIndex                   | int          | define parameter with index           |              |
 | priorType                        | string       | penalty shape (Gaussian/Flat)         | Gaussian     |
 | priorValue                       | double       | prior value (expected)                | nan          |
 | isEnabled                        | bool         | use parameter in the propagator       | true         |
 | isFixed                          | bool         | use parameter in the propagator       | false        |
+| isThrown                         | bool         | throw parameter when generating toy   | false        |
 | parameterStepSize                | double       | Expected scale of the variation       | 1.0          |
-| parameterLimits                  | pair(double) | minimum and maximum allowed values    | [-inf, +inf] |
+| parameterLimits                  | pair(double) | minimum and maximum for the domain    | [-inf, +inf] |
+| physicalLimits                   | pair(double) | minimum and maximum physical range    | [-inf, +inf] |
 | throwLimits                      | pair(double) | minimum and maximum range to throw    | [-inf, +inf] |
 | mirrorRange                      | pair(double) | boundaries for internal mirroring     | [-inf, +inf] |
-| [dialSetDefinitions](Dial.md) | list(json)   | Only for single dimension dials       |              |
+| cyclicRange                      | pair(double) | boundaries of the cyclic interval     | [-inf, +inf] |
+| [dialSetDefinitions](Dial.md   ) | list(json)   | Only for single dimension dials       |              |
 
 #### dialSetDefinitions
 

@@ -382,6 +382,19 @@ bool SimpleMcmc::adaptiveDefaultProposalCovariance( AdaptiveStepMCMC& mcmc,
       double step = par->getStdDevValue();
       mcmc.GetProposeStep().SetGaussian(count0-1,step);
     }
+    if (par->isCyclic()) {
+      double min = par->getCyclicRange().min;
+      double max = par->getCyclicRange().max;
+      LogInfo << "Cyclic parameter " << par->getFullTitle()
+              << " range regularizes to "
+              << " [" << min << ", " << max << "]"
+              << std::endl;
+      if (useNormalizedFitSpace()) {
+        min = ParameterSet::toNormalizedParValue(min, *par);
+        max = ParameterSet::toNormalizedParValue(max, *par);
+      }
+      mcmc.GetProposeStep().SetCyclic(count0-1,min,max);
+    }
   }
 
   mcmc.GetProposeStep().ResetCorrelations();
@@ -547,6 +560,20 @@ bool SimpleMcmc::adaptiveLoadProposalCovariance( AdaptiveStepMCMC& mcmc,
         }
 #endif
         mcmc.GetProposeStep().SetGaussian(count1-1,step);
+        if (par1->isCyclic()) {
+          double min = par1->getCyclicRange().min;
+          double max = par1->getCyclicRange().max;
+          LogInfo << "Cyclic parameter " << par1->getFullTitle()
+                  << " range regularizes to "
+                  << " [" << min << ", " << max << "]"
+                  << std::endl;
+          if (useNormalizedFitSpace()) {
+            min = ParameterSet::toNormalizedParValue(min, *par1);
+            max = ParameterSet::toNormalizedParValue(max, *par1);
+          }
+          mcmc.GetProposeStep().SetCyclic(count1-1,min,max);
+        }
+
         continue;
       }
       double corr = proposalCov->GetBinContent(count1,count2)/sig1/sig2;

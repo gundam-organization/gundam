@@ -672,7 +672,9 @@ public:
             if (fForcedStep.size() != proposal.size()) {
                 throw std::logic_error("Proposal and forced length mismatch");
             }
-            std::copy(fForcedStep.begin(), fForcedStep.end(), proposal.begin());
+            for (int i = 0; i<proposal.size(); ++i) {
+                proposal[i] = fProposalType[i].Regularize(fForcedStep[i]);
+            }
             fForcedStep.clear();
             return;
         }
@@ -690,6 +692,7 @@ public:
                 // Make a uniform proposal.
                 proposal[scan] = gRandom->Uniform(fProposalType[scan].param1,
                                                   fProposalType[scan].param2);
+                proposal[scan] = fProposalType[scan].Regularize(proposal[scan]);
                 return;
             }
             // Make a Gaussian proposal around the initial value.
@@ -698,7 +701,7 @@ public:
                 sigma = std::sqrt(fProposalType[scan].param1);
             }
             double r = gRandom->Gaus(fCentralPoint[scan],sigma);
-            proposal[scan] = r;
+            proposal[scan] = fProposalType[scan].Regularize(r);
             MCMC_DEBUG(0) << "propose " << r << " for " << scan << std::endl;
             return;
         }
@@ -721,6 +724,11 @@ public:
                 if (fProposalType[j].type == 1) continue;
                 proposal[j] += fSigma*r*fDecomposition(i,j);
             }
+        }
+
+        // Make sure the proposal is regularized
+        for (std::size_t i = 0; i < proposal.size(); ++i) {
+            proposal[i] = fProposalType[i].Regularize(proposal[i]);
         }
     }
 
@@ -864,6 +872,26 @@ public:
                       << std::endl;
         fProposalType[dim].type = 0;
         fProposalType[dim].param1 = sigma*sigma;
+    }
+
+    /// Set the domain for a cyclic parameter.  When this is used, the
+    /// parameter step will be limited to be between `lower <= value < upper`,
+    /// and the cyclic domain can be removed if upper and lower are equal.
+    /// When a cyclic domain is set, parameter value will be regularized after
+    /// each step, and the difference between two parameters is assumes a
+    /// periodic domain (this limits the maximum difference to range/2).
+    void SetCyclic(int dim, double lower, double upper) {
+        if (dim < 0 || (std::size_t) dim >= fProposalType.size()) {
+            MCMC_ERROR << "Dimension " << dim << " is out of range."
+                       << std::endl;
+            return;
+        }
+        MCMC_DEBUG(1) << "Cyclic domain for dimension " << dim
+                      << " is " << std::min(lower,upper)
+                      << " to " << std::max(lower,upper)
+                      << std::endl;
+        fProposalType[dim].lower = std::min(lower,upper);
+        fProposalType[dim].range = std::abs(upper-lower);
     }
 
     /// Reset the correlations (removes all prior correlations).  This should
@@ -1778,11 +1806,10 @@ private:
         // Update the estimate of the central value.  This is simply a running
         // average of the position of the points in the posterior.
         for (std::size_t i=0; i< current.size(); ++i) {
-            fCentralPointChange[i] = fCentralPoint[i];
-            fCentralPoint[i] *= fCentralPointTrials;
-            fCentralPoint[i] += current[i];
-            fCentralPoint[i] /= fCentralPointTrials + 1;
-            fCentralPointChange[i] = fCentralPoint[i] - fCentralPointChange[i];
+            double d = fProposalType[i].Difference(current[i],fCentralPoint[i]);
+            fCentralPointChange[i] = d/(fCentralPointTrials+1);
+            fCentralPoint[i] += fCentralPointChange[i];
+            fCentralPoint[i] = fProposalType[i].Regularize(fCentralPoint[i]);
         }
         fCentralPointTrials = std::min(fCovarianceWindow,
                                        fCentralPointTrials+1.0);
@@ -1804,8 +1831,11 @@ private:
                     v -= fCentralPointChange[i]*fCentralPointChange[j];
 #endif
                     // Calculate the "covariance" of the new point.
-                    double r = (current[i]-fCentralPoint[i])
-                        *(current[j]-fCentralPoint[j]);
+                    double r
+                        = (fProposalType[i].Difference(current[i],
+                                                      fCentralPoint[i])
+                           *fProposalType[i].Difference(current[j],
+                                                        fCentralPoint[j]));
                     // Update the running average of the covariance.
                     v *= fCovarianceTrials;
                     v += r;
@@ -1894,10 +1924,25 @@ private:
 
     // Record the type of proposal to use for each dimension
     struct ProposalType {
-        ProposalType(): type(0), param1(0), param2(0) {}
+        ProposalType(): type(0), param1(0), param2(0), lower(0), range(-1) {}
         int type;      // 0 for Gaussian, 1 for Uniform.
         double param1; // Sigma for Gaussian, Minimum for Uniform
         double param2; // Not used for Gaussian, Maximum for Uniform
+        double lower;  // The lower end  of a cyclic parameter range
+        double range;  // The total range of a cyclic parameter
+        double Regularize(double v) {
+            if (range < std::numeric_limits<float>::epsilon()) return v;
+            while (v < lower) v += range; // Brute force, but clear
+            while (v >= lower+range) v -= range;
+            return v;
+        }
+        double Difference(double u, double v) {
+            u = Regularize(u) - Regularize(v);
+            if (range <  std::numeric_limits<float>::epsilon()) return u;
+            while (u > 0.5*range) u -= range; // Brute force, but clear
+            while (u <= -0.5*range) u += range;
+            return u;
+        }
     };
 
     // The type of distribution to draw the proposal for a dimension from.
@@ -1978,7 +2023,7 @@ private:
 
 // MIT License
 
-// Copyright (c) 2017-2022 Clark McGrew
+// Copyright (c) 2017-2025 Clark McGrew
 
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal

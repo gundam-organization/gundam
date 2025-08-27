@@ -49,7 +49,6 @@ public:
   void setThrowValue(double throwValue){ _throwValue_ = throwValue; }
   void setStdDevValue(double stdDevValue){ _stdDevValue_ = stdDevValue; }
   void setDialSetConfig(const std::vector<ConfigReader>& dialDefinitionsList_){ _dialDefinitionsList_ = dialDefinitionsList_; }
-  void setMarginalised(bool isMarginalised){ _isMarginalised_ = isMarginalised; }
 
   /// Set the limits for this parameter.  Parameter values less than
   /// this value are illegal, and the likelihood is undefined.  The job will
@@ -73,6 +72,16 @@ public:
   /// while the input parameter value can continue outside of the bounds.
   void setMaxMirror(double maxMirror);
 
+  /// Record the minimum boundary for a cyclic parameter.  This is mostly
+  /// for documentation purposes, but the fitter might use it (e.g. the
+  /// MCMC) during the fit.
+  void setMinCyclic(double minCyclic);
+
+  /// Record the minimum boundary for a cyclic parameter.  This is mostly
+  /// for documentation purposes, but the fitter might use it (e.g. the
+  /// MCMC) during the fit.
+  void setMaxCyclic(double maxCyclic);
+
   /// Set the parameter value.  This always checks the parameter validity, but
   /// if force is true, then it will only print warnings, otherwise it stops
   /// with EXIT_FAILURE.
@@ -84,6 +93,7 @@ public:
   [[nodiscard]] auto isEigen() const{ return _isEigen_; }
   [[nodiscard]] auto isEnabled() const{ return _isEnabled_; }
   [[nodiscard]] auto isThrown() const{ return _isThrown_ and _isEnabled_ and not _isFixed_; }
+  [[nodiscard]] bool isCyclic() const;
   [[nodiscard]] auto gotUpdated() const { return _gotUpdated_; }
   [[nodiscard]] auto getParameterIndex() const{ return _parameterIndex_; }
   [[nodiscard]] auto getStepSize() const{ return _stepSize_; }
@@ -94,12 +104,17 @@ public:
   [[nodiscard]] auto getPriorType() const{ return _priorType_; }
   [[nodiscard]] auto& getParameterLimits() const{ return _parameterLimits_; }
   [[nodiscard]] auto& getMirrorRange() const{ return _mirrorRange_; }
+  [[nodiscard]] auto& getCyclicRange() const{ return _cyclicRange_; }
   [[nodiscard]] auto& getThrowLimits() const{ return _throwLimits_; }
   [[nodiscard]] auto& getPhysicalLimits() const{ return _physicalLimits_; }
   [[nodiscard]] auto& getName() const{ return _name_; }
   [[nodiscard]] auto& getDialDefinitionsList() const{ return _dialDefinitionsList_; }
 
   [[nodiscard]] double getParameterValue() const;
+
+  /// The value of the parameter after applying any mirroring, and cyclic
+  /// corrections.
+  [[nodiscard]] double getRegularizedValue() const;
 
   /// Query if a value is in the domain of likelihood for this parameter.  Math
   /// remediation for those of us (including myself) who don't recall grammar
@@ -121,8 +136,6 @@ public:
 
   /// Query if a value matchs the validity requirements.
   [[nodiscard]] bool isValidValue(double value) const;
-
-  [[nodiscard]] bool isMarginalised() const{ return _isMarginalised_; }
 
   /// Copy the prior value of the parameter into the current value.  This will
   /// fail if the prior value has not been set.
@@ -182,11 +195,11 @@ private:
   GenericToolbox::Range _throwLimits_;
   GenericToolbox::Range _physicalLimits_;
   GenericToolbox::Range _mirrorRange_;
+  GenericToolbox::Range _cyclicRange_;
 
   double _stepSize_{std::nan("unset")};
   std::string _name_{};
   std::string _dialsWorkingDirectory_{"."};
-  bool _isMarginalised_{false};
   ConfigReader _parameterConfig_{};
   std::vector<ConfigReader> _dialDefinitionsList_{};
 
