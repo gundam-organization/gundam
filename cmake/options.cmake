@@ -20,6 +20,7 @@ option( WITH_MINUIT2_MISSING "Allow MINUIT2 to be missing" OFF )
 option( WITH_PYTHON_INTERFACE "Compile the python interface modules" OFF )
 option( WITH_TESTS "Build CMake tests." ON )
 option( WITH_GOOGLE_TEST "Enables GoogleTest unit tests." OFF )
+option( WITH_PYTORCH "Enable using PyTorch to sample likelihood from pytorch model." OFF )
 
 # compile helper
 option( YAMLCPP_DIR "Set custom path to yaml-cpp lib." OFF )

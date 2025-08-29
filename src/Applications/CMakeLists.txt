@@ -12,14 +12,11 @@ set(
     gundamConfigCompare
     gundamPlotExtractor
     gundamConfigUnfolder
+    gundamSystematicsThrower
 )
 
-set(SCRIPT_LIST
-  # GUNDAM scripts (not compiled)
-  gundamContinue
-)
 
-if( WITH_GUNDAM_SANDBOX_APP )
+if( ENABLE_DEV_MODE )
     list(APPEND APPLICATION_LIST Sandbox)
 endif()
 
@@ -85,6 +82,8 @@ target_link_libraries( gundamFitPlot GundamUtils )
 target_link_libraries( gundamConfigUnfolder GundamUtils )
 target_link_libraries( gundamConfigCompare GundamUtils )
 target_link_libraries( gundamPlotExtractor GundamUtils )
+target_link_libraries( gundamSystematicsThrower GundamUtils GundamFitter )
+
 
 if( WITH_GUNDAM_ROOT_APP )
 #target_sources( gundamRoot PRIVATE G__GundamRootDict.cxx )
@@ -94,8 +93,3 @@ target_link_libraries( gundamRoot
     #    GundamPropagator
     )
 endif ()
-
-foreach( script ${SCRIPT_LIST} )
-  cmessage( STATUS "Adding script: ${script}" )
-  install(PROGRAMS src/${script} DESTINATION bin)
-endforeach()

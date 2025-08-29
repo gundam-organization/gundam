@@ -218,7 +218,8 @@ void ParameterSet::processCovarianceMatrix(){
       std::exit(1);
     }
   }
-  LogInfo << nbParameters << " effective parameters were defined in set: " << getName() << std::endl;
+
+  LogInfo << "Full prior has " << _priorFullCovarianceMatrix_->GetNrows() << " rows. Set has " << _parameterList_.size() << " params. "<< nbParameters << " effective parameters were defined in set: " << getName() << std::endl;
 
   _priorCovarianceMatrix_ = std::make_shared<TMatrixDSym>(nbParameters);
   int iStrippedPar = -1;
@@ -857,8 +858,9 @@ JsonType ParameterSet::exportInjectorConfig() const{
 
   return out;
 }
-void ParameterSet::injectParameterValues(const JsonType& config_){
-  LogInfo << "Importing parameters from config for \"" << this->getName() << "\"" << std::endl;
+void ParameterSet::injectParameterValues(const JsonType& config_, bool quietVerbose_){
+
+  if( not quietVerbose_) LogInfo << "Importing parameters from config for \"" << this->getName() << "\"" << std::endl;
 
   auto config = ConfigUtils::getForwardedConfig(config_);
   LogExitIf( config.empty(), "Invalid injector config" << std::endl << config_ );
@@ -887,7 +889,7 @@ void ParameterSet::injectParameterValues(const JsonType& config_){
       }
 
       LogScopeIndent;
-      LogInfo << "Injecting \"" << this->getParameterList()[iPar].getFullTitle() << "\": " << parList[iPar] << std::endl;
+      if( not quietVerbose_) LogInfo << "Injecting \"" << this->getParameterList()[iPar].getFullTitle() << "\": " << parList[iPar] << std::endl;
       this->getParameterList()[iPar].setParameterValue( std::stod(parList[iPar]) );
     }
   }
@@ -905,7 +907,7 @@ void ParameterSet::injectParameterValues(const JsonType& config_){
           continue;
         }
 
-        LogInfo << "Injecting \"" << parPtr->getFullTitle() << "\": " << GenericToolbox::Json::fetchValue<double>(parValueEntry, "value") << std::endl;
+        if( not quietVerbose_) LogInfo << "Injecting \"" << parPtr->getFullTitle() << "\": " << GenericToolbox::Json::fetchValue<double>(parValueEntry, "value") << std::endl;
         parPtr->setParameterValue( GenericToolbox::Json::fetchValue<double>(parValueEntry, "value") );
       }
       else if( GenericToolbox::Json::doKeyExist(parValueEntry, "title") ){
@@ -919,7 +921,7 @@ void ParameterSet::injectParameterValues(const JsonType& config_){
           continue;
         }
 
-        LogInfo << "Injecting \"" << parPtr->getFullTitle() << "\": " << GenericToolbox::Json::fetchValue<double>(parValueEntry, "value") << std::endl;
+        if( not quietVerbose_) LogInfo << "Injecting \"" << parPtr->getFullTitle() << "\": " << GenericToolbox::Json::fetchValue<double>(parValueEntry, "value") << std::endl;
         parPtr->setParameterValue( GenericToolbox::Json::fetchValue<double>(parValueEntry, "value") );
       }
       else if( GenericToolbox::Json::doKeyExist(parValueEntry, "index") ){
@@ -933,7 +935,7 @@ void ParameterSet::injectParameterValues(const JsonType& config_){
           continue;
         }
 
-        LogInfo << "Injecting \"" << parPtr->getFullTitle() << "\": " << GenericToolbox::Json::fetchValue<double>(parValueEntry, "value") << std::endl;
+        if( not quietVerbose_) LogInfo << "Injecting \"" << parPtr->getFullTitle() << "\": " << GenericToolbox::Json::fetchValue<double>(parValueEntry, "value") << std::endl;
         parPtr->setParameterValue( GenericToolbox::Json::fetchValue<double>(parValueEntry, "value") );
       }
       else {

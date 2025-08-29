@@ -209,3 +209,23 @@ else( WITH_CUDA_LIB )
     cmessage( STATUS "WITH_CACHE_MANAGER=ON: CUDA support disabled. Use -D WITH_CUDA_LIB=ON if needed." )
   endif()
 endif( WITH_CUDA_LIB )
+
+
+####################
+# libtorch (optional)
+####################
+if( WITH_PYTORCH )
+  cmessage( STATUS "WITH_PYTORCH=ON: Checking for libtorch ...")
+  find_package( Torch REQUIRED )
+  if( Torch_FOUND )
+    cmessage( STATUS "libtorch found.")
+    cmessage( STATUS " - Torch include directory: ${TORCH_INCLUDE_DIRS}")
+    cmessage( STATUS " - Torch lib: ${TORCH_LIBRARIES}")
+    include_directories( ${TORCH_INCLUDE_DIRS} )
+    link_libraries( ${TORCH_LIBRARIES} )
+  else()
+    cmessage( FATAL_ERROR "libtorch not found.")
+  endif()
+else()
+  cmessage( STATUS "WITH_PYTORCH=OFF: libtorch disabled.")
+endif( WITH_PYTORCH )
