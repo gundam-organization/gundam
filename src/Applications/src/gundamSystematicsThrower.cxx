@@ -536,9 +536,9 @@ int main(int argc, char** argv){
             if (setMatches) {
                 LogInfo << " will be marginalized out.   \n";
                 // loop over the parameters in the set and set the corresponding margThis to true
-                for (auto &par: parSet.getParameterList()) {
-                    par.setMarginalised(true);
-                }
+//                for (auto &par: parSet.getParameterList()) {
+//                    par.setMarginalised(true);
+//                }
             } else {
                 LogInfo << " will not be marginalized out.   \n";
             }
@@ -558,11 +558,11 @@ int main(int argc, char** argv){
                     matches = (false);
                 }
             }
-            par.setMarginalised(matches or setMatches);
-            if (!par.isMarginalised()){
-                marg_param_list->Add(new TObjString(par.getFullTitle().c_str()));
-            }
-            if(par.isMarginalised()){
+//            par.setMarginalised(matches or setMatches);
+//            if (!par.isMarginalised()){
+//                marg_param_list->Add(new TObjString(par.getFullTitle().c_str()));
+//            }
+            if(false){
                 LogInfo << "Parameter " << par.getFullTitle()
                 << " -> type: " << par.getPriorType() << " mu=" << par.getPriorValue()
                 << " sigma= " << par.getStdDevValue() << " limits: "<< par.getPhysicalLimits().min << " - "
@@ -730,12 +730,11 @@ int main(int argc, char** argv){
                 if (not par.isEnabled()) continue;
 //                LogInfo<<"  "<<par.getTitle()<<" -> "<<par.getParameterValue()<<std::endl;
                 parameters->push_back(par.getParameterValue());
-                margThis->push_back(par.isMarginalised());
+                margThis->push_back(0);
                 prior->push_back(par.getDistanceFromNominal() * par.getDistanceFromNominal());
                 priorSum += prior->back();
                 gLLH += weightsChiSquare->at(iPar);
-                if(not par.isMarginalised())
-                    survivingParameterValues.push_back(par.getParameterValue());
+                survivingParameterValues.push_back(par.getParameterValue());
                 iPar++;
             }
         }
