@@ -38,6 +38,12 @@ PYBIND11_MODULE(GUNDAM, module) {
   .def("cd", &GenericToolbox::Json::cd)
   ;
 
+  pybind11::class_<GenericToolbox::TFilePath>(gtModule, "TFilePath")
+  .def("getSubDir", &GenericToolbox::TFilePath::getSubDir)
+  ;
+
+
+
   // ConfigUtils namespace
   auto configUtilsModule = module.def_submodule("ConfigUtils");
   pybind11::class_<ConfigUtils::ConfigBuilder>(configUtilsModule, "ConfigBuilder")
@@ -91,6 +97,7 @@ PYBIND11_MODULE(GUNDAM, module) {
   .def(pybind11::init())
   .def("getParametersManager", pybind11::overload_cast<>(&Propagator::getParametersManager), pybind11::return_value_policy::reference)
   .def("copyHistBinContentFrom", pybind11::overload_cast<const Propagator&>(&Propagator::copyHistBinContentFrom), pybind11::return_value_policy::reference)
+  .def("writeParameterStateTree", &Propagator::writeParameterStateTree)
   ;
 
   pybind11::class_<LikelihoodInterface>(module, "LikelihoodInterface")
@@ -124,6 +131,7 @@ PYBIND11_MODULE(GUNDAM, module) {
   .def("fit", &FitterEngine::fit)
   .def("getMinimizer", pybind11::overload_cast<>(&FitterEngine::getMinimizer), pybind11::return_value_policy::reference)
   .def("getLikelihoodInterface", pybind11::overload_cast<>(&FitterEngine::getLikelihoodInterface), pybind11::return_value_policy::reference)
+  .def("getTFilePath", &FitterEngine::getTFilePath)
   ;
 }
 
