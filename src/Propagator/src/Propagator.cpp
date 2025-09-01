@@ -209,7 +209,7 @@ void Propagator::writeParameterStateTree(const GenericToolbox::TFilePath& saveDi
 
 
   tree->Fill();
-  tree->Write();
+  tree->Write(tree->GetName(), TObject::kOverwrite);
   delete tree;
 
 }
