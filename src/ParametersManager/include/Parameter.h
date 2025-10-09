@@ -40,6 +40,7 @@ public:
   void setPriorType(PriorType priorType){ _priorType_ = priorType; }
   void setIsEnabled(bool isEnabled){ _isEnabled_ = isEnabled; }
   void setIsFixed(bool isFixed){ _isFixed_ = isFixed; }
+  void setIsFrozen(bool isFrozen){ _isFrozen_ = isFrozen; }
   void setIsEigen(bool isEigen){ _isEigen_ = isEigen; }
   void setIsFree(bool isFree){ _isFree_ = isFree; }
   void setIsThrown(bool isThrown){ _isThrown_ = isThrown; }
@@ -72,13 +73,15 @@ public:
   /// while the input parameter value can continue outside of the bounds.
   void setMaxMirror(double maxMirror);
 
-  /// Record the minimum boundary for a cyclic parameter.  This is mostly
-  /// for documentation purposes, but the fitter might use it (e.g. the
+  /// Record the minimum boundary for a cyclic parameter.  A cyclic parameter
+  /// will "wrap" from the minimum to maximum boundary of the range.  This is
+  /// mostly for documentation purposes, but the fitter might use it (e.g. the
   /// MCMC) during the fit.
   void setMinCyclic(double minCyclic);
 
-  /// Record the minimum boundary for a cyclic parameter.  This is mostly
-  /// for documentation purposes, but the fitter might use it (e.g. the
+  /// Record the minimum boundary for a cyclic parameter.  A cyclic parameter
+  /// will "wrap" from the minimum to maximum boundary of the range.  This is
+  /// mostly for documentation purposes, but the fitter might use it (e.g. the
   /// MCMC) during the fit.
   void setMaxCyclic(double maxCyclic);
 
@@ -87,18 +90,53 @@ public:
   /// with EXIT_FAILURE.
   void setParameterValue(double parameterValue, bool force=false);
 
-  // const getters
+  /// The parameter has no constrains applied.
   [[nodiscard]] auto isFree() const{ return _isFree_; }
+
+  /// The parameter is fixed, and does not enter into the penalty term.
+  /// Although it is removed from the covariance and its value is used for the
+  /// reweighting.  This constrasts with a frozen variable where the value of
+  /// the variable will not be changed by the fit, but the variable is used to
+  /// calculate the penalty term.
   [[nodiscard]] auto isFixed() const{ return _isFixed_; }
+
+  /// The parameter affects the likelihood, and is included in the penalty,
+  /// but should not be varied as part of the fit.  A common usage is for
+  /// profiling where a parameter is frozen at a particular value and the
+  /// likelihood is minimized with respect to the other parameters.  Notice
+  /// that this only changes the behavior of the maximum likelihood "fit", and
+  /// does not change the behavior toy throws, or the Bayesian MCMC analysis
+  /// [where the absolute value of the LLH isn't meaningful].  Note:
+  /// Parameters in an eigen decomposed parameter set cannot be frozen.
+  [[nodiscard]] auto isFrozen() const{ return _isFrozen_; }
+
+  /// When a parameter set is eigen decomposed, a set of "fake" parameters is
+  /// created for each of the eigen vectors.  This is true when the current
+  /// parameter is one of the "fake" parameters.
   [[nodiscard]] auto isEigen() const{ return _isEigen_; }
+
+  /// The parameter is enable for the analysis.  If this is false, then the
+  /// value is not used for reweighting, and does not affect the penalty.
   [[nodiscard]] auto isEnabled() const{ return _isEnabled_; }
+
+  /// A random value should be generated for this parameter when the parameter
+  /// set is thrown.  Notice that a "frozen" parameter is thrown, while a
+  /// "fixed" parameter is not.
   [[nodiscard]] auto isThrown() const{ return _isThrown_ and _isEnabled_ and not _isFixed_; }
+
   [[nodiscard]] bool isCyclic() const;
   [[nodiscard]] auto gotUpdated() const { return _gotUpdated_; }
   [[nodiscard]] auto getParameterIndex() const{ return _parameterIndex_; }
   [[nodiscard]] auto getStepSize() const{ return _stepSize_; }
+
+  /// Prefit expected value for the parameter.  The systematic penalty term
+  /// is calculated relative to this value.
   [[nodiscard]] auto getPriorValue() const{ return _priorValue_; }
+
+  /// The random value for this parameter generated with the parameter is
+  /// thrown.
   [[nodiscard]] auto getThrowValue() const{ return _throwValue_; }
+
   [[nodiscard]] auto getStdDevValue() const{ return _stdDevValue_; }
   [[nodiscard]] auto getOwner() const{ return _owner_; }
   [[nodiscard]] auto getPriorType() const{ return _priorType_; }
@@ -110,6 +148,7 @@ public:
   [[nodiscard]] auto& getName() const{ return _name_; }
   [[nodiscard]] auto& getDialDefinitionsList() const{ return _dialDefinitionsList_; }
 
+  /// Get the current value of the parameter.
   [[nodiscard]] double getParameterValue() const;
 
   /// The value of the parameter after applying any mirroring, and cyclic
@@ -154,8 +193,16 @@ public:
   /// setStdDevvalue()).  This is a signed difference.
   [[nodiscard]] double getDistanceFromNominal() const;
 
+  /// Provide a string summarizing the parameter (bounds, enabled, etc).
   [[nodiscard]] std::string getSummary() const;
+
+  /// Provide a string name for the parameter.  This will be unique
+  /// within the parameter set, and is constructed using the index of the
+  /// parameter in the set, and an optional user provided name.
   [[nodiscard]] std::string getTitle() const;
+
+  /// Provide a string name for the parameter that is unique.  This is
+  /// constructed using the parameter set name, and the parameter title.
   [[nodiscard]] std::string getFullTitle() const;
 
   /// Define the type of validity that needs to be required by
@@ -172,15 +219,22 @@ public:
   ///
   /// Example: setParameterValidity("range,mirror,physical")
   void setValidity(const std::string& validity);
+
+  /// Set the parameter validity based on bit field:
+  /// 0b0001 -- The parameter should be between the minimum and maximum value.
+  /// 0b0010 -- The parameter should be between the mirroring values.
+  /// 0b0100 -- The parameter should be between the physical bounds.
+  /// The setValidity(string) overload is the prefered interface.
   void setValidity(int validity) {_validFlags_ = validity;}
 
-  // print
+  /// A convenience function to print the summary to LogInfo
   void printConfiguration() const;
 
 private:
   // Parameters
   bool _isEnabled_{true};
   bool _isFixed_{false};
+  bool _isFrozen_{false};
   bool _isEigen_{false};
   bool _isFree_{false};
   bool _isThrown_{true};
