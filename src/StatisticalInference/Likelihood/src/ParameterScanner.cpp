@@ -386,6 +386,7 @@ void ParameterScanner::generateOneSigmaPlots(TDirectory* saveDir_){
       if( not effPar.isEnabled() ) continue;
       std::string tag;
       if( effPar.isFixed() ){ tag += "_FIXED"; }
+      if( effPar.isFrozen() ){ tag += "_FROZEN"; }
       makeOneSigmaPlotFct(
           effPar,
           GenericToolbox::mkdirTFile(saveDir_, parSet.getName() + "/" + effPar.getTitle() + tag)
@@ -538,6 +539,7 @@ void ParameterScanner::varyEvenRates(const std::vector<double>& paramVariationLi
         std::string tag;
         if( par.isFixed() ){ tag += "_FIXED"; }
         if( par.isFree() ){ tag += "_FREE"; }
+        if( par.isFrozen() ){ tag += "_FROZEN"; }
 
         TDirectory* subDir = GenericToolbox::mkdirTFile(saveDir_, parSet.getName() + "/" + par.getTitle() + tag);
         makeVariedEventRatesFct(par, paramVariationList_, subDir);
