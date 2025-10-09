@@ -100,7 +100,7 @@ void RootMinimizer::initializeImpl(){
     );
   }
 
-  LogWarning << "Initializing RootMinimizer..." << std::endl;
+  LogInfo << "Initializing RootMinimizer..." << std::endl;
   if( not std::isnan(_tolerancePerDegreeOfFreedom_) ) {
     LogWarning << "Using tolerance per degree of freedom: " << _tolerancePerDegreeOfFreedom_ << std::endl;
     _tolerance_ = _tolerancePerDegreeOfFreedom_ * fetchNbDegreeOfFreedom();
@@ -170,7 +170,7 @@ void RootMinimizer::initializeImpl(){
     }
   }
 
-  LogWarning << "RootMinimizer initialized." << std::endl;
+  LogInfo << "RootMinimizer initialized." << std::endl;
 }
 
 void RootMinimizer::dumpFitParameterSettings() {
@@ -236,10 +236,25 @@ void RootMinimizer::minimize(){
   int nbFitCallOffset = getMonitor().nbEvalLikelihoodCalls;
   LogInfo << "Fit call offset: " << nbFitCallOffset << std::endl;
 
+  /// Apply the frozen state to the root minimizer variable definitions
+  for( std::size_t iFitPar = 0 ; iFitPar < getMinimizerFitParameterPtr().size() ; iFitPar++ ){
+    auto& fitPar = *(getMinimizerFitParameterPtr()[iFitPar]);
+    if (fitPar.isFrozen()) {
+      if (fitPar.isEigen()) {
+        LogAlert << "Eigen decomposed parameters cannot be frozen, and remain free"
+                 << std::endl;
+      }
+      getMinimizer()->FixVariable(iFitPar);
+    }
+    else {
+      getMinimizer()->ReleaseVariable(iFitPar);
+    }
+  }
+
   dumpFitParameterSettings();
 
   if( _preFitWithSimplex_ ){
-    LogWarning << "Running simplex algo before the minimizer" << std::endl;
+    LogInfo << "Running simplex algo before the minimizer" << std::endl;
     LogThrowIf(_minimizerType_ != "Minuit2", "Can't launch simplex with " << _minimizerType_);
 
     std::string originalAlgo = _rootMinimizer_->Options().MinimizerAlgorithm();
@@ -277,7 +292,7 @@ void RootMinimizer::minimize(){
     _rootMinimizer_->SetStrategy(_strategy_);
 
     LogInfo << getMonitor().convergenceMonitor.generateMonitorString(); // lasting printout
-    LogWarning << "Simplex ended after " << getMonitor().nbEvalLikelihoodCalls - nbFitCallOffset << " calls." << std::endl;
+    LogInfo << "Simplex ended after " << getMonitor().nbEvalLikelihoodCalls - nbFitCallOffset << " calls." << std::endl;
   }
 
   getMonitor().minimizerTitle = _minimizerType_ + "/" + _minimizerAlgo_;
@@ -298,10 +313,10 @@ void RootMinimizer::minimize(){
 
   LogInfo << getMonitor().convergenceMonitor.generateMonitorString(); // lasting printout
   LogInfo << "Minimization ended after " << nbMinimizeCalls << " calls." << std::endl;
-  if(_minimizerType_ == "Minuit" or _minimizerType_ == "Minuit2") LogWarning << "Status code: " << GundamUtils::minuitStatusCodeStr.at(_rootMinimizer_->Status()) << std::endl;
-  else LogWarning << "Status code: " << _rootMinimizer_->Status() << std::endl;
-  if(_minimizerType_ == "Minuit" or _minimizerType_ == "Minuit2") LogWarning << "Covariance matrix status code: " << GundamUtils::covMatrixStatusCodeStr.at(_rootMinimizer_->CovMatrixStatus()) << std::endl;
-  else LogWarning << "Covariance matrix status code: " << _rootMinimizer_->CovMatrixStatus() << std::endl;
+  if(_minimizerType_ == "Minuit" or _minimizerType_ == "Minuit2") LogInfo << "Status code: " << GundamUtils::minuitStatusCodeStr.at(_rootMinimizer_->Status()) << std::endl;
+  else LogInfo << "Status code: " << _rootMinimizer_->Status() << std::endl;
+  if(_minimizerType_ == "Minuit" or _minimizerType_ == "Minuit2") LogInfo << "Covariance matrix status code: " << GundamUtils::covMatrixStatusCodeStr.at(_rootMinimizer_->CovMatrixStatus()) << std::endl;
+  else LogInfo << "Covariance matrix status code: " << _rootMinimizer_->CovMatrixStatus() << std::endl;
 
   // Make sure we are on the right spot
   updateCacheToBestfitPoint();
@@ -424,13 +439,13 @@ void RootMinimizer::calcErrors(){
 
   LogThrowIf(not isInitialized(), "not initialized");
 
-  LogWarning << std::endl << GenericToolbox::addUpDownBars("Calling calcErrors()...") << std::endl;
+  LogInfo << std::endl << GenericToolbox::addUpDownBars("Calling calcErrors()...") << std::endl;
 
   int nbFitCallOffset = getMonitor().nbEvalLikelihoodCalls;
   LogInfo << "Fit call offset: " << nbFitCallOffset << std::endl;
 
   if     ( _errorAlgo_ == "Minos" ){
-    LogWarning << std::endl << GenericToolbox::addUpDownBars("Calling MINOS...") << std::endl;
+    LogInfo << std::endl << GenericToolbox::addUpDownBars("Calling MINOS...") << std::endl;
 
     double errLow, errHigh;
     _rootMinimizer_->SetPrintLevel(0);
@@ -443,7 +458,7 @@ void RootMinimizer::calcErrors(){
       getMonitor().isEnabled = false;
 
 #if ROOT_VERSION_CODE >= ROOT_VERSION(6,23,02)
-      LogWarning << GundamUtils::minosStatusCodeStr.at(_rootMinimizer_->MinosStatus()) << std::endl;
+      LogInfo << GundamUtils::minosStatusCodeStr.at(_rootMinimizer_->MinosStatus()) << std::endl;
 #endif
       if( isOk ){
         LogInfo << _rootMinimizer_->VariableName(iFitPar) << ": " << errLow << " <- " << _rootMinimizer_->X()[iFitPar] << " -> +" << errHigh << std::endl;
@@ -487,14 +502,14 @@ void RootMinimizer::calcErrors(){
     LogInfo << "Error calculation took: " << GenericToolbox::toString(errorStopWatch.eval()) << std::endl;
 
     LogInfo << "Hesse ended after " << getMonitor().nbEvalLikelihoodCalls - nbFitCallOffset << " calls." << std::endl;
-    LogWarning << "HESSE status code: " << GundamUtils::hesseStatusCodeStr.at(_rootMinimizer_->Status()) << std::endl;
-    LogWarning << "Covariance matrix status code: " << GundamUtils::covMatrixStatusCodeStr.at(_rootMinimizer_->CovMatrixStatus()) << std::endl;
+    LogInfo << "HESSE status code: " << GundamUtils::hesseStatusCodeStr.at(_rootMinimizer_->Status()) << std::endl;
+    LogInfo << "Covariance matrix status code: " << GundamUtils::covMatrixStatusCodeStr.at(_rootMinimizer_->CovMatrixStatus()) << std::endl;
 
     // Make sure we are on the right spot
     updateCacheToBestfitPoint();
 
     if(not _fitHasConverged_){
-      LogError  << "Hesse did not converge." << std::endl;
+      LogError << "Hesse did not converge." << std::endl;
       LogError << getMonitor().convergenceMonitor.generateMonitorString(); // lasting printout
     }
     else{
@@ -737,7 +752,7 @@ void RootMinimizer::writePostFitData( TDirectory* saveDir_) {
       }
 
       double conditioning = decompCovMatrix.GetEigenValues().Min() / decompCovMatrix.GetEigenValues().Max();
-      LogWarning << "Post-fit error conditioning is: " << conditioning << std::endl;
+      LogInfo << "Post-fit error conditioning is: " << conditioning << std::endl;
 
       LogInfo << "Reconstructing postfit hessian matrix..." << std::endl;
       auto eigenValuesInv = TVectorD(decompCovMatrix.GetEigenValues());
@@ -1385,7 +1400,7 @@ void RootMinimizer::updateCacheToBestfitPoint(){
     LogThrow("No best fit point provided by the minimizer.");
   }
 
-  LogWarning << "Updating propagator cache to the best fit point..." << std::endl;
+  LogInfo << "Updating propagator cache to the best fit point..." << std::endl;
   this->evalFit(_rootMinimizer_->X() );
 }
 void RootMinimizer::saveGradientSteps(){
