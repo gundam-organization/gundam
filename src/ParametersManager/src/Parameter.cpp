@@ -78,7 +78,7 @@ void Parameter::initializeImpl() {
 
   if( _priorValue_ <= _parameterLimits_.min or _priorValue_ >= _parameterLimits_.max ) {
     // the user should know. This will prevent Asimov fits from converging
-o    LogAlert << "Prior value of \"" << getFullTitle() << "\" is set on the defined limits: " << _priorValue_ << " -> " << _parameterLimits_ << std::endl;
+    LogAlert << "Prior value of \"" << getFullTitle() << "\" is set on the defined limits: " << _priorValue_ << " -> " << _parameterLimits_ << std::endl;
   }
 
   // make sure the throws will always give parameters in bounds
