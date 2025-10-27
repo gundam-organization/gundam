@@ -389,7 +389,7 @@ void FitterEngine::fit(){
     LogInfo << getLikelihoodInterface().getSummary() << std::endl;
   }
 
-  _likelihoodInterface_.getModelPropagator().writeParameterStateTree(
+  _likelihoodInterface_.getModelPropagator().writeParameterValueTree(
     GenericToolbox::TFilePath(_saveDir_, "preFit")
   );
 

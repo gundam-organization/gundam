@@ -263,6 +263,18 @@ void RootMinimizer::minimize(){
     // Make sure we are on the right spot
     updateCacheToBestfitPoint();
 
+    for( auto& parSet : getModelPropagator().getParametersManager().getParameterSetsList() ) {
+      for( auto& par : parSet.getParameterList() ) {
+        _parametersPosteriorValueMap_[&par] = par.getParameterValue();
+      }
+
+      if( parSet.isEnableEigenDecomp() ) {
+        for( auto& par : parSet.getEigenParameterList() ) {
+          _parametersPosteriorValueMap_[&par] = par.getParameterValue();
+        }
+      }
+    }
+
     // export bf point with SIMPLEX
     LogInfo << "Writing " << _minimizerType_ << "/Simplex best fit parameters..." << std::endl;
     GenericToolbox::writeInTFileWithObjTypeExt(
@@ -305,6 +317,18 @@ void RootMinimizer::minimize(){
 
   // Make sure we are on the right spot
   updateCacheToBestfitPoint();
+
+  for( auto& parSet : getModelPropagator().getParametersManager().getParameterSetsList() ) {
+    for( auto& par : parSet.getParameterList() ) {
+      _parametersPosteriorValueMap_[&par] = par.getParameterValue();
+    }
+
+    if( parSet.isEnableEigenDecomp() ) {
+      for( auto& par : parSet.getEigenParameterList() ) {
+        _parametersPosteriorValueMap_[&par] = par.getParameterValue();
+      }
+    }
+  }
 
   // export bf point
   LogInfo << "Writing " << _minimizerType_ << "/" << _minimizerAlgo_ << " best fit parameters..." << std::endl;
@@ -516,6 +540,7 @@ void RootMinimizer::calcErrors(){
     GenericToolbox::mkdirTFile( getOwner().getSaveDir(), "postFit")->WriteObject(hesseStats.get(), hesseStats->GetName());
 
     LogInfo << "Writing HESSE post-fit errors" << std::endl;
+    this->saveFitParametersPosteriorCovariance();
     this->writePostFitData(GenericToolbox::mkdirTFile(getOwner().getSaveDir(), "postFit/Hesse"));
     GenericToolbox::triggerTFileWrite(GenericToolbox::mkdirTFile(getOwner().getSaveDir(), "postFit/Hesse"));
   }
@@ -622,6 +647,21 @@ double RootMinimizer::getTargetEdm() const{
 }
 
 // core
+void RootMinimizer::savePosteriorSinglets(){
+  updateCacheToBestfitPoint();
+
+  LogInfo << "Saving posterior singlets..." << std::endl;
+  for( auto& parSet : this->getModelPropagator().getParametersManager().getParameterSetsList() ){
+    if( not parSet.isEnabled() ) continue;
+    if( parSet.isEnableEigenDecomp() ){
+      LogWarning << parSet.getName() << " is using eigen decomposition. Saving original parameters..." << std::endl;
+      for( auto& par : parSet.getParameterList() ){
+        if( not par.isEnabled() ) continue;
+        par.savePosteriorSinglet();
+      }
+    }
+  }
+}
 void RootMinimizer::saveMinimizerSettings( TDirectory* saveDir_) const {
   LogInfo << "Saving minimizer settings..." << std::endl;
 
@@ -648,8 +688,46 @@ void RootMinimizer::saveMinimizerSettings( TDirectory* saveDir_) const {
     GenericToolbox::writeInTFileWithObjTypeExt( saveDir_, TNamed("errorAlgo", _errorAlgo_.c_str()) );
   }
 }
+void RootMinimizer::writeParameterPostfitErrors(const GenericToolbox::TFilePath& saveDir_) const{
+  if( saveDir_.getRootDir() == nullptr ) {
+    LogError << "TFilePath has no root TDirectory set. Skipping " << __METHOD_NAME__ << std::endl;
+    return;
+  }
+
+  for( auto& parSet : getLikelihoodInterface().getModelPropagator().getParametersManager().getParameterSetsList() ) {
+    if( not parSet.isEnabled() ){ continue; }
+
+    auto* tree = new TTree("parStdDevTree", "Parameter error TTree");
+    std::list<double> parValueList{};
+
+    auto makeErrorBranchFct = [&](const std::vector<Parameter>& parList_){
+      for( auto& par : parList_ ) {
+        if( not par.isEnabled() ){ continue; }
+        parValueList.emplace_back(par.getStdDevValue());
+
+        tree->Branch(
+          GenericToolbox::generateCleanBranchName(par.getFullTitle()).c_str(),
+          &parValueList.back()
+        );
+      }
+    };
+
+    if( parSet.isEnableEigenDecomp() ){ makeErrorBranchFct(parSet.getEigenParameterList()); }
+    makeErrorBranchFct(parSet.getParameterList());
+
+    tree->Fill();
+    tree->Write(tree->GetName(), TObject::kOverwrite);
+    delete tree;
+  }
+
+
+}
 
 // protected
+void RootMinimizer::saveFitParametersPosteriorCovariance(){
+  TMatrixDSym postfitCovarianceMatrix(int(_rootMinimizer_->NDim()));
+  _rootMinimizer_->GetCovMatrix(postfitCovarianceMatrix.GetMatrixArray());
+}
 void RootMinimizer::writePostFitData( TDirectory* saveDir_) {
   LogInfo << __METHOD_NAME__ << std::endl;
   LogThrowIf(not isInitialized(), "not initialized");

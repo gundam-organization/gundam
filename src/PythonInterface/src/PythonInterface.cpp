@@ -91,13 +91,16 @@ PYBIND11_MODULE(GUNDAM, module) {
   .def("throwParameters", &ParametersManager::throwParameters)
   .def("exportParameterInjectorConfig", &ParametersManager::exportParameterInjectorConfig)
   .def("injectParameterValues", &ParametersManager::injectParameterValues)
+  .def("moveParametersToPrior", &ParametersManager::moveParametersToPrior)
   ;
 
   pybind11::class_<Propagator>(module, "Propagator")
   .def(pybind11::init())
   .def("getParametersManager", pybind11::overload_cast<>(&Propagator::getParametersManager), pybind11::return_value_policy::reference)
   .def("copyHistBinContentFrom", pybind11::overload_cast<const Propagator&>(&Propagator::copyHistBinContentFrom), pybind11::return_value_policy::reference)
-  .def("writeParameterStateTree", &Propagator::writeParameterStateTree)
+  .def("writeParameterValueTree", &Propagator::writeParameterValueTree)
+  .def("writeParameterStdDevTree", &Propagator::writeParameterStdDevTree)
+  .def("applyParameters", &Propagator::applyParameters)
   ;
 
   pybind11::class_<LikelihoodInterface>(module, "LikelihoodInterface")

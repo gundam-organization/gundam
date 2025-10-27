@@ -84,7 +84,8 @@ public:
   void printConfiguration() const;
   void printBreakdowns() const;
   void writeEventRates(const GenericToolbox::TFilePath& saveDir_) const;
-  void writeParameterStateTree(const GenericToolbox::TFilePath& saveDir_) const;
+  void writeParameterValueTree(const GenericToolbox::TFilePath& saveDir_) const;
+  void writeParameterStdDevTree(const GenericToolbox::TFilePath& saveDir_) const;
 
 #ifdef GUNDAM_USING_CACHE_MANAGER
   void initializeCacheManager();

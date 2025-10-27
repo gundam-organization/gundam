@@ -45,9 +45,13 @@ public:
   [[nodiscard]] const std::unique_ptr<ROOT::Math::Minimizer> &getMinimizer() const{ return _rootMinimizer_; }
 
   // core
+  void savePosteriorSinglets();
+  void saveFitParametersPosteriorValue();
   void saveMinimizerSettings(TDirectory* saveDir_) const;
+  void writeParameterPostfitErrors(const GenericToolbox::TFilePath& saveDir_) const;
 
 protected:
+  void saveFitParametersPosteriorCovariance();
   void writePostFitData(TDirectory* saveDir_);
   void updateCacheToBestfitPoint();
   void saveGradientSteps();
@@ -88,6 +92,15 @@ private:
   // internals
   bool _minimizeDone_{false};
   bool _fitHasConverged_{false};
+
+  // post-fit
+  struct SingletHolder{ double value{std::nan("unset")}; double normValue{std::nan("unset")}; };
+  struct DoubletHolder{
+    double cov{std::nan("unset")}; double normCov{std::nan("unset")};
+    double hessian{std::nan("unset")}; double normHessian{std::nan("unset")};
+  };
+  std::map<const Parameter*, SingletHolder> _parametersPosteriorSingletMap_{};
+  std::map<std::pair<const Parameter*, const Parameter*>, DoubletHolder> _parametersPosteriorDoubletMap_{};
 
   /// A functor that can be called by Minuit or anybody else.  This wraps
   /// evalFit.
