@@ -222,6 +222,11 @@ int main(int argc, char** argv){
           if( not par.isEnabled() ){ continue; }
           par.setPriorValue( par.getParameterValue() );
         }
+        if( parSet.isEnableEigenDecomp() ) {
+          for( auto& eig : parSet.getEigenParameterList() ){
+            eig.setPriorValue( eig.getParameterValue() );
+          }
+        }
       }
     });
 
