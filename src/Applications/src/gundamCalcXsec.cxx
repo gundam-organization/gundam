@@ -208,6 +208,12 @@ int main(int argc, char** argv){
           if( not par.isEnabled() ){ continue; }
           par.setPriorValue( par.getParameterValue() );
         }
+        if( parSet.isUseEigenDecompInFit() ) {
+          for( auto& eig : parSet.getEigenParameterList() ) {
+            if( not eig.isEnabled() ){ continue; }
+            eig.setPriorValue( eig.getParameterValue() );
+          }
+        }
       }
     });
 
