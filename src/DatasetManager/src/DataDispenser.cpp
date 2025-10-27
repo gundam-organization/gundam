@@ -348,6 +348,7 @@ void DataDispenser::fetchRequestedLeaves(){
 
   if( _parameters_.useReweightEngine ){
     LogInfo << "Selecting dial collections..." << std::endl;
+    _cache_.dialCollectionsRefList.clear();
     for( auto& dialCollection : _cache_.propagatorPtr->getDialCollectionList() ){
       if( not dialCollection.isEnabled() ){ continue; }
       if( not dialCollection.isDatasetValid( _owner_->getName() ) ){ continue; }
@@ -1071,8 +1072,7 @@ void DataDispenser::loadEvent(int iThread_){
     }
   }
 
-  std::vector<DialBase*> eventByEventDialBuffer{};
-  eventByEventDialBuffer.resize(_cache_.dialCollectionsRefList.size(), nullptr);
+  std::unordered_map<size_t, DialBase*> eventByEventDialBuffer{};
 
   if(iThread_ == 0){
 
@@ -1250,8 +1250,6 @@ void DataDispenser::loadEvent(int iThread_){
 
       // only load event-by-event dials, binned dials etc. will be processed later
       for( auto *dialCollectionRef: _cache_.dialCollectionsRefList ){
-
-        eventByEventDialBuffer[dialCollectionRef->getIndex()] = nullptr;
 
         // if not event-by-event dial -> leave
         if( dialCollectionRef->getDialLeafName().empty() ){ continue; }
