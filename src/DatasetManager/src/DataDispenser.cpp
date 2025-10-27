@@ -1072,7 +1072,7 @@ void DataDispenser::loadEvent(int iThread_){
     }
   }
 
-  std::unordered_map<size_t, DialBase*> eventByEventDialBuffer{};
+  std::unordered_map<int, DialBase*> eventByEventDialBuffer{};
 
   if(iThread_ == 0){
 
