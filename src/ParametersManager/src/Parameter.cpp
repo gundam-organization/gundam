@@ -204,7 +204,7 @@ bool Parameter::isInDomain(double value_, bool verbose_) const {
 
   if( not _parameterLimits_.hasBound() ){ return true; }
 
-  if( _parameterLimits_.isBellowMin(value_) ){
+  if( _parameterLimits_.isBelowMin(value_) ){
     if (verbose_) {
       LogError << "Value is below minimum: " << value_ << std::endl;
       LogError << "Summary: " << getSummary() << std::endl;
