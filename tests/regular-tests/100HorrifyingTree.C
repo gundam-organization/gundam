@@ -1,6 +1,6 @@
 # !/bin/bash
 # Wrap a ROOT macro as a script.
-root <<EOF
+root -n <<EOF
 
 #include <iostream>
 #include <string>

@@ -1071,8 +1071,8 @@ void DataDispenser::loadEvent(int iThread_){
     }
   }
 
-  std::vector<DialBase*> eventByEventDialBuffer{};
-  eventByEventDialBuffer.resize(_cache_.dialCollectionsRefList.size(), nullptr);
+  std::unordered_map<int, DialBase*> eventByEventDialBuffer{};
+  eventByEventDialBuffer.reserve(_cache_.dialCollectionsRefList.size());
 
   if(iThread_ == 0){
 
@@ -1187,6 +1187,9 @@ void DataDispenser::loadEvent(int iThread_){
 
   while( true ){
 
+    // VERY IMPORTANT
+    eventByEventDialBuffer.clear();
+
     {
       // make sure we request a new entry and wait once we go for another loop
       GenericToolbox::ScopedGuard readerGuard{
@@ -1250,8 +1253,6 @@ void DataDispenser::loadEvent(int iThread_){
 
       // only load event-by-event dials, binned dials etc. will be processed later
       for( auto *dialCollectionRef: _cache_.dialCollectionsRefList ){
-
-        eventByEventDialBuffer[dialCollectionRef->getIndex()] = nullptr;
 
         // if not event-by-event dial -> leave
         if( dialCollectionRef->getDialLeafName().empty() ){ continue; }
@@ -1320,7 +1321,7 @@ void DataDispenser::loadEvent(int iThread_){
     eventDialCacheEntry->event.sampleIndex = std::size_t(eventIndexingBuffer.getIndices().sample);
     eventDialCacheEntry->event.eventIndex = sampleEventIndex;
 
-    auto *dialEntryPtr = &eventDialCacheEntry->dials[0];
+    auto *dialEntryPtr = eventDialCacheEntry->dials.data();
     for( auto *dialCollectionRef: _cache_.dialCollectionsRefList ){
 
       // leave if event-by-event -> already loaded
@@ -1351,8 +1352,7 @@ void DataDispenser::loadEvent(int iThread_){
       int iCollection = dialCollectionRef->getIndex();
 
       if( dialCollectionRef->getDialType() == DialCollection::DialType::Tabulated
-          or dialCollectionRef->getDialType() == DialCollection::DialType::Kriged ){
-
+          or dialCollectionRef->getDialType() == DialCollection::DialType::Kriged ) {
         // Event-by-event dial with a factory.
 
         std::unique_ptr<DialBase> dialBase(
@@ -1394,7 +1394,6 @@ void DataDispenser::loadEvent(int iThread_){
             dialEntryPtr++;
           }
         }
-
       }
 
     } // dial collection loop

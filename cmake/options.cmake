@@ -12,6 +12,7 @@ option( ENABLE_DEV_MODE "Enable specific dev related printouts." OFF  )
 
 # extensions
 option( WITH_DOXYGEN "Build documentation with doxygen." OFF )
+option( WITH_ROOT_DICT_BUILD "Build the targets that require ROOT_GENERATE_DICTIONARY." ON )
 option( WITH_GUNDAM_ROOT_APP "Build app gundamRoot." ON )
 option( WITH_GUNDAM_SANDBOX_APP "Build app gundamRoot." OFF )
 option( WITH_CACHE_MANAGER "Enable compiling of the cache manager (required for GPU computing)." ON )
