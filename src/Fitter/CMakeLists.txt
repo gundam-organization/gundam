@@ -30,25 +30,29 @@ if( WITH_ROOT_DICT_BUILD )
     OPTIONS "${CMAKE_CXX_FLAGS_DICT}"
   )
 
-  set( DICT_SIMPLEMCMC SimpleMcmc_Dict )
+  target_link_libraries(
+      ${LIB_NAME}
+      PUBLIC
+      GundamStatisticalInference
+      ${DICT_SIMPLEMCMC}
+  )
+
+  # Install the ROOT pcm and rootmap files
+  install(
+      FILES
+      ${CMAKE_CURRENT_BINARY_DIR}/libGundamFitter_rdict.pcm
+      ${CMAKE_CURRENT_BINARY_DIR}/libGundamFitter.rootmap
+      DESTINATION
+      ${CMAKE_INSTALL_PREFIX}/lib
+      COMPONENT
+      libraries
+  )
+else()
+  target_link_libraries(
+      ${LIB_NAME}
+      PUBLIC
+      GundamStatisticalInference
+  )
 endif()
 
-target_link_libraries(
-    ${LIB_NAME}
-    PUBLIC
-    GundamStatisticalInference
-    ${DICT_SIMPLEMCMC}
-)
-
 install(TARGETS ${LIB_NAME} DESTINATION lib)
-
-# Install the ROOT pcm and rootmap files
-install(
-  FILES
-  ${CMAKE_CURRENT_BINARY_DIR}/libGundamFitter_rdict.pcm
-  ${CMAKE_CURRENT_BINARY_DIR}/libGundamFitter.rootmap
-  DESTINATION
-  ${CMAKE_INSTALL_PREFIX}/lib
-  COMPONENT
-  libraries
-)
