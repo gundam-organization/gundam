@@ -20,20 +20,24 @@ target_include_directories(
     ${CMAKE_CURRENT_SOURCE_DIR}/Minimizer/include
 )
 
+if( WITH_ROOT_DICT_BUILD )
+  set(CMAKE_CXX_FLAGS_DICT "-Wno-nonportable-include-path")
+  ROOT_GENERATE_DICTIONARY(
+    SimpleMcmc_Dict
+    ${CMAKE_CURRENT_SOURCE_DIR}/Minimizer/include/SimpleMcmc.h
+    MODULE ${LIB_NAME}
+    LINKDEF ${CMAKE_CURRENT_SOURCE_DIR}/Minimizer/src/SimpleMcmc_LinkDef.h
+    OPTIONS "${CMAKE_CXX_FLAGS_DICT}"
+  )
+
+  set( DICT_SIMPLEMCMC SimpleMcmc_Dict )
+endif()
+
 target_link_libraries(
     ${LIB_NAME}
     PUBLIC
     GundamStatisticalInference
-    SimpleMcmc_Dict
-)
-
-set(CMAKE_CXX_FLAGS_DICT "-Wno-nonportable-include-path")
-ROOT_GENERATE_DICTIONARY(
-  SimpleMcmc_Dict
-  ${CMAKE_CURRENT_SOURCE_DIR}/Minimizer/include/SimpleMcmc.h
-  MODULE ${LIB_NAME}
-  LINKDEF ${CMAKE_CURRENT_SOURCE_DIR}/Minimizer/src/SimpleMcmc_LinkDef.h
-  OPTIONS "${CMAKE_CXX_FLAGS_DICT}"
+    ${DICT_SIMPLEMCMC}
 )
 
 install(TARGETS ${LIB_NAME} DESTINATION lib)
