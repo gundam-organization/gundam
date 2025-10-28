@@ -348,7 +348,6 @@ void DataDispenser::fetchRequestedLeaves(){
 
   if( _parameters_.useReweightEngine ){
     LogInfo << "Selecting dial collections..." << std::endl;
-    _cache_.dialCollectionsRefList.clear();
     for( auto& dialCollection : _cache_.propagatorPtr->getDialCollectionList() ){
       if( not dialCollection.isEnabled() ){ continue; }
       if( not dialCollection.isDatasetValid( _owner_->getName() ) ){ continue; }
