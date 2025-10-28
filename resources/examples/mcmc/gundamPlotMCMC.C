@@ -677,7 +677,10 @@ void gundamPlotMCMC() {
     for (std::size_t iAcc = 0; iAcc < posteriorParamPlots.size(); ++iAcc) {
         // Skip parameters that will not be in the summary plots.  These are
         // parameters that were fixed and have a zero autocorrelation.
-        if (!gPosteriorAutocorrelation[iAcc]) continue;
+        if (!gPosteriorAutocorrelation[iAcc]) {
+            std::cout << "Skip plot: " << iAcc << std::endl;
+            continue;
+        }
         for (int k = 1;
              k<=gPosteriorAutocorrelation[iAcc]->GetNbinsX(); ++k) {
             double a = gPosteriorAutocorrelation[iAcc]->GetBinContent(k);
@@ -715,7 +718,7 @@ void gundamPlotMCMC() {
         int b = gPosteriorAutocorrelationAvg->GetBin(x);
         double e = gPosteriorAutocorrelationAvg->GetBinError(x);
         double s = std::abs(r/e)/std::sqrt(2.0);
-        effectiveSampleSize += std::erf(s)*r;
+        effectiveSampleSize += std::erf(s)*std::abs(r);
     }
     effectiveSampleSize = steps/(1.0 + 2.0*std::abs(effectiveSampleSize));
     eventWeight = effectiveSampleSize/steps;
@@ -732,7 +735,7 @@ void gundamPlotMCMC() {
             int b = gPosteriorAutocorrelation[iPar]->GetBin(x);
             double e = gPosteriorAutocorrelation[iPar]->GetBinError(x);
             double s = std::abs(r/e)/std::sqrt(2.0);
-            ess.back() += std::erf(s)*r;
+            ess.back() += std::erf(s)*std::abs(r);
         }
         ess.back() = steps/(1.0 + 2.0*ess.back());
     }
@@ -789,9 +792,22 @@ void gundamPlotMCMC() {
             for (std::size_t iPar = 0; iPar < points->size(); ++iPar) {
                 double content = points->at(iPar);
                 if (!posteriorParamPlots[iPar]) {
+                    std::cout << "Missing parameter " << iPar
+                              << std::endl;
                     continue;
                 }
-                if (ess[iPar] < 0.1) continue;
+                if (not std::isfinite(ess[iPar])) {
+                    std::cout << "Parameter " << iPar
+                              << " ESS is not finite:" << ess[iPar]
+                              << std::endl;
+                    continue;
+                }
+                if (ess[iPar] <= 0.0) {
+                    std::cout << "Parameter " << iPar
+                              << " ESS is invalid: " << ess[iPar]
+                              << std::endl;
+                    continue;
+                }
                 double w = ess[iPar]/steps;
                 posteriorParamPlots[iPar]->Fill(content,w);
             }

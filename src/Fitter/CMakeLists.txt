@@ -20,31 +20,39 @@ target_include_directories(
     ${CMAKE_CURRENT_SOURCE_DIR}/Minimizer/include
 )
 
-target_link_libraries(
-    ${LIB_NAME}
-    PUBLIC
-    GundamStatisticalInference
+if( WITH_ROOT_DICT_BUILD )
+  set(CMAKE_CXX_FLAGS_DICT "-Wno-nonportable-include-path")
+  ROOT_GENERATE_DICTIONARY(
     SimpleMcmc_Dict
-)
+    ${CMAKE_CURRENT_SOURCE_DIR}/Minimizer/include/SimpleMcmc.h
+    MODULE ${LIB_NAME}
+    LINKDEF ${CMAKE_CURRENT_SOURCE_DIR}/Minimizer/src/SimpleMcmc_LinkDef.h
+    OPTIONS "${CMAKE_CXX_FLAGS_DICT}"
+  )
 
-set(CMAKE_CXX_FLAGS_DICT "-Wno-nonportable-include-path")
-ROOT_GENERATE_DICTIONARY(
-  SimpleMcmc_Dict
-  ${CMAKE_CURRENT_SOURCE_DIR}/Minimizer/include/SimpleMcmc.h
-  MODULE ${LIB_NAME}
-  LINKDEF ${CMAKE_CURRENT_SOURCE_DIR}/Minimizer/src/SimpleMcmc_LinkDef.h
-  OPTIONS "${CMAKE_CXX_FLAGS_DICT}"
-)
+  target_link_libraries(
+      ${LIB_NAME}
+      PUBLIC
+      GundamStatisticalInference
+      ${DICT_SIMPLEMCMC}
+  )
+
+  # Install the ROOT pcm and rootmap files
+  install(
+      FILES
+      ${CMAKE_CURRENT_BINARY_DIR}/libGundamFitter_rdict.pcm
+      ${CMAKE_CURRENT_BINARY_DIR}/libGundamFitter.rootmap
+      DESTINATION
+      ${CMAKE_INSTALL_PREFIX}/lib
+      COMPONENT
+      libraries
+  )
+else()
+  target_link_libraries(
+      ${LIB_NAME}
+      PUBLIC
+      GundamStatisticalInference
+  )
+endif()
 
 install(TARGETS ${LIB_NAME} DESTINATION lib)
-
-# Install the ROOT pcm and rootmap files
-install(
-  FILES
-  ${CMAKE_CURRENT_BINARY_DIR}/libGundamFitter_rdict.pcm
-  ${CMAKE_CURRENT_BINARY_DIR}/libGundamFitter.rootmap
-  DESTINATION
-  ${CMAKE_INSTALL_PREFIX}/lib
-  COMPONENT
-  libraries
-)
