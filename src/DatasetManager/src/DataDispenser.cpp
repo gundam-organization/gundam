@@ -1188,6 +1188,9 @@ void DataDispenser::loadEvent(int iThread_){
 
   while( true ){
 
+    // VERY IMPORTANT
+    eventByEventDialBuffer.clear();
+
     {
       // make sure we request a new entry and wait once we go for another loop
       GenericToolbox::ScopedGuard readerGuard{
@@ -1397,8 +1400,6 @@ void DataDispenser::loadEvent(int iThread_){
 
     } // dial collection loop
 
-    // VERY IMPORTANT
-    eventByEventDialBuffer.clear();
   } // while ok
 
 }
