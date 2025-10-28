@@ -205,16 +205,7 @@ bool Parameter::isInDomain(double value_, bool verbose_) const {
 
   if( not _parameterLimits_.hasBound() ){ return true; }
 
-#define GenericToolboxUtils_NOT_FIXED
-#ifdef GenericToolboxUtils_NOT_FIXED
-  // It's "Bellow", and not "Below" because there is an unfixed bug in the
-  // generic toolbox.
-#warning Work around GenericToolbox.Utils.h isBellowMin bug until it is fixed
-  if( _parameterLimits_.isBellowMin(value_) ){
-#else
-    if( _parameterLimits_.isBelowMin(value_) ){
-#endif
-
+  if( _parameterLimits_.isBelowMin(value_) ){
     if (verbose_) {
       LogError << "Value is below minimum: " << value_ << std::endl;
       LogError << "Summary: " << getSummary() << std::endl;

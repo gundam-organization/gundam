@@ -389,6 +389,10 @@ void FitterEngine::fit(){
     LogInfo << getLikelihoodInterface().getSummary() << std::endl;
   }
 
+  _likelihoodInterface_.getModelPropagator().writeParameterStateTree(
+    GenericToolbox::TFilePath(_saveDir_, "preFit")
+  );
+
   // Leaving now?
   if( _isDryRun_ ){
     LogAlert << "Dry run requested. Leaving before the minimization." << std::endl;

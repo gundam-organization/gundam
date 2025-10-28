@@ -175,6 +175,44 @@ void Propagator::reweightEvents(bool updateDials) {
 void Propagator::writeEventRates(const GenericToolbox::TFilePath& saveDir_) const {
   for( auto& sample : _sampleSet_.getSampleList() ){ sample.writeEventRates(saveDir_); }
 }
+void Propagator::writeParameterStateTree(const GenericToolbox::TFilePath& saveDir_) const{
+  if( saveDir_.getRootDir() == nullptr ) {
+    LogError << "TFilePath has no root TDirectory set. Skipping " << __METHOD_NAME__ << std::endl;
+    return;
+  }
+
+  saveDir_.getDir()->cd();
+  auto* tree = new TTree("parStateTree", "Parameter state tree");
+  std::list<double> parValueList{};
+
+  for( auto& parSet : _parManager_.getParameterSetsList() ){
+    if( not parSet.isEnabled() ){ continue; }
+
+    auto makeBranchFct = [&](const std::vector<Parameter>& parList_){
+      for( auto& par : parList_ ) {
+        if( not par.isEnabled() ){ continue; }
+        parValueList.emplace_back(par.getParameterValue());
+
+        tree->Branch(
+          GenericToolbox::generateCleanBranchName(par.getFullTitle()).c_str(),
+          &parValueList.back()
+        );
+      }
+    };
+
+    if( parSet.isEnableEigenDecomp() ){
+      makeBranchFct(parSet.getEigenParameterList());
+    }
+    makeBranchFct(parSet.getParameterList());
+
+  }
+
+
+  tree->Fill();
+  tree->Write(tree->GetName(), TObject::kOverwrite);
+  delete tree;
+
+}
 void Propagator::printConfiguration() const {
   LogInfo << std::endl << "Printing propagator configuration:" << std::endl;
 

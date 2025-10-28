@@ -81,6 +81,7 @@ public:
   LikelihoodInterface& getLikelihoodInterface(){ return _likelihoodInterface_; }
   ParameterScanner& getParameterScanner(){ return _parameterScanner_; }
   TDirectory* getSaveDir(){ return _saveDir_; }
+  GenericToolbox::TFilePath getTFilePath(){ return GenericToolbox::TFilePath(_saveDir_); }
   bool& getGenerateSamplePlots(){ return _generateSamplePlots_; }
 
   // Core
