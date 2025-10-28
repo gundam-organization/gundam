@@ -1319,7 +1319,7 @@ void DataDispenser::loadEvent(int iThread_){
     eventDialCacheEntry->event.sampleIndex = std::size_t(eventIndexingBuffer.getIndices().sample);
     eventDialCacheEntry->event.eventIndex = sampleEventIndex;
 
-    auto *dialEntryPtr = &eventDialCacheEntry->dials[0];
+    auto *dialEntryPtr = eventDialCacheEntry->dials.data();
     for( auto *dialCollectionRef: _cache_.dialCollectionsRefList ){
 
       // leave if event-by-event -> already loaded
@@ -1350,8 +1350,7 @@ void DataDispenser::loadEvent(int iThread_){
       int iCollection = dialCollectionRef->getIndex();
 
       if( dialCollectionRef->getDialType() == DialCollection::DialType::Tabulated
-          or dialCollectionRef->getDialType() == DialCollection::DialType::Kriged ){
-
+          or dialCollectionRef->getDialType() == DialCollection::DialType::Kriged ) {
         // Event-by-event dial with a factory.
 
         std::unique_ptr<DialBase> dialBase(
@@ -1368,36 +1367,38 @@ void DataDispenser::loadEvent(int iThread_){
           dialEntryPtr->interfaceIndex = freeSlotDial;
           dialEntryPtr++;
         }
-      }
-      else{
-
-        if( dialCollectionRef->getDialInterfaceList().size() == 1
-            and dialCollectionRef->getDialBinSet().getBinList().empty()){
-          // There isn't any binning, and there is only one dial.
-          // In this case we don't need to check if the dial is in
-          // a bin.
-          dialEntryPtr->collectionIndex = iCollection;
-          dialEntryPtr->interfaceIndex = 0;
-          dialEntryPtr++;
-        }
         else{
-          // There are multiple dials, or there is a list of bins
-          // to apply the dial to.  Check if the event falls into
-          // a bin, and apply the correct binning.  Some events
-          // may not be in any bin.
-          auto dialBinIdx = eventIndexingBuffer.getVariables().findBinIndex(
-              dialCollectionRef->getDialBinSet().getBinList());
-          if( dialBinIdx != -1 ){
+
+          if( dialCollectionRef->getDialInterfaceList().size() == 1
+              and dialCollectionRef->getDialBinSet().getBinList().empty()){
+            // There isn't any binning, and there is only one dial.
+            // In this case we don't need to check if the dial is in
+            // a bin.
             dialEntryPtr->collectionIndex = iCollection;
-            dialEntryPtr->interfaceIndex = dialBinIdx;
+            dialEntryPtr->interfaceIndex = 0;
             dialEntryPtr++;
           }
-        }
+          else{
+            // There are multiple dials, or there is a list of bins
+            // to apply the dial to.  Check if the event falls into
+            // a bin, and apply the correct binning.  Some events
+            // may not be in any bin.
+            auto dialBinIdx = eventIndexingBuffer.getVariables().findBinIndex(
+                dialCollectionRef->getDialBinSet().getBinList());
+            if( dialBinIdx != -1 ){
+              dialEntryPtr->collectionIndex = iCollection;
+              dialEntryPtr->interfaceIndex = dialBinIdx;
+              dialEntryPtr++;
+            }
+          }
 
+        }
       }
 
     } // dial collection loop
 
+    // VERY IMPORTANT
+    eventByEventDialBuffer.clear();
   } // while ok
 
 }
