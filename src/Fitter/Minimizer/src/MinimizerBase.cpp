@@ -62,7 +62,7 @@ void MinimizerBase::initializeImpl(){
     for( auto& par : parSet.getEffectiveParameterList() ){
       if( par.isEnabled() and not par.isFixed() ) {
         _minimizerParameterPtrList_.emplace_back( &par );
-        if( par.isFree() ){ _nbFreeParameters_++; }
+        if( par.isFree() and not par.isFrozen() ){ _nbFreeParameters_++; }
       }
     }
   }
@@ -195,7 +195,7 @@ double MinimizerBase::evalFit( const double* parArray_ ){
 
       size_t nbValidPars = std::count_if(
               _minimizerParameterPtrList_.begin(), _minimizerParameterPtrList_.end(),
-              [](const Parameter* par_){ return not ( par_->isFixed() or not par_->isEnabled() ); } );
+              [](const Parameter* par_){ return not ( par_->isFixed() or par_->isFrozen() or not par_->isEnabled() ); } );
 
       std::stringstream ssHeader;
       ssHeader << std::endl << GenericToolbox::getNowDateString("%Y.%m.%d %H:%M:%S");
@@ -347,6 +347,7 @@ void MinimizerBase::printParameters(){
 
       if( not par.isEnabled() ) { continue; }
       else if( par.isFixed() )  { statusStr = "Fixed (prior applied)";    colorStr = GenericToolbox::ColorCodes::yellowLightText; }
+      else if( par.isFrozen() )  { statusStr = "Frozen (penalty applied)";    colorStr = GenericToolbox::ColorCodes::yellowLightText; }
       else                      {
         statusStr = Parameter::PriorType::toString(par.getPriorType()) + " Prior";
         if(par.getPriorType()==Parameter::PriorType::Flat) colorStr = GenericToolbox::ColorCodes::blueLightText;

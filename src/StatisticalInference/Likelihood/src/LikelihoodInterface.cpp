@@ -128,7 +128,7 @@ void LikelihoodInterface::initializeImpl() {
 
   /// move the parameter away from the prior if needed
   if( not _modelPropagator_.getParameterInjectorMc().empty() ){
-    LogWarning << "Injecting parameters on MC samples..." << std::endl;
+    LogInfo << "Injecting parameters on MC samples..." << std::endl;
     _modelPropagator_.getParametersManager().injectParameterValues(
         ConfigUtils::getForwardedConfig(_modelPropagator_.getParameterInjectorMc())
     );
@@ -201,7 +201,6 @@ double LikelihoodInterface::evalPenaltyLikelihood(const ParameterSet& parSet_) c
   if( _applyInfinitePenaltyOnOutOfBoundPar_ and parSet_.hasOutOfBoundsParameters() ) {
     LogError << "Returning an +inf penalty for out-of-bounds parameters in: " << parSet_.getName() << std::endl;
     return std::numeric_limits<double>::infinity();
-    // return buffer * 1000.;
   }
 
   return buffer;
@@ -418,7 +417,7 @@ void LikelihoodInterface::loadDataPropagator(){
       dataDispenser->getParameters().isData = true;
 
       if( not dataDispenser->getParameters().evalModelAt.empty() ){
-        LogWarning << "Generating data histograms using model evaluated with a set of parameters" << std::endl;
+        LogInfo << "Generating data histograms using model evaluated with a set of parameters" << std::endl;
 
         LogInfo << "Injecting parameters to the model..." << std::endl;
         _modelPropagator_.getParametersManager().injectParameterValues(dataDispenser->getParameters().evalModelAt);
@@ -434,13 +433,13 @@ void LikelihoodInterface::loadDataPropagator(){
         // histograms are filled afterward
       }
       else {
-        LogWarning << "Loading data propagator..." << std::endl;
+        LogInfo << "Loading data propagator..." << std::endl;
         dataDispenser->load( _dataPropagator_ );
       }
 
     }
 
-    LogWarning << "Setting dial cache for data..." << std::endl;
+    LogInfo << "Setting dial cache for data..." << std::endl;
     _dataPropagator_.getDialManager().shrinkDialContainers();
     _dataPropagator_.buildDialCache();
 
@@ -450,7 +449,7 @@ void LikelihoodInterface::loadDataPropagator(){
 
   }
 
-  LogInfo << "Propagating parameters on events..." << std::endl;
+  LogInfo << "Propagating weights on data events..." << std::endl;
   _dataPropagator_.reweightEvents();
 
   LogInfo << "Filling up data sample bin caches..." << std::endl;
@@ -558,11 +557,11 @@ void LikelihoodInterface::throwToyParameters(Propagator& propagator_){
   }
 
   if( not _toyParameterInjector_.empty() ){
-    LogWarning << "Injecting parameters..." << std::endl;
+    LogInfo << "Injecting parameters..." << std::endl;
     propagator_.getParametersManager().injectParameterValues( _toyParameterInjector_ );
   }
   else{
-    LogWarning << "Throwing toy parameters according to covariance matrices..." << std::endl;
+    LogInfo << "Throwing toy parameters according to covariance matrices..." << std::endl;
     propagator_.getParametersManager().throwParameters();
   }
 
@@ -595,7 +594,7 @@ void LikelihoodInterface::throwStatErrors(Propagator& propagator_){
 
   LogInfo << "Throwing statistical error on histograms..." << std::endl;
   if( _gaussStatThrowInToys_ ) {
-    LogWarning << "Using gaussian statistical throws. (caveat: distribution truncated when the bins are close to zero)" << std::endl;
+    LogWarning << "Using Gaussian statistical throws. (caveat: distribution truncated when the bins are close to zero)" << std::endl;
   }
   for( auto& sample : propagator_.getSampleSet().getSampleList() ){
     // Asimov bin content -> toy data

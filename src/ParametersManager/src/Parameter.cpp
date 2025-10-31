@@ -11,7 +11,6 @@
 
 #include <sstream>
 
-
 void Parameter::prepareConfig(ConfigReader& config_){
   config_.clearFields();
   config_.defineFields({
@@ -19,6 +18,7 @@ void Parameter::prepareConfig(ConfigReader& config_){
     {"isEnabled"},
     {"priorValue"},
     {"isFixed"},
+    {"isFrozen"},
     {"isThrown"},
     {"parameterStepSize"},
     {"parameterIndex"},
@@ -49,6 +49,7 @@ void Parameter::configureImpl(){
   }
 
   _config_.fillValue(_isFixed_, "isFixed");
+  _config_.fillValue(_isFrozen_, "isFrozen");
   _config_.fillValue(_isThrown_, "isThrown");
   _config_.fillValue(_stepSize_, "parameterStepSize");
   _config_.fillValue(_physicalLimits_, "physicalLimits");
@@ -71,12 +72,12 @@ void Parameter::initializeImpl() {
   LogThrowIf(_parameterIndex_ == -1, "Parameter index is not set.");
 
   if( not _isEnabled_ ) { return; }
-  LogThrowIf(std::isnan(_priorValue_), "Prior value is not set: " << getFullTitle());
-  LogThrowIf(std::isnan(_stdDevValue_), "Std dev value is not set: " << getFullTitle());
-  LogThrowIf(std::isnan(_parameterValue_), "Parameter value is not set: " << getFullTitle());
+  LogExitIf(std::isnan(_priorValue_), "Prior value is not set: " << getFullTitle());
+  LogExitIf(std::isnan(_stdDevValue_), "Std dev value is not set: " << getFullTitle());
+  LogExitIf(std::isnan(_parameterValue_), "Parameter value is not set: " << getFullTitle());
 
-  if( _priorValue_ == _parameterLimits_.min or _priorValue_ == _parameterLimits_.max ) {
-    // the user should know. This will prevent Asimov fits to converge
+  if( _priorValue_ <= _parameterLimits_.min or _priorValue_ >= _parameterLimits_.max ) {
+    // the user should know. This will prevent Asimov fits from converging
     LogAlert << "Prior value of \"" << getFullTitle() << "\" is set on the defined limits: " << _priorValue_ << " -> " << _parameterLimits_ << std::endl;
   }
 
