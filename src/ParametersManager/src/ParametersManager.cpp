@@ -83,16 +83,20 @@ void ParametersManager::initializeImpl(){
         if( par.isFixed() ){ continue; }
 
         iParIndex++; // will be in the list
-        if( par.isFree() ){ iFree++; }
 
         _globalCovParList_.emplace_back( &par );
+
+        (*_globalCovarianceMatrix_)[parSetOffset + iParIndex][parSetOffset + iParIndex] =
+          par.getStdDevValue()*par.getStdDevValue();
+
+        if( par.isFree() ){ iFree++; continue; }
         int jParIndex{-1};
         int jFree{0};
         for(int jCov = 0 ; jCov < parSet.getPriorCovarianceMatrix()->GetNcols() ; jCov++ ){
           if( not parSet.getParameterList()[jCov].isEnabled() ){ continue; }
           if( parSet.getParameterList()[jCov].isFixed() ){ continue; }
           jParIndex++;
-          if( parSet.getParameterList()[jCov].isFree() ){ jFree++; }
+          if( parSet.getParameterList()[jCov].isFree() ){ jFree++; continue; }
           (*_globalCovarianceMatrix_)[parSetOffset + iParIndex][parSetOffset + jParIndex] =
             (*parSet.getPriorCovarianceMatrix())[iParIndex-iFree][jParIndex-jFree];
         }
