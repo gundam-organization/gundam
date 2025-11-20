@@ -397,10 +397,12 @@ void RootMinimizer::minimize(){
       parameterSetArrList[iParSet].writeRawData( getLikelihoodInterface().evalPenaltyLikelihood( parSet ) );
 
       for( auto& par : parSet.getParameterList() ){
+        if( not par.isEnabled() ){ continue; }
         leavesDict.emplace_back(GenericToolbox::replaceSubstringInString(par.getTitle(), " ", "_") + "/D");
         parameterSetArrList[iParSet].writeRawData(par.getParameterValue());
       }
 
+      if( leavesDict.empty() ){ continue; }
       bestFitStats->Branch(
           GenericToolbox::generateCleanBranchName(parSet.getName()).c_str(),
           &parameterSetArrList[iParSet].getRawDataArray()[0],
@@ -513,7 +515,7 @@ void RootMinimizer::calcErrors(){
     hesseStats->Branch("errorTimeInSec", &errorTimeInSec);
 
     hesseStats->Fill();
-    GenericToolbox::mkdirTFile( getOwner().getSaveDir(), "postFit")->WriteObject(hesseStats.get(), hesseStats->GetName());
+    GenericToolbox::mkdirTFile(getOwner().getSaveDir(), "postFit/Hesse")->WriteObject(hesseStats.get(), hesseStats->GetName());
 
     LogInfo << "Writing HESSE post-fit errors" << std::endl;
     this->writePostFitData(GenericToolbox::mkdirTFile(getOwner().getSaveDir(), "postFit/Hesse"));
