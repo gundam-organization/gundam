@@ -530,6 +530,32 @@ int main(int argc, char** argv){
     );
   }
 
+  std::unordered_map<const ParameterSet*, GenericToolbox::RawDataArray> parDataList;
+
+  for( auto& parset : propagator.getParametersManager().getParameterSetsList() ){
+    if( not parset.isEnabled() ){ continue; }
+
+    parDataList[&parset] = GenericToolbox::RawDataArray();
+    std::vector<std::string> leafNameList{};
+
+    for( auto& par : parset.getParameterList() ) {
+      if( not par.isEnabled() ){ continue; }
+      leafNameList.emplace_back(Form("%s/D", GenericToolbox::generateCleanBranchName(par.getFullTitle()).c_str()));
+      parDataList[&parset].writeRawData( par.getParameterValue() );
+    }
+
+    xsecThrowTree->Branch(
+        GenericToolbox::generateCleanBranchName( parset.getName() ).c_str(),
+        parDataList[&parset].getRawDataArray().data(),
+        GenericToolbox::joinVectorString(leafNameList, ":").c_str()
+    );
+    xsecAtBestFitTree->Branch(
+        GenericToolbox::generateCleanBranchName( parset.getName() ).c_str(),
+        parDataList[&parset].getRawDataArray().data(),
+        GenericToolbox::joinVectorString(leafNameList, ":").c_str()
+    );
+  }
+
   int nToys{ clParser.getOptionVal<int>("nToys") };
 
   // no bin volume of events -> use the current weight container
@@ -699,6 +725,14 @@ int main(int argc, char** argv){
 
     // Write the branches
     writeTimer.start();
+    for( auto& parset : propagator.getParametersManager().getParameterSetsList() ) {
+      if( not parset.isEnabled() ){ continue; }
+      parDataList[&parset].resetCursor();
+      for( auto& par : parset.getParameterList() ) {
+        if( not par.isEnabled() ){ continue; }
+        parDataList[&parset].writeRawData( par.getParameterValue() );
+      }
+    }
     xsecThrowTree->Fill();
     writeTimer.stop();
   }
