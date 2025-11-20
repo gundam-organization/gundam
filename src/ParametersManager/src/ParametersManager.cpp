@@ -196,12 +196,6 @@ void ParametersManager::throwParametersFromParSetCovariance(){
 void ParametersManager::initializeStrippedGlobalCov(){
   LogInfo << "Creating stripped global covariance matrix..." << std::endl;
   LogThrowIf( _globalCovarianceMatrix_ == nullptr, "Global covariance matrix not set." );
-
-  int ipar = 0;
-  for( auto& g : _globalCovParList_ ) {
-    LogDebug << ipar++ << ": " << g->getFullTitle() << std::endl;
-  }
-
   LogThrowIf( _globalCovarianceMatrix_->GetNrows() != _globalCovParList_.size(),
     "Global covariance matrix dim = " << _globalCovarianceMatrix_->GetNrows()
     << " while _globalCovParList_ size: " << _globalCovParList_.size()
