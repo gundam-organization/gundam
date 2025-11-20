@@ -753,6 +753,7 @@ int main(int argc, char** argv){
   std::vector<TH1D> binValues{};
   binValues.reserve(propagator.getSampleSet().getSampleList().size() );
   int iBinGlobal{-1};
+  int iBranchSeparation{-1};
 
   for( auto& xsec : crossSectionDataList ){
 
@@ -770,6 +771,21 @@ int main(int argc, char** argv){
       globalCorMatrixHist->GetXaxis()->SetBinLabel(1+iBinGlobal, GenericToolbox::joinPath(xsec.samplePtr->getName(), binTitle).c_str());
       globalCovMatrixHist->GetYaxis()->SetBinLabel(1+iBinGlobal, GenericToolbox::joinPath(xsec.samplePtr->getName(), binTitle).c_str());
       globalCorMatrixHist->GetYaxis()->SetBinLabel(1+iBinGlobal, GenericToolbox::joinPath(xsec.samplePtr->getName(), binTitle).c_str());
+    }
+
+    iBranchSeparation = iBinGlobal+1;
+
+    for( auto& parset : propagator.getParametersManager().getParameterSetsList() ) {
+      if(not parset.isEnabled()){ continue; }
+      for( auto& par : parset.getParameterList() ) {
+        if(not par.isEnabled()){continue;}
+        iBinGlobal++;
+        std::string binTitle{par.getFullTitle()};
+        globalCovMatrixHist->GetXaxis()->SetBinLabel(1+iBinGlobal, GenericToolbox::joinPath(xsec.samplePtr->getName(), binTitle).c_str());
+        globalCorMatrixHist->GetXaxis()->SetBinLabel(1+iBinGlobal, GenericToolbox::joinPath(xsec.samplePtr->getName(), binTitle).c_str());
+        globalCovMatrixHist->GetYaxis()->SetBinLabel(1+iBinGlobal, GenericToolbox::joinPath(xsec.samplePtr->getName(), binTitle).c_str());
+        globalCorMatrixHist->GetYaxis()->SetBinLabel(1+iBinGlobal, GenericToolbox::joinPath(xsec.samplePtr->getName(), binTitle).c_str());
+      }
     }
 
     xsec.histogram.SetMarkerStyle(kFullDotLarge);
@@ -792,11 +808,17 @@ int main(int argc, char** argv){
   globalCovMatrixHist->GetXaxis()->SetLabelSize(0.02);
   globalCovMatrixHist->GetYaxis()->SetLabelSize(0.02);
   GenericToolbox::writeInTFileWithObjTypeExt(GenericToolbox::mkdirTFile(calcXsecDir, "matrices"), globalCovMatrixHist, "covarianceMatrix");
+  auto chopped = GenericToolbox::chopTH2D(globalCovMatrixHist, iBranchSeparation);
+  GenericToolbox::writeInTFileWithObjTypeExt(GenericToolbox::mkdirTFile(calcXsecDir, "matrices"), chopped[0], "binsCovarianceMatrix");
+  GenericToolbox::writeInTFileWithObjTypeExt(GenericToolbox::mkdirTFile(calcXsecDir, "matrices"), chopped[1], "parsCovarianceMatrix");
 
   globalCorMatrixHist->GetXaxis()->SetLabelSize(0.02);
   globalCorMatrixHist->GetYaxis()->SetLabelSize(0.02);
   globalCorMatrixHist->GetZaxis()->SetRangeUser(-1, 1);
   GenericToolbox::writeInTFileWithObjTypeExt(GenericToolbox::mkdirTFile(calcXsecDir, "matrices"), globalCorMatrixHist, "correlationMatrix");
+  chopped = GenericToolbox::chopTH2D(globalCorMatrixHist, iBranchSeparation);
+  GenericToolbox::writeInTFileWithObjTypeExt(GenericToolbox::mkdirTFile(calcXsecDir, "matrices"), chopped[0], "binsCorrelationMatrix");
+  GenericToolbox::writeInTFileWithObjTypeExt(GenericToolbox::mkdirTFile(calcXsecDir, "matrices"), chopped[1], "parsCorrelationMatrix");
 
   // now propagate to the engine for the plot generator
   LogInfo << "Re-normalizing the samples for the plot generator..." << std::endl;
