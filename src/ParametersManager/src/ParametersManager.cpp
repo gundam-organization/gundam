@@ -57,7 +57,7 @@ void ParametersManager::initializeImpl(){
 
     int nPars{0};
     for( auto& par : parSet.getParameterList() ){
-      if( par.isEnabled() ){ nPars++; }
+      if( par.isEnabled() and not par.isFixed() ){ nPars++; }
     }
 
     nEnabledPars += nPars;
