@@ -57,7 +57,7 @@ void ParametersManager::initializeImpl(){
 
     int nPars{0};
     for( auto& par : parSet.getParameterList() ){
-      if( par.isEnabled() ){ nPars++; }
+      if( par.isEnabled() and not par.isFixed() ){ nPars++; }
     }
 
     nEnabledPars += nPars;
@@ -73,21 +73,35 @@ void ParametersManager::initializeImpl(){
   _globalCovarianceMatrix_ = std::make_shared<TMatrixD>(nEnabledPars, nEnabledPars );
   int parSetOffset = 0;
   for( auto& parSet : _parameterSetList_ ){
-    if( parSet.getPriorCovarianceMatrix() != nullptr ){
-      int iGlobalOffset{-1};
-      bool hasZero{false};
-      for(int iCov = 0 ; iCov < parSet.getPriorCovarianceMatrix()->GetNrows() ; iCov++ ){
-        if( not parSet.getParameterList()[iCov].isEnabled() ){ continue; }
-        iGlobalOffset++;
-        _globalCovParList_.emplace_back( &parSet.getParameterList()[iCov] );
-        int jGlobalOffset{-1};
+    if( parSet.getPriorCovarianceMatrix() != nullptr ) {
+      int iParIndex{-1};
+      int iFree{0}; // free parameters are not in the prior covariance matrices
+      int nCov{parSet.getPriorCovarianceMatrix()->GetNrows()};
+      // LogDebug << "Adding parSet: " << parSet.getName() << " with " << nCov << " cov pars" << std::endl;
+      for( auto& par : parSet.getParameterList() ){
+        if( not par.isEnabled() ){ continue; }
+        if( par.isFixed() ){ continue; }
+
+        iParIndex++; // will be in the list
+
+        _globalCovParList_.emplace_back( &par );
+
+        (*_globalCovarianceMatrix_)[parSetOffset + iParIndex][parSetOffset + iParIndex] =
+          par.getStdDevValue()*par.getStdDevValue();
+
+        if( par.isFree() ){ iFree++; continue; }
+        int jParIndex{-1};
+        int jFree{0};
         for(int jCov = 0 ; jCov < parSet.getPriorCovarianceMatrix()->GetNcols() ; jCov++ ){
           if( not parSet.getParameterList()[jCov].isEnabled() ){ continue; }
-          jGlobalOffset++;
-          (*_globalCovarianceMatrix_)[parSetOffset + iGlobalOffset][parSetOffset + jGlobalOffset] = (*parSet.getPriorCovarianceMatrix())[iCov][jCov];
+          if( parSet.getParameterList()[jCov].isFixed() ){ continue; }
+          jParIndex++;
+          if( parSet.getParameterList()[jCov].isFree() ){ jFree++; continue; }
+          (*_globalCovarianceMatrix_)[parSetOffset + iParIndex][parSetOffset + jParIndex] =
+            (*parSet.getPriorCovarianceMatrix())[iParIndex-iFree][jParIndex-jFree];
         }
       }
-      parSetOffset += (iGlobalOffset+1);
+      parSetOffset += (iParIndex+1);
     }
     else{
       // diagonal
@@ -186,6 +200,10 @@ void ParametersManager::throwParametersFromParSetCovariance(){
 void ParametersManager::initializeStrippedGlobalCov(){
   LogInfo << "Creating stripped global covariance matrix..." << std::endl;
   LogThrowIf( _globalCovarianceMatrix_ == nullptr, "Global covariance matrix not set." );
+  LogThrowIf( _globalCovarianceMatrix_->GetNrows() != _globalCovParList_.size(),
+    "Global covariance matrix dim = " << _globalCovarianceMatrix_->GetNrows()
+    << " while _globalCovParList_ size: " << _globalCovParList_.size()
+    );
 
   _strippedParameterList_.clear();
   for( int iGlobPar = 0 ; iGlobPar < _globalCovarianceMatrix_->GetNrows() ; iGlobPar++ ){

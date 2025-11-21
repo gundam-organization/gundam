@@ -78,8 +78,46 @@ if(ENABLE_TTY_CHECK)
   add_definitions(-D ENABLE_TTY_CHECK)
 endif()
 
-set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -fPIC -O1 -g -fsanitize=address")
+set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -fPIC -O1 -g")
 set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -fPIC -O3 -g")
+
+if( CMAKE_BUILD_TYPE STREQUAL "DEBUG" )
+  # Try to enable AddressSanitizer automatically if the toolchain supports it
+
+  include(CheckCXXSourceCompiles)
+
+  # Save CMake internals we are about to modify
+  set(_saved_req_flags "${CMAKE_REQUIRED_FLAGS}")
+  set(_saved_try_type "${CMAKE_TRY_COMPILE_TARGET_TYPE}")
+
+  # We want to test a real executable (so linking must succeed, including libasan)
+  set(CMAKE_TRY_COMPILE_TARGET_TYPE EXECUTABLE)
+  set(CMAKE_REQUIRED_FLAGS "${CMAKE_REQUIRED_FLAGS} -fsanitize=address")
+
+  check_cxx_source_compiles(
+      "int main() { return 0; }"
+      HAVE_WORKING_ASAN
+  )
+
+  # Restore internals
+  set(CMAKE_REQUIRED_FLAGS "${_saved_req_flags}")
+  set(CMAKE_TRY_COMPILE_TARGET_TYPE "${_saved_try_type}")
+
+  if(HAVE_WORKING_ASAN)
+    message(STATUS "AddressSanitizer detected, enabling for Debug builds.")
+
+    # Enable globally (only in Debug, you can tweak the condition if you want)
+    add_compile_options(
+        $<$<CONFIG:Debug>:-fsanitize=address>
+    )
+    add_link_options(
+        $<$<CONFIG:Debug>:-fsanitize=address>
+    )
+  else()
+    message(STATUS "AddressSanitizer not usable on this toolchain, keeping it disabled.")
+  endif()
+
+endif()
 
 ################################################################################
 # CMake Generated
