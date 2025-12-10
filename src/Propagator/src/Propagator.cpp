@@ -281,6 +281,7 @@ void Propagator::printBreakdowns() const {
         t << par.getFullTitle();
         t << GenericToolbox::TablePrinter::NextColumn << nbEventForParameter[ &par ].nbTotal;
 
+        LogDebug << "Parameter " << par.getFullTitle() << " has " << nbEventForParameter[ &par ].nbTotal << " events." << std::endl;
         if( hasNoDial and nbEventForParameter[ &par ].nbTotal != 0 ){ hasNoDial = false; }
 
         if( _showNbEventPerSampleParameterBreakdown_ ){
