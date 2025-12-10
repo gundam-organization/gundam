@@ -235,10 +235,10 @@ void Propagator::printBreakdowns() const {
 
     std::map<const Parameter*, NbEventBreakdown> nbEventForParameter{}; // assuming int = 0 by default
     for( auto& cache: _eventDialCache_.getCache() ){
-      DEBUG_VAR(cache.dialResponseCacheList.size());
       for( auto& dial : cache.dialResponseCacheList ){
         for( int iInput = 0 ; iInput < dial.dialInterface->getInputBufferRef()->getInputSize() ; iInput++ ){
           nbEventForParameter[ &dial.dialInterface->getInputBufferRef()->getParameter(iInput) ].nbTotal += 1;
+          LogDebugOnce << "FOUND INPUTS" << std::endl;
 
           if( _showNbEventPerSampleParameterBreakdown_ ){
             nbEventForParameter[ &dial.dialInterface->getInputBufferRef()->getParameter(iInput) ]
