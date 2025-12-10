@@ -1218,7 +1218,6 @@ void DataDispenser::loadEvent(int iThread_){
         eventIndexingBuffer.getWeights().base *= threadSharedData.buffer.eventVarAsWeight->getBuffer().getValueAsDouble();
       }
 
-
       // skip this event if 0
       if( eventIndexingBuffer.getWeights().base == 0 ){ continue; }
       // no negative weights -> error
@@ -1227,6 +1226,8 @@ void DataDispenser::loadEvent(int iThread_){
         LogError << "Event buffer is: " << eventIndexingBuffer.getSummary() << std::endl;
         LogThrow("Negative nominal weight");
       }
+
+      eventIndexingBuffer.getWeights().current = eventIndexingBuffer.getWeights().base;
 
       // grab data from TChain
       eventIndexingBuffer.getIndices().entry     = threadSharedData.treeChain->GetReadEntry();
