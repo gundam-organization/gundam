@@ -55,15 +55,18 @@ void DatasetDefinition::configureImpl() {
     _dataDispenserDict_.emplace(name, DataDispenser(this));
     _dataDispenserDict_.at(name).getParameters().isData = true;
 
+    ConfigUtils::ConfigBuilder dataConfigBuilder;
+
+    // use model as a base if "fromModel" is set
     if( dataEntry.fetchValue("fromModel", false) ){
-      _dataDispenserDict_.at(name).setConfig( _modelDispenser_.getConfig() );
+      LogInfo << name << " dataset will inherit from Model definition." << std::endl;
+      dataConfigBuilder.setConfig( _modelDispenser_.getConfig().getConfig() );
     }
 
     // use override
-    GenericToolbox::Json::applyOverrides(
-      _dataDispenserDict_.at(name).getConfig().getConfig(),
-      dataEntry.getConfig()
-    );
+    dataConfigBuilder.override( dataEntry.getConfig() );
+    dataConfigBuilder.setConfig( dataConfigBuilder.getConfig() );
+
     _dataDispenserDict_.at(name).configure();
   }
 
