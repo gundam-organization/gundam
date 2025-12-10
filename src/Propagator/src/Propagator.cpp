@@ -251,6 +251,10 @@ void Propagator::printBreakdowns() const {
       }
     }
 
+    for( auto& pair : nbEventForParameter ) {
+      DEBUG_VAR(pair.second.nbTotal);
+    }
+
     GenericToolbox::TablePrinter t;
     t << "Parameter";
     t << GenericToolbox::TablePrinter::NextColumn << "All samples";
