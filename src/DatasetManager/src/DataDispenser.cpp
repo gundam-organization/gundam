@@ -1227,8 +1227,6 @@ void DataDispenser::loadEvent(int iThread_){
         LogThrow("Negative nominal weight");
       }
 
-      eventIndexingBuffer.getWeights().current = eventIndexingBuffer.getWeights().base;
-
       // grab data from TChain
       eventIndexingBuffer.getIndices().entry     = threadSharedData.treeChain->GetReadEntry();
       eventIndexingBuffer.getIndices().treeFile      = threadSharedData.treeChain->GetTreeNumber();
