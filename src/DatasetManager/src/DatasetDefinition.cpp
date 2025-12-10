@@ -69,7 +69,9 @@ void DatasetDefinition::configureImpl() {
 
     // use override
     dataConfigBuilder.override( dataEntry.getConfig() );
-    _dataDispenserDict_.at(name).setConfig( ConfigReader(dataConfigBuilder.getConfig()) );
+    ConfigReader cr(dataConfigBuilder.getConfig());
+    cr.setParentPath(dataEntry.getParentPath());
+    _dataDispenserDict_.at(name).setConfig( cr );
 
     _dataDispenserDict_.at(name).configure();
   }
