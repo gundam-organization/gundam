@@ -377,6 +377,8 @@ void Propagator::reweightEvents( int iThread_) {
       int(_eventDialCache_.getCache().size())
   );
 
+  DEBUG_VAR(_eventDialCache_.getCache().size());
+
   std::for_each(
       _eventDialCache_.getCache().begin() + bounds.beginIndex,
       _eventDialCache_.getCache().begin() + bounds.endIndex,
