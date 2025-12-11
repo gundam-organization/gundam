@@ -95,7 +95,9 @@ void Propagator::clearContent(){
   _sampleSet_.clearEventLists();
 
   // also wiping event-by-event dials...
-  _dialManager_.clearEventByEventDials();
+  // _dialManager_.clearEventByEventDials();
+  _dialManager_.setParametersManager(&_parManager_);
+  _dialManager_.configure();
 
   // reset the cache
   _eventDialCache_ = EventDialCache();
