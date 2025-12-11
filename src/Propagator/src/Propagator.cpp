@@ -385,6 +385,7 @@ void Propagator::reweightEvents( int iThread_) {
       [&]( EventDialCache::CacheEntry& cache_){
         if(once) {
           DEBUG_VAR(cache_.dialResponseCacheList.size());
+          DEBUG_VAR(cache_.event->getEventWeight());
           once = false;
         }
         _eventDialCache_.reweightEntry(cache_);
