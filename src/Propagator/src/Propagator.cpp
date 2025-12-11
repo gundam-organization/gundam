@@ -98,6 +98,7 @@ void Propagator::clearContent(){
   // _dialManager_.clearEventByEventDials();
   _dialManager_.setParametersManager(&_parManager_);
   _dialManager_.configure();
+  _dialManager_.initialize();
 
   // reset the cache
   _eventDialCache_ = EventDialCache();
@@ -235,13 +236,9 @@ void Propagator::printBreakdowns() const {
       std::map<int, int> nbForSample{};
     };
 
-    bool once{true};
-
     std::map<const Parameter*, NbEventBreakdown> nbEventForParameter{}; // assuming int = 0 by default
     for( auto& cache: _eventDialCache_.getCache() ){
       for( auto& dial : cache.dialResponseCacheList ){
-        LogDebugIf(once) << "DIAL HAS INPUTS: " << dial.dialInterface->getInputBufferRef()->getInputSize() << std::endl;
-        once=false;
         for( int iInput = 0 ; iInput < dial.dialInterface->getInputBufferRef()->getInputSize() ; iInput++ ){
           nbEventForParameter[ &dial.dialInterface->getInputBufferRef()->getParameter(iInput) ].nbTotal += 1;
 
@@ -251,10 +248,6 @@ void Propagator::printBreakdowns() const {
           }
         }
       }
-    }
-
-    for( auto& pair : nbEventForParameter ) {
-      DEBUG_VAR(pair.second.nbTotal);
     }
 
     GenericToolbox::TablePrinter t;
