@@ -544,16 +544,16 @@ void LikelihoodInterface::throwToyParameters(Propagator& propagator_){
   std::cout << propagator_.getSampleSet().getSampleBreakdown() << std::endl;
 
   if( propagator_.isDebugPrintLoadedEvents() ){
-    LogDebug << "Toy events:" << std::endl;
-    LogDebug << GET_VAR_NAME_VALUE(propagator_.getDebugPrintLoadedEventsNbPerSample()) << std::endl;
+    LogInfo << "Toy events:" << std::endl;
+    LogInfo << GET_VAR_NAME_VALUE(propagator_.getDebugPrintLoadedEventsNbPerSample()) << std::endl;
     int iEvt{0};
     for( auto& entry : propagator_.getEventDialCache().getCache() ) {
-      LogDebug << "Event #" << iEvt++ << "{" << std::endl;
+      LogInfo << "Event #" << iEvt++ << "{" << std::endl;
       {
         LogScopeIndent;
-        LogDebug << entry.getSummary() << std::endl;
+        LogInfo << entry.getSummary() << std::endl;
       }
-      LogDebug << "}" << std::endl;
+      LogInfo << "}" << std::endl;
       if( iEvt >= propagator_.getDebugPrintLoadedEventsNbPerSample() ) break;
     }
   }
