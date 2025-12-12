@@ -94,9 +94,9 @@ public:
   GenericToolbox::Time::AveragedTimer<10> reweightTimer;
   GenericToolbox::Time::AveragedTimer<10> refillHistogramTimer;
 
-protected:
   void initializeThreads();
 
+protected:
   // multithreading
   void reweightEvents( int iThread_);
   void refillHistogramsFct( int iThread_);

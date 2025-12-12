@@ -359,6 +359,7 @@ void LikelihoodInterface::loadDataPropagator(){
   LogInfo << "Loading data..." << std::endl;
 
   _dataPropagator_.clearContent();
+  _dataPropagator_.initializeThreads();
 
   bool isAsimov{_dataType_ == DataType::Asimov or _forceAsimovData_};
   for( auto& dataSet : _datasetList_ ){
