@@ -82,6 +82,7 @@ private:
   // internals
   DatasetDefinition* _owner_{nullptr};
   DataDispenserCache _cache_;
+  GenericToolbox::Atomic<int> _unbinnedEvents_;
 
   // needed to check which variables need to be loaded
   const PlotGenerator* _plotGeneratorPtr_{nullptr};
