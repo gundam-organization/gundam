@@ -385,14 +385,14 @@ void Propagator::reweightEvents( int iThread_) {
       _eventDialCache_.getCache().begin() + bounds.beginIndex,
       _eventDialCache_.getCache().begin() + bounds.endIndex,
       [&]( EventDialCache::CacheEntry& cache_){
-        if(once) {
-          DEBUG_VAR(cache_.dialResponseCacheList.size());
-          DEBUG_VAR(cache_.event->getEventWeight());
-          DEBUG_VAR(&cache_);
-          DEBUG_VAR(&cache_.event);
-          LogDebug << cache_.event->getSummary() << std::endl;
-          once = false;
-        }
+        // if(once) {
+        //   DEBUG_VAR(cache_.dialResponseCacheList.size());
+        //   DEBUG_VAR(cache_.event->getEventWeight());
+        //   DEBUG_VAR(&cache_);
+        //   DEBUG_VAR(&cache_.event);
+        //   LogDebug << cache_.event->getSummary() << std::endl;
+        //   once = false;
+        // }
         _eventDialCache_.reweightEntry(cache_);
       }
   );

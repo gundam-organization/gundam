@@ -88,9 +88,11 @@ void LikelihoodInterface::initializeImpl() {
 
   for( auto& dataSet : _datasetList_ ){ dataSet.initialize(); }
 
-  _modelPropagator_.initialize();
-  _modelPropagator_.printConfiguration();
   _dataPropagator_ = _modelPropagator_; // avoid tons of printouts
+
+  _modelPropagator_.initialize();
+  _dataPropagator_.initialize();
+  _modelPropagator_.printConfiguration();
 
   _plotGenerator_.setModelSampleSetPtr( &_modelPropagator_.getSampleSet().getSampleList() );
   _plotGenerator_.setDataSampleSetPtr( &_dataPropagator_.getSampleSet().getSampleList() );
@@ -359,7 +361,6 @@ void LikelihoodInterface::loadDataPropagator(){
   LogInfo << "Loading data..." << std::endl;
 
   _dataPropagator_.clearContent();
-  _dataPropagator_.initializeThreads();
 
   bool isAsimov{_dataType_ == DataType::Asimov or _forceAsimovData_};
   for( auto& dataSet : _datasetList_ ){
