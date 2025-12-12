@@ -307,6 +307,7 @@ void Propagator::printBreakdowns() const {
       {
         LogScopeIndent;
         LogDebug << "PTR:" << _eventDialCache_.getCache()[iEvt].event << std::endl;
+        DEBUG_VAR(&_eventDialCache_.getCache()[iEvt]);
         LogInfo << _eventDialCache_.getCache()[iEvt].getSummary() << std::endl;
       }
       LogInfo << "}" << std::endl;
@@ -387,7 +388,8 @@ void Propagator::reweightEvents( int iThread_) {
         if(once) {
           DEBUG_VAR(cache_.dialResponseCacheList.size());
           DEBUG_VAR(cache_.event->getEventWeight());
-          LogDebug << cache_.event << std::endl;
+          DEBUG_VAR(&cache_);
+          DEBUG_VAR(&cache_.event);
           LogDebug << cache_.event->getSummary() << std::endl;
           once = false;
         }
