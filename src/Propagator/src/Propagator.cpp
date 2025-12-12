@@ -276,7 +276,6 @@ void Propagator::printBreakdowns() const {
         t << par.getFullTitle();
         t << GenericToolbox::TablePrinter::NextColumn << nbEventForParameter[ &par ].nbTotal;
 
-        LogDebug << "Parameter " << par.getFullTitle() << " has " << nbEventForParameter[ &par ].nbTotal << " events." << std::endl;
         if( hasNoDial and nbEventForParameter[ &par ].nbTotal != 0 ){ hasNoDial = false; }
 
         if( _showNbEventPerSampleParameterBreakdown_ ){
@@ -306,8 +305,6 @@ void Propagator::printBreakdowns() const {
       LogInfo << "Event #" << iEvt << "{" << std::endl;
       {
         LogScopeIndent;
-        LogDebug << "PTR:" << _eventDialCache_.getCache()[iEvt].event << std::endl;
-        DEBUG_VAR(&_eventDialCache_.getCache()[iEvt]);
         LogInfo << _eventDialCache_.getCache()[iEvt].getSummary() << std::endl;
       }
       LogInfo << "}" << std::endl;
@@ -380,19 +377,10 @@ void Propagator::reweightEvents( int iThread_) {
   );
 
 
-  bool once{true};
   std::for_each(
       _eventDialCache_.getCache().begin() + bounds.beginIndex,
       _eventDialCache_.getCache().begin() + bounds.endIndex,
       [&]( EventDialCache::CacheEntry& cache_){
-        // if(once) {
-        //   DEBUG_VAR(cache_.dialResponseCacheList.size());
-        //   DEBUG_VAR(cache_.event->getEventWeight());
-        //   DEBUG_VAR(&cache_);
-        //   DEBUG_VAR(&cache_.event);
-        //   LogDebug << cache_.event->getSummary() << std::endl;
-        //   once = false;
-        // }
         _eventDialCache_.reweightEntry(cache_);
       }
   );
