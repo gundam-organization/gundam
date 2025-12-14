@@ -52,8 +52,24 @@ foreach(cxxstd IN ITEMS 23 20 17 14 11)
 endforeach()
 
 if(!IS_ROOT_CXX_STANDARD_SET)
-  cmessage( ALERT "ROOT C++ standard not set, use ROOT minimum (C++20)")
-  set(CMAKE_CXX_STANDARD 20)
+  # !! This is an old routine that use to work in 2025 !!
+  # Explicitly set the compiler version so that it will match the
+  # compiler that was used to compile ROOT.  Recent ROOT documentation
+  # explicitly notes that the appliation needs to use the same C++
+  # standard as ROOT.
+  if ( ROOT_cxx14_FOUND )
+    cmessage(STATUS "ROOT compiled with C++14")
+    set(CMAKE_CXX_STANDARD 14)
+  elseif ( ROOT_cxx17_FOUND )
+    cmessage(STATUS "ROOT compiled with C++17")
+    set(CMAKE_CXX_STANDARD 17)
+  elseif ( ROOT_cxx20_FOUND )
+    cmessage(STATUS "ROOT compiled with C++20")
+    set(CMAKE_CXX_STANDARD 20)
+  else ( ROOT_cxx14_FOUND )
+    cmessage( ALERT "ROOT C++ standard not set, use ROOT minimum (C++14)")
+    set(CMAKE_CXX_STANDARD 14)
+  endif ( ROOT_cxx14_FOUND)
 endif()
 
 if(CXX_MARCH_FLAG)
