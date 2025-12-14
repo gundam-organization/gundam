@@ -155,9 +155,9 @@ void DataDispenser::initializeImpl(){
 }
 
 void DataDispenser::load(Propagator& propagator_){
-  LogWarning << "Loading dataset: " << getTitle() << std::endl;
-  LogThrowIf(not this->isInitialized(), "Can't load while not initialized.");
-  LogThrowIf(not propagator_.isInitialized(), "Can't load while propagator_ is not initialized.");
+  LogInfo << "Loading dataset: " << getTitle() << std::endl;
+  LogExitIf(not this->isInitialized(), "Can't load while not initialized.");
+  LogExitIf(not propagator_.isInitialized(), "Can't load while propagator_ is not initialized.");
 
   _cache_.clear();
   _cache_.propagatorPtr = &propagator_;
@@ -199,7 +199,25 @@ void DataDispenser::load(Propagator& propagator_){
   this->preAllocateMemory();
   this->readAndFill();
 
-  LogWarning << "Loaded " << getTitle() << std::endl;
+  LogInfo << "Loaded " << getTitle() << std::endl;
+  if (this->_unbinnedEvents_.getValue() > 0) {
+#ifdef GUNDAM_EXIT_ON_UNBINNED_EVENTS
+    // Exit since the fitted results will be "wrong".
+    LogError << "Invalid event selection or likelihood definition"
+             << std::endl
+             << "Events selected, but not included in a likelihood bin: "
+             << this->_unbinnedEvents_.getValue()
+             << std::endl;
+    LogExit("Incorrect event selection or likelihood binning");
+#else
+    LogWarning << "Mismatch between event selection and likelihood definitions"
+             << std::endl
+             << "Events selected, but not included in likelihood: "
+             << this->_unbinnedEvents_.getValue()
+             << std::endl;
+#endif
+ }
+
 }
 std::string DataDispenser::getTitle(){
   std::stringstream ss;
@@ -209,7 +227,7 @@ std::string DataDispenser::getTitle(){
 }
 
 void DataDispenser::buildSampleToFillList(){
-  LogWarning << "Fetching samples to fill..." << std::endl;
+  LogInfo << "Fetching samples to fill..." << std::endl;
 
   for( auto& sample : _cache_.propagatorPtr->getSampleSet().getSampleList() ){
     if( not sample.isEnabled() ) continue;
@@ -262,7 +280,7 @@ void DataDispenser::parseStringParameters() {
   if(not _parameters_.selectionCutFormulaStr.empty()){ _parameters_.selectionCutFormulaStr = "(" + _parameters_.selectionCutFormulaStr + ")"; }
 }
 void DataDispenser::doEventSelection(){
-  LogWarning << "Performing event selection..." << std::endl;
+  LogInfo << "Performing event selection..." << std::endl;
 
   LogInfo << "Event selection..." << std::endl;
 
@@ -325,7 +343,7 @@ void DataDispenser::doEventSelection(){
   }
 
   if( _owner_->isShowSelectedEventCount() ){
-    LogWarning << "Events passing selection cuts:" << std::endl;
+    LogInfo << "Events passing selection cuts:" << std::endl;
     GenericToolbox::TablePrinter t;
     t << "Sample" << GenericToolbox::TablePrinter::NextColumn;
     t << "Selection" << GenericToolbox::TablePrinter::NextColumn;
@@ -344,7 +362,7 @@ void DataDispenser::doEventSelection(){
 
 }
 void DataDispenser::fetchRequestedLeaves(){
-  LogWarning << "Poll every objects for requested variables..." << std::endl;
+  LogInfo << "Poll all objects for requested variables..." << std::endl;
 
   if( _parameters_.useReweightEngine ){
     LogInfo << "Selecting dial collections..." << std::endl;
@@ -575,7 +593,8 @@ void DataDispenser::preAllocateMemory(){
   _cache_.propagatorPtr->getEventDialCache().allocateCacheEntries(_cache_.totalNbEvents, nDialsMaxPerEvent);
 }
 void DataDispenser::readAndFill(){
-  LogWarning << "Reading dataset and loading..." << std::endl;
+  LogInfo << "Reading dataset and loading..." << std::endl;
+  this->_unbinnedEvents_.setValue(0);
 
   if( not _parameters_.nominalWeightFormulaStr.empty() ){
     LogInfo << "Nominal weight: \"" << _parameters_.nominalWeightFormulaStr << "\"" << std::endl;
@@ -584,7 +603,7 @@ void DataDispenser::readAndFill(){
     LogInfo << "Dial index for TClonesArray: \"" << _parameters_.dialIndexFormula << "\"" << std::endl;
   }
 
-  LogWarning << "Loading and indexing..." << std::endl;
+  LogInfo << "Loading and indexing..." << std::endl;
   if(not _owner_->isDevSingleThreadEventLoaderAndIndexer() and getNbParallelCpu() > 1 ){
     threadSharedDataList.resize(getNbParallelCpu() );
     ROOT::EnableThreadSafety(); // EXTREMELY IMPORTANT
@@ -609,7 +628,7 @@ void DataDispenser::loadFromHistContent(){
   LogWarning << "Creating dummy PhysicsEvent entries for loading hist content" << std::endl;
 
   // non-trivial as we need to propagate systematics. Need to merge with the original data loader, but not straight forward?
-  LogThrowIf( _parameters_.useReweightEngine, "Hist loader not implemented for MC containers" );
+  LogExitIf( _parameters_.useReweightEngine, "Hist loader not implemented for MC containers" );
 
   // counting events
   _cache_.sampleNbOfEvents.resize(_cache_.samplesToFillList.size());
@@ -740,7 +759,7 @@ std::shared_ptr<TChain> DataDispenser::openChain(bool verbose_) const{
 
     if( verbose_ ){
       LogScopeIndent;
-      LogWarning << name << std::endl;
+      LogInfo << name << std::endl;
     }
 
     std::string treePath{_parameters_.globalTreePath};
@@ -878,7 +897,7 @@ void DataDispenser::eventSelectionFunction(int iThread_){
           ){
         if( sampleHasBeenFound ){
           LogError << "Entry #" << iEntry << "already has a sample." << std::endl;
-          LogThrow("Multi-sample event isn't handled yet by GUNDAM.");
+          LogExit("Multi-sample event isn't handled yet by GUNDAM.");
         }
         sampleHasBeenFound = true;
         threadSelectionResults.entrySampleIndexList[iEntry] = sampleCut.sampleIndex;
@@ -962,7 +981,7 @@ void DataDispenser::runEventFillThreads(int iThread_){
       }
     }
 
-    LogThrowIf(threadSharedData.buffer.eventVarAsWeight==nullptr, "Could not find variable: " << _parameters_.eventVariableAsWeight);
+    LogExitIf(threadSharedData.buffer.eventVarAsWeight==nullptr, "Could not find variable: " << _parameters_.eventVariableAsWeight);
   }
 
   // start event filler
@@ -1224,7 +1243,7 @@ void DataDispenser::loadEvent(int iThread_){
       if( eventIndexingBuffer.getWeights().base  < 0 ){
         LogError << "Negative nominal weight:" << std::endl;
         LogError << "Event buffer is: " << eventIndexingBuffer.getSummary() << std::endl;
-        LogThrow("Negative nominal weight");
+        LogExit("Negative nominal weight");
       }
 
       // grab data from TChain
@@ -1242,7 +1261,20 @@ void DataDispenser::loadEvent(int iThread_){
       LoaderUtils::fillBinIndex(eventIndexingBuffer, eventSample.getHistogram().getBinContextList());
 
       // No bin found -> next sample
-      if( eventIndexingBuffer.getIndices().bin == -1 ){ continue; }
+      if( eventIndexingBuffer.getIndices().bin == -1 ){
+        const int unbinnedEventThrottle = 5;
+        if( this->_unbinnedEvents_++ < unbinnedEventThrottle ){
+          LogAlert <<  "Selected event not in a likelihood histogram bin: "
+                     << std::endl
+                     << eventIndexingBuffer.getSummary()
+                     << std::endl;
+          if ( this->_unbinnedEvents_.getValue() == unbinnedEventThrottle ) {
+            LogAlert <<  "Further unbinned event warnings will be skipped."
+                     << std::endl;
+          }
+        }
+        continue;
+      }
 
       // dialIndexTreeFormula is modified by the TChain reader
       int dialCloneArrayIndex{0};
