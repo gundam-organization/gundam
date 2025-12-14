@@ -88,9 +88,11 @@ void LikelihoodInterface::initializeImpl() {
 
   for( auto& dataSet : _datasetList_ ){ dataSet.initialize(); }
 
-  _modelPropagator_.initialize();
-  _modelPropagator_.printConfiguration();
   _dataPropagator_ = _modelPropagator_; // avoid tons of printouts
+
+  _modelPropagator_.initialize();
+  _dataPropagator_.initialize();
+  _modelPropagator_.printConfiguration();
 
   _plotGenerator_.setModelSampleSetPtr( &_modelPropagator_.getSampleSet().getSampleList() );
   _plotGenerator_.setDataSampleSetPtr( &_dataPropagator_.getSampleSet().getSampleList() );
@@ -542,16 +544,16 @@ void LikelihoodInterface::throwToyParameters(Propagator& propagator_){
   std::cout << propagator_.getSampleSet().getSampleBreakdown() << std::endl;
 
   if( propagator_.isDebugPrintLoadedEvents() ){
-    LogDebug << "Toy events:" << std::endl;
-    LogDebug << GET_VAR_NAME_VALUE(propagator_.getDebugPrintLoadedEventsNbPerSample()) << std::endl;
+    LogInfo << "Toy events:" << std::endl;
+    LogInfo << GET_VAR_NAME_VALUE(propagator_.getDebugPrintLoadedEventsNbPerSample()) << std::endl;
     int iEvt{0};
     for( auto& entry : propagator_.getEventDialCache().getCache() ) {
-      LogDebug << "Event #" << iEvt++ << "{" << std::endl;
+      LogInfo << "Event #" << iEvt++ << "{" << std::endl;
       {
         LogScopeIndent;
-        LogDebug << entry.getSummary() << std::endl;
+        LogInfo << entry.getSummary() << std::endl;
       }
-      LogDebug << "}" << std::endl;
+      LogInfo << "}" << std::endl;
       if( iEvt >= propagator_.getDebugPrintLoadedEventsNbPerSample() ) break;
     }
   }

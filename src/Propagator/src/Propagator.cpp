@@ -95,7 +95,10 @@ void Propagator::clearContent(){
   _sampleSet_.clearEventLists();
 
   // also wiping event-by-event dials...
-  _dialManager_.clearEventByEventDials();
+  // _dialManager_.clearEventByEventDials();
+  _dialManager_.setParametersManager(&_parManager_);
+  _dialManager_.configure();
+  _dialManager_.initialize();
 
   // reset the cache
   _eventDialCache_ = EventDialCache();
@@ -373,10 +376,13 @@ void Propagator::reweightEvents( int iThread_) {
       int(_eventDialCache_.getCache().size())
   );
 
+
   std::for_each(
       _eventDialCache_.getCache().begin() + bounds.beginIndex,
       _eventDialCache_.getCache().begin() + bounds.endIndex,
-      [this]( EventDialCache::CacheEntry& cache_){ _eventDialCache_.reweightEntry(cache_); }
+      [&]( EventDialCache::CacheEntry& cache_){
+        _eventDialCache_.reweightEntry(cache_);
+      }
   );
 
 }

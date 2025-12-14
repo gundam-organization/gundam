@@ -1237,7 +1237,6 @@ void DataDispenser::loadEvent(int iThread_){
         eventIndexingBuffer.getWeights().base *= threadSharedData.buffer.eventVarAsWeight->getBuffer().getValueAsDouble();
       }
 
-
       // skip this event if 0
       if( eventIndexingBuffer.getWeights().base == 0 ){ continue; }
       // no negative weights -> error
