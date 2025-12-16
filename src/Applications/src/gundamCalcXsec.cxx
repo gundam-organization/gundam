@@ -815,8 +815,12 @@ int main(int argc, char** argv){
   LogDebugIf(GundamGlobals::isDebug()) << "Writing cov" << std::endl;
   globalCovMatrixHist->GetXaxis()->SetLabelSize(0.02);
   globalCovMatrixHist->GetYaxis()->SetLabelSize(0.02);
+  LogDebugIf(GundamGlobals::isDebug()) << "SetLabelSize done" << std::endl;
   GenericToolbox::writeInTFileWithObjTypeExt(GenericToolbox::mkdirTFile(calcXsecDir, "matrices"), globalCovMatrixHist, "covarianceMatrix");
+  LogDebugIf(GundamGlobals::isDebug()) << "writeInTFileWithObjTypeExt done" << std::endl;
   auto chopped = GenericToolbox::chopTH2D(globalCovMatrixHist, iBranchSeparation);
+  LogExitIf(chopped.empty(), "Invalid chopp?? " << globalCovMatrixHist->GetNbinsX() << " - " << iBranchSeparation);
+  LogDebugIf(GundamGlobals::isDebug()) << "chopTH2D done" << std::endl;
   GenericToolbox::writeInTFileWithObjTypeExt(GenericToolbox::mkdirTFile(calcXsecDir, "matrices"), chopped[0], "binsCovarianceMatrix");
   GenericToolbox::writeInTFileWithObjTypeExt(GenericToolbox::mkdirTFile(calcXsecDir, "matrices"), chopped[1], "parsCovarianceMatrix");
 
