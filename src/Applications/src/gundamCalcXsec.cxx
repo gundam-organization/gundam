@@ -757,9 +757,10 @@ int main(int argc, char** argv){
   int iBinGlobal{-1};
   int iBranchSeparation{-1};
 
-  LogDebugIf(GundamGlobals::isDebug()) << "Begging of loop over crossSectionDataList" << std::endl;
+  LogDebugIf(GundamGlobals::isDebug()) << "Begging of loop over crossSectionDataList size = " << crossSectionDataList.size() << std::endl;
 
   for( auto& xsec : crossSectionDataList ){
+    DEBUG_VAR(xsec.samplePtr->getName());
 
     for( int iBin = 0 ; iBin < xsec.samplePtr->getHistogram().getNbBins() ; iBin++ ){
       iBinGlobal++;
@@ -809,6 +810,9 @@ int main(int argc, char** argv){
 
   }
 
+  LogDebugIf(GundamGlobals::isDebug()) << "End of loop over crossSectionDataList" << std::endl;
+
+  LogDebugIf(GundamGlobals::isDebug()) << "Writing cov" << std::endl;
   globalCovMatrixHist->GetXaxis()->SetLabelSize(0.02);
   globalCovMatrixHist->GetYaxis()->SetLabelSize(0.02);
   GenericToolbox::writeInTFileWithObjTypeExt(GenericToolbox::mkdirTFile(calcXsecDir, "matrices"), globalCovMatrixHist, "covarianceMatrix");
@@ -816,6 +820,7 @@ int main(int argc, char** argv){
   GenericToolbox::writeInTFileWithObjTypeExt(GenericToolbox::mkdirTFile(calcXsecDir, "matrices"), chopped[0], "binsCovarianceMatrix");
   GenericToolbox::writeInTFileWithObjTypeExt(GenericToolbox::mkdirTFile(calcXsecDir, "matrices"), chopped[1], "parsCovarianceMatrix");
 
+  LogDebugIf(GundamGlobals::isDebug()) << "Writing cor" << std::endl;
   globalCorMatrixHist->GetXaxis()->SetLabelSize(0.02);
   globalCorMatrixHist->GetYaxis()->SetLabelSize(0.02);
   globalCorMatrixHist->GetZaxis()->SetRangeUser(-1, 1);
