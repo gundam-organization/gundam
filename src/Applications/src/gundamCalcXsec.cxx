@@ -745,15 +745,19 @@ int main(int argc, char** argv){
   auto* meanValuesVector = GenericToolbox::generateMeanVectorOfTree(
       useBestFitAsCentralValue ? xsecAtBestFitTree : xsecThrowTree
   );
+  LogDebugIf(GundamGlobals::isDebug()) << "generateCovarianceMatrixOfTree" << std::endl;
   auto* globalCovMatrix = GenericToolbox::generateCovarianceMatrixOfTree( xsecThrowTree );
 
   auto* globalCovMatrixHist = GenericToolbox::convertTMatrixDtoTH2D(globalCovMatrix);
   auto* globalCorMatrixHist = GenericToolbox::convertTMatrixDtoTH2D(GenericToolbox::convertToCorrelationMatrix(globalCovMatrix));
 
+  LogDebugIf(GundamGlobals::isDebug()) << "Reserve binValues" << std::endl;
   std::vector<TH1D> binValues{};
   binValues.reserve(propagator.getSampleSet().getSampleList().size() );
   int iBinGlobal{-1};
   int iBranchSeparation{-1};
+
+  LogDebugIf(GundamGlobals::isDebug()) << "Begging of loop over crossSectionDataList" << std::endl;
 
   for( auto& xsec : crossSectionDataList ){
 
