@@ -818,7 +818,6 @@ int main(int argc, char** argv){
   GenericToolbox::writeInTFileWithObjTypeExt(GenericToolbox::mkdirTFile(calcXsecDir, "matrices"), chopped[0], "binsCovarianceMatrix");
   GenericToolbox::writeInTFileWithObjTypeExt(GenericToolbox::mkdirTFile(calcXsecDir, "matrices"), chopped[1], "parsCovarianceMatrix");
 
-  LogDebugIf(GundamGlobals::isDebug()) << "Writing cor" << std::endl;
   globalCorMatrixHist->GetXaxis()->SetLabelSize(0.02);
   globalCorMatrixHist->GetYaxis()->SetLabelSize(0.02);
   globalCorMatrixHist->GetZaxis()->SetRangeUser(-1, 1);
