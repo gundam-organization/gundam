@@ -485,6 +485,8 @@ int main(int argc, char** argv){
   std::vector<CrossSectionData> crossSectionDataList{};
 
   LogInfo << "Initializing xsec samples..." << std::endl;
+  size_t nBinsSamples{0};
+  size_t nParsThrown{0};
   crossSectionDataList.reserve(propagator.getSampleSet().getSampleList().size() );
   for( auto& sample : propagator.getSampleSet().getSampleList() ){
     crossSectionDataList.emplace_back();
@@ -504,6 +506,7 @@ int main(int argc, char** argv){
     xsecEntry.branchBinsData.lock();
 
     LogDebugIf(GundamGlobals::isDebug()) << "Adding sample branch: " << GenericToolbox::generateCleanBranchName( sample.getName() ) << "/" << GenericToolbox::joinVectorString(leafNameList, ":") << std::endl;
+    nBinsSamples += leafNameList.size();
     xsecThrowTree->Branch(
         GenericToolbox::generateCleanBranchName( sample.getName() ).c_str(),
         xsecEntry.branchBinsData.getRawDataArray().data(),
@@ -546,6 +549,7 @@ int main(int argc, char** argv){
     }
 
     LogDebugIf(GundamGlobals::isDebug()) << "Adding par branch: " << GenericToolbox::generateCleanBranchName( parset.getName() ) << "/" << GenericToolbox::joinVectorString(leafNameList, ":") << std::endl;
+    nParsThrown += leafNameList.size();
     xsecThrowTree->Branch(
         GenericToolbox::generateCleanBranchName( parset.getName() ).c_str(),
         parDataList[&parset].getRawDataArray().data(),
@@ -750,6 +754,8 @@ int main(int argc, char** argv){
   LogDebugIf(GundamGlobals::isDebug()) << "generateCovarianceMatrixOfTree" << std::endl;
   auto* globalCovMatrix = GenericToolbox::generateCovarianceMatrixOfTree( xsecThrowTree );
 
+  LogInfo << "Throw covariance matrix is " << globalCovMatrix->GetNrows() << " x " << globalCovMatrix->GetNcols() << std::endl;
+
   auto* globalCovMatrixHist = GenericToolbox::convertTMatrixDtoTH2D(globalCovMatrix);
   auto* globalCorMatrixHist = GenericToolbox::convertTMatrixDtoTH2D(GenericToolbox::convertToCorrelationMatrix(globalCovMatrix));
 
@@ -821,7 +827,7 @@ int main(int argc, char** argv){
   GenericToolbox::writeInTFileWithObjTypeExt(GenericToolbox::mkdirTFile(calcXsecDir, "matrices"), globalCovMatrixHist, "covarianceMatrix");
   LogDebugIf(GundamGlobals::isDebug()) << "writeInTFileWithObjTypeExt done" << std::endl;
   auto chopped = GenericToolbox::chopTH2D(globalCovMatrixHist, iBranchSeparation);
-  LogExitIf(chopped.empty(), "Invalid chopp?? " << globalCovMatrixHist->GetNbinsX() << " - " << iBranchSeparation);
+  LogExitIf(chopped.empty(), "Invalid chopp?? " << globalCovMatrixHist->GetNbinsX() << " - " << iBranchSeparation << ", nBinsSamples="<<nBinsSamples << ", nParsThrown=" << nParsThrown);
   LogDebugIf(GundamGlobals::isDebug()) << "chopTH2D done" << std::endl;
   GenericToolbox::writeInTFileWithObjTypeExt(GenericToolbox::mkdirTFile(calcXsecDir, "matrices"), chopped[0], "binsCovarianceMatrix");
   GenericToolbox::writeInTFileWithObjTypeExt(GenericToolbox::mkdirTFile(calcXsecDir, "matrices"), chopped[1], "parsCovarianceMatrix");
