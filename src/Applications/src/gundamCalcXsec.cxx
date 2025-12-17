@@ -485,6 +485,8 @@ int main(int argc, char** argv){
   std::vector<CrossSectionData> crossSectionDataList{};
 
   LogInfo << "Initializing xsec samples..." << std::endl;
+  size_t nBinsSamples{0};
+  size_t nParsThrown{0};
   crossSectionDataList.reserve(propagator.getSampleSet().getSampleList().size() );
   for( auto& sample : propagator.getSampleSet().getSampleList() ){
     crossSectionDataList.emplace_back();
@@ -503,6 +505,8 @@ int main(int argc, char** argv){
     }
     xsecEntry.branchBinsData.lock();
 
+    LogDebugIf(GundamGlobals::isDebug()) << "Adding sample branch: " << GenericToolbox::generateCleanBranchName( sample.getName() ) << "/" << GenericToolbox::joinVectorString(leafNameList, ":") << std::endl;
+    nBinsSamples += leafNameList.size();
     xsecThrowTree->Branch(
         GenericToolbox::generateCleanBranchName( sample.getName() ).c_str(),
         xsecEntry.branchBinsData.getRawDataArray().data(),
@@ -544,6 +548,8 @@ int main(int argc, char** argv){
       parDataList[&parset].writeRawData( par.getParameterValue() );
     }
 
+    LogDebugIf(GundamGlobals::isDebug()) << "Adding par branch: " << GenericToolbox::generateCleanBranchName( parset.getName() ) << "/" << GenericToolbox::joinVectorString(leafNameList, ":") << std::endl;
+    nParsThrown += leafNameList.size();
     xsecThrowTree->Branch(
         GenericToolbox::generateCleanBranchName( parset.getName() ).c_str(),
         parDataList[&parset].getRawDataArray().data(),
@@ -747,45 +753,31 @@ int main(int argc, char** argv){
   );
   auto* globalCovMatrix = GenericToolbox::generateCovarianceMatrixOfTree( xsecThrowTree );
 
+  LogInfo << "Throw covariance matrix is " << globalCovMatrix->GetNrows() << " x " << globalCovMatrix->GetNcols() << std::endl;
+
   auto* globalCovMatrixHist = GenericToolbox::convertTMatrixDtoTH2D(globalCovMatrix);
   auto* globalCorMatrixHist = GenericToolbox::convertTMatrixDtoTH2D(GenericToolbox::convertToCorrelationMatrix(globalCovMatrix));
 
   std::vector<TH1D> binValues{};
   binValues.reserve(propagator.getSampleSet().getSampleList().size() );
-  int iBinGlobal{-1};
-  int iBranchSeparation{-1};
+  int iBinSampleGlobal{-1};
 
   for( auto& xsec : crossSectionDataList ){
 
     for( int iBin = 0 ; iBin < xsec.samplePtr->getHistogram().getNbBins() ; iBin++ ){
-      iBinGlobal++;
+      iBinSampleGlobal++;
 
       std::string binTitle = xsec.samplePtr->getHistogram().getBinContextList()[iBin].bin.getSummary();
       double binVolume = xsec.samplePtr->getHistogram().getBinContextList()[iBin].bin.getVolume();
 
-      xsec.histogram.SetBinContent( 1+iBin, (*meanValuesVector)[iBinGlobal] );
-      xsec.histogram.SetBinError( 1+iBin, std::sqrt( (*globalCovMatrix)[iBinGlobal][iBinGlobal] ) );
+      xsec.histogram.SetBinContent( 1+iBin, (*meanValuesVector)[iBinSampleGlobal] );
+      xsec.histogram.SetBinError( 1+iBin, std::sqrt( (*globalCovMatrix)[iBinSampleGlobal][iBinSampleGlobal] ) );
       xsec.histogram.GetXaxis()->SetBinLabel( 1+iBin, binTitle.c_str() );
 
-      globalCovMatrixHist->GetXaxis()->SetBinLabel(1+iBinGlobal, GenericToolbox::joinPath(xsec.samplePtr->getName(), binTitle).c_str());
-      globalCorMatrixHist->GetXaxis()->SetBinLabel(1+iBinGlobal, GenericToolbox::joinPath(xsec.samplePtr->getName(), binTitle).c_str());
-      globalCovMatrixHist->GetYaxis()->SetBinLabel(1+iBinGlobal, GenericToolbox::joinPath(xsec.samplePtr->getName(), binTitle).c_str());
-      globalCorMatrixHist->GetYaxis()->SetBinLabel(1+iBinGlobal, GenericToolbox::joinPath(xsec.samplePtr->getName(), binTitle).c_str());
-    }
-
-    iBranchSeparation = iBinGlobal+1;
-
-    for( auto& parset : propagator.getParametersManager().getParameterSetsList() ) {
-      if(not parset.isEnabled()){ continue; }
-      for( auto& par : parset.getParameterList() ) {
-        if(not par.isEnabled()){continue;}
-        iBinGlobal++;
-        std::string binTitle{par.getFullTitle()};
-        globalCovMatrixHist->GetXaxis()->SetBinLabel(1+iBinGlobal, GenericToolbox::joinPath(xsec.samplePtr->getName(), binTitle).c_str());
-        globalCorMatrixHist->GetXaxis()->SetBinLabel(1+iBinGlobal, GenericToolbox::joinPath(xsec.samplePtr->getName(), binTitle).c_str());
-        globalCovMatrixHist->GetYaxis()->SetBinLabel(1+iBinGlobal, GenericToolbox::joinPath(xsec.samplePtr->getName(), binTitle).c_str());
-        globalCorMatrixHist->GetYaxis()->SetBinLabel(1+iBinGlobal, GenericToolbox::joinPath(xsec.samplePtr->getName(), binTitle).c_str());
-      }
+      globalCovMatrixHist->GetXaxis()->SetBinLabel(1+iBinSampleGlobal, GenericToolbox::joinPath(xsec.samplePtr->getName(), binTitle).c_str());
+      globalCorMatrixHist->GetXaxis()->SetBinLabel(1+iBinSampleGlobal, GenericToolbox::joinPath(xsec.samplePtr->getName(), binTitle).c_str());
+      globalCovMatrixHist->GetYaxis()->SetBinLabel(1+iBinSampleGlobal, GenericToolbox::joinPath(xsec.samplePtr->getName(), binTitle).c_str());
+      globalCorMatrixHist->GetYaxis()->SetBinLabel(1+iBinSampleGlobal, GenericToolbox::joinPath(xsec.samplePtr->getName(), binTitle).c_str());
     }
 
     xsec.histogram.SetMarkerStyle(kFullDotLarge);
@@ -805,10 +797,25 @@ int main(int argc, char** argv){
 
   }
 
+  int iBinParGlobal{-1};
+  for( auto& parset : propagator.getParametersManager().getParameterSetsList() ) {
+    if(not parset.isEnabled()){ continue; }
+    for( auto& par : parset.getParameterList() ) {
+      if(not par.isEnabled()){continue;}
+      iBinParGlobal++;
+      std::string binTitle{par.getFullTitle()};
+      globalCovMatrixHist->GetXaxis()->SetBinLabel(1+nBinsSamples+iBinParGlobal, binTitle.c_str());
+      globalCorMatrixHist->GetXaxis()->SetBinLabel(1+nBinsSamples+iBinParGlobal, binTitle.c_str());
+      globalCovMatrixHist->GetYaxis()->SetBinLabel(1+nBinsSamples+iBinParGlobal, binTitle.c_str());
+      globalCorMatrixHist->GetYaxis()->SetBinLabel(1+nBinsSamples+iBinParGlobal, binTitle.c_str());
+    }
+  }
+
   globalCovMatrixHist->GetXaxis()->SetLabelSize(0.02);
   globalCovMatrixHist->GetYaxis()->SetLabelSize(0.02);
   GenericToolbox::writeInTFileWithObjTypeExt(GenericToolbox::mkdirTFile(calcXsecDir, "matrices"), globalCovMatrixHist, "covarianceMatrix");
-  auto chopped = GenericToolbox::chopTH2D(globalCovMatrixHist, iBranchSeparation);
+  auto chopped = GenericToolbox::chopTH2D(globalCovMatrixHist, int(nBinsSamples));
+  LogExitIf(chopped.empty(), "Invalid chopp?? " << globalCovMatrixHist->GetNbinsX() << ", nBinsSamples="<<nBinsSamples << ", nParsThrown=" << nParsThrown);
   GenericToolbox::writeInTFileWithObjTypeExt(GenericToolbox::mkdirTFile(calcXsecDir, "matrices"), chopped[0], "binsCovarianceMatrix");
   GenericToolbox::writeInTFileWithObjTypeExt(GenericToolbox::mkdirTFile(calcXsecDir, "matrices"), chopped[1], "parsCovarianceMatrix");
 
@@ -816,7 +823,7 @@ int main(int argc, char** argv){
   globalCorMatrixHist->GetYaxis()->SetLabelSize(0.02);
   globalCorMatrixHist->GetZaxis()->SetRangeUser(-1, 1);
   GenericToolbox::writeInTFileWithObjTypeExt(GenericToolbox::mkdirTFile(calcXsecDir, "matrices"), globalCorMatrixHist, "correlationMatrix");
-  chopped = GenericToolbox::chopTH2D(globalCorMatrixHist, iBranchSeparation);
+  chopped = GenericToolbox::chopTH2D(globalCorMatrixHist, int(nBinsSamples));
   GenericToolbox::writeInTFileWithObjTypeExt(GenericToolbox::mkdirTFile(calcXsecDir, "matrices"), chopped[0], "binsCorrelationMatrix");
   GenericToolbox::writeInTFileWithObjTypeExt(GenericToolbox::mkdirTFile(calcXsecDir, "matrices"), chopped[1], "parsCorrelationMatrix");
 
