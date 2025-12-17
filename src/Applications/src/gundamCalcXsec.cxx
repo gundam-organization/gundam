@@ -503,6 +503,7 @@ int main(int argc, char** argv){
     }
     xsecEntry.branchBinsData.lock();
 
+    LogDebugIf(GundamGlobals::isDebug()) << "Adding sample branch: " << GenericToolbox::generateCleanBranchName( sample.getName() ) << "/" << GenericToolbox::joinVectorString(leafNameList, ":") << std::endl;
     xsecThrowTree->Branch(
         GenericToolbox::generateCleanBranchName( sample.getName() ).c_str(),
         xsecEntry.branchBinsData.getRawDataArray().data(),
@@ -544,6 +545,7 @@ int main(int argc, char** argv){
       parDataList[&parset].writeRawData( par.getParameterValue() );
     }
 
+    LogDebugIf(GundamGlobals::isDebug()) << "Adding par branch: " << GenericToolbox::generateCleanBranchName( parset.getName() ) << "/" << GenericToolbox::joinVectorString(leafNameList, ":") << std::endl;
     xsecThrowTree->Branch(
         GenericToolbox::generateCleanBranchName( parset.getName() ).c_str(),
         parDataList[&parset].getRawDataArray().data(),
