@@ -196,6 +196,10 @@ int main(int argc, char** argv){
 
   }
 
+  // Data has no point to be loaded there
+  fitter.getLikelihoodInterface().setForceAsimovData( true );
+  fitter.getLikelihoodInterface().setDataType( LikelihoodInterface::DataType::Asimov );
+
   // Load everything
   fitter.getLikelihoodInterface().initialize();
 
@@ -862,9 +866,9 @@ int main(int argc, char** argv){
   }
 
   LogInfo << "Generating xsec sample plots..." << std::endl;
-  // manual trigger to tweak the error bars
   fitter.getLikelihoodInterface().getPlotGenerator().generateSampleHistograms( GenericToolbox::mkdirTFile(calcXsecDir, "plots/histograms") );
 
+  // manual trigger to tweak the error bars
   for( auto& histHolder : fitter.getLikelihoodInterface().getPlotGenerator().getHistHolderList(0) ){
     if( not histHolder.isData ){ continue; } // only data will print errors
 
@@ -886,6 +890,7 @@ int main(int argc, char** argv){
     // alright, now rescale error bars
     for( int iBin = 0 ; iBin < histHolder.histPtr->GetNbinsX() ; iBin++ ){
       // relative error should be set
+      histHolder.histPtr->SetBinContent( 1+iBin, histHolder.histPtr->GetBinContent(1+iBin) / nToys );
       histHolder.histPtr->SetBinError(
           1+iBin,
           histHolder.histPtr->GetBinContent(1+iBin)
