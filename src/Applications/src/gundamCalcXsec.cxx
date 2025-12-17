@@ -30,6 +30,7 @@ int main(int argc, char** argv){
 
   clParser.addDummyOption("Main options:");
   clParser.addOption("configFile", {"-c", "--config-file"}, "Specify path to the fitter config file");
+  clParser.addOption("overrideFiles", {"-of", "--override-files"}, "Provide config files that will override keys", -1);
   clParser.addOption("fitterFile", {"-f"}, "Specify the fitter output file");
   clParser.addOption("outputFile", {"-o", "--out-file"}, "Specify the CalcXsec output file");
   clParser.addOption("nbThreads", {"-t", "--nb-threads"}, "Specify nb of parallel threads");
@@ -107,6 +108,15 @@ int main(int argc, char** argv){
   LogAlertIf(clParser.isOptionTriggered("usePreFit")) << "Pre-fit mode enabled: will throw toys according to the prior covariance matrices..." << std::endl;
 
   ConfigReader xsecConfig(ConfigUtils::readConfigFile( clParser.getOptionVal<std::string>("configFile") ));
+  ConfigUtils::ConfigBuilder xcBuilder{xsecConfig.getConfig()};
+
+  // add overrides
+  if( clParser.isOptionTriggered("overrideFiles") ) {
+    LogInfo << "Applying overrides..." << std::endl;
+    xcBuilder.override( clParser.getOptionValList<std::string>("overrideFiles") );
+  }
+
+  xsecConfig.setConfig(xcBuilder.getConfig());
   xsecConfig.defineFields({
     {"outputFolder"},
     {"useBestFitAsCentralValue"},
@@ -260,6 +270,7 @@ int main(int argc, char** argv){
     // this list insure all appendices will appear in the same order
     std::vector<GundamUtils::AppendixEntry> appendixDict{
         {"configFile", ""},
+        {"overrideFiles", "With"},
         {"fitterFile", "Fit"},
         {"nToys", "nToys"},
         {"randomSeed", "Seed"},
