@@ -825,7 +825,7 @@ int main(int argc, char** argv){
   LogDebugIf(GundamGlobals::isDebug()) << "SetLabelSize done" << std::endl;
   GenericToolbox::writeInTFileWithObjTypeExt(GenericToolbox::mkdirTFile(calcXsecDir, "matrices"), globalCovMatrixHist, "covarianceMatrix");
   LogDebugIf(GundamGlobals::isDebug()) << "writeInTFileWithObjTypeExt done" << std::endl;
-  auto chopped = GenericToolbox::chopTH2D(globalCovMatrixHist, nBinsSamples);
+  auto chopped = GenericToolbox::chopTH2D(globalCovMatrixHist, int(nBinsSamples));
   LogExitIf(chopped.empty(), "Invalid chopp?? " << globalCovMatrixHist->GetNbinsX() << " - " << iBranchSeparation << ", nBinsSamples="<<nBinsSamples << ", nParsThrown=" << nParsThrown);
   LogDebugIf(GundamGlobals::isDebug()) << "chopTH2D done" << std::endl;
   GenericToolbox::writeInTFileWithObjTypeExt(GenericToolbox::mkdirTFile(calcXsecDir, "matrices"), chopped[0], "binsCovarianceMatrix");
@@ -836,7 +836,7 @@ int main(int argc, char** argv){
   globalCorMatrixHist->GetYaxis()->SetLabelSize(0.02);
   globalCorMatrixHist->GetZaxis()->SetRangeUser(-1, 1);
   GenericToolbox::writeInTFileWithObjTypeExt(GenericToolbox::mkdirTFile(calcXsecDir, "matrices"), globalCorMatrixHist, "correlationMatrix");
-  chopped = GenericToolbox::chopTH2D(globalCorMatrixHist, iBranchSeparation);
+  chopped = GenericToolbox::chopTH2D(globalCorMatrixHist, int(nBinsSamples));
   GenericToolbox::writeInTFileWithObjTypeExt(GenericToolbox::mkdirTFile(calcXsecDir, "matrices"), chopped[0], "binsCorrelationMatrix");
   GenericToolbox::writeInTFileWithObjTypeExt(GenericToolbox::mkdirTFile(calcXsecDir, "matrices"), chopped[1], "parsCorrelationMatrix");
 
