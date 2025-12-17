@@ -751,7 +751,6 @@ int main(int argc, char** argv){
   auto* meanValuesVector = GenericToolbox::generateMeanVectorOfTree(
       useBestFitAsCentralValue ? xsecAtBestFitTree : xsecThrowTree
   );
-  LogDebugIf(GundamGlobals::isDebug()) << "generateCovarianceMatrixOfTree" << std::endl;
   auto* globalCovMatrix = GenericToolbox::generateCovarianceMatrixOfTree( xsecThrowTree );
 
   LogInfo << "Throw covariance matrix is " << globalCovMatrix->GetNrows() << " x " << globalCovMatrix->GetNcols() << std::endl;
@@ -759,13 +758,9 @@ int main(int argc, char** argv){
   auto* globalCovMatrixHist = GenericToolbox::convertTMatrixDtoTH2D(globalCovMatrix);
   auto* globalCorMatrixHist = GenericToolbox::convertTMatrixDtoTH2D(GenericToolbox::convertToCorrelationMatrix(globalCovMatrix));
 
-  LogDebugIf(GundamGlobals::isDebug()) << "Reserve binValues" << std::endl;
   std::vector<TH1D> binValues{};
   binValues.reserve(propagator.getSampleSet().getSampleList().size() );
   int iBinGlobal{-1};
-  int iBranchSeparation{-1};
-
-  LogDebugIf(GundamGlobals::isDebug()) << "Begging of loop over crossSectionDataList size = " << crossSectionDataList.size() << std::endl;
 
   for( auto& xsec : crossSectionDataList ){
 
@@ -784,8 +779,6 @@ int main(int argc, char** argv){
       globalCovMatrixHist->GetYaxis()->SetBinLabel(1+iBinGlobal, GenericToolbox::joinPath(xsec.samplePtr->getName(), binTitle).c_str());
       globalCorMatrixHist->GetYaxis()->SetBinLabel(1+iBinGlobal, GenericToolbox::joinPath(xsec.samplePtr->getName(), binTitle).c_str());
     }
-
-    iBranchSeparation = iBinGlobal+1;
 
     for( auto& parset : propagator.getParametersManager().getParameterSetsList() ) {
       if(not parset.isEnabled()){ continue; }
@@ -817,17 +810,11 @@ int main(int argc, char** argv){
 
   }
 
-  LogDebugIf(GundamGlobals::isDebug()) << "End of loop over crossSectionDataList" << std::endl;
-
-  LogDebugIf(GundamGlobals::isDebug()) << "Writing cov" << std::endl;
   globalCovMatrixHist->GetXaxis()->SetLabelSize(0.02);
   globalCovMatrixHist->GetYaxis()->SetLabelSize(0.02);
-  LogDebugIf(GundamGlobals::isDebug()) << "SetLabelSize done" << std::endl;
   GenericToolbox::writeInTFileWithObjTypeExt(GenericToolbox::mkdirTFile(calcXsecDir, "matrices"), globalCovMatrixHist, "covarianceMatrix");
-  LogDebugIf(GundamGlobals::isDebug()) << "writeInTFileWithObjTypeExt done" << std::endl;
   auto chopped = GenericToolbox::chopTH2D(globalCovMatrixHist, int(nBinsSamples));
-  LogExitIf(chopped.empty(), "Invalid chopp?? " << globalCovMatrixHist->GetNbinsX() << " - " << iBranchSeparation << ", nBinsSamples="<<nBinsSamples << ", nParsThrown=" << nParsThrown);
-  LogDebugIf(GundamGlobals::isDebug()) << "chopTH2D done" << std::endl;
+  LogExitIf(chopped.empty(), "Invalid chopp?? " << globalCovMatrixHist->GetNbinsX() << ", nBinsSamples="<<nBinsSamples << ", nParsThrown=" << nParsThrown);
   GenericToolbox::writeInTFileWithObjTypeExt(GenericToolbox::mkdirTFile(calcXsecDir, "matrices"), chopped[0], "binsCovarianceMatrix");
   GenericToolbox::writeInTFileWithObjTypeExt(GenericToolbox::mkdirTFile(calcXsecDir, "matrices"), chopped[1], "parsCovarianceMatrix");
 
