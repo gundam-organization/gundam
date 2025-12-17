@@ -204,6 +204,7 @@ int main(int argc, char** argv){
   fitter.getLikelihoodInterface().initialize();
 
   Propagator& propagator{fitter.getLikelihoodInterface().getModelPropagator()};
+  Propagator& dataPropagator{fitter.getLikelihoodInterface().getDataPropagator()};
 
 
   if( clParser.isOptionTriggered("dryRun") ){
@@ -499,6 +500,11 @@ int main(int argc, char** argv){
     LogScopeIndent;
     LogInfo << "Defining xsec entry: " << sample.getName() << std::endl;
     xsecEntry.samplePtr = &sample;
+
+    for( auto& dataSample : dataPropagator.getSampleSet().getSampleList()) {
+      if( sample.getIndex() == dataSample.getIndex() ) { xsecEntry.sampleDataPtr = &dataSample; break; }
+    }
+
     xsecEntry.config = sample.getConfig();
     xsecEntry.branchBinsData.resetCursor();
     std::vector<std::string> leafNameList{};
@@ -630,13 +636,13 @@ int main(int argc, char** argv){
         }
 
         // set event weight
-//        {
-//          auto& dataEvList{xsec.samplePtr->getDataContainer().getEventList()};
-//          std::for_each(dataEvList.begin(), dataEvList.end(), [&]( Event& ev_){
-//            if( iBin != ev_.getIndices().bin ){ return; }
-//            ev_.getWeights().current = binData;
-//          });
-//        }
+        {
+          auto& dataEvList{xsec.sampleDataPtr->getEventList()};
+          std::for_each(dataEvList.begin(), dataEvList.end(), [&]( Event& ev_){
+            if( iBin != ev_.getIndices().bin ){ return; }
+            ev_.getWeights().current = binData;
+          });
+        }
 
         // bin volume
         auto& bin = xsec.samplePtr->getHistogram().getBinContextList()[iBin].bin;
@@ -849,20 +855,20 @@ int main(int argc, char** argv){
         ev_.getWeights().current /= double(nEventInBin[ev_.getIndices().bin]);
       });
     }
-//    {
-//      auto &dataEvList{xsec.samplePtr->getDataContainer().getEventList()};
-//      std::vector<size_t> nEventInBin(xsec.histogram.GetNbinsX(), 0);
-//      for( size_t iBin = 0 ; iBin < nEventInBin.size() ; iBin++ ){
-//        nEventInBin[iBin] = std::count_if(dataEvList.begin(), dataEvList.end(), [iBin]( Event &ev_) {
-//          return ev_.getIndices().bin== iBin;
-//        });
-//      }
-//
-//      std::for_each(dataEvList.begin(), dataEvList.end(), [&]( Event &ev_) {
-//        ev_.getWeights().current /= nToys;
-//        ev_.getWeights().current /= double(nEventInBin[ev_.getIndices().bin]);
-//      });
-//    }
+    {
+      auto &dataEvList{xsec.sampleDataPtr->getEventList()};
+      std::vector<size_t> nEventInBin(xsec.histogram.GetNbinsX(), 0);
+      for( size_t iBin = 0 ; iBin < nEventInBin.size() ; iBin++ ){
+        nEventInBin[iBin] = std::count_if(dataEvList.begin(), dataEvList.end(), [iBin]( Event &ev_) {
+          return ev_.getIndices().bin== iBin;
+        });
+      }
+
+      std::for_each(dataEvList.begin(), dataEvList.end(), [&]( Event &ev_) {
+        ev_.getWeights().current /= nToys;
+        ev_.getWeights().current /= double(nEventInBin[ev_.getIndices().bin]);
+      });
+    }
   }
 
   LogInfo << "Generating xsec sample plots..." << std::endl;
@@ -890,7 +896,7 @@ int main(int argc, char** argv){
     // alright, now rescale error bars
     for( int iBin = 0 ; iBin < histHolder.histPtr->GetNbinsX() ; iBin++ ){
       // relative error should be set
-      histHolder.histPtr->SetBinContent( 1+iBin, histHolder.histPtr->GetBinContent(1+iBin) / nToys );
+      // histHolder.histPtr->SetBinContent( 1+iBin, histHolder.histPtr->GetBinContent(1+iBin) / nToys );
       histHolder.histPtr->SetBinError(
           1+iBin,
           histHolder.histPtr->GetBinContent(1+iBin)
