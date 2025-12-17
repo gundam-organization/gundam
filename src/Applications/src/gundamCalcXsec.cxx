@@ -768,7 +768,6 @@ int main(int argc, char** argv){
   LogDebugIf(GundamGlobals::isDebug()) << "Begging of loop over crossSectionDataList size = " << crossSectionDataList.size() << std::endl;
 
   for( auto& xsec : crossSectionDataList ){
-    DEBUG_VAR(xsec.samplePtr->getName());
 
     for( int iBin = 0 ; iBin < xsec.samplePtr->getHistogram().getNbBins() ; iBin++ ){
       iBinGlobal++;
@@ -826,7 +825,7 @@ int main(int argc, char** argv){
   LogDebugIf(GundamGlobals::isDebug()) << "SetLabelSize done" << std::endl;
   GenericToolbox::writeInTFileWithObjTypeExt(GenericToolbox::mkdirTFile(calcXsecDir, "matrices"), globalCovMatrixHist, "covarianceMatrix");
   LogDebugIf(GundamGlobals::isDebug()) << "writeInTFileWithObjTypeExt done" << std::endl;
-  auto chopped = GenericToolbox::chopTH2D(globalCovMatrixHist, iBranchSeparation);
+  auto chopped = GenericToolbox::chopTH2D(globalCovMatrixHist, nBinsSamples);
   LogExitIf(chopped.empty(), "Invalid chopp?? " << globalCovMatrixHist->GetNbinsX() << " - " << iBranchSeparation << ", nBinsSamples="<<nBinsSamples << ", nParsThrown=" << nParsThrown);
   LogDebugIf(GundamGlobals::isDebug()) << "chopTH2D done" << std::endl;
   GenericToolbox::writeInTFileWithObjTypeExt(GenericToolbox::mkdirTFile(calcXsecDir, "matrices"), chopped[0], "binsCovarianceMatrix");
