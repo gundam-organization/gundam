@@ -760,37 +760,24 @@ int main(int argc, char** argv){
 
   std::vector<TH1D> binValues{};
   binValues.reserve(propagator.getSampleSet().getSampleList().size() );
-  int iBinGlobal{-1};
+  int iBinSampleGlobal{-1};
 
   for( auto& xsec : crossSectionDataList ){
 
     for( int iBin = 0 ; iBin < xsec.samplePtr->getHistogram().getNbBins() ; iBin++ ){
-      iBinGlobal++;
+      iBinSampleGlobal++;
 
       std::string binTitle = xsec.samplePtr->getHistogram().getBinContextList()[iBin].bin.getSummary();
       double binVolume = xsec.samplePtr->getHistogram().getBinContextList()[iBin].bin.getVolume();
 
-      xsec.histogram.SetBinContent( 1+iBin, (*meanValuesVector)[iBinGlobal] );
-      xsec.histogram.SetBinError( 1+iBin, std::sqrt( (*globalCovMatrix)[iBinGlobal][iBinGlobal] ) );
+      xsec.histogram.SetBinContent( 1+iBin, (*meanValuesVector)[iBinSampleGlobal] );
+      xsec.histogram.SetBinError( 1+iBin, std::sqrt( (*globalCovMatrix)[iBinSampleGlobal][iBinSampleGlobal] ) );
       xsec.histogram.GetXaxis()->SetBinLabel( 1+iBin, binTitle.c_str() );
 
-      globalCovMatrixHist->GetXaxis()->SetBinLabel(1+iBinGlobal, GenericToolbox::joinPath(xsec.samplePtr->getName(), binTitle).c_str());
-      globalCorMatrixHist->GetXaxis()->SetBinLabel(1+iBinGlobal, GenericToolbox::joinPath(xsec.samplePtr->getName(), binTitle).c_str());
-      globalCovMatrixHist->GetYaxis()->SetBinLabel(1+iBinGlobal, GenericToolbox::joinPath(xsec.samplePtr->getName(), binTitle).c_str());
-      globalCorMatrixHist->GetYaxis()->SetBinLabel(1+iBinGlobal, GenericToolbox::joinPath(xsec.samplePtr->getName(), binTitle).c_str());
-    }
-
-    for( auto& parset : propagator.getParametersManager().getParameterSetsList() ) {
-      if(not parset.isEnabled()){ continue; }
-      for( auto& par : parset.getParameterList() ) {
-        if(not par.isEnabled()){continue;}
-        iBinGlobal++;
-        std::string binTitle{par.getFullTitle()};
-        globalCovMatrixHist->GetXaxis()->SetBinLabel(1+iBinGlobal, GenericToolbox::joinPath(xsec.samplePtr->getName(), binTitle).c_str());
-        globalCorMatrixHist->GetXaxis()->SetBinLabel(1+iBinGlobal, GenericToolbox::joinPath(xsec.samplePtr->getName(), binTitle).c_str());
-        globalCovMatrixHist->GetYaxis()->SetBinLabel(1+iBinGlobal, GenericToolbox::joinPath(xsec.samplePtr->getName(), binTitle).c_str());
-        globalCorMatrixHist->GetYaxis()->SetBinLabel(1+iBinGlobal, GenericToolbox::joinPath(xsec.samplePtr->getName(), binTitle).c_str());
-      }
+      globalCovMatrixHist->GetXaxis()->SetBinLabel(1+iBinSampleGlobal, GenericToolbox::joinPath(xsec.samplePtr->getName(), binTitle).c_str());
+      globalCorMatrixHist->GetXaxis()->SetBinLabel(1+iBinSampleGlobal, GenericToolbox::joinPath(xsec.samplePtr->getName(), binTitle).c_str());
+      globalCovMatrixHist->GetYaxis()->SetBinLabel(1+iBinSampleGlobal, GenericToolbox::joinPath(xsec.samplePtr->getName(), binTitle).c_str());
+      globalCorMatrixHist->GetYaxis()->SetBinLabel(1+iBinSampleGlobal, GenericToolbox::joinPath(xsec.samplePtr->getName(), binTitle).c_str());
     }
 
     xsec.histogram.SetMarkerStyle(kFullDotLarge);
@@ -808,6 +795,20 @@ int main(int argc, char** argv){
         &xsec.histogram, GenericToolbox::generateCleanBranchName( xsec.samplePtr->getName() )
     );
 
+  }
+
+  int iBinParGlobal{-1};
+  for( auto& parset : propagator.getParametersManager().getParameterSetsList() ) {
+    if(not parset.isEnabled()){ continue; }
+    for( auto& par : parset.getParameterList() ) {
+      if(not par.isEnabled()){continue;}
+      iBinParGlobal++;
+      std::string binTitle{par.getFullTitle()};
+      globalCovMatrixHist->GetXaxis()->SetBinLabel(1+nBinsSamples+iBinParGlobal, binTitle.c_str());
+      globalCorMatrixHist->GetXaxis()->SetBinLabel(1+nBinsSamples+iBinParGlobal, binTitle.c_str());
+      globalCovMatrixHist->GetYaxis()->SetBinLabel(1+nBinsSamples+iBinParGlobal, binTitle.c_str());
+      globalCorMatrixHist->GetYaxis()->SetBinLabel(1+nBinsSamples+iBinParGlobal, binTitle.c_str());
+    }
   }
 
   globalCovMatrixHist->GetXaxis()->SetLabelSize(0.02);
