@@ -103,7 +103,13 @@ echo ' See gundam-tests.sh for more usage documentation.'
 TESTS="fast-tests"
 
 # Handle any input arguments
-  TEMP=$(getopt -o 'afres' -n "$0" -- "$@")
+if [ $(uname) == "Darwin" ]; then
+    # Work around MacOS bug
+    TEMP=$(getopt "$0" "$@")
+else
+    TEMP=$(getopt -o 'afres' -n "$0" -- "$@")
+fi
+
 if [ $? -ne 0 ]; then
     echo "Error ..."
     exit 1

@@ -18,5 +18,3 @@ const std::vector<double>& DialBase::getDialData() const {
     static const std::vector<double> dummy;
     return dummy;
 }
-
-std::string DialBase::getDialTypeName() const { return {"DialBase"}; }

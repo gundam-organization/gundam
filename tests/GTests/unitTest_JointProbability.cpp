@@ -327,3 +327,70 @@ TEST(jointProbability, OA2021_UpdateErr_Continuity) {
     }
 
 }
+
+TEST(jointProbability, BarlowLLH_Continuity) {
+
+    std::unique_ptr<JointProbability::JointProbabilityBase>
+        jointProb(JointProbability::makeJointProbability(
+                      "BarlowLLH"));
+    double data = 20.0;
+    double origPred = std::max(1.0, data);
+    double fracErr = 1.0/sqrt(origPred);
+    double origErr = fracErr * origPred;;
+    double predErr = fracErr * origPred;;
+
+    // Check the continuity for values less than the observation
+    double lastP = -1;
+    double lastPred = 0.0;
+    for (double pred = origPred; pred != lastPred; pred *= 0.9) {
+        predErr = fracErr*pred;
+        double newP = jointProb->eval(data, pred, predErr,0);
+        ASSERT_FALSE(std::isnan(newP)) << "Not a number for"
+                                       << " data: " << data
+                                       << " prediction: " << pred
+                                       << " error: " << predErr;
+        ASSERT_GE(newP,lastP) << "Not monotonic for"
+                              << " data: " << data
+                              << " prediction: " << pred
+                              << " error: " << predErr
+                              << " prob: " << newP << " (" << lastP << ")"
+                              << " diff: " << newP-lastP;
+        lastP = newP;
+        lastPred = pred;
+    }
+
+    // Check the value for a prediction of zero.
+    double zeroP = jointProb->eval(data, 0.0, 0.0, 0);
+    ASSERT_FALSE(std::isnan(zeroP)) << "Not a number for"
+                                    << " data: " << data
+                                    << " prediction: " << 0.0
+                                    << " error: " << 0.0;
+    ASSERT_GE(zeroP,lastP) << "Not monotonic for"
+                           << " data: " << data
+                           << " prediction: " << 0.0
+                           << " error: " << 0.0
+                           << " prob: " << zeroP << " (" << lastP << ")"
+                           << " diff: " << zeroP-lastP;
+
+
+    // Check the continuity for values greater than the observation
+    lastP = -1;
+    lastPred = 0.0;
+    for (double pred = origPred; pred < 20*origPred; pred *= 1.01) {
+        predErr = fracErr*pred;
+        double newP = jointProb->eval(data, pred, predErr,0);
+        ASSERT_FALSE(std::isnan(newP)) << "Not a number for"
+                                       << " data: " << data
+                                       << " prediction: " << pred
+                                       << " error: " << predErr;
+        ASSERT_GE(newP,lastP) << "Not monotonic for"
+                              << " data: " << data
+                              << " prediction: " << pred
+                              << " error: " << predErr
+                              << " prob: " << newP << " (" << lastP << ")"
+                              << " diff: " << newP-lastP;
+        lastP = newP;
+        lastPred = pred;
+    }
+
+}

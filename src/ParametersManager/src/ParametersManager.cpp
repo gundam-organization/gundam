@@ -20,15 +20,23 @@ void ParametersManager::unmuteLogger(){ Logger::setIsMuted( false ); }
 // config
 void ParametersManager::configureImpl(){
 
-  GenericToolbox::Json::fillValue(_config_, _throwToyParametersWithGlobalCov_, "throwToyParametersWithGlobalCov");
-  GenericToolbox::Json::fillValue(_config_, _reThrowParSetIfOutOfPhysical_, {{"reThrowParSetIfOutOfBounds"},{"reThrowParSetIfOutOfPhysical"}});
-  GenericToolbox::Json::fillValue(_config_, _parameterSetListConfig_, "parameterSetList");
+  _config_.clearFields();
+  _config_.defineFields({
+    {"throwToyParametersWithGlobalCov"},
+    {"reThrowParSetIfOutOfBounds",{"reThrowParSetIfOutOfPhysical"}},
+    {"parameterSetList"},
+  });
+  _config_.checkConfiguration();
 
-  LogDebugIf(GundamGlobals::isDebug()) << _parameterSetListConfig_.size() << " parameter sets are defined." << std::endl;
+  _config_.fillValue(_throwToyParametersWithGlobalCov_, "throwToyParametersWithGlobalCov");
+  _config_.fillValue(_reThrowParSetIfOutOfPhysical_, "reThrowParSetIfOutOfBounds");
+  _config_.fillValue(_parameterSetListConfig_, "parameterSetList");
+
+  LogDebugIf(GundamGlobals::isDebug()) << _parameterSetListConfig_.getConfig().size() << " parameter sets are defined." << std::endl;
 
   _parameterSetList_.clear(); // make sure there nothing in case readConfig is called more than once
-  _parameterSetList_.reserve( _parameterSetListConfig_.size() );
-  for( const auto& parameterSetConfig : _parameterSetListConfig_ ){
+  _parameterSetList_.reserve( _parameterSetListConfig_.getConfig().size() );
+  for( const auto& parameterSetConfig : _parameterSetListConfig_.loop() ){
     _parameterSetList_.emplace_back();
     _parameterSetList_.back().configure( parameterSetConfig );
 
@@ -38,16 +46,18 @@ void ParametersManager::configureImpl(){
       _parameterSetList_.pop_back();
     }
   }
-
 }
 void ParametersManager::initializeImpl(){
+
+  _config_.printUnusedKeys();
+
   int nEnabledPars = 0;
   for( auto& parSet : _parameterSetList_ ){
     parSet.initialize();
 
     int nPars{0};
     for( auto& par : parSet.getParameterList() ){
-      if( par.isEnabled() ){ nPars++; }
+      if( par.isEnabled() and not par.isFixed() ){ nPars++; }
     }
 
     nEnabledPars += nPars;
@@ -55,25 +65,43 @@ void ParametersManager::initializeImpl(){
   }
   LogInfo << "Total number of parameters: " << nEnabledPars << std::endl;
 
+  if (nEnabledPars < 1) {
+    LogError << "CONFIG ERROR: No parameters have been defined" << std::endl;
+  }
+
   LogInfo << "Building global covariance matrix (" << nEnabledPars << "x" << nEnabledPars << ")" << std::endl;
   _globalCovarianceMatrix_ = std::make_shared<TMatrixD>(nEnabledPars, nEnabledPars );
   int parSetOffset = 0;
   for( auto& parSet : _parameterSetList_ ){
-    if( parSet.getPriorCovarianceMatrix() != nullptr ){
-      int iGlobalOffset{-1};
-      bool hasZero{false};
-      for(int iCov = 0 ; iCov < parSet.getPriorCovarianceMatrix()->GetNrows() ; iCov++ ){
-        if( not parSet.getParameterList()[iCov].isEnabled() ){ continue; }
-        iGlobalOffset++;
-        _globalCovParList_.emplace_back( &parSet.getParameterList()[iCov] );
-        int jGlobalOffset{-1};
+    if( parSet.getPriorCovarianceMatrix() != nullptr ) {
+      int iParIndex{-1};
+      int iFree{0}; // free parameters are not in the prior covariance matrices
+      int nCov{parSet.getPriorCovarianceMatrix()->GetNrows()};
+      // LogDebug << "Adding parSet: " << parSet.getName() << " with " << nCov << " cov pars" << std::endl;
+      for( auto& par : parSet.getParameterList() ){
+        if( not par.isEnabled() ){ continue; }
+        if( par.isFixed() ){ continue; }
+
+        iParIndex++; // will be in the list
+
+        _globalCovParList_.emplace_back( &par );
+
+        (*_globalCovarianceMatrix_)[parSetOffset + iParIndex][parSetOffset + iParIndex] =
+          par.getStdDevValue()*par.getStdDevValue();
+
+        if( par.isFree() ){ iFree++; continue; }
+        int jParIndex{-1};
+        int jFree{0};
         for(int jCov = 0 ; jCov < parSet.getPriorCovarianceMatrix()->GetNcols() ; jCov++ ){
           if( not parSet.getParameterList()[jCov].isEnabled() ){ continue; }
-          jGlobalOffset++;
-          (*_globalCovarianceMatrix_)[parSetOffset + iGlobalOffset][parSetOffset + jGlobalOffset] = (*parSet.getPriorCovarianceMatrix())[iCov][jCov];
+          if( parSet.getParameterList()[jCov].isFixed() ){ continue; }
+          jParIndex++;
+          if( parSet.getParameterList()[jCov].isFree() ){ jFree++; continue; }
+          (*_globalCovarianceMatrix_)[parSetOffset + iParIndex][parSetOffset + jParIndex] =
+            (*parSet.getPriorCovarianceMatrix())[iParIndex-iFree][jParIndex-jFree];
         }
       }
-      parSetOffset += (iGlobalOffset+1);
+      parSetOffset += (iParIndex+1);
     }
     else{
       // diagonal
@@ -172,6 +200,10 @@ void ParametersManager::throwParametersFromParSetCovariance(){
 void ParametersManager::initializeStrippedGlobalCov(){
   LogInfo << "Creating stripped global covariance matrix..." << std::endl;
   LogThrowIf( _globalCovarianceMatrix_ == nullptr, "Global covariance matrix not set." );
+  LogThrowIf( _globalCovarianceMatrix_->GetNrows() != _globalCovParList_.size(),
+    "Global covariance matrix dim = " << _globalCovarianceMatrix_->GetNrows()
+    << " while _globalCovParList_ size: " << _globalCovParList_.size()
+    );
 
   _strippedParameterList_.clear();
   for( int iGlobPar = 0 ; iGlobPar < _globalCovarianceMatrix_->GetNrows() ; iGlobPar++ ){
@@ -222,27 +254,18 @@ void ParametersManager::throwParametersFromGlobalCovariance(bool quietVerbose_){
     for( int iPar = 0 ; iPar < _choleskyMatrix_->GetNrows() ; iPar++ ){
       auto* parPtr = _strippedParameterList_[iPar];
       parPtr->setThrowValue(parPtr->getPriorValue() + throws[iPar]);
-      if ( not std::isnan(parPtr->getMinValue()) and parPtr->getThrowValue() < parPtr->getMinValue()) {
-        LogAlert << "Thrown value lower than min bound -> " << parPtr->getThrowValue() << " < min(" << parPtr->getMinValue() << ") " << parPtr->getFullTitle() << std::endl;
-        rethrow = true;
-        break;
+      if( not parPtr->getThrowLimits().isInBounds(parPtr->getThrowValue()) ){
+        LogAlert << "Thrown value out of bounds -> " << parPtr->getThrowValue() << " not in: " << parPtr->getThrowLimits() << " for " << parPtr->getFullTitle() << std::endl;
+        rethrow = true; break;
       }
-      if ( not std::isnan(parPtr->getMaxValue()) and parPtr->getThrowValue() > parPtr->getMaxValue()) {
-        LogAlert << "Thrown value greater than max bound -> " << parPtr->getThrowValue() << " > max(" << parPtr->getMaxValue() << ") " << parPtr->getFullTitle() << std::endl;
-        rethrow = true;
-        break;
-      }
+
+      // ok, set the parameter
       parPtr->setParameterValue( parPtr->getThrowValue() );
       if( not _reThrowParSetIfOutOfPhysical_ ) continue;
-      if( not std::isnan(parPtr->getMinPhysical()) and parPtr->getParameterValue() < parPtr->getMinPhysical() ){
+
+      if( not parPtr->getPhysicalLimits().isInBounds( parPtr->getParameterValue() ) ) {
         rethrow = true;
-        LogAlert << "thrown value lower than physical min bound -> "
-                 << parPtr->getSummary() << std::endl;
-        break;
-      }
-      if( not std::isnan(parPtr->getMaxPhysical()) and parPtr->getParameterValue() > parPtr->getMaxPhysical() ){
-        rethrow = true;
-        LogAlert << "thrown value higher than physical max bound -> "
+        LogAlert << "Thrown value out of physical bounds -> " << parPtr->getParameterValue() << " -> "
                  << parPtr->getSummary() << std::endl;
         break;
       }
@@ -339,13 +362,8 @@ bool ParametersManager::hasValidParameterSets() const {
   return true;
 }
 void ParametersManager::printConfiguration() const {
-
-  LogInfo << GET_VAR_NAME_VALUE(_throwToyParametersWithGlobalCov_) << std::endl;
-  LogInfo << GET_VAR_NAME_VALUE(_reThrowParSetIfOutOfPhysical_) << std::endl;
-
   LogInfo << _parameterSetList_.size() << " parameter sets defined." << std::endl;
   for( auto& parSet : _parameterSetList_ ){ parSet.printConfiguration(); }
-
 }
 
 void ParametersManager::setParameterValidity(const std::string& v) {

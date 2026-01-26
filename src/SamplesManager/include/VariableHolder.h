@@ -25,14 +25,14 @@ public:
 
   // setters
   template<typename T>void set(const T& value_){ var = value_; updateCache(); }
-  void set(void *src_, size_t size_);
+  void set(const void *src_, size_t size_);
 
   // const-getters
-  [[nodiscard]] const GenericToolbox::AnyType& get() const { return var; }
-  [[nodiscard]] double getVarAsDouble() const { return cache; }
+  [[nodiscard]] auto getVarAsDouble() const { return cache; }
+  [[nodiscard]] auto& get() const { return var; }
 
   // mutable getters
-  GenericToolbox::AnyType& get(){ return var; }
+  auto& get(){ return var; }
 
 protected:
   // user should not have to worry about the cache
@@ -45,7 +45,7 @@ private:
 };
 
 
-inline void VariableHolder::set(void *src_, size_t size_){
+inline void VariableHolder::set(const void *src_, size_t size_){
   memcpy(var.getPlaceHolderPtr()->getVariableAddress(), src_, size_);
   updateCache();
 }

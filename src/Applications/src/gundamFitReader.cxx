@@ -232,9 +232,7 @@ int main(int argc, char** argv){
       LogScopeIndent;
 
       RootUtils::ObjectReader::readObject<TNamed>(f.get(), GenericToolbox::joinPath(pathPreFit, "llhState_TNamed"), [&](TNamed* injectorStr){
-        if( clParser.isOptionTriggered("verbose") ){
-          LogInfo << blueLightText << "Pre-fit Likelihood state: " << resetColor << injectorStr->GetTitle() << std::endl;
-        }
+        LogInfo << blueLightText << "Pre-fit Likelihood state: " << resetColor << injectorStr->GetTitle() << std::endl;
         if( clParser.isOptionTriggered("extractDataToDisk") ){
           auto outSubDir{GenericToolbox::joinPath( outDir, pathPreFit)};
           if( not GenericToolbox::isDir( outSubDir ) ){ GenericToolbox::mkdir( outSubDir ); }
@@ -277,6 +275,33 @@ int main(int argc, char** argv){
         int statusCode{int(tree->GetLeaf("fitStatusCode")->GetValue())};
         LogInfo << blueLightText << "Fit status code: " << resetColor;
         LogInfo << ( GenericToolbox::isIn( statusCode, GundamUtils::minuitStatusCodeStr ) ? GundamUtils::minuitStatusCodeStr.at(statusCode) : std::to_string(statusCode) );
+        LogInfo << std::endl;
+
+        int covStatusCode{int(tree->GetLeaf("covStatusCode")->GetValue())};
+        LogInfo << blueLightText << "Covariance matrix status code: " << resetColor;
+        LogInfo << ( GenericToolbox::isIn( covStatusCode, GundamUtils::covMatrixStatusCodeStr ) ? GundamUtils::covMatrixStatusCodeStr.at(covStatusCode) : std::to_string(covStatusCode) );
+        LogInfo << std::endl;
+        double edmBestFit{(tree->GetLeaf("edmBestFit")->GetValue())};
+        LogInfo << blueLightText << "Estimated Distance from the Minimum (EDM) at best fit: " << resetColor;
+        LogInfo << edmBestFit;
+        LogInfo << std::endl;
+      });
+      RootUtils::ObjectReader::readObject<TTree>(f.get(), GenericToolbox::joinPath(pathPostFit, "Hesse", "hesseStats"), [&](TTree* tree){
+        tree->GetEntry(0);
+        // bool success{tree->GetLeaf("hesseSuccess")->GetValue() == 1};
+        // LogInfo << (success? greenLightText: redLightText) << "Did HESSE succeeded? " << (success ? "yes": "no") << resetColor << std::endl;
+
+        if( tree->GetLeaf("hesseStatusCode") != nullptr ){
+          // was added in a later version of GUNDAM
+          int hesseResultCode{int(tree->GetLeaf("hesseStatusCode")->GetValue())};
+          LogInfo << blueLightText << "HESSE status code: " << resetColor;
+          LogInfo << hesseResultCode << " -> " << ( GenericToolbox::isIn( hesseResultCode, GundamUtils::hesseStatusCodeStr ) ? GundamUtils::hesseStatusCodeStr.at(hesseResultCode) : std::to_string(hesseResultCode) );
+          LogInfo << std::endl;
+        }
+
+        int resultCode{int(tree->GetLeaf("covStatusCode")->GetValue())};
+        LogInfo << blueLightText << "HESSE covariance matrix status code: " << resetColor;
+        LogInfo << ( GenericToolbox::isIn( resultCode, GundamUtils::covMatrixStatusCodeStr ) ? GundamUtils::covMatrixStatusCodeStr.at(resultCode) : std::to_string(resultCode) );
         LogInfo << std::endl;
       });
       RootUtils::ObjectReader::readObject<TNamed>(f.get(), GenericToolbox::joinPath(pathPostFit, "llhState_TNamed"), [&](TNamed* injectorStr){

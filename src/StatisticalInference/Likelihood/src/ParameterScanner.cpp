@@ -20,15 +20,26 @@ void ParameterScanner::muteLogger(){ Logger::setIsMuted(true); }
 void ParameterScanner::unmuteLogger(){ Logger::setIsMuted(false); }
 
 void ParameterScanner::configureImpl() {
+  _config_.defineFields({
+    {"nbPoints"},
+    {"varsConfig"},
+    {"nbPointsLineScan"},
+    {"useParameterLimits"},
+    {"parameterSigmaRange"},
+  });
+  _config_.checkConfiguration();
 
-  GenericToolbox::Json::fillValue(_config_, _nbPoints_, "nbPoints");
-  GenericToolbox::Json::fillValue(_config_, _varsConfig_, "varsConfig");
-  GenericToolbox::Json::fillValue(_config_, _nbPointsLineScan_, "nbPointsLineScan");
-  GenericToolbox::Json::fillValue(_config_, _useParameterLimits_, "useParameterLimits");
-  GenericToolbox::Json::fillValue(_config_, _parameterSigmaRange_, "parameterSigmaRange");
+  _config_.fillValue(_nbPoints_, "nbPoints");
+  _config_.fillValue(_varsConfig_, "varsConfig");
+  _config_.fillValue(_nbPointsLineScan_, "nbPointsLineScan");
+  _config_.fillValue(_useParameterLimits_, "useParameterLimits");
+  _config_.fillValue(_parameterSigmaRange_, "parameterSigmaRange");
 
 }
 void ParameterScanner::initializeImpl() {
+
+  _config_.printUnusedKeys();
+
   LogWarning << "Initializing ParameterScanner..." << std::endl;
 
   LogThrowIf(_likelihoodInterfacePtr_ == nullptr, "_likelihoodInterfacePtr_ not set.");
@@ -160,8 +171,8 @@ void ParameterScanner::scanParameter(Parameter& par_, TDirectory* saveDir_) {
   double highBound = origVal + _parameterSigmaRange_.max * par_.getStdDevValue();
 
   if( _useParameterLimits_ ){
-    lowBound = std::max(lowBound, par_.getMinValue());
-    highBound = std::min(highBound, par_.getMaxValue());
+    lowBound = std::max(lowBound, par_.getParameterLimits().min);
+    highBound = std::min(highBound, par_.getParameterLimits().max);
   }
 
   int offSet{0}; // offset help make sure the first point
@@ -366,7 +377,7 @@ void ParameterScanner::generateOneSigmaPlots(TDirectory* saveDir_){
 
     if( not parSet.isEnabled() ) continue;
 
-    if( GenericToolbox::Json::fetchValue(parSet.getConfig(), "disableOneSigmaPlots", false) ){
+    if( parSet.isDisableOneSigmaPlots() ){
       LogInfo << "+1σ plots disabled for \"" << parSet.getName() << "\"" << std::endl;
       continue;
     }
@@ -375,6 +386,7 @@ void ParameterScanner::generateOneSigmaPlots(TDirectory* saveDir_){
       if( not effPar.isEnabled() ) continue;
       std::string tag;
       if( effPar.isFixed() ){ tag += "_FIXED"; }
+      if( effPar.isFrozen() ){ tag += "_FROZEN"; }
       makeOneSigmaPlotFct(
           effPar,
           GenericToolbox::mkdirTFile(saveDir_, parSet.getName() + "/" + effPar.getTitle() + tag)
@@ -457,8 +469,8 @@ void ParameterScanner::varyEvenRates(const std::vector<double>& paramVariationLi
       buffEvtRatesMap.emplace_back();
 
       double cappedParValue{par_.getPriorValue() + variationList_[iVar] * par_.getStdDevValue()};
-      cappedParValue = std::min(cappedParValue, par_.getMaxValue());
-      cappedParValue = std::max(cappedParValue, par_.getMinValue());
+      cappedParValue = std::min(cappedParValue, par_.getParameterLimits().max);
+      cappedParValue = std::max(cappedParValue, par_.getParameterLimits().min);
 
       par_.setParameterValue( cappedParValue );
       _likelihoodInterfacePtr_->getModelPropagator().propagateParameters();
@@ -510,7 +522,7 @@ void ParameterScanner::varyEvenRates(const std::vector<double>& paramVariationLi
   for( auto& parSet : _likelihoodInterfacePtr_->getModelPropagator().getParametersManager().getParameterSetsList() ){
 
     if( not parSet.isEnabled() ) continue;
-    if( GenericToolbox::Json::fetchValue(parSet.getConfig(), "skipVariedEventRates", false) ){
+    if( parSet.isSkipVariedEventRates() ){
       LogInfo << "Event rate variation skipped for \"" << parSet.getName() << "\"" << std::endl;
       continue;
     }
@@ -527,13 +539,13 @@ void ParameterScanner::varyEvenRates(const std::vector<double>& paramVariationLi
         std::string tag;
         if( par.isFixed() ){ tag += "_FIXED"; }
         if( par.isFree() ){ tag += "_FREE"; }
+        if( par.isFrozen() ){ tag += "_FROZEN"; }
 
         TDirectory* subDir = GenericToolbox::mkdirTFile(saveDir_, parSet.getName() + "/" + par.getTitle() + tag);
         makeVariedEventRatesFct(par, paramVariationList_, subDir);
 
       }
     }
-
   }
 }
 void ParameterScanner::setGraphTitles(const std::string& title_){
@@ -561,9 +573,20 @@ void ParameterScanner::writeGraphEntry(GraphEntry& entry_, TDirectory* saveDir_)
     entry_.graph.SetMarkerStyle( kFullTriangleUp );
   }
 
+  double yMin{*std::min_element(entry_.graph.GetY(), entry_.graph.GetY() + entry_.graph.GetN())};
+  double yMax{*std::max_element(entry_.graph.GetY(), entry_.graph.GetY() + entry_.graph.GetN())};
+  // enabling the log scale
+  if( yMin == 0 ){ yMin = yMax*1e-10; }
+  entry_.graph.SetMinimum(yMin);
+  entry_.graph.SetMaximum(yMax);
+  entry_.graph.GetYaxis()->SetRangeUser(yMin, yMax);
+  entry_.graph.GetYaxis()->SetLimits(yMin, yMax);
+
   GenericToolbox::writeInTFileWithObjTypeExt(
-      GenericToolbox::mkdirTFile( saveDir_, entry_.scanDataPtr->folder ),
+      GenericToolbox::mkdirTFile( saveDir_,
+          GenericToolbox::generateCleanBranchName(entry_.scanDataPtr->folder) + "/" + GenericToolbox::generateCleanBranchName(entry_.fitParPtr->getOwner()->getName())
+        ),
       entry_.graph,
-      GenericToolbox::generateCleanBranchName(entry_.fitParPtr->getFullTitle())
+      GenericToolbox::generateCleanBranchName("n" + entry_.fitParPtr->getTitle())
   );
 }

@@ -5,15 +5,7 @@
 #include "Logger.h"
 
 
-void Bilinear::setAllowExtrapolation(bool allowExtrapolation) {
-  _allowExtrapolation_ = allowExtrapolation;
-}
-
-bool Bilinear::getAllowExtrapolation() const {
-  return _allowExtrapolation_;
-}
-
-void Bilinear::buildDial(const TH2& h2_, const std::string& option_){
+void Bilinear::buildDial(const TH2& h2_){
     // Copy the spline data into local storage.  The local storage should be
     // easily packable for the GPU.
     //

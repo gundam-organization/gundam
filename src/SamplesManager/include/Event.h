@@ -10,11 +10,8 @@
 
 #include "GenericToolbox.Utils.h"
 
-#include <map>
-#include <mutex>
-#include <vector>
 #include <string>
-#include <sstream>
+#include <ostream>
 
 
 namespace Cache { class Manager; }
@@ -25,16 +22,17 @@ public:
   Event() = default;
 
   // const getters
-  [[nodiscard]] const EventUtils::Indices& getIndices() const{ return _indices_; }
-  [[nodiscard]] const EventUtils::Weights& getWeights() const{ return _weights_; }
-  [[nodiscard]] const VariableCollection& getVariables() const{ return _variables_; }
+  [[nodiscard]] auto& getIndices() const{ return _indices_; }
+  [[nodiscard]] auto& getWeights() const{ return _weights_; }
+  [[nodiscard]] auto& getVariables() const{ return _variables_; }
 
   // mutable getters
-  EventUtils::Indices& getIndices(){ return _indices_; }
-  EventUtils::Weights& getWeights(){ return _weights_; }
-  VariableCollection& getVariables(){ return _variables_; }
+  auto& getIndices(){ return _indices_; }
+  auto& getWeights(){ return _weights_; }
+  auto& getVariables(){ return _variables_; }
 
   // const core
+  [[nodiscard]] size_t getSize() const;
   [[nodiscard]] double getEventWeight() const { return _weights_.current; }
   [[nodiscard]] std::string getSummary() const;
   friend std::ostream& operator <<( std::ostream& o, const Event& this_ ){ o << this_.getSummary(); return o; }

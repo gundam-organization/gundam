@@ -24,25 +24,27 @@ protected:
   void initializeImpl() override;
 
 public:
-  explicit DatasetDefinition( const JsonType& config_, int datasetIndex_): _dataSetIndex_(datasetIndex_) { this->configure(config_); }
+  explicit DatasetDefinition( const ConfigReader& config_, int datasetIndex_): _dataSetIndex_(datasetIndex_) { this->configure(config_); }
 
   void setDataSetIndex(int dataSetIndex){ _dataSetIndex_ = dataSetIndex; }
   void setSelectedDataEntry(const std::string& selectedDataEntry_){ _selectedDataEntry_ = selectedDataEntry_; }
 
   // const-getters
-  [[nodiscard]] bool isEnabled() const{ return _isEnabled_; }
-  [[nodiscard]] bool isSortLoadedEvents() const{ return _sortLoadedEvents_; }
-  [[nodiscard]] bool isShowSelectedEventCount() const{ return _showSelectedEventCount_; }
-  [[nodiscard]] bool isDevSingleThreadEventSelection() const{ return _devSingleThreadEventSelection_; }
-  [[nodiscard]] bool isDevSingleThreadEventLoaderAndIndexer() const{ return _devSingleThreadEventLoaderAndIndexer_; }
-  [[nodiscard]] int getDataSetIndex() const{ return _dataSetIndex_; }
-  [[nodiscard]] const std::string &getName() const{ return _name_; }
-  [[nodiscard]] const std::string &getSelectedDataEntry() const{ return _selectedDataEntry_; }
-  [[nodiscard]] const std::string &getSelectedToyEntry() const{ return _selectedToyEntry_; }
-  [[nodiscard]] const std::map<std::string, DataDispenser> &getDataDispenserDict() const { return _dataDispenserDict_; }
+  [[nodiscard]] auto isEnabled() const{ return _isEnabled_; }
+  [[nodiscard]] auto isSortLoadedEvents() const{ return _sortLoadedEvents_; }
+  [[nodiscard]] auto isShowSelectedEventCount() const{ return _showSelectedEventCount_; }
+  [[nodiscard]] auto isDevSingleThreadEventSelection() const{ return _devSingleThreadEventSelection_; }
+  [[nodiscard]] auto isDevSingleThreadEventLoaderAndIndexer() const{ return _devSingleThreadEventLoaderAndIndexer_; }
+  [[nodiscard]] auto getNbMaxThreadsForLoad() const{ return _nbMaxThreadsForLoad_; }
+  [[nodiscard]] auto getDataSetIndex() const{ return _dataSetIndex_; }
+  [[nodiscard]] auto& getName() const{ return _name_; }
+  [[nodiscard]] auto& getSelectedDataEntry() const{ return _selectedDataEntry_; }
+  [[nodiscard]] auto& getSelectedToyEntry() const{ return _selectedToyEntry_; }
+  [[nodiscard]] auto& getDataDispenserDict() const { return _dataDispenserDict_; }
 
-  DataDispenser &getModelDispenser(){ return _modelDispenser_; }
-  std::map<std::string, DataDispenser> &getDataDispenserDict(){ return _dataDispenserDict_; }
+  // mutable getters
+  auto& getModelDispenser(){ return _modelDispenser_; }
+  auto& getDataDispenserDict(){ return _dataDispenserDict_; }
 
   void updateDispenserOwnership();
 
@@ -64,6 +66,7 @@ private:
   bool _isEnabled_{true};
   bool _showSelectedEventCount_{true};
   int _dataSetIndex_{-1};
+  int _nbMaxThreadsForLoad_{4};
   std::string _name_{};
   std::string _selectedDataEntry_{"Asimov"};
   std::string _selectedToyEntry_{"Asimov"};

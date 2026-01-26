@@ -190,7 +190,7 @@ public:
     /// Make the likelihood class available as TSimpleMCMC::LogLikelihood.
     typedef UserLikelihood LogLikelihood;
 
-    /// Make the step proposal cclass available as TSimpleMCMC::ProposeStep.
+    /// Make the step proposal class available as TSimpleMCMC::ProposeStep.
     typedef UserProposal ProposeStep;
 
     /// Declare an object to run an MCMC.  The resulting MCMC normally uses
@@ -362,8 +362,8 @@ public:
     ///
     ///     * 0 : Do a normal metropolis step.
     ///
-    ///     * 1 : Only take "down hill" steps.  This turns the algorythm into
-    ///           a very slow way to maximize the likelihood..
+    ///     * 1 : Only take "down hill" steps.  This turns the algorithm into
+    ///           a very slow way to maximize the likelihood.
     ///
     ///     * 2 : Accept every step.  This can be used to scan the likelihood.
     ///
@@ -420,7 +420,7 @@ public:
             std::copy(fProposed.begin(), fProposed.end(),
                       fSaveAccepted.begin());
             fAcceptedLogLikelihood = fProposedLogLikelihood;
-            // Check to see if it gest written.
+            // Check to see if it gets written.
             if (save) SaveStep(false);
             return true;
         }
@@ -439,7 +439,7 @@ public:
         // negative, the proposed point is less probable than the accepted
         // point.
         double delta = fProposedLogLikelihood - fAcceptedLogLikelihood;
-        if (delta < 0.0 ) {
+        if (delta < 0.0) {
             // If the metropolis method parameter is false, then don't apply
             // the Metropolis algorithm and only take steps that increase the
             // probability.  Setting metropolis to false turns this into an
@@ -466,17 +466,17 @@ public:
         // print the new step when one is found.
         if (metropolis == 1) {
             static int localCount = 0;
-            MCMC_DEBUG(1) << localCount
+            MCMC_DEBUG(2) << "Minimizing step " << localCount
                           << " L: "   << fProposedLogLikelihood;
             const std::size_t elems = 4;
             for (std::size_t i = 0;
                  i < std::min(elems,fProposed.size()); ++i) {
-                MCMC_DEBUG(1) << " [" << i << "]=" << fProposed[i];
+                MCMC_DEBUG(2) << " [" << i << "]=" << fProposed[i];
             }
             if (elems < fProposed.size()) {
-                MCMC_DEBUG(1) << " [..." << fProposed.size() << "]";
+                MCMC_DEBUG(2) << " [..." << fProposed.size() << "]";
             }
-            MCMC_DEBUG(1) << std::endl;
+            MCMC_DEBUG(2) << std::endl;
             ++localCount;
         }
 
@@ -651,6 +651,7 @@ public:
         fScanDimension(-1) {
         fMaxCorrelation = std::numeric_limits<Parameter>::epsilon();
         fMaxCorrelation = 1.0 - std::sqrt(fMaxCorrelation);
+        fForcedStep.clear();
     }
 
     /// Take a proposed trial point to fill, the current point, and the
@@ -663,6 +664,19 @@ public:
             MCMC_ERROR << "Proposal and current vectors must be same size."
                        << std::endl;
             throw std::logic_error("Proposal and current length mismatch");
+        }
+
+        /// If there is a forced step, then that is the proposal.  This does
+        /// not update the proposal internal information.
+        if (fForcedStep.size() > 0) {
+            if (fForcedStep.size() != proposal.size()) {
+                throw std::logic_error("Proposal and forced length mismatch");
+            }
+            for (int i = 0; i<proposal.size(); ++i) {
+                proposal[i] = fProposalType[i].Regularize(fForcedStep[i]);
+            }
+            fForcedStep.clear();
+            return;
         }
 
         /// If the "scan" variable is set, then only change that variable.
@@ -678,6 +692,7 @@ public:
                 // Make a uniform proposal.
                 proposal[scan] = gRandom->Uniform(fProposalType[scan].param1,
                                                   fProposalType[scan].param2);
+                proposal[scan] = fProposalType[scan].Regularize(proposal[scan]);
                 return;
             }
             // Make a Gaussian proposal around the initial value.
@@ -686,16 +701,15 @@ public:
                 sigma = std::sqrt(fProposalType[scan].param1);
             }
             double r = gRandom->Gaus(fCentralPoint[scan],sigma);
-            proposal[scan] = r;
+            proposal[scan] = fProposalType[scan].Regularize(r);
             MCMC_DEBUG(0) << "propose " << r << " for " << scan << std::endl;
             return;
         }
 
         UpdateState(current,value);
 
+        // Making a regular proposal.  Start from the current step.
         std::copy(current.begin(), current.end(), proposal.begin());
-
-        // Make the proposal.
         for (std::size_t i = 0; i < proposal.size(); ++i) {
             if (fProposalType[i].type == 1) {
                 // Make a uniform proposal.
@@ -710,6 +724,11 @@ public:
                 if (fProposalType[j].type == 1) continue;
                 proposal[j] += fSigma*r*fDecomposition(i,j);
             }
+        }
+
+        // Make sure the proposal is regularized
+        for (std::size_t i = 0; i < proposal.size(); ++i) {
+            proposal[i] = fProposalType[i].Regularize(proposal[i]);
         }
     }
 
@@ -758,6 +777,11 @@ public:
     /// have an acceptance (approximately) equal to the target acceptance.
     double GetSigma() const {return fSigma;}
 
+    /// Explicitly set the current step size in standard deviations.  This is
+    /// a dangerous operation, but can be helpful during the initial burnin of
+    /// a chain.
+    void SetSigma(double s) {fSigma = s;}
+
     /// Get the current acceptance (averaged over the acceptance window).  The
     /// step size will be adjusted so that this asymtotically approaches the
     /// target acceptance.  The usual target acceptance is about 23% (when
@@ -778,6 +802,27 @@ public:
         fProposalType.resize(dim);
     }
     int GetDim() const {return fLastPoint.size();}
+
+    /// Force a step to a new position.  After this has been used, the next
+    /// step may have an invalid likelihood.  The caller should loop until a
+    /// step with a valid likelihood is accepted.  The correct way to use this
+    /// with a random step is:
+    /// \code
+    /// for(int throttle = 0; trottle < 1000; ++throttle) {
+    ///     -> choose a random point
+    ///     mcmc.GetProposeStep().ForceStep(prior);
+    ///     mcmc.Step(false,2);
+    ///     if (std::isfinite(mcmc.GetAcceptedLogLikelihood())
+    ///         and mcmc.GetAcceptedLogLikelihood() > -1.0E+10) break;
+    /// };
+    /// \endcode
+    bool ForceStep(const Vector& forceStep) {
+        if (forceStep.size() != fLastPoint.size()) {
+            throw std::invalid_argument("Invalid forced step point.");
+        }
+        fForcedStep = forceStep;
+        return true;
+    }
 
     /// Set the dimension to be scanned (only use for debugging the likelihood)
     void SetScanDimension(int dim) {
@@ -827,6 +872,26 @@ public:
                       << std::endl;
         fProposalType[dim].type = 0;
         fProposalType[dim].param1 = sigma*sigma;
+    }
+
+    /// Set the domain for a cyclic parameter.  When this is used, the
+    /// parameter step will be limited to be between `lower <= value < upper`,
+    /// and the cyclic domain can be removed if upper and lower are equal.
+    /// When a cyclic domain is set, parameter value will be regularized after
+    /// each step, and the difference between two parameters is assumes a
+    /// periodic domain (this limits the maximum difference to range/2).
+    void SetCyclic(int dim, double lower, double upper) {
+        if (dim < 0 || (std::size_t) dim >= fProposalType.size()) {
+            MCMC_ERROR << "Dimension " << dim << " is out of range."
+                       << std::endl;
+            return;
+        }
+        MCMC_DEBUG(1) << "Cyclic domain for dimension " << dim
+                      << " is " << std::min(lower,upper)
+                      << " to " << std::max(lower,upper)
+                      << std::endl;
+        fProposalType[dim].lower = std::min(lower,upper);
+        fProposalType[dim].range = std::abs(upper-lower);
     }
 
     /// Reset the correlations (removes all prior correlations).  This should
@@ -1741,11 +1806,10 @@ private:
         // Update the estimate of the central value.  This is simply a running
         // average of the position of the points in the posterior.
         for (std::size_t i=0; i< current.size(); ++i) {
-            fCentralPointChange[i] = fCentralPoint[i];
-            fCentralPoint[i] *= fCentralPointTrials;
-            fCentralPoint[i] += current[i];
-            fCentralPoint[i] /= fCentralPointTrials + 1;
-            fCentralPointChange[i] = fCentralPoint[i] - fCentralPointChange[i];
+            double d = fProposalType[i].Difference(current[i],fCentralPoint[i]);
+            fCentralPointChange[i] = d/(fCentralPointTrials+1);
+            fCentralPoint[i] += fCentralPointChange[i];
+            fCentralPoint[i] = fProposalType[i].Regularize(fCentralPoint[i]);
         }
         fCentralPointTrials = std::min(fCovarianceWindow,
                                        fCentralPointTrials+1.0);
@@ -1767,8 +1831,11 @@ private:
                     v -= fCentralPointChange[i]*fCentralPointChange[j];
 #endif
                     // Calculate the "covariance" of the new point.
-                    double r = (current[i]-fCentralPoint[i])
-                        *(current[j]-fCentralPoint[j]);
+                    double r
+                        = (fProposalType[i].Difference(current[i],
+                                                      fCentralPoint[i])
+                           *fProposalType[i].Difference(current[j],
+                                                        fCentralPoint[j]));
                     // Update the running average of the covariance.
                     v *= fCovarianceTrials;
                     v += r;
@@ -1857,10 +1924,25 @@ private:
 
     // Record the type of proposal to use for each dimension
     struct ProposalType {
-        ProposalType(): type(0), param1(0), param2(0) {}
+        ProposalType(): type(0), param1(0), param2(0), lower(0), range(-1) {}
         int type;      // 0 for Gaussian, 1 for Uniform.
         double param1; // Sigma for Gaussian, Minimum for Uniform
         double param2; // Not used for Gaussian, Maximum for Uniform
+        double lower;  // The lower end  of a cyclic parameter range
+        double range;  // The total range of a cyclic parameter
+        double Regularize(double v) {
+            if (range < std::numeric_limits<float>::epsilon()) return v;
+            while (v < lower) v += range; // Brute force, but clear
+            while (v >= lower+range) v -= range;
+            return v;
+        }
+        double Difference(double u, double v) {
+            u = Regularize(u) - Regularize(v);
+            if (range <  std::numeric_limits<float>::epsilon()) return u;
+            while (u > 0.5*range) u -= range; // Brute force, but clear
+            while (u <= -0.5*range) u += range;
+            return u;
+        }
     };
 
     // The type of distribution to draw the proposal for a dimension from.
@@ -1933,11 +2015,15 @@ private:
     // point.  If the value is outside the range of parameter indices, it's
     // skipped (it must be between 0 and dim to scan).
     int fScanDimension;
+
+    /// A vector to save the value of a forced step.  This will have a zero
+    /// size if there isn't a forced step.
+    Vector fForcedStep;
 };
 
 // MIT License
 
-// Copyright (c) 2017-2022 Clark McGrew
+// Copyright (c) 2017-2025 Clark McGrew
 
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal

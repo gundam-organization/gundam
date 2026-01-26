@@ -10,7 +10,6 @@
 #include <vector>
 #include <string>
 
-
 class ParameterSet;
 
 /// Hold a Parameter that is a member of a ParameterSet to be used in the fit.
@@ -25,6 +24,7 @@ public:
   ENUM_FIELD(Gaussian) \
   ENUM_FIELD(Flat)
 #include "GenericToolbox.MakeEnum.h"
+  static void prepareConfig(ConfigReader& config_);
 
 protected:
   // called through JsonBaseClass::configure() and JsonBaseClass::initialize()
@@ -35,14 +35,23 @@ public:
   explicit Parameter(const ParameterSet* owner_): _owner_(owner_) {}
   Parameter() = delete; // Cannot be independently constructed.
 
+  void setOwner(const ParameterSet *owner_){ _owner_ = owner_; }
+  void setName(const std::string &name){ _name_ = name; }
+  void setPriorType(PriorType priorType){ _priorType_ = priorType; }
   void setIsEnabled(bool isEnabled){ _isEnabled_ = isEnabled; }
   void setIsFixed(bool isFixed){ _isFixed_ = isFixed; }
+  void setIsFrozen(bool isFrozen){ _isFrozen_ = isFrozen; }
   void setIsEigen(bool isEigen){ _isEigen_ = isEigen; }
   void setIsFree(bool isFree){ _isFree_ = isFree; }
+  void setIsThrown(bool isThrown){ _isThrown_ = isThrown; }
   void setParameterIndex(int parameterIndex){ _parameterIndex_ = parameterIndex; }
   void setStepSize(double stepSize){ _stepSize_ = stepSize; }
+  void setPriorValue(double priorValue){ _priorValue_ = priorValue; }
+  void setThrowValue(double throwValue){ _throwValue_ = throwValue; }
+  void setStdDevValue(double stdDevValue){ _stdDevValue_ = stdDevValue; }
+  void setDialSetConfig(const std::vector<ConfigReader>& dialDefinitionsList_){ _dialDefinitionsList_ = dialDefinitionsList_; }
 
-  /// Set the minimum value for this parameter.  Parameter values less than
+  /// Set the limits for this parameter.  Parameter values less than
   /// this value are illegal, and the likelihood is undefined.  The job will
   /// terminate when it encounters an illegal parameter value.  Note: Using a
   /// minimum value when also using eigenvalue decomposition, or PCA results
@@ -50,22 +59,12 @@ public:
   /// boundaries and may set take values that are out of bounds.  In this
   /// case, the job will stop.  Note: If the minimum value is not set, then
   /// the bound is a negative infinity.
-  void setMinValue(double minValue){ _parameterLimits_.min = minValue; }
-
-  /// Set the maximum value for this parameter.  Parameter values more than
-  /// this value are illegal, and the likelihood is undefined. The job will
-  /// terminate when it encounters an illegal parameter value.  Note: Using a
-  /// minimum value when also using eigenvalue decomposition, or PCA results
-  /// in undefined behavior because the decomposition will not honor the
-  /// boundaries and may set take values that are out of bounds.  In this
-  /// case, the job will stop.  Note: If the maximum value is not set, then
-  /// the bound is at positive infinity.
-  void setMaxValue(double maxValue){ _parameterLimits_.max = maxValue; }
+  void setLimits(const GenericToolbox::Range& limits_){ _parameterLimits_ = limits_; }
 
   /// Record the minimum mirroring boundary being used by any dials for this
   /// parameter.  If this is set, then GUNDAM will constrain the parameter
   /// value passed to the likelihood to be greater than the mirror boundary,
-  /// while the input parameter value can continue outside of the bounds.
+  /// while the input parameter value can continue outside the bounds.
   void setMinMirror(double minMirror);
 
   /// Record the maximum mirroring boundary being used by any dials for this
@@ -74,33 +73,87 @@ public:
   /// while the input parameter value can continue outside of the bounds.
   void setMaxMirror(double maxMirror);
 
-  /// Record the physical minimum bound for the parameter.  This is the range
-  /// where the parameter has a physically meaningful value.  Because of
-  /// numeric continuation, the likelihood may have a finite value outside of
-  /// the physical range.  From a mathmatical perspective, the value of the
-  /// LLH is infinite below the physical minimum.  This can be enforced
-  /// using the Likelihood::SetParameterValidity() method.
-  void setMinPhysical(double minPhysical){ _physicalLimits_.min = minPhysical; }
+  /// Record the minimum boundary for a cyclic parameter.  A cyclic parameter
+  /// will "wrap" from the minimum to maximum boundary of the range.  This is
+  /// mostly for documentation purposes, but the fitter might use it (e.g. the
+  /// MCMC) during the fit.
+  void setMinCyclic(double minCyclic);
 
-  /// Record the physical maximum bound for the parameter.  This is the range
-  /// where the parameter has a physically meaningful value.  Because of
-  /// numeric continuation, the likelihood may have a finite value outside of
-  /// the physical range.  From a mathmatical perspective, the value of the
-  /// LLH is infinite below the physical minimum.  This can be enforced
-  /// using the Likelihood::SetParameterValidity() method.
-  void setMaxPhysical(double maxPhysical){ _physicalLimits_.max = maxPhysical; }
-  void setPriorValue(double priorValue){ _priorValue_ = priorValue; }
-  void setThrowValue(double throwValue){ _throwValue_ = throwValue; }
-  void setStdDevValue(double stdDevValue){ _stdDevValue_ = stdDevValue; }
+  /// Record the minimum boundary for a cyclic parameter.  A cyclic parameter
+  /// will "wrap" from the minimum to maximum boundary of the range.  This is
+  /// mostly for documentation purposes, but the fitter might use it (e.g. the
+  /// MCMC) during the fit.
+  void setMaxCyclic(double maxCyclic);
 
   /// Set the parameter value.  This always checks the parameter validity, but
   /// if force is true, then it will only print warnings, otherwise it stops
   /// with EXIT_FAILURE.
   void setParameterValue(double parameterValue, bool force=false);
-  void setName(const std::string &name){ _name_ = name; }
-  void setDialSetConfig(const JsonType &jsonConfig_);
-  void setOwner(const ParameterSet *owner_){ _owner_ = owner_; }
-  void setPriorType(PriorType priorType){ _priorType_ = priorType; }
+
+  /// The parameter has no constrains applied.
+  [[nodiscard]] auto isFree() const{ return _isFree_; }
+
+  /// The parameter is fixed, and does not enter into the penalty term.
+  /// Although it is removed from the covariance and its value is used for the
+  /// reweighting.  This constrasts with a frozen variable where the value of
+  /// the variable will not be changed by the fit, but the variable is used to
+  /// calculate the penalty term.
+  [[nodiscard]] auto isFixed() const{ return _isFixed_; }
+
+  /// The parameter affects the likelihood, and is included in the penalty,
+  /// but should not be varied as part of the fit.  A common usage is for
+  /// profiling where a parameter is frozen at a particular value and the
+  /// likelihood is minimized with respect to the other parameters.  Notice
+  /// that this only changes the behavior of the maximum likelihood "fit", and
+  /// does not change the behavior toy throws, or the Bayesian MCMC analysis
+  /// [where the absolute value of the LLH isn't meaningful].  Note:
+  /// Parameters in an eigen decomposed parameter set cannot be frozen.
+  [[nodiscard]] auto isFrozen() const{ return _isFrozen_; }
+
+  /// When a parameter set is eigen decomposed, a set of "fake" parameters is
+  /// created for each of the eigen vectors.  This is true when the current
+  /// parameter is one of the "fake" parameters.
+  [[nodiscard]] auto isEigen() const{ return _isEigen_; }
+
+  /// The parameter is enable for the analysis.  If this is false, then the
+  /// value is not used for reweighting, and does not affect the penalty.
+  [[nodiscard]] auto isEnabled() const{ return _isEnabled_; }
+
+  /// A random value should be generated for this parameter when the parameter
+  /// set is thrown.  Notice that a "frozen" parameter is thrown, while a
+  /// "fixed" parameter is not.
+  [[nodiscard]] auto isThrown() const{ return _isThrown_ and _isEnabled_ and not _isFixed_; }
+
+  [[nodiscard]] bool isCyclic() const;
+  [[nodiscard]] auto gotUpdated() const { return _gotUpdated_; }
+  [[nodiscard]] auto getParameterIndex() const{ return _parameterIndex_; }
+  [[nodiscard]] auto getStepSize() const{ return _stepSize_; }
+
+  /// Prefit expected value for the parameter.  The systematic penalty term
+  /// is calculated relative to this value.
+  [[nodiscard]] auto getPriorValue() const{ return _priorValue_; }
+
+  /// The random value for this parameter generated with the parameter is
+  /// thrown.
+  [[nodiscard]] auto getThrowValue() const{ return _throwValue_; }
+
+  [[nodiscard]] auto getStdDevValue() const{ return _stdDevValue_; }
+  [[nodiscard]] auto getOwner() const{ return _owner_; }
+  [[nodiscard]] auto getPriorType() const{ return _priorType_; }
+  [[nodiscard]] auto& getParameterLimits() const{ return _parameterLimits_; }
+  [[nodiscard]] auto& getMirrorRange() const{ return _mirrorRange_; }
+  [[nodiscard]] auto& getCyclicRange() const{ return _cyclicRange_; }
+  [[nodiscard]] auto& getThrowLimits() const{ return _throwLimits_; }
+  [[nodiscard]] auto& getPhysicalLimits() const{ return _physicalLimits_; }
+  [[nodiscard]] auto& getName() const{ return _name_; }
+  [[nodiscard]] auto& getDialDefinitionsList() const{ return _dialDefinitionsList_; }
+
+  /// Get the current value of the parameter.
+  [[nodiscard]] double getParameterValue() const;
+
+  /// The value of the parameter after applying any mirroring, and cyclic
+  /// corrections.
+  [[nodiscard]] double getRegularizedValue() const;
 
   /// Query if a value is in the domain of likelihood for this parameter.  Math
   /// remediation for those of us (including myself) who don't recall grammar
@@ -123,34 +176,6 @@ public:
   /// Query if a value matchs the validity requirements.
   [[nodiscard]] bool isValidValue(double value) const;
 
-  [[nodiscard]] bool isFree() const{ return _isFree_; }
-  [[nodiscard]] bool isFixed() const{ return _isFixed_; }
-  [[nodiscard]] bool isEigen() const{ return _isEigen_; }
-  [[nodiscard]] bool isEnabled() const{ return _isEnabled_; }
-  [[nodiscard]] bool gotUpdated() const { return _gotUpdated_; }
-  [[nodiscard]] int getParameterIndex() const{ return _parameterIndex_; }
-  [[nodiscard]] double getStepSize() const{ return _stepSize_; }
-  /// See setMinValue() for documentation.
-  [[nodiscard]] double getMinValue() const{ return _parameterLimits_.min; }
-  /// See setMaxValue() for documentation.
-  [[nodiscard]] double getMaxValue() const{ return _parameterLimits_.max; }
-  /// See setMinMirror for documentation.
-  [[nodiscard]] double getMinMirror() const{ return _mirrorRange_.min; }
-  /// See setMaxMirror for documentation.
-  [[nodiscard]] double getMaxMirror() const{ return _mirrorRange_.max; }
-  [[nodiscard]] double getPriorValue() const{ return _priorValue_; }
-  [[nodiscard]] double getThrowValue() const{ return _throwValue_; }
-  /// See setMinPhysical for documentation.
-  [[nodiscard]] double getMinPhysical() const{ return _physicalLimits_.min; }
-  /// See setMinPhysical for documentation.
-  [[nodiscard]] double getMaxPhysical() const{ return _physicalLimits_.max; }
-  [[nodiscard]] double getStdDevValue() const{ return _stdDevValue_; }
-  [[nodiscard]] double getParameterValue() const;
-  [[nodiscard]] const std::string &getName() const{ return _name_; }
-  [[nodiscard]] const JsonType &getDialDefinitionsList() const{ return _dialDefinitionsList_; }
-  [[nodiscard]] const ParameterSet *getOwner() const{ return _owner_; }
-  [[nodiscard]] PriorType getPriorType() const{ return _priorType_; }
-
   /// Copy the prior value of the parameter into the current value.  This will
   /// fail if the prior value has not been set.
   void setValueAtPrior();
@@ -168,8 +193,16 @@ public:
   /// setStdDevvalue()).  This is a signed difference.
   [[nodiscard]] double getDistanceFromNominal() const;
 
+  /// Provide a string summarizing the parameter (bounds, enabled, etc).
   [[nodiscard]] std::string getSummary() const;
+
+  /// Provide a string name for the parameter.  This will be unique
+  /// within the parameter set, and is constructed using the index of the
+  /// parameter in the set, and an optional user provided name.
   [[nodiscard]] std::string getTitle() const;
+
+  /// Provide a string name for the parameter that is unique.  This is
+  /// constructed using the parameter set name, and the parameter title.
   [[nodiscard]] std::string getFullTitle() const;
 
   /// Define the type of validity that needs to be required by
@@ -186,17 +219,25 @@ public:
   ///
   /// Example: setParameterValidity("range,mirror,physical")
   void setValidity(const std::string& validity);
+
+  /// Set the parameter validity based on bit field:
+  /// 0b0001 -- The parameter should be between the minimum and maximum value.
+  /// 0b0010 -- The parameter should be between the mirroring values.
+  /// 0b0100 -- The parameter should be between the physical bounds.
+  /// The setValidity(string) overload is the prefered interface.
   void setValidity(int validity) {_validFlags_ = validity;}
 
-  // print
+  /// A convenience function to print the summary to LogInfo
   void printConfiguration() const;
 
 private:
   // Parameters
   bool _isEnabled_{true};
   bool _isFixed_{false};
+  bool _isFrozen_{false};
   bool _isEigen_{false};
   bool _isFree_{false};
+  bool _isThrown_{true};
   bool _gotUpdated_{false};
   int _parameterIndex_{-1}; // to get the right definition in the json config (in case "name" is not specified)
   double _parameterValue_{std::nan("unset")};
@@ -205,14 +246,16 @@ private:
   double _stdDevValue_{std::nan("unset")};
 
   GenericToolbox::Range _parameterLimits_;
+  GenericToolbox::Range _throwLimits_;
   GenericToolbox::Range _physicalLimits_;
   GenericToolbox::Range _mirrorRange_;
+  GenericToolbox::Range _cyclicRange_;
 
   double _stepSize_{std::nan("unset")};
   std::string _name_{};
   std::string _dialsWorkingDirectory_{"."};
-  JsonType _parameterConfig_{};
-  JsonType _dialDefinitionsList_{};
+  ConfigReader _parameterConfig_{};
+  std::vector<ConfigReader> _dialDefinitionsList_{};
 
   // Internals
   const ParameterSet* _owner_{nullptr};

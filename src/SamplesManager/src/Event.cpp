@@ -4,20 +4,28 @@
 
 #include "Event.h"
 
-#include "GundamGlobals.h"
-#include "GundamAlmostEqual.h"
-
-#include "Logger.h"
-
-#include <cmath>
+#include <sstream>
 
 
 // misc
+size_t Event::getSize() const{
+  size_t staticSize = sizeof(Event);
+
+  size_t dynamicSize = sizeof(VariableHolder) * _variables_.getVarList().capacity();
+
+  for( auto& var : _variables_.getVarList() ){
+    dynamicSize += var.get().getStoredSize();
+  }
+
+  return staticSize + dynamicSize;
+}
 std::string Event::getSummary() const {
   std::stringstream ss;
   ss << "Indices{" << _indices_ << "}";
   ss << std::endl << "Weights{" << _weights_ << "}";
-  ss << std::endl << "Variables{" << std::endl << _variables_ << std::endl << "}";
+  ss << std::endl << "Variables{";
+  if(not _variables_.empty()){ ss << std::endl << _variables_ << std::endl; }
+  ss << "}";
   return ss.str();
 }
 

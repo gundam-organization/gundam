@@ -25,6 +25,9 @@ class DatasetDefinition; // owner
 
 class DataDispenser : public JsonBaseClass {
 
+public:
+  static void prepareConfig(ConfigReader &config_);
+
 protected:
   void configureImpl() override;
   void initializeImpl() override;
@@ -38,8 +41,8 @@ public:
   void setPlotGeneratorPtr( const PlotGenerator* plotGeneratorPtr_ ){ _plotGeneratorPtr_ = plotGeneratorPtr_; }
 
   // const getters
-  [[nodiscard]] const DatasetDefinition* getOwner() const{ return _owner_; }
-  [[nodiscard]] const DataDispenserParameters &getParameters() const{ return _parameters_; }
+  [[nodiscard]] auto* getOwner() const{ return _owner_; }
+  [[nodiscard]] auto& getParameters() const{ return _parameters_; }
 
   // non-const getters
   DataDispenserParameters &getParameters(){ return _parameters_; }
@@ -60,7 +63,9 @@ protected:
   void loadFromHistContent();
 
   // utils
-  std::shared_ptr<TChain> openChain(bool verbose_ = false);
+  [[nodiscard]] int getNbParallelCpu() const;
+  [[nodiscard]] const std::string& getVariableExpression(const std::string& variable_) const;
+  [[nodiscard]] std::shared_ptr<TChain> openChain(bool verbose_ = false) const;
 
   // multi-thread
   void eventSelectionFunction(int iThread_);
@@ -70,7 +75,6 @@ protected:
 
   std::vector<ThreadSharedData> threadSharedDataList{};
 
-
 private:
   // config
   DataDispenserParameters _parameters_;
@@ -78,13 +82,12 @@ private:
   // internals
   DatasetDefinition* _owner_{nullptr};
   DataDispenserCache _cache_;
+  GenericToolbox::Atomic<int> _unbinnedEvents_;
 
   // needed to check which variables need to be loaded
   const PlotGenerator* _plotGeneratorPtr_{nullptr};
 
   // multi-threading
-  GenericToolbox::ParallelWorker _threadPool_{};
-  GenericToolbox::ParallelWorker _threadPoolEventLoad_{};
   GenericToolbox::NoCopyWrapper<std::mutex> _mutex_{};
 
 };

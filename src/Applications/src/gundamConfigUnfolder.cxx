@@ -39,7 +39,7 @@ int main( int argc, char** argv ){
   LogInfo << "Reading config..." << std::endl;
 
   // Import
-  ConfigUtils::ConfigHandler configHandler( clp.getOptionVal<std::string>("configFile") );
+  ConfigUtils::ConfigBuilder configHandler( clp.getOptionVal<std::string>("configFile") );
   configHandler.override( clp.getOptionValList<std::string>("overrideFiles") );
 
   // Export

@@ -9,62 +9,25 @@
 #include "Logger.h"
 
 
-void GeneralSpline::setAllowExtrapolation(bool allowExtrapolation) {
-  _allowExtrapolation_ = allowExtrapolation;
-}
-
-bool GeneralSpline::getAllowExtrapolation() const {
-  return _allowExtrapolation_;
-}
-
-void GeneralSpline::buildDial(const TGraph& graph_, const std::string& option_){
-  // Copy the spline data into local storage.
-  TGraph grf(graph_);
-  grf.Sort();
-  buildDial(TSpline3(Form("%p", &graph_), &graph_), option_);
-}
-
-void GeneralSpline::buildDial(const TSpline3& sp_, const std::string& option_){
-  std::vector<double> xPoints;
-  std::vector<double> yPoints;
-  std::vector<double> deriv;
-
-  // Copy the spline data into local storage.
-  for (int i = 0; i < sp_.GetNp(); ++i) {
-    double x;
-    double y;
-    sp_.GetKnot(i,x,y);
-    double d = sp_.Derivative(x);
-    xPoints.push_back(x);
-    yPoints.push_back(y);
-    deriv.push_back(d);
-  }
-  buildDial(xPoints, yPoints, deriv);
-}
-
-void GeneralSpline::buildDial(const std::vector<double>& xPoints,
-                              const std::vector<double>& yPoints,
-                              const std::vector<double>& deriv,
-                              const std::string& option_){
+void GeneralSpline::buildDial(const std::vector<DialUtils::DialPoint>& splinePointList_){
   LogThrowIf(not _splineData_.empty(), "Spline data already set.");
 
-  _splineBounds_.min = xPoints.front();
-  _splineBounds_.max = xPoints.back();
+  _splineBounds_.min = splinePointList_.front().x;
+  _splineBounds_.max = splinePointList_.back().x;
 
-  _splineData_.resize(2 + xPoints.size()*3);
-  _splineData_[0] = xPoints.front();
-  _splineData_[1] = (xPoints.back()-xPoints.front())/(xPoints.size()-1.0);
+  _splineData_.resize(2 + splinePointList_.size()*3);
+  _splineData_[0] = splinePointList_.front().x;
+  _splineData_[1] = (splinePointList_.back().x-splinePointList_.front().x)/(splinePointList_.size()-1.0);
 
   // Copy the spline data into local storage.
-  for (int i = 0; i < xPoints.size(); ++i) {
-    double x = xPoints[i];
-    double y = yPoints[i];
-    double d = deriv[i];
-    _splineData_[2 + 3*i + 0] = y;
-    _splineData_[2 + 3*i + 1] = d;
-    _splineData_[2 + 3*i + 2] = x;
+  for (size_t iPt = 0; iPt < splinePointList_.size(); ++iPt) {
+    double x = splinePointList_[iPt].x;
+    double y = splinePointList_[iPt].y;
+    double d = splinePointList_[iPt].slope;
+    _splineData_[2 + 3*iPt + 0] = y;
+    _splineData_[2 + 3*iPt + 1] = d;
+    _splineData_[2 + 3*iPt + 2] = x;
   }
-
 }
 
 double GeneralSpline::evalResponse(const DialInputBuffer& input_) const {

@@ -110,6 +110,7 @@ TEST_F(hemiLaunchTestDevice, ExplicitGridSize)
 	ASSERT_GE(bdim, 32);
 }
 
+#ifdef CONTINUE_WITHOUT_ABORT_ON_CUDA_ERROR
 TEST_F(hemiLaunchTestDevice, InvalidConfigShouldFail)
 {
 	// Fail due to block size too large
@@ -120,6 +121,7 @@ TEST_F(hemiLaunchTestDevice, InvalidConfigShouldFail)
             ASSERT_FAILURE(checkCudaErrors());
         }
         catch (...) {
+            std::cout << "caught" << std::endl;
             ASSERT_SUCCESS(checkCudaErrors());
         }
 
@@ -136,6 +138,7 @@ TEST_F(hemiLaunchTestDevice, InvalidConfigShouldFail)
             ASSERT_SUCCESS(checkCudaErrors());
         }
 }
+#endif
 
 TEST_F(hemiLaunchTestDevice, CorrectVariadicParams_cudaLaunch) {
 	hemi::cudaLaunch(KernelFunc, dCount, dBdim, dGdim, 1);
@@ -192,6 +195,7 @@ TEST_F(hemiLaunchTestDevice, ExplicitGridSize_cudaLaunch)
 	ASSERT_GE(bdim, 32);
 }
 
+#ifdef CONTINUE_WITHOUT_ABORT_ON_CUDA_ERROR
 TEST_F(hemiLaunchTestDevice, InvalidConfigShouldFail_cudaLaunch)
 {
 	// Fail due to block size too large
@@ -217,3 +221,4 @@ TEST_F(hemiLaunchTestDevice, InvalidConfigShouldFail_cudaLaunch)
             ASSERT_SUCCESS(checkCudaErrors());
         }
 }
+#endif

@@ -62,14 +62,14 @@ bool Cache::Parameters::HasGPU(bool dump) {
         LogInfo << "CUDA GRID MAX DIM:         " << "X:" << prop.maxGridSize[0]
                   << " Y:" << prop.maxGridSize[1]
                   << " Z:" << prop.maxGridSize[2] << std::endl;
-        LogInfo << "CUDA WARP:                 " << prop.warpSize << std::endl;
-        LogInfo << "CUDA CLOCK:                " << prop.clockRate << std::endl;
         LogInfo << "CUDA GLOBAL MEM:           " << prop.totalGlobalMem << std::endl;
         LogInfo << "CUDA SHARED MEM:           " << prop.sharedMemPerBlock << std::endl;
-        LogInfo << "CUDA L2 CACHE MEM:         " << prop.l2CacheSize << std::endl;
         LogInfo << "CUDA CONST MEM:            " << prop.totalConstMem << std::endl;
-        LogInfo << "CUDA MEM PITCH:            " << prop.memPitch << std::endl;
         LogInfo << "CUDA REGISTERS:            " << prop.regsPerBlock << std::endl;
+        LogInfo << "CUDA WARP:                 " << prop.warpSize << std::endl;
+#if CUDART_VERSION < 13000
+        LogInfo << "CUDA CLOCK:                " << prop.clockRate << std::endl;
+#endif
     }
     if (prop.totalGlobalMem < 1) return false;
     if (prop.multiProcessorCount < 1) return false;

@@ -23,11 +23,11 @@ public:
   void setAllowExtrapolation(bool allowExtrapolation_) override { _allowExtrapolation_ = allowExtrapolation_; }
 
   void setCoefficientList(const std::vector<double> &coefficientList_){ _coefficientList_ = coefficientList_; }
-  void setSplineBounds(const DialUtils::Range& splineBounds_){ _splineBounds_ = splineBounds_; }
+  void setSplineBounds(const GenericToolbox::Range& splineBounds_){ _splineBounds_ = splineBounds_; }
 
 private:
   std::vector<double> _coefficientList_{};
-  DialUtils::Range _splineBounds_{std::nan("unset"), std::nan("unset")};
+  GenericToolbox::Range _splineBounds_{std::nan("unset"), std::nan("unset")};
   bool _allowExtrapolation_{false};
 
 };

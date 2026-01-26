@@ -9,7 +9,8 @@
 #include "Propagator.h"
 #include "LikelihoodInterface.h"
 #include "MinimizerBase.h"
-#include "FitterTask.h"
+#include "GundamApp.h"
+
 
 #include "GenericToolbox.Utils.h"
 #include "GenericToolbox.Time.h"
@@ -29,7 +30,7 @@ public:
 #define ENUM_NAME MinimizerType
 #define ENUM_FIELDS \
   ENUM_FIELD( RootMinimizer, 0 ) \
-  ENUM_FIELD( AdaptiveMCMC )
+  ENUM_FIELD( SimpleMCMC )
 #include "GenericToolbox.MakeEnum.h"
 
 #define ENUM_NAME PcaMethod
@@ -47,8 +48,12 @@ public:
   FitterEngine() = default;
   explicit FitterEngine(TDirectory *saveDir_) : _saveDir_(saveDir_) {};
 
+  // static
+  static void setRandomSeed(int seed_){ gRandom->SetSeed(seed_); }
+
   // Setters
   void setSaveDir(TDirectory *saveDir){ _saveDir_ = saveDir; }
+  void setSaveDir(GundamApp& app_, const std::string& subFolder_){ _saveDir_ = GenericToolbox::mkdirTFile(app_.getOutfilePtr(), subFolder_); }
   void setIsDryRun(bool isDryRun_){ _isDryRun_ = isDryRun_; }
   void setEnablePca(bool enablePca_){ _enablePca_ = enablePca_; }
   void setEnablePreFitScan(bool enablePreFitScan){ _enablePreFitScan_ = enablePreFitScan; }
@@ -62,30 +67,29 @@ public:
   void setThrowGain(double throwGain_){ _throwGain_ = throwGain_; }
   void setPcaThreshold(double pcaThreshold_){ _pcaThreshold_ = pcaThreshold_; }
   void setPcaMethod(PcaMethod pcaMethod_){ _pcaMethod_ = pcaMethod_; }
+  void setDisableParLimits(bool disableParLimits_){ _disableParLimits_ = disableParLimits_; }
 
   // const-getters
-  [[nodiscard]] const auto& getPreFitParState() const{ return _preFitParState_; }
-  [[nodiscard]] const auto& getPostFitParState() const{ return _postFitParState_; }
+  [[nodiscard]] auto& getPreFitParState() const{ return _preFitParState_; }
+  [[nodiscard]] auto& getPostFitParState() const{ return _postFitParState_; }
   [[nodiscard]] MinimizerType getMinimizerType() const{ return _minimizerType_; }
-  [[nodiscard]] const MinimizerBase& getMinimizer() const{ return *_minimizer_; }
-  [[nodiscard]] const LikelihoodInterface& getLikelihoodInterface() const{ return _likelihoodInterface_; }
-  [[nodiscard]] const ParameterScanner& getParameterScanner() const{ return _parameterScanner_; }
+  [[nodiscard]] auto& getMinimizer() const{ return *_minimizer_; }
+  [[nodiscard]] auto& getLikelihoodInterface() const{ return _likelihoodInterface_; }
+  [[nodiscard]] auto& getParameterScanner() const{ return _parameterScanner_; }
 
   // mutable-getters
   MinimizerBase& getMinimizer(){ return *_minimizer_; }
-  MinimizerBase* getMinimizerPtr(){ return _minimizer_.get(); }
   LikelihoodInterface& getLikelihoodInterface(){ return _likelihoodInterface_; }
   ParameterScanner& getParameterScanner(){ return _parameterScanner_; }
   TDirectory* getSaveDir(){ return _saveDir_; }
+  GenericToolbox::TFilePath getTFilePath(){ return GenericToolbox::TFilePath(_saveDir_); }
+  bool& getGenerateSamplePlots(){ return _generateSamplePlots_; }
 
   // Core
   void fit();
   void runPcaCheck();
   void rescaleParametersStepSize();
-  void checkNumericalAccuracy();
-
-protected:
-  void runFitterTaskList();
+  bool checkNumericalAccuracy();
 
 private:
   // Parameters
@@ -94,11 +98,12 @@ private:
   bool _throwMcBeforeFit_{false};
   bool _enablePreFitScan_{false};
   bool _enablePostFitScan_{false};
-  bool _enablePreFitToPostFitLineScan_{true};
+  bool _enablePreFitToPostFitLineScan_{false};
   bool _generateSamplePlots_{true};
   bool _generateOneSigmaPlots_{false};
   bool _doAllParamVariations_{false};
   bool _scaleParStepWithChi2Response_{false};
+  bool _disableParLimits_{false};
   double _throwGain_{1.};
   double _parStepGain_{0.1};
   bool _savePostfitEventTrees_{false};
@@ -107,6 +112,7 @@ private:
   GenericToolbox::Json::JsonType _postFitParState_{};
 
   // dev
+  bool _fixGhostEigenParametersAfterFirstRejected_{false};
   double _pcaThreshold_{0};
   PcaMethod _pcaMethod_{PcaMethod::DeltaChi2Threshold};
 
@@ -116,7 +122,6 @@ private:
   ParameterScanner _parameterScanner_{};
   MinimizerType _minimizerType_{};
   std::unique_ptr<MinimizerBase> _minimizer_{}; // a virtual class in charge of driving the LikelihoodInterface
-  std::vector<FitterTask> _taskList_{};
 
 };
 #endif //GUNDAM_FITTER_ENGINE_H

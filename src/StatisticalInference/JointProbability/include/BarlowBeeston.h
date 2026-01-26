@@ -30,9 +30,10 @@ namespace JointProbability{
   }
 
   double BarlowBeeston::eval(double data_, double pred_, double err_, int bin_) const {
-    const double dataVal = data_;
-    const double predVal = pred_;
-    const double mcUncert = err_;
+    // Impose "physical" constraints
+    const double dataVal = std::max(data_,0.0);
+    const double predVal = std::max(pred_,std::sqrt(std::numeric_limits<double>::min()));
+    const double mcUncert = std::max(err_,std::numeric_limits<double>::min());
 
     _buf_.rel_var = mcUncert / TMath::Sq(predVal);
     _buf_.b       = (predVal * _buf_.rel_var) - 1;

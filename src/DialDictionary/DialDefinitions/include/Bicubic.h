@@ -13,28 +13,21 @@ class Bicubic : public DialBase {
 
 public:
   Bicubic() = default;
-  ~Bicubic() override = default;
 
-  [[nodiscard]] std::unique_ptr<DialBase> clone() const override {
-       return std::make_unique<Bicubic>(*this);
-  }
-
+  // mandatory overrides
+  [[nodiscard]] std::unique_ptr<DialBase> clone() const override { return std::make_unique<Bicubic>(*this); }
   [[nodiscard]] std::string getDialTypeName() const override {return {"Bicubic"};}
-
-  /// Allow extrapolation of the data.  The default is to
-  /// forbid extrapolation.
-  virtual void setAllowExtrapolation(bool allow_) override;
-  [[nodiscard]] virtual bool getAllowExtrapolation() const override;
-
-  // Return the dial response for the input parameters.  The DialInputBuffer
-  // should contain two input parameters.
   [[nodiscard]] double evalResponse(const DialInputBuffer& input_) const override;
+
+  // other overrides
+  void setAllowExtrapolation(bool allowExtrapolation) override { _allowExtrapolation_ = allowExtrapolation; }
+  [[nodiscard]] bool getAllowExtrapolation() const override { return _allowExtrapolation_; }
+  [[nodiscard]] const std::vector<double>& getDialData() const override { return _splineData_; }
 
   /// Pass information to the dial so that it can build it's internal
   /// information.
-  virtual void buildDial(const TH2& h2, const std::string& option_="") override;
+  void buildDial(const TH2& h2);
 
-  [[nodiscard]] const std::vector<double>& getDialData() const override {return _splineData_;}
 
 protected:
   bool _allowExtrapolation_{false};
@@ -45,10 +38,7 @@ protected:
   std::vector<double> _splineData_{};
 
   // The vector of input parameter bounds.
-  std::vector<DialUtils::Range> _splineBounds_;
+  std::vector<GenericToolbox::Range> _splineBounds_;
 };
-
-typedef CachedDial<Bicubic> BicubicCache;
-
 
 #endif //GUNDAM_BICUBIC_SPLINE_H

@@ -39,7 +39,7 @@ public:
     DialResponseCache() = delete; // prevent not setting up the interface ptr
     explicit DialResponseCache( DialInterface& interface_ )
       : dialInterface(&interface_) {
-      this->updateRequested = dialInterface->getInputBufferRef()->isDialUpdateRequestedPtr();
+      this->updateRequested = (bool*) dialInterface->getInputBufferRef()->isDialUpdateRequestedPtr();
     }
     // The dial interface to be used with the Event.
     DialInterface* dialInterface{nullptr};
@@ -91,8 +91,9 @@ public:
     std::size_t interfaceIndex {std::size_t(-1)};
 
     [[nodiscard]] std::string getSummary(bool shallow_ = true) const{
+      if( collectionIndex == std::size_t(-1) and interfaceIndex == std::size_t(-1) ){ return {}; }
       std::stringstream ss;
-      ss << "collection: " << collectionIndex << ", interface: " << interfaceIndex;
+      ss << "{ collection: " << collectionIndex << ", interface: " << interfaceIndex << "}";
       return ss.str();
     }
     friend std::ostream& operator <<( std::ostream& o, const DialIndexCacheEntry& this_ ){
@@ -149,7 +150,7 @@ public:
   // returns the current index
   [[nodiscard]] size_t getFillIndex() const { return _fillIndex_; }
 
-  [[nodiscard]] const std::vector<IndexedCacheEntry>& getIndexedCache() const { return _indexedCache_; }
+  [[nodiscard]] auto& getIndexedCache() const { return _indexedCache_; }
 
   /// Provide the event dial cache.  The event dial cache containes a
   /// CacheElem_t object for every dial applied to a physics event.  The
@@ -177,8 +178,7 @@ public:
   /// Build the association between pointers to PhysicsEvent objects and the
   /// pointers to DialInterface objects.  This must be done before the event
   /// dial cache can be used, but after the index cache has been filled.
-  void buildReferenceCache(SampleSet& sampleSet_,
-                           std::vector<DialCollection>& dialCollectionList_);
+  void buildReferenceCache(SampleSet& sampleSet_, std::vector<DialCollection>& dialCollectionList_);
 
   /// Resize the cache vectors to remove entries with null events
   void shrinkIndexedCache();

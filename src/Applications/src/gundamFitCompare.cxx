@@ -538,6 +538,8 @@ void makeErrorComparePlots(bool usePrefit_, bool useNomVal_) {
     for( auto& histEntry : compHist ){
       overlayCanvas->cd();
 
+      LogContinueIf(histEntry.second==nullptr, "\"" << histEntry.first << "\" histEntry is null: skipping.");
+
       histEntry.second->Draw("E1");
       overlayCanvas->Update();
       TLine* line1{nullptr}, *line2{nullptr};

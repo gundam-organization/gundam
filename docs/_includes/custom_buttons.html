@@ -1,0 +1,32 @@
+<a href="javascript:history.back()" class="back-button">Back</a>
+
+{% if page.next_page %}
+  <a href="{{ page.next_page }}" class="next-button" style="display: none;">Next</a>
+{% endif %}
+
+<button onclick="scrollToTop()" class="top-button">Top</button>
+
+<script>
+  function scrollToTop() {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  window.onscroll = function() {
+    const topButton = document.querySelector('.top-button');
+    const nextButton = document.querySelector('.next-button');
+
+    // Show/Hide the "Top" button based on scroll position
+    if (document.body.scrollTop > 100 || document.documentElement.scrollTop > 100) {
+      topButton.style.display = "block";
+    } else {
+      topButton.style.display = "none";
+    }
+
+    // Show the "Next" button when the user reaches the bottom of the page
+    if (nextButton && (window.innerHeight + window.scrollY) >= document.body.offsetHeight) {
+      nextButton.style.display = "block";
+    } else if (nextButton) {
+      nextButton.style.display = "none";
+    }
+  };
+</script>

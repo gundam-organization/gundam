@@ -14,30 +14,46 @@ scanParameters: false        # can be triggered with --scan
 generateOneSigmaPlots: false # can be enabled with --one-sigma
 
 fitterEngineConfig:
-  engineType: mcmc
-
-  mcmcConfig:
-    algorithm: metropolis
-    proposal: adaptive
-    burninCycles: 8
-    burninSteps: 2000
-    burninResets: 0
-    saveBurnin: true
-    burninWindow: 100
-    burninCovWindow: 10000
-
-    cycles: 4
-    steps: 10000
-    adaptiveWindow: 400
-    adaptiveCovWindow: 1000000
-    adaptiveFreezeAfter: 1
 
   minimizerConfig:
-    minimizer: "Minuit2"
-    algorithm: "Migrad"
-    errors: "Hesse"
-    print_level: 2
-    tolerance: 1E-6
+    type: SimpleMcmc
+    algorithm: metropolis
+    proposal: adaptive
+    adaptiveRestore: none
+
+    cycles: 20
+    steps: 10000
+    acceptanceWindow: 200
+    covarianceWindow: 100000
+    covarianceDeweighting: 0.0
+    sequence: |
+      for (int chain = 0; chain < gMCMC.Cycles(); ++chain) {
+        gMCMC.RunCycle("Chain",chain);
+      }
+
+    burninCycles: 8
+    saveBurnin: false
+    burninSequence: |
+      for (int chain = 0; chain < gMCMC.Burnin(); ++chain) {
+        gMCMC.Restart();
+
+        gMCMC.AcceptanceWindow(100);
+        gMCMC.FreezeStep(chain > 0);
+        gMCMC.FreezeCovariance(true);
+        gMCMC.AcceptanceAlgorithm(1);
+        gMCMC.Steps(2000);
+        gMCMC.RunCycle("Downhill",chain);
+
+        gMCMC.AcceptanceWindow(100);
+        gMCMC.FreezeCovariance(true);
+        gMCMC.Steps(2000);
+        gMCMC.RunCycle("Wander",chain);
+
+        gMCMC.Steps(1000);
+        gMCMC.AcceptanceWindow(100);
+        gMCMC.FreezeCovariance(false);
+        gMCMC.RunCycle("Burn-in",chain);
+      }
 
   propagatorConfig:
     throwAsimovFitParameters: false
@@ -59,13 +75,7 @@ fitterEngineConfig:
               - "${DATA_DIR}/100HorrifyingTree.root"
 
     fitSampleSetConfig:
-      # LeastSquares is used for tests because it is mathematically simple
-      # and numerically stable.
-      llhStatFunction: LeastSquares
       dataEventType: TestData
-
-      llhConfig:
-        lsqPoissonianApproximation: true
 
       fitSampleList:
         - name: AB
@@ -87,33 +97,49 @@ fitterEngineConfig:
 
           - parameterName: "norm_A"
             isEnabled: true
-            dialSetDefinitions:
-              - dialsType: Normalization
-                applyOnDataSets: [ "TestSample" ]
-                applyCondition: "[C] > 0"
+            parameterLimits: [0.0, 2.0]
 
           - parameterName: "norm_B"
             isEnabled: true
-            dialSetDefinitions:
-              - dialsType: Normalization
-                applyOnDataSets: [ "TestSample" ]
-                applyCondition: "[C] <= 0"
+            parameterLimits: [0.0, 2.0]
 
-          - parameterName: "spline_C"
-            isEnabled: true
-            dialSetDefinitions:
-              - dialsType: Spline
-                dialLeafName: "spline_C"
-                applyOnDataSets: [ "TestSample" ]
-                applyCondition: "[C] > 0"
+          # - parameterName: "spline_C"
+          #   isEnabled: true
 
-          - parameterName: "spline_D"
-            isEnabled: true
-            dialSetDefinitions:
-              - dialsType: Spline
-                dialLeafName: "spline_D"
-                applyOnDataSets: [ "TestSample" ]
-                applyCondition: "[C] <= 0"
+          # - parameterName: "spline_D"
+          #   isEnabled: true
+
+        dialSetDefinitions:
+          - dialsType: Normalization
+            printDialsSummary: true
+            applyOnDataSets: [ "TestSample" ]
+            applyCondition: "[C] > 0"
+            dialInputList:
+              - name: "norm_A"
+
+          - dialsType: Normalization
+            printDialsSummary: true
+            applyOnDataSets: [ "TestSample" ]
+            applyCondition: "[C] <= 0"
+            dialInputList:
+              - name: "norm_B"
+
+          # - dialsType: Spline
+          #   printDialsSummary: true
+          #   dialLeafName: "spline_C"
+          #   applyOnDataSets: [ "TestSample" ]
+          #   applyCondition: "abs([C]) > 0.3"
+          #   dialInputList:
+          #     - name: "spline_C"
+
+          # - dialsType: Spline
+          #   printDialsSummary: true
+          #   dialLeafName: "spline_D"
+          #   applyOnDataSets: [ "TestSample" ]
+          #   applyCondition: "abs([C]) < 0.4"
+          #   dialInputList:
+          #     - name: "spline_D"
+
 
 # End of the yaml file
 # Local Variables:

@@ -2,7 +2,7 @@
 
 set(
     APPLICATION_LIST
-    # GUNDAM apps
+    # GUNDAM C++ apps
     gundamFitter
     gundamFitReader
     gundamCalcXsec
@@ -14,12 +14,16 @@ set(
     gundamConfigUnfolder
 )
 
+set(SCRIPT_LIST
+  # GUNDAM scripts (not compiled)
+  gundamContinue
+)
 
-if( ENABLE_DEV_MODE )
+if( WITH_GUNDAM_SANDBOX_APP )
     list(APPEND APPLICATION_LIST Sandbox)
 endif()
 
-if( WITH_GUNDAM_ROOT_APP )
+if( WITH_GUNDAM_ROOT_APP AND WITH_ROOT_DICT_BUILD )
     list(APPEND APPLICATION_LIST gundamRoot)
 
     # Need a full unfold of the source path
@@ -82,11 +86,16 @@ target_link_libraries( gundamConfigUnfolder GundamUtils )
 target_link_libraries( gundamConfigCompare GundamUtils )
 target_link_libraries( gundamPlotExtractor GundamUtils )
 
-if( WITH_GUNDAM_ROOT_APP )
+if( WITH_GUNDAM_ROOT_APP AND WITH_ROOT_DICT_BUILD )
 #target_sources( gundamRoot PRIVATE G__GundamRootDict.cxx )
 #target_link_libraries( gundamRoot GundamPropagator )
-target_link_libraries( gundamRoot
-    GundamRootDict GundamUtils
-    #    GundamPropagator
-    )
+    target_link_libraries( gundamRoot
+        GundamRootDict GundamUtils
+        #    GundamPropagator
+        )
 endif ()
+
+foreach( script ${SCRIPT_LIST} )
+  cmessage( STATUS "Adding script: ${script}" )
+  install(PROGRAMS src/${script} DESTINATION bin)
+endforeach()

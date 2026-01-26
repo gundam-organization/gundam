@@ -1,0 +1,425 @@
+#!/bin/bash
+
+# Manage running multiple jobs in parallel.  This can handle any
+# command line that creates the required output file (see :OUTPUT:
+# below), but is mainly intended to run MCMC chains that are a
+# sequence of multiple output files.  The intended use cases are: 1)
+# when you want to run a single MCMC chain by starting multiple jobs
+# in sequence without managing them by hand; or, 2) when you use a
+# cluster to run several of parallel chains and you want to continue
+# the chains as new queue slots become available.  The file naming
+# convention keeps track of the "parent" for each file, as well as the
+# order that the files are created.
+#
+# Details: This implements a naming convention to simplify running
+# several chains in parallel and picks the next job to process.  It
+# expects that all of the jobs are run in a single directory.  The
+# script works fine with a single chain, but is most useful with
+# running lots (and lots) of parallel chains.
+#
+# USAGE:
+#
+#   gundamContinue [-N] [-D output-directory] <basefile> -- <command>
+#
+#     Run <command> while replacing ":INPUT:" with an input filename
+#     and ":OUTPUT:" with the require output filename.
+#
+# OPTIONS:
+#
+#     -N -- Start a new chain.  If the base file doesn't exist, then
+#           :INPUT: will be set to "none" (which gundamFitter knows to
+#           handle as a special case).
+#
+#     -D <dir> -- Specify the directory that contains the output
+#           files.  This defaults to the directory containing the
+#           <basefile>.
+#
+#   Arguments:
+#
+#     <basefile> -- This is the name of a starting point for the
+#        chain.  It can be a file containing an MCMC chain generated
+#        by gundamFitter (i.e. containing the initial burn-in of the
+#        chain).  It is typically going to be named something like
+#        [prefix].root where the prefix is chosen by the user.  If the
+#        <basefile> exists, then it needs to be a valid GUNDAM output
+#        file.  If the <basefile> doesn't exist, then the basename is
+#        used as the prefix and the directory name provides the
+#        default output directory, and the input file is set to
+#        "none".  If the file doesn't exist, then the ".root"
+#        extension is optional.
+#
+#     <command> -- The command to be run.  This is everything after
+#        the first double dash ("--"), and should (usually) be a
+#        correct gundamFitter command line.  The final command line
+#        will be built by replacing ":INPUT:" with the intended input
+#        filename, and ":OUTPUT: for the intended output file name.
+#        The command must create the file named in :OUTPUT: or the
+#        command will be assumed to have failed.
+#
+# This is usually run as part of a batch job (e.g. in a slurm script),
+# but here is an example of how it might be run by hand.
+#
+# # Make three starting point files
+# $ gundamContinue -N SimpleMCMC.root -- \
+#        gundamFitter --gpu -t 16 -c config.yaml \
+#           -O /fitterEngineConfig/minimizerConfig/adaptiveRestore=:INPUT: \
+#           -o :OUTPUT:
+# $ gundamContinue -N SimpleMCMC.root -- \
+#        gundamFitter --gpu -t 16 -c config.yaml \
+#           -O /fitterEngineConfig/minimizerConfig/adaptiveRestore=:INPUT: \
+#           -o :OUTPUT:
+# $ gundamContinue -N SimpleMCMC.root -- \
+#        gundamFitter --gpu -t 16 -c config.yaml \
+#           -O /fitterEngineConfig/minimizerConfig/adaptiveRestore=:INPUT: \
+#           -o :OUTPUT:
+#
+# Run the three more times and continue the chains.  Notice the lack
+# of "-N" option to gundamContinue, and that the gundam command
+# remains unchanged.
+#
+# $ for i in 1 2 3; do
+# $   gundamContinue SimpleMCMC.root -- \
+#          gundamFitter --gpu -t 16 -c config.yaml \
+#             -O /fitterEngineConfig/minimizerConfig/adaptiveRestore=:INPUT: \
+#             -o :OUTPUT:
+# $ done
+#
+# This produced output like
+#
+# $ ls
+# SimpleMCMC_173a32_01_d3245f_c72d6f54_6b8553dd.closed.root
+# SimpleMCMC_173a32_02_93752a_6b8553dd_d3e878a8.open.root
+# SimpleMCMC_82f821_01_432b54_6db1a3aa_c34e97cb.closed.root
+# SimpleMCMC_82f821_02_feba42_c34e97cb_ffd79c45.open.root
+# SimpleMCMC_a34b52_01_973983_4800f386_4daeb417.closed.root
+# SimpleMCMC_a34b52_02_ae318f_4daeb417_abf3ef80.open.root
+# $
+#
+# The important part of the name is the prefix ("SimpleMCMC") which
+# comes from the name of the input file on the command line.  It's the
+# first input file for the chain.  The other important parts are the
+# first (hex) number which specifies the specific chain, and the
+# second (decimal) number which gives the epoch of the file.  The 00
+# epoch is used internally to specify the original input file
+# (i.e. SimpleMCMC.root), and is not saved.
+#
+# Depending on the number of steps in each file, and the input
+# configuration, epoch 01 might be treated as burn-in and the other
+# files (i.e. "*.closed.root" and "*.open.root") can be added together
+# to form a posterior distribution.  The rest of the name is there to
+# help with forensic debugging.
+#
+# The File naming convention is:
+#     <PREFIX>_<CHAIN>_<EPOCH>_<PARENT>_<CHILD>.<SUFFIX>
+#
+#  PREFIX -- based on what the user provides.  This is for different
+#       types of chains.
+#
+#  CHAIN -- A unique identifier for the chain.  This is created when
+#       the chain is started and will be copied to all files in the
+#       chain.
+#
+#  EPOCH -- The number of "epochs" between this file and the first
+#       file of the particular chain.  This has 2 characters (decimal)
+#
+#  PARENT -- The md5sum value for the parent file.  This is the file
+#       before the current file in the chain.  This has 8 characters (hex)
+#
+#  CHILD -- The md5sum value for this file.  This has 8 characters (hex)
+#
+#  SUFFIX -- One of
+#     .open.root    -- This is the last file in a chain and can be extended
+#     .closed.root  -- This is not the last file in a chain. Don't extend it
+#     .input.root   -- An file being used as input for a job.
+#     .running.root -- An output file being generated by a job
+#
+# When started, this will rename one "[blah].open.root" to
+# "[blah].closed.root" and link it to "[blah].input.root" and run the
+# job with output to "[blah].running.root".  When the job finishes
+# successfully "[blah].input.root" is removed and [blah].running.root
+# is renamed to "[blah].open.root".  If the job fails,
+# "[blah].closed.root" is renamed back to "[blah].open.root".
+#
+
+MAKE_NEW_FILE="maybe"
+
+usage () {
+    cat <<EOF
+USAGE:
+    $(basename $0) [-N] [-D output-directory] <basefile> -- <command>
+
+    Run <command> while replacing ":INPUT:" with an input filename
+    and ":OUTPUT:" with the require output filename.
+
+OPTIONS:
+    -N -- Start a new chain.  If the base file doesn't exist, then
+          :INPUT: will be set to "none" (which gundamFitter knows to
+          handle as a special case).
+    -D <dir> -- Specify the directory that contains the output
+          files.  This defaults to the directory containing the
+          <basefile>.
+    -h -- This message.
+
+ARGUMENTS:
+    <basefile> -- The basename of the files or the initial input file.
+    <command>  -- The command to be run.
+EOF
+}
+
+####################################
+# Make a (random) string that is unique to this job
+unique () {
+    if [ -x /usr/bin/uuidgen ] ; then
+        UNIQ=$(uuidgen | md5sum)
+    else
+        sleep 1
+        UNIQ=$(echo $(uname -a) $(date +%s%N) | md5sum)
+    fi
+    echo $(echo ${UNIQ} | cut -c 1-32)
+}
+
+#####################################
+# Handle any input options
+TEMP=$(getopt -o 'hND:' -n "$0" -- "$@")
+if [ $? -ne 0 ]; then
+    usage
+    echo
+    echo "ERROR: Bad command line"
+    exit 1
+fi
+eval set -- "$TEMP"
+unset TEMP
+while true; do
+    case "$1" in
+        # Force a new epoch 01 file to be started.
+        '-D')
+            shift
+            DIRECTORY=$(realpath $1)
+            shift
+            if [ ! -x ${DIRECTORY} ]; then
+                usage
+                echo
+                echo ERROR: Output directory does not exist.
+                exit 1
+            fi
+            continue;;
+        '-h')
+            usage
+            exit 0
+            continue;;
+	'-N')
+            echo Starting a new chain.
+            MAKE_NEW_FILE=yes
+	    shift
+	    continue;;
+	'--')
+	    shift
+	    break;
+    esac
+done
+
+#####################################
+# Get the base file name that provides the prefix.  It doesn't need to
+# exist, but if it does, then it provides the starting point for the
+# chain.
+if [ ${#1} -lt 1 ]; then
+    usage
+    echo
+    echo ERROR: The base name is missing.
+    exit 1
+fi
+BASEFILE=$1
+shift
+
+BASENAME=$(basename ${BASEFILE} | cut -d_ -f 1 | sed s/.root//)
+if [ ${#DIRECTORY} = 0 ]; then
+    DIRECTORY=$(realpath $(dirname ${BASEFILE}))
+fi
+
+####################################
+# Get the executable you want to run.  This is a good place to modify
+# and hardcode how the program is going to run (copy gundamContinue
+# to a new name).
+COMMAND="$*"
+
+if [ ${#COMMAND} -lt 2 ]; then
+    usage
+    echo
+    echo ERROR: A command must be provided
+    exit 1
+fi
+
+UNIQUE=$(unique)
+
+###################################
+# Find an input file to read.
+ORIGINAL=missing
+CLOSED=missing
+INPUT=missing
+while true; do
+    for file in $(find ${DIRECTORY} -maxdepth 1 -name "${BASENAME}_*.open.root" | sort -t_ -k3 ); do
+        if [ "x${MAKE_NEW_FILE}" == "xyes" ]; then
+            break
+        fi
+        # Use mv to see if we can become the "owner" of the file.
+        # This depends on linux mv being atomic for renaming files
+        # within a single directory.  That's a slightly dangerous
+        # assumption on distributed file systems, so this sleeps for a
+        # moment after the move to try and let things stabilize.
+        TRY=$(dirname ${file})/${UNIQUE}$(basename ${file})
+        mv ${file} ${TRY} || true
+        # Pause a moment
+        sleep 1
+        # Check if we got the file.  If we did, then move the "open"
+        # input file to "closed" so it's marked as having been used.
+        if [ -f ${TRY} ]; then
+            ORIGINAL=${file}
+            CLOSED=$(echo ${file} | sed s/.open.root/.closed.root/)
+            mv ${TRY} ${CLOSED}
+            break
+        fi
+    done
+    if [ -f ${CLOSED} ]; then
+        # The input file was found, so all is good.
+        break
+    fi
+    echo Check if we should make a new chain
+    if [ "x${MAKE_NEW_FILE}" != "xno" ]; then
+        echo No file to continue.  Try to make a new chain.
+        MAKE_NEW_FILE=yes
+    fi
+    # There isn't an existing open chain file.  Check if we can make a
+    # new one or exit with an error.
+    if [ "x${MAKE_NEW_FILE}" != "xyes" ]; then
+        echo You need to run this with -N first, or jobs need to finish.
+        exit 1
+    fi
+    echo Making a new chain
+    # Only one try at making a new chain.
+    MAKE_NEW_FILE=no
+    # Link the base file into an "open file" with epoch zero and try
+    # again.  The base should be named "${PREFIX}[.root]".  If the
+    # name contains "_" everything before the first one will become
+    # the prefix.
+    PREFIX=${DIRECTORY}/${BASENAME}
+    CHAIN=$(echo ${UNIQUE} | cut -c 1-8)
+    if [ -f ${BASEFILE} ]; then
+        # The basefile names an actual file, so link it to the "open" file.
+        BASE=$(md5sum ${BASEFILE} | cut -c 1-6)
+        NEWFILE=${PREFIX}_${CHAIN}_00_00000000_${BASE}.open.root
+        ln -s $(realpath ${BASEFILE}) ${NEWFILE}
+    else
+        # The basefile doesn't exist so it is just providing a prefix.
+        # Create an empty "open" file and flag it as fake.
+        FAKEFILE="yes"
+        BASEFILE=""
+        BASE=$(echo ${UNIQUE} | cut -c 1-6)
+        NEWFILE=${PREFIX}_${CHAIN}_00_00000000_${BASE}.open.root
+        touch ${NEWFILE}
+    fi
+    # Don't loop quickly.  A new "open" chain has been created by
+    # either linking to the basefile, or creating a new fake chain
+    # using touch.  Sleep before looking for the open chain in case
+    # this is running on a distributed file system which might take a
+    # "few milliseconds" to exchange the updated state.
+    sleep 1
+done
+
+# A sanity check.
+if [ ! -f ${CLOSED} ]; then
+    echo "The input file ${CLOSED} is missing!?!"
+    exit 1
+fi
+
+################################################
+# Parse the fields in the input file name
+PREFIX=$(echo ${CLOSED} | cut -d_ -f 1)
+CHAIN=$(echo ${CLOSED} | cut -d_ -f 2)
+OLDEPOCH=$(echo ${CLOSED} | cut -d_ -f 3)
+GRANDPARENT=$(echo ${CLOSED} | cut -d_ -f 4)
+PARENT=$(echo ${CLOSED} | cut -d_ -f 5 | sed s/\\..*//g )
+
+# Check the that input file is properly named!
+CHECK=${PREFIX}_${CHAIN}_${OLDEPOCH}_${GRANDPARENT}_${PARENT}
+if [ ! -f ${CHECK}.closed.root ]; then
+    echo Problem with input file: ${CLOSED}
+    echo Parsed fields: ${CHECK}
+    echo From original file: ${ORIGINAL}
+    exit 1
+fi
+
+################################################
+# Generate the location of the temporary input file.
+INPUT=$(echo ${CLOSED} | sed s/.closed.root/.input.root/)
+
+# Link the final (closed) location to the temporary input name
+if [ -f ${CLOSED} ]; then
+    ln -s ${CLOSED} ${INPUT}
+fi
+
+# Check if the input file is a real file and remove it if it isn't
+if [ "x${FAKEFILE}" = "xyes" ]; then
+    rm ${CLOSED}
+    rm ${INPUT}
+    INPUT="none"
+fi
+
+# Generate the new epoch for the file.
+NEWEPOCH=$(printf %2.2d $(( $(echo ${OLDEPOCH} | sed s/0*//) + 1)) )
+
+# Make the temporary name for the running file
+RUNNING=${PREFIX}_${CHAIN}_${NEWEPOCH}_${PARENT}_XXXXXXXX.running.root
+
+echo "#####################################################"
+echo "I/O Directory:   " $(dirname ${RUNNING})
+echo "Original file:   " $(basename ${ORIGINAL})
+echo "Temporary input: " $(basename ${INPUT})
+echo "Temporary output:" $(basename ${RUNNING})
+COMMAND_LINE=$(echo "${COMMAND}" | \
+                   sed s%:INPUT:%${INPUT}%g | \
+                   sed s%:OUTPUT:%${RUNNING}%g)
+echo "Raw Command:     " ${COMMAND}
+echo "Expanded Command:" ${COMMAND_LINE}
+echo "Current path:    " $(realpath ${PWD})
+echo "Start time:      " $(date)
+echo "#####################################################"
+
+#################################################
+# Run the job!  Don't let it fail
+time ${COMMAND_LINE} || ([ -f ${RUNNING} ] && rm ${RUNNING})
+
+echo "#####################################################"
+echo "End time:        " $(date)
+
+# Check if the output file was generated.  If there was no output,
+# then reopen the "closed" input file.
+if [ ! -f ${RUNNING} ]; then
+    echo ERROR: Job failed to create output file.
+    echo Missing output file: ${RUNNING}
+    echo Original file: ${ORIGINAL}
+    if [ -f ${INPUT} ]; then
+        rm ${INPUT}
+    fi
+    # Move the closed file back to the original file name (but don't
+    # overwrite original if it exists.
+    if [ ! -f ${ORIGINAL} -a -f ${CLOSED} ]; then
+        mv ${CLOSED} ${ORIGINAL}
+    fi
+    echo ERROR: Exit with failed status
+    exit 1
+fi
+
+# Find the checksum value for the new file
+CHILD=$(md5sum ${RUNNING} | cut -c 1-6)
+
+# Make the final name for the file that was just run.
+OPEN=${PREFIX}_${CHAIN}_${NEWEPOCH}_${PARENT}_${CHILD}.open.root
+echo "New file:        " ${OPEN}
+
+# Move the temporary output file to it's final file name.
+mv ${RUNNING} ${OPEN}
+
+# Remove the temporary input file
+if [ -f ${INPUT} ]; then
+    rm ${INPUT}
+fi

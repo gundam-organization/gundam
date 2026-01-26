@@ -1,0 +1,115 @@
+/* Common button styles (Cayman theme colors) */
+.back-button, .next-button, .top-button {
+  position: fixed;
+  padding: 10px 15px;
+  background-color: #157878; /* Cayman primary color */
+  color: white;
+  border-radius: 3px;
+  font-family: 'Open Sans', sans-serif;
+  font-size: 14px;
+  text-decoration: none;
+  border: 1px solid transparent;
+  transition: background-color 0.3s ease, border-color 0.3s ease;
+}
+
+/* Positioning the buttons */
+.back-button {
+  bottom: 20px;
+  left: 20px;
+}
+
+.next-button {
+  bottom: 20px;
+  right: 120px; /* Adjust to avoid overlapping the top button */
+  display: none; /* Hidden initially */
+}
+
+.top-button {
+  display: none; /* Hidden until scroll event */
+  bottom: 20px;
+  right: 20px;
+}
+
+/* Adding arrows using ::before pseudo-element */
+
+/* Back button with left arrow */
+.back-button::before {
+  content: "← "; /* Left arrow */
+  margin-right: 5px;
+}
+
+/* Next button with right arrow */
+.next-button::before {
+  content: "→ "; /* Right arrow */
+  margin-left: 5px;
+}
+
+/* Top button with up arrow */
+.top-button::before {
+  content: "↑ "; /* Up arrow */
+  margin-right: 5px;
+}
+
+/* Hover effects */
+.back-button:hover, .next-button:hover, .top-button:hover {
+  background-color: #0d5959; /* Darker hover color */
+  border-color: #0d5959;
+}
+
+/* Arrow for the header title to indicate collapsibility */
+.header-title::after {
+  content: "▼"; /* Down arrow */
+  float: right;
+  margin-left: 10px;
+  font-size: 1rem;
+  color: #0d5959; /* Primary color for links */
+}
+
+/* Change arrow direction when content is expanded */
+.header-title.collapsed::after {
+  content: "▲"; /* Up arrow */
+  color: #0d5959; /* Primary color for links */
+}
+
+/* Collapsible headers */
+.collapsible-header {
+  list-style: none; /* Remove default bullet points */
+  margin: 0 0 10px 0; /* Adjust margin for spacing between collapsible headers */
+  padding: 0; /* Ensure consistent padding */  
+}
+
+/* Header title styling with larger font */
+.header-title {
+  cursor: pointer;
+  color: #0366d6; /* Primary color for links */
+  padding-left: 0; /* Remove padding for a cleaner look */
+  font-family: 'Open Sans', sans-serif;
+  border-radius: 3px;
+  margin: 0; /* Remove margins for compact headers */
+  border: none;
+  font-size: 1.1rem; /* Increase font size for the header */
+  transition: color 0.3s ease; /* Optional color transition */
+  text-decoration: none; /* Remove any default link decoration */
+}
+
+/* Optional hover effect for the header */
+.header-title:hover {
+  color: #157878; /* Darker hover color */
+}
+
+/* Collapsible content container with larger font */
+.header-content {
+  height: 0; /* Initially collapsed */
+  overflow: hidden; /* Hide overflowing content */
+  transition: height 0.3s ease-out; /* Smooth height transition */
+  padding-left: 20px; /* Indent content to match sub-list style */
+  margin: 5px 0; /* Adjust margin for spacing */
+  font-family: 'Open Sans', sans-serif;
+  font-size: 1rem; /* Increase font size for the content */
+}
+
+/* Content within the collapsible section with larger font */
+.header-content p {
+  margin: 5px 0; /* Adjust margin for paragraphs */
+  font-size: 1rem; /* Larger font size for paragraphs inside collapsible content */
+}

@@ -61,58 +61,6 @@ protected:
     GenericToolbox::VariablesMonitor convergenceMonitor;
 
     std::unique_ptr<TTree> historyTree{nullptr};
-
-    struct GradientDescentMonitor{
-      bool isEnabled{false};
-
-      struct ValueDefinition{
-        std::string name{};
-        std::function<double(const MinimizerBase* this_)> getValueFct{};
-
-        ValueDefinition(const std::string& name_, const std::function<double(const MinimizerBase* this_)>& getValueFct_){
-          name = name_;
-          getValueFct = getValueFct_;
-        }
-      };
-      std::vector<ValueDefinition> valueDefinitionList{};
-
-      struct StepPoint{
-        JsonType parState;
-        double fitCallNb{0};
-        std::vector<double> valueMonitorList{}; // .size() = valueDefinitionList.size()
-      };
-      std::vector<StepPoint> stepPointList{};
-
-      void addStep(const MinimizerBase* this_){
-        stepPointList.emplace_back();
-        stepPointList.back().valueMonitorList.reserve( valueDefinitionList.size() );
-        fillLastStep(this_);
-      }
-      void fillLastStep(const MinimizerBase* this_){
-        stepPointList.back().parState = this_->getModelPropagator().getParametersManager().exportParameterInjectorConfig();
-        stepPointList.back().fitCallNb = this_->getMonitor().nbEvalLikelihoodCalls;
-        for( auto& valueDefinition : valueDefinitionList ){
-          stepPointList.back().valueMonitorList.emplace_back( valueDefinition.getValueFct(this_) );
-        }
-      }
-
-      [[nodiscard]] int getValueIndex(const std::string& name_) const {
-        int idx = GenericToolbox::findElementIndex(name_, valueDefinitionList, [](const ValueDefinition& elm){ return elm.name; });
-        LogThrowIf(idx == -1, "Could not find element " << name_);
-        return idx;
-      }
-      [[nodiscard]] double getLastStepValue(const std::string& name_) const {
-        LogThrowIf(stepPointList.empty());
-        return stepPointList.back().valueMonitorList[getValueIndex(name_)];
-      }
-      [[nodiscard]] double getLastStepDeltaValue(const std::string& name_) const {
-        if( stepPointList.size() < 2 ){ return 0; }
-        auto idx = getValueIndex(name_);
-        return stepPointList[stepPointList.size()-2].valueMonitorList[idx] - stepPointList.back().valueMonitorList[idx];
-      }
-
-    };
-    GradientDescentMonitor gradientDescentMonitor{};
   };
 
 public:
@@ -157,9 +105,24 @@ public:
   [[nodiscard]] int getMinimizerStatus() const { return _minimizerStatus_; }
   void setMinimizerStatus(int s) {_minimizerStatus_ = s;}
 
+  /// Define the type of validity that needs to be required by
+  /// hasValidParameterValues.  This accepts a string with the possible values
+  /// being:
+  ///
+  ///  "range"           -- Between the parameter minimum and maximum values.
+  ///  "norange"         -- Do not require parameters in the valid range
+  ///  "mirror"          -- Between the mirrored values (if parameter has
+  ///                       mirroring).
+  ///  "nomirror"        -- Do not require parameters in the mirrored range
+  ///  "physical"        -- Only physically meaningful values.
+  ///  "nophysical"      -- Do not require parameters in the physical range.
+  ///
+  /// Example: setParameterValidity("range,mirror,physical")
+  void setParameterValidity(const std::string& validity);
+
   // mutable getters
   Monitor& getMonitor(){ return _monitor_; }
-  [[nodiscard]] const Monitor& getMonitor() const { return _monitor_; }
+  [[nodiscard]] auto& getMonitor() const { return _monitor_; }
 
   // core
   void printParameters();
@@ -169,7 +132,7 @@ public:
 protected:
   /// Get a reference to the FitterEngine that owns this minimizer.
   FitterEngine& getOwner() { return *_owner_; }
-  [[nodiscard]] const FitterEngine& getOwner() const { return *_owner_; }
+  [[nodiscard]] auto& getOwner() const { return *_owner_; }
 
   // Get the propagator being used to calculate the likelihood.  This is a
   // local convenience function to get the propagator from the owner.
@@ -199,11 +162,14 @@ protected:
   bool useNormalizedFitSpace() const {return _useNormalizedFitSpace_;}
   int* getNbFreeParametersPtr() {return &_nbFreeParameters_;}
 
+protected:
+  std::vector<Parameter*> _minimizerParameterPtrList_{};
+  Monitor _monitor_{};
+
 private:
   /// Save a copy of the address of the engine that owns this object.
   FitterEngine* _owner_{nullptr};
 
-  std::vector<Parameter*> _minimizerParameterPtrList_{};
   int _minimizerStatus_{-1}; // -1: invalid, 0: success, >0: errors
   int _nbFreeParameters_{0};
 
@@ -212,7 +178,17 @@ private:
   bool _useNormalizedFitSpace_{true};
   bool _checkParameterValidity_{false};
   bool _isEnabledCalcError_{true};
-  Monitor _monitor_{};
+
+  /// Define what sort of validity the parameters have to have for a finite
+  /// likelihood.  The "range" value means that the parameter needs to be
+  /// between the allowed minimum and maximum values for the parameter.  The
+  /// "mirror" value means that the parameter needs to be between the mirror
+  /// bounds too.  The specific definitions (and the default) is defined by
+  /// Parameter.
+  std::string _likelihoodValidity_{""};
+
+  // output
+  bool _writeLlhHistory_{false};
 
 };
 

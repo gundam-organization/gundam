@@ -27,6 +27,6 @@ OUTPUT_FILE=${DATA_DIR}/${BASE}.root
 echo ${OUTPUT_FILE}
 echo ${CONFIG_FILE}
 
-gundamFitter -t 1 -s 10000 -c ${CONFIG_FILE} -o ${OUTPUT_FILE}
+time gundamFitter -t 1 -s 10000 -c ${CONFIG_FILE} -o ${OUTPUT_FILE}
 
 # End of the script

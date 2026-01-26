@@ -1,6 +1,7 @@
 set( LIB_NAME GundamDialDictionary )
 
 set( SRCFILES
+    DialEngine/src/DialManager.cpp
     DialEngine/src/DialInputBuffer.cpp
     DialEngine/src/DialInterface.cpp
     DialEngine/src/DialResponseSupervisor.cpp
@@ -8,13 +9,15 @@ set( SRCFILES
     DialEngine/src/EventDialCache.cpp
 
     # DialDefinitions
+    DialDefinitions/src/DialUtils.cpp
     DialDefinitions/src/DialBase.cpp
 
-    DialDefinitions/src/Graph.cpp
-    DialDefinitions/src/LightGraph.cpp
+    DialDefinitions/src/Kriged.cpp
 
-    DialDefinitions/src/Spline.cpp
-    DialDefinitions/src/SimpleSpline.cpp
+    DialDefinitions/src/RootGraph.cpp
+    DialDefinitions/src/Graph.cpp
+
+    DialDefinitions/src/RootSpline.cpp
     DialDefinitions/src/GeneralSpline.cpp
     DialDefinitions/src/UniformSpline.cpp
     DialDefinitions/src/CompactSpline.cpp
@@ -26,14 +29,9 @@ set( SRCFILES
     DialDefinitions/src/RootFormula.cpp
     DialDefinitions/src/Polynomial.cpp
 
-
     # DialFactories
-    DialFactories/src/DialBaseFactory.cpp
-    DialFactories/src/NormDialBaseFactory.cpp
-    DialFactories/src/GraphDialBaseFactory.cpp
-    DialFactories/src/SplineDialBaseFactory.cpp
-    DialFactories/src/SurfaceDialBaseFactory.cpp
     DialFactories/src/TabulatedDialFactory.cpp
+    DialFactories/src/KrigedDialFactory.cpp
     )
 
 set( HEADERS
@@ -49,12 +47,12 @@ set( HEADERS
     DialDefinitions/include/Norm.h
     DialDefinitions/include/Shift.h
     DialDefinitions/include/Tabulated.h
+    DialDefinitions/include/Kriged.h
 
+    DialDefinitions/include/RootGraph.h
     DialDefinitions/include/Graph.h
-    DialDefinitions/include/LightGraph.h
 
-    DialDefinitions/include/Spline.h
-    DialDefinitions/include/SimpleSpline.h
+    DialDefinitions/include/RootSpline.h
     DialDefinitions/include/GeneralSpline.h
     DialDefinitions/include/UniformSpline.h
     DialDefinitions/include/CompactSpline.h
@@ -66,12 +64,8 @@ set( HEADERS
     DialDefinitions/include/Polynomial.h
 
     # DialFactories
-    DialFactories/include/DialBaseFactory.h
-    DialFactories/include/NormDialBaseFactory.h
-    DialFactories/include/GraphDialBaseFactory.h
-    DialFactories/include/SplineDialBaseFactory.h
-    DialFactories/include/SurfaceDialBaseFactory.h
     DialFactories/include/TabulatedDialFactory.h
+    DialFactories/include/KrigedDialFactory.h
     )
 
 if( USE_STATIC_LINKS )

@@ -8,9 +8,8 @@
 
 
 
-void VariableCollection::setVarNameList( const std::shared_ptr<std::vector<std::string>> &nameListPtr_ ){
-  LogThrowIf(nameListPtr_ == nullptr, "Invalid commonNameListPtr_ provided.");
-  _nameListPtr_ = nameListPtr_;
+void VariableCollection::setVarNameList( const std::vector<std::string> &nameListPtr_ ){
+  _nameListPtr_ = &nameListPtr_;
   _varList_.clear();
   _varList_.resize(_nameListPtr_->size());
 }
@@ -22,6 +21,7 @@ int VariableCollection::findVarIndex( const std::string& leafName_, bool throwIf
   return out;
 }
 const VariableHolder& VariableCollection::fetchVariable( const std::string& name_) const{
+  LogThrowIf(name_.empty(), "Can't fetch variable with empty name.");
   int index = this->findVarIndex(name_, true);
   return _varList_[index];
 }

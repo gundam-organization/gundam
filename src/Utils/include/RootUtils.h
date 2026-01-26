@@ -31,7 +31,7 @@ namespace RootUtils{
   // template impl
   template<typename T> bool ObjectReader::readObject( TDirectory* f_, const std::vector<std::string>& objPathList_, const std::function<void(T*)>& action_ ){
     using namespace GenericToolbox::ColorCodes;
-    T* obj;
+    T* obj{nullptr};
     for( auto& objPath : objPathList_ ){
       obj = f_->Get<T>(objPath.c_str());
       if( obj != nullptr ){ break; }

@@ -15,11 +15,13 @@ class Shift : public DialBase {
 public:
   Shift() = default;
 
+  // mandatory overrides
   [[nodiscard]] std::unique_ptr<DialBase> clone() const override { return std::make_unique<Shift>(*this); }
   [[nodiscard]] std::string getDialTypeName() const override { return {"Shift"}; }
   [[nodiscard]] double evalResponse(const DialInputBuffer& input_) const override { return _shiftValue_; }
 
-  void buildDial(double shift_, const std::string& options_="") override { _shiftValue_ = shift_; }
+  // setters
+  void setShiftValue(double shift_){ _shiftValue_ = shift_; }
 
 private:
   double _shiftValue_{1};

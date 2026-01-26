@@ -36,7 +36,6 @@ void DataDispenserCache::clear(){
   sampleEventListPtrToFill.clear();
 
   varsRequestedForIndexing.clear();
-  varsRequestedForStorage.clear();
   varToLeafDict.clear();
 
   varsToOverrideList.clear();
@@ -44,11 +43,6 @@ void DataDispenserCache::clear(){
 void DataDispenserCache::addVarRequestedForIndexing(const std::string& varName_) {
   LogThrowIf(varName_.empty(), "no var name provided.");
   GenericToolbox::addIfNotInVector(varName_, this->varsRequestedForIndexing);
-}
-void DataDispenserCache::addVarRequestedForStorage(const std::string& varName_){
-  LogThrowIf(varName_.empty(), "no var name provided.");
-  GenericToolbox::addIfNotInVector(varName_, this->varsRequestedForStorage);
-  this->addVarRequestedForIndexing(varName_);
 }
 
 

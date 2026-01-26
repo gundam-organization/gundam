@@ -41,12 +41,12 @@ namespace JointProbability{
 namespace JointProbability{
 
   // JointProbabilityPlugin
-  void PluginJointProbability::configureImpl(){
-    GenericToolbox::Json::fillValue(_config_, llhPluginSrc, "llhPluginSrc");
-    GenericToolbox::Json::fillValue(_config_, llhSharedLib, "llhSharedLib");
+  inline void PluginJointProbability::configureImpl(){
+    _config_.fillValue(llhPluginSrc, "llhPluginSrc");
+    _config_.fillValue(llhSharedLib, "llhSharedLib");
   }
 
-  void PluginJointProbability::initializeImpl(){
+  inline void PluginJointProbability::initializeImpl(){
     if( not llhSharedLib.empty()) this->load();
     else if( not llhPluginSrc.empty()){
       this->compile();
@@ -55,14 +55,14 @@ namespace JointProbability{
     else{ LogThrow("Can't initialize JointProbabilityPlugin without llhSharedLib nor llhPluginSrc."); }
   }
 
-  double PluginJointProbability::eval(double data_, double pred_, double err_, int bin_) const {
+  inline double PluginJointProbability::eval(double data_, double pred_, double err_, int bin_) const {
     LogThrowIf(evalFcn == nullptr, "Library not loaded properly.");
     return reinterpret_cast<double (*)( double, double, double )>(evalFcn)(
         data_, pred_, err_
     );
   }
 
-  void PluginJointProbability::compile(){
+  inline void PluginJointProbability::compile(){
     LogInfo << "Compiling: " << llhPluginSrc << std::endl;
     llhSharedLib = GenericToolbox::replaceExtension(llhPluginSrc, "so");
 
@@ -73,7 +73,7 @@ namespace JointProbability{
     LogThrowIf(system(ss.str().c_str()) != 0, "Compile command failed.");
   }
 
-  void PluginJointProbability::load(){
+  inline void PluginJointProbability::load(){
     LogInfo << "Loading shared lib: " << llhSharedLib << std::endl;
     fLib = dlopen(llhSharedLib.c_str(), RTLD_LAZY);
     LogThrowIf(fLib == nullptr, "Cannot open library: " << dlerror());

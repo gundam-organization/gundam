@@ -12,10 +12,15 @@
 
 
 void EventVarTransformLib::configureImpl(){
+  _config_.clearFields();
   this->EventVarTransform::configureImpl();
-  GenericToolbox::Json::fillValue(_config_, _libraryFile_, "libraryFile");
+  _config_.defineFields({{"libraryFile"}});
+  _config_.fillValue(_libraryFile_, "libraryFile");
 }
 void EventVarTransformLib::initializeImpl(){
+
+  _config_.printUnusedKeys();
+
   LogInfo << "Loading variable transformation: " << _name_ << std::endl;
   LogThrowIf(_outputVariableName_.empty(), "output variable name not set.");
 
@@ -44,6 +49,7 @@ void EventVarTransformLib::initInputFormulas(){
   _inputBuffer_.resize(_inputFormulaList_.size(), std::nan("unset"));
 }
 double EventVarTransformLib::evalTransformation( const Event& event_, std::vector<double>& inputBuffer_) const{
+  std::lock_guard<std::mutex> guard(GundamGlobals::getGlobalMutEx());
   // Eval the requested variables
   size_t nFormula{_inputFormulaList_.size()};
   for( size_t iFormula = 0 ; iFormula < nFormula ; iFormula++ ){

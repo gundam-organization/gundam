@@ -23,19 +23,21 @@ protected:
 
 public:
   // setters
-  void setParameterSetListConfig(const JsonType& parameterSetListConfig_){ _parameterSetListConfig_ = parameterSetListConfig_; }
+  void setParameterSetListConfig(const ConfigReader& parameterSetListConfig_){ _parameterSetListConfig_ = parameterSetListConfig_; }
   void setReThrowParSetIfOutOfPhysical(bool reThrowParSetIfOutOfPhysical_){ _reThrowParSetIfOutOfPhysical_ = reThrowParSetIfOutOfPhysical_; }
   void setThrowToyParametersWithGlobalCov(bool throwToyParametersWithGlobalCov_){ _throwToyParametersWithGlobalCov_ = throwToyParametersWithGlobalCov_; }
   void setGlobalCovarianceMatrix(const std::shared_ptr<TMatrixD> &globalCovarianceMatrix){ _globalCovarianceMatrix_ = globalCovarianceMatrix; }
 
   // const getters
-  [[nodiscard]] const std::shared_ptr<TMatrixD> &getGlobalCovarianceMatrix() const{ return _globalCovarianceMatrix_; }
-  [[nodiscard]] const std::shared_ptr<TMatrixD> &getStrippedCovarianceMatrix() const{ return _strippedCovarianceMatrix_; }
-  [[nodiscard]] const std::vector<ParameterSet> &getParameterSetsList() const{ return _parameterSetList_; }
+  [[nodiscard]] auto& getGlobalCovarianceMatrix() const{ return _globalCovarianceMatrix_; }
+  [[nodiscard]] auto& getStrippedCovarianceMatrix() const{ return _strippedCovarianceMatrix_; }
+  [[nodiscard]] auto& getParameterSetsList() const{ return _parameterSetList_; }
 
   // getters
-  std::shared_ptr<TMatrixD> &getGlobalCovarianceMatrix(){ return _globalCovarianceMatrix_; }
-  std::vector<ParameterSet> &getParameterSetsList(){ return _parameterSetList_; }
+  auto& getGlobalCovarianceMatrix(){ return _globalCovarianceMatrix_; }
+  auto& getParameterSetsList(){ return _parameterSetList_; }
+  auto& getParameterSetListConfig(){ return _parameterSetListConfig_; }
+  auto& getThrowToyParametersWithGlobalCov(){ return _throwToyParametersWithGlobalCov_; }
 
   // const core
   [[nodiscard]] std::string getParametersSummary( bool showEigen_ = true ) const;
@@ -81,7 +83,7 @@ private:
   // config
   bool _reThrowParSetIfOutOfPhysical_{true};
   bool _throwToyParametersWithGlobalCov_{false};
-  JsonType _parameterSetListConfig_{};
+  ConfigReader _parameterSetListConfig_{};
 
   // internals
   std::vector<ParameterSet> _parameterSetList_{};

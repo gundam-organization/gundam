@@ -5,28 +5,53 @@
 #include "CacheManager.h"
 #endif
 
-
 #include "Logger.h"
-
 
 void MinimizerBase::configureImpl(){
 
+  _config_.defineFields({
+    {"monitorRefreshRateInMs"},
+    {"showParametersOnFitMonitor"},
+    {"maxNbParametersPerLineOnMonitor"},
+    {"enablePostFitErrorFit"},
+    {"useNormalizedFitSpace"},
+    {"writeLlhHistory"},
+    {"likelihoodValidity"},
+    {"checkParameterValidity"},
+  });
+
   // nested objects first
   int monitorRefreshRateInMs(5000);
-  GenericToolbox::Json::fillValue(_config_, monitorRefreshRateInMs, "monitorRefreshRateInMs");
+  _config_.fillValue(monitorRefreshRateInMs, "monitorRefreshRateInMs");
   // slow down the refresh rate if in batch mode
   monitorRefreshRateInMs *= ( GenericToolbox::getTerminalWidth() != 0 ? 1 : 10 );
   _monitor_.convergenceMonitor.setMaxRefreshRateInMs( monitorRefreshRateInMs );
 
   // members
-  GenericToolbox::Json::fillValue(_config_, _monitor_.showParameters, "showParametersOnFitMonitor");
-  GenericToolbox::Json::fillValue(_config_, _monitor_.maxNbParametersPerLine, "maxNbParametersPerLineOnMonitor");
-  GenericToolbox::Json::fillValue(_config_, _isEnabledCalcError_, "enablePostFitErrorFit");
-  GenericToolbox::Json::fillValue(_config_, _useNormalizedFitSpace_, "useNormalizedFitSpace");
+  _config_.fillValue(_monitor_.showParameters, "showParametersOnFitMonitor");
+  _config_.fillValue(_monitor_.maxNbParametersPerLine, "maxNbParametersPerLineOnMonitor");
+  _config_.fillValue(_isEnabledCalcError_, "enablePostFitErrorFit");
+  _config_.fillValue(_useNormalizedFitSpace_, "useNormalizedFitSpace");
+  _config_.fillValue(_writeLlhHistory_, "writeLlhHistory");
 
+  // Define what sort of validity the parameters have to have for a finite
+  // likelihood.  The "range" value means that the parameter needs to be
+  // between the allowed minimum and maximum values for the parameter.  The
+  // "mirror" value means that the parameter needs to be between the mirror
+  // bounds too.  The "physical" value means that the parameter has to be in
+  // the physically allowed range.
+  _config_.fillValue(_likelihoodValidity_, "likelihoodValidity");
+
+  // Determine if the validity will be checked when the function is evaluated.
+  // This must be true for the likelihoodValidity checks to be applied.
+  _config_.fillValue(_checkParameterValidity_, "checkParameterValidity");
 }
+
 void MinimizerBase::initializeImpl(){
-  LogWarning << "Initializing MinimizerBase..." << std::endl;
+
+  _config_.printUnusedKeys();
+
+  LogInfo << "Initializing MinimizerBase..." << std::endl;
 
   LogThrowIf(_owner_ == nullptr, "FitterEngine owner not set.");
 
@@ -37,16 +62,15 @@ void MinimizerBase::initializeImpl(){
     for( auto& par : parSet.getEffectiveParameterList() ){
       if( par.isEnabled() and not par.isFixed() ) {
         _minimizerParameterPtrList_.emplace_back( &par );
-        if( par.isFree() ){ _nbFreeParameters_++; }
+        if( par.isFree() and not par.isFrozen() ){ _nbFreeParameters_++; }
       }
     }
   }
   LogInfo << "Nb minimizer parameters: " << _minimizerParameterPtrList_.size() << std::endl;
 
-  if( not GundamGlobals::isLightOutputMode() ){
-    _monitor_.historyTree = std::make_unique<TTree>( "chi2History", "chi2History");
+  if( not GundamGlobals::isLightOutputMode() and _writeLlhHistory_ ){
+    _monitor_.historyTree = std::make_unique<TTree>( "llhHistory", "llhHistory");
     _monitor_.historyTree->SetDirectory( nullptr ); // will be saved later
-    _monitor_.historyTree->Branch("nbEvalLikelihoodCalls", &_monitor_.nbEvalLikelihoodCalls);
     _monitor_.historyTree->Branch("totalLikelihood", &getLikelihoodInterface().getBuffer().totalLikelihood);
     _monitor_.historyTree->Branch("statLikelihood", &getLikelihoodInterface().getBuffer().statLikelihood);
     _monitor_.historyTree->Branch("penaltyLikelihood", &getLikelihoodInterface().getBuffer().penaltyLikelihood);
@@ -66,29 +90,11 @@ void MinimizerBase::initializeImpl(){
   _monitor_.convergenceMonitor.addVariable("Stat");
   _monitor_.convergenceMonitor.addVariable("Syst");
 
-  if( _monitor_.gradientDescentMonitor.isEnabled ){
-    _monitor_.convergenceMonitor.defineNewQuantity({ "LastStep", "Last step descent", [&](GenericToolbox::VariableMonitor& v){
-      return GenericToolbox::parseUnitPrefix(_monitor_.gradientDescentMonitor.getLastStepDeltaValue(v.getName()), 8); }
-    });
-    _monitor_.convergenceMonitor.addDisplayedQuantity("LastStep");
-    _monitor_.convergenceMonitor.getQuantity("LastStep").title = "Last step descent";
+  // Set how the parameter values are handled (outside of different validity
+  // ranges)
+  this->setParameterValidity( _likelihoodValidity_ );
 
-    _monitor_.gradientDescentMonitor.valueDefinitionList.emplace_back(
-        "Total/dof", [](const MinimizerBase* this_){ return this_->getLikelihoodInterface().getLastLikelihood() / this_->fetchNbDegreeOfFreedom(); }
-    );
-    _monitor_.gradientDescentMonitor.valueDefinitionList.emplace_back(
-        "Total", [](const MinimizerBase* this_){ return this_->getLikelihoodInterface().getBuffer().totalLikelihood; }
-    );
-    _monitor_.gradientDescentMonitor.valueDefinitionList.emplace_back(
-        "Stat", [](const MinimizerBase* this_){ return this_->getLikelihoodInterface().getBuffer().statLikelihood; }
-    );
-    _monitor_.gradientDescentMonitor.valueDefinitionList.emplace_back(
-        "Syst", [](const MinimizerBase* this_){ return this_->getLikelihoodInterface().getBuffer().penaltyLikelihood; }
-    );
-  }
-
-
-  LogWarning << "MinimizerBase initialized." << std::endl;
+  LogInfo << "MinimizerBase initialized." << std::endl;
 }
 
 void MinimizerBase::minimize(){
@@ -115,12 +121,14 @@ void MinimizerBase::minimize(){
           << "Number of degree of freedom: " << fetchNbDegreeOfFreedom()
           << std::endl;
 
-  LogWarning << std::endl << GenericToolbox::addUpDownBars("Calling minimize()...") << std::endl;
+  LogInfo << std::endl << GenericToolbox::addUpDownBars("Calling minimize()...") << std::endl;
 }
+
 void MinimizerBase::calcErrors(){
   /// A virtual method that is called by the FiterEngine to calculate the
   /// errors at best fit point. By default it does nothing.
 }
+
 void MinimizerBase::scanParameters(TDirectory* saveDir_){
   /// A virtual method that by default scans the parameters used by the minimizer.
   /// This provides a view of the parameters seen by the minimizer, which may
@@ -130,6 +138,7 @@ void MinimizerBase::scanParameters(TDirectory* saveDir_){
   LogThrowIf( not isInitialized() );
   for( auto& parPtr : _minimizerParameterPtrList_ ) { getParameterScanner().scanParameter( *parPtr, saveDir_ ); }
 }
+
 double MinimizerBase::evalFit( const double* parArray_ ){
 /// The main access is through the evalFit method which takes an array of
 /// floating point values and returns the likelihood. The meaning of the
@@ -141,7 +150,7 @@ double MinimizerBase::evalFit( const double* parArray_ ){
 
   // Check the fit parameter values.  Do this first so that the parameters
   // don't change when a bad set of values is tried with evalFit.  This will
-  // only be enabled if the derived class has requested it.
+  // only be enabled if it is requested.
   if (_checkParameterValidity_) {
     const double* v = parArray_;
     for( auto* par : _minimizerParameterPtrList_ ){
@@ -149,6 +158,9 @@ double MinimizerBase::evalFit( const double* parArray_ ){
       if (_useNormalizedFitSpace_) val = ParameterSet::toRealParValue(val,*par);
       if (par->isValidValue(val)) continue;
       _monitor_.evalLlhTimer.stop();
+      /// A "Really Big Number".  This needs to be an appropriate value to
+      /// safely represent an impossible chi-squared value "representing"
+      /// -log(0.0)/2.
       return std::numeric_limits<double>::infinity();
     }
   }
@@ -177,53 +189,21 @@ double MinimizerBase::evalFit( const double* parArray_ ){
     _monitor_.nbEvalLikelihoodCalls++;
 
     if( _monitor_.historyTree != nullptr ){ _monitor_.historyTree->Fill(); }
-    if( _monitor_.gradientDescentMonitor.isEnabled ){
-
-      auto& gradient = _monitor_.gradientDescentMonitor;
-
-      // When gradient descent base minimizer probe a point toward the
-      // minimum, every parameter get updated
-      bool isGradientDescentStep =
-          std::all_of(
-              _minimizerParameterPtrList_.begin(), _minimizerParameterPtrList_.end(),
-              [](const Parameter* par_){
-                return ( par_->gotUpdated() or par_->isFixed() or not par_->isEnabled() );
-              } );
-      if( isGradientDescentStep or gradient.stepPointList.empty() ){
-
-        if( gradient.stepPointList.empty() ){
-          // add the initial point
-          LogWarning << "Adding initial point of the gradient monitor: ";
-          gradient.addStep( this );
-        }
-        else{
-          if( gradient.stepPointList.back().fitCallNb == _monitor_.nbEvalLikelihoodCalls - 1 ){
-            LogWarning << "Minimizer is adjusting the step size: ";
-            gradient.fillLastStep( this );
-          }
-          else{
-            LogWarning << "Gradient step detected at iteration #" << _monitor_.nbEvalLikelihoodCalls << ": ";
-            gradient.addStep( this );
-          }
-        }
-
-        if( gradient.stepPointList.size() >= 2 ){
-          LogWarning << gradient.getLastStepValue("Total") + gradient.getLastStepDeltaValue("Total") << " -> ";
-        }
-        LogWarning << gradient.getLastStepValue("Total") << std::endl;
-      }
-    }
     if( _monitor_.convergenceMonitor.isGenerateMonitorStringOk() ){
 
       _monitor_.iterationCounterClock.count( _monitor_.nbEvalLikelihoodCalls );
 
+      size_t nbValidPars = std::count_if(
+              _minimizerParameterPtrList_.begin(), _minimizerParameterPtrList_.end(),
+              [](const Parameter* par_){ return not ( par_->isFixed() or par_->isFrozen() or not par_->isEnabled() ); } );
+
       std::stringstream ssHeader;
+      ssHeader << std::endl << GenericToolbox::getNowDateString("%Y.%m.%d %H:%M:%S");
       ssHeader << std::endl << __METHOD_NAME__ << ": call #" << _monitor_.nbEvalLikelihoodCalls;
-      ssHeader << std::endl << _monitor_.stateTitleMonitor;
-//    ssHeader << std::endl << "Target EDM: " << getMinimizer().get;
+      ssHeader << std::endl << _monitor_.stateTitleMonitor << " / Nb of parameters to fit: " << nbValidPars;
       ssHeader << std::endl << "RAM: " << GenericToolbox::parseSizeUnits(double(GenericToolbox::getProcessMemoryUsage()));
       double cpuPercent = GenericToolbox::getCpuUsageByProcess();
-      ssHeader << " / CPU: " << cpuPercent << "% (" << cpuPercent / GundamGlobals::getNbCpuThreads() << "% efficiency)";
+      ssHeader << " / CPU: " << cpuPercent << "% / " << cpuPercent / GundamGlobals::getNbCpuThreads() << "% efficiency";
       ssHeader << std::endl << "Avg log-likelihood computation time: " << _monitor_.evalLlhTimer;
       ssHeader << std::endl;
 
@@ -232,6 +212,7 @@ double MinimizerBase::evalFit( const double* parArray_ ){
       t << "" << GenericToolbox::TablePrinter::NextColumn;
       t << "Propagator" << GenericToolbox::TablePrinter::NextColumn;
 
+      t << "Dial Update" << GenericToolbox::TablePrinter::NextColumn;
 #ifdef GUNDAM_USING_CACHE_MANAGER
       if( Cache::Manager::Get() != nullptr ){
         t << "Cache::Fill" << GenericToolbox::TablePrinter::NextColumn;
@@ -249,6 +230,7 @@ double MinimizerBase::evalFit( const double* parArray_ ){
       t << "Speed" << GenericToolbox::TablePrinter::NextColumn;
       t << _monitor_.iterationCounterClock.evalTickSpeed() << " it/s" << GenericToolbox::TablePrinter::NextColumn;
 
+      t << getModelPropagator().getDialManager().getUpdateTimer() << GenericToolbox::TablePrinter::NextColumn;
 
 #ifdef GUNDAM_USING_CACHE_MANAGER
       if( Cache::Manager::Get() != nullptr ){
@@ -306,10 +288,10 @@ double MinimizerBase::evalFit( const double* parArray_ ){
 
       if( _monitor_.nbEvalLikelihoodCalls == 1 ){
         // don't erase these lines
-        LogWarning << _monitor_.convergenceMonitor.generateMonitorString(false, true);
+        LogInfo << _monitor_.convergenceMonitor.generateMonitorString(false, true);
       }
       else{
-        LogInfo << _monitor_.convergenceMonitor.generateMonitorString(
+        std::cout << _monitor_.convergenceMonitor.generateMonitorString(
             GenericToolbox::getTerminalWidth() != 0, // trail back if not in batch mode
             true // force generate
         );
@@ -331,19 +313,32 @@ double MinimizerBase::evalFit( const double* parArray_ ){
   return getLikelihoodInterface().getLastLikelihood();
 }
 
+void MinimizerBase::setParameterValidity(const std::string& validity) {
+  if (validity.empty()) return;
+  _likelihoodValidity_ = validity;
+  if (not _checkParameterValidity_) {
+    LogWarning << "Parameter validity requirement set, but not checked."
+               << std::endl;
+    LogWarning << "Add 'checkParameterValidity: true' to check validity"
+               << std::endl;
+  }
+  for( auto* par : _minimizerParameterPtrList_ ){
+    par->setValidity(_likelihoodValidity_);
+  }
+}
+
 void MinimizerBase::printParameters(){
   // This prints the same set of parameters as are in the vector returned by
   // getMinimizerFitParameterPtr(), but does it by parameter set so that the
   // output is a little more clear.
 
-  LogWarning << std::endl << GenericToolbox::addUpDownBars("Summary of the fit parameters:") << std::endl;
+  LogInfo << std::endl << GenericToolbox::addUpDownBars("Summary of the fit parameters:") << std::endl;
   for( const auto& parSet : getModelPropagator().getParametersManager().getParameterSetsList() ){
-
     GenericToolbox::TablePrinter t;
-    t.setColTitles({ {"Title"}, {"Starting"}, {"Prior"}, {"StdDev"}, {"Min"}, {"Max"}, {"Status"} });
+    t.setColTitles({ {"Title"}, {"Starting"}, {"Prior"}, {"StdDev"}, {"Limits"}, {"Status"} });
 
     auto& parList = parSet.getEffectiveParameterList();
-    LogWarning << parSet.getName() << ": " << parList.size() << " parameters" << std::endl;
+    LogInfo << parSet.getName() << ": " << parList.size() << " parameters" << std::endl;
     if( parList.empty() ) continue;
 
     for( const auto& par : parList ){
@@ -352,6 +347,7 @@ void MinimizerBase::printParameters(){
 
       if( not par.isEnabled() ) { continue; }
       else if( par.isFixed() )  { statusStr = "Fixed (prior applied)";    colorStr = GenericToolbox::ColorCodes::yellowLightText; }
+      else if( par.isFrozen() )  { statusStr = "Frozen (penalty applied)";    colorStr = GenericToolbox::ColorCodes::yellowLightText; }
       else                      {
         statusStr = Parameter::PriorType::toString(par.getPriorType()) + " Prior";
         if(par.getPriorType()==Parameter::PriorType::Flat) colorStr = GenericToolbox::ColorCodes::blueLightText;
@@ -366,8 +362,7 @@ void MinimizerBase::printParameters(){
                          std::to_string( par.getParameterValue() ),
                          std::to_string( par.getPriorValue() ),
                          std::to_string( par.getStdDevValue() ),
-                         std::to_string( par.getMinValue() ),
-                         std::to_string( par.getMaxValue() ),
+                         par.getParameterLimits().toString(),
                          statusStr
                      }, colorStr);
     }
@@ -375,7 +370,6 @@ void MinimizerBase::printParameters(){
     t.printTable();
   }
 }
-
 
 Propagator& MinimizerBase::getModelPropagator(){ return _owner_->getLikelihoodInterface().getModelPropagator(); }
 [[nodiscard]] const Propagator& MinimizerBase::getModelPropagator() const { return _owner_->getLikelihoodInterface().getModelPropagator(); }
