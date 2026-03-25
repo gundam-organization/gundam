@@ -129,11 +129,11 @@ template<typename T> auto PhysicsEvent::getVarValue(const std::string &leafName_
   return this->getVariable<T>(leafName_, arrayIndex_);
 }
 template<typename T> auto PhysicsEvent::getVariable(const std::string& leafName_, size_t arrayIndex_) const -> const T&{
-  return this->getVariableAsAnyType(leafName_, arrayIndex_).template getValue<T>();
+  return this->getVariableAsAnyType(leafName_, arrayIndex_).getValue<T>();
 }
 template<typename T> void PhysicsEvent::setVariable(const T& value_, const std::string& leafName_, size_t arrayIndex_){
   int index = this->findVarIndex(leafName_, true);
-  _varHolderList_[index][arrayIndex_].template getValue<T>() = value_;
+  _varHolderList_[index][arrayIndex_].getValue<T>() = value_;
   if( not _varToDoubleCache_.empty() ){ _varToDoubleCache_[index][arrayIndex_] = std::nan("unset"); }
 }
 
