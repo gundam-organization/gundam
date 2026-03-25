@@ -1090,7 +1090,13 @@ std::unique_ptr<DialBase> DialCollection::makeSplineDial(const TObject* src_) co
   // handled using a graph, but Catmull-Rom is fast, and works better with the
   // GPU.  The isMonotonic is forced to false so that this uses CompactSpline
   // instead of MonotonicSpline.
-  if( splinePointList.size() <= 2 ){ splType = "catmull-rom"; isMonotonic = false; }
+  if( splinePointList.size() <= 2 ) {
+    splType = "catmull-rom";
+    if( isMonotonic ) {
+      // LogError << "Monotonic splines CANCELED?." << std::endl;
+      isMonotonic = false;
+    }
+  }
 
   ////////////////////////////////////////////////////////////////
   // Check if the spline slope calculation should be updated.  The slopes for
@@ -1099,14 +1105,6 @@ std::unique_ptr<DialBase> DialCollection::makeSplineDial(const TObject* src_) co
   // slopes for the other types ("catmull-rom", "akima")
   if     ( splType == "catmull-rom" ){ DialUtils::fillCatmullRomSlopes(splinePointList); }
   else if( splType == "akima" ){ DialUtils::fillAkimaSlopes(splinePointList); }
-
-  ////////////////////////////////////////////////////////////////
-  // Check if the spline is supposed to be monotonic and condition the slopes
-  // if necessary.  This is ignored by "ROOT" splines.  The Catmull-Rom
-  // splines have a special implementation for monotonic splines, so save a
-  // flag that can be checked later.
-  ////////////////////////////////////////////////////////////////
-  if( isMonotonic ){ DialUtils::applyMonotonicCondition(splinePointList); }
 
   ///////////////////////////////////////////////////////////
   // Create the right kind low level spline class base on all of the previous
@@ -1141,8 +1139,8 @@ std::unique_ptr<DialBase> DialCollection::makeSplineDial(const TObject* src_) co
       // user knows that it's not uniform and continue.
       LogThrowIf(uniformityTolerance != defUniformityTolerance, "Invalid catmull-rom inputs -- Nonuniform spacing");
     }
-
     if( isMonotonic ) {
+      // no slope conditioning in the catmull-rom case
       auto monotonicSpline = std::make_unique<MonotonicSpline>();
       monotonicSpline->buildDial(splinePointList);
       out = std::move(monotonicSpline);
@@ -1153,6 +1151,14 @@ std::unique_ptr<DialBase> DialCollection::makeSplineDial(const TObject* src_) co
       out = std::move(compactSpline);
     }
 
+  }
+  else if( isMonotonic ) {
+    // condition the slopes
+    DialUtils::applyMonotonicCondition(splinePointList);
+
+    auto monotonicSpline = std::make_unique<MonotonicSpline>();
+    monotonicSpline->buildDial(splinePointList);
+    out = std::move(monotonicSpline);
   }
   else if( DialUtils::isUniform(splinePointList, uniformityTolerance) ){
     // Haven't matched a specific special case, but we have uniformly spaced
