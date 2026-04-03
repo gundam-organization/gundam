@@ -10,3 +10,6 @@
 	path = submodules/simple-cpp-cmd-line-parser
 	url = https://github.com/gundam-organization/simple-cpp-cmd-line-parser.git
 	branch = main
+[submodule "submodules/googletest"]
+	path = submodules/googletest
+	url = https://github.com/google/googletest.git
