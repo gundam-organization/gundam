@@ -102,6 +102,17 @@ echo ' See gundam-tests.sh for more usage documentation.'
 # The default tests to be run.
 TESTS="fast-tests"
 
+# bash colors
+C_RESET='\033[0m'
+LRED='\033[01;31m'
+LGREEN='\033[01;32m'
+LYELLOW='\033[01;33m'
+
+export INFO="$LGREEN<Info>$C_RESET"
+export WARNING="$LYELLOW<Warning>$C_RESET"
+export ERROR="$LRED<Error>$C_RESET"
+
+
 # Handle any input arguments
 if [ $(uname) == "Darwin" ]; then
     # Work around MacOS bug
@@ -207,7 +218,7 @@ mkdir -p ${OUTPUT_DIR}
 
 # Make sure the output directory was correctly created (i.e. it exists)
 if [ ! -x ${OUTPUT_DIR} ]; then
-    echo OUTPUT DIRECTORY WAS NOT CREATED: ${OUTPUT_DIR}
+    echo -e "$ERROR OUTPUT DIRECTORY WAS NOT CREATED: ${OUTPUT_DIR}"
     exit 1
 fi
 
@@ -216,7 +227,7 @@ FAILURES=""
 EXPECTED=""
 for d in ${TESTS}; do
     if [ ! -x ${PWD}/${d} ]; then
-        echo TESTING DIRECTORY ${d} DOES NOT EXIST
+        echo -e "$WARNING TESTING DIRECTORY ${d} DOES NOT EXIST"
         continue;
     fi
     for i in $(find ${d} -name "[0-9]*" -type f | grep -v "~" | sort); do
@@ -237,28 +248,28 @@ for d in ${TESTS}; do
         if (cd $OUTPUT_DIR && ${JOB} ${DIR} >& ${LOG}); then
             # The job exited with success, but look for a fail messsage
             if (tail -5 ${OUTPUT_DIR}/${LOG} | grep FAIL >> /dev/null); then
-                echo JOB FAILURE: ${i}
+                echo -e "$ERROR JOB FAILURE: ${i}"
             elif (tail -10 ${OUTPUT_DIR}/${LOG} | grep "Execution.*aborted" >> /dev/null); then
-                echo JOB FAILURE: ${i}
+                echo -e "$ERROR JOB FAILURE: ${i}"
             else
-                echo JOB SUCCESS: ${i}
+                echo -e "$INFO JOB SUCCESS: ${i}"
                 SUCCESS="yes"
             fi
         else
-            echo JOB FAILURE: ${i}
+            echo -e "$ERROR JOB FAILURE: ${i}"
         fi
         if [ ${SUCCESS} = "yes" ]; then
             # The job succeeded, make sure it's not in EXPECTED_FAILURES
             if (grep -F $i EXPECTED_FAILURES >> /dev/null); then
                 cat ${OUTPUT_DIR}/${LOG}
-                echo JOB FAILURE: Expected $i to fail
+                echo -e "$ERROR JOB FAILURE: Expected $i to fail"
                 FAILURES="${FAILURES} unexpected-success:\"${JOB}\""
             fi
         else
             # The job failed, check if it was expected
             if (grep -F $i EXPECTED_FAILURES >> /dev/null); then
                 cat ${OUTPUT_DIR}/${LOG}
-                echo JOB SUCCESS: Failure was expected for $i
+                echo -e "$INFO JOB SUCCESS: Failure was expected for $i"
                 EXPECTED="${EXPECTED} \"${JOB}\""
             else
                 cat ${OUTPUT_DIR}/${LOG}
@@ -283,10 +294,10 @@ if [ ${#FAILURES} -gt 0 ]; then
         echo FAILED: $i
     done
     echo
-    echo FAIL: Tests failed
+    echo -e "$ERROR FAIL: Tests failed"
     exit 1
 else
     echo
-    echo SUCCESS: Tests succeeded
+    echo -e "$INFO SUCCESS: Tests succeeded"
 fi
 # End of the script
