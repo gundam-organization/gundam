@@ -20,7 +20,7 @@ option( WITH_CUDA_LIB "Enable CUDA language check (Cache::Manager requires a GPU
 option( WITH_MINUIT2_MISSING "Allow MINUIT2 to be missing" OFF )
 option( WITH_PYTHON_INTERFACE "Compile the python interface modules" OFF )
 option( WITH_TESTS "Build CMake tests." ON )
-option( WITH_GOOGLE_TEST "Enables GoogleTest unit tests." OFF )
+option( WITH_GOOGLE_TEST "Enable GoogleTest (disable at your own risk).." ON )
 
 # compile helper
 option( YAMLCPP_DIR "Set custom path to yaml-cpp lib." OFF )
