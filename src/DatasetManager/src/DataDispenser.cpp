@@ -1271,10 +1271,20 @@ void DataDispenser::loadEvent(int iThread_){
         if( sampleBinIdxList.back() == -1 ){
           const int unbinnedEventThrottle = 5;
           if( this->_unbinnedEvents_++ < unbinnedEventThrottle ){
-            LogAlert <<  "Selected event not in a likelihood histogram bin: "
-                       << std::endl
-                       << eventIndexingBuffer.getSummary()
-                       << std::endl;
+
+            // grab relevant variables
+            auto varNames = LoaderUtils::getRelevantVarNames(eventSample.getHistogram().getBinContextList());
+
+            LogAlert <<  "Selected event not in a likelihood histogram bin: " << std::endl;
+            LogScopeIndent;
+            LogAlert << eventIndexingBuffer.getSummary(false) << std::endl;
+            LogAlert << "Variables used in binning{ ";
+            for( auto& varName : varNames ) {
+              LogAlert << varName << ": " << eventIndexingBuffer.getVariables().fetchVariable(varName).getVarAsDouble() << ", ";
+            }
+            LogAlert << "}" << std::endl;
+
+
             if ( this->_unbinnedEvents_.getValue() == unbinnedEventThrottle ) {
               LogAlert <<  "Further unbinned event warnings will be skipped."
                        << std::endl;

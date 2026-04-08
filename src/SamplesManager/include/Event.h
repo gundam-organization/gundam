@@ -34,7 +34,7 @@ public:
   // const core
   [[nodiscard]] size_t getSize() const;
   [[nodiscard]] double getEventWeight() const { return _weights_.current; }
-  [[nodiscard]] std::string getSummary() const;
+  [[nodiscard]] std::string getSummary(bool printVars_ = true) const;
   friend std::ostream& operator <<( std::ostream& o, const Event& this_ ){ o << this_.getSummary(); return o; }
 
 private:
