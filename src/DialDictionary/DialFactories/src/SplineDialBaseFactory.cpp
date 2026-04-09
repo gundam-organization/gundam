@@ -8,7 +8,7 @@
 #include "UniformSpline.h"
 #include "GeneralSpline.h"
 #include "MonotonicSpline.h"
-#include "MakeMonotonicSpline.h"
+#include "FritshCarlsonMonotonicCondition.h"
 #include "Shift.h"
 
 #include "TGraph.h"
@@ -363,7 +363,7 @@ DialBase* SplineDialBaseFactory::makeDial(const std::string& dialTitle_,
   // flag that can be checked later.
   ////////////////////////////////////////////////////////////////
   bool isMonotonic = ( dialSubType_.find("monotonic") != std::string::npos );
-  if ( isMonotonic ) { ::util::MakeMonotonicSpline(_xPointListBuffer_, _yPointListBuffer_, _slopeListBuffer_); }
+  if ( isMonotonic ) { ::FritshCarlson::MonotonicCondition(_xPointListBuffer_, _yPointListBuffer_, _slopeListBuffer_); }
 
   // If there are only two points, then force a catmull-rom.  This could be
   // handled using a graph, but Catmull-Rom is fast, and works better with the
@@ -482,5 +482,4 @@ DialBase* SplineDialBaseFactory::makeDial(const std::string& dialTitle_,
 // Local Variables:
 // mode:c++
 // c-basic-offset:2
-// compile-command:"$(git rev-parse --show-toplevel)/cmake/gundam-build.sh"
 // End:
