@@ -1,6 +1,7 @@
 #ifndef MakeMonotonicSpline_h_seen
 #define MakeMonotonicSpline_h_seen
 namespace {
+#error Replace with FritshCarlsonMonotonicCondition.h
     // Place this in a namespace inside the anonymous namespace!
     namespace util {
 

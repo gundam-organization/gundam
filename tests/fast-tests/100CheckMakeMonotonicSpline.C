@@ -1,6 +1,6 @@
 # !/bin/bash
 # Wrap a ROOT macro as a script.
-root <<EOF
+(root -x -n | grep SUCCESS || echo FAILED) <<EOF
 
 #include <iostream>
 #include <string>
@@ -13,7 +13,7 @@ root <<EOF
 // Test the CalculateGeneralSpline routine on the CPU.
 
 #include "${GUNDAM_ROOT}/src/Utils/include/CalculateGeneralSpline.h"
-#include "${GUNDAM_ROOT}/src/Utils/include/MakeMonotonicSpline.h"
+#include "${GUNDAM_ROOT}/src/Utils/include/FritshCarlsonMonotonicCondition.h"
 
 std::string args{"$*"};
 
@@ -92,7 +92,7 @@ int main() {
             data[2+3*knot+2] = xValues[knot];
         }
         TGraph monotonicSpline;
-        ::util::MakeMonotonicSpline(xValues,yValues,slopes);
+        ::FritshCarlson::MonotonicCondition(xValues,yValues,slopes);
         for (int knot = 0; knot < nKnots; ++knot) {
             data[2+3*knot+0] = yValues[knot];
             data[2+3*knot+1] = slopes[knot];
@@ -125,6 +125,7 @@ int main() {
         gPad->Print("100CheckMakeMonotonicSpline1.png");
     }
 #endif
+    if (status == 0) std::cout << "SUCCESS" << std::endl;
 
     return status;
 }
