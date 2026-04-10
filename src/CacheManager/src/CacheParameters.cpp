@@ -67,7 +67,7 @@ bool Cache::Parameters::HasGPU(bool dump) {
                   << " Y:" << prop.maxGridSize[1]
                   << " Z:" << prop.maxGridSize[2] << std::endl;
         LogInfo << "CUDA WARP:                 " << prop.warpSize << std::endl;
-        LogInfo << "CUDA CLOCK:                " << prop.clockRate << std::endl;
+        // LogInfo << "CUDA CLOCK:                " << prop.clockRate << std::endl;
         LogInfo << "CUDA GLOBAL MEM:           " << prop.totalGlobalMem << std::endl;
         LogInfo << "CUDA SHARED MEM:           " << prop.sharedMemPerBlock << std::endl;
         LogInfo << "CUDA L2 CACHE MEM:         " << prop.l2CacheSize << std::endl;
