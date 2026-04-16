@@ -1,0 +1,153 @@
+#include <iostream>
+#include <string>
+#include <memory>
+#include <cmath>
+
+#include <gtest/gtest.h>
+
+#include <TGraph.h>
+#include <TPad.h>
+
+////////////////////////////////////////////////////////////////////////
+// Test the CalculateMonotonicSpline routine on the CPU.
+#include "CalculateMonotonicSpline.h"
+
+TEST(MonotonicSpline,TwoPoints) {
+    // Test linear interpolation between two points
+    double data[] = {0.0, 1.0, 0.0, 1.0};
+    int nData = 2;
+    std::unique_ptr<TGraph> data1(new TGraph());
+    for (int p=0; p<nData; ++p) {
+        double x = data[0] + p*data[1];
+        double y = data[p+2];
+        data1->SetPoint(p,x,y);
+    }
+    std::unique_ptr<TGraph> graph1(new TGraph());
+    int p = 0;
+    for (double x = -1.0; x <= 2.0; x += 0.1) {
+        double v = CalculateMonotonicSpline(x, -10.0, 10.0, data, 2);
+        EXPECT_NEAR(x, v, 1E-6)
+            << "Two Point Tolerance";
+        graph1->SetPoint(p++,x,v);
+    }
+    graph1->Draw("AC");
+    data1->Draw("*,same");
+    gPad->Print("100CheckMonotonicSpline1.pdf");
+    gPad->Print("100CheckMonotonicSpline1.png");
+}
+
+TEST(MonotonicSpline,ThreePoints) {
+    // Test non-linear interpolation between three points
+    int nData = 3;
+    double data[] = {-1.0,  2.0/(nData-1), 0.0, 1.0, 0.0};
+    std::unique_ptr<TGraph> data1(new TGraph());
+    for (int p=0; p<nData; ++p) {
+        double x = data[0] + p*data[1];
+        double y = data[p+2];
+        data1->SetPoint(p,x,y);
+    }
+    std::unique_ptr<TGraph> graph1(new TGraph());
+    int p = 0;
+    for (double x = -1.5; x <= 1.5; x += 0.1) {
+        double v0 = CalculateMonotonicSpline(x, -10.0, 10.0, data, nData);
+        double v1 = CalculateMonotonicSpline(-x, -10.0, 10.0, data, nData);
+        EXPECT_NEAR(v0, v1, 1E-6)
+            << "Symmetric tolerance (test 2) (X=" << x << ")";
+        graph1->SetPoint(p++,x,v0);
+    }
+    graph1->Draw("AC");
+    data1->Draw("*,same");
+    gPad->Print("100CheckMonotonicSpline2.pdf");
+    gPad->Print("100CheckMonotonicSpline2.png");
+}
+
+TEST(MonotonicSpline,SixPoints) {
+    // Test interpolation between six points
+    int nData = 6;
+    double data[] = {-1.0, 2.0/(nData-1), 0.0, 0.0, 1.0, 1.0, 0.0, 0.0};
+    std::unique_ptr<TGraph> data1(new TGraph());
+    for (int p=0; p<nData; ++p) {
+        double x = data[0] + p*data[1];
+        double y = data[p+2];
+        data1->SetPoint(p,x,y);
+    }
+    std::unique_ptr<TGraph> graph1(new TGraph());
+    int p = 0;
+    for (double x = -1.5; x <= 1.5; x += 0.01) {
+        double v0 = CalculateMonotonicSpline(x, -10.0, 10.0, data, nData);
+        double v1 = CalculateMonotonicSpline(-x, -10.0, 10.0, data, nData);
+        EXPECT_NEAR(v0, v1, 1E-6)
+            << "Symmetric tolerance (test 3) (X=" << x << ")";
+        graph1->SetPoint(p++,x,v0);
+        graph1->SetPoint(p++,x,v0);
+    }
+    graph1->Draw("AC");
+    data1->Draw("*,same");
+    gPad->Print("100CheckMonotonicSpline3.pdf");
+    gPad->Print("100CheckMonotonicSpline3.png");
+}
+
+TEST(MonotonicSpline,OverShoot) {
+    // Test interpolation where there can be a lot of overshoot
+    int nData = 13;
+    double data[] = {-1.0, 2.0/(nData-1),
+                     0.5, 1.5,
+                     1.0, 1.0, 1.0, 1.0,
+                     0.5,
+                     1.0, 1.0, 1.0, 1.0,
+                     1.5, 0.5};
+    std::unique_ptr<TGraph> data1(new TGraph());
+    for (int p=0; p<nData; ++p) {
+        double x = data[0] + p*data[1];
+        double y = data[p+2];
+        data1->SetPoint(p,x,y);
+    }
+    std::unique_ptr<TGraph> graph1(new TGraph());
+    int p = 0;
+    for (double x = -1.1; x <= 1.1; x += 0.01) {
+        double v0 = CalculateMonotonicSpline(x, -10.0, 10.0, data, nData);
+        double v1 = CalculateMonotonicSpline(-x, -10.0, 10.0, data, nData);
+        EXPECT_NEAR(v0, v1, 1E-6)
+            << "Symmetric tolerance (test 4) (X=" << x << ")";
+        graph1->SetPoint(p++,x,v0);
+    }
+    graph1->Draw("AC");
+    data1->Draw("*,same");
+    gPad->Print("100CheckMonotonicSpline4.pdf");
+    gPad->Print("100CheckMonotonicSpline4.png");
+}
+
+TEST(MonotonicSpline,Symmetric) {
+    // Test interpolation where there is a smooth symmetric function
+    int nData = 17;
+    double data[] = {-1.0, 2.0/(nData-1),
+                     0.0, 0.0, 0.0, 0.5, 1.5,
+                     1.0, 1.0, 1.0, 1.0,
+                     0.5,
+                     1.0, 1.0, 1.0, 1.0,
+                     1.5, 0.5, 0.0, 0.0, 0.0};
+    std::unique_ptr<TGraph> data1(new TGraph());
+    for (int p=0; p<nData; ++p) {
+        double x = data[0] + p*data[1];
+        data[p+2] = std::cos(4.0*x);
+        double y = data[p+2];
+        data1->SetPoint(p,x,y);
+    }
+    std::unique_ptr<TGraph> graph1(new TGraph());
+    int p = 0;
+    for (double x = -1.5; x <= 1.5; x += 0.01) {
+        double v0 = CalculateMonotonicSpline(x, -10.0, 10.0, data, nData);
+        double v1 = CalculateMonotonicSpline(-x, -10.0, 10.0, data, nData);
+        EXPECT_NEAR(v0, v1, 1E-6)
+            << "Symmetric tolerance (test 5) (X=" << x << ")";
+        graph1->SetPoint(p++,x,v0);
+    }
+    graph1->Draw("AC");
+    data1->Draw("*,same");
+    gPad->Print("100CheckMonotonicSpline5.pdf");
+    gPad->Print("100CheckMonotonicSpline5.png");
+}
+/// Local Variables:
+/// mode:c++
+/// c-basic-offset:4
+/// End:

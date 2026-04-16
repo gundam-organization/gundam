@@ -41,6 +41,20 @@ else()
   cmessage( WARNING "GTest package enabled for developer unit tests.")
   enable_testing()
 
+  cmessage( STATUS "Compiling google tests" )
+  add_executable(gundamGTest_unitTest.exe
+    GTests/unitTest_CalculateCompactSpline.cpp
+    GTests/unitTest_CalculateMonotonicSpline.cpp
+    GTests/unitTest_CalculateGraph.cpp
+    GTests/unitTest_CalculateGeneralSpline.cpp
+    GTests/unitTest_CalculateUniformSpline.cpp
+    GTests/unitTest_ApplyMonotonicCondition.cpp
+  )
+  target_link_libraries(gundamGTest_unitTest.exe GTest::gtest_main)
+  target_link_libraries(gundamGTest_unitTest.exe GundamFitter)
+  gtest_discover_tests(gundamGTest_unitTest.exe)
+
+
   # Setup the hemi test suite for the host
   add_executable(hemiTest_host.exe
     GTests/hemiArrayTest.cpp
