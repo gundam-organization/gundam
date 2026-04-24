@@ -145,7 +145,7 @@ namespace {
         //             Type  Time(%)      Time     Calls       Avg       Min       Max  Name
         //                    20.26%  137.925s    262004  526.42us  517.37us  550.90us  _ZN4hemi6KernelIN78_GLOBAL__N__54_tmpxft_00103aad_00000000_7_WeightGeneralSpline_cpp1_ii_220155e217HEMISplinesKernelEJPdPKdS5_S5_S5_PKiPKsS7_mEEEvT_DpT0_
         //
-        const int knotCount = (dim-2)/3 - 2;
+        const int knotCount = (dim-2)/3 - 1;
         int ix = 0;
         // Define a non-branching conditional to update the offset.  The &&
         // becomes a "multiplication", and the conditional update becomes a

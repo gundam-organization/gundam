@@ -1,7 +1,7 @@
 ---
 layout: default
 title: Getting started 
-next_page: "https://ulyevarou.github.io/GUNDAM-documentation/usage.html"
+next_page: "usage.html"
 ---
 
 # Installation instructions

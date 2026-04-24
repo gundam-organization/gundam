@@ -23,10 +23,16 @@ if(NOT DEFINED GUNDAM_TESTS_ARGUMENT OR GUNDAM_TESTS_ARGUMENT STREQUAL "")
   set(GUNDAM_TESTS_ARGUMENT "-f")
 endif(NOT DEFINED GUNDAM_TESTS_ARGUMENT OR GUNDAM_TESTS_ARGUMENT STREQUAL "")
 
-add_test(
+set(DEV_WITHOUT_GUNDAM_TESTS ON) # Should be off by default.
+# Run the main executable test scripts.  These are relatively slow, so they
+if( NOT DEV_WITHOUT_GUNDAM_TESTS )
+  add_test(
     NAME gundam-tests
     COMMAND "sh" "-c" "(cd ${CMAKE_SOURCE_DIR}/tests && ./gundam-tests.sh ${GUNDAM_TESTS_ARGUMENT} -a ${CMAKE_BINARY_DIR}/Testing/gundam-tests.$(date +%Y-%m-%d-%H%M%S) )"
-)
+  )
+else()
+  cmessage( WARN "GUNDAM executable tests not being run.")
+endif( NOT DEV_WITHOUT_GUNDAM_TESTS )
 
 if( WITH_GOOGLE_TEST )
   ## Compiled unit tests using GoogleTest.
@@ -34,7 +40,16 @@ if( WITH_GOOGLE_TEST )
 
   cmessage( STATUS "Compiling google tests" )
   add_executable(gundamGTest_unitTest.exe
-    GTests/unitTest_JointProbability.cpp)
+    GTests/unitTest_JointProbability.cpp
+    GTests/unitTest_CalculateCompactSpline.cpp
+    GTests/unitTest_CalculateMonotonicSpline.cpp
+    GTests/unitTest_CalculateGraph.cpp
+    GTests/unitTest_CalculateGeneralSpline.cpp
+    GTests/unitTest_CalculateUniformSpline.cpp
+    GTests/unitTest_CalculateBilinearInterpolation.cpp
+    GTests/unitTest_CalculateBicubicSpline.cpp
+    GTests/unitTest_ApplyMonotonicCondition.cpp
+  )
   target_link_libraries(gundamGTest_unitTest.exe GTest::gtest_main)
   target_link_libraries(gundamGTest_unitTest.exe GundamFitter)
   gtest_discover_tests(gundamGTest_unitTest.exe)

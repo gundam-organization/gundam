@@ -1,7 +1,7 @@
 ---
 layout: default
 title: Lineage and Legacy
-next_page: "https://gundam-organization.github.io/gundam/appendix.html"
+next_page: "appendix.html"
 ---
 
 GUNDAM was primarily developed as a tool for conducting sensitivity studies with the *Upgraded

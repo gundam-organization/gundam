@@ -1,23 +1,10 @@
 ---
 layout: default
 title: FAQs 
-next_page: "https://ulyevarou.github.io/GUNDAM-documentation/LineageandLegacy.html"
+next_page: "LineageandLegacy.html"
 ---
 
-<div id="issues"></div>
-
-<script>
-  async function fetchIssues() {
-    const response = await fetch('https://github.com/gundam-organization/gundam/issues');
-    const issues = await response.json();
-    const issuesContainer = document.getElementById('issues');
-
-    issues.forEach(issue => {
-      const issueElement = document.createElement('div');
-      issueElement.innerHTML = `<h3><a href="${issue.html_url}">${issue.title}</a></h3>`;
-      issuesContainer.appendChild(issueElement);
-    });
-  }
-
-  document.addEventListener('DOMContentLoaded', fetchIssues);
-</script>
+<details>
+  <summary><strong>Is a non-converging Gundam fit a sign of a software problem?</strong></summary>
+  <p>Not usually. Gundam uses MINUIT to minimize the negative log-likelihood (NLL) function and find the best-fit parameters. For this process to work reliably, the NLL surface must be smooth, well-behaved, and contain a clear global minimum. Attributes related to the model, parameterization or input uncertainties/correlations can create a likelihood surface that is difficult to optimize. Thus, non-convergence is often a diagnostic signal that the model or inputs need refinement, rather than a failure of Gundam.</p>
+</details>

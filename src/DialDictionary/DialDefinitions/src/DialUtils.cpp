@@ -170,6 +170,7 @@ namespace DialUtils{
       }
     }
   }
+
   void applyMonotonicCondition(std::vector<DialPoint> &splinePointList_){
     // Apply the Fritsh-Carlson monotonic condition to the slopes.  This
     // adjusts the slopes (when necessary), however, with Catmull-Rom the
@@ -179,26 +180,93 @@ namespace DialUtils{
     // F.N.Fritsch, and R.E.Carlson, "Monotone Piecewise Cubic
     // Interpolation" SIAM Journal on Numerical Analysis, Vol. 17, Iss. 2
     // (1980) doi:10.1137/0717021
+    //
+    // This implementation closely (and pedantically) follows the original
+    // paper (see Section 4, page 241). The step comments follow the notes
+    // from the Wikipedia Monotonic Cubic Interpolation article. It is
+    // slightly adapted from the reference implementation noted in
+    // unitTest_ApplyMonotonicCondition.cpp by C.McGrew and relicensed under
+    // the GUNDAM licence (LGPL 2.1).
 
-    auto nPoints = splinePointList_.size();
+    const std::size_t nPoints{splinePointList_.size()};
 
-    for( std::size_t i = 0; i < nPoints; i++ ) {
-      double m{splinePointList_[i].slope};
-      double p{splinePointList_[i].slope};
+    // 1) Find the secant line slopes.
+    std::vector<double> d(nPoints);
+    for (std::size_t k = 0; k<nPoints-1; ++k) {
+      d[k] = (splinePointList_[k+1].y-splinePointList_[k].y)/(splinePointList_[k+1].x-splinePointList_[k].x);
+    }
 
-      if( i >= 1 )         { m = getSlope(splinePointList_[i - 1], splinePointList_[i]); }
-      if( i < nPoints - 1 ){ p = getSlope(splinePointList_[i], splinePointList_[i + 1]); }
+    // 2) Initialize tangent for interior data points.
+    std::vector<double> m(nPoints);
+    for (std::size_t k=1; k<nPoints-1; ++k) {
+      m[k] = (d[k-1]+d[k])/2.0;
+    }
+    m[0] = d[0];
+    m[nPoints-1] = d[nPoints-2];
 
-      double delta = std::min(std::abs(m), std::abs(p));
-      // Make sure the slope at a cusp (where the average slope
-      // flips sign) is zero.
-      if( m * p < 0.0 ) delta = 0.0;
-      // This a conservative bound on when the slope is "safe".
-      // It's not the actual value where the spline becomes
-      // non-monotonic.
-      if( std::abs(splinePointList_[i].slope) > 3.0 * delta ) {
-        if(splinePointList_[i].slope < 0){ splinePointList_[i].slope = - 3.0 * delta; }
-        else{ splinePointList_[i].slope = 3.0 * delta; }
+    // 2.A) Set tangents to flat if there is a cusp which is true when
+    // ds have opposite signs.
+    for (std::size_t k=1; k<nPoints; ++k) {
+      if (d[k-1]*d[k] < 0.0) m[k] = 0.0;
+    }
+
+    // 3) When the successive points are equal, set the slopes to
+    // zero.  This is when d is zero.
+    for (std::size_t k = 0; k<nPoints-1; ++k) {
+      if (std::abs(d[k]) < std::numeric_limits<double>::epsilon()) {
+        m[k] = 0.0;
+        m[k+1] = 0.0;
+      }
+    }
+
+    // 4.A) Calculate alpha
+    std::vector<double> alpha(nPoints);
+    for (std::size_t k = 0; k < nPoints; ++k) {
+      alpha[k] = 0.0;
+      if (std::abs(d[k]) > std::numeric_limits<double>::epsilon()) {
+        alpha[k] = m[k]/d[k];
+      }
+    }
+
+    // 4.B) Calculate beta
+    std::vector<double> beta(nPoints);
+    for (std::size_t k = 0; k < nPoints; ++k) {
+      beta[k] = 0.0;
+      if (std::abs(d[k]) > std::numeric_limits<double>::epsilon()) {
+        if (k < nPoints-1) beta[k] = m[k+1]/d[k];
+      }
+    }
+
+    // 4.C) When alpha is zero slope is zero
+    for (std::size_t k = 0; k < nPoints; ++k) {
+      if (alpha[k] < 0.0) m[k] = 0.0;
+    }
+
+    // 4.D) When beta is zero next slope is zero.
+    for (std::size_t k = 0; k < nPoints-1; ++k) {
+      if (beta[k] < 0.0) m[k+1] = 0.0;
+    }
+
+    // 5) Prevent overshoot This applies the criteria for set 1 in the
+    // Fritzch-Carlson paper (figure 2).
+    double bound = 3.0;
+    for (std::size_t k = 0; k < nPoints; ++k) {
+      if (alpha[k] > bound) m[k] = bound*d[k];
+    }
+    for (std::size_t k = 0; k < nPoints-1; ++k) {
+      if (beta[k] > bound) m[k+1] = bound*d[k];
+    }
+
+    // 6) Fix the slopes
+    for (std::size_t k = 0; k < nPoints; ++k) {
+      double s = splinePointList_[k].slope;
+      // Limit the range of the slope
+      if (splinePointList_[k].slope > 0.0 and splinePointList_[k].slope > m[k]) s = m[k];
+      if (splinePointList_[k].slope < 0.0 and splinePointList_[k].slope < m[k]) s = m[k];
+      // If the slope changed, copy it back into the output.
+      if (std::abs(s-splinePointList_[k].slope)
+          > std::numeric_limits<double>::epsilon()) {
+        splinePointList_[k].slope = s;
       }
     }
   }
