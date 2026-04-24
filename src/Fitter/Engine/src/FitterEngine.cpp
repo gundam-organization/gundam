@@ -232,12 +232,11 @@ void FitterEngine::initializeImpl(){
     );
     GenericToolbox::writeInTFileWithObjTypeExt(
         GenericToolbox::mkdirTFile(_saveDir_, saveFolder ),
-        GenericToolbox::toCorrelationMatrix(parSet.getPriorCovarianceMatrix().get()),
-        "correlationMatrix"
+        parSet.getPriorCorrelationMatrix().get(), "correlationMatrix"
     );
     GenericToolbox::writeInTFileWithObjTypeExt(
         GenericToolbox::mkdirTFile( _saveDir_, saveFolder ),
-        parSet.getInverseCovarianceMatrix().get(), "invCovarianceMatrix"
+        parSet.getInverseCorrelationMatrix().get(), "correlationMatrixInv"
     );
 
     auto parsSaveFolder = GenericToolbox::joinPath( saveFolder, "parameters" );

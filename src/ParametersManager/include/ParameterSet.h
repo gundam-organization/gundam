@@ -85,9 +85,11 @@ public:
   [[nodiscard]] auto& getName() const{ return _name_; }
   [[nodiscard]] auto& getDialSetDefinitions() const{ return _dialSetDefinitions_; }
   [[nodiscard]] auto& getCustomParThrow() const{ return _customParThrow_; }
-  [[nodiscard]] auto& getPriorCovarianceMatrix() const { return _priorCovarianceMatrix_; }
   [[nodiscard]] auto& getPriorFullCovarianceMatrix() const { return _priorFullCovarianceMatrix_; }
-  [[nodiscard]] auto& getInverseCovarianceMatrix() const{ return _inverseCovarianceMatrix_; }
+  [[nodiscard]] auto& getPriorCorrelationMatrix() const { return _priorCorrelationMatrix_; }
+  [[nodiscard]] auto& getInverseCorrelationMatrix() const{ return _inverseCorrelationMatrix_; }
+  // ad hoc
+  [[nodiscard]] auto& getPriorCovarianceMatrix() const { return _priorCovarianceMatrix_; }
 
   /// Get the vector of parameters for this parameter set in the real
   /// parameter space.  These parameters are not eigendecomposed.  WARNING:
@@ -168,10 +170,11 @@ public:
   static double toRealParValue(double normParValue, const Parameter& par);
   static double toRealParRange(double normParRange, const Parameter& par);
 
-  /// A convenience function to check if a parameter is enabled, not free, and
-  /// not fix.  This is true if the parameter should be in the stripped
+  /// A convenience function to check if a parameter is enabled, not free
+  /// This is true if the parameter should be in the stripped
   /// covariance matrix.
   static bool isValidCorrelatedParameter(const Parameter& par_);
+  static bool isValidAndNotFixedCorrelatedParameter(const Parameter& par_);
 
   // print
   void printConfiguration() const;
@@ -253,16 +256,18 @@ private:
 
   // original loaded from file
   std::shared_ptr<TMatrixDSym> _priorFullCovarianceMatrix_{nullptr};
-  // matrices stripped from fixed/freed parameters
-  std::shared_ptr<TMatrixDSym> _priorCovarianceMatrix_{nullptr};
-  std::shared_ptr<TMatrixD> _inverseCovarianceMatrix_{nullptr}; // inverse matrix used for chi2
 
   std::shared_ptr<TVectorD>  _parameterPriorList_{nullptr};
   std::shared_ptr<TVectorD>  _parameterLowerBoundsList_{nullptr};
   std::shared_ptr<TVectorD>  _parameterUpperBoundsList_{nullptr};
   std::shared_ptr<TObjArray> _parameterNamesList_{nullptr};
 
-  std::shared_ptr<TVectorD>  _deltaVectorPtr_{nullptr}; // difference from prior
+  // penalty chi2
+  // matrices stripped from fixed/freed parameters
+  std::shared_ptr<TMatrixDSym> _priorCovarianceMatrix_{nullptr}; // only used for ROOT writes
+  std::shared_ptr<TMatrixDSym> _priorCorrelationMatrix_{nullptr};
+  std::shared_ptr<TMatrixD> _inverseCorrelationMatrix_{nullptr};
+  std::shared_ptr<TVectorD> _deltaVectorPtr_{nullptr}; // difference from prior + normed by std-dev
 
   std::shared_ptr<TMatrixD> _choleskyMatrix_{nullptr};
   GenericToolbox::CorrelatedVariablesSampler _correlatedVariableThrower_{};

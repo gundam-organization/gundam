@@ -1249,7 +1249,7 @@ void RootMinimizer::writePostFitData( TDirectory* saveDir_) {
             }
           }
 
-          if(parSet_.getPriorCovarianceMatrix() != nullptr ){
+          if(parSet_.getPriorCorrelationMatrix() != nullptr ){
             gStyle->GetCanvasPreferGL() ? preFitErrorHist->SetFillColorAlpha(kRed-9, 0.7) : preFitErrorHist->SetFillColor(kRed-9);
           }
 

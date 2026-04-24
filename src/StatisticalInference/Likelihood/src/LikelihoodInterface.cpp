@@ -182,7 +182,7 @@ double LikelihoodInterface::evalPenaltyLikelihood(const ParameterSet& parSet_) c
 
   double buffer = 0;
 
-  if( parSet_.getPriorCovarianceMatrix() != nullptr ){
+  if( parSet_.getPriorCorrelationMatrix() != nullptr ){
     if( parSet_.isEnableEigenDecomp() ){
       for( const auto& eigenPar : parSet_.getEigenParameterList() ){
         if( eigenPar.isFixed() ){ continue; }
@@ -196,7 +196,7 @@ double LikelihoodInterface::evalPenaltyLikelihood(const ParameterSet& parSet_) c
       // compute penalty term with covariance
       buffer =
           (*parSet_.getDeltaVectorPtr())
-          * ( (*parSet_.getInverseCovarianceMatrix()) * (*parSet_.getDeltaVectorPtr()) );
+          * ( (*parSet_.getInverseCorrelationMatrix()) * (*parSet_.getDeltaVectorPtr()) );
     }
   }
 

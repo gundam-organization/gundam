@@ -73,10 +73,10 @@ void ParametersManager::initializeImpl(){
   _globalCovarianceMatrix_ = std::make_shared<TMatrixD>(nEnabledPars, nEnabledPars );
   int parSetOffset = 0;
   for( auto& parSet : _parameterSetList_ ){
-    if( parSet.getPriorCovarianceMatrix() != nullptr ) {
+    if( parSet.getPriorCorrelationMatrix() != nullptr ) {
       int iParIndex{-1};
       int iFree{0}; // free parameters are not in the prior covariance matrices
-      int nCov{parSet.getPriorCovarianceMatrix()->GetNrows()};
+      int nCov{parSet.getPriorCorrelationMatrix()->GetNrows()};
       // LogDebug << "Adding parSet: " << parSet.getName() << " with " << nCov << " cov pars" << std::endl;
       for( auto& par : parSet.getParameterList() ){
         if( not par.isEnabled() ){ continue; }
@@ -92,7 +92,7 @@ void ParametersManager::initializeImpl(){
         if( par.isFree() ){ iFree++; continue; }
         int jParIndex{-1};
         int jFree{0};
-        for(int jCov = 0 ; jCov < parSet.getPriorCovarianceMatrix()->GetNcols() ; jCov++ ){
+        for(int jCov = 0 ; jCov < parSet.getPriorCorrelationMatrix()->GetNcols() ; jCov++ ){
           if( not parSet.getParameterList()[jCov].isEnabled() ){ continue; }
           if( parSet.getParameterList()[jCov].isFixed() ){ continue; }
           jParIndex++;
@@ -187,7 +187,7 @@ void ParametersManager::throwParametersFromParSetCovariance(){
 
     LogContinueIf( not parSet.isEnabledThrowToyParameters(), "Toy throw is disabled for " << parSet.getName() );
 
-    if( parSet.getPriorCovarianceMatrix() != nullptr ){
+    if( parSet.getPriorCorrelationMatrix() != nullptr ){
       LogWarning << parSet.getName() << ": throwing correlated parameters..." << std::endl;
       LogScopeIndent;
       parSet.throwParameters(_reThrowParSetIfOutOfPhysical_);
