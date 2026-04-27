@@ -187,21 +187,30 @@ void ParameterSet::processCovarianceMatrix(){
   if( _priorFullCovarianceMatrix_ == nullptr ){ return; } // nothing to do
 
   LogInfo << "Stripping the matrix from fixed/disabled parameters..." << std::endl;
-  int nbParameters{0};
-  int configWarnings{0};
-  for( const auto& par : _parameterList_ ){
+  _nCorrelatedParams_ = 0;
+  _correlatedParameterList_.resize(0);
+  _correlatedParameterList_.reserve(_parameterList_.size()); // max
+  for( auto& par : _parameterList_ ) {
     if( not ParameterSet::isValidCorrelatedParameter(par) ) continue;
-    nbParameters++;
-    if( not isEnableEigenDecomp() ) continue;
+    _correlatedParameterList_.emplace_back(&par);
+    _nCorrelatedParams_++;
+  }
+  _correlatedParameterList_.shrink_to_fit();
+
+
+  int configWarnings{0};
+  if( isEnableEigenDecomp() ) {
     // Warn if using eigen decomposition with bounded parameters.
-    if( par.getParameterLimits().isUnbounded() ){ continue; }
-    LogAlert << "Undefined behavior: Eigen-decomposition of a bounded parameter: "
-               << par.getFullTitle()
-               << std::endl;
-    ++configWarnings;
+    for( auto& par : _correlatedParameterList_ ){
+      if( par->getParameterLimits().isUnbounded() ){ continue; }
+      LogAlert << "Undefined behavior: Eigen-decomposition of a bounded parameter: "
+                 << par->getFullTitle()
+                 << std::endl;
+      ++configWarnings;
+    }
   }
 
-  if( nbParameters == 0 ){
+  if( _correlatedParameterList_.empty() ){
     LogAlert << "No parameter is enabled. Disabling the parameter set." << std::endl;
     _isEnabled_ = false;
     return;
@@ -218,40 +227,30 @@ void ParameterSet::processCovarianceMatrix(){
       std::exit(1);
     }
   }
-  LogInfo << nbParameters << " effective parameters were defined in set: " << getName() << std::endl;
+  LogInfo << _correlatedParameterList_.size() << " effective parameters were defined in set: " << getName() << std::endl;
 
-  _priorCovarianceMatrix_  = std::make_shared<TMatrixDSym>(nbParameters);
-  int iStrippedPar = -1;
-  for( int iPar = 0 ; iPar < int(_parameterList_.size()) ; iPar++ ){
-    if( not ParameterSet::isValidCorrelatedParameter(_parameterList_[iPar]) ) continue;
-    iStrippedPar++;
-    int jStrippedPar = -1;
-    for( int jPar = 0 ; jPar < int(_parameterList_.size()) ; jPar++ ){
-      if( not ParameterSet::isValidCorrelatedParameter(_parameterList_[jPar]) ) continue;
-      jStrippedPar++;
-      (*_priorCovarianceMatrix_)[iStrippedPar][jStrippedPar] = (*_priorFullCovarianceMatrix_)[iPar][jPar];
+  _priorCorrelationMatrix_  = std::make_shared<TMatrixDSym>(_nCorrelatedParams_);
+
+  // filling correlation matrix from input covariance matrix
+  for( int iPar = 0 ; iPar < _nCorrelatedParams_ ; iPar++ ) {
+    for( int jPar = 0 ; jPar < _nCorrelatedParams_ ; jPar++ ) {
+      (*_priorCorrelationMatrix_)[iPar][jPar] =
+        (*_priorFullCovarianceMatrix_)[_correlatedParameterList_[iPar]->getParameterIndex()][_correlatedParameterList_[jPar]->getParameterIndex()];
+      // normalize to correlation
+      (*_priorCorrelationMatrix_)[iPar][jPar] /= _correlatedParameterList_[iPar]->getStdDevValue() * _correlatedParameterList_[jPar]->getStdDevValue();
     }
   }
-  LogExitIf(not _priorCovarianceMatrix_->IsSymmetric(),
-            getName() << ":Covariance matrix is not symmetric");
 
-  // making correlation matrix
-  _priorCorrelationMatrix_ = std::shared_ptr<TMatrixDSym>((TMatrixDSym*)_priorCovarianceMatrix_->Clone());
-  for( int iPar = 0 ; iPar < _priorCovarianceMatrix_->GetNrows() ; iPar++ ) {
-    for( int jPar = 0 ; jPar < _priorCovarianceMatrix_->GetNcols() ; jPar++ ) {
-      if(iPar == jPar){ (*_priorCorrelationMatrix_)[iPar][jPar] = 1; continue; }
-
-      (*_priorCorrelationMatrix_)[iPar][jPar] /= std::sqrt((*_priorCovarianceMatrix_)[iPar][iPar]*(*_priorCovarianceMatrix_)[jPar][jPar]);
-    }
-  }
+  // sanity check
+  LogExitIf(not _priorCorrelationMatrix_->IsSymmetric(), getName() << ":Covariance matrix is not symmetric");
 
   // buffer that will be used to calculate the penalty chi2
-  _deltaVectorPtr_ = std::make_shared<TVectorD>(_priorCovarianceMatrix_->GetNrows());
+  _deltaVectorPtr_ = std::make_shared<TVectorD>(_priorCorrelationMatrix_->GetNrows());
 
   if( not isEnableEigenDecomp() ){
     LogInfo << "Computing inverse of the stripped covariance matrix: "
-               << _priorCovarianceMatrix_->GetNcols() << "x"
-               << _priorCovarianceMatrix_->GetNrows() << std::endl;
+               << _priorCorrelationMatrix_->GetNcols() << "x"
+               << _priorCorrelationMatrix_->GetNrows() << std::endl;
     _priorCorrelationMatrixInv_ = std::shared_ptr<TMatrixD>((TMatrixD*)(_priorCorrelationMatrix_->Clone()));
 
     double det{-1};
@@ -259,7 +258,7 @@ void ParameterSet::processCovarianceMatrix(){
 
     bool failed{false};
     if( det < 0 ){
-      _priorCovarianceMatrix_->Print();
+      _priorCorrelationMatrix_->Print();
       LogError << "Stripped covariance must be positive definite. Determinant is: " << det << std::endl;
       failed = true;
     }
@@ -282,13 +281,19 @@ void ParameterSet::processCovarianceMatrix(){
 
     LogExitIf(failed, "Failed inverting prior covariance matrix of par set: " << getName() );
 
+    // re-building covariance matrix
+    _priorCovarianceMatrixInv_ = std::shared_ptr<TMatrixD>((TMatrixD*)(_priorCorrelationMatrixInv_->Clone()));
+
   }
   else {
     LogInfo << "Decomposing the stripped covariance matrix..." << std::endl;
-    _eigenParameterList_.resize(_priorCovarianceMatrix_->GetNrows(), Parameter(this));
 
-    LogAlertIf(_priorCovarianceMatrix_->GetNrows() > 1000) << "Decomposing matrix with " << _priorCovarianceMatrix_->GetNrows() << " dim might take a while..." << std::endl;
-    _eigenDecomp_     = std::make_shared<TMatrixDSymEigen>(*_priorCovarianceMatrix_);
+    _eigenParameterList_.resize(_nCorrelatedParams_, Parameter(this));
+
+    LogAlertIf(_nCorrelatedParams_ > 1000) << "Decomposing matrix with " << _nCorrelatedParams_ << " dim might take a while..." << std::endl;
+
+    auto covMatrix = generatePriorCovarianceMatrix();
+    _eigenDecomp_     = std::make_shared<TMatrixDSymEigen>(*((TMatrixDSym*)covMatrix.get()));
 
     // Used for base swapping
     _eigenValues_     = std::shared_ptr<TVectorD>( (TVectorD*) _eigenDecomp_->GetEigenValues().Clone() );
@@ -327,8 +332,8 @@ void ParameterSet::processCovarianceMatrix(){
     _nbEnabledEigen_ = 0;
     double eigenTotal = _eigenValues_->Sum();
 
-    _priorCorrelationMatrixInv_ = std::make_shared<TMatrixD>(_priorCovarianceMatrix_->GetNrows(), _priorCovarianceMatrix_->GetNrows());
-    _projectorMatrix_           = std::make_shared<TMatrixD>(_priorCovarianceMatrix_->GetNrows(), _priorCovarianceMatrix_->GetNrows());
+    _priorCorrelationMatrixInv_ = std::make_shared<TMatrixD>(_nCorrelatedParams_, _nCorrelatedParams_);
+    _projectorMatrix_           = std::make_shared<TMatrixD>(_nCorrelatedParams_, _nCorrelatedParams_);
 
     auto eigenState = std::make_unique<TVectorD>(_eigenValues_->GetNrows());
 
@@ -389,14 +394,22 @@ void ParameterSet::processCovarianceMatrix(){
     (*_priorCorrelationMatrixInv_) *= (*diagInvMatrix);
     (*_priorCorrelationMatrixInv_) *= (*_eigenVectorsInv_);
 
+    for( int iPar = 0 ; iPar < _nCorrelatedParams_ ; iPar++ ) {
+      for( int jPar = 0 ; jPar < _nCorrelatedParams_ ; jPar++ ) {
+        (*_priorCorrelationMatrixInv_)[iPar][jPar] /=
+              _correlatedParameterList_[iPar]->getStdDevValue()
+            * _correlatedParameterList_[jPar]->getStdDevValue();
+      }
+    }
+
     LogInfo << "Eigen decomposition with " << _nbEnabledEigen_ << " / " << _eigenValues_->GetNrows() << " vectors" << std::endl;
     if(_nbEnabledEigen_ != _eigenValues_->GetNrows() ){
       LogInfo << "Max eigen fraction set to " << _maxEigenFraction_*100 << "%" << std::endl;
       LogInfo << "Fraction taken: " << eigenCumulative / eigenTotal*100 << "%" << std::endl;
     }
 
-    _originalParBuffer_ = std::make_shared<TVectorD>(_priorCovarianceMatrix_->GetNrows() );
-    _eigenParBuffer_    = std::make_shared<TVectorD>(_priorCovarianceMatrix_->GetNrows() );
+    _originalParBuffer_ = std::make_shared<TVectorD>( _nCorrelatedParams_ );
+    _eigenParBuffer_    = std::make_shared<TVectorD>( _nCorrelatedParams_ );
 
     // Put original parameters to the prior
     for( auto& par : _parameterList_ ){
@@ -480,6 +493,22 @@ void ParameterSet::setValidity(const std::string& validity) {
   LogInfo << "Set parameter set validity to " << validity << std::endl;
 }
 
+std::shared_ptr<TMatrixD> ParameterSet::generatePriorCovarianceMatrix() const{
+  if( _priorCorrelationMatrix_ == nullptr ){ return nullptr; }
+
+  // start from correlation
+  auto out = std::shared_ptr<TMatrixD>((TMatrixD*)(_priorCorrelationMatrix_->Clone()));
+
+  // multiplying
+  for( int iPar = 0 ; iPar < _nCorrelatedParams_ ; iPar++ ) {
+    for( int jPar = 0 ; jPar < _nCorrelatedParams_ ; jPar++ ) {
+      (*out)[iPar][jPar] *= _correlatedParameterList_[iPar]->getStdDevValue() * _correlatedParameterList_[jPar]->getStdDevValue();
+    }
+  }
+  return out;
+}
+
+
 // Parameter throw
 void ParameterSet::moveParametersToPrior(){
   if( not isEnableEigenDecomp() ){
@@ -498,10 +527,12 @@ void ParameterSet::moveParametersToPrior(){
 }
 void ParameterSet::throwParameters(bool rethrowIfNotInPhysical_, double gain_){
 
-  TVectorD throwsList;
-  if (_priorCovarianceMatrix_) {
-    throwsList.ResizeTo(_priorCovarianceMatrix_->GetNrows());
+  if( _nCorrelatedParams_ == 0 ) {
+    LogInfo << getName() << ": no parameters to throw, skipping..." << std::endl;
+    return;
   }
+
+  TVectorD throwsList(_nCorrelatedParams_);
 
   // generic function to handle multiple throws
   std::function<void(std::function<void()>)> throwParsFct =
@@ -650,14 +681,13 @@ void ParameterSet::throwParameters(bool rethrowIfNotInPhysical_, double gain_){
              << " using alternate generator: Mark Hartz Generator"
              << std::endl;
 
-    int iPar{0};
-    for( auto& par : _parameterList_ ){
-      if( ParameterSet::isValidCorrelatedParameter(par) ){ throwsList[iPar++] = par.getPriorValue(); }
+    for( int iPar = 0 ; iPar < _nCorrelatedParams_ ; iPar++ ) {
+      throwsList[iPar] = 0; // this will be used as a shift on the thrown value
     }
 
     if( _markHartzGen_ == nullptr ){
       LogInfo << "Generating Cholesky matrix in set: " << getName() << std::endl;
-      _markHartzGen_ = std::make_shared<ParameterThrowerMarkHarz>(throwsList, *_priorCovarianceMatrix_);
+      _markHartzGen_ = std::make_shared<ParameterThrowerMarkHarz>(throwsList, *_priorCorrelationMatrix_);
     }
     // TVectorD throws(_priorCovarianceMatrix_->GetNrows());
 
@@ -665,15 +695,13 @@ void ParameterSet::throwParameters(bool rethrowIfNotInPhysical_, double gain_){
     std::function<void()> markScottThrowFct = [&](){
       if ( _markHartzGen_ == nullptr) return;
 
-      throwPars.resize(_priorCovarianceMatrix_->GetNrows());
+      throwPars.resize(_nCorrelatedParams_);
 
       _markHartzGen_->ThrowSet(throwPars);
-      // THROWS ARE CENTERED AROUND 1!!
 
       // convert to TVectorD
-      int iPar{0};
-      for( auto& thrownPar : throwPars ){
-        throwsList[iPar++] = thrownPar;
+      for( int iPar = 0 ; iPar < _nCorrelatedParams_ ; iPar++ ) {
+        throwsList[iPar] = throwPars[iPar] * _correlatedParameterList_[iPar]->getStdDevValue();
       }
     };
 
@@ -730,9 +758,8 @@ void ParameterSet::throwParameters(bool rethrowIfNotInPhysical_, double gain_){
   else {
       LogInfo << "Throwing parameters for " << _name_ << " using Cholesky matrix" << std::endl;
 
-      if( not _correlatedVariableThrower_.isInitialized()
-          and _priorCovarianceMatrix_ != nullptr){
-        _correlatedVariableThrower_.setCovarianceMatrixPtr(_priorCovarianceMatrix_.get());
+      if( not _correlatedVariableThrower_.isInitialized() ){
+        _correlatedVariableThrower_.setCovarianceMatrixPtr(_priorCorrelationMatrix_.get());
         _correlatedVariableThrower_.initialize();
         int iFit{-1};
         for( auto& par : this->getParameterList() ){
@@ -748,8 +775,10 @@ void ParameterSet::throwParameters(bool rethrowIfNotInPhysical_, double gain_){
       }
 
       std::function<void()> gundamThrowFct = [&](){
-        if ( _priorCovarianceMatrix_ == nullptr) return;
         _correlatedVariableThrower_.throwCorrelatedVariables(throwsList);
+        for( int iPar = 0 ; iPar < _nCorrelatedParams_ ; iPar++ ) {
+          throwsList[iPar] *= _correlatedParameterList_[iPar]->getStdDevValue();
+        }
       };
 
       throwParsFct( gundamThrowFct );
