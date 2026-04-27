@@ -220,7 +220,7 @@ void ParameterSet::processCovarianceMatrix(){
   }
   LogInfo << nbParameters << " effective parameters were defined in set: " << getName() << std::endl;
 
-  _priorCovarianceMatrix_ = std::make_shared<TMatrixDSym>(nbParameters);
+  _priorCovarianceMatrix_  = std::make_shared<TMatrixDSym>(nbParameters);
   int iStrippedPar = -1;
   for( int iPar = 0 ; iPar < int(_parameterList_.size()) ; iPar++ ){
     if( not ParameterSet::isValidCorrelatedParameter(_parameterList_[iPar]) ) continue;
@@ -232,19 +232,30 @@ void ParameterSet::processCovarianceMatrix(){
       (*_priorCovarianceMatrix_)[iStrippedPar][jStrippedPar] = (*_priorFullCovarianceMatrix_)[iPar][jPar];
     }
   }
-  _deltaVectorPtr_ = std::make_shared<TVectorD>(_priorCovarianceMatrix_->GetNrows());
-
   LogExitIf(not _priorCovarianceMatrix_->IsSymmetric(),
             getName() << ":Covariance matrix is not symmetric");
+
+  // making correlation matrix
+  _priorCorrelationMatrix_ = std::shared_ptr<TMatrixDSym>((TMatrixDSym*)_priorCovarianceMatrix_->Clone());
+  for( int iPar = 0 ; iPar < _priorCovarianceMatrix_->GetNrows() ; iPar++ ) {
+    for( int jPar = 0 ; jPar < _priorCovarianceMatrix_->GetNcols() ; jPar++ ) {
+      if(iPar == jPar){ (*_priorCorrelationMatrix_)[iPar][jPar] = 1; continue; }
+
+      (*_priorCorrelationMatrix_)[iPar][jPar] /= std::sqrt((*_priorCovarianceMatrix_)[iPar][iPar]*(*_priorCovarianceMatrix_)[jPar][jPar]);
+    }
+  }
+
+  // buffer that will be used to calculate the penalty chi2
+  _deltaVectorPtr_ = std::make_shared<TVectorD>(_priorCovarianceMatrix_->GetNrows());
 
   if( not isEnableEigenDecomp() ){
     LogInfo << "Computing inverse of the stripped covariance matrix: "
                << _priorCovarianceMatrix_->GetNcols() << "x"
                << _priorCovarianceMatrix_->GetNrows() << std::endl;
-    _inverseCovarianceMatrix_ = std::shared_ptr<TMatrixD>((TMatrixD*)(_priorCovarianceMatrix_->Clone()));
+    _priorCorrelationMatrixInv_ = std::shared_ptr<TMatrixD>((TMatrixD*)(_priorCorrelationMatrix_->Clone()));
 
     double det{-1};
-    _inverseCovarianceMatrix_->Invert(&det);
+    _priorCorrelationMatrixInv_->Invert(&det);
 
     bool failed{false};
     if( det < 0 ){
@@ -255,13 +266,13 @@ void ParameterSet::processCovarianceMatrix(){
 
     TVectorD eigenValues;
 
-    if(_inverseCovarianceMatrix_->GetNrows() == 1) {
+    if(_priorCorrelationMatrixInv_->GetNrows() == 1) {
       eigenValues.ResizeTo(1);
-      eigenValues[0] = (*_inverseCovarianceMatrix_)[0][0];
+      eigenValues[0] = (*_priorCorrelationMatrixInv_)[0][0];
     }
     else {
       // https://root-forum.cern.ch/t/tmatrixt-get-eigenvalues/25924
-      _inverseCovarianceMatrix_->EigenVectors(eigenValues);
+      _priorCorrelationMatrixInv_->EigenVectors(eigenValues);
     }
 
     if( eigenValues.Min() < 0 ){
@@ -277,7 +288,7 @@ void ParameterSet::processCovarianceMatrix(){
     _eigenParameterList_.resize(_priorCovarianceMatrix_->GetNrows(), Parameter(this));
 
     LogAlertIf(_priorCovarianceMatrix_->GetNrows() > 1000) << "Decomposing matrix with " << _priorCovarianceMatrix_->GetNrows() << " dim might take a while..." << std::endl;
-    _eigenDecomp_     = std::make_shared<TMatrixDSymEigen>(*_priorCovarianceMatrix_);
+    _eigenDecomp_     = std::make_shared<TMatrixDSymEigen>(*_priorCorrelationMatrix_);
 
     // Used for base swapping
     _eigenValues_     = std::shared_ptr<TVectorD>( (TVectorD*) _eigenDecomp_->GetEigenValues().Clone() );
@@ -316,8 +327,8 @@ void ParameterSet::processCovarianceMatrix(){
     _nbEnabledEigen_ = 0;
     double eigenTotal = _eigenValues_->Sum();
 
-    _inverseCovarianceMatrix_ = std::make_shared<TMatrixD>(_priorCovarianceMatrix_->GetNrows(), _priorCovarianceMatrix_->GetNrows());
-    _projectorMatrix_         = std::make_shared<TMatrixD>(_priorCovarianceMatrix_->GetNrows(), _priorCovarianceMatrix_->GetNrows());
+    _priorCorrelationMatrixInv_ = std::make_shared<TMatrixD>(_priorCovarianceMatrix_->GetNrows(), _priorCovarianceMatrix_->GetNrows());
+    _projectorMatrix_           = std::make_shared<TMatrixD>(_priorCovarianceMatrix_->GetNrows(), _priorCovarianceMatrix_->GetNrows());
 
     auto eigenState = std::make_unique<TVectorD>(_eigenValues_->GetNrows());
 
@@ -374,9 +385,9 @@ void ParameterSet::processCovarianceMatrix(){
     (*_projectorMatrix_) *= (*eigenStateMatrix);
     (*_projectorMatrix_) *= (*_eigenVectorsInv_);
 
-    (*_inverseCovarianceMatrix_) =  (*_eigenVectors_);
-    (*_inverseCovarianceMatrix_) *= (*diagInvMatrix);
-    (*_inverseCovarianceMatrix_) *= (*_eigenVectorsInv_);
+    (*_priorCorrelationMatrixInv_) =  (*_eigenVectors_);
+    (*_priorCorrelationMatrixInv_) *= (*diagInvMatrix);
+    (*_priorCorrelationMatrixInv_) *= (*_eigenVectorsInv_);
 
     LogInfo << "Eigen decomposition with " << _nbEnabledEigen_ << " / " << _eigenValues_->GetNrows() << " vectors" << std::endl;
     if(_nbEnabledEigen_ != _eigenValues_->GetNrows() ){
@@ -457,7 +468,7 @@ void ParameterSet::updateDeltaVector() const{
   int iFit{0};
   for( const auto& par : _parameterList_ ){
     if( ParameterSet::isValidCorrelatedParameter(par) ){
-      (*_deltaVectorPtr_)[iFit++] = par.getParameterValue() - par.getPriorValue();
+      (*_deltaVectorPtr_)[iFit++] = (par.getParameterValue() - par.getPriorValue())/par.getStdDevValue();
     }
   }
 }
@@ -803,7 +814,7 @@ std::string ParameterSet::getSummary() const {
           std::string statusStr;
 
           if( not par.isEnabled() ) { continue; }
-          else if( par.isFixed() )  { statusStr = "Fixed (prior applied)";    colorStr = GenericToolbox::ColorCodes::yellowLightText; }
+          else if( par.isFixed() )  { statusStr = "Fixed (applied, penalty ignored)";    colorStr = GenericToolbox::ColorCodes::yellowLightText; }
           else if( par.isFrozen() )  { statusStr = "Frozen (penalty applied)";    colorStr = GenericToolbox::ColorCodes::yellowLightText; }
           else if( par.isFree() )   { statusStr = "Free";     colorStr = GenericToolbox::ColorCodes::blueLightText; }
           else                      { statusStr = "Constrained"; }
