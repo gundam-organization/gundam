@@ -226,20 +226,20 @@ void FitterEngine::initializeImpl(){
     for( auto& parSet : getLikelihoodInterface().getModelPropagator().getParametersManager().getParameterSetsList() ){
       if(not parSet.isEnabled()) continue;
 
-      auto saveFolder = GenericToolbox::joinPath( "propagator", parSet.getName() );
-      GenericToolbox::writeInTFileWithObjTypeExt(
-          GenericToolbox::mkdirTFile( _saveDir_, saveFolder ),
-          parSet.getPriorCovarianceMatrix().get(), "covarianceMatrix"
-      );
-      GenericToolbox::writeInTFileWithObjTypeExt(
-          GenericToolbox::mkdirTFile(_saveDir_, saveFolder ),
-          GenericToolbox::toCorrelationMatrix(parSet.getPriorCovarianceMatrix().get()),
-          "correlationMatrix"
-      );
-      GenericToolbox::writeInTFileWithObjTypeExt(
-          GenericToolbox::mkdirTFile( _saveDir_, saveFolder ),
-          parSet.getInverseCovarianceMatrix().get(), "invCovarianceMatrix"
-      );
+    auto saveFolder = GenericToolbox::joinPath( "propagator", parSet.getName() );
+    GenericToolbox::writeInTFileWithObjTypeExt(
+        GenericToolbox::mkdirTFile( _saveDir_, saveFolder ),
+        parSet.getPriorCovarianceMatrix().get(), "covarianceMatrix"
+    );
+    GenericToolbox::writeInTFileWithObjTypeExt(
+        GenericToolbox::mkdirTFile(_saveDir_, saveFolder ),
+        parSet.getPriorCorrelationMatrix().get(),
+        "correlationMatrix"
+    );
+    GenericToolbox::writeInTFileWithObjTypeExt(
+        GenericToolbox::mkdirTFile( _saveDir_, saveFolder ),
+        parSet.getInverseCorrelationMatrix().get(), "invCorrelationMatrix"
+    );
 
       auto parsSaveFolder = GenericToolbox::joinPath( saveFolder, "parameters" );
       for( auto& par : parSet.getParameterList() ){
