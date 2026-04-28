@@ -1378,15 +1378,12 @@ void RootMinimizer::writePostFitData( TDirectory* saveDir_) {
 
       // restore the original size of the matrix
       covMatrix = std::make_unique<TMatrixD>(int(parList->size()), int(parList->size()));
-      int iStripped{-1};
-      for( auto& iPar : *parList ){
-        if( iPar.isFixed() or not iPar.isEnabled() ) continue;
-        iStripped++;
-        int jStripped{-1};
-        for( auto& jPar : *parList ){
-          if( jPar.isFixed() or not jPar.isEnabled() ) continue;
-          jStripped++;
-          (*covMatrix)[iPar.getParameterIndex()][jPar.getParameterIndex()] = (*originalStrippedCovMatrix)[iStripped][jStripped];
+      for( int iPar = 0; iPar < parSet.getNbCorrelatedParameters() ; ++iPar ){
+        for( int jPar = 0; jPar < parSet.getNbCorrelatedParameters() ; ++jPar ) {
+          (*covMatrix)
+            [parSet.getCorrelatedParameterList()[iPar]->getParameterIndex()]
+            [parSet.getCorrelatedParameterList()[jPar]->getParameterIndex()]
+            = (*originalStrippedCovMatrix)[iPar][jPar];
         }
       }
 
