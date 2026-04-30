@@ -479,17 +479,12 @@ bool ParameterSet::hasOutOfBoundsParameters() const{
 }
 void ParameterSet::updateDeltaVector() const{
   int iFit{0};
-  for( const auto& par : _parameterList_ ){
-    if( ParameterSet::isValidCorrelatedParameter(par) ){
-      (*_deltaVectorPtr_)[iFit++] = (par.getParameterValue() - par.getPriorValue())/par.getStdDevValue();
-    }
+  for( auto& par : _correlatedParameterList_ ) {
+    (*_deltaVectorPtr_)[iFit++] = (par->getParameterValue() - par->getPriorValue())/par->getStdDevValue();
   }
 }
-
 void ParameterSet::setValidity(const std::string& validity) {
-  for (Parameter& par : getParameterList()) {
-    par.setValidity(validity);
-  }
+  for (Parameter& par : getParameterList()) { par.setValidity(validity); }
   LogInfo << "Set parameter set validity to " << validity << std::endl;
 }
 
@@ -761,15 +756,16 @@ void ParameterSet::throwParameters(bool rethrowIfNotInPhysical_, double gain_){
       if( not _correlatedVariableThrower_.isInitialized() ){
         _correlatedVariableThrower_.setCovarianceMatrixPtr(_priorCorrelationMatrix_.get());
         _correlatedVariableThrower_.initialize();
-        int iFit{-1};
-        for( auto& par : this->getParameterList() ){
-          if( ParameterSet::isValidCorrelatedParameter(par) ){
-            iFit++;
-            _correlatedVariableThrower_.getParLimitList().at(iFit) = par.getThrowLimits();
-            // cancel the prior, thrown values are centered around 0
-            _correlatedVariableThrower_.getParLimitList().at(iFit) -= par.getPriorValue();
-          }
+
+        for( int iPar = 0 ; iPar < _nCorrelatedParams_ ; iPar++ ) {
+          _correlatedVariableThrower_.getParLimitList()[iPar]  = _correlatedParameterList_[iPar]->getThrowLimits();
+          // cancel the prior, thrown values are centered around 0
+          _correlatedVariableThrower_.getParLimitList()[iPar] -= _correlatedParameterList_[iPar]->getPriorValue();
+          // since we use correlation matrix, rescale the limits
+          _correlatedVariableThrower_.getParLimitList()[iPar].min /= _correlatedParameterList_[iPar]->getStdDevValue();
+          _correlatedVariableThrower_.getParLimitList()[iPar].max /= _correlatedParameterList_[iPar]->getStdDevValue();
         }
+
         _correlatedVariableThrower_.setNbMaxTries(100000); // could be a user parameter
         _correlatedVariableThrower_.extractBlocks();
       }
