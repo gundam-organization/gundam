@@ -31,6 +31,7 @@ namespace {
         spline.SetLineWidth(5);
         spline.SetLineColor(kRed);
         spline.Draw("same");
+        double splineRange = spline.GetXmax()-spline.GetXmin();
         const int nKnots = spline.GetNp();
         EXPECT_EQ(nKnots,graph.GetN()) << testName << ": Knots match graph";
         const int dim = 2*nKnots + 2;
@@ -55,18 +56,18 @@ namespace {
             spline.GetKnot(knot,xxx,yyy);
             double splineValue = spline.Eval(xxx);
             double calcValue
-                = CalculateUniformSpline(xxx,-100.0, 100.0,
+                = CalculateUniformSpline(xxx,-1.0E+20, 1.0E+20,
                                          data.data(), dim);
             EXPECT_NEAR(splineValue, calcValue, 1e-5)
                 << testName << ": must match at knots";
         }
         TGraph uniformSpline;
         int point = 0;
-        for (double xxx = spline.GetXmin()-1.0;
-             xxx<=spline.GetXmax()+1.0; xxx += 0.01) {
+        for (double xxx = spline.GetXmin()-0.5*splineRange;
+             xxx<=spline.GetXmax()+0.5*splineRange; xxx += 0.01) {
             double splineValue = spline.Eval(xxx);
             double calcValue
-                = CalculateUniformSpline(xxx,-100.0, 100.0,
+                = CalculateUniformSpline(xxx,-1.0E+20, 1.0E+20,
                                          data.data(), dim);
             uniformSpline.SetPoint(point++, xxx, calcValue);
             EXPECT_NEAR(splineValue, calcValue, 1E-6)
@@ -122,7 +123,7 @@ namespace {
             double xxx = graph.GetPointX(knot);
             double yyy = graph.GetPointY(knot);
             double calcValue
-                = CalculateUniformSpline(xxx,-100.0, 100.0,
+                = CalculateUniformSpline(xxx,-1.0E+20, 1.0E+20,
                                          data.data(), dim);
             EXPECT_NEAR(yyy, calcValue, 1e-5)
                 << testName << ": must match at knots";
@@ -132,7 +133,7 @@ namespace {
         for (double xxx = spline.GetXmin();
              xxx<=spline.GetXmax(); xxx += 0.01) {
             double calcValue
-                = CalculateUniformSpline(xxx,-100.0, 100.0,
+                = CalculateUniformSpline(xxx,-1.0E+20, 1.0E+20,
                                          data.data(), dim);
             uniformSpline.SetPoint(point++, xxx, calcValue);
         }
@@ -157,9 +158,18 @@ TEST(UniformSpline,MatchTSpline3ThreeKnot) {
     testUniformSpline3(graph,"MatchTSpline3ThreeKnot",true);
 }
 
+TEST(UniformSpline,MatchTSpline3ThreeKnotSymmetric) {
+    // Define a TSpline3 and make sure that UniformSpline reproduces it
+    TGraph graph;
+    graph.SetPoint(0,-3.0, 5.5);
+    graph.SetPoint(1, 0.0, 1.0);
+    graph.SetPoint(2, 3.0, 5.5);
+    testUniformSpline3(graph,"MatchTSpline3ThreeKnotSymmetric",true);
+}
+
 TEST(UniformSpine,MatchTSpline3FiveKnot) {
-    // Define a TGraph and make sure that UniformSpline reproduces it
-    TGraph graph(3);
+    // Define a TGraph and make sure that GeneralSpline reproduces it
+    TGraph graph(5);
     graph.SetPoint(0,-1.0, 0.0);
     graph.SetPoint(1, 0.0, 1.0);
     graph.SetPoint(2, 1.0, 3.5);
