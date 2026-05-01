@@ -23,7 +23,7 @@ if(NOT DEFINED GUNDAM_TESTS_ARGUMENT OR GUNDAM_TESTS_ARGUMENT STREQUAL "")
   set(GUNDAM_TESTS_ARGUMENT "-f")
 endif(NOT DEFINED GUNDAM_TESTS_ARGUMENT OR GUNDAM_TESTS_ARGUMENT STREQUAL "")
 
-set(DEV_WITHOUT_GUNDAM_TESTS ON) # Should be off by default.
+set(DEV_WITHOUT_GUNDAM_TESTS OFF) # Should be off by default.
 # Run the main executable test scripts.  These are relatively slow, so they
 if( NOT DEV_WITHOUT_GUNDAM_TESTS )
   add_test(
