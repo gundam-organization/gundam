@@ -9,7 +9,6 @@
 #     cmake -- Don't compile the source (only run cmake).
 #     clean -- Run clean the build area after running cmake (run make clean)
 #     keep-going  -- Continue after compilation errors (add -k to make)
-#     ctest -- Run tests directly with ctest
 #     test  -- Run tests after the build
 #     verbose -- Run make with verbose turned on.
 #     help  -- This message
@@ -59,7 +58,6 @@ if [ ! -d ${BUILD_LOCATION} ]; then
     echo Unable to access build location at ${BUILD_LOCATION}
     exit 1
 fi
-cd ${BUILD_LOCATION}
 
 # If GUNDAM_INSTALL is not set, then the installation is in the same
 # directory as the build.
@@ -67,6 +65,7 @@ if [ ${#GUNDAM_INSTALL} == 0 ]; then
     GUNDAM_INSTALL=${BUILD_LOCATION}
 fi
 
+FORCE_CMAKE="no"
 ONLY_CMAKE="no"
 RUN_CLEAN="no"
 RUN_TEST="no"
@@ -80,18 +79,13 @@ if [ "x${GUNDAM_JOBS}" == x ]; then
     echo XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
     echo
 fi
-MAKE_OPTIONS=" -j${GUNDAM_JOBS} "
+MAKE_OPTIONS=""
 while [ "x${1}" != "x" ]; do
     case ${1} in
         fo*) # force
             shift
             echo Reconfigure build.
-            if [ -f  CMakeCache.txt ]; then
-	        rm CMakeCache.txt
-            fi
-            if [ -d CMakeFiles ]; then
-	        rm -rf CMakeFiles
-            fi
+            FORCE_CMAKE="yes"
             ;;
         cm*) # cmake
             shift
@@ -108,32 +102,26 @@ while [ "x${1}" != "x" ]; do
             echo Continue on errors
             MAKE_OPTIONS=" -k ${MAKE_OPTIONS}"
             ;;
-        ctest*) # test
-            shift
-            echo Run ctest
-            RUN_TEST="ctest"
-            ;;
-        test*) # test
+        test|ctest) # test
             shift
             echo Run tests
-            RUN_TEST="make-test"
+            RUN_TEST="yes"
             ;;
         ve*) # verbose
             shift
             export VERBOSE=true
             ;;
         he*) # help
-            echo 
+            echo
             echo "gundam-build [help|force|...] [-D<cmake-definitions>]"
             echo "   force -- Force cmake to ignore the cache"
             echo "   cmake -- Don't build the package (only run cmake)"
             echo "   clean -- Run make clean after cmake"
             echo "   keep  -- Keep going on a compilation error (make -k)"
-            echo "   ctest <ctest-arguments> -- Run ctest on the build"
-            echo "   test  -- Run tests after the build"
+            echo "   test <ctest-arguments> -- Run ctest on the build"
             echo "   verbose -- Run make with verbose turned on."
             echo "   help  -- This message"
-            echo 
+            echo
             exit 0
             ;;
         -D*) # Add definitions
@@ -147,39 +135,43 @@ while [ "x${1}" != "x" ]; do
     esac
 done
 
-if [ ${RUN_CLEAN} = "yes" ]; then
-    if [ ! -f Makefile ]; then
-        echo ERROR: Makefile does not exist -- cannot clean.
-        exit 1;
-    fi
-    echo make clean
-    make ${MAKE_OPTIONS} clean
-    echo Source cleaned.
-    exit 0
+if [ ! -f ${BUILD_LOCATION}/CMakeCache.txt -o ${FORCE_CMAKE} = "yes" ]; then
+    echo cmake -B ${BUILD_LOCATION} -S ${GUNDAM_ROOT} --fresh ${DEFINES}
+    cmake -B ${BUILD_LOCATION} -S ${GUNDAM_ROOT} --fresh ${DEFINES}
 fi
 
-if [ ! -f CMakeCache.txt ]; then
-    echo cmake ${DEFINES} ${GUNDAM_ROOT}
-    cmake ${DEFINES} ${GUNDAM_ROOT}
+if [ ${RUN_CLEAN} = "yes" ]; then
+    echo cmake --build ${BUILD_LOCATION} --target clean
+    cmake --build ${BUILD_LOCATION} --target clean
+    echo Source cleaned.
+    exit 0
 fi
 
 if [ ${ONLY_CMAKE} = "yes" ]; then
     exit 0
 fi
 
-echo make ${MAKE_OPTIONS}
-make ${MAKE_OPTIONS} || exit 1
-echo make install
-make ${MAKE_OPTIONS} install || exit 1
+echo cmake --build ${BUILD_LOCATION} \
+     --parallel ${GUNDAM_JOBS} \
+     -- ${MAKE_OPTIONS}
+cmake --build ${BUILD_LOCATION} \
+      --parallel ${GUNDAM_JOBS} \
+      -- ${MAKE_OPTIONS} \
+    || exit 1
 
-if [ ${RUN_TEST} = "ctest" ]; then
-    echo Run ctest $*
-    ctest $* || exit 1
-fi
+echo cmake --install ${BUILD_LOCATION} --parallel ${GUNDAM_JOBS} || exit 1
+cmake --install ${BUILD_LOCATION} --parallel ${GUNDAM_JOBS} || exit 1
 
-if [ ${RUN_TEST} = "make-test" ]; then
-    echo Run make test
-    make ${MAKE_OPTIONS} test || exit 1
+if [ ${RUN_TEST} = "yes" ]; then
+    echo ctest --test-dir ${BUILD_LOCATION} \
+          --parallel ${GUNDAM_JOBS} \
+          --output-on-failure \
+          $*
+    ctest --test-dir ${BUILD_LOCATION} \
+          --parallel ${GUNDAM_JOBS} \
+          --output-on-failure \
+          $* \
+        || exit 1
 fi
 
 echo "build:       " ${BUILD_LOCATION}

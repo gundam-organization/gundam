@@ -35,63 +35,57 @@ else()
 endif( NOT DEV_WITHOUT_GUNDAM_TESTS )
 
 if( WITH_GOOGLE_TEST )
-  ## Compiled unit tests using GoogleTest.  These are only run if GTest
-  ## is found.
-  find_package(GTest QUIET)
+  ## Compiled unit tests using GoogleTest.
+  include(GoogleTest)
 
-  if(GTEST_FOUND)
-    cmessage( STATUS "Compiling google tests" )
-    add_executable(gundamGTest_unitTest.exe
-      GTests/unitTest_JointProbability.cpp
-      GTests/unitTest_CalculateCompactSpline.cpp
-      GTests/unitTest_CalculateMonotonicSpline.cpp
-      GTests/unitTest_CalculateGraph.cpp
-      GTests/unitTest_CalculateGeneralSpline.cpp
-      GTests/unitTest_CalculateUniformSpline.cpp
-      GTests/unitTest_CalculateBilinearInterpolation.cpp
-      GTests/unitTest_CalculateBicubicSpline.cpp
-      GTests/unitTest_ApplyMonotonicCondition.cpp
-    )
-    target_link_libraries(gundamGTest_unitTest.exe GTest::gtest_main)
-    target_link_libraries(gundamGTest_unitTest.exe GundamFitter)
-    gtest_discover_tests(gundamGTest_unitTest.exe)
+  cmessage( STATUS "Compiling google tests" )
+  add_executable(gundamGTest_unitTest.exe
+    GTests/unitTest_JointProbability.cpp
+    GTests/unitTest_CalculateCompactSpline.cpp
+    GTests/unitTest_CalculateMonotonicSpline.cpp
+    GTests/unitTest_CalculateGraph.cpp
+    GTests/unitTest_CalculateGeneralSpline.cpp
+    GTests/unitTest_CalculateUniformSpline.cpp
+    GTests/unitTest_CalculateBilinearInterpolation.cpp
+    GTests/unitTest_CalculateBicubicSpline.cpp
+    GTests/unitTest_ApplyMonotonicCondition.cpp
+  )
+  target_link_libraries(gundamGTest_unitTest.exe GTest::gtest_main)
+  target_link_libraries(gundamGTest_unitTest.exe GundamFitter)
+  gtest_discover_tests(gundamGTest_unitTest.exe)
 
-    if( WITH_CACHE_MANAGER )
-      # Setup the hemi test suite for the host
+  if( WITH_CACHE_MANAGER )
+    # Setup the hemi test suite for the host
 
-      add_executable(gundamGTest_host.exe
-          GTests/hemiArrayTest.cpp
-          GTests/hemiExecutionPolicyTest.cpp
-          GTests/cachedSumsTest.cpp
-          GTests/hemiExternals.cpp)
-      target_link_libraries(gundamGTest_host.exe GTest::gtest_main)
-      target_link_libraries(gundamGTest_host.exe GundamCacheManager)
-      target_compile_definitions(gundamGTest_host.exe PUBLIC HEMI_CUDA_DISABLE)
-      gtest_discover_tests(gundamGTest_host.exe)
+    add_executable(gundamGTest_host.exe
+      GTests/hemiArrayTest.cpp
+      GTests/hemiExecutionPolicyTest.cpp
+      GTests/cachedSumsTest.cpp
+      GTests/hemiExternals.cpp)
+    target_link_libraries(gundamGTest_host.exe GTest::gtest_main)
+    target_link_libraries(gundamGTest_host.exe GundamCacheManager)
+    target_compile_definitions(gundamGTest_host.exe PUBLIC HEMI_CUDA_DISABLE)
+    gtest_discover_tests(gundamGTest_host.exe)
 
-      if(CMAKE_CUDA_COMPILER)
-        # Setup the hemi test suite for the device.
-        add_executable(gundamGTest_device.exe
-            GTests/hemiArrayTest.cu
-            GTests/hemiExecutionPolicyTest.cu
-            GTests/hemiLaunch.cu
-            GTests/cachedSumsTest.cu
-            GTests/hemiExternals.cpp)
-        target_link_libraries(gundamGTest_device.exe GTest::gtest_main)
-        target_link_libraries(gundamGTest_device.exe GundamCacheManager)
-        gtest_discover_tests(gundamGTest_device.exe)
-      endif(CMAKE_CUDA_COMPILER)
+    if(CMAKE_CUDA_COMPILER)
+      # Setup the hemi test suite for the device.
+      add_executable(gundamGTest_device.exe
+        GTests/hemiArrayTest.cu
+        GTests/hemiExecutionPolicyTest.cu
+        GTests/hemiLaunch.cu
+        GTests/cachedSumsTest.cu
+        GTests/hemiExternals.cpp)
+      target_link_libraries(gundamGTest_device.exe GTest::gtest_main)
+      target_link_libraries(gundamGTest_device.exe GundamCacheManager)
+      gtest_discover_tests(gundamGTest_device.exe)
+    endif(CMAKE_CUDA_COMPILER)
 
-    else( WITH_CACHE_MANAGER )
+  else( WITH_CACHE_MANAGER )
 
-      cmessage( WARNING "WITH_CACHE_MANAGER is set to false. Skipping Cache::Manager test executables." )
+    cmessage( WARNING "WITH_CACHE_MANAGER is set to false. Skipping Cache::Manager test executables." )
 
-    endif( WITH_CACHE_MANAGER )
-
-  else(GTEST_FOUND)
-    cmessage( WARNING "Google test is not available." )
-  endif(GTEST_FOUND)
+  endif( WITH_CACHE_MANAGER )
 
 else(WITH_GOOGLE_TEST)
-  cmessage( STATUS "Unit tests will not be used")
+  cmessage( WARNING "GoogleTests are not used and some unit tests are skipped")
 endif()

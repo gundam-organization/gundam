@@ -23,6 +23,7 @@ endfunction( checkSubmodule )
 checkSubmodule( cpp-generic-toolbox )
 checkSubmodule( simple-cpp-logger )
 checkSubmodule( simple-cpp-cmd-line-parser )
+checkSubmodule( googletest )
 
 ## Add the CmdLineParser
 # Reproduce needed parts of the simple-cpp-cmd-line-parser CMakeLists.txt
@@ -73,3 +74,6 @@ else()
   add_definitions( -D LOGGER_ENABLE_COLORS_ON_USER_HEADER=1 )
 endif()
 
+## GoogleTest as a subdirectory.  This makes it available to the
+# rest of the build using the "include(GoogleTest)" cmake module.
+add_subdirectory( ${CMAKE_SOURCE_DIR}/submodules/googletest )
