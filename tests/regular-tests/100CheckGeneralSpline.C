@@ -98,7 +98,7 @@ int main() {
 #ifdef TEST2
     {
         // Define a TGraph and make sure that GeneralSpline reproduces it
-        TGraph graph(3);
+        TGraph graph;
         graph.SetPoint(0,-3.0, 0.0);
         graph.SetPoint(1, 0.1, 1.0);
         graph.SetPoint(2, 2.3, 3.5);
@@ -170,7 +170,7 @@ int main() {
         double data[dim];
         data[0] = -3.0;
         data[1] = 0.0;
-        std::cout << "Test1: Number of knots " << nKnots << std::endl;
+        std::cout << "Test4: Number of knots " << nKnots << std::endl;
         for (int knot = 0; knot < nKnots; ++knot) {
             double xx;
             double yy;
@@ -183,20 +183,77 @@ int main() {
         }
         TGraph generalSpline;
         int point = 0;
-        for (double xxx = spline.GetXmin() - 2.0;
-             xxx<=spline.GetXmax() + 2.0; xxx += 0.01) {
+        double delta = spline.GetXmax()-spline.GetXmin();
+        for (double xxx = spline.GetXmin() - 0.5*delta;
+             xxx<=spline.GetXmax() + 0.5*delta; xxx += 0.01) {
             double splineValue = spline.Eval(xxx);
             double calcValue
                 = CalculateGeneralSpline(xxx,-100.0, 100.0,
                                        data, dim);
             generalSpline.SetPoint(point++, xxx, calcValue);
-            TOLERANCE("Test3: Spline Mismatch", splineValue, calcValue, 1E-6);
+            TOLERANCE("Test4: Spline Mismatch", splineValue, calcValue, 1E-6);
         }
         generalSpline.SetLineWidth(3);
         generalSpline.SetLineColor(kGreen);
         generalSpline.Draw("same");
         gPad->Print("100CheckGeneralSpline3.pdf");
         gPad->Print("100CheckGeneralSpline3.png");
+    }
+#endif
+
+#define TEST4
+#ifdef TEST4
+    {
+        // Define a 3 point symmetric spline
+        // Define a TSpline3 and make sure that GeneralSpline reproduces it
+        TGraph graph;
+        graph.SetPoint(0,-1.0, 1.0);
+        graph.SetPoint(1, 0.0, 0.0);
+        graph.SetPoint(2, 1.0, 1.0);
+        TSpline3 spline("splineOfGraph",&graph);
+        const int nKnots = spline.GetNp();
+        const int dim = 3*nKnots + 2;
+        double data[dim];
+        data[0] = -3.0;
+        data[1] = 0.0;
+        std::cout << "Test4: Number of knots " << nKnots << std::endl;
+        for (int knot = 0; knot < nKnots; ++knot) {
+            double xx;
+            double yy;
+            double ss;
+            spline.GetKnot(knot,xx,yy);
+            ss = spline.Derivative(xx);
+            data[2+3*knot+0] = yy;
+            data[2+3*knot+1] = ss;
+            data[2+3*knot+2] = xx;
+        }
+        TGraph generalSpline;
+        TGraph rootSpline;
+        int point = 0;
+        double delta = spline.GetXmax()-spline.GetXmin();
+        for (double xxx = spline.GetXmin() - 0.5*delta;
+             xxx<=spline.GetXmax() + 0.5*delta; xxx += 0.01) {
+            double splineValue = spline.Eval(xxx);
+            double calcValue
+                = CalculateGeneralSpline(xxx,-100.0, 100.0,
+                                       data, dim);
+            rootSpline.SetPoint(point,xxx,splineValue);
+            generalSpline.SetPoint(point++, xxx, calcValue);
+            TOLERANCE("Test4: Spline Mismatch", splineValue, calcValue, 1E-6);
+        }
+        generalSpline.SetLineWidth(5);
+        generalSpline.SetLineColor(kGreen);
+        generalSpline.Draw("AC");
+        spline.SetLineWidth(3);
+        spline.SetLineColor(kRed);
+        spline.Draw("same");
+        rootSpline.SetLineWidth(2);
+        rootSpline.SetLineColor(kRed);
+        rootSpline.Draw("same");
+        graph.SetLineStyle(2);
+        graph.Draw("same");
+        gPad->Print("100CheckGeneralSpline4.pdf");
+        gPad->Print("100CheckGeneralSpline4.png");
     }
 #endif
 
