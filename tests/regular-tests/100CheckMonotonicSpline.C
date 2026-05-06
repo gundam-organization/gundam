@@ -72,7 +72,8 @@ int main() {
 #define TEST2
 #ifdef TEST2
     {
-        // Test non-linear interpolation between three points
+        // Test non-linear interpolation between three points with maximum at
+        // zero.
         int nData = 3;
         double data[] = {-1.0,  2.0/(nData-1), 0.0, 1.0, 0.0};
         std::unique_ptr<TGraph> data1(new TGraph());
@@ -194,6 +195,41 @@ int main() {
         data1->Draw("*,same");
         gPad->Print("100CheckMonotonicSpline5.pdf");
         gPad->Print("100CheckMonotonicSpline5.png");
+    }
+#endif
+
+#define TEST6
+#ifdef TEST6
+    {
+        // Test non-linear interpolation between three points with minimum at
+        // zero.
+        int nData = 3;
+        double data[] = {-1.0,  2.0/(nData-1), 1.0, 0.0, 1.0};
+        std::unique_ptr<TGraph> data1(new TGraph());
+        for (int p=0; p<nData; ++p) {
+            double x = data[0] + p*data[1];
+            double y = data[p+2];
+            data1->SetPoint(p,x,y);
+        }
+        std::unique_ptr<TGraph> graph1(new TGraph());
+        int p = 0;
+        for (double x = -2.0; x <= 2.0; x += 0.1) {
+            double v0 = CalculateMonotonicSpline(x, -10.0, 10.0, data, nData);
+            double v1 = CalculateMonotonicSpline(-x, -10.0, 10.0, data, nData);
+            std::ostringstream tmp;
+            tmp << "Symmetric tolerance (test 6) (X=" << x << ")";
+            if (v0 < 0.0) {
+                std::cout << "FAIL: " << tmp.str()
+                          << " -- Spline must be positive (Y=" << v0 << ")"
+                          << std::endl;
+            }
+            TOLERANCE(tmp.str(), v0, v1, 1E-6);
+            graph1->SetPoint(p++,x,v0);
+        }
+        graph1->Draw("AC");
+        data1->Draw("*,same");
+        gPad->Print("100CheckMonotonicSpline6.pdf");
+        gPad->Print("100CheckMonotonicSpline6.png");
     }
 #endif
 
