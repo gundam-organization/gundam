@@ -101,6 +101,8 @@ public:
   void writeEvents(const GenericToolbox::TFilePath& saveDir_) const;
   void writeEventRates(const GenericToolbox::TFilePath& saveDir_) const;
 
+  void writeDials(const GenericToolbox::TFilePath& saveDir_) const;
+
   // print
   void printBreakdowns() const;
   std::string getSampleBreakdownTable() const;

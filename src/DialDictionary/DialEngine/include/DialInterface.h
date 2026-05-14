@@ -54,6 +54,12 @@ public:
   [[nodiscard]] double evalResponse() const { return _responseSupervisorPtr_->process(_dial_->evalResponse(*_inputBufferPtr_)); }
   [[nodiscard]] std::string getSummary(bool shallow_=true) const;
 
+  // void fillGraph(TGraph& out_) const{
+  //   int n = out_.GetN();
+  //   // determine the range
+  //   _inputBufferPtr_->get
+  // }
+
 private:
   // owner of
   DialBaseObject _dial_{};

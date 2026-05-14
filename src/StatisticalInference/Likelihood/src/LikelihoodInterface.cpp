@@ -240,6 +240,21 @@ std::string LikelihoodInterface::getSummary() const {
   return ss.str();
 }
 
+void LikelihoodInterface::writeDials(const GenericToolbox::TFilePath& saveDir_) const{
+
+  for( auto& cache : _modelPropagator_.getEventDialCache().getCache() ) {
+    for( auto& dial : cache.dialResponseCacheList ) {
+      if( dial.dialInterface == nullptr ) { continue; }
+      // dial.dialInterface->getInputBufferRef().
+      // dial.dialInterface->getDial()->evalResponse(dial.dialInterface);
+      // break;
+    }
+    break;
+  }
+
+
+}
+
 void LikelihoodInterface::writeEvents(const GenericToolbox::TFilePath& saveDir_) const {
   LogInfo << "Writing sample events data." << std::endl;
 
