@@ -119,7 +119,7 @@ void FitterEngine::configureImpl(){
   _config_.fillValue(_allParamVariationsSigmas_, "paramVariationsSigmas");
 
   // enableParamVariations option didn't exist in the past
-  if( _config_.hasField("paramVariationsSigmas") and not _doAllParamVariations_ ){
+  if( _config_.hasField("paramVariationsSigmas") and _doAllParamVariations_ ){
     _doAllParamVariations_ = true;
   }
 
