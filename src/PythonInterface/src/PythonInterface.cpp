@@ -6,6 +6,9 @@
 #include "FitterEngine.h"
 #include "ConfigUtils.h"
 #include "GundamApp.h"
+#include "VariableHolder.h"
+#include "VariableCollection.h"
+#include "Event.h"
 
 #include "Logger.h"
 
@@ -170,6 +173,7 @@ PYBIND11_MODULE(GUNDAM, module) {
   .def("getBinningFilePath", &Sample::getBinningFilePath) // returns a ConfigReader object
   .def("getName", &Sample::getName, pybind11::return_value_policy::reference)
   .def("getHistogram", static_cast<Histogram& (Sample::*)()>(&Sample::getHistogram), pybind11::return_value_policy::reference)
+  .def("getEventList", static_cast<std::vector<Event>& (Sample::*)()>(&Sample::getEventList), pybind11::return_value_policy::reference)
   .def("getSummary", &Sample::getSummary)
   ;
   pybind11::class_<Histogram>(module, "Histogram")
@@ -223,6 +227,28 @@ PYBIND11_MODULE(GUNDAM, module) {
   .def(pybind11::init())
   .def_readwrite("data", &SamplePair::data)
   .def_readwrite("model", &SamplePair::model)
+  ;
+
+  // VariableHolder: wraps a typed variable with a cached double read-out
+  pybind11::class_<VariableHolder>(module, "VariableHolder")
+  .def("getVarAsDouble", &VariableHolder::getVarAsDouble)
+  ;
+
+  // VariableCollection: per-event list of named variables (e.g. "Enu", "Pmu")
+  pybind11::class_<VariableCollection>(module, "VariableCollection")
+  .def("fetchVariable",
+       static_cast<VariableHolder& (VariableCollection::*)(const std::string&)>(&VariableCollection::fetchVariable),
+       pybind11::return_value_policy::reference)
+  .def("findVarIndex", &VariableCollection::findVarIndex,
+       pybind11::arg("leafName"), pybind11::arg("throwIfNotFound") = true)
+  ;
+
+  // Event: one MC event — current weight + variable collection
+  pybind11::class_<Event>(module, "Event")
+  .def("getEventWeight", &Event::getEventWeight)
+  .def("getVariables",
+       static_cast<VariableCollection& (Event::*)()>(&Event::getVariables),
+       pybind11::return_value_policy::reference)
   ;
 
   // no CTOR here
