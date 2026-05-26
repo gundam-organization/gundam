@@ -23,7 +23,7 @@ if(NOT DEFINED GUNDAM_TESTS_ARGUMENT OR GUNDAM_TESTS_ARGUMENT STREQUAL "")
   set(GUNDAM_TESTS_ARGUMENT "-f")
 endif(NOT DEFINED GUNDAM_TESTS_ARGUMENT OR GUNDAM_TESTS_ARGUMENT STREQUAL "")
 
-set(DEV_WITHOUT_GUNDAM_TESTS ON) # Should be off by default.
+set(DEV_WITHOUT_GUNDAM_TESTS OFF) # Should be off by default.
 # Run the main executable test scripts.  These are relatively slow, so they
 if( NOT DEV_WITHOUT_GUNDAM_TESTS )
   add_test(
@@ -31,7 +31,7 @@ if( NOT DEV_WITHOUT_GUNDAM_TESTS )
     COMMAND "sh" "-c" "(cd ${CMAKE_SOURCE_DIR}/tests && ./gundam-tests.sh ${GUNDAM_TESTS_ARGUMENT} -a ${CMAKE_BINARY_DIR}/Testing/gundam-tests.$(date +%Y-%m-%d-%H%M%S) )"
   )
 else()
-  cmessage( WARN "GUNDAM executable tests not being run.")
+  cmessage( WARNING "GUNDAM executable tests (gundam-tests.sh) not being run.")
 endif( NOT DEV_WITHOUT_GUNDAM_TESTS )
 
 if( WITH_GOOGLE_TEST )
