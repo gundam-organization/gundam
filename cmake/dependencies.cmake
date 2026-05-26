@@ -131,13 +131,16 @@ include_directories( ${ROOT_INCLUDE_DIR} )
 ####################
 
 cmessage( STATUS "Looking for JSON install..." )
-FetchContent_Declare(
-  nlohmann_json
-  GIT_REPOSITORY https://github.com/nlohmann/json.git
-  GIT_TAG v3.11.3
-  FIND_PACKAGE_ARGS NAMES nlohmann_json 
-)
-set(DeclaredContent ${DeclaredContent} nlohmann_json)
+find_package(nlohmann_json)
+if( NOT nlohmann_json_FOUND )
+  cmessage( WARNING "System nlohmann_json package not found")
+  FetchContent_Declare(
+    nlohmann_json
+    GIT_REPOSITORY https://github.com/nlohmann/json.git
+    GIT_TAG v3.11.3
+  )
+  set(DeclaredContent ${DeclaredContent} nlohmann_json)
+endif( NOT nlohmann_json_FOUND )
 
 
 ####################
@@ -172,13 +175,16 @@ link_libraries( ${YAML_CPP_LIBRARIES} )
 ####################
 # GoogleTest
 ####################
-FetchContent_Declare(
-  GTest
-  GIT_REPOSITORY https://github.com/google/googletest.git
-  GIT_TAG v1.16.0
-  FIND_PACKAGE_ARGS NAMES GTest
-)
-set(DeclaredContent ${DeclaredContent} GTest)
+find_package(GTest)
+if( NOT GTest_FOUND )
+  cmessage( WARNING "System GTest package not found")
+  FetchContent_Declare(
+    GTest
+    GIT_REPOSITORY https://github.com/google/googletest.git
+    GIT_TAG v1.16.0
+  )
+  set(DeclaredContent ${DeclaredContent} GTest)
+endif( NOT GTest_FOUND )
 
 ####################
 # CUDA (optional)
