@@ -90,6 +90,7 @@
 #   needed).
 
 echo 'USAGE: gundam-tests.sh [-f] [-r] [-e] [-s] [-a] [output-directory]'
+echo '    -c               : Force use of terminfo colors for output'
 echo '    -f               : Only run the fast tests [default]'
 echo '    -r               : Run fast and regular tests'
 echo '    -e               : Run fast, regular and extended tests'
@@ -107,17 +108,22 @@ if [ $(uname) == "Darwin" ]; then
     # Work around MacOS bug
     TEMP=$(getopt "$0" "$@")
 else
-    TEMP=$(getopt -o 'afres' -n "$0" -- "$@")
+    TEMP=$(getopt -o 'acfres' -n "$0" -- "$@")
 fi
 
+# Check for getopt errors
 if [ $? -ne 0 ]; then
-    echo "Error ..."
     exit 1
 fi
+
 eval set -- "$TEMP"
 unset TEMP
 while true; do
     case "$1" in
+        '-c') # Force colors
+            USE_COLORS="yes"
+            shift
+            continue;;
 	'-f')
             # be explicit about the testing
 	    TESTS="fast-tests"
@@ -151,6 +157,32 @@ done
 echo
 echo Requesting tests in ${TESTS}
 
+# Result when this script has a problem.
+RESULT_ERROR="ERROR:"
+RESULT_WARNING="WARNING:"
+
+# Result for a particular sub job.
+RESULT_JOB_FAILURE="JOB FAILURE:"
+RESULT_JOB_SUCCESS="JOB SUCCESS:"
+
+# Result for the test.  These report the result to the testing harness.
+RESULT_FAILURE="FAIL:"
+RESULT_SUCCESS="SUCCESS:"
+
+# Add colors to the results (on terminals only)
+if [ -t 1 -o ${USE_COLORS}x == "yesx" ]; then
+    TERMINFO_INIT=$(tput init)
+    TERMINFO_RED=$(tput setaf 1)
+    TERMINFO_YELLOW=$(tput setaf 3)
+    TERMINFO_GREEN=$(tput setaf 2)
+    RESULT_ERROR=${TERMINFO_RED}${RESULT_ERROR}${TERMINFO_INIT}
+    RESULT_WARNING=${TERMINFO_YELLOW}${RESULT_ERROR}${TERMINFO_INIT}
+    RESULT_JOB_FAILURE=${TERMINFO_RED}${RESULT_JOB_FAILURE}${TERMINFO_INIT}
+    RESULT_JOB_SUCCESS=${TERMINFO_GREEN}${RESULT_JOB_SUCCESS}${TERMINFO_INIT}
+    RESULT_FAILURE=${TERMINFO_RED}${RESULT_FAILURE}${TERMINFO_INIT}
+    RESULT_SUCCESS=${TERMINFO_GREEN}${RESULT_SUCCESS}${TERMINFO_INIT}
+fi
+
 # Find the name of the output directory.  It might have been provided
 # on the command line.
 OUTPUT_DIR="output.$(date +%Y-%m-%d-%H%M)"  # A default name for the output
@@ -163,13 +195,13 @@ echo Output will be in ${OUTPUT_DIR}
 
 # Make sure the output directory does not exist.
 if [ -x ${OUTPUT_DIR} ]; then
-    echo ERROR: Output directory already exists ${OUTPUT_DIR}
+    echo -e ${RESULT_ERROR} Output directory already exists ${OUTPUT_DIR}
     exit 1
 fi
 
 echo Running in ${PWD}
 if [ ! -x ./gundam-tests.sh ]; then
-    echo ERROR: Must be run from the directory containing gundam-tests.sh
+    echo -e ${RESULT_ERROR} Must be run from the directory containing gundam-tests.sh
     exit 1
 fi
 
@@ -185,13 +217,13 @@ for i in ${TESTS}; do
 done
 
 if [ ! -f EXPECTED_FAILURES ]; then
-    echo ERROR: EXPECTED_FAILURES file must exist, but it can be empty.
+    echo -e ${RESULT_ERROR} EXPECTED_FAILURES file must exist, but it can be empty.
     exit 1
 fi
 
 if [ ${APPLY}x != "yesx" ]; then
     echo
-    echo WARNING: Add the -a option to run the test.
+    echo -e ${RESULT_ERROR} Tests not run. Add the -a option to run the test.
     exit 1
 fi
 
@@ -207,7 +239,7 @@ mkdir -p ${OUTPUT_DIR}
 
 # Make sure the output directory was correctly created (i.e. it exists)
 if [ ! -x ${OUTPUT_DIR} ]; then
-    echo OUTPUT DIRECTORY WAS NOT CREATED: ${OUTPUT_DIR}
+    echo -e ${RESULT_ERROR} OUTPUT DIRECTORY WAS NOT CREATED: ${OUTPUT_DIR}
     exit 1
 fi
 
@@ -216,7 +248,7 @@ FAILURES=""
 EXPECTED=""
 for d in ${TESTS}; do
     if [ ! -x ${PWD}/${d} ]; then
-        echo TESTING DIRECTORY ${d} DOES NOT EXIST
+        echo -e ${RESULT_WARNING} TESTING DIRECTORY ${d} DOES NOT EXIST
         continue;
     fi
     for i in $(find ${d} -name "[0-9]*" -type f | grep -v "~" | sort); do
@@ -237,28 +269,28 @@ for d in ${TESTS}; do
         if (cd $OUTPUT_DIR && ${JOB} ${DIR} >& ${LOG}); then
             # The job exited with success, but look for a fail messsage
             if (tail -5 ${OUTPUT_DIR}/${LOG} | grep FAIL >> /dev/null); then
-                echo JOB FAILURE: ${i}
+                echo -e ${RESULT_JOB_FAILURE} ${i}
             elif (tail -10 ${OUTPUT_DIR}/${LOG} | grep "Execution.*aborted" >> /dev/null); then
-                echo JOB FAILURE: ${i}
+                echo -e ${RESULT_JOB_FAILURE} ${i}
             else
-                echo JOB SUCCESS: ${i}
+                echo -e ${RESULT_JOB_SUCCESS} ${i}
                 SUCCESS="yes"
             fi
         else
-            echo JOB FAILURE: ${i}
+            echo -e ${RESULT_JOB_FAILURE} ${i}
         fi
         if [ ${SUCCESS} = "yes" ]; then
             # The job succeeded, make sure it's not in EXPECTED_FAILURES
             if (grep -F $i EXPECTED_FAILURES >> /dev/null); then
                 cat ${OUTPUT_DIR}/${LOG}
-                echo JOB FAILURE: Expected $i to fail
+                echo -e ${RESULT_JOB_FAILURE} Expected $i to fail
                 FAILURES="${FAILURES} unexpected-success:\"${JOB}\""
             fi
         else
             # The job failed, check if it was expected
             if (grep -F $i EXPECTED_FAILURES >> /dev/null); then
                 cat ${OUTPUT_DIR}/${LOG}
-                echo JOB SUCCESS: Failure was expected for $i
+                echo -e ${RESULT_JOB_SUCCESS} Failure was expected for $i
                 EXPECTED="${EXPECTED} \"${JOB}\""
             else
                 cat ${OUTPUT_DIR}/${LOG}
@@ -272,7 +304,7 @@ if [ ${#EXPECTED} -gt 0 ]; then
     echo
     echo Expected Failures:
     for i in ${EXPECTED}; do
-        echo EXPECTED: $i
+        echo EXPECTED FAILURE: $i
     done
 fi
 
@@ -280,13 +312,13 @@ if [ ${#FAILURES} -gt 0 ]; then
     echo
     echo Failed Jobs:
     for i in ${FAILURES}; do
-        echo FAILED: $i
+        echo UNEXPECTED FAILURE: $i
     done
     echo
-    echo FAIL: Tests failed
+    echo -e ${RESULT_FAILURE} Tests failed
     exit 1
 else
     echo
-    echo SUCCESS: Tests succeeded
+    echo -e ${RESULT_SUCCESS} Tests succeeded
 fi
 # End of the script
