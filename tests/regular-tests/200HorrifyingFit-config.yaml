@@ -12,9 +12,9 @@ scanParameters: false        # can be triggered with --scan
 generateOneSigmaPlots: false # can be enabled with --one-sigma
 
 fitterEngineConfig:
-  engineType: minimizer
 
   mcmcConfig:
+    type: SimpleMCMC
     algorithm: metropolis
     proposal: adaptive
     burninCycles: 3
@@ -30,12 +30,6 @@ fitterEngineConfig:
     adaptiveCovWindow: 5000
     adaptiveFreezeAfter: 1
 
-  minimizerConfig:
-    minimizer: "Minuit2"
-    algorithm: "Migrad"
-    errors: "Hesse"
-    print_level: 2
-    tolerance: 1E-6
 
   propagatorConfig:
     throwAsimovFitParameters: false
