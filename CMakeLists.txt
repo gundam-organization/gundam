@@ -2,10 +2,7 @@
 # GUNDAM project CMake main file
 #
 
-# cmake_minimum_required() should be called prior to this top-level project()
-# 3.10 minimum a priori. Taking a lower version as min will make recent CMake
-# version complain about the deprecation version older than 3.10.
-# Might require higher version for specific features.
+# 3.11 minimum required for FetchContent
 cmake_minimum_required( VERSION 3.10 FATAL_ERROR )
 
 # Define project

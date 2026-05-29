@@ -1,6 +1,11 @@
 message("")
-cmessage( WARNING "Checking dependencies...")
+cmessage( STATUS "Checking dependencies...")
 
+include( FetchContent )
+
+# A string with all the packages to be made available after everything
+# is declared
+set(DeclaredContent "")
 
 ##########
 # ROOT
@@ -126,22 +131,16 @@ include_directories( ${ROOT_INCLUDE_DIR} )
 ####################
 
 cmessage( STATUS "Looking for JSON install..." )
-find_package( nlohmann_json QUIET )
-
-if( nlohmann_json_FOUND )
-  cmessage( STATUS "nlohmann JSON library found.")
-  link_libraries( nlohmann_json::nlohmann_json )
-else()
-  cmessage( ALERT "nlohmann JSON library not found. Using fetch content... (CMake version >= 3.11)")
-  cmake_minimum_required( VERSION 3.11 FATAL_ERROR )
-  include( FetchContent )
-
-  FetchContent_Declare( json URL https://github.com/nlohmann/json/releases/download/v3.11.3/json.tar.xz )
-  FetchContent_MakeAvailable( json )
-
-  include_directories( ${nlohmann_json_SOURCE_DIR}/include )
-  cmessage( STATUS "nlohmann JSON library fetched: ${nlohmann_json_SOURCE_DIR}/include")
-endif()
+find_package(nlohmann_json)
+if( NOT nlohmann_json_FOUND )
+  cmessage( WARNING "System nlohmann_json package not found")
+  FetchContent_Declare(
+    nlohmann_json
+    GIT_REPOSITORY https://github.com/nlohmann/json.git
+    GIT_TAG v3.11.3
+  )
+  set(DeclaredContent ${DeclaredContent} nlohmann_json)
+endif( NOT nlohmann_json_FOUND )
 
 
 ####################
@@ -173,6 +172,19 @@ include_directories( ${YAMLCPP_INCLUDE_DIR} )
 link_libraries( ${YAML_CPP_LIBRARIES} )
 
 
+####################
+# GoogleTest
+####################
+find_package(GTest)
+if( NOT GTest_FOUND )
+  cmessage( WARNING "System GTest package not found")
+  FetchContent_Declare(
+    GTest
+    GIT_REPOSITORY https://github.com/google/googletest.git
+    GIT_TAG v1.16.0
+  )
+  set(DeclaredContent ${DeclaredContent} GTest)
+endif( NOT GTest_FOUND )
 
 ####################
 # CUDA (optional)
@@ -196,6 +208,7 @@ if( WITH_CUDA_LIB )
         # After cmake 3.23, this can be set to all or all-major
         set( CMAKE_CUDA_ARCHITECTURES all )
       else()
+        cmessage( WARNING "Force CUDA architecture to 52 (deprecated)")
         set( CMAKE_CUDA_ARCHITECTURES 52 )
       endif()
     endif()
@@ -209,3 +222,12 @@ else( WITH_CUDA_LIB )
     cmessage( STATUS "WITH_CACHE_MANAGER=ON: CUDA support disabled. Use -D WITH_CUDA_LIB=ON if needed." )
   endif()
 endif( WITH_CUDA_LIB )
+
+if (DeclaredContent)
+  # Make any FetchContent available.  Fetched packages should be added
+  # to the local DeclaredContent variable.
+  cmessage(STATUS "Declared Content ${DeclaredContent}")
+  FetchContent_MakeAvailable(${DeclaredContent})
+else()
+  cmessage(WARNING "No content declared")
+endif (DeclaredContent)
