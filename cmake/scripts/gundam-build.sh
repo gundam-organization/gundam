@@ -124,9 +124,10 @@ while [ "x${1}" != "x" ]; do
             echo
             exit 0
             ;;
-        -D*) # Add definitions
+        -D*) # Add definitions and force cmake
             echo Add $1
             DEFINES="${DEFINES} ${1}"
+            FORCE_CMAKE="yes"
             shift
             ;;
         *)
