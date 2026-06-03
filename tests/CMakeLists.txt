@@ -62,6 +62,7 @@ if( WITH_GOOGLE_TEST )
   list(APPEND FAST_TESTS GTests/unitTest_CalculateBicubicSpline.cpp)
   list(APPEND FAST_TESTS GTests/unitTest_ApplyMonotonicCondition.cpp)
   list(APPEND FAST_TESTS GTests/unitTest_DialUtils.cpp)
+  list(APPEND FAST_TESTS GTests/unitTest_DialDefinitions.cpp)
 
   # Compile the fast test executable, but only add them to ctest if
   # WITH_FAST_TEST is on. This should NOT be "optimized" to skip compilation
