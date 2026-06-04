@@ -102,7 +102,7 @@ while [ "x${1}" != "x" ]; do
             echo Continue on errors
             MAKE_OPTIONS=" -k ${MAKE_OPTIONS}"
             ;;
-        test|ctest) # test
+        te*|cte*) # test or ctest
             shift
             echo Run tests
             RUN_TEST="yes"
