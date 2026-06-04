@@ -228,6 +228,6 @@ endif( WITH_CUDA_LIB )
 if (DeclaredContent)
   # Make any FetchContent available.  Fetched packages should be added
   # to the local DeclaredContent variable.
-  cmessage(WARNING "FetchContest: Will build ${DeclaredContent}")
+  cmessage(WARNING "FetchContent: Will build ${DeclaredContent}")
   FetchContent_MakeAvailable(${DeclaredContent})
 endif (DeclaredContent)
