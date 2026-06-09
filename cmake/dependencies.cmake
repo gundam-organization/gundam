@@ -168,7 +168,7 @@ if( "${YAMLCPP_INCLUDE_DIR} " STREQUAL " ")
   cmessage(FATAL_ERROR "empty YAMLCPP_INCLUDE_DIR returned.")
 endif()
 set(YAML_CPP_LIBRARIES ${YAMLCPP_LIBRARY})
-include_directories( ${YAMLCPP_INCLUDE_DIR} )
+include_directories( SYSTEM ${YAMLCPP_INCLUDE_DIR} )
 link_libraries( ${YAML_CPP_LIBRARIES} )
 
 
