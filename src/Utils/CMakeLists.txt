@@ -50,7 +50,7 @@ include_directories( ${CMAKE_BINARY_DIR}/generated/ ) # version header
 
 # Make sure the current directories are available for the later
 # compilation.
-target_include_directories( GundamUtils PUBLIC
+target_include_directories( GundamUtils BEFORE PUBLIC
   ${CMAKE_CURRENT_SOURCE_DIR}/include
   ${CMAKE_BINARY_DIR}/generated
 )

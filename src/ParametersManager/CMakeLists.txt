@@ -30,7 +30,7 @@ else()
   add_library(${LIB_NAME} SHARED ${SRCFILES})
 endif()
 
-target_include_directories(${LIB_NAME} PUBLIC
+target_include_directories(${LIB_NAME} BEFORE PUBLIC
   ${CMAKE_CURRENT_SOURCE_DIR}/include)
 
 # Dependencies
@@ -53,4 +53,3 @@ install(TARGETS ${LIB_NAME} DESTINATION lib)
 #        COMPONENT
 #        libraries
 #)
-
