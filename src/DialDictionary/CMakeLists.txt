@@ -75,7 +75,9 @@ else()
 endif()
 
 target_include_directories(
-    ${LIB_NAME} PUBLIC
+    ${LIB_NAME}
+    BEFORE
+    PUBLIC
     DialEngine/include
     DialFactories/include
     DialDefinitions/include
