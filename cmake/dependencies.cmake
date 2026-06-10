@@ -146,31 +146,26 @@ endif( NOT nlohmann_json_FOUND )
 ####################
 # YAML-CPP
 ####################
-
 cmessage( STATUS "Looking for YAML install..." )
 
-# WORKAROUND FOR CCLYON (old cmake version/pkg)
-set( CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_CURRENT_SOURCE_DIR}/cmake/utils )
-set( CMAKE_PREFIX_PATH ${CMAKE_PREFIX_PATH} ${CMAKE_CURRENT_SOURCE_DIR}/cmake/utils )
-
-if( DEFINED $YAMLCPP_DIR )
-  cmessage( ALERT "Setting yaml-cpp hint to ${YAMLCPP_DIR}." )
-  set( YAMLCPP_INSTALL_DIR ${YAMLCPP_DIR} )
+find_package(yaml-cpp)
+if( NOT yaml-cpp_FOUND )
+  cmessage( WARNING "System yaml-cpp package not found")
+  FetchContent_Declare(
+    yaml-cpp
+    GIT_REPOSITORY https://github.com/jbeder/yaml-cpp.git
+    GIT_TAG yaml-cpp-0.9.0
+    # Make sure yaml-cpp doesn't mess with gtest
+    CMAKE_ARGS -DGTEST_INSTALL=OFF
+  )
+  set(DeclaredContent ${DeclaredContent} yaml-cpp)
+else()
+  cmessage( STATUS "Using yaml-cpp ${yaml-cpp_VERSION}")
+  cmessage( WARNING "Using yaml include  ${YAML_CPP_INCLUDE_DIR}")
+  cmessage( WARNING "Using yaml library  ${YAML_CPP_LIBRARIES}")
+  include_directories( ${YAML_CPP_INCLUDE_DIR} )
+  link_libraries( ${YAML_CPP_LIBRARIES} )
 endif()
-
-find_package( YAMLCPP REQUIRED HINTS ${YAMLCPP_DIR} )
-if( NOT YAMLCPP_FOUND )
-  cmessage(FATAL_ERROR "yaml-cpp library not found.")
-endif()
-  cmessage( STATUS " - yaml-cpp include directory: ${YAMLCPP_INCLUDE_DIR}")
-  cmessage( STATUS " - yaml-cpp lib: ${YAMLCPP_LIBRARY}")
-if( "${YAMLCPP_INCLUDE_DIR} " STREQUAL " ")
-  cmessage(FATAL_ERROR "empty YAMLCPP_INCLUDE_DIR returned.")
-endif()
-set(YAML_CPP_LIBRARIES ${YAMLCPP_LIBRARY})
-include_directories( ${YAMLCPP_INCLUDE_DIR} )
-link_libraries( ${YAML_CPP_LIBRARIES} )
-
 
 ####################
 # GoogleTest
@@ -223,11 +218,20 @@ else( WITH_CUDA_LIB )
   endif()
 endif( WITH_CUDA_LIB )
 
+####################
+# FetchContent packages.
+####################
+
 if (DeclaredContent)
   # Make any FetchContent available.  Fetched packages should be added
   # to the local DeclaredContent variable.
   cmessage(STATUS "Declared Content ${DeclaredContent}")
   FetchContent_MakeAvailable(${DeclaredContent})
+  # Do specific steps needed for each package that might have been fetched.
+  if ( "yaml-cpp" IN_LIST DeclaredContent)
+    # Add the yaml-cpp library so we don't add it to every executable load.
+    link_libraries(yaml-cpp::yaml-cpp)
+  endif()
 else()
   cmessage(WARNING "No content declared")
 endif (DeclaredContent)
