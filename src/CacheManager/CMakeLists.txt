@@ -61,7 +61,7 @@ endif( USE_STATIC_LINKS )
 
 # Make sure the current directories are available for the later
 # compilation.
-target_include_directories( GundamCacheManager PUBLIC
+target_include_directories( GundamCacheManager BEFORE PUBLIC
   ${CMAKE_CURRENT_SOURCE_DIR}/include)
 
 target_link_libraries( GundamCacheManager PUBLIC

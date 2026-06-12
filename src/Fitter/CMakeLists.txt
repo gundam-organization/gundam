@@ -15,7 +15,9 @@ else()
 endif()
 
 target_include_directories(
-    ${LIB_NAME} PUBLIC
+    ${LIB_NAME}
+    BEFORE
+    PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/Engine/include
     ${CMAKE_CURRENT_SOURCE_DIR}/Minimizer/include
 )

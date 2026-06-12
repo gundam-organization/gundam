@@ -1,12 +1,12 @@
 # Tabulated Dials
 
 A tabulated dial provides an efficient way to do an event-by-event reweight
-of an event based on a truth variable and fitting parameters.  It is an
-efficient way to handle a one-dimensional lookup table. For instance, this
-can be used for long and short baseline oscillation fits that are dependent
-on the true neutrino energy.  The table will be refilled for each set of
-oscillation parameters.  An external library is used declare a look up
-table, to fill the table for each iteration, and look up the position of
+of an event based on a single truth variable and fitting parameters.  It is
+an efficient way to handle a one-dimensional lookup table. For instance,
+this can be used for long and short baseline oscillation fits that are
+dependent on the true neutrino energy.  The table will be refilled for each
+set of oscillation parameters.  An external library is used declare a look
+up table, to fill the table for each iteration, and look up the position of
 each event in the table based on truth variables.
 
 The yaml for a Tabulated Dial is
@@ -39,7 +39,7 @@ dialSetDefinitions:
 
 If `initFunction` is provided it will be called before calling the update or the binning functions.  It is called with the signature:
 
-```
+```C++
     extern "C"
     int initFunc(const char* name,
                  int argc, const char* argv[],
@@ -50,13 +50,13 @@ If `initFunction` is provided it will be called before calling the update or the
 * argv -- argument strings.  The arguments are defined by the library, but are usually things like input file names for the lookup table information.
 * bins -- The suggested size the table.  The library must choose an appropriate binning that will be used for the table.
 
-The function should less than or equal to zero for failure, and otherwise, the number of elements needed to store the table (usually, the same as the input value of "bins").
+The return value must be less than or equal to zero for failure, and otherwise, the provide the number of elements needed to store the table (usually, the same as the input value of "bins").
 
 # Library function to update the table
 
 The update function is called before the events are reweighted.  The `updateFunction` signature is:
 
-```
+```C++
     extern "C"
     int updateFunc(const char* name,
                    double table[], int bins,
@@ -68,7 +68,7 @@ The update function is called before the events are reweighted.  The `updateFunc
 * par   -- The parameters.  Must match parameters define in the dial definition
 * npar  -- number of parameters
 
-The function should return 0 for success, and any other value for failure
+The function must return 0 for success, and any other value for failure
 
 The table will be filled with "bins" values calculated with uniform spacing between "low" and "high".  If bins is one, there must be one value calculated for "low", if bins is two or more, then the first point is located at "low", and the last point is located at "high".  The step between the bins is (high-low)/(bins-1).  Examples:
 ```
@@ -84,7 +84,7 @@ While the update can (in principle) be done directly on the GPU, and have the ta
 # Library function to index events
 
 The binning function is called as the MC events are read into the internal structures, and return an index into the lookup table for an event.  The `binningFunction` signature is:
-```
+```C++
     extern "C"
     double binFunc(const char* name,
                    int nvar, const double varv[],

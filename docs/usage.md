@@ -16,6 +16,7 @@ There are several applications that can be run within GUNDAM. The primary purpos
 
   - [gundamConfigCompare](applications/gundamConfigCompare.md)
   - [gundamConfigUnfolder](applications/gundamConfigUnfolder.md)
+  - [gundamFitCompare](applications/gundamFitCompare.md)
   - [gundamFitPlot](applications/gundamFitPlot.md)
   - [gundamFitReader](applications/gundamFitReader.md)
   - [gundamInputZipper](applications/gundamInputZipper.md)

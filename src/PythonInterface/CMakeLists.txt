@@ -9,6 +9,9 @@ pybind11_add_module( ${LIB_NAME} ${SRC_FILE_LIST} )
 
 target_include_directories( ${LIB_NAME} PUBLIC
     ${PYBIND11_INCLUDE_DIRS}
+)
+
+target_include_directories( ${LIB_NAME} BEFORE PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
 
@@ -28,6 +31,5 @@ target_link_libraries( ${LIB_NAME} PUBLIC
 #)
 #
 install( TARGETS ${LIB_NAME} DESTINATION lib )
-
 
 
