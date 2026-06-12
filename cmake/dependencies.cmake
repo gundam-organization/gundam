@@ -175,16 +175,18 @@ link_libraries( ${YAML_CPP_LIBRARIES} )
 ####################
 # GoogleTest
 ####################
-find_package(GTest)
-if( NOT GTest_FOUND )
-  cmessage( WARNING "System GTest package not found")
-  FetchContent_Declare(
-    GTest
-    GIT_REPOSITORY https://github.com/google/googletest.git
-    GIT_TAG v1.16.0
-  )
-  set(DeclaredContent ${DeclaredContent} GTest)
-endif( NOT GTest_FOUND )
+if( WITH_GOOGLE_TEST )
+  find_package(GTest)
+  if( NOT GTest_FOUND )
+    cmessage( WARNING "System GTest package not found")
+    FetchContent_Declare(
+      GTest
+      GIT_REPOSITORY https://github.com/google/googletest.git
+      GIT_TAG v1.16.0
+    )
+    set(DeclaredContent ${DeclaredContent} GTest)
+  endif( NOT GTest_FOUND )
+endif( WITH_GOOGLE_TEST )
 
 ####################
 # CUDA (optional)
@@ -226,8 +228,6 @@ endif( WITH_CUDA_LIB )
 if (DeclaredContent)
   # Make any FetchContent available.  Fetched packages should be added
   # to the local DeclaredContent variable.
-  cmessage(STATUS "Declared Content ${DeclaredContent}")
+  cmessage(WARNING "FetchContent: Will build ${DeclaredContent}")
   FetchContent_MakeAvailable(${DeclaredContent})
-else()
-  cmessage(WARNING "No content declared")
 endif (DeclaredContent)
