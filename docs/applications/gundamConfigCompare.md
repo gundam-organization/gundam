@@ -20,4 +20,10 @@ Override files can also be provided as inputs:
 gundamConfigCompare -c1 path/to/config1.yaml -c2 path/to/config2.yaml -of1 path/to/override1.yaml -of2 path/to/override2.yaml 
 ```
 
+The input config files can also be given labels as shown below:
+Override files can also be provided as inputs:
+```bash 
+gundamConfigCompare -c1 path/to/config1.yaml -n1 label_name_c1 -c2 path/to/config2.yaml -n2 label_name_c2
+```
+
 Additionally one can use the `-a` argument to show all the keys being compared.
