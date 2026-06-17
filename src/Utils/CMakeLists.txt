@@ -55,7 +55,7 @@ target_include_directories( GundamUtils BEFORE PUBLIC
   ${CMAKE_BINARY_DIR}/generated
 )
 
-target_link_libraries( GundamUtils PUBLIC ${ROOT_LIBRARIES} )
+target_link_libraries( GundamUtils PUBLIC ${ROOT_LIBRARIES} yaml-cpp::yaml-cpp)
 install( TARGETS GundamUtils DESTINATION lib )
 
 #Can uncomment this to install the headers... but is it really neccessary?
