@@ -228,7 +228,7 @@ endif( WITH_CUDA_LIB )
 if (DeclaredContent)
   # Make any FetchContent available.  Fetched packages should be added
   # to the local DeclaredContent variable.
-  cmessage(STATUS "Declared Content ${DeclaredContent}")
+  cmessage(WARNING "FetchContent: Will build ${DeclaredContent}")
   FetchContent_MakeAvailable(${DeclaredContent})
   # Do specific steps needed for each package that might have been fetched.
   if ( "yaml-cpp" IN_LIST DeclaredContent)

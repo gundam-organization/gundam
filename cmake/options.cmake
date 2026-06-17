@@ -21,6 +21,11 @@ option( WITH_MINUIT2_MISSING "Allow MINUIT2 to be missing" OFF )
 option( WITH_PYTHON_INTERFACE "Compile the python interface modules" OFF )
 option( WITH_TESTS "Build CMake tests." ON )
 option( WITH_GOOGLE_TEST "Enable GoogleTest (disable at your own risk).." ON )
+option( WITH_INTERFACE_TEST "Enable gundam-test.sh interface tests" ON)
+option( WITH_FAST_TEST "Enable the fast unit tests (ideal for CI)" ON)
+option( WITH_REGULAR_TEST "Enable the regular unit tests" OFF)
+option( WITH_EXTENDED_TEST "Enable the regular unit tests" OFF)
+option( WITH_SLOW_TEST "Enable the regular unit tests" OFF)
 
 # compile helper
 option( YAMLCPP_DIR "Set custom path to yaml-cpp lib." OFF )
@@ -114,4 +119,20 @@ if(WITH_PYTHON_INTERFACE)
   set( PYBIND11_PYTHON_VERSION 3.11.6 )
   set( PYBIND11_FINDPYTHON ON )
   find_package( pybind11 REQUIRED )
+endif()
+
+# Ensure that all lower level tests are on
+if(WITH_SLOW_TEST AND NOT WITH_EXTENDED_TEST)
+  cmessage( WARNING "Extended tests enabled by slow tests")
+  set(WITH_EXTENDED_TEST ON )
+endif()
+
+if(WITH_EXTENDED_TEST AND NOT WITH_REGULAR_TEST)
+  cmessage( WARNING "Regular tests enabled by extended tests")
+  set(WITH_REGULAR_TEST ON)
+endif()
+
+if(WITH_REGULAR_TEST AND NOT WITH_FAST_TEST)
+  cmessage( WARNING "Fast tests enabled by regular tests")
+  set(WITH_FAST_TEST ON)
 endif()
