@@ -2,6 +2,7 @@ message("")
 cmessage( STATUS "Checking dependencies...")
 
 include( FetchContent )
+set(FETCHCONTENT_TRY_FIND_PACKAGE_MODE NEVER)
 
 # A string with all the packages to be made available after everything
 # is declared
@@ -146,7 +147,7 @@ if( NOT nlohmann_json_FOUND )
     GIT_SHALLOW true
     # Only do the basic compile
     CMAKE_ARGS -DJSON_BuildTests=OFF -DJSON_CI=OFF
-    OVERRIDE_FIND_PACKAGE
+    # OVERRIDE_FIND_PACKAGE
   )
   set(DeclaredContent ${DeclaredContent} nlohmann_json)
 endif( NOT nlohmann_json_FOUND )
@@ -166,7 +167,7 @@ if( NOT yaml-cpp_FOUND )
     GIT_TAG yaml-cpp-0.9.0
     # Make sure yaml-cpp doesn't mess with gtest
     CMAKE_ARGS -DGTEST_INSTALL=OFF
-    OVERRIDE_FIND_PACKAGE
+    # OVERRIDE_FIND_PACKAGE
   )
   set(DeclaredContent ${DeclaredContent} yaml-cpp)
 endif()
@@ -182,7 +183,7 @@ if( NOT GTest_FOUND )
     GTest
     GIT_REPOSITORY https://github.com/google/googletest.git
     GIT_TAG v1.16.0
-    OVERRIDE_FIND_PACKAGE
+    # OVERRIDE_FIND_PACKAGE
   )
   set(DeclaredContent ${DeclaredContent} GTest)
 endif( NOT GTest_FOUND )
