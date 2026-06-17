@@ -160,8 +160,8 @@ cmake --build ${BUILD_LOCATION} \
       -- ${MAKE_OPTIONS} \
     || exit 1
 
-echo cmake --install ${BUILD_LOCATION} --parallel ${GUNDAM_JOBS} || exit 1
-cmake --install ${BUILD_LOCATION} --parallel ${GUNDAM_JOBS} || exit 1
+echo cmake --install ${BUILD_LOCATION} || exit 1
+cmake --install ${BUILD_LOCATION} || exit 1
 
 if [ ${RUN_TEST} = "yes" ]; then
     echo ctest --test-dir ${BUILD_LOCATION} \
