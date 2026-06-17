@@ -41,12 +41,19 @@ if( ROOT_FOUND )
   # Grab functions such as generate dictionary
   include( ${ROOT_USE_FILE} )
 
+  # Add the libraries and include files here.  These "should" go in
+  # the target_link_libraries or target_include_directories for each library
+  # that uses them, but they all use them, so put them here. This keeps the
+  # symmetry when root-config (if find_package didn't work)
+  link_libraries(${ROOT_LIBRARIES})
+  include_directories(${ROOT_INCLUDE_DIRS})
+
   if (ROOT_VERSION VERSION_GREATER_EQUAL 6.30.00)
     set(ROOT_minuit2_FOUND "yes")
   endif()
 
 else( ROOT_FOUND )
-  cmessage( STATUS "find_package didn't find ROOT. Using shell instead...")
+  cmessage( WARNING "find_package didn't find ROOT. Using shell instead...")
 
   # ROOT
   if(NOT DEFINED ENV{ROOTSYS} )
@@ -123,8 +130,6 @@ if (NOT ROOT_minuit2_FOUND AND NOT WITH_MINUIT2_MISSING)
   cmessage(FATAL_ERROR "[ROOT]: minuit2 is required")
 endif()
 
-include_directories( ${ROOT_INCLUDE_DIR} )
-
 
 ####################
 # NLOHMANN JSON
@@ -138,6 +143,9 @@ if( NOT nlohmann_json_FOUND )
     nlohmann_json
     GIT_REPOSITORY https://github.com/nlohmann/json.git
     GIT_TAG v3.11.3
+    GIT_SHALLOW true
+    # Only do the basic compile
+    CMAKE_ARGS -DJSON_BuildTests=OFF -DJSON_CI=OFF
     OVERRIDE_FIND_PACKAGE
   )
   set(DeclaredContent ${DeclaredContent} nlohmann_json)
@@ -161,13 +169,8 @@ if( NOT yaml-cpp_FOUND )
     OVERRIDE_FIND_PACKAGE
   )
   set(DeclaredContent ${DeclaredContent} yaml-cpp)
-else()
-  cmessage( STATUS "Using yaml-cpp ${yaml-cpp_VERSION}")
-  cmessage( WARNING "Using yaml include  ${YAML_CPP_INCLUDE_DIR}")
-  cmessage( WARNING "Using yaml library  ${YAML_CPP_LIBRARIES}")
-  include_directories( ${YAML_CPP_INCLUDE_DIR} )
-  link_libraries( ${YAML_CPP_LIBRARIES} )
 endif()
+
 
 ####################
 # GoogleTest
@@ -230,11 +233,6 @@ if (DeclaredContent)
   # to the local DeclaredContent variable.
   cmessage(WARNING "FetchContent: Will build ${DeclaredContent}")
   FetchContent_MakeAvailable(${DeclaredContent})
-  # Do specific steps needed for each package that might have been fetched.
-  if ( "yaml-cpp" IN_LIST DeclaredContent)
-    # Add the yaml-cpp library so we don't add it to every executable load.
-    link_libraries(yaml-cpp::yaml-cpp)
-  endif()
 else()
   cmessage(WARNING "No content declared")
 endif (DeclaredContent)
