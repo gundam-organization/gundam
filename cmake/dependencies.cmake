@@ -138,7 +138,7 @@ if( NOT nlohmann_json_FOUND )
     nlohmann_json
     GIT_REPOSITORY https://github.com/nlohmann/json.git
     GIT_TAG v3.11.3
-    FIND_PACKAGE_OVERRIDE
+    OVERRIDE_FIND_PACKAGE
   )
   set(DeclaredContent ${DeclaredContent} nlohmann_json)
 endif( NOT nlohmann_json_FOUND )
@@ -158,7 +158,7 @@ if( NOT yaml-cpp_FOUND )
     GIT_TAG yaml-cpp-0.9.0
     # Make sure yaml-cpp doesn't mess with gtest
     CMAKE_ARGS -DGTEST_INSTALL=OFF
-    FIND_PACKAGE_OVERRIDE
+    OVERRIDE_FIND_PACKAGE
   )
   set(DeclaredContent ${DeclaredContent} yaml-cpp)
 else()
@@ -179,7 +179,7 @@ if( NOT GTest_FOUND )
     GTest
     GIT_REPOSITORY https://github.com/google/googletest.git
     GIT_TAG v1.16.0
-    FIND_PACKAGE_OVERRIDE
+    OVERRIDE_FIND_PACKAGE
   )
   set(DeclaredContent ${DeclaredContent} GTest)
 endif( NOT GTest_FOUND )
