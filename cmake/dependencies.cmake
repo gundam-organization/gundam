@@ -131,13 +131,14 @@ include_directories( ${ROOT_INCLUDE_DIR} )
 ####################
 
 cmessage( STATUS "Looking for JSON install..." )
-find_package(nlohmann_json)
+find_package(nlohmann_json 3.11.3 EXACT QUIET)
 if( NOT nlohmann_json_FOUND )
   cmessage( WARNING "System nlohmann_json package not found")
   FetchContent_Declare(
     nlohmann_json
     GIT_REPOSITORY https://github.com/nlohmann/json.git
     GIT_TAG v3.11.3
+    FIND_PACKAGE_OVERRIDE
   )
   set(DeclaredContent ${DeclaredContent} nlohmann_json)
 endif( NOT nlohmann_json_FOUND )
@@ -148,7 +149,7 @@ endif( NOT nlohmann_json_FOUND )
 ####################
 cmessage( STATUS "Looking for YAML install..." )
 
-find_package(yaml-cpp)
+find_package(yaml-cpp 0.9.0 EXACT QUIET)
 if( NOT yaml-cpp_FOUND )
   cmessage( WARNING "System yaml-cpp package not found")
   FetchContent_Declare(
@@ -157,6 +158,7 @@ if( NOT yaml-cpp_FOUND )
     GIT_TAG yaml-cpp-0.9.0
     # Make sure yaml-cpp doesn't mess with gtest
     CMAKE_ARGS -DGTEST_INSTALL=OFF
+    FIND_PACKAGE_OVERRIDE
   )
   set(DeclaredContent ${DeclaredContent} yaml-cpp)
 else()
@@ -170,13 +172,14 @@ endif()
 ####################
 # GoogleTest
 ####################
-find_package(GTest)
+find_package(GTest 1.16.0 EXACT QUIET)
 if( NOT GTest_FOUND )
   cmessage( WARNING "System GTest package not found")
   FetchContent_Declare(
     GTest
     GIT_REPOSITORY https://github.com/google/googletest.git
     GIT_TAG v1.16.0
+    FIND_PACKAGE_OVERRIDE
   )
   set(DeclaredContent ${DeclaredContent} GTest)
 endif( NOT GTest_FOUND )
