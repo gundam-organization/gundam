@@ -136,7 +136,7 @@ endif()
 ####################
 
 cmessage( STATUS "Looking for JSON install..." )
-find_package(nlohmann_json 3.11.3 EXACT QUIET)
+find_package(nlohmann_json 3.11.3 EXACT CONFIG)
 if( NOT nlohmann_json_FOUND )
   cmessage( WARNING "System nlohmann_json package not found")
   FetchContent_Declare(
@@ -157,7 +157,7 @@ endif( NOT nlohmann_json_FOUND )
 ####################
 cmessage( STATUS "Looking for YAML install..." )
 
-find_package(yaml-cpp 0.9.0 EXACT QUIET)
+find_package(yaml-cpp 0.9.0 EXACT CONFIG)
 if( NOT yaml-cpp_FOUND )
   cmessage( WARNING "System yaml-cpp package not found")
   FetchContent_Declare(
@@ -175,7 +175,7 @@ endif()
 ####################
 # GoogleTest
 ####################
-find_package(GTest 1.16.0 EXACT QUIET)
+find_package(GTest 1.16.0 EXACT CONFIG)
 if( NOT GTest_FOUND )
   cmessage( WARNING "System GTest package not found")
   FetchContent_Declare(
