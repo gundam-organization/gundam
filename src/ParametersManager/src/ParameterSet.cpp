@@ -1091,8 +1091,14 @@ void ParameterSet::defineParameters(){
       for( auto& enableEntry : _enableOnlyParameters_ ){
         enableEntry.clearFields();
         enableEntry.defineFields({{"name"}});
+        enableEntry.defineFields({{"index"}});
         if( enableEntry.hasField("name")
             and par.getName() == enableEntry.fetchValue<std::string>("name") ){
+          isEnabled = true;
+          break;
+        }
+        if( enableEntry.hasField("index")
+            and par.getParameterIndex() == enableEntry.fetchValue<int>("index") ) {
           isEnabled = true;
           break;
         }
@@ -1111,10 +1117,16 @@ void ParameterSet::defineParameters(){
       for( auto& disableEntry : _disableParameters_ ){
         disableEntry.clearFields();
         disableEntry.defineFields({{"name"}});
+        disableEntry.defineFields({{"index"}});
         if( disableEntry.hasField("name")
             and par.getName() == disableEntry.fetchValue<std::string>("name") ){
           isEnabled = false;
           break;
+        }
+        if( disableEntry.hasField("index")
+        and par.getParameterIndex() == disableEntry.fetchValue<int>("index") ) {
+              isEnabled = true;
+              break;
         }
       }
 
