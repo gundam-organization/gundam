@@ -30,8 +30,10 @@ include_directories(submodules/simple-cpp-cmd-line-parser/include)
 add_definitions( -D CMDLINEPARSER_YAML_CPP_ENABLED=1 )
 
 ## Add the GenericToolbox²
-# Reproduce needed parts of the cpp-generic-toolbox CMakeLists.txt
+# Reproduce needed parts of the cpp-generic-toolbox CMakeLists.txt.  This
+# needs the nlohmann library.
 include_directories(submodules/cpp-generic-toolbox/include)
+link_libraries(nlohmann_json::nlohmann_json)
 
 #file( GLOB CPP_GENERIC_TOOLBOX_HEADERS ${CMAKE_SOURCE_DIR}/submodules/cpp-generic-toolbox/include/*.h )
 #file( GLOB CPP_GENERIC_TOOLBOX_HEADERS_IMPL ${CMAKE_SOURCE_DIR}/submodules/cpp-generic-toolbox/include/implementation/*.h )
