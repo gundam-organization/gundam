@@ -7,6 +7,9 @@
 #include "ConfigUtils.h"
 #include "GundamApp.h"
 
+#include "GenericToolbox.Fs.h"
+#include "GenericToolbox.Os.h"
+
 #include "Logger.h"
 
 #include <pybind11/pybind11.h>
@@ -15,7 +18,36 @@
 #include <pybind11/functional.h>
 #include <pybind11/chrono.h>
 
+#include <cerrno>
+#include <cstring>
 #include <string>
+#include <unistd.h>
+
+
+namespace {
+
+void setRuntimeWorkingDirectory(const std::string& dirPath_, bool createIfMissing_){
+  auto expandedDirPath = GenericToolbox::expandEnvironmentVariables(dirPath_);
+
+  if( expandedDirPath.empty() ){
+    throw pybind11::value_error("Runtime working directory cannot be empty.");
+  }
+
+  if( not GenericToolbox::isDir(expandedDirPath) ){
+    if( createIfMissing_ ){
+      GenericToolbox::mkdir(expandedDirPath);
+    }
+    if( not GenericToolbox::isDir(expandedDirPath) ){
+      throw pybind11::value_error("Runtime working directory does not exist: " + expandedDirPath);
+    }
+  }
+
+  if( chdir(expandedDirPath.c_str()) != 0 ){
+    throw std::runtime_error("Could not set runtime working directory to \"" + expandedDirPath + "\": " + std::strerror(errno));
+  }
+}
+
+}
 
 
 PYBIND11_MODULE(GUNDAM, module) {
@@ -25,6 +57,12 @@ PYBIND11_MODULE(GUNDAM, module) {
   module.def("setNumberOfThreads", &GundamGlobals::setNumberOfThreads, "Set the number of threads for Gundam");
   module.def("setLightOutputMode", &GundamGlobals::setLightOutputMode, "Reduce the amount of outputs in the root files");
   module.def("setIsDebug", &GundamGlobals::setIsDebug, "Enables debug printouts");
+  module.def("setRuntimeWorkingDirectory", &setRuntimeWorkingDirectory,
+             pybind11::arg("dirPath"),
+             pybind11::arg("createIfMissing") = false,
+             "Set the process working directory used by GUNDAM to resolve relative runtime paths.");
+  module.def("getRuntimeWorkingDirectory", &GenericToolbox::getCurrentWorkingDirectory,
+             "Get the process working directory used by GUNDAM to resolve relative runtime paths.");
 
   // JsonType for the return type
   pybind11::class_<JsonType>(module, "JsonType")
@@ -134,4 +172,3 @@ PYBIND11_MODULE(GUNDAM, module) {
   .def("getTFilePath", &FitterEngine::getTFilePath)
   ;
 }
-
