@@ -96,3 +96,13 @@ needed:
 GUNDAM.setRuntimeWorkingDirectory("/path/to/run/directory", createIfMissing=True)
 print(GUNDAM.getRuntimeWorkingDirectory())
 ```
+Relative paths used by GUNDAM are resolved from the current process working
+directory. When using the Python interface, call
+`GUNDAM.setRuntimeWorkingDirectory(...)` before loading relative config files or
+initializing the runtime. Pass `createIfMissing=True` to create the directory if
+needed:
+
+```python
+GUNDAM.setRuntimeWorkingDirectory("/path/to/run/directory", createIfMissing=True)
+print(GUNDAM.getRuntimeWorkingDirectory())
+```
