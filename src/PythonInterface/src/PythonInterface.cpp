@@ -4,6 +4,7 @@
 
 #include "PythonInterface.h"
 #include "FitterEngine.h"
+#include "DatasetDefinition.h"
 #include "ConfigUtils.h"
 #include "GundamApp.h"
 
@@ -124,36 +125,97 @@ PYBIND11_MODULE(GUNDAM, module) {
   // .def("getOutfilePtr", &GundamApp::getOutfilePtr) // CAN'T EXPOSE ROOT PTRs
   ;
 
+  pybind11::class_<Parameter>(module, "Parameter")
+  .def("getName", &Parameter::getName)
+  .def("getFullTitle", &Parameter::getFullTitle)
+  .def("isEnabled", &Parameter::isEnabled)
+  .def("getStepSize", &Parameter::getStepSize)
+  .def("getPriorValue", &Parameter::getPriorValue)
+  .def("getStdDevValue", &Parameter::getStdDevValue)
+  .def("getThrowValue", &Parameter::getThrowValue)
+  .def("getParameterValue", &Parameter::getParameterValue)
+  .def("setParameterValue", &Parameter::setParameterValue)
+  ;
+
+  pybind11::class_<ParameterSet>(module, "ParameterSet")
+  .def(pybind11::init())
+  .def("getParameterList", pybind11::overload_cast<>(&ParameterSet::getParameterList), pybind11::return_value_policy::reference)
+  ;
+
   pybind11::class_<ParametersManager>(module, "ParametersManager")
   .def(pybind11::init())
   .def("throwParameters", &ParametersManager::throwParameters)
   .def("exportParameterInjectorConfig", &ParametersManager::exportParameterInjectorConfig)
   .def("injectParameterValues", &ParametersManager::injectParameterValues)
+  .def("getParameterSetsList", pybind11::overload_cast<>(&ParametersManager::getParameterSetsList), pybind11::return_value_policy::reference)
   ;
 
   pybind11::class_<Propagator>(module, "Propagator")
   .def(pybind11::init())
+  .def("initialize", pybind11::overload_cast<>(&Propagator::initialize), pybind11::return_value_policy::reference)
   .def("getParametersManager", pybind11::overload_cast<>(&Propagator::getParametersManager), pybind11::return_value_policy::reference)
   .def("copyHistBinContentFrom", pybind11::overload_cast<const Propagator&>(&Propagator::copyHistBinContentFrom), pybind11::return_value_policy::reference)
   .def("writeParameterStateTree", &Propagator::writeParameterStateTree)
   ;
 
-  pybind11::class_<LikelihoodInterface>(module, "LikelihoodInterface")
+  pybind11::class_<DatasetDefinition>(module, "DatasetDefinition")
+  .def("initialize", pybind11::overload_cast<>(&DatasetDefinition::initialize), pybind11::return_value_policy::reference)
+  ;
+
+  auto likelihoodInterfaceClass = pybind11::class_<LikelihoodInterface>(module, "LikelihoodInterface");
+
+  auto dataTypeClass = pybind11::class_<LikelihoodInterface::DataType>(likelihoodInterfaceClass, "DataType")
+  .def(pybind11::init())
+  .def(pybind11::init([](const std::string& name_){
+    auto dataType{LikelihoodInterface::DataType::toEnum(name_, true)};
+    if( dataType.value == static_cast<LikelihoodInterface::DataType::EnumTypeName>(LikelihoodInterface::DataType::overflowValue) ){
+      throw pybind11::value_error("Unknown DataType: " + name_);
+    }
+    return dataType;
+  }), pybind11::arg("name"))
+  .def_static("toEnum", [](const std::string& name_, bool ignoreCase_){
+    auto dataType{LikelihoodInterface::DataType::toEnum(name_, ignoreCase_)};
+    if( dataType.value == static_cast<LikelihoodInterface::DataType::EnumTypeName>(LikelihoodInterface::DataType::overflowValue) ){
+      throw pybind11::value_error("Unknown DataType: " + name_);
+    }
+    return dataType;
+  }, pybind11::arg("name"), pybind11::arg("ignoreCase") = true)
+  .def_static("generateVectorStr", &LikelihoodInterface::DataType::generateVectorStr)
+  .def("toString", [](const LikelihoodInterface::DataType& this_){ return this_.toString(); })
+  .def("__str__", [](const LikelihoodInterface::DataType& this_){ return this_.toString(); })
+  .def("__repr__", [](const LikelihoodInterface::DataType& this_){ return "DataType." + this_.toString(); })
+  .def("__eq__", [](const LikelihoodInterface::DataType& lhs_, const LikelihoodInterface::DataType& rhs_){ return lhs_ == rhs_; })
+  ;
+  dataTypeClass.attr("Asimov") = pybind11::cast(LikelihoodInterface::DataType(LikelihoodInterface::DataType::Asimov));
+  dataTypeClass.attr("Toy") = pybind11::cast(LikelihoodInterface::DataType(LikelihoodInterface::DataType::Toy));
+  dataTypeClass.attr("RealData") = pybind11::cast(LikelihoodInterface::DataType(LikelihoodInterface::DataType::RealData));
+
+  likelihoodInterfaceClass
   .def(pybind11::init())
   .def("getSummary", &LikelihoodInterface::getSummary, pybind11::call_guard<pybind11::gil_scoped_release>())
+  .def("getLastLikelihood", &LikelihoodInterface::getLastLikelihood, pybind11::call_guard<pybind11::gil_scoped_release>())
   .def("propagateAndEvalLikelihood", &LikelihoodInterface::propagateAndEvalLikelihood, pybind11::call_guard<pybind11::gil_scoped_release>())
   .def("evalLikelihood", &LikelihoodInterface::evalLikelihood, pybind11::call_guard<pybind11::gil_scoped_release>())
   .def("setForceAsimovData", &LikelihoodInterface::setForceAsimovData, pybind11::call_guard<pybind11::gil_scoped_release>())
   .def("throwToyParameters", &LikelihoodInterface::throwToyParameters, pybind11::call_guard<pybind11::gil_scoped_release>())
   .def("throwStatErrors", &LikelihoodInterface::throwStatErrors, pybind11::call_guard<pybind11::gil_scoped_release>())
   .def("setCurrentParameterValuesAsPrior", &LikelihoodInterface::setCurrentParameterValuesAsPrior, pybind11::call_guard<pybind11::gil_scoped_release>())
+  .def("setDataType", &LikelihoodInterface::setDataType, pybind11::call_guard<pybind11::gil_scoped_release>())
   .def("getModelPropagator", pybind11::overload_cast<>(&LikelihoodInterface::getModelPropagator), pybind11::return_value_policy::reference)
   .def("getDataPropagator", pybind11::overload_cast<>(&LikelihoodInterface::getDataPropagator), pybind11::return_value_policy::reference)
+  .def("getDatasetList", pybind11::overload_cast<>(&LikelihoodInterface::getDatasetList), pybind11::return_value_policy::reference)
+  .def("initialize", pybind11::overload_cast<>(&LikelihoodInterface::initialize), pybind11::return_value_policy::reference)
+  ;
+
+  pybind11::class_<ParameterScanner>(module, "ParameterScanner")
+  .def(pybind11::init())
+  .def("initialize", pybind11::overload_cast<>(&ParameterScanner::initialize), pybind11::return_value_policy::reference)
   ;
 
   // no CTOR here
   pybind11::class_<MinimizerBase>(module, "MinimizerBase")
   .def("minimize", &MinimizerBase::minimize)
+  .def("fetchNbDegreeOfFreedom", &MinimizerBase::fetchNbDegreeOfFreedom)
   ;
 
   pybind11::class_<FitterEngine>(module, "FitterEngine")
@@ -169,6 +231,7 @@ PYBIND11_MODULE(GUNDAM, module) {
   .def("fit", &FitterEngine::fit)
   .def("getMinimizer", pybind11::overload_cast<>(&FitterEngine::getMinimizer), pybind11::return_value_policy::reference)
   .def("getLikelihoodInterface", pybind11::overload_cast<>(&FitterEngine::getLikelihoodInterface), pybind11::return_value_policy::reference)
+  .def("getParameterScanner", pybind11::overload_cast<>(&FitterEngine::getParameterScanner), pybind11::return_value_policy::reference)
   .def("getTFilePath", &FitterEngine::getTFilePath)
   ;
 }
