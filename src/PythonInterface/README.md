@@ -53,6 +53,7 @@ Example for an Asymov fit
 
 ```python
 import GUNDAM
+GUNDAM.setRuntimeWorkingDirectory("/path/to/run/directory")
 GUNDAM.setLightOutputMode(True)
 GUNDAM.setNumberOfThreads(2)
 
@@ -66,9 +67,32 @@ e.setConfig(fitterEngineConfig)
 e.configure()
 
 e.getLikelihoodInterface().setForceAsimovData(True)
+e.getLikelihoodInterface().setDataType(GUNDAM.LikelihoodInterface.DataType.Asimov)
 
 e.initialize()
 
 e.fit()
 ```
 
+The likelihood data type can be selected with
+`LikelihoodInterface.DataType`. The available values are `Asimov`, `Toy`, and
+`RealData`:
+
+```python
+likelihood = e.getLikelihoodInterface()
+
+likelihood.setDataType(GUNDAM.LikelihoodInterface.DataType.Asimov)
+likelihood.setDataType(GUNDAM.LikelihoodInterface.DataType.Toy)
+likelihood.setDataType(GUNDAM.LikelihoodInterface.DataType.RealData)
+```
+
+Relative paths used by GUNDAM are resolved from the current process working
+directory. When using the Python interface, call
+`GUNDAM.setRuntimeWorkingDirectory(...)` before loading relative config files or
+initializing the runtime. Pass `createIfMissing=True` to create the directory if
+needed:
+
+```python
+GUNDAM.setRuntimeWorkingDirectory("/path/to/run/directory", createIfMissing=True)
+print(GUNDAM.getRuntimeWorkingDirectory())
+```
