@@ -15,6 +15,7 @@
 #include "Math/Minimizer.h"
 #include "Math/Functor.h"
 #include "TDirectory.h"
+#include "TMatrixD.h"
 #include "TMatrixDSym.h"
 
 #include <memory>
@@ -99,6 +100,8 @@ private:
   std::unique_ptr<ROOT::Math::Minimizer> _rootMinimizer_{nullptr};
   std::vector<double> _bestfitPointCache_{};
   std::unique_ptr<TMatrixDSym> _bestfitCovCache_{nullptr};
+  std::vector<int> _bestfitCovThrowParIndexCache_{};
+  std::unique_ptr<TMatrixD> _bestfitCovCholeskyCache_{nullptr};
 
   struct GradientDescentMonitor{
     bool isEnabled{false};

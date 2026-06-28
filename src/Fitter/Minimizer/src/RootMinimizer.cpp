@@ -648,54 +648,23 @@ void RootMinimizer::throwPostfitParameters(){
   LogThrowIf(_rootMinimizer_ == nullptr, "Invalid root minimizer");
   LogThrowIf(_bestfitPointCache_.empty(), "Best-fit point cache is empty.");
   LogThrowIf(_bestfitCovCache_ == nullptr, "Best-fit covariance cache is empty.");
+  LogThrowIf(_bestfitCovCholeskyCache_ == nullptr, "Best-fit covariance Cholesky cache is empty.");
+  LogThrowIf(_bestfitCovThrowParIndexCache_.empty(), "Best-fit covariance throw parameter index cache is empty.");
   LogThrowIf(int(_bestfitPointCache_.size()) != _bestfitCovCache_->GetNrows(),
              "Best-fit point cache dimension (" << _bestfitPointCache_.size()
              << ") does not match covariance cache dimension (" << _bestfitCovCache_->GetNrows() << ").");
 
   LogInfo << "Throwing post-fit parameters from cached ROOT minimizer covariance matrix..." << std::endl;
 
-  std::vector<int> thrownParIndexList;
-  thrownParIndexList.reserve(_bestfitPointCache_.size());
-  for( int iFitPar = 0 ; iFitPar < _bestfitCovCache_->GetNrows() ; iFitPar++ ){
-    double variance = (*_bestfitCovCache_)[iFitPar][iFitPar];
-    LogThrowIf(
-        std::isnan(variance),
-        "Invalid NaN variance in post-fit covariance matrix for " << _rootMinimizer_->VariableName(iFitPar)
-    );
-    if( variance <= 0 ){ continue; }
-    thrownParIndexList.emplace_back(iFitPar);
-  }
-  LogThrowIf(thrownParIndexList.empty(), "No parameter with positive post-fit variance found.");
-
-  TMatrixDSym strippedCovarianceMatrix(int(thrownParIndexList.size()));
-  for( int iThrowPar = 0 ; iThrowPar < strippedCovarianceMatrix.GetNrows() ; iThrowPar++ ){
-    int iFitPar = thrownParIndexList[iThrowPar];
-    for( int jThrowPar = 0 ; jThrowPar < strippedCovarianceMatrix.GetNcols() ; jThrowPar++ ){
-      int jFitPar = thrownParIndexList[jThrowPar];
-      strippedCovarianceMatrix[iThrowPar][jThrowPar] = (*_bestfitCovCache_)[iFitPar][jFitPar];
-    }
-  }
-
-  auto choleskyMatrix = std::unique_ptr<TMatrixD>(GenericToolbox::getCholeskyMatrix(&strippedCovarianceMatrix));
-  LogThrowIf(
-      choleskyMatrix == nullptr,
-      "Could not decompose the post-fit covariance matrix. Covariance matrix status code: "
-      << _rootMinimizer_->CovMatrixStatus()
-  );
-
   std::vector<double> thrownParValues(_bestfitPointCache_);
 
-  auto thrownOffsets = GenericToolbox::throwCorrelatedParameters(choleskyMatrix.get());
-  for( int iThrowPar = 0 ; iThrowPar < int(thrownParIndexList.size()) ; iThrowPar++ ){
-    int iFitPar = thrownParIndexList[iThrowPar];
+  auto thrownOffsets = GenericToolbox::throwCorrelatedParameters(_bestfitCovCholeskyCache_.get());
+  for( int iThrowPar = 0 ; iThrowPar < int(_bestfitCovThrowParIndexCache_.size()) ; iThrowPar++ ){
+    int iFitPar = _bestfitCovThrowParIndexCache_[iThrowPar];
     thrownParValues[iFitPar] += thrownOffsets[iThrowPar];
   }
 
-  evalFit(thrownParValues.data());
-
-  for( int iFitPar = 0 ; iFitPar < _rootMinimizer_->NDim() ; iFitPar++ ){
-    _rootMinimizer_->SetVariableValue(iFitPar, thrownParValues[iFitPar]);
-  }
+  LogThrowIf(not setFitParameterValues(thrownParValues.data()), "Invalid thrown post-fit parameter values.");
 }
 
 void RootMinimizer::saveMinimizerSettings( TDirectory* saveDir_) const {
@@ -1478,10 +1447,40 @@ void RootMinimizer::updateBestfitCovCache(){
   LogThrowIf(_rootMinimizer_ == nullptr, "Invalid root minimizer");
 
   LogInfo << "Updating best-fit covariance cache..." << std::endl;
+  _bestfitCovThrowParIndexCache_.clear();
+  _bestfitCovCholeskyCache_.reset();
   _bestfitCovCache_ = std::make_unique<TMatrixDSym>(int(_rootMinimizer_->NDim()));
   LogThrowIf(
       not _rootMinimizer_->GetCovMatrix(_bestfitCovCache_->GetMatrixArray()),
       "Could not retrieve the post-fit covariance matrix from the minimizer."
+  );
+
+  _bestfitCovThrowParIndexCache_.reserve(_rootMinimizer_->NDim());
+  for( int iFitPar = 0 ; iFitPar < _bestfitCovCache_->GetNrows() ; iFitPar++ ){
+    double variance = (*_bestfitCovCache_)[iFitPar][iFitPar];
+    LogThrowIf(
+        std::isnan(variance),
+        "Invalid NaN variance in post-fit covariance matrix for " << _rootMinimizer_->VariableName(iFitPar)
+    );
+    if( variance <= 0 ){ continue; }
+    _bestfitCovThrowParIndexCache_.emplace_back(iFitPar);
+  }
+  LogThrowIf(_bestfitCovThrowParIndexCache_.empty(), "No parameter with positive post-fit variance found.");
+
+  TMatrixDSym strippedCovarianceMatrix(int(_bestfitCovThrowParIndexCache_.size()));
+  for( int iThrowPar = 0 ; iThrowPar < strippedCovarianceMatrix.GetNrows() ; iThrowPar++ ){
+    int iFitPar = _bestfitCovThrowParIndexCache_[iThrowPar];
+    for( int jThrowPar = 0 ; jThrowPar < strippedCovarianceMatrix.GetNcols() ; jThrowPar++ ){
+      int jFitPar = _bestfitCovThrowParIndexCache_[jThrowPar];
+      strippedCovarianceMatrix[iThrowPar][jThrowPar] = (*_bestfitCovCache_)[iFitPar][jFitPar];
+    }
+  }
+
+  _bestfitCovCholeskyCache_ = std::unique_ptr<TMatrixD>(GenericToolbox::getCholeskyMatrix(&strippedCovarianceMatrix));
+  LogThrowIf(
+      _bestfitCovCholeskyCache_ == nullptr,
+      "Could not decompose the post-fit covariance matrix. Covariance matrix status code: "
+      << _rootMinimizer_->CovMatrixStatus()
   );
 }
 void RootMinimizer::saveGradientSteps(){
