@@ -15,6 +15,7 @@
 #include "Math/Minimizer.h"
 #include "Math/Functor.h"
 #include "TDirectory.h"
+#include "TMatrixDSym.h"
 
 #include <memory>
 #include <vector>
@@ -45,11 +46,14 @@ public:
   [[nodiscard]] const std::unique_ptr<ROOT::Math::Minimizer> &getMinimizer() const{ return _rootMinimizer_; }
 
   // core
+  void throwPostfitParameters();
   void saveMinimizerSettings(TDirectory* saveDir_) const;
 
 protected:
   void writePostFitData(TDirectory* saveDir_);
   void updateCacheToBestfitPoint();
+  void updateBestfitPointCache();
+  void updateBestfitCovCache();
   void saveGradientSteps();
 
 private:
@@ -93,6 +97,8 @@ private:
   /// evalFit.
   ROOT::Math::Functor _functor_{};
   std::unique_ptr<ROOT::Math::Minimizer> _rootMinimizer_{nullptr};
+  std::vector<double> _bestfitPointCache_{};
+  std::unique_ptr<TMatrixDSym> _bestfitCovCache_{nullptr};
 
   struct GradientDescentMonitor{
     bool isEnabled{false};
