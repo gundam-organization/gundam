@@ -98,10 +98,14 @@ private:
   /// evalFit.
   ROOT::Math::Functor _functor_{};
   std::unique_ptr<ROOT::Math::Minimizer> _rootMinimizer_{nullptr};
-  std::vector<double> _bestfitPointCache_{};
-  std::unique_ptr<TMatrixDSym> _bestfitCovCache_{nullptr};
-  std::vector<int> _bestfitCovThrowParIndexCache_{};
-  std::unique_ptr<TMatrixD> _bestfitCovCholeskyCache_{nullptr};
+
+  struct PostfitCache{
+    std::vector<double> bestfitPoint{};
+    std::unique_ptr<TMatrixDSym> covariance{nullptr};
+    std::vector<int> throwParIndexList{};
+    std::unique_ptr<TMatrixD> choleskyCovariance{nullptr};
+  };
+  PostfitCache postfitCache{};
 
   struct GradientDescentMonitor{
     bool isEnabled{false};
