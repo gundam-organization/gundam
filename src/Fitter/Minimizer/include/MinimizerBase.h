@@ -87,6 +87,10 @@ public:
   /// defined by the vector of pointers to Parameter returned by the LikelihoodInterface.
   virtual double evalFit( const double* parArray_ );
 
+  /// Set the minimizer parameters in GUNDAM without propagating them or
+  /// evaluating the likelihood.
+  bool setFitParameterValues( const double* parArray_ );
+
   // default calcErrors() is not defined
   [[nodiscard]] virtual bool isErrorCalcEnabled() const { return false; }
 

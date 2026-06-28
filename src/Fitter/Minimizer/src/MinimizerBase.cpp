@@ -139,17 +139,9 @@ void MinimizerBase::scanParameters(TDirectory* saveDir_){
   for( auto& parPtr : _minimizerParameterPtrList_ ) { getParameterScanner().scanParameter( *parPtr, saveDir_ ); }
 }
 
-double MinimizerBase::evalFit( const double* parArray_ ){
-/// The main access is through the evalFit method which takes an array of
-/// floating point values and returns the likelihood. The meaning of the
-/// parameters is defined by the vector of pointers to Parameter returned by
-/// the LikelihoodInterface.
-
-  _monitor_.externalTimer.stop();
-  _monitor_.evalLlhTimer.start();
-
+bool MinimizerBase::setFitParameterValues( const double* parArray_ ){
   // Check the fit parameter values.  Do this first so that the parameters
-  // don't change when a bad set of values is tried with evalFit.  This will
+  // don't change when a bad set of values is tried. This will
   // only be enabled if it is requested.
   if (_checkParameterValidity_) {
     const double* v = parArray_;
@@ -157,11 +149,7 @@ double MinimizerBase::evalFit( const double* parArray_ ){
       double val = *(v++);
       if (_useNormalizedFitSpace_) val = ParameterSet::toRealParValue(val,*par);
       if (par->isValidValue(val)) continue;
-      _monitor_.evalLlhTimer.stop();
-      /// A "Really Big Number".  This needs to be an appropriate value to
-      /// safely represent an impossible chi-squared value "representing"
-      /// -log(0.0)/2.
-      return std::numeric_limits<double>::infinity();
+      return false;
     }
   }
 
@@ -178,6 +166,26 @@ double MinimizerBase::evalFit( const double* parArray_ ){
     for( auto* par : _minimizerParameterPtrList_ ){
       par->setParameterValue(*(v++), true);
     }
+  }
+
+  return true;
+}
+
+double MinimizerBase::evalFit( const double* parArray_ ){
+/// The main access is through the evalFit method which takes an array of
+/// floating point values and returns the likelihood. The meaning of the
+/// parameters is defined by the vector of pointers to Parameter returned by
+/// the LikelihoodInterface.
+
+  _monitor_.externalTimer.stop();
+  _monitor_.evalLlhTimer.start();
+
+  if( not setFitParameterValues(parArray_) ){
+    _monitor_.evalLlhTimer.stop();
+    /// A "Really Big Number".  This needs to be an appropriate value to
+    /// safely represent an impossible chi-squared value "representing"
+    /// -log(0.0)/2.
+    return std::numeric_limits<double>::infinity();
   }
 
   // Propagate the parameters
