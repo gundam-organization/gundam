@@ -101,9 +101,16 @@ private:
 
   struct PostfitCache{
     std::vector<double> bestfitPoint{};
+    std::vector<std::string> variableNames{};
     std::unique_ptr<TMatrixDSym> covariance{nullptr};
     std::vector<int> throwParIndexList{};
     std::unique_ptr<TMatrixD> choleskyCovariance{nullptr};
+    int status{-1};
+    int covarianceStatus{-1};
+    int nFree{0};
+    int nIterations{0};
+    double edm{std::nan("unset")};
+    double minValue{std::nan("unset")};
   };
   PostfitCache postfitCache{};
 

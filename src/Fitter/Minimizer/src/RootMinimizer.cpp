@@ -276,6 +276,7 @@ void RootMinimizer::minimize(){
     getMonitor().isEnabled = false;
 
     // Make sure we are on the right spot
+    updateBestfitPointCache();
     updateCacheToBestfitPoint();
 
     // export bf point with SIMPLEX
@@ -307,20 +308,20 @@ void RootMinimizer::minimize(){
   getMonitor().isEnabled = false;
 
   minimizationStopWatch.stop();
+  updateBestfitPointCache();
   LogInfo << "Minimization stopped after " << GenericToolbox::toString(minimizationStopWatch.eval()) << std::endl;
 
   int nbMinimizeCalls = getMonitor().nbEvalLikelihoodCalls - nbFitCallOffset;
 
   LogInfo << getMonitor().convergenceMonitor.generateMonitorString(); // lasting printout
   LogInfo << "Minimization ended after " << nbMinimizeCalls << " calls." << std::endl;
-  if(_minimizerType_ == "Minuit" or _minimizerType_ == "Minuit2") LogInfo << "Status code: " << GundamUtils::minuitStatusCodeStr.at(_rootMinimizer_->Status()) << std::endl;
-  else LogInfo << "Status code: " << _rootMinimizer_->Status() << std::endl;
-  if(_minimizerType_ == "Minuit" or _minimizerType_ == "Minuit2") LogInfo << "Covariance matrix status code: " << GundamUtils::covMatrixStatusCodeStr.at(_rootMinimizer_->CovMatrixStatus()) << std::endl;
-  else LogInfo << "Covariance matrix status code: " << _rootMinimizer_->CovMatrixStatus() << std::endl;
+  if(_minimizerType_ == "Minuit" or _minimizerType_ == "Minuit2") LogInfo << "Status code: " << GundamUtils::minuitStatusCodeStr.at(postfitCache.status) << std::endl;
+  else LogInfo << "Status code: " << postfitCache.status << std::endl;
+  if(_minimizerType_ == "Minuit" or _minimizerType_ == "Minuit2") LogInfo << "Covariance matrix status code: " << GundamUtils::covMatrixStatusCodeStr.at(postfitCache.covarianceStatus) << std::endl;
+  else LogInfo << "Covariance matrix status code: " << postfitCache.covarianceStatus << std::endl;
 
   // Make sure we are on the right spot
   updateCacheToBestfitPoint();
-  updateBestfitPointCache();
   updateBestfitCovCache();
 
   // export bf point
@@ -346,12 +347,12 @@ void RootMinimizer::minimize(){
   if( getOwner().getSaveDir() != nullptr ) {
     LogInfo << "Writing convergence stats..." << std::endl;
     int toyIndex = getModelPropagator().getIThrow();
-    int nIterations = int(_rootMinimizer_->NIterations());
-    int nFitPars = int(_rootMinimizer_->NFree());
-    double edmBestFit = _rootMinimizer_->Edm();
-    double fitStatus = _rootMinimizer_->Status();
-    double covStatus = _rootMinimizer_->CovMatrixStatus();
-    double chi2MinFitter = _rootMinimizer_->MinValue();
+    int nIterations = postfitCache.nIterations;
+    int nFitPars = postfitCache.nFree;
+    double edmBestFit = postfitCache.edm;
+    double fitStatus = postfitCache.status;
+    double covStatus = postfitCache.covarianceStatus;
+    double chi2MinFitter = postfitCache.minValue;
     double minimizationTimeInSec = minimizationStopWatch.eval().count();
 
     int nDof = fetchNbDegreeOfFreedom();
@@ -437,7 +438,7 @@ void RootMinimizer::minimize(){
   }
 
   if( _fitHasConverged_ ){ setMinimizerStatus(0); }
-  else{ setMinimizerStatus(_rootMinimizer_->Status()); }
+  else{ setMinimizerStatus(postfitCache.status); }
 }
 void RootMinimizer::calcErrors(){
 
@@ -453,9 +454,11 @@ void RootMinimizer::calcErrors(){
 
     double errLow, errHigh;
     _rootMinimizer_->SetPrintLevel(0);
+    LogThrowIf(postfitCache.bestfitPoint.empty(), "Best-fit point cache is empty.");
+    LogThrowIf(postfitCache.variableNames.empty(), "Best-fit variable name cache is empty.");
 
-    for( int iFitPar = 0 ; iFitPar < _rootMinimizer_->NDim() ; iFitPar++ ){
-      LogInfo << "Evaluating: " << _rootMinimizer_->VariableName(iFitPar) << "..." << std::endl;
+    for( int iFitPar = 0 ; iFitPar < int(postfitCache.bestfitPoint.size()) ; iFitPar++ ){
+      LogInfo << "Evaluating: " << postfitCache.variableNames[iFitPar] << "..." << std::endl;
 
       getMonitor().isEnabled = true;
       bool isOk = _rootMinimizer_->GetMinosError(iFitPar, errLow, errHigh);
@@ -465,24 +468,22 @@ void RootMinimizer::calcErrors(){
       LogInfo << GundamUtils::minosStatusCodeStr.at(_rootMinimizer_->MinosStatus()) << std::endl;
 #endif
       if( isOk ){
-        LogInfo << _rootMinimizer_->VariableName(iFitPar) << ": " << errLow << " <- " << _rootMinimizer_->X()[iFitPar] << " -> +" << errHigh << std::endl;
+        LogInfo << postfitCache.variableNames[iFitPar] << ": " << errLow << " <- " << postfitCache.bestfitPoint[iFitPar] << " -> +" << errHigh << std::endl;
       }
       else{
-        LogError << _rootMinimizer_->VariableName(iFitPar) << ": " << errLow << " <- " << _rootMinimizer_->X()[iFitPar] << " -> +" << errHigh
+        LogError << postfitCache.variableNames[iFitPar] << ": " << errLow << " <- " << postfitCache.bestfitPoint[iFitPar] << " -> +" << errHigh
                  << " - MINOS returned an error." << std::endl;
       }
     }
 
     // Put back at minimum
-    for( int iFitPar = 0 ; iFitPar < _rootMinimizer_->NDim() ; iFitPar++ ){
-      getMinimizerFitParameterPtr()[iFitPar]->setParameterValue(_rootMinimizer_->X()[iFitPar]);
-    }
+    LogThrowIf(not setFitParameterValues(postfitCache.bestfitPoint.data()), "Invalid cached best-fit parameter values.");
   } // Minos
   else if( _errorAlgo_ == "Hesse" ){
 
     if( _restoreStepSizeBeforeHesse_ ){
       LogWarning << "Restoring step size before HESSE..." << std::endl;
-      for( int iFitPar = 0 ; iFitPar < _rootMinimizer_->NDim() ; iFitPar++ ){
+      for( int iFitPar = 0 ; iFitPar < int(getMinimizerFitParameterPtr().size()) ; iFitPar++ ){
         auto& par = *getMinimizerFitParameterPtr()[iFitPar];
         if(not useNormalizedFitSpace()){ _rootMinimizer_->SetVariableStepSize(iFitPar, par.getStepSize() * _stepSizeScaling_); }
         else{ _rootMinimizer_->SetVariableStepSize(iFitPar, ParameterSet::toNormalizedParRange(par.getStepSize() * _stepSizeScaling_, par)); } // should be 1
@@ -490,6 +491,7 @@ void RootMinimizer::calcErrors(){
     }
 
     // Make sure we are on the right spot
+    updateBestfitPointCache();
     updateCacheToBestfitPoint();
 
     getMonitor().minimizerTitle = _minimizerType_ + "/" + _errorAlgo_;
@@ -503,11 +505,12 @@ void RootMinimizer::calcErrors(){
     getMonitor().isEnabled = false;
 
     errorStopWatch.stop();
+    updateBestfitPointCache();
     LogInfo << "Error calculation took: " << GenericToolbox::toString(errorStopWatch.eval()) << std::endl;
 
     LogInfo << "Hesse ended after " << getMonitor().nbEvalLikelihoodCalls - nbFitCallOffset << " calls." << std::endl;
-    LogInfo << "HESSE status code: " << GundamUtils::hesseStatusCodeStr.at(_rootMinimizer_->Status()) << std::endl;
-    LogInfo << "Covariance matrix status code: " << GundamUtils::covMatrixStatusCodeStr.at(_rootMinimizer_->CovMatrixStatus()) << std::endl;
+    LogInfo << "HESSE status code: " << GundamUtils::hesseStatusCodeStr.at(postfitCache.status) << std::endl;
+    LogInfo << "Covariance matrix status code: " << GundamUtils::covMatrixStatusCodeStr.at(postfitCache.covarianceStatus) << std::endl;
 
     // Make sure we are on the right spot
     updateCacheToBestfitPoint();
@@ -522,8 +525,8 @@ void RootMinimizer::calcErrors(){
       LogInfo << getMonitor().convergenceMonitor.generateMonitorString(); // lasting printout
     }
 
-    int covStatus = _rootMinimizer_->CovMatrixStatus();
-    int hesseStatusCode = _rootMinimizer_->Status();
+    int covStatus = postfitCache.covarianceStatus;
+    int hesseStatusCode = postfitCache.status;
 
     auto hesseStats = std::make_unique<TTree>("hesseStats", "hesseStats");
     hesseStats->SetDirectory(nullptr);
@@ -699,14 +702,18 @@ void RootMinimizer::writePostFitData( TDirectory* saveDir_) {
   LogInfo << __METHOD_NAME__ << std::endl;
   LogThrowIf(not isInitialized(), "not initialized");
   LogThrowIf(saveDir_==nullptr, "Save dir not specified");
+  LogThrowIf(postfitCache.covariance == nullptr, "Best-fit covariance cache is empty.");
+  LogThrowIf(postfitCache.variableNames.empty(), "Best-fit variable name cache is empty.");
+  LogThrowIf(int(postfitCache.variableNames.size()) != postfitCache.covariance->GetNrows(),
+             "Best-fit variable name cache dimension (" << postfitCache.variableNames.size()
+             << ") does not match covariance cache dimension (" << postfitCache.covariance->GetNrows() << ").");
 
-  LogInfo << "Extracting post-fit covariance matrix" << std::endl;
+  LogInfo << "Loading post-fit covariance matrix from cache" << std::endl;
   auto* matricesDir = GenericToolbox::mkdirTFile(saveDir_, "hessian");
 
-  TMatrixDSym postfitCovarianceMatrix(int(_rootMinimizer_->NDim()));
-  TMatrixDSym postfitHessianMatrix(int(_rootMinimizer_->NDim()));
-  _rootMinimizer_->GetCovMatrix(postfitCovarianceMatrix.GetMatrixArray());
-  _rootMinimizer_->GetCovMatrix(postfitHessianMatrix.GetMatrixArray());
+  TMatrixDSym postfitCovarianceMatrix(*postfitCache.covariance);
+  TMatrixDSym postfitHessianMatrix(*postfitCache.covariance);
+  int nFitPars = postfitCovarianceMatrix.GetNrows();
 
   std::function<void(TDirectory*)> decomposeCovarianceMatrixFct = [&](TDirectory* outDir_){
 
@@ -719,9 +726,9 @@ void RootMinimizer::writePostFitData( TDirectory* saveDir_) {
       hist_->GetXaxis()->SetLabelSize(0.02);
     };
     std::function<void(TH1*)> applyBinLabels = [&](TH1* hist_){
-      for( int iPar = 0 ; iPar < _rootMinimizer_->NDim() ; iPar++ ){
-        hist_->GetXaxis()->SetBinLabel(iPar+1, _rootMinimizer_->VariableName(iPar).c_str());
-        if(hist_->GetDimension() >= 2) hist_->GetYaxis()->SetBinLabel(iPar+1, _rootMinimizer_->VariableName(iPar).c_str());
+      for( int iPar = 0 ; iPar < int(postfitCache.variableNames.size()) ; iPar++ ){
+        hist_->GetXaxis()->SetBinLabel(iPar+1, postfitCache.variableNames[iPar].c_str());
+        if(hist_->GetDimension() >= 2) hist_->GetYaxis()->SetBinLabel(iPar+1, postfitCache.variableNames[iPar].c_str());
       }
       applyLooks(hist_);
     };
@@ -791,7 +798,7 @@ void RootMinimizer::writePostFitData( TDirectory* saveDir_) {
       auto invEigVectors = TMatrixD(decompCovMatrix.GetEigenVectors());
       invEigVectors.T();
 
-      TMatrixD hessianMatrix(int(_rootMinimizer_->NDim()), int(_rootMinimizer_->NDim())); hessianMatrix.Zero();
+      TMatrixD hessianMatrix(nFitPars, nFitPars); hessianMatrix.Zero();
       hessianMatrix += decompCovMatrix.GetEigenVectors();
       hessianMatrix *= (*diagonalMatrixInv);
       hessianMatrix *= invEigVectors;
@@ -805,7 +812,7 @@ void RootMinimizer::writePostFitData( TDirectory* saveDir_) {
       if( _generatedPostFitEigenBreakdown_ ){
         LogInfo << "Eigen breakdown..." << std::endl;
         TH1D eigenBreakdownHist("eigenBreakdownHist", "eigenBreakdownHist",
-                                int(_rootMinimizer_->NDim()), -0.5, int(_rootMinimizer_->NDim()) - 0.5);
+                                nFitPars, -0.5, nFitPars - 0.5);
         std::vector<TH1D> eigenBreakdownAccum(decompCovMatrix.GetEigenValues().GetNrows(), eigenBreakdownHist);
         TH1D* lastAccumHist{nullptr};
         std::string progressTitle = LogWarning.getPrefixString() + "Accumulating eigen components...";
@@ -821,7 +828,7 @@ void RootMinimizer::writePostFitData( TDirectory* saveDir_) {
                                            decompCovMatrix.GetEigenValues()[iEigen]));
           eigenBreakdownHist.SetLineColor(GenericToolbox::defaultColorWheel[iEigen%int(GenericToolbox::defaultColorWheel.size())]);
           eigenBreakdownHist.SetLabelSize(0.02);
-          for ( int iPar = int(_rootMinimizer_->NDim()) - 1; iPar >= 0; iPar--) {
+          for ( int iPar = nFitPars - 1; iPar >= 0; iPar--) {
             eigenBreakdownHist.SetBinContent(iPar + 1,
                                              decompCovMatrix.GetEigenVectors()[iPar][iEigen] *
                                              decompCovMatrix.GetEigenVectors()[iPar][iEigen] *
@@ -895,9 +902,9 @@ void RootMinimizer::writePostFitData( TDirectory* saveDir_) {
         TH1D parBreakdownHist("parBreakdownHist", "parBreakdownHist",
                               decompCovMatrix.GetEigenValues().GetNrows(), -0.5,
                               decompCovMatrix.GetEigenValues().GetNrows() - 0.5);
-        std::vector<TH1D> parBreakdownAccum(_rootMinimizer_->NDim());
+        std::vector<TH1D> parBreakdownAccum(nFitPars);
         TH1D* lastAccumHist{nullptr};
-        for ( int iPar = int(_rootMinimizer_->NDim()) - 1; iPar >= 0; iPar--){
+        for ( int iPar = nFitPars - 1; iPar >= 0; iPar--){
 
           if( lastAccumHist != nullptr ) parBreakdownAccum[iPar] = *lastAccumHist;
           else parBreakdownAccum[iPar] = parBreakdownHist;
@@ -905,7 +912,7 @@ void RootMinimizer::writePostFitData( TDirectory* saveDir_) {
 
           parBreakdownHist.SetLineColor(GenericToolbox::defaultColorWheel[iPar%int(GenericToolbox::defaultColorWheel.size())]);
 
-          parBreakdownHist.SetTitle(Form("Eigen breakdown for parameter #%i: %s", iPar, _rootMinimizer_->VariableName(iPar).c_str()));
+          parBreakdownHist.SetTitle(Form("Eigen breakdown for parameter #%i: %s", iPar, postfitCache.variableNames[iPar].c_str()));
           for (int iEigen = decompCovMatrix.GetEigenValues().GetNrows() - 1; iEigen >= 0; iEigen--){
             parBreakdownHist.SetBinContent(
                 iPar+1,
@@ -1421,32 +1428,34 @@ void RootMinimizer::writePostFitData( TDirectory* saveDir_) {
   } // parSet
 }
 void RootMinimizer::updateCacheToBestfitPoint(){
-  LogThrowIf(_rootMinimizer_ == nullptr, "Invalid root minimizer");
-  if (_rootMinimizer_->X() == nullptr) {
-    LogError << "Minimizer error with "
-             << _rootMinimizer_->Options().MinimizerType()
-             << ":" << _rootMinimizer_->Options().MinimizerAlgorithm()
-             << std::endl;
-    LogThrow("No best fit point provided by the minimizer.");
-  }
+  LogThrowIf(postfitCache.bestfitPoint.empty(), "Best-fit point cache is empty.");
 
   LogInfo << "Updating propagator cache to the best fit point..." << std::endl;
-  this->evalFit(_rootMinimizer_->X() );
+  this->evalFit(postfitCache.bestfitPoint.data());
 }
 void RootMinimizer::updateBestfitPointCache(){
   LogThrowIf(_rootMinimizer_ == nullptr, "Invalid root minimizer");
   LogThrowIf(_rootMinimizer_->X() == nullptr, "No best fit point provided by the minimizer.");
 
   LogInfo << "Updating best-fit point cache..." << std::endl;
+  postfitCache.status = _rootMinimizer_->Status();
+  postfitCache.covarianceStatus = _rootMinimizer_->CovMatrixStatus();
+  postfitCache.nFree = int(_rootMinimizer_->NFree());
+  postfitCache.nIterations = int(_rootMinimizer_->NIterations());
+  postfitCache.edm = _rootMinimizer_->Edm();
+  postfitCache.minValue = _rootMinimizer_->MinValue();
   postfitCache.bestfitPoint.resize(_rootMinimizer_->NDim());
+  postfitCache.variableNames.resize(_rootMinimizer_->NDim());
   for( int iFitPar = 0 ; iFitPar < _rootMinimizer_->NDim() ; iFitPar++ ){
     postfitCache.bestfitPoint[iFitPar] = _rootMinimizer_->X()[iFitPar];
+    postfitCache.variableNames[iFitPar] = _rootMinimizer_->VariableName(iFitPar);
   }
 }
 void RootMinimizer::updateBestfitCovCache(){
   LogThrowIf(_rootMinimizer_ == nullptr, "Invalid root minimizer");
 
   LogInfo << "Updating best-fit covariance cache..." << std::endl;
+  LogThrowIf(postfitCache.variableNames.empty(), "Best-fit variable name cache is empty.");
   postfitCache.throwParIndexList.clear();
   postfitCache.choleskyCovariance.reset();
   postfitCache.covariance = std::make_unique<TMatrixDSym>(int(_rootMinimizer_->NDim()));
@@ -1454,13 +1463,17 @@ void RootMinimizer::updateBestfitCovCache(){
       not _rootMinimizer_->GetCovMatrix(postfitCache.covariance->GetMatrixArray()),
       "Could not retrieve the post-fit covariance matrix from the minimizer."
   );
+  postfitCache.covarianceStatus = _rootMinimizer_->CovMatrixStatus();
+  LogThrowIf(int(postfitCache.variableNames.size()) != postfitCache.covariance->GetNrows(),
+             "Best-fit variable name cache dimension (" << postfitCache.variableNames.size()
+             << ") does not match covariance cache dimension (" << postfitCache.covariance->GetNrows() << ").");
 
-  postfitCache.throwParIndexList.reserve(_rootMinimizer_->NDim());
+  postfitCache.throwParIndexList.reserve(postfitCache.covariance->GetNrows());
   for( int iFitPar = 0 ; iFitPar < postfitCache.covariance->GetNrows() ; iFitPar++ ){
     double variance = (*postfitCache.covariance)[iFitPar][iFitPar];
     LogThrowIf(
         std::isnan(variance),
-        "Invalid NaN variance in post-fit covariance matrix for " << _rootMinimizer_->VariableName(iFitPar)
+        "Invalid NaN variance in post-fit covariance matrix for " << postfitCache.variableNames[iFitPar]
     );
     if( variance <= 0 ){ continue; }
     postfitCache.throwParIndexList.emplace_back(iFitPar);
@@ -1480,7 +1493,7 @@ void RootMinimizer::updateBestfitCovCache(){
   LogThrowIf(
       postfitCache.choleskyCovariance == nullptr,
       "Could not decompose the post-fit covariance matrix. Covariance matrix status code: "
-      << _rootMinimizer_->CovMatrixStatus()
+      << postfitCache.covarianceStatus
   );
 }
 void RootMinimizer::saveGradientSteps(){
