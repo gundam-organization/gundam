@@ -4,6 +4,7 @@
 
 #include "PythonInterface.h"
 #include "FitterEngine.h"
+#include "RootMinimizer.h"
 #include "DatasetDefinition.h"
 #include "ConfigUtils.h"
 #include "GundamApp.h"
@@ -215,7 +216,12 @@ PYBIND11_MODULE(GUNDAM, module) {
   // no CTOR here
   pybind11::class_<MinimizerBase>(module, "MinimizerBase")
   .def("minimize", &MinimizerBase::minimize)
+  .def("throwPostfitParameters", &MinimizerBase::throwPostfitParameters)
   .def("fetchNbDegreeOfFreedom", &MinimizerBase::fetchNbDegreeOfFreedom)
+  ;
+
+  pybind11::class_<RootMinimizer, MinimizerBase>(module, "RootMinimizer")
+  .def("throwPostfitParameters", &RootMinimizer::throwPostfitParameters)
   ;
 
   pybind11::class_<FitterEngine>(module, "FitterEngine")

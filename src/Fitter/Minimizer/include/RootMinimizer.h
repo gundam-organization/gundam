@@ -34,6 +34,7 @@ public:
   void calcErrors() override;
   void scanParameters( TDirectory* saveDir_ ) override;
   double evalFit( const double* parArray_ ) override;
+  void throwPostfitParameters() override;
   [[nodiscard]] bool isErrorCalcEnabled() const override { return not disableCalcError(); }
 
   // c-tor
@@ -47,7 +48,6 @@ public:
   [[nodiscard]] const std::unique_ptr<ROOT::Math::Minimizer> &getMinimizer() const{ return _rootMinimizer_; }
 
   // core
-  void throwPostfitParameters();
   void saveMinimizerSettings(TDirectory* saveDir_) const;
 
 protected:

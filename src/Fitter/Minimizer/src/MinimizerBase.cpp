@@ -139,6 +139,10 @@ void MinimizerBase::scanParameters(TDirectory* saveDir_){
   for( auto& parPtr : _minimizerParameterPtrList_ ) { getParameterScanner().scanParameter( *parPtr, saveDir_ ); }
 }
 
+void MinimizerBase::throwPostfitParameters(){
+  /// By default, post-fit throws are not available for a generic minimizer.
+}
+
 bool MinimizerBase::setFitParameterValues( const double* parArray_ ){
   // Check the fit parameter values.  Do this first so that the parameters
   // don't change when a bad set of values is tried. This will

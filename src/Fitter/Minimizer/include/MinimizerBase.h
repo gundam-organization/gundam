@@ -87,6 +87,11 @@ public:
   /// defined by the vector of pointers to Parameter returned by the LikelihoodInterface.
   virtual double evalFit( const double* parArray_ );
 
+  /// Throw a new parameter point around the post-fit best fit. By default,
+  /// minimizers that do not provide post-fit throws leave the parameters
+  /// unchanged.
+  virtual void throwPostfitParameters();
+
   /// Set the minimizer parameters in GUNDAM without propagating them or
   /// evaluating the likelihood.
   bool setFitParameterValues( const double* parArray_ );
