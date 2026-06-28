@@ -657,8 +657,6 @@ void RootMinimizer::throwPostfitParameters(){
              "Best-fit point cache dimension (" << postfitCache.bestfitPoint.size()
              << ") does not match covariance cache dimension (" << postfitCache.covariance->GetNrows() << ").");
 
-  LogInfo << "Throwing post-fit parameters from cached ROOT minimizer covariance matrix..." << std::endl;
-
   std::vector<double> thrownParValues(postfitCache.bestfitPoint);
 
   auto thrownOffsets = GenericToolbox::throwCorrelatedParameters(postfitCache.choleskyCovariance.get());
