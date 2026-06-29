@@ -20,8 +20,9 @@ covariance.
 | priorType                        | string       | penalty shape (Gaussian/Flat)                              | Gaussian     |
 | priorValue                       | double       | prior value (expected)                                     | nan          |
 | isEnabled                        | bool         | use parameter in the propagator                            | true         |
-| isPenaltyDisabled                | bool         | Fix value, do not use in fit, and strip from covariance    | false        |
-| isFrozen                         | bool         | Fix the parameter in the fit (e.g. set MINUIT FixVariable) | false        |
+| isPenaltyDisabled                | bool         | Fix value in fit, and strip from covariance                | false        |
+| isFixed                          | bool         | Fix the parameter in the fit (e.g. set MINUIT FixVariable) | false        |
+| isFrozen                         | bool         | DEPRECATED: use isFixed                                    | false        |
 | isThrown                         | bool         | throw parameter when generating toy                        | false        |
 | parameterStepSize                | double       | Expected scale of the variation                            | 1.0          |
 | parameterLimits                  | pair(double) | minimum and maximum for the domain                         | [-inf, +inf] |

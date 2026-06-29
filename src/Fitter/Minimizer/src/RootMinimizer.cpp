@@ -239,7 +239,7 @@ void RootMinimizer::minimize(){
   /// Apply the frozen state to the root minimizer variable definitions
   for( std::size_t iFitPar = 0 ; iFitPar < getMinimizerFitParameterPtr().size() ; iFitPar++ ){
     auto& fitPar = *(getMinimizerFitParameterPtr()[iFitPar]);
-    if (fitPar.isFrozen()) {
+    if (fitPar.isFixed()) {
       if (fitPar.isEigen()) {
         LogAlert << "Eigen decomposed parameters cannot be frozen, and remain free"
                  << std::endl;

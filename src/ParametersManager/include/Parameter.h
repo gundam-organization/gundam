@@ -40,7 +40,7 @@ public:
   void setPriorType(PriorType priorType){ _priorType_ = priorType; }
   void setIsEnabled(bool isEnabled){ _isEnabled_ = isEnabled; }
   void setIsPenaltyDisabled(bool isPenaltyDisabled){ _isPenaltyDisabled_ = isPenaltyDisabled; }
-  void setIsFrozen(bool isFrozen){ _isFrozen_ = isFrozen; }
+  void setIsFixed(bool isFixed){_isFixed_ = isFixed; }
   void setIsEigen(bool isEigen){ _isEigen_ = isEigen; }
   void setIsFree(bool isFree){ _isFree_ = isFree; }
   void setIsThrown(bool isThrown){ _isThrown_ = isThrown; }
@@ -108,7 +108,7 @@ public:
   /// does not change the behavior toy throws, or the Bayesian MCMC analysis
   /// [where the absolute value of the LLH isn't meaningful].  Note:
   /// Parameters in an eigen decomposed parameter set cannot be frozen.
-  [[nodiscard]] auto isFrozen() const{ return _isFrozen_; }
+  [[nodiscard]] auto isFixed() const{ return _isFixed_; }
 
   /// When a parameter set is eigen decomposed, a set of "fake" parameters is
   /// created for each of the eigen vectors.  This is true when the current
@@ -234,7 +234,7 @@ private:
   // Parameters
   bool _isEnabled_{true};
   bool _isPenaltyDisabled_{false};
-  bool _isFrozen_{false};
+  bool _isFixed_{false};
   bool _isEigen_{false};
   bool _isFree_{false};
   bool _isThrown_{true};

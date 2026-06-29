@@ -473,7 +473,7 @@ void ParameterSet::setValidity(const std::string& validity) {
 void ParameterSet::moveParametersToPrior(){
   if( not isEnableEigenDecomp() ){
     for( auto& par : _parameterList_ ){
-      if( par.isPenaltyDisabled() or par.isFrozen() or not par.isEnabled() ){ continue; }
+      if( par.isPenaltyDisabled() or par.isFixed() or not par.isEnabled() ){ continue; }
       par.setParameterValue(par.getPriorValue());
     }
   }
@@ -803,8 +803,8 @@ std::string ParameterSet::getSummary() const {
           std::string statusStr;
 
           if( not par.isEnabled() ) { continue; }
-          else if( par.isPenaltyDisabled() )  { statusStr = "Fixed (prior applied)";    colorStr = GenericToolbox::ColorCodes::yellowLightText; }
-          else if( par.isFrozen() )  { statusStr = "Frozen (penalty applied)";    colorStr = GenericToolbox::ColorCodes::yellowLightText; }
+          else if( par.isPenaltyDisabled() )  { statusStr = "Fixed (w/o penalty)";    colorStr = GenericToolbox::ColorCodes::yellowLightText; }
+          else if( par.isFixed() )  { statusStr = "Fixed (w/ penalty applied)";    colorStr = GenericToolbox::ColorCodes::yellowLightText; }
           else if( par.isFree() )   { statusStr = "Free";     colorStr = GenericToolbox::ColorCodes::blueLightText; }
           else                      { statusStr = "Constrained"; }
 
