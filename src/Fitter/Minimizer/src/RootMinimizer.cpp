@@ -582,7 +582,7 @@ double RootMinimizer::evalFit(const double *parArray_){
       // minimum, every parameter get updated
       size_t nbValidPars = std::count_if(
               _minimizerParameterPtrList_.begin(), _minimizerParameterPtrList_.end(),
-              [](const Parameter* par_){ return not ( par_->isFixed() or not par_->isEnabled() ); } );
+              [](const Parameter* par_){ return not ( par_->isPenaltyDisabled() or not par_->isEnabled() ); } );
       size_t nParUpdated = std::count_if(
               _minimizerParameterPtrList_.begin(), _minimizerParameterPtrList_.end(),
               [](const Parameter* par_){ return par_->gotUpdated(); } );
@@ -1121,7 +1121,7 @@ void RootMinimizer::writePostFitData( TDirectory* saveDir_) {
         t << "Prior Fraction" << GenericToolbox::TablePrinter::NextLine;
 
         for( const auto& par : parList_ ){
-          if( par.isEnabled() and not par.isFixed() ){
+          if( par.isEnabled() and not par.isPenaltyDisabled() ){
             double priorFraction = std::sqrt((*covMatrix_)[par.getParameterIndex()][par.getParameterIndex()]) / par.getStdDevValue();
             std::stringstream ss;
 #ifndef NOCOLOR
@@ -1190,7 +1190,7 @@ void RootMinimizer::writePostFitData( TDirectory* saveDir_) {
                               [par.getParameterIndex()]));
               }
               preFitErrorHist->SetBinContent( 1 + par.getParameterIndex(), par.getPriorValue() );
-              if( par.isEnabled() and not par.isFixed() and not par.isFree() ){
+              if( par.isEnabled() and not par.isPenaltyDisabled() and not par.isFree() ){
                 preFitErrorHist->SetBinError( 1 + par.getParameterIndex(), par.getStdDevValue() );
               }
             }
@@ -1209,7 +1209,7 @@ void RootMinimizer::writePostFitData( TDirectory* saveDir_) {
               }
 
               preFitErrorHist->SetBinContent( 1 + par.getParameterIndex(), 0 );
-              if( par.isEnabled() and not par.isFixed() and not par.isFree() ){
+              if( par.isEnabled() and not par.isPenaltyDisabled() and not par.isFree() ){
                 preFitErrorHist->SetBinError( 1 + par.getParameterIndex(), 1 );
               }
             } // norm
@@ -1243,7 +1243,7 @@ void RootMinimizer::writePostFitData( TDirectory* saveDir_) {
               b.SetFillColor(kGreen-10);
               freeParBoxes.emplace_back(b);
             }
-            else if( par.isFixed() or not par.isEnabled() ){
+            else if( par.isPenaltyDisabled() or not par.isEnabled() ){
               b.SetFillColor(kGray);
               fixedParBoxes.emplace_back(b);
             }
@@ -1360,7 +1360,7 @@ void RootMinimizer::writePostFitData( TDirectory* saveDir_) {
 
       // need to restore the non-fitted values before the base swap
       for( auto& eigenPar : *parList ){
-        if( eigenPar.isEnabled() and not eigenPar.isFixed() ) continue;
+        if( eigenPar.isEnabled() and not eigenPar.isPenaltyDisabled() ) continue;
         (*covMatrix)[eigenPar.getParameterIndex()][eigenPar.getParameterIndex()] = eigenPar.getStdDevValue() * eigenPar.getStdDevValue();
       }
 
@@ -1377,11 +1377,11 @@ void RootMinimizer::writePostFitData( TDirectory* saveDir_) {
       covMatrix = std::make_unique<TMatrixD>(int(parList->size()), int(parList->size()));
       int iStripped{-1};
       for( auto& iPar : *parList ){
-        if( iPar.isFixed() or not iPar.isEnabled() ) continue;
+        if( iPar.isPenaltyDisabled() or not iPar.isEnabled() ) continue;
         iStripped++;
         int jStripped{-1};
         for( auto& jPar : *parList ){
-          if( jPar.isFixed() or not jPar.isEnabled() ) continue;
+          if( jPar.isPenaltyDisabled() or not jPar.isEnabled() ) continue;
           jStripped++;
           (*covMatrix)[iPar.getParameterIndex()][jPar.getParameterIndex()] = (*originalStrippedCovMatrix)[iStripped][jStripped];
         }

@@ -385,7 +385,7 @@ void ParameterScanner::generateOneSigmaPlots(TDirectory* saveDir_){
     for( auto& effPar : parSet.getEffectiveParameterList() ){
       if( not effPar.isEnabled() ) continue;
       std::string tag;
-      if( effPar.isFixed() ){ tag += "_FIXED"; }
+      if( effPar.isPenaltyDisabled() ){ tag += "_FIXED"; }
       if( effPar.isFrozen() ){ tag += "_FROZEN"; }
       makeOneSigmaPlotFct(
           effPar,
@@ -537,7 +537,7 @@ void ParameterScanner::varyEvenRates(const std::vector<double>& paramVariationLi
         if( not par.isEnabled() ) continue;
 
         std::string tag;
-        if( par.isFixed() ){ tag += "_FIXED"; }
+        if( par.isPenaltyDisabled() ){ tag += "_FIXED"; }
         if( par.isFree() ){ tag += "_FREE"; }
         if( par.isFrozen() ){ tag += "_FROZEN"; }
 

@@ -331,7 +331,7 @@ void ParameterSet::processCovarianceMatrix(){
       _eigenParameterList_[iEigen].setName("eigen");
 
       // fixing all of them by default
-      _eigenParameterList_[iEigen].setIsFixed(true);
+      _eigenParameterList_[iEigen].setIsPenaltyDisabled(true);
       (*eigenState)[iEigen] = 0;
       (*_eigenValuesInv_)[iEigen] = 1./(*_eigenValues_)[iEigen];
 
@@ -360,7 +360,7 @@ void ParameterSet::processCovarianceMatrix(){
       }
 
       // if we reach this point, the eigen value is accepted
-      _eigenParameterList_[iEigen].setIsFixed( false );
+      _eigenParameterList_[iEigen].setIsPenaltyDisabled( false );
       (*eigenState)[iEigen] = 1.;
       eigenCumulative += (*_eigenValues_)[iEigen];
       _nbEnabledEigen_++;
@@ -473,13 +473,13 @@ void ParameterSet::setValidity(const std::string& validity) {
 void ParameterSet::moveParametersToPrior(){
   if( not isEnableEigenDecomp() ){
     for( auto& par : _parameterList_ ){
-      if( par.isFixed() or par.isFrozen() or not par.isEnabled() ){ continue; }
+      if( par.isPenaltyDisabled() or par.isFrozen() or not par.isEnabled() ){ continue; }
       par.setParameterValue(par.getPriorValue());
     }
   }
   else{
     for( auto& eigenPar : _eigenParameterList_ ){
-      if( eigenPar.isFixed() or not eigenPar.isEnabled() ) continue;
+      if( eigenPar.isPenaltyDisabled() or not eigenPar.isEnabled() ) continue;
       eigenPar.setParameterValue(eigenPar.getPriorValue());
     }
     this->propagateEigenToOriginal();
@@ -750,7 +750,7 @@ void ParameterSet::propagateOriginalToEigen(){
   // First propagate to the buffer
   int iParOffSet{0};
   for( const auto& par : _parameterList_ ){
-    if( par.isFixed() or not par.isEnabled() ) continue;
+    if( par.isPenaltyDisabled() or not par.isEnabled() ) continue;
     (*_originalParBuffer_)[iParOffSet++] = par.getParameterValue();
   }
 
@@ -776,7 +776,7 @@ void ParameterSet::propagateEigenToOriginal(){
   // Propagate back to the real parameters
   int iParOffSet{0};
   for( auto& par : _parameterList_ ){
-    if( par.isFixed() or not par.isEnabled() ) continue;
+    if( par.isPenaltyDisabled() or not par.isEnabled() ) continue;
     par.setParameterValue((*_originalParBuffer_)[iParOffSet++], true);
   }
 }
@@ -803,7 +803,7 @@ std::string ParameterSet::getSummary() const {
           std::string statusStr;
 
           if( not par.isEnabled() ) { continue; }
-          else if( par.isFixed() )  { statusStr = "Fixed (prior applied)";    colorStr = GenericToolbox::ColorCodes::yellowLightText; }
+          else if( par.isPenaltyDisabled() )  { statusStr = "Fixed (prior applied)";    colorStr = GenericToolbox::ColorCodes::yellowLightText; }
           else if( par.isFrozen() )  { statusStr = "Frozen (penalty applied)";    colorStr = GenericToolbox::ColorCodes::yellowLightText; }
           else if( par.isFree() )   { statusStr = "Free";     colorStr = GenericToolbox::ColorCodes::blueLightText; }
           else                      { statusStr = "Constrained"; }
@@ -987,7 +987,7 @@ double ParameterSet::toRealParValue(double normParValue, const Parameter& par) {
   return normParValue*par.getStdDevValue() + par.getPriorValue();
 }
 bool ParameterSet::isValidCorrelatedParameter(const Parameter& par_){
-  return ( par_.isEnabled() and not par_.isFixed() and not par_.isFree() );
+  return ( par_.isEnabled() and not par_.isPenaltyDisabled() and not par_.isFree() );
 }
 
 void ParameterSet::printConfiguration() const {
