@@ -280,11 +280,13 @@ void RootMinimizer::minimize(){
     updateCacheToBestfitPoint();
 
     // export bf point with SIMPLEX
-    LogInfo << "Writing " << _minimizerType_ << "/Simplex best fit parameters..." << std::endl;
-    GenericToolbox::writeInTFileWithObjTypeExt(
-        GenericToolbox::mkdirTFile( getOwner().getSaveDir(), GenericToolbox::joinPath("postFit", _minimizerAlgo_) ),
-        TNamed("parameterStateAfterSimplex", GenericToolbox::Json::toReadableString( getModelPropagator().getParametersManager().exportParameterInjectorConfig() ).c_str() )
-    );
+    if( getOwner().getSaveDir() != nullptr ) {
+      LogInfo << "Writing " << _minimizerType_ << "/Simplex best fit parameters..." << std::endl;
+      GenericToolbox::writeInTFileWithObjTypeExt(
+          GenericToolbox::mkdirTFile( getOwner().getSaveDir(), GenericToolbox::joinPath("postFit", _minimizerAlgo_) ),
+          TNamed("parameterStateAfterSimplex", GenericToolbox::Json::toReadableString( getModelPropagator().getParametersManager().exportParameterInjectorConfig() ).c_str() )
+      );
+    }
 
     // Back to original
     _rootMinimizer_->Options().SetMinimizerAlgorithm(originalAlgo.c_str());
@@ -325,18 +327,20 @@ void RootMinimizer::minimize(){
   updateBestfitCovCache();
 
   // export bf point
-  LogInfo << "Writing " << _minimizerType_ << "/" << _minimizerAlgo_ << " best fit parameters..." << std::endl;
-  GenericToolbox::writeInTFileWithObjTypeExt(
-      GenericToolbox::mkdirTFile( getOwner().getSaveDir(), GenericToolbox::joinPath("postFit", _minimizerAlgo_) ),
-      TNamed("parameterStateAfterMinimize", GenericToolbox::Json::toReadableString( getModelPropagator().getParametersManager().exportParameterInjectorConfig() ).c_str() )
-  );
+  if( getOwner().getSaveDir() != nullptr ) {
+    LogInfo << "Writing " << _minimizerType_ << "/" << _minimizerAlgo_ << " best fit parameters..." << std::endl;
+    GenericToolbox::writeInTFileWithObjTypeExt(
+        GenericToolbox::mkdirTFile( getOwner().getSaveDir(), GenericToolbox::joinPath("postFit", _minimizerAlgo_) ),
+        TNamed("parameterStateAfterMinimize", GenericToolbox::Json::toReadableString( getModelPropagator().getParametersManager().exportParameterInjectorConfig() ).c_str() )
+    );
 
-  if( getMonitor().historyTree != nullptr ){
-    LogInfo << "Saving LLH history..." << std::endl;
-    GenericToolbox::writeInTFileWithObjTypeExt(getOwner().getSaveDir(), getMonitor().historyTree.get());
+    if( getMonitor().historyTree != nullptr ){
+      LogInfo << "Saving LLH history..." << std::endl;
+      GenericToolbox::writeInTFileWithObjTypeExt(getOwner().getSaveDir(), getMonitor().historyTree.get());
+    }
+
+    if( gradientDescentMonitor.isEnabled ){ saveGradientSteps(); }
   }
-
-  if( gradientDescentMonitor.isEnabled ){ saveGradientSteps(); }
 
   if( _fitHasConverged_ ){ LogInfo << "Minimization has converged!" << std::endl; }
   else{ LogError << "Minimization did not converged." << std::endl; }
@@ -525,23 +529,25 @@ void RootMinimizer::calcErrors(){
       LogInfo << getMonitor().convergenceMonitor.generateMonitorString(); // lasting printout
     }
 
-    int covStatus = postfitCache.covarianceStatus;
-    int hesseStatusCode = postfitCache.status;
+    if( getOwner().getSaveDir() != nullptr ) {
+      int covStatus = postfitCache.covarianceStatus;
+      int hesseStatusCode = postfitCache.status;
 
-    auto hesseStats = std::make_unique<TTree>("hesseStats", "hesseStats");
-    hesseStats->SetDirectory(nullptr);
-    hesseStats->Branch("hesseStatusCode", &hesseStatusCode);
-    hesseStats->Branch("covStatusCode", &covStatus);
+      auto hesseStats = std::make_unique<TTree>("hesseStats", "hesseStats");
+      hesseStats->SetDirectory(nullptr);
+      hesseStats->Branch("hesseStatusCode", &hesseStatusCode);
+      hesseStats->Branch("covStatusCode", &covStatus);
 
-    double errorTimeInSec = errorStopWatch.eval().count();
-    hesseStats->Branch("errorTimeInSec", &errorTimeInSec);
+      double errorTimeInSec = errorStopWatch.eval().count();
+      hesseStats->Branch("errorTimeInSec", &errorTimeInSec);
 
-    hesseStats->Fill();
-    GenericToolbox::mkdirTFile(getOwner().getSaveDir(), "postFit/Hesse")->WriteObject(hesseStats.get(), hesseStats->GetName());
+      hesseStats->Fill();
+      GenericToolbox::mkdirTFile(getOwner().getSaveDir(), "postFit/Hesse")->WriteObject(hesseStats.get(), hesseStats->GetName());
 
-    LogInfo << "Writing HESSE post-fit errors" << std::endl;
-    this->writePostFitData(GenericToolbox::mkdirTFile(getOwner().getSaveDir(), "postFit/Hesse"));
-    GenericToolbox::triggerTFileWrite(GenericToolbox::mkdirTFile(getOwner().getSaveDir(), "postFit/Hesse"));
+      LogInfo << "Writing HESSE post-fit errors" << std::endl;
+      this->writePostFitData(GenericToolbox::mkdirTFile(getOwner().getSaveDir(), "postFit/Hesse"));
+      GenericToolbox::triggerTFileWrite(GenericToolbox::mkdirTFile(getOwner().getSaveDir(), "postFit/Hesse"));
+    }
   }
   else{
     LogError << GET_VAR_NAME_VALUE(_errorAlgo_) << " not implemented." << std::endl;
