@@ -375,7 +375,7 @@ bool SimpleMcmc::adaptiveDefaultProposalCovariance( AdaptiveStepMCMC& mcmc,
       if (step <= std::abs(1E-10*par->getPriorValue())) {
         step = std::max(par->getStepSize(),par->getStdDevValue());
       }
-      step /= std::sqrt(getMinimizerFitParameterPtr().size());
+      step /= std::sqrt(mcmc.GetProposeStep().GetDim());
       mcmc.GetProposeStep().SetGaussian(count0-1,step);
     }
     else {
@@ -797,19 +797,26 @@ void SimpleMcmc::adaptiveRestart(AdaptiveStepMCMC& mcmc,
 }
 void SimpleMcmc::adaptiveSetupAndRun(AdaptiveStepMCMC& mcmc) {
 
+  // Save a pointer to the AdaptiveStepMCMC object so it can be used with the
+  // sequencer.
   _adaptiveMCMC_ = &mcmc;
 
-  mcmc.GetProposeStep().SetDim(getMinimizerFitParameterPtr().size());
+  // Create a fitting parameter vector and initialize it.  No need to worry
+  // about resizing it or it moving, so be lazy and just use push_back.  This
+  // will create a vector with one entry for every parameter that will be
+  // varied.
+  sMCMC::Vector prior;
+  adaptiveMakePrior(mcmc, prior, _randomStart_);
+
+  // The dimension will be the number of non-fixed parameters.
+  mcmc.GetProposeStep().SetDim(prior.size());
+
+  // Create a functor for the mcmc.
   mcmc.GetLogLikelihood().functor
     = std::make_unique<ROOT::Math::Functor>(
-      this, &SimpleMcmc::evalFitValid,
-      getMinimizerFitParameterPtr().size());
+      this, &SimpleMcmc::evalFitValid, prior.size());
   mcmc.GetProposeStep().SetCovarianceUpdateDeweighting(0.0);
   mcmc.GetProposeStep().SetCovarianceFrozen(false);
-
-  // Create a fitting parameter vector and initialize it.  No need to worry
-  // about resizing it or it moving, so be lazy and just use push_back.
-  sMCMC::Vector prior;
 
   adaptiveStart(mcmc,prior,_randomStart_);
 
@@ -875,18 +882,17 @@ void SimpleMcmc::adaptiveSetupAndRun(AdaptiveStepMCMC& mcmc) {
 }
 void SimpleMcmc::fixedSetupAndRun( FixedStepMCMC& mcmc) {
 
-  mcmc.GetProposeStep().SetDim(getMinimizerFitParameterPtr().size());
-  mcmc.GetLogLikelihood().functor
-    = std::make_unique<ROOT::Math::Functor>(
-      this,
-      &SimpleMcmc::evalFitValid,
-      getMinimizerFitParameterPtr().size());
-  mcmc.GetProposeStep().fSigma = _simpleSigma_;
-
   sMCMC::Vector prior;
   for (const Parameter* par : getMinimizerFitParameterPtr() ) {
     prior.push_back(par->getPriorValue());
   }
+
+  // Cannot use GetProposeStep().GetDim() here since the simple stepper
+  // doesn't initialize that until after the first step.
+  mcmc.GetLogLikelihood().functor
+    = std::make_unique<ROOT::Math::Functor>(
+      this, &SimpleMcmc::evalFitValid, prior.size());
+  mcmc.GetProposeStep().fSigma = _simpleSigma_;
 
   // Fill the initial point.
   fillPoint();
@@ -1085,7 +1091,10 @@ void SimpleMcmc::minimize() {
 }
 
 double SimpleMcmc::evalFitValid(const double* parArray_) {
-  double value = this->evalFit( parArray_ );
+  // Map between internal indices (parArray_) and GUNDAM indices
+  // (gundamArray).  The gundamArray should be a class member so the memory
+  // can be allocated once, and then values copied into it.
+  double value = this->evalFit( parArray_);
   return value;
 }
 
