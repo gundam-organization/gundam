@@ -228,16 +228,16 @@ void FitterEngine::initializeImpl(){
     auto saveFolder = GenericToolbox::joinPath( "propagator", parSet.getName() );
     GenericToolbox::writeInTFileWithObjTypeExt(
         GenericToolbox::mkdirTFile( _saveDir_, saveFolder ),
-        parSet.getPriorCovarianceMatrix().get(), "covarianceMatrix"
+        parSet.generatePriorCovarianceMatrix().get(), "priorCovarianceMatrix"
     );
     GenericToolbox::writeInTFileWithObjTypeExt(
         GenericToolbox::mkdirTFile(_saveDir_, saveFolder ),
-        GenericToolbox::toCorrelationMatrix(parSet.getPriorCovarianceMatrix().get()),
-        "correlationMatrix"
+        parSet.getPriorCorrelationMatrix().get(),
+        "priorCorrelationMatrix"
     );
     GenericToolbox::writeInTFileWithObjTypeExt(
         GenericToolbox::mkdirTFile( _saveDir_, saveFolder ),
-        parSet.getInverseCovarianceMatrix().get(), "invCovarianceMatrix"
+        parSet.getInversePriorCorrelationMatrix().get(), "priorCorrelationMatrixInv"
     );
 
     auto parsSaveFolder = GenericToolbox::joinPath( saveFolder, "parameters" );
