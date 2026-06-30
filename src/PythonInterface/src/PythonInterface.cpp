@@ -156,6 +156,7 @@ PYBIND11_MODULE(GUNDAM, module) {
   pybind11::class_<ParameterSet>(module, "ParameterSet")
   .def(pybind11::init())
   .def("isEnableEigenDecomp", &ParameterSet::isEnableEigenDecomp)
+  .def("setEnableEigenDecomp", &ParameterSet::setEnableEigenDecomp)
   .def("getParameterList", pybind11::overload_cast<>(&ParameterSet::getParameterList), pybind11::return_value_policy::reference_internal)
   .def("getEigenParameterList", pybind11::overload_cast<>(&ParameterSet::getEigenParameterList), pybind11::return_value_policy::reference_internal)
   ;
@@ -167,8 +168,7 @@ PYBIND11_MODULE(GUNDAM, module) {
   .def("throwParameters", &ParametersManager::throwParameters)
   .def("exportParameterInjectorConfig", &ParametersManager::exportParameterInjectorConfig)
   .def("injectParameterValues", &ParametersManager::injectParameterValues)
-  .def("getParameterSetsList", pybind11::overload_cast<>(&ParametersManager::getParameterSetsList),
-       pybind11::return_value_policy::reference_internal)
+  .def("getParameterSetsList", pybind11::overload_cast<>(&ParametersManager::getParameterSetsList), pybind11::return_value_policy::reference_internal)
   ;
 
   pybind11::class_<Histogram::BinContent>(module, "HistogramBinContent")

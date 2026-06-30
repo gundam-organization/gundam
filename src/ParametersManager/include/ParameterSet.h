@@ -39,6 +39,7 @@ public:
 
   // setters
   void setEnableDebugPrintout(bool enableDebugPrintout_){ _enableDebugPrintout_ = enableDebugPrintout_; }
+  void setEnableEigenDecomp(bool enableEigenDecomp_){ _enableEigenDecomp_ = enableEigenDecomp_; }
   void setGlobalParRange(GenericToolbox::Range globalParRange_){ _globalParRange_ = globalParRange_; }
   void setEigenParRange(GenericToolbox::Range eigenParRange_){ _eigenParRange_ = eigenParRange_; }
 
