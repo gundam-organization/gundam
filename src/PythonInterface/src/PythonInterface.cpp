@@ -156,9 +156,10 @@ PYBIND11_MODULE(GUNDAM, module) {
   pybind11::class_<ParameterSet>(module, "ParameterSet")
   .def(pybind11::init())
   .def("isEnableEigenDecomp", &ParameterSet::isEnableEigenDecomp)
-  .def("setEnableEigenDecomp", &ParameterSet::setEnableEigenDecomp)
   .def("getParameterList", pybind11::overload_cast<>(&ParameterSet::getParameterList), pybind11::return_value_policy::reference_internal)
   .def("getEigenParameterList", pybind11::overload_cast<>(&ParameterSet::getEigenParameterList), pybind11::return_value_policy::reference_internal)
+  .def("propagateOriginalToEigen", &ParameterSet::propagateOriginalToEigen)
+  .def("propagateEigenToOriginal", &ParameterSet::propagateEigenToOriginal)
   ;
 
   pybind11::bind_vector<std::vector<ParameterSet>>(module, "ParameterSetList");
