@@ -130,10 +130,7 @@ PYBIND11_MODULE(GUNDAM, module) {
 
   pybind11::class_<ConfigUtils::ConfigReader::FieldDefinition>(configReaderClass, "FieldDefinition")
   .def(pybind11::init())
-  .def(pybind11::init<std::string, std::vector<std::string>, std::string>(),
-       pybind11::arg("name"),
-       pybind11::arg("path") = std::vector<std::string>{},
-       pybind11::arg("defaultValue") = "")
+  .def(pybind11::init<std::string, std::vector<std::string>, std::string>(), pybind11::arg("name"), pybind11::arg("path") = std::vector<std::string>{}, pybind11::arg("defaultValue") = "")
   ;
 
   pybind11::class_<GundamApp>(module, "GundamApp")
@@ -167,6 +164,11 @@ PYBIND11_MODULE(GUNDAM, module) {
   pybind11::bind_vector<std::vector<VariableHolder>>(module, "VariableHolderList");
 
   pybind11::class_<VariableCollection>(module, "VariableCollection")
+  .def("getNameList", [](const VariableCollection& this_){
+    auto* nameListPtr = this_.getNameListPtr();
+    if( nameListPtr == nullptr ){ return std::vector<std::string>{}; }
+    return *this_.getNameListPtr();
+  }, pybind11::return_value_policy::copy)
   .def("getVarList", pybind11::overload_cast<>(&VariableCollection::getVarList),
        pybind11::return_value_policy::reference_internal)
   .def("fetchVariable", pybind11::overload_cast<const std::string&>(&VariableCollection::fetchVariable),
