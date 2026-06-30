@@ -133,6 +133,11 @@ public:
   Monitor& getMonitor(){ return _monitor_; }
   [[nodiscard]] auto& getMonitor() const { return _monitor_; }
 
+  // Get the vector of parameters being fitted. The actual parameters live in
+  // the likelihood; this vector only holds the minimizer selection/order.
+  std::vector<Parameter *> &getMinimizerFitParameterPtr(){ return _minimizerParameterPtrList_; }
+  const std::vector<Parameter *> &getMinimizerFitParameterPtr() const{ return _minimizerParameterPtrList_; }
+
   // core
   void printParameters();
   [[nodiscard]] int fetchNbDegreeOfFreedom() const { return getLikelihoodInterface().getNbSampleBins() - _nbFreeParameters_; }
@@ -156,12 +161,6 @@ protected:
   // local convenience function to get the likelihood from the owner.
   LikelihoodInterface& getLikelihoodInterface();
   [[nodiscard]] const LikelihoodInterface& getLikelihoodInterface() const;
-
-  // Get the vector of parameters being fitted.  This is a local convenience
-  // function to get the vector of fit parameter pointers.  The actual vector
-  // lives in the likelihood.
-  std::vector<Parameter *> &getMinimizerFitParameterPtr(){ return _minimizerParameterPtrList_; }
-  const std::vector<Parameter *> &getMinimizerFitParameterPtr() const{ return _minimizerParameterPtrList_; }
 
   // The minimizer evalFit function won't explicitly check the parameter
   // validity without setting this to true.

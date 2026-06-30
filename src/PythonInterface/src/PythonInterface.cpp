@@ -7,6 +7,9 @@
 #include "RootMinimizer.h"
 #include "DatasetDefinition.h"
 #include "Histogram.h"
+#include "Parameter.h"
+#include "ParameterSet.h"
+#include "ParametersManager.h"
 #include "Sample.h"
 #include "SampleSet.h"
 #include "ConfigUtils.h"
@@ -30,6 +33,9 @@
 #include <unistd.h>
 
 PYBIND11_MAKE_OPAQUE(std::vector<Histogram::BinContent>);
+PYBIND11_MAKE_OPAQUE(std::vector<Parameter>);
+PYBIND11_MAKE_OPAQUE(std::vector<Parameter*>);
+PYBIND11_MAKE_OPAQUE(std::vector<ParameterSet>);
 PYBIND11_MAKE_OPAQUE(std::vector<Sample>);
 
 namespace {
@@ -141,20 +147,28 @@ PYBIND11_MODULE(GUNDAM, module) {
   .def("getStdDevValue", &Parameter::getStdDevValue)
   .def("getThrowValue", &Parameter::getThrowValue)
   .def("getParameterValue", &Parameter::getParameterValue)
-  .def("setParameterValue", &Parameter::setParameterValue)
+  .def("setParameterValue", &Parameter::setParameterValue,
+       pybind11::arg("parameterValue"),
+       pybind11::arg("force") = false)
   ;
+
+  pybind11::bind_vector<std::vector<Parameter>>(module, "ParameterList");
+  pybind11::bind_vector<std::vector<Parameter*>>(module, "ParameterPtrList");
 
   pybind11::class_<ParameterSet>(module, "ParameterSet")
   .def(pybind11::init())
-  .def("getParameterList", pybind11::overload_cast<>(&ParameterSet::getParameterList), pybind11::return_value_policy::reference)
+  .def("getParameterList", pybind11::overload_cast<>(&ParameterSet::getParameterList), pybind11::return_value_policy::reference_internal)
   ;
+
+  pybind11::bind_vector<std::vector<ParameterSet>>(module, "ParameterSetList");
 
   pybind11::class_<ParametersManager>(module, "ParametersManager")
   .def(pybind11::init())
   .def("throwParameters", &ParametersManager::throwParameters)
   .def("exportParameterInjectorConfig", &ParametersManager::exportParameterInjectorConfig)
   .def("injectParameterValues", &ParametersManager::injectParameterValues)
-  .def("getParameterSetsList", pybind11::overload_cast<>(&ParametersManager::getParameterSetsList), pybind11::return_value_policy::reference)
+  .def("getParameterSetsList", pybind11::overload_cast<>(&ParametersManager::getParameterSetsList),
+       pybind11::return_value_policy::reference_internal)
   ;
 
   pybind11::class_<Histogram::BinContent>(module, "HistogramBinContent")
@@ -264,6 +278,8 @@ PYBIND11_MODULE(GUNDAM, module) {
   .def("minimize", &MinimizerBase::minimize)
   .def("throwPostfitParameters", &MinimizerBase::throwPostfitParameters)
   .def("fetchNbDegreeOfFreedom", &MinimizerBase::fetchNbDegreeOfFreedom)
+  .def("getMinimizerFitParameterPtr", pybind11::overload_cast<>(&MinimizerBase::getMinimizerFitParameterPtr),
+       pybind11::return_value_policy::reference_internal)
   ;
 
   pybind11::class_<RootMinimizer, MinimizerBase>(module, "RootMinimizer")
