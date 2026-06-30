@@ -147,9 +147,7 @@ PYBIND11_MODULE(GUNDAM, module) {
   .def("getStdDevValue", &Parameter::getStdDevValue)
   .def("getThrowValue", &Parameter::getThrowValue)
   .def("getParameterValue", &Parameter::getParameterValue)
-  .def("setParameterValue", &Parameter::setParameterValue,
-       pybind11::arg("parameterValue"),
-       pybind11::arg("force") = false)
+  .def("setParameterValue", &Parameter::setParameterValue, pybind11::arg("parameterValue"), pybind11::arg("force") = false)
   ;
 
   pybind11::bind_vector<std::vector<Parameter>>(module, "ParameterList");
@@ -157,7 +155,9 @@ PYBIND11_MODULE(GUNDAM, module) {
 
   pybind11::class_<ParameterSet>(module, "ParameterSet")
   .def(pybind11::init())
+  .def("isEnableEigenDecomp", &ParameterSet::isEnableEigenDecomp)
   .def("getParameterList", pybind11::overload_cast<>(&ParameterSet::getParameterList), pybind11::return_value_policy::reference_internal)
+  .def("getEigenParameterList", pybind11::overload_cast<>(&ParameterSet::getEigenParameterList), pybind11::return_value_policy::reference_internal)
   ;
 
   pybind11::bind_vector<std::vector<ParameterSet>>(module, "ParameterSetList");
