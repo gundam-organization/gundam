@@ -6,6 +6,7 @@
 #include "FitterEngine.h"
 #include "RootMinimizer.h"
 #include "DatasetDefinition.h"
+#include "Event.h"
 #include "Histogram.h"
 #include "Parameter.h"
 #include "ParameterSet.h"
@@ -35,10 +36,12 @@
 #include <unistd.h>
 
 PYBIND11_MAKE_OPAQUE(std::vector<Histogram::BinContent>);
+PYBIND11_MAKE_OPAQUE(std::vector<Event>);
 PYBIND11_MAKE_OPAQUE(std::vector<Parameter>);
 PYBIND11_MAKE_OPAQUE(std::vector<Parameter*>);
 PYBIND11_MAKE_OPAQUE(std::vector<ParameterSet>);
 PYBIND11_MAKE_OPAQUE(std::vector<Sample>);
+PYBIND11_MAKE_OPAQUE(std::vector<VariableHolder>);
 
 namespace {
 
@@ -140,6 +143,56 @@ PYBIND11_MODULE(GUNDAM, module) {
   // .def("getOutfilePtr", &GundamApp::getOutfilePtr) // CAN'T EXPOSE ROOT PTRs
   ;
 
+  pybind11::class_<EventUtils::Indices>(module, "EventIndices")
+  .def_readwrite("dataset", &EventUtils::Indices::dataset)
+  .def_readwrite("treeFile", &EventUtils::Indices::treeFile)
+  .def_readwrite("sample", &EventUtils::Indices::sample)
+  .def_readwrite("bin", &EventUtils::Indices::bin)
+  .def_readwrite("entry", &EventUtils::Indices::entry)
+  .def_readwrite("treeEntry", &EventUtils::Indices::treeEntry)
+  .def("getSummary", &EventUtils::Indices::getSummary)
+  ;
+
+  pybind11::class_<EventUtils::Weights>(module, "EventWeights")
+  .def_readwrite("base", &EventUtils::Weights::base)
+  .def_readwrite("current", &EventUtils::Weights::current)
+  .def("resetCurrentWeight", &EventUtils::Weights::resetCurrentWeight)
+  .def("getSummary", &EventUtils::Weights::getSummary)
+  ;
+
+  pybind11::class_<VariableHolder>(module, "VariableHolder")
+  .def("getVarAsDouble", &VariableHolder::getVarAsDouble)
+  ;
+
+  pybind11::bind_vector<std::vector<VariableHolder>>(module, "VariableHolderList");
+
+  pybind11::class_<VariableCollection>(module, "VariableCollection")
+  .def("getVarList", pybind11::overload_cast<>(&VariableCollection::getVarList),
+       pybind11::return_value_policy::reference_internal)
+  .def("fetchVariable", pybind11::overload_cast<const std::string&>(&VariableCollection::fetchVariable),
+       pybind11::return_value_policy::reference_internal)
+  .def("findVarIndex", &VariableCollection::findVarIndex,
+       pybind11::arg("leafName"),
+       pybind11::arg("throwIfNotFound") = true)
+  .def("empty", &VariableCollection::empty)
+  .def("getSummary", &VariableCollection::getSummary)
+  ;
+
+  pybind11::class_<Event>(module, "Event")
+  .def("getIndices", pybind11::overload_cast<>(&Event::getIndices),
+       pybind11::return_value_policy::reference_internal)
+  .def("getWeights", pybind11::overload_cast<>(&Event::getWeights),
+       pybind11::return_value_policy::reference_internal)
+  .def("getVariables", pybind11::overload_cast<>(&Event::getVariables),
+       pybind11::return_value_policy::reference_internal)
+  .def("getSize", &Event::getSize)
+  .def("getEventWeight", &Event::getEventWeight)
+  .def("getSummary", &Event::getSummary,
+       pybind11::arg("printVars") = true)
+  ;
+
+  pybind11::bind_vector<std::vector<Event>>(module, "EventList");
+
   pybind11::class_<Parameter>(module, "Parameter")
   .def("getName", &Parameter::getName)
   .def("getFullTitle", &Parameter::getFullTitle)
@@ -211,6 +264,7 @@ PYBIND11_MODULE(GUNDAM, module) {
   .def("getSelectionCutsStr", &Sample::getSelectionCutsStr)
   .def("getSampleWeightFormulaStr", &Sample::getSampleWeightFormulaStr)
   .def("getHistogram", pybind11::overload_cast<>(&Sample::getHistogram), pybind11::return_value_policy::reference_internal)
+  .def("getEventList", pybind11::overload_cast<>(&Sample::getEventList), pybind11::return_value_policy::reference_internal)
   .def("getSumWeights", &Sample::getSumWeights)
   .def("getNbBinnedEvents", &Sample::getNbBinnedEvents)
   .def("getSummary", &Sample::getSummary)
