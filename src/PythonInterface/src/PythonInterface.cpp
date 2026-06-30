@@ -20,6 +20,8 @@
 
 #include "Logger.h"
 
+#include "TMatrixDSym.h"
+
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 #include <pybind11/complex.h>
@@ -150,6 +152,19 @@ PYBIND11_MODULE(GUNDAM, module) {
   .def("setParameterValue", &Parameter::setParameterValue, pybind11::arg("parameterValue"), pybind11::arg("force") = false)
   ;
 
+  pybind11::class_<TMatrixDSym, std::shared_ptr<TMatrixDSym>>(module, "TMatrixDSym")
+  .def("GetNrows", &TMatrixDSym::GetNrows)
+  .def("GetNcols", &TMatrixDSym::GetNcols)
+  .def("__getitem__", [](const TMatrixDSym& this_, pybind11::tuple idx_){
+    if( idx_.size() != 2 ){ throw pybind11::index_error("TMatrixDSym indices must be a tuple of two integers."); }
+    return this_(idx_[0].cast<int>(), idx_[1].cast<int>());
+  })
+  .def("__setitem__", [](TMatrixDSym& this_, pybind11::tuple idx_, double value_){
+    if( idx_.size() != 2 ){ throw pybind11::index_error("TMatrixDSym indices must be a tuple of two integers."); }
+    this_(idx_[0].cast<int>(), idx_[1].cast<int>()) = value_;
+  })
+  ;
+
   pybind11::bind_vector<std::vector<Parameter>>(module, "ParameterList");
   pybind11::bind_vector<std::vector<Parameter*>>(module, "ParameterPtrList");
 
@@ -158,6 +173,8 @@ PYBIND11_MODULE(GUNDAM, module) {
   .def("isEnableEigenDecomp", &ParameterSet::isEnableEigenDecomp)
   .def("getParameterList", pybind11::overload_cast<>(&ParameterSet::getParameterList), pybind11::return_value_policy::reference_internal)
   .def("getEigenParameterList", pybind11::overload_cast<>(&ParameterSet::getEigenParameterList), pybind11::return_value_policy::reference_internal)
+  .def("getPriorCovarianceMatrix", pybind11::overload_cast<>(&ParameterSet::getPriorCovarianceMatrix, pybind11::const_))
+  .def("getPriorFullCovarianceMatrix", pybind11::overload_cast<>(&ParameterSet::getPriorFullCovarianceMatrix, pybind11::const_))
   .def("propagateOriginalToEigen", &ParameterSet::propagateOriginalToEigen)
   .def("propagateEigenToOriginal", &ParameterSet::propagateEigenToOriginal)
   ;
