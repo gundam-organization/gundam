@@ -3,6 +3,7 @@
 //
 
 #include "PythonInterface.h"
+#include "EventDialCache.h"
 #include "FitterEngine.h"
 #include "RootMinimizer.h"
 #include "DatasetDefinition.h"
@@ -35,6 +36,8 @@
 #include <string>
 #include <unistd.h>
 
+PYBIND11_MAKE_OPAQUE(std::vector<EventDialCache::CacheEntry>);
+PYBIND11_MAKE_OPAQUE(std::vector<EventDialCache::DialResponseCache>);
 PYBIND11_MAKE_OPAQUE(std::vector<Histogram::BinContent>);
 PYBIND11_MAKE_OPAQUE(std::vector<Event>);
 PYBIND11_MAKE_OPAQUE(std::vector<Parameter>);
@@ -195,6 +198,35 @@ PYBIND11_MODULE(GUNDAM, module) {
 
   pybind11::bind_vector<std::vector<Event>>(module, "EventList");
 
+  pybind11::class_<DialInterface>(module, "DialInterface")
+  .def("evalResponse", &DialInterface::evalResponse)
+  .def("getSummary", &DialInterface::getSummary, pybind11::arg("shallow") = true);
+
+  pybind11::class_<EventDialCache::DialResponseCache>(module, "DialResponseCache")
+  .def_readwrite("response", &EventDialCache::DialResponseCache::response)
+  .def("update", &EventDialCache::DialResponseCache::update)
+  .def("getResponse", &EventDialCache::DialResponseCache::getResponse)
+  .def_property_readonly("dialInterface", [](EventDialCache::DialResponseCache& this_){return this_.dialInterface;}, pybind11::return_value_policy::reference_internal)
+  .def("getDialInterface", [](EventDialCache::DialResponseCache& this_){return this_.dialInterface;}, pybind11::return_value_policy::reference_internal)
+  ;
+
+  pybind11::bind_vector<std::vector<EventDialCache::DialResponseCache>>(module, "DialResponseCacheList");
+
+  pybind11::class_<EventDialCache::CacheEntry>(module, "EventDialCacheEntry")
+  .def_property_readonly("event", [](EventDialCache::CacheEntry& this_){return this_.event;}, pybind11::return_value_policy::reference_internal)
+  .def_property_readonly("dialResponseCacheList", [](EventDialCache::CacheEntry& this_) -> std::vector<EventDialCache::DialResponseCache>& {return this_.dialResponseCacheList;}, pybind11::return_value_policy::reference_internal)
+  .def("getEvent", [](EventDialCache::CacheEntry& this_){return this_.event;}, pybind11::return_value_policy::reference_internal)
+  .def("getDialResponseCacheList", [](EventDialCache::CacheEntry& this_) -> std::vector<EventDialCache::DialResponseCache>& {return this_.dialResponseCacheList;}, pybind11::return_value_policy::reference_internal)
+  .def("getSummary", &EventDialCache::CacheEntry::getSummary, pybind11::arg("shallow") = true)
+  ;
+
+  pybind11::bind_vector<std::vector<EventDialCache::CacheEntry>>(module, "EventDialCacheEntryList");
+
+  pybind11::class_<EventDialCache>(module, "EventDialCache")
+  .def("getFillIndex", &EventDialCache::getFillIndex)
+  .def("getCache", pybind11::overload_cast<>(&EventDialCache::getCache), pybind11::return_value_policy::reference_internal)
+  ;
+
   pybind11::class_<Parameter>(module, "Parameter")
   .def("getName", &Parameter::getName)
   .def("getFullTitle", &Parameter::getFullTitle)
@@ -288,6 +320,7 @@ PYBIND11_MODULE(GUNDAM, module) {
   .def(pybind11::init())
   .def("initialize", pybind11::overload_cast<>(&Propagator::initialize), pybind11::return_value_policy::reference)
   .def("getSampleSet", pybind11::overload_cast<>(&Propagator::getSampleSet), pybind11::return_value_policy::reference_internal)
+  .def("getEventDialCache", pybind11::overload_cast<>(&Propagator::getEventDialCache), pybind11::return_value_policy::reference_internal)
   .def("getParametersManager", pybind11::overload_cast<>(&Propagator::getParametersManager), pybind11::return_value_policy::reference)
   .def("copyHistBinContentFrom", pybind11::overload_cast<const Propagator&>(&Propagator::copyHistBinContentFrom), pybind11::return_value_policy::reference)
   .def("writeParameterStateTree", &Propagator::writeParameterStateTree)
