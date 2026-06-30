@@ -17,8 +17,8 @@ void Parameter::prepareConfig(ConfigReader& config_){
     {"name", {"parameterName"}},
     {"isEnabled"},
     {"priorValue"},
-    {"isFixed"},
-    {"isFrozen"},
+    {"isPenaltyDisabled"},
+    {"isFixed", {"isFrozen"}},
     {"isThrown"},
     {"parameterStepSize"},
     {"parameterIndex"},
@@ -48,8 +48,8 @@ void Parameter::configureImpl(){
     }
   }
 
+  _config_.fillValue(_isPenaltyDisabled_, "isPenaltyDisabled");
   _config_.fillValue(_isFixed_, "isFixed");
-  _config_.fillValue(_isFrozen_, "isFrozen");
   _config_.fillValue(_isThrown_, "isThrown");
   _config_.fillValue(_stepSize_, "parameterStepSize");
   _config_.fillValue(_physicalLimits_, "physicalLimits");

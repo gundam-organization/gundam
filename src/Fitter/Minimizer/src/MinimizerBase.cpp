@@ -60,9 +60,9 @@ void MinimizerBase::initializeImpl(){
   _minimizerParameterPtrList_.reserve( getLikelihoodInterface().getNbParameters() );
   for( auto& parSet : getModelPropagator().getParametersManager().getParameterSetsList() ){
     for( auto& par : parSet.getEffectiveParameterList() ){
-      if( par.isEnabled() and not par.isFixed() ) {
+      if( par.isEnabled() and not par.isPenaltyDisabled() ) {
         _minimizerParameterPtrList_.emplace_back( &par );
-        if( par.isFree() and not par.isFrozen() ){ _nbFreeParameters_++; }
+        if( par.isFree() and not par.isFixed() ){ _nbFreeParameters_++; }
       }
     }
   }
@@ -195,7 +195,7 @@ double MinimizerBase::evalFit( const double* parArray_ ){
 
       size_t nbValidPars = std::count_if(
               _minimizerParameterPtrList_.begin(), _minimizerParameterPtrList_.end(),
-              [](const Parameter* par_){ return not ( par_->isFixed() or par_->isFrozen() or not par_->isEnabled() ); } );
+              [](const Parameter* par_){ return not ( par_->isPenaltyDisabled() or par_->isFixed() or not par_->isEnabled() ); } );
 
       std::stringstream ssHeader;
       ssHeader << std::endl << GenericToolbox::getNowDateString("%Y.%m.%d %H:%M:%S");
@@ -253,7 +253,7 @@ double MinimizerBase::evalFit( const double* parArray_ ){
         ssHeader << std::endl << std::setprecision(1) << std::scientific << std::showpos;
         int nParPerLine{0};
         for( auto* fitPar : _minimizerParameterPtrList_ ){
-          if( fitPar->isFixed() ) continue;
+          if( fitPar->isPenaltyDisabled() ) continue;
           if( curParSet != fitPar->getOwner()->getName() ){
             if( not curParSet.empty() ) ssHeader << std::endl;
             curParSet = fitPar->getOwner()->getName();
@@ -346,8 +346,8 @@ void MinimizerBase::printParameters(){
       std::string statusStr;
 
       if( not par.isEnabled() ) { continue; }
-      else if( par.isFixed() )  { statusStr = "Fixed (prior applied)";    colorStr = GenericToolbox::ColorCodes::yellowLightText; }
-      else if( par.isFrozen() )  { statusStr = "Frozen (penalty applied)";    colorStr = GenericToolbox::ColorCodes::yellowLightText; }
+      else if( par.isPenaltyDisabled() )  { statusStr = "Fixed (penalty not applied)";    colorStr = GenericToolbox::ColorCodes::yellowLightText; }
+      else if( par.isFixed() )  { statusStr = "Fixed (penalty applied)";    colorStr = GenericToolbox::ColorCodes::yellowLightText; }
       else                      {
         statusStr = Parameter::PriorType::toString(par.getPriorType()) + " Prior";
         if(par.getPriorType()==Parameter::PriorType::Flat) colorStr = GenericToolbox::ColorCodes::blueLightText;

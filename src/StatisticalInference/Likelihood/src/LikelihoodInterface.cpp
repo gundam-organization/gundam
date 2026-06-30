@@ -185,7 +185,7 @@ double LikelihoodInterface::evalPenaltyLikelihood(const ParameterSet& parSet_) c
   if( parSet_.getPriorCovarianceMatrix() != nullptr ){
     if( parSet_.isEnableEigenDecomp() ){
       for( const auto& eigenPar : parSet_.getEigenParameterList() ){
-        if( eigenPar.isFixed() ){ continue; }
+        if( eigenPar.isPenaltyDisabled() ){ continue; }
         buffer += TMath::Sq( (eigenPar.getParameterValue() - eigenPar.getPriorValue()) / eigenPar.getStdDevValue() ) ;
       }
     }

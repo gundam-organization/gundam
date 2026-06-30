@@ -13,22 +13,24 @@ covariance.
 
 ### Config options
 
-| Option                           | Type         | Description                           | Default      |
-|----------------------------------|--------------|---------------------------------------|--------------|
-| name                             | string       | define parameter with name (expected) |              |
-| parameterIndex                   | int          | define parameter with index           |              |
-| priorType                        | string       | penalty shape (Gaussian/Flat)         | Gaussian     |
-| priorValue                       | double       | prior value (expected)                | nan          |
-| isEnabled                        | bool         | use parameter in the propagator       | true         |
-| isFixed                          | bool         | use parameter in the propagator       | false        |
-| isThrown                         | bool         | throw parameter when generating toy   | false        |
-| parameterStepSize                | double       | Expected scale of the variation       | 1.0          |
-| parameterLimits                  | pair(double) | minimum and maximum for the domain    | [-inf, +inf] |
-| physicalLimits                   | pair(double) | minimum and maximum physical range    | [-inf, +inf] |
-| throwLimits                      | pair(double) | minimum and maximum range to throw    | [-inf, +inf] |
-| mirrorRange                      | pair(double) | boundaries for internal mirroring     | [-inf, +inf] |
-| cyclicRange                      | pair(double) | boundaries of the cyclic interval     | [-inf, +inf] |
-| [dialSetDefinitions](Dial.md   ) | list(json)   | Only for single dimension dials       |              |
+| Option                           | Type         | Description                                                | Default      |
+|----------------------------------|--------------|------------------------------------------------------------|--------------|
+| name                             | string       | define parameter with name (expected)                      |              |
+| parameterIndex                   | int          | define parameter with index                                |              |
+| priorType                        | string       | penalty shape (Gaussian/Flat)                              | Gaussian     |
+| priorValue                       | double       | prior value (expected)                                     | nan          |
+| isEnabled                        | bool         | use parameter in the propagator                            | true         |
+| isPenaltyDisabled                | bool         | Fix value in fit, and strip from covariance                | false        |
+| isFixed                          | bool         | Fix the parameter in the fit (e.g. set MINUIT FixVariable) | false        |
+| isFrozen                         | bool         | DEPRECATED: use isFixed                                    | false        |
+| isThrown                         | bool         | throw parameter when generating toy                        | false        |
+| parameterStepSize                | double       | Expected scale of the variation                            | 1.0          |
+| parameterLimits                  | pair(double) | minimum and maximum for the domain                         | [-inf, +inf] |
+| physicalLimits                   | pair(double) | minimum and maximum physical range                         | [-inf, +inf] |
+| throwLimits                      | pair(double) | minimum and maximum range to throw                         | [-inf, +inf] |
+| mirrorRange                      | pair(double) | boundaries for internal mirroring                          | [-inf, +inf] |
+| cyclicRange                      | pair(double) | boundaries of the cyclic interval                          | [-inf, +inf] |
+| [dialSetDefinitions](Dial.md   ) | list(json)   | Only for single dimension dials                            |              |
 
 #### dialSetDefinitions
 
