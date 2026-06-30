@@ -196,7 +196,7 @@ void FitterEngine::initializeImpl(){
         thrownParameterValues.emplace_back();
 
         for( auto& par : parSet.getParameterList() ){
-          if( not par.isEnabled() or par.isFixed() or par.isFree() ) continue;
+          if( not par.isEnabled() or par.isPenaltyDisabled() or par.isFree() ) continue;
           leavesList.emplace_back(GenericToolbox::generateCleanBranchName(par.getTitle()) + "/D");
           thrownParameterValues.back().writeRawData(par.getThrowValue());
         }
@@ -561,7 +561,7 @@ void FitterEngine::runPcaCheck(){
       ssPrint << "(" << par.getParameterIndex()+1 << "/" << parList.size() << ") +1 std-dev on " << parSet.getName() + "/" + par.getTitle();
 
       if( fixNextEigenPars ){
-        par.setIsFixed(true);
+        par.setIsPenaltyDisabled(true);
 #ifndef NOCOLOR
         std::string red(GenericToolbox::ColorCodes::redBackground);
         std::string rst(GenericToolbox::ColorCodes::resetColor);
@@ -573,7 +573,7 @@ void FitterEngine::runPcaCheck(){
         continue;
       }
 
-      if( par.isEnabled() and not par.isFixed() ){
+      if( par.isEnabled() and not par.isPenaltyDisabled() ){
         double currentParValue = par.getParameterValue();
         par.setParameterValue( currentParValue + par.getStdDevValue() );
 
@@ -619,7 +619,7 @@ void FitterEngine::runPcaCheck(){
         LogAlert << color << ssPrint.str() << rst << std::endl;
 
         if( fixParPca ){
-          par.setIsFixed(true); // ignored in the Chi2 computation of the parSet
+          par.setIsPenaltyDisabled(true); // ignored in the Chi2 computation of the parSet
           if( parSet.isEnableEigenDecomp() and _fixGhostEigenParametersAfterFirstRejected_ ){
             fixNextEigenPars = true;
           }

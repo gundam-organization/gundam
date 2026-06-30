@@ -1007,7 +1007,7 @@ void SimpleMcmc::minimize() {
     for (const Parameter& iPar : parSet.getParameterList()) {
       ++countParameters;
       parameterIndex.push_back(iPar.getParameterIndex());
-      parameterFixed.push_back(iPar.isFixed());
+      parameterFixed.push_back(iPar.isPenaltyDisabled());
       parameterEnabled.push_back(iPar.isEnabled());
       parameterName.push_back(iPar.getTitle());
       parameterPrior.push_back(iPar.getPriorValue());

@@ -57,7 +57,7 @@ void ParametersManager::initializeImpl(){
 
     int nPars{0};
     for( auto& par : parSet.getParameterList() ){
-      if( par.isEnabled() and not par.isFixed() ){ nPars++; }
+      if( par.isEnabled() and not par.isPenaltyDisabled() ){ nPars++; }
     }
 
     nEnabledPars += nPars;
@@ -80,7 +80,7 @@ void ParametersManager::initializeImpl(){
       // LogDebug << "Adding parSet: " << parSet.getName() << " with " << nCov << " cov pars" << std::endl;
       for( auto& par : parSet.getParameterList() ){
         if( not par.isEnabled() ){ continue; }
-        if( par.isFixed() ){ continue; }
+        if( par.isPenaltyDisabled() ){ continue; }
 
         iParIndex++; // will be in the list
 
@@ -94,7 +94,7 @@ void ParametersManager::initializeImpl(){
         int jFree{0};
         for(int jCov = 0 ; jCov < parSet.getPriorCovarianceMatrix()->GetNcols() ; jCov++ ){
           if( not parSet.getParameterList()[jCov].isEnabled() ){ continue; }
-          if( parSet.getParameterList()[jCov].isFixed() ){ continue; }
+          if( parSet.getParameterList()[jCov].isPenaltyDisabled() ){ continue; }
           jParIndex++;
           if( parSet.getParameterList()[jCov].isFree() ){ jFree++; continue; }
           (*_globalCovarianceMatrix_)[parSetOffset + iParIndex][parSetOffset + jParIndex] =
@@ -207,7 +207,7 @@ void ParametersManager::initializeStrippedGlobalCov(){
 
   _strippedParameterList_.clear();
   for( int iGlobPar = 0 ; iGlobPar < _globalCovarianceMatrix_->GetNrows() ; iGlobPar++ ){
-    if( _globalCovParList_[iGlobPar]->isFixed() ){ continue; }
+    if( _globalCovParList_[iGlobPar]->isPenaltyDisabled() ){ continue; }
     if( _globalCovParList_[iGlobPar]->isFree() and (*_globalCovarianceMatrix_)[iGlobPar][iGlobPar] == 0 ){ continue; }
     _strippedParameterList_.emplace_back( _globalCovParList_[iGlobPar] );
   }
