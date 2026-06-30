@@ -6,6 +6,9 @@
 #include "FitterEngine.h"
 #include "RootMinimizer.h"
 #include "DatasetDefinition.h"
+#include "Histogram.h"
+#include "Sample.h"
+#include "SampleSet.h"
 #include "ConfigUtils.h"
 #include "GundamApp.h"
 
@@ -19,12 +22,15 @@
 #include <pybind11/complex.h>
 #include <pybind11/functional.h>
 #include <pybind11/chrono.h>
+#include <pybind11/stl_bind.h>
 
 #include <cerrno>
 #include <cstring>
 #include <string>
 #include <unistd.h>
 
+PYBIND11_MAKE_OPAQUE(std::vector<Histogram::BinContent>);
+PYBIND11_MAKE_OPAQUE(std::vector<Sample>);
 
 namespace {
 
@@ -151,9 +157,49 @@ PYBIND11_MODULE(GUNDAM, module) {
   .def("getParameterSetsList", pybind11::overload_cast<>(&ParametersManager::getParameterSetsList), pybind11::return_value_policy::reference)
   ;
 
+  pybind11::class_<Histogram::BinContent>(module, "HistogramBinContent")
+  .def(pybind11::init())
+  .def_readwrite("sumWeights", &Histogram::BinContent::sumWeights)
+  .def_readwrite("sqrtSumSqWeights", &Histogram::BinContent::sqrtSumSqWeights)
+  ;
+
+  pybind11::bind_vector<std::vector<Histogram::BinContent>>(module, "HistogramBinContentList");
+
+  pybind11::class_<Histogram>(module, "Histogram")
+  .def("getNbBins", &Histogram::getNbBins)
+  .def("getBinContentList", pybind11::overload_cast<>(&Histogram::getBinContentList),
+       pybind11::return_value_policy::reference_internal)
+  ;
+
+  pybind11::class_<Sample>(module, "Sample")
+  .def("isEnabled", &Sample::isEnabled)
+  .def("isEventMcThrowDisabled", &Sample::isEventMcThrowDisabled)
+  .def("getIndex", &Sample::getIndex)
+  .def("getName", &Sample::getName)
+  .def("getSelectionCutsStr", &Sample::getSelectionCutsStr)
+  .def("getSampleWeightFormulaStr", &Sample::getSampleWeightFormulaStr)
+  .def("getHistogram", pybind11::overload_cast<>(&Sample::getHistogram), pybind11::return_value_policy::reference_internal)
+  .def("getSumWeights", &Sample::getSumWeights)
+  .def("getNbBinnedEvents", &Sample::getNbBinnedEvents)
+  .def("getSummary", &Sample::getSummary)
+  ;
+
+  pybind11::bind_vector<std::vector<Sample>>(module, "SampleList");
+
+  pybind11::class_<SampleSet>(module, "SampleSet")
+  .def("getSampleList", pybind11::overload_cast<>(&SampleSet::getSampleList),
+       pybind11::return_value_policy::reference_internal)
+  .def("getEventVariableNameList", pybind11::overload_cast<>(&SampleSet::getEventVariableNameList),
+       pybind11::return_value_policy::reference_internal)
+  .def("empty", &SampleSet::empty)
+  .def("getNbOfEvents", &SampleSet::getNbOfEvents)
+  .def("getSampleBreakdown", &SampleSet::getSampleBreakdown)
+  ;
+
   pybind11::class_<Propagator>(module, "Propagator")
   .def(pybind11::init())
   .def("initialize", pybind11::overload_cast<>(&Propagator::initialize), pybind11::return_value_policy::reference)
+  .def("getSampleSet", pybind11::overload_cast<>(&Propagator::getSampleSet), pybind11::return_value_policy::reference_internal)
   .def("getParametersManager", pybind11::overload_cast<>(&Propagator::getParametersManager), pybind11::return_value_policy::reference)
   .def("copyHistBinContentFrom", pybind11::overload_cast<const Propagator&>(&Propagator::copyHistBinContentFrom), pybind11::return_value_policy::reference)
   .def("writeParameterStateTree", &Propagator::writeParameterStateTree)
