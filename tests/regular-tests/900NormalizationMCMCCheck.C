@@ -115,13 +115,13 @@ int main() {
     // 100NormalizationTree.C.  They need to be changed if that tree is
     // changed.
     double allowedSigma = 5.0;
-    TOLERANCE("Check MCMC matches HESSE value for #0_Positive_C",
+    TOLERANCE("Check MCMC mean value matchs fit value for #0_Positive_C",
               positiveC.GetMean(),
               postFitErrorsHesse->GetBinContent(1), allowedSigma*relativeSigma);
-    TOLERANCE("Check MCMC matches HESSE value for #0_Positive_C",
+    TOLERANCE("Check MCMC RMS matches HESSE value for #0_Positive_C",
               positiveC.GetRMS(),
               postFitErrorsHesse->GetBinError(1), allowedSigma*relativeSigma);
-    TOLERANCE("Check MCMC RMS matches HESSE value for #1_Negative_C",
+    TOLERANCE("Check MCMC mean value matches fit value for #1_Negative_C",
               negativeC.GetMean(),
               postFitErrorsHesse->GetBinContent(2), allowedSigma*relativeSigma);
     TOLERANCE("Check MCMC RMS matches HESSE value for #1_Negative_C",
