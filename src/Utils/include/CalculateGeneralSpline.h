@@ -195,6 +195,87 @@ namespace {
 
         return v;
     }
+
+    DEVICE_CALLABLE_INLINE
+    double CalculateGeneralSplineGradient(const double x,
+                                          const double lowerBound, double upperBound,
+                                          const DEVICE_FLOATING_POINT* data,
+                                          const int dim) {
+#if defined(CALCULATE_GENERAL_SPLINE_LINEAR_IF)
+        const int knotCount = (dim-2)/3;
+        int ix = 0;
+        if (x > data[2+3*(ix+1)+2] && ix < knotCount-2) ++ix;
+        if (x > data[2+3*(ix+1)+2] && ix < knotCount-2) ++ix;
+        if (x > data[2+3*(ix+1)+2] && ix < knotCount-2) ++ix;
+        if (x > data[2+3*(ix+1)+2] && ix < knotCount-2) ++ix;
+        if (x > data[2+3*(ix+1)+2] && ix < knotCount-2) ++ix;
+        if (x > data[2+3*(ix+1)+2] && ix < knotCount-2) ++ix;
+        if (x > data[2+3*(ix+1)+2] && ix < knotCount-2) ++ix;
+        if (x > data[2+3*(ix+1)+2] && ix < knotCount-2) ++ix;
+        if (x > data[2+3*(ix+1)+2] && ix < knotCount-2) ++ix;
+        if (x > data[2+3*(ix+1)+2] && ix < knotCount-2) ++ix;
+        if (x > data[2+3*(ix+1)+2] && ix < knotCount-2) ++ix;
+        if (x > data[2+3*(ix+1)+2] && ix < knotCount-2) ++ix;
+        if (x > data[2+3*(ix+1)+2] && ix < knotCount-2) ++ix;
+        if (x > data[2+3*(ix+1)+2] && ix < knotCount-2) ++ix;
+        if (x > data[2+3*(ix+1)+2] && ix < knotCount-2) ++ix;
+#elif defined(CALCULATE_GENERAL_SPLINE_LINEAR_MULT)
+        const int knotCount = (dim-2)/3 - 2;
+        int ix = 0;
+        ix += (x > data[2+3*(ix+1)+2]) * (ix < knotCount);
+        ix += (x > data[2+3*(ix+1)+2]) * (ix < knotCount);
+        ix += (x > data[2+3*(ix+1)+2]) * (ix < knotCount);
+        ix += (x > data[2+3*(ix+1)+2]) * (ix < knotCount);
+        ix += (x > data[2+3*(ix+1)+2]) * (ix < knotCount);
+        ix += (x > data[2+3*(ix+1)+2]) * (ix < knotCount);
+        ix += (x > data[2+3*(ix+1)+2]) * (ix < knotCount);
+        ix += (x > data[2+3*(ix+1)+2]) * (ix < knotCount);
+        ix += (x > data[2+3*(ix+1)+2]) * (ix < knotCount);
+        ix += (x > data[2+3*(ix+1)+2]) * (ix < knotCount);
+        ix += (x > data[2+3*(ix+1)+2]) * (ix < knotCount);
+        ix += (x > data[2+3*(ix+1)+2]) * (ix < knotCount);
+        ix += (x > data[2+3*(ix+1)+2]) * (ix < knotCount);
+        ix += (x > data[2+3*(ix+1)+2]) * (ix < knotCount);
+        ix += (x > data[2+3*(ix+1)+2]) * (ix < knotCount);
+#elif defined(CALCULATE_GENERAL_SPLINE_LOOPED_CHECK)
+        const int knotCount = (dim-2)/3 - 2;
+        int ix = 0;
+#define CHECK_OFFSET(ioff)  if ((ix+ioff < knotCount) && (x > data[2+3*(ix+ioff)+2])) ix += ioff
+        for( int offset = 1 << ( 31 - __builtin_clz(knotCount) ) ; offset > 0 ; offset >>= 1 ){
+            CHECK_OFFSET(offset);
+        }
+#undef CHECK_OFFSET
+#else
+        const int knotCount = (dim-2)/3 - 1;
+        int ix = 0;
+#define CHECK_OFFSET(ioff)  if ((ix+ioff < knotCount) && (x > data[2+3*(ix+ioff)+2])) ix += ioff
+        CHECK_OFFSET(16);
+        CHECK_OFFSET(8);
+        CHECK_OFFSET(4);
+        CHECK_OFFSET(2);
+        CHECK_OFFSET(1);
+#undef CHECK_OFFSET
+#endif
+
+        const double x1 = data[2+3*ix+2];
+        const double x2 = data[2+3*(ix+1)+2];
+        const double step = x2-x1;
+        const double fx = (x - x1)/step;
+
+        const double p1 = data[2+3*ix];
+        const double m1 = data[2+3*ix+1]*step;
+        const double p2 = data[2+3*(ix+1)];
+        const double m2 = data[2+3*(ix+1)+1]*step;
+
+        const double a = 2.0*p1 - 2.0*p2 + m2 + m1;
+        const double b = 3.0*p2 - 3.0*p1 - m2 - 2.0*m1;
+        double v = ((a*fx + b)*fx + m1)*fx + p1;
+
+        if (v < lowerBound) return 0.0;
+        if (v > upperBound) return 0.0;
+
+        return ((3.0*a*fx + 2.0*b)*fx + m1)/step;
+    }
 }
 
 // An MIT Style License

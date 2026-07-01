@@ -78,6 +78,34 @@ namespace {
 
         return v;
     }
+
+    DEVICE_CALLABLE_INLINE
+    double CalculateUniformSplineGradient(const double x,
+                                          const double lowerBound, double upperBound,
+                                          const DEVICE_FLOATING_POINT* data,
+                                          const int dim) {
+        const double step = data[1];
+        const double xx = (x-data[0])/step;
+        int ix = xx;
+        if (ix<0) ix=0;
+        if (2*ix+7>dim) ix = (dim-2)/2 - 2 ;
+
+        const double fx = xx-ix;
+
+        const double p1 = data[2+2*ix];
+        const double m1 = data[2+2*ix+1]*step;
+        const double p2 = data[2+2*ix+2];
+        const double m2 = data[2+2*ix+3]*step;
+
+        const double a = 2.0*p1 - 2.0*p2 + m2 + m1;
+        const double b = 3.0*p2 - 3.0*p1 - m2 - 2.0*m1;
+        double v = ((a*fx + b)*fx + m1)*fx + p1;
+
+        if (v < lowerBound) return 0.0;
+        if (v > upperBound) return 0.0;
+
+        return ((3.0*a*fx + 2.0*b)*fx + m1)/step;
+    }
 }
 
 // An MIT Style License

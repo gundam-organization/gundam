@@ -147,6 +147,67 @@ namespace {
         return v;
     }
 
+    DEVICE_CALLABLE_INLINE
+    double CalculateMonotonicSplineGradient(const double x,
+                                            const double lowerBound, double upperBound,
+                                            const DEVICE_FLOATING_POINT* data,
+                                            const int dim) {
+        const double low = data[0];
+        const double step = data[1];
+        const double xx = (x-low)/step;
+        const int ix = (xx<0) ? xx-1: xx;
+
+        int d21_0 = ix-1;
+        if (d21_0 < 0)     d21_0 = 0;
+        if (d21_0 > dim-2) d21_0 = dim-2;
+        const int d21_1 = d21_0+1;
+        int d32_0 = ix;
+        if (d32_0 < 0)     d32_0 = 0;
+        if (d32_0 > dim-2) d32_0 = dim-2;
+        const int d32_1 = d32_0+1;
+        int d43_0 = ix+1;
+        if (d43_0 < 0)     d43_0 = 0;
+        if (d43_0 > dim-2) d43_0 = dim-2;
+        const int d43_1 = d43_0+1;
+
+        const double p2 = data[2+d32_0];
+        const double p3 = data[2+d32_1];
+        const double fx = xx-d32_0;
+
+        const double d21 = data[2+d21_1] - data[2+d21_0];
+        const double d32 = p3-p2;
+        const double d43 = data[2+d43_1] - data[2+d43_0];
+
+        double m2 = 0.5*(d21+d32);
+        double m3 = 0.5*(d32+d43);
+
+#ifdef FRITSCH_CARLSON
+        if (d32*d21 <= 0.0) m2 = 0.0;
+        if (d43*d32 <= 0.0) m3 = 0.0;
+
+        const double ad21 = (d21<0) ? -d21: d21;
+        const double ad32 = (d32<0) ? -d32: d32;
+        const double ad43 = (d43<0) ? -d43: d43;
+
+        const double delta2 = 3.0*((ad21 < ad32) ? ad21 : ad32);
+        const double delta3 = 3.0*((ad32 < ad43) ? ad32 : ad43);
+
+        if (m2 > delta2) m2 = delta2;
+        if (m2 < -delta2) m2 = -delta2;
+        if (m3 > delta3) m3 = delta3;
+        if (m3 < -delta3) m3 = -delta3;
+#endif
+
+        const double a = 2.0*p2 - 2.0*p3 + m3 + m2;
+        const double b = 3.0*p3 - 3.0*p2 - m3 - 2.0*m2;
+        double v = ((a*fx + b)*fx + m2)*fx + p2;
+
+        if (v < lowerBound) return 0.0;
+        if (v > upperBound) return 0.0;
+
+        return ((3.0*a*fx + 2.0*b)*fx + m2)/step;
+    }
+
 }
 
 // An MIT Style License

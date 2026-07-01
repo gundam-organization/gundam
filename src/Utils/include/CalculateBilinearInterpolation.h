@@ -150,6 +150,51 @@ namespace {
 
         return val;
     }
+
+    DEVICE_CALLABLE_INLINE
+    DEVICE_FLOATING_POINT
+    CalculateBilinearInterpolationGradient(const DEVICE_FLOATING_POINT x,
+                                           const DEVICE_FLOATING_POINT y,
+                                           const int iInput,
+                                           const DEVICE_FLOATING_POINT lowerBound,
+                                           const DEVICE_FLOATING_POINT upperBound,
+                                           const DEVICE_FLOATING_POINT* knots,
+                                           const int nx, const int ny,
+                                           const DEVICE_FLOATING_POINT* xx,
+                                           const int nnx,
+                                           const DEVICE_FLOATING_POINT* yy,
+                                           const int nny) {
+        const int ix = BilinearIndex(x, xx, nnx-1);
+        const int iy = BilinearIndex(y, yy, nny-1);
+
+#define IXY(ixx,iyy) ((ixx)*ny + (iyy))
+        const DEVICE_FLOATING_POINT x0 = xx[ix];
+        const DEVICE_FLOATING_POINT x1 = xx[ix+1];
+        const DEVICE_FLOATING_POINT y0 = yy[iy];
+        const DEVICE_FLOATING_POINT y1 = yy[iy+1];
+        const DEVICE_FLOATING_POINT q00 = knots[IXY(ix,iy)];
+        const DEVICE_FLOATING_POINT q10 = knots[IXY(ix+1,iy)];
+        const DEVICE_FLOATING_POINT q01 = knots[IXY(ix,iy+1)];
+        const DEVICE_FLOATING_POINT q11 = knots[IXY(ix+1,iy+1)];
+#undef IXY
+
+        const DEVICE_FLOATING_POINT tx = (x-x0)/(x1-x0);
+        const DEVICE_FLOATING_POINT ty = (y-y0)/(y1-y0);
+        DEVICE_FLOATING_POINT val =
+            (1.0-tx)*(1.0-ty)*q00 + tx*(1.0-ty)*q10
+            + (1.0-tx)*ty*q01 + tx*ty*q11;
+
+        if (val<lowerBound) return 0.0;
+        if (val>upperBound) return 0.0;
+
+        if (iInput == 0) {
+            return ((1.0-ty)*(q10-q00) + ty*(q11-q01))/(x1-x0);
+        }
+        if (iInput == 1) {
+            return ((1.0-tx)*(q01-q00) + tx*(q11-q10))/(y1-y0);
+        }
+        return 0.0;
+    }
 }
 
 // An MIT Style License
