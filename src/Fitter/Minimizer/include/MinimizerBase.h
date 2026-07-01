@@ -86,6 +86,8 @@ public:
   /// point values and returns the likelihood. The meaning of the parameters is
   /// defined by the vector of pointers to Parameter returned by the LikelihoodInterface.
   virtual double evalFit( const double* parArray_ );
+  void evalFitGradient();
+  void evalFitGradient( const std::vector<Parameter*>& parameterList_ );
 
   // default calcErrors() is not defined
   [[nodiscard]] virtual bool isErrorCalcEnabled() const { return false; }

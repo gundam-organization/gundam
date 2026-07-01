@@ -312,6 +312,12 @@ double MinimizerBase::evalFit( const double* parArray_ ){
   _monitor_.externalTimer.start();
   return getLikelihoodInterface().getLastLikelihood();
 }
+void MinimizerBase::evalFitGradient(){
+  this->evalFitGradient(_minimizerParameterPtrList_);
+}
+void MinimizerBase::evalFitGradient( const std::vector<Parameter*>& parameterList_ ){
+  getLikelihoodInterface().evalLikelihoodGradient(parameterList_);
+}
 
 void MinimizerBase::setParameterValidity(const std::string& validity) {
   if (validity.empty()) return;
