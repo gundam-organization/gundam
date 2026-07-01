@@ -17,6 +17,7 @@
 #include <vector>
 #include <utility>
 
+class Parameter;
 
 class EventDialCache{
 
@@ -187,6 +188,7 @@ public:
   void fillCacheEntries(const SampleSet& sampleSet_);
 
   void reweightEntry( CacheEntry& entry_);
+  void evalEventWeightGradient(CacheEntry& entry_, const std::vector<Parameter*>& parameterList_, bool resetGradients_ = true);
 
 
 private:

@@ -19,6 +19,7 @@ public:
   [[nodiscard]] std::unique_ptr<DialBase> clone() const override { return std::make_unique<Shift>(*this); }
   [[nodiscard]] std::string getDialTypeName() const override { return {"Shift"}; }
   [[nodiscard]] double evalResponse(const DialInputBuffer& input_) const override { return _shiftValue_; }
+  [[nodiscard]] double evalGradient(const DialInputBuffer& input_, int iInput_) const override { return 0.; }
 
   // setters
   void setShiftValue(double shift_){ _shiftValue_ = shift_; }

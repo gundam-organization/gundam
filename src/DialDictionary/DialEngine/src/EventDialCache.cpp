@@ -5,6 +5,9 @@
 #include "EventDialCache.h"
 
 #include "Logger.h"
+#include "Parameter.h"
+
+#include <algorithm>
 
 
 void EventDialCache::buildReferenceCache( SampleSet& sampleSet_, std::vector<DialCollection>& dialCollectionList_){
@@ -168,4 +171,60 @@ void EventDialCache::reweightEntry( EventDialCache::CacheEntry& entry_){
 
   entry_.event->getWeights().resetCurrentWeight(); // reset to the base weight
   entry_.event->getWeights().current *= tempReweight; // apply the reweight factor
+}
+
+void EventDialCache::evalEventWeightGradient(EventDialCache::CacheEntry& entry_,
+                                             const std::vector<Parameter*>& parameterList_,
+                                             bool resetGradients_){
+  if( resetGradients_ ){
+    for( auto* parameter : parameterList_ ){
+      if( parameter == nullptr ){ continue; }
+      parameter->resetGradient();
+    }
+  }
+
+  if( entry_.event == nullptr or entry_.dialResponseCacheList.empty() ){ return; }
+
+  auto isRequestedParameter = [&](Parameter* parameter_){
+    if( parameter_ == nullptr ){ return false; }
+    return std::find(parameterList_.begin(), parameterList_.end(), parameter_) != parameterList_.end();
+  };
+
+  std::vector<double> responseList(entry_.dialResponseCacheList.size(), 1.);
+  double responseProduct{1.};
+  for( size_t iDial = 0 ; iDial < entry_.dialResponseCacheList.size() ; iDial++ ){
+    responseList[iDial] = entry_.dialResponseCacheList[iDial].getResponse();
+    responseProduct *= responseList[iDial];
+  }
+
+  if( _globalEventReweightCap_.isEnabled and responseProduct > _globalEventReweightCap_.maxReweight ){
+    return;
+  }
+
+  auto addGradient = [&](Parameter* parameter_, double gradient_){
+    if( parameter_ == nullptr or gradient_ == 0 ){ return; }
+    if( not isRequestedParameter(parameter_) ){ return; }
+    parameter_->addGradient(gradient_);
+  };
+
+  const double baseWeight{entry_.event->getWeights().base};
+  for( size_t iDial = 0 ; iDial < entry_.dialResponseCacheList.size() ; iDial++ ){
+    auto& dialResponseCache = entry_.dialResponseCacheList[iDial];
+    auto* dialInterface = dialResponseCache.dialInterface;
+    if( dialInterface == nullptr or dialInterface->getInputBufferRef() == nullptr ){ continue; }
+
+    double productExcludingDial{1.};
+    for( size_t jDial = 0 ; jDial < responseList.size() ; jDial++ ){
+      if( jDial == iDial ){ continue; }
+      productExcludingDial *= responseList[jDial];
+    }
+
+    const auto* inputBuffer = dialInterface->getInputBufferRef();
+    for( int iInput = 0 ; iInput < inputBuffer->getInputSize() ; iInput++ ){
+      auto* parameterPtr = &inputBuffer->getParameter(iInput);
+      const double dialGradient = dialInterface->evalGradient(iInput);
+      const double inputGradient = inputBuffer->evalInputGradient(iInput);
+      addGradient(parameterPtr, baseWeight * productExcludingDial * dialGradient * inputGradient);
+    }
+  }
 }

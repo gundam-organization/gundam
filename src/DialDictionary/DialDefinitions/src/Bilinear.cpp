@@ -62,3 +62,29 @@ double Bilinear::evalResponse(const DialInputBuffer& input_) const {
         xx, nx,
         yy, ny);
 }
+
+double Bilinear::evalGradient(const DialInputBuffer& input_, int iInput_) const {
+    if( iInput_ < 0 or iInput_ > 1 ){ return 0.; }
+
+    double input0{input_.getInputBuffer()[0]};
+    double input1{input_.getInputBuffer()[1]};
+
+    if( not _allowExtrapolation_ ){
+        if (input0 <= _splineBounds_[0].min or input0 >= _splineBounds_[0].max) return 0.;
+        if (input1 <= _splineBounds_[1].min or input1 >= _splineBounds_[1].max) return 0.;
+    }
+
+    const double *data = _splineData_.data();
+    int nx = *(data++);
+    int ny = *(data++);
+    const double* xx = data;
+    data += nx;
+    const double* yy = data;
+    data += ny;
+    const double* knots = data;
+    return CalculateBilinearInterpolationGradient(
+        input0, input1, iInput_, -1E20, 1E20,
+        knots, nx, ny,
+        xx, nx,
+        yy, ny);
+}
