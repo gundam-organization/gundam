@@ -188,7 +188,8 @@ public:
   void fillCacheEntries(const SampleSet& sampleSet_);
 
   void reweightEntry( CacheEntry& entry_);
-  void evalEventWeightGradient(CacheEntry& entry_, const std::vector<Parameter*>& parameterList_, bool resetGradients_ = true);
+  void evalEventWeightGradient(CacheEntry& entry_, const std::vector<Parameter*>& parameterList_,
+                               bool resetGradients_ = true, double gradientScale_ = 1.);
 
 
 private:

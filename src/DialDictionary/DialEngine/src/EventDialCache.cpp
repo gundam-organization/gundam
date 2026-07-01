@@ -175,7 +175,8 @@ void EventDialCache::reweightEntry( EventDialCache::CacheEntry& entry_){
 
 void EventDialCache::evalEventWeightGradient(EventDialCache::CacheEntry& entry_,
                                              const std::vector<Parameter*>& parameterList_,
-                                             bool resetGradients_){
+                                             bool resetGradients_,
+                                             double gradientScale_){
   if( resetGradients_ ){
     for( auto* parameter : parameterList_ ){
       if( parameter == nullptr ){ continue; }
@@ -224,7 +225,7 @@ void EventDialCache::evalEventWeightGradient(EventDialCache::CacheEntry& entry_,
       auto* parameterPtr = &inputBuffer->getParameter(iInput);
       const double dialGradient = dialInterface->evalGradient(iInput);
       const double inputGradient = inputBuffer->evalInputGradient(iInput);
-      addGradient(parameterPtr, baseWeight * productExcludingDial * dialGradient * inputGradient);
+      addGradient(parameterPtr, gradientScale_ * baseWeight * productExcludingDial * dialGradient * inputGradient);
     }
   }
 }
