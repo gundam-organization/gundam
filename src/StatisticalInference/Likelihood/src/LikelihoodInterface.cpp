@@ -173,10 +173,6 @@ void LikelihoodInterface::propagateAndEvalLikelihood(){
   std::future<bool> eventually = _modelPropagator_.applyParameters();
   this->evalLikelihood(eventually);
 }
-double LikelihoodInterface::propagateAndEvalLikelihoodGradient(const std::vector<Parameter*>& parameterList_){
-  std::future<bool> eventually = _modelPropagator_.applyParameters();
-  return this->evalLikelihoodGradient(eventually, parameterList_);
-}
 
 double LikelihoodInterface::evalLikelihood(std::future<bool>& propagation) const {
   this->evalPenaltyLikelihood();
@@ -184,7 +180,7 @@ double LikelihoodInterface::evalLikelihood(std::future<bool>& propagation) const
   _buffer_.updateTotal();
   return _buffer_.totalLikelihood;
 }
-double LikelihoodInterface::evalLikelihoodGradient(std::future<bool>& propagation, const std::vector<Parameter*>& parameterList_) {
+void LikelihoodInterface::evalLikelihoodGradient(const std::vector<Parameter*>& parameterList_) {
   std::vector<Parameter*> statGradientParameterList{parameterList_};
 
   for( auto& parSet : _modelPropagator_.getParametersManager().getParameterSetsList() ){
@@ -214,7 +210,7 @@ double LikelihoodInterface::evalLikelihoodGradient(std::future<bool>& propagatio
     parameter->resetGradient();
   }
 
-  this->evalStatLikelihoodGradient(propagation, statGradientParameterList);
+  this->evalStatLikelihoodGradient(statGradientParameterList);
 
   for( auto& parSet : _modelPropagator_.getParametersManager().getParameterSetsList() ){
     if( not parSet.isEnabled() or not parSet.isEnableEigenDecomp() ){ continue; }
@@ -241,8 +237,6 @@ double LikelihoodInterface::evalLikelihoodGradient(std::future<bool>& propagatio
   }
 
   this->evalPenaltyLikelihoodGradient(parameterList_);
-  _buffer_.updateTotal();
-  return _buffer_.totalLikelihood;
 }
 double LikelihoodInterface::evalStatLikelihood(std::future<bool>& propagation) const {
   if (propagation.valid()) propagation.get();
@@ -252,10 +246,7 @@ double LikelihoodInterface::evalStatLikelihood(std::future<bool>& propagation) c
   }
   return _buffer_.statLikelihood;
 }
-double LikelihoodInterface::evalStatLikelihoodGradient(std::future<bool>& propagation,
-                                                       const std::vector<Parameter*>& parameterList_) {
-  if (propagation.valid()) propagation.get();
-
+void LikelihoodInterface::evalStatLikelihoodGradient(const std::vector<Parameter*>& parameterList_) {
   struct BinGradientScale{
     double sumWeights{0};
     double sqrtSumSqWeightsOverError{0};
@@ -277,8 +268,6 @@ double LikelihoodInterface::evalStatLikelihoodGradient(std::future<bool>& propag
     sampleGradientScaleList.resize(hist.getNbBins());
 
     for( int iBin = 0 ; iBin < hist.getNbBins() ; iBin++ ){
-      _buffer_.statLikelihood += _jointProbabilityPtr_->eval(samplePair, iBin);
-
       const auto& binContent = hist.getBinContentList()[iBin];
       auto& gradientScale = sampleGradientScaleList[iBin];
       gradientScale.sumWeights = _jointProbabilityPtr_->evalPredictionGradient(samplePair, iBin);
@@ -309,8 +298,6 @@ double LikelihoodInterface::evalStatLikelihoodGradient(std::future<bool>& propag
         cacheEntry, parameterList_, false, eventGradientScale
     );
   }
-
-  return _buffer_.statLikelihood;
 }
 double LikelihoodInterface::evalPenaltyLikelihood() const {
   _buffer_.penaltyLikelihood = 0;
@@ -319,21 +306,18 @@ double LikelihoodInterface::evalPenaltyLikelihood() const {
   }
   return _buffer_.penaltyLikelihood;
 }
-double LikelihoodInterface::evalPenaltyLikelihoodGradient(const std::vector<Parameter*>& parameterList_) {
-  _buffer_.penaltyLikelihood = 0;
+void LikelihoodInterface::evalPenaltyLikelihoodGradient(const std::vector<Parameter*>& parameterList_) {
   for( auto& parSet : _modelPropagator_.getParametersManager().getParameterSetsList() ){
-    _buffer_.penaltyLikelihood += this->evalPenaltyLikelihoodGradient(parSet, parameterList_);
+    this->evalPenaltyLikelihoodGradient(parSet, parameterList_);
   }
-  return _buffer_.penaltyLikelihood;
 }
-double LikelihoodInterface::evalPenaltyLikelihoodGradient(ParameterSet& parSet_,
-                                                          const std::vector<Parameter*>& parameterList_) {
-  const double penaltyLikelihood{LikelihoodInterface::evalPenaltyLikelihood(parSet_)};
-
-  if( not parSet_.isEnabled() ){ return penaltyLikelihood; }
-  if( parSet_.getPriorCovarianceMatrix() == nullptr ){ return penaltyLikelihood; }
+void LikelihoodInterface::evalPenaltyLikelihoodGradient(ParameterSet& parSet_,
+                                                        const std::vector<Parameter*>& parameterList_) {
+  if( not parSet_.isEnabled() ){ return; }
+  if( parSet_.getPriorCovarianceMatrix() == nullptr ){ return; }
 
   if( parSet_.isEnableEigenDecomp() ){
+    bool hasRequestedOriginalParameter{false};
     for( auto& eigenPar : parSet_.getEigenParameterList() ){
       if( not containsParameter(parameterList_, &eigenPar) ){ continue; }
       if( eigenPar.isPenaltyDisabled() ){ continue; }
@@ -343,11 +327,19 @@ double LikelihoodInterface::evalPenaltyLikelihoodGradient(ParameterSet& parSet_,
           / TMath::Sq(eigenPar.getStdDevValue())
       );
     }
-    return penaltyLikelihood;
+
+    for( auto& par : parSet_.getParameterList() ){
+      if( not ParameterSet::isValidCorrelatedParameter(par) ){ continue; }
+      if( containsParameter(parameterList_, &par) ){
+        hasRequestedOriginalParameter = true;
+        break;
+      }
+    }
+    if( not hasRequestedOriginalParameter ){ return; }
   }
 
   if( parSet_.getInverseCovarianceMatrix() == nullptr or parSet_.getDeltaVectorPtr() == nullptr ){
-    return penaltyLikelihood;
+    return;
   }
 
   parSet_.updateDeltaVector();
@@ -362,8 +354,6 @@ double LikelihoodInterface::evalPenaltyLikelihoodGradient(ParameterSet& parSet_,
     }
     iFit++;
   }
-
-  return penaltyLikelihood;
 }
 double LikelihoodInterface::evalPenaltyLikelihood(const ParameterSet& parSet_) const{
   if( not parSet_.isEnabled() ){ return 0; }
