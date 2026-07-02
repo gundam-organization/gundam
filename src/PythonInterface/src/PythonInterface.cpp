@@ -134,7 +134,9 @@ PYBIND11_MODULE(GUNDAM, module) {
   .def("getStdDevValue", &Parameter::getStdDevValue)
   .def("getThrowValue", &Parameter::getThrowValue)
   .def("getParameterValue", &Parameter::getParameterValue)
-  .def("setParameterValue", &Parameter::setParameterValue)
+  .def("getGradient", &Parameter::getGradient)
+  .def("isPenaltyDisabled", &Parameter::isPenaltyDisabled)
+  .def("setParameterValue", &Parameter::setParameterValue, pybind11::arg("parameterValue"), pybind11::arg("force") = false)
   ;
 
   pybind11::class_<ParameterSet>(module, "ParameterSet")
@@ -215,7 +217,14 @@ PYBIND11_MODULE(GUNDAM, module) {
   // no CTOR here
   pybind11::class_<MinimizerBase>(module, "MinimizerBase")
   .def("minimize", &MinimizerBase::minimize)
+  .def("setDisableCalcError", &MinimizerBase::setDisableCalcError)
   .def("fetchNbDegreeOfFreedom", &MinimizerBase::fetchNbDegreeOfFreedom)
+  .def("evalFit", [](MinimizerBase& this_, const std::vector<double>& parArray_){
+    return this_.evalFit(parArray_.data());
+  }, pybind11::arg("parArray"))
+  .def("evalFitGradient", pybind11::overload_cast<>(&MinimizerBase::evalFitGradient))
+  .def("evalFitGradient", pybind11::overload_cast<const std::vector<Parameter*>&>(&MinimizerBase::evalFitGradient))
+  .def("getMinimizerFitParameterList", pybind11::overload_cast<>(&MinimizerBase::getMinimizerFitParameterList), pybind11::return_value_policy::reference)
   ;
 
   pybind11::class_<FitterEngine>(module, "FitterEngine")

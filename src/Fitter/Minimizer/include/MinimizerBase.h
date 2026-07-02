@@ -129,6 +129,8 @@ public:
   // core
   void printParameters();
   [[nodiscard]] int fetchNbDegreeOfFreedom() const { return getLikelihoodInterface().getNbSampleBins() - _nbFreeParameters_; }
+  std::vector<Parameter *> &getMinimizerFitParameterList(){ return _minimizerParameterPtrList_; }
+  const std::vector<Parameter *> &getMinimizerFitParameterList() const{ return _minimizerParameterPtrList_; }
 
 
 protected:
