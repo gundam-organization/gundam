@@ -115,9 +115,10 @@ namespace {
         //     + p3*(3.0*fxx-2.0*fxxx) + m3*(fxxx-fxx);
 
         // Factored via Horner's method.
-        const double a = 2.0*p2 - 2.0*p3 + m3 + m2;
-        const double b = 3.0*p3 - 3.0*p2 - m3 - 2.0*m2;
-        double v = ((a*fx + b)*fx + m2)*fx + p2;
+        double v = ((((2.0*p2 - 2.0*p3 + m3 + m2)*fx
+                      + 3.0*p3 - 3.0*p2 - m3 - 2.0*m2)*fx
+                     +m2)*fx
+                    +p2);
 
         if (v < lowerBound) {
             v = lowerBound;
@@ -128,6 +129,8 @@ namespace {
             if (grad != nullptr) *grad = 0.0;
         }
         else if (grad != nullptr) {
+            const double a = 2.0*p2 - 2.0*p3 + m3 + m2;
+            const double b = 3.0*p3 - 3.0*p2 - m3 - 2.0*m2;
             *grad = ((3.0*a*fx + 2.0*b)*fx + m2)/step;
         }
 
@@ -147,9 +150,42 @@ namespace {
                                           const double lowerBound, double upperBound,
                                           const DEVICE_FLOATING_POINT* data,
                                           const int dim) {
-        double grad = 0.0;
-        CalculateCompactSpline(&grad, x, lowerBound, upperBound, data, dim);
-        return grad;
+        const double low = data[0];
+        const double step = data[1];
+        const double xx = (x-low)/step;
+        const int ix = (xx<0) ? xx-1: xx;
+
+        int d21_0 = ix-1;
+        if (d21_0 < 0)     d21_0 = 0;
+        if (d21_0 > dim-2) d21_0 = dim-2;
+        int d21_1 = d21_0+1;
+        int d32_0 = ix;
+        if (d32_0 < 0)     d32_0 = 0;
+        if (d32_0 > dim-2) d32_0 = dim-2;
+        int d32_1 = d32_0+1;
+        int d43_0 = ix+1;
+        if (d43_0 < 0)     d43_0 = 0;
+        if (d43_0 > dim-2) d43_0 = dim-2;
+        int d43_1 = d43_0+1;
+
+        const double p2 = data[2+d32_0];
+        const double p3 = data[2+d32_1];
+        const double fx = xx-d32_0;
+
+        const double d21 = data[2+d21_1] - data[2+d21_0];
+        const double d32 = p3-p2;
+        const double d43 = data[2+d43_1] - data[2+d43_0];
+        double m2 = 0.5*(d21+d32);
+        double m3 = 0.5*(d32+d43);
+
+        const double a = 2.0*p2 - 2.0*p3 + m3 + m2;
+        const double b = 3.0*p3 - 3.0*p2 - m3 - 2.0*m2;
+        double v = ((a*fx + b)*fx + m2)*fx + p2;
+
+        if (v < lowerBound) return 0.0;
+        if (v > upperBound) return 0.0;
+
+        return ((3.0*a*fx + 2.0*b)*fx + m2)/step;
     }
 
 }
