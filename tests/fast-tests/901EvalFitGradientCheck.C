@@ -3,8 +3,6 @@
 #
 # Check MinimizerBase::evalFitGradient against a centered finite difference.
 
-export DATA_DIR=${PWD}
-
 root -b -n <<EOF
 R__LOAD_LIBRARY(libGundamFitter)
 
