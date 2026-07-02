@@ -110,6 +110,41 @@ namespace {
 
     }
 
+    // Do the "interpolation" in one dimension and optionally calculate the
+    // derivative with respect to x.
+    DEVICE_CALLABLE_INLINE
+    DEVICE_FLOATING_POINT
+    BicubicCINT(DEVICE_FLOATING_POINT* grad,
+                const DEVICE_FLOATING_POINT x,
+                const DEVICE_FLOATING_POINT x0,
+                const DEVICE_FLOATING_POINT p0,
+                const DEVICE_FLOATING_POINT x1,
+                const DEVICE_FLOATING_POINT p1,
+                const DEVICE_FLOATING_POINT x2,
+                const DEVICE_FLOATING_POINT p2,
+                const DEVICE_FLOATING_POINT x3,
+                const DEVICE_FLOATING_POINT p3) {
+
+        const double step = x2-x1;
+        const double fx = (x - x1)/step;
+        double m1 = step*(p2-p0)/(x2-x0);
+        double m2 = step*(p3-p1)/(x3-x1);
+
+        // Make linear outside of region
+        if (fx < 0.0) m2 = m1;
+        if (fx > 1.0) m1 = m2;
+
+        const double a = -2.0*p2 + 2.0*p1 + m2 + m1;
+        const double b = 3.0*p2 - 3.0*p1 - m2 - 2.0*m1;
+        const double v = ((a*fx + b)*fx + m1)*fx + p1;
+
+        if (grad != nullptr) {
+            *grad = ((3.0*a*fx + 2.0*b)*fx + m1)/step;
+        }
+
+        return v;
+    }
+
     // Interpolate one point with non-uniform knots on each axis.  Each axis
     // can have have at most 16 knots defined, and there must be at least 4
     // knots (i.e. a minimum of one square facet)..  The knots are specified
@@ -142,7 +177,8 @@ namespace {
     //
     DEVICE_CALLABLE_INLINE
     DEVICE_FLOATING_POINT
-    CalculateBicubicSpline(const DEVICE_FLOATING_POINT x,
+    CalculateBicubicSpline(DEVICE_FLOATING_POINT* grad,
+                            const DEVICE_FLOATING_POINT x,
                             const DEVICE_FLOATING_POINT y,
                             const DEVICE_FLOATING_POINT lowerBound,
                             const DEVICE_FLOATING_POINT upperBound,
@@ -202,7 +238,9 @@ namespace {
         }
 
         const DEVICE_FLOATING_POINT u0 = (iy > 0) ? yy[iy-1]: 2*yy[iy]-yy[iy+1];
-        const DEVICE_FLOATING_POINT v0 = BicubicCINT(x,a0,b0,a1,b1,a2,b2,a3,b3);
+        DEVICE_FLOATING_POINT dv0dx;
+        const DEVICE_FLOATING_POINT v0 = BicubicCINT(
+            (grad != nullptr) ? &dv0dx : nullptr, x, a0, b0, a1, b1, a2, b2, a3, b3);
 
         // Interpolate the second band (at a fixed y value) in yy[iy].
         // Handle the corner cases.
@@ -228,7 +266,9 @@ namespace {
         }
 
         const DEVICE_FLOATING_POINT u1 = yy[iy];
-        const DEVICE_FLOATING_POINT v1 = BicubicCINT(x,a0,b0,a1,b1,a2,b2,a3,b3);
+        DEVICE_FLOATING_POINT dv1dx;
+        const DEVICE_FLOATING_POINT v1 = BicubicCINT(
+            (grad != nullptr) ? &dv1dx : nullptr, x, a0, b0, a1, b1, a2, b2, a3, b3);
 
         // Interpolate the third band (at a fixed y value) in yy[iy+1].
         // Handle the corner cases.
@@ -254,7 +294,9 @@ namespace {
         }
 
         const DEVICE_FLOATING_POINT u2 = yy[iy+1];
-        const DEVICE_FLOATING_POINT v2 = BicubicCINT(x,a0,b0,a1,b1,a2,b2,a3,b3);
+        DEVICE_FLOATING_POINT dv2dx;
+        const DEVICE_FLOATING_POINT v2 = BicubicCINT(
+            (grad != nullptr) ? &dv2dx : nullptr, x, a0, b0, a1, b1, a2, b2, a3, b3);
 
         // Interpolate the fourth band (at a fixed y value) in yy[iy+2].
         // Handle the corner cases.
@@ -286,18 +328,75 @@ namespace {
         }
 
         const DEVICE_FLOATING_POINT u3 = (iy < nny-2) ? yy[iy+2] : 2*yy[iy+1] - yy[iy];
-        const DEVICE_FLOATING_POINT v3 = BicubicCINT(x,a0,b0,a1,b1,a2,b2,a3,b3);
+        DEVICE_FLOATING_POINT dv3dx;
+        const DEVICE_FLOATING_POINT v3 = BicubicCINT(
+            (grad != nullptr) ? &dv3dx : nullptr, x, a0, b0, a1, b1, a2, b2, a3, b3);
 
-        DEVICE_FLOATING_POINT val = BicubicCINT(y,u0,v0,u1,v1,u2,v2,u3,v3);
+        DEVICE_FLOATING_POINT dvdy;
+        DEVICE_FLOATING_POINT val = BicubicCINT(
+            (grad != nullptr) ? &dvdy : nullptr, y, u0, v0, u1, v1, u2, v2, u3, v3);
 
         // Apply the clamp.  This could be done using the CUDA min/max
         // primitives, but this is not a critical section of the code, and the
         // min/max api is drawn from "C", not std::max/std::min, so I think
         // this is safer for most users to read.
-        if (val<lowerBound) val = lowerBound;
-        if (val>upperBound) val = upperBound;
+        if (val<lowerBound) {
+            val = lowerBound;
+            if (grad != nullptr) {
+                grad[0] = 0.0;
+                grad[1] = 0.0;
+            }
+        }
+        else if (val>upperBound) {
+            val = upperBound;
+            if (grad != nullptr) {
+                grad[0] = 0.0;
+                grad[1] = 0.0;
+            }
+        }
+        else if (grad != nullptr) {
+            grad[0] = BicubicCINT(y, u0, dv0dx, u1, dv1dx, u2, dv2dx, u3, dv3dx);
+            grad[1] = dvdy;
+        }
 
         return val;
+    }
+
+    DEVICE_CALLABLE_INLINE
+    DEVICE_FLOATING_POINT
+    CalculateBicubicSpline(const DEVICE_FLOATING_POINT x,
+                            const DEVICE_FLOATING_POINT y,
+                            const DEVICE_FLOATING_POINT lowerBound,
+                            const DEVICE_FLOATING_POINT upperBound,
+                            const DEVICE_FLOATING_POINT* knots,
+                            const int nx, const int ny,
+                            const DEVICE_FLOATING_POINT* xx,
+                            const int nnx,
+                            const DEVICE_FLOATING_POINT* yy,
+                            const int nny) {
+        return CalculateBicubicSpline(
+            nullptr, x, y, lowerBound, upperBound, knots, nx, ny, xx, nnx, yy, nny);
+    }
+
+    DEVICE_CALLABLE_INLINE
+    DEVICE_FLOATING_POINT
+    CalculateBicubicSplineGradient(const DEVICE_FLOATING_POINT x,
+                                    const DEVICE_FLOATING_POINT y,
+                                    const int iInput,
+                                    const DEVICE_FLOATING_POINT lowerBound,
+                                    const DEVICE_FLOATING_POINT upperBound,
+                                    const DEVICE_FLOATING_POINT* knots,
+                                    const int nx, const int ny,
+                                    const DEVICE_FLOATING_POINT* xx,
+                                    const int nnx,
+                                    const DEVICE_FLOATING_POINT* yy,
+                                    const int nny) {
+        DEVICE_FLOATING_POINT grad[2] = {0.0, 0.0};
+        CalculateBicubicSpline(
+            grad, x, y, lowerBound, upperBound, knots, nx, ny, xx, nnx, yy, nny);
+        if (iInput == 0) return grad[0];
+        if (iInput == 1) return grad[1];
+        return 0.0;
     }
 }
 
