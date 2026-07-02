@@ -102,7 +102,8 @@ namespace {
     //
     DEVICE_CALLABLE_INLINE
     DEVICE_FLOATING_POINT
-    CalculateBilinearInterpolation(const DEVICE_FLOATING_POINT x,
+    CalculateBilinearInterpolation(DEVICE_FLOATING_POINT* grad,
+                                   const DEVICE_FLOATING_POINT x,
                                    const DEVICE_FLOATING_POINT y,
                                    const DEVICE_FLOATING_POINT lowerBound,
                                    const DEVICE_FLOATING_POINT upperBound,
@@ -118,52 +119,6 @@ namespace {
         // will be extrapolated.  The corners of the facet [(ix,iy),
         // (ix+1,iy), (ix,iy+1), and (ix+1,iy+1)] always exist in the grid of
         // knots.
-        const int ix = BilinearIndex(x, xx, nnx-1);
-        const int iy = BilinearIndex(y, yy, nny-1);
-
-#define IXY(ixx,iyy) ((ixx)*ny + (iyy))
-        DEVICE_FLOATING_POINT a0, b0, a1, b1;
-        a0 = xx[ix];
-        b0 = knots[IXY(ix,iy)];
-        a1 = xx[ix+1];
-        b1 = knots[IXY(ix+1,iy)];
-
-        const DEVICE_FLOATING_POINT u0 = yy[iy];
-        const DEVICE_FLOATING_POINT v0 = BilinearCINT(x,a0,b0,a1,b1);
-
-        a0 = xx[ix];
-        b0 = knots[IXY(ix,iy+1)];
-        a1 = xx[ix+1];
-        b1 = knots[IXY(ix+1,iy+1)];
-
-        const DEVICE_FLOATING_POINT u1 = yy[iy+1];
-        const DEVICE_FLOATING_POINT v1 = BilinearCINT(x,a0,b0,a1,b1);
-
-        DEVICE_FLOATING_POINT val = BilinearCINT(y,u0,v0,u1,v1);
-
-        // Apply the clamp.  This could be done using the CUDA min/max
-        // primitives, but this is not a critical section of the code, and the
-        // min/max api is drawn from "C", not std::max/std::min, so I think
-        // this is safer for most users to read.
-        if (val<lowerBound) val = lowerBound;
-        if (val>upperBound) val = upperBound;
-
-        return val;
-    }
-
-    DEVICE_CALLABLE_INLINE
-    DEVICE_FLOATING_POINT
-    CalculateBilinearInterpolationGradient(const DEVICE_FLOATING_POINT x,
-                                           const DEVICE_FLOATING_POINT y,
-                                           const int iInput,
-                                           const DEVICE_FLOATING_POINT lowerBound,
-                                           const DEVICE_FLOATING_POINT upperBound,
-                                           const DEVICE_FLOATING_POINT* knots,
-                                           const int nx, const int ny,
-                                           const DEVICE_FLOATING_POINT* xx,
-                                           const int nnx,
-                                           const DEVICE_FLOATING_POINT* yy,
-                                           const int nny) {
         const int ix = BilinearIndex(x, xx, nnx-1);
         const int iy = BilinearIndex(y, yy, nny-1);
 
@@ -184,15 +139,66 @@ namespace {
             (1.0-tx)*(1.0-ty)*q00 + tx*(1.0-ty)*q10
             + (1.0-tx)*ty*q01 + tx*ty*q11;
 
-        if (val<lowerBound) return 0.0;
-        if (val>upperBound) return 0.0;
+        // Apply the clamp.  This could be done using the CUDA min/max
+        // primitives, but this is not a critical section of the code, and the
+        // min/max api is drawn from "C", not std::max/std::min, so I think
+        // this is safer for most users to read.
+        if (val<lowerBound) {
+            val = lowerBound;
+            if (grad != nullptr) {
+                grad[0] = 0.0;
+                grad[1] = 0.0;
+            }
+        }
+        else if (val>upperBound) {
+            val = upperBound;
+            if (grad != nullptr) {
+                grad[0] = 0.0;
+                grad[1] = 0.0;
+            }
+        }
+        else if (grad != nullptr) {
+            grad[0] = ((1.0-ty)*(q10-q00) + ty*(q11-q01))/(x1-x0);
+            grad[1] = ((1.0-tx)*(q01-q00) + tx*(q11-q10))/(y1-y0);
+        }
 
-        if (iInput == 0) {
-            return ((1.0-ty)*(q10-q00) + ty*(q11-q01))/(x1-x0);
-        }
-        if (iInput == 1) {
-            return ((1.0-tx)*(q01-q00) + tx*(q11-q10))/(y1-y0);
-        }
+        return val;
+    }
+
+    DEVICE_CALLABLE_INLINE
+    DEVICE_FLOATING_POINT
+    CalculateBilinearInterpolation(const DEVICE_FLOATING_POINT x,
+                                   const DEVICE_FLOATING_POINT y,
+                                   const DEVICE_FLOATING_POINT lowerBound,
+                                   const DEVICE_FLOATING_POINT upperBound,
+                                   const DEVICE_FLOATING_POINT* knots,
+                                   const int nx, const int ny,
+                                   const DEVICE_FLOATING_POINT* xx,
+                                   const int nnx,
+                                   const DEVICE_FLOATING_POINT* yy,
+                                   const int nny) {
+        return CalculateBilinearInterpolation(
+            nullptr, x, y, lowerBound, upperBound, knots, nx, ny, xx, nnx, yy, nny);
+    }
+
+    DEVICE_CALLABLE_INLINE
+    DEVICE_FLOATING_POINT
+    CalculateBilinearInterpolationGradient(const DEVICE_FLOATING_POINT x,
+                                           const DEVICE_FLOATING_POINT y,
+                                           const int iInput,
+                                           const DEVICE_FLOATING_POINT lowerBound,
+                                           const DEVICE_FLOATING_POINT upperBound,
+                                           const DEVICE_FLOATING_POINT* knots,
+                                           const int nx, const int ny,
+                                           const DEVICE_FLOATING_POINT* xx,
+                                           const int nnx,
+                                           const DEVICE_FLOATING_POINT* yy,
+                                           const int nny) {
+        DEVICE_FLOATING_POINT grad[2] = {0.0, 0.0};
+        CalculateBilinearInterpolation(
+            grad, x, y, lowerBound, upperBound, knots, nx, ny, xx, nnx, yy, nny);
+        if (iInput == 0) return grad[0];
+        if (iInput == 1) return grad[1];
         return 0.0;
     }
 }

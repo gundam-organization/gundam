@@ -41,13 +41,17 @@ namespace {
     /// but different calls.  In particular the dim parameter meaning is not
     /// consistent.
     DEVICE_CALLABLE_INLINE
-    double CalculateGraph(const double x,
+    double CalculateGraph(double* grad,
+                          const double x,
                           const double lowerBound, double upperBound,
                           const DEVICE_FLOATING_POINT* data,
                           const int dim) {
 
         // Short circuit 1 point graphs.
-        if (dim < 4) return data[0];
+        if (dim < 4) {
+            if (grad != nullptr) *grad = 0.0;
+            return data[0];
+        }
 
         // Check to find a point that is less than x.  This is "brute force"
         // binary search for upto 16 elements.  The "if" has been checked and
@@ -81,10 +85,37 @@ namespace {
 
         double v = p1 + fx*m;
 
-        if (v < lowerBound) v = lowerBound;
-        if (v > upperBound) v = upperBound;
+        if (v < lowerBound) {
+            v = lowerBound;
+            if (grad != nullptr) *grad = 0.0;
+        }
+        else if (v > upperBound) {
+            v = upperBound;
+            if (grad != nullptr) *grad = 0.0;
+        }
+        else if (grad != nullptr) {
+            *grad = m/step;
+        }
 
         return v;
+    }
+
+    DEVICE_CALLABLE_INLINE
+    double CalculateGraph(const double x,
+                          const double lowerBound, double upperBound,
+                          const DEVICE_FLOATING_POINT* data,
+                          const int dim) {
+        return CalculateGraph(nullptr, x, lowerBound, upperBound, data, dim);
+    }
+
+    DEVICE_CALLABLE_INLINE
+    double CalculateGraphGradient(const double x,
+                                  const double lowerBound, double upperBound,
+                                  const DEVICE_FLOATING_POINT* data,
+                                  const int dim) {
+        double grad = 0.0;
+        CalculateGraph(&grad, x, lowerBound, upperBound, data, dim);
+        return grad;
     }
 }
 
