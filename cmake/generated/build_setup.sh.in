@@ -16,4 +16,7 @@ if ! [[ ":$DYLD_LIBRARY_PATH:" == *":@CMAKE_INSTALL_PREFIX@/lib:"* ]]; then
   export DYLD_LIBRARY_PATH=@CMAKE_INSTALL_PREFIX@/lib:$DYLD_LIBRARY_PATH
 fi
 
+if ! [[ ":$PYTHONPATH:" == *":@CMAKE_INSTALL_PREFIX@/lib:"* ]]; then
+  export PYTHONPATH=@CMAKE_INSTALL_PREFIX@/lib:$PYTHONPATH
+fi
 
