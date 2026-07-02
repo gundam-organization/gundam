@@ -29,6 +29,19 @@ public:
 
 
 protected:
+  struct PreparedBilinearCall {
+    double input0{};
+    double input1{};
+    const double* knots{};
+    const double* xx{};
+    const double* yy{};
+    int nx{};
+    int ny{};
+    bool valid{true};
+  };
+
+  [[nodiscard]] PreparedBilinearCall prepareBilinearCall(const DialInputBuffer& input_, bool forGradient_) const;
+
   bool _allowExtrapolation_{false};
 
   // A block of data to calculate the spline values.  This must be filled for

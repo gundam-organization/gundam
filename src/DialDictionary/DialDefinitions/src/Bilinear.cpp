@@ -37,54 +37,56 @@ void Bilinear::buildDial(const TH2& h2_){
 
 }
 
-double Bilinear::evalResponse(const DialInputBuffer& input_) const {
-    double input0{input_.getInputBuffer()[0]};
-    double input1{input_.getInputBuffer()[1]};
+Bilinear::PreparedBilinearCall Bilinear::prepareBilinearCall(
+    const DialInputBuffer& input_, const bool forGradient_) const {
+
+    PreparedBilinearCall call{};
+    call.input0 = input_.getInputBuffer()[0];
+    call.input1 = input_.getInputBuffer()[1];
 
     if( not _allowExtrapolation_ ){
-        if (input0 < _splineBounds_[0].min) input0 = _splineBounds_[0].min;
-        if (input0 > _splineBounds_[0].max) input0 = _splineBounds_[0].max;
-        if (input1 < _splineBounds_[1].min) input1 = _splineBounds_[1].min;
-        if (input1 > _splineBounds_[1].max) input1 = _splineBounds_[1].max;
+        if( forGradient_ ){
+            if( call.input0 <= _splineBounds_[0].min or call.input0 >= _splineBounds_[0].max ) call.valid = false;
+            if( call.input1 <= _splineBounds_[1].min or call.input1 >= _splineBounds_[1].max ) call.valid = false;
+        }
+        else {
+            if( call.input0 < _splineBounds_[0].min ) call.input0 = _splineBounds_[0].min;
+            if( call.input0 > _splineBounds_[0].max ) call.input0 = _splineBounds_[0].max;
+            if( call.input1 < _splineBounds_[1].min ) call.input1 = _splineBounds_[1].min;
+            if( call.input1 > _splineBounds_[1].max ) call.input1 = _splineBounds_[1].max;
+        }
     }
 
     const double *data = _splineData_.data();
-    int nx = *(data++);
-    int ny = *(data++);
-    const double* xx = data;
-    data += nx;
-    const double* yy = data;
-    data += ny;
-    const double* knots = data;
+    call.nx = *(data++);
+    call.ny = *(data++);
+    call.xx = data;
+    data += call.nx;
+    call.yy = data;
+    data += call.ny;
+    call.knots = data;
+
+    return call;
+}
+
+double Bilinear::evalResponse(const DialInputBuffer& input_) const {
+    const auto call = this->prepareBilinearCall(input_, false);
     return CalculateBilinearInterpolation(
-        input0, input1, -1E20, 1E20,
-        knots, nx, ny,
-        xx, nx,
-        yy, ny);
+        call.input0, call.input1, -1E20, 1E20,
+        call.knots, call.nx, call.ny,
+        call.xx, call.nx,
+        call.yy, call.ny);
 }
 
 double Bilinear::evalGradient(const DialInputBuffer& input_, int iInput_) const {
     if( iInput_ < 0 or iInput_ > 1 ){ return 0.; }
 
-    double input0{input_.getInputBuffer()[0]};
-    double input1{input_.getInputBuffer()[1]};
+    const auto call = this->prepareBilinearCall(input_, true);
+    if( not call.valid ){ return 0.; }
 
-    if( not _allowExtrapolation_ ){
-        if (input0 <= _splineBounds_[0].min or input0 >= _splineBounds_[0].max) return 0.;
-        if (input1 <= _splineBounds_[1].min or input1 >= _splineBounds_[1].max) return 0.;
-    }
-
-    const double *data = _splineData_.data();
-    int nx = *(data++);
-    int ny = *(data++);
-    const double* xx = data;
-    data += nx;
-    const double* yy = data;
-    data += ny;
-    const double* knots = data;
     return CalculateBilinearInterpolationGradient(
-        input0, input1, iInput_, -1E20, 1E20,
-        knots, nx, ny,
-        xx, nx,
-        yy, ny);
+        call.input0, call.input1, iInput_, -1E20, 1E20,
+        call.knots, call.nx, call.ny,
+        call.xx, call.nx,
+        call.yy, call.ny);
 }
