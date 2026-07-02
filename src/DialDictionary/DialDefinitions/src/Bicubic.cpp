@@ -4,7 +4,6 @@
 #include "GenericToolbox.Root.h"
 #include "Logger.h"
 
-
 void Bicubic::buildDial(const TH2& h2_){
     // Copy the spline data into local storage.  The local storage should be
     // easily packable for the GPU.
@@ -37,53 +36,55 @@ void Bicubic::buildDial(const TH2& h2_){
 
 }
 
-double Bicubic::evalResponse(const DialInputBuffer& input_) const {
-    double input0{input_.getInputBuffer()[0]};
-    double input1{input_.getInputBuffer()[1]};
+Bicubic::PreparedBicubicCall Bicubic::prepareBicubicCall(
+    const DialInputBuffer& input_, const bool forGradient_) const {
+
+    PreparedBicubicCall call{};
+    call.input0 = input_.getInputBuffer()[0];
+    call.input1 = input_.getInputBuffer()[1];
 
     if( not _allowExtrapolation_ ){
-        if (input0 < _splineBounds_[0].min) input0 = _splineBounds_[0].min;
-        if (input0 > _splineBounds_[0].max) input0 = _splineBounds_[0].max;
-        if (input1 < _splineBounds_[1].min) input1 = _splineBounds_[1].min;
-        if (input1 > _splineBounds_[1].max) input1 = _splineBounds_[1].max;
+        if( forGradient_ ){
+            if( call.input0 <= _splineBounds_[0].min or call.input0 >= _splineBounds_[0].max ) call.valid = false;
+            if( call.input1 <= _splineBounds_[1].min or call.input1 >= _splineBounds_[1].max ) call.valid = false;
+        }
+        else {
+            if( call.input0 < _splineBounds_[0].min ) call.input0 = _splineBounds_[0].min;
+            if( call.input0 > _splineBounds_[0].max ) call.input0 = _splineBounds_[0].max;
+            if( call.input1 < _splineBounds_[1].min ) call.input1 = _splineBounds_[1].min;
+            if( call.input1 > _splineBounds_[1].max ) call.input1 = _splineBounds_[1].max;
+        }
     }
 
     const double *data = _splineData_.data();
-    const int nx = *(data++);
-    const int ny = *(data++);
-    const double* xx = data;
-    data += nx;
-    const double* yy = data;
-    data += ny;
-    const double* knots = data;
-    return CalculateBicubicSpline(input0, input1, -1E20, 1E20,
-                                  knots, nx, ny,
-                                  xx, nx,
-                                  yy, ny);
+    call.nx = *(data++);
+    call.ny = *(data++);
+    call.xx = data;
+    data += call.nx;
+    call.yy = data;
+    data += call.ny;
+    call.knots = data;
+
+    return call;
+}
+
+double Bicubic::evalResponse(const DialInputBuffer& input_) const {
+    const auto call = this->prepareBicubicCall(input_, false);
+    return CalculateBicubicSpline(call.input0, call.input1, -1E20, 1E20,
+                                  call.knots, call.nx, call.ny,
+                                  call.xx, call.nx,
+                                  call.yy, call.ny);
 }
 
 double Bicubic::evalGradient(const DialInputBuffer& input_, int iInput_) const {
     if( iInput_ < 0 or iInput_ > 1 ){ return 0.; }
 
-    double input0{input_.getInputBuffer()[0]};
-    double input1{input_.getInputBuffer()[1]};
+    const auto call = this->prepareBicubicCall(input_, true);
+    if( not call.valid ){ return 0.; }
 
-    if( not _allowExtrapolation_ ){
-        if (input0 <= _splineBounds_[0].min or input0 >= _splineBounds_[0].max) return 0.;
-        if (input1 <= _splineBounds_[1].min or input1 >= _splineBounds_[1].max) return 0.;
-    }
-
-    const double *data = _splineData_.data();
-    const int nx = *(data++);
-    const int ny = *(data++);
-    const double* xx = data;
-    data += nx;
-    const double* yy = data;
-    data += ny;
-    const double* knots = data;
     return CalculateBicubicSplineGradient(
-        input0, input1, iInput_, -1E20, 1E20,
-        knots, nx, ny,
-        xx, nx,
-        yy, ny);
+        call.input0, call.input1, iInput_, -1E20, 1E20,
+        call.knots, call.nx, call.ny,
+        call.xx, call.nx,
+        call.yy, call.ny);
 }
