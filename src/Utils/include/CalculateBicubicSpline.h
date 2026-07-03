@@ -138,9 +138,9 @@ namespace {
         const double b = 3.0*p2 - 3.0*p1 - m2 - 2.0*m1;
         const double v = ((a*fx + b)*fx + m1)*fx + p1;
 
-        if (grad != nullptr) {
-            *grad = ((3.0*a*fx + 2.0*b)*fx + m1)/step;
-        }
+        if (!grad) return v;
+
+        *grad = ((3.0*a*fx + 2.0*b)*fx + m1)/step;
 
         return v;
     }
@@ -333,31 +333,23 @@ namespace {
             (grad != nullptr) ? &dv3dx : nullptr, x, a0, b0, a1, b1, a2, b2, a3, b3);
 
         DEVICE_FLOATING_POINT dvdy;
-        DEVICE_FLOATING_POINT val = BicubicCINT(
+        const DEVICE_FLOATING_POINT rawVal = BicubicCINT(
             (grad != nullptr) ? &dvdy : nullptr, y, u0, v0, u1, v1, u2, v2, u3, v3);
 
         // Apply the clamp.  This could be done using the CUDA min/max
         // primitives, but this is not a critical section of the code, and the
         // min/max api is drawn from "C", not std::max/std::min, so I think
         // this is safer for most users to read.
-        if (val<lowerBound) {
-            val = lowerBound;
-            if (grad != nullptr) {
-                grad[0] = 0.0;
-                grad[1] = 0.0;
-            }
-        }
-        else if (val>upperBound) {
-            val = upperBound;
-            if (grad != nullptr) {
-                grad[0] = 0.0;
-                grad[1] = 0.0;
-            }
-        }
-        else if (grad != nullptr) {
-            grad[0] = BicubicCINT(y, u0, dv0dx, u1, dv1dx, u2, dv2dx, u3, dv3dx);
-            grad[1] = dvdy;
-        }
+        DEVICE_FLOATING_POINT val = rawVal;
+        if (val<lowerBound) val = lowerBound;
+        if (val>upperBound) val = upperBound;
+
+        if (!grad) return val;
+
+        const DEVICE_FLOATING_POINT active =
+            (rawVal >= lowerBound) * (rawVal <= upperBound);
+        grad[0] = active*BicubicCINT(y, u0, dv0dx, u1, dv1dx, u2, dv2dx, u3, dv3dx);
+        grad[1] = active*dvdy;
 
         return val;
     }

@@ -181,29 +181,26 @@ namespace {
 
         // A more numerically stable calculation
         const double t = 3.0*fxx-2.0*fxxx;
-        double v = p1 - p1*t + m1*(fxxx-2.0*fxx+fx)
-                    + p2*t + m2*(fxxx-fxx);
+        const double rawV = p1 - p1*t + m1*(fxxx-2.0*fxx+fx)
+                            + p2*t + m2*(fxxx-fxx);
 #else
         // Factored via Horner's method.
-        double v = ((((2.0*p1 - 2.0*p2 + m2 + m1)*fx
-                      + 3.0*p2 - 3.0*p1 - m2 - 2.0*m1)*fx
-                     +m1)*fx
-                    +p1);
+        const double rawV = ((((2.0*p1 - 2.0*p2 + m2 + m1)*fx
+                               + 3.0*p2 - 3.0*p1 - m2 - 2.0*m1)*fx
+                              +m1)*fx
+                             +p1);
 #endif
 
-        if (v < lowerBound) {
-            v = lowerBound;
-            if (grad != nullptr) *grad = 0.0;
-        }
-        else if (v > upperBound) {
-            v = upperBound;
-            if (grad != nullptr) *grad = 0.0;
-        }
-        else if (grad != nullptr) {
-            const double a = 2.0*p1 - 2.0*p2 + m2 + m1;
-            const double b = 3.0*p2 - 3.0*p1 - m2 - 2.0*m1;
-            *grad = ((3.0*a*fx + 2.0*b)*fx + m1)/step;
-        }
+        double v = rawV;
+        if (v < lowerBound) v = lowerBound;
+        if (v > upperBound) v = upperBound;
+
+        if (!grad) return v;
+
+        const double a = 2.0*p1 - 2.0*p2 + m2 + m1;
+        const double b = 3.0*p2 - 3.0*p1 - m2 - 2.0*m1;
+        const double active = (rawV >= lowerBound) * (rawV <= upperBound);
+        *grad = active*((3.0*a*fx + 2.0*b)*fx + m1)/step;
 
         return v;
     }

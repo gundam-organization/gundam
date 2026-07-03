@@ -49,7 +49,8 @@ namespace {
 
         // Short circuit 1 point graphs.
         if (dim < 4) {
-            if (grad != nullptr) *grad = 0.0;
+            if (!grad) return data[0];
+            *grad = 0.0;
             return data[0];
         }
 
@@ -83,19 +84,16 @@ namespace {
 
         const double m = p2-p1;
 
-        double v = p1 + fx*m;
+        const double rawV = p1 + fx*m;
 
-        if (v < lowerBound) {
-            v = lowerBound;
-            if (grad != nullptr) *grad = 0.0;
-        }
-        else if (v > upperBound) {
-            v = upperBound;
-            if (grad != nullptr) *grad = 0.0;
-        }
-        else if (grad != nullptr) {
-            *grad = m/step;
-        }
+        double v = rawV;
+        if (v < lowerBound) v = lowerBound;
+        if (v > upperBound) v = upperBound;
+
+        if (!grad) return v;
+
+        const double active = (rawV >= lowerBound) * (rawV <= upperBound);
+        *grad = active*m/step;
 
         return v;
     }

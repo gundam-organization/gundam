@@ -135,7 +135,7 @@ namespace {
 
         const DEVICE_FLOATING_POINT tx = (x-x0)/(x1-x0);
         const DEVICE_FLOATING_POINT ty = (y-y0)/(y1-y0);
-        DEVICE_FLOATING_POINT val =
+        const DEVICE_FLOATING_POINT rawVal =
             (1.0-tx)*(1.0-ty)*q00 + tx*(1.0-ty)*q10
             + (1.0-tx)*ty*q01 + tx*ty*q11;
 
@@ -143,24 +143,16 @@ namespace {
         // primitives, but this is not a critical section of the code, and the
         // min/max api is drawn from "C", not std::max/std::min, so I think
         // this is safer for most users to read.
-        if (val<lowerBound) {
-            val = lowerBound;
-            if (grad != nullptr) {
-                grad[0] = 0.0;
-                grad[1] = 0.0;
-            }
-        }
-        else if (val>upperBound) {
-            val = upperBound;
-            if (grad != nullptr) {
-                grad[0] = 0.0;
-                grad[1] = 0.0;
-            }
-        }
-        else if (grad != nullptr) {
-            grad[0] = ((1.0-ty)*(q10-q00) + ty*(q11-q01))/(x1-x0);
-            grad[1] = ((1.0-tx)*(q01-q00) + tx*(q11-q10))/(y1-y0);
-        }
+        DEVICE_FLOATING_POINT val = rawVal;
+        if (val<lowerBound) val = lowerBound;
+        if (val>upperBound) val = upperBound;
+
+        if (!grad) return val;
+
+        const DEVICE_FLOATING_POINT active =
+            (rawVal >= lowerBound) * (rawVal <= upperBound);
+        grad[0] = active*((1.0-ty)*(q10-q00) + ty*(q11-q01))/(x1-x0);
+        grad[1] = active*((1.0-tx)*(q01-q00) + tx*(q11-q10))/(y1-y0);
 
         return val;
     }

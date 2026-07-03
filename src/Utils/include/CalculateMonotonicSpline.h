@@ -137,24 +137,21 @@ namespace {
         //     + p3*(3.0*fxx-2.0*fxxx) + m3*(fxxx-fxx);
 
         // Factored via Horner's method.
-        double v = ((((2.0*p2 - 2.0*p3 + m3 + m2)*fx
-                      + 3.0*p3 - 3.0*p2 - m3 - 2.0*m2)*fx
-                     +m2)*fx
-                    +p2);
+        const double rawV = ((((2.0*p2 - 2.0*p3 + m3 + m2)*fx
+                               + 3.0*p3 - 3.0*p2 - m3 - 2.0*m2)*fx
+                              +m2)*fx
+                             +p2);
 
-        if (v < lowerBound) {
-            v = lowerBound;
-            if (grad != nullptr) *grad = 0.0;
-        }
-        else if (v > upperBound) {
-            v = upperBound;
-            if (grad != nullptr) *grad = 0.0;
-        }
-        else if (grad != nullptr) {
-            const double a = 2.0*p2 - 2.0*p3 + m3 + m2;
-            const double b = 3.0*p3 - 3.0*p2 - m3 - 2.0*m2;
-            *grad = ((3.0*a*fx + 2.0*b)*fx + m2)/step;
-        }
+        double v = rawV;
+        if (v < lowerBound) v = lowerBound;
+        if (v > upperBound) v = upperBound;
+
+        if (!grad) return v;
+
+        const double a = 2.0*p2 - 2.0*p3 + m3 + m2;
+        const double b = 3.0*p3 - 3.0*p2 - m3 - 2.0*m2;
+        const double active = (rawV >= lowerBound) * (rawV <= upperBound);
+        *grad = active*((3.0*a*fx + 2.0*b)*fx + m2)/step;
 
         return v;
     }
