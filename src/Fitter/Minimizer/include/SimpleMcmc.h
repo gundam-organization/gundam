@@ -46,18 +46,19 @@ public:
   // c-tor
   explicit SimpleMcmc(FitterEngine* owner_);
 
-  // core
-
-  /// Same as `evalFit` but also check that all the parameters are within
-  /// the allowed ranges.  If a parameter is out of range, then return an
-  /// "infinite" likelihood.
-  double evalFitValid( const double* parArray_ );
+private:
 
   /// Check that the parameters for the last time the propagator was used are
   /// all within the allowed ranges.
   [[nodiscard]] bool hasValidParameterValues() const;
 
-private:
+  /// Like `evalFit` but internal to simple mcmc so that it can do
+  /// parameter remapping between what TSimpleMCMC sees and what GUNDAM
+  /// evalFit sees
+  double evalFitSimpleMcmc( const double* parArray_ );
+
+  /// A buffer for evalFitValid.
+  std::vector<double> _evalFitSimpleMcmcWorkSpace_;
 
   /// The basic algorithm used.  The only implemented algorithm is the
   /// metropolis step, but this may be extended to support Gibbs and other
