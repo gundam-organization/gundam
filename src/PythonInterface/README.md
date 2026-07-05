@@ -72,6 +72,13 @@ e.getLikelihoodInterface().setDataType(GUNDAM.LikelihoodInterface.DataType.Asimo
 e.initialize()
 
 e.fit()
+
+# Draw a new parameter point around the post-fit best fit.
+# This only updates the GUNDAM parameter values; propagate/evaluate explicitly
+# if you need refreshed histograms or likelihood values.
+minimizer = e.getMinimizer()
+minimizer.throwPostfitParameters()
+e.getLikelihoodInterface().propagateAndEvalLikelihood()
 ```
 
 The likelihood data type can be selected with
