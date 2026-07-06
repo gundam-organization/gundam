@@ -360,6 +360,7 @@ bool SimpleMcmc::adaptiveDefaultProposalCovariance( AdaptiveStepMCMC& mcmc,
   /// Set the diagonal elements for the parameters.
   int count0 = 0;
   for (const Parameter* par : getMinimizerFitParameterPtr() ) {
+    if (par->isFixed()) continue; // Fixed parameters are skipped.
     ++count0;
     if( useNormalizedFitSpace() ){
       // Changing the boundaries, change the value/step size?
@@ -375,7 +376,7 @@ bool SimpleMcmc::adaptiveDefaultProposalCovariance( AdaptiveStepMCMC& mcmc,
       if (step <= std::abs(1E-10*par->getPriorValue())) {
         step = std::max(par->getStepSize(),par->getStdDevValue());
       }
-      step /= std::sqrt(getMinimizerFitParameterPtr().size());
+      step /= std::sqrt(mcmc.GetProposeStep().GetDim());
       mcmc.GetProposeStep().SetGaussian(count0-1,step);
     }
     else {
@@ -397,11 +398,13 @@ bool SimpleMcmc::adaptiveDefaultProposalCovariance( AdaptiveStepMCMC& mcmc,
     }
   }
 
+  // Dump all of the previous correlations.
   mcmc.GetProposeStep().ResetCorrelations();
 
   // Set up the correlations in the priors.
   int count1 = 0;             // The index in the parameter array
   for (const Parameter* par1 : getMinimizerFitParameterPtr() ) {
+    if (par1->isFixed()) continue;
     ++count1;
     const ParameterSet* set1 = par1->getOwner();
     if (!set1) {
@@ -417,6 +420,7 @@ bool SimpleMcmc::adaptiveDefaultProposalCovariance( AdaptiveStepMCMC& mcmc,
 
     int count2 = 0;             // The index in the parameter array
     for (const Parameter* par2 : getMinimizerFitParameterPtr()) {
+      if (par2->isFixed()) continue;
       ++count2;
       const ParameterSet* set2 = par2->getOwner();
       if (!set2) {
@@ -535,6 +539,7 @@ bool SimpleMcmc::adaptiveLoadProposalCovariance( AdaptiveStepMCMC& mcmc,
   TAxis* covAxisLabels = dynamic_cast<TAxis*>(proposalCov->GetXaxis());
   int count1 = 0;
   for (const Parameter* par1 : getMinimizerFitParameterPtr() ) {
+    if (par1->isFixed()) continue;
     ++count1;
     std::string parName(par1->getFullTitle());
     std::string covName(covAxisLabels->GetBinLabel(count1));
@@ -547,6 +552,7 @@ bool SimpleMcmc::adaptiveLoadProposalCovariance( AdaptiveStepMCMC& mcmc,
     double sig1 = std::sqrt(proposalCov->GetBinContent(count1,count1));
     int count2 = 0;
     for (const Parameter* par2 : getMinimizerFitParameterPtr() ) {
+      if (par2->isFixed()) continue;
       ++count2;
       double sig2 = std::sqrt(proposalCov->GetBinContent(count2,count2));
       if (count2 < count1) continue;
@@ -726,6 +732,7 @@ void SimpleMcmc::adaptiveMakePrior(AdaptiveStepMCMC& mcmc,
                                    bool randomize) {
   prior.clear();
   for (const Parameter* par : getMinimizerFitParameterPtr() ) {
+    if (par->isFixed()) continue;
     double val = par->getPriorValue();
     if (randomize) {
       double err = par->getStdDevValue();
@@ -755,12 +762,10 @@ void SimpleMcmc::adaptiveMakePrior(AdaptiveStepMCMC& mcmc,
 
       val = lowBound + r*(highBound-lowBound);
     }
-    if (not useNormalizedFitSpace()) {
-      prior.push_back(val);
+    if (useNormalizedFitSpace()) {
+      val = ParameterSet::toNormalizedParValue(val, *par);
     }
-    else {
-      prior.push_back(ParameterSet::toNormalizedParValue(val, *par));
-    }
+    prior.push_back(val);
   }
 }
 
@@ -797,19 +802,26 @@ void SimpleMcmc::adaptiveRestart(AdaptiveStepMCMC& mcmc,
 }
 void SimpleMcmc::adaptiveSetupAndRun(AdaptiveStepMCMC& mcmc) {
 
+  // Save a pointer to the AdaptiveStepMCMC object so it can be used with the
+  // sequencer.
   _adaptiveMCMC_ = &mcmc;
 
-  mcmc.GetProposeStep().SetDim(getMinimizerFitParameterPtr().size());
+  // Create a fitting parameter vector and initialize it.  No need to worry
+  // about resizing it or it moving, so be lazy and just use push_back.  This
+  // will create a vector with one entry for every parameter that will be
+  // varied.
+  sMCMC::Vector prior;
+  adaptiveMakePrior(mcmc, prior, _randomStart_);
+
+  // The dimension will be the number of non-fixed parameters.
+  mcmc.GetProposeStep().SetDim(prior.size());
+
+  // Create a functor for the mcmc.
   mcmc.GetLogLikelihood().functor
     = std::make_unique<ROOT::Math::Functor>(
-      this, &SimpleMcmc::evalFitValid,
-      getMinimizerFitParameterPtr().size());
+      this, &SimpleMcmc::evalFitSimpleMcmc, prior.size());
   mcmc.GetProposeStep().SetCovarianceUpdateDeweighting(0.0);
   mcmc.GetProposeStep().SetCovarianceFrozen(false);
-
-  // Create a fitting parameter vector and initialize it.  No need to worry
-  // about resizing it or it moving, so be lazy and just use push_back.
-  sMCMC::Vector prior;
 
   adaptiveStart(mcmc,prior,_randomStart_);
 
@@ -875,18 +887,18 @@ void SimpleMcmc::adaptiveSetupAndRun(AdaptiveStepMCMC& mcmc) {
 }
 void SimpleMcmc::fixedSetupAndRun( FixedStepMCMC& mcmc) {
 
-  mcmc.GetProposeStep().SetDim(getMinimizerFitParameterPtr().size());
-  mcmc.GetLogLikelihood().functor
-    = std::make_unique<ROOT::Math::Functor>(
-      this,
-      &SimpleMcmc::evalFitValid,
-      getMinimizerFitParameterPtr().size());
-  mcmc.GetProposeStep().fSigma = _simpleSigma_;
-
   sMCMC::Vector prior;
   for (const Parameter* par : getMinimizerFitParameterPtr() ) {
+    if (par->isFixed()) continue;
     prior.push_back(par->getPriorValue());
   }
+
+  // Cannot use GetProposeStep().GetDim() here since the simple stepper
+  // doesn't initialize that until after the first step.
+  mcmc.GetLogLikelihood().functor
+    = std::make_unique<ROOT::Math::Functor>(
+      this, &SimpleMcmc::evalFitSimpleMcmc, prior.size());
+  mcmc.GetProposeStep().fSigma = _simpleSigma_;
 
   // Fill the initial point.
   fillPoint();
@@ -1084,8 +1096,22 @@ void SimpleMcmc::minimize() {
   setMinimizerStatus(0);
 }
 
-double SimpleMcmc::evalFitValid(const double* parArray_) {
-  double value = this->evalFit( parArray_ );
+double SimpleMcmc::evalFitSimpleMcmc(const double* parArray_) {
+  // Set the buffer size to zero (library doesn't deallocate).
+  _evalFitSimpleMcmcWorkSpace_.clear();
+  // Map between internal indices (parArray_) and GUNDAM indices
+  int count = 0;
+  for (const Parameter* par : getMinimizerFitParameterPtr() ) {
+    double val = par->getParameterValue();
+    if (useNormalizedFitSpace()) {
+      val = ParameterSet::toNormalizedParValue(val, *par);
+    }
+    _evalFitSimpleMcmcWorkSpace_.emplace_back(val);
+    if (par->isFixed()) continue;
+    // Overwrite the current parameter value with the new MCMC value
+    _evalFitSimpleMcmcWorkSpace_.back() = parArray_[count++];
+  }
+  double value = this->evalFit(_evalFitSimpleMcmcWorkSpace_.data());
   return value;
 }
 
