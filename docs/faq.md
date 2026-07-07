@@ -50,6 +50,6 @@ details1[open] {
 </style>
 
 <details1>
-  <summary1><strong>How does Gundam handle spline extrapolation?</strong></summary1>
+  <summary1><strong>How does Gundam handle spline extrapolation??????????????????????????</strong></summary1>
   <p>Gundam features multiple spline interpolation methods, and they have different approaches for when the spline extends beyond the boundaries. A not-a-knot spline performs cubic extrapolation by continuing the cubic polynomial defined by the first/last two points of the dataset. This maintains agreement with splines generated using ROOT's TSpline3 class. A Catmull-Rom spline extrapolates linearly beyond the defined knots.</p>
 </details1>
