@@ -67,6 +67,10 @@ std::string Bin::Edges::getSummary(bool shallow_) const {
 // configure
 void Bin::configureImpl(){
 
+  _config_.defineFields({
+    {"edgesList", {"edges"}},
+  });
+
   for( auto& edgeConfig : _config_.loop("edgesList") ){
     _binEdgesList_.emplace_back( _binEdgesList_.size() );
     _binEdgesList_.back().configure( edgeConfig );

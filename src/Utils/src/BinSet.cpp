@@ -258,11 +258,19 @@ void BinSet::readTxtBinningDefinition(){
 
 void BinSet::readBinningConfig( const ConfigReader& binning_){
 
-  binning_.fillValue(_sortBins_, "sortBins");
+  auto binning = binning_;
+  binning.clearFields();
+  binning.defineFields({
+    {"binList"},
+    {"binningDefinition" },
+    {"sortBins"},
+  });
 
-  if( binning_.hasField("binningDefinition") ){
+  binning.fillValue(_sortBins_, "sortBins");
 
-    auto binningDefinition = binning_.fetchValue<ConfigReader>("binningDefinition");
+  if( binning.hasField("binningDefinition") ){
+
+    auto binningDefinition = binning.fetchValue<ConfigReader>("binningDefinition");
     struct Dimension{
       int nBins{0};
       int nModulo{1};
@@ -356,7 +364,7 @@ void BinSet::readBinningConfig( const ConfigReader& binning_){
 
   }
 
-  for( auto& binDef : binning_.loop("binList") ){
+  for( auto& binDef : binning.loop("binList") ){
     _binList_.emplace_back( _binList_.size() );
     _binList_.back().configure( binDef );
   }
