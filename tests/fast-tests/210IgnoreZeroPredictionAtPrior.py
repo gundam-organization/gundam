@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# GUNDAM_TEST_PYTHON_DEPENDENCIES: uproot
 
 import math
 import sys
