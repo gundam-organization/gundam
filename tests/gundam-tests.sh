@@ -294,31 +294,36 @@ collect_python_test_dependencies() {
 prepare_python_test_venv() {
     local job=$1
     local log=$2
+    local log_path="${log}"
+
+    if [[ "${log_path}" != /* ]]; then
+        log_path="${OUTPUT_DIR}/${log_path}"
+    fi
 
     if [ "${PYTHON_TEST_VENV_READY}" = "yes" ]; then
         local resolved_python=""
         resolved_python=$(resolve_python_test_interpreter "${job}") || {
-            echo "$resolved_python" > "${PWD}/${OUTPUT_DIR}/${log}"
+            echo "$resolved_python" > "${log_path}"
             return 1
         }
         if [ "${resolved_python}" != "${PYTHON_TEST_VENV_PYTHON}" ]; then
-            echo "FAIL: Python interpreter mismatch for ${job}: ${resolved_python} != ${PYTHON_TEST_VENV_PYTHON}" > "${PWD}/${OUTPUT_DIR}/${log}"
+            echo "FAIL: Python interpreter mismatch for ${job}: ${resolved_python} != ${PYTHON_TEST_VENV_PYTHON}" > "${log_path}"
             return 1
         fi
         return 0
     fi
 
     PYTHON_TEST_VENV_PYTHON=$(resolve_python_test_interpreter "${job}") || {
-        echo "${PYTHON_TEST_VENV_PYTHON}" > "${PWD}/${OUTPUT_DIR}/${log}"
+        echo "${PYTHON_TEST_VENV_PYTHON}" > "${log_path}"
         return 1
     }
 
-    "${PYTHON_TEST_VENV_PYTHON}" -m venv "${PYTHON_TEST_VENV}" > "${PWD}/${OUTPUT_DIR}/${log}" 2>&1 || return 1
+    "${PYTHON_TEST_VENV_PYTHON}" -m venv "${PYTHON_TEST_VENV}" > "${log_path}" 2>&1 || return 1
 
     local deps=""
     deps=$(collect_python_test_dependencies)
     if [ -n "${deps}" ]; then
-        "${PYTHON_TEST_VENV}/bin/python" -m pip install ${deps} >> "${PWD}/${OUTPUT_DIR}/${log}" 2>&1 || return 1
+        "${PYTHON_TEST_VENV}/bin/python" -m pip install ${deps} >> "${log_path}" 2>&1 || return 1
     fi
 
     PYTHON_TEST_VENV_READY="yes"
