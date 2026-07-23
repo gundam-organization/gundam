@@ -31,8 +31,10 @@
 #include <pybind11/chrono.h>
 #include <pybind11/stl_bind.h>
 
+#include <cstdio>
 #include <cerrno>
 #include <cstring>
+#include <iostream>
 #include <string>
 #include <unistd.h>
 
@@ -71,6 +73,15 @@ void setRuntimeWorkingDirectory(const std::string& dirPath_, bool createIfMissin
   }
 }
 
+void flushOutput(){
+  std::cout.flush();
+  std::cerr.flush();
+  std::fflush(nullptr);
+  if( Logger::getStreamBufferSupervisorPtr() != nullptr ){
+    Logger::getStreamBufferSupervisorPtr()->flush();
+  }
+}
+
 }
 
 
@@ -87,6 +98,7 @@ PYBIND11_MODULE(GUNDAM, module) {
              "Set the process working directory used by GUNDAM to resolve relative runtime paths.");
   module.def("getRuntimeWorkingDirectory", &GenericToolbox::getCurrentWorkingDirectory,
              "Get the process working directory used by GUNDAM to resolve relative runtime paths.");
+  module.def("flushOutput", &flushOutput, "Flush Python-adjacent C/C++ output streams used by GUNDAM.");
 
   // JsonType for the return type
   pybind11::class_<JsonType>(module, "JsonType")
