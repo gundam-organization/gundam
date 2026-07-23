@@ -243,6 +243,104 @@ if [ ! -x ${OUTPUT_DIR} ]; then
     exit 1
 fi
 
+PYTHON_TEST_VENV="${PWD}/venv"
+PYTHON_TEST_VENV_PYTHON=""
+PYTHON_TEST_VENV_READY="no"
+
+resolve_python_test_interpreter() {
+    local job=$1
+
+    local shebang
+    shebang=$(head -n 1 "${job}")
+
+    local python_cmd=""
+    if [[ "${shebang}" == "#!/usr/bin/env "* ]]; then
+        python_cmd=${shebang#\#!/usr/bin/env }
+    elif [[ "${shebang}" == "#!"* ]]; then
+        python_cmd=${shebang#\#!}
+    else
+        python_cmd=python3
+    fi
+
+    local resolved_python=""
+    if [[ "${python_cmd}" == /* ]]; then
+        resolved_python=${python_cmd}
+    else
+        resolved_python=$(command -v "${python_cmd}")
+    fi
+
+    if [ ! -x "${resolved_python}" ]; then
+        echo "FAIL: Python interpreter not found for ${job}: ${python_cmd}"
+        return 1
+    fi
+
+    echo "${resolved_python}"
+}
+
+collect_python_test_dependencies() {
+    local deps=""
+    local job=""
+    local dep_line=""
+    for d in ${TESTS}; do
+        if [ ! -x "${PWD}/${d}" ]; then
+            continue
+        fi
+        for job in $(find "${d}" -name "[0-9]*.py" -type f | grep -v "~" | sort); do
+            if [ ! -x "${job}" ]; then
+                continue
+            fi
+            dep_line=$(grep -E '^# GUNDAM_TEST_PYTHON_DEPENDENCIES:' "${job}" || true)
+            if [ -n "${dep_line}" ]; then
+                deps="${deps} ${dep_line#\# GUNDAM_TEST_PYTHON_DEPENDENCIES: }"
+            fi
+        done
+    done
+    echo "${deps}" | xargs -n 1 | sort -u | xargs
+}
+
+prepare_python_test_venv() {
+    local job=$1
+    local log=$2
+
+    if [ "${PYTHON_TEST_VENV_READY}" = "yes" ]; then
+        local resolved_python=""
+        resolved_python=$(resolve_python_test_interpreter "${job}") || {
+            echo "$resolved_python" > "${PWD}/${OUTPUT_DIR}/${log}"
+            return 1
+        }
+        if [ "${resolved_python}" != "${PYTHON_TEST_VENV_PYTHON}" ]; then
+            echo "FAIL: Python interpreter mismatch for ${job}: ${resolved_python} != ${PYTHON_TEST_VENV_PYTHON}" > "${PWD}/${OUTPUT_DIR}/${log}"
+            return 1
+        fi
+        return 0
+    fi
+
+    PYTHON_TEST_VENV_PYTHON=$(resolve_python_test_interpreter "${job}") || {
+        echo "${PYTHON_TEST_VENV_PYTHON}" > "${PWD}/${OUTPUT_DIR}/${log}"
+        return 1
+    }
+
+    "${PYTHON_TEST_VENV_PYTHON}" -m venv "${PYTHON_TEST_VENV}" > "${PWD}/${OUTPUT_DIR}/${log}" 2>&1 || return 1
+
+    local deps=""
+    deps=$(collect_python_test_dependencies)
+    if [ -n "${deps}" ]; then
+        "${PYTHON_TEST_VENV}/bin/python" -m pip install ${deps} >> "${PWD}/${OUTPUT_DIR}/${log}" 2>&1 || return 1
+    fi
+
+    PYTHON_TEST_VENV_READY="yes"
+    return 0
+}
+
+run_python_test() {
+    local job=$1
+    local dir=$2
+    local log=$3
+
+    prepare_python_test_venv "${job}" "${log}" || return 1
+    (cd "${OUTPUT_DIR}" && "${PYTHON_TEST_VENV}/bin/python" "${job}" "${dir}" >> "${log}" 2>&1)
+}
+
 # Find and run the jobs in lexical order.
 FAILURES=""
 EXPECTED=""
@@ -265,8 +363,20 @@ for d in ${TESTS}; do
         # The name of the output log file
         LOG=$(basename ${JOB}).log
         # Run the script in the output directory.
-        echo "(cd $OUTPUT_DIR && ${JOB} ${DIR})"
-        if (cd $OUTPUT_DIR && ${JOB} ${DIR} >& ${LOG}); then
+        if [[ "${JOB}" == *.py ]]; then
+            echo "python-venv:${JOB} ${DIR}"
+            : > "${OUTPUT_DIR}/${LOG}"
+            run_python_test "${JOB}" "${DIR}" "${LOG}"
+            JOB_STATUS=$?
+        else
+            echo "(cd $OUTPUT_DIR && ${JOB} ${DIR})"
+            if (cd $OUTPUT_DIR && ${JOB} ${DIR} >& ${LOG}); then
+                JOB_STATUS=0
+            else
+                JOB_STATUS=$?
+            fi
+        fi
+        if [ ${JOB_STATUS} -eq 0 ]; then
             # The job exited with success, but look for a fail messsage
             if (tail -5 ${OUTPUT_DIR}/${LOG} | grep FAIL >> /dev/null); then
                 echo -e ${RESULT_JOB_FAILURE} ${i}
