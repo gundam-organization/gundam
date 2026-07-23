@@ -38,7 +38,9 @@
 
 PYBIND11_MAKE_OPAQUE(std::vector<EventDialCache::CacheEntry>);
 PYBIND11_MAKE_OPAQUE(std::vector<EventDialCache::DialResponseCache>);
+PYBIND11_MAKE_OPAQUE(std::vector<Bin::Edges>);
 PYBIND11_MAKE_OPAQUE(std::vector<Histogram::BinContent>);
+PYBIND11_MAKE_OPAQUE(std::vector<Histogram::BinContext>);
 PYBIND11_MAKE_OPAQUE(std::vector<Event>);
 PYBIND11_MAKE_OPAQUE(std::vector<Parameter>);
 PYBIND11_MAKE_OPAQUE(std::vector<Parameter*>);
@@ -276,6 +278,32 @@ PYBIND11_MODULE(GUNDAM, module) {
   .def("getParameterSetsList", pybind11::overload_cast<>(&ParametersManager::getParameterSetsList), pybind11::return_value_policy::reference_internal)
   ;
 
+  pybind11::class_<Bin::Edges>(module, "BinEdges")
+  .def("getCenterValue", &Bin::Edges::getCenterValue)
+  .def("getSummary", &Bin::Edges::getSummary, pybind11::arg("shallow") = true)
+  .def_readonly("isConditionVar", &Bin::Edges::isConditionVar)
+  .def_readonly("index", &Bin::Edges::index)
+  .def_readonly("varIndexCache", &Bin::Edges::varIndexCache)
+  .def_readonly("min", &Bin::Edges::min)
+  .def_readonly("max", &Bin::Edges::max)
+  .def_readonly("varName", &Bin::Edges::varName)
+  ;
+
+  pybind11::bind_vector<std::vector<Bin::Edges>>(module, "BinEdgesList");
+
+  pybind11::class_<Bin>(module, "Bin")
+  .def("isZeroWideRangesTolerated", &Bin::isZeroWideRangesTolerated)
+  .def("getIndex", &Bin::getIndex)
+  .def("getFormulaStr", &Bin::getFormulaStr)
+  .def("getTreeFormulaStr", &Bin::getTreeFormulaStr)
+  .def("getEdgesList", pybind11::overload_cast<>(&Bin::getEdgesList),
+       pybind11::return_value_policy::reference_internal)
+  .def("buildVariableNameList", &Bin::buildVariableNameList)
+  .def("getVolume", &Bin::getVolume)
+  .def("isVariableSet", &Bin::isVariableSet)
+  .def("getSummary", &Bin::getSummary, pybind11::arg("shallow") = true)
+  ;
+
   pybind11::class_<Histogram::BinContent>(module, "HistogramBinContent")
   .def(pybind11::init())
   .def_readwrite("sumWeights", &Histogram::BinContent::sumWeights)
@@ -284,9 +312,20 @@ PYBIND11_MODULE(GUNDAM, module) {
 
   pybind11::bind_vector<std::vector<Histogram::BinContent>>(module, "HistogramBinContentList");
 
+  pybind11::class_<Histogram::BinContext>(module, "HistogramBinContext")
+  .def_property_readonly("bin", [](Histogram::BinContext& this_) -> Bin& { return this_.bin; },
+                         pybind11::return_value_policy::reference_internal)
+  .def("getBin", [](Histogram::BinContext& this_) -> Bin& { return this_.bin; },
+       pybind11::return_value_policy::reference_internal)
+  ;
+
+  pybind11::bind_vector<std::vector<Histogram::BinContext>>(module, "HistogramBinContextList");
+
   pybind11::class_<Histogram>(module, "Histogram")
   .def("getNbBins", &Histogram::getNbBins)
   .def("getBinContentList", pybind11::overload_cast<>(&Histogram::getBinContentList),
+       pybind11::return_value_policy::reference_internal)
+  .def("getBinContextList", pybind11::overload_cast<>(&Histogram::getBinContextList),
        pybind11::return_value_policy::reference_internal)
   ;
 
