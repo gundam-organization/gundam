@@ -52,14 +52,15 @@ fitterEngineConfig:
 """
 
 
-def evaluate_config(config_path: Path) -> float:
+def evaluate_config(config_text: str, work_dir: Path) -> float:
     import GUNDAM
 
-    GUNDAM.setRuntimeWorkingDirectory(str(config_path.parent))
+    GUNDAM.setRuntimeWorkingDirectory(str(work_dir))
     GUNDAM.setLightOutputMode(True)
     GUNDAM.setNumberOfThreads(1)
 
-    config_builder = GUNDAM.ConfigUtils.ConfigBuilder(str(config_path))
+    config_builder = GUNDAM.ConfigUtils.ConfigBuilder()
+    config_builder.setConfigFromYamlString(config_text)
     config_reader = GUNDAM.ConfigUtils.ConfigReader(config_builder.getConfig())
     config_reader.defineField(GUNDAM.ConfigUtils.ConfigReader.FieldDefinition("fitterEngineConfig"))
     fitter_engine_config = config_reader.fetchValueConfigReader("fitterEngineConfig")
@@ -94,15 +95,13 @@ def main() -> int:
 
     work_dir = Path.cwd()
     root_path = work_dir / "210IgnoreZeroPredictionAtPrior.root"
-    config_false_path = work_dir / "210IgnoreZeroPredictionAtPrior-false.yaml"
-    config_true_path = work_dir / "210IgnoreZeroPredictionAtPrior-true.yaml"
 
     write_input_root_file(root_path)
-    config_false_path.write_text(build_config_text(root_path, False), encoding="ascii")
-    config_true_path.write_text(build_config_text(root_path, True), encoding="ascii")
+    config_false_text = build_config_text(root_path, False)
+    config_true_text = build_config_text(root_path, True)
 
-    llh_without_ignore = evaluate_config(config_false_path)
-    llh_with_ignore = evaluate_config(config_true_path)
+    llh_without_ignore = evaluate_config(config_false_text, work_dir)
+    llh_with_ignore = evaluate_config(config_true_text, work_dir)
 
     if not math.isinf(llh_without_ignore):
         print(f"FAIL: expected infinite LLH without ignore flag, got {llh_without_ignore}")
