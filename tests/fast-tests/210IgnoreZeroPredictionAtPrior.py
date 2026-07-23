@@ -24,16 +24,7 @@ def write_input_root_file(root_path: Path) -> None:
         tree.extend({"X": array("d", [-0.5] * 10)})
 
 
-def write_binning_file(binning_path: Path) -> None:
-    binning_path.write_text(
-        "variables: X X\n"
-        "-1 0\n"
-        "0 1\n",
-        encoding="ascii",
-    )
-
-
-def build_config_text(root_path: Path, binning_path: Path, ignore_zero_bins: bool) -> str:
+def build_config_text(root_path: Path, ignore_zero_bins: bool) -> str:
     bool_str = "true" if ignore_zero_bins else "false"
     return f"""
 fitterEngineConfig:
@@ -65,7 +56,7 @@ fitterEngineConfig:
         sampleList:
           - name: X
             isEnabled: true
-            binning: "{binning_path}"
+            binning: {{ binningDefinition: [{{ name: "X", edges: [-1, 0, 1] }}]  }}
             dataSets: [ "TestSample" ]
 """
 
@@ -112,14 +103,12 @@ def main() -> int:
 
     work_dir = Path.cwd()
     root_path = work_dir / "210IgnoreZeroPredictionAtPrior.root"
-    binning_path = work_dir / "210IgnoreZeroPredictionAtPrior-binning.txt"
     config_false_path = work_dir / "210IgnoreZeroPredictionAtPrior-false.yaml"
     config_true_path = work_dir / "210IgnoreZeroPredictionAtPrior-true.yaml"
 
     write_input_root_file(root_path)
-    write_binning_file(binning_path)
-    config_false_path.write_text(build_config_text(root_path, binning_path, False), encoding="ascii")
-    config_true_path.write_text(build_config_text(root_path, binning_path, True), encoding="ascii")
+    config_false_path.write_text(build_config_text(root_path, False), encoding="ascii")
+    config_true_path.write_text(build_config_text(root_path, True), encoding="ascii")
 
     llh_without_ignore = evaluate_config(config_false_path)
     llh_with_ignore = evaluate_config(config_true_path)
