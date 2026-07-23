@@ -15,6 +15,11 @@ namespace JointProbability{
   class JointProbabilityBase : public JsonBaseClass {
 
   protected:
+    struct BinFlags{
+      bool isZeroPredictionAtPrior{false};
+    };
+
+  protected:
     void configureImpl() override;
 
   public:
@@ -57,6 +62,7 @@ namespace JointProbability{
 
   private:
     bool _ignoreBinsWithZeroPredictionAtPrior_{false};
+    std::vector<std::vector<BinFlags>> _binFlagsListPerSample_{};
 
   };
 
@@ -67,7 +73,7 @@ namespace JointProbability{
 
   inline bool JointProbabilityBase::isBinIgnored(const SamplePair& samplePair_, int bin_) const{
     if( not _ignoreBinsWithZeroPredictionAtPrior_ ){ return false; }
-    return samplePair_.model->getHistogram().getBinContextList()[bin_].isZeroPredictionAtPrior;
+    return _binFlagsListPerSample_[samplePair_.model->getIndex()][bin_].isZeroPredictionAtPrior;
   }
 }
 
