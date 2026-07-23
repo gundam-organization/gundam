@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import ctypes
 import math
 import sys
 from pathlib import Path
@@ -52,7 +53,13 @@ fitterEngineConfig:
 """
 
 
-def evaluate_config(config_text: str, work_dir: Path) -> float:
+def flush_output() -> None:
+    sys.stdout.flush()
+    sys.stderr.flush()
+    ctypes.CDLL(None).fflush(None)
+
+
+def evaluate_config(config_text: str, work_dir: Path, label: str) -> float:
     import GUNDAM
 
     GUNDAM.setRuntimeWorkingDirectory(str(work_dir))
@@ -70,19 +77,28 @@ def evaluate_config(config_text: str, work_dir: Path) -> float:
     engine.configure()
     likelihood_interface = engine.getLikelihoodInterface()
     likelihood_interface.initialize()
+    flush_output()
+
     likelihood_interface.propagateAndEvalLikelihood()
 
     likelihood = likelihood_interface.getLastLikelihood()
 
     sample = likelihood_interface.getModelPropagator().getSampleSet().getSampleList()[0]
     bin_content_list = sample.getHistogram().getBinContentList()
+    bin_context_list = sample.getHistogram().getBinContextList()
 
     if len(bin_content_list) != 2:
         raise RuntimeError(f"Expected 2 bins, got {len(bin_content_list)}")
+    if len(bin_context_list) != 2:
+        raise RuntimeError(f"Expected 2 bin contexts, got {len(bin_context_list)}")
     if bin_content_list[0].sumWeights <= 0.0:
         raise RuntimeError("First bin should be populated.")
     if bin_content_list[1].sumWeights != 0.0:
         raise RuntimeError(f"Second bin should be empty, got {bin_content_list[1].sumWeights}")
+
+    print(f"Bin contents ({label}):", flush=True)
+    for bin_context, bin_content in zip(bin_context_list, bin_content_list):
+        print(f"  {bin_context.bin.getSummary(False)} -> sumWeights={bin_content.sumWeights}", flush=True)
 
     return likelihood
 
@@ -100,8 +116,8 @@ def main() -> int:
     config_false_text = build_config_text(root_path, False)
     config_true_text = build_config_text(root_path, True)
 
-    llh_without_ignore = evaluate_config(config_false_text, work_dir)
-    llh_with_ignore = evaluate_config(config_true_text, work_dir)
+    llh_without_ignore = evaluate_config(config_false_text, work_dir, "ignore=false")
+    llh_with_ignore = evaluate_config(config_true_text, work_dir, "ignore=true")
 
     if not math.isinf(llh_without_ignore):
         print(f"FAIL: expected infinite LLH without ignore flag, got {llh_without_ignore}")
@@ -111,9 +127,10 @@ def main() -> int:
         print(f"FAIL: expected finite LLH with ignore flag, got {llh_with_ignore}")
         return 1
 
-    print(f"LLH without ignore flag: {llh_without_ignore}")
-    print(f"LLH with ignore flag: {llh_with_ignore}")
-    print("SUCCESS: ignoreBinsWithZeroPredictionAtPrior keeps the Poisson LLH finite.")
+    flush_output()
+    print(f"LLH without ignore flag: {llh_without_ignore}", flush=True)
+    print(f"LLH with ignore flag: {llh_with_ignore}", flush=True)
+    print("SUCCESS: ignoreBinsWithZeroPredictionAtPrior keeps the Poisson LLH finite.", flush=True)
     return 0
 
 
