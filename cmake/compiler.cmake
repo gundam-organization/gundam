@@ -96,8 +96,8 @@ endif()
 set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -fPIC -O1 -g")
 set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -fPIC -O3 -g")
 
-if( CMAKE_BUILD_TYPE STREQUAL "DEBUG" )
-  # Try to enable AddressSanitizer automatically if the toolchain supports it
+if( WITH_ASAN )
+  cmessage( STATUS "WITH_ASAN=ON: checking AddressSanitizer support..." )
 
   include(CheckCXXSourceCompiles)
 
@@ -119,19 +119,17 @@ if( CMAKE_BUILD_TYPE STREQUAL "DEBUG" )
   set(CMAKE_TRY_COMPILE_TARGET_TYPE "${_saved_try_type}")
 
   if(HAVE_WORKING_ASAN)
-    message(STATUS "AddressSanitizer detected, enabling for Debug builds.")
+    cmessage( STATUS "AddressSanitizer detected, enabling instrumentation." )
 
-    # Enable globally (only in Debug, you can tweak the condition if you want)
     add_compile_options(
-        $<$<CONFIG:Debug>:-fsanitize=address>
+        -fsanitize=address
     )
     add_link_options(
-        $<$<CONFIG:Debug>:-fsanitize=address>
+        -fsanitize=address
     )
   else()
-    message(STATUS "AddressSanitizer not usable on this toolchain, keeping it disabled.")
+    cmessage( FATAL_ERROR "WITH_ASAN=ON but AddressSanitizer is not usable on this toolchain." )
   endif()
-
 endif()
 
 ################################################################################
@@ -144,4 +142,3 @@ cmessage( STATUS "C++ Standard      : ${CMAKE_CXX_STANDARD}" )
 cmessage( STATUS "C++ Release flags : ${CMAKE_CXX_FLAGS_RELEASE}" )
 cmessage( STATUS "C++ Debug flags   : ${CMAKE_CXX_FLAGS_DEBUG}" )
 cmessage( STATUS "Build type        : ${CMAKE_BUILD_TYPE}" )
-
