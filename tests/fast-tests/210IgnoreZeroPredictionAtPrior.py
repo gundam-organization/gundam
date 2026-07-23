@@ -5,16 +5,6 @@ import sys
 from pathlib import Path
 
 
-def add_python_module_paths(repo_root: Path) -> None:
-    candidates = [
-        repo_root / "cmake-build-debug" / "src" / "PythonInterface",
-        repo_root / "cmake-build-release" / "src" / "PythonInterface",
-    ]
-    for candidate in candidates:
-        candidate_str = str(candidate)
-        if candidate.is_dir() and candidate_str not in sys.path:
-            sys.path.insert(0, candidate_str)
-
 def write_input_root_file(root_path: Path) -> None:
     import uproot
     from array import array
@@ -99,8 +89,6 @@ def evaluate_config(config_text: str, work_dir: Path, label: str) -> float:
 def main() -> int:
     script_dir = Path(sys.argv[1]).resolve() if len(sys.argv) > 1 else Path(__file__).resolve().parent
     repo_root = script_dir.parents[1]
-
-    add_python_module_paths(repo_root)
 
     work_dir = Path.cwd()
     root_path = work_dir / "210IgnoreZeroPredictionAtPrior.root"
