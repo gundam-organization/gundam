@@ -5,6 +5,10 @@ import sys
 from pathlib import Path
 
 
+def flush_python_outputs() -> None:
+    sys.stdout.flush()
+    sys.stderr.flush()
+
 def write_input_root_file(root_path: Path) -> None:
     import uproot
     from array import array
@@ -44,6 +48,8 @@ fitterEngineConfig:
 def evaluate_config(config_text: str, work_dir: Path, label: str) -> float:
     import GUNDAM
 
+    flush_python_outputs()
+
     GUNDAM.setRuntimeWorkingDirectory(str(work_dir))
     GUNDAM.setLightOutputMode(True)
     GUNDAM.setNumberOfThreads(1)
@@ -69,6 +75,7 @@ def evaluate_config(config_text: str, work_dir: Path, label: str) -> float:
     bin_content_list = sample.getHistogram().getBinContentList()
     bin_context_list = sample.getHistogram().getBinContextList()
 
+
     if len(bin_content_list) != 2:
         raise RuntimeError(f"Expected 2 bins, got {len(bin_content_list)}")
     if len(bin_context_list) != 2:
@@ -78,10 +85,9 @@ def evaluate_config(config_text: str, work_dir: Path, label: str) -> float:
     if bin_content_list[1].sumWeights != 0.0:
         raise RuntimeError(f"Second bin should be empty, got {bin_content_list[1].sumWeights}")
 
-    GUNDAM.flushOutput()
-    print(f"Bin contents ({label}):", flush=True)
+    print(f"Bin contents ({label}):")
     for bin_context, bin_content in zip(bin_context_list, bin_content_list):
-        print(f"  {bin_context.bin.getSummary(False)} -> sumWeights={bin_content.sumWeights}", flush=True)
+        print(f"  {bin_context.bin.getSummary(False)} -> sumWeights={bin_content.sumWeights}")
 
     return likelihood
 
@@ -108,11 +114,9 @@ def main() -> int:
         print(f"FAIL: expected finite LLH with ignore flag, got {llh_with_ignore}")
         return 1
 
-    import GUNDAM
-    GUNDAM.flushOutput()
-    print(f"LLH without ignore flag: {llh_without_ignore}", flush=True)
-    print(f"LLH with ignore flag: {llh_with_ignore}", flush=True)
-    print("SUCCESS: ignoreBinsWithZeroPredictionAtPrior keeps the Poisson LLH finite.", flush=True)
+    print(f"LLH without ignore flag: {llh_without_ignore}")
+    print(f"LLH with ignore flag: {llh_with_ignore}")
+    print("SUCCESS: ignoreBinsWithZeroPredictionAtPrior keeps the Poisson LLH finite.")
     return 0
 
 
