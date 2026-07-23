@@ -41,7 +41,6 @@ COPY ./src $REPO_DIR/src
 # COPY ./submodules $REPO_DIR/submodules # submodules are not pulled on github
 COPY ./cmake $REPO_DIR/cmake
 COPY ./CMakeLists.txt $REPO_DIR/CMakeLists.txt
-COPY ./tests $REPO_DIR/tests
 COPY ./.git $REPO_DIR/.git
 
 # Checking out missing code
@@ -55,6 +54,9 @@ RUN cmake \
       -D WITH_PYTHON_INTERFACE=ON \
       $REPO_DIR 
 RUN make -j3 install
+
+# copying tests after install to avoid recompling when modifications have been made
+COPY ./tests $REPO_DIR/tests
 
 # run the tests
 RUN . $INSTALL_DIR/setup.sh && CTEST_OUTPUT_ON_FAILURE=1 make test
