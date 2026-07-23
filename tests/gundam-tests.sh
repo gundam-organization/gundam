@@ -89,13 +89,14 @@
 #   The output file should be named 200RunGUNDAM.root (or similar as
 #   needed).
 
-echo 'USAGE: gundam-tests.sh [-f] [-r] [-e] [-s] [-a] [output-directory]'
+echo 'USAGE: gundam-tests.sh [-f] [-r] [-e] [-s] [-v] [-a] [output-directory]'
 echo '    -c               : Force use of terminfo colors for output'
 echo '    -f               : Only run the fast tests [default]'
 echo '    -r               : Run fast and regular tests'
 echo '    -e               : Run fast, regular and extended tests'
 echo '    -s               : Run all tests including the slow tests'
 echo '    -t <test-path>   : Run only one test script, e.g. fast-tests/210IgnoreZeroPredictionAtPrior.py'
+echo '    -v               : Print test logs live while also saving them to the log files'
 echo '    -a               : Apply the tests (no tests are run without this)'
 echo '    output-directory : The name of the output directory.  The default'
 echo '                       value is \"./output.YYYY-MM-DD-hhmm\"'
@@ -105,59 +106,43 @@ echo ' See gundam-tests.sh for more usage documentation.'
 TESTS="fast-tests"
 
 # Handle any input arguments
-if [ $(uname) == "Darwin" ]; then
-    # Work around MacOS bug
-    TEMP=$(getopt "$0" "$@")
-else
-    TEMP=$(getopt -o 'acfrest:' -n "$0" -- "$@")
-fi
-
-# Check for getopt errors
-if [ $? -ne 0 ]; then
-    exit 1
-fi
-
-eval set -- "$TEMP"
-unset TEMP
-while true; do
-    case "$1" in
-        '-c') # Force colors
+while getopts ":acfvrest:" opt; do
+    case "${opt}" in
+        c)
             USE_COLORS="yes"
-            shift
-            continue;;
-	'-f')
-            # be explicit about the testing
-	    TESTS="fast-tests"
-	    shift
-	    continue;;
-	'-r')
-            # be explicit about the testing
-	    TESTS="fast-tests regular-tests"
-	    shift
-	    continue;;
-	'-e')
-            # be explicit about the testing
-	    TESTS="fast-tests regular-tests extended-tests"
-	    shift
-	    continue;;
-	'-s')
-            # be explicit about the testing
-	    TESTS="fast-tests regular-tests extended-tests slow-tests"
-	    shift
-	    continue;;
-        '-t')
-            SINGLE_TEST="$2"
-            shift 2
-            continue;;
-        '-a')
+            ;;
+        v)
+            VERBOSE_LOGS="yes"
+            ;;
+        f)
+            TESTS="fast-tests"
+            ;;
+        r)
+            TESTS="fast-tests regular-tests"
+            ;;
+        e)
+            TESTS="fast-tests regular-tests extended-tests"
+            ;;
+        s)
+            TESTS="fast-tests regular-tests extended-tests slow-tests"
+            ;;
+        t)
+            SINGLE_TEST="${OPTARG}"
+            ;;
+        a)
             APPLY="yes"
-            shift
-            continue;;
-	'--')
-	    shift
-	    break;
+            ;;
+        :)
+            echo "Missing argument for -${OPTARG}"
+            exit 1
+            ;;
+        \?)
+            echo "Unknown option: -${OPTARG}"
+            exit 1
+            ;;
     esac
 done
+shift $((OPTIND - 1))
 
 echo
 echo Requesting tests in ${TESTS}
@@ -346,7 +331,15 @@ run_python_test() {
     local log=$3
 
     prepare_python_test_venv "${job}" "${log}" || return 1
-    (cd "${OUTPUT_DIR}" && "${PYTHON_TEST_VENV}/bin/python" "${job}" "${dir}" >> "${log}" 2>&1)
+    if [ "${VERBOSE_LOGS}" = "yes" ]; then
+        (
+            cd "${OUTPUT_DIR}" &&
+            "${PYTHON_TEST_VENV}/bin/python" "${job}" "${dir}" 2>&1 | tee -a "${log}"
+            exit ${PIPESTATUS[0]}
+        )
+    else
+        (cd "${OUTPUT_DIR}" && "${PYTHON_TEST_VENV}/bin/python" "${job}" "${dir}" >> "${log}" 2>&1)
+    fi
 }
 
 # Find and run the jobs in lexical order.
@@ -381,7 +374,14 @@ for d in ${TESTS}; do
             JOB_STATUS=$?
         else
             echo "(cd $OUTPUT_DIR && ${JOB} ${DIR})"
-            if (cd $OUTPUT_DIR && ${JOB} ${DIR} >& ${LOG}); then
+            if [ "${VERBOSE_LOGS}" = "yes" ]; then
+                (
+                    cd $OUTPUT_DIR &&
+                    ${JOB} ${DIR} 2>&1 | tee ${LOG}
+                    exit ${PIPESTATUS[0]}
+                )
+                JOB_STATUS=$?
+            elif (cd $OUTPUT_DIR && ${JOB} ${DIR} >& ${LOG}); then
                 JOB_STATUS=0
             else
                 JOB_STATUS=$?
