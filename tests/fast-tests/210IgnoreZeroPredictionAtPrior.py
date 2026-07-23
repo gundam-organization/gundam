@@ -18,11 +18,11 @@ def add_python_module_paths(repo_root: Path) -> None:
 
 def write_input_root_file(root_path: Path) -> None:
     import uproot
+    from array import array
 
     with uproot.recreate(root_path) as root_file:
-        root_file["tree_mc"] = {
-            "X": [-0.5] * 10,
-        }
+        tree = root_file.mktree("tree_mc", {"X": "float64"})
+        tree.extend({"X": array("d", [-0.5] * 10)})
 
 
 def write_binning_file(binning_path: Path) -> None:
@@ -57,7 +57,7 @@ fitterEngineConfig:
         model:
           tree: tree_mc
           selectionCutFormula: "(1)"
-          nominalWeightFormula: "(1.0)"
+          nominalTreeWeightFormula: "(1.0)"
           filePathList:
             - "{root_path}"
 
@@ -88,6 +88,7 @@ def evaluate_config(config_path: Path) -> float:
     engine.configure()
     likelihood_interface = engine.getLikelihoodInterface()
     likelihood_interface.initialize()
+    likelihood_interface.propagateAndEvalLikelihood()
 
     likelihood = likelihood_interface.getLastLikelihood()
 
