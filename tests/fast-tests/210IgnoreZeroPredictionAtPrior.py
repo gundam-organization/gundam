@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 
-import ctypes
 import math
 import sys
 from pathlib import Path
@@ -52,13 +51,6 @@ fitterEngineConfig:
             dataSets: [ "TestSample" ]
 """
 
-
-def flush_output() -> None:
-    sys.stdout.flush()
-    sys.stderr.flush()
-    ctypes.CDLL(None).fflush(None)
-
-
 def evaluate_config(config_text: str, work_dir: Path, label: str) -> float:
     import GUNDAM
 
@@ -77,7 +69,7 @@ def evaluate_config(config_text: str, work_dir: Path, label: str) -> float:
     engine.configure()
     likelihood_interface = engine.getLikelihoodInterface()
     likelihood_interface.initialize()
-    flush_output()
+    GUNDAM.flushOutput()
 
     likelihood_interface.propagateAndEvalLikelihood()
 
@@ -96,6 +88,7 @@ def evaluate_config(config_text: str, work_dir: Path, label: str) -> float:
     if bin_content_list[1].sumWeights != 0.0:
         raise RuntimeError(f"Second bin should be empty, got {bin_content_list[1].sumWeights}")
 
+    GUNDAM.flushOutput()
     print(f"Bin contents ({label}):", flush=True)
     for bin_context, bin_content in zip(bin_context_list, bin_content_list):
         print(f"  {bin_context.bin.getSummary(False)} -> sumWeights={bin_content.sumWeights}", flush=True)
@@ -127,7 +120,8 @@ def main() -> int:
         print(f"FAIL: expected finite LLH with ignore flag, got {llh_with_ignore}")
         return 1
 
-    flush_output()
+    import GUNDAM
+    GUNDAM.flushOutput()
     print(f"LLH without ignore flag: {llh_without_ignore}", flush=True)
     print(f"LLH with ignore flag: {llh_with_ignore}", flush=True)
     print("SUCCESS: ignoreBinsWithZeroPredictionAtPrior keeps the Poisson LLH finite.", flush=True)
