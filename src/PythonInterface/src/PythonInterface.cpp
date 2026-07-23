@@ -113,6 +113,7 @@ PYBIND11_MODULE(GUNDAM, module) {
   .def(pybind11::init<const std::string&>())
   .def(pybind11::init<const JsonType&>())
   .def("setConfig", pybind11::overload_cast<const std::string&>(&ConfigUtils::ConfigBuilder::setConfig))
+  .def("setConfigFromYamlString", &ConfigUtils::ConfigBuilder::setConfigFromYamlString)
   .def("setConfig", pybind11::overload_cast<const JsonType&>(&ConfigUtils::ConfigBuilder::setConfig))
   .def("setConfig", pybind11::overload_cast<const JsonType&>(&ConfigUtils::ConfigBuilder::setConfig))
   .def("getConfig", pybind11::overload_cast<>(&ConfigUtils::ConfigBuilder::getConfig, pybind11::const_), pybind11::return_value_policy::reference)
