@@ -126,6 +126,7 @@ void LikelihoodInterface::initializeImpl() {
   /// here we know every parameter is at its nominal value
   LogInfo << "First evaluation of the LLH at the nominal value..." << std::endl;
   this->propagateAndEvalLikelihood();
+  _jointProbabilityPtr_->updateZeroPredictionBinsAtPriorFlag(_samplePairList_);
   LogInfo << this->getSummary() << std::endl;
 
   /// move the parameter away from the prior if needed

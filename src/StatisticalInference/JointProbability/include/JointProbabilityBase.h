@@ -8,10 +8,14 @@
 #include "SamplePair.h"
 
 #include <string>
+#include <vector>
 
 namespace JointProbability{
 
   class JointProbabilityBase : public JsonBaseClass {
+
+  protected:
+    void configureImpl() override;
 
   public:
     // simple rtti, makes the class purely virtual
@@ -26,6 +30,7 @@ namespace JointProbability{
 
     // Likelihood for a single bin llh from histogram and bin index.  Override this if precalculation is needed.
     [[nodiscard]] virtual double eval( const SamplePair& samplePair_, int bin_ ) const {
+      if( this->isBinIgnored(samplePair_, bin_) ){ return 0.; }
       const double dataVal{samplePair_.data->getHistogram().getBinContentList()[bin_].sumWeights};
       const double predVal{samplePair_.model->getHistogram().getBinContentList()[bin_].sumWeights};
       const double predErr{samplePair_.model->getHistogram().getBinContentList()[bin_].sqrtSumSqWeights};
@@ -36,11 +41,34 @@ namespace JointProbability{
     [[nodiscard]] virtual double eval( const SamplePair& samplePair_ ) const{
       double out{0};
       const int nBins{int(samplePair_.model->getHistogram().getNbBins())};
-      for( int iBin = 0; iBin < nBins; iBin++ ){ out += this->eval(samplePair_, iBin); }
+      for( int iBin = 0; iBin < nBins; iBin++ ){
+        if( this->isBinIgnored(samplePair_, iBin) ){ continue; }
+        out += this->eval(samplePair_, iBin);
+      }
       return out;
     }
 
+    void updateZeroPredictionBinsAtPriorFlag(const std::vector<SamplePair>& samplePairList_);
+
+    [[nodiscard]] bool isIgnoreBinsWithZeroPredictionAtPrior() const { return _ignoreBinsWithZeroPredictionAtPrior_; }
+
+  protected:
+    [[nodiscard]] bool isBinIgnored(const SamplePair& samplePair_, int bin_) const;
+
+  private:
+    bool _ignoreBinsWithZeroPredictionAtPrior_{false};
+
   };
+
+  inline void JointProbabilityBase::configureImpl(){
+    _config_.defineFields({{"ignoreBinsWithZeroPredictionAtPrior"}});
+    _config_.fillValue(_ignoreBinsWithZeroPredictionAtPrior_, "ignoreBinsWithZeroPredictionAtPrior");
+  }
+
+  inline bool JointProbabilityBase::isBinIgnored(const SamplePair& samplePair_, int bin_) const{
+    if( not _ignoreBinsWithZeroPredictionAtPrior_ ){ return false; }
+    return samplePair_.model->getHistogram().getBinContextList()[bin_].isZeroPredictionAtPrior;
+  }
 }
 
 

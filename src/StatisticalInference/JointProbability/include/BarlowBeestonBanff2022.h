@@ -59,6 +59,7 @@ namespace JointProbability{
   };
 
   inline void BarlowBeestonBanff2022::configureImpl(){
+    JointProbabilityBase::configureImpl();
     _config_.defineFields({
       {"muteZeroPredBinWarn"},
       {"allowZeroMcWhenZeroData"},
@@ -89,6 +90,7 @@ namespace JointProbability{
   }
 
   inline double BarlowBeestonBanff2022::eval(const SamplePair& samplePair_, int bin_) const {
+    if( this->isBinIgnored(samplePair_, bin_) ){ return 0.; }
     double dataVal = samplePair_.data->getHistogram().getBinContentList()[bin_].sumWeights;
     double predVal = samplePair_.model->getHistogram().getBinContentList()[bin_].sumWeights;
 

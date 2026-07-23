@@ -24,6 +24,7 @@ public:
   struct BinContext{
     Bin bin{};
     std::vector<Event*> eventPtrList{};
+    bool isZeroPredictionAtPrior{false};
   };
 
   // const getters

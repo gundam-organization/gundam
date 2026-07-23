@@ -30,6 +30,7 @@ namespace JointProbability{
   };
 
   inline void LeastSquares::configureImpl(){
+    JointProbabilityBase::configureImpl();
     LogWarning << "Using LeastSquaresLLH: NOT A REAL LIKELIHOOD" << std::endl;
     _config_.defineFields({{"lsqPoissonianApproximation"}});
     _config_.fillValue(lsqPoissonianApproximation, "lsqPoissonianApproximation");
