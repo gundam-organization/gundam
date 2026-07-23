@@ -21,9 +21,11 @@ namespace ConfigUtils {
 
   // read JSON/YAML
   JsonType readConfigFile(const std::string& configFilePath_);
+  JsonType readConfigYamlString(const std::string& yamlConfigString_);
 
   // converting YAML to JSON
   JsonType convertYamlToJson(const std::string& configFilePath_);
+  JsonType convertYamlToJsonString(const std::string& yamlConfigString_);
   JsonType convertYamlToJson(const YAML::Node& yamlConfig_);
 
   // unfolding JSON/YAML
@@ -41,6 +43,7 @@ namespace ConfigUtils {
 
     // setters
     void setConfig(const std::string& filePath_);
+    void setConfigFromYamlString(const std::string& yamlConfigString_);
     void setConfig(const JsonType& config_){ _config_ = config_; }
 
     // const-getters
