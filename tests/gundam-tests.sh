@@ -95,6 +95,7 @@ echo '    -f               : Only run the fast tests [default]'
 echo '    -r               : Run fast and regular tests'
 echo '    -e               : Run fast, regular and extended tests'
 echo '    -s               : Run all tests including the slow tests'
+echo '    -t <test-path>   : Run only one test script, e.g. fast-tests/210IgnoreZeroPredictionAtPrior.py'
 echo '    -a               : Apply the tests (no tests are run without this)'
 echo '    output-directory : The name of the output directory.  The default'
 echo '                       value is \"./output.YYYY-MM-DD-hhmm\"'
@@ -108,7 +109,7 @@ if [ $(uname) == "Darwin" ]; then
     # Work around MacOS bug
     TEMP=$(getopt "$0" "$@")
 else
-    TEMP=$(getopt -o 'acfres' -n "$0" -- "$@")
+    TEMP=$(getopt -o 'acfrest:' -n "$0" -- "$@")
 fi
 
 # Check for getopt errors
@@ -144,6 +145,10 @@ while true; do
 	    TESTS="fast-tests regular-tests extended-tests slow-tests"
 	    shift
 	    continue;;
+        '-t')
+            SINGLE_TEST="$2"
+            shift 2
+            continue;;
         '-a')
             APPLY="yes"
             shift
@@ -210,6 +215,9 @@ for i in ${TESTS}; do
         echo Testing directory found: $i
         for j in $(find ${i} -name "[0-9]*" -type f | grep -v "~" | sort); do
             if [ -x ${j} ]; then
+                if [ -n "${SINGLE_TEST}" ] && [ "${j}" != "${SINGLE_TEST}" ]; then
+                    continue
+                fi
                 echo '   Will run:' $j
             fi
         done
@@ -350,6 +358,9 @@ for d in ${TESTS}; do
         continue;
     fi
     for i in $(find ${d} -name "[0-9]*" -type f | grep -v "~" | sort); do
+        if [ -n "${SINGLE_TEST}" ] && [ "${i}" != "${SINGLE_TEST}" ]; then
+            continue
+        fi
         JOB=${PWD}/${i}
         # Only run files that are executable
         if [ ! -x ${JOB} ]; then
