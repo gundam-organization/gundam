@@ -1,4 +1,5 @@
-#!/usr/bin/env python3.14
+#!/usr/bin/env python3
+# GUNDAM_TEST_PYTHON_DEPENDENCIES: uproot
 
 import math
 import sys
@@ -14,7 +15,6 @@ def add_python_module_paths(repo_root: Path) -> None:
         candidate_str = str(candidate)
         if candidate.is_dir() and candidate_str not in sys.path:
             sys.path.insert(0, candidate_str)
-
 
 def write_input_root_file(root_path: Path) -> None:
     import uproot
@@ -109,13 +109,6 @@ def main() -> int:
     repo_root = script_dir.parents[1]
 
     add_python_module_paths(repo_root)
-
-    try:
-        import GUNDAM  # noqa: F401
-        import uproot  # noqa: F401
-    except ImportError as exc:
-        print(f"FAIL: missing Python module dependency: {exc}")
-        return 1
 
     work_dir = Path.cwd()
     root_path = work_dir / "210IgnoreZeroPredictionAtPrior.root"
