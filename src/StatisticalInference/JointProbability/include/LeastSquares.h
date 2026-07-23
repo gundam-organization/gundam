@@ -22,6 +22,10 @@ namespace JointProbability{
   public:
     [[nodiscard]] std::string getType() const override { return "PluginJointProbability"; }
     [[nodiscard]] double eval(double data_, double pred_, double err_, int bin_) const override;
+    [[nodiscard]] double evalPredictionGradient(double data_, double pred_, double err_, int bin_) const override;
+    [[nodiscard]] double evalSqrtSumSqWeightsGradient(double data_, double pred_, double err_, int bin_) const override { return 0.; }
+    [[nodiscard]] double evalPredictionGradient(const SamplePair& samplePair_, int bin_) const override;
+    [[nodiscard]] double evalSqrtSumSqWeightsGradient(const SamplePair& samplePair_, int bin_) const override { return 0.; }
 
     /// If true the use Poissonian approximation with the variance equal to
     /// the observed value (i.e. the data).
@@ -48,6 +52,17 @@ namespace JointProbability{
     v = v*v;
     if (lsqPoissonianApproximation && dataVal > 1.0) v /= 0.5*dataVal;
     return v;
+  }
+  inline double LeastSquares::evalPredictionGradient(double data_, double pred_, double err_, int bin_) const {
+    double out{2. * (pred_ - data_)};
+    if (lsqPoissonianApproximation && data_ > 1.0) out /= 0.5 * data_;
+    return out;
+  }
+  inline double LeastSquares::evalPredictionGradient(const SamplePair& samplePair_, int bin_) const {
+    const double dataVal{samplePair_.data->getHistogram().getBinContentList()[bin_].sumWeights};
+    const double predVal{samplePair_.model->getHistogram().getBinContentList()[bin_].sumWeights};
+    const double predErr{samplePair_.model->getHistogram().getBinContentList()[bin_].sqrtSumSqWeights};
+    return evalPredictionGradient(dataVal, predVal, predErr, bin_);
   }
 
 }

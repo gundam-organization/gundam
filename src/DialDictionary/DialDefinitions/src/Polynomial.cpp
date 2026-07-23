@@ -20,3 +20,21 @@ double Polynomial::evalResponse(const DialInputBuffer& input_) const {
   }
   return result;
 }
+
+double Polynomial::evalGradient(const DialInputBuffer& input_, int iInput_) const {
+  if( iInput_ != 0 ){ return 0.; }
+
+  double result{0};
+  double factor{1};
+  double dialInput{input_.getInputBuffer()[0]};
+
+  if( not _allowExtrapolation_ ){
+    if( dialInput <= _splineBounds_.min or dialInput >= _splineBounds_.max ){ return 0.; }
+  }
+
+  for( size_t iCoeff = 1 ; iCoeff < _coefficientList_.size() ; iCoeff++ ) {
+    result += double(iCoeff) * _coefficientList_[iCoeff] * factor;
+    factor *= dialInput;
+  }
+  return result;
+}

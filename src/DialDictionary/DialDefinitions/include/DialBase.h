@@ -37,6 +37,9 @@ public:
   /// Evaluate the dial response at the set of parameter values in DialInputBuffer.
   [[nodiscard]] virtual double evalResponse(const DialInputBuffer& input_) const = 0;
 
+  /// Evaluate d(response)/d(input[iInput_]) at the current input point.
+  [[nodiscard]] virtual double evalGradient(const DialInputBuffer& input_, int iInput_) const;
+
   /// Allow extrapolation of the data. The default should be to forbid extrapolation.
   virtual void setAllowExtrapolation(bool allow_){}
   [[nodiscard]] virtual bool getAllowExtrapolation() const {return false;}

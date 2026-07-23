@@ -238,6 +238,8 @@ PYBIND11_MODULE(GUNDAM, module) {
   .def("getStdDevValue", &Parameter::getStdDevValue)
   .def("getThrowValue", &Parameter::getThrowValue)
   .def("getParameterValue", &Parameter::getParameterValue)
+  .def("getGradient", &Parameter::getGradient)
+  .def("isPenaltyDisabled", &Parameter::isPenaltyDisabled)
   .def("setParameterValue", &Parameter::setParameterValue, pybind11::arg("parameterValue"), pybind11::arg("force") = false)
   ;
 
@@ -423,9 +425,16 @@ PYBIND11_MODULE(GUNDAM, module) {
   pybind11::class_<MinimizerBase>(module, "MinimizerBase")
   .def("minimize", &MinimizerBase::minimize)
   .def("throwPostfitParameters", &MinimizerBase::throwPostfitParameters)
+  .def("setDisableCalcError", &MinimizerBase::setDisableCalcError)
   .def("fetchNbDegreeOfFreedom", &MinimizerBase::fetchNbDegreeOfFreedom)
   .def("getMinimizerFitParameterPtr", pybind11::overload_cast<>(&MinimizerBase::getMinimizerFitParameterPtr),
        pybind11::return_value_policy::reference_internal)
+  .def("evalFit", [](MinimizerBase& this_, const std::vector<double>& parArray_){
+    return this_.evalFit(parArray_.data());
+  }, pybind11::arg("parArray"))
+  .def("evalFitGradient", pybind11::overload_cast<>(&MinimizerBase::evalFitGradient))
+  .def("evalFitGradient", pybind11::overload_cast<const std::vector<Parameter*>&>(&MinimizerBase::evalFitGradient))
+  .def("getMinimizerFitParameterList", pybind11::overload_cast<>(&MinimizerBase::getMinimizerFitParameterList), pybind11::return_value_policy::reference)
   ;
 
   pybind11::class_<RootMinimizer, MinimizerBase>(module, "RootMinimizer")
@@ -441,7 +450,7 @@ PYBIND11_MODULE(GUNDAM, module) {
   .def("configure", pybind11::overload_cast<const ConfigReader&>(&FitterEngine::configure))
   .def("configure", pybind11::overload_cast<>(&FitterEngine::configure))
   .def("initialize", &FitterEngine::initialize)
-  .def("setRandomSeed", &FitterEngine::setRandomSeed)
+  .def_static("setRandomSeed", &FitterEngine::setRandomSeed)
   .def("fit", &FitterEngine::fit)
   .def("getMinimizer", pybind11::overload_cast<>(&FitterEngine::getMinimizer), pybind11::return_value_policy::reference)
   .def("getLikelihoodInterface", pybind11::overload_cast<>(&FitterEngine::getLikelihoodInterface), pybind11::return_value_policy::reference)

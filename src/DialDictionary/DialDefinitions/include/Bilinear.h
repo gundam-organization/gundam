@@ -18,6 +18,7 @@ public:
   [[nodiscard]] std::unique_ptr<DialBase> clone() const override { return std::make_unique<Bilinear>(*this); }
   [[nodiscard]] std::string getDialTypeName() const override {return {"Bilinear"};}
   [[nodiscard]] double evalResponse(const DialInputBuffer& input_) const override;
+  [[nodiscard]] double evalGradient(const DialInputBuffer& input_, int iInput_) const override;
 
   // other overrides
   void setAllowExtrapolation(bool allowExtrapolation) override { _allowExtrapolation_ = allowExtrapolation; }
@@ -28,6 +29,19 @@ public:
 
 
 protected:
+  struct PreparedBilinearCall {
+    double input0{};
+    double input1{};
+    const double* knots{};
+    const double* xx{};
+    const double* yy{};
+    int nx{};
+    int ny{};
+    bool valid{true};
+  };
+
+  [[nodiscard]] PreparedBilinearCall prepareBilinearCall(const DialInputBuffer& input_, bool forGradient_) const;
+
   bool _allowExtrapolation_{false};
 
   // A block of data to calculate the spline values.  This must be filled for

@@ -49,6 +49,9 @@ public:
   void setPriorValue(double priorValue){ _priorValue_ = priorValue; }
   void setThrowValue(double throwValue){ _throwValue_ = throwValue; }
   void setStdDevValue(double stdDevValue){ _stdDevValue_ = stdDevValue; }
+  void setGradient(double gradient){ _gradient_ = gradient; }
+  void addGradient(double gradient){ _gradient_ += gradient; }
+  void resetGradient(){ _gradient_ = 0; }
   void setDialSetConfig(const std::vector<ConfigReader>& dialDefinitionsList_){ _dialDefinitionsList_ = dialDefinitionsList_; }
 
   /// Set the limits for this parameter.  Parameter values less than
@@ -138,6 +141,7 @@ public:
   [[nodiscard]] auto getThrowValue() const{ return _throwValue_; }
 
   [[nodiscard]] auto getStdDevValue() const{ return _stdDevValue_; }
+  [[nodiscard]] auto getGradient() const{ return _gradient_; }
   [[nodiscard]] auto getOwner() const{ return _owner_; }
   [[nodiscard]] auto getPriorType() const{ return _priorType_; }
   [[nodiscard]] auto& getParameterLimits() const{ return _parameterLimits_; }
@@ -244,6 +248,7 @@ private:
   double _priorValue_{std::nan("unset")};
   double _throwValue_{std::nan("unset")};
   double _stdDevValue_{std::nan("unset")};
+  double _gradient_{0};
 
   GenericToolbox::Range _parameterLimits_;
   GenericToolbox::Range _throwLimits_;

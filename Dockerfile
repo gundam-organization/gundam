@@ -25,6 +25,7 @@ RUN apt-get install -y git || true
 RUN apt-get install -y libyaml-cpp-dev || true
 RUN apt-get install -y nlohmann-json3-dev || true
 RUN apt-get install -y libvdt-dev || true
+RUN apt-get install -y pybind11-dev || true
 
 ENV WORK_DIR /home/work
 ENV REPO_DIR $WORK_DIR/repo
@@ -51,6 +52,7 @@ RUN git submodule update --init --recursive
 WORKDIR $BUILD_DIR
 RUN cmake \
       -D CMAKE_INSTALL_PREFIX=$INSTALL_DIR \
+      -D WITH_PYTHON_INTERFACE=ON \
       $REPO_DIR 
 RUN make -j3 install
 
