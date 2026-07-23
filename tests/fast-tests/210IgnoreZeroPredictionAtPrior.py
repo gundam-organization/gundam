@@ -28,13 +28,6 @@ def build_config_text(root_path: Path, ignore_zero_bins: bool) -> str:
     bool_str = "true" if ignore_zero_bins else "false"
     return f"""
 fitterEngineConfig:
-  minimizerConfig:
-    type: RootMinimizer
-    minimizer: "Minuit2"
-    algorithm: "Migrad"
-    errors: "Hesse"
-    print_level: 0
-    tolerance: 1E-6
 
   likelihoodInterfaceConfig:
     jointProbabilityConfig:
@@ -46,8 +39,6 @@ fitterEngineConfig:
         isEnabled: true
         model:
           tree: tree_mc
-          selectionCutFormula: "(1)"
-          nominalTreeWeightFormula: "(1.0)"
           filePathList:
             - "{root_path}"
 
