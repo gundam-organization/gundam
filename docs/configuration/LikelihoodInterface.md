@@ -21,3 +21,17 @@ using `jointProbabilityConfig`.
 | gaussStatThrowInToys                | bool |                                             |           |
 | enableEventMcThrow                  | bool |                                             |           |
 
+### `jointProbabilityConfig`
+
+The `jointProbabilityConfig` block is forwarded to the selected joint
+probability implementation.
+
+#### Common options
+
+| Joint Probability Options             | Type | Description                                                                                                                              | default |
+|---------------------------------------|------|------------------------------------------------------------------------------------------------------------------------------------------|---------|
+| ignoreBinsWithZeroPredictionAtPrior   | bool | If `true`, bins with a null model prediction at the prior are ignored in the likelihood evaluation. A warning is printed for each bin disabled this way. | `false` |
+
+This option is intended for analyses where the user-defined binning contains
+bins that are meant to stay empty, for example with square binning layouts
+that include unreachable phase-space regions.

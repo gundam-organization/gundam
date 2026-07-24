@@ -18,6 +18,7 @@ namespace JointProbability{
   };
 
   double BarlowBeestonBanff2022Sfgd::eval(const SamplePair& samplePair_, int bin_) const {
+    if( this->isBinIgnored(samplePair_, bin_) ){ return 0.; }
 
     double dataVal = samplePair_.data->getHistogram().getBinContentList()[bin_].sumWeights;
     double predVal = samplePair_.model->getHistogram().getBinContentList()[bin_].sumWeights;

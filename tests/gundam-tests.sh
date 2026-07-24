@@ -89,12 +89,14 @@
 #   The output file should be named 200RunGUNDAM.root (or similar as
 #   needed).
 
-echo 'USAGE: gundam-tests.sh [-f] [-r] [-e] [-s] [-a] [output-directory]'
+echo 'USAGE: gundam-tests.sh [-f] [-r] [-e] [-s] [-v] [-a] [output-directory]'
 echo '    -c               : Force use of terminfo colors for output'
 echo '    -f               : Only run the fast tests [default]'
 echo '    -r               : Run fast and regular tests'
 echo '    -e               : Run fast, regular and extended tests'
 echo '    -s               : Run all tests including the slow tests'
+echo '    -t <test-path>   : Run only one test script, e.g. fast-tests/210IgnoreZeroPredictionAtPrior.py'
+echo '    -v               : Print test logs live while also saving them to the log files'
 echo '    -a               : Apply the tests (no tests are run without this)'
 echo '    output-directory : The name of the output directory.  The default'
 echo '                       value is \"./output.YYYY-MM-DD-hhmm\"'
@@ -104,55 +106,43 @@ echo ' See gundam-tests.sh for more usage documentation.'
 TESTS="fast-tests"
 
 # Handle any input arguments
-if [ $(uname) == "Darwin" ]; then
-    # Work around MacOS bug
-    TEMP=$(getopt "$0" "$@")
-else
-    TEMP=$(getopt -o 'acfres' -n "$0" -- "$@")
-fi
-
-# Check for getopt errors
-if [ $? -ne 0 ]; then
-    exit 1
-fi
-
-eval set -- "$TEMP"
-unset TEMP
-while true; do
-    case "$1" in
-        '-c') # Force colors
+while getopts ":acfvrest:" opt; do
+    case "${opt}" in
+        c)
             USE_COLORS="yes"
-            shift
-            continue;;
-	'-f')
-            # be explicit about the testing
-	    TESTS="fast-tests"
-	    shift
-	    continue;;
-	'-r')
-            # be explicit about the testing
-	    TESTS="fast-tests regular-tests"
-	    shift
-	    continue;;
-	'-e')
-            # be explicit about the testing
-	    TESTS="fast-tests regular-tests extended-tests"
-	    shift
-	    continue;;
-	'-s')
-            # be explicit about the testing
-	    TESTS="fast-tests regular-tests extended-tests slow-tests"
-	    shift
-	    continue;;
-        '-a')
+            ;;
+        v)
+            VERBOSE_LOGS="yes"
+            ;;
+        f)
+            TESTS="fast-tests"
+            ;;
+        r)
+            TESTS="fast-tests regular-tests"
+            ;;
+        e)
+            TESTS="fast-tests regular-tests extended-tests"
+            ;;
+        s)
+            TESTS="fast-tests regular-tests extended-tests slow-tests"
+            ;;
+        t)
+            SINGLE_TEST="${OPTARG}"
+            ;;
+        a)
             APPLY="yes"
-            shift
-            continue;;
-	'--')
-	    shift
-	    break;
+            ;;
+        :)
+            echo "Missing argument for -${OPTARG}"
+            exit 1
+            ;;
+        \?)
+            echo "Unknown option: -${OPTARG}"
+            exit 1
+            ;;
     esac
 done
+shift $((OPTIND - 1))
 
 echo
 echo Requesting tests in ${TESTS}
@@ -210,6 +200,9 @@ for i in ${TESTS}; do
         echo Testing directory found: $i
         for j in $(find ${i} -name "[0-9]*" -type f | grep -v "~" | sort); do
             if [ -x ${j} ]; then
+                if [ -n "${SINGLE_TEST}" ] && [ "${j}" != "${SINGLE_TEST}" ]; then
+                    continue
+                fi
                 echo '   Will run:' $j
             fi
         done
@@ -243,6 +236,78 @@ if [ ! -x ${OUTPUT_DIR} ]; then
     exit 1
 fi
 
+REPO_ROOT=$(cd "${PWD}/.." && pwd)
+PYTHON_TEST_VENV="${REPO_ROOT}/venv"
+PYTHON_TEST_REQUIREMENTS="${PWD}/requirements.txt"
+PYTHON_TEST_VENV_READY="no"
+
+prepare_python_test_venv() {
+    local log=$1
+    local log_path="${log}"
+
+    if [[ "${log_path}" != /* ]]; then
+        log_path="${OUTPUT_DIR}/${log_path}"
+    fi
+
+    if [ "${PYTHON_TEST_VENV_READY}" = "yes" ]; then
+        return 0
+    fi
+
+    if [ ! -d "${PYTHON_TEST_VENV}" ]; then
+        python3 -m venv "${PYTHON_TEST_VENV}" > "${log_path}" 2>&1 || return 1
+    fi
+
+    (
+        . "${PYTHON_TEST_VENV}/bin/activate" || exit 1
+        if [ -f "${PYTHON_TEST_REQUIREMENTS}" ]; then
+            local missing_requirements="no"
+            local requirement=""
+            local package_name=""
+            while IFS= read -r requirement; do
+                case "${requirement}" in
+                    ""|\#*)
+                        continue
+                        ;;
+                esac
+                package_name=$(printf '%s\n' "${requirement}" | sed 's/[<>=!~;\[].*$//')
+                if ! python -m pip show "${package_name}" > /dev/null 2>&1; then
+                    missing_requirements="yes"
+                    break
+                fi
+            done < "${PYTHON_TEST_REQUIREMENTS}"
+
+            if [ "${missing_requirements}" = "yes" ]; then
+                python -m pip install -r "${PYTHON_TEST_REQUIREMENTS}" >> "${log_path}" 2>&1 || exit 1
+            fi
+        fi
+    ) >> "${log_path}" 2>&1 || return 1
+
+    PYTHON_TEST_VENV_READY="yes"
+    return 0
+}
+
+run_python_test() {
+    local job=$1
+    local dir=$2
+    local log=$3
+
+    prepare_python_test_venv "${log}" || return 1
+    if [ "${VERBOSE_LOGS}" = "yes" ]; then
+        (
+            cd "${OUTPUT_DIR}" &&
+            . "${PYTHON_TEST_VENV}/bin/activate" &&
+            python "${job}" "${dir}" 2>&1 | tee -a "${log}"
+            exit ${PIPESTATUS[0]}
+        )
+    else
+        (
+            cd "${OUTPUT_DIR}" &&
+            . "${PYTHON_TEST_VENV}/bin/activate" &&
+            python "${job}" "${dir}" >> "${log}" 2>&1
+        )
+    fi
+}
+
 # Find and run the jobs in lexical order.
 FAILURES=""
 EXPECTED=""
@@ -252,6 +317,9 @@ for d in ${TESTS}; do
         continue;
     fi
     for i in $(find ${d} -name "[0-9]*" -type f | grep -v "~" | sort); do
+        if [ -n "${SINGLE_TEST}" ] && [ "${i}" != "${SINGLE_TEST}" ]; then
+            continue
+        fi
         JOB=${PWD}/${i}
         # Only run files that are executable
         if [ ! -x ${JOB} ]; then
@@ -265,8 +333,27 @@ for d in ${TESTS}; do
         # The name of the output log file
         LOG=$(basename ${JOB}).log
         # Run the script in the output directory.
-        echo "(cd $OUTPUT_DIR && ${JOB} ${DIR})"
-        if (cd $OUTPUT_DIR && ${JOB} ${DIR} >& ${LOG}); then
+        if [[ "${JOB}" == *.py ]]; then
+            echo "python-venv:${JOB} ${DIR}"
+            : > "${OUTPUT_DIR}/${LOG}"
+            run_python_test "${JOB}" "${DIR}" "${LOG}"
+            JOB_STATUS=$?
+        else
+            echo "(cd $OUTPUT_DIR && ${JOB} ${DIR})"
+            if [ "${VERBOSE_LOGS}" = "yes" ]; then
+                (
+                    cd $OUTPUT_DIR &&
+                    ${JOB} ${DIR} 2>&1 | tee ${LOG}
+                    exit ${PIPESTATUS[0]}
+                )
+                JOB_STATUS=$?
+            elif (cd $OUTPUT_DIR && ${JOB} ${DIR} >& ${LOG}); then
+                JOB_STATUS=0
+            else
+                JOB_STATUS=$?
+            fi
+        fi
+        if [ ${JOB_STATUS} -eq 0 ]; then
             # The job exited with success, but look for a fail messsage
             if (tail -5 ${OUTPUT_DIR}/${LOG} | grep FAIL >> /dev/null); then
                 echo -e ${RESULT_JOB_FAILURE} ${i}

@@ -17,15 +17,6 @@ SHELL ["/bin/bash", "-c"]
 
 RUN apt-get update
 
-# Install the prerequisites.  Install individually and allow
-# installation to fail since ubuntu tends to be a little jumpy about
-# which packages are distributed.
-
-RUN apt-get install -y git || true
-RUN apt-get install -y libyaml-cpp-dev || true
-RUN apt-get install -y nlohmann-json3-dev || true
-RUN apt-get install -y libvdt-dev || true
-
 ENV WORK_DIR /home/work
 ENV REPO_DIR $WORK_DIR/repo
 ENV BUILD_DIR $WORK_DIR/build
@@ -35,13 +26,29 @@ RUN mkdir -p $REPO_DIR
 RUN mkdir -p $BUILD_DIR
 RUN mkdir -p $INSTALL_DIR
 
+# Install the prerequisites.  Install individually and allow
+# installation to fail since ubuntu tends to be a little jumpy about
+# which packages are distributed.
+
+RUN apt-get install -y git || true
+RUN apt-get install -y libyaml-cpp-dev || true
+RUN apt-get install -y nlohmann-json3-dev || true
+RUN apt-get install -y libvdt-dev || true
+RUN apt-get install -y pybind11-dev || true
+RUN apt-get install -y python3-venv || true
+
 # Copying GUNDAM source files
 COPY ./src $REPO_DIR/src
 # COPY ./submodules $REPO_DIR/submodules # submodules are not pulled on github
 COPY ./cmake $REPO_DIR/cmake
 COPY ./CMakeLists.txt $REPO_DIR/CMakeLists.txt
-COPY ./tests $REPO_DIR/tests
 COPY ./.git $REPO_DIR/.git
+COPY ./tests $REPO_DIR/tests
+
+RUN python3 -m venv $REPO_DIR/venv
+# Install Python test dependencies once at image build time.
+RUN . $REPO_DIR/venv/bin/activate && \
+    if [ -f $REPO_DIR/tests/requirements.txt ]; then python -m pip install -r $REPO_DIR/tests/requirements.txt; fi
 
 # Checking out missing code
 WORKDIR $REPO_DIR
@@ -51,6 +58,7 @@ RUN git submodule update --init --recursive
 WORKDIR $BUILD_DIR
 RUN cmake \
       -D CMAKE_INSTALL_PREFIX=$INSTALL_DIR \
+      -D WITH_PYTHON_INTERFACE=ON \
       $REPO_DIR 
 RUN make -j3 install
 

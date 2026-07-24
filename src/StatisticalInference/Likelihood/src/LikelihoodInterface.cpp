@@ -122,8 +122,14 @@ void LikelihoodInterface::initializeImpl() {
   LogInfo << "Move back MC parameters to prior..." << std::endl;
   _modelPropagator_.getParametersManager().moveParametersToPrior();
 
+  LogInfo << "Propagating prior parameters on model histograms..." << std::endl;
+  std::future<bool> priorPropagation = _modelPropagator_.applyParameters();
+  if( priorPropagation.valid() ){ priorPropagation.get(); }
+
+  _jointProbabilityPtr_->updateZeroPredictionBinsAtPriorFlag(_samplePairList_);
+
   /// some joint fit probability might need to save the value of the nominal histogram.
-  /// here we know every parameter is at its nominal value
+  /// here we know every parameter is at its nominal value and the bin flags are up-to-date
   LogInfo << "First evaluation of the LLH at the nominal value..." << std::endl;
   this->propagateAndEvalLikelihood();
   LogInfo << this->getSummary() << std::endl;

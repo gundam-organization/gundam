@@ -17,6 +17,34 @@
 
 namespace JointProbability{
 
+  void JointProbabilityBase::updateZeroPredictionBinsAtPriorFlag(const std::vector<SamplePair>& samplePairList_){
+    _binFlagsListPerSample_.clear();
+    _binFlagsListPerSample_.resize(samplePairList_.size());
+
+    for( auto& samplePair : samplePairList_ ){
+      auto& modelHist = samplePair.model->getHistogram();
+      auto& binFlagsList = _binFlagsListPerSample_[samplePair.model->getIndex()];
+      binFlagsList.clear();
+      binFlagsList.resize(modelHist.getNbBins());
+
+      for( int iBin = 0 ; iBin < modelHist.getNbBins() ; iBin++ ){
+        auto& binFlags = binFlagsList[iBin];
+        binFlags.isZeroPredictionAtPrior = false;
+
+        if( not _ignoreBinsWithZeroPredictionAtPrior_ ){ continue; }
+
+        const auto& binContent = modelHist.getBinContentList()[iBin];
+        if( binContent.sumWeights != 0. ){ continue; }
+
+        binFlags.isZeroPredictionAtPrior = true;
+        LogWarning << "Ignoring bin with zero prediction at prior: "
+                   << samplePair.model->getName()
+                   << "/" << modelHist.getBinContextList()[iBin].bin.getSummary()
+                   << std::endl;
+      }
+    }
+  }
+
   JointProbabilityBase* makeJointProbability(const std::string& type_){
 
     std::string enumTypeStr{type_};

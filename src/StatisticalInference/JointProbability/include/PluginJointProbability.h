@@ -42,6 +42,12 @@ namespace JointProbability{
 
   // JointProbabilityPlugin
   inline void PluginJointProbability::configureImpl(){
+    JointProbabilityBase::configureImpl();
+    _config_.defineFields({
+      {"llhPluginSrc"},
+      {"llhSharedLib"},
+    });
+    _config_.checkConfiguration();
     _config_.fillValue(llhPluginSrc, "llhPluginSrc");
     _config_.fillValue(llhSharedLib, "llhSharedLib");
   }

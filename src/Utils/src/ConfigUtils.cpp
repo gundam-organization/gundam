@@ -49,10 +49,27 @@ namespace ConfigUtils {
 
     return output;
   }
+  JsonType readConfigYamlString(const std::string& yamlConfigString_){
+    JsonType output;
+
+    try{
+      output = ConfigUtils::convertYamlToJsonString(yamlConfigString_);
+    }
+    catch(...){
+      LogError << "Error while reading YAML config string." << std::endl;
+      std::exit(EXIT_FAILURE);
+    }
+
+    ConfigUtils::unfoldConfig(output);
+    return output;
+  }
 
   // YAML to JSON converting
   JsonType convertYamlToJson(const std::string& configFilePath_){
     return ConfigUtils::convertYamlToJson(GenericToolbox::Yaml::readConfigFile(configFilePath_));
+  }
+  JsonType convertYamlToJsonString(const std::string& yamlConfigString_){
+    return ConfigUtils::convertYamlToJson(YAML::Load(yamlConfigString_));
   }
   JsonType convertYamlToJson(const YAML::Node& yaml){
     JsonType output = JsonType::parse(GenericToolbox::Yaml::toJsonString(yaml));
@@ -172,6 +189,10 @@ namespace ConfigUtils {
       LogInfo << "Reading config file: " << filePath_ << std::endl;
       _config_ = ConfigUtils::readConfigFile(filePath_ ); // works with yaml
     }
+  }
+  void ConfigBuilder::setConfigFromYamlString(const std::string& yamlConfigString_){
+    LogInfo << "Reading config from YAML string." << std::endl;
+    _config_ = ConfigUtils::readConfigYamlString(yamlConfigString_);
   }
 
   void ConfigBuilder::override( const JsonType& overrideConfig_ ){

@@ -31,8 +31,10 @@
 #include <pybind11/chrono.h>
 #include <pybind11/stl_bind.h>
 
+#include <cstdio>
 #include <cerrno>
 #include <cstring>
+#include <iostream>
 #include <string>
 #include <unistd.h>
 
@@ -71,6 +73,15 @@ void setRuntimeWorkingDirectory(const std::string& dirPath_, bool createIfMissin
   }
 }
 
+void flushOutput(){
+  std::cout.flush();
+  std::cerr.flush();
+  std::fflush(nullptr);
+  if( Logger::getStreamBufferSupervisorPtr() != nullptr ){
+    Logger::getStreamBufferSupervisorPtr()->flush();
+  }
+}
+
 }
 
 
@@ -87,6 +98,7 @@ PYBIND11_MODULE(GUNDAM, module) {
              "Set the process working directory used by GUNDAM to resolve relative runtime paths.");
   module.def("getRuntimeWorkingDirectory", &GenericToolbox::getCurrentWorkingDirectory,
              "Get the process working directory used by GUNDAM to resolve relative runtime paths.");
+  module.def("flushOutput", &flushOutput, "Flush Python-adjacent C/C++ output streams used by GUNDAM.");
 
   // JsonType for the return type
   pybind11::class_<JsonType>(module, "JsonType")
@@ -113,6 +125,7 @@ PYBIND11_MODULE(GUNDAM, module) {
   .def(pybind11::init<const std::string&>())
   .def(pybind11::init<const JsonType&>())
   .def("setConfig", pybind11::overload_cast<const std::string&>(&ConfigUtils::ConfigBuilder::setConfig))
+  .def("setConfigFromYamlString", &ConfigUtils::ConfigBuilder::setConfigFromYamlString)
   .def("setConfig", pybind11::overload_cast<const JsonType&>(&ConfigUtils::ConfigBuilder::setConfig))
   .def("setConfig", pybind11::overload_cast<const JsonType&>(&ConfigUtils::ConfigBuilder::setConfig))
   .def("getConfig", pybind11::overload_cast<>(&ConfigUtils::ConfigBuilder::getConfig, pybind11::const_), pybind11::return_value_policy::reference)
@@ -402,7 +415,6 @@ PYBIND11_MODULE(GUNDAM, module) {
   .def("getSummary", &LikelihoodInterface::getSummary, pybind11::call_guard<pybind11::gil_scoped_release>())
   .def("getLastLikelihood", &LikelihoodInterface::getLastLikelihood, pybind11::call_guard<pybind11::gil_scoped_release>())
   .def("propagateAndEvalLikelihood", &LikelihoodInterface::propagateAndEvalLikelihood, pybind11::call_guard<pybind11::gil_scoped_release>())
-  .def("evalLikelihood", &LikelihoodInterface::evalLikelihood, pybind11::call_guard<pybind11::gil_scoped_release>())
   .def("setForceAsimovData", &LikelihoodInterface::setForceAsimovData, pybind11::call_guard<pybind11::gil_scoped_release>())
   .def("throwToyParameters", &LikelihoodInterface::throwToyParameters, pybind11::call_guard<pybind11::gil_scoped_release>())
   .def("throwStatErrors", &LikelihoodInterface::throwStatErrors, pybind11::call_guard<pybind11::gil_scoped_release>())
