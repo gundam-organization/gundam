@@ -1290,11 +1290,11 @@ void DataDispenser::eventSelectionFunction(int iThread_){
   }
 
   for( auto& var : selectionCache.varsRequestedForIndexing ){
+    varIndexingList.emplace_back();
     if( isActiveVariableDictName(selectionCache, var) ){
-      varIndexingList.emplace_back(nullptr);
+      ThreadSharedData::VariableBuffer::storeTempIndex(varIndexingList.back(), -1);
       continue;
     }
-    varIndexingList.emplace_back();
     ThreadSharedData::VariableBuffer::storeTempIndex(
         varIndexingList.back(),
         tb.addExpression(::getVariableExpression(selectionCache, _parameters_.variableDict, var))

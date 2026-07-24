@@ -174,14 +174,19 @@ struct ThreadSharedData{
     std::vector<VariableDictBuffer> variableDictEvalList{};
 
     static void storeTempIndex(const GenericToolbox::TreeBuffer::ExpressionBuffer*& var_, int idx_){
-      var_ = reinterpret_cast<const GenericToolbox::TreeBuffer::ExpressionBuffer *>(static_cast<size_t>(idx_));
+      if( idx_ == -1 ){
+        var_ = reinterpret_cast<const GenericToolbox::TreeBuffer::ExpressionBuffer *>(static_cast<size_t>(-1));
+        return;
+      }
+      var_ = reinterpret_cast<const GenericToolbox::TreeBuffer::ExpressionBuffer *>(static_cast<size_t>(idx_ + 1));
     }
     static void unfoldTempIndex(const GenericToolbox::TreeBuffer::ExpressionBuffer*& var_, const std::vector<std::shared_ptr<GenericToolbox::TreeBuffer::ExpressionBuffer>>& list_){
-      int idx = static_cast<int>(reinterpret_cast<size_t>(var_));
-      if( idx == -1 ){
+      auto encodedIndex = reinterpret_cast<size_t>(var_);
+      if( encodedIndex == 0 or encodedIndex == static_cast<size_t>(-1) ){
         var_ = nullptr;
         return;
       }
+      int idx = static_cast<int>(encodedIndex - 1);
       var_ = list_[idx].get();
     }
   };
