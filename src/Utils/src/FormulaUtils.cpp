@@ -5,6 +5,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <set>
 #include <sstream>
 
 namespace {
@@ -23,6 +24,46 @@ namespace {
 
     auto previousChar = formula_[openingBracketPos_ - 1];
     return not (std::isalnum(static_cast<unsigned char>(previousChar)) or previousChar == '_');
+  }
+
+  size_t findNextNonSpace(const std::string& str_, size_t pos_){
+    while( pos_ < str_.size() and std::isspace(static_cast<unsigned char>(str_[pos_])) ){ pos_++; }
+    return pos_;
+  }
+
+  bool isIdentifierChar(char c_){
+    return std::isalnum(static_cast<unsigned char>(c_)) or c_ == '_';
+  }
+
+  bool isIdentifierStart(char c_){
+    return std::isalpha(static_cast<unsigned char>(c_)) or c_ == '_';
+  }
+
+  bool isBareIdentifierFormulaToken(
+      const std::string& formula_,
+      size_t begin_,
+      size_t end_
+  ){
+    if( begin_ >= end_ ){ return false; }
+
+    // Namespace components and function names are not event variables.
+    if( begin_ >= 2 and formula_[begin_ - 1] == ':' and formula_[begin_ - 2] == ':' ){ return false; }
+    if( end_ + 1 < formula_.size() and formula_[end_] == ':' and formula_[end_ + 1] == ':' ){ return false; }
+
+    auto nextNonSpace = findNextNonSpace(formula_, end_);
+    if( nextNonSpace < formula_.size() and formula_[nextNonSpace] == '(' ){ return false; }
+
+    auto token = formula_.substr(begin_, end_ - begin_);
+    static const std::set<std::string> reservedTokens{
+        "true", "false",
+        "and", "or", "not",
+        "pi", "e"
+    };
+    return reservedTokens.find(token) == reservedTokens.end();
+  }
+
+  void addUnique(std::vector<std::string>& list_, const std::string& value_){
+    if( std::find(list_.begin(), list_.end(), value_) == list_.end() ){ list_.emplace_back(value_); }
   }
 
   std::string joinReferenceStack(const std::vector<std::string>& stack_, const std::string& extra_){
@@ -132,6 +173,112 @@ std::string resolveFormulaReferences(
 ){
   std::vector<std::string> referenceStack;
   return resolveFormulaReferencesImpl(formula_, variableDict_, referenceStack, resolutionMode_);
+}
+
+std::vector<std::string> extractFormulaReferenceNames(const std::string& formula_){
+  std::vector<std::string> output;
+
+  size_t cursor{0};
+  while( cursor < formula_.size() ){
+    auto openingBracketPos = formula_.find('[', cursor);
+    if( openingBracketPos == std::string::npos ){ break; }
+
+    auto closingBracketPos = formula_.find(']', openingBracketPos + 1);
+    LogExitIf(
+        closingBracketPos == std::string::npos,
+        "Invalid formula reference in \"" << formula_ << "\": missing closing ']'."
+    );
+
+    auto referenceName = formula_.substr(openingBracketPos + 1, closingBracketPos - openingBracketPos - 1);
+    if(
+        isFormulaReferenceName(referenceName)
+        and isStandaloneFormulaReference(formula_, openingBracketPos)
+    ){
+      addUnique(output, referenceName);
+    }
+
+    cursor = closingBracketPos + 1;
+  }
+
+  return output;
+}
+
+std::vector<std::string> extractBareVariableNames(const std::string& formula_){
+  std::vector<std::string> output;
+
+  size_t cursor{0};
+  while( cursor < formula_.size() ){
+    if( formula_[cursor] == '[' ){
+      auto closingBracketPos = formula_.find(']', cursor + 1);
+      LogExitIf(
+          closingBracketPos == std::string::npos,
+          "Invalid formula reference in \"" << formula_ << "\": missing closing ']'."
+      );
+      cursor = closingBracketPos + 1;
+      continue;
+    }
+
+    if( not isIdentifierStart(formula_[cursor]) ){
+      cursor++;
+      continue;
+    }
+
+    auto begin = cursor;
+    cursor++;
+    while( cursor < formula_.size() and isIdentifierChar(formula_[cursor]) ){ cursor++; }
+
+    if( isBareIdentifierFormulaToken(formula_, begin, cursor) ){
+      addUnique(output, formula_.substr(begin, cursor - begin));
+    }
+  }
+
+  return output;
+}
+
+std::vector<std::string> extractEventVariableNames(const std::string& formula_){
+  auto output = extractFormulaReferenceNames(formula_);
+  for( const auto& varName : extractBareVariableNames(formula_) ){ addUnique(output, varName); }
+  return output;
+}
+
+std::string convertBareVariablesToFormulaParameters(const std::string& formula_){
+  std::string output;
+  output.reserve(formula_.size() + 16);
+
+  size_t cursor{0};
+  while( cursor < formula_.size() ){
+    if( formula_[cursor] == '[' ){
+      auto closingBracketPos = formula_.find(']', cursor + 1);
+      LogExitIf(
+          closingBracketPos == std::string::npos,
+          "Invalid formula reference in \"" << formula_ << "\": missing closing ']'."
+      );
+      output.append(formula_, cursor, closingBracketPos - cursor + 1);
+      cursor = closingBracketPos + 1;
+      continue;
+    }
+
+    if( not isIdentifierStart(formula_[cursor]) ){
+      output += formula_[cursor];
+      cursor++;
+      continue;
+    }
+
+    auto begin = cursor;
+    cursor++;
+    while( cursor < formula_.size() and isIdentifierChar(formula_[cursor]) ){ cursor++; }
+
+    if( isBareIdentifierFormulaToken(formula_, begin, cursor) ){
+      output += "[";
+      output.append(formula_, begin, cursor - begin);
+      output += "]";
+    }
+    else{
+      output.append(formula_, begin, cursor - begin);
+    }
+  }
+
+  return output;
 }
 
 }

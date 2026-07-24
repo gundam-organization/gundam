@@ -30,36 +30,364 @@
 
 #include <unordered_map>
 #include <map>
+#include <set>
 #include <string>
 #include <vector>
 #include <sstream>
 
 namespace {
 
-  std::string buildResolvedSampleWeightFormulaStr(
-      const Sample& sample_,
+  bool hasFormulaReferences(const std::string& formula_){
+    return not FormulaUtils::extractFormulaReferenceNames(formula_).empty();
+  }
+
+  bool parseBracketToken(
+      const std::string& formula_,
+      size_t openingBracketPos_,
+      size_t& closingBracketPos_,
+      std::string& token_
+  ){
+    if( openingBracketPos_ >= formula_.size() or formula_[openingBracketPos_] != '[' ){ return false; }
+    closingBracketPos_ = formula_.find(']', openingBracketPos_ + 1);
+    LogExitIf(
+        closingBracketPos_ == std::string::npos,
+        "Invalid formula reference in \"" << formula_ << "\": missing closing ']'."
+    );
+    token_ = formula_.substr(openingBracketPos_ + 1, closingBracketPos_ - openingBracketPos_ - 1);
+    return true;
+  }
+
+  std::string registerTreeExpressionAlias(
+      DataDispenserCache& cache_,
+      const std::string& treeExpression_
+  ){
+    auto existingAlias = cache_.eventFormulaTreeExpressionAliases.find(treeExpression_);
+    if( existingAlias != cache_.eventFormulaTreeExpressionAliases.end() ){ return existingAlias->second; }
+
+    std::string alias = "__gundam_formula_tree_expr_" + std::to_string(cache_.eventFormulaTreeExpressionAliases.size());
+    cache_.eventFormulaTreeExpressionAliases[treeExpression_] = alias;
+
+    cache_.addVarRequestedForIndexing(alias);
+    cache_.variableDictEvalList.emplace_back();
+    cache_.variableDictEvalList.back().name = alias;
+    cache_.variableDictEvalList.back().expr = treeExpression_;
+    cache_.variableDictEvalList.back().backend = DataDispenserCache::VariableDictEntry::TreeBufferExpression;
+
+    return alias;
+  }
+
+  std::string resolveTreeArrayIndexToken(
+      const std::string& token_,
       const std::map<std::string, std::string>& variableDict_
   ){
-    if( sample_.getSampleWeightFormulaStr().empty() ){ return ""; }
-
+    auto dictEntry = variableDict_.find(token_);
+    if( dictEntry == variableDict_.end() ){ return token_; }
     return FormulaUtils::resolveFormulaReferences(
-        sample_.getSampleWeightFormulaStr(),
+        dictEntry->second,
         variableDict_,
-        FormulaUtils::FormulaResolutionMode::AllowTreeLeafFallback
+        FormulaUtils::FormulaResolutionMode::StrictVariableDictOnly
     );
   }
 
-  std::string buildResolvedApplyConditionFormulaStr(
-      const DialCollection& dialCollection_,
+  std::string buildTreeArrayExpression(
+      const std::string& branchName_,
+      const std::string& formula_,
+      size_t firstIndexOpeningBracketPos_,
+      size_t& expressionEnd_,
       const std::map<std::string, std::string>& variableDict_
   ){
-    if( dialCollection_.getApplyConditionStr().empty() ){ return ""; }
+    std::string output = branchName_;
+    expressionEnd_ = firstIndexOpeningBracketPos_;
 
-    return FormulaUtils::resolveFormulaReferences(
-        dialCollection_.getApplyConditionStr(),
-        variableDict_,
-        FormulaUtils::FormulaResolutionMode::AllowTreeLeafFallback
+    while( expressionEnd_ < formula_.size() and formula_[expressionEnd_] == '[' ){
+      size_t closingBracketPos{0};
+      std::string token;
+      parseBracketToken(formula_, expressionEnd_, closingBracketPos, token);
+      output += "[" + resolveTreeArrayIndexToken(token, variableDict_) + "]";
+      expressionEnd_ = closingBracketPos + 1;
+    }
+
+    return output;
+  }
+
+  std::string replaceAliasedTreeExpressions(
+      const std::string& formula_,
+      const std::map<std::string, std::string>& treeExpressionAliases_
+  ){
+    std::string output = formula_;
+    for( const auto& entry : treeExpressionAliases_ ){
+      auto firstArrayBracketPos = entry.first.find('[');
+      auto bracketExpression = (
+          firstArrayBracketPos == std::string::npos ?
+          "[" + entry.first + "]" :
+          "[" + entry.first.substr(0, firstArrayBracketPos) + "]" + entry.first.substr(firstArrayBracketPos)
+      );
+
+      GenericToolbox::replaceSubstringInsideInputString(output, bracketExpression, "[" + entry.second + "]");
+    }
+    return output;
+  }
+
+  std::string registerAndReplaceTreeArrayReferences(
+      DataDispenserCache& cache_,
+      const std::string& formula_,
+      const std::map<std::string, std::string>& variableDict_
+  ){
+    std::string output;
+    output.reserve(formula_.size());
+
+    size_t cursor{0};
+    while( cursor < formula_.size() ){
+      if( std::isalpha(static_cast<unsigned char>(formula_[cursor])) or formula_[cursor] == '_' ){
+        auto identifierBegin = cursor;
+        cursor++;
+        while(
+            cursor < formula_.size()
+            and (std::isalnum(static_cast<unsigned char>(formula_[cursor])) or formula_[cursor] == '_')
+        ){
+          cursor++;
+        }
+
+        if( cursor < formula_.size() and formula_[cursor] == '[' ){
+          size_t expressionEnd = cursor;
+          auto treeExpression = buildTreeArrayExpression(
+              formula_.substr(identifierBegin, cursor - identifierBegin),
+              formula_,
+              cursor,
+              expressionEnd,
+              variableDict_
+          );
+          auto alias = registerTreeExpressionAlias(cache_, treeExpression);
+          output += "[" + alias + "]";
+          cursor = expressionEnd;
+          continue;
+        }
+
+        output.append(formula_, identifierBegin, cursor - identifierBegin);
+        continue;
+      }
+
+      if( formula_[cursor] != '[' ){
+        output += formula_[cursor];
+        cursor++;
+        continue;
+      }
+
+      auto openingBracketPos = cursor;
+      if( openingBracketPos == std::string::npos ){
+        output.append(formula_, cursor, std::string::npos);
+        break;
+      }
+
+      size_t firstClosingBracketPos{0};
+      std::string firstToken;
+      parseBracketToken(formula_, openingBracketPos, firstClosingBracketPos, firstToken);
+
+      if(
+          not FormulaUtils::extractFormulaReferenceNames("[" + firstToken + "]").empty()
+          and variableDict_.find(firstToken) != variableDict_.end()
+      ){
+        output.append(formula_, cursor, firstClosingBracketPos - cursor + 1);
+        cursor = firstClosingBracketPos + 1;
+        continue;
+      }
+
+      if(
+          FormulaUtils::extractFormulaReferenceNames("[" + firstToken + "]").empty()
+          or firstClosingBracketPos + 1 >= formula_.size()
+          or formula_[firstClosingBracketPos + 1] != '['
+      ){
+        output.append(formula_, cursor, firstClosingBracketPos - cursor + 1);
+        cursor = firstClosingBracketPos + 1;
+        continue;
+      }
+
+      size_t expressionEnd = firstClosingBracketPos + 1;
+      auto treeExpression = buildTreeArrayExpression(
+          firstToken,
+          formula_,
+          firstClosingBracketPos + 1,
+          expressionEnd,
+          variableDict_
+      );
+      auto alias = registerTreeExpressionAlias(cache_, treeExpression);
+
+      output.append(formula_, cursor, openingBracketPos - cursor);
+      output += "[" + alias + "]";
+      cursor = expressionEnd;
+    }
+
+    return output;
+  }
+
+  bool isActiveVariableDictName(const DataDispenserCache& cache_, const std::string& name_){
+    for( const auto& entry : cache_.variableDictEvalList ){
+      if( entry.name == name_ ){ return true; }
+    }
+    return false;
+  }
+
+  const DataDispenserCache::VariableDictEntry* getActiveVariableDictEntry(const DataDispenserCache& cache_, const std::string& name_){
+    for( const auto& entry : cache_.variableDictEvalList ){
+      if( entry.name == name_ ){ return &entry; }
+    }
+    return nullptr;
+  }
+
+  bool isEventBufferOnlyVariable(const DataDispenserCache& cache_, const std::string& name_){
+    auto* entry = getActiveVariableDictEntry(cache_, name_);
+    return entry != nullptr and entry->backend == DataDispenserCache::VariableDictEntry::EventBufferFormula;
+  }
+
+  void addVariablesRequestedByFormula(
+      DataDispenserCache& cache_,
+      const std::string& formula_,
+      const std::map<std::string, std::string>& variableDict_,
+      bool strictFormulaReferences_,
+      std::set<std::string>& variableDictStack_
+  );
+
+  void addVariableDictRequestedByName(
+      DataDispenserCache& cache_,
+      const std::string& name_,
+      const std::map<std::string, std::string>& variableDict_,
+      std::set<std::string>& variableDictStack_
+  ){
+    auto dictEntry = variableDict_.find(name_);
+    if( dictEntry == variableDict_.end() ){
+      cache_.addVarRequestedForIndexing(name_);
+      return;
+    }
+
+    if( isActiveVariableDictName(cache_, name_) ){ return; }
+    LogExitIf(
+        variableDictStack_.count(name_) != 0,
+        "Cyclic variableDict reference detected while preparing variable \"" << name_ << "\"."
     );
+
+    variableDictStack_.insert(name_);
+    addVariablesRequestedByFormula(cache_, dictEntry->second, variableDict_, true, variableDictStack_);
+    variableDictStack_.erase(name_);
+
+    cache_.addVarRequestedForIndexing(name_);
+    cache_.variableDictEvalList.emplace_back();
+    cache_.variableDictEvalList.back().name = name_;
+    cache_.variableDictEvalList.back().expr = dictEntry->second;
+    cache_.variableDictEvalList.back().backend = (
+        hasFormulaReferences(dictEntry->second) ?
+        DataDispenserCache::VariableDictEntry::EventBufferFormula :
+        DataDispenserCache::VariableDictEntry::TreeBufferExpression
+    );
+  }
+
+  void addVariablesRequestedByFormula(
+      DataDispenserCache& cache_,
+      const std::string& formula_,
+      const std::map<std::string, std::string>& variableDict_,
+      bool strictFormulaReferences_,
+      std::set<std::string>& variableDictStack_
+  ){
+    if( formula_.empty() ){ return; }
+
+    auto formula = registerAndReplaceTreeArrayReferences(cache_, formula_, variableDict_);
+
+    for( const auto& referenceName : FormulaUtils::extractFormulaReferenceNames(formula) ){
+      auto dictEntry = variableDict_.find(referenceName);
+      if( dictEntry != variableDict_.end() ){
+        addVariableDictRequestedByName(cache_, referenceName, variableDict_, variableDictStack_);
+      }
+      else if( isActiveVariableDictName(cache_, referenceName) ){
+        cache_.addVarRequestedForIndexing(referenceName);
+      }
+      else{
+        LogExitIf(
+            strictFormulaReferences_,
+            "Unknown variableDict reference [" << referenceName << "] in formula \"" << formula_ << "\"."
+        );
+        cache_.addVarRequestedForIndexing(referenceName);
+      }
+    }
+
+    for( const auto& bareVarName : FormulaUtils::extractBareVariableNames(formula) ){
+      cache_.addVarRequestedForIndexing(bareVarName);
+    }
+  }
+
+  void addVariablesRequestedByFormula(
+      DataDispenserCache& cache_,
+      const std::string& formula_,
+      const std::map<std::string, std::string>& variableDict_,
+      bool strictFormulaReferences_
+  ){
+    std::set<std::string> variableDictStack;
+    addVariablesRequestedByFormula(cache_, formula_, variableDict_, strictFormulaReferences_, variableDictStack);
+  }
+
+  void compileEventFormula(
+      ThreadSharedData::VariableBuffer::EventFormula& eventFormula_,
+      const std::string& formulaStr_,
+      const std::vector<std::string>& eventVariableNameList_
+  ){
+    eventFormula_.expr = FormulaUtils::convertBareVariablesToFormulaParameters(formulaStr_);
+    eventFormula_.formula = TFormula(eventFormula_.expr.c_str(), eventFormula_.expr.c_str());
+    LogExitIf(not eventFormula_.formula.IsValid(), "\"" << formulaStr_ << "\" -> \"" << eventFormula_.expr << "\": could not be parsed as event-buffer formula.");
+
+    eventFormula_.varIndexList.clear();
+    eventFormula_.varIndexList.reserve(eventFormula_.formula.GetNpar());
+    for( int iPar = 0 ; iPar < eventFormula_.formula.GetNpar() ; iPar++ ){
+      auto varIndex = GenericToolbox::findElementIndex(eventFormula_.formula.GetParName(iPar), eventVariableNameList_);
+      LogExitIf(
+          varIndex == -1,
+          "Formula \"" << formulaStr_ << "\" requires event variable \"" << eventFormula_.formula.GetParName(iPar)
+                       << "\", but it is not available in the event buffer."
+      );
+      eventFormula_.varIndexList.emplace_back(varIndex);
+    }
+  }
+
+  void compileRuntimeFormula(
+      ThreadSharedData::VariableBuffer::RuntimeFormula& formula_,
+      GenericToolbox::TreeBuffer& treeBuffer_,
+      const std::string& formulaStr_,
+      const std::vector<std::string>& eventVariableNameList_,
+      const std::map<std::string, std::string>& treeExpressionAliases_
+  ){
+    formula_ = ThreadSharedData::VariableBuffer::RuntimeFormula();
+    if( formulaStr_.empty() ){ return; }
+
+    auto formulaStr = replaceAliasedTreeExpressions(formulaStr_, treeExpressionAliases_);
+
+    if( hasFormulaReferences(formulaStr) ){
+      formula_.backend = ThreadSharedData::VariableBuffer::RuntimeFormula::EventBufferFormula;
+      compileEventFormula(formula_.eventFormula, formulaStr, eventVariableNameList_);
+      return;
+    }
+
+    if( FormulaUtils::extractBareVariableNames(formulaStr).empty() ){
+      formula_.backend = ThreadSharedData::VariableBuffer::RuntimeFormula::EventBufferFormula;
+      compileEventFormula(formula_.eventFormula, formulaStr, eventVariableNameList_);
+      return;
+    }
+
+    formula_.backend = ThreadSharedData::VariableBuffer::RuntimeFormula::TreeBufferExpression;
+    ThreadSharedData::VariableBuffer::storeTempIndex(
+        formula_.treeExpression,
+        treeBuffer_.addExpression(formulaStr)
+    );
+  }
+
+  void unfoldRuntimeFormula(
+      ThreadSharedData::VariableBuffer::RuntimeFormula& formula_,
+      const std::vector<std::shared_ptr<GenericToolbox::TreeBuffer::ExpressionBuffer>>& expressionBufferList_
+  ){
+    if( formula_.backend != ThreadSharedData::VariableBuffer::RuntimeFormula::TreeBufferExpression ){ return; }
+    ThreadSharedData::VariableBuffer::unfoldTempIndex(formula_.treeExpression, expressionBufferList_);
+  }
+
+  void evalVariableDict(Event& event_, const std::vector<ThreadSharedData::VariableBuffer::VariableDictBuffer>& variableDictEvalList_){
+    for( const auto& entry : variableDictEvalList_ ){
+      event_.getVariables().getVarList()[entry.outputVarIndex].set(entry.formula.eval(event_));
+    }
   }
 
 }
@@ -228,8 +556,8 @@ void DataDispenser::load(Propagator& propagator_){
   }
 
   this->parseStringParameters();
-  this->doEventSelection();
   this->fetchRequestedLeaves();
+  this->doEventSelection();
   this->preAllocateMemory();
   this->readAndFill();
 
@@ -286,41 +614,12 @@ void DataDispenser::parseStringParameters() {
 
   if( not _parameters_.variableDict.empty() ){
     for( auto& entryDict : _parameters_.variableDict ){ replaceToyIndexFct(entryDict.second); }
-    for( auto& entryDict : _parameters_.variableDict ){
-      entryDict.second = FormulaUtils::resolveFormulaReferences(
-          entryDict.second,
-          _parameters_.variableDict,
-          FormulaUtils::FormulaResolutionMode::StrictVariableDictOnly
-      );
-    }
     LogInfo << "Variable dictionary: " << GenericToolbox::toString(_parameters_.variableDict) << std::endl;
   }
 
   replaceToyIndexFct(_parameters_.dialIndexFormula);
   replaceToyIndexFct(_parameters_.nominalWeightFormulaStr);
   replaceToyIndexFct(_parameters_.selectionCutFormulaStr);
-
-  if( not _parameters_.dialIndexFormula.empty() ){
-    _parameters_.dialIndexFormula = FormulaUtils::resolveFormulaReferences(
-        _parameters_.dialIndexFormula,
-        _parameters_.variableDict,
-        FormulaUtils::FormulaResolutionMode::AllowTreeLeafFallback
-    );
-  }
-  if( not _parameters_.nominalWeightFormulaStr.empty() ){
-    _parameters_.nominalWeightFormulaStr = FormulaUtils::resolveFormulaReferences(
-        _parameters_.nominalWeightFormulaStr,
-        _parameters_.variableDict,
-        FormulaUtils::FormulaResolutionMode::AllowTreeLeafFallback
-    );
-  }
-  if( not _parameters_.selectionCutFormulaStr.empty() ){
-    _parameters_.selectionCutFormulaStr = FormulaUtils::resolveFormulaReferences(
-        _parameters_.selectionCutFormulaStr,
-        _parameters_.variableDict,
-        FormulaUtils::FormulaResolutionMode::AllowTreeLeafFallback
-    );
-  }
 
   // add surrounding parenthesis to force the LeafForm to treat it as a TFormula
   if(not _parameters_.dialIndexFormula.empty()){ _parameters_.dialIndexFormula = "(" + _parameters_.dialIndexFormula + ")"; }
@@ -425,8 +724,9 @@ void DataDispenser::fetchRequestedLeaves(){
   if( not _cache_.dialCollectionsRefList.empty() ) {
     std::vector<std::string> indexRequests;
     for( auto& dialCollection : _cache_.dialCollectionsRefList ) {
-      auto applyConditionFormulaStr = buildResolvedApplyConditionFormulaStr(*dialCollection, _parameters_.variableDict);
+      auto applyConditionFormulaStr = dialCollection->getApplyConditionStr();
       if( not applyConditionFormulaStr.empty() ) {
+        addVariablesRequestedByFormula(_cache_, applyConditionFormulaStr, _parameters_.variableDict, false);
         LogInfo << "DialCollection \"" << dialCollection->getTitle()
                 << "\" applyCondition: \"" << applyConditionFormulaStr << "\"" << std::endl;
       }
@@ -443,7 +743,10 @@ void DataDispenser::fetchRequestedLeaves(){
       }
     }
     LogInfo << "DialCollection requests for indexing: " << GenericToolbox::toString(indexRequests) << std::endl;
-    for( auto& var : indexRequests ){ _cache_.addVarRequestedForIndexing(var); }
+    for( auto& var : indexRequests ){
+      std::set<std::string> variableDictStack;
+      addVariableDictRequestedByName(_cache_, var, _parameters_.variableDict, variableDictStack);
+    }
   }
 
   // sample binning -> indexing only
@@ -455,19 +758,27 @@ void DataDispenser::fetchRequestedLeaves(){
           GenericToolbox::addIfNotInVector(edges.varName, varForIndexingListBuffer);
         }
       }
-      auto sampleWeightFormulaStr = buildResolvedSampleWeightFormulaStr(sample, _parameters_.variableDict);
+      if( not sample.getSelectionCutsStr().empty() ){
+        addVariablesRequestedByFormula(_cache_, sample.getSelectionCutsStr(), _parameters_.variableDict, false);
+      }
+      auto sampleWeightFormulaStr = sample.getSampleWeightFormulaStr();
       if( not sampleWeightFormulaStr.empty() ){
+        addVariablesRequestedByFormula(_cache_, sampleWeightFormulaStr, _parameters_.variableDict, false);
         LogInfo << "Sample \"" << sample.getName() << "\" weight formula: \"" << sampleWeightFormulaStr << "\"" << std::endl;
       }
     }
     LogInfo << "Samples variable request for indexing: " << GenericToolbox::toString(varForIndexingListBuffer) << std::endl;
-    for( auto &var: varForIndexingListBuffer ){ _cache_.addVarRequestedForIndexing(var); }
+    for( auto &var: varForIndexingListBuffer ){
+      std::set<std::string> variableDictStack;
+      addVariableDictRequestedByName(_cache_, var, _parameters_.variableDict, variableDictStack);
+    }
   }
 
   // for event weight
   if( not _parameters_.eventVariableAsWeight.empty() ){
     LogInfo << "Variable for event weight: " << _parameters_.eventVariableAsWeight << std::endl;
-    _cache_.addVarRequestedForIndexing(_parameters_.eventVariableAsWeight);
+    std::set<std::string> variableDictStack;
+    addVariableDictRequestedByName(_cache_, _parameters_.eventVariableAsWeight, _parameters_.variableDict, variableDictStack);
   }
 
   // plotGen -> for storage as we need those in prefit and postfit
@@ -481,7 +792,8 @@ void DataDispenser::fetchRequestedLeaves(){
     }
     LogInfo << "PlotGenerator variable request for storage: " << GenericToolbox::toString(varForStorageListBuffer) << std::endl;
     for( auto& var : varForStorageListBuffer ) {
-      _cache_.addVarRequestedForIndexing(var);
+      std::set<std::string> variableDictStack;
+      addVariableDictRequestedByName(_cache_, var, _parameters_.variableDict, variableDictStack);
       GenericToolbox::addIfNotInVector(var, _cache_.propagatorPtr->getSampleSet().getEventVariableNameList());
     }
   }
@@ -492,10 +804,15 @@ void DataDispenser::fetchRequestedLeaves(){
     varForStorageListBuffer = _parameters_.additionalVarsStorage;
     LogInfo << "Additional var requests for storage:" << GenericToolbox::toString(varForStorageListBuffer) << std::endl;
     for (auto &var: varForStorageListBuffer) {
-      _cache_.addVarRequestedForIndexing(var);
+      std::set<std::string> variableDictStack;
+      addVariableDictRequestedByName(_cache_, var, _parameters_.variableDict, variableDictStack);
       GenericToolbox::addIfNotInVector(var, _cache_.propagatorPtr->getSampleSet().getEventVariableNameList());
     }
   }
+
+  addVariablesRequestedByFormula(_cache_, _parameters_.selectionCutFormulaStr, _parameters_.variableDict, false);
+  addVariablesRequestedByFormula(_cache_, _parameters_.nominalWeightFormulaStr, _parameters_.variableDict, false);
+  addVariablesRequestedByFormula(_cache_, _parameters_.dialIndexFormula, _parameters_.variableDict, false);
 
   // transforms inputs
   if( not _parameters_.eventVarTransformList.empty() ){
@@ -514,7 +831,10 @@ void DataDispenser::fetchRequestedLeaves(){
     }
 
     LogInfo << "EventVariableTransformation requests for indexing: " << GenericToolbox::toString(indexRequests) << std::endl;
-    for( auto& var : indexRequests ){ _cache_.addVarRequestedForIndexing(var); }
+    for( auto& var : indexRequests ){
+      std::set<std::string> variableDictStack;
+      addVariableDictRequestedByName(_cache_, var, _parameters_.variableDict, variableDictStack);
+    }
   }
 
   // LogInfo << "Vars requested for indexing: " << GenericToolbox::toString(_cache_.varsRequestedForIndexing, false) << std::endl;
@@ -529,7 +849,10 @@ void DataDispenser::fetchRequestedLeaves(){
     _cache_.varToLeafDict[var].first = GenericToolbox::stripBracket(_cache_.varToLeafDict[var].first, '[', ']');
 
     // look for override requests
-    if( GenericToolbox::isIn(_cache_.varToLeafDict[var].first, _parameters_.variableDict) ){
+    if(
+        GenericToolbox::isIn(_cache_.varToLeafDict[var].first, _parameters_.variableDict)
+        and not isActiveVariableDictName(_cache_, var)
+    ){
       // leafVar will actually be the override leaf name while event will keep the original name
       _cache_.varToLeafDict[var].first = _parameters_.variableDict[_cache_.varToLeafDict[var].first];
       _cache_.varToLeafDict[var].first = GenericToolbox::stripBracket(_cache_.varToLeafDict[var].first, '[', ']');
@@ -561,6 +884,7 @@ void DataDispenser::preAllocateMemory(){
   treeBuffer.setTree(treeChain.get());
 
   for( auto& var : _cache_.varsRequestedForIndexing ){
+    if( isEventBufferOnlyVariable(_cache_, var) ){ continue; }
     treeBuffer.addExpression( getVariableExpression( var ) );
   }
   treeBuffer.initialize();
@@ -571,10 +895,17 @@ void DataDispenser::preAllocateMemory(){
 
   std::vector<const GenericToolbox::TreeBuffer::ExpressionBuffer*> expList{};
   for( auto& storageVar : *eventPlaceholder.getVariables().getNameListPtr() ){
+    if( isEventBufferOnlyVariable(_cache_, storageVar) ){
+      expList.emplace_back(nullptr);
+      continue;
+    }
     expList.emplace_back( treeBuffer.getExpressionBuffer(getVariableExpression( storageVar )) );
   }
 
-  LoaderUtils::copyData(eventPlaceholder, expList);
+  for( size_t iExp = 0 ; iExp < expList.size() ; iExp++ ){
+    if( expList[iExp] == nullptr ){ eventPlaceholder.getVariables().getVarList()[iExp].set(0.); }
+    else{ eventPlaceholder.getVariables().getVarList()[iExp].set(expList[iExp]->getBuffer()); }
+  }
 
   LogInfo << "Reserving event memory..." << std::endl;
   {
@@ -805,6 +1136,13 @@ int DataDispenser::getNbParallelCpu() const{
   return GundamGlobals::getNbCpuThreads(_owner_->getNbMaxThreadsForLoad());
 }
 const std::string& DataDispenser::getVariableExpression(const std::string& variable_) const {
+  auto* activeEntry = getActiveVariableDictEntry(_cache_, variable_);
+  if( activeEntry != nullptr ){
+    if( activeEntry->backend == DataDispenserCache::VariableDictEntry::TreeBufferExpression ){
+      return activeEntry->expr;
+    }
+    return variable_;
+  }
   try{ return _parameters_.variableDict.at(variable_); } catch( ... ) {}
   return variable_; // if not found
 }
@@ -863,17 +1201,28 @@ void DataDispenser::eventSelectionFunction(int iThread_){
   GenericToolbox::TreeBuffer tb;
   tb.setTree( treeChain.get() );
 
+  Event eventSelectionBuffer;
+  eventSelectionBuffer.getIndices().dataset = _owner_->getDataSetIndex();
+  eventSelectionBuffer.getVariables().setVarNameList(_cache_.varsRequestedForIndexing);
+
+  std::vector<const GenericToolbox::TreeBuffer::ExpressionBuffer*> varIndexingList;
+  varIndexingList.reserve(_cache_.varsRequestedForIndexing.size());
+
   // global cut
-  int selectionCutLeafFormIndex{-1};
-  if( not _parameters_.selectionCutFormulaStr.empty() ){
-    LogInfoIf(iThread_ == 0) << "Global selection cut: \"" << _parameters_.selectionCutFormulaStr << "\"" << std::endl;
-    selectionCutLeafFormIndex = tb.addExpression( _parameters_.selectionCutFormulaStr );
-  }
+  ThreadSharedData::VariableBuffer::RuntimeFormula selectionCutFormula;
+  LogInfoIf(iThread_ == 0 and not _parameters_.selectionCutFormulaStr.empty()) << "Global selection cut: \"" << _parameters_.selectionCutFormulaStr << "\"" << std::endl;
+  compileRuntimeFormula(
+      selectionCutFormula,
+      tb,
+      _parameters_.selectionCutFormulaStr,
+      _cache_.varsRequestedForIndexing,
+      _cache_.eventFormulaTreeExpressionAliases
+  );
 
   // sample cuts
   struct SampleCut{
     int sampleIndex{-1};
-    int cutIndex{-1};
+    ThreadSharedData::VariableBuffer::RuntimeFormula formula{};
   };
   std::vector<SampleCut> sampleCutList;
   sampleCutList.reserve( _cache_.samplesToFillList.size() );
@@ -884,19 +1233,53 @@ void DataDispenser::eventSelectionFunction(int iThread_){
     sampleCutList.back().sampleIndex = iSample;
 
     std::string selectionCut = samplePtr->getSelectionCutsStr();
-    if( not selectionCut.empty() ){
-      selectionCut = FormulaUtils::resolveFormulaReferences(
-          selectionCut,
-          _parameters_.variableDict,
-          FormulaUtils::FormulaResolutionMode::AllowTreeLeafFallback
-      );
-    }
-
     if( selectionCut.empty() ){ continue; }
-
-    sampleCutList.back().cutIndex = tb.addExpression( selectionCut );
+    compileRuntimeFormula(
+        sampleCutList.back().formula,
+        tb,
+        selectionCut,
+        _cache_.varsRequestedForIndexing,
+        _cache_.eventFormulaTreeExpressionAliases
+    );
   }
+
+  std::vector<ThreadSharedData::VariableBuffer::VariableDictBuffer> variableDictEvalList;
+  variableDictEvalList.reserve(_cache_.variableDictEvalList.size());
+  for( const auto& variableDictEntry : _cache_.variableDictEvalList ){
+    variableDictEvalList.emplace_back();
+    variableDictEvalList.back().name = variableDictEntry.name;
+    variableDictEvalList.back().outputVarIndex = GenericToolbox::findElementIndex(
+        variableDictEntry.name,
+        _cache_.varsRequestedForIndexing
+    );
+    LogExitIf(variableDictEvalList.back().outputVarIndex == -1, "Missing variableDict output variable: " << variableDictEntry.name);
+    compileRuntimeFormula(
+        variableDictEvalList.back().formula,
+        tb,
+        variableDictEntry.expr,
+        _cache_.varsRequestedForIndexing,
+        _cache_.eventFormulaTreeExpressionAliases
+    );
+  }
+
+  for( auto& var : _cache_.varsRequestedForIndexing ){
+    if( isActiveVariableDictName(_cache_, var) ){
+      varIndexingList.emplace_back(nullptr);
+      continue;
+    }
+    varIndexingList.emplace_back();
+    ThreadSharedData::VariableBuffer::storeTempIndex(
+        varIndexingList.back(),
+        tb.addExpression(getVariableExpression(var))
+    );
+  }
+
   tb.initialize();
+
+  unfoldRuntimeFormula(selectionCutFormula, tb.getExpressionBufferList());
+  for( auto& sampleCut : sampleCutList ){ unfoldRuntimeFormula(sampleCut.formula, tb.getExpressionBufferList()); }
+  for( auto& variableDictEntry : variableDictEvalList ){ unfoldRuntimeFormula(variableDictEntry.formula, tb.getExpressionBufferList()); }
+  for( auto& varInd : varIndexingList ){ ThreadSharedData::VariableBuffer::unfoldTempIndex(varInd, tb.getExpressionBufferList()); }
 
   GenericToolbox::VariableMonitor readSpeed("bytes");
 
@@ -941,8 +1324,14 @@ void DataDispenser::eventSelectionFunction(int iThread_){
     }
     tb.saveExpressions();
 
-    if ( selectionCutLeafFormIndex != -1 ){
-      if( tb.getExpressionBufferList()[selectionCutLeafFormIndex]->getBuffer().getValueAsDouble() == 0 ){
+    for( size_t iVar = 0 ; iVar < varIndexingList.size() ; iVar++ ){
+      if( varIndexingList[iVar] == nullptr ){ continue; }
+      eventSelectionBuffer.getVariables().getVarList()[iVar].set(varIndexingList[iVar]->getBuffer());
+    }
+    evalVariableDict(eventSelectionBuffer, variableDictEvalList);
+
+    if ( selectionCutFormula.isEnabled() ){
+      if( selectionCutFormula.eval(eventSelectionBuffer) == 0 ){
         // skip it
         continue;
       }
@@ -951,8 +1340,8 @@ void DataDispenser::eventSelectionFunction(int iThread_){
     bool sampleHasBeenFound{false};
     for( auto& sampleCut : sampleCutList ){
 
-      if(  sampleCut.cutIndex == -1  // no cut?
-           or tb.getExpressionBufferList()[sampleCut.cutIndex]->getBuffer().getValueAsDouble() != 0 // pass cut?
+      if(  not sampleCut.formula.isEnabled()  // no cut?
+           or sampleCut.formula.eval(eventSelectionBuffer) != 0 // pass cut?
           ){
         if( not _parameters_.allowMultipleSamplesPerEntry and sampleHasBeenFound ){
           LogError << "Entry #" << iEntry << "already has a sample." << std::endl;
@@ -992,56 +1381,74 @@ void DataDispenser::runEventFillThreads(int iThread_){
   threadSharedData.treeBuffer.setTree(threadSharedData.treeChain.get());
 
   // nominal weight
-  if( not _parameters_.nominalWeightFormulaStr.empty() ){
-    ThreadSharedData::VariableBuffer::storeTempIndex(
-          threadSharedData.buffer.nominalWeight,
-          threadSharedData.treeBuffer.addExpression(_parameters_.nominalWeightFormulaStr)
-        );
-  }
+  compileRuntimeFormula(
+      threadSharedData.buffer.nominalWeightFormula,
+      threadSharedData.treeBuffer,
+      _parameters_.nominalWeightFormulaStr,
+      _cache_.varsRequestedForIndexing,
+      _cache_.eventFormulaTreeExpressionAliases
+  );
 
   // dial array index
-  if( not _parameters_.dialIndexFormula.empty() ){
-    ThreadSharedData::VariableBuffer::storeTempIndex(
-          threadSharedData.buffer.dialIndex,
-          threadSharedData.treeBuffer.addExpression(_parameters_.dialIndexFormula)
-        );
-  }
+  compileRuntimeFormula(
+      threadSharedData.buffer.dialIndexFormula,
+      threadSharedData.treeBuffer,
+      _parameters_.dialIndexFormula,
+      _cache_.varsRequestedForIndexing,
+      _cache_.eventFormulaTreeExpressionAliases
+  );
 
-  threadSharedData.buffer.dialApplyConditionList.resize(_cache_.dialCollectionsRefList.size(), nullptr);
-  for( auto& dialApplyCondition : threadSharedData.buffer.dialApplyConditionList ){
-    ThreadSharedData::VariableBuffer::storeTempIndex(dialApplyCondition, -1);
-  }
+  threadSharedData.buffer.dialApplyConditionFormulaList.resize(_cache_.dialCollectionsRefList.size());
   for( size_t iDialCollection = 0 ; iDialCollection < _cache_.dialCollectionsRefList.size() ; iDialCollection++ ){
-    auto applyConditionFormulaStr = buildResolvedApplyConditionFormulaStr(
-        *_cache_.dialCollectionsRefList[iDialCollection],
-        _parameters_.variableDict
-    );
+    auto applyConditionFormulaStr = _cache_.dialCollectionsRefList[iDialCollection]->getApplyConditionStr();
     if( applyConditionFormulaStr.empty() ){ continue; }
-    ThreadSharedData::VariableBuffer::storeTempIndex(
-        threadSharedData.buffer.dialApplyConditionList[iDialCollection],
-        threadSharedData.treeBuffer.addExpression(applyConditionFormulaStr)
+    compileRuntimeFormula(
+        threadSharedData.buffer.dialApplyConditionFormulaList[iDialCollection],
+        threadSharedData.treeBuffer,
+        applyConditionFormulaStr,
+        _cache_.varsRequestedForIndexing,
+        _cache_.eventFormulaTreeExpressionAliases
     );
   }
 
-  threadSharedData.buffer.sampleWeightList.resize(_cache_.samplesToFillList.size(), nullptr);
-  for( auto& sampleWeight : threadSharedData.buffer.sampleWeightList ){
-    ThreadSharedData::VariableBuffer::storeTempIndex(sampleWeight, -1);
-  }
+  threadSharedData.buffer.sampleWeightFormulaList.resize(_cache_.samplesToFillList.size());
   for( size_t iSample = 0 ; iSample < _cache_.samplesToFillList.size() ; iSample++ ){
-    auto sampleWeightFormulaStr = buildResolvedSampleWeightFormulaStr(
-        *_cache_.samplesToFillList[iSample],
-        _parameters_.variableDict
-    );
+    auto sampleWeightFormulaStr = _cache_.samplesToFillList[iSample]->getSampleWeightFormulaStr();
     if( sampleWeightFormulaStr.empty() ){ continue; }
-    ThreadSharedData::VariableBuffer::storeTempIndex(
-        threadSharedData.buffer.sampleWeightList[iSample],
-        threadSharedData.treeBuffer.addExpression(sampleWeightFormulaStr)
+    compileRuntimeFormula(
+        threadSharedData.buffer.sampleWeightFormulaList[iSample],
+        threadSharedData.treeBuffer,
+        sampleWeightFormulaStr,
+        _cache_.varsRequestedForIndexing,
+        _cache_.eventFormulaTreeExpressionAliases
+    );
+  }
+
+  threadSharedData.buffer.variableDictEvalList.reserve(_cache_.variableDictEvalList.size());
+  for( const auto& variableDictEntry : _cache_.variableDictEvalList ){
+    threadSharedData.buffer.variableDictEvalList.emplace_back();
+    threadSharedData.buffer.variableDictEvalList.back().name = variableDictEntry.name;
+    threadSharedData.buffer.variableDictEvalList.back().outputVarIndex = GenericToolbox::findElementIndex(
+        variableDictEntry.name,
+        _cache_.varsRequestedForIndexing
+    );
+    LogExitIf(threadSharedData.buffer.variableDictEvalList.back().outputVarIndex == -1, "Missing variableDict output variable: " << variableDictEntry.name);
+    compileRuntimeFormula(
+        threadSharedData.buffer.variableDictEvalList.back().formula,
+        threadSharedData.treeBuffer,
+        variableDictEntry.expr,
+        _cache_.varsRequestedForIndexing,
+        _cache_.eventFormulaTreeExpressionAliases
     );
   }
 
   // variables definition
   for( auto& var : _cache_.varsRequestedForIndexing ){
     threadSharedData.buffer.varIndexingList.emplace_back();
+    if( isActiveVariableDictName(_cache_, var) ){
+      ThreadSharedData::VariableBuffer::storeTempIndex(threadSharedData.buffer.varIndexingList.back(), -1);
+      continue;
+    }
     ThreadSharedData::VariableBuffer::storeTempIndex(
       threadSharedData.buffer.varIndexingList.back(),
       threadSharedData.treeBuffer.addExpression(getVariableExpression(var))
@@ -1049,6 +1456,10 @@ void DataDispenser::runEventFillThreads(int iThread_){
   }
   for( auto& var : _cache_.propagatorPtr->getSampleSet().getEventVariableNameList() ){
     threadSharedData.buffer.varStorageList.emplace_back();
+    if( isActiveVariableDictName(_cache_, var) ){
+      ThreadSharedData::VariableBuffer::storeTempIndex(threadSharedData.buffer.varStorageList.back(), -1);
+      continue;
+    }
     ThreadSharedData::VariableBuffer::storeTempIndex(
       threadSharedData.buffer.varStorageList.back(),
       threadSharedData.treeBuffer.addExpression(getVariableExpression(var))
@@ -1058,10 +1469,11 @@ void DataDispenser::runEventFillThreads(int iThread_){
   threadSharedData.treeBuffer.initialize();
 
   // grab ptr address now
-  if( not _parameters_.nominalWeightFormulaStr.empty() ){ ThreadSharedData::VariableBuffer::unfoldTempIndex(threadSharedData.buffer.nominalWeight, threadSharedData.treeBuffer.getExpressionBufferList()); }
-  if( not _parameters_.dialIndexFormula.empty() ){ ThreadSharedData::VariableBuffer::unfoldTempIndex(threadSharedData.buffer.dialIndex, threadSharedData.treeBuffer.getExpressionBufferList()); }
-  for( auto& dialApplyCondition : threadSharedData.buffer.dialApplyConditionList ){ ThreadSharedData::VariableBuffer::unfoldTempIndex(dialApplyCondition, threadSharedData.treeBuffer.getExpressionBufferList()); }
-  for( auto& sampleWeight : threadSharedData.buffer.sampleWeightList ){ ThreadSharedData::VariableBuffer::unfoldTempIndex(sampleWeight, threadSharedData.treeBuffer.getExpressionBufferList()); }
+  unfoldRuntimeFormula(threadSharedData.buffer.nominalWeightFormula, threadSharedData.treeBuffer.getExpressionBufferList());
+  unfoldRuntimeFormula(threadSharedData.buffer.dialIndexFormula, threadSharedData.treeBuffer.getExpressionBufferList());
+  for( auto& dialApplyCondition : threadSharedData.buffer.dialApplyConditionFormulaList ){ unfoldRuntimeFormula(dialApplyCondition, threadSharedData.treeBuffer.getExpressionBufferList()); }
+  for( auto& sampleWeight : threadSharedData.buffer.sampleWeightFormulaList ){ unfoldRuntimeFormula(sampleWeight, threadSharedData.treeBuffer.getExpressionBufferList()); }
+  for( auto& variableDictEntry : threadSharedData.buffer.variableDictEvalList ){ unfoldRuntimeFormula(variableDictEntry.formula, threadSharedData.treeBuffer.getExpressionBufferList()); }
   for( auto& varInd: threadSharedData.buffer.varIndexingList ){ ThreadSharedData::VariableBuffer::unfoldTempIndex(varInd, threadSharedData.treeBuffer.getExpressionBufferList()); }
   for( auto& varSto: threadSharedData.buffer.varStorageList ){ ThreadSharedData::VariableBuffer::unfoldTempIndex(varSto, threadSharedData.treeBuffer.getExpressionBufferList()); }
 
@@ -1069,12 +1481,12 @@ void DataDispenser::runEventFillThreads(int iThread_){
   if( not _parameters_.eventVariableAsWeight.empty() ){
     for( size_t iVar = 0 ; iVar < _cache_.varsRequestedForIndexing.size() ; iVar++ ){
       if( _cache_.varsRequestedForIndexing[iVar] == _parameters_.eventVariableAsWeight ) {
-        threadSharedData.buffer.eventVarAsWeight = threadSharedData.buffer.varIndexingList[iVar];
+        threadSharedData.buffer.eventVarAsWeightIndex = int(iVar);
         break;
       }
     }
 
-    LogExitIf(threadSharedData.buffer.eventVarAsWeight==nullptr, "Could not find variable: " << _parameters_.eventVariableAsWeight);
+    LogExitIf(threadSharedData.buffer.eventVarAsWeightIndex == -1, "Could not find variable: " << _parameters_.eventVariableAsWeight);
   }
 
   // start event filler
@@ -1228,8 +1640,15 @@ void DataDispenser::loadEvent(int iThread_){
 
       varDisplayList.back().varName = _cache_.varsRequestedForIndexing[iVar];
 
-      varDisplayList.back().leafName = threadSharedData.buffer.varIndexingList[iVar]->getExpression();
-      varDisplayList.back().leafTypeName = GenericToolbox::findOriginalVariableType(threadSharedData.buffer.varIndexingList[iVar]->getBuffer());
+      if( threadSharedData.buffer.varIndexingList[iVar] != nullptr ){
+        varDisplayList.back().leafName = threadSharedData.buffer.varIndexingList[iVar]->getExpression();
+        varDisplayList.back().leafTypeName = GenericToolbox::findOriginalVariableType(threadSharedData.buffer.varIndexingList[iVar]->getBuffer());
+      }
+      else{
+        auto* variableDictEntry = getActiveVariableDictEntry(_cache_, _cache_.varsRequestedForIndexing[iVar]);
+        varDisplayList.back().leafName = (variableDictEntry == nullptr ? "" : variableDictEntry->expr);
+        varDisplayList.back().leafTypeName = "formula";
+      }
 
       std::vector<std::string> transformsList;
       for( auto* varTransformForIndexing : varTransformForIndexingList ){
@@ -1239,7 +1658,7 @@ void DataDispenser::loadEvent(int iThread_){
       }
       varDisplayList.back().transformStr = GenericToolbox::toString(transformsList);
       varDisplayList.back().priorityIndex = 999;
-      if( varDisplayList.back().leafTypeName != "\xFF" ){
+      if( threadSharedData.buffer.varIndexingList[iVar] != nullptr and varDisplayList.back().leafTypeName != "\xFF" ){
         varDisplayList.back().priorityIndex = int( threadSharedData.buffer.varIndexingList[iVar]->getBuffer().getStoredSize() );
       }
 
@@ -1317,7 +1736,12 @@ void DataDispenser::loadEvent(int iThread_){
       if( threadSharedData.isDoneReading.getValue() ){ break; }
 
       // leafFormIndexingList is modified by the TChain reader
-      LoaderUtils::copyData(eventIndexingBuffer, threadSharedData.buffer.varIndexingList);
+      for( size_t iVar = 0 ; iVar < threadSharedData.buffer.varIndexingList.size() ; iVar++ ){
+        if( threadSharedData.buffer.varIndexingList[iVar] == nullptr ){ continue; }
+        eventIndexingBuffer.getVariables().getVarList()[iVar].set(threadSharedData.buffer.varIndexingList[iVar]->getBuffer());
+      }
+
+      evalVariableDict(eventIndexingBuffer, threadSharedData.buffer.variableDictEvalList);
 
       // Propagate variable transformations for indexing
       LoaderUtils::applyVarTransforms(eventIndexingBuffer, varTransformForIndexingList);
@@ -1326,13 +1750,13 @@ void DataDispenser::loadEvent(int iThread_){
       eventIndexingBuffer.getWeights().base = 1;
 
       // nominalWeightTreeFormula is attached to the TChain
-      if( threadSharedData.buffer.nominalWeight != nullptr ){
-        eventIndexingBuffer.getWeights().base = threadSharedData.buffer.nominalWeight->getBuffer().getValueAsDouble();
+      if( threadSharedData.buffer.nominalWeightFormula.isEnabled() ){
+        eventIndexingBuffer.getWeights().base = threadSharedData.buffer.nominalWeightFormula.eval(eventIndexingBuffer);
       }
 
       // additional weight with an event variable
-      if( threadSharedData.buffer.eventVarAsWeight != nullptr ){
-        eventIndexingBuffer.getWeights().base *= threadSharedData.buffer.eventVarAsWeight->getBuffer().getValueAsDouble();
+      if( threadSharedData.buffer.eventVarAsWeightIndex != -1 ){
+        eventIndexingBuffer.getWeights().base *= eventIndexingBuffer.getVariables().getVarList()[threadSharedData.buffer.eventVarAsWeightIndex].getVarAsDouble();
       }
 
       // skip this event if 0
@@ -1388,8 +1812,8 @@ void DataDispenser::loadEvent(int iThread_){
         }
 
         sampleWeightList.emplace_back(1);
-        if( threadSharedData.buffer.sampleWeightList[sampleIdx] != nullptr ){
-          double sampleWeight = threadSharedData.buffer.sampleWeightList[sampleIdx]->getBuffer().getValueAsDouble();
+        if( threadSharedData.buffer.sampleWeightFormulaList[sampleIdx].isEnabled() ){
+          double sampleWeight = threadSharedData.buffer.sampleWeightFormulaList[sampleIdx].eval(eventIndexingBuffer);
           if( sampleWeight < 0 ) {
             LogError << "Negative sampleWeight:" << sampleWeight << std::endl;
             LogError << "sampleWeight buffer is: " << eventIndexingBuffer.getSummary() << std::endl;
@@ -1407,8 +1831,8 @@ void DataDispenser::loadEvent(int iThread_){
 
       // dialIndexTreeFormula is modified by the TChain reader
       int dialCloneArrayIndex{0};
-      if( threadSharedData.buffer.dialIndex != nullptr ){
-        dialCloneArrayIndex = static_cast<int>(threadSharedData.buffer.dialIndex->getBuffer().getValueAsLong());
+      if( threadSharedData.buffer.dialIndexFormula.isEnabled() ){
+        dialCloneArrayIndex = static_cast<int>(threadSharedData.buffer.dialIndexFormula.eval(eventIndexingBuffer));
       }
 
       // only load event-by-event dials, binned dials etc. will be processed later
@@ -1418,8 +1842,8 @@ void DataDispenser::loadEvent(int iThread_){
         // if not event-by-event dial -> leave
         if( dialCollectionRef->getDialLeafName().empty() ){ continue; }
 
-        if( threadSharedData.buffer.dialApplyConditionList[iDialCollection] != nullptr ){
-          if( threadSharedData.buffer.dialApplyConditionList[iDialCollection]->getBuffer().getValueAsDouble() == 0 ){
+        if( threadSharedData.buffer.dialApplyConditionFormulaList[iDialCollection].isEnabled() ){
+          if( threadSharedData.buffer.dialApplyConditionFormulaList[iDialCollection].eval(eventIndexingBuffer) == 0 ){
             // next dialSet
             continue;
           }
@@ -1508,8 +1932,8 @@ void DataDispenser::loadEvent(int iThread_){
           continue; // skip the rest
         }
 
-        if( threadSharedData.buffer.dialApplyConditionList[iDialCollection] != nullptr ){
-          if( threadSharedData.buffer.dialApplyConditionList[iDialCollection]->getBuffer().getValueAsDouble() == 0 ){
+        if( threadSharedData.buffer.dialApplyConditionFormulaList[iDialCollection].isEnabled() ){
+          if( threadSharedData.buffer.dialApplyConditionFormulaList[iDialCollection].eval(eventIndexingBuffer) == 0 ){
             // next dialSet
             continue;
           }

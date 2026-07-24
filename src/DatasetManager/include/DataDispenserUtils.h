@@ -13,6 +13,7 @@
 
 #include "TChain.h"
 #include "TTreeFormula.h"
+#include "TFormula.h"
 
 
 #include "string"
@@ -90,6 +91,19 @@ struct DataDispenserCache{
 
   std::vector<std::string> varsRequestedForIndexing{};
   std::map<std::string, std::pair<std::string, bool>> varToLeafDict; // varToLeafDict[EVENT_VAR_NAME] = {LEAF_NAME, IS_DUMMY}
+  std::map<std::string, std::string> eventFormulaTreeExpressionAliases{};
+
+  struct VariableDictEntry{
+    enum EvalBackend{
+      TreeBufferExpression,
+      EventBufferFormula
+    };
+
+    std::string name{};
+    std::string expr{};
+    EvalBackend backend{TreeBufferExpression};
+  };
+  std::vector<VariableDictEntry> variableDictEvalList{};
 
   struct ThreadSelectionResult{
     std::vector<size_t> sampleNbOfEvents;
@@ -110,13 +124,54 @@ struct ThreadSharedData{
 
   // buffer
   struct VariableBuffer{
-    const GenericToolbox::TreeBuffer::ExpressionBuffer* nominalWeight{nullptr};
-    const GenericToolbox::TreeBuffer::ExpressionBuffer* dialIndex{nullptr};
-    const GenericToolbox::TreeBuffer::ExpressionBuffer* eventVarAsWeight{nullptr};
-    std::vector<const GenericToolbox::TreeBuffer::ExpressionBuffer*> dialApplyConditionList{};
-    std::vector<const GenericToolbox::TreeBuffer::ExpressionBuffer*> sampleWeightList{};
+    struct EventFormula{
+      std::string expr{};
+      TFormula formula{};
+      std::vector<int> varIndexList{};
+
+      double eval(const Event& event_) const{
+        std::vector<double> parArray(formula.GetNpar());
+        for( int iPar = 0 ; iPar < formula.GetNpar() ; iPar++ ){
+          parArray[iPar] = event_.getVariables().getVarList()[varIndexList[iPar]].getVarAsDouble();
+        }
+        return formula.EvalPar(nullptr, parArray.empty() ? nullptr : parArray.data());
+      }
+    };
+
+    struct RuntimeFormula{
+      enum EvalBackend{
+        Disabled,
+        TreeBufferExpression,
+        EventBufferFormula
+      };
+
+      EvalBackend backend{Disabled};
+      const GenericToolbox::TreeBuffer::ExpressionBuffer* treeExpression{nullptr};
+      EventFormula eventFormula{};
+
+      bool isEnabled() const{ return backend != Disabled; }
+      double eval(const Event& event_) const{
+        if( backend == TreeBufferExpression ){ return treeExpression->getBuffer().getValueAsDouble(); }
+        if( backend == EventBufferFormula ){ return eventFormula.eval(event_); }
+        return 0;
+      }
+    };
+
+    struct VariableDictBuffer{
+      std::string name{};
+      int outputVarIndex{-1};
+      RuntimeFormula formula{};
+    };
+
+    int eventVarAsWeightIndex{-1};
     std::vector<const GenericToolbox::TreeBuffer::ExpressionBuffer*> varIndexingList{};
     std::vector<const GenericToolbox::TreeBuffer::ExpressionBuffer*> varStorageList{};
+
+    RuntimeFormula nominalWeightFormula{};
+    RuntimeFormula dialIndexFormula{};
+    std::vector<RuntimeFormula> dialApplyConditionFormulaList{};
+    std::vector<RuntimeFormula> sampleWeightFormulaList{};
+    std::vector<VariableDictBuffer> variableDictEvalList{};
 
     static void storeTempIndex(const GenericToolbox::TreeBuffer::ExpressionBuffer*& var_, int idx_){
       var_ = reinterpret_cast<const GenericToolbox::TreeBuffer::ExpressionBuffer *>(static_cast<size_t>(idx_));

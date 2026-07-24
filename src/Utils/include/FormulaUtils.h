@@ -29,6 +29,14 @@ namespace FormulaUtils {
       FormulaResolutionMode resolutionMode_ = FormulaResolutionMode::StrictVariableDictOnly
   );
 
+  std::vector<std::string> extractFormulaReferenceNames(const std::string& formula_);
+
+  std::vector<std::string> extractBareVariableNames(const std::string& formula_);
+
+  std::vector<std::string> extractEventVariableNames(const std::string& formula_);
+
+  std::string convertBareVariablesToFormulaParameters(const std::string& formula_);
+
 }
 
 #endif
