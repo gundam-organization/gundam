@@ -1079,6 +1079,9 @@ void DataDispenser::runEventFillThreads(int iThread_){
   }
 
   threadSharedData.buffer.dialApplyConditionList.resize(_cache_.dialCollectionsRefList.size(), nullptr);
+  for( auto& dialApplyCondition : threadSharedData.buffer.dialApplyConditionList ){
+    ThreadSharedData::VariableBuffer::storeTempIndex(dialApplyCondition, -1);
+  }
   for( size_t iDialCollection = 0 ; iDialCollection < _cache_.dialCollectionsRefList.size() ; iDialCollection++ ){
     auto applyConditionFormulaStr = buildResolvedApplyConditionFormulaStr(
         *_cache_.dialCollectionsRefList[iDialCollection],
@@ -1092,6 +1095,9 @@ void DataDispenser::runEventFillThreads(int iThread_){
   }
 
   threadSharedData.buffer.sampleWeightList.resize(_cache_.samplesToFillList.size(), nullptr);
+  for( auto& sampleWeight : threadSharedData.buffer.sampleWeightList ){
+    ThreadSharedData::VariableBuffer::storeTempIndex(sampleWeight, -1);
+  }
   for( size_t iSample = 0 ; iSample < _cache_.samplesToFillList.size() ; iSample++ ){
     auto sampleWeightFormulaStr = buildResolvedSampleWeightFormulaStr(
         *_cache_.samplesToFillList[iSample],
@@ -1386,6 +1392,9 @@ void DataDispenser::loadEvent(int iThread_){
 
       // Propagate variable transformations for indexing
       LoaderUtils::applyVarTransforms(eventIndexingBuffer, varTransformForIndexingList);
+
+      // Default behavior for empty or omitted weight formulas must be neutral.
+      eventIndexingBuffer.getWeights().base = 1;
 
       // nominalWeightTreeFormula is attached to the TChain
       if( threadSharedData.buffer.nominalWeight != nullptr ){

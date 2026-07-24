@@ -123,7 +123,10 @@ struct ThreadSharedData{
     }
     static void unfoldTempIndex(const GenericToolbox::TreeBuffer::ExpressionBuffer*& var_, const std::vector<std::shared_ptr<GenericToolbox::TreeBuffer::ExpressionBuffer>>& list_){
       int idx = static_cast<int>(reinterpret_cast<size_t>(var_));
-      if( idx == -1 ){ var_ = nullptr; }
+      if( idx == -1 ){
+        var_ = nullptr;
+        return;
+      }
       var_ = list_[idx].get();
     }
   };
