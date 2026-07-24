@@ -349,7 +349,11 @@ void DataDispenser::parseStringParameters() {
   };
   auto overrideLeavesNamesFct = [&](std::string& formula_){
     for( auto& replaceEntry : _cache_.varsToOverrideList ){
-      GenericToolbox::replaceSubstringInsideInputString(formula_, replaceEntry, _parameters_.variableDict[replaceEntry]);
+      GenericToolbox::replaceSubstringInsideInputString(
+          formula_,
+          "[" + replaceEntry + "]",
+          _parameters_.variableDict[replaceEntry]
+      );
     }
   };
 
@@ -371,6 +375,12 @@ void DataDispenser::parseStringParameters() {
   if( not _parameters_.selectionCutFormulaStr.empty() ){
     _parameters_.selectionCutFormulaStr = resolveFormulaReferences(
         _parameters_.selectionCutFormulaStr,
+        _parameters_.variableDict
+    );
+  }
+  if( not _parameters_.nominalWeightFormulaStr.empty() ){
+    _parameters_.nominalWeightFormulaStr = resolveFormulaReferences(
+        _parameters_.nominalWeightFormulaStr,
         _parameters_.variableDict
     );
   }
