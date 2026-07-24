@@ -5,8 +5,6 @@
 #include <vector>
 #include <map>
 
-namespace ConfigUtils { class ConfigReader; }
-
 namespace FormulaUtils {
 
   struct FormulaComponent{
@@ -19,20 +17,8 @@ namespace FormulaUtils {
     AllowTreeLeafFallback
   };
 
-  std::vector<FormulaComponent> readFormulaComponents(
-      const ConfigUtils::ConfigReader& config_,
-      const std::string& fieldName_
-  );
-
   std::string joinFormulaComponents(
       const std::vector<FormulaComponent>& components_,
-      const std::string& joinStr_,
-      bool skipEmptyExpr_ = true
-  );
-
-  std::string buildFormulaString(
-      const ConfigUtils::ConfigReader& config_,
-      const std::string& fieldName_,
       const std::string& joinStr_,
       bool skipEmptyExpr_ = true
   );
@@ -41,15 +27,6 @@ namespace FormulaUtils {
       const std::string& formula_,
       const std::map<std::string, std::string>& variableDict_,
       FormulaResolutionMode resolutionMode_ = FormulaResolutionMode::StrictVariableDictOnly
-  );
-
-  std::string buildAndResolveFormulaString(
-      const ConfigUtils::ConfigReader& config_,
-      const std::string& fieldName_,
-      const std::string& joinStr_,
-      const std::map<std::string, std::string>& variableDict_,
-      FormulaResolutionMode resolutionMode_ = FormulaResolutionMode::StrictVariableDictOnly,
-      bool skipEmptyExpr_ = true
   );
 
 }
