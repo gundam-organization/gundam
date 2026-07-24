@@ -27,6 +27,16 @@ FIELD_CASES = {
         "hybrid": "([global_scale] > 0) && (OscChannel == 1)",
         "pure_ttreeformula": "(OscChannel == 1) * (RecoEnu > 0.2)",
     },
+    "dialIndexFormula": {
+        "pure_tformula": "[zero_index]",
+        "hybrid": "[zero_index] + (OscChannel == 1) - 1",
+        "pure_ttreeformula": "(OscChannel == 1) - 1",
+    },
+    "applyCondition": {
+        "pure_tformula": "[global_scale] > 0",
+        "hybrid": "([global_scale] > 0) && (OscChannel == 1)",
+        "pure_ttreeformula": "(OscChannel == 1) * (RecoEnu > 0.2)",
+    },
     "variableDictExpr": {
         "pure_tformula": "[const_norm] * [global_scale]",
         "hybrid": "([global_scale]) * (OscChannel == 1)",
@@ -78,12 +88,15 @@ def build_config_text(field_name: str, case_name: str, root_path: Path) -> str:
     variable_dict_lines = [
         '            - { name: "const_norm", expr: "634441." }',
         '            - { name: "global_scale", expr: "2." }',
+        '            - { name: "zero_index", expr: "0." }',
     ]
 
     nominal_weight_formula = "(1.0)"
     selection_cut_formula = "(1)"
     sample_weight_formula = ""
     selection_cut_str = ""
+    dial_index_formula = ""
+    apply_condition = ""
 
     if field_name == "selectionCutFormula":
         selection_cut_formula = FIELD_CASES[field_name][case_name]
@@ -93,6 +106,10 @@ def build_config_text(field_name: str, case_name: str, root_path: Path) -> str:
         sample_weight_formula = FIELD_CASES[field_name][case_name]
     elif field_name == "selectionCutStr":
         selection_cut_str = FIELD_CASES[field_name][case_name]
+    elif field_name == "dialIndexFormula":
+        dial_index_formula = FIELD_CASES[field_name][case_name]
+    elif field_name == "applyCondition":
+        apply_condition = FIELD_CASES[field_name][case_name]
     elif field_name == "variableDictExpr":
         variable_dict_lines.append(
             f'            - {{ name: "resolved_weight", expr: "{FIELD_CASES[field_name][case_name]}" }}'
@@ -111,7 +128,33 @@ def build_config_text(field_name: str, case_name: str, root_path: Path) -> str:
     if sample_extra_lines:
         sample_extra_block = "\n" + "\n".join(sample_extra_lines)
 
+    model_extra_lines = []
+    if dial_index_formula:
+        model_extra_lines.append(f'          dialIndexFormula: "{dial_index_formula}"')
+
+    model_extra_block = ""
+    if model_extra_lines:
+        model_extra_block = "\n" + "\n".join(model_extra_lines)
+
     variable_dict_block = "\n".join(variable_dict_lines)
+
+    parameter_set_block = ""
+    if apply_condition:
+        parameter_set_block = f"""
+      parameterSetList:
+        - name: "NormParameters"
+          isEnabled: true
+          nominalStepSize: 0.1
+          parameterDefinitions:
+            - name: "norm_A"
+              isEnabled: true
+              priorValue: 1.0
+              parameterLimits: [0.0, 2.0]
+              dialSetDefinitions:
+                - dialType: "Normalization"
+                  applyOnDataSets: [ "TestSample" ]
+                  applyCondition: "{apply_condition}"
+"""
 
     return f"""
 fitterEngineConfig:
@@ -128,6 +171,7 @@ fitterEngineConfig:
             - "{root_path}"
           selectionCutFormula: "{selection_cut_formula}"
           nominalTreeWeightFormula: "{nominal_weight_formula}"
+{model_extra_block}
           variableDict:
 {variable_dict_block}
 
@@ -141,6 +185,7 @@ fitterEngineConfig:
                 - name: "X"
                   edges: [ -1, 0, 1 ]{sample_extra_block}
             dataSets: [ "TestSample" ]
+{parameter_set_block}
 """
 
 
