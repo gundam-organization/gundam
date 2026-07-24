@@ -3,6 +3,7 @@
 //
 
 #include "ConfigUtils.h"
+#include "FormulaUtils.h"
 #include "GundamUtils.h"
 #include "GundamBacktrace.h"
 
@@ -443,20 +444,7 @@ namespace ConfigUtils {
     return getConfigEntry(fieldName_).second != nullptr;
   }
   void ConfigReader::fillFormula(std::string& formulaToFill_, const std::string& fieldName_, const std::string& joinStr_) const{
-    if( not hasField(fieldName_) ){ return; }
-
-    auto formulaList = fetchValue<std::vector<std::string>>(fieldName_);
-    formulaList.erase(
-        std::remove_if(
-            formulaList.begin(),
-            formulaList.end(),
-            [](const std::string& formula_){ return formula_.empty(); }
-        ),
-        formulaList.end()
-    );
-    for( auto& formula : formulaList ){ formula += ")"; formula.insert(0, "("); }
-
-    formulaToFill_ = GenericToolbox::joinVectorString(formulaList, joinStr_);
+    formulaToFill_ = FormulaUtils::buildFormulaString(*this, fieldName_, joinStr_);
   }
   void ConfigReader::printUnusedKeys() const{
     // for context dependent options
