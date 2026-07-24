@@ -42,6 +42,12 @@ EXPECTED_RETURN_CODES = {
 }
 
 
+def format_return_code(return_code: int) -> str:
+    if return_code < 0:
+        return f"signal {-return_code}"
+    return str(return_code)
+
+
 def flush_python_outputs() -> None:
     sys.stdout.flush()
     sys.stderr.flush()
@@ -210,6 +216,9 @@ def main() -> int:
     root_path = work_dir / "110VariableFormulaResolution.root"
     write_input_root_file(root_path)
 
+    summary_rows = []
+    has_failure = False
+
     for field_name, case_map in FIELD_CASES.items():
         for case_name in case_map:
             expected_return_code = EXPECTED_RETURN_CODES[(field_name, case_name)]
@@ -221,11 +230,46 @@ def main() -> int:
             if result.stderr:
                 print(result.stderr, end="" if result.stderr.endswith("\n") else "\n")
 
-            if result.returncode != expected_return_code:
-                print(
-                    f"FAIL: case {field_name}/{case_name} returned {result.returncode}, expected {expected_return_code}"
-                )
-                return 1
+            status = "PASS" if result.returncode == expected_return_code else "FAIL"
+            if status == "FAIL":
+                has_failure = True
+
+            summary_rows.append(
+                {
+                    "case": f"{field_name}/{case_name}",
+                    "status": status,
+                    "return_code": result.returncode,
+                    "expected_return_code": expected_return_code,
+                }
+            )
+
+    case_width = max(len("Case"), max(len(row["case"]) for row in summary_rows))
+    status_width = len("Status")
+    rc_width = max(len("Return"), max(len(format_return_code(row["return_code"])) for row in summary_rows))
+    expected_width = max(
+        len("Expected"),
+        max(len(format_return_code(row["expected_return_code"])) for row in summary_rows),
+    )
+
+    print()
+    print(
+        f"{'Case':<{case_width}}  {'Status':<{status_width}}  "
+        f"{'Return':<{rc_width}}  {'Expected':<{expected_width}}"
+    )
+    print(
+        f"{'-' * case_width}  {'-' * status_width}  "
+        f"{'-' * rc_width}  {'-' * expected_width}"
+    )
+    for row in summary_rows:
+        print(
+            f"{row['case']:<{case_width}}  {row['status']:<{status_width}}  "
+            f"{format_return_code(row['return_code']):<{rc_width}}  "
+            f"{format_return_code(row['expected_return_code']):<{expected_width}}"
+        )
+
+    if has_failure:
+        print("FAIL: formula parsing matrix produced one or more unexpected results.")
+        return 1
 
     print("SUCCESS: formula parsing matrix matches the targeted GUNDAM behavior for all tested fields.")
     return 0
