@@ -446,6 +446,14 @@ namespace ConfigUtils {
     if( not hasField(fieldName_) ){ return; }
 
     auto formulaList = fetchValue<std::vector<std::string>>(fieldName_);
+    formulaList.erase(
+        std::remove_if(
+            formulaList.begin(),
+            formulaList.end(),
+            [](const std::string& formula_){ return formula_.empty(); }
+        ),
+        formulaList.end()
+    );
     for( auto& formula : formulaList ){ formula += ")"; formula.insert(0, "("); }
 
     formulaToFill_ = GenericToolbox::joinVectorString(formulaList, joinStr_);
