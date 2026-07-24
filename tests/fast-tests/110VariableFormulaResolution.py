@@ -292,7 +292,7 @@ def run_case_subprocess(
     script_path: Path,
     script_dir: Path,
     root_path: Path,
-) -> subprocess.CompletedProcess[str]:
+) -> subprocess.CompletedProcess:
     return subprocess.run(
         [
             sys.executable,
