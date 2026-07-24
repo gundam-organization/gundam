@@ -37,6 +37,11 @@
 
 namespace {
 
+  enum class FormulaReferenceResolutionMode{
+    StrictVariableDictOnly,
+    AllowTreeLeafFallback
+  };
+
   bool isFormulaReferenceName(const std::string& name_){
     if( name_.empty() ){ return false; }
     if( not (std::isalpha(static_cast<unsigned char>(name_[0])) or name_[0] == '_') ){ return false; }
@@ -69,7 +74,8 @@ namespace {
   std::string resolveFormulaReferences(
       const std::string& formula_,
       const std::map<std::string, std::string>& variableDict_,
-      std::vector<std::string>& referenceStack_
+      std::vector<std::string>& referenceStack_,
+      FormulaReferenceResolutionMode resolutionMode_
   ){
     std::string output;
     output.reserve(formula_.size());
@@ -99,8 +105,14 @@ namespace {
       }
 
       auto dictEntry = variableDict_.find(referenceName);
-      LogExitIf(dictEntry == variableDict_.end(),
-                "Unknown variableDict reference [" << referenceName << "] in formula \"" << formula_ << "\".");
+      if( dictEntry == variableDict_.end() ){
+        if( resolutionMode_ == FormulaReferenceResolutionMode::AllowTreeLeafFallback ){
+          output += referenceName;
+          cursor = closingBracketPos + 1;
+          continue;
+        }
+        LogExit("Unknown variableDict reference [" << referenceName << "] in formula \"" << formula_ << "\".");
+      }
 
       LogExitIf(
           std::find(referenceStack_.begin(), referenceStack_.end(), referenceName) != referenceStack_.end(),
@@ -108,7 +120,7 @@ namespace {
       );
 
       referenceStack_.emplace_back(referenceName);
-      auto resolvedExpression = resolveFormulaReferences(dictEntry->second, variableDict_, referenceStack_);
+      auto resolvedExpression = resolveFormulaReferences(dictEntry->second, variableDict_, referenceStack_, resolutionMode_);
       referenceStack_.pop_back();
 
       output += "(" + resolvedExpression + ")";
@@ -120,10 +132,11 @@ namespace {
 
   std::string resolveFormulaReferences(
       const std::string& formula_,
-      const std::map<std::string, std::string>& variableDict_
+      const std::map<std::string, std::string>& variableDict_,
+      FormulaReferenceResolutionMode resolutionMode_ = FormulaReferenceResolutionMode::StrictVariableDictOnly
   ){
     std::vector<std::string> referenceStack;
-    return resolveFormulaReferences(formula_, variableDict_, referenceStack);
+    return resolveFormulaReferences(formula_, variableDict_, referenceStack, resolutionMode_);
   }
 
   std::string buildResolvedSampleWeightFormulaStr(
@@ -132,7 +145,11 @@ namespace {
   ){
     if( sample_.getSampleWeightFormulaStr().empty() ){ return ""; }
 
-    return resolveFormulaReferences(sample_.getSampleWeightFormulaStr(), variableDict_);
+    return resolveFormulaReferences(
+        sample_.getSampleWeightFormulaStr(),
+        variableDict_,
+        FormulaReferenceResolutionMode::AllowTreeLeafFallback
+    );
   }
 
   std::string buildResolvedApplyConditionFormulaStr(
@@ -141,7 +158,11 @@ namespace {
   ){
     if( dialCollection_.getApplyConditionStr().empty() ){ return ""; }
 
-    return resolveFormulaReferences(dialCollection_.getApplyConditionStr(), variableDict_);
+    return resolveFormulaReferences(
+        dialCollection_.getApplyConditionStr(),
+        variableDict_,
+        FormulaReferenceResolutionMode::AllowTreeLeafFallback
+    );
   }
 
 }
@@ -369,7 +390,11 @@ void DataDispenser::parseStringParameters() {
   if( not _parameters_.variableDict.empty() ){
     for( auto& entryDict : _parameters_.variableDict ){ replaceToyIndexFct(entryDict.second); }
     for( auto& entryDict : _parameters_.variableDict ){
-      entryDict.second = resolveFormulaReferences(entryDict.second, _parameters_.variableDict);
+      entryDict.second = resolveFormulaReferences(
+          entryDict.second,
+          _parameters_.variableDict,
+          FormulaReferenceResolutionMode::StrictVariableDictOnly
+      );
     }
     LogInfo << "Variable dictionary: " << GenericToolbox::toString(_parameters_.variableDict) << std::endl;
   }
@@ -381,19 +406,22 @@ void DataDispenser::parseStringParameters() {
   if( not _parameters_.dialIndexFormula.empty() ){
     _parameters_.dialIndexFormula = resolveFormulaReferences(
         _parameters_.dialIndexFormula,
-        _parameters_.variableDict
+        _parameters_.variableDict,
+        FormulaReferenceResolutionMode::AllowTreeLeafFallback
     );
   }
   if( not _parameters_.nominalWeightFormulaStr.empty() ){
     _parameters_.nominalWeightFormulaStr = resolveFormulaReferences(
         _parameters_.nominalWeightFormulaStr,
-        _parameters_.variableDict
+        _parameters_.variableDict,
+        FormulaReferenceResolutionMode::AllowTreeLeafFallback
     );
   }
   if( not _parameters_.selectionCutFormulaStr.empty() ){
     _parameters_.selectionCutFormulaStr = resolveFormulaReferences(
         _parameters_.selectionCutFormulaStr,
-        _parameters_.variableDict
+        _parameters_.variableDict,
+        FormulaReferenceResolutionMode::AllowTreeLeafFallback
     );
   }
 
@@ -960,7 +988,11 @@ void DataDispenser::eventSelectionFunction(int iThread_){
 
     std::string selectionCut = samplePtr->getSelectionCutsStr();
     if( not selectionCut.empty() ){
-      selectionCut = resolveFormulaReferences(selectionCut, _parameters_.variableDict);
+      selectionCut = resolveFormulaReferences(
+          selectionCut,
+          _parameters_.variableDict,
+          FormulaReferenceResolutionMode::AllowTreeLeafFallback
+      );
     }
 
     if( selectionCut.empty() ){ continue; }
