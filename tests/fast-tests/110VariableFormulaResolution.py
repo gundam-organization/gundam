@@ -4,6 +4,7 @@ import subprocess
 import sys
 from array import array
 from pathlib import Path
+from typing import Dict, List
 
 
 FIELD_CASES = {
@@ -84,7 +85,7 @@ def format_return_code(return_code: int) -> str:
     return str(return_code)
 
 
-def print_summary_table(title: str, rows: list[dict]) -> None:
+def print_summary_table(title: str, rows: List[Dict]) -> None:
     if not rows:
         return
 
