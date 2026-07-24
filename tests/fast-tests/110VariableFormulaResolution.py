@@ -141,19 +141,20 @@ def build_config_text(field_name: str, case_name: str, root_path: Path) -> str:
     parameter_set_block = ""
     if apply_condition:
         parameter_set_block = f"""
-      parameterSetList:
-        - name: "NormParameters"
-          isEnabled: true
-          nominalStepSize: 0.1
-          parameterDefinitions:
-            - name: "norm_A"
-              isEnabled: true
-              priorValue: 1.0
-              parameterLimits: [0.0, 2.0]
-              dialSetDefinitions:
-                - dialType: "Normalization"
-                  applyOnDataSets: [ "TestSample" ]
-                  applyCondition: "{apply_condition}"
+      parametersManagerConfig:
+        parameterSetList:
+          - name: "NormParameters"
+            isEnabled: true
+            nominalStepSize: 0.1
+            parameterDefinitions:
+              - name: "norm_A"
+                isEnabled: true
+                priorValue: 1.0
+                parameterLimits: [0.0, 2.0]
+                dialSetDefinitions:
+                  - dialType: "Normalization"
+                    applyOnDataSets: [ "TestSample" ]
+                    applyCondition: "{apply_condition}"
 """
 
     return f"""
