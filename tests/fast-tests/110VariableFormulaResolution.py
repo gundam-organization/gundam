@@ -183,7 +183,7 @@ fitterEngineConfig:
             binning:
               binningDefinition:
                 - name: "X"
-                  edges: [ -1, 0, 1 ]{sample_extra_block}
+                  edges: [ -1, 1 ]{sample_extra_block}
             dataSets: [ "TestSample" ]
 {parameter_set_block}
 """
