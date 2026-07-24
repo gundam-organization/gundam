@@ -126,21 +126,13 @@ namespace {
     return resolveFormulaReferences(formula_, variableDict_, referenceStack);
   }
 
-  std::shared_ptr<TFormula> buildResolvedSampleWeightFormula(
+  std::string buildResolvedSampleWeightFormulaStr(
       const Sample& sample_,
       const std::map<std::string, std::string>& variableDict_
   ){
-    if( sample_.getSampleWeightFormulaStr().empty() ){ return nullptr; }
+    if( sample_.getSampleWeightFormulaStr().empty() ){ return ""; }
 
-    auto resolvedFormula = resolveFormulaReferences(sample_.getSampleWeightFormulaStr(), variableDict_);
-    auto formula = std::make_shared<TFormula>(
-        GenericToolbox::generateCleanBranchName(sample_.getName() + "_sampleWeightFormula").c_str(),
-        resolvedFormula.c_str()
-    );
-    LogThrowIf(not formula->IsValid(),
-               "\"" << sample_.getSampleWeightFormulaStr() << "\" -> \"" << resolvedFormula
-                   << "\": could not be parsed as sample weight formula.");
-    return formula;
+    return resolveFormulaReferences(sample_.getSampleWeightFormulaStr(), variableDict_);
   }
 
 }
@@ -529,11 +521,9 @@ void DataDispenser::fetchRequestedLeaves(){
           GenericToolbox::addIfNotInVector(edges.varName, varForIndexingListBuffer);
         }
       }
-      auto sampleWeightFormula = buildResolvedSampleWeightFormula(sample, _parameters_.variableDict);
-      if( sampleWeightFormula != nullptr ) {
-        for( int iPar = 0 ; iPar < sampleWeightFormula->GetNpar() ; iPar++ ){
-          GenericToolbox::addIfNotInVector(sampleWeightFormula->GetParName(iPar), varForIndexingListBuffer);
-        }
+      auto sampleWeightFormulaStr = buildResolvedSampleWeightFormulaStr(sample, _parameters_.variableDict);
+      if( not sampleWeightFormulaStr.empty() ){
+        LogInfo << "Sample \"" << sample.getName() << "\" weight formula: \"" << sampleWeightFormulaStr << "\"" << std::endl;
       }
     }
     LogInfo << "Samples variable request for indexing: " << GenericToolbox::toString(varForIndexingListBuffer) << std::endl;
@@ -1079,6 +1069,19 @@ void DataDispenser::runEventFillThreads(int iThread_){
         );
   }
 
+  threadSharedData.buffer.sampleWeightList.resize(_cache_.samplesToFillList.size(), nullptr);
+  for( size_t iSample = 0 ; iSample < _cache_.samplesToFillList.size() ; iSample++ ){
+    auto sampleWeightFormulaStr = buildResolvedSampleWeightFormulaStr(
+        *_cache_.samplesToFillList[iSample],
+        _parameters_.variableDict
+    );
+    if( sampleWeightFormulaStr.empty() ){ continue; }
+    ThreadSharedData::VariableBuffer::storeTempIndex(
+        threadSharedData.buffer.sampleWeightList[iSample],
+        threadSharedData.treeBuffer.addExpression(sampleWeightFormulaStr)
+    );
+  }
+
   // variables definition
   for( auto& var : _cache_.varsRequestedForIndexing ){
     threadSharedData.buffer.varIndexingList.emplace_back();
@@ -1100,6 +1103,7 @@ void DataDispenser::runEventFillThreads(int iThread_){
   // grab ptr address now
   if( not _parameters_.nominalWeightFormulaStr.empty() ){ ThreadSharedData::VariableBuffer::unfoldTempIndex(threadSharedData.buffer.nominalWeight, threadSharedData.treeBuffer.getExpressionBufferList()); }
   if( not _parameters_.dialIndexFormula.empty() ){ ThreadSharedData::VariableBuffer::unfoldTempIndex(threadSharedData.buffer.dialIndex, threadSharedData.treeBuffer.getExpressionBufferList()); }
+  for( auto& sampleWeight : threadSharedData.buffer.sampleWeightList ){ ThreadSharedData::VariableBuffer::unfoldTempIndex(sampleWeight, threadSharedData.treeBuffer.getExpressionBufferList()); }
   for( auto& varInd: threadSharedData.buffer.varIndexingList ){ ThreadSharedData::VariableBuffer::unfoldTempIndex(varInd, threadSharedData.treeBuffer.getExpressionBufferList()); }
   for( auto& varSto: threadSharedData.buffer.varStorageList ){ ThreadSharedData::VariableBuffer::unfoldTempIndex(varSto, threadSharedData.treeBuffer.getExpressionBufferList()); }
 
@@ -1336,13 +1340,6 @@ void DataDispenser::loadEvent(int iThread_){
   // std::vector<int> sampleIdxList;
   std::vector<int> sampleBinIdxList;
   std::vector<double> sampleWeightList;
-  std::vector<std::shared_ptr<TFormula>> sampleWeightFormulaList(_cache_.samplesToFillList.size(), nullptr);
-  for( size_t iSample = 0 ; iSample < _cache_.samplesToFillList.size() ; iSample++ ){
-    sampleWeightFormulaList[iSample] = buildResolvedSampleWeightFormula(
-        *_cache_.samplesToFillList[iSample],
-        _parameters_.variableDict
-    );
-  }
 
   while( true ){
 
@@ -1430,9 +1427,8 @@ void DataDispenser::loadEvent(int iThread_){
         }
 
         sampleWeightList.emplace_back(1);
-        // dial collections may come with a condition formula
-        if( sampleWeightFormulaList[sampleIdx] != nullptr ){
-          double sampleWeight = LoaderUtils::evalFormula(eventIndexingBuffer, sampleWeightFormulaList[sampleIdx].get());
+        if( threadSharedData.buffer.sampleWeightList[sampleIdx] != nullptr ){
+          double sampleWeight = threadSharedData.buffer.sampleWeightList[sampleIdx]->getBuffer().getValueAsDouble();
           if( sampleWeight < 0 ) {
             LogError << "Negative sampleWeight:" << sampleWeight << std::endl;
             LogError << "sampleWeight buffer is: " << eventIndexingBuffer.getSummary() << std::endl;

@@ -113,6 +113,7 @@ struct ThreadSharedData{
     const GenericToolbox::TreeBuffer::ExpressionBuffer* nominalWeight{nullptr};
     const GenericToolbox::TreeBuffer::ExpressionBuffer* dialIndex{nullptr};
     const GenericToolbox::TreeBuffer::ExpressionBuffer* eventVarAsWeight{nullptr};
+    std::vector<const GenericToolbox::TreeBuffer::ExpressionBuffer*> sampleWeightList{};
     std::vector<const GenericToolbox::TreeBuffer::ExpressionBuffer*> varIndexingList{};
     std::vector<const GenericToolbox::TreeBuffer::ExpressionBuffer*> varStorageList{};
 
