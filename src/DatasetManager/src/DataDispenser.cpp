@@ -135,6 +135,15 @@ namespace {
     return resolveFormulaReferences(sample_.getSampleWeightFormulaStr(), variableDict_);
   }
 
+  std::string buildResolvedApplyConditionFormulaStr(
+      const DialCollection& dialCollection_,
+      const std::map<std::string, std::string>& variableDict_
+  ){
+    if( dialCollection_.getApplyConditionStr().empty() ){ return ""; }
+
+    return resolveFormulaReferences(dialCollection_.getApplyConditionStr(), variableDict_);
+  }
+
 }
 
 
@@ -491,10 +500,10 @@ void DataDispenser::fetchRequestedLeaves(){
   if( not _cache_.dialCollectionsRefList.empty() ) {
     std::vector<std::string> indexRequests;
     for( auto& dialCollection : _cache_.dialCollectionsRefList ) {
-      if( dialCollection->getApplyConditionFormula() != nullptr ) {
-        for( int iPar = 0 ; iPar < dialCollection->getApplyConditionFormula()->GetNpar() ; iPar++ ){
-          GenericToolbox::addIfNotInVector(dialCollection->getApplyConditionFormula()->GetParName(iPar), indexRequests);
-        }
+      auto applyConditionFormulaStr = buildResolvedApplyConditionFormulaStr(*dialCollection, _parameters_.variableDict);
+      if( not applyConditionFormulaStr.empty() ) {
+        LogInfo << "DialCollection \"" << dialCollection->getTitle()
+                << "\" applyCondition: \"" << applyConditionFormulaStr << "\"" << std::endl;
       }
       if( not dialCollection->getDialLeafName().empty() ){
         GenericToolbox::addIfNotInVector(dialCollection->getDialLeafName(), indexRequests);
@@ -1069,6 +1078,19 @@ void DataDispenser::runEventFillThreads(int iThread_){
         );
   }
 
+  threadSharedData.buffer.dialApplyConditionList.resize(_cache_.dialCollectionsRefList.size(), nullptr);
+  for( size_t iDialCollection = 0 ; iDialCollection < _cache_.dialCollectionsRefList.size() ; iDialCollection++ ){
+    auto applyConditionFormulaStr = buildResolvedApplyConditionFormulaStr(
+        *_cache_.dialCollectionsRefList[iDialCollection],
+        _parameters_.variableDict
+    );
+    if( applyConditionFormulaStr.empty() ){ continue; }
+    ThreadSharedData::VariableBuffer::storeTempIndex(
+        threadSharedData.buffer.dialApplyConditionList[iDialCollection],
+        threadSharedData.treeBuffer.addExpression(applyConditionFormulaStr)
+    );
+  }
+
   threadSharedData.buffer.sampleWeightList.resize(_cache_.samplesToFillList.size(), nullptr);
   for( size_t iSample = 0 ; iSample < _cache_.samplesToFillList.size() ; iSample++ ){
     auto sampleWeightFormulaStr = buildResolvedSampleWeightFormulaStr(
@@ -1103,6 +1125,7 @@ void DataDispenser::runEventFillThreads(int iThread_){
   // grab ptr address now
   if( not _parameters_.nominalWeightFormulaStr.empty() ){ ThreadSharedData::VariableBuffer::unfoldTempIndex(threadSharedData.buffer.nominalWeight, threadSharedData.treeBuffer.getExpressionBufferList()); }
   if( not _parameters_.dialIndexFormula.empty() ){ ThreadSharedData::VariableBuffer::unfoldTempIndex(threadSharedData.buffer.dialIndex, threadSharedData.treeBuffer.getExpressionBufferList()); }
+  for( auto& dialApplyCondition : threadSharedData.buffer.dialApplyConditionList ){ ThreadSharedData::VariableBuffer::unfoldTempIndex(dialApplyCondition, threadSharedData.treeBuffer.getExpressionBufferList()); }
   for( auto& sampleWeight : threadSharedData.buffer.sampleWeightList ){ ThreadSharedData::VariableBuffer::unfoldTempIndex(sampleWeight, threadSharedData.treeBuffer.getExpressionBufferList()); }
   for( auto& varInd: threadSharedData.buffer.varIndexingList ){ ThreadSharedData::VariableBuffer::unfoldTempIndex(varInd, threadSharedData.treeBuffer.getExpressionBufferList()); }
   for( auto& varSto: threadSharedData.buffer.varStorageList ){ ThreadSharedData::VariableBuffer::unfoldTempIndex(varSto, threadSharedData.treeBuffer.getExpressionBufferList()); }
@@ -1451,14 +1474,14 @@ void DataDispenser::loadEvent(int iThread_){
       }
 
       // only load event-by-event dials, binned dials etc. will be processed later
-      for( auto *dialCollectionRef: _cache_.dialCollectionsRefList ){
+      for( size_t iDialCollection = 0 ; iDialCollection < _cache_.dialCollectionsRefList.size() ; iDialCollection++ ){
+        auto *dialCollectionRef = _cache_.dialCollectionsRefList[iDialCollection];
 
         // if not event-by-event dial -> leave
         if( dialCollectionRef->getDialLeafName().empty() ){ continue; }
 
-        // dial collections may come with a condition formula
-        if( dialCollectionRef->getApplyConditionFormula() != nullptr ){
-          if( LoaderUtils::evalFormula(eventIndexingBuffer, dialCollectionRef->getApplyConditionFormula().get()) == 0 ){
+        if( threadSharedData.buffer.dialApplyConditionList[iDialCollection] != nullptr ){
+          if( threadSharedData.buffer.dialApplyConditionList[iDialCollection]->getBuffer().getValueAsDouble() == 0 ){
             // next dialSet
             continue;
           }
@@ -1519,7 +1542,8 @@ void DataDispenser::loadEvent(int iThread_){
       eventDialCacheEntry->event.eventIndex = sampleEventIndex;
 
       auto *dialEntryPtr = eventDialCacheEntry->dials.data();
-      for( auto *dialCollectionRef: _cache_.dialCollectionsRefList ){
+      for( size_t iDialCollection = 0 ; iDialCollection < _cache_.dialCollectionsRefList.size() ; iDialCollection++ ){
+        auto *dialCollectionRef = _cache_.dialCollectionsRefList[iDialCollection];
 
         // leave if event-by-event -> already loaded
         if( not dialCollectionRef->getDialLeafName().empty() ){
@@ -1546,9 +1570,8 @@ void DataDispenser::loadEvent(int iThread_){
           continue; // skip the rest
         }
 
-        // dial collections may come with a condition formula
-        if( dialCollectionRef->getApplyConditionFormula() != nullptr ){
-          if( LoaderUtils::evalFormula(eventIndexingBuffer, dialCollectionRef->getApplyConditionFormula().get()) == 0 ){
+        if( threadSharedData.buffer.dialApplyConditionList[iDialCollection] != nullptr ){
+          if( threadSharedData.buffer.dialApplyConditionList[iDialCollection]->getBuffer().getValueAsDouble() == 0 ){
             // next dialSet
             continue;
           }
