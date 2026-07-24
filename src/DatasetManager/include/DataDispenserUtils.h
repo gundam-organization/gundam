@@ -91,8 +91,6 @@ struct DataDispenserCache{
   std::vector<std::string> varsRequestedForIndexing{};
   std::map<std::string, std::pair<std::string, bool>> varToLeafDict; // varToLeafDict[EVENT_VAR_NAME] = {LEAF_NAME, IS_DUMMY}
 
-  std::vector<std::string> varsToOverrideList; // stores the leaves names to override in the right order
-
   struct ThreadSelectionResult{
     std::vector<size_t> sampleNbOfEvents;
     GenericToolbox::CSRVector<int> entrySampleIndexList;

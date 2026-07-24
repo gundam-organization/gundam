@@ -37,12 +37,9 @@ void DataDispenserCache::clear(){
 
   varsRequestedForIndexing.clear();
   varToLeafDict.clear();
-
-  varsToOverrideList.clear();
 }
 void DataDispenserCache::addVarRequestedForIndexing(const std::string& varName_) {
   LogThrowIf(varName_.empty(), "no var name provided.");
   GenericToolbox::addIfNotInVector(varName_, this->varsRequestedForIndexing);
 }
-
 

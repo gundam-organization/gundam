@@ -347,34 +347,22 @@ void DataDispenser::parseStringParameters() {
       GenericToolbox::replaceSubstringInsideInputString(formula_, "<I_TOY>", std::to_string(_cache_.propagatorPtr->getIThrow()));
     }
   };
-  auto overrideLeavesNamesFct = [&](std::string& formula_){
-    for( auto& replaceEntry : _cache_.varsToOverrideList ){
-      GenericToolbox::replaceSubstringInsideInputString(
-          formula_,
-          "[" + replaceEntry + "]",
-          _parameters_.variableDict[replaceEntry]
-      );
-    }
-  };
 
   if( not _parameters_.variableDict.empty() ){
     for( auto& entryDict : _parameters_.variableDict ){ replaceToyIndexFct(entryDict.second); }
-    LogInfo << "Variable dictionary: " << GenericToolbox::toString(_parameters_.variableDict) << std::endl;
-
-    for( auto& overrideEntry : _parameters_.variableDict ){
-      _cache_.varsToOverrideList.emplace_back(overrideEntry.first);
+    for( auto& entryDict : _parameters_.variableDict ){
+      entryDict.second = resolveFormulaReferences(entryDict.second, _parameters_.variableDict);
     }
-    // make sure we process the longest words first: "thisIsATest" variable should be replaced before "thisIs"
-    GenericToolbox::sortVector(_cache_.varsToOverrideList, [](const std::string& a_, const std::string& b_){ return a_.size() > b_.size(); });
+    LogInfo << "Variable dictionary: " << GenericToolbox::toString(_parameters_.variableDict) << std::endl;
   }
 
   replaceToyIndexFct(_parameters_.dialIndexFormula);
   replaceToyIndexFct(_parameters_.nominalWeightFormulaStr);
   replaceToyIndexFct(_parameters_.selectionCutFormulaStr);
 
-  if( not _parameters_.selectionCutFormulaStr.empty() ){
-    _parameters_.selectionCutFormulaStr = resolveFormulaReferences(
-        _parameters_.selectionCutFormulaStr,
+  if( not _parameters_.dialIndexFormula.empty() ){
+    _parameters_.dialIndexFormula = resolveFormulaReferences(
+        _parameters_.dialIndexFormula,
         _parameters_.variableDict
     );
   }
@@ -384,10 +372,12 @@ void DataDispenser::parseStringParameters() {
         _parameters_.variableDict
     );
   }
-
-  overrideLeavesNamesFct(_parameters_.dialIndexFormula);
-  overrideLeavesNamesFct(_parameters_.nominalWeightFormulaStr);
-  overrideLeavesNamesFct(_parameters_.selectionCutFormulaStr);
+  if( not _parameters_.selectionCutFormulaStr.empty() ){
+    _parameters_.selectionCutFormulaStr = resolveFormulaReferences(
+        _parameters_.selectionCutFormulaStr,
+        _parameters_.variableDict
+    );
+  }
 
   // add surrounding parenthesis to force the LeafForm to treat it as a TFormula
   if(not _parameters_.dialIndexFormula.empty()){ _parameters_.dialIndexFormula = "(" + _parameters_.dialIndexFormula + ")"; }
@@ -941,10 +931,8 @@ void DataDispenser::eventSelectionFunction(int iThread_){
     sampleCutList.back().sampleIndex = iSample;
 
     std::string selectionCut = samplePtr->getSelectionCutsStr();
-    for (auto &replaceEntry: _cache_.varsToOverrideList) {
-      GenericToolbox::replaceSubstringInsideInputString(
-          selectionCut, replaceEntry, _parameters_.variableDict[replaceEntry]
-      );
+    if( not selectionCut.empty() ){
+      selectionCut = resolveFormulaReferences(selectionCut, _parameters_.variableDict);
     }
 
     if( selectionCut.empty() ){ continue; }
