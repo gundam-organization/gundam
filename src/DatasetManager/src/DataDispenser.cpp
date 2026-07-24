@@ -239,6 +239,22 @@ namespace {
     return entry != nullptr and entry->backend == DataDispenserCache::VariableDictEntry::EventBufferFormula;
   }
 
+  const std::string& getVariableExpression(
+      const DataDispenserCache& cache_,
+      const std::map<std::string, std::string>& variableDict_,
+      const std::string& variable_
+  ){
+    auto* activeEntry = getActiveVariableDictEntry(cache_, variable_);
+    if( activeEntry != nullptr ){
+      if( activeEntry->backend == DataDispenserCache::VariableDictEntry::TreeBufferExpression ){
+        return activeEntry->expr;
+      }
+      return variable_;
+    }
+    try{ return variableDict_.at(variable_); } catch( ... ) {}
+    return variable_;
+  }
+
   void addVariablesRequestedByFormula(
       DataDispenserCache& cache_,
       const std::string& formula_,
@@ -1136,15 +1152,7 @@ int DataDispenser::getNbParallelCpu() const{
   return GundamGlobals::getNbCpuThreads(_owner_->getNbMaxThreadsForLoad());
 }
 const std::string& DataDispenser::getVariableExpression(const std::string& variable_) const {
-  auto* activeEntry = getActiveVariableDictEntry(_cache_, variable_);
-  if( activeEntry != nullptr ){
-    if( activeEntry->backend == DataDispenserCache::VariableDictEntry::TreeBufferExpression ){
-      return activeEntry->expr;
-    }
-    return variable_;
-  }
-  try{ return _parameters_.variableDict.at(variable_); } catch( ... ) {}
-  return variable_; // if not found
+  return ::getVariableExpression(_cache_, _parameters_.variableDict, variable_);
 }
 std::shared_ptr<TChain> DataDispenser::openChain(bool verbose_) const{
   LogInfoIf(verbose_) << "Opening ROOT files containing events..." << std::endl;
@@ -1201,12 +1209,31 @@ void DataDispenser::eventSelectionFunction(int iThread_){
   GenericToolbox::TreeBuffer tb;
   tb.setTree( treeChain.get() );
 
+  DataDispenserCache selectionCache;
+  addVariablesRequestedByFormula(
+      selectionCache,
+      _parameters_.selectionCutFormulaStr,
+      _parameters_.variableDict,
+      false
+  );
+  for( auto* samplePtr : _cache_.samplesToFillList ){
+    addVariablesRequestedByFormula(
+        selectionCache,
+        samplePtr->getSelectionCutsStr(),
+        _parameters_.variableDict,
+        false
+    );
+  }
+  LogInfoIf(iThread_ == 0) << "Selection variable requests: "
+                           << GenericToolbox::toString(selectionCache.varsRequestedForIndexing, false)
+                           << std::endl;
+
   Event eventSelectionBuffer;
   eventSelectionBuffer.getIndices().dataset = _owner_->getDataSetIndex();
-  eventSelectionBuffer.getVariables().setVarNameList(_cache_.varsRequestedForIndexing);
+  eventSelectionBuffer.getVariables().setVarNameList(selectionCache.varsRequestedForIndexing);
 
   std::vector<const GenericToolbox::TreeBuffer::ExpressionBuffer*> varIndexingList;
-  varIndexingList.reserve(_cache_.varsRequestedForIndexing.size());
+  varIndexingList.reserve(selectionCache.varsRequestedForIndexing.size());
 
   // global cut
   ThreadSharedData::VariableBuffer::RuntimeFormula selectionCutFormula;
@@ -1215,8 +1242,8 @@ void DataDispenser::eventSelectionFunction(int iThread_){
       selectionCutFormula,
       tb,
       _parameters_.selectionCutFormulaStr,
-      _cache_.varsRequestedForIndexing,
-      _cache_.eventFormulaTreeExpressionAliases
+      selectionCache.varsRequestedForIndexing,
+      selectionCache.eventFormulaTreeExpressionAliases
   );
 
   // sample cuts
@@ -1238,39 +1265,39 @@ void DataDispenser::eventSelectionFunction(int iThread_){
         sampleCutList.back().formula,
         tb,
         selectionCut,
-        _cache_.varsRequestedForIndexing,
-        _cache_.eventFormulaTreeExpressionAliases
+        selectionCache.varsRequestedForIndexing,
+        selectionCache.eventFormulaTreeExpressionAliases
     );
   }
 
   std::vector<ThreadSharedData::VariableBuffer::VariableDictBuffer> variableDictEvalList;
-  variableDictEvalList.reserve(_cache_.variableDictEvalList.size());
-  for( const auto& variableDictEntry : _cache_.variableDictEvalList ){
+  variableDictEvalList.reserve(selectionCache.variableDictEvalList.size());
+  for( const auto& variableDictEntry : selectionCache.variableDictEvalList ){
     variableDictEvalList.emplace_back();
     variableDictEvalList.back().name = variableDictEntry.name;
     variableDictEvalList.back().outputVarIndex = GenericToolbox::findElementIndex(
         variableDictEntry.name,
-        _cache_.varsRequestedForIndexing
+        selectionCache.varsRequestedForIndexing
     );
     LogExitIf(variableDictEvalList.back().outputVarIndex == -1, "Missing variableDict output variable: " << variableDictEntry.name);
     compileRuntimeFormula(
         variableDictEvalList.back().formula,
         tb,
         variableDictEntry.expr,
-        _cache_.varsRequestedForIndexing,
-        _cache_.eventFormulaTreeExpressionAliases
+        selectionCache.varsRequestedForIndexing,
+        selectionCache.eventFormulaTreeExpressionAliases
     );
   }
 
-  for( auto& var : _cache_.varsRequestedForIndexing ){
-    if( isActiveVariableDictName(_cache_, var) ){
+  for( auto& var : selectionCache.varsRequestedForIndexing ){
+    if( isActiveVariableDictName(selectionCache, var) ){
       varIndexingList.emplace_back(nullptr);
       continue;
     }
     varIndexingList.emplace_back();
     ThreadSharedData::VariableBuffer::storeTempIndex(
         varIndexingList.back(),
-        tb.addExpression(getVariableExpression(var))
+        tb.addExpression(::getVariableExpression(selectionCache, _parameters_.variableDict, var))
     );
   }
 
