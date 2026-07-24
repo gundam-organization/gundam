@@ -97,7 +97,7 @@ def build_config_text(field_name: str, case_name: str, root_path: Path) -> str:
         variable_dict_lines.append(
             f'            - {{ name: "resolved_weight", expr: "{FIELD_CASES[field_name][case_name]}" }}'
         )
-        nominal_weight_formula = "resolved_weight"
+        nominal_weight_formula = "[resolved_weight]"
     else:
         raise RuntimeError(f"Unknown field name: {field_name}")
 
