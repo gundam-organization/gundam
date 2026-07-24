@@ -8,39 +8,60 @@ from pathlib import Path
 
 FIELD_CASES = {
     "selectionCutFormula": {
+        "literal": "1.",
         "pure_tformula": "[global_scale] > 0",
         "hybrid": "([global_scale] > 0) && (OscChannel == 1)",
         "pure_ttreeformula": "(OscChannel == 1) * (RecoEnu > 0.2)",
+        "empty": "",
+        "omitted": None,
     },
     "nominalTreeWeightFormula": {
+        "literal": "1.",
         "pure_tformula": "[global_scale]",
         "hybrid": "([global_scale]) * (OscChannel == 1)",
         "pure_ttreeformula": "(OscChannel == 1) * (RecoEnu > 0.2)",
+        "empty": "",
+        "omitted": None,
     },
     "sampleWeightFormula": {
+        "literal": "1.",
         "pure_tformula": "[global_scale] * [const_norm]",
         "hybrid": "([global_scale]) * (OscChannel == 1)",
         "pure_ttreeformula": "(OscChannel == 1) * (RecoEnu > 0.2)",
+        "empty": "",
+        "omitted": None,
     },
     "selectionCutStr": {
+        "literal": "1.",
         "pure_tformula": "[global_scale] > 0",
         "hybrid": "([global_scale] > 0) && (OscChannel == 1)",
         "pure_ttreeformula": "(OscChannel == 1) * (RecoEnu > 0.2)",
+        "empty": "",
+        "omitted": None,
     },
     "dialIndexFormula": {
+        "literal": "1.",
         "pure_tformula": "[zero_index]",
         "hybrid": "[zero_index] + (OscChannel == 1) - 1",
         "pure_ttreeformula": "(OscChannel == 1) - 1",
+        "empty": "",
+        "omitted": None,
     },
     "applyCondition": {
+        "literal": "1.",
         "pure_tformula": "[global_scale] > 0",
         "hybrid": "([global_scale] > 0) && (OscChannel == 1)",
         "pure_ttreeformula": "(OscChannel == 1) * (RecoEnu > 0.2)",
+        "empty": "",
+        "omitted": None,
     },
     "variableDictExpr": {
+        "literal": "1.",
         "pure_tformula": "[const_norm] * [global_scale]",
         "hybrid": "([global_scale]) * (OscChannel == 1)",
         "pure_ttreeformula": "(OscChannel == 1) * (RecoEnu > 0.2)",
+        "empty": "",
+        "omitted": None,
     },
 }
 
@@ -50,12 +71,47 @@ EXPECTED_RETURN_CODES = {
     for field_name, case_map in FIELD_CASES.items()
     for case_name in case_map
 }
+EXPECTED_RETURN_CODES.update(
+    {
+        ("variableDictExpr", "empty"): 1,
+    }
+)
 
 
 def format_return_code(return_code: int) -> str:
     if return_code < 0:
         return f"signal {-return_code}"
     return str(return_code)
+
+
+def print_summary_table(title: str, rows: list[dict]) -> None:
+    if not rows:
+        return
+
+    case_width = max(len("Case"), max(len(row["case"]) for row in rows))
+    status_width = len("Status")
+    rc_width = max(len("Return"), max(len(format_return_code(row["return_code"])) for row in rows))
+    expected_width = max(
+        len("Expected"),
+        max(len(format_return_code(row["expected_return_code"])) for row in rows),
+    )
+
+    print()
+    print(title)
+    print(
+        f"{'Case':<{case_width}}  {'Status':<{status_width}}  "
+        f"{'Return':<{rc_width}}  {'Expected':<{expected_width}}"
+    )
+    print(
+        f"{'-' * case_width}  {'-' * status_width}  "
+        f"{'-' * rc_width}  {'-' * expected_width}"
+    )
+    for row in rows:
+        print(
+            f"{row['case']:<{case_width}}  {row['status']:<{status_width}}  "
+            f"{format_return_code(row['return_code']):<{rc_width}}  "
+            f"{format_return_code(row['expected_return_code']):<{expected_width}}"
+        )
 
 
 def flush_python_outputs() -> None:
@@ -85,6 +141,8 @@ def write_input_root_file(root_path: Path) -> None:
 
 
 def build_config_text(field_name: str, case_name: str, root_path: Path) -> str:
+    field_value = FIELD_CASES[field_name][case_name]
+
     variable_dict_lines = [
         '            - { name: "const_norm", expr: "634441." }',
         '            - { name: "global_scale", expr: "2." }',
@@ -93,53 +151,66 @@ def build_config_text(field_name: str, case_name: str, root_path: Path) -> str:
 
     nominal_weight_formula = "(1.0)"
     selection_cut_formula = "(1)"
-    sample_weight_formula = ""
-    selection_cut_str = ""
-    dial_index_formula = ""
-    apply_condition = ""
+    sample_weight_formula = None
+    selection_cut_str = None
+    dial_index_formula = None
+    apply_condition = None
 
     if field_name == "selectionCutFormula":
-        selection_cut_formula = FIELD_CASES[field_name][case_name]
+        selection_cut_formula = field_value
     elif field_name == "nominalTreeWeightFormula":
-        nominal_weight_formula = FIELD_CASES[field_name][case_name]
+        nominal_weight_formula = field_value
     elif field_name == "sampleWeightFormula":
-        sample_weight_formula = FIELD_CASES[field_name][case_name]
+        sample_weight_formula = field_value
     elif field_name == "selectionCutStr":
-        selection_cut_str = FIELD_CASES[field_name][case_name]
+        selection_cut_str = field_value
     elif field_name == "dialIndexFormula":
-        dial_index_formula = FIELD_CASES[field_name][case_name]
+        dial_index_formula = field_value
     elif field_name == "applyCondition":
-        apply_condition = FIELD_CASES[field_name][case_name]
+        apply_condition = field_value
     elif field_name == "variableDictExpr":
-        variable_dict_lines.append(
-            f'            - {{ name: "resolved_weight", expr: "{FIELD_CASES[field_name][case_name]}" }}'
-        )
-        nominal_weight_formula = "[resolved_weight]"
+        if field_value is not None:
+            variable_dict_lines.append(
+                f'            - {{ name: "resolved_weight", expr: "{field_value}" }}'
+            )
+            nominal_weight_formula = "[resolved_weight]"
     else:
         raise RuntimeError(f"Unknown field name: {field_name}")
 
+    model_lines = [
+        '          tree: tree_mc',
+        '          filePathList:',
+        f'            - "{root_path}"',
+    ]
+    if selection_cut_formula is not None:
+        model_lines.append(f'          selectionCutFormula: "{selection_cut_formula}"')
+    if nominal_weight_formula is not None:
+        model_lines.append(f'          nominalTreeWeightFormula: "{nominal_weight_formula}"')
+    if dial_index_formula is not None:
+        model_lines.append(f'          dialIndexFormula: "{dial_index_formula}"')
+    model_block = "\n".join(model_lines)
+
     sample_extra_lines = []
-    if selection_cut_str:
+    if selection_cut_str is not None:
         sample_extra_lines.append(f'            selectionCutStr: "{selection_cut_str}"')
-    if sample_weight_formula:
+    if sample_weight_formula is not None:
         sample_extra_lines.append(f'            sampleWeightFormula: "{sample_weight_formula}"')
 
     sample_extra_block = ""
     if sample_extra_lines:
         sample_extra_block = "\n" + "\n".join(sample_extra_lines)
 
-    model_extra_lines = []
-    if dial_index_formula:
-        model_extra_lines.append(f'          dialIndexFormula: "{dial_index_formula}"')
-
-    model_extra_block = ""
-    if model_extra_lines:
-        model_extra_block = "\n" + "\n".join(model_extra_lines)
-
     variable_dict_block = "\n".join(variable_dict_lines)
 
     parameter_set_block = ""
-    if apply_condition:
+    if field_name == "applyCondition":
+        apply_condition_lines = [
+            '                  - dialType: "Normalization"',
+            '                    applyOnDataSets: [ "TestSample" ]',
+        ]
+        if apply_condition is not None:
+            apply_condition_lines.append(f'                    applyCondition: "{apply_condition}"')
+        apply_condition_block = "\n".join(apply_condition_lines)
         parameter_set_block = f"""
       parametersManagerConfig:
         parameterSetList:
@@ -152,9 +223,7 @@ def build_config_text(field_name: str, case_name: str, root_path: Path) -> str:
                 priorValue: 1.0
                 parameterLimits: [0.0, 2.0]
                 dialSetDefinitions:
-                  - dialType: "Normalization"
-                    applyOnDataSets: [ "TestSample" ]
-                    applyCondition: "{apply_condition}"
+{apply_condition_block}
 """
 
     return f"""
@@ -167,12 +236,7 @@ fitterEngineConfig:
       - name: "TestSample"
         isEnabled: true
         model:
-          tree: tree_mc
-          filePathList:
-            - "{root_path}"
-          selectionCutFormula: "{selection_cut_formula}"
-          nominalTreeWeightFormula: "{nominal_weight_formula}"
-{model_extra_block}
+{model_block}
           variableDict:
 {variable_dict_block}
 
@@ -289,29 +353,11 @@ def main() -> int:
                 }
             )
 
-    case_width = max(len("Case"), max(len(row["case"]) for row in summary_rows))
-    status_width = len("Status")
-    rc_width = max(len("Return"), max(len(format_return_code(row["return_code"])) for row in summary_rows))
-    expected_width = max(
-        len("Expected"),
-        max(len(format_return_code(row["expected_return_code"])) for row in summary_rows),
-    )
+    passing_rows = [row for row in summary_rows if row["status"] == "PASS"]
+    failing_rows = [row for row in summary_rows if row["status"] == "FAIL"]
 
-    print()
-    print(
-        f"{'Case':<{case_width}}  {'Status':<{status_width}}  "
-        f"{'Return':<{rc_width}}  {'Expected':<{expected_width}}"
-    )
-    print(
-        f"{'-' * case_width}  {'-' * status_width}  "
-        f"{'-' * rc_width}  {'-' * expected_width}"
-    )
-    for row in summary_rows:
-        print(
-            f"{row['case']:<{case_width}}  {row['status']:<{status_width}}  "
-            f"{format_return_code(row['return_code']):<{rc_width}}  "
-            f"{format_return_code(row['expected_return_code']):<{expected_width}}"
-        )
+    print_summary_table("Passing cases", passing_rows)
+    print_summary_table("Failing cases", failing_rows)
 
     if has_failure:
         print("FAIL: formula parsing matrix produced one or more unexpected results.")
