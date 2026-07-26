@@ -13,7 +13,10 @@ public:
   EventVarTransformLib() = default;
   explicit EventVarTransformLib(const ConfigReader& config_){ this->configure(config_); }
 
+  void configureFromVariableDict(const std::string& outputVariableName_, ConfigReader& config_);
   void reload();
+
+  void setLibraryFile(const std::string& libraryFile_){ _libraryFile_ = libraryFile_; }
 
 protected:
   void initializeImpl() override;

@@ -22,6 +22,10 @@ public:
   void setIsEnabled(bool isEnabled_){ _isEnabled_=isEnabled_; }
   void setIndex(int index_){ _index_ = index_; }
   void setUseCache(bool useCache_){ _useCache_ = useCache_; }
+  void setName(const std::string& name_){ _name_ = name_; }
+  void setOutputVariableName(const std::string& outputVariableName_){ _outputVariableName_ = outputVariableName_; }
+  void setMessageOnError(const std::string& messageOnError_){ _messageOnError_ = messageOnError_; }
+  void setInputFormulaStrList(const std::vector<std::string>& inputFormulaStrList_){ _inputFormulaStrList_ = inputFormulaStrList_; }
 
   bool isEnabled() const{ return _isEnabled_; }
   bool useCache() const{ return _useCache_; }

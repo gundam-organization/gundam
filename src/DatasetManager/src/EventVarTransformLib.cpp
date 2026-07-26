@@ -14,9 +14,41 @@
 
 void EventVarTransformLib::configureImpl(){
   _config_.clearFields();
-  this->EventVarTransform::configureImpl();
-  _config_.defineFields({{"libraryFile"}});
+  _config_.defineFields({
+      {FieldFlag::MANDATORY, "name", {"title"}},
+      {FieldFlag::MANDATORY, "outputVariableName"},
+      {"isEnabled"},
+      {"inputList"},
+      {"messageOnError"},
+      {"libraryFile"},
+  });
+  _config_.checkConfiguration();
+
+  _config_.fillValue(_name_, "name");
+  _config_.fillValue(_isEnabled_, "isEnabled");
+  _config_.fillValue(_messageOnError_, "messageOnError");
+  _config_.fillValue(_outputVariableName_, "outputVariableName");
+  _inputFormulaStrList_ = ConfigUtils::readFormulaExprList(_config_, "inputList");
   _config_.fillValue(_libraryFile_, "libraryFile");
+}
+void EventVarTransformLib::configureFromVariableDict(const std::string& outputVariableName_, ConfigReader& config_){
+  config_.defineFields({
+      {FieldFlag::MANDATORY, "libraryFile"},
+      {FieldFlag::MANDATORY, "inputList"},
+      {"messageOnError"},
+      {"title", {"name"}},
+      {"isEnabled"},
+  });
+  config_.checkConfiguration();
+
+  this->setOutputVariableName(outputVariableName_);
+  this->setName(outputVariableName_);
+  config_.fillValue(_name_, "title");
+  config_.fillValue(_isEnabled_, "isEnabled");
+  config_.fillValue(_messageOnError_, "messageOnError");
+  config_.fillValue(_libraryFile_, "libraryFile");
+  this->setInputFormulaStrList(ConfigUtils::readFormulaExprList(config_, "inputList"));
+  config_.printUnusedKeys();
 }
 void EventVarTransformLib::initializeImpl(){
 

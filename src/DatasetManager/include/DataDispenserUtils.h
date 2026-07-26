@@ -38,9 +38,9 @@ struct DataDispenserParameters{
   std::vector<std::string> activeLeafNameList{};
   std::vector<std::string> filePathList{};
   std::map<std::string, std::string> variableDict{};
+  std::map<std::string, EventVarTransformLib> variableDictTransform{};
   std::vector<std::string> additionalVarsStorage{};
   std::vector<std::string> dummyVariablesList;
-  std::vector<EventVarTransformLib> eventVarTransformList;
 
   struct FromHistContent{
     bool isEnabled{false};
@@ -96,12 +96,14 @@ struct DataDispenserCache{
   struct VariableDictEntry{
     enum EvalBackend{
       TreeBufferExpression,
-      EventBufferFormula
+      EventBufferFormula,
+      LibraryTransform
     };
 
     std::string name{};
     std::string expr{};
     EvalBackend backend{TreeBufferExpression};
+    const EventVarTransformLib* transformPtr{nullptr};
   };
   std::vector<VariableDictEntry> variableDictEvalList{};
 
@@ -161,6 +163,8 @@ struct ThreadSharedData{
       std::string name{};
       int outputVarIndex{-1};
       RuntimeFormula formula{};
+      EventVarTransformLib transform{};
+      bool isLibraryTransform{false};
     };
 
     int eventVarAsWeightIndex{-1};

@@ -26,16 +26,41 @@ As an entry list
 
 #### mc
 
-| Option                  | Type                | Description                                                     | Default |
-|-------------------------|---------------------|-----------------------------------------------------------------|---------|
-| tree                    | string              | Name of the TTree containing the data in each file              |         |
-| selectionCutFormula     | string              | Global selection cut (should return 0 if not selected)          |         |
-| nominalWeightFormula    | string/list(string) | Formula that returns the base weight of a given event           |         |
-| filePathList            | list(string)        | list of ROOT files containing the TTree                         |         |
-| additionalLeavesStorage | list(string)        | list of variables to be stored in memory                        |         |
-| variablesTransform      | list(json)          | list of transform operations that will be applied while loading |         |
-| variableDict        | list(json)          | dictionary translating a leaf/formula to variable name          |         |
-| fromHistContent         | json                | use hist bin content directly. This will create dummy events    |         |
+| Option                  | Type                         | Description                                                                 | Default |
+|-------------------------|------------------------------|-----------------------------------------------------------------------------|---------|
+| tree                    | string                       | Name of the TTree containing the data in each file                          |         |
+| selectionCutFormula     | formula                      | Global selection cut (should return 0 if not selected)                      |         |
+| nominalTreeWeightFormula | formula                     | Formula that returns the base weight of a given event                       |         |
+| filePathList            | list(string)                 | list of ROOT files containing the TTree                                     |         |
+| additionalLeavesStorage | list(string)                 | list of variables to be stored in memory                                    |         |
+| variablesTransform      | list(json)                   | Deprecated. Use `variableDict` entries with `evalFromLib` instead.          |         |
+| variableDict            | list(json)                   | dictionary translating a leaf, formula, or shared-library output to a variable name |         |
+| fromHistContent         | json                         | use hist bin content directly. This will create dummy events                |         |
+
+Formula fields can be written as a single expression, a list of expressions, or a list of named expression entries:
+
+```yaml
+myFormula: "[var1] * 4"
+myFormula: ["[var1] * 4", "[var2] + 1"]
+myFormula:
+  - { name: "part1", expr: "[var1] * 4" }
+  - { name: "part2", expr: "[var2] + 1" }
+```
+
+`variableDict` entries can define either an `expr` or an `evalFromLib` block:
+
+```yaml
+variableDict:
+  - { name: "myVar", expr: "treeBranch + 10." }
+  - name: "myVarFromLib"
+    evalFromLib:
+      title: "optional title"
+      libraryFile: "foo.so"
+      inputList:
+        - "[myVar]"
+        - "TMath::Abs(mode)"
+      messageOnError: "optional build hint"
+```
 
 
 #### data
@@ -49,4 +74,3 @@ All options from MC
 | useReweightEngine        | bool   | Force to load the dials while loading the data. Used for custom toys that use the reweight engine for generating the histograms | false   |
 | evalModelAt              | json   | Specify which sets of parameters to eval the model and copy the events from. Parameter injector format                          |         |
 | overridePropagatorConfig | json   | Use a custom set of config option that will override the propagator config. Any parameter can be changed from here              |         |
-
