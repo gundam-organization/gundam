@@ -272,6 +272,21 @@ namespace {
     return variable_;
   }
 
+  std::string getVariableDisplayExpression(
+      const DataDispenserCache::VariableDictEntry* entry_
+  ){
+    if( entry_ == nullptr ){ return ""; }
+    if( entry_->backend != DataDispenserCache::VariableDictEntry::LibraryTransform ){ return entry_->expr; }
+
+    const auto& transform = *entry_->transformPtr;
+    auto libraryFileName = GenericToolbox::getFileName(transform.getLibraryFile(), true);
+    if( transform.getName().empty() or transform.getName() == transform.getOutputVariableName() ){
+      return "evalFromLib(\"" + libraryFileName + "\")";
+    }
+
+    return "evalFromLib(\"" + transform.getName() + "\", \"" + libraryFileName + "\")";
+  }
+
   void addVariablesRequestedByFormula(
       DataDispenserCache& cache_,
       const std::string& formula_,
@@ -1699,7 +1714,7 @@ void DataDispenser::loadEvent(int iThread_){
       }
       else{
         auto* variableDictEntry = getActiveVariableDictEntry(_cache_, _cache_.varsRequestedForIndexing[iVar]);
-        varDisplayList.back().leafName = (variableDictEntry == nullptr ? "" : variableDictEntry->expr);
+        varDisplayList.back().leafName = getVariableDisplayExpression(variableDictEntry);
         varDisplayList.back().leafTypeName = "formula";
       }
 

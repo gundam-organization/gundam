@@ -17,6 +17,7 @@ public:
   void reload();
 
   void setLibraryFile(const std::string& libraryFile_){ _libraryFile_ = libraryFile_; }
+  const std::string& getLibraryFile() const{ return _libraryFile_; }
 
 protected:
   void initializeImpl() override;
