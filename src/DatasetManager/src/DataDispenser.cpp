@@ -76,6 +76,27 @@ namespace {
     return alias;
   }
 
+  bool isGeneratedTreeExpressionAlias(const DataDispenserCache& cache_, const std::string& name_){
+    return std::any_of(
+        cache_.eventFormulaTreeExpressionAliases.begin(),
+        cache_.eventFormulaTreeExpressionAliases.end(),
+        [&](const auto& entry_){ return entry_.second == name_; }
+    );
+  }
+
+  std::vector<std::string> filterDisplayedVariableNames(
+      const DataDispenserCache& cache_,
+      const std::vector<std::string>& variableNameList_
+  ){
+    std::vector<std::string> out;
+    out.reserve(variableNameList_.size());
+    for( const auto& varName : variableNameList_ ){
+      if( isGeneratedTreeExpressionAlias(cache_, varName) ){ continue; }
+      out.emplace_back(varName);
+    }
+    return out;
+  }
+
   std::string resolveTreeArrayIndexToken(
       const std::string& token_,
       const std::map<std::string, std::string>& variableDict_
@@ -1269,7 +1290,7 @@ void DataDispenser::eventSelectionFunction(int iThread_){
     );
   }
   LogInfoIf(iThread_ == 0) << "Selection variable requests: "
-                           << GenericToolbox::toString(selectionCache.varsRequestedForIndexing, false)
+                           << GenericToolbox::toString(filterDisplayedVariableNames(selectionCache, selectionCache.varsRequestedForIndexing), false)
                            << std::endl;
 
   Event eventSelectionBuffer;
@@ -1704,6 +1725,7 @@ void DataDispenser::loadEvent(int iThread_){
 
     varDisplayList.reserve( _cache_.varsRequestedForIndexing.size() );
     for( size_t iVar = 0 ; iVar < _cache_.varsRequestedForIndexing.size() ; iVar++ ){
+      if( isGeneratedTreeExpressionAlias(_cache_, _cache_.varsRequestedForIndexing[iVar]) ){ continue; }
       varDisplayList.emplace_back();
 
       varDisplayList.back().varName = _cache_.varsRequestedForIndexing[iVar];
@@ -1744,7 +1766,7 @@ void DataDispenser::loadEvent(int iThread_){
     } );
 
     for( auto& varDisplay : varDisplayList ){
-      if( not varDisplay.lineColor.empty() ){ table.setColorBuffer( varDisplay.lineColor ); }
+      table.setColorBuffer( varDisplay.lineColor );
       table << varDisplay.varName << GenericToolbox::TablePrinter::NextColumn;
       table << varDisplay.leafName << "/" << varDisplay.leafTypeName << GenericToolbox::TablePrinter::NextColumn;
     }
