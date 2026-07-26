@@ -509,7 +509,7 @@ void DataDispenser::prepareConfig(ConfigReader &config_){
     {"overridePropagatorConfig"},
     {"selectionCutFormula"},
     {"allowMultipleSamplesPerEntry"},
-    {"nominalTreeWeightFormula", {"nominalWeightFormula"}},
+    {"nominalWeightFormula", {"nominalTreeWeightFormula"}},
     {"variableDict", {"overrideLeafDict"}},
     {"fromModel", {"fromMc"}},
     {"evalModelAt"},
