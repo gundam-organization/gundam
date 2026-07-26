@@ -1187,6 +1187,16 @@ void ParameterSet::defineParameters(){
         }
       }
 
+      // If no covariance matrix is defined, parameters are created from the
+      // configuration order itself, so preserving the positional mapping keeps
+      // existing configs working without requiring parameterIndex.
+      if( selectedParConfig.empty() and _priorFullCovarianceMatrix_ == nullptr ){
+        auto configVector = _parameterDefinitionConfig_.loop();
+        if( size_t(par.getParameterIndex()) < configVector.size() ){
+          selectedParConfig = configVector.at(size_t(par.getParameterIndex()));
+        }
+      }
+
       if( selectedParConfig.empty() and par.isEnabled() ){
         std::stringstream ss;
         ss << "No parameterDefinitions entry mapped to enabled parameter #"
