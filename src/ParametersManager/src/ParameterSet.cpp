@@ -1156,54 +1156,52 @@ void ParameterSet::defineParameters(){
 
     if( not _parameterDefinitionConfig_.empty() ){
       // Alternative 1: define dials then parameters
-      if (_parameterNamesList_ != nullptr) {
+      ConfigReader selectedParConfig;
+
+      if( _parameterNamesList_ != nullptr ) {
         // Find the parameter using the name from the vector of names for
         // the covariance.
-
-        ConfigReader selectedParConfig;
-
-        // search with name
         std::string parName = _parameterNamesList_->At(par.getParameterIndex())->GetName();
         for( auto& parConfig : _parameterDefinitionConfig_.loop() ){
           parConfig.defineFields({
-            {"name", {"parameterName"}},
+              {"name", {"parameterName"}},
           });
-          if( parConfig.hasField("name") ){
-            if( parName == parConfig.fetchValue<std::string>("name") ){
-              selectedParConfig = parConfig;
-              break;
-            }
+          if( parConfig.hasField("name")
+              and parName == parConfig.fetchValue<std::string>("name") ){
+            selectedParConfig = parConfig;
+            break;
           }
         }
+      }
 
-        // not found? try with the index
-        if( selectedParConfig.empty() ){
-          for( auto& parConfig : _parameterDefinitionConfig_.loop() ){
-            parConfig.defineFields({{"parameterIndex"}});
-            if( parConfig.hasField("parameterIndex") ){
-              if( par.getParameterIndex() == parConfig.fetchValue<int>("parameterIndex") ){
-                selectedParConfig = parConfig;
-                break;
-              }
-            }
+      // Always allow an explicit parameterIndex mapping, even when the
+      // covariance file does not expose a parameter name list.
+      if( selectedParConfig.empty() ){
+        for( auto& parConfig : _parameterDefinitionConfig_.loop() ){
+          parConfig.defineFields({{"parameterIndex"}});
+          if( parConfig.hasField("parameterIndex")
+              and par.getParameterIndex() == parConfig.fetchValue<int>("parameterIndex") ){
+            selectedParConfig = parConfig;
+            break;
           }
         }
-
-        par.setConfig( selectedParConfig );
       }
-      else{
-        // No covariance provided, so find the name based on the order in
-        // the parameter set.
-        auto configVector = _parameterDefinitionConfig_.loop();
-        LogThrowIf(configVector.size() <= par.getParameterIndex(),
-                   "Parameter index out of range");
-        auto& parConfig = configVector.at(par.getParameterIndex());
-        par.setConfig( parConfig );
 
-        LogWarning << "Parameter #" << par.getParameterIndex()
-                   << " not defined by covariance matrix file"
-                   << std::endl;
+      if( selectedParConfig.empty() and par.isEnabled() ){
+        std::stringstream ss;
+        ss << "No parameterDefinitions entry mapped to enabled parameter #"
+           << par.getParameterIndex();
+        if( _parameterNamesList_ != nullptr ){
+          ss << " (\"" << _parameterNamesList_->At(par.getParameterIndex())->GetName() << "\")";
+        }
+        else{
+          ss << ". Please specify \"parameterIndex\" explicitly";
+        }
+        ss << ".";
+        LogWarning << ss.str() << std::endl;
       }
+
+      par.setConfig( selectedParConfig );
     }
     else if( not _dialSetDefinitions_.empty() ){
       // Alternative 2: define dials then parameters
