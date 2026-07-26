@@ -11,6 +11,7 @@
 
 #include <vector>
 #include <string>
+#include <map>
 
 
 class EventVarTransform : public JsonBaseClass {
@@ -46,6 +47,9 @@ protected:
 
   double evalTransformation(const Event& event_) const;
   virtual double evalTransformation( const Event& event_, std::vector<double>& inputBuffer_) const;
+  [[nodiscard]] const std::string& getInputFormulaParameterSource(const std::string& parameterName_) const;
+  void registerInputFormulaParameterSource(const std::string& parameterName_, const std::string& sourceName_);
+  [[nodiscard]] size_t getInputFormulaParameterSourceCount() const{ return _inputFormulaParameterSourceDict_.size(); }
 
   // config
   bool _isEnabled_{true};
@@ -60,6 +64,7 @@ protected:
   // Internals
   bool _useCache_{true};
   std::vector<TFormula> _inputFormulaList_;
+  std::map<std::string, std::string> _inputFormulaParameterSourceDict_{};
 
   // CACHES / not parallelisable
   double _outputCache_{};

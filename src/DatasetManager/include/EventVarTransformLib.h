@@ -25,6 +25,8 @@ protected:
 
   void loadLibrary();
   void initInputFormulas();
+  std::string registerInputFormulaArrayAlias(const std::string& sourceExpression_, size_t formulaIndex_);
+  std::string rewriteInputFormulaTreeArrayExpressions(const std::string& formula_, size_t formulaIndex_);
 
   double evalTransformation( const Event& event_, std::vector<double>& inputBuffer_) const override;
 

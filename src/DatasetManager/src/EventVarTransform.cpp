@@ -38,7 +38,7 @@ const std::vector<std::string>& EventVarTransform::fetchRequestedVars() const {
   if( _requestedLeavesForEvalCache_.empty() ){
     for( auto& formula : _inputFormulaList_ ){
       for( int iPar = 0 ; iPar < formula.GetNpar() ; iPar++ ){
-        GenericToolbox::addIfNotInVector(formula.GetParName(iPar), _requestedLeavesForEvalCache_);
+        GenericToolbox::addIfNotInVector(getInputFormulaParameterSource(formula.GetParName(iPar)), _requestedLeavesForEvalCache_);
       }
     }
   }
@@ -68,6 +68,14 @@ double EventVarTransform::evalTransformation(const Event& event_) const {
 }
 double EventVarTransform::evalTransformation( const Event& event_, std::vector<double>& inputBuffer_) const{
   return std::nan("defaultEvalTransformOutput");
+}
+const std::string& EventVarTransform::getInputFormulaParameterSource(const std::string& parameterName_) const{
+  auto it = _inputFormulaParameterSourceDict_.find(parameterName_);
+  if( it != _inputFormulaParameterSourceDict_.end() ){ return it->second; }
+  return parameterName_;
+}
+void EventVarTransform::registerInputFormulaParameterSource(const std::string& parameterName_, const std::string& sourceName_){
+  _inputFormulaParameterSourceDict_[parameterName_] = sourceName_;
 }
 void EventVarTransform::storeOutput( double output_, Event& storeEvent_ ) const{
   auto& variable = storeEvent_.getVariables().fetchVariable(this->getOutputVariableName());
