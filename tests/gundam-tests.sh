@@ -99,7 +99,7 @@ echo '    -t <test-path>   : Run only one test script, e.g. fast-tests/210Ignore
 echo '    -v               : Print test logs live while also saving them to the log files'
 echo '    -a               : Apply the tests (no tests are run without this)'
 echo '    output-directory : The name of the output directory.  The default'
-echo '                       value is \"./output.YYYY-MM-DD-hhmm\"'
+echo '                       value is \"./output.YYYY-MM-DD-hhmmss\"'
 echo ' See gundam-tests.sh for more usage documentation.'
 
 # The default tests to be run.
@@ -175,7 +175,7 @@ fi
 
 # Find the name of the output directory.  It might have been provided
 # on the command line.
-OUTPUT_DIR="output.$(date +%Y-%m-%d-%H%M)"  # A default name for the output
+OUTPUT_DIR="output.$(date +%Y-%m-%d-%H%M%S)"  # A default name for the output
 if [ ${#1} -gt 0 ]; then
     # A name was provided on the command line.
     OUTPUT_DIR=${1}
