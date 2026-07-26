@@ -612,7 +612,7 @@ void DataDispenser::configureImpl(){
   _config_.fillValue(_parameters_.allowMultipleSamplesPerEntry, "allowMultipleSamplesPerEntry");
 
   _config_.fillFormula(_parameters_.selectionCutFormulaStr, "selectionCutFormula", "&&");
-  _config_.fillFormula(_parameters_.nominalWeightFormulaStr, "nominalTreeWeightFormula", "*");
+  _config_.fillFormula(_parameters_.nominalWeightFormulaStr, "nominalWeightFormula", "*");
 
 }
 void DataDispenser::initializeImpl(){
