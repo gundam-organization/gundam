@@ -5,6 +5,7 @@
 #include "EventVarTransformLib.h"
 #include "LoaderUtils.h"
 #include "ConfigUtils.h"
+#include "FormulaUtils.h"
 
 #include "Logger.h"
 
@@ -43,8 +44,9 @@ void EventVarTransformLib::loadLibrary(){
 void EventVarTransformLib::initInputFormulas(){
   _inputFormulaList_.clear();
   for( auto& inputFormulaStr : _inputFormulaStrList_ ){
-    _inputFormulaList_.emplace_back( inputFormulaStr.c_str(), inputFormulaStr.c_str() );
-    LogThrowIf(not _inputFormulaList_.back().IsValid(), "\"" << inputFormulaStr << "\": could not be parsed as formula expression.")
+    auto formulaStr = FormulaUtils::convertBareVariablesToFormulaParameters(inputFormulaStr);
+    _inputFormulaList_.emplace_back( formulaStr.c_str(), formulaStr.c_str() );
+    LogThrowIf(not _inputFormulaList_.back().IsValid(), "\"" << inputFormulaStr << "\" -> \"" << formulaStr << "\": could not be parsed as formula expression.")
   }
   _inputBuffer_.resize(_inputFormulaList_.size(), std::nan("unset"));
 }
