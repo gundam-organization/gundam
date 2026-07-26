@@ -28,6 +28,11 @@ namespace ConfigUtils {
       const std::string& fieldName_
   );
 
+  std::vector<std::string> readFormulaExprList(
+      const ConfigReader& config_,
+      const std::string& fieldName_
+  );
+
   std::string buildFormulaString(
       const ConfigReader& config_,
       const std::string& fieldName_,

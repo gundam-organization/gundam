@@ -23,7 +23,7 @@ void EventVarTransform::configureImpl(){
   _config_.fillValue(_isEnabled_, "isEnabled");
   _config_.fillValue(_messageOnError_, "messageOnError");
   _config_.fillValue(_outputVariableName_, "outputVariableName");
-  _config_.fillValue(_inputFormulaStrList_, "inputList");
+  _inputFormulaStrList_ = ConfigUtils::readFormulaExprList(_config_, "inputList");
 }
 void EventVarTransform::initializeImpl(){
   _config_.printUnusedKeys();
@@ -74,4 +74,3 @@ void EventVarTransform::storeOutput( double output_, Event& storeEvent_ ) const{
   auto& variable = storeEvent_.getVariables().fetchVariable(this->getOutputVariableName());
   variable.set( output_ );
 }
-

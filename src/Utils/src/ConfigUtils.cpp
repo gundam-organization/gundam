@@ -121,6 +121,27 @@ namespace ConfigUtils {
     return out;
   }
 
+  std::vector<std::string> readFormulaExprList(
+      const ConfigReader& config_,
+      const std::string& fieldName_
+  ){
+    auto keyValuePair = config_.getConfigEntry(fieldName_);
+    if( keyValuePair.second == nullptr ){ return {}; }
+
+    LogExitIf(
+        not keyValuePair.second->is_array(),
+        config_.getParentPath() << "/" << keyValuePair.first << ": formula list entry must be an array."
+    );
+
+    auto componentList = readFormulaComponents(config_, fieldName_);
+    std::vector<std::string> out;
+    out.reserve(componentList.size());
+    for( const auto& component : componentList ){
+      out.emplace_back(component.expr);
+    }
+    return out;
+  }
+
   std::string buildFormulaString(
       const ConfigReader& config_,
       const std::string& fieldName_,
