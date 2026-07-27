@@ -15,9 +15,28 @@ def flush_python_outputs() -> None:
 def write_input_root_file(root_path: Path) -> None:
     import uproot
 
+    event_data = {
+        "Enu": [0.6, 0.8, 1.2, 1.5, 2.0, 2.5],
+        "FlavorEmit": [14, 14, 14, 14, 14, 14],
+        "FlavorDetect": [12, 14, 12, 14, 12, 14],
+    }
+
     with uproot.recreate(root_path) as root_file:
-        tree = root_file.mktree("tree_mc", {"X": "float64"})
-        tree.extend({"X": array("d", [0.5] * 10)})
+        tree = root_file.mktree(
+            "tree_mc",
+            {
+                "Enu": "float64",
+                "FlavorEmit": "int32",
+                "FlavorDetect": "int32",
+            },
+        )
+        tree.extend(
+            {
+                "Enu": array("d", event_data["Enu"]),
+                "FlavorEmit": array("i", event_data["FlavorEmit"]),
+                "FlavorDetect": array("i", event_data["FlavorDetect"]),
+            }
+        )
 
 
 def write_external_weight_script(script_path: Path) -> None:
@@ -27,16 +46,77 @@ def write_external_weight_script(script_path: Path) -> None:
                 "#!/usr/bin/env python3",
                 "import json",
                 "import sys",
+                "from multiprocessing import shared_memory",
                 "",
-                "with open(sys.argv[1], 'r', encoding='utf-8') as payload_file:",
-                "    payload = json.load(payload_file)",
+                "import numpy as np",
                 "",
-                "parameters = {entry['name']: entry['value'] for entry in payload['parameters']}",
-                "delta_msq = parameters['deltaMsq']",
-                "sin_sq_theta = parameters['sinSqTheta']",
-                "x_values = payload['inputs']['X']",
-                "weights = [1.0 + sin_sq_theta * delta_msq * x for x in x_values]",
-                "print(json.dumps({'weights': weights}))",
+                "",
+                "def attach_array(array_description):",
+                "    try:",
+                "        shm = shared_memory.SharedMemory(name=array_description['shmName'], track=False)",
+                "    except TypeError:",
+                "        shm = shared_memory.SharedMemory(name=array_description['shmName'])",
+                "        try:",
+                "            from multiprocessing import resource_tracker",
+                "            resource_tracker.unregister(shm._name, 'shared_memory')",
+                "        except Exception:",
+                "            pass",
+                "    array = np.ndarray(tuple(array_description['shape']), dtype=np.float64, buffer=shm.buf)",
+                "    return shm, array",
+                "",
+                "",
+                "def respond(response):",
+                "    print(json.dumps(response), flush=True)",
+                "",
+                "",
+                "def run_worker():",
+                "    state = {'shared_memory': []}",
+                "    for line in sys.stdin:",
+                "        command = json.loads(line)",
+                "        if command['command'] == 'initialize':",
+                "            state['inputs'] = {}",
+                "            for input_name, input_description in command['inputs'].items():",
+                "                shm, array = attach_array(input_description)",
+                "                state['shared_memory'].append(shm)",
+                "                state['inputs'][input_name] = array",
+                "            shm, array = attach_array(command['parameterBuffer'])",
+                "            state['shared_memory'].append(shm)",
+                "            state['parameters'] = array",
+                "            state['parameter_names'] = [entry['name'] for entry in command['parameters']]",
+                "            shm, array = attach_array(command['weights'])",
+                "            state['shared_memory'].append(shm)",
+                "            state['weights'] = array",
+                "            respond({'status': 'ok'})",
+                "        elif command['command'] == 'evaluate':",
+                "            parameter_values = dict(zip(state['parameter_names'], state['parameters']))",
+                "            delta_msq = parameter_values['deltaMsq']",
+                "            sin_sq_theta = parameter_values['sinSqTheta']",
+                "            baseline_km = 295.0",
+                "            enu = state['inputs']['Enu']",
+                "            flavor_emit = np.rint(state['inputs']['FlavorEmit']).astype(np.int64)",
+                "            flavor_detect = np.rint(state['inputs']['FlavorDetect']).astype(np.int64)",
+                "            phase = 1.267 * delta_msq * baseline_km / enu",
+                "            transition_prob = sin_sq_theta * np.sin(phase) ** 2",
+                "            survival_prob = 1.0 - transition_prob",
+                "            same_flavor = flavor_emit == flavor_detect",
+                "            state['weights'][:] = np.where(same_flavor, survival_prob, transition_prob)",
+                "            respond({'status': 'ok'})",
+                "        elif command['command'] == 'shutdown':",
+                "            respond({'status': 'ok'})",
+                "            for shm in state.get('shared_memory', []):",
+                "                shm.close()",
+                "            return 0",
+                "        else:",
+                "            respond({'status': 'error', 'message': 'unknown command: {0}'.format(command['command'])})",
+                "            return 1",
+                "    return 0",
+                "",
+                "",
+                "if __name__ == '__main__':",
+                "    if len(sys.argv) >= 2 and sys.argv[1] == '--worker':",
+                "        sys.exit(run_worker())",
+                "    print(json.dumps({'status': 'error', 'message': 'expected --worker'}), flush=True)",
+                "    sys.exit(1)",
                 "",
             ]
         ),
@@ -63,12 +143,12 @@ fitterEngineConfig:
     propagatorConfig:
       sampleSetConfig:
         sampleList:
-          - name: X
+          - name: Enu
             isEnabled: true
             binning:
               binningDefinition:
-                - name: "X"
-                  edges: [0, 1]
+                - name: "Enu"
+                  edges: [0, 5]
             dataSets: [ "TestSample" ]
 
       parametersManagerConfig:
@@ -85,16 +165,16 @@ fitterEngineConfig:
                 externalWeight:
                   pythonExecutable: "{python_executable}"
                   evalScript: "{eval_script_path}"
-                  inputList: [ "[X]" ]
+                  inputList: [ "[Enu]", "[FlavorEmit]", "[FlavorDetect]" ]
             parameterDefinitions:
               - name: "deltaMsq"
                 isEnabled: true
-                priorValue: 2.0
+                priorValue: 2.5e-3
                 priorType: Flat
-                parameterLimits: [0.0, 10.0]
+                parameterLimits: [0.0, 1.0]
               - name: "sinSqTheta"
                 isEnabled: true
-                priorValue: 0.5
+                priorValue: 0.2
                 priorType: Flat
                 parameterLimits: [0.0, 1.0]
 """.format(
@@ -144,8 +224,6 @@ def evaluate_config(config_text: str, work_dir: Path) -> float:
 
 def main() -> int:
     script_dir = Path(sys.argv[1]).resolve() if len(sys.argv) > 1 else Path(__file__).resolve().parent
-    repo_root = script_dir.parents[1]
-
     work_dir = Path.cwd()
     root_path = work_dir / "213ExternalWeightResponse.root"
     eval_script_path = work_dir / "213ExternalWeightResponse_eval.py"
@@ -156,7 +234,26 @@ def main() -> int:
     config_text = build_config_text(root_path, eval_script_path, sys.executable)
     sum_weights = evaluate_config(config_text, work_dir)
 
-    expected_sum_weights = 10.0 * (1.0 + 0.5 * 2.0 * 0.5)
+    baseline_km = 295.0
+    delta_msq = 2.5e-3
+    sin_sq_theta = 0.2
+    event_data = [
+        {"Enu": 0.6, "FlavorEmit": 14, "FlavorDetect": 12},
+        {"Enu": 0.8, "FlavorEmit": 14, "FlavorDetect": 14},
+        {"Enu": 1.2, "FlavorEmit": 14, "FlavorDetect": 12},
+        {"Enu": 1.5, "FlavorEmit": 14, "FlavorDetect": 14},
+        {"Enu": 2.0, "FlavorEmit": 14, "FlavorDetect": 12},
+        {"Enu": 2.5, "FlavorEmit": 14, "FlavorDetect": 14},
+    ]
+    expected_sum_weights = 0.0
+    for event in event_data:
+        phase = 1.267 * delta_msq * baseline_km / event["Enu"]
+        transition_probability = sin_sq_theta * math.sin(phase) ** 2
+        if event["FlavorEmit"] == event["FlavorDetect"]:
+            expected_sum_weights += 1.0 - transition_probability
+        else:
+            expected_sum_weights += transition_probability
+
     if not math.isclose(sum_weights, expected_sum_weights, rel_tol=0.0, abs_tol=1.0e-9):
         print(
             "FAIL: expected external weights to give sumWeights={0}, got {1}".format(
@@ -166,7 +263,7 @@ def main() -> int:
         )
         return 1
 
-    print("SUCCESS: ExternalWeight evaluates event weights through the test Python venv.")
+    print("SUCCESS: ExternalWeight evaluates a two-flavor oscillation probability with mixed input semantics.")
     return 0
 
 
