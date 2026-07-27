@@ -26,12 +26,14 @@ set( SRCFILES
     DialDefinitions/src/Bicubic.cpp
 
     DialDefinitions/src/CompiledLibDial.cpp
+    DialDefinitions/src/ExternalWeight.cpp
     DialDefinitions/src/RootFormula.cpp
     DialDefinitions/src/Polynomial.cpp
 
     # DialFactories
     DialFactories/src/TabulatedDialFactory.cpp
     DialFactories/src/KrigedDialFactory.cpp
+    DialFactories/src/ExternalWeightDialFactory.cpp
     )
 
 set( HEADERS
@@ -62,10 +64,12 @@ set( HEADERS
 
     DialDefinitions/include/RootFormula.h
     DialDefinitions/include/Polynomial.h
+    DialDefinitions/include/ExternalWeight.h
 
     # DialFactories
     DialFactories/include/TabulatedDialFactory.h
     DialFactories/include/KrigedDialFactory.h
+    DialFactories/include/ExternalWeightDialFactory.h
     )
 
 if( USE_STATIC_LINKS )

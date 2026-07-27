@@ -6,6 +6,7 @@
 
 #include "TabulatedDialFactory.h"
 #include "KrigedDialFactory.h"
+#include "ExternalWeightDialFactory.h"
 
 #include "RootFormula.h"
 #include "Shift.h"
@@ -56,6 +57,7 @@ void DialCollection::prepareConfig(ConfigReader &config_){
       {"dialsTreePath"},
       {"dialsDefinitions"},
       {"tableConfig"},
+      {"externalWeight"},
       {FieldFlag::DEPRECATED, "parameterLimits", "\"parameterLimits\" should be set in the parameter definition section. Not the dial definition. Support has been removed."},
     });
   config_.checkConfiguration();
@@ -665,6 +667,25 @@ bool DialCollection::initializeDialsWithKriging(const ConfigReader& dialsDefinit
   return true;
 }
 
+bool DialCollection::initializeDialsWithExternalWeight(const ConfigReader& dialsDefinition_){
+  auto externalWeight = std::make_unique<ExternalWeightDialFactory>(dialsDefinition_);
+  _dialCollectionData_.emplace_back(std::move(externalWeight));
+
+  int index = int(_dialCollectionData_.size()) - 1;
+
+  for( const auto& var : getCollectionData<ExternalWeightDialFactory>(index)->getInputNameList() ){
+    addExtraLeafName(var);
+  }
+
+  addUpdate(
+      [index](DialCollection* dc){
+        dc->getCollectionData<ExternalWeightDialFactory>(index)
+          ->updateWeights(dc->getDialInputBufferList().front());
+      });
+
+  return true;
+}
+
 bool DialCollection::initializeDialsWithBinningFile(const ConfigReader& dialsDefinition) {
   if( not dialsDefinition.hasField("binning") ){ return false; }
 
@@ -887,6 +908,11 @@ bool DialCollection::initializeDialsWithDefinition() {
     _isEventByEvent_ = true;
     LogThrowIf(not initializeDialsWithKriging(dialsDefinition),
                "Error initializing dials with kriging");
+  }
+  else if( _dialType_ == DialType::ExternalWeight ) {
+    _isEventByEvent_ = true;
+    LogThrowIf(not initializeDialsWithExternalWeight(dialsDefinition),
+               "Error initializing dials with external weights");
   }
   else if( dialsDefinition.hasField("binning") ) {
     // This dial collection is binned with different weights for each bin.
