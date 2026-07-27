@@ -5,6 +5,8 @@
 
 #include "ConfigUtils.h"
 
+#include <cstddef>
+#include <memory>
 #include <mutex>
 #include <string>
 #include <vector>
@@ -21,6 +23,8 @@ public:
 
   class PythonWorker {
   public:
+    ~PythonWorker();
+
     void configure(const PythonWorkerConfig& config_);
     void initialize();
     void loadEvents(const std::vector<std::string>& inputNameList_, const std::vector<std::vector<double>>& inputValueList_, std::size_t eventCount_);
@@ -29,10 +33,36 @@ public:
     [[nodiscard]] const PythonWorkerConfig& getConfig() const{ return _config_; }
 
   private:
+    struct SharedMemoryBuffer {
+      explicit SharedMemoryBuffer(std::string name_, std::size_t nbDoubles_);
+      ~SharedMemoryBuffer();
+
+      SharedMemoryBuffer(const SharedMemoryBuffer&) = delete;
+      SharedMemoryBuffer& operator=(const SharedMemoryBuffer&) = delete;
+
+      std::string name{};
+      std::size_t nbDoubles{0};
+      std::size_t nbBytes{0};
+      int fd{-1};
+      double* ptr{nullptr};
+    };
+
+    void startWorkerProcess(const DialInputBuffer& inputBuffer_);
+    void sendWorkerCommand(const JsonType& command_);
+    JsonType readWorkerResponse();
+    void stopWorkerProcess();
+
     PythonWorkerConfig _config_{};
     std::vector<std::string> _loadedInputNameList_{};
-    std::vector<std::vector<double>> _loadedInputValueList_{};
+    std::vector<std::unique_ptr<SharedMemoryBuffer>> _inputBufferList_{};
+    std::unique_ptr<SharedMemoryBuffer> _parameterBuffer_{nullptr};
+    std::unique_ptr<SharedMemoryBuffer> _weightBuffer_{nullptr};
+    std::size_t _eventCount_{0};
     bool _isInitialized_{false};
+    bool _isWorkerStarted_{false};
+    int _workerInputFd_{-1};
+    int _workerOutputFd_{-1};
+    int _workerPid_{-1};
   };
 
 public:
