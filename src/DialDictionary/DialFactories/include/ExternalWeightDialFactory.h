@@ -19,6 +19,7 @@ public:
     std::string pythonVenv{};
     std::string initScript{};
     std::string evalScript{};
+    std::vector<std::string> scriptArgs{};
   };
 
   class PythonWorker {
@@ -48,6 +49,7 @@ public:
     };
 
     void startWorkerProcess(const DialInputBuffer& inputBuffer_);
+    void validateEvalScript();
     void sendWorkerCommand(const JsonType& command_);
     JsonType readWorkerResponse();
     void stopWorkerProcess();
