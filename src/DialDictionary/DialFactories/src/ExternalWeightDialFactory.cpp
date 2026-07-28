@@ -6,12 +6,14 @@
 #include "Logger.h"
 
 #include <algorithm>
+#include <array>
 #include <cctype>
 #include <cerrno>
 #include <cstdio>
 #include <cstring>
 #include <fcntl.h>
 #include <sstream>
+#include <sys/stat.h>
 #include <sys/mman.h>
 #include <sys/wait.h>
 #include <utility>
@@ -68,6 +70,7 @@ ExternalWeightDialFactory::ExternalWeightDialFactory(const ConfigReader& config_
       {"pythonVenv"},
       {"initScript"},
       {"evalScript"},
+      {"scriptArgs"},
       {"inputList"},
     });
   config.checkConfiguration();
@@ -86,6 +89,7 @@ ExternalWeightDialFactory::ExternalWeightDialFactory(const ConfigReader& config_
   config.fillValue(workerConfig.pythonVenv, "pythonVenv");
   config.fillValue(workerConfig.initScript, "initScript");
   config.fillValue(workerConfig.evalScript, "evalScript");
+  config.fillValue(workerConfig.scriptArgs, "scriptArgs");
 
   if( workerConfig.pythonExecutable.empty() and not workerConfig.pythonVenv.empty() ){
     workerConfig.pythonExecutable = workerConfig.pythonVenv + "/bin/python";
@@ -163,13 +167,67 @@ void ExternalWeightDialFactory::PythonWorker::initialize() {
              "ExternalWeight pythonExecutable is not configured. Provide pythonExecutable or pythonVenv.");
   LogThrowIf(_config_.evalScript.empty(),
              "ExternalWeight evalScript is not configured.");
+  LogThrowIf(access(_config_.pythonExecutable.c_str(), X_OK) != 0,
+             "ExternalWeight pythonExecutable is not executable: \"" << _config_.pythonExecutable
+             << "\" / " << std::strerror(errno));
+  LogThrowIf(access(_config_.evalScript.c_str(), R_OK) != 0,
+             "ExternalWeight evalScript is not readable: \"" << _config_.evalScript
+             << "\" / " << std::strerror(errno));
 
   if( not _config_.initScript.empty() ){
     LogWarning << "ExternalWeight initScript is currently ignored by the shared-memory worker. "
                << "Put initialization logic in the worker initialize command handler instead." << std::endl;
   }
 
+  this->validateEvalScript();
   _isInitialized_ = true;
+}
+
+void ExternalWeightDialFactory::PythonWorker::validateEvalScript() {
+  int stdoutPipe[2];
+  LogThrowIf(pipe(stdoutPipe) == -1,
+             "Could not create ExternalWeight py_compile pipe: " << std::strerror(errno));
+
+  const pid_t pid = fork();
+  LogThrowIf(pid == -1, "Could not fork ExternalWeight py_compile process: " << std::strerror(errno));
+
+  if( pid == 0 ){
+    dup2(stdoutPipe[1], STDOUT_FILENO);
+    dup2(stdoutPipe[1], STDERR_FILENO);
+    close(stdoutPipe[0]);
+    close(stdoutPipe[1]);
+
+    execl(
+        _config_.pythonExecutable.c_str(),
+        _config_.pythonExecutable.c_str(),
+        "-m",
+        "py_compile",
+        _config_.evalScript.c_str(),
+        static_cast<char*>(nullptr)
+    );
+    _exit(127);
+  }
+
+  close(stdoutPipe[1]);
+
+  std::string output;
+  char buffer[1024];
+  while( true ){
+    ssize_t nRead = read(stdoutPipe[0], buffer, sizeof(buffer));
+    if( nRead == 0 ){ break; }
+    LogThrowIf(nRead < 0,
+               "Could not read ExternalWeight py_compile output: " << std::strerror(errno));
+    output.append(buffer, std::size_t(nRead));
+  }
+  close(stdoutPipe[0]);
+
+  int status = 0;
+  waitpid(pid, &status, 0);
+  LogThrowIf(
+      not WIFEXITED(status) or WEXITSTATUS(status) != 0,
+      "ExternalWeight evalScript failed `python -m py_compile`: \"" << _config_.evalScript << "\""
+      << (output.empty() ? "" : std::string{"\n"} + output)
+  );
 }
 
 void ExternalWeightDialFactory::PythonWorker::loadEvents(
@@ -263,11 +321,19 @@ void ExternalWeightDialFactory::PythonWorker::startWorkerProcess(const DialInput
     close(stdoutPipe[0]);
     close(stdoutPipe[1]);
 
-    execl(_config_.pythonExecutable.c_str(),
-          _config_.pythonExecutable.c_str(),
-          _config_.evalScript.c_str(),
-          "--worker",
-          static_cast<char*>(nullptr));
+    std::vector<std::string> argvStorage;
+    argvStorage.reserve(3 + _config_.scriptArgs.size());
+    argvStorage.emplace_back(_config_.pythonExecutable);
+    argvStorage.emplace_back(_config_.evalScript);
+    for( const auto& arg : _config_.scriptArgs ){ argvStorage.emplace_back(arg); }
+    argvStorage.emplace_back("--worker");
+
+    std::vector<char*> argv;
+    argv.reserve(argvStorage.size() + 1);
+    for( auto& arg : argvStorage ){ argv.emplace_back(arg.data()); }
+    argv.emplace_back(nullptr);
+
+    execv(_config_.pythonExecutable.c_str(), argv.data());
     _exit(127);
   }
 

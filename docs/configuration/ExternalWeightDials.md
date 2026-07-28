@@ -25,6 +25,7 @@ parameterSetList:
         externalWeight:
           pythonExecutable: "/path/to/venv/bin/python"
           evalScript: "./config/externalWeightWorker.py"
+          scriptArgs: [ "--model-config", "./config/osc.yaml" ]
           inputList:
             - "[Enu]"
             - "[FlavorEmit]"
@@ -51,6 +52,7 @@ parameterSetList:
 | pythonExecutable   | string     | Python executable used to start the worker                                |         |
 | pythonVenv         | string     | Alternative to `pythonExecutable`; GUNDAM uses `<pythonVenv>/bin/python`  |         |
 | evalScript         | string     | Python worker script                                                      |         |
+| scriptArgs         | list(str)  | Extra command-line arguments passed to the Python worker script           | empty   |
 | inputList          | list(str)  | Event variables made available to the worker                              |         |
 | initScript         | string     | Currently ignored by the shared-memory worker                             |         |
 
@@ -71,6 +73,20 @@ The worker is launched as:
 ```bash
 /path/to/python externalWeightWorker.py --worker
 ```
+
+If `scriptArgs` is provided, GUNDAM inserts those arguments before `--worker`. For example:
+
+```bash
+/path/to/python externalWeightWorker.py --model-config ./config/osc.yaml --worker
+```
+
+Before starting the persistent worker, GUNDAM runs a light preflight check with:
+
+```bash
+/path/to/python -m py_compile externalWeightWorker.py
+```
+
+This does not accelerate the fit in a meaningful way, but it catches Python syntax errors early and fails before the likelihood initialization continues.
 
 GUNDAM communicates with the worker through small JSON commands on stdin/stdout. The numerical arrays are not transferred through JSON. They are exposed as POSIX shared-memory buffers.
 
