@@ -103,6 +103,8 @@ PYBIND11_MODULE(GUNDAM, module) {
   // JsonType for the return type
   pybind11::class_<JsonType>(module, "JsonType")
   .def(pybind11::init())
+  .def(pybind11::init([](const std::string& jsonString_){ return JsonType::parse(jsonString_);}), pybind11::arg("jsonString"))
+  .def("toString", [](const JsonType& this_, bool shallow_){ return GenericToolbox::Json::toReadableString(this_, shallow_); }, pybind11::arg("shallow") = false)
   ;
 
 
@@ -288,6 +290,7 @@ PYBIND11_MODULE(GUNDAM, module) {
   .def("throwParameters", &ParametersManager::throwParameters)
   .def("exportParameterInjectorConfig", &ParametersManager::exportParameterInjectorConfig)
   .def("injectParameterValues", &ParametersManager::injectParameterValues)
+  .def("injectParameterValues", [](ParametersManager& self, const std::string& jsonString){ self.injectParameterValues(JsonType(jsonString)); })
   .def("getParameterSetsList", pybind11::overload_cast<>(&ParametersManager::getParameterSetsList), pybind11::return_value_policy::reference_internal)
   ;
 
@@ -453,7 +456,7 @@ PYBIND11_MODULE(GUNDAM, module) {
   .def("configure", pybind11::overload_cast<const ConfigReader&>(&FitterEngine::configure))
   .def("configure", pybind11::overload_cast<>(&FitterEngine::configure))
   .def("initialize", &FitterEngine::initialize)
-  .def("setRandomSeed", &FitterEngine::setRandomSeed)
+  .def_static("setRandomSeed", &FitterEngine::setRandomSeed)
   .def("fit", &FitterEngine::fit)
   .def("getMinimizer", pybind11::overload_cast<>(&FitterEngine::getMinimizer), pybind11::return_value_policy::reference)
   .def("getLikelihoodInterface", pybind11::overload_cast<>(&FitterEngine::getLikelihoodInterface), pybind11::return_value_policy::reference)
