@@ -103,6 +103,7 @@ PYBIND11_MODULE(GUNDAM, module) {
   // JsonType for the return type
   pybind11::class_<JsonType>(module, "JsonType")
   .def(pybind11::init())
+  .def("toString", [](const JsonType& this_, bool shallow_){ return GenericToolbox::Json::toReadableString(this_, shallow_); }, pybind11::arg("shallow") = false)
   ;
 
 
