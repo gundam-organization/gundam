@@ -290,6 +290,7 @@ PYBIND11_MODULE(GUNDAM, module) {
   .def("throwParameters", &ParametersManager::throwParameters)
   .def("exportParameterInjectorConfig", &ParametersManager::exportParameterInjectorConfig)
   .def("injectParameterValues", &ParametersManager::injectParameterValues)
+  .def("injectParameterValues", [](ParametersManager& self, const std::string& jsonString){ self.injectParameterValues(JsonType(jsonString)); })
   .def("getParameterSetsList", pybind11::overload_cast<>(&ParametersManager::getParameterSetsList), pybind11::return_value_policy::reference_internal)
   ;
 
