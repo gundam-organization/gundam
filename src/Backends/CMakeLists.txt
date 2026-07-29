@@ -12,6 +12,12 @@ set(SRCFILES
 
 if(APPLE)
   enable_language(OBJCXX)
+  file(READ ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/MPS/src/MpsBackendKernels.metal MPS_BACKEND_KERNEL_SOURCE)
+  configure_file(
+      ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/MPS/src/MpsBackendKernelSource.h.in
+      ${CMAKE_CURRENT_BINARY_DIR}/generated/MpsBackendKernelSource.h
+      @ONLY
+  )
   list(APPEND SRCFILES ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/MPS/src/MpsBackend.mm)
 else()
   list(APPEND SRCFILES ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/MPS/src/MpsBackend.cpp)
@@ -44,6 +50,8 @@ target_include_directories(
     ${CMAKE_CURRENT_SOURCE_DIR}/Common/include
     ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/CPU/include
     ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/MPS/include
+    PRIVATE
+    ${CMAKE_CURRENT_BINARY_DIR}/generated
 )
 
 target_link_libraries(
