@@ -142,6 +142,9 @@ void Propagator::initializeBackend(){
                << "LikelihoodInterface consumes CPU histograms." << std::endl;
     _backendPropagationRequest_.outputs.emplace_back(Backends::OutputRequest::Histograms);
   }
+  LogInfo << "Propagation backend enabled: " << _backendConfig_.type
+          << " with output requests " << Backends::toString(_backendPropagationRequest_)
+          << std::endl;
 
   _backendManager_ = std::make_shared<Backends::BackendManager>();
   _backendManager_->setBackend(Backends::makeBackend(_backendConfig_));

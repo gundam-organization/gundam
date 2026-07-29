@@ -2,8 +2,10 @@
 
 #include "DialInputBuffer.h"
 #include "DialInterface.h"
+#include "DialResponseSupervisor.h"
 #include "Event.h"
 #include "Histogram.h"
+#include "Norm.h"
 #include "Parameter.h"
 
 #include "Logger.h"
@@ -13,6 +15,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstring>
 #include <limits>
 #include <vector>
 
@@ -20,6 +23,32 @@ namespace {
   static NSString* const kMpsBackendMetalSource = @R"METAL(
 #include <metal_stdlib>
 using namespace metal;
+
+kernel void compute_norm_event_weights(
+    device float* eventWeights [[buffer(0)]],
+    device const float* baseWeights [[buffer(1)]],
+    device const uint* eventDialOffsets [[buffer(2)]],
+    device const uint* eventDialCounts [[buffer(3)]],
+    device const uint* normParameterIndices [[buffer(4)]],
+    device const float* normMinResponses [[buffer(5)]],
+    device const float* normMaxResponses [[buffer(6)]],
+    device const float* parameters [[buffer(7)]],
+    constant uint& nEvents [[buffer(8)]],
+    uint gid [[thread_position_in_grid]]) {
+  if( gid >= nEvents ){ return; }
+
+  float weight = baseWeights[gid];
+  uint dialOffset = eventDialOffsets[gid];
+  uint dialCount = eventDialCounts[gid];
+  for( uint iDial = 0 ; iDial < dialCount ; iDial++ ){
+    uint flatDial = dialOffset + iDial;
+    float response = parameters[normParameterIndices[flatDial]];
+    response = max(response, normMinResponses[flatDial]);
+    response = min(response, normMaxResponses[flatDial]);
+    weight *= response;
+  }
+  eventWeights[gid] = weight;
+}
 
 kernel void fill_histograms(
     device const float* eventWeights [[buffer(0)]],
@@ -63,6 +92,22 @@ kernel void fill_histograms(
                                length:values.size() * sizeof(T)
                               options:MTLResourceStorageModeShared];
   }
+
+  id<MTLBuffer> makeEmptyBuffer(id<MTLDevice> device, std::size_t byteSize) {
+    if( byteSize == 0 ){ return nil; }
+    return [device newBufferWithLength:byteSize options:MTLResourceStorageModeShared];
+  }
+
+  void releaseBuffer(id<MTLBuffer>& buffer) {
+    [buffer release];
+    buffer = nil;
+  }
+
+  template<typename T>
+  void copyToBuffer(id<MTLBuffer> buffer, const std::vector<T>& values) {
+    if( buffer == nil or values.empty() ){ return; }
+    std::memcpy(buffer.contents, values.data(), values.size() * sizeof(T));
+  }
 }
 
 struct Backends::MpsBackend::Impl {
@@ -77,8 +122,24 @@ struct Backends::MpsBackend::Impl {
 
   id<MTLDevice> device{nil};
   id<MTLCommandQueue> commandQueue{nil};
+  id<MTLComputePipelineState> normWeightsPipeline{nil};
   id<MTLComputePipelineState> histogramPipeline{nil};
   bool isAvailable{false};
+
+  bool isDeviceModelSupported{false};
+  id<MTLBuffer> eventWeightsBuffer{nil};
+  id<MTLBuffer> baseWeightsBuffer{nil};
+  id<MTLBuffer> eventDialOffsetsBuffer{nil};
+  id<MTLBuffer> eventDialCountsBuffer{nil};
+  id<MTLBuffer> globalBinsBuffer{nil};
+  id<MTLBuffer> normParameterIndicesBuffer{nil};
+  id<MTLBuffer> normMinResponsesBuffer{nil};
+  id<MTLBuffer> normMaxResponsesBuffer{nil};
+  id<MTLBuffer> parametersBuffer{nil};
+  id<MTLBuffer> histSumsBuffer{nil};
+  id<MTLBuffer> histSumSquaresBuffer{nil};
+  id<MTLBuffer> nEventsBuffer{nil};
+  id<MTLBuffer> totalBinsBuffer{nil};
 
   BackendModel model{};
   BackendLikelihoodModel likelihoodModel{};
@@ -118,6 +179,24 @@ struct Backends::MpsBackend::Impl {
       return;
     }
 
+    id<MTLFunction> normWeightsFunction = [library newFunctionWithName:@"compute_norm_event_weights"];
+    if( normWeightsFunction == nil ){
+      LogError << "Could not find compute_norm_event_weights Metal function." << std::endl;
+      [library release];
+      return;
+    }
+
+    normWeightsPipeline = [device newComputePipelineStateWithFunction:normWeightsFunction error:&error];
+    [normWeightsFunction release];
+    if( normWeightsPipeline == nil ){
+      if( error != nil ){
+        LogError << "Could not create MPS backend norm weights pipeline: "
+                 << [[error localizedDescription] UTF8String] << std::endl;
+      }
+      [library release];
+      return;
+    }
+
     id<MTLFunction> histogramFunction = [library newFunctionWithName:@"fill_histograms"];
     if( histogramFunction == nil ){
       LogError << "Could not find fill_histograms Metal function." << std::endl;
@@ -143,9 +222,27 @@ struct Backends::MpsBackend::Impl {
   }
 
   ~Impl() {
+    releaseDeviceBuffers();
+    [normWeightsPipeline release];
     [histogramPipeline release];
     [commandQueue release];
     [device release];
+  }
+
+  void releaseDeviceBuffers() {
+    releaseBuffer(eventWeightsBuffer);
+    releaseBuffer(baseWeightsBuffer);
+    releaseBuffer(eventDialOffsetsBuffer);
+    releaseBuffer(eventDialCountsBuffer);
+    releaseBuffer(globalBinsBuffer);
+    releaseBuffer(normParameterIndicesBuffer);
+    releaseBuffer(normMinResponsesBuffer);
+    releaseBuffer(normMaxResponsesBuffer);
+    releaseBuffer(parametersBuffer);
+    releaseBuffer(histSumsBuffer);
+    releaseBuffer(histSumSquaresBuffer);
+    releaseBuffer(nEventsBuffer);
+    releaseBuffer(totalBinsBuffer);
   }
 
   bool isCurrentToken(const PropagationToken& token_) const {
@@ -178,6 +275,181 @@ struct Backends::MpsBackend::Impl {
   void updateInputBuffers() {
     for( const auto* inputBuffer : model.inputBuffers ){
       const_cast<DialInputBuffer*>(inputBuffer)->update();
+    }
+  }
+
+  int findParameterIndex(const Parameter* parameter_) const {
+    for( std::size_t iPar = 0 ; iPar < model.parameters.size() ; iPar++ ){
+      if( model.parameters[iPar] == parameter_ ){ return int(iPar); }
+    }
+    return -1;
+  }
+
+  bool buildDeviceModel() {
+    releaseDeviceBuffers();
+    isDeviceModelSupported = false;
+
+    if( not isAvailable ){ return false; }
+    if( model.events.empty() or model.totalBins <= 0 ){ return false; }
+
+    std::vector<float> baseWeights(model.events.size());
+    std::vector<uint32_t> eventDialOffsets(model.events.size());
+    std::vector<uint32_t> eventDialCounts(model.events.size());
+    std::vector<int> globalBins(model.events.size());
+    std::vector<uint32_t> normParameterIndices(model.eventDials.size());
+    std::vector<float> normMinResponses(model.eventDials.size(), -std::numeric_limits<float>::infinity());
+    std::vector<float> normMaxResponses(model.eventDials.size(), std::numeric_limits<float>::infinity());
+
+    for( const auto& event : model.events ){
+      baseWeights[event.resultIndex] = float(event.baseWeight);
+      eventDialOffsets[event.resultIndex] = uint32_t(event.firstDial);
+      eventDialCounts[event.resultIndex] = uint32_t(event.dialCount);
+      globalBins[event.resultIndex] = event.globalBinIndex;
+    }
+
+    for( std::size_t iDial = 0 ; iDial < model.eventDials.size() ; iDial++ ){
+      const auto* interface = model.eventDials[iDial].interface;
+      if( interface == nullptr or dynamic_cast<const Norm*>(interface->getDialBaseRef()) == nullptr ){
+        return false;
+      }
+
+      const auto* inputBuffer = interface->getInputBufferRef();
+      if( inputBuffer == nullptr or inputBuffer->getBufferSize() != 1 ){
+        return false;
+      }
+
+      int parameterIndex = findParameterIndex(&inputBuffer->getParameter(0));
+      if( parameterIndex < 0 ){ return false; }
+      normParameterIndices[iDial] = uint32_t(parameterIndex);
+
+      const auto* supervisor = interface->getResponseSupervisorRef();
+      if( supervisor != nullptr ){
+        if( not std::isnan(supervisor->getMinResponse()) ){
+          normMinResponses[iDial] = float(supervisor->getMinResponse());
+        }
+        if( not std::isnan(supervisor->getMaxResponse()) ){
+          normMaxResponses[iDial] = float(supervisor->getMaxResponse());
+        }
+      }
+    }
+
+    uint32_t nEvents = uint32_t(model.events.size());
+    uint32_t totalBins = uint32_t(model.totalBins);
+
+    baseWeightsBuffer = makeBuffer(device, baseWeights);
+    eventDialOffsetsBuffer = makeBuffer(device, eventDialOffsets);
+    eventDialCountsBuffer = makeBuffer(device, eventDialCounts);
+    globalBinsBuffer = makeBuffer(device, globalBins);
+    normParameterIndicesBuffer = makeBuffer(device, normParameterIndices);
+    normMinResponsesBuffer = makeBuffer(device, normMinResponses);
+    normMaxResponsesBuffer = makeBuffer(device, normMaxResponses);
+    eventWeightsBuffer = makeEmptyBuffer(device, model.events.size() * sizeof(float));
+    parametersBuffer = makeEmptyBuffer(device, model.parameters.size() * sizeof(float));
+    histSumsBuffer = makeEmptyBuffer(device, std::size_t(model.totalBins) * sizeof(float));
+    histSumSquaresBuffer = makeEmptyBuffer(device, std::size_t(model.totalBins) * sizeof(float));
+    nEventsBuffer = [device newBufferWithBytes:&nEvents length:sizeof(nEvents) options:MTLResourceStorageModeShared];
+    totalBinsBuffer = [device newBufferWithBytes:&totalBins length:sizeof(totalBins) options:MTLResourceStorageModeShared];
+
+    if( baseWeightsBuffer == nil or eventDialOffsetsBuffer == nil or eventDialCountsBuffer == nil
+        or globalBinsBuffer == nil or normParameterIndicesBuffer == nil or normMinResponsesBuffer == nil
+        or normMaxResponsesBuffer == nil or eventWeightsBuffer == nil or parametersBuffer == nil
+        or histSumsBuffer == nil or histSumSquaresBuffer == nil or nEventsBuffer == nil
+        or totalBinsBuffer == nil ){
+      releaseDeviceBuffers();
+      return false;
+    }
+
+    isDeviceModelSupported = true;
+    return true;
+  }
+
+  void updateDeviceParameters() {
+    std::vector<float> parameterValues(model.parameters.size());
+    for( std::size_t iPar = 0 ; iPar < model.parameters.size() ; iPar++ ){
+      parameterValues[iPar] = float(model.parameters[iPar]->getParameterValue());
+    }
+    copyToBuffer(parametersBuffer, parameterValues);
+  }
+
+  bool encodeNormEventWeights(id<MTLComputeCommandEncoder> encoder) {
+    if( not isDeviceModelSupported ){ return false; }
+    [encoder setComputePipelineState:normWeightsPipeline];
+    [encoder setBuffer:eventWeightsBuffer offset:0 atIndex:0];
+    [encoder setBuffer:baseWeightsBuffer offset:0 atIndex:1];
+    [encoder setBuffer:eventDialOffsetsBuffer offset:0 atIndex:2];
+    [encoder setBuffer:eventDialCountsBuffer offset:0 atIndex:3];
+    [encoder setBuffer:normParameterIndicesBuffer offset:0 atIndex:4];
+    [encoder setBuffer:normMinResponsesBuffer offset:0 atIndex:5];
+    [encoder setBuffer:normMaxResponsesBuffer offset:0 atIndex:6];
+    [encoder setBuffer:parametersBuffer offset:0 atIndex:7];
+    [encoder setBuffer:nEventsBuffer offset:0 atIndex:8];
+
+    NSUInteger width = std::min<NSUInteger>(normWeightsPipeline.maxTotalThreadsPerThreadgroup, 256);
+    if( width == 0 ){ width = 1; }
+    [encoder dispatchThreads:MTLSizeMake(NSUInteger(model.events.size()), 1, 1)
+       threadsPerThreadgroup:MTLSizeMake(width, 1, 1)];
+    return true;
+  }
+
+  bool encodeHistogramsFromDeviceWeights(id<MTLComputeCommandEncoder> encoder) {
+    if( not isDeviceModelSupported ){ return false; }
+    [encoder setComputePipelineState:histogramPipeline];
+    [encoder setBuffer:eventWeightsBuffer offset:0 atIndex:0];
+    [encoder setBuffer:globalBinsBuffer offset:0 atIndex:1];
+    [encoder setBuffer:histSumsBuffer offset:0 atIndex:2];
+    [encoder setBuffer:histSumSquaresBuffer offset:0 atIndex:3];
+    [encoder setBuffer:nEventsBuffer offset:0 atIndex:4];
+    [encoder setBuffer:totalBinsBuffer offset:0 atIndex:5];
+
+    NSUInteger width = std::min<NSUInteger>(histogramPipeline.maxTotalThreadsPerThreadgroup, 256);
+    if( width == 0 ){ width = 1; }
+    [encoder dispatchThreads:MTLSizeMake(NSUInteger(model.totalBins), 1, 1)
+       threadsPerThreadgroup:MTLSizeMake(width, 1, 1)];
+    return true;
+  }
+
+  bool runDevicePropagation(bool needHistograms_) {
+    if( not isDeviceModelSupported ){ return false; }
+    updateDeviceParameters();
+
+    id<MTLCommandBuffer> commandBuffer = [commandQueue commandBuffer];
+    id<MTLComputeCommandEncoder> encoder = [commandBuffer computeCommandEncoder];
+    if( not encodeNormEventWeights(encoder) ){
+      [encoder endEncoding];
+      return false;
+    }
+    if( needHistograms_ and not encodeHistogramsFromDeviceWeights(encoder) ){
+      [encoder endEncoding];
+      return false;
+    }
+    [encoder endEncoding];
+    [commandBuffer commit];
+    [commandBuffer waitUntilCompleted];
+
+    if( commandBuffer.status != MTLCommandBufferStatusCompleted ){
+      return false;
+    }
+
+    if( needHistograms_ ){
+      auto* histSums = static_cast<float*>(histSumsBuffer.contents);
+      auto* histSumSquares = static_cast<float*>(histSumSquaresBuffer.contents);
+      lastResult.histSums.resize(model.totalBins);
+      lastResult.histSumSquares.resize(model.totalBins);
+      for( int iBin = 0 ; iBin < model.totalBins ; iBin++ ){
+        lastResult.histSums[iBin] = histSums[iBin];
+        lastResult.histSumSquares[iBin] = histSumSquares[iBin];
+      }
+    }
+
+    return true;
+  }
+
+  void copyDeviceEventWeightsToHostResult() {
+    LogThrowIf(eventWeightsBuffer == nil);
+    auto* weights = static_cast<float*>(eventWeightsBuffer.contents);
+    lastResult.eventWeights.resize(model.events.size());
+    for( const auto& event : model.events ){
+      lastResult.eventWeights[event.resultIndex] = weights[event.resultIndex];
     }
   }
 
@@ -292,6 +564,9 @@ struct Backends::MpsBackend::Impl {
   }
 
   void materializeEventWeights() {
+    if( lastResult.eventWeights.empty() and eventWeightsBuffer != nil ){
+      copyDeviceEventWeightsToHostResult();
+    }
     LogThrowIf(lastResult.eventWeights.size() != model.events.size());
     for( const auto& event : model.events ){
       event.event->getWeights().current = lastResult.eventWeights[event.resultIndex];
@@ -337,6 +612,7 @@ Backends::BackendCapabilities Backends::MpsBackend::getCapabilities() const {
 void Backends::MpsBackend::build(const BackendModel& model_) {
   _impl_->model = model_;
   _impl_->lastResult = Impl::Result();
+  _impl_->buildDeviceModel();
   _impl_->isBuilt = true;
 }
 
@@ -366,12 +642,28 @@ Backends::PropagationToken Backends::MpsBackend::requestPropagation(
   _impl_->applyParameterSnapshot(parameters_);
   _impl_->updateInputBuffers();
 
-  if( request_.has(OutputRequest::EventWeights) ){
+  bool needsEventWeights = request_.has(OutputRequest::EventWeights);
+  bool needsHistograms = request_.has(OutputRequest::Histograms) or request_.has(OutputRequest::Likelihood);
+  bool usedDevicePropagation = false;
+
+  if( needsEventWeights or needsHistograms ){
+    usedDevicePropagation = _impl_->runDevicePropagation(needsHistograms);
+    if( usedDevicePropagation ){
+      if( needsEventWeights ){
+        _impl_->lastResult.status.eventWeights = OutputState::ReadyOnDevice;
+      }
+      if( request_.has(OutputRequest::Histograms) ){
+        _impl_->lastResult.status.histograms = OutputState::ReadyOnDevice;
+      }
+    }
+  }
+
+  if( request_.has(OutputRequest::EventWeights) and not usedDevicePropagation ){
     _impl_->calculateEventWeights();
     _impl_->lastResult.status.eventWeights = OutputState::ReadyOnHost;
   }
 
-  if( request_.has(OutputRequest::Histograms) or request_.has(OutputRequest::Likelihood) ){
+  if( needsHistograms and not usedDevicePropagation ){
     if( not _impl_->calculateHistogramsOnDevice() ){
       _impl_->lastResult.status.backend = BackendStatus::Failed;
       if( request_.has(OutputRequest::Histograms) ){

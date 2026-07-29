@@ -7,6 +7,8 @@
 
 namespace Backends {
 
+  struct PropagationRequest;
+
   enum class OutputRequest {
     EventWeights,
     Histograms,
@@ -14,6 +16,9 @@ namespace Backends {
     BinIndices,
     ObservableValues
   };
+
+  [[nodiscard]] std::string toString(OutputRequest request_);
+  [[nodiscard]] std::string toString(const PropagationRequest& request_);
 
   enum class OutputState {
     NotRequested,
