@@ -341,6 +341,8 @@ struct Backends::MpsBackend::Impl {
     releaseDeviceBuffers();
     isDeviceModelSupported = false;
     deviceModelFallbackReason.clear();
+    auto buildStart = std::chrono::steady_clock::now();
+    auto lastStageStart = buildStart;
 
     auto fail = [this](std::string reason_) {
       deviceModelFallbackReason = std::move(reason_);
@@ -354,6 +356,13 @@ struct Backends::MpsBackend::Impl {
     if( model.totalBins <= 0 ){
       return fail("the backend model has no histogram bins.");
     }
+
+    LogInfo << "MPS backend: building device model for "
+            << model.events.size() << " events, "
+            << model.eventDials.size() << " event dials, "
+            << model.parameters.size() << " parameters and "
+            << model.totalBins << " histogram bins."
+            << std::endl;
 
     std::vector<std::string> unsupportedDialTypes;
     for( const auto& eventDial : model.eventDials ){
@@ -370,6 +379,10 @@ struct Backends::MpsBackend::Impl {
       return fail("unsupported MPS dial types present in propagator: " + joinValues(unsupportedDialTypes)
                   + ". Supported types are Norm, CompactSpline, UniformSpline, MonotonicSpline, GeneralSpline, Graph and Shift.");
     }
+    LogInfo << "MPS backend: compatibility scan done in "
+            << secondsSince(lastStageStart) << " s."
+            << std::endl;
+    lastStageStart = std::chrono::steady_clock::now();
 
     std::vector<float> baseWeights(model.events.size());
     std::vector<uint32_t> eventDialOffsets(model.events.size());
@@ -392,7 +405,23 @@ struct Backends::MpsBackend::Impl {
     dialSplineSizes.reserve(model.eventDials.size());
     dialAllowExtrapolation.reserve(model.eventDials.size());
 
-    for( const auto& event : model.events ){
+    std::size_t shiftCount{0};
+    std::size_t normCount{0};
+    std::size_t compactSplineCount{0};
+    std::size_t uniformSplineCount{0};
+    std::size_t monotonicSplineCount{0};
+    std::size_t generalSplineCount{0};
+    std::size_t graphCount{0};
+    LogInfo << "MPS backend: entering event/dial packing loop."
+            << " This phase resolves parameters and flattens per-event dial payloads."
+            << std::endl;
+
+    constexpr std::size_t kPackingProgressEventStep = 10000;
+    auto packingLoopStart = std::chrono::steady_clock::now();
+    auto lastPackingProgress = packingLoopStart;
+    std::size_t processedDialRefs{0};
+    for( std::size_t iEvent = 0 ; iEvent < model.events.size() ; iEvent++ ){
+      const auto& event = model.events[iEvent];
       if( event.globalBinIndex < 0 or event.globalBinIndex >= model.totalBins ){
         return fail("at least one event has an invalid global bin index.");
       }
@@ -402,6 +431,7 @@ struct Backends::MpsBackend::Impl {
       eventsPerBin[event.globalBinIndex]++;
       uint32_t packedDialCount = 0;
       for( std::size_t iDial = 0 ; iDial < event.dialCount ; iDial++ ){
+        processedDialRefs++;
         const auto& eventDial = model.eventDials[event.firstDial + iDial];
         const auto* interface = eventDial.interface;
         if( interface == nullptr or interface->getDialBaseRef() == nullptr ){
@@ -411,6 +441,7 @@ struct Backends::MpsBackend::Impl {
 
         if( const auto* shift = dynamic_cast<const Shift*>(dialBase) ){
           baseWeights[event.resultIndex] *= float(shift->evalResponse(DialInputBuffer()));
+          shiftCount++;
           continue;
         }
 
@@ -433,6 +464,7 @@ struct Backends::MpsBackend::Impl {
 
         if( dynamic_cast<const Norm*>(dialBase) != nullptr ){
           packedDialType = kMpsDialTypeNorm;
+          normCount++;
         }
         else if( dynamic_cast<const CompactSpline*>(dialBase) != nullptr ){
           const auto& data = dialBase->getDialData();
@@ -445,6 +477,7 @@ struct Backends::MpsBackend::Impl {
           packedAllowExtrapolation = dialBase->getAllowExtrapolation() ? 1 : 0;
           splineData.reserve(splineData.size() + data.size());
           for( auto value : data ){ splineData.emplace_back(float(value)); }
+          compactSplineCount++;
         }
         else if( dynamic_cast<const UniformSpline*>(dialBase) != nullptr ){
           const auto& data = dialBase->getDialData();
@@ -457,6 +490,7 @@ struct Backends::MpsBackend::Impl {
           packedAllowExtrapolation = dialBase->getAllowExtrapolation() ? 1 : 0;
           splineData.reserve(splineData.size() + data.size());
           for( auto value : data ){ splineData.emplace_back(float(value)); }
+          uniformSplineCount++;
         }
         else if( dynamic_cast<const MonotonicSpline*>(dialBase) != nullptr ){
           const auto& data = dialBase->getDialData();
@@ -469,6 +503,7 @@ struct Backends::MpsBackend::Impl {
           packedAllowExtrapolation = dialBase->getAllowExtrapolation() ? 1 : 0;
           splineData.reserve(splineData.size() + data.size());
           for( auto value : data ){ splineData.emplace_back(float(value)); }
+          monotonicSplineCount++;
         }
         else if( dynamic_cast<const GeneralSpline*>(dialBase) != nullptr ){
           const auto& data = dialBase->getDialData();
@@ -481,6 +516,7 @@ struct Backends::MpsBackend::Impl {
           packedAllowExtrapolation = dialBase->getAllowExtrapolation() ? 1 : 0;
           splineData.reserve(splineData.size() + data.size());
           for( auto value : data ){ splineData.emplace_back(float(value)); }
+          generalSplineCount++;
         }
         else if( dynamic_cast<const Graph*>(dialBase) != nullptr ){
           const auto& data = dialBase->getDialData();
@@ -493,6 +529,7 @@ struct Backends::MpsBackend::Impl {
           packedAllowExtrapolation = dialBase->getAllowExtrapolation() ? 1 : 0;
           splineData.reserve(splineData.size() + data.size());
           for( auto value : data ){ splineData.emplace_back(float(value)); }
+          graphCount++;
         }
         else{
           return fail("dial type " + dialBase->getDialTypeName()
@@ -521,7 +558,36 @@ struct Backends::MpsBackend::Impl {
         packedDialCount++;
       }
       eventDialCounts[event.resultIndex] = packedDialCount;
+
+      if( ((iEvent + 1) % kPackingProgressEventStep) == 0 or (iEvent + 1) == model.events.size() ){
+        auto now = std::chrono::steady_clock::now();
+        LogInfo << "MPS backend: packing progress "
+                << (iEvent + 1) << "/" << model.events.size()
+                << " events, "
+                << processedDialRefs << "/" << model.eventDials.size()
+                << " dial refs scanned, "
+                << dialTypes.size() << " dynamic dials packed, elapsed "
+                << secondsSince(packingLoopStart) << " s"
+                << " (+" << secondsSince(lastPackingProgress) << " s)"
+                << "."
+                << std::endl;
+        lastPackingProgress = now;
+      }
     }
+    LogInfo << "MPS backend: packed event/dial data in "
+            << secondsSince(lastStageStart) << " s"
+            << " [norm=" << normCount
+            << ", compact=" << compactSplineCount
+            << ", uniform=" << uniformSplineCount
+            << ", monotonic=" << monotonicSplineCount
+            << ", general=" << generalSplineCount
+            << ", graph=" << graphCount
+            << ", shift=" << shiftCount
+            << ", dynamic packed=" << dialTypes.size()
+            << ", spline scalars=" << splineData.size()
+            << "]."
+            << std::endl;
+    lastStageStart = std::chrono::steady_clock::now();
 
     std::vector<uint32_t> binEventOffsets(model.totalBins + 1, 0);
     for( int iBin = 0 ; iBin < model.totalBins ; iBin++ ){
@@ -542,6 +608,13 @@ struct Backends::MpsBackend::Impl {
         1,
         (maxEventsPerBin + histogramChunkSize - 1) / histogramChunkSize
     );
+    LogInfo << "MPS backend: built histogram index tables in "
+            << secondsSince(lastStageStart) << " s"
+            << " [max events/bin=" << maxEventsPerBin
+            << ", chunks/bin=" << maxHistogramChunksPerBin
+            << "]."
+            << std::endl;
+    lastStageStart = std::chrono::steady_clock::now();
 
     if( dialTypes.empty() ){
       dialTypes.emplace_back(0);
@@ -558,6 +631,14 @@ struct Backends::MpsBackend::Impl {
     uint32_t totalBins = uint32_t(model.totalBins);
     uint32_t chunkSize = histogramChunkSize;
     uint32_t totalPartials = totalBins * maxHistogramChunksPerBin;
+
+    LogInfo << "MPS backend: allocating/uploading Metal buffers."
+            << " Event weights bytes=" << model.events.size() * sizeof(float)
+            << ", histogram bytes=" << std::size_t(model.totalBins) * sizeof(float)
+            << ", partial histogram bytes=" << std::size_t(totalPartials) * sizeof(float)
+            << ", packed dial count=" << dialTypes.size()
+            << "."
+            << std::endl;
 
     baseWeightsBuffer = makePrivateBuffer(device, commandQueue, baseWeights);
     eventDialOffsetsBuffer = makePrivateBuffer(device, commandQueue, eventDialOffsets);
@@ -606,9 +687,15 @@ struct Backends::MpsBackend::Impl {
       releaseDeviceBuffers();
       return fail("Metal buffer allocation failed while building the MPS backend model.");
     }
+    LogInfo << "MPS backend: Metal buffers ready in "
+            << secondsSince(lastStageStart) << " s."
+            << std::endl;
 
     parameterValuesScratch.resize(model.parameters.size());
     isDeviceModelSupported = true;
+    LogInfo << "MPS backend: device model build completed in "
+            << secondsSince(buildStart) << " s."
+            << std::endl;
     return true;
   }
 
