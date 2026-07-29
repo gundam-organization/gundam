@@ -83,6 +83,82 @@ kernel void fill_histograms(
   histSums[gid] = sum;
   histSumSquares[gid] = sumSq;
 }
+
+kernel void fill_histogram_partials_by_bin(
+    device const float* eventWeights [[buffer(0)]],
+    device const uint* binEventOffsets [[buffer(1)]],
+    device const uint* binEventIndices [[buffer(2)]],
+    device float* partialSums [[buffer(3)]],
+    device float* partialSumSquares [[buffer(4)]],
+    constant uint& totalBins [[buffer(5)]],
+    constant uint& maxChunksPerBin [[buffer(6)]],
+    constant uint& chunkSize [[buffer(7)]],
+    uint gid [[thread_position_in_grid]]) {
+  uint totalPartials = totalBins * maxChunksPerBin;
+  if( gid >= totalPartials ){ return; }
+
+  uint bin = gid / maxChunksPerBin;
+  uint chunk = gid - bin * maxChunksPerBin;
+  uint binBegin = binEventOffsets[bin];
+  uint binEnd = binEventOffsets[bin + 1];
+  uint begin = binBegin + chunk * chunkSize;
+  uint end = min(begin + chunkSize, binEnd);
+
+  float sum = 0.0f;
+  float sumCompensation = 0.0f;
+  float sumSq = 0.0f;
+  float sumSqCompensation = 0.0f;
+  for( uint iEntry = begin ; iEntry < end ; iEntry++ ){
+    uint iEvent = binEventIndices[iEntry];
+    float weight = eventWeights[iEvent];
+    float correctedWeight = weight - sumCompensation;
+    float nextSum = sum + correctedWeight;
+    sumCompensation = (nextSum - sum) - correctedWeight;
+    sum = nextSum;
+
+    float weightSq = weight * weight;
+    float correctedWeightSq = weightSq - sumSqCompensation;
+    float nextSumSq = sumSq + correctedWeightSq;
+    sumSqCompensation = (nextSumSq - sumSq) - correctedWeightSq;
+    sumSq = nextSumSq;
+  }
+
+  partialSums[gid] = sum;
+  partialSumSquares[gid] = sumSq;
+}
+
+kernel void finalize_histograms_from_partials(
+    device const float* partialSums [[buffer(0)]],
+    device const float* partialSumSquares [[buffer(1)]],
+    device float* histSums [[buffer(2)]],
+    device float* histSumSquares [[buffer(3)]],
+    constant uint& totalBins [[buffer(4)]],
+    constant uint& maxChunksPerBin [[buffer(5)]],
+    uint gid [[thread_position_in_grid]]) {
+  if( gid >= totalBins ){ return; }
+
+  float sum = 0.0f;
+  float sumCompensation = 0.0f;
+  float sumSq = 0.0f;
+  float sumSqCompensation = 0.0f;
+  uint offset = gid * maxChunksPerBin;
+  for( uint iChunk = 0 ; iChunk < maxChunksPerBin ; iChunk++ ){
+    float partial = partialSums[offset + iChunk];
+    float correctedPartial = partial - sumCompensation;
+    float nextSum = sum + correctedPartial;
+    sumCompensation = (nextSum - sum) - correctedPartial;
+    sum = nextSum;
+
+    float partialSq = partialSumSquares[offset + iChunk];
+    float correctedPartialSq = partialSq - sumSqCompensation;
+    float nextSumSq = sumSq + correctedPartialSq;
+    sumSqCompensation = (nextSumSq - sumSq) - correctedPartialSq;
+    sumSq = nextSumSq;
+  }
+
+  histSums[gid] = sum;
+  histSumSquares[gid] = sumSq;
+}
 )METAL";
 
   template<typename T>
@@ -108,6 +184,25 @@ kernel void fill_histograms(
     if( buffer == nil or values.empty() ){ return; }
     std::memcpy(buffer.contents, values.data(), values.size() * sizeof(T));
   }
+
+  id<MTLComputePipelineState> makePipeline(id<MTLDevice> device,
+                                           id<MTLLibrary> library,
+                                           NSString* functionName) {
+    NSError* error = nil;
+    id<MTLFunction> function = [library newFunctionWithName:functionName];
+    if( function == nil ){
+      LogError << "Could not find " << [functionName UTF8String] << " Metal function." << std::endl;
+      return nil;
+    }
+
+    id<MTLComputePipelineState> pipeline = [device newComputePipelineStateWithFunction:function error:&error];
+    [function release];
+    if( pipeline == nil and error != nil ){
+      LogError << "Could not create MPS backend pipeline " << [functionName UTF8String]
+               << ": " << [[error localizedDescription] UTF8String] << std::endl;
+    }
+    return pipeline;
+  }
 }
 
 struct Backends::MpsBackend::Impl {
@@ -124,22 +219,32 @@ struct Backends::MpsBackend::Impl {
   id<MTLCommandQueue> commandQueue{nil};
   id<MTLComputePipelineState> normWeightsPipeline{nil};
   id<MTLComputePipelineState> histogramPipeline{nil};
+  id<MTLComputePipelineState> histogramPartialsPipeline{nil};
+  id<MTLComputePipelineState> histogramFinalizePipeline{nil};
   bool isAvailable{false};
 
   bool isDeviceModelSupported{false};
+  static constexpr uint32_t histogramChunkSize{256};
+  uint32_t maxHistogramChunksPerBin{1};
   id<MTLBuffer> eventWeightsBuffer{nil};
   id<MTLBuffer> baseWeightsBuffer{nil};
   id<MTLBuffer> eventDialOffsetsBuffer{nil};
   id<MTLBuffer> eventDialCountsBuffer{nil};
   id<MTLBuffer> globalBinsBuffer{nil};
+  id<MTLBuffer> binEventOffsetsBuffer{nil};
+  id<MTLBuffer> binEventIndicesBuffer{nil};
   id<MTLBuffer> normParameterIndicesBuffer{nil};
   id<MTLBuffer> normMinResponsesBuffer{nil};
   id<MTLBuffer> normMaxResponsesBuffer{nil};
   id<MTLBuffer> parametersBuffer{nil};
+  id<MTLBuffer> partialHistSumsBuffer{nil};
+  id<MTLBuffer> partialHistSumSquaresBuffer{nil};
   id<MTLBuffer> histSumsBuffer{nil};
   id<MTLBuffer> histSumSquaresBuffer{nil};
   id<MTLBuffer> nEventsBuffer{nil};
   id<MTLBuffer> totalBinsBuffer{nil};
+  id<MTLBuffer> maxHistogramChunksPerBinBuffer{nil};
+  id<MTLBuffer> histogramChunkSizeBuffer{nil};
 
   BackendModel model{};
   BackendLikelihoodModel likelihoodModel{};
@@ -179,41 +284,13 @@ struct Backends::MpsBackend::Impl {
       return;
     }
 
-    id<MTLFunction> normWeightsFunction = [library newFunctionWithName:@"compute_norm_event_weights"];
-    if( normWeightsFunction == nil ){
-      LogError << "Could not find compute_norm_event_weights Metal function." << std::endl;
-      [library release];
-      return;
-    }
-
-    normWeightsPipeline = [device newComputePipelineStateWithFunction:normWeightsFunction error:&error];
-    [normWeightsFunction release];
-    if( normWeightsPipeline == nil ){
-      if( error != nil ){
-        LogError << "Could not create MPS backend norm weights pipeline: "
-                 << [[error localizedDescription] UTF8String] << std::endl;
-      }
-      [library release];
-      return;
-    }
-
-    id<MTLFunction> histogramFunction = [library newFunctionWithName:@"fill_histograms"];
-    if( histogramFunction == nil ){
-      LogError << "Could not find fill_histograms Metal function." << std::endl;
-      [library release];
-      return;
-    }
-
-    histogramPipeline = [device newComputePipelineStateWithFunction:histogramFunction error:&error];
-    [histogramFunction release];
+    normWeightsPipeline = makePipeline(device, library, @"compute_norm_event_weights");
+    histogramPipeline = makePipeline(device, library, @"fill_histograms");
+    histogramPartialsPipeline = makePipeline(device, library, @"fill_histogram_partials_by_bin");
+    histogramFinalizePipeline = makePipeline(device, library, @"finalize_histograms_from_partials");
     [library release];
-    if( histogramPipeline == nil ){
-      if( error != nil ){
-        LogError << "Could not create MPS backend histogram pipeline: "
-                 << [[error localizedDescription] UTF8String] << std::endl;
-      }
-      return;
-    }
+    if( normWeightsPipeline == nil or histogramPipeline == nil
+        or histogramPartialsPipeline == nil or histogramFinalizePipeline == nil ){ return; }
 
     commandQueue = [device newCommandQueue];
     if( commandQueue == nil ){ return; }
@@ -225,6 +302,8 @@ struct Backends::MpsBackend::Impl {
     releaseDeviceBuffers();
     [normWeightsPipeline release];
     [histogramPipeline release];
+    [histogramPartialsPipeline release];
+    [histogramFinalizePipeline release];
     [commandQueue release];
     [device release];
   }
@@ -235,14 +314,20 @@ struct Backends::MpsBackend::Impl {
     releaseBuffer(eventDialOffsetsBuffer);
     releaseBuffer(eventDialCountsBuffer);
     releaseBuffer(globalBinsBuffer);
+    releaseBuffer(binEventOffsetsBuffer);
+    releaseBuffer(binEventIndicesBuffer);
     releaseBuffer(normParameterIndicesBuffer);
     releaseBuffer(normMinResponsesBuffer);
     releaseBuffer(normMaxResponsesBuffer);
     releaseBuffer(parametersBuffer);
+    releaseBuffer(partialHistSumsBuffer);
+    releaseBuffer(partialHistSumSquaresBuffer);
     releaseBuffer(histSumsBuffer);
     releaseBuffer(histSumSquaresBuffer);
     releaseBuffer(nEventsBuffer);
     releaseBuffer(totalBinsBuffer);
+    releaseBuffer(maxHistogramChunksPerBinBuffer);
+    releaseBuffer(histogramChunkSizeBuffer);
   }
 
   bool isCurrentToken(const PropagationToken& token_) const {
@@ -296,16 +381,39 @@ struct Backends::MpsBackend::Impl {
     std::vector<uint32_t> eventDialOffsets(model.events.size());
     std::vector<uint32_t> eventDialCounts(model.events.size());
     std::vector<int> globalBins(model.events.size());
+    std::vector<uint32_t> eventsPerBin(model.totalBins, 0);
     std::vector<uint32_t> normParameterIndices(model.eventDials.size());
     std::vector<float> normMinResponses(model.eventDials.size(), -std::numeric_limits<float>::infinity());
     std::vector<float> normMaxResponses(model.eventDials.size(), std::numeric_limits<float>::infinity());
 
     for( const auto& event : model.events ){
+      if( event.globalBinIndex < 0 or event.globalBinIndex >= model.totalBins ){ return false; }
       baseWeights[event.resultIndex] = float(event.baseWeight);
       eventDialOffsets[event.resultIndex] = uint32_t(event.firstDial);
       eventDialCounts[event.resultIndex] = uint32_t(event.dialCount);
       globalBins[event.resultIndex] = event.globalBinIndex;
+      eventsPerBin[event.globalBinIndex]++;
     }
+
+    std::vector<uint32_t> binEventOffsets(model.totalBins + 1, 0);
+    for( int iBin = 0 ; iBin < model.totalBins ; iBin++ ){
+      binEventOffsets[iBin + 1] = binEventOffsets[iBin] + eventsPerBin[iBin];
+    }
+    std::vector<uint32_t> binEventFill = binEventOffsets;
+    std::vector<uint32_t> binEventIndices(model.events.size());
+    for( const auto& event : model.events ){
+      auto& fillIndex = binEventFill[event.globalBinIndex];
+      binEventIndices[fillIndex++] = uint32_t(event.resultIndex);
+    }
+
+    uint32_t maxEventsPerBin = 0;
+    for( auto count : eventsPerBin ){
+      maxEventsPerBin = std::max(maxEventsPerBin, count);
+    }
+    maxHistogramChunksPerBin = std::max<uint32_t>(
+        1,
+        (maxEventsPerBin + histogramChunkSize - 1) / histogramChunkSize
+    );
 
     for( std::size_t iDial = 0 ; iDial < model.eventDials.size() ; iDial++ ){
       const auto* interface = model.eventDials[iDial].interface;
@@ -335,26 +443,41 @@ struct Backends::MpsBackend::Impl {
 
     uint32_t nEvents = uint32_t(model.events.size());
     uint32_t totalBins = uint32_t(model.totalBins);
+    uint32_t chunkSize = histogramChunkSize;
+    uint32_t totalPartials = totalBins * maxHistogramChunksPerBin;
 
     baseWeightsBuffer = makeBuffer(device, baseWeights);
     eventDialOffsetsBuffer = makeBuffer(device, eventDialOffsets);
     eventDialCountsBuffer = makeBuffer(device, eventDialCounts);
     globalBinsBuffer = makeBuffer(device, globalBins);
+    binEventOffsetsBuffer = makeBuffer(device, binEventOffsets);
+    binEventIndicesBuffer = makeBuffer(device, binEventIndices);
     normParameterIndicesBuffer = makeBuffer(device, normParameterIndices);
     normMinResponsesBuffer = makeBuffer(device, normMinResponses);
     normMaxResponsesBuffer = makeBuffer(device, normMaxResponses);
     eventWeightsBuffer = makeEmptyBuffer(device, model.events.size() * sizeof(float));
     parametersBuffer = makeEmptyBuffer(device, model.parameters.size() * sizeof(float));
+    partialHistSumsBuffer = makeEmptyBuffer(device, std::size_t(totalPartials) * sizeof(float));
+    partialHistSumSquaresBuffer = makeEmptyBuffer(device, std::size_t(totalPartials) * sizeof(float));
     histSumsBuffer = makeEmptyBuffer(device, std::size_t(model.totalBins) * sizeof(float));
     histSumSquaresBuffer = makeEmptyBuffer(device, std::size_t(model.totalBins) * sizeof(float));
     nEventsBuffer = [device newBufferWithBytes:&nEvents length:sizeof(nEvents) options:MTLResourceStorageModeShared];
     totalBinsBuffer = [device newBufferWithBytes:&totalBins length:sizeof(totalBins) options:MTLResourceStorageModeShared];
+    maxHistogramChunksPerBinBuffer = [device newBufferWithBytes:&maxHistogramChunksPerBin
+                                                         length:sizeof(maxHistogramChunksPerBin)
+                                                        options:MTLResourceStorageModeShared];
+    histogramChunkSizeBuffer = [device newBufferWithBytes:&chunkSize
+                                                   length:sizeof(chunkSize)
+                                                  options:MTLResourceStorageModeShared];
 
     if( baseWeightsBuffer == nil or eventDialOffsetsBuffer == nil or eventDialCountsBuffer == nil
-        or globalBinsBuffer == nil or normParameterIndicesBuffer == nil or normMinResponsesBuffer == nil
+        or globalBinsBuffer == nil or binEventOffsetsBuffer == nil or binEventIndicesBuffer == nil
+        or normParameterIndicesBuffer == nil or normMinResponsesBuffer == nil
         or normMaxResponsesBuffer == nil or eventWeightsBuffer == nil or parametersBuffer == nil
+        or partialHistSumsBuffer == nil or partialHistSumSquaresBuffer == nil
         or histSumsBuffer == nil or histSumSquaresBuffer == nil or nEventsBuffer == nil
-        or totalBinsBuffer == nil ){
+        or totalBinsBuffer == nil or maxHistogramChunksPerBinBuffer == nil
+        or histogramChunkSizeBuffer == nil ){
       releaseDeviceBuffers();
       return false;
     }
@@ -393,15 +516,30 @@ struct Backends::MpsBackend::Impl {
 
   bool encodeHistogramsFromDeviceWeights(id<MTLComputeCommandEncoder> encoder) {
     if( not isDeviceModelSupported ){ return false; }
-    [encoder setComputePipelineState:histogramPipeline];
+    [encoder setComputePipelineState:histogramPartialsPipeline];
     [encoder setBuffer:eventWeightsBuffer offset:0 atIndex:0];
-    [encoder setBuffer:globalBinsBuffer offset:0 atIndex:1];
+    [encoder setBuffer:binEventOffsetsBuffer offset:0 atIndex:1];
+    [encoder setBuffer:binEventIndicesBuffer offset:0 atIndex:2];
+    [encoder setBuffer:partialHistSumsBuffer offset:0 atIndex:3];
+    [encoder setBuffer:partialHistSumSquaresBuffer offset:0 atIndex:4];
+    [encoder setBuffer:totalBinsBuffer offset:0 atIndex:5];
+    [encoder setBuffer:maxHistogramChunksPerBinBuffer offset:0 atIndex:6];
+    [encoder setBuffer:histogramChunkSizeBuffer offset:0 atIndex:7];
+
+    NSUInteger width = std::min<NSUInteger>(histogramPartialsPipeline.maxTotalThreadsPerThreadgroup, 256);
+    if( width == 0 ){ width = 1; }
+    [encoder dispatchThreads:MTLSizeMake(NSUInteger(model.totalBins) * maxHistogramChunksPerBin, 1, 1)
+       threadsPerThreadgroup:MTLSizeMake(width, 1, 1)];
+
+    [encoder setComputePipelineState:histogramFinalizePipeline];
+    [encoder setBuffer:partialHistSumsBuffer offset:0 atIndex:0];
+    [encoder setBuffer:partialHistSumSquaresBuffer offset:0 atIndex:1];
     [encoder setBuffer:histSumsBuffer offset:0 atIndex:2];
     [encoder setBuffer:histSumSquaresBuffer offset:0 atIndex:3];
-    [encoder setBuffer:nEventsBuffer offset:0 atIndex:4];
-    [encoder setBuffer:totalBinsBuffer offset:0 atIndex:5];
+    [encoder setBuffer:totalBinsBuffer offset:0 atIndex:4];
+    [encoder setBuffer:maxHistogramChunksPerBinBuffer offset:0 atIndex:5];
 
-    NSUInteger width = std::min<NSUInteger>(histogramPipeline.maxTotalThreadsPerThreadgroup, 256);
+    width = std::min<NSUInteger>(histogramFinalizePipeline.maxTotalThreadsPerThreadgroup, 256);
     if( width == 0 ){ width = 1; }
     [encoder dispatchThreads:MTLSizeMake(NSUInteger(model.totalBins), 1, 1)
        threadsPerThreadgroup:MTLSizeMake(width, 1, 1)];
