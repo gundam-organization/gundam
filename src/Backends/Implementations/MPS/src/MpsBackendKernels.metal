@@ -2,6 +2,8 @@ constant uint kDialTypeNorm = 0;
 constant uint kDialTypeCompactSpline = 1;
 constant uint kDialTypeUniformSpline = 2;
 constant uint kDialTypeMonotonicSpline = 3;
+constant uint kDialTypeGeneralSpline = 4;
+constant uint kDialTypeGraph = 5;
 
 float evaluate_compact_spline(float x, bool allowExtrapolation, device const float* data, uint dim) {
   if( !allowExtrapolation ){
@@ -32,6 +34,26 @@ float evaluate_monotonic_spline(float x, bool allowExtrapolation, device const f
     x = clamp(x, low, high);
   }
   return GundamDeviceMath::EvaluateMonotonicSpline(x, -INFINITY, INFINITY, data, int(dim));
+}
+
+float evaluate_general_spline(float x, bool allowExtrapolation, device const float* data, uint dim) {
+  if( !allowExtrapolation ){
+    uint knotCount = (dim - 2) / 3;
+    float low = data[2];
+    float high = data[2 + 3 * (knotCount - 1) + 2];
+    x = clamp(x, low, high);
+  }
+  return GundamDeviceMath::EvaluateGeneralSpline(x, -INFINITY, INFINITY, data, int(dim));
+}
+
+float evaluate_graph(float x, bool allowExtrapolation, device const float* data, uint dim) {
+  if( !allowExtrapolation ){
+    uint knotCount = dim / 2;
+    float low = data[1];
+    float high = data[2 * (knotCount - 1) + 1];
+    x = clamp(x, low, high);
+  }
+  return GundamDeviceMath::EvaluateGraph(x, -INFINITY, INFINITY, data, int(dim));
 }
 
 kernel void compute_event_weights(
@@ -91,6 +113,26 @@ kernel void compute_event_weights(
           dialAllowExtrapolation[flatDial] != 0,
           splineData + splineOffset,
           splineSize - 2
+      );
+    }
+    else if( dialType == kDialTypeGeneralSpline ){
+      uint splineOffset = dialSplineOffsets[flatDial];
+      uint splineSize = dialSplineSizes[flatDial];
+      response = evaluate_general_spline(
+          input,
+          dialAllowExtrapolation[flatDial] != 0,
+          splineData + splineOffset,
+          splineSize
+      );
+    }
+    else if( dialType == kDialTypeGraph ){
+      uint splineOffset = dialSplineOffsets[flatDial];
+      uint splineSize = dialSplineSizes[flatDial];
+      response = evaluate_graph(
+          input,
+          dialAllowExtrapolation[flatDial] != 0,
+          splineData + splineOffset,
+          splineSize
       );
     }
     response = max(response, dialMinResponses[flatDial]);

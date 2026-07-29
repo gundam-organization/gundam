@@ -201,22 +201,29 @@ def assert_close_list(label: str, left: list[float], right: list[float]) -> None
             raise RuntimeError(f"{label}: bin {i_bin} mismatch {left_value} != {right_value}")
 
 
-def compare_results(standard_results, backend_results) -> None:
+def compare_results(case_name: str, requested_outputs: list[str], standard_results, backend_results) -> None:
     if len(standard_results) != len(backend_results):
-        raise RuntimeError("Benchmark result count mismatch.")
+        raise RuntimeError(f"{case_name}: benchmark result count mismatch.")
 
     non_zero_llh_count = 0
+    check_likelihood = "Likelihood" in requested_outputs
+    check_histograms = (
+        "Histograms" in requested_outputs
+        or "EventWeights" in requested_outputs
+        or not check_likelihood
+    )
     for i_point, (standard, backend) in enumerate(zip(standard_results, backend_results)):
         standard_llh, standard_sums = standard
         backend_llh, backend_sums = backend
-        if not math.isclose(backend_llh, standard_llh, rel_tol=1e-10, abs_tol=1e-8):
-            raise RuntimeError(f"LLH mismatch at point {i_point}: {backend_llh} != {standard_llh}")
+        if check_likelihood and not math.isclose(backend_llh, standard_llh, rel_tol=1e-10, abs_tol=1e-8):
+            raise RuntimeError(f"{case_name}: LLH mismatch at point {i_point}: {backend_llh} != {standard_llh}")
         if not math.isclose(standard_llh, 0.0, rel_tol=0.0, abs_tol=1e-8):
             non_zero_llh_count += 1
-        assert_close_list(f"histogram sums at point {i_point}", backend_sums, standard_sums)
+        if check_histograms:
+            assert_close_list(f"{case_name}: histogram sums at point {i_point}", backend_sums, standard_sums)
 
     if non_zero_llh_count == 0:
-        raise RuntimeError("All benchmark LLH values are zero.")
+        raise RuntimeError(f"{case_name}: all benchmark LLH values are zero.")
 
 
 def print_timing_table(timings: list[BenchmarkTiming]) -> None:
@@ -291,7 +298,7 @@ def main() -> int:
             work_dir,
         )
         backend_elapsed, backend_results = benchmark(backend_interface, parameter_points)
-        compare_results(standard_results, backend_results)
+        compare_results(benchmark_case.name, benchmark_case.output_requests, standard_results, backend_results)
         timings.append(
             BenchmarkTiming(
                 name=benchmark_case.name,
