@@ -4,6 +4,7 @@ import math
 import sys
 from array import array
 from pathlib import Path
+from typing import Optional
 
 
 def flush_python_outputs() -> None:
@@ -94,7 +95,23 @@ fitterEngineConfig:
 """
 
 
-def evaluate_config(config_text: str, work_dir: Path) -> tuple[float, list[float], list[float]]:
+def set_normalization_parameters(likelihood_interface, positive_value: float, negative_value: float) -> None:
+    parameter_set = (
+        likelihood_interface
+        .getModelPropagator()
+        .getParametersManager()
+        .getParameterSetsList()[0]
+    )
+    parameter_list = parameter_set.getParameterList()
+    parameter_list[0].setParameterValue(positive_value)
+    parameter_list[1].setParameterValue(negative_value)
+
+
+def evaluate_config(
+    config_text: str,
+    work_dir: Path,
+    systematic_point: Optional[tuple[float, float]] = None,
+) -> tuple[float, list[float], list[float]]:
     repo_root = Path(__file__).resolve().parents[2]
     for build_dir in ("cmake-build-debug", "cmake-build-release"):
         python_module_dir = repo_root / build_dir / "src" / "PythonInterface"
@@ -123,6 +140,9 @@ def evaluate_config(config_text: str, work_dir: Path) -> tuple[float, list[float
     likelihood_interface.initialize()
     GUNDAM.flushOutput()
 
+    if systematic_point is not None:
+        set_normalization_parameters(likelihood_interface, *systematic_point)
+
     likelihood_interface.propagateAndEvalLikelihood()
 
     likelihood = likelihood_interface.getLastLikelihood()
@@ -150,28 +170,55 @@ def main() -> int:
 
     write_input_root_file(root_path)
 
-    standard_llh, standard_sums, standard_errors = evaluate_config(
+    prior_standard_llh, prior_standard_sums, prior_standard_errors = evaluate_config(
         build_config_text(root_path, False),
         work_dir,
     )
-    backend_llh, backend_sums, backend_errors = evaluate_config(
+    prior_backend_llh, prior_backend_sums, prior_backend_errors = evaluate_config(
         build_config_text(root_path, True),
         work_dir,
     )
 
-    expected_sums = [7.0, 8.0]
-    assert_close_list("standard sums", standard_sums, expected_sums)
-    assert_close_list("backend sums", backend_sums, standard_sums)
-    assert_close_list("backend errors", backend_errors, standard_errors)
+    systematic_point = (4.0, 1.0)
+    standard_llh, standard_sums, standard_errors = evaluate_config(
+        build_config_text(root_path, False),
+        work_dir,
+        systematic_point,
+    )
+    backend_llh, backend_sums, backend_errors = evaluate_config(
+        build_config_text(root_path, True),
+        work_dir,
+        systematic_point,
+    )
+
+    expected_prior_sums = [7.0, 8.0]
+    expected_shifted_sums = [9.0, 6.0]
+    assert_close_list("standard prior sums", prior_standard_sums, expected_prior_sums)
+    assert_close_list("backend prior sums", prior_backend_sums, prior_standard_sums)
+    assert_close_list("backend prior errors", prior_backend_errors, prior_standard_errors)
+
+    assert_close_list("standard shifted sums", standard_sums, expected_shifted_sums)
+    assert_close_list("backend shifted sums", backend_sums, standard_sums)
+    assert_close_list("backend shifted errors", backend_errors, standard_errors)
+
+    if not math.isclose(prior_backend_llh, prior_standard_llh, rel_tol=1e-12, abs_tol=1e-12):
+        raise RuntimeError(f"Prior LLH mismatch {prior_backend_llh} != {prior_standard_llh}")
 
     if not math.isclose(backend_llh, standard_llh, rel_tol=1e-12, abs_tol=1e-12):
-        raise RuntimeError(f"LLH mismatch {backend_llh} != {standard_llh}")
+        raise RuntimeError(f"Shifted LLH mismatch {backend_llh} != {standard_llh}")
 
-    print("Standard bin sums:", standard_sums)
-    print("Backend CPU bin sums:", backend_sums)
-    print("Standard LLH:", standard_llh)
-    print("Backend CPU LLH:", backend_llh)
-    print("SUCCESS: CPU backend propagation matches the standard propagation path.")
+    if math.isclose(standard_llh, 0.0, rel_tol=0.0, abs_tol=1e-12):
+        raise RuntimeError("Shifted LLH is unexpectedly zero.")
+
+    print("Prior standard bin sums:", prior_standard_sums)
+    print("Prior backend CPU bin sums:", prior_backend_sums)
+    print("Shifted standard bin sums:", standard_sums)
+    print("Shifted backend CPU bin sums:", backend_sums)
+    print("Prior standard LLH:", prior_standard_llh)
+    print("Prior backend CPU LLH:", prior_backend_llh)
+    print("Shifted standard LLH:", standard_llh)
+    print("Shifted backend CPU LLH:", backend_llh)
+    print("SUCCESS: CPU backend propagation matches the standard propagation path at prior and shifted parameters.")
     return 0
 
 
