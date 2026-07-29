@@ -11,6 +11,10 @@ set(SRCFILES
     )
 
 set(HEADERS
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/DeviceMath/SharedSplineCommon.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/DeviceMath/SharedSplineCompact.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/DeviceMath/SharedSplineUniform.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/DeviceMath/SharedSplineMonotonic.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/CalculateGeneralSpline.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/CalculateMonotonicSpline.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/CalculateUniformSpline.h

@@ -24,60 +24,17 @@
 #define DEVICE_FLOATING_POINT double
 #endif
 
+#include "DeviceMath/SharedSplineUniform.h"
+
 // Place in a private name space so it plays nicely with CUDA
 namespace {
-    // Interpolate one point using a spline with uniformly spaced knots.  This
-    // is much faster than TSpline3 (about fifty times faster, but careful,
-    // controlled benchmarking was not done).  This takes the "index" of the
-    // point in the data, the parameter value (that made the index), a minimum
-    // and maximum output value, the buffer of data for this spline, and the
-    // number of data elements in the spline data.  The input data is arrange
-    // as
-    //
-    // data[0] -- spline lower bound
-    // data[1] -- spline step
-    // data[2+2*n+0] -- The function value for knot n (0 to dim-3)
-    // data[2+2*n+1] -- The function slope for knot n
-    //
-    // NOTE: CalculateUniformSpline, CalculateGeneralSpline,
-    // CalculateCompactSpline, and CalculateMonotonicSpline have very similar,
-    // but different calls.  In particular the dim parameter meaning is not
-    // consistent.
-    DEVICE_CALLABLE_INLINE
-    double CalculateUniformSpline(const double x,
-                                  const double lowerBound, double upperBound,
-                                  const DEVICE_FLOATING_POINT* data,
-                                  const int dim) {
-
-        // Get the integer part
-        const double step = data[1];
-        const double xx = (x-data[0])/step;
-        int ix = xx;
-        if (ix<0) ix=0;
-        if (2*ix+7>dim) ix = (dim-2)/2 - 2 ;
-
-        const double fx = xx-ix;
-
-        const double p1 = data[2+2*ix];
-        const double m1 = data[2+2*ix+1]*step;
-        const double p2 = data[2+2*ix+2];
-        const double m2 = data[2+2*ix+3]*step;
-
-        // Cubic spline with the points and slopes.
-        // double v = p1*(2.0*fxxx-3.0*fxx+1.0) + m1*(fxxx-2.0*fxx+fx)
-        //         + p2*(3.0*fxx-2.0*fxxx) + m2*(fxxx-fxx));
-
-        // Factored via Horner's method.
-        double v = ((((2.0*p1 - 2.0*p2 + m2 + m1)*fx
-                      + 3.0*p2 - 3.0*p1 - m2 - 2.0*m1)*fx
-                     +m1)*fx
-                    +p1);
-
-        if (v < lowerBound) v = lowerBound;
-        if (v > upperBound) v = upperBound;
-
-        return v;
-    }
+  DEVICE_CALLABLE_INLINE
+  double CalculateUniformSpline(const double x,
+                                const double lowerBound, double upperBound,
+                                const DEVICE_FLOATING_POINT* data,
+                                const int dim) {
+    return GundamDeviceMath::EvaluateUniformSpline(x, lowerBound, upperBound, data, dim);
+  }
 }
 
 // An MIT Style License
