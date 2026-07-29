@@ -11,6 +11,8 @@
 
 #include "GenericToolbox.Utils.h"
 
+#include <map>
+
 Backends::BackendModel Backends::BackendModelBuilder::build(
     SampleSet& sampleSet_,
     const EventDialCache& eventDialCache_) {
@@ -18,6 +20,7 @@ Backends::BackendModel Backends::BackendModelBuilder::build(
   BackendModel model;
   model.samples.reserve(sampleSet_.getSampleList().size());
 
+  std::map<int, int> sampleBinOffsetMap;
   int binOffset{0};
   for( auto& sample : sampleSet_.getSampleList() ){
     BackendSampleRef sampleRef;
@@ -26,6 +29,7 @@ Backends::BackendModel Backends::BackendModelBuilder::build(
     sampleRef.binOffset = binOffset;
     sampleRef.binCount = sample.getHistogram().getNbBins();
     model.samples.emplace_back(sampleRef);
+    sampleBinOffsetMap[sampleRef.sampleIndex] = sampleRef.binOffset;
     binOffset += sampleRef.binCount;
   }
   model.totalBins = binOffset;
@@ -40,6 +44,7 @@ Backends::BackendModel Backends::BackendModelBuilder::build(
     eventRef.event = cacheEntry.event;
     eventRef.sampleIndex = cacheEntry.event->getIndices().sample;
     eventRef.binIndex = cacheEntry.event->getIndices().bin;
+    eventRef.globalBinIndex = sampleBinOffsetMap.at(eventRef.sampleIndex) + eventRef.binIndex;
     eventRef.baseWeight = cacheEntry.event->getWeights().base;
     eventRef.firstDial = model.eventDials.size();
     eventRef.dialCount = cacheEntry.dialResponseCacheList.size();
@@ -51,6 +56,7 @@ Backends::BackendModel Backends::BackendModelBuilder::build(
       model.eventDials.emplace_back(dialRef);
 
       const auto* inputBuffer = dialResponse.dialInterface->getInputBufferRef();
+      GenericToolbox::addIfNotInVector(inputBuffer, model.inputBuffers);
       for( int iInput = 0 ; iInput < inputBuffer->getBufferSize() ; iInput++ ){
         const auto* parPtr = &inputBuffer->getParameter(iInput);
         GenericToolbox::addIfNotInVector(parPtr, model.parameters);

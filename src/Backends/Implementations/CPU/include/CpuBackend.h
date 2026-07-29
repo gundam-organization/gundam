@@ -38,8 +38,9 @@ namespace Backends {
     };
 
     [[nodiscard]] bool isCurrentToken(const PropagationToken& token_) const;
-    [[nodiscard]] int getGlobalBinIndex(const BackendEventRef& event_) const;
     void applyParameterSnapshot(const ParameterSnapshot& parameters_);
+    void resetResult(const PropagationRequest& request_);
+    void updateInputBuffers();
     void calculateEventWeights(Result& result_);
     void calculateHistograms(Result& result_);
     void materializeEventWeights(Result& result_);

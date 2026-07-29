@@ -5,6 +5,7 @@
 #include <vector>
 
 class DialInterface;
+class DialInputBuffer;
 class Event;
 class Histogram;
 class Parameter;
@@ -19,6 +20,7 @@ namespace Backends {
     Event* event{nullptr};
     int sampleIndex{-1};
     int binIndex{-1};
+    int globalBinIndex{-1};
     double baseWeight{1};
     std::size_t firstDial{0};
     std::size_t dialCount{0};
@@ -35,6 +37,7 @@ namespace Backends {
   struct BackendModel {
     std::vector<BackendEventRef> events{};
     std::vector<BackendDialRef> eventDials{};
+    std::vector<const DialInputBuffer*> inputBuffers{};
     std::vector<BackendSampleRef> samples{};
     std::vector<const Parameter*> parameters{};
     int totalBins{0};

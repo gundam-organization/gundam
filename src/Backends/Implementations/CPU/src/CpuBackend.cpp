@@ -9,6 +9,7 @@
 #include "Logger.h"
 
 #include <cmath>
+#include <algorithm>
 
 Backends::BackendCapabilities Backends::CpuBackend::getCapabilities() const {
   BackendCapabilities out;
@@ -34,16 +35,10 @@ Backends::PropagationToken Backends::CpuBackend::requestPropagation(
              "ParameterSnapshot size mismatch: " << parameters_.values.size()
                                                  << " != " << _model_.parameters.size());
 
-  _lastResult_ = Result();
-  _lastResult_.token.id = _nextTokenId_++;
-  _lastResult_.token.isValid = true;
-  _lastResult_.status.backend = BackendStatus::Running;
-
-  for( auto request : request_.outputs ){
-    _lastResult_.status.state(request) = OutputState::Scheduled;
-  }
+  resetResult(request_);
 
   applyParameterSnapshot(parameters_);
+  updateInputBuffers();
 
   if( request_.has(OutputRequest::EventWeights) or request_.has(OutputRequest::Histograms) ){
     calculateEventWeights(_lastResult_);
@@ -111,15 +106,6 @@ bool Backends::CpuBackend::isCurrentToken(const PropagationToken& token_) const 
   return token_.isValid and _lastResult_.token.isValid and token_.id == _lastResult_.token.id;
 }
 
-int Backends::CpuBackend::getGlobalBinIndex(const BackendEventRef& event_) const {
-  for( const auto& sample : _model_.samples ){
-    if( sample.sampleIndex == event_.sampleIndex ){
-      return sample.binOffset + event_.binIndex;
-    }
-  }
-  return -1;
-}
-
 void Backends::CpuBackend::applyParameterSnapshot(const ParameterSnapshot& parameters_) {
   if( parameters_.empty() ){ return; }
 
@@ -129,16 +115,31 @@ void Backends::CpuBackend::applyParameterSnapshot(const ParameterSnapshot& param
   }
 }
 
+void Backends::CpuBackend::resetResult(const PropagationRequest& request_) {
+  _lastResult_.token.id = _nextTokenId_++;
+  _lastResult_.token.isValid = true;
+  _lastResult_.status = PropagationStatus();
+  _lastResult_.status.backend = BackendStatus::Running;
+
+  for( auto request : request_.outputs ){
+    _lastResult_.status.state(request) = OutputState::Scheduled;
+  }
+}
+
+void Backends::CpuBackend::updateInputBuffers() {
+  for( const auto* inputBuffer : _model_.inputBuffers ){
+    const_cast<DialInputBuffer*>(inputBuffer)->update();
+  }
+}
+
 void Backends::CpuBackend::calculateEventWeights(Result& result_) {
-  result_.eventWeights.assign(_model_.events.size(), 0);
+  result_.eventWeights.resize(_model_.events.size());
 
   for( const auto& event : _model_.events ){
     double weight = event.baseWeight;
 
     for( std::size_t iDial = 0 ; iDial < event.dialCount ; iDial++ ){
       const auto& dialRef = _model_.eventDials[event.firstDial + iDial];
-      auto* inputBuffer = const_cast<DialInputBuffer*>(dialRef.interface->getInputBufferRef());
-      inputBuffer->update();
       weight *= dialRef.interface->evalResponse();
     }
 
@@ -151,11 +152,13 @@ void Backends::CpuBackend::calculateHistograms(Result& result_) {
     calculateEventWeights(result_);
   }
 
-  result_.histSums.assign(_model_.totalBins, 0);
-  result_.histSumSquares.assign(_model_.totalBins, 0);
+  result_.histSums.resize(_model_.totalBins);
+  result_.histSumSquares.resize(_model_.totalBins);
+  std::fill(result_.histSums.begin(), result_.histSums.end(), 0);
+  std::fill(result_.histSumSquares.begin(), result_.histSumSquares.end(), 0);
 
   for( const auto& event : _model_.events ){
-    int globalBin = getGlobalBinIndex(event);
+    int globalBin = event.globalBinIndex;
     if( globalBin < 0 ){ continue; }
     double weight = result_.eventWeights[event.resultIndex];
     result_.histSums[globalBin] += weight;
@@ -175,16 +178,19 @@ void Backends::CpuBackend::materializeHistograms(Result& result_) {
   LogThrowIf(result_.histSumSquares.size() != std::size_t(_model_.totalBins));
 
   for( const auto& sample : _model_.samples ){
-    for( auto& binContent : sample.histogram->getBinContentList() ){
+    auto& binContentList = sample.histogram->getBinContentList();
+    auto& binContextList = sample.histogram->getBinContextList();
+
+    for( auto& binContent : binContentList ){
       binContent.sumWeights = 0;
       binContent.sqrtSumSqWeights = 0;
     }
 
-    for( auto& binContext : sample.histogram->getBinContextList() ){
+    for( auto& binContext : binContextList ){
       int globalBin = sample.binOffset + binContext.bin.getIndex();
-      auto& binContent = sample.histogram->getBinContentList().at(binContext.bin.getIndex());
-      binContent.sumWeights = result_.histSums.at(globalBin);
-      binContent.sqrtSumSqWeights = std::sqrt(result_.histSumSquares.at(globalBin));
+      auto& binContent = binContentList[binContext.bin.getIndex()];
+      binContent.sumWeights = result_.histSums[globalBin];
+      binContent.sqrtSumSqWeights = std::sqrt(result_.histSumSquares[globalBin]);
     }
   }
 }
