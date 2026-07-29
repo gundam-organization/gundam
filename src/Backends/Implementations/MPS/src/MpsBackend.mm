@@ -129,6 +129,9 @@ struct Backends::MpsBackend::Impl {
     lastResult.token.isValid = true;
     lastResult.status = PropagationStatus();
     lastResult.status.backend = BackendStatus::Running;
+    lastResult.eventWeights.clear();
+    lastResult.histSums.clear();
+    lastResult.histSumSquares.clear();
     lastResult.likelihood = 0;
 
     for( auto request : request_.outputs ){

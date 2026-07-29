@@ -153,6 +153,10 @@ void Backends::CpuBackend::resetResult(const PropagationRequest& request_) {
   _lastResult_.token.isValid = true;
   _lastResult_.status = PropagationStatus();
   _lastResult_.status.backend = BackendStatus::Running;
+  _lastResult_.eventWeights.clear();
+  _lastResult_.histSums.clear();
+  _lastResult_.histSumSquares.clear();
+  _lastResult_.likelihood = 0;
 
   for( auto request : request_.outputs ){
     _lastResult_.status.state(request) = OutputState::Scheduled;
