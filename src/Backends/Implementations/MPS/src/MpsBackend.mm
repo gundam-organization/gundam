@@ -32,13 +32,23 @@ kernel void fill_histograms(
   if( gid >= totalBins ){ return; }
 
   float sum = 0.0f;
+  float sumCompensation = 0.0f;
   float sumSq = 0.0f;
+  float sumSqCompensation = 0.0f;
   int bin = int(gid);
   for( uint iEvent = 0 ; iEvent < nEvents ; iEvent++ ){
     if( globalBins[iEvent] != bin ){ continue; }
     float weight = eventWeights[iEvent];
-    sum += weight;
-    sumSq += weight * weight;
+    float correctedWeight = weight - sumCompensation;
+    float nextSum = sum + correctedWeight;
+    sumCompensation = (nextSum - sum) - correctedWeight;
+    sum = nextSum;
+
+    float weightSq = weight * weight;
+    float correctedWeightSq = weightSq - sumSqCompensation;
+    float nextSumSq = sumSq + correctedWeightSq;
+    sumSqCompensation = (nextSumSq - sumSq) - correctedWeightSq;
+    sumSq = nextSumSq;
   }
 
   histSums[gid] = sum;
@@ -81,7 +91,25 @@ struct Backends::MpsBackend::Impl {
     if( device == nil ){ return; }
 
     NSError* error = nil;
-    id<MTLLibrary> library = [device newLibraryWithSource:kMpsBackendMetalSource options:nil error:&error];
+    auto* compileOptions = [[MTLCompileOptions alloc] init];
+#if defined(__MAC_OS_X_VERSION_MAX_ALLOWED) && __MAC_OS_X_VERSION_MAX_ALLOWED >= 150000
+    if( @available(macOS 15.0, *) ){
+      compileOptions.mathMode = MTLMathModeSafe;
+    }
+    else{
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
+      compileOptions.fastMathEnabled = NO;
+#pragma clang diagnostic pop
+    }
+#else
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
+    compileOptions.fastMathEnabled = NO;
+#pragma clang diagnostic pop
+#endif
+    id<MTLLibrary> library = [device newLibraryWithSource:kMpsBackendMetalSource options:compileOptions error:&error];
+    [compileOptions release];
     if( library == nil ){
       if( error != nil ){
         LogError << "Could not compile MPS backend Metal library: "
