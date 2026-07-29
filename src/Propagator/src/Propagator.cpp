@@ -14,39 +14,14 @@
 #include "GundamBacktrace.h"
 
 #ifdef GUNDAM_USING_BACKENDS
+#include "BackendFactory.h"
 #include "BackendModelBuilder.h"
-#include "CpuBackend.h"
-#include "MpsBackend.h"
 #endif
 
 #include "GenericToolbox.Utils.h"
 
 #include <memory>
 #include <vector>
-
-#ifdef GUNDAM_USING_BACKENDS
-namespace {
-  Backends::OutputRequest parseBackendOutputRequest(const std::string& outputRequest_) {
-    if( outputRequest_ == "EventWeights" or outputRequest_ == "eventWeights" ){
-      return Backends::OutputRequest::EventWeights;
-    }
-    if( outputRequest_ == "Histograms" or outputRequest_ == "histograms" ){
-      return Backends::OutputRequest::Histograms;
-    }
-    if( outputRequest_ == "Likelihood" or outputRequest_ == "likelihood" ){
-      return Backends::OutputRequest::Likelihood;
-    }
-    if( outputRequest_ == "BinIndices" or outputRequest_ == "binIndices" ){
-      return Backends::OutputRequest::BinIndices;
-    }
-    if( outputRequest_ == "ObservableValues" or outputRequest_ == "observableValues" ){
-      return Backends::OutputRequest::ObservableValues;
-    }
-    LogThrow("Unknown backend output request: " << outputRequest_);
-    return Backends::OutputRequest::Histograms;
-  }
-}
-#endif
 
 void Propagator::muteLogger(){ Logger::setIsMuted( true ); }
 void Propagator::unmuteLogger(){ Logger::setIsMuted( false ); }
@@ -141,7 +116,7 @@ void Propagator::buildDialCache(){
   _dialManager_.invalidateInputBuffers();
 }
 #ifdef GUNDAM_USING_BACKENDS
-void Propagator::configureBackend(const BackendConfig& backendConfig_){
+void Propagator::configureBackend(const Backends::BackendConfig& backendConfig_){
   _backendConfig_ = backendConfig_;
 }
 
@@ -153,13 +128,7 @@ void Propagator::initializeBackend(){
 
   LogInfo << "Initializing propagation backend: " << _backendConfig_.type << std::endl;
 
-  _backendPropagationRequest_.outputs.clear();
-  for( const auto& outputRequest : _backendConfig_.outputRequests ){
-    _backendPropagationRequest_.outputs.emplace_back(parseBackendOutputRequest(outputRequest));
-  }
-  if( _backendPropagationRequest_.outputs.empty() ){
-    _backendPropagationRequest_.outputs.emplace_back(Backends::OutputRequest::Histograms);
-  }
+  _backendPropagationRequest_ = _backendConfig_.makePropagationRequest();
   if( not _backendPropagationRequest_.has(Backends::OutputRequest::Histograms) ){
     LogWarning << "Adding OutputRequest::Histograms to backendConfig because the current "
                << "LikelihoodInterface consumes CPU histograms." << std::endl;
@@ -167,15 +136,7 @@ void Propagator::initializeBackend(){
   }
 
   _backendManager_ = std::make_shared<Backends::BackendManager>();
-  if( _backendConfig_.type == "CPU" or _backendConfig_.type == "cpu" ){
-    _backendManager_->setBackend(std::make_unique<Backends::CpuBackend>());
-  }
-  else if( _backendConfig_.type == "MPS" or _backendConfig_.type == "mps" ){
-    _backendManager_->setBackend(std::make_unique<Backends::MpsBackend>());
-  }
-  else{
-    LogThrow("Unknown backend type: " << _backendConfig_.type);
-  }
+  _backendManager_->setBackend(Backends::makeBackend(_backendConfig_));
 
   auto backendModel = Backends::BackendModelBuilder::build(_sampleSet_, _eventDialCache_);
   _backendManager_->build(backendModel);

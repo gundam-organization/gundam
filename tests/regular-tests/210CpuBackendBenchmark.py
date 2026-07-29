@@ -40,7 +40,7 @@ def build_config_text(root_path: Path, enable_backend: bool) -> str:
     backendConfig:
       isEnabled: true
       type: CPU
-      outputRequests: [EventWeights, Histograms]
+      outputRequests: [Histograms]
 """
 
     return f"""

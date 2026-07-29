@@ -43,6 +43,7 @@ namespace Backends {
     void updateInputBuffers();
     void calculateEventWeights(Result& result_);
     void calculateHistograms(Result& result_);
+    void calculateHistogramsFromEvents(Result& result_);
     void materializeEventWeights(Result& result_);
     void materializeHistograms(Result& result_);
 

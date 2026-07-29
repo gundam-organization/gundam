@@ -17,6 +17,7 @@
 #include "GenericToolbox.Thread.h"
 
 #ifdef GUNDAM_USING_BACKENDS
+#include "BackendConfig.h"
 #include "BackendManager.h"
 #include "BackendTypes.h"
 #endif
@@ -68,12 +69,7 @@ public:
   void buildDialCache();
 #ifdef GUNDAM_USING_BACKENDS
   void initializeBackend();
-  struct BackendConfig{
-    bool isEnabled{false};
-    std::string type{"CPU"};
-    std::vector<std::string> outputRequests{"Histograms"};
-  };
-  void configureBackend(const BackendConfig& backendConfig_);
+  void configureBackend(const Backends::BackendConfig& backendConfig_);
 #endif
 
   /// Apply the current parameters and wait for it to finish.  This reweights
@@ -136,7 +132,7 @@ private:
   int _iThrow_{-1};
 
 #ifdef GUNDAM_USING_BACKENDS
-  BackendConfig _backendConfig_{};
+  Backends::BackendConfig _backendConfig_{};
   Backends::PropagationRequest _backendPropagationRequest_{};
   std::shared_ptr<Backends::BackendManager> _backendManager_{nullptr};
 #endif

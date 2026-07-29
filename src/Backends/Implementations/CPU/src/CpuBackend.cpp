@@ -40,15 +40,18 @@ Backends::PropagationToken Backends::CpuBackend::requestPropagation(
   applyParameterSnapshot(parameters_);
   updateInputBuffers();
 
-  if( request_.has(OutputRequest::EventWeights) or request_.has(OutputRequest::Histograms) ){
+  if( request_.has(OutputRequest::EventWeights) ){
     calculateEventWeights(_lastResult_);
-    if( request_.has(OutputRequest::EventWeights) ){
-      _lastResult_.status.eventWeights = OutputState::ReadyOnDevice;
-    }
+    _lastResult_.status.eventWeights = OutputState::ReadyOnDevice;
   }
 
   if( request_.has(OutputRequest::Histograms) ){
-    calculateHistograms(_lastResult_);
+    if( request_.has(OutputRequest::EventWeights) ){
+      calculateHistograms(_lastResult_);
+    }
+    else{
+      calculateHistogramsFromEvents(_lastResult_);
+    }
     _lastResult_.status.histograms = OutputState::ReadyOnDevice;
   }
 
@@ -161,6 +164,27 @@ void Backends::CpuBackend::calculateHistograms(Result& result_) {
     int globalBin = event.globalBinIndex;
     if( globalBin < 0 ){ continue; }
     double weight = result_.eventWeights[event.resultIndex];
+    result_.histSums[globalBin] += weight;
+    result_.histSumSquares[globalBin] += weight * weight;
+  }
+}
+
+void Backends::CpuBackend::calculateHistogramsFromEvents(Result& result_) {
+  result_.histSums.resize(_model_.totalBins);
+  result_.histSumSquares.resize(_model_.totalBins);
+  std::fill(result_.histSums.begin(), result_.histSums.end(), 0);
+  std::fill(result_.histSumSquares.begin(), result_.histSumSquares.end(), 0);
+
+  for( const auto& event : _model_.events ){
+    int globalBin = event.globalBinIndex;
+    if( globalBin < 0 ){ continue; }
+
+    double weight = event.baseWeight;
+    for( std::size_t iDial = 0 ; iDial < event.dialCount ; iDial++ ){
+      const auto& dialRef = _model_.eventDials[event.firstDial + iDial];
+      weight *= dialRef.interface->evalResponse();
+    }
+
     result_.histSums[globalBin] += weight;
     result_.histSumSquares[globalBin] += weight * weight;
   }

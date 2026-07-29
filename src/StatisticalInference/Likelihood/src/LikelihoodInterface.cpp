@@ -84,16 +84,7 @@ void LikelihoodInterface::configureImpl(){
 
 #ifdef GUNDAM_USING_BACKENDS
   if( _config_.hasField("backendConfig") ){
-    auto backendConfig = _config_.fetchValue<ConfigReader>("backendConfig");
-    backendConfig.defineFields({
-      {"isEnabled", {"enabled"}},
-      {"type", {"backend", "name"}},
-      {"outputRequests", {"outputs"}},
-    });
-    backendConfig.fillValue(_backendConfig_.isEnabled, "isEnabled");
-    backendConfig.fillValue(_backendConfig_.type, "type");
-    backendConfig.fillValue(_backendConfig_.outputRequests, "outputRequests");
-    backendConfig.printUnusedKeys();
+    _backendConfig_ = _config_.fetchValue<ConfigReader>("backendConfig");
   }
 #else
   if( _config_.hasField("backendConfig") ){
@@ -375,7 +366,7 @@ void LikelihoodInterface::loadModelPropagator(){
   });
 
 #ifdef GUNDAM_USING_BACKENDS
-  _modelPropagator_.configureBackend(_backendConfig_);
+  _modelPropagator_.configureBackend(Backends::BackendConfig::fromConfig(_backendConfig_));
   _modelPropagator_.initializeBackend();
 #endif
 

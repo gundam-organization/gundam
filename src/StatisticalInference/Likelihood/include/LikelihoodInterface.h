@@ -127,7 +127,7 @@ private:
   DataType _dataType_{DataType::Asimov};
   JsonType _toyParameterInjector_{};
 #ifdef GUNDAM_USING_BACKENDS
-  Propagator::BackendConfig _backendConfig_{};
+  ConfigReader _backendConfig_{};
 #endif
 
   // internals
