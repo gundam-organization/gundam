@@ -136,7 +136,8 @@ void Propagator::initializeBackend(){
   LogInfo << "Initializing propagation backend: " << _backendConfig_.type << std::endl;
 
   _backendPropagationRequest_ = _backendConfig_.makePropagationRequest();
-  if( not _backendPropagationRequest_.has(Backends::OutputRequest::Histograms) ){
+  if( not _backendPropagationRequest_.has(Backends::OutputRequest::Histograms)
+      and not _backendPropagationRequest_.has(Backends::OutputRequest::Likelihood) ){
     LogWarning << "Adding OutputRequest::Histograms to backendConfig because the current "
                << "LikelihoodInterface consumes CPU histograms." << std::endl;
     _backendPropagationRequest_.outputs.emplace_back(Backends::OutputRequest::Histograms);
