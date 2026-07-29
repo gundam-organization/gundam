@@ -17,6 +17,14 @@
 #endif
 #endif
 
+#ifndef GUNDAM_DEVICE_MATH_SCALAR
+#define GUNDAM_DEVICE_MATH_SCALAR GUNDAM_DEVICE_MATH_FLOAT
+#endif
+
+#ifndef GUNDAM_DEVICE_MATH_PTR_CONST
+#define GUNDAM_DEVICE_MATH_PTR_CONST const GUNDAM_DEVICE_MATH_FLOAT*
+#endif
+
 namespace GundamDeviceMath {
   GUNDAM_DEVICE_MATH_INLINE
   int ClampSplineSegmentIndex(int index_, int dim_) {
@@ -26,19 +34,22 @@ namespace GundamDeviceMath {
   }
 
   GUNDAM_DEVICE_MATH_INLINE
-  double ClampResponse(double value_, double lowerBound_, double upperBound_) {
+  GUNDAM_DEVICE_MATH_SCALAR ClampResponse(GUNDAM_DEVICE_MATH_SCALAR value_,
+                                          GUNDAM_DEVICE_MATH_SCALAR lowerBound_,
+                                          GUNDAM_DEVICE_MATH_SCALAR upperBound_) {
     if( value_ < lowerBound_ ){ return lowerBound_; }
     if( value_ > upperBound_ ){ return upperBound_; }
     return value_;
   }
 
   GUNDAM_DEVICE_MATH_INLINE
-  double Abs(double value_) {
+  GUNDAM_DEVICE_MATH_SCALAR Abs(GUNDAM_DEVICE_MATH_SCALAR value_) {
     return value_ < 0.0 ? -value_ : value_;
   }
 
   GUNDAM_DEVICE_MATH_INLINE
-  double Min(double left_, double right_) {
+  GUNDAM_DEVICE_MATH_SCALAR Min(GUNDAM_DEVICE_MATH_SCALAR left_,
+                                GUNDAM_DEVICE_MATH_SCALAR right_) {
     return left_ < right_ ? left_ : right_;
   }
 }

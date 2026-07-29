@@ -1,7 +1,9 @@
 #ifndef SHARED_SPLINE_UNIFORM_H_SEEN
 #define SHARED_SPLINE_UNIFORM_H_SEEN
 
+#ifndef GUNDAM_DEVICE_MATH_SKIP_COMMON_INCLUDE
 #include "DeviceMath/SharedSplineCommon.h"
+#endif
 
 namespace GundamDeviceMath {
   // Interpolate one point using a spline with uniformly spaced knots.  This
@@ -20,26 +22,29 @@ namespace GundamDeviceMath {
   // but different calls.  In particular the dim parameter meaning is not
   // consistent.
   GUNDAM_DEVICE_MATH_INLINE
-  double EvaluateUniformSpline(const double x_,
-                               const double lowerBound_,
-                               const double upperBound_,
-                               const GUNDAM_DEVICE_MATH_FLOAT* data_,
+  GUNDAM_DEVICE_MATH_SCALAR EvaluateUniformSpline(const GUNDAM_DEVICE_MATH_SCALAR x_,
+                                                  const GUNDAM_DEVICE_MATH_SCALAR lowerBound_,
+                                                  const GUNDAM_DEVICE_MATH_SCALAR upperBound_,
+                                                  GUNDAM_DEVICE_MATH_PTR_CONST data_,
                                const int dim_) {
-    const double step = data_[1];
-    const double xx = (x_ - data_[0]) / step;
+    const GUNDAM_DEVICE_MATH_SCALAR step = data_[1];
+    const GUNDAM_DEVICE_MATH_SCALAR xx = (x_ - data_[0]) / step;
     int ix = int(xx);
     if( ix < 0 ){ ix = 0; }
     if( 2 * ix + 7 > dim_ ){ ix = (dim_ - 2) / 2 - 2; }
 
-    const double fx = xx - ix;
-    const double p1 = data_[2 + 2 * ix];
-    const double m1 = data_[2 + 2 * ix + 1] * step;
-    const double p2 = data_[2 + 2 * ix + 2];
-    const double m2 = data_[2 + 2 * ix + 3] * step;
+    const GUNDAM_DEVICE_MATH_SCALAR fx = xx - ix;
+    const GUNDAM_DEVICE_MATH_SCALAR p1 = data_[2 + 2 * ix];
+    const GUNDAM_DEVICE_MATH_SCALAR m1 = data_[2 + 2 * ix + 1] * step;
+    const GUNDAM_DEVICE_MATH_SCALAR p2 = data_[2 + 2 * ix + 2];
+    const GUNDAM_DEVICE_MATH_SCALAR m2 = data_[2 + 2 * ix + 3] * step;
 
     // Cubic spline with the points and slopes, factored via Horner's method.
-    const double value = ((((2.0 * p1 - 2.0 * p2 + m2 + m1) * fx
-                            + 3.0 * p2 - 3.0 * p1 - m2 - 2.0 * m1) * fx
+    const GUNDAM_DEVICE_MATH_SCALAR value = ((((GUNDAM_DEVICE_MATH_SCALAR(2.0) * p1
+                                                    - GUNDAM_DEVICE_MATH_SCALAR(2.0) * p2 + m2 + m1) * fx
+                                               + GUNDAM_DEVICE_MATH_SCALAR(3.0) * p2
+                                               - GUNDAM_DEVICE_MATH_SCALAR(3.0) * p1
+                                               - m2 - GUNDAM_DEVICE_MATH_SCALAR(2.0) * m1) * fx
                            + m1) * fx
                           + p1);
 
