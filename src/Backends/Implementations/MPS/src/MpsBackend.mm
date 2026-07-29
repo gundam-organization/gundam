@@ -27,6 +27,7 @@
 #include <cstring>
 #include <limits>
 #include <string>
+#include <unordered_map>
 #include <utility>
 #include <vector>
 
@@ -177,6 +178,7 @@ struct Backends::MpsBackend::Impl {
   id<MTLBuffer> baseWeightsBuffer{nil};
   id<MTLBuffer> eventDialOffsetsBuffer{nil};
   id<MTLBuffer> eventDialCountsBuffer{nil};
+  id<MTLBuffer> eventDialIndicesBuffer{nil};
   id<MTLBuffer> globalBinsBuffer{nil};
   id<MTLBuffer> binEventOffsetsBuffer{nil};
   id<MTLBuffer> binEventIndicesBuffer{nil};
@@ -271,6 +273,7 @@ struct Backends::MpsBackend::Impl {
     releaseBuffer(baseWeightsBuffer);
     releaseBuffer(eventDialOffsetsBuffer);
     releaseBuffer(eventDialCountsBuffer);
+    releaseBuffer(eventDialIndicesBuffer);
     releaseBuffer(globalBinsBuffer);
     releaseBuffer(binEventOffsetsBuffer);
     releaseBuffer(binEventIndicesBuffer);
@@ -330,13 +333,6 @@ struct Backends::MpsBackend::Impl {
     }
   }
 
-  int findParameterIndex(const Parameter* parameter_) const {
-    for( std::size_t iPar = 0 ; iPar < model.parameters.size() ; iPar++ ){
-      if( model.parameters[iPar] == parameter_ ){ return int(iPar); }
-    }
-    return -1;
-  }
-
   bool buildDeviceModel() {
     releaseDeviceBuffers();
     isDeviceModelSupported = false;
@@ -384,9 +380,20 @@ struct Backends::MpsBackend::Impl {
             << std::endl;
     lastStageStart = std::chrono::steady_clock::now();
 
+    std::unordered_map<const Parameter*, uint32_t> parameterIndexMap;
+    parameterIndexMap.reserve(model.parameters.size());
+    for( std::size_t iPar = 0 ; iPar < model.parameters.size() ; iPar++ ){
+      parameterIndexMap[model.parameters[iPar]] = uint32_t(iPar);
+    }
+    LogInfo << "MPS backend: built parameter lookup table in "
+            << secondsSince(lastStageStart) << " s."
+            << std::endl;
+    lastStageStart = std::chrono::steady_clock::now();
+
     std::vector<float> baseWeights(model.events.size());
     std::vector<uint32_t> eventDialOffsets(model.events.size());
     std::vector<uint32_t> eventDialCounts(model.events.size());
+    std::vector<uint32_t> eventDialIndices{};
     std::vector<int> globalBins(model.events.size());
     std::vector<uint32_t> eventsPerBin(model.totalBins, 0);
     std::vector<uint32_t> dialTypes{};
@@ -404,6 +411,9 @@ struct Backends::MpsBackend::Impl {
     dialSplineOffsets.reserve(model.eventDials.size());
     dialSplineSizes.reserve(model.eventDials.size());
     dialAllowExtrapolation.reserve(model.eventDials.size());
+    eventDialIndices.reserve(model.eventDials.size());
+    std::unordered_map<const DialInterface*, uint32_t> packedDialIndexMap{};
+    packedDialIndexMap.reserve(model.eventDials.size());
 
     std::size_t shiftCount{0};
     std::size_t normCount{0};
@@ -413,7 +423,7 @@ struct Backends::MpsBackend::Impl {
     std::size_t generalSplineCount{0};
     std::size_t graphCount{0};
     LogInfo << "MPS backend: entering event/dial packing loop."
-            << " This phase resolves parameters and flattens per-event dial payloads."
+            << " This phase resolves parameters, deduplicates shared dials and flattens per-event dial indices."
             << std::endl;
 
     constexpr std::size_t kPackingProgressEventStep = 10000;
@@ -451,110 +461,118 @@ struct Backends::MpsBackend::Impl {
                       + " is not MPS-compatible because it does not have exactly one input parameter.");
         }
 
-        int parameterIndex = findParameterIndex(&inputBuffer->getParameter(0));
-        if( parameterIndex < 0 ){
+        auto parameterIndexIt = parameterIndexMap.find(&inputBuffer->getParameter(0));
+        if( parameterIndexIt == parameterIndexMap.end() ){
           return fail("dial type " + dialBase->getDialTypeName()
                       + " references a parameter missing from the backend parameter table.");
         }
 
-        uint32_t packedDialType = 0;
-        uint32_t packedSplineOffset = 0;
-        uint32_t packedSplineSize = 0;
-        uint32_t packedAllowExtrapolation = 0;
+        auto packedDialIndexIt = packedDialIndexMap.find(interface);
+        if( packedDialIndexIt == packedDialIndexMap.end() ){
+          uint32_t packedDialType = 0;
+          uint32_t packedSplineOffset = 0;
+          uint32_t packedSplineSize = 0;
+          uint32_t packedAllowExtrapolation = 0;
 
-        if( dynamic_cast<const Norm*>(dialBase) != nullptr ){
-          packedDialType = kMpsDialTypeNorm;
-          normCount++;
-        }
-        else if( dynamic_cast<const CompactSpline*>(dialBase) != nullptr ){
-          const auto& data = dialBase->getDialData();
-          if( data.size() < 6 ){
-            return fail("CompactSpline dial data is too small for MPS evaluation.");
+          if( dynamic_cast<const Norm*>(dialBase) != nullptr ){
+            packedDialType = kMpsDialTypeNorm;
+            normCount++;
           }
-          packedDialType = kMpsDialTypeCompactSpline;
-          packedSplineOffset = uint32_t(splineData.size());
-          packedSplineSize = uint32_t(data.size());
-          packedAllowExtrapolation = dialBase->getAllowExtrapolation() ? 1 : 0;
-          splineData.reserve(splineData.size() + data.size());
-          for( auto value : data ){ splineData.emplace_back(float(value)); }
-          compactSplineCount++;
-        }
-        else if( dynamic_cast<const UniformSpline*>(dialBase) != nullptr ){
-          const auto& data = dialBase->getDialData();
-          if( data.size() < 8 ){
-            return fail("UniformSpline dial data is too small for MPS evaluation.");
+          else if( dynamic_cast<const CompactSpline*>(dialBase) != nullptr ){
+            const auto& data = dialBase->getDialData();
+            if( data.size() < 6 ){
+              return fail("CompactSpline dial data is too small for MPS evaluation.");
+            }
+            packedDialType = kMpsDialTypeCompactSpline;
+            packedSplineOffset = uint32_t(splineData.size());
+            packedSplineSize = uint32_t(data.size());
+            packedAllowExtrapolation = dialBase->getAllowExtrapolation() ? 1 : 0;
+            splineData.reserve(splineData.size() + data.size());
+            for( auto value : data ){ splineData.emplace_back(float(value)); }
+            compactSplineCount++;
           }
-          packedDialType = kMpsDialTypeUniformSpline;
-          packedSplineOffset = uint32_t(splineData.size());
-          packedSplineSize = uint32_t(data.size());
-          packedAllowExtrapolation = dialBase->getAllowExtrapolation() ? 1 : 0;
-          splineData.reserve(splineData.size() + data.size());
-          for( auto value : data ){ splineData.emplace_back(float(value)); }
-          uniformSplineCount++;
-        }
-        else if( dynamic_cast<const MonotonicSpline*>(dialBase) != nullptr ){
-          const auto& data = dialBase->getDialData();
-          if( data.size() < 5 ){
-            return fail("MonotonicSpline dial data is too small for MPS evaluation.");
+          else if( dynamic_cast<const UniformSpline*>(dialBase) != nullptr ){
+            const auto& data = dialBase->getDialData();
+            if( data.size() < 8 ){
+              return fail("UniformSpline dial data is too small for MPS evaluation.");
+            }
+            packedDialType = kMpsDialTypeUniformSpline;
+            packedSplineOffset = uint32_t(splineData.size());
+            packedSplineSize = uint32_t(data.size());
+            packedAllowExtrapolation = dialBase->getAllowExtrapolation() ? 1 : 0;
+            splineData.reserve(splineData.size() + data.size());
+            for( auto value : data ){ splineData.emplace_back(float(value)); }
+            uniformSplineCount++;
           }
-          packedDialType = kMpsDialTypeMonotonicSpline;
-          packedSplineOffset = uint32_t(splineData.size());
-          packedSplineSize = uint32_t(data.size());
-          packedAllowExtrapolation = dialBase->getAllowExtrapolation() ? 1 : 0;
-          splineData.reserve(splineData.size() + data.size());
-          for( auto value : data ){ splineData.emplace_back(float(value)); }
-          monotonicSplineCount++;
-        }
-        else if( dynamic_cast<const GeneralSpline*>(dialBase) != nullptr ){
-          const auto& data = dialBase->getDialData();
-          if( data.size() < 11 ){
-            return fail("GeneralSpline dial data is too small for MPS evaluation.");
+          else if( dynamic_cast<const MonotonicSpline*>(dialBase) != nullptr ){
+            const auto& data = dialBase->getDialData();
+            if( data.size() < 5 ){
+              return fail("MonotonicSpline dial data is too small for MPS evaluation.");
+            }
+            packedDialType = kMpsDialTypeMonotonicSpline;
+            packedSplineOffset = uint32_t(splineData.size());
+            packedSplineSize = uint32_t(data.size());
+            packedAllowExtrapolation = dialBase->getAllowExtrapolation() ? 1 : 0;
+            splineData.reserve(splineData.size() + data.size());
+            for( auto value : data ){ splineData.emplace_back(float(value)); }
+            monotonicSplineCount++;
           }
-          packedDialType = kMpsDialTypeGeneralSpline;
-          packedSplineOffset = uint32_t(splineData.size());
-          packedSplineSize = uint32_t(data.size());
-          packedAllowExtrapolation = dialBase->getAllowExtrapolation() ? 1 : 0;
-          splineData.reserve(splineData.size() + data.size());
-          for( auto value : data ){ splineData.emplace_back(float(value)); }
-          generalSplineCount++;
-        }
-        else if( dynamic_cast<const Graph*>(dialBase) != nullptr ){
-          const auto& data = dialBase->getDialData();
-          if( data.size() < 2 ){
-            return fail("Graph dial data is too small for MPS evaluation.");
+          else if( dynamic_cast<const GeneralSpline*>(dialBase) != nullptr ){
+            const auto& data = dialBase->getDialData();
+            if( data.size() < 11 ){
+              return fail("GeneralSpline dial data is too small for MPS evaluation.");
+            }
+            packedDialType = kMpsDialTypeGeneralSpline;
+            packedSplineOffset = uint32_t(splineData.size());
+            packedSplineSize = uint32_t(data.size());
+            packedAllowExtrapolation = dialBase->getAllowExtrapolation() ? 1 : 0;
+            splineData.reserve(splineData.size() + data.size());
+            for( auto value : data ){ splineData.emplace_back(float(value)); }
+            generalSplineCount++;
           }
-          packedDialType = kMpsDialTypeGraph;
-          packedSplineOffset = uint32_t(splineData.size());
-          packedSplineSize = uint32_t(data.size());
-          packedAllowExtrapolation = dialBase->getAllowExtrapolation() ? 1 : 0;
-          splineData.reserve(splineData.size() + data.size());
-          for( auto value : data ){ splineData.emplace_back(float(value)); }
-          graphCount++;
-        }
-        else{
-          return fail("dial type " + dialBase->getDialTypeName()
-                      + " unexpectedly passed the MPS compatibility scan but has no device encoder.");
+          else if( dynamic_cast<const Graph*>(dialBase) != nullptr ){
+            const auto& data = dialBase->getDialData();
+            if( data.size() < 2 ){
+              return fail("Graph dial data is too small for MPS evaluation.");
+            }
+            packedDialType = kMpsDialTypeGraph;
+            packedSplineOffset = uint32_t(splineData.size());
+            packedSplineSize = uint32_t(data.size());
+            packedAllowExtrapolation = dialBase->getAllowExtrapolation() ? 1 : 0;
+            splineData.reserve(splineData.size() + data.size());
+            for( auto value : data ){ splineData.emplace_back(float(value)); }
+            graphCount++;
+          }
+          else{
+            return fail("dial type " + dialBase->getDialTypeName()
+                        + " unexpectedly passed the MPS compatibility scan but has no device encoder.");
+          }
+
+          float minResponse = -std::numeric_limits<float>::infinity();
+          float maxResponse = std::numeric_limits<float>::infinity();
+          const auto* supervisor = interface->getResponseSupervisorRef();
+          if( supervisor != nullptr ){
+            if( not std::isnan(supervisor->getMinResponse()) ){
+              minResponse = float(supervisor->getMinResponse());
+            }
+            if( not std::isnan(supervisor->getMaxResponse()) ){
+              maxResponse = float(supervisor->getMaxResponse());
+            }
+          }
+
+          uint32_t packedDialIndex = uint32_t(dialTypes.size());
+          packedDialIndexMap.emplace(interface, packedDialIndex);
+          dialTypes.emplace_back(packedDialType);
+          dialParameterIndices.emplace_back(parameterIndexIt->second);
+          dialMinResponses.emplace_back(minResponse);
+          dialMaxResponses.emplace_back(maxResponse);
+          dialSplineOffsets.emplace_back(packedSplineOffset);
+          dialSplineSizes.emplace_back(packedSplineSize);
+          dialAllowExtrapolation.emplace_back(packedAllowExtrapolation);
+          packedDialIndexIt = packedDialIndexMap.find(interface);
         }
 
-        float minResponse = -std::numeric_limits<float>::infinity();
-        float maxResponse = std::numeric_limits<float>::infinity();
-        const auto* supervisor = interface->getResponseSupervisorRef();
-        if( supervisor != nullptr ){
-          if( not std::isnan(supervisor->getMinResponse()) ){
-            minResponse = float(supervisor->getMinResponse());
-          }
-          if( not std::isnan(supervisor->getMaxResponse()) ){
-            maxResponse = float(supervisor->getMaxResponse());
-          }
-        }
-
-        dialTypes.emplace_back(packedDialType);
-        dialParameterIndices.emplace_back(uint32_t(parameterIndex));
-        dialMinResponses.emplace_back(minResponse);
-        dialMaxResponses.emplace_back(maxResponse);
-        dialSplineOffsets.emplace_back(packedSplineOffset);
-        dialSplineSizes.emplace_back(packedSplineSize);
-        dialAllowExtrapolation.emplace_back(packedAllowExtrapolation);
+        eventDialIndices.emplace_back(packedDialIndexIt->second);
         packedDialCount++;
       }
       eventDialCounts[event.resultIndex] = packedDialCount;
@@ -566,7 +584,7 @@ struct Backends::MpsBackend::Impl {
                 << " events, "
                 << processedDialRefs << "/" << model.eventDials.size()
                 << " dial refs scanned, "
-                << dialTypes.size() << " dynamic dials packed, elapsed "
+                << dialTypes.size() << " unique dynamic dials packed, elapsed "
                 << secondsSince(packingLoopStart) << " s"
                 << " (+" << secondsSince(lastPackingProgress) << " s)"
                 << "."
@@ -583,7 +601,8 @@ struct Backends::MpsBackend::Impl {
             << ", general=" << generalSplineCount
             << ", graph=" << graphCount
             << ", shift=" << shiftCount
-            << ", dynamic packed=" << dialTypes.size()
+            << ", unique dynamic packed=" << dialTypes.size()
+            << ", event dial indices=" << eventDialIndices.size()
             << ", spline scalars=" << splineData.size()
             << "]."
             << std::endl;
@@ -625,6 +644,7 @@ struct Backends::MpsBackend::Impl {
       dialSplineSizes.emplace_back(0);
       dialAllowExtrapolation.emplace_back(0);
     }
+    if( eventDialIndices.empty() ){ eventDialIndices.emplace_back(0); }
     if( splineData.empty() ){ splineData.emplace_back(0); }
 
     uint32_t nEvents = uint32_t(model.events.size());
@@ -636,13 +656,15 @@ struct Backends::MpsBackend::Impl {
             << " Event weights bytes=" << model.events.size() * sizeof(float)
             << ", histogram bytes=" << std::size_t(model.totalBins) * sizeof(float)
             << ", partial histogram bytes=" << std::size_t(totalPartials) * sizeof(float)
-            << ", packed dial count=" << dialTypes.size()
+            << ", unique packed dial count=" << dialTypes.size()
+            << ", event dial index count=" << eventDialIndices.size()
             << "."
             << std::endl;
 
     baseWeightsBuffer = makePrivateBuffer(device, commandQueue, baseWeights);
     eventDialOffsetsBuffer = makePrivateBuffer(device, commandQueue, eventDialOffsets);
     eventDialCountsBuffer = makePrivateBuffer(device, commandQueue, eventDialCounts);
+    eventDialIndicesBuffer = makePrivateBuffer(device, commandQueue, eventDialIndices);
     globalBinsBuffer = makePrivateBuffer(device, commandQueue, globalBins);
     binEventOffsetsBuffer = makePrivateBuffer(device, commandQueue, binEventOffsets);
     binEventIndicesBuffer = makePrivateBuffer(device, commandQueue, binEventIndices);
@@ -673,6 +695,7 @@ struct Backends::MpsBackend::Impl {
                                                   options:MTLResourceStorageModeShared];
 
     if( baseWeightsBuffer == nil or eventDialOffsetsBuffer == nil or eventDialCountsBuffer == nil
+        or eventDialIndicesBuffer == nil
         or globalBinsBuffer == nil or binEventOffsetsBuffer == nil or binEventIndicesBuffer == nil
         or dialTypesBuffer == nil or dialParameterIndicesBuffer == nil
         or dialMinResponsesBuffer == nil or dialMaxResponsesBuffer == nil
@@ -718,16 +741,17 @@ struct Backends::MpsBackend::Impl {
     [encoder setBuffer:baseWeightsBuffer offset:0 atIndex:1];
     [encoder setBuffer:eventDialOffsetsBuffer offset:0 atIndex:2];
     [encoder setBuffer:eventDialCountsBuffer offset:0 atIndex:3];
-    [encoder setBuffer:dialTypesBuffer offset:0 atIndex:4];
-    [encoder setBuffer:dialParameterIndicesBuffer offset:0 atIndex:5];
-    [encoder setBuffer:dialMinResponsesBuffer offset:0 atIndex:6];
-    [encoder setBuffer:dialMaxResponsesBuffer offset:0 atIndex:7];
-    [encoder setBuffer:dialSplineOffsetsBuffer offset:0 atIndex:8];
-    [encoder setBuffer:dialSplineSizesBuffer offset:0 atIndex:9];
-    [encoder setBuffer:dialAllowExtrapolationBuffer offset:0 atIndex:10];
-    [encoder setBuffer:splineDataBuffer offset:0 atIndex:11];
-    [encoder setBuffer:parametersBuffer offset:0 atIndex:12];
-    [encoder setBuffer:nEventsBuffer offset:0 atIndex:13];
+    [encoder setBuffer:eventDialIndicesBuffer offset:0 atIndex:4];
+    [encoder setBuffer:dialTypesBuffer offset:0 atIndex:5];
+    [encoder setBuffer:dialParameterIndicesBuffer offset:0 atIndex:6];
+    [encoder setBuffer:dialMinResponsesBuffer offset:0 atIndex:7];
+    [encoder setBuffer:dialMaxResponsesBuffer offset:0 atIndex:8];
+    [encoder setBuffer:dialSplineOffsetsBuffer offset:0 atIndex:9];
+    [encoder setBuffer:dialSplineSizesBuffer offset:0 atIndex:10];
+    [encoder setBuffer:dialAllowExtrapolationBuffer offset:0 atIndex:11];
+    [encoder setBuffer:splineDataBuffer offset:0 atIndex:12];
+    [encoder setBuffer:parametersBuffer offset:0 atIndex:13];
+    [encoder setBuffer:nEventsBuffer offset:0 atIndex:14];
 
     NSUInteger width = std::min<NSUInteger>(eventWeightsPipeline.maxTotalThreadsPerThreadgroup, 256);
     if( width == 0 ){ width = 1; }
