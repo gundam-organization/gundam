@@ -8,8 +8,14 @@ set(SRCFILES
     ${CMAKE_CURRENT_SOURCE_DIR}/Common/src/BackendModelBuilder.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/Common/src/BackendTypes.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/CPU/src/CpuBackend.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/MPS/src/MpsBackend.cpp
 )
+
+if(APPLE)
+  enable_language(OBJCXX)
+  list(APPEND SRCFILES ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/MPS/src/MpsBackend.mm)
+else()
+  list(APPEND SRCFILES ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/MPS/src/MpsBackend.cpp)
+endif()
 
 set(HEADERS
     ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/BackendConfig.h
@@ -45,5 +51,9 @@ target_link_libraries(
     PUBLIC
     GundamDialDictionary
 )
+
+if(APPLE)
+  target_link_libraries(${LIB_NAME} PUBLIC "-framework Foundation" "-framework Metal")
+endif()
 
 install(TARGETS ${LIB_NAME} DESTINATION lib)

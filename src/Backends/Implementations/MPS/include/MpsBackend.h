@@ -1,17 +1,21 @@
 #ifndef GUNDAM_MPS_BACKEND_H
 #define GUNDAM_MPS_BACKEND_H
 
+#include "BackendLikelihoodModel.h"
 #include "BackendModel.h"
 #include "BackendTypes.h"
-#include "CpuBackend.h"
 #include "IPropagationBackend.h"
 #include "ParameterSnapshot.h"
+
+#include <memory>
+#include <cstdint>
 
 namespace Backends {
 
   class MpsBackend : public IPropagationBackend {
   public:
-    MpsBackend() = default;
+    MpsBackend();
+    ~MpsBackend() override;
 
     [[nodiscard]] std::string getName() const override { return "MPS"; }
     [[nodiscard]] BackendCapabilities getCapabilities() const override;
@@ -29,7 +33,8 @@ namespace Backends {
     [[nodiscard]] double getLikelihood(const PropagationToken& token_) const override;
 
   private:
-    CpuBackend _hostBackend_{};
+    struct Impl;
+    std::unique_ptr<Impl> _impl_{};
   };
 
 }

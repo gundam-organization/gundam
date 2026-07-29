@@ -18,7 +18,20 @@ def build_mps_config_text(cpu_test_module, root_path: Path, enable_backend: bool
     config_text = cpu_test_module.build_config_text(root_path, enable_backend)
     if enable_backend:
         config_text = config_text.replace("type: CPU", "type: MPS")
+        config_text = config_text.replace(
+            "outputRequests: [EventWeights, Histograms]",
+            "outputRequests: [EventWeights, Histograms, Likelihood]",
+        )
     return config_text
+
+
+def assert_mps_close_list(label: str, left: list[float], right: list[float]) -> None:
+    if len(left) != len(right):
+        raise RuntimeError(f"{label}: length mismatch {len(left)} != {len(right)}")
+
+    for i, (left_value, right_value) in enumerate(zip(left, right)):
+        if not math.isclose(left_value, right_value, rel_tol=1e-5, abs_tol=1e-5):
+            raise RuntimeError(f"{label}: bin {i} mismatch {left_value} != {right_value}")
 
 
 def main() -> int:
@@ -53,17 +66,17 @@ def main() -> int:
     expected_prior_sums = [7.0, 8.0]
     expected_shifted_sums = [9.0, 6.0]
     cpu_test.assert_close_list("standard prior sums", prior_standard_sums, expected_prior_sums)
-    cpu_test.assert_close_list("MPS prior sums", prior_backend_sums, prior_standard_sums)
-    cpu_test.assert_close_list("MPS prior errors", prior_backend_errors, prior_standard_errors)
+    assert_mps_close_list("MPS prior sums", prior_backend_sums, prior_standard_sums)
+    assert_mps_close_list("MPS prior errors", prior_backend_errors, prior_standard_errors)
 
     cpu_test.assert_close_list("standard shifted sums", standard_sums, expected_shifted_sums)
-    cpu_test.assert_close_list("MPS shifted sums", backend_sums, standard_sums)
-    cpu_test.assert_close_list("MPS shifted errors", backend_errors, standard_errors)
+    assert_mps_close_list("MPS shifted sums", backend_sums, standard_sums)
+    assert_mps_close_list("MPS shifted errors", backend_errors, standard_errors)
 
-    if not math.isclose(prior_backend_llh, prior_standard_llh, rel_tol=1e-12, abs_tol=1e-12):
+    if not math.isclose(prior_backend_llh, prior_standard_llh, rel_tol=1e-5, abs_tol=1e-5):
         raise RuntimeError(f"Prior LLH mismatch {prior_backend_llh} != {prior_standard_llh}")
 
-    if not math.isclose(backend_llh, standard_llh, rel_tol=1e-12, abs_tol=1e-12):
+    if not math.isclose(backend_llh, standard_llh, rel_tol=1e-5, abs_tol=1e-5):
         raise RuntimeError(f"Shifted LLH mismatch {backend_llh} != {standard_llh}")
 
     if math.isclose(standard_llh, 0.0, rel_tol=0.0, abs_tol=1e-12):
