@@ -3,6 +3,7 @@
 
 #include "BackendModel.h"
 #include "BackendTypes.h"
+#include "CpuBackend.h"
 #include "IPropagationBackend.h"
 #include "ParameterSnapshot.h"
 
@@ -28,8 +29,7 @@ namespace Backends {
     [[nodiscard]] double getLikelihood(const PropagationToken& token_) const override;
 
   private:
-    BackendModel _model_{};
-    PropagationStatus _status_{};
+    CpuBackend _hostBackend_{};
   };
 
 }

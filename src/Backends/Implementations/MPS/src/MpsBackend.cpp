@@ -3,48 +3,42 @@
 #include "Logger.h"
 
 Backends::BackendCapabilities Backends::MpsBackend::getCapabilities() const {
-  BackendCapabilities out;
+  auto out = _hostBackend_.getCapabilities();
   out.supportsGpu = true;
-  out.deviceName = "Metal Performance Shaders";
+  out.deviceName = "Metal Performance Shaders host bridge";
   return out;
 }
 
 void Backends::MpsBackend::build(const BackendModel& model_) {
-  _model_ = model_;
-  _status_ = PropagationStatus();
-  _status_.backend = BackendStatus::Unavailable;
+  _hostBackend_.build(model_);
 }
 
-void Backends::MpsBackend::setLikelihoodModel(const BackendLikelihoodModel&) {
+void Backends::MpsBackend::setLikelihoodModel(const BackendLikelihoodModel& likelihoodModel_) {
+  _hostBackend_.setLikelihoodModel(likelihoodModel_);
 }
 
 Backends::PropagationToken Backends::MpsBackend::requestPropagation(
-    const ParameterSnapshot&,
+    const ParameterSnapshot& parameters_,
     const PropagationRequest& request_) {
-  _status_ = PropagationStatus();
-  _status_.backend = BackendStatus::Unavailable;
-  for( auto request : request_.outputs ){
-    _status_.state(request) = OutputState::Failed;
-  }
-  return {};
+  return _hostBackend_.requestPropagation(parameters_, request_);
 }
 
-Backends::PropagationStatus Backends::MpsBackend::getStatus(const PropagationToken&) const {
-  return _status_;
+Backends::PropagationStatus Backends::MpsBackend::getStatus(const PropagationToken& token_) const {
+  return _hostBackend_.getStatus(token_);
 }
 
-bool Backends::MpsBackend::isReady(const PropagationToken&) const {
-  return false;
+bool Backends::MpsBackend::isReady(const PropagationToken& token_) const {
+  return _hostBackend_.isReady(token_);
 }
 
-void Backends::MpsBackend::wait(const PropagationToken&) {
+void Backends::MpsBackend::wait(const PropagationToken& token_) {
+  _hostBackend_.wait(token_);
 }
 
-void Backends::MpsBackend::materialize(const PropagationToken&, OutputRequest) {
-  LogThrow("MpsBackend is declared but device kernels are not implemented yet.");
+void Backends::MpsBackend::materialize(const PropagationToken& token_, OutputRequest output_) {
+  _hostBackend_.materialize(token_, output_);
 }
 
-double Backends::MpsBackend::getLikelihood(const PropagationToken&) const {
-  LogThrow("MpsBackend likelihood is not implemented yet.");
-  return 0;
+double Backends::MpsBackend::getLikelihood(const PropagationToken& token_) const {
+  return _hostBackend_.getLikelihood(token_);
 }
