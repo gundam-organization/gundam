@@ -38,6 +38,9 @@ namespace {
   constexpr uint32_t kMpsDialTypeMonotonicSpline{3};
   constexpr uint32_t kMpsDialTypeGeneralSpline{4};
   constexpr uint32_t kMpsDialTypeGraph{5};
+  constexpr uint32_t kMpsDialEvalInline{0};
+  constexpr uint32_t kMpsDialEvalCached{1};
+  constexpr uint32_t kMpsCachedDialReuseThreshold{8};
 
   static NSString* const kMpsBackendMetalSource = GUNDAM_MPS_BACKEND_KERNEL_SOURCE;
 
@@ -166,6 +169,7 @@ struct Backends::MpsBackend::Impl {
   id<MTLDevice> device{nil};
   id<MTLCommandQueue> commandQueue{nil};
   id<MTLComputePipelineState> eventWeightsPipeline{nil};
+  id<MTLComputePipelineState> cachedDialResponsesPipeline{nil};
   id<MTLComputePipelineState> histogramPipeline{nil};
   id<MTLComputePipelineState> histogramPartialsPipeline{nil};
   id<MTLComputePipelineState> histogramFinalizePipeline{nil};
@@ -179,6 +183,8 @@ struct Backends::MpsBackend::Impl {
   id<MTLBuffer> eventDialOffsetsBuffer{nil};
   id<MTLBuffer> eventDialCountsBuffer{nil};
   id<MTLBuffer> eventDialIndicesBuffer{nil};
+  id<MTLBuffer> dialEvaluationModesBuffer{nil};
+  id<MTLBuffer> cachedDialResponsesBuffer{nil};
   id<MTLBuffer> globalBinsBuffer{nil};
   id<MTLBuffer> binEventOffsetsBuffer{nil};
   id<MTLBuffer> binEventIndicesBuffer{nil};
@@ -199,6 +205,7 @@ struct Backends::MpsBackend::Impl {
   id<MTLBuffer> histSumsReadbackBuffer{nil};
   id<MTLBuffer> histSumSquaresReadbackBuffer{nil};
   id<MTLBuffer> nEventsBuffer{nil};
+  id<MTLBuffer> packedDialCountBuffer{nil};
   id<MTLBuffer> totalBinsBuffer{nil};
   id<MTLBuffer> maxHistogramChunksPerBinBuffer{nil};
   id<MTLBuffer> histogramChunkSizeBuffer{nil};
@@ -211,6 +218,7 @@ struct Backends::MpsBackend::Impl {
   std::string deviceModelFallbackReason{};
   std::uint64_t nextTokenId{1};
   bool isBuilt{false};
+  uint32_t cachedDialCount{0};
 
   Impl() {
     device = MTLCreateSystemDefaultDevice();
@@ -245,11 +253,12 @@ struct Backends::MpsBackend::Impl {
     }
 
     eventWeightsPipeline = makePipeline(device, library, @"compute_event_weights");
+    cachedDialResponsesPipeline = makePipeline(device, library, @"compute_cached_dial_responses");
     histogramPipeline = makePipeline(device, library, @"fill_histograms");
     histogramPartialsPipeline = makePipeline(device, library, @"fill_histogram_partials_by_bin");
     histogramFinalizePipeline = makePipeline(device, library, @"finalize_histograms_from_partials");
     [library release];
-    if( eventWeightsPipeline == nil or histogramPipeline == nil
+    if( eventWeightsPipeline == nil or cachedDialResponsesPipeline == nil or histogramPipeline == nil
         or histogramPartialsPipeline == nil or histogramFinalizePipeline == nil ){ return; }
 
     commandQueue = [device newCommandQueue];
@@ -261,6 +270,7 @@ struct Backends::MpsBackend::Impl {
   ~Impl() {
     releaseDeviceBuffers();
     [eventWeightsPipeline release];
+    [cachedDialResponsesPipeline release];
     [histogramPipeline release];
     [histogramPartialsPipeline release];
     [histogramFinalizePipeline release];
@@ -274,6 +284,8 @@ struct Backends::MpsBackend::Impl {
     releaseBuffer(eventDialOffsetsBuffer);
     releaseBuffer(eventDialCountsBuffer);
     releaseBuffer(eventDialIndicesBuffer);
+    releaseBuffer(dialEvaluationModesBuffer);
+    releaseBuffer(cachedDialResponsesBuffer);
     releaseBuffer(globalBinsBuffer);
     releaseBuffer(binEventOffsetsBuffer);
     releaseBuffer(binEventIndicesBuffer);
@@ -294,6 +306,7 @@ struct Backends::MpsBackend::Impl {
     releaseBuffer(histSumsReadbackBuffer);
     releaseBuffer(histSumSquaresReadbackBuffer);
     releaseBuffer(nEventsBuffer);
+    releaseBuffer(packedDialCountBuffer);
     releaseBuffer(totalBinsBuffer);
     releaseBuffer(maxHistogramChunksPerBinBuffer);
     releaseBuffer(histogramChunkSizeBuffer);
@@ -398,6 +411,7 @@ struct Backends::MpsBackend::Impl {
     std::vector<uint32_t> eventsPerBin(model.totalBins, 0);
     std::vector<uint32_t> dialTypes{};
     std::vector<uint32_t> dialParameterIndices{};
+    std::vector<uint32_t> dialEvaluationModes{};
     std::vector<float> dialMinResponses{};
     std::vector<float> dialMaxResponses{};
     std::vector<uint32_t> dialSplineOffsets{};
@@ -413,7 +427,9 @@ struct Backends::MpsBackend::Impl {
     std::size_t graphCount{0};
     std::size_t uniqueSplineScalarCount{0};
     std::vector<const DialInterface*> uniqueDynamicDialInterfaces{};
+    std::vector<uint32_t> uniqueDynamicDialReuseCounts{};
     uniqueDynamicDialInterfaces.reserve(model.eventDials.size());
+    uniqueDynamicDialReuseCounts.reserve(model.eventDials.size());
     std::unordered_map<const DialInterface*, uint32_t> packedDialIndexMap{};
     packedDialIndexMap.reserve(model.eventDials.size());
 
@@ -455,10 +471,15 @@ struct Backends::MpsBackend::Impl {
                       + " references a parameter missing from the backend parameter table.");
         }
 
-        if( packedDialIndexMap.find(interface) != packedDialIndexMap.end() ){ continue; }
+        auto packedDialIndexIt = packedDialIndexMap.find(interface);
+        if( packedDialIndexIt != packedDialIndexMap.end() ){
+          uniqueDynamicDialReuseCounts[packedDialIndexIt->second]++;
+          continue;
+        }
         uint32_t packedDialIndex = uint32_t(uniqueDynamicDialInterfaces.size());
         packedDialIndexMap.emplace(interface, packedDialIndex);
         uniqueDynamicDialInterfaces.emplace_back(interface);
+        uniqueDynamicDialReuseCounts.emplace_back(1);
 
         if( dynamic_cast<const Norm*>(dialBase) != nullptr ){
           normCount++;
@@ -534,6 +555,7 @@ struct Backends::MpsBackend::Impl {
 
     dialTypes.reserve(uniqueDynamicDialInterfaces.size());
     dialParameterIndices.reserve(uniqueDynamicDialInterfaces.size());
+    dialEvaluationModes.reserve(uniqueDynamicDialInterfaces.size());
     dialMinResponses.reserve(uniqueDynamicDialInterfaces.size());
     dialMaxResponses.reserve(uniqueDynamicDialInterfaces.size());
     dialSplineOffsets.reserve(uniqueDynamicDialInterfaces.size());
@@ -545,13 +567,16 @@ struct Backends::MpsBackend::Impl {
     LogInfo << "MPS backend: second packing pass."
             << " This phase materializes unique dial descriptors and payloads."
             << std::endl;
-    for( const auto* interface : uniqueDynamicDialInterfaces ){
+    cachedDialCount = 0;
+    for( std::size_t iUniqueDial = 0 ; iUniqueDial < uniqueDynamicDialInterfaces.size() ; iUniqueDial++ ){
+      const auto* interface = uniqueDynamicDialInterfaces[iUniqueDial];
       const auto* dialBase = interface->getDialBaseRef();
       const auto* inputBuffer = interface->getInputBufferRef();
       auto parameterIndexIt = parameterIndexMap.find(&inputBuffer->getParameter(0));
       LogThrowIf(parameterIndexIt == parameterIndexMap.end(), "Internal MPS packing error: missing parameter index.");
 
       uint32_t packedDialType = 0;
+      uint32_t packedDialEvaluationMode = kMpsDialEvalInline;
       uint32_t packedSplineOffset = 0;
       uint32_t packedSplineSize = 0;
       uint32_t packedAllowExtrapolation = 0;
@@ -603,6 +628,11 @@ struct Backends::MpsBackend::Impl {
         LogThrow("Internal MPS packing error: unsupported unique dial type.");
       }
 
+      if( packedDialType != kMpsDialTypeNorm and uniqueDynamicDialReuseCounts[iUniqueDial] >= kMpsCachedDialReuseThreshold ){
+        packedDialEvaluationMode = kMpsDialEvalCached;
+        cachedDialCount++;
+      }
+
       float minResponse = -std::numeric_limits<float>::infinity();
       float maxResponse = std::numeric_limits<float>::infinity();
       const auto* supervisor = interface->getResponseSupervisorRef();
@@ -617,6 +647,7 @@ struct Backends::MpsBackend::Impl {
 
       dialTypes.emplace_back(packedDialType);
       dialParameterIndices.emplace_back(parameterIndexIt->second);
+      dialEvaluationModes.emplace_back(packedDialEvaluationMode);
       dialMinResponses.emplace_back(minResponse);
       dialMaxResponses.emplace_back(maxResponse);
       dialSplineOffsets.emplace_back(packedSplineOffset);
@@ -681,6 +712,7 @@ struct Backends::MpsBackend::Impl {
             << ", graph=" << graphCount
             << ", shift=" << shiftCount
             << ", unique dynamic packed=" << dialTypes.size()
+            << ", cached expensive dials=" << cachedDialCount
             << ", event dial indices=" << eventDialIndices.size()
             << ", spline scalars=" << splineData.size()
             << "]."
@@ -717,6 +749,7 @@ struct Backends::MpsBackend::Impl {
     if( dialTypes.empty() ){
       dialTypes.emplace_back(0);
       dialParameterIndices.emplace_back(0);
+      dialEvaluationModes.emplace_back(kMpsDialEvalInline);
       dialMinResponses.emplace_back(1.0f);
       dialMaxResponses.emplace_back(1.0f);
       dialSplineOffsets.emplace_back(0);
@@ -727,6 +760,7 @@ struct Backends::MpsBackend::Impl {
     if( splineData.empty() ){ splineData.emplace_back(0); }
 
     uint32_t nEvents = uint32_t(model.events.size());
+    uint32_t packedDialCount = uint32_t(dialTypes.size());
     uint32_t totalBins = uint32_t(model.totalBins);
     uint32_t chunkSize = histogramChunkSize;
     uint32_t totalPartials = totalBins * maxHistogramChunksPerBin;
@@ -736,6 +770,7 @@ struct Backends::MpsBackend::Impl {
             << ", histogram bytes=" << std::size_t(model.totalBins) * sizeof(float)
             << ", partial histogram bytes=" << std::size_t(totalPartials) * sizeof(float)
             << ", unique packed dial count=" << dialTypes.size()
+            << ", cached dial count=" << cachedDialCount
             << ", event dial index count=" << eventDialIndices.size()
             << "."
             << std::endl;
@@ -744,6 +779,7 @@ struct Backends::MpsBackend::Impl {
     eventDialOffsetsBuffer = makePrivateBuffer(device, commandQueue, eventDialOffsets);
     eventDialCountsBuffer = makePrivateBuffer(device, commandQueue, eventDialCounts);
     eventDialIndicesBuffer = makePrivateBuffer(device, commandQueue, eventDialIndices);
+    dialEvaluationModesBuffer = makePrivateBuffer(device, commandQueue, dialEvaluationModes);
     globalBinsBuffer = makePrivateBuffer(device, commandQueue, globalBins);
     binEventOffsetsBuffer = makePrivateBuffer(device, commandQueue, binEventOffsets);
     binEventIndicesBuffer = makePrivateBuffer(device, commandQueue, binEventIndices);
@@ -755,6 +791,7 @@ struct Backends::MpsBackend::Impl {
     dialSplineSizesBuffer = makePrivateBuffer(device, commandQueue, dialSplineSizes);
     dialAllowExtrapolationBuffer = makePrivateBuffer(device, commandQueue, dialAllowExtrapolation);
     splineDataBuffer = makePrivateBuffer(device, commandQueue, splineData);
+    cachedDialResponsesBuffer = makePrivateEmptyBuffer(device, std::size_t(dialTypes.size()) * sizeof(float));
     eventWeightsBuffer = makePrivateEmptyBuffer(device, model.events.size() * sizeof(float));
     eventWeightsReadbackBuffer = makeSharedEmptyBuffer(device, model.events.size() * sizeof(float));
     parametersBuffer = makeSharedEmptyBuffer(device, std::max<std::size_t>(1, model.parameters.size()) * sizeof(float));
@@ -765,6 +802,7 @@ struct Backends::MpsBackend::Impl {
     histSumsReadbackBuffer = makeSharedEmptyBuffer(device, std::size_t(model.totalBins) * sizeof(float));
     histSumSquaresReadbackBuffer = makeSharedEmptyBuffer(device, std::size_t(model.totalBins) * sizeof(float));
     nEventsBuffer = [device newBufferWithBytes:&nEvents length:sizeof(nEvents) options:MTLResourceStorageModeShared];
+    packedDialCountBuffer = [device newBufferWithBytes:&packedDialCount length:sizeof(packedDialCount) options:MTLResourceStorageModeShared];
     totalBinsBuffer = [device newBufferWithBytes:&totalBins length:sizeof(totalBins) options:MTLResourceStorageModeShared];
     maxHistogramChunksPerBinBuffer = [device newBufferWithBytes:&maxHistogramChunksPerBin
                                                          length:sizeof(maxHistogramChunksPerBin)
@@ -775,6 +813,7 @@ struct Backends::MpsBackend::Impl {
 
     if( baseWeightsBuffer == nil or eventDialOffsetsBuffer == nil or eventDialCountsBuffer == nil
         or eventDialIndicesBuffer == nil
+        or dialEvaluationModesBuffer == nil or cachedDialResponsesBuffer == nil
         or globalBinsBuffer == nil or binEventOffsetsBuffer == nil or binEventIndicesBuffer == nil
         or dialTypesBuffer == nil or dialParameterIndicesBuffer == nil
         or dialMinResponsesBuffer == nil or dialMaxResponsesBuffer == nil
@@ -784,6 +823,7 @@ struct Backends::MpsBackend::Impl {
         or partialHistSumsBuffer == nil or partialHistSumSquaresBuffer == nil
         or histSumsBuffer == nil or histSumSquaresBuffer == nil or eventWeightsReadbackBuffer == nil
         or histSumsReadbackBuffer == nil or histSumSquaresReadbackBuffer == nil or nEventsBuffer == nil
+        or packedDialCountBuffer == nil
         or totalBinsBuffer == nil or maxHistogramChunksPerBinBuffer == nil
         or histogramChunkSizeBuffer == nil ){
       releaseDeviceBuffers();
@@ -821,20 +861,46 @@ struct Backends::MpsBackend::Impl {
     [encoder setBuffer:eventDialOffsetsBuffer offset:0 atIndex:2];
     [encoder setBuffer:eventDialCountsBuffer offset:0 atIndex:3];
     [encoder setBuffer:eventDialIndicesBuffer offset:0 atIndex:4];
-    [encoder setBuffer:dialTypesBuffer offset:0 atIndex:5];
-    [encoder setBuffer:dialParameterIndicesBuffer offset:0 atIndex:6];
-    [encoder setBuffer:dialMinResponsesBuffer offset:0 atIndex:7];
-    [encoder setBuffer:dialMaxResponsesBuffer offset:0 atIndex:8];
-    [encoder setBuffer:dialSplineOffsetsBuffer offset:0 atIndex:9];
-    [encoder setBuffer:dialSplineSizesBuffer offset:0 atIndex:10];
-    [encoder setBuffer:dialAllowExtrapolationBuffer offset:0 atIndex:11];
-    [encoder setBuffer:splineDataBuffer offset:0 atIndex:12];
-    [encoder setBuffer:parametersBuffer offset:0 atIndex:13];
-    [encoder setBuffer:nEventsBuffer offset:0 atIndex:14];
+    [encoder setBuffer:dialEvaluationModesBuffer offset:0 atIndex:5];
+    [encoder setBuffer:cachedDialResponsesBuffer offset:0 atIndex:6];
+    [encoder setBuffer:dialTypesBuffer offset:0 atIndex:7];
+    [encoder setBuffer:dialParameterIndicesBuffer offset:0 atIndex:8];
+    [encoder setBuffer:dialMinResponsesBuffer offset:0 atIndex:9];
+    [encoder setBuffer:dialMaxResponsesBuffer offset:0 atIndex:10];
+    [encoder setBuffer:dialSplineOffsetsBuffer offset:0 atIndex:11];
+    [encoder setBuffer:dialSplineSizesBuffer offset:0 atIndex:12];
+    [encoder setBuffer:dialAllowExtrapolationBuffer offset:0 atIndex:13];
+    [encoder setBuffer:splineDataBuffer offset:0 atIndex:14];
+    [encoder setBuffer:parametersBuffer offset:0 atIndex:15];
+    [encoder setBuffer:nEventsBuffer offset:0 atIndex:16];
 
     NSUInteger width = std::min<NSUInteger>(eventWeightsPipeline.maxTotalThreadsPerThreadgroup, 256);
     if( width == 0 ){ width = 1; }
     [encoder dispatchThreads:MTLSizeMake(NSUInteger(model.events.size()), 1, 1)
+       threadsPerThreadgroup:MTLSizeMake(width, 1, 1)];
+    return true;
+  }
+
+  bool encodeCachedDialResponses(id<MTLComputeCommandEncoder> encoder) {
+    if( not isDeviceModelSupported ){ return false; }
+    if( cachedDialCount == 0 ){ return true; }
+    [encoder setComputePipelineState:cachedDialResponsesPipeline];
+    [encoder setBuffer:cachedDialResponsesBuffer offset:0 atIndex:0];
+    [encoder setBuffer:dialEvaluationModesBuffer offset:0 atIndex:1];
+    [encoder setBuffer:dialTypesBuffer offset:0 atIndex:2];
+    [encoder setBuffer:dialParameterIndicesBuffer offset:0 atIndex:3];
+    [encoder setBuffer:dialMinResponsesBuffer offset:0 atIndex:4];
+    [encoder setBuffer:dialMaxResponsesBuffer offset:0 atIndex:5];
+    [encoder setBuffer:dialSplineOffsetsBuffer offset:0 atIndex:6];
+    [encoder setBuffer:dialSplineSizesBuffer offset:0 atIndex:7];
+    [encoder setBuffer:dialAllowExtrapolationBuffer offset:0 atIndex:8];
+    [encoder setBuffer:splineDataBuffer offset:0 atIndex:9];
+    [encoder setBuffer:parametersBuffer offset:0 atIndex:10];
+    [encoder setBuffer:packedDialCountBuffer offset:0 atIndex:11];
+
+    NSUInteger width = std::min<NSUInteger>(cachedDialResponsesPipeline.maxTotalThreadsPerThreadgroup, 256);
+    if( width == 0 ){ width = 1; }
+    [encoder dispatchThreads:MTLSizeMake(NSUInteger(dialTypes.size()), 1, 1)
        threadsPerThreadgroup:MTLSizeMake(width, 1, 1)];
     return true;
   }
@@ -878,6 +944,10 @@ struct Backends::MpsBackend::Impl {
     auto encodeStart = std::chrono::steady_clock::now();
     id<MTLCommandBuffer> commandBuffer = [commandQueue commandBuffer];
     id<MTLComputeCommandEncoder> encoder = [commandBuffer computeCommandEncoder];
+    if( not encodeCachedDialResponses(encoder) ){
+      [encoder endEncoding];
+      return false;
+    }
     if( not encodeEventWeights(encoder) ){
       [encoder endEncoding];
       return false;

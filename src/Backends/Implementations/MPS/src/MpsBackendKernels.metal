@@ -4,6 +4,8 @@ constant uint kDialTypeUniformSpline = 2;
 constant uint kDialTypeMonotonicSpline = 3;
 constant uint kDialTypeGeneralSpline = 4;
 constant uint kDialTypeGraph = 5;
+constant uint kDialEvalInline = 0;
+constant uint kDialEvalCached = 1;
 
 float evaluate_compact_spline(float x, bool allowExtrapolation, device const float* data, uint dim) {
   if( !allowExtrapolation ){
@@ -56,22 +58,126 @@ float evaluate_graph(float x, bool allowExtrapolation, device const float* data,
   return GundamDeviceMath::EvaluateGraph(x, -INFINITY, INFINITY, data, int(dim));
 }
 
+float evaluate_packed_dial(
+    uint packedDial,
+    device const uint* dialTypes,
+    device const uint* dialParameterIndices,
+    device const uint* dialSplineOffsets,
+    device const uint* dialSplineSizes,
+    device const uint* dialAllowExtrapolation,
+    device const float* splineData,
+    device const float* parameters,
+    device const float* dialMinResponses,
+    device const float* dialMaxResponses) {
+  float input = parameters[dialParameterIndices[packedDial]];
+  float response = 1.0f;
+  uint dialType = dialTypes[packedDial];
+  if( dialType == kDialTypeNorm ){
+    response = input;
+  }
+  else if( dialType == kDialTypeCompactSpline ){
+    uint splineOffset = dialSplineOffsets[packedDial];
+    uint splineSize = dialSplineSizes[packedDial];
+    response = evaluate_compact_spline(
+        input,
+        dialAllowExtrapolation[packedDial] != 0,
+        splineData + splineOffset,
+        splineSize - 2
+    );
+  }
+  else if( dialType == kDialTypeUniformSpline ){
+    uint splineOffset = dialSplineOffsets[packedDial];
+    uint splineSize = dialSplineSizes[packedDial];
+    response = evaluate_uniform_spline(
+        input,
+        dialAllowExtrapolation[packedDial] != 0,
+        splineData + splineOffset,
+        splineSize
+    );
+  }
+  else if( dialType == kDialTypeMonotonicSpline ){
+    uint splineOffset = dialSplineOffsets[packedDial];
+    uint splineSize = dialSplineSizes[packedDial];
+    response = evaluate_monotonic_spline(
+        input,
+        dialAllowExtrapolation[packedDial] != 0,
+        splineData + splineOffset,
+        splineSize - 2
+    );
+  }
+  else if( dialType == kDialTypeGeneralSpline ){
+    uint splineOffset = dialSplineOffsets[packedDial];
+    uint splineSize = dialSplineSizes[packedDial];
+    response = evaluate_general_spline(
+        input,
+        dialAllowExtrapolation[packedDial] != 0,
+        splineData + splineOffset,
+        splineSize
+    );
+  }
+  else if( dialType == kDialTypeGraph ){
+    uint splineOffset = dialSplineOffsets[packedDial];
+    uint splineSize = dialSplineSizes[packedDial];
+    response = evaluate_graph(
+        input,
+        dialAllowExtrapolation[packedDial] != 0,
+        splineData + splineOffset,
+        splineSize
+    );
+  }
+  response = max(response, dialMinResponses[packedDial]);
+  response = min(response, dialMaxResponses[packedDial]);
+  return response;
+}
+
+kernel void compute_cached_dial_responses(
+    device float* cachedDialResponses [[buffer(0)]],
+    device const uint* dialEvaluationModes [[buffer(1)]],
+    device const uint* dialTypes [[buffer(2)]],
+    device const uint* dialParameterIndices [[buffer(3)]],
+    device const float* dialMinResponses [[buffer(4)]],
+    device const float* dialMaxResponses [[buffer(5)]],
+    device const uint* dialSplineOffsets [[buffer(6)]],
+    device const uint* dialSplineSizes [[buffer(7)]],
+    device const uint* dialAllowExtrapolation [[buffer(8)]],
+    device const float* splineData [[buffer(9)]],
+    device const float* parameters [[buffer(10)]],
+    constant uint& packedDialCount [[buffer(11)]],
+    uint gid [[thread_position_in_grid]]) {
+  if( gid >= packedDialCount ){ return; }
+  if( dialEvaluationModes[gid] != kDialEvalCached ){ return; }
+  cachedDialResponses[gid] = evaluate_packed_dial(
+      gid,
+      dialTypes,
+      dialParameterIndices,
+      dialSplineOffsets,
+      dialSplineSizes,
+      dialAllowExtrapolation,
+      splineData,
+      parameters,
+      dialMinResponses,
+      dialMaxResponses
+  );
+}
+
 kernel void compute_event_weights(
     device float* eventWeights [[buffer(0)]],
     device const float* baseWeights [[buffer(1)]],
     device const uint* eventDialOffsets [[buffer(2)]],
     device const uint* eventDialCounts [[buffer(3)]],
     device const uint* eventDialIndices [[buffer(4)]],
-    device const uint* dialTypes [[buffer(5)]],
-    device const uint* dialParameterIndices [[buffer(6)]],
-    device const float* dialMinResponses [[buffer(7)]],
-    device const float* dialMaxResponses [[buffer(8)]],
-    device const uint* dialSplineOffsets [[buffer(9)]],
-    device const uint* dialSplineSizes [[buffer(10)]],
-    device const uint* dialAllowExtrapolation [[buffer(11)]],
-    device const float* splineData [[buffer(12)]],
-    device const float* parameters [[buffer(13)]],
-    constant uint& nEvents [[buffer(14)]],
+    device const uint* dialEvaluationModes [[buffer(5)]],
+    device const float* cachedDialResponses [[buffer(6)]],
+    device const uint* dialTypes [[buffer(7)]],
+    device const uint* dialParameterIndices [[buffer(8)]],
+    device const float* dialMinResponses [[buffer(9)]],
+    device const float* dialMaxResponses [[buffer(10)]],
+    device const uint* dialSplineOffsets [[buffer(11)]],
+    device const uint* dialSplineSizes [[buffer(12)]],
+    device const uint* dialAllowExtrapolation [[buffer(13)]],
+    device const float* splineData [[buffer(14)]],
+    device const float* parameters [[buffer(15)]],
+    constant uint& nEvents [[buffer(16)]],
     uint gid [[thread_position_in_grid]]) {
   if( gid >= nEvents ){ return; }
 
@@ -80,64 +186,24 @@ kernel void compute_event_weights(
   uint dialCount = eventDialCounts[gid];
   for( uint iDial = 0 ; iDial < dialCount ; iDial++ ){
     uint packedDial = eventDialIndices[dialOffset + iDial];
-    float input = parameters[dialParameterIndices[packedDial]];
     float response = 1.0f;
-    uint dialType = dialTypes[packedDial];
-    if( dialType == kDialTypeNorm ){
-      response = input;
+    if( dialEvaluationModes[packedDial] == kDialEvalCached ){
+      response = cachedDialResponses[packedDial];
     }
-    else if( dialType == kDialTypeCompactSpline ){
-      uint splineOffset = dialSplineOffsets[packedDial];
-      uint splineSize = dialSplineSizes[packedDial];
-      response = evaluate_compact_spline(
-          input,
-          dialAllowExtrapolation[packedDial] != 0,
-          splineData + splineOffset,
-          splineSize - 2
+    else{
+      response = evaluate_packed_dial(
+          packedDial,
+          dialTypes,
+          dialParameterIndices,
+          dialSplineOffsets,
+          dialSplineSizes,
+          dialAllowExtrapolation,
+          splineData,
+          parameters,
+          dialMinResponses,
+          dialMaxResponses
       );
     }
-    else if( dialType == kDialTypeUniformSpline ){
-      uint splineOffset = dialSplineOffsets[packedDial];
-      uint splineSize = dialSplineSizes[packedDial];
-      response = evaluate_uniform_spline(
-          input,
-          dialAllowExtrapolation[packedDial] != 0,
-          splineData + splineOffset,
-          splineSize
-      );
-    }
-    else if( dialType == kDialTypeMonotonicSpline ){
-      uint splineOffset = dialSplineOffsets[packedDial];
-      uint splineSize = dialSplineSizes[packedDial];
-      response = evaluate_monotonic_spline(
-          input,
-          dialAllowExtrapolation[packedDial] != 0,
-          splineData + splineOffset,
-          splineSize - 2
-      );
-    }
-    else if( dialType == kDialTypeGeneralSpline ){
-      uint splineOffset = dialSplineOffsets[packedDial];
-      uint splineSize = dialSplineSizes[packedDial];
-      response = evaluate_general_spline(
-          input,
-          dialAllowExtrapolation[packedDial] != 0,
-          splineData + splineOffset,
-          splineSize
-      );
-    }
-    else if( dialType == kDialTypeGraph ){
-      uint splineOffset = dialSplineOffsets[packedDial];
-      uint splineSize = dialSplineSizes[packedDial];
-      response = evaluate_graph(
-          input,
-          dialAllowExtrapolation[packedDial] != 0,
-          splineData + splineOffset,
-          splineSize
-      );
-    }
-    response = max(response, dialMinResponses[packedDial]);
-    response = min(response, dialMaxResponses[packedDial]);
     weight *= response;
   }
   eventWeights[gid] = weight;
