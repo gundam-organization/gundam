@@ -126,6 +126,9 @@ private:
   bool _applyInfinitePenaltyOnOutOfBoundPar_{false};
   DataType _dataType_{DataType::Asimov};
   JsonType _toyParameterInjector_{};
+#ifdef GUNDAM_USING_BACKENDS
+  Propagator::BackendConfig _backendConfig_{};
+#endif
 
   // internals
   int _nbParameters_{0};

@@ -68,6 +68,12 @@ public:
   void buildDialCache();
 #ifdef GUNDAM_USING_BACKENDS
   void initializeBackend();
+  struct BackendConfig{
+    bool isEnabled{false};
+    std::string type{"CPU"};
+    std::vector<std::string> outputRequests{"Histograms"};
+  };
+  void configureBackend(const BackendConfig& backendConfig_);
 #endif
 
   /// Apply the current parameters and wait for it to finish.  This reweights
@@ -130,11 +136,6 @@ private:
   int _iThrow_{-1};
 
 #ifdef GUNDAM_USING_BACKENDS
-  struct BackendConfig{
-    bool isEnabled{false};
-    std::string type{"CPU"};
-    std::vector<std::string> outputRequests{"Histograms"};
-  };
   BackendConfig _backendConfig_{};
   Backends::PropagationRequest _backendPropagationRequest_{};
   std::shared_ptr<Backends::BackendManager> _backendManager_{nullptr};

@@ -24,6 +24,7 @@ void LikelihoodInterface::configureImpl(){
     {"jointProbabilityConfig"},
     {"plotGeneratorConfig"},
     {"eventTreeWriter"},
+    {"backendConfig"},
     {"enableStatThrowInToys"},
     {"gaussStatThrowInToys"},
     {"enableEventMcThrow"},
@@ -80,6 +81,25 @@ void LikelihoodInterface::configureImpl(){
   _config_.fillValue(_gaussStatThrowInToys_, "gaussStatThrowInToys");
   _config_.fillValue(_enableEventMcThrow_, "enableEventMcThrow");
   _config_.fillValue(_applyInfinitePenaltyOnOutOfBoundPar_, "applyInfinitePenaltyOnOutOfBoundPar");
+
+#ifdef GUNDAM_USING_BACKENDS
+  if( _config_.hasField("backendConfig") ){
+    auto backendConfig = _config_.fetchValue<ConfigReader>("backendConfig");
+    backendConfig.defineFields({
+      {"isEnabled", {"enabled"}},
+      {"type", {"backend", "name"}},
+      {"outputRequests", {"outputs"}},
+    });
+    backendConfig.fillValue(_backendConfig_.isEnabled, "isEnabled");
+    backendConfig.fillValue(_backendConfig_.type, "type");
+    backendConfig.fillValue(_backendConfig_.outputRequests, "outputRequests");
+    backendConfig.printUnusedKeys();
+  }
+#else
+  if( _config_.hasField("backendConfig") ){
+    LogWarning << "backendConfig was provided but GUNDAM was built without WITH_BACKENDS." << std::endl;
+  }
+#endif
 
 }
 void LikelihoodInterface::initializeImpl() {
@@ -355,6 +375,7 @@ void LikelihoodInterface::loadModelPropagator(){
   });
 
 #ifdef GUNDAM_USING_BACKENDS
+  _modelPropagator_.configureBackend(_backendConfig_);
   _modelPropagator_.initializeBackend();
 #endif
 

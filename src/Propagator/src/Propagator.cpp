@@ -64,8 +64,8 @@ void Propagator::configureImpl(){
     {"devSingleThreadReweight"},
     {"devSingleThreadHistFill"},
     {"globalEventReweightCap"},
-    {"backendConfig"},
     // relocated:
+    {FieldFlag::RELOCATED, "backendConfig", "likelihoodInterfaceConfig/backendConfig"},
     {FieldFlag::RELOCATED, "parameterSetListConfig", "parametersManagerConfig/parameterSetList"},
     {FieldFlag::RELOCATED, "throwToyParametersWithGlobalCov", "parametersManagerConfig"},
     {FieldFlag::RELOCATED, "enableStatThrowInToys", "likelihoodInterfaceConfig/enableStatThrowInToys"},
@@ -105,25 +105,6 @@ void Propagator::configureImpl(){
   _config_.fillValue(_devSingleThreadHistFill_, "devSingleThreadHistFill");
   _config_.fillValue(_eventDialCache_.getGlobalEventReweightCap().maxReweight, "globalEventReweightCap");
 
-#ifdef GUNDAM_USING_BACKENDS
-  if( _config_.hasField("backendConfig") ){
-    auto backendConfig = _config_.fetchValue<ConfigReader>("backendConfig");
-    backendConfig.defineFields({
-      {"isEnabled", {"enabled"}},
-      {"type", {"backend", "name"}},
-      {"outputRequests", {"outputs"}},
-    });
-    backendConfig.fillValue(_backendConfig_.isEnabled, "isEnabled");
-    backendConfig.fillValue(_backendConfig_.type, "type");
-    backendConfig.fillValue(_backendConfig_.outputRequests, "outputRequests");
-    backendConfig.printUnusedKeys();
-  }
-#else
-  if( _config_.hasField("backendConfig") ){
-    LogWarning << "backendConfig was provided but GUNDAM was built without WITH_BACKENDS." << std::endl;
-  }
-#endif
-
 }
 void Propagator::initializeImpl(){
 
@@ -160,6 +141,10 @@ void Propagator::buildDialCache(){
   _dialManager_.invalidateInputBuffers();
 }
 #ifdef GUNDAM_USING_BACKENDS
+void Propagator::configureBackend(const BackendConfig& backendConfig_){
+  _backendConfig_ = backendConfig_;
+}
+
 void Propagator::initializeBackend(){
   if( not _backendConfig_.isEnabled ){
     _backendManager_ = nullptr;
