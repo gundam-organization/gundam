@@ -400,6 +400,28 @@ kernel void finalize_histograms_from_partials(
     return std::chrono::duration<double>(std::chrono::steady_clock::now() - start_).count();
   }
 
+  bool isMpsSupportedDialType(const DialBase* dialBase_) {
+    return dynamic_cast<const Norm*>(dialBase_) != nullptr
+           or dynamic_cast<const CompactSpline*>(dialBase_) != nullptr
+           or dynamic_cast<const UniformSpline*>(dialBase_) != nullptr
+           or dynamic_cast<const MonotonicSpline*>(dialBase_) != nullptr;
+  }
+
+  void appendUnique(std::vector<std::string>& values_, const std::string& value_) {
+    if( std::find(values_.begin(), values_.end(), value_) == values_.end() ){
+      values_.emplace_back(value_);
+    }
+  }
+
+  std::string joinValues(const std::vector<std::string>& values_) {
+    std::string out;
+    for( std::size_t iValue = 0 ; iValue < values_.size() ; iValue++ ){
+      if( iValue != 0 ){ out += ", "; }
+      out += values_[iValue];
+    }
+    return out;
+  }
+
   id<MTLComputePipelineState> makePipeline(id<MTLDevice> device,
                                            id<MTLLibrary> library,
                                            NSString* functionName) {
@@ -623,6 +645,22 @@ struct Backends::MpsBackend::Impl {
       return fail("the backend model has no histogram bins.");
     }
 
+    std::vector<std::string> unsupportedDialTypes;
+    for( const auto& eventDial : model.eventDials ){
+      const auto* interface = eventDial.interface;
+      if( interface == nullptr or interface->getDialBaseRef() == nullptr ){
+        return fail("at least one event dial has no DialInterface/DialBase.");
+      }
+      const auto* dialBase = interface->getDialBaseRef();
+      if( not isMpsSupportedDialType(dialBase) ){
+        appendUnique(unsupportedDialTypes, dialBase->getDialTypeName());
+      }
+    }
+    if( not unsupportedDialTypes.empty() ){
+      return fail("unsupported MPS dial types present in propagator: " + joinValues(unsupportedDialTypes)
+                  + ". Supported types are Norm, CompactSpline, UniformSpline and MonotonicSpline.");
+    }
+
     std::vector<float> baseWeights(model.events.size());
     std::vector<uint32_t> eventDialOffsets(model.events.size());
     std::vector<uint32_t> eventDialCounts(model.events.size());
@@ -729,7 +767,7 @@ struct Backends::MpsBackend::Impl {
       }
       else{
         return fail("dial type " + dialBase->getDialTypeName()
-                    + " is not implemented in the MPS backend. Supported types are Norm, CompactSpline, UniformSpline and MonotonicSpline.");
+                    + " unexpectedly passed the MPS compatibility scan but has no device encoder.");
       }
 
       const auto* supervisor = interface->getResponseSupervisorRef();
