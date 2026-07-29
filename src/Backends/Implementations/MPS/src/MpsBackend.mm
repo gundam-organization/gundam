@@ -20,6 +20,8 @@
 #include <cmath>
 #include <cstring>
 #include <limits>
+#include <string>
+#include <utility>
 #include <vector>
 
 namespace {
@@ -410,6 +412,7 @@ struct Backends::MpsBackend::Impl {
   Result lastResult{};
   BackendTimingSummary lastTiming{};
   std::vector<float> parameterValuesScratch{};
+  std::string deviceModelFallbackReason{};
   std::uint64_t nextTokenId{1};
   bool isBuilt{false};
 
@@ -543,9 +546,20 @@ struct Backends::MpsBackend::Impl {
   bool buildDeviceModel() {
     releaseDeviceBuffers();
     isDeviceModelSupported = false;
+    deviceModelFallbackReason.clear();
 
-    if( not isAvailable ){ return false; }
-    if( model.events.empty() or model.totalBins <= 0 ){ return false; }
+    auto fail = [this](std::string reason_) {
+      deviceModelFallbackReason = std::move(reason_);
+      return false;
+    };
+
+    if( not isAvailable ){ return fail("Metal is not available."); }
+    if( model.events.empty() ){
+      return fail("the backend model has no events.");
+    }
+    if( model.totalBins <= 0 ){
+      return fail("the backend model has no histogram bins.");
+    }
 
     std::vector<float> baseWeights(model.events.size());
     std::vector<uint32_t> eventDialOffsets(model.events.size());
@@ -562,7 +576,9 @@ struct Backends::MpsBackend::Impl {
     std::vector<float> splineData{};
 
     for( const auto& event : model.events ){
-      if( event.globalBinIndex < 0 or event.globalBinIndex >= model.totalBins ){ return false; }
+      if( event.globalBinIndex < 0 or event.globalBinIndex >= model.totalBins ){
+        return fail("at least one event has an invalid global bin index.");
+      }
       baseWeights[event.resultIndex] = float(event.baseWeight);
       eventDialOffsets[event.resultIndex] = uint32_t(event.firstDial);
       eventDialCounts[event.resultIndex] = uint32_t(event.dialCount);
@@ -593,17 +609,21 @@ struct Backends::MpsBackend::Impl {
     for( std::size_t iDial = 0 ; iDial < model.eventDials.size() ; iDial++ ){
       const auto* interface = model.eventDials[iDial].interface;
       if( interface == nullptr or interface->getDialBaseRef() == nullptr ){
-        return false;
+        return fail("at least one event dial has no DialInterface/DialBase.");
       }
       const auto* dialBase = interface->getDialBaseRef();
 
       const auto* inputBuffer = interface->getInputBufferRef();
       if( inputBuffer == nullptr or inputBuffer->getBufferSize() != 1 ){
-        return false;
+        return fail("dial type " + dialBase->getDialTypeName()
+                    + " is not MPS-compatible because it does not have exactly one input parameter.");
       }
 
       int parameterIndex = findParameterIndex(&inputBuffer->getParameter(0));
-      if( parameterIndex < 0 ){ return false; }
+      if( parameterIndex < 0 ){
+        return fail("dial type " + dialBase->getDialTypeName()
+                    + " references a parameter missing from the backend parameter table.");
+      }
       dialParameterIndices[iDial] = uint32_t(parameterIndex);
 
       if( dynamic_cast<const Norm*>(dialBase) != nullptr ){
@@ -611,7 +631,9 @@ struct Backends::MpsBackend::Impl {
       }
       else if( dynamic_cast<const CompactSpline*>(dialBase) != nullptr ){
         const auto& data = dialBase->getDialData();
-        if( data.size() < 6 ){ return false; }
+        if( data.size() < 6 ){
+          return fail("CompactSpline dial data is too small for MPS evaluation.");
+        }
         dialTypes[iDial] = kMpsDialTypeCompactSpline;
         dialSplineOffsets[iDial] = uint32_t(splineData.size());
         dialSplineSizes[iDial] = uint32_t(data.size());
@@ -621,7 +643,9 @@ struct Backends::MpsBackend::Impl {
       }
       else if( dynamic_cast<const UniformSpline*>(dialBase) != nullptr ){
         const auto& data = dialBase->getDialData();
-        if( data.size() < 8 ){ return false; }
+        if( data.size() < 8 ){
+          return fail("UniformSpline dial data is too small for MPS evaluation.");
+        }
         dialTypes[iDial] = kMpsDialTypeUniformSpline;
         dialSplineOffsets[iDial] = uint32_t(splineData.size());
         dialSplineSizes[iDial] = uint32_t(data.size());
@@ -630,7 +654,8 @@ struct Backends::MpsBackend::Impl {
         for( auto value : data ){ splineData.emplace_back(float(value)); }
       }
       else{
-        return false;
+        return fail("dial type " + dialBase->getDialTypeName()
+                    + " is not implemented in the MPS backend. Supported types are Norm, CompactSpline and UniformSpline.");
       }
 
       const auto* supervisor = interface->getResponseSupervisorRef();
@@ -695,7 +720,7 @@ struct Backends::MpsBackend::Impl {
         or totalBinsBuffer == nil or maxHistogramChunksPerBinBuffer == nil
         or histogramChunkSizeBuffer == nil ){
       releaseDeviceBuffers();
-      return false;
+      return fail("Metal buffer allocation failed while building the MPS backend model.");
     }
 
     parameterValuesScratch.resize(model.parameters.size());
@@ -1021,7 +1046,13 @@ Backends::BackendCapabilities Backends::MpsBackend::getCapabilities() const {
 void Backends::MpsBackend::build(const BackendModel& model_) {
   _impl_->model = model_;
   _impl_->lastResult = Impl::Result();
-  _impl_->buildDeviceModel();
+  if( not _impl_->buildDeviceModel() ){
+    LogWarning << "MPS backend cannot use the GPU propagation path: "
+               << (_impl_->deviceModelFallbackReason.empty() ? "unknown compatibility issue."
+                                                             : _impl_->deviceModelFallbackReason)
+               << " Falling back to the standard backend path for unsupported calculations."
+               << std::endl;
+  }
   _impl_->isBuilt = true;
 }
 
