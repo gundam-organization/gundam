@@ -6,6 +6,7 @@ import time
 from array import array
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Optional
 
 
 def flush_python_outputs() -> None:
@@ -33,14 +34,47 @@ def write_input_root_file(root_path: Path, nb_events: int) -> None:
         tree.extend({"X": x_values, "C": c_values})
 
 
-def build_config_text(root_path: Path, enable_backend: bool) -> str:
+def load_gundam_module():
+    repo_root = Path(__file__).resolve().parents[2]
+    for build_dir in ("cmake-build-debug", "cmake-build-release"):
+        python_module_dir = repo_root / build_dir / "src" / "PythonInterface"
+        if python_module_dir.exists():
+            sys.path.insert(0, str(python_module_dir))
+            break
+
+    import GUNDAM
+
+    return GUNDAM
+
+
+@dataclass
+class BenchmarkContext:
+    engine: object
+    likelihood_interface: object
+
+
+@dataclass
+class BenchmarkCase:
+    name: str
+    output_requests: list[str]
+
+
+@dataclass
+class BenchmarkTiming:
+    name: str
+    output_requests: list[str]
+    elapsed: float
+    speedup: float
+
+
+def build_config_text(root_path: Path, output_requests: Optional[list[str]] = None) -> str:
     backend_config = ""
-    if enable_backend:
-        backend_config = """
+    if output_requests is not None:
+        backend_config = f"""
     backendConfig:
       isEnabled: true
       type: CPU
-      outputRequests: [Histograms]
+      outputRequests: [{", ".join(output_requests)}]
 """
 
     return f"""
@@ -95,25 +129,6 @@ fitterEngineConfig:
                 dialInputList:
                   - name: "Negative_C"
 """
-
-
-def load_gundam_module():
-    repo_root = Path(__file__).resolve().parents[2]
-    for build_dir in ("cmake-build-debug", "cmake-build-release"):
-        python_module_dir = repo_root / build_dir / "src" / "PythonInterface"
-        if python_module_dir.exists():
-            sys.path.insert(0, str(python_module_dir))
-            break
-
-    import GUNDAM
-
-    return GUNDAM
-
-
-@dataclass
-class BenchmarkContext:
-    engine: object
-    likelihood_interface: object
 
 
 def build_likelihood_interface(config_text: str, work_dir: Path):
@@ -195,6 +210,31 @@ def compare_results(standard_results, backend_results) -> None:
         raise RuntimeError("All benchmark LLH values are zero.")
 
 
+def print_timing_table(timings: list[BenchmarkTiming]) -> None:
+    rows = [
+        (
+            timing.name,
+            ", ".join(timing.output_requests) if timing.output_requests else "standard",
+            f"{timing.elapsed:.6f}",
+            "1.000" if timing.speedup == 1.0 else f"{timing.speedup:.3f}",
+        )
+        for timing in timings
+    ]
+    headers = ("Case", "Requested outputs", "Time [s]", "Speedup")
+    widths = [
+        max(len(headers[i_col]), *(len(row[i_col]) for row in rows))
+        for i_col in range(len(headers))
+    ]
+
+    def format_row(row) -> str:
+        return " | ".join(str(value).ljust(widths[i_col]) for i_col, value in enumerate(row))
+
+    print(format_row(headers))
+    print("-+-".join("-" * width for width in widths))
+    for row in rows:
+        print(format_row(row))
+
+
 def main() -> int:
     script_dir = Path(sys.argv[1]).resolve() if len(sys.argv) > 1 else Path(__file__).resolve().parent
     work_dir = Path.cwd()
@@ -216,20 +256,46 @@ def main() -> int:
         (1.6, 3.6),
     ]
 
-    standard_interface = build_likelihood_interface(build_config_text(root_path, False), work_dir)
-    backend_interface = build_likelihood_interface(build_config_text(root_path, True), work_dir)
+    benchmark_cases = [
+        BenchmarkCase("backend histograms", ["Histograms"]),
+        BenchmarkCase("backend event weights", ["EventWeights"]),
+        BenchmarkCase("backend likelihood", ["Likelihood"]),
+        BenchmarkCase("backend weights+hist", ["EventWeights", "Histograms"]),
+        BenchmarkCase("backend hist+llh", ["Histograms", "Likelihood"]),
+    ]
 
+    standard_interface = build_likelihood_interface(build_config_text(root_path), work_dir)
     standard_elapsed, standard_results = benchmark(standard_interface, parameter_points)
-    backend_elapsed, backend_results = benchmark(backend_interface, parameter_points)
-    compare_results(standard_results, backend_results)
 
-    speedup = standard_elapsed / backend_elapsed if backend_elapsed > 0 else float("inf")
+    timings = [
+        BenchmarkTiming(
+            name="standard",
+            output_requests=[],
+            elapsed=standard_elapsed,
+            speedup=1.0,
+        )
+    ]
+
+    for benchmark_case in benchmark_cases:
+        backend_interface = build_likelihood_interface(
+            build_config_text(root_path, benchmark_case.output_requests),
+            work_dir,
+        )
+        backend_elapsed, backend_results = benchmark(backend_interface, parameter_points)
+        compare_results(standard_results, backend_results)
+        timings.append(
+            BenchmarkTiming(
+                name=benchmark_case.name,
+                output_requests=benchmark_case.output_requests,
+                elapsed=backend_elapsed,
+                speedup=standard_elapsed / backend_elapsed if backend_elapsed > 0 else float("inf"),
+            )
+        )
+
     print(f"Benchmark events: 120000")
     print(f"Benchmark parameter points: {len(parameter_points)}")
-    print(f"Standard propagation time: {standard_elapsed:.6f} s")
-    print(f"CPU backend propagation time: {backend_elapsed:.6f} s")
-    print(f"CPU backend speedup: {speedup:.3f}x")
-    print("SUCCESS: CPU backend benchmark matches standard propagation.")
+    print_timing_table(timings)
+    print("SUCCESS: CPU backend benchmark cases match standard propagation.")
     return 0
 
 
