@@ -13,6 +13,7 @@ namespace Backends {
     bool isEnabled{false};
     std::string type{"CPU"};
     std::vector<OutputRequest> outputRequests{OutputRequest::Histograms};
+    std::vector<OutputRequest> materializeOutputRequests{};
 
     [[nodiscard]] PropagationRequest makePropagationRequest() const;
 

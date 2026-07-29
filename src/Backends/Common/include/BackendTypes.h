@@ -2,6 +2,7 @@
 #define GUNDAM_BACKEND_TYPES_H
 
 #include <cstdint>
+#include <cstddef>
 #include <string>
 #include <vector>
 
@@ -49,9 +50,33 @@ namespace Backends {
 
   struct PropagationRequest {
     std::vector<OutputRequest> outputs{};
+    std::vector<OutputRequest> materializeOutputs{};
     bool allowAsync{true};
 
     [[nodiscard]] bool has(OutputRequest request_) const;
+    [[nodiscard]] bool shouldMaterialize(OutputRequest request_) const;
+  };
+
+  struct BackendDeviceView {
+    const void* device{nullptr};
+    const void* eventWeights{nullptr};
+    std::size_t eventWeightsBytes{0};
+    const void* histSums{nullptr};
+    const void* histSumSquares{nullptr};
+    std::size_t histogramBytes{0};
+  };
+
+  struct BackendTimingSummary {
+    double parameterUploadSeconds{0};
+    double commandEncodeSeconds{0};
+    double deviceWaitSeconds{0};
+    double histogramReadbackSeconds{0};
+    double eventWeightReadbackSeconds{0};
+    double eventWeightMaterializationSeconds{0};
+    double histogramMaterializationSeconds{0};
+    double likelihoodHostSeconds{0};
+    std::size_t histogramReadbackBytes{0};
+    std::size_t eventWeightReadbackBytes{0};
   };
 
   struct PropagationToken {

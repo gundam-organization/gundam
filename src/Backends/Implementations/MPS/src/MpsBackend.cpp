@@ -54,3 +54,11 @@ double Backends::MpsBackend::getLikelihood(const PropagationToken&) const {
   LogThrow("MpsBackend likelihood is unavailable on this platform.");
   return 0;
 }
+
+Backends::BackendDeviceView Backends::MpsBackend::getDeviceView(const PropagationToken&) const {
+  return {};
+}
+
+Backends::BackendTimingSummary Backends::MpsBackend::getLastTimingSummary() const {
+  return {};
+}

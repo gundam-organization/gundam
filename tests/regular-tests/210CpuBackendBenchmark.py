@@ -57,6 +57,7 @@ class BenchmarkContext:
 class BenchmarkCase:
     name: str
     output_requests: list[str]
+    materialize_output_requests: Optional[list[str]] = None
 
 
 @dataclass
@@ -67,14 +68,22 @@ class BenchmarkTiming:
     speedup: float
 
 
-def build_config_text(root_path: Path, output_requests: Optional[list[str]] = None) -> str:
+def build_config_text(
+    root_path: Path,
+    output_requests: Optional[list[str]] = None,
+    materialize_output_requests: Optional[list[str]] = None,
+) -> str:
     backend_config = ""
     if output_requests is not None:
+        materialize_config = ""
+        if materialize_output_requests is not None:
+            materialize_config = f"""
+      materializeOutputRequests: [{", ".join(materialize_output_requests)}]"""
         backend_config = f"""
     backendConfig:
       isEnabled: true
       type: CPU
-      outputRequests: [{", ".join(output_requests)}]
+      outputRequests: [{", ".join(output_requests)}]{materialize_config}
 """
 
     return f"""

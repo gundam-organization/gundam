@@ -14,6 +14,7 @@
 #import <Metal/Metal.h>
 
 #include <algorithm>
+#include <chrono>
 #include <cmath>
 #include <cstring>
 #include <limits>
@@ -162,16 +163,55 @@ kernel void finalize_histograms_from_partials(
 )METAL";
 
   template<typename T>
-  id<MTLBuffer> makeBuffer(id<MTLDevice> device, const std::vector<T>& values) {
+  id<MTLBuffer> makeSharedBuffer(id<MTLDevice> device, const std::vector<T>& values) {
     if( values.empty() ){ return nil; }
     return [device newBufferWithBytes:values.data()
                                length:values.size() * sizeof(T)
                               options:MTLResourceStorageModeShared];
   }
 
-  id<MTLBuffer> makeEmptyBuffer(id<MTLDevice> device, std::size_t byteSize) {
+  id<MTLBuffer> makeSharedEmptyBuffer(id<MTLDevice> device, std::size_t byteSize) {
     if( byteSize == 0 ){ return nil; }
     return [device newBufferWithLength:byteSize options:MTLResourceStorageModeShared];
+  }
+
+  id<MTLBuffer> makePrivateEmptyBuffer(id<MTLDevice> device, std::size_t byteSize) {
+    if( byteSize == 0 ){ return nil; }
+    return [device newBufferWithLength:byteSize options:MTLResourceStorageModePrivate];
+  }
+
+  template<typename T>
+  id<MTLBuffer> makePrivateBuffer(id<MTLDevice> device,
+                                  id<MTLCommandQueue> commandQueue,
+                                  const std::vector<T>& values) {
+    if( values.empty() ){ return nil; }
+    std::size_t byteSize = values.size() * sizeof(T);
+    id<MTLBuffer> privateBuffer = makePrivateEmptyBuffer(device, byteSize);
+    id<MTLBuffer> stagingBuffer = [device newBufferWithBytes:values.data()
+                                                      length:byteSize
+                                                     options:MTLResourceStorageModeShared];
+    if( privateBuffer == nil or stagingBuffer == nil ){
+      [privateBuffer release];
+      [stagingBuffer release];
+      return nil;
+    }
+
+    id<MTLCommandBuffer> commandBuffer = [commandQueue commandBuffer];
+    id<MTLBlitCommandEncoder> encoder = [commandBuffer blitCommandEncoder];
+    [encoder copyFromBuffer:stagingBuffer
+               sourceOffset:0
+                   toBuffer:privateBuffer
+          destinationOffset:0
+                       size:byteSize];
+    [encoder endEncoding];
+    [commandBuffer commit];
+    [commandBuffer waitUntilCompleted];
+    [stagingBuffer release];
+    if( commandBuffer.status != MTLCommandBufferStatusCompleted ){
+      [privateBuffer release];
+      return nil;
+    }
+    return privateBuffer;
   }
 
   void releaseBuffer(id<MTLBuffer>& buffer) {
@@ -183,6 +223,10 @@ kernel void finalize_histograms_from_partials(
   void copyToBuffer(id<MTLBuffer> buffer, const std::vector<T>& values) {
     if( buffer == nil or values.empty() ){ return; }
     std::memcpy(buffer.contents, values.data(), values.size() * sizeof(T));
+  }
+
+  [[nodiscard]] double secondsSince(std::chrono::steady_clock::time_point start_) {
+    return std::chrono::duration<double>(std::chrono::steady_clock::now() - start_).count();
   }
 
   id<MTLComputePipelineState> makePipeline(id<MTLDevice> device,
@@ -241,6 +285,9 @@ struct Backends::MpsBackend::Impl {
   id<MTLBuffer> partialHistSumSquaresBuffer{nil};
   id<MTLBuffer> histSumsBuffer{nil};
   id<MTLBuffer> histSumSquaresBuffer{nil};
+  id<MTLBuffer> eventWeightsReadbackBuffer{nil};
+  id<MTLBuffer> histSumsReadbackBuffer{nil};
+  id<MTLBuffer> histSumSquaresReadbackBuffer{nil};
   id<MTLBuffer> nEventsBuffer{nil};
   id<MTLBuffer> totalBinsBuffer{nil};
   id<MTLBuffer> maxHistogramChunksPerBinBuffer{nil};
@@ -249,6 +296,8 @@ struct Backends::MpsBackend::Impl {
   BackendModel model{};
   BackendLikelihoodModel likelihoodModel{};
   Result lastResult{};
+  BackendTimingSummary lastTiming{};
+  std::vector<float> parameterValuesScratch{};
   std::uint64_t nextTokenId{1};
   bool isBuilt{false};
 
@@ -324,6 +373,9 @@ struct Backends::MpsBackend::Impl {
     releaseBuffer(partialHistSumSquaresBuffer);
     releaseBuffer(histSumsBuffer);
     releaseBuffer(histSumSquaresBuffer);
+    releaseBuffer(eventWeightsReadbackBuffer);
+    releaseBuffer(histSumsReadbackBuffer);
+    releaseBuffer(histSumSquaresReadbackBuffer);
     releaseBuffer(nEventsBuffer);
     releaseBuffer(totalBinsBuffer);
     releaseBuffer(maxHistogramChunksPerBinBuffer);
@@ -343,6 +395,7 @@ struct Backends::MpsBackend::Impl {
     lastResult.histSums.clear();
     lastResult.histSumSquares.clear();
     lastResult.likelihood = 0;
+    lastTiming = BackendTimingSummary();
 
     for( auto request : request_.outputs ){
       lastResult.status.state(request) = OutputState::Scheduled;
@@ -446,21 +499,24 @@ struct Backends::MpsBackend::Impl {
     uint32_t chunkSize = histogramChunkSize;
     uint32_t totalPartials = totalBins * maxHistogramChunksPerBin;
 
-    baseWeightsBuffer = makeBuffer(device, baseWeights);
-    eventDialOffsetsBuffer = makeBuffer(device, eventDialOffsets);
-    eventDialCountsBuffer = makeBuffer(device, eventDialCounts);
-    globalBinsBuffer = makeBuffer(device, globalBins);
-    binEventOffsetsBuffer = makeBuffer(device, binEventOffsets);
-    binEventIndicesBuffer = makeBuffer(device, binEventIndices);
-    normParameterIndicesBuffer = makeBuffer(device, normParameterIndices);
-    normMinResponsesBuffer = makeBuffer(device, normMinResponses);
-    normMaxResponsesBuffer = makeBuffer(device, normMaxResponses);
-    eventWeightsBuffer = makeEmptyBuffer(device, model.events.size() * sizeof(float));
-    parametersBuffer = makeEmptyBuffer(device, model.parameters.size() * sizeof(float));
-    partialHistSumsBuffer = makeEmptyBuffer(device, std::size_t(totalPartials) * sizeof(float));
-    partialHistSumSquaresBuffer = makeEmptyBuffer(device, std::size_t(totalPartials) * sizeof(float));
-    histSumsBuffer = makeEmptyBuffer(device, std::size_t(model.totalBins) * sizeof(float));
-    histSumSquaresBuffer = makeEmptyBuffer(device, std::size_t(model.totalBins) * sizeof(float));
+    baseWeightsBuffer = makePrivateBuffer(device, commandQueue, baseWeights);
+    eventDialOffsetsBuffer = makePrivateBuffer(device, commandQueue, eventDialOffsets);
+    eventDialCountsBuffer = makePrivateBuffer(device, commandQueue, eventDialCounts);
+    globalBinsBuffer = makePrivateBuffer(device, commandQueue, globalBins);
+    binEventOffsetsBuffer = makePrivateBuffer(device, commandQueue, binEventOffsets);
+    binEventIndicesBuffer = makePrivateBuffer(device, commandQueue, binEventIndices);
+    normParameterIndicesBuffer = makePrivateBuffer(device, commandQueue, normParameterIndices);
+    normMinResponsesBuffer = makePrivateBuffer(device, commandQueue, normMinResponses);
+    normMaxResponsesBuffer = makePrivateBuffer(device, commandQueue, normMaxResponses);
+    eventWeightsBuffer = makePrivateEmptyBuffer(device, model.events.size() * sizeof(float));
+    eventWeightsReadbackBuffer = makeSharedEmptyBuffer(device, model.events.size() * sizeof(float));
+    parametersBuffer = makeSharedEmptyBuffer(device, model.parameters.size() * sizeof(float));
+    partialHistSumsBuffer = makePrivateEmptyBuffer(device, std::size_t(totalPartials) * sizeof(float));
+    partialHistSumSquaresBuffer = makePrivateEmptyBuffer(device, std::size_t(totalPartials) * sizeof(float));
+    histSumsBuffer = makePrivateEmptyBuffer(device, std::size_t(model.totalBins) * sizeof(float));
+    histSumSquaresBuffer = makePrivateEmptyBuffer(device, std::size_t(model.totalBins) * sizeof(float));
+    histSumsReadbackBuffer = makeSharedEmptyBuffer(device, std::size_t(model.totalBins) * sizeof(float));
+    histSumSquaresReadbackBuffer = makeSharedEmptyBuffer(device, std::size_t(model.totalBins) * sizeof(float));
     nEventsBuffer = [device newBufferWithBytes:&nEvents length:sizeof(nEvents) options:MTLResourceStorageModeShared];
     totalBinsBuffer = [device newBufferWithBytes:&totalBins length:sizeof(totalBins) options:MTLResourceStorageModeShared];
     maxHistogramChunksPerBinBuffer = [device newBufferWithBytes:&maxHistogramChunksPerBin
@@ -475,23 +531,29 @@ struct Backends::MpsBackend::Impl {
         or normParameterIndicesBuffer == nil or normMinResponsesBuffer == nil
         or normMaxResponsesBuffer == nil or eventWeightsBuffer == nil or parametersBuffer == nil
         or partialHistSumsBuffer == nil or partialHistSumSquaresBuffer == nil
-        or histSumsBuffer == nil or histSumSquaresBuffer == nil or nEventsBuffer == nil
+        or histSumsBuffer == nil or histSumSquaresBuffer == nil or eventWeightsReadbackBuffer == nil
+        or histSumsReadbackBuffer == nil or histSumSquaresReadbackBuffer == nil or nEventsBuffer == nil
         or totalBinsBuffer == nil or maxHistogramChunksPerBinBuffer == nil
         or histogramChunkSizeBuffer == nil ){
       releaseDeviceBuffers();
       return false;
     }
 
+    parameterValuesScratch.resize(model.parameters.size());
     isDeviceModelSupported = true;
     return true;
   }
 
   void updateDeviceParameters() {
-    std::vector<float> parameterValues(model.parameters.size());
-    for( std::size_t iPar = 0 ; iPar < model.parameters.size() ; iPar++ ){
-      parameterValues[iPar] = float(model.parameters[iPar]->getParameterValue());
+    auto start = std::chrono::steady_clock::now();
+    if( parameterValuesScratch.size() != model.parameters.size() ){
+      parameterValuesScratch.resize(model.parameters.size());
     }
-    copyToBuffer(parametersBuffer, parameterValues);
+    for( std::size_t iPar = 0 ; iPar < model.parameters.size() ; iPar++ ){
+      parameterValuesScratch[iPar] = float(model.parameters[iPar]->getParameterValue());
+    }
+    copyToBuffer(parametersBuffer, parameterValuesScratch);
+    lastTiming.parameterUploadSeconds += secondsSince(start);
   }
 
   bool encodeNormEventWeights(id<MTLComputeCommandEncoder> encoder) {
@@ -550,6 +612,7 @@ struct Backends::MpsBackend::Impl {
     if( not isDeviceModelSupported ){ return false; }
     updateDeviceParameters();
 
+    auto encodeStart = std::chrono::steady_clock::now();
     id<MTLCommandBuffer> commandBuffer = [commandQueue commandBuffer];
     id<MTLComputeCommandEncoder> encoder = [commandBuffer computeCommandEncoder];
     if( not encodeNormEventWeights(encoder) ){
@@ -561,22 +624,43 @@ struct Backends::MpsBackend::Impl {
       return false;
     }
     [encoder endEncoding];
+    if( needHistograms_ ){
+      id<MTLBlitCommandEncoder> blitEncoder = [commandBuffer blitCommandEncoder];
+      std::size_t histogramBytes = std::size_t(model.totalBins) * sizeof(float);
+      [blitEncoder copyFromBuffer:histSumsBuffer
+                     sourceOffset:0
+                         toBuffer:histSumsReadbackBuffer
+                destinationOffset:0
+                             size:histogramBytes];
+      [blitEncoder copyFromBuffer:histSumSquaresBuffer
+                     sourceOffset:0
+                         toBuffer:histSumSquaresReadbackBuffer
+                destinationOffset:0
+                             size:histogramBytes];
+      [blitEncoder endEncoding];
+      lastTiming.histogramReadbackBytes += 2 * histogramBytes;
+    }
     [commandBuffer commit];
+    lastTiming.commandEncodeSeconds += secondsSince(encodeStart);
+    auto waitStart = std::chrono::steady_clock::now();
     [commandBuffer waitUntilCompleted];
+    lastTiming.deviceWaitSeconds += secondsSince(waitStart);
 
     if( commandBuffer.status != MTLCommandBufferStatusCompleted ){
       return false;
     }
 
     if( needHistograms_ ){
-      auto* histSums = static_cast<float*>(histSumsBuffer.contents);
-      auto* histSumSquares = static_cast<float*>(histSumSquaresBuffer.contents);
+      auto readbackStart = std::chrono::steady_clock::now();
+      auto* histSums = static_cast<float*>(histSumsReadbackBuffer.contents);
+      auto* histSumSquares = static_cast<float*>(histSumSquaresReadbackBuffer.contents);
       lastResult.histSums.resize(model.totalBins);
       lastResult.histSumSquares.resize(model.totalBins);
       for( int iBin = 0 ; iBin < model.totalBins ; iBin++ ){
         lastResult.histSums[iBin] = histSums[iBin];
         lastResult.histSumSquares[iBin] = histSumSquares[iBin];
       }
+      lastTiming.histogramReadbackSeconds += secondsSince(readbackStart);
     }
 
     return true;
@@ -584,11 +668,28 @@ struct Backends::MpsBackend::Impl {
 
   void copyDeviceEventWeightsToHostResult() {
     LogThrowIf(eventWeightsBuffer == nil);
-    auto* weights = static_cast<float*>(eventWeightsBuffer.contents);
+    auto start = std::chrono::steady_clock::now();
+    id<MTLCommandBuffer> commandBuffer = [commandQueue commandBuffer];
+    id<MTLBlitCommandEncoder> encoder = [commandBuffer blitCommandEncoder];
+    std::size_t byteSize = model.events.size() * sizeof(float);
+    [encoder copyFromBuffer:eventWeightsBuffer
+               sourceOffset:0
+                   toBuffer:eventWeightsReadbackBuffer
+          destinationOffset:0
+                       size:byteSize];
+    [encoder endEncoding];
+    [commandBuffer commit];
+    [commandBuffer waitUntilCompleted];
+    LogThrowIf(commandBuffer.status != MTLCommandBufferStatusCompleted,
+               "Could not copy MPS event weights back to host.");
+    lastTiming.eventWeightReadbackBytes += byteSize;
+
+    auto* weights = static_cast<float*>(eventWeightsReadbackBuffer.contents);
     lastResult.eventWeights.resize(model.events.size());
     for( const auto& event : model.events ){
       lastResult.eventWeights[event.resultIndex] = weights[event.resultIndex];
     }
+    lastTiming.eventWeightReadbackSeconds += secondsSince(start);
   }
 
   void calculateEventWeights() {
@@ -626,8 +727,8 @@ struct Backends::MpsBackend::Impl {
       globalBins[event.resultIndex] = event.globalBinIndex;
     }
 
-    auto eventWeightsBuffer = makeBuffer(device, eventWeightsFloat);
-    auto globalBinsBuffer = makeBuffer(device, globalBins);
+    auto eventWeightsBuffer = makeSharedBuffer(device, eventWeightsFloat);
+    auto globalBinsBuffer = makeSharedBuffer(device, globalBins);
     auto histSumsBuffer = [device newBufferWithLength:std::size_t(model.totalBins) * sizeof(float)
                                               options:MTLResourceStorageModeShared];
     auto histSumSquaresBuffer = [device newBufferWithLength:std::size_t(model.totalBins) * sizeof(float)
@@ -689,6 +790,7 @@ struct Backends::MpsBackend::Impl {
   }
 
   void calculateLikelihood() {
+    auto start = std::chrono::steady_clock::now();
     lastResult.likelihood = 0;
     for( const auto& sample : likelihoodModel.samples ){
       for( int iBin = 0 ; iBin < int(sample.dataSums.size()) ; iBin++ ){
@@ -699,19 +801,23 @@ struct Backends::MpsBackend::Impl {
         lastResult.likelihood += sample.evalBin(sample.dataSums[iBin], pred, predErr, iBin);
       }
     }
+    lastTiming.likelihoodHostSeconds += secondsSince(start);
   }
 
   void materializeEventWeights() {
     if( lastResult.eventWeights.empty() and eventWeightsBuffer != nil ){
       copyDeviceEventWeightsToHostResult();
     }
+    auto start = std::chrono::steady_clock::now();
     LogThrowIf(lastResult.eventWeights.size() != model.events.size());
     for( const auto& event : model.events ){
       event.event->getWeights().current = lastResult.eventWeights[event.resultIndex];
     }
+    lastTiming.eventWeightMaterializationSeconds += secondsSince(start);
   }
 
   void materializeHistograms() {
+    auto start = std::chrono::steady_clock::now();
     LogThrowIf(lastResult.histSums.size() != std::size_t(model.totalBins));
     LogThrowIf(lastResult.histSumSquares.size() != std::size_t(model.totalBins));
 
@@ -731,6 +837,7 @@ struct Backends::MpsBackend::Impl {
         binContent.sqrtSumSqWeights = std::sqrt(lastResult.histSumSquares[globalBin]);
       }
     }
+    lastTiming.histogramMaterializationSeconds += secondsSince(start);
   }
 };
 
@@ -883,4 +990,20 @@ double Backends::MpsBackend::getLikelihood(const PropagationToken& token_) const
              and _impl_->lastResult.status.likelihood != OutputState::ReadyOnHost,
              "Backend likelihood is not ready.");
   return _impl_->lastResult.likelihood;
+}
+
+Backends::BackendDeviceView Backends::MpsBackend::getDeviceView(const PropagationToken& token_) const {
+  LogThrowIf(not _impl_->isCurrentToken(token_), "Invalid MpsBackend propagation token.");
+  BackendDeviceView out;
+  out.device = _impl_->device;
+  out.eventWeights = _impl_->eventWeightsBuffer;
+  out.eventWeightsBytes = _impl_->model.events.size() * sizeof(float);
+  out.histSums = _impl_->histSumsBuffer;
+  out.histSumSquares = _impl_->histSumSquaresBuffer;
+  out.histogramBytes = std::size_t(_impl_->model.totalBins) * sizeof(float);
+  return out;
+}
+
+Backends::BackendTimingSummary Backends::MpsBackend::getLastTimingSummary() const {
+  return _impl_->lastTiming;
 }

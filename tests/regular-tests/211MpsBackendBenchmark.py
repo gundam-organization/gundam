@@ -15,8 +15,13 @@ def load_cpu_benchmark_module():
     return module
 
 
-def build_mps_config_text(cpu_benchmark, root_path: Path, output_requests: list[str] | None = None) -> str:
-    config_text = cpu_benchmark.build_config_text(root_path, output_requests)
+def build_mps_config_text(
+    cpu_benchmark,
+    root_path: Path,
+    output_requests: list[str] | None = None,
+    materialize_output_requests: list[str] | None = None,
+) -> str:
+    config_text = cpu_benchmark.build_config_text(root_path, output_requests, materialize_output_requests)
     if output_requests is not None:
         config_text = config_text.replace("type: CPU", "type: MPS")
     return config_text
@@ -86,8 +91,10 @@ def main() -> int:
     benchmark_cases = [
         cpu_benchmark.BenchmarkCase("mps histograms", ["Histograms"]),
         cpu_benchmark.BenchmarkCase("mps event weights", ["EventWeights"]),
+        cpu_benchmark.BenchmarkCase("mps weights device-only", ["EventWeights", "Histograms"], ["Histograms"]),
         cpu_benchmark.BenchmarkCase("mps likelihood only", ["Likelihood"]),
         cpu_benchmark.BenchmarkCase("mps weights+hist", ["EventWeights", "Histograms"]),
+        cpu_benchmark.BenchmarkCase("mps weights+hist no weights copy", ["EventWeights", "Histograms"], ["Histograms"]),
         cpu_benchmark.BenchmarkCase("mps hist+llh", ["Histograms", "Likelihood"]),
     ]
 
@@ -108,7 +115,12 @@ def main() -> int:
 
     for benchmark_case in benchmark_cases:
         backend_interface = cpu_benchmark.build_likelihood_interface(
-            build_mps_config_text(cpu_benchmark, root_path, benchmark_case.output_requests),
+            build_mps_config_text(
+                cpu_benchmark,
+                root_path,
+                benchmark_case.output_requests,
+                benchmark_case.materialize_output_requests,
+            ),
             work_dir,
         )
         backend_elapsed, backend_results = cpu_benchmark.benchmark(backend_interface, parameter_points)

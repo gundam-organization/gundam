@@ -29,6 +29,13 @@ bool Backends::PropagationRequest::has(OutputRequest request_) const {
   return std::find(outputs.begin(), outputs.end(), request_) != outputs.end();
 }
 
+bool Backends::PropagationRequest::shouldMaterialize(OutputRequest request_) const {
+  if( materializeOutputs.empty() ){
+    return has(request_);
+  }
+  return std::find(materializeOutputs.begin(), materializeOutputs.end(), request_) != materializeOutputs.end();
+}
+
 Backends::OutputState& Backends::PropagationStatus::state(OutputRequest request_) {
   switch( request_ ){
     case OutputRequest::EventWeights: return eventWeights;

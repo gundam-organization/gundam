@@ -31,6 +31,7 @@ Backends::PropagationRequest Backends::BackendConfig::makePropagationRequest() c
   if( out.outputs.empty() ){
     out.outputs.emplace_back(OutputRequest::Histograms);
   }
+  out.materializeOutputs = materializeOutputRequests;
   return out;
 }
 
@@ -41,18 +42,26 @@ Backends::BackendConfig Backends::BackendConfig::fromConfig(ConfigReader config_
     {"isEnabled", {"enabled"}},
     {"type", {"backend", "name"}},
     {"outputRequests", {"outputs"}},
+    {"materializeOutputRequests", {"materializeOutputs", "hostOutputs"}},
   });
 
   std::vector<std::string> outputRequestNames{"Histograms"};
+  std::vector<std::string> materializeOutputRequestNames{};
   config_.fillValue(out.isEnabled, "isEnabled");
   config_.fillValue(out.type, "type");
   config_.fillValue(outputRequestNames, "outputRequests");
+  config_.fillValue(materializeOutputRequestNames, "materializeOutputRequests");
   config_.printUnusedKeys();
 
   out.outputRequests.clear();
   out.outputRequests.reserve(outputRequestNames.size());
   for( const auto& outputRequestName : outputRequestNames ){
     out.outputRequests.emplace_back(parseOutputRequest(outputRequestName));
+  }
+  out.materializeOutputRequests.clear();
+  out.materializeOutputRequests.reserve(materializeOutputRequestNames.size());
+  for( const auto& outputRequestName : materializeOutputRequestNames ){
+    out.materializeOutputRequests.emplace_back(parseOutputRequest(outputRequestName));
   }
 
   return out;

@@ -141,10 +141,20 @@ void Propagator::initializeBackend(){
     LogWarning << "Adding OutputRequest::Histograms to backendConfig because the current "
                << "LikelihoodInterface consumes CPU histograms." << std::endl;
     _backendPropagationRequest_.outputs.emplace_back(Backends::OutputRequest::Histograms);
+    if( not _backendPropagationRequest_.materializeOutputs.empty()
+        and not _backendPropagationRequest_.shouldMaterialize(Backends::OutputRequest::Histograms) ){
+      _backendPropagationRequest_.materializeOutputs.emplace_back(Backends::OutputRequest::Histograms);
+    }
   }
   LogInfo << "Propagation backend enabled: " << _backendConfig_.type
           << " with output requests " << Backends::toString(_backendPropagationRequest_)
           << std::endl;
+  if( not _backendPropagationRequest_.materializeOutputs.empty() ){
+    Backends::PropagationRequest materializationRequest;
+    materializationRequest.outputs = _backendPropagationRequest_.materializeOutputs;
+    LogInfo << "Propagation backend host materialization requests "
+            << Backends::toString(materializationRequest) << std::endl;
+  }
 
   _backendManager_ = std::make_shared<Backends::BackendManager>();
   _backendManager_->setBackend(Backends::makeBackend(_backendConfig_));
@@ -189,6 +199,7 @@ std::future<bool> Propagator::applyParameters(){
             _lastBackendStatLikelihood_ = _backendManager_->getBackend()->getLikelihood(token);
             _hasLastBackendStatLikelihood_ = true;
           }
+          if( not _backendPropagationRequest_.shouldMaterialize(outputRequest) ){ continue; }
           _backendManager_->materialize(token, outputRequest);
         }
         return true;

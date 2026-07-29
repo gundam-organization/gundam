@@ -31,6 +31,8 @@ namespace Backends {
     void wait(const PropagationToken& token_) override;
     void materialize(const PropagationToken& token_, OutputRequest output_) override;
     [[nodiscard]] double getLikelihood(const PropagationToken& token_) const override;
+    [[nodiscard]] BackendDeviceView getDeviceView(const PropagationToken& token_) const override;
+    [[nodiscard]] BackendTimingSummary getLastTimingSummary() const override;
 
   private:
     struct Impl;

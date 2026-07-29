@@ -28,6 +28,8 @@ namespace Backends {
     virtual void wait(const PropagationToken& token_) = 0;
     virtual void materialize(const PropagationToken& token_, OutputRequest output_) = 0;
     [[nodiscard]] virtual double getLikelihood(const PropagationToken& token_) const = 0;
+    [[nodiscard]] virtual BackendDeviceView getDeviceView(const PropagationToken&) const { return {}; }
+    [[nodiscard]] virtual BackendTimingSummary getLastTimingSummary() const { return {}; }
   };
 
 }
