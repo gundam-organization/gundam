@@ -41,9 +41,16 @@ else()
   set(CACHE_MANAGER_LIBRARIES "")
 endif()
 
+if( WITH_BACKENDS )
+  set(BACKENDS_LIBRARIES "GundamBackends")
+else()
+  set(BACKENDS_LIBRARIES "")
+endif()
+
 target_link_libraries( GundamPropagator
     PUBLIC
     GundamDialDictionary
+    ${BACKENDS_LIBRARIES}
     ${CACHE_MANAGER_LIBRARIES}
 )
 

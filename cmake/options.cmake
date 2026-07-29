@@ -86,6 +86,13 @@ else()
   cmessage( STATUS "Cache manager is disabled. Use -D WITH_CACHE_MANAGER=ON if needed." )
 endif()
 
+if( WITH_BACKENDS )
+  cmessage( STATUS "-D WITH_BACKENDS=ON: enabling experimental backend library..." )
+  add_definitions( -D GUNDAM_USING_BACKENDS )
+else()
+  cmessage( STATUS "Experimental backend library is disabled. Use -D WITH_BACKENDS=ON if needed." )
+endif()
+
 
 if( WITH_DOXYGEN )
   cmessage( STATUS "-D WITH_DOXYGEN=ON: enabling doxygen build..." )

@@ -354,6 +354,10 @@ void LikelihoodInterface::loadModelPropagator(){
     }
   });
 
+#ifdef GUNDAM_USING_BACKENDS
+  _modelPropagator_.initializeBackend();
+#endif
+
 #ifdef GUNDAM_USING_CACHE_MANAGER
   if( Cache::Manager::IsCacheManagerEnabled() ){
     _modelPropagator_.initializeCacheManager();

@@ -16,9 +16,15 @@
 #include "GenericToolbox.Time.h"
 #include "GenericToolbox.Thread.h"
 
+#ifdef GUNDAM_USING_BACKENDS
+#include "BackendManager.h"
+#include "BackendTypes.h"
+#endif
+
 #include <vector>
 #include <map>
 #include <future>
+#include <memory>
 
 class Propagator : public JsonBaseClass {
 
@@ -60,6 +66,9 @@ public:
   // Core
   void clearContent();
   void buildDialCache();
+#ifdef GUNDAM_USING_BACKENDS
+  void initializeBackend();
+#endif
 
   /// Apply the current parameters and wait for it to finish.  This reweights
   /// the events, and refills the histograms.  This is a convenience wrapper
@@ -119,6 +128,17 @@ private:
   bool _showNbEventPerSampleParameterBreakdown_{false};
   bool _enableEigenToOrigInPropagate_{true};
   int _iThrow_{-1};
+
+#ifdef GUNDAM_USING_BACKENDS
+  struct BackendConfig{
+    bool isEnabled{false};
+    std::string type{"CPU"};
+    std::vector<std::string> outputRequests{"Histograms"};
+  };
+  BackendConfig _backendConfig_{};
+  Backends::PropagationRequest _backendPropagationRequest_{};
+  std::shared_ptr<Backends::BackendManager> _backendManager_{nullptr};
+#endif
 
   // Sub-layers
   SampleSet _sampleSet_{};
