@@ -16,6 +16,7 @@ Backends::BackendCapabilities Backends::CpuBackend::getCapabilities() const {
   out.supportsCpu = true;
   out.supportsEventWeights = true;
   out.supportsHistograms = true;
+  out.supportsLikelihood = true;
   out.deviceName = "host";
   return out;
 }
@@ -24,6 +25,10 @@ void Backends::CpuBackend::build(const BackendModel& model_) {
   _model_ = model_;
   _lastResult_ = Result();
   _isBuilt_ = true;
+}
+
+void Backends::CpuBackend::setLikelihoodModel(const BackendLikelihoodModel& likelihoodModel_) {
+  _likelihoodModel_ = likelihoodModel_;
 }
 
 Backends::PropagationToken Backends::CpuBackend::requestPropagation(
@@ -56,7 +61,21 @@ Backends::PropagationToken Backends::CpuBackend::requestPropagation(
   }
 
   if( request_.has(OutputRequest::Likelihood) ){
-    _lastResult_.status.likelihood = OutputState::Failed;
+    if( _likelihoodModel_.empty() ){
+      _lastResult_.status.likelihood = OutputState::Failed;
+    }
+    else{
+      if( _lastResult_.histSums.empty() ){
+        if( request_.has(OutputRequest::EventWeights) ){
+          calculateHistograms(_lastResult_);
+        }
+        else{
+          calculateHistogramsFromEvents(_lastResult_);
+        }
+      }
+      calculateLikelihood(_lastResult_);
+      _lastResult_.status.likelihood = OutputState::ReadyOnDevice;
+    }
   }
   if( request_.has(OutputRequest::BinIndices) ){
     _lastResult_.status.binIndices = OutputState::Failed;
@@ -100,9 +119,20 @@ void Backends::CpuBackend::materialize(const PropagationToken& token_, OutputReq
     materializeHistograms(_lastResult_);
     _lastResult_.status.histograms = OutputState::ReadyOnHost;
   }
+  else if( output_ == OutputRequest::Likelihood ){
+    _lastResult_.status.likelihood = OutputState::ReadyOnHost;
+  }
   else{
     LogThrow("CpuBackend cannot materialize requested output yet.");
   }
+}
+
+double Backends::CpuBackend::getLikelihood(const PropagationToken& token_) const {
+  LogThrowIf(not isCurrentToken(token_), "Invalid CpuBackend propagation token.");
+  LogThrowIf(_lastResult_.status.likelihood != OutputState::ReadyOnDevice
+             and _lastResult_.status.likelihood != OutputState::ReadyOnHost,
+             "Backend likelihood is not ready.");
+  return _lastResult_.likelihood;
 }
 
 bool Backends::CpuBackend::isCurrentToken(const PropagationToken& token_) const {
@@ -187,6 +217,20 @@ void Backends::CpuBackend::calculateHistogramsFromEvents(Result& result_) {
 
     result_.histSums[globalBin] += weight;
     result_.histSumSquares[globalBin] += weight * weight;
+  }
+}
+
+void Backends::CpuBackend::calculateLikelihood(Result& result_) {
+  result_.likelihood = 0;
+
+  for( const auto& sample : _likelihoodModel_.samples ){
+    for( int iBin = 0 ; iBin < int(sample.dataSums.size()) ; iBin++ ){
+      if( iBin < int(sample.ignoredBins.size()) and sample.ignoredBins[iBin] ){ continue; }
+      int globalBin = sample.binOffset + iBin;
+      double pred = result_.histSums[globalBin];
+      double predErr = std::sqrt(result_.histSumSquares[globalBin]);
+      result_.likelihood += sample.evalBin(sample.dataSums[iBin], pred, predErr, iBin);
+    }
   }
 }
 

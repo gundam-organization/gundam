@@ -20,6 +20,7 @@ namespace Backends {
     [[nodiscard]] PropagationStatus getStatus(const PropagationToken& token_) const override;
 
     void build(const BackendModel& model_) override;
+    void setLikelihoodModel(const BackendLikelihoodModel& likelihoodModel_) override;
     PropagationToken requestPropagation(
         const ParameterSnapshot& parameters_,
         const PropagationRequest& request_) override;
@@ -27,6 +28,7 @@ namespace Backends {
     bool isReady(const PropagationToken& token_) const override;
     void wait(const PropagationToken& token_) override;
     void materialize(const PropagationToken& token_, OutputRequest output_) override;
+    [[nodiscard]] double getLikelihood(const PropagationToken& token_) const override;
 
   private:
     struct Result {
@@ -35,6 +37,7 @@ namespace Backends {
       std::vector<double> eventWeights{};
       std::vector<double> histSums{};
       std::vector<double> histSumSquares{};
+      double likelihood{0};
     };
 
     [[nodiscard]] bool isCurrentToken(const PropagationToken& token_) const;
@@ -44,10 +47,12 @@ namespace Backends {
     void calculateEventWeights(Result& result_);
     void calculateHistograms(Result& result_);
     void calculateHistogramsFromEvents(Result& result_);
+    void calculateLikelihood(Result& result_);
     void materializeEventWeights(Result& result_);
     void materializeHistograms(Result& result_);
 
     BackendModel _model_{};
+    BackendLikelihoodModel _likelihoodModel_{};
     Result _lastResult_{};
     std::uint64_t _nextTokenId_{1};
     bool _isBuilt_{false};

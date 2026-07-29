@@ -18,6 +18,7 @@
 
 #ifdef GUNDAM_USING_BACKENDS
 #include "BackendConfig.h"
+#include "BackendLikelihoodModel.h"
 #include "BackendManager.h"
 #include "BackendTypes.h"
 #endif
@@ -70,6 +71,9 @@ public:
 #ifdef GUNDAM_USING_BACKENDS
   void initializeBackend();
   void configureBackend(const Backends::BackendConfig& backendConfig_);
+  void configureBackendLikelihoodModel(const Backends::BackendLikelihoodModel& likelihoodModel_);
+  [[nodiscard]] bool hasLastBackendStatLikelihood() const { return _hasLastBackendStatLikelihood_; }
+  [[nodiscard]] double getLastBackendStatLikelihood() const { return _lastBackendStatLikelihood_; }
 #endif
 
   /// Apply the current parameters and wait for it to finish.  This reweights
@@ -133,8 +137,11 @@ private:
 
 #ifdef GUNDAM_USING_BACKENDS
   Backends::BackendConfig _backendConfig_{};
+  Backends::BackendLikelihoodModel _backendLikelihoodModel_{};
   Backends::PropagationRequest _backendPropagationRequest_{};
   std::shared_ptr<Backends::BackendManager> _backendManager_{nullptr};
+  bool _hasLastBackendStatLikelihood_{false};
+  double _lastBackendStatLikelihood_{0};
 #endif
 
   // Sub-layers

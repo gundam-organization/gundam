@@ -15,6 +15,9 @@ void Backends::MpsBackend::build(const BackendModel& model_) {
   _status_.backend = BackendStatus::Unavailable;
 }
 
+void Backends::MpsBackend::setLikelihoodModel(const BackendLikelihoodModel&) {
+}
+
 Backends::PropagationToken Backends::MpsBackend::requestPropagation(
     const ParameterSnapshot&,
     const PropagationRequest& request_) {
@@ -39,4 +42,9 @@ void Backends::MpsBackend::wait(const PropagationToken&) {
 
 void Backends::MpsBackend::materialize(const PropagationToken&, OutputRequest) {
   LogThrow("MpsBackend is declared but device kernels are not implemented yet.");
+}
+
+double Backends::MpsBackend::getLikelihood(const PropagationToken&) const {
+  LogThrow("MpsBackend likelihood is not implemented yet.");
+  return 0;
 }

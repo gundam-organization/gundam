@@ -14,6 +14,7 @@ set(SRCFILES
 set(HEADERS
     ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/BackendConfig.h
     ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/BackendFactory.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/BackendLikelihoodModel.h
     ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/BackendManager.h
     ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/BackendModel.h
     ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/BackendModelBuilder.h

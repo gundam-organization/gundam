@@ -114,6 +114,9 @@ protected:
   void loadModelPropagator();
   void loadDataPropagator();
   void buildSamplePairList();
+#ifdef GUNDAM_USING_BACKENDS
+  [[nodiscard]] Backends::BackendLikelihoodModel buildBackendLikelihoodModel() const;
+#endif
 
   DataDispenser* getDataDispenser( DatasetDefinition& dataset_ );
 

@@ -17,6 +17,7 @@ namespace Backends {
     [[nodiscard]] PropagationStatus getStatus(const PropagationToken& token_) const override;
 
     void build(const BackendModel& model_) override;
+    void setLikelihoodModel(const BackendLikelihoodModel& likelihoodModel_) override;
     PropagationToken requestPropagation(
         const ParameterSnapshot& parameters_,
         const PropagationRequest& request_) override;
@@ -24,6 +25,7 @@ namespace Backends {
     bool isReady(const PropagationToken& token_) const override;
     void wait(const PropagationToken& token_) override;
     void materialize(const PropagationToken& token_, OutputRequest output_) override;
+    [[nodiscard]] double getLikelihood(const PropagationToken& token_) const override;
 
   private:
     BackendModel _model_{};

@@ -120,6 +120,13 @@ void Propagator::configureBackend(const Backends::BackendConfig& backendConfig_)
   _backendConfig_ = backendConfig_;
 }
 
+void Propagator::configureBackendLikelihoodModel(const Backends::BackendLikelihoodModel& likelihoodModel_){
+  _backendLikelihoodModel_ = likelihoodModel_;
+  if( _backendManager_ != nullptr ){
+    _backendManager_->getBackend()->setLikelihoodModel(_backendLikelihoodModel_);
+  }
+}
+
 void Propagator::initializeBackend(){
   if( not _backendConfig_.isEnabled ){
     _backendManager_ = nullptr;
@@ -140,6 +147,7 @@ void Propagator::initializeBackend(){
 
   auto backendModel = Backends::BackendModelBuilder::build(_sampleSet_, _eventDialCache_);
   _backendManager_->build(backendModel);
+  _backendManager_->getBackend()->setLikelihoodModel(_backendLikelihoodModel_);
 }
 #endif
 void Propagator::propagateParameters(){
@@ -155,6 +163,7 @@ std::future<bool> Propagator::applyParameters(){
   _dialManager_.updateDialState();
 
 #ifdef GUNDAM_USING_BACKENDS
+  _hasLastBackendStatLikelihood_ = false;
   if( _backendManager_ != nullptr ){
     Backends::ParameterSnapshot snapshot;
     auto token = _backendManager_->requestPropagation(snapshot, _backendPropagationRequest_);
@@ -171,6 +180,10 @@ std::future<bool> Propagator::applyParameters(){
           if( outputState != Backends::OutputState::ReadyOnDevice and outputState != Backends::OutputState::ReadyOnHost ){
             LogWarning << "Requested backend output is not ready. Skipping materialization." << std::endl;
             continue;
+          }
+          if( outputRequest == Backends::OutputRequest::Likelihood ){
+            _lastBackendStatLikelihood_ = _backendManager_->getBackend()->getLikelihood(token);
+            _hasLastBackendStatLikelihood_ = true;
           }
           _backendManager_->materialize(token, outputRequest);
         }
