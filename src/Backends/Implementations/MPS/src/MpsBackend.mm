@@ -6,6 +6,7 @@
 #include "Event.h"
 #include "Histogram.h"
 #include "CompactSpline.h"
+#include "MonotonicSpline.h"
 #include "Norm.h"
 #include "Parameter.h"
 #include "UniformSpline.h"
@@ -28,6 +29,7 @@ namespace {
   constexpr uint32_t kMpsDialTypeNorm{0};
   constexpr uint32_t kMpsDialTypeCompactSpline{1};
   constexpr uint32_t kMpsDialTypeUniformSpline{2};
+  constexpr uint32_t kMpsDialTypeMonotonicSpline{3};
 
   static NSString* const kMpsBackendMetalSource = @R"METAL(
 #include <metal_stdlib>
@@ -36,6 +38,7 @@ using namespace metal;
 constant uint kDialTypeNorm = 0;
 constant uint kDialTypeCompactSpline = 1;
 constant uint kDialTypeUniformSpline = 2;
+constant uint kDialTypeMonotonicSpline = 3;
 
 float evaluate_compact_spline(float x, bool allowExtrapolation, device const float* data, uint dim) {
   float low = data[0];
@@ -104,6 +107,55 @@ float evaluate_uniform_spline(float x, bool allowExtrapolation, device const flo
           + p1);
 }
 
+float evaluate_monotonic_spline(float x, bool allowExtrapolation, device const float* data, uint dim) {
+  float low = data[0];
+  float step = data[1];
+  if( !allowExtrapolation ){
+    float high = low + float(dim - 1) * step;
+    x = clamp(x, low, high);
+  }
+
+  float xx = (x - low) / step;
+  int ix = int(floor(xx));
+
+  int d21_0 = ix - 1;
+  if( d21_0 < 0 ){ d21_0 = 0; }
+  if( d21_0 > int(dim) - 2 ){ d21_0 = int(dim) - 2; }
+  int d21_1 = d21_0 + 1;
+
+  int d32_0 = ix;
+  if( d32_0 < 0 ){ d32_0 = 0; }
+  if( d32_0 > int(dim) - 2 ){ d32_0 = int(dim) - 2; }
+  int d32_1 = d32_0 + 1;
+
+  int d43_0 = ix + 1;
+  if( d43_0 < 0 ){ d43_0 = 0; }
+  if( d43_0 > int(dim) - 2 ){ d43_0 = int(dim) - 2; }
+  int d43_1 = d43_0 + 1;
+
+  float p2 = data[2 + d32_0];
+  float p3 = data[2 + d32_1];
+  float fx = xx - float(d32_0);
+  float d21 = data[2 + d21_1] - data[2 + d21_0];
+  float d32 = p3 - p2;
+  float d43 = data[2 + d43_1] - data[2 + d43_0];
+  float m2 = 0.5f * (d21 + d32);
+  float m3 = 0.5f * (d32 + d43);
+
+  if( d32 * d21 <= 0.0f ){ m2 = 0.0f; }
+  if( d43 * d32 <= 0.0f ){ m3 = 0.0f; }
+
+  float delta2 = 3.0f * min(abs(d21), abs(d32));
+  float delta3 = 3.0f * min(abs(d32), abs(d43));
+  m2 = clamp(m2, -delta2, delta2);
+  m3 = clamp(m3, -delta3, delta3);
+
+  return ((((2.0f * p2 - 2.0f * p3 + m3 + m2) * fx
+            + 3.0f * p3 - 3.0f * p2 - m3 - 2.0f * m2) * fx
+           + m2) * fx
+          + p2);
+}
+
 kernel void compute_event_weights(
     device float* eventWeights [[buffer(0)]],
     device const float* baseWeights [[buffer(1)]],
@@ -151,6 +203,16 @@ kernel void compute_event_weights(
           dialAllowExtrapolation[flatDial] != 0,
           splineData + splineOffset,
           splineSize
+      );
+    }
+    else if( dialType == kDialTypeMonotonicSpline ){
+      uint splineOffset = dialSplineOffsets[flatDial];
+      uint splineSize = dialSplineSizes[flatDial];
+      response = evaluate_monotonic_spline(
+          input,
+          dialAllowExtrapolation[flatDial] != 0,
+          splineData + splineOffset,
+          splineSize - 2
       );
     }
     response = max(response, dialMinResponses[flatDial]);
@@ -653,9 +715,21 @@ struct Backends::MpsBackend::Impl {
         splineData.reserve(splineData.size() + data.size());
         for( auto value : data ){ splineData.emplace_back(float(value)); }
       }
+      else if( dynamic_cast<const MonotonicSpline*>(dialBase) != nullptr ){
+        const auto& data = dialBase->getDialData();
+        if( data.size() < 5 ){
+          return fail("MonotonicSpline dial data is too small for MPS evaluation.");
+        }
+        dialTypes[iDial] = kMpsDialTypeMonotonicSpline;
+        dialSplineOffsets[iDial] = uint32_t(splineData.size());
+        dialSplineSizes[iDial] = uint32_t(data.size());
+        dialAllowExtrapolation[iDial] = dialBase->getAllowExtrapolation() ? 1 : 0;
+        splineData.reserve(splineData.size() + data.size());
+        for( auto value : data ){ splineData.emplace_back(float(value)); }
+      }
       else{
         return fail("dial type " + dialBase->getDialTypeName()
-                    + " is not implemented in the MPS backend. Supported types are Norm, CompactSpline and UniformSpline.");
+                    + " is not implemented in the MPS backend. Supported types are Norm, CompactSpline, UniformSpline and MonotonicSpline.");
       }
 
       const auto* supervisor = interface->getResponseSupervisorRef();
