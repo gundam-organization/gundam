@@ -21,7 +21,44 @@
 #include "GenericToolbox.Utils.h"
 
 #include <memory>
+#include <sstream>
 #include <vector>
+
+namespace {
+  std::string formatBackendTimingSummary(const Backends::BackendTimingSummary& timing_) {
+    std::stringstream ss;
+    ss << "Backend timing summary:"
+       << " build[scan=" << timing_.buildCompatibilityScanSeconds
+       << "s, parLookup=" << timing_.buildParameterLookupSeconds
+       << "s, firstPass=" << timing_.buildFirstPassSeconds
+       << "s, secondPass=" << timing_.buildSecondPassSeconds
+       << "s, finalFlatten=" << timing_.buildFinalFlattenSeconds
+       << "s, histIndex=" << timing_.buildHistogramIndexSeconds
+       << "s, bufferUpload=" << timing_.buildBufferUploadSeconds
+       << "s]"
+       << " device[paramUpload=" << timing_.parameterUploadSeconds
+       << "s, cachedDialStage=" << timing_.cachedDialStageSeconds
+       << "s, eventWeightsStage=" << timing_.eventWeightsStageSeconds
+       << "s, histogramStage=" << timing_.histogramStageSeconds
+       << "s, encode=" << timing_.commandEncodeSeconds
+       << "s, wait=" << timing_.deviceWaitSeconds
+       << "s, histReadback=" << timing_.histogramReadbackSeconds
+       << "s/" << timing_.histogramReadbackBytes
+       << "B, eventWeightReadback=" << timing_.eventWeightReadbackSeconds
+       << "s/" << timing_.eventWeightReadbackBytes
+       << "B]"
+       << " host[llh=" << timing_.likelihoodHostSeconds
+       << "s, eventWeightMaterialize=" << timing_.eventWeightMaterializationSeconds
+       << "s, histogramMaterialize=" << timing_.histogramMaterializationSeconds
+       << "s]"
+       << " counts[uniqueDials=" << timing_.uniqueDialCount
+       << ", cachedDials=" << timing_.cachedDialCount
+       << ", eventDialIndices=" << timing_.eventDialIndexCount
+       << ", splineScalars=" << timing_.splineScalarCount
+       << "]";
+    return ss.str();
+  }
+}
 
 void Propagator::muteLogger(){ Logger::setIsMuted( true ); }
 void Propagator::unmuteLogger(){ Logger::setIsMuted( false ); }
@@ -201,6 +238,9 @@ std::future<bool> Propagator::applyParameters(){
           }
           if( not _backendPropagationRequest_.shouldMaterialize(outputRequest) ){ continue; }
           _backendManager_->materialize(token, outputRequest);
+        }
+        if( GundamGlobals::isDebug() ){
+          LogInfo << formatBackendTimingSummary(_backendManager_->getBackend()->getLastTimingSummary()) << std::endl;
         }
         return true;
       });

@@ -67,7 +67,17 @@ namespace Backends {
   };
 
   struct BackendTimingSummary {
+    double buildCompatibilityScanSeconds{0};
+    double buildParameterLookupSeconds{0};
+    double buildFirstPassSeconds{0};
+    double buildSecondPassSeconds{0};
+    double buildFinalFlattenSeconds{0};
+    double buildHistogramIndexSeconds{0};
+    double buildBufferUploadSeconds{0};
     double parameterUploadSeconds{0};
+    double cachedDialStageSeconds{0};
+    double eventWeightsStageSeconds{0};
+    double histogramStageSeconds{0};
     double commandEncodeSeconds{0};
     double deviceWaitSeconds{0};
     double histogramReadbackSeconds{0};
@@ -75,6 +85,10 @@ namespace Backends {
     double eventWeightMaterializationSeconds{0};
     double histogramMaterializationSeconds{0};
     double likelihoodHostSeconds{0};
+    std::size_t uniqueDialCount{0};
+    std::size_t cachedDialCount{0};
+    std::size_t eventDialIndexCount{0};
+    std::size_t splineScalarCount{0};
     std::size_t histogramReadbackBytes{0};
     std::size_t eventWeightReadbackBytes{0};
   };
