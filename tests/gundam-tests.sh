@@ -99,7 +99,7 @@ echo '    -t <test-path>   : Run only one test script, e.g. fast-tests/210Ignore
 echo '    -v               : Print test logs live while also saving them to the log files'
 echo '    -a               : Apply the tests (no tests are run without this)'
 echo '    output-directory : The name of the output directory.  The default'
-echo '                       value is \"./output.YYYY-MM-DD-hhmm\"'
+echo '                       value is \"./output.YYYY-MM-DD-hhmmss\"'
 echo ' See gundam-tests.sh for more usage documentation.'
 
 # The default tests to be run.
@@ -175,7 +175,7 @@ fi
 
 # Find the name of the output directory.  It might have been provided
 # on the command line.
-OUTPUT_DIR="output.$(date +%Y-%m-%d-%H%M)"  # A default name for the output
+OUTPUT_DIR="output.$(date +%Y-%m-%d-%H%M%S)"  # A default name for the output
 if [ ${#1} -gt 0 ]; then
     # A name was provided on the command line.
     OUTPUT_DIR=${1}
@@ -195,19 +195,40 @@ if [ ! -x ./gundam-tests.sh ]; then
     exit 1
 fi
 
+is_test_runnable() {
+    local test_path=$1
+    if [[ "${test_path}" == *.py ]]; then
+        return 0
+    fi
+    if [ -x "${test_path}" ]; then
+        return 0
+    fi
+    return 1
+}
+
+SINGLE_TEST_FOUND="no"
+
 for i in ${TESTS}; do
     if [ -x ${PWD}/${i} ]; then
         echo Testing directory found: $i
         for j in $(find ${i} -name "[0-9]*" -type f | grep -v "~" | sort); do
-            if [ -x ${j} ]; then
-                if [ -n "${SINGLE_TEST}" ] && [ "${j}" != "${SINGLE_TEST}" ]; then
-                    continue
-                fi
-                echo '   Will run:' $j
+            if ! is_test_runnable "${j}"; then
+                continue
             fi
+            if [ -n "${SINGLE_TEST}" ] && [ "${j}" != "${SINGLE_TEST}" ]; then
+                continue
+            fi
+            SINGLE_TEST_FOUND="yes"
+            echo '   Will run:' $j
         done
     fi
 done
+
+if [ -n "${SINGLE_TEST}" ] && [ "${SINGLE_TEST_FOUND}" != "yes" ]; then
+    echo
+    echo -e ${RESULT_ERROR} Requested test not found or not runnable: ${SINGLE_TEST}
+    exit 1
+fi
 
 if [ ! -f EXPECTED_FAILURES ]; then
     echo -e ${RESULT_ERROR} EXPECTED_FAILURES file must exist, but it can be empty.
@@ -321,8 +342,7 @@ for d in ${TESTS}; do
             continue
         fi
         JOB=${PWD}/${i}
-        # Only run files that are executable
-        if [ ! -x ${JOB} ]; then
+        if ! is_test_runnable "${JOB}"; then
             continue;
         fi
         # SUCCESS is false by default.

@@ -86,9 +86,9 @@ public:
   [[nodiscard]] const BinSet &getDialBinSet() const{ return _dialBinSet_; }
   [[nodiscard]] const std::vector<std::string> &getDataSetNameList() const{ return _dataSetNameList_; }
 
-  // A formula to decide if the dial should be applied to an event.  The dial
-  // should be applied if this returns a non-zero value.
-  [[nodiscard]] const std::shared_ptr<TFormula> &getApplyConditionFormula() const{ return _applyConditionFormula_; }
+  // A formula string to decide if the dial should be applied to an event.
+  // The dial should be applied if this returns a non-zero value.
+  [[nodiscard]] const std::string &getApplyConditionStr() const{ return _applyConditionStr_; }
 
   [[nodiscard]] auto& getDialType() const{ return _dialType_; }
   [[nodiscard]] auto& getDialOptions() const{ return _dialOptions_; }
@@ -238,8 +238,6 @@ private:
   // _dialInputBufferList_.
   std::vector<DialResponseSupervisor> _dialResponseSupervisorList_{};
 
-  // A formula to decide if the dial should be applied to an event.
-  std::shared_ptr<TFormula> _applyConditionFormula_{nullptr};
   GenericToolbox::Atomic<size_t> _dialFreeSlot_{0};
 
   // A pointer to dial specific data

@@ -135,7 +135,6 @@ void PlotGenerator::configureImpl(){
 
 }
 void PlotGenerator::initializeImpl() {
-  LogWarning << __METHOD_NAME__ << std::endl;
   LogThrowIf(_modelSampleListPtr_ == nullptr);
 }
 
@@ -674,7 +673,6 @@ std::vector<std::string> PlotGenerator::fetchListOfSplitVarNames() const {
 
 // Internals
 void PlotGenerator::defineHistogramHolders() {
-  LogWarning << __METHOD_NAME__ << std::endl;
   _histHolderCacheList_[0].clear();
 
   LogInfo << "Defining histogram holders..." << std::endl;

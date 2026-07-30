@@ -13,7 +13,11 @@ public:
   EventVarTransformLib() = default;
   explicit EventVarTransformLib(const ConfigReader& config_){ this->configure(config_); }
 
+  void configureFromVariableDict(const std::string& outputVariableName_, ConfigReader& config_);
   void reload();
+
+  void setLibraryFile(const std::string& libraryFile_){ _libraryFile_ = libraryFile_; }
+  const std::string& getLibraryFile() const{ return _libraryFile_; }
 
 protected:
   void initializeImpl() override;
@@ -21,6 +25,8 @@ protected:
 
   void loadLibrary();
   void initInputFormulas();
+  std::string registerInputFormulaArrayAlias(const std::string& sourceExpression_, size_t formulaIndex_);
+  std::string rewriteInputFormulaTreeArrayExpressions(const std::string& formula_, size_t formulaIndex_);
 
   double evalTransformation( const Event& event_, std::vector<double>& inputBuffer_) const override;
 

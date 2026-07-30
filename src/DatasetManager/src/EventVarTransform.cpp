@@ -23,12 +23,11 @@ void EventVarTransform::configureImpl(){
   _config_.fillValue(_isEnabled_, "isEnabled");
   _config_.fillValue(_messageOnError_, "messageOnError");
   _config_.fillValue(_outputVariableName_, "outputVariableName");
-  _config_.fillValue(_inputFormulaStrList_, "inputList");
+  _inputFormulaStrList_ = ConfigUtils::readFormulaExprList(_config_, "inputList");
 }
 void EventVarTransform::initializeImpl(){
   _config_.printUnusedKeys();
 
-  LogInfo << "Loading variable transformation: " << _name_ << std::endl;
   LogThrowIf(_outputVariableName_.empty(), "output variable name not set.");
 }
 
@@ -39,7 +38,7 @@ const std::vector<std::string>& EventVarTransform::fetchRequestedVars() const {
   if( _requestedLeavesForEvalCache_.empty() ){
     for( auto& formula : _inputFormulaList_ ){
       for( int iPar = 0 ; iPar < formula.GetNpar() ; iPar++ ){
-        GenericToolbox::addIfNotInVector(formula.GetParName(iPar), _requestedLeavesForEvalCache_);
+        GenericToolbox::addIfNotInVector(getInputFormulaParameterSource(formula.GetParName(iPar)), _requestedLeavesForEvalCache_);
       }
     }
   }
@@ -70,8 +69,15 @@ double EventVarTransform::evalTransformation(const Event& event_) const {
 double EventVarTransform::evalTransformation( const Event& event_, std::vector<double>& inputBuffer_) const{
   return std::nan("defaultEvalTransformOutput");
 }
+const std::string& EventVarTransform::getInputFormulaParameterSource(const std::string& parameterName_) const{
+  auto it = _inputFormulaParameterSourceDict_.find(parameterName_);
+  if( it != _inputFormulaParameterSourceDict_.end() ){ return it->second; }
+  return parameterName_;
+}
+void EventVarTransform::registerInputFormulaParameterSource(const std::string& parameterName_, const std::string& sourceName_){
+  _inputFormulaParameterSourceDict_[parameterName_] = sourceName_;
+}
 void EventVarTransform::storeOutput( double output_, Event& storeEvent_ ) const{
   auto& variable = storeEvent_.getVariables().fetchVariable(this->getOutputVariableName());
   variable.set( output_ );
 }
-
