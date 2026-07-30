@@ -85,26 +85,34 @@ void Backends::BackendsManager::materialize(OutputRequest outputRequest_) {
   switch( outputRequest_.value ){
     case OutputRequest::EventWeights: {
       const auto& eventWeights = backend->getEventWeightsHostView(_lastPropagationToken_);
-      const auto& engineView = backend->getEngineView();
-      const auto& model = engineView.propagation;
+      const auto& model = _backendEngineLayout_.view.propagation;
+      const auto& eventBindings = _backendEngineLayout_.bindings.events;
       LogThrowIf(eventWeights.size() != model.events.size(), "Event weights host view size mismatch.");
-      for( const auto& event : model.events ){
-        event.event->getWeights().current = eventWeights.at(event.resultIndex);
+      LogThrowIf(eventBindings.size() != model.events.size(), "Event bindings size mismatch.");
+      for( std::size_t iEvent = 0 ; iEvent < model.events.size() ; iEvent++ ){
+        const auto& event = model.events.at(iEvent);
+        auto* eventPtr = eventBindings.at(iEvent).event;
+        LogThrowIf(eventPtr == nullptr, "Null event binding during backend materialization.");
+        eventPtr->getWeights().current = eventWeights.at(event.resultIndex);
       }
       return;
     }
 
     case OutputRequest::Histograms: {
-      const auto& engineView = backend->getEngineView();
-      const auto& model = engineView.propagation;
+      const auto& model = _backendEngineLayout_.view.propagation;
+      const auto& sampleBindings = _backendEngineLayout_.bindings.samples;
       const auto& histSums = backend->getHistogramSumsHostView(_lastPropagationToken_);
       const auto& histSumSquares = backend->getHistogramSumSquaresHostView(_lastPropagationToken_);
       LogThrowIf(histSums.size() != std::size_t(model.totalBins), "Histogram sums host view size mismatch.");
       LogThrowIf(histSumSquares.size() != std::size_t(model.totalBins), "Histogram sum squares host view size mismatch.");
+      LogThrowIf(sampleBindings.size() != model.samples.size(), "Sample bindings size mismatch.");
 
-      for( const auto& sample : model.samples ){
-        auto& binContentList = sample.histogram->getBinContentList();
-        auto& binContextList = sample.histogram->getBinContextList();
+      for( std::size_t iSample = 0 ; iSample < model.samples.size() ; iSample++ ){
+        const auto& sample = model.samples.at(iSample);
+        auto* histogramPtr = sampleBindings.at(iSample).histogram;
+        LogThrowIf(histogramPtr == nullptr, "Null histogram binding during backend materialization.");
+        auto& binContentList = histogramPtr->getBinContentList();
+        auto& binContextList = histogramPtr->getBinContextList();
 
         for( auto& binContent : binContentList ){
           binContent.sumWeights = 0;
@@ -143,7 +151,7 @@ void Backends::BackendsManager::initializeImpl() {
   LogThrowIf(_likelihoodInterfacePtr_ == nullptr, "BackendsManager requires a LikelihoodInterface before initialize().");
 
   LogInfo << "Initializing propagation backend: " << _type_ << std::endl;
-  _backendEngineView_.build(*_likelihoodInterfacePtr_);
+  _backendEngineLayout_.build(*_likelihoodInterfacePtr_);
 
   LogInfo << "Propagation backend enabled: " << _type_
           << " with fixed device outputs [EventWeights, Histograms, StatLikelihood]"
@@ -155,7 +163,7 @@ void Backends::BackendsManager::initializeImpl() {
 
   _backendRuntimeManager_ = std::make_shared<BackendRuntimeManager>();
   _backendRuntimeManager_->setBackend(makeBackend(*this));
-  _backendRuntimeManager_->build(_backendEngineView_);
+  _backendRuntimeManager_->build(_backendEngineLayout_.view);
 }
 
 std::future<Backends::BackendPropagationResult> Backends::BackendsManager::propagate() {

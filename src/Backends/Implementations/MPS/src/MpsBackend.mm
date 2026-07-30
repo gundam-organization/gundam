@@ -1400,14 +1400,11 @@ struct Backends::MpsBackend::Impl {
   }
 
   void materializeEventWeights() {
+    auto start = std::chrono::steady_clock::now();
     if( lastResult.eventWeights.empty() and eventWeightsBuffer != nil ){
       copyDeviceEventWeightsToHostResult();
     }
-    auto start = std::chrono::steady_clock::now();
     LogThrowIf(lastResult.eventWeights.size() != model.events.size());
-    for( const auto& event : model.events ){
-      event.event->getWeights().current = lastResult.eventWeights[event.resultIndex];
-    }
     lastTiming.eventWeightMaterializationSeconds += secondsSince(start);
   }
 
@@ -1415,23 +1412,6 @@ struct Backends::MpsBackend::Impl {
     auto start = std::chrono::steady_clock::now();
     LogThrowIf(lastResult.histSums.size() != std::size_t(model.totalBins));
     LogThrowIf(lastResult.histSumSquares.size() != std::size_t(model.totalBins));
-
-    for( const auto& sample : model.samples ){
-      auto& binContentList = sample.histogram->getBinContentList();
-      auto& binContextList = sample.histogram->getBinContextList();
-
-      for( auto& binContent : binContentList ){
-        binContent.sumWeights = 0;
-        binContent.sqrtSumSqWeights = 0;
-      }
-
-      for( auto& binContext : binContextList ){
-        int globalBin = sample.binOffset + binContext.bin.getIndex();
-        auto& binContent = binContentList[binContext.bin.getIndex()];
-        binContent.sumWeights = lastResult.histSums[globalBin];
-        binContent.sqrtSumSqWeights = std::sqrt(lastResult.histSumSquares[globalBin]);
-      }
-    }
     lastTiming.histogramMaterializationSeconds += secondsSince(start);
   }
 };

@@ -1,6 +1,8 @@
 set(LIB_NAME GundamBackends)
 
 set(SRCFILES
+    ${CMAKE_CURRENT_SOURCE_DIR}/Common/src/BackendEngineBindings.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/Common/src/BackendEngineLayout.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/Common/src/BackendFactory.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/Common/src/BackendRuntimeManager.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/Common/src/BackendsManager.cpp
@@ -41,6 +43,8 @@ endif()
 
 set(HEADERS
     ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/BackendsManager.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/BackendEngineBindings.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/BackendEngineLayout.h
     ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/BackendFactory.h
     ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/BackendEngineView.h
     ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/BackendRuntimeManager.h

@@ -7,8 +7,6 @@
 
 class DialInterface;
 class DialInputBuffer;
-class Event;
-class Histogram;
 class LikelihoodInterface;
 class Parameter;
 
@@ -19,7 +17,6 @@ namespace Backends {
   };
 
   struct BackendEventRef {
-    Event* event{nullptr};
     int sampleIndex{-1};
     int binIndex{-1};
     int globalBinIndex{-1};
@@ -30,7 +27,6 @@ namespace Backends {
   };
 
   struct BackendSampleRef {
-    Histogram* histogram{nullptr};
     int sampleIndex{-1};
     int binOffset{0};
     int binCount{0};

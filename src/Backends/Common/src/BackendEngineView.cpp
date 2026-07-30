@@ -37,7 +37,6 @@ void Backends::BackendEngineView::build(LikelihoodInterface& likelihoodInterface
   int binOffset{0};
   for( auto& sample : sampleSet.getSampleList() ){
     BackendSampleRef sampleRef;
-    sampleRef.histogram = &sample.getHistogram();
     sampleRef.sampleIndex = sample.getIndex();
     sampleRef.binOffset = binOffset;
     sampleRef.binCount = sample.getHistogram().getNbBins();
@@ -54,7 +53,6 @@ void Backends::BackendEngineView::build(LikelihoodInterface& likelihoodInterface
     if( cacheEntry.event->getIndices().bin < 0 ){ continue; }
 
     BackendEventRef eventRef;
-    eventRef.event = cacheEntry.event;
     eventRef.sampleIndex = cacheEntry.event->getIndices().sample;
     eventRef.binIndex = cacheEntry.event->getIndices().bin;
     eventRef.globalBinIndex = sampleBinOffsetMap.at(eventRef.sampleIndex) + eventRef.binIndex;
