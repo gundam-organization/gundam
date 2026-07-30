@@ -111,13 +111,26 @@ void Backends::BackendsManager::materialize(OutputRequest outputRequest_) {
   LogThrowIf(outputState != OutputState::ReadyOnDevice and outputState != OutputState::ReadyOnHost,
              "Requested backend output is not ready for materialization: " << outputRequest_.toString());
 
-  if( outputRequest_ == OutputRequest::StatLikelihood ){
-    _likelihoodInterfacePtr_->getBuffer().statLikelihood = backend->getLikelihood(_lastPropagationToken_);
+  switch( outputRequest_.value ){
+    case OutputRequest::EventWeights:
+    case OutputRequest::Histograms:
+      if( outputState == OutputState::ReadyOnDevice ){
+        _backendRuntimeManager_->materialize(_lastPropagationToken_, outputRequest_);
+      }
+      return;
+
+    case OutputRequest::SampleLikelihoods:
+      LogThrow("BackendsManager::materialize(OutputRequest::SampleLikelihoods) is not implemented yet: LikelihoodInterface has no destination slot yet.");
+      return;
+
+    case OutputRequest::StatLikelihood:
+      _likelihoodInterfacePtr_->getBuffer().statLikelihood = backend->getLikelihood(_lastPropagationToken_);
+      return;
+    default:
+      LogError << "Unhandled OutputRequest in BackendsManager::materialize: " << outputRequest_.toString() << std::endl;
   }
 
-  if( outputState == OutputState::ReadyOnDevice ){
-    _backendRuntimeManager_->materialize(_lastPropagationToken_, outputRequest_);
-  }
+  LogThrow("Unhandled OutputRequest in BackendsManager::materialize: " << outputRequest_.toString());
 }
 
 void Backends::BackendsManager::initializeImpl() {
