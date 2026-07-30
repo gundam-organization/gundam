@@ -472,9 +472,7 @@ void FitterEngine::fit(){
   bool origCopy = Cache::Manager::SetIsEventWeightCopyEnabled( false );
 #endif
 #ifdef GUNDAM_USING_BACKENDS
-  bool wasAutoMaterializeEnabled{false};
   if( _backendsManager_.hasBackend() ){
-    wasAutoMaterializeEnabled = _backendsManager_.isAutoMaterializeEnabled();
     _backendsManager_.setEnableAutoMaterialize(false);
   }
 #endif
@@ -497,11 +495,6 @@ void FitterEngine::fit(){
     Cache::Manager::Get()->CopyEventWeights();
   }
   Cache::Manager::SetIsEventWeightCopyEnabled(origCopy);
-#endif
-#ifdef GUNDAM_USING_BACKENDS
-  if( _backendsManager_.hasBackend() and not wasAutoMaterializeEnabled ){
-    _backendsManager_.setEnableAutoMaterialize(false);
-  }
 #endif
 
   _postFitParState_ = getLikelihoodInterface().getModelPropagator().getParametersManager().exportParameterInjectorConfig();
