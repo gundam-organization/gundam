@@ -13,11 +13,6 @@
 #include "ConfigUtils.h"
 #include "GundamBacktrace.h"
 
-#ifdef GUNDAM_USING_BACKENDS
-#include "BackendFactory.h"
-#include "BackendModelBuilder.h"
-#endif
-
 #include "GenericToolbox.Utils.h"
 
 #include <memory>
@@ -153,52 +148,8 @@ void Propagator::buildDialCache(){
   _dialManager_.invalidateInputBuffers();
 }
 #ifdef GUNDAM_USING_BACKENDS
-void Propagator::configureBackend(const Backends::BackendConfig& backendConfig_){
-  _backendConfig_ = backendConfig_;
-}
-
-void Propagator::configureBackendLikelihoodModel(const Backends::BackendLikelihoodModel& likelihoodModel_){
-  _backendLikelihoodModel_ = likelihoodModel_;
-  if( _backendManager_ != nullptr ){
-    _backendManager_->getBackend()->setLikelihoodModel(_backendLikelihoodModel_);
-  }
-}
-
-void Propagator::initializeBackend(){
-  if( not _backendConfig_.isEnabled ){
-    _backendManager_ = nullptr;
-    return;
-  }
-
-  LogInfo << "Initializing propagation backend: " << _backendConfig_.type << std::endl;
-
-  _backendPropagationRequest_ = _backendConfig_.makePropagationRequest();
-  if( not _backendPropagationRequest_.has(Backends::OutputRequest::Histograms)
-      and not _backendPropagationRequest_.has(Backends::OutputRequest::Likelihood) ){
-    LogWarning << "Adding OutputRequest::Histograms to backendConfig because the current "
-               << "LikelihoodInterface consumes CPU histograms." << std::endl;
-    _backendPropagationRequest_.outputs.emplace_back(Backends::OutputRequest::Histograms);
-    if( not _backendPropagationRequest_.materializeOutputs.empty()
-        and not _backendPropagationRequest_.shouldMaterialize(Backends::OutputRequest::Histograms) ){
-      _backendPropagationRequest_.materializeOutputs.emplace_back(Backends::OutputRequest::Histograms);
-    }
-  }
-  LogInfo << "Propagation backend enabled: " << _backendConfig_.type
-          << " with output requests " << Backends::toString(_backendPropagationRequest_)
-          << std::endl;
-  if( not _backendPropagationRequest_.materializeOutputs.empty() ){
-    Backends::PropagationRequest materializationRequest;
-    materializationRequest.outputs = _backendPropagationRequest_.materializeOutputs;
-    LogInfo << "Propagation backend host materialization requests "
-            << Backends::toString(materializationRequest) << std::endl;
-  }
-
-  _backendManager_ = std::make_shared<Backends::BackendManager>();
-  _backendManager_->setBackend(Backends::makeBackend(_backendConfig_));
-
-  auto backendModel = Backends::BackendModelBuilder::build(_sampleSet_, _eventDialCache_);
-  _backendManager_->build(backendModel);
-  _backendManager_->getBackend()->setLikelihoodModel(_backendLikelihoodModel_);
+void Propagator::setBackendsManager(Backends::BackendsManager* backendsManager_){
+  _backendsManager_ = backendsManager_;
 }
 #endif
 void Propagator::propagateParameters(){
@@ -215,14 +166,18 @@ std::future<bool> Propagator::applyParameters(){
 
 #ifdef GUNDAM_USING_BACKENDS
   _hasLastBackendStatLikelihood_ = false;
-  if( _backendManager_ != nullptr ){
+  if( _backendsManager_ != nullptr and _backendsManager_->hasBackend() ){
+    auto* backendRuntimeManager = _backendsManager_->getBackendRuntimeManager();
+    const auto& propagationRequest = _backendsManager_->getPropagationRequest();
     Backends::ParameterSnapshot snapshot;
-    auto token = _backendManager_->requestPropagation(snapshot, _backendPropagationRequest_);
+    auto token = backendRuntimeManager->requestPropagation(snapshot, propagationRequest);
     if( token.isValid ){
       return std::async(std::launch::deferred, [this, token]{
-        _backendManager_->wait(token);
-        auto status = _backendManager_->getBackend()->getStatus(token);
-        for( auto outputRequest : _backendPropagationRequest_.outputs ){
+        auto* backendRuntimeManager = _backendsManager_->getBackendRuntimeManager();
+        const auto& propagationRequest = _backendsManager_->getPropagationRequest();
+        backendRuntimeManager->wait(token);
+        auto status = backendRuntimeManager->getBackend()->getStatus(token);
+        for( auto outputRequest : propagationRequest.outputs ){
           auto outputState = status.state(outputRequest);
           if( outputState == Backends::OutputState::Failed ){
             LogWarning << "Requested backend output failed or is not implemented yet. Skipping materialization." << std::endl;
@@ -233,14 +188,14 @@ std::future<bool> Propagator::applyParameters(){
             continue;
           }
           if( outputRequest == Backends::OutputRequest::Likelihood ){
-            _lastBackendStatLikelihood_ = _backendManager_->getBackend()->getLikelihood(token);
+            _lastBackendStatLikelihood_ = backendRuntimeManager->getBackend()->getLikelihood(token);
             _hasLastBackendStatLikelihood_ = true;
           }
-          if( not _backendPropagationRequest_.shouldMaterialize(outputRequest) ){ continue; }
-          _backendManager_->materialize(token, outputRequest);
+          if( not propagationRequest.shouldMaterialize(outputRequest) ){ continue; }
+          backendRuntimeManager->materialize(token, outputRequest);
         }
         if( GundamGlobals::isDebug() ){
-          LogInfo << formatBackendTimingSummary(_backendManager_->getBackend()->getLastTimingSummary()) << std::endl;
+          LogInfo << formatBackendTimingSummary(backendRuntimeManager->getBackend()->getLastTimingSummary()) << std::endl;
         }
         return true;
       });

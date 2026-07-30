@@ -17,9 +17,7 @@
 #include "GenericToolbox.Thread.h"
 
 #ifdef GUNDAM_USING_BACKENDS
-#include "BackendConfig.h"
-#include "BackendLikelihoodModel.h"
-#include "BackendManager.h"
+#include "BackendsManager.h"
 #include "BackendTypes.h"
 #endif
 
@@ -69,9 +67,7 @@ public:
   void clearContent();
   void buildDialCache();
 #ifdef GUNDAM_USING_BACKENDS
-  void initializeBackend();
-  void configureBackend(const Backends::BackendConfig& backendConfig_);
-  void configureBackendLikelihoodModel(const Backends::BackendLikelihoodModel& likelihoodModel_);
+  void setBackendsManager(Backends::BackendsManager* backendsManager_);
   [[nodiscard]] bool hasLastBackendStatLikelihood() const { return _hasLastBackendStatLikelihood_; }
   [[nodiscard]] double getLastBackendStatLikelihood() const { return _lastBackendStatLikelihood_; }
 #endif
@@ -136,10 +132,7 @@ private:
   int _iThrow_{-1};
 
 #ifdef GUNDAM_USING_BACKENDS
-  Backends::BackendConfig _backendConfig_{};
-  Backends::BackendLikelihoodModel _backendLikelihoodModel_{};
-  Backends::PropagationRequest _backendPropagationRequest_{};
-  std::shared_ptr<Backends::BackendManager> _backendManager_{nullptr};
+  Backends::BackendsManager* _backendsManager_{nullptr};
   bool _hasLastBackendStatLikelihood_{false};
   double _lastBackendStatLikelihood_{0};
 #endif
