@@ -41,11 +41,12 @@ namespace Backends {
     void setEnableAutoMaterialize(bool enableAutoMaterialize_);
     void setMaterializeOutputList(std::vector<OutputRequest> materializeOutputList_);
     void setMaterializeOutputList(std::initializer_list<OutputRequest> materializeOutputList_);
-    void initializeBackend(const LikelihoodInterface& likelihoodInterface_);
+    void setLikelihoodInterface(const LikelihoodInterface* likelihoodInterface_);
     std::future<BackendPropagationResult> propagate(Propagator& propagator_);
 
   protected:
     void configureImpl() override;
+    void initializeImpl() override;
 
   private:
     // configuration
@@ -61,6 +62,7 @@ namespace Backends {
         OutputRequest::SampleLikelihoods,
         OutputRequest::StatLikelihood,
     };
+    const LikelihoodInterface* _likelihoodInterface_{nullptr};
     BackendLikelihoodModel _backendLikelihoodModel_{};
     std::shared_ptr<BackendRuntimeManager> _backendRuntimeManager_{nullptr};
   };
