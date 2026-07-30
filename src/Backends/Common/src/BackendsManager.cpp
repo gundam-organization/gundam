@@ -1,47 +1,10 @@
 #include "BackendsManager.h"
 
-#include "BackendEngineViewBuilder.h"
 #include "LikelihoodInterface.h"
 #include "Logger.h"
 
 #include <algorithm>
 #include <sstream>
-#include <utility>
-
-namespace {
-  void fillBackendLikelihoodView(
-      const LikelihoodInterface& likelihoodInterface_,
-      Backends::BackendLikelihoodView& likelihoodView_) {
-    likelihoodView_.samples.clear();
-    likelihoodView_.samples.reserve(likelihoodInterface_.getSamplePairList().size());
-
-    int binOffset{0};
-    for( const auto& samplePair : likelihoodInterface_.getSamplePairList() ){
-      Backends::BackendLikelihoodSampleRef sampleRef;
-      sampleRef.binOffset = binOffset;
-      sampleRef.dataSums.reserve(samplePair.data->getHistogram().getNbBins());
-      sampleRef.ignoredBins.reserve(samplePair.data->getHistogram().getNbBins());
-
-      const auto& dataBinContentList = samplePair.data->getHistogram().getBinContentList();
-      const auto& modelBinContentList = samplePair.model->getHistogram().getBinContentList();
-      for( int iBin = 0 ; iBin < samplePair.data->getHistogram().getNbBins() ; iBin++ ){
-        sampleRef.dataSums.emplace_back(dataBinContentList[iBin].sumWeights);
-        sampleRef.ignoredBins.emplace_back(
-            likelihoodInterface_.getJointProbabilityPtr()->isIgnoreBinsWithZeroPredictionAtPrior()
-            and modelBinContentList[iBin].sumWeights == 0.
-        );
-      }
-
-      auto* jointProbability = likelihoodInterface_.getJointProbabilityPtr();
-      sampleRef.evalBin = [jointProbability](double data_, double pred_, double err_, int bin_){
-        return jointProbability->eval(data_, pred_, err_, bin_);
-      };
-
-      likelihoodView_.samples.emplace_back(std::move(sampleRef));
-      binOffset += samplePair.model->getHistogram().getNbBins();
-    }
-  }
-}
 
 std::string Backends::formatBackendTimingSummary(const BackendTimingSummary& timing_) {
   std::stringstream ss;
@@ -180,11 +143,7 @@ void Backends::BackendsManager::initializeImpl() {
   LogThrowIf(_likelihoodInterfacePtr_ == nullptr, "BackendsManager requires a LikelihoodInterface before initialize().");
 
   LogInfo << "Initializing propagation backend: " << _type_ << std::endl;
-  _backendEngineView_ = BackendEngineViewBuilder::build(
-      const_cast<Propagator&>(_likelihoodInterfacePtr_->getModelPropagator()).getSampleSet(),
-      _likelihoodInterfacePtr_->getModelPropagator().getEventDialCache()
-  );
-  fillBackendLikelihoodView(*_likelihoodInterfacePtr_, _backendEngineView_.likelihood);
+  _backendEngineView_.build(*_likelihoodInterfacePtr_);
 
   LogInfo << "Propagation backend enabled: " << _type_
           << " with fixed device outputs [EventWeights, Histograms, StatLikelihood]"

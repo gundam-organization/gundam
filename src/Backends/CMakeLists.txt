@@ -5,7 +5,6 @@ set(SRCFILES
     ${CMAKE_CURRENT_SOURCE_DIR}/Common/src/BackendRuntimeManager.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/Common/src/BackendsManager.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/Common/src/BackendEngineView.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/Common/src/BackendEngineViewBuilder.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/Common/src/BackendTypes.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/CPU/src/CpuBackend.cpp
 )
@@ -44,7 +43,6 @@ set(HEADERS
     ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/BackendsManager.h
     ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/BackendFactory.h
     ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/BackendEngineView.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/BackendEngineViewBuilder.h
     ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/BackendRuntimeManager.h
     ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/BackendTypes.h
     ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/IPropagationBackend.h

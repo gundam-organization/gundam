@@ -9,6 +9,7 @@ class DialInterface;
 class DialInputBuffer;
 class Event;
 class Histogram;
+class LikelihoodInterface;
 class Parameter;
 
 namespace Backends {
@@ -65,6 +66,7 @@ namespace Backends {
     BackendLikelihoodView likelihood{};
 
     void clear();
+    void build(LikelihoodInterface& likelihoodInterface_);
     [[nodiscard]] bool empty() const { return propagation.empty() and likelihood.empty(); }
   };
 
