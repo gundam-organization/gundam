@@ -18,7 +18,6 @@
 
 #ifdef GUNDAM_USING_BACKENDS
 #include "BackendsManager.h"
-#include "BackendTypes.h"
 #endif
 
 #include <vector>

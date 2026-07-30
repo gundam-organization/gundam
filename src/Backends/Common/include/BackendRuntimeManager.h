@@ -1,5 +1,5 @@
-#ifndef GUNDAM_BACKEND_MANAGER_H
-#define GUNDAM_BACKEND_MANAGER_H
+#ifndef GUNDAM_BACKEND_RUNTIME_MANAGER_H
+#define GUNDAM_BACKEND_RUNTIME_MANAGER_H
 
 #include "BackendModel.h"
 #include "BackendTypes.h"
@@ -10,9 +10,9 @@
 
 namespace Backends {
 
-  class BackendManager {
+  class BackendRuntimeManager {
   public:
-    BackendManager() = default;
+    BackendRuntimeManager() = default;
 
     void setBackend(std::unique_ptr<IPropagationBackend> backend_);
     [[nodiscard]] bool hasBackend() const { return _backend_ != nullptr; }
@@ -32,4 +32,4 @@ namespace Backends {
 
 }
 
-#endif // GUNDAM_BACKEND_MANAGER_H
+#endif // GUNDAM_BACKEND_RUNTIME_MANAGER_H

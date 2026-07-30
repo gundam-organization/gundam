@@ -12,6 +12,9 @@
 #include "Propagator.h"
 #include "EventTreeWriter.h"
 #include "DatasetDefinition.h"
+#ifdef GUNDAM_USING_BACKENDS
+#include "BackendsManager.h"
+#endif
 
 #include "GenericToolbox.Utils.h"
 #include "GenericToolbox.Time.h"
@@ -130,7 +133,7 @@ private:
   DataType _dataType_{DataType::Asimov};
   JsonType _toyParameterInjector_{};
 #ifdef GUNDAM_USING_BACKENDS
-  ConfigReader _backendConfig_{};
+  Backends::BackendsManager _backendsManager_{};
 #endif
 
   // internals

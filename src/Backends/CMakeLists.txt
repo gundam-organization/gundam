@@ -3,7 +3,8 @@ set(LIB_NAME GundamBackends)
 set(SRCFILES
     ${CMAKE_CURRENT_SOURCE_DIR}/Common/src/BackendConfig.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/Common/src/BackendFactory.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/Common/src/BackendManager.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/Common/src/BackendRuntimeManager.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/Common/src/BackendsManager.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/Common/src/BackendModel.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/Common/src/BackendModelBuilder.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/Common/src/BackendTypes.cpp
@@ -41,12 +42,13 @@ else()
 endif()
 
 set(HEADERS
+    ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/BackendsManager.h
     ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/BackendConfig.h
     ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/BackendFactory.h
     ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/BackendLikelihoodModel.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/BackendManager.h
     ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/BackendModel.h
     ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/BackendModelBuilder.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/BackendRuntimeManager.h
     ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/BackendTypes.h
     ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/IPropagationBackend.h
     ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/ParameterSnapshot.h

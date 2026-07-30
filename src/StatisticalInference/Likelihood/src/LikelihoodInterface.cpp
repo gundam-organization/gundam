@@ -6,6 +6,9 @@
 #ifdef GUNDAM_USING_CACHE_MANAGER
 #include "CacheManager.h"
 #endif
+#ifdef GUNDAM_USING_BACKENDS
+#include "BackendModelBuilder.h"
+#endif
 #include "GundamGlobals.h"
 
 #include "GenericToolbox.Map.h"
@@ -84,7 +87,8 @@ void LikelihoodInterface::configureImpl(){
 
 #ifdef GUNDAM_USING_BACKENDS
   if( _config_.hasField("backendConfig") ){
-    _backendConfig_ = _config_.fetchValue<ConfigReader>("backendConfig");
+    _config_.fillValue(_backendsManager_.getConfig(), "backendConfig");
+    _backendsManager_.configure();
   }
 #else
   if( _config_.hasField("backendConfig") ){
@@ -331,7 +335,7 @@ void LikelihoodInterface::load(){
 
   this->buildSamplePairList();
 #ifdef GUNDAM_USING_BACKENDS
-  _modelPropagator_.configureBackendLikelihoodModel(this->buildBackendLikelihoodModel());
+  _backendsManager_.setLikelihoodModel(this->buildBackendLikelihoodModel());
 #endif
   this->printBreakdowns();
 
@@ -375,8 +379,11 @@ void LikelihoodInterface::loadModelPropagator(){
   });
 
 #ifdef GUNDAM_USING_BACKENDS
-  _modelPropagator_.configureBackend(Backends::BackendConfig::fromConfig(_backendConfig_));
-  _modelPropagator_.initializeBackend();
+  _modelPropagator_.setBackendsManager(&_backendsManager_);
+  _backendsManager_.initializeBackend(Backends::BackendModelBuilder::build(
+      _modelPropagator_.getSampleSet(),
+      _modelPropagator_.getEventDialCache()
+  ));
 #endif
 
 #ifdef GUNDAM_USING_CACHE_MANAGER
