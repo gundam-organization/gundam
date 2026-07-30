@@ -13,8 +13,6 @@
 #include <memory>
 
 class LikelihoodInterface;
-class Propagator;
-
 namespace Backends {
 
   [[nodiscard]] std::string formatBackendTimingSummary(const BackendTimingSummary& timing_);
@@ -41,14 +39,16 @@ namespace Backends {
     [[nodiscard]] bool isAutoMaterializeEnabled() const { return _enableAutoMaterialize_; }
     [[nodiscard]] const std::string& getType() const { return _type_; }
     [[nodiscard]] const std::vector<OutputRequest>& getMaterializeOutputList() const { return _materializeOutputList_; }
+    [[nodiscard]] bool willAutoMaterialize(OutputRequest outputRequest_) const;
     [[nodiscard]] bool hasBackend() const { return _backendRuntimeManager_ != nullptr and _backendRuntimeManager_->hasBackend(); }
     [[nodiscard]] BackendRuntimeManager* getBackendRuntimeManager() { return _backendRuntimeManager_.get(); }
     [[nodiscard]] const BackendRuntimeManager* getBackendRuntimeManager() const { return _backendRuntimeManager_.get(); }
 
-    void setEnableAutoMaterialize(bool enableAutoMaterialize_);
-    void setMaterializeOutputList(std::vector<OutputRequest> materializeOutputList_);
+    void setEnableAutoMaterialize(bool enableAutoMaterialize_){ _enableAutoMaterialize_ = enableAutoMaterialize_; }
+    void setMaterializeOutputList(const std::vector<OutputRequest>& materializeOutputList_){ _materializeOutputList_ = materializeOutputList_; }
     void setMaterializeOutputList(std::initializer_list<OutputRequest> materializeOutputList_);
-    std::future<BackendPropagationResult> propagate(Propagator& propagator_);
+    void materialize(OutputRequest outputRequest_);
+    std::future<BackendPropagationResult> propagate();
 
 
   private:
@@ -68,6 +68,7 @@ namespace Backends {
     LikelihoodInterface* _likelihoodInterfacePtr_{nullptr};
     BackendLikelihoodModel _backendLikelihoodModel_{};
     std::shared_ptr<BackendRuntimeManager> _backendRuntimeManager_{nullptr};
+    PropagationToken _lastPropagationToken_{};
   };
 
 }

@@ -333,13 +333,15 @@ void FitterEngine::initializeImpl(){
 void FitterEngine::evaluateLikelihood(){
 #ifdef GUNDAM_USING_BACKENDS
   if( _backendsManager_.hasBackend() ){
-    auto backendResult = _backendsManager_.propagate(getLikelihoodInterface().getModelPropagator());
+    auto backendResult = _backendsManager_.propagate();
     if( backendResult.valid() ){
       auto result = backendResult.get();
       if( result.isValid ){
         getLikelihoodInterface().evalPenaltyLikelihood();
         if( result.hasStatLikelihood ){
-          getLikelihoodInterface().getBuffer().statLikelihood = result.statLikelihood;
+          if( not _backendsManager_.willAutoMaterialize(Backends::OutputRequest::StatLikelihood) ){
+            _backendsManager_.materialize(Backends::OutputRequest::StatLikelihood);
+          }
         }
         else{
           std::future<bool> invalidPropagation;

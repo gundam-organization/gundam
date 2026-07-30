@@ -92,16 +92,32 @@ bool Backends::BackendsManager::shouldMaterialize(OutputRequest outputRequest_) 
   return std::find(_materializeOutputList_.begin(), _materializeOutputList_.end(), outputRequest_) != _materializeOutputList_.end();
 }
 
-void Backends::BackendsManager::setEnableAutoMaterialize(bool enableAutoMaterialize_) {
-  _enableAutoMaterialize_ = enableAutoMaterialize_;
-}
-
-void Backends::BackendsManager::setMaterializeOutputList(std::vector<OutputRequest> materializeOutputList_) {
-  _materializeOutputList_ = std::move(materializeOutputList_);
+bool Backends::BackendsManager::willAutoMaterialize(OutputRequest outputRequest_) const {
+  return _enableAutoMaterialize_ and shouldMaterialize(outputRequest_);
 }
 
 void Backends::BackendsManager::setMaterializeOutputList(std::initializer_list<OutputRequest> materializeOutputList_) {
   setMaterializeOutputList(std::vector<OutputRequest>(materializeOutputList_));
+}
+
+void Backends::BackendsManager::materialize(OutputRequest outputRequest_) {
+  LogThrowIf(not hasBackend(), "No backend initialized.");
+  LogThrowIf(not _lastPropagationToken_.isValid, "No backend propagation token available for materialization.");
+  LogThrowIf(_likelihoodInterfacePtr_ == nullptr, "BackendsManager requires a LikelihoodInterface for materialization.");
+
+  auto* backend = _backendRuntimeManager_->getBackend();
+  auto status = backend->getStatus(_lastPropagationToken_);
+  auto outputState = status.state(outputRequest_);
+  LogThrowIf(outputState != OutputState::ReadyOnDevice and outputState != OutputState::ReadyOnHost,
+             "Requested backend output is not ready for materialization: " << outputRequest_.toString());
+
+  if( outputRequest_ == OutputRequest::StatLikelihood ){
+    _likelihoodInterfacePtr_->getBuffer().statLikelihood = backend->getLikelihood(_lastPropagationToken_);
+  }
+
+  if( outputState == OutputState::ReadyOnDevice ){
+    _backendRuntimeManager_->materialize(_lastPropagationToken_, outputRequest_);
+  }
 }
 
 void Backends::BackendsManager::initializeImpl() {
@@ -133,11 +149,12 @@ void Backends::BackendsManager::initializeImpl() {
   _backendRuntimeManager_->getBackend()->setLikelihoodModel(_backendLikelihoodModel_);
 }
 
-std::future<Backends::BackendPropagationResult> Backends::BackendsManager::propagate(Propagator&) {
+std::future<Backends::BackendPropagationResult> Backends::BackendsManager::propagate() {
   LogThrowIf(not hasBackend(), "No backend initialized.");
 
   Backends::ParameterSnapshot snapshot;
   auto token = _backendRuntimeManager_->requestPropagation(snapshot);
+  _lastPropagationToken_ = token;
   if( not token.isValid ){
     return std::async(std::launch::deferred, []{
       return BackendPropagationResult{};
@@ -163,8 +180,8 @@ std::future<Backends::BackendPropagationResult> Backends::BackendsManager::propa
         result.hasStatLikelihood = true;
       }
 
-      if( not _enableAutoMaterialize_ or not shouldMaterialize(outputRequest) ){ continue; }
-      backendRuntimeManager->materialize(token, outputRequest);
+      if( not willAutoMaterialize(outputRequest) ){ continue; }
+      materialize(outputRequest);
     }
 
     return result;
