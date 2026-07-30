@@ -408,12 +408,12 @@ struct Backends::MpsBackend::Impl {
     lastResult.status.statLikelihood = OutputState::Scheduled;
   }
 
-  double getDialInputValue(const BackendDialInputRef& inputRef_, const ParameterSnapshot& parameters_) const {
+  double getDialInputValue(const BackendDialInputView& inputRef_, const ParameterSnapshot& parameters_) const {
     LogThrowIf(parameters_.empty(), "MpsBackend requires a populated ParameterSnapshot.");
     return parameters_.values.at(inputRef_.parameterIndex);
   }
 
-  static double applyDialInputTransform(const BackendDialInputRef& inputRef_, double rawValue_) {
+  static double applyDialInputTransform(const BackendDialInputView& inputRef_, double rawValue_) {
     if( not inputRef_.useMirror ){ return rawValue_; }
 
     double transformed = std::abs(std::fmod(
@@ -429,7 +429,7 @@ struct Backends::MpsBackend::Impl {
     return transformed + inputRef_.mirrorMin;
   }
 
-  double evaluateDialResponse(const BackendDialRef& dialRef_, const ParameterSnapshot& parameters_) const {
+  double evaluateDialResponse(const BackendDialView& dialRef_, const ParameterSnapshot& parameters_) const {
     auto clampResponse = [&dialRef_](double response_){
       if( dialRef_.hasMinResponse and response_ < dialRef_.minResponse ){ response_ = dialRef_.minResponse; }
       if( dialRef_.hasMaxResponse and response_ > dialRef_.maxResponse ){ response_ = dialRef_.maxResponse; }
@@ -724,7 +724,7 @@ struct Backends::MpsBackend::Impl {
             << " This phase materializes unique dial descriptors and payloads."
             << std::endl;
     cachedDialCount = 0;
-    auto fillMinMax = [](const BackendDialRef& dialRef_, float& minResponse_, float& maxResponse_) {
+    auto fillMinMax = [](const BackendDialView& dialRef_, float& minResponse_, float& maxResponse_) {
       minResponse_ = -std::numeric_limits<float>::infinity();
       maxResponse_ = std::numeric_limits<float>::infinity();
       if( dialRef_.hasMinResponse ){ minResponse_ = float(dialRef_.minResponse); }

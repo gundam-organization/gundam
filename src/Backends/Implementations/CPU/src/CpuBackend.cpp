@@ -137,7 +137,7 @@ void Backends::CpuBackend::resetResult() {
   _lastResult_.status.statLikelihood = OutputState::Scheduled;
 }
 
-double Backends::CpuBackend::evaluateDialResponse(const BackendDialRef& dialRef_, const ParameterSnapshot& parameters_) const {
+double Backends::CpuBackend::evaluateDialResponse(const BackendDialView& dialRef_, const ParameterSnapshot& parameters_) const {
   auto clampResponse = [&dialRef_](double response_){
     if( dialRef_.hasMinResponse and response_ < dialRef_.minResponse ){ response_ = dialRef_.minResponse; }
     if( dialRef_.hasMaxResponse and response_ > dialRef_.maxResponse ){ response_ = dialRef_.maxResponse; }
@@ -209,12 +209,12 @@ double Backends::CpuBackend::evaluateDialResponse(const BackendDialRef& dialRef_
   LogThrow("Unhandled backend dial type in CpuBackend.");
 }
 
-double Backends::CpuBackend::getDialInputValue(const BackendDialInputRef& inputRef_, const ParameterSnapshot& parameters_) const {
+double Backends::CpuBackend::getDialInputValue(const BackendDialInputView& inputRef_, const ParameterSnapshot& parameters_) const {
   LogThrowIf(parameters_.empty(), "CpuBackend requires a populated ParameterSnapshot.");
   return parameters_.values.at(inputRef_.parameterIndex);
 }
 
-double Backends::CpuBackend::applyDialInputTransform(const BackendDialInputRef& inputRef_, double rawValue_) {
+double Backends::CpuBackend::applyDialInputTransform(const BackendDialInputView& inputRef_, double rawValue_) {
   if( not inputRef_.useMirror ){ return rawValue_; }
 
   double transformed = std::abs(std::fmod(

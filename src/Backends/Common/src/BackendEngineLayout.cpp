@@ -33,7 +33,7 @@ namespace {
     std::map<int, int> sampleBinOffsetMap;
     int binOffset{0};
     for( auto& sample : sampleSet.getSampleList() ){
-      Backends::BackendSampleRef sampleRef;
+      Backends::BackendSampleView sampleRef;
       sampleRef.sampleIndex = sample.getIndex();
       sampleRef.binOffset = binOffset;
       sampleRef.binCount = sample.getHistogram().getNbBins();
@@ -45,13 +45,13 @@ namespace {
 
     propagation.events.reserve(eventDialCache.getCache().size());
     std::unordered_map<const Parameter*, std::size_t> parameterIndexMap{};
-    std::unordered_map<const DialInterface*, Backends::BackendDialRef> dialDescriptorMap{};
+    std::unordered_map<const DialInterface*, Backends::BackendDialView> dialDescriptorMap{};
 
     for( const auto& cacheEntry : eventDialCache.getCache() ){
       if( cacheEntry.event == nullptr ){ continue; }
       if( cacheEntry.event->getIndices().bin < 0 ){ continue; }
 
-      Backends::BackendEventRef eventRef;
+      Backends::BackendEventView eventRef;
       eventRef.sampleIndex = cacheEntry.event->getIndices().sample;
       eventRef.binIndex = cacheEntry.event->getIndices().bin;
       eventRef.globalBinIndex = sampleBinOffsetMap.at(eventRef.sampleIndex) + eventRef.binIndex;
@@ -69,7 +69,7 @@ namespace {
           continue;
         }
 
-        Backends::BackendDialRef dialRef;
+        Backends::BackendDialView dialRef;
         const auto* dialBase = interface->getDialBaseRef();
         LogThrowIf(dialBase == nullptr, "Null DialBase while building BackendEngineView.");
         const auto* inputBuffer = interface->getInputBufferRef();
@@ -138,7 +138,7 @@ namespace {
             parameterIndexIt = parameterIndexMap.emplace(parPtr, parameterIndexMap.size()).first;
           }
 
-          Backends::BackendDialInputRef inputRef;
+          Backends::BackendDialInputView inputRef;
           inputRef.parameterIndex = parameterIndexIt->second;
           const auto& mirrorEdges = inputBuffer->getMirrorEdges(iInput);
           inputRef.useMirror = not std::isnan(mirrorEdges.minValue);
@@ -156,7 +156,7 @@ namespace {
     likelihood.samples.reserve(likelihoodInterface_.getSamplePairList().size());
     binOffset = 0;
     for( const auto& samplePair : likelihoodInterface_.getSamplePairList() ){
-      Backends::BackendLikelihoodSampleRef sampleRef;
+      Backends::BackendLikelihoodSampleView sampleRef;
       sampleRef.binOffset = binOffset;
       sampleRef.dataSums.reserve(samplePair.data->getHistogram().getNbBins());
       sampleRef.ignoredBins.reserve(samplePair.data->getHistogram().getNbBins());

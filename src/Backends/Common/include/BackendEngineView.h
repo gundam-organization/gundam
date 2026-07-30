@@ -8,6 +8,9 @@
 
 namespace Backends {
 
+  // Passive, flattened view of the fitter engine state for backend consumption.
+  // It owns no engine logic and only exposes backend-friendly event, dial, sample,
+  // and likelihood descriptors built upstream by BackendEngineLayout.
   enum class BackendDialType : std::uint8_t {
     Norm = 0,
     Shift,
@@ -18,14 +21,14 @@ namespace Backends {
     Graph
   };
 
-  struct BackendDialInputRef {
+  struct BackendDialInputView {
     std::size_t parameterIndex{std::size_t(-1)};
     bool useMirror{false};
     double mirrorMin{0};
     double mirrorRange{0};
   };
 
-  struct BackendDialRef {
+  struct BackendDialView {
     BackendDialType type{BackendDialType::Norm};
     std::size_t firstInput{0};
     std::size_t inputCount{0};
@@ -38,7 +41,7 @@ namespace Backends {
     bool hasMaxResponse{false};
   };
 
-  struct BackendEventRef {
+  struct BackendEventView {
     int sampleIndex{-1};
     int binIndex{-1};
     int globalBinIndex{-1};
@@ -48,13 +51,13 @@ namespace Backends {
     std::size_t resultIndex{0};
   };
 
-  struct BackendSampleRef {
+  struct BackendSampleView {
     int sampleIndex{-1};
     int binOffset{0};
     int binCount{0};
   };
 
-  struct BackendLikelihoodSampleRef {
+  struct BackendLikelihoodSampleView {
     int binOffset{0};
     std::vector<double> dataSums{};
     std::vector<bool> ignoredBins{};
@@ -62,11 +65,11 @@ namespace Backends {
   };
 
   struct BackendPropagationView {
-    std::vector<BackendEventRef> events{};
-    std::vector<BackendDialRef> eventDials{};
-    std::vector<BackendDialInputRef> dialInputs{};
+    std::vector<BackendEventView> events{};
+    std::vector<BackendDialView> eventDials{};
+    std::vector<BackendDialInputView> dialInputs{};
     std::vector<double> dialPayloads{};
-    std::vector<BackendSampleRef> samples{};
+    std::vector<BackendSampleView> samples{};
     std::size_t parameterCount{0};
     int totalBins{0};
 
@@ -83,7 +86,7 @@ namespace Backends {
   };
 
   struct BackendLikelihoodView {
-    std::vector<BackendLikelihoodSampleRef> samples{};
+    std::vector<BackendLikelihoodSampleView> samples{};
 
     [[nodiscard]] bool empty() const { return samples.empty(); }
   };
