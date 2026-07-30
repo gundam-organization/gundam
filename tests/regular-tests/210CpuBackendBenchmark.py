@@ -6,7 +6,6 @@ import time
 from array import array
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional
 
 
 def flush_python_outputs() -> None:
@@ -53,37 +52,13 @@ class BenchmarkContext:
     likelihood_interface: object
 
 
-@dataclass
-class BenchmarkCase:
-    name: str
-    output_requests: list[str]
-    materialize_output_requests: Optional[list[str]] = None
-
-
-@dataclass
-class BenchmarkTiming:
-    name: str
-    output_requests: list[str]
-    elapsed: float
-    speedup: float
-
-
-def build_config_text(
-    root_path: Path,
-    output_requests: Optional[list[str]] = None,
-    materialize_output_requests: Optional[list[str]] = None,
-) -> str:
+def build_config_text(root_path: Path, backend_type: str | None = None) -> str:
     backend_config = ""
-    if output_requests is not None:
-        materialize_config = ""
-        if materialize_output_requests is not None:
-            materialize_config = f"""
-      materializeOutputRequests: [{", ".join(materialize_output_requests)}]"""
+    if backend_type is not None:
         backend_config = f"""
     backendConfig:
       isEnabled: true
-      type: CPU
-      outputRequests: [{", ".join(output_requests)}]{materialize_config}
+      type: {backend_type}
 """
 
     return f"""
@@ -140,7 +115,7 @@ fitterEngineConfig:
 """
 
 
-def build_likelihood_interface(config_text: str, work_dir: Path):
+def build_likelihood_interface(config_text: str, work_dir: Path) -> BenchmarkContext:
     GUNDAM = load_gundam_module()
 
     GUNDAM.setRuntimeWorkingDirectory(str(work_dir))
@@ -186,69 +161,49 @@ def benchmark(context: BenchmarkContext, parameter_points: list[tuple[float, flo
     start = time.perf_counter()
     for point in parameter_points:
         set_normalization_parameters(likelihood_interface, *point)
-        likelihood_interface.propagateAndEvalLikelihood()
+        context.engine.propagateAndEvalLikelihood()
         results.append((likelihood_interface.getLastLikelihood(), get_histogram_sums(likelihood_interface)))
     elapsed = time.perf_counter() - start
     return elapsed, results
 
 
-def assert_close_list(label: str, left: list[float], right: list[float]) -> None:
+def assert_close_list(label: str, left: list[float], right: list[float], rel_tol: float = 1e-10, abs_tol: float = 1e-8) -> None:
     if len(left) != len(right):
         raise RuntimeError(f"{label}: length mismatch {len(left)} != {len(right)}")
 
     for i_bin, (left_value, right_value) in enumerate(zip(left, right)):
-        if not math.isclose(left_value, right_value, rel_tol=1e-10, abs_tol=1e-8):
+        if not math.isclose(left_value, right_value, rel_tol=rel_tol, abs_tol=abs_tol):
             raise RuntimeError(f"{label}: bin {i_bin} mismatch {left_value} != {right_value}")
 
 
-def compare_results(case_name: str, requested_outputs: list[str], standard_results, backend_results) -> None:
+def compare_results(standard_results, backend_results, rel_tol: float = 1e-10, abs_tol: float = 1e-8) -> None:
     if len(standard_results) != len(backend_results):
-        raise RuntimeError(f"{case_name}: benchmark result count mismatch.")
+        raise RuntimeError("Benchmark result count mismatch.")
 
     non_zero_llh_count = 0
-    check_likelihood = "Likelihood" in requested_outputs
-    check_histograms = (
-        "Histograms" in requested_outputs
-        or "EventWeights" in requested_outputs
-        or not check_likelihood
-    )
     for i_point, (standard, backend) in enumerate(zip(standard_results, backend_results)):
         standard_llh, standard_sums = standard
         backend_llh, backend_sums = backend
-        if check_likelihood and not math.isclose(backend_llh, standard_llh, rel_tol=1e-10, abs_tol=1e-8):
-            raise RuntimeError(f"{case_name}: LLH mismatch at point {i_point}: {backend_llh} != {standard_llh}")
+
+        if not math.isclose(backend_llh, standard_llh, rel_tol=rel_tol, abs_tol=abs_tol):
+            raise RuntimeError(f"LLH mismatch at point {i_point}: {backend_llh} != {standard_llh}")
+
+        assert_close_list(f"histogram sums at point {i_point}", backend_sums, standard_sums, rel_tol=rel_tol, abs_tol=abs_tol)
+
         if not math.isclose(standard_llh, 0.0, rel_tol=0.0, abs_tol=1e-8):
             non_zero_llh_count += 1
-        if check_histograms:
-            assert_close_list(f"{case_name}: histogram sums at point {i_point}", backend_sums, standard_sums)
 
     if non_zero_llh_count == 0:
-        raise RuntimeError(f"{case_name}: all benchmark LLH values are zero.")
+        raise RuntimeError("All benchmark LLH values are zero.")
 
 
-def print_timing_table(timings: list[BenchmarkTiming]) -> None:
-    rows = [
-        (
-            timing.name,
-            ", ".join(timing.output_requests) if timing.output_requests else "standard",
-            f"{timing.elapsed:.6f}",
-            "1.000" if timing.speedup == 1.0 else f"{timing.speedup:.3f}",
-        )
-        for timing in timings
-    ]
-    headers = ("Case", "Requested outputs", "Time [s]", "Speedup")
-    widths = [
-        max(len(headers[i_col]), *(len(row[i_col]) for row in rows))
-        for i_col in range(len(headers))
-    ]
-
-    def format_row(row) -> str:
-        return " | ".join(str(value).ljust(widths[i_col]) for i_col, value in enumerate(row))
-
-    print(format_row(headers))
-    print("-+-".join("-" * width for width in widths))
-    for row in rows:
-        print(format_row(row))
+def make_parameter_points(nb_points: int) -> list[tuple[float, float]]:
+    points = []
+    for i_point in range(nb_points):
+        positive = 1.35 + 1.85 * ((i_point * 17) % nb_points) / max(nb_points - 1, 1)
+        negative = 1.75 + 2.15 * ((i_point * 29 + 7) % nb_points) / max(nb_points - 1, 1)
+        points.append((positive, negative))
+    return points
 
 
 def main() -> int:
@@ -256,62 +211,27 @@ def main() -> int:
     work_dir = Path.cwd()
     root_path = work_dir / "210CpuBackendBenchmark.root"
 
+    nb_events = 120000
+    nb_parameter_points = 100
+
     flush_python_outputs()
-    write_input_root_file(root_path, nb_events=120000)
+    write_input_root_file(root_path, nb_events=nb_events)
+    parameter_points = make_parameter_points(nb_parameter_points)
 
-    parameter_points = [
-        (2.0, 3.0),
-        (2.3, 2.6),
-        (1.7, 3.5),
-        (2.8, 2.1),
-        (1.4, 3.8),
-        (3.1, 1.9),
-        (2.5, 2.4),
-        (1.8, 3.2),
-        (2.9, 2.0),
-        (1.6, 3.6),
-    ]
+    standard_context = build_likelihood_interface(build_config_text(root_path), work_dir)
+    backend_context = build_likelihood_interface(build_config_text(root_path, backend_type="CPU"), work_dir)
 
-    benchmark_cases = [
-        BenchmarkCase("backend histograms", ["Histograms"]),
-        BenchmarkCase("backend event weights", ["EventWeights"]),
-        BenchmarkCase("backend likelihood", ["Likelihood"]),
-        BenchmarkCase("backend weights+hist", ["EventWeights", "Histograms"]),
-        BenchmarkCase("backend hist+llh", ["Histograms", "Likelihood"]),
-    ]
+    standard_elapsed, standard_results = benchmark(standard_context, parameter_points)
+    backend_elapsed, backend_results = benchmark(backend_context, parameter_points)
 
-    standard_interface = build_likelihood_interface(build_config_text(root_path), work_dir)
-    standard_elapsed, standard_results = benchmark(standard_interface, parameter_points)
+    compare_results(standard_results, backend_results)
 
-    timings = [
-        BenchmarkTiming(
-            name="standard",
-            output_requests=[],
-            elapsed=standard_elapsed,
-            speedup=1.0,
-        )
-    ]
-
-    for benchmark_case in benchmark_cases:
-        backend_interface = build_likelihood_interface(
-            build_config_text(root_path, benchmark_case.output_requests),
-            work_dir,
-        )
-        backend_elapsed, backend_results = benchmark(backend_interface, parameter_points)
-        compare_results(benchmark_case.name, benchmark_case.output_requests, standard_results, backend_results)
-        timings.append(
-            BenchmarkTiming(
-                name=benchmark_case.name,
-                output_requests=benchmark_case.output_requests,
-                elapsed=backend_elapsed,
-                speedup=standard_elapsed / backend_elapsed if backend_elapsed > 0 else float("inf"),
-            )
-        )
-
-    print(f"Benchmark events: 120000")
+    print(f"Benchmark events: {nb_events}")
     print(f"Benchmark parameter points: {len(parameter_points)}")
-    print_timing_table(timings)
-    print("SUCCESS: CPU backend benchmark cases match standard propagation.")
+    print(f"Standard propagation time: {standard_elapsed:.6f} s")
+    print(f"CPU backend propagation time: {backend_elapsed:.6f} s")
+    print(f"CPU backend speedup: {standard_elapsed / backend_elapsed:.3f}x")
+    print("SUCCESS: CPU backend propagation matches the standard propagation path.")
     return 0
 
 
