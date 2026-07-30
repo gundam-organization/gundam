@@ -41,10 +41,6 @@ namespace Backends {
       double likelihood{0};
     };
 
-    [[nodiscard]] double evaluateDialResponse(const BackendDialView& dialRef_, const ParameterSnapshot& parameters_) const;
-    [[nodiscard]] double getDialInputValue(const BackendDialInputView& inputRef_, const ParameterSnapshot& parameters_) const;
-    static double applyDialInputTransform(const BackendDialInputView& inputRef_, double rawValue_);
-
     [[nodiscard]] bool isCurrentToken(const PropagationToken& token_) const;
     void resetResult();
     void calculateEventWeights(Result& result_, const ParameterSnapshot& parameters_);

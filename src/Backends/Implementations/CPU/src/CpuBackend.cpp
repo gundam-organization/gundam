@@ -1,13 +1,8 @@
 #include "CpuBackend.h"
 
-#include "CalculateCompactSpline.h"
-#include "CalculateGeneralSpline.h"
-#include "CalculateGraph.h"
-#include "CalculateMonotonicSpline.h"
-#include "CalculateUniformSpline.h"
+#include "Semantics/BackendDialSemantics.h"
 #include "Logger.h"
 
-#include <cmath>
 #include <algorithm>
 
 Backends::BackendCapabilities Backends::CpuBackend::getCapabilities() const {
@@ -137,112 +132,12 @@ void Backends::CpuBackend::resetResult() {
   _lastResult_.status.statLikelihood = OutputState::Scheduled;
 }
 
-double Backends::CpuBackend::evaluateDialResponse(const BackendDialView& dialRef_, const ParameterSnapshot& parameters_) const {
-  auto clampResponse = [&dialRef_](double response_){
-    if( dialRef_.hasMinResponse and response_ < dialRef_.minResponse ){ response_ = dialRef_.minResponse; }
-    if( dialRef_.hasMaxResponse and response_ > dialRef_.maxResponse ){ response_ = dialRef_.maxResponse; }
-    return response_;
-  };
-
-  auto getInput = [this, &dialRef_, &parameters_](std::size_t iInput_){
-    const auto& inputRef = _engineView_.propagation.dialInputs.at(dialRef_.firstInput + iInput_);
-    return applyDialInputTransform(inputRef, getDialInputValue(inputRef, parameters_));
-  };
-
-  const double* payload = _engineView_.propagation.dialPayloads.data() + dialRef_.payloadOffset;
-
-  switch( dialRef_.type ){
-    case BackendDialType::Norm:
-      LogThrowIf(dialRef_.inputCount != 1, "Backend Norm dial expects exactly one input.");
-      return clampResponse(getInput(0));
-
-    case BackendDialType::Shift:
-      LogThrowIf(dialRef_.payloadSize < 1, "Backend Shift dial payload is empty.");
-      return clampResponse(payload[0]);
-
-    case BackendDialType::CompactSpline: {
-      LogThrowIf(dialRef_.payloadSize < 3, "Backend CompactSpline payload is too small.");
-      double x = getInput(0);
-      if( not dialRef_.allowExtrapolation ){
-        x = std::clamp(x, payload[0], payload[0] + payload[1] * double(dialRef_.payloadSize - 3));
-      }
-      return clampResponse(CalculateCompactSpline(x, -1E20, 1E20, payload, int(dialRef_.payloadSize - 2)));
-    }
-
-    case BackendDialType::UniformSpline: {
-      LogThrowIf(dialRef_.payloadSize < 4, "Backend UniformSpline payload is too small.");
-      double x = getInput(0);
-      if( not dialRef_.allowExtrapolation ){
-        x = std::clamp(x, payload[0], payload[0] + payload[1] * double((dialRef_.payloadSize - 2) / 2 - 1));
-      }
-      return clampResponse(CalculateUniformSpline(x, -1E20, 1E20, payload, int(dialRef_.payloadSize)));
-    }
-
-    case BackendDialType::MonotonicSpline: {
-      LogThrowIf(dialRef_.payloadSize < 3, "Backend MonotonicSpline payload is too small.");
-      double x = getInput(0);
-      if( not dialRef_.allowExtrapolation ){
-        x = std::clamp(x, payload[0], payload[0] + payload[1] * double(dialRef_.payloadSize - 3));
-      }
-      return clampResponse(CalculateMonotonicSpline(x, -1E20, 1E20, payload, int(dialRef_.payloadSize - 2)));
-    }
-
-    case BackendDialType::GeneralSpline: {
-      LogThrowIf(dialRef_.payloadSize < 5, "Backend GeneralSpline payload is too small.");
-      double x = getInput(0);
-      if( not dialRef_.allowExtrapolation ){
-        x = std::clamp(x, payload[0], payload[0] + payload[1] * double((dialRef_.payloadSize - 2) / 3 - 1));
-      }
-      return clampResponse(CalculateGeneralSpline(x, -1E20, 1E20, payload, int(dialRef_.payloadSize)));
-    }
-
-    case BackendDialType::Graph: {
-      LogThrowIf(dialRef_.payloadSize < 2, "Backend Graph payload is too small.");
-      double x = getInput(0);
-      if( not dialRef_.allowExtrapolation ){
-        x = std::clamp(x, payload[1], payload[dialRef_.payloadSize - 1]);
-      }
-      return clampResponse(CalculateGraph(x, -1E20, 1E20, payload, int(dialRef_.payloadSize)));
-    }
-  }
-
-  LogThrow("Unhandled backend dial type in CpuBackend.");
-}
-
-double Backends::CpuBackend::getDialInputValue(const BackendDialInputView& inputRef_, const ParameterSnapshot& parameters_) const {
-  LogThrowIf(parameters_.empty(), "CpuBackend requires a populated ParameterSnapshot.");
-  return parameters_.values.at(inputRef_.parameterIndex);
-}
-
-double Backends::CpuBackend::applyDialInputTransform(const BackendDialInputView& inputRef_, double rawValue_) {
-  if( not inputRef_.useMirror ){ return rawValue_; }
-
-  double transformed = std::abs(std::fmod(
-      rawValue_ - inputRef_.mirrorMin,
-      2 * inputRef_.mirrorRange
-  ));
-
-  if( transformed > inputRef_.mirrorRange ){
-    transformed -= 2 * inputRef_.mirrorRange;
-    transformed = -transformed;
-  }
-
-  return transformed + inputRef_.mirrorMin;
-}
-
 void Backends::CpuBackend::calculateEventWeights(Result& result_, const ParameterSnapshot& parameters_) {
   const auto& model = _engineView_.propagation;
   result_.eventWeights.resize(model.events.size());
 
   for( const auto& event : model.events ){
-    double weight = event.baseWeight;
-
-    for( std::size_t iDial = 0 ; iDial < event.dialCount ; iDial++ ){
-      const auto& dialRef = model.eventDials[event.firstDial + iDial];
-      weight *= evaluateDialResponse(dialRef, parameters_);
-    }
-
-    result_.eventWeights[event.resultIndex] = weight;
+    result_.eventWeights[event.resultIndex] = Semantics::evalEventWeight(model, event, parameters_);
   }
 }
 
@@ -277,11 +172,7 @@ void Backends::CpuBackend::calculateHistogramsFromEvents(Result& result_, const 
     int globalBin = event.globalBinIndex;
     if( globalBin < 0 ){ continue; }
 
-    double weight = event.baseWeight;
-    for( std::size_t iDial = 0 ; iDial < event.dialCount ; iDial++ ){
-      const auto& dialRef = model.eventDials[event.firstDial + iDial];
-      weight *= evaluateDialResponse(dialRef, parameters_);
-    }
+    double weight = Semantics::evalEventWeight(model, event, parameters_);
 
     result_.histSums[globalBin] += weight;
     result_.histSumSquares[globalBin] += weight * weight;
