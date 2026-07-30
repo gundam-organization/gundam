@@ -1,20 +1,21 @@
 #include "BackendEngineView.h"
 
 #include "EventDialCache.h"
-#include "GenericToolbox.Utils.h"
 #include "Histogram.h"
 #include "LikelihoodInterface.h"
 #include "Parameter.h"
 #include "Sample.h"
 #include "SampleSet.h"
 
+#include <cmath>
 #include <map>
+#include <unordered_map>
 #include <utility>
 
 void Backends::BackendPropagationView::clear() {
   events.clear();
   eventDials.clear();
-  inputBuffers.clear();
+  dialInputs.clear();
   samples.clear();
   parameters.clear();
   totalBins = 0;
@@ -47,6 +48,7 @@ void Backends::BackendEngineView::build(LikelihoodInterface& likelihoodInterface
   propagation.totalBins = binOffset;
 
   propagation.events.reserve(eventDialCache.getCache().size());
+  std::unordered_map<const Parameter*, std::size_t> parameterIndexMap{};
 
   for( const auto& cacheEntry : eventDialCache.getCache() ){
     if( cacheEntry.event == nullptr ){ continue; }
@@ -64,13 +66,28 @@ void Backends::BackendEngineView::build(LikelihoodInterface& likelihoodInterface
     for( const auto& dialResponse : cacheEntry.dialResponseCacheList ){
       BackendDialRef dialRef;
       dialRef.interface = dialResponse.dialInterface;
+      const auto* inputBuffer = dialResponse.dialInterface->getInputBufferRef();
+      dialRef.firstInput = propagation.dialInputs.size();
+      dialRef.inputCount = inputBuffer == nullptr ? 0 : std::size_t(inputBuffer->getBufferSize());
       propagation.eventDials.emplace_back(dialRef);
 
-      const auto* inputBuffer = dialResponse.dialInterface->getInputBufferRef();
-      GenericToolbox::addIfNotInVector(inputBuffer, propagation.inputBuffers);
+      if( inputBuffer == nullptr ){ continue; }
+
       for( int iInput = 0 ; iInput < inputBuffer->getBufferSize() ; iInput++ ){
         const auto* parPtr = &inputBuffer->getParameter(iInput);
-        GenericToolbox::addIfNotInVector(parPtr, propagation.parameters);
+        auto parameterIndexIt = parameterIndexMap.find(parPtr);
+        if( parameterIndexIt == parameterIndexMap.end() ){
+          propagation.parameters.emplace_back(parPtr);
+          parameterIndexIt = parameterIndexMap.emplace(parPtr, propagation.parameters.size() - 1).first;
+        }
+
+        BackendDialInputRef inputRef;
+        inputRef.parameterIndex = parameterIndexIt->second;
+        const auto& mirrorEdges = inputBuffer->getMirrorEdges(iInput);
+        inputRef.useMirror = not std::isnan(mirrorEdges.minValue);
+        inputRef.mirrorMin = mirrorEdges.minValue;
+        inputRef.mirrorRange = mirrorEdges.range;
+        propagation.dialInputs.emplace_back(inputRef);
       }
     }
 

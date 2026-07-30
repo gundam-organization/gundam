@@ -6,14 +6,22 @@
 #include <vector>
 
 class DialInterface;
-class DialInputBuffer;
 class LikelihoodInterface;
 class Parameter;
 
 namespace Backends {
 
+  struct BackendDialInputRef {
+    std::size_t parameterIndex{std::size_t(-1)};
+    bool useMirror{false};
+    double mirrorMin{0};
+    double mirrorRange{0};
+  };
+
   struct BackendDialRef {
     const DialInterface* interface{nullptr};
+    std::size_t firstInput{0};
+    std::size_t inputCount{0};
   };
 
   struct BackendEventRef {
@@ -42,7 +50,7 @@ namespace Backends {
   struct BackendPropagationView {
     std::vector<BackendEventRef> events{};
     std::vector<BackendDialRef> eventDials{};
-    std::vector<const DialInputBuffer*> inputBuffers{};
+    std::vector<BackendDialInputRef> dialInputs{};
     std::vector<BackendSampleRef> samples{};
     std::vector<const Parameter*> parameters{};
     int totalBins{0};

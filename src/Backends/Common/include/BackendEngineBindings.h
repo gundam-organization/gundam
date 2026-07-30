@@ -3,7 +3,6 @@
 
 #include <vector>
 
-class DialInputBuffer;
 class DialInterface;
 class Event;
 class Histogram;
@@ -29,16 +28,11 @@ namespace Backends {
     Parameter* parameter{nullptr};
   };
 
-  struct BackendInputBufferBinding {
-    DialInputBuffer* inputBuffer{nullptr};
-  };
-
   struct BackendEngineBindings {
     std::vector<BackendEventBinding> events{};
     std::vector<BackendDialBinding> eventDials{};
     std::vector<BackendSampleBinding> samples{};
     std::vector<BackendParameterBinding> parameters{};
-    std::vector<BackendInputBufferBinding> inputBuffers{};
 
     void clear();
     void build(LikelihoodInterface& likelihoodInterface_);
@@ -46,8 +40,7 @@ namespace Backends {
       return events.empty()
              and eventDials.empty()
              and samples.empty()
-             and parameters.empty()
-             and inputBuffers.empty();
+             and parameters.empty();
     }
   };
 

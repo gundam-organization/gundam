@@ -1,6 +1,5 @@
 #include "BackendEngineBindings.h"
 
-#include "DialInputBuffer.h"
 #include "DialInterface.h"
 #include "EventDialCache.h"
 #include "Event.h"
@@ -24,7 +23,6 @@ void Backends::BackendEngineBindings::clear() {
   eventDials.clear();
   samples.clear();
   parameters.clear();
-  inputBuffers.clear();
 }
 
 void Backends::BackendEngineBindings::build(LikelihoodInterface& likelihoodInterface_) {
@@ -57,11 +55,8 @@ void Backends::BackendEngineBindings::build(LikelihoodInterface& likelihoodInter
       dialBinding.interface = dialResponse.dialInterface;
       eventDials.emplace_back(dialBinding);
 
-      auto* inputBuffer = const_cast<DialInputBuffer*>(dialResponse.dialInterface->getInputBufferRef());
+      const auto* inputBuffer = dialResponse.dialInterface->getInputBufferRef();
       if( inputBuffer != nullptr ){
-        if( not containsIf(inputBuffers, [inputBuffer](const auto& binding_){ return binding_.inputBuffer == inputBuffer; }) ){
-          inputBuffers.emplace_back(BackendInputBufferBinding{inputBuffer});
-        }
         for( int iInput = 0 ; iInput < inputBuffer->getBufferSize() ; iInput++ ){
           auto* parameter = const_cast<Parameter*>(&inputBuffer->getParameter(iInput));
           if( not containsIf(parameters, [parameter](const auto& binding_){ return binding_.parameter == parameter; }) ){

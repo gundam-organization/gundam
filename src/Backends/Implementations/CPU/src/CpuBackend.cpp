@@ -2,9 +2,6 @@
 
 #include "DialInputBuffer.h"
 #include "DialInterface.h"
-#include "Event.h"
-#include "Histogram.h"
-#include "Parameter.h"
 
 #include "Logger.h"
 
@@ -38,10 +35,7 @@ Backends::PropagationToken Backends::CpuBackend::requestPropagation(const Parame
 
   resetResult();
 
-  applyParameterSnapshot(parameters_);
-  updateInputBuffers();
-
-  calculateEventWeights(_lastResult_);
+  calculateEventWeights(_lastResult_, parameters_);
   _lastResult_.status.eventWeights = OutputState::ReadyOnDevice;
 
   calculateHistograms(_lastResult_);
@@ -126,15 +120,6 @@ bool Backends::CpuBackend::isCurrentToken(const PropagationToken& token_) const 
   return token_.isValid and _lastResult_.token.isValid and token_.id == _lastResult_.token.id;
 }
 
-void Backends::CpuBackend::applyParameterSnapshot(const ParameterSnapshot& parameters_) {
-  if( parameters_.empty() ){ return; }
-
-  for( std::size_t iPar = 0 ; iPar < parameters_.values.size() ; iPar++ ){
-    auto* parPtr = const_cast<Parameter*>(_engineView_.propagation.parameters.at(iPar));
-    parPtr->setParameterValue(parameters_.values.at(iPar), true);
-  }
-}
-
 void Backends::CpuBackend::resetResult() {
   _lastResult_.token.id = _nextTokenId_++;
   _lastResult_.token.isValid = true;
@@ -150,13 +135,45 @@ void Backends::CpuBackend::resetResult() {
   _lastResult_.status.statLikelihood = OutputState::Scheduled;
 }
 
-void Backends::CpuBackend::updateInputBuffers() {
-  for( const auto* inputBuffer : _engineView_.propagation.inputBuffers ){
-    const_cast<DialInputBuffer*>(inputBuffer)->update();
+double Backends::CpuBackend::evaluateDialResponse(const BackendDialRef& dialRef_, const ParameterSnapshot& parameters_) const {
+  LogThrowIf(dialRef_.interface == nullptr, "Null dial interface in CPU backend.");
+
+  auto& scratchBuffer = _scratchDialInputBuffer_.getInputBuffer();
+  scratchBuffer.resize(dialRef_.inputCount);
+  for( std::size_t iInput = 0 ; iInput < dialRef_.inputCount ; iInput++ ){
+    const auto& inputRef = _engineView_.propagation.dialInputs.at(dialRef_.firstInput + iInput);
+    scratchBuffer[iInput] = applyDialInputTransform(inputRef, getDialInputValue(inputRef, parameters_));
   }
+
+  return dialRef_.interface->getResponseSupervisorRef()->process(
+      dialRef_.interface->getDialBaseRef()->evalResponse(_scratchDialInputBuffer_)
+  );
 }
 
-void Backends::CpuBackend::calculateEventWeights(Result& result_) {
+double Backends::CpuBackend::getDialInputValue(const BackendDialInputRef& inputRef_, const ParameterSnapshot& parameters_) const {
+  if( not parameters_.empty() ){
+    return parameters_.values.at(inputRef_.parameterIndex);
+  }
+  return _engineView_.propagation.parameters.at(inputRef_.parameterIndex)->getParameterValue();
+}
+
+double Backends::CpuBackend::applyDialInputTransform(const BackendDialInputRef& inputRef_, double rawValue_) {
+  if( not inputRef_.useMirror ){ return rawValue_; }
+
+  double transformed = std::abs(std::fmod(
+      rawValue_ - inputRef_.mirrorMin,
+      2 * inputRef_.mirrorRange
+  ));
+
+  if( transformed > inputRef_.mirrorRange ){
+    transformed -= 2 * inputRef_.mirrorRange;
+    transformed = -transformed;
+  }
+
+  return transformed + inputRef_.mirrorMin;
+}
+
+void Backends::CpuBackend::calculateEventWeights(Result& result_, const ParameterSnapshot& parameters_) {
   const auto& model = _engineView_.propagation;
   result_.eventWeights.resize(model.events.size());
 
@@ -165,7 +182,7 @@ void Backends::CpuBackend::calculateEventWeights(Result& result_) {
 
     for( std::size_t iDial = 0 ; iDial < event.dialCount ; iDial++ ){
       const auto& dialRef = model.eventDials[event.firstDial + iDial];
-      weight *= dialRef.interface->evalResponse();
+      weight *= evaluateDialResponse(dialRef, parameters_);
     }
 
     result_.eventWeights[event.resultIndex] = weight;
@@ -174,7 +191,7 @@ void Backends::CpuBackend::calculateEventWeights(Result& result_) {
 
 void Backends::CpuBackend::calculateHistograms(Result& result_) {
   if( result_.eventWeights.empty() ){
-    calculateEventWeights(result_);
+    calculateEventWeights(result_, ParameterSnapshot{});
   }
 
   const auto& model = _engineView_.propagation;
@@ -192,7 +209,7 @@ void Backends::CpuBackend::calculateHistograms(Result& result_) {
   }
 }
 
-void Backends::CpuBackend::calculateHistogramsFromEvents(Result& result_) {
+void Backends::CpuBackend::calculateHistogramsFromEvents(Result& result_, const ParameterSnapshot& parameters_) {
   const auto& model = _engineView_.propagation;
   result_.histSums.resize(model.totalBins);
   result_.histSumSquares.resize(model.totalBins);
@@ -206,7 +223,7 @@ void Backends::CpuBackend::calculateHistogramsFromEvents(Result& result_) {
     double weight = event.baseWeight;
     for( std::size_t iDial = 0 ; iDial < event.dialCount ; iDial++ ){
       const auto& dialRef = model.eventDials[event.firstDial + iDial];
-      weight *= dialRef.interface->evalResponse();
+      weight *= evaluateDialResponse(dialRef, parameters_);
     }
 
     result_.histSums[globalBin] += weight;

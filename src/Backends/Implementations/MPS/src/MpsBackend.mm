@@ -275,6 +275,7 @@ struct Backends::MpsBackend::Impl {
   uint32_t monotonicDialDescriptorCount{0};
   uint32_t generalDialDescriptorCount{0};
   uint32_t graphDialDescriptorCount{0};
+  mutable DialInputBuffer scratchDialInputBuffer{};
 
   Impl() : model(engineView.propagation), likelihoodModel(engineView.likelihood) {
     device = MTLCreateSystemDefaultDevice();
@@ -402,18 +403,42 @@ struct Backends::MpsBackend::Impl {
     lastResult.status.statLikelihood = OutputState::Scheduled;
   }
 
-  void applyParameterSnapshot(const ParameterSnapshot& parameters_) {
-    if( parameters_.empty() ){ return; }
-    for( std::size_t iPar = 0 ; iPar < parameters_.values.size() ; iPar++ ){
-      auto* parPtr = const_cast<Parameter*>(model.parameters.at(iPar));
-      parPtr->setParameterValue(parameters_.values.at(iPar), true);
+  double getDialInputValue(const BackendDialInputRef& inputRef_, const ParameterSnapshot& parameters_) const {
+    if( not parameters_.empty() ){
+      return parameters_.values.at(inputRef_.parameterIndex);
     }
+    return model.parameters.at(inputRef_.parameterIndex)->getParameterValue();
   }
 
-  void updateInputBuffers() {
-    for( const auto* inputBuffer : model.inputBuffers ){
-      const_cast<DialInputBuffer*>(inputBuffer)->update();
+  static double applyDialInputTransform(const BackendDialInputRef& inputRef_, double rawValue_) {
+    if( not inputRef_.useMirror ){ return rawValue_; }
+
+    double transformed = std::abs(std::fmod(
+        rawValue_ - inputRef_.mirrorMin,
+        2 * inputRef_.mirrorRange
+    ));
+
+    if( transformed > inputRef_.mirrorRange ){
+      transformed -= 2 * inputRef_.mirrorRange;
+      transformed = -transformed;
     }
+
+    return transformed + inputRef_.mirrorMin;
+  }
+
+  double evaluateDialResponse(const BackendDialRef& dialRef_, const ParameterSnapshot& parameters_) const {
+    LogThrowIf(dialRef_.interface == nullptr, "Null dial interface in MPS backend fallback.");
+
+    auto& scratchBuffer = scratchDialInputBuffer.getInputBuffer();
+    scratchBuffer.resize(dialRef_.inputCount);
+    for( std::size_t iInput = 0 ; iInput < dialRef_.inputCount ; iInput++ ){
+      const auto& inputRef = model.dialInputs.at(dialRef_.firstInput + iInput);
+      scratchBuffer[iInput] = applyDialInputTransform(inputRef, getDialInputValue(inputRef, parameters_));
+    }
+
+    return dialRef_.interface->getResponseSupervisorRef()->process(
+        dialRef_.interface->getDialBaseRef()->evalResponse(scratchDialInputBuffer)
+    );
   }
 
   bool buildDeviceModel() {
@@ -1001,13 +1026,20 @@ struct Backends::MpsBackend::Impl {
     return true;
   }
 
-  void updateDeviceParameters() {
+  void updateDeviceParameters(const ParameterSnapshot& parameters_) {
     auto start = std::chrono::steady_clock::now();
     if( parameterValuesScratch.size() != model.parameters.size() ){
       parameterValuesScratch.resize(model.parameters.size());
     }
-    for( std::size_t iPar = 0 ; iPar < model.parameters.size() ; iPar++ ){
-      parameterValuesScratch[iPar] = float(model.parameters[iPar]->getParameterValue());
+    if( parameters_.empty() ){
+      for( std::size_t iPar = 0 ; iPar < model.parameters.size() ; iPar++ ){
+        parameterValuesScratch[iPar] = float(model.parameters[iPar]->getParameterValue());
+      }
+    }
+    else{
+      for( std::size_t iPar = 0 ; iPar < model.parameters.size() ; iPar++ ){
+        parameterValuesScratch[iPar] = float(parameters_.values.at(iPar));
+      }
     }
     copyToBuffer(parametersBuffer, parameterValuesScratch);
     lastTiming.parameterUploadSeconds += secondsSince(start);
@@ -1099,9 +1131,9 @@ struct Backends::MpsBackend::Impl {
     return true;
   }
 
-  bool runDevicePropagation(bool needHistograms_) {
+  bool runDevicePropagation(const ParameterSnapshot& parameters_, bool needHistograms_) {
     if( not isDeviceModelSupported ){ return false; }
-    updateDeviceParameters();
+    updateDeviceParameters(parameters_);
 
     auto encodeAllCachedResponses = [&](id<MTLComputeCommandEncoder> encoder_) {
       return encodeCachedDialResponses(encoder_, cachedCompactResponsesPipeline, compactCachedResponsesBuffer, compactDialDescriptorsBuffer, compactDialDescriptorCount)
@@ -1287,7 +1319,7 @@ struct Backends::MpsBackend::Impl {
     lastTiming.eventWeightReadbackSeconds += secondsSince(start);
   }
 
-  void calculateEventWeights() {
+  void calculateEventWeights(const ParameterSnapshot& parameters_) {
     lastResult.eventWeights.resize(model.events.size());
 
     for( const auto& event : model.events ){
@@ -1295,7 +1327,7 @@ struct Backends::MpsBackend::Impl {
 
       for( std::size_t iDial = 0 ; iDial < event.dialCount ; iDial++ ){
         const auto& dialRef = model.eventDials[event.firstDial + iDial];
-        weight *= dialRef.interface->evalResponse();
+        weight *= evaluateDialResponse(dialRef, parameters_);
       }
 
       lastResult.eventWeights[event.resultIndex] = weight;
@@ -1312,7 +1344,7 @@ struct Backends::MpsBackend::Impl {
     }
 
     if( lastResult.eventWeights.size() != model.events.size() ){
-      calculateEventWeights();
+      calculateEventWeights(ParameterSnapshot{});
     }
 
     std::vector<float> eventWeightsFloat(lastResult.eventWeights.size());
@@ -1460,15 +1492,12 @@ Backends::PropagationToken Backends::MpsBackend::requestPropagation(const Parame
     return {};
   }
 
-  _impl_->applyParameterSnapshot(parameters_);
-  _impl_->updateInputBuffers();
-
   bool needsEventWeights = true;
   bool needsHistograms = true;
   bool usedDevicePropagation = false;
 
   if( needsEventWeights or needsHistograms ){
-    usedDevicePropagation = _impl_->runDevicePropagation(needsHistograms);
+    usedDevicePropagation = _impl_->runDevicePropagation(parameters_, needsHistograms);
     if( usedDevicePropagation ){
       _impl_->lastResult.status.eventWeights = OutputState::ReadyOnDevice;
       _impl_->lastResult.status.histograms = OutputState::ReadyOnDevice;
@@ -1476,7 +1505,7 @@ Backends::PropagationToken Backends::MpsBackend::requestPropagation(const Parame
   }
 
   if( not usedDevicePropagation ){
-    _impl_->calculateEventWeights();
+    _impl_->calculateEventWeights(parameters_);
     _impl_->lastResult.status.eventWeights = OutputState::ReadyOnHost;
   }
 

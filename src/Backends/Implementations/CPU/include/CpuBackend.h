@@ -3,6 +3,7 @@
 
 #include "BackendEngineView.h"
 #include "BackendTypes.h"
+#include "DialInputBuffer.h"
 #include "IPropagationBackend.h"
 #include "ParameterSnapshot.h"
 
@@ -41,16 +42,19 @@ namespace Backends {
       double likelihood{0};
     };
 
+    [[nodiscard]] double evaluateDialResponse(const BackendDialRef& dialRef_, const ParameterSnapshot& parameters_) const;
+    [[nodiscard]] double getDialInputValue(const BackendDialInputRef& inputRef_, const ParameterSnapshot& parameters_) const;
+    static double applyDialInputTransform(const BackendDialInputRef& inputRef_, double rawValue_);
+
     [[nodiscard]] bool isCurrentToken(const PropagationToken& token_) const;
-    void applyParameterSnapshot(const ParameterSnapshot& parameters_);
     void resetResult();
-    void updateInputBuffers();
-    void calculateEventWeights(Result& result_);
+    void calculateEventWeights(Result& result_, const ParameterSnapshot& parameters_);
     void calculateHistograms(Result& result_);
-    void calculateHistogramsFromEvents(Result& result_);
+    void calculateHistogramsFromEvents(Result& result_, const ParameterSnapshot& parameters_);
     void calculateLikelihood(Result& result_);
 
     BackendEngineView _engineView_{};
+    mutable DialInputBuffer _scratchDialInputBuffer_{};
     Result _lastResult_{};
     std::uint64_t _nextTokenId_{1};
     bool _isBuilt_{false};
