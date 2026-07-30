@@ -90,10 +90,6 @@ void LikelihoodInterface::configureImpl(){
     _config_.fillValue(_backendsManager_.getConfig(), "backendConfig");
     _backendsManager_.configure();
   }
-#else
-  if( _config_.hasField("backendConfig") ){
-    LogWarning << "backendConfig was provided but GUNDAM was built without WITH_BACKENDS." << std::endl;
-  }
 #endif
 
 }

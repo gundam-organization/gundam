@@ -35,10 +35,13 @@ namespace Backends {
     void configureImpl() override;
 
   private:
-    [[nodiscard]] PropagationRequest makePropagationRequest() const;
-
+    // configuration
     bool _isEnabled_{false};
     std::string _type_{"CPU"};
+
+    [[nodiscard]] PropagationRequest makePropagationRequest() const;
+
+
     std::vector<OutputRequest> _outputRequests_{OutputRequest::Histograms};
     std::vector<OutputRequest> _materializeOutputRequests_{};
     BackendLikelihoodModel _backendLikelihoodModel_{};
