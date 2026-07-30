@@ -1,7 +1,6 @@
 #ifndef GUNDAM_BACKENDS_MANAGER_H
 #define GUNDAM_BACKENDS_MANAGER_H
 
-#include "BackendConfig.h"
 #include "BackendFactory.h"
 #include "BackendLikelihoodModel.h"
 #include "BackendModel.h"
@@ -19,10 +18,12 @@ namespace Backends {
   public:
     BackendsManager() = default;
 
-    [[nodiscard]] const BackendConfig& getBackendConfig() const { return _backendConfig_; }
     [[nodiscard]] const BackendLikelihoodModel& getLikelihoodModel() const { return _backendLikelihoodModel_; }
     [[nodiscard]] const PropagationRequest& getPropagationRequest() const { return _propagationRequest_; }
-    [[nodiscard]] bool isEnabled() const { return _backendConfig_.isEnabled; }
+    [[nodiscard]] bool isEnabled() const { return _isEnabled_; }
+    [[nodiscard]] const std::string& getType() const { return _type_; }
+    [[nodiscard]] const std::vector<OutputRequest>& getOutputRequests() const { return _outputRequests_; }
+    [[nodiscard]] const std::vector<OutputRequest>& getMaterializeOutputRequests() const { return _materializeOutputRequests_; }
     [[nodiscard]] bool hasBackend() const { return _backendRuntimeManager_ != nullptr and _backendRuntimeManager_->hasBackend(); }
     [[nodiscard]] BackendRuntimeManager* getBackendRuntimeManager() { return _backendRuntimeManager_.get(); }
     [[nodiscard]] const BackendRuntimeManager* getBackendRuntimeManager() const { return _backendRuntimeManager_.get(); }
@@ -34,7 +35,12 @@ namespace Backends {
     void configureImpl() override;
 
   private:
-    BackendConfig _backendConfig_{};
+    [[nodiscard]] PropagationRequest makePropagationRequest() const;
+
+    bool _isEnabled_{false};
+    std::string _type_{"CPU"};
+    std::vector<OutputRequest> _outputRequests_{OutputRequest::Histograms};
+    std::vector<OutputRequest> _materializeOutputRequests_{};
     BackendLikelihoodModel _backendLikelihoodModel_{};
     PropagationRequest _propagationRequest_{};
     std::shared_ptr<BackendRuntimeManager> _backendRuntimeManager_{nullptr};

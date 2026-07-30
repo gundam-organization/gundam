@@ -5,10 +5,10 @@
 
 namespace Backends {
 
-  struct BackendConfig;
+  class BackendsManager;
   class IPropagationBackend;
 
-  std::unique_ptr<IPropagationBackend> makeBackend(const BackendConfig& config_);
+  std::unique_ptr<IPropagationBackend> makeBackend(const BackendsManager& config_);
 
 }
 

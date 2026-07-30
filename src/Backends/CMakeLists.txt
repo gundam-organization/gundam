@@ -1,7 +1,6 @@
 set(LIB_NAME GundamBackends)
 
 set(SRCFILES
-    ${CMAKE_CURRENT_SOURCE_DIR}/Common/src/BackendConfig.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/Common/src/BackendFactory.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/Common/src/BackendRuntimeManager.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/Common/src/BackendsManager.cpp
@@ -43,7 +42,6 @@ endif()
 
 set(HEADERS
     ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/BackendsManager.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/BackendConfig.h
     ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/BackendFactory.h
     ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/BackendLikelihoodModel.h
     ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/BackendModel.h
