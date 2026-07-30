@@ -8,7 +8,6 @@
 #include "LikelihoodInterface.h"
 #include "MonotonicSpline.h"
 #include "Norm.h"
-#include "Parameter.h"
 #include "Sample.h"
 #include "Shift.h"
 #include "SampleSet.h"
@@ -27,7 +26,7 @@ void Backends::BackendPropagationView::clear() {
   dialInputs.clear();
   dialPayloads.clear();
   samples.clear();
-  parameters.clear();
+  parameterCount = 0;
   totalBins = 0;
 }
 
@@ -149,8 +148,7 @@ void Backends::BackendEngineView::build(LikelihoodInterface& likelihoodInterface
         const auto* parPtr = &inputBuffer->getParameter(iInput);
         auto parameterIndexIt = parameterIndexMap.find(parPtr);
         if( parameterIndexIt == parameterIndexMap.end() ){
-          propagation.parameters.emplace_back(parPtr);
-          parameterIndexIt = parameterIndexMap.emplace(parPtr, propagation.parameters.size() - 1).first;
+          parameterIndexIt = parameterIndexMap.emplace(parPtr, parameterIndexMap.size()).first;
         }
 
         BackendDialInputRef inputRef;
@@ -165,6 +163,8 @@ void Backends::BackendEngineView::build(LikelihoodInterface& likelihoodInterface
 
     propagation.events.emplace_back(eventRef);
   }
+
+  propagation.parameterCount = parameterIndexMap.size();
 
   likelihood.samples.reserve(likelihoodInterface_.getSamplePairList().size());
   binOffset = 0;

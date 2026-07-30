@@ -5,8 +5,6 @@
 #include "CalculateGraph.h"
 #include "CalculateMonotonicSpline.h"
 #include "CalculateUniformSpline.h"
-#include "Parameter.h"
-
 #include "Logger.h"
 
 #include <cmath>
@@ -33,9 +31,9 @@ Backends::PropagationToken Backends::CpuBackend::requestPropagation(const Parame
   LogThrowIf(not _isBuilt_, "CpuBackend has not been built.");
   const auto& model = _engineView_.propagation;
   const auto& likelihoodModel = _engineView_.likelihood;
-  LogThrowIf(not parameters_.empty() and parameters_.values.size() != model.parameters.size(),
+  LogThrowIf(not parameters_.empty() and parameters_.values.size() != model.parameterCount,
              "ParameterSnapshot size mismatch: " << parameters_.values.size()
-                                                 << " != " << model.parameters.size());
+                                                 << " != " << model.parameterCount);
 
   resetResult();
 
@@ -212,10 +210,8 @@ double Backends::CpuBackend::evaluateDialResponse(const BackendDialRef& dialRef_
 }
 
 double Backends::CpuBackend::getDialInputValue(const BackendDialInputRef& inputRef_, const ParameterSnapshot& parameters_) const {
-  if( not parameters_.empty() ){
-    return parameters_.values.at(inputRef_.parameterIndex);
-  }
-  return _engineView_.propagation.parameters.at(inputRef_.parameterIndex)->getParameterValue();
+  LogThrowIf(parameters_.empty(), "CpuBackend requires a populated ParameterSnapshot.");
+  return parameters_.values.at(inputRef_.parameterIndex);
 }
 
 double Backends::CpuBackend::applyDialInputTransform(const BackendDialInputRef& inputRef_, double rawValue_) {

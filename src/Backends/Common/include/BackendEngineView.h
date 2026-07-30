@@ -7,7 +7,6 @@
 #include <vector>
 
 class LikelihoodInterface;
-class Parameter;
 
 namespace Backends {
 
@@ -70,7 +69,7 @@ namespace Backends {
     std::vector<BackendDialInputRef> dialInputs{};
     std::vector<double> dialPayloads{};
     std::vector<BackendSampleRef> samples{};
-    std::vector<const Parameter*> parameters{};
+    std::size_t parameterCount{0};
     int totalBins{0};
 
     void clear();

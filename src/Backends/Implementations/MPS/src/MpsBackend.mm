@@ -18,7 +18,6 @@
 #include "CompactSpline.h"
 #include "MonotonicSpline.h"
 #include "Norm.h"
-#include "Parameter.h"
 #include "Shift.h"
 #include "UniformSpline.h"
 
@@ -410,10 +409,8 @@ struct Backends::MpsBackend::Impl {
   }
 
   double getDialInputValue(const BackendDialInputRef& inputRef_, const ParameterSnapshot& parameters_) const {
-    if( not parameters_.empty() ){
-      return parameters_.values.at(inputRef_.parameterIndex);
-    }
-    return model.parameters.at(inputRef_.parameterIndex)->getParameterValue();
+    LogThrowIf(parameters_.empty(), "MpsBackend requires a populated ParameterSnapshot.");
+    return parameters_.values.at(inputRef_.parameterIndex);
   }
 
   static double applyDialInputTransform(const BackendDialInputRef& inputRef_, double rawValue_) {
@@ -514,7 +511,7 @@ struct Backends::MpsBackend::Impl {
     LogInfo << "MPS backend: building device model for "
             << model.events.size() << " events, "
             << model.eventDials.size() << " event dials, "
-            << model.parameters.size() << " parameters and "
+            << model.parameterCount << " parameters and "
             << model.totalBins << " histogram bins."
             << std::endl;
 
@@ -964,7 +961,7 @@ struct Backends::MpsBackend::Impl {
     graphCachedResponsesBuffer = makePrivateEmptyBuffer(device, std::size_t(graphDialDescriptors.size()) * sizeof(float));
     eventWeightsBuffer = makePrivateEmptyBuffer(device, model.events.size() * sizeof(float));
     eventWeightsReadbackBuffer = makeSharedEmptyBuffer(device, model.events.size() * sizeof(float));
-    parametersBuffer = makeSharedEmptyBuffer(device, std::max<std::size_t>(1, model.parameters.size()) * sizeof(float));
+    parametersBuffer = makeSharedEmptyBuffer(device, std::max<std::size_t>(1, model.parameterCount) * sizeof(float));
     partialHistSumsBuffer = makePrivateEmptyBuffer(device, std::size_t(totalPartials) * sizeof(float));
     partialHistSumSquaresBuffer = makePrivateEmptyBuffer(device, std::size_t(totalPartials) * sizeof(float));
     histSumsBuffer = makePrivateEmptyBuffer(device, std::size_t(model.totalBins) * sizeof(float));
@@ -1006,7 +1003,7 @@ struct Backends::MpsBackend::Impl {
             << std::endl;
     buildTiming.buildBufferUploadSeconds = secondsSince(lastStageStart);
 
-    parameterValuesScratch.resize(model.parameters.size());
+    parameterValuesScratch.resize(model.parameterCount);
     isDeviceModelSupported = true;
     buildTiming.uniqueDialCount = compactDialDescriptorCount + uniformDialDescriptorCount
                                   + monotonicDialDescriptorCount + generalDialDescriptorCount
@@ -1022,18 +1019,15 @@ struct Backends::MpsBackend::Impl {
 
   void updateDeviceParameters(const ParameterSnapshot& parameters_) {
     auto start = std::chrono::steady_clock::now();
-    if( parameterValuesScratch.size() != model.parameters.size() ){
-      parameterValuesScratch.resize(model.parameters.size());
+    if( parameterValuesScratch.size() != model.parameterCount ){
+      parameterValuesScratch.resize(model.parameterCount);
     }
-    if( parameters_.empty() ){
-      for( std::size_t iPar = 0 ; iPar < model.parameters.size() ; iPar++ ){
-        parameterValuesScratch[iPar] = float(model.parameters[iPar]->getParameterValue());
-      }
-    }
-    else{
-      for( std::size_t iPar = 0 ; iPar < model.parameters.size() ; iPar++ ){
-        parameterValuesScratch[iPar] = float(parameters_.values.at(iPar));
-      }
+    LogThrowIf(parameters_.empty(), "MpsBackend requires a populated ParameterSnapshot.");
+    LogThrowIf(parameters_.values.size() != model.parameterCount,
+               "ParameterSnapshot size mismatch: " << parameters_.values.size()
+                                                   << " != " << model.parameterCount);
+    for( std::size_t iPar = 0 ; iPar < model.parameterCount ; iPar++ ){
+      parameterValuesScratch[iPar] = float(parameters_.values.at(iPar));
     }
     copyToBuffer(parametersBuffer, parameterValuesScratch);
     lastTiming.parameterUploadSeconds += secondsSince(start);
@@ -1470,9 +1464,9 @@ void Backends::MpsBackend::build(const BackendEngineView& engineView_) {
 
 Backends::PropagationToken Backends::MpsBackend::requestPropagation(const ParameterSnapshot& parameters_) {
   LogThrowIf(not _impl_->isBuilt, "MpsBackend has not been built.");
-  LogThrowIf(not parameters_.empty() and parameters_.values.size() != _impl_->model.parameters.size(),
+  LogThrowIf(not parameters_.empty() and parameters_.values.size() != _impl_->model.parameterCount,
              "ParameterSnapshot size mismatch: " << parameters_.values.size()
-                                                 << " != " << _impl_->model.parameters.size());
+                                                 << " != " << _impl_->model.parameterCount);
 
   _impl_->resetResult();
 

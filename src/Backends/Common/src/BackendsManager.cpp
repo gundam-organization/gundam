@@ -2,6 +2,7 @@
 
 #include "LikelihoodInterface.h"
 #include "Logger.h"
+#include "Parameter.h"
 
 #include <algorithm>
 #include <sstream>
@@ -170,6 +171,12 @@ std::future<Backends::BackendPropagationResult> Backends::BackendsManager::propa
   LogThrowIf(not hasBackend(), "No backend initialized.");
 
   Backends::ParameterSnapshot snapshot;
+  snapshot.values.reserve(_backendEngineLayout_.bindings.parameters.size());
+  for( const auto& binding : _backendEngineLayout_.bindings.parameters ){
+    LogThrowIf(binding.parameter == nullptr, "Null parameter binding while building backend snapshot.");
+    snapshot.values.emplace_back(binding.parameter->getParameterValue());
+  }
+
   auto token = _backendRuntimeManager_->requestPropagation(snapshot);
   _lastPropagationToken_ = token;
   if( not token.isValid ){
