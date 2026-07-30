@@ -13,11 +13,12 @@
 
 #include <map>
 
-Backends::BackendModel Backends::BackendModelBuilder::build(
+Backends::BackendEngineView Backends::BackendEngineViewBuilder::build(
     SampleSet& sampleSet_,
     const EventDialCache& eventDialCache_) {
 
-  BackendModel model;
+  BackendEngineView engineView;
+  auto& model = engineView.propagation;
   model.samples.reserve(sampleSet_.getSampleList().size());
 
   std::map<int, int> sampleBinOffsetMap;
@@ -66,5 +67,5 @@ Backends::BackendModel Backends::BackendModelBuilder::build(
     model.events.emplace_back(eventRef);
   }
 
-  return model;
+  return engineView;
 }

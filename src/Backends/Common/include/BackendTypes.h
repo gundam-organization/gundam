@@ -17,21 +17,23 @@ ENUM_FIELD( SampleLikelihoods ) \
 ENUM_FIELD( StatLikelihood )
 #include "GenericToolbox.MakeEnum.h"
 
-  enum class OutputState {
-    NotRequested,
-    Scheduled,
-    ReadyOnDevice,
-    ReadyOnHost,
-    Failed
-  };
+#define ENUM_NAME OutputState
+#define ENUM_FIELDS \
+ENUM_FIELD( NotRequested, 0 ) \
+ENUM_FIELD( Scheduled ) \
+ENUM_FIELD( ReadyOnDevice ) \
+ENUM_FIELD( ReadyOnHost ) \
+ENUM_FIELD( Failed )
+#include "GenericToolbox.MakeEnum.h"
 
-  enum class BackendStatus {
-    Unconfigured,
-    Ready,
-    Running,
-    Failed,
-    Unavailable
-  };
+#define ENUM_NAME BackendStatus
+#define ENUM_FIELDS \
+ENUM_FIELD( Unconfigured, 0 ) \
+ENUM_FIELD( Ready ) \
+ENUM_FIELD( Running ) \
+ENUM_FIELD( Failed ) \
+ENUM_FIELD( Unavailable )
+#include "GenericToolbox.MakeEnum.h"
 
   struct BackendCapabilities {
     bool supportsCpu{false};
@@ -86,7 +88,7 @@ ENUM_FIELD( StatLikelihood )
   };
 
   struct PropagationStatus {
-    BackendStatus backend{BackendStatus::Unconfigured};
+    BackendStatus backend{BackendStatus::Failed};
     OutputState eventWeights{OutputState::NotRequested};
     OutputState histograms{OutputState::NotRequested};
     OutputState sampleLikelihoods{OutputState::NotRequested};

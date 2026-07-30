@@ -2,7 +2,6 @@
 #define GUNDAM_BACKENDS_MANAGER_H
 
 #include "BackendFactory.h"
-#include "BackendLikelihoodModel.h"
 #include "BackendModel.h"
 #include "BackendRuntimeManager.h"
 
@@ -34,7 +33,7 @@ namespace Backends {
 
     void setLikelihoodInterfacePtr(LikelihoodInterface* likelihoodInterfacePtr_){ _likelihoodInterfacePtr_ = likelihoodInterfacePtr_; }
 
-    [[nodiscard]] const BackendLikelihoodModel& getLikelihoodModel() const { return _backendLikelihoodModel_; }
+    [[nodiscard]] const BackendEngineView& getEngineView() const { return _backendEngineView_; }
     [[nodiscard]] bool isEnabled() const { return _isEnabled_; }
     [[nodiscard]] bool isAutoMaterializeEnabled() const { return _enableAutoMaterialize_; }
     [[nodiscard]] const std::string& getType() const { return _type_; }
@@ -66,7 +65,7 @@ namespace Backends {
         OutputRequest::StatLikelihood,
     };
     LikelihoodInterface* _likelihoodInterfacePtr_{nullptr};
-    BackendLikelihoodModel _backendLikelihoodModel_{};
+    BackendEngineView _backendEngineView_{};
     std::shared_ptr<BackendRuntimeManager> _backendRuntimeManager_{nullptr};
     PropagationToken _lastPropagationToken_{};
   };

@@ -19,7 +19,7 @@ namespace Backends {
     [[nodiscard]] IPropagationBackend* getBackend() { return _backend_.get(); }
     [[nodiscard]] const IPropagationBackend* getBackend() const { return _backend_.get(); }
 
-    void build(const BackendModel& model_);
+    void build(const BackendEngineView& engineView_);
     PropagationToken requestPropagation(const ParameterSnapshot& parameters_);
     void wait(const PropagationToken& token_);
     void materialize(const PropagationToken& token_, OutputRequest output_);

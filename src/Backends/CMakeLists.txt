@@ -43,7 +43,6 @@ endif()
 set(HEADERS
     ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/BackendsManager.h
     ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/BackendFactory.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/BackendLikelihoodModel.h
     ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/BackendModel.h
     ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/BackendModelBuilder.h
     ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/BackendRuntimeManager.h

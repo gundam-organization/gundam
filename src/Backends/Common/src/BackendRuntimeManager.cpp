@@ -6,9 +6,9 @@ void Backends::BackendRuntimeManager::setBackend(std::unique_ptr<IPropagationBac
   _backend_ = std::move(backend_);
 }
 
-void Backends::BackendRuntimeManager::build(const BackendModel& model_) {
+void Backends::BackendRuntimeManager::build(const BackendEngineView& engineView_) {
   LogThrowIf(_backend_ == nullptr, "No backend selected.");
-  _backend_->build(model_);
+  _backend_->build(engineView_);
 }
 
 Backends::PropagationToken Backends::BackendRuntimeManager::requestPropagation(const ParameterSnapshot& parameters_) {

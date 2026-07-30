@@ -9,9 +9,11 @@
 #include <utility>
 
 namespace {
-  Backends::BackendLikelihoodModel buildBackendLikelihoodModel(const LikelihoodInterface& likelihoodInterface_){
-    Backends::BackendLikelihoodModel out;
-    out.samples.reserve(likelihoodInterface_.getSamplePairList().size());
+  void fillBackendLikelihoodView(
+      const LikelihoodInterface& likelihoodInterface_,
+      Backends::BackendLikelihoodView& likelihoodView_) {
+    likelihoodView_.samples.clear();
+    likelihoodView_.samples.reserve(likelihoodInterface_.getSamplePairList().size());
 
     int binOffset{0};
     for( const auto& samplePair : likelihoodInterface_.getSamplePairList() ){
@@ -35,11 +37,9 @@ namespace {
         return jointProbability->eval(data_, pred_, err_, bin_);
       };
 
-      out.samples.emplace_back(std::move(sampleRef));
+      likelihoodView_.samples.emplace_back(std::move(sampleRef));
       binOffset += samplePair.model->getHistogram().getNbBins();
     }
-
-    return out;
   }
 }
 
@@ -122,7 +122,8 @@ void Backends::BackendsManager::materialize(OutputRequest outputRequest_) {
   switch( outputRequest_.value ){
     case OutputRequest::EventWeights: {
       const auto& eventWeights = backend->getEventWeightsHostView(_lastPropagationToken_);
-      const auto& model = backend->getModel();
+      const auto& engineView = backend->getEngineView();
+      const auto& model = engineView.propagation;
       LogThrowIf(eventWeights.size() != model.events.size(), "Event weights host view size mismatch.");
       for( const auto& event : model.events ){
         event.event->getWeights().current = eventWeights.at(event.resultIndex);
@@ -131,7 +132,8 @@ void Backends::BackendsManager::materialize(OutputRequest outputRequest_) {
     }
 
     case OutputRequest::Histograms: {
-      const auto& model = backend->getModel();
+      const auto& engineView = backend->getEngineView();
+      const auto& model = engineView.propagation;
       const auto& histSums = backend->getHistogramSumsHostView(_lastPropagationToken_);
       const auto& histSumSquares = backend->getHistogramSumSquaresHostView(_lastPropagationToken_);
       LogThrowIf(histSums.size() != std::size_t(model.totalBins), "Histogram sums host view size mismatch.");
@@ -178,7 +180,11 @@ void Backends::BackendsManager::initializeImpl() {
   LogThrowIf(_likelihoodInterfacePtr_ == nullptr, "BackendsManager requires a LikelihoodInterface before initialize().");
 
   LogInfo << "Initializing propagation backend: " << _type_ << std::endl;
-  _backendLikelihoodModel_ = buildBackendLikelihoodModel(*_likelihoodInterfacePtr_);
+  _backendEngineView_ = BackendEngineViewBuilder::build(
+      const_cast<Propagator&>(_likelihoodInterfacePtr_->getModelPropagator()).getSampleSet(),
+      _likelihoodInterfacePtr_->getModelPropagator().getEventDialCache()
+  );
+  fillBackendLikelihoodView(*_likelihoodInterfacePtr_, _backendEngineView_.likelihood);
 
   LogInfo << "Propagation backend enabled: " << _type_
           << " with fixed device outputs [EventWeights, Histograms, StatLikelihood]"
@@ -190,13 +196,7 @@ void Backends::BackendsManager::initializeImpl() {
 
   _backendRuntimeManager_ = std::make_shared<BackendRuntimeManager>();
   _backendRuntimeManager_->setBackend(makeBackend(*this));
-  _backendRuntimeManager_->build(
-      BackendModelBuilder::build(
-          const_cast<Propagator&>(_likelihoodInterfacePtr_->getModelPropagator()).getSampleSet(),
-          _likelihoodInterfacePtr_->getModelPropagator().getEventDialCache()
-      )
-  );
-  _backendRuntimeManager_->getBackend()->setLikelihoodModel(_backendLikelihoodModel_);
+  _backendRuntimeManager_->build(_backendEngineView_);
 }
 
 std::future<Backends::BackendPropagationResult> Backends::BackendsManager::propagate() {

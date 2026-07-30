@@ -18,10 +18,9 @@ namespace Backends {
     [[nodiscard]] std::string getName() const override { return "CPU"; }
     [[nodiscard]] BackendCapabilities getCapabilities() const override;
     [[nodiscard]] PropagationStatus getStatus(const PropagationToken& token_) const override;
-    [[nodiscard]] const BackendModel& getModel() const override { return _model_; }
+    [[nodiscard]] const BackendEngineView& getEngineView() const override { return _engineView_; }
 
-    void build(const BackendModel& model_) override;
-    void setLikelihoodModel(const BackendLikelihoodModel& likelihoodModel_) override;
+    void build(const BackendEngineView& engineView_) override;
     PropagationToken requestPropagation(const ParameterSnapshot& parameters_) override;
 
     bool isReady(const PropagationToken& token_) const override;
@@ -51,8 +50,7 @@ namespace Backends {
     void calculateHistogramsFromEvents(Result& result_);
     void calculateLikelihood(Result& result_);
 
-    BackendModel _model_{};
-    BackendLikelihoodModel _likelihoodModel_{};
+    BackendEngineView _engineView_{};
     Result _lastResult_{};
     std::uint64_t _nextTokenId_{1};
     bool _isBuilt_{false};

@@ -1,7 +1,6 @@
 #ifndef GUNDAM_MPS_BACKEND_H
 #define GUNDAM_MPS_BACKEND_H
 
-#include "BackendLikelihoodModel.h"
 #include "BackendModel.h"
 #include "BackendTypes.h"
 #include "IPropagationBackend.h"
@@ -20,10 +19,9 @@ namespace Backends {
     [[nodiscard]] std::string getName() const override { return "MPS"; }
     [[nodiscard]] BackendCapabilities getCapabilities() const override;
     [[nodiscard]] PropagationStatus getStatus(const PropagationToken& token_) const override;
-    [[nodiscard]] const BackendModel& getModel() const override;
+    [[nodiscard]] const BackendEngineView& getEngineView() const override;
 
-    void build(const BackendModel& model_) override;
-    void setLikelihoodModel(const BackendLikelihoodModel& likelihoodModel_) override;
+    void build(const BackendEngineView& engineView_) override;
     PropagationToken requestPropagation(const ParameterSnapshot& parameters_) override;
 
     bool isReady(const PropagationToken& token_) const override;

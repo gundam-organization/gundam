@@ -2,6 +2,7 @@
 #define GUNDAM_BACKEND_MODEL_H
 
 #include <cstddef>
+#include <functional>
 #include <vector>
 
 class DialInterface;
@@ -34,7 +35,14 @@ namespace Backends {
     int binCount{0};
   };
 
-  struct BackendModel {
+  struct BackendLikelihoodSampleRef {
+    int binOffset{0};
+    std::vector<double> dataSums{};
+    std::vector<bool> ignoredBins{};
+    std::function<double(double, double, double, int)> evalBin{};
+  };
+
+  struct BackendPropagationView {
     std::vector<BackendEventRef> events{};
     std::vector<BackendDialRef> eventDials{};
     std::vector<const DialInputBuffer*> inputBuffers{};
@@ -44,6 +52,20 @@ namespace Backends {
 
     void clear();
     [[nodiscard]] bool empty() const { return events.empty(); }
+  };
+
+  struct BackendLikelihoodView {
+    std::vector<BackendLikelihoodSampleRef> samples{};
+
+    [[nodiscard]] bool empty() const { return samples.empty(); }
+  };
+
+  struct BackendEngineView {
+    BackendPropagationView propagation{};
+    BackendLikelihoodView likelihood{};
+
+    void clear();
+    [[nodiscard]] bool empty() const { return propagation.empty() and likelihood.empty(); }
   };
 
 }

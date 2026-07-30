@@ -21,22 +21,20 @@ Backends::BackendCapabilities Backends::CpuBackend::getCapabilities() const {
   return out;
 }
 
-void Backends::CpuBackend::build(const BackendModel& model_) {
-  _model_ = model_;
+void Backends::CpuBackend::build(const BackendEngineView& engineView_) {
+  _engineView_ = engineView_;
   _lastResult_ = Result();
   _isBuilt_ = true;
-}
-
-void Backends::CpuBackend::setLikelihoodModel(const BackendLikelihoodModel& likelihoodModel_) {
-  _likelihoodModel_ = likelihoodModel_;
 }
 
 Backends::PropagationToken Backends::CpuBackend::requestPropagation(const ParameterSnapshot& parameters_) {
 
   LogThrowIf(not _isBuilt_, "CpuBackend has not been built.");
-  LogThrowIf(not parameters_.empty() and parameters_.values.size() != _model_.parameters.size(),
+  const auto& model = _engineView_.propagation;
+  const auto& likelihoodModel = _engineView_.likelihood;
+  LogThrowIf(not parameters_.empty() and parameters_.values.size() != model.parameters.size(),
              "ParameterSnapshot size mismatch: " << parameters_.values.size()
-                                                 << " != " << _model_.parameters.size());
+                                                 << " != " << model.parameters.size());
 
   resetResult();
 
@@ -50,7 +48,7 @@ Backends::PropagationToken Backends::CpuBackend::requestPropagation(const Parame
   _lastResult_.status.histograms = OutputState::ReadyOnDevice;
 
   _lastResult_.status.sampleLikelihoods = OutputState::Failed;
-  if( _likelihoodModel_.empty() ){
+  if( likelihoodModel.empty() ){
     _lastResult_.status.statLikelihood = OutputState::Failed;
   }
   else{
@@ -132,7 +130,7 @@ void Backends::CpuBackend::applyParameterSnapshot(const ParameterSnapshot& param
   if( parameters_.empty() ){ return; }
 
   for( std::size_t iPar = 0 ; iPar < parameters_.values.size() ; iPar++ ){
-    auto* parPtr = const_cast<Parameter*>(_model_.parameters.at(iPar));
+    auto* parPtr = const_cast<Parameter*>(_engineView_.propagation.parameters.at(iPar));
     parPtr->setParameterValue(parameters_.values.at(iPar), true);
   }
 }
@@ -153,19 +151,20 @@ void Backends::CpuBackend::resetResult() {
 }
 
 void Backends::CpuBackend::updateInputBuffers() {
-  for( const auto* inputBuffer : _model_.inputBuffers ){
+  for( const auto* inputBuffer : _engineView_.propagation.inputBuffers ){
     const_cast<DialInputBuffer*>(inputBuffer)->update();
   }
 }
 
 void Backends::CpuBackend::calculateEventWeights(Result& result_) {
-  result_.eventWeights.resize(_model_.events.size());
+  const auto& model = _engineView_.propagation;
+  result_.eventWeights.resize(model.events.size());
 
-  for( const auto& event : _model_.events ){
+  for( const auto& event : model.events ){
     double weight = event.baseWeight;
 
     for( std::size_t iDial = 0 ; iDial < event.dialCount ; iDial++ ){
-      const auto& dialRef = _model_.eventDials[event.firstDial + iDial];
+      const auto& dialRef = model.eventDials[event.firstDial + iDial];
       weight *= dialRef.interface->evalResponse();
     }
 
@@ -178,12 +177,13 @@ void Backends::CpuBackend::calculateHistograms(Result& result_) {
     calculateEventWeights(result_);
   }
 
-  result_.histSums.resize(_model_.totalBins);
-  result_.histSumSquares.resize(_model_.totalBins);
+  const auto& model = _engineView_.propagation;
+  result_.histSums.resize(model.totalBins);
+  result_.histSumSquares.resize(model.totalBins);
   std::fill(result_.histSums.begin(), result_.histSums.end(), 0);
   std::fill(result_.histSumSquares.begin(), result_.histSumSquares.end(), 0);
 
-  for( const auto& event : _model_.events ){
+  for( const auto& event : model.events ){
     int globalBin = event.globalBinIndex;
     if( globalBin < 0 ){ continue; }
     double weight = result_.eventWeights[event.resultIndex];
@@ -193,18 +193,19 @@ void Backends::CpuBackend::calculateHistograms(Result& result_) {
 }
 
 void Backends::CpuBackend::calculateHistogramsFromEvents(Result& result_) {
-  result_.histSums.resize(_model_.totalBins);
-  result_.histSumSquares.resize(_model_.totalBins);
+  const auto& model = _engineView_.propagation;
+  result_.histSums.resize(model.totalBins);
+  result_.histSumSquares.resize(model.totalBins);
   std::fill(result_.histSums.begin(), result_.histSums.end(), 0);
   std::fill(result_.histSumSquares.begin(), result_.histSumSquares.end(), 0);
 
-  for( const auto& event : _model_.events ){
+  for( const auto& event : model.events ){
     int globalBin = event.globalBinIndex;
     if( globalBin < 0 ){ continue; }
 
     double weight = event.baseWeight;
     for( std::size_t iDial = 0 ; iDial < event.dialCount ; iDial++ ){
-      const auto& dialRef = _model_.eventDials[event.firstDial + iDial];
+      const auto& dialRef = model.eventDials[event.firstDial + iDial];
       weight *= dialRef.interface->evalResponse();
     }
 
@@ -214,9 +215,10 @@ void Backends::CpuBackend::calculateHistogramsFromEvents(Result& result_) {
 }
 
 void Backends::CpuBackend::calculateLikelihood(Result& result_) {
+  const auto& likelihoodModel = _engineView_.likelihood;
   result_.likelihood = 0;
 
-  for( const auto& sample : _likelihoodModel_.samples ){
+  for( const auto& sample : likelihoodModel.samples ){
     for( int iBin = 0 ; iBin < int(sample.dataSums.size()) ; iBin++ ){
       if( iBin < int(sample.ignoredBins.size()) and sample.ignoredBins[iBin] ){ continue; }
       int globalBin = sample.binOffset + iBin;

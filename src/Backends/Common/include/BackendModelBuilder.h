@@ -8,9 +8,9 @@ class SampleSet;
 
 namespace Backends {
 
-  class BackendModelBuilder {
+  class BackendEngineViewBuilder {
   public:
-    static BackendModel build(SampleSet& sampleSet_, const EventDialCache& eventDialCache_);
+    static BackendEngineView build(SampleSet& sampleSet_, const EventDialCache& eventDialCache_);
   };
 
 }

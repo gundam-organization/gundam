@@ -254,8 +254,9 @@ struct Backends::MpsBackend::Impl {
   id<MTLBuffer> maxHistogramChunksPerBinBuffer{nil};
   id<MTLBuffer> histogramChunkSizeBuffer{nil};
 
-  BackendModel model{};
-  BackendLikelihoodModel likelihoodModel{};
+  BackendEngineView engineView{};
+  BackendPropagationView& model;
+  BackendLikelihoodView& likelihoodModel;
   Result lastResult{};
   BackendTimingSummary buildTiming{};
   BackendTimingSummary lastTiming{};
@@ -275,7 +276,7 @@ struct Backends::MpsBackend::Impl {
   uint32_t generalDialDescriptorCount{0};
   uint32_t graphDialDescriptorCount{0};
 
-  Impl() {
+  Impl() : model(engineView.propagation), likelihoodModel(engineView.likelihood) {
     device = MTLCreateSystemDefaultDevice();
     if( device == nil ){ return; }
 
@@ -1448,8 +1449,8 @@ Backends::BackendCapabilities Backends::MpsBackend::getCapabilities() const {
   return out;
 }
 
-void Backends::MpsBackend::build(const BackendModel& model_) {
-  _impl_->model = model_;
+void Backends::MpsBackend::build(const BackendEngineView& engineView_) {
+  _impl_->engineView = engineView_;
   _impl_->lastResult = Impl::Result();
   if( not _impl_->buildDeviceModel() ){
     LogWarning << "MPS backend cannot use the GPU propagation path: "
@@ -1459,10 +1460,6 @@ void Backends::MpsBackend::build(const BackendModel& model_) {
                << std::endl;
   }
   _impl_->isBuilt = true;
-}
-
-void Backends::MpsBackend::setLikelihoodModel(const BackendLikelihoodModel& likelihoodModel_) {
-  _impl_->likelihoodModel = likelihoodModel_;
 }
 
 Backends::PropagationToken Backends::MpsBackend::requestPropagation(const ParameterSnapshot& parameters_) {
@@ -1535,8 +1532,8 @@ Backends::PropagationStatus Backends::MpsBackend::getStatus(const PropagationTok
   return _impl_->lastResult.status;
 }
 
-const Backends::BackendModel& Backends::MpsBackend::getModel() const {
-  return _impl_->model;
+const Backends::BackendEngineView& Backends::MpsBackend::getEngineView() const {
+  return _impl_->engineView;
 }
 
 bool Backends::MpsBackend::isReady(const PropagationToken& token_) const {
