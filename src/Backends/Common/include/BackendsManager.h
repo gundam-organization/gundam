@@ -34,7 +34,7 @@ namespace Backends {
   public:
     BackendsManager() = default;
 
-    void setLikelihoodInterfacePtr(const LikelihoodInterface* likelihoodInterfacePtr_){ _likelihoodInterfacePtr_ = likelihoodInterfacePtr_; }
+    void setLikelihoodInterfacePtr(LikelihoodInterface* likelihoodInterfacePtr_){ _likelihoodInterfacePtr_ = likelihoodInterfacePtr_; }
 
     [[nodiscard]] const BackendLikelihoodModel& getLikelihoodModel() const { return _backendLikelihoodModel_; }
     [[nodiscard]] bool isEnabled() const { return _isEnabled_; }
@@ -65,7 +65,7 @@ namespace Backends {
         OutputRequest::SampleLikelihoods,
         OutputRequest::StatLikelihood,
     };
-    const LikelihoodInterface* _likelihoodInterfacePtr_{nullptr};
+    LikelihoodInterface* _likelihoodInterfacePtr_{nullptr};
     BackendLikelihoodModel _backendLikelihoodModel_{};
     std::shared_ptr<BackendRuntimeManager> _backendRuntimeManager_{nullptr};
   };
