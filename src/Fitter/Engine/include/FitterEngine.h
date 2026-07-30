@@ -95,7 +95,7 @@ public:
 
   // Core
   void fit();
-  void propagateAndEvalLikelihood();
+  void evaluateLikelihood();
   void runPcaCheck();
   void rescaleParametersStepSize();
   bool checkNumericalAccuracy();

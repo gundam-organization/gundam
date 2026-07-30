@@ -109,7 +109,7 @@ void MinimizerBase::minimize(){
 
   this->printParameters();
 
-  getOwner().propagateAndEvalLikelihood();
+  getOwner().evaluateLikelihood();
   LogInfo << "Initial likelihood state:" << std::endl;
   LogInfo << getLikelihoodInterface().getSummary() << std::endl;
 
@@ -193,7 +193,7 @@ double MinimizerBase::evalFit( const double* parArray_ ){
   }
 
   // Propagate the parameters
-  getOwner().propagateAndEvalLikelihood();
+  getOwner().evaluateLikelihood();
   _monitor_.evalLlhTimer.stop();
 
   // Monitor if enabled

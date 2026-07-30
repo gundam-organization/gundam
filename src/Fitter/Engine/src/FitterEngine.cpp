@@ -184,7 +184,7 @@ void FitterEngine::initializeImpl(){
   _minimizer_->initialize();
 
   // Make sure parameters are fully propagated
-  this->propagateAndEvalLikelihood();
+  this->evaluateLikelihood();
 
   if( _saveDir_ != nullptr ) {
     // Write data
@@ -329,7 +329,7 @@ void FitterEngine::initializeImpl(){
 
 }
 
-void FitterEngine::propagateAndEvalLikelihood(){
+void FitterEngine::evaluateLikelihood(){
 #ifdef GUNDAM_USING_BACKENDS
   if( _backendsManager_.hasBackend() ){
     auto backendResult = _backendsManager_.propagate(getLikelihoodInterface().getModelPropagator());
@@ -448,7 +448,7 @@ void FitterEngine::fit(){
 
 
     LogInfo << "Current LLH state:" << std::endl;
-    this->propagateAndEvalLikelihood();
+    this->evaluateLikelihood();
 
     LogInfo << getLikelihoodInterface().getSummary() << std::endl;
   }
@@ -488,7 +488,7 @@ void FitterEngine::fit(){
     _backendsManager_.setEnableAutoMaterialize(true);
   }
 #endif
-  this->propagateAndEvalLikelihood();
+  this->evaluateLikelihood();
 
 #ifdef GUNDAM_USING_CACHE_MANAGER
   if( Cache::Manager::IsBuilt() ){
@@ -580,7 +580,7 @@ void FitterEngine::fit(){
 // protected
 void FitterEngine::runPcaCheck(){
 
-  this->propagateAndEvalLikelihood();
+  this->evaluateLikelihood();
 
   LogAlert << "Using PCA method: " << _pcaMethod_.toString() << " / threshold = " << _pcaThreshold_ << std::endl;
 
@@ -634,7 +634,7 @@ void FitterEngine::runPcaCheck(){
         ssPrint << " " << currentParValue << " -> " << par.getParameterValue();
         LogInfo << ssPrint.str() << "..." << std::endl;
 
-        this->propagateAndEvalLikelihood();
+        this->evaluateLikelihood();
 
         double criteria{0};
 
@@ -693,12 +693,12 @@ void FitterEngine::runPcaCheck(){
   }
 
   // comeback to old values
-  this->propagateAndEvalLikelihood();
+  this->evaluateLikelihood();
 }
 void FitterEngine::rescaleParametersStepSize(){
   LogInfo << __METHOD_NAME__ << std::endl;
 
-  this->propagateAndEvalLikelihood();
+  this->evaluateLikelihood();
   double baseLlhPull = getLikelihoodInterface().getLastPenaltyLikelihood();
   double baseLlh = getLikelihoodInterface().getLastLikelihood();
 
@@ -712,7 +712,7 @@ void FitterEngine::rescaleParametersStepSize(){
       double currentParValue = par.getParameterValue();
       par.setParameterValue( currentParValue + par.getStdDevValue() );
 
-      this->propagateAndEvalLikelihood();
+      this->evaluateLikelihood();
 
       double deltaChi2 = getLikelihoodInterface().getLastLikelihood() - baseLlh;
       double deltaChi2Pulls = getLikelihoodInterface().getLastPenaltyLikelihood() - baseLlhPull;
@@ -732,14 +732,14 @@ void FitterEngine::rescaleParametersStepSize(){
 
       par.setStepSize( stepSize );
       par.setParameterValue( currentParValue + stepSize );
-      this->propagateAndEvalLikelihood();
+      this->evaluateLikelihood();
       LogInfo << " -> Δχ²(step) = " << getLikelihoodInterface().getLastLikelihood() - baseLlh << std::endl;
       par.setParameterValue( currentParValue );
     }
 
   }
 
-  this->propagateAndEvalLikelihood();
+  this->evaluateLikelihood();
 }
 bool FitterEngine::checkNumericalAccuracy(){
   LogAlert << __METHOD_NAME__ << std::endl;
@@ -777,7 +777,7 @@ bool FitterEngine::checkNumericalAccuracy(){
           parSet.getParameterList()[iPar].setParameterValue( throws[iThrow][iParSet][iPar] );
         }
       }
-      this->propagateAndEvalLikelihood();
+      this->evaluateLikelihood();
 
       if( responses[iThrow] == responses[iThrow] ){ // not nan
         if (not GundamUtils::almostEqual(

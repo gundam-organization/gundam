@@ -462,5 +462,6 @@ PYBIND11_MODULE(GUNDAM, module) {
   .def("getLikelihoodInterface", pybind11::overload_cast<>(&FitterEngine::getLikelihoodInterface), pybind11::return_value_policy::reference)
   .def("getParameterScanner", pybind11::overload_cast<>(&FitterEngine::getParameterScanner), pybind11::return_value_policy::reference)
   .def("getTFilePath", &FitterEngine::getTFilePath)
+  .def("evaluateLikelihood", &FitterEngine::evaluateLikelihood)
   ;
 }
