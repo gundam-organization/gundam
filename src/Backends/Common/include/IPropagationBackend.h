@@ -17,6 +17,7 @@ namespace Backends {
     [[nodiscard]] virtual std::string getName() const = 0;
     [[nodiscard]] virtual BackendCapabilities getCapabilities() const = 0;
     [[nodiscard]] virtual PropagationStatus getStatus(const PropagationToken& token_) const = 0;
+    [[nodiscard]] virtual const BackendModel& getModel() const = 0;
 
     virtual void build(const BackendModel& model_) = 0;
     virtual void setLikelihoodModel(const BackendLikelihoodModel& likelihoodModel_) = 0;
@@ -26,6 +27,9 @@ namespace Backends {
     virtual void wait(const PropagationToken& token_) = 0;
     virtual void materialize(const PropagationToken& token_, OutputRequest output_) = 0;
     [[nodiscard]] virtual double getLikelihood(const PropagationToken& token_) const = 0;
+    [[nodiscard]] virtual const std::vector<double>& getEventWeightsHostView(const PropagationToken& token_) const = 0;
+    [[nodiscard]] virtual const std::vector<double>& getHistogramSumsHostView(const PropagationToken& token_) const = 0;
+    [[nodiscard]] virtual const std::vector<double>& getHistogramSumSquaresHostView(const PropagationToken& token_) const = 0;
     [[nodiscard]] virtual BackendDeviceView getDeviceView(const PropagationToken&) const { return {}; }
     [[nodiscard]] virtual BackendTimingSummary getLastTimingSummary() const { return {}; }
   };

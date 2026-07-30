@@ -85,11 +85,9 @@ void Backends::CpuBackend::materialize(const PropagationToken& token_, OutputReq
              "Requested backend output is not ready.");
 
   if( output_ == OutputRequest::EventWeights ){
-    materializeEventWeights(_lastResult_);
     _lastResult_.status.eventWeights = OutputState::ReadyOnHost;
   }
   else if( output_ == OutputRequest::Histograms ){
-    materializeHistograms(_lastResult_);
     _lastResult_.status.histograms = OutputState::ReadyOnHost;
   }
   else if( output_ == OutputRequest::SampleLikelihoods ){
@@ -109,6 +107,21 @@ double Backends::CpuBackend::getLikelihood(const PropagationToken& token_) const
              and _lastResult_.status.statLikelihood != OutputState::ReadyOnHost,
              "Backend likelihood is not ready.");
   return _lastResult_.likelihood;
+}
+
+const std::vector<double>& Backends::CpuBackend::getEventWeightsHostView(const PropagationToken& token_) const {
+  LogThrowIf(not isCurrentToken(token_), "Invalid CpuBackend propagation token.");
+  return _lastResult_.eventWeights;
+}
+
+const std::vector<double>& Backends::CpuBackend::getHistogramSumsHostView(const PropagationToken& token_) const {
+  LogThrowIf(not isCurrentToken(token_), "Invalid CpuBackend propagation token.");
+  return _lastResult_.histSums;
+}
+
+const std::vector<double>& Backends::CpuBackend::getHistogramSumSquaresHostView(const PropagationToken& token_) const {
+  LogThrowIf(not isCurrentToken(token_), "Invalid CpuBackend propagation token.");
+  return _lastResult_.histSumSquares;
 }
 
 bool Backends::CpuBackend::isCurrentToken(const PropagationToken& token_) const {
@@ -210,35 +223,6 @@ void Backends::CpuBackend::calculateLikelihood(Result& result_) {
       double pred = result_.histSums[globalBin];
       double predErr = std::sqrt(result_.histSumSquares[globalBin]);
       result_.likelihood += sample.evalBin(sample.dataSums[iBin], pred, predErr, iBin);
-    }
-  }
-}
-
-void Backends::CpuBackend::materializeEventWeights(Result& result_) {
-  LogThrowIf(result_.eventWeights.size() != _model_.events.size());
-  for( const auto& event : _model_.events ){
-    event.event->getWeights().current = result_.eventWeights[event.resultIndex];
-  }
-}
-
-void Backends::CpuBackend::materializeHistograms(Result& result_) {
-  LogThrowIf(result_.histSums.size() != std::size_t(_model_.totalBins));
-  LogThrowIf(result_.histSumSquares.size() != std::size_t(_model_.totalBins));
-
-  for( const auto& sample : _model_.samples ){
-    auto& binContentList = sample.histogram->getBinContentList();
-    auto& binContextList = sample.histogram->getBinContextList();
-
-    for( auto& binContent : binContentList ){
-      binContent.sumWeights = 0;
-      binContent.sqrtSumSqWeights = 0;
-    }
-
-    for( auto& binContext : binContextList ){
-      int globalBin = sample.binOffset + binContext.bin.getIndex();
-      auto& binContent = binContentList[binContext.bin.getIndex()];
-      binContent.sumWeights = result_.histSums[globalBin];
-      binContent.sqrtSumSqWeights = std::sqrt(result_.histSumSquares[globalBin]);
     }
   }
 }

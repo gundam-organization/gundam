@@ -111,13 +111,50 @@ void Backends::BackendsManager::materialize(OutputRequest outputRequest_) {
   LogThrowIf(outputState != OutputState::ReadyOnDevice and outputState != OutputState::ReadyOnHost,
              "Requested backend output is not ready for materialization: " << outputRequest_.toString());
 
+  if( outputState == OutputState::ReadyOnDevice ){
+    _backendRuntimeManager_->materialize(_lastPropagationToken_, outputRequest_);
+    status = backend->getStatus(_lastPropagationToken_);
+    outputState = status.state(outputRequest_);
+    LogThrowIf(outputState != OutputState::ReadyOnHost and outputState != OutputState::ReadyOnDevice,
+               "Backend materialization did not produce a host-ready output: " << outputRequest_.toString());
+  }
+
   switch( outputRequest_.value ){
-    case OutputRequest::EventWeights:
-    case OutputRequest::Histograms:
-      if( outputState == OutputState::ReadyOnDevice ){
-        _backendRuntimeManager_->materialize(_lastPropagationToken_, outputRequest_);
+    case OutputRequest::EventWeights: {
+      const auto& eventWeights = backend->getEventWeightsHostView(_lastPropagationToken_);
+      const auto& model = backend->getModel();
+      LogThrowIf(eventWeights.size() != model.events.size(), "Event weights host view size mismatch.");
+      for( const auto& event : model.events ){
+        event.event->getWeights().current = eventWeights.at(event.resultIndex);
       }
       return;
+    }
+
+    case OutputRequest::Histograms: {
+      const auto& model = backend->getModel();
+      const auto& histSums = backend->getHistogramSumsHostView(_lastPropagationToken_);
+      const auto& histSumSquares = backend->getHistogramSumSquaresHostView(_lastPropagationToken_);
+      LogThrowIf(histSums.size() != std::size_t(model.totalBins), "Histogram sums host view size mismatch.");
+      LogThrowIf(histSumSquares.size() != std::size_t(model.totalBins), "Histogram sum squares host view size mismatch.");
+
+      for( const auto& sample : model.samples ){
+        auto& binContentList = sample.histogram->getBinContentList();
+        auto& binContextList = sample.histogram->getBinContextList();
+
+        for( auto& binContent : binContentList ){
+          binContent.sumWeights = 0;
+          binContent.sqrtSumSqWeights = 0;
+        }
+
+        for( auto& binContext : binContextList ){
+          int globalBin = sample.binOffset + binContext.bin.getIndex();
+          auto& binContent = binContentList[binContext.bin.getIndex()];
+          binContent.sumWeights = histSums.at(globalBin);
+          binContent.sqrtSumSqWeights = std::sqrt(histSumSquares.at(globalBin));
+        }
+      }
+      return;
+    }
 
     case OutputRequest::SampleLikelihoods:
       LogThrow("BackendsManager::materialize(OutputRequest::SampleLikelihoods) is not implemented yet: LikelihoodInterface has no destination slot yet.");

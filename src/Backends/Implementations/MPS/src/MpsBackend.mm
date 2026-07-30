@@ -1535,6 +1535,10 @@ Backends::PropagationStatus Backends::MpsBackend::getStatus(const PropagationTok
   return _impl_->lastResult.status;
 }
 
+const Backends::BackendModel& Backends::MpsBackend::getModel() const {
+  return _impl_->model;
+}
+
 bool Backends::MpsBackend::isReady(const PropagationToken& token_) const {
   return _impl_->isCurrentToken(token_) and _impl_->lastResult.status.backend == BackendStatus::Ready;
 }
@@ -1574,6 +1578,21 @@ double Backends::MpsBackend::getLikelihood(const PropagationToken& token_) const
              and _impl_->lastResult.status.statLikelihood != OutputState::ReadyOnHost,
              "Backend likelihood is not ready.");
   return _impl_->lastResult.likelihood;
+}
+
+const std::vector<double>& Backends::MpsBackend::getEventWeightsHostView(const PropagationToken& token_) const {
+  LogThrowIf(not _impl_->isCurrentToken(token_), "Invalid MpsBackend propagation token.");
+  return _impl_->lastResult.eventWeights;
+}
+
+const std::vector<double>& Backends::MpsBackend::getHistogramSumsHostView(const PropagationToken& token_) const {
+  LogThrowIf(not _impl_->isCurrentToken(token_), "Invalid MpsBackend propagation token.");
+  return _impl_->lastResult.histSums;
+}
+
+const std::vector<double>& Backends::MpsBackend::getHistogramSumSquaresHostView(const PropagationToken& token_) const {
+  LogThrowIf(not _impl_->isCurrentToken(token_), "Invalid MpsBackend propagation token.");
+  return _impl_->lastResult.histSumSquares;
 }
 
 Backends::BackendDeviceView Backends::MpsBackend::getDeviceView(const PropagationToken& token_) const {
