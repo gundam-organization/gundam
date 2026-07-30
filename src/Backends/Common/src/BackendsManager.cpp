@@ -1,29 +1,46 @@
 #include "BackendsManager.h"
 
-#include "ConfigUtils.h"
+#include "BackendModelBuilder.h"
+#include "LikelihoodInterface.h"
 #include "Logger.h"
+#include "Propagator.h"
 
+#include <algorithm>
 #include <sstream>
+#include <utility>
 
 namespace {
-  Backends::OutputRequest parseOutputRequest(const std::string& outputRequest_) {
-    if( outputRequest_ == "EventWeights" or outputRequest_ == "eventWeights" ){
-      return Backends::OutputRequest::EventWeights;
+  Backends::BackendLikelihoodModel buildBackendLikelihoodModel(const LikelihoodInterface& likelihoodInterface_){
+    Backends::BackendLikelihoodModel out;
+    out.samples.reserve(likelihoodInterface_.getSamplePairList().size());
+
+    int binOffset{0};
+    for( const auto& samplePair : likelihoodInterface_.getSamplePairList() ){
+      Backends::BackendLikelihoodSampleRef sampleRef;
+      sampleRef.binOffset = binOffset;
+      sampleRef.dataSums.reserve(samplePair.data->getHistogram().getNbBins());
+      sampleRef.ignoredBins.reserve(samplePair.data->getHistogram().getNbBins());
+
+      const auto& dataBinContentList = samplePair.data->getHistogram().getBinContentList();
+      const auto& modelBinContentList = samplePair.model->getHistogram().getBinContentList();
+      for( int iBin = 0 ; iBin < samplePair.data->getHistogram().getNbBins() ; iBin++ ){
+        sampleRef.dataSums.emplace_back(dataBinContentList[iBin].sumWeights);
+        sampleRef.ignoredBins.emplace_back(
+            likelihoodInterface_.getJointProbabilityPtr()->isIgnoreBinsWithZeroPredictionAtPrior()
+            and modelBinContentList[iBin].sumWeights == 0.
+        );
+      }
+
+      auto* jointProbability = likelihoodInterface_.getJointProbabilityPtr();
+      sampleRef.evalBin = [jointProbability](double data_, double pred_, double err_, int bin_){
+        return jointProbability->eval(data_, pred_, err_, bin_);
+      };
+
+      out.samples.emplace_back(std::move(sampleRef));
+      binOffset += samplePair.model->getHistogram().getNbBins();
     }
-    if( outputRequest_ == "Histograms" or outputRequest_ == "histograms" ){
-      return Backends::OutputRequest::Histograms;
-    }
-    if( outputRequest_ == "Likelihood" or outputRequest_ == "likelihood" ){
-      return Backends::OutputRequest::Likelihood;
-    }
-    if( outputRequest_ == "BinIndices" or outputRequest_ == "binIndices" ){
-      return Backends::OutputRequest::BinIndices;
-    }
-    if( outputRequest_ == "ObservableValues" or outputRequest_ == "observableValues" ){
-      return Backends::OutputRequest::ObservableValues;
-    }
-    LogThrow("Unknown backend output request: " << outputRequest_);
-    return Backends::OutputRequest::Histograms;
+
+    return out;
   }
 }
 
@@ -63,31 +80,20 @@ std::string Backends::formatBackendTimingSummary(const BackendTimingSummary& tim
 
 void Backends::BackendsManager::configureImpl() {
   _config_.defineFields({
-    {"isEnabled", {"enabled"}},
-    {"type", {"backend", "name"}},
-    {"outputRequests", {"outputs"}},
-    {"materializeOutputRequests", {"materializeOutputs", "hostOutputs"}},
+    {"isEnabled"},
+    {"type"},
+    {"outputRequests"},
   });
 
-  std::vector<std::string> outputRequestNames{"Histograms"};
-  std::vector<std::string> materializeOutputRequestNames{};
   _config_.fillValue(_isEnabled_, "isEnabled");
   _config_.fillValue(_type_, "type");
-  _config_.fillValue(outputRequestNames, "outputRequests");
-  _config_.fillValue(materializeOutputRequestNames, "materializeOutputRequests");
+  if( _config_.hasField("outputRequests") ){
+    _outputRequests_.clear();
+    for( const auto& outputRequestEntry : _config_.loop("outputRequests") ){
+      _outputRequests_.emplace_back(OutputRequest::toEnum(outputRequestEntry.toString(), true));
+    }
+  }
   _config_.printUnusedKeys();
-
-  _outputRequests_.clear();
-  _outputRequests_.reserve(outputRequestNames.size());
-  for( const auto& outputRequestName : outputRequestNames ){
-    _outputRequests_.emplace_back(parseOutputRequest(outputRequestName));
-  }
-
-  _materializeOutputRequests_.clear();
-  _materializeOutputRequests_.reserve(materializeOutputRequestNames.size());
-  for( const auto& outputRequestName : materializeOutputRequestNames ){
-    _materializeOutputRequests_.emplace_back(parseOutputRequest(outputRequestName));
-  }
 
   _propagationRequest_ = makePropagationRequest();
 }
@@ -98,18 +104,34 @@ Backends::PropagationRequest Backends::BackendsManager::makePropagationRequest()
   if( out.outputs.empty() ){
     out.outputs.emplace_back(OutputRequest::Histograms);
   }
-  out.materializeOutputs = _materializeOutputRequests_;
+
+  if( _enableAutoMaterialize_ ){
+    out.materializeOutputs.reserve(out.outputs.size());
+    for( auto outputRequest : out.outputs ){
+      if( std::find(_materializeOutputList_.begin(), _materializeOutputList_.end(), outputRequest) != _materializeOutputList_.end() ){
+        out.materializeOutputs.emplace_back(outputRequest);
+      }
+    }
+  }
+
   return out;
 }
 
-void Backends::BackendsManager::setLikelihoodModel(const BackendLikelihoodModel& likelihoodModel_) {
-  _backendLikelihoodModel_ = likelihoodModel_;
-  if( _backendRuntimeManager_ != nullptr and _backendRuntimeManager_->hasBackend() ){
-    _backendRuntimeManager_->getBackend()->setLikelihoodModel(_backendLikelihoodModel_);
-  }
+void Backends::BackendsManager::setEnableAutoMaterialize(bool enableAutoMaterialize_) {
+  _enableAutoMaterialize_ = enableAutoMaterialize_;
+  _propagationRequest_ = makePropagationRequest();
 }
 
-void Backends::BackendsManager::initializeBackend(const BackendModel& model_) {
+void Backends::BackendsManager::setMaterializeOutputList(std::vector<OutputRequest> materializeOutputList_) {
+  _materializeOutputList_ = std::move(materializeOutputList_);
+  _propagationRequest_ = makePropagationRequest();
+}
+
+void Backends::BackendsManager::setMaterializeOutputList(std::initializer_list<OutputRequest> materializeOutputList_) {
+  setMaterializeOutputList(std::vector<OutputRequest>(materializeOutputList_));
+}
+
+void Backends::BackendsManager::initializeBackend(const LikelihoodInterface& likelihoodInterface_) {
   if( not _isEnabled_ ){
     _backendRuntimeManager_ = nullptr;
     return;
@@ -117,29 +139,89 @@ void Backends::BackendsManager::initializeBackend(const BackendModel& model_) {
 
   LogInfo << "Initializing propagation backend: " << _type_ << std::endl;
 
+  _backendLikelihoodModel_ = buildBackendLikelihoodModel(likelihoodInterface_);
   _propagationRequest_ = makePropagationRequest();
   if( not _propagationRequest_.has(OutputRequest::Histograms)
       and not _propagationRequest_.has(OutputRequest::Likelihood) ){
-    LogWarning << "Adding OutputRequest::Histograms to backendConfig because the current "
-               << "LikelihoodInterface consumes CPU histograms." << std::endl;
+    LogWarning << "Adding OutputRequest::Histograms to backend configuration because the standard engine path consumes CPU histograms." << std::endl;
     _propagationRequest_.outputs.emplace_back(OutputRequest::Histograms);
-    if( not _propagationRequest_.materializeOutputs.empty()
+    if( _enableAutoMaterialize_
+        and std::find(_materializeOutputList_.begin(), _materializeOutputList_.end(), OutputRequest::Histograms) != _materializeOutputList_.end()
         and not _propagationRequest_.shouldMaterialize(OutputRequest::Histograms) ){
       _propagationRequest_.materializeOutputs.emplace_back(OutputRequest::Histograms);
     }
   }
+
   LogInfo << "Propagation backend enabled: " << _type_
           << " with output requests " << toString(_propagationRequest_)
           << std::endl;
-  if( not _propagationRequest_.materializeOutputs.empty() ){
+  if( _enableAutoMaterialize_ and not _propagationRequest_.materializeOutputs.empty() ){
     PropagationRequest materializationRequest;
     materializationRequest.outputs = _propagationRequest_.materializeOutputs;
-    LogInfo << "Propagation backend host materialization requests "
+    LogInfo << "Propagation backend auto materialization requests "
             << toString(materializationRequest) << std::endl;
   }
 
   _backendRuntimeManager_ = std::make_shared<BackendRuntimeManager>();
   _backendRuntimeManager_->setBackend(makeBackend(*this));
-  _backendRuntimeManager_->build(model_);
+  _backendRuntimeManager_->build(
+      BackendModelBuilder::build(
+          const_cast<Propagator&>(likelihoodInterface_.getModelPropagator()).getSampleSet(),
+          likelihoodInterface_.getModelPropagator().getEventDialCache()
+      )
+  );
   _backendRuntimeManager_->getBackend()->setLikelihoodModel(_backendLikelihoodModel_);
+}
+
+std::future<Backends::BackendPropagationResult> Backends::BackendsManager::propagate(Propagator& propagator_) {
+  LogThrowIf(not hasBackend(), "No backend initialized.");
+
+  _propagationRequest_ = makePropagationRequest();
+
+  if( not _propagationRequest_.has(OutputRequest::Histograms)
+      and not _propagationRequest_.has(OutputRequest::Likelihood) ){
+    LogWarning << "Backend propagation requested without Histograms or Likelihood. The standard engine path may not observe any updated prediction." << std::endl;
+  }
+
+  Backends::ParameterSnapshot snapshot;
+  auto token = _backendRuntimeManager_->requestPropagation(snapshot, _propagationRequest_);
+  if( not token.isValid ){
+    return std::async(std::launch::deferred, []{
+      return BackendPropagationResult{};
+    });
+  }
+
+  return std::async(std::launch::deferred, [this, &propagator_, token]{
+    BackendPropagationResult result;
+    auto* backendRuntimeManager = getBackendRuntimeManager();
+    backendRuntimeManager->wait(token);
+
+    auto status = backendRuntimeManager->getBackend()->getStatus(token);
+    for( auto outputRequest : _propagationRequest_.outputs ){
+      auto outputState = status.state(outputRequest);
+      if( outputState == OutputState::Failed ){
+        LogWarning << "Requested backend output failed or is not implemented yet. Skipping materialization." << std::endl;
+        continue;
+      }
+      if( outputState != OutputState::ReadyOnDevice and outputState != OutputState::ReadyOnHost ){
+        LogWarning << "Requested backend output is not ready. Skipping materialization." << std::endl;
+        continue;
+      }
+
+      result.isValid = true;
+      if( outputRequest == OutputRequest::Likelihood ){
+        result.statLikelihood = backendRuntimeManager->getBackend()->getLikelihood(token);
+        result.hasStatLikelihood = true;
+      }
+
+      if( not _propagationRequest_.shouldMaterialize(outputRequest) ){ continue; }
+      backendRuntimeManager->materialize(token, outputRequest);
+    }
+
+    if( propagator_.getSampleSet().getSampleList().empty() ){
+      result.isValid = false;
+    }
+
+    return result;
+  });
 }

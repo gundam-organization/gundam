@@ -1541,7 +1541,7 @@ void RootMinimizer::saveGradientSteps(){
     ParameterSet::muteLogger(); Propagator::muteLogger(); ParametersManager::muteLogger();
     getModelPropagator().getParametersManager().injectParameterValues(gradientDescentMonitor.stepPointList[iGradStep].parState );
 
-    getLikelihoodInterface().propagateAndEvalLikelihood();
+    getOwner().propagateAndEvalLikelihood();
 
     if( not GundamGlobals::isLightOutputMode() and gradientDescentMonitor.writeGradientSteps ) {
       auto outDir = GenericToolbox::mkdirTFile(getOwner().getSaveDir(), Form("fit/gradient/steps/step_%i", int(iGradStep)));

@@ -12,9 +12,6 @@
 #include "Propagator.h"
 #include "EventTreeWriter.h"
 #include "DatasetDefinition.h"
-#ifdef GUNDAM_USING_BACKENDS
-#include "BackendsManager.h"
-#endif
 
 #include "GenericToolbox.Utils.h"
 #include "GenericToolbox.Time.h"
@@ -117,9 +114,6 @@ protected:
   void loadModelPropagator();
   void loadDataPropagator();
   void buildSamplePairList();
-#ifdef GUNDAM_USING_BACKENDS
-  [[nodiscard]] Backends::BackendLikelihoodModel buildBackendLikelihoodModel() const;
-#endif
 
   DataDispenser* getDataDispenser( DatasetDefinition& dataset_ );
 
@@ -132,9 +126,6 @@ private:
   bool _applyInfinitePenaltyOnOutOfBoundPar_{false};
   DataType _dataType_{DataType::Asimov};
   JsonType _toyParameterInjector_{};
-#ifdef GUNDAM_USING_BACKENDS
-  Backends::BackendsManager _backendsManager_{};
-#endif
 
   // internals
   int _nbParameters_{0};

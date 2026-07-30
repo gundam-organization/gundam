@@ -75,6 +75,7 @@ target_link_libraries(
     ${LIB_NAME}
     PUBLIC
     GundamDialDictionary
+    GundamStatisticalInference
 )
 
 if(APPLE)

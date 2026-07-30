@@ -16,10 +16,6 @@
 #include "GenericToolbox.Time.h"
 #include "GenericToolbox.Thread.h"
 
-#ifdef GUNDAM_USING_BACKENDS
-#include "BackendsManager.h"
-#endif
-
 #include <vector>
 #include <map>
 #include <future>
@@ -65,11 +61,6 @@ public:
   // Core
   void clearContent();
   void buildDialCache();
-#ifdef GUNDAM_USING_BACKENDS
-  void setBackendsManager(Backends::BackendsManager* backendsManager_);
-  [[nodiscard]] bool hasLastBackendStatLikelihood() const { return _hasLastBackendStatLikelihood_; }
-  [[nodiscard]] double getLastBackendStatLikelihood() const { return _lastBackendStatLikelihood_; }
-#endif
 
   /// Apply the current parameters and wait for it to finish.  This reweights
   /// the events, and refills the histograms.  This is a convenience wrapper
@@ -129,12 +120,6 @@ private:
   bool _showNbEventPerSampleParameterBreakdown_{false};
   bool _enableEigenToOrigInPropagate_{true};
   int _iThrow_{-1};
-
-#ifdef GUNDAM_USING_BACKENDS
-  Backends::BackendsManager* _backendsManager_{nullptr};
-  bool _hasLastBackendStatLikelihood_{false};
-  double _lastBackendStatLikelihood_{0};
-#endif
 
   // Sub-layers
   SampleSet _sampleSet_{};

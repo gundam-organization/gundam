@@ -77,13 +77,6 @@ Backends::PropagationToken Backends::CpuBackend::requestPropagation(
       _lastResult_.status.likelihood = OutputState::ReadyOnDevice;
     }
   }
-  if( request_.has(OutputRequest::BinIndices) ){
-    _lastResult_.status.binIndices = OutputState::Failed;
-  }
-  if( request_.has(OutputRequest::ObservableValues) ){
-    _lastResult_.status.observableValues = OutputState::Failed;
-  }
-
   _lastResult_.status.backend = BackendStatus::Ready;
   return _lastResult_.token;
 }

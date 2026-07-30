@@ -3,6 +3,7 @@
 
 #include <cstdint>
 #include <cstddef>
+#include <sstream>
 #include <string>
 #include <vector>
 
@@ -10,13 +11,12 @@ namespace Backends {
 
   struct PropagationRequest;
 
-  enum class OutputRequest {
-    EventWeights,
-    Histograms,
-    Likelihood,
-    BinIndices,
-    ObservableValues
-  };
+#define ENUM_NAME OutputRequest
+#define ENUM_FIELDS \
+ENUM_FIELD( EventWeights, 0 ) \
+ENUM_FIELD( Histograms ) \
+ENUM_FIELD( Likelihood )
+#include "GenericToolbox.MakeEnum.h"
 
   [[nodiscard]] std::string toString(OutputRequest request_);
   [[nodiscard]] std::string toString(const PropagationRequest& request_);
@@ -103,8 +103,6 @@ namespace Backends {
     OutputState eventWeights{OutputState::NotRequested};
     OutputState histograms{OutputState::NotRequested};
     OutputState likelihood{OutputState::NotRequested};
-    OutputState binIndices{OutputState::NotRequested};
-    OutputState observableValues{OutputState::NotRequested};
 
     OutputState& state(OutputRequest request_);
     [[nodiscard]] OutputState state(OutputRequest request_) const;

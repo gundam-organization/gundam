@@ -1534,13 +1534,6 @@ Backends::PropagationToken Backends::MpsBackend::requestPropagation(
     }
   }
 
-  if( request_.has(OutputRequest::BinIndices) ){
-    _impl_->lastResult.status.binIndices = OutputState::Failed;
-  }
-  if( request_.has(OutputRequest::ObservableValues) ){
-    _impl_->lastResult.status.observableValues = OutputState::Failed;
-  }
-
   _impl_->lastResult.status.backend = BackendStatus::Ready;
   return _impl_->lastResult.token;
 }

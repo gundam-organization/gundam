@@ -109,11 +109,6 @@ void Propagator::buildDialCache(){
   _eventDialCache_.buildReferenceCache(_sampleSet_, _dialManager_.getDialCollectionList());
   _dialManager_.invalidateInputBuffers();
 }
-#ifdef GUNDAM_USING_BACKENDS
-void Propagator::setBackendsManager(Backends::BackendsManager* backendsManager_){
-  _backendsManager_ = backendsManager_;
-}
-#endif
 void Propagator::propagateParameters(){
   std::future<bool> result = applyParameters();
   result.get();
@@ -125,46 +120,6 @@ std::future<bool> Propagator::applyParameters(){
   // should be shared for both.
   if( _enableEigenToOrigInPropagate_ ){ _parManager_.convertEigenToOrig(); }
   _dialManager_.updateDialState();
-
-#ifdef GUNDAM_USING_BACKENDS
-  _hasLastBackendStatLikelihood_ = false;
-  if( _backendsManager_ != nullptr and _backendsManager_->hasBackend() ){
-    auto* backendRuntimeManager = _backendsManager_->getBackendRuntimeManager();
-    const auto& propagationRequest = _backendsManager_->getPropagationRequest();
-    Backends::ParameterSnapshot snapshot;
-    auto token = backendRuntimeManager->requestPropagation(snapshot, propagationRequest);
-    if( token.isValid ){
-      return std::async(std::launch::deferred, [this, token]{
-        auto* backendRuntimeManager = _backendsManager_->getBackendRuntimeManager();
-        const auto& propagationRequest = _backendsManager_->getPropagationRequest();
-        backendRuntimeManager->wait(token);
-        auto status = backendRuntimeManager->getBackend()->getStatus(token);
-        for( auto outputRequest : propagationRequest.outputs ){
-          auto outputState = status.state(outputRequest);
-          if( outputState == Backends::OutputState::Failed ){
-            LogWarning << "Requested backend output failed or is not implemented yet. Skipping materialization." << std::endl;
-            continue;
-          }
-          if( outputState != Backends::OutputState::ReadyOnDevice and outputState != Backends::OutputState::ReadyOnHost ){
-            LogWarning << "Requested backend output is not ready. Skipping materialization." << std::endl;
-            continue;
-          }
-          if( outputRequest == Backends::OutputRequest::Likelihood ){
-            _lastBackendStatLikelihood_ = backendRuntimeManager->getBackend()->getLikelihood(token);
-            _hasLastBackendStatLikelihood_ = true;
-          }
-          if( not propagationRequest.shouldMaterialize(outputRequest) ){ continue; }
-          backendRuntimeManager->materialize(token, outputRequest);
-        }
-        if( GundamGlobals::isDebug() ){
-          LogInfo << formatBackendTimingSummary(backendRuntimeManager->getBackend()->getLastTimingSummary()) << std::endl;
-        }
-        return true;
-      });
-    }
-    LogWarning << "Propagation backend did not return a valid token. Falling back to the standard propagation path." << std::endl;
-  }
-#endif
 
 #ifdef GUNDAM_USING_CACHE_MANAGER
   // Trigger the reweight on the GPU.  This will fill the histograms, but most

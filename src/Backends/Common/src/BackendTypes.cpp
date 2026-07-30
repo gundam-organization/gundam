@@ -4,13 +4,9 @@
 #include <sstream>
 
 std::string Backends::toString(OutputRequest request_) {
-  switch( request_ ){
-    case OutputRequest::EventWeights: return "EventWeights";
-    case OutputRequest::Histograms: return "Histograms";
-    case OutputRequest::Likelihood: return "Likelihood";
-    case OutputRequest::BinIndices: return "BinIndices";
-    case OutputRequest::ObservableValues: return "ObservableValues";
-  }
+  if( request_ == OutputRequest::EventWeights ){ return "EventWeights"; }
+  if( request_ == OutputRequest::Histograms ){ return "Histograms"; }
+  if( request_ == OutputRequest::Likelihood ){ return "Likelihood"; }
   return "Unknown";
 }
 
@@ -37,23 +33,15 @@ bool Backends::PropagationRequest::shouldMaterialize(OutputRequest request_) con
 }
 
 Backends::OutputState& Backends::PropagationStatus::state(OutputRequest request_) {
-  switch( request_ ){
-    case OutputRequest::EventWeights: return eventWeights;
-    case OutputRequest::Histograms: return histograms;
-    case OutputRequest::Likelihood: return likelihood;
-    case OutputRequest::BinIndices: return binIndices;
-    case OutputRequest::ObservableValues: return observableValues;
-  }
+  if( request_ == OutputRequest::EventWeights ){ return eventWeights; }
+  if( request_ == OutputRequest::Histograms ){ return histograms; }
+  if( request_ == OutputRequest::Likelihood ){ return likelihood; }
   return histograms;
 }
 
 Backends::OutputState Backends::PropagationStatus::state(OutputRequest request_) const {
-  switch( request_ ){
-    case OutputRequest::EventWeights: return eventWeights;
-    case OutputRequest::Histograms: return histograms;
-    case OutputRequest::Likelihood: return likelihood;
-    case OutputRequest::BinIndices: return binIndices;
-    case OutputRequest::ObservableValues: return observableValues;
-  }
+  if( request_ == OutputRequest::EventWeights ){ return eventWeights; }
+  if( request_ == OutputRequest::Histograms ){ return histograms; }
+  if( request_ == OutputRequest::Likelihood ){ return likelihood; }
   return OutputState::Failed;
 }

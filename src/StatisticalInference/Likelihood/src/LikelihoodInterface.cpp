@@ -6,9 +6,6 @@
 #ifdef GUNDAM_USING_CACHE_MANAGER
 #include "CacheManager.h"
 #endif
-#ifdef GUNDAM_USING_BACKENDS
-#include "BackendModelBuilder.h"
-#endif
 #include "GundamGlobals.h"
 
 #include "GenericToolbox.Map.h"
@@ -84,13 +81,6 @@ void LikelihoodInterface::configureImpl(){
   _config_.fillValue(_gaussStatThrowInToys_, "gaussStatThrowInToys");
   _config_.fillValue(_enableEventMcThrow_, "enableEventMcThrow");
   _config_.fillValue(_applyInfinitePenaltyOnOutOfBoundPar_, "applyInfinitePenaltyOnOutOfBoundPar");
-
-#ifdef GUNDAM_USING_BACKENDS
-  if( _config_.hasField("backendConfig") ){
-    _config_.fillValue(_backendsManager_.getConfig(), "backendConfig");
-    _backendsManager_.configure();
-  }
-#endif
 
 }
 void LikelihoodInterface::initializeImpl() {
@@ -181,12 +171,6 @@ double LikelihoodInterface::evalLikelihood(std::future<bool>& propagation) const
 }
 double LikelihoodInterface::evalStatLikelihood(std::future<bool>& propagation) const {
   if (propagation.valid()) propagation.get();
-#ifdef GUNDAM_USING_BACKENDS
-  if( _modelPropagator_.hasLastBackendStatLikelihood() ){
-    _buffer_.statLikelihood = _modelPropagator_.getLastBackendStatLikelihood();
-    return _buffer_.statLikelihood;
-  }
-#endif
   _buffer_.statLikelihood = 0.;
   for( auto &samplePair: _samplePairList_ ){
     _buffer_.statLikelihood += this->evalStatLikelihood( samplePair );
@@ -330,9 +314,6 @@ void LikelihoodInterface::load(){
   _plotGenerator_.defineHistogramHolders();
 
   this->buildSamplePairList();
-#ifdef GUNDAM_USING_BACKENDS
-  _backendsManager_.setLikelihoodModel(this->buildBackendLikelihoodModel());
-#endif
   this->printBreakdowns();
 
   /// model propagator needs to be fast, let the workers wait for the signal
@@ -373,14 +354,6 @@ void LikelihoodInterface::loadModelPropagator(){
       sample.getHistogram().refillHistogram(iThread);
     }
   });
-
-#ifdef GUNDAM_USING_BACKENDS
-  _modelPropagator_.setBackendsManager(&_backendsManager_);
-  _backendsManager_.initializeBackend(Backends::BackendModelBuilder::build(
-      _modelPropagator_.getSampleSet(),
-      _modelPropagator_.getEventDialCache()
-  ));
-#endif
 
 #ifdef GUNDAM_USING_CACHE_MANAGER
   if( Cache::Manager::IsCacheManagerEnabled() ){
@@ -523,41 +496,6 @@ void LikelihoodInterface::buildSamplePairList(){
   }
 
 }
-
-#ifdef GUNDAM_USING_BACKENDS
-Backends::BackendLikelihoodModel LikelihoodInterface::buildBackendLikelihoodModel() const{
-  Backends::BackendLikelihoodModel out;
-  out.samples.reserve(_samplePairList_.size());
-
-  int binOffset{0};
-  for( const auto& samplePair : _samplePairList_ ){
-    Backends::BackendLikelihoodSampleRef sampleRef;
-    sampleRef.binOffset = binOffset;
-    sampleRef.dataSums.reserve(samplePair.data->getHistogram().getNbBins());
-    sampleRef.ignoredBins.reserve(samplePair.data->getHistogram().getNbBins());
-
-    const auto& dataBinContentList = samplePair.data->getHistogram().getBinContentList();
-    const auto& modelBinContentList = samplePair.model->getHistogram().getBinContentList();
-    for( int iBin = 0 ; iBin < samplePair.data->getHistogram().getNbBins() ; iBin++ ){
-      sampleRef.dataSums.emplace_back(dataBinContentList[iBin].sumWeights);
-      sampleRef.ignoredBins.emplace_back(
-          _jointProbabilityPtr_->isIgnoreBinsWithZeroPredictionAtPrior()
-          and modelBinContentList[iBin].sumWeights == 0.
-      );
-    }
-
-    auto* jointProbability = _jointProbabilityPtr_.get();
-    sampleRef.evalBin = [jointProbability](double data_, double pred_, double err_, int bin_){
-      return jointProbability->eval(data_, pred_, err_, bin_);
-    };
-
-    out.samples.emplace_back(std::move(sampleRef));
-    binOffset += samplePair.model->getHistogram().getNbBins();
-  }
-
-  return out;
-}
-#endif
 
 DataDispenser* LikelihoodInterface::getDataDispenser( DatasetDefinition& dataset_ ){
 
