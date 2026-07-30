@@ -160,7 +160,7 @@ void FitterEngine::initializeImpl(){
   getLikelihoodInterface().initialize();
 #ifdef GUNDAM_USING_BACKENDS
   if( _backendsManager_.isEnabled() ){
-    _backendsManager_.setLikelihoodInterface(&getLikelihoodInterface());
+    _backendsManager_.setLikelihoodInterfacePtr(&getLikelihoodInterface());
     _backendsManager_.initialize();
   }
 #endif

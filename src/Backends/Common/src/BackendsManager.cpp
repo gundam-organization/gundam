@@ -104,19 +104,15 @@ void Backends::BackendsManager::setMaterializeOutputList(std::initializer_list<O
   setMaterializeOutputList(std::vector<OutputRequest>(materializeOutputList_));
 }
 
-void Backends::BackendsManager::setLikelihoodInterface(const LikelihoodInterface* likelihoodInterface_) {
-  _likelihoodInterface_ = likelihoodInterface_;
-}
-
 void Backends::BackendsManager::initializeImpl() {
   if( not _isEnabled_ ){
     _backendRuntimeManager_ = nullptr;
     return;
   }
-  LogThrowIf(_likelihoodInterface_ == nullptr, "BackendsManager requires a LikelihoodInterface before initialize().");
+  LogThrowIf(_likelihoodInterfacePtr_ == nullptr, "BackendsManager requires a LikelihoodInterface before initialize().");
 
   LogInfo << "Initializing propagation backend: " << _type_ << std::endl;
-  _backendLikelihoodModel_ = buildBackendLikelihoodModel(*_likelihoodInterface_);
+  _backendLikelihoodModel_ = buildBackendLikelihoodModel(*_likelihoodInterfacePtr_);
 
   LogInfo << "Propagation backend enabled: " << _type_
           << " with fixed device outputs [EventWeights, Histograms, StatLikelihood]"
@@ -130,8 +126,8 @@ void Backends::BackendsManager::initializeImpl() {
   _backendRuntimeManager_->setBackend(makeBackend(*this));
   _backendRuntimeManager_->build(
       BackendModelBuilder::build(
-          const_cast<Propagator&>(_likelihoodInterface_->getModelPropagator()).getSampleSet(),
-          _likelihoodInterface_->getModelPropagator().getEventDialCache()
+          const_cast<Propagator&>(_likelihoodInterfacePtr_->getModelPropagator()).getSampleSet(),
+          _likelihoodInterfacePtr_->getModelPropagator().getEventDialCache()
       )
   );
   _backendRuntimeManager_->getBackend()->setLikelihoodModel(_backendLikelihoodModel_);
