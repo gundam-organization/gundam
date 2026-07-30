@@ -1,9 +1,7 @@
 #include "CpuBackend.h"
 
-#include "Semantics/BackendDialSemantics.h"
+#include "Semantics/BackendHostPropagation.h"
 #include "Logger.h"
-
-#include <algorithm>
 
 Backends::BackendCapabilities Backends::CpuBackend::getCapabilities() const {
   BackendCapabilities out;
@@ -133,63 +131,32 @@ void Backends::CpuBackend::resetResult() {
 }
 
 void Backends::CpuBackend::calculateEventWeights(Result& result_, const ParameterSnapshot& parameters_) {
-  const auto& model = _engineView_.propagation;
-  result_.eventWeights.resize(model.events.size());
-
-  for( const auto& event : model.events ){
-    result_.eventWeights[event.resultIndex] = Semantics::evalEventWeight(model, event, parameters_);
-  }
+  Semantics::calculateEventWeights(result_.eventWeights, _engineView_.propagation, parameters_);
 }
 
 void Backends::CpuBackend::calculateHistograms(Result& result_) {
-  if( result_.eventWeights.empty() ){
-    calculateEventWeights(result_, ParameterSnapshot{});
-  }
-
-  const auto& model = _engineView_.propagation;
-  result_.histSums.resize(model.totalBins);
-  result_.histSumSquares.resize(model.totalBins);
-  std::fill(result_.histSums.begin(), result_.histSums.end(), 0);
-  std::fill(result_.histSumSquares.begin(), result_.histSumSquares.end(), 0);
-
-  for( const auto& event : model.events ){
-    int globalBin = event.globalBinIndex;
-    if( globalBin < 0 ){ continue; }
-    double weight = result_.eventWeights[event.resultIndex];
-    result_.histSums[globalBin] += weight;
-    result_.histSumSquares[globalBin] += weight * weight;
-  }
+  LogThrowIf(result_.eventWeights.empty(), "CPU backend histogram build requires event weights.");
+  Semantics::calculateHistogramsFromEventWeights(
+      result_.histSums,
+      result_.histSumSquares,
+      _engineView_.propagation,
+      result_.eventWeights
+  );
 }
 
 void Backends::CpuBackend::calculateHistogramsFromEvents(Result& result_, const ParameterSnapshot& parameters_) {
-  const auto& model = _engineView_.propagation;
-  result_.histSums.resize(model.totalBins);
-  result_.histSumSquares.resize(model.totalBins);
-  std::fill(result_.histSums.begin(), result_.histSums.end(), 0);
-  std::fill(result_.histSumSquares.begin(), result_.histSumSquares.end(), 0);
-
-  for( const auto& event : model.events ){
-    int globalBin = event.globalBinIndex;
-    if( globalBin < 0 ){ continue; }
-
-    double weight = Semantics::evalEventWeight(model, event, parameters_);
-
-    result_.histSums[globalBin] += weight;
-    result_.histSumSquares[globalBin] += weight * weight;
-  }
+  Semantics::calculateHistograms(
+      result_.histSums,
+      result_.histSumSquares,
+      _engineView_.propagation,
+      parameters_
+  );
 }
 
 void Backends::CpuBackend::calculateLikelihood(Result& result_) {
-  const auto& likelihoodModel = _engineView_.likelihood;
-  result_.likelihood = 0;
-
-  for( const auto& sample : likelihoodModel.samples ){
-    for( int iBin = 0 ; iBin < int(sample.dataSums.size()) ; iBin++ ){
-      if( iBin < int(sample.ignoredBins.size()) and sample.ignoredBins[iBin] ){ continue; }
-      int globalBin = sample.binOffset + iBin;
-      double pred = result_.histSums[globalBin];
-      double predErr = std::sqrt(result_.histSumSquares[globalBin]);
-      result_.likelihood += sample.evalBin(sample.dataSums[iBin], pred, predErr, iBin);
-    }
-  }
+  result_.likelihood = Semantics::calculateLikelihood(
+      _engineView_.likelihood,
+      result_.histSums,
+      result_.histSumSquares
+  );
 }

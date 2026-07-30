@@ -8,6 +8,9 @@ set(SRCFILES
     ${CMAKE_CURRENT_SOURCE_DIR}/Common/src/BackendsManager.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/Common/src/BackendTypes.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/CPU/src/CpuBackend.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/MPS/src/MpsBackendImpl.mm
+    ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/MPS/src/MpsBackendDeviceModel.mm
+    ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/MPS/src/MpsBackendExecution.mm
 )
 
 if(APPLE)
@@ -51,9 +54,12 @@ set(HEADERS
     ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/IPropagationBackend.h
     ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/ParameterSnapshot.h
     ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/Semantics/BackendSemanticsQualifiers.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/Semantics/BackendDialSemanticsCore.h
     ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/Semantics/BackendDialSemantics.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/Semantics/BackendHostPropagation.h
     ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/CPU/include/CpuBackend.h
     ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/MPS/include/MpsBackend.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/MPS/include/MpsBackendInternal.h
 )
 
 if( USE_STATIC_LINKS )

@@ -11,6 +11,8 @@
 
 namespace Backends {
 
+  struct MpsBackendImpl;
+
   class MpsBackend : public IPropagationBackend {
   public:
     MpsBackend();
@@ -35,8 +37,7 @@ namespace Backends {
     [[nodiscard]] BackendTimingSummary getLastTimingSummary() const override;
 
   private:
-    struct Impl;
-    std::unique_ptr<Impl> _impl_{};
+    std::unique_ptr<MpsBackendImpl> _impl_{};
   };
 
 }
