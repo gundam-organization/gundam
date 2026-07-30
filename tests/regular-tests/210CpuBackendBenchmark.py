@@ -161,7 +161,7 @@ def benchmark(context: BenchmarkContext, parameter_points: list[tuple[float, flo
     start = time.perf_counter()
     for point in parameter_points:
         set_normalization_parameters(likelihood_interface, *point)
-        context.engine.propagateAndEvalLikelihood()
+        context.engine.evaluateLikelihood()
         results.append((likelihood_interface.getLastLikelihood(), get_histogram_sums(likelihood_interface)))
     elapsed = time.perf_counter() - start
     return elapsed, results
