@@ -30,11 +30,9 @@ namespace Backends {
     BackendsManager() = default;
 
     [[nodiscard]] const BackendLikelihoodModel& getLikelihoodModel() const { return _backendLikelihoodModel_; }
-    [[nodiscard]] const PropagationRequest& getPropagationRequest() const { return _propagationRequest_; }
     [[nodiscard]] bool isEnabled() const { return _isEnabled_; }
     [[nodiscard]] bool isAutoMaterializeEnabled() const { return _enableAutoMaterialize_; }
     [[nodiscard]] const std::string& getType() const { return _type_; }
-    [[nodiscard]] const std::vector<OutputRequest>& getOutputRequests() const { return _outputRequests_; }
     [[nodiscard]] const std::vector<OutputRequest>& getMaterializeOutputList() const { return _materializeOutputList_; }
     [[nodiscard]] bool hasBackend() const { return _backendRuntimeManager_ != nullptr and _backendRuntimeManager_->hasBackend(); }
     [[nodiscard]] BackendRuntimeManager* getBackendRuntimeManager() { return _backendRuntimeManager_.get(); }
@@ -55,16 +53,15 @@ namespace Backends {
     bool _enableAutoMaterialize_{true};
     std::string _type_{"CPU"};
 
-    [[nodiscard]] PropagationRequest makePropagationRequest() const;
+    [[nodiscard]] bool shouldMaterialize(OutputRequest outputRequest_) const;
 
-    std::vector<OutputRequest> _outputRequests_{OutputRequest::Likelihood};
     std::vector<OutputRequest> _materializeOutputList_{
         OutputRequest::EventWeights,
         OutputRequest::Histograms,
-        OutputRequest::Likelihood
+        OutputRequest::SampleLikelihoods,
+        OutputRequest::StatLikelihood,
     };
     BackendLikelihoodModel _backendLikelihoodModel_{};
-    PropagationRequest _propagationRequest_{};
     std::shared_ptr<BackendRuntimeManager> _backendRuntimeManager_{nullptr};
   };
 

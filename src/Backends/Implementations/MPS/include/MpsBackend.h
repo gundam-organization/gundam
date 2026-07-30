@@ -23,9 +23,7 @@ namespace Backends {
 
     void build(const BackendModel& model_) override;
     void setLikelihoodModel(const BackendLikelihoodModel& likelihoodModel_) override;
-    PropagationToken requestPropagation(
-        const ParameterSnapshot& parameters_,
-        const PropagationRequest& request_) override;
+    PropagationToken requestPropagation(const ParameterSnapshot& parameters_) override;
 
     bool isReady(const PropagationToken& token_) const override;
     void wait(const PropagationToken& token_) override;

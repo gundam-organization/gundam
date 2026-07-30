@@ -21,9 +21,7 @@ namespace Backends {
 
     void build(const BackendModel& model_) override;
     void setLikelihoodModel(const BackendLikelihoodModel& likelihoodModel_) override;
-    PropagationToken requestPropagation(
-        const ParameterSnapshot& parameters_,
-        const PropagationRequest& request_) override;
+    PropagationToken requestPropagation(const ParameterSnapshot& parameters_) override;
 
     bool isReady(const PropagationToken& token_) const override;
     void wait(const PropagationToken& token_) override;
@@ -42,7 +40,7 @@ namespace Backends {
 
     [[nodiscard]] bool isCurrentToken(const PropagationToken& token_) const;
     void applyParameterSnapshot(const ParameterSnapshot& parameters_);
-    void resetResult(const PropagationRequest& request_);
+    void resetResult();
     void updateInputBuffers();
     void calculateEventWeights(Result& result_);
     void calculateHistograms(Result& result_);

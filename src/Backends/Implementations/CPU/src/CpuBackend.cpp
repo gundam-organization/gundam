@@ -31,51 +31,31 @@ void Backends::CpuBackend::setLikelihoodModel(const BackendLikelihoodModel& like
   _likelihoodModel_ = likelihoodModel_;
 }
 
-Backends::PropagationToken Backends::CpuBackend::requestPropagation(
-    const ParameterSnapshot& parameters_,
-    const PropagationRequest& request_) {
+Backends::PropagationToken Backends::CpuBackend::requestPropagation(const ParameterSnapshot& parameters_) {
 
   LogThrowIf(not _isBuilt_, "CpuBackend has not been built.");
   LogThrowIf(not parameters_.empty() and parameters_.values.size() != _model_.parameters.size(),
              "ParameterSnapshot size mismatch: " << parameters_.values.size()
                                                  << " != " << _model_.parameters.size());
 
-  resetResult(request_);
+  resetResult();
 
   applyParameterSnapshot(parameters_);
   updateInputBuffers();
 
-  if( request_.has(OutputRequest::EventWeights) ){
-    calculateEventWeights(_lastResult_);
-    _lastResult_.status.eventWeights = OutputState::ReadyOnDevice;
-  }
+  calculateEventWeights(_lastResult_);
+  _lastResult_.status.eventWeights = OutputState::ReadyOnDevice;
 
-  if( request_.has(OutputRequest::Histograms) ){
-    if( request_.has(OutputRequest::EventWeights) ){
-      calculateHistograms(_lastResult_);
-    }
-    else{
-      calculateHistogramsFromEvents(_lastResult_);
-    }
-    _lastResult_.status.histograms = OutputState::ReadyOnDevice;
-  }
+  calculateHistograms(_lastResult_);
+  _lastResult_.status.histograms = OutputState::ReadyOnDevice;
 
-  if( request_.has(OutputRequest::Likelihood) ){
-    if( _likelihoodModel_.empty() ){
-      _lastResult_.status.likelihood = OutputState::Failed;
-    }
-    else{
-      if( _lastResult_.histSums.empty() ){
-        if( request_.has(OutputRequest::EventWeights) ){
-          calculateHistograms(_lastResult_);
-        }
-        else{
-          calculateHistogramsFromEvents(_lastResult_);
-        }
-      }
-      calculateLikelihood(_lastResult_);
-      _lastResult_.status.likelihood = OutputState::ReadyOnDevice;
-    }
+  _lastResult_.status.sampleLikelihoods = OutputState::Failed;
+  if( _likelihoodModel_.empty() ){
+    _lastResult_.status.statLikelihood = OutputState::Failed;
+  }
+  else{
+    calculateLikelihood(_lastResult_);
+    _lastResult_.status.statLikelihood = OutputState::ReadyOnDevice;
   }
   _lastResult_.status.backend = BackendStatus::Ready;
   return _lastResult_.token;
@@ -112,8 +92,11 @@ void Backends::CpuBackend::materialize(const PropagationToken& token_, OutputReq
     materializeHistograms(_lastResult_);
     _lastResult_.status.histograms = OutputState::ReadyOnHost;
   }
-  else if( output_ == OutputRequest::Likelihood ){
-    _lastResult_.status.likelihood = OutputState::ReadyOnHost;
+  else if( output_ == OutputRequest::SampleLikelihoods ){
+    LogThrow("CpuBackend cannot materialize sample likelihoods yet.");
+  }
+  else if( output_ == OutputRequest::StatLikelihood ){
+    _lastResult_.status.statLikelihood = OutputState::ReadyOnHost;
   }
   else{
     LogThrow("CpuBackend cannot materialize requested output yet.");
@@ -122,8 +105,8 @@ void Backends::CpuBackend::materialize(const PropagationToken& token_, OutputReq
 
 double Backends::CpuBackend::getLikelihood(const PropagationToken& token_) const {
   LogThrowIf(not isCurrentToken(token_), "Invalid CpuBackend propagation token.");
-  LogThrowIf(_lastResult_.status.likelihood != OutputState::ReadyOnDevice
-             and _lastResult_.status.likelihood != OutputState::ReadyOnHost,
+  LogThrowIf(_lastResult_.status.statLikelihood != OutputState::ReadyOnDevice
+             and _lastResult_.status.statLikelihood != OutputState::ReadyOnHost,
              "Backend likelihood is not ready.");
   return _lastResult_.likelihood;
 }
@@ -141,7 +124,7 @@ void Backends::CpuBackend::applyParameterSnapshot(const ParameterSnapshot& param
   }
 }
 
-void Backends::CpuBackend::resetResult(const PropagationRequest& request_) {
+void Backends::CpuBackend::resetResult() {
   _lastResult_.token.id = _nextTokenId_++;
   _lastResult_.token.isValid = true;
   _lastResult_.status = PropagationStatus();
@@ -150,10 +133,10 @@ void Backends::CpuBackend::resetResult(const PropagationRequest& request_) {
   _lastResult_.histSums.clear();
   _lastResult_.histSumSquares.clear();
   _lastResult_.likelihood = 0;
-
-  for( auto request : request_.outputs ){
-    _lastResult_.status.state(request) = OutputState::Scheduled;
-  }
+  _lastResult_.status.eventWeights = OutputState::Scheduled;
+  _lastResult_.status.histograms = OutputState::Scheduled;
+  _lastResult_.status.sampleLikelihoods = OutputState::Scheduled;
+  _lastResult_.status.statLikelihood = OutputState::Scheduled;
 }
 
 void Backends::CpuBackend::updateInputBuffers() {

@@ -9,17 +9,13 @@
 
 namespace Backends {
 
-  struct PropagationRequest;
-
 #define ENUM_NAME OutputRequest
 #define ENUM_FIELDS \
 ENUM_FIELD( EventWeights, 0 ) \
 ENUM_FIELD( Histograms ) \
-ENUM_FIELD( Likelihood )
+ENUM_FIELD( SampleLikelihoods ) \
+ENUM_FIELD( StatLikelihood )
 #include "GenericToolbox.MakeEnum.h"
-
-  [[nodiscard]] std::string toString(OutputRequest request_);
-  [[nodiscard]] std::string toString(const PropagationRequest& request_);
 
   enum class OutputState {
     NotRequested,
@@ -46,15 +42,6 @@ ENUM_FIELD( Likelihood )
     bool supportsDynamicBinning{false};
     bool supportsObservableTransforms{false};
     std::string deviceName{};
-  };
-
-  struct PropagationRequest {
-    std::vector<OutputRequest> outputs{};
-    std::vector<OutputRequest> materializeOutputs{};
-    bool allowAsync{true};
-
-    [[nodiscard]] bool has(OutputRequest request_) const;
-    [[nodiscard]] bool shouldMaterialize(OutputRequest request_) const;
   };
 
   struct BackendDeviceView {
@@ -102,7 +89,8 @@ ENUM_FIELD( Likelihood )
     BackendStatus backend{BackendStatus::Unconfigured};
     OutputState eventWeights{OutputState::NotRequested};
     OutputState histograms{OutputState::NotRequested};
-    OutputState likelihood{OutputState::NotRequested};
+    OutputState sampleLikelihoods{OutputState::NotRequested};
+    OutputState statLikelihood{OutputState::NotRequested};
 
     OutputState& state(OutputRequest request_);
     [[nodiscard]] OutputState state(OutputRequest request_) const;

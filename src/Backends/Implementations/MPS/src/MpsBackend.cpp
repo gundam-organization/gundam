@@ -24,14 +24,13 @@ void Backends::MpsBackend::build(const BackendModel&) {
 void Backends::MpsBackend::setLikelihoodModel(const BackendLikelihoodModel&) {
 }
 
-Backends::PropagationToken Backends::MpsBackend::requestPropagation(
-    const ParameterSnapshot&,
-    const PropagationRequest& request_) {
+Backends::PropagationToken Backends::MpsBackend::requestPropagation(const ParameterSnapshot&) {
   _impl_->status = PropagationStatus();
   _impl_->status.backend = BackendStatus::Unavailable;
-  for( auto request : request_.outputs ){
-    _impl_->status.state(request) = OutputState::Failed;
-  }
+  _impl_->status.eventWeights = OutputState::Failed;
+  _impl_->status.histograms = OutputState::Failed;
+  _impl_->status.sampleLikelihoods = OutputState::Failed;
+  _impl_->status.statLikelihood = OutputState::Failed;
   return {};
 }
 

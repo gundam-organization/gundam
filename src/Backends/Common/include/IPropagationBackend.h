@@ -20,9 +20,7 @@ namespace Backends {
 
     virtual void build(const BackendModel& model_) = 0;
     virtual void setLikelihoodModel(const BackendLikelihoodModel& likelihoodModel_) = 0;
-    virtual PropagationToken requestPropagation(
-        const ParameterSnapshot& parameters_,
-        const PropagationRequest& request_) = 0;
+    virtual PropagationToken requestPropagation(const ParameterSnapshot& parameters_) = 0;
 
     virtual bool isReady(const PropagationToken& token_) const = 0;
     virtual void wait(const PropagationToken& token_) = 0;

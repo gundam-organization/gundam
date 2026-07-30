@@ -385,7 +385,7 @@ struct Backends::MpsBackend::Impl {
     return token_.isValid and lastResult.token.isValid and token_.id == lastResult.token.id;
   }
 
-  void resetResult(const PropagationRequest& request_) {
+  void resetResult() {
     lastResult.token.id = nextTokenId++;
     lastResult.token.isValid = true;
     lastResult.status = PropagationStatus();
@@ -395,10 +395,10 @@ struct Backends::MpsBackend::Impl {
     lastResult.histSumSquares.clear();
     lastResult.likelihood = 0;
     lastTiming = buildTiming;
-
-    for( auto request : request_.outputs ){
-      lastResult.status.state(request) = OutputState::Scheduled;
-    }
+    lastResult.status.eventWeights = OutputState::Scheduled;
+    lastResult.status.histograms = OutputState::Scheduled;
+    lastResult.status.sampleLikelihoods = OutputState::Scheduled;
+    lastResult.status.statLikelihood = OutputState::Scheduled;
   }
 
   void applyParameterSnapshot(const ParameterSnapshot& parameters_) {
@@ -1465,21 +1465,20 @@ void Backends::MpsBackend::setLikelihoodModel(const BackendLikelihoodModel& like
   _impl_->likelihoodModel = likelihoodModel_;
 }
 
-Backends::PropagationToken Backends::MpsBackend::requestPropagation(
-    const ParameterSnapshot& parameters_,
-    const PropagationRequest& request_) {
+Backends::PropagationToken Backends::MpsBackend::requestPropagation(const ParameterSnapshot& parameters_) {
   LogThrowIf(not _impl_->isBuilt, "MpsBackend has not been built.");
   LogThrowIf(not parameters_.empty() and parameters_.values.size() != _impl_->model.parameters.size(),
              "ParameterSnapshot size mismatch: " << parameters_.values.size()
                                                  << " != " << _impl_->model.parameters.size());
 
-  _impl_->resetResult(request_);
+  _impl_->resetResult();
 
   if( not _impl_->isAvailable ){
     _impl_->lastResult.status.backend = BackendStatus::Unavailable;
-    for( auto request : request_.outputs ){
-      _impl_->lastResult.status.state(request) = OutputState::Failed;
-    }
+    _impl_->lastResult.status.eventWeights = OutputState::Failed;
+    _impl_->lastResult.status.histograms = OutputState::Failed;
+    _impl_->lastResult.status.sampleLikelihoods = OutputState::Failed;
+    _impl_->lastResult.status.statLikelihood = OutputState::Failed;
     _impl_->lastResult.token.isValid = false;
     return {};
   }
@@ -1487,23 +1486,19 @@ Backends::PropagationToken Backends::MpsBackend::requestPropagation(
   _impl_->applyParameterSnapshot(parameters_);
   _impl_->updateInputBuffers();
 
-  bool needsEventWeights = request_.has(OutputRequest::EventWeights);
-  bool needsHistograms = request_.has(OutputRequest::Histograms) or request_.has(OutputRequest::Likelihood);
+  bool needsEventWeights = true;
+  bool needsHistograms = true;
   bool usedDevicePropagation = false;
 
   if( needsEventWeights or needsHistograms ){
     usedDevicePropagation = _impl_->runDevicePropagation(needsHistograms);
     if( usedDevicePropagation ){
-      if( needsEventWeights ){
-        _impl_->lastResult.status.eventWeights = OutputState::ReadyOnDevice;
-      }
-      if( request_.has(OutputRequest::Histograms) ){
-        _impl_->lastResult.status.histograms = OutputState::ReadyOnDevice;
-      }
+      _impl_->lastResult.status.eventWeights = OutputState::ReadyOnDevice;
+      _impl_->lastResult.status.histograms = OutputState::ReadyOnDevice;
     }
   }
 
-  if( request_.has(OutputRequest::EventWeights) and not usedDevicePropagation ){
+  if( not usedDevicePropagation ){
     _impl_->calculateEventWeights();
     _impl_->lastResult.status.eventWeights = OutputState::ReadyOnHost;
   }
@@ -1511,27 +1506,20 @@ Backends::PropagationToken Backends::MpsBackend::requestPropagation(
   if( needsHistograms and not usedDevicePropagation ){
     if( not _impl_->calculateHistogramsOnDevice() ){
       _impl_->lastResult.status.backend = BackendStatus::Failed;
-      if( request_.has(OutputRequest::Histograms) ){
-        _impl_->lastResult.status.histograms = OutputState::Failed;
-      }
-      if( request_.has(OutputRequest::Likelihood) ){
-        _impl_->lastResult.status.likelihood = OutputState::Failed;
-      }
+      _impl_->lastResult.status.histograms = OutputState::Failed;
+      _impl_->lastResult.status.statLikelihood = OutputState::Failed;
       return _impl_->lastResult.token;
     }
-    if( request_.has(OutputRequest::Histograms) ){
-      _impl_->lastResult.status.histograms = OutputState::ReadyOnDevice;
-    }
+    _impl_->lastResult.status.histograms = OutputState::ReadyOnDevice;
   }
 
-  if( request_.has(OutputRequest::Likelihood) ){
-    if( _impl_->likelihoodModel.empty() ){
-      _impl_->lastResult.status.likelihood = OutputState::Failed;
-    }
-    else{
-      _impl_->calculateLikelihood();
-      _impl_->lastResult.status.likelihood = OutputState::ReadyOnHost;
-    }
+  _impl_->lastResult.status.sampleLikelihoods = OutputState::Failed;
+  if( _impl_->likelihoodModel.empty() ){
+    _impl_->lastResult.status.statLikelihood = OutputState::Failed;
+  }
+  else{
+    _impl_->calculateLikelihood();
+    _impl_->lastResult.status.statLikelihood = OutputState::ReadyOnHost;
   }
 
   _impl_->lastResult.status.backend = BackendStatus::Ready;
@@ -1569,8 +1557,11 @@ void Backends::MpsBackend::materialize(const PropagationToken& token_, OutputReq
     _impl_->materializeHistograms();
     _impl_->lastResult.status.histograms = OutputState::ReadyOnHost;
   }
-  else if( output_ == OutputRequest::Likelihood ){
-    _impl_->lastResult.status.likelihood = OutputState::ReadyOnHost;
+  else if( output_ == OutputRequest::SampleLikelihoods ){
+    LogThrow("MpsBackend cannot materialize sample likelihoods yet.");
+  }
+  else if( output_ == OutputRequest::StatLikelihood ){
+    _impl_->lastResult.status.statLikelihood = OutputState::ReadyOnHost;
   }
   else{
     LogThrow("MpsBackend cannot materialize requested output yet.");
@@ -1579,8 +1570,8 @@ void Backends::MpsBackend::materialize(const PropagationToken& token_, OutputReq
 
 double Backends::MpsBackend::getLikelihood(const PropagationToken& token_) const {
   LogThrowIf(not _impl_->isCurrentToken(token_), "Invalid MpsBackend propagation token.");
-  LogThrowIf(_impl_->lastResult.status.likelihood != OutputState::ReadyOnDevice
-             and _impl_->lastResult.status.likelihood != OutputState::ReadyOnHost,
+  LogThrowIf(_impl_->lastResult.status.statLikelihood != OutputState::ReadyOnDevice
+             and _impl_->lastResult.status.statLikelihood != OutputState::ReadyOnHost,
              "Backend likelihood is not ready.");
   return _impl_->lastResult.likelihood;
 }

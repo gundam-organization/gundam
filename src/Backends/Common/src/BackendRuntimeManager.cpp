@@ -11,11 +11,9 @@ void Backends::BackendRuntimeManager::build(const BackendModel& model_) {
   _backend_->build(model_);
 }
 
-Backends::PropagationToken Backends::BackendRuntimeManager::requestPropagation(
-    const ParameterSnapshot& parameters_,
-    const PropagationRequest& request_) {
+Backends::PropagationToken Backends::BackendRuntimeManager::requestPropagation(const ParameterSnapshot& parameters_) {
   LogThrowIf(_backend_ == nullptr, "No backend selected.");
-  return _backend_->requestPropagation(parameters_, request_);
+  return _backend_->requestPropagation(parameters_);
 }
 
 void Backends::BackendRuntimeManager::wait(const PropagationToken& token_) {
