@@ -2,14 +2,24 @@
 #define GUNDAM_BACKEND_MODEL_H
 
 #include <cstddef>
+#include <cstdint>
 #include <functional>
 #include <vector>
 
-class DialInterface;
 class LikelihoodInterface;
 class Parameter;
 
 namespace Backends {
+
+  enum class BackendDialType : std::uint8_t {
+    Norm = 0,
+    Shift,
+    CompactSpline,
+    UniformSpline,
+    MonotonicSpline,
+    GeneralSpline,
+    Graph
+  };
 
   struct BackendDialInputRef {
     std::size_t parameterIndex{std::size_t(-1)};
@@ -19,9 +29,16 @@ namespace Backends {
   };
 
   struct BackendDialRef {
-    const DialInterface* interface{nullptr};
+    BackendDialType type{BackendDialType::Norm};
     std::size_t firstInput{0};
     std::size_t inputCount{0};
+    std::size_t payloadOffset{0};
+    std::size_t payloadSize{0};
+    bool allowExtrapolation{false};
+    double minResponse{0};
+    double maxResponse{0};
+    bool hasMinResponse{false};
+    bool hasMaxResponse{false};
   };
 
   struct BackendEventRef {
@@ -51,6 +68,7 @@ namespace Backends {
     std::vector<BackendEventRef> events{};
     std::vector<BackendDialRef> eventDials{};
     std::vector<BackendDialInputRef> dialInputs{};
+    std::vector<double> dialPayloads{};
     std::vector<BackendSampleRef> samples{};
     std::vector<const Parameter*> parameters{};
     int totalBins{0};

@@ -1,11 +1,20 @@
 #include "BackendEngineView.h"
 
+#include "CompactSpline.h"
 #include "EventDialCache.h"
+#include "GeneralSpline.h"
+#include "Graph.h"
 #include "Histogram.h"
 #include "LikelihoodInterface.h"
+#include "MonotonicSpline.h"
+#include "Norm.h"
 #include "Parameter.h"
 #include "Sample.h"
+#include "Shift.h"
 #include "SampleSet.h"
+#include "UniformSpline.h"
+
+#include "DialResponseSupervisor.h"
 
 #include <cmath>
 #include <map>
@@ -16,6 +25,7 @@ void Backends::BackendPropagationView::clear() {
   events.clear();
   eventDials.clear();
   dialInputs.clear();
+  dialPayloads.clear();
   samples.clear();
   parameters.clear();
   totalBins = 0;
@@ -49,6 +59,7 @@ void Backends::BackendEngineView::build(LikelihoodInterface& likelihoodInterface
 
   propagation.events.reserve(eventDialCache.getCache().size());
   std::unordered_map<const Parameter*, std::size_t> parameterIndexMap{};
+  std::unordered_map<const DialInterface*, BackendDialRef> dialDescriptorMap{};
 
   for( const auto& cacheEntry : eventDialCache.getCache() ){
     if( cacheEntry.event == nullptr ){ continue; }
@@ -64,11 +75,72 @@ void Backends::BackendEngineView::build(LikelihoodInterface& likelihoodInterface
     eventRef.resultIndex = propagation.events.size();
 
     for( const auto& dialResponse : cacheEntry.dialResponseCacheList ){
+      const auto* interface = dialResponse.dialInterface;
+      LogThrowIf(interface == nullptr, "Null DialInterface while building BackendEngineView.");
+      auto cachedDescriptorIt = dialDescriptorMap.find(interface);
+      if( cachedDescriptorIt != dialDescriptorMap.end() ){
+        propagation.eventDials.emplace_back(cachedDescriptorIt->second);
+        continue;
+      }
+
       BackendDialRef dialRef;
-      dialRef.interface = dialResponse.dialInterface;
-      const auto* inputBuffer = dialResponse.dialInterface->getInputBufferRef();
+      const auto* dialBase = interface->getDialBaseRef();
+      LogThrowIf(dialBase == nullptr, "Null DialBase while building BackendEngineView.");
+      const auto* inputBuffer = interface->getInputBufferRef();
       dialRef.firstInput = propagation.dialInputs.size();
       dialRef.inputCount = inputBuffer == nullptr ? 0 : std::size_t(inputBuffer->getBufferSize());
+      dialRef.payloadOffset = propagation.dialPayloads.size();
+
+      if( auto* supervisor = interface->getResponseSupervisorRef() ; supervisor != nullptr ){
+        dialRef.hasMinResponse = not std::isnan(supervisor->getMinResponse());
+        dialRef.hasMaxResponse = not std::isnan(supervisor->getMaxResponse());
+        dialRef.minResponse = supervisor->getMinResponse();
+        dialRef.maxResponse = supervisor->getMaxResponse();
+      }
+
+      if( dynamic_cast<const Norm*>(dialBase) != nullptr ){
+        dialRef.type = BackendDialType::Norm;
+      }
+      else if( dynamic_cast<const Shift*>(dialBase) != nullptr ){
+        dialRef.type = BackendDialType::Shift;
+        propagation.dialPayloads.emplace_back(dialBase->evalResponse(DialInputBuffer()));
+      }
+      else if( dynamic_cast<const CompactSpline*>(dialBase) != nullptr ){
+        dialRef.type = BackendDialType::CompactSpline;
+        dialRef.allowExtrapolation = dialBase->getAllowExtrapolation();
+        const auto& data = dialBase->getDialData();
+        propagation.dialPayloads.insert(propagation.dialPayloads.end(), data.begin(), data.end());
+      }
+      else if( dynamic_cast<const UniformSpline*>(dialBase) != nullptr ){
+        dialRef.type = BackendDialType::UniformSpline;
+        dialRef.allowExtrapolation = dialBase->getAllowExtrapolation();
+        const auto& data = dialBase->getDialData();
+        propagation.dialPayloads.insert(propagation.dialPayloads.end(), data.begin(), data.end());
+      }
+      else if( dynamic_cast<const MonotonicSpline*>(dialBase) != nullptr ){
+        dialRef.type = BackendDialType::MonotonicSpline;
+        dialRef.allowExtrapolation = dialBase->getAllowExtrapolation();
+        const auto& data = dialBase->getDialData();
+        propagation.dialPayloads.insert(propagation.dialPayloads.end(), data.begin(), data.end());
+      }
+      else if( dynamic_cast<const GeneralSpline*>(dialBase) != nullptr ){
+        dialRef.type = BackendDialType::GeneralSpline;
+        dialRef.allowExtrapolation = dialBase->getAllowExtrapolation();
+        const auto& data = dialBase->getDialData();
+        propagation.dialPayloads.insert(propagation.dialPayloads.end(), data.begin(), data.end());
+      }
+      else if( dynamic_cast<const Graph*>(dialBase) != nullptr ){
+        dialRef.type = BackendDialType::Graph;
+        dialRef.allowExtrapolation = dialBase->getAllowExtrapolation();
+        const auto& data = dialBase->getDialData();
+        propagation.dialPayloads.insert(propagation.dialPayloads.end(), data.begin(), data.end());
+      }
+      else{
+        LogThrow("Unsupported dial type for BackendEngineView: " << dialBase->getDialTypeName());
+      }
+
+      dialRef.payloadSize = propagation.dialPayloads.size() - dialRef.payloadOffset;
+      dialDescriptorMap.emplace(interface, dialRef);
       propagation.eventDials.emplace_back(dialRef);
 
       if( inputBuffer == nullptr ){ continue; }

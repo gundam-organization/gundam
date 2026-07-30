@@ -1,7 +1,11 @@
 #include "CpuBackend.h"
 
-#include "DialInputBuffer.h"
-#include "DialInterface.h"
+#include "CalculateCompactSpline.h"
+#include "CalculateGeneralSpline.h"
+#include "CalculateGraph.h"
+#include "CalculateMonotonicSpline.h"
+#include "CalculateUniformSpline.h"
+#include "Parameter.h"
 
 #include "Logger.h"
 
@@ -136,18 +140,75 @@ void Backends::CpuBackend::resetResult() {
 }
 
 double Backends::CpuBackend::evaluateDialResponse(const BackendDialRef& dialRef_, const ParameterSnapshot& parameters_) const {
-  LogThrowIf(dialRef_.interface == nullptr, "Null dial interface in CPU backend.");
+  auto clampResponse = [&dialRef_](double response_){
+    if( dialRef_.hasMinResponse and response_ < dialRef_.minResponse ){ response_ = dialRef_.minResponse; }
+    if( dialRef_.hasMaxResponse and response_ > dialRef_.maxResponse ){ response_ = dialRef_.maxResponse; }
+    return response_;
+  };
 
-  auto& scratchBuffer = _scratchDialInputBuffer_.getInputBuffer();
-  scratchBuffer.resize(dialRef_.inputCount);
-  for( std::size_t iInput = 0 ; iInput < dialRef_.inputCount ; iInput++ ){
-    const auto& inputRef = _engineView_.propagation.dialInputs.at(dialRef_.firstInput + iInput);
-    scratchBuffer[iInput] = applyDialInputTransform(inputRef, getDialInputValue(inputRef, parameters_));
+  auto getInput = [this, &dialRef_, &parameters_](std::size_t iInput_){
+    const auto& inputRef = _engineView_.propagation.dialInputs.at(dialRef_.firstInput + iInput_);
+    return applyDialInputTransform(inputRef, getDialInputValue(inputRef, parameters_));
+  };
+
+  const double* payload = _engineView_.propagation.dialPayloads.data() + dialRef_.payloadOffset;
+
+  switch( dialRef_.type ){
+    case BackendDialType::Norm:
+      LogThrowIf(dialRef_.inputCount != 1, "Backend Norm dial expects exactly one input.");
+      return clampResponse(getInput(0));
+
+    case BackendDialType::Shift:
+      LogThrowIf(dialRef_.payloadSize < 1, "Backend Shift dial payload is empty.");
+      return clampResponse(payload[0]);
+
+    case BackendDialType::CompactSpline: {
+      LogThrowIf(dialRef_.payloadSize < 3, "Backend CompactSpline payload is too small.");
+      double x = getInput(0);
+      if( not dialRef_.allowExtrapolation ){
+        x = std::clamp(x, payload[0], payload[0] + payload[1] * double(dialRef_.payloadSize - 3));
+      }
+      return clampResponse(CalculateCompactSpline(x, -1E20, 1E20, payload, int(dialRef_.payloadSize - 2)));
+    }
+
+    case BackendDialType::UniformSpline: {
+      LogThrowIf(dialRef_.payloadSize < 4, "Backend UniformSpline payload is too small.");
+      double x = getInput(0);
+      if( not dialRef_.allowExtrapolation ){
+        x = std::clamp(x, payload[0], payload[0] + payload[1] * double((dialRef_.payloadSize - 2) / 2 - 1));
+      }
+      return clampResponse(CalculateUniformSpline(x, -1E20, 1E20, payload, int(dialRef_.payloadSize)));
+    }
+
+    case BackendDialType::MonotonicSpline: {
+      LogThrowIf(dialRef_.payloadSize < 3, "Backend MonotonicSpline payload is too small.");
+      double x = getInput(0);
+      if( not dialRef_.allowExtrapolation ){
+        x = std::clamp(x, payload[0], payload[0] + payload[1] * double(dialRef_.payloadSize - 3));
+      }
+      return clampResponse(CalculateMonotonicSpline(x, -1E20, 1E20, payload, int(dialRef_.payloadSize - 2)));
+    }
+
+    case BackendDialType::GeneralSpline: {
+      LogThrowIf(dialRef_.payloadSize < 5, "Backend GeneralSpline payload is too small.");
+      double x = getInput(0);
+      if( not dialRef_.allowExtrapolation ){
+        x = std::clamp(x, payload[0], payload[0] + payload[1] * double((dialRef_.payloadSize - 2) / 3 - 1));
+      }
+      return clampResponse(CalculateGeneralSpline(x, -1E20, 1E20, payload, int(dialRef_.payloadSize)));
+    }
+
+    case BackendDialType::Graph: {
+      LogThrowIf(dialRef_.payloadSize < 2, "Backend Graph payload is too small.");
+      double x = getInput(0);
+      if( not dialRef_.allowExtrapolation ){
+        x = std::clamp(x, payload[1], payload[dialRef_.payloadSize - 1]);
+      }
+      return clampResponse(CalculateGraph(x, -1E20, 1E20, payload, int(dialRef_.payloadSize)));
+    }
   }
 
-  return dialRef_.interface->getResponseSupervisorRef()->process(
-      dialRef_.interface->getDialBaseRef()->evalResponse(_scratchDialInputBuffer_)
-  );
+  LogThrow("Unhandled backend dial type in CpuBackend.");
 }
 
 double Backends::CpuBackend::getDialInputValue(const BackendDialInputRef& inputRef_, const ParameterSnapshot& parameters_) const {

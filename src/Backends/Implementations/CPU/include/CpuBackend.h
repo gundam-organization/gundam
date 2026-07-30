@@ -3,7 +3,6 @@
 
 #include "BackendEngineView.h"
 #include "BackendTypes.h"
-#include "DialInputBuffer.h"
 #include "IPropagationBackend.h"
 #include "ParameterSnapshot.h"
 
@@ -54,7 +53,6 @@ namespace Backends {
     void calculateLikelihood(Result& result_);
 
     BackendEngineView _engineView_{};
-    mutable DialInputBuffer _scratchDialInputBuffer_{};
     Result _lastResult_{};
     std::uint64_t _nextTokenId_{1};
     bool _isBuilt_{false};
