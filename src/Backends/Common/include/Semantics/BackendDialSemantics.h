@@ -3,24 +3,29 @@
 
 #include "BackendEngineView.h"
 #include "ParameterSnapshot.h"
+#include "Semantics/BackendSemanticsQualifiers.h"
 
 #include "CalculateCompactSpline.h"
 #include "CalculateGeneralSpline.h"
 #include "CalculateGraph.h"
 #include "CalculateMonotonicSpline.h"
 #include "CalculateUniformSpline.h"
-#include "Logger.h"
 
-#include <algorithm>
+#include <cstddef>
 #include <cmath>
-#include <utility>
 
 namespace Backends::Semantics {
 
-  inline double transformDialInput(const BackendDialInputView& inputRef_, double rawValue_) {
+  GUNDAM_BACKEND_FORCE_INLINE GUNDAM_BACKEND_HOST_DEVICE
+  double clampValue(double value_, double low_, double high_) {
+    return value_ < low_ ? low_ : (value_ > high_ ? high_ : value_);
+  }
+
+  GUNDAM_BACKEND_FORCE_INLINE GUNDAM_BACKEND_HOST_DEVICE
+  double transformDialInput(const BackendDialInputView& inputRef_, double rawValue_) {
     if( not inputRef_.useMirror ){ return rawValue_; }
 
-    double transformed = std::abs(std::fmod(
+    double transformed = ::fabs(::fmod(
         rawValue_ - inputRef_.mirrorMin,
         2 * inputRef_.mirrorRange
     ));
@@ -33,121 +38,147 @@ namespace Backends::Semantics {
     return transformed + inputRef_.mirrorMin;
   }
 
-  inline double clampDialResponse(const BackendDialView& dialRef_, double response_) {
+  GUNDAM_BACKEND_FORCE_INLINE GUNDAM_BACKEND_HOST_DEVICE
+  double clampDialResponse(const BackendDialView& dialRef_, double response_) {
     if( dialRef_.hasMinResponse and response_ < dialRef_.minResponse ){ response_ = dialRef_.minResponse; }
     if( dialRef_.hasMaxResponse and response_ > dialRef_.maxResponse ){ response_ = dialRef_.maxResponse; }
     return response_;
   }
 
-  inline double getParameterValue(const BackendDialInputView& inputRef_, const ParameterSnapshot& parameters_) {
-    LogThrowIf(parameters_.empty(), "BackendDialSemantics requires a populated ParameterSnapshot.");
-    return parameters_.values.at(inputRef_.parameterIndex);
+  GUNDAM_BACKEND_FORCE_INLINE GUNDAM_BACKEND_HOST_DEVICE
+  double loadParameterValue(const BackendDialInputView& inputRef_, const double* parameterValues_) {
+    GUNDAM_BACKEND_SEMANTICS_ASSERT(parameterValues_ != nullptr);
+    return parameterValues_[inputRef_.parameterIndex];
   }
 
-  inline const double* getDialPayload(const BackendPropagationView& propagation_, const BackendDialView& dialRef_) {
-    return propagation_.dialPayloads.data() + dialRef_.payloadOffset;
+  GUNDAM_BACKEND_FORCE_INLINE GUNDAM_BACKEND_HOST_DEVICE
+  const double* getDialPayload(const double* dialPayloads_, const BackendDialView& dialRef_) {
+    GUNDAM_BACKEND_SEMANTICS_ASSERT(dialPayloads_ != nullptr or dialRef_.payloadSize == 0);
+    return dialPayloads_ + dialRef_.payloadOffset;
   }
 
-  template<typename RawInputProvider>
-  inline double evalDialResponse(const BackendPropagationView& propagation_,
-                                 const BackendDialView& dialRef_,
-                                 RawInputProvider&& rawInputProvider_) {
-    auto getInput = [&propagation_, &dialRef_, &rawInputProvider_](std::size_t iInput_){
-      const auto& inputRef = propagation_.dialInputs.at(dialRef_.firstInput + iInput_);
-      return transformDialInput(inputRef, rawInputProvider_(inputRef));
-    };
-
-    const double* payload = getDialPayload(propagation_, dialRef_);
-
+  GUNDAM_BACKEND_FORCE_INLINE GUNDAM_BACKEND_HOST_DEVICE
+  double evalDialResponseFromInput(const BackendDialView& dialRef_,
+                                   double inputValue_,
+                                   const double* payload_) {
     switch( dialRef_.type ){
       case BackendDialType::Norm:
-        LogThrowIf(dialRef_.inputCount != 1, "Backend Norm dial expects exactly one input.");
-        return clampDialResponse(dialRef_, getInput(0));
+        GUNDAM_BACKEND_SEMANTICS_ASSERT(dialRef_.inputCount == 1);
+        return clampDialResponse(dialRef_, inputValue_);
 
       case BackendDialType::Shift:
-        LogThrowIf(dialRef_.payloadSize < 1, "Backend Shift dial payload is empty.");
-        return clampDialResponse(dialRef_, payload[0]);
+        GUNDAM_BACKEND_SEMANTICS_ASSERT(dialRef_.payloadSize >= 1);
+        return clampDialResponse(dialRef_, payload_[0]);
 
       case BackendDialType::CompactSpline: {
-        LogThrowIf(dialRef_.payloadSize < 3, "Backend CompactSpline payload is too small.");
-        double x = getInput(0);
+        GUNDAM_BACKEND_SEMANTICS_ASSERT(dialRef_.payloadSize >= 3);
+        double x = inputValue_;
         if( not dialRef_.allowExtrapolation ){
-          x = std::clamp(x, payload[0], payload[0] + payload[1] * double(dialRef_.payloadSize - 3));
+          x = clampValue(x, payload_[0], payload_[0] + payload_[1] * double(dialRef_.payloadSize - 3));
         }
-        return clampDialResponse(dialRef_, CalculateCompactSpline(x, -1E20, 1E20, payload, int(dialRef_.payloadSize - 2)));
+        return clampDialResponse(dialRef_, CalculateCompactSpline(x, -1E20, 1E20, payload_, int(dialRef_.payloadSize - 2)));
       }
 
       case BackendDialType::UniformSpline: {
-        LogThrowIf(dialRef_.payloadSize < 4, "Backend UniformSpline payload is too small.");
-        double x = getInput(0);
+        GUNDAM_BACKEND_SEMANTICS_ASSERT(dialRef_.payloadSize >= 4);
+        double x = inputValue_;
         if( not dialRef_.allowExtrapolation ){
-          x = std::clamp(x, payload[0], payload[0] + payload[1] * double((dialRef_.payloadSize - 2) / 2 - 1));
+          x = clampValue(x, payload_[0], payload_[0] + payload_[1] * double((dialRef_.payloadSize - 2) / 2 - 1));
         }
-        return clampDialResponse(dialRef_, CalculateUniformSpline(x, -1E20, 1E20, payload, int(dialRef_.payloadSize)));
+        return clampDialResponse(dialRef_, CalculateUniformSpline(x, -1E20, 1E20, payload_, int(dialRef_.payloadSize)));
       }
 
       case BackendDialType::MonotonicSpline: {
-        LogThrowIf(dialRef_.payloadSize < 3, "Backend MonotonicSpline payload is too small.");
-        double x = getInput(0);
+        GUNDAM_BACKEND_SEMANTICS_ASSERT(dialRef_.payloadSize >= 3);
+        double x = inputValue_;
         if( not dialRef_.allowExtrapolation ){
-          x = std::clamp(x, payload[0], payload[0] + payload[1] * double(dialRef_.payloadSize - 3));
+          x = clampValue(x, payload_[0], payload_[0] + payload_[1] * double(dialRef_.payloadSize - 3));
         }
-        return clampDialResponse(dialRef_, CalculateMonotonicSpline(x, -1E20, 1E20, payload, int(dialRef_.payloadSize - 2)));
+        return clampDialResponse(dialRef_, CalculateMonotonicSpline(x, -1E20, 1E20, payload_, int(dialRef_.payloadSize - 2)));
       }
 
       case BackendDialType::GeneralSpline: {
-        LogThrowIf(dialRef_.payloadSize < 5, "Backend GeneralSpline payload is too small.");
-        double x = getInput(0);
+        GUNDAM_BACKEND_SEMANTICS_ASSERT(dialRef_.payloadSize >= 5);
+        double x = inputValue_;
         if( not dialRef_.allowExtrapolation ){
-          x = std::clamp(x, payload[0], payload[0] + payload[1] * double((dialRef_.payloadSize - 2) / 3 - 1));
+          x = clampValue(x, payload_[0], payload_[0] + payload_[1] * double((dialRef_.payloadSize - 2) / 3 - 1));
         }
-        return clampDialResponse(dialRef_, CalculateGeneralSpline(x, -1E20, 1E20, payload, int(dialRef_.payloadSize)));
+        return clampDialResponse(dialRef_, CalculateGeneralSpline(x, -1E20, 1E20, payload_, int(dialRef_.payloadSize)));
       }
 
       case BackendDialType::Graph: {
-        LogThrowIf(dialRef_.payloadSize < 2, "Backend Graph payload is too small.");
-        double x = getInput(0);
+        GUNDAM_BACKEND_SEMANTICS_ASSERT(dialRef_.payloadSize >= 2);
+        double x = inputValue_;
         if( not dialRef_.allowExtrapolation ){
-          x = std::clamp(x, payload[1], payload[dialRef_.payloadSize - 1]);
+          x = clampValue(x, payload_[1], payload_[dialRef_.payloadSize - 1]);
         }
-        return clampDialResponse(dialRef_, CalculateGraph(x, -1E20, 1E20, payload, int(dialRef_.payloadSize)));
+        return clampDialResponse(dialRef_, CalculateGraph(x, -1E20, 1E20, payload_, int(dialRef_.payloadSize)));
       }
     }
 
-    LogThrow("Unhandled backend dial type in BackendDialSemantics.");
+    GUNDAM_BACKEND_SEMANTICS_ASSERT(false);
+    return 1.;
+  }
+
+  GUNDAM_BACKEND_FORCE_INLINE GUNDAM_BACKEND_HOST_DEVICE
+  double evalDialResponse(const BackendDialView& dialRef_,
+                          const BackendDialInputView* dialInputs_,
+                          const double* dialPayloads_,
+                          const double* parameterValues_) {
+    GUNDAM_BACKEND_SEMANTICS_ASSERT(dialInputs_ != nullptr or dialRef_.inputCount == 0);
+    const double* payload = getDialPayload(dialPayloads_, dialRef_);
+
+    if( dialRef_.type == BackendDialType::Shift ){
+      return evalDialResponseFromInput(dialRef_, 0., payload);
+    }
+
+    GUNDAM_BACKEND_SEMANTICS_ASSERT(dialRef_.inputCount >= 1);
+    const auto& inputRef = dialInputs_[dialRef_.firstInput];
+    const double inputValue = transformDialInput(inputRef, loadParameterValue(inputRef, parameterValues_));
+    return evalDialResponseFromInput(dialRef_, inputValue, payload);
+  }
+
+  GUNDAM_BACKEND_FORCE_INLINE GUNDAM_BACKEND_HOST_DEVICE
+  double evalEventWeight(const BackendEventView& eventRef_,
+                         const BackendDialView* eventDials_,
+                         const BackendDialInputView* dialInputs_,
+                         const double* dialPayloads_,
+                         const double* parameterValues_) {
+    GUNDAM_BACKEND_SEMANTICS_ASSERT(eventDials_ != nullptr or eventRef_.dialCount == 0);
+
+    double weight = eventRef_.baseWeight;
+    for( std::size_t iDial = 0 ; iDial < eventRef_.dialCount ; iDial++ ){
+      const auto& dialRef = eventDials_[eventRef_.firstDial + iDial];
+      weight *= evalDialResponse(dialRef, dialInputs_, dialPayloads_, parameterValues_);
+    }
+    return weight;
+  }
+
+  inline const double* getParameterValues(const ParameterSnapshot& parameters_) {
+    GUNDAM_BACKEND_SEMANTICS_ASSERT(not parameters_.empty());
+    return parameters_.values.data();
   }
 
   inline double evalDialResponse(const BackendPropagationView& propagation_,
                                  const BackendDialView& dialRef_,
                                  const ParameterSnapshot& parameters_) {
     return evalDialResponse(
-        propagation_,
         dialRef_,
-        [&parameters_](const BackendDialInputView& inputRef_){ return getParameterValue(inputRef_, parameters_); }
+        propagation_.dialInputs.data(),
+        propagation_.dialPayloads.data(),
+        getParameterValues(parameters_)
     );
-  }
-
-  template<typename RawInputProvider>
-  inline double evalEventWeight(const BackendPropagationView& propagation_,
-                                const BackendEventView& eventRef_,
-                                RawInputProvider&& rawInputProvider_) {
-    double weight = eventRef_.baseWeight;
-
-    for( std::size_t iDial = 0 ; iDial < eventRef_.dialCount ; iDial++ ){
-      const auto& dialRef = propagation_.eventDials.at(eventRef_.firstDial + iDial);
-      weight *= evalDialResponse(propagation_, dialRef, std::forward<RawInputProvider>(rawInputProvider_));
-    }
-
-    return weight;
   }
 
   inline double evalEventWeight(const BackendPropagationView& propagation_,
                                 const BackendEventView& eventRef_,
                                 const ParameterSnapshot& parameters_) {
     return evalEventWeight(
-        propagation_,
         eventRef_,
-        [&parameters_](const BackendDialInputView& inputRef_){ return getParameterValue(inputRef_, parameters_); }
+        propagation_.eventDials.data(),
+        propagation_.dialInputs.data(),
+        propagation_.dialPayloads.data(),
+        getParameterValues(parameters_)
     );
   }
 

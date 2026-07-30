@@ -1,12 +1,7 @@
 #include "MpsBackend.h"
 
 #include "MpsBackendKernelSource.h"
-
-#include "CalculateCompactSpline.h"
-#include "CalculateGeneralSpline.h"
-#include "CalculateGraph.h"
-#include "CalculateMonotonicSpline.h"
-#include "CalculateUniformSpline.h"
+#include "Semantics/BackendDialSemantics.h"
 
 #include "DialInputBuffer.h"
 #include "DialInterface.h"
@@ -406,86 +401,6 @@ struct Backends::MpsBackend::Impl {
     lastResult.status.histograms = OutputState::Scheduled;
     lastResult.status.sampleLikelihoods = OutputState::Scheduled;
     lastResult.status.statLikelihood = OutputState::Scheduled;
-  }
-
-  double getDialInputValue(const BackendDialInputView& inputRef_, const ParameterSnapshot& parameters_) const {
-    LogThrowIf(parameters_.empty(), "MpsBackend requires a populated ParameterSnapshot.");
-    return parameters_.values.at(inputRef_.parameterIndex);
-  }
-
-  static double applyDialInputTransform(const BackendDialInputView& inputRef_, double rawValue_) {
-    if( not inputRef_.useMirror ){ return rawValue_; }
-
-    double transformed = std::abs(std::fmod(
-        rawValue_ - inputRef_.mirrorMin,
-        2 * inputRef_.mirrorRange
-    ));
-
-    if( transformed > inputRef_.mirrorRange ){
-      transformed -= 2 * inputRef_.mirrorRange;
-      transformed = -transformed;
-    }
-
-    return transformed + inputRef_.mirrorMin;
-  }
-
-  double evaluateDialResponse(const BackendDialView& dialRef_, const ParameterSnapshot& parameters_) const {
-    auto clampResponse = [&dialRef_](double response_){
-      if( dialRef_.hasMinResponse and response_ < dialRef_.minResponse ){ response_ = dialRef_.minResponse; }
-      if( dialRef_.hasMaxResponse and response_ > dialRef_.maxResponse ){ response_ = dialRef_.maxResponse; }
-      return response_;
-    };
-
-    auto getInput = [this, &dialRef_, &parameters_](std::size_t iInput_){
-      const auto& inputRef = model.dialInputs.at(dialRef_.firstInput + iInput_);
-      return applyDialInputTransform(inputRef, getDialInputValue(inputRef, parameters_));
-    };
-
-    const double* payload = model.dialPayloads.data() + dialRef_.payloadOffset;
-
-    switch( dialRef_.type ){
-      case BackendDialType::Norm:
-        return clampResponse(getInput(0));
-      case BackendDialType::Shift:
-        return clampResponse(payload[0]);
-      case BackendDialType::CompactSpline: {
-        double x = getInput(0);
-        if( not dialRef_.allowExtrapolation ){
-          x = std::clamp(x, payload[0], payload[0] + payload[1] * double(dialRef_.payloadSize - 3));
-        }
-        return clampResponse(CalculateCompactSpline(x, -1E20, 1E20, payload, int(dialRef_.payloadSize - 2)));
-      }
-      case BackendDialType::UniformSpline: {
-        double x = getInput(0);
-        if( not dialRef_.allowExtrapolation ){
-          x = std::clamp(x, payload[0], payload[0] + payload[1] * double((dialRef_.payloadSize - 2) / 2 - 1));
-        }
-        return clampResponse(CalculateUniformSpline(x, -1E20, 1E20, payload, int(dialRef_.payloadSize)));
-      }
-      case BackendDialType::MonotonicSpline: {
-        double x = getInput(0);
-        if( not dialRef_.allowExtrapolation ){
-          x = std::clamp(x, payload[0], payload[0] + payload[1] * double(dialRef_.payloadSize - 3));
-        }
-        return clampResponse(CalculateMonotonicSpline(x, -1E20, 1E20, payload, int(dialRef_.payloadSize - 2)));
-      }
-      case BackendDialType::GeneralSpline: {
-        double x = getInput(0);
-        if( not dialRef_.allowExtrapolation ){
-          x = std::clamp(x, payload[0], payload[0] + payload[1] * double((dialRef_.payloadSize - 2) / 3 - 1));
-        }
-        return clampResponse(CalculateGeneralSpline(x, -1E20, 1E20, payload, int(dialRef_.payloadSize)));
-      }
-      case BackendDialType::Graph: {
-        double x = getInput(0);
-        if( not dialRef_.allowExtrapolation ){
-          x = std::clamp(x, payload[1], payload[dialRef_.payloadSize - 1]);
-        }
-        return clampResponse(CalculateGraph(x, -1E20, 1E20, payload, int(dialRef_.payloadSize)));
-      }
-    }
-
-    LogThrow("Unhandled backend dial type in MPS fallback.");
   }
 
   bool buildDeviceModel() {
@@ -1311,14 +1226,7 @@ struct Backends::MpsBackend::Impl {
     lastResult.eventWeights.resize(model.events.size());
 
     for( const auto& event : model.events ){
-      double weight = event.baseWeight;
-
-      for( std::size_t iDial = 0 ; iDial < event.dialCount ; iDial++ ){
-        const auto& dialRef = model.eventDials[event.firstDial + iDial];
-        weight *= evaluateDialResponse(dialRef, parameters_);
-      }
-
-      lastResult.eventWeights[event.resultIndex] = weight;
+      lastResult.eventWeights[event.resultIndex] = Backends::Semantics::evalEventWeight(model, event, parameters_);
     }
   }
 

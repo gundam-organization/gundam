@@ -50,6 +50,7 @@ set(HEADERS
     ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/BackendTypes.h
     ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/IPropagationBackend.h
     ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/ParameterSnapshot.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/Semantics/BackendSemanticsQualifiers.h
     ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/Semantics/BackendDialSemantics.h
     ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/CPU/include/CpuBackend.h
     ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/MPS/include/MpsBackend.h
