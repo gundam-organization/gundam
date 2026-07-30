@@ -6,8 +6,6 @@
 #include <functional>
 #include <vector>
 
-class LikelihoodInterface;
-
 namespace Backends {
 
   enum class BackendDialType : std::uint8_t {
@@ -72,7 +70,15 @@ namespace Backends {
     std::size_t parameterCount{0};
     int totalBins{0};
 
-    void clear();
+    void clear() {
+      events.clear();
+      eventDials.clear();
+      dialInputs.clear();
+      dialPayloads.clear();
+      samples.clear();
+      parameterCount = 0;
+      totalBins = 0;
+    }
     [[nodiscard]] bool empty() const { return events.empty(); }
   };
 
@@ -86,8 +92,10 @@ namespace Backends {
     BackendPropagationView propagation{};
     BackendLikelihoodView likelihood{};
 
-    void clear();
-    void build(LikelihoodInterface& likelihoodInterface_);
+    void clear() {
+      propagation.clear();
+      likelihood.samples.clear();
+    }
     [[nodiscard]] bool empty() const { return propagation.empty() and likelihood.empty(); }
   };
 

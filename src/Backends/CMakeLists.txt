@@ -6,7 +6,6 @@ set(SRCFILES
     ${CMAKE_CURRENT_SOURCE_DIR}/Common/src/BackendFactory.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/Common/src/BackendRuntimeManager.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/Common/src/BackendsManager.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/Common/src/BackendEngineView.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/Common/src/BackendTypes.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/CPU/src/CpuBackend.cpp
 )
