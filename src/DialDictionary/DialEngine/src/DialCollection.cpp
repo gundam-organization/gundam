@@ -405,12 +405,6 @@ void DialCollection::readParametersFromConfig(const ConfigReader &config_) {
     _applyConditionStr_ += " )";
   }
 
-  if (not _applyConditionStr_.empty()) {
-    _applyConditionFormula_ = std::make_shared<TFormula>("_applyConditionFormula_", _applyConditionStr_.c_str());
-    LogThrowIf(not _applyConditionFormula_->IsValid(),
-               "\"" << _applyConditionStr_ << "\": could not be parsed as formula expression.")
-  }
-
   if (_useMirrorDial_) {
     _mirrorRange_ = _mirrorHighEdge_ - _mirrorLowEdge_;
     LogThrowIf(_mirrorRange_ < 0, GET_VAR_NAME_VALUE(_mirrorHighEdge_) << " < " << GET_VAR_NAME_VALUE(_mirrorLowEdge_))

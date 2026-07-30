@@ -28,6 +28,8 @@ std::string DataDispenserParameters::getSummary() const{
 void DataDispenserCache::clear(){
   propagatorPtr = nullptr;
 
+  totalNbEvents = 0;
+
   samplesToFillList.clear();
   sampleNbOfEvents.clear();
   entrySampleIndexList.clear();
@@ -37,12 +39,10 @@ void DataDispenserCache::clear(){
 
   varsRequestedForIndexing.clear();
   varToLeafDict.clear();
-
-  varsToOverrideList.clear();
+  eventFormulaTreeExpressionAliases.clear();
+  variableDictEvalList.clear();
 }
 void DataDispenserCache::addVarRequestedForIndexing(const std::string& varName_) {
   LogThrowIf(varName_.empty(), "no var name provided.");
   GenericToolbox::addIfNotInVector(varName_, this->varsRequestedForIndexing);
 }
-
-
