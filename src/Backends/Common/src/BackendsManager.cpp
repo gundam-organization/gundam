@@ -9,17 +9,6 @@
 #include <utility>
 
 namespace {
-  std::string toStringOutputList(const std::vector<Backends::OutputRequest>& outputList_){
-    std::stringstream ss;
-    ss << "[";
-    for( std::size_t iOutput = 0 ; iOutput < outputList_.size() ; iOutput++ ){
-      if( iOutput != 0 ){ ss << ", "; }
-      ss << Backends::toString(outputList_.at(iOutput));
-    }
-    ss << "]";
-    return ss.str();
-  }
-
   Backends::BackendLikelihoodModel buildBackendLikelihoodModel(const LikelihoodInterface& likelihoodInterface_){
     Backends::BackendLikelihoodModel out;
     out.samples.reserve(likelihoodInterface_.getSamplePairList().size());
@@ -129,7 +118,7 @@ void Backends::BackendsManager::initializeBackend(const LikelihoodInterface& lik
           << std::endl;
   if( _enableAutoMaterialize_ and not _materializeOutputList_.empty() ){
     LogInfo << "Propagation backend auto materialization requests "
-            << toStringOutputList(_materializeOutputList_) << std::endl;
+            << GenericToolbox::toString(_materializeOutputList_) << std::endl;
   }
 
   _backendRuntimeManager_ = std::make_shared<BackendRuntimeManager>();
