@@ -330,7 +330,9 @@ void ExternalWeightDialFactory::PythonWorker::startWorkerProcess(const DialInput
 
     std::vector<char*> argv;
     argv.reserve(argvStorage.size() + 1);
-    for( auto& arg : argvStorage ){ argv.emplace_back(arg.data()); }
+    // std::string::data() returns const char* before C++17, while execv
+    // requires a mutable argv array even though it does not modify its entries.
+    for( auto& arg : argvStorage ){ argv.emplace_back(const_cast<char*>(arg.c_str())); }
     argv.emplace_back(nullptr);
 
     execv(_config_.pythonExecutable.c_str(), argv.data());
