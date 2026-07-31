@@ -3,7 +3,10 @@
 #include "MpsEngineBackendInternal.h"
 #include "Semantics/BackendHostPropagation.h"
 
-Backends::MpsEngineBackend::MpsEngineBackend() : _impl_(std::make_unique<MpsEngineBackendImpl>()) {}
+Backends::MpsEngineBackend::MpsEngineBackend(bool enableCachedDialResponses_)
+    : _impl_(std::make_unique<MpsEngineBackendImpl>()) {
+  _impl_->enableCachedDialResponses = enableCachedDialResponses_;
+}
 Backends::MpsEngineBackend::~MpsEngineBackend() = default;
 
 Backends::BackendCapabilities Backends::MpsEngineBackend::getCapabilities() const {

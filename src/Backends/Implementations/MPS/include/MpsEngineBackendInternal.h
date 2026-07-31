@@ -56,6 +56,7 @@ namespace Backends {
     id<MTLComputePipelineState> histogramPartialsPipeline{nil};
     id<MTLComputePipelineState> histogramFinalizePipeline{nil};
     bool isAvailable{false};
+    bool enableCachedDialResponses{true};
 
     bool isDeviceModelSupported{false};
     static constexpr uint32_t histogramChunkSize{256};

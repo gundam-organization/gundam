@@ -37,6 +37,7 @@ namespace Backends {
     [[nodiscard]] const EngineView& getEngineView() const { return _backendEngineLayout_.view; }
     [[nodiscard]] bool isEnabled() const { return _isEnabled_; }
     [[nodiscard]] bool isAutoMaterializeEnabled() const { return _enableAutoMaterialize_; }
+    [[nodiscard]] bool isCachedDialResponsesEnabled() const { return _enableCachedDialResponses_; }
     [[nodiscard]] const std::string& getType() const { return _type_; }
     [[nodiscard]] const std::vector<OutputRequest>& getMaterializeOutputList() const { return _materializeOutputList_; }
     [[nodiscard]] bool willAutoMaterialize(OutputRequest outputRequest_) const;
@@ -45,6 +46,7 @@ namespace Backends {
     [[nodiscard]] const EngineBackend* getBackend() const { return _backend_.get(); }
 
     void setEnableAutoMaterialize(bool enableAutoMaterialize_){ _enableAutoMaterialize_ = enableAutoMaterialize_; }
+    void setEnableCachedDialResponses(bool enableCachedDialResponses_){ _enableCachedDialResponses_ = enableCachedDialResponses_; }
     void setMaterializeOutputList(const std::vector<OutputRequest>& materializeOutputList_){ _materializeOutputList_ = materializeOutputList_; }
     void setMaterializeOutputList(std::initializer_list<OutputRequest> materializeOutputList_);
     void materialize(OutputRequest outputRequest_);
@@ -55,6 +57,7 @@ namespace Backends {
     // configuration
     bool _isEnabled_{false};
     bool _enableAutoMaterialize_{true};
+    bool _enableCachedDialResponses_{true};
     std::string _type_{"CPU"};
 
     [[nodiscard]] bool shouldMaterialize(OutputRequest outputRequest_) const;

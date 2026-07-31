@@ -262,7 +262,7 @@ bool Backends::MpsEngineBackendImpl::buildDeviceModel() {
       descriptor.flags = eventDial.allowExtrapolation ? kMpsDialFlagAllowExtrapolation : 0u;
       fillMinMax(eventDial, descriptor.minResponse, descriptor.maxResponse);
 
-      if( reuseCounts_[iUniqueDial] >= kMpsCachedDialReuseThreshold ){
+      if( enableCachedDialResponses and reuseCounts_[iUniqueDial] >= kMpsCachedDialReuseThreshold ){
         descriptor.flags |= kMpsDialFlagCached;
         cachedCount_++;
         cachedDialCount++;
@@ -468,11 +468,14 @@ bool Backends::MpsEngineBackendImpl::buildDeviceModel() {
   binEventOffsetsBuffer = makePrivateBuffer(device, commandQueue, binEventOffsets);
   binEventIndicesBuffer = makePrivateBuffer(device, commandQueue, binEventIndices);
   splineDataBuffer = makePrivateBuffer(device, commandQueue, splineData);
-  compactCachedResponsesBuffer = makePrivateEmptyBuffer(device, std::size_t(compactDialDescriptors.size()) * sizeof(float));
-  uniformCachedResponsesBuffer = makePrivateEmptyBuffer(device, std::size_t(uniformDialDescriptors.size()) * sizeof(float));
-  monotonicCachedResponsesBuffer = makePrivateEmptyBuffer(device, std::size_t(monotonicDialDescriptors.size()) * sizeof(float));
-  generalCachedResponsesBuffer = makePrivateEmptyBuffer(device, std::size_t(generalDialDescriptors.size()) * sizeof(float));
-  graphCachedResponsesBuffer = makePrivateEmptyBuffer(device, std::size_t(graphDialDescriptors.size()) * sizeof(float));
+  const auto cachedResponseBufferBytes = [this](std::size_t descriptorCount_){
+    return (enableCachedDialResponses ? descriptorCount_ : std::size_t(1)) * sizeof(float);
+  };
+  compactCachedResponsesBuffer = makePrivateEmptyBuffer(device, cachedResponseBufferBytes(compactDialDescriptors.size()));
+  uniformCachedResponsesBuffer = makePrivateEmptyBuffer(device, cachedResponseBufferBytes(uniformDialDescriptors.size()));
+  monotonicCachedResponsesBuffer = makePrivateEmptyBuffer(device, cachedResponseBufferBytes(monotonicDialDescriptors.size()));
+  generalCachedResponsesBuffer = makePrivateEmptyBuffer(device, cachedResponseBufferBytes(generalDialDescriptors.size()));
+  graphCachedResponsesBuffer = makePrivateEmptyBuffer(device, cachedResponseBufferBytes(graphDialDescriptors.size()));
   eventWeightsBuffer = makePrivateEmptyBuffer(device, model.events.size() * sizeof(float));
   eventWeightsReadbackBuffer = makeSharedEmptyBuffer(device, model.events.size() * sizeof(float));
   parametersBuffer = makeSharedEmptyBuffer(device, std::max<std::size_t>(1, model.parameterCount) * sizeof(float));
