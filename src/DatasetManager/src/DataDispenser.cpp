@@ -636,7 +636,8 @@ void DataDispenser::configureImpl(){
   // options
   _config_.fillValue(_parameters_.globalTreePath, "tree");
   _parameters_.filePathList.clear();
-  if( const auto* filePathListConfig = _config_.getConfigEntry("filePathList").second; filePathListConfig != nullptr ){
+  const auto* filePathListConfig = _config_.getConfigEntry("filePathList").second;
+  if( filePathListConfig != nullptr ){
     LogExitIf(not filePathListConfig->is_array(), "filePathList must be a list.");
     _parameters_.filePathList.reserve(filePathListConfig->size());
 
@@ -644,7 +645,8 @@ void DataDispenser::configureImpl(){
     bool isFirstEntry{true};
     for( size_t iEntry = 0; iEntry < filePathListConfig->size(); ++iEntry ){
       const auto& filePathConfig = filePathListConfig->at(iEntry);
-      auto& filePathEntry = _parameters_.filePathList.emplace_back();
+      _parameters_.filePathList.emplace_back();
+      auto& filePathEntry = _parameters_.filePathList.back();
 
       // Keep the legacy list(string) syntax fully compatible.
       if( filePathConfig.is_string() ){
@@ -670,7 +672,8 @@ void DataDispenser::configureImpl(){
           });
           friendConfig.checkConfiguration();
 
-          auto& friendEntry = filePathEntry.friendList.emplace_back();
+          filePathEntry.friendList.emplace_back();
+          auto& friendEntry = filePathEntry.friendList.back();
           friendEntry.name = friendConfig.fetchValue<std::string>("name");
           friendEntry.path = friendConfig.fetchValue<std::string>("path");
         }
