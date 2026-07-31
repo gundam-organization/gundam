@@ -92,6 +92,12 @@ target_link_libraries( ${LIB_NAME}
     GundamSamplesManager
 )
 
+# shm_open/shm_unlink are provided by librt on Linux. They are part of libc on
+# macOS, so do not add this dependency there.
+if( UNIX AND NOT APPLE )
+  target_link_libraries( ${LIB_NAME} PRIVATE rt )
+endif()
+
 
 
 #set_target_properties(${LIB_NAME} PROPERTIES VERSION "${GUNDAM_VERSION_STRING}")
