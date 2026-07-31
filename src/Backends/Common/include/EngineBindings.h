@@ -11,28 +11,28 @@ class Parameter;
 
 namespace Backends {
 
-  struct BackendEventBinding {
+  struct EventBinding {
     Event* event{nullptr};
   };
 
-  struct BackendDialBinding {
+  struct DialBinding {
     const DialInterface* interface{nullptr};
   };
 
-  struct BackendSampleBinding {
+  struct SampleBinding {
     Histogram* histogram{nullptr};
     int sampleIndex{-1};
   };
 
-  struct BackendParameterBinding {
+  struct ParameterBinding {
     Parameter* parameter{nullptr};
   };
 
   struct EngineBindings {
-    std::vector<BackendEventBinding> events{};
-    std::vector<BackendDialBinding> eventDials{};
-    std::vector<BackendSampleBinding> samples{};
-    std::vector<BackendParameterBinding> parameters{};
+    std::vector<EventBinding> events{};
+    std::vector<DialBinding> eventDials{};
+    std::vector<SampleBinding> samples{};
+    std::vector<ParameterBinding> parameters{};
 
     void clear();
     void build(LikelihoodInterface& likelihoodInterface_);

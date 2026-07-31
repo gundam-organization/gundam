@@ -44,19 +44,19 @@ endif()
 
 set(HEADERS
     ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/BackendsManager.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/BackendEngineBindings.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/BackendEngineDescriptors.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/BackendEngineLayout.h
     ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/BackendFactory.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/EngineView.h
     ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/BackendTypes.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/IPropagationBackend.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/EngineBindings.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/EngineDescriptors.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/EngineLayout.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/EngineView.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/EngineBackend.h
     ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/ParameterSnapshot.h
     ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/Semantics/BackendSemanticsQualifiers.h
     ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/Semantics/BackendDialSemanticsCore.h
     ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/Semantics/BackendDialSemantics.h
     ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/Semantics/BackendHostPropagation.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/CPU/include/CpuBackend.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/CPU/include/CpuEngineBackend.h
     ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/MPS/include/MpsEngineBackend.h
     ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/MPS/include/MpsEngineBackendInternal.h
 )

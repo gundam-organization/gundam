@@ -5,7 +5,7 @@
 
 #include "EngineView.h"
 #include "BackendTypes.h"
-#include "MpsBackendKernelSource.h"
+#include "MpsEngineBackendKernelSource.h"
 #include "ParameterSnapshot.h"
 
 #include "CompactSpline.h"
@@ -34,7 +34,7 @@
 
 namespace Backends {
 
-  struct MpsBackendImpl {
+  struct MpsEngineBackendImpl {
     struct Result {
       PropagationToken token{};
       PropagationStatus status{};
@@ -97,8 +97,8 @@ namespace Backends {
     id<MTLBuffer> histogramChunkSizeBuffer{nil};
 
     EngineView engineView{};
-    BackendPropagationView& model;
-    BackendLikelihoodView& likelihoodModel;
+    PropagationView& model;
+    LikelihoodView& likelihoodModel;
     Result lastResult{};
     BackendTimingSummary buildTiming{};
     BackendTimingSummary lastTiming{};
@@ -118,8 +118,8 @@ namespace Backends {
     uint32_t generalDialDescriptorCount{0};
     uint32_t graphDialDescriptorCount{0};
 
-    MpsBackendImpl();
-    ~MpsBackendImpl();
+    MpsEngineBackendImpl();
+    ~MpsEngineBackendImpl();
 
     void releaseDeviceBuffers();
     [[nodiscard]] bool isCurrentToken(const PropagationToken& token_) const;
@@ -155,7 +155,7 @@ namespace {
   constexpr uint32_t kMpsDialFlagCached{1u << 1};
   constexpr uint32_t kMpsCachedDialReuseThreshold{8};
 
-  static NSString* const kMpsBackendMetalSource = GUNDAM_MPS_BACKEND_KERNEL_SOURCE;
+  static NSString* const kMpsEngineBackendMetalSource = GUNDAM_MPS_BACKEND_KERNEL_SOURCE;
 
   struct MpsEventDialRanges {
     uint32_t normOffset{0};

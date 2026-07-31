@@ -33,7 +33,7 @@ namespace {
     std::map<int, int> sampleBinOffsetMap;
     int binOffset{0};
     for( auto& sample : sampleSet.getSampleList() ){
-      Backends::BackendSampleView sampleRef;
+      Backends::SampleView sampleRef;
       sampleRef.sampleIndex = sample.getIndex();
       sampleRef.binOffset = binOffset;
       sampleRef.binCount = sample.getHistogram().getNbBins();
@@ -51,7 +51,7 @@ namespace {
       if( cacheEntry.event == nullptr ){ continue; }
       if( cacheEntry.event->getIndices().bin < 0 ){ continue; }
 
-      Backends::BackendEventView eventRef;
+      Backends::EventView eventRef;
       eventRef.sampleIndex = cacheEntry.event->getIndices().sample;
       eventRef.binIndex = cacheEntry.event->getIndices().bin;
       eventRef.globalBinIndex = sampleBinOffsetMap.at(eventRef.sampleIndex) + eventRef.binIndex;
@@ -156,7 +156,7 @@ namespace {
     likelihood.samples.reserve(likelihoodInterface_.getSamplePairList().size());
     binOffset = 0;
     for( const auto& samplePair : likelihoodInterface_.getSamplePairList() ){
-      Backends::BackendLikelihoodSampleView sampleRef;
+      Backends::LikelihoodSampleView sampleRef;
       sampleRef.binOffset = binOffset;
       sampleRef.dataSums.reserve(samplePair.data->getHistogram().getNbBins());
       sampleRef.ignoredBins.reserve(samplePair.data->getHistogram().getNbBins());

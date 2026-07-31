@@ -11,7 +11,7 @@ namespace Backends {
   // Passive, flattened view of the fitter engine state for backend consumption.
   // It owns no engine logic and only exposes backend-friendly event, dial, sample,
   // and likelihood descriptors built upstream by BackendEngineLayout.
-  struct BackendEventView {
+  struct EventView {
     int sampleIndex{-1};
     int binIndex{-1};
     int globalBinIndex{-1};
@@ -19,25 +19,25 @@ namespace Backends {
     std::size_t resultIndex{0};
   };
 
-  struct BackendSampleView {
+  struct SampleView {
     int sampleIndex{-1};
     int binOffset{0};
     int binCount{0};
   };
 
-  struct BackendLikelihoodSampleView {
+  struct LikelihoodSampleView {
     int binOffset{0};
     std::vector<double> dataSums{};
     std::vector<bool> ignoredBins{};
     std::function<double(double, double, double, int)> evalBin{};
   };
 
-  struct BackendPropagationView {
-    std::vector<BackendEventView> events{};
+  struct PropagationView {
+    std::vector<EventView> events{};
     std::vector<BackendDialDescriptor> eventDials{};
     std::vector<BackendDialInputDescriptor> dialInputs{};
     std::vector<double> dialPayloads{};
-    std::vector<BackendSampleView> samples{};
+    std::vector<SampleView> samples{};
     std::size_t parameterCount{0};
     int totalBins{0};
 
@@ -53,15 +53,15 @@ namespace Backends {
     [[nodiscard]] bool empty() const { return events.empty(); }
   };
 
-  struct BackendLikelihoodView {
-    std::vector<BackendLikelihoodSampleView> samples{};
+  struct LikelihoodView {
+    std::vector<LikelihoodSampleView> samples{};
 
     [[nodiscard]] bool empty() const { return samples.empty(); }
   };
 
   struct EngineView {
-    BackendPropagationView propagation{};
-    BackendLikelihoodView likelihood{};
+    PropagationView propagation{};
+    LikelihoodView likelihood{};
 
     void clear() {
       propagation.clear();

@@ -11,7 +11,7 @@ namespace Backends::Semantics {
     return parameters_.values.data();
   }
 
-  inline double evalDialResponse(const BackendPropagationView& propagation_,
+  inline double evalDialResponse(const PropagationView& propagation_,
                                  const BackendDialDescriptor& dialRef_,
                                  const ParameterSnapshot& parameters_) {
     return evalDialResponse(
@@ -22,8 +22,8 @@ namespace Backends::Semantics {
     );
   }
 
-  inline double evalEventWeight(const BackendPropagationView& propagation_,
-                                const BackendEventView& eventRef_,
+  inline double evalEventWeight(const PropagationView& propagation_,
+                                const EventView& eventRef_,
                                 const ParameterSnapshot& parameters_) {
     return evalEventWeight(
         eventRef_.weight,

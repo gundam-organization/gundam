@@ -12,7 +12,7 @@
 namespace Backends::Semantics {
 
   inline void calculateEventWeights(std::vector<double>& eventWeights_,
-                                    const BackendPropagationView& propagation_,
+                                    const PropagationView& propagation_,
                                     const ParameterSnapshot& parameters_) {
     eventWeights_.resize(propagation_.events.size());
     for( const auto& event : propagation_.events ){
@@ -22,7 +22,7 @@ namespace Backends::Semantics {
 
   inline void calculateHistogramsFromEventWeights(std::vector<double>& histSums_,
                                                   std::vector<double>& histSumSquares_,
-                                                  const BackendPropagationView& propagation_,
+                                                  const PropagationView& propagation_,
                                                   const std::vector<double>& eventWeights_) {
     histSums_.assign(propagation_.totalBins, 0.);
     histSumSquares_.assign(propagation_.totalBins, 0.);
@@ -37,14 +37,14 @@ namespace Backends::Semantics {
 
   inline void calculateHistograms(std::vector<double>& histSums_,
                                   std::vector<double>& histSumSquares_,
-                                  const BackendPropagationView& propagation_,
+                                  const PropagationView& propagation_,
                                   const ParameterSnapshot& parameters_) {
     std::vector<double> eventWeights{};
     calculateEventWeights(eventWeights, propagation_, parameters_);
     calculateHistogramsFromEventWeights(histSums_, histSumSquares_, propagation_, eventWeights);
   }
 
-  inline double calculateLikelihood(const BackendLikelihoodView& likelihood_,
+  inline double calculateLikelihood(const LikelihoodView& likelihood_,
                                     const std::vector<double>& histSums_,
                                     const std::vector<double>& histSumSquares_) {
     double likelihoodValue{0};

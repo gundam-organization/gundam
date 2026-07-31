@@ -33,7 +33,7 @@ void Backends::EngineBindings::build(LikelihoodInterface& likelihoodInterface_) 
 
   samples.reserve(sampleSet.getSampleList().size());
   for( auto& sample : sampleSet.getSampleList() ){
-    BackendSampleBinding sampleBinding;
+    SampleBinding sampleBinding;
     sampleBinding.histogram = &sample.getHistogram();
     sampleBinding.sampleIndex = sample.getIndex();
     samples.emplace_back(sampleBinding);
@@ -46,12 +46,12 @@ void Backends::EngineBindings::build(LikelihoodInterface& likelihoodInterface_) 
     if( cacheEntry.event == nullptr ){ continue; }
     if( cacheEntry.event->getIndices().bin < 0 ){ continue; }
 
-    BackendEventBinding eventBinding;
+    EventBinding eventBinding;
     eventBinding.event = cacheEntry.event;
     events.emplace_back(eventBinding);
 
     for( const auto& dialResponse : cacheEntry.dialResponseCacheList ){
-      BackendDialBinding dialBinding;
+      DialBinding dialBinding;
       dialBinding.interface = dialResponse.dialInterface;
       eventDials.emplace_back(dialBinding);
 
@@ -60,7 +60,7 @@ void Backends::EngineBindings::build(LikelihoodInterface& likelihoodInterface_) 
         for( int iInput = 0 ; iInput < inputBuffer->getBufferSize() ; iInput++ ){
           auto* parameter = const_cast<Parameter*>(&inputBuffer->getParameter(iInput));
           if( not containsIf(parameters, [parameter](const auto& binding_){ return binding_.parameter == parameter; }) ){
-            parameters.emplace_back(BackendParameterBinding{parameter});
+            parameters.emplace_back(ParameterBinding{parameter});
           }
         }
       }
