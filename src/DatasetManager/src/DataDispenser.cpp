@@ -642,7 +642,7 @@ void DataDispenser::configureImpl(){
     _parameters_.filePathList.reserve(filePathListConfig->size());
 
     std::set<std::string> expectedFriendNameSet;
-    bool isFirstEntry{true};
+    bool hasEnabledFilePathEntry{false};
     for( size_t iEntry = 0; iEntry < filePathListConfig->size(); ++iEntry ){
       const auto& filePathConfig = filePathListConfig->at(iEntry);
       _parameters_.filePathList.emplace_back();
@@ -659,16 +659,19 @@ void DataDispenser::configureImpl(){
         entryConfig.defineFields({
           {FieldFlag::MANDATORY, "name"},
           {FieldFlag::MANDATORY, "path"},
+          {"isEnabled"},
           {"friendList"},
         });
         entryConfig.checkConfiguration();
         filePathEntry.name = entryConfig.fetchValue<std::string>("name");
         filePathEntry.path = entryConfig.fetchValue<std::string>("path");
+        entryConfig.fillValue(filePathEntry.isEnabled, "isEnabled");
 
         for( auto& friendConfig : entryConfig.loop("friendList") ){
           friendConfig.defineFields({
             {FieldFlag::MANDATORY, "name"},
             {FieldFlag::MANDATORY, "path"},
+            {"isEnabled"},
           });
           friendConfig.checkConfiguration();
 
@@ -676,6 +679,7 @@ void DataDispenser::configureImpl(){
           auto& friendEntry = filePathEntry.friendList.back();
           friendEntry.name = friendConfig.fetchValue<std::string>("name");
           friendEntry.path = friendConfig.fetchValue<std::string>("path");
+          friendConfig.fillValue(friendEntry.isEnabled, "isEnabled");
         }
       }
       std::set<std::string> friendNameSet;
@@ -685,14 +689,22 @@ void DataDispenser::configureImpl(){
             "Duplicate friend name \"" << friendEntry.name << "\" in filePathList/" << iEntry
         );
       }
-      if( isFirstEntry ){ expectedFriendNameSet = std::move(friendNameSet); }
+      if( not filePathEntry.isEnabled ){ continue; }
+
+      std::set<std::string> enabledFriendNameSet;
+      for( const auto& friendEntry : filePathEntry.friendList ){
+        if( friendEntry.isEnabled ){ enabledFriendNameSet.emplace(friendEntry.name); }
+      }
+      if( not hasEnabledFilePathEntry ){
+        expectedFriendNameSet = std::move(enabledFriendNameSet);
+        hasEnabledFilePathEntry = true;
+      }
       else{
         LogExitIf(
-            friendNameSet != expectedFriendNameSet,
-            "Every filePathList entry must define the same friend names, so that the friend TChains remain aligned."
+            enabledFriendNameSet != expectedFriendNameSet,
+            "Every enabled filePathList entry must define the same enabled friend names, so that the friend TChains remain aligned."
         );
       }
-      isFirstEntry = false;
     }
   }
   _config_.fillValue(_parameters_.additionalVarsStorage, "additionalLeavesStorage");
@@ -753,11 +765,13 @@ void DataDispenser::load(Propagator& propagator_){
   }
 
   for( const auto& fileEntry : _parameters_.filePathList ){
+    if( not fileEntry.isEnabled ){ continue; }
     validateRootFileAndTreePath(
         resolveRootFileAndTreePath(fileEntry.path, _parameters_.globalTreePath),
         "ROOT file"
     );
     for( const auto& friendEntry : fileEntry.friendList ){
+      if( not friendEntry.isEnabled ){ continue; }
       validateRootFileAndTreePath(
           resolveRootFileAndTreePath(friendEntry.path, _parameters_.globalTreePath),
           "friend \"" + friendEntry.name + "\""
@@ -1327,6 +1341,7 @@ std::shared_ptr<TChain> DataDispenser::openChain(bool verbose_) const{
   std::shared_ptr<TChain> treeChain(new TChain(), [friendChainList](TChain* chain){ delete chain; });
 
   for( const auto& fileEntry : _parameters_.filePathList ){
+    if( not fileEntry.isEnabled ){ continue; }
     auto source = resolveRootFileAndTreePath(fileEntry.path, _parameters_.globalTreePath);
 
     if( verbose_ ){
@@ -1338,7 +1353,11 @@ std::shared_ptr<TChain> DataDispenser::openChain(bool verbose_) const{
 
     Long64_t sourceNbEntries{-1};
     std::unique_ptr<TFile> temp{};
-    if( _parameters_.fractionOfEntries != 1. or not fileEntry.friendList.empty() ){
+    bool hasEnabledFriend{false};
+    for( const auto& friendEntry : fileEntry.friendList ){
+      if( friendEntry.isEnabled ){ hasEnabledFriend = true; break; }
+    }
+    if( _parameters_.fractionOfEntries != 1. or hasEnabledFriend ){
       temp.reset(TFile::Open(source.filePath.c_str()));
       LogExitIf(temp == nullptr, "Error while opening TFile: " << source.filePath);
 
@@ -1359,6 +1378,7 @@ std::shared_ptr<TChain> DataDispenser::openChain(bool verbose_) const{
     treeChain->AddFile(source.filePath.c_str(), nMaxEntries, source.treePath.c_str());
 
     for( const auto& friendEntry : fileEntry.friendList ){
+      if( not friendEntry.isEnabled ){ continue; }
       auto friendSource = resolveRootFileAndTreePath(friendEntry.path, _parameters_.globalTreePath);
       validateRootFileAndTreePath(friendSource, "friend \"" + friendEntry.name + "\"");
 
@@ -1379,7 +1399,6 @@ std::shared_ptr<TChain> DataDispenser::openChain(bool verbose_) const{
       if( friendChain == nullptr ){
         friendChain = std::make_shared<TChain>(friendEntry.name.c_str());
         friendChainList->emplace_back(friendChain);
-        LogExitIf(treeChain->AddFriend(friendChain.get(), friendEntry.name.c_str()) == nullptr, "Could not attach friend TChain: " << friendEntry.name);
       }
       friendChain->AddFile(friendSource.filePath.c_str(), nMaxEntries, friendSource.treePath.c_str());
     }
@@ -1392,6 +1411,17 @@ std::shared_ptr<TChain> DataDispenser::openChain(bool verbose_) const{
         "Friend TChain \"" << friendChain->GetName() << "\" has " << friendChain->GetEntries()
         << " entries while the main TChain has " << treeChain->GetEntries() << ". Friends must be entry-aligned."
     );
+    LogExitIf(
+        treeChain->AddFriend(friendChain.get(), friendChain->GetName()) == nullptr,
+        "Could not attach friend TChain: " << friendChain->GetName()
+    );
+  }
+
+  // ROOT 6.24 connects the current trees of friend TChains lazily. Load the
+  // first entry now so qualified friend expressions are available when a
+  // TreeBuffer/TTreeFormula is initialized immediately after openChain().
+  if( not friendChainList->empty() and treeChain->GetEntries() > 0 ){
+    LogExitIf(treeChain->LoadTree(0) < 0, "Could not load the first entry of the main TChain with its friends.");
   }
 
   return treeChain;

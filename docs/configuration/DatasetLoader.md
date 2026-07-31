@@ -82,9 +82,11 @@ filePathList:
         path: "${DATA_DIR}/truth-run1.root:truth"
   - name: "run2"
     path: "${DATA_DIR}/events-run2.root:events"
+    isEnabled: true
     friendList:
       - name: "weights"
         path: "${DATA_DIR}/weights-run2.root:weights"
+        isEnabled: true
       - name: "truth"
         path: "${DATA_DIR}/truth-run2.root:truth"
 
@@ -92,7 +94,7 @@ variableDict:
   - { name: "weight", expr: "weights.nominalWeight" }
 ```
 
-Every named file entry must declare the same friend aliases. Each friend tree must have exactly the same number and order of entries as its corresponding main tree. A branch with a unique name may be referenced without its alias, but `friendAlias.branch` is the recommended form because it remains unambiguous.
+Both main-file and friend entries accept `isEnabled` (default: `true`). Disabled main files are excluded from the chain; disabled friends are not attached. Every enabled file entry must declare the same enabled friend aliases. Each enabled friend tree must have exactly the same number and order of entries as its corresponding main tree. A branch with a unique name may be referenced without its alias, but `friendAlias.branch` is the recommended form because it remains unambiguous.
 
 
 #### data
