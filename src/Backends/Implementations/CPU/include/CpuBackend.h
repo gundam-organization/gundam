@@ -44,7 +44,10 @@ namespace Backends {
 
     [[nodiscard]] bool isCurrentToken(const PropagationToken& token_) const;
     void initializeThreads();
+    void initializeDialResponseCache();
     void resetResult();
+    void updateCachedDialResponses(const ParameterSnapshot& parameters_);
+    void updateCachedDialResponsesThread(int iThread_);
     void calculateEventWeights(Result& result_, const ParameterSnapshot& parameters_);
     void calculateEventWeightsThread(int iThread_);
     void calculateHistograms(Result& result_);
@@ -57,6 +60,14 @@ namespace Backends {
     GenericToolbox::ParallelWorker _threadPool_{};
     Result* _activeResult_{nullptr};
     const ParameterSnapshot* _activeParameters_{nullptr};
+    std::vector<std::vector<std::uint32_t>> _cachedDialsByParameter_{};
+    std::vector<std::uint32_t> _dirtyCachedDialIndices_{};
+    std::vector<double> _cachedDialResponses_{};
+    std::vector<double> _cachedDialInputs_{};
+    std::vector<double> _lastParameterValues_{};
+    std::vector<std::uint8_t> _isCachedDial_{};
+    std::vector<std::uint8_t> _isCachedDialResponseValid_{};
+    bool _isDialResponseCachePrimed_{false};
     std::vector<std::vector<double>> _threadHistogramSums_{};
     std::vector<std::vector<double>> _threadHistogramSumSquares_{};
     std::uint64_t _nextTokenId_{1};

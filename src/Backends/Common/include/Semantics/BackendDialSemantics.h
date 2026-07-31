@@ -27,7 +27,8 @@ namespace Backends::Semantics {
                                 const ParameterSnapshot& parameters_) {
     return evalEventWeight(
         eventRef_.weight,
-        propagation_.eventDials.data(),
+        propagation_.eventDialIndices.data(),
+        propagation_.dials.data(),
         propagation_.dialInputs.data(),
         propagation_.dialPayloads.data(),
         getParameterValues(parameters_)

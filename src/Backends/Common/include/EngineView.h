@@ -3,6 +3,7 @@
 
 #include "EngineDescriptors.h"
 
+#include <cstdint>
 #include <functional>
 #include <vector>
 
@@ -34,7 +35,10 @@ namespace Backends {
 
   struct PropagationView {
     std::vector<EventView> events{};
-    std::vector<BackendDialDescriptor> eventDials{};
+    // Each dial is stored once. Events reference their dial occurrences through
+    // eventDialIndices, using EventWeightDescriptor::firstDial/dialCount.
+    std::vector<BackendDialDescriptor> dials{};
+    std::vector<std::uint32_t> eventDialIndices{};
     std::vector<BackendDialInputDescriptor> dialInputs{};
     std::vector<double> dialPayloads{};
     std::vector<SampleView> samples{};
@@ -43,7 +47,8 @@ namespace Backends {
 
     void clear() {
       events.clear();
-      eventDials.clear();
+      dials.clear();
+      eventDialIndices.clear();
       dialInputs.clear();
       dialPayloads.clear();
       samples.clear();

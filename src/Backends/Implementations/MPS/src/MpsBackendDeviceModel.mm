@@ -22,7 +22,7 @@ bool Backends::MpsBackendImpl::buildDeviceModel() {
 
   LogInfo << "MPS backend: building device model for "
           << model.events.size() << " events, "
-          << model.eventDials.size() << " event dials, "
+          << model.eventDialIndices.size() << " event dials, "
           << model.parameterCount << " parameters and "
           << model.totalBins << " histogram bins."
           << std::endl;
@@ -73,20 +73,20 @@ bool Backends::MpsBackendImpl::buildDeviceModel() {
   std::vector<uint32_t> monotonicDialReuseCounts{};
   std::vector<uint32_t> generalDialReuseCounts{};
   std::vector<uint32_t> graphDialReuseCounts{};
-  uniqueCompactDialOffsets.reserve(model.eventDials.size());
-  uniqueUniformDialOffsets.reserve(model.eventDials.size());
-  uniqueMonotonicDialOffsets.reserve(model.eventDials.size());
-  uniqueGeneralDialOffsets.reserve(model.eventDials.size());
-  uniqueGraphDialOffsets.reserve(model.eventDials.size());
-  compactDialReuseCounts.reserve(model.eventDials.size());
-  uniformDialReuseCounts.reserve(model.eventDials.size());
-  monotonicDialReuseCounts.reserve(model.eventDials.size());
-  generalDialReuseCounts.reserve(model.eventDials.size());
-  graphDialReuseCounts.reserve(model.eventDials.size());
+  uniqueCompactDialOffsets.reserve(model.dials.size());
+  uniqueUniformDialOffsets.reserve(model.dials.size());
+  uniqueMonotonicDialOffsets.reserve(model.dials.size());
+  uniqueGeneralDialOffsets.reserve(model.dials.size());
+  uniqueGraphDialOffsets.reserve(model.dials.size());
+  compactDialReuseCounts.reserve(model.dials.size());
+  uniformDialReuseCounts.reserve(model.dials.size());
+  monotonicDialReuseCounts.reserve(model.dials.size());
+  generalDialReuseCounts.reserve(model.dials.size());
+  graphDialReuseCounts.reserve(model.dials.size());
   std::unordered_map<std::size_t, MpsPackedDialRef> packedDialIndexMap{};
-  packedDialIndexMap.reserve(model.eventDials.size());
+  packedDialIndexMap.reserve(model.dials.size());
   std::unordered_map<std::size_t, const BackendDialDescriptor*> packedDialDescriptorMap{};
-  packedDialDescriptorMap.reserve(model.eventDials.size());
+  packedDialDescriptorMap.reserve(model.dials.size());
 
   LogInfo << "MPS backend: first packing pass."
           << " This phase inventories unique shared dials and precomputes payload sizes."
@@ -103,7 +103,7 @@ bool Backends::MpsBackendImpl::buildDeviceModel() {
     }
     for( std::size_t iDial = 0 ; iDial < event.weight.dialCount ; iDial++ ){
       processedDialRefs++;
-      const auto& eventDial = model.eventDials[event.weight.firstDial + iDial];
+      const auto& eventDial = model.dials[model.eventDialIndices[event.weight.firstDial + iDial]];
       if( eventDial.type == BackendDialType::Shift ){
         shiftCount++;
         continue;
@@ -203,7 +203,7 @@ bool Backends::MpsBackendImpl::buildDeviceModel() {
       LogInfo << "MPS backend: first pass progress "
               << (iEvent + 1) << "/" << model.events.size()
               << " events, "
-              << processedDialRefs << "/" << model.eventDials.size()
+              << processedDialRefs << "/" << model.eventDialIndices.size()
               << " dial refs scanned, "
               << packedDialIndexMap.size() << " unique dynamic dials found, elapsed "
               << secondsSince(packingLoopStart) << " s"
@@ -311,7 +311,7 @@ bool Backends::MpsBackendImpl::buildDeviceModel() {
     eventRanges.graphOffset = uint32_t(graphDialIndices.size());
     for( std::size_t iDial = 0 ; iDial < event.weight.dialCount ; iDial++ ){
       processedDialRefs++;
-      const auto& eventDial = model.eventDials[event.weight.firstDial + iDial];
+      const auto& eventDial = model.dials[model.eventDialIndices[event.weight.firstDial + iDial]];
       if( eventDial.type == BackendDialType::Shift ){
         LogThrowIf(eventDial.payloadSize < 1, "Internal MPS packing error: Shift dial payload is empty.");
         baseWeights[event.resultIndex] *= float(model.dialPayloads.at(eventDial.payloadOffset));
@@ -357,7 +357,7 @@ bool Backends::MpsBackendImpl::buildDeviceModel() {
       LogInfo << "MPS backend: final pass progress "
               << (iEvent + 1) << "/" << model.events.size()
               << " events, "
-              << processedDialRefs << "/" << model.eventDials.size()
+              << processedDialRefs << "/" << model.eventDialIndices.size()
               << " dial refs scanned, elapsed "
               << secondsSince(packingLoopStart) << " s"
               << " (+" << std::chrono::duration<double>(now - lastPackingProgress).count() << " s)"

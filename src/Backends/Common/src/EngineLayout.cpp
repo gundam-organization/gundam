@@ -45,7 +45,7 @@ namespace {
 
     propagation.events.reserve(eventDialCache.getCache().size());
     std::unordered_map<const Parameter*, std::size_t> parameterIndexMap{};
-    std::unordered_map<const DialInterface*, Backends::BackendDialDescriptor> dialDescriptorMap{};
+    std::unordered_map<const DialInterface*, std::uint32_t> dialIndexMap{};
 
     for( const auto& cacheEntry : eventDialCache.getCache() ){
       if( cacheEntry.event == nullptr ){ continue; }
@@ -56,16 +56,16 @@ namespace {
       eventRef.binIndex = cacheEntry.event->getIndices().bin;
       eventRef.globalBinIndex = sampleBinOffsetMap.at(eventRef.sampleIndex) + eventRef.binIndex;
       eventRef.weight.baseWeight = cacheEntry.event->getWeights().base;
-      eventRef.weight.firstDial = propagation.eventDials.size();
+      eventRef.weight.firstDial = propagation.eventDialIndices.size();
       eventRef.weight.dialCount = cacheEntry.dialResponseCacheList.size();
       eventRef.resultIndex = propagation.events.size();
 
       for( const auto& dialResponse : cacheEntry.dialResponseCacheList ){
         const auto* interface = dialResponse.dialInterface;
         LogThrowIf(interface == nullptr, "Null DialInterface while building EngineView.");
-        auto cachedDescriptorIt = dialDescriptorMap.find(interface);
-        if( cachedDescriptorIt != dialDescriptorMap.end() ){
-          propagation.eventDials.emplace_back(cachedDescriptorIt->second);
+        auto cachedDialIt = dialIndexMap.find(interface);
+        if( cachedDialIt != dialIndexMap.end() ){
+          propagation.eventDialIndices.emplace_back(cachedDialIt->second);
           continue;
         }
 
@@ -126,8 +126,10 @@ namespace {
         }
 
         dialRef.payloadSize = propagation.dialPayloads.size() - dialRef.payloadOffset;
-        dialDescriptorMap.emplace(interface, dialRef);
-        propagation.eventDials.emplace_back(dialRef);
+        const auto dialIndex = std::uint32_t(propagation.dials.size());
+        propagation.dials.emplace_back(dialRef);
+        dialIndexMap.emplace(interface, dialIndex);
+        propagation.eventDialIndices.emplace_back(dialIndex);
 
         if( inputBuffer == nullptr ){ continue; }
 

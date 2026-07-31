@@ -141,15 +141,17 @@ namespace Backends::Semantics {
 
   GUNDAM_BACKEND_FORCE_INLINE GUNDAM_BACKEND_HOST_DEVICE
   double evalEventWeight(const BackendEventWeightDescriptor& eventRef_,
-                         const BackendDialDescriptor* eventDials_,
+                         const std::uint32_t* eventDialIndices_,
+                         const BackendDialDescriptor* dials_,
                          const BackendDialInputDescriptor* dialInputs_,
                          const double* dialPayloads_,
                          const double* parameterValues_) {
-    GUNDAM_BACKEND_SEMANTICS_ASSERT(eventDials_ != nullptr or eventRef_.dialCount == 0);
+    GUNDAM_BACKEND_SEMANTICS_ASSERT(eventDialIndices_ != nullptr or eventRef_.dialCount == 0);
+    GUNDAM_BACKEND_SEMANTICS_ASSERT(dials_ != nullptr or eventRef_.dialCount == 0);
 
     double weight = eventRef_.baseWeight;
     for( std::size_t iDial = 0 ; iDial < eventRef_.dialCount ; iDial++ ){
-      const auto& dialRef = eventDials_[eventRef_.firstDial + iDial];
+      const auto& dialRef = dials_[eventDialIndices_[eventRef_.firstDial + iDial]];
       weight *= evalDialResponse(dialRef, dialInputs_, dialPayloads_, parameterValues_);
     }
     return weight;
