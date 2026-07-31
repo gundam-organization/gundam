@@ -36,7 +36,17 @@ struct DataDispenserParameters{
   std::string selectionCutFormulaStr{};
   std::string eventVariableAsWeight{};
   std::vector<std::string> activeLeafNameList{};
-  std::vector<std::string> filePathList{};
+  struct FilePathEntry{
+    struct FriendTree{
+      std::string name{}; // ROOT friend alias
+      std::string path{}; // ROOT file path, optionally followed by :tree/path
+    };
+
+    std::string name{}; // config-list identifier, used by the override mechanism
+    std::string path{}; // ROOT file path, optionally followed by :tree/path
+    std::vector<FriendTree> friendList{};
+  };
+  std::vector<FilePathEntry> filePathList{};
   std::map<std::string, std::string> variableDict{};
   std::map<std::string, EventVarTransformLib> variableDictTransform{};
   std::vector<std::string> additionalVarsStorage{};
