@@ -4,12 +4,13 @@
 #include "EngineView.h"
 #include "BackendTypes.h"
 #include "ParameterSnapshot.h"
+#include "ConfigUtils.h"
 
 #include <string>
 
 namespace Backends {
 
-  class EngineBackend {
+  class EngineBackend : public JsonBaseClass {
   public:
     virtual ~EngineBackend() = default;
 
@@ -30,6 +31,9 @@ namespace Backends {
     [[nodiscard]] virtual const std::vector<double>& getHistogramSumSquaresHostView(const PropagationToken& token_) const = 0;
     [[nodiscard]] virtual BackendDeviceView getDeviceView(const PropagationToken&) const { return {}; }
     [[nodiscard]] virtual BackendTimingSummary getLastTimingSummary() const { return {}; }
+
+  protected:
+    void configureImpl() override { _config_.printUnusedKeys(); }
   };
 
 }

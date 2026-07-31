@@ -45,12 +45,12 @@ void Backends::BackendManager::configureImpl() {
   _config_.defineFields({
     {"isEnabled"},
     {"type"},
-    {"enableCachedDialResponses"},
+    {"backendConfig"},
   });
 
   _config_.fillValue(_isEnabled_, "isEnabled");
   _config_.fillValue(_type_, "type");
-  _config_.fillValue(_enableCachedDialResponses_, "enableCachedDialResponses");
+  _config_.fillValue(_backendConfig_, "backendConfig");
   _config_.printUnusedKeys();
 }
 
@@ -166,6 +166,7 @@ void Backends::BackendManager::initializeImpl() {
 
   _backend_ = makeBackend(*this);
   LogThrowIf(_backend_ == nullptr, "Could not create propagation backend.");
+  _backend_->configure(_backendConfig_);
   _backend_->build(_backendEngineLayout_.view);
 }
 

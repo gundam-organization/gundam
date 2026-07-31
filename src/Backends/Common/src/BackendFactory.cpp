@@ -11,7 +11,7 @@ std::unique_ptr<Backends::EngineBackend> Backends::makeBackend(const BackendMana
     return std::make_unique<CpuEngineBackend>();
   }
   if( config_.getType() == "MPS" or config_.getType() == "mps" ){
-    return std::make_unique<MpsEngineBackend>(config_.isCachedDialResponsesEnabled());
+    return std::make_unique<MpsEngineBackend>();
   }
 
   LogThrow("Unknown backend type: " << config_.getType());

@@ -14,8 +14,11 @@ namespace Backends {
   struct MpsEngineBackendImpl;
 
   class MpsEngineBackend : public EngineBackend {
+  protected:
+    void configureImpl() override;
+
   public:
-    explicit MpsEngineBackend(bool enableCachedDialResponses_ = true);
+    MpsEngineBackend();
     ~MpsEngineBackend() override;
 
     [[nodiscard]] std::string getName() const override { return "MPS"; }
