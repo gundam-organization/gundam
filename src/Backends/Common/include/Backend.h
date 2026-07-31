@@ -10,9 +10,9 @@
 
 namespace Backends {
 
-  class EngineBackend : public JsonBaseClass {
+  class Backend : public JsonBaseClass {
   public:
-    virtual ~EngineBackend() = default;
+    virtual ~Backend() = default;
 
     [[nodiscard]] virtual std::string getName() const = 0;
     [[nodiscard]] virtual BackendCapabilities getCapabilities() const = 0;

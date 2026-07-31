@@ -34,7 +34,6 @@ void Propagator::configureImpl(){
     {"devSingleThreadHistFill"},
     {"globalEventReweightCap"},
     // relocated:
-    {FieldFlag::RELOCATED, "backendConfig", "likelihoodInterfaceConfig/backendConfig"},
     {FieldFlag::RELOCATED, "parameterSetListConfig", "parametersManagerConfig/parameterSetList"},
     {FieldFlag::RELOCATED, "throwToyParametersWithGlobalCov", "parametersManagerConfig"},
     {FieldFlag::RELOCATED, "enableStatThrowInToys", "likelihoodInterfaceConfig/enableStatThrowInToys"},

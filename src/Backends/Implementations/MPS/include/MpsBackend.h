@@ -3,7 +3,7 @@
 
 #include "EngineView.h"
 #include "BackendTypes.h"
-#include "EngineBackend.h"
+#include "Backend.h"
 #include "ParameterSnapshot.h"
 
 #include <memory>
@@ -11,15 +11,15 @@
 
 namespace Backends {
 
-  struct MpsEngineBackendImpl;
+  struct MpsBackendImpl;
 
-  class MpsEngineBackend : public EngineBackend {
+  class MpsBackend : public Backend {
   protected:
     void configureImpl() override;
 
   public:
-    MpsEngineBackend();
-    ~MpsEngineBackend() override;
+    MpsBackend();
+    ~MpsBackend() override;
 
     [[nodiscard]] std::string getName() const override { return "MPS"; }
     [[nodiscard]] BackendCapabilities getCapabilities() const override;
@@ -40,7 +40,7 @@ namespace Backends {
     [[nodiscard]] BackendTimingSummary getLastTimingSummary() const override;
 
   private:
-    std::unique_ptr<MpsEngineBackendImpl> _impl_{};
+    std::unique_ptr<MpsBackendImpl> _impl_{};
   };
 
 }

@@ -1,9 +1,9 @@
-#include "CpuEngineBackend.h"
+#include "CpuBackend.h"
 
 #include "Semantics/BackendHostPropagation.h"
 #include "Logger.h"
 
-Backends::BackendCapabilities Backends::CpuEngineBackend::getCapabilities() const {
+Backends::BackendCapabilities Backends::CpuBackend::getCapabilities() const {
   BackendCapabilities out;
   out.supportsCpu = true;
   out.supportsEventWeights = true;
@@ -13,13 +13,13 @@ Backends::BackendCapabilities Backends::CpuEngineBackend::getCapabilities() cons
   return out;
 }
 
-void Backends::CpuEngineBackend::build(const EngineView& engineView_) {
+void Backends::CpuBackend::build(const EngineView& engineView_) {
   _engineView_ = engineView_;
   _lastResult_ = Result();
   _isBuilt_ = true;
 }
 
-Backends::PropagationToken Backends::CpuEngineBackend::requestPropagation(const ParameterSnapshot& parameters_) {
+Backends::PropagationToken Backends::CpuBackend::requestPropagation(const ParameterSnapshot& parameters_) {
 
   LogThrowIf(not _isBuilt_, "CpuBackend has not been built.");
   const auto& model = _engineView_.propagation;
@@ -48,7 +48,7 @@ Backends::PropagationToken Backends::CpuEngineBackend::requestPropagation(const 
   return _lastResult_.token;
 }
 
-Backends::PropagationStatus Backends::CpuEngineBackend::getStatus(const PropagationToken& token_) const {
+Backends::PropagationStatus Backends::CpuBackend::getStatus(const PropagationToken& token_) const {
   if( not isCurrentToken(token_) ){
     PropagationStatus out;
     out.backend = BackendStatus::Failed;
@@ -57,15 +57,15 @@ Backends::PropagationStatus Backends::CpuEngineBackend::getStatus(const Propagat
   return _lastResult_.status;
 }
 
-bool Backends::CpuEngineBackend::isReady(const PropagationToken& token_) const {
+bool Backends::CpuBackend::isReady(const PropagationToken& token_) const {
   return isCurrentToken(token_) and _lastResult_.status.backend == BackendStatus::Ready;
 }
 
-void Backends::CpuEngineBackend::wait(const PropagationToken& token_) {
+void Backends::CpuBackend::wait(const PropagationToken& token_) {
   LogThrowIf(not isCurrentToken(token_), "Invalid CpuBackend propagation token.");
 }
 
-void Backends::CpuEngineBackend::materialize(const PropagationToken& token_, OutputRequest output_) {
+void Backends::CpuBackend::materialize(const PropagationToken& token_, OutputRequest output_) {
   LogThrowIf(not isCurrentToken(token_), "Invalid CpuBackend propagation token.");
   LogThrowIf(_lastResult_.status.state(output_) != OutputState::ReadyOnDevice
              and _lastResult_.status.state(output_) != OutputState::ReadyOnHost,
@@ -88,7 +88,7 @@ void Backends::CpuEngineBackend::materialize(const PropagationToken& token_, Out
   }
 }
 
-double Backends::CpuEngineBackend::getLikelihood(const PropagationToken& token_) const {
+double Backends::CpuBackend::getLikelihood(const PropagationToken& token_) const {
   LogThrowIf(not isCurrentToken(token_), "Invalid CpuBackend propagation token.");
   LogThrowIf(_lastResult_.status.statLikelihood != OutputState::ReadyOnDevice
              and _lastResult_.status.statLikelihood != OutputState::ReadyOnHost,
@@ -96,26 +96,26 @@ double Backends::CpuEngineBackend::getLikelihood(const PropagationToken& token_)
   return _lastResult_.likelihood;
 }
 
-const std::vector<double>& Backends::CpuEngineBackend::getEventWeightsHostView(const PropagationToken& token_) const {
+const std::vector<double>& Backends::CpuBackend::getEventWeightsHostView(const PropagationToken& token_) const {
   LogThrowIf(not isCurrentToken(token_), "Invalid CpuBackend propagation token.");
   return _lastResult_.eventWeights;
 }
 
-const std::vector<double>& Backends::CpuEngineBackend::getHistogramSumsHostView(const PropagationToken& token_) const {
+const std::vector<double>& Backends::CpuBackend::getHistogramSumsHostView(const PropagationToken& token_) const {
   LogThrowIf(not isCurrentToken(token_), "Invalid CpuBackend propagation token.");
   return _lastResult_.histSums;
 }
 
-const std::vector<double>& Backends::CpuEngineBackend::getHistogramSumSquaresHostView(const PropagationToken& token_) const {
+const std::vector<double>& Backends::CpuBackend::getHistogramSumSquaresHostView(const PropagationToken& token_) const {
   LogThrowIf(not isCurrentToken(token_), "Invalid CpuBackend propagation token.");
   return _lastResult_.histSumSquares;
 }
 
-bool Backends::CpuEngineBackend::isCurrentToken(const PropagationToken& token_) const {
+bool Backends::CpuBackend::isCurrentToken(const PropagationToken& token_) const {
   return token_.isValid and _lastResult_.token.isValid and token_.id == _lastResult_.token.id;
 }
 
-void Backends::CpuEngineBackend::resetResult() {
+void Backends::CpuBackend::resetResult() {
   _lastResult_.token.id = _nextTokenId_++;
   _lastResult_.token.isValid = true;
   _lastResult_.status = PropagationStatus();
@@ -130,11 +130,11 @@ void Backends::CpuEngineBackend::resetResult() {
   _lastResult_.status.statLikelihood = OutputState::Scheduled;
 }
 
-void Backends::CpuEngineBackend::calculateEventWeights(Result& result_, const ParameterSnapshot& parameters_) {
+void Backends::CpuBackend::calculateEventWeights(Result& result_, const ParameterSnapshot& parameters_) {
   Semantics::calculateEventWeights(result_.eventWeights, _engineView_.propagation, parameters_);
 }
 
-void Backends::CpuEngineBackend::calculateHistograms(Result& result_) {
+void Backends::CpuBackend::calculateHistograms(Result& result_) {
   LogThrowIf(result_.eventWeights.empty(), "CPU backend histogram build requires event weights.");
   Semantics::calculateHistogramsFromEventWeights(
       result_.histSums,
@@ -144,7 +144,7 @@ void Backends::CpuEngineBackend::calculateHistograms(Result& result_) {
   );
 }
 
-void Backends::CpuEngineBackend::calculateHistogramsFromEvents(Result& result_, const ParameterSnapshot& parameters_) {
+void Backends::CpuBackend::calculateHistogramsFromEvents(Result& result_, const ParameterSnapshot& parameters_) {
   Semantics::calculateHistograms(
       result_.histSums,
       result_.histSumSquares,
@@ -153,7 +153,7 @@ void Backends::CpuEngineBackend::calculateHistogramsFromEvents(Result& result_, 
   );
 }
 
-void Backends::CpuEngineBackend::calculateLikelihood(Result& result_) {
+void Backends::CpuBackend::calculateLikelihood(Result& result_) {
   result_.likelihood = Semantics::calculateLikelihood(
       _engineView_.likelihood,
       result_.histSums,

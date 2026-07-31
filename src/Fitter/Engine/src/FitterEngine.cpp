@@ -95,8 +95,8 @@ void FitterEngine::configureImpl(){
   _config_.fillValue(_likelihoodInterface_.getConfig(), "likelihoodInterfaceConfig");
   _likelihoodInterface_.configure();
 #ifdef GUNDAM_USING_BACKENDS
-  if( _likelihoodInterface_.getConfig().hasField("backendConfig") ){
-    _backendsManager_.setConfig(_likelihoodInterface_.getConfig().fetchValue<ConfigReader>("backendConfig"));
+  if( _likelihoodInterface_.getConfig().hasField("backendManagerConfig") ){
+    _backendsManager_.setConfig(_likelihoodInterface_.getConfig().fetchValue<ConfigReader>("backendManagerConfig"));
     _backendsManager_.configure();
   }
 #endif

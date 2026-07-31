@@ -6,9 +6,9 @@
 namespace Backends {
 
   class BackendManager;
-  class EngineBackend;
+  class Backend;
 
-  std::unique_ptr<EngineBackend> makeBackend(const BackendManager& config_);
+  std::unique_ptr<Backend> makeBackend(const BackendManager& config_);
 
 }
 

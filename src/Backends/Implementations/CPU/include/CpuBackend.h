@@ -3,7 +3,7 @@
 
 #include "EngineView.h"
 #include "BackendTypes.h"
-#include "EngineBackend.h"
+#include "Backend.h"
 #include "ParameterSnapshot.h"
 
 #include <cstdint>
@@ -11,9 +11,9 @@
 
 namespace Backends {
 
-  class CpuEngineBackend : public EngineBackend {
+  class CpuBackend : public Backend {
   public:
-    CpuEngineBackend() = default;
+    CpuBackend() = default;
 
     [[nodiscard]] std::string getName() const override { return "CPU"; }
     [[nodiscard]] BackendCapabilities getCapabilities() const override;

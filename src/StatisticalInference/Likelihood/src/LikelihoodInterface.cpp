@@ -24,7 +24,7 @@ void LikelihoodInterface::configureImpl(){
     {"jointProbabilityConfig"},
     {"plotGeneratorConfig"},
     {"eventTreeWriter"},
-    {"backendConfig"},
+    {"backendManagerConfig"},
     {"enableStatThrowInToys"},
     {"gaussStatThrowInToys"},
     {"enableEventMcThrow"},

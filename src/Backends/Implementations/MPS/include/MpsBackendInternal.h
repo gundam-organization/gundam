@@ -1,11 +1,11 @@
 #ifndef GUNDAM_MPS_BACKEND_INTERNAL_H
 #define GUNDAM_MPS_BACKEND_INTERNAL_H
 
-#include "MpsEngineBackend.h"
+#include "MpsBackend.h"
 
 #include "EngineView.h"
 #include "BackendTypes.h"
-#include "MpsEngineBackendKernelSource.h"
+#include "MpsBackendKernelSource.h"
 #include "ParameterSnapshot.h"
 
 #include "CompactSpline.h"
@@ -34,7 +34,7 @@
 
 namespace Backends {
 
-  struct MpsEngineBackendImpl {
+  struct MpsBackendImpl {
     struct Result {
       PropagationToken token{};
       PropagationStatus status{};
@@ -119,8 +119,8 @@ namespace Backends {
     uint32_t generalDialDescriptorCount{0};
     uint32_t graphDialDescriptorCount{0};
 
-    MpsEngineBackendImpl();
-    ~MpsEngineBackendImpl();
+    MpsBackendImpl();
+    ~MpsBackendImpl();
 
     void releaseDeviceBuffers();
     [[nodiscard]] bool isCurrentToken(const PropagationToken& token_) const;
@@ -156,7 +156,7 @@ namespace {
   constexpr uint32_t kMpsDialFlagCached{1u << 1};
   constexpr uint32_t kMpsCachedDialReuseThreshold{8};
 
-  static NSString* const kMpsEngineBackendMetalSource = GUNDAM_MPS_BACKEND_KERNEL_SOURCE;
+  static NSString* const kMpsBackendMetalSource = GUNDAM_MPS_BACKEND_KERNEL_SOURCE;
 
   struct MpsEventDialRanges {
     uint32_t normOffset{0};

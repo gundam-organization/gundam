@@ -1,12 +1,12 @@
-#include "MpsEngineBackend.h"
+#include "MpsBackend.h"
 
-#include "MpsEngineBackendInternal.h"
+#include "MpsBackendInternal.h"
 #include "Semantics/BackendHostPropagation.h"
 
-Backends::MpsEngineBackend::MpsEngineBackend() : _impl_(std::make_unique<MpsEngineBackendImpl>()) {}
-Backends::MpsEngineBackend::~MpsEngineBackend() = default;
+Backends::MpsBackend::MpsBackend() : _impl_(std::make_unique<MpsBackendImpl>()) {}
+Backends::MpsBackend::~MpsBackend() = default;
 
-void Backends::MpsEngineBackend::configureImpl() {
+void Backends::MpsBackend::configureImpl() {
   _config_.defineFields({
       {"enableCachedDialResponses"},
   });
@@ -14,7 +14,7 @@ void Backends::MpsEngineBackend::configureImpl() {
   _config_.printUnusedKeys();
 }
 
-Backends::BackendCapabilities Backends::MpsEngineBackend::getCapabilities() const {
+Backends::BackendCapabilities Backends::MpsBackend::getCapabilities() const {
   BackendCapabilities out;
   out.supportsGpu = true;
   out.supportsEventWeights = true;
@@ -24,9 +24,9 @@ Backends::BackendCapabilities Backends::MpsEngineBackend::getCapabilities() cons
   return out;
 }
 
-void Backends::MpsEngineBackend::build(const EngineView& engineView_) {
+void Backends::MpsBackend::build(const EngineView& engineView_) {
   _impl_->engineView = engineView_;
-  _impl_->lastResult = MpsEngineBackendImpl::Result();
+  _impl_->lastResult = MpsBackendImpl::Result();
   if( not _impl_->buildDeviceModel() ){
     LogWarning << "MPS backend cannot use the GPU propagation path: "
                << (_impl_->deviceModelFallbackReason.empty() ? "unknown compatibility issue."
@@ -37,8 +37,8 @@ void Backends::MpsEngineBackend::build(const EngineView& engineView_) {
   _impl_->isBuilt = true;
 }
 
-Backends::PropagationToken Backends::MpsEngineBackend::requestPropagation(const ParameterSnapshot& parameters_) {
-  LogThrowIf(not _impl_->isBuilt, "MpsEngineBackend has not been built.");
+Backends::PropagationToken Backends::MpsBackend::requestPropagation(const ParameterSnapshot& parameters_) {
+  LogThrowIf(not _impl_->isBuilt, "MpsBackend has not been built.");
   LogThrowIf(not parameters_.empty() and parameters_.values.size() != _impl_->model.parameterCount,
              "ParameterSnapshot size mismatch: " << parameters_.values.size()
                                                  << " != " << _impl_->model.parameterCount);
@@ -95,7 +95,7 @@ Backends::PropagationToken Backends::MpsEngineBackend::requestPropagation(const 
   return _impl_->lastResult.token;
 }
 
-Backends::PropagationStatus Backends::MpsEngineBackend::getStatus(const PropagationToken& token_) const {
+Backends::PropagationStatus Backends::MpsBackend::getStatus(const PropagationToken& token_) const {
   if( not _impl_->isCurrentToken(token_) ){
     PropagationStatus out;
     out.backend = BackendStatus::Failed;
@@ -104,20 +104,20 @@ Backends::PropagationStatus Backends::MpsEngineBackend::getStatus(const Propagat
   return _impl_->lastResult.status;
 }
 
-const Backends::EngineView& Backends::MpsEngineBackend::getEngineView() const {
+const Backends::EngineView& Backends::MpsBackend::getEngineView() const {
   return _impl_->engineView;
 }
 
-bool Backends::MpsEngineBackend::isReady(const PropagationToken& token_) const {
+bool Backends::MpsBackend::isReady(const PropagationToken& token_) const {
   return _impl_->isCurrentToken(token_) and _impl_->lastResult.status.backend == BackendStatus::Ready;
 }
 
-void Backends::MpsEngineBackend::wait(const PropagationToken& token_) {
-  LogThrowIf(not _impl_->isCurrentToken(token_), "Invalid MpsEngineBackend propagation token.");
+void Backends::MpsBackend::wait(const PropagationToken& token_) {
+  LogThrowIf(not _impl_->isCurrentToken(token_), "Invalid MpsBackend propagation token.");
 }
 
-void Backends::MpsEngineBackend::materialize(const PropagationToken& token_, OutputRequest output_) {
-  LogThrowIf(not _impl_->isCurrentToken(token_), "Invalid MpsEngineBackend propagation token.");
+void Backends::MpsBackend::materialize(const PropagationToken& token_, OutputRequest output_) {
+  LogThrowIf(not _impl_->isCurrentToken(token_), "Invalid MpsBackend propagation token.");
   LogThrowIf(_impl_->lastResult.status.state(output_) != OutputState::ReadyOnDevice
              and _impl_->lastResult.status.state(output_) != OutputState::ReadyOnHost,
              "Requested backend output is not ready.");
@@ -131,41 +131,41 @@ void Backends::MpsEngineBackend::materialize(const PropagationToken& token_, Out
     _impl_->lastResult.status.histograms = OutputState::ReadyOnHost;
   }
   else if( output_ == OutputRequest::SampleLikelihoods ){
-    LogThrow("MpsEngineBackend cannot materialize sample likelihoods yet.");
+    LogThrow("MpsBackend cannot materialize sample likelihoods yet.");
   }
   else if( output_ == OutputRequest::StatLikelihood ){
     _impl_->lastResult.status.statLikelihood = OutputState::ReadyOnHost;
   }
   else{
-    LogThrow("MpsEngineBackend cannot materialize requested output yet.");
+    LogThrow("MpsBackend cannot materialize requested output yet.");
   }
 }
 
-double Backends::MpsEngineBackend::getLikelihood(const PropagationToken& token_) const {
-  LogThrowIf(not _impl_->isCurrentToken(token_), "Invalid MpsEngineBackend propagation token.");
+double Backends::MpsBackend::getLikelihood(const PropagationToken& token_) const {
+  LogThrowIf(not _impl_->isCurrentToken(token_), "Invalid MpsBackend propagation token.");
   LogThrowIf(_impl_->lastResult.status.statLikelihood != OutputState::ReadyOnDevice
              and _impl_->lastResult.status.statLikelihood != OutputState::ReadyOnHost,
              "Backend likelihood is not ready.");
   return _impl_->lastResult.likelihood;
 }
 
-const std::vector<double>& Backends::MpsEngineBackend::getEventWeightsHostView(const PropagationToken& token_) const {
-  LogThrowIf(not _impl_->isCurrentToken(token_), "Invalid MpsEngineBackend propagation token.");
+const std::vector<double>& Backends::MpsBackend::getEventWeightsHostView(const PropagationToken& token_) const {
+  LogThrowIf(not _impl_->isCurrentToken(token_), "Invalid MpsBackend propagation token.");
   return _impl_->lastResult.eventWeights;
 }
 
-const std::vector<double>& Backends::MpsEngineBackend::getHistogramSumsHostView(const PropagationToken& token_) const {
-  LogThrowIf(not _impl_->isCurrentToken(token_), "Invalid MpsEngineBackend propagation token.");
+const std::vector<double>& Backends::MpsBackend::getHistogramSumsHostView(const PropagationToken& token_) const {
+  LogThrowIf(not _impl_->isCurrentToken(token_), "Invalid MpsBackend propagation token.");
   return _impl_->lastResult.histSums;
 }
 
-const std::vector<double>& Backends::MpsEngineBackend::getHistogramSumSquaresHostView(const PropagationToken& token_) const {
-  LogThrowIf(not _impl_->isCurrentToken(token_), "Invalid MpsEngineBackend propagation token.");
+const std::vector<double>& Backends::MpsBackend::getHistogramSumSquaresHostView(const PropagationToken& token_) const {
+  LogThrowIf(not _impl_->isCurrentToken(token_), "Invalid MpsBackend propagation token.");
   return _impl_->lastResult.histSumSquares;
 }
 
-Backends::BackendDeviceView Backends::MpsEngineBackend::getDeviceView(const PropagationToken& token_) const {
-  LogThrowIf(not _impl_->isCurrentToken(token_), "Invalid MpsEngineBackend propagation token.");
+Backends::BackendDeviceView Backends::MpsBackend::getDeviceView(const PropagationToken& token_) const {
+  LogThrowIf(not _impl_->isCurrentToken(token_), "Invalid MpsBackend propagation token.");
   BackendDeviceView out;
   out.device = _impl_->device;
   out.eventWeights = _impl_->eventWeightsBuffer;
@@ -176,6 +176,6 @@ Backends::BackendDeviceView Backends::MpsEngineBackend::getDeviceView(const Prop
   return out;
 }
 
-Backends::BackendTimingSummary Backends::MpsEngineBackend::getLastTimingSummary() const {
+Backends::BackendTimingSummary Backends::MpsBackend::getLastTimingSummary() const {
   return _impl_->lastTiming;
 }
