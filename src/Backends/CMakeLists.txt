@@ -6,10 +6,10 @@ set(SRCFILES
     ${CMAKE_CURRENT_SOURCE_DIR}/Common/src/BackendFactory.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/Common/src/BackendManager.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/Common/src/BackendTypes.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/CPU/src/CpuBackend.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/MPS/src/MpsBackendImpl.mm
-    ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/MPS/src/MpsBackendDeviceModel.mm
-    ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/MPS/src/MpsBackendExecution.mm
+    ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/CPU/src/CpuEngineBackend.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/MPS/src/MpsEngineBackendImpl.mm
+    ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/MPS/src/MpsEngineBackendDeviceModel.mm
+    ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/MPS/src/MpsEngineBackendExecution.mm
 )
 
 if(APPLE)
@@ -22,8 +22,8 @@ if(APPLE)
       ${CMAKE_SOURCE_DIR}/src/Utils/include/DeviceMath/SharedSplineMonotonic.h
       ${CMAKE_SOURCE_DIR}/src/Utils/include/DeviceMath/SharedSplineGeneral.h
       ${CMAKE_SOURCE_DIR}/src/Utils/include/DeviceMath/SharedGraph.h
-      ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/MPS/src/MpsBackendKernels.metal
-      ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/MPS/src/MpsBackendKernelSource.h.in
+      ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/MPS/src/MpsEngineBackendKernels.metal
+      ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/MPS/src/MpsEngineBackendKernelSource.h.in
   )
   file(READ ${CMAKE_SOURCE_DIR}/src/Utils/include/DeviceMath/SharedSplineCommon.h MPS_SHARED_SPLINE_COMMON)
   file(READ ${CMAKE_SOURCE_DIR}/src/Utils/include/DeviceMath/SharedSplineCompact.h MPS_SHARED_SPLINE_COMPACT)
@@ -31,15 +31,15 @@ if(APPLE)
   file(READ ${CMAKE_SOURCE_DIR}/src/Utils/include/DeviceMath/SharedSplineMonotonic.h MPS_SHARED_SPLINE_MONOTONIC)
   file(READ ${CMAKE_SOURCE_DIR}/src/Utils/include/DeviceMath/SharedSplineGeneral.h MPS_SHARED_SPLINE_GENERAL)
   file(READ ${CMAKE_SOURCE_DIR}/src/Utils/include/DeviceMath/SharedGraph.h MPS_SHARED_GRAPH)
-  file(READ ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/MPS/src/MpsBackendKernels.metal MPS_BACKEND_KERNEL_SOURCE)
+  file(READ ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/MPS/src/MpsEngineBackendKernels.metal MPS_BACKEND_KERNEL_SOURCE)
   configure_file(
-      ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/MPS/src/MpsBackendKernelSource.h.in
-      ${CMAKE_CURRENT_BINARY_DIR}/generated/MpsBackendKernelSource.h
+      ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/MPS/src/MpsEngineBackendKernelSource.h.in
+      ${CMAKE_CURRENT_BINARY_DIR}/generated/MpsEngineBackendKernelSource.h
       @ONLY
   )
-  list(APPEND SRCFILES ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/MPS/src/MpsBackend.mm)
+  list(APPEND SRCFILES ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/MPS/src/MpsEngineBackend.mm)
 else()
-  list(APPEND SRCFILES ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/MPS/src/MpsBackend.cpp)
+  list(APPEND SRCFILES ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/MPS/src/MpsEngineBackend.cpp)
 endif()
 
 set(HEADERS
@@ -57,8 +57,8 @@ set(HEADERS
     ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/Semantics/BackendDialSemantics.h
     ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/Semantics/BackendHostPropagation.h
     ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/CPU/include/CpuBackend.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/MPS/include/MpsBackend.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/MPS/include/MpsBackendInternal.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/MPS/include/MpsEngineBackend.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/MPS/include/MpsEngineBackendInternal.h
 )
 
 if( USE_STATIC_LINKS )

@@ -1,6 +1,6 @@
-#include "MpsBackendInternal.h"
+#include "MpsEngineBackendInternal.h"
 
-bool Backends::MpsBackendImpl::buildDeviceModel() {
+bool Backends::MpsEngineBackendImpl::buildDeviceModel() {
   releaseDeviceBuffers();
   isDeviceModelSupported = false;
   deviceModelFallbackReason.clear();

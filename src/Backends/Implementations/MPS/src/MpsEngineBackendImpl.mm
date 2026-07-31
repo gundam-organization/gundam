@@ -1,6 +1,6 @@
-#include "MpsBackendInternal.h"
+#include "MpsEngineBackendInternal.h"
 
-Backends::MpsBackendImpl::MpsBackendImpl() : model(engineView.propagation), likelihoodModel(engineView.likelihood) {
+Backends::MpsEngineBackendImpl::MpsEngineBackendImpl() : model(engineView.propagation), likelihoodModel(engineView.likelihood) {
   device = MTLCreateSystemDefaultDevice();
   if( device == nil ){ return; }
 
@@ -22,7 +22,7 @@ Backends::MpsBackendImpl::MpsBackendImpl() : model(engineView.propagation), like
   compileOptions.fastMathEnabled = NO;
 #pragma clang diagnostic pop
 #endif
-  id<MTLLibrary> library = [device newLibraryWithSource:kMpsBackendMetalSource options:compileOptions error:&error];
+  id<MTLLibrary> library = [device newLibraryWithSource:kMpsEngineBackendMetalSource options:compileOptions error:&error];
   [compileOptions release];
   if( library == nil ){
     if( error != nil ){
@@ -53,7 +53,7 @@ Backends::MpsBackendImpl::MpsBackendImpl() : model(engineView.propagation), like
   isAvailable = true;
 }
 
-Backends::MpsBackendImpl::~MpsBackendImpl() {
+Backends::MpsEngineBackendImpl::~MpsEngineBackendImpl() {
   releaseDeviceBuffers();
   [eventWeightsPipeline release];
   [cachedCompactResponsesPipeline release];
@@ -68,7 +68,7 @@ Backends::MpsBackendImpl::~MpsBackendImpl() {
   [device release];
 }
 
-void Backends::MpsBackendImpl::releaseDeviceBuffers() {
+void Backends::MpsEngineBackendImpl::releaseDeviceBuffers() {
   releaseBuffer(eventWeightsBuffer);
   releaseBuffer(baseWeightsBuffer);
   releaseBuffer(eventDialRangesBuffer);
@@ -106,11 +106,11 @@ void Backends::MpsBackendImpl::releaseDeviceBuffers() {
   releaseBuffer(histogramChunkSizeBuffer);
 }
 
-bool Backends::MpsBackendImpl::isCurrentToken(const PropagationToken& token_) const {
+bool Backends::MpsEngineBackendImpl::isCurrentToken(const PropagationToken& token_) const {
   return token_.isValid and lastResult.token.isValid and token_.id == lastResult.token.id;
 }
 
-void Backends::MpsBackendImpl::resetResult() {
+void Backends::MpsEngineBackendImpl::resetResult() {
   lastResult.token.id = nextTokenId++;
   lastResult.token.isValid = true;
   lastResult.status = PropagationStatus();

@@ -1,13 +1,13 @@
-#include "MpsBackendInternal.h"
+#include "MpsEngineBackendInternal.h"
 
 #include "Semantics/BackendHostPropagation.h"
 
-void Backends::MpsBackendImpl::updateDeviceParameters(const ParameterSnapshot& parameters_) {
+void Backends::MpsEngineBackendImpl::updateDeviceParameters(const ParameterSnapshot& parameters_) {
   auto start = std::chrono::steady_clock::now();
   if( parameterValuesScratch.size() != model.parameterCount ){
     parameterValuesScratch.resize(model.parameterCount);
   }
-  LogThrowIf(parameters_.empty(), "MpsBackend requires a populated ParameterSnapshot.");
+  LogThrowIf(parameters_.empty(), "MpsEngineBackend requires a populated ParameterSnapshot.");
   LogThrowIf(parameters_.values.size() != model.parameterCount,
              "ParameterSnapshot size mismatch: " << parameters_.values.size()
                                                  << " != " << model.parameterCount);
@@ -18,7 +18,7 @@ void Backends::MpsBackendImpl::updateDeviceParameters(const ParameterSnapshot& p
   lastTiming.parameterUploadSeconds += secondsSince(start);
 }
 
-bool Backends::MpsBackendImpl::encodeEventWeights(id<MTLComputeCommandEncoder> encoder) {
+bool Backends::MpsEngineBackendImpl::encodeEventWeights(id<MTLComputeCommandEncoder> encoder) {
   if( not isDeviceModelSupported ){ return false; }
   [encoder setComputePipelineState:eventWeightsPipeline];
   [encoder setBuffer:eventWeightsBuffer offset:0 atIndex:0];
@@ -51,7 +51,7 @@ bool Backends::MpsBackendImpl::encodeEventWeights(id<MTLComputeCommandEncoder> e
   return true;
 }
 
-bool Backends::MpsBackendImpl::encodeCachedDialResponses(id<MTLComputeCommandEncoder> encoder,
+bool Backends::MpsEngineBackendImpl::encodeCachedDialResponses(id<MTLComputeCommandEncoder> encoder,
                                                          id<MTLComputePipelineState> pipeline_,
                                                          id<MTLBuffer> cachedResponsesBuffer_,
                                                          id<MTLBuffer> descriptorsBuffer_,
@@ -72,7 +72,7 @@ bool Backends::MpsBackendImpl::encodeCachedDialResponses(id<MTLComputeCommandEnc
   return true;
 }
 
-bool Backends::MpsBackendImpl::encodeHistogramsFromDeviceWeights(id<MTLComputeCommandEncoder> encoder) {
+bool Backends::MpsEngineBackendImpl::encodeHistogramsFromDeviceWeights(id<MTLComputeCommandEncoder> encoder) {
   if( not isDeviceModelSupported ){ return false; }
   [encoder setComputePipelineState:histogramPartialsPipeline];
   [encoder setBuffer:eventWeightsBuffer offset:0 atIndex:0];
@@ -104,7 +104,7 @@ bool Backends::MpsBackendImpl::encodeHistogramsFromDeviceWeights(id<MTLComputeCo
   return true;
 }
 
-bool Backends::MpsBackendImpl::runDevicePropagation(const ParameterSnapshot& parameters_, bool needHistograms_) {
+bool Backends::MpsEngineBackendImpl::runDevicePropagation(const ParameterSnapshot& parameters_, bool needHistograms_) {
   if( not isDeviceModelSupported ){ return false; }
   updateDeviceParameters(parameters_);
 
@@ -250,7 +250,7 @@ bool Backends::MpsBackendImpl::runDevicePropagation(const ParameterSnapshot& par
   return true;
 }
 
-void Backends::MpsBackendImpl::copyDeviceEventWeightsToHostResult() {
+void Backends::MpsEngineBackendImpl::copyDeviceEventWeightsToHostResult() {
   LogThrowIf(eventWeightsBuffer == nil);
   auto start = std::chrono::steady_clock::now();
   id<MTLCommandBuffer> commandBuffer = [commandQueue commandBuffer];
@@ -272,7 +272,7 @@ void Backends::MpsBackendImpl::copyDeviceEventWeightsToHostResult() {
   lastTiming.eventWeightReadbackSeconds += secondsSince(start);
 }
 
-bool Backends::MpsBackendImpl::calculateHistogramsOnDevice() {
+bool Backends::MpsEngineBackendImpl::calculateHistogramsOnDevice() {
   if( not isAvailable ){ return false; }
   if( model.totalBins <= 0 ){ return false; }
   if( model.events.empty() ){
@@ -353,7 +353,7 @@ bool Backends::MpsBackendImpl::calculateHistogramsOnDevice() {
   return ok;
 }
 
-void Backends::MpsBackendImpl::calculateLikelihood() {
+void Backends::MpsEngineBackendImpl::calculateLikelihood() {
   auto start = std::chrono::steady_clock::now();
   lastResult.likelihood = Semantics::calculateLikelihood(
       likelihoodModel,
@@ -363,7 +363,7 @@ void Backends::MpsBackendImpl::calculateLikelihood() {
   lastTiming.likelihoodHostSeconds += secondsSince(start);
 }
 
-void Backends::MpsBackendImpl::materializeEventWeights() {
+void Backends::MpsEngineBackendImpl::materializeEventWeights() {
   auto start = std::chrono::steady_clock::now();
   if( lastResult.eventWeights.empty() and eventWeightsBuffer != nil ){
     copyDeviceEventWeightsToHostResult();
@@ -372,7 +372,7 @@ void Backends::MpsBackendImpl::materializeEventWeights() {
   lastTiming.eventWeightMaterializationSeconds += secondsSince(start);
 }
 
-void Backends::MpsBackendImpl::materializeHistograms() {
+void Backends::MpsEngineBackendImpl::materializeHistograms() {
   auto start = std::chrono::steady_clock::now();
   LogThrowIf(lastResult.histSums.size() != std::size_t(model.totalBins));
   LogThrowIf(lastResult.histSumSquares.size() != std::size_t(model.totalBins));

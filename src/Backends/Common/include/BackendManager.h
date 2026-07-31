@@ -3,7 +3,7 @@
 
 #include "EngineLayout.h"
 #include "BackendFactory.h"
-#include "IPropagationBackend.h"
+#include "EngineBackend.h"
 
 #include "ConfigUtils.h"
 
@@ -41,8 +41,8 @@ namespace Backends {
     [[nodiscard]] const std::vector<OutputRequest>& getMaterializeOutputList() const { return _materializeOutputList_; }
     [[nodiscard]] bool willAutoMaterialize(OutputRequest outputRequest_) const;
     [[nodiscard]] bool hasBackend() const { return _backend_ != nullptr; }
-    [[nodiscard]] IPropagationBackend* getBackend() { return _backend_.get(); }
-    [[nodiscard]] const IPropagationBackend* getBackend() const { return _backend_.get(); }
+    [[nodiscard]] EngineBackend* getBackend() { return _backend_.get(); }
+    [[nodiscard]] const EngineBackend* getBackend() const { return _backend_.get(); }
 
     void setEnableAutoMaterialize(bool enableAutoMaterialize_){ _enableAutoMaterialize_ = enableAutoMaterialize_; }
     void setMaterializeOutputList(const std::vector<OutputRequest>& materializeOutputList_){ _materializeOutputList_ = materializeOutputList_; }
@@ -67,7 +67,7 @@ namespace Backends {
     };
     LikelihoodInterface* _likelihoodInterfacePtr_{nullptr};
     EngineLayout _backendEngineLayout_{};
-    std::unique_ptr<IPropagationBackend> _backend_{nullptr};
+    std::unique_ptr<EngineBackend> _backend_{nullptr};
     PropagationToken _lastPropagationToken_{};
   };
 

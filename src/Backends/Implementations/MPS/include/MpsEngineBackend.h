@@ -3,7 +3,7 @@
 
 #include "EngineView.h"
 #include "BackendTypes.h"
-#include "IPropagationBackend.h"
+#include "EngineBackend.h"
 #include "ParameterSnapshot.h"
 
 #include <memory>
@@ -13,10 +13,10 @@ namespace Backends {
 
   struct MpsBackendImpl;
 
-  class MpsBackend : public IPropagationBackend {
+  class MpsEngineBackend : public EngineBackend {
   public:
-    MpsBackend();
-    ~MpsBackend() override;
+    MpsEngineBackend();
+    ~MpsEngineBackend() override;
 
     [[nodiscard]] std::string getName() const override { return "MPS"; }
     [[nodiscard]] BackendCapabilities getCapabilities() const override;

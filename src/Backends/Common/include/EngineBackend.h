@@ -9,9 +9,9 @@
 
 namespace Backends {
 
-  class IPropagationBackend {
+  class EngineBackend {
   public:
-    virtual ~IPropagationBackend() = default;
+    virtual ~EngineBackend() = default;
 
     [[nodiscard]] virtual std::string getName() const = 0;
     [[nodiscard]] virtual BackendCapabilities getCapabilities() const = 0;
