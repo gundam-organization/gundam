@@ -45,7 +45,7 @@ namespace {
 
     propagation.events.reserve(eventDialCache.getCache().size());
     std::unordered_map<const Parameter*, std::size_t> parameterIndexMap{};
-    std::unordered_map<const DialInterface*, Backends::BackendDialView> dialDescriptorMap{};
+    std::unordered_map<const DialInterface*, Backends::BackendDialDescriptor> dialDescriptorMap{};
 
     for( const auto& cacheEntry : eventDialCache.getCache() ){
       if( cacheEntry.event == nullptr ){ continue; }
@@ -55,9 +55,9 @@ namespace {
       eventRef.sampleIndex = cacheEntry.event->getIndices().sample;
       eventRef.binIndex = cacheEntry.event->getIndices().bin;
       eventRef.globalBinIndex = sampleBinOffsetMap.at(eventRef.sampleIndex) + eventRef.binIndex;
-      eventRef.baseWeight = cacheEntry.event->getWeights().base;
-      eventRef.firstDial = propagation.eventDials.size();
-      eventRef.dialCount = cacheEntry.dialResponseCacheList.size();
+      eventRef.weight.baseWeight = cacheEntry.event->getWeights().base;
+      eventRef.weight.firstDial = propagation.eventDials.size();
+      eventRef.weight.dialCount = cacheEntry.dialResponseCacheList.size();
       eventRef.resultIndex = propagation.events.size();
 
       for( const auto& dialResponse : cacheEntry.dialResponseCacheList ){
@@ -69,7 +69,7 @@ namespace {
           continue;
         }
 
-        Backends::BackendDialView dialRef;
+        Backends::BackendDialDescriptor dialRef;
         const auto* dialBase = interface->getDialBaseRef();
         LogThrowIf(dialBase == nullptr, "Null DialBase while building BackendEngineView.");
         const auto* inputBuffer = interface->getInputBufferRef();
@@ -138,7 +138,7 @@ namespace {
             parameterIndexIt = parameterIndexMap.emplace(parPtr, parameterIndexMap.size()).first;
           }
 
-          Backends::BackendDialInputView inputRef;
+          Backends::BackendDialInputDescriptor inputRef;
           inputRef.parameterIndex = parameterIndexIt->second;
           const auto& mirrorEdges = inputBuffer->getMirrorEdges(iInput);
           inputRef.useMirror = not std::isnan(mirrorEdges.minValue);

@@ -46,6 +46,7 @@ endif()
 set(HEADERS
     ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/BackendsManager.h
     ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/BackendEngineBindings.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/BackendEngineDescriptors.h
     ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/BackendEngineLayout.h
     ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/BackendFactory.h
     ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/BackendEngineView.h

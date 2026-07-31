@@ -85,7 +85,7 @@ bool Backends::MpsBackendImpl::buildDeviceModel() {
   graphDialReuseCounts.reserve(model.eventDials.size());
   std::unordered_map<std::size_t, MpsPackedDialRef> packedDialIndexMap{};
   packedDialIndexMap.reserve(model.eventDials.size());
-  std::unordered_map<std::size_t, const BackendDialView*> packedDialDescriptorMap{};
+  std::unordered_map<std::size_t, const BackendDialDescriptor*> packedDialDescriptorMap{};
   packedDialDescriptorMap.reserve(model.eventDials.size());
 
   LogInfo << "MPS backend: first packing pass."
@@ -101,9 +101,9 @@ bool Backends::MpsBackendImpl::buildDeviceModel() {
     if( event.globalBinIndex < 0 or event.globalBinIndex >= model.totalBins ){
       return fail("at least one event has an invalid global bin index.");
     }
-    for( std::size_t iDial = 0 ; iDial < event.dialCount ; iDial++ ){
+    for( std::size_t iDial = 0 ; iDial < event.weight.dialCount ; iDial++ ){
       processedDialRefs++;
-      const auto& eventDial = model.eventDials[event.firstDial + iDial];
+      const auto& eventDial = model.eventDials[event.weight.firstDial + iDial];
       if( eventDial.type == BackendDialType::Shift ){
         shiftCount++;
         continue;
@@ -239,7 +239,7 @@ bool Backends::MpsBackendImpl::buildDeviceModel() {
           << " This phase materializes unique dial descriptors and payloads."
           << std::endl;
   cachedDialCount = 0;
-  auto fillMinMax = [](const BackendDialView& dialRef_, float& minResponse_, float& maxResponse_) {
+  auto fillMinMax = [](const BackendDialDescriptor& dialRef_, float& minResponse_, float& maxResponse_) {
     minResponse_ = -std::numeric_limits<float>::infinity();
     maxResponse_ = std::numeric_limits<float>::infinity();
     if( dialRef_.hasMinResponse ){ minResponse_ = float(dialRef_.minResponse); }
@@ -299,7 +299,7 @@ bool Backends::MpsBackendImpl::buildDeviceModel() {
   processedDialRefs = 0;
   for( std::size_t iEvent = 0 ; iEvent < model.events.size() ; iEvent++ ){
     const auto& event = model.events[iEvent];
-    baseWeights[event.resultIndex] = float(event.baseWeight);
+    baseWeights[event.resultIndex] = float(event.weight.baseWeight);
     globalBins[event.resultIndex] = event.globalBinIndex;
     eventsPerBin[event.globalBinIndex]++;
     auto& eventRanges = eventDialRanges[event.resultIndex];
@@ -309,9 +309,9 @@ bool Backends::MpsBackendImpl::buildDeviceModel() {
     eventRanges.monotonicOffset = uint32_t(monotonicDialIndices.size());
     eventRanges.generalOffset = uint32_t(generalDialIndices.size());
     eventRanges.graphOffset = uint32_t(graphDialIndices.size());
-    for( std::size_t iDial = 0 ; iDial < event.dialCount ; iDial++ ){
+    for( std::size_t iDial = 0 ; iDial < event.weight.dialCount ; iDial++ ){
       processedDialRefs++;
-      const auto& eventDial = model.eventDials[event.firstDial + iDial];
+      const auto& eventDial = model.eventDials[event.weight.firstDial + iDial];
       if( eventDial.type == BackendDialType::Shift ){
         LogThrowIf(eventDial.payloadSize < 1, "Internal MPS packing error: Shift dial payload is empty.");
         baseWeights[event.resultIndex] *= float(model.dialPayloads.at(eventDial.payloadOffset));

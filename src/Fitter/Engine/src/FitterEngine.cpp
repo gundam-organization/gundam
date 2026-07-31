@@ -554,9 +554,21 @@ void FitterEngine::fit(){
       // individual weight
       bool origCopy = Cache::Manager::SetIsEventWeightCopyEnabled( false );
 #endif
+#ifdef GUNDAM_USING_BACKENDS
+      if( _backendsManager_.hasBackend() ){
+        _backendsManager_.setEnableAutoMaterialize(false);
+      }
+#endif
 
       LogInfo << "Computing post-fit errors..." << std::endl;
       _minimizer_->calcErrors();
+
+#ifdef GUNDAM_USING_BACKENDS
+      if( _backendsManager_.hasBackend() ){
+        _backendsManager_.setEnableAutoMaterialize(true);
+      }
+#endif
+      this->evaluateLikelihood();
 
 #ifdef GUNDAM_USING_CACHE_MANAGER
       if( Cache::Manager::IsBuilt() ){

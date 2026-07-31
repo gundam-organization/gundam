@@ -3,6 +3,8 @@
 
 #include "Semantics/BackendSemanticsQualifiers.h"
 
+#include "BackendEngineDescriptors.h"
+
 #include "CalculateCompactSpline.h"
 #include "CalculateGeneralSpline.h"
 #include "CalculateGraph.h"
@@ -15,39 +17,13 @@
 
 namespace Backends::Semantics {
 
-  struct BackendDialInputCore {
-    std::size_t parameterIndex{std::size_t(-1)};
-    bool useMirror{false};
-    double mirrorMin{0};
-    double mirrorRange{0};
-  };
-
-  struct BackendDialCore {
-    std::uint8_t type{0};
-    std::size_t firstInput{0};
-    std::size_t inputCount{0};
-    std::size_t payloadOffset{0};
-    std::size_t payloadSize{0};
-    bool allowExtrapolation{false};
-    double minResponse{0};
-    double maxResponse{0};
-    bool hasMinResponse{false};
-    bool hasMaxResponse{false};
-  };
-
-  struct BackendEventCore {
-    double baseWeight{1};
-    std::size_t firstDial{0};
-    std::size_t dialCount{0};
-  };
-
   GUNDAM_BACKEND_FORCE_INLINE GUNDAM_BACKEND_HOST_DEVICE
   double clampValue(double value_, double low_, double high_) {
     return value_ < low_ ? low_ : (value_ > high_ ? high_ : value_);
   }
 
   GUNDAM_BACKEND_FORCE_INLINE GUNDAM_BACKEND_HOST_DEVICE
-  double transformDialInput(const BackendDialInputCore& inputRef_, double rawValue_) {
+  double transformDialInput(const BackendDialInputDescriptor& inputRef_, double rawValue_) {
     if( not inputRef_.useMirror ){ return rawValue_; }
 
     double transformed = ::fabs(::fmod(
@@ -64,38 +40,38 @@ namespace Backends::Semantics {
   }
 
   GUNDAM_BACKEND_FORCE_INLINE GUNDAM_BACKEND_HOST_DEVICE
-  double clampDialResponse(const BackendDialCore& dialRef_, double response_) {
+  double clampDialResponse(const BackendDialDescriptor& dialRef_, double response_) {
     if( dialRef_.hasMinResponse and response_ < dialRef_.minResponse ){ response_ = dialRef_.minResponse; }
     if( dialRef_.hasMaxResponse and response_ > dialRef_.maxResponse ){ response_ = dialRef_.maxResponse; }
     return response_;
   }
 
   GUNDAM_BACKEND_FORCE_INLINE GUNDAM_BACKEND_HOST_DEVICE
-  double loadParameterValue(const BackendDialInputCore& inputRef_, const double* parameterValues_) {
+  double loadParameterValue(const BackendDialInputDescriptor& inputRef_, const double* parameterValues_) {
     GUNDAM_BACKEND_SEMANTICS_ASSERT(parameterValues_ != nullptr);
     return parameterValues_[inputRef_.parameterIndex];
   }
 
   GUNDAM_BACKEND_FORCE_INLINE GUNDAM_BACKEND_HOST_DEVICE
-  const double* getDialPayload(const double* dialPayloads_, const BackendDialCore& dialRef_) {
+  const double* getDialPayload(const double* dialPayloads_, const BackendDialDescriptor& dialRef_) {
     GUNDAM_BACKEND_SEMANTICS_ASSERT(dialPayloads_ != nullptr or dialRef_.payloadSize == 0);
     return dialPayloads_ + dialRef_.payloadOffset;
   }
 
   GUNDAM_BACKEND_FORCE_INLINE GUNDAM_BACKEND_HOST_DEVICE
-  double evalDialResponseFromInput(const BackendDialCore& dialRef_,
+  double evalDialResponseFromInput(const BackendDialDescriptor& dialRef_,
                                    double inputValue_,
                                    const double* payload_) {
     switch( dialRef_.type ){
-      case 0:
+      case BackendDialType::Norm:
         GUNDAM_BACKEND_SEMANTICS_ASSERT(dialRef_.inputCount == 1);
         return clampDialResponse(dialRef_, inputValue_);
 
-      case 1:
+      case BackendDialType::Shift:
         GUNDAM_BACKEND_SEMANTICS_ASSERT(dialRef_.payloadSize >= 1);
         return clampDialResponse(dialRef_, payload_[0]);
 
-      case 2: {
+      case BackendDialType::CompactSpline: {
         GUNDAM_BACKEND_SEMANTICS_ASSERT(dialRef_.payloadSize >= 3);
         double x = inputValue_;
         if( not dialRef_.allowExtrapolation ){
@@ -104,7 +80,7 @@ namespace Backends::Semantics {
         return clampDialResponse(dialRef_, CalculateCompactSpline(x, -1E20, 1E20, payload_, int(dialRef_.payloadSize - 2)));
       }
 
-      case 3: {
+      case BackendDialType::UniformSpline: {
         GUNDAM_BACKEND_SEMANTICS_ASSERT(dialRef_.payloadSize >= 4);
         double x = inputValue_;
         if( not dialRef_.allowExtrapolation ){
@@ -113,7 +89,7 @@ namespace Backends::Semantics {
         return clampDialResponse(dialRef_, CalculateUniformSpline(x, -1E20, 1E20, payload_, int(dialRef_.payloadSize)));
       }
 
-      case 4: {
+      case BackendDialType::MonotonicSpline: {
         GUNDAM_BACKEND_SEMANTICS_ASSERT(dialRef_.payloadSize >= 3);
         double x = inputValue_;
         if( not dialRef_.allowExtrapolation ){
@@ -122,7 +98,7 @@ namespace Backends::Semantics {
         return clampDialResponse(dialRef_, CalculateMonotonicSpline(x, -1E20, 1E20, payload_, int(dialRef_.payloadSize - 2)));
       }
 
-      case 5: {
+      case BackendDialType::GeneralSpline: {
         GUNDAM_BACKEND_SEMANTICS_ASSERT(dialRef_.payloadSize >= 5);
         double x = inputValue_;
         if( not dialRef_.allowExtrapolation ){
@@ -131,7 +107,7 @@ namespace Backends::Semantics {
         return clampDialResponse(dialRef_, CalculateGeneralSpline(x, -1E20, 1E20, payload_, int(dialRef_.payloadSize)));
       }
 
-      case 6: {
+      case BackendDialType::Graph: {
         GUNDAM_BACKEND_SEMANTICS_ASSERT(dialRef_.payloadSize >= 2);
         double x = inputValue_;
         if( not dialRef_.allowExtrapolation ){
@@ -146,14 +122,14 @@ namespace Backends::Semantics {
   }
 
   GUNDAM_BACKEND_FORCE_INLINE GUNDAM_BACKEND_HOST_DEVICE
-  double evalDialResponse(const BackendDialCore& dialRef_,
-                          const BackendDialInputCore* dialInputs_,
+  double evalDialResponse(const BackendDialDescriptor& dialRef_,
+                          const BackendDialInputDescriptor* dialInputs_,
                           const double* dialPayloads_,
                           const double* parameterValues_) {
     GUNDAM_BACKEND_SEMANTICS_ASSERT(dialInputs_ != nullptr or dialRef_.inputCount == 0);
     const double* payload = getDialPayload(dialPayloads_, dialRef_);
 
-    if( dialRef_.type == 1 ){
+    if( dialRef_.type == BackendDialType::Shift ){
       return evalDialResponseFromInput(dialRef_, 0., payload);
     }
 
@@ -164,9 +140,9 @@ namespace Backends::Semantics {
   }
 
   GUNDAM_BACKEND_FORCE_INLINE GUNDAM_BACKEND_HOST_DEVICE
-  double evalEventWeight(const BackendEventCore& eventRef_,
-                         const BackendDialCore* eventDials_,
-                         const BackendDialInputCore* dialInputs_,
+  double evalEventWeight(const BackendEventWeightDescriptor& eventRef_,
+                         const BackendDialDescriptor* eventDials_,
+                         const BackendDialInputDescriptor* dialInputs_,
                          const double* dialPayloads_,
                          const double* parameterValues_) {
     GUNDAM_BACKEND_SEMANTICS_ASSERT(eventDials_ != nullptr or eventRef_.dialCount == 0);
