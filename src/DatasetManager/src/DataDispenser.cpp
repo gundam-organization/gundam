@@ -1379,7 +1379,6 @@ std::shared_ptr<TChain> DataDispenser::openChain(bool verbose_) const{
       if( friendChain == nullptr ){
         friendChain = std::make_shared<TChain>(friendEntry.name.c_str());
         friendChainList->emplace_back(friendChain);
-        LogExitIf(treeChain->AddFriend(friendChain.get(), friendEntry.name.c_str()) == nullptr, "Could not attach friend TChain: " << friendEntry.name);
       }
       friendChain->AddFile(friendSource.filePath.c_str(), nMaxEntries, friendSource.treePath.c_str());
     }
@@ -1392,6 +1391,17 @@ std::shared_ptr<TChain> DataDispenser::openChain(bool verbose_) const{
         "Friend TChain \"" << friendChain->GetName() << "\" has " << friendChain->GetEntries()
         << " entries while the main TChain has " << treeChain->GetEntries() << ". Friends must be entry-aligned."
     );
+    LogExitIf(
+        treeChain->AddFriend(friendChain.get(), friendChain->GetName()) == nullptr,
+        "Could not attach friend TChain: " << friendChain->GetName()
+    );
+  }
+
+  // ROOT 6.24 connects the current trees of friend TChains lazily. Load the
+  // first entry now so qualified friend expressions are available when a
+  // TreeBuffer/TTreeFormula is initialized immediately after openChain().
+  if( not friendChainList->empty() and treeChain->GetEntries() > 0 ){
+    LogExitIf(treeChain->LoadTree(0) < 0, "Could not load the first entry of the main TChain with its friends.");
   }
 
   return treeChain;
