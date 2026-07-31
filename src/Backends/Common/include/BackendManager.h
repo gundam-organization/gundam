@@ -3,7 +3,7 @@
 
 #include "EngineLayout.h"
 #include "BackendFactory.h"
-#include "BackendRuntimeManager.h"
+#include "IPropagationBackend.h"
 
 #include "ConfigUtils.h"
 
@@ -40,9 +40,9 @@ namespace Backends {
     [[nodiscard]] const std::string& getType() const { return _type_; }
     [[nodiscard]] const std::vector<OutputRequest>& getMaterializeOutputList() const { return _materializeOutputList_; }
     [[nodiscard]] bool willAutoMaterialize(OutputRequest outputRequest_) const;
-    [[nodiscard]] bool hasBackend() const { return _backendRuntimeManager_ != nullptr and _backendRuntimeManager_->hasBackend(); }
-    [[nodiscard]] BackendRuntimeManager* getBackendRuntimeManager() { return _backendRuntimeManager_.get(); }
-    [[nodiscard]] const BackendRuntimeManager* getBackendRuntimeManager() const { return _backendRuntimeManager_.get(); }
+    [[nodiscard]] bool hasBackend() const { return _backend_ != nullptr; }
+    [[nodiscard]] IPropagationBackend* getBackend() { return _backend_.get(); }
+    [[nodiscard]] const IPropagationBackend* getBackend() const { return _backend_.get(); }
 
     void setEnableAutoMaterialize(bool enableAutoMaterialize_){ _enableAutoMaterialize_ = enableAutoMaterialize_; }
     void setMaterializeOutputList(const std::vector<OutputRequest>& materializeOutputList_){ _materializeOutputList_ = materializeOutputList_; }
@@ -67,7 +67,7 @@ namespace Backends {
     };
     LikelihoodInterface* _likelihoodInterfacePtr_{nullptr};
     EngineLayout _backendEngineLayout_{};
-    std::shared_ptr<BackendRuntimeManager> _backendRuntimeManager_{nullptr};
+    std::unique_ptr<IPropagationBackend> _backend_{nullptr};
     PropagationToken _lastPropagationToken_{};
   };
 

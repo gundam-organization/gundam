@@ -350,7 +350,7 @@ void FitterEngine::evaluateLikelihood(){
         getLikelihoodInterface().getBuffer().updateTotal();
         if( GundamGlobals::isDebug() ){
           LogInfo << Backends::formatBackendTimingSummary(
-              _backendsManager_.getBackendRuntimeManager()->getBackend()->getLastTimingSummary()
+              _backendsManager_.getBackend()->getLastTimingSummary()
           ) << std::endl;
         }
         return;

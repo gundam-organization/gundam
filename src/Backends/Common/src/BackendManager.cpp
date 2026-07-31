@@ -69,14 +69,14 @@ void Backends::BackendManager::materialize(OutputRequest outputRequest_) {
   LogThrowIf(not _lastPropagationToken_.isValid, "No backend propagation token available for materialization.");
   LogThrowIf(_likelihoodInterfacePtr_ == nullptr, "BackendsManager requires a LikelihoodInterface for materialization.");
 
-  auto* backend = _backendRuntimeManager_->getBackend();
+  auto* backend = getBackend();
   auto status = backend->getStatus(_lastPropagationToken_);
   auto outputState = status.state(outputRequest_);
   LogThrowIf(outputState != OutputState::ReadyOnDevice and outputState != OutputState::ReadyOnHost,
              "Requested backend output is not ready for materialization: " << outputRequest_.toString());
 
   if( outputState == OutputState::ReadyOnDevice ){
-    _backendRuntimeManager_->materialize(_lastPropagationToken_, outputRequest_);
+    backend->materialize(_lastPropagationToken_, outputRequest_);
     status = backend->getStatus(_lastPropagationToken_);
     outputState = status.state(outputRequest_);
     LogThrowIf(outputState != OutputState::ReadyOnHost and outputState != OutputState::ReadyOnDevice,
@@ -146,7 +146,7 @@ void Backends::BackendManager::materialize(OutputRequest outputRequest_) {
 
 void Backends::BackendManager::initializeImpl() {
   if( not _isEnabled_ ){
-    _backendRuntimeManager_ = nullptr;
+    _backend_ = nullptr;
     return;
   }
   LogThrowIf(_likelihoodInterfacePtr_ == nullptr, "BackendsManager requires a LikelihoodInterface before initialize().");
@@ -162,9 +162,9 @@ void Backends::BackendManager::initializeImpl() {
             << GenericToolbox::toString(_materializeOutputList_) << std::endl;
   }
 
-  _backendRuntimeManager_ = std::make_shared<BackendRuntimeManager>();
-  _backendRuntimeManager_->setBackend(makeBackend(*this));
-  _backendRuntimeManager_->build(_backendEngineLayout_.view);
+  _backend_ = makeBackend(*this);
+  LogThrowIf(_backend_ == nullptr, "Could not create propagation backend.");
+  _backend_->build(_backendEngineLayout_.view);
 }
 
 std::future<Backends::BackendPropagationResult> Backends::BackendManager::propagate() {
@@ -177,7 +177,7 @@ std::future<Backends::BackendPropagationResult> Backends::BackendManager::propag
     snapshot.values.emplace_back(binding.parameter->getParameterValue());
   }
 
-  auto token = _backendRuntimeManager_->requestPropagation(snapshot);
+  auto token = _backend_->requestPropagation(snapshot);
   _lastPropagationToken_ = token;
   if( not token.isValid ){
     return std::async(std::launch::deferred, []{
@@ -187,10 +187,10 @@ std::future<Backends::BackendPropagationResult> Backends::BackendManager::propag
 
   return std::async(std::launch::deferred, [this, token]{
     BackendPropagationResult result;
-    auto* backendRuntimeManager = getBackendRuntimeManager();
-    backendRuntimeManager->wait(token);
+    auto* backend = getBackend();
+    backend->wait(token);
 
-    auto status = backendRuntimeManager->getBackend()->getStatus(token);
+    auto status = backend->getStatus(token);
     for( auto outputRequest : {OutputRequest::EventWeights, OutputRequest::Histograms, OutputRequest::SampleLikelihoods, OutputRequest::StatLikelihood} ){
       auto outputState = status.state(outputRequest);
       if( outputState == OutputState::Failed ){ continue; }
@@ -200,7 +200,7 @@ std::future<Backends::BackendPropagationResult> Backends::BackendManager::propag
 
       result.isValid = true;
       if( outputRequest == OutputRequest::StatLikelihood ){
-        result.statLikelihood = backendRuntimeManager->getBackend()->getLikelihood(token);
+        result.statLikelihood = backend->getLikelihood(token);
         result.hasStatLikelihood = true;
       }
 
