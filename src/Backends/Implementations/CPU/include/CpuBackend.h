@@ -5,6 +5,7 @@
 #include "BackendTypes.h"
 #include "Backend.h"
 #include "ParameterSnapshot.h"
+#include "GenericToolbox.Thread.h"
 
 #include <cstdint>
 #include <vector>
@@ -42,14 +43,22 @@ namespace Backends {
     };
 
     [[nodiscard]] bool isCurrentToken(const PropagationToken& token_) const;
+    void initializeThreads();
     void resetResult();
     void calculateEventWeights(Result& result_, const ParameterSnapshot& parameters_);
+    void calculateEventWeightsThread(int iThread_);
     void calculateHistograms(Result& result_);
+    void calculateHistogramsThread(int iThread_);
     void calculateHistogramsFromEvents(Result& result_, const ParameterSnapshot& parameters_);
     void calculateLikelihood(Result& result_);
 
     EngineView _engineView_{};
     Result _lastResult_{};
+    GenericToolbox::ParallelWorker _threadPool_{};
+    Result* _activeResult_{nullptr};
+    const ParameterSnapshot* _activeParameters_{nullptr};
+    std::vector<std::vector<double>> _threadHistogramSums_{};
+    std::vector<std::vector<double>> _threadHistogramSumSquares_{};
     std::uint64_t _nextTokenId_{1};
     bool _isBuilt_{false};
   };

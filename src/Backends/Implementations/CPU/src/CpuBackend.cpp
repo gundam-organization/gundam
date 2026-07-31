@@ -1,7 +1,10 @@
 #include "CpuBackend.h"
 
 #include "Semantics/BackendHostPropagation.h"
+#include "GundamGlobals.h"
 #include "Logger.h"
+
+#include <algorithm>
 
 Backends::BackendCapabilities Backends::CpuBackend::getCapabilities() const {
   BackendCapabilities out;
@@ -16,6 +19,7 @@ Backends::BackendCapabilities Backends::CpuBackend::getCapabilities() const {
 void Backends::CpuBackend::build(const EngineView& engineView_) {
   _engineView_ = engineView_;
   _lastResult_ = Result();
+  initializeThreads();
   _isBuilt_ = true;
 }
 
@@ -115,6 +119,21 @@ bool Backends::CpuBackend::isCurrentToken(const PropagationToken& token_) const 
   return token_.isValid and _lastResult_.token.isValid and token_.id == _lastResult_.token.id;
 }
 
+void Backends::CpuBackend::initializeThreads() {
+  if( _threadPool_.getJobPtr("CpuBackend::calculateEventWeights") != nullptr ){ return; }
+
+  _threadPool_.setNThreads(std::max(1, GundamGlobals::getNbCpuThreads()));
+  _threadPool_.setCpuTimeSaverIsEnabled(false);
+  _threadPool_.addJob(
+      "CpuBackend::calculateEventWeights",
+      [this](int iThread_){ calculateEventWeightsThread(iThread_); }
+  );
+  _threadPool_.addJob(
+      "CpuBackend::calculateHistograms",
+      [this](int iThread_){ calculateHistogramsThread(iThread_); }
+  );
+}
+
 void Backends::CpuBackend::resetResult() {
   _lastResult_.token.id = _nextTokenId_++;
   _lastResult_.token.isValid = true;
@@ -131,17 +150,67 @@ void Backends::CpuBackend::resetResult() {
 }
 
 void Backends::CpuBackend::calculateEventWeights(Result& result_, const ParameterSnapshot& parameters_) {
-  Semantics::calculateEventWeights(result_.eventWeights, _engineView_.propagation, parameters_);
+  const auto& propagation = _engineView_.propagation;
+  result_.eventWeights.resize(propagation.events.size());
+  _activeResult_ = &result_;
+  _activeParameters_ = &parameters_;
+  _threadPool_.runJob("CpuBackend::calculateEventWeights");
+  _activeParameters_ = nullptr;
+  _activeResult_ = nullptr;
+}
+
+void Backends::CpuBackend::calculateEventWeightsThread(int iThread_) {
+  const auto& propagation = _engineView_.propagation;
+  const auto bounds = GenericToolbox::ParallelWorker::getThreadBoundIndices(
+      iThread_, _threadPool_.getNbThreads(), propagation.events.size()
+  );
+  for( std::size_t iEvent = bounds.beginIndex ; iEvent < bounds.endIndex ; iEvent++ ){
+    const auto& event = propagation.events[iEvent];
+    _activeResult_->eventWeights[event.resultIndex] = Semantics::evalEventWeight(
+        propagation, event, *_activeParameters_
+    );
+  }
 }
 
 void Backends::CpuBackend::calculateHistograms(Result& result_) {
   LogThrowIf(result_.eventWeights.empty(), "CPU backend histogram build requires event weights.");
-  Semantics::calculateHistogramsFromEventWeights(
-      result_.histSums,
-      result_.histSumSquares,
-      _engineView_.propagation,
-      result_.eventWeights
+  const auto& propagation = _engineView_.propagation;
+  const int nThreads = _threadPool_.getNbThreads();
+  _threadHistogramSums_.resize(nThreads);
+  _threadHistogramSumSquares_.resize(nThreads);
+  for( int iThread = 0 ; iThread < nThreads ; iThread++ ){
+    _threadHistogramSums_[iThread].assign(propagation.totalBins, 0.);
+    _threadHistogramSumSquares_[iThread].assign(propagation.totalBins, 0.);
+  }
+
+  result_.histSums.assign(propagation.totalBins, 0.);
+  result_.histSumSquares.assign(propagation.totalBins, 0.);
+  _activeResult_ = &result_;
+  _threadPool_.runJob("CpuBackend::calculateHistograms");
+  _activeResult_ = nullptr;
+
+  for( int iBin = 0 ; iBin < propagation.totalBins ; iBin++ ){
+    for( int iThread = 0 ; iThread < nThreads ; iThread++ ){
+      result_.histSums[iBin] += _threadHistogramSums_[iThread][iBin];
+      result_.histSumSquares[iBin] += _threadHistogramSumSquares_[iThread][iBin];
+    }
+  }
+}
+
+void Backends::CpuBackend::calculateHistogramsThread(int iThread_) {
+  const auto& propagation = _engineView_.propagation;
+  const auto bounds = GenericToolbox::ParallelWorker::getThreadBoundIndices(
+      iThread_, _threadPool_.getNbThreads(), propagation.events.size()
   );
+  auto& histSums = _threadHistogramSums_[iThread_];
+  auto& histSumSquares = _threadHistogramSumSquares_[iThread_];
+  for( std::size_t iEvent = bounds.beginIndex ; iEvent < bounds.endIndex ; iEvent++ ){
+    const auto& event = propagation.events[iEvent];
+    if( event.globalBinIndex < 0 ){ continue; }
+    const double weight = _activeResult_->eventWeights[event.resultIndex];
+    histSums[event.globalBinIndex] += weight;
+    histSumSquares[event.globalBinIndex] += weight * weight;
+  }
 }
 
 void Backends::CpuBackend::calculateHistogramsFromEvents(Result& result_, const ParameterSnapshot& parameters_) {
