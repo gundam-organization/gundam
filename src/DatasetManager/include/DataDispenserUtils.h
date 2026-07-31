@@ -40,10 +40,12 @@ struct DataDispenserParameters{
     struct FriendTree{
       std::string name{}; // ROOT friend alias
       std::string path{}; // ROOT file path, optionally followed by :tree/path
+      bool isEnabled{true};
     };
 
     std::string name{}; // config-list identifier, used by the override mechanism
     std::string path{}; // ROOT file path, optionally followed by :tree/path
+    bool isEnabled{true};
     std::vector<FriendTree> friendList{};
   };
   std::vector<FilePathEntry> filePathList{};
