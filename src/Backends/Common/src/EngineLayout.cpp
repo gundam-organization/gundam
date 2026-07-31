@@ -1,4 +1,4 @@
-#include "BackendEngineLayout.h"
+#include "EngineLayout.h"
 
 #include "CompactSpline.h"
 #include "DialResponseSupervisor.h"
@@ -21,7 +21,7 @@
 #include <utility>
 
 namespace {
-  void buildBackendEngineView(Backends::BackendEngineView& view_, LikelihoodInterface& likelihoodInterface_) {
+  void buildEngineView(Backends::EngineView& view_, LikelihoodInterface& likelihoodInterface_) {
     auto& propagation = view_.propagation;
     auto& likelihood = view_.likelihood;
 
@@ -62,7 +62,7 @@ namespace {
 
       for( const auto& dialResponse : cacheEntry.dialResponseCacheList ){
         const auto* interface = dialResponse.dialInterface;
-        LogThrowIf(interface == nullptr, "Null DialInterface while building BackendEngineView.");
+        LogThrowIf(interface == nullptr, "Null DialInterface while building EngineView.");
         auto cachedDescriptorIt = dialDescriptorMap.find(interface);
         if( cachedDescriptorIt != dialDescriptorMap.end() ){
           propagation.eventDials.emplace_back(cachedDescriptorIt->second);
@@ -71,7 +71,7 @@ namespace {
 
         Backends::BackendDialDescriptor dialRef;
         const auto* dialBase = interface->getDialBaseRef();
-        LogThrowIf(dialBase == nullptr, "Null DialBase while building BackendEngineView.");
+        LogThrowIf(dialBase == nullptr, "Null DialBase while building EngineView.");
         const auto* inputBuffer = interface->getInputBufferRef();
         dialRef.firstInput = propagation.dialInputs.size();
         dialRef.inputCount = inputBuffer == nullptr ? 0 : std::size_t(inputBuffer->getBufferSize());
@@ -122,7 +122,7 @@ namespace {
           propagation.dialPayloads.insert(propagation.dialPayloads.end(), data.begin(), data.end());
         }
         else{
-          LogThrow("Unsupported dial type for BackendEngineView: " << dialBase->getDialTypeName());
+          LogThrow("Unsupported dial type for EngineView: " << dialBase->getDialTypeName());
         }
 
         dialRef.payloadSize = propagation.dialPayloads.size() - dialRef.payloadOffset;
@@ -182,13 +182,13 @@ namespace {
   }
 }
 
-void Backends::BackendEngineLayout::clear() {
+void Backends::EngineLayout::clear() {
   view.clear();
   bindings.clear();
 }
 
-void Backends::BackendEngineLayout::build(LikelihoodInterface& likelihoodInterface_) {
+void Backends::EngineLayout::build(LikelihoodInterface& likelihoodInterface_) {
   clear();
-  buildBackendEngineView(view, likelihoodInterface_);
+  buildEngineView(view, likelihoodInterface_);
   bindings.build(likelihoodInterface_);
 }

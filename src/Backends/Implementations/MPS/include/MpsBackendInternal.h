@@ -3,7 +3,7 @@
 
 #include "MpsBackend.h"
 
-#include "BackendEngineView.h"
+#include "EngineView.h"
 #include "BackendTypes.h"
 #include "MpsBackendKernelSource.h"
 #include "ParameterSnapshot.h"
@@ -96,7 +96,7 @@ namespace Backends {
     id<MTLBuffer> maxHistogramChunksPerBinBuffer{nil};
     id<MTLBuffer> histogramChunkSizeBuffer{nil};
 
-    BackendEngineView engineView{};
+    EngineView engineView{};
     BackendPropagationView& model;
     BackendLikelihoodView& likelihoodModel;
     Result lastResult{};

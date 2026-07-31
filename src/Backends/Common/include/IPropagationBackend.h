@@ -1,7 +1,7 @@
 #ifndef GUNDAM_I_PROPAGATION_BACKEND_H
 #define GUNDAM_I_PROPAGATION_BACKEND_H
 
-#include "BackendEngineView.h"
+#include "EngineView.h"
 #include "BackendTypes.h"
 #include "ParameterSnapshot.h"
 
@@ -16,9 +16,9 @@ namespace Backends {
     [[nodiscard]] virtual std::string getName() const = 0;
     [[nodiscard]] virtual BackendCapabilities getCapabilities() const = 0;
     [[nodiscard]] virtual PropagationStatus getStatus(const PropagationToken& token_) const = 0;
-    [[nodiscard]] virtual const BackendEngineView& getEngineView() const = 0;
+    [[nodiscard]] virtual const EngineView& getEngineView() const = 0;
 
-    virtual void build(const BackendEngineView& engineView_) = 0;
+    virtual void build(const EngineView& engineView_) = 0;
     virtual PropagationToken requestPropagation(const ParameterSnapshot& parameters_) = 0;
 
     virtual bool isReady(const PropagationToken& token_) const = 0;

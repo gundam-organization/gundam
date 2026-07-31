@@ -1,7 +1,7 @@
 #ifndef GUNDAM_BACKEND_RUNTIME_MANAGER_H
 #define GUNDAM_BACKEND_RUNTIME_MANAGER_H
 
-#include "BackendEngineView.h"
+#include "EngineView.h"
 #include "BackendTypes.h"
 #include "IPropagationBackend.h"
 #include "ParameterSnapshot.h"
@@ -19,7 +19,7 @@ namespace Backends {
     [[nodiscard]] IPropagationBackend* getBackend() { return _backend_.get(); }
     [[nodiscard]] const IPropagationBackend* getBackend() const { return _backend_.get(); }
 
-    void build(const BackendEngineView& engineView_);
+    void build(const EngineView& engineView_);
     PropagationToken requestPropagation(const ParameterSnapshot& parameters_);
     void wait(const PropagationToken& token_);
     void materialize(const PropagationToken& token_, OutputRequest output_);

@@ -13,7 +13,7 @@ Backends::BackendCapabilities Backends::CpuBackend::getCapabilities() const {
   return out;
 }
 
-void Backends::CpuBackend::build(const BackendEngineView& engineView_) {
+void Backends::CpuBackend::build(const EngineView& engineView_) {
   _engineView_ = engineView_;
   _lastResult_ = Result();
   _isBuilt_ = true;

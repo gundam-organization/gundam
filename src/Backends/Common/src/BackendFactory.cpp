@@ -1,12 +1,12 @@
 #include "BackendFactory.h"
 
-#include "BackendsManager.h"
+#include "BackendManager.h"
 #include "CpuBackend.h"
 #include "MpsBackend.h"
 
 #include "Logger.h"
 
-std::unique_ptr<Backends::IPropagationBackend> Backends::makeBackend(const BackendsManager& config_) {
+std::unique_ptr<Backends::IPropagationBackend> Backends::makeBackend(const BackendManager& config_) {
   if( config_.getType() == "CPU" or config_.getType() == "cpu" ){
     return std::make_unique<CpuBackend>();
   }

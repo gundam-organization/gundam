@@ -1,11 +1,11 @@
 set(LIB_NAME GundamBackends)
 
 set(SRCFILES
-    ${CMAKE_CURRENT_SOURCE_DIR}/Common/src/BackendEngineBindings.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/Common/src/BackendEngineLayout.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/Common/src/EngineBindings.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/Common/src/EngineLayout.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/Common/src/BackendFactory.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/Common/src/BackendRuntimeManager.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/Common/src/BackendsManager.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/Common/src/BackendManager.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/Common/src/BackendTypes.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/CPU/src/CpuBackend.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/MPS/src/MpsBackendImpl.mm
@@ -49,7 +49,7 @@ set(HEADERS
     ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/BackendEngineDescriptors.h
     ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/BackendEngineLayout.h
     ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/BackendFactory.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/BackendEngineView.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/EngineView.h
     ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/BackendRuntimeManager.h
     ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/BackendTypes.h
     ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/IPropagationBackend.h

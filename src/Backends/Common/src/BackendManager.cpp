@@ -1,4 +1,4 @@
-#include "BackendsManager.h"
+#include "BackendManager.h"
 
 #include "LikelihoodInterface.h"
 #include "Logger.h"
@@ -41,7 +41,7 @@ std::string Backends::formatBackendTimingSummary(const BackendTimingSummary& tim
   return ss.str();
 }
 
-void Backends::BackendsManager::configureImpl() {
+void Backends::BackendManager::configureImpl() {
   _config_.defineFields({
     {"isEnabled"},
     {"type"},
@@ -52,19 +52,19 @@ void Backends::BackendsManager::configureImpl() {
   _config_.printUnusedKeys();
 }
 
-bool Backends::BackendsManager::shouldMaterialize(OutputRequest outputRequest_) const {
+bool Backends::BackendManager::shouldMaterialize(OutputRequest outputRequest_) const {
   return std::find(_materializeOutputList_.begin(), _materializeOutputList_.end(), outputRequest_) != _materializeOutputList_.end();
 }
 
-bool Backends::BackendsManager::willAutoMaterialize(OutputRequest outputRequest_) const {
+bool Backends::BackendManager::willAutoMaterialize(OutputRequest outputRequest_) const {
   return _enableAutoMaterialize_ and shouldMaterialize(outputRequest_);
 }
 
-void Backends::BackendsManager::setMaterializeOutputList(std::initializer_list<OutputRequest> materializeOutputList_) {
+void Backends::BackendManager::setMaterializeOutputList(std::initializer_list<OutputRequest> materializeOutputList_) {
   setMaterializeOutputList(std::vector<OutputRequest>(materializeOutputList_));
 }
 
-void Backends::BackendsManager::materialize(OutputRequest outputRequest_) {
+void Backends::BackendManager::materialize(OutputRequest outputRequest_) {
   LogThrowIf(not hasBackend(), "No backend initialized.");
   LogThrowIf(not _lastPropagationToken_.isValid, "No backend propagation token available for materialization.");
   LogThrowIf(_likelihoodInterfacePtr_ == nullptr, "BackendsManager requires a LikelihoodInterface for materialization.");
@@ -144,7 +144,7 @@ void Backends::BackendsManager::materialize(OutputRequest outputRequest_) {
   LogThrow("Unhandled OutputRequest in BackendsManager::materialize: " << outputRequest_.toString());
 }
 
-void Backends::BackendsManager::initializeImpl() {
+void Backends::BackendManager::initializeImpl() {
   if( not _isEnabled_ ){
     _backendRuntimeManager_ = nullptr;
     return;
@@ -167,7 +167,7 @@ void Backends::BackendsManager::initializeImpl() {
   _backendRuntimeManager_->build(_backendEngineLayout_.view);
 }
 
-std::future<Backends::BackendPropagationResult> Backends::BackendsManager::propagate() {
+std::future<Backends::BackendPropagationResult> Backends::BackendManager::propagate() {
   LogThrowIf(not hasBackend(), "No backend initialized.");
 
   Backends::ParameterSnapshot snapshot;

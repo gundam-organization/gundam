@@ -11,7 +11,7 @@
 #include "MinimizerBase.h"
 #include "GundamApp.h"
 #ifdef GUNDAM_USING_BACKENDS
-#include "BackendsManager.h"
+#include "BackendManager.h"
 #endif
 
 
@@ -89,8 +89,8 @@ public:
   bool& getGenerateSamplePlots(){ return _generateSamplePlots_; }
   bool& getDoAllParamVariations(){ return _doAllParamVariations_; }
 #ifdef GUNDAM_USING_BACKENDS
-  Backends::BackendsManager& getBackendsManager(){ return _backendsManager_; }
-  [[nodiscard]] const Backends::BackendsManager& getBackendsManager() const { return _backendsManager_; }
+  Backends::BackendManager& getBackendsManager(){ return _backendsManager_; }
+  [[nodiscard]] const Backends::BackendManager& getBackendsManager() const { return _backendsManager_; }
 #endif
 
   // Core
@@ -130,7 +130,7 @@ private:
   LikelihoodInterface _likelihoodInterface_{};
   ParameterScanner _parameterScanner_{};
 #ifdef GUNDAM_USING_BACKENDS
-  Backends::BackendsManager _backendsManager_{};
+  Backends::BackendManager _backendsManager_{};
 #endif
   MinimizerType _minimizerType_{};
   std::unique_ptr<MinimizerBase> _minimizer_{}; // a virtual class in charge of driving the LikelihoodInterface

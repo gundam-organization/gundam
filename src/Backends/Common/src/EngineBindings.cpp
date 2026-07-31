@@ -1,4 +1,4 @@
-#include "BackendEngineBindings.h"
+#include "EngineBindings.h"
 
 #include "DialInterface.h"
 #include "EventDialCache.h"
@@ -18,14 +18,14 @@ namespace {
   }
 }
 
-void Backends::BackendEngineBindings::clear() {
+void Backends::EngineBindings::clear() {
   events.clear();
   eventDials.clear();
   samples.clear();
   parameters.clear();
 }
 
-void Backends::BackendEngineBindings::build(LikelihoodInterface& likelihoodInterface_) {
+void Backends::EngineBindings::build(LikelihoodInterface& likelihoodInterface_) {
   clear();
 
   auto& sampleSet = const_cast<Propagator&>(likelihoodInterface_.getModelPropagator()).getSampleSet();

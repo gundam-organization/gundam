@@ -16,7 +16,7 @@ Backends::BackendCapabilities Backends::MpsBackend::getCapabilities() const {
   return out;
 }
 
-void Backends::MpsBackend::build(const BackendEngineView& engineView_) {
+void Backends::MpsBackend::build(const EngineView& engineView_) {
   _impl_->engineView = engineView_;
   _impl_->lastResult = MpsBackendImpl::Result();
   if( not _impl_->buildDeviceModel() ){
@@ -96,7 +96,7 @@ Backends::PropagationStatus Backends::MpsBackend::getStatus(const PropagationTok
   return _impl_->lastResult.status;
 }
 
-const Backends::BackendEngineView& Backends::MpsBackend::getEngineView() const {
+const Backends::EngineView& Backends::MpsBackend::getEngineView() const {
   return _impl_->engineView;
 }
 

@@ -1,16 +1,16 @@
 #ifndef GUNDAM_BACKEND_ENGINE_LAYOUT_H
 #define GUNDAM_BACKEND_ENGINE_LAYOUT_H
 
-#include "BackendEngineBindings.h"
-#include "BackendEngineView.h"
+#include "EngineBindings.h"
+#include "EngineView.h"
 
 class LikelihoodInterface;
 
 namespace Backends {
 
-  struct BackendEngineLayout {
-    BackendEngineView view{};
-    BackendEngineBindings bindings{};
+  struct EngineLayout {
+    EngineView view{};
+    EngineBindings bindings{};
 
     void clear();
     void build(LikelihoodInterface& likelihoodInterface_);

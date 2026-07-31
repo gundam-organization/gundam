@@ -1,7 +1,7 @@
 #ifndef GUNDAM_BACKEND_MODEL_H
 #define GUNDAM_BACKEND_MODEL_H
 
-#include "BackendEngineDescriptors.h"
+#include "EngineDescriptors.h"
 
 #include <functional>
 #include <vector>
@@ -59,7 +59,7 @@ namespace Backends {
     [[nodiscard]] bool empty() const { return samples.empty(); }
   };
 
-  struct BackendEngineView {
+  struct EngineView {
     BackendPropagationView propagation{};
     BackendLikelihoodView likelihood{};
 

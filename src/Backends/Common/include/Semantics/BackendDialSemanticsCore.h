@@ -3,7 +3,7 @@
 
 #include "Semantics/BackendSemanticsQualifiers.h"
 
-#include "BackendEngineDescriptors.h"
+#include "EngineDescriptors.h"
 
 #include "CalculateCompactSpline.h"
 #include "CalculateGeneralSpline.h"

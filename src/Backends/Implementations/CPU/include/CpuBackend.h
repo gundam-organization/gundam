@@ -1,7 +1,7 @@
 #ifndef GUNDAM_CPU_BACKEND_H
 #define GUNDAM_CPU_BACKEND_H
 
-#include "BackendEngineView.h"
+#include "EngineView.h"
 #include "BackendTypes.h"
 #include "IPropagationBackend.h"
 #include "ParameterSnapshot.h"
@@ -18,9 +18,9 @@ namespace Backends {
     [[nodiscard]] std::string getName() const override { return "CPU"; }
     [[nodiscard]] BackendCapabilities getCapabilities() const override;
     [[nodiscard]] PropagationStatus getStatus(const PropagationToken& token_) const override;
-    [[nodiscard]] const BackendEngineView& getEngineView() const override { return _engineView_; }
+    [[nodiscard]] const EngineView& getEngineView() const override { return _engineView_; }
 
-    void build(const BackendEngineView& engineView_) override;
+    void build(const EngineView& engineView_) override;
     PropagationToken requestPropagation(const ParameterSnapshot& parameters_) override;
 
     bool isReady(const PropagationToken& token_) const override;
@@ -48,7 +48,7 @@ namespace Backends {
     void calculateHistogramsFromEvents(Result& result_, const ParameterSnapshot& parameters_);
     void calculateLikelihood(Result& result_);
 
-    BackendEngineView _engineView_{};
+    EngineView _engineView_{};
     Result _lastResult_{};
     std::uint64_t _nextTokenId_{1};
     bool _isBuilt_{false};

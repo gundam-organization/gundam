@@ -28,7 +28,7 @@ namespace Backends {
     Parameter* parameter{nullptr};
   };
 
-  struct BackendEngineBindings {
+  struct EngineBindings {
     std::vector<BackendEventBinding> events{};
     std::vector<BackendDialBinding> eventDials{};
     std::vector<BackendSampleBinding> samples{};

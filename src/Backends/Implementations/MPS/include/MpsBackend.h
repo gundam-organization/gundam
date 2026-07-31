@@ -1,7 +1,7 @@
 #ifndef GUNDAM_MPS_BACKEND_H
 #define GUNDAM_MPS_BACKEND_H
 
-#include "BackendEngineView.h"
+#include "EngineView.h"
 #include "BackendTypes.h"
 #include "IPropagationBackend.h"
 #include "ParameterSnapshot.h"
@@ -21,9 +21,9 @@ namespace Backends {
     [[nodiscard]] std::string getName() const override { return "MPS"; }
     [[nodiscard]] BackendCapabilities getCapabilities() const override;
     [[nodiscard]] PropagationStatus getStatus(const PropagationToken& token_) const override;
-    [[nodiscard]] const BackendEngineView& getEngineView() const override;
+    [[nodiscard]] const EngineView& getEngineView() const override;
 
-    void build(const BackendEngineView& engineView_) override;
+    void build(const EngineView& engineView_) override;
     PropagationToken requestPropagation(const ParameterSnapshot& parameters_) override;
 
     bool isReady(const PropagationToken& token_) const override;
