@@ -39,6 +39,9 @@ public:
   /// DialBase.
   [[nodiscard]] const DialInputBuffer *getInputBufferRef() const {return _inputBufferPtr_;}
 
+  // Hacky way of tweaking input buffer manually. Used for python interface
+  DialInputBuffer& getInputBuffer() {return *((DialInputBuffer *) _inputBufferPtr_);}
+
   /// Get the dial calculation method.  The dial will need one or more
   /// Parameter inputs, and the number *must* match the number and order of
   /// the Parameters in the DialInputBuffer.
