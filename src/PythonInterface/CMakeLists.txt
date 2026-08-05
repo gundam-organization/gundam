@@ -5,7 +5,7 @@ set( SRC_FILE_LIST
     src/PythonInterface.cpp
 )
 
-pybind11_add_module( ${LIB_NAME} ${SRC_FILE_LIST} )
+pybind11_add_module( ${LIB_NAME} NO_EXTRAS ${SRC_FILE_LIST} )
 
 target_include_directories( ${LIB_NAME} PUBLIC
     ${PYBIND11_INCLUDE_DIRS}
