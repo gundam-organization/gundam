@@ -13,7 +13,9 @@ statistical analyses with different purposes and setups.  It has been
 developed as a fork of
 [xsllhFitter](https://gitlab.com/cuddandr/xsLLhFitter), in the context of
 the Upgrade of ND280 for the T2K neutrino experiment. Over the years, it has been extensively optimized 
-and developed into a flexible framework, now used in the ICARUS experiment (see [this paper](https://arxiv.org/abs/2604.24925)) 
+and developed into a flexible framework that can perform both cross-section and oscillation analyses in different
+experiments. It is used not only in T2K (see [this paper](https://arxiv.org/pdf/2607.10638)) 
+but also in the ICARUS experiment (see [this paper](https://arxiv.org/abs/2604.24925)) 
 and actively promoted within DUNE.
 
 The applications are configurable with a set of YAML/JSON files (see the
