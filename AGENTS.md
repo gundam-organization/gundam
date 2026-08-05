@@ -10,8 +10,8 @@ parameters on histograms in order to compute a binned likelihood.
 - `src/`: C++ code
   - Each subfolder represents a library (except for `Applications` 
   which gather executables source code)
-  - Each library holds either a pair of `src` and `include` subfolder
-  either a sub-library with its name, himself containing `src` and `include`.
+  - Each library holds either a pair of `src` and `include` subfolders
+  or a sub-library with its name, itself containing `src` and `include`.
 - `tests/`: tests that ensure the code is producing accurate results.
 - `cmake/`: `./CMakeLists.txt` refers to sub-CMake files within this directory.
 
