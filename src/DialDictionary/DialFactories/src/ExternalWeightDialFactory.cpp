@@ -291,9 +291,101 @@ void ExternalWeightPythonWorker::startWorkerProcess(const DialInputBuffer& input
     close(stdoutPipe[0]);
     close(stdoutPipe[1]);
 
+    // The bootstrap owns the wire protocol.  A user script only needs to
+    // expose run(command), with the shared-memory descriptions already
+    // converted to NumPy arrays by the bootstrap.
+    static const char* bootstrap = R"PY(
+import json
+import runpy
+import sys
+import traceback
+from multiprocessing import shared_memory
+
+import numpy as np
+
+
+def _attach(description):
+    try:
+        shm = shared_memory.SharedMemory(name=description["shmName"], track=False)
+    except TypeError:
+        shm = shared_memory.SharedMemory(name=description["shmName"])
+        try:
+            from multiprocessing import resource_tracker
+            resource_tracker.unregister(shm._name, "shared_memory")
+        except Exception:
+            pass
+    return shm, np.ndarray(tuple(description["shape"]), dtype=np.float64, buffer=shm.buf)
+
+
+def _respond(payload):
+    print(json.dumps(payload if payload is not None else {"status": "ok"}), flush=True)
+
+
+def _worker():
+    script = sys.argv[1]
+    user_args = sys.argv[2:-1]
+    # Make argv useful both while importing the script and in configure().
+    sys.argv = [script] + user_args
+    namespace = runpy.run_path(script, run_name="__external_weight_user__")
+
+    # Keep the old protocol usable while users migrate to run(command).
+    if not callable(namespace.get("run")):
+        legacy_worker = namespace.get("run_worker")
+        if not callable(legacy_worker):
+            raise RuntimeError("ExternalWeight evalScript must define run(command_) or run_worker()")
+        sys.argv.append("--worker")
+        return legacy_worker()
+
+    configure = namespace.get("configure")
+    if callable(configure):
+        configure(user_args)
+
+    state = {"shared_memory": []}
+    for line in sys.stdin:
+        command = json.loads(line)
+        command_name = command.get("command")
+
+        if command_name == "initialize":
+            state["inputs"] = {}
+            command["parameterInfo"] = command["parameters"]
+            for name, description in command["inputs"].items():
+                shm, array = _attach(description)
+                state["shared_memory"].append(shm)
+                state["inputs"][name] = array
+            shm, state["parameterBuffer"] = _attach(command["parameterBuffer"])
+            state["shared_memory"].append(shm)
+            shm, state["weights"] = _attach(command["weights"])
+            state["shared_memory"].append(shm)
+            state["parameterNames"] = [entry["name"] for entry in command["parameters"]]
+
+        # These fields are Python-only additions and are never sent over JSON.
+        command["inputs"] = state.get("inputs", {})
+        command["parameters"] = dict(zip(state.get("parameterNames", []),
+                                          state.get("parameterBuffer", [])))
+        command["weights"] = state.get("weights")
+        result = namespace["run"](command)
+        _respond(result)
+
+        if command_name == "shutdown":
+            for shm in state["shared_memory"]:
+                shm.close()
+            return 0
+    return 0
+
+
+try:
+    sys.exit(_worker())
+except Exception as error:
+    traceback.print_exc(file=sys.stderr)
+    _respond({"status": "error", "message": str(error)})
+    sys.exit(1)
+)PY";
+
     std::vector<std::string> argvStorage;
-    argvStorage.reserve(3 + _scriptArgs_.size());
+    argvStorage.reserve(4 + _scriptArgs_.size());
     argvStorage.emplace_back(_pythonExecutable_);
+    argvStorage.emplace_back("-c");
+    argvStorage.emplace_back(bootstrap);
     argvStorage.emplace_back(_evalScript_);
     for( const auto& arg : _scriptArgs_ ){ argvStorage.emplace_back(arg); }
     argvStorage.emplace_back("--worker");
