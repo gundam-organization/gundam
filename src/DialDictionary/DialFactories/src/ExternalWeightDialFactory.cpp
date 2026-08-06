@@ -318,7 +318,8 @@ def _attach(description):
 
 
 def _respond(payload):
-    print(json.dumps(payload if payload is not None else {"status": "ok"}), flush=True)
+    sys.stdout.write(json.dumps(payload if payload is not None else {"status": "ok"}) + "\n")
+    sys.stdout.flush()
 
 
 def _worker():
@@ -336,38 +337,57 @@ def _worker():
         sys.argv.append("--worker")
         return legacy_worker()
 
+    run = namespace["run"]
     configure = namespace.get("configure")
     if callable(configure):
         configure(user_args)
 
-    state = {"shared_memory": []}
-    for line in sys.stdin:
+    shared_memory_list = []
+    inputs = {}
+    parameter_names = []
+    parameter_buffer = None
+    weights = None
+    parameters = {}
+    user_command = None
+    read_line = sys.stdin.buffer.readline
+
+    while True:
+        line = read_line()
+        if not line:
+            break
         command = json.loads(line)
         command_name = command.get("command")
 
         if command_name == "initialize":
-            state["inputs"] = {}
-            command["parameterInfo"] = command["parameters"]
+            user_command = command
+            user_command["parameterInfo"] = command["parameters"]
+            inputs.clear()
             for name, description in command["inputs"].items():
                 shm, array = _attach(description)
-                state["shared_memory"].append(shm)
-                state["inputs"][name] = array
-            shm, state["parameterBuffer"] = _attach(command["parameterBuffer"])
-            state["shared_memory"].append(shm)
-            shm, state["weights"] = _attach(command["weights"])
-            state["shared_memory"].append(shm)
-            state["parameterNames"] = [entry["name"] for entry in command["parameters"]]
+                shared_memory_list.append(shm)
+                inputs[name] = array
+            shm, parameter_buffer = _attach(command["parameterBuffer"])
+            shared_memory_list.append(shm)
+            shm, weights = _attach(command["weights"])
+            shared_memory_list.append(shm)
+            parameter_names[:] = [entry["name"] for entry in command["parameters"]]
+            user_command["inputs"] = inputs
+            user_command["parameters"] = parameters
+            user_command["weights"] = weights
+        elif command_name == "evaluate":
+            # Reuse the command and parameter dictionary. This avoids
+            # allocating three dictionaries on every propagation.
+            user_command["command"] = "evaluate"
+            parameters.clear()
+            parameters.update(zip(parameter_names, parameter_buffer))
+        elif command_name == "shutdown":
+            user_command["command"] = "shutdown"
 
-        # These fields are Python-only additions and are never sent over JSON.
-        command["inputs"] = state.get("inputs", {})
-        command["parameters"] = dict(zip(state.get("parameterNames", []),
-                                          state.get("parameterBuffer", [])))
-        command["weights"] = state.get("weights")
-        result = namespace["run"](command)
+        result = run(user_command)
         _respond(result)
 
         if command_name == "shutdown":
-            for shm in state["shared_memory"]:
+            for shm in shared_memory_list:
                 shm.close()
             return 0
     return 0
