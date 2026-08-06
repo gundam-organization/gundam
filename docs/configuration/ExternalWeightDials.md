@@ -165,120 +165,71 @@ The worker should read the current parameter values from `parameterBuffer`, comp
 
 ## Minimal Worker Example
 
-```python
-#!/usr/bin/env python3
+GUNDAM preloads the worker protocol, including JSON parsing, shared-memory
+attachment and response handling. A new-style script only needs a `run`
+function. On every call, `command_` contains:
 
-import json
+- `command_['command']`: `initialize`, `evaluate` or `shutdown`;
+- `command_['inputs']`: a dictionary of NumPy arrays;
+- `command_['parameters']`: a dictionary mapping parameter names to values;
+- `command_['weights']`: the writable NumPy output array.
+
+The `initialize` command also contains `parameterInfo`, with the original
+parameter metadata. The function may return a response dictionary; when it
+returns `None`, GUNDAM sends `{"status": "ok"}`. An optional `configure`
+function receives `scriptArgs` before the first command, allowing the script
+to parse its command-line arguments.
+
+```python
 import sys
-from multiprocessing import shared_memory
 
 import numpy as np
 
 
-def attach_array(description):
-    # GUNDAM creates the POSIX shared-memory object and sends its name plus
-    # the array metadata in the JSON command. Python only attaches to the
-    # existing object; no numerical payload is copied here.
-    try:
-        # Python 3.13+ supports track=False. This tells Python's resource
-        # tracker that the shared-memory lifetime is managed by GUNDAM, not
-        # by this worker process.
-        shm = shared_memory.SharedMemory(name=description["shmName"], track=False)
-    except TypeError:
-        # Older Python versions do not have track=False. They register the
-        # block in the resource tracker by default, so unregister it manually
-        # to avoid Python unlinking a buffer owned by GUNDAM at shutdown.
-        shm = shared_memory.SharedMemory(name=description["shmName"])
-        try:
-            from multiprocessing import resource_tracker
-            resource_tracker.unregister(shm._name, "shared_memory")
-        except Exception:
-            pass
+def configure(arguments_):
+    # arguments_ contains workerConfig.scriptArgs. For example, with:
+    #   scriptArgs: ["--baseline-km", "295"]
+    import argparse
 
-    # Build a NumPy view directly on top of the shared-memory buffer. This is
-    # zero-copy: reading/writing this array reads/writes the same memory that
-    # GUNDAM mapped on the C++ side.
-    array = np.ndarray(tuple(description["shape"]), dtype=np.float64, buffer=shm.buf)
-
-    # Keep both objects alive. The NumPy array views shm.buf, and the
-    # SharedMemory handle must stay open as long as the array is used.
-    return shm, array
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--baseline-km", type=float, default=295.0)
+    configure.options = parser.parse_args(arguments_)
 
 
-def respond(payload):
-    print(json.dumps(payload), flush=True)
+def run(command_):
+    command_name = command_["command"]
 
+    if command_name == "initialize":
+        # Inputs are already attached NumPy arrays at this point. The
+        # parameterInfo list contains name/title/index metadata.
+        print("Loaded parameters:", command_["parameterInfo"], file=sys.stderr)
+        return {"status": "ok"}
 
-def run_worker():
-    state = {"shared_memory": []}
+    if command_name == "evaluate":
+        parameters = command_["parameters"]
+        enu = command_["inputs"]["Enu"]
+        flavor_emit = np.rint(command_["inputs"]["FlavorEmit"]).astype(np.int64)
+        flavor_detect = np.rint(command_["inputs"]["FlavorDetect"]).astype(np.int64)
 
-    for line in sys.stdin:
-        command = json.loads(line)
+        phase = 1.267 * parameters["deltaMsq"] * configure.options.baseline_km / enu
+        transition_prob = parameters["sinSqTheta"] * np.sin(phase) ** 2
+        command_["weights"][:] = np.where(
+            flavor_emit == flavor_detect,
+            1.0 - transition_prob,
+            transition_prob,
+        )
+        return {"status": "ok"}
 
-        if command["command"] == "initialize":
-            state["inputs"] = {}
+    if command_name == "shutdown":
+        # GUNDAM closes the shared-memory handles after run() returns.
+        return {"status": "ok"}
 
-            # Event-level input arrays are read-only from the worker point of
-            # view. GUNDAM fills them once while loading the dataset.
-            for name, description in command["inputs"].items():
-                shm, array = attach_array(description)
-                state["shared_memory"].append(shm)
-                state["inputs"][name] = array
-
-            # This small array is overwritten by GUNDAM before every
-            # evaluate command. Its order matches command["parameters"].
-            shm, array = attach_array(command["parameterBuffer"])
-            state["shared_memory"].append(shm)
-            state["parameters"] = array
-            state["parameter_names"] = [entry["name"] for entry in command["parameters"]]
-
-            # This output array must be filled by the worker with exactly one
-            # weight per selected event.
-            shm, array = attach_array(command["weights"])
-            state["shared_memory"].append(shm)
-            state["weights"] = array
-
-            respond({"status": "ok"})
-
-        elif command["command"] == "evaluate":
-            parameters = dict(zip(state["parameter_names"], state["parameters"]))
-            enu = state["inputs"]["Enu"]
-            flavor_emit = np.rint(state["inputs"]["FlavorEmit"]).astype(np.int64)
-            flavor_detect = np.rint(state["inputs"]["FlavorDetect"]).astype(np.int64)
-
-            delta_msq = parameters["deltaMsq"]
-            sin_sq_theta = parameters["sinSqTheta"]
-            baseline_km = 295.0
-
-            # Write in-place into the shared output buffer. GUNDAM will read
-            # these values after receiving the status response.
-            phase = 1.267 * delta_msq * baseline_km / enu
-            transition_prob = sin_sq_theta * np.sin(phase) ** 2
-            survival_prob = 1.0 - transition_prob
-            same_flavor = flavor_emit == flavor_detect
-            state["weights"][:] = np.where(same_flavor, survival_prob, transition_prob)
-            respond({"status": "ok"})
-
-        elif command["command"] == "shutdown":
-            respond({"status": "ok"})
-            for shm in state["shared_memory"]:
-                # Close the Python handle only. The actual unlink is owned by
-                # GUNDAM, which created the shared-memory object.
-                shm.close()
-            return 0
-
-        else:
-            respond({"status": "error", "message": "unknown command"})
-            return 1
-
-    return 0
-
-
-if __name__ == "__main__":
-    if len(sys.argv) >= 2 and sys.argv[1] == "--worker":
-        sys.exit(run_worker())
-    sys.exit(1)
+    return {"status": "error", "message": "unknown command: " + command_name}
 ```
+
+`attach_array`, `respond`, `run_worker` and the `__main__` block are no
+longer needed. GUNDAM calls `configure` once, then calls `run` for each
+command and handles the shared-memory cleanup after `shutdown`.
 
 ## Internal Engine Flow
 
