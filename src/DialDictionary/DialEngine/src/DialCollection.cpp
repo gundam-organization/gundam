@@ -57,7 +57,6 @@ void DialCollection::prepareConfig(ConfigReader &config_){
       {"dialsTreePath"},
       {"dialsDefinitions"},
       {"tableConfig"},
-      {"externalWeight"},
       {FieldFlag::DEPRECATED, "parameterLimits", "\"parameterLimits\" should be set in the parameter definition section. Not the dial definition. Support has been removed."},
     });
   config_.checkConfiguration();
@@ -106,6 +105,13 @@ void DialCollection::configureImpl() {
 }
 void DialCollection::initializeImpl() {
   LogThrowIf(_index_==-1, "Index not set.");
+
+  for( auto& collectionData : _dialCollectionData_ ){
+    if( auto* externalWeight = dynamic_cast<ExternalWeightDialFactory*>(collectionData.get()) ){
+      externalWeight->initialize();
+    }
+  }
+
   this->setupDialInterfaceReferences();
 }
 
@@ -287,7 +293,9 @@ void DialCollection::readParametersFromConfig(const ConfigReader &config_) {
   // globals for the dialSet
   config_.fillValue(_enableDialsSummary_, "printDialSummary");
   config_.fillValue(_dialType_, "dialType");
-  config_.fillValue(_dialOptions_, "options");
+  if( _dialType_ != DialType::ExternalWeight ){
+    config_.fillValue(_dialOptions_, "options");
+  }
   config_.fillValue(_dialLeafName_, "treeExpression");
   config_.fillValue(_minDialResponse_, "minDialResponse");
   config_.fillValue(_maxDialResponse_, "maxDialResponse");
@@ -668,12 +676,16 @@ bool DialCollection::initializeDialsWithKriging(const ConfigReader& dialsDefinit
 }
 
 bool DialCollection::initializeDialsWithExternalWeight(const ConfigReader& dialsDefinition_){
-  auto externalWeight = std::make_unique<ExternalWeightDialFactory>(dialsDefinition_);
+  LogThrowIf(not dialsDefinition_.hasField("options"),
+             "ExternalWeight dial requires an options configuration block.");
+
+  auto externalWeight = std::make_unique<ExternalWeightDialFactory>();
+  externalWeight->configure(dialsDefinition_.fetchValue<ConfigReader>("options"));
   _dialCollectionData_.emplace_back(std::move(externalWeight));
 
   int index = int(_dialCollectionData_.size()) - 1;
 
-  for( const auto& var : getCollectionData<ExternalWeightDialFactory>(index)->getInputNameList() ){
+  for( const auto& var : getCollectionData<ExternalWeightDialFactory>(index)->getInputEventVarNameList() ){
     addExtraLeafName(var);
   }
 

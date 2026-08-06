@@ -1,48 +1,27 @@
 #include "ExternalWeightDialFactory.h"
 
-#include "ExternalWeight.h"
+#include "ExternalWeightDispatcher.h"
 #include "Event.h"
 #include "GenericToolbox.Utils.h"
 #include "Logger.h"
 
 #include <algorithm>
 #include <array>
-#include <cctype>
 #include <cerrno>
 #include <cstdio>
 #include <cstring>
 #include <fcntl.h>
-#include <sstream>
 #include <sys/stat.h>
 #include <sys/mman.h>
 #include <sys/wait.h>
 #include <utility>
 #include <unistd.h>
 
-namespace {
-  std::string trimString(const std::string& str_){
-    auto begin = std::find_if_not(str_.begin(), str_.end(), [](unsigned char c){ return std::isspace(c); });
-    auto end = std::find_if_not(str_.rbegin(), str_.rend(), [](unsigned char c){ return std::isspace(c); }).base();
-    if( begin >= end ){ return {}; }
-    return {begin, end};
-  }
-
-  std::string buildSharedMemoryName(const std::string& tag_){
-    std::stringstream ss;
-    ss << "gdmEW_" << getpid() << "_" << tag_;
-    return ss.str();
-  }
-
-  std::string toPosixSharedMemoryName(const std::string& name_){
-    return "/" + name_;
-  }
-}
-
-ExternalWeightDialFactory::PythonWorker::SharedMemoryBuffer::SharedMemoryBuffer(
+ExternalWeightWorker::SharedMemoryBuffer::SharedMemoryBuffer(
     std::string name_,
     std::size_t nbDoubles_)
     : name(std::move(name_)), nbDoubles(nbDoubles_), nbBytes(std::max<std::size_t>(nbDoubles_, 1)*sizeof(double)) {
-  auto posixName = toPosixSharedMemoryName(name);
+  const std::string posixName = "/" + name;
   fd = shm_open(posixName.c_str(), O_CREAT | O_EXCL | O_RDWR, 0600);
   LogThrowIf(fd == -1, "Could not create shared memory \"" << posixName << "\": " << std::strerror(errno));
   LogThrowIf(ftruncate(fd, off_t(nbBytes)) == -1,
@@ -52,138 +31,189 @@ ExternalWeightDialFactory::PythonWorker::SharedMemoryBuffer::SharedMemoryBuffer(
              "Could not map shared memory \"" << posixName << "\": " << std::strerror(errno));
 }
 
-ExternalWeightDialFactory::PythonWorker::SharedMemoryBuffer::~SharedMemoryBuffer(){
+ExternalWeightWorker::SharedMemoryBuffer::~SharedMemoryBuffer(){
   if( ptr != nullptr and ptr != MAP_FAILED ){ munmap(ptr, nbBytes); }
   if( fd != -1 ){ close(fd); }
-  if( not name.empty() ){ shm_unlink(toPosixSharedMemoryName(name).c_str()); }
+  if( not name.empty() ){ shm_unlink(("/" + name).c_str()); }
 }
 
-ExternalWeightDialFactory::ExternalWeightDialFactory(const ConfigReader& config_) {
-  ConfigReader config(config_);
-
-  if( config.hasField("externalWeight") ){
-    config = config.fetchValue<ConfigReader>("externalWeight");
+std::string ExternalWeightWorker::normalizeInputName(const std::string& inputName_) {
+  auto out = GenericToolbox::trimString(inputName_, " ");
+  if( out.size() >= 2 and out.front() == '[' and out.back() == ']' ){
+    out = out.substr(1, out.size() - 2);
+    out = GenericToolbox::trimString(out, " ");
   }
+  return out;
+}
 
-  config.defineFields({
-      {"pythonExecutable"},
-      {"pythonVenv"},
-      {"initScript"},
-      {"evalScript"},
-      {"scriptArgs"},
-      {"inputList"},
-    });
-  config.checkConfiguration();
+void ExternalWeightWorker::configureImpl() {
 
-  config.fillValue(_inputNameList_, "inputList");
-  LogThrowIf(_inputNameList_.empty(), "ExternalWeight requires a non-empty inputList.");
-
-  for( auto& inputName : _inputNameList_ ){
+  _config_.fillValue(_inputEventVarNameList_, "inputEventVarList");
+  for( auto& inputName : _inputEventVarNameList_ ){
     inputName = normalizeInputName(inputName);
-    LogThrowIf(inputName.empty(), "ExternalWeight inputList contains an empty input name.");
+    LogThrowIf(inputName.empty(), "ExternalWeight inputEventVarList contains an empty input name.");
   }
-  _inputValueList_.resize(_inputNameList_.size());
+  _inputEventValueList_.resize(_inputEventVarNameList_.size());
 
-  PythonWorkerConfig workerConfig{};
-  config.fillValue(workerConfig.pythonExecutable, "pythonExecutable");
-  config.fillValue(workerConfig.pythonVenv, "pythonVenv");
-  config.fillValue(workerConfig.initScript, "initScript");
-  config.fillValue(workerConfig.evalScript, "evalScript");
-  config.fillValue(workerConfig.scriptArgs, "scriptArgs");
-
-  if( workerConfig.pythonExecutable.empty() and not workerConfig.pythonVenv.empty() ){
-    workerConfig.pythonExecutable = workerConfig.pythonVenv + "/bin/python";
-  }
-
-  _worker_.configure(workerConfig);
-  _worker_.initialize();
 }
 
-DialBase* ExternalWeightDialFactory::makeDial(const Event& event_) {
+std::size_t ExternalWeightWorker::registerEvent(const Event& event_) {
   std::lock_guard<std::mutex> lock(_eventRegistrationMutex_);
+  LogThrowIf(_areEventsLoaded_, "Cannot register an event after loading ExternalWeight buffers.");
 
-  const std::size_t eventIndex = _weightList_.size();
-
-  for( std::size_t iInput = 0 ; iInput < _inputNameList_.size() ; ++iInput ){
-    _inputValueList_[iInput].emplace_back(event_.getVariables().fetchVariable(_inputNameList_[iInput]).getVarAsDouble());
+  const std::size_t eventIndex = _weightList_->size();
+  for( std::size_t iInput = 0 ; iInput < _inputEventVarNameList_.size() ; ++iInput ){
+    _inputEventValueList_[iInput].emplace_back(
+        event_.getVariables().fetchVariable(_inputEventVarNameList_[iInput]).getVarAsDouble()
+    );
   }
-
-  _weightList_.emplace_back(1.);
-  return new ExternalWeight(&_weightList_, eventIndex);
+  _weightList_->emplace_back(1.);
+  return eventIndex;
 }
 
-void ExternalWeightDialFactory::updateWeights(DialInputBuffer& inputBuffer_) {
-  if( not _eventsLoadedInWorker_ ){
+void ExternalWeightWorker::finalizeEventLoading() {
+  if( _areEventsLoaded_ ){ return; }
+
+  _eventCount_ = _weightList_->size();
+  _inputBufferList_.clear();
+  _inputBufferList_.reserve(_inputEventValueList_.size());
+  for( std::size_t iInput = 0 ; iInput < _inputEventValueList_.size() ; ++iInput ){
+    LogThrowIf(_inputEventValueList_[iInput].size() != _eventCount_,
+               "ExternalWeight input \"" << _inputEventVarNameList_[iInput] << "\" has "
+               << _inputEventValueList_[iInput].size() << " entries for " << _eventCount_ << " events.");
+    _inputEventValueList_[iInput].shrink_to_fit();
+    _inputBufferList_.emplace_back(
+        std::make_unique<SharedMemoryBuffer>(
+            "gdmEW_" + std::to_string(getpid()) + "_i" + std::to_string(iInput),
+            _eventCount_
+        )
+    );
+    std::copy(_inputEventValueList_[iInput].begin(), _inputEventValueList_[iInput].end(), _inputBufferList_.back()->ptr);
+  }
+
+  _weightList_->shrink_to_fit();
+  _weightBuffer_ = std::make_unique<SharedMemoryBuffer>(
+      "gdmEW_" + std::to_string(getpid()) + "_w",
+      _eventCount_
+  );
+  std::fill(_weightBuffer_->ptr, _weightBuffer_->ptr + _eventCount_, 1.);
+  _areEventsLoaded_ = true;
+
+  LogInfo << "ExternalWeight worker registered " << _eventCount_
+          << " events with inputs " << GenericToolbox::toString(_inputEventVarNameList_) << "." << std::endl;
+}
+
+void ExternalWeightWorker::updateWeights(DialInputBuffer& inputBuffer_) {
+  if( not _areEventsLoaded_ ){
     this->finalizeEventLoading();
   }
   else if( not inputBuffer_.isDialUpdateRequested() ){
     return;
   }
+  this->evaluate(inputBuffer_);
+}
 
-  for( const auto& values : _inputValueList_ ){
-    LogThrowIf(values.size() != _weightList_.size(),
-               "ExternalWeight internal size mismatch: "
-               << _weightList_.size() << " weights for "
-               << values.size() << " registered input values.");
+void ExternalWeightWorker::evaluate(const DialInputBuffer& inputBuffer_) {
+  LogThrowIf(not this->isInitialized(), "ExternalWeight worker is not initialized.");
+  LogThrowIf(_weightBuffer_ == nullptr, "ExternalWeight worker has no weight buffer.");
+  LogThrowIf(_eventCount_ != _weightList_->size(),
+             "ExternalWeight has " << _eventCount_ << " shared-memory weights for "
+             << _weightList_->size() << " registered dials.");
+
+  if( _parameterBuffer_ == nullptr ){
+    _parameterBuffer_ = std::make_unique<SharedMemoryBuffer>(
+        "gdmEW_" + std::to_string(getpid()) + "_parameters",
+        std::size_t(inputBuffer_.getInputSize())
+    );
   }
-  _worker_.evaluate(inputBuffer_, _weightList_);
-}
-
-void ExternalWeightDialFactory::finalizeEventLoading() {
-  if( _eventsLoadedInWorker_ ){ return; }
-
-  for( auto& values : _inputValueList_ ){
-    LogThrowIf(values.size() != _weightList_.size(),
-               "ExternalWeight input size mismatch: "
-               << values.size() << " values for " << _weightList_.size() << " registered events.");
-    values.shrink_to_fit();
+  LogThrowIf(_parameterBuffer_->nbDoubles != std::size_t(inputBuffer_.getInputSize()),
+             "ExternalWeight parameter buffer size mismatch.");
+  for( int iPar = 0 ; iPar < inputBuffer_.getInputSize() ; ++iPar ){
+    _parameterBuffer_->ptr[iPar] = inputBuffer_.getInputBuffer().at(iPar);
   }
-  _weightList_.shrink_to_fit();
-  _worker_.loadEvents(_inputNameList_, _inputValueList_, _weightList_.size());
-  _eventsLoadedInWorker_ = true;
+
+  this->evaluateImpl(inputBuffer_);
+  std::copy(_weightBuffer_->ptr, _weightBuffer_->ptr + _eventCount_, _weightList_->begin());
 }
 
-std::string ExternalWeightDialFactory::normalizeInputName(const std::string& inputName_) {
-  auto out = trimString(inputName_);
-  if( out.size() >= 2 and out.front() == '[' and out.back() == ']' ){
-    out = out.substr(1, out.size() - 2);
-    out = trimString(out);
+void ExternalWeightDialFactory::configureImpl() {
+  _config_.clearFields();
+  _config_.defineFields({
+      {FieldFlag::MANDATORY, "type"},
+      {"inputEventVarList"},
+      {"workerConfig"},
+    });
+  _config_.checkConfiguration();
+
+  const auto workerType = _config_.fetchValue<std::string>("type");
+  if( workerType == "PythonWorker" ){
+    _worker_ = std::make_unique<ExternalWeightPythonWorker>();
+    _worker_->configure(_config_);
   }
-  return out;
+  else{
+    LogThrow("Unsupported ExternalWeight worker type: \"" << workerType << "\".");
+  }
+
+  // The worker owns the event inputs and the calculated weights.
 }
 
-void ExternalWeightDialFactory::PythonWorker::configure(const PythonWorkerConfig& config_) {
-  _config_ = config_;
+void ExternalWeightDialFactory::initializeImpl() {
+  LogThrowIf(_worker_ == nullptr, "ExternalWeight worker is not configured.");
+  _worker_->initialize();
 }
 
-ExternalWeightDialFactory::PythonWorker::~PythonWorker(){
+DialBase* ExternalWeightDialFactory::makeDial(const Event& event_) {
+  const std::size_t eventIndex = _worker_->registerEvent(event_);
+  return new ExternalWeightDispatcher(_worker_->getWeightList(), eventIndex);
+}
+
+void ExternalWeightPythonWorker::configureImpl() {
+  ExternalWeightWorker::configureImpl();
+
+  auto pythonConfig = _config_.fetchValue<ConfigReader>("workerConfig");
+  pythonConfig.defineFields({
+      {FieldFlag::MANDATORY, "pythonExecutable"},
+      {FieldFlag::MANDATORY, "evalScript"},
+      {"initScript"},
+      {"scriptArgs"},
+    });
+  pythonConfig.checkConfiguration();
+
+  pythonConfig.fillValue(_pythonExecutable_, "pythonExecutable");
+  pythonConfig.fillValue(_initScript_, "initScript");
+  pythonConfig.fillValue(_evalScript_, "evalScript");
+  pythonConfig.fillValue(_scriptArgs_, "scriptArgs");
+
+  LogThrowIf(_pythonExecutable_.empty(),
+             "ExternalWeight PythonWorker requires either pythonExecutable.");
+}
+
+ExternalWeightPythonWorker::~ExternalWeightPythonWorker(){
   this->stopWorkerProcess();
 }
 
-void ExternalWeightDialFactory::PythonWorker::initialize() {
-  if( _isInitialized_ ){ return; }
+void ExternalWeightPythonWorker::initializeImpl() {
 
-  LogThrowIf(_config_.pythonExecutable.empty(),
+  LogThrowIf(_pythonExecutable_.empty(),
              "ExternalWeight pythonExecutable is not configured. Provide pythonExecutable or pythonVenv.");
-  LogThrowIf(_config_.evalScript.empty(),
+  LogThrowIf(_evalScript_.empty(),
              "ExternalWeight evalScript is not configured.");
-  LogThrowIf(access(_config_.pythonExecutable.c_str(), X_OK) != 0,
-             "ExternalWeight pythonExecutable is not executable: \"" << _config_.pythonExecutable
+  LogThrowIf(access(_pythonExecutable_.c_str(), X_OK) != 0,
+             "ExternalWeight pythonExecutable is not executable: \"" << _pythonExecutable_
              << "\" / " << std::strerror(errno));
-  LogThrowIf(access(_config_.evalScript.c_str(), R_OK) != 0,
-             "ExternalWeight evalScript is not readable: \"" << _config_.evalScript
+  LogThrowIf(access(_evalScript_.c_str(), R_OK) != 0,
+             "ExternalWeight evalScript is not readable: \"" << _evalScript_
              << "\" / " << std::strerror(errno));
 
-  if( not _config_.initScript.empty() ){
+  if( not _initScript_.empty() ){
     LogWarning << "ExternalWeight initScript is currently ignored by the shared-memory worker. "
                << "Put initialization logic in the worker initialize command handler instead." << std::endl;
   }
 
   this->validateEvalScript();
-  _isInitialized_ = true;
 }
 
-void ExternalWeightDialFactory::PythonWorker::validateEvalScript() {
+void ExternalWeightPythonWorker::validateEvalScript() {
   int stdoutPipe[2];
   LogThrowIf(pipe(stdoutPipe) == -1,
              "Could not create ExternalWeight py_compile pipe: " << std::strerror(errno));
@@ -198,11 +228,11 @@ void ExternalWeightDialFactory::PythonWorker::validateEvalScript() {
     close(stdoutPipe[1]);
 
     execl(
-        _config_.pythonExecutable.c_str(),
-        _config_.pythonExecutable.c_str(),
+        _pythonExecutable_.c_str(),
+        _pythonExecutable_.c_str(),
         "-m",
         "py_compile",
-        _config_.evalScript.c_str(),
+        _evalScript_.c_str(),
         static_cast<char*>(nullptr)
     );
     _exit(127);
@@ -225,85 +255,25 @@ void ExternalWeightDialFactory::PythonWorker::validateEvalScript() {
   waitpid(pid, &status, 0);
   LogThrowIf(
       not WIFEXITED(status) or WEXITSTATUS(status) != 0,
-      "ExternalWeight evalScript failed `python -m py_compile`: \"" << _config_.evalScript << "\""
+      "ExternalWeight evalScript failed `python -m py_compile`: \"" << _evalScript_ << "\""
       << (output.empty() ? "" : std::string{"\n"} + output)
   );
 }
 
-void ExternalWeightDialFactory::PythonWorker::loadEvents(
-    const std::vector<std::string>& inputNameList_,
-    const std::vector<std::vector<double>>& inputValueList_,
-    std::size_t eventCount_) {
-  LogThrowIf(not _isInitialized_, "ExternalWeight PythonWorker is not initialized.");
-  LogThrowIf(inputNameList_.size() != inputValueList_.size(),
-             "ExternalWeight worker received " << inputNameList_.size()
-             << " input names but " << inputValueList_.size() << " input arrays.");
-  _loadedInputNameList_ = inputNameList_;
-  _eventCount_ = eventCount_;
-
-  _inputBufferList_.clear();
-  _inputBufferList_.reserve(inputValueList_.size());
-  for( std::size_t iInput = 0 ; iInput < inputValueList_.size() ; ++iInput ){
-    LogThrowIf(inputValueList_[iInput].size() != eventCount_,
-               "ExternalWeight input \"" << inputNameList_[iInput] << "\" has "
-               << inputValueList_[iInput].size() << " entries for " << eventCount_ << " events.");
-    _inputBufferList_.emplace_back(
-        std::make_unique<SharedMemoryBuffer>(
-            buildSharedMemoryName("i" + std::to_string(iInput)),
-            eventCount_
-        )
-    );
-    std::copy(inputValueList_[iInput].begin(), inputValueList_[iInput].end(), _inputBufferList_.back()->ptr);
-  }
-
-  _weightBuffer_ = std::make_unique<SharedMemoryBuffer>(
-      buildSharedMemoryName("w"),
-      eventCount_
-  );
-  std::fill(_weightBuffer_->ptr, _weightBuffer_->ptr + eventCount_, 1.);
-
-  LogInfo << "ExternalWeight worker registered " << eventCount_
-          << " events with inputs " << GenericToolbox::toString(inputNameList_) << "." << std::endl;
-}
-
-void ExternalWeightDialFactory::PythonWorker::evaluate(
-    const DialInputBuffer& inputBuffer_,
-    std::vector<double>& weightList_) {
-  LogThrowIf(not _isInitialized_, "ExternalWeight PythonWorker is not initialized.");
-  LogThrowIf(_weightBuffer_ == nullptr, "ExternalWeight worker has no weight buffer.");
-  LogThrowIf(_eventCount_ != weightList_.size(),
-             "ExternalWeight has " << _eventCount_ << " shared-memory weights for "
-             << weightList_.size() << " registered dials.");
-
+void ExternalWeightPythonWorker::evaluateImpl(const DialInputBuffer& inputBuffer_) {
   if( not _isWorkerStarted_ ){
     this->startWorkerProcess(inputBuffer_);
   }
-
-  LogThrowIf(_parameterBuffer_ == nullptr, "ExternalWeight worker has no parameter buffer.");
-  LogThrowIf(_parameterBuffer_->nbDoubles != std::size_t(inputBuffer_.getInputSize()),
-             "ExternalWeight parameter buffer size mismatch.");
-
-  for( int iPar = 0 ; iPar < inputBuffer_.getInputSize() ; ++iPar ){
-    _parameterBuffer_->ptr[iPar] = inputBuffer_.getInputBuffer().at(iPar);
-  }
-
   JsonType command;
   command["command"] = "evaluate";
   this->sendWorkerCommand(command);
   auto response = this->readWorkerResponse();
   LogThrowIf(response.value("status", std::string{}) != "ok",
              "ExternalWeight worker evaluation failed: " << response.dump());
-
-  std::copy(_weightBuffer_->ptr, _weightBuffer_->ptr + _eventCount_, weightList_.begin());
 }
 
-void ExternalWeightDialFactory::PythonWorker::startWorkerProcess(const DialInputBuffer& inputBuffer_) {
+void ExternalWeightPythonWorker::startWorkerProcess(const DialInputBuffer& inputBuffer_) {
   if( _isWorkerStarted_ ){ return; }
-
-  _parameterBuffer_ = std::make_unique<SharedMemoryBuffer>(
-      buildSharedMemoryName("parameters"),
-      std::size_t(inputBuffer_.getInputSize())
-  );
 
   int stdinPipe[2];
   int stdoutPipe[2];
@@ -322,10 +292,10 @@ void ExternalWeightDialFactory::PythonWorker::startWorkerProcess(const DialInput
     close(stdoutPipe[1]);
 
     std::vector<std::string> argvStorage;
-    argvStorage.reserve(3 + _config_.scriptArgs.size());
-    argvStorage.emplace_back(_config_.pythonExecutable);
-    argvStorage.emplace_back(_config_.evalScript);
-    for( const auto& arg : _config_.scriptArgs ){ argvStorage.emplace_back(arg); }
+    argvStorage.reserve(3 + _scriptArgs_.size());
+    argvStorage.emplace_back(_pythonExecutable_);
+    argvStorage.emplace_back(_evalScript_);
+    for( const auto& arg : _scriptArgs_ ){ argvStorage.emplace_back(arg); }
     argvStorage.emplace_back("--worker");
 
     std::vector<char*> argv;
@@ -335,7 +305,7 @@ void ExternalWeightDialFactory::PythonWorker::startWorkerProcess(const DialInput
     for( auto& arg : argvStorage ){ argv.emplace_back(const_cast<char*>(arg.c_str())); }
     argv.emplace_back(nullptr);
 
-    execv(_config_.pythonExecutable.c_str(), argv.data());
+    execv(_pythonExecutable_.c_str(), argv.data());
     _exit(127);
   }
 
@@ -348,13 +318,15 @@ void ExternalWeightDialFactory::PythonWorker::startWorkerProcess(const DialInput
 
   JsonType initCommand;
   initCommand["command"] = "initialize";
-  initCommand["nEvents"] = _eventCount_;
+  initCommand["nEvents"] = getEventCount();
   initCommand["inputs"] = JsonType::object();
-  for( std::size_t iInput = 0 ; iInput < _loadedInputNameList_.size() ; ++iInput ){
-    initCommand["inputs"][_loadedInputNameList_[iInput]] = {
-        {"shmName", _inputBufferList_.at(iInput)->name},
+  const auto& inputNameList = getLoadedInputNameList();
+  const auto& inputBufferList = getInputBufferList();
+  for( std::size_t iInput = 0 ; iInput < inputNameList.size() ; ++iInput ){
+    initCommand["inputs"][inputNameList[iInput]] = {
+        {"shmName", inputBufferList.at(iInput)->name},
         {"dtype", "float64"},
-        {"shape", {_eventCount_}}
+        {"shape", {getEventCount()}}
     };
   }
 
@@ -366,15 +338,19 @@ void ExternalWeightDialFactory::PythonWorker::startWorkerProcess(const DialInput
         {"index", iPar}
     });
   }
+  const auto* parameterBuffer = getParameterBuffer();
+  const auto* weightBuffer = getWeightBuffer();
+  LogThrowIf(parameterBuffer == nullptr or weightBuffer == nullptr,
+             "ExternalWeight worker shared-memory buffers are not initialized.");
   initCommand["parameterBuffer"] = {
-      {"shmName", _parameterBuffer_->name},
+      {"shmName", parameterBuffer->name},
       {"dtype", "float64"},
       {"shape", {std::size_t(inputBuffer_.getInputSize())}}
   };
   initCommand["weights"] = {
-      {"shmName", _weightBuffer_->name},
+      {"shmName", weightBuffer->name},
       {"dtype", "float64"},
-      {"shape", {_eventCount_}}
+      {"shape", {getEventCount()}}
   };
 
   this->sendWorkerCommand(initCommand);
@@ -383,7 +359,7 @@ void ExternalWeightDialFactory::PythonWorker::startWorkerProcess(const DialInput
              "ExternalWeight worker initialization failed: " << response.dump());
 }
 
-void ExternalWeightDialFactory::PythonWorker::sendWorkerCommand(const JsonType& command_) {
+void ExternalWeightPythonWorker::sendWorkerCommand(const JsonType& command_) {
   LogThrowIf(_workerInputFd_ == -1, "ExternalWeight worker input pipe is not open.");
 
   const std::string line = command_.dump() + "\n";
@@ -397,7 +373,7 @@ void ExternalWeightDialFactory::PythonWorker::sendWorkerCommand(const JsonType& 
   }
 }
 
-JsonType ExternalWeightDialFactory::PythonWorker::readWorkerResponse() {
+JsonType ExternalWeightPythonWorker::readWorkerResponse() {
   LogThrowIf(_workerOutputFd_ == -1, "ExternalWeight worker output pipe is not open.");
 
   std::string line;
@@ -418,7 +394,7 @@ JsonType ExternalWeightDialFactory::PythonWorker::readWorkerResponse() {
   return {};
 }
 
-void ExternalWeightDialFactory::PythonWorker::stopWorkerProcess() {
+void ExternalWeightPythonWorker::stopWorkerProcess() {
   if( _isWorkerStarted_ and _workerInputFd_ != -1 ){
     try{
       JsonType command;

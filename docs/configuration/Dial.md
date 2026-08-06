@@ -146,14 +146,16 @@ the [tableConfig](KrigedDials.md) option.
 
 #### `dialType: ExternalWeight`
 
-| Option         | Type | Description                                      | Default |
-|----------------|------|--------------------------------------------------|---------|
-| externalWeight | json | Python worker configuration for external weights |         |
+| Option            | Type      | Description                                             | Default |
+|-------------------|-----------|---------------------------------------------------------|---------|
+| type              | string    | Worker implementation; currently `PythonWorker`         |         |
+| inputEventVarList | list(str) | Optional event variables exposed to the worker          | empty   |
+| workerConfig      | json      | Configuration specific to the selected worker           |         |
 
-Use a persistent Python worker to calculate one weight per selected event.
-The event inputs, fit parameters, and output weights are exchanged through
-CPU shared-memory arrays. JSON is only used as a lightweight control
-protocol. See [ExternalWeightDials](ExternalWeightDials.md).
+Use an external worker to calculate one weight per selected event.
+`PythonWorker` is the current implementation; other worker types can use the
+same shared-memory inputs, parameters, and output weights. JSON is only used
+as a lightweight control protocol. See [ExternalWeightDials](ExternalWeightDials.md).
 
 #### `dialType: Formula`
 
