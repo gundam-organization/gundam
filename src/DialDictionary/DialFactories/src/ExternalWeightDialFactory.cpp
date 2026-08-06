@@ -7,7 +7,6 @@
 
 #include <algorithm>
 #include <array>
-#include <cctype>
 #include <cerrno>
 #include <cstdio>
 #include <cstring>
@@ -20,13 +19,6 @@
 #include <unistd.h>
 
 namespace {
-  std::string trimString(const std::string& str_){
-    auto begin = std::find_if_not(str_.begin(), str_.end(), [](unsigned char c){ return std::isspace(c); });
-    auto end = std::find_if_not(str_.rbegin(), str_.rend(), [](unsigned char c){ return std::isspace(c); }).base();
-    if( begin >= end ){ return {}; }
-    return {begin, end};
-  }
-
   std::string buildSharedMemoryName(const std::string& tag_){
     std::stringstream ss;
     ss << "gdmEW_" << getpid() << "_" << tag_;
@@ -145,10 +137,10 @@ void ExternalWeightDialFactory::finalizeEventLoading() {
 }
 
 std::string ExternalWeightDialFactory::normalizeInputName(const std::string& inputName_) {
-  auto out = trimString(inputName_);
+  auto out = GenericToolbox::trimString(inputName_, " ");
   if( out.size() >= 2 and out.front() == '[' and out.back() == ']' ){
     out = out.substr(1, out.size() - 2);
-    out = trimString(out);
+    out = GenericToolbox::trimString(out, " ");
   }
   return out;
 }
