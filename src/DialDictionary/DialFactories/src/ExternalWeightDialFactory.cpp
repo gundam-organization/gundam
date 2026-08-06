@@ -81,14 +81,15 @@ void ExternalWeightDialFactory::configureImpl() {
              "ExternalWeight requires either pythonExecutable or pythonVenv.");
   LogThrowIf(not _workerConfig_.pythonExecutable.empty() and not _workerConfig_.pythonVenv.empty(),
              "ExternalWeight cannot configure both pythonExecutable and pythonVenv.");
-}
 
-void ExternalWeightDialFactory::initializeImpl() {
   if( _workerConfig_.pythonExecutable.empty() and not _workerConfig_.pythonVenv.empty() ){
     _workerConfig_.pythonExecutable = _workerConfig_.pythonVenv + "/bin/python";
   }
 
   _worker_.configure(_workerConfig_);
+}
+
+void ExternalWeightDialFactory::initializeImpl() {
   _worker_.initialize();
 }
 
