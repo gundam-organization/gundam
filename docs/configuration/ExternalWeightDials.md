@@ -2,7 +2,9 @@
 
 [< back to parent (Dial)](Dial.md)
 
-External weight dials let GUNDAM delegate the evaluation of event weights to an external Python worker. This is useful when the response depends on many events at once, for example an oscillation engine that can evaluate all event weights in a vectorized CPU/GPU backend.
+External weight dials let GUNDAM delegate the evaluation of event weights to an external worker. `PythonWorker` is the first implementation; the common worker interface is also intended for precompiled external libraries.
+
+This is useful when the response depends on many events at once, for example an oscillation engine that can evaluate all event weights in a vectorized CPU/GPU backend.
 
 The external worker is persistent. GUNDAM loads the requested event inputs once, then each likelihood propagation only sends the current fit parameters and asks the worker to update the event weights.
 
@@ -22,14 +24,16 @@ parameterSetList:
         dialInputList:
           - name: "deltaMsq"
           - name: "sinSqTheta"
-        externalWeight:
-          pythonExecutable: "/path/to/venv/bin/python"
-          evalScript: "./config/externalWeightWorker.py"
-          scriptArgs: [ "--model-config", "./config/osc.yaml" ]
-          inputList:
+        options:
+          type: "PythonWorker"
+          inputEventVarList:
             - "[Enu]"
             - "[FlavorEmit]"
             - "[FlavorDetect]"
+          workerConfig:
+            pythonExecutable: "/path/to/venv/bin/python"
+            evalScript: "./config/externalWeightWorker.py"
+            scriptArgs: [ "--model-config", "./config/osc.yaml" ]
 
     parameterDefinitions:
       - name: "deltaMsq"
@@ -44,25 +48,26 @@ parameterSetList:
 
 ### Options
 
-| Option             | Type       | Description                                                               | Default |
-|--------------------|------------|---------------------------------------------------------------------------|---------|
-| dialType           | string     | Must be `ExternalWeight`                                                  |         |
-| dialInputList      | list(json) | Fit parameters passed to the worker                                       |         |
-| externalWeight     | json       | Worker configuration                                                      |         |
-| pythonExecutable   | string     | Python executable used to start the worker                                |         |
-| pythonVenv         | string     | Alternative to `pythonExecutable`; GUNDAM uses `<pythonVenv>/bin/python`  |         |
-| evalScript         | string     | Python worker script                                                      |         |
-| scriptArgs         | list(str)  | Extra command-line arguments passed to the Python worker script           | empty   |
-| inputList          | list(str)  | Event variables made available to the worker                              |         |
-| initScript         | string     | Currently ignored by the shared-memory worker                             |         |
+| Option                        | Type       | Description                                                     | Default |
+|-------------------------------|------------|-----------------------------------------------------------------|---------|
+| dialType                      | string     | Must be `ExternalWeight`                                        |         |
+| dialInputList                 | list(json) | Fit parameters passed to the worker                             |         |
+| options.type                  | string     | Worker implementation; currently `PythonWorker`                 |         |
+| options.inputEventVarList     | list(str)  | Event variables made available to every worker                  | empty   |
+| options.workerConfig          | json       | Configuration specific to the selected worker                   |         |
+| workerConfig.pythonExecutable | string     | Python executable used to start `PythonWorker`                  |         |
+| workerConfig.evalScript       | string     | Python worker script                                            |         |
+| workerConfig.scriptArgs       | list(str)  | Extra command-line arguments passed to the Python worker script | empty   |
+| workerConfig.initScript       | string     | Currently ignored by the shared-memory Python worker            |         |
 
-`inputList` entries use the same variable naming as other event formulas. In practice, prefer bracket notation for variables from the dataset `variableDict`:
+`inputEventVarList` entries use the same variable naming as other event formulas. In practice, prefer bracket notation for variables from the dataset `variableDict`:
 
 ```yaml
-inputList: [ "[Enu]", "[FlavorEmit]", "[FlavorDetect]" ]
+options:
+  inputEventVarList: [ "[Enu]", "[FlavorEmit]", "[FlavorDetect]" ]
 ```
 
-At least one input variable is required. Each input is evaluated while loading the dataset and stored in memory for the worker.
+`inputEventVarList` is optional. Omit it when the weight depends only on fit parameters. Each configured input is evaluated while loading the dataset and stored in memory by the common worker layer.
 
 At the moment, the shared-memory transport exposes event inputs as `float64` arrays. If an input is semantically an integer, such as a flavor code, the worker should cast it explicitly before using it.
 
@@ -277,11 +282,11 @@ if __name__ == "__main__":
 
 ## Internal Engine Flow
 
-During dataset loading, GUNDAM creates one `ExternalWeight` dial per selected event. Each dial stores its event index and a pointer to a shared weight vector owned by the `ExternalWeightDialFactory`.
+During dataset loading, GUNDAM creates one `ExternalWeightDispatcher` per selected event. Each dispatcher stores its event index and a shared reference to the weight vector owned by `ExternalWeightWorker`.
 
 After all events are loaded:
 
-1. GUNDAM allocates one shared-memory `double` array per requested input variable.
+1. GUNDAM allocates one shared-memory `double` array per requested input variable (none when `inputEventVarList` is omitted).
 2. GUNDAM fills those input arrays once from the selected events.
 3. GUNDAM allocates one shared-memory `double` array for the current fit parameters.
 4. GUNDAM allocates one shared-memory `double` array for the output event weights.
@@ -292,8 +297,8 @@ At each propagation:
 1. GUNDAM writes the current fit parameter values into `parameterBuffer`.
 2. GUNDAM sends the small JSON command `{ "command": "evaluate" }`.
 3. The Python worker computes all event weights and writes them into the shared `weights` array.
-4. GUNDAM copies the shared `weights` array into the factory weight vector.
-5. Each `ExternalWeight` dial returns the weight corresponding to its event index.
+4. The common worker layer copies the shared `weights` array into its weight vector.
+5. Each `ExternalWeightDispatcher` returns the weight corresponding to its event index.
 
 The large numerical arrays are therefore never serialized to JSON and are not written to disk. JSON is only used as a small control protocol for metadata and commands.
 
