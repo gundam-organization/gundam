@@ -11,7 +11,7 @@
 #include <string>
 #include <vector>
 
-class ExternalWeightDialFactory : public DialFactoryBase {
+class ExternalWeightDialFactory : public DialFactoryBase, public JsonBaseClass {
 
 public:
   struct PythonWorkerConfig {
@@ -69,7 +69,12 @@ public:
 
 public:
   ExternalWeightDialFactory() = default;
-  explicit ExternalWeightDialFactory(const ConfigReader& config_);
+
+protected:
+  void configureImpl() override;
+  void initializeImpl() override;
+
+public:
 
   [[nodiscard]] DialBase* makeDial(const Event& event_) override;
 
@@ -85,6 +90,7 @@ private:
   std::vector<std::string> _inputNameList_{};
   std::vector<std::vector<double>> _inputValueList_{};
   std::vector<double> _weightList_{};
+  PythonWorkerConfig _workerConfig_{};
   PythonWorker _worker_{};
   bool _eventsLoadedInWorker_{false};
   mutable std::mutex _eventRegistrationMutex_{};

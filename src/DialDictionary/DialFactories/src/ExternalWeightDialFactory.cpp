@@ -58,24 +58,19 @@ ExternalWeightDialFactory::PythonWorker::SharedMemoryBuffer::~SharedMemoryBuffer
   if( not name.empty() ){ shm_unlink(toPosixSharedMemoryName(name).c_str()); }
 }
 
-ExternalWeightDialFactory::ExternalWeightDialFactory(const ConfigReader& config_) {
-  ConfigReader config(config_);
-
-  if( config.hasField("externalWeight") ){
-    config = config.fetchValue<ConfigReader>("externalWeight");
-  }
-
-  config.defineFields({
+void ExternalWeightDialFactory::configureImpl() {
+  _config_.clearFields();
+  _config_.defineFields({
       {"pythonExecutable"},
       {"pythonVenv"},
       {"initScript"},
-      {"evalScript"},
+      {FieldFlag::MANDATORY, "evalScript"},
       {"scriptArgs"},
-      {"inputList"},
+      {FieldFlag::MANDATORY, "inputList"},
     });
-  config.checkConfiguration();
+  _config_.checkConfiguration();
 
-  config.fillValue(_inputNameList_, "inputList");
+  _config_.fillValue(_inputNameList_, "inputList");
   LogThrowIf(_inputNameList_.empty(), "ExternalWeight requires a non-empty inputList.");
 
   for( auto& inputName : _inputNameList_ ){
@@ -84,18 +79,24 @@ ExternalWeightDialFactory::ExternalWeightDialFactory(const ConfigReader& config_
   }
   _inputValueList_.resize(_inputNameList_.size());
 
-  PythonWorkerConfig workerConfig{};
-  config.fillValue(workerConfig.pythonExecutable, "pythonExecutable");
-  config.fillValue(workerConfig.pythonVenv, "pythonVenv");
-  config.fillValue(workerConfig.initScript, "initScript");
-  config.fillValue(workerConfig.evalScript, "evalScript");
-  config.fillValue(workerConfig.scriptArgs, "scriptArgs");
+  _config_.fillValue(_workerConfig_.pythonExecutable, "pythonExecutable");
+  _config_.fillValue(_workerConfig_.pythonVenv, "pythonVenv");
+  _config_.fillValue(_workerConfig_.initScript, "initScript");
+  _config_.fillValue(_workerConfig_.evalScript, "evalScript");
+  _config_.fillValue(_workerConfig_.scriptArgs, "scriptArgs");
 
-  if( workerConfig.pythonExecutable.empty() and not workerConfig.pythonVenv.empty() ){
-    workerConfig.pythonExecutable = workerConfig.pythonVenv + "/bin/python";
+  LogThrowIf(_workerConfig_.pythonExecutable.empty() and _workerConfig_.pythonVenv.empty(),
+             "ExternalWeight requires either pythonExecutable or pythonVenv.");
+  LogThrowIf(not _workerConfig_.pythonExecutable.empty() and not _workerConfig_.pythonVenv.empty(),
+             "ExternalWeight cannot configure both pythonExecutable and pythonVenv.");
+}
+
+void ExternalWeightDialFactory::initializeImpl() {
+  if( _workerConfig_.pythonExecutable.empty() and not _workerConfig_.pythonVenv.empty() ){
+    _workerConfig_.pythonExecutable = _workerConfig_.pythonVenv + "/bin/python";
   }
 
-  _worker_.configure(workerConfig);
+  _worker_.configure(_workerConfig_);
   _worker_.initialize();
 }
 
