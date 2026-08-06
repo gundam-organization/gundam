@@ -165,7 +165,7 @@ fitterEngineConfig:
                 options:
                   type: PythonWorker
                   inputEventVarList: [ "[Enu]", "[FlavorEmit]", "[FlavorDetect]" ]
-                  pythonWorkerConfig:
+                  workerConfig:
                     pythonExecutable: "{python_executable}"
                     evalScript: "{eval_script_path}"
             parameterDefinitions:
