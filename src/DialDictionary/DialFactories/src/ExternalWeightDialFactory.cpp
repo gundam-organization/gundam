@@ -71,49 +71,69 @@ void ExternalWeightWorker::configureImpl() {
     inputName = normalizeInputName(inputName);
     LogThrowIf(inputName.empty(), "ExternalWeight inputEventVarList contains an empty input name.");
   }
+  _inputEventValueList_.resize(_inputEventVarNameList_.size());
 
 }
 
-void ExternalWeightWorker::loadEvents(
-    const std::vector<std::string>& inputNameList_,
-    const std::vector<std::vector<double>>& inputValueList_,
-    std::size_t eventCount_) {
-  LogThrowIf(not this->isInitialized(), "ExternalWeight worker is not initialized.");
-  LogThrowIf(inputNameList_ != _inputEventVarNameList_,
-             "ExternalWeight worker received an input list that differs from its configuration.");
-  LogThrowIf(inputNameList_.size() != inputValueList_.size(),
-             "ExternalWeight worker received " << inputNameList_.size()
-             << " input names but " << inputValueList_.size() << " input arrays.");
+std::size_t ExternalWeightWorker::registerEvent(const Event& event_) {
+  std::lock_guard<std::mutex> lock(_eventRegistrationMutex_);
+  LogThrowIf(_areEventsLoaded_, "Cannot register an event after loading ExternalWeight buffers.");
 
-  _eventCount_ = eventCount_;
+  const std::size_t eventIndex = _weightList_->size();
+  for( std::size_t iInput = 0 ; iInput < _inputEventVarNameList_.size() ; ++iInput ){
+    _inputEventValueList_[iInput].emplace_back(
+        event_.getVariables().fetchVariable(_inputEventVarNameList_[iInput]).getVarAsDouble()
+    );
+  }
+  _weightList_->emplace_back(1.);
+  return eventIndex;
+}
+
+void ExternalWeightWorker::finalizeEventLoading() {
+  if( _areEventsLoaded_ ){ return; }
+
+  _eventCount_ = _weightList_->size();
   _inputBufferList_.clear();
-  _inputBufferList_.reserve(inputValueList_.size());
-  for( std::size_t iInput = 0 ; iInput < inputValueList_.size() ; ++iInput ){
-    LogThrowIf(inputValueList_[iInput].size() != eventCount_,
-               "ExternalWeight input \"" << inputNameList_[iInput] << "\" has "
-               << inputValueList_[iInput].size() << " entries for " << eventCount_ << " events.");
+  _inputBufferList_.reserve(_inputEventValueList_.size());
+  for( std::size_t iInput = 0 ; iInput < _inputEventValueList_.size() ; ++iInput ){
+    LogThrowIf(_inputEventValueList_[iInput].size() != _eventCount_,
+               "ExternalWeight input \"" << _inputEventVarNameList_[iInput] << "\" has "
+               << _inputEventValueList_[iInput].size() << " entries for " << _eventCount_ << " events.");
+    _inputEventValueList_[iInput].shrink_to_fit();
     _inputBufferList_.emplace_back(
         std::make_unique<SharedMemoryBuffer>(
             buildSharedMemoryName("i" + std::to_string(iInput)),
-            eventCount_
+            _eventCount_
         )
     );
-    std::copy(inputValueList_[iInput].begin(), inputValueList_[iInput].end(), _inputBufferList_.back()->ptr);
+    std::copy(_inputEventValueList_[iInput].begin(), _inputEventValueList_[iInput].end(), _inputBufferList_.back()->ptr);
   }
 
-  _weightBuffer_ = std::make_unique<SharedMemoryBuffer>(buildSharedMemoryName("w"), eventCount_);
-  std::fill(_weightBuffer_->ptr, _weightBuffer_->ptr + eventCount_, 1.);
+  _weightList_->shrink_to_fit();
+  _weightBuffer_ = std::make_unique<SharedMemoryBuffer>(buildSharedMemoryName("w"), _eventCount_);
+  std::fill(_weightBuffer_->ptr, _weightBuffer_->ptr + _eventCount_, 1.);
+  _areEventsLoaded_ = true;
 
-  LogInfo << "ExternalWeight worker registered " << eventCount_
-          << " events with inputs " << GenericToolbox::toString(inputNameList_) << "." << std::endl;
+  LogInfo << "ExternalWeight worker registered " << _eventCount_
+          << " events with inputs " << GenericToolbox::toString(_inputEventVarNameList_) << "." << std::endl;
 }
 
-void ExternalWeightWorker::evaluate(const DialInputBuffer& inputBuffer_, std::vector<double>& weightList_) {
+void ExternalWeightWorker::updateWeights(DialInputBuffer& inputBuffer_) {
+  if( not _areEventsLoaded_ ){
+    this->finalizeEventLoading();
+  }
+  else if( not inputBuffer_.isDialUpdateRequested() ){
+    return;
+  }
+  this->evaluate(inputBuffer_);
+}
+
+void ExternalWeightWorker::evaluate(const DialInputBuffer& inputBuffer_) {
   LogThrowIf(not this->isInitialized(), "ExternalWeight worker is not initialized.");
   LogThrowIf(_weightBuffer_ == nullptr, "ExternalWeight worker has no weight buffer.");
-  LogThrowIf(_eventCount_ != weightList_.size(),
+  LogThrowIf(_eventCount_ != _weightList_->size(),
              "ExternalWeight has " << _eventCount_ << " shared-memory weights for "
-             << weightList_.size() << " registered dials.");
+             << _weightList_->size() << " registered dials.");
 
   if( _parameterBuffer_ == nullptr ){
     _parameterBuffer_ = std::make_unique<SharedMemoryBuffer>(
@@ -128,7 +148,7 @@ void ExternalWeightWorker::evaluate(const DialInputBuffer& inputBuffer_, std::ve
   }
 
   this->evaluateImpl(inputBuffer_);
-  std::copy(_weightBuffer_->ptr, _weightBuffer_->ptr + _eventCount_, weightList_.begin());
+  std::copy(_weightBuffer_->ptr, _weightBuffer_->ptr + _eventCount_, _weightList_->begin());
 }
 
 void ExternalWeightDialFactory::configureImpl() {
@@ -151,8 +171,7 @@ void ExternalWeightDialFactory::configureImpl() {
     LogThrow("Unsupported ExternalWeight worker type: \"" << workerType << "\".");
   }
 
-  _inputNameList_ = _worker_->getInputNameList();
-  _inputValueList_.resize(_inputNameList_.size());
+  // The worker owns the event inputs and the calculated weights.
 }
 
 void ExternalWeightDialFactory::initializeImpl() {
@@ -161,47 +180,12 @@ void ExternalWeightDialFactory::initializeImpl() {
 }
 
 DialBase* ExternalWeightDialFactory::makeDial(const Event& event_) {
-  std::lock_guard<std::mutex> lock(_eventRegistrationMutex_);
-
-  const std::size_t eventIndex = _weightList_.size();
-
-  for( std::size_t iInput = 0 ; iInput < _inputNameList_.size() ; ++iInput ){
-    _inputValueList_[iInput].emplace_back(event_.getVariables().fetchVariable(_inputNameList_[iInput]).getVarAsDouble());
-  }
-
-  _weightList_.emplace_back(1.);
-  return new ExternalWeightDispatcher(&_weightList_, eventIndex);
+  const std::size_t eventIndex = _worker_->registerEvent(event_);
+  return new ExternalWeightDispatcher(_worker_->getWeightList(), eventIndex);
 }
 
 void ExternalWeightDialFactory::updateWeights(DialInputBuffer& inputBuffer_) {
-  if( not _eventsLoadedInWorker_ ){
-    this->finalizeEventLoading();
-  }
-  else if( not inputBuffer_.isDialUpdateRequested() ){
-    return;
-  }
-
-  for( const auto& values : _inputValueList_ ){
-    LogThrowIf(values.size() != _weightList_.size(),
-               "ExternalWeight internal size mismatch: "
-               << _weightList_.size() << " weights for "
-               << values.size() << " registered input values.");
-  }
-  _worker_->evaluate(inputBuffer_, _weightList_);
-}
-
-void ExternalWeightDialFactory::finalizeEventLoading() {
-  if( _eventsLoadedInWorker_ ){ return; }
-
-  for( auto& values : _inputValueList_ ){
-    LogThrowIf(values.size() != _weightList_.size(),
-               "ExternalWeight input size mismatch: "
-               << values.size() << " values for " << _weightList_.size() << " registered events.");
-    values.shrink_to_fit();
-  }
-  _weightList_.shrink_to_fit();
-  _worker_->loadEvents(_inputNameList_, _inputValueList_, _weightList_.size());
-  _eventsLoadedInWorker_ = true;
+  _worker_->updateWeights(inputBuffer_);
 }
 
 void ExternalWeightPythonWorker::configureImpl() {

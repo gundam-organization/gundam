@@ -3,15 +3,17 @@
 
 #include "DialBase.h"
 
+#include <memory>
 #include <string>
+#include <utility>
 #include <vector>
 
 class ExternalWeightDispatcher : public DialBase {
 
 public:
   ExternalWeightDispatcher() = delete;
-  ExternalWeightDispatcher(const std::vector<double>* weightList_, std::size_t eventIndex_)
-      : _weightList_(weightList_), _eventIndex_(eventIndex_) {}
+  ExternalWeightDispatcher(std::shared_ptr<const std::vector<double>> weightList_, std::size_t eventIndex_)
+      : _weightList_(std::move(weightList_)), _eventIndex_(eventIndex_) {}
 
   [[nodiscard]] std::unique_ptr<DialBase> clone() const override { return std::make_unique<ExternalWeightDispatcher>(*this); }
   [[nodiscard]] std::string getDialTypeName() const override { return {"ExternalWeightDispatcher"}; }
@@ -20,7 +22,7 @@ public:
   [[nodiscard]] std::string getSummary() const override;
 
 private:
-  const std::vector<double>* _weightList_{nullptr};
+  std::shared_ptr<const std::vector<double>> _weightList_{nullptr};
   std::size_t _eventIndex_{std::size_t(-1)};
 
 };
