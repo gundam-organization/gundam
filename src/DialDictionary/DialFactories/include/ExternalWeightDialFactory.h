@@ -11,26 +11,17 @@
 #include <string>
 #include <vector>
 
+
 class ExternalWeightWorker : public JsonBaseClass {
 public:
   ~ExternalWeightWorker() override = default;
 
-  virtual void loadEvents(const std::vector<std::string>& inputNameList_, const std::vector<std::vector<double>>& inputValueList_, std::size_t eventCount_) = 0;
-  virtual void evaluate(const DialInputBuffer& inputBuffer_, std::vector<double>& weightList_) = 0;
+  void loadEvents(const std::vector<std::string>& inputNameList_, const std::vector<std::vector<double>>& inputValueList_, std::size_t eventCount_);
+  void evaluate(const DialInputBuffer& inputBuffer_, std::vector<double>& weightList_);
 
-  [[nodiscard]] virtual const std::vector<std::string>& getInputNameList() const = 0;
-};
+  [[nodiscard]] const std::vector<std::string>& getInputNameList() const { return _inputEventVarNameList_; }
 
-class ExternalWeightPythonWorker : public ExternalWeightWorker {
-public:
-  ~ExternalWeightPythonWorker() override;
-
-  void loadEvents(const std::vector<std::string>& inputNameList_, const std::vector<std::vector<double>>& inputValueList_, std::size_t eventCount_) override;
-  void evaluate(const DialInputBuffer& inputBuffer_, std::vector<double>& weightList_) override;
-
-  [[nodiscard]] const std::vector<std::string>& getInputNameList() const override { return _inputNameList_; }
-
-private:
+protected:
   struct SharedMemoryBuffer {
     explicit SharedMemoryBuffer(std::string name_, std::size_t nbDoubles_);
     ~SharedMemoryBuffer();
@@ -45,26 +36,46 @@ private:
     double* ptr{nullptr};
   };
 
+  [[nodiscard]] const std::vector<std::string>& getLoadedInputNameList() const { return _inputEventVarNameList_; }
+  [[nodiscard]] const std::vector<std::unique_ptr<SharedMemoryBuffer>>& getInputBufferList() const { return _inputBufferList_; }
+  [[nodiscard]] const SharedMemoryBuffer* getParameterBuffer() const { return _parameterBuffer_.get(); }
+  [[nodiscard]] const SharedMemoryBuffer* getWeightBuffer() const { return _weightBuffer_.get(); }
+  [[nodiscard]] std::size_t getEventCount() const { return _eventCount_; }
+
+protected:
   static std::string normalizeInputName(const std::string& inputName_);
+  void configureImpl() override;
+
+private:
+  virtual void evaluateImpl(const DialInputBuffer& inputBuffer_) = 0;
+
+  std::vector<std::string> _inputEventVarNameList_{};
+  std::vector<std::unique_ptr<SharedMemoryBuffer>> _inputBufferList_{};
+  std::unique_ptr<SharedMemoryBuffer> _parameterBuffer_{nullptr};
+  std::unique_ptr<SharedMemoryBuffer> _weightBuffer_{nullptr};
+  std::size_t _eventCount_{0};
+};
+
+class ExternalWeightPythonWorker : public ExternalWeightWorker {
+public:
+  ~ExternalWeightPythonWorker() override;
+
+protected:
+  void configureImpl() override;
+  void initializeImpl() override;
+
+private:
   void startWorkerProcess(const DialInputBuffer& inputBuffer_);
   void validateEvalScript();
   void sendWorkerCommand(const JsonType& command_);
   JsonType readWorkerResponse();
   void stopWorkerProcess();
-  void configureImpl() override;
-  void initializeImpl() override;
-
+  void evaluateImpl(const DialInputBuffer& inputBuffer_) override;
   std::string _pythonExecutable_{};
   std::string _pythonVenv_{};
   std::string _initScript_{};
   std::string _evalScript_{};
   std::vector<std::string> _scriptArgs_{};
-  std::vector<std::string> _inputNameList_{};
-  std::vector<std::string> _loadedInputNameList_{};
-  std::vector<std::unique_ptr<SharedMemoryBuffer>> _inputBufferList_{};
-  std::unique_ptr<SharedMemoryBuffer> _parameterBuffer_{nullptr};
-  std::unique_ptr<SharedMemoryBuffer> _weightBuffer_{nullptr};
-  std::size_t _eventCount_{0};
   bool _isWorkerStarted_{false};
   int _workerInputFd_{-1};
   int _workerOutputFd_{-1};

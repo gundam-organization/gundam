@@ -164,10 +164,10 @@ fitterEngineConfig:
                   - name: "sinSqTheta"
                 options:
                   type: PythonWorker
+                  inputEventVarList: [ "[Enu]", "[FlavorEmit]", "[FlavorDetect]" ]
                   pythonWorkerConfig:
                     pythonExecutable: "{python_executable}"
                     evalScript: "{eval_script_path}"
-                    inputList: [ "[Enu]", "[FlavorEmit]", "[FlavorDetect]" ]
             parameterDefinitions:
               - name: "deltaMsq"
                 isEnabled: true
