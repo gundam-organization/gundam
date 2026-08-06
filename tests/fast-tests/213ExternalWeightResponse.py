@@ -162,10 +162,12 @@ fitterEngineConfig:
                 dialInputList:
                   - name: "deltaMsq"
                   - name: "sinSqTheta"
-                externalWeight:
-                  pythonExecutable: "{python_executable}"
-                  evalScript: "{eval_script_path}"
-                  inputList: [ "[Enu]", "[FlavorEmit]", "[FlavorDetect]" ]
+                options:
+                  type: PythonWorker
+                  pythonWorkerConfig:
+                    pythonExecutable: "{python_executable}"
+                    evalScript: "{eval_script_path}"
+                    inputList: [ "[Enu]", "[FlavorEmit]", "[FlavorDetect]" ]
             parameterDefinitions:
               - name: "deltaMsq"
                 isEnabled: true
