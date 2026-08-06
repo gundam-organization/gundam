@@ -80,7 +80,6 @@ private:
   void stopWorkerProcess();
   void evaluateImpl(const DialInputBuffer& inputBuffer_) override;
   std::string _pythonExecutable_{};
-  std::string _pythonVenv_{};
   std::string _initScript_{};
   std::string _evalScript_{};
   std::vector<std::string> _scriptArgs_{};

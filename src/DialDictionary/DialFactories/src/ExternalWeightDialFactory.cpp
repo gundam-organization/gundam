@@ -47,11 +47,6 @@ std::string ExternalWeightWorker::normalizeInputName(const std::string& inputNam
 }
 
 void ExternalWeightWorker::configureImpl() {
-  _config_.clearFields();
-  _config_.defineFields({
-      {"type"},
-      {"inputEventVarList"},
-    });
 
   _config_.fillValue(_inputEventVarNameList_, "inputEventVarList");
   for( auto& inputName : _inputEventVarNameList_ ){
@@ -152,8 +147,6 @@ void ExternalWeightDialFactory::configureImpl() {
 
   const auto workerType = _config_.fetchValue<std::string>("type");
   if( workerType == "PythonWorker" ){
-    LogThrowIf(not _config_.hasField("workerConfig"),
-               "ExternalWeight options.type is PythonWorker but workerConfig is missing.");
     _worker_ = std::make_unique<ExternalWeightPythonWorker>();
     _worker_->configure(_config_);
   }
@@ -179,27 +172,20 @@ void ExternalWeightPythonWorker::configureImpl() {
 
   auto pythonConfig = _config_.fetchValue<ConfigReader>("workerConfig");
   pythonConfig.defineFields({
-      {"pythonExecutable"},
-      {"pythonVenv"},
-      {"initScript"},
+      {FieldFlag::MANDATORY, "pythonExecutable"},
       {FieldFlag::MANDATORY, "evalScript"},
+      {"initScript"},
       {"scriptArgs"},
     });
   pythonConfig.checkConfiguration();
 
   pythonConfig.fillValue(_pythonExecutable_, "pythonExecutable");
-  pythonConfig.fillValue(_pythonVenv_, "pythonVenv");
   pythonConfig.fillValue(_initScript_, "initScript");
   pythonConfig.fillValue(_evalScript_, "evalScript");
   pythonConfig.fillValue(_scriptArgs_, "scriptArgs");
 
-  LogThrowIf(_pythonExecutable_.empty() and _pythonVenv_.empty(),
-             "ExternalWeight PythonWorker requires either pythonExecutable or pythonVenv.");
-  LogThrowIf(not _pythonExecutable_.empty() and not _pythonVenv_.empty(),
-             "ExternalWeight PythonWorker cannot configure both pythonExecutable and pythonVenv.");
-  if( _pythonExecutable_.empty() ){
-    _pythonExecutable_ = _pythonVenv_ + "/bin/python";
-  }
+  LogThrowIf(_pythonExecutable_.empty(),
+             "ExternalWeight PythonWorker requires either pythonExecutable.");
 }
 
 ExternalWeightPythonWorker::~ExternalWeightPythonWorker(){
