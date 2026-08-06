@@ -11,30 +11,17 @@
 #include <cstdio>
 #include <cstring>
 #include <fcntl.h>
-#include <sstream>
 #include <sys/stat.h>
 #include <sys/mman.h>
 #include <sys/wait.h>
 #include <utility>
 #include <unistd.h>
 
-namespace {
-  std::string buildSharedMemoryName(const std::string& tag_){
-    std::stringstream ss;
-    ss << "gdmEW_" << getpid() << "_" << tag_;
-    return ss.str();
-  }
-
-  std::string toPosixSharedMemoryName(const std::string& name_){
-    return "/" + name_;
-  }
-}
-
 ExternalWeightWorker::SharedMemoryBuffer::SharedMemoryBuffer(
     std::string name_,
     std::size_t nbDoubles_)
     : name(std::move(name_)), nbDoubles(nbDoubles_), nbBytes(std::max<std::size_t>(nbDoubles_, 1)*sizeof(double)) {
-  auto posixName = toPosixSharedMemoryName(name);
+  const std::string posixName = "/" + name;
   fd = shm_open(posixName.c_str(), O_CREAT | O_EXCL | O_RDWR, 0600);
   LogThrowIf(fd == -1, "Could not create shared memory \"" << posixName << "\": " << std::strerror(errno));
   LogThrowIf(ftruncate(fd, off_t(nbBytes)) == -1,
@@ -47,7 +34,7 @@ ExternalWeightWorker::SharedMemoryBuffer::SharedMemoryBuffer(
 ExternalWeightWorker::SharedMemoryBuffer::~SharedMemoryBuffer(){
   if( ptr != nullptr and ptr != MAP_FAILED ){ munmap(ptr, nbBytes); }
   if( fd != -1 ){ close(fd); }
-  if( not name.empty() ){ shm_unlink(toPosixSharedMemoryName(name).c_str()); }
+  if( not name.empty() ){ shm_unlink(("/" + name).c_str()); }
 }
 
 std::string ExternalWeightWorker::normalizeInputName(const std::string& inputName_) {
@@ -102,7 +89,7 @@ void ExternalWeightWorker::finalizeEventLoading() {
     _inputEventValueList_[iInput].shrink_to_fit();
     _inputBufferList_.emplace_back(
         std::make_unique<SharedMemoryBuffer>(
-            buildSharedMemoryName("i" + std::to_string(iInput)),
+            "gdmEW_" + std::to_string(getpid()) + "_i" + std::to_string(iInput),
             _eventCount_
         )
     );
@@ -110,7 +97,10 @@ void ExternalWeightWorker::finalizeEventLoading() {
   }
 
   _weightList_->shrink_to_fit();
-  _weightBuffer_ = std::make_unique<SharedMemoryBuffer>(buildSharedMemoryName("w"), _eventCount_);
+  _weightBuffer_ = std::make_unique<SharedMemoryBuffer>(
+      "gdmEW_" + std::to_string(getpid()) + "_w",
+      _eventCount_
+  );
   std::fill(_weightBuffer_->ptr, _weightBuffer_->ptr + _eventCount_, 1.);
   _areEventsLoaded_ = true;
 
@@ -137,7 +127,7 @@ void ExternalWeightWorker::evaluate(const DialInputBuffer& inputBuffer_) {
 
   if( _parameterBuffer_ == nullptr ){
     _parameterBuffer_ = std::make_unique<SharedMemoryBuffer>(
-        buildSharedMemoryName("parameters"),
+        "gdmEW_" + std::to_string(getpid()) + "_parameters",
         std::size_t(inputBuffer_.getInputSize())
     );
   }
@@ -156,14 +146,14 @@ void ExternalWeightDialFactory::configureImpl() {
   _config_.defineFields({
       {FieldFlag::MANDATORY, "type"},
       {"inputEventVarList"},
-      {"pythonWorkerConfig"},
+      {"workerConfig"},
     });
   _config_.checkConfiguration();
 
   const auto workerType = _config_.fetchValue<std::string>("type");
   if( workerType == "PythonWorker" ){
-    LogThrowIf(not _config_.hasField("pythonWorkerConfig"),
-               "ExternalWeight options.type is PythonWorker but pythonWorkerConfig is missing.");
+    LogThrowIf(not _config_.hasField("workerConfig"),
+               "ExternalWeight options.type is PythonWorker but workerConfig is missing.");
     _worker_ = std::make_unique<ExternalWeightPythonWorker>();
     _worker_->configure(_config_);
   }
@@ -184,16 +174,10 @@ DialBase* ExternalWeightDialFactory::makeDial(const Event& event_) {
   return new ExternalWeightDispatcher(_worker_->getWeightList(), eventIndex);
 }
 
-void ExternalWeightDialFactory::updateWeights(DialInputBuffer& inputBuffer_) {
-  _worker_->updateWeights(inputBuffer_);
-}
-
 void ExternalWeightPythonWorker::configureImpl() {
   ExternalWeightWorker::configureImpl();
-  _config_.defineField({FieldFlag::MANDATORY, "pythonWorkerConfig"});
-  _config_.checkConfiguration();
 
-  auto pythonConfig = _config_.fetchValue<ConfigReader>("pythonWorkerConfig");
+  auto pythonConfig = _config_.fetchValue<ConfigReader>("workerConfig");
   pythonConfig.defineFields({
       {"pythonExecutable"},
       {"pythonVenv"},

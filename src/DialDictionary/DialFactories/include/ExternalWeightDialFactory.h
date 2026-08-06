@@ -20,7 +20,7 @@ public:
   std::size_t registerEvent(const Event& event_);
   void updateWeights(DialInputBuffer& inputBuffer_);
 
-  [[nodiscard]] const std::vector<std::string>& getInputNameList() const { return _inputEventVarNameList_; }
+  [[nodiscard]] const std::vector<std::string>& getInputEventVarNameList() const { return _inputEventVarNameList_; }
   [[nodiscard]] const std::shared_ptr<std::vector<double>>& getWeightList() const { return _weightList_; }
 
 protected:
@@ -102,9 +102,12 @@ protected:
 public:
 
   [[nodiscard]] DialBase* makeDial(const Event& event_) override;
-  void updateWeights(DialInputBuffer& inputBuffer_);
+  void updateWeights(DialInputBuffer& inputBuffer_){ _worker_->updateWeights(inputBuffer_); }
 
-  [[nodiscard]] const std::vector<std::string>& getInputNameList() const{ return _worker_->getInputNameList(); }
+  [[nodiscard]] const std::vector<std::string>& getInputEventVarNameList() const{
+    LogThrowIf(_worker_ == nullptr, "Can't fetch input event name list. Worker isn't set.");
+    return _worker_->getInputEventVarNameList();
+  }
 
 private:
   std::unique_ptr<ExternalWeightWorker> _worker_{nullptr};

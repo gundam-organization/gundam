@@ -685,7 +685,7 @@ bool DialCollection::initializeDialsWithExternalWeight(const ConfigReader& dials
 
   int index = int(_dialCollectionData_.size()) - 1;
 
-  for( const auto& var : getCollectionData<ExternalWeightDialFactory>(index)->getInputNameList() ){
+  for( const auto& var : getCollectionData<ExternalWeightDialFactory>(index)->getInputEventVarNameList() ){
     addExtraLeafName(var);
   }
 
