@@ -1,6 +1,6 @@
 #include "ExternalWeightDialFactory.h"
 
-#include "ExternalWeight.h"
+#include "ExternalWeightDispatcher.h"
 #include "Event.h"
 #include "GenericToolbox.Utils.h"
 #include "Logger.h"
@@ -88,7 +88,7 @@ DialBase* ExternalWeightDialFactory::makeDial(const Event& event_) {
   }
 
   _weightList_.emplace_back(1.);
-  return new ExternalWeight(&_weightList_, eventIndex);
+  return new ExternalWeightDispatcher(&_weightList_, eventIndex);
 }
 
 void ExternalWeightDialFactory::updateWeights(DialInputBuffer& inputBuffer_) {

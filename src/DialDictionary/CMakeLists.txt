@@ -26,7 +26,7 @@ set( SRCFILES
     DialDefinitions/src/Bicubic.cpp
 
     DialDefinitions/src/CompiledLibDial.cpp
-    DialDefinitions/src/ExternalWeight.cpp
+    DialDefinitions/src/ExternalWeightDispatcher.cpp
     DialDefinitions/src/RootFormula.cpp
     DialDefinitions/src/Polynomial.cpp
 
@@ -64,7 +64,7 @@ set( HEADERS
 
     DialDefinitions/include/RootFormula.h
     DialDefinitions/include/Polynomial.h
-    DialDefinitions/include/ExternalWeight.h
+    DialDefinitions/include/ExternalWeightDispatcher.h
 
     # DialFactories
     DialFactories/include/TabulatedDialFactory.h
