@@ -56,15 +56,6 @@ std::string ExternalWeightWorker::normalizeInputName(const std::string& inputNam
 
 void ExternalWeightWorker::configureImpl() {
 
-  _config_.clearFields();
-  _config_.defineFields({
-      {"inputEventVarList"},
-      {"useBinnedWeights"},
-      {"binning"},
-      {"workerConfig"},
-    });
-  _config_.checkConfiguration();
-
   _config_.fillValue(_inputEventVarNameList_, "inputEventVarList");
   for( auto& inputName : _inputEventVarNameList_ ){
     inputName = normalizeInputName(inputName);
