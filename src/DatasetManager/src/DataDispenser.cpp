@@ -37,6 +37,40 @@
 
 namespace {
 
+  struct RootFileAndTreePath{
+    std::string filePath{};
+    std::string treePath{};
+  };
+
+  RootFileAndTreePath resolveRootFileAndTreePath(
+      const std::string& configuredPath_,
+      const std::string& defaultTreePath_
+  ){
+    RootFileAndTreePath out;
+    out.filePath = GenericToolbox::expandEnvironmentVariables(configuredPath_);
+    GenericToolbox::replaceSubstringInsideInputString(out.filePath, "//", "/");
+
+    out.treePath = defaultTreePath_;
+    auto chunks = GenericToolbox::splitString(out.filePath, ":", true);
+    if( chunks.size() > 1 ){
+      out.treePath = chunks[1];
+      out.filePath = chunks[0];
+    }
+
+    LogExitIf(out.treePath.empty(), "TTree path not set for ROOT file: " << configuredPath_);
+    return out;
+  }
+
+  void validateRootFileAndTreePath(
+      const RootFileAndTreePath& source_,
+      const std::string& sourceDescription_
+  ){
+    LogExitIf(
+        not GenericToolbox::doesTFileIsValid(source_.filePath, {source_.treePath}),
+        "Could not open " << sourceDescription_ << ": " << source_.filePath << " with TTree " << source_.treePath
+    );
+  }
+
   bool hasFormulaReferences(const std::string& formula_){
     return not FormulaUtils::extractFormulaReferenceNames(formula_).empty();
   }
@@ -601,7 +635,78 @@ void DataDispenser::configureImpl(){
 
   // options
   _config_.fillValue(_parameters_.globalTreePath, "tree");
-  _config_.fillValue(_parameters_.filePathList, "filePathList");
+  _parameters_.filePathList.clear();
+  const auto* filePathListConfig = _config_.getConfigEntry("filePathList").second;
+  if( filePathListConfig != nullptr ){
+    LogExitIf(not filePathListConfig->is_array(), "filePathList must be a list.");
+    _parameters_.filePathList.reserve(filePathListConfig->size());
+
+    std::set<std::string> expectedFriendNameSet;
+    bool hasEnabledFilePathEntry{false};
+    for( size_t iEntry = 0; iEntry < filePathListConfig->size(); ++iEntry ){
+      const auto& filePathConfig = filePathListConfig->at(iEntry);
+      _parameters_.filePathList.emplace_back();
+      auto& filePathEntry = _parameters_.filePathList.back();
+
+      // Keep the legacy list(string) syntax fully compatible.
+      if( filePathConfig.is_string() ){
+        filePathEntry.path = GenericToolbox::Json::get<std::string>(filePathConfig);
+      }
+      else{
+        LogExitIf(not filePathConfig.is_object(), "filePathList/" << iEntry << " must be a string or an object.");
+        ConfigReader entryConfig(filePathConfig);
+        entryConfig.setParentPath(GenericToolbox::joinPath(_config_.getParentPath(), "filePathList", iEntry));
+        entryConfig.defineFields({
+          {FieldFlag::MANDATORY, "name"},
+          {FieldFlag::MANDATORY, "path"},
+          {"isEnabled"},
+          {"friendList"},
+        });
+        entryConfig.checkConfiguration();
+        filePathEntry.name = entryConfig.fetchValue<std::string>("name");
+        filePathEntry.path = entryConfig.fetchValue<std::string>("path");
+        entryConfig.fillValue(filePathEntry.isEnabled, "isEnabled");
+
+        for( auto& friendConfig : entryConfig.loop("friendList") ){
+          friendConfig.defineFields({
+            {FieldFlag::MANDATORY, "name"},
+            {FieldFlag::MANDATORY, "path"},
+            {"isEnabled"},
+          });
+          friendConfig.checkConfiguration();
+
+          filePathEntry.friendList.emplace_back();
+          auto& friendEntry = filePathEntry.friendList.back();
+          friendEntry.name = friendConfig.fetchValue<std::string>("name");
+          friendEntry.path = friendConfig.fetchValue<std::string>("path");
+          friendConfig.fillValue(friendEntry.isEnabled, "isEnabled");
+        }
+      }
+      std::set<std::string> friendNameSet;
+      for( const auto& friendEntry : filePathEntry.friendList ){
+        LogExitIf(
+            not friendNameSet.emplace(friendEntry.name).second,
+            "Duplicate friend name \"" << friendEntry.name << "\" in filePathList/" << iEntry
+        );
+      }
+      if( not filePathEntry.isEnabled ){ continue; }
+
+      std::set<std::string> enabledFriendNameSet;
+      for( const auto& friendEntry : filePathEntry.friendList ){
+        if( friendEntry.isEnabled ){ enabledFriendNameSet.emplace(friendEntry.name); }
+      }
+      if( not hasEnabledFilePathEntry ){
+        expectedFriendNameSet = std::move(enabledFriendNameSet);
+        hasEnabledFilePathEntry = true;
+      }
+      else{
+        LogExitIf(
+            enabledFriendNameSet != expectedFriendNameSet,
+            "Every enabled filePathList entry must define the same enabled friend names, so that the friend TChains remain aligned."
+        );
+      }
+    }
+  }
   _config_.fillValue(_parameters_.additionalVarsStorage, "additionalLeavesStorage");
   _config_.fillValue(_parameters_.dummyVariablesList, "dummyVariablesList");
   _config_.fillValue(_parameters_.useReweightEngine, "useReweightEngine");
@@ -659,9 +764,19 @@ void DataDispenser::load(Propagator& propagator_){
     return;
   }
 
-  for( const auto& file: _parameters_.filePathList){
-    std::string path = GenericToolbox::expandEnvironmentVariables(file);
-    LogExitIf(not GenericToolbox::doesTFileIsValid(path, {_parameters_.globalTreePath}), "Invalid file: " << path);
+  for( const auto& fileEntry : _parameters_.filePathList ){
+    if( not fileEntry.isEnabled ){ continue; }
+    validateRootFileAndTreePath(
+        resolveRootFileAndTreePath(fileEntry.path, _parameters_.globalTreePath),
+        "ROOT file"
+    );
+    for( const auto& friendEntry : fileEntry.friendList ){
+      if( not friendEntry.isEnabled ){ continue; }
+      validateRootFileAndTreePath(
+          resolveRootFileAndTreePath(friendEntry.path, _parameters_.globalTreePath),
+          "friend \"" + friendEntry.name + "\""
+      );
+    }
   }
 
   this->parseStringParameters();
@@ -1220,41 +1335,93 @@ const std::string& DataDispenser::getVariableExpression(const std::string& varia
 std::shared_ptr<TChain> DataDispenser::openChain(bool verbose_) const{
   LogInfoIf(verbose_) << "Opening ROOT files containing events..." << std::endl;
 
-  std::shared_ptr<TChain> treeChain(std::make_shared<TChain>());
-  for( const auto& file: _parameters_.filePathList){
-    std::string name = GenericToolbox::expandEnvironmentVariables(file);
-    GenericToolbox::replaceSubstringInsideInputString(name, "//", "/");
+  // TFriendElement does not own a TChain supplied through AddFriend(TTree*, ...).
+  // Keep the friend chains alive through the lifetime of their master chain.
+  auto friendChainList = std::make_shared<std::vector<std::shared_ptr<TChain>>>();
+  std::shared_ptr<TChain> treeChain(new TChain(), [friendChainList](TChain* chain){ delete chain; });
+
+  for( const auto& fileEntry : _parameters_.filePathList ){
+    if( not fileEntry.isEnabled ){ continue; }
+    auto source = resolveRootFileAndTreePath(fileEntry.path, _parameters_.globalTreePath);
 
     if( verbose_ ){
       LogScopeIndent;
-      LogInfo << name << std::endl;
+      LogInfo << source.filePath << ":" << source.treePath << std::endl;
     }
 
-    std::string treePath{_parameters_.globalTreePath};
-    auto chunks = GenericToolbox::splitString(name, ":", true);
-    if( chunks.size() > 1 ){ treePath = chunks[1]; name = chunks[0];  }
+    validateRootFileAndTreePath(source, "ROOT file");
 
-    LogExitIf( treePath.empty(), "TTree path not set." );
+    Long64_t sourceNbEntries{-1};
+    std::unique_ptr<TFile> temp{};
+    bool hasEnabledFriend{false};
+    for( const auto& friendEntry : fileEntry.friendList ){
+      if( friendEntry.isEnabled ){ hasEnabledFriend = true; break; }
+    }
+    if( _parameters_.fractionOfEntries != 1. or hasEnabledFriend ){
+      temp.reset(TFile::Open(source.filePath.c_str()));
+      LogExitIf(temp == nullptr, "Error while opening TFile: " << source.filePath);
 
-    LogExitIf( not GenericToolbox::doesTFileIsValid(name, {treePath}), "Could not open TFile: " << name << " with TTree " << treePath);
+      auto* tree = temp->Get<TTree>(source.treePath.c_str());
+      LogExitIf(tree == nullptr, "Error while opening TTree: " << source.treePath << " in " << source.filePath);
+      sourceNbEntries = tree->GetEntries();
+    }
 
     Long64_t nMaxEntries{TTree::kMaxEntries};
     if( _parameters_.fractionOfEntries != 1. ){
-      std::unique_ptr<TFile> temp{TFile::Open(name.c_str())};
-      LogExitIf(temp== nullptr, "Error while opening TFile: " << name);
-
-      auto* tree = temp->Get<TTree>(treePath.c_str());
-      LogExitIf(tree== nullptr, "Error while opening TTree: " << treePath << " in " << name);
-
-      nMaxEntries = Long64_t( double(tree->GetEntries()) * _parameters_.fractionOfEntries );
+      nMaxEntries = Long64_t( double(sourceNbEntries) * _parameters_.fractionOfEntries );
       if( verbose_ ){
         LogScopeIndent;
         LogWarning << "Max entries: " << nMaxEntries << std::endl;
       }
 
     }
-    treeChain->AddFile(name.c_str(), nMaxEntries, treePath.c_str());
+    treeChain->AddFile(source.filePath.c_str(), nMaxEntries, source.treePath.c_str());
 
+    for( const auto& friendEntry : fileEntry.friendList ){
+      if( not friendEntry.isEnabled ){ continue; }
+      auto friendSource = resolveRootFileAndTreePath(friendEntry.path, _parameters_.globalTreePath);
+      validateRootFileAndTreePath(friendSource, "friend \"" + friendEntry.name + "\"");
+
+      std::unique_ptr<TFile> friendFile{TFile::Open(friendSource.filePath.c_str())};
+      LogExitIf(friendFile == nullptr, "Error while opening friend file: " << friendSource.filePath);
+      auto* friendTree = friendFile->Get<TTree>(friendSource.treePath.c_str());
+      LogExitIf(friendTree == nullptr, "Error while opening friend TTree: " << friendSource.treePath << " in " << friendSource.filePath);
+      LogExitIf(
+          friendTree->GetEntries() != sourceNbEntries,
+          "Friend \"" << friendEntry.name << "\" in " << friendSource.filePath << " has " << friendTree->GetEntries()
+          << " entries, while its main tree in " << source.filePath << " has " << sourceNbEntries << ". Friends must be entry-aligned."
+      );
+
+      std::shared_ptr<TChain> friendChain;
+      for( const auto& existingFriendChain : *friendChainList ){
+        if( existingFriendChain->GetName() == friendEntry.name ){ friendChain = existingFriendChain; break; }
+      }
+      if( friendChain == nullptr ){
+        friendChain = std::make_shared<TChain>(friendEntry.name.c_str());
+        friendChainList->emplace_back(friendChain);
+      }
+      friendChain->AddFile(friendSource.filePath.c_str(), nMaxEntries, friendSource.treePath.c_str());
+    }
+
+  }
+
+  for( const auto& friendChain : *friendChainList ){
+    LogExitIf(
+        friendChain->GetEntries() != treeChain->GetEntries(),
+        "Friend TChain \"" << friendChain->GetName() << "\" has " << friendChain->GetEntries()
+        << " entries while the main TChain has " << treeChain->GetEntries() << ". Friends must be entry-aligned."
+    );
+    LogExitIf(
+        treeChain->AddFriend(friendChain.get(), friendChain->GetName()) == nullptr,
+        "Could not attach friend TChain: " << friendChain->GetName()
+    );
+  }
+
+  // ROOT 6.24 connects the current trees of friend TChains lazily. Load the
+  // first entry now so qualified friend expressions are available when a
+  // TreeBuffer/TTreeFormula is initialized immediately after openChain().
+  if( not friendChainList->empty() and treeChain->GetEntries() > 0 ){
+    LogExitIf(treeChain->LoadTree(0) < 0, "Could not load the first entry of the main TChain with its friends.");
   }
 
   return treeChain;

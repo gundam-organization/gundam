@@ -6,6 +6,7 @@
 [![GitHub forks](https://badgen.net/github/forks/gundam-organization/gundam/)](https://github.com/gundam-organization/gundam/network/members)
 [![GitHub release](https://img.shields.io/github/release/gundam-organization/gundam.svg)](https://github.com/gundam-organization/gundam/releases/)
 [![Generic badge](https://img.shields.io/badge/Users-Example_of_inputs-GREEN.svg)](https://github.com/gundam-organization/gundam-input-tutorial)
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/gundam-organization/gundam)
 
 GUNDAM, standing for *Generalized and Unified Neutrino Data Analysis
 Methods*, is a suite of applications that aims to perform various
