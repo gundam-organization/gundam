@@ -4,6 +4,7 @@
 #include "DialFactoryBase.h"
 
 #include "ConfigUtils.h"
+#include "BinSet.h"
 
 #include <cstddef>
 #include <memory>
@@ -19,6 +20,10 @@ public:
 
   std::size_t registerEvent(const Event& event_);
   void updateWeights(DialInputBuffer& inputBuffer_);
+  [[nodiscard]] virtual std::unique_ptr<DialBase> makeBinnedDial(std::size_t binIndex_);
+
+  [[nodiscard]] bool useBinnedWeights() const { return _useBinnedWeights_; }
+  [[nodiscard]] const BinSet& getBinning() const { return _binning_; }
 
   [[nodiscard]] const std::vector<std::string>& getInputEventVarNameList() const { return _inputEventVarNameList_; }
   [[nodiscard]] const std::shared_ptr<std::vector<double>>& getWeightList() const { return _weightList_; }
@@ -43,6 +48,7 @@ protected:
   [[nodiscard]] const SharedMemoryBuffer* getParameterBuffer() const { return _parameterBuffer_.get(); }
   [[nodiscard]] const SharedMemoryBuffer* getWeightBuffer() const { return _weightBuffer_.get(); }
   [[nodiscard]] std::size_t getEventCount() const { return _eventCount_; }
+  [[nodiscard]] std::size_t getWeightCount() const { return _weightCount_; }
 
 protected:
   static std::string normalizeInputName(const std::string& inputName_);
@@ -60,6 +66,9 @@ private:
   std::unique_ptr<SharedMemoryBuffer> _parameterBuffer_{nullptr};
   std::unique_ptr<SharedMemoryBuffer> _weightBuffer_{nullptr};
   std::size_t _eventCount_{0};
+  std::size_t _weightCount_{0};
+  bool _useBinnedWeights_{false};
+  BinSet _binning_{};
   bool _areEventsLoaded_{false};
   mutable std::mutex _eventRegistrationMutex_{};
 };
@@ -101,7 +110,18 @@ protected:
 public:
 
   [[nodiscard]] DialBase* makeDial(const Event& event_) override;
+  [[nodiscard]] std::unique_ptr<DialBase> makeBinnedDial(std::size_t binIndex_){ return _worker_->makeBinnedDial(binIndex_); }
   void updateWeights(DialInputBuffer& inputBuffer_){ _worker_->updateWeights(inputBuffer_); }
+
+  [[nodiscard]] bool useBinnedWeights() const{
+    LogThrowIf(_worker_ == nullptr, "Can't fetch binned-weight mode. Worker isn't set.");
+    return _worker_->useBinnedWeights();
+  }
+
+  [[nodiscard]] const BinSet& getBinning() const{
+    LogThrowIf(_worker_ == nullptr, "Can't fetch binning. Worker isn't set.");
+    return _worker_->getBinning();
+  }
 
   [[nodiscard]] const std::vector<std::string>& getInputEventVarNameList() const{
     LogThrowIf(_worker_ == nullptr, "Can't fetch input event name list. Worker isn't set.");

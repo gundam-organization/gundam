@@ -679,14 +679,26 @@ bool DialCollection::initializeDialsWithExternalWeight(const ConfigReader& dials
   LogThrowIf(not dialsDefinition_.hasField("options"),
              "ExternalWeight dial requires an options configuration block.");
 
-  auto externalWeight = std::make_unique<ExternalWeightDialFactory>();
-  externalWeight->configure(dialsDefinition_.fetchValue<ConfigReader>("options"));
-  _dialCollectionData_.emplace_back(std::move(externalWeight));
+  auto externalWeightFactory = std::make_unique<ExternalWeightDialFactory>();
+  externalWeightFactory->configure(dialsDefinition_.fetchValue<ConfigReader>("options"));
+  _dialCollectionData_.emplace_back(std::move(externalWeightFactory));
 
   int index = int(_dialCollectionData_.size()) - 1;
 
   for( const auto& var : getCollectionData<ExternalWeightDialFactory>(index)->getInputEventVarNameList() ){
     addExtraLeafName(var);
+  }
+
+  auto* externalWeight = getCollectionData<ExternalWeightDialFactory>(index);
+  if( externalWeight->useBinnedWeights() ){
+    _dialBinSet_ = externalWeight->getBinning();
+    _dialInterfaceList_.reserve(_dialBinSet_.getBinList().size());
+    for( std::size_t iBin = 0 ; iBin < _dialBinSet_.getBinList().size() ; ++iBin ){
+      _dialInterfaceList_.emplace_back();
+      _dialInterfaceList_.back().setDial(
+          DialBaseObject(externalWeight->makeBinnedDial(iBin))
+      );
+    }
   }
 
   addUpdate(
@@ -922,9 +934,10 @@ bool DialCollection::initializeDialsWithDefinition() {
                "Error initializing dials with kriging");
   }
   else if( _dialType_ == DialType::ExternalWeight ) {
-    _isEventByEvent_ = true;
     LogThrowIf(not initializeDialsWithExternalWeight(dialsDefinition),
                "Error initializing dials with external weights");
+    auto* externalWeight = getCollectionData<ExternalWeightDialFactory>(_dialCollectionData_.size() - 1);
+    _isEventByEvent_ = not externalWeight->useBinnedWeights();
   }
   else if( dialsDefinition.hasField("binning") ) {
     // This dial collection is binned with different weights for each bin.

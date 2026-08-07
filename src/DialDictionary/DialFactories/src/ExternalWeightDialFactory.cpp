@@ -37,6 +37,14 @@ ExternalWeightWorker::SharedMemoryBuffer::~SharedMemoryBuffer(){
   if( not name.empty() ){ shm_unlink(("/" + name).c_str()); }
 }
 
+std::unique_ptr<DialBase> ExternalWeightWorker::makeBinnedDial(std::size_t binIndex_) {
+  LogThrowIf(not _useBinnedWeights_,
+             "Cannot create a binned ExternalWeight dial when useBinnedWeights is false.");
+  LogThrowIf(binIndex_ >= _weightList_->size(),
+             "ExternalWeight bin index out of range: " << binIndex_ << " >= " << _weightList_->size());
+  return std::make_unique<ExternalWeightDispatcher>(_weightList_, binIndex_);
+}
+
 std::string ExternalWeightWorker::normalizeInputName(const std::string& inputName_) {
   auto out = GenericToolbox::trimString(inputName_, " ");
   if( out.size() >= 2 and out.front() == '[' and out.back() == ']' ){
@@ -48,17 +56,48 @@ std::string ExternalWeightWorker::normalizeInputName(const std::string& inputNam
 
 void ExternalWeightWorker::configureImpl() {
 
+  _config_.clearFields();
+  _config_.defineFields({
+      {"inputEventVarList"},
+      {"useBinnedWeights"},
+      {"binning"},
+      {"workerConfig"},
+    });
+  _config_.checkConfiguration();
+
   _config_.fillValue(_inputEventVarNameList_, "inputEventVarList");
   for( auto& inputName : _inputEventVarNameList_ ){
     inputName = normalizeInputName(inputName);
     LogThrowIf(inputName.empty(), "ExternalWeight inputEventVarList contains an empty input name.");
   }
+
+  _config_.fillValue(_useBinnedWeights_, "useBinnedWeights");
+  if( _useBinnedWeights_ ){
+    LogThrowIf(not _config_.hasField("binning"),
+               "ExternalWeight useBinnedWeights requires a binning configuration.");
+    _binning_.configure(_config_.fetchValue<ConfigReader>("binning"));
+    LogThrowIf(_binning_.getBinList().empty(),
+               "ExternalWeight binned weights require at least one bin.");
+
+    for( const auto& variableName : _binning_.buildVariableNameList() ){
+      if( not GenericToolbox::doesElementIsInVector(variableName, _inputEventVarNameList_) ){
+        _inputEventVarNameList_.emplace_back(variableName);
+      }
+    }
+  }
   _inputEventValueList_.resize(_inputEventVarNameList_.size());
+
+  _weightCount_ = _useBinnedWeights_ ? _binning_.getBinList().size() : 0;
+  if( _useBinnedWeights_ ){
+    _weightList_->assign(_weightCount_, 1.);
+  }
 
 }
 
 std::size_t ExternalWeightWorker::registerEvent(const Event& event_) {
   std::lock_guard<std::mutex> lock(_eventRegistrationMutex_);
+  LogThrowIf(_useBinnedWeights_,
+             "Binned ExternalWeight dials must be created from the configured binning.");
   LogThrowIf(_areEventsLoaded_, "Cannot register an event after loading ExternalWeight buffers.");
 
   const std::size_t eventIndex = _weightList_->size();
@@ -74,33 +113,70 @@ std::size_t ExternalWeightWorker::registerEvent(const Event& event_) {
 void ExternalWeightWorker::finalizeEventLoading() {
   if( _areEventsLoaded_ ){ return; }
 
-  _eventCount_ = _weightList_->size();
-  _inputBufferList_.clear();
-  _inputBufferList_.reserve(_inputEventValueList_.size());
-  for( std::size_t iInput = 0 ; iInput < _inputEventValueList_.size() ; ++iInput ){
-    LogThrowIf(_inputEventValueList_[iInput].size() != _eventCount_,
-               "ExternalWeight input \"" << _inputEventVarNameList_[iInput] << "\" has "
-               << _inputEventValueList_[iInput].size() << " entries for " << _eventCount_ << " events.");
-    _inputEventValueList_[iInput].shrink_to_fit();
-    _inputBufferList_.emplace_back(
-        std::make_unique<SharedMemoryBuffer>(
-            "gdmEW_" + std::to_string(getpid()) + "_i" + std::to_string(iInput),
-            _eventCount_
-        )
+  if( _useBinnedWeights_ ){
+    _eventCount_ = 0;
+    _weightCount_ = _binning_.getBinList().size();
+    _inputBufferList_.clear();
+    _inputBufferList_.reserve(_inputEventVarNameList_.size());
+
+    for( std::size_t iInput = 0 ; iInput < _inputEventVarNameList_.size() ; ++iInput ){
+      const auto& inputName = _inputEventVarNameList_[iInput];
+      auto inputBuffer = std::make_unique<SharedMemoryBuffer>(
+          "gdmEW_" + std::to_string(getpid()) + "_i" + std::to_string(iInput),
+          _weightCount_
+      );
+      for( std::size_t iBin = 0 ; iBin < _weightCount_ ; ++iBin ){
+        const auto* edges = _binning_.getBinList().at(iBin).getVarEdgesPtr(inputName);
+        LogThrowIf(edges == nullptr,
+                   "ExternalWeight binned input \"" << inputName
+                   << "\" is not defined by bin " << iBin << ".");
+        inputBuffer->ptr[iBin] = edges->getCenterValue();
+      }
+      _inputBufferList_.emplace_back(std::move(inputBuffer));
+    }
+
+    _weightList_->assign(_weightCount_, 1.);
+    _weightList_->shrink_to_fit();
+    _weightBuffer_ = std::make_unique<SharedMemoryBuffer>(
+        "gdmEW_" + std::to_string(getpid()) + "_w",
+        _weightCount_
     );
-    std::copy(_inputEventValueList_[iInput].begin(), _inputEventValueList_[iInput].end(), _inputBufferList_.back()->ptr);
+    std::fill(_weightBuffer_->ptr, _weightBuffer_->ptr + _weightCount_, 1.);
+    _areEventsLoaded_ = true;
+    LogInfo << "ExternalWeight worker registered " << _weightCount_
+            << " bins with inputs " << GenericToolbox::toString(_inputEventVarNameList_) << "." << std::endl;
   }
+  else {
 
-  _weightList_->shrink_to_fit();
-  _weightBuffer_ = std::make_unique<SharedMemoryBuffer>(
-      "gdmEW_" + std::to_string(getpid()) + "_w",
-      _eventCount_
-  );
-  std::fill(_weightBuffer_->ptr, _weightBuffer_->ptr + _eventCount_, 1.);
-  _areEventsLoaded_ = true;
+    _eventCount_ = _weightList_->size();
+    _weightCount_ = _eventCount_;
+    _inputBufferList_.clear();
+    _inputBufferList_.reserve(_inputEventValueList_.size());
+    for( std::size_t iInput = 0 ; iInput < _inputEventValueList_.size() ; ++iInput ){
+      LogThrowIf(_inputEventValueList_[iInput].size() != _eventCount_,
+                 "ExternalWeight input \"" << _inputEventVarNameList_[iInput] << "\" has "
+                 << _inputEventValueList_[iInput].size() << " entries for " << _eventCount_ << " events.");
+      _inputEventValueList_[iInput].shrink_to_fit();
+      _inputBufferList_.emplace_back(
+          std::make_unique<SharedMemoryBuffer>(
+              "gdmEW_" + std::to_string(getpid()) + "_i" + std::to_string(iInput),
+              _eventCount_
+          )
+      );
+      std::copy(_inputEventValueList_[iInput].begin(), _inputEventValueList_[iInput].end(), _inputBufferList_.back()->ptr);
+    }
 
-  LogInfo << "ExternalWeight worker registered " << _eventCount_
-          << " events with inputs " << GenericToolbox::toString(_inputEventVarNameList_) << "." << std::endl;
+    _weightList_->shrink_to_fit();
+    _weightBuffer_ = std::make_unique<SharedMemoryBuffer>(
+        "gdmEW_" + std::to_string(getpid()) + "_w",
+        _eventCount_
+    );
+    std::fill(_weightBuffer_->ptr, _weightBuffer_->ptr + _eventCount_, 1.);
+    _areEventsLoaded_ = true;
+
+    LogInfo << "ExternalWeight worker registered " << _eventCount_
+            << " events with inputs " << GenericToolbox::toString(_inputEventVarNameList_) << "." << std::endl;
+  }
 }
 
 void ExternalWeightWorker::updateWeights(DialInputBuffer& inputBuffer_) {
@@ -116,7 +192,7 @@ void ExternalWeightWorker::updateWeights(DialInputBuffer& inputBuffer_) {
 void ExternalWeightWorker::evaluate(const DialInputBuffer& inputBuffer_) {
   LogThrowIf(not this->isInitialized(), "ExternalWeight worker is not initialized.");
   LogThrowIf(_weightBuffer_ == nullptr, "ExternalWeight worker has no weight buffer.");
-  LogThrowIf(_eventCount_ != _weightList_->size(),
+  LogThrowIf(_weightCount_ != _weightList_->size(),
              "ExternalWeight has " << _eventCount_ << " shared-memory weights for "
              << _weightList_->size() << " registered dials.");
 
@@ -133,7 +209,7 @@ void ExternalWeightWorker::evaluate(const DialInputBuffer& inputBuffer_) {
   }
 
   this->evaluateImpl(inputBuffer_);
-  std::copy(_weightBuffer_->ptr, _weightBuffer_->ptr + _eventCount_, _weightList_->begin());
+  std::copy(_weightBuffer_->ptr, _weightBuffer_->ptr + _weightCount_, _weightList_->begin());
 }
 
 void ExternalWeightDialFactory::configureImpl() {
@@ -141,6 +217,8 @@ void ExternalWeightDialFactory::configureImpl() {
   _config_.defineFields({
       {FieldFlag::MANDATORY, "type"},
       {"inputEventVarList"},
+      {"useBinnedWeights"},
+      {"binning"},
       {"workerConfig"},
     });
   _config_.checkConfiguration();
@@ -431,6 +509,7 @@ except Exception as error:
   JsonType initCommand;
   initCommand["command"] = "initialize";
   initCommand["nEvents"] = getEventCount();
+  initCommand["nBins"] = getWeightCount();
   initCommand["inputs"] = JsonType::object();
   const auto& inputNameList = getLoadedInputNameList();
   const auto& inputBufferList = getInputBufferList();
@@ -438,7 +517,7 @@ except Exception as error:
     initCommand["inputs"][inputNameList[iInput]] = {
         {"shmName", inputBufferList.at(iInput)->name},
         {"dtype", "float64"},
-        {"shape", {getEventCount()}}
+        {"shape", {getWeightCount()}}
     };
   }
 
@@ -462,7 +541,7 @@ except Exception as error:
   initCommand["weights"] = {
       {"shmName", weightBuffer->name},
       {"dtype", "float64"},
-      {"shape", {getEventCount()}}
+      {"shape", {getWeightCount()}}
   };
 
   this->sendWorkerCommand(initCommand);
