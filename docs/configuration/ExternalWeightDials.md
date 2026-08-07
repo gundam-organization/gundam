@@ -26,6 +26,7 @@ parameterSetList:
           - name: "sinSqTheta"
         options:
           type: "PythonWorker"
+          useBinnedWeights: false
           inputEventVarList:
             - "[Enu]"
             - "[FlavorEmit]"
@@ -54,6 +55,8 @@ parameterSetList:
 | dialInputList                 | list(json) | Fit parameters passed to the worker                             |         |
 | options.type                  | string     | Worker implementation; currently `PythonWorker`                 |         |
 | options.inputEventVarList     | list(str)  | Event variables made available to every worker                  | empty   |
+| options.useBinnedWeights      | bool       | Evaluate one weight per configured bin instead of per event      | false   |
+| options.binning                | json       | `BinSet` configuration used when `useBinnedWeights` is enabled  |         |
 | options.workerConfig          | json       | Configuration specific to the selected worker                   |         |
 | workerConfig.pythonExecutable | string     | Python executable used to start `PythonWorker`                  |         |
 | workerConfig.evalScript       | string     | Python worker script                                            |         |
@@ -68,6 +71,38 @@ options:
 ```
 
 `inputEventVarList` is optional. Omit it when the weight depends only on fit parameters. Each configured input is evaluated while loading the dataset and stored in memory by the common worker layer.
+
+When `useBinnedWeights` is enabled, `options.binning` uses the standard GUNDAM
+`BinSet` syntax. GUNDAM creates one dispatcher per bin and `EventDialCache`
+associates each event with the matching dispatcher. The Python worker receives
+one input value per bin, evaluated at the bin center, and writes one weight
+per bin. Binning variables are automatically added to `inputEventVarList`.
+Every input variable requested by the worker must be defined in every bin.
+Events outside the configured bins do not receive the external dial.
+
+For example:
+
+```yaml
+options:
+  type: PythonWorker
+  useBinnedWeights: true
+  binning:
+    binningDefinition:
+      - name: Enu
+        nBins: 100
+        min: 0.0
+        max: 10.0
+      - name: FlavorEmit
+        values: [12, 14]
+      - name: FlavorDetect
+        values: [12, 14]
+  workerConfig:
+    pythonExecutable: "/path/to/venv/bin/python"
+    evalScript: "./config/externalWeightWorker.py"
+```
+
+In binned mode, `command_["nBins"]` is the size of the NumPy arrays exposed
+through `command_["inputs"]` and `command_["weights"]`.
 
 At the moment, the shared-memory transport exposes event inputs as `float64` arrays. If an input is semantically an integer, such as a flavor code, the worker should cast it explicitly before using it.
 
@@ -233,23 +268,26 @@ command and handles the shared-memory cleanup after `shutdown`.
 
 ## Internal Engine Flow
 
-During dataset loading, GUNDAM creates one `ExternalWeightDispatcher` per selected event. Each dispatcher stores its event index and a shared reference to the weight vector owned by `ExternalWeightWorker`.
+In the default mode, GUNDAM creates one `ExternalWeightDispatcher` per
+selected event. In `useBinnedWeights` mode, it creates one dispatcher per
+configured bin instead; `EventDialCache` associates each selected event with
+the corresponding bin dispatcher.
 
 After all events are loaded:
 
 1. GUNDAM allocates one shared-memory `double` array per requested input variable (none when `inputEventVarList` is omitted).
-2. GUNDAM fills those input arrays once from the selected events.
+2. GUNDAM fills those input arrays once from the selected events, or with bin-center values in binned mode.
 3. GUNDAM allocates one shared-memory `double` array for the current fit parameters.
-4. GUNDAM allocates one shared-memory `double` array for the output event weights.
+4. GUNDAM allocates one shared-memory `double` array for the output weights. Its size is `nEvents` in the default mode and `nBins` in binned mode.
 5. GUNDAM starts the Python worker and sends the shared-memory names and array metadata in the `initialize` JSON command.
 
 At each propagation:
 
 1. GUNDAM writes the current fit parameter values into `parameterBuffer`.
 2. GUNDAM sends the small JSON command `{ "command": "evaluate" }`.
-3. The Python worker computes all event weights and writes them into the shared `weights` array.
-4. The common worker layer copies the shared `weights` array into its weight vector.
-5. Each `ExternalWeightDispatcher` returns the weight corresponding to its event index.
+3. The Python worker computes all event or bin weights and writes them into the shared `weights` array.
+4. The common worker layer updates the shared weight vector.
+5. Each `ExternalWeightDispatcher` returns the weight corresponding to its event or bin index.
 
 The large numerical arrays are therefore never serialized to JSON and are not written to disk. JSON is only used as a small control protocol for metadata and commands.
 
