@@ -84,7 +84,12 @@ def write_external_weight_script(script_path: Path) -> None:
     )
 
 
-def build_config_text(root_path: Path, eval_script_path: Path, python_executable: str) -> str:
+def build_config_text(
+    root_path: Path,
+    eval_script_path: Path,
+    python_executable: str,
+    use_binned_weights: bool,
+) -> str:
     return """
 fitterEngineConfig:
   likelihoodInterfaceConfig:
@@ -97,6 +102,7 @@ fitterEngineConfig:
         isEnabled: true
         model:
           tree: tree_mc
+          additionalLeavesStorage: ["Enu", "FlavorEmit", "FlavorDetect"]
           filePathList:
             - "{root_path}"
 
@@ -124,6 +130,16 @@ fitterEngineConfig:
                   - name: "sinSqTheta"
                 options:
                   type: PythonWorker
+                  useBinnedWeights: {use_binned_weights}
+                  binning:
+                    binningDefinition:
+                      - name: Enu
+                        # Bin centers are exactly the six test event energies.
+                        edges: [0.55, 0.65, 0.95, 1.45, 1.55, 2.45, 2.55]
+                      - name: FlavorEmit
+                        values: [14]
+                      - name: FlavorDetect
+                        values: [12, 14]
                   inputEventVarList: [ "[Enu]", "[FlavorEmit]", "[FlavorDetect]" ]
                   workerConfig:
                     pythonExecutable: "{python_executable}"
@@ -144,6 +160,7 @@ fitterEngineConfig:
         root_path=root_path,
         eval_script_path=eval_script_path,
         python_executable=python_executable,
+        use_binned_weights=str(use_binned_weights).lower(),
     )
 
 
@@ -178,11 +195,29 @@ def evaluate_config(config_text: str, work_dir: Path) -> float:
     if len(bin_content_list) != 1:
       raise RuntimeError("Expected 1 bin, got {0}".format(len(bin_content_list)))
 
+    event_weight_list = []
+    print("Event weights (ExternalWeight):")
+    for event in sample.getEventList():
+        enu = event.getVariables().fetchVariable("Enu").getVarAsDouble()
+        flavor_emit = event.getVariables().fetchVariable("FlavorEmit").getVarAsDouble()
+        flavor_detect = event.getVariables().fetchVariable("FlavorDetect").getVarAsDouble()
+        event_weight = float(event.getEventWeight())
+        event_weight_list.append((event.getIndices().treeEntry, event_weight))
+        print(
+            "  treeEntry={0}: Enu={1}, FlavorEmit={2}, FlavorDetect={3}, weight={4}".format(
+                event.getIndices().treeEntry,
+                enu,
+                flavor_emit,
+                flavor_detect,
+                event_weight,
+            )
+        )
+
     print("Bin contents (ExternalWeight):")
     for bin_context, bin_content in zip(bin_context_list, bin_content_list):
         print("  {0} -> sumWeights={1}".format(bin_context.bin.getSummary(False), bin_content.sumWeights))
 
-    return float(bin_content_list[0].sumWeights)
+    return float(bin_content_list[0].sumWeights), event_weight_list
 
 
 def main() -> int:
@@ -193,9 +228,6 @@ def main() -> int:
 
     write_input_root_file(root_path)
     write_external_weight_script(eval_script_path)
-
-    config_text = build_config_text(root_path, eval_script_path, sys.executable)
-    sum_weights = evaluate_config(config_text, work_dir)
 
     baseline_km = 295.0
     delta_msq = 2.5e-3
@@ -209,24 +241,48 @@ def main() -> int:
         {"Enu": 2.5, "FlavorEmit": 14, "FlavorDetect": 14},
     ]
     expected_sum_weights = 0.0
+    expected_event_weights = {}
     for event in event_data:
         phase = 1.267 * delta_msq * baseline_km / event["Enu"]
         transition_probability = sin_sq_theta * math.sin(phase) ** 2
-        if event["FlavorEmit"] == event["FlavorDetect"]:
-            expected_sum_weights += 1.0 - transition_probability
-        else:
-            expected_sum_weights += transition_probability
-
-    if not math.isclose(sum_weights, expected_sum_weights, rel_tol=0.0, abs_tol=1.0e-9):
-        print(
-            "FAIL: expected external weights to give sumWeights={0}, got {1}".format(
-                expected_sum_weights,
-                sum_weights,
-            )
+        event_weight = (
+            1.0 - transition_probability
+            if event["FlavorEmit"] == event["FlavorDetect"]
+            else transition_probability
         )
-        return 1
+        expected_sum_weights += event_weight
+        expected_event_weights[event["Enu"]] = event_weight
 
-    print("SUCCESS: ExternalWeight evaluates a two-flavor oscillation probability with mixed input semantics.")
+    for use_binned_weights in (False, True):
+        config_text = build_config_text(
+            root_path,
+            eval_script_path,
+            sys.executable,
+            use_binned_weights,
+        )
+        sum_weights, event_weight_list = evaluate_config(config_text, work_dir)
+        mode_name = "binned" if use_binned_weights else "event-by-event"
+        for tree_entry, event_weight in event_weight_list:
+            expected_weight = expected_event_weights[event_data[tree_entry]["Enu"]]
+            if not math.isclose(event_weight, expected_weight, rel_tol=0.0, abs_tol=1.0e-9):
+                print(
+                    "FAIL ({0}): treeEntry={1} expected weight={2}, got {3}".format(
+                        mode_name, tree_entry, expected_weight, event_weight
+                    )
+                )
+                return 1
+        if not math.isclose(sum_weights, expected_sum_weights, rel_tol=0.0, abs_tol=1.0e-9):
+            print(
+                "FAIL ({0}): expected external weights to give sumWeights={1}, got {2}".format(
+                    mode_name,
+                    expected_sum_weights,
+                    sum_weights,
+                )
+            )
+            return 1
+        print("SUCCESS ({0}): sumWeights={1}".format(mode_name, sum_weights))
+
+    print("SUCCESS: ExternalWeight matches in event-by-event and binned modes.")
     return 0
 
 
