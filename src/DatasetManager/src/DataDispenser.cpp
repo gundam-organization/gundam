@@ -2019,7 +2019,8 @@ void DataDispenser::loadEvent(int iThread_){
 
         if( dialCollectionRef->getDialType() == DialCollection::DialType::Tabulated
             or dialCollectionRef->getDialType() == DialCollection::DialType::Kriged
-            or dialCollectionRef->getDialType() == DialCollection::DialType::ExternalWeight ) {
+            or (dialCollectionRef->getDialType() == DialCollection::DialType::ExternalWeight
+                and dialCollectionRef->isEventByEvent()) ) {
           // Event-by-event dial with a factory.
 
           std::unique_ptr<DialBase> dialBase(
