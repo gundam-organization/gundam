@@ -41,8 +41,6 @@ GUNDAM [User Documentation](https://gundam-organization.github.io/gundam/) is gr
   - Recommended GCC 8+ ( GCC 5 minimum )
   - Recommended Clang 9+ ( Clang 3.4 minimum )
 - [ROOT 6, compiled with C++14 or later](https://github.com/root-project/root)
-- [JSON for Modern C++](https://github.com/nlohmann/json)
-- [yaml-cpp](https://github.com/jbeder/yaml-cpp)
 
 ![Clone & Update banner](resources/images/README/sections/sections.002.png)
 
