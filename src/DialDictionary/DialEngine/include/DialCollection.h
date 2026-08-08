@@ -32,10 +32,12 @@ public:
   ENUM_FIELD( Formula ) \
   ENUM_FIELD( CompiledLibDial ) \
   ENUM_FIELD( Tabulated ) \
-  ENUM_FIELD( Kriged )
+  ENUM_FIELD( Kriged ) \
+  ENUM_FIELD( ExternalWeight )
 #define ENUM_DICT \
    ENUM_DICT_ENTRY("Normalization", "Norm") \
-   ENUM_DICT_ENTRY("RootFormula", "Formula")
+   ENUM_DICT_ENTRY("RootFormula", "Formula") \
+   ENUM_DICT_ENTRY("ExternalWeightResponse", "ExternalWeight")
 #include "GenericToolbox.MakeEnum.h"
   MAKE_ENUM_JSON_INTERFACE(DialType);
 
@@ -178,6 +180,7 @@ protected:
   bool initializeDialsWithBinningFile(const ConfigReader& dialsDefinition);
   bool initializeDialsWithTabulation(const ConfigReader& dialsDefinition);
   bool initializeDialsWithKriging(const ConfigReader& dialsDefinition);
+  bool initializeDialsWithExternalWeight(const ConfigReader& dialsDefinition);
 
   void readParametersFromConfig(const ConfigReader &config_);
   ConfigReader fetchDialsDefinition(const ConfigReader &definitionsList_) const;
