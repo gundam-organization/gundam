@@ -50,6 +50,17 @@ Backends::PropagationToken Backends::CpuBackend::requestPropagation(const Parame
     _lastResult_.status.statLikelihood = OutputState::ReadyOnDevice;
   }
   _lastResult_.status.backend = BackendStatus::Ready;
+
+  _lastTiming_ = BackendTimingSummary();
+  _lastTiming_.cachedDialStageSeconds = _cachedDialStageTimer_.eval().count();
+  _lastTiming_.eventWeightsStageSeconds = _eventWeightsStageTimer_.eval().count();
+  _lastTiming_.histogramStageSeconds = _histogramStageTimer_.eval().count();
+  _lastTiming_.likelihoodHostSeconds = _likelihoodHostTimer_.eval().count();
+  _lastTiming_.uniqueDialCount = model.dials.size();
+  _lastTiming_.cachedDialCount = std::count(_isCachedDial_.begin(), _isCachedDial_.end(), std::uint8_t(true));
+  _lastTiming_.eventDialIndexCount = model.eventDialIndices.size();
+  _lastTiming_.splineScalarCount = model.dialPayloads.size();
+
   return _lastResult_.token;
 }
 
@@ -188,12 +199,17 @@ void Backends::CpuBackend::calculateEventWeights(Result& result_, const Paramete
   updateCachedDialResponses(parameters_);
   _activeResult_ = &result_;
   _activeParameters_ = &parameters_;
-  _threadPool_.runJob("CpuBackend::calculateEventWeights");
+  {
+    auto timerScope = _eventWeightsStageTimer_.scopeTime();
+    _threadPool_.runJob("CpuBackend::calculateEventWeights");
+  }
   _activeParameters_ = nullptr;
   _activeResult_ = nullptr;
 }
 
 void Backends::CpuBackend::updateCachedDialResponses(const ParameterSnapshot& parameters_) {
+  auto timerScope = _cachedDialStageTimer_.scopeTime();
+
   _dirtyCachedDialIndices_.clear();
   if( not _isDialResponseCachePrimed_ or _lastParameterValues_.size() != parameters_.values.size() ){
     for( std::uint32_t iDial = 0 ; iDial < _isCachedDial_.size() ; iDial++ ){
@@ -262,6 +278,8 @@ void Backends::CpuBackend::calculateEventWeightsThread(int iThread_) {
 }
 
 void Backends::CpuBackend::calculateHistograms(Result& result_) {
+  auto timerScope = _histogramStageTimer_.scopeTime();
+
   LogThrowIf(result_.eventWeights.empty(), "CPU backend histogram build requires event weights.");
   const auto& propagation = _engineView_.propagation;
   const int nThreads = _threadPool_.getNbThreads();
@@ -312,6 +330,8 @@ void Backends::CpuBackend::calculateHistogramsFromEvents(Result& result_, const 
 }
 
 void Backends::CpuBackend::calculateLikelihood(Result& result_) {
+  auto timerScope = _likelihoodHostTimer_.scopeTime();
+
   result_.likelihood = Semantics::calculateLikelihood(
       _engineView_.likelihood,
       result_.histSums,

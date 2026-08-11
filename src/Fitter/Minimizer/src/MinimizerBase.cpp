@@ -220,10 +220,40 @@ double MinimizerBase::evalFit( const double* parArray_ ){
       ssHeader << std::endl;
 
       GenericToolbox::TablePrinter t;
+      auto formatBackendTime = [](double seconds_){
+        if( seconds_ <= 0 ){ return std::string{"not-mon."}; }
+        return GenericToolbox::parseTimeUnit(seconds_*1E6);
+      };
 
       t << "" << GenericToolbox::TablePrinter::NextColumn;
-      t << "Propagator" << GenericToolbox::TablePrinter::NextColumn;
 
+#ifdef GUNDAM_USING_BACKENDS
+      const bool isBackendActive = getOwner().getBackendsManager().hasBackend();
+      if( isBackendActive ){
+        const auto& backendManager = getOwner().getBackendsManager();
+        const auto* backend = backendManager.getBackend();
+        const std::string backendName = backend != nullptr ? backend->getName() : std::string{"unknown"};
+        const bool hasCpuBackendTiming = backend != nullptr and backendManager.getType() == "CPU";
+        const auto timing = hasCpuBackendTiming ? backend->getLastTimingSummary() : Backends::BackendTimingSummary();
+
+        t << "Backend (" << backendName << ")" << GenericToolbox::TablePrinter::NextColumn;
+        t << "Dial cache" << GenericToolbox::TablePrinter::NextColumn;
+        t << "Event weights" << GenericToolbox::TablePrinter::NextColumn;
+        t << "histograms fill" << GenericToolbox::TablePrinter::NextColumn;
+        t << "Stat LLH" << GenericToolbox::TablePrinter::NextColumn;
+        t << _monitor_.minimizerTitle << GenericToolbox::TablePrinter::NextLine;
+
+        t << "Speed" << GenericToolbox::TablePrinter::NextColumn;
+        t << _monitor_.iterationCounterClock.evalTickSpeed() << " it/s" << GenericToolbox::TablePrinter::NextColumn;
+        t << (hasCpuBackendTiming ? formatBackendTime(timing.cachedDialStageSeconds) : std::string{"NM"}) << GenericToolbox::TablePrinter::NextColumn;
+        t << (hasCpuBackendTiming ? formatBackendTime(timing.eventWeightsStageSeconds) : std::string{"NM"}) << GenericToolbox::TablePrinter::NextColumn;
+        t << (hasCpuBackendTiming ? formatBackendTime(timing.histogramStageSeconds) : std::string{"NM"}) << GenericToolbox::TablePrinter::NextColumn;
+        t << (hasCpuBackendTiming ? formatBackendTime(timing.likelihoodHostSeconds) : std::string{"NM"}) << GenericToolbox::TablePrinter::NextColumn;
+        t << _monitor_.externalTimer << GenericToolbox::TablePrinter::NextLine;
+      }
+      else{
+#endif
+      t << "Propagator" << GenericToolbox::TablePrinter::NextColumn;
       t << "Dial Update" << GenericToolbox::TablePrinter::NextColumn;
 #ifdef GUNDAM_USING_CACHE_MANAGER
       if( Cache::Manager::Get() != nullptr ){
@@ -257,6 +287,9 @@ double MinimizerBase::evalFit( const double* parArray_ ){
       }
 #endif
       t << _monitor_.externalTimer << GenericToolbox::TablePrinter::NextLine;
+#ifdef GUNDAM_USING_BACKENDS
+      }
+#endif
 
       ssHeader << t.generateTableString();
 
