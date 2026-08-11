@@ -5,6 +5,7 @@
 #include "BackendTypes.h"
 #include "Backend.h"
 #include "ParameterSnapshot.h"
+#include "GenericToolbox.Time.h"
 #include "GenericToolbox.Thread.h"
 
 #include <cstdint>
@@ -31,6 +32,7 @@ namespace Backends {
     [[nodiscard]] const std::vector<double>& getEventWeightsHostView(const PropagationToken& token_) const override;
     [[nodiscard]] const std::vector<double>& getHistogramSumsHostView(const PropagationToken& token_) const override;
     [[nodiscard]] const std::vector<double>& getHistogramSumSquaresHostView(const PropagationToken& token_) const override;
+    [[nodiscard]] BackendTimingSummary getLastTimingSummary() const override { return _lastTiming_; }
 
   private:
     struct Result {
@@ -70,6 +72,11 @@ namespace Backends {
     bool _isDialResponseCachePrimed_{false};
     std::vector<std::vector<double>> _threadHistogramSums_{};
     std::vector<std::vector<double>> _threadHistogramSumSquares_{};
+    GenericToolbox::Time::AveragedTimer<10> _cachedDialStageTimer_{};
+    GenericToolbox::Time::AveragedTimer<10> _eventWeightsStageTimer_{};
+    GenericToolbox::Time::AveragedTimer<10> _histogramStageTimer_{};
+    GenericToolbox::Time::AveragedTimer<10> _likelihoodHostTimer_{};
+    BackendTimingSummary _lastTiming_{};
     std::uint64_t _nextTokenId_{1};
     bool _isBuilt_{false};
   };
