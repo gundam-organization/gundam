@@ -39,6 +39,22 @@ namespace {
     return std::isalpha(static_cast<unsigned char>(c_)) or c_ == '_';
   }
 
+  // ROOT qualifies friend-tree leaves with an alias, e.g. friend.branch.
+  // Treat the complete qualified path as one leaf expression rather than as
+  // two independent bare variables.
+  size_t consumeQualifiedIdentifier(const std::string& formula_, size_t cursor_){
+    while( cursor_ < formula_.size() and isIdentifierChar(formula_[cursor_]) ){ cursor_++; }
+    while(
+        cursor_ + 1 < formula_.size()
+        and formula_[cursor_] == '.'
+        and isIdentifierStart(formula_[cursor_ + 1])
+    ){
+      cursor_ += 2;
+      while( cursor_ < formula_.size() and isIdentifierChar(formula_[cursor_]) ){ cursor_++; }
+    }
+    return cursor_;
+  }
+
   bool isBareIdentifierFormulaToken(
       const std::string& formula_,
       size_t begin_,
@@ -224,8 +240,7 @@ std::vector<std::string> extractBareVariableNames(const std::string& formula_){
     }
 
     auto begin = cursor;
-    cursor++;
-    while( cursor < formula_.size() and isIdentifierChar(formula_[cursor]) ){ cursor++; }
+    cursor = consumeQualifiedIdentifier(formula_, cursor + 1);
 
     if( isBareIdentifierFormulaToken(formula_, begin, cursor) ){
       addUnique(output, formula_.substr(begin, cursor - begin));
@@ -265,8 +280,7 @@ std::string convertBareVariablesToFormulaParameters(const std::string& formula_)
     }
 
     auto begin = cursor;
-    cursor++;
-    while( cursor < formula_.size() and isIdentifierChar(formula_[cursor]) ){ cursor++; }
+    cursor = consumeQualifiedIdentifier(formula_, cursor + 1);
 
     if( isBareIdentifierFormulaToken(formula_, begin, cursor) ){
       output += "[";

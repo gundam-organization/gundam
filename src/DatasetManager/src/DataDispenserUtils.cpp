@@ -18,7 +18,7 @@ std::string DataDispenserParameters::getSummary() const{
   ss << std::endl << GET_VAR_NAME_VALUE(nominalWeightFormulaStr);
   ss << std::endl << GET_VAR_NAME_VALUE(selectionCutFormulaStr);
   ss << std::endl << "activeLeafNameList = " << GenericToolbox::toString(activeLeafNameList, true);
-  ss << std::endl << "filePathList = " << GenericToolbox::toString(filePathList, true);
+  ss << std::endl << "filePathList = " << GenericToolbox::toString(filePathList, [](const DataDispenserParameters::FilePathEntry& entry){ return entry.path; }, true);
   ss << std::endl << "variableDict = " << GenericToolbox::toString(variableDict, true);
   ss << std::endl << "additionalVarsStorage = " << GenericToolbox::toString(additionalVarsStorage, true);
   return ss.str();

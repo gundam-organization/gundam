@@ -6,6 +6,7 @@
 [![GitHub forks](https://badgen.net/github/forks/gundam-organization/gundam/)](https://github.com/gundam-organization/gundam/network/members)
 [![GitHub release](https://img.shields.io/github/release/gundam-organization/gundam.svg)](https://github.com/gundam-organization/gundam/releases/)
 [![Generic badge](https://img.shields.io/badge/Users-Example_of_inputs-GREEN.svg)](https://github.com/gundam-organization/gundam-input-tutorial)
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/gundam-organization/gundam)
 
 GUNDAM, standing for *Generalized and Unified Neutrino Data Analysis
 Methods*, is a suite of applications that aims to perform various
@@ -40,8 +41,6 @@ GUNDAM [User Documentation](https://gundam-organization.github.io/gundam/) is gr
   - Recommended GCC 8+ ( GCC 5 minimum )
   - Recommended Clang 9+ ( Clang 3.4 minimum )
 - [ROOT 6, compiled with C++14 or later](https://github.com/root-project/root)
-- [JSON for Modern C++](https://github.com/nlohmann/json)
-- [yaml-cpp](https://github.com/jbeder/yaml-cpp)
 
 ![Clone & Update banner](resources/images/README/sections/sections.002.png)
 
