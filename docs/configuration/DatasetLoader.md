@@ -31,7 +31,7 @@ As an entry list
 | tree                    | string                       | Name of the TTree containing the data in each file                          |         |
 | selectionCutFormula     | formula                      | Global selection cut (should return 0 if not selected)                      |         |
 | nominalTreeWeightFormula | formula                     | Formula that returns the base weight of a given event                       |         |
-| filePathList            | list(string)                 | list of ROOT files containing the TTree                                     |         |
+| filePathList            | list(string \| json)          | list of ROOT files containing the TTree; entries can attach friend TTrees   |         |
 | additionalLeavesStorage | list(string)                 | list of variables to be stored in memory                                    |         |
 | variablesTransform      | list(json)                   | Deprecated. Use `variableDict` entries with `evalFromLib` instead.          |         |
 | variableDict            | list(json)                   | dictionary translating a leaf, formula, or shared-library output to a variable name |         |
@@ -61,6 +61,40 @@ variableDict:
         - "TMath::Abs(mode)"
       messageOnError: "optional build hint"
 ```
+
+`filePathList` keeps its historical list-of-strings syntax:
+
+```yaml
+filePathList:
+  - "${DATA_DIR}/events.root"
+```
+
+It can also use named entries to attach ROOT friend trees. The `name` keys identify list entries for configuration overrides; friend names are ROOT aliases and should be used to qualify their branches in formulas.
+
+```yaml
+filePathList:
+  - name: "run1"
+    path: "${DATA_DIR}/events-run1.root:events"
+    friendList:
+      - name: "weights"
+        path: "${DATA_DIR}/weights-run1.root:weights"
+      - name: "truth"
+        path: "${DATA_DIR}/truth-run1.root:truth"
+  - name: "run2"
+    path: "${DATA_DIR}/events-run2.root:events"
+    isEnabled: true
+    friendList:
+      - name: "weights"
+        path: "${DATA_DIR}/weights-run2.root:weights"
+        isEnabled: true
+      - name: "truth"
+        path: "${DATA_DIR}/truth-run2.root:truth"
+
+variableDict:
+  - { name: "weight", expr: "weights.nominalWeight" }
+```
+
+Both main-file and friend entries accept `isEnabled` (default: `true`). Disabled main files are excluded from the chain; disabled friends are not attached. Every enabled file entry must declare the same enabled friend aliases. Each enabled friend tree must have exactly the same number and order of entries as its corresponding main tree. A branch with a unique name may be referenced without its alias, but `friendAlias.branch` is the recommended form because it remains unambiguous.
 
 
 #### data

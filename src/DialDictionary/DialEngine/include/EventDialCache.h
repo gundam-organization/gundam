@@ -78,6 +78,24 @@ public:
       }
       return ss.str();
     }
+    [[nodiscard]] bool isEventAffectedBy(const Parameter& parameter_) {
+      return not getDialIndicesAffecting(parameter_).empty();
+    }
+    [[nodiscard]] std::vector<int> getDialIndicesAffecting(const Parameter& parameter_) {
+      std::vector<int> out;
+      // loop over the dials attached to this event
+      int idx{-1};
+      for( auto& dialCache : dialResponseCacheList ) {
+        idx++;
+        // some dials may have > 1 paramater as input
+        for( size_t inputIndex = 0 ; inputIndex < dialCache.dialInterface->getInputBufferRef()->getInputSize() ; inputIndex++ ){
+          if( &dialCache.dialInterface->getInputBufferRef()->getParameter(int(inputIndex)) == &parameter_ ) {
+            out.emplace_back(idx);
+          }
+        }
+      }
+      return out;
+    }
   };
 
   /// A pair of indices into the vector of dial collections, and then the

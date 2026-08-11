@@ -215,8 +215,15 @@ PYBIND11_MODULE(GUNDAM, module) {
 
   pybind11::bind_vector<std::vector<Event>>(module, "EventList");
 
+  pybind11::class_<DialInputBuffer>(module, "DialInputBuffer")
+  .def("update", &DialInputBuffer::update)
+  .def("getSummary", &DialInputBuffer::getSummary)
+  .def("invalidateBuffers", &DialInputBuffer::invalidateBuffers)
+  ;
+
   pybind11::class_<DialInterface>(module, "DialInterface")
   .def("evalResponse", &DialInterface::evalResponse)
+  .def("getInputBuffer", &DialInterface::getInputBuffer, pybind11::return_value_policy::reference_internal)
   .def("getSummary", &DialInterface::getSummary, pybind11::arg("shallow") = true);
 
   pybind11::class_<EventDialCache::DialResponseCache>(module, "DialResponseCache")
@@ -235,6 +242,7 @@ PYBIND11_MODULE(GUNDAM, module) {
   .def("getEvent", [](EventDialCache::CacheEntry& this_){return this_.event;}, pybind11::return_value_policy::reference_internal)
   .def("getDialResponseCacheList", [](EventDialCache::CacheEntry& this_) -> std::vector<EventDialCache::DialResponseCache>& {return this_.dialResponseCacheList;}, pybind11::return_value_policy::reference_internal)
   .def("getSummary", &EventDialCache::CacheEntry::getSummary, pybind11::arg("shallow") = true)
+  .def("getDialIndicesAffecting", &EventDialCache::CacheEntry::getDialIndicesAffecting, pybind11::arg("parameter_"))
   ;
 
   pybind11::bind_vector<std::vector<EventDialCache::CacheEntry>>(module, "EventDialCacheEntryList");
@@ -253,6 +261,7 @@ PYBIND11_MODULE(GUNDAM, module) {
   .def("getStdDevValue", &Parameter::getStdDevValue)
   .def("getThrowValue", &Parameter::getThrowValue)
   .def("getParameterValue", &Parameter::getParameterValue)
+  .def("getSummary", &Parameter::getSummary)
   .def("setParameterValue", &Parameter::setParameterValue, pybind11::arg("parameterValue"), pybind11::arg("force") = false)
   ;
 
