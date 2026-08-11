@@ -144,6 +144,19 @@ Use a precalculated table of weights.  The table may be refilled for each
 iteration of the fitter. The method of filling the table is defined using
 the [tableConfig](KrigedDials.md) option.
 
+#### `dialType: ExternalWeight`
+
+| Option            | Type      | Description                                             | Default |
+|-------------------|-----------|---------------------------------------------------------|---------|
+| type              | string    | Worker implementation; currently `PythonWorker`         |         |
+| inputEventVarList | list(str) | Optional event variables exposed to the worker          | empty   |
+| workerConfig      | json      | Configuration specific to the selected worker           |         |
+
+Use an external worker to calculate one weight per selected event.
+`PythonWorker` is the current implementation; other worker types can use the
+same shared-memory inputs, parameters, and output weights. JSON is only used
+as a lightweight control protocol. See [ExternalWeightDials](ExternalWeightDials.md).
+
 #### `dialType: Formula`
 
 Apply a weight using a ROOT formula.  This is not fully supported since it
