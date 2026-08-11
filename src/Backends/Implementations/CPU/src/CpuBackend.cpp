@@ -162,12 +162,10 @@ void Backends::CpuBackend::initializeDialResponseCache() {
 
   for( std::uint32_t iDial = 0 ; iDial < propagation.dials.size() ; iDial++ ){
     const auto& dial = propagation.dials[iDial];
-    const bool isComplexDial = dial.type == BackendDialType::CompactSpline
-                               or dial.type == BackendDialType::UniformSpline
-                               or dial.type == BackendDialType::MonotonicSpline
-                               or dial.type == BackendDialType::GeneralSpline
-                               or dial.type == BackendDialType::Graph;
-    if( not isComplexDial or dial.inputCount != 1 or dial.firstInput >= propagation.dialInputs.size() ){
+    const bool canCacheSingleInputResponse = dial.type != BackendDialType::Shift
+                                             and dial.inputCount == 1
+                                             and dial.firstInput < propagation.dialInputs.size();
+    if( not canCacheSingleInputResponse ){
       continue;
     }
 
