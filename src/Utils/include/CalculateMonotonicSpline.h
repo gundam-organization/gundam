@@ -1,5 +1,4 @@
 #ifndef CALCULATE_MONOTONIC_SPLINE_H_SEEN
-#include <cmath>
 // Calculate a monotonic spline with uniformly space knots.  This adds a
 // function that can be called from CPU (with c++), or a GPU (with CUDA).
 // This is much faster than TSpline3.  This uses the constraint that the slope
@@ -30,123 +29,17 @@
 #define DEVICE_FLOATING_POINT double
 #endif
 
+#include "DeviceMath/SharedSplineMonotonic.h"
+
 // Place in a private name space so it plays nicely with CUDA
 namespace {
-    // Interpolate one point using a monotonic spline.  This takes the "index"
-    // of the point in the data, the parameter value (that made the index), a
-    // minimum and maximum bound, the buffer of data for this spline, and the
-    // number of knots in the spline data.  The input data is arrange
-    // as
-
-    // data[0] -- spline lower bound
-    // data[1] -- spline step between X values
-    // data[2+n+0] -- The function value for knot n (0 to dim-1)
-    //
-    // NOTE: CalculateUniformSpline, CalculateGeneralSpline,
-    // CalculateCompactSpline, and CalculateMonotonicSpline have very similar,
-    // but different calls.  In particular the dim parameter meaning is not
-    // consistent.
-    DEVICE_CALLABLE_INLINE
-    double CalculateMonotonicSpline(const double x,
-                                    const double lowerBound, double upperBound,
-                                    const DEVICE_FLOATING_POINT* data,
-                                    const int dim) {
-
-        // Interpolate between p2 and p3
-        // ix-2 ix-1 ix   ix+1 ix+2 ix+3
-        // p0   p1   p2---p3   p4   p5
-        //   d10  d21  d32  d43  d54
-        // m0| |m1| |m2| |m3| |m4| |m5
-        //  a0 ||a1 ||a2 ||a3 ||a4 ||a5
-        //     b0   b1   b2   b3   b4
-
-        const double low = data[0];
-        const double step = data[1];
-
-        // Get the integer part
-        const double xx = (x-low)/step;
-        const int ix = (xx<0) ? xx-1: xx;
-
-        // Calculate the indices of the two points to calculate d21
-        int d21_0 = ix-1;             // p1
-        if (d21_0 < 0)     d21_0 = 0;
-        if (d21_0 > dim-2) d21_0 = dim-2;
-        const int d21_1 = d21_0+1;          // p2
-        // Calculate the indices of the two points to calculate d32
-        int d32_0 = ix;               // p2
-        if (d32_0 < 0)     d32_0 = 0;
-        if (d32_0 > dim-2) d32_0 = dim-2;
-        const int d32_1 = d32_0+1;          // p3
-        // Calculate the indices of the two points to calculate d43;
-        int d43_0 = ix+1;             // p3
-        if (d43_0 < 0)     d43_0 = 0;
-        if (d43_0 > dim-2) d43_0 = dim-2;
-        const int d43_1 = d43_0+1;          // p4
-
-        // Find the points to use.
-        const double p2 = data[2+d32_0];
-        const double p3 = data[2+d32_1];
-
-        // Get the remainder for the "index".  If the input index is less than
-        // zero or greater than kPointSize-1, this is the distance from the
-        // boundary.
-        const double fx = xx-d32_0;
-
-        // Get the values of the deltas
-        const double d21 = data[2+d21_1] - data[2+d21_0];
-        const double d32 = p3-p2;
-        const double d43 = data[2+d43_1] - data[2+d43_0];
-
-        // Find the raw slopes at each point
-        double m2 = 0.5*(d21+d32);
-        double m3 = 0.5*(d32+d43);
-
-#define FRITSCH_CARLSON
-#ifdef FRITSCH_CARLSON
-        // Apply the Fritsh-Carlson monotonic condition to the slopes.
-        //
-        // F.N.Fritsch, and R.E.Carlson, "Monotone Piecewise Cubic
-        // Interpolation" SIAM Journal on Numerical Analysis, Vol. 17, Iss. 2
-        // (1980) doi:10.1137/0717021
-        //
-
-        // Deal with cusp points and flat areas.
-        if (d32*d21 <= 0.0) m2 = 0.0;
-        if (d43*d32 <= 0.0) m3 = 0.0;
-
-        const double ad21 = (d21<0) ? -d21: d21;
-        const double ad32 = (d32<0) ? -d32: d32;
-        const double ad43 = (d43<0) ? -d43: d43;
-
-        const double delta2 = 3.0*((ad21 < ad32) ? ad21 : ad32);
-        const double delta3 = 3.0*((ad32 < ad43) ? ad32 : ad43);
-
-        if (m2 > delta2) m2 = delta2;
-        if (m2 < -delta2) m2 = -delta2;
-        if (m3 > delta3) m3 = delta3;
-        if (m3 < -delta3) m3 = -delta3;
-#endif
-
-        // Cubic spline with the points and slopes.  This is the formula that
-        // you will find in most text books for a hermitian spline.
-
-        // const double fxx = fx*fx;
-        // const double fxxx = fx*fxx;
-        // double v = p2*(2.0*fxxx-3.0*fxx+1.0) + m2*(fxxx-2.0*fxx+fx)
-        //     + p3*(3.0*fxx-2.0*fxxx) + m3*(fxxx-fxx);
-
-        // Factored via Horner's method.
-        double v = ((((2.0*p2 - 2.0*p3 + m3 + m2)*fx
-                      + 3.0*p3 - 3.0*p2 - m3 - 2.0*m2)*fx
-                     +m2)*fx
-                    +p2);
-
-        if (v < lowerBound) v = lowerBound;
-        if (v > upperBound) v = upperBound;
-
-        return v;
-    }
-
+  DEVICE_CALLABLE_INLINE
+  double CalculateMonotonicSpline(const double x,
+                                  const double lowerBound, double upperBound,
+                                  const DEVICE_FLOATING_POINT* data,
+                                  const int dim) {
+    return GundamDeviceMath::EvaluateMonotonicSpline(x, lowerBound, upperBound, data, dim);
+  }
 }
 
 // An MIT Style License

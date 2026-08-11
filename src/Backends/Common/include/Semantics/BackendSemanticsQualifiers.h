@@ -1,0 +1,18 @@
+#ifndef GUNDAM_BACKEND_SEMANTICS_QUALIFIERS_H
+#define GUNDAM_BACKEND_SEMANTICS_QUALIFIERS_H
+
+#include <cassert>
+
+#if defined(__CUDACC__)
+#define GUNDAM_BACKEND_HOST_DEVICE __host__ __device__
+#define GUNDAM_BACKEND_FORCE_INLINE __forceinline__
+#else
+#define GUNDAM_BACKEND_HOST_DEVICE
+#define GUNDAM_BACKEND_FORCE_INLINE inline
+#endif
+
+#ifndef GUNDAM_BACKEND_SEMANTICS_ASSERT
+#define GUNDAM_BACKEND_SEMANTICS_ASSERT(condition) assert(condition)
+#endif
+
+#endif // GUNDAM_BACKEND_SEMANTICS_QUALIFIERS_H

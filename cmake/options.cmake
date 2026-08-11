@@ -16,6 +16,7 @@ option( WITH_ROOT_DICT_BUILD "Build the targets that require ROOT_GENERATE_DICTI
 option( WITH_GUNDAM_ROOT_APP "Build app gundamRoot." ON )
 option( WITH_GUNDAM_SANDBOX_APP "Build app gundamRoot." OFF )
 option( WITH_CACHE_MANAGER "Enable compiling of the cache manager (required for GPU computing)." ON )
+option( WITH_BACKENDS "Enable compiling of the experimental backend library." ON )
 option( WITH_CUDA_LIB "Enable CUDA language check (Cache::Manager requires a GPU if CUDA is found)." OFF )
 option( WITH_MINUIT2_MISSING "Allow MINUIT2 to be missing" OFF )
 option( WITH_PYTHON_INTERFACE "Compile the python interface modules" OFF )
@@ -83,6 +84,13 @@ if( WITH_CACHE_MANAGER )
   endif( NOT WITH_CUDA_LIB )
 else()
   cmessage( STATUS "Cache manager is disabled. Use -D WITH_CACHE_MANAGER=ON if needed." )
+endif()
+
+if( WITH_BACKENDS )
+  cmessage( STATUS "-D WITH_BACKENDS=ON: enabling experimental backend library..." )
+  add_definitions( -D GUNDAM_USING_BACKENDS )
+else()
+  cmessage( STATUS "Experimental backend library is disabled. Use -D WITH_BACKENDS=ON if needed." )
 endif()
 
 

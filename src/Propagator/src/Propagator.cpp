@@ -15,7 +15,6 @@
 
 #include "GenericToolbox.Utils.h"
 
-#include <memory>
 #include <vector>
 
 void Propagator::muteLogger(){ Logger::setIsMuted( true ); }

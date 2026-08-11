@@ -19,6 +19,7 @@
 #include <vector>
 #include <map>
 #include <future>
+#include <memory>
 
 class Propagator : public JsonBaseClass {
 
