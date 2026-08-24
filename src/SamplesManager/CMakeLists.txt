@@ -32,7 +32,8 @@ target_include_directories(
 
 target_link_libraries(
     ${LIB_NAME}
-    PUBLIC GundamParametersManager
+    PUBLIC
+    GundamUtils
 )
 
 #set_target_properties( ${LIB_NAME} PROPERTIES VERSION "${GUNDAM_VERSION_STRING}")

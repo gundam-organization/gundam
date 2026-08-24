@@ -43,6 +43,8 @@ endif()
 
 target_link_libraries( GundamPropagator
     PUBLIC
+    GundamParametersManager
+    GundamSamplesManager
     GundamDialDictionary
     ${CACHE_MANAGER_LIBRARIES}
 )
