@@ -6,6 +6,7 @@
 
 #include "TabulatedDialFactory.h"
 #include "KrigedDialFactory.h"
+#include "ExternalWeightDialFactory.h"
 
 #include "RootFormula.h"
 #include "Shift.h"
@@ -104,6 +105,13 @@ void DialCollection::configureImpl() {
 }
 void DialCollection::initializeImpl() {
   LogThrowIf(_index_==-1, "Index not set.");
+
+  for( auto& collectionData : _dialCollectionData_ ){
+    if( auto* externalWeight = dynamic_cast<ExternalWeightDialFactory*>(collectionData.get()) ){
+      externalWeight->initialize();
+    }
+  }
+
   this->setupDialInterfaceReferences();
 }
 
@@ -285,7 +293,9 @@ void DialCollection::readParametersFromConfig(const ConfigReader &config_) {
   // globals for the dialSet
   config_.fillValue(_enableDialsSummary_, "printDialSummary");
   config_.fillValue(_dialType_, "dialType");
-  config_.fillValue(_dialOptions_, "options");
+  if( _dialType_ != DialType::ExternalWeight ){
+    config_.fillValue(_dialOptions_, "options");
+  }
   config_.fillValue(_dialLeafName_, "treeExpression");
   config_.fillValue(_minDialResponse_, "minDialResponse");
   config_.fillValue(_maxDialResponse_, "maxDialResponse");
@@ -665,6 +675,41 @@ bool DialCollection::initializeDialsWithKriging(const ConfigReader& dialsDefinit
   return true;
 }
 
+bool DialCollection::initializeDialsWithExternalWeight(const ConfigReader& dialsDefinition_){
+  LogThrowIf(not dialsDefinition_.hasField("options"),
+             "ExternalWeight dial requires an options configuration block.");
+
+  auto externalWeightFactory = std::make_unique<ExternalWeightDialFactory>();
+  externalWeightFactory->configure(dialsDefinition_.fetchValue<ConfigReader>("options"));
+  _dialCollectionData_.emplace_back(std::move(externalWeightFactory));
+
+  int index = int(_dialCollectionData_.size()) - 1;
+
+  for( const auto& var : getCollectionData<ExternalWeightDialFactory>(index)->getInputEventVarNameList() ){
+    addExtraLeafName(var);
+  }
+
+  auto* externalWeight = getCollectionData<ExternalWeightDialFactory>(index);
+  if( externalWeight->useBinnedWeights() ){
+    _dialBinSet_ = externalWeight->getBinning();
+    _dialInterfaceList_.reserve(_dialBinSet_.getBinList().size());
+    for( std::size_t iBin = 0 ; iBin < _dialBinSet_.getBinList().size() ; ++iBin ){
+      _dialInterfaceList_.emplace_back();
+      _dialInterfaceList_.back().setDial(
+          DialBaseObject(externalWeight->makeBinnedDial(iBin))
+      );
+    }
+  }
+
+  addUpdate(
+      [index](DialCollection* dc){
+        dc->getCollectionData<ExternalWeightDialFactory>(index)
+          ->updateWeights(dc->getDialInputBufferList().front());
+      });
+
+  return true;
+}
+
 bool DialCollection::initializeDialsWithBinningFile(const ConfigReader& dialsDefinition) {
   if( not dialsDefinition.hasField("binning") ){ return false; }
 
@@ -887,6 +932,12 @@ bool DialCollection::initializeDialsWithDefinition() {
     _isEventByEvent_ = true;
     LogThrowIf(not initializeDialsWithKriging(dialsDefinition),
                "Error initializing dials with kriging");
+  }
+  else if( _dialType_ == DialType::ExternalWeight ) {
+    LogThrowIf(not initializeDialsWithExternalWeight(dialsDefinition),
+               "Error initializing dials with external weights");
+    auto* externalWeight = getCollectionData<ExternalWeightDialFactory>(_dialCollectionData_.size() - 1);
+    _isEventByEvent_ = not externalWeight->useBinnedWeights();
   }
   else if( dialsDefinition.hasField("binning") ) {
     // This dial collection is binned with different weights for each bin.
