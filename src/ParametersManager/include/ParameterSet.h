@@ -85,9 +85,14 @@ public:
   [[nodiscard]] auto& getName() const{ return _name_; }
   [[nodiscard]] auto& getDialSetDefinitions() const{ return _dialSetDefinitions_; }
   [[nodiscard]] auto& getCustomParThrow() const{ return _customParThrow_; }
-  [[nodiscard]] auto& getPriorCovarianceMatrix() const { return _priorCovarianceMatrix_; }
   [[nodiscard]] auto& getPriorFullCovarianceMatrix() const { return _priorFullCovarianceMatrix_; }
-  [[nodiscard]] auto& getInverseCovarianceMatrix() const{ return _inverseCovarianceMatrix_; }
+  [[nodiscard]] auto& getNbCorrelatedParameters() const{ return _nCorrelatedParams_; }
+  [[nodiscard]] auto& getCorrelatedParameterList() const{ return _correlatedParameterList_; }
+  [[nodiscard]] auto& getPriorCorrelationMatrix() const{ return _priorCorrelationMatrix_; }
+  [[nodiscard]] auto& getInversePriorCorrelationMatrix() const{ return _priorCorrelationMatrixInv_; }
+
+  // derive from correlation and std-devs
+  std::shared_ptr<TMatrixD> generatePriorCovarianceMatrix() const;
 
   /// Get the vector of parameters for this parameter set in the real
   /// parameter space.  These parameters are not eigendecomposed.  WARNING:
@@ -253,9 +258,13 @@ private:
 
   // original loaded from file
   std::shared_ptr<TMatrixDSym> _priorFullCovarianceMatrix_{nullptr};
-  // matrices stripped from fixed/freed parameters
-  std::shared_ptr<TMatrixDSym> _priorCovarianceMatrix_{nullptr};
-  std::shared_ptr<TMatrixD> _inverseCovarianceMatrix_{nullptr}; // inverse matrix used for chi2
+
+  // penalty
+  int _nCorrelatedParams_{0};
+  std::vector<Parameter*> _correlatedParameterList_{}; // list of references for the corr matrices
+  std::shared_ptr<TMatrixDSym> _priorCorrelationMatrix_{nullptr};
+  std::shared_ptr<TMatrixD> _priorCorrelationMatrixInv_{nullptr};
+  std::shared_ptr<TMatrixD> _priorCovarianceMatrixInv_{nullptr};
 
   std::shared_ptr<TVectorD>  _parameterPriorList_{nullptr};
   std::shared_ptr<TVectorD>  _parameterLowerBoundsList_{nullptr};
