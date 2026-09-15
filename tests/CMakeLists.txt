@@ -47,6 +47,28 @@ if( WITH_GOOGLE_TEST )
   include(GoogleTest)
   cmessage( STATUS "Compiling google tests" )
 
+  function(gundam_discover_tests target_)
+    if(APPLE)
+      # DYLD_LIBRARY_PATH overrides even the build RPATHs and can load an older
+      # installed GUNDAM. Sanitize both discovery (which runs during the build)
+      # and CTest execution, without changing the user's shell environment.
+      # TEST_LAUNCHER was introduced in CMake 3.29. Older GoogleTest modules
+      # use CROSSCOMPILING_EMULATOR as their executable wrapper on native builds.
+      if(CMAKE_VERSION VERSION_LESS 3.29)
+        set(launcher_property CROSSCOMPILING_EMULATOR)
+      else()
+        set(launcher_property TEST_LAUNCHER)
+      endif()
+      get_property(existing_launcher TARGET ${target_} PROPERTY ${launcher_property})
+      set(launcher "${CMAKE_COMMAND}" -E env --unset=DYLD_LIBRARY_PATH)
+      if(existing_launcher)
+        list(APPEND launcher ${existing_launcher})
+      endif()
+      set_property(TARGET ${target_} PROPERTY ${launcher_property} "${launcher}")
+    endif()
+    gtest_discover_tests(${target_} ${ARGN})
+  endfunction()
+
   ## Create a list of all of the fast tests.  These are always
   ## compiled, and are run when WITH_FAST_TEST is on.  The fast tests
   ## are run during CI, so all of them should finish quickly, and we
@@ -75,7 +97,7 @@ if( WITH_GOOGLE_TEST )
     target_link_libraries(gundamGTest_fastTest.exe GTest::gtest_main)
     target_link_libraries(gundamGTest_fastTest.exe GundamFitter)
     if(WITH_FAST_TEST)
-      gtest_discover_tests(gundamGTest_fastTest.exe PROPERTIES LABELS unit)
+      gundam_discover_tests(gundamGTest_fastTest.exe PROPERTIES LABELS unit)
     endif(WITH_FAST_TEST)
   endif(FAST_TESTS)
 
@@ -91,7 +113,7 @@ if( WITH_GOOGLE_TEST )
     target_link_libraries(gundamGTest_regularTest.exe GTest::gtest_main)
     target_link_libraries(gundamGTest_regularTest.exe GundamFitter)
     if(WITH_REGULAR_TEST)
-      gtest_discover_tests(gundamGTest_regularTest.exe PROPERTIES LABELS unit)
+      gundam_discover_tests(gundamGTest_regularTest.exe PROPERTIES LABELS unit)
     endif(WITH_REGULAR_TEST)
   endif(REGULAR_TESTS)
 
@@ -106,7 +128,7 @@ if( WITH_GOOGLE_TEST )
     target_link_libraries(gundamGTest_host.exe GundamCacheManager)
     target_compile_definitions(gundamGTest_host.exe PUBLIC HEMI_CUDA_DISABLE)
     if (WITH_REGULAR_TEST)
-      gtest_discover_tests(gundamGTest_host.exe PROPERTIES LABELS host)
+      gundam_discover_tests(gundamGTest_host.exe PROPERTIES LABELS host)
     endif(WITH_REGULAR_TEST)
 
     if(CMAKE_CUDA_COMPILER)
@@ -120,7 +142,7 @@ if( WITH_GOOGLE_TEST )
       target_link_libraries(gundamGTest_device.exe GTest::gtest_main)
       target_link_libraries(gundamGTest_device.exe GundamCacheManager)
       if(WITH_REGULAR_TEST)
-        gtest_discover_tests(gundamGTest_device.exe PROPERTIES LABELS device)
+        gundam_discover_tests(gundamGTest_device.exe PROPERTIES LABELS device)
       endif(WITH_REGULAR_TEST)
     endif(CMAKE_CUDA_COMPILER)
 
