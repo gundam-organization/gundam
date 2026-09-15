@@ -125,6 +125,20 @@ bool Backends::packDeviceBackendModel(const PropagationView& model_,
         continue;
       }
 
+      if( eventDial.type == BackendDialType::ExternalWeight ){
+        if( eventDial.externalBlockIndex >= model_.externalWeightBlocks.size() ){
+          return fail("External weight source index is out of range.");
+        }
+        const auto& block = model_.externalWeightBlocks[eventDial.externalBlockIndex];
+        if( eventDial.externalWeightIndex >= block.count
+            or block.offset > std::numeric_limits<std::uint32_t>::max()
+            or eventDial.externalWeightIndex > std::numeric_limits<std::uint32_t>::max() - block.offset ){
+          return fail("External weight index cannot be represented on the device.");
+        }
+        packedModel_.totalDynamicDialOccurrences++;
+        continue;
+      }
+
       if( eventDial.inputCount != 1 ){
         return fail("at least one backend dial is not device-compatible because it does not have exactly one input parameter.");
       }
@@ -324,6 +338,7 @@ bool Backends::packDeviceBackendModel(const PropagationView& model_,
     eventRanges.uniformOffset = std::uint32_t(packedModel_.uniformDialIndices.size());
     eventRanges.monotonicOffset = std::uint32_t(packedModel_.monotonicDialIndices.size());
     eventRanges.generalOffset = std::uint32_t(packedModel_.generalDialIndices.size());
+    eventRanges.externalOffset = std::uint32_t(packedModel_.externalDialOccurrences.size());
     eventRanges.graphOffset = std::uint32_t(packedModel_.graphDialIndices.size());
     for( std::size_t iDial = 0 ; iDial < event.weight.dialCount ; iDial++ ){
       processedDialRefs++;
@@ -331,6 +346,15 @@ bool Backends::packDeviceBackendModel(const PropagationView& model_,
       if( eventDial.type == BackendDialType::Shift ){
         LogThrowIf(eventDial.payloadSize < 1, "Internal device packing error: Shift dial payload is empty.");
         packedModel_.baseWeights[event.resultIndex] *= float(model_.dialPayloads.at(eventDial.payloadOffset));
+        continue;
+      }
+      if( eventDial.type == BackendDialType::ExternalWeight ){
+        const auto& block = model_.externalWeightBlocks.at(eventDial.externalBlockIndex);
+        DeviceExternalDialOccurrence occurrence;
+        occurrence.weightIndex = std::uint32_t(block.offset + eventDial.externalWeightIndex);
+        occurrence.minResponse = eventDial.hasMinResponse ? float(eventDial.minResponse) : -std::numeric_limits<float>::infinity();
+        occurrence.maxResponse = eventDial.hasMaxResponse ? float(eventDial.maxResponse) : std::numeric_limits<float>::infinity();
+        packedModel_.externalDialOccurrences.emplace_back(occurrence);
         continue;
       }
       if( eventDial.type == BackendDialType::Norm ){
@@ -366,6 +390,7 @@ bool Backends::packDeviceBackendModel(const PropagationView& model_,
     eventRanges.uniformCount = std::uint32_t(packedModel_.uniformDialIndices.size()) - eventRanges.uniformOffset;
     eventRanges.monotonicCount = std::uint32_t(packedModel_.monotonicDialIndices.size()) - eventRanges.monotonicOffset;
     eventRanges.generalCount = std::uint32_t(packedModel_.generalDialIndices.size()) - eventRanges.generalOffset;
+    eventRanges.externalCount = std::uint32_t(packedModel_.externalDialOccurrences.size()) - eventRanges.externalOffset;
     eventRanges.graphCount = std::uint32_t(packedModel_.graphDialIndices.size()) - eventRanges.graphOffset;
 
     if( ((iEvent + 1) % kPackingProgressEventStep) == 0 or (iEvent + 1) == model_.events.size() ){

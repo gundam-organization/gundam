@@ -1,10 +1,12 @@
 #include "BackendManager.h"
 
 #include "LikelihoodInterface.h"
+#include "ExternalWeightBuffer.h"
 #include "Logger.h"
 #include "Parameter.h"
 
 #include <algorithm>
+#include <chrono>
 #include <sstream>
 
 std::string Backends::formatBackendTimingSummary(const BackendTimingSummary& timing_) {
@@ -19,7 +21,9 @@ std::string Backends::formatBackendTimingSummary(const BackendTimingSummary& tim
      << "s, bufferUpload=" << timing_.buildBufferUploadSeconds
      << "s]"
      << " device[paramUpload=" << timing_.parameterUploadSeconds
-     << "s, cachedDialStage=" << timing_.cachedDialStageSeconds
+     << "s, externalWeightUpload=" << timing_.externalWeightUploadSeconds
+     << "s/" << timing_.externalWeightUploadBytes << "B/" << timing_.externalWeightUploadBlocks << " blocks"
+     << ", cachedDialStage=" << timing_.cachedDialStageSeconds
      << "s, eventWeightsStage=" << timing_.eventWeightsStageSeconds
      << "s, histogramStage=" << timing_.histogramStageSeconds
      << "s, encode=" << timing_.commandEncodeSeconds
@@ -173,14 +177,26 @@ void Backends::BackendManager::initializeImpl() {
 std::future<Backends::BackendPropagationResult> Backends::BackendManager::propagate() {
   LogThrowIf(not hasBackend(), "No backend initialized.");
 
-  Backends::ParameterSnapshot snapshot;
+  LogThrowIf(_likelihoodInterfacePtr_ == nullptr, "No likelihood interface for backend propagation.");
+  auto prepareStart = std::chrono::steady_clock::now();
+  _likelihoodInterfacePtr_->getModelPropagator().preparePropagation();
+  _lastPreparationSeconds_ = std::chrono::duration<double>(std::chrono::steady_clock::now() - prepareStart).count();
+
+  Backends::PropagationInputs inputs;
+  auto& snapshot = inputs.parameters;
   snapshot.values.reserve(_backendEngineLayout_.bindings.parameters.size());
   for( const auto& binding : _backendEngineLayout_.bindings.parameters ){
     LogThrowIf(binding.parameter == nullptr, "Null parameter binding while building backend snapshot.");
     snapshot.values.emplace_back(binding.parameter->getParameterValue());
   }
 
-  auto token = _backend_->requestPropagation(snapshot);
+  inputs.externalWeights.reserve(_backendEngineLayout_.bindings.externalWeights.size());
+  for( std::size_t iBlock = 0; iBlock < _backendEngineLayout_.bindings.externalWeights.size(); ++iBlock ){
+    const auto& source = _backendEngineLayout_.bindings.externalWeights[iBlock];
+    const auto& layout = _backendEngineLayout_.view.propagation.externalWeightBlocks[iBlock];
+    inputs.externalWeights.push_back({source->data(), source->size(), layout.offset, source->getGeneration()});
+  }
+  auto token = _backend_->requestPropagation(inputs);
   _lastPropagationToken_ = token;
   if( not token.isValid ){
     return std::async(std::launch::deferred, []{

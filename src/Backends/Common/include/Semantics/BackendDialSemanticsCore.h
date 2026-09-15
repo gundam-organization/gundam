@@ -63,6 +63,10 @@ namespace Backends::Semantics {
                                    double inputValue_,
                                    const double* payload_) {
     switch( dialRef_.type ){
+      case BackendDialType::ExternalWeight:
+        GUNDAM_BACKEND_SEMANTICS_ASSERT(false);
+        return 1.;
+
       case BackendDialType::Norm:
         GUNDAM_BACKEND_SEMANTICS_ASSERT(dialRef_.inputCount == 1);
         return clampDialResponse(dialRef_, inputValue_);

@@ -2,6 +2,8 @@ constant uint kDialFlagAllowExtrapolation = 1u << 0;
 constant uint kDialFlagCached = 1u << 1;
 
 struct EventDialRanges {
+  uint externalOffset;
+  uint externalCount;
   uint normOffset;
   uint normCount;
   uint compactOffset;
@@ -14,6 +16,12 @@ struct EventDialRanges {
   uint generalCount;
   uint graphOffset;
   uint graphCount;
+};
+
+struct ExternalDialOccurrence {
+  uint weightIndex;
+  float minResponse;
+  float maxResponse;
 };
 
 struct NormDialOccurrence {
@@ -245,6 +253,8 @@ kernel void compute_event_weights(
     device const float* graphCachedResponses [[buffer(19)]],
     device const float* splineData [[buffer(20)]],
     constant uint& nEvents [[buffer(21)]],
+    device const float* externalWeights [[buffer(22)]],
+    device const ExternalDialOccurrence* externalDialOccurrences [[buffer(23)]],
     uint gid [[thread_position_in_grid]]) {
   if( gid >= nEvents ){ return; }
 
@@ -321,6 +331,14 @@ kernel void compute_event_weights(
     else{
       response = evaluate_graph_descriptor(descriptor, splineData, parameters);
     }
+    weight *= response;
+  }
+  for( uint iDial = 0; iDial < ranges.externalCount; ++iDial ){
+    ExternalDialOccurrence occurrence = externalDialOccurrences[ranges.externalOffset + iDial];
+    float response = externalWeights[occurrence.weightIndex];
+    // Match host comparison semantics, including NaN responses.
+    if( response < occurrence.minResponse ){ response = occurrence.minResponse; }
+    else if( response > occurrence.maxResponse ){ response = occurrence.maxResponse; }
     weight *= response;
   }
   eventWeights[gid] = weight;

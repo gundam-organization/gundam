@@ -15,7 +15,8 @@ namespace Backends {
     UniformSpline,
     MonotonicSpline,
     GeneralSpline,
-    Graph
+    Graph,
+    ExternalWeight
   };
 
   struct BackendDialInputDescriptor {
@@ -31,11 +32,18 @@ namespace Backends {
     std::size_t inputCount{0};
     std::size_t payloadOffset{0};
     std::size_t payloadSize{0};
+    std::size_t externalBlockIndex{0};
+    std::size_t externalWeightIndex{0};
     bool allowExtrapolation{false};
     double minResponse{0};
     double maxResponse{0};
     bool hasMinResponse{false};
     bool hasMaxResponse{false};
+  };
+
+  struct ExternalWeightBlockDescriptor {
+    std::size_t offset{0};
+    std::size_t count{0};
   };
 
   struct BackendEventWeightDescriptor {

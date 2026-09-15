@@ -3,6 +3,7 @@
 #include "CompactSpline.h"
 #include "DialResponseSupervisor.h"
 #include "EventDialCache.h"
+#include "ExternalWeightDispatcher.h"
 #include "GeneralSpline.h"
 #include "Graph.h"
 #include "Histogram.h"
@@ -21,7 +22,7 @@
 #include <utility>
 
 namespace {
-  void buildEngineView(Backends::EngineView& view_, LikelihoodInterface& likelihoodInterface_) {
+  void buildEngineView(Backends::EngineView& view_, Backends::EngineBindings& bindings_, LikelihoodInterface& likelihoodInterface_) {
     auto& propagation = view_.propagation;
     auto& likelihood = view_.likelihood;
 
@@ -46,6 +47,8 @@ namespace {
     propagation.events.reserve(eventDialCache.getCache().size());
     std::unordered_map<const Parameter*, std::size_t> parameterIndexMap{};
     std::unordered_map<const DialInterface*, std::uint32_t> dialIndexMap{};
+    std::unordered_map<const ExternalWeightBuffer*, std::size_t> externalSourceIndices{};
+    std::size_t externalWeightCount{0};
 
     for( const auto& cacheEntry : eventDialCache.getCache() ){
       if( cacheEntry.event == nullptr ){ continue; }
@@ -84,7 +87,21 @@ namespace {
           dialRef.maxResponse = supervisor->getMaxResponse();
         }
 
-        if( dynamic_cast<const Norm*>(dialBase) != nullptr ){
+        if( auto* external = dynamic_cast<const ExternalWeightDispatcher*>(dialBase) ){
+          const auto& source = external->getWeightSource();
+          LogThrowIf(source == nullptr or external->getWeightIndex() >= source->size(),
+                     "Invalid external weight source while building EngineView.");
+          auto inserted = externalSourceIndices.emplace(source.get(), bindings_.externalWeights.size());
+          if( inserted.second ){
+            bindings_.externalWeights.emplace_back(source);
+            propagation.externalWeightBlocks.push_back({externalWeightCount, source->size()});
+            externalWeightCount += source->size();
+          }
+          dialRef.type = Backends::BackendDialType::ExternalWeight;
+          dialRef.externalBlockIndex = inserted.first->second;
+          dialRef.externalWeightIndex = external->getWeightIndex();
+        }
+        else if( dynamic_cast<const Norm*>(dialBase) != nullptr ){
           dialRef.type = Backends::BackendDialType::Norm;
         }
         else if( dynamic_cast<const Shift*>(dialBase) != nullptr ){
@@ -191,6 +208,6 @@ void Backends::EngineLayout::clear() {
 
 void Backends::EngineLayout::build(LikelihoodInterface& likelihoodInterface_) {
   clear();
-  buildEngineView(view, likelihoodInterface_);
   bindings.build(likelihoodInterface_);
+  buildEngineView(view, bindings, likelihoodInterface_);
 }

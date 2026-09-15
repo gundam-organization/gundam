@@ -75,6 +75,7 @@ public:
   /// may cause a wait.  The future will be valid if the calculation was
   /// successfully started, true if the calculation has completed correctly,
   /// and false if the calculation started correctly, but failed.
+  void preparePropagation();
   std::future<bool> applyParameters();
 
   void reweightEvents(bool updateDials = true);

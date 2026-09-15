@@ -85,6 +85,9 @@ namespace Backends {
     id<MTLBuffer> binEventIndicesBuffer{nil};
     id<MTLBuffer> splineDataBuffer{nil};
     id<MTLBuffer> parametersBuffer{nil};
+    id<MTLBuffer> externalWeightsBuffer{nil};
+    id<MTLBuffer> externalDialOccurrencesBuffer{nil};
+    std::vector<std::uint64_t> externalWeightGenerations{};
     id<MTLBuffer> partialHistSumsBuffer{nil};
     id<MTLBuffer> partialHistSumSquaresBuffer{nil};
     id<MTLBuffer> histSumsBuffer{nil};
@@ -128,6 +131,7 @@ namespace Backends {
 
     [[nodiscard]] bool buildDeviceModel();
     void updateDeviceParameters(const ParameterSnapshot& parameters_);
+    void updateExternalWeights(const PropagationInputs& inputs_);
     [[nodiscard]] bool encodeEventWeights(id<MTLComputeCommandEncoder> encoder);
     [[nodiscard]] bool encodeCachedDialResponses(id<MTLComputeCommandEncoder> encoder,
                                                  id<MTLComputePipelineState> pipeline_,
@@ -135,7 +139,7 @@ namespace Backends {
                                                  id<MTLBuffer> descriptorsBuffer_,
                                                  uint32_t descriptorCount_);
     [[nodiscard]] bool encodeHistogramsFromDeviceWeights(id<MTLComputeCommandEncoder> encoder);
-    [[nodiscard]] bool runDevicePropagation(const ParameterSnapshot& parameters_, bool needHistograms_);
+    [[nodiscard]] bool runDevicePropagation(const PropagationInputs& inputs_, bool needHistograms_);
     void copyDeviceEventWeightsToHostResult();
     [[nodiscard]] bool calculateHistogramsOnDevice();
     void calculateLikelihood();
@@ -159,6 +163,8 @@ namespace {
   static NSString* const kMpsBackendMetalSource = GUNDAM_MPS_BACKEND_KERNEL_SOURCE;
 
   struct MpsEventDialRanges {
+    std::uint32_t externalOffset{0};
+    std::uint32_t externalCount{0};
     uint32_t normOffset{0};
     uint32_t normCount{0};
     uint32_t compactOffset{0};
@@ -171,6 +177,12 @@ namespace {
     uint32_t generalCount{0};
     uint32_t graphOffset{0};
     uint32_t graphCount{0};
+  };
+
+  struct MpsExternalDialOccurrence {
+    std::uint32_t weightIndex{0};
+    float minResponse{0};
+    float maxResponse{0};
   };
 
   struct MpsNormDialOccurrence {

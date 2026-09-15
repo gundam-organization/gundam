@@ -41,6 +41,7 @@ namespace Backends {
     std::vector<std::uint32_t> eventDialIndices{};
     std::vector<BackendDialInputDescriptor> dialInputs{};
     std::vector<double> dialPayloads{};
+    std::vector<ExternalWeightBlockDescriptor> externalWeightBlocks{};
     std::vector<SampleView> samples{};
     std::size_t parameterCount{0};
     int totalBins{0};
@@ -51,6 +52,7 @@ namespace Backends {
       eventDialIndices.clear();
       dialInputs.clear();
       dialPayloads.clear();
+      externalWeightBlocks.clear();
       samples.clear();
       parameterCount = 0;
       totalBins = 0;

@@ -24,18 +24,16 @@ void Backends::CpuBackend::build(const EngineView& engineView_) {
   _isBuilt_ = true;
 }
 
-Backends::PropagationToken Backends::CpuBackend::requestPropagation(const ParameterSnapshot& parameters_) {
+Backends::PropagationToken Backends::CpuBackend::requestPropagation(const PropagationInputs& inputs_) {
 
   LogThrowIf(not _isBuilt_, "CpuBackend has not been built.");
   const auto& model = _engineView_.propagation;
   const auto& likelihoodModel = _engineView_.likelihood;
-  LogThrowIf(not parameters_.empty() and parameters_.values.size() != model.parameterCount,
-             "ParameterSnapshot size mismatch: " << parameters_.values.size()
-                                                 << " != " << model.parameterCount);
+  inputs_.validate(model);
 
   resetResult();
 
-  calculateEventWeights(_lastResult_, parameters_);
+  calculateEventWeights(_lastResult_, inputs_);
   _lastResult_.status.eventWeights = OutputState::ReadyOnDevice;
 
   calculateHistograms(_lastResult_);
@@ -163,6 +161,7 @@ void Backends::CpuBackend::initializeDialResponseCache() {
   for( std::uint32_t iDial = 0 ; iDial < propagation.dials.size() ; iDial++ ){
     const auto& dial = propagation.dials[iDial];
     const bool canCacheSingleInputResponse = dial.type != BackendDialType::Shift
+                                             and dial.type != BackendDialType::ExternalWeight
                                              and dial.inputCount == 1
                                              and dial.firstInput < propagation.dialInputs.size();
     if( not canCacheSingleInputResponse ){
@@ -191,46 +190,46 @@ void Backends::CpuBackend::resetResult() {
   _lastResult_.status.statLikelihood = OutputState::Scheduled;
 }
 
-void Backends::CpuBackend::calculateEventWeights(Result& result_, const ParameterSnapshot& parameters_) {
+void Backends::CpuBackend::calculateEventWeights(Result& result_, const PropagationInputs& inputs_) {
   const auto& propagation = _engineView_.propagation;
   result_.eventWeights.resize(propagation.events.size());
-  updateCachedDialResponses(parameters_);
+  updateCachedDialResponses(inputs_);
   _activeResult_ = &result_;
-  _activeParameters_ = &parameters_;
+  _activeInputs_ = &inputs_;
   {
     auto timerScope = _eventWeightsStageTimer_.scopeTime();
     _threadPool_.runJob("CpuBackend::calculateEventWeights");
   }
-  _activeParameters_ = nullptr;
+  _activeInputs_ = nullptr;
   _activeResult_ = nullptr;
 }
 
-void Backends::CpuBackend::updateCachedDialResponses(const ParameterSnapshot& parameters_) {
+void Backends::CpuBackend::updateCachedDialResponses(const PropagationInputs& inputs_) {
   auto timerScope = _cachedDialStageTimer_.scopeTime();
 
   _dirtyCachedDialIndices_.clear();
-  if( not _isDialResponseCachePrimed_ or _lastParameterValues_.size() != parameters_.values.size() ){
+  if( not _isDialResponseCachePrimed_ or _lastParameterValues_.size() != inputs_.parameters.values.size() ){
     for( std::uint32_t iDial = 0 ; iDial < _isCachedDial_.size() ; iDial++ ){
       if( _isCachedDial_[iDial] ){ _dirtyCachedDialIndices_.emplace_back(iDial); }
     }
-    _lastParameterValues_ = parameters_.values;
+    _lastParameterValues_ = inputs_.parameters.values;
     _isDialResponseCachePrimed_ = true;
   }
   else{
-    for( std::size_t iParameter = 0 ; iParameter < parameters_.values.size() ; iParameter++ ){
-      if( parameters_.values[iParameter] == _lastParameterValues_[iParameter] ){ continue; }
+    for( std::size_t iParameter = 0 ; iParameter < inputs_.parameters.values.size() ; iParameter++ ){
+      if( inputs_.parameters.values[iParameter] == _lastParameterValues_[iParameter] ){ continue; }
       if( iParameter < _cachedDialsByParameter_.size() ){
         const auto& cachedDials = _cachedDialsByParameter_[iParameter];
         _dirtyCachedDialIndices_.insert(_dirtyCachedDialIndices_.end(), cachedDials.begin(), cachedDials.end());
       }
-      _lastParameterValues_[iParameter] = parameters_.values[iParameter];
+      _lastParameterValues_[iParameter] = inputs_.parameters.values[iParameter];
     }
   }
 
   if( _dirtyCachedDialIndices_.empty() ){ return; }
-  _activeParameters_ = &parameters_;
+  _activeInputs_ = &inputs_;
   _threadPool_.runJob("CpuBackend::updateCachedDialResponses");
-  _activeParameters_ = nullptr;
+  _activeInputs_ = nullptr;
 }
 
 void Backends::CpuBackend::updateCachedDialResponsesThread(int iThread_) {
@@ -238,7 +237,7 @@ void Backends::CpuBackend::updateCachedDialResponsesThread(int iThread_) {
   const auto bounds = GenericToolbox::ParallelWorker::getThreadBoundIndices(
       iThread_, _threadPool_.getNbThreads(), _dirtyCachedDialIndices_.size()
   );
-  const double* parameterValues = _activeParameters_->values.data();
+  const double* parameterValues = _activeInputs_->parameters.values.data();
   for( std::size_t iDirtyDial = bounds.beginIndex ; iDirtyDial < bounds.endIndex ; iDirtyDial++ ){
     const auto dialIndex = _dirtyCachedDialIndices_[iDirtyDial];
     const auto& dial = propagation.dials[dialIndex];
@@ -269,7 +268,7 @@ void Backends::CpuBackend::calculateEventWeightsThread(int iThread_) {
       const auto& dial = propagation.dials[dialIndex];
       weight *= _isCachedDial_[dialIndex]
                 ? _cachedDialResponses_[dialIndex]
-                : Semantics::evalDialResponse(propagation, dial, *_activeParameters_);
+                : Semantics::evalDialResponse(propagation, dial, *_activeInputs_);
     }
     _activeResult_->eventWeights[event.resultIndex] = weight;
   }
@@ -318,12 +317,12 @@ void Backends::CpuBackend::calculateHistogramsThread(int iThread_) {
   }
 }
 
-void Backends::CpuBackend::calculateHistogramsFromEvents(Result& result_, const ParameterSnapshot& parameters_) {
+void Backends::CpuBackend::calculateHistogramsFromEvents(Result& result_, const PropagationInputs& inputs_) {
   Semantics::calculateHistograms(
       result_.histSums,
       result_.histSumSquares,
       _engineView_.propagation,
-      parameters_
+      inputs_
   );
 }
 

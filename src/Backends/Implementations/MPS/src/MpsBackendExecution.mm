@@ -7,7 +7,6 @@ void Backends::MpsBackendImpl::updateDeviceParameters(const ParameterSnapshot& p
   if( parameterValuesScratch.size() != model.parameterCount ){
     parameterValuesScratch.resize(model.parameterCount);
   }
-  LogThrowIf(parameters_.empty(), "MpsBackend requires a populated ParameterSnapshot.");
   LogThrowIf(parameters_.values.size() != model.parameterCount,
              "ParameterSnapshot size mismatch: " << parameters_.values.size()
                                                  << " != " << model.parameterCount);
@@ -16,6 +15,25 @@ void Backends::MpsBackendImpl::updateDeviceParameters(const ParameterSnapshot& p
   }
   copyToBuffer(parametersBuffer, parameterValuesScratch);
   lastTiming.parameterUploadSeconds += secondsSince(start);
+}
+
+void Backends::MpsBackendImpl::updateExternalWeights(const PropagationInputs& inputs_) {
+  auto start = std::chrono::steady_clock::now();
+  auto* destination = static_cast<float*>(externalWeightsBuffer.contents);
+  for( std::size_t iBlock = 0; iBlock < inputs_.externalWeights.size(); ++iBlock ){
+    const auto& block = inputs_.externalWeights[iBlock];
+    if( externalWeightGenerations[iBlock] == block.generation ){ continue; }
+    // Convert directly into the persistent Metal shared buffer: no staging vector.
+    if( block.count != 0 ){
+      std::transform(block.values, block.values + block.count,
+                     destination + block.destinationOffset,
+                     [](double value_){ return float(value_); });
+    }
+    externalWeightGenerations[iBlock] = block.generation;
+    lastTiming.externalWeightUploadBytes += block.count * sizeof(float);
+    ++lastTiming.externalWeightUploadBlocks;
+  }
+  lastTiming.externalWeightUploadSeconds += secondsSince(start);
 }
 
 bool Backends::MpsBackendImpl::encodeEventWeights(id<MTLComputeCommandEncoder> encoder) {
@@ -43,6 +61,8 @@ bool Backends::MpsBackendImpl::encodeEventWeights(id<MTLComputeCommandEncoder> e
   [encoder setBuffer:graphCachedResponsesBuffer offset:0 atIndex:19];
   [encoder setBuffer:splineDataBuffer offset:0 atIndex:20];
   [encoder setBuffer:nEventsBuffer offset:0 atIndex:21];
+  [encoder setBuffer:externalWeightsBuffer offset:0 atIndex:22];
+  [encoder setBuffer:externalDialOccurrencesBuffer offset:0 atIndex:23];
 
   NSUInteger width = std::min<NSUInteger>(eventWeightsPipeline.maxTotalThreadsPerThreadgroup, 256);
   if( width == 0 ){ width = 1; }
@@ -104,9 +124,10 @@ bool Backends::MpsBackendImpl::encodeHistogramsFromDeviceWeights(id<MTLComputeCo
   return true;
 }
 
-bool Backends::MpsBackendImpl::runDevicePropagation(const ParameterSnapshot& parameters_, bool needHistograms_) {
+bool Backends::MpsBackendImpl::runDevicePropagation(const PropagationInputs& inputs_, bool needHistograms_) {
   if( not isDeviceModelSupported ){ return false; }
-  updateDeviceParameters(parameters_);
+  updateDeviceParameters(inputs_.parameters);
+  updateExternalWeights(inputs_);
 
   auto encodeAllCachedResponses = [&](id<MTLComputeCommandEncoder> encoder_) {
     if( not enableCachedDialResponses ){ return true; }

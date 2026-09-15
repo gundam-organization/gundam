@@ -37,11 +37,9 @@ void Backends::MpsBackend::build(const EngineView& engineView_) {
   _impl_->isBuilt = true;
 }
 
-Backends::PropagationToken Backends::MpsBackend::requestPropagation(const ParameterSnapshot& parameters_) {
+Backends::PropagationToken Backends::MpsBackend::requestPropagation(const PropagationInputs& inputs_) {
   LogThrowIf(not _impl_->isBuilt, "MpsBackend has not been built.");
-  LogThrowIf(not parameters_.empty() and parameters_.values.size() != _impl_->model.parameterCount,
-             "ParameterSnapshot size mismatch: " << parameters_.values.size()
-                                                 << " != " << _impl_->model.parameterCount);
+  inputs_.validate(_impl_->model);
 
   _impl_->resetResult();
 
@@ -60,7 +58,7 @@ Backends::PropagationToken Backends::MpsBackend::requestPropagation(const Parame
   bool usedDevicePropagation = false;
 
   if( needsEventWeights or needsHistograms ){
-    usedDevicePropagation = _impl_->runDevicePropagation(parameters_, needsHistograms);
+    usedDevicePropagation = _impl_->runDevicePropagation(inputs_, needsHistograms);
     if( usedDevicePropagation ){
       _impl_->lastResult.status.eventWeights = OutputState::ReadyOnDevice;
       _impl_->lastResult.status.histograms = OutputState::ReadyOnDevice;
@@ -68,7 +66,7 @@ Backends::PropagationToken Backends::MpsBackend::requestPropagation(const Parame
   }
 
   if( not usedDevicePropagation ){
-    Semantics::calculateEventWeights(_impl_->lastResult.eventWeights, _impl_->model, parameters_);
+    Semantics::calculateEventWeights(_impl_->lastResult.eventWeights, _impl_->model, inputs_);
     _impl_->lastResult.status.eventWeights = OutputState::ReadyOnHost;
   }
 

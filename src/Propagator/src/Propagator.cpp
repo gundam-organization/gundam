@@ -113,12 +113,16 @@ void Propagator::propagateParameters(){
   result.get();
 }
 
-std::future<bool> Propagator::applyParameters(){
+void Propagator::preparePropagation(){
   // Make sure the dial state is updated before reweighting and filling the
   // histograms.  This has to be done before the GPU and CPU calculations, and
   // should be shared for both.
   if( _enableEigenToOrigInPropagate_ ){ _parManager_.convertEigenToOrig(); }
   _dialManager_.updateDialState();
+}
+
+std::future<bool> Propagator::applyParameters(){
+  preparePropagation();
 
 #ifdef GUNDAM_USING_CACHE_MANAGER
   // Trigger the reweight on the GPU.  This will fill the histograms, but most

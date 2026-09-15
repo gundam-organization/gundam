@@ -64,6 +64,7 @@ set( HEADERS
 
     DialDefinitions/include/RootFormula.h
     DialDefinitions/include/Polynomial.h
+    DialDefinitions/include/ExternalWeightBuffer.h
     DialDefinitions/include/ExternalWeightDispatcher.h
 
     # DialFactories

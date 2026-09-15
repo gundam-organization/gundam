@@ -2,7 +2,7 @@
 #define GUNDAM_BACKEND_HOST_PROPAGATION_H
 
 #include "EngineView.h"
-#include "ParameterSnapshot.h"
+#include "PropagationInputs.h"
 #include "Semantics/BackendDialSemantics.h"
 
 #include <algorithm>
@@ -13,10 +13,10 @@ namespace Backends::Semantics {
 
   inline void calculateEventWeights(std::vector<double>& eventWeights_,
                                     const PropagationView& propagation_,
-                                    const ParameterSnapshot& parameters_) {
+                                    const PropagationInputs& inputs_) {
     eventWeights_.resize(propagation_.events.size());
     for( const auto& event : propagation_.events ){
-      eventWeights_[event.resultIndex] = evalEventWeight(propagation_, event, parameters_);
+      eventWeights_[event.resultIndex] = evalEventWeight(propagation_, event, inputs_);
     }
   }
 
@@ -38,9 +38,9 @@ namespace Backends::Semantics {
   inline void calculateHistograms(std::vector<double>& histSums_,
                                   std::vector<double>& histSumSquares_,
                                   const PropagationView& propagation_,
-                                  const ParameterSnapshot& parameters_) {
+                                  const PropagationInputs& inputs_) {
     std::vector<double> eventWeights{};
-    calculateEventWeights(eventWeights, propagation_, parameters_);
+    calculateEventWeights(eventWeights, propagation_, inputs_);
     calculateHistogramsFromEventWeights(histSums_, histSumSquares_, propagation_, eventWeights);
   }
 

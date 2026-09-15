@@ -63,6 +63,9 @@ ENUM_FIELD( Unavailable )
     double buildFinalFlattenSeconds{0};
     double buildHistogramIndexSeconds{0};
     double buildBufferUploadSeconds{0};
+    double externalWeightUploadSeconds{0};
+    std::size_t externalWeightUploadBytes{0};
+    std::size_t externalWeightUploadBlocks{0};
     double parameterUploadSeconds{0};
     double cachedDialStageSeconds{0};
     double eventWeightsStageSeconds{0};

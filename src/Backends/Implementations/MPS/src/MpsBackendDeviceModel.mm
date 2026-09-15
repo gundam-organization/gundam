@@ -41,6 +41,7 @@ bool Backends::MpsBackendImpl::buildDeviceModel() {
   std::vector<float> baseWeights(model.events.size());
   std::vector<MpsEventDialRanges> eventDialRanges(model.events.size());
   std::vector<MpsNormDialOccurrence> normDialOccurrences{};
+  std::vector<MpsExternalDialOccurrence> externalDialOccurrences{};
   std::vector<uint32_t> compactDialIndices{};
   std::vector<uint32_t> uniformDialIndices{};
   std::vector<uint32_t> monotonicDialIndices{};
@@ -106,6 +107,20 @@ bool Backends::MpsBackendImpl::buildDeviceModel() {
       const auto& eventDial = model.dials[model.eventDialIndices[event.weight.firstDial + iDial]];
       if( eventDial.type == BackendDialType::Shift ){
         shiftCount++;
+        continue;
+      }
+
+      if( eventDial.type == BackendDialType::ExternalWeight ){
+        if( eventDial.externalBlockIndex >= model.externalWeightBlocks.size() ){
+          return fail("External weight source index is out of range.");
+        }
+        const auto& block = model.externalWeightBlocks[eventDial.externalBlockIndex];
+        if( eventDial.externalWeightIndex >= block.count
+            or block.offset > std::numeric_limits<std::uint32_t>::max()
+            or eventDial.externalWeightIndex > std::numeric_limits<std::uint32_t>::max() - block.offset ){
+          return fail("External weight index cannot be represented on the device.");
+        }
+        totalDynamicDialOccurrences++;
         continue;
       }
 
@@ -308,6 +323,7 @@ bool Backends::MpsBackendImpl::buildDeviceModel() {
     eventRanges.uniformOffset = uint32_t(uniformDialIndices.size());
     eventRanges.monotonicOffset = uint32_t(monotonicDialIndices.size());
     eventRanges.generalOffset = uint32_t(generalDialIndices.size());
+    eventRanges.externalOffset = std::uint32_t(externalDialOccurrences.size());
     eventRanges.graphOffset = uint32_t(graphDialIndices.size());
     for( std::size_t iDial = 0 ; iDial < event.weight.dialCount ; iDial++ ){
       processedDialRefs++;
@@ -315,6 +331,15 @@ bool Backends::MpsBackendImpl::buildDeviceModel() {
       if( eventDial.type == BackendDialType::Shift ){
         LogThrowIf(eventDial.payloadSize < 1, "Internal MPS packing error: Shift dial payload is empty.");
         baseWeights[event.resultIndex] *= float(model.dialPayloads.at(eventDial.payloadOffset));
+        continue;
+      }
+      if( eventDial.type == BackendDialType::ExternalWeight ){
+        const auto& block = model.externalWeightBlocks.at(eventDial.externalBlockIndex);
+        MpsExternalDialOccurrence occurrence;
+        occurrence.weightIndex = std::uint32_t(block.offset + eventDial.externalWeightIndex);
+        occurrence.minResponse = eventDial.hasMinResponse ? float(eventDial.minResponse) : -std::numeric_limits<float>::infinity();
+        occurrence.maxResponse = eventDial.hasMaxResponse ? float(eventDial.maxResponse) : std::numeric_limits<float>::infinity();
+        externalDialOccurrences.emplace_back(occurrence);
         continue;
       }
       if( eventDial.type == BackendDialType::Norm ){
@@ -350,6 +375,7 @@ bool Backends::MpsBackendImpl::buildDeviceModel() {
     eventRanges.uniformCount = uint32_t(uniformDialIndices.size()) - eventRanges.uniformOffset;
     eventRanges.monotonicCount = uint32_t(monotonicDialIndices.size()) - eventRanges.monotonicOffset;
     eventRanges.generalCount = uint32_t(generalDialIndices.size()) - eventRanges.generalOffset;
+    eventRanges.externalCount = std::uint32_t(externalDialOccurrences.size()) - eventRanges.externalOffset;
     eventRanges.graphCount = uint32_t(graphDialIndices.size()) - eventRanges.graphOffset;
 
     if( ((iEvent + 1) % kPackingProgressEventStep) == 0 or (iEvent + 1) == model.events.size() ){
@@ -431,6 +457,7 @@ bool Backends::MpsBackendImpl::buildDeviceModel() {
   if( monotonicDialDescriptors.empty() ){ monotonicDialDescriptors.emplace_back(MpsSplineDialDescriptor{}); }
   if( generalDialDescriptors.empty() ){ generalDialDescriptors.emplace_back(MpsSplineDialDescriptor{}); }
   if( graphDialDescriptors.empty() ){ graphDialDescriptors.emplace_back(MpsSplineDialDescriptor{}); }
+  if( externalDialOccurrences.empty() ){ externalDialOccurrences.emplace_back(); }
   if( splineData.empty() ){ splineData.emplace_back(0); }
 
   uint32_t nEvents = uint32_t(model.events.size());
@@ -478,6 +505,13 @@ bool Backends::MpsBackendImpl::buildDeviceModel() {
   graphCachedResponsesBuffer = makePrivateEmptyBuffer(device, cachedResponseBufferBytes(graphDialDescriptors.size()));
   eventWeightsBuffer = makePrivateEmptyBuffer(device, model.events.size() * sizeof(float));
   eventWeightsReadbackBuffer = makeSharedEmptyBuffer(device, model.events.size() * sizeof(float));
+  std::size_t externalWeightCount{0};
+  for( const auto& block : model.externalWeightBlocks ){
+    externalWeightCount = std::max(externalWeightCount, block.offset + block.count);
+  }
+  externalWeightsBuffer = makeSharedEmptyBuffer(device, std::max<std::size_t>(1, externalWeightCount) * sizeof(float));
+  externalDialOccurrencesBuffer = makePrivateBuffer(device, commandQueue, externalDialOccurrences);
+  externalWeightGenerations.assign(model.externalWeightBlocks.size(), 0);
   parametersBuffer = makeSharedEmptyBuffer(device, std::max<std::size_t>(1, model.parameterCount) * sizeof(float));
   partialHistSumsBuffer = makePrivateEmptyBuffer(device, std::size_t(totalPartials) * sizeof(float));
   partialHistSumSquaresBuffer = makePrivateEmptyBuffer(device, std::size_t(totalPartials) * sizeof(float));
@@ -494,7 +528,7 @@ bool Backends::MpsBackendImpl::buildDeviceModel() {
                                                  length:sizeof(chunkSize)
                                                 options:MTLResourceStorageModeShared];
 
-  if( baseWeightsBuffer == nil or eventDialRangesBuffer == nil or normDialOccurrencesBuffer == nil
+  if( externalWeightsBuffer == nil or externalDialOccurrencesBuffer == nil or baseWeightsBuffer == nil or eventDialRangesBuffer == nil or normDialOccurrencesBuffer == nil
       or compactDialIndicesBuffer == nil or uniformDialIndicesBuffer == nil
       or monotonicDialIndicesBuffer == nil or generalDialIndicesBuffer == nil
       or graphDialIndicesBuffer == nil

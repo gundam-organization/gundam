@@ -23,6 +23,7 @@ void Backends::EngineBindings::clear() {
   eventDials.clear();
   samples.clear();
   parameters.clear();
+  externalWeights.clear();
 }
 
 void Backends::EngineBindings::build(LikelihoodInterface& likelihoodInterface_) {

@@ -456,6 +456,23 @@ PYBIND11_MODULE(GUNDAM, module) {
   .def("throwPostfitParameters", &RootMinimizer::throwPostfitParameters)
   ;
 
+#ifdef GUNDAM_USING_BACKENDS
+  pybind11::class_<Backends::BackendTimingSummary>(module, "BackendTimingSummary")
+  .def_readonly("externalWeightUploadSeconds", &Backends::BackendTimingSummary::externalWeightUploadSeconds)
+  .def_readonly("externalWeightUploadBytes", &Backends::BackendTimingSummary::externalWeightUploadBytes)
+  .def_readonly("externalWeightUploadBlocks", &Backends::BackendTimingSummary::externalWeightUploadBlocks)
+  ;
+  pybind11::class_<Backends::BackendManager>(module, "BackendManager")
+  .def("hasBackend", &Backends::BackendManager::hasBackend)
+  .def("getType", &Backends::BackendManager::getType)
+  .def("getLastPreparationSeconds", &Backends::BackendManager::getLastPreparationSeconds)
+  .def("getLastTimingSummary", [](const Backends::BackendManager& manager_){
+    LogThrowIf(not manager_.hasBackend(), "No backend initialized.");
+    return manager_.getBackend()->getLastTimingSummary();
+  })
+  ;
+#endif
+
   pybind11::class_<FitterEngine>(module, "FitterEngine")
   .def(pybind11::init())
   // .def("setSaveDir", pybind11::overload_cast<TDirectory*>(&FitterEngine::setSaveDir)) // CAN'T EXPOSE ROOT PTRs
@@ -472,5 +489,8 @@ PYBIND11_MODULE(GUNDAM, module) {
   .def("getParameterScanner", pybind11::overload_cast<>(&FitterEngine::getParameterScanner), pybind11::return_value_policy::reference)
   .def("getTFilePath", &FitterEngine::getTFilePath)
   .def("evaluateLikelihood", &FitterEngine::evaluateLikelihood)
+#ifdef GUNDAM_USING_BACKENDS
+  .def("getBackendsManager", pybind11::overload_cast<>(&FitterEngine::getBackendsManager), pybind11::return_value_policy::reference_internal)
+#endif
   ;
 }

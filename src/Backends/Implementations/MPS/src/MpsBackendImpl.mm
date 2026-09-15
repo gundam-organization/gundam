@@ -93,6 +93,9 @@ void Backends::MpsBackendImpl::releaseDeviceBuffers() {
   releaseBuffer(binEventIndicesBuffer);
   releaseBuffer(splineDataBuffer);
   releaseBuffer(parametersBuffer);
+  releaseBuffer(externalWeightsBuffer);
+  releaseBuffer(externalDialOccurrencesBuffer);
+  externalWeightGenerations.clear();
   releaseBuffer(partialHistSumsBuffer);
   releaseBuffer(partialHistSumSquaresBuffer);
   releaseBuffer(histSumsBuffer);

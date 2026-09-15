@@ -4,7 +4,7 @@
 #include "EngineView.h"
 #include "BackendTypes.h"
 #include "Backend.h"
-#include "ParameterSnapshot.h"
+#include "PropagationInputs.h"
 #include "GenericToolbox.Time.h"
 #include "GenericToolbox.Thread.h"
 
@@ -23,7 +23,7 @@ namespace Backends {
     [[nodiscard]] const EngineView& getEngineView() const override { return _engineView_; }
 
     void build(const EngineView& engineView_) override;
-    PropagationToken requestPropagation(const ParameterSnapshot& parameters_) override;
+    PropagationToken requestPropagation(const PropagationInputs& inputs_) override;
 
     bool isReady(const PropagationToken& token_) const override;
     void wait(const PropagationToken& token_) override;
@@ -48,20 +48,20 @@ namespace Backends {
     void initializeThreads();
     void initializeDialResponseCache();
     void resetResult();
-    void updateCachedDialResponses(const ParameterSnapshot& parameters_);
+    void updateCachedDialResponses(const PropagationInputs& inputs_);
     void updateCachedDialResponsesThread(int iThread_);
-    void calculateEventWeights(Result& result_, const ParameterSnapshot& parameters_);
+    void calculateEventWeights(Result& result_, const PropagationInputs& inputs_);
     void calculateEventWeightsThread(int iThread_);
     void calculateHistograms(Result& result_);
     void calculateHistogramsThread(int iThread_);
-    void calculateHistogramsFromEvents(Result& result_, const ParameterSnapshot& parameters_);
+    void calculateHistogramsFromEvents(Result& result_, const PropagationInputs& inputs_);
     void calculateLikelihood(Result& result_);
 
     EngineView _engineView_{};
     Result _lastResult_{};
     GenericToolbox::ParallelWorker _threadPool_{};
     Result* _activeResult_{nullptr};
-    const ParameterSnapshot* _activeParameters_{nullptr};
+    const PropagationInputs* _activeInputs_{nullptr};
     std::vector<std::vector<std::uint32_t>> _cachedDialsByParameter_{};
     std::vector<std::uint32_t> _dirtyCachedDialIndices_{};
     std::vector<double> _cachedDialResponses_{};

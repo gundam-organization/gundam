@@ -2,7 +2,9 @@
 #define GUNDAM_BACKEND_ENGINE_BINDINGS_H
 
 #include <vector>
+#include <memory>
 
+class ExternalWeightBuffer;
 class DialInterface;
 class Event;
 class Histogram;
@@ -33,6 +35,7 @@ namespace Backends {
     std::vector<DialBinding> eventDials{};
     std::vector<SampleBinding> samples{};
     std::vector<ParameterBinding> parameters{};
+    std::vector<std::shared_ptr<const ExternalWeightBuffer>> externalWeights{};
 
     void clear();
     void build(LikelihoodInterface& likelihoodInterface_);

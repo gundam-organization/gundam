@@ -22,6 +22,8 @@ namespace Backends {
   constexpr std::uint32_t kDeviceHistogramChunkSize{256};
 
   struct DeviceEventDialRanges {
+    std::uint32_t externalOffset{0};
+    std::uint32_t externalCount{0};
     std::uint32_t normOffset{0};
     std::uint32_t normCount{0};
     std::uint32_t compactOffset{0};
@@ -34,6 +36,12 @@ namespace Backends {
     std::uint32_t generalCount{0};
     std::uint32_t graphOffset{0};
     std::uint32_t graphCount{0};
+  };
+
+  struct DeviceExternalDialOccurrence {
+    std::uint32_t weightIndex{0};
+    float minResponse{0};
+    float maxResponse{0};
   };
 
   struct DeviceNormDialOccurrence {
@@ -60,6 +68,7 @@ namespace Backends {
     std::vector<float> baseWeights{};
     std::vector<DeviceEventDialRanges> eventDialRanges{};
     std::vector<DeviceNormDialOccurrence> normDialOccurrences{};
+    std::vector<DeviceExternalDialOccurrence> externalDialOccurrences{};
     std::vector<std::uint32_t> compactDialIndices{};
     std::vector<std::uint32_t> uniformDialIndices{};
     std::vector<std::uint32_t> monotonicDialIndices{};

@@ -356,6 +356,7 @@ void FitterEngine::evaluateLikelihood(){
         return;
       }
     }
+    getLikelihoodInterface().getModelPropagator().getDialManager().invalidateInputBuffers();
     LogWarning << "Propagation backend did not produce a valid result. Falling back to the standard propagation path." << std::endl;
   }
 #endif

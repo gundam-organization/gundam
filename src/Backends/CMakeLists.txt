@@ -1,19 +1,22 @@
 set(LIB_NAME GundamBackends)
 
 set(SRCFILES
+    ${CMAKE_CURRENT_SOURCE_DIR}/Common/src/DeviceBackendModel.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/Common/src/EngineBindings.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/Common/src/EngineLayout.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/Common/src/BackendFactory.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/Common/src/BackendManager.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/Common/src/BackendTypes.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/CPU/src/CpuBackend.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/MPS/src/MpsBackendImpl.mm
-    ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/MPS/src/MpsBackendDeviceModel.mm
-    ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/MPS/src/MpsBackendExecution.mm
 )
 
 if(APPLE)
   enable_language(OBJCXX)
+  list(APPEND SRCFILES
+    ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/MPS/src/MpsBackendImpl.mm
+    ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/MPS/src/MpsBackendDeviceModel.mm
+    ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/MPS/src/MpsBackendExecution.mm
+  )
   set_property(
       DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
       ${CMAKE_SOURCE_DIR}/src/Utils/include/DeviceMath/SharedSplineCommon.h
@@ -38,25 +41,24 @@ if(APPLE)
       @ONLY
   )
   list(APPEND SRCFILES ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/MPS/src/MpsBackend.mm)
-else()
-  list(APPEND SRCFILES ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/MPS/src/MpsBackend.cpp)
 endif()
 
 set(HEADERS
-    ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/BackendsManager.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/BackendManager.h
     ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/BackendFactory.h
     ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/BackendTypes.h
     ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/EngineBindings.h
     ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/EngineDescriptors.h
     ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/EngineLayout.h
     ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/EngineView.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/EngineBackend.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/Backend.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/PropagationInputs.h
     ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/ParameterSnapshot.h
     ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/Semantics/BackendSemanticsQualifiers.h
     ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/Semantics/BackendDialSemanticsCore.h
     ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/Semantics/BackendDialSemantics.h
     ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/Semantics/BackendHostPropagation.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/CPU/include/CpuEngineBackend.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/CPU/include/CpuBackend.h
     ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/MPS/include/MpsBackend.h
     ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/MPS/include/MpsBackendInternal.h
 )

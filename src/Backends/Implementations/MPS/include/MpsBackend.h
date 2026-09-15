@@ -4,7 +4,7 @@
 #include "EngineView.h"
 #include "BackendTypes.h"
 #include "Backend.h"
-#include "ParameterSnapshot.h"
+#include "PropagationInputs.h"
 
 #include <memory>
 #include <cstdint>
@@ -27,7 +27,7 @@ namespace Backends {
     [[nodiscard]] const EngineView& getEngineView() const override;
 
     void build(const EngineView& engineView_) override;
-    PropagationToken requestPropagation(const ParameterSnapshot& parameters_) override;
+    PropagationToken requestPropagation(const PropagationInputs& inputs_) override;
 
     bool isReady(const PropagationToken& token_) const override;
     void wait(const PropagationToken& token_) override;

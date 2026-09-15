@@ -35,6 +35,7 @@ namespace Backends {
 
     [[nodiscard]] const EngineLayout& getEngineLayout() const { return _backendEngineLayout_; }
     [[nodiscard]] const EngineView& getEngineView() const { return _backendEngineLayout_.view; }
+    [[nodiscard]] double getLastPreparationSeconds() const { return _lastPreparationSeconds_; }
     [[nodiscard]] bool isEnabled() const { return _isEnabled_; }
     [[nodiscard]] bool isAutoMaterializeEnabled() const { return _enableAutoMaterialize_; }
     [[nodiscard]] const std::string& getType() const { return _type_; }
@@ -53,6 +54,7 @@ namespace Backends {
 
   private:
     // configuration
+    double _lastPreparationSeconds_{0};
     bool _isEnabled_{false};
     bool _enableAutoMaterialize_{true};
     std::string _type_{"CPU"};

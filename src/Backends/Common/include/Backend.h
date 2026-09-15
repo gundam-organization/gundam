@@ -3,7 +3,7 @@
 
 #include "EngineView.h"
 #include "BackendTypes.h"
-#include "ParameterSnapshot.h"
+#include "PropagationInputs.h"
 #include "ConfigUtils.h"
 
 #include <string>
@@ -20,7 +20,7 @@ namespace Backends {
     [[nodiscard]] virtual const EngineView& getEngineView() const = 0;
 
     virtual void build(const EngineView& engineView_) = 0;
-    virtual PropagationToken requestPropagation(const ParameterSnapshot& parameters_) = 0;
+    virtual PropagationToken requestPropagation(const PropagationInputs& inputs_) = 0;
 
     virtual bool isReady(const PropagationToken& token_) const = 0;
     virtual void wait(const PropagationToken& token_) = 0;

@@ -2,6 +2,7 @@
 #define GUNDAM_EXTERNAL_WEIGHT_DIAL_FACTORY_H
 
 #include "DialFactoryBase.h"
+#include "ExternalWeightBuffer.h"
 
 #include "ConfigUtils.h"
 #include "BinSet.h"
@@ -26,7 +27,7 @@ public:
   [[nodiscard]] const BinSet& getBinning() const { return _binning_; }
 
   [[nodiscard]] const std::vector<std::string>& getInputEventVarNameList() const { return _inputEventVarNameList_; }
-  [[nodiscard]] const std::shared_ptr<std::vector<double>>& getWeightList() const { return _weightList_; }
+  [[nodiscard]] const std::shared_ptr<ExternalWeightBuffer>& getWeightSource() const { return _weightSource_; }
 
 protected:
   struct SharedMemoryBuffer {
@@ -61,15 +62,16 @@ private:
 
   std::vector<std::string> _inputEventVarNameList_{};
   std::vector<std::vector<double>> _inputEventValueList_{};
-  std::shared_ptr<std::vector<double>> _weightList_{std::make_shared<std::vector<double>>()};
+  std::shared_ptr<ExternalWeightBuffer> _weightSource_{std::make_shared<ExternalWeightBuffer>()};
   std::vector<std::unique_ptr<SharedMemoryBuffer>> _inputBufferList_{};
   std::unique_ptr<SharedMemoryBuffer> _parameterBuffer_{nullptr};
-  std::unique_ptr<SharedMemoryBuffer> _weightBuffer_{nullptr};
+  std::shared_ptr<SharedMemoryBuffer> _weightBuffer_{nullptr};
   std::size_t _eventCount_{0};
   std::size_t _weightCount_{0};
   bool _useBinnedWeights_{false};
   BinSet _binning_{};
   bool _areEventsLoaded_{false};
+  bool _isEvaluationPending_{true};
   mutable std::mutex _eventRegistrationMutex_{};
 };
 
