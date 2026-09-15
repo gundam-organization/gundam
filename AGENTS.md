@@ -22,8 +22,8 @@ made. From lower to higher abstraction level, libraries
 are hierarchical as such:
 - Utils
 - ParametersManager (depends on Utils)
-- SamplesManager (depends on ParametersManager)
-- DialDictionary (depends on SamplesManager)
+- SamplesManager (depends on Utils)
+- DialDictionary (depends on SamplesManager and ParametersManager)
 - CacheManager (depends on DialDictionary)
 - Propagator (depends on DialDictionary and optionnaly CacheManager)
 - DatasetManager (depends on Propagator)
