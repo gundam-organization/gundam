@@ -10,7 +10,6 @@
 #include "CacheRecursiveSums.h"
 
 #include "gtest/gtest.h"
-#include "gtest/gtest-spi.h"
 
 #ifdef HEMI_CUDA_COMPILER
 #define ASSERT_SUCCESS(res) ASSERT_EQ(cudaSuccess, (res));
@@ -102,44 +101,16 @@ TEST(cachedSumsTest, RecursiveSums)
 
     hemi::deviceSynchronize();
 
-    // The filled bins must always be correct.
+    // Every bin must be correct.  The filled bins must hold the sum of
+    // their weights, and the empty bins (fBinOffsets[bin] ==
+    // fBinOffsets[bin+1]) must be zero rather than the sum of the next
+    // filled bin.
     for (int b = 0; b < bins; ++b) {
-        if (isEmpty[b]) continue;
+        const char* kind = isEmpty[b] ? "empty bin " : "bin ";
         EXPECT_DOUBLE_EQ(recursiveSums.GetSum(b), expectedSum[b])
-            << "RecursiveSums sum in bin " << b << " is wrong";
+            << "RecursiveSums sum in " << kind << b << " is wrong";
         EXPECT_DOUBLE_EQ(recursiveSums.GetSum2(b), expectedSum2[b])
-            << "RecursiveSums sum2 in bin " << b << " is wrong";
-    }
-
-    // EXPECTED FAILURE: Cache::RecursiveSums does not handle empty bins
-    // correctly.  An empty bin (fBinOffsets[bin] == fBinOffsets[bin+1])
-    // reports the sum of the next filled bin instead of zero.  The checks
-    // for the empty bins are run with the failures intercepted, and the
-    // test only requires that the known bug is still present.  Once
-    // RecursiveSums is fixed this block will fail: remove the interception
-    // and check the empty bins together with the filled bins above.
-    {
-        ::testing::TestPartResultArray emptyBinFailures;
-        {
-            ::testing::ScopedFakeTestPartResultReporter reporter(
-                ::testing::ScopedFakeTestPartResultReporter::
-                    INTERCEPT_ONLY_CURRENT_THREAD,
-                &emptyBinFailures);
-            for (int b : emptyBins) {
-                EXPECT_DOUBLE_EQ(recursiveSums.GetSum(b), expectedSum[b])
-                    << "RecursiveSums sum in empty bin " << b << " is wrong";
-                EXPECT_DOUBLE_EQ(recursiveSums.GetSum2(b), expectedSum2[b])
-                    << "RecursiveSums sum2 in empty bin " << b << " is wrong";
-            }
-        }
-        for (int i = 0; i < emptyBinFailures.size(); ++i) {
-            std::cout << "[ EXPECTED ] "
-                      << emptyBinFailures.GetTestPartResult(i).message()
-                      << std::endl;
-        }
-        EXPECT_GT(emptyBinFailures.size(), 0)
-            << "RecursiveSums now handles empty bins correctly:"
-            << " remove the expected failure from this test";
+            << "RecursiveSums sum2 in " << kind << b << " is wrong";
     }
 
 }

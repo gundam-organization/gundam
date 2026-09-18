@@ -119,7 +119,8 @@ void Cache::RecursiveSums::Initialize() {
   }
 
   // Fill the offsets for each histogram bin.  This also makes sure that all
-  // the bins exist.  There will be a problem in one of the bins is empty.
+  // the bins exist.  An empty bin has fBinOffsets[bin] == fBinOffsets[bin+1]
+  // and is handled by HEMICopyResults.
   {
     int bin = 0;
     int offset = 0;
@@ -267,14 +268,17 @@ namespace {
     }
   }
 
-  // A function to copy the final sums into the output.
+  // A function to copy the final sums into the output.  An empty bin owns
+  // no slot in the work buffer (offsets[i] == offsets[i+1]), so buffer[offsets[i]]
+  // would be the next filled bin's sum (or past the end of the buffer for
+  // the last bin).  Empty bins must report zero.
   HEMI_KERNEL_FUNCTION(HEMICopyResults,
                        double* sums,
                        const double* buffer,
                        const int* offsets,
                        int NB) {
     for (int i : hemi::grid_stride_range(0, NB)) {
-      sums[i] = buffer[offsets[i]];
+      sums[i] = (offsets[i] < offsets[i+1]) ? buffer[offsets[i]] : 0.0;
     }
   }
 }
