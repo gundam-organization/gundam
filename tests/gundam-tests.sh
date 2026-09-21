@@ -1,103 +1,13 @@
 #!/bin/bash
 #
-# Run tests on gundam.  Test scripts that are kept in the fast-tests
-# subdirectory will always be run.  Any test scripts that take a lot
-# of time and are for more detailed validation should be kept in
-# slow-tests.  Tests that are not part of "fast-tests" will only be
-# run when the applicable options are set.  The apply option ("-a")
-# must be added to actually run the scripts.
+# Run the GUNDAM validation tests.
 #
-# The testing levels are:
+# This must be run from the tests directory that contains it, and it runs
+# nothing unless the apply option ("-a") is given.
 #
-#    fast-tests/ -- Always run and used during continuous integration.
-#
-#    regular-tests/ -- Quick tests that are not used for CI, but
-#       should be run locally before a push/pull-request Run when "-r"
-#       is provided.  They are run after and can use results from the
-#       fast-tests.  (Plan to get a dring of water while these tests run).
-#
-#    extended-tests/ -- Slower tests that are run when "-e" is
-#       provided.  These tests should finish in well under 30 seconds,
-#       and all of the tests should take less than a few minutes.
-#       They are run after and can use results from the fast and
-#       regular tests. (Plan to take a coffee break while these tests
-#       run).
-#
-#    slow-tests/ -- Long validation tests.  Only run with "-s" is
-#       provided.  These tests are run after all other tests are
-#       finished. (Plan to work on something else while these tests
-#       run).
-#
-# This needs to be run in the tests subdirectory (which contains this
-# script).  Any tests that are expected to fail should be listed in
-# the EXPECTED_FAILURES file (by file name relative to the tests
-# directory) where there is an example called
-# "fast-tests/090ExpectedFailure.sh" that is part of the testing
-# framework.
-#
-# Validation scripts can be any executable file, but are generally
-# written in bash or python.  They are run in a separate execution
-# directory with command line
-#
-# cd <output> && <script> <directory>
-#
-# Where <output> is directory where the script is run, <script> is the
-# full path of the test script, and <directory> is the full path of
-# the directory containing the test script.  Any necessary
-# configuration files should be saved in the same directory as the
-# script.
-#
-# The gundam-tests.sh script will run all of the executable scripts in
-# the script directories (i.e. fast-tests and/or slow-tests) that
-# start with a digit.  The list of scripts to be run are printed
-# before they start to run.  All of the fast-tests are run before all
-# of the slow-tests (i.e. slow-tests can use output from fast-tests)
-#
-# The validation scripts are run in the order of increasing speed, so
-# fast-tests are run before slow-tests.  Tests in a particular
-# category (e.g. fast-tests) are run in lexical order based on the
-# script name.  This means that script "001MyName" is run before
-# "002MyName", so users have controll of the script order. The
-# following convention is suggested for script naming.
-#
-#    000-099 -- Reserved for gundam-tests.sh.  This is where job
-#               headers and similar things can be generated, and where
-#               the run environment is set up.  A script here builds
-#               something that the later tests need, so a test that is
-#               run on its own (see "-t") will not have it.
-#
-#    100-199 -- Scripts which don't require input.  This includes any
-#               scripts generating input data that can be used by the
-#               later tests.
-#
-#    200-299 -- Scripts which generate gundam output files.  These
-#               scripts mostly apply fits.
-#
-#    800-899 -- Scripts which produce summary files.
-#
-#    900-998 -- Scripts looking at summary files and checking results
-#
-#    999 -- Reserved for gundam-tests.sh.  This is where job
-#               completion information is generated.
-#
-# NAMING CONVENTION EXAMPLE: This is how the naming convention works
-# in practice.  This is how a script that runs a GUNDAM fit that takes
-# a binning and configuration file might be named.
-#
-#   fast-test/
-#     200RunGUNDAM.sh          -- The script
-#     200RunGUNDAM-config.yaml -- The configuration file
-#     200RunGUNDAM-binning.txt -- The binning file.
-#     200RunGUNDAM-utils.py    -- Python utilities used by the script
-#
-#   The output file should be named 200RunGUNDAM.root (or similar as
-#   needed).
-#
-# A file named "<NNNName>-<role>.<ext>" is support material for the test
-# "<NNNName>", and is never a test itself.  Such a file is found by the
-# search for test scripts, and is skipped only because it cannot be
-# executed, so it must never be given the executable bit.  A python file of
-# this kind holds utilities that the test imports, and has no "#!" line.
+# See README-TESTS.md in this directory for the testing levels, how a test
+# script is run, the script naming convention, the support file convention,
+# and the environment that the python tests need.
 
 echo 'USAGE: gundam-tests.sh [-f] [-r] [-e] [-s] [-v] [-a] [output-directory]'
 echo '    -c               : Force use of terminfo colors for output'
@@ -112,7 +22,7 @@ echo '    -v               : Print test logs live while also saving them to the 
 echo '    -a               : Apply the tests (no tests are run without this)'
 echo '    output-directory : The name of the output directory.  The default'
 echo '                       value is \"./output.YYYY-MM-DD-hhmmss\"'
-echo ' See gundam-tests.sh for more usage documentation.'
+echo ' See README-TESTS.md for more documentation.'
 
 # The default tests to be run.
 TESTS="fast-tests"
