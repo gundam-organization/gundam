@@ -61,7 +61,10 @@
 # following convention is suggested for script naming.
 #
 #    000-099 -- Reserved for gundam-tests.sh.  This is where job
-#               headers and similar things can be generated.
+#               headers and similar things can be generated, and where
+#               the run environment is set up.  A script here builds
+#               something that the later tests need, so a test that is
+#               run on its own (see "-t") will not have it.
 #
 #    100-199 -- Scripts which don't require input.  This includes any
 #               scripts generating input data that can be used by the
@@ -85,9 +88,16 @@
 #     200RunGUNDAM.sh          -- The script
 #     200RunGUNDAM-config.yaml -- The configuration file
 #     200RunGUNDAM-binning.txt -- The binning file.
+#     200RunGUNDAM-utils.py    -- Python utilities used by the script
 #
 #   The output file should be named 200RunGUNDAM.root (or similar as
 #   needed).
+#
+# A file named "<NNNName>-<role>.<ext>" is support material for the test
+# "<NNNName>", and is never a test itself.  Such a file is found by the
+# search for test scripts, and is skipped only because it cannot be
+# executed, so it must never be given the executable bit.  A python file of
+# this kind holds utilities that the test imports, and has no "#!" line.
 
 echo 'USAGE: gundam-tests.sh [-f] [-r] [-e] [-s] [-v] [-a] [output-directory]'
 echo '    -c               : Force use of terminfo colors for output'
@@ -95,7 +105,9 @@ echo '    -f               : Only run the fast tests [default]'
 echo '    -r               : Run fast and regular tests'
 echo '    -e               : Run fast, regular and extended tests'
 echo '    -s               : Run all tests including the slow tests'
-echo '    -t <test-path>   : Run only one test script, e.g. fast-tests/210IgnoreZeroPredictionAtPrior.py'
+echo '    -t <test-path>   : Run only one test script, e.g. fast-tests/200CovarianceFit.sh'
+echo '                       (the 000-099 setup scripts are not run, so a test'
+echo '                       needing them will fail)'
 echo '    -v               : Print test logs live while also saving them to the log files'
 echo '    -a               : Apply the tests (no tests are run without this)'
 echo '    output-directory : The name of the output directory.  The default'
@@ -197,9 +209,6 @@ fi
 
 is_test_runnable() {
     local test_path=$1
-    if [[ "${test_path}" == *.py ]]; then
-        return 0
-    fi
     if [ -x "${test_path}" ]; then
         return 0
     fi
@@ -257,78 +266,6 @@ if [ ! -x ${OUTPUT_DIR} ]; then
     exit 1
 fi
 
-REPO_ROOT=$(cd "${PWD}/.." && pwd)
-PYTHON_TEST_VENV="${REPO_ROOT}/venv"
-PYTHON_TEST_REQUIREMENTS="${PWD}/fast-tests/005PythonSetup-requirements.txt"
-PYTHON_TEST_VENV_READY="no"
-
-prepare_python_test_venv() {
-    local log=$1
-    local log_path="${log}"
-
-    if [[ "${log_path}" != /* ]]; then
-        log_path="${OUTPUT_DIR}/${log_path}"
-    fi
-
-    if [ "${PYTHON_TEST_VENV_READY}" = "yes" ]; then
-        return 0
-    fi
-
-    if [ ! -d "${PYTHON_TEST_VENV}" ]; then
-        python3 -m venv "${PYTHON_TEST_VENV}" > "${log_path}" 2>&1 || return 1
-    fi
-
-    (
-        . "${PYTHON_TEST_VENV}/bin/activate" || exit 1
-        if [ -f "${PYTHON_TEST_REQUIREMENTS}" ]; then
-            local missing_requirements="no"
-            local requirement=""
-            local package_name=""
-            while IFS= read -r requirement; do
-                case "${requirement}" in
-                    ""|\#*)
-                        continue
-                        ;;
-                esac
-                package_name=$(printf '%s\n' "${requirement}" | sed 's/[<>=!~;\[].*$//')
-                if ! python -m pip show "${package_name}" > /dev/null 2>&1; then
-                    missing_requirements="yes"
-                    break
-                fi
-            done < "${PYTHON_TEST_REQUIREMENTS}"
-
-            if [ "${missing_requirements}" = "yes" ]; then
-                python -m pip install -r "${PYTHON_TEST_REQUIREMENTS}" >> "${log_path}" 2>&1 || exit 1
-            fi
-        fi
-    ) >> "${log_path}" 2>&1 || return 1
-
-    PYTHON_TEST_VENV_READY="yes"
-    return 0
-}
-
-run_python_test() {
-    local job=$1
-    local dir=$2
-    local log=$3
-
-    prepare_python_test_venv "${log}" || return 1
-    if [ "${VERBOSE_LOGS}" = "yes" ]; then
-        (
-            cd "${OUTPUT_DIR}" &&
-            . "${PYTHON_TEST_VENV}/bin/activate" &&
-            python "${job}" "${dir}" 2>&1 | tee -a "${log}"
-            exit ${PIPESTATUS[0]}
-        )
-    else
-        (
-            cd "${OUTPUT_DIR}" &&
-            . "${PYTHON_TEST_VENV}/bin/activate" &&
-            python "${job}" "${dir}" >> "${log}" 2>&1
-        )
-    fi
-}
-
 # Find and run the jobs in lexical order.
 FAILURES=""
 EXPECTED=""
@@ -353,25 +290,18 @@ for d in ${TESTS}; do
         # The name of the output log file
         LOG=$(basename ${JOB}).log
         # Run the script in the output directory.
-        if [[ "${JOB}" == *.py ]]; then
-            echo "python-venv:${JOB} ${DIR}"
-            : > "${OUTPUT_DIR}/${LOG}"
-            run_python_test "${JOB}" "${DIR}" "${LOG}"
+        echo "(cd $OUTPUT_DIR && ${JOB} ${DIR})"
+        if [ "${VERBOSE_LOGS}" = "yes" ]; then
+            (
+                cd $OUTPUT_DIR &&
+                ${JOB} ${DIR} 2>&1 | tee ${LOG}
+                exit ${PIPESTATUS[0]}
+            )
             JOB_STATUS=$?
+        elif (cd $OUTPUT_DIR && ${JOB} ${DIR} >& ${LOG}); then
+            JOB_STATUS=0
         else
-            echo "(cd $OUTPUT_DIR && ${JOB} ${DIR})"
-            if [ "${VERBOSE_LOGS}" = "yes" ]; then
-                (
-                    cd $OUTPUT_DIR &&
-                    ${JOB} ${DIR} 2>&1 | tee ${LOG}
-                    exit ${PIPESTATUS[0]}
-                )
-                JOB_STATUS=$?
-            elif (cd $OUTPUT_DIR && ${JOB} ${DIR} >& ${LOG}); then
-                JOB_STATUS=0
-            else
-                JOB_STATUS=$?
-            fi
+            JOB_STATUS=$?
         fi
         if [ ${JOB_STATUS} -eq 0 ]; then
             # The job exited with success, but look for a fail messsage
