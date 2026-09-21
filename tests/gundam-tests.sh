@@ -259,7 +259,7 @@ fi
 
 REPO_ROOT=$(cd "${PWD}/.." && pwd)
 PYTHON_TEST_VENV="${REPO_ROOT}/venv"
-PYTHON_TEST_REQUIREMENTS="${PWD}/requirements.txt"
+PYTHON_TEST_REQUIREMENTS="${PWD}/fast-tests/005PythonSetup-requirements.txt"
 PYTHON_TEST_VENV_READY="no"
 
 prepare_python_test_venv() {
