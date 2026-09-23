@@ -180,8 +180,8 @@ parameter values (X) and responses (Y) for each event:
 ```yaml
 dialType: Spline
 dialBranchData:
-  parameterValues: spline_parameter_values
-  responses: spline_responses
+  parameterValuesTArray: spline_parameter_values
+  weightValuesTArray: spline_responses
 ```
 
 Both names refer to branches of the input TTree. The branches must contain

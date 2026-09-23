@@ -102,7 +102,7 @@ def main():
     reference = evaluate(paths, "dialLeafName: graph", False)
     for backend in [False, True]:
         for config in ["treeExpression: graph", "dialBranchData: graph",
-                       "dialBranchData: {parameterValues: parameters, responses: responses}"]:
+                       "dialBranchData: {parameterValuesTArray: parameters, weightValuesTArray: responses}"]:
             result = evaluate(paths, config, backend)
             for actual, expected in zip(result, reference):
                 for a, b in zip(actual, expected):
@@ -116,14 +116,14 @@ def main():
         subprocess.run([sys.executable, str(Path(__file__).resolve()), "--write-input", str(path), str(i * 3), "edge"], check=True)
     reference = evaluate(paths, "dialBranchData: graph", False)
     for backend in [False, True]:
-        actual = evaluate(paths, "dialBranchData: {parameterValues: parameters, responses: responses}", backend)
+        actual = evaluate(paths, "dialBranchData: {parameterValuesTArray: parameters, weightValuesTArray: responses}", backend)
         for a, b in zip(actual, reference):
             if not all(math.isclose(x, y, rel_tol=1e-7, abs_tol=1e-7) for x, y in zip(a, b)):
                 raise RuntimeError(f"Empty/constant/small arrays: {actual} != {reference}")
     for config, message in [
-        ("dialBranchData: {parameterValues: X, responses: responses}", "must contain a TArray"),
-        ("dialBranchData: {parameterValues: missing, responses: responses}", "Missing dialBranchData branch"),
-        ("dialBranchData: {parameterValues: '', responses: responses}", "non-empty"),
+        ("dialBranchData: {parameterValuesTArray: X, weightValuesTArray: responses}", "must contain a TArray"),
+        ("dialBranchData: {parameterValuesTArray: missing, weightValuesTArray: responses}", "Missing dialBranchData branch"),
+        ("dialBranchData: {parameterValuesTArray: '', weightValuesTArray: responses}", "non-empty"),
     ]:
         try:
             evaluate(paths, config, False)
@@ -134,7 +134,7 @@ def main():
             raise RuntimeError(f"Invalid input accepted: {config}")
     subprocess.run([sys.executable, str(Path(__file__).resolve()), "--write-input", str(paths[0]), "0", "mismatch"], check=True)
     try:
-        evaluate(paths[:1], "dialBranchData: {parameterValues: parameters, responses: responses}", False)
+        evaluate(paths[:1], "dialBranchData: {parameterValuesTArray: parameters, weightValuesTArray: responses}", False)
     except RuntimeError as error:
         if "array size mismatch" not in str(error):
             raise
