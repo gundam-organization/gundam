@@ -33,6 +33,7 @@ RUN apt-get install -y libyaml-cpp-dev || true
 RUN apt-get install -y nlohmann-json3-dev || true
 RUN apt-get install -y libvdt-dev || true
 RUN apt-get install -y python3-venv || true
+RUN apt-get install -y python3-pip || true
 
 # Copying GUNDAM source files
 COPY ./src $REPO_DIR/src
@@ -43,11 +44,27 @@ COPY ./.git $REPO_DIR/.git
 COPY ./tests $REPO_DIR/tests
 
 RUN python3 -m venv $REPO_DIR/venv
-# Keep pybind11 independent of the Ubuntu package version.
+# Keep pybind11 independent of the Ubuntu package version.  This is also
+# the environment that gundam-tests.sh runs the python tests in today.
+#
+# TO BE REMOVED once the python tests run in a standalone environment:
+# the "uproot numpy" line below is only here because gundam-tests.sh runs
+# the python tests inside $REPO_DIR/venv.  When the tests build an
+# environment of their own, they inherit the system interpreter instead,
+# and the system installation further down is the one they use.  The rest
+# of this RUN stays, since pybind11 is needed to build GUNDAM.
 RUN . $REPO_DIR/venv/bin/activate && \
     python -m pip install --upgrade pip && \
     python -m pip install pybind11==2.13.6 && \
-    if [ -f $REPO_DIR/tests/requirements.txt ]; then python -m pip install -r $REPO_DIR/tests/requirements.txt; fi
+    python -m pip install uproot numpy
+
+# The packages the python tests need, named explicitly.  This list
+# must be kept in step with the python test requirements file. This
+# will override the system packages if they were already installed.
+# Since this is being done on a clean installation, these packages
+# probably don't exist. This safely handles it for future
+# distributions.
+RUN PIP_BREAK_SYSTEM_PACKAGES=1 python3 -m pip install uproot numpy
 
 # Checking out missing code
 WORKDIR $REPO_DIR
