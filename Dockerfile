@@ -58,9 +58,13 @@ RUN . $REPO_DIR/venv/bin/activate && \
     python -m pip install pybind11==2.13.6 && \
     python -m pip install uproot numpy
 
-# The packages the python tests need, named explicitly.  This list must be
-# kept in step with the python test requirements file.
-RUN python3 -m pip install --break-system-packages uproot numpy
+# The packages the python tests need, named explicitly.  This list
+# must be kept in step with the python test requirements file. This
+# will override the system packages if they were already installed.
+# Since this is being done on a clean installation, these packages
+# probably don't exist. This safely handles it for future
+# distributions.
+RUN PIP_BREAK_SYSTEM_PACKAGES=1 python3 -m pip install uproot numpy
 
 # Checking out missing code
 WORKDIR $REPO_DIR
