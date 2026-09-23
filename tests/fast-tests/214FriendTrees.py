@@ -15,9 +15,11 @@ def write_root_files(main_path: Path, friend_path: Path) -> None:
     with uproot.recreate(friend_path) as root_file:
         tree = root_file.mktree("friend_events", {"friendValue": "float64"})
         tree.extend({"friendValue": array("d", [0.25, 0.75, 1.25, 1.75])})
+        tree = root_file.mktree("friend_offsets", {"friendValue": "float64"})
+        tree.extend({"friendValue": array("d", [0.5, 0.5, 0.0, 0.0])})
 
 
-def build_config(main_path: Path, friend_path: Path) -> str:
+def build_config(main_path: Path, friend_list: str, expression: str) -> str:
     return f"""
 fitterEngineConfig:
   likelihoodInterfaceConfig:
@@ -31,11 +33,10 @@ fitterEngineConfig:
             - name: main
               path: "{main_path}:events"
               friendList:
-                - name: friend
-                  path: "{friend_path}:friend_events"
+{friend_list}
           variableDict:
             - name: X
-              expr: "friend.friendValue"
+              expr: "{expression}"
   propagatorConfig:
     sampleSetConfig:
       sampleList:
@@ -44,6 +45,27 @@ fitterEngineConfig:
           binning: {{ binningDefinition: [{{ name: X, edges: [0, 1, 2] }}] }}
           dataSets: [FriendTreeSample]
 """
+
+
+def check_histogram(config_yaml: str, expected: list[float]) -> None:
+    import GUNDAM
+
+    config_builder = GUNDAM.ConfigUtils.ConfigBuilder()
+    config_builder.setConfigFromYamlString(config_yaml)
+    config = GUNDAM.ConfigUtils.ConfigReader(config_builder.getConfig())
+    config.defineField(GUNDAM.ConfigUtils.ConfigReader.FieldDefinition("fitterEngineConfig"))
+
+    engine = GUNDAM.FitterEngine()
+    engine.setConfig(config.fetchValueConfigReader("fitterEngineConfig"))
+    engine.configure()
+    likelihood = engine.getLikelihoodInterface()
+    likelihood.initialize()
+    likelihood.propagateAndEvalLikelihood()
+
+    sample = likelihood.getModelPropagator().getSampleSet().getSampleList()[0]
+    contents = [bin_content.sumWeights for bin_content in sample.getHistogram().getBinContentList()]
+    if contents != expected:
+        raise AssertionError(f"Expected {expected}, got {contents}")
 
 
 def main() -> int:
@@ -58,25 +80,33 @@ def main() -> int:
     GUNDAM.setLightOutputMode(True)
     GUNDAM.setNumberOfThreads(1)
 
-    config_builder = GUNDAM.ConfigUtils.ConfigBuilder()
-    config_builder.setConfigFromYamlString(build_config(main_path, friend_path))
-    config = GUNDAM.ConfigUtils.ConfigReader(config_builder.getConfig())
-    config.defineField(GUNDAM.ConfigUtils.ConfigReader.FieldDefinition("fitterEngineConfig"))
+    legacy_friend = f"""
+                - name: friend
+                  path: "{friend_path}:friend_events"
+"""
+    grouped_friends = f"""
+                - name: xsec_syst_friends
+                  path: "{friend_path}"
+                  treeList: [friend_events, friend_offsets]
+"""
+    check_histogram(build_config(main_path, legacy_friend, "friend.friendValue"), [2.0, 2.0])
+    check_histogram(
+        build_config(main_path, grouped_friends, "friend_events.friendValue + friend_offsets.friendValue"),
+        [1.0, 3.0],
+    )
+    check_histogram(
+        build_config(main_path, legacy_friend + grouped_friends, "friend.friendValue + friend_offsets.friendValue"),
+        [1.0, 3.0],
+    )
+    disabled_friends = f"""
+                - name: disabled_friends
+                  path: "{work_dir / '214FriendTrees-missing.root'}"
+                  isEnabled: false
+                  treeList: [missing_tree1, missing_tree2]
+"""
+    check_histogram(build_config(main_path, legacy_friend + disabled_friends, "friend.friendValue"), [2.0, 2.0])
 
-    engine = GUNDAM.FitterEngine()
-    engine.setConfig(config.fetchValueConfigReader("fitterEngineConfig"))
-    engine.configure()
-    likelihood = engine.getLikelihoodInterface()
-    likelihood.initialize()
-    likelihood.propagateAndEvalLikelihood()
-
-    sample = likelihood.getModelPropagator().getSampleSet().getSampleList()[0]
-    contents = [bin_content.sumWeights for bin_content in sample.getHistogram().getBinContentList()]
-    if contents != [2.0, 2.0]:
-        print(f"FAIL: expected [2.0, 2.0] from friend.friendValue, got {contents}")
-        return 1
-
-    print("SUCCESS: friend-tree branch is available through its configured alias.")
+    print("SUCCESS: legacy, grouped, mixed and disabled friend trees behave as expected.")
     return 0
 
 

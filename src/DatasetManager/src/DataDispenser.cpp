@@ -672,14 +672,33 @@ void DataDispenser::configureImpl(){
             {FieldFlag::MANDATORY, "name"},
             {FieldFlag::MANDATORY, "path"},
             {"isEnabled"},
+            {"treeList"},
           });
           friendConfig.checkConfiguration();
 
-          filePathEntry.friendList.emplace_back();
-          auto& friendEntry = filePathEntry.friendList.back();
+          DataDispenserParameters::FilePathEntry::FriendTree friendEntry;
           friendEntry.name = friendConfig.fetchValue<std::string>("name");
           friendEntry.path = friendConfig.fetchValue<std::string>("path");
           friendConfig.fillValue(friendEntry.isEnabled, "isEnabled");
+          if( friendConfig.getConfigEntry("treeList").second != nullptr ){
+            auto treeList = friendConfig.fetchValue<std::vector<std::string>>("treeList");
+            LogExitIf(treeList.empty(), "Friend \"" << friendEntry.name << "\": treeList must not be empty.");
+            LogExitIf(
+                friendEntry.path.find(':') != std::string::npos,
+                "Friend \"" << friendEntry.name << "\": path must contain only the ROOT file path when treeList is provided."
+            );
+            for( const auto& treePath : treeList ){
+              LogExitIf(treePath.empty(), "Friend \"" << friendEntry.name << "\": treeList contains an empty tree path.");
+              auto treeEntry = friendEntry;
+              // The group name identifies the config entry; each tree has its own ROOT alias.
+              treeEntry.name = treePath;
+              treeEntry.path += ":" + treePath;
+              filePathEntry.friendList.emplace_back(std::move(treeEntry));
+            }
+          }
+          else{
+            filePathEntry.friendList.emplace_back(std::move(friendEntry));
+          }
         }
       }
       std::set<std::string> friendNameSet;
