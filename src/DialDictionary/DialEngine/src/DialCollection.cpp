@@ -144,8 +144,8 @@ std::string DialCollection::getSummary(bool shallow_) const{
   if( not _dialOptions_.empty() ){ ss << ":\"" << _dialOptions_ << "\""; }
   if( not _dialLeafName_.empty() ){ ss << " / dialBranchData:" << _dialLeafName_; }
   if( not _dialParameterValuesBranch_.empty() ){
-    ss << " / dialBranchData:{parameterValues:" << _dialParameterValuesBranch_
-       << ", responses:" << _dialResponsesBranch_ << "}";
+    ss << " / dialBranchData:{parameterValuesTArray:" << _dialParameterValuesBranch_
+       << ", weightValuesTArray:" << _dialResponsesBranch_ << "}";
   }
   if( _definitionRange_.hasBound() ){ ss << " / definitionRange:" << _definitionRange_; }
   if( _mirrorDefinitionRange_.hasBound() ){ ss << " / mirrorDefinitionRange:" << _mirrorDefinitionRange_; }
@@ -311,13 +311,13 @@ void DialCollection::readParametersFromConfig(const ConfigReader &config_) {
     }
     else{
       LogThrowIf(not branchData.getConfig().is_object(),
-                 "dialBranchData must be a branch expression or {parameterValues, responses}");
-      branchData.defineFields({{"parameterValues"}, {"responses"}});
+                 "dialBranchData must be a branch expression or {parameterValuesTArray, weightValuesTArray}");
+      branchData.defineFields({{"parameterValuesTArray"}, {"weightValuesTArray"}});
       branchData.checkConfiguration();
-      _dialParameterValuesBranch_ = branchData.fetchValue<std::string>("parameterValues");
-      _dialResponsesBranch_ = branchData.fetchValue<std::string>("responses");
+      _dialParameterValuesBranch_ = branchData.fetchValue<std::string>("parameterValuesTArray");
+      _dialResponsesBranch_ = branchData.fetchValue<std::string>("weightValuesTArray");
       LogThrowIf(_dialParameterValuesBranch_.empty() or _dialResponsesBranch_.empty(),
-                 "dialBranchData requires non-empty parameterValues and responses branch names");
+                 "dialBranchData requires non-empty parameterValuesTArray and weightValuesTArray branch names");
       LogThrowIf(_dialType_ != DialType::Spline and _dialType_ != DialType::Graph,
                  "TArray dialBranchData requires dialType Spline or Graph");
     }
