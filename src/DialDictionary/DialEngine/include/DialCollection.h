@@ -85,6 +85,10 @@ public:
   // (e.g. it might be an tabulated event-by-event dial).
   [[nodiscard]] const std::string &getDialLeafName() const{ return _dialLeafName_; }
 
+  [[nodiscard]] bool hasDialBranchData() const{ return not _dialLeafName_.empty() or not _dialParameterValuesBranch_.empty(); }
+  [[nodiscard]] const std::string& getDialParameterValuesBranch() const{ return _dialParameterValuesBranch_; }
+  [[nodiscard]] const std::string& getDialResponsesBranch() const{ return _dialResponsesBranch_; }
+
   [[nodiscard]] const BinSet &getDialBinSet() const{ return _dialBinSet_; }
   [[nodiscard]] const std::vector<std::string> &getDataSetNameList() const{ return _dataSetNameList_; }
 
@@ -209,6 +213,8 @@ private:
   double _mirrorRange_{std::nan("unset")};
   std::string _applyConditionStr_{};
   std::string _dialLeafName_{};
+  std::string _dialParameterValuesBranch_{};
+  std::string _dialResponsesBranch_{};
 
   DialType _dialType_{DialType::Norm}; // Graph, Spline...
   std::string _dialOptions_{}; // monotonic, catmull-rom...

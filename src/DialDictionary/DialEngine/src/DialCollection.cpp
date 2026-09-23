@@ -39,7 +39,7 @@ void DialCollection::prepareConfig(ConfigReader &config_){
       {"printDialSummary", {"printDialsSummary"}},
       {"dialType", {"type", "dialsType"}},
       {"options", {"dialSubType"}},
-      {"treeExpression", {"dialLeafName"}},
+      {"dialBranchData", {"dialLeafName", "treeExpression"}},
       {"minDialResponse", {"minimumSplineResponse"}},
       {"maxDialResponse"},
       {"useMirrorDial"},
@@ -142,7 +142,11 @@ std::string DialCollection::getSummary(bool shallow_) const{
   ss << this->getTitle();
   if( _dialType_ != DialType::Unset ){ ss << " / " << _dialType_; }
   if( not _dialOptions_.empty() ){ ss << ":\"" << _dialOptions_ << "\""; }
-  if( not _dialLeafName_.empty() ){ ss << " / dialLeafName:" << _dialLeafName_; }
+  if( not _dialLeafName_.empty() ){ ss << " / dialBranchData:" << _dialLeafName_; }
+  if( not _dialParameterValuesBranch_.empty() ){
+    ss << " / dialBranchData:{parameterValues:" << _dialParameterValuesBranch_
+       << ", responses:" << _dialResponsesBranch_ << "}";
+  }
   if( _definitionRange_.hasBound() ){ ss << " / definitionRange:" << _definitionRange_; }
   if( _mirrorDefinitionRange_.hasBound() ){ ss << " / mirrorDefinitionRange:" << _mirrorDefinitionRange_; }
 
@@ -296,7 +300,28 @@ void DialCollection::readParametersFromConfig(const ConfigReader &config_) {
   if( _dialType_ != DialType::ExternalWeight ){
     config_.fillValue(_dialOptions_, "options");
   }
-  config_.fillValue(_dialLeafName_, "treeExpression");
+  if( config_.hasField("dialBranchData") ){
+    auto branchData = config_.fetchValue<ConfigReader>("dialBranchData");
+    _dialLeafName_.clear();
+    _dialParameterValuesBranch_.clear();
+    _dialResponsesBranch_.clear();
+    if( branchData.getConfig().is_string() ){
+      _dialLeafName_ = branchData.getConfig().get<std::string>();
+      LogThrowIf(_dialLeafName_.empty(), "dialBranchData must not be empty");
+    }
+    else{
+      LogThrowIf(not branchData.getConfig().is_object(),
+                 "dialBranchData must be a branch expression or {parameterValues, responses}");
+      branchData.defineFields({{"parameterValues"}, {"responses"}});
+      branchData.checkConfiguration();
+      _dialParameterValuesBranch_ = branchData.fetchValue<std::string>("parameterValues");
+      _dialResponsesBranch_ = branchData.fetchValue<std::string>("responses");
+      LogThrowIf(_dialParameterValuesBranch_.empty() or _dialResponsesBranch_.empty(),
+                 "dialBranchData requires non-empty parameterValues and responses branch names");
+      LogThrowIf(_dialType_ != DialType::Spline and _dialType_ != DialType::Graph,
+                 "TArray dialBranchData requires dialType Spline or Graph");
+    }
+  }
   config_.fillValue(_minDialResponse_, "minDialResponse");
   config_.fillValue(_maxDialResponse_, "maxDialResponse");
   config_.fillValue(_useMirrorDial_, "useMirrorDial");
@@ -947,10 +972,9 @@ bool DialCollection::initializeDialsWithDefinition() {
       LogThrowIf(not initializeDialsWithBinningFile(dialsDefinition),
                "Error initializing dials with binning file");
     }
-  else if (not _dialLeafName_.empty()) {
-    // None of the other dial types are matched, and a dialLeafName field has
-    // been provided, so this is an event by event dial with one TGraph (or
-    // TSpline3) per event.  The generation of the dials will be handled in
+  else if (hasDialBranchData()) {
+    // Branch data defines an event-by-event dial from a ROOT object
+    // or a pair of TArray branches.  The generation of the dials will be handled in
     // DataDispenser.
     _isEventByEvent_ = true;
   }
