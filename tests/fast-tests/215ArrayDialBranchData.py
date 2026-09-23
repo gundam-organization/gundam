@@ -89,7 +89,7 @@ likelihoodInterfaceConfig:
     results = []
     for value in [0.0, -0.5, 0.5, 1.0, 1.5]:
         parameter.setParameterValue(value)
-        engine.evaluateLikelihood()
+        likelihood.propagateAndEvalLikelihood()
         content = propagator.getSampleSet().getSampleList()[0].getHistogram().getBinContentList()[0]
         results.append((content.sumWeights, content.sqrtSumSqWeights))
     return results
