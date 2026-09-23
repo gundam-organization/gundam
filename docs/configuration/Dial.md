@@ -41,7 +41,7 @@ external libraries to calculate weights.
 
 | Option                 | Type         | Description                                                            | Default |
 |------------------------|--------------|------------------------------------------------------------------------|---------|
-| dialLeafName           | string       | fetch dial from the dataset TTree with the corresponding leaf name     |         |
+| dialBranchData         | string or object | Read a ROOT object branch or a pair of TArray branches (see below). `dialLeafName` and `treeExpression` remain aliases. | |
 | dialsFilePath          | string       | root file containing the set of dials                                  |         |
 | dialsList              | string       | path within root file to the list of dials                             |         |
 | tableConfig            | json         | Definition of functions to call for Tabular dials                      | empty   |
@@ -60,7 +60,7 @@ Treat the parameter as a simple weight.  In this case, the parameter must be bou
 
 | Option                 | Type         | Description                                                            | Default |
 |------------------------|--------------|------------------------------------------------------------------------|---------|
-| dialLeafName           | string       | fetch dial from the dataset TTree with the corresponding leaf name     |         |
+| dialBranchData         | string or object | Read a ROOT object branch or a pair of TArray branches (see below). `dialLeafName` and `treeExpression` remain aliases. | |
 | dialsFilePath          | string       | root file containing the set of dials                                  |         |
 | dialsList              | string       | path within root file to the list of dials                             |         |
 
@@ -95,7 +95,7 @@ The `Spline` dial type can have several `dialSubType` values
 
 | Option                 | Type         | Description                                                            | Default |
 |------------------------|--------------|------------------------------------------------------------------------|---------|
-| dialLeafName           | string       | fetch dial from the dataset TTree with the corresponding leaf name     |         |
+| dialBranchData         | string or object | Read a ROOT object branch or a pair of TArray branches (see below). `dialLeafName` and `treeExpression` remain aliases. | |
 | dialsFilePath          | string       | root file containing the set of dials                                  |         |
 | dialsList              | string       | path within root file to the list of dials                             |         |
 
@@ -110,7 +110,7 @@ leaf named by the `dialLeaf` field, and must contain a TGraph object.
 
 | Option                 | Type         | Description                                                            | Default |
 |------------------------|--------------|------------------------------------------------------------------------|---------|
-| dialLeafName           | string       | fetch dial from the dataset TTree with the corresponding leaf name     |         |
+| dialBranchData         | string or object | Read a ROOT object branch or a pair of TArray branches (see below). `dialLeafName` and `treeExpression` remain aliases. | |
 | dialsFilePath          | string       | root file containing the set of dials                                  |         |
 | dialsList              | string       | path within root file to the list of dials                             |         |
 
@@ -171,3 +171,33 @@ cannot be efficiently applied with GPU acceleration.
 | excludedRanges                    | list(pair(double)) | list of ranges (min, max) where the dials of the set don't apply |         |
 | allowedValues                     | list(double)       | list of values where the dials of the set apply                  |         |
 | excludedValues                    | list(double)       | list of values where the dials of the set apply                  |         |
+
+### Event-by-event branch data
+
+For a `Spline` or `Graph` dial, a pair of TArray branches can supply the
+parameter values (X) and responses (Y) for each event:
+
+```yaml
+dialType: Spline
+dialBranchData:
+  parameterValues: spline_parameter_values
+  responses: spline_responses
+```
+
+Both names refer to branches of the input TTree. The branches must contain
+TArray objects, for example TArrayF or TArrayD; the two arrays may use different
+numeric types but must have the same length for each entry. Points are paired
+by array index and processed using the same spline options, sorting, definition
+range and extrapolation settings as TGraph inputs. Empty arrays produce no dial;
+constant responses retain the existing constant-dial behavior.
+
+Existing ROOT object inputs use a string:
+
+```yaml
+dialType: Spline
+dialBranchData: spline_graph
+```
+
+Existing configurations using `dialLeafName: spline_graph` or
+`treeExpression: spline_graph` remain supported. The array-pair form is limited
+to `Spline` and `Graph` dials; it does not use the TClonesArray dial index.
