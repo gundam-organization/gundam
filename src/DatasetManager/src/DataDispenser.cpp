@@ -1947,6 +1947,25 @@ void DataDispenser::loadEvent(int iThread_){
       }
     }
 
+    // TArray dial branches are read on demand, outside the event variable buffers.
+    std::set<std::string> displayedExpressions;
+    for( const auto& varDisplay : varDisplayList ){
+      displayedExpressions.emplace(varDisplay.leafName);
+    }
+    for( const auto* dialCollection : _cache_.dialCollectionsRefList ){
+      for( const auto& branchName : {dialCollection->getDialParameterValuesBranch(), dialCollection->getDialResponsesBranch()} ){
+        if( branchName.empty() or not displayedExpressions.emplace(branchName).second ){ continue; }
+        varDisplayList.emplace_back();
+        auto& varDisplay = varDisplayList.back();
+        varDisplay.varName = branchName;
+        varDisplay.leafName = branchName;
+        varDisplay.leafTypeName = "p";
+        varDisplay.priorityIndex = 999;
+        varDisplay.lineColor = GenericToolbox::ColorCodes::magentaBackground;
+        hasEventDials = true;
+      }
+    }
+
     GenericToolbox::sortVector( varDisplayList, [](const VarDisplay& a_, const VarDisplay& b_){
       if( a_.priorityIndex < b_.priorityIndex ){ return true; }
       if( a_.priorityIndex > b_.priorityIndex ){ return false; }
