@@ -278,7 +278,7 @@ namespace {
                        const int* offsets,
                        int NB) {
     for (int i : hemi::grid_stride_range(0, NB)) {
-      sums[i] = (offsets[i] < offsets[i+1]) ? buffer[offsets[i]] : 0.0;
+      sums[i] = (offsets[i] < offsets[i+1])*buffer[offsets[i]];
     }
   }
 }
