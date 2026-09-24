@@ -5,13 +5,15 @@
 #ifndef GUNDAM_ITERATIVE_SEARCH_H
 #define GUNDAM_ITERATIVE_SEARCH_H
 
-// IterativeSearch is a minimizer that scans a set of "grid parameters" over a
-// grid and, at every node, minimizes the remaining parameters with a
-// ROOT::Math::Minimizer. One reduced entry per node is written out.
+// IterativeSearch is a minimizer that iterates over a set of "search
+// parameters", and at every point minimizes the remaining parameters with a
+// ROOT::Math::Minimizer. One reduced entry per point is written out.
 //
-// Work in progress: the grid logic is being migrated step by step. For now
-// this class only sets up the underlying ROOT minimizer.
+// Work in progress: the iteration logic is being migrated step by step. For
+// now this class resolves the search parameters and sets up the underlying
+// ROOT minimizer on the remaining ones.
 
+#include "ParameterSet.h"
 #include "MinimizerBase.h"
 
 #include "Math/Minimizer.h"
@@ -19,6 +21,7 @@
 
 #include <memory>
 #include <string>
+#include <vector>
 
 
 class IterativeSearch : public MinimizerBase {
@@ -28,6 +31,15 @@ protected:
   void initializeImpl() override;
 
 public:
+  struct SearchParameter {
+    std::string parameterSetName{};
+    std::string parameterName{};
+    std::vector<double> values{};
+
+    // filled by resolveSearchParameters()
+    Parameter* parPtr{nullptr};
+  };
+
   // overrides
   void minimize() override;
   [[nodiscard]] bool isErrorCalcEnabled() const override { return false; }
@@ -37,8 +49,20 @@ public:
 
   // const getters
   [[nodiscard]] const std::unique_ptr<ROOT::Math::Minimizer>& getMinimizer() const{ return _rootMinimizer_; }
+  [[nodiscard]] const std::vector<SearchParameter>& getSearchParameterList() const{ return _searchParameterList_; }
+
+protected:
+  // name -> Parameter*, checks, setIsFixed(true)
+  void resolveSearchParameters();
+  // erase the search parameters from getMinimizerFitParameterPtr()
+  void stripSearchParametersFromList();
+  // Clear() + SetVariable loop. Used at init and for any restart from a given point.
+  void resetMinimizer(const std::vector<double>& startValues_);
 
 private:
+  // config
+  std::vector<SearchParameter> _searchParameterList_{};
+
   int _strategy_{0}; // 0: fewest gradient cycles, enough without Hesse
   int _printLevel_{0};
   double _tolerance_{1.};
@@ -50,6 +74,10 @@ private:
   // internals
   ROOT::Math::Functor _functor_{};
   std::unique_ptr<ROOT::Math::Minimizer> _rootMinimizer_{nullptr};
+
+  // starting point in fit space, replayed by a cold start
+  std::vector<double> _prefitValues_{};
+  std::vector<double> _prefitSteps_{};
 
 };
 
