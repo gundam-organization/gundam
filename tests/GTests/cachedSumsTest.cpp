@@ -1,5 +1,6 @@
 #include <iostream>
 #include <limits>
+#include <vector>
 
 #include <TRandom.h>
 
@@ -56,16 +57,39 @@ TEST(cachedSumsTest, RecursiveSums)
 {
     int entries = 100;
     int bins = 10;
-    int N = bins*entries;
+
+    // Some histogram bins do not receive any events.  The sum (and sum
+    // squared) for an empty bin must be zero.  The first bin, a bin in the
+    // middle, and the last bin are left empty.  The empty last bin checks
+    // that the result is not read from past the end of the internal work
+    // buffer (where fBinOffsets[bin] == fBinOffsets[bin+1] == N).
+    std::vector<int> emptyBins{0, 3, bins-1};
+    std::vector<bool> isEmpty(bins, false);
+    for (int b : emptyBins) isEmpty[b] = true;
+
+    int filledBins = bins - int(emptyBins.size());
+    int N = filledBins*entries;
+
+    // Give each bin a distinct weight so that a sum read from the wrong bin
+    // is unambiguous.
     hemi::Array<double> weights(N);
-    for (int e=0; e<N; ++e) {
-        weights.hostPtr()[e] = 1.0;
-    }
+    std::vector<double> expectedSum(bins, 0.0);
+    std::vector<double> expectedSum2(bins, 0.0);
 
     Cache::RecursiveSums recursiveSums(weights,bins);
-    for (int e=0; e<N; ++e) {
-        int bin = e/entries;
-        recursiveSums.SetEventIndex(e,bin);
+    {
+        int e = 0;
+        for (int b = 0; b < bins; ++b) {
+            if (isEmpty[b]) continue;
+            double w = 1.0 + b;
+            expectedSum[b] = entries*w;
+            expectedSum2[b] = entries*w*w;
+            for (int i = 0; i < entries; ++i, ++e) {
+                weights.hostPtr()[e] = w;
+                recursiveSums.SetEventIndex(e,b);
+            }
+        }
+        ASSERT_EQ(e, N);
     }
 
     recursiveSums.Initialize();
@@ -77,9 +101,16 @@ TEST(cachedSumsTest, RecursiveSums)
 
     hemi::deviceSynchronize();
 
+    // Every bin must be correct.  The filled bins must hold the sum of
+    // their weights, and the empty bins (fBinOffsets[bin] ==
+    // fBinOffsets[bin+1]) must be zero rather than the sum of the next
+    // filled bin.
     for (int b = 0; b < bins; ++b) {
-        EXPECT_EQ(recursiveSums.GetSum(b), entries)
-            << "RecursiveSums bin " << b << " is wrong";
+        const char* kind = isEmpty[b] ? "empty bin " : "bin ";
+        EXPECT_DOUBLE_EQ(recursiveSums.GetSum(b), expectedSum[b])
+            << "RecursiveSums sum in " << kind << b << " is wrong";
+        EXPECT_DOUBLE_EQ(recursiveSums.GetSum2(b), expectedSum2[b])
+            << "RecursiveSums sum2 in " << kind << b << " is wrong";
     }
 
 }
