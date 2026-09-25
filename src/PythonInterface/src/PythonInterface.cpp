@@ -179,6 +179,23 @@ PYBIND11_MODULE(GUNDAM, module) {
 
   pybind11::class_<VariableHolder>(module, "VariableHolder")
   .def("getVarAsDouble", &VariableHolder::getVarAsDouble)
+  .def("getValue", [](const VariableHolder& this_) -> pybind11::object {
+    const auto& value = this_.get();
+    const auto& type = value.getType();
+    // Read integers directly to preserve precision beyond the double cache.
+    if( type == typeid(char) ){ return pybind11::int_(value.getValue<char>()); }
+    if( type == typeid(signed char) ){ return pybind11::int_(value.getValue<signed char>()); }
+    if( type == typeid(unsigned char) ){ return pybind11::int_(value.getValue<unsigned char>()); }
+    if( type == typeid(short) ){ return pybind11::int_(value.getValue<short>()); }
+    if( type == typeid(unsigned short) ){ return pybind11::int_(value.getValue<unsigned short>()); }
+    if( type == typeid(int) ){ return pybind11::int_(value.getValue<int>()); }
+    if( type == typeid(unsigned int) ){ return pybind11::int_(value.getValue<unsigned int>()); }
+    if( type == typeid(long) ){ return pybind11::int_(value.getValue<long>()); }
+    if( type == typeid(unsigned long) ){ return pybind11::int_(value.getValue<unsigned long>()); }
+    if( type == typeid(long long) ){ return pybind11::int_(value.getValue<long long>()); }
+    if( type == typeid(unsigned long long) ){ return pybind11::int_(value.getValue<unsigned long long>()); }
+    return pybind11::float_(this_.getVarAsDouble());
+  }, "Return the stored integer exactly, or the cached double as a Python float.")
   ;
 
   pybind11::bind_vector<std::vector<VariableHolder>>(module, "VariableHolderList");
