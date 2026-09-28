@@ -48,15 +48,6 @@ if [ ${#1} -gt 0 ]; then
     shift
 fi
 
-# Try to setup root.  ROOT installs thisroot.sh in the bin directory
-# to setup the environment.  The first "thisroot.sh" in the path will
-# define the root that is used.
-if [ "x${ROOTSYS}" = x ]; then
-    echo ROOT not available.  Make sure that you have sourced thisroot.sh
-    echo before gundam is setup.  You will need to run thisroot.sh before you
-    echo can build.
-fi
-
 # Find the root of the building area.
 ___gundam_root() {
     COUNT=5
@@ -127,6 +118,23 @@ ___path_remove ()  {
 
 ___path_prepend PATH ${GUNDAM_ROOT}/${GUNDAM_TARGET}/bin
 ___path_prepend LD_LIBRARY_PATH ${GUNDAM_ROOT}/${GUNDAM_TARGET}/lib
+
+if [ -f ${GUNDAM_ROOT}/${GUNDAM_TARGET}/setup.sh ]; then
+    source ${GUNDAM_ROOT}/${GUNDAM_TARGET}/setup.sh
+else
+    ___path_prepend PATH ${GUNDAM_ROOT}/${GUNDAM_TARGET}/bin
+    ___path_prepend LD_LIBRARY_PATH ${GUNDAM_ROOT}/${GUNDAM_TARGET}/lib
+fi
+
+# Try to setup root.  ROOT installs thisroot.sh in the bin directory
+# to setup the environment.  The first "thisroot.sh" in the path will
+# define the root that is used.
+if [ "x${ROOTSYS}" = x ]; then
+    echo
+    echo ROOT not available.  You will need to run thisroot.sh before you
+    echo can build. This is only required before configuration with cmake.
+    echo
+fi
 
 unset -f ___path_prepend
 unset -f ___path_remove
