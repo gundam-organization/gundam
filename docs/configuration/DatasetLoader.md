@@ -94,7 +94,21 @@ variableDict:
   - { name: "weight", expr: "weights.nominalWeight" }
 ```
 
-Both main-file and friend entries accept `isEnabled` (default: `true`). Disabled main files are excluded from the chain; disabled friends are not attached. Every enabled file entry must declare the same enabled friend aliases. Each enabled friend tree must have exactly the same number and order of entries as its corresponding main tree. A branch with a unique name may be referenced without its alias, but `friendAlias.branch` is the recommended form because it remains unambiguous.
+To attach several friend trees from the same ROOT file, use `treeList`:
+
+```yaml
+friendList:
+  - name: "xsec_syst_friends"
+    path: "/path/to/friend/trees/file.root"
+    treeList: ["friendTree1", "friendTree2"]
+
+variableDict:
+  - { name: "weight", expr: "friendTree1.nominalWeight * friendTree2.correction" }
+```
+
+With `treeList`, `name` identifies the group for configuration overrides, and each tree name becomes its ROOT friend alias. `path` must contain only the file path, without a `:tree` suffix. The list must be nonempty and contain nonempty tree names. Grouped entries can be mixed with single-tree entries; all resulting aliases must be unique within each main-file entry. Without `treeList`, `name` remains the alias as before.
+
+Both main-file and friend entries accept `isEnabled` (default: `true`). Disabled main files are excluded from the chain; disabled friends are not attached. For grouped friends, `isEnabled` applies to every tree in the group. Every enabled file entry must declare the same enabled friend aliases. Each enabled friend tree must have exactly the same number and order of entries as its corresponding main tree. A branch with a unique name may be referenced without its alias, but `friendAlias.branch` is the recommended form because it remains unambiguous.
 
 
 #### data
