@@ -6,6 +6,7 @@
 import sys
 from array import array
 from pathlib import Path
+from typing import List
 
 # Re-run inside the python environment built by 005PythonSetup.sh.  This
 # fails when the environment does not exist, which is what happens when the
@@ -62,7 +63,7 @@ fitterEngineConfig:
 """
 
 
-def check_histogram(config_yaml: str, expected: list[float]) -> None:
+def check_histogram(config_yaml: str, expected: List[float]) -> None:
     import GUNDAM
 
     config_builder = GUNDAM.ConfigUtils.ConfigBuilder()
