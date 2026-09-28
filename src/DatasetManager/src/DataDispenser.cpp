@@ -27,6 +27,11 @@
 #include "TClonesArray.h"
 #include "TChain.h"
 #include "THn.h"
+#include <TArray.h>
+#include <TBranchElement.h>
+#include <TLeafObject.h>
+#include <TClass.h>
+#include <TGraph.h>
 
 #include <unordered_map>
 #include <map>
@@ -1923,6 +1928,25 @@ void DataDispenser::loadEvent(int iThread_){
       }
     }
 
+    // TArray dial branches are read on demand, outside the event variable buffers.
+    std::set<std::string> displayedExpressions;
+    for( const auto& varDisplay : varDisplayList ){
+      displayedExpressions.emplace(varDisplay.leafName);
+    }
+    for( const auto* dialCollection : _cache_.dialCollectionsRefList ){
+      for( const auto& branchName : {dialCollection->getDialParameterValuesBranch(), dialCollection->getDialResponsesBranch()} ){
+        if( branchName.empty() or not displayedExpressions.emplace(branchName).second ){ continue; }
+        varDisplayList.emplace_back();
+        auto& varDisplay = varDisplayList.back();
+        varDisplay.varName = branchName;
+        varDisplay.leafName = branchName;
+        varDisplay.leafTypeName = "p";
+        varDisplay.priorityIndex = 999;
+        varDisplay.lineColor = GenericToolbox::ColorCodes::magentaBackground;
+        hasEventDials = true;
+      }
+    }
+
     GenericToolbox::sortVector( varDisplayList, [](const VarDisplay& a_, const VarDisplay& b_){
       if( a_.priorityIndex < b_.priorityIndex ){ return true; }
       if( a_.priorityIndex > b_.priorityIndex ){ return false; }
@@ -1963,6 +1987,32 @@ void DataDispenser::loadEvent(int iThread_){
   // std::vector<int> sampleIdxList;
   std::vector<int> sampleBinIdxList;
   std::vector<double> sampleWeightList;
+
+  // TArray does not inherit from TObject. Validate the ROOT class before casting.
+  auto readArray = [&threadSharedData](const std::string& branchName_) -> const TArray* {
+    auto* branch = threadSharedData.treeChain->GetBranch(branchName_.c_str());
+    LogThrowIf(branch == nullptr, "Missing dialBranchData branch: " << branchName_);
+    TClass* arrayClass{nullptr};
+    EDataType dataType{kOther_t};
+    branch->GetExpectedType(arrayClass, dataType);
+    LogThrowIf(arrayClass == nullptr or not arrayClass->InheritsFrom(TArray::Class()),
+               "dialBranchData branch '" << branchName_ << "' must contain a TArray");
+    branch->SetStatus(true);
+    if( branch->GetAddress() == nullptr ){ branch->SetAddress(nullptr); }
+    // Read on demand. ROOT owns the object buffer.
+    // The branch's tree provides the local entry, also after a TChain transition.
+    LogThrowIf(branch->GetEntry(branch->GetTree()->GetReadEntry(), 1) < 0,
+               "Could not read dialBranchData branch: " << branchName_);
+    void* object{nullptr};
+    if( auto* element = dynamic_cast<TBranchElement*>(branch) ){
+      object = element->GetObject();
+    }
+    else if( auto* leaf = dynamic_cast<TLeafObject*>(branch->GetListOfLeaves()->At(0)) ){
+      object = leaf->GetObject();
+    }
+    LogThrowIf(object == nullptr, "Null TArray in dialBranchData branch: " << branchName_);
+    return static_cast<const TArray*>(arrayClass->DynamicCast(TArray::Class(), object));
+  };
 
   while( true ){
 
@@ -2083,13 +2133,29 @@ void DataDispenser::loadEvent(int iThread_){
         auto *dialCollectionRef = _cache_.dialCollectionsRefList[iDialCollection];
 
         // if not event-by-event dial -> leave
-        if( dialCollectionRef->getDialLeafName().empty() ){ continue; }
+        if( not dialCollectionRef->hasDialBranchData() ){ continue; }
 
         if( threadSharedData.buffer.dialApplyConditionFormulaList[iDialCollection].isEnabled() ){
           if( threadSharedData.buffer.dialApplyConditionFormulaList[iDialCollection].eval(eventIndexingBuffer) == 0 ){
             // next dialSet
             continue;
           }
+        }
+
+        if( not dialCollectionRef->getDialParameterValuesBranch().empty() ){
+          const auto* parameterValues = readArray(dialCollectionRef->getDialParameterValuesBranch());
+          const auto* responses = readArray(dialCollectionRef->getDialResponsesBranch());
+          LogThrowIf(parameterValues->GetSize() != responses->GetSize(),
+                     "dialBranchData array size mismatch for " << dialCollectionRef->getTitle()
+                     << ": " << parameterValues->GetSize() << " parameter values, "
+                     << responses->GetSize() << " responses");
+          TGraph graph(parameterValues->GetSize());
+          for( int iPoint = 0; iPoint < parameterValues->GetSize(); ++iPoint ){
+            graph.SetPoint(iPoint, parameterValues->GetAt(iPoint), responses->GetAt(iPoint));
+          }
+          auto dial = dialCollectionRef->makeDial(&graph);
+          eventByEventDialBuffer[dialCollectionRef->getIndex()] = dial.release();
+          continue;
         }
 
         // grab as a general TObject, then let the factory figure out what to do with it
@@ -2151,7 +2217,7 @@ void DataDispenser::loadEvent(int iThread_){
         auto *dialCollectionRef = _cache_.dialCollectionsRefList[iDialCollection];
 
         // leave if event-by-event -> already loaded
-        if( not dialCollectionRef->getDialLeafName().empty() ){
+        if( dialCollectionRef->hasDialBranchData() ){
 
           // dialBase is valid -> store it
           if( eventByEventDialBuffer[dialCollectionRef->getIndex()] != nullptr ){
