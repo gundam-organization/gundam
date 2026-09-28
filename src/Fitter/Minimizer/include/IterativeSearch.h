@@ -13,13 +13,19 @@
 // parameter, visited in a walk where consecutive points are neighbours. A job
 // can be told to run only a slice of the walk, so the work can be shared.
 //
-// Work in progress: the per-point output trees are not written yet.
+// Output, under postFit/ of the fit directory:
+//   pointList          one entry per visited point: llh, convergence, the profiled values
+//                      and (optionally) the post-fit values of the other parameters
+//   problemDefinition  one entry: which parameters were profiled over which values, the
+//                      key for the arrays in pointList, and the best point of this file
 
 #include "ParameterSet.h"
 #include "MinimizerBase.h"
 
 #include "Math/Minimizer.h"
 #include "Math/Functor.h"
+#include "TDirectory.h"
+#include "TTree.h"
 
 #include <cmath>
 #include <memory>
@@ -72,6 +78,11 @@ protected:
   void buildSearchPointList();
   // firstPoint/nbPoints or pointList -> _runList_
   void buildRunList();
+  // pointList tree: one entry per visited point. Nothing is booked without an output file.
+  void bookPointList();
+  // problemDefinition tree: one entry, the key for ProfiledValues[] and
+  // PostFitParameterValues[], plus the best point of this file
+  void writeProblemDefinition(int bestPoint_, double bestLlh_);
 
 private:
   // config
@@ -87,6 +98,8 @@ private:
   bool _warmStart_{true};
   // redo a point from the prefit point if its llh is above the previous one by more than this. nan: never
   double _coldRefitThreshold_{std::nan("unset")};
+  // write PostFitParameterValues[] in the pointList tree
+  bool _saveParameterVector_{true};
 
   int _strategy_{0}; // 0: fewest gradient cycles, enough without Hesse
   int _printLevel_{0};
@@ -98,6 +111,20 @@ private:
 
   // internals
   std::vector<SearchPoint> _searchPointList_{};
+
+  // owned by the output directory
+  TTree* _pointListTree_{nullptr};
+
+  // branch buffers, addresses have to outlive the fill loop
+  int _outPoint_{0};
+  int _outNbCalls_{0};
+  bool _outConverged_{false};
+  double _outLlh_{0};
+  double _outLlhStat_{0};
+  double _outLlhPenalty_{0};
+  double _outEdm_{0};
+  std::vector<double> _outProfiledValues_{};
+  std::vector<double> _outParValues_{};
 
   ROOT::Math::Functor _functor_{};
   std::unique_ptr<ROOT::Math::Minimizer> _rootMinimizer_{nullptr};

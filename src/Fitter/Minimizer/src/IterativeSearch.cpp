@@ -3,8 +3,10 @@
 //
 
 #include "IterativeSearch.h"
+#include "FitterEngine.h"
 
 #include "GundamGlobals.h"
+#include "GenericToolbox.Root.h"
 #include "GenericToolbox.Time.h"
 #include "Logger.h"
 
@@ -30,6 +32,7 @@ void IterativeSearch::configureImpl(){
     {"serpentine"},
     {"warmStart"},
     {"coldRefitThreshold"},
+    {"saveParameterVector"},
     {"minimizer"},
     {"algorithm"},
     {"strategy"},
@@ -47,6 +50,7 @@ void IterativeSearch::configureImpl(){
   _config_.fillValue(_serpentine_, "serpentine");
   _config_.fillValue(_warmStart_, "warmStart");
   _config_.fillValue(_coldRefitThreshold_, "coldRefitThreshold");
+  _config_.fillValue(_saveParameterVector_, "saveParameterVector");
 
   _config_.fillValue(_minimizerType_, "minimizer");
   _config_.fillValue(_minimizerAlgo_, "algorithm");
@@ -322,11 +326,91 @@ void IterativeSearch::resetMinimizer(const std::vector<double>& startValues_){
   }
 }
 
+void IterativeSearch::bookPointList(){
+
+  // no output file, nothing to book. The fill and write calls check the pointer
+  if( getOwner().getSaveDir() == nullptr ){ return; }
+
+  // the tree is attached to the directory, so AutoSave() can flush it while the job runs
+  GenericToolbox::mkdirTFile( getOwner().getSaveDir(), "postFit" )->cd();
+
+  _pointListTree_ = new TTree("pointList", "One entry per visited point");
+
+  _pointListTree_->Branch("Point", &_outPoint_, "Point/I");
+  _pointListTree_->Branch("LLH", &_outLlh_, "LLH/D");
+  _pointListTree_->Branch("LLHStatistical", &_outLlhStat_, "LLHStatistical/D");
+  _pointListTree_->Branch("LLHPenalty", &_outLlhPenalty_, "LLHPenalty/D");
+  _pointListTree_->Branch("Converged", &_outConverged_, "Converged/O");
+  _pointListTree_->Branch("Edm", &_outEdm_, "Edm/D");
+  _pointListTree_->Branch("nCalls", &_outNbCalls_, "nCalls/I");
+
+  // the profiled values of this point, in the order of the searchParameters list
+  _outProfiledValues_.assign( _searchParameterList_.size(), 0. );
+  _pointListTree_->Branch("ProfiledValues", _outProfiledValues_.data(),
+                          ("ProfiledValues[" + std::to_string(_outProfiledValues_.size()) + "]/D").c_str());
+
+  // the post-fit values of the other parameters, in minimizer order (the key is in problemDefinition)
+  if( _saveParameterVector_ ){
+    _outParValues_.assign( getMinimizerFitParameterPtr().size(), 0. );
+    _pointListTree_->Branch("PostFitParameterValues", _outParValues_.data(),
+                            ("PostFitParameterValues[" + std::to_string(_outParValues_.size()) + "]/D").c_str());
+  }
+}
+
+void IterativeSearch::writeProblemDefinition(int bestPoint_, double bestLlh_){
+
+  if( getOwner().getSaveDir() == nullptr ){ return; }
+
+  GenericToolbox::mkdirTFile( getOwner().getSaveDir(), "postFit" )->cd();
+
+  auto* problemDefinition = new TTree("problemDefinition", "Profiled parameters and the key for pointList");
+
+  int nProfiledParameters{ int(_searchParameterList_.size()) };
+  int nPoints{ int(_searchPointList_.size()) };
+  int nSampleBins{ getLikelihoodInterface().getNbSampleBins() };
+  int nParameters{ int(getMinimizerFitParameterPtr().size()) };
+
+  // which parameters were profiled, over which values
+  std::vector<std::string> profiledParameterName;
+  std::vector<std::vector<double>> profiledParameterValues;
+  for( auto& searchPar : _searchParameterList_ ){
+    profiledParameterName.emplace_back( searchPar.parPtr->getFullTitle() );
+    profiledParameterValues.emplace_back( searchPar.values );
+  }
+
+  // the key for PostFitParameterValues[]: minimizer parameter order, search parameters already stripped
+  std::vector<std::string> parameterName;
+  std::vector<double> parameterPrior;
+  std::vector<double> parameterSigma;
+  for( auto* parPtr : getMinimizerFitParameterPtr() ){
+    parameterName.emplace_back( parPtr->getFullTitle() );
+    parameterPrior.emplace_back( parPtr->getPriorValue() );
+    parameterSigma.emplace_back( parPtr->getStdDevValue() );
+  }
+
+  problemDefinition->Branch("nProfiledParameters", &nProfiledParameters, "nProfiledParameters/I");
+  problemDefinition->Branch("nPoints", &nPoints, "nPoints/I");
+  problemDefinition->Branch("nSampleBins", &nSampleBins, "nSampleBins/I");
+  problemDefinition->Branch("BestPointInFile", &bestPoint_, "BestPointInFile/I");
+  problemDefinition->Branch("BestLLHInFile", &bestLlh_, "BestLLHInFile/D");
+  problemDefinition->Branch("ProfiledParameterName", &profiledParameterName);
+  problemDefinition->Branch("ProfiledParameterValues", &profiledParameterValues);
+  problemDefinition->Branch("nParameters", &nParameters, "nParameters/I");
+  problemDefinition->Branch("ParameterName", &parameterName);
+  problemDefinition->Branch("ParameterPrior", &parameterPrior);
+  problemDefinition->Branch("ParameterSigma", &parameterSigma);
+
+  problemDefinition->Fill();
+  problemDefinition->Write();
+}
+
 void IterativeSearch::minimize(){
   // calling the common routine: parameter table and initial likelihood
   this->MinimizerBase::minimize();
 
   getMonitor().minimizerTitle = _minimizerType_ + "/" + _minimizerAlgo_;
+
+  this->bookPointList();
 
   double previousLlh{std::nan("unset")};
   double bestLlh{std::numeric_limits<double>::infinity()};
@@ -388,6 +472,30 @@ void IterativeSearch::minimize(){
       bestSearchValues = point.values;
     }
 
+    // one entry per point in the pointList tree
+    _outPoint_ = point.index;
+    _outLlh_ = previousLlh;
+    _outLlhStat_ = getLikelihoodInterface().getBuffer().statLikelihood;
+    _outLlhPenalty_ = getLikelihoodInterface().getBuffer().penaltyLikelihood;
+    _outConverged_ = hasConverged;
+    _outEdm_ = _rootMinimizer_->Edm();
+    _outNbCalls_ = getMonitor().nbEvalLikelihoodCalls - nbCallOffset;
+    // element-wise copy: the branch holds the address of the buffer, it must not be reallocated
+    std::copy( point.values.begin(), point.values.end(), _outProfiledValues_.begin() );
+    if( _saveParameterVector_ ){
+      for( std::size_t iPar = 0 ; iPar < _outParValues_.size() ; iPar++ ){
+        auto& fitPar = *(getMinimizerFitParameterPtr()[iPar]);
+        double value{ _rootMinimizer_->X()[iPar] };
+        if( useNormalizedFitSpace() ){ value = ParameterSet::toRealParValue(value, fitPar); }
+        _outParValues_[iPar] = value;
+      }
+    }
+    if( _pointListTree_ != nullptr ){
+      _pointListTree_->Fill();
+      // a job can run for hours: keep the file readable if it gets killed
+      if( iRun % 100 == 99 ){ _pointListTree_->AutoSave("SaveSelf"); }
+    }
+
     LogInfo << "Point " << point.index << " (" << iRun + 1 << "/" << _runList_.size() << "): " << ssPoint.str()
             << " -> llh " << previousLlh
             << " (stat " << getLikelihoodInterface().getBuffer().statLikelihood
@@ -397,6 +505,9 @@ void IterativeSearch::minimize(){
             << ( hasConverged ? "" : " NOT CONVERGED" )
             << std::endl;
   }
+
+  if( _pointListTree_ != nullptr ){ _pointListTree_->Write(); }
+  this->writeProblemDefinition( bestPoint, bestLlh );
 
   LogInfo << "Best point: " << bestPoint << ", llh " << bestLlh << " at";
   for( std::size_t iPar = 0 ; iPar < _searchParameterList_.size() ; iPar++ ){
