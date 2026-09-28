@@ -5,12 +5,15 @@
 #include "IterativeSearch.h"
 
 #include "GundamGlobals.h"
+#include "GenericToolbox.Time.h"
 #include "Logger.h"
 
 #include "Math/Factory.h"
 
 #include <algorithm>
 #include <cmath>
+#include <limits>
+#include <sstream>
 
 
 void IterativeSearch::configureImpl(){
@@ -21,6 +24,12 @@ void IterativeSearch::configureImpl(){
 
   _config_.defineFields({
     {FieldFlag::MANDATORY, "searchParameters"},
+    {"firstPoint"},
+    {"nbPoints"},
+    {"pointList"},
+    {"serpentine"},
+    {"warmStart"},
+    {"coldRefitThreshold"},
     {"minimizer"},
     {"algorithm"},
     {"strategy"},
@@ -30,6 +39,14 @@ void IterativeSearch::configureImpl(){
     {"maxFcnCalls", {"max_fcn"}},
   });
   _config_.checkConfiguration();
+
+  _config_.fillValue(_firstPoint_, "firstPoint");
+  _config_.fillValue(_nbPoints_, "nbPoints");
+  _config_.fillValue(_runList_, "pointList");
+
+  _config_.fillValue(_serpentine_, "serpentine");
+  _config_.fillValue(_warmStart_, "warmStart");
+  _config_.fillValue(_coldRefitThreshold_, "coldRefitThreshold");
 
   _config_.fillValue(_minimizerType_, "minimizer");
   _config_.fillValue(_minimizerAlgo_, "algorithm");
@@ -148,7 +165,85 @@ void IterativeSearch::initializeImpl(){
   LogInfo << "Minimizer parameters: " << getMinimizerFitParameterPtr().size()
           << " (search parameters removed)" << std::endl;
 
+  // the points to visit, and the slice of them this job runs
+  this->buildSearchPointList();
+  this->buildRunList();
+  LogInfo << _searchPointList_.size() << " search points. This job runs " << _runList_.size()
+          << " of them, from point " << _runList_.front() << " to " << _runList_.back() << "." << std::endl;
+
   LogInfo << "IterativeSearch initialized." << std::endl;
+}
+
+void IterativeSearch::buildSearchPointList(){
+
+  int nbPoints{1};
+  for( auto& searchPar : _searchParameterList_ ){ nbPoints *= int(searchPar.values.size()); }
+
+  _searchPointList_.clear();
+  _searchPointList_.reserve( nbPoints );
+
+  std::vector<int> valueIndexList( _searchParameterList_.size(), 0 );
+  for( int iPoint = 0 ; iPoint < nbPoints ; iPoint++ ){
+
+    // decode the walk position like a mixed radix number, last search parameter running fastest
+    int remainder{iPoint};
+    for( int iPar = int(_searchParameterList_.size()) - 1 ; iPar >= 0 ; iPar-- ){
+      int nbValues{ int(_searchParameterList_[iPar].values.size()) };
+      valueIndexList[iPar] = remainder % nbValues;
+      remainder /= nbValues;
+    }
+
+    if( _serpentine_ ){
+      // reverse a parameter's direction every time the slower ones have advanced an odd number
+      // of times, so consecutive points are always neighbours instead of jumping back across a row
+      std::vector<int> walk{ valueIndexList };
+      int parity{0};
+      for( std::size_t iPar = 0 ; iPar + 1 < walk.size() ; iPar++ ){
+        parity += walk[iPar];
+        if( parity % 2 == 1 ){
+          valueIndexList[iPar + 1] = int(_searchParameterList_[iPar + 1].values.size()) - 1 - walk[iPar + 1];
+        }
+      }
+    }
+
+    _searchPointList_.emplace_back();
+    auto& point = _searchPointList_.back();
+    point.index = iPoint;
+    point.values.reserve( _searchParameterList_.size() );
+    for( std::size_t iPar = 0 ; iPar < _searchParameterList_.size() ; iPar++ ){
+      point.values.emplace_back( _searchParameterList_[iPar].values[valueIndexList[iPar]] );
+    }
+  }
+}
+
+void IterativeSearch::buildRunList(){
+
+  int nbPoints{ int(_searchPointList_.size()) };
+
+  // an explicit list from the config wins
+  if( not _runList_.empty() ){
+    for( int point : _runList_ ){
+      LogThrowIf(point < 0 or point >= nbPoints, "pointList has point " << point << ", the search has " << nbPoints << " points.");
+    }
+    return;
+  }
+
+  LogThrowIf(_firstPoint_ < 0 or _firstPoint_ >= nbPoints,
+             "firstPoint is " << _firstPoint_ << ", the search has " << nbPoints << " points.");
+
+  // default: run everything from firstPoint
+  if( _nbPoints_ < 0 ){ _nbPoints_ = nbPoints - _firstPoint_; }
+  LogThrowIf(_nbPoints_ == 0, "nbPoints is 0. Give a positive nbPoints, or a pointList.");
+
+  int nbToRun{ _nbPoints_ };
+  if( _firstPoint_ + nbToRun > nbPoints ){
+    LogAlert << "Only " << nbPoints - _firstPoint_ << " points left from " << _firstPoint_
+             << ", running those instead of " << nbToRun << "." << std::endl;
+    nbToRun = nbPoints - _firstPoint_;
+  }
+
+  _runList_.reserve( nbToRun );
+  for( int iPoint = 0 ; iPoint < nbToRun ; iPoint++ ){ _runList_.emplace_back( _firstPoint_ + iPoint ); }
 }
 
 void IterativeSearch::resolveSearchParameters(){
@@ -228,10 +323,94 @@ void IterativeSearch::resetMinimizer(const std::vector<double>& startValues_){
 }
 
 void IterativeSearch::minimize(){
-  // calling the common routine
+  // calling the common routine: parameter table and initial likelihood
   this->MinimizerBase::minimize();
 
-  LogAlert << "IterativeSearch::minimize() is not implemented yet. Parameters are left unchanged." << std::endl;
+  getMonitor().minimizerTitle = _minimizerType_ + "/" + _minimizerAlgo_;
 
-  setMinimizerStatus( 0 );
+  double previousLlh{std::nan("unset")};
+  double bestLlh{std::numeric_limits<double>::infinity()};
+  int bestPoint{-1};
+  std::vector<double> bestFitValues( getMinimizerFitParameterPtr().size(), 0 );
+  std::vector<double> bestSearchValues( _searchParameterList_.size(), 0 );
+
+  int nbFailedPoints{0};
+
+  GenericToolbox::Time::Timer pointStopWatch;
+
+  for( std::size_t iRun = 0 ; iRun < _runList_.size() ; iRun++ ){
+    auto& point = _searchPointList_[ _runList_[iRun] ];
+
+    // move the search parameters onto this point. They are fixed for the minimizer, so only this loop changes them
+    std::stringstream ssPoint;
+    for( std::size_t iPar = 0 ; iPar < _searchParameterList_.size() ; iPar++ ){
+      _searchParameterList_[iPar].parPtr->setParameterValue( point.values[iPar] );
+      ssPoint << ( iPar == 0 ? "" : ", " ) << _searchParameterList_[iPar].parameterName << " = " << point.values[iPar];
+    }
+
+    // the first point runs on the declaration made at init. With a warm start, Minuit keeps the
+    // state of the previous point and starts from there; otherwise go back to the prefit point
+    if( not _warmStart_ and iRun != 0 ){ this->resetMinimizer( _prefitValues_ ); }
+
+    getMonitor().stateTitleMonitor = "Search point " + std::to_string(point.index)
+                                   + " (" + std::to_string(iRun + 1) + "/" + std::to_string(_runList_.size()) + ")"
+                                   + " / " + ssPoint.str();
+
+    int nbCallOffset{ getMonitor().nbEvalLikelihoodCalls };
+    pointStopWatch.start();
+
+    getMonitor().isEnabled = true;
+    bool hasConverged{ _rootMinimizer_->Minimize() };
+
+    // a warm start can get stuck in the previous point's valley. If the result is much worse
+    // than the previous point, redo it from the prefit point
+    if( _warmStart_ and not std::isnan(_coldRefitThreshold_) and not std::isnan(previousLlh)
+        and _rootMinimizer_->MinValue() > previousLlh + _coldRefitThreshold_ ){
+      LogAlert << "Point " << point.index << " landed " << _rootMinimizer_->MinValue() - previousLlh
+               << " above the previous point. Refitting from the prefit point." << std::endl;
+      this->resetMinimizer( _prefitValues_ );
+      hasConverged = _rootMinimizer_->Minimize();
+    }
+    getMonitor().isEnabled = false;
+
+    pointStopWatch.stop();
+
+    // Minuit's last call is not necessarily the minimum: put the propagator and the llh buffers on X()
+    this->evalFit( _rootMinimizer_->X() );
+
+    previousLlh = _rootMinimizer_->MinValue();
+    if( not hasConverged ){ nbFailedPoints++; }
+
+    if( previousLlh < bestLlh ){
+      bestLlh = previousLlh;
+      bestPoint = point.index;
+      for( std::size_t iPar = 0 ; iPar < bestFitValues.size() ; iPar++ ){ bestFitValues[iPar] = _rootMinimizer_->X()[iPar]; }
+      bestSearchValues = point.values;
+    }
+
+    LogInfo << "Point " << point.index << " (" << iRun + 1 << "/" << _runList_.size() << "): " << ssPoint.str()
+            << " -> llh " << previousLlh
+            << " (stat " << getLikelihoodInterface().getBuffer().statLikelihood
+            << ", syst " << getLikelihoodInterface().getBuffer().penaltyLikelihood << ")"
+            << " in " << getMonitor().nbEvalLikelihoodCalls - nbCallOffset << " calls, "
+            << GenericToolbox::toString(pointStopWatch.eval())
+            << ( hasConverged ? "" : " NOT CONVERGED" )
+            << std::endl;
+  }
+
+  LogInfo << "Best point: " << bestPoint << ", llh " << bestLlh << " at";
+  for( std::size_t iPar = 0 ; iPar < _searchParameterList_.size() ; iPar++ ){
+    LogInfo << " " << _searchParameterList_[iPar].parameterName << " = " << bestSearchValues[iPar];
+  }
+  LogInfo << std::endl;
+
+  if( nbFailedPoints != 0 ){ LogError << nbFailedPoints << " of " << _runList_.size() << " points did not converge." << std::endl; }
+
+  // FitterEngine writes the parameter state next, so leave the propagator on the best point
+  for( std::size_t iPar = 0 ; iPar < _searchParameterList_.size() ; iPar++ ){
+    _searchParameterList_[iPar].parPtr->setParameterValue( bestSearchValues[iPar] );
+  }
+  this->evalFit( bestFitValues.data() );
+
+  setMinimizerStatus( nbFailedPoints == 0 ? 0 : 1 );
 }
