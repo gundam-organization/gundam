@@ -2178,10 +2178,7 @@ void DataDispenser::loadEvent(int iThread_){
         }
 
         // grab as a general TObject, then let the factory figure out what to do with it
-        try {
-          dialAddressMap.at(dialCollectionRef->getIndex());
-        }
-        catch( ... ) {
+        if( dialAddressMap.find(dialCollectionRef->getIndex()) == dialAddressMap.end() ){
           auto* dialExpression = threadSharedData.treeBuffer.getExpressionBuffer( dialCollectionRef->getDialLeafName() );
           LogThrowIf( dialExpression == nullptr );
           dialAddressMap[dialCollectionRef->getIndex()] = (const TObject**) dialExpression->getBuffer().getPlaceHolderPtr()->getVariableAddress();
