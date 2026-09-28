@@ -110,7 +110,7 @@ void Propagator::buildDialCache(){
 }
 void Propagator::propagateParameters(){
   std::future<bool> result = applyParameters();
-  result.get();
+  static_cast<void>(result.get());
 }
 
 std::future<bool> Propagator::applyParameters(){
