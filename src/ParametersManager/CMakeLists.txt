@@ -5,12 +5,14 @@ set(SRCFILES
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ParameterSet.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Parameter.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ParametersManager.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/ParameterThrowerMarkHarz.cpp
 )
 
 set(HEADERS
     ${CMAKE_CURRENT_SOURCE_DIR}/include/Parameter.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ParameterSet.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ParametersManager.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/ParameterThrowerMarkHarz.h
 )
 
 #ROOT_GENERATE_DICTIONARY(
