@@ -32,8 +32,9 @@ if ! gundamFitter --debug --cpu -t 1 -s 10000 -c ${CONFIG_FILE} -o ${OUTPUT_FILE
     exit 1
 fi
 
-# Check the search output. Positive_C is profiled over 0.4, 0.5, 0.6, 0.7, 0.8
-# and the data was generated with Positive_C = 0.6 and Negative_C = 0.8.
+# Check the search output. Positive_C is profiled over 0.6, 0.7, 0.8, 0.9, 1.0
+# and the data was generated with Positive_C = 0.8 and Negative_C = 0.6 (see
+# 100NormalizationTree.C: 4000/5000 events with C > 0, 3000/5000 with C <= 0).
 root -b -q -l <<ROOTEOF
 {
     TFile file("${OUTPUT_FILE}");
@@ -48,7 +49,9 @@ root -b -q -l <<ROOTEOF
         return 1;
     }
 
-    int point; double llh; bool converged; double profiledValues[1]; double parValues[1];
+    // the search parameter stays in the minimizer parameter list, so PostFitParameterValues
+    // holds both: Positive_C (slot 0, the search parameter) and Negative_C (slot 1)
+    int point; double llh; bool converged; double profiledValues[1]; double parValues[2];
     pointList->SetBranchAddress("Point", &point);
     pointList->SetBranchAddress("LLH", &llh);
     pointList->SetBranchAddress("Converged", &converged);
@@ -59,10 +62,16 @@ root -b -q -l <<ROOTEOF
     for (int i = 0; i < pointList->GetEntries(); ++i) {
         pointList->GetEntry(i);
         std::cout << "point " << point << ": Positive_C = " << profiledValues[0]
-                  << " Negative_C = " << parValues[0] << " llh = " << llh
+                  << " Negative_C = " << parValues[1] << " llh = " << llh
                   << (converged ? "" : " NOT CONVERGED") << std::endl;
         if (not converged) { std::cout << "FAIL: point " << point << " did not converge" << std::endl; return 1; }
-        if (llh < bestLlh) { bestLlh = llh; bestPositive = profiledValues[0]; bestNegative = parValues[0]; }
+        // Minuit's copy of the search parameter must have followed the grid
+        if (std::abs(parValues[0] - profiledValues[0]) > 1E-9) {
+            std::cout << "FAIL: point " << point << " has PostFitParameterValues[0] = " << parValues[0]
+                      << " but ProfiledValues[0] = " << profiledValues[0] << std::endl;
+            return 1;
+        }
+        if (llh < bestLlh) { bestLlh = llh; bestPositive = profiledValues[0]; bestNegative = parValues[1]; }
     }
 
     int nPoints, nProfiledParameters, nParameters; double bestLlhInFile;
@@ -71,7 +80,7 @@ root -b -q -l <<ROOTEOF
     problemDefinition->SetBranchAddress("nParameters", &nParameters);
     problemDefinition->SetBranchAddress("BestLLHInFile", &bestLlhInFile);
     problemDefinition->GetEntry(0);
-    if (nPoints != 5 or nProfiledParameters != 1 or nParameters != 1) {
+    if (nPoints != 5 or nProfiledParameters != 1 or nParameters != 2) {
         std::cout << "FAIL: problemDefinition says " << nPoints << " points, " << nProfiledParameters
                   << " profiled parameters, " << nParameters << " parameters" << std::endl;
         return 1;
@@ -81,12 +90,12 @@ root -b -q -l <<ROOTEOF
         return 1;
     }
 
-    if (std::abs(bestPositive - 0.6) > 1E-9) {
-        std::cout << "FAIL: best point has Positive_C = " << bestPositive << ", expected 0.6" << std::endl;
+    if (std::abs(bestPositive - 0.8) > 1E-9) {
+        std::cout << "FAIL: best point has Positive_C = " << bestPositive << ", expected 0.8" << std::endl;
         return 1;
     }
-    if (std::abs(bestNegative - 0.8) > 0.05) {
-        std::cout << "FAIL: Negative_C at the best point is " << bestNegative << ", expected 0.8" << std::endl;
+    if (std::abs(bestNegative - 0.6) > 0.05) {
+        std::cout << "FAIL: Negative_C at the best point is " << bestNegative << ", expected 0.6" << std::endl;
         return 1;
     }
     std::cout << "SUCCESS: iterative search found Positive_C = " << bestPositive << ", Negative_C = " << bestNegative << std::endl;

@@ -47,6 +47,11 @@ public:
 
     // filled by resolveSearchParameters()
     Parameter* parPtr{nullptr};
+    // filled by resolveSearchParameterIndices(): slot of this parameter in
+    // getMinimizerFitParameterPtr(), i.e. the Minuit variable index. The
+    // search parameters stay in the minimizer list as fixed variables, and
+    // the search moves them with SetVariableValue() at every point.
+    int fitParIndex{-1};
   };
 
   struct SearchPoint {
@@ -56,6 +61,8 @@ public:
 
   // overrides
   void minimize() override;
+  // scans the minimizer parameters, skipping the search parameters
+  void scanParameters( TDirectory* saveDir_ ) override;
   [[nodiscard]] bool isErrorCalcEnabled() const override { return false; }
 
   // c-tor
@@ -70,10 +77,14 @@ public:
 protected:
   // name -> Parameter*, checks, setIsFixed(true)
   void resolveSearchParameters();
-  // erase the search parameters from getMinimizerFitParameterPtr()
-  void stripSearchParametersFromList();
+  // locate the search parameters in getMinimizerFitParameterPtr() -> fitParIndex
+  void resolveSearchParameterIndices();
   // Clear() + SetVariable loop. Used at init and for any restart from a given point.
+  // The search slots get startValues_ too: call applySearchPoint() afterwards.
   void resetMinimizer(const std::vector<double>& startValues_);
+  // move the search parameters onto a point: both the Parameter and Minuit's copy of it
+  void applySearchPoint(const SearchPoint& point_);
+  [[nodiscard]] bool isSearchParameter(const Parameter* parPtr_) const;
   // cartesian product of the search parameter values, in walk order
   void buildSearchPointList();
   // firstPoint/nbPoints or pointList -> _runList_
