@@ -6,6 +6,7 @@
 #include "GundamGlobals.h"
 #include "RootMinimizer.h"
 #include "SimpleMcmc.h"
+#include "IterativeSearch.h"
 
 #ifdef GUNDAM_USING_CACHE_MANAGER
 #include "CacheManager.h"
@@ -75,6 +76,9 @@ void FitterEngine::configureImpl(){
       break;
     case MinimizerType::SimpleMCMC:
       this->_minimizer_ = std::make_unique<SimpleMcmc>( this );
+      break;
+    case MinimizerType::IterativeSearch:
+      this->_minimizer_ = std::make_unique<IterativeSearch>( this );
       break;
     default:
       LogExit("Unknown minimizer type selected: " << minimizerTypeStr << std::endl << "Available: " << MinimizerType::generateEnumFieldsAsString());
