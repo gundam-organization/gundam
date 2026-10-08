@@ -112,8 +112,8 @@ void IterativeSearch::initializeImpl(){
 
   this->MinimizerBase::initializeImpl();
 
-  // the search parameters must not be handed to the minimizer
-  this->stripSearchParametersFromList();
+  // the search parameters stay in the minimizer list as fixed variables: find their slots
+  this->resolveSearchParameterIndices();
 
   LogInfo << "Initializing IterativeSearch..." << std::endl;
 
@@ -167,7 +167,7 @@ void IterativeSearch::initializeImpl(){
             << searchPar.values.front() << " to " << searchPar.values.back() << std::endl;
   }
   LogInfo << "Minimizer parameters: " << getMinimizerFitParameterPtr().size()
-          << " (search parameters removed)" << std::endl;
+          << " (including " << _searchParameterList_.size() << " search parameters, fixed for the minimizer)" << std::endl;
 
   // the points to visit, and the slice of them this job runs
   this->buildSearchPointList();
@@ -274,19 +274,42 @@ void IterativeSearch::resolveSearchParameters(){
                  searchPar.parPtr->getFullTitle() << ": value " << value << " is outside " << searchPar.parPtr->getParameterLimits());
     }
 
-    // the search drives this parameter, not the minimizer
+    // the search drives this parameter, not the minimizer. Fixed parameters stay in the
+    // minimizer list, so Minuit holds a (fixed) copy that applySearchPoint() keeps in sync
     searchPar.parPtr->setIsFixed( true );
   }
 }
 
-void IterativeSearch::stripSearchParametersFromList(){
+void IterativeSearch::resolveSearchParameterIndices(){
 
   auto& parList = getMinimizerFitParameterPtr();
 
   for( auto& searchPar : _searchParameterList_ ){
     auto it = std::find( parList.begin(), parList.end(), searchPar.parPtr );
     LogThrowIf(it == parList.end(), searchPar.parPtr->getFullTitle() << " is not a minimizer parameter.");
-    parList.erase( it );
+    searchPar.fitParIndex = int( std::distance( parList.begin(), it ) );
+  }
+}
+
+bool IterativeSearch::isSearchParameter(const Parameter* parPtr_) const{
+  return std::any_of(
+      _searchParameterList_.begin(), _searchParameterList_.end(),
+      [parPtr_](const SearchParameter& s){ return s.parPtr == parPtr_; }
+  );
+}
+
+void IterativeSearch::applySearchPoint(const SearchPoint& point_){
+  // the Parameter is what the propagator reads, Minuit's copy is what setFitParameterValues()
+  // writes back on every evalFit(). Both have to hold the point, otherwise the first likelihood
+  // call would put the parameter back on Minuit's stale value.
+  for( std::size_t iPar = 0 ; iPar < _searchParameterList_.size() ; iPar++ ){
+    auto& searchPar = _searchParameterList_[iPar];
+    searchPar.parPtr->setParameterValue( point_.values[iPar] );
+
+    double fitSpaceValue{ point_.values[iPar] };
+    if( useNormalizedFitSpace() ){ fitSpaceValue = ParameterSet::toNormalizedParValue(fitSpaceValue, *searchPar.parPtr); }
+    LogThrowIf(not _rootMinimizer_->SetVariableValue( searchPar.fitParIndex, fitSpaceValue ),
+               "Could not set Minuit variable " << searchPar.fitParIndex << " (" << searchPar.parPtr->getFullTitle() << ")");
   }
 }
 
@@ -321,7 +344,7 @@ void IterativeSearch::resetMinimizer(const std::vector<double>& startValues_){
       else if( limits.hasUpperBound() ){ _rootMinimizer_->SetVariableUpperLimit(iFitPar, limits.max); }
     }
 
-    // fixed by the user, not by the search (search parameters are not in this list)
+    // fixed by the user, or a search parameter (flagged fixed by resolveSearchParameters)
     if( fitPar.isFixed() ){ _rootMinimizer_->FixVariable(iFitPar); }
   }
 }
@@ -425,16 +448,18 @@ void IterativeSearch::minimize(){
   for( std::size_t iRun = 0 ; iRun < _runList_.size() ; iRun++ ){
     auto& point = _searchPointList_[ _runList_[iRun] ];
 
-    // move the search parameters onto this point. They are fixed for the minimizer, so only this loop changes them
     std::stringstream ssPoint;
     for( std::size_t iPar = 0 ; iPar < _searchParameterList_.size() ; iPar++ ){
-      _searchParameterList_[iPar].parPtr->setParameterValue( point.values[iPar] );
       ssPoint << ( iPar == 0 ? "" : ", " ) << _searchParameterList_[iPar].parameterName << " = " << point.values[iPar];
     }
 
     // the first point runs on the declaration made at init. With a warm start, Minuit keeps the
     // state of the previous point and starts from there; otherwise go back to the prefit point
     if( not _warmStart_ and iRun != 0 ){ this->resetMinimizer( _prefitValues_ ); }
+
+    // move the search parameters onto this point. Has to come after the reset, which puts
+    // the search slots back on the prefit values
+    this->applySearchPoint( point );
 
     getMonitor().stateTitleMonitor = "Search point " + std::to_string(point.index)
                                    + " (" + std::to_string(iRun + 1) + "/" + std::to_string(_runList_.size()) + ")"
@@ -453,6 +478,7 @@ void IterativeSearch::minimize(){
       LogAlert << "Point " << point.index << " landed " << _rootMinimizer_->MinValue() - previousLlh
                << " above the previous point. Refitting from the prefit point." << std::endl;
       this->resetMinimizer( _prefitValues_ );
+      this->applySearchPoint( point );
       hasConverged = _rootMinimizer_->Minimize();
     }
     getMonitor().isEnabled = false;
@@ -517,11 +543,20 @@ void IterativeSearch::minimize(){
 
   if( nbFailedPoints != 0 ){ LogError << nbFailedPoints << " of " << _runList_.size() << " points did not converge." << std::endl; }
 
-  // FitterEngine writes the parameter state next, so leave the propagator on the best point
-  for( std::size_t iPar = 0 ; iPar < _searchParameterList_.size() ; iPar++ ){
-    _searchParameterList_[iPar].parPtr->setParameterValue( bestSearchValues[iPar] );
-  }
+  // FitterEngine writes the parameter state next, so leave the propagator on the best point.
+  // bestFitValues holds the search slots too, so evalFit() alone puts everything in place
   this->evalFit( bestFitValues.data() );
 
   setMinimizerStatus( nbFailedPoints == 0 ? 0 : 1 );
+}
+
+void IterativeSearch::scanParameters(TDirectory* saveDir_){
+  // same as MinimizerBase::scanParameters, but the search parameters are not scanned: the
+  // search itself is the view of the likelihood along them
+  LogInfo << "Performing scans of fit parameters..." << std::endl;
+  LogThrowIf( not isInitialized() );
+  for( auto* parPtr : getMinimizerFitParameterPtr() ){
+    if( this->isSearchParameter(parPtr) ){ continue; }
+    getParameterScanner().scanParameter( *parPtr, saveDir_ );
+  }
 }
