@@ -73,53 +73,30 @@ void ParametersManager::initializeImpl(){
   _globalCovarianceMatrix_ = std::make_shared<TMatrixD>(nEnabledPars, nEnabledPars );
   int parSetOffset = 0;
   for( auto& parSet : _parameterSetList_ ){
-    if( parSet.getPriorCorrelationMatrix() != nullptr ) {
-      int iParIndex{-1};
-      int iFree{0}; // free parameters are not in the prior covariance matrices
-      int nCov{parSet.getPriorCorrelationMatrix()->GetNrows()};
-      // LogDebug << "Adding parSet: " << parSet.getName() << " with " << nCov << " cov pars" << std::endl;
-      for( auto& par : parSet.getParameterList() ){
-        if( not par.isEnabled() ){ continue; }
-        if( par.isPenaltyDisabled() ){ continue; }
-
-        iParIndex++; // will be in the list
-
-        _globalCovParList_.emplace_back( &par );
-
-        (*_globalCovarianceMatrix_)[parSetOffset + iParIndex][parSetOffset + iParIndex] =
-          par.getStdDevValue()*par.getStdDevValue();
-
-        if( par.isFree() ){ iFree++; continue; }
-        int jParIndex{-1};
-        int jFree{0};
-        for(int jCov = 0 ; jCov < parSet.getPriorCorrelationMatrix()->GetNcols() ; jCov++ ){
-          if( not parSet.getParameterList()[jCov].isEnabled() ){ continue; }
-          if( parSet.getParameterList()[jCov].isPenaltyDisabled() ){ continue; }
-          jParIndex++;
-          if( parSet.getParameterList()[jCov].isFree() ){ jFree++; continue; }
-          (*_globalCovarianceMatrix_)[parSetOffset + iParIndex][parSetOffset + jParIndex] =
-            (*parSet.getPriorCorrelationMatrix())[iParIndex-iFree][jParIndex-jFree]
-            * parSet.getCorrelatedParameterList()[iParIndex-iFree]->getStdDevValue()
-            * parSet.getCorrelatedParameterList()[jParIndex-jFree]->getStdDevValue()
-          ;
+    auto covariance = parSet.generatePriorCovarianceMatrix();
+    int iCorrelated{0};
+    int iGlobal{parSetOffset};
+    for( auto& par : parSet.getParameterList() ){
+      if( not par.isEnabled() or par.isPenaltyDisabled() ){ continue; }
+      _globalCovParList_.emplace_back(&par);
+      // Free parameters have no prior variance when their std-dev is unset.
+      (*_globalCovarianceMatrix_)[iGlobal][iGlobal] =
+        std::isnan(par.getStdDevValue()) ? 0 : par.getStdDevValue()*par.getStdDevValue();
+      if( not par.isFree() ){
+        int jCorrelated{0};
+        int jGlobal{parSetOffset};
+        for( const auto& otherPar : parSet.getParameterList() ){
+          if( not otherPar.isEnabled() or otherPar.isPenaltyDisabled() ){ continue; }
+          if( not otherPar.isFree() ){
+            (*_globalCovarianceMatrix_)[iGlobal][jGlobal] = (*covariance)[iCorrelated][jCorrelated++];
+          }
+          ++jGlobal;
         }
+        ++iCorrelated;
       }
-      parSetOffset += (iParIndex+1);
+      ++iGlobal;
     }
-    else{
-      // diagonal
-      for( auto& par : parSet.getParameterList() ){
-        if( not par.isEnabled() ){ continue; }
-        _globalCovParList_.emplace_back(&par);
-        if( par.isFree() ){
-          (*_globalCovarianceMatrix_)[parSetOffset][parSetOffset] = 0;
-        }
-        else{
-          (*_globalCovarianceMatrix_)[parSetOffset][parSetOffset] = par.getStdDevValue() * par.getStdDevValue();
-        }
-        parSetOffset++;
-      }
-    }
+    parSetOffset = iGlobal;
   }
 
 }

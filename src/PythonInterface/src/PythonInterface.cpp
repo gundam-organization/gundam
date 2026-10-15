@@ -273,6 +273,7 @@ PYBIND11_MODULE(GUNDAM, module) {
   .def("getName", &Parameter::getName)
   .def("getFullTitle", &Parameter::getFullTitle)
   .def("isEnabled", &Parameter::isEnabled)
+  .def("isFree", &Parameter::isFree)
   .def("getStepSize", &Parameter::getStepSize)
   .def("getPriorValue", &Parameter::getPriorValue)
   .def("getStdDevValue", &Parameter::getStdDevValue)
@@ -443,6 +444,7 @@ PYBIND11_MODULE(GUNDAM, module) {
   likelihoodInterfaceClass
   .def(pybind11::init())
   .def("getSummary", &LikelihoodInterface::getSummary, pybind11::call_guard<pybind11::gil_scoped_release>())
+  .def("getLastPenaltyLikelihood", &LikelihoodInterface::getLastPenaltyLikelihood)
   .def("getLastLikelihood", &LikelihoodInterface::getLastLikelihood, pybind11::call_guard<pybind11::gil_scoped_release>())
   .def("propagateAndEvalLikelihood", &LikelihoodInterface::propagateAndEvalLikelihood, pybind11::call_guard<pybind11::gil_scoped_release>())
   .def("setForceAsimovData", &LikelihoodInterface::setForceAsimovData, pybind11::call_guard<pybind11::gil_scoped_release>())

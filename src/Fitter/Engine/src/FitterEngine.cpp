@@ -385,7 +385,7 @@ void FitterEngine::fit(){
           auto& parList = parSet.getParameterList();
           double pushVal =
               parList[parIndex].getParameterValue()
-              + parList[parIndex].getStdDevValue()
+              + ParameterSet::toRealParRange(1., parList[parIndex])
                 * GenericToolbox::Json::fetchValue<double>(entry, "nbSigmaAway");
 
           LogAlert << "Pushing #" << parIndex << " to " << pushVal << std::endl;
@@ -570,7 +570,7 @@ void FitterEngine::runPcaCheck(){
 
       if( par.isEnabled() and not par.isPenaltyDisabled() ){
         double currentParValue = par.getParameterValue();
-        par.setParameterValue( currentParValue + par.getStdDevValue() );
+        par.setParameterValue( currentParValue + ParameterSet::toRealParRange(1., par) );
 
         ssPrint << " " << currentParValue << " -> " << par.getParameterValue();
         LogInfo << ssPrint.str() << "..." << std::endl;
@@ -651,7 +651,7 @@ void FitterEngine::rescaleParametersStepSize(){
       if( not par.isEnabled() ){ continue; }
 
       double currentParValue = par.getParameterValue();
-      par.setParameterValue( currentParValue + par.getStdDevValue() );
+      par.setParameterValue( currentParValue + ParameterSet::toRealParRange(1., par) );
 
       getLikelihoodInterface().propagateAndEvalLikelihood();
 
@@ -669,7 +669,7 @@ void FitterEngine::rescaleParametersStepSize(){
               << " -> σ x " << _parStepGain_ << " x " << stepSize
               << " -> Δχ² = " << deltaChi2 << " = " << deltaChi2 - deltaChi2Pulls << "(stat) + " << deltaChi2Pulls << "(pulls)";
 
-      stepSize *= par.getStdDevValue() * _parStepGain_;
+      stepSize *= ParameterSet::toRealParRange(1., par) * _parStepGain_;
 
       par.setStepSize( stepSize );
       par.setParameterValue( currentParValue + stepSize );

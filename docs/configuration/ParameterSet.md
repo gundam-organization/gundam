@@ -133,3 +133,29 @@ disableParameters:
 |----------|--------|--------------------------------------|---------|
 | minValue | double | min value of parameters from the set | -inf    |
 | maxValue | double | max value of parameters from the set | +inf    |
+
+### Independent parameter constraints
+
+A covariance file is optional. For example, this set has two independent
+Gaussian constraints and one free parameter:
+
+```yaml
+name: independentParameters
+isEnabled: true
+nominalStepSize: 0.1
+parameterDefinitions:
+  - name: normalization
+    priorValue: 1.0
+    stdDev: 0.2
+  - name: offset
+    priorValue: 0.0
+    stdDev: 0.5
+  - name: unconstrained
+    priorValue: 1.0
+    parameterStepSize: 0.1
+```
+
+The penalty is the sum of squared deviations divided by the respective
+variances. The free parameter contributes no penalty. The same `stdDev`
+field can override individual uncertainties when a covariance matrix is loaded;
+the input correlations are preserved.

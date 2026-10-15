@@ -1086,7 +1086,8 @@ void RootMinimizer::writePostFitData( TDirectory* saveDir_) {
     // Rescale the post-fit values:
     for(int iRow = 0 ; iRow < postfitCovarianceMatrix.GetNrows() ; iRow++ ){
       for(int iCol = 0 ; iCol < postfitCovarianceMatrix.GetNcols() ; iCol++ ){
-        postfitCovarianceMatrix[iRow][iCol] *= (getMinimizerFitParameterPtr()[iRow]->getStdDevValue()) * (getMinimizerFitParameterPtr()[iCol]->getStdDevValue());
+        postfitCovarianceMatrix[iRow][iCol] *= ParameterSet::toRealParRange(1., *getMinimizerFitParameterPtr()[iRow])
+                                             * ParameterSet::toRealParRange(1., *getMinimizerFitParameterPtr()[iCol]);
       }
     }
 

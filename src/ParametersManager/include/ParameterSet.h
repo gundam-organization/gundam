@@ -92,7 +92,7 @@ public:
   [[nodiscard]] auto& getInversePriorCorrelationMatrix() const{ return _priorCorrelationMatrixInv_; }
 
   // derive from correlation and std-devs
-  std::shared_ptr<TMatrixD> generatePriorCovarianceMatrix() const;
+  std::shared_ptr<TMatrixDSym> generatePriorCovarianceMatrix() const;
 
   /// Get the vector of parameters for this parameter set in the real
   /// parameter space.  These parameters are not eigendecomposed.  WARNING:
@@ -207,7 +207,7 @@ private:
   bool _disableOneSigmaPlots_{false};
   int _nbParameterDefinition_{-1};
   int _maxNbEigenParameters_{-1};
-  double _nominalStepSize_{std::nan("unset")};
+  double _nominalStepSize_{1.};
   double _eigenSvdThreshold_{std::nan("unset")};
   double _maxEigenFraction_{1};
   std::string _name_{};
@@ -265,7 +265,6 @@ private:
   std::vector<Parameter*> _correlatedParameterList_{}; // list of references for the corr matrices
   std::shared_ptr<TMatrixDSym> _priorCorrelationMatrix_{nullptr};
   std::shared_ptr<TMatrixD> _priorCorrelationMatrixInv_{nullptr};
-  std::shared_ptr<TMatrixD> _priorCovarianceMatrixInv_{nullptr};
 
   std::shared_ptr<TVectorD>  _parameterPriorList_{nullptr};
   std::shared_ptr<TVectorD>  _parameterLowerBoundsList_{nullptr};
@@ -274,9 +273,6 @@ private:
 
   // penalty chi2
   // matrices stripped from fixed/freed parameters
-  std::shared_ptr<TMatrixDSym> _priorCovarianceMatrix_{nullptr}; // only used for ROOT writes
-  std::shared_ptr<TMatrixDSym> _priorCorrelationMatrix_{nullptr};
-  std::shared_ptr<TMatrixD> _inverseCorrelationMatrix_{nullptr};
   std::shared_ptr<TVectorD> _deltaVectorPtr_{nullptr}; // difference from prior + normed by std-dev
 
   std::shared_ptr<TMatrixD> _choleskyMatrix_{nullptr};

@@ -17,6 +17,7 @@ void Parameter::prepareConfig(ConfigReader& config_){
     {"name", {"parameterName"}},
     {"isEnabled"},
     {"priorValue"},
+    {"stdDev"},
     {"isPenaltyDisabled"},
     {"isFixed", {"isFrozen"}},
     {"isThrown"},
@@ -48,6 +49,14 @@ void Parameter::configureImpl(){
     }
   }
 
+  _config_.fillValue(_stdDevValue_, "stdDev");
+  LogThrowIf(not std::isnan(_stdDevValue_)
+             and (not std::isfinite(_stdDevValue_) or _stdDevValue_ <= 0),
+             "Std dev must be positive and finite, or NaN for a free parameter: " << getFullTitle());
+  if( _config_.hasField("stdDev") and not std::isnan(_stdDevValue_) ){
+    _stepSize_ = _stdDevValue_;
+  }
+
   _config_.fillValue(_isPenaltyDisabled_, "isPenaltyDisabled");
   _config_.fillValue(_isFixed_, "isFixed");
   _config_.fillValue(_isThrown_, "isThrown");
@@ -61,7 +70,7 @@ void Parameter::configureImpl(){
   _config_.fillValue(_parameterLimits_, "parameterLimits");
 
   _config_.fillEnum(_priorType_, "priorType");
-  if( _priorType_ == PriorType::Flat ){ _isFree_ = true; }
+  _isFree_ = _priorType_ == PriorType::Flat or std::isnan(_stdDevValue_);
 
 }
 void Parameter::initializeImpl() {
@@ -73,7 +82,8 @@ void Parameter::initializeImpl() {
 
   if( not _isEnabled_ ) { return; }
   LogExitIf(std::isnan(_priorValue_), "Prior value is not set: " << getFullTitle());
-  LogExitIf(std::isnan(_stdDevValue_), "Std dev value is not set: " << getFullTitle());
+  LogExitIf(not _isFree_ and (not std::isfinite(_stdDevValue_) or _stdDevValue_ <= 0),
+            "Invalid std dev value: " << getFullTitle());
   LogExitIf(std::isnan(_parameterValue_), "Parameter value is not set: " << getFullTitle());
 
   if( _priorValue_ <= _parameterLimits_.min or _priorValue_ >= _parameterLimits_.max ) {
