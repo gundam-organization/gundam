@@ -43,7 +43,7 @@ public:
   void throwStatError(bool useGaussThrow_ = false);
 
   // multi-thread
-  void updateBinEventList(std::vector<Event>& eventList_, int iThread_ = -1);
+  void updateBinEventList(std::vector<Event>& eventList_, int iThread_ = -1, int nThreads_ = -1);
   void refillHistogram(int iThread_ = -1);
 
   // utils

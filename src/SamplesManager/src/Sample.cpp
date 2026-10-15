@@ -133,21 +133,42 @@ std::ostream& operator <<( std::ostream& o, const Sample& this_ ){
 void Sample::updateEventBinning(){
   if( not _useDynamicBinning_ ){ return; }
 
-  if( not _eventList_.empty() ){
-    // Loading uses a temporary indexing buffer. Rebind its cached indices to
-    // the stored variables, whose layout is shared by every event in the sample.
-    const auto& variables = _eventList_.front().getVariables();
-    for( auto& binContext : _histogram_.getBinContextList() ){
-      for( auto& edges : binContext.bin.getEdgesList() ){
-        edges.varIndexCache = variables.findVarIndex(edges.varName);
-      }
+  GenericToolbox::ParallelWorker threadPool;
+  threadPool.setNThreads(GundamGlobals::getNbCpuThreads());
+  this->updateEventBinning(threadPool);
+}
+
+void Sample::updateEventBinning(GenericToolbox::ParallelWorker& threadPool_){
+  if( not _useDynamicBinning_ ){ return; }
+  if( _eventList_.empty() ){
+    this->indexEventInHistogramBin();
+    return;
+  }
+
+  // Loading uses a temporary indexing buffer. Rebind its cached indices to
+  // the stored variables, whose layout is shared by every event in the sample.
+  const auto& variables = _eventList_.front().getVariables();
+  for( auto& binContext : _histogram_.getBinContextList() ){
+    for( auto& edges : binContext.bin.getEdgesList() ){
+      edges.varIndexCache = variables.findVarIndex(edges.varName);
     }
   }
 
-  for( auto& event : _eventList_ ){
-    event.getIndices().bin = _histogram_.findBinIndex(event);
-  }
-  this->indexEventInHistogramBin();
+  threadPool_.runJob([&](int iThread_){
+    auto bounds = GenericToolbox::ParallelWorker::getThreadBoundIndices(
+        iThread_, threadPool_.getNbThreads(), _eventList_.size()
+    );
+    for( size_t iEvent = bounds.beginIndex ; iEvent < bounds.endIndex ; iEvent++ ){
+      auto& event = _eventList_[iEvent];
+      event.getIndices().bin = _histogram_.findBinIndex(event);
+    }
+  });
+
+  // runJob waits for every index to be updated. Each thread can then rebuild
+  // distinct bin lists without reading indices that are still being modified.
+  threadPool_.runJob([&](int iThread_){
+    _histogram_.updateBinEventList(_eventList_, iThread_, threadPool_.getNbThreads());
+  });
 }
 
 void Sample::indexEventInHistogramBin( int iThread_){

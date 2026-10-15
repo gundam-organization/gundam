@@ -209,7 +209,8 @@ def main():
     GUNDAM.setLightOutputMode(True)
     path = Path.cwd() / "217DynamicRebinning.root"
     write_input(path)
-    for threads in [1, 2]:
+    # Include more workers than events or bins, as well as uneven partitions.
+    for threads in [1, 2, 4, 8]:
         evaluate(path, threads)
     print("SUCCESS: rebinning updates indices, histogram contents and errors after event migration.")
     return 0

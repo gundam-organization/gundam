@@ -397,7 +397,7 @@ PYBIND11_MODULE(GUNDAM, module) {
   pybind11::class_<Sample>(module, "Sample")
   .def("setUseDynamicBinning", &Sample::setUseDynamicBinning)
   .def("isUseDynamicBinning", &Sample::isUseDynamicBinning)
-  .def("updateEventBinning", &Sample::updateEventBinning,
+  .def("updateEventBinning", pybind11::overload_cast<>(&Sample::updateEventBinning),
        "Reassign events in a dynamic sample; propagate afterwards to refill its histogram.")
   .def("isEnabled", &Sample::isEnabled)
   .def("isEventMcThrowDisabled", &Sample::isEventMcThrowDisabled)

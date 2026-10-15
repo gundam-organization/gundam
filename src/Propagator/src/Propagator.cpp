@@ -111,7 +111,7 @@ void Propagator::buildDialCache(){
 }
 void Propagator::updateEventBinning(){
   for( auto& sample : _sampleSet_.getSampleList() ){
-    sample.updateEventBinning();
+    sample.updateEventBinning(_threadPool_);
   }
 }
 void Propagator::propagateParameters(){
