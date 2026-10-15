@@ -369,6 +369,11 @@ PYBIND11_MODULE(GUNDAM, module) {
   .def("getSummary", &Bin::getSummary, pybind11::arg("shallow") = true)
   ;
 
+  pybind11::class_<BinningResponse::BinFraction>(module, "BinFraction")
+  .def_readonly("binIndex", &BinningResponse::BinFraction::binIndex)
+  .def_readonly("fraction", &BinningResponse::BinFraction::fraction)
+  ;
+
   pybind11::class_<Histogram::BinContent>(module, "HistogramBinContent")
   .def(pybind11::init())
   .def_readwrite("sumWeights", &Histogram::BinContent::sumWeights)
@@ -388,6 +393,9 @@ PYBIND11_MODULE(GUNDAM, module) {
 
   pybind11::class_<Histogram>(module, "Histogram")
   .def("getNbBins", &Histogram::getNbBins)
+  .def("isBinningResponseEnabled", &Histogram::isBinningResponseEnabled)
+  .def("evaluateBinningResponse", &Histogram::evaluateBinningResponse)
+  .def("refillHistogram", &Histogram::refillHistogram, pybind11::arg("iThread") = -1)
   .def("getBinContentList", pybind11::overload_cast<>(&Histogram::getBinContentList),
        pybind11::return_value_policy::reference_internal)
   .def("getBinContextList", pybind11::overload_cast<>(&Histogram::getBinContextList),

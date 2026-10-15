@@ -5,6 +5,7 @@
 #ifndef GUNDAM_HISTOGRAM_H
 #define GUNDAM_HISTOGRAM_H
 
+#include "BinningResponse.h"
 #include "Event.h"
 #include "Bin.h"
 #include "ConfigUtils.h"
@@ -21,12 +22,18 @@ public:
     double sumWeights{0};
     double sqrtSumSqWeights{0};
   };
+  struct EventContribution{
+    Event* eventPtr{nullptr};
+    double fraction{0};
+  };
   struct BinContext{
     Bin bin{};
     std::vector<Event*> eventPtrList{};
+    std::vector<EventContribution> eventContributionList{};
   };
 
   // const getters
+  [[nodiscard]] bool isBinningResponseEnabled() const{ return _binningResponse_.isEnabled(); }
   [[nodiscard]] auto getNbBins() const { return nBins; }
   [[nodiscard]] auto& getBinContentList() const { return binContentList; }
   [[nodiscard]] auto& getBinContextList() const { return binContextList; }
@@ -36,9 +43,11 @@ public:
   auto& getBinContextList(){ return binContextList; }
 
   // core
+  void configureBinningResponse(const ConfigReader& config_);
   void build(const ConfigReader& binningConfig_);
   // Bin edge variable-index caches must match the event's variable layout.
   [[nodiscard]] int findBinIndex(const Event& event_) const;
+  [[nodiscard]] std::vector<BinningResponse::BinFraction> evaluateBinningResponse(const Event& event_) const;
   void throwEventMcError();
   void throwStatError(bool useGaussThrow_ = false);
 
@@ -53,6 +62,7 @@ public:
   [[nodiscard]] auto loop(size_t start_, size_t end_) const { return GenericToolbox::ZipPartial(start_, end_, binContentList, binContextList); }
 
 private:
+  BinningResponse _binningResponse_;
   int nBins{0};
   std::vector<BinContent> binContentList{};
   std::vector<BinContext> binContextList{};

@@ -12,6 +12,8 @@
 
 #include "TRandom3.h"
 
+#include <unordered_set>
+
 
 
 void Histogram::build(const ConfigReader& binningConfig_){
@@ -29,6 +31,30 @@ void Histogram::build(const ConfigReader& binningConfig_){
   }
 
 }
+void Histogram::configureBinningResponse(const ConfigReader& config_){
+  _binningResponse_.setConfig(config_);
+  _binningResponse_.configure();
+  std::vector<Bin> bins;
+  bins.reserve(binContextList.size());
+  for( const auto& context : binContextList ){ bins.emplace_back(context.bin); }
+  _binningResponse_.build(bins);
+}
+std::vector<BinningResponse::BinFraction> Histogram::evaluateBinningResponse(const Event& event_) const{
+  std::vector<BinningResponse::BinFraction> fractions;
+  if( isBinningResponseEnabled() ){
+    _binningResponse_.evaluate(event_.getVariables(), fractions);
+  }
+  else{
+    int index = findBinIndex(event_);
+    if( index >= 0 ){
+      BinningResponse::BinFraction fraction;
+      fraction.binIndex = index;
+      fraction.fraction = 1;
+      fractions.emplace_back(fraction);
+    }
+  }
+  return fractions;
+}
 int Histogram::findBinIndex(const Event& event_) const{
   for( const auto& binContext : binContextList ){
     if( event_.getVariables().isInBin(binContext.bin) ){
@@ -38,6 +64,19 @@ int Histogram::findBinIndex(const Event& event_) const{
   return -1;
 }
 void Histogram::throwEventMcError(){
+  if( isBinningResponseEnabled() ){
+    std::unordered_set<Event*> events;
+    for( const auto& context : binContextList ){
+      for( const auto& contribution : context.eventContributionList ){
+        if( events.insert(contribution.eventPtr).second ){
+          contribution.eventPtr->getWeights().current *= double(gRandom->Poisson(1));
+        }
+      }
+    }
+    refillHistogram();
+    return;
+  }
+
   // event by event poisson throw -> takes into account the finite amount of stat in MC
 
 #if HAS_CPP_17
@@ -61,6 +100,9 @@ void Histogram::throwEventMcError(){
 
 }
 void Histogram::throwStatError(bool useGaussThrow_){
+  LogThrowIf(isBinningResponseEnabled(),
+             "Bin-wise statistical throws cannot be represented by shared event weights with a binning response.");
+
   /*
    * This is to convert "Asimov" histogram to toy-experiment (pseudo-data), i.e. with statistical fluctuations
    * */
@@ -102,12 +144,24 @@ void Histogram::updateBinEventList(std::vector<Event>& eventList_, int iThread_,
 
   for( int iBin = bounds.beginIndex ; iBin < bounds.endIndex ; iBin++ ){
     getBinContextList()[iBin].eventPtrList.clear();
+    getBinContextList()[iBin].eventContributionList.clear();
   }
   if( bounds.beginIndex == bounds.endIndex ){ return; }
 
   // Scan the events once per worker, rather than twice per bin. Each bin list
   // has a single writer and retains its capacity and event order across calls.
+  std::vector<BinningResponse::BinFraction> fractions;
   for( auto& event : eventList_ ){
+    if( isBinningResponseEnabled() ){
+      _binningResponse_.evaluate(event.getVariables(), fractions);
+      for( const auto& fraction : fractions ){
+        if( fraction.binIndex < bounds.beginIndex or fraction.binIndex >= bounds.endIndex ){ continue; }
+        EventContribution contribution;
+        contribution.eventPtr = &event;
+        contribution.fraction = fraction.fraction;
+        getBinContextList()[fraction.binIndex].eventContributionList.emplace_back(contribution);
+      }
+    }
     int iBin = event.getIndices().bin;
     if( iBin >= bounds.beginIndex and iBin < bounds.endIndex ){
       getBinContextList()[iBin].eventPtrList.emplace_back(&event);
@@ -132,6 +186,15 @@ void Histogram::refillHistogram(int iThread_){
     // reset
     binContent.sumWeights = 0;
     binContent.sqrtSumSqWeights = 0;
+    if( isBinningResponseEnabled() ){
+      for( const auto& contribution : binContext.eventContributionList ){
+        weightBuffer = contribution.eventPtr->getEventWeight() * contribution.fraction;
+        binContent.sumWeights += weightBuffer;
+        binContent.sqrtSumSqWeights += weightBuffer * weightBuffer;
+      }
+      binContent.sqrtSumSqWeights = std::sqrt(binContent.sqrtSumSqWeights);
+      continue;
+    }
     for( auto *eventPtr: binContext.eventPtrList ){
       weightBuffer = eventPtr->getEventWeight();
       binContent.sumWeights += weightBuffer;

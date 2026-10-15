@@ -18,6 +18,8 @@ void Sample::prepareConfig(ConfigReader &config_){
     {FieldFlag::MANDATORY, "name"},
     {"isEnabled"},
     {"disableEventMcThrow"},
+    {"binningResponse"},
+    {"useDynamicBinning"},
     {"binning", {"binningFile", "binningFilePath"}},
     {"selectionCutStr", {"selectionCuts"}},
     {"sampleWeightFormula"},
@@ -34,6 +36,7 @@ void Sample::configureImpl(){
 
   _config_.fillValue(_name_, "name");
   _config_.fillValue(_isEnabled_, "isEnabled");
+  _config_.fillValue(_useDynamicBinning_, "useDynamicBinning");
   _config_.fillValue(_disableEventMcThrow_, "disableEventMcThrow");
   _config_.fillValue(_binningConfig_, "binning");
   _config_.fillValue(_selectionCutStr_, "selectionCutStr");
@@ -49,6 +52,9 @@ void Sample::configureImpl(){
 
   LogDebugIf(GundamGlobals::isDebug()) << "Reading binning: " << _binningConfig_ << std::endl;
   _histogram_.build(_binningConfig_);
+  if( _config_.hasField("binningResponse") ){
+    _histogram_.configureBinningResponse(_config_.fetchValue<ConfigReader>("binningResponse"));
+  }
 
   LogDebugIf(GundamGlobals::isDebug()) << "Histogram has " << _histogram_.getNbBins() << " bins." << std::endl;
 }
@@ -71,6 +77,7 @@ double Sample::getSumWeights() const{
   return output;
 }
 size_t Sample::getNbBinnedEvents() const{
+  if( _histogram_.isBinningResponseEnabled() ){ return _eventList_.size(); }
   return std::accumulate(
       _eventList_.begin(), _eventList_.end(), size_t(0.),
       []( size_t sum_, const Event &ev_ ){
