@@ -129,6 +129,8 @@ public:
   /// thrown.
   [[nodiscard]] auto getThrowValue() const{ return _throwValue_; }
 
+  /// Release correlations with other parameters while retaining the Gaussian constraint.
+  [[nodiscard]] auto getReleasePriorCorrelations() const{ return _releasePriorCorrelations_; }
   [[nodiscard]] auto getStdDevValue() const{ return _stdDevValue_; }
   [[nodiscard]] auto getOwner() const{ return _owner_; }
   [[nodiscard]] auto& getParameterLimits() const{ return _parameterLimits_; }
@@ -226,6 +228,7 @@ private:
   bool _isEnabled_{true};
   bool _isPenaltyDisabled_{false};
   bool _isFixed_{false};
+  bool _releasePriorCorrelations_{false};
   bool _isEigen_{false};
   bool _isThrown_{true};
   bool _gotUpdated_{false};

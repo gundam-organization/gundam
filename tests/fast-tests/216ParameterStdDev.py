@@ -6,8 +6,34 @@ Needs ROOT in PATH and the freshly built GUNDAM module in PYTHONPATH.
 
 import json
 import math
+import os
+import sys
+from contextlib import contextmanager
 import subprocess
 from pathlib import Path
+
+
+@contextmanager
+def suppress_cpp_output():
+    import GUNDAM
+
+    GUNDAM.flushOutput()
+    sys.stdout.flush()
+    sys.stderr.flush()
+    saved_stdout, saved_stderr = os.dup(1), os.dup(2)
+    try:
+        with open(os.devnull, "w") as output:
+            os.dup2(output.fileno(), 1)
+            os.dup2(output.fileno(), 2)
+            try:
+                yield
+            finally:
+                GUNDAM.flushOutput()
+    finally:
+        os.dup2(saved_stdout, 1)
+        os.dup2(saved_stderr, 2)
+        os.close(saved_stdout)
+        os.close(saved_stderr)
 
 
 def assert_close(actual, expected):
@@ -26,6 +52,12 @@ void makeStdDevInput() {{
   covariance[0][0] = 4.; covariance[1][1] = 9.;
   covariance[0][1] = covariance[1][0] = 3.; // rho = 0.5
   covariance.Write("covariance");
+  TMatrixDSym covariance3(3);
+  covariance3[0][0] = 4.; covariance3[1][1] = 9.; covariance3[2][2] = 16.;
+  covariance3[0][1] = covariance3[1][0] = 3.;   // rho = 0.5
+  covariance3[0][2] = covariance3[2][0] = 2.;   // rho = 0.25
+  covariance3[1][2] = covariance3[2][1] = -2.4; // rho = -0.2
+  covariance3.Write("covariance3");
   double x = 0.;
   TTree tree("tree_mc", "tree_mc");
   tree.Branch("X", &x); tree.Fill(); tree.Write();
@@ -34,7 +66,8 @@ void makeStdDevInput() {{
     subprocess.run(["root", "-l", "-b", "-q", str(macro)], check=True)
 
 
-def run_case(path, definitions, correlated=False, eigen=False, nominal_step=0.1):
+def run_case(path, definitions, correlated=False, eigen=False, nominal_step=0.1,
+             check_throws=False, global_throws=False):
     import GUNDAM
 
     parameter_set_config = {
@@ -44,7 +77,8 @@ def run_case(path, definitions, correlated=False, eigen=False, nominal_step=0.1)
     if nominal_step is not None:
         parameter_set_config["nominalStepSize"] = nominal_step
     if correlated:
-        parameter_set_config.update(parameterDefinitionFilePath=str(path), covarianceMatrix="covariance")
+        parameter_set_config.update(parameterDefinitionFilePath=str(path),
+                                    covarianceMatrix="covariance3" if len(definitions) == 3 else "covariance")
     config = {"likelihoodInterfaceConfig": {
         "jointProbabilityConfig": {"type": "PoissonLLH"},
         "dataSetList": [{"name": "sample", "model": {
@@ -55,7 +89,8 @@ def run_case(path, definitions, correlated=False, eigen=False, nominal_step=0.1)
                 "name": "X", "binning": {"binningDefinition": [{"name": "X", "edges": [-1, 1]}]},
                 "dataSets": ["sample"],
             }]},
-            "parametersManagerConfig": {"parameterSetList": [parameter_set_config]},
+            "parametersManagerConfig": {"parameterSetList": [parameter_set_config],
+                                        "throwToyParametersWithGlobalCov": global_throws},
         },
     }}
     # Normalization dials keep the parameters enabled through propagation setup.
@@ -91,11 +126,39 @@ def run_case(path, definitions, correlated=False, eigen=False, nominal_step=0.1)
         elif not correlated or definition.get("stdDev", 0) == "nan":
             assert math.isnan(parameter.getStdDevValue())
             assert parameter.isFree()
-    if correlated and all(not p.isFree() for p in parameters):
-        assert_close(parameter_set.getPriorCorrelationMatrix()[0, 1], 0.5)
+    if correlated:
+        input_correlations = ((1., 0.5, 0.25), (0.5, 1., -0.2), (0.25, -0.2, 1.))
+        constrained = [(i, p) for i, p in enumerate(parameters)
+                       if p.isEnabled() and not p.isFree() and not definitions[i].get("isPenaltyDisabled", False)]
         covariance = parameter_set.getPriorCovarianceMatrix()
-        sigmas = [p.getStdDevValue() for p in parameters]
-        assert_close(covariance[0, 1], 0.5 * sigmas[0] * sigmas[1])
+        correlation = parameter_set.getPriorCorrelationMatrix()
+        for i, (original_i, parameter_i) in enumerate(constrained):
+            for j, (original_j, parameter_j) in enumerate(constrained):
+                expected = input_correlations[original_i][original_j]
+                if i != j and (definitions[original_i].get("releasePriorCorrelations", False)
+                               or definitions[original_j].get("releasePriorCorrelations", False)):
+                    expected = 0.
+                assert_close(correlation[i, j], expected)
+                assert_close(covariance[i, j], expected * parameter_i.getStdDevValue() * parameter_j.getStdDevValue())
+    if check_throws:
+        GUNDAM.FitterEngine.setRandomSeed(12345)
+        with suppress_cpp_output():
+            throws = []
+            for _ in range(4000):
+                manager.throwParameters()
+                throws.append([p.getParameterValue() for p in parameters])
+        means = [sum(row[i] for row in throws) / len(throws) for i in range(len(parameters))]
+        sample_covariance = [[sum((row[i] - means[i]) * (row[j] - means[j]) for row in throws)
+                              / (len(throws) - 1) for j in range(len(parameters))]
+                             for i in range(len(parameters))]
+        for i, parameter in enumerate(parameters):
+            sigma = parameter.getStdDevValue()
+            assert abs(means[i] - parameter.getPriorValue()) < 0.08 * sigma
+            assert abs(math.sqrt(sample_covariance[i][i]) / sigma - 1.) < 0.08
+            for j in range(len(parameters)):
+                empirical_correlation = sample_covariance[i][j] / math.sqrt(
+                    sample_covariance[i][i] * sample_covariance[j][j])
+                assert abs(empirical_correlation - correlation[i, j]) < 0.08
     return penalty
 
 
@@ -115,6 +178,28 @@ def main():
                               correlated=True, eigen=eigen), 7./27.)
         assert_close(run_case(path, [{"stdDev": 2.}, {"stdDev": 4.}], eigen=eigen), 1.25)
         assert_close(run_case(path, [{}, {}], eigen=eigen), 0.)
+    for eigen in (False, True):
+        # Release either side of a correlation, preserving inherited or overridden std-devs.
+        for released_index in (0, 1):
+            definitions = [{}, {}]
+            definitions[released_index]["releasePriorCorrelations"] = True
+            assert_close(run_case(path, definitions, correlated=True, eigen=eigen), 13./9.)
+            definitions[0]["stdDev"] = 4.
+            assert_close(run_case(path, definitions, correlated=True, eigen=eigen), 25./36.)
+        # Releasing one parameter must preserve correlations between the other two.
+        for released_index, expected in enumerate((1609./864., 68./45., 139./108.)):
+            definitions = [{}, {}, {}]
+            definitions[released_index]["releasePriorCorrelations"] = True
+            assert_close(run_case(path, definitions, correlated=True, eigen=eigen), expected)
+        assert_close(run_case(path, [{"stdDev": 2., "releasePriorCorrelations": True},
+                                    {"stdDev": 4.}], eigen=eigen), 1.25)
+    assert_close(run_case(path, [{"stdDev": "nan", "releasePriorCorrelations": True},
+                                {"stdDev": 6.}], correlated=True), 1./9.)
+    # Both throw paths must retain variances and the unaffected pair correlation.
+    for global_throws in (False, True):
+        assert_close(run_case(path, [{"stdDev": 4., "releasePriorCorrelations": True}, {}, {}],
+                              correlated=True, check_throws=True, global_throws=global_throws),
+                     961./864.)
     # Free parameters interleaved with constrained parameters exercise compact matrix ordering.
     assert_close(run_case(path, [{}, {"stdDev": 2.}, {}, {"stdDev": 4.},
                                  {"stdDev": 1., "isPenaltyDisabled": True},

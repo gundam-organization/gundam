@@ -24,6 +24,7 @@ It supplies the scale for minimization and scans; no default step is assumed.
 | name                             | string       | define parameter with name (expected)                      |              |
 | parameterIndex                   | int          | define parameter with index                                |              |
 | priorType                        | string       | DEPRECATED: use stdDev (Flat converts to nan)               | unset     |
+| releasePriorCorrelations         | bool         | Remove correlations with other parameters; keep stdDev constraint | false |
 | stdDev                           | double       | Individual prior standard deviation                       | covariance diagonal, or nan |
 | priorValue                       | double       | prior value (expected)                                     | nan          |
 | isEnabled                        | bool         | use parameter in the propagator                            | true         |
@@ -49,4 +50,22 @@ dialSetDefinitions:
           - name: "First Parameter"
           - name: "Second Parameter"
       <other fields>
+```
+
+#### releasePriorCorrelations
+
+Set `releasePriorCorrelations: true` to keep a parameter's Gaussian constraint
+while removing its prior correlations with every other parameter. Its standard
+deviation is inherited from the input covariance or overridden by `stdDev`.
+Correlations between the remaining parameters are preserved. This applies to
+the penalty, prior throws, and eigen decomposition. The default is `false`.
+Without an input covariance, parameters are already independent. A free parameter
+(`stdDev: "nan"`) still contributes no penalty regardless of this option.
+
+```yaml
+- parameterIndex: 0
+  name: independentPrior
+  releasePriorCorrelations: true
+  # Optional: override the inherited std-dev while keeping the Gaussian constraint
+  stdDev: 0.3
 ```

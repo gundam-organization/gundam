@@ -18,6 +18,7 @@ void Parameter::prepareConfig(ConfigReader& config_){
     {"isEnabled"},
     {"priorValue"},
     {"stdDev"},
+    {"releasePriorCorrelations"},
     {"isPenaltyDisabled"},
     {"isFixed", {"isFrozen"}},
     {"isThrown"},
@@ -50,6 +51,7 @@ void Parameter::configureImpl(){
   }
 
   _config_.fillValue(_stdDevValue_, "stdDev");
+  _config_.fillValue(_releasePriorCorrelations_, "releasePriorCorrelations");
   if( _config_.hasField("priorType") ){
     auto priorType = _config_.fetchValue<std::string>("priorType");
     LogThrowIf(priorType != "Flat" and priorType != "Gaussian",

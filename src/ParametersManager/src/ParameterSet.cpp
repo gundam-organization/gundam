@@ -240,6 +240,11 @@ void ParameterSet::processCovarianceMatrix(){
       int iIndex = _correlatedParameterList_[iPar]->getParameterIndex();
       for( int jPar = 0 ; jPar < _nCorrelatedParams_ ; jPar++ ) {
         int jIndex = _correlatedParameterList_[jPar]->getParameterIndex();
+        // Keep the diagonal at one and release correlations before inversion or decomposition.
+        if( iPar != jPar and (_correlatedParameterList_[iPar]->getReleasePriorCorrelations()
+                             or _correlatedParameterList_[jPar]->getReleasePriorCorrelations()) ){
+          continue;
+        }
         (*_priorCorrelationMatrix_)[iPar][jPar] =
           (*_priorFullCovarianceMatrix_)[iIndex][jIndex]
           / (std::sqrt((*_priorFullCovarianceMatrix_)[iIndex][iIndex])
