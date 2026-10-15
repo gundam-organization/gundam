@@ -190,27 +190,39 @@ void Histogram::updateBinEventLists(std::vector<Event>& eventList_, GenericToolb
   threadPool_.runJob([&](int iThread_){
     auto& worker = _responseWorkers_[iThread_];
     auto bounds = GenericToolbox::ParallelWorker::getThreadBoundIndices(iThread_, threadPool_.getNbThreads(), eventList_.size());
-    for( size_t iEvent = bounds.beginIndex ; iEvent < bounds.endIndex ; ++iEvent ){
-      auto& event = eventList_[iEvent];
-      if( updateBinIndices_ ){ event.getIndices().bin = findBinIndex(event); }
-      if( event.getIndices().bin >= 0 ){ ++worker.eventOffsets[event.getIndices().bin]; }
-      _binningResponse_.evaluate(event.getVariables(), worker.evaluationBuffer);
-      for( const auto& fraction : worker.evaluationBuffer.response.binFractions ){
-        IndexedContribution contribution;
-        contribution.binIndex = fraction.binIndex;
-        contribution.contribution.eventPtr = &event;
-        contribution.contribution.fraction = fraction.fraction;
-        worker.contributions.emplace_back(contribution);
-        ++worker.contributionOffsets[fraction.binIndex];
+    auto evaluateEvents = [&](const auto& evaluateResponse_){
+      for( size_t iEvent = bounds.beginIndex ; iEvent < bounds.endIndex ; ++iEvent ){
+        auto& event = eventList_[iEvent];
+        if( updateBinIndices_ ){ event.getIndices().bin = findBinIndex(event); }
+        if( event.getIndices().bin >= 0 ){ ++worker.eventOffsets[event.getIndices().bin]; }
+        evaluateResponse_(event.getVariables(), worker.evaluationBuffer);
+        for( const auto& fraction : worker.evaluationBuffer.response.binFractions ){
+          IndexedContribution contribution;
+          contribution.binIndex = fraction.binIndex;
+          contribution.contribution.eventPtr = &event;
+          contribution.contribution.fraction = fraction.fraction;
+          worker.contributions.emplace_back(contribution);
+          ++worker.contributionOffsets[fraction.binIndex];
+        }
+        if( worker.evaluationBuffer.response.outsideFraction > 0 ){
+          IndexedContribution contribution;
+          contribution.binIndex = nBins;
+          contribution.contribution.eventPtr = &event;
+          contribution.contribution.fraction = worker.evaluationBuffer.response.outsideFraction;
+          worker.contributions.emplace_back(contribution);
+          ++worker.contributionOffsets[nBins];
+        }
       }
-      if( worker.evaluationBuffer.response.outsideFraction > 0 ){
-        IndexedContribution contribution;
-        contribution.binIndex = nBins;
-        contribution.contribution.eventPtr = &event;
-        contribution.contribution.fraction = worker.evaluationBuffer.response.outsideFraction;
-        worker.contributions.emplace_back(contribution);
-        ++worker.contributionOffsets[nBins];
-      }
+    };
+    if( _binningResponse_.hasRelativeWidths() ){
+      evaluateEvents([&](const VariableCollection& variables_, BinningResponse::EvaluationBuffer& buffer_){
+        _binningResponse_.evaluateRelative(variables_, buffer_);
+      });
+    }
+    else{
+      evaluateEvents([&](const VariableCollection& variables_, BinningResponse::EvaluationBuffer& buffer_){
+        _binningResponse_.evaluateAbsolute(variables_, buffer_);
+      });
     }
   });
 
@@ -264,27 +276,39 @@ void Histogram::updateBinEventList(std::vector<Event>& eventList_, int iThread_,
   if( isBinningResponseEnabled() and not eventList_.empty() ){
     _binningResponse_.prepareEvaluation(eventList_.front().getVariables(), buffer);
   }
-  for( auto& event : eventList_ ){
-    if( isBinningResponseEnabled() ){
-      _binningResponse_.evaluate(event.getVariables(), buffer);
-      for( const auto& fraction : buffer.response.binFractions ){
-        if( fraction.binIndex < bounds.beginIndex or fraction.binIndex >= bounds.endIndex ){ continue; }
-        EventContribution contribution;
-        contribution.eventPtr = &event;
-        contribution.fraction = fraction.fraction;
-        getBinContextList()[fraction.binIndex].eventContributionList.emplace_back(contribution);
+  auto indexEvents = [&](const auto& evaluateResponse_){
+    for( auto& event : eventList_ ){
+      if( isBinningResponseEnabled() ){
+        evaluateResponse_(event.getVariables(), buffer);
+        for( const auto& fraction : buffer.response.binFractions ){
+          if( fraction.binIndex < bounds.beginIndex or fraction.binIndex >= bounds.endIndex ){ continue; }
+          EventContribution contribution;
+          contribution.eventPtr = &event;
+          contribution.fraction = fraction.fraction;
+          getBinContextList()[fraction.binIndex].eventContributionList.emplace_back(contribution);
+        }
+        if( nBins >= bounds.beginIndex and nBins < bounds.endIndex and buffer.response.outsideFraction > 0 ){
+          EventContribution contribution;
+          contribution.eventPtr = &event;
+          contribution.fraction = buffer.response.outsideFraction;
+          _outsideContributionList_.emplace_back(contribution);
+        }
       }
-      if( nBins >= bounds.beginIndex and nBins < bounds.endIndex and buffer.response.outsideFraction > 0 ){
-        EventContribution contribution;
-        contribution.eventPtr = &event;
-        contribution.fraction = buffer.response.outsideFraction;
-        _outsideContributionList_.emplace_back(contribution);
+      int iBin = event.getIndices().bin;
+      if( iBin >= bounds.beginIndex and iBin < bounds.endIndex ){
+        getBinContextList()[iBin].eventPtrList.emplace_back(&event);
       }
     }
-    int iBin = event.getIndices().bin;
-    if( iBin >= bounds.beginIndex and iBin < bounds.endIndex ){
-      getBinContextList()[iBin].eventPtrList.emplace_back(&event);
-    }
+  };
+  if( _binningResponse_.hasRelativeWidths() ){
+    indexEvents([&](const VariableCollection& variables_, BinningResponse::EvaluationBuffer& buffer_){
+      _binningResponse_.evaluateRelative(variables_, buffer_);
+    });
+  }
+  else{
+    indexEvents([&](const VariableCollection& variables_, BinningResponse::EvaluationBuffer& buffer_){
+      _binningResponse_.evaluateAbsolute(variables_, buffer_);
+    });
   }
 }
 void Histogram::refillHistogram(int iThread_){

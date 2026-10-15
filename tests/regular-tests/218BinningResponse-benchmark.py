@@ -12,10 +12,11 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "fast-tests"))
 import_module("005PythonSetup-utils").requireVenv(__file__)
 
 
-def make_engine(path, bins):
+def make_engine(path, bins, width_fraction=None):
     import GUNDAM
     import numpy as np
 
+    width_config = "width: 0.2" if width_fraction is None else f"widthFraction: {width_fraction}"
     builder = GUNDAM.ConfigUtils.ConfigBuilder()
     builder.setConfigFromYamlString(f"""
 likelihoodInterfaceConfig:
@@ -39,7 +40,7 @@ likelihoodInterfaceConfig:
           binningResponse:
             isEnabled: true
             variables:
-              - {{name: X, width: 0.2}}
+              - {{name: X, {width_config}}}
 """)
     engine = GUNDAM.FitterEngine()
     engine.setConfig(GUNDAM.ConfigUtils.ConfigReader(builder.getConfig()))
@@ -57,11 +58,15 @@ def main():
     parser.add_argument("--events", type=int, default=100000)
     parser.add_argument("--bins", type=int, nargs="+", default=[4, 64])
     parser.add_argument("--threads", type=int, nargs="+", default=[1, 2, 4, 8])
+    parser.add_argument("--width-fraction", type=float, help="Use relative widths instead of the default absolute width")
     parser.add_argument("--repeat", type=int, default=7)
     parser.add_argument("--output", type=Path, default=Path("218BinningResponse-benchmark.json"))
     args = parser.parse_args()
     if min([args.events, args.repeat] + args.bins + args.threads) <= 0:
         parser.error("Event, bin, thread and repetition counts must be positive")
+
+    if args.width_fraction is not None and not 0 < args.width_fraction <= 0.5:
+        parser.error("width-fraction must be in (0, 0.5]")
 
     GUNDAM.setLightOutputMode(True)
     path = Path.cwd() / "218BinningResponse-benchmark.root"
@@ -73,7 +78,7 @@ def main():
     for bins in args.bins:
         for threads in args.threads:
             GUNDAM.setNumberOfThreads(threads)
-            engine = make_engine(path, bins)
+            engine = make_engine(path, bins, args.width_fraction)
             likelihood = engine.getLikelihoodInterface()
             propagator = likelihood.getModelPropagator()
             sample = propagator.getSampleSet().getSampleList()[0]
@@ -89,6 +94,7 @@ def main():
                 propagation_times.append(time.perf_counter() - start)
             results.append({
                 "bins": bins, "events": args.events, "threads": threads,
+                "width_fraction": args.width_fraction,
                 "rebinning_ms": statistics.median(rebinning_times) * 1000,
                 "propagation_ms": statistics.median(propagation_times) * 1000,
                 "sum_weights": [entry.sumWeights for entry in sample.getHistogram().getBinContentList()],
