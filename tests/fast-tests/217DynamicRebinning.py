@@ -28,6 +28,15 @@ def write_input(path):
         })
 
 
+def expect_runtime_error(function, message):
+    try:
+        function()
+    except RuntimeError as error:
+        assert message in str(error), str(error)
+    else:
+        raise AssertionError(f"Expected RuntimeError containing: {message}")
+
+
 def evaluate(path, threads):
     import GUNDAM
 
@@ -82,9 +91,21 @@ likelihoodInterfaceConfig:
     likelihood = engine.getLikelihoodInterface()
     propagator = likelihood.getModelPropagator()
     dynamic, static, empty = propagator.getSampleSet().getSampleList()
+    expect_runtime_error(static.updateEventBinning, "Dynamic binning is disabled")
+    # Changing the flag is allowed in both directions before initialization.
+    static.setUseDynamicBinning(True)
+    static.setUseDynamicBinning(False)
     dynamic.setUseDynamicBinning(True)
     empty.setUseDynamicBinning(True)
     engine.initialize()
+    expect_runtime_error(static.updateEventBinning, "Dynamic binning is disabled")
+    for sample, enabled in [(dynamic, True), (static, False), (empty, True)]:
+        # Reject changes and redundant assignments, including for empty samples.
+        for value in [False, True]:
+            expect_runtime_error(
+                lambda: sample.setUseDynamicBinning(value), "already initialized"
+            )
+            assert sample.isUseDynamicBinning() == enabled
     parameter = propagator.getParametersManager().getParameterSetsList()[0].getParameterList()[0]
     events = {event.getIndices().entry: event for event in dynamic.getEventList()}
     assert set(events) == set(range(5))

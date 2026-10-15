@@ -131,7 +131,7 @@ std::ostream& operator <<( std::ostream& o, const Sample& this_ ){
 }
 
 void Sample::updateEventBinning(){
-  if( not _useDynamicBinning_ ){ return; }
+  LogThrowIf(not _useDynamicBinning_, "Dynamic binning is disabled for sample \"" << _name_ << "\".");
 
   GenericToolbox::ParallelWorker threadPool;
   threadPool.setNThreads(GundamGlobals::getNbCpuThreads());
@@ -139,7 +139,7 @@ void Sample::updateEventBinning(){
 }
 
 void Sample::updateEventBinning(GenericToolbox::ParallelWorker& threadPool_){
-  if( not _useDynamicBinning_ ){ return; }
+  LogThrowIf(not _useDynamicBinning_, "Dynamic binning is disabled for sample \"" << _name_ << "\".");
   if( _eventList_.empty() ){
     this->indexEventInHistogramBin();
     return;
