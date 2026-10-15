@@ -82,6 +82,7 @@ public:
   [[nodiscard]] auto getInvertedEigenVectors() const{ return _eigenVectorsInv_.get(); }
   [[nodiscard]] auto getEigenVectors() const{ return _eigenVectors_.get(); }
   [[nodiscard]] auto getDeltaVectorPtr() const{ return _deltaVectorPtr_.get(); }
+  [[nodiscard]] auto getNominalStepSize() const{ return _nominalStepSize_; }
   [[nodiscard]] auto& getName() const{ return _name_; }
   [[nodiscard]] auto& getDialSetDefinitions() const{ return _dialSetDefinitions_; }
   [[nodiscard]] auto& getCustomParThrow() const{ return _customParThrow_; }
@@ -207,7 +208,7 @@ private:
   bool _disableOneSigmaPlots_{false};
   int _nbParameterDefinition_{-1};
   int _maxNbEigenParameters_{-1};
-  double _nominalStepSize_{1.};
+  double _nominalStepSize_{std::nan("unset")};
   double _eigenSvdThreshold_{std::nan("unset")};
   double _maxEigenFraction_{1};
   std::string _name_{};

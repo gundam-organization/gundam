@@ -253,7 +253,7 @@ void FitterEngine::initializeImpl(){
         GenericToolbox::writeInTFileWithObjTypeExt( outDir, TNamed( "index", std::to_string( par.getParameterIndex() ).c_str() ) );
         GenericToolbox::writeInTFileWithObjTypeExt( outDir, TNamed( "prior", std::to_string( par.getPriorValue() ).c_str() ) );
         GenericToolbox::writeInTFileWithObjTypeExt( outDir, TNamed( "stdDev", std::to_string( par.getStdDevValue() ).c_str() ) );
-        GenericToolbox::writeInTFileWithObjTypeExt( outDir, TNamed( "priorType", std::to_string( par.getPriorType().value ).c_str() ) );
+        GenericToolbox::writeInTFileWithObjTypeExt( outDir, TNamed( "priorType", std::to_string( par.isFree() ? 1 : 0 ).c_str() ) );
         GenericToolbox::writeInTFileWithObjTypeExt( outDir, TNamed( "min", std::to_string( par.getParameterLimits().min ).c_str() ) );
         GenericToolbox::writeInTFileWithObjTypeExt( outDir, TNamed( "max", std::to_string( par.getParameterLimits().max ).c_str() ) );
       }
@@ -271,7 +271,7 @@ void FitterEngine::initializeImpl(){
           GenericToolbox::writeInTFileWithObjTypeExt( outDir, TNamed( "index", std::to_string( eigen.getParameterIndex() ).c_str() ) );
           GenericToolbox::writeInTFileWithObjTypeExt( outDir, TNamed( "prior", std::to_string( eigen.getPriorValue() ).c_str() ) );
           GenericToolbox::writeInTFileWithObjTypeExt( outDir, TNamed( "stdDev", std::to_string( eigen.getStdDevValue() ).c_str() ) );
-          GenericToolbox::writeInTFileWithObjTypeExt( outDir, TNamed( "priorType", std::to_string( eigen.getPriorType().value ).c_str() ) );
+          GenericToolbox::writeInTFileWithObjTypeExt( outDir, TNamed( "priorType", std::to_string( eigen.isFree() ? 1 : 0 ).c_str() ) );
           GenericToolbox::writeInTFileWithObjTypeExt( outDir, TNamed( "min", std::to_string( eigen.getParameterLimits().min ).c_str() ) );
           GenericToolbox::writeInTFileWithObjTypeExt( outDir, TNamed( "max", std::to_string( eigen.getParameterLimits().max ).c_str() ) );
         }

@@ -50,6 +50,15 @@ void Parameter::configureImpl(){
   }
 
   _config_.fillValue(_stdDevValue_, "stdDev");
+  if( _config_.hasField("priorType") ){
+    auto priorType = _config_.fetchValue<std::string>("priorType");
+    LogThrowIf(priorType != "Flat" and priorType != "Gaussian",
+               "Unknown deprecated priorType: " << priorType << " for " << getFullTitle());
+    LogWarning << getFullTitle() << ": priorType is deprecated. Use stdDev instead."
+               << (priorType == "Flat" ? " Converting priorType: Flat to stdDev: nan." : " Keeping the configured stdDev.")
+               << std::endl;
+    if( priorType == "Flat" ){ _stdDevValue_ = std::nan("free"); }
+  }
   LogThrowIf(not std::isnan(_stdDevValue_)
              and (not std::isfinite(_stdDevValue_) or _stdDevValue_ <= 0),
              "Std dev must be positive and finite, or NaN for a free parameter: " << getFullTitle());
@@ -60,7 +69,12 @@ void Parameter::configureImpl(){
   _config_.fillValue(_isPenaltyDisabled_, "isPenaltyDisabled");
   _config_.fillValue(_isFixed_, "isFixed");
   _config_.fillValue(_isThrown_, "isThrown");
+  if( isFree() ){ _stepSize_ = _owner_->getNominalStepSize(); }
   _config_.fillValue(_stepSize_, "parameterStepSize");
+  LogThrowIf(isFree() and (not std::isfinite(_stepSize_) or _stepSize_ <= 0),
+             "Free parameter " << getFullTitle()
+             << " requires a positive finite nominalStepSize in its parameter set"
+             << " or an explicit parameterStepSize.");
   _config_.fillValue(_physicalLimits_, "physicalLimits");
   _config_.fillValue(_throwLimits_, "throwLimits");
   _config_.fillValue(_mirrorRange_, "mirrorRange");
@@ -69,8 +83,6 @@ void Parameter::configureImpl(){
 
   _config_.fillValue(_parameterLimits_, "parameterLimits");
 
-  _config_.fillEnum(_priorType_, "priorType");
-  _isFree_ = _priorType_ == PriorType::Flat or std::isnan(_stdDevValue_);
 
 }
 void Parameter::initializeImpl() {
@@ -82,7 +94,7 @@ void Parameter::initializeImpl() {
 
   if( not _isEnabled_ ) { return; }
   LogExitIf(std::isnan(_priorValue_), "Prior value is not set: " << getFullTitle());
-  LogExitIf(not _isFree_ and (not std::isfinite(_stdDevValue_) or _stdDevValue_ <= 0),
+  LogExitIf(not isFree() and (not std::isfinite(_stdDevValue_) or _stdDevValue_ <= 0),
             "Invalid std dev value: " << getFullTitle());
   LogExitIf(std::isnan(_parameterValue_), "Parameter value is not set: " << getFullTitle());
 

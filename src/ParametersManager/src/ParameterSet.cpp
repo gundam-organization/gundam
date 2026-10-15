@@ -1042,7 +1042,7 @@ void ParameterSet::printConfiguration() const {
     if( not par.isEnabled() ){ continue; }
     t << par.getTitle() << GenericToolbox::TablePrinter::NextColumn;
     t << par.getPriorValue() << GenericToolbox::TablePrinter::NextColumn;
-    t << (par.getPriorType() == Parameter::PriorType::Flat ? "Free": std::to_string(par.getStdDevValue())) << GenericToolbox::TablePrinter::NextColumn;
+    t << (par.isFree() ? "Free": std::to_string(par.getStdDevValue())) << GenericToolbox::TablePrinter::NextColumn;
     t << par.getParameterLimits() << GenericToolbox::TablePrinter::NextLine;
     nPars++;
   }

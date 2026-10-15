@@ -34,14 +34,15 @@ void makeStdDevInput() {{
     subprocess.run(["root", "-l", "-b", "-q", str(macro)], check=True)
 
 
-def run_case(path, definitions, correlated=False, eigen=False):
+def run_case(path, definitions, correlated=False, eigen=False, nominal_step=0.1):
     import GUNDAM
 
     parameter_set_config = {
         "name": "priors", "isEnabled": True, "parameterDefinitions": definitions,
-        "nominalStepSize": 0.1,
         "enableEigenDecomp": eigen,
     }
+    if nominal_step is not None:
+        parameter_set_config["nominalStepSize"] = nominal_step
     if correlated:
         parameter_set_config.update(parameterDefinitionFilePath=str(path), covarianceMatrix="covariance")
     config = {"likelihoodInterfaceConfig": {
@@ -82,7 +83,10 @@ def run_case(path, definitions, correlated=False, eigen=False):
     for parameter, definition in zip(parameters, definitions):
         if not parameter.isEnabled():
             continue
-        if "stdDev" in definition and definition["stdDev"] != "nan":
+        if definition.get("priorType") == "Flat":
+            assert math.isnan(parameter.getStdDevValue())
+            assert parameter.isFree()
+        elif "stdDev" in definition and definition["stdDev"] != "nan":
             assert_close(parameter.getStdDevValue(), definition["stdDev"])
         elif not correlated or definition.get("stdDev", 0) == "nan":
             assert math.isnan(parameter.getStdDevValue())
@@ -127,6 +131,21 @@ def main():
             pass
         else:
             raise AssertionError(f"Accepted invalid stdDev: {invalid_sigma}")
+    # Free parameters need an explicitly supplied scale, including covariance overrides.
+    for correlated in (False, True):
+        definitions = [{"stdDev": "nan"}, {"stdDev": 6.}]
+        for invalid_step in (None, 0., -0.1):
+            try:
+                run_case(path, definitions, correlated=correlated, nominal_step=invalid_step)
+            except RuntimeError as error:
+                assert "nominalStepSize" in str(error), str(error)
+            else:
+                raise AssertionError(f"Accepted free parameter with nominalStepSize={invalid_step}")
+        assert_close(run_case(path, [{"stdDev": "nan", "parameterStepSize": 0.2},
+                                    {"stdDev": 6.}], correlated=correlated, nominal_step=None), 1./9.)
+        assert_close(run_case(path, [{"priorType": "Gaussian", "stdDev": 2.},
+                                    {"stdDev": 4.}], correlated=correlated, nominal_step=None),
+                     1. if correlated else 1.25)
     print("SUCCESS: individual std-devs, preserved correlations, eigen priors, and free parameters.")
 
 

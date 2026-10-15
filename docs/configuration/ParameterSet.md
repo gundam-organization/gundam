@@ -59,7 +59,7 @@ so an `eigenValueThreshold` of 1E-12 is usually appropriate.
 | [dialSetDefinitions](Dial.md)        | list(Json)       | The list of "dials" that modify the model                    |         |
 | isEnabled                            | bool             | Is the set is enabled for the fit                            |         |
 | isScanEnabled                        | bool             | Should the set be "scanned" by the parameter scanner         |         |
-| nominalStepSize                      | double           | The step scale used by the minimizer                         | 1.0     |
+| nominalStepSize                      | double           | Step scale; required for free parameters without parameterStepSize | nan     |
 | printDialSetSummary                  | bool             | Should the dial set summary be printed                       | false   |
 | printParameterSummary                | bool             | Should the parameter set summary be printed                  | false   |
 | parameterLimits                      | [double, double] | Define a range for all parameters in this set                |         |
