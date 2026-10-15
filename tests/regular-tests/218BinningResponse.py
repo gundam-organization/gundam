@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Plot hard and smooth bin migrations using the compiled Python interface."""
 import csv
+import json
 import math
 import sys
 from array import array
@@ -12,7 +13,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "fast-tests"))
 import_module("005PythonSetup-utils").requireVenv(__file__)
 
 
-def make_engine(path, threads, dynamic=True):
+def make_engine(path, threads, dynamic=True, l_shaped=False):
     import GUNDAM
 
     GUNDAM.setNumberOfThreads(threads)
@@ -20,7 +21,25 @@ def make_engine(path, threads, dynamic=True):
     for dimensions in [1, 2]:
         for smooth in [False, True]:
             name = f"{'smooth' if smooth else 'hard'}{dimensions}d"
-            y_binning = "\n              - {name: Y, edges: [0, 1, 2]}" if dimensions == 2 else ""
+            binning = {"binningDefinition": [
+                {"name": "X", "edges": [0, 1, 2.5, 3]},
+                {"name": "category", "edges": [0, 1, 2]},
+            ]}
+            if dimensions == 2:
+                binning["binningDefinition"].append({"name": "Y", "edges": [0, 1, 2]})
+            if l_shaped and dimensions == 2:
+                bins = []
+                for category in [0, 1]:
+                    for y in [0, 1]:
+                        for lower, upper in [(0, 1), (1, 2.5), (2.5, 3)]:
+                            if y == 1 and lower == 2.5:
+                                continue
+                            bins.append({"edgesList": [
+                                {"name": "X", "bounds": [lower, upper]},
+                                {"name": "Y", "bounds": [y, y + 1]},
+                                {"name": "category", "bounds": [category, category + 1]},
+                            ]})
+                binning = {"binList": bins}
             response = "\n          binningResponse: {isEnabled: false}\n" if dimensions == 1 else ""
             if smooth:
                 response = """
@@ -34,10 +53,7 @@ def make_engine(path, threads, dynamic=True):
             samples.append(f"""
         - name: {name}
           useDynamicBinning: {str(dynamic).lower()}
-          binning:
-            binningDefinition:
-              - {{name: X, edges: [0, 1, 2.5, 3]}}{y_binning}
-              - {{name: category, edges: [0, 1, 2]}}
+          binning: {json.dumps(binning)}
 {response}""")
     builder = GUNDAM.ConfigUtils.ConfigBuilder()
     builder.setConfigFromYamlString(f"""
@@ -76,20 +92,29 @@ def check_histogram(sample):
     histogram = sample.getHistogram()
     sums = [0.] * histogram.getNbBins()
     squares = [0.] * len(sums)
+    outside_sum, outside_square = 0., 0.
     for event in sample.getEventList():
-        fractions = histogram.evaluateBinningResponse(event)
-        if histogram.isBinningResponseEnabled():
-            assert math.isclose(sum(entry.fraction for entry in fractions), 1., abs_tol=2e-15)
+        response = histogram.evaluateEventBinningResponse(event)
+        fractions = response.binFractions
+        assert 0 <= response.outsideFraction <= 1
+        assert math.isclose(sum(entry.fraction for entry in fractions) + response.outsideFraction, 1., abs_tol=2e-15)
         for entry in fractions:
             assert 0 <= entry.fraction <= 1
             weight = event.getEventWeight() * entry.fraction
             sums[entry.binIndex] += weight
             squares[entry.binIndex] += weight * weight
+        if histogram.isBinningResponseEnabled():
+            weight = event.getEventWeight() * response.outsideFraction
+            outside_sum += weight
+            outside_square += weight * weight
     for index, content in enumerate(histogram.getBinContentList()):
         assert math.isclose(content.sumWeights, sums[index], abs_tol=1e-12)
         assert math.isclose(content.sqrtSumSqWeights, math.sqrt(squares[index]), abs_tol=1e-12)
+    outside = histogram.getOutsideBinContent()
+    assert math.isclose(outside.sumWeights, outside_sum, abs_tol=1e-12)
+    assert math.isclose(outside.sqrtSumSqWeights, math.sqrt(outside_square), abs_tol=1e-12)
     if histogram.isBinningResponseEnabled():
-        assert math.isclose(sum(sums), sample.getSumWeights(), abs_tol=1e-12)
+        assert math.isclose(sum(sums) + outside.sumWeights, sample.getSumWeights(), abs_tol=1e-12)
 
 
 def scan(engine, positions):
@@ -113,11 +138,13 @@ def scan(engine, positions):
             check_histogram(sample)
             content = sample.getHistogram().getBinContentList()
             values.append([content[indices[key]].sumWeights / event.getEventWeight() for key in keys])
-        results[sample.getName()] = (keys, np.asarray(values))
+            values[-1].append(sample.getHistogram().evaluateEventBinningResponse(event).outsideFraction)
+        results[sample.getName()] = (keys + [(None, None, 0)], np.asarray(values))
     return results
 
 
-def plot_results(positions, results):
+def plot_results(positions, results, suffix=""):
+
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
@@ -131,12 +158,13 @@ def plot_results(positions, results):
         for index, key in enumerate(smooth_keys):
             color = f"C{index}"
             axes[0, column].plot(positions, hard[:, index], "--", color=color, alpha=0.6)
-            axes[0, column].plot(positions, smooth[:, index], color=color, label=f"bin lower edges {key[:dimensions]}")
+            axes[0, column].plot(positions, smooth[:, index], color=color, label="outside" if key[0] is None else f"bin lower edges {key[:dimensions]}")
         axes[0, column].set_title(f"{dimensions}D: solid = smooth, dashed = hard")
         axes[0, column].set_ylabel("Fraction of event weight")
         axes[0, column].legend(fontsize=8)
-        axes[1, column].plot(positions, np.sum(hard, axis=1), "--", label="hard")
-        axes[1, column].plot(positions, np.sum(smooth, axis=1), label="smooth")
+        axes[1, column].plot(positions, np.sum(hard[:, :-1], axis=1), "--", label="hard: inside")
+        axes[1, column].plot(positions, np.sum(smooth[:, :-1], axis=1), label="smooth: inside")
+        axes[1, column].plot(positions, np.sum(smooth, axis=1), ":", color="black", label="smooth: inside + outside")
         axes[1, column].set_ylabel("Sum of fractions")
         axes[1, column].legend()
         first_x_bins = [index for index, key in enumerate(smooth_keys) if key[0] == 0]
@@ -150,19 +178,115 @@ def plot_results(positions, results):
                 axes[row, column].axvline(edge, color="gray", linewidth=0.5)
     figure.tight_layout()
     for extension in ["png", "pdf"]:
-        figure.savefig(f"218BinningResponse.{extension}")
+        figure.savefig(f"218BinningResponse{suffix}.{extension}")
     plt.close(figure)
 
     figure, axes = plt.subplots(1, 2, figsize=(12, 4), sharey=True)
     for axis, mode in zip(axes, ["hard", "smooth"]):
-        values = results[f"{mode}1d"][1]
+        values = results[f"{mode}1d"][1][:, :-1]
         target = np.asarray([0.2, 0.5, 0.3])
         objective = np.sum((values - target) ** 2, axis=1)
         axis.plot(positions, objective)
         axis.set(title=f"Quadratic objective: {mode}", xlabel="Event X", ylabel="Sum of squared residuals")
         axis.grid(alpha=0.25)
     figure.tight_layout()
-    figure.savefig("218BinningResponse-objective.png")
+    figure.savefig(f"218BinningResponse{suffix}-objective.png")
+    plt.close(figure)
+
+
+def check_l_shaped(engine, positions):
+
+    propagator = engine.getLikelihoodInterface().getModelPropagator()
+    sample = next(sample for sample in propagator.getSampleSet().getSampleList() if sample.getName() == "smooth2d")
+    histogram = sample.getHistogram()
+    event = sample.getEventList()[0]
+    x = event.getVariables().fetchVariable("X")
+    y = event.getVariables().fetchVariable("Y")
+    for position, expected_outside in [((0.5, 0.5), 0.), ((2.5, 1.), 0.25),
+                                       ((3., 0.), 0.75), ((2.75, 1.5), 1.), ((4., 3.), 1.)]:
+        x.setValue(position[0])
+        y.setValue(position[1])
+        propagator.updateEventSampleBinning()
+        engine.getLikelihoodInterface().propagateAndEvalLikelihood()
+        check_histogram(sample)
+        response = histogram.evaluateEventBinningResponse(event)
+        assert math.isclose(response.outsideFraction, expected_outside, abs_tol=1e-12)
+        if position == (2.5, 1.):
+            assert len(response.binFractions) == 3
+            assert all(math.isclose(entry.fraction, 0.25, abs_tol=1e-12) for entry in response.binFractions)
+
+    def outside_on_diagonal(displacement):
+        x.setValue(2.5 + displacement)
+        y.setValue(1. + displacement)
+        return histogram.evaluateEventBinningResponse(event).outsideFraction
+
+    step = 1e-4
+    lower, center, upper = [outside_on_diagonal(position) for position in [-step, 0., step]]
+    assert math.isclose((upper - lower) / (2 * step), 3.90625, rel_tol=1e-5)
+    assert math.isclose((upper - 2 * center + lower) / step**2, 29.296875, rel_tol=1e-4)
+    x.setValue(0.5)
+    y.setValue(0.5)
+    category = event.getVariables().fetchVariable("category")
+    category.setValue(3.)
+    propagator.updateEventSampleBinning()
+    engine.getLikelihoodInterface().propagateAndEvalLikelihood()
+    check_histogram(sample)
+    assert histogram.evaluateEventBinningResponse(event).outsideFraction == 1.
+    category.setValue(0.)
+    x.setValue(2.5)
+    y.setValue(1.)
+    event.getWeights().current = -3.
+    propagator.updateEventSampleBinning()
+    histogram.refillHistogram()
+    check_histogram(sample)
+    event.getWeights().current = 3.
+    return scan(engine, positions)
+
+
+def plot_l_shaped_domain(engine):
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    from matplotlib.patches import Rectangle
+    import numpy as np
+
+    samples = engine.getLikelihoodInterface().getModelPropagator().getSampleSet().getSampleList()
+    sample = next(sample for sample in samples if sample.getName() == "smooth2d")
+    histogram = sample.getHistogram()
+    event = sample.getEventList()[0]
+    x = event.getVariables().fetchVariable("X")
+    y = event.getVariables().fetchVariable("Y")
+    original = (x.getValue(), y.getValue())
+    x_values = np.linspace(-0.4, 3.4, 121)
+    y_values = np.linspace(-0.4, 2.4, 101)
+    outside = np.empty((len(y_values), len(x_values)))
+    for row, y_value in enumerate(y_values):
+        y.setValue(float(y_value))
+        for column, x_value in enumerate(x_values):
+            x.setValue(float(x_value))
+            outside[row, column] = histogram.evaluateEventBinningResponse(event).outsideFraction
+    x.setValue(original[0])
+    y.setValue(original[1])
+    mesh_x, mesh_y = np.meshgrid(x_values, y_values)
+    hard = np.zeros_like(outside)
+    rectangles = []
+    for context in histogram.getBinContextList():
+        edges = {edge.varName: edge for edge in context.bin.getEdgesList()}
+        if edges["category"].min != 0:
+            continue
+        left, right = edges["X"].min, edges["X"].max
+        bottom, top = edges["Y"].min, edges["Y"].max
+        hard[(mesh_x >= left) & (mesh_x < right) & (mesh_y >= bottom) & (mesh_y < top)] = 1.
+        rectangles.append((left, bottom, right - left, top - bottom))
+    figure, axes = plt.subplots(1, 3, figsize=(14, 4), sharex=True, sharey=True)
+    for axis, values, title in zip(axes, [hard, 1 - outside, outside],
+                                  ["Hard: inside", "Smooth: inside", "Smooth: outside"]):
+        mesh = axis.pcolormesh(x_values, y_values, values, shading="auto", vmin=0, vmax=1)
+        for rectangle in rectangles:
+            axis.add_patch(Rectangle(rectangle[:2], rectangle[2], rectangle[3], fill=False, edgecolor="white", linewidth=0.7))
+        axis.set(title=title, xlabel="Event X", ylabel="Event Y", aspect="equal")
+    figure.colorbar(mesh, ax=list(axes), label="Fraction of event weight", shrink=0.8)
+    figure.savefig("218BinningResponse-L-domain.png", bbox_inches="tight")
     plt.close(figure)
 
 
@@ -198,7 +322,7 @@ def main():
         assert not sample.isUseDynamicBinning()
         if sample.getHistogram().isBinningResponseEnabled():
             assert len(sample.getEventList()) == 2
-            assert sample.getNbBinnedEvents() == 2
+            assert sample.getNbBinnedEvents() == 0
             assert all(event.getIndices().bin == -1 for event in sample.getEventList())
             check_histogram(sample)
         else:
@@ -210,6 +334,17 @@ def main():
         for index, position in enumerate(positions):
             writer.writerow([position] + [value for _, values in results.values() for value in values[index]])
     plot_results(positions, results)
+    for threads in [1, 2, 4, 8]:
+        l_engine = make_engine(path, threads, l_shaped=True)
+        scan_indices = [0, 260, 300, 340, 600, 800]
+        l_results = check_l_shaped(l_engine, positions if threads == 1 else positions[scan_indices])
+        if threads == 1:
+            l_reference = l_results
+            plot_results(positions, l_results, suffix="-L")
+            plot_l_shaped_domain(l_engine)
+        else:
+            for name, (_, values) in l_results.items():
+                assert np.array_equal(values, l_reference[name][1][scan_indices])
     print("SUCCESS: conserved weights and histogram errors; generated 218BinningResponse plots and CSV.")
     return 0
 

@@ -36,15 +36,6 @@ double BinningResponse::findWidth(const std::string& variableName_) const{
   return 0;
 }
 
-bool BinningResponse::haveSameUnsmoothedEdges(const Bin& first_, const Bin& second_) const{
-  for( const auto& edge : first_.getEdgesList() ){
-    if( findWidth(edge.varName) != 0 ){ continue; }
-    const auto* other = second_.getVarEdgesPtr(edge.varName);
-    if( other == nullptr or edge.min != other->min or edge.max != other->max ){ return false; }
-  }
-  return true;
-}
-
 void BinningResponse::build(const std::vector<Bin>& binList_){
   _responseBins_.clear();
   _variableNames_.clear();
@@ -68,90 +59,42 @@ void BinningResponse::build(const std::vector<Bin>& binList_){
     }
   }
 
-  std::vector<std::vector<size_t>> slices;
-  for( size_t iBin = 0 ; iBin < binList_.size() ; ++iBin ){
-    auto slice = std::find_if(slices.begin(), slices.end(), [&](const std::vector<size_t>& indices_){
-      return haveSameUnsmoothedEdges(binList_[indices_.front()], binList_[iBin]);
-    });
-    if( slice == slices.end() ){ slices.push_back({iBin}); }
-    else{ slice->push_back(iBin); }
-  }
-
-  for( size_t i = 0 ; i < slices.size() ; ++i ){
+  for( size_t i = 0 ; i < binList_.size() ; ++i ){
     for( size_t j = 0 ; j < i ; ++j ){
-      const auto& first = binList_[slices[i].front()];
-      const auto& second = binList_[slices[j].front()];
       bool overlaps{true};
-      for( const auto& edge : first.getEdgesList() ){
-        if( findWidth(edge.varName) != 0 ){ continue; }
-        const auto& other = second.getVarEdges(edge.varName);
+      for( const auto& edge : binList_[i].getEdgesList() ){
+        const auto& other = binList_[j].getVarEdges(edge.varName);
         bool intersects;
-        if( edge.isConditionVar ){ intersects = second.isBetweenEdges(other, edge.min); }
-        else if( other.isConditionVar ){ intersects = first.isBetweenEdges(edge, other.min); }
+        if( edge.min == edge.max ){ intersects = binList_[j].isBetweenEdges(other, edge.min); }
+        else if( other.min == other.max ){ intersects = binList_[i].isBetweenEdges(edge, other.min); }
         else{ intersects = edge.min < other.max and other.min < edge.max; }
         if( not intersects ){ overlaps = false; break; }
       }
-      LogThrowIf(overlaps, "Binning response does not support overlapping unsmoothed slices.");
+      LogThrowIf(overlaps, "Binning response does not support overlapping bins.");
     }
   }
 
   _responseBins_.resize(binList_.size());
-  for( const auto& slice : slices ){
-    std::vector<double> lowerBounds(_axes_.size(), std::numeric_limits<double>::infinity());
-    std::vector<double> upperBounds(_axes_.size(), -std::numeric_limits<double>::infinity());
-    double totalVolume{0};
-    for( size_t iBin : slice ){
-      double volume{1};
-      for( size_t iAxis = 0 ; iAxis < _axes_.size() ; ++iAxis ){
-        const auto& edge = binList_[iBin].getVarEdges(_axes_[iAxis].name);
-        lowerBounds[iAxis] = std::min(lowerBounds[iAxis], edge.min);
-        upperBounds[iAxis] = std::max(upperBounds[iAxis], edge.max);
-        volume *= edge.max - edge.min;
-      }
-      totalVolume += volume;
+  for( size_t iBin = 0 ; iBin < binList_.size() ; ++iBin ){
+    auto& responseBin = _responseBins_[iBin];
+    responseBin.binIndex = binList_[iBin].getIndex();
+    for( size_t iVariable = 0 ; iVariable < _variableNames_.size() ; ++iVariable ){
+      const auto& edge = binList_[iBin].getVarEdges(_variableNames_[iVariable]);
+      if( findWidth(edge.varName) != 0 ){ continue; }
+      SelectionInterval interval;
+      interval.variableIndex = iVariable;
+      interval.lowerBound = edge.min;
+      interval.upperBound = edge.max;
+      responseBin.selectionIntervals.emplace_back(interval);
     }
-    double boundingVolume{1};
-    for( size_t iAxis = 0 ; iAxis < _axes_.size() ; ++iAxis ){
-      boundingVolume *= upperBounds[iAxis] - lowerBounds[iAxis];
-    }
-    LogThrowIf(not std::isfinite(boundingVolume) or not std::isfinite(totalVolume)
-               or std::abs(totalVolume - boundingVolume) > 1e-12 * boundingVolume,
-               "Binning response requires a rectangular domain without holes in each hard-variable slice.");
-
-    for( size_t i = 0 ; i < slice.size() ; ++i ){
-      for( size_t j = 0 ; j < i ; ++j ){
-        bool overlaps{true};
-        for( const auto& axis : _axes_ ){
-          const auto& first = binList_[slice[i]].getVarEdges(axis.name);
-          const auto& second = binList_[slice[j]].getVarEdges(axis.name);
-          if( first.max <= second.min or second.max <= first.min ){ overlaps = false; break; }
-        }
-        LogThrowIf(overlaps, "Binning response does not support overlapping bins.");
-      }
-    }
-
-    for( size_t iBin : slice ){
-      auto& responseBin = _responseBins_[iBin];
-      responseBin.binIndex = binList_[iBin].getIndex();
-      for( size_t iVariable = 0 ; iVariable < _variableNames_.size() ; ++iVariable ){
-        const auto& edge = binList_[iBin].getVarEdges(_variableNames_[iVariable]);
-        if( findWidth(edge.varName) != 0 ){ continue; }
-        SelectionInterval interval;
-        interval.variableIndex = iVariable;
-        interval.lowerBound = edge.min;
-        interval.upperBound = edge.max;
-        responseBin.selectionIntervals.emplace_back(interval);
-      }
-      for( size_t iAxis = 0 ; iAxis < _axes_.size() ; ++iAxis ){
-        const auto& axis = _axes_[iAxis];
-        const auto& edge = binList_[iBin].getVarEdges(axis.name);
-        ResponseInterval interval;
-        interval.variableIndex = std::distance(_variableNames_.begin(), std::find(_variableNames_.begin(), _variableNames_.end(), axis.name));
-        interval.inverseWidth = 1 / axis.width;
-        interval.lowerBound = edge.min == lowerBounds[iAxis] ? -std::numeric_limits<double>::infinity() : edge.min;
-        interval.upperBound = edge.max == upperBounds[iAxis] ? std::numeric_limits<double>::infinity() : edge.max;
-        responseBin.intervals.emplace_back(std::move(interval));
-      }
+    for( const auto& axis : _axes_ ){
+      const auto& edge = binList_[iBin].getVarEdges(axis.name);
+      ResponseInterval interval;
+      interval.variableIndex = std::distance(_variableNames_.begin(), std::find(_variableNames_.begin(), _variableNames_.end(), axis.name));
+      interval.inverseWidth = 1 / axis.width;
+      interval.lowerBound = edge.min;
+      interval.upperBound = edge.max;
+      responseBin.intervals.emplace_back(interval);
     }
   }
 }
@@ -175,7 +118,7 @@ void BinningResponse::evaluate(const VariableCollection& variables_, EvaluationB
     LogThrowIf(not std::isfinite(value), "Nonfinite binning variable: " << _variableNames_[iVariable]);
     buffer_.values[iVariable] = value;
   }
-  auto& fractions = buffer_.fractions;
+  auto& fractions = buffer_.response.binFractions;
   fractions.clear();
   double total{0};
   for( const auto& responseBin : _responseBins_ ){
@@ -204,15 +147,15 @@ void BinningResponse::evaluate(const VariableCollection& variables_, EvaluationB
     fractions.emplace_back(binFraction);
     total += fraction;
   }
-  LogThrowIf(total <= 0 or not std::isfinite(total),
-             "Event has no binning response. Check its unsmoothed variables against the sample binning.");
-  for( auto& fraction : fractions ){ fraction.fraction /= total; }
-  auto largest = std::max_element(fractions.begin(), fractions.end(), [](const BinFraction& first_, const BinFraction& second_){
-    return first_.fraction < second_.fraction;
-  });
-  double others{0};
-  for( const auto& fraction : fractions ){
-    if( &fraction != &*largest ){ others += fraction.fraction; }
+  double tolerance = 64 * std::numeric_limits<double>::epsilon() * std::max(size_t(1), fractions.size());
+  LogThrowIf(not std::isfinite(total) or total > 1 + tolerance,
+             "Total binning response exceeds one: " << total);
+  if( total > 1 ){
+    auto largest = std::max_element(fractions.begin(), fractions.end(), [](const BinFraction& first_, const BinFraction& second_){
+      return first_.fraction < second_.fraction;
+    });
+    largest->fraction -= total - 1;
+    total = 1;
   }
-  largest->fraction = 1 - others;
+  buffer_.response.outsideFraction = 1 - total;
 }

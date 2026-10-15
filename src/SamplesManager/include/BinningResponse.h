@@ -14,10 +14,15 @@ public:
     double fraction{0};
   };
 
+  struct EventResponse{
+    std::vector<BinFraction> binFractions;
+    double outsideFraction{1};
+  };
+
   struct EvaluationBuffer{
     std::vector<int> variableIndices;
     std::vector<double> values;
-    std::vector<BinFraction> fractions;
+    EventResponse response;
   };
 
   [[nodiscard]] bool isEnabled() const{ return _isEnabled_; }
@@ -51,7 +56,6 @@ private:
   };
 
   static double cumulativeKernel(double position_);
-  [[nodiscard]] bool haveSameUnsmoothedEdges(const Bin& first_, const Bin& second_) const;
   [[nodiscard]] double findWidth(const std::string& variableName_) const;
 
   bool _isEnabled_{false};

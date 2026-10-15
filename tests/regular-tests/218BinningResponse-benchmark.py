@@ -93,6 +93,8 @@ def main():
                 "propagation_ms": statistics.median(propagation_times) * 1000,
                 "sum_weights": [entry.sumWeights for entry in sample.getHistogram().getBinContentList()],
                 "sqrt_sum_sq_weights": [entry.sqrtSumSqWeights for entry in sample.getHistogram().getBinContentList()],
+                "outside_sum_weights": sample.getHistogram().getOutsideBinContent().sumWeights,
+                "outside_sqrt_sum_sq_weights": sample.getHistogram().getOutsideBinContent().sqrtSumSqWeights,
             })
     args.output.write_text(json.dumps({"module": GUNDAM.__file__, "results": results}, indent=2) + "\n")
     print(f"Benchmark saved to {args.output.resolve()}", flush=True)

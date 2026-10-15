@@ -44,22 +44,37 @@ For each axis the response integrates the compact kernel
 `K(u) = 15/16 * (1 - u*u)^2` for `abs(u) < 1`, and zero elsewhere.
 Its cumulative function is the quintic smoothstep, so bin fractions are twice
 continuously differentiable. Multidimensional responses multiply the integrals
-along the configured axes. Fractions are nonnegative and normalized per event;
-the sum of its contributions equals its current weight to floating-point
-precision. Far from internal boundaries an event contributes to exactly one bin.
+along the configured axes. Each bin uses its actual bounds, including at the
+outer contour. Fractions are nonnegative and are not renormalized over the
+physical bins. The remaining fraction is tracked separately:
 
-The bins at each outer boundary extend their response to infinity. Events outside
-the nominal range of a smoothed variable therefore contribute to the edge bins;
-they are retained during loading. This preserves weight and continuity at the
-outer boundaries as well. This behavior differs intentionally from hard binning,
-which excludes out-of-range events.
+```text
+outsideFraction = 1 - sum(binFractions)
+```
+
+For every event, physical-bin contributions plus its outside contribution equal
+its current weight to floating-point precision. Far inside a sufficiently large
+bin, the event contributes only to that bin. Far outside the domain, its entire
+weight goes to `outside`. Events outside the nominal domain are retained during
+loading when the response is enabled.
+
+The outside content is a diagnostic quantity, separate from the physical bins.
+It does not add a bin to the histogram bin list, plots of physical bins, or the
+likelihood. The predicted rate inside the domain can therefore change smoothly
+as events cross its external contour. `Sample::getSumWeights()` still sums the
+full event weights, including outside contributions; `getNbBinnedEvents()` counts
+geometric membership, using `event.getIndices().bin`.
+
+Each individual bin must be rectangular and use the same set of variables.
+The union of bins need not be rectangular: rows of different lengths and
+L-shaped domains are supported. Uncovered regions, including gaps, contribute
+to `outside`. Overlapping bins remain unsupported.
 
 Unlisted variables retain their exact bin selection. Condition variables cannot
-be smoothed. All retained events must match a bin slice in the unsmoothed
-variables; otherwise response evaluation throws an error. Use sample selections
-to exclude unwanted categories. Within each slice defined by identical
-unsmoothed edges, the bins must tile a finite rectangular domain without holes
-or overlaps. Every bin must use the same set of variables.
+be smoothed. An event matching no interval or category in the unsmoothed
+variables has `outsideFraction = 1`. Changes to unsmoothed variables and sample
+selections can still introduce discontinuities; continuity of the response only
+applies to the smoothed axes.
 
 Response fractions are cached with the histogram's event lists. After changing
 stored variables, explicitly call `sample.updateEventBinning()` (with
@@ -68,14 +83,25 @@ propagate to refill the histograms. Propagation alone does not reassign bins.
 Binning responses also work for fixed samples and are then computed at loading.
 The parameters and dials are independent of this configuration.
 
-The Python histogram API exposes `isBinningResponseEnabled()` and
-`evaluateBinningResponse(event)`, returning entries with `binIndex` and
-`fraction`. `event.getIndices().bin` remains the geometric bin index and can be
-`-1` even when the response contributes to an edge bin.
+The Python histogram API exposes:
+
+- `isBinningResponseEnabled()`;
+- `evaluateBinningResponse(event)`, returning only physical-bin entries with
+  `binIndex` and `fraction`;
+- `evaluateEventBinningResponse(event)`, returning `binFractions` and
+  `outsideFraction`;
+- `getOutsideBinContent()`, with `sumWeights` and `sqrtSumSqWeights`, updated
+  alongside the physical-bin contents during histogram filling.
+
+`event.getIndices().bin` remains the geometric bin index. It can be `-1` while
+some response still contributes to nearby physical bins. With the response
+disabled, histogram filling remains unchanged and outside content is not
+accumulated.
 
 Bin MC errors accumulate `(eventWeight * fraction)^2`. A shared event induces
 correlations between bins; these covariances are not stored in `BinContent`.
-Event MC throws draw once per event. Independent bin statistical throws are
+Outside MC errors use the same convention. Event MC throws draw once per event,
+including events contributing only outside. Independent bin statistical throws are
 unsupported with binning responses and raise an error, since their outcomes
 cannot in general be represented by the shared event weights. The cache manager
 has not been adapted to this feature; use the CPU histogram filling path.
@@ -83,8 +109,10 @@ has not been adapted to this feature; use the CPU histogram filling path.
 `tests/regular-tests/218BinningResponse.py` produces PNG/PDF comparisons of hard
 and smooth responses, sums of fractions and numerical derivatives, a quadratic
 objective plot, and a CSV of the scan. It covers 1D and 2D binning, unequal bin
-sizes, categorical slices, external boundaries and several thread counts. Its
-Python environment needs `uproot`, `numpy` and `matplotlib`.
+sizes, categorical slices, external boundaries, L-shaped domains and several
+thread counts. The plots include the outside response and conservation of
+physical-bin plus outside weights. A separate 2D map shows the response across
+the full L-shaped domain. Its Python environment needs `uproot`, `numpy` and `matplotlib`.
 
 ### CPU parallelism
 
@@ -99,7 +127,8 @@ updates. Event order within a bin is preserved across thread counts. Temporary
 storage scales with the number of nonzero contributions plus workers times bins,
 and its allocations are reused between rebinning calls.
 
-The histogram refill continues to distribute bins over workers and uses the
+The histogram refill distributes physical bins and the separate outside content
+over workers and uses the
 cached fractions. Changing only event weights therefore does not recompute the
 response. Rebinning still scans the bin definitions per event; a spatial lookup
 could further reduce this cost for large binnings. Refill parallelism is limited
@@ -119,5 +148,5 @@ python /path/to/tests/regular-tests/218BinningResponse-benchmark.py \
 
 Run it in the test Python environment with the intended compiled GUNDAM module on
 `PYTHONPATH`. The JSON output includes the loaded module path, median timings,
-bin contents and MC errors. Compare builds with the same inputs, compiler options
-and an otherwise idle machine; there is no timing threshold in the test suite.
+physical-bin and outside contents and MC errors. Compare builds with the same
+inputs, compiler options and an otherwise idle machine; there is no timing threshold in the test suite.

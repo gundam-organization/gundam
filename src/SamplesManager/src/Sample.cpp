@@ -77,7 +77,6 @@ double Sample::getSumWeights() const{
   return output;
 }
 size_t Sample::getNbBinnedEvents() const{
-  if( _histogram_.isBinningResponseEnabled() ){ return _eventList_.size(); }
   return std::accumulate(
       _eventList_.begin(), _eventList_.end(), size_t(0.),
       []( size_t sum_, const Event &ev_ ){

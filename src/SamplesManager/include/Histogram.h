@@ -36,6 +36,7 @@ public:
 
   // const getters
   [[nodiscard]] bool isBinningResponseEnabled() const{ return _binningResponse_.isEnabled(); }
+  [[nodiscard]] auto& getOutsideBinContent() const{ return _outsideBinContent_; }
   [[nodiscard]] auto getNbBins() const { return nBins; }
   [[nodiscard]] auto& getBinContentList() const { return binContentList; }
   [[nodiscard]] auto& getBinContextList() const { return binContextList; }
@@ -49,6 +50,7 @@ public:
   void build(const ConfigReader& binningConfig_);
   // Bin edge variable-index caches must match the event's variable layout.
   [[nodiscard]] int findBinIndex(const Event& event_) const;
+  [[nodiscard]] BinningResponse::EventResponse evaluateEventBinningResponse(const Event& event_) const;
   [[nodiscard]] std::vector<BinningResponse::BinFraction> evaluateBinningResponse(const Event& event_) const;
   void throwEventMcError();
   void throwStatError(bool useGaussThrow_ = false);
@@ -76,6 +78,11 @@ private:
     std::vector<size_t> eventOffsets;
   };
 
+  std::vector<EventContribution>& getContributionList(int binIndex_);
+  static void fillBinContent(const std::vector<EventContribution>& contributions_, BinContent& content_);
+
+  BinContent _outsideBinContent_;
+  std::vector<EventContribution> _outsideContributionList_;
   std::vector<ResponseWorker> _responseWorkers_;
   BinningResponse _binningResponse_;
   int nBins{0};

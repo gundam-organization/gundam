@@ -21,6 +21,9 @@ void Histogram::build(const ConfigReader& binningConfig_){
   BinSet binning;
   binning.configure( binningConfig_ );
 
+  _outsideBinContent_ = BinContent();
+  _outsideContributionList_.clear();
+  _responseWorkers_.clear();
   nBins = int( binning.getBinList().size() );
   binContentList.resize( nBins );
   binContextList.resize( nBins );
@@ -39,24 +42,39 @@ void Histogram::configureBinningResponse(const ConfigReader& config_){
   for( const auto& context : binContextList ){ bins.emplace_back(context.bin); }
   _binningResponse_.build(bins);
 }
-std::vector<BinningResponse::BinFraction> Histogram::evaluateBinningResponse(const Event& event_) const{
-  std::vector<BinningResponse::BinFraction> fractions;
+BinningResponse::EventResponse Histogram::evaluateEventBinningResponse(const Event& event_) const{
   if( isBinningResponseEnabled() ){
     BinningResponse::EvaluationBuffer buffer;
     _binningResponse_.prepareEvaluation(event_.getVariables(), buffer);
     _binningResponse_.evaluate(event_.getVariables(), buffer);
-    fractions = std::move(buffer.fractions);
+    return std::move(buffer.response);
   }
-  else{
-    int index = findBinIndex(event_);
-    if( index >= 0 ){
-      BinningResponse::BinFraction fraction;
-      fraction.binIndex = index;
-      fraction.fraction = 1;
-      fractions.emplace_back(fraction);
-    }
+  BinningResponse::EventResponse response;
+  int index = findBinIndex(event_);
+  if( index >= 0 ){
+    BinningResponse::BinFraction fraction;
+    fraction.binIndex = index;
+    fraction.fraction = 1;
+    response.binFractions.emplace_back(fraction);
+    response.outsideFraction = 0;
   }
-  return fractions;
+  return response;
+}
+std::vector<BinningResponse::BinFraction> Histogram::evaluateBinningResponse(const Event& event_) const{
+  return evaluateEventBinningResponse(event_).binFractions;
+}
+std::vector<Histogram::EventContribution>& Histogram::getContributionList(int binIndex_){
+  return binIndex_ == nBins ? _outsideContributionList_ : binContextList[binIndex_].eventContributionList;
+}
+void Histogram::fillBinContent(const std::vector<EventContribution>& contributions_, BinContent& content_){
+  content_.sumWeights = 0;
+  content_.sqrtSumSqWeights = 0;
+  for( const auto& contribution : contributions_ ){
+    double weight = contribution.eventPtr->getEventWeight() * contribution.fraction;
+    content_.sumWeights += weight;
+    content_.sqrtSumSqWeights += weight * weight;
+  }
+  content_.sqrtSumSqWeights = std::sqrt(content_.sqrtSumSqWeights);
 }
 int Histogram::findBinIndex(const Event& event_) const{
   for( const auto& binContext : binContextList ){
@@ -69,8 +87,8 @@ int Histogram::findBinIndex(const Event& event_) const{
 void Histogram::throwEventMcError(){
   if( isBinningResponseEnabled() ){
     std::unordered_set<Event*> events;
-    for( const auto& context : binContextList ){
-      for( const auto& contribution : context.eventContributionList ){
+    for( int iBin = 0 ; iBin <= nBins ; ++iBin ){
+      for( const auto& contribution : getContributionList(iBin) ){
         if( events.insert(contribution.eventPtr).second ){
           contribution.eventPtr->getWeights().current *= double(gRandom->Poisson(1));
         }
@@ -153,6 +171,7 @@ void Histogram::updateBinEventLists(std::vector<Event>& eventList_, GenericToolb
     return;
   }
   if( eventList_.empty() ){
+    _outsideContributionList_.clear();
     for( auto& context : binContextList ){
       context.eventPtrList.clear();
       context.eventContributionList.clear();
@@ -164,7 +183,7 @@ void Histogram::updateBinEventLists(std::vector<Event>& eventList_, GenericToolb
   for( auto& worker : _responseWorkers_ ){
     _binningResponse_.prepareEvaluation(eventList_.front().getVariables(), worker.evaluationBuffer);
     worker.contributions.clear();
-    worker.contributionOffsets.assign(nBins, 0);
+    worker.contributionOffsets.assign(nBins + 1, 0);
     worker.eventOffsets.assign(nBins, 0);
   }
 
@@ -176,7 +195,7 @@ void Histogram::updateBinEventLists(std::vector<Event>& eventList_, GenericToolb
       if( updateBinIndices_ ){ event.getIndices().bin = findBinIndex(event); }
       if( event.getIndices().bin >= 0 ){ ++worker.eventOffsets[event.getIndices().bin]; }
       _binningResponse_.evaluate(event.getVariables(), worker.evaluationBuffer);
-      for( const auto& fraction : worker.evaluationBuffer.fractions ){
+      for( const auto& fraction : worker.evaluationBuffer.response.binFractions ){
         IndexedContribution contribution;
         contribution.binIndex = fraction.binIndex;
         contribution.contribution.eventPtr = &event;
@@ -184,29 +203,39 @@ void Histogram::updateBinEventLists(std::vector<Event>& eventList_, GenericToolb
         worker.contributions.emplace_back(contribution);
         ++worker.contributionOffsets[fraction.binIndex];
       }
+      if( worker.evaluationBuffer.response.outsideFraction > 0 ){
+        IndexedContribution contribution;
+        contribution.binIndex = nBins;
+        contribution.contribution.eventPtr = &event;
+        contribution.contribution.fraction = worker.evaluationBuffer.response.outsideFraction;
+        worker.contributions.emplace_back(contribution);
+        ++worker.contributionOffsets[nBins];
+      }
     }
   });
 
-  for( int iBin = 0 ; iBin < nBins ; ++iBin ){
+  for( int iBin = 0 ; iBin <= nBins ; ++iBin ){
     size_t nContributions{0};
     size_t nEvents{0};
     for( auto& worker : _responseWorkers_ ){
       size_t contributionCount = worker.contributionOffsets[iBin];
-      size_t eventCount = worker.eventOffsets[iBin];
       worker.contributionOffsets[iBin] = nContributions;
-      worker.eventOffsets[iBin] = nEvents;
       nContributions += contributionCount;
-      nEvents += eventCount;
+      if( iBin < nBins ){
+        size_t eventCount = worker.eventOffsets[iBin];
+        worker.eventOffsets[iBin] = nEvents;
+        nEvents += eventCount;
+      }
     }
-    binContextList[iBin].eventContributionList.resize(nContributions);
-    binContextList[iBin].eventPtrList.resize(nEvents);
+    getContributionList(iBin).resize(nContributions);
+    if( iBin < nBins ){ binContextList[iBin].eventPtrList.resize(nEvents); }
   }
 
   threadPool_.runJob([&](int iThread_){
     auto& worker = _responseWorkers_[iThread_];
     for( const auto& contribution : worker.contributions ){
       int iBin = contribution.binIndex;
-      binContextList[iBin].eventContributionList[worker.contributionOffsets[iBin]++] = contribution.contribution;
+      getContributionList(iBin)[worker.contributionOffsets[iBin]++] = contribution.contribution;
     }
     auto bounds = GenericToolbox::ParallelWorker::getThreadBoundIndices(iThread_, threadPool_.getNbThreads(), eventList_.size());
     for( size_t iEvent = bounds.beginIndex ; iEvent < bounds.endIndex ; ++iEvent ){
@@ -220,12 +249,12 @@ void Histogram::updateBinEventLists(std::vector<Event>& eventList_, GenericToolb
 void Histogram::updateBinEventList(std::vector<Event>& eventList_, int iThread_, int nThreads_) {
 
   auto bounds = GenericToolbox::ParallelWorker::getThreadBoundIndices(
-      iThread_, nThreads_ == -1 ? GundamGlobals::getNbCpuThreads() : nThreads_, getNbBins()
+      iThread_, nThreads_ == -1 ? GundamGlobals::getNbCpuThreads() : nThreads_, getNbBins() + int(isBinningResponseEnabled())
   );
 
   for( int iBin = bounds.beginIndex ; iBin < bounds.endIndex ; iBin++ ){
-    getBinContextList()[iBin].eventPtrList.clear();
-    getBinContextList()[iBin].eventContributionList.clear();
+    getContributionList(iBin).clear();
+    if( iBin < nBins ){ getBinContextList()[iBin].eventPtrList.clear(); }
   }
   if( bounds.beginIndex == bounds.endIndex ){ return; }
 
@@ -238,12 +267,18 @@ void Histogram::updateBinEventList(std::vector<Event>& eventList_, int iThread_,
   for( auto& event : eventList_ ){
     if( isBinningResponseEnabled() ){
       _binningResponse_.evaluate(event.getVariables(), buffer);
-      for( const auto& fraction : buffer.fractions ){
+      for( const auto& fraction : buffer.response.binFractions ){
         if( fraction.binIndex < bounds.beginIndex or fraction.binIndex >= bounds.endIndex ){ continue; }
         EventContribution contribution;
         contribution.eventPtr = &event;
         contribution.fraction = fraction.fraction;
         getBinContextList()[fraction.binIndex].eventContributionList.emplace_back(contribution);
+      }
+      if( nBins >= bounds.beginIndex and nBins < bounds.endIndex and buffer.response.outsideFraction > 0 ){
+        EventContribution contribution;
+        contribution.eventPtr = &event;
+        contribution.fraction = buffer.response.outsideFraction;
+        _outsideContributionList_.emplace_back(contribution);
       }
     }
     int iBin = event.getIndices().bin;
@@ -255,8 +290,14 @@ void Histogram::updateBinEventList(std::vector<Event>& eventList_, int iThread_,
 void Histogram::refillHistogram(int iThread_){
 
   auto bounds = GenericToolbox::ParallelWorker::getThreadBoundIndices(
-      iThread_, GundamGlobals::getNbCpuThreads(), getNbBins()
+      iThread_, GundamGlobals::getNbCpuThreads(), getNbBins() + int(isBinningResponseEnabled())
   );
+
+  if( isBinningResponseEnabled() and nBins >= bounds.beginIndex and nBins < bounds.endIndex ){
+    fillBinContent(_outsideContributionList_, _outsideBinContent_);
+  }
+  if( bounds.beginIndex >= nBins ){ return; }
+  bounds.endIndex = std::min(bounds.endIndex, nBins);
 
   // avoid using [] operator for each access. Use the memory address directly
   double weightBuffer;
@@ -271,12 +312,7 @@ void Histogram::refillHistogram(int iThread_){
     binContent.sumWeights = 0;
     binContent.sqrtSumSqWeights = 0;
     if( isBinningResponseEnabled() ){
-      for( const auto& contribution : binContext.eventContributionList ){
-        weightBuffer = contribution.eventPtr->getEventWeight() * contribution.fraction;
-        binContent.sumWeights += weightBuffer;
-        binContent.sqrtSumSqWeights += weightBuffer * weightBuffer;
-      }
-      binContent.sqrtSumSqWeights = std::sqrt(binContent.sqrtSumSqWeights);
+      fillBinContent(binContext.eventContributionList, binContent);
       continue;
     }
     for( auto *eventPtr: binContext.eventPtrList ){
