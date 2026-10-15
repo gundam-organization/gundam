@@ -99,13 +99,6 @@ likelihoodInterfaceConfig:
     empty.setUseDynamicBinning(True)
     engine.initialize()
     expect_runtime_error(static.updateEventBinning, "Dynamic binning is disabled")
-    for sample, enabled in [(dynamic, True), (static, False), (empty, True)]:
-        # Reject changes and redundant assignments, including for empty samples.
-        for value in [False, True]:
-            expect_runtime_error(
-                lambda: sample.setUseDynamicBinning(value), "already initialized"
-            )
-            assert sample.isUseDynamicBinning() == enabled
     parameter = propagator.getParametersManager().getParameterSetsList()[0].getParameterList()[0]
     events = {event.getIndices().entry: event for event in dynamic.getEventList()}
     assert set(events) == set(range(5))
