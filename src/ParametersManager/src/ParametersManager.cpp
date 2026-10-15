@@ -98,7 +98,10 @@ void ParametersManager::initializeImpl(){
           jParIndex++;
           if( parSet.getParameterList()[jCov].isFree() ){ jFree++; continue; }
           (*_globalCovarianceMatrix_)[parSetOffset + iParIndex][parSetOffset + jParIndex] =
-            (*parSet.getPriorCovarianceMatrix())[iParIndex-iFree][jParIndex-jFree];
+            (*parSet.getPriorCorrelationMatrix())[iParIndex-iFree][jParIndex-jFree]
+            * parSet.getCorrelatedParameterList()[iParIndex-iFree]->getStdDevValue()
+            * parSet.getCorrelatedParameterList()[jParIndex-jFree]->getStdDevValue()
+          ;
         }
       }
       parSetOffset += (iParIndex+1);

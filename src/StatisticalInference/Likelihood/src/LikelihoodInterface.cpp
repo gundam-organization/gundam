@@ -201,8 +201,8 @@ double LikelihoodInterface::evalPenaltyLikelihood(const ParameterSet& parSet_) c
 
       // compute penalty term with covariance
       buffer =
-          (*parSet_.getDeltaVectorPtr())
-          * ( (*parSet_.getInverseCorrelationMatrix()) * (*parSet_.getDeltaVectorPtr()) );
+            (*parSet_.getDeltaVectorPtr())
+          * ( (*parSet_.getInversePriorCorrelationMatrix()) * (*parSet_.getDeltaVectorPtr()) );
     }
   }
 
