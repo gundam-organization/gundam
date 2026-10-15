@@ -42,7 +42,10 @@ void Histogram::configureBinningResponse(const ConfigReader& config_){
 std::vector<BinningResponse::BinFraction> Histogram::evaluateBinningResponse(const Event& event_) const{
   std::vector<BinningResponse::BinFraction> fractions;
   if( isBinningResponseEnabled() ){
-    _binningResponse_.evaluate(event_.getVariables(), fractions);
+    BinningResponse::EvaluationBuffer buffer;
+    _binningResponse_.prepareEvaluation(event_.getVariables(), buffer);
+    _binningResponse_.evaluate(event_.getVariables(), buffer);
+    fractions = std::move(buffer.fractions);
   }
   else{
     int index = findBinIndex(event_);
@@ -136,6 +139,84 @@ void Histogram::throwStatError(bool useGaussThrow_){
   }
 }
 
+void Histogram::updateBinEventLists(std::vector<Event>& eventList_, GenericToolbox::ParallelWorker& threadPool_, bool updateBinIndices_){
+  if( not isBinningResponseEnabled() ){
+    if( updateBinIndices_ ){
+      threadPool_.runJob([&](int iThread_){
+        auto bounds = GenericToolbox::ParallelWorker::getThreadBoundIndices(iThread_, threadPool_.getNbThreads(), eventList_.size());
+        for( size_t iEvent = bounds.beginIndex ; iEvent < bounds.endIndex ; ++iEvent ){
+          eventList_[iEvent].getIndices().bin = findBinIndex(eventList_[iEvent]);
+        }
+      });
+    }
+    threadPool_.runJob([&](int iThread_){ updateBinEventList(eventList_, iThread_, threadPool_.getNbThreads()); });
+    return;
+  }
+  if( eventList_.empty() ){
+    for( auto& context : binContextList ){
+      context.eventPtrList.clear();
+      context.eventContributionList.clear();
+    }
+    return;
+  }
+
+  _responseWorkers_.resize(threadPool_.getNbThreads());
+  for( auto& worker : _responseWorkers_ ){
+    _binningResponse_.prepareEvaluation(eventList_.front().getVariables(), worker.evaluationBuffer);
+    worker.contributions.clear();
+    worker.contributionOffsets.assign(nBins, 0);
+    worker.eventOffsets.assign(nBins, 0);
+  }
+
+  threadPool_.runJob([&](int iThread_){
+    auto& worker = _responseWorkers_[iThread_];
+    auto bounds = GenericToolbox::ParallelWorker::getThreadBoundIndices(iThread_, threadPool_.getNbThreads(), eventList_.size());
+    for( size_t iEvent = bounds.beginIndex ; iEvent < bounds.endIndex ; ++iEvent ){
+      auto& event = eventList_[iEvent];
+      if( updateBinIndices_ ){ event.getIndices().bin = findBinIndex(event); }
+      if( event.getIndices().bin >= 0 ){ ++worker.eventOffsets[event.getIndices().bin]; }
+      _binningResponse_.evaluate(event.getVariables(), worker.evaluationBuffer);
+      for( const auto& fraction : worker.evaluationBuffer.fractions ){
+        IndexedContribution contribution;
+        contribution.binIndex = fraction.binIndex;
+        contribution.contribution.eventPtr = &event;
+        contribution.contribution.fraction = fraction.fraction;
+        worker.contributions.emplace_back(contribution);
+        ++worker.contributionOffsets[fraction.binIndex];
+      }
+    }
+  });
+
+  for( int iBin = 0 ; iBin < nBins ; ++iBin ){
+    size_t nContributions{0};
+    size_t nEvents{0};
+    for( auto& worker : _responseWorkers_ ){
+      size_t contributionCount = worker.contributionOffsets[iBin];
+      size_t eventCount = worker.eventOffsets[iBin];
+      worker.contributionOffsets[iBin] = nContributions;
+      worker.eventOffsets[iBin] = nEvents;
+      nContributions += contributionCount;
+      nEvents += eventCount;
+    }
+    binContextList[iBin].eventContributionList.resize(nContributions);
+    binContextList[iBin].eventPtrList.resize(nEvents);
+  }
+
+  threadPool_.runJob([&](int iThread_){
+    auto& worker = _responseWorkers_[iThread_];
+    for( const auto& contribution : worker.contributions ){
+      int iBin = contribution.binIndex;
+      binContextList[iBin].eventContributionList[worker.contributionOffsets[iBin]++] = contribution.contribution;
+    }
+    auto bounds = GenericToolbox::ParallelWorker::getThreadBoundIndices(iThread_, threadPool_.getNbThreads(), eventList_.size());
+    for( size_t iEvent = bounds.beginIndex ; iEvent < bounds.endIndex ; ++iEvent ){
+      auto& event = eventList_[iEvent];
+      int iBin = event.getIndices().bin;
+      if( iBin >= 0 ){ binContextList[iBin].eventPtrList[worker.eventOffsets[iBin]++] = &event; }
+    }
+  });
+}
+
 void Histogram::updateBinEventList(std::vector<Event>& eventList_, int iThread_, int nThreads_) {
 
   auto bounds = GenericToolbox::ParallelWorker::getThreadBoundIndices(
@@ -150,11 +231,14 @@ void Histogram::updateBinEventList(std::vector<Event>& eventList_, int iThread_,
 
   // Scan the events once per worker, rather than twice per bin. Each bin list
   // has a single writer and retains its capacity and event order across calls.
-  std::vector<BinningResponse::BinFraction> fractions;
+  BinningResponse::EvaluationBuffer buffer;
+  if( isBinningResponseEnabled() and not eventList_.empty() ){
+    _binningResponse_.prepareEvaluation(eventList_.front().getVariables(), buffer);
+  }
   for( auto& event : eventList_ ){
     if( isBinningResponseEnabled() ){
-      _binningResponse_.evaluate(event.getVariables(), fractions);
-      for( const auto& fraction : fractions ){
+      _binningResponse_.evaluate(event.getVariables(), buffer);
+      for( const auto& fraction : buffer.fractions ){
         if( fraction.binIndex < bounds.beginIndex or fraction.binIndex >= bounds.endIndex ){ continue; }
         EventContribution contribution;
         contribution.eventPtr = &event;

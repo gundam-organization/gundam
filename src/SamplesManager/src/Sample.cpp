@@ -161,6 +161,11 @@ void Sample::updateEventBinning(GenericToolbox::ParallelWorker& threadPool_){
     }
   }
 
+  if( _histogram_.isBinningResponseEnabled() ){
+    _histogram_.updateBinEventLists(_eventList_, threadPool_, true);
+    return;
+  }
+
   threadPool_.runJob([&](int iThread_){
     auto bounds = GenericToolbox::ParallelWorker::getThreadBoundIndices(
         iThread_, threadPool_.getNbThreads(), _eventList_.size()
@@ -180,4 +185,8 @@ void Sample::updateEventBinning(GenericToolbox::ParallelWorker& threadPool_){
 
 void Sample::indexEventInHistogramBin( int iThread_){
   _histogram_.updateBinEventList(_eventList_, iThread_);
+}
+
+void Sample::indexEventInHistogramBin(GenericToolbox::ParallelWorker& threadPool_){
+  _histogram_.updateBinEventLists(_eventList_, threadPool_);
 }

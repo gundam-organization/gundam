@@ -4,7 +4,9 @@
 
 #include <algorithm>
 #include <cmath>
+#include <iterator>
 #include <limits>
+#include <utility>
 
 void BinningResponse::configureImpl(){
   _config_.clearFields();
@@ -19,7 +21,7 @@ void BinningResponse::configureImpl(){
     Axis axis;
     axisConfig.fillValue(axis.name, "name");
     axisConfig.fillValue(axis.width, "width");
-    LogThrowIf(axis.name.empty() or not std::isfinite(axis.width) or axis.width <= 0,
+    LogThrowIf(axis.name.empty() or not std::isfinite(axis.width) or axis.width <= 0 or not std::isfinite(1 / axis.width),
                "Binning response requires a variable name and a finite, positive width.");
     LogThrowIf(findWidth(axis.name) != 0, "Duplicate binning response variable: " << axis.name);
     _axes_.emplace_back(std::move(axis));
@@ -45,8 +47,11 @@ bool BinningResponse::haveSameUnsmoothedEdges(const Bin& first_, const Bin& seco
 
 void BinningResponse::build(const std::vector<Bin>& binList_){
   _responseBins_.clear();
+  _variableNames_.clear();
   if( not _isEnabled_ ){ return; }
   LogThrowIf(binList_.empty(), "Binning response requires a nonempty binning.");
+
+  for( const auto& edge : binList_.front().getEdgesList() ){ _variableNames_.emplace_back(edge.varName); }
 
   for( const auto& bin : binList_ ){
     LogThrowIf(bin.getEdgesList().size() != binList_.front().getEdgesList().size(),
@@ -127,13 +132,22 @@ void BinningResponse::build(const std::vector<Bin>& binList_){
 
     for( size_t iBin : slice ){
       auto& responseBin = _responseBins_[iBin];
-      responseBin.bin = binList_[iBin];
+      responseBin.binIndex = binList_[iBin].getIndex();
+      for( size_t iVariable = 0 ; iVariable < _variableNames_.size() ; ++iVariable ){
+        const auto& edge = binList_[iBin].getVarEdges(_variableNames_[iVariable]);
+        if( findWidth(edge.varName) != 0 ){ continue; }
+        SelectionInterval interval;
+        interval.variableIndex = iVariable;
+        interval.lowerBound = edge.min;
+        interval.upperBound = edge.max;
+        responseBin.selectionIntervals.emplace_back(interval);
+      }
       for( size_t iAxis = 0 ; iAxis < _axes_.size() ; ++iAxis ){
         const auto& axis = _axes_[iAxis];
         const auto& edge = binList_[iBin].getVarEdges(axis.name);
         ResponseInterval interval;
-        interval.variableName = axis.name;
-        interval.width = axis.width;
+        interval.variableIndex = std::distance(_variableNames_.begin(), std::find(_variableNames_.begin(), _variableNames_.end(), axis.name));
+        interval.inverseWidth = 1 / axis.width;
         interval.lowerBound = edge.min == lowerBounds[iAxis] ? -std::numeric_limits<double>::infinity() : edge.min;
         interval.upperBound = edge.max == upperBounds[iAxis] ? std::numeric_limits<double>::infinity() : edge.max;
         responseBin.intervals.emplace_back(std::move(interval));
@@ -149,40 +163,55 @@ double BinningResponse::cumulativeKernel(double position_){
   return t * t * t * (10 + t * (-15 + 6 * t));
 }
 
-void BinningResponse::evaluate(const VariableCollection& variables_, std::vector<BinFraction>& fractions_) const{
-  fractions_.clear();
+void BinningResponse::prepareEvaluation(const VariableCollection& variables_, EvaluationBuffer& buffer_) const{
+  buffer_.variableIndices.clear();
+  for( const auto& name : _variableNames_ ){ buffer_.variableIndices.emplace_back(variables_.findVarIndex(name)); }
+  buffer_.values.resize(_variableNames_.size());
+}
+
+void BinningResponse::evaluate(const VariableCollection& variables_, EvaluationBuffer& buffer_) const{
+  for( size_t iVariable = 0 ; iVariable < _variableNames_.size() ; ++iVariable ){
+    double value = variables_.getVarList()[buffer_.variableIndices[iVariable]].getVarAsDouble();
+    LogThrowIf(not std::isfinite(value), "Nonfinite binning variable: " << _variableNames_[iVariable]);
+    buffer_.values[iVariable] = value;
+  }
+  auto& fractions = buffer_.fractions;
+  fractions.clear();
   double total{0};
   for( const auto& responseBin : _responseBins_ ){
     bool matches{true};
-    for( const auto& edge : responseBin.bin.getEdgesList() ){
-      if( findWidth(edge.varName) != 0 ){ continue; }
-      double value = variables_.fetchVariable(edge.varName).getVarAsDouble();
-      LogThrowIf(not std::isfinite(value), "Nonfinite binning variable: " << edge.varName);
-      if( not responseBin.bin.isBetweenEdges(edge, value) ){ matches = false; break; }
+    for( const auto& interval : responseBin.selectionIntervals ){
+      double value = buffer_.values[interval.variableIndex];
+      bool contains = interval.lowerBound == interval.upperBound ? value == interval.lowerBound
+          : value >= interval.lowerBound and value < interval.upperBound;
+      if( not contains ){
+        matches = false;
+        break;
+      }
     }
     if( not matches ){ continue; }
     double fraction{1};
     for( const auto& interval : responseBin.intervals ){
-      double value = variables_.fetchVariable(interval.variableName).getVarAsDouble();
-      LogThrowIf(not std::isfinite(value), "Nonfinite binning variable: " << interval.variableName);
-      fraction *= std::max(0., cumulativeKernel((interval.upperBound - value) / interval.width)
-                            - cumulativeKernel((interval.lowerBound - value) / interval.width));
+      double value = buffer_.values[interval.variableIndex];
+      fraction *= std::max(0., cumulativeKernel((interval.upperBound - value) * interval.inverseWidth)
+                            - cumulativeKernel((interval.lowerBound - value) * interval.inverseWidth));
+      if( fraction == 0 ){ break; }
     }
     if( fraction == 0 ){ continue; }
     BinFraction binFraction;
-    binFraction.binIndex = responseBin.bin.getIndex();
+    binFraction.binIndex = responseBin.binIndex;
     binFraction.fraction = fraction;
-    fractions_.emplace_back(binFraction);
+    fractions.emplace_back(binFraction);
     total += fraction;
   }
   LogThrowIf(total <= 0 or not std::isfinite(total),
              "Event has no binning response. Check its unsmoothed variables against the sample binning.");
-  for( auto& fraction : fractions_ ){ fraction.fraction /= total; }
-  auto largest = std::max_element(fractions_.begin(), fractions_.end(), [](const BinFraction& first_, const BinFraction& second_){
+  for( auto& fraction : fractions ){ fraction.fraction /= total; }
+  auto largest = std::max_element(fractions.begin(), fractions.end(), [](const BinFraction& first_, const BinFraction& second_){
     return first_.fraction < second_.fraction;
   });
   double others{0};
-  for( const auto& fraction : fractions_ ){
+  for( const auto& fraction : fractions ){
     if( &fraction != &*largest ){ others += fraction.fraction; }
   }
   largest->fraction = 1 - others;

@@ -13,6 +13,8 @@
 #include "GenericToolbox.Loops.h"
 
 
+namespace GenericToolbox { class ParallelWorker; }
+
 class Histogram{
 
 public:
@@ -52,6 +54,7 @@ public:
   void throwStatError(bool useGaussThrow_ = false);
 
   // multi-thread
+  void updateBinEventLists(std::vector<Event>& eventList_, GenericToolbox::ParallelWorker& threadPool_, bool updateBinIndices_ = false);
   void updateBinEventList(std::vector<Event>& eventList_, int iThread_ = -1, int nThreads_ = -1);
   void refillHistogram(int iThread_ = -1);
 
@@ -62,6 +65,18 @@ public:
   [[nodiscard]] auto loop(size_t start_, size_t end_) const { return GenericToolbox::ZipPartial(start_, end_, binContentList, binContextList); }
 
 private:
+  struct IndexedContribution{
+    int binIndex{-1};
+    EventContribution contribution;
+  };
+  struct ResponseWorker{
+    BinningResponse::EvaluationBuffer evaluationBuffer;
+    std::vector<IndexedContribution> contributions;
+    std::vector<size_t> contributionOffsets;
+    std::vector<size_t> eventOffsets;
+  };
+
+  std::vector<ResponseWorker> _responseWorkers_;
   BinningResponse _binningResponse_;
   int nBins{0};
   std::vector<BinContent> binContentList{};

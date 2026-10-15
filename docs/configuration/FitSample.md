@@ -85,3 +85,39 @@ and smooth responses, sums of fractions and numerical derivatives, a quadratic
 objective plot, and a CSV of the scan. It covers 1D and 2D binning, unequal bin
 sizes, categorical slices, external boundaries and several thread counts. Its
 Python environment needs `uproot`, `numpy` and `matplotlib`.
+
+### CPU parallelism
+
+Binning responses are evaluated once per event, partitioning the event list over
+the workers. Each worker reuses its own evaluation buffer and contribution list.
+Variable indices, interval definitions and inverse widths are prepared outside
+the event loop; each variable value is read once per event.
+
+Workers first count their contributions per bin. Prefix offsets then give each
+worker a disjoint part of each bin list, which it fills without locks or atomic
+updates. Event order within a bin is preserved across thread counts. Temporary
+storage scales with the number of nonzero contributions plus workers times bins,
+and its allocations are reused between rebinning calls.
+
+The histogram refill continues to distribute bins over workers and uses the
+cached fractions. Changing only event weights therefore does not recompute the
+response. Rebinning still scans the bin definitions per event; a spatial lookup
+could further reduce this cost for large binnings. Refill parallelism is limited
+by the number of bins and can be uneven when their populations differ.
+
+For repeated updates, prefer `propagator.updateEventSampleBinning()` in Python:
+it reuses the propagator's thread pool. The standalone
+`sample.updateEventBinning()` creates a temporary pool for each call.
+
+The optional benchmark helper measures rebinning separately from propagation
+(reweighting, histogram filling and likelihood evaluation):
+
+```bash
+python /path/to/tests/regular-tests/218BinningResponse-benchmark.py \
+  --events 100000 --bins 4 64 --threads 1 2 4 8 --repeat 7
+```
+
+Run it in the test Python environment with the intended compiled GUNDAM module on
+`PYTHONPATH`. The JSON output includes the loaded module path, median timings,
+bin contents and MC errors. Compare builds with the same inputs, compiler options
+and an otherwise idle machine; there is no timing threshold in the test suite.
