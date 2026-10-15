@@ -32,10 +32,12 @@ public:
   ENUM_FIELD( Formula ) \
   ENUM_FIELD( CompiledLibDial ) \
   ENUM_FIELD( Tabulated ) \
-  ENUM_FIELD( Kriged )
+  ENUM_FIELD( Kriged ) \
+  ENUM_FIELD( ExternalWeight )
 #define ENUM_DICT \
    ENUM_DICT_ENTRY("Normalization", "Norm") \
-   ENUM_DICT_ENTRY("RootFormula", "Formula")
+   ENUM_DICT_ENTRY("RootFormula", "Formula") \
+   ENUM_DICT_ENTRY("ExternalWeightResponse", "ExternalWeight")
 #include "GenericToolbox.MakeEnum.h"
   MAKE_ENUM_JSON_INTERFACE(DialType);
 
@@ -82,6 +84,10 @@ public:
   // dial is not event-by-event, or if the dial is not based on a "spline"
   // (e.g. it might be an tabulated event-by-event dial).
   [[nodiscard]] const std::string &getDialLeafName() const{ return _dialLeafName_; }
+
+  [[nodiscard]] bool hasDialBranchData() const{ return not _dialLeafName_.empty() or not _dialParameterValuesBranch_.empty(); }
+  [[nodiscard]] const std::string& getDialParameterValuesBranch() const{ return _dialParameterValuesBranch_; }
+  [[nodiscard]] const std::string& getDialResponsesBranch() const{ return _dialResponsesBranch_; }
 
   [[nodiscard]] const BinSet &getDialBinSet() const{ return _dialBinSet_; }
   [[nodiscard]] const std::vector<std::string> &getDataSetNameList() const{ return _dataSetNameList_; }
@@ -178,6 +184,7 @@ protected:
   bool initializeDialsWithBinningFile(const ConfigReader& dialsDefinition);
   bool initializeDialsWithTabulation(const ConfigReader& dialsDefinition);
   bool initializeDialsWithKriging(const ConfigReader& dialsDefinition);
+  bool initializeDialsWithExternalWeight(const ConfigReader& dialsDefinition);
 
   void readParametersFromConfig(const ConfigReader &config_);
   ConfigReader fetchDialsDefinition(const ConfigReader &definitionsList_) const;
@@ -206,6 +213,8 @@ private:
   double _mirrorRange_{std::nan("unset")};
   std::string _applyConditionStr_{};
   std::string _dialLeafName_{};
+  std::string _dialParameterValuesBranch_{};
+  std::string _dialResponsesBranch_{};
 
   DialType _dialType_{DialType::Norm}; // Graph, Spline...
   std::string _dialOptions_{}; // monotonic, catmull-rom...

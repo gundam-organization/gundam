@@ -137,9 +137,9 @@ endif()
 ####################
 
 cmessage( STATUS "Looking for JSON install..." )
-find_package(nlohmann_json 3.11.3 EXACT CONFIG)
+find_package(nlohmann_json 3.11.3 EXACT QUIET CONFIG)
 if( NOT nlohmann_json_FOUND )
-  cmessage( WARNING "System nlohmann_json package not found")
+  cmessage( WARNING "System nlohmann_json 3.11.3 not found; using FetchContent to download it.")
   FetchContent_Declare(
     nlohmann_json
     GIT_REPOSITORY https://github.com/nlohmann/json.git
