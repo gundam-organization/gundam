@@ -109,7 +109,7 @@ void Propagator::buildDialCache(){
   _eventDialCache_.buildReferenceCache(_sampleSet_, _dialManager_.getDialCollectionList());
   _dialManager_.invalidateInputBuffers();
 }
-void Propagator::updateEventBinning(){
+void Propagator::updateEventSampleBinning(){
   for( auto& sample : _sampleSet_.getSampleList() ){
     sample.updateEventBinning(_threadPool_);
   }

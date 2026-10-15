@@ -68,7 +68,6 @@ public:
   void reserveEventMemory(size_t dataSetIndex_, size_t nEvents, const Event &eventBuffer_);
   void shrinkEventList(size_t newTotalSize_);
   void updateEventBinning();
-  // Reuse an existing pool; both phases complete before returning.
   void updateEventBinning(GenericToolbox::ParallelWorker& threadPool_);
 
   // printouts

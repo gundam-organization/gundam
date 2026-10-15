@@ -146,7 +146,7 @@ likelihoodInterfaceConfig:
 
     initial = [(0, 0), (1, 1), None, None, None]
     check(initial)
-    propagator.updateEventBinning()
+    propagator.updateEventSampleBinning()
     check(initial)  # Also exercises rebinding the loader's variable-index caches.
 
     # The setter preserves scalar types and exact 64-bit integer values.
@@ -176,7 +176,7 @@ likelihoodInterfaceConfig:
     for event in static.getEventList():
         event.getVariables().fetchVariable("X").setValue(100.0)
     check(initial)  # Rebinning is explicit, rather than triggered by propagation.
-    propagator.updateEventBinning()
+    propagator.updateEventSampleBinning()
     check([(1, 0), None, (0, 0), (1, 1), (0, 1)])
 
     set_value(0, "category", 1)
@@ -190,7 +190,7 @@ likelihoodInterfaceConfig:
 
     for entry in events:
         set_value(entry, "X", 2.0)
-    propagator.updateEventBinning()
+    propagator.updateEventSampleBinning()
     check([None] * 5, scale=1.25)  # Previously occupied bins must be emptied.
 
     for entry, values in original.items():
@@ -198,7 +198,7 @@ likelihoodInterfaceConfig:
             set_value(entry, name, value)
     parameter.setParameterValue(1.0)
     for _ in range(2):
-        propagator.updateEventBinning()
+        propagator.updateEventSampleBinning()
         check(initial)
 
 

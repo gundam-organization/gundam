@@ -426,7 +426,7 @@ PYBIND11_MODULE(GUNDAM, module) {
 
   pybind11::class_<Propagator>(module, "Propagator")
   .def(pybind11::init())
-  .def("updateEventBinning", &Propagator::updateEventBinning,
+  .def("updateEventSampleBinning", &Propagator::updateEventSampleBinning,
        "Reassign events in all dynamic samples; propagate afterwards to refill histograms.")
   .def("initialize", pybind11::overload_cast<>(&Propagator::initialize), pybind11::return_value_policy::reference)
   .def("getSampleSet", pybind11::overload_cast<>(&Propagator::getSampleSet), pybind11::return_value_policy::reference_internal)
