@@ -984,7 +984,8 @@ void RootMinimizer::writePostFitData( TDirectory* saveDir_) {
           for( auto& iPar : *parList ){
             int jParIdx{0};
             for( auto& jPar : *parList ){
-              (*globalPassageMatrix)[blocOffset + iPar.getParameterIndex()][blocOffset + jPar.getParameterIndex()] = (*parSet.getEigenVectors())[iParIdx][jParIdx];
+              (*globalPassageMatrix)[blocOffset + iPar.getParameterIndex()][blocOffset + jPar.getParameterIndex()] =
+                (*parSet.getEigenVectors())[iParIdx][jParIdx];
               jParIdx++;
             }
             iParIdx++;
@@ -1015,13 +1016,15 @@ void RootMinimizer::writePostFitData( TDirectory* saveDir_) {
 
               if( iMinimizerIndex != -1 and jMinimizerIndex != -1 ){
                 // Use the fit-constrained value
-                (*unstrippedCovMatrix)[iOffset + iPar.getParameterIndex()][jOffset + jPar.getParameterIndex()] = postfitCovarianceMatrix[iMinimizerIndex][jMinimizerIndex];
+                (*unstrippedCovMatrix)[iOffset + iPar.getParameterIndex()][jOffset + jPar.getParameterIndex()] =
+                  postfitCovarianceMatrix[iMinimizerIndex][jMinimizerIndex];
               }
               else{
                 // Inherit from the prior in eigen -> only diagonal are non 0
                 if( &iParSet == &jParSet and iParSet.isEnableEigenDecomp() ){
                   if( iPar.getParameterIndex() == jPar.getParameterIndex() ){
-                    (*unstrippedCovMatrix)[iOffset + iPar.getParameterIndex()][jOffset + jPar.getParameterIndex()] = iPar.getStdDevValue()*iPar.getStdDevValue();
+                    (*unstrippedCovMatrix)[iOffset + iPar.getParameterIndex()][jOffset + jPar.getParameterIndex()] =
+                      iPar.getStdDevValue()*iPar.getStdDevValue();
                   }
                 }
               }
@@ -1287,7 +1290,7 @@ void RootMinimizer::writePostFitData( TDirectory* saveDir_) {
             }
           }
 
-          if(parSet_.getPriorCovarianceMatrix() != nullptr ){
+          if(parSet_.getPriorCorrelationMatrix() != nullptr ){
             gStyle->GetCanvasPreferGL() ? preFitErrorHist->SetFillColorAlpha(kRed-9, 0.7) : preFitErrorHist->SetFillColor(kRed-9);
           }
 
@@ -1413,15 +1416,12 @@ void RootMinimizer::writePostFitData( TDirectory* saveDir_) {
 
       // restore the original size of the matrix
       covMatrix = std::make_unique<TMatrixD>(int(parList->size()), int(parList->size()));
-      int iStripped{-1};
-      for( auto& iPar : *parList ){
-        if( iPar.isPenaltyDisabled() or not iPar.isEnabled() ) continue;
-        iStripped++;
-        int jStripped{-1};
-        for( auto& jPar : *parList ){
-          if( jPar.isPenaltyDisabled() or not jPar.isEnabled() ) continue;
-          jStripped++;
-          (*covMatrix)[iPar.getParameterIndex()][jPar.getParameterIndex()] = (*originalStrippedCovMatrix)[iStripped][jStripped];
+      for( int iPar = 0; iPar < parSet.getNbCorrelatedParameters() ; ++iPar ){
+        for( int jPar = 0; jPar < parSet.getNbCorrelatedParameters() ; ++jPar ) {
+          (*covMatrix)
+            [parSet.getCorrelatedParameterList()[iPar]->getParameterIndex()]
+            [parSet.getCorrelatedParameterList()[jPar]->getParameterIndex()]
+            = (*originalStrippedCovMatrix)[iPar][jPar];
         }
       }
 
