@@ -37,6 +37,8 @@ public:
 
   // core
   void build(const ConfigReader& binningConfig_);
+  // Bin edge variable-index caches must match the event's variable layout.
+  [[nodiscard]] int findBinIndex(const Event& event_) const;
   void throwEventMcError();
   void throwStatError(bool useGaussThrow_ = false);
 

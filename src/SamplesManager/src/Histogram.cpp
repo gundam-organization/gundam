@@ -29,6 +29,14 @@ void Histogram::build(const ConfigReader& binningConfig_){
   }
 
 }
+int Histogram::findBinIndex(const Event& event_) const{
+  for( const auto& binContext : binContextList ){
+    if( event_.getVariables().isInBin(binContext.bin) ){
+      return binContext.bin.getIndex();
+    }
+  }
+  return -1;
+}
 void Histogram::throwEventMcError(){
   // event by event poisson throw -> takes into account the finite amount of stat in MC
 

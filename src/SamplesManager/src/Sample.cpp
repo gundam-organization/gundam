@@ -130,6 +130,26 @@ std::ostream& operator <<( std::ostream& o, const Sample& this_ ){
   o << this_.getSummary(); return o;
 }
 
+void Sample::updateEventBinning(){
+  if( not _useDynamicBinning_ ){ return; }
+
+  if( not _eventList_.empty() ){
+    // Loading uses a temporary indexing buffer. Rebind its cached indices to
+    // the stored variables, whose layout is shared by every event in the sample.
+    const auto& variables = _eventList_.front().getVariables();
+    for( auto& binContext : _histogram_.getBinContextList() ){
+      for( auto& edges : binContext.bin.getEdgesList() ){
+        edges.varIndexCache = variables.findVarIndex(edges.varName);
+      }
+    }
+  }
+
+  for( auto& event : _eventList_ ){
+    event.getIndices().bin = _histogram_.findBinIndex(event);
+  }
+  this->indexEventInHistogramBin();
+}
+
 void Sample::indexEventInHistogramBin( int iThread_){
   _histogram_.updateBinEventList(_eventList_, iThread_);
 }

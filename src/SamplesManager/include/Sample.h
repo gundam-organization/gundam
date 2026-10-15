@@ -65,6 +65,7 @@ public:
   // core
   void reserveEventMemory(size_t dataSetIndex_, size_t nEvents, const Event &eventBuffer_);
   void shrinkEventList(size_t newTotalSize_);
+  void updateEventBinning();
 
   // printouts
   void printConfiguration() const;

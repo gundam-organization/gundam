@@ -2098,7 +2098,7 @@ void DataDispenser::loadEvent(int iThread_){
       for( auto& sampleIdx : sampleIdxList ) {
         Sample& eventSample{*_cache_.samplesToFillList[sampleIdx]};
         // look for the bin index
-        LoaderUtils::fillBinIndex(eventIndexingBuffer, eventSample.getHistogram().getBinContextList());
+        eventIndexingBuffer.getIndices().bin = eventSample.getHistogram().findBinIndex(eventIndexingBuffer);
         sampleBinIdxList.emplace_back(eventIndexingBuffer.getIndices().bin);
 
         // No bin found -> warning
