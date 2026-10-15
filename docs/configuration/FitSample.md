@@ -18,6 +18,19 @@
 | dataNorm      | double       | data sample global normalisation          | 1       |
 
 
+## Binning variables
+
+All bins within a binning must define exactly the same set of variable names.
+Their order may differ, and bin widths and bounds may vary. A variable cannot
+appear more than once in a bin. Different samples may use different sets of
+variables, provided each sample's binning is internally consistent.
+
+This validation applies to every `BinSet`, independently of dynamic binning or
+smoothing, and covers JSON/YAML definitions and text files with multiple
+`variables:` sections. Inconsistent definitions are rejected during
+configuration, before checking bin overlaps, with the offending bin index and
+its expected and actual variable names.
+
 ## Binning response
 
 The optional `binningResponse` distributes each event weight continuously over
