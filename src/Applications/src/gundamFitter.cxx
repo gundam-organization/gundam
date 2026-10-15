@@ -356,10 +356,7 @@ int main(int argc, char** argv){
 
   // relocated options
   gundamFitterConfig.fillValue(fitter.getGenerateSamplePlots(), "generateSamplePlots");
-  if( gundamFitterConfig.hasField("allParamVariations") ){
-    fitter.setDoAllParamVariations(true);
-    fitter.setAllParamVariationsSigmas(gundamFitterConfig.fetchValue<std::vector<double>>("allParamVariations"));
-  }
+  gundamFitterConfig.fillValue(fitter.getDoAllParamVariations(), "allParamVariations");
 
   // Check if the first point of the fit should be moved before the
   // minimization.  This is not changing the prior value, only the starting

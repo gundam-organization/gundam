@@ -14,7 +14,9 @@ else()
 endif()
 
 target_include_directories(
-    ${LIB_NAME} PUBLIC
+    ${LIB_NAME}
+    BEFORE
+    PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/JointProbability/include
     ${CMAKE_CURRENT_SOURCE_DIR}/Likelihood/include
 )

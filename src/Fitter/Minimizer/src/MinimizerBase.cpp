@@ -60,9 +60,9 @@ void MinimizerBase::initializeImpl(){
   _minimizerParameterPtrList_.reserve( getLikelihoodInterface().getNbParameters() );
   for( auto& parSet : getModelPropagator().getParametersManager().getParameterSetsList() ){
     for( auto& par : parSet.getEffectiveParameterList() ){
-      if( par.isEnabled() and not par.isFixed() ) {
+      if( par.isEnabled() and not par.isPenaltyDisabled() ) {
         _minimizerParameterPtrList_.emplace_back( &par );
-        if( par.isFree() and not par.isFrozen() ){ _nbFreeParameters_++; }
+        if( par.isFree() and not par.isFixed() ){ _nbFreeParameters_++; }
       }
     }
   }
@@ -139,17 +139,13 @@ void MinimizerBase::scanParameters(TDirectory* saveDir_){
   for( auto& parPtr : _minimizerParameterPtrList_ ) { getParameterScanner().scanParameter( *parPtr, saveDir_ ); }
 }
 
-double MinimizerBase::evalFit( const double* parArray_ ){
-/// The main access is through the evalFit method which takes an array of
-/// floating point values and returns the likelihood. The meaning of the
-/// parameters is defined by the vector of pointers to Parameter returned by
-/// the LikelihoodInterface.
+void MinimizerBase::throwPostfitParameters(){
+  /// By default, post-fit throws are not available for a generic minimizer.
+}
 
-  _monitor_.externalTimer.stop();
-  _monitor_.evalLlhTimer.start();
-
+bool MinimizerBase::setFitParameterValues( const double* parArray_ ){
   // Check the fit parameter values.  Do this first so that the parameters
-  // don't change when a bad set of values is tried with evalFit.  This will
+  // don't change when a bad set of values is tried. This will
   // only be enabled if it is requested.
   if (_checkParameterValidity_) {
     const double* v = parArray_;
@@ -157,11 +153,7 @@ double MinimizerBase::evalFit( const double* parArray_ ){
       double val = *(v++);
       if (_useNormalizedFitSpace_) val = ParameterSet::toRealParValue(val,*par);
       if (par->isValidValue(val)) continue;
-      _monitor_.evalLlhTimer.stop();
-      /// A "Really Big Number".  This needs to be an appropriate value to
-      /// safely represent an impossible chi-squared value "representing"
-      /// -log(0.0)/2.
-      return std::numeric_limits<double>::infinity();
+      return false;
     }
   }
 
@@ -180,6 +172,26 @@ double MinimizerBase::evalFit( const double* parArray_ ){
     }
   }
 
+  return true;
+}
+
+double MinimizerBase::evalFit( const double* parArray_ ){
+/// The main access is through the evalFit method which takes an array of
+/// floating point values and returns the likelihood. The meaning of the
+/// parameters is defined by the vector of pointers to Parameter returned by
+/// the LikelihoodInterface.
+
+  _monitor_.externalTimer.stop();
+  _monitor_.evalLlhTimer.start();
+
+  if( not setFitParameterValues(parArray_) ){
+    _monitor_.evalLlhTimer.stop();
+    /// A "Really Big Number".  This needs to be an appropriate value to
+    /// safely represent an impossible chi-squared value "representing"
+    /// -log(0.0)/2.
+    return std::numeric_limits<double>::infinity();
+  }
+
   // Propagate the parameters
   getLikelihoodInterface().propagateAndEvalLikelihood();
   _monitor_.evalLlhTimer.stop();
@@ -195,7 +207,7 @@ double MinimizerBase::evalFit( const double* parArray_ ){
 
       size_t nbValidPars = std::count_if(
               _minimizerParameterPtrList_.begin(), _minimizerParameterPtrList_.end(),
-              [](const Parameter* par_){ return not ( par_->isFixed() or par_->isFrozen() or not par_->isEnabled() ); } );
+              [](const Parameter* par_){ return not ( par_->isPenaltyDisabled() or par_->isFixed() or not par_->isEnabled() ); } );
 
       std::stringstream ssHeader;
       ssHeader << std::endl << GenericToolbox::getNowDateString("%Y.%m.%d %H:%M:%S");
@@ -253,7 +265,7 @@ double MinimizerBase::evalFit( const double* parArray_ ){
         ssHeader << std::endl << std::setprecision(1) << std::scientific << std::showpos;
         int nParPerLine{0};
         for( auto* fitPar : _minimizerParameterPtrList_ ){
-          if( fitPar->isFixed() ) continue;
+          if( fitPar->isPenaltyDisabled() ) continue;
           if( curParSet != fitPar->getOwner()->getName() ){
             if( not curParSet.empty() ) ssHeader << std::endl;
             curParSet = fitPar->getOwner()->getName();
@@ -346,8 +358,8 @@ void MinimizerBase::printParameters(){
       std::string statusStr;
 
       if( not par.isEnabled() ) { continue; }
-      else if( par.isFixed() )  { statusStr = "Fixed (prior applied)";    colorStr = GenericToolbox::ColorCodes::yellowLightText; }
-      else if( par.isFrozen() )  { statusStr = "Frozen (penalty applied)";    colorStr = GenericToolbox::ColorCodes::yellowLightText; }
+      else if( par.isPenaltyDisabled() )  { statusStr = "Fixed (penalty not applied)";    colorStr = GenericToolbox::ColorCodes::yellowLightText; }
+      else if( par.isFixed() )  { statusStr = "Fixed (penalty applied)";    colorStr = GenericToolbox::ColorCodes::yellowLightText; }
       else                      {
         statusStr = Parameter::PriorType::toString(par.getPriorType()) + " Prior";
         if(par.getPriorType()==Parameter::PriorType::Flat) colorStr = GenericToolbox::ColorCodes::blueLightText;

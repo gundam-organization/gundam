@@ -3,19 +3,86 @@
 //
 
 #include "PythonInterface.h"
+#include "EventDialCache.h"
 #include "FitterEngine.h"
+#include "RootMinimizer.h"
+#include "DatasetDefinition.h"
+#include "Event.h"
+#include "Histogram.h"
+#include "Parameter.h"
+#include "ParameterSet.h"
+#include "ParametersManager.h"
+#include "Sample.h"
+#include "SampleSet.h"
 #include "ConfigUtils.h"
 #include "GundamApp.h"
 
+#include "GenericToolbox.Fs.h"
+#include "GenericToolbox.Os.h"
+
 #include "Logger.h"
+
+#include "TMatrixDSym.h"
 
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 #include <pybind11/complex.h>
 #include <pybind11/functional.h>
 #include <pybind11/chrono.h>
+#include <pybind11/stl_bind.h>
 
+#include <cstdio>
+#include <cerrno>
+#include <cstring>
+#include <iostream>
 #include <string>
+#include <unistd.h>
+
+PYBIND11_MAKE_OPAQUE(std::vector<EventDialCache::CacheEntry>);
+PYBIND11_MAKE_OPAQUE(std::vector<EventDialCache::DialResponseCache>);
+PYBIND11_MAKE_OPAQUE(std::vector<Bin::Edges>);
+PYBIND11_MAKE_OPAQUE(std::vector<Histogram::BinContent>);
+PYBIND11_MAKE_OPAQUE(std::vector<Histogram::BinContext>);
+PYBIND11_MAKE_OPAQUE(std::vector<Event>);
+PYBIND11_MAKE_OPAQUE(std::vector<Parameter>);
+PYBIND11_MAKE_OPAQUE(std::vector<Parameter*>);
+PYBIND11_MAKE_OPAQUE(std::vector<ParameterSet>);
+PYBIND11_MAKE_OPAQUE(std::vector<Sample>);
+PYBIND11_MAKE_OPAQUE(std::vector<VariableHolder>);
+
+namespace {
+
+void setRuntimeWorkingDirectory(const std::string& dirPath_, bool createIfMissing_){
+  auto expandedDirPath = GenericToolbox::expandEnvironmentVariables(dirPath_);
+
+  if( expandedDirPath.empty() ){
+    throw pybind11::value_error("Runtime working directory cannot be empty.");
+  }
+
+  if( not GenericToolbox::isDir(expandedDirPath) ){
+    if( createIfMissing_ ){
+      GenericToolbox::mkdir(expandedDirPath);
+    }
+    if( not GenericToolbox::isDir(expandedDirPath) ){
+      throw pybind11::value_error("Runtime working directory does not exist: " + expandedDirPath);
+    }
+  }
+
+  if( chdir(expandedDirPath.c_str()) != 0 ){
+    throw std::runtime_error("Could not set runtime working directory to \"" + expandedDirPath + "\": " + std::strerror(errno));
+  }
+}
+
+void flushOutput(){
+  std::cout.flush();
+  std::cerr.flush();
+  std::fflush(nullptr);
+  if( Logger::getStreamBufferSupervisorPtr() != nullptr ){
+    Logger::getStreamBufferSupervisorPtr()->flush();
+  }
+}
+
+}
 
 
 PYBIND11_MODULE(GUNDAM, module) {
@@ -25,10 +92,19 @@ PYBIND11_MODULE(GUNDAM, module) {
   module.def("setNumberOfThreads", &GundamGlobals::setNumberOfThreads, "Set the number of threads for Gundam");
   module.def("setLightOutputMode", &GundamGlobals::setLightOutputMode, "Reduce the amount of outputs in the root files");
   module.def("setIsDebug", &GundamGlobals::setIsDebug, "Enables debug printouts");
+  module.def("setRuntimeWorkingDirectory", &setRuntimeWorkingDirectory,
+             pybind11::arg("dirPath"),
+             pybind11::arg("createIfMissing") = false,
+             "Set the process working directory used by GUNDAM to resolve relative runtime paths.");
+  module.def("getRuntimeWorkingDirectory", &GenericToolbox::getCurrentWorkingDirectory,
+             "Get the process working directory used by GUNDAM to resolve relative runtime paths.");
+  module.def("flushOutput", &flushOutput, "Flush Python-adjacent C/C++ output streams used by GUNDAM.");
 
   // JsonType for the return type
   pybind11::class_<JsonType>(module, "JsonType")
   .def(pybind11::init())
+  .def(pybind11::init([](const std::string& jsonString_){ return JsonType::parse(jsonString_);}), pybind11::arg("jsonString"))
+  .def("toString", [](const JsonType& this_, bool shallow_){ return GenericToolbox::Json::toReadableString(this_, shallow_); }, pybind11::arg("shallow") = false)
   ;
 
 
@@ -51,6 +127,7 @@ PYBIND11_MODULE(GUNDAM, module) {
   .def(pybind11::init<const std::string&>())
   .def(pybind11::init<const JsonType&>())
   .def("setConfig", pybind11::overload_cast<const std::string&>(&ConfigUtils::ConfigBuilder::setConfig))
+  .def("setConfigFromYamlString", &ConfigUtils::ConfigBuilder::setConfigFromYamlString)
   .def("setConfig", pybind11::overload_cast<const JsonType&>(&ConfigUtils::ConfigBuilder::setConfig))
   .def("setConfig", pybind11::overload_cast<const JsonType&>(&ConfigUtils::ConfigBuilder::setConfig))
   .def("getConfig", pybind11::overload_cast<>(&ConfigUtils::ConfigBuilder::getConfig, pybind11::const_), pybind11::return_value_policy::reference)
@@ -73,10 +150,7 @@ PYBIND11_MODULE(GUNDAM, module) {
 
   pybind11::class_<ConfigUtils::ConfigReader::FieldDefinition>(configReaderClass, "FieldDefinition")
   .def(pybind11::init())
-  .def(pybind11::init<std::string, std::vector<std::string>, std::string>(),
-       pybind11::arg("name"),
-       pybind11::arg("path") = std::vector<std::string>{},
-       pybind11::arg("defaultValue") = "")
+  .def(pybind11::init<std::string, std::vector<std::string>, std::string>(), pybind11::arg("name"), pybind11::arg("path") = std::vector<std::string>{}, pybind11::arg("defaultValue") = "")
   ;
 
   pybind11::class_<GundamApp>(module, "GundamApp")
@@ -86,36 +160,317 @@ PYBIND11_MODULE(GUNDAM, module) {
   // .def("getOutfilePtr", &GundamApp::getOutfilePtr) // CAN'T EXPOSE ROOT PTRs
   ;
 
+  pybind11::class_<EventUtils::Indices>(module, "EventIndices")
+  .def_readwrite("dataset", &EventUtils::Indices::dataset)
+  .def_readwrite("treeFile", &EventUtils::Indices::treeFile)
+  .def_readwrite("sample", &EventUtils::Indices::sample)
+  .def_readwrite("bin", &EventUtils::Indices::bin)
+  .def_readwrite("entry", &EventUtils::Indices::entry)
+  .def_readwrite("treeEntry", &EventUtils::Indices::treeEntry)
+  .def("getSummary", &EventUtils::Indices::getSummary)
+  ;
+
+  pybind11::class_<EventUtils::Weights>(module, "EventWeights")
+  .def_readwrite("base", &EventUtils::Weights::base)
+  .def_readwrite("current", &EventUtils::Weights::current)
+  .def("resetCurrentWeight", &EventUtils::Weights::resetCurrentWeight)
+  .def("getSummary", &EventUtils::Weights::getSummary)
+  ;
+
+  pybind11::class_<VariableHolder>(module, "VariableHolder")
+  .def("getVarAsDouble", &VariableHolder::getVarAsDouble)
+  .def("getValue", [](const VariableHolder& this_) -> pybind11::object {
+    const auto& value = this_.get();
+    const auto& type = value.getType();
+    // Read integers directly to preserve precision beyond the double cache.
+    if( type == typeid(char) ){ return pybind11::int_(value.getValue<char>()); }
+    if( type == typeid(signed char) ){ return pybind11::int_(value.getValue<signed char>()); }
+    if( type == typeid(unsigned char) ){ return pybind11::int_(value.getValue<unsigned char>()); }
+    if( type == typeid(short) ){ return pybind11::int_(value.getValue<short>()); }
+    if( type == typeid(unsigned short) ){ return pybind11::int_(value.getValue<unsigned short>()); }
+    if( type == typeid(int) ){ return pybind11::int_(value.getValue<int>()); }
+    if( type == typeid(unsigned int) ){ return pybind11::int_(value.getValue<unsigned int>()); }
+    if( type == typeid(long) ){ return pybind11::int_(value.getValue<long>()); }
+    if( type == typeid(unsigned long) ){ return pybind11::int_(value.getValue<unsigned long>()); }
+    if( type == typeid(long long) ){ return pybind11::int_(value.getValue<long long>()); }
+    if( type == typeid(unsigned long long) ){ return pybind11::int_(value.getValue<unsigned long long>()); }
+    return pybind11::float_(this_.getVarAsDouble());
+  }, "Return the stored integer exactly, or the cached double as a Python float.")
+  ;
+
+  pybind11::bind_vector<std::vector<VariableHolder>>(module, "VariableHolderList");
+
+  pybind11::class_<VariableCollection>(module, "VariableCollection")
+  .def("getNameList", [](const VariableCollection& this_){
+    auto* nameListPtr = this_.getNameListPtr();
+    if( nameListPtr == nullptr ){ return std::vector<std::string>{}; }
+    return *this_.getNameListPtr();
+  }, pybind11::return_value_policy::copy)
+  .def("getVarList", pybind11::overload_cast<>(&VariableCollection::getVarList),
+       pybind11::return_value_policy::reference_internal)
+  .def("fetchVariable", pybind11::overload_cast<const std::string&>(&VariableCollection::fetchVariable),
+       pybind11::return_value_policy::reference_internal)
+  .def("findVarIndex", &VariableCollection::findVarIndex,
+       pybind11::arg("leafName"),
+       pybind11::arg("throwIfNotFound") = true)
+  .def("empty", &VariableCollection::empty)
+  .def("getSummary", &VariableCollection::getSummary)
+  ;
+
+  pybind11::class_<Event>(module, "Event")
+  .def("getIndices", pybind11::overload_cast<>(&Event::getIndices),
+       pybind11::return_value_policy::reference_internal)
+  .def("getWeights", pybind11::overload_cast<>(&Event::getWeights),
+       pybind11::return_value_policy::reference_internal)
+  .def("getVariables", pybind11::overload_cast<>(&Event::getVariables),
+       pybind11::return_value_policy::reference_internal)
+  .def("getSize", &Event::getSize)
+  .def("getEventWeight", &Event::getEventWeight)
+  .def("getSummary", &Event::getSummary,
+       pybind11::arg("printVars") = true)
+  ;
+
+  pybind11::bind_vector<std::vector<Event>>(module, "EventList");
+
+  pybind11::class_<DialInputBuffer>(module, "DialInputBuffer")
+  .def("update", &DialInputBuffer::update)
+  .def("getSummary", &DialInputBuffer::getSummary)
+  .def("invalidateBuffers", &DialInputBuffer::invalidateBuffers)
+  ;
+
+  pybind11::class_<DialInterface>(module, "DialInterface")
+  .def("evalResponse", &DialInterface::evalResponse)
+  .def("getInputBuffer", &DialInterface::getInputBuffer, pybind11::return_value_policy::reference_internal)
+  .def("getSummary", &DialInterface::getSummary, pybind11::arg("shallow") = true);
+
+  pybind11::class_<EventDialCache::DialResponseCache>(module, "DialResponseCache")
+  .def_readwrite("response", &EventDialCache::DialResponseCache::response)
+  .def("update", &EventDialCache::DialResponseCache::update)
+  .def("getResponse", &EventDialCache::DialResponseCache::getResponse)
+  .def_property_readonly("dialInterface", [](EventDialCache::DialResponseCache& this_){return this_.dialInterface;}, pybind11::return_value_policy::reference_internal)
+  .def("getDialInterface", [](EventDialCache::DialResponseCache& this_){return this_.dialInterface;}, pybind11::return_value_policy::reference_internal)
+  ;
+
+  pybind11::bind_vector<std::vector<EventDialCache::DialResponseCache>>(module, "DialResponseCacheList");
+
+  pybind11::class_<EventDialCache::CacheEntry>(module, "EventDialCacheEntry")
+  .def_property_readonly("event", [](EventDialCache::CacheEntry& this_){return this_.event;}, pybind11::return_value_policy::reference_internal)
+  .def_property_readonly("dialResponseCacheList", [](EventDialCache::CacheEntry& this_) -> std::vector<EventDialCache::DialResponseCache>& {return this_.dialResponseCacheList;}, pybind11::return_value_policy::reference_internal)
+  .def("getEvent", [](EventDialCache::CacheEntry& this_){return this_.event;}, pybind11::return_value_policy::reference_internal)
+  .def("getDialResponseCacheList", [](EventDialCache::CacheEntry& this_) -> std::vector<EventDialCache::DialResponseCache>& {return this_.dialResponseCacheList;}, pybind11::return_value_policy::reference_internal)
+  .def("getSummary", &EventDialCache::CacheEntry::getSummary, pybind11::arg("shallow") = true)
+  .def("getDialIndicesAffecting", &EventDialCache::CacheEntry::getDialIndicesAffecting, pybind11::arg("parameter_"))
+  ;
+
+  pybind11::bind_vector<std::vector<EventDialCache::CacheEntry>>(module, "EventDialCacheEntryList");
+
+  pybind11::class_<EventDialCache>(module, "EventDialCache")
+  .def("getFillIndex", &EventDialCache::getFillIndex)
+  .def("getCache", pybind11::overload_cast<>(&EventDialCache::getCache), pybind11::return_value_policy::reference_internal)
+  ;
+
+  pybind11::class_<Parameter>(module, "Parameter")
+  .def("getName", &Parameter::getName)
+  .def("getFullTitle", &Parameter::getFullTitle)
+  .def("isEnabled", &Parameter::isEnabled)
+  .def("getStepSize", &Parameter::getStepSize)
+  .def("getPriorValue", &Parameter::getPriorValue)
+  .def("getStdDevValue", &Parameter::getStdDevValue)
+  .def("getThrowValue", &Parameter::getThrowValue)
+  .def("getParameterValue", &Parameter::getParameterValue)
+  .def("getSummary", &Parameter::getSummary)
+  .def("setParameterValue", &Parameter::setParameterValue, pybind11::arg("parameterValue"), pybind11::arg("force") = false)
+  ;
+
+  pybind11::class_<TMatrixDSym, std::shared_ptr<TMatrixDSym>>(module, "TMatrixDSym")
+  .def("GetNrows", &TMatrixDSym::GetNrows)
+  .def("GetNcols", &TMatrixDSym::GetNcols)
+  .def("__getitem__", [](const TMatrixDSym& this_, pybind11::tuple idx_){
+    if( idx_.size() != 2 ){ throw pybind11::index_error("TMatrixDSym indices must be a tuple of two integers."); }
+    return this_(idx_[0].cast<int>(), idx_[1].cast<int>());
+  })
+  .def("__setitem__", [](TMatrixDSym& this_, pybind11::tuple idx_, double value_){
+    if( idx_.size() != 2 ){ throw pybind11::index_error("TMatrixDSym indices must be a tuple of two integers."); }
+    this_(idx_[0].cast<int>(), idx_[1].cast<int>()) = value_;
+  })
+  ;
+
+  pybind11::bind_vector<std::vector<Parameter>>(module, "ParameterList");
+  pybind11::bind_vector<std::vector<Parameter*>>(module, "ParameterPtrList");
+
+  pybind11::class_<ParameterSet>(module, "ParameterSet")
+  .def(pybind11::init())
+  .def("isEnableEigenDecomp", &ParameterSet::isEnableEigenDecomp)
+  .def("getParameterList", pybind11::overload_cast<>(&ParameterSet::getParameterList), pybind11::return_value_policy::reference_internal)
+  .def("getEigenParameterList", pybind11::overload_cast<>(&ParameterSet::getEigenParameterList), pybind11::return_value_policy::reference_internal)
+  .def("getPriorCovarianceMatrix", pybind11::overload_cast<>(&ParameterSet::getPriorCovarianceMatrix, pybind11::const_))
+  .def("getPriorFullCovarianceMatrix", pybind11::overload_cast<>(&ParameterSet::getPriorFullCovarianceMatrix, pybind11::const_))
+  .def("propagateOriginalToEigen", &ParameterSet::propagateOriginalToEigen)
+  .def("propagateEigenToOriginal", &ParameterSet::propagateEigenToOriginal)
+  ;
+
+  pybind11::bind_vector<std::vector<ParameterSet>>(module, "ParameterSetList");
+
   pybind11::class_<ParametersManager>(module, "ParametersManager")
   .def(pybind11::init())
   .def("throwParameters", &ParametersManager::throwParameters)
   .def("exportParameterInjectorConfig", &ParametersManager::exportParameterInjectorConfig)
   .def("injectParameterValues", &ParametersManager::injectParameterValues)
+  .def("injectParameterValues", [](ParametersManager& self, const std::string& jsonString){ self.injectParameterValues(JsonType(jsonString)); })
+  .def("getParameterSetsList", pybind11::overload_cast<>(&ParametersManager::getParameterSetsList), pybind11::return_value_policy::reference_internal)
+  ;
+
+  pybind11::class_<Bin::Edges>(module, "BinEdges")
+  .def("getCenterValue", &Bin::Edges::getCenterValue)
+  .def("getSummary", &Bin::Edges::getSummary, pybind11::arg("shallow") = true)
+  .def_readonly("isConditionVar", &Bin::Edges::isConditionVar)
+  .def_readonly("index", &Bin::Edges::index)
+  .def_readonly("varIndexCache", &Bin::Edges::varIndexCache)
+  .def_readonly("min", &Bin::Edges::min)
+  .def_readonly("max", &Bin::Edges::max)
+  .def_readonly("varName", &Bin::Edges::varName)
+  ;
+
+  pybind11::bind_vector<std::vector<Bin::Edges>>(module, "BinEdgesList");
+
+  pybind11::class_<Bin>(module, "Bin")
+  .def("isZeroWideRangesTolerated", &Bin::isZeroWideRangesTolerated)
+  .def("getIndex", &Bin::getIndex)
+  .def("getFormulaStr", &Bin::getFormulaStr)
+  .def("getTreeFormulaStr", &Bin::getTreeFormulaStr)
+  .def("getEdgesList", pybind11::overload_cast<>(&Bin::getEdgesList),
+       pybind11::return_value_policy::reference_internal)
+  .def("buildVariableNameList", &Bin::buildVariableNameList)
+  .def("getVolume", &Bin::getVolume)
+  .def("isVariableSet", &Bin::isVariableSet)
+  .def("getSummary", &Bin::getSummary, pybind11::arg("shallow") = true)
+  ;
+
+  pybind11::class_<Histogram::BinContent>(module, "HistogramBinContent")
+  .def(pybind11::init())
+  .def_readwrite("sumWeights", &Histogram::BinContent::sumWeights)
+  .def_readwrite("sqrtSumSqWeights", &Histogram::BinContent::sqrtSumSqWeights)
+  ;
+
+  pybind11::bind_vector<std::vector<Histogram::BinContent>>(module, "HistogramBinContentList");
+
+  pybind11::class_<Histogram::BinContext>(module, "HistogramBinContext")
+  .def_property_readonly("bin", [](Histogram::BinContext& this_) -> Bin& { return this_.bin; },
+                         pybind11::return_value_policy::reference_internal)
+  .def("getBin", [](Histogram::BinContext& this_) -> Bin& { return this_.bin; },
+       pybind11::return_value_policy::reference_internal)
+  ;
+
+  pybind11::bind_vector<std::vector<Histogram::BinContext>>(module, "HistogramBinContextList");
+
+  pybind11::class_<Histogram>(module, "Histogram")
+  .def("getNbBins", &Histogram::getNbBins)
+  .def("getBinContentList", pybind11::overload_cast<>(&Histogram::getBinContentList),
+       pybind11::return_value_policy::reference_internal)
+  .def("getBinContextList", pybind11::overload_cast<>(&Histogram::getBinContextList),
+       pybind11::return_value_policy::reference_internal)
+  ;
+
+  pybind11::class_<Sample>(module, "Sample")
+  .def("isEnabled", &Sample::isEnabled)
+  .def("isEventMcThrowDisabled", &Sample::isEventMcThrowDisabled)
+  .def("getIndex", &Sample::getIndex)
+  .def("getName", &Sample::getName)
+  .def("getSelectionCutsStr", &Sample::getSelectionCutsStr)
+  .def("getSampleWeightFormulaStr", &Sample::getSampleWeightFormulaStr)
+  .def("getHistogram", pybind11::overload_cast<>(&Sample::getHistogram), pybind11::return_value_policy::reference_internal)
+  .def("getEventList", pybind11::overload_cast<>(&Sample::getEventList), pybind11::return_value_policy::reference_internal)
+  .def("getSumWeights", &Sample::getSumWeights)
+  .def("getNbBinnedEvents", &Sample::getNbBinnedEvents)
+  .def("getSummary", &Sample::getSummary)
+  ;
+
+  pybind11::bind_vector<std::vector<Sample>>(module, "SampleList");
+
+  pybind11::class_<SampleSet>(module, "SampleSet")
+  .def("getSampleList", pybind11::overload_cast<>(&SampleSet::getSampleList),
+       pybind11::return_value_policy::reference_internal)
+  .def("getEventVariableNameList", pybind11::overload_cast<>(&SampleSet::getEventVariableNameList),
+       pybind11::return_value_policy::reference_internal)
+  .def("empty", &SampleSet::empty)
+  .def("getNbOfEvents", &SampleSet::getNbOfEvents)
+  .def("getSampleBreakdown", &SampleSet::getSampleBreakdown)
   ;
 
   pybind11::class_<Propagator>(module, "Propagator")
   .def(pybind11::init())
+  .def("initialize", pybind11::overload_cast<>(&Propagator::initialize), pybind11::return_value_policy::reference)
+  .def("getSampleSet", pybind11::overload_cast<>(&Propagator::getSampleSet), pybind11::return_value_policy::reference_internal)
+  .def("getEventDialCache", pybind11::overload_cast<>(&Propagator::getEventDialCache), pybind11::return_value_policy::reference_internal)
   .def("getParametersManager", pybind11::overload_cast<>(&Propagator::getParametersManager), pybind11::return_value_policy::reference)
   .def("copyHistBinContentFrom", pybind11::overload_cast<const Propagator&>(&Propagator::copyHistBinContentFrom), pybind11::return_value_policy::reference)
   .def("writeParameterStateTree", &Propagator::writeParameterStateTree)
   ;
 
-  pybind11::class_<LikelihoodInterface>(module, "LikelihoodInterface")
+  pybind11::class_<DatasetDefinition>(module, "DatasetDefinition")
+  .def("initialize", pybind11::overload_cast<>(&DatasetDefinition::initialize), pybind11::return_value_policy::reference)
+  ;
+
+  auto likelihoodInterfaceClass = pybind11::class_<LikelihoodInterface>(module, "LikelihoodInterface");
+
+  auto dataTypeClass = pybind11::class_<LikelihoodInterface::DataType>(likelihoodInterfaceClass, "DataType")
+  .def(pybind11::init())
+  .def(pybind11::init([](const std::string& name_){
+    auto dataType{LikelihoodInterface::DataType::toEnum(name_, true)};
+    if( dataType.value == static_cast<LikelihoodInterface::DataType::EnumTypeName>(LikelihoodInterface::DataType::overflowValue) ){
+      throw pybind11::value_error("Unknown DataType: " + name_);
+    }
+    return dataType;
+  }), pybind11::arg("name"))
+  .def_static("toEnum", [](const std::string& name_, bool ignoreCase_){
+    auto dataType{LikelihoodInterface::DataType::toEnum(name_, ignoreCase_)};
+    if( dataType.value == static_cast<LikelihoodInterface::DataType::EnumTypeName>(LikelihoodInterface::DataType::overflowValue) ){
+      throw pybind11::value_error("Unknown DataType: " + name_);
+    }
+    return dataType;
+  }, pybind11::arg("name"), pybind11::arg("ignoreCase") = true)
+  .def_static("generateVectorStr", &LikelihoodInterface::DataType::generateVectorStr)
+  .def("toString", [](const LikelihoodInterface::DataType& this_){ return this_.toString(); })
+  .def("__str__", [](const LikelihoodInterface::DataType& this_){ return this_.toString(); })
+  .def("__repr__", [](const LikelihoodInterface::DataType& this_){ return "DataType." + this_.toString(); })
+  .def("__eq__", [](const LikelihoodInterface::DataType& lhs_, const LikelihoodInterface::DataType& rhs_){ return lhs_ == rhs_; })
+  ;
+  dataTypeClass.attr("Asimov") = pybind11::cast(LikelihoodInterface::DataType(LikelihoodInterface::DataType::Asimov));
+  dataTypeClass.attr("Toy") = pybind11::cast(LikelihoodInterface::DataType(LikelihoodInterface::DataType::Toy));
+  dataTypeClass.attr("RealData") = pybind11::cast(LikelihoodInterface::DataType(LikelihoodInterface::DataType::RealData));
+
+  likelihoodInterfaceClass
   .def(pybind11::init())
   .def("getSummary", &LikelihoodInterface::getSummary, pybind11::call_guard<pybind11::gil_scoped_release>())
+  .def("getLastLikelihood", &LikelihoodInterface::getLastLikelihood, pybind11::call_guard<pybind11::gil_scoped_release>())
   .def("propagateAndEvalLikelihood", &LikelihoodInterface::propagateAndEvalLikelihood, pybind11::call_guard<pybind11::gil_scoped_release>())
-  .def("evalLikelihood", &LikelihoodInterface::evalLikelihood, pybind11::call_guard<pybind11::gil_scoped_release>())
   .def("setForceAsimovData", &LikelihoodInterface::setForceAsimovData, pybind11::call_guard<pybind11::gil_scoped_release>())
   .def("throwToyParameters", &LikelihoodInterface::throwToyParameters, pybind11::call_guard<pybind11::gil_scoped_release>())
   .def("throwStatErrors", &LikelihoodInterface::throwStatErrors, pybind11::call_guard<pybind11::gil_scoped_release>())
   .def("setCurrentParameterValuesAsPrior", &LikelihoodInterface::setCurrentParameterValuesAsPrior, pybind11::call_guard<pybind11::gil_scoped_release>())
+  .def("setDataType", &LikelihoodInterface::setDataType, pybind11::call_guard<pybind11::gil_scoped_release>())
   .def("getModelPropagator", pybind11::overload_cast<>(&LikelihoodInterface::getModelPropagator), pybind11::return_value_policy::reference)
   .def("getDataPropagator", pybind11::overload_cast<>(&LikelihoodInterface::getDataPropagator), pybind11::return_value_policy::reference)
+  .def("getDatasetList", pybind11::overload_cast<>(&LikelihoodInterface::getDatasetList), pybind11::return_value_policy::reference)
+  .def("initialize", pybind11::overload_cast<>(&LikelihoodInterface::initialize), pybind11::return_value_policy::reference)
+  ;
+
+  pybind11::class_<ParameterScanner>(module, "ParameterScanner")
+  .def(pybind11::init())
+  .def("initialize", pybind11::overload_cast<>(&ParameterScanner::initialize), pybind11::return_value_policy::reference)
   ;
 
   // no CTOR here
   pybind11::class_<MinimizerBase>(module, "MinimizerBase")
   .def("minimize", &MinimizerBase::minimize)
+  .def("throwPostfitParameters", &MinimizerBase::throwPostfitParameters)
+  .def("fetchNbDegreeOfFreedom", &MinimizerBase::fetchNbDegreeOfFreedom)
+  .def("getMinimizerFitParameterPtr", pybind11::overload_cast<>(&MinimizerBase::getMinimizerFitParameterPtr),
+       pybind11::return_value_policy::reference_internal)
+  ;
+
+  pybind11::class_<RootMinimizer, MinimizerBase>(module, "RootMinimizer")
+  .def("throwPostfitParameters", &RootMinimizer::throwPostfitParameters)
   ;
 
   pybind11::class_<FitterEngine>(module, "FitterEngine")
@@ -127,11 +482,11 @@ PYBIND11_MODULE(GUNDAM, module) {
   .def("configure", pybind11::overload_cast<const ConfigReader&>(&FitterEngine::configure))
   .def("configure", pybind11::overload_cast<>(&FitterEngine::configure))
   .def("initialize", &FitterEngine::initialize)
-  .def("setRandomSeed", &FitterEngine::setRandomSeed)
+  .def_static("setRandomSeed", &FitterEngine::setRandomSeed)
   .def("fit", &FitterEngine::fit)
   .def("getMinimizer", pybind11::overload_cast<>(&FitterEngine::getMinimizer), pybind11::return_value_policy::reference)
   .def("getLikelihoodInterface", pybind11::overload_cast<>(&FitterEngine::getLikelihoodInterface), pybind11::return_value_policy::reference)
+  .def("getParameterScanner", pybind11::overload_cast<>(&FitterEngine::getParameterScanner), pybind11::return_value_policy::reference)
   .def("getTFilePath", &FitterEngine::getTFilePath)
   ;
 }
-

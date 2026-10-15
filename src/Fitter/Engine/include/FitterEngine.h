@@ -61,7 +61,7 @@ public:
   void setEnablePreFitToPostFitLineScan(bool enablePreFitToPostFitScan){ _enablePreFitToPostFitLineScan_ = enablePreFitToPostFitScan; }
   void setGenerateSamplePlots(bool generateSamplePlots){ _generateSamplePlots_ = generateSamplePlots; }
   void setGenerateOneSigmaPlots(bool generateOneSigmaPlots){ _generateOneSigmaPlots_ = generateOneSigmaPlots; }
-  void setDoAllParamVariations(bool doAllParamVariations_){ _doAllParamVariations_ = doAllParamVariations_; }
+  void setDoAllParamVariations(bool doAllParamVariations){ _doAllParamVariations_ = doAllParamVariations; }
   void setAllParamVariationsSigmas(const std::vector<double> &allParamVariationsSigmas){ _allParamVariationsSigmas_ = allParamVariationsSigmas; }
   void setThrowMcBeforeFit(bool throwMcBeforeFit_){ _throwMcBeforeFit_ = throwMcBeforeFit_; }
   void setThrowGain(double throwGain_){ _throwGain_ = throwGain_; }
@@ -84,6 +84,7 @@ public:
   TDirectory* getSaveDir(){ return _saveDir_; }
   GenericToolbox::TFilePath getTFilePath(){ return GenericToolbox::TFilePath(_saveDir_); }
   bool& getGenerateSamplePlots(){ return _generateSamplePlots_; }
+  bool& getDoAllParamVariations(){ return _doAllParamVariations_; }
 
   // Core
   void fit();

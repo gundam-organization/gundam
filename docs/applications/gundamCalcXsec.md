@@ -25,9 +25,17 @@ A certain number of trigger options can be used depending  on what the user need
 
 | Option          | Description                                          |
 | --------------- | ---------------------------------------------------- |
-| -d              | Only overrides fitter config and prints it.          |
+| -c, --config-file | Specify path to the fitter config file             |
+| -of, --override-files | Provide config files that will override keys    |
+| -f              | Specify the fitter output file                       |
+| -o, --out-file  | Specify the CalcXsec output file                     |
+| -t, --nb-threads | Specify nb of parallel threads                      |
+| -n              | Specify number of toys                               |
+| -s, --seed      | Set random seed                                      |
+| -d, --dry-run              | Only overrides fitter config and prints it.          |
 | -use-bf-as-xsec | Use best-fit as x-sec value instead of mean of toys. |
 | --use-prefit    | Use prefit covariance matrices for the toy throws.   |
+| --debug         | Add debug verbose.                                    |
 
 For a complete list of options run command without arguments.
 
@@ -38,3 +46,4 @@ For a complete list of options run command without arguments.
 | [fitterEngineConfig](../configuration/FitterEngine.md) | json         | FitterEngine config                                             |         |
 | minGundamVersion                                       | string       | gundamFitter will stop if the version is lower                  |         |
 | outputFolder                                           | string       | Folder where the output file is written                         | ./      |
+

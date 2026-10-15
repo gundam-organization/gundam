@@ -7,10 +7,12 @@
 
 #include <Logger.h>
 
+#include "FormulaUtils.h"
 #include "GenericToolbox.Json.h"
 
 #include "yaml-cpp/yaml.h"
 
+#include <map>
 #include <string>
 #include <utility>
 
@@ -19,11 +21,41 @@ typedef GenericToolbox::Json::JsonType JsonType;
 
 namespace ConfigUtils {
 
+  class ConfigReader;
+
+  std::vector<FormulaUtils::FormulaComponent> readFormulaComponents(
+      const ConfigReader& config_,
+      const std::string& fieldName_
+  );
+
+  std::vector<std::string> readFormulaExprList(
+      const ConfigReader& config_,
+      const std::string& fieldName_
+  );
+
+  std::string buildFormulaString(
+      const ConfigReader& config_,
+      const std::string& fieldName_,
+      const std::string& joinStr_,
+      bool skipEmptyExpr_ = true
+  );
+
+  std::string buildAndResolveFormulaString(
+      const ConfigReader& config_,
+      const std::string& fieldName_,
+      const std::string& joinStr_,
+      const std::map<std::string, std::string>& variableDict_,
+      FormulaUtils::FormulaResolutionMode resolutionMode_ = FormulaUtils::FormulaResolutionMode::StrictVariableDictOnly,
+      bool skipEmptyExpr_ = true
+  );
+
   // read JSON/YAML
   JsonType readConfigFile(const std::string& configFilePath_);
+  JsonType readConfigYamlString(const std::string& yamlConfigString_);
 
   // converting YAML to JSON
   JsonType convertYamlToJson(const std::string& configFilePath_);
+  JsonType convertYamlToJsonString(const std::string& yamlConfigString_);
   JsonType convertYamlToJson(const YAML::Node& yamlConfig_);
 
   // unfolding JSON/YAML
@@ -41,6 +73,7 @@ namespace ConfigUtils {
 
     // setters
     void setConfig(const std::string& filePath_);
+    void setConfigFromYamlString(const std::string& yamlConfigString_);
     void setConfig(const JsonType& config_){ _config_ = config_; }
 
     // const-getters

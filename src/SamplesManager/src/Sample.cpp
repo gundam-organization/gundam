@@ -10,7 +10,6 @@
 #include "GenericToolbox.Loops.h"
 
 #include <string>
-#include <memory>
 
 
 void Sample::prepareConfig(ConfigReader &config_){
@@ -46,15 +45,6 @@ void Sample::configureImpl(){
   if( not _isEnabled_ ){
     LogDebugIf(GundamGlobals::isDebug()) << "-> disabled" << std::endl;
     return;
-  }
-
-  if (not _sampleWeightFormulaStr_.empty()) {
-    _sampleWeightFormula_ = std::make_shared<TFormula>(
-      "_sampleWeightFormula_",
-      _sampleWeightFormulaStr_.c_str()
-    );
-    LogThrowIf(not _sampleWeightFormula_->IsValid(),
-               "\"" << _sampleWeightFormulaStr_ << "\": could not be parsed as formula expression.");
   }
 
   LogDebugIf(GundamGlobals::isDebug()) << "Reading binning: " << _binningConfig_ << std::endl;

@@ -23,4 +23,6 @@ A certain number of trigger options can be used depending  on what the user need
 | Option          | Description                                        |
 | --------------- | -------------------------------------------------- |
 | -e              | Export data to output files                        |
-| --show-par-list | Show parameters list                               |
+| --show-par-list | Show parameters list  
+| --show-par-list | Show parameters list |
+| --compare       | Compare two fit files. Example: gundamFitCompare -f1 path/to/fit1.root -f2 path/to/fit2.root -n1 fit1 -n2 fit2 -a1 Hesse -a2 Hesse -o path/to/compare.root |

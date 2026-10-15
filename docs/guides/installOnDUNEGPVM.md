@@ -4,11 +4,12 @@ For those who don’t want to waste time installing multiple packages on their d
 ### 0. Setup
 ```bash
 source /exp/dune/app/users/flynnguo/spack_install/setup-env.sh
-spack load yaml-cpp
-spack load root@6.28.12
-spack load cmake@3.27.7
+
 spack load gcc@12.2.0
-spack load jsoncpp@1.9.5
+spack load root@6.28.12%gcc@12.2.0
+spack load cmake@3.27.7%gcc@12.2.0
+spack load yaml-cpp@0.7.0%gcc@12.2.0
+spack load jsoncpp@1.9.5%gcc@12.2.0
 ```
 ### 1. Shell setup 
 ```bash
@@ -33,7 +34,7 @@ To copy the code on your computer or cluster, we recommend to use GIT.
 We assume 
 ```bash
 cd $REPO_DIR
-git clone --recursive -b LTS/1.8.x https://github.com/gundam-organization/gundam.git
+git clone --recurse-submodules https://github.com/gundam-organization/gundam.git
 cd gundam
 ```
 For GUNDAM users, it is recommended for you to check out the latest
@@ -56,6 +57,13 @@ make install -j$(nproc)         #make install -j4
 export LD_LIBRARY_PATH=/exp/dune/app/users/flynnguo/spack_install/__spack_path_placeholder__/__spack_path_placeholder__/__spack_path_placeholder__/__spack_path_placeholder__/__spack_path_placeholder__/__spack_path_placeholder__/__spack_path_placeholder__/__spack_path_placeholde/yaml-cpp/0.7.0/linux-almalinux9-x86_64_v3-gcc-12.2.0-tkehcjd266veu3oj3hupgrbewiimoe4s/lib64:$LD_LIBRARY_PATH 
 ```
 ### 4. Next time login 
+```bash
+export LD_LIBRARY_PATH=/exp/dune/app/users/flynnguo/spack_install/__spack_path_placeholder__/__spack_path_placeholder__/__spack_path_placeholder__/__spack_path_placeholder__/__spack_path_placeholder__/__spack_path_placeholder__/__spack_path_placeholder__/__spack_path_placeholde/yaml-cpp/0.7.0/linux-almalinux9-x86_64_v3-gcc-12.2.0-tkehcjd266veu3oj3hupgrbewiimoe4s/lib64:$LD_LIBRARY_PATH
+source /exp/dune/app/users/$USER/GUNDAM/Install/gundam/setup.sh
+gundamFitter
+```
+
+### 4. Next time login (old, please don't use)  
 ```bash
 source /exp/dune/app/users/flynnguo/.bashrc
 myspack

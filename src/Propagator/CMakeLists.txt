@@ -30,6 +30,7 @@ endif()
 
 
 target_include_directories( GundamPropagator
+    BEFORE
     PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
@@ -42,6 +43,8 @@ endif()
 
 target_link_libraries( GundamPropagator
     PUBLIC
+    GundamParametersManager
+    GundamSamplesManager
     GundamDialDictionary
     ${CACHE_MANAGER_LIBRARIES}
 )

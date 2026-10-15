@@ -6,28 +6,31 @@
 [![GitHub forks](https://badgen.net/github/forks/gundam-organization/gundam/)](https://github.com/gundam-organization/gundam/network/members)
 [![GitHub release](https://img.shields.io/github/release/gundam-organization/gundam.svg)](https://github.com/gundam-organization/gundam/releases/)
 [![Generic badge](https://img.shields.io/badge/Users-Example_of_inputs-GREEN.svg)](https://github.com/gundam-organization/gundam-input-tutorial)
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/gundam-organization/gundam)
 
 GUNDAM, standing for *Generalized and Unified Neutrino Data Analysis
-Methods*, is a suite of applications which aims at performing various
-statistical analysis with different purposes and setups.  It has been
+Methods*, is a suite of applications that aims to perform various
+statistical analyses with different purposes and setups.  It has been
 developed as a fork of
 [xsllhFitter](https://gitlab.com/cuddandr/xsLLhFitter), in the context of
-the Upgrade of ND280 for the T2K neutrino experiment.  The GUNDAM source
-code is officially available at the
-[GUNDAM-organization on GitHub](https://github.com/gundam-organization/gundam).
+the Upgrade of ND280 for the T2K neutrino experiment. Over the years, it has been extensively optimized 
+and developed into a flexible framework that can perform both cross-section and oscillation analyses in different
+experiments. It is used not only in T2K (see [this paper](https://arxiv.org/pdf/2607.10638)) 
+but also in the ICARUS experiment (see [this paper](https://arxiv.org/abs/2604.24925)) 
+and actively promoted within DUNE.
 
 The applications are configurable with a set of YAML/JSON files (see the
 [configuration](./docs/configuration/TopLevel.md) documentation) so users do
-not need to modify the code for each new study.  A lot of time and efforts
+not need to modify the code for each new study. A lot of time and effort
 are usually invested by various working groups to debug and optimize pieces
-of codes doing generic tasks, and GUNDAM lets that work be distributed to
-all users. As GUNDAM is designed for maximize flexibility to accommodate
+of code doing generic tasks, and GUNDAM lets that work be distributed to
+all users. As GUNDAM is designed to maximize flexibility to accommodate
 various physics fitting needs and makes sure that optimizations and
 debugging benefit all analyses.
 
 ## Documentation
 
-GUNDAM [User Documentation](https://gundam-organization.github.io/gundam/) is growing daily.  You can also find examples and other interesting materials under the [resources/](resources/) hierarchy in this repository.  All of the web documentation is available in the source tree under the [docs/](docs/) hierarcy in this repository (see the [index](docs/index.md).)
+GUNDAM [User Documentation](https://gundam-organization.github.io/gundam/) is growing daily.  You can also find examples and other interesting materials under the [resources/](resources/) hierarchy in this repository.  All of the web documentation is available in the source tree under the [docs/](docs/) hierarchy in this repository (see the [index](docs/index.md).)
 
 ![Dependencies banner](resources/images/README/sections/sections.001.png)
 
@@ -38,8 +41,6 @@ GUNDAM [User Documentation](https://gundam-organization.github.io/gundam/) is gr
   - Recommended GCC 8+ ( GCC 5 minimum )
   - Recommended Clang 9+ ( Clang 3.4 minimum )
 - [ROOT 6, compiled with C++14 or later](https://github.com/root-project/root)
-- [JSON for Modern C++](https://github.com/nlohmann/json)
-- [yaml-cpp](https://github.com/jbeder/yaml-cpp)
 
 ![Clone & Update banner](resources/images/README/sections/sections.002.png)
 
@@ -47,7 +48,7 @@ GUNDAM [User Documentation](https://gundam-organization.github.io/gundam/) is gr
 
 GUNDAM source code is officially available under the
 [GUNDAM-organization on GitHub](https://github.com/gundam-organization/gundam).
-To copy the code on your computer or cluster, we recommend to use GIT.
+To copy the code on your computer or cluster, we recommend using Git.
 
 ```bash
 cd $REPO_DIR
@@ -55,9 +56,9 @@ git clone --recurse-submodules https://github.com/gundam-organization/gundam.git
 cd gundam
 ```
 
-For GUNDAM users, it is recommended for you to check out the latest
+For GUNDAM users, it is recommended that you check out the latest
 tagged version of this repository. A simple bash script allows you to
-check out the latest tagged version by tapping:
+Check out the latest tagged version by tapping:
 
 ```bash
 ./update.sh --latest
@@ -66,14 +67,15 @@ check out the latest tagged version by tapping:
 Note that this command will also automatically check out the submodules
 included in the project. Therefore, in order to update your code when
 a new release is available, simply use the same command. Note that git versions
-before 2.0 may have issues to checkout the correct submodules (see issue #429).  If you run the `update.sh` script without any options, it will provide a help message.  Useful variants are
+before 2.0 may have issues checking out the correct submodules (see issue #429).  
+If you run the `update.sh` script without any options, it will provide a help message.  Useful variants are
 
 - `./update.sh --up` : Update to the head of the current branch.  Make sure all of the submodules are also updated.
 - `./update.sh --head` : Checkout the main branch.  Make sure all of the submodules are also updated.
 
 ## Using and Building GUNDAM
 
-GUNDAM uses a standard git and cmake setup. This section will assume that you are putting your files in:
+GUNDAM uses a standard git and CMake setup. This section will assume that you are putting your files in:
 
 - `$REPO_DIR`: the path to the folder where your git projects are stored. This guide
   will download this repo into the subdirectory `$REPO_DIR/gundam`.
@@ -91,16 +93,16 @@ can be configured using
 ```bash
 source ${INSTALL_DIR}/gundam/setup.sh
 ```
-This will setup the environment for GUNDAM, including the version of ROOT
+This will set up the environment for GUNDAM, including the version of ROOT
 that was used to compile and install the project.
 
 ### Development setup
 
 A setup optimized for development in a bash shell is provided with the
 GUNDAM cmake build system. This is optimized for working on several
-parallel versions (and branches) of gundam, possibly using different
-compilers, and processors.  It keeps the installation and build directories
-inside the top level repository with machine/system specific names and
+parallel versions (and branches) of GUNDAM, possibly using different
+compilers and processors.  It keeps the installation and build directories
+inside the top-level repository with machine- and system-specific names and
 implicitly assumes that you will be working on (and testing) several
 branches simultaneously.  The naming scheme is
 `gundam-${compiler}_${compiler_version}-${compiler_machine}`
@@ -127,9 +129,9 @@ After setting up using `gundam-setup.sh`, two commands will be added to your env
 - gundam-build [help] : Compile, install, configure, test GUNDAM
 - gundam-setup [extra] : Redo the environment setup. The `extra` argument is added to the `GUNDAM_TARGET` directory name.
 
-The `gundam-build` command provides a standardized, location invariant, interface to the build system.  It can be run from any place and will recompile a new version into the gundam build directory.
+The `gundam-build` command provides a standardized, location-invariant interface to the build system.  It can be run from any place and will recompile a new version into the GUNDAM build directory.
 
-When using this type of setup, it is a good idea to clone each major version, or branch, into a separate sub-directory.  It this case, the tops of the repos will be organized something like this:
+When using this type of setup, it is a good idea to clone each major version, or branch, into a separate subdirectory.  In this case, the tops of the repos will be organized something like this:
 ```
 ${REPO_DIR}/gundam/main/
 ${REPO_DIR}/gundam/myWork/
@@ -139,7 +141,7 @@ This allows you to easily keep and test several independent versions of GUNDAM a
 
 ### Manual Shell setup
 
-GUNDAM uses a standard cmake build system, so it can be configured by hand.
+GUNDAM uses a standard CMake build system, so it can be configured by hand.
 
 - `$REPO_DIR`: the path to the folder where your git projects are stored. This guide
   will download this repo into the subdirectory `$REPO_DIR/gundam`.

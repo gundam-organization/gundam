@@ -122,8 +122,14 @@ void LikelihoodInterface::initializeImpl() {
   LogInfo << "Move back MC parameters to prior..." << std::endl;
   _modelPropagator_.getParametersManager().moveParametersToPrior();
 
+  LogInfo << "Propagating prior parameters on model histograms..." << std::endl;
+  std::future<bool> priorPropagation = _modelPropagator_.applyParameters();
+  if( priorPropagation.valid() ){ static_cast<void>(priorPropagation.get()); }
+
+  _jointProbabilityPtr_->updateZeroPredictionBinsAtPriorFlag(_samplePairList_);
+
   /// some joint fit probability might need to save the value of the nominal histogram.
-  /// here we know every parameter is at its nominal value
+  /// here we know every parameter is at its nominal value and the bin flags are up-to-date
   LogInfo << "First evaluation of the LLH at the nominal value..." << std::endl;
   this->propagateAndEvalLikelihood();
   LogInfo << this->getSummary() << std::endl;
@@ -163,7 +169,7 @@ double LikelihoodInterface::evalLikelihood(std::future<bool>& propagation) const
   return _buffer_.totalLikelihood;
 }
 double LikelihoodInterface::evalStatLikelihood(std::future<bool>& propagation) const {
-  if (propagation.valid()) propagation.get();
+  if (propagation.valid()) static_cast<void>(propagation.get());
   _buffer_.statLikelihood = 0.;
   for( auto &samplePair: _samplePairList_ ){
     _buffer_.statLikelihood += this->evalStatLikelihood( samplePair );
@@ -185,7 +191,7 @@ double LikelihoodInterface::evalPenaltyLikelihood(const ParameterSet& parSet_) c
   if( parSet_.getPriorCorrelationMatrix() != nullptr ){
     if( parSet_.isEnableEigenDecomp() ){
       for( const auto& eigenPar : parSet_.getEigenParameterList() ){
-        if( eigenPar.isFixed() ){ continue; }
+        if( eigenPar.isPenaltyDisabled() ){ continue; }
         buffer += TMath::Sq( (eigenPar.getParameterValue() - eigenPar.getPriorValue()) / eigenPar.getStdDevValue() ) ;
       }
     }

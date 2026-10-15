@@ -265,7 +265,7 @@ namespace {
 
         // Possibly plot the result for debugging.
         if (plot) {
-            generalSpline.SetLineWidth(1.5);
+            generalSpline.SetLineWidth(1);
             generalSpline.SetLineColor(kGreen);
             generalSpline.Draw("same");
         }

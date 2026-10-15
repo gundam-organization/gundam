@@ -26,15 +26,16 @@ endif()
 
 target_include_directories(
     ${LIB_NAME}
+    BEFORE
     PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
 
 target_link_libraries(
     ${LIB_NAME}
-    PUBLIC GundamParametersManager
+    PUBLIC
+    GundamUtils
 )
 
 #set_target_properties( ${LIB_NAME} PROPERTIES VERSION "${GUNDAM_VERSION_STRING}")
 
 install(TARGETS ${LIB_NAME} DESTINATION lib)
-

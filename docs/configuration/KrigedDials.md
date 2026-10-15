@@ -1,20 +1,12 @@
-# Tabulated Dials
+# Kriged Dials
 
-A kriged dial provides an efficient way to do an event-by-event reweight of
-an event based on a truth variable and fitting parameters when the lookup
-is indexed by more than one truth variable. For instance, this can be used
-for atmospheric neutrino oscillation probability tables where the event
-probability depends on both the neutrino direction, and the neutrino
-energy.  The table will be refilled fore each set of oscillation
-parameters.  An external library is used declare a look up table, to fill
-the table for each iteration, and look up the position of each event in the
-table based on truth variables.
+A kriged dial provides an efficient way to do an event-by-event reweight of an event based on fitting parameters when the lookup is indexed by more than one truth variable. For instance, this can be used for atmospheric neutrino oscillation probability tables where the event probability depends on both the neutrino direction, and the neutrino energy. The kriged dial uses a lookup table that must be filled when the fitting parameter values are changed. The table is managed by an external library that is used to declare the look up table, fill the table for each iteration, and look up the "kriging weights" in the table for each set of truth variables.
 
-The yaml for a Tabulated Dial is
+The yaml for a Kriged dial is
 
 ```YAML
 dialSetDefinitions:
-  - dialType: Tabulated
+  - dialType: Kriged
     printDialsSummary: true
     dialInputList:
       - name: <fit-parameter1-name>
@@ -38,11 +30,11 @@ dialSetDefinitions:
                                                the event weight
 ```
 
-# Function to initialize the library
+## Function to initialize the library
 
 If `initFunction` is provided it will be called before calling the update or the binning functions.  It is called with the signature:
 
-```
+```C++
     extern "C"
     int initFunc(const char* name,
                  int argc, const char* argv[],
@@ -53,13 +45,13 @@ If `initFunction` is provided it will be called before calling the update or the
 * argv -- argument strings.  The arguments are defined by the library, but are usually things like input file names for the lookup table information.
 * bins -- The suggested size the table.  The library must choose an appropriate binning that will be used for the table.
 
-The function should return less than or equal to zero for failure, and otherwise, the number of elements needed to store the table (usually, the  same as the input value of "bins").
+The function must return less than or equal to zero for failure, and otherwise, the number of elements needed to store the table (often, the same as the input value of "bins").
 
-# Library function to update the table
+## Library function to update the table
 
 The update function is called before the events are reweighted.  The `updateFunction` signature is:
 
-```
+```C++
     extern "C"
     int updateFunc(const char* name,
                    double table[], int bins,
@@ -75,10 +67,11 @@ The function should return 0 for success, and any other value for failure
 
 While the update can (in principle) be done directly on the GPU, and have the table directly accessed by the Cache::Manager, the results must be copied back to the CPU so that the Propagator event weight calculation can be done.  The current implementation does not expose the methods to hand the table directly from the external library to the Cache::Manager kernels.  The calculation can also be done solely on the CPU, and the results will be copied to the GPU.
 
-# Library function to look up the events
+## Library function to look up the events
 
 The weight function is called as the MC events are read into the internal structures, and returns the indices and weights to use for an event.  The `weightFunction` signature is:
-```
+
+```C++
     extern "C"
     int weightFunc(const char* name, int bins,
                    int nvar, const double varv[],
@@ -90,20 +83,30 @@ The weight function is called as the MC events are read into the internal struct
 * nvar -- number of (truth) variables used to find bin
 * varv -- array of (truth) variables used to find bin
 * maxEntries -- The space allocated for index and weights
-* index[] -- (output) an array filled with the index values used to weight
-                 the event.  It must hold at least `maxEntries` values
-* weights[] -- (output) an array filled with the weights to be applied the
-                 the table entries referenced in the index array.  It must
-                 hold at least `maxeEntries` values.
+* index[] -- (output) an array filled with the index values used to weight the event.  It must hold at least `maxEntries` values
+* weights[] -- (output) an array filled with the weights to be applied the table entries referenced in the index array.  It must hold at least `maxeEntries` values.
 
 The function should return an int giving the number of entries that were filled in the index array.  The index and weights arrays are "parallel", so the first element of the index array is the index in the table that the weight in the first element of the weight array will be applied to.  The pseudocode for the event weight calculation is
-```
+
+```C++
 double weight = 0;
 for (int i=0; i<entries; ++i) weight += weights[i]*table[index[i]];
 ```
 
-# Compiling the library
+## Compiling the library
 
- The library should loadable by dlopen, so it needs be compiled with (at least)
+The library should loadable by dlopen, so it needs be compiled with (at least)
 
 `gcc -fPIC -rdynamic --shared -o <LibraryName>.so <source>`
+
+## An abbreviated theory of Kriging
+
+Kriging provides a general, relatively efficient, implementation of a
+multi-dimensional look up table for a function, when the function can be
+calculated at a set of "sampled" points, and needs to be extrapolated to
+"unsampled" points. The function value for the unsampled points is calculated
+as the weighted average of selected sampled points (the weights and sampled
+points can be pre-calculated).  Kriging is a special case of gaussian process
+regression using a linear kernel, and was developed by D. Krige (Krige, D. G.
+1951. "A statistical approach to some mine valuation and allied problems on the
+Witwatersrand", Master's thesis, University of the Witwatersrand).

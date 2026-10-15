@@ -23,6 +23,7 @@ namespace LoaderUtils{
   void copyData(const Event& src_, Event& dst_);
   void copyData(Event& event_, const std::vector<const GenericToolbox::TreeBuffer::ExpressionBuffer*>& expList_);
   void fillBinIndex(Event& event_, const std::vector<Histogram::BinContext>& binList_);
+  std::vector<std::string> getRelevantVarNames(const std::vector<Histogram::BinContext>& binList_);
   double evalFormula(const Event& event_, const TFormula* formulaPtr_, std::vector<int>* indexDict_ = nullptr);
   void applyVarTransforms(Event& event_, const std::vector<EventVarTransformLib*>& transformList_);
 

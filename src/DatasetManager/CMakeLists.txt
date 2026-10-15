@@ -28,7 +28,7 @@ else()
   add_library( ${LIB_NAME} SHARED ${SRCFILES} )
 endif()
 
-target_include_directories(${LIB_NAME} PUBLIC
+target_include_directories(${LIB_NAME} BEFORE PUBLIC
   ${CMAKE_CURRENT_SOURCE_DIR}/include)
 
 target_link_libraries( ${LIB_NAME}
@@ -41,4 +41,3 @@ target_link_libraries( ${LIB_NAME}
 install( TARGETS ${LIB_NAME} DESTINATION lib )
 #Can uncomment this to install the headers... but is it really neccessary?
 # install(FILES ${HEADERS} DESTINATION include)
-

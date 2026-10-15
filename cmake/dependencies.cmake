@@ -1,6 +1,12 @@
 message("")
-cmessage( WARNING "Checking dependencies...")
+cmessage( STATUS "Checking dependencies...")
 
+include( FetchContent )
+set(FETCHCONTENT_TRY_FIND_PACKAGE_MODE NEVER)
+
+# A string with all the packages to be made available after everything
+# is declared
+set(DeclaredContent "")
 
 ##########
 # ROOT
@@ -36,12 +42,19 @@ if( ROOT_FOUND )
   # Grab functions such as generate dictionary
   include( ${ROOT_USE_FILE} )
 
+  # Add the libraries and include files here.  These "should" go in
+  # the target_link_libraries or target_include_directories for each library
+  # that uses them, but they all use them, so put them here. This keeps the
+  # symmetry when root-config (if find_package didn't work)
+  link_libraries(${ROOT_LIBRARIES})
+  include_directories(${ROOT_INCLUDE_DIRS})
+
   if (ROOT_VERSION VERSION_GREATER_EQUAL 6.30.00)
     set(ROOT_minuit2_FOUND "yes")
   endif()
 
 else( ROOT_FOUND )
-  cmessage( STATUS "find_package didn't find ROOT. Using shell instead...")
+  cmessage( WARNING "find_package didn't find ROOT. Using shell instead...")
 
   # ROOT
   if(NOT DEFINED ENV{ROOTSYS} )
@@ -118,61 +131,62 @@ if (NOT ROOT_minuit2_FOUND AND NOT WITH_MINUIT2_MISSING)
   cmessage(FATAL_ERROR "[ROOT]: minuit2 is required")
 endif()
 
-include_directories( ${ROOT_INCLUDE_DIR} )
-
 
 ####################
 # NLOHMANN JSON
 ####################
 
 cmessage( STATUS "Looking for JSON install..." )
-find_package( nlohmann_json QUIET )
-
-if( nlohmann_json_FOUND )
-  cmessage( STATUS "nlohmann JSON library found.")
-  link_libraries( nlohmann_json::nlohmann_json )
-else()
-  cmessage( ALERT "nlohmann JSON library not found. Using fetch content... (CMake version >= 3.11)")
-  cmake_minimum_required( VERSION 3.11 FATAL_ERROR )
-  include( FetchContent )
-
-  FetchContent_Declare( json URL https://github.com/nlohmann/json/releases/download/v3.11.3/json.tar.xz )
-  FetchContent_MakeAvailable( json )
-
-  include_directories( ${nlohmann_json_SOURCE_DIR}/include )
-  cmessage( STATUS "nlohmann JSON library fetched: ${nlohmann_json_SOURCE_DIR}/include")
-endif()
+find_package(nlohmann_json 3.11.3 EXACT QUIET CONFIG)
+if( NOT nlohmann_json_FOUND )
+  cmessage( WARNING "System nlohmann_json 3.11.3 not found; using FetchContent to download it.")
+  FetchContent_Declare(
+    nlohmann_json
+    GIT_REPOSITORY https://github.com/nlohmann/json.git
+    GIT_TAG v3.11.3
+    GIT_SHALLOW true
+    # Only do the basic compile
+    CMAKE_ARGS -DJSON_BuildTests=OFF -DJSON_CI=OFF
+    # OVERRIDE_FIND_PACKAGE
+  )
+  set(DeclaredContent ${DeclaredContent} nlohmann_json)
+endif( NOT nlohmann_json_FOUND )
 
 
 ####################
 # YAML-CPP
 ####################
-
 cmessage( STATUS "Looking for YAML install..." )
 
-# WORKAROUND FOR CCLYON (old cmake version/pkg)
-set( CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_CURRENT_SOURCE_DIR}/cmake/utils )
-set( CMAKE_PREFIX_PATH ${CMAKE_PREFIX_PATH} ${CMAKE_CURRENT_SOURCE_DIR}/cmake/utils )
-
-if( DEFINED $YAMLCPP_DIR )
-  cmessage( ALERT "Setting yaml-cpp hint to ${YAMLCPP_DIR}." )
-  set( YAMLCPP_INSTALL_DIR ${YAMLCPP_DIR} )
+find_package(yaml-cpp 0.9.0 EXACT CONFIG)
+if( NOT yaml-cpp_FOUND )
+  cmessage( WARNING "System yaml-cpp package not found")
+  FetchContent_Declare(
+    yaml-cpp
+    GIT_REPOSITORY https://github.com/jbeder/yaml-cpp.git
+    GIT_TAG yaml-cpp-0.9.0
+    # Make sure yaml-cpp doesn't mess with gtest
+    CMAKE_ARGS -DGTEST_INSTALL=OFF
+    # OVERRIDE_FIND_PACKAGE
+  )
+  set(DeclaredContent ${DeclaredContent} yaml-cpp)
 endif()
 
-find_package( YAMLCPP REQUIRED HINTS ${YAMLCPP_DIR} )
-if( NOT YAMLCPP_FOUND )
-  cmessage(FATAL_ERROR "yaml-cpp library not found.")
-endif()
-  cmessage( STATUS " - yaml-cpp include directory: ${YAMLCPP_INCLUDE_DIR}")
-  cmessage( STATUS " - yaml-cpp lib: ${YAMLCPP_LIBRARY}")
-if( "${YAMLCPP_INCLUDE_DIR} " STREQUAL " ")
-  cmessage(FATAL_ERROR "empty YAMLCPP_INCLUDE_DIR returned.")
-endif()
-set(YAML_CPP_LIBRARIES ${YAMLCPP_LIBRARY})
-include_directories( ${YAMLCPP_INCLUDE_DIR} )
-link_libraries( ${YAML_CPP_LIBRARIES} )
 
-
+####################
+# GoogleTest
+####################
+find_package(GTest 1.16.0 EXACT CONFIG)
+if( NOT GTest_FOUND )
+  cmessage( WARNING "System GTest package not found")
+  FetchContent_Declare(
+    GTest
+    GIT_REPOSITORY https://github.com/google/googletest.git
+    GIT_TAG v1.16.0
+    # OVERRIDE_FIND_PACKAGE
+  )
+  set(DeclaredContent ${DeclaredContent} GTest)
+endif( NOT GTest_FOUND )
 
 ####################
 # CUDA (optional)
@@ -196,6 +210,7 @@ if( WITH_CUDA_LIB )
         # After cmake 3.23, this can be set to all or all-major
         set( CMAKE_CUDA_ARCHITECTURES all )
       else()
+        cmessage( WARNING "Force CUDA architecture to 52 (deprecated)")
         set( CMAKE_CUDA_ARCHITECTURES 52 )
       endif()
     endif()
@@ -209,3 +224,16 @@ else( WITH_CUDA_LIB )
     cmessage( STATUS "WITH_CACHE_MANAGER=ON: CUDA support disabled. Use -D WITH_CUDA_LIB=ON if needed." )
   endif()
 endif( WITH_CUDA_LIB )
+
+####################
+# FetchContent packages.
+####################
+
+if (DeclaredContent)
+  # Make any FetchContent available.  Fetched packages should be added
+  # to the local DeclaredContent variable.
+  cmessage(WARNING "FetchContent: Will build ${DeclaredContent}")
+  FetchContent_MakeAvailable(${DeclaredContent})
+else()
+  cmessage(WARNING "No content declared")
+endif (DeclaredContent)

@@ -337,7 +337,7 @@ void ParameterSet::processCovarianceMatrix(){
       _eigenParameterList_[iEigen].setName("eigen");
 
       // fixing all of them by default
-      _eigenParameterList_[iEigen].setIsFixed(true);
+      _eigenParameterList_[iEigen].setIsPenaltyDisabled(true);
       (*eigenState)[iEigen] = 0;
       (*_eigenValuesInv_)[iEigen] = 1./(*_eigenValues_)[iEigen];
 
@@ -366,7 +366,7 @@ void ParameterSet::processCovarianceMatrix(){
       }
 
       // if we reach this point, the eigen value is accepted
-      _eigenParameterList_[iEigen].setIsFixed( false );
+      _eigenParameterList_[iEigen].setIsPenaltyDisabled( false );
       (*eigenState)[iEigen] = 1.;
       eigenCumulative += (*_eigenValues_)[iEigen];
       _nbEnabledEigen_++;
@@ -479,13 +479,13 @@ void ParameterSet::setValidity(const std::string& validity) {
 void ParameterSet::moveParametersToPrior(){
   if( not isEnableEigenDecomp() ){
     for( auto& par : _parameterList_ ){
-      if( par.isFixed() or par.isFrozen() or not par.isEnabled() ){ continue; }
+      if( par.isPenaltyDisabled() or par.isFixed() or not par.isEnabled() ){ continue; }
       par.setParameterValue(par.getPriorValue());
     }
   }
   else{
     for( auto& eigenPar : _eigenParameterList_ ){
-      if( eigenPar.isFixed() or not eigenPar.isEnabled() ) continue;
+      if( eigenPar.isPenaltyDisabled() or not eigenPar.isEnabled() ) continue;
       eigenPar.setParameterValue(eigenPar.getPriorValue());
     }
     this->propagateEigenToOriginal();
@@ -795,7 +795,7 @@ void ParameterSet::propagateOriginalToEigen(){
   // First propagate to the buffer
   int iParOffSet{0};
   for( const auto& par : _parameterList_ ){
-    if( par.isFixed() or not par.isEnabled() ) continue;
+    if( par.isPenaltyDisabled() or not par.isEnabled() ) continue;
     (*_originalParBuffer_)[iParOffSet++] = par.getParameterValue();
   }
 
@@ -821,7 +821,7 @@ void ParameterSet::propagateEigenToOriginal(){
   // Propagate back to the real parameters
   int iParOffSet{0};
   for( auto& par : _parameterList_ ){
-    if( par.isFixed() or not par.isEnabled() ) continue;
+    if( par.isPenaltyDisabled() or not par.isEnabled() ) continue;
     par.setParameterValue((*_originalParBuffer_)[iParOffSet++], true);
   }
 }
@@ -848,8 +848,8 @@ std::string ParameterSet::getSummary() const {
           std::string statusStr;
 
           if( not par.isEnabled() ) { continue; }
-          else if( par.isFixed() )  { statusStr = "Fixed (prior applied)";    colorStr = GenericToolbox::ColorCodes::yellowLightText; }
-          else if( par.isFrozen() )  { statusStr = "Frozen (penalty applied)";    colorStr = GenericToolbox::ColorCodes::yellowLightText; }
+          else if( par.isPenaltyDisabled() )  { statusStr = "Fixed (w/o penalty)";    colorStr = GenericToolbox::ColorCodes::yellowLightText; }
+          else if( par.isFixed() )  { statusStr = "Fixed (w/ penalty applied)";    colorStr = GenericToolbox::ColorCodes::yellowLightText; }
           else if( par.isFree() )   { statusStr = "Free";     colorStr = GenericToolbox::ColorCodes::blueLightText; }
           else                      { statusStr = "Constrained"; }
 
@@ -1032,7 +1032,7 @@ double ParameterSet::toRealParValue(double normParValue, const Parameter& par) {
   return normParValue*par.getStdDevValue() + par.getPriorValue();
 }
 bool ParameterSet::isValidCorrelatedParameter(const Parameter& par_){
-  return ( par_.isEnabled() and not par_.isFree() );
+  return ( par_.isEnabled() and not par_.isPenaltyDisabled() and not par_.isFree() );
 }
 bool ParameterSet::isValidAndNotFixedCorrelatedParameter(const Parameter& par_){
   return ( par_.isEnabled() and not par_.isFixed() and not par_.isFree() );
@@ -1139,8 +1139,14 @@ void ParameterSet::defineParameters(){
       for( auto& enableEntry : _enableOnlyParameters_ ){
         enableEntry.clearFields();
         enableEntry.defineFields({{"name"}});
+        enableEntry.defineFields({{"index"}});
         if( enableEntry.hasField("name")
             and par.getName() == enableEntry.fetchValue<std::string>("name") ){
+          isEnabled = true;
+          break;
+        }
+        if( enableEntry.hasField("index")
+            and par.getParameterIndex() == enableEntry.fetchValue<int>("index") ) {
           isEnabled = true;
           break;
         }
@@ -1159,10 +1165,16 @@ void ParameterSet::defineParameters(){
       for( auto& disableEntry : _disableParameters_ ){
         disableEntry.clearFields();
         disableEntry.defineFields({{"name"}});
+        disableEntry.defineFields({{"index"}});
         if( disableEntry.hasField("name")
             and par.getName() == disableEntry.fetchValue<std::string>("name") ){
           isEnabled = false;
           break;
+        }
+        if( disableEntry.hasField("index")
+        and par.getParameterIndex() == disableEntry.fetchValue<int>("index") ) {
+              isEnabled = true;
+              break;
         }
       }
 
@@ -1192,54 +1204,62 @@ void ParameterSet::defineParameters(){
 
     if( not _parameterDefinitionConfig_.empty() ){
       // Alternative 1: define dials then parameters
-      if (_parameterNamesList_ != nullptr) {
+      ConfigReader selectedParConfig;
+
+      if( _parameterNamesList_ != nullptr ) {
         // Find the parameter using the name from the vector of names for
         // the covariance.
-
-        ConfigReader selectedParConfig;
-
-        // search with name
         std::string parName = _parameterNamesList_->At(par.getParameterIndex())->GetName();
         for( auto& parConfig : _parameterDefinitionConfig_.loop() ){
           parConfig.defineFields({
-            {"name", {"parameterName"}},
+              {"name", {"parameterName"}},
           });
-          if( parConfig.hasField("name") ){
-            if( parName == parConfig.fetchValue<std::string>("name") ){
-              selectedParConfig = parConfig;
-              break;
-            }
+          if( parConfig.hasField("name")
+              and parName == parConfig.fetchValue<std::string>("name") ){
+            selectedParConfig = parConfig;
+            break;
           }
         }
-
-        // not found? try with the index
-        if( selectedParConfig.empty() ){
-          for( auto& parConfig : _parameterDefinitionConfig_.loop() ){
-            parConfig.defineFields({{"parameterIndex"}});
-            if( parConfig.hasField("parameterIndex") ){
-              if( par.getParameterIndex() == parConfig.fetchValue<int>("parameterIndex") ){
-                selectedParConfig = parConfig;
-                break;
-              }
-            }
-          }
-        }
-
-        par.setConfig( selectedParConfig );
       }
-      else{
-        // No covariance provided, so find the name based on the order in
-        // the parameter set.
+
+      // Always allow an explicit parameterIndex mapping, even when the
+      // covariance file does not expose a parameter name list.
+      if( selectedParConfig.empty() ){
+        for( auto& parConfig : _parameterDefinitionConfig_.loop() ){
+          parConfig.defineFields({{"parameterIndex"}});
+          if( parConfig.hasField("parameterIndex")
+              and par.getParameterIndex() == parConfig.fetchValue<int>("parameterIndex") ){
+            selectedParConfig = parConfig;
+            break;
+          }
+        }
+      }
+
+      // If no covariance matrix is defined, parameters are created from the
+      // configuration order itself, so preserving the positional mapping keeps
+      // existing configs working without requiring parameterIndex.
+      if( selectedParConfig.empty() and _priorFullCovarianceMatrix_ == nullptr ){
         auto configVector = _parameterDefinitionConfig_.loop();
-        LogThrowIf(configVector.size() <= par.getParameterIndex(),
-                   "Parameter index out of range");
-        auto& parConfig = configVector.at(par.getParameterIndex());
-        par.setConfig( parConfig );
-
-        LogWarning << "Parameter #" << par.getParameterIndex()
-                   << " not defined by covariance matrix file"
-                   << std::endl;
+        if( size_t(par.getParameterIndex()) < configVector.size() ){
+          selectedParConfig = configVector.at(size_t(par.getParameterIndex()));
+        }
       }
+
+      if( selectedParConfig.empty() and par.isEnabled() ){
+        std::stringstream ss;
+        ss << "No parameterDefinitions entry mapped to enabled parameter #"
+           << par.getParameterIndex();
+        if( _parameterNamesList_ != nullptr ){
+          ss << " (\"" << _parameterNamesList_->At(par.getParameterIndex())->GetName() << "\")";
+        }
+        else{
+          ss << ". Please specify \"parameterIndex\" explicitly";
+        }
+        ss << ".";
+        LogWarning << ss.str() << std::endl;
+      }
+
+      par.setConfig( selectedParConfig );
     }
     else if( not _dialSetDefinitions_.empty() ){
       // Alternative 2: define dials then parameters

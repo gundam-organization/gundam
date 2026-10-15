@@ -15,6 +15,8 @@
 #include "Math/Minimizer.h"
 #include "Math/Functor.h"
 #include "TDirectory.h"
+#include "TMatrixD.h"
+#include "TMatrixDSym.h"
 
 #include <memory>
 #include <vector>
@@ -32,6 +34,7 @@ public:
   void calcErrors() override;
   void scanParameters( TDirectory* saveDir_ ) override;
   double evalFit( const double* parArray_ ) override;
+  void throwPostfitParameters() override;
   [[nodiscard]] bool isErrorCalcEnabled() const override { return not disableCalcError(); }
 
   // c-tor
@@ -50,6 +53,8 @@ public:
 protected:
   void writePostFitData(TDirectory* saveDir_);
   void updateCacheToBestfitPoint();
+  void updateBestfitPointCache();
+  void updateBestfitCovCache();
   void saveGradientSteps();
 
 private:
@@ -93,6 +98,21 @@ private:
   /// evalFit.
   ROOT::Math::Functor _functor_{};
   std::unique_ptr<ROOT::Math::Minimizer> _rootMinimizer_{nullptr};
+
+  struct PostfitCache{
+    std::vector<double> bestfitPoint{};
+    std::vector<std::string> variableNames{};
+    std::unique_ptr<TMatrixDSym> covariance{nullptr};
+    std::vector<int> throwParIndexList{};
+    std::unique_ptr<TMatrixD> choleskyCovariance{nullptr};
+    int status{-1};
+    int covarianceStatus{-1};
+    int nFree{0};
+    int nIterations{0};
+    double edm{std::nan("unset")};
+    double minValue{std::nan("unset")};
+  };
+  PostfitCache postfitCache{};
 
   struct GradientDescentMonitor{
     bool isEnabled{false};

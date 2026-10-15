@@ -72,8 +72,8 @@ so an `eigenValueThreshold` of 1E-12 is usually appropriate.
 | parameterPriorValueList              | string           | Name of TVectorD with prior values for each parameter        | empty   |
 | parameterLowerBoundsList             | string           | Name of TVectorD with parameter lower bounds                 | empty   |
 | parameterUpperBoundsList             | string           | Name of TVectorD with parameter lower bounds                 | empty   |
-| enableOnlyParameters                 | list             | List of enabled parameter for this set (others disabled)     | empty   |
-| disableParameters                    | list             | List of disabled parameters for this set (others enabled)    | empty   |
+| enableOnlyParameters                 | list(Json)       | List of enabled parameters for this set (others disabled)    | empty   |
+| disableParameters                    | list(Json)       | List of disabled parameters for this set (others enabled)    | empty   |
 | useEigenDecompForThrows              | bool             | Throw toys in eigen decomposed basis                         | false   |
 | enableEigenDecomp                    | bool             | Eigen decompose the prior covariance matrix                  | false   |
 | allowEigenDecompWithBounds           | bool             | Allow bounds to be ignored when eigen decomposing            | false   |
@@ -105,6 +105,26 @@ dialSetDefinitions:
           - name: "First Parameter"
           - name: "Second Parameter"
       <other fields>
+```
+
+#### enableOnlyParameters and disableParameters options
+
+The `enableOnlyParameters` and `disableParameters` fields hold lists that select parameters by name or by index.  `enableOnlyParameters` disables every parameter in the set except the selected ones.  `disableParameters` disables only the selected parameters, leaving the other parameters enabled.
+
+| Options | Type   | Description                                           | Default |
+|---------|--------|-------------------------------------------------------|---------|
+| name    | string | Select a parameter using its name                     |         |
+| index   | int    | Select a parameter using its zero-based index in set  |         |
+
+For example:
+```yaml
+enableOnlyParameters:
+    - name: "First Parameter"
+    - index: 2
+
+disableParameters:
+    - name: "Second Parameter"
+    - index: 3
 ```
 
 #### parameterLimits options

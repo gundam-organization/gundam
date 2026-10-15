@@ -18,7 +18,7 @@ std::string DataDispenserParameters::getSummary() const{
   ss << std::endl << GET_VAR_NAME_VALUE(nominalWeightFormulaStr);
   ss << std::endl << GET_VAR_NAME_VALUE(selectionCutFormulaStr);
   ss << std::endl << "activeLeafNameList = " << GenericToolbox::toString(activeLeafNameList, true);
-  ss << std::endl << "filePathList = " << GenericToolbox::toString(filePathList, true);
+  ss << std::endl << "filePathList = " << GenericToolbox::toString(filePathList, [](const DataDispenserParameters::FilePathEntry& entry){ return entry.path; }, true);
   ss << std::endl << "variableDict = " << GenericToolbox::toString(variableDict, true);
   ss << std::endl << "additionalVarsStorage = " << GenericToolbox::toString(additionalVarsStorage, true);
   return ss.str();
@@ -27,6 +27,8 @@ std::string DataDispenserParameters::getSummary() const{
 
 void DataDispenserCache::clear(){
   propagatorPtr = nullptr;
+
+  totalNbEvents = 0;
 
   samplesToFillList.clear();
   sampleNbOfEvents.clear();
@@ -37,12 +39,10 @@ void DataDispenserCache::clear(){
 
   varsRequestedForIndexing.clear();
   varToLeafDict.clear();
-
-  varsToOverrideList.clear();
+  eventFormulaTreeExpressionAliases.clear();
+  variableDictEvalList.clear();
 }
 void DataDispenserCache::addVarRequestedForIndexing(const std::string& varName_) {
   LogThrowIf(varName_.empty(), "no var name provided.");
   GenericToolbox::addIfNotInVector(varName_, this->varsRequestedForIndexing);
 }
-
-

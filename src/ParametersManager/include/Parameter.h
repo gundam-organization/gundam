@@ -39,8 +39,8 @@ public:
   void setName(const std::string &name){ _name_ = name; }
   void setPriorType(PriorType priorType){ _priorType_ = priorType; }
   void setIsEnabled(bool isEnabled){ _isEnabled_ = isEnabled; }
-  void setIsFixed(bool isFixed){ _isFixed_ = isFixed; }
-  void setIsFrozen(bool isFrozen){ _isFrozen_ = isFrozen; }
+  void setIsPenaltyDisabled(bool isPenaltyDisabled){ _isPenaltyDisabled_ = isPenaltyDisabled; }
+  void setIsFixed(bool isFixed){_isFixed_ = isFixed; }
   void setIsEigen(bool isEigen){ _isEigen_ = isEigen; }
   void setIsFree(bool isFree){ _isFree_ = isFree; }
   void setIsThrown(bool isThrown){ _isThrown_ = isThrown; }
@@ -93,12 +93,12 @@ public:
   /// The parameter has no constrains applied.
   [[nodiscard]] auto isFree() const{ return _isFree_; }
 
-  /// The parameter is fixed, and does not enter into the penalty term.
-  /// Although it is removed from the covariance and its value is used for the
-  /// reweighting.  This constrasts with a frozen variable where the value of
-  /// the variable will not be changed by the fit, but the variable is used to
-  /// calculate the penalty term.
-  [[nodiscard]] auto isFixed() const{ return _isFixed_; }
+  /// The parameter penalty is disabled and does not enter into the penalty
+  /// term.  Although it is removed from the covariance and its value is used
+  /// for the reweighting.  This constrasts with a frozen variable where the
+  /// value of the variable will not be changed by the fit, but the variable
+  /// is used to calculate the penalty term.
+  [[nodiscard]] auto isPenaltyDisabled() const{ return _isPenaltyDisabled_; }
 
   /// The parameter affects the likelihood, and is included in the penalty,
   /// but should not be varied as part of the fit.  A common usage is for
@@ -108,7 +108,7 @@ public:
   /// does not change the behavior toy throws, or the Bayesian MCMC analysis
   /// [where the absolute value of the LLH isn't meaningful].  Note:
   /// Parameters in an eigen decomposed parameter set cannot be frozen.
-  [[nodiscard]] auto isFrozen() const{ return _isFrozen_; }
+  [[nodiscard]] auto isFixed() const{ return _isFixed_; }
 
   /// When a parameter set is eigen decomposed, a set of "fake" parameters is
   /// created for each of the eigen vectors.  This is true when the current
@@ -121,8 +121,8 @@ public:
 
   /// A random value should be generated for this parameter when the parameter
   /// set is thrown.  Notice that a "frozen" parameter is thrown, while a
-  /// "fixed" parameter is not.
-  [[nodiscard]] auto isThrown() const{ return _isThrown_ and _isEnabled_ and not _isFixed_; }
+  /// "isPenaltyDisabled" parameter is not.
+  [[nodiscard]] auto isThrown() const{ return _isThrown_ and _isEnabled_ and not _isPenaltyDisabled_; }
 
   [[nodiscard]] bool isCyclic() const;
   [[nodiscard]] auto gotUpdated() const { return _gotUpdated_; }
@@ -233,8 +233,8 @@ public:
 private:
   // Parameters
   bool _isEnabled_{true};
+  bool _isPenaltyDisabled_{false};
   bool _isFixed_{false};
-  bool _isFrozen_{false};
   bool _isEigen_{false};
   bool _isFree_{false};
   bool _isThrown_{true};

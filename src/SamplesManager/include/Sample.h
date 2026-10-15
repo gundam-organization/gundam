@@ -16,9 +16,6 @@
 
 #include <vector>
 #include <string>
-#include <memory>
-
-
 
 class Sample : public JsonBaseClass {
 
@@ -48,7 +45,6 @@ public:
   [[nodiscard]] auto getIndex() const{ return _index_; }
   [[nodiscard]] auto& getName() const{ return _name_; }
   [[nodiscard]] auto& getSelectionCutsStr() const{ return _selectionCutStr_; }
-  [[nodiscard]] auto& getSampleWeightFormula() const{ return _sampleWeightFormula_; }
   [[nodiscard]] auto& getSampleWeightFormulaStr() const{ return _sampleWeightFormulaStr_; }
   [[nodiscard]] auto& getBinningFilePath() const{ return _binningConfig_; }
   [[nodiscard]] auto& getHistogram() const{ return _histogram_; }
@@ -93,7 +89,6 @@ private:
   Histogram _histogram_{};
   std::vector<Event> _eventList_{};
   std::vector<DatasetProperties> _loadedDatasetList_{};
-  std::shared_ptr<TFormula> _sampleWeightFormula_{nullptr};
 
 };
 

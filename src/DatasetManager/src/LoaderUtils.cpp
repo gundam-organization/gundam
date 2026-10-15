@@ -38,6 +38,15 @@ namespace LoaderUtils{
     }
     event_.getIndices().bin = -1;
   }
+  std::vector<std::string> getRelevantVarNames(const std::vector<Histogram::BinContext>& binList_){
+    std::vector<std::string> relevantVarNames;
+    for( auto& bin : binList_ ){
+      for( auto& edges : bin.bin.getEdgesList() ) {
+        GenericToolbox::addIfNotInVector(edges.varName, relevantVarNames);
+      }
+    }
+    return relevantVarNames;
+  }
   double evalFormula(const Event& event_, const TFormula* formulaPtr_, std::vector<int>* indexDict_){
     LogThrowIf(formulaPtr_ == nullptr, GET_VAR_NAME_VALUE(formulaPtr_));
 

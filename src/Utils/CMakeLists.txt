@@ -5,6 +5,7 @@ set(SRCFILES
     ${CMAKE_CURRENT_SOURCE_DIR}/src/GundamGreetings.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ParameterThrowerMarkHarz.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ConfigUtils.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/FormulaUtils.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/GundamUtils.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/RootUtils.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/GundamApp.cpp
@@ -21,6 +22,7 @@ set(HEADERS
     ${CMAKE_CURRENT_SOURCE_DIR}/include/VariableDictionary.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ParameterThrowerMarkHarz.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ConfigUtils.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/FormulaUtils.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/GundamUtils.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/GundamApp.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/GundamBacktrace.h
@@ -50,12 +52,12 @@ include_directories( ${CMAKE_BINARY_DIR}/generated/ ) # version header
 
 # Make sure the current directories are available for the later
 # compilation.
-target_include_directories( GundamUtils PUBLIC
+target_include_directories( GundamUtils BEFORE PUBLIC
   ${CMAKE_CURRENT_SOURCE_DIR}/include
   ${CMAKE_BINARY_DIR}/generated
 )
 
-target_link_libraries( GundamUtils PUBLIC ${ROOT_LIBRARIES} )
+target_link_libraries( GundamUtils PUBLIC ${ROOT_LIBRARIES} yaml-cpp::yaml-cpp)
 install( TARGETS GundamUtils DESTINATION lib )
 
 #Can uncomment this to install the headers... but is it really neccessary?

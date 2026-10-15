@@ -9,11 +9,19 @@ The `gundamFitCompare` app that takes as input the output of [gundamFitter](gund
 
 ### Usage
 
-One has to use the arguments `-f1` and `-f2` to specify the input fit files. Then using `-n1` and `-n2` names the fits respectively and lastly using `-a1` and `-a2` chooses the algorithm to compare (Migrad, Hesse, etc).
+It takes the path to each fit file as arguments as follows:
+```bash
+gundamConfigCompare -f1 path/to/fit1.root -c2 path/to/fit2.root
+```
+The output files path is specified by the argument `-o`:
+```bash
+gundamFitCompare -f1 path/to/fit1.root -f2 path/to/fit2.root -o path/to/compare.root
+ ```
+
+Additionally, the comparison algorithm (Migrad, Hesse, etc.) can be specified using `-a1` and `-a2`, and the fits can be named using `-n1` and `-n2`, respectively:
 ```bash
 gundamFitCompare -f1 path/to/fit1.root -f2 path/to/fit2.root -n1 fit1 -n2 fit2 -a1 Hesse -a2 Hesse -o path/to/compare.root
-```
-The argument `-o` specifiers where the output compare file is saved. 
+``` 
 
 ### Trigger options
 
