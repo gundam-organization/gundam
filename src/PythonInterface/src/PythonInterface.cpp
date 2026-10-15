@@ -372,6 +372,8 @@ PYBIND11_MODULE(GUNDAM, module) {
   ;
 
   pybind11::class_<Sample>(module, "Sample")
+  .def("setUseDynamicBinning", &Sample::setUseDynamicBinning)
+  .def("isUseDynamicBinning", &Sample::isUseDynamicBinning)
   .def("isEnabled", &Sample::isEnabled)
   .def("isEventMcThrowDisabled", &Sample::isEventMcThrowDisabled)
   .def("getIndex", &Sample::getIndex)
