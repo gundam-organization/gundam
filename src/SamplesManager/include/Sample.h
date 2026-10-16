@@ -77,6 +77,7 @@ public:
 
   // multi-thread
   void indexEventInHistogramBin( int iThread_ = -1);
+  void indexEventInHistogramBin(GenericToolbox::ParallelWorker& threadPool_);
 
 private:
   // configuration
