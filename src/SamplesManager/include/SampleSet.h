@@ -39,6 +39,8 @@ public:
 
   void copyEventsFrom(const SampleSet& src_);
   void copyHistBinContentFrom(const SampleSet& src_);
+  /// Reassign events and rebuild bin contributions in all dynamic samples.
+  void updateEventBinning(GenericToolbox::ParallelWorker& threadPool_);
   [[nodiscard]] size_t getNbOfEvents() const;
 
   // misc

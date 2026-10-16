@@ -41,7 +41,7 @@ external libraries to calculate weights.
 
 | Option                 | Type         | Description                                                            | Default |
 |------------------------|--------------|------------------------------------------------------------------------|---------|
-| dialLeafName           | string       | fetch dial from the dataset TTree with the corresponding leaf name     |         |
+| dialBranchData         | string or object | Read a ROOT object branch or a pair of TArray branches (see below). `dialLeafName` and `treeExpression` remain aliases. | |
 | dialsFilePath          | string       | root file containing the set of dials                                  |         |
 | dialsList              | string       | path within root file to the list of dials                             |         |
 | tableConfig            | json         | Definition of functions to call for Tabular dials                      | empty   |
@@ -60,7 +60,7 @@ Treat the parameter as a simple weight.  In this case, the parameter must be bou
 
 | Option                 | Type         | Description                                                            | Default |
 |------------------------|--------------|------------------------------------------------------------------------|---------|
-| dialLeafName           | string       | fetch dial from the dataset TTree with the corresponding leaf name     |         |
+| dialBranchData         | string or object | Read a ROOT object branch or a pair of TArray branches (see below). `dialLeafName` and `treeExpression` remain aliases. | |
 | dialsFilePath          | string       | root file containing the set of dials                                  |         |
 | dialsList              | string       | path within root file to the list of dials                             |         |
 
@@ -95,7 +95,7 @@ The `Spline` dial type can have several `dialSubType` values
 
 | Option                 | Type         | Description                                                            | Default |
 |------------------------|--------------|------------------------------------------------------------------------|---------|
-| dialLeafName           | string       | fetch dial from the dataset TTree with the corresponding leaf name     |         |
+| dialBranchData         | string or object | Read a ROOT object branch or a pair of TArray branches (see below). `dialLeafName` and `treeExpression` remain aliases. | |
 | dialsFilePath          | string       | root file containing the set of dials                                  |         |
 | dialsList              | string       | path within root file to the list of dials                             |         |
 
@@ -110,7 +110,7 @@ leaf named by the `dialLeaf` field, and must contain a TGraph object.
 
 | Option                 | Type         | Description                                                            | Default |
 |------------------------|--------------|------------------------------------------------------------------------|---------|
-| dialLeafName           | string       | fetch dial from the dataset TTree with the corresponding leaf name     |         |
+| dialBranchData         | string or object | Read a ROOT object branch or a pair of TArray branches (see below). `dialLeafName` and `treeExpression` remain aliases. | |
 | dialsFilePath          | string       | root file containing the set of dials                                  |         |
 | dialsList              | string       | path within root file to the list of dials                             |         |
 
@@ -171,3 +171,73 @@ cannot be efficiently applied with GPU acceleration.
 | excludedRanges                    | list(pair(double)) | list of ranges (min, max) where the dials of the set don't apply |         |
 | allowedValues                     | list(double)       | list of values where the dials of the set apply                  |         |
 | excludedValues                    | list(double)       | list of values where the dials of the set apply                  |         |
+
+### Event-by-event branch data
+
+For a `Spline` or `Graph` dial, a pair of TArray branches can supply the
+parameter values (X) and responses (Y) for each event:
+
+```yaml
+dialType: Spline
+dialBranchData:
+  parameterValuesTArray: spline_parameter_values
+  weightValuesTArray: spline_responses
+```
+
+Both names refer to branches of the input TTree. The branches must contain
+TArray objects, for example TArrayF or TArrayD; the two arrays may use different
+numeric types but must have the same length for each entry. Points are paired
+by array index and processed using the same spline options, sorting, definition
+range and extrapolation settings as TGraph inputs. Empty arrays produce no dial;
+constant responses retain the existing constant-dial behavior.
+
+Existing ROOT object inputs use a string:
+
+```yaml
+dialType: Spline
+dialBranchData: spline_graph
+```
+
+Existing configurations using `dialLeafName: spline_graph` or
+`treeExpression: spline_graph` remain supported. The array-pair form is limited
+to `Spline` and `Graph` dials; it does not use the TClonesArray dial index.
+
+### Applying a dial to an event variable
+
+Any dial can target a stored event variable instead of the event weight:
+
+```yaml
+dialType: Normalization
+applyToVariable: recoEnergy
+variableResponseMode: Multiply
+```
+
+`variableResponseMode` accepts `Multiply` (the default), `Add`, or `Override`.
+For each event and target variable, responses are composed as:
+
+```text
+value = (Override response, or loaded value) * product(Multiply responses) + sum(Add responses)
+```
+
+Multiple `Override` dials targeting the same variable of the same event are an
+error. Disjoint application conditions may select different override dials.
+Every propagation starts from the loaded reference value, so shifts do not
+accumulate. Target variables hold double precision responses; other variables
+retain their stored types. The reference is captured when the dial cache is built,
+before the first propagation.
+
+The loader stores target variables automatically and retains out-of-bin events
+in samples binned with those variables by enabling `useDynamicBinning`. Initial
+loading assigns bins using the loaded values. Propagation updates variables,
+rebuilds bin contributions, computes event weights, and fills histograms.
+Smoothing is enabled only through an explicit `binningResponse` configuration;
+its fractions are recomputed using the updated variables.
+
+`Add` and `Override` allow negative responses by default. Explicit
+`minDialResponse` and `maxDialResponse` limits still apply. Variable responses
+are excluded from the event weight and its global reweight cap. Sample selections
+and event-to-dial associations remain those established at loading; derived
+variables are not automatically recalculated after a target variable changes.
+This feature currently requires the CPU propagation path. Leave CacheManager
+disabled (`--cache-manager off` with `gundamFitter`); its support is outside this
+implementation.

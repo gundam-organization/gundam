@@ -122,11 +122,7 @@ void ParameterScanner::initializeImpl() {
   }
   if( GenericToolbox::Json::fetchValue(_varsConfig_, "weightPerSamplePerBin", false) ){
     for( auto& sample : _likelihoodInterfacePtr_->getModelPropagator().getSampleSet().getSampleList() ){
-#if HAS_CPP_17
       for( auto [binContent, binContext] : sample.getHistogram().loop() ){
-#else
-        for( auto element : sample.getHistogram().loop() ){ auto& binContent = std::get<0>(element); auto& binContext = std::get<1>(element);
-#endif
         _scanDataDict_.emplace_back();
         auto& scanEntry = _scanDataDict_.back();
         scanEntry.yPoints = std::vector<double>(_nbPoints_+1,0);
@@ -167,8 +163,8 @@ void ParameterScanner::scanParameter(Parameter& par_, TDirectory* saveDir_) {
   }
 
   double origVal = par_.getParameterValue();
-  double lowBound = origVal + _parameterSigmaRange_.min * par_.getStdDevValue();
-  double highBound = origVal + _parameterSigmaRange_.max * par_.getStdDevValue();
+  double lowBound = origVal + ParameterSet::toRealParRange(_parameterSigmaRange_.min, par_);
+  double highBound = origVal + ParameterSet::toRealParRange(_parameterSigmaRange_.max, par_);
 
   if( _useParameterLimits_ ){
     lowBound = std::max(lowBound, par_.getParameterLimits().min);
@@ -353,7 +349,7 @@ void ParameterScanner::generateOneSigmaPlots(TDirectory* saveDir_){
     double currentParValue = par_.getParameterValue();
 
     // Push the selected parameter to 1 sigma
-    par_.setParameterValue( currentParValue + par_.getStdDevValue() );
+    par_.setParameterValue( currentParValue + ParameterSet::toRealParRange(1., par_) );
 
     // Propagate the parameters
     _likelihoodInterfacePtr_->getModelPropagator().propagateParameters();
@@ -468,7 +464,7 @@ void ParameterScanner::varyEvenRates(const std::vector<double>& paramVariationLi
 
       buffEvtRatesMap.emplace_back();
 
-      double cappedParValue{par_.getPriorValue() + variationList_[iVar] * par_.getStdDevValue()};
+      double cappedParValue{par_.getPriorValue() + ParameterSet::toRealParRange(variationList_[iVar], par_)};
       cappedParValue = std::min(cappedParValue, par_.getParameterLimits().max);
       cappedParValue = std::max(cappedParValue, par_.getParameterLimits().min);
 
@@ -493,7 +489,7 @@ void ParameterScanner::varyEvenRates(const std::vector<double>& paramVariationLi
       /*if (par_.isFree()) (*variationList_TVectorD)(iVar) = variationList_[iVar];
       else
       */
-      (*variationList_TVectorD)(iVar) = par_.getPriorValue() + variationList_[iVar] * par_.getStdDevValue();
+      (*variationList_TVectorD)(iVar) = par_.getPriorValue() + ParameterSet::toRealParRange(variationList_[iVar], par_);
     }
     GenericToolbox::writeInTFileWithObjTypeExt(saveSubDir_, variationList_TVectorD, "paramValues");
 

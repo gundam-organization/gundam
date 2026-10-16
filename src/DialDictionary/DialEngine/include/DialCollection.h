@@ -41,6 +41,14 @@ public:
 #include "GenericToolbox.MakeEnum.h"
   MAKE_ENUM_JSON_INTERFACE(DialType);
 
+#define ENUM_NAME VariableResponseMode
+#define ENUM_FIELDS \
+  ENUM_FIELD( Multiply ) \
+  ENUM_FIELD( Add ) \
+  ENUM_FIELD( Override )
+#include "GenericToolbox.MakeEnum.h"
+  MAKE_ENUM_JSON_INTERFACE(VariableResponseMode);
+
   static void prepareConfig(ConfigReader &config_);
 
 public:
@@ -85,6 +93,10 @@ public:
   // (e.g. it might be an tabulated event-by-event dial).
   [[nodiscard]] const std::string &getDialLeafName() const{ return _dialLeafName_; }
 
+  [[nodiscard]] bool hasDialBranchData() const{ return not _dialLeafName_.empty() or not _dialParameterValuesBranch_.empty(); }
+  [[nodiscard]] const std::string& getDialParameterValuesBranch() const{ return _dialParameterValuesBranch_; }
+  [[nodiscard]] const std::string& getDialResponsesBranch() const{ return _dialResponsesBranch_; }
+
   [[nodiscard]] const BinSet &getDialBinSet() const{ return _dialBinSet_; }
   [[nodiscard]] const std::vector<std::string> &getDataSetNameList() const{ return _dataSetNameList_; }
 
@@ -94,6 +106,9 @@ public:
 
   [[nodiscard]] auto& getDialType() const{ return _dialType_; }
   [[nodiscard]] auto& getDialOptions() const{ return _dialOptions_; }
+
+  [[nodiscard]] const std::string& getApplyToVariable() const{ return _applyToVariable_; }
+  [[nodiscard]] VariableResponseMode getVariableResponseMode() const{ return _variableResponseMode_; }
 
   // mutable getters
   BinSet &getDialBinSet(){ return _dialBinSet_; }
@@ -182,6 +197,7 @@ protected:
   bool initializeDialsWithKriging(const ConfigReader& dialsDefinition);
   bool initializeDialsWithExternalWeight(const ConfigReader& dialsDefinition);
 
+  void readVariableResponseConfig(const ConfigReader& config_);
   void readParametersFromConfig(const ConfigReader &config_);
   ConfigReader fetchDialsDefinition(const ConfigReader &definitionsList_) const;
 
@@ -209,6 +225,11 @@ private:
   double _mirrorRange_{std::nan("unset")};
   std::string _applyConditionStr_{};
   std::string _dialLeafName_{};
+  std::string _dialParameterValuesBranch_{};
+  std::string _dialResponsesBranch_{};
+
+  std::string _applyToVariable_{};
+  VariableResponseMode _variableResponseMode_{VariableResponseMode::Multiply};
 
   DialType _dialType_{DialType::Norm}; // Graph, Spline...
   std::string _dialOptions_{}; // monotonic, catmull-rom...

@@ -9,6 +9,7 @@
 
 
 void DialInputBuffer::invalidateBuffers(){
+  ++_revision_;
   // invalidate buffer
   for( auto& buf : _inputBuffer_ ){ buf = std::nan("unset"); }
 }
@@ -86,11 +87,11 @@ void DialInputBuffer::update(){
       _inputBuffer_[inputRef.bufferIndex] = tempBuffer;
     }
   }
+  if( _isDialUpdateRequested_ ){ ++_revision_; }
 }
 void DialInputBuffer::addParameterReference( const ParameterReference& parReference_){
   LogThrowIf(_isInitialized_, "Can't add parameter index while initialized.");
-  _inputParameterReferenceList_.emplace_back(parReference_);
-  auto& parRef = _inputParameterReferenceList_.back();
+  auto& parRef = _inputParameterReferenceList_.emplace_back(parReference_);
   parRef.bufferIndex = int(_inputParameterReferenceList_.size())-1;
 }
 std::string DialInputBuffer::getSummary(bool shallow_) const{

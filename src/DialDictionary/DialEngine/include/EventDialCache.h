@@ -44,13 +44,18 @@ public:
     // The dial interface to be used with the Event.
     DialInterface* dialInterface{nullptr};
     // The cached result calculated by the dial.
+    bool appliesToVariable{false};
     double response{std::nan("unset")};
     // A cached boolean to check if the dial needs to be updated.
     bool *updateRequested{nullptr};
+    std::uint64_t inputRevision{std::uint64_t(-1)};
     void update(){
-      // Reevaluate the dial if an update has been requested
-      if( *(this->updateRequested) ) {
+      // Retain changes until this response consumes them, even when the
+      // input buffer has been updated again in the meantime.
+      auto revision = dialInterface->getInputBufferRef()->getRevision();
+      if( inputRevision != revision ) {
         response = dialInterface->evalResponse();
+        inputRevision = revision;
       }
     }
     double getResponse(){
@@ -59,11 +64,22 @@ public:
     }
   };
 
+  /// Per-event target, with responses indexed into dialResponseCacheList.
+  /// The loaded reference is captured after sorting events, before propagation.
+  struct VariableResponseCache {
+    int variableIndex{-1};
+    double referenceValue{0};
+    std::vector<std::size_t> multiplyDials;
+    std::vector<std::size_t> addDials;
+    std::size_t overrideDial{std::size_t(-1)};
+  };
+
   /// The cache element associating a Event to the appropriate
   /// DialInterface.
   struct CacheEntry {
     Event* event;
     std::vector<DialResponseCache> dialResponseCacheList{};
+    std::vector<VariableResponseCache> variableResponseCacheList{};
 
     [[nodiscard]] std::string getSummary(bool shallow_ = true) const {
       std::stringstream ss;
@@ -204,11 +220,15 @@ public:
   // copy from
   void fillCacheEntries(const SampleSet& sampleSet_);
 
+  void applyVariableResponses(CacheEntry& entry_);
+  [[nodiscard]] bool hasVariableResponses() const{ return _hasVariableResponses_; }
+
   void reweightEntry( CacheEntry& entry_);
 
 
 private:
   // The next available entry in the indexed cache.
+  bool _hasVariableResponses_{false};
   size_t _fillIndex_{0};
 
   // A cache mapping events to dials.  This is built while the dials are

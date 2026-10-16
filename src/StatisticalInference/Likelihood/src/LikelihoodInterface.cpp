@@ -125,7 +125,7 @@ void LikelihoodInterface::initializeImpl() {
 
   LogInfo << "Propagating prior parameters on model histograms..." << std::endl;
   std::future<bool> priorPropagation = _modelPropagator_.applyParameters();
-  if( priorPropagation.valid() ){ priorPropagation.get(); }
+  if( priorPropagation.valid() ){ static_cast<void>(priorPropagation.get()); }
 
   _jointProbabilityPtr_->updateZeroPredictionBinsAtPriorFlag(_samplePairList_);
 
@@ -170,7 +170,7 @@ double LikelihoodInterface::evalLikelihood(std::future<bool>& propagation) const
   return _buffer_.totalLikelihood;
 }
 double LikelihoodInterface::evalStatLikelihood(std::future<bool>& propagation) const {
-  if (propagation.valid()) propagation.get();
+  if (propagation.valid()) static_cast<void>(propagation.get());
   _buffer_.statLikelihood = 0.;
   for( auto &samplePair: _samplePairList_ ){
     _buffer_.statLikelihood += this->evalStatLikelihood( samplePair );
@@ -189,7 +189,7 @@ double LikelihoodInterface::evalPenaltyLikelihood(const ParameterSet& parSet_) c
 
   double buffer = 0;
 
-  if( parSet_.getPriorCovarianceMatrix() != nullptr ){
+  if( parSet_.getPriorCorrelationMatrix() != nullptr ){
     if( parSet_.isEnableEigenDecomp() ){
       for( const auto& eigenPar : parSet_.getEigenParameterList() ){
         if( eigenPar.isPenaltyDisabled() ){ continue; }
@@ -202,8 +202,8 @@ double LikelihoodInterface::evalPenaltyLikelihood(const ParameterSet& parSet_) c
 
       // compute penalty term with covariance
       buffer =
-          (*parSet_.getDeltaVectorPtr())
-          * ( (*parSet_.getInverseCovarianceMatrix()) * (*parSet_.getDeltaVectorPtr()) );
+            (*parSet_.getDeltaVectorPtr())
+          * ( (*parSet_.getInversePriorCorrelationMatrix()) * (*parSet_.getDeltaVectorPtr()) );
     }
   }
 
@@ -344,9 +344,12 @@ void LikelihoodInterface::loadModelPropagator(){
   _threadPool_.runJob([this](int iThread){
     LogInfoIf(iThread <= 0) << "Updating sample per bin event lists..." << std::endl;
     for( auto& sample : _modelPropagator_.getSampleSet().getSampleList() ){
-      sample.indexEventInHistogramBin(iThread);
+      if( not sample.getHistogram().isBinningResponseEnabled() ){ sample.indexEventInHistogramBin(iThread); }
     }
   });
+  for( auto& sample : _modelPropagator_.getSampleSet().getSampleList() ){
+    if( sample.getHistogram().isBinningResponseEnabled() ){ sample.indexEventInHistogramBin(_threadPool_); }
+  }
 
   LogInfo << "Filling up model sample histograms..." << std::endl;
   _threadPool_.runJob([this](int iThread){
@@ -462,9 +465,12 @@ void LikelihoodInterface::loadDataPropagator(){
   _threadPool_.runJob([this](int iThread){
     LogInfoIf(iThread <= 0) << "Updating sample per bin event lists..." << std::endl;
     for( auto& sample : _dataPropagator_.getSampleSet().getSampleList() ){
-      sample.indexEventInHistogramBin(iThread);
+      if( not sample.getHistogram().isBinningResponseEnabled() ){ sample.indexEventInHistogramBin(iThread); }
     }
   });
+  for( auto& sample : _dataPropagator_.getSampleSet().getSampleList() ){
+    if( sample.getHistogram().isBinningResponseEnabled() ){ sample.indexEventInHistogramBin(_threadPool_); }
+  }
 
   LogInfo << "Filling up data sample histograms..." << std::endl;
   _threadPool_.runJob([this](int iThread){

@@ -11,6 +11,7 @@
 #include "ParametersManager.h"
 #include "DialCollection.h"
 #include "EventDialCache.h"
+#include "EventVariableResponseCache.h"
 #include "SampleSet.h"
 
 #include "GenericToolbox.Time.h"
@@ -61,9 +62,13 @@ public:
   // Core
   void clearContent();
   void buildDialCache();
+  /// Reassign events in dynamic samples using their current stored variables.
+  /// Rebuild bin event lists; the next propagation refills the histograms.
+  /// Event-to-dial associations are preserved.
+  void updateEventSampleBinning();
 
-  /// Apply the current parameters and wait for it to finish.  This reweights
-  /// the events, and refills the histograms.  This is a convenience wrapper
+  /// Apply the current parameters and wait for it to finish. This updates
+  /// event variables and bin contributions before reweighting and filling histograms.  This is a convenience wrapper
   /// around applyParameters().get().
   void propagateParameters();
 
@@ -78,6 +83,8 @@ public:
   void preparePropagation();
   std::future<bool> applyParameters();
 
+  /// With updateDials=true, also update variable responses and dynamic binning.
+  /// With false, the caller must have prepared the dial and variable state.
   void reweightEvents(bool updateDials = true);
 
   // misc
@@ -125,6 +132,7 @@ private:
   // Sub-layers
   SampleSet _sampleSet_{};
   EventDialCache _eventDialCache_{};
+  EventVariableResponseCache _eventVariableResponseCache_{};
   ParametersManager _parManager_{};
   DialManager _dialManager_{};
 

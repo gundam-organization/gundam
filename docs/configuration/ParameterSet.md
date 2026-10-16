@@ -59,7 +59,7 @@ so an `eigenValueThreshold` of 1E-12 is usually appropriate.
 | [dialSetDefinitions](Dial.md)        | list(Json)       | The list of "dials" that modify the model                    |         |
 | isEnabled                            | bool             | Is the set is enabled for the fit                            |         |
 | isScanEnabled                        | bool             | Should the set be "scanned" by the parameter scanner         |         |
-| nominalStepSize                      | double           | The step scale used by the minimizer                         | 1.0     |
+| nominalStepSize                      | double           | Step scale; required for free parameters without parameterStepSize | nan     |
 | printDialSetSummary                  | bool             | Should the dial set summary be printed                       | false   |
 | printParameterSummary                | bool             | Should the parameter set summary be printed                  | false   |
 | parameterLimits                      | [double, double] | Define a range for all parameters in this set                |         |
@@ -133,3 +133,29 @@ disableParameters:
 |----------|--------|--------------------------------------|---------|
 | minValue | double | min value of parameters from the set | -inf    |
 | maxValue | double | max value of parameters from the set | +inf    |
+
+### Independent parameter constraints
+
+A covariance file is optional. For example, this set has two independent
+Gaussian constraints and one free parameter:
+
+```yaml
+name: independentParameters
+isEnabled: true
+nominalStepSize: 0.1
+parameterDefinitions:
+  - name: normalization
+    priorValue: 1.0
+    stdDev: 0.2
+  - name: offset
+    priorValue: 0.0
+    stdDev: 0.5
+  - name: unconstrained
+    priorValue: 1.0
+    parameterStepSize: 0.1
+```
+
+The penalty is the sum of squared deviations divided by the respective
+variances. The free parameter contributes no penalty. The same `stdDev`
+field can override individual uncertainties when a covariance matrix is loaded;
+the input correlations are preserved.

@@ -3,7 +3,6 @@ set(SRCFILES
     ${CMAKE_CURRENT_SOURCE_DIR}/src/BinSet.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Bin.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/GundamGreetings.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/ParameterThrowerMarkHarz.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ConfigUtils.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/FormulaUtils.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/GundamUtils.cpp
@@ -24,7 +23,6 @@ set(HEADERS
     ${CMAKE_CURRENT_SOURCE_DIR}/include/GundamGlobals.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/GundamGreetings.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/VariableDictionary.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/include/ParameterThrowerMarkHarz.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ConfigUtils.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/FormulaUtils.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/GundamUtils.h

@@ -27,6 +27,11 @@
 #include "TClonesArray.h"
 #include "TChain.h"
 #include "THn.h"
+#include <TArray.h>
+#include <TBranchElement.h>
+#include <TLeafObject.h>
+#include <TClass.h>
+#include <TGraph.h>
 
 #include <unordered_map>
 #include <map>
@@ -672,14 +677,33 @@ void DataDispenser::configureImpl(){
             {FieldFlag::MANDATORY, "name"},
             {FieldFlag::MANDATORY, "path"},
             {"isEnabled"},
+            {"treeList"},
           });
           friendConfig.checkConfiguration();
 
-          filePathEntry.friendList.emplace_back();
-          auto& friendEntry = filePathEntry.friendList.back();
+          DataDispenserParameters::FilePathEntry::FriendTree friendEntry;
           friendEntry.name = friendConfig.fetchValue<std::string>("name");
           friendEntry.path = friendConfig.fetchValue<std::string>("path");
           friendConfig.fillValue(friendEntry.isEnabled, "isEnabled");
+          if( friendConfig.getConfigEntry("treeList").second != nullptr ){
+            auto treeList = friendConfig.fetchValue<std::vector<std::string>>("treeList");
+            LogExitIf(treeList.empty(), "Friend \"" << friendEntry.name << "\": treeList must not be empty.");
+            LogExitIf(
+                friendEntry.path.find(':') != std::string::npos,
+                "Friend \"" << friendEntry.name << "\": path must contain only the ROOT file path when treeList is provided."
+            );
+            for( const auto& treePath : treeList ){
+              LogExitIf(treePath.empty(), "Friend \"" << friendEntry.name << "\": treeList contains an empty tree path.");
+              auto treeEntry = friendEntry;
+              // The group name identifies the config entry; each tree has its own ROOT alias.
+              treeEntry.name = treePath;
+              treeEntry.path += ":" + treePath;
+              filePathEntry.friendList.emplace_back(std::move(treeEntry));
+            }
+          }
+          else{
+            filePathEntry.friendList.emplace_back(std::move(friendEntry));
+          }
         }
       }
       std::set<std::string> friendNameSet;
@@ -973,13 +997,22 @@ void DataDispenser::fetchRequestedLeaves(){
     }
   }
 
-  // sample binning -> indexing only
+  // Variable dial targets must be available even when they are not binning axes.
+  for( const auto& name : _cache_.propagatorPtr->getSampleSet().getEventVariableNameList() ){
+    std::set<std::string> variableDictStack;
+    addVariableDictRequestedByName(_cache_, name, _parameters_.variableDict, _parameters_.variableDictTransform, variableDictStack);
+  }
+
+  // Sample binning variables are also stored when dynamic binning is enabled.
   {
     std::vector<std::string> varForIndexingListBuffer{};
     for (const auto& sample : _cache_.propagatorPtr->getSampleSet().getSampleList()) {
       for (const auto& binContext : sample.getHistogram().getBinContextList()) {
         for (const auto& edges : binContext.bin.getEdgesList()) {
           GenericToolbox::addIfNotInVector(edges.varName, varForIndexingListBuffer);
+          if( sample.isUseDynamicBinning() or sample.getHistogram().isBinningResponseEnabled() ){
+            GenericToolbox::addIfNotInVector(edges.varName, _cache_.propagatorPtr->getSampleSet().getEventVariableNameList());
+          }
         }
       }
       if( not sample.getSelectionCutsStr().empty() ){
@@ -1859,6 +1892,8 @@ void DataDispenser::loadEvent(int iThread_){
   auto& threadSharedData = threadSharedDataList[iThread_];
 
   // local
+  // Snapshot conditions while the reader still owns this entry's tree buffers.
+  std::vector<bool> dialApplyConditionList(_cache_.dialCollectionsRefList.size(), true);
   Event eventIndexingBuffer;
   eventIndexingBuffer.getIndices().dataset = _owner_->getDataSetIndex();
 
@@ -1923,6 +1958,25 @@ void DataDispenser::loadEvent(int iThread_){
       }
     }
 
+    // TArray dial branches are read on demand, outside the event variable buffers.
+    std::set<std::string> displayedExpressions;
+    for( const auto& varDisplay : varDisplayList ){
+      displayedExpressions.emplace(varDisplay.leafName);
+    }
+    for( const auto* dialCollection : _cache_.dialCollectionsRefList ){
+      for( const auto& branchName : {dialCollection->getDialParameterValuesBranch(), dialCollection->getDialResponsesBranch()} ){
+        if( branchName.empty() or not displayedExpressions.emplace(branchName).second ){ continue; }
+        varDisplayList.emplace_back();
+        auto& varDisplay = varDisplayList.back();
+        varDisplay.varName = branchName;
+        varDisplay.leafName = branchName;
+        varDisplay.leafTypeName = "p";
+        varDisplay.priorityIndex = 999;
+        varDisplay.lineColor = GenericToolbox::ColorCodes::magentaBackground;
+        hasEventDials = true;
+      }
+    }
+
     GenericToolbox::sortVector( varDisplayList, [](const VarDisplay& a_, const VarDisplay& b_){
       if( a_.priorityIndex < b_.priorityIndex ){ return true; }
       if( a_.priorityIndex > b_.priorityIndex ){ return false; }
@@ -1963,6 +2017,32 @@ void DataDispenser::loadEvent(int iThread_){
   // std::vector<int> sampleIdxList;
   std::vector<int> sampleBinIdxList;
   std::vector<double> sampleWeightList;
+
+  // TArray does not inherit from TObject. Validate the ROOT class before casting.
+  auto readArray = [&threadSharedData](const std::string& branchName_) -> const TArray* {
+    auto* branch = threadSharedData.treeChain->GetBranch(branchName_.c_str());
+    LogThrowIf(branch == nullptr, "Missing dialBranchData branch: " << branchName_);
+    TClass* arrayClass{nullptr};
+    EDataType dataType{kOther_t};
+    branch->GetExpectedType(arrayClass, dataType);
+    LogThrowIf(arrayClass == nullptr or not arrayClass->InheritsFrom(TArray::Class()),
+               "dialBranchData branch '" << branchName_ << "' must contain a TArray");
+    branch->SetStatus(true);
+    if( branch->GetAddress() == nullptr ){ branch->SetAddress(nullptr); }
+    // Read on demand. ROOT owns the object buffer.
+    // The branch's tree provides the local entry, also after a TChain transition.
+    LogThrowIf(branch->GetEntry(branch->GetTree()->GetReadEntry(), 1) < 0,
+               "Could not read dialBranchData branch: " << branchName_);
+    void* object{nullptr};
+    if( auto* element = dynamic_cast<TBranchElement*>(branch) ){
+      object = element->GetObject();
+    }
+    else if( auto* leaf = dynamic_cast<TLeafObject*>(branch->GetListOfLeaves()->At(0)) ){
+      object = leaf->GetObject();
+    }
+    LogThrowIf(object == nullptr, "Null TArray in dialBranchData branch: " << branchName_);
+    return static_cast<const TArray*>(arrayClass->DynamicCast(TArray::Class(), object));
+  };
 
   while( true ){
 
@@ -2022,15 +2102,15 @@ void DataDispenser::loadEvent(int iThread_){
       sampleWeightList.clear(); sampleWeightList.reserve(sampleIdxList.size());
 
 
-      bool hasValidBin{false};
+      bool hasSampleToFill{false};
       for( auto& sampleIdx : sampleIdxList ) {
         Sample& eventSample{*_cache_.samplesToFillList[sampleIdx]};
         // look for the bin index
-        LoaderUtils::fillBinIndex(eventIndexingBuffer, eventSample.getHistogram().getBinContextList());
+        eventIndexingBuffer.getIndices().bin = eventSample.getHistogram().findBinIndex(eventIndexingBuffer);
         sampleBinIdxList.emplace_back(eventIndexingBuffer.getIndices().bin);
 
         // No bin found -> warning
-        if( sampleBinIdxList.back() == -1 ){
+        if( sampleBinIdxList.back() == -1 and not (eventSample.isUseDynamicBinning() or eventSample.getHistogram().isBinningResponseEnabled()) ){
           const int unbinnedEventThrottle = 5;
           if( this->_unbinnedEvents_++ < unbinnedEventThrottle ){
 
@@ -2065,10 +2145,12 @@ void DataDispenser::loadEvent(int iThread_){
           sampleWeightList.back() *= sampleWeight;
         }
 
-        hasValidBin = hasValidBin or ( sampleBinIdxList.back() != -1 and sampleWeightList.back() != 0 );
+        hasSampleToFill = hasSampleToFill or (
+            (sampleBinIdxList.back() != -1 or eventSample.isUseDynamicBinning() or eventSample.getHistogram().isBinningResponseEnabled())
+            and sampleWeightList.back() != 0 );
       }
 
-      if( not hasValidBin ){ continue; }
+      if( not hasSampleToFill ){ continue; }
 
       // now we are sure the entry should be read till the end
 
@@ -2078,25 +2160,38 @@ void DataDispenser::loadEvent(int iThread_){
         dialCloneArrayIndex = static_cast<int>(threadSharedData.buffer.dialIndexFormula.eval(eventIndexingBuffer));
       }
 
+      for( size_t iCollection = 0 ; iCollection < dialApplyConditionList.size() ; ++iCollection ){
+        auto& condition = threadSharedData.buffer.dialApplyConditionFormulaList[iCollection];
+        dialApplyConditionList[iCollection] = not condition.isEnabled() or condition.eval(eventIndexingBuffer) != 0;
+      }
+
       // only load event-by-event dials, binned dials etc. will be processed later
       for( size_t iDialCollection = 0 ; iDialCollection < _cache_.dialCollectionsRefList.size() ; iDialCollection++ ){
         auto *dialCollectionRef = _cache_.dialCollectionsRefList[iDialCollection];
 
         // if not event-by-event dial -> leave
-        if( dialCollectionRef->getDialLeafName().empty() ){ continue; }
+        if( not dialCollectionRef->hasDialBranchData() ){ continue; }
 
-        if( threadSharedData.buffer.dialApplyConditionFormulaList[iDialCollection].isEnabled() ){
-          if( threadSharedData.buffer.dialApplyConditionFormulaList[iDialCollection].eval(eventIndexingBuffer) == 0 ){
-            // next dialSet
-            continue;
+        if( not dialApplyConditionList[iDialCollection] ){ continue; }
+
+        if( not dialCollectionRef->getDialParameterValuesBranch().empty() ){
+          const auto* parameterValues = readArray(dialCollectionRef->getDialParameterValuesBranch());
+          const auto* responses = readArray(dialCollectionRef->getDialResponsesBranch());
+          LogThrowIf(parameterValues->GetSize() != responses->GetSize(),
+                     "dialBranchData array size mismatch for " << dialCollectionRef->getTitle()
+                     << ": " << parameterValues->GetSize() << " parameter values, "
+                     << responses->GetSize() << " responses");
+          TGraph graph(parameterValues->GetSize());
+          for( int iPoint = 0; iPoint < parameterValues->GetSize(); ++iPoint ){
+            graph.SetPoint(iPoint, parameterValues->GetAt(iPoint), responses->GetAt(iPoint));
           }
+          auto dial = dialCollectionRef->makeDial(&graph);
+          eventByEventDialBuffer[dialCollectionRef->getIndex()] = dial.release();
+          continue;
         }
 
         // grab as a general TObject, then let the factory figure out what to do with it
-        try {
-          dialAddressMap.at(dialCollectionRef->getIndex());
-        }
-        catch( ... ) {
+        if( dialAddressMap.find(dialCollectionRef->getIndex()) == dialAddressMap.end() ){
           auto* dialExpression = threadSharedData.treeBuffer.getExpressionBuffer( dialCollectionRef->getDialLeafName() );
           LogThrowIf( dialExpression == nullptr );
           dialAddressMap[dialCollectionRef->getIndex()] = (const TObject**) dialExpression->getBuffer().getPlaceHolderPtr()->getVariableAddress();
@@ -2119,7 +2214,10 @@ void DataDispenser::loadEvent(int iThread_){
 
     const auto& sampleIdxList = _cache_.entrySampleIndexList[eventIndexingBuffer.getIndices().entry];
     for( int iSample = 0 ; iSample < int(sampleIdxList.size()) ; iSample++ ){
-      if( sampleBinIdxList[iSample] == -1 or sampleWeightList[iSample] == 0. ){ continue; }
+      if( sampleWeightList[iSample] == 0. ){ continue; }
+      if( sampleBinIdxList[iSample] == -1
+          and not (_cache_.samplesToFillList[sampleIdxList[iSample]]->isUseDynamicBinning()
+                  or _cache_.samplesToFillList[sampleIdxList[iSample]]->getHistogram().isBinningResponseEnabled()) ){ continue; }
 
       // update for this specific sample
       eventIndexingBuffer.getIndices().sample = _cache_.samplesToFillList[sampleIdxList[iSample]]->getIndex();
@@ -2151,7 +2249,7 @@ void DataDispenser::loadEvent(int iThread_){
         auto *dialCollectionRef = _cache_.dialCollectionsRefList[iDialCollection];
 
         // leave if event-by-event -> already loaded
-        if( not dialCollectionRef->getDialLeafName().empty() ){
+        if( dialCollectionRef->hasDialBranchData() ){
 
           // dialBase is valid -> store it
           if( eventByEventDialBuffer[dialCollectionRef->getIndex()] != nullptr ){
@@ -2175,12 +2273,7 @@ void DataDispenser::loadEvent(int iThread_){
           continue; // skip the rest
         }
 
-        if( threadSharedData.buffer.dialApplyConditionFormulaList[iDialCollection].isEnabled() ){
-          if( threadSharedData.buffer.dialApplyConditionFormulaList[iDialCollection].eval(eventIndexingBuffer) == 0 ){
-            // next dialSet
-            continue;
-          }
-        }
+        if( not dialApplyConditionList[iDialCollection] ){ continue; }
 
         int iCollection = dialCollectionRef->getIndex();
 
