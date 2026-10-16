@@ -17,7 +17,7 @@
 #include <functional>
 
 // compiler flags
-#if HAS_CPP_17
+#if __cplusplus >= 202002L
 #define GUNDAM_LIKELY_COMPILER_FLAG [[likely]]
 #define GUNDAM_UNLIKELY_COMPILER_FLAG [[unlikely]]
 #else
