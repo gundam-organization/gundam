@@ -48,10 +48,14 @@ public:
     double response{std::nan("unset")};
     // A cached boolean to check if the dial needs to be updated.
     bool *updateRequested{nullptr};
+    std::uint64_t inputRevision{std::uint64_t(-1)};
     void update(){
-      // Reevaluate the dial if an update has been requested
-      if( *(this->updateRequested) ) {
+      // Retain changes until this response consumes them, even when the
+      // input buffer has been updated again in the meantime.
+      auto revision = dialInterface->getInputBufferRef()->getRevision();
+      if( inputRevision != revision ) {
         response = dialInterface->evalResponse();
+        inputRevision = revision;
       }
     }
     double getResponse(){

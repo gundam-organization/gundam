@@ -19,6 +19,8 @@
 #include <vector>
 #include <map>
 #include <future>
+#include <cstdint>
+#include <utility>
 
 class Propagator : public JsonBaseClass {
 
@@ -127,6 +129,11 @@ private:
   bool _showNbEventPerSampleParameterBreakdown_{false};
   bool _enableEigenToOrigInPropagate_{true};
   int _iThrow_{-1};
+
+  bool _variableStateValid_{false};
+  std::vector<std::pair<const DialInputBuffer*, std::uint64_t>> _variableInputRevisions_;
+  // Samples made dynamic solely for variable dials can retain their bin lists.
+  std::vector<bool> _variableDialBinningSamples_;
 
   // Sub-layers
   SampleSet _sampleSet_{};

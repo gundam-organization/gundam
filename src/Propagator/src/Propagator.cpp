@@ -52,6 +52,7 @@ void Propagator::configureImpl(){
   // nested objects
   _config_.fillValue(_sampleSet_.getConfig(), "sampleSetConfig");
   _sampleSet_.configure();
+  _variableDialBinningSamples_.assign(_sampleSet_.getSampleList().size(), false);
 
   // relocated
   _config_.fillValue(_parManager_.getParameterSetListConfig(), "parameterSetListConfig");
@@ -93,6 +94,8 @@ void Propagator::initializeImpl(){
 
 // core
 void Propagator::clearContent(){
+  _variableStateValid_ = false;
+  _variableInputRevisions_.clear();
 
   // clearing events in MC containers
   _sampleSet_.clearEventLists();
@@ -111,9 +114,17 @@ void Propagator::clearContent(){
 
 }
 void Propagator::buildDialCache(){
+  _variableStateValid_ = false;
+  _variableInputRevisions_.clear();
   _eventDialCache_.shrinkIndexedCache();
   _eventDialCache_.buildReferenceCache(_sampleSet_, _dialManager_.getDialCollectionList());
   _dialManager_.invalidateInputBuffers();
+  for( auto& collection : _dialManager_.getDialCollectionList() ){
+    if( not collection.isEnabled() or collection.getApplyToVariable().empty() ){ continue; }
+    for( const auto& buffer : collection.getDialInputBufferList() ){
+      _variableInputRevisions_.emplace_back(&buffer, buffer.getRevision());
+    }
+  }
 }
 void Propagator::updateEventSampleBinning(){
   for( auto& sample : _sampleSet_.getSampleList() ){
@@ -412,6 +423,20 @@ void Propagator::refillHistogramsFct( int iThread_){
 
 void Propagator::updateEventVariablesAndBinning(){
   if( not _eventDialCache_.hasVariableResponses() ){ return; }
+  bool changed = not _variableStateValid_;
+  for( const auto& input : _variableInputRevisions_ ){
+    if( input.first->getRevision() != input.second ){ changed = true; }
+  }
+  if( not changed ){
+    // Explicit dynamic binning may depend on changes outside variable dials.
+    auto& samples = _sampleSet_.getSampleList();
+    for( size_t iSample = 0 ; iSample < samples.size() ; ++iSample ){
+      if( samples[iSample].isUseDynamicBinning() and not _variableDialBinningSamples_[iSample] ){
+        samples[iSample].updateEventBinning(_threadPool_);
+      }
+    }
+    return;
+  }
   _threadPool_.runJob([&](int iThread_){
     auto& cache = _eventDialCache_.getCache();
     auto bounds = GenericToolbox::ParallelWorker::getThreadBoundIndices(iThread_, _threadPool_.getNbThreads(), cache.size());
@@ -420,19 +445,26 @@ void Propagator::updateEventVariablesAndBinning(){
     }
   });
   updateEventSampleBinning();
+  // Commit only after all variables and bin contributions have been updated.
+  for( auto& input : _variableInputRevisions_ ){ input.second = input.first->getRevision(); }
+  _variableStateValid_ = true;
 }
 
 void Propagator::prepareVariableDials(){
   for( const auto& collection : _dialManager_.getDialCollectionList() ){
     if( not collection.isEnabled() or collection.getApplyToVariable().empty() ){ continue; }
     GenericToolbox::addIfNotInVector(collection.getApplyToVariable(), _sampleSet_.getEventVariableNameList());
-    for( auto& sample : _sampleSet_.getSampleList() ){
+    auto& samples = _sampleSet_.getSampleList();
+    _variableDialBinningSamples_.resize(samples.size(), false);
+    for( size_t iSample = 0 ; iSample < samples.size() ; ++iSample ){
+      auto& sample = samples[iSample];
       for( const auto& context : sample.getHistogram().getBinContextList() ){
         for( const auto& edges : context.bin.getEdgesList() ){
           if( edges.varName == collection.getApplyToVariable() and not sample.isUseDynamicBinning() ){
             LogInfo << "Enabling dynamic binning for sample \"" << sample.getName()
                     << "\": dial targets variable \"" << edges.varName << "\"." << std::endl;
             sample.setUseDynamicBinning(true);
+            _variableDialBinningSamples_[iSample] = true;
           }
         }
       }
