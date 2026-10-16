@@ -67,7 +67,7 @@ void makeStdDevInput() {{
 
 
 def run_case(path, definitions, correlated=False, eigen=False, nominal_step=0.1,
-             check_throws=False, global_throws=False):
+             check_throws=False, global_throws=False, expected_steps=None):
     import GUNDAM
 
     parameter_set_config = {
@@ -108,6 +108,9 @@ def run_case(path, definitions, correlated=False, eigen=False, nominal_step=0.1,
     manager = propagator.getParametersManager()
     parameter_set = manager.getParameterSetsList()[0]
     parameters = parameter_set.getParameterList()
+    if expected_steps is not None:
+        for parameter, expected_step in zip(parameters, expected_steps):
+            assert_close(parameter.getStepSize(), expected_step)
     for parameter in parameters:
         if parameter.isEnabled():
             parameter.setParameterValue(3.)
@@ -216,18 +219,34 @@ def main():
             pass
         else:
             raise AssertionError(f"Accepted invalid stdDev: {invalid_sigma}")
-    # Free parameters need an explicitly supplied scale, including covariance overrides.
+    # Free priors retain covariance-derived steps without requiring an explicit scale.
+    for free_prior in ({"priorType": "Flat"}, {"stdDev": "nan"}):
+        for nominal_step in (None, 0.1):
+            assert_close(run_case(path, [dict(free_prior), {}], correlated=True,
+                                  nominal_step=nominal_step, expected_steps=[2., 3.]), 4./9.)
+        assert_close(run_case(path, [dict(free_prior, parameterStepSize=0.2), {}],
+                              correlated=True, nominal_step=None,
+                              expected_steps=[0.2, 3.]), 4./9.)
+    # Without covariance, free parameters still need an explicitly supplied scale.
+    for invalid_step in (None, 0., -0.1):
+        try:
+            run_case(path, [{"stdDev": "nan"}], nominal_step=invalid_step)
+        except RuntimeError as error:
+            assert "nominalStepSize" in str(error), str(error)
+        else:
+            raise AssertionError(f"Accepted free parameter with nominalStepSize={invalid_step}")
     for correlated in (False, True):
-        definitions = [{"stdDev": "nan"}, {"stdDev": 6.}]
-        for invalid_step in (None, 0., -0.1):
+        for invalid_step in ("nan", 0., -0.1):
             try:
-                run_case(path, definitions, correlated=correlated, nominal_step=invalid_step)
+                run_case(path, [{"stdDev": "nan", "parameterStepSize": invalid_step},
+                                {"stdDev": 6.}], correlated=correlated)
             except RuntimeError as error:
-                assert "nominalStepSize" in str(error), str(error)
+                assert "parameterStepSize" in str(error), str(error)
             else:
-                raise AssertionError(f"Accepted free parameter with nominalStepSize={invalid_step}")
+                raise AssertionError(f"Accepted free parameter with parameterStepSize={invalid_step}")
         assert_close(run_case(path, [{"stdDev": "nan", "parameterStepSize": 0.2},
-                                    {"stdDev": 6.}], correlated=correlated, nominal_step=None), 1./9.)
+                                    {"stdDev": 6.}], correlated=correlated, nominal_step=None,
+                              expected_steps=[0.2, 6.]), 1./9.)
         assert_close(run_case(path, [{"priorType": "Gaussian", "stdDev": 2.},
                                     {"stdDev": 4.}], correlated=correlated, nominal_step=None),
                      1. if correlated else 1.25)

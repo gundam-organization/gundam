@@ -71,11 +71,11 @@ void Parameter::configureImpl(){
   _config_.fillValue(_isPenaltyDisabled_, "isPenaltyDisabled");
   _config_.fillValue(_isFixed_, "isFixed");
   _config_.fillValue(_isThrown_, "isThrown");
-  if( isFree() ){ _stepSize_ = _owner_->getNominalStepSize(); }
   _config_.fillValue(_stepSize_, "parameterStepSize");
   LogThrowIf(isFree() and (not std::isfinite(_stepSize_) or _stepSize_ <= 0),
              "Free parameter " << getFullTitle()
-             << " requires a positive finite nominalStepSize in its parameter set"
+             << " requires a positive finite step size from the covariance matrix,"
+             << " nominalStepSize in its parameter set"
              << " or an explicit parameterStepSize.");
   _config_.fillValue(_physicalLimits_, "physicalLimits");
   _config_.fillValue(_throwLimits_, "throwLimits");
