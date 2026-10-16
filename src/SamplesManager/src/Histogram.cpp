@@ -32,11 +32,7 @@ void Histogram::build(const ConfigReader& binningConfig_){
 void Histogram::throwEventMcError(){
   // event by event poisson throw -> takes into account the finite amount of stat in MC
 
-#if HAS_CPP_17
   for( auto [binContent, binContext] : loop() ){
-#else
-  for( auto element : loop() ){ auto& binContent = std::get<0>(element); auto& binContext = std::get<1>(element);
-#endif
     binContent.sumWeights = 0;
     binContent.sqrtSumSqWeights = 0;
     for (auto *eventPtr: binContext.eventPtrList) {
@@ -58,11 +54,7 @@ void Histogram::throwStatError(bool useGaussThrow_){
    * */
   double nCounts;
 
-#if HAS_CPP_17
   for( auto [binContent, binContext] : loop() ){
-#else
-  for( auto element : loop() ){ auto& binContent = std::get<0>(element); auto& binContext = std::get<1>(element);
-#endif
     if( binContent.sumWeights == 0 ){
       // this should not happen.
       continue;
@@ -113,11 +105,7 @@ void Histogram::refillHistogram(int iThread_){
   // avoid using [] operator for each access. Use the memory address directly
   double weightBuffer;
 
-#if HAS_CPP_17
   for( auto [binContent, binContext] : loop(bounds.beginIndex, bounds.endIndex) ){
-#else
-  for( auto element : loop(bounds.beginIndex, bounds.endIndex) ){ auto& binContent = std::get<0>(element); auto& binContext = std::get<1>(element);
-#endif
 
     // reset
     binContent.sumWeights = 0;
