@@ -14,7 +14,7 @@ import_module("005PythonSetup-utils").requireVenv(__file__)
 RAW = [-0.25, 0.25, 1.25, 2.25]
 
 
-def make_engine(path, conflict=False, disjoint=False, reverse=False, bad_mode=None):
+def make_engine(path, conflict=False, disjoint=False, reverse=False, bad_mode=None, explicit_dynamic=False):
     import GUNDAM
 
     def dial(mode=None, variable="X", condition=None):
@@ -51,7 +51,8 @@ def make_engine(path, conflict=False, disjoint=False, reverse=False, bad_mode=No
         {"name": "hard", "binning": binning},
         {"name": "smooth", "binning": binning, "binningResponse": {
             "isEnabled": True, "variables": [{"name": "X", "width": 0.2}]}},
-        {"name": "static", "binning": {"binningDefinition": [{"name": "Y", "edges": [0, 1]}]}},
+        {"name": "static", "useDynamicBinning": explicit_dynamic,
+         "binning": {"binningDefinition": [{"name": "Y", "edges": [0, 1]}]}},
     ]
     config = {"likelihoodInterfaceConfig": {
         "jointProbabilityConfig": {"type": "LeastSquares", "lsqPoissonianApproximation": True},
@@ -74,7 +75,7 @@ def make_engine(path, conflict=False, disjoint=False, reverse=False, bad_mode=No
     engine.initialize()
     hard, smooth, static = propagator.getSampleSet().getSampleList()
     assert hard.isUseDynamicBinning() and smooth.isUseDynamicBinning()
-    assert not static.isUseDynamicBinning()
+    assert static.isUseDynamicBinning() == explicit_dynamic
     assert not hard.getHistogram().isBinningResponseEnabled()
     return engine
 
@@ -166,6 +167,73 @@ def write_input(path, count=4):
                      "weight": array("d", range(1, count + 1))})
 
 
+def exercise_cache(path, threads):
+    import GUNDAM
+
+    GUNDAM.setNumberOfThreads(threads)
+    engine = make_engine(path, explicit_dynamic=True)
+    likelihood = engine.getLikelihoodInterface()
+    propagator = likelihood.getModelPropagator()
+    hard, smooth, dynamic = propagator.getSampleSet().getSampleList()
+    parameters = {parameter.getName(): parameter for parameter in
+                  propagator.getParametersManager().getParameterSetsList()[0].getParameterList()}
+    prior = [(1.25 if entry % 2 else raw) * .75 + .25 for entry, raw in enumerate(RAW)]
+
+    # Deliberately alter stored state as a probe: a skipped pass must leave it
+    # untouched. Histogram contributions must still come from the cached bins.
+    probes = []
+    for sample in (hard, smooth):
+        event = sample.getEventList()[0]
+        probes.append((event, event.getIndices().bin))
+        event.getVariables().fetchVariable("X").setValue(123.)
+        event.getIndices().bin = -123
+    for weight in (2., 1.5, 2.):
+        parameters["weight"].setParameterValue(weight)
+        likelihood.propagateAndEvalLikelihood()
+        for event, original_bin in probes:
+            close(event.getVariables().fetchVariable("X").getVarAsDouble(), 123.)
+            assert event.getIndices().bin == -123, "Unchanged migration must skip rebinning"
+        # Restore the probes to check the cached histogram sums and smoothing.
+        for event, original_bin in probes:
+            event.getVariables().fetchVariable("X").setValue(prior[0])
+            event.getIndices().bin = original_bin
+        check(propagator, prior, .5, weight)
+        for event, original_bin in probes:
+            event.getVariables().fetchVariable("X").setValue(123.)
+            event.getIndices().bin = -123
+
+    # An explicit buffer invalidation must force variable application even
+    # though all parameter values are unchanged.
+    for entry in propagator.getEventDialCache().getCache():
+        for response in entry.getDialResponseCacheList():
+            response.getDialInterface().getInputBuffer().invalidateBuffers()
+    likelihood.propagateAndEvalLikelihood()
+    check(propagator, prior, .5, 2.)
+
+    # Multiple buffer updates before propagation must not lose a pending change.
+    for mult in (2., 1.):
+        parameters["multiply"].setParameterValue(mult)
+        for entry in propagator.getEventDialCache().getCache():
+            for response in entry.getDialResponseCacheList():
+                buffer = response.getDialInterface().getInputBuffer()
+                buffer.update()
+                buffer.update()
+        likelihood.propagateAndEvalLikelihood()
+        expected = [(1.25 if entry % 2 else raw) * mult * .75 + .25
+                    for entry, raw in enumerate(RAW)]
+        check(propagator, expected, .5, 2.)
+
+    # Explicit dynamic samples must rebin even with unchanged migration inputs.
+    event = dynamic.getEventList()[0]
+    event.getVariables().fetchVariable("Y").setValue(2.)
+    likelihood.propagateAndEvalLikelihood()
+    assert event.getIndices().bin == -1
+    close(dynamic.getHistogram().getBinContentList()[0].sumWeights, 18.)
+    event.getVariables().fetchVariable("Y").setValue(.5)
+    likelihood.propagateAndEvalLikelihood()
+    check(propagator, prior, .5, 2.)
+
+
 def main():
     import GUNDAM
 
@@ -175,6 +243,7 @@ def main():
     write_input(path)
     for threads in [1, 4, 8]:
         exercise(path, threads)
+        exercise_cache(path, threads)
     exercise(path, 2, reverse=True)
     exercise(path, 2, disjoint=True)
     # The reader runs independently even with one filler thread. Alternating
