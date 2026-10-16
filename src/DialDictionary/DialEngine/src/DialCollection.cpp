@@ -47,6 +47,8 @@ void DialCollection::prepareConfig(ConfigReader &config_){
       {"mirrorHighEdge"},
       {"allowDialExtrapolation"},
       {"applyCondition"},
+      {"applyToVariable"},
+      {"variableResponseMode"},
       {"definitionRange"},
       {"mirrorDefinitionRange"},
       {"applyConditions"},
@@ -67,6 +69,8 @@ void DialCollection::configureImpl() {
   _config_.fillValue(_dataSetNameList_, "applyOnDataSets");
   _config_.fillValue(_isEnabled_, "isEnabled");
   if( not _isEnabled_ ){ return; }
+
+  readVariableResponseConfig(_config_);
 
   // Dials are directly defined with a binning file?
   if     ( initializeNormDialsWithParBinning() ){}
@@ -147,6 +151,7 @@ std::string DialCollection::getSummary(bool shallow_) const{
     ss << " / dialBranchData:{parameterValuesTArray:" << _dialParameterValuesBranch_
        << ", weightValuesTArray:" << _dialResponsesBranch_ << "}";
   }
+  if( not _applyToVariable_.empty() ){ ss << " / variable:" << _applyToVariable_ << " / mode:" << _variableResponseMode_; }
   if( _definitionRange_.hasBound() ){ ss << " / definitionRange:" << _definitionRange_; }
   if( _mirrorDefinitionRange_.hasBound() ){ ss << " / mirrorDefinitionRange:" << _mirrorDefinitionRange_; }
 
@@ -293,7 +298,25 @@ void DialCollection::setupDialInterfaceReferences(){
 }
 
 // init protected
+void DialCollection::readVariableResponseConfig(const ConfigReader& config_){
+  if( config_.hasField("applyToVariable") ){
+    _applyToVariable_ = config_.fetchValue<std::string>("applyToVariable");
+  }
+  if( config_.hasField("variableResponseMode") ){
+    LogThrowIf(config_.fetchValue<std::string>("variableResponseMode").empty(), "variableResponseMode must not be empty");
+  }
+  config_.fillEnum(_variableResponseMode_, "variableResponseMode");
+  LogThrowIf(_variableResponseMode_ != VariableResponseMode::Multiply
+             and _variableResponseMode_ != VariableResponseMode::Add
+             and _variableResponseMode_ != VariableResponseMode::Override,
+             "Invalid variableResponseMode: expected Multiply, Add, or Override");
+  LogThrowIf(config_.hasField("applyToVariable") and _applyToVariable_.empty(), "applyToVariable must not be empty");
+  LogThrowIf(config_.hasField("variableResponseMode") and _applyToVariable_.empty(),
+             "variableResponseMode requires applyToVariable");
+}
+
 void DialCollection::readParametersFromConfig(const ConfigReader &config_) {
+  readVariableResponseConfig(config_);
   // globals for the dialSet
   config_.fillValue(_enableDialsSummary_, "printDialSummary");
   config_.fillValue(_dialType_, "dialType");
@@ -322,6 +345,8 @@ void DialCollection::readParametersFromConfig(const ConfigReader &config_) {
                  "TArray dialBranchData requires dialType Spline or Graph");
     }
   }
+  _minDialResponse_ = _applyToVariable_.empty() or _variableResponseMode_ == VariableResponseMode::Multiply
+      ? 0. : std::nan("unset");
   config_.fillValue(_minDialResponse_, "minDialResponse");
   config_.fillValue(_maxDialResponse_, "maxDialResponse");
   config_.fillValue(_useMirrorDial_, "useMirrorDial");
@@ -485,7 +510,7 @@ bool DialCollection::initializeNormDialsWithParBinning() {
 
   // By default use min dial response for norm dials
   _dialResponseSupervisorList_.resize( 1 );
-  _dialResponseSupervisorList_[0].setMinResponse( _config_.fetchValue("minDialResponse", double(0.)) );
+  _dialResponseSupervisorList_[0].setMinResponse( _minDialResponse_ );
   _dialResponseSupervisorList_[0].setMaxResponse( _config_.fetchValue("maxDialResponse", _maxDialResponse_) );
 
   _dialInterfaceList_.reserve( _dialBinSet_.getBinList().size() );
@@ -988,7 +1013,7 @@ bool DialCollection::initializeDialsWithDefinition() {
 
   _dialResponseSupervisorList_.emplace_back();
   _dialResponseSupervisorList_.back().setMinResponse(
-      _config_.fetchValue("minDialResponse", double(0.))
+      _minDialResponse_
   );
   _dialResponseSupervisorList_.back().setMaxResponse(
       _config_.fetchValue("maxDialResponse", _maxDialResponse_)

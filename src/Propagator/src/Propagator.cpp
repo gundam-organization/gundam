@@ -64,6 +64,8 @@ void Propagator::configureImpl(){
   _dialManager_.setParametersManager(&_parManager_);
   _dialManager_.configure();
 
+  prepareVariableDials();
+
   // Monitoring parameters
   _config_.fillValue(_showNbEventParameterBreakdown_, "showNbEventParameterBreakdown");
   _config_.fillValue(_showNbEventPerSampleParameterBreakdown_, "showNbEventPerSampleParameterBreakdown");
@@ -82,6 +84,7 @@ void Propagator::initializeImpl(){
   _parManager_.initialize();
   _sampleSet_.initialize();
   _dialManager_.initialize();
+  prepareVariableDials();
 
   initializeThreads();
 
@@ -99,9 +102,12 @@ void Propagator::clearContent(){
   _dialManager_.setParametersManager(&_parManager_);
   _dialManager_.configure();
   _dialManager_.initialize();
+  prepareVariableDials();
 
-  // reset the cache
+  // Reset event associations while preserving the configured weight cap.
+  auto reweightCap = _eventDialCache_.getGlobalEventReweightCap();
   _eventDialCache_ = EventDialCache();
+  _eventDialCache_.getGlobalEventReweightCap() = reweightCap;
 
 }
 void Propagator::buildDialCache(){
@@ -126,6 +132,7 @@ std::future<bool> Propagator::applyParameters(){
   // should be shared for both.
   if( _enableEigenToOrigInPropagate_ ){ _parManager_.convertEigenToOrig(); }
   _dialManager_.updateDialState();
+  updateEventVariablesAndBinning();
 
 #ifdef GUNDAM_USING_CACHE_MANAGER
   // Trigger the reweight on the GPU.  This will fill the histograms, but most
@@ -168,6 +175,7 @@ void Propagator::reweightEvents(bool updateDials) {
     // isForceCpuCalculation is true.
     if( _enableEigenToOrigInPropagate_ ){ _parManager_.convertEigenToOrig(); }
     _dialManager_.updateDialState();
+    updateEventVariablesAndBinning();
   }
 
   // timer start/stop after the dials are updated.
@@ -398,6 +406,37 @@ void Propagator::reweightEvents( int iThread_) {
 void Propagator::refillHistogramsFct( int iThread_){
   for( auto& sample : _sampleSet_.getSampleList() ){
     sample.getHistogram().refillHistogram(iThread_);
+  }
+}
+
+
+void Propagator::updateEventVariablesAndBinning(){
+  if( not _eventDialCache_.hasVariableResponses() ){ return; }
+  _threadPool_.runJob([&](int iThread_){
+    auto& cache = _eventDialCache_.getCache();
+    auto bounds = GenericToolbox::ParallelWorker::getThreadBoundIndices(iThread_, _threadPool_.getNbThreads(), cache.size());
+    for( size_t iEntry = bounds.beginIndex ; iEntry < bounds.endIndex ; ++iEntry ){
+      _eventDialCache_.applyVariableResponses(cache[iEntry]);
+    }
+  });
+  updateEventSampleBinning();
+}
+
+void Propagator::prepareVariableDials(){
+  for( const auto& collection : _dialManager_.getDialCollectionList() ){
+    if( not collection.isEnabled() or collection.getApplyToVariable().empty() ){ continue; }
+    GenericToolbox::addIfNotInVector(collection.getApplyToVariable(), _sampleSet_.getEventVariableNameList());
+    for( auto& sample : _sampleSet_.getSampleList() ){
+      for( const auto& context : sample.getHistogram().getBinContextList() ){
+        for( const auto& edges : context.bin.getEdgesList() ){
+          if( edges.varName == collection.getApplyToVariable() and not sample.isUseDynamicBinning() ){
+            LogInfo << "Enabling dynamic binning for sample \"" << sample.getName()
+                    << "\": dial targets variable \"" << edges.varName << "\"." << std::endl;
+            sample.setUseDynamicBinning(true);
+          }
+        }
+      }
+    }
   }
 }
 
