@@ -361,8 +361,8 @@ void MinimizerBase::printParameters(){
       else if( par.isPenaltyDisabled() )  { statusStr = "Fixed (penalty not applied)";    colorStr = GenericToolbox::ColorCodes::yellowLightText; }
       else if( par.isFixed() )  { statusStr = "Fixed (penalty applied)";    colorStr = GenericToolbox::ColorCodes::yellowLightText; }
       else                      {
-        statusStr = Parameter::PriorType::toString(par.getPriorType()) + " Prior";
-        if(par.getPriorType()==Parameter::PriorType::Flat) colorStr = GenericToolbox::ColorCodes::blueLightText;
+        statusStr = par.isFree() ? "Free" : "Gaussian Prior";
+        if(par.isFree()) colorStr = GenericToolbox::ColorCodes::blueLightText;
       }
 
 #ifdef NOCOLOR
