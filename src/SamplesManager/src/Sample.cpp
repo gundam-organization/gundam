@@ -145,6 +145,7 @@ void Sample::updateEventBinning(){
 }
 
 void Sample::updateEventBinning(GenericToolbox::ParallelWorker& threadPool_){
+  ++_binningRevision_;
   LogThrowIf(not _useDynamicBinning_, "Dynamic binning is disabled for sample \"" << _name_ << "\".");
   if( _eventList_.empty() ){
     this->indexEventInHistogramBin();

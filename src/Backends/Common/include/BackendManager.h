@@ -63,6 +63,7 @@ namespace Backends {
     [[nodiscard]] bool shouldMaterialize(OutputRequest outputRequest_) const;
 
     std::vector<OutputRequest> _materializeOutputList_{
+        OutputRequest::EventState,
         OutputRequest::EventWeights,
         OutputRequest::Histograms,
         OutputRequest::SampleLikelihoods,
@@ -72,6 +73,11 @@ namespace Backends {
     EngineLayout _backendEngineLayout_{};
     std::unique_ptr<Backend> _backend_{nullptr};
     PropagationToken _lastPropagationToken_{};
+    std::uint64_t _lastBinningRevision_{0};
+    std::vector<std::uint64_t> _sampleBinningRevisions_{};
+    std::uint64_t _lastMaterializedStateRevision_{0};
+    std::uint64_t _lastMaterializedVariableRevision_{0};
+    std::vector<std::uint64_t> _lastMaterializedSampleRevisions_{};
   };
 
 }

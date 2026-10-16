@@ -42,6 +42,9 @@ bool Backends::packDeviceBackendModel(const PropagationView& model_,
     return false;
   };
 
+  if( model_.requiresEventBinning() or model_.hasReweightCap ){
+    return fail("event-variable responses, dynamic/smoothed binning and event reweight caps require the CPU backend.");
+  }
   if( model_.events.empty() ){
     return fail("the backend model has no events.");
   }

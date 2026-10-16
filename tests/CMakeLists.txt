@@ -87,6 +87,7 @@ if( WITH_GOOGLE_TEST )
   list(APPEND FAST_TESTS GTests/unitTest_DialDefinitions.cpp)
   if(WITH_BACKENDS)
     list(APPEND FAST_TESTS GTests/unitTest_ExternalWeightBackend.cpp)
+    list(APPEND FAST_TESTS GTests/unitTest_CpuBinning.cpp)
   endif()
 
   # Compile the fast test executable, but only add them to ctest if

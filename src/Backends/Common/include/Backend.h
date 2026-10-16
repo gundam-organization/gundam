@@ -29,6 +29,17 @@ namespace Backends {
     [[nodiscard]] virtual const std::vector<double>& getEventWeightsHostView(const PropagationToken& token_) const = 0;
     [[nodiscard]] virtual const std::vector<double>& getHistogramSumsHostView(const PropagationToken& token_) const = 0;
     [[nodiscard]] virtual const std::vector<double>& getHistogramSumSquaresHostView(const PropagationToken& token_) const = 0;
+    [[nodiscard]] virtual const EventState& getEventStateHostView(const PropagationToken&) const {
+      throw std::runtime_error("Backend does not provide event state.");
+    }
+    [[nodiscard]] virtual const std::vector<double>& getOutsideSumsHostView(const PropagationToken&) const {
+      static const std::vector<double> empty;
+      return empty;
+    }
+    [[nodiscard]] virtual const std::vector<double>& getOutsideSumSquaresHostView(const PropagationToken&) const {
+      static const std::vector<double> empty;
+      return empty;
+    }
     [[nodiscard]] virtual BackendDeviceView getDeviceView(const PropagationToken&) const { return {}; }
     [[nodiscard]] virtual BackendTimingSummary getLastTimingSummary() const { return {}; }
 

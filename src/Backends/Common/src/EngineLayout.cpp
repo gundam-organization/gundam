@@ -16,6 +16,7 @@
 #include "Shift.h"
 #include "UniformSpline.h"
 
+#include <algorithm>
 #include <cmath>
 #include <map>
 #include <unordered_map>
@@ -31,44 +32,71 @@ namespace {
 
     propagation.samples.reserve(sampleSet.getSampleList().size());
 
-    std::map<int, int> sampleBinOffsetMap;
+    std::map<int, std::size_t> samplePositionMap;
     int binOffset{0};
     for( auto& sample : sampleSet.getSampleList() ){
       Backends::SampleView sampleRef;
       sampleRef.sampleIndex = sample.getIndex();
       sampleRef.binOffset = binOffset;
       sampleRef.binCount = sample.getHistogram().getNbBins();
-      propagation.samples.emplace_back(sampleRef);
-      sampleBinOffsetMap[sampleRef.sampleIndex] = sampleRef.binOffset;
-      binOffset += sampleRef.binCount;
+      sampleRef.useDynamicBinning = sample.isUseDynamicBinning();
+      sampleRef.readHostVariables = sample.isUseDynamicBinning() and eventDialCache.hasVariableResponses()
+          and not likelihoodInterface_.getModelPropagator().isAutomaticBinningSample(propagation.samples.size());
+      if( sampleRef.useDynamicBinning or sample.getHistogram().isBinningResponseEnabled() ){
+        sampleRef.binning = sample.getHistogram().exportBinningLayout();
+        sampleRef.variableNames = sampleRef.binning.variableNames;
+      }
+      samplePositionMap[sampleRef.sampleIndex] = propagation.samples.size();
+      propagation.samples.emplace_back(std::move(sampleRef));
+      binOffset += sample.getHistogram().getNbBins();
     }
     propagation.totalBins = binOffset;
+    propagation.hasVariableResponses = eventDialCache.hasVariableResponses();
+    propagation.hasReweightCap = eventDialCache.getGlobalEventReweightCap().isEnabled;
+    propagation.maxReweight = eventDialCache.getGlobalEventReweightCap().maxReweight;
+    // Every event in a sample uses the same compact variable schema. Binning
+    // coordinates come first; auxiliary dial targets follow.
+    for( const auto& entry : eventDialCache.getCache() ){
+      if( entry.event == nullptr ){ continue; }
+      auto& sample = propagation.samples.at(samplePositionMap.at(entry.event->getIndices().sample));
+      for( const auto& response : entry.variableResponseCacheList ){
+        const auto& name = entry.event->getVariables().getNameListPtr()->at(response.variableIndex);
+        if( std::find(sample.variableNames.begin(), sample.variableNames.end(), name) == sample.variableNames.end() ){
+          sample.variableNames.emplace_back(name);
+        }
+      }
+    }
 
     propagation.events.reserve(eventDialCache.getCache().size());
     std::unordered_map<const Parameter*, std::size_t> parameterIndexMap{};
+    for( std::size_t i = 0; i < bindings_.parameters.size(); ++i ){
+      parameterIndexMap.emplace(bindings_.parameters[i].parameter, i);
+    }
     std::unordered_map<const DialInterface*, std::uint32_t> dialIndexMap{};
     std::unordered_map<const ExternalWeightBuffer*, std::size_t> externalSourceIndices{};
     std::size_t externalWeightCount{0};
 
     for( const auto& cacheEntry : eventDialCache.getCache() ){
       if( cacheEntry.event == nullptr ){ continue; }
-      if( cacheEntry.event->getIndices().bin < 0 ){ continue; }
 
       Backends::EventView eventRef;
       eventRef.sampleIndex = cacheEntry.event->getIndices().sample;
       eventRef.binIndex = cacheEntry.event->getIndices().bin;
-      eventRef.globalBinIndex = sampleBinOffsetMap.at(eventRef.sampleIndex) + eventRef.binIndex;
+      eventRef.samplePosition = samplePositionMap.at(eventRef.sampleIndex);
+      const auto& sample = propagation.samples.at(eventRef.samplePosition);
+      eventRef.globalBinIndex = eventRef.binIndex < 0 ? -1 : sample.binOffset + eventRef.binIndex;
       eventRef.weight.baseWeight = cacheEntry.event->getWeights().base;
       eventRef.weight.firstDial = propagation.eventDialIndices.size();
-      eventRef.weight.dialCount = cacheEntry.dialResponseCacheList.size();
+
       eventRef.resultIndex = propagation.events.size();
 
+      std::vector<std::uint32_t> allDialIndices;
       for( const auto& dialResponse : cacheEntry.dialResponseCacheList ){
         const auto* interface = dialResponse.dialInterface;
         LogThrowIf(interface == nullptr, "Null DialInterface while building EngineView.");
         auto cachedDialIt = dialIndexMap.find(interface);
         if( cachedDialIt != dialIndexMap.end() ){
-          propagation.eventDialIndices.emplace_back(cachedDialIt->second);
+          allDialIndices.emplace_back(cachedDialIt->second);
           continue;
         }
 
@@ -145,8 +173,9 @@ namespace {
         dialRef.payloadSize = propagation.dialPayloads.size() - dialRef.payloadOffset;
         const auto dialIndex = std::uint32_t(propagation.dials.size());
         propagation.dials.emplace_back(dialRef);
+        bindings_.uniqueDials.push_back({interface});
         dialIndexMap.emplace(interface, dialIndex);
-        propagation.eventDialIndices.emplace_back(dialIndex);
+        allDialIndices.emplace_back(dialIndex);
 
         if( inputBuffer == nullptr ){ continue; }
 
@@ -167,6 +196,39 @@ namespace {
         }
       }
 
+      for( std::size_t i = 0; i < allDialIndices.size(); ++i ){
+        if( not cacheEntry.dialResponseCacheList[i].appliesToVariable ){
+          propagation.eventDialIndices.emplace_back(allDialIndices[i]);
+        }
+      }
+      eventRef.weight.dialCount = propagation.eventDialIndices.size() - eventRef.weight.firstDial;
+      eventRef.firstVariable = propagation.variableValues.size();
+      eventRef.variableCount = sample.variableNames.size();
+      const auto& variables = cacheEntry.event->getVariables();
+      for( const auto& name : sample.variableNames ){
+        int index = variables.findVarIndex(name);
+        bool isTarget = std::any_of(cacheEntry.variableResponseCacheList.begin(), cacheEntry.variableResponseCacheList.end(),
+                                    [&](const auto& target_){ return target_.variableIndex == index; });
+        bindings_.variables.push_back({cacheEntry.event, index, propagation.variableValues.size(), sample.readHostVariables, isTarget});
+        propagation.variableValues.emplace_back(variables.getVarList()[index].getVarAsDouble());
+      }
+      eventRef.firstVariableResponse = propagation.variableResponses.size();
+      for( const auto& target : cacheEntry.variableResponseCacheList ){
+        Backends::BackendVariableResponseDescriptor response;
+        const auto& name = variables.getNameListPtr()->at(target.variableIndex);
+        response.variableIndex = eventRef.firstVariable
+            + std::size_t(std::find(sample.variableNames.begin(), sample.variableNames.end(), name) - sample.variableNames.begin());
+        response.referenceValue = target.referenceValue;
+        if( target.overrideDial != std::size_t(-1) ){ response.overrideDial = allDialIndices.at(target.overrideDial); }
+        response.firstMultiplyDial = propagation.variableDialIndices.size();
+        for( auto dial : target.multiplyDials ){ propagation.variableDialIndices.emplace_back(allDialIndices.at(dial)); }
+        response.multiplyDialCount = propagation.variableDialIndices.size() - response.firstMultiplyDial;
+        response.firstAddDial = propagation.variableDialIndices.size();
+        for( auto dial : target.addDials ){ propagation.variableDialIndices.emplace_back(allDialIndices.at(dial)); }
+        response.addDialCount = propagation.variableDialIndices.size() - response.firstAddDial;
+        propagation.variableResponses.emplace_back(response);
+      }
+      eventRef.variableResponseCount = propagation.variableResponses.size() - eventRef.firstVariableResponse;
       propagation.events.emplace_back(eventRef);
     }
 

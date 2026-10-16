@@ -8,12 +8,14 @@
 
 #include "Event.h"
 #include "Histogram.h"
+
 #include "BinSet.h"
 #include "GundamGlobals.h"
 
 #include "GenericToolbox.Root.h" // TFile
 #include "GenericToolbox.Loops.h"
 
+#include <cstdint>
 #include <vector>
 #include <string>
 
@@ -63,6 +65,7 @@ public:
   [[nodiscard]] bool isDatasetValid(const std::string& datasetName_) const;
   [[nodiscard]] double getSumWeights() const;
   [[nodiscard]] size_t getNbBinnedEvents() const;
+  [[nodiscard]] std::uint64_t getBinningRevision() const { return _binningRevision_; }
 
   // core
   void reserveEventMemory(size_t dataSetIndex_, size_t nEvents, const Event &eventBuffer_);
@@ -80,6 +83,7 @@ public:
   void indexEventInHistogramBin(GenericToolbox::ParallelWorker& threadPool_);
 
 private:
+  std::uint64_t _binningRevision_{0};
   // configuration
   bool _isEnabled_{true};
   bool _useDynamicBinning_{false};

@@ -25,6 +25,8 @@ Backends::BackendCapabilities Backends::MpsBackend::getCapabilities() const {
 }
 
 void Backends::MpsBackend::build(const EngineView& engineView_) {
+  LogThrowIf(engineView_.propagation.requiresEventBinning() or engineView_.propagation.hasReweightCap,
+             "MPS does not yet support event-variable responses, dynamic/smoothed binning or event reweight caps. Use the CPU backend.");
   _impl_->engineView = engineView_;
   _impl_->lastResult = MpsBackendImpl::Result();
   if( not _impl_->buildDeviceModel() ){

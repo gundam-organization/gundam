@@ -2,6 +2,7 @@
 #define GUNDAM_BACKEND_MODEL_H
 
 #include "EngineDescriptors.h"
+#include "BinningLayout.h"
 
 #include <cstdint>
 #include <functional>
@@ -18,12 +19,21 @@ namespace Backends {
     int globalBinIndex{-1};
     BackendEventWeightDescriptor weight{};
     std::size_t resultIndex{0};
+    std::size_t samplePosition{std::size_t(-1)};
+    std::size_t firstVariable{0};
+    std::size_t variableCount{0};
+    std::size_t firstVariableResponse{0};
+    std::size_t variableResponseCount{0};
   };
 
   struct SampleView {
     int sampleIndex{-1};
     int binOffset{0};
     int binCount{0};
+    bool useDynamicBinning{false};
+    bool readHostVariables{false};
+    BinningLayout binning{};
+    std::vector<std::string> variableNames{};
   };
 
   struct LikelihoodSampleView {
@@ -45,6 +55,20 @@ namespace Backends {
     std::vector<SampleView> samples{};
     std::size_t parameterCount{0};
     int totalBins{0};
+    std::vector<double> variableValues{};
+    std::vector<BackendVariableResponseDescriptor> variableResponses{};
+    std::vector<std::uint32_t> variableDialIndices{};
+    bool hasVariableResponses{false};
+    bool hasReweightCap{false};
+    double maxReweight{0};
+
+    [[nodiscard]] bool requiresEventBinning() const {
+      if( hasVariableResponses ){ return true; }
+      for( const auto& sample : samples ){
+        if( sample.useDynamicBinning or sample.binning.isSmoothed ){ return true; }
+      }
+      return false;
+    }
 
     void clear() {
       events.clear();
@@ -56,6 +80,12 @@ namespace Backends {
       samples.clear();
       parameterCount = 0;
       totalBins = 0;
+      variableValues.clear();
+      variableResponses.clear();
+      variableDialIndices.clear();
+      hasVariableResponses = false;
+      hasReweightCap = false;
+      maxReweight = 0;
     }
     [[nodiscard]] bool empty() const { return events.empty(); }
   };
@@ -64,6 +94,20 @@ namespace Backends {
     std::vector<LikelihoodSampleView> samples{};
 
     [[nodiscard]] bool empty() const { return samples.empty(); }
+  };
+
+  struct EventBinContribution {
+    int binIndex{-1}; // Sample-local; -1 denotes the outside contribution.
+    double fraction{0};
+  };
+
+  struct EventState {
+    std::uint64_t revision{1};
+    std::uint64_t variableRevision{1};
+    std::vector<std::uint64_t> sampleRevisions{};
+    std::vector<double> variables{};
+    std::vector<int> bins{};
+    std::vector<std::vector<EventBinContribution>> contributions{};
   };
 
   struct EngineView {

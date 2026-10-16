@@ -25,7 +25,12 @@ std::string Backends::formatBackendTimingSummary(const BackendTimingSummary& tim
      << "s/" << timing_.externalWeightUploadBytes << "B/" << timing_.externalWeightUploadBlocks << " blocks"
      << ", cachedDialStage=" << timing_.cachedDialStageSeconds
      << "s, eventWeightsStage=" << timing_.eventWeightsStageSeconds
-     << "s, histogramStage=" << timing_.histogramStageSeconds
+     << "s, variables=" << timing_.variableStageSeconds
+     << "s, binning=" << timing_.binningStageSeconds
+     << "s, rebinnedEvents=" << timing_.rebinnedEventCount
+     << ", candidates=" << timing_.binCandidateCount
+     << ", contributions=" << timing_.binContributionCount
+     << ", histogramStage=" << timing_.histogramStageSeconds
      << "s, encode=" << timing_.commandEncodeSeconds
      << "s, wait=" << timing_.deviceWaitSeconds
      << "s, histReadback=" << timing_.histogramReadbackSeconds
@@ -90,6 +95,58 @@ void Backends::BackendManager::materialize(OutputRequest outputRequest_) {
   }
 
   switch( outputRequest_.value ){
+    case OutputRequest::EventState: {
+      const auto& state = backend->getEventStateHostView(_lastPropagationToken_);
+      if( _lastMaterializedStateRevision_ == state.revision ){ return; }
+      const auto& model = _backendEngineLayout_.view.propagation;
+      const auto& bindings = _backendEngineLayout_.bindings;
+      LogThrowIf(state.variables.size() != model.variableValues.size() or state.bins.size() != model.events.size()
+                 or state.contributions.size() != model.events.size(), "Backend event state size mismatch.");
+      for( const auto& binding : bindings.variables ){
+        if( binding.isDialTarget and _lastMaterializedVariableRevision_ != state.variableRevision ){
+          binding.event->getVariables().getVarList()[binding.variableIndex].set(state.variables.at(binding.valueIndex));
+        }
+      }
+      std::vector<bool> changedSamples(model.samples.size(), false);
+      for( std::size_t i = 0; i < model.samples.size(); ++i ){
+        changedSamples[i] = i >= _lastMaterializedSampleRevisions_.size()
+            or _lastMaterializedSampleRevisions_[i] != state.sampleRevisions.at(i);
+      }
+      // Host pointer lists are diagnostic state. Rebuild only on explicit/auto
+      // materialization, and only when the cached event state changed.
+      for( std::size_t i = 0; i < model.samples.size(); ++i ){
+        const auto& sample = model.samples[i];
+        if( not changedSamples[i] or (not sample.useDynamicBinning and not sample.binning.isSmoothed) ){ continue; }
+        auto* histogram = bindings.samples.at(i).histogram;
+        for( auto& bin : histogram->getBinContextList() ){
+          bin.eventPtrList.clear();
+          bin.eventContributionList.clear();
+        }
+        histogram->getOutsideContributionList().clear();
+      }
+      for( std::size_t i = 0; i < model.events.size(); ++i ){
+        const auto& event = model.events[i];
+        auto* eventPtr = bindings.events.at(i).event;
+        const auto& sample = model.samples.at(event.samplePosition);
+        if( not changedSamples[event.samplePosition] or (not sample.useDynamicBinning and not sample.binning.isSmoothed) ){ continue; }
+        int bin = state.bins.at(event.resultIndex);
+        eventPtr->getIndices().bin = bin;
+        auto* histogram = bindings.samples.at(event.samplePosition).histogram;
+        if( bin >= 0 ){ histogram->getBinContextList().at(bin).eventPtrList.emplace_back(eventPtr); }
+        if( sample.binning.isSmoothed ){
+          for( const auto& contribution : state.contributions[event.resultIndex] ){
+            auto& list = contribution.binIndex < 0 ? histogram->getOutsideContributionList()
+                : histogram->getBinContextList().at(contribution.binIndex).eventContributionList;
+            list.push_back({eventPtr, contribution.fraction});
+          }
+        }
+      }
+      _likelihoodInterfacePtr_->getModelPropagator().invalidateVariableResponses();
+      _lastMaterializedStateRevision_ = state.revision;
+      _lastMaterializedVariableRevision_ = state.variableRevision;
+      _lastMaterializedSampleRevisions_ = state.sampleRevisions;
+      return;
+    }
     case OutputRequest::EventWeights: {
       const auto& eventWeights = backend->getEventWeightsHostView(_lastPropagationToken_);
       const auto& model = _backendEngineLayout_.view.propagation;
@@ -110,6 +167,8 @@ void Backends::BackendManager::materialize(OutputRequest outputRequest_) {
       const auto& sampleBindings = _backendEngineLayout_.bindings.samples;
       const auto& histSums = backend->getHistogramSumsHostView(_lastPropagationToken_);
       const auto& histSumSquares = backend->getHistogramSumSquaresHostView(_lastPropagationToken_);
+      const auto& outsideSums = backend->getOutsideSumsHostView(_lastPropagationToken_);
+      const auto& outsideSumSquares = backend->getOutsideSumSquaresHostView(_lastPropagationToken_);
       LogThrowIf(histSums.size() != std::size_t(model.totalBins), "Histogram sums host view size mismatch.");
       LogThrowIf(histSumSquares.size() != std::size_t(model.totalBins), "Histogram sum squares host view size mismatch.");
       LogThrowIf(sampleBindings.size() != model.samples.size(), "Sample bindings size mismatch.");
@@ -118,6 +177,11 @@ void Backends::BackendManager::materialize(OutputRequest outputRequest_) {
         const auto& sample = model.samples.at(iSample);
         auto* histogramPtr = sampleBindings.at(iSample).histogram;
         LogThrowIf(histogramPtr == nullptr, "Null histogram binding during backend materialization.");
+        if( sample.binning.isSmoothed ){
+          auto& outside = histogramPtr->getOutsideBinContent();
+          outside.sumWeights = outsideSums.at(iSample);
+          outside.sqrtSumSqWeights = std::sqrt(outsideSumSquares.at(iSample));
+        }
         auto& binContentList = histogramPtr->getBinContentList();
         auto& binContextList = histogramPtr->getBinContextList();
 
@@ -159,6 +223,14 @@ void Backends::BackendManager::initializeImpl() {
 
   LogInfo << "Initializing propagation backend: " << _type_ << std::endl;
   _backendEngineLayout_.build(*_likelihoodInterfacePtr_);
+  _lastBinningRevision_ = _likelihoodInterfacePtr_->getModelPropagator().getBinningRevision();
+  _lastMaterializedStateRevision_ = 0;
+  _lastMaterializedVariableRevision_ = 0;
+  _lastMaterializedSampleRevisions_.clear();
+  _sampleBinningRevisions_.clear();
+  for( const auto& binding : _backendEngineLayout_.bindings.samples ){
+    _sampleBinningRevisions_.push_back(binding.sample->getBinningRevision());
+  }
 
   LogInfo << "Propagation backend enabled: " << _type_
           << " with fixed device outputs [EventWeights, Histograms, StatLikelihood]"
@@ -179,7 +251,9 @@ std::future<Backends::BackendPropagationResult> Backends::BackendManager::propag
 
   LogThrowIf(_likelihoodInterfacePtr_ == nullptr, "No likelihood interface for backend propagation.");
   auto prepareStart = std::chrono::steady_clock::now();
-  _likelihoodInterfacePtr_->getModelPropagator().preparePropagation();
+  auto& propagator = _likelihoodInterfacePtr_->getModelPropagator();
+  const bool handlesEventState = _backend_->getCapabilities().supportsObservableTransforms;
+  propagator.preparePropagation(not handlesEventState);
   _lastPreparationSeconds_ = std::chrono::duration<double>(std::chrono::steady_clock::now() - prepareStart).count();
 
   Backends::PropagationInputs inputs;
@@ -196,7 +270,35 @@ std::future<Backends::BackendPropagationResult> Backends::BackendManager::propag
     const auto& layout = _backendEngineLayout_.view.propagation.externalWeightBlocks[iBlock];
     inputs.externalWeights.push_back({source->data(), source->size(), layout.offset, source->getGeneration()});
   }
+  const auto& model = _backendEngineLayout_.view.propagation;
+  inputs.forceBinningUpdate = propagator.getBinningRevision() != _lastBinningRevision_;
+  for( std::size_t i = 0; i < _sampleBinningRevisions_.size(); ++i ){
+    if( _sampleBinningRevisions_[i] != _backendEngineLayout_.bindings.samples[i].sample->getBinningRevision() ){
+      inputs.forceBinningUpdate = true;
+    }
+  }
+  for( const auto& binding : _backendEngineLayout_.bindings.uniqueDials ){
+    const auto* buffer = binding.interface->getInputBufferRef();
+    inputs.dialInputRevisions.push_back(buffer == nullptr ? 0 : buffer->getRevision());
+  }
+  const auto& variableBindings = _backendEngineLayout_.bindings.variables;
+  if( handlesEventState and (inputs.forceBinningUpdate
+      or std::any_of(variableBindings.begin(), variableBindings.end(), [](const auto& binding_){ return binding_.readFromHost; })) ){
+    inputs.hostVariables = model.variableValues;
+    for( const auto& binding : variableBindings ){
+      if( binding.readFromHost or inputs.forceBinningUpdate ){
+        inputs.hostVariables.at(binding.valueIndex) = binding.event->getVariables().getVarList()[binding.variableIndex].getVarAsDouble();
+      }
+    }
+  }
   auto token = _backend_->requestPropagation(inputs);
+  if( token.isValid ){
+    _lastBinningRevision_ = propagator.getBinningRevision();
+    for( std::size_t i = 0; i < _sampleBinningRevisions_.size(); ++i ){
+      _sampleBinningRevisions_[i] = _backendEngineLayout_.bindings.samples[i].sample->getBinningRevision();
+    }
+    if( handlesEventState ){ propagator.invalidateVariableResponses(); }
+  }
   _lastPropagationToken_ = token;
   if( not token.isValid ){
     return std::async(std::launch::deferred, []{
@@ -210,7 +312,7 @@ std::future<Backends::BackendPropagationResult> Backends::BackendManager::propag
     backend->wait(token);
 
     auto status = backend->getStatus(token);
-    for( auto outputRequest : {OutputRequest::EventWeights, OutputRequest::Histograms, OutputRequest::SampleLikelihoods, OutputRequest::StatLikelihood} ){
+    for( auto outputRequest : {OutputRequest::EventState, OutputRequest::EventWeights, OutputRequest::Histograms, OutputRequest::SampleLikelihoods, OutputRequest::StatLikelihood} ){
       auto outputState = status.state(outputRequest);
       if( outputState == OutputState::Failed ){ continue; }
       if( outputState != OutputState::ReadyOnDevice and outputState != OutputState::ReadyOnHost ){

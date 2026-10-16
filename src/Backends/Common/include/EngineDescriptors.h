@@ -46,6 +46,16 @@ namespace Backends {
     std::size_t count{0};
   };
 
+  struct BackendVariableResponseDescriptor {
+    std::size_t variableIndex{0}; // Absolute index in the event-variable buffer.
+    double referenceValue{0};
+    std::size_t overrideDial{std::size_t(-1)};
+    std::size_t firstMultiplyDial{0};
+    std::size_t multiplyDialCount{0};
+    std::size_t firstAddDial{0};
+    std::size_t addDialCount{0};
+  };
+
   struct BackendEventWeightDescriptor {
     double baseWeight{1};
     std::size_t firstDial{0};

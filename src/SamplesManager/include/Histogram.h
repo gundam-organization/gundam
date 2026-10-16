@@ -48,6 +48,9 @@ public:
   // core
   void configureBinningResponse(const ConfigReader& config_);
   void build(const ConfigReader& binningConfig_);
+  [[nodiscard]] BinningLayout exportBinningLayout() const;
+  auto& getOutsideBinContent(){ return _outsideBinContent_; }
+  auto& getOutsideContributionList(){ return _outsideContributionList_; }
   // Bin edge variable-index caches must match the event's variable layout.
   [[nodiscard]] int findBinIndex(const Event& event_) const;
   [[nodiscard]] BinningResponse::EventResponse evaluateEventBinningResponse(const Event& event_) const;

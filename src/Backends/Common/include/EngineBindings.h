@@ -10,11 +10,20 @@ class Event;
 class Histogram;
 class LikelihoodInterface;
 class Parameter;
+class Sample;
 
 namespace Backends {
 
   struct EventBinding {
     Event* event{nullptr};
+  };
+
+  struct VariableBinding {
+    Event* event{nullptr};
+    int variableIndex{-1};
+    std::size_t valueIndex{0};
+    bool readFromHost{false};
+    bool isDialTarget{false};
   };
 
   struct DialBinding {
@@ -24,6 +33,7 @@ namespace Backends {
   struct SampleBinding {
     Histogram* histogram{nullptr};
     int sampleIndex{-1};
+    Sample* sample{nullptr};
   };
 
   struct ParameterBinding {
@@ -32,7 +42,9 @@ namespace Backends {
 
   struct EngineBindings {
     std::vector<EventBinding> events{};
+    std::vector<VariableBinding> variables{};
     std::vector<DialBinding> eventDials{};
+    std::vector<DialBinding> uniqueDials{};
     std::vector<SampleBinding> samples{};
     std::vector<ParameterBinding> parameters{};
     std::vector<std::shared_ptr<const ExternalWeightBuffer>> externalWeights{};

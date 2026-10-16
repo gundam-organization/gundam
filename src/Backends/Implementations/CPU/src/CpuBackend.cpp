@@ -12,6 +12,8 @@ Backends::BackendCapabilities Backends::CpuBackend::getCapabilities() const {
   out.supportsEventWeights = true;
   out.supportsHistograms = true;
   out.supportsLikelihood = true;
+  out.supportsDynamicBinning = true;
+  out.supportsObservableTransforms = true;
   out.deviceName = "host";
   return out;
 }
@@ -21,6 +23,30 @@ void Backends::CpuBackend::build(const EngineView& engineView_) {
   _lastResult_ = Result();
   initializeThreads();
   initializeDialResponseCache();
+  const auto& model = _engineView_.propagation;
+  _eventState_ = EventState();
+  if( model.requiresEventBinning() ){
+    _eventState_.variables = model.variableValues;
+    _eventState_.sampleRevisions.assign(model.samples.size(), 1);
+    _eventState_.bins.resize(model.events.size(), -1);
+    _eventState_.contributions.resize(model.events.size());
+  }
+  _validBinning_.assign(model.events.size(), false);
+  _binningIndices_.resize(model.samples.size());
+  for( std::size_t i = 0; i < model.samples.size(); ++i ){ _binningIndices_[i].build(model.samples[i].binning); }
+  _binningWorkers_.assign(_threadPool_.getNbThreads(), {});
+  _workerErrors_.resize(_threadPool_.getNbThreads());
+  _variableDialDependencies_.assign(model.dials.size(), false);
+  for( auto dial : model.variableDialIndices ){ _variableDialDependencies_.at(dial) = true; }
+  for( const auto& target : model.variableResponses ){
+    if( target.overrideDial != std::size_t(-1) ){ _variableDialDependencies_.at(target.overrideDial) = true; }
+  }
+  _lastBinningParameters_.clear();
+  _lastExternalGenerations_.clear();
+  _lastHostVariables_.clear();
+  _lastDialRevisions_.clear();
+  _eventStateValid_ = false;
+  _cachedContributionCount_ = 0;
   _isBuilt_ = true;
 }
 
@@ -32,9 +58,26 @@ Backends::PropagationToken Backends::CpuBackend::requestPropagation(const Propag
   inputs_.validate(model);
 
   resetResult();
+  _lastTiming_ = BackendTimingSummary();
 
   calculateEventWeights(_lastResult_, inputs_);
   _lastResult_.status.eventWeights = OutputState::ReadyOnDevice;
+
+  if( model.requiresEventBinning() ){
+    try{ updateEventState(inputs_); }
+    catch( ... ){
+      // A failed parallel pass may have touched only part of the state.
+      // Retry from host/reference values rather than publishing partial caches.
+      _eventStateValid_ = false;
+      std::fill(_validBinning_.begin(), _validBinning_.end(), false);
+      _lastHostVariables_.clear();
+      _activeInputs_ = nullptr;
+      _lastResult_.status.backend = BackendStatus::Failed;
+      _lastResult_.token.isValid = false;
+      throw;
+    }
+    _lastResult_.status.eventState = OutputState::ReadyOnDevice;
+  }
 
   calculateHistograms(_lastResult_);
   _lastResult_.status.histograms = OutputState::ReadyOnDevice;
@@ -49,7 +92,6 @@ Backends::PropagationToken Backends::CpuBackend::requestPropagation(const Propag
   }
   _lastResult_.status.backend = BackendStatus::Ready;
 
-  _lastTiming_ = BackendTimingSummary();
   _lastTiming_.cachedDialStageSeconds = _cachedDialStageTimer_.eval().count();
   _lastTiming_.eventWeightsStageSeconds = _eventWeightsStageTimer_.eval().count();
   _lastTiming_.histogramStageSeconds = _histogramStageTimer_.eval().count();
@@ -85,7 +127,10 @@ void Backends::CpuBackend::materialize(const PropagationToken& token_, OutputReq
              and _lastResult_.status.state(output_) != OutputState::ReadyOnHost,
              "Requested backend output is not ready.");
 
-  if( output_ == OutputRequest::EventWeights ){
+  if( output_ == OutputRequest::EventState ){
+    _lastResult_.status.eventState = OutputState::ReadyOnHost;
+  }
+  else if( output_ == OutputRequest::EventWeights ){
     _lastResult_.status.eventWeights = OutputState::ReadyOnHost;
   }
   else if( output_ == OutputRequest::Histograms ){
@@ -142,6 +187,16 @@ void Backends::CpuBackend::initializeThreads() {
       "CpuBackend::calculateHistograms",
       [this](int iThread_){ calculateHistogramsThread(iThread_); }
   );
+  // ParallelWorker does not forward worker exceptions. Capture them so every
+  // thread can finish its job before an error is rethrown on the caller.
+  _threadPool_.addJob("CpuBackend::updateEventVariables", [this](int iThread_){
+    try{ updateEventVariablesThread(iThread_); }
+    catch( ... ){ _workerErrors_[iThread_] = std::current_exception(); }
+  });
+  _threadPool_.addJob("CpuBackend::updateEventBinning", [this](int iThread_){
+    try{ updateEventBinningThread(iThread_); }
+    catch( ... ){ _workerErrors_[iThread_] = std::current_exception(); }
+  });
   _threadPool_.addJob(
       "CpuBackend::updateCachedDialResponses",
       [this](int iThread_){ updateCachedDialResponsesThread(iThread_); }
@@ -262,7 +317,7 @@ void Backends::CpuBackend::calculateEventWeightsThread(int iThread_) {
   );
   for( std::size_t iEvent = bounds.beginIndex ; iEvent < bounds.endIndex ; iEvent++ ){
     const auto& event = propagation.events[iEvent];
-    double weight = event.weight.baseWeight;
+    double weight = 1.;
     for( std::size_t iDial = 0 ; iDial < event.weight.dialCount ; iDial++ ){
       const auto dialIndex = propagation.eventDialIndices[event.weight.firstDial + iDial];
       const auto& dial = propagation.dials[dialIndex];
@@ -270,23 +325,25 @@ void Backends::CpuBackend::calculateEventWeightsThread(int iThread_) {
                 ? _cachedDialResponses_[dialIndex]
                 : Semantics::evalDialResponse(propagation, dial, *_activeInputs_);
     }
-    _activeResult_->eventWeights[event.resultIndex] = weight;
+    if( propagation.hasReweightCap ){ weight = std::min(weight, propagation.maxReweight); }
+    _activeResult_->eventWeights[event.resultIndex] = event.weight.baseWeight * weight;
   }
 }
 
 void Backends::CpuBackend::calculateHistograms(Result& result_) {
   auto timerScope = _histogramStageTimer_.scopeTime();
 
-  LogThrowIf(result_.eventWeights.empty(), "CPU backend histogram build requires event weights.");
   const auto& propagation = _engineView_.propagation;
   const int nThreads = _threadPool_.getNbThreads();
   _threadHistogramSums_.resize(nThreads);
   _threadHistogramSumSquares_.resize(nThreads);
   for( int iThread = 0 ; iThread < nThreads ; iThread++ ){
-    _threadHistogramSums_[iThread].assign(propagation.totalBins, 0.);
-    _threadHistogramSumSquares_[iThread].assign(propagation.totalBins, 0.);
+    _threadHistogramSums_[iThread].assign(propagation.totalBins + propagation.samples.size(), 0.);
+    _threadHistogramSumSquares_[iThread].assign(propagation.totalBins + propagation.samples.size(), 0.);
   }
 
+  result_.outsideSums.assign(propagation.samples.size(), 0.);
+  result_.outsideSumSquares.assign(propagation.samples.size(), 0.);
   result_.histSums.assign(propagation.totalBins, 0.);
   result_.histSumSquares.assign(propagation.totalBins, 0.);
   _activeResult_ = &result_;
@@ -297,6 +354,12 @@ void Backends::CpuBackend::calculateHistograms(Result& result_) {
     for( int iThread = 0 ; iThread < nThreads ; iThread++ ){
       result_.histSums[iBin] += _threadHistogramSums_[iThread][iBin];
       result_.histSumSquares[iBin] += _threadHistogramSumSquares_[iThread][iBin];
+    }
+  }
+  for( std::size_t iSample = 0; iSample < propagation.samples.size(); ++iSample ){
+    for( int iThread = 0; iThread < nThreads; ++iThread ){
+      result_.outsideSums[iSample] += _threadHistogramSums_[iThread][propagation.totalBins + iSample];
+      result_.outsideSumSquares[iSample] += _threadHistogramSumSquares_[iThread][propagation.totalBins + iSample];
     }
   }
 }
@@ -310,8 +373,21 @@ void Backends::CpuBackend::calculateHistogramsThread(int iThread_) {
   auto& histSumSquares = _threadHistogramSumSquares_[iThread_];
   for( std::size_t iEvent = bounds.beginIndex ; iEvent < bounds.endIndex ; iEvent++ ){
     const auto& event = propagation.events[iEvent];
-    if( event.globalBinIndex < 0 ){ continue; }
     const double weight = _activeResult_->eventWeights[event.resultIndex];
+    if( event.samplePosition < propagation.samples.size() ){
+      const auto& sample = propagation.samples[event.samplePosition];
+      if( sample.useDynamicBinning or sample.binning.isSmoothed ){
+        for( const auto& contribution : _eventState_.contributions[event.resultIndex] ){
+          const std::size_t bin = contribution.binIndex < 0 ? propagation.totalBins + event.samplePosition
+              : sample.binOffset + contribution.binIndex;
+          double value = weight * contribution.fraction;
+          histSums[bin] += value;
+          histSumSquares[bin] += value * value;
+        }
+        continue;
+      }
+    }
+    if( event.globalBinIndex < 0 ){ continue; }
     histSums[event.globalBinIndex] += weight;
     histSumSquares[event.globalBinIndex] += weight * weight;
   }
@@ -334,4 +410,19 @@ void Backends::CpuBackend::calculateLikelihood(Result& result_) {
       result_.histSums,
       result_.histSumSquares
   );
+}
+
+const Backends::EventState& Backends::CpuBackend::getEventStateHostView(const PropagationToken& token_) const {
+  LogThrowIf(not isCurrentToken(token_), "Invalid CpuBackend propagation token.");
+  return _eventState_;
+}
+
+const std::vector<double>& Backends::CpuBackend::getOutsideSumsHostView(const PropagationToken& token_) const {
+  LogThrowIf(not isCurrentToken(token_), "Invalid CpuBackend propagation token.");
+  return _lastResult_.outsideSums;
+}
+
+const std::vector<double>& Backends::CpuBackend::getOutsideSumSquaresHostView(const PropagationToken& token_) const {
+  LogThrowIf(not isCurrentToken(token_), "Invalid CpuBackend propagation token.");
+  return _lastResult_.outsideSumSquares;
 }

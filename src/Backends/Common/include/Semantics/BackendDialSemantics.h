@@ -25,15 +25,29 @@ namespace Backends::Semantics {
     );
   }
 
+  template<typename ResponseEvaluator>
+  inline double evalVariableResponse(const BackendVariableResponseDescriptor& target_,
+                                     const std::uint32_t* dialIndices_, ResponseEvaluator&& response_) {
+    double value = target_.overrideDial == std::size_t(-1) ? target_.referenceValue : response_(target_.overrideDial);
+    for( std::size_t i = target_.firstMultiplyDial; i < target_.firstMultiplyDial + target_.multiplyDialCount; ++i ){
+      value *= response_(dialIndices_[i]);
+    }
+    for( std::size_t i = target_.firstAddDial; i < target_.firstAddDial + target_.addDialCount; ++i ){
+      value += response_(dialIndices_[i]);
+    }
+    return value;
+  }
+
   inline double evalEventWeight(const PropagationView& propagation_,
                                 const EventView& eventRef_,
                                 const PropagationInputs& inputs_) {
-    double weight = eventRef_.weight.baseWeight;
+    double weight = 1.;
     for( std::size_t iDial = 0; iDial < eventRef_.weight.dialCount; ++iDial ){
       const auto& dial = propagation_.dials[propagation_.eventDialIndices[eventRef_.weight.firstDial + iDial]];
       weight *= evalDialResponse(propagation_, dial, inputs_);
     }
-    return weight;
+    if( propagation_.hasReweightCap and weight > propagation_.maxReweight ){ weight = propagation_.maxReweight; }
+    return eventRef_.weight.baseWeight * weight;
   }
 
 }

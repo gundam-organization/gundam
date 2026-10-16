@@ -20,8 +20,19 @@ namespace Backends {
   struct PropagationInputs {
     ParameterSnapshot parameters{};
     std::vector<ExternalWeightBlockView> externalWeights{};
+    // Optional host edits to explicitly dynamic observables, in model order.
+    // Empty keeps the state resident in the backend.
+    std::vector<double> hostVariables{};
+    bool forceBinningUpdate{false};
+    std::vector<std::uint64_t> dialInputRevisions{};
 
     void validate(const PropagationView& model_) const {
+      if( not dialInputRevisions.empty() and dialInputRevisions.size() != model_.dials.size() ){
+        throw std::runtime_error("Backend dial revision count mismatch.");
+      }
+      if( not hostVariables.empty() and hostVariables.size() != model_.variableValues.size() ){
+        throw std::runtime_error("Backend host variable buffer size mismatch.");
+      }
       if( parameters.values.size() != model_.parameterCount ){
         throw std::runtime_error("Backend parameter snapshot size mismatch.");
       }

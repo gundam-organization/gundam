@@ -3,6 +3,7 @@
 #include <sstream>
 
 Backends::OutputState& Backends::PropagationStatus::state(OutputRequest request_) {
+  if( request_ == OutputRequest::EventState ){ return eventState; }
   if( request_ == OutputRequest::EventWeights ){ return eventWeights; }
   if( request_ == OutputRequest::Histograms ){ return histograms; }
   if( request_ == OutputRequest::SampleLikelihoods ){ return sampleLikelihoods; }
@@ -11,6 +12,7 @@ Backends::OutputState& Backends::PropagationStatus::state(OutputRequest request_
 }
 
 Backends::OutputState Backends::PropagationStatus::state(OutputRequest request_) const {
+  if( request_ == OutputRequest::EventState ){ return eventState; }
   if( request_ == OutputRequest::EventWeights ){ return eventWeights; }
   if( request_ == OutputRequest::Histograms ){ return histograms; }
   if( request_ == OutputRequest::SampleLikelihoods ){ return sampleLikelihoods; }

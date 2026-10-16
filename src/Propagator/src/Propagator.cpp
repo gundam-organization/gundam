@@ -119,6 +119,7 @@ void Propagator::buildDialCache(){
   _eventVariableResponseCache_.build(_dialManager_.getDialCollectionList());
 }
 void Propagator::updateEventSampleBinning(){
+  ++_binningRevision_;
   _sampleSet_.updateEventBinning(_threadPool_);
 }
 void Propagator::propagateParameters(){
@@ -126,13 +127,13 @@ void Propagator::propagateParameters(){
   static_cast<void>(result.get());
 }
 
-void Propagator::preparePropagation(){
+void Propagator::preparePropagation(bool updateEventVariables_){
   // Make sure the dial state is updated before reweighting and filling the
   // histograms.  This has to be done before the GPU and CPU calculations, and
   // should be shared for both.
   if( _enableEigenToOrigInPropagate_ ){ _parManager_.convertEigenToOrig(); }
   _dialManager_.updateDialState();
-  _eventVariableResponseCache_.update(_eventDialCache_, _sampleSet_, _threadPool_);
+  if( updateEventVariables_ ){ _eventVariableResponseCache_.update(_eventDialCache_, _sampleSet_, _threadPool_); }
 }
 
 std::future<bool> Propagator::applyParameters(){

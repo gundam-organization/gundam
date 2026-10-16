@@ -14,7 +14,8 @@ namespace Backends {
 ENUM_FIELD( EventWeights, 0 ) \
 ENUM_FIELD( Histograms ) \
 ENUM_FIELD( SampleLikelihoods ) \
-ENUM_FIELD( StatLikelihood )
+ENUM_FIELD( StatLikelihood ) \
+ENUM_FIELD( EventState )
 #include "GenericToolbox.MakeEnum.h"
 
 #define ENUM_NAME OutputState
@@ -70,6 +71,11 @@ ENUM_FIELD( Unavailable )
     double cachedDialStageSeconds{0};
     double eventWeightsStageSeconds{0};
     double histogramStageSeconds{0};
+    double variableStageSeconds{0};
+    double binningStageSeconds{0};
+    std::size_t rebinnedEventCount{0};
+    std::size_t binCandidateCount{0};
+    std::size_t binContributionCount{0};
     double commandEncodeSeconds{0};
     double deviceWaitSeconds{0};
     double histogramReadbackSeconds{0};
@@ -92,6 +98,7 @@ ENUM_FIELD( Unavailable )
 
   struct PropagationStatus {
     BackendStatus backend{BackendStatus::Failed};
+    OutputState eventState{OutputState::NotRequested};
     OutputState eventWeights{OutputState::NotRequested};
     OutputState histograms{OutputState::NotRequested};
     OutputState sampleLikelihoods{OutputState::NotRequested};

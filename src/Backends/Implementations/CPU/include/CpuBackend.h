@@ -9,6 +9,7 @@
 #include "GenericToolbox.Thread.h"
 
 #include <cstdint>
+#include <exception>
 #include <vector>
 
 namespace Backends {
@@ -32,6 +33,9 @@ namespace Backends {
     [[nodiscard]] const std::vector<double>& getEventWeightsHostView(const PropagationToken& token_) const override;
     [[nodiscard]] const std::vector<double>& getHistogramSumsHostView(const PropagationToken& token_) const override;
     [[nodiscard]] const std::vector<double>& getHistogramSumSquaresHostView(const PropagationToken& token_) const override;
+    [[nodiscard]] const EventState& getEventStateHostView(const PropagationToken& token_) const override;
+    [[nodiscard]] const std::vector<double>& getOutsideSumsHostView(const PropagationToken& token_) const override;
+    [[nodiscard]] const std::vector<double>& getOutsideSumSquaresHostView(const PropagationToken& token_) const override;
     [[nodiscard]] BackendTimingSummary getLastTimingSummary() const override { return _lastTiming_; }
 
   private:
@@ -41,6 +45,8 @@ namespace Backends {
       std::vector<double> eventWeights{};
       std::vector<double> histSums{};
       std::vector<double> histSumSquares{};
+      std::vector<double> outsideSums{};
+      std::vector<double> outsideSumSquares{};
       double likelihood{0};
     };
 
@@ -52,11 +58,37 @@ namespace Backends {
     void updateCachedDialResponsesThread(int iThread_);
     void calculateEventWeights(Result& result_, const PropagationInputs& inputs_);
     void calculateEventWeightsThread(int iThread_);
+    void updateEventState(const PropagationInputs& inputs_);
+    void runEventStateJob(const std::string& jobName_);
+    void updateEventVariablesThread(int iThread_);
+    void updateEventBinningThread(int iThread_);
+    double evalResponse(std::size_t dial_) const;
     void calculateHistograms(Result& result_);
     void calculateHistogramsThread(int iThread_);
     void calculateHistogramsFromEvents(Result& result_, const PropagationInputs& inputs_);
     void calculateLikelihood(Result& result_);
 
+    struct BinningWorker {
+      std::vector<std::size_t> candidates{};
+      std::vector<std::uint8_t> changedSamples{};
+      std::size_t rebinnedEvents{0};
+      std::size_t candidatesTested{0};
+    };
+    std::vector<std::exception_ptr> _workerErrors_{};
+    EventState _eventState_{};
+    std::vector<BinningIndex> _binningIndices_{};
+    std::vector<BinningWorker> _binningWorkers_{};
+    std::vector<std::uint8_t> _validBinning_{};
+    std::vector<std::uint8_t> _variableDialDependencies_{};
+    std::vector<double> _lastBinningParameters_{};
+    std::vector<std::uint64_t> _lastExternalGenerations_{};
+    std::vector<double> _lastHostVariables_{};
+    std::vector<std::uint64_t> _lastDialRevisions_{};
+    bool _variableInputsChanged_{true};
+    bool _eventStateValid_{false};
+    std::size_t _cachedContributionCount_{0};
+    GenericToolbox::Time::AveragedTimer<10> _variableStageTimer_{};
+    GenericToolbox::Time::AveragedTimer<10> _binningStageTimer_{};
     EngineView _engineView_{};
     Result _lastResult_{};
     GenericToolbox::ParallelWorker _threadPool_{};

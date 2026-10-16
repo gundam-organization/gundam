@@ -5,6 +5,7 @@ set( SRCFILES
     ${CMAKE_CURRENT_SOURCE_DIR}/src/VariableCollection.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/EventUtils.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Event.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/BinningLayout.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/BinningResponse.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Histogram.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Sample.cpp
@@ -13,6 +14,7 @@ set( SRCFILES
 
 set( HEADERS
     ${CMAKE_CURRENT_SOURCE_DIR}/include/EventUtils.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/BinningLayout.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/BinningResponse.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/Histogram.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/Event.h

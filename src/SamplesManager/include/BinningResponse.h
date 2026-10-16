@@ -1,6 +1,7 @@
 #ifndef GUNDAM_BINNING_RESPONSE_H
 #define GUNDAM_BINNING_RESPONSE_H
 
+#include "BinningLayout.h"
 #include "VariableCollection.h"
 #include "Bin.h"
 
@@ -28,6 +29,7 @@ public:
   [[nodiscard]] bool isEnabled() const{ return _isEnabled_; }
   [[nodiscard]] bool hasRelativeWidths() const{ return _hasRelativeWidths_; }
   void build(const std::vector<Bin>& binList_);
+  [[nodiscard]] BinningLayout exportLayout() const;
   void prepareEvaluation(const VariableCollection& variables_, EvaluationBuffer& buffer_) const;
   void evaluate(const VariableCollection& variables_, EvaluationBuffer& buffer_) const;
   void evaluateAbsolute(const VariableCollection& variables_, EvaluationBuffer& buffer_) const;

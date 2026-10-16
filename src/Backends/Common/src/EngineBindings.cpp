@@ -20,7 +20,9 @@ namespace {
 
 void Backends::EngineBindings::clear() {
   events.clear();
+  variables.clear();
   eventDials.clear();
+  uniqueDials.clear();
   samples.clear();
   parameters.clear();
   externalWeights.clear();
@@ -37,6 +39,7 @@ void Backends::EngineBindings::build(LikelihoodInterface& likelihoodInterface_) 
     SampleBinding sampleBinding;
     sampleBinding.histogram = &sample.getHistogram();
     sampleBinding.sampleIndex = sample.getIndex();
+    sampleBinding.sample = &sample;
     samples.emplace_back(sampleBinding);
   }
 
@@ -45,7 +48,6 @@ void Backends::EngineBindings::build(LikelihoodInterface& likelihoodInterface_) 
 
   for( const auto& cacheEntry : eventDialCache.getCache() ){
     if( cacheEntry.event == nullptr ){ continue; }
-    if( cacheEntry.event->getIndices().bin < 0 ){ continue; }
 
     EventBinding eventBinding;
     eventBinding.event = cacheEntry.event;

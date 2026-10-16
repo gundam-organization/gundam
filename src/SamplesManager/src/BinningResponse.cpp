@@ -8,6 +8,7 @@
 #include <limits>
 #include <numeric>
 #include <utility>
+#include <type_traits>
 
 void BinningResponse::configureImpl(){
   _config_.clearFields();
@@ -217,10 +218,7 @@ void BinningResponse::buildRelativeResponse(const std::vector<Bin>& binList_){
 }
 
 double BinningResponse::cumulativeKernel(double position_){
-  if( position_ <= -1 ){ return 0; }
-  if( position_ >= 1 ){ return 1; }
-  double t = (position_ + 1) / 2;
-  return t * t * t * (10 + t * (-15 + 6 * t));
+  return BinningSemantics::cumulativeKernel(position_);
 }
 
 void BinningResponse::prepareEvaluation(const VariableCollection& variables_, EvaluationBuffer& buffer_) const{
@@ -334,4 +332,35 @@ double BinningResponse::evaluateRelativeResponse(EvaluationBuffer& buffer_) cons
     total += fraction;
   }
   return total;
+}
+
+BinningLayout BinningResponse::exportLayout() const{
+  BinningLayout layout;
+  layout.variableNames = _variableNames_;
+  layout.isSmoothed = true;
+  auto appendBin = [&](const auto& responseBin_){
+    BinningBin bin;
+    bin.binIndex = responseBin_.binIndex;
+    bin.firstInterval = layout.intervals.size();
+    for( const auto& selection : responseBin_.selectionIntervals ){
+      layout.intervals.push_back({selection.variableIndex, selection.lowerBound, selection.upperBound, 0, 0});
+    }
+    for( const auto& interval : responseBin_.intervals ){
+      BinningInterval packed;
+      packed.variableIndex = interval.variableIndex;
+      packed.lowerBound = interval.lowerBound;
+      packed.upperBound = interval.upperBound;
+      if constexpr( std::is_same_v<std::decay_t<decltype(interval)>, RelativeResponseInterval> ){
+        packed.lowerInverseWidth = interval.lowerInverseWidth;
+        packed.upperInverseWidth = interval.upperInverseWidth;
+      }
+      else{ packed.lowerInverseWidth = packed.upperInverseWidth = interval.inverseWidth; }
+      layout.intervals.emplace_back(packed);
+    }
+    bin.intervalCount = layout.intervals.size() - bin.firstInterval;
+    layout.bins.emplace_back(bin);
+  };
+  if( _hasRelativeWidths_ ){ for( const auto& bin : _relativeResponseBins_ ){ appendBin(bin); } }
+  else{ for( const auto& bin : _responseBins_ ){ appendBin(bin); } }
+  return layout;
 }

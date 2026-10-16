@@ -17,6 +17,7 @@
 #include "GenericToolbox.Time.h"
 #include "GenericToolbox.Thread.h"
 
+#include <cstdint>
 #include <vector>
 #include <map>
 #include <future>
@@ -80,7 +81,14 @@ public:
   /// may cause a wait.  The future will be valid if the calculation was
   /// successfully started, true if the calculation has completed correctly,
   /// and false if the calculation started correctly, but failed.
-  void preparePropagation();
+  /// Backends which own observable propagation pass false to retain the
+  /// prepared parameter/dial inputs without running host variable/bin updates.
+  void preparePropagation(bool updateEventVariables_ = true);
+  [[nodiscard]] bool isAutomaticBinningSample(std::size_t sample_) const {
+    return _eventVariableResponseCache_.isAutomaticBinningSample(sample_);
+  }
+  [[nodiscard]] std::uint64_t getBinningRevision() const { return _binningRevision_; }
+  void invalidateVariableResponses(){ _eventVariableResponseCache_.invalidateState(); }
   std::future<bool> applyParameters();
 
   /// With updateDials=true, also update variable responses and dynamic binning.
@@ -124,6 +132,7 @@ private:
   JsonType _parameterInjectorToy_;
 
   // Internals
+  std::uint64_t _binningRevision_{0};
   bool _showNbEventParameterBreakdown_{true};
   bool _showNbEventPerSampleParameterBreakdown_{false};
   bool _enableEigenToOrigInPropagate_{true};

@@ -196,6 +196,7 @@ public:
   std::vector<CacheEntry> &getCache(){ return _cache_; }
   [[nodiscard]] const std::vector<CacheEntry> &getCache() const{ return _cache_; }
 
+  [[nodiscard]] const GlobalEventReweightCap& getGlobalEventReweightCap() const { return _globalEventReweightCap_; }
   GlobalEventReweightCap& getGlobalEventReweightCap(){ return _globalEventReweightCap_; }
 
   /// Allocate entries for events in the indexed cache.  The first parameter

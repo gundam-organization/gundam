@@ -8,6 +8,7 @@ set(SRCFILES
     ${CMAKE_CURRENT_SOURCE_DIR}/Common/src/BackendManager.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/Common/src/BackendTypes.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/CPU/src/CpuBackend.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/CPU/src/CpuBackendBinning.cpp
 )
 
 if(APPLE)

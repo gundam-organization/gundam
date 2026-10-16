@@ -404,7 +404,7 @@ PYBIND11_MODULE(GUNDAM, module) {
   .def("isBinningResponseEnabled", &Histogram::isBinningResponseEnabled)
   .def("evaluateBinningResponse", &Histogram::evaluateBinningResponse)
   .def("evaluateEventBinningResponse", &Histogram::evaluateEventBinningResponse)
-  .def("getOutsideBinContent", &Histogram::getOutsideBinContent, pybind11::return_value_policy::reference_internal)
+  .def("getOutsideBinContent", pybind11::overload_cast<>(&Histogram::getOutsideBinContent), pybind11::return_value_policy::reference_internal)
   .def("refillHistogram", &Histogram::refillHistogram, pybind11::arg("iThread") = -1)
   .def("getBinContentList", pybind11::overload_cast<>(&Histogram::getBinContentList),
        pybind11::return_value_policy::reference_internal)
@@ -526,6 +526,13 @@ PYBIND11_MODULE(GUNDAM, module) {
 
 #ifdef GUNDAM_USING_BACKENDS
   pybind11::class_<Backends::BackendTimingSummary>(module, "BackendTimingSummary")
+  .def_readonly("variableStageSeconds", &Backends::BackendTimingSummary::variableStageSeconds)
+  .def_readonly("binningStageSeconds", &Backends::BackendTimingSummary::binningStageSeconds)
+  .def_readonly("rebinnedEventCount", &Backends::BackendTimingSummary::rebinnedEventCount)
+  .def_readonly("binCandidateCount", &Backends::BackendTimingSummary::binCandidateCount)
+  .def_readonly("binContributionCount", &Backends::BackendTimingSummary::binContributionCount)
+  .def_readonly("eventWeightsStageSeconds", &Backends::BackendTimingSummary::eventWeightsStageSeconds)
+  .def_readonly("histogramStageSeconds", &Backends::BackendTimingSummary::histogramStageSeconds)
   .def_readonly("externalWeightUploadSeconds", &Backends::BackendTimingSummary::externalWeightUploadSeconds)
   .def_readonly("externalWeightUploadBytes", &Backends::BackendTimingSummary::externalWeightUploadBytes)
   .def_readonly("externalWeightUploadBlocks", &Backends::BackendTimingSummary::externalWeightUploadBlocks)
@@ -534,6 +541,10 @@ PYBIND11_MODULE(GUNDAM, module) {
   .def("hasBackend", &Backends::BackendManager::hasBackend)
   .def("getType", &Backends::BackendManager::getType)
   .def("getLastPreparationSeconds", &Backends::BackendManager::getLastPreparationSeconds)
+  .def("setEnableAutoMaterialize", &Backends::BackendManager::setEnableAutoMaterialize)
+  .def("materialize", [](Backends::BackendManager& manager_, const std::string& output_){
+    manager_.materialize(Backends::OutputRequest::toEnum(output_));
+  })
   .def("getLastTimingSummary", [](const Backends::BackendManager& manager_){
     LogThrowIf(not manager_.hasBackend(), "No backend initialized.");
     return manager_.getBackend()->getLastTimingSummary();
