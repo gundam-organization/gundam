@@ -43,10 +43,12 @@ def run(command_):
                     "binningDefinition": [{"name": "X", "edges": [0, 1, 2]}]}}]},
                 "parametersManagerConfig": {"parameterSetList": [
                     {"name": "Flux", "isEnabled": True, "enableEigenDecomp": True,
+                     "parameterDefinitionFilePath": str(work / "220ExternalWeightScan-covariance.root"),
+                     "covarianceMatrix": "flux",
                      "nominalStepSize": .01, "parameterDefinitions": [
-                         {"name": "flux1", "priorValue": 1., "stdDev": .05,
+                         {"name": "flux1", "parameterIndex": 0, "priorValue": 1., "stdDev": .05,
                           "dialSetDefinitions": [{"dialType": "Normalization"}]},
-                         {"name": "flux2", "priorValue": 1., "stdDev": .1,
+                         {"name": "flux2", "parameterIndex": 1, "priorValue": 1., "stdDev": .1,
                           "dialSetDefinitions": [{"dialType": "Normalization"}]},
                      ]},
                     {"name": "Migration", "isEnabled": True, "isScanEnabled": scan_migration,
@@ -72,7 +74,9 @@ def run(command_):
             "--light-mode", "--cache-manager", "off", "-t", str(threads),
             "-o", str(work / f"220ExternalWeightScan-{tag}.root"),
         ], stdout=output, stderr=subprocess.STDOUT, timeout=120)
-    log = log_path.read_text()
+    # Concurrent progress output may interleave UTF-8 characters. The scan
+    # markers checked below are ASCII; keep the log usable for diagnostics.
+    log = log_path.read_text(errors="replace")
     assert result.returncode == 0, log
     assert "Scanning: Flux/#0_eigen / 100 steps" in log, log
     assert "Scanning: Flux/#1_eigen / 100 steps" in log, log
@@ -100,6 +104,21 @@ def main():
     executable = shutil.which("gundamFitter")
     assert executable, "gundamFitter must be on PATH"
     print("Testing executable:", executable, flush=True)
+    # Eigen decomposition requires an explicit covariance on supported branches.
+    root_executable = shutil.which("root")
+    assert root_executable, "ROOT must be on PATH to create the covariance fixture"
+    macro = Path.cwd() / "ExternalWeightScanCovariance.C"
+    macro.write_text('''void ExternalWeightScanCovariance(){
+    TFile output("220ExternalWeightScan-covariance.root", "RECREATE");
+    TMatrixDSym covariance(2);
+    covariance(0, 0) = 0.0025;
+    covariance(1, 1) = 0.01;
+    covariance.Write("flux");
+}
+''')
+    result = subprocess.run([root_executable, "-n", "-l", "-b", "-q", str(macro)],
+                            stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=60)
+    assert result.returncode == 0, result.stdout.decode(errors="replace")
     root = Path.cwd() / "220ExternalWeightScan-input.root"
     with uproot.recreate(root) as output:
         tree = output.mktree("events", {"X": "float64"})

@@ -11,6 +11,7 @@
 #include "ParametersManager.h"
 #include "DialCollection.h"
 #include "EventDialCache.h"
+#include "EventVariableResponseCache.h"
 #include "SampleSet.h"
 
 #include "GenericToolbox.Time.h"
@@ -19,8 +20,6 @@
 #include <vector>
 #include <map>
 #include <future>
-#include <cstdint>
-#include <utility>
 
 class Propagator : public JsonBaseClass {
 
@@ -110,8 +109,6 @@ protected:
   void refillHistogramsFct( int iThread_);
 
   void refillHistograms();
-  void updateEventVariablesAndBinning();
-  void prepareVariableDials();
 
 private:
 
@@ -130,14 +127,10 @@ private:
   bool _enableEigenToOrigInPropagate_{true};
   int _iThrow_{-1};
 
-  bool _variableStateValid_{false};
-  std::vector<std::pair<const DialInputBuffer*, std::uint64_t>> _variableInputRevisions_;
-  // Samples made dynamic solely for variable dials can retain their bin lists.
-  std::vector<bool> _variableDialBinningSamples_;
-
   // Sub-layers
   SampleSet _sampleSet_{};
   EventDialCache _eventDialCache_{};
+  EventVariableResponseCache _eventVariableResponseCache_{};
   ParametersManager _parManager_{};
   DialManager _dialManager_{};
 
