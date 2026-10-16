@@ -29,15 +29,6 @@ namespace LoaderUtils{
       event_.getVariables().getVarList()[iLeaf].set( expList_[iLeaf]->getBuffer() );
     }
   }
-  void fillBinIndex(Event& event_, const std::vector<Histogram::BinContext>& binList_){
-    for( auto& binContext : binList_ ){
-      if( event_.getVariables().isInBin(binContext.bin) ){
-        event_.getIndices().bin = binContext.bin.getIndex();
-        return;
-      }
-    }
-    event_.getIndices().bin = -1;
-  }
   std::vector<std::string> getRelevantVarNames(const std::vector<Histogram::BinContext>& binList_){
     std::vector<std::string> relevantVarNames;
     for( auto& bin : binList_ ){
@@ -65,5 +56,4 @@ namespace LoaderUtils{
   }
 
 }
-
 
