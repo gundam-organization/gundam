@@ -32,6 +32,7 @@ public:
   // overrides
   void minimize() override;
   void calcErrors() override;
+  int checkFlatDirections() override;
   void scanParameters( TDirectory* saveDir_ ) override;
   double evalFit( const double* parArray_ ) override;
   void throwPostfitParameters() override;
