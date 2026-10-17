@@ -235,8 +235,9 @@ void RootMinimizer::dumpMinuit2State() {
 void RootMinimizer::minimize(){
   // calling the common routine
   this->MinimizerBase::minimize();
-  LogThrowIf(checkFlatDirections() > 0,
-             "Cannot start fit: flat LLH directions were detected. Check the reported fit parameters.");
+  LogAlertIf(checkFlatDirections() > 0)
+  << "Check the reported parameters: flat LLH directions were detected, the fit might fail."
+  << std::endl;
 
   GenericToolbox::Time::Timer minimizationStopWatch;
   minimizationStopWatch.start();
