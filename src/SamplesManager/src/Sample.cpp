@@ -18,6 +18,8 @@ void Sample::prepareConfig(ConfigReader &config_){
     {FieldFlag::MANDATORY, "name"},
     {"isEnabled"},
     {"disableEventMcThrow"},
+    {"binningResponse"},
+    {"useDynamicBinning"},
     {"binning", {"binningFile", "binningFilePath"}},
     {"selectionCutStr", {"selectionCuts"}},
     {"sampleWeightFormula"},
@@ -34,6 +36,7 @@ void Sample::configureImpl(){
 
   _config_.fillValue(_name_, "name");
   _config_.fillValue(_isEnabled_, "isEnabled");
+  _config_.fillValue(_useDynamicBinning_, "useDynamicBinning");
   _config_.fillValue(_disableEventMcThrow_, "disableEventMcThrow");
   _config_.fillValue(_binningConfig_, "binning");
   _config_.fillValue(_selectionCutStr_, "selectionCutStr");
@@ -49,6 +52,9 @@ void Sample::configureImpl(){
 
   LogDebugIf(GundamGlobals::isDebug()) << "Reading binning: " << _binningConfig_ << std::endl;
   _histogram_.build(_binningConfig_);
+  if( _config_.hasField("binningResponse") ){
+    _histogram_.configureBinningResponse(_config_.fetchValue<ConfigReader>("binningResponse"));
+  }
 
   LogDebugIf(GundamGlobals::isDebug()) << "Histogram has " << _histogram_.getNbBins() << " bins." << std::endl;
 }
@@ -130,6 +136,56 @@ std::ostream& operator <<( std::ostream& o, const Sample& this_ ){
   o << this_.getSummary(); return o;
 }
 
+void Sample::updateEventBinning(){
+  LogThrowIf(not _useDynamicBinning_, "Dynamic binning is disabled for sample \"" << _name_ << "\".");
+
+  GenericToolbox::ParallelWorker threadPool;
+  threadPool.setNThreads(GundamGlobals::getNbCpuThreads());
+  this->updateEventBinning(threadPool);
+}
+
+void Sample::updateEventBinning(GenericToolbox::ParallelWorker& threadPool_){
+  LogThrowIf(not _useDynamicBinning_, "Dynamic binning is disabled for sample \"" << _name_ << "\".");
+  if( _eventList_.empty() ){
+    this->indexEventInHistogramBin();
+    return;
+  }
+
+  // Loading uses a temporary indexing buffer. Rebind its cached indices to
+  // the stored variables, whose layout is shared by every event in the sample.
+  const auto& variables = _eventList_.front().getVariables();
+  for( auto& binContext : _histogram_.getBinContextList() ){
+    for( auto& edges : binContext.bin.getEdgesList() ){
+      edges.varIndexCache = variables.findVarIndex(edges.varName);
+    }
+  }
+
+  if( _histogram_.isBinningResponseEnabled() ){
+    _histogram_.updateBinEventLists(_eventList_, threadPool_, true);
+    return;
+  }
+
+  threadPool_.runJob([&](int iThread_){
+    auto bounds = GenericToolbox::ParallelWorker::getThreadBoundIndices(
+        iThread_, threadPool_.getNbThreads(), _eventList_.size()
+    );
+    for( size_t iEvent = bounds.beginIndex ; iEvent < bounds.endIndex ; iEvent++ ){
+      auto& event = _eventList_[iEvent];
+      event.getIndices().bin = _histogram_.findBinIndex(event);
+    }
+  });
+
+  // runJob waits for every index to be updated. Each thread can then rebuild
+  // distinct bin lists without reading indices that are still being modified.
+  threadPool_.runJob([&](int iThread_){
+    _histogram_.updateBinEventList(_eventList_, iThread_, threadPool_.getNbThreads());
+  });
+}
+
 void Sample::indexEventInHistogramBin( int iThread_){
   _histogram_.updateBinEventList(_eventList_, iThread_);
+}
+
+void Sample::indexEventInHistogramBin(GenericToolbox::ParallelWorker& threadPool_){
+  _histogram_.updateBinEventLists(_eventList_, threadPool_);
 }
