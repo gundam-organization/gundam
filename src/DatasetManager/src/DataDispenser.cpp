@@ -1303,6 +1303,14 @@ void DataDispenser::loadFromHistContent(){
     auto* histObj = fHist->Get( sampleHistDef->hist.c_str() );
     LogExitIf( histObj == nullptr, "Could not find TObject \"" << sampleHistDef->hist << "\" within " << fHist->GetPath() );
 
+    if( sample->getHistogram().isBinningResponseEnabled() ){
+      // Imported bin contents already define the data histogram. Dummy events
+      // retain their assigned bin; they must not undergo another binning response.
+      LogInfo << "Disabling binning response for sample \"" << sample->getName()
+              << "\" loaded from histogram content." << std::endl;
+      sample->getHistogram().configureBinningResponse(ConfigReader(JsonType{{"isEnabled", false}}));
+    }
+
     if( histObj->InheritsFrom("THnD") ){
       auto* hist = (THnD*) histObj;
       int nBins = 1;
@@ -1325,6 +1333,11 @@ void DataDispenser::loadFromHistContent(){
         }
         sample->getEventList()[iBin].getWeights().base = (hist->GetBinContent(histBinIndex));
         sample->getEventList()[iBin].getWeights().resetCurrentWeight();
+
+        // Every dummy event needs a cache entry, even without attached dials.
+        auto* eventDialCacheEntry = _cache_.propagatorPtr->getEventDialCache().fetchNextCacheEntry();
+        eventDialCacheEntry->event.sampleIndex = std::size_t(sample->getIndex());
+        eventDialCacheEntry->event.eventIndex = _cache_.sampleIndexOffsetList[sample->getIndex()]++;
       }
     }
     else if(histObj->InheritsFrom("TH1D")){
