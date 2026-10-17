@@ -1,6 +1,7 @@
 #include "CpuBackend.h"
 
 #include "Semantics/BackendDialSemantics.h"
+#include "Semantics/BackendVariableResponse.h"
 
 #include "Logger.h"
 
@@ -70,7 +71,7 @@ void Backends::CpuBackend::updateEventVariablesThread(int iThread_) {
     for( std::size_t i = event.firstVariableResponse; i < event.firstVariableResponse + event.variableResponseCount; ++i ){
       const auto& target = model.variableResponses[i];
       double value = Semantics::evalVariableResponse(target, model.variableDialIndices.data(),
-                                                      [this](std::size_t dial_){ return evalResponse(dial_); });
+          [this](std::size_t dial_){ return evalResponse(dial_); });
       assign(target.variableIndex, value);
     }
   }

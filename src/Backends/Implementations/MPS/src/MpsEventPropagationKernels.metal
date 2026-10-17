@@ -87,7 +87,7 @@ kernel void propagate_event_state(
   if( control.updateVariables ){
     for( uint i = event.firstResponse; i < event.firstResponse + event.responseCount; ++i ){
       auto target = targets[i];
-      auto value = GundamBinningMath::evalVariableResponse(target, variableDialIndices, PropagationResponses{responses});
+      auto value = Backends::Semantics::evalVariableResponse(target, variableDialIndices, PropagationResponses{responses});
       if( target.variableIndex - event.firstVariable < sample.variableCount && variables[target.variableIndex] != value ){ changed = true; }
       variables[target.variableIndex] = value;
     }
