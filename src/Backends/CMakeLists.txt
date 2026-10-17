@@ -24,7 +24,7 @@ if(APPLE)
   )
   set_property(
       DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
-      ${CMAKE_SOURCE_DIR}/src/Utils/include/DeviceMath/DoubleFloat.h
+      ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/DeviceMath/DoubleFloat.h
       ${CMAKE_SOURCE_DIR}/src/Utils/include/DeviceMath/SharedBinningMath.h
       ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/DevicePropagationTypes.h
       ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/MPS/src/MpsEventPropagationKernels.metal
@@ -47,7 +47,7 @@ if(APPLE)
   file(READ ${CMAKE_SOURCE_DIR}/src/Utils/include/DeviceMath/SharedSplineGeneral.h MPS_SHARED_SPLINE_GENERAL)
   file(READ ${CMAKE_SOURCE_DIR}/src/Utils/include/DeviceMath/SharedGraph.h MPS_SHARED_GRAPH)
   file(READ ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/MPS/src/MpsBackendKernels.metal MPS_BACKEND_KERNEL_SOURCE)
-  file(READ ${CMAKE_SOURCE_DIR}/src/Utils/include/DeviceMath/DoubleFloat.h MPS_DOUBLE_FLOAT)
+  file(READ ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/DeviceMath/DoubleFloat.h MPS_DOUBLE_FLOAT)
   set(MPS_OBSERVABLE_SPLINES "${MPS_SHARED_SPLINE_COMMON}\n${MPS_SHARED_SPLINE_COMPACT}\n${MPS_SHARED_SPLINE_UNIFORM}\n${MPS_SHARED_SPLINE_MONOTONIC}\n${MPS_SHARED_SPLINE_GENERAL}\n${MPS_SHARED_GRAPH}")
   string(REPLACE "GundamDeviceMath" "GundamObservableMath" MPS_OBSERVABLE_SPLINES "${MPS_OBSERVABLE_SPLINES}")
   string(REPLACE "SHARED_" "OBSERVABLE_SHARED_" MPS_OBSERVABLE_SPLINES "${MPS_OBSERVABLE_SPLINES}")
@@ -60,6 +60,7 @@ if(APPLE)
 endif()
 
 set(HEADERS
+    ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/DeviceMath/DoubleFloat.h
     ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/BinningGeometry.h
     ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/EventStateCache.h
     ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/PropagationResult.h
