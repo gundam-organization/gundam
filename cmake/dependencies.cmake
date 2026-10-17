@@ -74,8 +74,16 @@ if( ROOT_FOUND )
   )
   cmessage( STATUS "[ROOT]: ROOT Version: ${ROOT_VERSION}" )
 
-  # Grab functions such as generate dictionary
-  include( ${ROOT_USE_FILE} )
+  # Grab functions such as generate dictionary.  ROOTConfig.cmake already
+  # pulled in RootMacros.cmake, so ROOT_USE_FILE is only needed for its
+  # compile flags.  On Windows with a non-MSVC compiler (e.g. the MinGW that
+  # CLion bundles), ROOT_CXX_FLAGS contains MSVC-only switches (-nologo,
+  # -EHsc, /std:c++20, ...) which clang/gcc would reject, so it is skipped.
+  if(NOT (WIN32 AND NOT MSVC))
+    include( ${ROOT_USE_FILE} )
+  else()
+    cmessage( STATUS "[ROOT]: Skipping ROOT_USE_FILE flags (non-MSVC on Windows)." )
+  endif()
 
   # Add the libraries and include files here.  These "should" go in
   # the target_link_libraries or target_include_directories for each library
