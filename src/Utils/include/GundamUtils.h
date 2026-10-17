@@ -71,7 +71,8 @@ namespace GundamUtils {
   };
 
   // 0 not calculated 1 approximated 2 made pos def , 3 accurate
-  inline const std::map<int, std::string> covMatrixStatusCodeStr{
+  static const std::map<int, std::string> covMatrixStatusCodeStr{
+      { -1, "status = -1   : not available (Hesse or matrix inversion failed)" },
       { 0, "status = 0    : not calculated" },
       { 1, "status = 1    : approximated"},
       { 2, "status = 2    : made pos def"},
