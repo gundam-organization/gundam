@@ -42,6 +42,8 @@ def child(mode):
                 'binningDefinition': [{'name': 'X', 'edges': [0, 1]}]}}]},
             'parametersManagerConfig': {'parameterSetList': [{'name': 'response', 'isEnabled': True,
                 'nominalStepSize': .1, 'parameterDefinitions': parameters}]}}}
+    if hasattr(GUNDAM.FitterEngine, 'getBackendsManager'):
+        li['backendManagerConfig'] = {'isEnabled': True, 'type': 'CPU'}
     config = {'likelihoodInterfaceConfig': li, 'enablePca': False,
               'scaleParStepWithChi2Response': False, 'generateSamplePlots': False,
               'generateOneSigmaPlots': False,

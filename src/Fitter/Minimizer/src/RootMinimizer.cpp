@@ -334,6 +334,19 @@ void RootMinimizer::minimize(){
   updateCacheToBestfitPoint();
   updateBestfitCovCache();
 
+#ifdef GUNDAM_USING_BACKENDS
+  // Reporting below reads host events and histograms, while the fit may have
+  // kept its propagated state exclusively in the backend.
+  auto& backendsManager = getOwner().getBackendsManager();
+  if( backendsManager.hasBackend() ){
+    if( backendsManager.getEngineView().propagation.requiresEventBinning() ){
+      backendsManager.materialize(Backends::OutputRequest::EventState);
+    }
+    backendsManager.materialize(Backends::OutputRequest::EventWeights);
+    backendsManager.materialize(Backends::OutputRequest::Histograms);
+  }
+#endif
+
   // export bf point
   if( getOwner().getSaveDir() != nullptr ) {
     LogInfo << "Writing " << _minimizerType_ << "/" << _minimizerAlgo_ << " best fit parameters..." << std::endl;

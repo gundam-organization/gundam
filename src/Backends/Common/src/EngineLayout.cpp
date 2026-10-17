@@ -261,8 +261,8 @@ namespace {
       }
 
       auto* jointProbability = likelihoodInterface_.getJointProbabilityPtr();
-      sampleRef.evalBin = [jointProbability](double data_, double pred_, double err_, int bin_){
-        return jointProbability->eval(data_, pred_, err_, bin_);
+      sampleRef.evalBin = [jointProbability, samplePair](double data_, double pred_, double err_, int bin_){
+        return jointProbability->evalWithPrediction(samplePair, data_, pred_, err_, bin_);
       };
 
       likelihood.samples.emplace_back(std::move(sampleRef));
