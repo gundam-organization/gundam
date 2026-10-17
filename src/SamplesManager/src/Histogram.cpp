@@ -338,22 +338,3 @@ void Histogram::refillHistogram(int iThread_){
   }
 
 }
-
-BinningLayout Histogram::exportBinningLayout() const{
-  if( isBinningResponseEnabled() ){ return _binningResponse_.exportLayout(); }
-  BinningLayout layout;
-  if( binContextList.empty() ){ return layout; }
-  layout.variableNames = binContextList.front().bin.buildVariableNameList();
-  for( const auto& context : binContextList ){
-    BinningBin bin;
-    bin.binIndex = context.bin.getIndex();
-    bin.firstInterval = layout.intervals.size();
-    for( const auto& edge : context.bin.getEdgesList() ){
-      auto position = std::find(layout.variableNames.begin(), layout.variableNames.end(), edge.varName);
-      layout.intervals.push_back({std::size_t(position - layout.variableNames.begin()), edge.min, edge.max, 0, 0});
-    }
-    bin.intervalCount = layout.intervals.size() - bin.firstInterval;
-    layout.bins.emplace_back(bin);
-  }
-  return layout;
-}

@@ -1,5 +1,5 @@
-#ifndef GUNDAM_BINNING_LAYOUT_H
-#define GUNDAM_BINNING_LAYOUT_H
+#ifndef GUNDAM_BACKEND_BINNING_GEOMETRY_H
+#define GUNDAM_BACKEND_BINNING_GEOMETRY_H
 
 #include "DeviceMath/SharedBinningMath.h"
 
@@ -8,6 +8,10 @@
 #include <cstddef>
 #include <string>
 #include <vector>
+
+class Histogram;
+
+namespace Backends {
 
 // Compiled bin geometry. Offsets and numeric descriptors can also be packed
 // for device execution; no Event, ROOT or configuration objects are retained.
@@ -26,19 +30,21 @@ struct BinningBin {
   std::size_t intervalCount{0};
 };
 
-struct BinningLayout {
+struct BinningGeometry {
   std::vector<std::string> variableNames;
   std::vector<BinningInterval> intervals;
   std::vector<BinningBin> bins;
   bool isSmoothed{false};
 };
 
+[[nodiscard]] BinningGeometry buildBinningGeometry(const Histogram& histogram_);
+
 namespace BinningSemantics {
   inline double cumulativeKernel(double position_) {
     return GundamBinningMath::cumulativeKernel(position_);
   }
 
-  inline double fraction(const BinningLayout& layout_, const BinningBin& bin_, const double* values_) {
+  inline double fraction(const BinningGeometry& layout_, const BinningBin& bin_, const double* values_) {
     double result{1};
     for( std::size_t i = bin_.firstInterval; i < bin_.firstInterval + bin_.intervalCount; ++i ){
       const auto& interval = layout_.intervals[i];
@@ -56,7 +62,7 @@ namespace BinningSemantics {
 // overlapping bins. The scratch vector belongs to the caller/thread.
 class BinningIndex {
 public:
-  void build(const BinningLayout& layout_);
+  void build(const BinningGeometry& layout_);
   void findCandidates(const double* values_, std::vector<std::size_t>& candidates_) const;
   [[nodiscard]] std::size_t getNbNodes() const { return _nodes_.size(); }
 
@@ -75,7 +81,7 @@ public:
 private:
   int buildNode(std::size_t first_, std::size_t count_);
   void findCandidates(int node_, const double* values_, std::vector<std::size_t>& candidates_) const;
-  bool buildGrid(const BinningLayout& layout_);
+  bool buildGrid(const BinningGeometry& layout_);
 
   std::size_t _dimensionCount_{0};
   std::vector<std::size_t> _binPositions_;
@@ -85,5 +91,7 @@ private:
   std::vector<std::vector<double>> _gridEdges_;
   std::vector<std::size_t> _gridBins_;
 };
+
+} // namespace Backends
 
 #endif

@@ -17,7 +17,6 @@
 #include "GenericToolbox.Time.h"
 #include "GenericToolbox.Thread.h"
 
-#include <cstdint>
 #include <vector>
 #include <map>
 #include <future>
@@ -48,6 +47,7 @@ public:
   [[nodiscard]] auto& getSampleSet() const { return _sampleSet_; }
   [[nodiscard]] auto& getDialManager() const { return _dialManager_; }
   [[nodiscard]] auto& getEventDialCache() const { return _eventDialCache_; }
+  [[nodiscard]] const EventVariableResponseCache& getEventVariableResponseCache() const { return _eventVariableResponseCache_; }
   [[nodiscard]] auto& getParametersManager() const { return _parManager_; }
   [[nodiscard]] auto& getDialCollectionList() const{ return _dialManager_.getDialCollectionList(); }
   [[nodiscard]] auto& getParameterInjectorMc() const { return _parameterInjectorMc_; }
@@ -84,10 +84,6 @@ public:
   /// Backends which own observable propagation pass false to retain the
   /// prepared parameter/dial inputs without running host variable/bin updates.
   void preparePropagation(bool updateEventVariables_ = true);
-  [[nodiscard]] bool isAutomaticBinningSample(std::size_t sample_) const {
-    return _eventVariableResponseCache_.isAutomaticBinningSample(sample_);
-  }
-  [[nodiscard]] std::uint64_t getBinningRevision() const { return _binningRevision_; }
   void invalidateVariableResponses(){ _eventVariableResponseCache_.invalidateState(); }
   std::future<bool> applyParameters();
 
@@ -132,7 +128,6 @@ private:
   JsonType _parameterInjectorToy_;
 
   // Internals
-  std::uint64_t _binningRevision_{0};
   bool _showNbEventParameterBreakdown_{true};
   bool _showNbEventPerSampleParameterBreakdown_{false};
   bool _enableEigenToOrigInPropagate_{true};

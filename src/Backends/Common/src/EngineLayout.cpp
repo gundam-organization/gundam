@@ -41,9 +41,9 @@ namespace {
       sampleRef.binCount = sample.getHistogram().getNbBins();
       sampleRef.useDynamicBinning = sample.isUseDynamicBinning();
       sampleRef.readHostVariables = sample.isUseDynamicBinning() and eventDialCache.hasVariableResponses()
-          and not likelihoodInterface_.getModelPropagator().isAutomaticBinningSample(propagation.samples.size());
+          and not likelihoodInterface_.getModelPropagator().getEventVariableResponseCache().isAutomaticBinningSample(propagation.samples.size());
       if( sampleRef.useDynamicBinning or sample.getHistogram().isBinningResponseEnabled() ){
-        sampleRef.binning = sample.getHistogram().exportBinningLayout();
+        sampleRef.binning = Backends::buildBinningGeometry(sample.getHistogram());
         sampleRef.variableNames = sampleRef.binning.variableNames;
       }
       samplePositionMap[sampleRef.sampleIndex] = propagation.samples.size();

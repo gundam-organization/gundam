@@ -7,6 +7,7 @@
 
 #include "ConfigUtils.h"
 
+#include <functional>
 #include <future>
 #include <initializer_list>
 #include <memory>
@@ -73,8 +74,8 @@ namespace Backends {
     EngineLayout _backendEngineLayout_{};
     std::unique_ptr<Backend> _backend_{nullptr};
     PropagationToken _lastPropagationToken_{};
-    std::uint64_t _lastBinningRevision_{0};
-    std::vector<std::uint64_t> _sampleBinningRevisions_{};
+    std::shared_ptr<bool> _hostBinningChanged_{};
+    std::vector<std::shared_ptr<std::function<void()>>> _binningUpdateListeners_{};
     std::uint64_t _lastMaterializedStateRevision_{0};
     std::uint64_t _lastMaterializedVariableRevision_{0};
     std::vector<std::uint64_t> _lastMaterializedSampleRevisions_{};

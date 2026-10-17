@@ -76,6 +76,15 @@ def exercise_manual_binning(path, backend_name="CPU"):
         engine.evaluateLikelihood()
     assert_same(sums(engines[1]), sums(engines[0]))
     assert_same(sums(engines[1]), [0., 10., 0.])
+    for engine in engines:
+        propagator = engine.getLikelihoodInterface().getModelPropagator()
+        sample = propagator.getSampleSet().getSampleList()[0]
+        for event in sample.getEventList():
+            event.getVariables().fetchVariable('X').setValue(.5)
+        propagator.updateEventSampleBinning()
+        engine.evaluateLikelihood()
+    assert_same(sums(engines[1]), sums(engines[0]))
+    assert_same(sums(engines[1]), [10., 0., 0.])
 
 
 def main(backend_name="CPU"):

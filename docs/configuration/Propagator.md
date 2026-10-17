@@ -47,8 +47,10 @@ and interval arithmetic use a two-float representation (about 48 significant
 bits). This protects strict bin decisions from ordinary float32 rounding without
 claiming IEEE double precision. Unrepresentable/collapsed geometry is rejected.
 
-`Sample` and `Histogram` remain independent of hardware. Their compiled
-`BinningLayout` and `BinningIndex` are consumed by the backends. `EventStateCache`
+`Sample` and `Histogram` remain independent of hardware. The backend library
+builds `BinningGeometry` from their bin boundaries and response data, and owns
+`BinningIndex` for spatial searches. Explicit sample rebinning notifies subscribers;
+`BackendManager` owns the resulting invalidation flag. `EventStateCache`
 shares invalidation/publication rules between CPU and MPS. `DevicePropagationModel`
 packs the numerical descriptors; `MpsEventPropagation` owns Metal execution and
 resident contributions. `DeviceWeightModel` retains the specialized static-bin

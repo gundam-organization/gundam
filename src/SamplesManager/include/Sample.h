@@ -15,7 +15,8 @@
 #include "GenericToolbox.Root.h" // TFile
 #include "GenericToolbox.Loops.h"
 
-#include <cstdint>
+#include <functional>
+#include <memory>
 #include <vector>
 #include <string>
 
@@ -65,11 +66,12 @@ public:
   [[nodiscard]] bool isDatasetValid(const std::string& datasetName_) const;
   [[nodiscard]] double getSumWeights() const;
   [[nodiscard]] size_t getNbBinnedEvents() const;
-  [[nodiscard]] std::uint64_t getBinningRevision() const { return _binningRevision_; }
 
   // core
   void reserveEventMemory(size_t dataSetIndex_, size_t nEvents, const Event &eventBuffer_);
   void shrinkEventList(size_t newTotalSize_);
+  // Keep the returned handle alive to receive notifications; dropping it unsubscribes.
+  [[nodiscard]] std::shared_ptr<std::function<void()>> addBinningUpdateListener(std::function<void()> listener_);
   void updateEventBinning();
   void updateEventBinning(GenericToolbox::ParallelWorker& threadPool_);
 
@@ -83,7 +85,6 @@ public:
   void indexEventInHistogramBin(GenericToolbox::ParallelWorker& threadPool_);
 
 private:
-  std::uint64_t _binningRevision_{0};
   // configuration
   bool _isEnabled_{true};
   bool _useDynamicBinning_{false};
@@ -96,6 +97,7 @@ private:
   std::vector<std::string> _enabledDatasetList_;
 
   // Internals
+  std::vector<std::weak_ptr<std::function<void()>>> _binningUpdateListeners_;
   std::vector<size_t> _dataSetIndexList_;
 
   Histogram _histogram_{};

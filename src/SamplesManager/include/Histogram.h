@@ -35,6 +35,7 @@ public:
   };
 
   // const getters
+  [[nodiscard]] const BinningResponse& getBinningResponse() const{ return _binningResponse_; }
   [[nodiscard]] bool isBinningResponseEnabled() const{ return _binningResponse_.isEnabled(); }
   [[nodiscard]] auto& getOutsideBinContent() const{ return _outsideBinContent_; }
   [[nodiscard]] auto getNbBins() const { return nBins; }
@@ -48,7 +49,6 @@ public:
   // core
   void configureBinningResponse(const ConfigReader& config_);
   void build(const ConfigReader& binningConfig_);
-  [[nodiscard]] BinningLayout exportBinningLayout() const;
   auto& getOutsideBinContent(){ return _outsideBinContent_; }
   auto& getOutsideContributionList(){ return _outsideContributionList_; }
   // Bin edge variable-index caches must match the event's variable layout.

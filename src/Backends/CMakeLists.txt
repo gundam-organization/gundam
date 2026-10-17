@@ -1,6 +1,7 @@
 set(LIB_NAME GundamBackends)
 
 set(SRCFILES
+    ${CMAKE_CURRENT_SOURCE_DIR}/Common/src/BinningGeometry.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/Common/src/DevicePropagationModel.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/Common/src/EventStateCache.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/Common/src/DeviceWeightModel.cpp
@@ -59,6 +60,7 @@ if(APPLE)
 endif()
 
 set(HEADERS
+    ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/BinningGeometry.h
     ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/EventStateCache.h
     ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/PropagationResult.h
     ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/DeviceWeightModel.h

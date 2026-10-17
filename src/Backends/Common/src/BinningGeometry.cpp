@@ -1,9 +1,75 @@
-#include "BinningLayout.h"
+#include "BinningGeometry.h"
+
+#include "Histogram.h"
 
 #include <limits>
 #include <numeric>
+#include <utility>
 
-void BinningIndex::build(const BinningLayout& layout_) {
+namespace Backends {
+
+namespace {
+
+BinningGeometry buildResponseGeometry(const BinningResponse& response_){
+  BinningGeometry layout;
+  layout.variableNames = response_.getVariableNames();
+  layout.isSmoothed = true;
+  auto appendBin = [&](const auto& responseBin_, const auto& widths_){
+    BinningBin bin;
+    bin.binIndex = responseBin_.binIndex;
+    bin.firstInterval = layout.intervals.size();
+    for( const auto& selection : responseBin_.selectionIntervals ){
+      layout.intervals.push_back({selection.variableIndex, selection.lowerBound, selection.upperBound, 0, 0});
+    }
+    for( const auto& interval : responseBin_.intervals ){
+      BinningInterval packed;
+      packed.variableIndex = interval.variableIndex;
+      packed.lowerBound = interval.lowerBound;
+      packed.upperBound = interval.upperBound;
+      auto widths = widths_(interval);
+      packed.lowerInverseWidth = widths.first;
+      packed.upperInverseWidth = widths.second;
+      layout.intervals.emplace_back(packed);
+    }
+    bin.intervalCount = layout.intervals.size() - bin.firstInterval;
+    layout.bins.emplace_back(bin);
+  };
+  if( response_.hasRelativeWidths() ){
+    for( const auto& bin : response_.getRelativeResponseBins() ){
+      appendBin(bin, [](const auto& interval_){ return std::make_pair(interval_.lowerInverseWidth, interval_.upperInverseWidth); });
+    }
+  }
+  else{
+    for( const auto& bin : response_.getResponseBins() ){
+      appendBin(bin, [](const auto& interval_){ return std::make_pair(interval_.inverseWidth, interval_.inverseWidth); });
+    }
+  }
+  return layout;
+}
+
+}
+
+BinningGeometry buildBinningGeometry(const Histogram& histogram_){
+  if( histogram_.isBinningResponseEnabled() ){ return buildResponseGeometry(histogram_.getBinningResponse()); }
+  const auto& binContextList = histogram_.getBinContextList();
+  BinningGeometry layout;
+  if( binContextList.empty() ){ return layout; }
+  layout.variableNames = binContextList.front().bin.buildVariableNameList();
+  for( const auto& context : binContextList ){
+    BinningBin bin;
+    bin.binIndex = context.bin.getIndex();
+    bin.firstInterval = layout.intervals.size();
+    for( const auto& edge : context.bin.getEdgesList() ){
+      auto position = std::find(layout.variableNames.begin(), layout.variableNames.end(), edge.varName);
+      layout.intervals.push_back({std::size_t(position - layout.variableNames.begin()), edge.min, edge.max, 0, 0});
+    }
+    bin.intervalCount = layout.intervals.size() - bin.firstInterval;
+    layout.bins.emplace_back(bin);
+  }
+  return layout;
+}
+
+void BinningIndex::build(const BinningGeometry& layout_) {
   _dimensionCount_ = layout_.variableNames.size();
   _nodes_.clear();
   _nodeBounds_.clear();
@@ -72,7 +138,7 @@ int BinningIndex::buildNode(std::size_t first_, std::size_t count_) {
   return index;
 }
 
-bool BinningIndex::buildGrid(const BinningLayout& layout_) {
+bool BinningIndex::buildGrid(const BinningGeometry& layout_) {
   if( _dimensionCount_ == 0 or layout_.bins.empty() ){ return false; }
   std::vector<std::vector<double>> edges(_dimensionCount_);
   for( const auto& bin : layout_.bins ){
@@ -158,3 +224,5 @@ void BinningIndex::findCandidates(int node_, const double* values_, std::vector<
   findCandidates(node.left, values_, candidates_);
   findCandidates(node.right, values_, candidates_);
 }
+
+} // namespace Backends

@@ -2,7 +2,7 @@
 #define GUNDAM_BACKEND_MODEL_H
 
 #include "EngineDescriptors.h"
-#include "BinningLayout.h"
+#include "BinningGeometry.h"
 
 #include <cstdint>
 #include <functional>
@@ -32,7 +32,7 @@ namespace Backends {
     int binCount{0};
     bool useDynamicBinning{false};
     bool readHostVariables{false};
-    BinningLayout binning{};
+    BinningGeometry binning{};
     std::vector<std::string> variableNames{};
   };
 

@@ -119,7 +119,6 @@ void Propagator::buildDialCache(){
   _eventVariableResponseCache_.build(_dialManager_.getDialCollectionList());
 }
 void Propagator::updateEventSampleBinning(){
-  ++_binningRevision_;
   _sampleSet_.updateEventBinning(_threadPool_);
 }
 void Propagator::propagateParameters(){

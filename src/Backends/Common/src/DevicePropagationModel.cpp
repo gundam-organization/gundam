@@ -20,7 +20,7 @@ namespace {
     }
     return Backends::ObservableScalar(value_);
   }
-  std::size_t contributionBound(const BinningLayout& layout_, const BinningIndex& index_) {
+  std::size_t contributionBound(const Backends::BinningGeometry& layout_, const Backends::BinningIndex& index_) {
     if( not layout_.isSmoothed ){ return 1; }
     std::size_t largest{0};
     auto dimension = layout_.variableNames.size();

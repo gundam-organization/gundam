@@ -9,7 +9,9 @@
 #include "GenericToolbox.Thread.h"
 #include "GenericToolbox.Loops.h"
 
+#include <algorithm>
 #include <string>
+#include <utility>
 
 
 void Sample::prepareConfig(ConfigReader &config_){
@@ -136,6 +138,14 @@ std::ostream& operator <<( std::ostream& o, const Sample& this_ ){
   o << this_.getSummary(); return o;
 }
 
+std::shared_ptr<std::function<void()>> Sample::addBinningUpdateListener(std::function<void()> listener_){
+  auto listener = std::make_shared<std::function<void()>>(std::move(listener_));
+  _binningUpdateListeners_.erase(std::remove_if(_binningUpdateListeners_.begin(), _binningUpdateListeners_.end(),
+      [](const auto& entry_){ return entry_.expired(); }), _binningUpdateListeners_.end());
+  _binningUpdateListeners_.emplace_back(listener);
+  return listener;
+}
+
 void Sample::updateEventBinning(){
   LogThrowIf(not _useDynamicBinning_, "Dynamic binning is disabled for sample \"" << _name_ << "\".");
 
@@ -145,7 +155,14 @@ void Sample::updateEventBinning(){
 }
 
 void Sample::updateEventBinning(GenericToolbox::ParallelWorker& threadPool_){
-  ++_binningRevision_;
+  // Notify before changing any state, so failed updates also invalidate observers.
+  for( auto it = _binningUpdateListeners_.begin(); it != _binningUpdateListeners_.end(); ){
+    if( auto listener = it->lock() ){
+      (*listener)();
+      ++it;
+    }
+    else{ it = _binningUpdateListeners_.erase(it); }
+  }
   LogThrowIf(not _useDynamicBinning_, "Dynamic binning is disabled for sample \"" << _name_ << "\".");
   if( _eventList_.empty() ){
     this->indexEventInHistogramBin();

@@ -219,6 +219,8 @@ void Backends::BackendManager::materialize(OutputRequest outputRequest_) {
 
 void Backends::BackendManager::initializeImpl() {
   if( not _isEnabled_ ){
+    _binningUpdateListeners_.clear();
+    _hostBinningChanged_.reset();
     _backend_ = nullptr;
     return;
   }
@@ -226,13 +228,14 @@ void Backends::BackendManager::initializeImpl() {
 
   LogInfo << "Initializing propagation backend: " << _type_ << std::endl;
   _backendEngineLayout_.build(*_likelihoodInterfacePtr_);
-  _lastBinningRevision_ = _likelihoodInterfacePtr_->getModelPropagator().getBinningRevision();
   _lastMaterializedStateRevision_ = 0;
   _lastMaterializedVariableRevision_ = 0;
   _lastMaterializedSampleRevisions_.clear();
-  _sampleBinningRevisions_.clear();
+  _binningUpdateListeners_.clear();
+  _hostBinningChanged_ = std::make_shared<bool>(false);
   for( const auto& binding : _backendEngineLayout_.bindings.samples ){
-    _sampleBinningRevisions_.push_back(binding.sample->getBinningRevision());
+    _binningUpdateListeners_.push_back(binding.sample->addBinningUpdateListener(
+        [changed = _hostBinningChanged_]{ *changed = true; }));
   }
 
   LogInfo << "Propagation backend enabled: " << _type_
@@ -274,12 +277,7 @@ std::future<Backends::BackendPropagationResult> Backends::BackendManager::propag
     inputs.externalWeights.push_back({source->data(), source->size(), layout.offset, source->getGeneration()});
   }
   const auto& model = _backendEngineLayout_.view.propagation;
-  inputs.forceBinningUpdate = propagator.getBinningRevision() != _lastBinningRevision_;
-  for( std::size_t i = 0; i < _sampleBinningRevisions_.size(); ++i ){
-    if( _sampleBinningRevisions_[i] != _backendEngineLayout_.bindings.samples[i].sample->getBinningRevision() ){
-      inputs.forceBinningUpdate = true;
-    }
-  }
+  inputs.forceBinningUpdate = *_hostBinningChanged_;
   for( const auto& binding : _backendEngineLayout_.bindings.uniqueDials ){
     const auto* buffer = binding.interface->getInputBufferRef();
     inputs.dialInputRevisions.push_back(buffer == nullptr ? 0 : buffer->getRevision());
@@ -296,10 +294,7 @@ std::future<Backends::BackendPropagationResult> Backends::BackendManager::propag
   }
   auto token = _backend_->requestPropagation(inputs);
   if( token.isValid ){
-    _lastBinningRevision_ = propagator.getBinningRevision();
-    for( std::size_t i = 0; i < _sampleBinningRevisions_.size(); ++i ){
-      _sampleBinningRevisions_[i] = _backendEngineLayout_.bindings.samples[i].sample->getBinningRevision();
-    }
+    *_hostBinningChanged_ = false;
     if( handlesEventState ){ propagator.invalidateVariableResponses(); }
   }
   _lastPropagationToken_ = token;

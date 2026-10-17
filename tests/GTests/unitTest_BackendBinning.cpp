@@ -4,6 +4,9 @@
 #endif
 #include "DeviceWeightModel.h"
 #include "Histogram.h"
+#include "Sample.h"
+
+#include "GenericToolbox.Thread.h"
 #include "DevicePropagationModel.h"
 #include "CompactSpline.h"
 #include "UniformSpline.h"
@@ -58,7 +61,7 @@ namespace {
     sample.binCount = histogram.getNbBins();
     sample.useDynamicBinning = true;
     sample.readHostVariables = true;
-    sample.binning = histogram.exportBinningLayout();
+    sample.binning = Backends::buildBinningGeometry(histogram);
     sample.variableNames = sample.binning.variableNames;
     model.samples = {sample};
     model.totalBins = sample.binCount;
@@ -150,7 +153,7 @@ TEST_P(BinningBackend, GridSearchAndCacheInvalidation) {
   SampleView sample;
   sample.useDynamicBinning = true;
   sample.binCount = 128;
-  sample.binning = histogram.exportBinningLayout();
+  sample.binning = Backends::buildBinningGeometry(histogram);
   model.samples = {sample};
   model.totalBins = 128;
   model.parameterCount = 2;
@@ -215,13 +218,37 @@ TEST_P(BinningBackend, GridSearchAndCacheInvalidation) {
   EXPECT_FALSE(reason.empty());
 }
 
+TEST(SampleBinning, NotificationsFollowSubscriberLifetime) {
+  Sample sample;
+  sample.setUseDynamicBinning(true);
+  sample.getHistogram() = makeHistogram(false, false, false);
+  int firstUpdates{0}, secondUpdates{0};
+  auto first = sample.addBinningUpdateListener([&]{ ++firstUpdates; });
+  auto second = sample.addBinningUpdateListener([&]{ ++secondUpdates; });
+  sample.updateEventBinning();
+  EXPECT_EQ(firstUpdates, 1);
+  EXPECT_EQ(secondUpdates, 1);
+
+  // Dropping a subscription must neither keep it alive nor affect other subscribers.
+  std::weak_ptr<std::function<void()>> expired = first;
+  first.reset();
+  EXPECT_TRUE(expired.expired());
+  GenericToolbox::ParallelWorker worker;
+  worker.setNThreads(1);
+  sample.updateEventBinning(worker);
+  EXPECT_EQ(firstUpdates, 1);
+  EXPECT_EQ(secondUpdates, 2);
+  second.reset();
+  EXPECT_NO_THROW(sample.updateEventBinning(worker));
+}
+
 TEST(BinningIndex, OverlappingStrictBinsKeepFirstMatch) {
   // Public compiled layouts can also be supplied directly by backend clients.
-  BinningLayout layout;
+  Backends::BinningGeometry layout;
   layout.variableNames = {"X"};
   layout.intervals = {{0, 0., 2., 0., 0.}, {0, 1., 3., 0., 0.}};
   layout.bins = {{0, 0, 1}, {1, 1, 1}};
-  BinningIndex index;
+  Backends::BinningIndex index;
   index.build(layout);
   double value = 1.5;
   std::vector<std::size_t> candidates;
@@ -236,7 +263,7 @@ TEST_P(BinningBackend, NonfiniteResponseCanBeRetried) {
   EngineView view;
   auto& model = view.propagation;
   SampleView sample;
-  sample.binning = histogram.exportBinningLayout();
+  sample.binning = Backends::buildBinningGeometry(histogram);
   sample.binCount = histogram.getNbBins();
   sample.useDynamicBinning = sample.readHostVariables = true;
   model.samples = {sample};
