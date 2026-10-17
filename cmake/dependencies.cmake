@@ -16,6 +16,31 @@ set(DeclaredContent "")
 # ROOTConfig.cmake -> usually in /install/dir/of/root/6.26.06_2/share/root/cmake
 
 cmessage( STATUS "Looking for ROOT install..." )
+
+# On Windows, ROOT is commonly unpacked into C:\root_<version> (e.g.
+# C:\root_6.40.04).  If it was not hand-added to CMAKE_PREFIX_PATH, look for
+# it there so that find_package(ROOT) picks it up automatically.
+if(WIN32 AND NOT DEFINED CMAKE_PREFIX_PATH)
+  if(NOT ROOT_DIR AND NOT ROOTSYS)
+    file(GLOB _root_dirs "C:/root_*")
+    if(_root_dirs)
+      list(SORT _root_dirs)
+      list(GET _root_dirs -1 _latest_root)
+      cmessage( STATUS "[ROOT]: Auto-detected ROOT in ${_latest_root}" )
+      set(ROOT_DIR "${_latest_root}")
+      list(APPEND CMAKE_PREFIX_PATH "${_latest_root}")
+    else()
+      file(GLOB _root_dirs "C:/root")
+      if(_root_dirs)
+        list(GET _root_dirs 0 _latest_root)
+        cmessage( STATUS "[ROOT]: Auto-detected ROOT in ${_latest_root}" )
+        set(ROOT_DIR "${_latest_root}")
+        list(APPEND CMAKE_PREFIX_PATH "${_latest_root}")
+      endif()
+    endif()
+  endif()
+endif()
+
 find_package(
     ROOT
     COMPONENTS
@@ -25,7 +50,17 @@ find_package(
 
 if( ROOT_FOUND )
   if (NOT ROOT_config_CMD)
-    set(ROOT_config_CMD ${ROOT_root_CMD}-config)
+    if(WIN32)
+      find_program(ROOT_config_CMD "root-config.bat" HINTS "${ROOT_BINDIR}" NO_DEFAULT_PATH)
+      if(NOT ROOT_config_CMD)
+        # Fall back to the derive-from-executable name like on Unix.  On
+        # Windows the root executable is ROOT.exe so this usually produces
+        # an invalid path, which is why we prefer root-config.bat above.
+        set(ROOT_config_CMD ${ROOT_root_CMD}-config)
+      endif()
+    else()
+      set(ROOT_config_CMD ${ROOT_root_CMD}-config)
+    endif()
   endif(NOT ROOT_config_CMD)
 
   cmessage( STATUS "[ROOT]: ROOT found." )
@@ -102,15 +137,23 @@ endif( ROOT_FOUND )
 # Try to figure out which version of C++ was used to compile ROOT.  ROOT
 # generates header files that depend on the compiler version so we will
 # need to use the same version.
-execute_process(COMMAND ${ROOT_config_CMD} --has-cxx14 COMMAND grep yes
-  OUTPUT_VARIABLE ROOT_cxx14_FOUND
-  OUTPUT_STRIP_TRAILING_WHITESPACE)
-execute_process(COMMAND ${ROOT_config_CMD} --has-cxx17 COMMAND grep yes
-  OUTPUT_VARIABLE ROOT_cxx17_FOUND
-  OUTPUT_STRIP_TRAILING_WHITESPACE)
-execute_process(COMMAND ${ROOT_config_CMD} --has-cxx20 COMMAND grep yes
-  OUTPUT_VARIABLE ROOT_cxx20_FOUND
-  OUTPUT_STRIP_TRAILING_WHITESPACE)
+if( ROOT_CXX_STANDARD )
+  # ROOTConfig.cmake reports the standard directly (most useful on Windows).
+  set(ROOT_cxx11_FOUND "yes")
+  set(ROOT_cxx14_FOUND "yes")
+  set(ROOT_cxx17_FOUND "yes")
+  set(ROOT_cxx20_FOUND "yes")
+else()
+  execute_process(COMMAND ${ROOT_config_CMD} --has-cxx14 COMMAND grep yes
+    OUTPUT_VARIABLE ROOT_cxx14_FOUND
+    OUTPUT_STRIP_TRAILING_WHITESPACE)
+  execute_process(COMMAND ${ROOT_config_CMD} --has-cxx17 COMMAND grep yes
+    OUTPUT_VARIABLE ROOT_cxx17_FOUND
+    OUTPUT_STRIP_TRAILING_WHITESPACE)
+  execute_process(COMMAND ${ROOT_config_CMD} --has-cxx20 COMMAND grep yes
+    OUTPUT_VARIABLE ROOT_cxx20_FOUND
+    OUTPUT_STRIP_TRAILING_WHITESPACE)
+endif()
 
 # Extract the home location for ROOT.  This is the value of ROOTSYS
 execute_process (COMMAND ${ROOT_config_CMD} --prefix
@@ -123,6 +166,16 @@ if (NOT ROOT_minuit2_FOUND)
     OUTPUT_VARIABLE ROOT_minuit2_FOUND
     OUTPUT_STRIP_TRAILING_WHITESPACE)
 endif(NOT ROOT_minuit2_FOUND)
+
+# The Windows binaries of ROOT (>=6.30) do not carry the --has-minuit2 feature
+# switch in root-config.bat, but Minuit2 is always present there.  The Minuit2
+# headers/libraries can be located directly in that case.
+if(WIN32 AND NOT ROOT_minuit2_FOUND)
+  if(EXISTS "${ROOT_INCLUDE_DIRS}/Minuit2")
+    set(ROOT_minuit2_FOUND "yes")
+    cmessage( STATUS "[ROOT]: Minuit2 detected in ROOT include directory." )
+  endif()
+endif()
 
 # If we truly don't have minuit2, then complain
 if (NOT ROOT_minuit2_FOUND AND NOT WITH_MINUIT2_MISSING)
