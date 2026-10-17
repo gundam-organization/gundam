@@ -514,6 +514,7 @@ PYBIND11_MODULE(GUNDAM, module) {
   // no CTOR here
   pybind11::class_<MinimizerBase>(module, "MinimizerBase")
   .def("minimize", &MinimizerBase::minimize)
+  .def("checkFlatDirections", &MinimizerBase::checkFlatDirections, pybind11::call_guard<pybind11::gil_scoped_release>())
   .def("throwPostfitParameters", &MinimizerBase::throwPostfitParameters)
   .def("fetchNbDegreeOfFreedom", &MinimizerBase::fetchNbDegreeOfFreedom)
   .def("getMinimizerFitParameterPtr", pybind11::overload_cast<>(&MinimizerBase::getMinimizerFitParameterPtr),
@@ -562,6 +563,7 @@ PYBIND11_MODULE(GUNDAM, module) {
   .def("setSaveDir", pybind11::overload_cast<GundamApp&, const std::string&>(&FitterEngine::setSaveDir))
   .def("setConfig", pybind11::overload_cast<const ConfigReader&>(&FitterEngine::setConfig))
   .def("setDoAllParamVariations", &FitterEngine::setDoAllParamVariations)
+  .def("setIsDryRun", &FitterEngine::setIsDryRun)
   .def("configure", pybind11::overload_cast<const ConfigReader&>(&FitterEngine::configure))
   .def("configure", pybind11::overload_cast<>(&FitterEngine::configure))
   .def("initialize", &FitterEngine::initialize)

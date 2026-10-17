@@ -74,6 +74,8 @@ public:
   /// should either be skipped, or the covariance can be filled using
   /// information from the posterior.
   virtual void calcErrors();
+  /// Diagnose locally flat fit parameters and return their count.
+  virtual int checkFlatDirections() { return 0; }
 
   /// A virtual method that should scan the parameters used by the minimizer.
   /// This provides a view of the parameters seen by the minimizer, which may
