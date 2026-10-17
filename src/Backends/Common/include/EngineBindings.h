@@ -6,6 +6,7 @@
 
 class ExternalWeightBuffer;
 class DialInterface;
+class DialInputBuffer;
 class Event;
 class Histogram;
 class LikelihoodInterface;
@@ -44,7 +45,7 @@ namespace Backends {
     std::vector<EventBinding> events{};
     std::vector<VariableBinding> variables{};
     std::vector<DialBinding> eventDials{};
-    std::vector<DialBinding> uniqueDials{};
+    std::vector<const DialInputBuffer*> variableInputBuffers{};
     std::vector<SampleBinding> samples{};
     std::vector<ParameterBinding> parameters{};
     std::vector<std::shared_ptr<const ExternalWeightBuffer>> externalWeights{};

@@ -20,6 +20,7 @@
 #include <cmath>
 #include <map>
 #include <unordered_map>
+#include <unordered_set>
 #include <utility>
 
 namespace {
@@ -75,6 +76,7 @@ namespace {
     std::unordered_map<const DialInterface*, std::uint32_t> dialIndexMap{};
     std::unordered_map<const ExternalWeightBuffer*, std::size_t> externalSourceIndices{};
     std::size_t externalWeightCount{0};
+    std::unordered_set<const DialInputBuffer*> variableInputBuffers;
 
     for( const auto& cacheEntry : eventDialCache.getCache() ){
       if( cacheEntry.event == nullptr ){ continue; }
@@ -94,6 +96,12 @@ namespace {
       for( const auto& dialResponse : cacheEntry.dialResponseCacheList ){
         const auto* interface = dialResponse.dialInterface;
         LogThrowIf(interface == nullptr, "Null DialInterface while building EngineView.");
+        if( dialResponse.appliesToVariable ){
+          const auto* buffer = interface->getInputBufferRef();
+          if( buffer != nullptr and variableInputBuffers.insert(buffer).second ){
+            bindings_.variableInputBuffers.emplace_back(buffer);
+          }
+        }
         auto cachedDialIt = dialIndexMap.find(interface);
         if( cachedDialIt != dialIndexMap.end() ){
           allDialIndices.emplace_back(cachedDialIt->second);
@@ -173,7 +181,6 @@ namespace {
         dialRef.payloadSize = propagation.dialPayloads.size() - dialRef.payloadOffset;
         const auto dialIndex = std::uint32_t(propagation.dials.size());
         propagation.dials.emplace_back(dialRef);
-        bindings_.uniqueDials.push_back({interface});
         dialIndexMap.emplace(interface, dialIndex);
         allDialIndices.emplace_back(dialIndex);
 
@@ -233,6 +240,7 @@ namespace {
     }
 
     propagation.parameterCount = parameterIndexMap.size();
+    propagation.variableInputBufferCount = bindings_.variableInputBuffers.size();
 
     likelihood.samples.reserve(likelihoodInterface_.getSamplePairList().size());
     binOffset = 0;

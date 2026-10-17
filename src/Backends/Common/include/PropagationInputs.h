@@ -24,11 +24,12 @@ namespace Backends {
     // Empty keeps the state resident in the backend.
     std::vector<double> hostVariables{};
     bool forceBinningUpdate{false};
-    std::vector<std::uint64_t> dialInputRevisions{};
+    // Optional revisions of unique input buffers used by observable dials.
+    std::vector<std::uint64_t> variableInputRevisions{};
 
     void validate(const PropagationView& model_) const {
-      if( not dialInputRevisions.empty() and dialInputRevisions.size() != model_.dials.size() ){
-        throw std::runtime_error("Backend dial revision count mismatch.");
+      if( not variableInputRevisions.empty() and variableInputRevisions.size() != model_.variableInputBufferCount ){
+        throw std::runtime_error("Backend variable input revision count mismatch.");
       }
       if( not hostVariables.empty() and hostVariables.size() != model_.variableValues.size() ){
         throw std::runtime_error("Backend host variable buffer size mismatch.");

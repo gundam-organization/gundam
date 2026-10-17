@@ -6,35 +6,37 @@ void Backends::EventStateCache::build(const PropagationView& model_) {
   *this = EventStateCache();
   _model_ = &model_;
   _sampleRevisions_.assign(model_.samples.size(), 1);
-  for( auto dial : model_.variableDialIndices ){ _variableDials_.push_back(dial); }
+  std::vector<std::size_t> variableDials(model_.variableDialIndices.begin(), model_.variableDialIndices.end());
   for( const auto& target : model_.variableResponses ){
-    if( target.overrideDial != std::size_t(-1) ){ _variableDials_.push_back(target.overrideDial); }
+    if( target.overrideDial != std::size_t(-1) ){ variableDials.push_back(target.overrideDial); }
   }
-  std::sort(_variableDials_.begin(), _variableDials_.end());
-  _variableDials_.erase(std::unique(_variableDials_.begin(), _variableDials_.end()), _variableDials_.end());
+  auto unique = [](auto& values_){
+    std::sort(values_.begin(), values_.end());
+    values_.erase(std::unique(values_.begin(), values_.end()), values_.end());
+  };
+  unique(variableDials);
+  for( auto index : variableDials ){
+    const auto& dial = model_.dials.at(index);
+    for( std::size_t i = dial.firstInput; i < dial.firstInput + dial.inputCount; ++i ){
+      _parameterIndices_.push_back(model_.dialInputs.at(i).parameterIndex);
+    }
+    if( dial.type == BackendDialType::ExternalWeight ){ _externalBlockIndices_.push_back(dial.externalBlockIndex); }
+  }
+  unique(_parameterIndices_);
+  unique(_externalBlockIndices_);
 }
 
 void Backends::EventStateCache::prepare(const PropagationInputs& inputs_) {
-  _variableInputsChanged_ = not _valid_;
-  for( auto index : _variableDials_ ){
-    const auto& dial = _model_->dials.at(index);
-    if( not inputs_.dialInputRevisions.empty()
-        and (_dialRevisions_.size() != inputs_.dialInputRevisions.size() or _dialRevisions_[index] != inputs_.dialInputRevisions[index]) ){
-      _variableInputsChanged_ = true;
-    }
-    for( std::size_t i = dial.firstInput; i < dial.firstInput + dial.inputCount; ++i ){
-      auto parameter = _model_->dialInputs[i].parameterIndex;
-      if( _parameters_.size() != inputs_.parameters.values.size() or _parameters_[parameter] != inputs_.parameters.values[parameter] ){
-        _variableInputsChanged_ = true;
-      }
-    }
-    if( dial.type == BackendDialType::ExternalWeight ){
-      auto block = dial.externalBlockIndex;
-      if( _externalGenerations_.size() != inputs_.externalWeights.size() or _externalGenerations_[block] != inputs_.externalWeights[block].generation ){
-        _variableInputsChanged_ = true;
-      }
-    }
+  _variableInputsChanged_ = true;
+  if( not _valid_ ){ return; }
+  if( not inputs_.variableInputRevisions.empty() and _variableInputRevisions_ != inputs_.variableInputRevisions ){ return; }
+  for( std::size_t i = 0; i < _parameterIndices_.size(); ++i ){
+    if( _parameters_[i] != inputs_.parameters.values[_parameterIndices_[i]] ){ return; }
   }
+  for( std::size_t i = 0; i < _externalBlockIndices_.size(); ++i ){
+    if( _externalGenerations_[i] != inputs_.externalWeights[_externalBlockIndices_[i]].generation ){ return; }
+  }
+  _variableInputsChanged_ = false;
 }
 
 bool Backends::EventStateCache::needsUpdate(const PropagationInputs& inputs_) const {
@@ -56,11 +58,18 @@ void Backends::EventStateCache::commit(const PropagationInputs& inputs_, const s
   }
   if( _variableInputsChanged_ ){ ++_variableRevision_; }
   if( anyChanged or _variableInputsChanged_ ){ ++_revision_; }
-  _parameters_ = inputs_.parameters.values;
+  if( _variableInputsChanged_ ){
+    _parameters_.resize(_parameterIndices_.size());
+    for( std::size_t i = 0; i < _parameterIndices_.size(); ++i ){
+      _parameters_[i] = inputs_.parameters.values[_parameterIndices_[i]];
+    }
+    _externalGenerations_.resize(_externalBlockIndices_.size());
+    for( std::size_t i = 0; i < _externalBlockIndices_.size(); ++i ){
+      _externalGenerations_[i] = inputs_.externalWeights[_externalBlockIndices_[i]].generation;
+    }
+    _variableInputRevisions_ = inputs_.variableInputRevisions;
+  }
   _hostVariables_ = inputs_.hostVariables;
-  _dialRevisions_ = inputs_.dialInputRevisions;
-  _externalGenerations_.clear();
-  for( const auto& block : inputs_.externalWeights ){ _externalGenerations_.push_back(block.generation); }
   _valid_ = true;
 }
 

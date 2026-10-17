@@ -2,6 +2,7 @@
 
 #include "LikelihoodInterface.h"
 #include "ExternalWeightBuffer.h"
+#include "DialInputBuffer.h"
 #include "Logger.h"
 #include "Parameter.h"
 
@@ -278,9 +279,9 @@ std::future<Backends::BackendPropagationResult> Backends::BackendManager::propag
   }
   const auto& model = _backendEngineLayout_.view.propagation;
   inputs.forceBinningUpdate = *_hostBinningChanged_;
-  for( const auto& binding : _backendEngineLayout_.bindings.uniqueDials ){
-    const auto* buffer = binding.interface->getInputBufferRef();
-    inputs.dialInputRevisions.push_back(buffer == nullptr ? 0 : buffer->getRevision());
+  inputs.variableInputRevisions.reserve(_backendEngineLayout_.bindings.variableInputBuffers.size());
+  for( const auto* buffer : _backendEngineLayout_.bindings.variableInputBuffers ){
+    inputs.variableInputRevisions.emplace_back(buffer->getRevision());
   }
   const auto& variableBindings = _backendEngineLayout_.bindings.variables;
   if( handlesEventState and (inputs.forceBinningUpdate

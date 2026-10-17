@@ -22,7 +22,7 @@ void Backends::EngineBindings::clear() {
   events.clear();
   variables.clear();
   eventDials.clear();
-  uniqueDials.clear();
+  variableInputBuffers.clear();
   samples.clear();
   parameters.clear();
   externalWeights.clear();

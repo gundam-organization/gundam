@@ -300,31 +300,61 @@ TEST_P(BinningBackend, ExternalVariableResponseUsesPublishedGeneration) {
   model.totalBins = 2;
   model.hasVariableResponses = true;
   model.variableValues = {.25};
-  model.externalWeightBlocks = {{0, 1}};
+  model.externalWeightBlocks = {{0, 1}, {1, 1}};
+  model.parameterCount = 2;
+  model.variableInputBufferCount = 1;
+  BackendDialInputDescriptor variableInput;
+  variableInput.parameterIndex = 0;
+  auto weightInput = variableInput;
+  weightInput.parameterIndex = 1;
+  model.dialInputs = {variableInput, weightInput};
   BackendDialDescriptor external;
   external.type = BackendDialType::ExternalWeight;
-  model.dials = {external};
+  external.inputCount = 1;
+  auto weight = external;
+  weight.firstInput = 1;
+  weight.externalBlockIndex = 1;
+  model.dials = {external, weight};
+  model.eventDialIndices = {1};
   BackendVariableResponseDescriptor target;
   target.overrideDial = 0;
   model.variableResponses = {target};
   EventView event;
   event.samplePosition = 0;
   event.variableCount = event.variableResponseCount = 1;
+  event.weight.dialCount = 1;
   model.events = {event};
   auto& backend = *this->backend;
   backend.build(view);
-  double value{.25};
+  double value{.25}, weightValue{1.};
   PropagationInputs inputs;
-  inputs.externalWeights = {{&value, 1, 0, 1}};
+  inputs.parameters.values = {.1, 1.};
+  inputs.variableInputRevisions = {1};
+  inputs.externalWeights = {{&value, 1, 0, 1}, {&weightValue, 1, 1, 1}};
   auto token = backend.requestPropagation(inputs);
   EXPECT_DOUBLE_EQ(backend.getHistogramSumsHostView(token)[0], 1.);
-  backend.requestPropagation(inputs);
+  token = backend.requestPropagation(inputs);
   EXPECT_EQ(backend.getLastTimingSummary().rebinnedEventCount, 0);
+  auto revision = backend.getEventStateHostView(token).variableRevision;
+  // A parameter and external block used only by weights must preserve migration.
+  inputs.parameters.values[1] = 2.;
+  weightValue = 2.;
+  ++inputs.externalWeights[1].generation;
+  token = backend.requestPropagation(inputs);
+  EXPECT_EQ(backend.getLastTimingSummary().rebinnedEventCount, 0);
+  EXPECT_EQ(backend.getEventStateHostView(token).variableRevision, revision);
+  EXPECT_DOUBLE_EQ(backend.getHistogramSumsHostView(token)[0], 2.);
+  // Explicit input invalidation is significant even with identical parameters.
+  ++inputs.variableInputRevisions[0];
+  token = backend.requestPropagation(inputs);
+  EXPECT_GT(backend.getEventStateHostView(token).variableRevision, revision);
   value = 1.25;
   ++inputs.externalWeights[0].generation;
   token = backend.requestPropagation(inputs);
   EXPECT_EQ(backend.getLastTimingSummary().rebinnedEventCount, 1);
-  EXPECT_DOUBLE_EQ(backend.getHistogramSumsHostView(token)[1], 1.);
+  EXPECT_DOUBLE_EQ(backend.getHistogramSumsHostView(token)[1], 2.);
+  inputs.variableInputRevisions.push_back(1);
+  EXPECT_THROW(backend.requestPropagation(inputs), std::runtime_error);
 }
 
 

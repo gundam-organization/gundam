@@ -51,7 +51,12 @@ claiming IEEE double precision. Unrepresentable/collapsed geometry is rejected.
 builds `BinningGeometry` from their bin boundaries and response data, and owns
 `BinningIndex` for spatial searches. Explicit sample rebinning notifies subscribers;
 `BackendManager` owns the resulting invalidation flag. `EventStateCache`
-shares invalidation/publication rules between CPU and MPS. `DevicePropagationModel`
+shares invalidation/publication rules between CPU and MPS. Observable input
+buffers, parameter dependencies and external source dependencies are deduplicated
+at build time. Weight-only changes preserve cached variable responses and bin
+contributions; explicit input invalidation and new external generations still
+trigger an update. Python workers retain their existing input-change checks.
+`DevicePropagationModel`
 packs the numerical descriptors; `MpsEventPropagation` owns Metal execution and
 resident contributions. `DeviceWeightModel` retains the specialized static-bin
 weight path, using the same packer for every consumer.

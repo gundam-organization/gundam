@@ -19,11 +19,12 @@ namespace Backends {
 
   private:
     const PropagationView* _model_{nullptr};
-    std::vector<std::size_t> _variableDials_{};
+    std::vector<std::size_t> _parameterIndices_{};
+    std::vector<std::size_t> _externalBlockIndices_{};
     std::vector<double> _parameters_{};
     std::vector<double> _hostVariables_{};
     std::vector<std::uint64_t> _externalGenerations_{};
-    std::vector<std::uint64_t> _dialRevisions_{};
+    std::vector<std::uint64_t> _variableInputRevisions_{};
     std::vector<std::uint64_t> _sampleRevisions_{};
     std::uint64_t _revision_{1};
     std::uint64_t _variableRevision_{1};

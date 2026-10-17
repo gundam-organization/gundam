@@ -54,6 +54,7 @@ namespace Backends {
     std::vector<ExternalWeightBlockDescriptor> externalWeightBlocks{};
     std::vector<SampleView> samples{};
     std::size_t parameterCount{0};
+    std::size_t variableInputBufferCount{0};
     int totalBins{0};
     std::vector<double> variableValues{};
     std::vector<BackendVariableResponseDescriptor> variableResponses{};
@@ -79,6 +80,7 @@ namespace Backends {
       externalWeightBlocks.clear();
       samples.clear();
       parameterCount = 0;
+      variableInputBufferCount = 0;
       totalBins = 0;
       variableValues.clear();
       variableResponses.clear();
