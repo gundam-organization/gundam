@@ -526,6 +526,10 @@ PYBIND11_MODULE(GUNDAM, module) {
 
 #ifdef GUNDAM_USING_BACKENDS
   pybind11::class_<Backends::BackendTimingSummary>(module, "BackendTimingSummary")
+  .def_readonly("devicePropagationSeconds", &Backends::BackendTimingSummary::devicePropagationSeconds)
+  .def_readonly("eventStateReadbackBytes", &Backends::BackendTimingSummary::eventStateReadbackBytes)
+  .def_readonly("eventWeightReadbackBytes", &Backends::BackendTimingSummary::eventWeightReadbackBytes)
+  .def_readonly("contributionBufferBytes", &Backends::BackendTimingSummary::contributionBufferBytes)
   .def_readonly("variableStageSeconds", &Backends::BackendTimingSummary::variableStageSeconds)
   .def_readonly("binningStageSeconds", &Backends::BackendTimingSummary::binningStageSeconds)
   .def_readonly("rebinnedEventCount", &Backends::BackendTimingSummary::rebinnedEventCount)

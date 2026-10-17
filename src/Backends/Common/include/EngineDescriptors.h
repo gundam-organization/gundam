@@ -1,6 +1,8 @@
 #ifndef GUNDAM_BACKEND_ENGINE_DESCRIPTORS_H
 #define GUNDAM_BACKEND_ENGINE_DESCRIPTORS_H
 
+#include "DevicePropagationTypes.h"
+
 #include <cstddef>
 #include <cstdint>
 
@@ -8,17 +10,6 @@ namespace Backends {
 
   // POD descriptors shared by host propagation and device-capable semantics.
   // They intentionally contain no owning containers or host-only behaviour.
-  enum class BackendDialType : std::uint8_t {
-    Norm = 0,
-    Shift,
-    CompactSpline,
-    UniformSpline,
-    MonotonicSpline,
-    GeneralSpline,
-    Graph,
-    ExternalWeight
-  };
-
   struct BackendDialInputDescriptor {
     std::size_t parameterIndex{std::size_t(-1)};
     bool useMirror{false};

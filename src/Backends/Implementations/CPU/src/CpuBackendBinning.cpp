@@ -16,31 +16,8 @@ double Backends::CpuBackend::evalResponse(std::size_t dial_) const {
 void Backends::CpuBackend::updateEventState(const PropagationInputs& inputs_) {
   const auto& model = _engineView_.propagation;
   _activeInputs_ = &inputs_;
-  _variableInputsChanged_ = not _eventStateValid_;
-  for( std::size_t iDial = 0; iDial < model.dials.size(); ++iDial ){
-    if( not _variableDialDependencies_[iDial] ){ continue; }
-    const auto& dial = model.dials[iDial];
-    if( not inputs_.dialInputRevisions.empty()
-        and (_lastDialRevisions_.size() != inputs_.dialInputRevisions.size()
-             or _lastDialRevisions_[iDial] != inputs_.dialInputRevisions[iDial]) ){
-      _variableInputsChanged_ = true;
-    }
-    for( std::size_t i = dial.firstInput; i < dial.firstInput + dial.inputCount; ++i ){
-      auto parameter = model.dialInputs[i].parameterIndex;
-      if( _lastBinningParameters_.size() != inputs_.parameters.values.size()
-          or _lastBinningParameters_[parameter] != inputs_.parameters.values[parameter] ){
-        _variableInputsChanged_ = true;
-      }
-    }
-    if( dial.type == BackendDialType::ExternalWeight ){
-      auto block = dial.externalBlockIndex;
-      if( _lastExternalGenerations_.size() != inputs_.externalWeights.size()
-          or _lastExternalGenerations_[block] != inputs_.externalWeights[block].generation ){
-        _variableInputsChanged_ = true;
-      }
-    }
-  }
-  if( not _variableInputsChanged_ and inputs_.hostVariables.empty() and not inputs_.forceBinningUpdate ){
+  _eventStateCache_.prepare(inputs_);
+  if( not _eventStateCache_.needsUpdate(inputs_) ){
     _lastTiming_.binContributionCount = _cachedContributionCount_;
     _activeInputs_ = nullptr;
     return;
@@ -61,20 +38,12 @@ void Backends::CpuBackend::updateEventState(const PropagationInputs& inputs_) {
   }
   for( const auto& contributions : _eventState_.contributions ){ _lastTiming_.binContributionCount += contributions.size(); }
   _cachedContributionCount_ = _lastTiming_.binContributionCount;
-  if( _variableInputsChanged_ ){ ++_eventState_.variableRevision; }
-  for( std::size_t i = 0; i < model.samples.size(); ++i ){
-    bool changed = _variableInputsChanged_ and model.samples[i].useDynamicBinning;
-    for( const auto& worker : _binningWorkers_ ){ changed = changed or worker.changedSamples[i]; }
-    if( changed ){ ++_eventState_.sampleRevisions[i]; }
+  std::vector<std::uint8_t> changedSamples(model.samples.size(), false);
+  for( const auto& worker : _binningWorkers_ ){
+    for( std::size_t i = 0; i < changedSamples.size(); ++i ){ changedSamples[i] |= worker.changedSamples[i]; }
   }
-  if( _variableInputsChanged_ or _lastTiming_.rebinnedEventCount != 0 ){ ++_eventState_.revision; }
-  // Commit only after both stages complete successfully.
-  _lastBinningParameters_ = inputs_.parameters.values;
-  _lastExternalGenerations_.clear();
-  for( const auto& block : inputs_.externalWeights ){ _lastExternalGenerations_.push_back(block.generation); }
-  _lastHostVariables_ = inputs_.hostVariables;
-  _lastDialRevisions_ = inputs_.dialInputRevisions;
-  _eventStateValid_ = true;
+  _eventStateCache_.commit(inputs_, changedSamples);
+  _eventStateCache_.publishRevisions(_eventState_);
   _activeInputs_ = nullptr;
 }
 
@@ -94,11 +63,10 @@ void Backends::CpuBackend::updateEventVariablesThread(int iThread_) {
     };
     if( not inputs.hostVariables.empty() and (sample.readHostVariables or inputs.forceBinningUpdate) ){
       for( std::size_t i = event.firstVariable; i < event.firstVariable + event.variableCount; ++i ){
-        if( inputs.forceBinningUpdate or _lastHostVariables_.size() != inputs.hostVariables.size()
-            or inputs.hostVariables[i] != _lastHostVariables_[i] ){ assign(i, inputs.hostVariables[i]); }
+        if( _eventStateCache_.hostVariableChanged(i, inputs) ){ assign(i, inputs.hostVariables[i]); }
       }
     }
-    if( not _variableInputsChanged_ ){ continue; }
+    if( not _eventStateCache_.variableInputsChanged() ){ continue; }
     for( std::size_t i = event.firstVariableResponse; i < event.firstVariableResponse + event.variableResponseCount; ++i ){
       const auto& target = model.variableResponses[i];
       double value = Semantics::evalVariableResponse(target, model.variableDialIndices.data(),

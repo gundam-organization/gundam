@@ -1,6 +1,8 @@
 #ifndef GUNDAM_BINNING_LAYOUT_H
 #define GUNDAM_BINNING_LAYOUT_H
 
+#include "DeviceMath/SharedBinningMath.h"
+
 #include <algorithm>
 #include <cmath>
 #include <cstddef>
@@ -33,10 +35,7 @@ struct BinningLayout {
 
 namespace BinningSemantics {
   inline double cumulativeKernel(double position_) {
-    if( position_ <= -1 ){ return 0; }
-    if( position_ >= 1 ){ return 1; }
-    double t = (position_ + 1) / 2;
-    return t * t * t * (10 + t * (-15 + 6 * t));
+    return GundamBinningMath::cumulativeKernel(position_);
   }
 
   inline double fraction(const BinningLayout& layout_, const BinningBin& bin_, const double* values_) {
@@ -44,17 +43,9 @@ namespace BinningSemantics {
     for( std::size_t i = bin_.firstInterval; i < bin_.firstInterval + bin_.intervalCount; ++i ){
       const auto& interval = layout_.intervals[i];
       double value = values_[interval.variableIndex];
-      if( interval.lowerInverseWidth == 0 ){
-        if( interval.lowerBound == interval.upperBound ){
-          if( value != interval.lowerBound ){ return 0; }
-        }
-        else if( value < interval.lowerBound or value >= interval.upperBound ){ return 0; }
-      }
-      else{
-        result *= std::max(0., cumulativeKernel((interval.upperBound - value) * interval.upperInverseWidth)
-                              - cumulativeKernel((interval.lowerBound - value) * interval.lowerInverseWidth));
-        if( result == 0 ){ return 0; }
-      }
+      result *= GundamBinningMath::intervalFraction(interval.lowerBound, interval.upperBound,
+                                                    interval.lowerInverseWidth, interval.upperInverseWidth, value);
+      if( result == 0 ){ return 0; }
     }
     return result;
   }
@@ -69,7 +60,6 @@ public:
   void findCandidates(const double* values_, std::vector<std::size_t>& candidates_) const;
   [[nodiscard]] std::size_t getNbNodes() const { return _nodes_.size(); }
 
-private:
   struct Bounds { double lower{0}; double upper{0}; };
   struct Node {
     std::size_t first{0};
@@ -77,6 +67,12 @@ private:
     int left{-1};
     int right{-1};
   };
+  [[nodiscard]] const auto& getNodes() const { return _nodes_; }
+  [[nodiscard]] const auto& getNodeBounds() const { return _nodeBounds_; }
+  [[nodiscard]] const auto& getBinBounds() const { return _binBounds_; }
+  [[nodiscard]] const auto& getBinPositions() const { return _binPositions_; }
+
+private:
   int buildNode(std::size_t first_, std::size_t count_);
   void findCandidates(int node_, const double* values_, std::vector<std::size_t>& candidates_) const;
   bool buildGrid(const BinningLayout& layout_);

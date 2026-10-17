@@ -11,10 +11,13 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 fixture = import_module('219VariableDials')
 
 
+TOLERANCE = 1e-10
+
+
 def assert_same(actual, expected):
     assert len(actual) == len(expected)
     for i, (a, b) in enumerate(zip(actual, expected)):
-        assert math.isclose(a, b, rel_tol=1e-10, abs_tol=1e-10), (i, a, b)
+        assert math.isclose(a, b, rel_tol=TOLERANCE, abs_tol=TOLERANCE), (i, a, b)
 
 
 def capture(engine):
@@ -33,7 +36,7 @@ def capture(engine):
     return result
 
 
-def exercise_manual_binning(path):
+def exercise_manual_binning(path, backend_name="CPU"):
     import GUNDAM
     engines = []
     for backend in (False, True):
@@ -49,7 +52,7 @@ def exercise_manual_binning(path):
             }]}},
         }
         if backend:
-            li['backendManagerConfig'] = {'isEnabled': True, 'type': 'CPU'}
+            li['backendManagerConfig'] = {'isEnabled': True, 'type': backend_name}
         config = {'likelihoodInterfaceConfig': li, 'enablePca': False, 'scaleParStepWithChi2Response': False,
                   'generateSamplePlots': False, 'generateOneSigmaPlots': False}
         engine = GUNDAM.FitterEngine()
@@ -75,7 +78,7 @@ def exercise_manual_binning(path):
     assert_same(sums(engines[1]), [0., 10., 0.])
 
 
-def main():
+def main(backend_name="CPU"):
     import GUNDAM
     if not hasattr(GUNDAM.FitterEngine, 'getBackendsManager'):
         print('SKIP: built without backends')
@@ -86,7 +89,7 @@ def main():
     for threads in (1, 2):
         GUNDAM.setNumberOfThreads(threads)
         reference = fixture.make_engine(path, explicit_dynamic=True)
-        backend = fixture.make_engine(path, explicit_dynamic=True, backend='CPU')
+        backend = fixture.make_engine(path, explicit_dynamic=True, backend=backend_name)
         assert backend.getBackendsManager().hasBackend()
         for point in ((1., .5, 1.25, 2.), (2., -.25, -.5, 1.5),
                       (2., -.25, -.5, 3.), (1., .5, 1.25, 2.)):
@@ -115,8 +118,15 @@ def main():
             engine.evaluateLikelihood()
         assert_same([backend.getLikelihoodInterface().getLastLikelihood()],
                     [reference.getLikelihoodInterface().getLastLikelihood()])
+        if backend_name == 'MPS':
+            timing = backend.getBackendsManager().getLastTimingSummary()
+            assert timing.devicePropagationSeconds > 0, 'Expected actual GPU execution'
+            assert timing.eventStateReadbackBytes == 0, 'Fit mode must keep observables resident'
+            assert timing.eventWeightReadbackBytes == 0, 'Fit mode must keep event weights resident'
         for output in ('EventState', 'EventWeights', 'Histograms'):
             backend.getBackendsManager().materialize(output)
+        if backend_name == 'MPS':
+            assert backend.getBackendsManager().getLastTimingSummary().eventStateReadbackBytes > 0
         assert_same(capture(backend), capture(reference))
         backend.getBackendsManager().setEnableAutoMaterialize(True)
         # An explicitly dynamic sample must not invalidate the cached state
@@ -136,7 +146,7 @@ def main():
             event.getVariables().fetchVariable('X').setValue(value)
             event.getIndices().bin = bin_index
         # Unchanged automatic migration and weight-only changes reuse bins.
-        cached = fixture.make_engine(path, backend='CPU')
+        cached = fixture.make_engine(path, backend=backend_name)
         cached.evaluateLikelihood()
         cached.evaluateLikelihood()
         assert cached.getBackendsManager().getLastTimingSummary().rebinnedEventCount == 0
@@ -154,15 +164,8 @@ def main():
         before = capture(cached)
         cached.getLikelihoodInterface().propagateAndEvalLikelihood()
         assert_same(capture(cached), before)
-    exercise_manual_binning(path)
-    if sys.platform == 'darwin':
-        try:
-            fixture.make_engine(path, backend='MPS')
-        except RuntimeError as error:
-            assert 'MPS does not yet support' in str(error), str(error)
-        else:
-            raise AssertionError('MPS silently accepted unsupported migration')
-    print('SUCCESS: CPU migration, variables, weights, errors, outside contributions and likelihood agree')
+    exercise_manual_binning(path, backend_name)
+    print(f'SUCCESS: {backend_name} migration, variables, weights, errors, outside contributions and likelihood agree')
 
 
 if __name__ == '__main__':

@@ -1,0 +1,284 @@
+#include "MpsEventPropagation.h"
+#include "MpsBackendInternal.h"
+
+#include <stdexcept>
+
+Backends::MpsEventPropagation::MpsEventPropagation(id<MTLDevice> device_, id<MTLCommandQueue> queue_, id<MTLLibrary> library_)
+    : _device_(device_), _queue_(queue_) {
+  const char* functions[]{"evaluate_propagation_dials", "propagate_event_state", "rebin_events", "clear_contribution_counts",
+    "count_bin_contributions", "index_histogram_chunks", "scatter_bin_contributions", "reduce_histogram_chunks", "finish_dynamic_histograms"};
+  for( std::size_t i = 0; i < _pipelines_.size(); ++i ){
+    _pipelines_[i] = makePipeline(_device_, library_, [NSString stringWithUTF8String:functions[i]]);
+    if( _pipelines_[i] == nil ){
+      for( auto pipeline : _pipelines_ ){ [pipeline release]; }
+      throw std::runtime_error("Could not create Metal event propagation pipelines.");
+    }
+  }
+}
+
+Backends::MpsEventPropagation::~MpsEventPropagation() {
+  clearBuffers();
+  for( auto pipeline : _pipelines_ ){ [pipeline release]; }
+}
+
+void Backends::MpsEventPropagation::clearBuffers() {
+  for( auto& value : _buffers_ ){ releaseBuffer(value); }
+}
+
+void Backends::MpsEventPropagation::clear() {
+  clearBuffers();
+  _model_ = nullptr;
+  _packed_ = DevicePropagationModel();
+  _state_ = EventState();
+  _cache_ = EventStateCache();
+  _valid_ = false;
+}
+
+void Backends::MpsEventPropagation::build(const PropagationView& model_) {
+  clearBuffers();
+  _model_ = &model_;
+  _packed_.build(model_);
+  _cache_.build(model_);
+  _state_ = EventState();
+  _materializedRevision_ = 0;
+  _valid_ = false;
+  _externalGenerations_.assign(model_.externalWeightBlocks.size(), 0);
+  auto allocate = [&](Buffer slot_, std::size_t bytes_, bool shared_ = false){
+    bytes_ = std::max(std::size_t(4), bytes_);
+    LogThrowIf(bytes_ > _device_.maxBufferLength, "Event propagation allocation exceeds Metal maxBufferLength: " << bytes_);
+    auto value = shared_ ? makeSharedEmptyBuffer(_device_, bytes_) : makePrivateEmptyBuffer(_device_, bytes_);
+    LogThrowIf(value == nil, "Metal event propagation buffer allocation failed: " << bytes_);
+    _buffers_[std::size_t(slot_)] = value;
+  };
+  auto upload = [&](Buffer slot_, const auto& values_){
+    using Value = typename std::decay_t<decltype(values_)>::value_type;
+    if( values_.empty() ){ allocate(slot_, sizeof(Value)); return; }
+    LogThrowIf(values_.size() > _device_.maxBufferLength / sizeof(Value), "Event propagation upload exceeds Metal maxBufferLength.");
+    _buffers_[std::size_t(slot_)] = makePrivateBuffer(_device_, _queue_, values_);
+    LogThrowIf(buffer(slot_) == nil, "Metal event propagation upload failed.");
+  };
+  upload(Buffer::Events, _packed_.events);
+  upload(Buffer::Samples, _packed_.samples);
+  upload(Buffer::Dials, _packed_.dials);
+  upload(Buffer::Targets, _packed_.variableResponses);
+  upload(Buffer::Intervals, _packed_.intervals);
+  upload(Buffer::Bins, _packed_.bins);
+  upload(Buffer::Nodes, _packed_.nodes);
+  upload(Buffer::Bounds, _packed_.bounds);
+  upload(Buffer::NodeBins, _packed_.nodeBins);
+  upload(Buffer::WeightDialIndices, _packed_.weightDialIndices);
+  upload(Buffer::VariableDialIndices, _packed_.variableDialIndices);
+  upload(Buffer::Payloads, _packed_.payloads);
+  upload(Buffer::Variables, _packed_.variables);
+  allocate(Buffer::Parameters, std::max(std::size_t(1), model_.parameterCount) * sizeof(ObservableScalar), true);
+  std::size_t externalCount{0};
+  for( const auto& block : model_.externalWeightBlocks ){ externalCount = std::max(externalCount, block.offset + block.count); }
+  allocate(Buffer::ExternalWeights, std::max(std::size_t(1), externalCount) * sizeof(ObservableScalar), true);
+  allocate(Buffer::Responses, std::max(std::size_t(1), _packed_.dials.size()) * sizeof(ObservableScalar));
+  allocate(Buffer::HostValues, std::max(std::size_t(1), _packed_.variables.size()) * sizeof(ObservableScalar), true);
+  allocate(Buffer::HostEdits, _packed_.variables.size() * sizeof(DeviceIndex), true);
+  allocate(Buffer::ChangedSamples, model_.samples.size() * sizeof(DeviceIndex), true);
+  allocate(Buffer::Control, sizeof(DevicePropagationControl), true);
+  for( auto slot : {Buffer::DirtyEvents, Buffer::HardBins, Buffer::EventCounts} ){ allocate(slot, model_.events.size() * sizeof(DeviceIndex)); }
+  allocate(Buffer::Contributions, std::max(std::size_t(1), std::size_t(_packed_.contributionCapacity)) * sizeof(DeviceBinContribution));
+  allocate(Buffer::EventWeights, model_.events.size() * sizeof(float));
+  for( auto slot : {Buffer::BinCounts, Buffer::BinOffsets, Buffer::BinPositions, Buffer::ChunkOffsets} ){
+    allocate(slot, (std::size_t(_packed_.histogramBins) + 1) * sizeof(DeviceIndex));
+  }
+  allocate(Buffer::BinContributions, std::size_t(_packed_.contributionCapacity) * sizeof(DeviceIndex));
+  allocate(Buffer::Chunks, std::size_t(_packed_.histogramChunkCapacity) * sizeof(DeviceHistogramChunk));
+  for( auto slot : {Buffer::PartialSums, Buffer::PartialSquares} ){
+    allocate(slot, std::size_t(_packed_.histogramChunkCapacity) * sizeof(float));
+  }
+  for( auto slot : {Buffer::HistogramSums, Buffer::HistogramSquares} ){
+    allocate(slot, std::size_t(_packed_.histogramBins) * sizeof(float));
+  }
+  // Readback buffers are created lazily for EventState/EventWeights, which fits
+  // usually leave resident. Histogram readback remains necessary for host LLH.
+  for( auto slot : {Buffer::ReadbackSums, Buffer::ReadbackSquares} ){
+    allocate(slot, std::size_t(_packed_.histogramBins) * sizeof(float), true);
+  }
+  std::memset(buffer(Buffer::Control).contents, 0, sizeof(DevicePropagationControl));
+}
+
+void Backends::MpsEventPropagation::dispatch(id<MTLComputeCommandEncoder> encoder_, Kernel kernel_, std::size_t count_,
+                                            std::initializer_list<Buffer> buffers_) {
+  if( count_ == 0 ){ return; }
+  auto pipeline = _pipelines_[std::size_t(kernel_)];
+  [encoder_ setComputePipelineState:pipeline];
+  NSUInteger index{0};
+  for( auto slot : buffers_ ){ [encoder_ setBuffer:buffer(slot) offset:0 atIndex:index++]; }
+  NSUInteger width = std::min<NSUInteger>(256, pipeline.maxTotalThreadsPerThreadgroup);
+  [encoder_ dispatchThreads:MTLSizeMake(count_, 1, 1) threadsPerThreadgroup:MTLSizeMake(width, 1, 1)];
+}
+
+void Backends::MpsEventPropagation::copy(id<MTLBlitCommandEncoder> encoder_, Buffer source_, Buffer destination_, std::size_t bytes_) {
+  if( not bytes_ ){ return; }
+  if( buffer(destination_) == nil ){
+    _buffers_[std::size_t(destination_)] = makeSharedEmptyBuffer(_device_, bytes_);
+    LogThrowIf(buffer(destination_) == nil, "Metal event propagation readback allocation failed.");
+  }
+  [encoder_ copyFromBuffer:buffer(source_) sourceOffset:0 toBuffer:buffer(destination_) destinationOffset:0 size:bytes_];
+}
+
+void Backends::MpsEventPropagation::propagate(const PropagationInputs& inputs_, PropagationResult& result_, BackendTimingSummary& timing_) {
+  const auto& model = *_model_;
+  inputs_.validate(model);
+  _cache_.prepare(inputs_);
+  uploadParameters<ObservableScalar>(buffer(Buffer::Parameters), inputs_.parameters, timing_);
+  uploadExternalWeights<ObservableScalar>(buffer(Buffer::ExternalWeights), _externalGenerations_, inputs_, timing_);
+  auto& control = *static_cast<DevicePropagationControl*>(buffer(Buffer::Control).contents);
+  control.error = control.rebinnedEvents = control.candidates = control.editCount = 0;
+  control.rebuildIndex = not _valid_;
+  control.firstPropagation = not _valid_;
+  control.updateVariables = _cache_.variableInputsChanged();
+  control.forceBinning = inputs_.forceBinningUpdate;
+  control.eventCount = DeviceIndex(model.events.size());
+  control.histogramBins = _packed_.histogramBins;
+  control.dialCount = DeviceIndex(_packed_.dials.size());
+  control.sampleCount = DeviceIndex(model.samples.size());
+  control.hasReweightCap = model.hasReweightCap;
+  control.maxReweight = float(model.maxReweight);
+  std::memset(buffer(Buffer::ChangedSamples).contents, 0, std::max(std::size_t(1), model.samples.size()) * sizeof(DeviceIndex));
+  if( not inputs_.hostVariables.empty() ){
+    auto* flags = static_cast<DeviceIndex*>(buffer(Buffer::HostEdits).contents);
+    auto* values = static_cast<ObservableScalar*>(buffer(Buffer::HostValues).contents);
+    std::fill(flags, flags + model.variableValues.size(), 0);
+    for( std::size_t i = 0; i < inputs_.hostVariables.size(); ++i ){
+      if( _cache_.hostVariableChanged(i, inputs_) ){
+        flags[i] = 1;
+        values[i] = ObservableScalar(inputs_.hostVariables[i]);
+        ++control.editCount;
+      }
+    }
+  }
+  auto encodeStart = std::chrono::steady_clock::now();
+  auto command = [_queue_ commandBuffer];
+  auto encoder = [command computeCommandEncoder];
+  dispatch(encoder, Kernel::Dials, _packed_.dials.size(), {Buffer::Dials, Buffer::Parameters, Buffer::Payloads, Buffer::ExternalWeights, Buffer::Responses, Buffer::Control});
+  dispatch(encoder, Kernel::Events, model.events.size(), {Buffer::Events, Buffer::Samples, Buffer::Targets, Buffer::WeightDialIndices,
+    Buffer::VariableDialIndices, Buffer::Responses, Buffer::HostValues, Buffer::HostEdits, Buffer::Variables, Buffer::DirtyEvents, Buffer::EventWeights, Buffer::Control});
+  if( _cache_.needsUpdate(inputs_) || not _valid_ ){
+    dispatch(encoder, Kernel::Binning, model.events.size(), {Buffer::Events, Buffer::Samples, Buffer::Nodes, Buffer::Bounds, Buffer::NodeBins,
+      Buffer::Bins, Buffer::Intervals, Buffer::Variables, Buffer::DirtyEvents, Buffer::HardBins, Buffer::EventCounts, Buffer::Contributions, Buffer::ChangedSamples, Buffer::Control});
+    dispatch(encoder, Kernel::ClearCounts, _packed_.histogramBins, {Buffer::BinCounts, Buffer::Control});
+    dispatch(encoder, Kernel::CountContributions, model.events.size(), {Buffer::Events, Buffer::EventCounts, Buffer::Contributions, Buffer::BinCounts, Buffer::Control});
+    dispatch(encoder, Kernel::IndexChunks, 1, {Buffer::BinCounts, Buffer::BinOffsets, Buffer::BinPositions, Buffer::ChunkOffsets, Buffer::Chunks, Buffer::Control});
+    dispatch(encoder, Kernel::Scatter, model.events.size(), {Buffer::Events, Buffer::EventCounts, Buffer::Contributions, Buffer::BinPositions, Buffer::BinContributions, Buffer::Control});
+  }
+  dispatch(encoder, Kernel::Reduce, _packed_.histogramChunkCapacity, {Buffer::Chunks, Buffer::BinContributions, Buffer::Contributions,
+    Buffer::EventWeights, Buffer::PartialSums, Buffer::PartialSquares, Buffer::Control});
+  dispatch(encoder, Kernel::Finish, _packed_.histogramBins, {Buffer::ChunkOffsets, Buffer::PartialSums, Buffer::PartialSquares,
+    Buffer::HistogramSums, Buffer::HistogramSquares, Buffer::Control});
+  [encoder endEncoding];
+  auto blit = [command blitCommandEncoder];
+  std::size_t histogramBytes = std::size_t(_packed_.histogramBins) * sizeof(float);
+  copy(blit, Buffer::HistogramSums, Buffer::ReadbackSums, histogramBytes);
+  copy(blit, Buffer::HistogramSquares, Buffer::ReadbackSquares, histogramBytes);
+  [blit endEncoding];
+  timing_.commandEncodeSeconds += secondsSince(encodeStart);
+  auto waitStart = std::chrono::steady_clock::now();
+  [command commit];
+  [command waitUntilCompleted];
+  timing_.deviceWaitSeconds += secondsSince(waitStart);
+  timing_.devicePropagationSeconds += command.GPUEndTime - command.GPUStartTime;
+  if( command.status != MTLCommandBufferStatusCompleted || control.error ){
+    _cache_.invalidate();
+    _valid_ = false;
+    throw std::runtime_error("Metal event propagation failed (nonfinite observable, invalid bin fractions or capacity overflow), error " + std::to_string(control.error));
+  }
+  _valid_ = true;
+  auto readbackStart = std::chrono::steady_clock::now();
+  const auto* sums = static_cast<const float*>(buffer(Buffer::ReadbackSums).contents);
+  const auto* squares = static_cast<const float*>(buffer(Buffer::ReadbackSquares).contents);
+  result_.histSums.assign(sums, sums + model.totalBins);
+  result_.histSumSquares.assign(squares, squares + model.totalBins);
+  result_.outsideSums.assign(sums + model.totalBins, sums + _packed_.histogramBins);
+  result_.outsideSumSquares.assign(squares + model.totalBins, squares + _packed_.histogramBins);
+  timing_.histogramReadbackBytes += 2 * histogramBytes;
+  timing_.histogramReadbackSeconds += secondsSince(readbackStart);
+  timing_.rebinnedEventCount = control.rebinnedEvents;
+  timing_.binCandidateCount = control.candidates;
+  timing_.binContributionCount = control.contributionCount;
+  timing_.uniqueDialCount = model.dials.size();
+  timing_.eventDialIndexCount = model.eventDialIndices.size() + model.variableDialIndices.size();
+  timing_.contributionBufferBytes = std::size_t(_packed_.contributionCapacity) * sizeof(DeviceBinContribution);
+  std::vector<std::uint8_t> changed(model.samples.size());
+  const auto* samples = static_cast<const DeviceIndex*>(buffer(Buffer::ChangedSamples).contents);
+  for( std::size_t i = 0; i < changed.size(); ++i ){ changed[i] = samples[i] != 0; }
+  _cache_.commit(inputs_, changed);
+}
+
+void Backends::MpsEventPropagation::materializeWeights(PropagationResult& result_, BackendTimingSummary& timing_) {
+  if( result_.eventWeights.size() == _model_->events.size() ){ return; }
+  auto start = std::chrono::steady_clock::now();
+  auto command = [_queue_ commandBuffer];
+  auto encoder = [command blitCommandEncoder];
+  std::size_t bytes = _model_->events.size() * sizeof(float);
+  copy(encoder, Buffer::EventWeights, Buffer::ReadbackWeights, bytes);
+  [encoder endEncoding];
+  [command commit];
+  [command waitUntilCompleted];
+  LogThrowIf(command.status != MTLCommandBufferStatusCompleted, "Metal event weight readback failed.");
+  auto* values = static_cast<float*>(buffer(Buffer::ReadbackWeights).contents);
+  result_.eventWeights.assign(values, values + _model_->events.size());
+  timing_.eventWeightReadbackBytes += bytes;
+  timing_.eventWeightReadbackSeconds += secondsSince(start);
+}
+
+const Backends::EventState& Backends::MpsEventPropagation::materializeState(BackendTimingSummary& timing_) {
+  EventState revisions;
+  _cache_.publishRevisions(revisions);
+  if( _materializedRevision_ == revisions.revision ){ return _state_; }
+  auto start = std::chrono::steady_clock::now();
+  auto command = [_queue_ commandBuffer];
+  auto encoder = [command blitCommandEncoder];
+  const auto& model = *_model_;
+  std::size_t variableBytes = model.variableValues.size() * sizeof(ObservableScalar);
+  std::size_t eventBytes = model.events.size() * sizeof(DeviceIndex);
+  std::size_t contributionBytes = std::size_t(_packed_.contributionCapacity) * sizeof(DeviceBinContribution);
+  copy(encoder, Buffer::Variables, Buffer::ReadbackVariables, variableBytes);
+  copy(encoder, Buffer::HardBins, Buffer::ReadbackBins, eventBytes);
+  copy(encoder, Buffer::EventCounts, Buffer::ReadbackCounts, eventBytes);
+  copy(encoder, Buffer::Contributions, Buffer::ReadbackContributions, contributionBytes);
+  [encoder endEncoding];
+  [command commit];
+  [command waitUntilCompleted];
+  LogThrowIf(command.status != MTLCommandBufferStatusCompleted, "Metal event state readback failed.");
+  _state_ = std::move(revisions);
+  if( variableBytes ){
+    auto* values = static_cast<ObservableScalar*>(buffer(Buffer::ReadbackVariables).contents);
+    _state_.variables.resize(model.variableValues.size());
+    for( std::size_t i = 0; i < _state_.variables.size(); ++i ){ _state_.variables[i] = double(values[i].high) + values[i].low; }
+  }
+  _state_.bins.resize(model.events.size());
+  _state_.contributions.resize(model.events.size());
+  const auto* bins = static_cast<int*>(buffer(Buffer::ReadbackBins).contents);
+  const auto* counts = static_cast<DeviceIndex*>(buffer(Buffer::ReadbackCounts).contents);
+  const auto* contributions = static_cast<DeviceBinContribution*>(buffer(Buffer::ReadbackContributions).contents);
+  for( std::size_t i = 0; i < model.events.size(); ++i ){
+    _state_.bins[i] = bins[i];
+    const auto& event = _packed_.events[i];
+    const auto& sample = _packed_.samples[event.sample];
+    for( std::size_t j = 0; j < counts[i]; ++j ){
+      const auto& contribution = contributions[event.firstContribution + j];
+      int bin = contribution.binIndex >= model.totalBins ? -1 : contribution.binIndex - int(sample.binOffset);
+      _state_.contributions[i].push_back({bin, contribution.fraction});
+    }
+  }
+  _materializedRevision_ = _state_.revision;
+  timing_.eventStateReadbackBytes += variableBytes + 2 * eventBytes + contributionBytes;
+  timing_.eventStateReadbackSeconds += secondsSince(start);
+  return _state_;
+}
+
+Backends::BackendDeviceView Backends::MpsEventPropagation::getDeviceView() const {
+  BackendDeviceView view;
+  view.device = _device_;
+  view.eventWeights = buffer(Buffer::EventWeights);
+  view.eventWeightsBytes = _model_->events.size() * sizeof(float);
+  view.histSums = buffer(Buffer::HistogramSums);
+  view.histSumSquares = buffer(Buffer::HistogramSquares);
+  view.histogramBytes = std::size_t(_model_->totalBins) * sizeof(float);
+  return view;
+}

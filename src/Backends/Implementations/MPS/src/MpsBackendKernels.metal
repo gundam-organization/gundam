@@ -1,43 +1,10 @@
 constant uint kDialFlagAllowExtrapolation = 1u << 0;
 constant uint kDialFlagCached = 1u << 1;
 
-struct EventDialRanges {
-  uint externalOffset;
-  uint externalCount;
-  uint normOffset;
-  uint normCount;
-  uint compactOffset;
-  uint compactCount;
-  uint uniformOffset;
-  uint uniformCount;
-  uint monotonicOffset;
-  uint monotonicCount;
-  uint generalOffset;
-  uint generalCount;
-  uint graphOffset;
-  uint graphCount;
-};
-
-struct ExternalDialOccurrence {
-  uint weightIndex;
-  float minResponse;
-  float maxResponse;
-};
-
-struct NormDialOccurrence {
-  uint parameterIndex;
-  float minResponse;
-  float maxResponse;
-};
-
-struct SplineDialDescriptor {
-  uint parameterIndex;
-  uint splineOffset;
-  uint splineSize;
-  uint flags;
-  float minResponse;
-  float maxResponse;
-};
+using EventDialRanges = Backends::DeviceEventDialRanges;
+using ExternalDialOccurrence = Backends::DeviceExternalDialOccurrence;
+using NormDialOccurrence = Backends::DeviceNormDialOccurrence;
+using SplineDialDescriptor = Backends::DeviceSplineDialDescriptor;
 
 float evaluate_compact_spline(float x, bool allowExtrapolation, device const float* data, uint dim) {
   if( !allowExtrapolation ){
@@ -73,7 +40,7 @@ float evaluate_monotonic_spline(float x, bool allowExtrapolation, device const f
 float evaluate_general_spline(float x, bool allowExtrapolation, device const float* data, uint dim) {
   if( !allowExtrapolation ){
     uint knotCount = (dim - 2) / 3;
-    float low = data[2];
+    float low = data[0];
     float high = data[2 + 3 * (knotCount - 1) + 2];
     x = clamp(x, low, high);
   }

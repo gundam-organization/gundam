@@ -4,17 +4,12 @@
 #include "MpsBackend.h"
 
 #include "EngineView.h"
+#include "PropagationResult.h"
+#include "MpsEventPropagation.h"
 #include "BackendTypes.h"
 #include "MpsBackendKernelSource.h"
 #include "ParameterSnapshot.h"
 
-#include "CompactSpline.h"
-#include "GeneralSpline.h"
-#include "Graph.h"
-#include "Norm.h"
-#include "MonotonicSpline.h"
-#include "Shift.h"
-#include "UniformSpline.h"
 
 #include "GundamGlobals.h"
 #include "Logger.h"
@@ -35,14 +30,7 @@
 namespace Backends {
 
   struct MpsBackendImpl {
-    struct Result {
-      PropagationToken token{};
-      PropagationStatus status{};
-      std::vector<double> eventWeights{};
-      std::vector<double> histSums{};
-      std::vector<double> histSumSquares{};
-      double likelihood{0};
-    };
+    using Result = PropagationResult;
 
     id<MTLDevice> device{nil};
     id<MTLCommandQueue> commandQueue{nil};
@@ -55,10 +43,12 @@ namespace Backends {
     id<MTLComputePipelineState> histogramPipeline{nil};
     id<MTLComputePipelineState> histogramPartialsPipeline{nil};
     id<MTLComputePipelineState> histogramFinalizePipeline{nil};
+    std::unique_ptr<MpsEventPropagation> eventPropagation{};
+    bool useEventPropagation{false};
     bool isAvailable{false};
     bool enableCachedDialResponses{true};
 
-    bool isDeviceModelSupported{false};
+    bool isWeightModelSupported{false};
     static constexpr uint32_t histogramChunkSize{256};
     uint32_t maxHistogramChunksPerBin{1};
     id<MTLBuffer> eventWeightsBuffer{nil};
@@ -106,7 +96,6 @@ namespace Backends {
     Result lastResult{};
     BackendTimingSummary buildTiming{};
     BackendTimingSummary lastTiming{};
-    std::vector<float> parameterValuesScratch{};
     std::string deviceModelFallbackReason{};
     std::uint64_t nextTokenId{1};
     bool isBuilt{false};
@@ -129,7 +118,7 @@ namespace Backends {
     [[nodiscard]] bool isCurrentToken(const PropagationToken& token_) const;
     void resetResult();
 
-    [[nodiscard]] bool buildDeviceModel();
+    [[nodiscard]] bool buildWeightModel();
     void updateDeviceParameters(const ParameterSnapshot& parameters_);
     void updateExternalWeights(const PropagationInputs& inputs_);
     [[nodiscard]] bool encodeEventWeights(id<MTLComputeCommandEncoder> encoder);
@@ -139,7 +128,7 @@ namespace Backends {
                                                  id<MTLBuffer> descriptorsBuffer_,
                                                  uint32_t descriptorCount_);
     [[nodiscard]] bool encodeHistogramsFromDeviceWeights(id<MTLComputeCommandEncoder> encoder);
-    [[nodiscard]] bool runDevicePropagation(const PropagationInputs& inputs_, bool needHistograms_);
+    [[nodiscard]] bool runWeightPropagation(const PropagationInputs& inputs_, bool needHistograms_);
     void copyDeviceEventWeightsToHostResult();
     [[nodiscard]] bool calculateHistogramsOnDevice();
     void calculateLikelihood();
@@ -150,60 +139,7 @@ namespace Backends {
 }
 
 namespace {
-  constexpr uint32_t kMpsDialTypeNorm{0};
-  constexpr uint32_t kMpsDialTypeCompactSpline{1};
-  constexpr uint32_t kMpsDialTypeUniformSpline{2};
-  constexpr uint32_t kMpsDialTypeMonotonicSpline{3};
-  constexpr uint32_t kMpsDialTypeGeneralSpline{4};
-  constexpr uint32_t kMpsDialTypeGraph{5};
-  constexpr uint32_t kMpsDialFlagAllowExtrapolation{1u << 0};
-  constexpr uint32_t kMpsDialFlagCached{1u << 1};
-  constexpr uint32_t kMpsCachedDialReuseThreshold{8};
-
   static NSString* const kMpsBackendMetalSource = GUNDAM_MPS_BACKEND_KERNEL_SOURCE;
-
-  struct MpsEventDialRanges {
-    std::uint32_t externalOffset{0};
-    std::uint32_t externalCount{0};
-    uint32_t normOffset{0};
-    uint32_t normCount{0};
-    uint32_t compactOffset{0};
-    uint32_t compactCount{0};
-    uint32_t uniformOffset{0};
-    uint32_t uniformCount{0};
-    uint32_t monotonicOffset{0};
-    uint32_t monotonicCount{0};
-    uint32_t generalOffset{0};
-    uint32_t generalCount{0};
-    uint32_t graphOffset{0};
-    uint32_t graphCount{0};
-  };
-
-  struct MpsExternalDialOccurrence {
-    std::uint32_t weightIndex{0};
-    float minResponse{0};
-    float maxResponse{0};
-  };
-
-  struct MpsNormDialOccurrence {
-    uint32_t parameterIndex{0};
-    float minResponse{1.0f};
-    float maxResponse{1.0f};
-  };
-
-  struct MpsSplineDialDescriptor {
-    uint32_t parameterIndex{0};
-    uint32_t splineOffset{0};
-    uint32_t splineSize{0};
-    uint32_t flags{0};
-    float minResponse{1.0f};
-    float maxResponse{1.0f};
-  };
-
-  struct MpsPackedDialRef {
-    uint32_t type{0};
-    uint32_t localIndex{0};
-  };
 
   template<typename T>
   id<MTLBuffer> makeSharedBuffer(id<MTLDevice> device, const std::vector<T>& values) {
@@ -262,39 +198,36 @@ namespace {
     buffer = nil;
   }
 
-  template<typename T>
-  void copyToBuffer(id<MTLBuffer> buffer, const std::vector<T>& values) {
-    if( buffer == nil or values.empty() ){ return; }
-    std::memcpy(buffer.contents, values.data(), values.size() * sizeof(T));
-  }
-
   [[nodiscard]] inline double secondsSince(std::chrono::steady_clock::time_point start_) {
     return std::chrono::duration<double>(std::chrono::steady_clock::now() - start_).count();
   }
 
-  inline bool isMpsSupportedDialType(const DialBase* dialBase_) {
-    return dynamic_cast<const Norm*>(dialBase_) != nullptr
-           or dynamic_cast<const CompactSpline*>(dialBase_) != nullptr
-           or dynamic_cast<const UniformSpline*>(dialBase_) != nullptr
-           or dynamic_cast<const MonotonicSpline*>(dialBase_) != nullptr
-           or dynamic_cast<const GeneralSpline*>(dialBase_) != nullptr
-           or dynamic_cast<const Graph*>(dialBase_) != nullptr
-           or dynamic_cast<const Shift*>(dialBase_) != nullptr;
+  template<typename Scalar = float>
+  inline void uploadParameters(id<MTLBuffer> destination_, const Backends::ParameterSnapshot& parameters_,
+                               Backends::BackendTimingSummary& timing_) {
+    auto start = std::chrono::steady_clock::now();
+    auto* destination = static_cast<Scalar*>(destination_.contents);
+    for( std::size_t i = 0; i < parameters_.values.size(); ++i ){ destination[i] = Scalar(parameters_.values[i]); }
+    timing_.parameterUploadSeconds += std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count();
   }
 
-  inline void appendUnique(std::vector<std::string>& values_, const std::string& value_) {
-    if( std::find(values_.begin(), values_.end(), value_) == values_.end() ){
-      values_.emplace_back(value_);
+  template<typename Scalar = float>
+  inline void uploadExternalWeights(id<MTLBuffer> destination_, std::vector<std::uint64_t>& generations_,
+                                    const Backends::PropagationInputs& inputs_, Backends::BackendTimingSummary& timing_) {
+    auto start = std::chrono::steady_clock::now();
+    auto* destination = static_cast<Scalar*>(destination_.contents);
+    for( std::size_t i = 0; i < inputs_.externalWeights.size(); ++i ){
+      const auto& block = inputs_.externalWeights[i];
+      if( generations_[i] == block.generation ){ continue; }
+      if( block.count ){
+        std::transform(block.values, block.values + block.count, destination + block.destinationOffset,
+                       [](double value_){ return Scalar(value_); });
+      }
+      generations_[i] = block.generation;
+      timing_.externalWeightUploadBytes += block.count * sizeof(Scalar);
+      ++timing_.externalWeightUploadBlocks;
     }
-  }
-
-  [[nodiscard]] inline std::string joinValues(const std::vector<std::string>& values_) {
-    std::string out;
-    for( std::size_t iValue = 0 ; iValue < values_.size() ; iValue++ ){
-      if( iValue != 0 ){ out += ", "; }
-      out += values_[iValue];
-    }
-    return out;
+    timing_.externalWeightUploadSeconds += std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count();
   }
 
   [[nodiscard]] inline id<MTLComputePipelineState> makePipeline(id<MTLDevice> device,

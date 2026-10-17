@@ -41,19 +41,21 @@ Backends::MpsBackendImpl::MpsBackendImpl() : model(engineView.propagation), like
   histogramPipeline = makePipeline(device, library, @"fill_histograms");
   histogramPartialsPipeline = makePipeline(device, library, @"fill_histogram_partials_by_bin");
   histogramFinalizePipeline = makePipeline(device, library, @"finalize_histograms_from_partials");
-  [library release];
   if( eventWeightsPipeline == nil or cachedCompactResponsesPipeline == nil or cachedUniformResponsesPipeline == nil
       or cachedMonotonicResponsesPipeline == nil or cachedGeneralResponsesPipeline == nil
       or cachedGraphResponsesPipeline == nil or histogramPipeline == nil
-      or histogramPartialsPipeline == nil or histogramFinalizePipeline == nil ){ return; }
+      or histogramPartialsPipeline == nil or histogramFinalizePipeline == nil ){ [library release]; return; }
 
   commandQueue = [device newCommandQueue];
-  if( commandQueue == nil ){ return; }
+  if( commandQueue == nil ){ [library release]; return; }
+  eventPropagation = std::make_unique<MpsEventPropagation>(device, commandQueue, library);
+  [library release];
 
   isAvailable = true;
 }
 
 Backends::MpsBackendImpl::~MpsBackendImpl() {
+  eventPropagation.reset();
   releaseDeviceBuffers();
   [eventWeightsPipeline release];
   [cachedCompactResponsesPipeline release];
@@ -121,6 +123,8 @@ void Backends::MpsBackendImpl::resetResult() {
   lastResult.eventWeights.clear();
   lastResult.histSums.clear();
   lastResult.histSumSquares.clear();
+  lastResult.outsideSums.clear();
+  lastResult.outsideSumSquares.clear();
   lastResult.likelihood = 0;
   lastTiming = buildTiming;
   lastResult.status.eventWeights = OutputState::Scheduled;

@@ -3,41 +3,15 @@
 #include "Semantics/BackendHostPropagation.h"
 
 void Backends::MpsBackendImpl::updateDeviceParameters(const ParameterSnapshot& parameters_) {
-  auto start = std::chrono::steady_clock::now();
-  if( parameterValuesScratch.size() != model.parameterCount ){
-    parameterValuesScratch.resize(model.parameterCount);
-  }
-  LogThrowIf(parameters_.values.size() != model.parameterCount,
-             "ParameterSnapshot size mismatch: " << parameters_.values.size()
-                                                 << " != " << model.parameterCount);
-  for( std::size_t iPar = 0 ; iPar < model.parameterCount ; iPar++ ){
-    parameterValuesScratch[iPar] = float(parameters_.values.at(iPar));
-  }
-  copyToBuffer(parametersBuffer, parameterValuesScratch);
-  lastTiming.parameterUploadSeconds += secondsSince(start);
+  uploadParameters(parametersBuffer, parameters_, lastTiming);
 }
 
 void Backends::MpsBackendImpl::updateExternalWeights(const PropagationInputs& inputs_) {
-  auto start = std::chrono::steady_clock::now();
-  auto* destination = static_cast<float*>(externalWeightsBuffer.contents);
-  for( std::size_t iBlock = 0; iBlock < inputs_.externalWeights.size(); ++iBlock ){
-    const auto& block = inputs_.externalWeights[iBlock];
-    if( externalWeightGenerations[iBlock] == block.generation ){ continue; }
-    // Convert directly into the persistent Metal shared buffer: no staging vector.
-    if( block.count != 0 ){
-      std::transform(block.values, block.values + block.count,
-                     destination + block.destinationOffset,
-                     [](double value_){ return float(value_); });
-    }
-    externalWeightGenerations[iBlock] = block.generation;
-    lastTiming.externalWeightUploadBytes += block.count * sizeof(float);
-    ++lastTiming.externalWeightUploadBlocks;
-  }
-  lastTiming.externalWeightUploadSeconds += secondsSince(start);
+  uploadExternalWeights(externalWeightsBuffer, externalWeightGenerations, inputs_, lastTiming);
 }
 
 bool Backends::MpsBackendImpl::encodeEventWeights(id<MTLComputeCommandEncoder> encoder) {
-  if( not isDeviceModelSupported ){ return false; }
+  if( not isWeightModelSupported ){ return false; }
   [encoder setComputePipelineState:eventWeightsPipeline];
   [encoder setBuffer:eventWeightsBuffer offset:0 atIndex:0];
   [encoder setBuffer:baseWeightsBuffer offset:0 atIndex:1];
@@ -76,7 +50,7 @@ bool Backends::MpsBackendImpl::encodeCachedDialResponses(id<MTLComputeCommandEnc
                                                          id<MTLBuffer> cachedResponsesBuffer_,
                                                          id<MTLBuffer> descriptorsBuffer_,
                                                          uint32_t descriptorCount_) {
-  if( not isDeviceModelSupported ){ return false; }
+  if( not isWeightModelSupported ){ return false; }
   if( descriptorCount_ == 0 ){ return true; }
   [encoder setComputePipelineState:pipeline_];
   [encoder setBuffer:cachedResponsesBuffer_ offset:0 atIndex:0];
@@ -93,7 +67,7 @@ bool Backends::MpsBackendImpl::encodeCachedDialResponses(id<MTLComputeCommandEnc
 }
 
 bool Backends::MpsBackendImpl::encodeHistogramsFromDeviceWeights(id<MTLComputeCommandEncoder> encoder) {
-  if( not isDeviceModelSupported ){ return false; }
+  if( not isWeightModelSupported ){ return false; }
   [encoder setComputePipelineState:histogramPartialsPipeline];
   [encoder setBuffer:eventWeightsBuffer offset:0 atIndex:0];
   [encoder setBuffer:binEventOffsetsBuffer offset:0 atIndex:1];
@@ -124,8 +98,8 @@ bool Backends::MpsBackendImpl::encodeHistogramsFromDeviceWeights(id<MTLComputeCo
   return true;
 }
 
-bool Backends::MpsBackendImpl::runDevicePropagation(const PropagationInputs& inputs_, bool needHistograms_) {
-  if( not isDeviceModelSupported ){ return false; }
+bool Backends::MpsBackendImpl::runWeightPropagation(const PropagationInputs& inputs_, bool needHistograms_) {
+  if( not isWeightModelSupported ){ return false; }
   updateDeviceParameters(inputs_.parameters);
   updateExternalWeights(inputs_);
 

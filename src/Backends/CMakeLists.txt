@@ -1,7 +1,9 @@
 set(LIB_NAME GundamBackends)
 
 set(SRCFILES
-    ${CMAKE_CURRENT_SOURCE_DIR}/Common/src/DeviceBackendModel.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/Common/src/DevicePropagationModel.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/Common/src/EventStateCache.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/Common/src/DeviceWeightModel.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/Common/src/EngineBindings.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/Common/src/EngineLayout.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/Common/src/BackendFactory.cpp
@@ -14,12 +16,17 @@ set(SRCFILES
 if(APPLE)
   enable_language(OBJCXX)
   list(APPEND SRCFILES
+    ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/MPS/src/MpsEventPropagation.mm
     ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/MPS/src/MpsBackendImpl.mm
-    ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/MPS/src/MpsBackendDeviceModel.mm
+    ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/MPS/src/MpsWeightModel.mm
     ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/MPS/src/MpsBackendExecution.mm
   )
   set_property(
       DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
+      ${CMAKE_SOURCE_DIR}/src/Utils/include/DeviceMath/DoubleFloat.h
+      ${CMAKE_SOURCE_DIR}/src/Utils/include/DeviceMath/SharedBinningMath.h
+      ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/DevicePropagationTypes.h
+      ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/MPS/src/MpsEventPropagationKernels.metal
       ${CMAKE_SOURCE_DIR}/src/Utils/include/DeviceMath/SharedSplineCommon.h
       ${CMAKE_SOURCE_DIR}/src/Utils/include/DeviceMath/SharedSplineCompact.h
       ${CMAKE_SOURCE_DIR}/src/Utils/include/DeviceMath/SharedSplineUniform.h
@@ -29,6 +36,9 @@ if(APPLE)
       ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/MPS/src/MpsBackendKernels.metal
       ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/MPS/src/MpsBackendKernelSource.h.in
   )
+  file(READ ${CMAKE_SOURCE_DIR}/src/Utils/include/DeviceMath/SharedBinningMath.h MPS_SHARED_BINNING_MATH)
+  file(READ ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/DevicePropagationTypes.h MPS_PROPAGATION_TYPES)
+  file(READ ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/MPS/src/MpsEventPropagationKernels.metal MPS_EVENT_PROPAGATION_KERNELS)
   file(READ ${CMAKE_SOURCE_DIR}/src/Utils/include/DeviceMath/SharedSplineCommon.h MPS_SHARED_SPLINE_COMMON)
   file(READ ${CMAKE_SOURCE_DIR}/src/Utils/include/DeviceMath/SharedSplineCompact.h MPS_SHARED_SPLINE_COMPACT)
   file(READ ${CMAKE_SOURCE_DIR}/src/Utils/include/DeviceMath/SharedSplineUniform.h MPS_SHARED_SPLINE_UNIFORM)
@@ -36,6 +46,10 @@ if(APPLE)
   file(READ ${CMAKE_SOURCE_DIR}/src/Utils/include/DeviceMath/SharedSplineGeneral.h MPS_SHARED_SPLINE_GENERAL)
   file(READ ${CMAKE_SOURCE_DIR}/src/Utils/include/DeviceMath/SharedGraph.h MPS_SHARED_GRAPH)
   file(READ ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/MPS/src/MpsBackendKernels.metal MPS_BACKEND_KERNEL_SOURCE)
+  file(READ ${CMAKE_SOURCE_DIR}/src/Utils/include/DeviceMath/DoubleFloat.h MPS_DOUBLE_FLOAT)
+  set(MPS_OBSERVABLE_SPLINES "${MPS_SHARED_SPLINE_COMMON}\n${MPS_SHARED_SPLINE_COMPACT}\n${MPS_SHARED_SPLINE_UNIFORM}\n${MPS_SHARED_SPLINE_MONOTONIC}\n${MPS_SHARED_SPLINE_GENERAL}\n${MPS_SHARED_GRAPH}")
+  string(REPLACE "GundamDeviceMath" "GundamObservableMath" MPS_OBSERVABLE_SPLINES "${MPS_OBSERVABLE_SPLINES}")
+  string(REPLACE "SHARED_" "OBSERVABLE_SHARED_" MPS_OBSERVABLE_SPLINES "${MPS_OBSERVABLE_SPLINES}")
   configure_file(
       ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/MPS/src/MpsBackendKernelSource.h.in
       ${CMAKE_CURRENT_BINARY_DIR}/generated/MpsBackendKernelSource.h
@@ -45,6 +59,11 @@ if(APPLE)
 endif()
 
 set(HEADERS
+    ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/EventStateCache.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/PropagationResult.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/DeviceWeightModel.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/DevicePropagationModel.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/DevicePropagationTypes.h
     ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/BackendManager.h
     ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/BackendFactory.h
     ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/BackendTypes.h
@@ -62,6 +81,7 @@ set(HEADERS
     ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/CPU/include/CpuBackend.h
     ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/MPS/include/MpsBackend.h
     ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/MPS/include/MpsBackendInternal.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/MPS/include/MpsEventPropagation.h
 )
 
 if( USE_STATIC_LINKS )

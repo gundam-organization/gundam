@@ -22,10 +22,10 @@ samples.  It owns the parameters, the samples, and the data loader.
 | devSingleThreadReweight                                     | bool       | Use a single thread for reweighting events with the CPU                                    | false   |
 | devSingleThreadHistFill                                     | bool       | Use a single thread for filling the histograms with the CPU                                | false   |
 
-### CPU backend and event migration
+### CPU/MPS backends and event migration
 
 With `likelihoodInterfaceConfig.backendManagerConfig` set to
-`{isEnabled: true, type: CPU}`, the backend applies variable dials, updates bin
+`{isEnabled: true, type: CPU}` or `{isEnabled: true, type: MPS}`, the backend applies variable dials, updates bin
 contributions and fills the histograms. Both `binningResponse` widths (`width`
 and `widthFraction`) are supported, including events outside the binning domain.
 Weight-only parameter changes reuse the cached contributions.
@@ -36,12 +36,23 @@ With variable dials, explicitly dynamic samples also consume host variable edits
 on each propagation. Automatically enabled dynamic samples retain their cached
 contributions until a dependent input changes or rebinning is explicitly requested.
 
-The CPU backend exposes `EventState` materialization for variables, bin indices
+Both backends expose `EventState` materialization for variables, bin indices
 and contribution lists. Fit iterations can keep these intermediates in the
 backend by disabling automatic materialization. The Python backend manager also
 provides `setEnableAutoMaterialize()` and `materialize("EventState")` (alongside
-`"EventWeights"` and `"Histograms"`). MPS migration and smoothed binning are not
-implemented yet; requesting them reports an unsupported configuration.
+`"EventWeights"` and `"Histograms"`). MPS computes observables, spatial bin
+searches, fractions and sparse histogram indexing on the GPU. Event weights and
+histogram sums use floats with compensated reduction; observables, their dials
+and interval arithmetic use a two-float representation (about 48 significant
+bits). This protects strict bin decisions from ordinary float32 rounding without
+claiming IEEE double precision. Unrepresentable/collapsed geometry is rejected.
+
+`Sample` and `Histogram` remain independent of hardware. Their compiled
+`BinningLayout` and `BinningIndex` are consumed by the backends. `EventStateCache`
+shares invalidation/publication rules between CPU and MPS. `DevicePropagationModel`
+packs the numerical descriptors; `MpsEventPropagation` owns Metal execution and
+resident contributions. `DeviceWeightModel` retains the specialized static-bin
+weight path, using the same packer for every consumer.
 
 A reproducible end-to-end benchmark is provided by
-`tests/regular-tests/221CpuBinningBenchmark.py`.
+`tests/regular-tests/221BinningBackendBenchmark.py`.

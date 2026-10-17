@@ -33,7 +33,10 @@ std::string Backends::formatBackendTimingSummary(const BackendTimingSummary& tim
      << ", histogramStage=" << timing_.histogramStageSeconds
      << "s, encode=" << timing_.commandEncodeSeconds
      << "s, wait=" << timing_.deviceWaitSeconds
-     << "s, histReadback=" << timing_.histogramReadbackSeconds
+     << "s, devicePropagation=" << timing_.devicePropagationSeconds
+     << "s, stateReadback=" << timing_.eventStateReadbackSeconds << "s/" << timing_.eventStateReadbackBytes
+     << "B, contributionBuffer=" << timing_.contributionBufferBytes
+     << "B, histReadback=" << timing_.histogramReadbackSeconds
      << "s/" << timing_.histogramReadbackBytes
      << "B, eventWeightReadback=" << timing_.eventWeightReadbackSeconds
      << "s/" << timing_.eventWeightReadbackBytes

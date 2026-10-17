@@ -78,6 +78,10 @@ ENUM_FIELD( Unavailable )
     std::size_t binContributionCount{0};
     double commandEncodeSeconds{0};
     double deviceWaitSeconds{0};
+    double devicePropagationSeconds{0};
+    double eventStateReadbackSeconds{0};
+    std::size_t eventStateReadbackBytes{0};
+    std::size_t contributionBufferBytes{0};
     double histogramReadbackSeconds{0};
     double eventWeightReadbackSeconds{0};
     double eventWeightMaterializationSeconds{0};

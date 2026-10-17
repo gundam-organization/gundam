@@ -36,16 +36,7 @@ void Backends::CpuBackend::build(const EngineView& engineView_) {
   for( std::size_t i = 0; i < model.samples.size(); ++i ){ _binningIndices_[i].build(model.samples[i].binning); }
   _binningWorkers_.assign(_threadPool_.getNbThreads(), {});
   _workerErrors_.resize(_threadPool_.getNbThreads());
-  _variableDialDependencies_.assign(model.dials.size(), false);
-  for( auto dial : model.variableDialIndices ){ _variableDialDependencies_.at(dial) = true; }
-  for( const auto& target : model.variableResponses ){
-    if( target.overrideDial != std::size_t(-1) ){ _variableDialDependencies_.at(target.overrideDial) = true; }
-  }
-  _lastBinningParameters_.clear();
-  _lastExternalGenerations_.clear();
-  _lastHostVariables_.clear();
-  _lastDialRevisions_.clear();
-  _eventStateValid_ = false;
+  _eventStateCache_.build(model);
   _cachedContributionCount_ = 0;
   _isBuilt_ = true;
 }
@@ -68,9 +59,8 @@ Backends::PropagationToken Backends::CpuBackend::requestPropagation(const Propag
     catch( ... ){
       // A failed parallel pass may have touched only part of the state.
       // Retry from host/reference values rather than publishing partial caches.
-      _eventStateValid_ = false;
+      _eventStateCache_.invalidate();
       std::fill(_validBinning_.begin(), _validBinning_.end(), false);
-      _lastHostVariables_.clear();
       _activeInputs_ = nullptr;
       _lastResult_.status.backend = BackendStatus::Failed;
       _lastResult_.token.isValid = false;

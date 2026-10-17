@@ -1,4 +1,4 @@
-#include "DeviceBackendModel.h"
+#include "DeviceWeightModel.h"
 
 #include "Logger.h"
 
@@ -16,19 +16,19 @@ namespace {
 
 }
 
-void Backends::DevicePackedModel::clear() {
-  *this = DevicePackedModel();
+void Backends::DeviceWeightModel::clear() {
+  *this = DeviceWeightModel();
 }
 
-std::uint32_t Backends::DevicePackedModel::uniqueDialCount() const {
+std::uint32_t Backends::DeviceWeightModel::uniqueDialCount() const {
   return compactDialDescriptorCount + uniformDialDescriptorCount
          + monotonicDialDescriptorCount + generalDialDescriptorCount
          + graphDialDescriptorCount;
 }
 
-bool Backends::packDeviceBackendModel(const PropagationView& model_,
+bool Backends::packDeviceWeightModel(const PropagationView& model_,
                                       bool enableCachedDialResponses_,
-                                      DevicePackedModel& packedModel_,
+                                      DeviceWeightModel& packedModel_,
                                       BackendTimingSummary& buildTiming_,
                                       std::string& fallbackReason_,
                                       const std::string& logPrefix_) {
@@ -43,7 +43,7 @@ bool Backends::packDeviceBackendModel(const PropagationView& model_,
   };
 
   if( model_.requiresEventBinning() or model_.hasReweightCap ){
-    return fail("event-variable responses, dynamic/smoothed binning and event reweight caps require the CPU backend.");
+    return fail("Static weight packing excludes observable propagation and reweight caps; use DevicePropagationModel.");
   }
   if( model_.events.empty() ){
     return fail("the backend model has no events.");

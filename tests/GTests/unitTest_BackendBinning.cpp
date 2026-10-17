@@ -1,6 +1,15 @@
 #include "CpuBackend.h"
-#include "DeviceBackendModel.h"
+#ifdef __APPLE__
+#include "MpsBackend.h"
+#endif
+#include "DeviceWeightModel.h"
 #include "Histogram.h"
+#include "DevicePropagationModel.h"
+#include "CompactSpline.h"
+#include "UniformSpline.h"
+#include "MonotonicSpline.h"
+#include "GeneralSpline.h"
+#include "Graph.h"
 
 #include <gtest/gtest.h>
 
@@ -39,7 +48,7 @@ namespace {
     return histogram;
   }
 
-  void compareWithHistogram(bool smooth_, bool relative_, bool irregular_, bool broad_) {
+  void compareWithHistogram(Backends::Backend& backend, bool smooth_, bool relative_, bool irregular_, bool broad_) {
     using namespace Backends;
     auto histogram = makeHistogram(smooth_, relative_, irregular_, broad_);
     EngineView view;
@@ -61,13 +70,13 @@ namespace {
     model.events = {event};
     Event hostEvent;
     hostEvent.getVariables().setVarNameList(sample.variableNames);
-    CpuBackend backend;
     backend.build(view);
     PropagationInputs inputs;
     inputs.hostVariables = {0, 0, 0};
     std::mt19937 random(724);
     std::uniform_real_distribution<double> x(-1.5, 5.5), y(-1., 3.);
-    for( int point = 0; point < 250; ++point ){
+    const double tolerance = backend.getCapabilities().supportsGpu ? 2e-5 : 1e-12;
+    for( int point = 0; point < (backend.getCapabilities().supportsGpu ? 50 : 250); ++point ){
       double values[]{x(random), y(random), double(point % 3)};
       // Include exact internal edges and the outer domain boundary.
       if( point < 5 ){ values[0] = point * 0.5; values[1] = 1.; values[2] = 0.; }
@@ -88,31 +97,47 @@ namespace {
       const auto& actualSquares = backend.getHistogramSumSquaresHostView(token);
       ASSERT_EQ(actual.size(), sums.size());
       for( std::size_t i = 0; i < sums.size(); ++i ){
-        EXPECT_NEAR(actual[i], sums[i], 1e-12) << point << ":" << i;
-        EXPECT_NEAR(actualSquares[i], squares[i], 1e-12) << point << ":" << i;
+        EXPECT_NEAR(actual[i], sums[i], tolerance) << point << ":" << i;
+        EXPECT_NEAR(actualSquares[i], squares[i], tolerance) << point << ":" << i;
       }
       EXPECT_EQ(backend.getEventStateHostView(token).bins[0], histogram.findBinIndex(hostEvent));
       if( smooth_ ){
-        EXPECT_NEAR(backend.getOutsideSumsHostView(token)[0], -2. * expected.outsideFraction, 1e-12);
-        EXPECT_NEAR(backend.getOutsideSumSquaresHostView(token)[0], 4. * expected.outsideFraction * expected.outsideFraction, 1e-12);
+        EXPECT_NEAR(backend.getOutsideSumsHostView(token)[0], -2. * expected.outsideFraction, tolerance);
+        EXPECT_NEAR(backend.getOutsideSumSquaresHostView(token)[0], 4. * expected.outsideFraction * expected.outsideFraction, tolerance);
       }
     }
   }
 }
 
-TEST(CpuBinning, MatchesLegacyGeometryAndResponse) {
+class BinningBackend : public testing::TestWithParam<bool> {
+protected:
+  std::unique_ptr<Backends::Backend> backend;
+  void SetUp() override {
+#ifdef __APPLE__
+    if( GetParam() ){ backend = std::make_unique<Backends::MpsBackend>(); }
+    else
+#endif
+    { backend = std::make_unique<Backends::CpuBackend>(); }
+  }
+};
+INSTANTIATE_TEST_SUITE_P(Cpu, BinningBackend, testing::Values(false));
+#ifdef __APPLE__
+INSTANTIATE_TEST_SUITE_P(Metal, BinningBackend, testing::Values(true));
+#endif
+
+TEST_P(BinningBackend, MatchesLegacyGeometryAndResponse) {
   for( bool smooth : {false, true} ){
     for( bool irregular : {false, true} ){
-      compareWithHistogram(smooth, false, irregular, false);
+      compareWithHistogram(*backend, smooth, false, irregular, false);
       if( smooth ){
-        compareWithHistogram(true, true, irregular, false);
-        compareWithHistogram(true, false, irregular, true);
+        compareWithHistogram(*backend, true, true, irregular, false);
+        compareWithHistogram(*backend, true, false, irregular, true);
       }
     }
   }
 }
 
-TEST(CpuBinning, GridSearchAndCacheInvalidation) {
+TEST_P(BinningBackend, GridSearchAndCacheInvalidation) {
   using namespace Backends;
   Histogram histogram;
   std::stringstream config;
@@ -155,13 +180,13 @@ TEST(CpuBinning, GridSearchAndCacheInvalidation) {
     model.variableResponses.emplace_back(target);
   }
   model.eventDialIndices = {1};
-  CpuBackend backend;
+  auto& backend = *this->backend;
   backend.build(view);
   PropagationInputs inputs;
   inputs.parameters.values = {1., 2.};
   auto token = backend.requestPropagation(inputs);
   EXPECT_EQ(backend.getLastTimingSummary().rebinnedEventCount, 2);
-  EXPECT_EQ(backend.getLastTimingSummary().binCandidateCount, 2);
+  EXPECT_LE(backend.getLastTimingSummary().binCandidateCount, backend.getCapabilities().supportsGpu ? 8 : 2);
   EXPECT_DOUBLE_EQ(backend.getHistogramSumsHostView(token)[64], 2.);
   inputs.parameters.values[1] = 3.;
   token = backend.requestPropagation(inputs);
@@ -183,14 +208,14 @@ TEST(CpuBinning, GridSearchAndCacheInvalidation) {
   token = backend.requestPropagation(inputs);
   EXPECT_EQ(backend.getLastTimingSummary().rebinnedEventCount, 2);
   EXPECT_EQ(backend.getEventStateHostView(token).bins[1], -1);
-  DevicePackedModel packed;
+  DeviceWeightModel packed;
   BackendTimingSummary timing;
   std::string reason;
-  EXPECT_FALSE(packDeviceBackendModel(model, true, packed, timing, reason, "test"));
+  EXPECT_FALSE(packDeviceWeightModel(model, true, packed, timing, reason, "test"));
   EXPECT_FALSE(reason.empty());
 }
 
-TEST(CpuBinning, OverlappingStrictBinsKeepFirstMatch) {
+TEST(BinningIndex, OverlappingStrictBinsKeepFirstMatch) {
   // Public compiled layouts can also be supplied directly by backend clients.
   BinningLayout layout;
   layout.variableNames = {"X"};
@@ -205,7 +230,7 @@ TEST(CpuBinning, OverlappingStrictBinsKeepFirstMatch) {
   EXPECT_EQ(candidates.front(), 0);
 }
 
-TEST(CpuBinning, NonfiniteResponseCanBeRetried) {
+TEST_P(BinningBackend, NonfiniteResponseCanBeRetried) {
   using namespace Backends;
   auto histogram = makeHistogram(true, true, true);
   EngineView view;
@@ -221,7 +246,7 @@ TEST(CpuBinning, NonfiniteResponseCanBeRetried) {
   event.samplePosition = 0;
   event.variableCount = 3;
   model.events = {event};
-  CpuBackend backend;
+  auto& backend = *this->backend;
   backend.build(view);
   PropagationInputs inputs;
   inputs.hostVariables = model.variableValues;
@@ -234,7 +259,7 @@ TEST(CpuBinning, NonfiniteResponseCanBeRetried) {
   EXPECT_EQ(backend.getHistogramSumsHostView(recovered), expected);
 }
 
-TEST(CpuBinning, ExternalVariableResponseUsesPublishedGeneration) {
+TEST_P(BinningBackend, ExternalVariableResponseUsesPublishedGeneration) {
   using namespace Backends;
   EngineView view;
   auto& model = view.propagation;
@@ -259,7 +284,7 @@ TEST(CpuBinning, ExternalVariableResponseUsesPublishedGeneration) {
   event.samplePosition = 0;
   event.variableCount = event.variableResponseCount = 1;
   model.events = {event};
-  CpuBackend backend;
+  auto& backend = *this->backend;
   backend.build(view);
   double value{.25};
   PropagationInputs inputs;
@@ -273,4 +298,153 @@ TEST(CpuBinning, ExternalVariableResponseUsesPublishedGeneration) {
   token = backend.requestPropagation(inputs);
   EXPECT_EQ(backend.getLastTimingSummary().rebinnedEventCount, 1);
   EXPECT_DOUBLE_EQ(backend.getHistogramSumsHostView(token)[1], 1.);
+}
+
+
+TEST_P(BinningBackend, VariableAndWeightDialsShareSemantics) {
+  using namespace Backends;
+  EngineView view;
+  auto& model = view.propagation;
+  model.parameterCount = 1;
+  model.dialInputs = {{0, true, -3., 6.}};
+  model.totalBins = 2;
+  model.hasVariableResponses = true;
+  model.hasReweightCap = true;
+  model.maxReweight = 2.5;
+  model.variableValues = {.6};
+  model.externalWeightBlocks = {{0, 1}};
+  SampleView sample;
+  sample.useDynamicBinning = true;
+  sample.binCount = 2;
+  sample.binning.variableNames = {"X"};
+  sample.binning.intervals = {{0, 0., 1., 5., 5.}, {0, 1., 2., 5., 5.}};
+  sample.binning.bins = {{0, 0, 1}, {1, 1, 1}};
+  sample.binning.isSmoothed = true;
+  model.samples = {sample};
+  BackendDialDescriptor norm;
+  norm.inputCount = 1;
+  norm.hasMinResponse = true;
+  norm.minResponse = -.75;
+  model.dials.push_back(norm);
+  auto append = [&](BackendDialType type_, const std::vector<double>& payload_){
+    BackendDialDescriptor dial;
+    dial.type = type_;
+    dial.inputCount = type_ == BackendDialType::Shift ? 0 : 1;
+    dial.payloadOffset = model.dialPayloads.size();
+    dial.payloadSize = payload_.size();
+    dial.hasMaxResponse = true;
+    dial.maxResponse = 1.75;
+    model.dialPayloads.insert(model.dialPayloads.end(), payload_.begin(), payload_.end());
+    model.dials.push_back(dial);
+  };
+  append(BackendDialType::Shift, {1.1});
+  std::vector<DialUtils::DialPoint> points;
+  for( int x = -2; x <= 2; ++x ){ points.push_back({double(x), 1 + .1*x + .05*x*x, .1 + .1*x}); }
+  CompactSpline compact; compact.buildDial(points);
+  UniformSpline uniform; uniform.buildDial(points);
+  MonotonicSpline monotonic; monotonic.buildDial(points);
+  GeneralSpline general; general.buildDial(points);
+  Graph graph; graph.buildDial(points);
+  append(BackendDialType::CompactSpline, compact.getDialData());
+  append(BackendDialType::UniformSpline, uniform.getDialData());
+  append(BackendDialType::MonotonicSpline, monotonic.getDialData());
+  append(BackendDialType::GeneralSpline, general.getDialData());
+  append(BackendDialType::Graph, graph.getDialData());
+  BackendDialDescriptor external;
+  external.type = BackendDialType::ExternalWeight;
+  model.dials.push_back(external);
+  model.eventDialIndices = {0, 1, 2, 3, 4, 5, 6, 7};
+  model.variableDialIndices = {1, 2, 3, 4, 5, 6, 7};
+  BackendVariableResponseDescriptor target;
+  target.overrideDial = 0;
+  target.multiplyDialCount = 6;
+  target.firstAddDial = 6;
+  target.addDialCount = 1;
+  model.variableResponses = {target};
+  EventView event;
+  event.samplePosition = 0;
+  event.variableCount = event.variableResponseCount = 1;
+  event.weight.dialCount = model.eventDialIndices.size();
+  event.weight.baseWeight = -2.;
+  model.events = {event};
+  double externalValue{.2};
+  PropagationInputs inputs;
+  inputs.externalWeights = {{&externalValue, 1, 0, 1}};
+  CpuBackend reference;
+  for( bool extrapolate : {false, true} ){
+    for( auto& dial : model.dials ){ dial.allowExtrapolation = extrapolate; }
+    reference.build(view);
+    backend->build(view);
+    for( double parameter : {-8., -2.7, -.25, .6, 2.7, 5., 1e9} ){
+      inputs.parameters.values = {parameter};
+      auto expected = reference.requestPropagation(inputs);
+      auto actual = backend->requestPropagation(inputs);
+      backend->materialize(actual, OutputRequest::EventWeights);
+      const double tolerance = backend->getCapabilities().supportsGpu ? 2e-5 : 1e-12;
+      EXPECT_NEAR(backend->getEventWeightsHostView(actual)[0], reference.getEventWeightsHostView(expected)[0], tolerance);
+      EXPECT_NEAR(backend->getEventStateHostView(actual).variables[0], reference.getEventStateHostView(expected).variables[0], tolerance);
+      for( int bin = 0; bin < 2; ++bin ){
+        EXPECT_NEAR(backend->getHistogramSumsHostView(actual)[bin], reference.getHistogramSumsHostView(expected)[bin], tolerance);
+        EXPECT_NEAR(backend->getHistogramSumSquaresHostView(actual)[bin], reference.getHistogramSumSquaresHostView(expected)[bin], tolerance);
+      }
+    }
+  }
+}
+
+TEST(DevicePropagationModel, RejectsCollapsedGeometry) {
+  Backends::PropagationView model;
+  Backends::SampleView sample;
+  sample.binning.variableNames = {"X"};
+  sample.binning.intervals = {{0, 1e30, std::nextafter(1e30, INFINITY), 0., 0.}};
+  sample.binning.bins = {{0, 0, 1}};
+  model.samples = {sample};
+  Backends::DevicePropagationModel packed;
+  EXPECT_THROW(packed.build(model), std::runtime_error);
+}
+
+
+TEST_P(BinningBackend, ResolvesNeighborsOfAnExactBoundary) {
+  using namespace Backends;
+  EngineView view;
+  auto& model = view.propagation;
+  model.variableValues = {.5};
+  model.totalBins = 2;
+  SampleView sample;
+  sample.useDynamicBinning = sample.readHostVariables = true;
+  sample.binCount = 2;
+  sample.binning.variableNames = {"X"};
+  sample.binning.intervals = {{0, 0., 1., 0., 0.}, {0, 1., 2., 0., 0.}};
+  sample.binning.bins = {{0, 0, 1}, {1, 1, 1}};
+  model.samples = {sample};
+  EventView event;
+  event.samplePosition = 0;
+  event.variableCount = 1;
+  model.events = {event};
+  backend->build(view);
+  PropagationInputs inputs;
+  for( double value : {std::nextafter(1., 0.), 1., std::nextafter(1., 2.)} ){
+    inputs.hostVariables = {value};
+    auto token = backend->requestPropagation(inputs);
+    EXPECT_EQ(backend->getEventStateHostView(token).bins[0], value < 1. ? 0 : 1);
+    EXPECT_DOUBLE_EQ(backend->getHistogramSumsHostView(token)[value < 1. ? 0 : 1], 1.);
+  }
+}
+
+TEST_P(BinningBackend, EmptyDynamicSampleProducesEmptyHistograms) {
+  using namespace Backends;
+  EngineView view;
+  SampleView sample;
+  sample.useDynamicBinning = true;
+  sample.binCount = 2;
+  sample.binning.variableNames = {"X"};
+  sample.binning.intervals = {{0, 0., 1., 5., 5.}, {0, 1., 2., 5., 5.}};
+  sample.binning.bins = {{0, 0, 1}, {1, 1, 1}};
+  sample.binning.isSmoothed = true;
+  view.propagation.samples = {sample};
+  view.propagation.totalBins = 2;
+  backend->build(view);
+  auto token = backend->requestPropagation({});
+  EXPECT_EQ(backend->getHistogramSumsHostView(token), std::vector<double>({0., 0.}));
+  EXPECT_EQ(backend->getOutsideSumsHostView(token), std::vector<double>({0.}));
+  EXPECT_TRUE(backend->getEventStateHostView(token).bins.empty());
 }

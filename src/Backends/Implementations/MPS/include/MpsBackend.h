@@ -36,6 +36,9 @@ namespace Backends {
     [[nodiscard]] const std::vector<double>& getEventWeightsHostView(const PropagationToken& token_) const override;
     [[nodiscard]] const std::vector<double>& getHistogramSumsHostView(const PropagationToken& token_) const override;
     [[nodiscard]] const std::vector<double>& getHistogramSumSquaresHostView(const PropagationToken& token_) const override;
+    [[nodiscard]] const EventState& getEventStateHostView(const PropagationToken& token_) const override;
+    [[nodiscard]] const std::vector<double>& getOutsideSumsHostView(const PropagationToken& token_) const override;
+    [[nodiscard]] const std::vector<double>& getOutsideSumSquaresHostView(const PropagationToken& token_) const override;
     [[nodiscard]] BackendDeviceView getDeviceView(const PropagationToken& token_) const override;
     [[nodiscard]] BackendTimingSummary getLastTimingSummary() const override;
 

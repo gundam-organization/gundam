@@ -2,6 +2,8 @@
 #define GUNDAM_CPU_BACKEND_H
 
 #include "EngineView.h"
+#include "EventStateCache.h"
+#include "PropagationResult.h"
 #include "BackendTypes.h"
 #include "Backend.h"
 #include "PropagationInputs.h"
@@ -39,16 +41,7 @@ namespace Backends {
     [[nodiscard]] BackendTimingSummary getLastTimingSummary() const override { return _lastTiming_; }
 
   private:
-    struct Result {
-      PropagationToken token{};
-      PropagationStatus status{};
-      std::vector<double> eventWeights{};
-      std::vector<double> histSums{};
-      std::vector<double> histSumSquares{};
-      std::vector<double> outsideSums{};
-      std::vector<double> outsideSumSquares{};
-      double likelihood{0};
-    };
+    using Result = PropagationResult;
 
     [[nodiscard]] bool isCurrentToken(const PropagationToken& token_) const;
     void initializeThreads();
@@ -79,13 +72,7 @@ namespace Backends {
     std::vector<BinningIndex> _binningIndices_{};
     std::vector<BinningWorker> _binningWorkers_{};
     std::vector<std::uint8_t> _validBinning_{};
-    std::vector<std::uint8_t> _variableDialDependencies_{};
-    std::vector<double> _lastBinningParameters_{};
-    std::vector<std::uint64_t> _lastExternalGenerations_{};
-    std::vector<double> _lastHostVariables_{};
-    std::vector<std::uint64_t> _lastDialRevisions_{};
-    bool _variableInputsChanged_{true};
-    bool _eventStateValid_{false};
+    EventStateCache _eventStateCache_{};
     std::size_t _cachedContributionCount_{0};
     GenericToolbox::Time::AveragedTimer<10> _variableStageTimer_{};
     GenericToolbox::Time::AveragedTimer<10> _binningStageTimer_{};

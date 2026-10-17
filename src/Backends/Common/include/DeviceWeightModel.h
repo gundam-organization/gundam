@@ -1,5 +1,5 @@
-#ifndef GUNDAM_DEVICE_BACKEND_MODEL_H
-#define GUNDAM_DEVICE_BACKEND_MODEL_H
+#ifndef GUNDAM_DEVICE_WEIGHT_MODEL_H
+#define GUNDAM_DEVICE_WEIGHT_MODEL_H
 
 #include "BackendTypes.h"
 #include "EngineView.h"
@@ -21,50 +21,12 @@ namespace Backends {
   constexpr std::uint32_t kDeviceCachedDialReuseThreshold{8};
   constexpr std::uint32_t kDeviceHistogramChunkSize{256};
 
-  struct DeviceEventDialRanges {
-    std::uint32_t externalOffset{0};
-    std::uint32_t externalCount{0};
-    std::uint32_t normOffset{0};
-    std::uint32_t normCount{0};
-    std::uint32_t compactOffset{0};
-    std::uint32_t compactCount{0};
-    std::uint32_t uniformOffset{0};
-    std::uint32_t uniformCount{0};
-    std::uint32_t monotonicOffset{0};
-    std::uint32_t monotonicCount{0};
-    std::uint32_t generalOffset{0};
-    std::uint32_t generalCount{0};
-    std::uint32_t graphOffset{0};
-    std::uint32_t graphCount{0};
-  };
-
-  struct DeviceExternalDialOccurrence {
-    std::uint32_t weightIndex{0};
-    float minResponse{0};
-    float maxResponse{0};
-  };
-
-  struct DeviceNormDialOccurrence {
-    std::uint32_t parameterIndex{0};
-    float minResponse{1.0F};
-    float maxResponse{1.0F};
-  };
-
-  struct DeviceSplineDialDescriptor {
-    std::uint32_t parameterIndex{0};
-    std::uint32_t splineOffset{0};
-    std::uint32_t splineSize{0};
-    std::uint32_t flags{0};
-    float minResponse{1.0F};
-    float maxResponse{1.0F};
-  };
-
   struct DevicePackedDialRef {
     std::uint32_t type{0};
     std::uint32_t localIndex{0};
   };
 
-  struct DevicePackedModel {
+  struct DeviceWeightModel {
     std::vector<float> baseWeights{};
     std::vector<DeviceEventDialRanges> eventDialRanges{};
     std::vector<DeviceNormDialOccurrence> normDialOccurrences{};
@@ -103,13 +65,13 @@ namespace Backends {
     [[nodiscard]] std::uint32_t uniqueDialCount() const;
   };
 
-  [[nodiscard]] bool packDeviceBackendModel(const PropagationView& model_,
+  [[nodiscard]] bool packDeviceWeightModel(const PropagationView& model_,
                                             bool enableCachedDialResponses_,
-                                            DevicePackedModel& packedModel_,
+                                            DeviceWeightModel& packedModel_,
                                             BackendTimingSummary& buildTiming_,
                                             std::string& fallbackReason_,
                                             const std::string& logPrefix_);
 
 }
 
-#endif // GUNDAM_DEVICE_BACKEND_MODEL_H
+#endif // GUNDAM_DEVICE_WEIGHT_MODEL_H

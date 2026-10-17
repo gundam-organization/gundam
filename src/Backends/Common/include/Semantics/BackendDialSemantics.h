@@ -2,6 +2,7 @@
 #define GUNDAM_BACKEND_DIAL_SEMANTICS_H
 
 #include "EngineView.h"
+#include "DeviceMath/SharedBinningMath.h"
 #include "PropagationInputs.h"
 #include "Semantics/BackendDialSemanticsCore.h"
 
@@ -28,14 +29,7 @@ namespace Backends::Semantics {
   template<typename ResponseEvaluator>
   inline double evalVariableResponse(const BackendVariableResponseDescriptor& target_,
                                      const std::uint32_t* dialIndices_, ResponseEvaluator&& response_) {
-    double value = target_.overrideDial == std::size_t(-1) ? target_.referenceValue : response_(target_.overrideDial);
-    for( std::size_t i = target_.firstMultiplyDial; i < target_.firstMultiplyDial + target_.multiplyDialCount; ++i ){
-      value *= response_(dialIndices_[i]);
-    }
-    for( std::size_t i = target_.firstAddDial; i < target_.firstAddDial + target_.addDialCount; ++i ){
-      value += response_(dialIndices_[i]);
-    }
-    return value;
+    return GundamBinningMath::evalVariableResponse(target_, dialIndices_, response_);
   }
 
   inline double evalEventWeight(const PropagationView& propagation_,
