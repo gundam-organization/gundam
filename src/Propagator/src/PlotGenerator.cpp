@@ -8,6 +8,7 @@
 #include "GundamGlobals.h"
 #include "ConfigUtils.h"
 #include "GundamUtils.h"
+#include "RootUtils.h"
 
 #include "Logger.h"
 #include "GenericToolbox.Root.h"
@@ -532,7 +533,7 @@ void PlotGenerator::generateCanvas(const std::vector<HistHolder> &histHolderList
       auto pathSplit = GenericToolbox::splitString(canvas.first, "/");
       std::string folderPath = GenericToolbox::joinVectorString(pathSplit, "/", 0, -1);
       std::string canvasName = pathSplit.back();
-      GenericToolbox::writeInTFileWithObjTypeExt(
+      RootUtils::writeCanvas(
           GenericToolbox::mkdirTFile(saveDir_, folderPath),
           canvas.second.get(), canvasName, false
           );
@@ -1015,4 +1016,3 @@ void PlotGenerator::buildEventBinCache( const std::vector<HistHolder *> &histPtr
   _threadPool_.runJob("fillEventHistCache");
   _threadPool_.removeJob("fillEventHistCache");
 }
-
