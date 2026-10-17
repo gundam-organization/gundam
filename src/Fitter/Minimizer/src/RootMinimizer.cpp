@@ -9,6 +9,7 @@
 #include "GundamGlobals.h"
 #include "GundamUtils.h"
 
+#include "GenericToolbox.Map.h"
 #include "GenericToolbox.Root.h"
 #include "Logger.h"
 
@@ -20,6 +21,11 @@
 #include "Minuit2/MnUserParameterState.h"
 #include "Minuit2/MinuitParameter.h"
 #include "TLegend.h"
+
+#include <cmath>
+#include <iomanip>
+#include <limits>
+#include <sstream>
 
 
 void RootMinimizer::configureImpl(){
@@ -229,6 +235,8 @@ void RootMinimizer::dumpMinuit2State() {
 void RootMinimizer::minimize(){
   // calling the common routine
   this->MinimizerBase::minimize();
+  LogThrowIf(checkFlatDirections() > 0,
+             "Cannot start fit: flat LLH directions were detected. Check the reported fit parameters.");
 
   GenericToolbox::Time::Timer minimizationStopWatch;
   minimizationStopWatch.start();
@@ -448,6 +456,11 @@ void RootMinimizer::calcErrors(){
 
   LogThrowIf(not isInitialized(), "not initialized");
 
+  // Probe the point reported by the minimizer, independently of its last FCN call.
+  updateBestfitPointCache();
+  updateCacheToBestfitPoint();
+  checkFlatDirections();
+
   LogInfo << std::endl << GenericToolbox::addUpDownBars("Calling calcErrors()...") << std::endl;
 
   int nbFitCallOffset = getMonitor().nbEvalLikelihoodCalls;
@@ -513,8 +526,17 @@ void RootMinimizer::calcErrors(){
     LogInfo << "Error calculation took: " << GenericToolbox::toString(errorStopWatch.eval()) << std::endl;
 
     LogInfo << "Hesse ended after " << getMonitor().nbEvalLikelihoodCalls - nbFitCallOffset << " calls." << std::endl;
-    LogInfo << "HESSE status code: " << GundamUtils::hesseStatusCodeStr.at(postfitCache.status) << std::endl;
-    LogInfo << "Covariance matrix status code: " << GundamUtils::covMatrixStatusCodeStr.at(postfitCache.covarianceStatus) << std::endl;
+    // Minuit2 adds 100 * hesseStatus to the minimization status.
+    int hesseStatus = postfitCache.status;
+    if( _minimizerType_ == "Minuit2" and hesseStatus >= 0 ){ hesseStatus = (hesseStatus / 100) % 10; }
+    auto hesseStatusIt = GundamUtils::hesseStatusCodeStr.find(hesseStatus);
+    LogInfo << "HESSE status code: " << postfitCache.status << " - "
+            << (hesseStatusIt != GundamUtils::hesseStatusCodeStr.end() ? hesseStatusIt->second : "Unknown HESSE status")
+            << std::endl;
+    auto covStatusIt = GundamUtils::covMatrixStatusCodeStr.find(postfitCache.covarianceStatus);
+    LogInfo << "Covariance matrix status code: "
+            << (covStatusIt != GundamUtils::covMatrixStatusCodeStr.end() ? covStatusIt->second : std::to_string(postfitCache.covarianceStatus))
+            << std::endl;
 
     // Make sure we are on the right spot
     updateCacheToBestfitPoint();
@@ -553,6 +575,106 @@ void RootMinimizer::calcErrors(){
     LogError << GET_VAR_NAME_VALUE(_errorAlgo_) << " not implemented." << std::endl;
   }
 }
+int RootMinimizer::checkFlatDirections(){
+  if( not isInitialized() or _rootMinimizer_ == nullptr ){
+    LogAlert << "Cannot check LLH flat directions before minimizer initialization." << std::endl;
+    return 0;
+  }
+  LogInfo << "Checking LLH flat directions..." << std::endl;
+  const auto evaluate = [this](){
+    getLikelihoodInterface().propagateAndEvalLikelihood();
+    return getLikelihoodInterface().getLastLikelihood();
+  };
+
+  double reference;
+  try{ reference = evaluate(); }
+  catch( const std::exception& error ){
+    LogAlert << "Cannot check LLH flat directions: " << error.what() << std::endl;
+    return 0;
+  }
+  if( not std::isfinite(reference) ){
+    LogAlert << "Cannot check LLH flat directions at non-finite LLH = " << reference << std::endl;
+    return 0;
+  }
+
+  int nFlatDirections{0};
+  const double tolerance = 32 * std::numeric_limits<double>::epsilon() * std::max(1., std::abs(reference));
+  for( size_t iPar = 0; iPar < getMinimizerFitParameterPtr().size(); ++iPar ){
+    auto& par = *getMinimizerFitParameterPtr()[iPar];
+    if( not par.isEnabled() or par.isFixed() or _rootMinimizer_->IsFixedVariable(iPar) ){ continue; }
+    const double value = par.getParameterValue();
+    const auto& bounds = par.getParameterLimits();
+    double step = std::abs(par.getStepSize() * _stepSizeScaling_) * 0.01;
+    if( not std::isfinite(step) or step <= 0 ){
+      LogAlert << "Cannot check LLH flat direction for " << par.getFullTitle()
+               << ": value = " << value << ", invalid step = " << step << std::endl;
+      continue;
+    }
+
+    try{
+      // Confirm small variations at two scales, to avoid mistaking roundoff
+      // at a single tiny step for a flat direction.
+      for( int iScale = 0; iScale < 2; ++iScale ){
+        double h = step * (iScale == 0 ? 1. : 10.);
+        double x1, x2;
+        const double below = bounds.hasLowerBound() ? value - bounds.min : std::numeric_limits<double>::infinity();
+        const double above = bounds.hasUpperBound() ? bounds.max - value : std::numeric_limits<double>::infinity();
+        if( below >= h and above >= h ){ x1 = value - h; x2 = value + h; }
+        else{
+          // Near a limit, use two inward points and a one-sided quadratic fit.
+          const double direction = above >= below ? 1. : -1.;
+          h = std::min(h, (direction > 0 ? above : below) / 2.);
+          x1 = value + direction * h;
+          x2 = value + direction * 2 * h;
+        }
+        if( x1 == value or x2 == value or x1 == x2 or h <= 0 ){
+          LogAlert << "Cannot resolve LLH probe steps for " << par.getFullTitle() << ": value = " << value << std::endl;
+          break;
+        }
+        par.setParameterValue(x1, true);
+        const double f1 = evaluate();
+        par.setParameterValue(x2, true);
+        const double f2 = evaluate();
+        par.setParameterValue(value, true);
+
+        if( not std::isfinite(f1) or not std::isfinite(f2) ){
+          LogAlert << "Non-finite LLH probe for " << par.getFullTitle() << ": value = " << value
+                   << ", f0 = " << reference << ", f1 = " << f1 << ", f2 = " << f2 << std::endl;
+          break;
+        }
+        const double slope1 = (f1 - reference) / (x1 - value);
+        const double slope2 = (f2 - reference) / (x2 - value);
+        const double secondDerivative = 2 * (slope2 - slope1) / (x2 - x1);
+        const double firstDerivative = slope1 - 0.5 * secondDerivative * (x1 - value);
+        if( std::abs(f1 - reference) > tolerance or std::abs(f2 - reference) > tolerance ){ break; }
+        if( iScale == 0 ){ continue; }
+
+        std::ostringstream message;
+        message << std::setprecision(std::numeric_limits<double>::max_digits10)
+                << "Flat LLH direction: " << par.getFullTitle() << ", value = " << value
+                << ", first derivative = " << firstDerivative << ", second derivative = " << secondDerivative
+                << ", x1 = " << x1 << ", x2 = " << x2
+                << ", f0 = " << reference << ", f1 = " << f1 << ", f2 = " << f2;
+        ++nFlatDirections;
+        if( firstDerivative == 0. and secondDerivative == 0. ){ LogError << message.str() << std::endl; }
+        else{ LogAlert << message.str() << std::endl; }
+      }
+    }
+    catch( const std::exception& error ){
+      par.setParameterValue(value, true);
+      LogAlert << "Could not check LLH flat direction for " << par.getFullTitle()
+               << ": value = " << value << ", " << error.what() << std::endl;
+    }
+  }
+  // Restore the propagated model and likelihood buffers, not just parameter
+  // values. These evaluations bypass fit counters/monitors.
+  try{ evaluate(); }
+  catch( const std::exception& error ){
+    LogAlert << "Could not restore LLH after checking flat directions: " << error.what() << std::endl;
+  }
+  return nFlatDirections;
+}
+
 void RootMinimizer::scanParameters( TDirectory* saveDir_ ){
   LogThrowIf(not isInitialized());
 
