@@ -1,0 +1,16 @@
+#pragma once
+// Force-included with MSVC /FI to avoid passing string literals with
+// spaces through /D arguments in generated Visual Studio projects.
+#ifndef PROGRESS_BAR_FILL_TAG
+#define PROGRESS_BAR_FILL_TAG "GUNDAM"
+#endif
+#ifndef LOGGER_TIME_FORMAT
+#define LOGGER_TIME_FORMAT "%Y.%m.%d %H:%M:%S"
+#endif
+#ifndef LOGGER_PREFIX_FORMAT
+#if defined(_DEBUG) || @MSVC_LOGGER_DEV_MODE@
+#define LOGGER_PREFIX_FORMAT "{TIME} {SEVERITY} {FILELINE}"
+#else
+#define LOGGER_PREFIX_FORMAT "{TIME} {SEVERITY} {FILENAME}"
+#endif
+#endif

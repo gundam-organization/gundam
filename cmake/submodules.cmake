@@ -30,7 +30,9 @@ include_directories(submodules/simple-cpp-cmd-line-parser/include)
 add_definitions( -D CMDLINEPARSER_YAML_CPP_ENABLED=1 )
 
 ## Configure the GenericToolbox
-add_definitions( -D PROGRESS_BAR_FILL_TAG="\\\"GUNDAM"\\\" )
+if(NOT MSVC)
+  add_definitions( "-DPROGRESS_BAR_FILL_TAG=\"GUNDAM\"" )
+endif()
 if (ENABLE_COLOR_OUTPUT)
   add_definitions( -D PROGRESS_BAR_ENABLE_RAINBOW=1 )
 else (ENABLE_COLOR_OUTPUT)
@@ -42,16 +44,31 @@ if( ENABLE_BATCH_MODE )
 endif( ENABLE_BATCH_MODE )
 
 ## Add the Logger
-add_definitions( -D LOGGER_TIME_FORMAT="\\\"%Y.%m.%d %H:%M:%S"\\\" )
 add_definitions( -D LOGGER_MAX_LOG_LEVEL_PRINTED=6 )
 add_definitions( -D LOGGER_PREFIX_LEVEL=3 )
 
-if( ${CMAKE_BUILD_TYPE} MATCHES DEBUG OR ${ENABLE_DEV_MODE} )
-  cmessage( STATUS "Logger set in DEBUG mode." )
-  add_definitions( -D LOGGER_PREFIX_FORMAT="\\\"{TIME} {SEVERITY} {FILELINE}"\\\" )
+if(MSVC)
+  # Keep string literals with spaces out of MSVC's /D arguments.
+  # _DEBUG in the header selects the actual Visual Studio configuration.
+  set(MSVC_LOGGER_DEV_MODE 0)
+  if(ENABLE_DEV_MODE)
+    set(MSVC_LOGGER_DEV_MODE 1)
+  endif()
+  configure_file(
+    "${CMAKE_CURRENT_SOURCE_DIR}/cmake/templates/MsvcCompat.h.in"
+    "${CMAKE_CURRENT_BINARY_DIR}/generated/MsvcCompat.h"
+    @ONLY
+  )
+  add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:/FI${CMAKE_CURRENT_BINARY_DIR}/generated/MsvcCompat.h>")
 else()
-  cmessage( STATUS "Logger set in RELEASE mode." )
-  add_definitions( -D LOGGER_PREFIX_FORMAT="\\\"{TIME} {SEVERITY} {FILENAME}"\\\" )
+  add_definitions( "-DLOGGER_TIME_FORMAT=\"%Y.%m.%d %H:%M:%S\"" )
+  if( ${CMAKE_BUILD_TYPE} MATCHES DEBUG OR ${ENABLE_DEV_MODE} )
+    cmessage( STATUS "Logger set in DEBUG mode." )
+    add_definitions( "-DLOGGER_PREFIX_FORMAT=\"{TIME} {SEVERITY} {FILELINE}\"" )
+  else()
+    cmessage( STATUS "Logger set in RELEASE mode." )
+    add_definitions( "-DLOGGER_PREFIX_FORMAT=\"{TIME} {SEVERITY} {FILENAME}\"" )
+  endif()
 endif()
 
 if(NOT ENABLE_COLOR_OUTPUT)
