@@ -1652,20 +1652,14 @@ void RootMinimizer::saveGradientSteps(){
   nPointsPerStep = std::min(nPointsPerStep, maxNbPoints/int(gradientDescentMonitor.stepPointList.size()));
   if( nPointsPerStep <= 1 ){ nPointsPerStep = 2; }
 
-  // make sure the parameter states get restored as we leave
+  const auto progressPrefix = LogInfo.getPrefixString();
+  Logger::ScopedMute muteLogger;
+
+  // Restore parameter values before the mute guard restores the logging state.
   auto currentParState = getModelPropagator().getParametersManager().exportParameterInjectorConfig();
   GenericToolbox::ScopedGuard g{
-      [&](){
-        ParametersManager::muteLogger();
-        ParameterSet::muteLogger();
-        ParameterScanner::muteLogger();
-      },
-      [&](){
-        getModelPropagator().getParametersManager().injectParameterValues( currentParState );
-        ParametersManager::unmuteLogger();
-        ParameterSet::unmuteLogger();
-        ParameterScanner::unmuteLogger();
-      }
+      [](){},
+      [&](){ getModelPropagator().getParametersManager().injectParameterValues(currentParState); }
   };
 
   // load starting point
@@ -1673,10 +1667,8 @@ void RootMinimizer::saveGradientSteps(){
 
   std::vector<ParameterScanner::GraphEntry> globalGraphList;
   for(size_t iGradStep = 0 ; iGradStep < gradientDescentMonitor.stepPointList.size() ; iGradStep++ ){
-    GenericToolbox::displayProgressBar(iGradStep, gradientDescentMonitor.stepPointList.size(), LogInfo.getPrefixString() + "Saving gradient steps...");
+    GenericToolbox::displayProgressBar(iGradStep, gradientDescentMonitor.stepPointList.size(), progressPrefix + "Saving gradient steps...");
 
-    // why do we need to remute the logger at each loop??
-    ParameterSet::muteLogger(); Propagator::muteLogger(); ParametersManager::muteLogger();
     getModelPropagator().getParametersManager().injectParameterValues(gradientDescentMonitor.stepPointList[iGradStep].parState );
 
     getOwner().evaluateLikelihood();
