@@ -251,10 +251,7 @@ void ParameterScanner::scanSegment(TDirectory *saveDir_, const JsonType &end_, c
   LogWarning << "Scanning along a segment with " << nSteps_ << " steps." << std::endl;
 
   // don't shout while re-injecting parameters
-  GenericToolbox::ScopedGuard s(
-      []{ ParameterSet::muteLogger(); ParametersManager::muteLogger(); },
-      []{ ParameterSet::unmuteLogger(); ParametersManager::unmuteLogger(); }
-  );
+  Logger::ScopedMute muteLogger;
 
   LogThrowIf(end_.empty(), "Ending injector config is empty()");
   LogThrowIf(nSteps_ < 0, "Invalid nSteps");
