@@ -29,17 +29,7 @@ checkSubmodule( simple-cpp-cmd-line-parser )
 include_directories(submodules/simple-cpp-cmd-line-parser/include)
 add_definitions( -D CMDLINEPARSER_YAML_CPP_ENABLED=1 )
 
-## Add the GenericToolbox²
-# Reproduce needed parts of the cpp-generic-toolbox CMakeLists.txt.  This
-# needs the nlohmann library.
-include_directories(submodules/cpp-generic-toolbox/include)
-link_libraries(nlohmann_json::nlohmann_json)
-
-#file( GLOB CPP_GENERIC_TOOLBOX_HEADERS ${CMAKE_SOURCE_DIR}/submodules/cpp-generic-toolbox/include/*.h )
-#file( GLOB CPP_GENERIC_TOOLBOX_HEADERS_IMPL ${CMAKE_SOURCE_DIR}/submodules/cpp-generic-toolbox/include/implementation/*.h )
-#install(FILES ${CPP_GENERIC_TOOLBOX_HEADERS} DESTINATION include)
-#install(FILES ${CPP_GENERIC_TOOLBOX_HEADERS_IMPL} DESTINATION include/implementation)
-
+## Configure the GenericToolbox
 add_definitions( -D PROGRESS_BAR_FILL_TAG="\\\"GUNDAM"\\\" )
 if (ENABLE_COLOR_OUTPUT)
   add_definitions( -D PROGRESS_BAR_ENABLE_RAINBOW=1 )
@@ -83,3 +73,17 @@ else()
 endif()
 set(SIMPLE_CPP_LOGGER_BUILD_TESTS OFF)
 add_subdirectory(submodules/simple-cpp-logger)
+
+# Build independent toolbox modules and enable the extensions used by GUNDAM.
+set(GENERIC_TOOLBOX_COMPILED ON)
+set(GENERIC_TOOLBOX_BUILD_SHARED ON)
+if(USE_STATIC_LINKS)
+  set(GENERIC_TOOLBOX_BUILD_SHARED OFF)
+endif()
+set(GENERIC_TOOLBOX_WITH_ROOT ON)
+set(GENERIC_TOOLBOX_WITH_JSON ON)
+set(GENERIC_TOOLBOX_WITH_YAML ON)
+set(GENERIC_TOOLBOX_INSTALL_PACKAGE OFF)
+set(GENERIC_TOOLBOX_BUILD_EXAMPLES OFF)
+set(GENERIC_TOOLBOX_BUILD_TESTS OFF)
+add_subdirectory(submodules/cpp-generic-toolbox)
