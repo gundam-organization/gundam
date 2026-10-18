@@ -12,6 +12,7 @@ set(SRCFILES
     )
 
 set(HEADERS
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/GundamUtilsExport.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/CalculateGeneralSpline.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/CalculateMonotonicSpline.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/CalculateUniformSpline.h
@@ -45,6 +46,10 @@ if( USE_STATIC_LINKS )
   add_library( GundamUtils STATIC ${SRCFILES})
 else()
   add_library( GundamUtils SHARED ${SRCFILES})
+endif()
+
+if(USE_STATIC_LINKS)
+  target_compile_definitions(GundamUtils PUBLIC GUNDAM_UTILS_STATIC_DEFINE)
 endif()
 
 add_dependencies( GundamUtils preBuildVersionCheck )

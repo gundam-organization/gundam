@@ -2,6 +2,11 @@
 message("")
 cmessage( WARNING "Defining modules...")
 
+if(WIN32)
+  # Export the module APIs and generate the import .lib files used by MSVC.
+  set(CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS ON)
+endif()
+
 set( MODULES Utils )
 
 # Add the basic modules

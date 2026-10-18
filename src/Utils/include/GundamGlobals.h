@@ -5,6 +5,8 @@
 #ifndef GUNDAM_GUNDAM_GLOBALS_H
 #define GUNDAM_GUNDAM_GLOBALS_H
 
+#include "GundamUtilsExport.h"
+
 #include <algorithm>
 #include <mutex>
 
@@ -51,7 +53,7 @@ private:
     // A global mutex for when it's truly needed.
     std::mutex globalMutEx{};
   };
-  static Parameters _parameters_;
+  static GUNDAM_UTILS_EXPORT Parameters _parameters_;
 
 
 };

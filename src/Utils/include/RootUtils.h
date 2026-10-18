@@ -5,6 +5,8 @@
 #ifndef GUNDAM_ROOTUTILS_H
 #define GUNDAM_ROOTUTILS_H
 
+#include "GundamUtilsExport.h"
+
 #include "TDirectory.h"
 
 #include "GenericToolbox.String.h"
@@ -23,8 +25,8 @@ namespace RootUtils{
     template<typename T> static bool readObject(TDirectory* f_, const std::string& objPath_, const std::function<void(T*)>& action_ = [](T*){});
     static bool readObject( TDirectory* f_, const std::string& objPath_);
 
-    static bool quiet;
-    static bool throwIfNotFound;
+    static GUNDAM_UTILS_EXPORT bool quiet;
+    static GUNDAM_UTILS_EXPORT bool throwIfNotFound;
 
   };
 
