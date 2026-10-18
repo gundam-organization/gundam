@@ -52,8 +52,6 @@ if( ENABLE_BATCH_MODE )
 endif( ENABLE_BATCH_MODE )
 
 ## Add the Logger
-# Reproduce needed parts of the simple-cpp-logger CMakeLists.txt
-include_directories(submodules/simple-cpp-logger/include)
 add_definitions( -D LOGGER_TIME_FORMAT="\\\"%Y.%m.%d %H:%M:%S"\\\" )
 add_definitions( -D LOGGER_MAX_LOG_LEVEL_PRINTED=6 )
 add_definitions( -D LOGGER_PREFIX_LEVEL=3 )
@@ -75,3 +73,13 @@ else()
   add_definitions( -D LOGGER_ENABLE_COLORS_ON_USER_HEADER=1 )
 endif()
 
+
+# GUNDAM uses the compiled engine; the facade retains per-source-file settings.
+set(SIMPLE_CPP_LOGGER_COMPILED ON)
+if(USE_STATIC_LINKS)
+  set(SIMPLE_CPP_LOGGER_BUILD_SHARED OFF)
+else()
+  set(SIMPLE_CPP_LOGGER_BUILD_SHARED ON)
+endif()
+set(SIMPLE_CPP_LOGGER_BUILD_TESTS OFF)
+add_subdirectory(submodules/simple-cpp-logger)
