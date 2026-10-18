@@ -24,6 +24,8 @@
 #define DEVICE_FLOATING_POINT double
 #endif
 
+#include "CalculateSearchOffset.h"
+
 // Place in a private name space so it plays nicely with CUDA
 namespace {
     /// Interpolate one point in a graph with non-uniform points.  The graph can
@@ -55,10 +57,7 @@ namespace {
         const int knotCount = (dim)/2;
         int ix = 0;
 #define CHECK_OFFSET(ioff)  if ((ix+ioff < knotCount) && (x > data[2*(ix+ioff)+1])) ix += ioff
-      // __builtin_clz(knotCount) counts the number of leading zeros in knotCount (available in GCC/Clang).
-      // 31 - __builtin_clz(knotCount) calculates the position of the most significant bit.
-      // 1 << (31 - __builtin_clz(knotCount)) generates the largest power of 2 ≤ knotCount
-      for( int offset = 1 << ( 31 - __builtin_clz(knotCount) ) ; offset > 0 ; offset >>= 1 ){
+      for( int offset = static_cast<int>(calculateSearchOffset(knotCount)) ; offset > 0 ; offset >>= 1 ){
         CHECK_OFFSET(offset);
       }
 #undef CHECK_OFFSET

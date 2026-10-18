@@ -48,8 +48,9 @@ add_definitions( -D LOGGER_MAX_LOG_LEVEL_PRINTED=6 )
 add_definitions( -D LOGGER_PREFIX_LEVEL=3 )
 
 if(MSVC)
+  add_compile_definitions(GUNDAM_DEBUG_LOGGER=$<IF:$<CONFIG:Debug>,1,0>)
   # Keep string literals with spaces out of MSVC's /D arguments.
-  # _DEBUG in the header selects the actual Visual Studio configuration.
+  # Select the logger format independently of the CRT used by ROOT.
   set(MSVC_LOGGER_DEV_MODE 0)
   if(ENABLE_DEV_MODE)
     set(MSVC_LOGGER_DEV_MODE 1)

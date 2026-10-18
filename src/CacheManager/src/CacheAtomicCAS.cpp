@@ -75,7 +75,11 @@ int CacheAtomicCAS(double *variable, double *expected, double update) {
 #endif
 #endif
 #ifndef TEMP_CACHE_ATOMIC_CAS_MANAGED
+#if defined(_MSC_VER)
+#pragma message("CacheAtomicCAS -- Using MutEx to implement Compare and Set for doubles")
+#else
 #warning CacheAtomicCAS -- Using MutEx to implement Compare and Set for doubles
+#endif
   std::lock_guard<std::mutex> lock(cacheAtomicCASMutEx);
   double expectation = *expected;
   *expected = *variable;
@@ -133,7 +137,11 @@ int CacheAtomicCAS(float *variable, float *expected, float update) {
 #endif
 #endif
 #ifndef TEMP_CACHE_ATOMIC_CAS_MANAGED
+#if defined(_MSC_VER)
+#pragma message("CacheAtomicCAS -- Using MutEx to implement Compare and Set for floats")
+#else
 #warning CacheAtomicCAS -- Using MutEx to implement Compare and Set for floats
+#endif
   std::lock_guard<std::mutex> lock(cacheAtomicCASMutEx);
   float expectation = *expected;
   *expected = *variable;
@@ -191,7 +199,11 @@ int CacheAtomicCAS(int *variable, int *expected, int update) {
 #endif
 #endif
 #ifndef TEMP_CACHE_ATOMIC_CAS_MANAGED
+#if defined(_MSC_VER)
+#pragma message("CacheAtomicCAS -- Using MutEx to implement Compare and Set for integers")
+#else
 #warning CacheAtomicCAS -- Using MutEx to implement Compare and Set for integers
+#endif
   std::lock_guard<std::mutex> lock(cacheAtomicCASMutEx);
   int expectation = *expected;
   *expected = *variable;

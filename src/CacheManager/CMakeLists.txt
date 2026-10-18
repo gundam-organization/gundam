@@ -2,6 +2,7 @@
 
 # The headers are the same for both CUDA and C++
 set( HEADERS
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/GundamCacheManagerExport.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/CacheManager.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/CacheParameters.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/CacheWeights.h
@@ -55,6 +56,7 @@ list( APPEND SRCFILES ${CMAKE_CURRENT_SOURCE_DIR}/src/CacheRecursiveSums.${SRC_F
 
 if( USE_STATIC_LINKS )
   add_library(GundamCacheManager STATIC ${SRCFILES})
+  target_compile_definitions(GundamCacheManager PUBLIC GUNDAM_CACHE_MANAGER_STATIC_DEFINE)
 else()
   add_library(GundamCacheManager SHARED ${SRCFILES})
 endif( USE_STATIC_LINKS )

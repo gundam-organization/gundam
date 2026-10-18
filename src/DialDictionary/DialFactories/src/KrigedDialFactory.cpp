@@ -1,4 +1,5 @@
 #include "KrigedDialFactory.h"
+#include "DynamicLibrary.h"
 
 #include <GundamGlobals.h>
 #include <DialBase.h>
@@ -8,7 +9,6 @@
 #include <GenericToolbox.Json.h>
 #include <Logger.h>
 
-#include <dlfcn.h>
 
 KrigedDialFactory::KrigedDialFactory(const ConfigReader& config_){
     LogThrowIf(not config_.hasField("tableConfig"), "tableConfig must be defined in:" << config_.toString(true));
@@ -61,16 +61,16 @@ KrigedDialFactory::KrigedDialFactory(const ConfigReader& config_){
         std::exit(EXIT_FAILURE); // Exit, not throw!
     }
 
-    void* library = dlopen(expandedPath.c_str(), RTLD_LAZY );
+    void* library = GundamUtils::DynamicLibrary::open(expandedPath.c_str());
     if( library == nullptr ){
-        LogError << "Cannot load library: " << dlerror() << std::endl;
+        LogError << "Cannot load library: " << GundamUtils::DynamicLibrary::error() << std::endl;
         std::exit(EXIT_FAILURE); // Exit, not throw!
     }
 
     // Get the initialization function.
     if (not getInitializationFunction().empty()) {
         std::lock_guard<std::mutex> guard(GundamGlobals::getGlobalMutEx());
-        void* initFunc = dlsym(library, getInitializationFunction().c_str());
+        void* initFunc = GundamUtils::DynamicLibrary::symbol(library, getInitializationFunction().c_str());
         if( initFunc == nullptr ){
             LogError << "Initialization function symbol not found: "
                      << getInitializationFunction()
@@ -103,7 +103,7 @@ KrigedDialFactory::KrigedDialFactory(const ConfigReader& config_){
     for (auto& t : _table_) t = std::nan("not-set");
 
     // Get the update function
-    void* updateFunc = dlsym(library, getUpdateFunction().c_str());
+    void* updateFunc = GundamUtils::DynamicLibrary::symbol(library, getUpdateFunction().c_str());
     if( updateFunc == nullptr ){
         LogError << "Update function symbol not found: "
                  << getUpdateFunction()
@@ -116,7 +116,7 @@ KrigedDialFactory::KrigedDialFactory(const ConfigReader& config_){
                    int bins, const double par[], int npar)>(updateFunc);
 
     // Get the weight function
-    void* weightFunc = dlsym(library, getWeightFunction().c_str());
+    void* weightFunc = GundamUtils::DynamicLibrary::symbol(library, getWeightFunction().c_str());
     if( weightFunc == nullptr ){
         LogError << "Weight function symbol not found: "
                  << getWeightFunction()

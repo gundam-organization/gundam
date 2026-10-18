@@ -13,6 +13,9 @@
 #include <vector>
 
 class Event;
+#if defined(_WIN32)
+namespace GundamUtils { class WindowsProcess; }
+#endif
 
 class ExternalWeightWorker : public JsonBaseClass {
 public:
@@ -39,7 +42,11 @@ protected:
     std::string name{};
     std::size_t nbDoubles{0};
     std::size_t nbBytes{0};
+#if defined(_WIN32)
+    void* mappingHandle{nullptr};
+#else
     int fd{-1};
+#endif
     double* ptr{nullptr};
   };
 
@@ -75,6 +82,7 @@ private:
 
 class ExternalWeightPythonWorker : public ExternalWeightWorker {
 public:
+  ExternalWeightPythonWorker();
   ~ExternalWeightPythonWorker() override;
 
 protected:
@@ -93,9 +101,13 @@ private:
   std::string _evalScript_{};
   std::vector<std::string> _scriptArgs_{};
   bool _isWorkerStarted_{false};
+#if defined(_WIN32)
+  std::unique_ptr<GundamUtils::WindowsProcess> _workerProcess_;
+#else
   int _workerInputFd_{-1};
   int _workerOutputFd_{-1};
   int _workerPid_{-1};
+#endif
 };
 
 class ExternalWeightDialFactory : public DialFactoryBase, public JsonBaseClass {

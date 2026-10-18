@@ -10,6 +10,28 @@
 cmessage( STATUS "Setting up tests..." )
 enable_testing()
 
+# Exercise portability without depending on the full fitter or GoogleTest.
+if(WITH_FAST_TEST)
+  add_library(GundamPortabilityPlugin SHARED portability/Plugin.cpp)
+  set_target_properties(GundamPortabilityPlugin PROPERTIES WINDOWS_EXPORT_ALL_SYMBOLS ON)
+  add_executable(gundamPortabilityTest portability/Portability.cpp)
+  target_link_libraries(gundamPortabilityTest PRIVATE GundamDialDictionary)
+  add_dependencies(gundamPortabilityTest GundamPortabilityPlugin)
+  add_test(NAME gundamPortability COMMAND gundamPortabilityTest $<TARGET_FILE:GundamPortabilityPlugin>)
+  set_tests_properties(gundamPortability PROPERTIES LABELS unit TIMEOUT 60)
+  if(WIN32)
+    set(portabilityTestPath "$ENV{PATH}")
+    foreach(dependency IN ITEMS GundamUtils GundamParametersManager GundamSamplesManager GundamDialDictionary
+        SimpleCppLogger GenericToolboxMacro GenericToolboxLog GenericToolboxString GenericToolboxOs
+        GenericToolboxFs GenericToolboxVector GenericToolboxUtils GenericToolboxTime GenericToolboxThread
+        GenericToolboxStream GenericToolboxRoot GenericToolboxJson GenericToolboxYaml ROOT::Core)
+      string(PREPEND portabilityTestPath "$<TARGET_FILE_DIR:${dependency}>;")
+    endforeach()
+    string(REPLACE ";" "\\;" portabilityTestPath "${portabilityTestPath}")
+    set_tests_properties(gundamPortability PROPERTIES ENVIRONMENT "PATH=${portabilityTestPath}")
+  endif()
+endif()
+
 # Run the gundam-tests.sh script which runs scripted tests.  The
 # COMMAND is a little complicated since the testing script needs to
 # run in the source directory, but puts the output in a sub-directory

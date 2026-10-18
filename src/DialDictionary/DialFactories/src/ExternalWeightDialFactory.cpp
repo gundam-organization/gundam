@@ -2,6 +2,7 @@
 
 #include "ExternalWeightDispatcher.h"
 #include "Event.h"
+#include "WindowsProcess.h"
 #include "GenericToolbox.Utils.h"
 #include "Logger.h"
 
@@ -10,17 +11,42 @@
 #include <cerrno>
 #include <cstdio>
 #include <cstring>
+#include <utility>
+#if defined(_WIN32)
+#include <io.h>
+#else
 #include <fcntl.h>
 #include <sys/stat.h>
 #include <sys/mman.h>
 #include <sys/wait.h>
-#include <utility>
 #include <unistd.h>
+#endif
+
+namespace {
+  auto getWorkerProcessId(){
+#if defined(_WIN32)
+    return GetCurrentProcessId();
+#else
+    return getpid();
+#endif
+  }
+}
 
 ExternalWeightWorker::SharedMemoryBuffer::SharedMemoryBuffer(
     std::string name_,
     std::size_t nbDoubles_)
     : name(std::move(name_)), nbDoubles(nbDoubles_), nbBytes(std::max<std::size_t>(nbDoubles_, 1)*sizeof(double)) {
+#if defined(_WIN32)
+  const auto size = static_cast<unsigned long long>(nbBytes);
+  GundamUtils::WindowsHandle mapping{CreateFileMappingA(INVALID_HANDLE_VALUE, nullptr, PAGE_READWRITE,
+      static_cast<DWORD>(size >> 32), static_cast<DWORD>(size), name.c_str())};
+  const auto error = GetLastError();
+  LogThrowIf(mapping == nullptr or error == ERROR_ALREADY_EXISTS,
+             "Could not create shared memory \"" << name << "\": Windows error " << error);
+  ptr = static_cast<double*>(MapViewOfFile(mapping.get(), FILE_MAP_ALL_ACCESS, 0, 0, nbBytes));
+  LogThrowIf(ptr == nullptr, "Could not map shared memory \"" << name << "\": Windows error " << GetLastError());
+  mappingHandle = mapping.release();
+#else
   const std::string posixName = "/" + name;
   fd = shm_open(posixName.c_str(), O_CREAT | O_EXCL | O_RDWR, 0600);
   LogThrowIf(fd == -1, "Could not create shared memory \"" << posixName << "\": " << std::strerror(errno));
@@ -29,12 +55,18 @@ ExternalWeightWorker::SharedMemoryBuffer::SharedMemoryBuffer(
   ptr = static_cast<double*>(mmap(nullptr, nbBytes, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0));
   LogThrowIf(ptr == MAP_FAILED,
              "Could not map shared memory \"" << posixName << "\": " << std::strerror(errno));
+#endif
 }
 
 ExternalWeightWorker::SharedMemoryBuffer::~SharedMemoryBuffer(){
+#if defined(_WIN32)
+  if( ptr != nullptr ){ UnmapViewOfFile(ptr); }
+  if( mappingHandle != nullptr ){ CloseHandle(mappingHandle); }
+#else
   if( ptr != nullptr and ptr != MAP_FAILED ){ munmap(ptr, nbBytes); }
   if( fd != -1 ){ close(fd); }
   if( not name.empty() ){ shm_unlink(("/" + name).c_str()); }
+#endif
 }
 
 std::unique_ptr<DialBase> ExternalWeightWorker::makeBinnedDial(std::size_t binIndex_) {
@@ -113,7 +145,7 @@ void ExternalWeightWorker::finalizeEventLoading() {
     for( std::size_t iInput = 0 ; iInput < _inputEventVarNameList_.size() ; ++iInput ){
       const auto& inputName = _inputEventVarNameList_[iInput];
       auto inputBuffer = std::make_unique<SharedMemoryBuffer>(
-          "gdmEW_" + std::to_string(getpid()) + "_i" + std::to_string(iInput),
+          "gdmEW_" + std::to_string(getWorkerProcessId()) + "_i" + std::to_string(iInput),
           _weightCount_
       );
       for( std::size_t iBin = 0 ; iBin < _weightCount_ ; ++iBin ){
@@ -129,7 +161,7 @@ void ExternalWeightWorker::finalizeEventLoading() {
     _weightList_->assign(_weightCount_, 1.);
     _weightList_->shrink_to_fit();
     _weightBuffer_ = std::make_unique<SharedMemoryBuffer>(
-        "gdmEW_" + std::to_string(getpid()) + "_w",
+        "gdmEW_" + std::to_string(getWorkerProcessId()) + "_w",
         _weightCount_
     );
     std::fill(_weightBuffer_->ptr, _weightBuffer_->ptr + _weightCount_, 1.);
@@ -150,7 +182,7 @@ void ExternalWeightWorker::finalizeEventLoading() {
       _inputEventValueList_[iInput].shrink_to_fit();
       _inputBufferList_.emplace_back(
           std::make_unique<SharedMemoryBuffer>(
-              "gdmEW_" + std::to_string(getpid()) + "_i" + std::to_string(iInput),
+              "gdmEW_" + std::to_string(getWorkerProcessId()) + "_i" + std::to_string(iInput),
               _eventCount_
           )
       );
@@ -159,7 +191,7 @@ void ExternalWeightWorker::finalizeEventLoading() {
 
     _weightList_->shrink_to_fit();
     _weightBuffer_ = std::make_unique<SharedMemoryBuffer>(
-        "gdmEW_" + std::to_string(getpid()) + "_w",
+        "gdmEW_" + std::to_string(getWorkerProcessId()) + "_w",
         _eventCount_
     );
     std::fill(_weightBuffer_->ptr, _weightBuffer_->ptr + _eventCount_, 1.);
@@ -189,7 +221,7 @@ void ExternalWeightWorker::evaluate(const DialInputBuffer& inputBuffer_) {
 
   if( _parameterBuffer_ == nullptr ){
     _parameterBuffer_ = std::make_unique<SharedMemoryBuffer>(
-        "gdmEW_" + std::to_string(getpid()) + "_parameters",
+        "gdmEW_" + std::to_string(getWorkerProcessId()) + "_parameters",
         std::size_t(inputBuffer_.getInputSize())
     );
   }
@@ -257,6 +289,8 @@ void ExternalWeightPythonWorker::configureImpl() {
              "ExternalWeight PythonWorker requires either pythonExecutable.");
 }
 
+ExternalWeightPythonWorker::ExternalWeightPythonWorker() = default;
+
 ExternalWeightPythonWorker::~ExternalWeightPythonWorker(){
   this->stopWorkerProcess();
 }
@@ -267,10 +301,20 @@ void ExternalWeightPythonWorker::initializeImpl() {
              "ExternalWeight pythonExecutable is not configured. Provide pythonExecutable or pythonVenv.");
   LogThrowIf(_evalScript_.empty(),
              "ExternalWeight evalScript is not configured.");
-  LogThrowIf(access(_pythonExecutable_.c_str(), X_OK) != 0,
+#if defined(_WIN32)
+  const int pythonAccess = _access(_pythonExecutable_.c_str(), 0);
+#else
+  const int pythonAccess = access(_pythonExecutable_.c_str(), X_OK);
+#endif
+  LogThrowIf(pythonAccess != 0,
              "ExternalWeight pythonExecutable is not executable: \"" << _pythonExecutable_
              << "\" / " << std::strerror(errno));
-  LogThrowIf(access(_evalScript_.c_str(), R_OK) != 0,
+#if defined(_WIN32)
+  const int scriptAccess = _access(_evalScript_.c_str(), 4);
+#else
+  const int scriptAccess = access(_evalScript_.c_str(), R_OK);
+#endif
+  LogThrowIf(scriptAccess != 0,
              "ExternalWeight evalScript is not readable: \"" << _evalScript_
              << "\" / " << std::strerror(errno));
 
@@ -283,6 +327,15 @@ void ExternalWeightPythonWorker::initializeImpl() {
 }
 
 void ExternalWeightPythonWorker::validateEvalScript() {
+#if defined(_WIN32)
+  GundamUtils::WindowsProcess process{{_pythonExecutable_, "-m", "py_compile", _evalScript_}, true};
+  process.closeInput();
+  std::string output;
+  char buffer[1024];
+  while( const auto count = process.read(buffer, sizeof(buffer)) ){ output.append(buffer, count); }
+  LogThrowIf(process.wait() != 0,
+             "ExternalWeight evalScript failed `python -m py_compile`: \"" << _evalScript_ << "\"\n" << output);
+#else
   int stdoutPipe[2];
   LogThrowIf(pipe(stdoutPipe) == -1,
              "Could not create ExternalWeight py_compile pipe: " << std::strerror(errno));
@@ -327,6 +380,7 @@ void ExternalWeightPythonWorker::validateEvalScript() {
       "ExternalWeight evalScript failed `python -m py_compile`: \"" << _evalScript_ << "\""
       << (output.empty() ? "" : std::string{"\n"} + output)
   );
+#endif
 }
 
 void ExternalWeightPythonWorker::evaluateImpl(const DialInputBuffer& inputBuffer_) {
@@ -344,6 +398,7 @@ void ExternalWeightPythonWorker::evaluateImpl(const DialInputBuffer& inputBuffer
 void ExternalWeightPythonWorker::startWorkerProcess(const DialInputBuffer& inputBuffer_) {
   if( _isWorkerStarted_ ){ return; }
 
+#if !defined(_WIN32)
   int stdinPipe[2];
   int stdoutPipe[2];
   LogThrowIf(pipe(stdinPipe) == -1, "Could not create ExternalWeight worker stdin pipe: " << std::strerror(errno));
@@ -359,6 +414,7 @@ void ExternalWeightPythonWorker::startWorkerProcess(const DialInputBuffer& input
     close(stdinPipe[1]);
     close(stdoutPipe[0]);
     close(stdoutPipe[1]);
+#endif
 
     // The bootstrap owns the wire protocol.  A user script only needs to
     // expose run(command), with the shared-memory descriptions already
@@ -378,11 +434,12 @@ def _attach(description):
         shm = shared_memory.SharedMemory(name=description["shmName"], track=False)
     except TypeError:
         shm = shared_memory.SharedMemory(name=description["shmName"])
-        try:
-            from multiprocessing import resource_tracker
-            resource_tracker.unregister(shm._name, "shared_memory")
-        except Exception:
-            pass
+        if sys.platform != "win32":
+            try:
+                from multiprocessing import resource_tracker
+                resource_tracker.unregister(shm._name, "shared_memory")
+            except Exception:
+                pass
     return shm, np.ndarray(tuple(description["shape"]), dtype=np.float64, buffer=shm.buf)
 
 
@@ -479,6 +536,9 @@ except Exception as error:
     for( const auto& arg : _scriptArgs_ ){ argvStorage.emplace_back(arg); }
     argvStorage.emplace_back("--worker");
 
+#if defined(_WIN32)
+  _workerProcess_ = std::make_unique<GundamUtils::WindowsProcess>(argvStorage);
+#else
     std::vector<char*> argv;
     argv.reserve(argvStorage.size() + 1);
     // std::string::data() returns const char* before C++17, while execv
@@ -495,6 +555,7 @@ except Exception as error:
   _workerInputFd_ = stdinPipe[1];
   _workerOutputFd_ = stdoutPipe[0];
   _workerPid_ = int(pid);
+#endif
   _isWorkerStarted_ = true;
 
   JsonType initCommand;
@@ -542,13 +603,21 @@ except Exception as error:
 }
 
 void ExternalWeightPythonWorker::sendWorkerCommand(const JsonType& command_) {
+#if defined(_WIN32)
+  LogThrowIf(_workerProcess_ == nullptr, "ExternalWeight worker input pipe is not open.");
+#else
   LogThrowIf(_workerInputFd_ == -1, "ExternalWeight worker input pipe is not open.");
+#endif
 
   const std::string line = command_.dump() + "\n";
   const char* data = line.data();
   std::size_t remaining = line.size();
   while( remaining != 0 ){
-    ssize_t nWritten = write(_workerInputFd_, data, remaining);
+#if defined(_WIN32)
+    const auto nWritten = _workerProcess_->write(data, remaining);
+#else
+    const auto nWritten = write(_workerInputFd_, data, remaining);
+#endif
     LogThrowIf(nWritten <= 0, "Could not write to ExternalWeight worker: " << std::strerror(errno));
     data += nWritten;
     remaining -= std::size_t(nWritten);
@@ -556,12 +625,20 @@ void ExternalWeightPythonWorker::sendWorkerCommand(const JsonType& command_) {
 }
 
 JsonType ExternalWeightPythonWorker::readWorkerResponse() {
+#if defined(_WIN32)
+  LogThrowIf(_workerProcess_ == nullptr, "ExternalWeight worker output pipe is not open.");
+#else
   LogThrowIf(_workerOutputFd_ == -1, "ExternalWeight worker output pipe is not open.");
+#endif
 
   std::string line;
   char c;
   while( true ){
-    ssize_t nRead = read(_workerOutputFd_, &c, 1);
+#if defined(_WIN32)
+    const auto nRead = _workerProcess_->read(&c, 1);
+#else
+    const auto nRead = read(_workerOutputFd_, &c, 1);
+#endif
     LogThrowIf(nRead <= 0, "Could not read from ExternalWeight worker: " << std::strerror(errno));
     if( c == '\n' ){ break; }
     line += c;
@@ -577,7 +654,7 @@ JsonType ExternalWeightPythonWorker::readWorkerResponse() {
 }
 
 void ExternalWeightPythonWorker::stopWorkerProcess() {
-  if( _isWorkerStarted_ and _workerInputFd_ != -1 ){
+  if( _isWorkerStarted_ ){
     try{
       JsonType command;
       command["command"] = "shutdown";
@@ -589,6 +666,13 @@ void ExternalWeightPythonWorker::stopWorkerProcess() {
     catch(...){}
   }
 
+#if defined(_WIN32)
+  if( _workerProcess_ != nullptr ){
+    _workerProcess_->closeInput();
+    _workerProcess_->wait();
+    _workerProcess_.reset();
+  }
+#else
   if( _workerInputFd_ != -1 ){ close(_workerInputFd_); _workerInputFd_ = -1; }
   if( _workerOutputFd_ != -1 ){ close(_workerOutputFd_); _workerOutputFd_ = -1; }
 
@@ -597,6 +681,7 @@ void ExternalWeightPythonWorker::stopWorkerProcess() {
     waitpid(pid_t(_workerPid_), &status, 0);
     _workerPid_ = -1;
   }
+#endif
 
   _isWorkerStarted_ = false;
 }

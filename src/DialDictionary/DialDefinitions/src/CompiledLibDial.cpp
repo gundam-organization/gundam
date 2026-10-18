@@ -3,11 +3,11 @@
 //
 
 #include "CompiledLibDial.h"
+#include "DynamicLibrary.h"
 #include "GundamGlobals.h"
 
 #include "Logger.h"
 
-#include <dlfcn.h>
 
 
 double CompiledLibDial::evalResponse( const DialInputBuffer &input_ ) const{
@@ -23,13 +23,13 @@ bool CompiledLibDial::loadLibrary(const std::string& path_){
     return false;
   }
 
-  _loadedLibrary_ = dlopen(path_.c_str(), RTLD_LAZY );
+  _loadedLibrary_ = GundamUtils::DynamicLibrary::open(path_.c_str());
   if( _loadedLibrary_ == nullptr ){
-    LogError << "Cannot open library: " << dlerror() << std::endl;
+    LogError << "Cannot open library: " << GundamUtils::DynamicLibrary::error() << std::endl;
     return false;
   }
 
-  _evalFct_ = (dlsym(_loadedLibrary_, "evalVariable"));
+  _evalFct_ = (GundamUtils::DynamicLibrary::symbol(_loadedLibrary_, "evalVariable"));
   if( _evalFct_ == nullptr ){
     LogError << "Cannot open evalFcn" << std::endl;
     return false;

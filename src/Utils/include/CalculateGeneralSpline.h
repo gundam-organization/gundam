@@ -25,6 +25,8 @@
 #define DEVICE_FLOATING_POINT double
 #endif
 
+#include "CalculateSearchOffset.h"
+
 // Place in a private name space so it plays nicely with CUDA
 namespace {
     // Interpolate one point a spline with non-uniform points.  The spline can
@@ -121,14 +123,7 @@ namespace {
         int ix = 0;
         // Define a non-branching conditional to update the offset.
 #define CHECK_OFFSET(ioff)  if ((ix+ioff < knotCount) && (x > data[2+3*(ix+ioff)+2])) ix += ioff
-        // __builtin_clz(knotCount) counts the number of leading zeros in
-        // knotCount (available in GCC/Clang).  31 - __builtin_clz(knotCount)
-        // calculates the position of the most significant bit.  1 << (31 -
-        // __builtin_clz(knotCount)) generates the largest power of 2 <=
-        // knotCount Not benchmarked, but adds extra branching loop to every
-        // iteration.  It assumes that knotCount is represented by a 32 bit
-        // integer.
-        for( int offset = 1 << ( 31 - __builtin_clz(knotCount) ) ; offset > 0 ; offset >>= 1 ){
+        for( int offset = static_cast<int>(calculateSearchOffset(knotCount)) ; offset > 0 ; offset >>= 1 ){
             CHECK_OFFSET(offset);
         }
 #undef CHECK_OFFSET

@@ -32,6 +32,18 @@ if( WITH_ROOT_DICT_BUILD )
     OPTIONS "${CMAKE_CXX_FLAGS_DICT}"
   )
 
+  # ROOT looks for its dictionary beside the library. Multi-configuration
+  # generators put the DLL in a configuration subdirectory.
+  if(CMAKE_CONFIGURATION_TYPES)
+    add_custom_command(TARGET ${LIB_NAME} POST_BUILD
+      COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "${CMAKE_CURRENT_BINARY_DIR}/libGundamFitter_rdict.pcm"
+        "${CMAKE_CURRENT_BINARY_DIR}/libGundamFitter.rootmap"
+        "$<TARGET_FILE_DIR:${LIB_NAME}>"
+      VERBATIM
+    )
+  endif()
+
   target_link_libraries(
       ${LIB_NAME}
       PUBLIC

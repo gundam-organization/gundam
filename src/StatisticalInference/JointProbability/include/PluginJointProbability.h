@@ -6,9 +6,9 @@
 #define GUNDAM_PLUGIN_JOINT_PROBABILITY_H
 
 #include "JointProbabilityBase.h"
+#include "DynamicLibrary.h"
 
 #include <string>
-#include <dlfcn.h>
 
 
 namespace JointProbability{
@@ -81,9 +81,9 @@ namespace JointProbability{
 
   inline void PluginJointProbability::load(){
     LogInfo << "Loading shared lib: " << llhSharedLib << std::endl;
-    fLib = dlopen(llhSharedLib.c_str(), RTLD_LAZY);
-    LogThrowIf(fLib == nullptr, "Cannot open library: " << dlerror());
-    evalFcn = (dlsym(fLib, "evalFct"));
+    fLib = GundamUtils::DynamicLibrary::open(llhSharedLib.c_str());
+    LogThrowIf(fLib == nullptr, "Cannot open library: " << GundamUtils::DynamicLibrary::error());
+    evalFcn = (GundamUtils::DynamicLibrary::symbol(fLib, "evalFct"));
     LogThrowIf(evalFcn == nullptr, "Cannot open evalFcn");
   }
 

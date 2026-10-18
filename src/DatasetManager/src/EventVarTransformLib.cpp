@@ -3,13 +3,13 @@
 //
 
 #include "EventVarTransformLib.h"
+#include "DynamicLibrary.h"
 #include "LoaderUtils.h"
 #include "ConfigUtils.h"
 #include "FormulaUtils.h"
 
 #include "Logger.h"
 
-#include <dlfcn.h>
 #include <cctype>
 
 
@@ -96,9 +96,9 @@ void EventVarTransformLib::reload(){
 
 void EventVarTransformLib::loadLibrary(){
   LogThrowIf(not GenericToolbox::isFile(_libraryFile_), "Could not find lib file: " << _libraryFile_ << std::endl << _messageOnError_);
-  _loadedLibrary_ = dlopen(_libraryFile_.c_str(), RTLD_LAZY );
-  LogThrowIf(_loadedLibrary_ == nullptr, "Cannot open library: " << dlerror() << std::endl << _messageOnError_);
-  _evalVariable_ = (dlsym(_loadedLibrary_, "evalVariable"));
+  _loadedLibrary_ = GundamUtils::DynamicLibrary::open(_libraryFile_.c_str());
+  LogThrowIf(_loadedLibrary_ == nullptr, "Cannot open library: " << GundamUtils::DynamicLibrary::error() << std::endl << _messageOnError_);
+  _evalVariable_ = (GundamUtils::DynamicLibrary::symbol(_loadedLibrary_, "evalVariable"));
   LogThrowIf(_evalVariable_ == nullptr, "Cannot open evalFcn" << std::endl << _messageOnError_);
 }
 std::string EventVarTransformLib::registerInputFormulaArrayAlias(const std::string& sourceExpression_, size_t formulaIndex_){

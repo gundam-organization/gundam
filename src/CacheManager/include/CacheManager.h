@@ -1,6 +1,8 @@
 #ifndef CacheManager_h_seen
 #define CacheManager_h_seen
 
+#include "GundamCacheManagerExport.h"
+
 #include "CacheSampleHistFiller.h"
 #include "CacheEventWeightFiller.h"
 #include "CacheParameters.h"
@@ -264,7 +266,7 @@ private:
 
     /// Expose the static parameters to the class (defined in
     /// CacheManager.cpp).
-    static Parameters fParameters;
+    static GUNDAM_CACHE_MANAGER_EXPORT Parameters fParameters;
 
     /// Hold the configuration that will be used to construct the manager
     /// (singleton).  This information was originally passed as arguments to

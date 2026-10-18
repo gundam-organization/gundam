@@ -1,4 +1,5 @@
 #include "TabulatedDialFactory.h"
+#include "DynamicLibrary.h"
 
 #include <GundamGlobals.h>
 #include <DialBase.h>
@@ -8,7 +9,6 @@
 #include <GenericToolbox.Json.h>
 #include <Logger.h>
 
-#include <dlfcn.h>
 
 
 TabulatedDialFactory::TabulatedDialFactory(const ConfigReader& config_) {
@@ -63,15 +63,15 @@ TabulatedDialFactory::TabulatedDialFactory(const ConfigReader& config_) {
     }
 
     std::lock_guard<std::mutex> guard(GundamGlobals::getGlobalMutEx());
-    void* library = dlopen(expandedPath.c_str(), RTLD_LAZY );
+    void* library = GundamUtils::DynamicLibrary::open(expandedPath.c_str());
     if( library == nullptr ){
-        LogError << "Cannot load library: " << dlerror() << std::endl;
+        LogError << "Cannot load library: " << GundamUtils::DynamicLibrary::error() << std::endl;
         std::exit(EXIT_FAILURE); // Exit, not throw!
     }
 
     // Get the initialization function.
     if (not getInitializationFunction().empty()) {
-        void* initFunc = dlsym(library, getInitializationFunction().c_str());
+        void* initFunc = GundamUtils::DynamicLibrary::symbol(library, getInitializationFunction().c_str());
         if( initFunc == nullptr ){
             LogError << "Initialization function symbol not found: "
                      << getInitializationFunction()
@@ -104,7 +104,7 @@ TabulatedDialFactory::TabulatedDialFactory(const ConfigReader& config_) {
     for (auto& t : _table_) t = std::nan("not-set");
 
     // Get the update function
-    void* updateFunc = dlsym(library, getUpdateFunction().c_str());
+    void* updateFunc = GundamUtils::DynamicLibrary::symbol(library, getUpdateFunction().c_str());
     if( updateFunc == nullptr ){
         LogError << "Update function symbol not found: "
                  << getUpdateFunction()
@@ -117,7 +117,7 @@ TabulatedDialFactory::TabulatedDialFactory(const ConfigReader& config_) {
                    int bins, const double par[], int npar)>(updateFunc);
 
     // Get the binning function
-    void* binningFunc = dlsym(library, getBinningFunction().c_str());
+    void* binningFunc = GundamUtils::DynamicLibrary::symbol(library, getBinningFunction().c_str());
     if( binningFunc == nullptr ){
         LogError << "Binning function symbol not found: "
                  << getBinningFunction()

@@ -5,6 +5,10 @@
 # 3.11 minimum required for FetchContent
 cmake_minimum_required( VERSION 3.10 FATAL_ERROR )
 
+if(POLICY CMP0091)
+  cmake_policy(SET CMP0091 NEW) # Select the MSVC runtime independently of optimization/debug flags.
+endif()
+
 # Define project
 project( GUNDAM )
 

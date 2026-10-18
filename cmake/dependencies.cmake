@@ -85,6 +85,34 @@ if( ROOT_FOUND )
     cmessage( STATUS "[ROOT]: Skipping ROOT_USE_FILE flags (non-MSVC on Windows)." )
   endif()
 
+  if(MSVC)
+    # ROOT dictionaries pass STL objects across the DLL boundary. Match ROOT's
+    # runtime (and its STL debug layout), even for a GUNDAM Debug configuration.
+    string(REGEX MATCH "(^|[ \t])[-/](MDd|MD|MTd|MT)([ \t]|$)" _root_runtime_flag "${ROOT_CXX_FLAGS}")
+    set(_root_runtime "${CMAKE_MATCH_2}")
+    if(_root_runtime)
+      if(_root_runtime STREQUAL "MD")
+        set(CMAKE_MSVC_RUNTIME_LIBRARY MultiThreadedDLL)
+      elseif(_root_runtime STREQUAL "MDd")
+        set(CMAKE_MSVC_RUNTIME_LIBRARY MultiThreadedDebugDLL)
+      elseif(_root_runtime STREQUAL "MT")
+        set(CMAKE_MSVC_RUNTIME_LIBRARY MultiThreaded)
+      else()
+        set(CMAKE_MSVC_RUNTIME_LIBRARY MultiThreadedDebug)
+      endif()
+      # Also migrate build trees configured before CMP0091 was enabled.
+      foreach(_runtime_language IN ITEMS C CXX)
+        foreach(_runtime_config IN ITEMS DEBUG RELEASE RELWITHDEBINFO MINSIZEREL)
+          set(_runtime_flags "CMAKE_${_runtime_language}_FLAGS_${_runtime_config}")
+          string(REGEX REPLACE "(^|[ \t])[-/]M[DT]d?([ \t]|$)" "\\1\\2"
+            ${_runtime_flags} "${${_runtime_flags}}")
+        endforeach()
+      endforeach()
+      set(gtest_force_shared_crt ON)
+      cmessage(STATUS "[ROOT]: Using MSVC runtime /${_root_runtime} for GUNDAM and its dependencies")
+    endif()
+  endif()
+
   # Add the libraries and include files here.  These "should" go in
   # the target_link_libraries or target_include_directories for each library
   # that uses them, but they all use them, so put them here. This keeps the
