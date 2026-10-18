@@ -47,7 +47,9 @@ if( ROOT_FOUND )
   # that uses them, but they all use them, so put them here. This keeps the
   # symmetry when root-config (if find_package didn't work)
   link_libraries(${ROOT_LIBRARIES})
-  include_directories(${ROOT_INCLUDE_DIRS})
+  # Match ROOT's imported targets: otherwise toolbox modules that do not link
+  # ROOT can pick its bundled JSON before the selected nlohmann_json headers.
+  include_directories(SYSTEM ${ROOT_INCLUDE_DIRS})
 
   if (ROOT_VERSION VERSION_GREATER_EQUAL 6.30.00)
     set(ROOT_minuit2_FOUND "yes")
