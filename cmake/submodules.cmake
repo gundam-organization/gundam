@@ -104,3 +104,8 @@ set(GENERIC_TOOLBOX_INSTALL_PACKAGE OFF)
 set(GENERIC_TOOLBOX_BUILD_EXAMPLES OFF)
 set(GENERIC_TOOLBOX_BUILD_TESTS OFF)
 add_subdirectory(submodules/cpp-generic-toolbox)
+
+# ROOT also ships nlohmann headers. Prefer GUNDAM's selected JSON package
+# when compiling the toolbox so its exported functions use the same ABI.
+target_include_directories(GenericToolboxJson BEFORE PUBLIC
+  "$<TARGET_PROPERTY:nlohmann_json::nlohmann_json,INTERFACE_INCLUDE_DIRECTORIES>")
