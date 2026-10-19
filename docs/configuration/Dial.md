@@ -24,8 +24,11 @@ external libraries to calculate weights.
 | applyOnDataSets        | list(string) | list (regex) of datasets the corresponding dials will apply to         | `["*"]` |
 | applyCondition         | string       | Only apply this dial with formula evaluates to non-zero                | empty   |
 | applyConditions        | list(json)   | Multiple condition formulas (only apply dial if all are true) formulas | n/a     |
-| minDialResponse        | double       | Minimum weight value returned by the dial response (should be zero)    | -inf    |
-| maxDialResponse        | double       | Maximum weight returned by the dial (typically you want about ten)     | inf     |
+| minDialResponse        | double       | Deprecated, still supported with a warning. Use `dialResponseLimits`.   | -inf    |
+| maxDialResponse        | double       | Deprecated, still supported with a warning. Use `dialResponseLimits`.   | inf     |
+| dialResponseLimits     | range        | Response bounds as `[min, max]`, `{min: ...}`, or `{max: ...}`           | existing response defaults |
+| enableResponseSmoothing | bool       | Apply centered C² transitions at finite response bounds in the original engine | false |
+| dialResponseSmoothingWidth | positive number or range | Transition half-width, shared or separate for each bound | unset |
 | binningFilePath        | string       | binning definition of a set of spline (along with `dialsFilePath`)     |         |
 | useMirrorDial          | bool         | enable dial mirroring along the edges                                  | false   |
 | mirrorLowEdge          | double       | low edge where mirroring applies                                       |         |
@@ -36,6 +39,58 @@ external libraries to calculate weights.
 | mirrorDefinitionRange  | pair(double) |                                                                        |         |
 | dialInputList          | list(json)   | List of parameters for this dial                                       | empty   |
 | dialsTreePath          | string       | Deprecated: tree name where the dials are stored                       |         |
+
+### Smooth response limits
+
+The original propagation engine can replace hard response clamps with centered
+quartic transitions. This operates on the evaluated dial response, independently
+of the direction in which the parameter changes, and does not modify input knots.
+Accelerated backends and the legacy CacheManager do not implement this option.
+
+```yaml
+dialType: Spline
+dialBranchData: graph
+dialResponseLimits: [0.0, 2.0]
+enableResponseSmoothing: true
+dialResponseSmoothingWidth: 0.1
+```
+
+A scalar width applies to both bounds. Separate widths can be specified as
+`[0.2, 0.05]` or `{min: 0.2, max: 0.05}`. The first entry always belongs to the
+lower bound; widths are never reordered by magnitude. For a single bound, for
+example `dialResponseLimits: {max: 2.0}`, `{max: 0.05}` is sufficient.
+
+All supplied widths must be finite and strictly positive, including widths for
+absent bounds. Set `enableResponseSmoothing: false` to disable smoothing rather
+than using a zero width. Enabling smoothing requires a width for each finite
+bound. Widths for absent or infinite bounds are otherwise unused. With two finite
+bounds, the sum of their widths must not exceed `max - min`; touching transition
+regions are allowed, overlapping regions are rejected.
+
+For a lower limit `L` and width `c`, the response is exactly `L` for raw weights
+`w <= L - c`, unchanged for `w >= L + c`, and otherwise:
+
+```text
+t = (w - L + c) / (2c)
+response = L + c * t³ * (2 - t)
+```
+
+The upper transition is the reflection of the lower transition. The value and
+first two derivatives match at the transition endpoints, and the slope stays
+between zero and one. In particular, a raw weight equal to a lower limit of zero
+returns `3c/16`, reaching exactly zero at `w = -c`. This smooths clamp junctions;
+it does not guarantee removal of kinks already present in the dial itself.
+
+`dialResponseLimits` also works without smoothing. When supplied, it replaces the
+default response bounds: an omitted bound is unbounded. The existing
+`minDialResponse` and `maxDialResponse` options are deprecated but remain
+supported with a warning, including with smoothing enabled. Old configurations
+retain their response bounds and hard-clamping behavior unless smoothing is
+explicitly enabled. The older `minimumSplineResponse` alias also remains readable.
+If combined with `dialResponseLimits`, explicitly supplied
+legacy values must match the corresponding limits; conflicts are rejected.
+Omitting `enableResponseSmoothing` preserves hard clamping even if a width is
+provided.
 
 ### Config options that apply to specific types of dials
 
