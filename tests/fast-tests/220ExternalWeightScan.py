@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Unrelated eigen scans keep a PythonWorker alive without reevaluating it."""
 import json
+import math
 import shutil
 import subprocess
 import sys
@@ -85,16 +86,30 @@ def run(command_):
     assert sum(command["command"] == "shutdown" for command in commands) == 1, commands
     evaluations = [command["parameters"] for command in commands if command["command"] == "evaluate"]
     assert evaluations[0] == {"shift": .05}, evaluations
+    # After the pre-fit scans, the dry-run flat-direction check probes the
+    # migration parameter on either side and restores its initial value.
+    scan_evaluations = evaluations
+    probe_count = 0
+    if "Checking LLH flat directions..." in log:
+        assert log.count("Checking LLH flat directions...") == 1, log
+        assert len(evaluations) >= 4, evaluations
+        lower, upper, restored = evaluations[-3:]
+        assert lower["shift"] < .05 < upper["shift"], evaluations
+        assert math.isclose(lower["shift"] + upper["shift"], .1, abs_tol=1e-12), evaluations
+        assert restored == {"shift": .05}, evaluations
+        scan_evaluations = evaluations[:-3]
+        probe_count = 3
     if scan_migration:
         assert "Scanning: Migration/#0_shift / 100 steps" in log, log
         # First evaluation, nbPoints+1 scan points, and restoration to the initial value.
-        assert len(evaluations) == points + 3, len(evaluations)
-        assert len({state["shift"] for state in evaluations}) == points + 1, evaluations
-        assert evaluations[-1] == {"shift": .05}, evaluations[-1]
+        assert len(scan_evaluations) == points + 3, len(scan_evaluations)
+        assert len({state["shift"] for state in scan_evaluations}) == points + 1, scan_evaluations
+        assert scan_evaluations[-1] == {"shift": .05}, scan_evaluations[-1]
     else:
         assert "Scanning: Migration/" not in log, log
-        assert evaluations == [{"shift": .05}], evaluations
-    print(f"threads={threads}, scan_migration={scan_migration}: {len(evaluations)} evaluate commands", flush=True)
+        assert scan_evaluations == [{"shift": .05}], scan_evaluations
+    print(f"threads={threads}, scan_migration={scan_migration}: {len(scan_evaluations)} scan evaluations, "
+          f"{probe_count} flat-direction probe/restoration evaluations", flush=True)
 
 
 def main():
