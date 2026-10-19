@@ -38,21 +38,20 @@ public:
   struct DialResponseCache {
     DialResponseCache() = delete; // prevent not setting up the interface ptr
     explicit DialResponseCache( DialInterface& interface_ )
-      : dialInterface(&interface_) {
-      this->updateRequested = (bool*) dialInterface->getInputBufferRef()->isDialUpdateRequestedPtr();
-    }
+      : dialInterface(&interface_), inputRevisionPtr(interface_.getInputBufferRef()->getRevisionPtr()) {}
     // The dial interface to be used with the Event.
     DialInterface* dialInterface{nullptr};
     // The cached result calculated by the dial.
     bool appliesToVariable{false};
     double response{std::nan("unset")};
-    // A cached boolean to check if the dial needs to be updated.
-    bool *updateRequested{nullptr};
+    // Cache the revision address to avoid following the interface and input
+    // buffer pointers for every response, including unchanged parameters.
+    const std::uint64_t* inputRevisionPtr{nullptr};
     std::uint64_t inputRevision{std::uint64_t(-1)};
     void update(){
       // Retain changes until this response consumes them, even when the
       // input buffer has been updated again in the meantime.
-      auto revision = dialInterface->getInputBufferRef()->getRevision();
+      auto revision = *inputRevisionPtr;
       if( inputRevision != revision ) {
         response = dialInterface->evalResponse();
         inputRevision = revision;

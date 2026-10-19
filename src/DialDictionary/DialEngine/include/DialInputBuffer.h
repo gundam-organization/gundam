@@ -51,6 +51,7 @@ public:
   // const getters
   [[nodiscard]] auto isDialUpdateRequested() const{ return _isDialUpdateRequested_; }
   [[nodiscard]] auto getRevision() const{ return _revision_; }
+  [[nodiscard]] const std::uint64_t* getRevisionPtr() const{ return &_revision_; }
   [[nodiscard]] auto isDialUpdateRequestedPtr() const{ return &_isDialUpdateRequested_; }
   [[nodiscard]] auto getBufferSize() const{ return _inputArraySize_; }
   [[nodiscard]] auto getInputSize() const{ return _inputParameterReferenceList_.size(); }
