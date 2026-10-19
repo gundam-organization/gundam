@@ -91,9 +91,12 @@ def child(mode):
 def main():
     for mode in ('dry', 'flatFit', 'dryClean', 'fit', 'restore', 'probe'):
         result = subprocess.run([sys.executable, __file__, mode], capture_output=True, text=True, errors='replace')
-        log = re.sub(r'\x1b\[[0-9;]*[A-Za-z]', '', result.stdout + result.stderr)
+        rawLog = result.stdout + result.stderr
+        log = re.sub(r'\x1b\[[0-9;]*[A-Za-z]', '', rawLog)
         Path(f'225FlatLikelihoodDirections-{mode}.log').write_text(log)
-        assert result.returncode == 0 and f'CHILD_OK {mode}' in log, log[-8000:]
+        # Python markers can land inside buffered C++ ANSI sequences. Check
+        # them before stripping escape codes, which can consume their first letter.
+        assert result.returncode == 0 and f'CHILD_OK {mode}' in rawLog, (mode, result.returncode, log[-8000:])
         assert log.count('Checking LLH flat directions...') == (2 if mode == 'fit' else 1), log[-8000:]
         flat = [line for line in log.splitlines() if 'Flat LLH direction:' in line]
         if mode in ('dry', 'flatFit', 'probe'):
@@ -102,12 +105,12 @@ def main():
             if mode == 'flatFit':
                 assert 'flat LLH directions were detected, the fit might fail' in log
                 assert 'Minimization ended' in log
-                assert 'COVARIANCE_UNAVAILABLE' in log or 'FLAT_FIT_COMPLETED' in log
+                assert 'COVARIANCE_UNAVAILABLE' in rawLog or 'FLAT_FIT_COMPLETED' in rawLog
                 assert 'Cannot start fit' not in log
             else:
                 assert 'Minimization ended' not in log
             if mode == 'dry':
-                assert f'FIT_BLOCKED {mode}' in log
+                assert f'FIT_BLOCKED {mode}' in rawLog
         else:
             assert not flat, flat  # A zero gradient at a curved minimum is valid.
     print('SUCCESS: flat dry-runs are blocked, Migrad warns and proceeds, error hooks run, and probe state is restored')
