@@ -1,5 +1,6 @@
 #include "MinimizerBase.h"
 #include "FitterEngine.h"
+#include "GundamUtils.h"
 
 #ifdef GUNDAM_USING_CACHE_MANAGER
 #include "CacheManager.h"
@@ -213,7 +214,7 @@ double MinimizerBase::evalFit( const double* parArray_ ){
       ssHeader << std::endl << GenericToolbox::getNowDateString("%Y.%m.%d %H:%M:%S");
       ssHeader << std::endl << __METHOD_NAME__ << ": call #" << _monitor_.nbEvalLikelihoodCalls;
       ssHeader << std::endl << _monitor_.stateTitleMonitor << " / Nb of parameters to fit: " << nbValidPars;
-      ssHeader << std::endl << "RAM: " << GenericToolbox::parseSizeUnits(double(GenericToolbox::getProcessMemoryUsage()));
+      ssHeader << std::endl << "RAM: " << GundamUtils::getProcessMemoryUsageSummary();
       double cpuPercent = GenericToolbox::getCpuUsageByProcess();
       ssHeader << " / CPU: " << cpuPercent << "% / " << cpuPercent / GundamGlobals::getNbCpuThreads() << "% efficiency";
       ssHeader << std::endl << "Avg log-likelihood computation time: " << _monitor_.evalLlhTimer;

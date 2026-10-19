@@ -1227,6 +1227,20 @@ void DataDispenser::readAndFill(){
     this->runEventFillThreads(-1); // for better debug breakdown
   }
 
+  // All reader and event-filler threads have joined. The events and dials now
+  // own their data, so the ROOT readers are no longer needed for propagation.
+  LogInfo << "Releasing ROOT readers and loading buffers..." << std::endl;
+  for( auto& threadSharedData : threadSharedDataList ){
+    if( threadSharedData.treeChain == nullptr ){ continue; }
+    // Disconnect ROOT while TreeBuffer's branch storage and notifier are alive.
+    // ResetBranchAddresses also disconnects the friend trees.
+    threadSharedData.treeChain->SetNotify(nullptr);
+    threadSharedData.treeChain->ResetBranchAddresses();
+  }
+  // TreeBuffer/formulas are destroyed before their TChain (member order in
+  // ThreadSharedData), which also releases the owned friend chains and files.
+  std::vector<ThreadSharedData>{}.swap(threadSharedDataList);
+
   LogInfo << "Shrinking lists..." << std::endl;
   for( size_t iSample = 0 ; iSample < _cache_.samplesToFillList.size() ; iSample++ ){
     _cache_.samplesToFillList[iSample]->shrinkEventList( _cache_.sampleIndexOffsetList[iSample] );
@@ -1837,7 +1851,7 @@ void DataDispenser::runEventFillThreads(int iThread_){
 
         int cpuPercent = int(GenericToolbox::getCpuUsageByProcess());
         ssProgressBar << " / CPU efficiency: " << GenericToolbox::padString(std::to_string(cpuPercent/nThreads), 3,' ')
-                      << "% / RAM: " << GenericToolbox::parseSizeUnits( double(GenericToolbox::getProcessMemoryUsage()) ) << std::endl;
+                      << "% / RAM: " << GundamUtils::getProcessMemoryUsageSummary() << std::endl;
 
         ssProgressBar << LogInfo.getPrefixString() << "Data size per entry: " << GenericToolbox::parseSizeUnits(readSpeed.getLastValue());
         ssProgressBar << " / Using " << nThreads << " threads" << std::endl;
