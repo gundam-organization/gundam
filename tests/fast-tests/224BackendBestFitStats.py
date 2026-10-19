@@ -3,7 +3,6 @@
 import json
 import math
 import sys
-from array import array
 from importlib import import_module
 from pathlib import Path
 
@@ -55,22 +54,18 @@ def close(actual, expected):
 
 def main():
     import GUNDAM
-    import ROOT
+    import numpy as np
+    import uproot
     if not hasattr(GUNDAM.FitterEngine, 'getBackendsManager'):
         print('SKIP: built without backends')
         return
     GUNDAM.setLightOutputMode(True)
     GUNDAM.setNumberOfThreads(2)
     path = Path.cwd() / '224BackendBestFitStats-input.root'
-    with ROOT.TFile(str(path), 'RECREATE'):
-        tree = ROOT.TTree('events', 'events')
-        x, weight = array('d', [0]), array('d', [0])
-        tree.Branch('X', x, 'X/D')
-        tree.Branch('weight', weight, 'weight/D')
-        for xv, w in [(.25, 1.5), (.75, 2.5), (1.25, 3.5), (1.75, 4.5)]:
-            x[0], weight[0] = xv, w
-            tree.Fill()
-        tree.Write()
+    with uproot.recreate(path) as output_file:
+        tree = output_file.mktree('events', {'X': 'float64', 'weight': 'float64'})
+        tree.extend({'X': np.array([.25, .75, 1.25, 1.75]),
+                     'weight': np.array([1.5, 2.5, 3.5, 4.5])})
     for probability, fixed_errors in [('BarlowLLH_BANFF_OA2021', False),
                                        ('BarlowLLH_BANFF_OA2021', True),
                                        ('BarlowLLH_BANFF_OA2021_SFGD', False)]:
@@ -96,17 +91,18 @@ def main():
     backend.fit()
     expected = backend.getLikelihoodInterface().getLastStatLikelihood()
     # Fit output is flushed by RootMinimizer; inspect through a read-only handle.
-    with ROOT.TFile(str(output), 'READ') as saved:
-        stats = saved.Get('FitterEngine/postFit/bestFitStats')
-        assert stats
-        stats.GetEntry(0)
-        close(stats.GetLeaf('statLikelihoodAtBestFit').GetValue(), expected)
+    with uproot.open(output) as saved:
+        stats = saved['FitterEngine/postFit/bestFitStats']
+        assert stats.num_entries == 1
+        close(float(stats['statLikelihoodAtBestFit'].array(library='np')[0]), expected)
         sample_sum = 0.
-        for branch in stats.GetListOfBranches():
-            leaves = list(branch.GetListOfLeaves())
-            if leaves and leaves[0].GetName() == 'llhSample':
-                sample_sum += leaves[0].GetValue()
-                close(sum(leaf.GetValue() for leaf in leaves[1:]), leaves[0].GetValue())
+        for branch in stats.values():
+            values = branch.array(library='np')
+            names = values.dtype.names or ()
+            if names and names[0] == 'llhSample':
+                sample_value = float(values['llhSample'][0])
+                sample_sum += sample_value
+                close(sum(float(values[name][0]) for name in names[1:]), sample_value)
         close(sample_sum, expected)
     print('SUCCESS: Barlow-Beeston backend likelihoods and bestFitStats agree with host samples and bins')
 
