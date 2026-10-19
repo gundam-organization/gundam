@@ -28,6 +28,7 @@
 #include "Logger.h"
 
 #include <sstream>
+#include <typeinfo>
 
 void DialCollection::prepareConfig(ConfigReader &config_){
   config_.clearFields();
@@ -112,6 +113,7 @@ void DialCollection::initializeImpl() {
     }
   }
 
+  this->deduplicateBinnedDials();
   this->setupDialInterfaceReferences();
 }
 
@@ -177,13 +179,142 @@ ParameterSet* DialCollection::getSupervisedParameterSet() const{
 }
 
 // core
+namespace {
+  bool isAffine(const std::vector<DialUtils::DialPoint>& points_, bool checkSlopes_){
+    if( points_.size() < 2 or not (points_.back().x > points_.front().x) ){ return false; }
+    const double slope = DialUtils::getSlope(points_.front(), points_.back());
+    if( not std::isfinite(slope) ){ return false; }
+    auto equal = [](double lhs_, double rhs_){
+      return std::isfinite(lhs_) and std::isfinite(rhs_)
+          and std::abs(lhs_ - rhs_) <= 64 * std::numeric_limits<double>::epsilon()
+              * std::max(1.0, std::max(std::abs(lhs_), std::abs(rhs_)));
+    };
+    for( const auto& point : points_ ){
+      if( not equal(point.y, points_.front().y + slope * (point.x - points_.front().x)) ){ return false; }
+      if( checkSlopes_ and not equal(point.slope, slope) ){ return false; }
+    }
+    return true;
+  }
+
+  // Include all evaluation state, including the exact upper bound (which can
+  // differ from the value reconstructed from a uniform grid's rounded step).
+  template<typename T> bool appendSplineSignature(const DialBase& dial_, std::vector<double>& signature_){
+    const auto* spline = dynamic_cast<const T*>(&dial_);
+    if( spline == nullptr ){ return false; }
+    signature_ = spline->getDialData();
+    signature_.push_back(spline->getSplineBounds().min);
+    signature_.push_back(spline->getSplineBounds().max);
+    return true;
+  }
+
+  bool getDialSignature(const DialBase& dial_, std::vector<double>& signature_){
+    if( appendSplineSignature<CompactSpline>(dial_, signature_)
+        or appendSplineSignature<MonotonicSpline>(dial_, signature_)
+        or appendSplineSignature<UniformSpline>(dial_, signature_)
+        or appendSplineSignature<GeneralSpline>(dial_, signature_) ){ return true; }
+    if( dynamic_cast<const Graph*>(&dial_) != nullptr ){
+      signature_ = dial_.getDialData();
+      return true;
+    }
+    if( const auto* shift = dynamic_cast<const Shift*>(&dial_) ){
+      signature_ = {shift->getShiftValue()};
+      return true;
+    }
+    return dynamic_cast<const Norm*>(&dial_) != nullptr;
+  }
+
+  size_t getDialSignatureHash(const DialBase& dial_, const std::vector<double>& signature_){
+    size_t hash = typeid(dial_).hash_code();
+    auto combineHash = [&](size_t value_){ hash ^= value_ + 0x9e3779b9 + (hash << 6) + (hash >> 2); };
+    combineHash(std::hash<bool>{}(dial_.getAllowExtrapolation()));
+    for( double value : signature_ ){ combineHash(std::hash<double>{}(value)); }
+    return hash;
+  }
+
+  bool matchesDialSignature(const DialBase& candidate_, const DialBase& dial_,
+                            const std::vector<double>& signature_){
+    if( typeid(candidate_) != typeid(dial_)
+        or candidate_.getAllowExtrapolation() != dial_.getAllowExtrapolation() ){ return false; }
+    std::vector<double> candidateSignature;
+    return getDialSignature(candidate_, candidateSignature) and candidateSignature == signature_;
+  }
+}
+
+void DialCollection::deduplicateBinnedDials(){
+  if( isEventByEvent() or _dialBinSet_.getBinList().empty() ){ return; }
+  std::unordered_multimap<size_t, size_t> index;
+  std::vector<double> signature;
+  size_t reused{0};
+  for( size_t iDial = 0; iDial < _dialInterfaceList_.size(); ++iDial ){
+    auto& interface = _dialInterfaceList_[iDial];
+    const auto* dial = interface.getDialBaseRef();
+    signature.clear();
+    if( dial == nullptr or not getDialSignature(*dial, signature) ){ continue; }
+    const auto hash = getDialSignatureHash(*dial, signature);
+    const auto matches = index.equal_range(hash);
+    bool found{false};
+    for( auto match = matches.first; match != matches.second; ++match ){
+      const auto& candidate = _dialInterfaceList_[match->second];
+      if( matchesDialSignature(*candidate.getDialBaseRef(), *dial, signature) ){
+        interface.shareDial(candidate);
+        ++reused;
+        found = true;
+        break;
+      }
+    }
+    if( not found ){ index.emplace(hash, iDial); }
+  }
+  if( reused != 0 ){
+    LogInfo << getTitle() << ": shared " << reused << " binned dial definitions; kept "
+            << _dialInterfaceList_.size() << " bin interfaces." << std::endl;
+  }
+}
+
+size_t DialCollection::storeEventDial(std::unique_ptr<DialBase> dial_){
+  LogThrowIf(dial_ == nullptr, "Cannot store a null event dial");
+  std::vector<double> signature;
+  // Interface sharing is only valid when every interface uses the same inputs
+  // and response supervisor. ROOT splines and event-dependent factories stay unique.
+  bool canShare = _dialInputBufferList_.size() == 1
+      and _dialResponseSupervisorList_.size() == 1
+      and getDialSignature(*dial_, signature);
+  const size_t hash = getDialSignatureHash(*dial_, signature);
+
+  std::unique_lock<std::mutex> lock(_eventDialMutex_);
+  if( canShare ){
+    auto matches = _eventDialIndex_.equal_range(hash);
+    for( auto match = matches.first; match != matches.second; ++match ){
+      const auto* candidate = _dialInterfaceList_[match->second].getDialBaseRef();
+      if( matchesDialSignature(*candidate, *dial_, signature) ){
+        ++_reusedEventDials_;
+        return match->second;
+      }
+    }
+  }
+  const size_t index = getNextDialFreeSlot();
+  if( _dialInterfaceList_.size() <= index ){ _dialInterfaceList_.resize(index + 1); }
+  _dialInterfaceList_[index].getDial().dialPtr = std::move(dial_);
+  if( canShare ){ _eventDialIndex_.emplace(hash, index); }
+  return index;
+}
+
 void DialCollection::clear(){
   _dialInterfaceList_.clear();
   _dialInterfaceList_.shrink_to_fit();
   _dialFreeSlot_.setValue(0);
+  _eventDialIndex_.clear();
+  _eventDialIndex_.rehash(0);
+  _reusedEventDials_ = 0;
 }
 
 void DialCollection::resizeContainers(){
+  if( _reusedEventDials_ != 0 ){
+    LogInfo << getTitle() << ": reused " << _reusedEventDials_
+            << " event dials; stored " << _dialFreeSlot_.getValue() << " interfaces." << std::endl;
+  }
+  _eventDialIndex_.clear();
+  _eventDialIndex_.rehash(0);
+  _reusedEventDials_ = 0;
   LogDebugIf(GundamGlobals::isDebug()) << "Resizing containers of the dial collection \"" << this->getTitle() << "\" from "
                                        << _dialInterfaceList_.size() << " to " << _dialFreeSlot_.getValue() << std::endl;
 
@@ -1249,6 +1380,14 @@ std::unique_ptr<DialBase> DialCollection::makeSplineDial(const TObject* src_) co
 
   }
 
+  // A two-point Graph is an affine response and retains the original domain.
+  // Check the effective spline slopes as well as the knot coordinates.
+  if( splType != "ROOT" and isAffine(splinePointList, true)
+      and (dynamic_cast<const GeneralSpline*>(out.get()) != nullptr
+           or DialUtils::isUniform(splinePointList, 64 * std::numeric_limits<double>::epsilon())) ){
+    return makeGraphDial(splinePointList);
+  }
+
   // Pass the ownership without any constraints!
   return out;
 
@@ -1353,7 +1492,14 @@ std::unique_ptr<DialBase> DialCollection::makeGraphDial(const std::vector<DialUt
   }
 
   auto dial = std::make_unique<Graph>();
-  dial->buildDial(pointList_);
+  if( isAffine(pointList_, false) ){
+    if( _allowDialExtrapolation_ and std::all_of(pointList_.begin(), pointList_.end(),
+          [](const DialUtils::DialPoint& point_){ return point_.x == point_.y; }) ){
+      return std::make_unique<Norm>();
+    }
+    dial->buildDial(std::vector<DialUtils::DialPoint>{pointList_.front(), pointList_.back()});
+  }
+  else{ dial->buildDial(pointList_); }
   return dial;
 }
 
