@@ -3,7 +3,12 @@
 import importlib.util
 import math
 import sys
+from importlib import import_module
 from pathlib import Path
+
+sys.dont_write_bytecode = True
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import_module("005PythonSetup-utils").requireVenv(__file__)
 
 
 def load_cpu_backend_test_module():
@@ -18,10 +23,6 @@ def build_mps_config_text(cpu_test_module, root_path: Path, enable_backend: bool
     config_text = cpu_test_module.build_config_text(root_path, enable_backend)
     if enable_backend:
         config_text = config_text.replace("type: CPU", "type: MPS")
-        config_text = config_text.replace(
-            "outputRequests: [EventWeights, Histograms]",
-            "outputRequests: [EventWeights, Histograms, Likelihood]",
-        )
     return config_text
 
 
@@ -35,6 +36,13 @@ def assert_mps_close_list(label: str, left: list[float], right: list[float]) -> 
 
 
 def main() -> int:
+    if sys.platform != "darwin":
+        print("SKIP: Metal is only available on macOS")
+        return 0
+    import GUNDAM
+    if not hasattr(GUNDAM.FitterEngine, "getBackendsManager"):
+        print("SKIP: GUNDAM was built without backends")
+        return 0
     cpu_test = load_cpu_backend_test_module()
 
     work_dir = Path.cwd()
@@ -49,6 +57,7 @@ def main() -> int:
     prior_backend_llh, prior_backend_sums, prior_backend_errors = cpu_test.evaluate_config(
         build_mps_config_text(cpu_test, root_path, True),
         work_dir,
+        backend_type="MPS",
     )
 
     systematic_point = (4.0, 1.0)
@@ -61,6 +70,7 @@ def main() -> int:
         build_mps_config_text(cpu_test, root_path, True),
         work_dir,
         systematic_point,
+        backend_type="MPS",
     )
 
     expected_prior_sums = [7.0, 8.0]

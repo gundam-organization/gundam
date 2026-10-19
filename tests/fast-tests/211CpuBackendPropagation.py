@@ -3,8 +3,13 @@
 import math
 import sys
 from array import array
+from importlib import import_module
 from pathlib import Path
 from typing import Optional
+
+sys.dont_write_bytecode = True
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import_module("005PythonSetup-utils").requireVenv(__file__)
 
 
 def flush_python_outputs() -> None:
@@ -35,14 +40,17 @@ def build_config_text(root_path: Path, enable_backend: bool) -> str:
     backend_config = ""
     if enable_backend:
         backend_config = """
-    backendConfig:
+    backendManagerConfig:
       isEnabled: true
       type: CPU
-      outputRequests: [EventWeights, Histograms]
 """
 
     return f"""
 fitterEngineConfig:
+  enablePca: false
+  scaleParStepWithChi2Response: false
+  generateSamplePlots: false
+  generateOneSigmaPlots: false
 
   likelihoodInterfaceConfig:
     jointProbabilityConfig:
@@ -111,16 +119,11 @@ def evaluate_config(
     config_text: str,
     work_dir: Path,
     systematic_point: Optional[tuple[float, float]] = None,
+    backend_type: Optional[str] = None,
 ) -> tuple[float, list[float], list[float]]:
-    repo_root = Path(__file__).resolve().parents[2]
-    for build_dir in ("cmake-build-debug", "cmake-build-release"):
-        python_module_dir = repo_root / build_dir / "src" / "PythonInterface"
-        if python_module_dir.exists():
-            sys.path.insert(0, str(python_module_dir))
-            break
-
     import GUNDAM
 
+    print("Testing module:", GUNDAM.__file__, flush=True)
     flush_python_outputs()
 
     GUNDAM.setRuntimeWorkingDirectory(str(work_dir))
@@ -137,13 +140,18 @@ def evaluate_config(
     engine.setConfig(fitter_engine_config)
     engine.configure()
     likelihood_interface = engine.getLikelihoodInterface()
-    likelihood_interface.initialize()
+    engine.initialize()
+    if hasattr(engine, "getBackendsManager"):
+        manager = engine.getBackendsManager()
+        assert manager.hasBackend() == (backend_type is not None)
+        if backend_type is not None:
+            assert manager.getType() == backend_type
     GUNDAM.flushOutput()
 
     if systematic_point is not None:
         set_normalization_parameters(likelihood_interface, *systematic_point)
 
-    likelihood_interface.propagateAndEvalLikelihood()
+    engine.evaluateLikelihood()
 
     likelihood = likelihood_interface.getLastLikelihood()
     sample = likelihood_interface.getModelPropagator().getSampleSet().getSampleList()[0]
@@ -164,6 +172,10 @@ def assert_close_list(label: str, left: list[float], right: list[float]) -> None
 
 
 def main() -> int:
+    import GUNDAM
+    if not hasattr(GUNDAM.FitterEngine, "getBackendsManager"):
+        print("SKIP: GUNDAM was built without backends")
+        return 0
     script_dir = Path(sys.argv[1]).resolve() if len(sys.argv) > 1 else Path(__file__).resolve().parent
     work_dir = Path.cwd()
     root_path = work_dir / "211CpuBackendPropagation.root"
@@ -177,6 +189,7 @@ def main() -> int:
     prior_backend_llh, prior_backend_sums, prior_backend_errors = evaluate_config(
         build_config_text(root_path, True),
         work_dir,
+        backend_type="CPU",
     )
 
     systematic_point = (4.0, 1.0)
@@ -189,6 +202,7 @@ def main() -> int:
         build_config_text(root_path, True),
         work_dir,
         systematic_point,
+        backend_type="CPU",
     )
 
     expected_prior_sums = [7.0, 8.0]
