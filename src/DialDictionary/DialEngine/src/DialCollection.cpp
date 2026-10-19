@@ -51,6 +51,7 @@ void DialCollection::prepareConfig(ConfigReader &config_){
       {"applyToVariable"},
       {"variableResponseMode"},
       {"definitionRange"},
+      {"knotResponseLimits"},
       {"mirrorDefinitionRange"},
       {"applyConditions"},
       {"parametersBinningPath"},
@@ -155,6 +156,7 @@ std::string DialCollection::getSummary(bool shallow_) const{
   }
   if( not _applyToVariable_.empty() ){ ss << " / variable:" << _applyToVariable_ << " / mode:" << _variableResponseMode_; }
   if( _definitionRange_.hasBound() ){ ss << " / definitionRange:" << _definitionRange_; }
+  if( _knotResponseLimits_.hasBound() ){ ss << " / knotResponseLimits:" << _knotResponseLimits_; }
   if( _mirrorDefinitionRange_.hasBound() ){ ss << " / mirrorDefinitionRange:" << _mirrorDefinitionRange_; }
 
   if( not shallow_ ){
@@ -486,6 +488,9 @@ void DialCollection::readParametersFromConfig(const ConfigReader &config_) {
   config_.fillValue(_allowDialExtrapolation_, "allowDialExtrapolation");
   config_.fillValue(_applyConditionStr_, "applyCondition");
   config_.fillValue(_definitionRange_, "definitionRange");
+  config_.fillValue(_knotResponseLimits_, "knotResponseLimits");
+  LogThrowIf(_knotResponseLimits_.hasBothBounds() and _knotResponseLimits_.min > _knotResponseLimits_.max,
+             "knotResponseLimits: min must not exceed max");
   config_.fillValue(_mirrorDefinitionRange_, "mirrorDefinitionRange");
 
   if( config_.hasField("applyConditions") ){
@@ -1467,6 +1472,25 @@ void DialCollection::checkDialPointList(std::vector<DialUtils::DialPoint>& point
     [](const DialUtils::DialPoint& a_, const DialUtils::DialPoint& b_){
       return a_.x < b_.x; // a goes first?
     });
+
+  if( _knotResponseLimits_.hasBound() ){
+    bool knotsChanged{false};
+    for( auto& point : pointList_ ){
+      if( _knotResponseLimits_.isBelowMin(point.y) ){
+        point.y = _knotResponseLimits_.min;
+        knotsChanged = true;
+      }
+      if( _knotResponseLimits_.isAboveMax(point.y) ){
+        point.y = _knotResponseLimits_.max;
+        knotsChanged = true;
+      }
+    }
+    if( knotsChanged and _dialType_ == DialType::Spline and pointList_.size() > 1 ){
+      // Rebuild the slopes from the bounded knots before choosing a spline type.
+      auto spline = DialUtils::buildTSpline3(pointList_);
+      for( auto& point : pointList_ ){ point.slope = spline.Derivative(point.x); }
+    }
+  }
 
   if( _mirrorDefinitionRange_.hasBound() ){
     // TODO: process mirroring options
