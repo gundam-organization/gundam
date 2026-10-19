@@ -2,8 +2,8 @@
 """Imported data histograms bypass the model's binning response."""
 import json
 import math
+import subprocess
 import sys
-from array import array
 from importlib import import_module
 from pathlib import Path
 
@@ -72,25 +72,38 @@ def exercise(path, histName, threads):
 
 def main():
     import GUNDAM
-    import ROOT
+    import numpy as np
+    import uproot
 
     print('Testing module:', GUNDAM.__file__, flush=True)
     GUNDAM.setLightOutputMode(True)
     path = Path.cwd() / '226BinningResponseHistData.root'
-    with ROOT.TFile(str(path), 'RECREATE'):
-        tree = ROOT.TTree('events', 'events')
-        x = array('d', [.95])
-        tree.Branch('X', x, 'X/D')
-        tree.Fill()
-        tree.Write()
-        hist = ROOT.TH1D('flat', 'flat', 3, 0., 3.)
-        histNd = ROOT.THnD('nd', 'nd', 1, array('i', [3]),
-                           array('d', [0.]), array('d', [3.]))
-        for index, value in enumerate((13., 0., 7.)):
-            hist.SetBinContent(index + 1, value)
-            histNd.SetBinContent(histNd.GetBin(array('d', [index + .5])), value)
-        hist.Write()
-        histNd.Write()
+    with uproot.recreate(path) as output:
+        tree = output.mktree('events', {'X': 'float64'})
+        tree.extend({'X': np.array([.95])})
+        output['flat'] = (np.array([13., 0., 7.]), np.array([0., 1., 2., 3.]))
+    # THnD serialization is not supported by uproot.
+    macro = Path.cwd() / '226BinningResponseHistData-input.C'
+    macro.write_text(r'''#include <TFile.h>
+#include <THn.h>
+#include <TSystem.h>
+{
+ {
+  TFile output(OUTPUT_PATH, "UPDATE");
+  int bins[] = {3};
+  double low[] = {0.}, high[] = {3.};
+  THnD hist("nd", "nd", 1, bins, low, high);
+  double values[] = {13., 0., 7.};
+  for (int index = 0; index < 3; ++index) {
+    double coordinate[] = {index + .5};
+    hist.SetBinContent(hist.GetBin(coordinate), values[index]);
+  }
+  hist.Write();
+ }
+ gSystem->Exit(0);
+}
+'''.replace('OUTPUT_PATH', json.dumps(str(path))))
+    subprocess.run(['root', '-n', '-l', '-b', '-q', str(macro)], check=True)
     for threads in (1, 4):
         for histName in ('flat', 'nd'):
             exercise(path, histName, threads)
