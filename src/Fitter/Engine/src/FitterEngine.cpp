@@ -4,6 +4,7 @@
 
 #include "FitterEngine.h"
 #include "GundamGlobals.h"
+#include "GundamUtils.h"
 #include "RootMinimizer.h"
 #include "SimpleMcmc.h"
 
@@ -315,6 +316,14 @@ void FitterEngine::initializeImpl(){
     LogInfo << "Saving all objects to disk..." << std::endl;
     GenericToolbox::triggerTFileWrite(_saveDir_);
   }
+
+  // Loading, PCA and output serialization can leave large freed allocations
+  // resident. Return unused allocator pages once, before scans/minimization.
+  LogInfo << "RAM before releasing unused allocator pages: "
+          << GundamUtils::getProcessMemoryUsageSummary() << std::endl;
+  GundamUtils::releaseUnusedMemory();
+  LogInfo << "RAM after releasing unused allocator pages: "
+          << GundamUtils::getProcessMemoryUsageSummary() << std::endl;
 
 }
 

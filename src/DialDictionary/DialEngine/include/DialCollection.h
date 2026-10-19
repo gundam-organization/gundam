@@ -18,6 +18,8 @@
 #include <string>
 #include <memory>
 #include <sstream>
+#include <mutex>
+#include <unordered_map>
 
 class DialCollection : public JsonBaseClass {
 
@@ -132,6 +134,9 @@ public:
   // DialCollection has changed to fix any pointer issues.
   void setupDialInterfaceReferences();
 
+  // Keep one interface per bin while sharing identical immutable curves.
+  void deduplicateBinnedDials();
+
   // Update the dial collection.  Most dial collections don't need an update,
   // but this provides a handle for collections that precalculate values prior
   // to doing the event reweighting.  An example of that would be the
@@ -151,8 +156,11 @@ public:
   // reweight calculation has been "frozen".
   void updateInputBuffers();
 
-  // Return the next slot in the DialBaseList that can b filled. Its
-  // thread safe, so multiple threads can fill the list.
+  // Loading only: store a branch dial, reusing an identical lightweight dial.
+  // Returns an interface index; no interface pointers may be retained while loading.
+  size_t storeEventDial(std::unique_ptr<DialBase> dial_);
+
+  // Return the next preallocated slot. Thread safe for event dial factories.
   size_t getNextDialFreeSlot(){ return _dialFreeSlot_++; }
   size_t getDialFreeSlotIndex() const { return _dialFreeSlot_.getValue(); }
 
@@ -248,6 +256,9 @@ private:
   std::vector<DialResponseSupervisor> _dialResponseSupervisorList_{};
 
   GenericToolbox::Atomic<size_t> _dialFreeSlot_{0};
+  GenericToolbox::NoCopyWrapper<std::mutex> _eventDialMutex_{};
+  std::unordered_multimap<size_t, size_t> _eventDialIndex_{};
+  size_t _reusedEventDials_{0};
 
   // A pointer to dial specific data
   std::vector<std::shared_ptr<DialCollection::CollectionData>>  _dialCollectionData_;
