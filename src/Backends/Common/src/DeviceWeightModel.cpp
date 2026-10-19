@@ -1,4 +1,6 @@
 #include "DeviceWeightModel.h"
+#include "ResponseSmoothingPacking.h"
+#include "Semantics/BackendDialSemanticsCore.h"
 
 #include "Logger.h"
 
@@ -41,6 +43,13 @@ bool Backends::packDeviceWeightModel(const PropagationView& model_,
     fallbackReason_ = std::move(reason_);
     return false;
   };
+
+  for( const auto& dial : model_.dials ){
+    if( dial.smoothing.minWidth == 0. and dial.smoothing.maxWidth == 0. ){ continue; }
+    DeviceNormDialOccurrence packed;
+    try{ packResponseLimits(dial, packed, [](double value_){ return float(value_); }); }
+    catch( const std::runtime_error& error ){ return fail(error.what()); }
+  }
 
   if( model_.requiresEventBinning() or model_.hasReweightCap ){
     return fail("Static weight packing excludes observable propagation and reweight caps; use DevicePropagationModel.");
@@ -272,12 +281,6 @@ bool Backends::packDeviceWeightModel(const PropagationView& model_,
           << " This phase materializes unique dial descriptors and payloads."
           << std::endl;
   packedModel_.cachedDialCount = 0;
-  auto fillMinMax = [](const BackendDialDescriptor& dialRef_, float& minResponse_, float& maxResponse_) {
-    minResponse_ = -std::numeric_limits<float>::infinity();
-    maxResponse_ = std::numeric_limits<float>::infinity();
-    if( dialRef_.hasMinResponse ){ minResponse_ = float(dialRef_.minResponse); }
-    if( dialRef_.hasMaxResponse ){ maxResponse_ = float(dialRef_.maxResponse); }
-  };
   auto packDescriptors = [&](const std::vector<std::size_t>& dialOffsets_,
                              const std::vector<std::uint32_t>& reuseCounts_,
                              std::vector<DeviceSplineDialDescriptor>& descriptors_,
@@ -293,7 +296,7 @@ bool Backends::packDeviceWeightModel(const PropagationView& model_,
       descriptor.splineOffset = std::uint32_t(packedModel_.splineData.size());
       descriptor.splineSize = std::uint32_t(eventDial.payloadSize);
       descriptor.flags = eventDial.allowExtrapolation ? kDeviceDialFlagAllowExtrapolation : 0u;
-      fillMinMax(eventDial, descriptor.minResponse, descriptor.maxResponse);
+      packResponseLimits(eventDial, descriptor, [](double value_){ return float(value_); });
 
       if( enableCachedDialResponses_ and reuseCounts_[iUniqueDial] >= kDeviceCachedDialReuseThreshold ){
         descriptor.flags |= kDeviceDialFlagCached;
@@ -348,15 +351,14 @@ bool Backends::packDeviceWeightModel(const PropagationView& model_,
       const auto& eventDial = model_.dials[model_.eventDialIndices[event.weight.firstDial + iDial]];
       if( eventDial.type == BackendDialType::Shift ){
         LogThrowIf(eventDial.payloadSize < 1, "Internal device packing error: Shift dial payload is empty.");
-        packedModel_.baseWeights[event.resultIndex] *= float(model_.dialPayloads.at(eventDial.payloadOffset));
+        packedModel_.baseWeights[event.resultIndex] *= float(Semantics::clampDialResponse(eventDial, model_.dialPayloads.at(eventDial.payloadOffset)));
         continue;
       }
       if( eventDial.type == BackendDialType::ExternalWeight ){
         const auto& block = model_.externalWeightBlocks.at(eventDial.externalBlockIndex);
         DeviceExternalDialOccurrence occurrence;
         occurrence.weightIndex = std::uint32_t(block.offset + eventDial.externalWeightIndex);
-        occurrence.minResponse = eventDial.hasMinResponse ? float(eventDial.minResponse) : -std::numeric_limits<float>::infinity();
-        occurrence.maxResponse = eventDial.hasMaxResponse ? float(eventDial.maxResponse) : std::numeric_limits<float>::infinity();
+        packResponseLimits(eventDial, occurrence, [](double value_){ return float(value_); });
         packedModel_.externalDialOccurrences.emplace_back(occurrence);
         continue;
       }
@@ -364,15 +366,9 @@ bool Backends::packDeviceWeightModel(const PropagationView& model_,
         LogThrowIf(eventDial.inputCount != 1,
                    "Internal device packing error: Norm dial is missing its parameter input.");
 
-        float minResponse = -std::numeric_limits<float>::infinity();
-        float maxResponse = std::numeric_limits<float>::infinity();
-        if( eventDial.hasMinResponse ){ minResponse = float(eventDial.minResponse); }
-        if( eventDial.hasMaxResponse ){ maxResponse = float(eventDial.maxResponse); }
-
         DeviceNormDialOccurrence occurrence;
         occurrence.parameterIndex = std::uint32_t(model_.dialInputs.at(eventDial.firstInput).parameterIndex);
-        occurrence.minResponse = minResponse;
-        occurrence.maxResponse = maxResponse;
+        packResponseLimits(eventDial, occurrence, [](double value_){ return float(value_); });
         packedModel_.normDialOccurrences.emplace_back(occurrence);
         continue;
       }

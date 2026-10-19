@@ -45,7 +45,7 @@ def write_input(path):
     subprocess.run(["root", "-n", "-l", "-b", "-q", str(macro)], check=True)
 
 
-def make_engine(path, options, dial_type="Normalization", branch="graph"):
+def make_engine(path, options, dial_type="Normalization", branch="graph", backend=None):
     import GUNDAM
 
     dial = {"dialType": dial_type, **options}
@@ -53,7 +53,7 @@ def make_engine(path, options, dial_type="Normalization", branch="graph"):
         dial.update(dialBranchData=branch, allowDialExtrapolation=True)
     config = {"likelihoodInterfaceConfig": {
         "jointProbabilityConfig": {"type": "LeastSquares", "lsqPoissonianApproximation": True},
-        "backendManagerConfig": {"isEnabled": False},
+        "backendManagerConfig": {"isEnabled": backend is not None, "type": backend or "CPU"},
         "dataSetList": [{"name": "input", "model": {"tree": "events", "filePathList": [str(path)]}}],
         "propagatorConfig": {
             "sampleSetConfig": {"sampleList": [{"name": "sample", "binning": {
@@ -69,6 +69,8 @@ def make_engine(path, options, dial_type="Normalization", branch="graph"):
     engine.setConfig(GUNDAM.ConfigUtils.ConfigReader(builder.getConfig()))
     engine.configure()
     engine.initialize()
+    if backend is not None:
+        assert engine.getBackendsManager().getType() == backend
     return engine
 
 
@@ -82,8 +84,8 @@ def lower_reference(value, bound, width):
     return bound + width * (2 * t**3 - t**4)
 
 
-def exercise(path, options, minimum, maximum, widths=None, dial_type="Normalization", branch="graph"):
-    engine = make_engine(path, options, dial_type, branch)
+def exercise(path, options, minimum, maximum, widths=None, dial_type="Normalization", branch="graph", backend=None):
+    engine = make_engine(path, options, dial_type, branch, backend)
     likelihood = engine.getLikelihoodInterface()
     propagator = likelihood.getModelPropagator()
     parameter = propagator.getParametersManager().getParameterSetsList()[0].getParameterList()[0]
@@ -99,7 +101,8 @@ def exercise(path, options, minimum, maximum, widths=None, dial_type="Normalizat
         for _ in range(2):  # Repeated propagation must reuse the processed response.
             likelihood.propagateAndEvalLikelihood()
             actual = sample.getHistogram().getBinContentList()[0].sumWeights
-            assert math.isclose(actual, expected, rel_tol=1e-10, abs_tol=1e-12), (options, value, actual, expected)
+            assert math.isclose(actual, expected, rel_tol=3e-6 if backend == "MPS" else 1e-10,
+                                abs_tol=3e-7 if backend == "MPS" else 1e-12), (backend, options, value, actual, expected)
 
 
 def plot_scans(path):
@@ -191,33 +194,41 @@ def main():
     GUNDAM.setLightOutputMode(True)
     path = Path.cwd() / "229DialResponseSmoothing.root"
     write_input(path)
-    for threads in [1, 4]:
-        GUNDAM.setNumberOfThreads(threads)
-        for width in [0.1, [0.4, 0.1], {"min": 0.4, "max": 0.1}]:
-            widths = (0.1, 0.1) if isinstance(width, float) else (0.4, 0.1)
-            options = {"dialResponseLimits": [0., 2.], "enableResponseSmoothing": True,
-                       "dialResponseSmoothingWidth": width}
-            exercise(path, options, 0., 2., widths)
-        exercise(path, {"dialResponseLimits": [0., 2.], "dialResponseSmoothingWidth": [0.4, 0.1]}, 0., 2.)
-        exercise(path, {"dialResponseLimits": [0., 2.], "enableResponseSmoothing": False,
-                        "dialResponseSmoothingWidth": [0.4, 0.1]}, 0., 2.)
-        exercise(path, {"minDialResponse": 0., "maxDialResponse": 2., "enableResponseSmoothing": True,
-                        "dialResponseSmoothingWidth": [0.4, 0.1]}, 0., 2., (0.4, 0.1))
-        exercise(path, {"minDialResponse": 0.2, "maxDialResponse": 1.8}, 0.2, 1.8)
-        exercise(path, {"minimumSplineResponse": 0.2}, 0.2, None)
-        exercise(path, {"maxDialResponse": 1.8}, 0., 1.8)
-        exercise(path, {"dialResponseLimits": {"max": 2.}, "enableResponseSmoothing": True,
-                        "dialResponseSmoothingWidth": {"max": 0.1}}, None, 2., (None, 0.1))
-        exercise(path, {"dialResponseLimits": {"min": 0.}, "enableResponseSmoothing": True,
-                        "dialResponseSmoothingWidth": 0.4}, 0., None, (0.4, None), "Graph")
-        exercise(path, {"dialResponseLimits": [0., 1.], "enableResponseSmoothing": True,
-                        "dialResponseSmoothingWidth": 0.1}, 0., 1., (0.1, 0.1), "Graph", "flat")
-        exercise(path, {"dialResponseLimits": [0., 2.], "enableResponseSmoothing": True,
-                        "dialResponseSmoothingWidth": [0.4, 0.1],
-                        "parametersBinningPath": {"binningDefinition": [{"name": "X", "edges": [0, 1]}]}},
-                 0., 2., (0.4, 0.1))
+    backends = [None]
+    if hasattr(GUNDAM.FitterEngine, "getBackendsManager"):
+        backends.append("CPU")
+        if sys.platform == "darwin":
+            backends.append("MPS")
+    for backend in backends:
+        def run(*args, **kwargs):
+            exercise(*args, **kwargs, backend=backend)
+        for threads in [1, 4]:
+            GUNDAM.setNumberOfThreads(threads)
+            for width in [0.1, [0.4, 0.1], {"min": 0.4, "max": 0.1}]:
+                widths = (0.1, 0.1) if isinstance(width, float) else (0.4, 0.1)
+                options = {"dialResponseLimits": [0., 2.], "enableResponseSmoothing": True,
+                           "dialResponseSmoothingWidth": width}
+                run(path, options, 0., 2., widths)
+            run(path, {"dialResponseLimits": [0., 2.], "dialResponseSmoothingWidth": [0.4, 0.1]}, 0., 2.)
+            run(path, {"dialResponseLimits": [0., 2.], "enableResponseSmoothing": False,
+                            "dialResponseSmoothingWidth": [0.4, 0.1]}, 0., 2.)
+            run(path, {"minDialResponse": 0., "maxDialResponse": 2., "enableResponseSmoothing": True,
+                            "dialResponseSmoothingWidth": [0.4, 0.1]}, 0., 2., (0.4, 0.1))
+            run(path, {"minDialResponse": 0.2, "maxDialResponse": 1.8}, 0.2, 1.8)
+            run(path, {"minimumSplineResponse": 0.2}, 0.2, None)
+            run(path, {"maxDialResponse": 1.8}, 0., 1.8)
+            run(path, {"dialResponseLimits": {"max": 2.}, "enableResponseSmoothing": True,
+                            "dialResponseSmoothingWidth": {"max": 0.1}}, None, 2., (None, 0.1))
+            run(path, {"dialResponseLimits": {"min": 0.}, "enableResponseSmoothing": True,
+                            "dialResponseSmoothingWidth": 0.4}, 0., None, (0.4, None), "Graph")
+            run(path, {"dialResponseLimits": [0., 1.], "enableResponseSmoothing": True,
+                            "dialResponseSmoothingWidth": 0.1}, 0., 1., (0.1, 0.1), "Graph", "flat")
+            run(path, {"dialResponseLimits": [0., 2.], "enableResponseSmoothing": True,
+                            "dialResponseSmoothingWidth": [0.4, 0.1],
+                            "parametersBinningPath": {"binningDefinition": [{"name": "X", "edges": [0, 1]}]}},
+                     0., 2., (0.4, 0.1))
     plot_scans(path)
-    print("SUCCESS: original engine applies centered C2 response smoothing, including asymmetric widths and unity dials.")
+    print("SUCCESS: original engine and backends apply centered C2 response smoothing, including asymmetric widths and unity dials.")
     return 0
 
 

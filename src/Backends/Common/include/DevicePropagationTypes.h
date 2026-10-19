@@ -1,6 +1,7 @@
 #ifndef GUNDAM_DEVICE_PROPAGATION_TYPES_H
 #define GUNDAM_DEVICE_PROPAGATION_TYPES_H
 #ifndef __METAL_VERSION__
+#include "Semantics/BackendResponseSmoothing.h"
 #include "DeviceMath/DoubleFloat.h"
 #include <cstdint>
 #endif
@@ -36,12 +37,14 @@ namespace Backends {
     DeviceIndex weightIndex{0};
     float minResponse{0};
     float maxResponse{0};
+    ResponseSmoothing<float> smoothing{};
   };
 
   struct DeviceNormDialOccurrence {
     DeviceIndex parameterIndex{0};
     float minResponse{1.0F};
     float maxResponse{1.0F};
+    ResponseSmoothing<float> smoothing{};
   };
 
   struct DeviceSplineDialDescriptor {
@@ -51,6 +54,7 @@ namespace Backends {
     DeviceIndex flags{0};
     float minResponse{1.0F};
     float maxResponse{1.0F};
+    ResponseSmoothing<float> smoothing{};
   };
 
 
@@ -58,6 +62,7 @@ namespace Backends {
     DeviceIndex type, parameterIndex, payloadOffset, payloadSize, externalIndex;
     DeviceIndex allowExtrapolation, useMirror;
     ObservableScalar mirrorMin, mirrorRange, minResponse, maxResponse;
+    ResponseSmoothing<ObservableScalar> smoothing{};
   };
   struct DeviceVariableResponse {
     DeviceIndex variableIndex;

@@ -24,6 +24,8 @@ public:
   // const getters
   [[nodiscard]] double getMinResponse() const{ return _minResponse_; }
   [[nodiscard]] double getMaxResponse() const{ return _maxResponse_; }
+  [[nodiscard]] double getMinSmoothingWidth() const{ return _minSmoothingWidth_; }
+  [[nodiscard]] double getMaxSmoothingWidth() const{ return _maxSmoothingWidth_; }
 
   [[nodiscard]] double process(double response_) const;
   [[nodiscard]] std::string getSummary(bool shallow_ = true) const;

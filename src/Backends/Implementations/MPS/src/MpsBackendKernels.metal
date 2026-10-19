@@ -67,9 +67,7 @@ float evaluate_compact_descriptor(
       splineData + descriptor.splineOffset,
       descriptor.splineSize - 2
   );
-  response = max(response, descriptor.minResponse);
-  response = min(response, descriptor.maxResponse);
-  return response;
+  return Backends::Semantics::processResponse(response, descriptor);
 }
 
 float evaluate_uniform_descriptor(
@@ -82,9 +80,7 @@ float evaluate_uniform_descriptor(
       splineData + descriptor.splineOffset,
       descriptor.splineSize
   );
-  response = max(response, descriptor.minResponse);
-  response = min(response, descriptor.maxResponse);
-  return response;
+  return Backends::Semantics::processResponse(response, descriptor);
 }
 
 float evaluate_monotonic_descriptor(
@@ -97,9 +93,7 @@ float evaluate_monotonic_descriptor(
       splineData + descriptor.splineOffset,
       descriptor.splineSize - 2
   );
-  response = max(response, descriptor.minResponse);
-  response = min(response, descriptor.maxResponse);
-  return response;
+  return Backends::Semantics::processResponse(response, descriptor);
 }
 
 float evaluate_general_descriptor(
@@ -112,9 +106,7 @@ float evaluate_general_descriptor(
       splineData + descriptor.splineOffset,
       descriptor.splineSize
   );
-  response = max(response, descriptor.minResponse);
-  response = min(response, descriptor.maxResponse);
-  return response;
+  return Backends::Semantics::processResponse(response, descriptor);
 }
 
 float evaluate_graph_descriptor(
@@ -127,9 +119,7 @@ float evaluate_graph_descriptor(
       splineData + descriptor.splineOffset,
       descriptor.splineSize
   );
-  response = max(response, descriptor.minResponse);
-  response = min(response, descriptor.maxResponse);
-  return response;
+  return Backends::Semantics::processResponse(response, descriptor);
 }
 
 kernel void compute_cached_compact_responses(
@@ -231,8 +221,7 @@ kernel void compute_event_weights(
   for( uint iDial = 0 ; iDial < ranges.normCount ; iDial++ ){
     NormDialOccurrence occurrence = normDialOccurrences[ranges.normOffset + iDial];
     float response = parameters[occurrence.parameterIndex];
-    response = max(response, occurrence.minResponse);
-    response = min(response, occurrence.maxResponse);
+    response = Backends::Semantics::processResponse(response, occurrence);
     weight *= response;
   }
 
@@ -304,8 +293,7 @@ kernel void compute_event_weights(
     ExternalDialOccurrence occurrence = externalDialOccurrences[ranges.externalOffset + iDial];
     float response = externalWeights[occurrence.weightIndex];
     // Match host comparison semantics, including NaN responses.
-    if( response < occurrence.minResponse ){ response = occurrence.minResponse; }
-    else if( response > occurrence.maxResponse ){ response = occurrence.maxResponse; }
+    response = Backends::Semantics::processResponse(response, occurrence);
     weight *= response;
   }
   eventWeights[gid] = weight;

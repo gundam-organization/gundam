@@ -26,6 +26,8 @@ namespace Backends {
     std::size_t externalBlockIndex{0};
     std::size_t externalWeightIndex{0};
     bool allowExtrapolation{false};
+    ResponseSmoothing<double> smoothing{};
+    // Inner transition thresholds; identical to the hard bounds when disabled.
     double minResponse{0};
     double maxResponse{0};
     bool hasMinResponse{false};

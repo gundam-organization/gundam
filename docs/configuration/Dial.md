@@ -27,7 +27,7 @@ external libraries to calculate weights.
 | minDialResponse        | double       | Deprecated, still supported with a warning. Use `dialResponseLimits`.   | -inf    |
 | maxDialResponse        | double       | Deprecated, still supported with a warning. Use `dialResponseLimits`.   | inf     |
 | dialResponseLimits     | range        | Response bounds as `[min, max]`, `{min: ...}`, or `{max: ...}`           | existing response defaults |
-| enableResponseSmoothing | bool       | Apply centered C^2 transitions at finite response bounds in the original engine | false |
+| enableResponseSmoothing | bool       | Apply centered C^2 transitions at finite response bounds | false |
 | dialResponseSmoothingWidth | positive number or range | Transition half-width, shared or separate for each bound | unset |
 | binningFilePath        | string       | binning definition of a set of spline (along with `dialsFilePath`)     |         |
 | useMirrorDial          | bool         | enable dial mirroring along the edges                                  | false   |
@@ -43,7 +43,7 @@ external libraries to calculate weights.
 ### Smooth response limits
 
 Smooth the evaluated response near its bounds using centered quartic transitions
-(original engine only):
+(original engine, CPU and Metal backends; CacheManager is unsupported):
 
 ```yaml
 dialResponseLimits: [0.0, 2.0]

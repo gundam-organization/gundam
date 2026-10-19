@@ -119,8 +119,15 @@ namespace {
         if( auto* supervisor = interface->getResponseSupervisorRef() ; supervisor != nullptr ){
           dialRef.hasMinResponse = not std::isnan(supervisor->getMinResponse());
           dialRef.hasMaxResponse = not std::isnan(supervisor->getMaxResponse());
-          dialRef.minResponse = supervisor->getMinResponse();
-          dialRef.maxResponse = supervisor->getMaxResponse();
+          auto& smoothing = dialRef.smoothing;
+          smoothing.minResponse = supervisor->getMinResponse();
+          smoothing.maxResponse = supervisor->getMaxResponse();
+          smoothing.minWidth = supervisor->getMinSmoothingWidth();
+          smoothing.maxWidth = supervisor->getMaxSmoothingWidth();
+          smoothing.minInverseWidth = smoothing.minWidth > 0. ? 0.5 / smoothing.minWidth : 0.;
+          smoothing.maxInverseWidth = smoothing.maxWidth > 0. ? 0.5 / smoothing.maxWidth : 0.;
+          dialRef.minResponse = smoothing.minResponse + smoothing.minWidth;
+          dialRef.maxResponse = smoothing.maxResponse - smoothing.maxWidth;
         }
 
         if( auto* external = dynamic_cast<const ExternalWeightDispatcher*>(dialBase) ){

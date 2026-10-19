@@ -1,4 +1,5 @@
 #include "DevicePropagationModel.h"
+#include "ResponseSmoothingPacking.h"
 
 #include <algorithm>
 #include <cmath>
@@ -61,8 +62,7 @@ void Backends::DevicePropagationModel::build(const PropagationView& model_) {
     packed.payloadOffset = index(dial.payloadOffset);
     packed.payloadSize = index(dial.payloadSize);
     packed.allowExtrapolation = dial.allowExtrapolation;
-    packed.minResponse = scalar(dial.hasMinResponse ? dial.minResponse : -std::numeric_limits<double>::infinity());
-    packed.maxResponse = scalar(dial.hasMaxResponse ? dial.maxResponse : std::numeric_limits<double>::infinity());
+    packResponseLimits(dial, packed, scalar);
     if( dial.type == BackendDialType::ExternalWeight ){
       const auto& block = model_.externalWeightBlocks.at(dial.externalBlockIndex);
       if( dial.externalWeightIndex >= block.count ){ throw std::runtime_error("Invalid external observable dial index."); }

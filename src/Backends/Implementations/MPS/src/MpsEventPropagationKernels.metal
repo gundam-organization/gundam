@@ -48,9 +48,7 @@ kernel void evaluate_propagation_dials(
     case BackendDialType::Graph: value = GundamObservableMath::EvaluateGraph(value, lower, upper, data, dial.payloadSize); break;
     case BackendDialType::ExternalWeight: value = externalWeights[dial.externalIndex]; break;
   }
-  if( value < dial.minResponse ){ value = dial.minResponse; }
-  if( value > dial.maxResponse ){ value = dial.maxResponse; }
-  responses[gid] = value;
+  responses[gid] = Backends::Semantics::processResponse(value, dial);
 }
 
 struct PropagationResponses {

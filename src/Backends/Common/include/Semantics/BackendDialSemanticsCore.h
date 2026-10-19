@@ -41,8 +41,12 @@ namespace Backends::Semantics {
 
   GUNDAM_BACKEND_FORCE_INLINE GUNDAM_BACKEND_HOST_DEVICE
   double clampDialResponse(const BackendDialDescriptor& dialRef_, double response_) {
-    if( dialRef_.hasMinResponse and response_ < dialRef_.minResponse ){ response_ = dialRef_.minResponse; }
-    if( dialRef_.hasMaxResponse and response_ > dialRef_.maxResponse ){ response_ = dialRef_.maxResponse; }
+    if( dialRef_.hasMinResponse and response_ < dialRef_.minResponse ){
+      return processLowerResponse(response_, dialRef_.minResponse, dialRef_.smoothing);
+    }
+    if( dialRef_.hasMaxResponse and response_ > dialRef_.maxResponse ){
+      return processUpperResponse(response_, dialRef_.maxResponse, dialRef_.smoothing);
+    }
     return response_;
   }
 
