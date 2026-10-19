@@ -4,32 +4,45 @@ import json
 import math
 import subprocess
 import sys
-from array import array
 from importlib import import_module
 from pathlib import Path
 
 
 def write_input(path):
-    import ROOT
-    ROOT.gROOT.SetBatch(True)
-    with ROOT.TFile(str(path), 'RECREATE'):
-        tree = ROOT.TTree('events', 'events')
-        coordinate = array('d', [0.])
-        tree.Branch('X', coordinate, 'X/D')
-        for value in (.25, .75, 1.25, 1.75, 2.25, 2.75, 3.25):
-            coordinate[0] = value
-            tree.Fill()
-        tree.Write()
-        dials = ROOT.TObjArray()
-        graphs = []
-        for scale in (.125, .125, .25, 0.):
-            graph = ROOT.TGraph(4)
-            for knot, x in enumerate((-1., 0., 1., 2.)):
-                graph.SetPoint(knot, x, 1 + scale * x * x)
-            graphs.append(graph)
-            dials.Add(graph)
-        dials.Write('dials', ROOT.TObject.kSingleKey)
-
+    # ROOT object branches/containers are written by a separate C++ process.
+    macro = Path.cwd() / "228SharedBinnedDials-input.C"
+    macro.write_text(r'''#include <TFile.h>
+#include <TTree.h>
+#include <TGraph.h>
+#include <TSystem.h>
+#include <TObjArray.h>
+{
+ {
+  TFile output(OUTPUT_PATH, "RECREATE");
+  TTree tree("events", "events");
+  double coordinate = 0.;
+  tree.Branch("X", &coordinate, "X/D");
+  for (double x : {.25, .75, 1.25, 1.75, 2.25, 2.75, 3.25}) {
+    coordinate = x;
+    tree.Fill();
+  }
+  tree.Write();
+  TObjArray dials;
+  dials.SetOwner(true);
+  for (double scale : {.125, .125, .25, 0.}) {
+    auto* graph = new TGraph(4);
+    for (int knot = 0; knot < 4; ++knot) {
+      double x = knot - 1.;
+      graph->SetPoint(knot, x, 1. + scale*x*x);
+    }
+    dials.Add(graph);
+  }
+  dials.Write("dials", TObject::kSingleKey);
+ }
+ gSystem->Exit(0);
+}
+'''.replace("OUTPUT_PATH", json.dumps(str(path))))
+    subprocess.run(["root", "-n", "-l", "-b", "-q", str(macro)], check=True)
 
 def exercise(path, threads):
     import GUNDAM
@@ -78,7 +91,7 @@ def main():
     sys.path.insert(0, str(Path(__file__).resolve().parent))
     import_module('005PythonSetup-utils').requireVenv(__file__)
     path = Path.cwd() / '228SharedBinnedDials.root'
-    subprocess.run([sys.executable, str(Path(__file__).resolve()), '--write-input', str(path)], check=True)
+    write_input(path)
     for threads in (1, 2):
         exercise(path, threads)
     print('SUCCESS: binned dial sharing preserves bin selection and event weights.')

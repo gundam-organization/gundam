@@ -5,33 +5,47 @@ import math
 import subprocess
 import sys
 from importlib import import_module
-from array import array
 from pathlib import Path
 
 
 def write_input(path):
-    import ROOT
-    ROOT.gROOT.SetBatch(True)
-    with ROOT.TFile(str(path), "RECREATE"):
-        tree = ROOT.TTree("events", "events")
-        coordinate = array("d", [0.5])
-        enabled = array("d", [1.0])
-        xs, ys = ROOT.TArrayD(4), ROOT.TArrayD(4)
-        graph = ROOT.TGraph(4)
-        tree.Branch("X", coordinate, "X/D")
-        tree.Branch("enabled", enabled, "enabled/D")
-        tree.Branch("parameters", xs)
-        tree.Branch("responses", ys)
-        tree.Branch("graph", graph, 32000, 0)
-        for event in range(12):
-            enabled[0] = float(event % 4 != 0)
-            for knot, x in enumerate((-1., 0., 1., 2.)):
-                y = (1 + .125 * x * x, 1 + .25 * x, x)[event % 3]
-                xs[knot], ys[knot] = x, y
-                graph.SetPoint(knot, x, y)
-            tree.Fill()
-        tree.Write()
-
+    # ROOT object branches/containers are written by a separate C++ process.
+    macro = Path.cwd() / "227SharedSplineLoading-input.C"
+    macro.write_text(r'''#include <TFile.h>
+#include <TTree.h>
+#include <TGraph.h>
+#include <TSystem.h>
+#include <TArrayD.h>
+{
+ {
+  TFile output(OUTPUT_PATH, "RECREATE");
+  TTree tree("events", "events");
+  double coordinate = .5, enabled = 1.;
+  TArrayD xs(4), ys(4);
+  TArrayD *parameters = &xs, *responses = &ys;
+  TGraph graphObject(4);
+  TGraph* graph = &graphObject;
+  tree.Branch("X", &coordinate, "X/D");
+  tree.Branch("enabled", &enabled, "enabled/D");
+  tree.Branch("parameters", "TArrayD", &parameters);
+  tree.Branch("responses", "TArrayD", &responses);
+  tree.Branch("graph", "TGraph", &graph, 32000, 0);
+  for (int event = 0; event < 12; ++event) {
+    enabled = (event % 4 != 0);
+    for (int knot = 0; knot < 4; ++knot) {
+      double x = knot - 1.;
+      double y = event % 3 == 0 ? 1. + .125*x*x : (event % 3 == 1 ? 1. + .25*x : x);
+      xs[knot] = x; ys[knot] = y;
+      graph->SetPoint(knot, x, y);
+    }
+    tree.Fill();
+  }
+  tree.Write();
+ }
+ gSystem->Exit(0);
+}
+'''.replace("OUTPUT_PATH", json.dumps(str(path))))
+    subprocess.run(["root", "-n", "-l", "-b", "-q", str(macro)], check=True)
 
 def exercise(paths, branch_data, threads):
     import GUNDAM
@@ -79,7 +93,7 @@ def main():
     import_module("005PythonSetup-utils").requireVenv(__file__)
     paths = [Path.cwd() / f'227SharedSplineLoading-{i}.root' for i in range(2)]
     for path in paths:
-        subprocess.run([sys.executable, str(Path(__file__).resolve()), '--write-input', str(path)], check=True)
+        write_input(path)
     for threads in (1, 2):
         for branch_data in ('graph', {'parameterValuesTArray': 'parameters', 'weightValuesTArray': 'responses'}):
             exercise(paths, branch_data, threads)
