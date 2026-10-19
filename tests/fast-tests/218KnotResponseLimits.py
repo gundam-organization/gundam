@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """Bounded dials must match dials built from explicitly clipped input knots."""
+import json
 import math
+import subprocess
 import sys
-from array import array
 from importlib import import_module
 from pathlib import Path
 
@@ -13,27 +14,44 @@ evaluate = import_module("215ArrayDialBranchData").evaluate
 
 
 def write_input(path, limits=None):
-    import ROOT
-
-    ROOT.gROOT.SetBatch(True)
-    with ROOT.TFile(str(path), "RECREATE") as output:
-        tree = ROOT.TTree("events", "events")
-        coordinate = array("d", [0.5])
-        graph = ROOT.TGraph()
-        tree.Branch("X", coordinate, "X/D")
-        tree.Branch("graph", graph, 32000, 0)
-        # Empty, single, two-point, uniform, nonuniform, and constant dials.
-        for xs, ys in [([], []), ([0.], [3.]), ([-1., 2.], [.25, 4.]),
-                       ([-1., 0., 1., 2.], [.25, 1., 2., 4.]),
-                       ([-1., 0., .75, 2.], [.25, 1., 2., 4.]),
-                       ([-1., 0., 1., 2.], [3.] * 4)]:
-            graph.Set(len(xs))
-            for index, (x, y) in enumerate(zip(xs, ys)):
-                if limits:
-                    y = max(limits.get("min", -math.inf), min(y, limits.get("max", math.inf)))
-                graph.SetPoint(index, x, y)
-            tree.Fill()
-        tree.Write()
+    # ROOT object branches are not writable with uproot.
+    macro = Path.cwd() / "218KnotResponseLimits-input.C"
+    lower = repr(limits['min']) if limits and 'min' in limits else '-std::numeric_limits<double>::infinity()'
+    upper = repr(limits['max']) if limits and 'max' in limits else 'std::numeric_limits<double>::infinity()'
+    macro.write_text(r'''#include <TFile.h>
+#include <TTree.h>
+#include <TGraph.h>
+#include <TSystem.h>
+#include <algorithm>
+#include <limits>
+#include <vector>
+{
+ {
+  TFile output(OUTPUT_PATH, "RECREATE");
+  TTree tree("events", "events");
+  double coordinate = .5;
+  TGraph graphObject;
+  TGraph* graph = &graphObject;
+  tree.Branch("X", &coordinate, "X/D");
+  tree.Branch("graph", "TGraph", &graph, 32000, 0);
+  std::vector<std::vector<double>> xs{{}, {0.}, {-1., 2.}, {-1., 0., 1., 2.},
+                                      {-1., 0., .75, 2.}, {-1., 0., 1., 2.}};
+  std::vector<std::vector<double>> ys{{}, {3.}, {.25, 4.}, {.25, 1., 2., 4.},
+                                      {.25, 1., 2., 4.}, {3., 3., 3., 3.}};
+  for (int event = 0; event < int(xs.size()); ++event) {
+    graph->Set(xs[event].size());
+    for (int point = 0; point < int(xs[event].size()); ++point) {
+      double y = std::max(LOWER_LIMIT, std::min(ys[event][point], UPPER_LIMIT));
+      graph->SetPoint(point, xs[event][point], y);
+    }
+    tree.Fill();
+  }
+  tree.Write();
+ }
+ gSystem->Exit(0);
+}
+'''.replace("OUTPUT_PATH", json.dumps(str(path))).replace("LOWER_LIMIT", lower).replace("UPPER_LIMIT", upper))
+    subprocess.run(["root", "-n", "-l", "-b", "-q", str(macro)], check=True)
 
 
 def main():
