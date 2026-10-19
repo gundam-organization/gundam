@@ -5,7 +5,6 @@ import math
 import re
 import subprocess
 import sys
-from array import array
 from importlib import import_module
 from pathlib import Path
 
@@ -16,17 +15,14 @@ import_module('005PythonSetup-utils').requireVenv(__file__)
 
 def child(mode):
     import GUNDAM
-    import ROOT
+    import numpy as np
+    import uproot
     GUNDAM.setNumberOfThreads(1)
     GUNDAM.setLightOutputMode(True)
     path = Path.cwd() / f'225FlatLikelihoodDirections-{mode}.root'
-    with ROOT.TFile(str(path), 'RECREATE'):
-        tree = ROOT.TTree('events', 'events')
-        x = array('d', [.5])
-        tree.Branch('X', x, 'X/D')
-        for _ in range(10):
-            tree.Fill()
-        tree.Write()
+    with uproot.recreate(path) as output:
+        tree = output.mktree('events', {'X': 'float64'})
+        tree.extend({'X': np.full(10, .5, dtype=np.float64)})
     parameters = [{'name': 'curved', 'priorValue': 1., 'priorType': 'Flat',
                    'dialSetDefinitions': [{'dialType': 'Normalization'}]}]
     if mode in ('dry', 'blocked', 'probe'):
