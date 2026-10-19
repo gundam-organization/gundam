@@ -121,14 +121,13 @@ likelihoodInterfaceConfig:
 
 
 def expect_failure(paths, config, message, index):
-    # Loader errors may terminate a worker thread. Isolate invalid inputs so
-    # both thrown exceptions and fatal exits can be checked by the parent.
-    payload = json.dumps({"paths": [str(path) for path in paths], "config": config})
+    # Isolate invalid inputs, but require a caught exception rather than a native crash.
+    payload = json.dumps({"paths": [str(path) for path in paths], "config": config, "message": message})
     result = subprocess.run([sys.executable, str(Path(__file__).resolve()), "--check-invalid", payload],
-                            capture_output=True, text=True)
+                            capture_output=True, text=True, errors="replace", timeout=60)
     log = result.stdout + result.stderr
     Path(f"215ArrayDialBranchData-invalid-{index}.log").write_text(log)
-    assert result.returncode != 0 and message in log, (config, result.returncode, log[-4000:])
+    assert result.returncode == 0 and "SUCCESS: caught expected loader exception" in log, (config, result.returncode, log[-4000:])
 
 
 def main():
@@ -174,6 +173,12 @@ if __name__ == "__main__":
         write_input(Path(sys.argv[2]), int(sys.argv[3]), sys.argv[4] if len(sys.argv) > 4 else "regular")
     elif len(sys.argv) > 1 and sys.argv[1] == "--check-invalid":
         payload = json.loads(sys.argv[2])
-        evaluate([Path(path) for path in payload["paths"]], payload["config"], False)
+        try:
+            evaluate([Path(path) for path in payload["paths"]], payload["config"], False)
+        except RuntimeError as error:
+            assert payload["message"] in str(error), str(error)
+            print("SUCCESS: caught expected loader exception:", error, flush=True)
+        else:
+            raise AssertionError("Invalid dial input was accepted")
     else:
         sys.exit(main())
