@@ -44,6 +44,9 @@ ENUM_FIELD( Unavailable )
     bool supportsLikelihood{false};
     bool supportsDynamicBinning{false};
     bool supportsObservableTransforms{false};
+    // Relative objective-function precision recommended to numerical fitters.
+    // Zero leaves the fitter's precision default unchanged.
+    double recommendedFunctionPrecision{0};
     std::string deviceName{};
   };
 

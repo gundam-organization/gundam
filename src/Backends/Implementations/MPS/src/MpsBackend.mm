@@ -22,6 +22,7 @@ Backends::BackendCapabilities Backends::MpsBackend::getCapabilities() const {
   out.supportsEventWeights = true;
   out.supportsHistograms = true;
   out.supportsLikelihood = true;
+  out.recommendedFunctionPrecision = std::numeric_limits<float>::epsilon();
   out.deviceName = _impl_->isAvailable ? [[_impl_->device name] UTF8String] : "Metal unavailable";
   return out;
 }
