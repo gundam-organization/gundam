@@ -46,6 +46,7 @@ public:
 
   // const getters
   [[nodiscard]] double getTargetEdm() const;
+  [[nodiscard]] double getFunctionPrecision() const { return _rootMinimizer_ ? _rootMinimizer_->Precision() : _functionPrecision_; }
   [[nodiscard]] const std::unique_ptr<ROOT::Math::Minimizer> &getMinimizer() const{ return _rootMinimizer_; }
 
   // core
@@ -79,6 +80,7 @@ private:
   int _simplexStrategy_{1};
 
   double _tolerance_{1E-4};
+  double _functionPrecision_{std::nan("unset")};
   double _tolerancePerDegreeOfFreedom_{std::nan("unset")};
   double _stepSizeScaling_{1};
   double _simplexToleranceLoose_{1000.};
