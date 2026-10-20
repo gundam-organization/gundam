@@ -27,17 +27,21 @@ As an entry list
 Before event selection, the loader sums the sizes of enabled main and friend files,
 counting each physical file once. Inputs below 500 MB (500,000,000 bytes) use one
 reader. Larger inputs run a raw, buffered file-read benchmark without ROOT
-decompression, comparing 1, 2, 4, ... readers up to the configured limit (including
+decompression, comparing 1, 2, 3, 4, 6, 8, 12, 16, ... readers up to the configured limit (including
 the limit itself). The smallest count reaching at least 90% of the best measured
 aggregate throughput is used for selection and loading. Explicit single-thread
 development options still take precedence.
 
 Each benchmark configuration reads the same total volume, distributed across all
 enabled physical files in proportion to their sizes, including friends. It starts
-at 16 MiB and can repeat at 32 and 64 MiB when measurements are shorter than
-200 ms. Further rounds stop once the total elapsed time reaches two seconds;
+at up to 16 MiB and can repeat with twice the volume when measurements are shorter
+than 200 ms, for at most four attempts per reader count (up to 16, 32, 64 and
+128 MiB). The initial volume is reduced if needed so that all four attempts fit
+in distinct regions of the input files. A retry message explains that data may
+be in the filesystem cache or storage may be very fast. Further rounds stop once
+the total elapsed time reaches two seconds;
 an individual read or round can take longer on slow storage. With a four-reader
-limit the maximum total read volume is 336 MiB. Trials use distinct file regions,
+limit the maximum total read volume is 960 MiB, also bounded by the total input size. Trials use distinct file regions,
 but existing operating-system caches can still influence the result. Unknown file
 sizes or read failures retain the configured thread limit; no benchmark runs when
 only one reader is allowed or both development options force a single thread.
