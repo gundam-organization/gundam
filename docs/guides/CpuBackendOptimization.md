@@ -67,6 +67,32 @@ These comparisons validate the optimized backend against its previous version wi
 
 Mixed and dynamic features were checked for correctness, but their performance gains have not been quantified on dedicated large fits.
 
+## Follow-up: post-fit Hesse stability
+
+The supplied `comp.root` and original fit outputs showed matching Migrad uncertainties but Hesse flux error ratios as large as 1.4328734 between backend and reference CPU propagation. Both Hesse runs reported status 0 and covariance status 3.
+
+Debugger inspection identified cancellation in the shared `BarlowBeestonBanff2022` likelihood, selected by `BarlowLLH_BANFF_OA2021`. For one nominal bin, data and prediction were both `655.82092932695639`, while the Barlow-Beeston adjusted prediction differed by one rounding step. The expression `newmc - data + data * (log(data) - log(newmc))` produced a negative statistical contribution of `-1.1368683772161603e-13`.
+
+The two CPU paths accumulate histograms in different orders. Real-model probes found bin differences around `3.6e-12` and statistical-likelihood differences around `1e-12`. Curvatures agreed at ordinary probe steps and became sensitive to rounding at smaller steps. Hesse differentiates and inverts this noisy likelihood, so agreement of fitted values or histograms at ordinary tolerances was insufficient to validate uncertainties.
+
+The shared likelihood now evaluates the equivalent `data * (r - log1p(r))`, where `r = (newmc - data) / data`. Near zero, a series through `r^10` avoids cancellation in `r - log1p(r)` itself. Extreme ratios retain the separate-log formulation. The mathematical likelihood, priors, event weights and histogram accumulation algorithms are unchanged; the numerical evaluation is more accurate near the minimum. Uncertainties from the old reference path can therefore change too.
+
+Both supplied Upgrade configurations were rerun in Release with four threads and Hesse enabled, using isolated outputs:
+
+| Validation | Result |
+|---|---:|
+| Maximum relative Hesse error difference, flux parameters | 4.83e-9 |
+| Maximum relative Hesse error difference, all parameter sets | 1.40e-8 |
+| Saved best-fit parameter value difference | 0 |
+| Relative Frobenius difference of the full covariance matrix | 1.22e-9 |
+| Hesse calls, reference / backend | 50,539 / 50,539 |
+| Hesse status, reference / backend | 0 / 0 |
+| Covariance status, reference / backend | 3 / 3 |
+
+The C++ near-minimum regression fails before the fix and passes after it. `230AsimovHesseStability.py` checks small-step curvature and post-fit Hesse uncertainties against an analytic one-parameter Asimov model, with and without the CPU backend. The resulting validation covers **106 C++ tests** (with the pre-existing `RootReaderCleanup` exclusion) and **27 Python tests** numbered 210 through 230.
+
+Raw outputs, logs and comparison data are under `/tmp/gundam-hesse-investigation/`. The regenerated comparison is `comp-stable.root`; the supplied comparison and fit outputs were not overwritten. These Hesse checks apply to CPU propagation; the earlier performance table remains a historical measurement of the optimization before this numerical fix.
+
 ## Proposed next steps
 
 1. Resolve the reported backend/reference Hesse discrepancy and add a regression test for likelihood curvature and post-fit uncertainties.
