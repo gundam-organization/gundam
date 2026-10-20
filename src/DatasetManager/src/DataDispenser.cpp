@@ -1445,16 +1445,25 @@ void DataDispenser::selectLoadThreadCount(){
     return;
   }
 
-  std::vector<int> candidates{1};
-  while( candidates.back() < maxThreads ){
-    candidates.push_back(candidates.back() > maxThreads / 2 ? maxThreads : candidates.back() * 2);
+  std::vector<int> candidates;
+  for( int nReaders = 1; nReaders <= std::min(4, maxThreads); ++nReaders ){
+    candidates.push_back(nReaders);
+  }
+  // Above four readers, try 6, 8, 12, 16, 24, ... and the exact limit.
+  for( Long64_t scale = 4; candidates.back() < maxThreads; scale *= 2 ){
+    candidates.push_back(int(std::min(Long64_t(maxThreads), scale + scale / 2)));
+    if( candidates.back() < maxThreads ){
+      candidates.push_back(int(std::min(Long64_t(maxThreads), 2 * scale)));
+    }
   }
 
   // Each candidate gets a separate part of every physical file, including
-  // friends. Three rounds use 1 + 2 + 4 slots: no probe range is read twice.
+  // friends. Four rounds use 1 + 2 + 4 + 8 slots: no probe range is read twice.
   // This reduces warming by our own reads, but cannot bypass an existing OS cache.
   constexpr Long64_t initialProbeBytes{16LL * 1024 * 1024};
-  const Long64_t slots = 7 * Long64_t(candidates.size());
+  constexpr int maxProbeAttempts{4};
+  constexpr Long64_t slotsPerCandidate{(1LL << maxProbeAttempts) - 1};
+  const Long64_t slots = slotsPerCandidate * Long64_t(candidates.size());
   const Long64_t baseBytes = std::min(initialProbeBytes, totalBytes / slots);
   LogInfo << "Benchmarking raw input I/O across " << inputFiles.size()
           << " physical files (main and enabled friends), " << totalBytes << " bytes." << std::endl;
@@ -1463,7 +1472,8 @@ void DataDispenser::selectLoadThreadCount(){
   const auto probeStart = Clock::now();
   std::vector<double> rates(candidates.size());
   try{
-    for( int round = 0; round < 3; ++round ){
+    for( int round = 0; round < maxProbeAttempts; ++round ){
+      LogInfo << "Raw I/O probe attempt " << round + 1 << "/" << maxProbeAttempts << std::endl;
       const Long64_t roundSlots = 1LL << round;
       const Long64_t roundOffset = roundSlots - 1;
       const Long64_t targetBytes = baseBytes * roundSlots;
@@ -1483,7 +1493,7 @@ void DataDispenser::selectLoadThreadCount(){
                   static_cast<long double>(targetBytes) * file.size / totalBytes / nReaders
               );
               if( bytes == 0 ){ continue; }
-              const long double slot = 7 * iCandidate + roundOffset
+              const long double slot = slotsPerCandidate * iCandidate + roundOffset
                                        + static_cast<long double>(roundSlots) * iReader / nReaders;
               const auto offset = static_cast<std::streamoff>(file.size * slot / slots);
               std::ifstream stream(file.path, std::ios::binary);
@@ -1525,6 +1535,15 @@ void DataDispenser::selectLoadThreadCount(){
           or std::chrono::duration<double>(Clock::now() - probeStart).count() >= 2. ){
         break;
       }
+      if( round + 1 < maxProbeAttempts ){
+        LogInfo << "Raw I/O probe measurements are shorter than 200 ms; data may be in the filesystem cache"
+                << " (or storage may be very fast). Retrying in different file regions with a larger read volume."
+                << std::endl;
+      }
+      else{
+        LogInfo << "Raw I/O probe reached the maximum of " << maxProbeAttempts
+                << " attempts; short measurements may still be influenced by the filesystem cache." << std::endl;
+      }
     }
   }
   catch( const std::exception& error ){
@@ -1533,7 +1552,7 @@ void DataDispenser::selectLoadThreadCount(){
     return;
   }
 
-  const double threshold = 0.95;
+  const double threshold = 0.9;
   const double bestRate = *std::max_element(rates.begin(), rates.end());
   if( bestRate <= 0 ){ return; }
   for( size_t iCandidate = 0; iCandidate < candidates.size(); ++iCandidate ){
