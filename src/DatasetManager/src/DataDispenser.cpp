@@ -33,12 +33,19 @@
 #include <TClass.h>
 #include <TGraph.h>
 
+#include <algorithm>
+#include <chrono>
+#include <fstream>
+#include <future>
+#include <limits>
+#include <stdexcept>
 #include <unordered_map>
 #include <map>
 #include <set>
 #include <string>
 #include <vector>
 #include <sstream>
+#include <sys/stat.h>
 
 namespace {
 
@@ -760,6 +767,7 @@ void DataDispenser::load(Propagator& propagator_){
   LogExitIf(not propagator_.isInitialized(), "Can't load while propagator_ is not initialized.");
 
   _cache_.clear();
+  _nbThreadsForLoad_ = 0;
   _cache_.propagatorPtr = &propagator_;
 
   if( not _parameters_.overridePropagatorConfig.empty() ){
@@ -803,6 +811,7 @@ void DataDispenser::load(Propagator& propagator_){
     }
   }
 
+  this->selectLoadThreadCount();
   this->parseStringParameters();
   this->fetchRequestedLeaves();
   this->doEventSelection();
@@ -1387,8 +1396,157 @@ void DataDispenser::loadFromHistContent(){
   fHist->Close();
 }
 
+void DataDispenser::selectLoadThreadCount(){
+  // File metadata is sufficient for small inputs; do not read payload data just
+  // to decide how to read it. Include enabled friends and count each file once.
+  constexpr Long64_t singleReaderThreshold{500LL * 1000 * 1000}; // 500 MB
+  std::set<std::string> filePaths;
+  for( const auto& fileEntry : _parameters_.filePathList ){
+    if( not fileEntry.isEnabled ){ continue; }
+    filePaths.insert(resolveRootFileAndTreePath(fileEntry.path, _parameters_.globalTreePath).filePath);
+    for( const auto& friendEntry : fileEntry.friendList ){
+      if( not friendEntry.isEnabled ){ continue; }
+      filePaths.insert(resolveRootFileAndTreePath(friendEntry.path, _parameters_.globalTreePath).filePath);
+    }
+  }
+
+  struct InputFile{
+    std::string path;
+    Long64_t size;
+  };
+  std::vector<InputFile> inputFiles;
+  std::set<std::pair<dev_t, ino_t>> fileIds;
+  Long64_t totalBytes{0};
+  for( const auto& filePath : filePaths ){
+    struct stat fileInfo{};
+    // Unknown sizes retain the configured limit rather than treating them as zero.
+    if( ::stat(filePath.c_str(), &fileInfo) != 0 or not S_ISREG(fileInfo.st_mode) or fileInfo.st_size < 0 ){
+      LogWarning << "Cannot determine input size for " << filePath
+                 << "; keeping the configured loading thread limit." << std::endl;
+      return;
+    }
+    // A friend may share a physical file with the main tree or another friend.
+    if( not fileIds.emplace(fileInfo.st_dev, fileInfo.st_ino).second ){ continue; }
+    if( fileInfo.st_size > std::numeric_limits<Long64_t>::max() - totalBytes ){ return; }
+    totalBytes += fileInfo.st_size;
+    if( fileInfo.st_size > 0 ){ inputFiles.push_back({filePath, fileInfo.st_size}); }
+  }
+
+  if( totalBytes < singleReaderThreshold ){
+    _nbThreadsForLoad_ = 1;
+    LogInfo << "Input files total " << totalBytes
+            << " bytes (< 500 MB): using one reader for event selection and loading." << std::endl;
+    return;
+  }
+
+  const int maxThreads = getNbParallelCpu();
+  if( maxThreads <= 1 or (_owner_->isDevSingleThreadEventSelection()
+                         and _owner_->isDevSingleThreadEventLoaderAndIndexer()) ){
+    return;
+  }
+
+  std::vector<int> candidates{1};
+  while( candidates.back() < maxThreads ){
+    candidates.push_back(candidates.back() > maxThreads / 2 ? maxThreads : candidates.back() * 2);
+  }
+
+  // Each candidate gets a separate part of every physical file, including
+  // friends. Three rounds use 1 + 2 + 4 slots: no probe range is read twice.
+  // This reduces warming by our own reads, but cannot bypass an existing OS cache.
+  constexpr Long64_t initialProbeBytes{16LL * 1024 * 1024};
+  const Long64_t slots = 7 * Long64_t(candidates.size());
+  const Long64_t baseBytes = std::min(initialProbeBytes, totalBytes / slots);
+  LogInfo << "Benchmarking raw input I/O across " << inputFiles.size()
+          << " physical files (main and enabled friends), " << totalBytes << " bytes." << std::endl;
+
+  using Clock = std::chrono::steady_clock;
+  const auto probeStart = Clock::now();
+  std::vector<double> rates(candidates.size());
+  try{
+    for( int round = 0; round < 3; ++round ){
+      const Long64_t roundSlots = 1LL << round;
+      const Long64_t roundOffset = roundSlots - 1;
+      const Long64_t targetBytes = baseBytes * roundSlots;
+      double shortestSeconds = std::numeric_limits<double>::max();
+      for( size_t iCandidate = 0; iCandidate < candidates.size(); ++iCandidate ){
+        const int nReaders = candidates[iCandidate];
+        const auto start = Clock::now();
+        std::vector<std::future<Long64_t>> readers;
+        // Open independent streams just like the independent TChains used by
+        // the real loader. Every reader also reads its share of the friend files.
+        for( int iReader = 0; iReader < nReaders; ++iReader ){
+          readers.emplace_back(std::async(std::launch::async, [&, iReader]{
+            std::vector<char> buffer(1024 * 1024);
+            Long64_t bytesRead{0};
+            for( const auto& file : inputFiles ){
+              const Long64_t bytes = Long64_t(
+                  static_cast<long double>(targetBytes) * file.size / totalBytes / nReaders
+              );
+              if( bytes == 0 ){ continue; }
+              const long double slot = 7 * iCandidate + roundOffset
+                                       + static_cast<long double>(roundSlots) * iReader / nReaders;
+              const auto offset = static_cast<std::streamoff>(file.size * slot / slots);
+              std::ifstream stream(file.path, std::ios::binary);
+              stream.seekg(offset);
+              Long64_t remaining = bytes;
+              while( remaining > 0 ){
+                const auto chunk = static_cast<std::streamsize>(
+                    std::min(remaining, Long64_t(buffer.size()))
+                );
+                stream.read(buffer.data(), chunk);
+                if( stream.gcount() != chunk ){
+                  throw std::runtime_error("Raw I/O probe could not read " + file.path);
+                }
+                remaining -= chunk;
+              }
+              bytesRead += bytes;
+            }
+            return bytesRead;
+          }));
+        }
+        Long64_t bytesRead{0};
+        // Join every reader before propagating failures (all lambdas reference
+        // the current candidate's locals).
+        std::exception_ptr failure;
+        for( auto& reader : readers ){
+          try{ bytesRead += reader.get(); }
+          catch(...){ if( not failure ){ failure = std::current_exception(); } }
+        }
+        if( failure ){ std::rethrow_exception(failure); }
+        const double seconds = std::chrono::duration<double>(Clock::now() - start).count();
+        shortestSeconds = std::min(shortestSeconds, seconds);
+        rates[iCandidate] = seconds > 0 ? double(bytesRead) / seconds : 0.;
+        LogInfo << "Raw I/O probe: " << nReaders << " reader(s), " << bytesRead
+                << " bytes in " << seconds << " s, " << rates[iCandidate] / 1.e6 << " MB/s." << std::endl;
+      }
+      // Repeat with equal, larger byte budgets for every candidate when reads
+      // were too short. The total bytes are bounded, even on slow storage.
+      if( shortestSeconds >= 0.2
+          or std::chrono::duration<double>(Clock::now() - probeStart).count() >= 2. ){
+        break;
+      }
+    }
+  }
+  catch( const std::exception& error ){
+    LogWarning << "Raw I/O probe failed: " << error.what()
+               << "; keeping the configured loading thread limit." << std::endl;
+    return;
+  }
+
+  const double bestRate = *std::max_element(rates.begin(), rates.end());
+  if( bestRate <= 0 ){ return; }
+  for( size_t iCandidate = 0; iCandidate < candidates.size(); ++iCandidate ){
+    if( rates[iCandidate] < 0.9 * bestRate ){ continue; }
+    _nbThreadsForLoad_ = candidates[iCandidate];
+    break;
+  }
+  LogInfo << "Raw I/O probe selected " << _nbThreadsForLoad_
+          << " reader(s) for event selection and loading (at least 90% of best measured throughput)." << std::endl;
+}
+
 int DataDispenser::getNbParallelCpu() const{
-  return GundamGlobals::getNbCpuThreads(_owner_->getNbMaxThreadsForLoad());
+  int nThreads = GundamGlobals::getNbCpuThreads(_owner_->getNbMaxThreadsForLoad());
+  return _nbThreadsForLoad_ > 0 ? std::min(nThreads, _nbThreadsForLoad_) : nThreads;
 }
 const std::string& DataDispenser::getVariableExpression(const std::string& variable_) const {
   return ::getVariableExpression(_cache_, _parameters_.variableDict, variable_);
