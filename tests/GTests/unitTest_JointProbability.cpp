@@ -16,6 +16,26 @@ namespace {
     }
 }
 
+TEST(jointProbability, BarlowBeestonResolvesPoissonDevianceNearTheMinimum) {
+    std::unique_ptr<JointProbability::JointProbabilityBase> probability(
+        JointProbability::makeJointProbability("BarlowLLH_BANFF_OA2021"));
+    for (double data : {1.e-6, 1., 655.82092932695639, 1.e8, 1.e12}) {
+        EXPECT_DOUBLE_EQ(probability->eval(data, data, 0., 0), 0.);
+        for (double relativeStep : {-1.e-4, -1.e-7, -1.e-10, 1.e-10, 1.e-7, 1.e-4}) {
+            const double prediction = data * (1. + relativeStep);
+            const long double delta = (static_cast<long double>(prediction) - data) / data;
+            // Independent expansion. The first omitted
+            // term is O(delta^6), below the tolerance for these probes.
+            const long double expected = 2.L * data * delta * delta
+                * (.5L - delta / 3.L + delta * delta / 4.L - delta * delta * delta / 5.L);
+            const double actual = probability->eval(data, prediction, 0., 0);
+            SCOPED_TRACE(::testing::Message() << "data=" << data << ", step=" << relativeStep);
+            EXPECT_GT(actual, 0.);
+            EXPECT_NEAR(actual, double(expected), double(expected) * 5.e-13);
+        }
+    }
+}
+
 TEST(jointProbability, PredictionValuesAreIndependentOfHostHistogram) {
     Sample model, data;
     configurePredictionSample(model, "model");
