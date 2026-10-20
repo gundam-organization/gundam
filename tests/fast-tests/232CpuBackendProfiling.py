@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Check sampled CPU diagnostics, cache accounting and unchanged predictions."""
 import json
+import os
 import sys
 from importlib import import_module
 from pathlib import Path
@@ -13,7 +14,8 @@ import_module('005PythonSetup-utils').requireVenv(__file__)
 def run(path, profile):
     import GUNDAM
     helper = import_module('211CpuBackendPropagation')
-    prefix = profile.read_text().splitlines() if profile is not None and profile.exists() else []
+    output = profile.with_name(f'{profile.stem}-{os.getpid()}{profile.suffix}') if profile is not None else None
+    prefix = output.read_text().splitlines() if output is not None and output.exists() else []
     text = helper.build_config_text(path, True)
     if profile is not None:
         text = text.replace('      type: CPU', f'''      type: CPU
@@ -38,12 +40,15 @@ def run(path, profile):
         predictions.append([(v.sumWeights, v.sqrtSumSqWeights) for v in bins])
     if profile is not None:
         # Records must be readable while the engine and output stream are alive.
-        lines = profile.read_text().splitlines()
+        lines = output.read_text().splitlines()
         assert lines[:len(prefix)] == prefix
         records = [json.loads(line) for line in lines[len(prefix):]]
         metadata = records[0]
         samples = records[1:]
         assert metadata['kind'] == 'metadata'
+        assert metadata['outputPath'] == str(output)
+        assert metadata['configuredOutputPath'] == str(profile)
+        assert metadata['system']['pid'] == os.getpid()
         assert metadata['threads'] == 4
         assert metadata['events'] == 6
         assert sum(r['events'] for r in metadata['weightRanges']) == 6
@@ -77,11 +82,13 @@ def main():
     GUNDAM.setLightOutputMode(True)
     root = Path.cwd() / '232CpuBackendProfiling-input.root'
     profile = Path.cwd() / '232CpuBackendProfiling.jsonl'
-    profile.unlink(missing_ok=True)
+    profile.with_name(f'{profile.stem}-{os.getpid()}{profile.suffix}').unlink(missing_ok=True)
+    profile.write_text('Existing unsuffixed report must be preserved.\n')
     import_module('211CpuBackendPropagation').write_input_root_file(root)
     expected = run(root, None)
     assert expected == run(root, profile)
     assert expected == run(root, profile)
+    assert profile.read_text() == 'Existing unsuffixed report must be preserved.\n'
     print('SUCCESS: CPU profiling preserves predictions and exports bounded, flushed cache/worker diagnostics.')
 
 

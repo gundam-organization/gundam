@@ -5,6 +5,7 @@
 #include "Logger.h"
 
 #include <algorithm>
+#include <filesystem>
 #include <map>
 #include <set>
 #include <sstream>
@@ -197,10 +198,16 @@ Backends::CpuBackendProfiler::WorkerScope::~WorkerScope() {
 
 Backends::CpuBackendProfiler::CpuBackendProfiler(const std::string& path_, std::size_t interval_,
     std::size_t maxSamples_, std::size_t threads_, Json metadata_)
-    : _output_(path_, std::ios::app), _interval_(interval_), _maxSamples_(maxSamples_) {
-  if( not _output_ ){ throw std::runtime_error("Cannot open CPU profile output: " + path_); }
+    : _interval_(interval_), _maxSamples_(maxSamples_) {
   for( auto& workers : _workers_ ){ workers.resize(threads_); }
   auto system = systemMetadata();
+  auto outputPath = std::filesystem::path(path_);
+  outputPath.replace_filename(outputPath.stem().string() + "-" + std::to_string(system.value("pid", 0))
+                              + outputPath.extension().string());
+  _output_.open(outputPath, std::ios::app);
+  if( not _output_ ){ throw std::runtime_error("Cannot open CPU profile output: " + outputPath.string()); }
+  metadata_["configuredOutputPath"] = path_;
+  metadata_["outputPath"] = outputPath.string();
   // Discover readable CPU accounting files once. Memory/NUMA accounting and
   // repeated discovery can be expensive on large batch nodes.
   std::set<std::string> cpuStatPaths;
@@ -222,7 +229,7 @@ Backends::CpuBackendProfiler::CpuBackendProfiler(const std::string& path_, std::
   metadata_["sampleInterval"] = interval_;
   metadata_["maxSamples"] = maxSamples_;
   write(std::move(metadata_));
-  LogInfo << "CPU profiling enabled: " << path_ << " (first 5 calls, then every " << interval_
+  LogInfo << "CPU profiling enabled: " << outputPath.string() << " (first 5 calls, then every " << interval_
           << "; at most " << maxSamples_ << " samples)." << std::endl;
 }
 
