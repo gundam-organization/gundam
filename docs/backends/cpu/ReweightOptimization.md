@@ -129,12 +129,27 @@ sequences and retains the short global-call cap. For example:
 ```sh
 python3 /path/to/gundam/tests/regular-tests/222CpuWeightSchedulingBenchmark.py \
   --benchmark inputs --config configOA2024.yaml --threads 8 \
-  --calls 100 --global-calls 10 --warmup 3 --trials 2 --rounds 2 \
+  --scenarios local1 --calls 1 --warmup 3 --trials 1 --rounds 1 \
   --override override/v12ProdRun45.yaml override/backendCpuTest.yaml
 ```
 
-This runs 2,480 timed evaluations, including 80 global calls, plus warmup and
-priming. `cacheInputGroups`, per-call `inputTransforms` and `sharedCacheInputs`
+Local workloads automatically cover every variable fit coordinate: `local1`
+uses at least N calls per trial and `local2` at least ceil(N/2). `--calls` can
+request additional calls; it cannot truncate this coverage. Coordinates are
+visited in manifest order, with reproducible bounded random displacements
+around the initialized point. Previously moved coordinates retain their small
+displacement until the trial ends. Eigen coordinates may change several physical
+parameters, so these are controlled workloads rather than actual Migrad steps.
+
+With 842 coordinates, this short example runs 1,684 timed evaluations, plus
+warmup and priming, using one model load and no global updates. Each `local1`
+case writes a `*-coordinate-costs.json` file with coordinate names, original/eigen
+space, sample counts, stage timings and affected-dial counts. Raw results record
+the coordinate indices per call; the summary records coverage. Use more trials
+for stable per-coordinate measurements. Global calls remain independently capped
+by `--global-calls` when that scenario is selected.
+
+`cacheInputGroups`, per-call `inputTransforms` and `sharedCacheInputs`
 identify whether sharing was available and used. Group metadata/state remain
 common to both modes: PerDial repeats transformations/comparisons in workers,
 while Shared reads prepared group values. The comparison isolates input reuse

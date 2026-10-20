@@ -33,8 +33,15 @@ def write_json(path, value):
     temporary.replace(path)
 
 
-def scenario_calls(args, scenario):
-    return min(args.calls, args.global_calls) if scenario == 'global' else args.calls
+def scenario_calls(args, scenario, parameter_count=None):
+    if scenario == 'global':
+        return min(args.calls, args.global_calls)
+    if scenario in ('local1', 'local2'):
+        if parameter_count is None:
+            return None  # Resolved from the actual fit coordinate list after loading.
+        coverage_calls = parameter_count if scenario == 'local1' else (parameter_count + 1) // 2
+        return max(args.calls, coverage_calls)
+    return args.calls
 
 
 class ParameterSequence:
@@ -68,18 +75,23 @@ class ParameterSequence:
                  'proposalStdDev': scale, 'space': space}
                 for i, (p, center, scale, space) in enumerate(self.entries)]
 
-    def apply(self, scenario, rng, call, digest):
+    def coordinates(self, scenario, call):
         if scenario == 'constant':
-            return 0
+            return []
         size = len(self.entries)
         count = {'local1': 1, 'local2': 2, 'global': size}[scenario]
         if size < count or not size:
             raise RuntimeError(f'{scenario} requires at least {max(1, count)} variable parameters; found {size}')
-        # Cycle over coordinates rather than repeatedly timing one cheap dial.
-        # Full coverage still requires enough calls for the parameter count.
-        # Only the selected coordinates change; earlier coordinates retain their
-        # small displacement until the trial ends (no hidden restoration calls).
-        indices = range(size) if scenario == 'global' else [(call * count + j) % size for j in range(count)]
+        if scenario == 'global':
+            return range(size)
+        return [(call * count + j) % size for j in range(count)]
+
+    def apply(self, scenario, rng, call, digest):
+        if scenario == 'constant':
+            return 0
+        indices = self.coordinates(scenario, call)
+        # Earlier coordinates retain their small displacement until the trial
+        # ends, so only the selected one or two coordinates change each call.
         for index in indices:
             parameter, center, scale, _ = self.entries[index]
             for _ in range(1000):
@@ -91,11 +103,11 @@ class ParameterSequence:
             parameter.setParameterValue(candidate)
             self.current[index] = candidate
             digest.update(struct.pack('<Qd', index, candidate))
-        return count
+        return len(indices)
 
 
 def measure_case(args, engine, metadata, tag, sequence, scenario):
-    calls = scenario_calls(args, scenario)
+    calls = scenario_calls(args, scenario, len(sequence.entries))
     sequence.reset()
     engine.evaluateLikelihood()
     progress(f'{tag}: warming up ({args.warmup} evaluations)')
@@ -112,9 +124,11 @@ def measure_case(args, engine, metadata, tag, sequence, scenario):
         progress(f'{tag}: trial {trial + 1}/{args.trials}, 0/{calls} evaluations')
         stages, caches, histograms, complete, updates, changed, likelihoods = [], [], [], [], [], [], []
         preparations, executions, candidates, linear = [], [], [], []
-        input_transforms, shared_inputs = [], []
+        input_transforms, shared_inputs, coordinate_indices = [], [], []
         last_progress = time.monotonic()
         for call in range(calls):
+            selected = sequence.coordinates(scenario, call)
+            coordinate_indices.append(list(selected) if scenario != 'global' else None)
             update_start = time.perf_counter()
             changed.append(sequence.apply(scenario, rng, call, digest))
             updates.append(time.perf_counter() - update_start)
@@ -143,7 +157,8 @@ def measure_case(args, engine, metadata, tag, sequence, scenario):
                     'changedFitCoordinates': changed, 'likelihoods': likelihoods,
                     'cachePreparationSeconds': preparations, 'cacheExecutionSeconds': executions,
                     'cacheCandidates': candidates, 'linearCacheTraversal': linear,
-                    'inputTransforms': input_transforms, 'sharedCacheInputs': shared_inputs})
+                    'inputTransforms': input_transforms, 'sharedCacheInputs': shared_inputs,
+                    'coordinateIndices': coordinate_indices})
         trials.append({'weightMedianMs': statistics.median(stages) * 1000,
                        'weightMeanMs': statistics.mean(stages) * 1000,
                        'weightP95Ms': sorted(stages)[int((len(stages) - 1) * .95)] * 1000,
@@ -161,12 +176,34 @@ def measure_case(args, engine, metadata, tag, sequence, scenario):
         write_json(args.output / f'{tag}.partial.json', {
             'complete': False, 'scenario': scenario, 'layout': metadata, 'trials': trials, 'raw': raw})
         progress(f"{tag}: trial {trial + 1}/{args.trials} finished; cache {trials[-1]['cacheMedianMs']:.3f} ms, reweight {trials[-1]['weightMedianMs']:.3f} ms")
+    covered = (set(range(len(sequence.entries))) if scenario == 'global' else
+               {index for trial in raw for indices in trial['coordinateIndices'] for index in indices})
+    coordinate_costs_file = None
+    if scenario == 'local1':
+        rows = []
+        positions_by_coordinate = [[] for _ in sequence.entries]
+        for trial in raw:
+            for call, indices in enumerate(trial['coordinateIndices']):
+                positions_by_coordinate[indices[0]].append((trial, call))
+        for index, (parameter, _, _, space) in enumerate(sequence.entries):
+            positions = positions_by_coordinate[index]
+            row = {'index': index, 'name': parameter.getFullTitle(), 'space': space, 'samples': len(positions)}
+            for source, target, scale in (
+                    ('cacheSeconds', 'cacheMedianMs', 1000), ('weightSeconds', 'weightMedianMs', 1000),
+                    ('histogramSeconds', 'histogramMedianMs', 1000), ('evaluationSeconds', 'evaluationMedianMs', 1000),
+                    ('cacheCandidates', 'cacheCandidatesMedian', 1), ('inputTransforms', 'inputTransformsMedian', 1)):
+                row[target] = statistics.median(trial[source][call] for trial, call in positions) * scale
+            rows.append(row)
+        coordinate_costs_file = f'{tag}-coordinate-costs.json'
+        write_json(args.output / coordinate_costs_file, rows)
     li = engine.getLikelihoodInterface()
     histogram = [(v.sumWeights, v.sqrtSumSqWeights)
                  for sample in li.getModelPropagator().getSampleSet().getSampleList()
                  for v in sample.getHistogram().getBinContentList()]
     return {'complete': True, 'scenario': scenario, 'seed': args.seed, 'stepScale': args.step_scale,
-            'variableFitCoordinates': len(sequence.entries), 'actualScheduling': metadata['weightScheduling'],
+            'variableFitCoordinates': len(sequence.entries), 'testedFitCoordinates': len(covered),
+            'coordinateCoverageComplete': len(covered) == len(sequence.entries),
+            'coordinateCostsFile': coordinate_costs_file, 'actualScheduling': metadata['weightScheduling'],
             'workBlocks': metadata['weightBlockCount'], 'threads': metadata['threads'],
             'cacheInputGroups': metadata['cacheInputGroups'],
             'cacheInputStorageBytes': metadata['cacheInputStorageBytes'],
@@ -216,6 +253,13 @@ def measure_suite(args):
     required = 2 if 'local2' in args.scenarios else int(any(s != 'constant' for s in args.scenarios))
     if len(sequence.entries) < required:
         raise RuntimeError(f'Requested scenarios require {required} variable fit coordinates; found {len(sequence.entries)}')
+    counts = {scenario: scenario_calls(args, scenario, len(sequence.entries)) for scenario in dict.fromkeys(args.scenarios)}
+    settings_path = args.output / 'settings.json'
+    settings = json.loads(settings_path.read_text())
+    settings.setdefault('callsByThreadCount', {})[str(threads)] = counts
+    settings['callsByScenario'] = counts
+    write_json(settings_path, settings)
+    progress(f't{threads}: resolved evaluations per trial: {counts}; local scenarios cover all {len(sequence.entries)} fit coordinates')
     write_json(args.output / f'parameters-t{threads}.json', sequence.manifest())
     progress(f't{threads}: {len(sequence.entries)} variable fit coordinates; scenarios: {args.scenarios}')
     references = {}
@@ -227,6 +271,8 @@ def measure_suite(args):
         layouts = [(mode, factor, 'Auto', 'Shared') for mode, factor in
                    [('Fixed', 2), *[('Dynamic', f) for f in dict.fromkeys(args.factors)]]]
     cases = [(scenario, *layout) for scenario in dict.fromkeys(args.scenarios) for layout in layouts]
+    total_calls = sum(counts.values()) * len(layouts) * args.trials * args.rounds
+    progress(f't{threads}: resolved timed-call budget: {total_calls}, excluding warmup and priming')
     for round_index in range(args.rounds):
         ordered = cases if round_index % 2 == 0 else list(reversed(cases))
         for scenario, mode, factor, traversal, evaluation in ordered:
@@ -305,7 +351,8 @@ def main():
     parser.add_argument('--seed', type=int, default=12345)
     parser.add_argument('--step-scale', type=float, default=.1,
                         help='Proposal standard deviation as a fraction of prior sigma (step size for flat parameters)')
-    parser.add_argument('--calls', type=int, default=100)
+    parser.add_argument('--calls', type=int, default=100,
+                        help='Evaluations per trial; local scenarios automatically extend to cover every fit coordinate')
     parser.add_argument('--global-calls', type=int, default=20,
                         help='Maximum evaluations per trial for the costly global workload')
     parser.add_argument('--warmup', type=int, default=5)
@@ -333,8 +380,9 @@ def main():
     progress(f'{len(set(args.threads))} model load(s), one per thread count; factors/rounds reuse the same model')
     counts = {s: scenario_calls(args, s) for s in dict.fromkeys(args.scenarios)}
     layout_count = 2 if args.benchmark in ('cache', 'inputs') else 1 + len(set(args.factors))
-    total_calls = sum(counts.values()) * layout_count * args.trials * args.rounds * len(set(args.threads))
-    progress(f'Timed evaluations per trial: {counts}; total across cases: {total_calls} (plus warmup/cache priming)')
+    total_calls = sum(value if value is not None else args.calls for value in counts.values()) * layout_count * args.trials * args.rounds * len(set(args.threads))
+    progress(f'Initial timed-call budget: at least {total_calls}; local counts are extended after loading to cover every coordinate')
+    progress(f'Evaluations per trial before resolving local coverage: {counts} (None means automatic full coverage)')
     write_json(args.output / 'settings.json', {
         'config': str(args.config), 'override': args.override, 'workDir': str(args.work_dir),
         'threads': args.threads, 'factors': args.factors, 'rounds': args.rounds,

@@ -96,6 +96,8 @@ def main():
             assert signature == signatures.setdefault(scenario, signature)
         constant_histogram = json.loads((output / 'round1-t4-constant-Fixed.json').read_text())['histogram']
         for case_path in output.glob('round*.json'):
+            if case_path.name.endswith('-coordinate-costs.json'):
+                continue
             result = json.loads(case_path.read_text())
             if result['scenario'] != 'constant':
                 assert result['histogram'] != constant_histogram
@@ -114,6 +116,8 @@ def main():
         assert len(cache_summary) == 16
         assert len({r['pid'] for r in cache_summary}) == 1
         for cache_path in cache_output.glob('round*.json'):
+            if cache_path.name.endswith('-coordinate-costs.json'):
+                continue
             result = json.loads(cache_path.read_text())
             assert result['mode'] == 'Dynamic' and result['blocksPerThread'] == 2
             assert result['histogramsAgree'] and result['likelihoodsAgree']
@@ -146,6 +150,32 @@ def main():
                         assert trial['inputTransformsMedian'] <= 4
                     else:
                         assert trial['inputTransformsMedian'] >= 540
+        coverage_output = base / f'coverage-results-{eigen}-{os.getpid()}'
+        with (base / f'coverage-benchmark-{eigen}.log').open('w') as log:
+            subprocess.run([sys.executable, str(benchmark), '--benchmark', 'inputs', '--config', str(path),
+                            '--threads', '4', '--scenarios', 'local1', 'local2', '--calls', '1',
+                            '--warmup', '1', '--trials', '1', '--rounds', '1', '--output', str(coverage_output)],
+                           stdout=log, stderr=subprocess.STDOUT, check=True)
+        coverage_summary = json.loads((coverage_output / 'summary.json').read_text())
+        assert len(coverage_summary) == 4
+        for result in coverage_summary:
+            assert result['coordinateCoverageComplete']
+            assert result['testedFitCoordinates'] == len(manifest)
+            expected_calls = len(manifest) if result['scenario'] == 'local1' else (len(manifest) + 1) // 2
+            assert result['callsPerTrial'] == expected_calls
+            assert result['likelihoodsAgree'] and result['histogramsAgree']
+            if result['scenario'] == 'local1':
+                costs = json.loads((coverage_output / result['coordinateCostsFile']).read_text())
+                assert [r['name'] for r in costs] == [p['name'] for p in manifest]
+                assert all(r['samples'] == 1 and r['cacheMedianMs'] >= 0 for r in costs)
+            else:
+                assert result['coordinateCostsFile'] is None
+            case = next(r for r in coverage_output.glob('round*.json')
+                        if not r.name.endswith('-coordinate-costs.json')
+                        and json.loads(r.read_text())['scenario'] == result['scenario']
+                        and json.loads(r.read_text())['inputEvaluation'] == result['inputEvaluation'])
+            raw = json.loads(case.read_text())['raw'][0]
+            assert {i for indices in raw['coordinateIndices'] for i in indices} == set(range(len(manifest)))
     print('SUCCESS: workload replay, traversals and shared input evaluations preserve predictions.')
 
 
