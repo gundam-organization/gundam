@@ -1533,15 +1533,17 @@ void DataDispenser::selectLoadThreadCount(){
     return;
   }
 
+  const double threshold = 0.95;
   const double bestRate = *std::max_element(rates.begin(), rates.end());
   if( bestRate <= 0 ){ return; }
   for( size_t iCandidate = 0; iCandidate < candidates.size(); ++iCandidate ){
-    if( rates[iCandidate] < 0.2 * bestRate ){ continue; }
+    if( rates[iCandidate] < threshold * bestRate ){ continue; }
     _nbThreadsForLoad_ = candidates[iCandidate];
     break;
   }
   LogInfo << "Raw I/O probe selected " << _nbThreadsForLoad_
-          << " reader(s) for event selection and loading (at least 90% of best measured throughput)." << std::endl;
+          << " reader(s) for event selection and loading (at least " << threshold*100
+          << "% of best measured throughput)." << std::endl;
 }
 
 int DataDispenser::getNbParallelCpu() const{
