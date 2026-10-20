@@ -1,0 +1,11 @@
+# Add last to the usual configuration overrides. Change the output path for
+# each thread-count/job comparison and copy the JSONL file out of batch scratch.
+fitterEngineConfig:
+  likelihoodInterfaceConfig:
+    backendManagerConfig:
+      isEnabled: true
+      type: CPU
+      backendConfig:
+        profileOutputPath: cpu-profile-4.jsonl
+        profileSampleInterval: 100
+        profileMaxSamples: 200
