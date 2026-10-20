@@ -317,6 +317,8 @@ void Backends::CpuBackendProfiler::end(const BackendTimingSummary& timing_) {
       {"variables", timing_.variableStageSeconds}, {"binning", timing_.binningStageSeconds},
       {"likelihood", timing_.likelihoodHostSeconds}};
   out["cacheTraversal"] = timing_.linearCacheTraversal ? "Linear" : "Indexed";
+  out["cacheInputTransformCount"] = timing_.cacheInputTransformCount;
+  out["sharedCacheInputs"] = timing_.sharedCacheInputs;
   out["cacheUpdateTimingSeconds"] = {{"preparation", timing_.cachePreparationSeconds},
                                      {"execution", timing_.cacheExecutionSeconds}};
 #ifdef __linux__
@@ -356,6 +358,10 @@ Backends::CpuBackendProfiler::Json Backends::CpuBackend::getWeightSchedulingDiag
       {"weightScheduling", _usesDynamicWeights_ ? "Dynamic" : "Fixed"},
       {"weightBlocksPerThread", _weightBlocksPerThread_}, {"weightBlockCount", _weightBlocks_.size()},
       {"cacheTraversalRequested", _cacheTraversal_.toString()},
+      {"cacheInputEvaluation", _inputEvaluation_.toString()},
+      {"cacheInputGroups", _cachedInputGroups_.size()},
+      {"cacheInputStorageBytes", getCachedInputStorageBytes()},
+      {"perDialInputStorageBytes", model.dials.size() * sizeof(double)},
       {"threads", _threadPool_.getNbThreads()}, {"events", model.events.size()},
       {"eventDialReferences", model.eventDialIndices.size()},
       {"commit", GundamVersionConfig::getVersionPostCommitHash()}};
@@ -381,6 +387,9 @@ void Backends::CpuBackend::initializeProfiler() {
       {"eventDialReferences", model.eventDialIndices.size()}, {"cachedDials", _cachedDialCount_},
       {"weightSchedulingRequested", _weightScheduling_.toString()},
       {"cacheTraversalRequested", _cacheTraversal_.toString()},
+      {"cacheInputEvaluation", _inputEvaluation_.toString()},
+      {"cacheInputGroups", _cachedInputGroups_.size()},
+      {"cacheInputStorageBytes", getCachedInputStorageBytes()},
       {"weightScheduling", _usesDynamicWeights_ ? "Dynamic" : "Fixed"},
       {"weightBlocksPerThread", _weightBlocksPerThread_},
       {"dynamicBlockTarget", _weightBlocksPerThread_ * _threadPool_.getNbThreads()},
@@ -412,6 +421,8 @@ void Backends::CpuBackend::initializeProfiler() {
   buffer("dialPayloads", model.dialPayloads);
   buffer("cachedResponses", _cachedDialResponses_);
   buffer("cachedInputs", _cachedDialInputs_);
+  buffer("cachedInputGroups", _cachedInputGroups_);
+  buffer("cachedDialInputGroups", _cachedDialInputGroups_);
   buffer("cachedFlags", _isCachedDial_);
   buffer("cacheValidity", _isCachedDialResponseValid_);
   buffer("previousParameters", _lastParameterValues_);

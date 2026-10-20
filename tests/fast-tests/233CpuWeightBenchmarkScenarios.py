@@ -14,23 +14,47 @@ import_module('005PythonSetup-utils').requireVenv(__file__)
 
 def main():
     import GUNDAM
-    import numpy as np
-    import uproot
     if not hasattr(GUNDAM.FitterEngine, 'getBackendsManager'):
         print('SKIP: GUNDAM was built without backends')
         return
     base = Path.cwd() / '233CpuWeightBenchmarkScenarios'
     base.mkdir(exist_ok=True)
     root = base / 'input.root'
-    with uproot.recreate(root) as saved:
-        tree = saved.mktree('tree_mc', {'X': 'float64'})
-        tree.extend({'X': np.tile([-.5, .5], 90)})
+    # Event-specific curves create many distinct responses with just a few
+    # equivalent inputs, exercising actual sharing rather than its fallback.
+    macro = base / 'input.C'
+    macro.write_text(r'''#include <TFile.h>
+#include <TTree.h>
+#include <TGraph.h>
+#include <TSystem.h>
+{
+  TFile file(OUTPUT, "RECREATE");
+  TTree tree("tree_mc", "tree_mc");
+  double coordinate;
+  TGraph curve(3);
+  TGraph* graph = &curve;
+  tree.Branch("X", &coordinate, "X/D");
+  tree.Branch("graph", "TGraph", &graph, 32000, 0);
+  for (int event = 0; event < 180; ++event) {
+    coordinate = event % 2 ? -.5 : .5;
+    for (int point = 0; point < 3; ++point) {
+      double x = .5 + .5 * point;
+      curve.SetPoint(point, x, 1. + .001 * (event + 1) * (x - 1.) + .002 * (x - 1.) * (x - 1.));
+    }
+    tree.Fill();
+  }
+  tree.Write();
+  file.Close();
+  gSystem->Exit(0);
+}
+'''.replace('OUTPUT', json.dumps(str(root))))
+    subprocess.run(['root', '-n', '-l', '-b', '-q', str(macro)], check=True)
     benchmark = Path(__file__).resolve().parents[1] / 'regular-tests' / '222CpuWeightSchedulingBenchmark.py'
     for eigen in (False, True):
         definitions = [dict(name=f'p{i}', priorValue=1., stdDev=.1 * (i + 1),
-                            dialSetDefinitions=[{'dialType': 'Normalization'}]) for i in range(3)]
+                            dialSetDefinitions=[{'dialType': 'Graph', 'dialBranchData': 'graph'}]) for i in range(3)]
         definitions += [dict(name='fixed', priorValue=1., stdDev=.1, isFixed=True,
-                             dialSetDefinitions=[{'dialType': 'Normalization'}])]
+                             dialSetDefinitions=[{'dialType': 'Graph', 'dialBranchData': 'graph'}])]
         if not eigen:
             definitions[0]['parameterLimits'] = [0.999, 1.001]
         config = {'fitterEngineConfig': {'likelihoodInterfaceConfig': {
@@ -102,7 +126,27 @@ def main():
                                                   trial['cacheExecutionSeconds'], trial['cacheSeconds']):
                     assert 0 <= prep + execution <= total + 1e-9
         assert all(r['cacheSpeedupVsIndexed'] > 0 for r in cache_summary)
-    print('SUCCESS: all benchmark scenarios vary the intended coordinates, replay identical sequences, and preserve predictions across layouts.')
+        input_output = base / f'input-results-{eigen}-{os.getpid()}'
+        with (base / f'input-benchmark-{eigen}.log').open('w') as log:
+            subprocess.run([sys.executable, str(benchmark), '--benchmark', 'inputs', '--config', str(path),
+                            '--threads', '4', '--calls', '7', '--global-calls', '3', '--warmup', '3',
+                            '--trials', '2', '--rounds', '2', '--output', str(input_output)],
+                           stdout=log, stderr=subprocess.STDOUT, check=True)
+        input_summary = json.loads((input_output / 'summary.json').read_text())
+        assert len(input_summary) == 16
+        assert len({r['pid'] for r in input_summary}) == 1
+        for result in input_summary:
+            assert result['cacheInputGroups'] == 4
+            assert result['cacheSpeedupVsPerDial'] > 0 and result['likelihoodsAgree'] and result['histogramsAgree']
+            for trial in result['trials']:
+                expected_calls = result['callsPerTrial'] if result['inputEvaluation'] == 'Shared' else 0
+                assert trial['sharedInputCalls'] == expected_calls
+                if result['scenario'] == 'global':
+                    if result['inputEvaluation'] == 'Shared':
+                        assert trial['inputTransformsMedian'] <= 4
+                    else:
+                        assert trial['inputTransformsMedian'] >= 540
+    print('SUCCESS: workload replay, traversals and shared input evaluations preserve predictions.')
 
 
 if __name__ == '__main__':

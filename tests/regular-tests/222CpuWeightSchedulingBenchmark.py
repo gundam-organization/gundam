@@ -112,6 +112,7 @@ def measure_case(args, engine, metadata, tag, sequence, scenario):
         progress(f'{tag}: trial {trial + 1}/{args.trials}, 0/{calls} evaluations')
         stages, caches, histograms, complete, updates, changed, likelihoods = [], [], [], [], [], [], []
         preparations, executions, candidates, linear = [], [], [], []
+        input_transforms, shared_inputs = [], []
         last_progress = time.monotonic()
         for call in range(calls):
             update_start = time.perf_counter()
@@ -130,6 +131,8 @@ def measure_case(args, engine, metadata, tag, sequence, scenario):
             preparations.append(timing.cachePreparationSeconds)
             executions.append(timing.cacheExecutionSeconds)
             candidates.append(timing.cacheCandidateCount)
+            input_transforms.append(timing.cacheInputTransformCount)
+            shared_inputs.append(timing.sharedCacheInputs)
             linear.append(timing.linearCacheTraversal)
             histograms.append(timing.histogramStageSeconds)
             if time.monotonic() - last_progress >= 5:
@@ -139,7 +142,8 @@ def measure_case(args, engine, metadata, tag, sequence, scenario):
                     'evaluationSeconds': complete, 'parameterUpdateSeconds': updates,
                     'changedFitCoordinates': changed, 'likelihoods': likelihoods,
                     'cachePreparationSeconds': preparations, 'cacheExecutionSeconds': executions,
-                    'cacheCandidates': candidates, 'linearCacheTraversal': linear})
+                    'cacheCandidates': candidates, 'linearCacheTraversal': linear,
+                    'inputTransforms': input_transforms, 'sharedCacheInputs': shared_inputs})
         trials.append({'weightMedianMs': statistics.median(stages) * 1000,
                        'weightMeanMs': statistics.mean(stages) * 1000,
                        'weightP95Ms': sorted(stages)[int((len(stages) - 1) * .95)] * 1000,
@@ -148,6 +152,8 @@ def measure_case(args, engine, metadata, tag, sequence, scenario):
                        'cacheExecutionMedianMs': statistics.median(executions) * 1000,
                        'cacheCandidateMedian': statistics.median(candidates),
                        'linearCacheCalls': sum(linear),
+                       'inputTransformsMedian': statistics.median(input_transforms),
+                       'sharedInputCalls': sum(shared_inputs),
                        'histogramMedianMs': statistics.median(histograms) * 1000,
                        'evaluationMedianMs': statistics.median(complete) * 1000,
                        'parameterUpdateMedianMs': statistics.median(updates) * 1000,
@@ -162,6 +168,9 @@ def measure_case(args, engine, metadata, tag, sequence, scenario):
     return {'complete': True, 'scenario': scenario, 'seed': args.seed, 'stepScale': args.step_scale,
             'variableFitCoordinates': len(sequence.entries), 'actualScheduling': metadata['weightScheduling'],
             'workBlocks': metadata['weightBlockCount'], 'threads': metadata['threads'],
+            'cacheInputGroups': metadata['cacheInputGroups'],
+            'cacheInputStorageBytes': metadata['cacheInputStorageBytes'],
+            'perDialInputStorageBytes': metadata['perDialInputStorageBytes'],
             'host': platform.node(), 'pid': os.getpid(), 'commit': metadata['commit'],
             'compilerOptimizationEnabled': metadata['compilerOptimizationEnabled'],
             'allowedCpus': sorted(os.sched_getaffinity(0)) if hasattr(os, 'sched_getaffinity') else None,
@@ -178,7 +187,7 @@ def measure_case(args, engine, metadata, tag, sequence, scenario):
 def measure_suite(args):
     import GUNDAM
     threads = args.worker_threads
-    if not hasattr(GUNDAM.BackendManager, 'setDiagnosticCpuCacheTraversal') or not hasattr(GUNDAM.ParameterSet, 'getEffectiveParameterList'):
+    if not hasattr(GUNDAM.BackendManager, 'setDiagnosticCpuInputEvaluation') or not hasattr(GUNDAM.ParameterSet, 'getEffectiveParameterList'):
         raise RuntimeError('Rebuild GUNDAM and select its Python module: runtime scheduling diagnostics are missing.')
     progress(f't{threads}: loading model once; GUNDAM module: {GUNDAM.__file__}')
     GUNDAM.setRuntimeWorkingDirectory(str(args.work_dir))
@@ -210,19 +219,30 @@ def measure_suite(args):
     write_json(args.output / f'parameters-t{threads}.json', sequence.manifest())
     progress(f't{threads}: {len(sequence.entries)} variable fit coordinates; scenarios: {args.scenarios}')
     references = {}
-    layouts = ([('Dynamic', 2, traversal) for traversal in ('Indexed', 'Auto')] if args.benchmark == 'cache'
-               else [(mode, factor, 'Auto') for mode, factor in [('Fixed', 2), *[('Dynamic', f) for f in dict.fromkeys(args.factors)]]])
-    cases = [(scenario, mode, factor, traversal) for scenario in dict.fromkeys(args.scenarios)
-             for mode, factor, traversal in layouts]
+    if args.benchmark == 'inputs':
+        layouts = [('Dynamic', 2, 'Auto', evaluation) for evaluation in ('PerDial', 'Shared')]
+    elif args.benchmark == 'cache':
+        layouts = [('Dynamic', 2, traversal, 'Shared') for traversal in ('Indexed', 'Auto')]
+    else:
+        layouts = [(mode, factor, 'Auto', 'Shared') for mode, factor in
+                   [('Fixed', 2), *[('Dynamic', f) for f in dict.fromkeys(args.factors)]]]
+    cases = [(scenario, *layout) for scenario in dict.fromkeys(args.scenarios) for layout in layouts]
     for round_index in range(args.rounds):
         ordered = cases if round_index % 2 == 0 else list(reversed(cases))
-        for scenario, mode, factor, traversal in ordered:
+        for scenario, mode, factor, traversal, evaluation in ordered:
             tag = f'round{round_index + 1}-t{threads}-{scenario}-{mode}' + (f'-x{factor}' if mode == 'Dynamic' else '')
             if args.benchmark == 'cache':
                 tag += f'-cache{traversal}'
+            elif args.benchmark == 'inputs':
+                tag += f'-inputs{evaluation}'
             progress(f'{tag}: rebuilding work ranges (events and cached responses retained)')
             engine.getBackendsManager().setDiagnosticCpuWeightScheduling(mode, factor)
-            metadata = json.loads(engine.getBackendsManager().setDiagnosticCpuCacheTraversal(traversal))
+            engine.getBackendsManager().setDiagnosticCpuCacheTraversal(traversal)
+            metadata = json.loads(engine.getBackendsManager().setDiagnosticCpuInputEvaluation(evaluation))
+            if args.benchmark == 'inputs':
+                progress(f"{tag}: {metadata['cacheInputGroups']} shared input groups; "
+                         f"input storage {metadata['cacheInputStorageBytes']} bytes "
+                         f"(per-dial reference {metadata['perDialInputStorageBytes']} bytes)")
             if mode == 'Dynamic' and metadata['weightScheduling'] != 'Dynamic':
                 raise RuntimeError(f'{tag}: too few events for the requested dynamic block count')
             count = metadata['weightBlockCount'] if mode == 'Dynamic' else threads
@@ -230,7 +250,7 @@ def measure_suite(args):
             result = measure_case(args, engine, metadata, tag, sequence, scenario)
             result.update(mode=mode, blocksPerThread=factor if mode == 'Dynamic' else None,
                           round=round_index + 1, pythonModule=GUNDAM.__file__,
-                          cacheTraversal=traversal, benchmark=args.benchmark)
+                          cacheTraversal=traversal, inputEvaluation=evaluation, benchmark=args.benchmark)
             values = result['histogram']
             signature = [t['sequenceDigest'] for t in result['trials']]
             likelihoods = [v for trial in result['raw'] for v in trial['likelihoods']]
@@ -255,9 +275,13 @@ def measure_suite(args):
             for measured in results:
                 baseline = next((r for r in results if r['round'] == measured['round']
                                  and r['threads'] == measured['threads'] and r['scenario'] == measured['scenario']
-                                 and (r['cacheTraversal'] == 'Indexed' if args.benchmark == 'cache' else r['mode'] == 'Fixed')), None)
+                                 and (r['inputEvaluation'] == 'PerDial' if args.benchmark == 'inputs' else
+                                      r['cacheTraversal'] == 'Indexed' if args.benchmark == 'cache' else r['mode'] == 'Fixed')), None)
                 if baseline:
-                    if args.benchmark == 'cache':
+                    if args.benchmark == 'inputs':
+                        measured['cacheSpeedupVsPerDial'] = baseline['cacheMedianMs'] / measured['cacheMedianMs']
+                        measured['evaluationSpeedupVsPerDial'] = baseline['evaluationMedianMs'] / measured['evaluationMedianMs']
+                    elif args.benchmark == 'cache':
                         measured['cacheSpeedupVsIndexed'] = baseline['cacheMedianMs'] / measured['cacheMedianMs']
                         measured['evaluationSpeedupVsIndexed'] = baseline['evaluationMedianMs'] / measured['evaluationMedianMs']
                     else:
@@ -269,8 +293,8 @@ def measure_suite(args):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--benchmark', choices=['weights', 'cache'], default='weights',
-                        help='Compare weight block factors, or Indexed/Auto cache traversal with Dynamic x2 weights')
+    parser.add_argument('--benchmark', choices=['weights', 'cache', 'inputs'], default='weights',
+                        help='Compare weight factors, cache traversal, or PerDial/Shared input evaluation (Dynamic x2)')
     parser.add_argument('--config', type=Path, required=True)
     parser.add_argument('--override', nargs='*', default=[])
     parser.add_argument('--work-dir', type=Path, default=Path.cwd())
@@ -308,7 +332,7 @@ def main():
     progress(f'Results: {args.output}')
     progress(f'{len(set(args.threads))} model load(s), one per thread count; factors/rounds reuse the same model')
     counts = {s: scenario_calls(args, s) for s in dict.fromkeys(args.scenarios)}
-    layout_count = 2 if args.benchmark == 'cache' else 1 + len(set(args.factors))
+    layout_count = 2 if args.benchmark in ('cache', 'inputs') else 1 + len(set(args.factors))
     total_calls = sum(counts.values()) * layout_count * args.trials * args.rounds * len(set(args.threads))
     progress(f'Timed evaluations per trial: {counts}; total across cases: {total_calls} (plus warmup/cache priming)')
     write_json(args.output / 'settings.json', {

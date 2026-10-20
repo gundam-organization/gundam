@@ -244,7 +244,7 @@ TEST(CpuCacheTraversal, LinearAndIndexedPreserveAllDialTypesAndSparseUpdates) {
   const int previousThreads = GundamGlobals::getNbCpuThreads();
   for( int threads : {1, 2, 5} ){
     GundamGlobals::setNumberOfThreads(threads);
-    for( int constants : {1, 100} ){
+    for( int constants : {1, 2000} ){
       auto view = std::make_shared<EngineView>();
       auto& model = view->propagation;
       model.parameterCount = 3;
@@ -276,7 +276,7 @@ TEST(CpuCacheTraversal, LinearAndIndexedPreserveAllDialTypesAndSparseUpdates) {
         model.events.push_back(event);
         model.eventWeights.push_back({1., model.eventDialIndices.size() - 1, 1});
       };
-      for( std::size_t i = 0; i < 60; ++i ){
+      for( std::size_t i = 0; i < 600; ++i ){
         BackendDialDescriptor dial;
         dial.type = types[i % types.size()];
         dial.firstInput = model.dialInputs.size();
@@ -294,9 +294,11 @@ TEST(CpuCacheTraversal, LinearAndIndexedPreserveAllDialTypesAndSparseUpdates) {
       BackendDialDescriptor external;
       external.type = BackendDialType::ExternalWeight;
       append(external, {});
-      CpuBackend indexed, automatic;
+      CpuBackend indexed, automatic, perDial;
       indexed.buildShared(view);
       automatic.buildShared(view);
+      perDial.buildShared(view);
+      perDial.setDiagnosticInputEvaluation(CpuInputEvaluation::PerDial);
       indexed.setDiagnosticCacheTraversal(CpuCacheTraversal::Indexed);
       PropagationInputs inputs;
       double externalValue{1.};
@@ -307,10 +309,13 @@ TEST(CpuCacheTraversal, LinearAndIndexedPreserveAllDialTypesAndSparseUpdates) {
         inputs.parameters.values = values[call];
         const auto expected = indexed.requestPropagation(inputs);
         const auto actual = automatic.requestPropagation(inputs);
+        const auto unshared = perDial.requestPropagation(inputs);
         const auto& timing = automatic.getLastTimingSummary();
         EXPECT_EQ(timing.linearCacheTraversal, constants == 1 and (call == 0 or call >= 3));
         EXPECT_EQ(timing.cacheCandidateCount, indexed.getLastTimingSummary().cacheCandidateCount);
         EXPECT_FALSE(indexed.getLastTimingSummary().linearCacheTraversal);
+        EXPECT_TRUE(timing.sharedCacheInputs);
+        EXPECT_FALSE(perDial.getLastTimingSummary().sharedCacheInputs);
         auto sameBits = [](const std::vector<double>& a, const std::vector<double>& b){
           ASSERT_EQ(a.size(), b.size());
           EXPECT_EQ(std::memcmp(a.data(), b.data(), a.size() * sizeof(double)), 0);
@@ -318,9 +323,85 @@ TEST(CpuCacheTraversal, LinearAndIndexedPreserveAllDialTypesAndSparseUpdates) {
         sameBits(indexed.getEventWeightsHostView(expected), automatic.getEventWeightsHostView(actual));
         sameBits(indexed.getHistogramSumsHostView(expected), automatic.getHistogramSumsHostView(actual));
         sameBits(indexed.getHistogramSumSquaresHostView(expected), automatic.getHistogramSumSquaresHostView(actual));
+        sameBits(perDial.getEventWeightsHostView(unshared), automatic.getEventWeightsHostView(actual));
+        sameBits(perDial.getHistogramSumsHostView(unshared), automatic.getHistogramSumsHostView(actual));
+        sameBits(perDial.getHistogramSumSquaresHostView(unshared), automatic.getHistogramSumSquaresHostView(actual));
         externalValue += .1;
       }
     }
   }
+  GundamGlobals::setNumberOfThreads(previousThreads);
+}
+
+TEST(CpuCacheInputs, MirrorKeysNaNsAndRuntimeSwitchesPreserveBits) {
+  using namespace Backends;
+  const int previousThreads = GundamGlobals::getNbCpuThreads();
+  GundamGlobals::setNumberOfThreads(5);
+  auto model = std::make_shared<EngineView>();
+  auto& propagation = model->propagation;
+  propagation.parameterCount = propagation.totalBins = 1;
+  const auto nan = std::numeric_limits<double>::quiet_NaN();
+  const std::vector<BackendDialInputDescriptor> inputs{
+      {0, false, nan, nan}, {0, true, 0., 2.}, {0, true, 1., 2.},
+      {0, true, 0., 3.}, {0, true, nan, 2.}, {0, true, 0., nan}};
+  for( std::size_t i = 0; i < 192; ++i ){
+    BackendDialDescriptor dial;
+    dial.inputCount = 1;
+    dial.firstInput = i;
+    propagation.dialInputs.push_back(inputs[i % inputs.size()]);
+    propagation.dials.push_back(dial);
+    propagation.eventDialIndices.push_back(i);
+    EventView event;
+    event.resultIndex = i;
+    event.globalBinIndex = 0;
+    propagation.events.push_back(event);
+    propagation.eventWeights.push_back({1., i, 1});
+  }
+  CpuBackend shared, perDial;
+  shared.buildShared(model);
+  // Unreferenced, unique-input dials force the reference onto the original
+  // per-dial input buffer without changing any event product. This makes the
+  // comparison independent of the new shared-group bookkeeping.
+  auto reference = *model;
+  for( std::size_t i = 0; i < 64; ++i ){
+    BackendDialDescriptor dial;
+    dial.firstInput = reference.propagation.dialInputs.size();
+    dial.inputCount = 1;
+    reference.propagation.dialInputs.push_back({0, true, 100. + double(i), 1.});
+    reference.propagation.dials.push_back(dial);
+  }
+  perDial.build(reference);
+  EXPECT_EQ(perDial.getWeightSchedulingDiagnostics().at("cacheInputGroups"), 0);
+  EXPECT_EQ(shared.getWeightSchedulingDiagnostics().at("cacheInputGroups"), 6);
+  EXPECT_LT(shared.getWeightSchedulingDiagnostics().at("cacheInputStorageBytes").get<std::size_t>(),
+            propagation.dials.size() * sizeof(double));
+  perDial.setDiagnosticInputEvaluation(CpuInputEvaluation::PerDial);
+  PropagationInputs runtime;
+  for( double value : {0., 0., 1., 1. + 1e-12, 3., 7., -1., nan, nan, 1.} ){
+    runtime.parameters.values = {value};
+    const auto expected = perDial.requestPropagation(runtime);
+    for( auto mode : {CpuInputEvaluation::Shared, CpuInputEvaluation::PerDial, CpuInputEvaluation::Shared} ){
+      shared.setDiagnosticInputEvaluation(mode);
+      const auto actual = shared.requestPropagation(runtime);
+      const auto& a = perDial.getEventWeightsHostView(expected);
+      const auto& b = shared.getEventWeightsHostView(actual);
+      ASSERT_EQ(a.size(), b.size());
+      EXPECT_EQ(std::memcmp(a.data(), b.data(), a.size() * sizeof(double)), 0);
+    }
+  }
+  // Inputs without reuse must fall back instead of retaining larger metadata.
+  auto unique = *model;
+  for( std::size_t i = 0; i < unique.propagation.dialInputs.size(); ++i ){
+    unique.propagation.dialInputs[i] = {0, true, double(i), 2.};
+  }
+  shared.build(unique);
+  EXPECT_EQ(shared.getWeightSchedulingDiagnostics().at("cacheInputGroups"), 0);
+  EXPECT_EQ(shared.getWeightSchedulingDiagnostics().at("cacheInputStorageBytes"),
+            unique.propagation.dials.size() * sizeof(double));
+  runtime.parameters.values = {1.};
+  const auto token = shared.requestPropagation(runtime);
+  EXPECT_FALSE(shared.getLastTimingSummary().sharedCacheInputs);
+  EXPECT_EQ(shared.getLastTimingSummary().cacheInputTransformCount, 192);
+  EXPECT_EQ(shared.getEventWeightsHostView(token).size(), 192);
   GundamGlobals::setNumberOfThreads(previousThreads);
 }

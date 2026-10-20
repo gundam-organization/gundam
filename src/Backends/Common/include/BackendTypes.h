@@ -75,6 +75,8 @@ ENUM_FIELD( Unavailable )
     double cachePreparationSeconds{0};
     double cacheExecutionSeconds{0};
     std::size_t cacheCandidateCount{0};
+    std::size_t cacheInputTransformCount{0};
+    bool sharedCacheInputs{false};
     bool linearCacheTraversal{false};
     double eventWeightsStageSeconds{0};
     double histogramStageSeconds{0};

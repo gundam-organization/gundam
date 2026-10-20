@@ -551,6 +551,8 @@ PYBIND11_MODULE(GUNDAM, module) {
   .def_readonly("cachePreparationSeconds", &Backends::BackendTimingSummary::cachePreparationSeconds)
   .def_readonly("cacheExecutionSeconds", &Backends::BackendTimingSummary::cacheExecutionSeconds)
   .def_readonly("cacheCandidateCount", &Backends::BackendTimingSummary::cacheCandidateCount)
+  .def_readonly("cacheInputTransformCount", &Backends::BackendTimingSummary::cacheInputTransformCount)
+  .def_readonly("sharedCacheInputs", &Backends::BackendTimingSummary::sharedCacheInputs)
   .def_readonly("linearCacheTraversal", &Backends::BackendTimingSummary::linearCacheTraversal)
   .def_readonly("histogramStageSeconds", &Backends::BackendTimingSummary::histogramStageSeconds)
   .def_readonly("externalWeightUploadSeconds", &Backends::BackendTimingSummary::externalWeightUploadSeconds)
@@ -579,6 +581,12 @@ PYBIND11_MODULE(GUNDAM, module) {
     auto* cpu = dynamic_cast<Backends::CpuBackend*>(manager_.getBackend());
     LogThrowIf(cpu == nullptr, "Cache traversal diagnostics require an initialized CPU backend.");
     cpu->setDiagnosticCacheTraversal(Backends::CpuCacheTraversal::toEnum(mode_));
+    return cpu->getWeightSchedulingDiagnostics().dump();
+  })
+  .def("setDiagnosticCpuInputEvaluation", [](Backends::BackendManager& manager_, const std::string& mode_){
+    auto* cpu = dynamic_cast<Backends::CpuBackend*>(manager_.getBackend());
+    LogThrowIf(cpu == nullptr, "Input evaluation diagnostics require an initialized CPU backend.");
+    cpu->setDiagnosticInputEvaluation(Backends::CpuInputEvaluation::toEnum(mode_));
     return cpu->getWeightSchedulingDiagnostics().dump();
   })
   ;

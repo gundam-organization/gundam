@@ -6,12 +6,37 @@ retained output storage described in the [Backends library](../BackendsLibrary.m
 
 ## Dial-response cache
 
-Each eligible single-input dial has a cached response, its last transformed input
-and a validity flag. Parameter-to-dial index lists identify affected responses
-when raw parameter values change. A candidate is evaluated only if its cache is
-invalid or its transformed input differs from the cached input. This preserves
-input mirroring and avoids recalculation when different raw inputs map to the
-same effective value. NaN inputs retain the evaluator's existing comparison rules.
+Each eligible single-input dial retains its own response and validity flag.
+Parameter-to-dial index lists identify affected responses when raw parameters
+change. A candidate is evaluated only if its response is invalid or its effective
+input differs from its previous value. This preserves mirroring and avoids
+recalculation when different raw inputs map to the same effective value. NaN
+inputs retain the evaluator's existing comparison rules.
+
+### Shared effective inputs
+
+At construction, the CPU groups cacheable inputs by parameter identity, mirror
+activation, and mirror minimum/range. Active mirror settings use bitwise keys;
+unused bounds do not distinguish unmirrored inputs. The temporary lookup table
+is discarded after construction. Dials retain their original order and reference
+a group through a 32-bit index; their spline data and responses stay separate.
+
+When a parameter changes, each affected group computes its transformed input
+and equality test once. Workers read that value and change flag while retaining
+the response's own validity check. Unchanged groups avoid per-dial transforms;
+NaN effective inputs still compare unequal and are reevaluated when their raw
+parameter changes. Group state is published only after the worker job joins,
+so workers never update shared group values concurrently.
+
+The group-index array and per-group state **replace** the per-dial double input
+cache. Construction checks actual retained capacities, including group-to-parameter
+indices; if they would cost at least as much as the old input cache, it falls
+back to per-dial evaluation/storage. Models without enough reuse therefore do
+not retain both representations. An early distinct-group bound also limits
+construction work for models with unique transformation settings.
+
+This shares input preparation without traversing dials by parameter group,
+preserving the sequential response-cache path's locality.
 
 Immutable `Shift` responses, including response limits and smoothing, are computed
 at model construction. They retain their position in the event product rather
@@ -66,14 +91,14 @@ execution order.
 | Dense response-cache traversal | Automatic sequential traversal, with sparse indexed fallback. |
 | Shared model and compact weight data | Shared CPU model storage and separate hot event-weight descriptors. |
 | Weight-loop specialization | Precompiled cached/mixed, capped/uncapped and scheduling variants. |
-| Shared identical input transformations | Not implemented: transformations and cached input comparisons remain per dial. |
+| Shared identical input transformations | Prepared equivalent-input groups, with one transformation/comparison per changed group and a memory-bounded per-dial fallback. |
 | Compact/type-specialized response updates | Not implemented: response updates still read generic dial descriptors and dispatch through the shared evaluator. |
 
-Sharing equivalent input transformations could reduce repeated parameter loads,
-mirroring and input comparisons, and reduce per-dial input bookkeeping. Equivalent
-inputs must include the parameter identity and transformation settings. Any such
-lookup must preserve the dense sequential dial traversal; revisiting all dials
-in parameter-group order would give up its locality advantage.
+Shared inputs remove repeated parameter/input loads, mirroring and equality
+checks in grouped execution. Response-specific bounds, smoothing, spline
+interval selection and numerical evaluation remain per dial. Generic immutable
+input descriptors are still part of the common model; this optimization does
+not compact or duplicate that representation.
 
 A smaller hot response descriptor and batches specialized by dial type or
 response policy could reduce metadata traffic and repeated dispatch. Those are
@@ -96,6 +121,33 @@ agreement and exports cache preparation, worker execution and complete-evaluatio
 times. The global workload has a small independent call cap. Runtime diagnostic
 switches are comparison tools, not fit tuning requirements; normal execution
 uses Auto response traversal and Dynamic x2 weight scheduling.
+
+`--benchmark inputs` compares `PerDial` and `Shared` input evaluation, retaining
+Auto traversal and Dynamic x2 weights. It loads the model once, replays the same
+sequences and retains the short global-call cap. For example:
+
+```sh
+python3 /path/to/gundam/tests/regular-tests/222CpuWeightSchedulingBenchmark.py \
+  --benchmark inputs --config configOA2024.yaml --threads 8 \
+  --calls 100 --global-calls 10 --warmup 3 --trials 2 --rounds 2 \
+  --override override/v12ProdRun45.yaml override/backendCpuTest.yaml
+```
+
+This runs 2,480 timed evaluations, including 80 global calls, plus warmup and
+priming. `cacheInputGroups`, per-call `inputTransforms` and `sharedCacheInputs`
+identify whether sharing was available and used. Group metadata/state remain
+common to both modes: PerDial repeats transformations/comparisons in workers,
+while Shared reads prepared group values. The comparison isolates input reuse
+with the same storage, not the entire previous cache representation. The
+transform counter includes group preparation in both modes and the additional
+per-dial transforms in PerDial mode. Group publication is included in cache
+execution time. Neither mode adds a second full-size input cache.
+
+If grouping falls back, the modes intentionally use the same per-dial path;
+`cacheInputGroups` is zero and no sharing gain should be inferred. Runtime
+switches preserve initialized response state. Regression coverage includes all
+cached dial types, different mirror settings, unchanged effective inputs, NaNs,
+mode switches, unique-input fallback, and original/eigen fit coordinates.
 
 TTree loading uses the effective limit from the global thread count and
 `nbMaxThreadsForLoad`. A limit of one or two skips the raw I/O probe and uses

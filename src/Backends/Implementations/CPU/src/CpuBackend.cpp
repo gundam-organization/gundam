@@ -6,6 +6,9 @@
 #include "Logger.h"
 
 #include <algorithm>
+#include <array>
+#include <cstring>
+#include <unordered_map>
 #include <charconv>
 #include <chrono>
 #include <cstdlib>
@@ -256,7 +259,6 @@ void Backends::CpuBackend::initializeDialResponseCache() {
   _changedCacheParameters_.assign(propagation.parameterCount, false);
   _cachedDialsByParameter_.assign(propagation.parameterCount, {});
   _cachedDialResponses_.assign(propagation.dials.size(), 1.);
-  _cachedDialInputs_.assign(propagation.dials.size(), 0.);
   _isCachedDial_.assign(propagation.dials.size(), false);
   _isCachedDialResponseValid_.assign(propagation.dials.size(), false);
   _lastParameterValues_.clear();
@@ -289,6 +291,68 @@ void Backends::CpuBackend::initializeDialResponseCache() {
     _cachedDialsByParameter_[parameterIndex].emplace_back(iDial);
     ++_parameterDependentCachedDialCount_;
   }
+  initializeCachedInputGroups();
+}
+
+void Backends::CpuBackend::initializeCachedInputGroups() {
+  const auto& model = _engineView_->propagation;
+  std::vector<double>{}.swap(_cachedDialInputs_);
+  std::vector<CachedInputGroup>{}.swap(_cachedInputGroups_);
+  std::vector<std::uint32_t>{}.swap(_cachedDialInputGroups_);
+  std::vector<std::vector<std::uint32_t>>{}.swap(_cachedInputGroupsByParameter_);
+  if( _parameterDependentCachedDialCount_ == 0 ){ return; }
+  auto fallback = [&]{
+    std::vector<CachedInputGroup>{}.swap(_cachedInputGroups_);
+    std::vector<std::uint32_t>{}.swap(_cachedDialInputGroups_);
+    std::vector<std::vector<std::uint32_t>>{}.swap(_cachedInputGroupsByParameter_);
+    _cachedDialInputs_.assign(model.dials.size(), 0.);
+  };
+  if( model.dials.size() < 8 ){ fallback(); return; }
+  using Key = std::array<std::uint64_t, 4>;
+  struct KeyHash {
+    std::size_t operator()(const Key& key_) const {
+      std::size_t hash{0};
+      for( auto item : key_ ){ hash ^= std::hash<std::uint64_t>{}(item) + 0x9e3779b9 + (hash << 6) + (hash >> 2); }
+      return hash;
+    }
+  };
+  // Bitwise keys preserve signed zero and NaN settings conservatively. Unused
+  // mirror bounds do not distinguish inputs when mirroring is disabled.
+  auto bits = [](double value_){ std::uint64_t result; std::memcpy(&result, &value_, sizeof(result)); return result; };
+  std::unordered_map<Key, std::uint32_t, KeyHash> groups;
+  _cachedDialInputGroups_.assign(model.dials.size(), std::numeric_limits<std::uint32_t>::max());
+  _cachedInputGroupsByParameter_.resize(model.parameterCount);
+  for( std::size_t dial = 0; dial < model.dials.size(); ++dial ){
+    if( not _isCachedDial_[dial] or model.dials[dial].type == BackendDialType::Shift ){ continue; }
+    const auto firstInput = model.dials[dial].firstInput;
+    const auto& input = model.dialInputs[firstInput];
+    const Key key{std::uint64_t(input.parameterIndex), std::uint64_t(input.useMirror),
+                  input.useMirror ? bits(input.mirrorMin) : 0, input.useMirror ? bits(input.mirrorRange) : 0};
+    auto found = groups.find(key);
+    if( found == groups.end() ){
+      // Stop early on models without enough reuse. Also check actual retained
+      // capacities below; shared metadata must replace, not augment, the old
+      // per-dial last-input buffer at a higher memory cost.
+      if( _cachedInputGroups_.size() >= model.dials.size() / 8 ){ groups.clear(); groups.rehash(0); fallback(); return; }
+      const auto index = std::uint32_t(_cachedInputGroups_.size());
+      found = groups.emplace(key, index).first;
+      _cachedInputGroups_.push_back({firstInput});
+      _cachedInputGroupsByParameter_[input.parameterIndex].push_back(index);
+    }
+    _cachedDialInputGroups_[dial] = found->second;
+  }
+  if( getCachedInputStorageBytes() >= model.dials.size() * sizeof(double) ){
+    groups.clear(); groups.rehash(0); fallback();
+  }
+}
+
+std::size_t Backends::CpuBackend::getCachedInputStorageBytes() const {
+  std::size_t bytes = _cachedDialInputs_.capacity() * sizeof(double)
+      + _cachedDialInputGroups_.capacity() * sizeof(std::uint32_t)
+      + _cachedInputGroups_.capacity() * sizeof(CachedInputGroup)
+      + _cachedInputGroupsByParameter_.capacity() * sizeof(std::vector<std::uint32_t>);
+  for( const auto& indices : _cachedInputGroupsByParameter_ ){ bytes += indices.capacity() * sizeof(std::uint32_t); }
+  return bytes;
 }
 
 void Backends::CpuBackend::resetResult() {
@@ -329,6 +393,14 @@ void Backends::CpuBackend::setDiagnosticCacheTraversal(CpuCacheTraversal travers
   LogThrowIf(traversal_ != CpuCacheTraversal::Auto and traversal_ != CpuCacheTraversal::Indexed,
              "Invalid CPU diagnostic cache traversal.");
   _cacheTraversal_ = traversal_;
+  initializeProfiler();
+}
+
+void Backends::CpuBackend::setDiagnosticInputEvaluation(CpuInputEvaluation evaluation_) {
+  LogThrowIf(not _isBuilt_, "Build the CPU backend before changing input evaluation.");
+  LogThrowIf(evaluation_ != CpuInputEvaluation::Shared and evaluation_ != CpuInputEvaluation::PerDial,
+             "Invalid CPU diagnostic input evaluation.");
+  _inputEvaluation_ = evaluation_;
   initializeProfiler();
 }
 
@@ -377,6 +449,21 @@ void Backends::CpuBackend::updateCachedDialResponses(const PropagationInputs& in
       }
     }
   }
+  const bool grouped = not _cachedInputGroups_.empty();
+  _lastTiming_.sharedCacheInputs = grouped and _inputEvaluation_ == CpuInputEvaluation::Shared;
+  if( grouped ){
+    for( std::size_t parameter = 0; parameter < values.size(); ++parameter ){
+      if( not _changedCacheParameters_[parameter] ){ continue; }
+      for( auto index : _cachedInputGroupsByParameter_[parameter] ){
+        auto& group = _cachedInputGroups_[index];
+        const auto& input = propagation.dialInputs[group.firstInput];
+        group.value = Semantics::transformDialInput(input, values[parameter]);
+        group.changed = not group.valid or group.value != group.previousValue;
+        ++_lastTiming_.cacheInputTransformCount;
+      }
+    }
+  }
+  if( not _lastTiming_.sharedCacheInputs ){ _lastTiming_.cacheInputTransformCount += _dirtyCachedDialCount_; }
   _lastParameterValues_ = values;
   _isDialResponseCachePrimed_ = true;
   _lastTiming_.cacheCandidateCount = _dirtyCachedDialCount_;
@@ -389,6 +476,17 @@ void Backends::CpuBackend::updateCachedDialResponses(const PropagationInputs& in
   _activeInputs_ = &inputs_;
   _threadPool_.runJob("CpuBackend::updateCachedDialResponses");
   _activeInputs_ = nullptr;
+  if( grouped ){
+    for( std::size_t parameter = 0; parameter < values.size(); ++parameter ){
+      if( not _changedCacheParameters_[parameter] ){ continue; }
+      for( auto index : _cachedInputGroupsByParameter_[parameter] ){
+        auto& group = _cachedInputGroups_[index];
+        group.previousValue = group.value;
+        group.valid = true;
+        group.changed = false;
+      }
+    }
+  }
   _lastTiming_.cacheExecutionSeconds = std::chrono::duration<double>(
       std::chrono::steady_clock::now() - executionStart).count();
 }
@@ -401,7 +499,7 @@ void Backends::CpuBackend::updateCachedDialResponsesThread(int iThread_) {
       _usesLinearCacheTraversal_ ? propagation.dials.size() : _dirtyCachedDialIndices_.size()
   );
   const double* parameterValues = _activeInputs_->parameters.values.data();
-  auto update = [&](auto sampled_, auto linear_){
+  auto update = [&](auto sampled_, auto linear_, auto shared_, auto grouped_){
     for( std::size_t iDirtyDial = bounds.beginIndex ; iDirtyDial < bounds.endIndex ; iDirtyDial++ ){
       const auto dialIndex = [&](){
         if constexpr( decltype(linear_)::value ){ return iDirtyDial; }
@@ -411,20 +509,39 @@ void Backends::CpuBackend::updateCachedDialResponsesThread(int iThread_) {
         if( not _isCachedDial_[dialIndex] or propagation.dials[dialIndex].type == BackendDialType::Shift ){ continue; }
       }
       const auto& dial = propagation.dials[dialIndex];
-      const auto& input = propagation.dialInputs[dial.firstInput];
+      const auto* group = [&](){
+        if constexpr( decltype(grouped_)::value ){ return &_cachedInputGroups_[_cachedDialInputGroups_[dialIndex]]; }
+        else{ return static_cast<const CachedInputGroup*>(nullptr); }
+      }();
+      const auto firstInput = [&](){
+        if constexpr( decltype(shared_)::value ){ return group->firstInput; }
+        else{ return dial.firstInput; }
+      }();
+      const auto& input = propagation.dialInputs[firstInput];
       if constexpr( decltype(linear_)::value ){
         if( not _changedCacheParameters_[input.parameterIndex] ){ continue; }
       }
-      const double inputValue = Semantics::transformDialInput(
-          input, Semantics::loadParameterValue(input, parameterValues)
-      );
-      if( _isCachedDialResponseValid_[dialIndex] and inputValue == _cachedDialInputs_[dialIndex] ){
+      double inputValue;
+      bool unchanged;
+      if constexpr( decltype(shared_)::value ){
+        inputValue = group->value;
+        unchanged = not group->changed;
+      }
+      else{
+        inputValue = Semantics::transformDialInput(input, Semantics::loadParameterValue(input, parameterValues));
+        const double previous = [&](){
+          if constexpr( decltype(grouped_)::value ){ return group->previousValue; }
+          else{ return _cachedDialInputs_[dialIndex]; }
+        }();
+        unchanged = inputValue == previous;
+      }
+      if( _isCachedDialResponseValid_[dialIndex] and unchanged ){
         if constexpr( decltype(sampled_)::value ){ ++probe.get()->unchangedInputs; }
         continue;
       }
       const auto* payload = Semantics::getDialPayload(propagation.dialPayloads.data(), dial);
       _cachedDialResponses_[dialIndex] = Semantics::evalDialResponseFromInput(dial, inputValue, payload);
-      _cachedDialInputs_[dialIndex] = inputValue;
+      if constexpr( not decltype(grouped_)::value ){ _cachedDialInputs_[dialIndex] = inputValue; }
       _isCachedDialResponseValid_[dialIndex] = true;
       if constexpr( decltype(sampled_)::value ){
         ++probe.get()->evaluatedDials;
@@ -432,12 +549,17 @@ void Backends::CpuBackend::updateCachedDialResponsesThread(int iThread_) {
       }
     }
   };
-  auto dispatch = [&](auto sampled_){
-    if( _usesLinearCacheTraversal_ ){ update(sampled_, std::true_type{}); }
-    else{ update(sampled_, std::false_type{}); }
+  auto dispatch = [&](auto sampled_, auto shared_, auto grouped_){
+    if( _usesLinearCacheTraversal_ ){ update(sampled_, std::true_type{}, shared_, grouped_); }
+    else{ update(sampled_, std::false_type{}, shared_, grouped_); }
   };
-  if( probe.get() != nullptr ){ dispatch(std::true_type{}); }
-  else{ dispatch(std::false_type{}); }
+  auto select = [&](auto sampled_){
+    if( _lastTiming_.sharedCacheInputs ){ dispatch(sampled_, std::true_type{}, std::true_type{}); }
+    else if( not _cachedInputGroups_.empty() ){ dispatch(sampled_, std::false_type{}, std::true_type{}); }
+    else{ dispatch(sampled_, std::false_type{}, std::false_type{}); }
+  };
+  if( probe.get() != nullptr ){ select(std::true_type{}); }
+  else{ select(std::false_type{}); }
 }
 
 void Backends::CpuBackend::initializeWeightExecution() {

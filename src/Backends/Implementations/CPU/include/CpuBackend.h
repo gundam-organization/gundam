@@ -25,6 +25,12 @@ ENUM_FIELD( Fixed, 0 ) \
 ENUM_FIELD( Dynamic )
 #include "GenericToolbox.MakeEnum.h"
 
+#define ENUM_NAME CpuInputEvaluation
+#define ENUM_FIELDS \
+ENUM_FIELD( Shared, 0 ) \
+ENUM_FIELD( PerDial )
+#include "GenericToolbox.MakeEnum.h"
+
 #define ENUM_NAME CpuCacheTraversal
 #define ENUM_FIELDS \
 ENUM_FIELD( Auto, 0 ) \
@@ -61,6 +67,7 @@ ENUM_FIELD( Indexed )
     // ranges/kernel selection change; model data and response caches are kept.
     void setDiagnosticWeightScheduling(CpuWeightScheduling scheduling_, std::size_t blocksPerThread_);
     void setDiagnosticCacheTraversal(CpuCacheTraversal traversal_);
+    void setDiagnosticInputEvaluation(CpuInputEvaluation evaluation_);
     [[nodiscard]] CpuBackendProfiler::Json getWeightSchedulingDiagnostics() const;
 
   protected:
@@ -73,6 +80,8 @@ ENUM_FIELD( Indexed )
     void initializeThreads();
     void initializeProfiler();
     void initializeDialResponseCache();
+    void initializeCachedInputGroups();
+    [[nodiscard]] std::size_t getCachedInputStorageBytes() const;
     void initializeWeightExecution();
     void initializeWeightScheduling();
     template<bool allResponsesCached, bool useReweightCap, bool dynamicScheduling>
@@ -121,6 +130,17 @@ ENUM_FIELD( Indexed )
     bool _usesLinearCacheTraversal_{false};
     std::vector<double> _cachedDialResponses_{};
     std::vector<double> _cachedDialInputs_{};
+    struct CachedInputGroup {
+      std::size_t firstInput{0};
+      double previousValue{0};
+      double value{0};
+      bool valid{false};
+      bool changed{false};
+    };
+    std::vector<CachedInputGroup> _cachedInputGroups_{};
+    std::vector<std::uint32_t> _cachedDialInputGroups_{};
+    std::vector<std::vector<std::uint32_t>> _cachedInputGroupsByParameter_{};
+    CpuInputEvaluation _inputEvaluation_{CpuInputEvaluation::Shared};
     std::vector<double> _lastParameterValues_{};
     std::vector<std::uint8_t> _isCachedDial_{};
     std::vector<std::uint8_t> _isCachedDialResponseValid_{};
