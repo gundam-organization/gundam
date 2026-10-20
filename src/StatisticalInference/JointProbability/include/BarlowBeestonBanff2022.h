@@ -10,6 +10,7 @@
 
 #include "GenericToolbox.Map.h"
 
+#include <cmath>
 
 namespace JointProbability{
 
@@ -222,7 +223,23 @@ namespace JointProbability{
       // The newMC value should not be a lot less than O(1), This protects
       // against small values (intentionally use epsilon() instead of min()
       // since this is relative to 1.0).
-      stat = newmc - dataVal + dataVal*(TMath::Log(dataVal)-TMath::Log(newmc));
+      const double residual = (newmc - dataVal) / dataVal;
+      if (std::abs(residual) < 1.e-2) {
+        // data * (r - log1p(r)), expanded through r^10. Subtracting
+        // logarithms loses the O(r^2) signal near an Asimov minimum and
+        // contaminates the finite differences used by Hesse.
+        const double series = .5 + residual * (-1./3. + residual * (1./4.
+            + residual * (-1./5. + residual * (1./6. + residual * (-1./7.
+            + residual * (1./8. + residual * (-1./9. + residual / 10.)))))));
+        stat = dataVal * residual * residual * series;
+      }
+      else if (std::abs(residual) < .5) {
+        stat = dataVal * (residual - std::log1p(residual));
+      }
+      else {
+        // Separate logs also handle extreme ratios without division overflow.
+        stat = newmc - dataVal + dataVal*(TMath::Log(dataVal)-TMath::Log(newmc));
+      }
     }
     else {
       // The mc predicted value is zero, and the data value is not zero.
