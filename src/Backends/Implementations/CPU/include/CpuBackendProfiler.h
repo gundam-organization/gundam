@@ -28,6 +28,7 @@ namespace Backends {
     struct alignas(64) WorkerRecord {
       Snapshot begin{}, end{};
       std::size_t evaluatedDials{0}, unchangedInputs{0};
+      std::size_t weightEvents{0}, weightBlocks{0};
       std::array<std::size_t, 8> evaluatedDialTypes{};
       bool ran{false};
     };

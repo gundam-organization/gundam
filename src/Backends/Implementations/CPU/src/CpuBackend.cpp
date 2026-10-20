@@ -12,11 +12,13 @@
 
 void Backends::CpuBackend::configureImpl() {
   _config_.clearFields();
-  _config_.defineFields({{"profileOutputPath"}, {"profileSampleInterval"}, {"profileMaxSamples"}});
+  _config_.defineFields({{"profileOutputPath"}, {"profileSampleInterval"}, {"profileMaxSamples"},
+                         {"weightScheduling"}});
   _config_.checkConfiguration();
   _config_.fillValue(_profileOutputPath_, "profileOutputPath");
   _config_.fillValue(_profileSampleInterval_, "profileSampleInterval");
   _config_.fillValue(_profileMaxSamples_, "profileMaxSamples");
+  _config_.fillEnum(_weightScheduling_, "weightScheduling");
   LogThrowIf(_profileSampleInterval_ <= 0 or _profileMaxSamples_ <= 0,
              "CPU profiling interval and maximum sample count must be strictly positive.");
 }
@@ -216,6 +218,10 @@ void Backends::CpuBackend::initializeThreads() {
       [this](int iThread_){
         CpuBackendProfiler::WorkerScope probe(_profiler_.get(), CpuBackendProfiler::Stage::Weights, iThread_);
         calculateEventWeightsThread(iThread_);
+        if( auto* record = probe.get() ){
+          record->weightEvents = _weightWorkerStats_[iThread_].events;
+          record->weightBlocks = _weightWorkerStats_[iThread_].blocks;
+        }
       }
   );
   _threadPool_.addJob(
@@ -303,6 +309,7 @@ void Backends::CpuBackend::calculateEventWeights(Result& result_, const Propagat
   _activeInputs_ = &inputs_;
   {
     auto timerScope = _eventWeightsStageTimer_.scopeTime();
+    if( _usesDynamicWeights_ ){ _nextWeightBlock_.store(0, std::memory_order_relaxed); }
     if( _profiler_ ){ _profiler_->beginStage(CpuBackendProfiler::Stage::Weights); }
     _threadPool_.runJob("CpuBackend::calculateEventWeights");
     if( _profiler_ ){ _profiler_->endStage(CpuBackendProfiler::Stage::Weights); }
@@ -395,24 +402,49 @@ void Backends::CpuBackend::initializeWeightExecution() {
     work += 1 + event.dialCount;
   }
   const auto threads = std::size_t(_threadPool_.getNbThreads());
-  _weightRanges_.assign(threads, {});
-  std::size_t cursor{0}, completed{0};
-  for( std::size_t thread = 0; thread < threads; ++thread ){
-    auto& range = _weightRanges_[thread];
-    range.begin = cursor;
-    const auto target = (work / threads) * (thread + 1) + (work % threads) * (thread + 1) / threads;
-    while( cursor < model.eventWeights.size() and (thread + 1 == threads or completed < target) ){
-      completed += 1 + model.eventWeights[cursor++].dialCount;
+  const auto blockTarget = 2 * threads;
+  _usesDynamicWeights_ = _weightScheduling_ == CpuWeightScheduling::Dynamic
+                        and threads > 1 and model.eventWeights.size() >= blockTarget;
+  _weightWorkerStats_.assign(threads, {});
+  auto makeRanges = [&](std::size_t count_, bool keepNonempty_){
+    std::vector<EventRange> ranges(count_);
+    std::size_t cursor{0}, completed{0};
+    for( std::size_t part = 0; part < count_; ++part ){
+      auto& range = ranges[part];
+      range.begin = cursor;
+      const auto target = (work / count_) * (part + 1) + (work % count_) * (part + 1) / count_;
+      // A very expensive event cannot be split. Still leave at least one
+      // event for every subsequent dynamic block, avoiding empty queue entries.
+      const auto limit = model.eventWeights.size() - (keepNonempty_ ? count_ - part - 1 : 0);
+      while( cursor < limit and (part + 1 == count_ or completed < target
+                                 or (keepNonempty_ and cursor == range.begin)) ){
+        completed += 1 + model.eventWeights[cursor++].dialCount;
+      }
+      range.end = cursor;
     }
-    range.end = cursor;
-  }
+    return ranges;
+  };
+  _weightRanges_ = makeRanges(threads, false);
+  _weightBlocks_ = _usesDynamicWeights_ ? makeRanges(blockTarget, true) : std::vector<EventRange>{};
   if( allCached ){
-    _weightJob_ = model.hasReweightCap ? &CpuBackend::calculateEventWeightsKernel<true, true>
-                                     : &CpuBackend::calculateEventWeightsKernel<true, false>;
+    if( _usesDynamicWeights_ ){
+      _weightJob_ = model.hasReweightCap ? &CpuBackend::calculateEventWeightsKernel<true, true, true>
+                                       : &CpuBackend::calculateEventWeightsKernel<true, false, true>;
+    }
+    else{
+      _weightJob_ = model.hasReweightCap ? &CpuBackend::calculateEventWeightsKernel<true, true, false>
+                                       : &CpuBackend::calculateEventWeightsKernel<true, false, false>;
+    }
   }
   else{
-    _weightJob_ = model.hasReweightCap ? &CpuBackend::calculateEventWeightsKernel<false, true>
-                                     : &CpuBackend::calculateEventWeightsKernel<false, false>;
+    if( _usesDynamicWeights_ ){
+      _weightJob_ = model.hasReweightCap ? &CpuBackend::calculateEventWeightsKernel<false, true, true>
+                                       : &CpuBackend::calculateEventWeightsKernel<false, false, true>;
+    }
+    else{
+      _weightJob_ = model.hasReweightCap ? &CpuBackend::calculateEventWeightsKernel<false, true, false>
+                                       : &CpuBackend::calculateEventWeightsKernel<false, false, false>;
+    }
   }
   LogInfo << "CPU reweight layout: " << model.eventWeights.size() << " events, "
           << model.eventWeights.size() * sizeof(BackendEventWeightDescriptor) << " hot descriptor bytes, "
@@ -420,23 +452,47 @@ void Backends::CpuBackend::initializeWeightExecution() {
           << _cachedDialCount_ << "/" << model.dials.size() << " cached dials, "
           << "all event responses cached=" << allCached << ", shared model owners=" << _engineView_.use_count()
           << "." << std::endl;
+  LogInfo << "CPU weight scheduling: " << (_usesDynamicWeights_ ? "Dynamic" : "Fixed")
+          << " (requested " << _weightScheduling_ << ", " << _weightBlocks_.size()
+          << " automatic dynamic blocks)." << std::endl;
 }
 
 void Backends::CpuBackend::calculateEventWeightsThread(int iThread_) {
   (this->*_weightJob_)(iThread_);
 }
 
-template<bool allResponsesCached, bool useReweightCap>
+template<bool allResponsesCached, bool useReweightCap, bool dynamicScheduling>
 void Backends::CpuBackend::calculateEventWeightsKernel(int iThread_) {
   const auto& model = _engineView_->propagation;
-  const auto& range = _weightRanges_[iThread_];
-  CpuWeightKernels::reweight<allResponsesCached, useReweightCap>(
+  auto reweightRange = [&](std::size_t begin_, std::size_t end_){
+    CpuWeightKernels::reweight<allResponsesCached, useReweightCap>(
       model.eventWeights.data(), model.eventDialIndices.data(), _cachedDialResponses_.data(),
-      _activeResult_->eventWeights.data(), range.begin, range.end, model.maxReweight,
+      _activeResult_->eventWeights.data(), begin_, end_, model.maxReweight,
       [this, &model](std::uint32_t dial_){
         return _isCachedDial_[dial_] ? _cachedDialResponses_[dial_]
             : Semantics::evalDialResponse(model, model.dials[dial_], *_activeInputs_);
       });
+  };
+  WeightWorkerStats stats;
+  if constexpr( dynamicScheduling ){
+    while( true ){
+      // Only block ownership is shared. Inputs are immutable during the job;
+      // workers write disjoint result slots and the pool joins before use.
+      const auto block = _nextWeightBlock_.fetch_add(1, std::memory_order_relaxed);
+      if( block >= _weightBlocks_.size() ){ break; }
+      const auto& range = _weightBlocks_[block];
+      reweightRange(range.begin, range.end);
+      stats.events += range.end - range.begin;
+      ++stats.blocks;
+    }
+  }
+  else{
+    const auto& range = _weightRanges_[iThread_];
+    reweightRange(range.begin, range.end);
+    stats.events = range.end - range.begin;
+    stats.blocks = stats.events != 0;
+  }
+  _weightWorkerStats_[iThread_] = stats;
 }
 
 void Backends::CpuBackend::calculateHistograms(Result& result_) {

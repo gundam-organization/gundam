@@ -11,12 +11,19 @@
 #include "GenericToolbox.Time.h"
 #include "GenericToolbox.Thread.h"
 
+#include <atomic>
 #include <cstdint>
 #include <exception>
 #include <memory>
 #include <vector>
 
 namespace Backends {
+
+#define ENUM_NAME CpuWeightScheduling
+#define ENUM_FIELDS \
+ENUM_FIELD( Fixed, 0 ) \
+ENUM_FIELD( Dynamic )
+#include "GenericToolbox.MakeEnum.h"
 
   class CpuBackend : public Backend {
   public:
@@ -55,7 +62,7 @@ namespace Backends {
     void initializeProfiler();
     void initializeDialResponseCache();
     void initializeWeightExecution();
-    template<bool allResponsesCached, bool useReweightCap>
+    template<bool allResponsesCached, bool useReweightCap, bool dynamicScheduling>
     void calculateEventWeightsKernel(int iThread_);
     void resetResult();
     void updateCachedDialResponses(const PropagationInputs& inputs_);
@@ -108,6 +115,12 @@ namespace Backends {
     GenericToolbox::Time::Timer _likelihoodHostTimer_{};
     struct EventRange { std::size_t begin{0}; std::size_t end{0}; };
     std::vector<EventRange> _weightRanges_{};
+    CpuWeightScheduling _weightScheduling_{CpuWeightScheduling::Dynamic};
+    bool _usesDynamicWeights_{false};
+    std::vector<EventRange> _weightBlocks_{};
+    alignas(64) std::atomic<std::size_t> _nextWeightBlock_{0};
+    struct alignas(64) WeightWorkerStats { std::size_t events{0}; std::size_t blocks{0}; };
+    std::vector<WeightWorkerStats> _weightWorkerStats_{};
     using WeightJob = void (CpuBackend::*)(int);
     WeightJob _weightJob_{nullptr};
     std::size_t _cachedDialCount_{0};

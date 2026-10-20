@@ -23,6 +23,10 @@ def run(path, profile):
         profileOutputPath: "{profile}"
         profileSampleInterval: 3
         profileMaxSamples: 8''')
+    else:
+        text = text.replace('      type: CPU', '''      type: CPU
+      backendConfig:
+        weightScheduling: Fixed''')
     builder = GUNDAM.ConfigUtils.ConfigBuilder()
     builder.setConfigFromYamlString(text)
     reader = GUNDAM.ConfigUtils.ConfigReader(builder.getConfig())
@@ -50,8 +54,18 @@ def run(path, profile):
         assert metadata['configuredOutputPath'] == str(profile)
         assert metadata['system']['pid'] == os.getpid()
         assert metadata['threads'] == 4
-        assert metadata['events'] == 6
-        assert sum(r['events'] for r in metadata['weightRanges']) == 6
+        assert metadata['events'] == 18
+        assert metadata['weightScheduling'] == 'Dynamic'
+        assert metadata['weightRangesRole'] == 'fixedReference'
+        assert metadata['weightBlockCount'] == metadata['dynamicBlockTarget'] == 8
+        assert metadata['weightBlocks'][0]['begin'] == 0
+        assert metadata['weightBlocks'][-1]['end'] == 18
+        assert all(a['end'] == b['begin'] for a, b in zip(
+            metadata['weightBlocks'], metadata['weightBlocks'][1:]))
+        assert sum(b['dialReferences'] for b in metadata['weightBlocks']) == metadata['eventDialReferences']
+        assert sum(b['events'] for b in metadata['weightBlocks']) == 18
+        assert all(b['events'] > 0 for b in metadata['weightBlocks'])
+        assert sum(r['events'] for r in metadata['weightRanges']) == 18
         assert sum(metadata['referencedDialTypes']) == metadata['eventDialReferences']
         assert [r['call'] for r in samples] == [1, 2, 3, 4, 5, 6, 9, 12]
         assert len({r['runId'] for r in records}) == 1
@@ -69,6 +83,8 @@ def run(path, profile):
                     if stage['name'] == 'cache':
                         assert sum(worker['evaluatedDialTypes']) == worker['evaluatedDials']
             assert len(stages['weights']['workers']) == 4
+            assert sum(w['weightEvents'] for w in stages['weights']['workers']) == 18
+            assert sum(w['weightBlocks'] for w in stages['weights']['workers']) == 8
             assert len(stages['histograms']['workers']) == 4
     return predictions
 
@@ -84,7 +100,12 @@ def main():
     profile = Path.cwd() / '232CpuBackendProfiling.jsonl'
     profile.with_name(f'{profile.stem}-{os.getpid()}{profile.suffix}').unlink(missing_ok=True)
     profile.write_text('Existing unsuffixed report must be preserved.\n')
-    import_module('211CpuBackendPropagation').write_input_root_file(root)
+    import numpy as np
+    import uproot
+    with uproot.recreate(root) as saved:
+        tree = saved.mktree('tree_mc', {'X': 'float64', 'C': 'float64'})
+        tree.extend({'X': np.tile([-.5, -.4, -.3, .2, .3, .4], 3),
+                     'C': np.tile([1., -1., 1., -1., 1., -1.], 3)})
     expected = run(root, None)
     assert expected == run(root, profile)
     assert expected == run(root, profile)

@@ -5,6 +5,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstring>
 #include <limits>
 #include <memory>
 #include <vector>
@@ -148,4 +149,60 @@ TEST(CpuWeightExecution, ConstantDialsNeedNoParameterInputs) {
     EXPECT_DOUBLE_EQ(backend.getEventWeightsHostView(token)[0], -2.);
     EXPECT_EQ(backend.getLastTimingSummary().cachedDialCount, 1);
   }
+}
+
+TEST(CpuWeightExecution, DynamicBlocksMatchFixedBitForBit) {
+  const int previousThreads = GundamGlobals::getNbCpuThreads();
+  for( int threads : {1, 2, 5} ){
+    GundamGlobals::setNumberOfThreads(threads);
+    for( bool mixed : {false, true} ){
+      for( bool capped : {false, true} ){
+        for( std::size_t events : {std::size_t(1), std::size_t(3), std::size_t(17), std::size_t(1031)} ){
+          SCOPED_TRACE(::testing::Message() << threads << " threads, events=" << events
+                       << ", mixed=" << mixed << ", capped=" << capped);
+          auto view = std::make_shared<Backends::EngineView>(makeWeightModel(mixed, capped));
+          auto& model = view->propagation;
+          const auto source = model.eventWeights;
+          model.events.resize(events);
+          model.eventWeights.resize(events);
+          model.totalBins = 3;
+          for( std::size_t i = 0; i < events; ++i ){
+            model.eventWeights[i] = source[i % source.size()];
+            model.eventWeights[i].baseWeight = i % 11 == 0 ? 0. : (i % 2 ? -1.3 : .7);
+            model.events[i].resultIndex = events - i - 1;
+            model.events[i].globalBinIndex = int(i % 3);
+          }
+          // One event dominates estimated work. The other dynamic blocks must
+          // remain nonempty even when this event crosses several work targets.
+          model.eventWeights[0].firstDial = model.eventDialIndices.size();
+          model.eventWeights[0].dialCount = 257;
+          model.eventWeights[0].baseWeight = 1.;
+          model.eventDialIndices.insert(model.eventDialIndices.end(), 257, 0);
+          Backends::CpuBackend fixed;
+          fixed.configure(ConfigUtils::ConfigReader(JsonType{{"weightScheduling", "Fixed"}}));
+          fixed.buildShared(view);
+          Backends::CpuBackend dynamic;
+          dynamic.configure(ConfigUtils::ConfigReader(JsonType{{"weightScheduling", "Dynamic"}}));
+          dynamic.buildShared(view);
+          Backends::PropagationInputs inputs;
+          double external{1.3};
+          if( mixed ){ inputs.externalWeights = {{&external, 1, 0, 1}}; }
+          for( double value : {2., 0., -.5, std::numeric_limits<double>::quiet_NaN()} ){
+            inputs.parameters.values = {value};
+            const auto expected = fixed.requestPropagation(inputs);
+            const auto actual = dynamic.requestPropagation(inputs);
+            auto sameBits = [](const std::vector<double>& a_, const std::vector<double>& b_){
+              ASSERT_EQ(a_.size(), b_.size());
+              EXPECT_EQ(std::memcmp(a_.data(), b_.data(), a_.size() * sizeof(double)), 0);
+            };
+            sameBits(fixed.getEventWeightsHostView(expected), dynamic.getEventWeightsHostView(actual));
+            sameBits(fixed.getHistogramSumsHostView(expected), dynamic.getHistogramSumsHostView(actual));
+            sameBits(fixed.getHistogramSumSquaresHostView(expected), dynamic.getHistogramSumSquaresHostView(actual));
+            external += .1;
+          }
+        }
+      }
+    }
+  }
+  GundamGlobals::setNumberOfThreads(previousThreads);
 }

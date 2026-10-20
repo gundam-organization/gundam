@@ -302,6 +302,10 @@ void Backends::CpuBackendProfiler::end(const BackendTimingSummary& timing_) {
         data["unchangedInputs"] = worker.unchangedInputs;
         data["evaluatedDialTypes"] = worker.evaluatedDialTypes;
       }
+      if( stage == 1 ){
+        data["weightEvents"] = worker.weightEvents;
+        data["weightBlocks"] = worker.weightBlocks;
+      }
       item["workers"].push_back(data);
     }
     item["joinTailSeconds"] = item["workers"].empty() ? Json(nullptr)
@@ -354,6 +358,10 @@ void Backends::CpuBackend::initializeProfiler() {
       {"hasReweightCap", model.hasReweightCap}, {"parameters", model.parameterCount},
       {"events", model.events.size()}, {"uniqueDials", model.dials.size()},
       {"eventDialReferences", model.eventDialIndices.size()}, {"cachedDials", _cachedDialCount_},
+      {"weightSchedulingRequested", _weightScheduling_.toString()},
+      {"weightScheduling", _usesDynamicWeights_ ? "Dynamic" : "Fixed"},
+      {"dynamicBlockTarget", 2 * _threadPool_.getNbThreads()},
+      {"weightRangesRole", _usesDynamicWeights_ ? "fixedReference" : "executed"},
       {"histogramBins", model.totalBins}, {"dialTypes", {"Norm", "Shift", "CompactSpline", "UniformSpline",
         "MonotonicSpline", "GeneralSpline", "Graph", "ExternalWeight"}}};
 #ifdef __OPTIMIZE__
@@ -400,12 +408,20 @@ void Backends::CpuBackend::initializeProfiler() {
   std::vector<std::size_t> parameterDials;
   for( const auto& dials : _cachedDialsByParameter_ ){ parameterDials.push_back(dials.size()); }
   metadata["cachedDialsPerParameter"] = parameterDials;
-  metadata["weightRanges"] = Json::array();
-  for( const auto& range : _weightRanges_ ){
-    std::size_t dials{0};
-    for( auto i = range.begin; i < range.end; ++i ){ dials += model.eventWeights[i].dialCount; }
-    metadata["weightRanges"].push_back({{"begin", range.begin}, {"end", range.end}, {"events", range.end - range.begin}, {"dialReferences", dials}});
-  }
+  auto describeRanges = [&](const std::vector<EventRange>& ranges_){
+    auto result = Json::array();
+    for( const auto& range : ranges_ ){
+      if( range.begin == range.end ){ continue; }
+      std::size_t dials{0};
+      for( auto i = range.begin; i < range.end; ++i ){ dials += model.eventWeights[i].dialCount; }
+      result.push_back({{"begin", range.begin}, {"end", range.end}, {"events", range.end - range.begin},
+                        {"dialReferences", dials}});
+    }
+    return result;
+  };
+  metadata["weightRanges"] = describeRanges(_weightRanges_);
+  metadata["weightBlocks"] = describeRanges(_usesDynamicWeights_ ? _weightBlocks_ : _weightRanges_);
+  metadata["weightBlockCount"] = metadata["weightBlocks"].size();
   std::map<std::size_t, std::size_t> multiplicities;
   for( const auto& event : model.eventWeights ){ ++multiplicities[event.dialCount]; }
   metadata["eventDialCountDistribution"] = Json::array();

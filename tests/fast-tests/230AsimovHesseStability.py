@@ -17,7 +17,8 @@ def evaluate(path, backend):
     config = {
         'likelihoodInterfaceConfig': {
             'jointProbabilityConfig': {'type': 'BarlowLLH_BANFF_OA2021', 'BBNoUpdateWeights': True},
-            'backendManagerConfig': {'isEnabled': backend, 'type': 'CPU'},
+            'backendManagerConfig': {'isEnabled': backend, 'type': 'CPU',
+                                     'backendConfig': {'weightScheduling': 'Dynamic'}},
             'datasetList': [{'name': 'input', 'model': {
                 'tree': 'events', 'filePathList': [str(path)], 'nominalWeightFormula': 'weight'}}],
             'propagatorConfig': {
