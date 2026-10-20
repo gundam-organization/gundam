@@ -316,6 +316,9 @@ void Backends::CpuBackendProfiler::end(const BackendTimingSummary& timing_) {
       {"weights", timing_.eventWeightsStageSeconds}, {"histograms", timing_.histogramStageSeconds},
       {"variables", timing_.variableStageSeconds}, {"binning", timing_.binningStageSeconds},
       {"likelihood", timing_.likelihoodHostSeconds}};
+  out["cacheTraversal"] = timing_.linearCacheTraversal ? "Linear" : "Indexed";
+  out["cacheUpdateTimingSeconds"] = {{"preparation", timing_.cachePreparationSeconds},
+                                     {"execution", timing_.cacheExecutionSeconds}};
 #ifdef __linux__
   // Heavy memory accounting is deliberately sparse. On large nodes, a full
   // export was observed to cost hundreds of milliseconds, outside the kernel
@@ -352,6 +355,7 @@ Backends::CpuBackendProfiler::Json Backends::CpuBackend::getWeightSchedulingDiag
   CpuBackendProfiler::Json out{
       {"weightScheduling", _usesDynamicWeights_ ? "Dynamic" : "Fixed"},
       {"weightBlocksPerThread", _weightBlocksPerThread_}, {"weightBlockCount", _weightBlocks_.size()},
+      {"cacheTraversalRequested", _cacheTraversal_.toString()},
       {"threads", _threadPool_.getNbThreads()}, {"events", model.events.size()},
       {"eventDialReferences", model.eventDialIndices.size()},
       {"commit", GundamVersionConfig::getVersionPostCommitHash()}};
@@ -376,6 +380,7 @@ void Backends::CpuBackend::initializeProfiler() {
       {"events", model.events.size()}, {"uniqueDials", model.dials.size()},
       {"eventDialReferences", model.eventDialIndices.size()}, {"cachedDials", _cachedDialCount_},
       {"weightSchedulingRequested", _weightScheduling_.toString()},
+      {"cacheTraversalRequested", _cacheTraversal_.toString()},
       {"weightScheduling", _usesDynamicWeights_ ? "Dynamic" : "Fixed"},
       {"weightBlocksPerThread", _weightBlocksPerThread_},
       {"dynamicBlockTarget", _weightBlocksPerThread_ * _threadPool_.getNbThreads()},

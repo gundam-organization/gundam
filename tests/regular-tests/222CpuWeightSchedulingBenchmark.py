@@ -33,6 +33,10 @@ def write_json(path, value):
     temporary.replace(path)
 
 
+def scenario_calls(args, scenario):
+    return min(args.calls, args.global_calls) if scenario == 'global' else args.calls
+
+
 class ParameterSequence:
     """Bounded, reproducible changes in the same coordinates used by the fit."""
     def __init__(self, engine, step_scale):
@@ -91,6 +95,7 @@ class ParameterSequence:
 
 
 def measure_case(args, engine, metadata, tag, sequence, scenario):
+    calls = scenario_calls(args, scenario)
     sequence.reset()
     engine.evaluateLikelihood()
     progress(f'{tag}: warming up ({args.warmup} evaluations)')
@@ -104,10 +109,11 @@ def measure_case(args, engine, metadata, tag, sequence, scenario):
         sequence.reset()
         engine.evaluateLikelihood()
         rng, digest = random.Random(args.seed + trial), hashlib.sha256()
-        progress(f'{tag}: trial {trial + 1}/{args.trials}, 0/{args.calls} evaluations')
+        progress(f'{tag}: trial {trial + 1}/{args.trials}, 0/{calls} evaluations')
         stages, caches, histograms, complete, updates, changed, likelihoods = [], [], [], [], [], [], []
+        preparations, executions, candidates, linear = [], [], [], []
         last_progress = time.monotonic()
-        for call in range(args.calls):
+        for call in range(calls):
             update_start = time.perf_counter()
             changed.append(sequence.apply(scenario, rng, call, digest))
             updates.append(time.perf_counter() - update_start)
@@ -121,17 +127,27 @@ def measure_case(args, engine, metadata, tag, sequence, scenario):
             timing = engine.getBackendsManager().getLastTimingSummary()
             stages.append(timing.eventWeightsStageSeconds)
             caches.append(timing.cachedDialStageSeconds)
+            preparations.append(timing.cachePreparationSeconds)
+            executions.append(timing.cacheExecutionSeconds)
+            candidates.append(timing.cacheCandidateCount)
+            linear.append(timing.linearCacheTraversal)
             histograms.append(timing.histogramStageSeconds)
             if time.monotonic() - last_progress >= 5:
-                progress(f'{tag}: trial {trial + 1}/{args.trials}, {call + 1}/{args.calls} evaluations')
+                progress(f'{tag}: trial {trial + 1}/{args.trials}, {call + 1}/{calls} evaluations')
                 last_progress = time.monotonic()
         raw.append({'weightSeconds': stages, 'cacheSeconds': caches, 'histogramSeconds': histograms,
                     'evaluationSeconds': complete, 'parameterUpdateSeconds': updates,
-                    'changedFitCoordinates': changed, 'likelihoods': likelihoods})
+                    'changedFitCoordinates': changed, 'likelihoods': likelihoods,
+                    'cachePreparationSeconds': preparations, 'cacheExecutionSeconds': executions,
+                    'cacheCandidates': candidates, 'linearCacheTraversal': linear})
         trials.append({'weightMedianMs': statistics.median(stages) * 1000,
                        'weightMeanMs': statistics.mean(stages) * 1000,
                        'weightP95Ms': sorted(stages)[int((len(stages) - 1) * .95)] * 1000,
                        'cacheMedianMs': statistics.median(caches) * 1000,
+                       'cachePreparationMedianMs': statistics.median(preparations) * 1000,
+                       'cacheExecutionMedianMs': statistics.median(executions) * 1000,
+                       'cacheCandidateMedian': statistics.median(candidates),
+                       'linearCacheCalls': sum(linear),
                        'histogramMedianMs': statistics.median(histograms) * 1000,
                        'evaluationMedianMs': statistics.median(complete) * 1000,
                        'parameterUpdateMedianMs': statistics.median(updates) * 1000,
@@ -150,9 +166,11 @@ def measure_case(args, engine, metadata, tag, sequence, scenario):
             'compilerOptimizationEnabled': metadata['compilerOptimizationEnabled'],
             'allowedCpus': sorted(os.sched_getaffinity(0)) if hasattr(os, 'sched_getaffinity') else None,
             'events': metadata['events'], 'eventDialReferences': metadata['eventDialReferences'],
-            'raw': raw, 'callsPerTrial': args.calls, 'trials': trials, 'histogram': histogram,
+            'raw': raw, 'callsPerTrial': calls, 'trials': trials, 'histogram': histogram,
             'weightMedianMs': statistics.median(t['weightMedianMs'] for t in trials),
             'cacheMedianMs': statistics.median(t['cacheMedianMs'] for t in trials),
+            'cachePreparationMedianMs': statistics.median(t['cachePreparationMedianMs'] for t in trials),
+            'cacheExecutionMedianMs': statistics.median(t['cacheExecutionMedianMs'] for t in trials),
             'evaluationMedianMs': statistics.median(t['evaluationMedianMs'] for t in trials),
             'histogramMedianMs': statistics.median(t['histogramMedianMs'] for t in trials)}
 
@@ -160,7 +178,7 @@ def measure_case(args, engine, metadata, tag, sequence, scenario):
 def measure_suite(args):
     import GUNDAM
     threads = args.worker_threads
-    if not hasattr(GUNDAM.BackendManager, 'setDiagnosticCpuWeightScheduling') or not hasattr(GUNDAM.ParameterSet, 'getEffectiveParameterList'):
+    if not hasattr(GUNDAM.BackendManager, 'setDiagnosticCpuCacheTraversal') or not hasattr(GUNDAM.ParameterSet, 'getEffectiveParameterList'):
         raise RuntimeError('Rebuild GUNDAM and select its Python module: runtime scheduling diagnostics are missing.')
     progress(f't{threads}: loading model once; GUNDAM module: {GUNDAM.__file__}')
     GUNDAM.setRuntimeWorkingDirectory(str(args.work_dir))
@@ -192,21 +210,27 @@ def measure_suite(args):
     write_json(args.output / f'parameters-t{threads}.json', sequence.manifest())
     progress(f't{threads}: {len(sequence.entries)} variable fit coordinates; scenarios: {args.scenarios}')
     references = {}
-    cases = [(scenario, mode, factor) for scenario in dict.fromkeys(args.scenarios)
-             for mode, factor in [('Fixed', 2), *[('Dynamic', f) for f in dict.fromkeys(args.factors)]]]
+    layouts = ([('Dynamic', 2, traversal) for traversal in ('Indexed', 'Auto')] if args.benchmark == 'cache'
+               else [(mode, factor, 'Auto') for mode, factor in [('Fixed', 2), *[('Dynamic', f) for f in dict.fromkeys(args.factors)]]])
+    cases = [(scenario, mode, factor, traversal) for scenario in dict.fromkeys(args.scenarios)
+             for mode, factor, traversal in layouts]
     for round_index in range(args.rounds):
         ordered = cases if round_index % 2 == 0 else list(reversed(cases))
-        for scenario, mode, factor in ordered:
+        for scenario, mode, factor, traversal in ordered:
             tag = f'round{round_index + 1}-t{threads}-{scenario}-{mode}' + (f'-x{factor}' if mode == 'Dynamic' else '')
+            if args.benchmark == 'cache':
+                tag += f'-cache{traversal}'
             progress(f'{tag}: rebuilding work ranges (events and cached responses retained)')
-            metadata = json.loads(engine.getBackendsManager().setDiagnosticCpuWeightScheduling(mode, factor))
+            engine.getBackendsManager().setDiagnosticCpuWeightScheduling(mode, factor)
+            metadata = json.loads(engine.getBackendsManager().setDiagnosticCpuCacheTraversal(traversal))
             if mode == 'Dynamic' and metadata['weightScheduling'] != 'Dynamic':
                 raise RuntimeError(f'{tag}: too few events for the requested dynamic block count')
             count = metadata['weightBlockCount'] if mode == 'Dynamic' else threads
             progress(f'{tag}: {count} work ranges ({mode}); starting evaluations')
             result = measure_case(args, engine, metadata, tag, sequence, scenario)
             result.update(mode=mode, blocksPerThread=factor if mode == 'Dynamic' else None,
-                          round=round_index + 1, pythonModule=GUNDAM.__file__)
+                          round=round_index + 1, pythonModule=GUNDAM.__file__,
+                          cacheTraversal=traversal, benchmark=args.benchmark)
             values = result['histogram']
             signature = [t['sequenceDigest'] for t in result['trials']]
             likelihoods = [v for trial in result['raw'] for v in trial['likelihoods']]
@@ -231,16 +255,22 @@ def measure_suite(args):
             for measured in results:
                 baseline = next((r for r in results if r['round'] == measured['round']
                                  and r['threads'] == measured['threads'] and r['scenario'] == measured['scenario']
-                                 and r['mode'] == 'Fixed'), None)
+                                 and (r['cacheTraversal'] == 'Indexed' if args.benchmark == 'cache' else r['mode'] == 'Fixed')), None)
                 if baseline:
-                    measured['weightSpeedupVsFixed'] = baseline['weightMedianMs'] / measured['weightMedianMs']
-                    measured['evaluationSpeedupVsFixed'] = baseline['evaluationMedianMs'] / measured['evaluationMedianMs']
+                    if args.benchmark == 'cache':
+                        measured['cacheSpeedupVsIndexed'] = baseline['cacheMedianMs'] / measured['cacheMedianMs']
+                        measured['evaluationSpeedupVsIndexed'] = baseline['evaluationMedianMs'] / measured['evaluationMedianMs']
+                    else:
+                        measured['weightSpeedupVsFixed'] = baseline['weightMedianMs'] / measured['weightMedianMs']
+                        measured['evaluationSpeedupVsFixed'] = baseline['evaluationMedianMs'] / measured['evaluationMedianMs']
             write_json(summary_path, results)
             progress(f"{tag}: saved; reweight {result['weightMedianMs']:.3f} ms, evaluation {result['evaluationMedianMs']:.3f} ms; histograms agree")
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--benchmark', choices=['weights', 'cache'], default='weights',
+                        help='Compare weight block factors, or Indexed/Auto cache traversal with Dynamic x2 weights')
     parser.add_argument('--config', type=Path, required=True)
     parser.add_argument('--override', nargs='*', default=[])
     parser.add_argument('--work-dir', type=Path, default=Path.cwd())
@@ -251,15 +281,17 @@ def main():
     parser.add_argument('--seed', type=int, default=12345)
     parser.add_argument('--step-scale', type=float, default=.1,
                         help='Proposal standard deviation as a fraction of prior sigma (step size for flat parameters)')
-    parser.add_argument('--calls', type=int, default=300)
-    parser.add_argument('--warmup', type=int, default=20)
-    parser.add_argument('--trials', type=int, default=3)
+    parser.add_argument('--calls', type=int, default=100)
+    parser.add_argument('--global-calls', type=int, default=20,
+                        help='Maximum evaluations per trial for the costly global workload')
+    parser.add_argument('--warmup', type=int, default=5)
+    parser.add_argument('--trials', type=int, default=2)
     parser.add_argument('--rounds', type=int, default=1, help='Repeat cases, alternating forward and reverse order')
     parser.add_argument('--output', type=Path,
                         default=Path(time.strftime('cpu-weight-benchmark-%Y%m%d-%H%M%S-') + str(os.getpid())))
     parser.add_argument('--worker-threads', type=int, help=argparse.SUPPRESS)
     args = parser.parse_args()
-    if min([*args.threads, *args.factors, args.calls, args.warmup, args.trials, args.rounds,
+    if min([*args.threads, *args.factors, args.calls, args.global_calls, args.warmup, args.trials, args.rounds,
             args.worker_threads or 2]) <= 0:
         parser.error('All counts must be positive')
     if not math.isfinite(args.step_scale) or args.step_scale <= 0:
@@ -275,16 +307,23 @@ def main():
     args.output.mkdir(parents=True, exist_ok=False)
     progress(f'Results: {args.output}')
     progress(f'{len(set(args.threads))} model load(s), one per thread count; factors/rounds reuse the same model')
+    counts = {s: scenario_calls(args, s) for s in dict.fromkeys(args.scenarios)}
+    layout_count = 2 if args.benchmark == 'cache' else 1 + len(set(args.factors))
+    total_calls = sum(counts.values()) * layout_count * args.trials * args.rounds * len(set(args.threads))
+    progress(f'Timed evaluations per trial: {counts}; total across cases: {total_calls} (plus warmup/cache priming)')
     write_json(args.output / 'settings.json', {
         'config': str(args.config), 'override': args.override, 'workDir': str(args.work_dir),
         'threads': args.threads, 'factors': args.factors, 'rounds': args.rounds,
-        'calls': args.calls, 'warmup': args.warmup, 'trials': args.trials, 'host': platform.node(),
+        'calls': args.calls, 'globalCalls': args.global_calls, 'callsByScenario': counts,
+        'warmup': args.warmup, 'trials': args.trials, 'host': platform.node(),
         'scenarios': args.scenarios, 'seed': args.seed, 'stepScale': args.step_scale,
+        'benchmark': args.benchmark,
         'parameterSequence': 'identical seeded sequences per scenario across layouts/rounds'})
     for threads in dict.fromkeys(args.threads):
         log_path = args.output / f't{threads}.log'
-        command = [sys.executable, '-u', str(Path(__file__).resolve()), '--config', str(args.config),
+        command = [sys.executable, '-u', str(Path(__file__).resolve()), '--benchmark', args.benchmark, '--config', str(args.config),
                    '--work-dir', str(args.work_dir), '--worker-threads', str(threads), '--calls', str(args.calls),
+                   '--global-calls', str(args.global_calls),
                    '--warmup', str(args.warmup), '--trials', str(args.trials), '--rounds', str(args.rounds),
                    '--output', str(args.output), '--factors', *map(str, args.factors),
                    '--scenarios', *args.scenarios, '--seed', str(args.seed), '--step-scale', str(args.step_scale)]

@@ -72,6 +72,10 @@ ENUM_FIELD( Unavailable )
     std::size_t externalWeightUploadBlocks{0};
     double parameterUploadSeconds{0};
     double cachedDialStageSeconds{0};
+    double cachePreparationSeconds{0};
+    double cacheExecutionSeconds{0};
+    std::size_t cacheCandidateCount{0};
+    bool linearCacheTraversal{false};
     double eventWeightsStageSeconds{0};
     double histogramStageSeconds{0};
     double variableStageSeconds{0};
