@@ -1,5 +1,10 @@
 #include "CpuBackend.h"
 #include "GundamGlobals.h"
+#include "CompactSpline.h"
+#include "UniformSpline.h"
+#include "MonotonicSpline.h"
+#include "GeneralSpline.h"
+#include "Graph.h"
 
 #include <gtest/gtest.h>
 
@@ -232,4 +237,90 @@ TEST(CpuWeightExecution, DiagnosticSchedulingRejectsInvalidRequests) {
   inputs.parameters.values = {1.};
   auto token = backend.requestPropagation(inputs);
   EXPECT_EQ(backend.getEventWeightsHostView(token), (std::vector<double>{-2., -2., -2.}));
+}
+
+TEST(CpuCacheTraversal, LinearAndIndexedPreserveAllDialTypesAndSparseUpdates) {
+  using namespace Backends;
+  const int previousThreads = GundamGlobals::getNbCpuThreads();
+  for( int threads : {1, 2, 5} ){
+    GundamGlobals::setNumberOfThreads(threads);
+    for( int constants : {1, 100} ){
+      auto view = std::make_shared<EngineView>();
+      auto& model = view->propagation;
+      model.parameterCount = 3;
+      model.totalBins = 3;
+      model.hasReweightCap = true;
+      model.maxReweight = 2.;
+      model.externalWeightBlocks = {{0, 1}};
+      std::vector<DialUtils::DialPoint> points;
+      for( int x = -2; x <= 4; ++x ){ points.push_back({double(x), 1. + .1 * x, .1}); }
+      CompactSpline compact; compact.buildDial(points);
+      UniformSpline uniform; uniform.buildDial(points);
+      MonotonicSpline monotonic; monotonic.buildDial(points);
+      GeneralSpline general; general.buildDial(points);
+      Graph graph; graph.buildDial(points);
+      const std::vector<std::vector<double>> payloads{{}, compact.getDialData(), uniform.getDialData(),
+          monotonic.getDialData(), general.getDialData(), graph.getDialData()};
+      const std::vector<BackendDialType> types{BackendDialType::Norm, BackendDialType::CompactSpline,
+          BackendDialType::UniformSpline, BackendDialType::MonotonicSpline, BackendDialType::GeneralSpline,
+          BackendDialType::Graph};
+      auto append = [&](BackendDialDescriptor dial, const std::vector<double>& payload){
+        dial.payloadOffset = model.dialPayloads.size();
+        dial.payloadSize = payload.size();
+        model.dialPayloads.insert(model.dialPayloads.end(), payload.begin(), payload.end());
+        model.eventDialIndices.push_back(model.dials.size());
+        model.dials.push_back(dial);
+        EventView event;
+        event.resultIndex = model.events.size();
+        event.globalBinIndex = event.resultIndex % 3;
+        model.events.push_back(event);
+        model.eventWeights.push_back({1., model.eventDialIndices.size() - 1, 1});
+      };
+      for( std::size_t i = 0; i < 60; ++i ){
+        BackendDialDescriptor dial;
+        dial.type = types[i % types.size()];
+        dial.firstInput = model.dialInputs.size();
+        dial.inputCount = 1;
+        dial.allowExtrapolation = i % 2;
+        dial.hasMinResponse = dial.hasMaxResponse = true;
+        dial.minResponse = .2;
+        dial.maxResponse = 1.8;
+        model.dialInputs.push_back({i % 3, i % 5 == 0, 0., 2.});
+        append(dial, payloads[i % payloads.size()]);
+      }
+      BackendDialDescriptor shift;
+      shift.type = BackendDialType::Shift;
+      for( int i = 0; i < constants; ++i ){ append(shift, {.8}); }
+      BackendDialDescriptor external;
+      external.type = BackendDialType::ExternalWeight;
+      append(external, {});
+      CpuBackend indexed, automatic;
+      indexed.buildShared(view);
+      automatic.buildShared(view);
+      indexed.setDiagnosticCacheTraversal(CpuCacheTraversal::Indexed);
+      PropagationInputs inputs;
+      double externalValue{1.};
+      inputs.externalWeights = {{&externalValue, 1, 0, 1}};
+      std::vector<std::vector<double>> values{{1., 1., 1.}, {1., 1., 1.}, {1.2, 1., 1.},
+          {1.2, 1.4, 1.6}, {1.3, 1.5, 1.7}, {5.3, 5.5, 5.7}};
+      for( std::size_t call = 0; call < values.size(); ++call ){
+        inputs.parameters.values = values[call];
+        const auto expected = indexed.requestPropagation(inputs);
+        const auto actual = automatic.requestPropagation(inputs);
+        const auto& timing = automatic.getLastTimingSummary();
+        EXPECT_EQ(timing.linearCacheTraversal, constants == 1 and (call == 0 or call >= 3));
+        EXPECT_EQ(timing.cacheCandidateCount, indexed.getLastTimingSummary().cacheCandidateCount);
+        EXPECT_FALSE(indexed.getLastTimingSummary().linearCacheTraversal);
+        auto sameBits = [](const std::vector<double>& a, const std::vector<double>& b){
+          ASSERT_EQ(a.size(), b.size());
+          EXPECT_EQ(std::memcmp(a.data(), b.data(), a.size() * sizeof(double)), 0);
+        };
+        sameBits(indexed.getEventWeightsHostView(expected), automatic.getEventWeightsHostView(actual));
+        sameBits(indexed.getHistogramSumsHostView(expected), automatic.getHistogramSumsHostView(actual));
+        sameBits(indexed.getHistogramSumSquaresHostView(expected), automatic.getHistogramSumSquaresHostView(actual));
+        externalValue += .1;
+      }
+    }
+  }
+  GundamGlobals::setNumberOfThreads(previousThreads);
 }

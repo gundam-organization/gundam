@@ -25,6 +25,12 @@ ENUM_FIELD( Fixed, 0 ) \
 ENUM_FIELD( Dynamic )
 #include "GenericToolbox.MakeEnum.h"
 
+#define ENUM_NAME CpuCacheTraversal
+#define ENUM_FIELDS \
+ENUM_FIELD( Auto, 0 ) \
+ENUM_FIELD( Indexed )
+#include "GenericToolbox.MakeEnum.h"
+
   class CpuBackend : public Backend {
   public:
     CpuBackend() = default;
@@ -54,6 +60,7 @@ ENUM_FIELD( Dynamic )
     // Diagnostic API: call between synchronous propagations. Only the work
     // ranges/kernel selection change; model data and response caches are kept.
     void setDiagnosticWeightScheduling(CpuWeightScheduling scheduling_, std::size_t blocksPerThread_);
+    void setDiagnosticCacheTraversal(CpuCacheTraversal traversal_);
     [[nodiscard]] CpuBackendProfiler::Json getWeightSchedulingDiagnostics() const;
 
   protected:
@@ -107,6 +114,11 @@ ENUM_FIELD( Dynamic )
     const PropagationInputs* _activeInputs_{nullptr};
     std::vector<std::vector<std::uint32_t>> _cachedDialsByParameter_{};
     std::vector<std::uint32_t> _dirtyCachedDialIndices_{};
+    std::vector<std::uint8_t> _changedCacheParameters_{};
+    CpuCacheTraversal _cacheTraversal_{CpuCacheTraversal::Auto};
+    std::size_t _parameterDependentCachedDialCount_{0};
+    std::size_t _dirtyCachedDialCount_{0};
+    bool _usesLinearCacheTraversal_{false};
     std::vector<double> _cachedDialResponses_{};
     std::vector<double> _cachedDialInputs_{};
     std::vector<double> _lastParameterValues_{};
