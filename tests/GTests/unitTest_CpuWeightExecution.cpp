@@ -184,20 +184,32 @@ TEST(CpuWeightExecution, DynamicBlocksMatchFixedBitForBit) {
           Backends::CpuBackend dynamic;
           dynamic.configure(ConfigUtils::ConfigReader(JsonType{{"weightScheduling", "Dynamic"}}));
           dynamic.buildShared(view);
+          const auto* modelStorage = dynamic.getEngineView().propagation.eventWeights.data();
           Backends::PropagationInputs inputs;
           double external{1.3};
           if( mixed ){ inputs.externalWeights = {{&external, 1, 0, 1}}; }
           for( double value : {2., 0., -.5, std::numeric_limits<double>::quiet_NaN()} ){
             inputs.parameters.values = {value};
             const auto expected = fixed.requestPropagation(inputs);
-            const auto actual = dynamic.requestPropagation(inputs);
             auto sameBits = [](const std::vector<double>& a_, const std::vector<double>& b_){
               ASSERT_EQ(a_.size(), b_.size());
               EXPECT_EQ(std::memcmp(a_.data(), b_.data(), a_.size() * sizeof(double)), 0);
             };
-            sameBits(fixed.getEventWeightsHostView(expected), dynamic.getEventWeightsHostView(actual));
-            sameBits(fixed.getHistogramSumsHostView(expected), dynamic.getHistogramSumsHostView(actual));
-            sameBits(fixed.getHistogramSumSquaresHostView(expected), dynamic.getHistogramSumSquaresHostView(actual));
+            for( std::size_t factor : {1, 2, 5, 10, 2} ){
+              for( auto mode : {Backends::CpuWeightScheduling::Dynamic, Backends::CpuWeightScheduling::Fixed} ){
+                dynamic.setDiagnosticWeightScheduling(mode, factor);
+                const auto layout = dynamic.getWeightSchedulingDiagnostics();
+                const auto dynamicExpected = mode == Backends::CpuWeightScheduling::Dynamic
+                    and threads > 1 and events >= factor * threads;
+                EXPECT_EQ(layout.at("weightBlockCount"), dynamicExpected ? factor * threads : 0);
+                EXPECT_EQ(layout.at("weightBlocksPerThread"), factor);
+                EXPECT_EQ(dynamic.getEngineView().propagation.eventWeights.data(), modelStorage);
+                const auto actual = dynamic.requestPropagation(inputs);
+                sameBits(fixed.getEventWeightsHostView(expected), dynamic.getEventWeightsHostView(actual));
+                sameBits(fixed.getHistogramSumsHostView(expected), dynamic.getHistogramSumsHostView(actual));
+                sameBits(fixed.getHistogramSumSquaresHostView(expected), dynamic.getHistogramSumSquaresHostView(actual));
+              }
+            }
             external += .1;
           }
         }
@@ -205,4 +217,19 @@ TEST(CpuWeightExecution, DynamicBlocksMatchFixedBitForBit) {
     }
   }
   GundamGlobals::setNumberOfThreads(previousThreads);
+}
+
+TEST(CpuWeightExecution, DiagnosticSchedulingRejectsInvalidRequests) {
+  Backends::CpuBackend backend;
+  EXPECT_THROW(backend.setDiagnosticWeightScheduling(Backends::CpuWeightScheduling::Dynamic, 2), std::exception);
+  GundamGlobals::setNumberOfThreads(2);
+  backend.build(makeWeightModel(false, false));
+  EXPECT_THROW(backend.setDiagnosticWeightScheduling(Backends::CpuWeightScheduling::Dynamic, 0), std::exception);
+  EXPECT_THROW(backend.setDiagnosticWeightScheduling(Backends::CpuWeightScheduling::Dynamic,
+                                                    std::numeric_limits<std::size_t>::max()), std::exception);
+  // Validation must leave the previous usable layout intact.
+  Backends::PropagationInputs inputs;
+  inputs.parameters.values = {1.};
+  auto token = backend.requestPropagation(inputs);
+  EXPECT_EQ(backend.getEventWeightsHostView(token), (std::vector<double>{-2., -2., -2.}));
 }

@@ -346,6 +346,23 @@ void Backends::CpuBackendProfiler::end(const BackendTimingSummary& timing_) {
   _active_ = false;
 }
 
+Backends::CpuBackendProfiler::Json Backends::CpuBackend::getWeightSchedulingDiagnostics() const {
+  LogThrowIf(not _isBuilt_, "No built CPU model for scheduling diagnostics.");
+  const auto& model = _engineView_->propagation;
+  CpuBackendProfiler::Json out{
+      {"weightScheduling", _usesDynamicWeights_ ? "Dynamic" : "Fixed"},
+      {"weightBlocksPerThread", _weightBlocksPerThread_}, {"weightBlockCount", _weightBlocks_.size()},
+      {"threads", _threadPool_.getNbThreads()}, {"events", model.events.size()},
+      {"eventDialReferences", model.eventDialIndices.size()},
+      {"commit", GundamVersionConfig::getVersionPostCommitHash()}};
+#ifdef __OPTIMIZE__
+  out["compilerOptimizationEnabled"] = true;
+#else
+  out["compilerOptimizationEnabled"] = false;
+#endif
+  return out;
+}
+
 void Backends::CpuBackend::initializeProfiler() {
   _profiler_.reset();
   if( _profileOutputPath_.empty() ){ return; }

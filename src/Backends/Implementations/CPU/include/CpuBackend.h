@@ -51,6 +51,11 @@ ENUM_FIELD( Dynamic )
     [[nodiscard]] BackendTimingSummary getLastTimingSummary() const override { return _lastTiming_; }
     [[nodiscard]] BackendTimingTotals getTimingTotals() const override { return _timingTotals_; }
 
+    // Diagnostic API: call between synchronous propagations. Only the work
+    // ranges/kernel selection change; model data and response caches are kept.
+    void setDiagnosticWeightScheduling(CpuWeightScheduling scheduling_, std::size_t blocksPerThread_);
+    [[nodiscard]] CpuBackendProfiler::Json getWeightSchedulingDiagnostics() const;
+
   protected:
     void configureImpl() override;
 
@@ -62,6 +67,7 @@ ENUM_FIELD( Dynamic )
     void initializeProfiler();
     void initializeDialResponseCache();
     void initializeWeightExecution();
+    void initializeWeightScheduling();
     template<bool allResponsesCached, bool useReweightCap, bool dynamicScheduling>
     void calculateEventWeightsKernel(int iThread_);
     void resetResult();
@@ -117,6 +123,8 @@ ENUM_FIELD( Dynamic )
     std::vector<EventRange> _weightRanges_{};
     CpuWeightScheduling _weightScheduling_{CpuWeightScheduling::Dynamic};
     std::size_t _weightBlocksPerThread_{2};
+    std::size_t _weightWork_{0};
+    bool _allWeightResponsesCached_{false};
     bool _usesDynamicWeights_{false};
     std::vector<EventRange> _weightBlocks_{};
     alignas(64) std::atomic<std::size_t> _nextWeightBlock_{0};

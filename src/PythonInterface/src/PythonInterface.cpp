@@ -17,6 +17,10 @@
 #include "ConfigUtils.h"
 #include "GundamApp.h"
 
+#ifdef GUNDAM_USING_BACKENDS
+#include "CpuBackend.h"
+#endif
+
 #include "GenericToolbox.Fs.h"
 #include "GenericToolbox.Os.h"
 
@@ -296,6 +300,9 @@ PYBIND11_MODULE(GUNDAM, module) {
   .def("getName", &Parameter::getName)
   .def("getFullTitle", &Parameter::getFullTitle)
   .def("isEnabled", &Parameter::isEnabled)
+  .def("isFixed", &Parameter::isFixed)
+  .def("isPenaltyDisabled", &Parameter::isPenaltyDisabled)
+  .def("isInDomain", &Parameter::isInDomain, pybind11::arg("value"), pybind11::arg("verbose") = false)
   .def("isFree", &Parameter::isFree)
   .def("getStepSize", &Parameter::getStepSize)
   .def("getPriorValue", &Parameter::getPriorValue)
@@ -324,10 +331,12 @@ PYBIND11_MODULE(GUNDAM, module) {
 
   pybind11::class_<ParameterSet>(module, "ParameterSet")
   .def(pybind11::init())
+  .def("isEnabled", &ParameterSet::isEnabled)
   .def("isEnableEigenDecomp", &ParameterSet::isEnableEigenDecomp)
   .def("getName", &ParameterSet::getName)
   .def("getParameterList", pybind11::overload_cast<>(&ParameterSet::getParameterList), pybind11::return_value_policy::reference_internal)
   .def("getEigenParameterList", pybind11::overload_cast<>(&ParameterSet::getEigenParameterList), pybind11::return_value_policy::reference_internal)
+  .def("getEffectiveParameterList", pybind11::overload_cast<>(&ParameterSet::getEffectiveParameterList), pybind11::return_value_policy::reference_internal)
   .def("getPriorCorrelationMatrix", pybind11::overload_cast<>(&ParameterSet::getPriorCorrelationMatrix, pybind11::const_))
   .def("getPriorCovarianceMatrix", pybind11::overload_cast<>(&ParameterSet::generatePriorCovarianceMatrix, pybind11::const_))
   .def("getPriorFullCovarianceMatrix", pybind11::overload_cast<>(&ParameterSet::getPriorFullCovarianceMatrix, pybind11::const_))
@@ -555,6 +564,12 @@ PYBIND11_MODULE(GUNDAM, module) {
   .def("getLastTimingSummary", [](const Backends::BackendManager& manager_){
     LogThrowIf(not manager_.hasBackend(), "No backend initialized.");
     return manager_.getBackend()->getLastTimingSummary();
+  })
+  .def("setDiagnosticCpuWeightScheduling", [](Backends::BackendManager& manager_, const std::string& mode_, std::size_t factor_){
+    auto* cpu = dynamic_cast<Backends::CpuBackend*>(manager_.getBackend());
+    LogThrowIf(cpu == nullptr, "CPU weight scheduling diagnostics require an initialized CPU backend.");
+    cpu->setDiagnosticWeightScheduling(Backends::CpuWeightScheduling::toEnum(mode_), factor_);
+    return cpu->getWeightSchedulingDiagnostics().dump();
   })
   ;
 #endif

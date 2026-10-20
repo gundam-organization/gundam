@@ -417,6 +417,29 @@ void Backends::CpuBackend::initializeWeightExecution() {
                "GUNDAM_CPU_DIAGNOSTIC_BLOCKS_PER_THREAD must be a positive integer without overflow.");
     LogWarning << "CPU diagnostic block factor override: " << _weightBlocksPerThread_ << std::endl;
   }
+  _weightWork_ = work;
+  _allWeightResponsesCached_ = allCached;
+  initializeWeightScheduling();
+}
+
+void Backends::CpuBackend::setDiagnosticWeightScheduling(CpuWeightScheduling scheduling_, std::size_t blocksPerThread_) {
+  LogThrowIf(not _isBuilt_, "Build the CPU backend before changing diagnostic scheduling.");
+  LogThrowIf(scheduling_ != CpuWeightScheduling::Fixed and scheduling_ != CpuWeightScheduling::Dynamic,
+             "Invalid CPU diagnostic scheduling mode.");
+  LogThrowIf(blocksPerThread_ == 0
+             or blocksPerThread_ > std::numeric_limits<std::size_t>::max() / _threadPool_.getNbThreads(),
+             "CPU diagnostic block factor must be a positive integer without overflow.");
+  _weightScheduling_ = scheduling_;
+  _weightBlocksPerThread_ = blocksPerThread_;
+  initializeWeightScheduling();
+  // If probes were requested, start a new run with the new layout metadata.
+  initializeProfiler();
+}
+
+void Backends::CpuBackend::initializeWeightScheduling() {
+  const auto& model = _engineView_->propagation;
+  const auto threads = std::size_t(_threadPool_.getNbThreads());
+  const auto work = _weightWork_;
   const auto blockTarget = _weightBlocksPerThread_ * threads;
   _usesDynamicWeights_ = _weightScheduling_ == CpuWeightScheduling::Dynamic
                         and threads > 1 and model.eventWeights.size() >= blockTarget;
@@ -441,7 +464,7 @@ void Backends::CpuBackend::initializeWeightExecution() {
   };
   _weightRanges_ = makeRanges(threads, false);
   _weightBlocks_ = _usesDynamicWeights_ ? makeRanges(blockTarget, true) : std::vector<EventRange>{};
-  if( allCached ){
+  if( _allWeightResponsesCached_ ){
     if( _usesDynamicWeights_ ){
       _weightJob_ = model.hasReweightCap ? &CpuBackend::calculateEventWeightsKernel<true, true, true>
                                        : &CpuBackend::calculateEventWeightsKernel<true, false, true>;
@@ -465,7 +488,7 @@ void Backends::CpuBackend::initializeWeightExecution() {
           << model.eventWeights.size() * sizeof(BackendEventWeightDescriptor) << " hot descriptor bytes, "
           << model.eventDialIndices.size() * sizeof(std::uint32_t) << " dial index bytes, "
           << _cachedDialCount_ << "/" << model.dials.size() << " cached dials, "
-          << "all event responses cached=" << allCached << ", shared model owners=" << _engineView_.use_count()
+          << "all event responses cached=" << _allWeightResponsesCached_ << ", shared model owners=" << _engineView_.use_count()
           << "." << std::endl;
   LogInfo << "CPU weight scheduling: " << (_usesDynamicWeights_ ? "Dynamic" : "Fixed")
           << " (requested " << _weightScheduling_ << ", " << _weightBlocks_.size()
