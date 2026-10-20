@@ -1397,9 +1397,20 @@ void DataDispenser::loadFromHistContent(){
 }
 
 void DataDispenser::selectLoadThreadCount(){
+  const int maxThreads = getNbParallelCpu();
+  if( maxThreads <= 2 ){
+    _nbThreadsForLoad_ = maxThreads;
+    LogInfo << "Using " << maxThreads << " reader(s) for event selection and loading; skipping raw I/O probe"
+            << " (at most two readers allowed)." << std::endl;
+    return;
+  }
+  if( _owner_->isDevSingleThreadEventSelection() and _owner_->isDevSingleThreadEventLoaderAndIndexer() ){
+    return;
+  }
+
   // File metadata is sufficient for small inputs; do not read payload data just
   // to decide how to read it. Include enabled friends and count each file once.
-  constexpr Long64_t singleReaderThreshold{500LL * 1000 * 1000}; // 500 MB
+  constexpr Long64_t probeSizeThreshold{500LL * 1000 * 1000}; // 500 MB
   std::set<std::string> filePaths;
   for( const auto& fileEntry : _parameters_.filePathList ){
     if( not fileEntry.isEnabled ){ continue; }
@@ -1432,21 +1443,17 @@ void DataDispenser::selectLoadThreadCount(){
     if( fileInfo.st_size > 0 ){ inputFiles.push_back({filePath, fileInfo.st_size}); }
   }
 
-  if( totalBytes < singleReaderThreshold ){
-    _nbThreadsForLoad_ = 1;
+  if( totalBytes < probeSizeThreshold ){
+    _nbThreadsForLoad_ = 2;
     LogInfo << "Input files total " << totalBytes
-            << " bytes (< 500 MB): using one reader for event selection and loading." << std::endl;
+            << " bytes (< 500 MB): using two readers for event selection and loading; skipping raw I/O probe."
+            << std::endl;
     return;
   }
 
-  const int maxThreads = getNbParallelCpu();
-  if( maxThreads <= 1 or (_owner_->isDevSingleThreadEventSelection()
-                         and _owner_->isDevSingleThreadEventLoaderAndIndexer()) ){
-    return;
-  }
-
+  // Keep at least two readers to overlap I/O with decompression and processing.
   std::vector<int> candidates;
-  for( int nReaders = 1; nReaders <= std::min(4, maxThreads); ++nReaders ){
+  for( int nReaders = 2; nReaders <= std::min(4, maxThreads); ++nReaders ){
     candidates.push_back(nReaders);
   }
   // Above four readers, try 6, 8, 12, 16, 24, ... and the exact limit.
