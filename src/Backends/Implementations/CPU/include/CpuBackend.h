@@ -6,6 +6,7 @@
 #include "PropagationResult.h"
 #include "BackendTypes.h"
 #include "Backend.h"
+#include "CpuBackendProfiler.h"
 #include "PropagationInputs.h"
 #include "GenericToolbox.Time.h"
 #include "GenericToolbox.Thread.h"
@@ -43,11 +44,15 @@ namespace Backends {
     [[nodiscard]] BackendTimingSummary getLastTimingSummary() const override { return _lastTiming_; }
     [[nodiscard]] BackendTimingTotals getTimingTotals() const override { return _timingTotals_; }
 
+  protected:
+    void configureImpl() override;
+
   private:
     using Result = PropagationResult;
 
     [[nodiscard]] bool isCurrentToken(const PropagationToken& token_) const;
     void initializeThreads();
+    void initializeProfiler();
     void initializeDialResponseCache();
     void initializeWeightExecution();
     template<bool allResponsesCached, bool useReweightCap>
@@ -111,6 +116,10 @@ namespace Backends {
     BackendTimingSummary _lastTiming_{};
     std::uint64_t _nextTokenId_{1};
     bool _isBuilt_{false};
+    std::string _profileOutputPath_{};
+    int _profileSampleInterval_{100};
+    int _profileMaxSamples_{200};
+    std::unique_ptr<CpuBackendProfiler> _profiler_{};
   };
 
 }

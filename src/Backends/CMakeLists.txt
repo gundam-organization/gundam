@@ -11,6 +11,7 @@ set(SRCFILES
     ${CMAKE_CURRENT_SOURCE_DIR}/Common/src/BackendManager.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/Common/src/BackendTypes.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/CPU/src/CpuBackend.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/CPU/src/CpuBackendProfiler.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/CPU/src/CpuBackendBinning.cpp
 )
 
@@ -90,6 +91,7 @@ set(HEADERS
     ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/Semantics/BackendHostPropagation.h
     ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/CPU/include/CpuWeightKernels.h
     ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/CPU/include/CpuBackend.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/CPU/include/CpuBackendProfiler.h
     ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/MPS/include/MpsBackend.h
     ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/MPS/include/MpsBackendInternal.h
     ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/MPS/include/MpsEventPropagation.h
@@ -122,5 +124,7 @@ target_link_libraries(
 if(APPLE)
   target_link_libraries(${LIB_NAME} PUBLIC "-framework Foundation" "-framework Metal")
 endif()
+
+target_compile_definitions(${LIB_NAME} PRIVATE GUNDAM_CPU_BUILD_TYPE="${CMAKE_BUILD_TYPE}")
 
 install(TARGETS ${LIB_NAME} DESTINATION lib)

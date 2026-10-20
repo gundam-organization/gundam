@@ -7,7 +7,19 @@
 
 #include <algorithm>
 #include <chrono>
+#include <type_traits>
 #include <utility>
+
+void Backends::CpuBackend::configureImpl() {
+  _config_.clearFields();
+  _config_.defineFields({{"profileOutputPath"}, {"profileSampleInterval"}, {"profileMaxSamples"}});
+  _config_.checkConfiguration();
+  _config_.fillValue(_profileOutputPath_, "profileOutputPath");
+  _config_.fillValue(_profileSampleInterval_, "profileSampleInterval");
+  _config_.fillValue(_profileMaxSamples_, "profileMaxSamples");
+  LogThrowIf(_profileSampleInterval_ <= 0 or _profileMaxSamples_ <= 0,
+             "CPU profiling interval and maximum sample count must be strictly positive.");
+}
 
 Backends::BackendCapabilities Backends::CpuBackend::getCapabilities() const {
   BackendCapabilities out;
@@ -52,6 +64,7 @@ void Backends::CpuBackend::buildShared(std::shared_ptr<const EngineView> engineV
   _workerErrors_.resize(_threadPool_.getNbThreads());
   _eventStateCache_.build(model);
   _cachedContributionCount_ = 0;
+  initializeProfiler();
   _isBuilt_ = true;
 }
 
@@ -62,6 +75,11 @@ Backends::PropagationToken Backends::CpuBackend::requestPropagation(const Propag
   const auto& model = _engineView_->propagation;
   const auto& likelihoodModel = _engineView_->likelihood;
   inputs_.validate(model);
+
+  if( _profiler_ ){
+    _profiler_->begin(_timingTotals_.propagationCount + 1, inputs_.parameters.values,
+                      _lastParameterValues_, _isDialResponseCachePrimed_);
+  }
 
   resetResult();
   _lastTiming_ = BackendTimingSummary();
@@ -112,6 +130,8 @@ Backends::PropagationToken Backends::CpuBackend::requestPropagation(const Propag
   _timingTotals_.eventWeightsSeconds += _lastTiming_.eventWeightsStageSeconds;
   _timingTotals_.histogramSeconds += _lastTiming_.histogramStageSeconds;
   _timingTotals_.likelihoodSeconds += _lastTiming_.likelihoodHostSeconds;
+
+  if( _profiler_ ){ _profiler_->end(_lastTiming_); }
 
   return _lastResult_.token;
 }
@@ -193,11 +213,17 @@ void Backends::CpuBackend::initializeThreads() {
   _threadPool_.setCpuTimeSaverIsEnabled(false);
   _threadPool_.addJob(
       "CpuBackend::calculateEventWeights",
-      [this](int iThread_){ calculateEventWeightsThread(iThread_); }
+      [this](int iThread_){
+        CpuBackendProfiler::WorkerScope probe(_profiler_.get(), CpuBackendProfiler::Stage::Weights, iThread_);
+        calculateEventWeightsThread(iThread_);
+      }
   );
   _threadPool_.addJob(
       "CpuBackend::calculateHistograms",
-      [this](int iThread_){ calculateHistogramsThread(iThread_); }
+      [this](int iThread_){
+        CpuBackendProfiler::WorkerScope probe(_profiler_.get(), CpuBackendProfiler::Stage::Histograms, iThread_);
+        calculateHistogramsThread(iThread_);
+      }
   );
   // ParallelWorker does not forward worker exceptions. Capture them so every
   // thread can finish its job before an error is rethrown on the caller.
@@ -270,12 +296,16 @@ void Backends::CpuBackend::resetResult() {
 void Backends::CpuBackend::calculateEventWeights(Result& result_, const PropagationInputs& inputs_) {
   const auto& propagation = _engineView_->propagation;
   result_.eventWeights.resize(propagation.events.size());
+  if( _profiler_ ){ _profiler_->beginStage(CpuBackendProfiler::Stage::Cache); }
   updateCachedDialResponses(inputs_);
+  if( _profiler_ ){ _profiler_->endStage(CpuBackendProfiler::Stage::Cache); }
   _activeResult_ = &result_;
   _activeInputs_ = &inputs_;
   {
     auto timerScope = _eventWeightsStageTimer_.scopeTime();
+    if( _profiler_ ){ _profiler_->beginStage(CpuBackendProfiler::Stage::Weights); }
     _threadPool_.runJob("CpuBackend::calculateEventWeights");
+    if( _profiler_ ){ _profiler_->endStage(CpuBackendProfiler::Stage::Weights); }
   }
   _activeInputs_ = nullptr;
   _activeResult_ = nullptr;
@@ -305,6 +335,7 @@ void Backends::CpuBackend::updateCachedDialResponses(const PropagationInputs& in
     }
   }
 
+  if( _profiler_ ){ _profiler_->cachePrepared(_dirtyCachedDialIndices_.size()); }
   if( _dirtyCachedDialIndices_.empty() ){ return; }
   _activeInputs_ = &inputs_;
   _threadPool_.runJob("CpuBackend::updateCachedDialResponses");
@@ -312,26 +343,36 @@ void Backends::CpuBackend::updateCachedDialResponses(const PropagationInputs& in
 }
 
 void Backends::CpuBackend::updateCachedDialResponsesThread(int iThread_) {
+  CpuBackendProfiler::WorkerScope probe(_profiler_.get(), CpuBackendProfiler::Stage::Cache, iThread_);
   const auto& propagation = _engineView_->propagation;
   const auto bounds = GenericToolbox::ParallelWorker::getThreadBoundIndices(
       iThread_, _threadPool_.getNbThreads(), _dirtyCachedDialIndices_.size()
   );
   const double* parameterValues = _activeInputs_->parameters.values.data();
-  for( std::size_t iDirtyDial = bounds.beginIndex ; iDirtyDial < bounds.endIndex ; iDirtyDial++ ){
-    const auto dialIndex = _dirtyCachedDialIndices_[iDirtyDial];
-    const auto& dial = propagation.dials[dialIndex];
-    const auto& input = propagation.dialInputs[dial.firstInput];
-    const double inputValue = Semantics::transformDialInput(
-        input, Semantics::loadParameterValue(input, parameterValues)
-    );
-    if( _isCachedDialResponseValid_[dialIndex] and inputValue == _cachedDialInputs_[dialIndex] ){
-      continue;
+  auto update = [&](auto sampled_){
+    for( std::size_t iDirtyDial = bounds.beginIndex ; iDirtyDial < bounds.endIndex ; iDirtyDial++ ){
+      const auto dialIndex = _dirtyCachedDialIndices_[iDirtyDial];
+      const auto& dial = propagation.dials[dialIndex];
+      const auto& input = propagation.dialInputs[dial.firstInput];
+      const double inputValue = Semantics::transformDialInput(
+          input, Semantics::loadParameterValue(input, parameterValues)
+      );
+      if( _isCachedDialResponseValid_[dialIndex] and inputValue == _cachedDialInputs_[dialIndex] ){
+        if constexpr( decltype(sampled_)::value ){ ++probe.get()->unchangedInputs; }
+        continue;
+      }
+      const auto* payload = Semantics::getDialPayload(propagation.dialPayloads.data(), dial);
+      _cachedDialResponses_[dialIndex] = Semantics::evalDialResponseFromInput(dial, inputValue, payload);
+      _cachedDialInputs_[dialIndex] = inputValue;
+      _isCachedDialResponseValid_[dialIndex] = true;
+      if constexpr( decltype(sampled_)::value ){
+        ++probe.get()->evaluatedDials;
+        ++probe.get()->evaluatedDialTypes[std::size_t(dial.type)];
+      }
     }
-    const auto* payload = Semantics::getDialPayload(propagation.dialPayloads.data(), dial);
-    _cachedDialResponses_[dialIndex] = Semantics::evalDialResponseFromInput(dial, inputValue, payload);
-    _cachedDialInputs_[dialIndex] = inputValue;
-    _isCachedDialResponseValid_[dialIndex] = true;
-  }
+  };
+  if( probe.get() != nullptr ){ update(std::true_type{}); }
+  else{ update(std::false_type{}); }
 }
 
 void Backends::CpuBackend::initializeWeightExecution() {
@@ -415,7 +456,9 @@ void Backends::CpuBackend::calculateHistograms(Result& result_) {
   result_.histSums.assign(propagation.totalBins, 0.);
   result_.histSumSquares.assign(propagation.totalBins, 0.);
   _activeResult_ = &result_;
+  if( _profiler_ ){ _profiler_->beginStage(CpuBackendProfiler::Stage::Histograms); }
   _threadPool_.runJob("CpuBackend::calculateHistograms");
+  if( _profiler_ ){ _profiler_->endStage(CpuBackendProfiler::Stage::Histograms); }
   _activeResult_ = nullptr;
 
   for( int iBin = 0 ; iBin < propagation.totalBins ; iBin++ ){
