@@ -1536,7 +1536,7 @@ void DataDispenser::selectLoadThreadCount(){
   const double bestRate = *std::max_element(rates.begin(), rates.end());
   if( bestRate <= 0 ){ return; }
   for( size_t iCandidate = 0; iCandidate < candidates.size(); ++iCandidate ){
-    if( rates[iCandidate] < 0.9 * bestRate ){ continue; }
+    if( rates[iCandidate] < 0.5 * bestRate ){ continue; }
     _nbThreadsForLoad_ = candidates[iCandidate];
     break;
   }
