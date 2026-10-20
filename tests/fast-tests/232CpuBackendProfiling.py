@@ -11,7 +11,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import_module('005PythonSetup-utils').requireVenv(__file__)
 
 
-def run(path, profile):
+def run(path, profile, factor=2):
     import GUNDAM
     helper = import_module('211CpuBackendPropagation')
     output = profile.with_name(f'{profile.stem}-{os.getpid()}{profile.suffix}') if profile is not None else None
@@ -57,7 +57,8 @@ def run(path, profile):
         assert metadata['events'] == 18
         assert metadata['weightScheduling'] == 'Dynamic'
         assert metadata['weightRangesRole'] == 'fixedReference'
-        assert metadata['weightBlockCount'] == metadata['dynamicBlockTarget'] == 8
+        assert metadata['weightBlocksPerThread'] == factor
+        assert metadata['weightBlockCount'] == metadata['dynamicBlockTarget'] == 4 * factor
         assert metadata['weightBlocks'][0]['begin'] == 0
         assert metadata['weightBlocks'][-1]['end'] == 18
         assert all(a['end'] == b['begin'] for a, b in zip(
@@ -84,7 +85,7 @@ def run(path, profile):
                         assert sum(worker['evaluatedDialTypes']) == worker['evaluatedDials']
             assert len(stages['weights']['workers']) == 4
             assert sum(w['weightEvents'] for w in stages['weights']['workers']) == 18
-            assert sum(w['weightBlocks'] for w in stages['weights']['workers']) == 8
+            assert sum(w['weightBlocks'] for w in stages['weights']['workers']) == 4 * factor
             assert len(stages['histograms']['workers']) == 4
     return predictions
 
@@ -109,6 +110,25 @@ def main():
     expected = run(root, None)
     assert expected == run(root, profile)
     assert expected == run(root, profile)
+    key = 'GUNDAM_CPU_DIAGNOSTIC_BLOCKS_PER_THREAD'
+    previous = os.environ.get(key)
+    try:
+        for factor in (3, 4):
+            os.environ[key] = str(factor)
+            assert expected == run(root, profile, factor)
+        for invalid in ('', '0', '-1', '2.5', '5junk', '18446744073709551616'):
+            os.environ[key] = invalid
+            try:
+                run(root, profile)
+            except RuntimeError as error:
+                assert key in str(error)
+            else:
+                raise AssertionError(f'Accepted invalid diagnostic factor: {invalid!r}')
+    finally:
+        if previous is None:
+            os.environ.pop(key, None)
+        else:
+            os.environ[key] = previous
     assert profile.read_text() == 'Existing unsuffixed report must be preserved.\n'
     print('SUCCESS: CPU profiling preserves predictions and exports bounded, flushed cache/worker diagnostics.')
 

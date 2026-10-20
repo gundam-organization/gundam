@@ -538,6 +538,7 @@ PYBIND11_MODULE(GUNDAM, module) {
   .def_readonly("binCandidateCount", &Backends::BackendTimingSummary::binCandidateCount)
   .def_readonly("binContributionCount", &Backends::BackendTimingSummary::binContributionCount)
   .def_readonly("eventWeightsStageSeconds", &Backends::BackendTimingSummary::eventWeightsStageSeconds)
+  .def_readonly("cachedDialStageSeconds", &Backends::BackendTimingSummary::cachedDialStageSeconds)
   .def_readonly("histogramStageSeconds", &Backends::BackendTimingSummary::histogramStageSeconds)
   .def_readonly("externalWeightUploadSeconds", &Backends::BackendTimingSummary::externalWeightUploadSeconds)
   .def_readonly("externalWeightUploadBytes", &Backends::BackendTimingSummary::externalWeightUploadBytes)

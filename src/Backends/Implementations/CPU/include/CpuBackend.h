@@ -116,6 +116,7 @@ ENUM_FIELD( Dynamic )
     struct EventRange { std::size_t begin{0}; std::size_t end{0}; };
     std::vector<EventRange> _weightRanges_{};
     CpuWeightScheduling _weightScheduling_{CpuWeightScheduling::Dynamic};
+    std::size_t _weightBlocksPerThread_{2};
     bool _usesDynamicWeights_{false};
     std::vector<EventRange> _weightBlocks_{};
     alignas(64) std::atomic<std::size_t> _nextWeightBlock_{0};

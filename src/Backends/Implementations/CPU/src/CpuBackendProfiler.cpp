@@ -360,7 +360,8 @@ void Backends::CpuBackend::initializeProfiler() {
       {"eventDialReferences", model.eventDialIndices.size()}, {"cachedDials", _cachedDialCount_},
       {"weightSchedulingRequested", _weightScheduling_.toString()},
       {"weightScheduling", _usesDynamicWeights_ ? "Dynamic" : "Fixed"},
-      {"dynamicBlockTarget", 2 * _threadPool_.getNbThreads()},
+      {"weightBlocksPerThread", _weightBlocksPerThread_},
+      {"dynamicBlockTarget", _weightBlocksPerThread_ * _threadPool_.getNbThreads()},
       {"weightRangesRole", _usesDynamicWeights_ ? "fixedReference" : "executed"},
       {"histogramBins", model.totalBins}, {"dialTypes", {"Norm", "Shift", "CompactSpline", "UniformSpline",
         "MonotonicSpline", "GeneralSpline", "Graph", "ExternalWeight"}}};

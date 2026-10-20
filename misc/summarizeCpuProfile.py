@@ -48,6 +48,11 @@ def summarize(path, include_startup=False):
               f'event/dial references={metadata["eventDialReferences"]:,}')
         print(f'Samples={len(samples)} ({len(all_samples)} including startup); '
               f'commit={metadata["commit"]}; compiler={metadata["compiler"]}')
+        if 'weightScheduling' in metadata:
+            details = (f'block size={metadata["weightBlockSize"]} events'
+                       if 'weightBlockSize' in metadata else f'work blocks={metadata["weightBlockCount"]}')
+            print(f'Weight scheduling={metadata["weightScheduling"]} '
+                  f'(requested {metadata["weightSchedulingRequested"]}); {details}')
         allowed = metadata['system'].get('allowedCpus')
         if allowed is not None:
             print(f'Allowed logical CPUs ({len(allowed)}): {allowed}')
@@ -78,7 +83,10 @@ def summarize(path, include_startup=False):
                     continue
                 cpus = sorted({w[key] for w in workers for key in ('cpuAtStart', 'cpuAtEnd') if w[key] is not None})
                 print(f'  {thread:2d}: work {milliseconds(median(w["wallSeconds"] for w in workers))}, '
-                      f'CPU {milliseconds(median(w["cpuSeconds"] for w in workers))}, CPUs={cpus or "unavailable"}')
+                      f'CPU {milliseconds(median(w["cpuSeconds"] for w in workers))}, CPUs={cpus or "unavailable"}'
+                      + (f'; median events={median(w["weightEvents"] for w in workers):g}, '
+                         f'blocks={median(w["weightBlocks"] for w in workers):g}'
+                         if name == 'weights' and 'weightEvents' in workers[0] else ''))
             if name == 'cache':
                 evaluated = [sum(w['evaluatedDials'] for w in s['workers']) for s in stage_samples]
                 skipped = [sum(w['unchangedInputs'] for w in s['workers']) for s in stage_samples]

@@ -6,7 +6,10 @@
 #include "Logger.h"
 
 #include <algorithm>
+#include <charconv>
 #include <chrono>
+#include <cstdlib>
+#include <limits>
 #include <type_traits>
 #include <utility>
 
@@ -402,7 +405,19 @@ void Backends::CpuBackend::initializeWeightExecution() {
     work += 1 + event.dialCount;
   }
   const auto threads = std::size_t(_threadPool_.getNbThreads());
-  const auto blockTarget = 2 * threads;
+  _weightBlocksPerThread_ = 2;
+  // Diagnostic-only override for controlled benchmarks; normal fits retain
+  // the automatic policy without a numeric configuration option.
+  if( const auto* diagnostic = std::getenv("GUNDAM_CPU_DIAGNOSTIC_BLOCKS_PER_THREAD") ){
+    const std::string value(diagnostic);
+    const auto parsed = std::from_chars(value.data(), value.data() + value.size(), _weightBlocksPerThread_);
+    LogThrowIf(parsed.ec != std::errc{} or parsed.ptr != value.data() + value.size()
+               or _weightBlocksPerThread_ == 0
+               or _weightBlocksPerThread_ > std::numeric_limits<std::size_t>::max() / threads,
+               "GUNDAM_CPU_DIAGNOSTIC_BLOCKS_PER_THREAD must be a positive integer without overflow.");
+    LogWarning << "CPU diagnostic block factor override: " << _weightBlocksPerThread_ << std::endl;
+  }
+  const auto blockTarget = _weightBlocksPerThread_ * threads;
   _usesDynamicWeights_ = _weightScheduling_ == CpuWeightScheduling::Dynamic
                         and threads > 1 and model.eventWeights.size() >= blockTarget;
   _weightWorkerStats_.assign(threads, {});
