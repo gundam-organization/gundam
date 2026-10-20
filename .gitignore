@@ -52,3 +52,6 @@ work/
 *.exe
 *.out
 *.app
+
+# Benchmarks
+*benchmark*
