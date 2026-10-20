@@ -111,6 +111,21 @@ namespace {
     for( const auto* path : {"/proc/cpuinfo", "/proc/self/status", "/proc/self/cgroup", "/proc/self/mountinfo",
                              "/proc/self/numa_maps", "/sys/devices/system/node/online",
                              "/sys/devices/system/cpu/smt/active"} ){ addFile(files, path); }
+    std::istringstream nodes(readFile("/sys/devices/system/node/online"));
+    std::string range;
+    while( std::getline(nodes, range, ',') ){
+      std::istringstream bounds(range);
+      int first{-1}, last{-1};
+      if( not (bounds >> first) or first < 0 ){ continue; }
+      last = first;
+      if( bounds.peek() == '-' ){ bounds.get(); bounds >> last; }
+      if( last < first or last > 4095 ){ continue; }
+      for( int node = first; node <= last; ++node ){
+        const auto root = "/sys/devices/system/node/node" + std::to_string(node);
+        addFile(files, root + "/cpulist");
+        addFile(files, root + "/distance");
+      }
+    }
     const int cpu = sched_getcpu();
     if( cpu >= 0 ){
       const std::string root = "/sys/devices/system/cpu/cpu" + std::to_string(cpu);
@@ -186,6 +201,18 @@ Backends::CpuBackendProfiler::CpuBackendProfiler(const std::string& path_, std::
   if( not _output_ ){ throw std::runtime_error("Cannot open CPU profile output: " + path_); }
   for( auto& workers : _workers_ ){ workers.resize(threads_); }
   auto system = systemMetadata();
+  // Discover readable CPU accounting files once. Memory/NUMA accounting and
+  // repeated discovery can be expensive on large batch nodes.
+  std::set<std::string> cpuStatPaths;
+  for( auto it = system["cgroupFiles"].begin(); it != system["cgroupFiles"].end(); ++it ){
+    auto path = it.key();
+    if( path.size() < 9 or path.substr(path.size() - 9) != "/cpu.stat" ){ continue; }
+    std::size_t duplicate;
+    while( (duplicate = path.find("//")) != std::string::npos ){ path.erase(duplicate, 1); }
+    cpuStatPaths.insert(path);
+  }
+  _cgroupCpuStatPaths_.assign(cpuStatPaths.begin(), cpuStatPaths.end());
+  metadata_["fullSystemSnapshotEverySamples"] = 50;
   _runId_ = std::to_string(std::chrono::system_clock::now().time_since_epoch().count())
             + "-" + std::to_string(system.value("pid", 0));
   metadata_["profileStartedUnixSeconds"] = std::chrono::duration<double>(
@@ -279,15 +306,28 @@ void Backends::CpuBackendProfiler::end(const BackendTimingSummary& timing_) {
       {"variables", timing_.variableStageSeconds}, {"binning", timing_.binningStageSeconds},
       {"likelihood", timing_.likelihoodHostSeconds}};
 #ifdef __linux__
+  // Heavy memory accounting is deliberately sparse. On large nodes, a full
+  // export was observed to cost hundreds of milliseconds, outside the kernel
+  // timers but still delaying the fit. Keep CPU throttling counters frequent.
+  const bool fullSnapshot = _samples_ == 0 or _samples_ == 5 or (_samples_ + 1) % 50 == 0;
+  out["systemSnapshot"] = fullSnapshot ? "full" : "light";
+  auto readStart = Clock::now();
   Json files = Json::object();
-  for( const auto* path : {"/proc/self/status", "/proc/self/smaps_rollup", "/proc/pressure/cpu", "/proc/pressure/memory"} ){
+  for( const auto* path : {"/proc/self/status", "/proc/pressure/cpu", "/proc/pressure/memory"} ){
     addFile(files, path);
   }
-  // The sixth sampled call is after the startup samples and captures placement
-  // after the weight/histogram buffers have been touched by their workers.
+  if( fullSnapshot ){ addFile(files, "/proc/self/smaps_rollup"); }
   if( _samples_ == 0 or _samples_ == 5 ){ addFile(files, "/proc/self/numa_maps"); }
   out["systemFiles"] = std::move(files);
-  out["cgroupFiles"] = cgroupFiles();
+  out["exportReadSeconds"]["processFiles"] = std::chrono::duration<double>(Clock::now() - readStart).count();
+  readStart = Clock::now();
+  Json cgroups = Json::object();
+  if( fullSnapshot ){ cgroups = cgroupFiles(); }
+  else{
+    for( const auto& path : _cgroupCpuStatPaths_ ){ addFile(cgroups, path); }
+  }
+  out["cgroupFiles"] = std::move(cgroups);
+  out["exportReadSeconds"]["cgroupFiles"] = std::chrono::duration<double>(Clock::now() - readStart).count();
 #endif
   write(std::move(out));
   _previousExportSeconds_ = std::chrono::duration<double>(Clock::now() - end.wall).count();
@@ -321,7 +361,9 @@ void Backends::CpuBackend::initializeProfiler() {
 #endif
   Json buffers = Json::object();
   auto buffer = [&](const std::string& name_, const auto& values_){
-    buffers[name_] = {{"elements", values_.size()}, {"elementBytes", sizeof(typename std::decay_t<decltype(values_)>::value_type)},
+    std::ostringstream address;
+    address << static_cast<const void*>(values_.data());
+    buffers[name_] = {{"dataAddress", address.str()}, {"elements", values_.size()}, {"elementBytes", sizeof(typename std::decay_t<decltype(values_)>::value_type)},
         {"sizeBytes", values_.size() * sizeof(values_[0])}, {"capacityBytes", values_.capacity() * sizeof(values_[0])}};
   };
   buffer("eventMetadata", model.events);

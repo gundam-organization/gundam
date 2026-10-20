@@ -57,6 +57,7 @@ namespace Backends {
     void write(Json record_);
     std::ofstream _output_{};
     std::string _runId_{};
+    std::vector<std::string> _cgroupCpuStatPaths_{};
     std::size_t _interval_{100}, _maxSamples_{200}, _samples_{0};
     bool _active_{false};
     std::uint64_t _call_{0};
