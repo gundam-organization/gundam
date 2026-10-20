@@ -34,8 +34,8 @@ namespace Backends {
 
     void setLikelihoodInterfacePtr(LikelihoodInterface* likelihoodInterfacePtr_){ _likelihoodInterfacePtr_ = likelihoodInterfacePtr_; }
 
-    [[nodiscard]] const EngineLayout& getEngineLayout() const { return _backendEngineLayout_; }
-    [[nodiscard]] const EngineView& getEngineView() const { return _backendEngineLayout_.view; }
+    [[nodiscard]] const EngineLayout& getEngineLayout() const { return *_backendEngineLayout_; }
+    [[nodiscard]] const EngineView& getEngineView() const { return _backendEngineLayout_->view; }
     [[nodiscard]] double getLastPreparationSeconds() const { return _lastPreparationSeconds_; }
     [[nodiscard]] bool isEnabled() const { return _isEnabled_; }
     [[nodiscard]] bool isAutoMaterializeEnabled() const { return _enableAutoMaterialize_; }
@@ -71,7 +71,7 @@ namespace Backends {
         OutputRequest::StatLikelihood,
     };
     LikelihoodInterface* _likelihoodInterfacePtr_{nullptr};
-    EngineLayout _backendEngineLayout_{};
+    std::shared_ptr<EngineLayout> _backendEngineLayout_{std::make_shared<EngineLayout>()};
     std::unique_ptr<Backend> _backend_{nullptr};
     PropagationToken _lastPropagationToken_{};
     std::shared_ptr<bool> _hostBinningChanged_{};

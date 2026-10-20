@@ -12,6 +12,7 @@
 
 #include <cstdint>
 #include <exception>
+#include <memory>
 #include <vector>
 
 namespace Backends {
@@ -23,9 +24,10 @@ namespace Backends {
     [[nodiscard]] std::string getName() const override { return "CPU"; }
     [[nodiscard]] BackendCapabilities getCapabilities() const override;
     [[nodiscard]] PropagationStatus getStatus(const PropagationToken& token_) const override;
-    [[nodiscard]] const EngineView& getEngineView() const override { return _engineView_; }
+    [[nodiscard]] const EngineView& getEngineView() const override { return *_engineView_; }
 
     void build(const EngineView& engineView_) override;
+    void buildShared(std::shared_ptr<const EngineView> engineView_) override;
     PropagationToken requestPropagation(const PropagationInputs& inputs_) override;
 
     bool isReady(const PropagationToken& token_) const override;
@@ -39,6 +41,7 @@ namespace Backends {
     [[nodiscard]] const std::vector<double>& getOutsideSumsHostView(const PropagationToken& token_) const override;
     [[nodiscard]] const std::vector<double>& getOutsideSumSquaresHostView(const PropagationToken& token_) const override;
     [[nodiscard]] BackendTimingSummary getLastTimingSummary() const override { return _lastTiming_; }
+    [[nodiscard]] BackendTimingTotals getTimingTotals() const override { return _timingTotals_; }
 
   private:
     using Result = PropagationResult;
@@ -46,6 +49,9 @@ namespace Backends {
     [[nodiscard]] bool isCurrentToken(const PropagationToken& token_) const;
     void initializeThreads();
     void initializeDialResponseCache();
+    void initializeWeightExecution();
+    template<bool allResponsesCached, bool useReweightCap>
+    void calculateEventWeightsKernel(int iThread_);
     void resetResult();
     void updateCachedDialResponses(const PropagationInputs& inputs_);
     void updateCachedDialResponsesThread(int iThread_);
@@ -74,9 +80,9 @@ namespace Backends {
     std::vector<std::uint8_t> _validBinning_{};
     EventStateCache _eventStateCache_{};
     std::size_t _cachedContributionCount_{0};
-    GenericToolbox::Time::AveragedTimer<10> _variableStageTimer_{};
-    GenericToolbox::Time::AveragedTimer<10> _binningStageTimer_{};
-    EngineView _engineView_{};
+    GenericToolbox::Time::Timer _variableStageTimer_{};
+    GenericToolbox::Time::Timer _binningStageTimer_{};
+    std::shared_ptr<const EngineView> _engineView_{std::make_shared<EngineView>()};
     Result _lastResult_{};
     GenericToolbox::ParallelWorker _threadPool_{};
     Result* _activeResult_{nullptr};
@@ -91,10 +97,17 @@ namespace Backends {
     bool _isDialResponseCachePrimed_{false};
     std::vector<std::vector<double>> _threadHistogramSums_{};
     std::vector<std::vector<double>> _threadHistogramSumSquares_{};
-    GenericToolbox::Time::AveragedTimer<10> _cachedDialStageTimer_{};
-    GenericToolbox::Time::AveragedTimer<10> _eventWeightsStageTimer_{};
-    GenericToolbox::Time::AveragedTimer<10> _histogramStageTimer_{};
-    GenericToolbox::Time::AveragedTimer<10> _likelihoodHostTimer_{};
+    GenericToolbox::Time::Timer _cachedDialStageTimer_{};
+    GenericToolbox::Time::Timer _eventWeightsStageTimer_{};
+    GenericToolbox::Time::Timer _histogramStageTimer_{};
+    GenericToolbox::Time::Timer _likelihoodHostTimer_{};
+    struct EventRange { std::size_t begin{0}; std::size_t end{0}; };
+    std::vector<EventRange> _weightRanges_{};
+    using WeightJob = void (CpuBackend::*)(int);
+    WeightJob _weightJob_{nullptr};
+    std::size_t _cachedDialCount_{0};
+    bool _requiresEventBinning_{false};
+    BackendTimingTotals _timingTotals_{};
     BackendTimingSummary _lastTiming_{};
     std::uint64_t _nextTokenId_{1};
     bool _isBuilt_{false};

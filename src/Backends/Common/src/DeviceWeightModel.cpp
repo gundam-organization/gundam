@@ -129,9 +129,9 @@ bool Backends::packDeviceWeightModel(const PropagationView& model_,
     if( event.globalBinIndex < 0 or event.globalBinIndex >= model_.totalBins ){
       return fail("at least one event has an invalid global bin index.");
     }
-    for( std::size_t iDial = 0 ; iDial < event.weight.dialCount ; iDial++ ){
+    for( std::size_t iDial = 0 ; iDial < model_.eventWeights.at(event.resultIndex).dialCount ; iDial++ ){
       processedDialRefs++;
-      const auto& eventDial = model_.dials[model_.eventDialIndices[event.weight.firstDial + iDial]];
+      const auto& eventDial = model_.dials[model_.eventDialIndices[model_.eventWeights.at(event.resultIndex).firstDial + iDial]];
       if( eventDial.type == BackendDialType::Shift ){
         shiftCount++;
         continue;
@@ -335,7 +335,7 @@ bool Backends::packDeviceWeightModel(const PropagationView& model_,
   processedDialRefs = 0;
   for( std::size_t iEvent = 0 ; iEvent < model_.events.size() ; iEvent++ ){
     const auto& event = model_.events[iEvent];
-    packedModel_.baseWeights[event.resultIndex] = float(event.weight.baseWeight);
+    packedModel_.baseWeights[event.resultIndex] = float(model_.eventWeights.at(event.resultIndex).baseWeight);
     packedModel_.globalBins[event.resultIndex] = event.globalBinIndex;
     eventsPerBin[event.globalBinIndex]++;
     auto& eventRanges = packedModel_.eventDialRanges[event.resultIndex];
@@ -346,9 +346,9 @@ bool Backends::packDeviceWeightModel(const PropagationView& model_,
     eventRanges.generalOffset = std::uint32_t(packedModel_.generalDialIndices.size());
     eventRanges.externalOffset = std::uint32_t(packedModel_.externalDialOccurrences.size());
     eventRanges.graphOffset = std::uint32_t(packedModel_.graphDialIndices.size());
-    for( std::size_t iDial = 0 ; iDial < event.weight.dialCount ; iDial++ ){
+    for( std::size_t iDial = 0 ; iDial < model_.eventWeights.at(event.resultIndex).dialCount ; iDial++ ){
       processedDialRefs++;
-      const auto& eventDial = model_.dials[model_.eventDialIndices[event.weight.firstDial + iDial]];
+      const auto& eventDial = model_.dials[model_.eventDialIndices[model_.eventWeights.at(event.resultIndex).firstDial + iDial]];
       if( eventDial.type == BackendDialType::Shift ){
         LogThrowIf(eventDial.payloadSize < 1, "Internal device packing error: Shift dial payload is empty.");
         packedModel_.baseWeights[event.resultIndex] *= float(Semantics::clampDialResponse(eventDial, model_.dialPayloads.at(eventDial.payloadOffset)));

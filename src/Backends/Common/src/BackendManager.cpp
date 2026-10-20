@@ -102,8 +102,8 @@ void Backends::BackendManager::materialize(OutputRequest outputRequest_) {
     case OutputRequest::EventState: {
       const auto& state = backend->getEventStateHostView(_lastPropagationToken_);
       if( _lastMaterializedStateRevision_ == state.revision ){ return; }
-      const auto& model = _backendEngineLayout_.view.propagation;
-      const auto& bindings = _backendEngineLayout_.bindings;
+      const auto& model = _backendEngineLayout_->view.propagation;
+      const auto& bindings = _backendEngineLayout_->bindings;
       LogThrowIf(state.variables.size() != model.variableValues.size() or state.bins.size() != model.events.size()
                  or state.contributions.size() != model.events.size(), "Backend event state size mismatch.");
       for( const auto& binding : bindings.variables ){
@@ -153,8 +153,8 @@ void Backends::BackendManager::materialize(OutputRequest outputRequest_) {
     }
     case OutputRequest::EventWeights: {
       const auto& eventWeights = backend->getEventWeightsHostView(_lastPropagationToken_);
-      const auto& model = _backendEngineLayout_.view.propagation;
-      const auto& eventBindings = _backendEngineLayout_.bindings.events;
+      const auto& model = _backendEngineLayout_->view.propagation;
+      const auto& eventBindings = _backendEngineLayout_->bindings.events;
       LogThrowIf(eventWeights.size() != model.events.size(), "Event weights host view size mismatch.");
       LogThrowIf(eventBindings.size() != model.events.size(), "Event bindings size mismatch.");
       for( std::size_t iEvent = 0 ; iEvent < model.events.size() ; iEvent++ ){
@@ -167,8 +167,8 @@ void Backends::BackendManager::materialize(OutputRequest outputRequest_) {
     }
 
     case OutputRequest::Histograms: {
-      const auto& model = _backendEngineLayout_.view.propagation;
-      const auto& sampleBindings = _backendEngineLayout_.bindings.samples;
+      const auto& model = _backendEngineLayout_->view.propagation;
+      const auto& sampleBindings = _backendEngineLayout_->bindings.samples;
       const auto& histSums = backend->getHistogramSumsHostView(_lastPropagationToken_);
       const auto& histSumSquares = backend->getHistogramSumSquaresHostView(_lastPropagationToken_);
       const auto& outsideSums = backend->getOutsideSumsHostView(_lastPropagationToken_);
@@ -228,13 +228,14 @@ void Backends::BackendManager::initializeImpl() {
   LogThrowIf(_likelihoodInterfacePtr_ == nullptr, "BackendsManager requires a LikelihoodInterface before initialize().");
 
   LogInfo << "Initializing propagation backend: " << _type_ << std::endl;
-  _backendEngineLayout_.build(*_likelihoodInterfacePtr_);
+  _backendEngineLayout_ = std::make_shared<EngineLayout>();
+  _backendEngineLayout_->build(*_likelihoodInterfacePtr_);
   _lastMaterializedStateRevision_ = 0;
   _lastMaterializedVariableRevision_ = 0;
   _lastMaterializedSampleRevisions_.clear();
   _binningUpdateListeners_.clear();
   _hostBinningChanged_ = std::make_shared<bool>(false);
-  for( const auto& binding : _backendEngineLayout_.bindings.samples ){
+  for( const auto& binding : _backendEngineLayout_->bindings.samples ){
     _binningUpdateListeners_.push_back(binding.sample->addBinningUpdateListener(
         [changed = _hostBinningChanged_]{ *changed = true; }));
   }
@@ -250,7 +251,7 @@ void Backends::BackendManager::initializeImpl() {
   _backend_ = makeBackend(*this);
   LogThrowIf(_backend_ == nullptr, "Could not create propagation backend.");
   _backend_->configure(_backendConfig_);
-  _backend_->build(_backendEngineLayout_.view);
+  _backend_->buildShared(std::shared_ptr<const EngineView>(_backendEngineLayout_, &_backendEngineLayout_->view));
 }
 
 std::future<Backends::BackendPropagationResult> Backends::BackendManager::propagate() {
@@ -265,25 +266,25 @@ std::future<Backends::BackendPropagationResult> Backends::BackendManager::propag
 
   Backends::PropagationInputs inputs;
   auto& snapshot = inputs.parameters;
-  snapshot.values.reserve(_backendEngineLayout_.bindings.parameters.size());
-  for( const auto& binding : _backendEngineLayout_.bindings.parameters ){
+  snapshot.values.reserve(_backendEngineLayout_->bindings.parameters.size());
+  for( const auto& binding : _backendEngineLayout_->bindings.parameters ){
     LogThrowIf(binding.parameter == nullptr, "Null parameter binding while building backend snapshot.");
     snapshot.values.emplace_back(binding.parameter->getParameterValue());
   }
 
-  inputs.externalWeights.reserve(_backendEngineLayout_.bindings.externalWeights.size());
-  for( std::size_t iBlock = 0; iBlock < _backendEngineLayout_.bindings.externalWeights.size(); ++iBlock ){
-    const auto& source = _backendEngineLayout_.bindings.externalWeights[iBlock];
-    const auto& layout = _backendEngineLayout_.view.propagation.externalWeightBlocks[iBlock];
+  inputs.externalWeights.reserve(_backendEngineLayout_->bindings.externalWeights.size());
+  for( std::size_t iBlock = 0; iBlock < _backendEngineLayout_->bindings.externalWeights.size(); ++iBlock ){
+    const auto& source = _backendEngineLayout_->bindings.externalWeights[iBlock];
+    const auto& layout = _backendEngineLayout_->view.propagation.externalWeightBlocks[iBlock];
     inputs.externalWeights.push_back({source->data(), source->size(), layout.offset, source->getGeneration()});
   }
-  const auto& model = _backendEngineLayout_.view.propagation;
+  const auto& model = _backendEngineLayout_->view.propagation;
   inputs.forceBinningUpdate = *_hostBinningChanged_;
-  inputs.variableInputRevisions.reserve(_backendEngineLayout_.bindings.variableInputBuffers.size());
-  for( const auto* buffer : _backendEngineLayout_.bindings.variableInputBuffers ){
+  inputs.variableInputRevisions.reserve(_backendEngineLayout_->bindings.variableInputBuffers.size());
+  for( const auto* buffer : _backendEngineLayout_->bindings.variableInputBuffers ){
     inputs.variableInputRevisions.emplace_back(buffer->getRevision());
   }
-  const auto& variableBindings = _backendEngineLayout_.bindings.variables;
+  const auto& variableBindings = _backendEngineLayout_->bindings.variables;
   if( handlesEventState and (inputs.forceBinningUpdate
       or std::any_of(variableBindings.begin(), variableBindings.end(), [](const auto& binding_){ return binding_.readFromHost; })) ){
     inputs.hostVariables = model.variableValues;

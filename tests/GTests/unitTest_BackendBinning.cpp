@@ -67,10 +67,12 @@ namespace {
     model.totalBins = sample.binCount;
     model.variableValues = {0, 0, 0};
     EventView event;
+    BackendEventWeightDescriptor eventWeight;
     event.samplePosition = 0;
     event.variableCount = 3;
-    event.weight.baseWeight = -2.; // Fractional sum-of-squares with negative weights.
+    eventWeight.baseWeight = -2.; // Fractional sum-of-squares with negative weights.
     model.events = {event};
+    model.eventWeights = {eventWeight};
     Event hostEvent;
     hostEvent.getVariables().setVarNameList(sample.variableNames);
     backend.build(view);
@@ -167,15 +169,17 @@ TEST_P(BinningBackend, GridSearchAndCacheInvalidation) {
   model.variableDialIndices = {0};
   for( std::size_t i = 0; i < 2; ++i ){
     EventView event;
+    BackendEventWeightDescriptor eventWeight;
     event.samplePosition = 0;
     event.firstVariable = i;
     event.variableCount = 1;
     event.firstVariableResponse = i;
     event.variableResponseCount = 1;
     event.resultIndex = i;
-    event.weight.firstDial = 0;
-    event.weight.dialCount = 1;
+    eventWeight.firstDial = 0;
+    eventWeight.dialCount = 1;
     model.events.emplace_back(event);
+    model.eventWeights.emplace_back(eventWeight);
     BackendVariableResponseDescriptor target;
     target.variableIndex = i;
     target.referenceValue = model.variableValues[i];
@@ -270,9 +274,11 @@ TEST_P(BinningBackend, NonfiniteResponseCanBeRetried) {
   model.totalBins = sample.binCount;
   model.variableValues = {.25, .5, 0.};
   EventView event;
+  BackendEventWeightDescriptor eventWeight;
   event.samplePosition = 0;
   event.variableCount = 3;
   model.events = {event};
+  model.eventWeights = {eventWeight};
   auto& backend = *this->backend;
   backend.build(view);
   PropagationInputs inputs;
@@ -320,10 +326,12 @@ TEST_P(BinningBackend, ExternalVariableResponseUsesPublishedGeneration) {
   target.overrideDial = 0;
   model.variableResponses = {target};
   EventView event;
+  BackendEventWeightDescriptor eventWeight;
   event.samplePosition = 0;
   event.variableCount = event.variableResponseCount = 1;
-  event.weight.dialCount = 1;
+  eventWeight.dialCount = 1;
   model.events = {event};
+  model.eventWeights = {eventWeight};
   auto& backend = *this->backend;
   backend.build(view);
   double value{.25}, weightValue{1.};
@@ -419,11 +427,13 @@ TEST_P(BinningBackend, VariableAndWeightDialsShareSemantics) {
   target.addDialCount = 1;
   model.variableResponses = {target};
   EventView event;
+  BackendEventWeightDescriptor eventWeight;
   event.samplePosition = 0;
   event.variableCount = event.variableResponseCount = 1;
-  event.weight.dialCount = model.eventDialIndices.size();
-  event.weight.baseWeight = -2.;
+  eventWeight.dialCount = model.eventDialIndices.size();
+  eventWeight.baseWeight = -2.;
   model.events = {event};
+  model.eventWeights = {eventWeight};
   double externalValue{.2};
   PropagationInputs inputs;
   inputs.externalWeights = {{&externalValue, 1, 0, 1}};
@@ -474,9 +484,11 @@ TEST_P(BinningBackend, ResolvesNeighborsOfAnExactBoundary) {
   sample.binning.bins = {{0, 0, 1}, {1, 1, 1}};
   model.samples = {sample};
   EventView event;
+  BackendEventWeightDescriptor eventWeight;
   event.samplePosition = 0;
   event.variableCount = 1;
   model.events = {event};
+  model.eventWeights = {eventWeight};
   backend->build(view);
   PropagationInputs inputs;
   for( double value : {std::nextafter(1., 0.), 1., std::nextafter(1., 2.)} ){

@@ -133,10 +133,10 @@ void Backends::DevicePropagationModel::build(const PropagationView& model_) {
   for( const auto& event : model_.events ){
     std::size_t sample = event.samplePosition < model_.samples.size() ? event.samplePosition : model_.samples.size();
     std::size_t capacity = sample < capacities.size() ? capacities[sample] : 1;
-    DevicePropagationEvent packed{index(event.weight.firstDial), index(event.weight.dialCount), index(event.firstVariable),
+    DevicePropagationEvent packed{index(model_.eventWeights.at(event.resultIndex).firstDial), index(model_.eventWeights.at(event.resultIndex).dialCount), index(event.firstVariable),
       index(event.variableCount), index(event.firstVariableResponse), index(event.variableResponseCount), index(sample),
       contributionCapacity, index(capacity), sample == model_.samples.size() ? event.globalBinIndex : event.binIndex,
-      float(scalar(event.weight.baseWeight))};
+      float(scalar(model_.eventWeights.at(event.resultIndex).baseWeight))};
     contributionCapacity = index(std::size_t(contributionCapacity) + capacity);
     // Device outputs are indexed consistently with resultIndex on every backend.
     if( event.resultIndex != events.size() ){ throw std::runtime_error("Device propagation requires contiguous event result indices."); }

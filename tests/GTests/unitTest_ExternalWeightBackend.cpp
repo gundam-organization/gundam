@@ -45,11 +45,13 @@ namespace {
     model.eventDialIndices = {0, 1, 2, 1, 0, 3};
     for( std::size_t iEvent = 0; iEvent < 3; ++iEvent ){
       EventView event;
+      BackendEventWeightDescriptor eventWeight;
       event.resultIndex = iEvent;
       event.globalBinIndex = iEvent == 2 ? 1 : 0;
-      event.weight.firstDial = iEvent == 0 ? 0 : (iEvent == 1 ? 3 : 4);
-      event.weight.dialCount = iEvent == 0 ? 3 : (iEvent == 1 ? 1 : 2);
+      eventWeight.firstDial = iEvent == 0 ? 0 : (iEvent == 1 ? 3 : 4);
+      eventWeight.dialCount = iEvent == 0 ? 3 : (iEvent == 1 ? 1 : 2);
       model.events.emplace_back(event);
+      model.eventWeights.emplace_back(eventWeight);
     }
     LikelihoodSampleView sample;
     sample.dataSums = {0., 0.};
@@ -116,12 +118,12 @@ namespace {
     model.propagation.parameterCount = 0;
     model.propagation.dialInputs.clear();
     model.propagation.eventDialIndices = {1, 2, 1, 3};
-    model.propagation.events[0].weight.firstDial = 0;
-    model.propagation.events[0].weight.dialCount = 2;
-    model.propagation.events[1].weight.firstDial = 2;
-    model.propagation.events[1].weight.dialCount = 1;
-    model.propagation.events[2].weight.firstDial = 3;
-    model.propagation.events[2].weight.dialCount = 1;
+    model.propagation.eventWeights[0].firstDial = 0;
+    model.propagation.eventWeights[0].dialCount = 2;
+    model.propagation.eventWeights[1].firstDial = 2;
+    model.propagation.eventWeights[1].dialCount = 1;
+    model.propagation.eventWeights[2].firstDial = 3;
+    model.propagation.eventWeights[2].dialCount = 1;
     inputs.parameters.values.clear();
     backend_.build(model);
     checkPropagation(backend_, inputs, {0., 1.5, 0.5}, device_, 2, 3);

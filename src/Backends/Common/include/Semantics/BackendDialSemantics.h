@@ -28,13 +28,14 @@ namespace Backends::Semantics {
   inline double evalEventWeight(const PropagationView& propagation_,
                                 const EventView& eventRef_,
                                 const PropagationInputs& inputs_) {
+    const auto& weightRef = propagation_.eventWeights[eventRef_.resultIndex];
     double weight = 1.;
-    for( std::size_t iDial = 0; iDial < eventRef_.weight.dialCount; ++iDial ){
-      const auto& dial = propagation_.dials[propagation_.eventDialIndices[eventRef_.weight.firstDial + iDial]];
+    for( std::size_t iDial = 0; iDial < weightRef.dialCount; ++iDial ){
+      const auto& dial = propagation_.dials[propagation_.eventDialIndices[weightRef.firstDial + iDial]];
       weight *= evalDialResponse(propagation_, dial, inputs_);
     }
     if( propagation_.hasReweightCap and weight > propagation_.maxReweight ){ weight = propagation_.maxReweight; }
-    return eventRef_.weight.baseWeight * weight;
+    return weightRef.baseWeight * weight;
   }
 
 }

@@ -17,7 +17,6 @@ namespace Backends {
     int sampleIndex{-1};
     int binIndex{-1};
     int globalBinIndex{-1};
-    BackendEventWeightDescriptor weight{};
     std::size_t resultIndex{0};
     std::size_t samplePosition{std::size_t(-1)};
     std::size_t firstVariable{0};
@@ -45,6 +44,8 @@ namespace Backends {
 
   struct PropagationView {
     std::vector<EventView> events{};
+    // Hot reweight data, indexed by EventView::resultIndex. Stored only once.
+    std::vector<BackendEventWeightDescriptor> eventWeights{};
     // Each dial is stored once. Events reference their dial occurrences through
     // eventDialIndices, using EventWeightDescriptor::firstDial/dialCount.
     std::vector<BackendDialDescriptor> dials{};
@@ -73,6 +74,7 @@ namespace Backends {
 
     void clear() {
       events.clear();
+      eventWeights.clear();
       dials.clear();
       eventDialIndices.clear();
       dialInputs.clear();

@@ -11,11 +11,11 @@
 
 double Backends::CpuBackend::evalResponse(std::size_t dial_) const {
   return _isCachedDial_[dial_] ? _cachedDialResponses_[dial_]
-      : Semantics::evalDialResponse(_engineView_.propagation, _engineView_.propagation.dials[dial_], *_activeInputs_);
+      : Semantics::evalDialResponse(_engineView_->propagation, _engineView_->propagation.dials[dial_], *_activeInputs_);
 }
 
 void Backends::CpuBackend::updateEventState(const PropagationInputs& inputs_) {
-  const auto& model = _engineView_.propagation;
+  const auto& model = _engineView_->propagation;
   _activeInputs_ = &inputs_;
   _eventStateCache_.prepare(inputs_);
   if( not _eventStateCache_.needsUpdate(inputs_) ){
@@ -49,7 +49,7 @@ void Backends::CpuBackend::updateEventState(const PropagationInputs& inputs_) {
 }
 
 void Backends::CpuBackend::updateEventVariablesThread(int iThread_) {
-  const auto& model = _engineView_.propagation;
+  const auto& model = _engineView_->propagation;
   const auto& inputs = *_activeInputs_;
   auto bounds = GenericToolbox::ParallelWorker::getThreadBoundIndices(iThread_, _threadPool_.getNbThreads(), model.events.size());
   for( std::size_t iEvent = bounds.beginIndex; iEvent < bounds.endIndex; ++iEvent ){
@@ -78,7 +78,7 @@ void Backends::CpuBackend::updateEventVariablesThread(int iThread_) {
 }
 
 void Backends::CpuBackend::updateEventBinningThread(int iThread_) {
-  const auto& model = _engineView_.propagation;
+  const auto& model = _engineView_->propagation;
   auto& worker = _binningWorkers_[iThread_];
   worker.rebinnedEvents = worker.candidatesTested = 0;
   worker.changedSamples.assign(model.samples.size(), false);

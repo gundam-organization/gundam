@@ -69,6 +69,7 @@ namespace {
     }
 
     propagation.events.reserve(eventDialCache.getCache().size());
+    propagation.eventWeights.reserve(eventDialCache.getCache().size());
     std::unordered_map<const Parameter*, std::size_t> parameterIndexMap{};
     for( std::size_t i = 0; i < bindings_.parameters.size(); ++i ){
       parameterIndexMap.emplace(bindings_.parameters[i].parameter, i);
@@ -82,13 +83,14 @@ namespace {
       if( cacheEntry.event == nullptr ){ continue; }
 
       Backends::EventView eventRef;
+      Backends::BackendEventWeightDescriptor weightRef;
       eventRef.sampleIndex = cacheEntry.event->getIndices().sample;
       eventRef.binIndex = cacheEntry.event->getIndices().bin;
       eventRef.samplePosition = samplePositionMap.at(eventRef.sampleIndex);
       const auto& sample = propagation.samples.at(eventRef.samplePosition);
       eventRef.globalBinIndex = eventRef.binIndex < 0 ? -1 : sample.binOffset + eventRef.binIndex;
-      eventRef.weight.baseWeight = cacheEntry.event->getWeights().base;
-      eventRef.weight.firstDial = propagation.eventDialIndices.size();
+      weightRef.baseWeight = cacheEntry.event->getWeights().base;
+      weightRef.firstDial = propagation.eventDialIndices.size();
 
       eventRef.resultIndex = propagation.events.size();
 
@@ -215,7 +217,7 @@ namespace {
           propagation.eventDialIndices.emplace_back(allDialIndices[i]);
         }
       }
-      eventRef.weight.dialCount = propagation.eventDialIndices.size() - eventRef.weight.firstDial;
+      weightRef.dialCount = propagation.eventDialIndices.size() - weightRef.firstDial;
       eventRef.firstVariable = propagation.variableValues.size();
       eventRef.variableCount = sample.variableNames.size();
       const auto& variables = cacheEntry.event->getVariables();
@@ -244,6 +246,7 @@ namespace {
       }
       eventRef.variableResponseCount = propagation.variableResponses.size() - eventRef.firstVariableResponse;
       propagation.events.emplace_back(eventRef);
+      propagation.eventWeights.emplace_back(weightRef);
     }
 
     propagation.parameterCount = parameterIndexMap.size();

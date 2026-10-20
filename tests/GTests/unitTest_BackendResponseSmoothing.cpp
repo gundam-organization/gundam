@@ -77,11 +77,12 @@ namespace {
     for( DeviceIndex dial = 0; dial < model.dials.size(); ++dial ){
       for( int repeat = 0; repeat < repeats_; ++repeat ){
         EventView event;
+        BackendEventWeightDescriptor eventWeight;
         event.sampleIndex = event.binIndex = event.globalBinIndex = 0;
         event.samplePosition = 0;
         event.resultIndex = model.events.size();
-        event.weight.firstDial = model.eventDialIndices.size();
-        event.weight.dialCount = 1;
+        eventWeight.firstDial = model.eventDialIndices.size();
+        eventWeight.dialCount = 1;
         model.eventDialIndices.push_back(dial);
         if( variables_ ){
           event.firstVariable = model.variableValues.size();
@@ -94,6 +95,7 @@ namespace {
           model.variableResponses.push_back(target);
         }
         model.events.push_back(event);
+        model.eventWeights.push_back(eventWeight);
       }
     }
     return view;

@@ -1,10 +1,13 @@
 #include "CpuBackend.h"
+#include "CpuWeightKernels.h"
 
 #include "Semantics/BackendHostPropagation.h"
 #include "GundamGlobals.h"
 #include "Logger.h"
 
 #include <algorithm>
+#include <chrono>
+#include <utility>
 
 Backends::BackendCapabilities Backends::CpuBackend::getCapabilities() const {
   BackendCapabilities out;
@@ -19,19 +22,30 @@ Backends::BackendCapabilities Backends::CpuBackend::getCapabilities() const {
 }
 
 void Backends::CpuBackend::build(const EngineView& engineView_) {
-  _engineView_ = engineView_;
+  buildShared(std::make_shared<EngineView>(engineView_));
+}
+
+void Backends::CpuBackend::buildShared(std::shared_ptr<const EngineView> engineView_) {
+  _isBuilt_ = false;
+  LogThrowIf(engineView_ == nullptr, "CpuBackend requires a model.");
+  _engineView_ = std::move(engineView_);
+  LogThrowIf(_engineView_->propagation.eventWeights.size() != _engineView_->propagation.events.size(),
+             "CpuBackend event weight layout size mismatch.");
   _lastResult_ = Result();
   initializeThreads();
   initializeDialResponseCache();
-  const auto& model = _engineView_.propagation;
+  initializeWeightExecution();
+  _timingTotals_ = BackendTimingTotals();
+  const auto& model = _engineView_->propagation;
   _eventState_ = EventState();
-  if( model.requiresEventBinning() ){
+  _requiresEventBinning_ = model.requiresEventBinning();
+  if( _requiresEventBinning_ ){
     _eventState_.variables = model.variableValues;
     _eventState_.sampleRevisions.assign(model.samples.size(), 1);
     _eventState_.bins.resize(model.events.size(), -1);
     _eventState_.contributions.resize(model.events.size());
   }
-  _validBinning_.assign(model.events.size(), false);
+  _validBinning_.assign(_requiresEventBinning_ ? model.events.size() : 0, false);
   _binningIndices_.resize(model.samples.size());
   for( std::size_t i = 0; i < model.samples.size(); ++i ){ _binningIndices_[i].build(model.samples[i].binning); }
   _binningWorkers_.assign(_threadPool_.getNbThreads(), {});
@@ -44,8 +58,9 @@ void Backends::CpuBackend::build(const EngineView& engineView_) {
 Backends::PropagationToken Backends::CpuBackend::requestPropagation(const PropagationInputs& inputs_) {
 
   LogThrowIf(not _isBuilt_, "CpuBackend has not been built.");
-  const auto& model = _engineView_.propagation;
-  const auto& likelihoodModel = _engineView_.likelihood;
+  const auto propagationStart = std::chrono::steady_clock::now();
+  const auto& model = _engineView_->propagation;
+  const auto& likelihoodModel = _engineView_->likelihood;
   inputs_.validate(model);
 
   resetResult();
@@ -54,7 +69,7 @@ Backends::PropagationToken Backends::CpuBackend::requestPropagation(const Propag
   calculateEventWeights(_lastResult_, inputs_);
   _lastResult_.status.eventWeights = OutputState::ReadyOnDevice;
 
-  if( model.requiresEventBinning() ){
+  if( _requiresEventBinning_ ){
     try{ updateEventState(inputs_); }
     catch( ... ){
       // A failed parallel pass may have touched only part of the state.
@@ -85,11 +100,18 @@ Backends::PropagationToken Backends::CpuBackend::requestPropagation(const Propag
   _lastTiming_.cachedDialStageSeconds = _cachedDialStageTimer_.eval().count();
   _lastTiming_.eventWeightsStageSeconds = _eventWeightsStageTimer_.eval().count();
   _lastTiming_.histogramStageSeconds = _histogramStageTimer_.eval().count();
-  _lastTiming_.likelihoodHostSeconds = _likelihoodHostTimer_.eval().count();
+  _lastTiming_.likelihoodHostSeconds = likelihoodModel.empty() ? 0. : _likelihoodHostTimer_.eval().count();
   _lastTiming_.uniqueDialCount = model.dials.size();
-  _lastTiming_.cachedDialCount = std::count(_isCachedDial_.begin(), _isCachedDial_.end(), std::uint8_t(true));
+  _lastTiming_.cachedDialCount = _cachedDialCount_;
   _lastTiming_.eventDialIndexCount = model.eventDialIndices.size();
   _lastTiming_.splineScalarCount = model.dialPayloads.size();
+
+  ++_timingTotals_.propagationCount;
+  _timingTotals_.propagationSeconds += std::chrono::duration<double>(std::chrono::steady_clock::now() - propagationStart).count();
+  _timingTotals_.cachedDialSeconds += _lastTiming_.cachedDialStageSeconds;
+  _timingTotals_.eventWeightsSeconds += _lastTiming_.eventWeightsStageSeconds;
+  _timingTotals_.histogramSeconds += _lastTiming_.histogramStageSeconds;
+  _timingTotals_.likelihoodSeconds += _lastTiming_.likelihoodHostSeconds;
 
   return _lastResult_.token;
 }
@@ -194,7 +216,7 @@ void Backends::CpuBackend::initializeThreads() {
 }
 
 void Backends::CpuBackend::initializeDialResponseCache() {
-  const auto& propagation = _engineView_.propagation;
+  const auto& propagation = _engineView_->propagation;
   _cachedDialsByParameter_.assign(propagation.parameterCount, {});
   _cachedDialResponses_.assign(propagation.dials.size(), 1.);
   _cachedDialInputs_.assign(propagation.dials.size(), 0.);
@@ -205,6 +227,17 @@ void Backends::CpuBackend::initializeDialResponseCache() {
 
   for( std::uint32_t iDial = 0 ; iDial < propagation.dials.size() ; iDial++ ){
     const auto& dial = propagation.dials[iDial];
+    if( dial.type == BackendDialType::Shift ){
+      // Shift responses depend only on immutable payload and response bounds.
+      // Keep their product position, but evaluate them only once per build.
+      LogThrowIf(dial.payloadSize == 0 or dial.payloadOffset >= propagation.dialPayloads.size(),
+                 "Invalid CPU constant dial payload.");
+      _isCachedDial_[iDial] = true;
+      _cachedDialResponses_[iDial] = Semantics::evalDialResponseFromInput(
+          dial, 0., Semantics::getDialPayload(propagation.dialPayloads.data(), dial));
+      _isCachedDialResponseValid_[iDial] = true;
+      continue;
+    }
     const bool canCacheSingleInputResponse = dial.type != BackendDialType::Shift
                                              and dial.type != BackendDialType::ExternalWeight
                                              and dial.inputCount == 1
@@ -225,7 +258,6 @@ void Backends::CpuBackend::resetResult() {
   _lastResult_.token.isValid = true;
   _lastResult_.status = PropagationStatus();
   _lastResult_.status.backend = BackendStatus::Running;
-  _lastResult_.eventWeights.clear();
   _lastResult_.histSums.clear();
   _lastResult_.histSumSquares.clear();
   _lastResult_.likelihood = 0;
@@ -236,7 +268,7 @@ void Backends::CpuBackend::resetResult() {
 }
 
 void Backends::CpuBackend::calculateEventWeights(Result& result_, const PropagationInputs& inputs_) {
-  const auto& propagation = _engineView_.propagation;
+  const auto& propagation = _engineView_->propagation;
   result_.eventWeights.resize(propagation.events.size());
   updateCachedDialResponses(inputs_);
   _activeResult_ = &result_;
@@ -255,7 +287,9 @@ void Backends::CpuBackend::updateCachedDialResponses(const PropagationInputs& in
   _dirtyCachedDialIndices_.clear();
   if( not _isDialResponseCachePrimed_ or _lastParameterValues_.size() != inputs_.parameters.values.size() ){
     for( std::uint32_t iDial = 0 ; iDial < _isCachedDial_.size() ; iDial++ ){
-      if( _isCachedDial_[iDial] ){ _dirtyCachedDialIndices_.emplace_back(iDial); }
+      if( _isCachedDial_[iDial] and not _isCachedDialResponseValid_[iDial] ){
+        _dirtyCachedDialIndices_.emplace_back(iDial);
+      }
     }
     _lastParameterValues_ = inputs_.parameters.values;
     _isDialResponseCachePrimed_ = true;
@@ -278,7 +312,7 @@ void Backends::CpuBackend::updateCachedDialResponses(const PropagationInputs& in
 }
 
 void Backends::CpuBackend::updateCachedDialResponsesThread(int iThread_) {
-  const auto& propagation = _engineView_.propagation;
+  const auto& propagation = _engineView_->propagation;
   const auto bounds = GenericToolbox::ParallelWorker::getThreadBoundIndices(
       iThread_, _threadPool_.getNbThreads(), _dirtyCachedDialIndices_.size()
   );
@@ -300,30 +334,74 @@ void Backends::CpuBackend::updateCachedDialResponsesThread(int iThread_) {
   }
 }
 
-void Backends::CpuBackend::calculateEventWeightsThread(int iThread_) {
-  const auto& propagation = _engineView_.propagation;
-  const auto bounds = GenericToolbox::ParallelWorker::getThreadBoundIndices(
-      iThread_, _threadPool_.getNbThreads(), propagation.events.size()
-  );
-  for( std::size_t iEvent = bounds.beginIndex ; iEvent < bounds.endIndex ; iEvent++ ){
-    const auto& event = propagation.events[iEvent];
-    double weight = 1.;
-    for( std::size_t iDial = 0 ; iDial < event.weight.dialCount ; iDial++ ){
-      const auto dialIndex = propagation.eventDialIndices[event.weight.firstDial + iDial];
-      const auto& dial = propagation.dials[dialIndex];
-      weight *= _isCachedDial_[dialIndex]
-                ? _cachedDialResponses_[dialIndex]
-                : Semantics::evalDialResponse(propagation, dial, *_activeInputs_);
-    }
-    if( propagation.hasReweightCap ){ weight = std::min(weight, propagation.maxReweight); }
-    _activeResult_->eventWeights[event.resultIndex] = event.weight.baseWeight * weight;
+void Backends::CpuBackend::initializeWeightExecution() {
+  const auto& model = _engineView_->propagation;
+  _cachedDialCount_ = std::count(_isCachedDial_.begin(), _isCachedDial_.end(), std::uint8_t(true));
+  bool allCached{true};
+  // Every result slot is populated directly by the hot descriptor array.
+  for( const auto& event : model.events ){
+    LogThrowIf(event.resultIndex >= model.eventWeights.size(), "Invalid CPU event result index.");
   }
+  for( auto dial : model.eventDialIndices ){
+    LogThrowIf(dial >= model.dials.size(), "Invalid CPU event dial index.");
+    allCached = allCached and _isCachedDial_[dial];
+  }
+  std::size_t work{0};
+  for( const auto& event : model.eventWeights ){
+    LogThrowIf(event.firstDial > model.eventDialIndices.size()
+               or event.dialCount > model.eventDialIndices.size() - event.firstDial,
+               "Invalid CPU event dial range.");
+    work += 1 + event.dialCount;
+  }
+  const auto threads = std::size_t(_threadPool_.getNbThreads());
+  _weightRanges_.assign(threads, {});
+  std::size_t cursor{0}, completed{0};
+  for( std::size_t thread = 0; thread < threads; ++thread ){
+    auto& range = _weightRanges_[thread];
+    range.begin = cursor;
+    const auto target = (work / threads) * (thread + 1) + (work % threads) * (thread + 1) / threads;
+    while( cursor < model.eventWeights.size() and (thread + 1 == threads or completed < target) ){
+      completed += 1 + model.eventWeights[cursor++].dialCount;
+    }
+    range.end = cursor;
+  }
+  if( allCached ){
+    _weightJob_ = model.hasReweightCap ? &CpuBackend::calculateEventWeightsKernel<true, true>
+                                     : &CpuBackend::calculateEventWeightsKernel<true, false>;
+  }
+  else{
+    _weightJob_ = model.hasReweightCap ? &CpuBackend::calculateEventWeightsKernel<false, true>
+                                     : &CpuBackend::calculateEventWeightsKernel<false, false>;
+  }
+  LogInfo << "CPU reweight layout: " << model.eventWeights.size() << " events, "
+          << model.eventWeights.size() * sizeof(BackendEventWeightDescriptor) << " hot descriptor bytes, "
+          << model.eventDialIndices.size() * sizeof(std::uint32_t) << " dial index bytes, "
+          << _cachedDialCount_ << "/" << model.dials.size() << " cached dials, "
+          << "all event responses cached=" << allCached << ", shared model owners=" << _engineView_.use_count()
+          << "." << std::endl;
+}
+
+void Backends::CpuBackend::calculateEventWeightsThread(int iThread_) {
+  (this->*_weightJob_)(iThread_);
+}
+
+template<bool allResponsesCached, bool useReweightCap>
+void Backends::CpuBackend::calculateEventWeightsKernel(int iThread_) {
+  const auto& model = _engineView_->propagation;
+  const auto& range = _weightRanges_[iThread_];
+  CpuWeightKernels::reweight<allResponsesCached, useReweightCap>(
+      model.eventWeights.data(), model.eventDialIndices.data(), _cachedDialResponses_.data(),
+      _activeResult_->eventWeights.data(), range.begin, range.end, model.maxReweight,
+      [this, &model](std::uint32_t dial_){
+        return _isCachedDial_[dial_] ? _cachedDialResponses_[dial_]
+            : Semantics::evalDialResponse(model, model.dials[dial_], *_activeInputs_);
+      });
 }
 
 void Backends::CpuBackend::calculateHistograms(Result& result_) {
   auto timerScope = _histogramStageTimer_.scopeTime();
 
-  const auto& propagation = _engineView_.propagation;
+  const auto& propagation = _engineView_->propagation;
   const int nThreads = _threadPool_.getNbThreads();
   _threadHistogramSums_.resize(nThreads);
   _threadHistogramSumSquares_.resize(nThreads);
@@ -355,12 +433,22 @@ void Backends::CpuBackend::calculateHistograms(Result& result_) {
 }
 
 void Backends::CpuBackend::calculateHistogramsThread(int iThread_) {
-  const auto& propagation = _engineView_.propagation;
+  const auto& propagation = _engineView_->propagation;
   const auto bounds = GenericToolbox::ParallelWorker::getThreadBoundIndices(
       iThread_, _threadPool_.getNbThreads(), propagation.events.size()
   );
   auto& histSums = _threadHistogramSums_[iThread_];
   auto& histSumSquares = _threadHistogramSumSquares_[iThread_];
+  if( not _requiresEventBinning_ ){
+    for( std::size_t iEvent = bounds.beginIndex; iEvent < bounds.endIndex; ++iEvent ){
+      const auto& event = propagation.events[iEvent];
+      if( event.globalBinIndex < 0 ){ continue; }
+      const double weight = _activeResult_->eventWeights[event.resultIndex];
+      histSums[event.globalBinIndex] += weight;
+      histSumSquares[event.globalBinIndex] += weight * weight;
+    }
+    return;
+  }
   for( std::size_t iEvent = bounds.beginIndex ; iEvent < bounds.endIndex ; iEvent++ ){
     const auto& event = propagation.events[iEvent];
     const double weight = _activeResult_->eventWeights[event.resultIndex];
@@ -387,7 +475,7 @@ void Backends::CpuBackend::calculateHistogramsFromEvents(Result& result_, const 
   Semantics::calculateHistograms(
       result_.histSums,
       result_.histSumSquares,
-      _engineView_.propagation,
+      _engineView_->propagation,
       inputs_
   );
 }
@@ -396,7 +484,7 @@ void Backends::CpuBackend::calculateLikelihood(Result& result_) {
   auto timerScope = _likelihoodHostTimer_.scopeTime();
 
   result_.likelihood = Semantics::calculateLikelihood(
-      _engineView_.likelihood,
+      _engineView_->likelihood,
       result_.histSums,
       result_.histSumSquares
   );

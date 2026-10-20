@@ -6,6 +6,7 @@
 #include "PropagationInputs.h"
 #include "ConfigUtils.h"
 
+#include <memory>
 #include <string>
 
 namespace Backends {
@@ -20,6 +21,8 @@ namespace Backends {
     [[nodiscard]] virtual const EngineView& getEngineView() const = 0;
 
     virtual void build(const EngineView& engineView_) = 0;
+    // Shared immutable model; implementations may retain it or use their own packing.
+    virtual void buildShared(std::shared_ptr<const EngineView> engineView_) { build(*engineView_); }
     virtual PropagationToken requestPropagation(const PropagationInputs& inputs_) = 0;
 
     virtual bool isReady(const PropagationToken& token_) const = 0;
@@ -42,6 +45,7 @@ namespace Backends {
     }
     [[nodiscard]] virtual BackendDeviceView getDeviceView(const PropagationToken&) const { return {}; }
     [[nodiscard]] virtual BackendTimingSummary getLastTimingSummary() const { return {}; }
+    [[nodiscard]] virtual BackendTimingTotals getTimingTotals() const { return {}; }
 
   protected:
     void configureImpl() override { _config_.printUnusedKeys(); }
