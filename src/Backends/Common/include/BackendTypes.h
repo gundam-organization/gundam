@@ -95,6 +95,16 @@ ENUM_FIELD( Unavailable )
     std::size_t eventWeightReadbackBytes{0};
   };
 
+  // Exact accumulated stage durations since the last backend build.
+  struct BackendTimingTotals {
+    std::uint64_t propagationCount{0};
+    double propagationSeconds{0};
+    double cachedDialSeconds{0};
+    double eventWeightsSeconds{0};
+    double histogramSeconds{0};
+    double likelihoodSeconds{0};
+  };
+
   struct PropagationToken {
     std::uint64_t id{0};
     bool isValid{false};

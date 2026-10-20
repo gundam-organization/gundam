@@ -594,6 +594,19 @@ void FitterEngine::fit(){
     }
   }
 
+#ifdef GUNDAM_USING_BACKENDS
+  if( _backendsManager_.hasBackend() ){
+    const auto totals = _backendsManager_.getBackend()->getTimingTotals();
+    if( totals.propagationCount > 0 ){
+      LogInfo << "Backend accumulated timing since build: calls=" << totals.propagationCount
+              << ", propagation=" << totals.propagationSeconds << "s"
+              << ", dialCache=" << totals.cachedDialSeconds << "s"
+              << ", eventWeights=" << totals.eventWeightsSeconds << "s"
+              << ", histograms=" << totals.histogramSeconds << "s"
+              << ", statLikelihood=" << totals.likelihoodSeconds << "s" << std::endl;
+    }
+  }
+#endif
   LogInfo << "Fit is done." << std::endl;
 }
 
