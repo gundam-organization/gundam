@@ -107,6 +107,34 @@ retain uncommon dial features and avoid adding another full-size backend copy.
 Their benefit depends on the model and requires a paired measurement; neither
 improvement is implied by the existing traversal optimization.
 
+## What the benchmarks showed
+
+The full OA2024 configuration (`v13Prod.yaml`) contains about 2.4 million events,
+20.3 million unique cached dials and 37.7 million event/dial references. Earlier
+`v12ProdRun45.yaml` runs covered a smaller dataset and are not full-scale results.
+
+| Experiment | Finding and decision |
+|---|---|
+| Fixed ranges versus 2, 5 and 10 blocks per worker | Two blocks provided enough load balancing in the tested workloads. Keep x2 as the automatic default rather than exposing a fit tuning parameter. |
+| Indexed versus sequential cache updates; per-dial versus shared input preparation | Retain automatic sparse/dense traversal and shared effective inputs. Tests cover constant points, changes to every fit coordinate and short all-parameter updates; constant-point timings alone would hide response-update costs. |
+| One to eight active weight workers on the same resident model | Weights benefit from parallelism, but scaling is sublinear. Slurm allocations can include SMT siblings, and different nodes give substantially different timings; cross-node differences are not software gains. |
+| Interleaving two or four event products | No improvement: about 18.1–18.2 ms versus 17.9–18.1 ms for the scalar loop in paired runs. The experimental kernels were removed. |
+| Single-thread stage timers and `perf` sampling | About 90% of sampled cycles were in weights and 9% in histograms. The hot loop already consists of an index load, an indirect double response load and multiplication, with no per-dial option/type dispatch. |
+
+The current evidence points to the response-access/product loop, but does not
+separate memory latency from multiplication dependencies or prove RAM-bandwidth
+saturation. Instruction-level samples near loop comparisons must not be read as
+the cost of those comparisons. JIT compilation is therefore deferred; preserving
+double precision and multiplication order remains a requirement.
+
+The next diagnostic compares current response addresses with a simulated
+first-use numbering. `--locality-only` writes `locality.json` after one model
+load, without running a fit or changing storage. It measures full-stream address
+locality and exact distinct-line reuse over the first million references. Its
+ideal LRU estimates exclude other traffic and worker contention; they can justify
+a layout experiment, but cannot establish a speedup. No response reordering has
+been implemented yet.
+
 ## Verification and diagnostics
 
 CPU regression tests compare weights, histogram sums and squared sums bit for
