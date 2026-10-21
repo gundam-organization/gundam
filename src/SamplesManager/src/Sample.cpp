@@ -189,7 +189,7 @@ void Sample::updateEventBinning(GenericToolbox::ParallelWorker& threadPool_){
     );
     for( size_t iEvent = bounds.beginIndex ; iEvent < bounds.endIndex ; iEvent++ ){
       auto& event = _eventList_[iEvent];
-      event.getIndices().bin = _histogram_.findBinIndex(event);
+      event.getIndices().bin = _histogram_.findBinIndex(event, event.getIndices().bin);
     }
   });
 

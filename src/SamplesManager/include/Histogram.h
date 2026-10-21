@@ -52,7 +52,8 @@ public:
   auto& getOutsideBinContent(){ return _outsideBinContent_; }
   auto& getOutsideContributionList(){ return _outsideContributionList_; }
   // Bin edge variable-index caches must match the event's variable layout.
-  [[nodiscard]] int findBinIndex(const Event& event_) const;
+  // Rebinning can reuse the previous bin when it still contains the event.
+  [[nodiscard]] int findBinIndex(const Event& event_, int previousBinIndex_ = -1) const;
   [[nodiscard]] BinningResponse::EventResponse evaluateEventBinningResponse(const Event& event_) const;
   [[nodiscard]] std::vector<BinningResponse::BinFraction> evaluateBinningResponse(const Event& event_) const;
   void throwEventMcError();

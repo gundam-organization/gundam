@@ -76,7 +76,12 @@ void Histogram::fillBinContent(const std::vector<EventContribution>& contributio
   }
   content_.sqrtSumSqWeights = std::sqrt(content_.sqrtSumSqWeights);
 }
-int Histogram::findBinIndex(const Event& event_) const{
+int Histogram::findBinIndex(const Event& event_, int previousBinIndex_) const{
+  // BinSet rejects overlapping bins, so a valid previous bin is unambiguous.
+  if( previousBinIndex_ >= 0 and size_t(previousBinIndex_) < binContextList.size() ){
+    const auto& bin = binContextList[previousBinIndex_].bin;
+    if( event_.getVariables().isInBin(bin) ){ return bin.getIndex(); }
+  }
   for( const auto& binContext : binContextList ){
     if( event_.getVariables().isInBin(binContext.bin) ){
       return binContext.bin.getIndex();
@@ -156,7 +161,8 @@ void Histogram::updateBinEventLists(std::vector<Event>& eventList_, GenericToolb
       threadPool_.runJob([&](int iThread_){
         auto bounds = GenericToolbox::ParallelWorker::getThreadBoundIndices(iThread_, threadPool_.getNbThreads(), eventList_.size());
         for( size_t iEvent = bounds.beginIndex ; iEvent < bounds.endIndex ; ++iEvent ){
-          eventList_[iEvent].getIndices().bin = findBinIndex(eventList_[iEvent]);
+          auto& event = eventList_[iEvent];
+          event.getIndices().bin = findBinIndex(event, event.getIndices().bin);
         }
       });
     }
@@ -186,7 +192,7 @@ void Histogram::updateBinEventLists(std::vector<Event>& eventList_, GenericToolb
     auto evaluateEvents = [&](const auto& evaluateResponse_){
       for( size_t iEvent = bounds.beginIndex ; iEvent < bounds.endIndex ; ++iEvent ){
         auto& event = eventList_[iEvent];
-        if( updateBinIndices_ ){ event.getIndices().bin = findBinIndex(event); }
+        if( updateBinIndices_ ){ event.getIndices().bin = findBinIndex(event, event.getIndices().bin); }
         if( event.getIndices().bin >= 0 ){ ++worker.eventOffsets[event.getIndices().bin]; }
         evaluateResponse_(event.getVariables(), worker.evaluationBuffer);
         for( const auto& fraction : worker.evaluationBuffer.response.binFractions ){
