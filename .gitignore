@@ -54,7 +54,4 @@ work/
 *.app
 
 # Benchmarks
-*benchmark*
-!tests/benchmarks/
-!tests/benchmarks/*.py
-!tests/benchmarks/README.md
+cpu-**

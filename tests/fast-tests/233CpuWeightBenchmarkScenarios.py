@@ -200,6 +200,23 @@ def main():
             assert sum(w['dialReferences'] for w in probe['workers']) == 720
             assert all(w['wallSeconds'] >= 0 for w in probe['workers'])
     assert not list(scaling_output.glob('*.partial.json'))
+    interleave = benchmark.with_name('224CpuWeightInterleaveBenchmark.py')
+    interleave_output = base / f'interleave-results-{os.getpid()}'
+    with (base / 'interleave-benchmark.log').open('w') as log:
+        subprocess.run([sys.executable, str(interleave), '--config', str(base / 'config-False.json'),
+                        '--threads', '4', '--calls', '3', '--warmup', '1', '--rounds', '2',
+                        '--output', str(interleave_output)], stdout=log, stderr=subprocess.STDOUT, check=True)
+    interleave_summary = json.loads((interleave_output / 'summary.json').read_text())
+    assert [r['lanes'] for r in interleave_summary] == [1, 2, 4, 4, 2, 1]
+    for result in interleave_summary:
+        assert result['weightsExactlyAgree'] and result['histogramsExactlyAgree'] and result['likelihoodsAgree']
+        assert result['weightSpeedupVsScalar'] > 0
+        case = json.loads((interleave_output / f"round{result['round']}-lanes{result['lanes']}.json").read_text())
+        assert case['layout']['weightInterleave'] == result['lanes']
+        assert case['layout']['weightWorkers'] == 4
+        assert len(case['raw'][0]['weights']) == 3
+    assert not list(interleave_output.glob('*.partial.json'))
+    assert not (interleave_output / 'reference-weights.bin').exists()
     print('SUCCESS: workload replay, traversals and shared input evaluations preserve predictions.')
 
 

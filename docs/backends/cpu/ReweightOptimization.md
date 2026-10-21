@@ -84,6 +84,14 @@ workloads use fixed ranges. Only range metadata is replicated; event, response
 and payload buffers are shared. Histogram filling and reduction keep their own
 execution order.
 
+An experimental diagnostic API also selects kernels with two or four interleaved
+cached events; normal fits retain the scalar kernel. These independent
+accumulators preserve product order within each event and reuse the same buffers.
+Mixed responses retain scalar execution. The dedicated
+[interleaving benchmark](../../../tests/benchmarks/README.md#experimental-interleaved-event-weights)
+checks weights and histogram bits and compares against scalar on the same loaded
+model. This is an experiment, not an enabled optimization or a JIT compiler.
+
 ## Scope of specialization
 
 | Optimization | Current implementation |

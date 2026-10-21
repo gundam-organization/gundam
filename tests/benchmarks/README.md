@@ -58,6 +58,44 @@ limit, but does not prove memory-bandwidth saturation. Hardware counters, if
 available on the worker node, are needed to distinguish cache misses, memory
 stalls and compute limits. No `perf` dependency or privilege is required here.
 
+## Experimental interleaved event weights
+
+```sh
+python3 "$REPO_DIR/gundam/tests/benchmarks/224CpuWeightInterleaveBenchmark.py" \
+  --config configOA2024.yaml --threads 8 --lanes 1 2 4 \
+  --calls 30 --trials 1 --rounds 2 \
+  --override override/v13Prod.yaml override/backendCpuTest.yaml
+```
+
+Rebuild/install the C++ backend and its Python interface first. The experiment
+compares the existing scalar kernel with two/four independent event accumulators.
+The fit default remains scalar; no new fit configuration is introduced. Runtime
+diagnostic selection happens outside propagation, with no interleave-mode branch
+inside the event loop. All variants use the same resident buffers and Dynamic x2
+scheduler. Dial products preserve per-event multiplication order, double precision
+and cap-before-base-weight semantics. Short ranges/tails use the scalar order;
+fully cached responses are required by the benchmark. Mixed response models keep
+the scalar evaluator path even if diagnostic interleaving is requested.
+
+The dataset loads once. Defaults measure 180 constant-point evaluations plus
+warmup/priming, reversing the order in the second round. There are no per-worker
+probes during these measurements. Results under
+`cpu-weight-interleave-<timestamp>-<PID>/` include per-call stage times and speedups
+against scalar within each round. Completed trials/cases are checkpointed as in
+the scaling benchmark. Return the whole output directory.
+
+Every variant checks the LLH on timed calls and compares every final event weight
+and histogram sum/squared sum bit for bit outside timing. A temporary disk-backed
+`reference-weights.bin` avoids retaining a second full-size weight array in RAM;
+comparison uses chunks of 65,536 events. That file is removed on success and can
+remain after interruption/failure. Host event weights are never materialized for
+this check. The benchmark adds no input event-count limit.
+
+Interleaving does not make indirect response loads contiguous or reduce their
+volume. It may overlap load/multiplication dependencies, but adds handling for
+unequal event dial counts. Gains are experimental and must be established on the
+production model; an absent or unstable gain is a reason to remove these variants.
+
 ## Other benchmarks
 
 - `222CpuWeightSchedulingBenchmark.py`: paired comparisons of weight scheduling,

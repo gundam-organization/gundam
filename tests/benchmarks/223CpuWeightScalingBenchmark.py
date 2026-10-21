@@ -130,22 +130,31 @@ def measure(args):
     progress(f'SUCCESS: all worker counts preserve LLH and histograms. Results: {args.output}')
 
 
-def main():
-    parser = argparse.ArgumentParser(description=__doc__)
+def main(measure_function=measure, interleaving=False, description=None):
+    parser = argparse.ArgumentParser(description=description or __doc__)
     parser.add_argument('--config', type=Path, required=True)
     parser.add_argument('--override', nargs='*', default=[])
     parser.add_argument('--work-dir', type=Path, default=Path.cwd())
     parser.add_argument('--threads', type=int, default=8, help='Resident pool size; dataset is loaded once')
-    parser.add_argument('--workers', nargs='+', type=int, default=[1, 2, 4, 8])
+    if interleaving:
+        parser.add_argument('--lanes', nargs='+', type=int, choices=[1, 2, 4], default=[1, 2, 4])
+    else:
+        parser.add_argument('--workers', nargs='+', type=int, default=[1, 2, 4, 8])
     parser.add_argument('--calls', type=int, default=30)
     parser.add_argument('--trials', type=int, default=1)
     parser.add_argument('--rounds', type=int, default=2, help='Alternate ascending and descending order')
     parser.add_argument('--warmup', type=int, default=3)
-    parser.add_argument('--probe-calls', type=int, default=5)
-    parser.add_argument('--output', type=Path, default=Path(time.strftime('cpu-weight-scaling-%Y%m%d-%H%M%S-') + str(os.getpid())))
+    if interleaving:
+        parser.set_defaults(probe_calls=0)
+    else:
+        parser.add_argument('--probe-calls', type=int, default=5)
+    parser.add_argument('--output', type=Path, default=Path(time.strftime(('cpu-weight-interleave-' if interleaving else 'cpu-weight-scaling-') + '%Y%m%d-%H%M%S-') + str(os.getpid())))
     parser.add_argument('--worker', action='store_true', help=argparse.SUPPRESS)
     args = parser.parse_args()
-    if min(args.threads, *args.workers, args.calls, args.trials, args.rounds, args.warmup, args.probe_calls) < 1:
+    if interleaving:
+        args.workers = [args.threads]
+        args.lanes = sorted(set([1, *args.lanes]))
+    if min(args.threads, *args.workers, args.calls, args.trials, args.rounds, args.warmup, args.probe_calls if not interleaving else 1) < 1:
         parser.error('Counts must be positive')
     if max(args.workers) > args.threads:
         parser.error('--workers cannot exceed the resident --threads pool')
@@ -154,16 +163,16 @@ def main():
     args.config = (args.work_dir / args.config).resolve()
     args.output = args.output.resolve()
     if args.worker:
-        measure(args)
+        measure_function(args)
         return
     args.output.mkdir(parents=True, exist_ok=False)
     settings = vars(args).copy()
     write_json(args.output / 'settings.json', {k: str(v) if isinstance(v, Path) else v for k, v in settings.items()})
     progress(f'Results: {args.output}; one dataset load, no event-count limit added')
-    count = len(args.workers) * args.rounds
-    progress(f'{count * args.calls * args.trials} timed evaluations + {count * args.probe_calls} separate worker probes + warmup/priming')
+    count = len(args.lanes if interleaving else args.workers) * args.rounds
+    progress(f'{count * args.calls * args.trials} timed evaluations + {0 if interleaving else count * args.probe_calls} separate worker probes + warmup/priming')
     log_path = args.output / 'native.log'
-    command = [sys.executable, '-u', str(Path(__file__).resolve()), *sys.argv[1:], '--worker', '--output', str(args.output)]
+    command = [sys.executable, '-u', str(Path(sys.argv[0]).resolve()), *sys.argv[1:], '--worker', '--output', str(args.output)]
     environment = os.environ.copy()
     environment.pop('GUNDAM_CPU_DIAGNOSTIC_BLOCKS_PER_THREAD', None)
     with log_path.open('w') as log, subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
