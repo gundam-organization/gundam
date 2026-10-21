@@ -20,8 +20,8 @@ thresholds. Optional smoothing coefficients live in a separate, deduplicated
 table and are read only when a response crosses a transition threshold. A zero
 smoothing index selects hard bounds. The spline descriptor retains extrapolation
 and response-cache flags in its low two bits; its remaining bits hold the
-smoothing-table index. Event references, spline payloads, response slots, and
-multiplication order retain their existing numbering and semantics.
+smoothing-table index. Event references, descriptor indices, response slots, and multiplication order
+retain their existing numbering and semantics.
 
 The common 48-byte spline descriptors and 36-byte normalization/external
 occurrences remain the backend-independent packing representation. MPS converts
@@ -36,3 +36,22 @@ The shared event loop is instantiated for both wire formats; interpolation and
 response-smoothing arithmetic are shared as well. Each measured likelihood and
 all final histogram bins must match exactly. Separate GPU stage probes run after
 the ordinary trials. See [benchmark instructions](../../../tests/benchmarks/README.md).
+
+Spline payloads are placed in first-use order across logical groups of 32 event
+threads. Within each group, families and dial ordinals are visited in kernel
+order before advancing across the event lanes. A payload is copied only once;
+its descriptor receives the new offset. Payload values, knot ordering and spline
+evaluation are unchanged. Shared dials retain one payload and the same response
+slot. This layout requires no extra resident GPU storage in normal runs.
+
+`tests/benchmarks/225MpsBackendProfiling.py --compare-payloads` retains both
+payload layouts and their compact descriptors for exact A/B measurements. It
+sets `enableDiagnosticPayloadComparison`, which is disabled in normal runs.
+The benchmark switches both descriptor offsets and the payload buffer together,
+including cached-response kernels. It alternates trial order and validates
+every likelihood and all final histogram bins exactly.
+
+Two additional arrangements were measured on OA2024 and discarded: interleaving
+dial references across 32-event tiles, and sorting events by dial-count profiles
+inside 256-event windows. They slowed evaluation on this dataset. Event order
+and the per-event reference layout therefore remain unchanged.

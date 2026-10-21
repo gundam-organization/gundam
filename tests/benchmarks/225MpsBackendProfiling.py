@@ -80,6 +80,8 @@ def load_engine(args):
     backend.update(isEnabled=True, type='MPS')
     if args.compare_descriptors:
         backend.setdefault('backendConfig', {})['enableDiagnosticDescriptorComparison'] = True
+    if args.compare_payloads:
+        backend.setdefault('backendConfig', {})['enableDiagnosticPayloadComparison'] = True
     write_json(args.output / 'resolved-fitter-config.json', config)
     engine = GUNDAM.FitterEngine()
     engine.configure(GUNDAM.ConfigUtils.ConfigReader(GUNDAM.JsonType(json.dumps(config))))
@@ -174,11 +176,14 @@ def compare_variants(args, engine):
     descriptor_comparison = args.compare_descriptors
     variant_names = ('legacyDescriptors', 'compactDescriptors') if descriptor_comparison else ('fullScan', 'compactIndices')
     method = 'setDiagnosticMpsCompactDialDescriptors' if descriptor_comparison else 'setDiagnosticMpsCompactCachedDials'
+    if args.compare_payloads:
+        variant_names = ('originalPayloads', 'orderedPayloads')
+        method = 'setDiagnosticMpsOrderedSplinePayloads'
     if not hasattr(manager, method):
         raise RuntimeError(f'Rebuild GUNDAM: missing {method}')
     set_variant = getattr(manager, method)
     metadata = json.loads(manager.getDiagnosticMps())
-    if metadata['path'] != 'packedWeights' or (not descriptor_comparison and not metadata['cachedDials']):
+    if metadata['path'] != 'packedWeights' or (not descriptor_comparison and not args.compare_payloads and not metadata['cachedDials']):
         raise RuntimeError('A/B comparison requires a compatible packed weight model')
     sequence = scheduling.ParameterSequence(engine, args.step_scale)
     write_json(args.output / 'parameters.json', sequence.manifest())
@@ -249,7 +254,7 @@ def compare_variants(args, engine):
 def measure(args):
     import GUNDAM
     engine = load_engine(args)
-    if args.compare_cached_dials or args.compare_descriptors:
+    if args.compare_cached_dials or args.compare_descriptors or args.compare_payloads:
         compare_variants(args, engine)
         return
     sequence = scheduling.ParameterSequence(engine, args.step_scale)
@@ -298,6 +303,8 @@ def measure(args):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     comparisons = parser.add_mutually_exclusive_group()
+    comparisons.add_argument('--compare-payloads', action='store_true',
+                             help='Compare spline payload ordering with GPU tile first-use ordering')
     comparisons.add_argument('--compare-descriptors', action='store_true',
                              help='Compare legacy descriptors with compact hot descriptors and cold smoothing')
     comparisons.add_argument('--compare-cached-dials', action='store_true',

@@ -30,6 +30,7 @@ namespace Backends {
     void setDiagnosticStageProfiling(bool enabled_);
     void setDiagnosticCompactCachedDials(bool enabled_);
     void setDiagnosticCompactDialDescriptors(bool enabled_);
+    void setDiagnosticOrderedSplinePayloads(bool enabled_);
     [[nodiscard]] std::string getDiagnostics() const;
     [[nodiscard]] std::string getDiagnosticStageGpuSeconds() const;
 

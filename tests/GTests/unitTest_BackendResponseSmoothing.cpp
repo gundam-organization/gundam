@@ -184,6 +184,66 @@ TEST(BackendResponseSmoothingPacking, RejectsCollapsedFloatTransition) {
 }
 
 #ifdef __APPLE__
+TEST(MpsOrderedSplinePayloads, PreservesRaggedEventsAndDistinctPayloadsExactly) {
+  MpsBackend backend;
+  if( backend.getCapabilities().deviceName == "Metal unavailable" ){ GTEST_SKIP(); }
+  backend.configure(ConfigReader(JsonType{{"enableDiagnosticPayloadComparison", true}}));
+  DialResponseSupervisor supervisor;
+  supervisor.setMinResponse(0.);
+  supervisor.setMaxResponse(2.);
+  supervisor.setSmoothingWidths(.4, .1);
+  auto view = makeModel(supervisor, false, 9); // 72 events and a partial GPU tile.
+  auto& model = view.propagation;
+  for( std::size_t family = 3; family < 8; ++family ){
+    auto descriptor = model.dials.at(family);
+    auto originalOffset = descriptor.payloadOffset;
+    descriptor.payloadOffset = model.dialPayloads.size();
+    for( std::size_t i = 0; i < descriptor.payloadSize; ++i ){
+      auto value = model.dialPayloads.at(originalOffset + i) + .15;
+      model.dialPayloads.push_back(value);
+    }
+    model.dials.push_back(descriptor);
+  }
+  model.eventDialIndices.clear();
+  for( std::size_t i = 0; i < model.eventWeights.size(); ++i ){
+    auto& weight = model.eventWeights[i];
+    weight.firstDial = model.eventDialIndices.size();
+    weight.dialCount = i % 4;
+    for( std::size_t j = 0; j < weight.dialCount; ++j ){
+      model.eventDialIndices.push_back((i + j) % model.dials.size());
+    }
+  }
+  for( int rebuild = 0; rebuild < 2; ++rebuild ){
+    backend.build(view);
+    double external = 0;
+    PropagationInputs inputs;
+    inputs.externalWeights = {{&external, 1, 0, 1}};
+    for( double value : {-.2, .5, 1.9, 2.5} ){
+      inputs.parameters.values = {value};
+      external = value;
+      ++inputs.externalWeights[0].generation;
+      std::vector<double> weights, sums, squares;
+      for( bool ordered : {false, true, false} ){
+        backend.setDiagnosticOrderedSplinePayloads(ordered);
+        auto token = backend.requestPropagation(inputs);
+        ASSERT_EQ(backend.getStatus(token).eventWeights, OutputState::ReadyOnDevice);
+        backend.materialize(token, OutputRequest::EventWeights);
+        backend.materialize(token, OutputRequest::Histograms);
+        if( weights.empty() ){
+          weights = backend.getEventWeightsHostView(token);
+          sums = backend.getHistogramSumsHostView(token);
+          squares = backend.getHistogramSumSquaresHostView(token);
+        }
+        else{
+          EXPECT_EQ(backend.getEventWeightsHostView(token), weights);
+          EXPECT_EQ(backend.getHistogramSumsHostView(token), sums);
+          EXPECT_EQ(backend.getHistogramSumSquaresHostView(token), squares);
+        }
+      }
+    }
+  }
+}
+
 TEST(MpsCompactDialDescriptors, MatchesLegacyWithBoundsSmoothingAndExternalWeights) {
   for( int repeats : {1, int(kDeviceCachedDialReuseThreshold)} ){
     MpsBackend backend;

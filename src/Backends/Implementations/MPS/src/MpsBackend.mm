@@ -10,9 +10,13 @@ void Backends::MpsBackend::configureImpl() {
   _config_.defineFields({
       {"enableCachedDialResponses"},
       {"enableDiagnosticDescriptorComparison"},
+      {"enableDiagnosticPayloadComparison"},
   });
   _config_.fillValue(_impl_->enableCachedDialResponses, "enableCachedDialResponses");
   _config_.fillValue(_impl_->enableDiagnosticDescriptorComparison, "enableDiagnosticDescriptorComparison");
+  _config_.fillValue(_impl_->enableDiagnosticPayloadComparison, "enableDiagnosticPayloadComparison");
+  LogThrowIf(_impl_->enableDiagnosticDescriptorComparison and _impl_->enableDiagnosticPayloadComparison,
+             "Select one MPS layout comparison at a time.");
   _config_.printUnusedKeys();
 }
 
@@ -255,6 +259,7 @@ std::string Backends::MpsBackend::getDiagnostics() const {
   out["cachedDials"] = impl.cachedDialCount;
   out["cachedResponsesEnabled"] = impl.enableCachedDialResponses;
   out["compactDialDescriptors"] = impl.useReducedDialDescriptors;
+  out["orderedSplinePayloads"] = impl.useOrderedSplinePayloads;
   out["descriptorComparisonEnabled"] = impl.enableDiagnosticDescriptorComparison;
   out["splineDescriptorBytes"] = impl.useReducedDialDescriptors ? sizeof(MpsSplineDialDescriptor) : sizeof(DeviceSplineDialDescriptor);
   out["normOccurrenceBytes"] = impl.useReducedDialDescriptors ? sizeof(MpsNormDialOccurrence) : sizeof(DeviceNormDialOccurrence);
@@ -278,6 +283,7 @@ std::string Backends::MpsBackend::getDiagnostics() const {
     // These belong to the packed weight path, not the event propagation path.
     out.erase("cachedDials");
     out.erase("compactDialDescriptors");
+    out.erase("orderedSplinePayloads");
     out.erase("descriptorComparisonEnabled");
     out.erase("splineDescriptorBytes");
     out.erase("normOccurrenceBytes");
@@ -304,14 +310,19 @@ std::string Backends::MpsBackend::getDiagnostics() const {
     buffer("graphDialIndicesBuffer", impl.graphDialIndicesBuffer);
     buffer("compactDialDescriptorsBuffer", impl.compactDialDescriptorsBuffer);
     buffer("reducedCompactDialDescriptorsBuffer", impl.reducedCompactDialDescriptorsBuffer);
+    buffer("orderedReducedCompactDialDescriptorsBuffer", impl.orderedReducedCompactDialDescriptorsBuffer);
     buffer("uniformDialDescriptorsBuffer", impl.uniformDialDescriptorsBuffer);
     buffer("reducedUniformDialDescriptorsBuffer", impl.reducedUniformDialDescriptorsBuffer);
+    buffer("orderedReducedUniformDialDescriptorsBuffer", impl.orderedReducedUniformDialDescriptorsBuffer);
     buffer("monotonicDialDescriptorsBuffer", impl.monotonicDialDescriptorsBuffer);
     buffer("reducedMonotonicDialDescriptorsBuffer", impl.reducedMonotonicDialDescriptorsBuffer);
+    buffer("orderedReducedMonotonicDialDescriptorsBuffer", impl.orderedReducedMonotonicDialDescriptorsBuffer);
     buffer("generalDialDescriptorsBuffer", impl.generalDialDescriptorsBuffer);
     buffer("reducedGeneralDialDescriptorsBuffer", impl.reducedGeneralDialDescriptorsBuffer);
+    buffer("orderedReducedGeneralDialDescriptorsBuffer", impl.orderedReducedGeneralDialDescriptorsBuffer);
     buffer("graphDialDescriptorsBuffer", impl.graphDialDescriptorsBuffer);
     buffer("reducedGraphDialDescriptorsBuffer", impl.reducedGraphDialDescriptorsBuffer);
+    buffer("orderedReducedGraphDialDescriptorsBuffer", impl.orderedReducedGraphDialDescriptorsBuffer);
     buffer("compactCachedResponsesBuffer", impl.compactCachedResponsesBuffer);
     buffer("compactCachedDialIndicesBuffer", impl.compactCachedDialIndicesBuffer);
     buffer("uniformCachedResponsesBuffer", impl.uniformCachedResponsesBuffer);
@@ -326,6 +337,7 @@ std::string Backends::MpsBackend::getDiagnostics() const {
     buffer("binEventOffsetsBuffer", impl.binEventOffsetsBuffer);
     buffer("binEventIndicesBuffer", impl.binEventIndicesBuffer);
     buffer("splineDataBuffer", impl.splineDataBuffer);
+    buffer("orderedSplineDataBuffer", impl.orderedSplineDataBuffer);
     buffer("responseSmoothingBuffer", impl.responseSmoothingBuffer);
     buffer("parametersBuffer", impl.parametersBuffer);
     buffer("externalWeightsBuffer", impl.externalWeightsBuffer);
@@ -387,4 +399,12 @@ void Backends::MpsBackend::setDiagnosticCompactDialDescriptors(bool enabled_) {
   LogThrowIf(not enabled_ and not _impl_->enableDiagnosticDescriptorComparison,
              "Build with enableDiagnosticDescriptorComparison for legacy descriptor diagnostics.");
   _impl_->useReducedDialDescriptors = enabled_;
+}
+
+void Backends::MpsBackend::setDiagnosticOrderedSplinePayloads(bool enabled_) {
+  LogThrowIf(not _impl_->isWeightModelSupported or _impl_->useEventPropagation or not _impl_->useReducedDialDescriptors,
+             "Payload comparison requires compact descriptors on the packed MPS path.");
+  LogThrowIf(not _impl_->enableDiagnosticPayloadComparison,
+             "Build with enableDiagnosticPayloadComparison for payload layout diagnostics.");
+  _impl_->useOrderedSplinePayloads = enabled_;
 }

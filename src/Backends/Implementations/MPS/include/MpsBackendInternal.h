@@ -58,6 +58,8 @@ namespace Backends {
     // The full descriptor scan is retained only for controlled diagnostic A/B runs.
     bool useCompactCachedDialIndices{true};
     bool useReducedDialDescriptors{true};
+    bool useOrderedSplinePayloads{true};
+    bool enableDiagnosticPayloadComparison{false};
     bool enableDiagnosticDescriptorComparison{false};
     bool enableDiagnosticStageProfiling{false};
     std::map<std::string, double> diagnosticStageGpuSeconds{};
@@ -77,14 +79,19 @@ namespace Backends {
     id<MTLBuffer> graphDialIndicesBuffer{nil};
     id<MTLBuffer> compactDialDescriptorsBuffer{nil};
     id<MTLBuffer> reducedCompactDialDescriptorsBuffer{nil};
+    id<MTLBuffer> orderedReducedCompactDialDescriptorsBuffer{nil};
     id<MTLBuffer> uniformDialDescriptorsBuffer{nil};
     id<MTLBuffer> reducedUniformDialDescriptorsBuffer{nil};
+    id<MTLBuffer> orderedReducedUniformDialDescriptorsBuffer{nil};
     id<MTLBuffer> monotonicDialDescriptorsBuffer{nil};
     id<MTLBuffer> reducedMonotonicDialDescriptorsBuffer{nil};
+    id<MTLBuffer> orderedReducedMonotonicDialDescriptorsBuffer{nil};
     id<MTLBuffer> generalDialDescriptorsBuffer{nil};
     id<MTLBuffer> reducedGeneralDialDescriptorsBuffer{nil};
+    id<MTLBuffer> orderedReducedGeneralDialDescriptorsBuffer{nil};
     id<MTLBuffer> graphDialDescriptorsBuffer{nil};
     id<MTLBuffer> reducedGraphDialDescriptorsBuffer{nil};
+    id<MTLBuffer> orderedReducedGraphDialDescriptorsBuffer{nil};
     id<MTLBuffer> compactCachedResponsesBuffer{nil};
     id<MTLBuffer> compactCachedDialIndicesBuffer{nil};
     id<MTLBuffer> uniformCachedResponsesBuffer{nil};
@@ -99,6 +106,7 @@ namespace Backends {
     id<MTLBuffer> binEventOffsetsBuffer{nil};
     id<MTLBuffer> binEventIndicesBuffer{nil};
     id<MTLBuffer> splineDataBuffer{nil};
+    id<MTLBuffer> orderedSplineDataBuffer{nil};
     id<MTLBuffer> responseSmoothingBuffer{nil};
     id<MTLBuffer> parametersBuffer{nil};
     id<MTLBuffer> externalWeightsBuffer{nil};

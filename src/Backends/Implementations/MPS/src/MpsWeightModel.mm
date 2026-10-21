@@ -1,5 +1,6 @@
 #include "MpsBackendInternal.h"
 #include "DeviceWeightModel.h"
+#include "MpsSplinePayloadLayout.h"
 
 #include <array>
 
@@ -11,6 +12,15 @@ bool Backends::MpsBackendImpl::buildWeightModel() {
   DeviceWeightModel packed;
   if( not packDeviceWeightModel(model, enableCachedDialResponses, packed, buildTiming,
                                   deviceModelFallbackReason, "MPS backend") ){ return false; }
+  if( enableDiagnosticDescriptorComparison ){ useOrderedSplinePayloads = false; }
+  std::unique_ptr<MpsSplinePayloadLayout> ordered;
+  if( useOrderedSplinePayloads or enableDiagnosticPayloadComparison ){
+    ordered = std::make_unique<MpsSplinePayloadLayout>(packed);
+    if( not enableDiagnosticPayloadComparison ){
+      ordered->apply(packed);
+      ordered.reset();
+    }
+  }
   auto lastStageStart = std::chrono::steady_clock::now();
   auto buildStart = lastStageStart;
   auto fail = [this](std::string reason_){ deviceModelFallbackReason = std::move(reason_); return false; };
@@ -107,6 +117,14 @@ bool Backends::MpsBackendImpl::buildWeightModel() {
   reducedMonotonicDialDescriptorsBuffer = uploadSplineDescriptors(monotonicDialDescriptors);
   reducedGeneralDialDescriptorsBuffer = uploadSplineDescriptors(generalDialDescriptors);
   reducedGraphDialDescriptorsBuffer = uploadSplineDescriptors(graphDialDescriptors);
+  if( ordered ){
+    orderedReducedCompactDialDescriptorsBuffer = uploadSplineDescriptors(ordered->compact);
+    orderedReducedUniformDialDescriptorsBuffer = uploadSplineDescriptors(ordered->uniform);
+    orderedReducedMonotonicDialDescriptorsBuffer = uploadSplineDescriptors(ordered->monotonic);
+    orderedReducedGeneralDialDescriptorsBuffer = uploadSplineDescriptors(ordered->general);
+    orderedReducedGraphDialDescriptorsBuffer = uploadSplineDescriptors(ordered->graph);
+    orderedSplineDataBuffer = makePrivateBuffer(device, commandQueue, ordered->data);
+  }
   responseSmoothingBuffer = makePrivateBuffer(device, commandQueue, smoothings);
 
   baseWeightsBuffer = makePrivateBuffer(device, commandQueue, baseWeights);
@@ -176,6 +194,12 @@ bool Backends::MpsBackendImpl::buildWeightModel() {
                                                  length:sizeof(chunkSize)
                                                 options:MTLResourceStorageModeShared];
 
+  if( enableDiagnosticPayloadComparison and
+      (orderedSplineDataBuffer == nil or orderedReducedCompactDialDescriptorsBuffer == nil or orderedReducedUniformDialDescriptorsBuffer == nil
+       or orderedReducedMonotonicDialDescriptorsBuffer == nil or orderedReducedGeneralDialDescriptorsBuffer == nil or orderedReducedGraphDialDescriptorsBuffer == nil) ){
+    releaseDeviceBuffers();
+    return fail("Ordered MPS payload allocation failed.");
+  }
   if( reducedNormDialOccurrencesBuffer == nil or reducedExternalDialOccurrencesBuffer == nil or reducedCompactDialDescriptorsBuffer == nil or reducedUniformDialDescriptorsBuffer == nil or reducedMonotonicDialDescriptorsBuffer == nil or reducedGeneralDialDescriptorsBuffer == nil or reducedGraphDialDescriptorsBuffer == nil
       or responseSmoothingBuffer == nil
       or compactCachedDialIndicesBuffer == nil or uniformCachedDialIndicesBuffer == nil or monotonicCachedDialIndicesBuffer == nil or generalCachedDialIndicesBuffer == nil or graphCachedDialIndicesBuffer == nil

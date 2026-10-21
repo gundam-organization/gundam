@@ -97,14 +97,19 @@ void Backends::MpsBackendImpl::releaseDeviceBuffers() {
   releaseBuffer(graphDialIndicesBuffer);
   releaseBuffer(compactDialDescriptorsBuffer);
   releaseBuffer(reducedCompactDialDescriptorsBuffer);
+  releaseBuffer(orderedReducedCompactDialDescriptorsBuffer);
   releaseBuffer(uniformDialDescriptorsBuffer);
   releaseBuffer(reducedUniformDialDescriptorsBuffer);
+  releaseBuffer(orderedReducedUniformDialDescriptorsBuffer);
   releaseBuffer(monotonicDialDescriptorsBuffer);
   releaseBuffer(reducedMonotonicDialDescriptorsBuffer);
+  releaseBuffer(orderedReducedMonotonicDialDescriptorsBuffer);
   releaseBuffer(generalDialDescriptorsBuffer);
   releaseBuffer(reducedGeneralDialDescriptorsBuffer);
+  releaseBuffer(orderedReducedGeneralDialDescriptorsBuffer);
   releaseBuffer(graphDialDescriptorsBuffer);
   releaseBuffer(reducedGraphDialDescriptorsBuffer);
+  releaseBuffer(orderedReducedGraphDialDescriptorsBuffer);
   releaseBuffer(compactCachedResponsesBuffer);
   releaseBuffer(compactCachedDialIndicesBuffer);
   releaseBuffer(uniformCachedResponsesBuffer);
@@ -119,6 +124,7 @@ void Backends::MpsBackendImpl::releaseDeviceBuffers() {
   releaseBuffer(binEventOffsetsBuffer);
   releaseBuffer(binEventIndicesBuffer);
   releaseBuffer(splineDataBuffer);
+  releaseBuffer(orderedSplineDataBuffer);
   releaseBuffer(responseSmoothingBuffer);
   releaseBuffer(parametersBuffer);
   releaseBuffer(externalWeightsBuffer);

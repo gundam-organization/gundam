@@ -102,13 +102,32 @@ dispatches from the previous optimization. Model loading enables
 `backendConfig.enableDiagnosticDescriptorComparison` so both layouts are
 available; normal runs allocate only the compact layout.
 
-The same alternating order, parameter sequences, ordinary timing passes,
-separate stage probes, and exact comparisons apply. Modes are called
+Descriptor comparisons use the original payload order in both modes to isolate
+the descriptor-size experiment. The same alternating order, parameter sequences,
+ordinary timing passes, separate stage probes, and exact comparisons apply. Modes are called
 `legacyDescriptors` and `compactDescriptors` in the JSON files. A/B allocation
 contains both layouts: subtract the inactive descriptor buffers when comparing
 normal production memory requirements. The smoothing table belongs only to the
 compact representation. No event, coefficient or reference reordering is
 performed by this experiment.
+
+### Comparing spline payload order
+
+Use `--compare-payloads --comparison-rounds 2` to compare the original payload
+order with first-use order across logical 32-event GPU tiles. Both modes use
+compact descriptors and compact cached-dial lists. Payload values, descriptor
+IDs, response slots, event references, and multiplication order are preserved;
+only payload offsets and placement differ.
+
+The script sets `backendConfig.enableDiagnosticPayloadComparison` before model
+initialization. The A/B model retains both payload buffers and both sets of
+compact descriptors so mode changes do not reload the dataset. Production uses
+the reordered payloads by default and allocates only one layout.
+
+JSON mode names are `originalPayloads` and `orderedPayloads`. Ordinary timing
+trials alternate A/B order; every likelihood and final histogram must match
+exactly. Separate GPU stage probes follow all ordinary trials. Do not interpret
+the dual A/B allocation as production GPU memory consumption.
 
 ## Single-thread propagation and function sampling
 
