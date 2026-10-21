@@ -4,6 +4,53 @@ These scripts measure performance; they are not part of the regular regression
 suite. Use a Release build with the Python interface enabled and select the
 matching installed `GUNDAM` Python module.
 
+## Single-thread propagation and function sampling
+
+```sh
+python3 "$REPO_DIR/gundam/tests/benchmarks/224CpuSingleThreadBenchmark.py" \
+  --config configOA2024.yaml --hardware-counters --perf-record \
+  --override override/v13Prod.yaml override/backendCpuTest.yaml
+```
+
+This sets the complete GUNDAM thread pool to one: weights, cache workers and
+histogram filling use one thread. This differs from the scaling benchmark's
+one-active-weight-worker case, which retains a larger histogram pool. Dataset
+loading also uses the single-thread setting and may take longer. The input
+selection is unchanged and no event-count limit is added. The complete production
+model still needs its usual memory allocation, even with only one compute thread.
+
+Default work is 40 constant-point timed evaluations, five separate counter probes,
+and (when `--perf-record` can attach) 40 separately sampled evaluations, plus
+warmup/priming. All response caches are primed; this isolates steady-state weight
+and histogram costs, not the cost of updating all spline responses. There is no
+Migrad/HESSE run and no dataset reload between passes.
+
+Output under `cpu-single-thread-<timestamp>-<PID>/` includes the normal JSON
+reports with cache, weight, histogram, statistical likelihood, variable, binning,
+host input-preparation and complete-evaluation times. Their sum can differ from
+complete time because wrapper/penalty work is outside the listed timers. Select
+the rebuilt Python interface to expose the statistical likelihood timer.
+
+Optional Linux `perf` sampling attaches only after model loading and ordinary
+measurements. It samples the complete repeated likelihood evaluation (including
+Python wrapper work), not just weights. It uses `cycles:u` at 199 Hz and DWARF
+call stacks, then writes `perf.data`, `perf-record.log`, `perf-report.txt` and
+`perf-status.json`. An additional `perf-annotate.txt` shows sampled assembly
+for functions above 1% overhead when disassembly is available. The report ranks
+self overhead by library/function; call
+stacks remain in `perf.data`. The short attachment delay may leave a small amount
+of startup/idle sampling outside the evaluation loop. Sampling results are never
+mixed into ordinary timing trials or the phase-scoped counter probes.
+
+If perf is absent, denied, or cannot stop/report normally, its status/log is
+retained and the ordinary timing results remain available. No installation or
+privilege escalation is attempted. Function/line resolution depends on the
+installed binary's symbols: Release can provide function attribution when symbols
+are retained; RelWithDebInfo is preferable for source/instruction analysis. A
+sampled instruction near a cache miss is not by itself proof of the stall's cause.
+See the [perf record](https://man7.org/linux/man-pages/man1/perf-record.1.html) and
+[perf report](https://man7.org/linux/man-pages/man1/perf-report.1.html) manuals.
+
 ## Resident CPU weight scaling
 
 On an allocation with eight CPUs, run from the production configuration directory:

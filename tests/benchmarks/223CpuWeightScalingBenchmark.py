@@ -66,6 +66,8 @@ def summarize_hardware(probes):
 
 def measure(args):
     import GUNDAM
+    if not hasattr(GUNDAM.BackendTimingSummary, 'likelihoodHostSeconds'):
+        raise RuntimeError('Rebuild/install GUNDAM: full stage timing fields are missing.')
     if not hasattr(GUNDAM.BackendManager, 'setDiagnosticCpuWeightWorkers'):
         raise RuntimeError('Rebuild/install GUNDAM: CPU weight worker diagnostics are missing.')
     if args.hardware_counters and (not hasattr(GUNDAM.BackendManager, 'setDiagnosticCpuWeightCounters')
@@ -124,7 +126,8 @@ def measure(args):
                 engine.evaluateLikelihood()
             raw = []
             for trial in range(args.trials):
-                times = {k: [] for k in ('weights', 'cache', 'histograms', 'evaluation')}
+                times = {k: [] for k in ('weights', 'cache', 'histograms', 'likelihood', 'variables',
+                                         'binning', 'hostPreparation', 'evaluation')}
                 for _ in range(args.calls):
                     start = time.perf_counter()
                     engine.evaluateLikelihood()
@@ -133,6 +136,10 @@ def measure(args):
                     times['weights'].append(timing.eventWeightsStageSeconds)
                     times['cache'].append(timing.cachedDialStageSeconds)
                     times['histograms'].append(timing.histogramStageSeconds)
+                    times['likelihood'].append(timing.likelihoodHostSeconds)
+                    times['variables'].append(timing.variableStageSeconds)
+                    times['binning'].append(timing.binningStageSeconds)
+                    times['hostPreparation'].append(manager.getLastPreparationSeconds())
                     if timing.cacheCandidateCount:
                         raise RuntimeError('Constant-point cache is not warm: unexpected dial candidates.')
                     value = engine.getLikelihoodInterface().getLastLikelihood()
@@ -186,27 +193,49 @@ def measure(args):
                 if baseline:
                     r['weightSpeedupVsOneWorker'] = baseline['timings']['weights']['medianMs'] / r['timings']['weights']['medianMs']
             write_json(args.output / 'summary.json', results)
+    if args.perf_record:
+        helper_spec = importlib.util.spec_from_file_location(
+            'sampling', Path(__file__).with_name('CpuSamplingProfile.py'))
+        sampling = importlib.util.module_from_spec(helper_spec)
+        helper_spec.loader.exec_module(sampling)
+        def evaluate_checked():
+            engine.evaluateLikelihood()
+            if not math.isclose(engine.getLikelihoodInterface().getLastLikelihood(), reference_llh,
+                                rel_tol=1e-10, abs_tol=1e-10):
+                raise RuntimeError('Likelihood changed during sampling pass.')
+        sampling.record_profile(args.output, evaluate_checked, args.profile_calls, write_json, progress)
+        manager.materialize('Histograms')
+        if histogram() != reference_histogram:
+            raise RuntimeError('Histogram changed during sampling pass.')
     progress(f'SUCCESS: all worker counts preserve LLH and histograms. Results: {args.output}')
 
 
-def main():
-    parser = argparse.ArgumentParser(description=__doc__)
+def main(single_thread=False, description=None):
+    parser = argparse.ArgumentParser(description=description or __doc__)
     parser.add_argument('--config', type=Path, required=True)
     parser.add_argument('--override', nargs='*', default=[])
     parser.add_argument('--work-dir', type=Path, default=Path.cwd())
-    parser.add_argument('--threads', type=int, default=8, help='Resident pool size; dataset is loaded once')
-    parser.add_argument('--workers', nargs='+', type=int, default=[1, 2, 4, 8])
-    parser.add_argument('--calls', type=int, default=30)
+    parser.add_argument('--threads', type=int, default=1 if single_thread else 8, help='Resident pool size; dataset is loaded once')
+    parser.add_argument('--workers', nargs='+', type=int, default=[1] if single_thread else [1, 2, 4, 8])
+    parser.add_argument('--calls', type=int, default=40 if single_thread else 30)
     parser.add_argument('--trials', type=int, default=1)
-    parser.add_argument('--rounds', type=int, default=2, help='Alternate ascending and descending order')
+    parser.add_argument('--rounds', type=int, default=1 if single_thread else 2, help='Alternate ascending and descending order')
     parser.add_argument('--warmup', type=int, default=3)
     parser.add_argument('--probe-calls', type=int, default=5)
     parser.add_argument('--hardware-counters', action='store_true',
                         help='Optional Linux perf counters and thread CPU/context-switch probes, only in the separate probe pass')
-    parser.add_argument('--output', type=Path, default=Path(time.strftime('cpu-weight-scaling-%Y%m%d-%H%M%S-') + str(os.getpid())))
+    if single_thread:
+        parser.add_argument('--perf-record', action='store_true', help='Optional Linux perf function/call-stack sampling, after timing trials')
+        parser.add_argument('--profile-calls', type=int, default=40, help='Separate sampled evaluations')
+    else:
+        parser.set_defaults(perf_record=False, profile_calls=40)
+    prefix = 'cpu-single-thread-' if single_thread else 'cpu-weight-scaling-'
+    parser.add_argument('--output', type=Path, default=Path(time.strftime(prefix + '%Y%m%d-%H%M%S-') + str(os.getpid())))
     parser.add_argument('--worker', action='store_true', help=argparse.SUPPRESS)
     args = parser.parse_args()
-    if min(args.threads, *args.workers, args.calls, args.trials, args.rounds, args.warmup, args.probe_calls) < 1:
+    if single_thread and (args.threads != 1 or args.workers != [1]):
+        parser.error('This benchmark requires --threads 1 --workers 1')
+    if min(args.threads, *args.workers, args.calls, args.trials, args.rounds, args.warmup, args.probe_calls, args.profile_calls) < 1:
         parser.error('Counts must be positive')
     if max(args.workers) > args.threads:
         parser.error('--workers cannot exceed the resident --threads pool')
@@ -223,8 +252,10 @@ def main():
     progress(f'Results: {args.output}; one dataset load, no event-count limit added')
     count = len(args.workers) * args.rounds
     progress(f'{count * args.calls * args.trials} timed evaluations + {count * args.probe_calls} separate worker probes + warmup/priming')
+    if args.perf_record:
+        progress(f'Additional separate perf pass: {args.profile_calls} evaluations if perf can attach')
     log_path = args.output / 'native.log'
-    command = [sys.executable, '-u', str(Path(__file__).resolve()), *sys.argv[1:], '--worker', '--output', str(args.output)]
+    command = [sys.executable, '-u', str(Path(sys.argv[0]).resolve()), *sys.argv[1:], '--worker', '--output', str(args.output)]
     environment = os.environ.copy()
     environment.pop('GUNDAM_CPU_DIAGNOSTIC_BLOCKS_PER_THREAD', None)
     with log_path.open('w') as log, subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,

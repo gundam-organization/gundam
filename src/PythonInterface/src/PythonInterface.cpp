@@ -560,6 +560,7 @@ PYBIND11_MODULE(GUNDAM, module) {
   .def_readonly("cacheInputTransformCount", &Backends::BackendTimingSummary::cacheInputTransformCount)
   .def_readonly("sharedCacheInputs", &Backends::BackendTimingSummary::sharedCacheInputs)
   .def_readonly("linearCacheTraversal", &Backends::BackendTimingSummary::linearCacheTraversal)
+  .def_readonly("likelihoodHostSeconds", &Backends::BackendTimingSummary::likelihoodHostSeconds)
   .def_readonly("histogramStageSeconds", &Backends::BackendTimingSummary::histogramStageSeconds)
   .def_readonly("externalWeightUploadSeconds", &Backends::BackendTimingSummary::externalWeightUploadSeconds)
   .def_readonly("externalWeightUploadBytes", &Backends::BackendTimingSummary::externalWeightUploadBytes)

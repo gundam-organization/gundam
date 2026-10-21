@@ -212,6 +212,22 @@ def main():
                     assert all(e['scaledCount'] is None for e in hardware['events'].values())
         assert result['hardware']['workerSamples'] == 2 * result['workers']
     assert not list(scaling_output.glob('*.partial.json'))
+    single = benchmark.with_name('224CpuSingleThreadBenchmark.py')
+    single_output = base / f'single-results-{os.getpid()}'
+    with (base / 'single-benchmark.log').open('w') as log:
+        subprocess.run([sys.executable, str(single), '--config', str(base / 'config-False.json'),
+                        '--calls', '3', '--warmup', '1', '--probe-calls', '2', '--hardware-counters',
+                        '--perf-record', '--profile-calls', '2', '--output', str(single_output)],
+                       stdout=log, stderr=subprocess.STDOUT, check=True)
+    single_summary = json.loads((single_output / 'summary.json').read_text())
+    assert len(single_summary) == 1
+    assert single_summary[0]['workers'] == single_summary[0]['poolThreads'] == 1
+    assert {'weights', 'cache', 'histograms', 'likelihood', 'variables', 'binning',
+            'hostPreparation', 'evaluation'} == set(single_summary[0]['timings'])
+    assert single_summary[0]['histogramsExactlyAgree'] and single_summary[0]['likelihoodsAgree']
+    status = json.loads((single_output / 'perf-status.json').read_text())
+    if sys.platform != 'linux':
+        assert not status['available']
     print('SUCCESS: workload replay, traversals and shared input evaluations preserve predictions.')
 
 

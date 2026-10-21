@@ -114,6 +114,12 @@ bit across the indexed and automatic response traversals, including sparse/dense
 transitions and mixed features. The numerical contract also preserves event
 product order and histogram reduction order across weight schedulers.
 
+`224CpuSingleThreadBenchmark.py` uses one thread for the complete propagation
+pipeline and reports all available stage timers. Its optional `--perf-record`
+pass samples resident likelihood evaluations by function after loading, outside
+ordinary timing/counter passes. This isolates steady-state costs with a primed
+dial cache; it does not model all-parameter response updates.
+
 Performance scripts live in `tests/benchmarks`; see the
 [benchmark instructions](../../../tests/benchmarks/README.md). The resident
 weight-scaling benchmark loads the model once and varies only active weight
