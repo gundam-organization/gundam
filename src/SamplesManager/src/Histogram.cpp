@@ -29,7 +29,12 @@ void Histogram::build(const ConfigReader& binningConfig_){
   }
 
 }
-int Histogram::findBinIndex(const Event& event_) const{
+int Histogram::findBinIndex(const Event& event_, int previousBinIndex_) const{
+  // BinSet rejects overlapping bins, so a valid previous bin is unambiguous.
+  if( previousBinIndex_ >= 0 and size_t(previousBinIndex_) < binContextList.size() ){
+    const auto& bin = binContextList[previousBinIndex_].bin;
+    if( event_.getVariables().isInBin(bin) ){ return bin.getIndex(); }
+  }
   for( const auto& binContext : binContextList ){
     if( event_.getVariables().isInBin(binContext.bin) ){
       return binContext.bin.getIndex();

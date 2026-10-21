@@ -163,6 +163,20 @@ likelihoodInterfaceConfig:
     propagator.updateEventSampleBinning()
     check(initial)  # Also exercises rebinding the loader's variable-index caches.
 
+    # Small steps keep events in their previous bins, including a bin after
+    # the first one. Repeating the update must preserve contents and errors.
+    for step in [0.01, 0.02, -0.01]:
+        set_value(0, "X", 0.25 + step)
+        set_value(1, "X", 1.25 + step)
+        propagator.updateEventSampleBinning()
+        check(initial)
+
+    # Invalid previous indices must fall back to the full bin search.
+    events[0].getIndices().bin = -1
+    events[1].getIndices().bin = len(bin_indices)
+    propagator.updateEventSampleBinning()
+    check(initial)
+
     # The setter preserves scalar types and exact 64-bit integer values.
     large = events[0].getVariables().fetchVariable("large")
     assert large.getValue() == 2**53 + 1
