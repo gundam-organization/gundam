@@ -594,6 +594,11 @@ PYBIND11_MODULE(GUNDAM, module) {
     LogThrowIf(mps == nullptr, "MPS stage diagnostics require an MPS backend.");
     mps->setDiagnosticStageProfiling(enabled_);
   })
+  .def("setDiagnosticMpsCompactDialDescriptors", [](Backends::BackendManager& manager_, bool enabled_){
+    auto* mps = dynamic_cast<Backends::MpsBackend*>(manager_.getBackend());
+    LogThrowIf(mps == nullptr, "Descriptor diagnostics require an MPS backend.");
+    mps->setDiagnosticCompactDialDescriptors(enabled_);
+  })
   .def("setDiagnosticMpsCompactCachedDials", [](Backends::BackendManager& manager_, bool enabled_){
     auto* mps = dynamic_cast<Backends::MpsBackend*>(manager_.getBackend());
     LogThrowIf(mps == nullptr, "Compact cached dial diagnostics require an MPS backend.");

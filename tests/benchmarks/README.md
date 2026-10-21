@@ -92,6 +92,24 @@ median/mean/p95 times by scenario/mode, speedup ratios, completion status, and
 exact comparison status. The diagnostic switch affects the packed-weight MPS
 path; the event-propagation path uses a different dial executor.
 
+### Comparing compact dial descriptors
+
+Use `--compare-descriptors --comparison-rounds 2` in place of
+`--compare-cached-dials` to compare the legacy 48-byte spline / 36-byte
+normalization and external-weight descriptors against compact 24-byte / 16-byte
+records with a separate smoothing table. Both modes retain compact cached dial
+dispatches from the previous optimization. Model loading enables
+`backendConfig.enableDiagnosticDescriptorComparison` so both layouts are
+available; normal runs allocate only the compact layout.
+
+The same alternating order, parameter sequences, ordinary timing passes,
+separate stage probes, and exact comparisons apply. Modes are called
+`legacyDescriptors` and `compactDescriptors` in the JSON files. A/B allocation
+contains both layouts: subtract the inactive descriptor buffers when comparing
+normal production memory requirements. The smoothing table belongs only to the
+compact representation. No event, coefficient or reference reordering is
+performed by this experiment.
+
 ## Single-thread propagation and function sampling
 
 ```sh

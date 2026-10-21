@@ -78,6 +78,8 @@ def load_engine(args):
                   generateSamplePlots=False, generateOneSigmaPlots=False)
     backend = config['likelihoodInterfaceConfig'].setdefault('backendManagerConfig', {})
     backend.update(isEnabled=True, type='MPS')
+    if args.compare_descriptors:
+        backend.setdefault('backendConfig', {})['enableDiagnosticDescriptorComparison'] = True
     write_json(args.output / 'resolved-fitter-config.json', config)
     engine = GUNDAM.FitterEngine()
     engine.configure(GUNDAM.ConfigUtils.ConfigReader(GUNDAM.JsonType(json.dumps(config))))
@@ -167,21 +169,25 @@ def check_exact(reference, actual):
         raise RuntimeError('A/B histograms differ (exact comparison)')
 
 
-def compare_cached_dials(args, engine):
+def compare_variants(args, engine):
     manager = engine.getBackendsManager()
-    if not hasattr(manager, 'setDiagnosticMpsCompactCachedDials'):
-        raise RuntimeError('Rebuild GUNDAM: compact cached dial comparison is unavailable')
+    descriptor_comparison = args.compare_descriptors
+    variant_names = ('legacyDescriptors', 'compactDescriptors') if descriptor_comparison else ('fullScan', 'compactIndices')
+    method = 'setDiagnosticMpsCompactDialDescriptors' if descriptor_comparison else 'setDiagnosticMpsCompactCachedDials'
+    if not hasattr(manager, method):
+        raise RuntimeError(f'Rebuild GUNDAM: missing {method}')
+    set_variant = getattr(manager, method)
     metadata = json.loads(manager.getDiagnosticMps())
-    if metadata['path'] != 'packedWeights' or not metadata['cachedDials']:
-        raise RuntimeError('Cached dial A/B comparison requires the packed weight path with cached dials')
+    if metadata['path'] != 'packedWeights' or (not descriptor_comparison and not metadata['cachedDials']):
+        raise RuntimeError('A/B comparison requires a compatible packed weight model')
     sequence = scheduling.ParameterSequence(engine, args.step_scale)
     write_json(args.output / 'parameters.json', sequence.manifest())
-    summary = {'complete': False, 'comparison': 'fullScan vs compactIndices',
+    summary = {'complete': False, 'comparison': ' vs '.join(variant_names),
                'exactResultsMatch': True, 'scenarios': {}}
-    accumulated = {scenario: {mode: [] for mode in ('fullScan', 'compactIndices')}
+    accumulated = {scenario: {mode: [] for mode in variant_names}
                    for scenario in args.scenarios}
-    for mode in ('fullScan', 'compactIndices'):
-        manager.setDiagnosticMpsCompactCachedDials(mode == 'compactIndices')
+    for mode in variant_names:
+        set_variant(mode == variant_names[1])
         write_json(args.output / f'model-{mode}.json', json.loads(manager.getDiagnosticMps()))
     try:
         for round_index in range(args.comparison_rounds):
@@ -189,12 +195,12 @@ def compare_cached_dials(args, engine):
                 calls = scheduling.scenario_calls(args, scenario, len(sequence.entries))
                 for trial in range(args.trials):
                     # Alternate A/B and B/A so one mode is not always measured first.
-                    modes = ['fullScan', 'compactIndices']
+                    modes = list(variant_names)
                     if (round_index + trial + scenario_index) % 2:
                         modes.reverse()
                     pair = {}
                     for mode in modes:
-                        manager.setDiagnosticMpsCompactCachedDials(mode == 'compactIndices')
+                        set_variant(mode == variant_names[1])
                         if args.warmup:
                             evaluate_pass(args, engine, sequence, scenario, args.warmup,
                                           args.seed + 1000000)
@@ -206,10 +212,10 @@ def compare_cached_dials(args, engine):
                         write_json(args.output / f'{tag}.json', result)
                         pair[mode] = result
                         accumulated[scenario][mode].extend(result['rows'])
-                    check_exact(pair['fullScan'], pair['compactIndices'])
+                    check_exact(pair[variant_names[0]], pair[variant_names[1]])
                     entry = {'callsPerTrial': calls, 'completedPairs': (round_index * args.trials + trial + 1),
                              'timings': {mode: summarize(rows) for mode, rows in accumulated[scenario].items()}}
-                    base, compact = (entry['timings'][mode] for mode in ('fullScan', 'compactIndices'))
+                    base, compact = (entry['timings'][mode] for mode in variant_names)
                     entry['evaluationSpeedup'] = base['evaluationSeconds']['medianMs'] / compact['evaluationSeconds']['medianMs']
                     entry['gpuSpeedup'] = base['devicePropagationSeconds']['medianMs'] / compact['devicePropagationSeconds']['medianMs']
                     summary['scenarios'][scenario] = entry
@@ -221,14 +227,14 @@ def compare_cached_dials(args, engine):
         if args.probe_calls:
             for scenario in args.scenarios:
                 pair = {}
-                for mode in ('fullScan', 'compactIndices'):
-                    manager.setDiagnosticMpsCompactCachedDials(mode == 'compactIndices')
+                for mode in variant_names:
+                    set_variant(mode == variant_names[1])
                     progress(f'{scenario}-{mode}: separate GPU stage probes')
                     result = evaluate_pass(args, engine, sequence, scenario, args.probe_calls,
                                            args.seed, profiling=True, spread=True)
                     write_json(args.output / f'{scenario}-{mode}-probes.json', result)
                     pair[mode] = result
-                check_exact(pair['fullScan'], pair['compactIndices'])
+                check_exact(pair[variant_names[0]], pair[variant_names[1]])
                 summary['scenarios'][scenario]['probeTimings'] = {
                     mode: {name: values for name, values in result['timings'].items() if name.startswith('gpu:')}
                     for mode, result in pair.items()}
@@ -236,15 +242,15 @@ def compare_cached_dials(args, engine):
         summary['complete'] = True
         write_json(args.output / 'summary.json', summary)
     finally:
-        manager.setDiagnosticMpsCompactCachedDials(True)
+        set_variant(True)
     progress(f'SUCCESS: A/B likelihoods and histograms exactly identical; results in {args.output}')
 
 
 def measure(args):
     import GUNDAM
     engine = load_engine(args)
-    if args.compare_cached_dials:
-        compare_cached_dials(args, engine)
+    if args.compare_cached_dials or args.compare_descriptors:
+        compare_variants(args, engine)
         return
     sequence = scheduling.ParameterSequence(engine, args.step_scale)
     write_json(args.output / 'parameters.json', sequence.manifest())
@@ -291,7 +297,10 @@ def measure(args):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--compare-cached-dials', action='store_true',
+    comparisons = parser.add_mutually_exclusive_group()
+    comparisons.add_argument('--compare-descriptors', action='store_true',
+                             help='Compare legacy descriptors with compact hot descriptors and cold smoothing')
+    comparisons.add_argument('--compare-cached-dials', action='store_true',
                         help='Compare full descriptor scans with compact cached indices on one resident model')
     parser.add_argument('--comparison-rounds', type=int, default=2,
                         help='A/B rounds; mode order alternates between rounds/trials')

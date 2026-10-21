@@ -33,11 +33,17 @@ Backends::MpsBackendImpl::MpsBackendImpl() : model(engineView.propagation), like
   }
 
   eventWeightsPipeline = makePipeline(device, library, @"compute_event_weights");
+  reducedEventWeightsPipeline = makePipeline(device, library, @"compute_event_weights_reduced");
   cachedCompactResponsesPipeline = makePipeline(device, library, @"compute_cached_compact_responses");
+  reducedCachedCompactResponsesPipeline = makePipeline(device, library, @"compute_cached_compact_responses_reduced");
   cachedUniformResponsesPipeline = makePipeline(device, library, @"compute_cached_uniform_responses");
+  reducedCachedUniformResponsesPipeline = makePipeline(device, library, @"compute_cached_uniform_responses_reduced");
   cachedMonotonicResponsesPipeline = makePipeline(device, library, @"compute_cached_monotonic_responses");
+  reducedCachedMonotonicResponsesPipeline = makePipeline(device, library, @"compute_cached_monotonic_responses_reduced");
   cachedGeneralResponsesPipeline = makePipeline(device, library, @"compute_cached_general_responses");
+  reducedCachedGeneralResponsesPipeline = makePipeline(device, library, @"compute_cached_general_responses_reduced");
   cachedGraphResponsesPipeline = makePipeline(device, library, @"compute_cached_graph_responses");
+  reducedCachedGraphResponsesPipeline = makePipeline(device, library, @"compute_cached_graph_responses_reduced");
   histogramPipeline = makePipeline(device, library, @"fill_histograms");
   histogramPartialsPipeline = makePipeline(device, library, @"fill_histogram_partials_by_bin");
   histogramFinalizePipeline = makePipeline(device, library, @"finalize_histograms_from_partials");
@@ -45,6 +51,8 @@ Backends::MpsBackendImpl::MpsBackendImpl() : model(engineView.propagation), like
       or cachedMonotonicResponsesPipeline == nil or cachedGeneralResponsesPipeline == nil
       or cachedGraphResponsesPipeline == nil or histogramPipeline == nil
       or histogramPartialsPipeline == nil or histogramFinalizePipeline == nil ){ [library release]; return; }
+
+  if( reducedEventWeightsPipeline == nil or reducedCachedCompactResponsesPipeline == nil or reducedCachedUniformResponsesPipeline == nil or reducedCachedMonotonicResponsesPipeline == nil or reducedCachedGeneralResponsesPipeline == nil or reducedCachedGraphResponsesPipeline == nil ){ [library release]; return; }
 
   commandQueue = [device newCommandQueue];
   if( commandQueue == nil ){ [library release]; return; }
@@ -58,11 +66,17 @@ Backends::MpsBackendImpl::~MpsBackendImpl() {
   eventPropagation.reset();
   releaseDeviceBuffers();
   [eventWeightsPipeline release];
+  [reducedEventWeightsPipeline release];
   [cachedCompactResponsesPipeline release];
+  [reducedCachedCompactResponsesPipeline release];
   [cachedUniformResponsesPipeline release];
+  [reducedCachedUniformResponsesPipeline release];
   [cachedMonotonicResponsesPipeline release];
+  [reducedCachedMonotonicResponsesPipeline release];
   [cachedGeneralResponsesPipeline release];
+  [reducedCachedGeneralResponsesPipeline release];
   [cachedGraphResponsesPipeline release];
+  [reducedCachedGraphResponsesPipeline release];
   [histogramPipeline release];
   [histogramPartialsPipeline release];
   [histogramFinalizePipeline release];
@@ -75,16 +89,22 @@ void Backends::MpsBackendImpl::releaseDeviceBuffers() {
   releaseBuffer(baseWeightsBuffer);
   releaseBuffer(eventDialRangesBuffer);
   releaseBuffer(normDialOccurrencesBuffer);
+  releaseBuffer(reducedNormDialOccurrencesBuffer);
   releaseBuffer(compactDialIndicesBuffer);
   releaseBuffer(uniformDialIndicesBuffer);
   releaseBuffer(monotonicDialIndicesBuffer);
   releaseBuffer(generalDialIndicesBuffer);
   releaseBuffer(graphDialIndicesBuffer);
   releaseBuffer(compactDialDescriptorsBuffer);
+  releaseBuffer(reducedCompactDialDescriptorsBuffer);
   releaseBuffer(uniformDialDescriptorsBuffer);
+  releaseBuffer(reducedUniformDialDescriptorsBuffer);
   releaseBuffer(monotonicDialDescriptorsBuffer);
+  releaseBuffer(reducedMonotonicDialDescriptorsBuffer);
   releaseBuffer(generalDialDescriptorsBuffer);
+  releaseBuffer(reducedGeneralDialDescriptorsBuffer);
   releaseBuffer(graphDialDescriptorsBuffer);
+  releaseBuffer(reducedGraphDialDescriptorsBuffer);
   releaseBuffer(compactCachedResponsesBuffer);
   releaseBuffer(compactCachedDialIndicesBuffer);
   releaseBuffer(uniformCachedResponsesBuffer);
@@ -99,9 +119,11 @@ void Backends::MpsBackendImpl::releaseDeviceBuffers() {
   releaseBuffer(binEventOffsetsBuffer);
   releaseBuffer(binEventIndicesBuffer);
   releaseBuffer(splineDataBuffer);
+  releaseBuffer(responseSmoothingBuffer);
   releaseBuffer(parametersBuffer);
   releaseBuffer(externalWeightsBuffer);
   releaseBuffer(externalDialOccurrencesBuffer);
+  releaseBuffer(reducedExternalDialOccurrencesBuffer);
   externalWeightGenerations.clear();
   releaseBuffer(partialHistSumsBuffer);
   releaseBuffer(partialHistSumSquaresBuffer);

@@ -12,33 +12,35 @@ void Backends::MpsBackendImpl::updateExternalWeights(const PropagationInputs& in
 
 bool Backends::MpsBackendImpl::encodeEventWeights(id<MTLComputeCommandEncoder> encoder) {
   if( not isWeightModelSupported ){ return false; }
-  [encoder setComputePipelineState:eventWeightsPipeline];
+  auto pipeline = useReducedDialDescriptors ? reducedEventWeightsPipeline : eventWeightsPipeline;
+  [encoder setComputePipelineState:pipeline];
   [encoder setBuffer:eventWeightsBuffer offset:0 atIndex:0];
   [encoder setBuffer:baseWeightsBuffer offset:0 atIndex:1];
   [encoder setBuffer:eventDialRangesBuffer offset:0 atIndex:2];
-  [encoder setBuffer:normDialOccurrencesBuffer offset:0 atIndex:3];
+  [encoder setBuffer:(useReducedDialDescriptors ? reducedNormDialOccurrencesBuffer : normDialOccurrencesBuffer) offset:0 atIndex:3];
   [encoder setBuffer:parametersBuffer offset:0 atIndex:4];
   [encoder setBuffer:compactDialIndicesBuffer offset:0 atIndex:5];
-  [encoder setBuffer:compactDialDescriptorsBuffer offset:0 atIndex:6];
+  [encoder setBuffer:(useReducedDialDescriptors ? reducedCompactDialDescriptorsBuffer : compactDialDescriptorsBuffer) offset:0 atIndex:6];
   [encoder setBuffer:compactCachedResponsesBuffer offset:0 atIndex:7];
   [encoder setBuffer:uniformDialIndicesBuffer offset:0 atIndex:8];
-  [encoder setBuffer:uniformDialDescriptorsBuffer offset:0 atIndex:9];
+  [encoder setBuffer:(useReducedDialDescriptors ? reducedUniformDialDescriptorsBuffer : uniformDialDescriptorsBuffer) offset:0 atIndex:9];
   [encoder setBuffer:uniformCachedResponsesBuffer offset:0 atIndex:10];
   [encoder setBuffer:monotonicDialIndicesBuffer offset:0 atIndex:11];
-  [encoder setBuffer:monotonicDialDescriptorsBuffer offset:0 atIndex:12];
+  [encoder setBuffer:(useReducedDialDescriptors ? reducedMonotonicDialDescriptorsBuffer : monotonicDialDescriptorsBuffer) offset:0 atIndex:12];
   [encoder setBuffer:monotonicCachedResponsesBuffer offset:0 atIndex:13];
   [encoder setBuffer:generalDialIndicesBuffer offset:0 atIndex:14];
-  [encoder setBuffer:generalDialDescriptorsBuffer offset:0 atIndex:15];
+  [encoder setBuffer:(useReducedDialDescriptors ? reducedGeneralDialDescriptorsBuffer : generalDialDescriptorsBuffer) offset:0 atIndex:15];
   [encoder setBuffer:generalCachedResponsesBuffer offset:0 atIndex:16];
   [encoder setBuffer:graphDialIndicesBuffer offset:0 atIndex:17];
-  [encoder setBuffer:graphDialDescriptorsBuffer offset:0 atIndex:18];
+  [encoder setBuffer:(useReducedDialDescriptors ? reducedGraphDialDescriptorsBuffer : graphDialDescriptorsBuffer) offset:0 atIndex:18];
   [encoder setBuffer:graphCachedResponsesBuffer offset:0 atIndex:19];
   [encoder setBuffer:splineDataBuffer offset:0 atIndex:20];
   [encoder setBuffer:nEventsBuffer offset:0 atIndex:21];
   [encoder setBuffer:externalWeightsBuffer offset:0 atIndex:22];
-  [encoder setBuffer:externalDialOccurrencesBuffer offset:0 atIndex:23];
+  [encoder setBuffer:(useReducedDialDescriptors ? reducedExternalDialOccurrencesBuffer : externalDialOccurrencesBuffer) offset:0 atIndex:23];
 
-  NSUInteger width = std::min<NSUInteger>(eventWeightsPipeline.maxTotalThreadsPerThreadgroup, 256);
+  [encoder setBuffer:responseSmoothingBuffer offset:0 atIndex:24];
+  NSUInteger width = std::min<NSUInteger>(pipeline.maxTotalThreadsPerThreadgroup, 256);
   if( width == 0 ){ width = 1; }
   [encoder dispatchThreads:MTLSizeMake(NSUInteger(model.events.size()), 1, 1)
      threadsPerThreadgroup:MTLSizeMake(width, 1, 1)];
@@ -64,6 +66,7 @@ bool Backends::MpsBackendImpl::encodeCachedDialResponses(id<MTLComputeCommandEnc
   [encoder setBuffer:cachedDialIndicesBuffer_ offset:0 atIndex:5];
   uint32_t useCachedIndices = useCompactCachedDialIndices;
   [encoder setBytes:&useCachedIndices length:sizeof(useCachedIndices) atIndex:6];
+  [encoder setBuffer:responseSmoothingBuffer offset:0 atIndex:7];
 
   NSUInteger width = std::min<NSUInteger>(pipeline_.maxTotalThreadsPerThreadgroup, 256);
   if( width == 0 ){ width = 1; }
@@ -112,11 +115,11 @@ bool Backends::MpsBackendImpl::runWeightPropagation(const PropagationInputs& inp
 
   auto encodeAllCachedResponses = [&](id<MTLComputeCommandEncoder> encoder_) {
     if( not enableCachedDialResponses ){ return true; }
-    return encodeCachedDialResponses(encoder_, cachedCompactResponsesPipeline, compactCachedResponsesBuffer, compactDialDescriptorsBuffer, compactDialDescriptorCount, compactCachedDialIndicesBuffer, compactCachedDialCount)
-           and encodeCachedDialResponses(encoder_, cachedUniformResponsesPipeline, uniformCachedResponsesBuffer, uniformDialDescriptorsBuffer, uniformDialDescriptorCount, uniformCachedDialIndicesBuffer, uniformCachedDialCount)
-           and encodeCachedDialResponses(encoder_, cachedMonotonicResponsesPipeline, monotonicCachedResponsesBuffer, monotonicDialDescriptorsBuffer, monotonicDialDescriptorCount, monotonicCachedDialIndicesBuffer, monotonicCachedDialCount)
-           and encodeCachedDialResponses(encoder_, cachedGeneralResponsesPipeline, generalCachedResponsesBuffer, generalDialDescriptorsBuffer, generalDialDescriptorCount, generalCachedDialIndicesBuffer, generalCachedDialCount)
-           and encodeCachedDialResponses(encoder_, cachedGraphResponsesPipeline, graphCachedResponsesBuffer, graphDialDescriptorsBuffer, graphDialDescriptorCount, graphCachedDialIndicesBuffer, graphCachedDialCount);
+    return encodeCachedDialResponses(encoder_, (useReducedDialDescriptors ? reducedCachedCompactResponsesPipeline : cachedCompactResponsesPipeline), compactCachedResponsesBuffer, (useReducedDialDescriptors ? reducedCompactDialDescriptorsBuffer : compactDialDescriptorsBuffer), compactDialDescriptorCount, compactCachedDialIndicesBuffer, compactCachedDialCount)
+           and encodeCachedDialResponses(encoder_, (useReducedDialDescriptors ? reducedCachedUniformResponsesPipeline : cachedUniformResponsesPipeline), uniformCachedResponsesBuffer, (useReducedDialDescriptors ? reducedUniformDialDescriptorsBuffer : uniformDialDescriptorsBuffer), uniformDialDescriptorCount, uniformCachedDialIndicesBuffer, uniformCachedDialCount)
+           and encodeCachedDialResponses(encoder_, (useReducedDialDescriptors ? reducedCachedMonotonicResponsesPipeline : cachedMonotonicResponsesPipeline), monotonicCachedResponsesBuffer, (useReducedDialDescriptors ? reducedMonotonicDialDescriptorsBuffer : monotonicDialDescriptorsBuffer), monotonicDialDescriptorCount, monotonicCachedDialIndicesBuffer, monotonicCachedDialCount)
+           and encodeCachedDialResponses(encoder_, (useReducedDialDescriptors ? reducedCachedGeneralResponsesPipeline : cachedGeneralResponsesPipeline), generalCachedResponsesBuffer, (useReducedDialDescriptors ? reducedGeneralDialDescriptorsBuffer : generalDialDescriptorsBuffer), generalDialDescriptorCount, generalCachedDialIndicesBuffer, generalCachedDialCount)
+           and encodeCachedDialResponses(encoder_, (useReducedDialDescriptors ? reducedCachedGraphResponsesPipeline : cachedGraphResponsesPipeline), graphCachedResponsesBuffer, (useReducedDialDescriptors ? reducedGraphDialDescriptorsBuffer : graphDialDescriptorsBuffer), graphDialDescriptorCount, graphCachedDialIndicesBuffer, graphCachedDialCount);
   };
 
   if( enableDiagnosticStageProfiling or GundamGlobals::isDebug() ){

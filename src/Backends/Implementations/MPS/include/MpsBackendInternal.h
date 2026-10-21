@@ -6,6 +6,7 @@
 #include "EngineView.h"
 #include "PropagationResult.h"
 #include "MpsEventPropagation.h"
+#include "MpsWeightTypes.h"
 #include "BackendTypes.h"
 #include "MpsBackendKernelSource.h"
 #include "ParameterSnapshot.h"
@@ -36,11 +37,17 @@ namespace Backends {
     id<MTLDevice> device{nil};
     id<MTLCommandQueue> commandQueue{nil};
     id<MTLComputePipelineState> eventWeightsPipeline{nil};
+    id<MTLComputePipelineState> reducedEventWeightsPipeline{nil};
     id<MTLComputePipelineState> cachedCompactResponsesPipeline{nil};
+    id<MTLComputePipelineState> reducedCachedCompactResponsesPipeline{nil};
     id<MTLComputePipelineState> cachedUniformResponsesPipeline{nil};
+    id<MTLComputePipelineState> reducedCachedUniformResponsesPipeline{nil};
     id<MTLComputePipelineState> cachedMonotonicResponsesPipeline{nil};
+    id<MTLComputePipelineState> reducedCachedMonotonicResponsesPipeline{nil};
     id<MTLComputePipelineState> cachedGeneralResponsesPipeline{nil};
+    id<MTLComputePipelineState> reducedCachedGeneralResponsesPipeline{nil};
     id<MTLComputePipelineState> cachedGraphResponsesPipeline{nil};
+    id<MTLComputePipelineState> reducedCachedGraphResponsesPipeline{nil};
     id<MTLComputePipelineState> histogramPipeline{nil};
     id<MTLComputePipelineState> histogramPartialsPipeline{nil};
     id<MTLComputePipelineState> histogramFinalizePipeline{nil};
@@ -50,6 +57,8 @@ namespace Backends {
     bool enableCachedDialResponses{true};
     // The full descriptor scan is retained only for controlled diagnostic A/B runs.
     bool useCompactCachedDialIndices{true};
+    bool useReducedDialDescriptors{true};
+    bool enableDiagnosticDescriptorComparison{false};
     bool enableDiagnosticStageProfiling{false};
     std::map<std::string, double> diagnosticStageGpuSeconds{};
 
@@ -60,16 +69,22 @@ namespace Backends {
     id<MTLBuffer> baseWeightsBuffer{nil};
     id<MTLBuffer> eventDialRangesBuffer{nil};
     id<MTLBuffer> normDialOccurrencesBuffer{nil};
+    id<MTLBuffer> reducedNormDialOccurrencesBuffer{nil};
     id<MTLBuffer> compactDialIndicesBuffer{nil};
     id<MTLBuffer> uniformDialIndicesBuffer{nil};
     id<MTLBuffer> monotonicDialIndicesBuffer{nil};
     id<MTLBuffer> generalDialIndicesBuffer{nil};
     id<MTLBuffer> graphDialIndicesBuffer{nil};
     id<MTLBuffer> compactDialDescriptorsBuffer{nil};
+    id<MTLBuffer> reducedCompactDialDescriptorsBuffer{nil};
     id<MTLBuffer> uniformDialDescriptorsBuffer{nil};
+    id<MTLBuffer> reducedUniformDialDescriptorsBuffer{nil};
     id<MTLBuffer> monotonicDialDescriptorsBuffer{nil};
+    id<MTLBuffer> reducedMonotonicDialDescriptorsBuffer{nil};
     id<MTLBuffer> generalDialDescriptorsBuffer{nil};
+    id<MTLBuffer> reducedGeneralDialDescriptorsBuffer{nil};
     id<MTLBuffer> graphDialDescriptorsBuffer{nil};
+    id<MTLBuffer> reducedGraphDialDescriptorsBuffer{nil};
     id<MTLBuffer> compactCachedResponsesBuffer{nil};
     id<MTLBuffer> compactCachedDialIndicesBuffer{nil};
     id<MTLBuffer> uniformCachedResponsesBuffer{nil};
@@ -84,9 +99,11 @@ namespace Backends {
     id<MTLBuffer> binEventOffsetsBuffer{nil};
     id<MTLBuffer> binEventIndicesBuffer{nil};
     id<MTLBuffer> splineDataBuffer{nil};
+    id<MTLBuffer> responseSmoothingBuffer{nil};
     id<MTLBuffer> parametersBuffer{nil};
     id<MTLBuffer> externalWeightsBuffer{nil};
     id<MTLBuffer> externalDialOccurrencesBuffer{nil};
+    id<MTLBuffer> reducedExternalDialOccurrencesBuffer{nil};
     std::vector<std::uint64_t> externalWeightGenerations{};
     id<MTLBuffer> partialHistSumsBuffer{nil};
     id<MTLBuffer> partialHistSumSquaresBuffer{nil};

@@ -30,6 +30,7 @@ if(APPLE)
       ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/Semantics/BackendVariableResponse.h
       ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/Semantics/BackendResponseSmoothing.h
       ${CMAKE_SOURCE_DIR}/src/Utils/include/DeviceMath/SharedBinningMath.h
+      ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/MPS/include/MpsWeightTypes.h
       ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/DevicePropagationTypes.h
       ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/MPS/src/MpsEventPropagationKernels.metal
       ${CMAKE_SOURCE_DIR}/src/Utils/include/DeviceMath/SharedSplineCommon.h
@@ -52,6 +53,7 @@ if(APPLE)
   file(READ ${CMAKE_SOURCE_DIR}/src/Utils/include/DeviceMath/SharedSplineMonotonic.h MPS_SHARED_SPLINE_MONOTONIC)
   file(READ ${CMAKE_SOURCE_DIR}/src/Utils/include/DeviceMath/SharedSplineGeneral.h MPS_SHARED_SPLINE_GENERAL)
   file(READ ${CMAKE_SOURCE_DIR}/src/Utils/include/DeviceMath/SharedGraph.h MPS_SHARED_GRAPH)
+  file(READ ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/MPS/include/MpsWeightTypes.h MPS_WEIGHT_TYPES)
   file(READ ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/MPS/src/MpsBackendKernels.metal MPS_BACKEND_KERNEL_SOURCE)
   file(READ ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/DeviceMath/DoubleFloat.h MPS_DOUBLE_FLOAT)
   set(MPS_OBSERVABLE_SPLINES "${MPS_SHARED_SPLINE_COMMON}\n${MPS_SHARED_SPLINE_COMPACT}\n${MPS_SHARED_SPLINE_UNIFORM}\n${MPS_SHARED_SPLINE_MONOTONIC}\n${MPS_SHARED_SPLINE_GENERAL}\n${MPS_SHARED_GRAPH}")
@@ -95,6 +97,7 @@ set(HEADERS
     ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/CPU/include/CpuBackendProfiler.h
     ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/CPU/include/CpuWeightProbe.h
     ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/MPS/include/MpsBackend.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/MPS/include/MpsWeightTypes.h
     ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/MPS/include/MpsBackendInternal.h
     ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/MPS/include/MpsEventPropagation.h
 )

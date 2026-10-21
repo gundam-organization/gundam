@@ -29,6 +29,7 @@ namespace Backends {
     // Separate diagnostic passes split GPU stages into synchronized commands.
     void setDiagnosticStageProfiling(bool enabled_);
     void setDiagnosticCompactCachedDials(bool enabled_);
+    void setDiagnosticCompactDialDescriptors(bool enabled_);
     [[nodiscard]] std::string getDiagnostics() const;
     [[nodiscard]] std::string getDiagnosticStageGpuSeconds() const;
 
