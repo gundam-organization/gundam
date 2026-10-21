@@ -22,6 +22,26 @@
 #include <sstream>
 
 namespace {
+  Backends::EngineView makeStrictBinningView(const Backends::BinningGeometry& layout_) {
+    Backends::EngineView view;
+    auto& model = view.propagation;
+    Backends::SampleView sample;
+    sample.useDynamicBinning = sample.readHostVariables = true;
+    sample.binCount = layout_.bins.size();
+    sample.binning = layout_;
+    model.samples = {sample};
+    model.totalBins = sample.binCount;
+    model.variableValues = {0};
+    Backends::EventView event;
+    event.samplePosition = 0;
+    event.variableCount = 1;
+    model.events = {event};
+    Backends::BackendEventWeightDescriptor weight;
+    weight.baseWeight = -2.;
+    model.eventWeights = {weight};
+    return view;
+  }
+
   Histogram makeHistogram(bool smooth_, bool relative_, bool irregular_, bool broad_ = false) {
     Histogram histogram;
     std::stringstream config;
@@ -259,6 +279,71 @@ TEST(BinningIndex, OverlappingStrictBinsKeepFirstMatch) {
   index.findCandidates(&value, candidates);
   ASSERT_EQ(candidates.size(), 2);
   EXPECT_EQ(candidates.front(), 0);
+}
+
+TEST(CpuBinning, PreviousBinAvoidsSearchAndFallsBackOnMigration) {
+  using namespace Backends;
+  // Gaps force tree lookup; bin identifiers deliberately differ from positions.
+  BinningGeometry layout;
+  layout.variableNames = {"X"};
+  layout.intervals = {{0, 0., 1.}, {0, 2., 3.}, {0, 4., 5.}, {0, 6., 7.}};
+  layout.bins = {{2, 0, 1}, {0, 1, 1}, {3, 2, 1}, {1, 3, 1}};
+  auto view = makeStrictBinningView(layout);
+  CpuBackend backend;
+  backend.build(view);
+  PropagationInputs inputs;
+  auto check = [&](double value_, int expectedBin_, std::size_t expectedCandidates_){
+    inputs.hostVariables = {value_};
+    auto token = backend.requestPropagation(inputs);
+    EXPECT_EQ(backend.getEventStateHostView(token).bins[0], expectedBin_);
+    EXPECT_EQ(backend.getLastTimingSummary().binCandidateCount, expectedCandidates_);
+    const auto& sums = backend.getHistogramSumsHostView(token);
+    const auto& squares = backend.getHistogramSumSquaresHostView(token);
+    for( std::size_t i = 0; i < sums.size(); ++i ){
+      EXPECT_DOUBLE_EQ(sums[i], int(i) == expectedBin_ ? -2. : 0.);
+      EXPECT_DOUBLE_EQ(squares[i], int(i) == expectedBin_ ? 4. : 0.);
+    }
+  };
+  check(6.25, 1, 4); // Initial tree search.
+  check(6.3, 1, 1);  // Only the current bin is tested.
+  check(6., 1, 1);   // Inclusive lower edge.
+  inputs.forceBinningUpdate = true;
+  check(6., 1, 1);
+  inputs.forceBinningUpdate = false;
+  check(7., -1, 5);  // Exclusive upper edge: failed hint plus tree search.
+  check(2.25, 0, 4); // An unbinned event can return to the histogram.
+  check(2.3, 0, 1);
+  check(4., 3, 5);   // Migration uses the full search.
+  check(4.1, 3, 1);
+  check(std::numeric_limits<double>::quiet_NaN(), 2, 4); // Legacy first-match semantics.
+  check(std::numeric_limits<double>::infinity(), -1, 4);
+  check(6.25, 1, 4);
+  backend.build(view); // Rebuilding discards previous event bins.
+  check(6.3, 1, 4);
+  check(6.4, 1, 1);
+}
+
+TEST(CpuBinning, PreviousBinPreservesOverlappingSelections) {
+  using namespace Backends;
+  BinningGeometry layout;
+  layout.variableNames = {"X"};
+  layout.intervals = {{0, 0., 2.}, {0, 1., 3.}, {0, 4., 4.}, {0, 3., 5.}};
+  layout.bins = {{0, 0, 1}, {1, 1, 1}, {2, 2, 1}, {3, 3, 1}};
+  CpuBackend backend;
+  backend.build(makeStrictBinningView(layout));
+  PropagationInputs inputs;
+  auto check = [&](double value_, int expectedBin_){
+    inputs.hostVariables = {value_};
+    auto token = backend.requestPropagation(inputs);
+    EXPECT_EQ(backend.getEventStateHostView(token).bins[0], expectedBin_);
+    EXPECT_DOUBLE_EQ(backend.getHistogramSumsHostView(token)[expectedBin_], -2.);
+  };
+  check(2.5, 1);
+  check(1.5, 0); // Still in bin 1, but the earlier bin must win.
+  check(3.5, 3);
+  check(4., 2);  // An earlier point selection also takes priority.
+  check(4.5, 3);
+  check(4., 2);
 }
 
 TEST_P(BinningBackend, NonfiniteResponseCanBeRetried) {

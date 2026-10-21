@@ -84,6 +84,24 @@ workloads use fixed ranges. Only range metadata is replicated; event, response
 and payload buffers are shared. Histogram filling and reduction keep their own
 execution order.
 
+## Dynamic binning
+
+For strict dynamic bins, the CPU first tests the event's current bin. If it
+still contains the updated variables, it keeps that bin and its unit contribution
+without querying the spatial index. Otherwise, it searches the usual grid or tree.
+Unbinned events also use the usual search.
+
+At model construction, a per-sample lookup maps bin identifiers to positions
+that cannot overlap an earlier bin. This preserves first-match priority for
+overlapping compiled layouts, including point selections. The existing tree
+prunes overlap checks during construction. Nonfinite variables bypass reuse to
+preserve the legacy comparison rules. No additional per-event cache is retained;
+the lookup reads the resident event bin and is rebuilt with the model.
+
+Smoothed responses still evaluate all contributing candidates, even when the
+central bin stays the same. `binCandidateCount` includes the attempted current-bin
+test and any candidates returned by the fallback search.
+
 ## Scope of specialization
 
 | Optimization | Current implementation |

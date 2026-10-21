@@ -9,6 +9,68 @@
 #include <cmath>
 #include <limits>
 
+namespace {
+  bool strictBinsOverlap(const Backends::BinningGeometry& layout_, const Backends::BinningBin& first_,
+                         const Backends::BinningBin& second_) {
+    for( std::size_t i = first_.firstInterval; i < first_.firstInterval + first_.intervalCount; ++i ){
+      const auto& first = layout_.intervals[i];
+      for( std::size_t j = second_.firstInterval; j < second_.firstInterval + second_.intervalCount; ++j ){
+        const auto& second = layout_.intervals[j];
+        if( first.variableIndex != second.variableIndex ){ continue; }
+        if( first.lowerBound == first.upperBound ){
+          if( second.lowerBound == second.upperBound ){
+            if( first.lowerBound != second.lowerBound ){ return false; }
+          }
+          else if( first.lowerBound < second.lowerBound or first.lowerBound >= second.upperBound ){ return false; }
+        }
+        else if( second.lowerBound == second.upperBound ){
+          if( second.lowerBound < first.lowerBound or second.lowerBound >= first.upperBound ){ return false; }
+        }
+        else if( first.upperBound <= second.lowerBound or second.upperBound <= first.lowerBound ){ return false; }
+      }
+    }
+    return true;
+  }
+}
+
+void Backends::CpuBackend::initializeBinning() {
+  const auto& samples = _engineView_->propagation.samples;
+  _binningIndices_.resize(samples.size());
+  _reusableBinPositions_.assign(samples.size(), {});
+  for( std::size_t iSample = 0; iSample < samples.size(); ++iSample ){
+    const auto& sample = samples[iSample];
+    const auto& layout = sample.binning;
+    auto& index = _binningIndices_[iSample];
+    index.build(layout);
+    if( not sample.useDynamicBinning or layout.isSmoothed ){ continue; }
+    auto& positions = _reusableBinPositions_[iSample];
+    positions.assign(sample.binCount, std::size_t(-1));
+    const auto dimensions = layout.variableNames.size();
+    const auto& binBounds = index.getBinBounds();
+    // Certify reuse once at build time. The existing tree prunes distant bins;
+    // exact interval checks distinguish adjacent bins from actual overlaps.
+    for( std::size_t position = 0; position < layout.bins.size(); ++position ){
+      const auto& bin = layout.bins[position];
+      if( bin.binIndex < 0 or std::size_t(bin.binIndex) >= positions.size() ){ continue; }
+      auto overlapsEarlier = [&](const auto& self_, int nodeIndex_) -> bool {
+        const auto& node = index.getNodes()[nodeIndex_];
+        for( std::size_t axis = 0; axis < dimensions; ++axis ){
+          const auto& bound = binBounds[position * dimensions + axis];
+          const auto& other = index.getNodeBounds()[nodeIndex_ * dimensions + axis];
+          if( bound.upper < other.lower or other.upper < bound.lower ){ return false; }
+        }
+        if( node.left >= 0 ){ return self_(self_, node.left) or self_(self_, node.right); }
+        for( std::size_t i = node.first; i < node.first + node.count; ++i ){
+          auto earlier = index.getBinPositions()[i];
+          if( earlier < position and strictBinsOverlap(layout, layout.bins[earlier], bin) ){ return true; }
+        }
+        return false;
+      };
+      if( not overlapsEarlier(overlapsEarlier, 0) ){ positions[bin.binIndex] = position; }
+    }
+  }
+}
+
 double Backends::CpuBackend::evalResponse(std::size_t dial_) const {
   return _isCachedDial_[dial_] ? _cachedDialResponses_[dial_]
       : Semantics::evalDialResponse(_engineView_->propagation, _engineView_->propagation.dials[dial_], *_activeInputs_);
@@ -104,9 +166,22 @@ void Backends::CpuBackend::updateEventBinningThread(int iThread_) {
         LogThrowIf(not std::isfinite(values[i]), "Nonfinite binning variable: " << layout.variableNames[i]);
       }
     }
+    auto& contributions = _eventState_.contributions[event.resultIndex];
+    const auto& positions = _reusableBinPositions_[event.samplePosition];
+    const int previousBin = _eventState_.bins[event.resultIndex];
+    if( previousBin >= 0 and std::size_t(previousBin) < positions.size()
+        and positions[previousBin] != std::size_t(-1)
+        and std::all_of(values, values + layout.variableNames.size(), [](double value_){ return std::isfinite(value_); }) ){
+      ++worker.candidatesTested;
+      const auto& bin = layout.bins[positions[previousBin]];
+      if( BinningSemantics::fraction(layout, bin, values) == 1 ){
+        contributions.assign(1, {previousBin, 1});
+        _validBinning_[event.resultIndex] = true;
+        continue;
+      }
+    }
     _binningIndices_[event.samplePosition].findCandidates(values, worker.candidates);
     worker.candidatesTested += worker.candidates.size();
-    auto& contributions = _eventState_.contributions[event.resultIndex];
     contributions.clear();
     int hardBin{-1};
     double total{0};

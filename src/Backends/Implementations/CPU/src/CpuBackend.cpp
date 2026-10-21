@@ -66,8 +66,7 @@ void Backends::CpuBackend::buildShared(std::shared_ptr<const EngineView> engineV
     _eventState_.contributions.resize(model.events.size());
   }
   _validBinning_.assign(_requiresEventBinning_ ? model.events.size() : 0, false);
-  _binningIndices_.resize(model.samples.size());
-  for( std::size_t i = 0; i < model.samples.size(); ++i ){ _binningIndices_[i].build(model.samples[i].binning); }
+  initializeBinning();
   _binningWorkers_.assign(_threadPool_.getNbThreads(), {});
   _workerErrors_.resize(_threadPool_.getNbThreads());
   _eventStateCache_.build(model);

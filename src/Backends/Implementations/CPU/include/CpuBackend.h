@@ -96,6 +96,7 @@ ENUM_FIELD( Indexed )
     void calculateEventWeights(Result& result_, const PropagationInputs& inputs_);
     void calculateEventWeightsThread(int iThread_);
     void updateEventState(const PropagationInputs& inputs_);
+    void initializeBinning();
     void runEventStateJob(const std::string& jobName_);
     void updateEventVariablesThread(int iThread_);
     void updateEventBinningThread(int iThread_);
@@ -114,6 +115,7 @@ ENUM_FIELD( Indexed )
     std::vector<std::exception_ptr> _workerErrors_{};
     EventState _eventState_{};
     std::vector<BinningIndex> _binningIndices_{};
+    std::vector<std::vector<std::size_t>> _reusableBinPositions_{};
     std::vector<BinningWorker> _binningWorkers_{};
     std::vector<std::uint8_t> _validBinning_{};
     EventStateCache _eventStateCache_{};
