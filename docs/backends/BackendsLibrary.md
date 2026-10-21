@@ -48,5 +48,6 @@ and smoothing. Executors may specialize traversal, scheduling and memory layout
 while preserving these numerical rules. CPU calculations use double precision;
 device precision and execution capabilities are backend-specific.
 
-See [CPU reweight optimization](cpu/ReweightOptimization.md) for response-cache
-invalidation, dense/sparse traversal and event-weight scheduling.
+See [CPU backend structure](cpu/CpuBackend.md) for data ownership and worker
+distribution, and [CPU reweight optimization](cpu/ReweightOptimization.md) for
+cache policies, optimization choices and benchmark findings.

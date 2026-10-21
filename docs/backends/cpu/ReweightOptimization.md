@@ -3,6 +3,8 @@
 The CPU backend separates updating unique dial responses from multiplying those
 responses into event weights. Both stages use the resident immutable model and
 retained output storage described in the [Backends library](../BackendsLibrary.md).
+See [CPU backend structure](CpuBackend.md) for the data layout and distribution
+of each propagation stage across workers.
 
 ## Dial-response cache
 
@@ -145,13 +147,19 @@ saturation. Instruction-level samples near loop comparisons must not be read as
 the cost of those comparisons. JIT compilation is therefore deferred; preserving
 double precision and multiplication order remains a requirement.
 
-The next diagnostic compares current response addresses with a simulated
+The locality diagnostic compares current response addresses with a simulated
 first-use numbering. `--locality-only` writes `locality.json` after one model
 load, without running a fit or changing storage. It measures full-stream address
 locality and exact distinct-line reuse over the first million references. Its
 ideal LRU estimates exclude other traffic and worker contention; they can justify
-a layout experiment, but cannot establish a speedup. No response reordering has
-been implemented yet.
+a layout experiment, but cannot establish a speedup.
+
+On the full OA2024 model, current and simulated first-use numbering produced
+identical metrics. `EngineLayout` already assigns dial indices at first encounter
+in the event traversal, so this proposed renumbering was discarded without a
+timing experiment. About 49.6% of consecutive accesses share a cache line and
+59.2% share a page; a 4096-reference window touches an average of 36.2 KiB of
+response cache lines. These figures do not establish a memory-bandwidth limit.
 
 ## Verification and diagnostics
 
