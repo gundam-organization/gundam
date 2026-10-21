@@ -94,6 +94,7 @@ namespace Backends {
   struct DevicePropagationControl {
     DeviceIndex error, rebuildIndex, rebinnedEvents, candidates, chunkCount, contributionCount;
     DeviceIndex updateVariables, forceBinning, firstPropagation, editCount;
+    DeviceIndex reusePreviousBin;
     DeviceIndex eventCount, histogramBins, dialCount, sampleCount;
     DeviceIndex hasReweightCap;
     float maxReweight;

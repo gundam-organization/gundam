@@ -10,6 +10,28 @@ namespace Backends {
 
 namespace {
 
+  bool strictBinsOverlap(const Backends::BinningGeometry& layout_, const Backends::BinningBin& first_,
+                         const Backends::BinningBin& second_) {
+    for( std::size_t i = first_.firstInterval; i < first_.firstInterval + first_.intervalCount; ++i ){
+      const auto& first = layout_.intervals[i];
+      for( std::size_t j = second_.firstInterval; j < second_.firstInterval + second_.intervalCount; ++j ){
+        const auto& second = layout_.intervals[j];
+        if( first.variableIndex != second.variableIndex ){ continue; }
+        if( first.lowerBound == first.upperBound ){
+          if( second.lowerBound == second.upperBound ){
+            if( first.lowerBound != second.lowerBound ){ return false; }
+          }
+          else if( first.lowerBound < second.lowerBound or first.lowerBound >= second.upperBound ){ return false; }
+        }
+        else if( second.lowerBound == second.upperBound ){
+          if( second.lowerBound < first.lowerBound or second.lowerBound >= first.upperBound ){ return false; }
+        }
+        else if( first.upperBound <= second.lowerBound or second.upperBound <= first.lowerBound ){ return false; }
+      }
+    }
+    return true;
+  }
+
 BinningGeometry buildResponseGeometry(const BinningResponse& response_){
   BinningGeometry layout;
   layout.variableNames = response_.getVariableNames();
@@ -98,6 +120,35 @@ void BinningIndex::build(const BinningGeometry& layout_) {
   }
   if( not layout_.bins.empty() ){ buildNode(0, layout_.bins.size()); }
   if( not layout_.isSmoothed ){ buildGrid(layout_); }
+}
+
+std::vector<std::size_t> BinningIndex::buildReusableBinPositions(const BinningGeometry& layout_, std::size_t binCount_) const {
+  std::vector<std::size_t> positions(binCount_, std::size_t(-1));
+  if( layout_.isSmoothed ){ return positions; }
+  const auto dimensions = layout_.variableNames.size();
+  const auto& binBounds = getBinBounds();
+  // Certify reuse once at build time. The existing tree prunes distant bins;
+  // exact interval checks distinguish adjacent bins from actual overlaps.
+  for( std::size_t position = 0; position < layout_.bins.size(); ++position ){
+    const auto& bin = layout_.bins[position];
+    if( bin.binIndex < 0 or std::size_t(bin.binIndex) >= positions.size() ){ continue; }
+    auto overlapsEarlier = [&](const auto& self_, int nodeIndex_) -> bool {
+      const auto& node = getNodes()[nodeIndex_];
+      for( std::size_t axis = 0; axis < dimensions; ++axis ){
+        const auto& bound = binBounds[position * dimensions + axis];
+        const auto& other = getNodeBounds()[nodeIndex_ * dimensions + axis];
+        if( bound.upper < other.lower or other.upper < bound.lower ){ return false; }
+      }
+      if( node.left >= 0 ){ return self_(self_, node.left) or self_(self_, node.right); }
+      for( std::size_t i = node.first; i < node.first + node.count; ++i ){
+        auto earlier = getBinPositions()[i];
+        if( earlier < position and strictBinsOverlap(layout_, layout_.bins[earlier], bin) ){ return true; }
+      }
+      return false;
+    };
+    if( not overlapsEarlier(overlapsEarlier, 0) ){ positions[bin.binIndex] = position; }
+  }
+  return positions;
 }
 
 int BinningIndex::buildNode(std::size_t first_, std::size_t count_) {

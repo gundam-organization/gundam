@@ -388,3 +388,37 @@ these passes are excluded from performance statistics. Their
 `sameBinFractionAmongRebinned` estimates the opportunity to reuse the previous
 bin, rather than measuring an implemented optimization. Event readbacks are
 forbidden during the ordinary measurement passes.
+
+### Comparing previous-bin reuse without an external worker
+
+For the upgrade inputs, `override/pmuScaleBinningTest.yaml` defines the
+`Pmu scale binning test` parameter set, with a unit normalization on `Pmu` and
+`stdDev: 0.01`. It disables the Eb parameter set and replaces the
+`ebMigration.yaml` override. Include `binResponse.yaml` to benchmark the
+configured smoothing too; omit it for an ordinary fitter run with strict bins.
+The production benchmark still needs it when requesting both modes:
+
+```sh
+env -u DYLD_LIBRARY_PATH \
+  PYTHONPATH="$PWD/cmake-build-release/src/PythonInterface" \
+  python3.15 tests/benchmarks/226ProductionBinningProfiling.py \
+  --work-dir /Users/nadrino/Documents/Work/Output/results/gundam/upgrade-cc-2026 \
+  --config ndUpCcInc.yaml --threads 4 \
+  --override override/datasetHighlandv5.27.1_CCLyon.yaml \
+    override/pmuScaleBinningTest.yaml override/binResponse.yaml override/backendMpsTest.yaml \
+  --parameter-set 'Pmu scale binning test' --step-scale 1 \
+  --scenarios constant global --calls 150 --trials 4 --warmup 20 \
+  --probe-calls 12 --compare-previous-bin
+```
+
+`--step-scale 1` proposes at one prior sigma (1% here). The override resides in
+the external input directory. `--compare-previous-bin` adds alternating A/B and
+B/A trials on each resident MPS model. The reference disables the shortcut; the
+other mode restores the enabled production default. Each trial replays the same
+seeded proposals from the initialized point. Results are written to
+`previous-bin-comparison.json`, `*-ab*-treeSearch.json`,
+`*-ab*-previousBin.json` and separate `*-ab-*-probes.json` files. A/B checks cover
+every likelihood and each final histogram with the existing 2e-5 tolerances.
+Counter differences are expected: a failed previous-bin check counts as an
+additional candidate before the fallback tree search. Smoothed cases keep the
+same binning algorithm in both diagnostic modes.

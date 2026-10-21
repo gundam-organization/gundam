@@ -14,7 +14,7 @@ namespace Backends {
     std::vector<DeviceBinningBin> bins;
     std::vector<DeviceBinningNode> nodes;
     std::vector<DeviceBinningBounds> bounds;
-    std::vector<DeviceIndex> nodeBins, weightDialIndices, variableDialIndices;
+    std::vector<DeviceIndex> nodeBins, reusableBins, weightDialIndices, variableDialIndices;
     std::vector<ObservableScalar> variables, payloads;
     DeviceIndex contributionCapacity{0};
     DeviceIndex histogramBins{0};

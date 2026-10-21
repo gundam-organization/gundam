@@ -64,6 +64,10 @@ class BinningIndex {
 public:
   void build(const BinningGeometry& layout_);
   void findCandidates(const double* values_, std::vector<std::size_t>& candidates_) const;
+  // Bin-index lookup for strict bins with no overlapping earlier selection.
+  // Missing/unsafe identifiers map to size_t(-1); smoothed bins are never reusable.
+  // layout_ must be the geometry used to build this index.
+  [[nodiscard]] std::vector<std::size_t> buildReusableBinPositions(const BinningGeometry& layout_, std::size_t binCount_) const;
   [[nodiscard]] std::size_t getNbNodes() const { return _nodes_.size(); }
 
   struct Bounds { double lower{0}; double upper{0}; };

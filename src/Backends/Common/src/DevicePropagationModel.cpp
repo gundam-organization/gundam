@@ -52,6 +52,7 @@ namespace {
 void Backends::DevicePropagationModel::build(const PropagationView& model_) {
   *this = DevicePropagationModel();
   histogramBins = index(std::size_t(model_.totalBins) + model_.samples.size());
+  reusableBins.assign(histogramBins, DeviceIndex(-1));
   for( double value : model_.variableValues ){ variables.push_back(scalar(value)); }
   for( double value : model_.dialPayloads ){ payloads.push_back(scalar(value)); }
   weightDialIndices = model_.eventDialIndices;
@@ -105,6 +106,14 @@ void Backends::DevicePropagationModel::build(const PropagationView& model_) {
           throw std::runtime_error("Bin geometry cannot be represented with compensated observable precision.");
         }
         intervals.push_back({index(interval.variableIndex), lower, upper, lowerWidth, upperWidth});
+      }
+    }
+    if( sample.useDynamicBinning and not layout.isSmoothed ){
+      auto positions = search.buildReusableBinPositions(layout, sample.binCount);
+      for( std::size_t bin = 0; bin < positions.size(); ++bin ){
+        if( positions[bin] != std::size_t(-1) ){
+          reusableBins.at(sample.binOffset + bin) = index(binOffset + positions[bin]);
+        }
       }
     }
     std::size_t nodeOffset = nodes.size(), boundOffset = bounds.size(), positionOffset = nodeBins.size();

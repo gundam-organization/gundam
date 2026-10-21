@@ -112,6 +112,7 @@ kernel void rebin_events(
     device DeviceBinContribution* contributions [[buffer(11)]],
     device uint* changedSamples [[buffer(12)]],
     device DevicePropagationControl& control [[buffer(13)]],
+    device const uint* reusableBins [[buffer(14)]],
     uint gid [[thread_position_in_grid]]) {
   if( gid >= control.eventCount || !dirty[gid] ){ return; }
   auto event = events[gid];
@@ -131,6 +132,33 @@ kernel void rebin_events(
   if( event.sample < control.sampleCount ){ atomic_store_explicit((device atomic_uint*)(changedSamples + event.sample), 1, memory_order_relaxed); }
   atomic_store_explicit((device atomic_uint*)&control.rebuildIndex, 1, memory_order_relaxed);
   uint count = 0, firstHardPosition = UINT_MAX, candidateCount = 0, largest = 0;
+  // The build certifies that a reusable strict bin cannot hide an earlier bin.
+  // HardBins is initialized by the first tree traversal, never by this shortcut.
+  if( control.reusePreviousBin && !control.firstPropagation && !sample.isSmoothed ){
+    int previousBin = hardBins[gid];
+    if( previousBin >= 0 && uint(previousBin) < sample.binCount ){
+      uint position = reusableBins[sample.binOffset + uint(previousBin)];
+      if( position != UINT_MAX ){
+        auto bin = bins[position];
+        ++candidateCount;
+        bool contains = true;
+        for( uint i = bin.firstInterval; i < bin.firstInterval + bin.intervalCount; ++i ){
+          auto interval = intervals[i];
+          if( !GundamBinningMath::contains(interval.lowerBound, interval.upperBound,
+                                         variables[event.firstVariable + interval.variableIndex]) ){
+            contains = false;
+            break;
+          }
+        }
+        if( contains ){
+          eventCounts[gid] = 1;
+          contributions[event.firstContribution] = {gid, int(sample.binOffset) + previousBin, 1};
+          atomic_fetch_add_explicit((device atomic_uint*)&control.candidates, 1, memory_order_relaxed);
+          return;
+        }
+      }
+    }
+  }
   float total = 0, largestFraction = 0;
   int hardBin = -1;
   uint nodeIndex = sample.firstNode;

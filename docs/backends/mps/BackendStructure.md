@@ -55,3 +55,27 @@ Two additional arrangements were measured on OA2024 and discarded: interleaving
 dial references across 32-event tiles, and sorting events by dial-count profiles
 inside 256-event windows. They slowed evaluation on this dataset. Event order
 and the per-event reference layout therefore remain unchanged.
+
+Dynamic strict binning first checks the event's previous bin. At model build,
+`BinningIndex::buildReusableBinPositions` certifies bins that cannot overlap an
+earlier selection. CPU and MPS share this certification, including point and
+category selections. MPS uploads a small lookup from global histogram bin to
+packed bin descriptor; missing or unsafe bins have no reusable entry. The
+lookup preserves sample offsets and bin identifiers independently of descriptor
+positions.
+
+The first propagation initializes the stored bins through the tree. Subsequent
+finite observable updates test a certified previous bin with the same compensated
+interval comparisons as the tree. If it no longer contains the event, or cannot
+be certified, the existing search preserves the earliest matching bin. Returning
+from outside the histogram also uses the tree. The shortcut still publishes the
+sample revision and reconstructs contribution indices as before. It is disabled
+for smoothed binning, whose fractions and neighboring contributions can change
+while the hard bin remains the same.
+
+`setDiagnosticMpsPreviousBinReuse(False)` selects the original tree search on an
+initialized model; `True` restores the production default. The production
+binning benchmark's `--compare-previous-bin` alternates the two modes on one
+resident model, compares likelihoods and final histograms, then records separate
+GPU stage probes. With smoothing enabled this flag leaves bin selection on the
+existing path.

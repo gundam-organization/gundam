@@ -241,6 +241,11 @@ void Backends::MpsBackend::setDiagnosticStageProfiling(bool enabled_) {
   if( _impl_->eventPropagation ){ _impl_->eventPropagation->setDiagnosticStageProfiling(enabled_); }
 }
 
+void Backends::MpsBackend::setDiagnosticPreviousBinReuse(bool enabled_) {
+  LogThrowIf(not _impl_->eventPropagation, "Metal event propagation is unavailable.");
+  _impl_->eventPropagation->setDiagnosticPreviousBinReuse(enabled_);
+}
+
 std::string Backends::MpsBackend::getDiagnostics() const {
   const auto& impl = *_impl_;
   JsonType out;

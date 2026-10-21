@@ -21,6 +21,7 @@ namespace Backends {
     MpsEventPropagation(const MpsEventPropagation&) = delete;
     MpsEventPropagation& operator=(const MpsEventPropagation&) = delete;
     void setDiagnosticStageProfiling(bool enabled_){ _enableDiagnosticStageProfiling_ = enabled_; }
+    void setDiagnosticPreviousBinReuse(bool enabled_){ _enablePreviousBinReuse_ = enabled_; }
     [[nodiscard]] std::string getDiagnostics() const;
     [[nodiscard]] const std::map<std::string, double>& getDiagnosticStageGpuSeconds() const { return _diagnosticStageGpuSeconds_; }
     void build(const PropagationView& model_);
@@ -33,7 +34,7 @@ namespace Backends {
 
   private:
     enum class Buffer {
-      Events, Samples, Dials, Targets, Intervals, Bins, Nodes, Bounds, NodeBins,
+      Events, Samples, Dials, Targets, Intervals, Bins, Nodes, Bounds, NodeBins, ReusableBins,
       WeightDialIndices, VariableDialIndices, Payloads, Parameters, ExternalWeights, Responses,
       Variables, HostValues, HostEdits, DirtyEvents, HardBins, EventCounts, Contributions, ChangedSamples, Control,
       EventWeights, BinCounts, BinOffsets, BinPositions, BinContributions, ChunkOffsets, Chunks,
@@ -57,6 +58,7 @@ namespace Backends {
     std::uint64_t _materializedRevision_{0};
     bool _valid_{false};
     bool _enableDiagnosticStageProfiling_{false};
+    bool _enablePreviousBinReuse_{true};
     std::map<std::string, double> _diagnosticStageGpuSeconds_{};
   };
 }

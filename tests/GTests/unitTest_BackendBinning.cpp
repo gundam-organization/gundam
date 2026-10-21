@@ -281,7 +281,7 @@ TEST(BinningIndex, OverlappingStrictBinsKeepFirstMatch) {
   EXPECT_EQ(candidates.front(), 0);
 }
 
-TEST(CpuBinning, PreviousBinAvoidsSearchAndFallsBackOnMigration) {
+TEST_P(BinningBackend, PreviousBinAvoidsSearchAndFallsBackOnMigration) {
   using namespace Backends;
   // Gaps force tree lookup; bin identifiers deliberately differ from positions.
   BinningGeometry layout;
@@ -289,7 +289,7 @@ TEST(CpuBinning, PreviousBinAvoidsSearchAndFallsBackOnMigration) {
   layout.intervals = {{0, 0., 1.}, {0, 2., 3.}, {0, 4., 5.}, {0, 6., 7.}};
   layout.bins = {{2, 0, 1}, {0, 1, 1}, {3, 2, 1}, {1, 3, 1}};
   auto view = makeStrictBinningView(layout);
-  CpuBackend backend;
+  auto& backend = *this->backend;
   backend.build(view);
   PropagationInputs inputs;
   auto check = [&](double value_, int expectedBin_, std::size_t expectedCandidates_){
@@ -315,21 +315,23 @@ TEST(CpuBinning, PreviousBinAvoidsSearchAndFallsBackOnMigration) {
   check(2.3, 0, 1);
   check(4., 3, 5);   // Migration uses the full search.
   check(4.1, 3, 1);
-  check(std::numeric_limits<double>::quiet_NaN(), 2, 4); // Legacy first-match semantics.
-  check(std::numeric_limits<double>::infinity(), -1, 4);
-  check(6.25, 1, 4);
+  if( not backend.getCapabilities().supportsGpu ){
+    check(std::numeric_limits<double>::quiet_NaN(), 2, 4); // Legacy first-match semantics.
+    check(std::numeric_limits<double>::infinity(), -1, 4);
+    check(6.25, 1, 4);
+  }
   backend.build(view); // Rebuilding discards previous event bins.
   check(6.3, 1, 4);
   check(6.4, 1, 1);
 }
 
-TEST(CpuBinning, PreviousBinPreservesOverlappingSelections) {
+TEST_P(BinningBackend, PreviousBinPreservesOverlappingSelections) {
   using namespace Backends;
   BinningGeometry layout;
   layout.variableNames = {"X"};
   layout.intervals = {{0, 0., 2.}, {0, 1., 3.}, {0, 4., 4.}, {0, 3., 5.}};
   layout.bins = {{0, 0, 1}, {1, 1, 1}, {2, 2, 1}, {3, 3, 1}};
-  CpuBackend backend;
+  auto& backend = *this->backend;
   backend.build(makeStrictBinningView(layout));
   PropagationInputs inputs;
   auto check = [&](double value_, int expectedBin_){
@@ -601,4 +603,55 @@ TEST_P(BinningBackend, EmptyDynamicSampleProducesEmptyHistograms) {
   EXPECT_EQ(backend->getHistogramSumsHostView(token), std::vector<double>({0., 0.}));
   EXPECT_EQ(backend->getOutsideSumsHostView(token), std::vector<double>({0.}));
   EXPECT_TRUE(backend->getEventStateHostView(token).bins.empty());
+}
+
+TEST_P(BinningBackend, PreviousBinUsesSampleOffsetsAndSelectionAxes) {
+  using namespace Backends;
+  BinningGeometry layout;
+  layout.variableNames = {"X", "category"};
+  layout.intervals = {{0, 0., 1.}, {1, 0., 0.}, {0, 0., 1.}, {1, 1., 1.}};
+  layout.bins = {{1, 0, 2}, {0, 2, 2}};
+  auto view = makeStrictBinningView(layout);
+  auto& model = view.propagation;
+  model.variableValues = {.25, 0., .25, 1.};
+  model.samples.push_back(model.samples.front());
+  model.samples[1].binOffset = 2;
+  model.totalBins = 4;
+  model.events[0].variableCount = 2;
+  auto event = model.events.front();
+  event.samplePosition = event.resultIndex = 1;
+  event.firstVariable = 2;
+  model.events.push_back(event);
+  model.eventWeights.push_back(model.eventWeights.front());
+  auto& backend = *this->backend;
+  backend.build(view);
+  PropagationInputs inputs;
+  inputs.hostVariables = model.variableValues;
+  backend.requestPropagation(inputs);
+  inputs.hostVariables[0] = inputs.hostVariables[2] = .3;
+  auto token = backend.requestPropagation(inputs);
+  EXPECT_EQ(backend.getEventStateHostView(token).bins, (std::vector<int>{1, 0}));
+  EXPECT_EQ(backend.getLastTimingSummary().binCandidateCount, 2);
+  EXPECT_EQ(backend.getHistogramSumsHostView(token), (std::vector<double>{0., -2., -2., 0.}));
+  // A new category invalidates the previous bin even at unchanged X.
+  inputs.hostVariables[1] = 1.;
+  inputs.hostVariables[3] = 0.;
+  token = backend.requestPropagation(inputs);
+  EXPECT_EQ(backend.getEventStateHostView(token).bins, (std::vector<int>{0, 1}));
+  EXPECT_EQ(backend.getHistogramSumsHostView(token), (std::vector<double>{-2., 0., 0., -2.}));
+}
+
+TEST(BinningIndex, PreviousBinCertificationExcludesSmoothingAndEarlierOverlaps) {
+  using namespace Backends;
+  BinningGeometry layout;
+  layout.variableNames = {"X"};
+  layout.intervals = {{0, 0., 1.}, {0, 1., 2.}, {0, 1.5, 3.}, {0, 4., 4.}, {0, 3., 5.}};
+  layout.bins = {{4, 0, 1}, {0, 1, 1}, {2, 2, 1}, {1, 3, 1}, {3, 4, 1}};
+  BinningIndex index;
+  index.build(layout);
+  EXPECT_EQ(index.buildReusableBinPositions(layout, 5),
+            (std::vector<std::size_t>{1, 3, std::size_t(-1), std::size_t(-1), 0}));
+  layout.isSmoothed = true;
+  index.build(layout);
+  EXPECT_EQ(index.buildReusableBinPositions(layout, 5), std::vector<std::size_t>(5, std::size_t(-1)));
 }

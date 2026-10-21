@@ -70,6 +70,7 @@ void Backends::MpsEventPropagation::build(const PropagationView& model_) {
   upload(Buffer::Nodes, _packed_.nodes);
   upload(Buffer::Bounds, _packed_.bounds);
   upload(Buffer::NodeBins, _packed_.nodeBins);
+  upload(Buffer::ReusableBins, _packed_.reusableBins);
   upload(Buffer::WeightDialIndices, _packed_.weightDialIndices);
   upload(Buffer::VariableDialIndices, _packed_.variableDialIndices);
   upload(Buffer::Payloads, _packed_.payloads);
@@ -150,6 +151,7 @@ void Backends::MpsEventPropagation::propagate(const PropagationInputs& inputs_, 
   control.error = control.rebinnedEvents = control.candidates = control.editCount = 0;
   control.rebuildIndex = not _valid_;
   control.firstPropagation = not _valid_;
+  control.reusePreviousBin = _enablePreviousBinReuse_;
   control.updateVariables = _cache_.variableInputsChanged();
   control.forceBinning = inputs_.forceBinningUpdate;
   control.eventCount = DeviceIndex(model.events.size());
@@ -179,7 +181,7 @@ void Backends::MpsEventPropagation::propagate(const PropagationInputs& inputs_, 
     Buffer::VariableDialIndices, Buffer::Responses, Buffer::HostValues, Buffer::HostEdits, Buffer::Variables, Buffer::DirtyEvents, Buffer::EventWeights, Buffer::Control});
   if( _cache_.needsUpdate(inputs_) || not _valid_ ){
     dispatch(encoder, Kernel::Binning, model.events.size(), {Buffer::Events, Buffer::Samples, Buffer::Nodes, Buffer::Bounds, Buffer::NodeBins,
-      Buffer::Bins, Buffer::Intervals, Buffer::Variables, Buffer::DirtyEvents, Buffer::HardBins, Buffer::EventCounts, Buffer::Contributions, Buffer::ChangedSamples, Buffer::Control});
+      Buffer::Bins, Buffer::Intervals, Buffer::Variables, Buffer::DirtyEvents, Buffer::HardBins, Buffer::EventCounts, Buffer::Contributions, Buffer::ChangedSamples, Buffer::Control, Buffer::ReusableBins});
     dispatch(encoder, Kernel::ClearCounts, _packed_.histogramBins, {Buffer::BinCounts, Buffer::Control});
     dispatch(encoder, Kernel::CountContributions, model.events.size(), {Buffer::Events, Buffer::EventCounts, Buffer::Contributions, Buffer::BinCounts, Buffer::Control});
     dispatch(encoder, Kernel::IndexChunks, 1, {Buffer::BinCounts, Buffer::BinOffsets, Buffer::BinPositions, Buffer::ChunkOffsets, Buffer::Chunks, Buffer::Control});
@@ -306,10 +308,13 @@ Backends::BackendDeviceView Backends::MpsEventPropagation::getDeviceView() const
 std::string Backends::MpsEventPropagation::getDiagnostics() const {
   JsonType out;
   out["lastStageGpuSeconds"] = _diagnosticStageGpuSeconds_;
+  out["previousBinReuseEnabled"] = _enablePreviousBinReuse_;
+  out["reusableBins"] = std::count_if(_packed_.reusableBins.begin(), _packed_.reusableBins.end(),
+      [](DeviceIndex position_){ return position_ != DeviceIndex(-1); });
   out["contributionCapacity"] = _packed_.contributionCapacity;
   out["histogramChunkCapacity"] = _packed_.histogramChunkCapacity;
   out["buffers"] = JsonType::array();
-  const char* names[]{"Events", "Samples", "Dials", "Targets", "Intervals", "Bins", "Nodes", "Bounds", "NodeBins", "WeightDialIndices", "VariableDialIndices", "Payloads", "Parameters", "ExternalWeights", "Responses", "Variables", "HostValues", "HostEdits", "DirtyEvents", "HardBins", "EventCounts", "Contributions", "ChangedSamples", "Control", "EventWeights", "BinCounts", "BinOffsets", "BinPositions", "BinContributions", "ChunkOffsets", "Chunks", "PartialSums", "PartialSquares", "HistogramSums", "HistogramSquares", "ReadbackSums", "ReadbackSquares", "ReadbackVariables", "ReadbackBins", "ReadbackCounts", "ReadbackContributions", "ReadbackWeights"};
+  const char* names[]{"Events", "Samples", "Dials", "Targets", "Intervals", "Bins", "Nodes", "Bounds", "NodeBins", "ReusableBins", "WeightDialIndices", "VariableDialIndices", "Payloads", "Parameters", "ExternalWeights", "Responses", "Variables", "HostValues", "HostEdits", "DirtyEvents", "HardBins", "EventCounts", "Contributions", "ChangedSamples", "Control", "EventWeights", "BinCounts", "BinOffsets", "BinPositions", "BinContributions", "ChunkOffsets", "Chunks", "PartialSums", "PartialSquares", "HistogramSums", "HistogramSquares", "ReadbackSums", "ReadbackSquares", "ReadbackVariables", "ReadbackBins", "ReadbackCounts", "ReadbackContributions", "ReadbackWeights"};
   static_assert(sizeof(names) / sizeof(*names) == std::size_t(Buffer::Count));
   for( std::size_t i = 0; i < _buffers_.size(); ++i ){
     auto value = _buffers_[i];

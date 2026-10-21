@@ -177,12 +177,55 @@ def worker(args):
             probe = measure(engine, sequence, scenario, args.probe_calls, args.seed, probe=True, capture=True)
             profiling.check_equal(reference, probe)
             write_json(output / f'{scenario}-probes.json', probe)
+    if args.compare_previous_bin and args.backend == 'MPS':
+        compare_previous_bin(args, engine, sequence, output)
     if args.mode == 'hard' and args.backend == 'MPS':
         for scenario in args.scenarios:
             write_json(output / f'{scenario}-bin-movement.json',
                        bin_movement(engine, sequence, scenario, args.probe_calls, args.seed))
     summary['complete'] = True
     write_json(output / 'summary.json', summary)
+
+
+def compare_previous_bin(args, engine, sequence, output):
+    manager = engine.getBackendsManager()
+    variants = ('treeSearch', 'previousBin')
+    results = {scenario: {variant: [] for variant in variants} for scenario in args.scenarios}
+    summary = {'complete': False, 'scenarios': {}}
+    try:
+        for scenario in args.scenarios:
+            for trial in range(args.trials):
+                pair = {}
+                # Alternate A/B and B/A on one resident model.
+                for variant in (variants if trial % 2 == 0 else variants[::-1]):
+                    manager.setDiagnosticMpsPreviousBinReuse(variant == 'previousBin')
+                    if args.warmup:
+                        measure(engine, sequence, scenario, args.warmup, args.seed + 1000000)
+                    progress(f'{args.mode}-{scenario}: {variant} A/B trial {trial + 1}')
+                    result = measure(engine, sequence, scenario, args.calls, args.seed + trial)
+                    write_json(output / f'{scenario}-ab{trial + 1}-{variant}.json', result)
+                    pair[variant] = result
+                    results[scenario][variant].extend(result['rows'])
+                profiling.check_equal(pair['treeSearch'], pair['previousBin'])
+                timings = {variant: profiling.summarize(rows)
+                           for variant, rows in results[scenario].items()}
+                summary['scenarios'][scenario] = {'timings': timings,
+                    'evaluationSpeedup': timings['treeSearch']['evaluationSeconds']['medianMs'] /
+                                         timings['previousBin']['evaluationSeconds']['medianMs'],
+                    'gpuSpeedup': timings['treeSearch']['devicePropagationSeconds']['medianMs'] /
+                                  timings['previousBin']['devicePropagationSeconds']['medianMs']}
+                write_json(output / 'previous-bin-comparison.json', summary)
+            probes = {}
+            for variant in variants:
+                manager.setDiagnosticMpsPreviousBinReuse(variant == 'previousBin')
+                probes[variant] = measure(engine, sequence, scenario, args.probe_calls,
+                                          args.seed, probe=True, capture=True)
+                write_json(output / f'{scenario}-ab-{variant}-probes.json', probes[variant])
+            profiling.check_equal(probes['treeSearch'], probes['previousBin'])
+    finally:
+        manager.setDiagnosticMpsPreviousBinReuse(True)
+    summary['complete'] = True
+    write_json(output / 'previous-bin-comparison.json', summary)
 
 
 def supervise(args, backend, mode):
@@ -278,6 +321,8 @@ def main():
     parser.add_argument('--probe-calls', type=int, default=5)
     parser.add_argument('--seed', type=int, default=12345)
     parser.add_argument('--step-scale', type=float, default=.1)
+    parser.add_argument('--compare-previous-bin', action='store_true',
+                        help='Alternate original tree search and previous-bin reuse on each resident MPS model')
     parser.add_argument('--worker', action='store_true', help=argparse.SUPPRESS)
     parser.add_argument('--backend', choices=['CPU', 'MPS'], help=argparse.SUPPRESS)
     parser.add_argument('--mode', choices=['hard', 'smoothed'], help=argparse.SUPPRESS)
