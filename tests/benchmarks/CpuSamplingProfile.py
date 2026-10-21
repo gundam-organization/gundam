@@ -7,6 +7,30 @@ import sys
 import time
 
 
+def check_profile_support(output, write_json):
+    executable = shutil.which('perf') if sys.platform.startswith('linux') else None
+    status = {'available': False, 'phase': 'preflight'}
+    if executable is None:
+        status['reason'] = 'Linux perf executable unavailable in PATH'
+    else:
+        data = output / 'perf-preflight.data'
+        command = [executable, 'record', '-e', 'cycles:u', '-F', '199', '--call-graph', 'dwarf,8192',
+                   '-o', str(data), '--', sys.executable, '-c', 'sum(range(1000000))']
+        status['command'] = command
+        with (output / 'perf-preflight.log').open('w') as log:
+            try:
+                result = subprocess.run(command, stdout=log, stderr=subprocess.STDOUT, timeout=15)
+                status['exitCode'] = result.returncode
+                status['available'] = result.returncode == 0
+                if not status['available']:
+                    status['reason'] = 'perf preflight failed; see perf-preflight.log'
+            except (OSError, subprocess.TimeoutExpired) as error:
+                status['reason'] = str(error)
+        data.unlink(missing_ok=True)
+    write_json(output / 'perf-status.json', status)
+    return status
+
+
 def record_profile(output, evaluate, calls, write_json, progress):
     status_path = output / 'perf-status.json'
     executable = shutil.which('perf') if sys.platform.startswith('linux') else None

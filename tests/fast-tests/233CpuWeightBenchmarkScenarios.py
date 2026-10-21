@@ -217,7 +217,7 @@ def main():
     with (base / 'single-benchmark.log').open('w') as log:
         subprocess.run([sys.executable, str(single), '--config', str(base / 'config-False.json'),
                         '--calls', '3', '--warmup', '1', '--probe-calls', '2', '--hardware-counters',
-                        '--perf-record', '--profile-calls', '2', '--output', str(single_output)],
+                        '--output', str(single_output)],
                        stdout=log, stderr=subprocess.STDOUT, check=True)
     single_summary = json.loads((single_output / 'summary.json').read_text())
     assert len(single_summary) == 1
@@ -225,9 +225,17 @@ def main():
     assert {'weights', 'cache', 'histograms', 'likelihood', 'variables', 'binning',
             'hostPreparation', 'evaluation'} == set(single_summary[0]['timings'])
     assert single_summary[0]['histogramsExactlyAgree'] and single_summary[0]['likelihoodsAgree']
-    status = json.loads((single_output / 'perf-status.json').read_text())
-    if sys.platform != 'linux':
-        assert not status['available']
+    missing_perf_output = base / f'missing-perf-{os.getpid()}'
+    environment = os.environ.copy()
+    environment['PATH'] = ''
+    missing = subprocess.run([sys.executable, str(single), '--config', str(base / 'does-not-exist.json'),
+                              '--perf-record', '--output', str(missing_perf_output)],
+                             env=environment, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+    assert missing.returncode != 0
+    status = json.loads((missing_perf_output / 'perf-status.json').read_text())
+    assert not status['available'] and status['phase'] == 'preflight'
+    assert 'stopped before loading' in missing.stdout
+    assert not (missing_perf_output / 'native.log').exists()
     print('SUCCESS: workload replay, traversals and shared input evaluations preserve predictions.')
 
 

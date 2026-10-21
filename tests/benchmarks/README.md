@@ -42,9 +42,12 @@ stacks remain in `perf.data`. The short attachment delay may leave a small amoun
 of startup/idle sampling outside the evaluation loop. Sampling results are never
 mixed into ordinary timing trials or the phase-scoped counter probes.
 
-If perf is absent, denied, or cannot stop/report normally, its status/log is
-retained and the ordinary timing results remain available. No installation or
-privilege escalation is attempted. Function/line resolution depends on the
+An explicit `--perf-record` request first runs a tiny perf permission/tool check,
+before dataset loading. If perf is absent or refused, the script stops immediately
+and writes `perf-status.json` / `perf-preflight.log` as available. Omit the flag
+when only stage/counter measurements are wanted. If later sampling/reporting fails,
+its status/log and already completed timing results remain available. No
+installation or privilege escalation is attempted. Function/line resolution depends on the
 installed binary's symbols: Release can provide function attribution when symbols
 are retained; RelWithDebInfo is preferable for source/instruction analysis. A
 sampled instruction near a cache miss is not by itself proof of the stall's cause.

@@ -249,6 +249,15 @@ def main(single_thread=False, description=None):
     args.output.mkdir(parents=True, exist_ok=False)
     settings = vars(args).copy()
     write_json(args.output / 'settings.json', {k: str(v) if isinstance(v, Path) else v for k, v in settings.items()})
+    if args.perf_record:
+        helper_spec = importlib.util.spec_from_file_location(
+            'sampling', Path(__file__).with_name('CpuSamplingProfile.py'))
+        sampling = importlib.util.module_from_spec(helper_spec)
+        helper_spec.loader.exec_module(sampling)
+        support = sampling.check_profile_support(args.output, write_json)
+        if not support['available']:
+            raise RuntimeError(support['reason'] + '; stopped before loading the dataset. '
+                               'Omit --perf-record to measure stages/counters without function sampling.')
     progress(f'Results: {args.output}; one dataset load, no event-count limit added')
     count = len(args.workers) * args.rounds
     progress(f'{count * args.calls * args.trials} timed evaluations + {count * args.probe_calls} separate worker probes + warmup/priming')
