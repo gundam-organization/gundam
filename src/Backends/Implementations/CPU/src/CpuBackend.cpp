@@ -223,6 +223,8 @@ void Backends::CpuBackend::initializeThreads() {
       "CpuBackend::calculateEventWeights",
       [this](int iThread_){
         if( std::size_t(iThread_) >= _weightRanges_.size() ){ return; }
+        auto* counters = _diagnosticWeightCounters_ ? _weightProbes_[iThread_].get() : nullptr;
+        if( counters ){ counters->begin(); }
         const auto start = _diagnosticWeightTiming_ ? std::chrono::steady_clock::now()
                                                   : std::chrono::steady_clock::time_point{};
         CpuBackendProfiler::WorkerScope probe(_profiler_.get(), CpuBackendProfiler::Stage::Weights, iThread_);
@@ -231,6 +233,7 @@ void Backends::CpuBackend::initializeThreads() {
           _weightWorkerStats_[iThread_].wallSeconds =
               std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count();
         }
+        if( counters ){ counters->end(); }
         if( auto* record = probe.get() ){
           record->weightEvents = _weightWorkerStats_[iThread_].events;
           record->weightBlocks = _weightWorkerStats_[iThread_].blocks;
@@ -618,6 +621,17 @@ void Backends::CpuBackend::setDiagnosticWeightScheduling(CpuWeightScheduling sch
   initializeWeightScheduling();
   // If probes were requested, start a new run with the new layout metadata.
   initializeProfiler();
+}
+
+void Backends::CpuBackend::setDiagnosticWeightCounters(bool enabled_) {
+  LogThrowIf(not _isBuilt_, "Build the CPU backend before enabling weight counters.");
+  if( enabled_ and _weightProbes_.empty() ){
+    for( int thread = 0; thread < _threadPool_.getNbThreads(); ++thread ){
+      _weightProbes_.emplace_back(std::make_unique<CpuWeightProbe>());
+    }
+  }
+  _diagnosticWeightCounters_ = enabled_;
+  if( not enabled_ ){ _weightProbes_.clear(); }
 }
 
 void Backends::CpuBackend::setDiagnosticWeightWorkers(std::size_t workers_, bool timing_) {

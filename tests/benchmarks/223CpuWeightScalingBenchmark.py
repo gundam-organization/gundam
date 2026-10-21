@@ -33,10 +33,51 @@ def stats(values):
             'p95Ms': ordered[int(.95 * (len(ordered) - 1))] * 1000}
 
 
+def summarize_hardware(probes):
+    reports = [worker['weightProbe'] for probe in probes for worker in probe['workers']]
+    names = ('cycles', 'instructions', 'cacheReferences', 'cacheMisses', 'llcReadMisses', 'dtlbReadMisses')
+    out = {'workerSamples': len(reports), 'validSamplesByEvent': {
+        name: sum(r['events'][name]['scaledCount'] is not None for r in reports) for name in names}}
+    fractions = [e['runningFraction'] for r in reports for e in r['events'].values()
+                 if e['runningFraction'] is not None]
+    out['minimumRunningFraction'] = min(fractions) if fractions else None
+    cpu = [r['cpuSeconds'] / r['wallSeconds'] for r in reports
+           if r.get('cpuSeconds') is not None and r.get('wallSeconds', 0) > 0]
+    out['medianWorkerCpuToWall'] = statistics.median(cpu) if cpu else None
+    ipc, misses, instructions = [], [], []
+    for probe in probes:
+        workers = probe['workers']
+        def total(name):
+            values = [w['weightProbe']['events'][name]['scaledCount'] for w in workers]
+            return sum(values) if all(v is not None for v in values) else None
+        cycles, retired, cache_misses = total('cycles'), total('instructions'), total('cacheMisses')
+        references = sum(w['dialReferences'] for w in workers)
+        if cycles and retired is not None:
+            ipc.append(retired / cycles)
+        if references and retired is not None:
+            instructions.append(retired / references)
+        if references and cache_misses is not None:
+            misses.append(1000 * cache_misses / references)
+    out['medianIpcEstimate'] = statistics.median(ipc) if ipc else None
+    out['medianInstructionsPerDialReference'] = statistics.median(instructions) if instructions else None
+    out['medianGenericCacheMissesPer1000DialReferences'] = statistics.median(misses) if misses else None
+    return out
+
+
 def measure(args):
     import GUNDAM
     if not hasattr(GUNDAM.BackendManager, 'setDiagnosticCpuWeightWorkers'):
         raise RuntimeError('Rebuild/install GUNDAM: CPU weight worker diagnostics are missing.')
+    if args.hardware_counters and (not hasattr(GUNDAM.BackendManager, 'setDiagnosticCpuWeightCounters')
+                                      or not hasattr(GUNDAM, 'probeCpuWeightCounters')):
+        raise RuntimeError('Rebuild/install GUNDAM: phase-scoped hardware probes are missing.')
+    if args.hardware_counters:
+        preflight = json.loads(GUNDAM.probeCpuWeightCounters())
+        write_json(args.output / 'counter-preflight.json', preflight)
+        opened = [name for name, event in preflight['events'].items() if event['available']]
+        errors = {name: event.get('error', 'unsupported platform') for name, event in preflight['events'].items()
+                  if not event['available']}
+        progress(f'Counter preflight before loading: opened {len(opened)}/6 events; {errors}')
     engine = scheduling.load_engine(args, args.threads)
     manager = engine.getBackendsManager()
     metadata = json.loads(manager.setDiagnosticCpuWeightScheduling('Dynamic', 2))
@@ -64,6 +105,13 @@ def measure(args):
                                  'stderr': captured.stderr[:4096]}
             except (OSError, subprocess.TimeoutExpired) as error:
                 system[label] = {'unavailable': str(error)}
+    if args.hardware_counters:
+        path = Path('/proc/sys/kernel/perf_event_paranoid')
+        try:
+            system['perfEventParanoid'] = path.read_text().strip()
+        except OSError:
+            system['perfEventParanoid'] = None
+        system['hardwareProbePolicy'] = 'calling worker, userspace only, independent perf events; weights only'
     write_json(args.output / 'model.json', system)
     results = []
     for round_index in range(args.rounds):
@@ -95,6 +143,10 @@ def measure(args):
                 progress(f"{tag}: trial {trial + 1}/{args.trials}, weights {stats(times['weights'])['medianMs']:.3f} ms")
             # Enable per-worker clocks only for this separate diagnostic pass.
             manager.setDiagnosticCpuWeightWorkers(workers, True)
+            if args.hardware_counters:
+                manager.setDiagnosticCpuWeightCounters(True)
+                # Open counters on their owner workers before recorded samples.
+                engine.evaluateLikelihood()
             probes = []
             for _ in range(args.probe_calls):
                 engine.evaluateLikelihood()
@@ -108,6 +160,11 @@ def measure(args):
                                'stageSeconds': manager.getLastTimingSummary().eventWeightsStageSeconds,
                                'meanToMaxWorkerTime': statistics.mean(r['wallSeconds'] for r in records) / maximum
                                if maximum > 0 else None})
+            if args.hardware_counters:
+                hardware = summarize_hardware(probes)
+                progress(f"{tag}: hardware samples: {hardware['validSamplesByEvent']}; "
+                         f"minimum PMU running fraction: {hardware['minimumRunningFraction']}")
+                manager.setDiagnosticCpuWeightCounters(False)
             manager.setDiagnosticCpuWeightWorkers(workers, False)
             manager.materialize('Histograms')
             if histogram() != reference_histogram:
@@ -117,6 +174,8 @@ def measure(args):
                       'poolThreads': args.threads, 'layout': layout, 'raw': raw, 'probes': probes,
                       'timings': {k: stats(v) for k, v in flattened.items()},
                       'likelihoodsAgree': True, 'histogramsExactlyAgree': True}
+            if args.hardware_counters:
+                result['hardware'] = hardware
             write_json(args.output / f'{tag}.json', result)
             (args.output / f'{tag}.partial.json').unlink(missing_ok=True)
             compact = {k: v for k, v in result.items() if k not in ('raw', 'probes', 'layout')}
@@ -142,6 +201,8 @@ def main():
     parser.add_argument('--rounds', type=int, default=2, help='Alternate ascending and descending order')
     parser.add_argument('--warmup', type=int, default=3)
     parser.add_argument('--probe-calls', type=int, default=5)
+    parser.add_argument('--hardware-counters', action='store_true',
+                        help='Optional Linux perf counters and thread CPU/context-switch probes, only in the separate probe pass')
     parser.add_argument('--output', type=Path, default=Path(time.strftime('cpu-weight-scaling-%Y%m%d-%H%M%S-') + str(os.getpid())))
     parser.add_argument('--worker', action='store_true', help=argparse.SUPPRESS)
     args = parser.parse_args()

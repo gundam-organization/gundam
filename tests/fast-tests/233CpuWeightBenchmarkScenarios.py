@@ -182,8 +182,9 @@ def main():
     with (base / 'scaling-benchmark.log').open('w') as log:
         subprocess.run([sys.executable, str(scaling), '--config', str(base / 'config-False.json'),
                         '--threads', '4', '--workers', '1', '2', '4', '--calls', '2',
-                        '--warmup', '1', '--trials', '1', '--rounds', '2', '--probe-calls', '2',
+                        '--warmup', '1', '--trials', '1', '--rounds', '2', '--probe-calls', '2', '--hardware-counters',
                         '--output', str(scaling_output)], stdout=log, stderr=subprocess.STDOUT, check=True)
+    assert (scaling_output / 'counter-preflight.json').exists()
     scaling_summary = json.loads((scaling_output / 'summary.json').read_text())
     assert [r['workers'] for r in scaling_summary] == [1, 2, 4, 4, 2, 1]
     for result in scaling_summary:
@@ -199,6 +200,17 @@ def main():
             assert sum(w['events'] for w in probe['workers']) == 180
             assert sum(w['dialReferences'] for w in probe['workers']) == 720
             assert all(w['wallSeconds'] >= 0 for w in probe['workers'])
+            for worker in probe['workers']:
+                hardware = worker['weightProbe']
+                assert hardware['measured'] and hardware['wallSeconds'] >= 0
+                assert len(hardware['events']) == 6
+                for event in hardware['events'].values():
+                    assert event['scaledCount'] is None or event['scaledCount'] >= 0
+                    assert event['runningFraction'] is None or 0 < event['runningFraction'] <= 1
+                if sys.platform != 'linux':
+                    assert not hardware['platformSupported']
+                    assert all(e['scaledCount'] is None for e in hardware['events'].values())
+        assert result['hardware']['workerSamples'] == 2 * result['workers']
     assert not list(scaling_output.glob('*.partial.json'))
     print('SUCCESS: workload replay, traversals and shared input evaluations preserve predictions.')
 

@@ -536,6 +536,12 @@ PYBIND11_MODULE(GUNDAM, module) {
   ;
 
 #ifdef GUNDAM_USING_BACKENDS
+  module.def("probeCpuWeightCounters", [](){
+    Backends::CpuWeightProbe probe;
+    probe.begin();
+    probe.end();
+    return probe.report().dump();
+  });
   pybind11::class_<Backends::BackendTimingSummary>(module, "BackendTimingSummary")
   .def_readonly("devicePropagationSeconds", &Backends::BackendTimingSummary::devicePropagationSeconds)
   .def_readonly("eventStateReadbackBytes", &Backends::BackendTimingSummary::eventStateReadbackBytes)
@@ -575,6 +581,11 @@ PYBIND11_MODULE(GUNDAM, module) {
     const auto* cpu = dynamic_cast<const Backends::CpuBackend*>(manager_.getBackend());
     LogThrowIf(cpu == nullptr, "Weight worker diagnostics require a CPU backend.");
     return cpu->getWeightSchedulingDiagnostics().dump();
+  })
+  .def("setDiagnosticCpuWeightCounters", [](Backends::BackendManager& manager_, bool enabled_){
+    auto* cpu = dynamic_cast<Backends::CpuBackend*>(manager_.getBackend());
+    LogThrowIf(cpu == nullptr, "Weight hardware counters require a CPU backend.");
+    cpu->setDiagnosticWeightCounters(enabled_);
   })
   .def("setDiagnosticCpuWeightWorkers", [](Backends::BackendManager& manager_, std::size_t workers_, bool timing_){
     auto* cpu = dynamic_cast<Backends::CpuBackend*>(manager_.getBackend());

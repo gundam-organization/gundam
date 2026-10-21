@@ -12,6 +12,7 @@ set(SRCFILES
     ${CMAKE_CURRENT_SOURCE_DIR}/Common/src/BackendTypes.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/CPU/src/CpuBackend.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/CPU/src/CpuBackendProfiler.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/CPU/src/CpuWeightProbe.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/CPU/src/CpuBackendBinning.cpp
 )
 
@@ -92,6 +93,7 @@ set(HEADERS
     ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/CPU/include/CpuWeightKernels.h
     ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/CPU/include/CpuBackend.h
     ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/CPU/include/CpuBackendProfiler.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/CPU/include/CpuWeightProbe.h
     ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/MPS/include/MpsBackend.h
     ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/MPS/include/MpsBackendInternal.h
     ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/MPS/include/MpsEventPropagation.h

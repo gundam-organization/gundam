@@ -7,6 +7,7 @@
 #include "BackendTypes.h"
 #include "Backend.h"
 #include "CpuBackendProfiler.h"
+#include "CpuWeightProbe.h"
 #include "PropagationInputs.h"
 #include "GenericToolbox.Time.h"
 #include "GenericToolbox.Thread.h"
@@ -66,6 +67,7 @@ ENUM_FIELD( Indexed )
     // Diagnostic API: call between synchronous propagations. Only the work
     // ranges/kernel selection change; model data and response caches are kept.
     void setDiagnosticWeightScheduling(CpuWeightScheduling scheduling_, std::size_t blocksPerThread_);
+    void setDiagnosticWeightCounters(bool enabled_);
     void setDiagnosticWeightWorkers(std::size_t workers_, bool timing_);
     void setDiagnosticCacheTraversal(CpuCacheTraversal traversal_);
     void setDiagnosticInputEvaluation(CpuInputEvaluation evaluation_);
@@ -159,6 +161,8 @@ ENUM_FIELD( Indexed )
     std::size_t _weightWork_{0};
     std::size_t _diagnosticWeightWorkers_{0};
     bool _diagnosticWeightTiming_{false};
+    bool _diagnosticWeightCounters_{false};
+    std::vector<std::unique_ptr<CpuWeightProbe>> _weightProbes_{};
     bool _allWeightResponsesCached_{false};
     bool _usesDynamicWeights_{false};
     std::vector<EventRange> _weightBlocks_{};

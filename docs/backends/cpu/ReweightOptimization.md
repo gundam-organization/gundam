@@ -119,7 +119,10 @@ Performance scripts live in `tests/benchmarks`; see the
 weight-scaling benchmark loads the model once and varies only active weight
 workers. It separates ordinary stage timings from per-worker wall-time probes,
 retains the histogram pool and checks likelihood/histogram agreement. These
-worker controls are diagnostic API calls; the default fit policy is unchanged.
+worker controls are diagnostic API calls; the default fit policy is unchanged. Optional
+`--hardware-counters` probes measure Linux per-worker CPU/cache events only in
+the separate weight-probe pass. Reports retain unsupported/denied events and PMU
+running fractions; they do not infer RAM bandwidth directly from cache misses.
 
 `222CpuWeightSchedulingBenchmark.py --benchmark cache` compares `Indexed` and
 `Auto` on the same loaded model with Dynamic x2 weights. It replays identical

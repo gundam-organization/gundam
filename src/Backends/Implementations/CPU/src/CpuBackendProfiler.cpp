@@ -371,6 +371,7 @@ Backends::CpuBackendProfiler::Json Backends::CpuBackend::getWeightSchedulingDiag
   out["compilerOptimizationEnabled"] = false;
 #endif
   out["weightWorkers"] = _weightRanges_.size();
+  out["hardwareCountersEnabled"] = _diagnosticWeightCounters_;
   out["workerTimingEnabled"] = _diagnosticWeightTiming_;
   out["lastWeightWorkers"] = CpuBackendProfiler::Json::array();
   for( std::size_t thread = 0; thread < _weightWorkerStats_.size(); ++thread ){
@@ -378,6 +379,9 @@ Backends::CpuBackendProfiler::Json Backends::CpuBackend::getWeightSchedulingDiag
     out["lastWeightWorkers"].push_back({{"thread", thread}, {"events", worker.events},
         {"dialReferences", worker.dialReferences}, {"blocks", worker.blocks},
         {"wallSeconds", worker.wallSeconds}});
+    if( _diagnosticWeightCounters_ and thread < _weightProbes_.size() ){
+      out["lastWeightWorkers"].back()["weightProbe"] = _weightProbes_[thread]->report();
+    }
   }
   return out;
 }

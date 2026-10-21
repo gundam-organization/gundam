@@ -58,6 +58,67 @@ limit, but does not prove memory-bandwidth saturation. Hardware counters, if
 available on the worker node, are needed to distinguish cache misses, memory
 stalls and compute limits. No `perf` dependency or privilege is required here.
 
+## Phase-scoped Linux hardware probes
+
+After rebuilding/installing GUNDAM, add `--hardware-counters` to the scaling
+benchmark. A short comparison of one and eight active workers is sufficient to
+start:
+
+```sh
+python3 "$REPO_DIR/gundam/tests/benchmarks/223CpuWeightScalingBenchmark.py" \
+  --config configOA2024.yaml --threads 8 --workers 1 8 \
+  --calls 20 --rounds 2 --probe-calls 5 --hardware-counters \
+  --override override/v13Prod.yaml override/backendCpuTest.yaml
+```
+
+A quick access check is printed and saved to `counter-preflight.json` before
+loading the dataset; per-worker access is checked again in the actual probes.
+Denied counters do not prevent collecting OS/thread timing data.
+
+This loads the dataset once, runs 80 ordinary timed evaluations and 20 recorded
+probe evaluations, plus warmup/priming and one counter-initialization evaluation
+per case. Counters are off for all ordinary timing trials. Linux worker threads
+open their own counters through `perf_event_open`, without an external `perf`
+process, system-wide monitoring, new library or elevated privilege request.
+Only userspace execution of the weight-job wrapper is counted; dial response
+updates, histograms, host publication and the final pool join are excluded.
+Opening counters, exporting reports and reading counters are outside the worker
+wall-time measurement. Hardware boundaries include a small amount of probe/setup
+code around the kernel, so these are diagnostic samples, not replacement timings.
+
+The optional probe requests cycles, retired instructions, generic cache references
+and misses, LLC read misses and data-TLB read misses. Every event is independent:
+one unsupported/denied event does not disable the others. Reports include errno,
+raw deltas, enabled/running time deltas and multiplex-scaled estimates. Counters
+remain disabled between weight jobs and are closed after each case. Counter and
+snapshot storage scales with worker count, not event count.
+
+The per-worker `weightProbe` record also includes thread CPU time, wall time,
+CPU IDs at both boundaries, voluntary/involuntary context switches and page
+faults. A matching CPU at both ends does not exclude intervening migrations.
+Page faults describe virtual-memory paging, not CPU cache misses. Even when
+hardware access is refused, the Linux thread/OS measurements are retained.
+On non-Linux platforms hardware/OS fields are explicitly unavailable; portable
+weight timings and correctness comparisons still run.
+
+`summary.json` adds counter coverage, the minimum PMU running fraction, an IPC
+estimate, instructions per dial reference, generic cache misses per 1,000 dial
+references and median worker CPU/wall ratio. Raw data remain in `round*-w*.json`.
+No missing counter is treated as zero. Low running fractions weaken estimates:
+independent events may have sampled different execution intervals. Generic cache
+event mappings depend on the CPU/kernel; counts must not be converted directly
+into RAM bytes or interpreted as a universal cache-miss rate.
+
+The questions are whether instructions per reference stay stable while cycles
+increase, whether cache/TLB misses accompany that change, and whether workers
+lose CPU time to scheduling. Low IPC alone cannot distinguish memory latency,
+SMT contention and multiplication dependencies. Cache misses alone do not prove
+RAM bandwidth saturation. Results guide the next experiment rather than applying
+a hardware-dependent threshold or changing the fit policy automatically.
+
+Counter semantics and Linux access restrictions are described in the
+[Linux `perf_event_open` manual](https://man7.org/linux/man-pages/man2/perf_event_open.2.html).
+
 ## Other benchmarks
 
 - `222CpuWeightSchedulingBenchmark.py`: paired comparisons of weight scheduling,
