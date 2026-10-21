@@ -3,7 +3,7 @@
 The CPU backend separates updating unique dial responses from multiplying those
 responses into event weights. Both stages use the resident immutable model and
 retained output storage described in the [Backends library](../BackendsLibrary.md).
-See [CPU backend structure](CpuBackend.md) for the data layout and distribution
+See [CPU backend structure](BackendStructure.md) for the data layout and distribution
 of each propagation stage across workers.
 
 ## Dial-response cache
