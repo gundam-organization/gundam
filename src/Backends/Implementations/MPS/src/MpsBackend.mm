@@ -246,6 +246,11 @@ void Backends::MpsBackend::setDiagnosticPreviousBinReuse(bool enabled_) {
   _impl_->eventPropagation->setDiagnosticPreviousBinReuse(enabled_);
 }
 
+void Backends::MpsBackend::setDiagnosticBinningIntervalPruning(bool enabled_) {
+  LogThrowIf(not _impl_->eventPropagation, "Metal event propagation is unavailable.");
+  _impl_->eventPropagation->setDiagnosticBinningIntervalPruning(enabled_);
+}
+
 std::string Backends::MpsBackend::getDiagnostics() const {
   const auto& impl = *_impl_;
   JsonType out;

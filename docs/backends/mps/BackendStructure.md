@@ -79,3 +79,18 @@ binning benchmark's `--compare-previous-bin` alternates the two modes on one
 resident model, compares likelihoods and final histograms, then records separate
 GPU stage probes. With smoothing enabled this flag leaves bin selection on the
 existing path.
+
+The bin search also rejects a candidate as soon as its remaining intervals cannot
+change the result. Strict binning only evaluates hard containment and stops at
+the first miss; it does not calculate unused smoothing fractions. For smoothed
+binning, early rejection requires both failed hard containment and a zero
+accumulated fraction. A point outside the hard bin may still contribute through
+the smoothing support, and a hard match must still be recorded even when its
+fraction rounds to zero. The order of nonzero fractional products and bin
+priority are preserved.
+
+`setDiagnosticMpsBinningIntervalPruning(False)` restores the full interval loop
+for A/B measurements. `True` is the production default. The production benchmark
+accepts `--compare-binning-intervals` to compare both loops on the same resident
+model, independently of the previous-bin shortcut. The two comparison flags are
+mutually exclusive.

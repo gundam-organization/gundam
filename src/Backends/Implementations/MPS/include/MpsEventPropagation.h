@@ -22,6 +22,7 @@ namespace Backends {
     MpsEventPropagation& operator=(const MpsEventPropagation&) = delete;
     void setDiagnosticStageProfiling(bool enabled_){ _enableDiagnosticStageProfiling_ = enabled_; }
     void setDiagnosticPreviousBinReuse(bool enabled_){ _enablePreviousBinReuse_ = enabled_; }
+    void setDiagnosticBinningIntervalPruning(bool enabled_){ _enableBinningIntervalPruning_ = enabled_; }
     [[nodiscard]] std::string getDiagnostics() const;
     [[nodiscard]] const std::map<std::string, double>& getDiagnosticStageGpuSeconds() const { return _diagnosticStageGpuSeconds_; }
     void build(const PropagationView& model_);
@@ -59,6 +60,7 @@ namespace Backends {
     bool _valid_{false};
     bool _enableDiagnosticStageProfiling_{false};
     bool _enablePreviousBinReuse_{true};
+    bool _enableBinningIntervalPruning_{true};
     std::map<std::string, double> _diagnosticStageGpuSeconds_{};
   };
 }

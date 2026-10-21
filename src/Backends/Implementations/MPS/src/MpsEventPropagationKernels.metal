@@ -180,8 +180,13 @@ kernel void rebin_events(
         auto interval = intervals[i];
         auto value = variables[event.firstVariable + interval.variableIndex];
         hardContains = hardContains && GundamBinningMath::contains(interval.lowerBound, interval.upperBound, value);
-        fraction *= float(GundamBinningMath::intervalFraction(interval.lowerBound, interval.upperBound,
-                        interval.lowerInverseWidth, interval.upperInverseWidth, value));
+        if( sample.isSmoothed || !control.pruneBinningIntervals ){
+          fraction *= float(GundamBinningMath::intervalFraction(interval.lowerBound, interval.upperBound,
+                          interval.lowerInverseWidth, interval.upperInverseWidth, value));
+        }
+        // A strict miss rejects the bin immediately. Smoothed support can
+        // extend outside the hard bin, so both tests must reject before pruning.
+        if( control.pruneBinningIntervals && !hardContains && (!sample.isSmoothed || fraction == 0) ){ break; }
       }
       if( hardContains && bin.position < firstHardPosition ){ hardBin = bin.binIndex; firstHardPosition = bin.position; }
       if( !sample.isSmoothed || fraction == 0 ){ continue; }

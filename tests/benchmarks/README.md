@@ -422,3 +422,28 @@ every likelihood and each final histogram with the existing 2e-5 tolerances.
 Counter differences are expected: a failed previous-bin check counts as an
 additional candidate before the fallback tree search. Smoothed cases keep the
 same binning algorithm in both diagnostic modes.
+
+### Large Pmu variations and interval rejection
+
+The external input override `override/pmuScaleBinningStressTest.yaml` is applied
+**after** `pmuScaleBinningTest.yaml`. It sets `stdDev: 0.5` and expands
+`parameterLimits` to `[0.01, 3.0]`. Keep `--step-scale 1` to propose at 50% of the
+nominal unit scale. This is a stress workload; proposals are redrawn outside
+the positive domain, so the accepted distribution is a truncated Gaussian.
+Simply setting `--step-scale 50` with the original `[0.8, 1.2]` bounds would not
+exercise large migrations.
+
+Use the command above with the additional stress override and
+`--compare-binning-intervals` in place of `--compare-previous-bin`. For example,
+`--scenarios global --calls 200 --trials 6 --warmup 30 --probe-calls 16` gives
+1,200 ordinary evaluations per backend/mode plus six alternating A/B pairs on
+each MPS model. The previous-bin optimization stays enabled in both variants.
+
+This comparison writes `interval-pruning-comparison.json`,
+`*-ab*-fullIntervals.json`, `*-ab*-prunedIntervals.json` and corresponding
+separate stage probes. `fullIntervals` executes the original complete interval
+loop; `prunedIntervals` stops once a candidate cannot match or contribute. Each
+raw row now includes `parameterValues` in parameter-manifest order, after the
+evaluation timer, so the actual proposal range can be inspected. Candidate
+counts describe bins visited, not individual interval operations; early
+interval rejection does not reduce these counts.

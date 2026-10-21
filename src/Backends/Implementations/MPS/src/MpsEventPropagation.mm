@@ -152,6 +152,7 @@ void Backends::MpsEventPropagation::propagate(const PropagationInputs& inputs_, 
   control.rebuildIndex = not _valid_;
   control.firstPropagation = not _valid_;
   control.reusePreviousBin = _enablePreviousBinReuse_;
+  control.pruneBinningIntervals = _enableBinningIntervalPruning_;
   control.updateVariables = _cache_.variableInputsChanged();
   control.forceBinning = inputs_.forceBinningUpdate;
   control.eventCount = DeviceIndex(model.events.size());
@@ -309,6 +310,7 @@ std::string Backends::MpsEventPropagation::getDiagnostics() const {
   JsonType out;
   out["lastStageGpuSeconds"] = _diagnosticStageGpuSeconds_;
   out["previousBinReuseEnabled"] = _enablePreviousBinReuse_;
+  out["binningIntervalPruningEnabled"] = _enableBinningIntervalPruning_;
   out["reusableBins"] = std::count_if(_packed_.reusableBins.begin(), _packed_.reusableBins.end(),
       [](DeviceIndex position_){ return position_ != DeviceIndex(-1); });
   out["contributionCapacity"] = _packed_.contributionCapacity;

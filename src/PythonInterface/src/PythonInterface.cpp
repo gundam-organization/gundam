@@ -589,6 +589,11 @@ PYBIND11_MODULE(GUNDAM, module) {
     return manager_.getBackend()->getLastTimingSummary();
   })
 #ifdef __APPLE__
+  .def("setDiagnosticMpsBinningIntervalPruning", [](Backends::BackendManager& manager_, bool enabled_){
+    auto* mps = dynamic_cast<Backends::MpsBackend*>(manager_.getBackend());
+    LogThrowIf(mps == nullptr, "Binning interval diagnostics require an MPS backend.");
+    mps->setDiagnosticBinningIntervalPruning(enabled_);
+  })
   .def("setDiagnosticMpsPreviousBinReuse", [](Backends::BackendManager& manager_, bool enabled_){
     auto* mps = dynamic_cast<Backends::MpsBackend*>(manager_.getBackend());
     LogThrowIf(mps == nullptr, "Previous-bin diagnostics require an MPS backend.");

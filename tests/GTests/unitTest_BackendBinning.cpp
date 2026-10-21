@@ -655,3 +655,16 @@ TEST(BinningIndex, PreviousBinCertificationExcludesSmoothingAndEarlierOverlaps) 
   index.build(layout);
   EXPECT_EQ(index.buildReusableBinPositions(layout, 5), std::vector<std::size_t>(5, std::size_t(-1)));
 }
+
+#ifdef __APPLE__
+TEST(MpsBinningIntervals, PrunedAndFullScansMatchHardAndSmoothedGeometry) {
+  Backends::MpsBackend backend;
+  for( bool enabled : {false, true} ){
+    backend.setDiagnosticBinningIntervalPruning(enabled);
+    compareWithHistogram(backend, false, false, true, false);
+    compareWithHistogram(backend, true, false, true, false);
+    compareWithHistogram(backend, true, true, true, false);
+    compareWithHistogram(backend, true, false, true, true);
+  }
+}
+#endif

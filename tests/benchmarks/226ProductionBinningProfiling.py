@@ -127,7 +127,7 @@ def measure(engine, sequence, scenario, calls, seed, probe=False, capture=False)
             if timing.eventWeightReadbackBytes or timing.eventStateReadbackBytes:
                 raise RuntimeError('Unexpected event readback during measurement')
             rows.append({'seconds': seconds, 'likelihood': value,
-                         'sequenceDigest': digest.hexdigest(),
+                         'sequenceDigest': digest.hexdigest(), 'parameterValues': list(sequence.current),
                          'counts': {name: getattr(timing, name) for name in profiling.COUNT_FIELDS}})
             # Correctness snapshots happen after the timer. Only separate
             # ordinary trials without snapshots contribute to timing summaries.
@@ -177,8 +177,8 @@ def worker(args):
             probe = measure(engine, sequence, scenario, args.probe_calls, args.seed, probe=True, capture=True)
             profiling.check_equal(reference, probe)
             write_json(output / f'{scenario}-probes.json', probe)
-    if args.compare_previous_bin and args.backend == 'MPS':
-        compare_previous_bin(args, engine, sequence, output)
+    if (args.compare_previous_bin or args.compare_binning_intervals) and args.backend == 'MPS':
+        compare_binning(args, engine, sequence, output)
     if args.mode == 'hard' and args.backend == 'MPS':
         for scenario in args.scenarios:
             write_json(output / f'{scenario}-bin-movement.json',
@@ -187,9 +187,14 @@ def worker(args):
     write_json(output / 'summary.json', summary)
 
 
-def compare_previous_bin(args, engine, sequence, output):
+def compare_binning(args, engine, sequence, output):
     manager = engine.getBackendsManager()
-    variants = ('treeSearch', 'previousBin')
+    interval_comparison = args.compare_binning_intervals
+    variants = ('fullIntervals', 'prunedIntervals') if interval_comparison else ('treeSearch', 'previousBin')
+    set_variant = (manager.setDiagnosticMpsBinningIntervalPruning if interval_comparison
+                   else manager.setDiagnosticMpsPreviousBinReuse)
+    summary_path = output / ('interval-pruning-comparison.json' if interval_comparison
+                             else 'previous-bin-comparison.json')
     results = {scenario: {variant: [] for variant in variants} for scenario in args.scenarios}
     summary = {'complete': False, 'scenarios': {}}
     try:
@@ -198,7 +203,7 @@ def compare_previous_bin(args, engine, sequence, output):
                 pair = {}
                 # Alternate A/B and B/A on one resident model.
                 for variant in (variants if trial % 2 == 0 else variants[::-1]):
-                    manager.setDiagnosticMpsPreviousBinReuse(variant == 'previousBin')
+                    set_variant(variant == variants[1])
                     if args.warmup:
                         measure(engine, sequence, scenario, args.warmup, args.seed + 1000000)
                     progress(f'{args.mode}-{scenario}: {variant} A/B trial {trial + 1}')
@@ -206,26 +211,26 @@ def compare_previous_bin(args, engine, sequence, output):
                     write_json(output / f'{scenario}-ab{trial + 1}-{variant}.json', result)
                     pair[variant] = result
                     results[scenario][variant].extend(result['rows'])
-                profiling.check_equal(pair['treeSearch'], pair['previousBin'])
+                profiling.check_equal(pair[variants[0]], pair[variants[1]])
                 timings = {variant: profiling.summarize(rows)
                            for variant, rows in results[scenario].items()}
                 summary['scenarios'][scenario] = {'timings': timings,
-                    'evaluationSpeedup': timings['treeSearch']['evaluationSeconds']['medianMs'] /
-                                         timings['previousBin']['evaluationSeconds']['medianMs'],
-                    'gpuSpeedup': timings['treeSearch']['devicePropagationSeconds']['medianMs'] /
-                                  timings['previousBin']['devicePropagationSeconds']['medianMs']}
-                write_json(output / 'previous-bin-comparison.json', summary)
+                    'evaluationSpeedup': timings[variants[0]]['evaluationSeconds']['medianMs'] /
+                                         timings[variants[1]]['evaluationSeconds']['medianMs'],
+                    'gpuSpeedup': timings[variants[0]]['devicePropagationSeconds']['medianMs'] /
+                                  timings[variants[1]]['devicePropagationSeconds']['medianMs']}
+                write_json(summary_path, summary)
             probes = {}
             for variant in variants:
-                manager.setDiagnosticMpsPreviousBinReuse(variant == 'previousBin')
+                set_variant(variant == variants[1])
                 probes[variant] = measure(engine, sequence, scenario, args.probe_calls,
                                           args.seed, probe=True, capture=True)
                 write_json(output / f'{scenario}-ab-{variant}-probes.json', probes[variant])
-            profiling.check_equal(probes['treeSearch'], probes['previousBin'])
+            profiling.check_equal(probes[variants[0]], probes[variants[1]])
     finally:
-        manager.setDiagnosticMpsPreviousBinReuse(True)
+        set_variant(True)
     summary['complete'] = True
-    write_json(output / 'previous-bin-comparison.json', summary)
+    write_json(summary_path, summary)
 
 
 def supervise(args, backend, mode):
@@ -321,8 +326,11 @@ def main():
     parser.add_argument('--probe-calls', type=int, default=5)
     parser.add_argument('--seed', type=int, default=12345)
     parser.add_argument('--step-scale', type=float, default=.1)
-    parser.add_argument('--compare-previous-bin', action='store_true',
+    comparisons = parser.add_mutually_exclusive_group()
+    comparisons.add_argument('--compare-previous-bin', action='store_true',
                         help='Alternate original tree search and previous-bin reuse on each resident MPS model')
+    comparisons.add_argument('--compare-binning-intervals', action='store_true',
+                        help='Alternate full interval scans and early rejection on each resident MPS model')
     parser.add_argument('--worker', action='store_true', help=argparse.SUPPRESS)
     parser.add_argument('--backend', choices=['CPU', 'MPS'], help=argparse.SUPPRESS)
     parser.add_argument('--mode', choices=['hard', 'smoothed'], help=argparse.SUPPRESS)
