@@ -94,6 +94,86 @@ TEST(CpuWeightExecution, CachedAndMixedPathsPreserveProductsAndCapOrder) {
   }
 }
 
+TEST(CpuWeightExecution, LocalityProbeMatchesColdLruAndKeepsModelUnchanged) {
+  GundamGlobals::setNumberOfThreads(1);
+  auto view = std::make_shared<Backends::EngineView>(makeWeightModel(false, false));
+  auto& model = view->propagation;
+  model.events.resize(1);
+  model.events[0].resultIndex = 0;
+  model.eventWeights.resize(1);
+  model.eventDialIndices.clear();
+  model.dials.resize(4160, model.dials[0]);
+  for( int repeat = 0; repeat < 2; ++repeat ){
+    for( std::uint32_t line = 0; line < 520; ++line ){
+      model.eventDialIndices.push_back(line * 8);
+      model.eventDialIndices.push_back(line * 8 + 1);
+    }
+  }
+  model.eventWeights[0].firstDial = 0;
+  model.eventWeights[0].dialCount = model.eventDialIndices.size();
+  Backends::CpuBackend backend;
+  backend.buildShared(view);
+  Backends::PropagationInputs inputs;
+  inputs.parameters.values = {1.001};
+  auto token = backend.requestPropagation(inputs);
+  const auto weights = backend.getEventWeightsHostView(token);
+  const auto indices = model.eventDialIndices;
+  const auto report = backend.getWeightLocalityDiagnostics();
+  ASSERT_TRUE(report.at("supported"));
+  EXPECT_EQ(report.at("references"), indices.size());
+  EXPECT_EQ(report.at("referencedResponses"), 1040);
+  const std::size_t offset = report.at("responseBasePageOffset");
+  for( const auto* layout : {"current", "firstUse"} ){
+    std::vector<std::size_t> slots(4160, 4160);
+    std::size_t next = 0;
+    for( const auto& estimate : report.at(layout).at("idealLru") ){
+      const std::size_t capacity = estimate.at("capacityBytes").get<std::size_t>() / 64;
+      std::vector<std::size_t> lru;
+      std::size_t hits = 0;
+      for( const auto id : indices ){
+        if( slots[id] == 4160 ){ slots[id] = next++; }
+        const auto slot = std::string(layout) == "current" ? id : slots[id];
+        const auto line = (offset + slot * sizeof(double)) / 64;
+        auto found = std::find(lru.begin(), lru.end(), line);
+        if( found != lru.end() ){ ++hits; lru.erase(found); }
+        lru.insert(lru.begin(), line);
+        if( lru.size() > capacity ){ lru.pop_back(); }
+      }
+      EXPECT_EQ(estimate.at("hits"), hits);
+      EXPECT_EQ(estimate.at("misses"), indices.size() - hits);
+    }
+  }
+  EXPECT_LT(report.at("firstUse").at("distinctLines").get<std::size_t>(),
+            report.at("current").at("distinctLines").get<std::size_t>());
+  EXPECT_EQ(model.eventDialIndices, indices);
+  token = backend.requestPropagation(inputs);
+  EXPECT_EQ(backend.getEventWeightsHostView(token), weights);
+}
+
+TEST(CpuWeightExecution, LocalityProbeHandlesNoReferencesAndMixedModels) {
+  auto view = makeWeightModel(false, false);
+  for( auto& event : view.propagation.eventWeights ){ event.dialCount = 0; event.firstDial = 0; }
+  view.propagation.eventDialIndices.clear();
+  Backends::CpuBackend backend;
+  backend.build(view);
+  const auto report = backend.getWeightLocalityDiagnostics();
+  EXPECT_EQ(report.at("references"), 0);
+  EXPECT_EQ(report.at("current").at("distinctLines"), 0);
+  EXPECT_EQ(report.at("current").at("idealLru")[0].at("hitFraction"), 0.);
+  // Full-stream counters continue after the bounded reuse-analysis prefix.
+  view.propagation.eventDialIndices.assign(1000003, 0);
+  view.propagation.eventWeights[0].dialCount = 1000003;
+  backend.build(view);
+  const auto bounded = backend.getWeightLocalityDiagnostics();
+  EXPECT_EQ(bounded.at("references"), 1000003);
+  EXPECT_EQ(bounded.at("reusePrefixReferences"), 1000000);
+  EXPECT_EQ(bounded.at("current").at("sameLineTransitions"), 1000002);
+  EXPECT_EQ(bounded.at("current").at("idealLru")[0].at("misses"), 1);
+  EXPECT_EQ(bounded.at("current").at("idealLru")[0].at("hits"), 999999);
+  backend.build(makeWeightModel(true, false));
+  EXPECT_FALSE(backend.getWeightLocalityDiagnostics().at("supported"));
+}
+
 TEST(CpuWeightExecution, SharedModelLifetimeAndStandaloneSnapshot) {
   Backends::CpuBackend backend;
   auto model = std::make_shared<Backends::EngineView>(makeWeightModel(false, false));

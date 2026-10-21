@@ -53,6 +53,7 @@ def record_profile(output, evaluate, calls, write_json, progress):
             status.update(available=False, reason=str(error))
             write_json(status_path, status)
             return
+        stop_requested = False
         try:
             # Allow perf to attach. Exact boundaries include this short idle
             # startup interval; it is not part of the uninstrumented timings.
@@ -65,6 +66,7 @@ def record_profile(output, evaluate, calls, write_json, progress):
                 status['evaluationWallSeconds'] = time.monotonic() - start
         finally:
             if child.poll() is None:
+                stop_requested = True
                 child.send_signal(signal.SIGINT)
             try:
                 child.wait(timeout=15)
@@ -73,7 +75,12 @@ def record_profile(output, evaluate, calls, write_json, progress):
                 child.wait()
                 status['reason'] = 'perf did not stop promptly'
             status['recordExitCode'] = child.returncode
-            status['complete'] = status['calls'] == calls and child.returncode == 0
+            # perf can flush its recording and then terminate with the SIGINT
+            # we sent. Only accept that signal when we requested the stop.
+            stopped_normally = child.returncode == 0 or (
+                stop_requested and child.returncode == -signal.SIGINT)
+            status['complete'] = (status['calls'] == calls and stopped_normally
+                                  and data.exists() and data.stat().st_size > 0)
             write_json(status_path, status)
     if status['complete'] and data.exists():
         report = [executable, 'report', '--stdio', '--no-children', '--sort', 'dso,symbol',

@@ -578,6 +578,11 @@ PYBIND11_MODULE(GUNDAM, module) {
     LogThrowIf(not manager_.hasBackend(), "No backend initialized.");
     return manager_.getBackend()->getLastTimingSummary();
   })
+  .def("getDiagnosticCpuWeightLocality", [](const Backends::BackendManager& manager_){
+    const auto* cpu = dynamic_cast<const Backends::CpuBackend*>(manager_.getBackend());
+    LogThrowIf(cpu == nullptr, "Weight locality diagnostics require a CPU backend.");
+    return cpu->getWeightLocalityDiagnostics().dump();
+  })
   .def("getDiagnosticCpuWeightScheduling", [](const Backends::BackendManager& manager_){
     const auto* cpu = dynamic_cast<const Backends::CpuBackend*>(manager_.getBackend());
     LogThrowIf(cpu == nullptr, "Weight worker diagnostics require a CPU backend.");

@@ -70,6 +70,9 @@ def measure(args):
         raise RuntimeError('Rebuild/install GUNDAM: full stage timing fields are missing.')
     if not hasattr(GUNDAM.BackendManager, 'setDiagnosticCpuWeightWorkers'):
         raise RuntimeError('Rebuild/install GUNDAM: CPU weight worker diagnostics are missing.')
+    if (args.locality_probe or args.locality_only) and not hasattr(
+            GUNDAM.BackendManager, 'getDiagnosticCpuWeightLocality'):
+        raise RuntimeError('Rebuild/install GUNDAM: response locality diagnostics are missing.')
     if args.hardware_counters and (not hasattr(GUNDAM.BackendManager, 'setDiagnosticCpuWeightCounters')
                                       or not hasattr(GUNDAM, 'probeCpuWeightCounters')):
         raise RuntimeError('Rebuild/install GUNDAM: phase-scoped hardware probes are missing.')
@@ -115,6 +118,17 @@ def measure(args):
             system['perfEventParanoid'] = None
         system['hardwareProbePolicy'] = 'calling worker, userspace only, independent perf events; weights only'
     write_json(args.output / 'model.json', system)
+    def probe_locality():
+        progress('Response locality: current order versus simulated first-use order; model unchanged')
+        start = time.perf_counter()
+        locality = json.loads(manager.getDiagnosticCpuWeightLocality())
+        locality['diagnosticWallSeconds'] = time.perf_counter() - start
+        write_json(args.output / 'locality.json', locality)
+        progress(f"Response locality saved ({locality['diagnosticWallSeconds']:.2f} s): "
+                 f"{args.output / 'locality.json'}")
+    if args.locality_only:
+        probe_locality()
+        return
     results = []
     for round_index in range(args.rounds):
         order = args.workers if round_index % 2 == 0 else list(reversed(args.workers))
@@ -207,6 +221,8 @@ def measure(args):
         manager.materialize('Histograms')
         if histogram() != reference_histogram:
             raise RuntimeError('Histogram changed during sampling pass.')
+    if args.locality_probe:
+        probe_locality()
     progress(f'SUCCESS: all worker counts preserve LLH and histograms. Results: {args.output}')
 
 
@@ -224,6 +240,10 @@ def main(single_thread=False, description=None):
     parser.add_argument('--probe-calls', type=int, default=5)
     parser.add_argument('--hardware-counters', action='store_true',
                         help='Optional Linux perf counters and thread CPU/context-switch probes, only in the separate probe pass')
+    parser.add_argument('--locality-probe', action='store_true',
+                        help='Analyze response index locality after all timing/sampling passes; no model mutation')
+    parser.add_argument('--locality-only', action='store_true',
+                        help='Only load/prime the model and analyze locality; skip timing/counter/sampling passes')
     if single_thread:
         parser.add_argument('--perf-record', action='store_true', help='Optional Linux perf function/call-stack sampling, after timing trials')
         parser.add_argument('--profile-calls', type=int, default=40, help='Separate sampled evaluations')
@@ -239,6 +259,8 @@ def main(single_thread=False, description=None):
         parser.error('Counts must be positive')
     if max(args.workers) > args.threads:
         parser.error('--workers cannot exceed the resident --threads pool')
+    if args.locality_only and (args.perf_record or args.hardware_counters):
+        parser.error('--locality-only does not run --perf-record or --hardware-counters')
     args.workers = sorted(set(args.workers))
     args.work_dir = args.work_dir.resolve()
     args.config = (args.work_dir / args.config).resolve()

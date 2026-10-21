@@ -54,6 +54,43 @@ sampled instruction near a cache miss is not by itself proof of the stall's caus
 See the [perf record](https://man7.org/linux/man-pages/man1/perf-record.1.html) and
 [perf report](https://man7.org/linux/man-pages/man1/perf-report.1.html) manuals.
 
+## Response locality diagnostic
+
+After rebuilding/installing the C++ library and Python interface, run:
+
+```sh
+python3 "$REPO_DIR/gundam/tests/benchmarks/223CpuWeightScalingBenchmark.py" \
+  --config configOA2024.yaml --threads 8 --workers 8 --locality-only \
+  --override override/v13Prod.yaml override/backendCpuTest.yaml
+```
+
+This loads the full configured dataset once with eight loading threads, primes
+the model, then writes `locality.json`. There is no fit, sampling pass or repeated
+timing trial. Alternatively add `--locality-probe` to a normal scaling or
+single-thread benchmark; analysis runs after measurements to avoid warming them.
+
+The diagnostic walks actual event descriptors and dial references in serial
+event-weight order. It compares current response slots against a hypothetical
+numbering by first use, retaining the current buffer's page offset for both.
+No response values, dial payloads, references or multiplication order are changed.
+Mixed cached/uncached models report unsupported rather than assuming all accesses
+are response-cache loads.
+
+Full-stream metrics include address-jump histograms, consecutive accesses sharing
+a 64-byte line or 4096-byte page, line runs, total distinct lines and distinct
+lines per 4096-reference window. Reuse distances count distinct intervening
+lines exactly on the **first one million references**, using a bounded temporary
+Fenwick tree. The resulting `idealLru` entries estimate cold, fully associative
+response-only LRU hits for 32 KiB, 256 KiB, 2 MiB and 32 MiB capacities. They do
+not model actual cache hierarchy, associativity, prefetching, other buffers or
+concurrent workers. The prefix may be unrepresentative of later samples.
+
+This is a geometry diagnostic, not a speed prediction or a hardware miss count.
+The simulated numbering is never executed. Temporary storage consists of one
+32-bit mapping per response slot, one last-position entry per possible cache line
+and at most four MB for prefix reuse analysis; the report estimates working bytes.
+These buffers are released on return and no full-size response copy is created.
+
 ## Resident CPU weight scaling
 
 On an allocation with eight CPUs, run from the production configuration directory:

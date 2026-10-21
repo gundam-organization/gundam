@@ -72,6 +72,7 @@ ENUM_FIELD( Indexed )
     void setDiagnosticCacheTraversal(CpuCacheTraversal traversal_);
     void setDiagnosticInputEvaluation(CpuInputEvaluation evaluation_);
     [[nodiscard]] CpuBackendProfiler::Json getWeightSchedulingDiagnostics() const;
+    [[nodiscard]] CpuBackendProfiler::Json getWeightLocalityDiagnostics() const;
 
   protected:
     void configureImpl() override;

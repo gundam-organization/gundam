@@ -7,6 +7,8 @@
 #include <algorithm>
 #include <filesystem>
 #include <map>
+#include <limits>
+#include <array>
 #include <set>
 #include <sstream>
 #include <type_traits>
@@ -383,6 +385,127 @@ Backends::CpuBackendProfiler::Json Backends::CpuBackend::getWeightSchedulingDiag
       out["lastWeightWorkers"].back()["weightProbe"] = _weightProbes_[thread]->report();
     }
   }
+  return out;
+}
+
+Backends::CpuBackendProfiler::Json Backends::CpuBackend::getWeightLocalityDiagnostics() const {
+  LogThrowIf(not _isBuilt_, "No built CPU model for locality diagnostics.");
+  using Json = CpuBackendProfiler::Json;
+  Json out{{"supported", _allWeightResponsesCached_},
+      {"scope", "serial event-weight order; response accesses only; no model mutation"},
+      {"lineBytes", 64}, {"pageBytes", 4096}, {"reusePrefixLimit", 1000000},
+      {"warning", "Geometric locality and ideal cold LRU estimates, not measured cache misses or timings. "
+                  "Reuse estimates cover a bounded prefix and may not represent all samples. "
+                  "Descriptor/index/output traffic, prefetching, associativity and other threads are excluded."}};
+  if( not _allWeightResponsesCached_ ){
+    out["reason"] = "Mixed uncached response evaluation is outside this probe's scope.";
+    return out;
+  }
+  const auto& model = _engineView_->propagation;
+  const std::size_t count = _cachedDialResponses_.size();
+  const std::size_t unset = std::numeric_limits<std::size_t>::max();
+  // One temporary ID per response; never copy response values or dial payloads.
+  std::vector<std::uint32_t> remap(count, std::numeric_limits<std::uint32_t>::max());
+  std::size_t next = 0, references = 0;
+  for( const auto& event : model.eventWeights ){
+    for( std::size_t i = 0; i < event.dialCount; ++i ){
+      const auto dial = model.eventDialIndices[event.firstDial + i];
+      LogThrowIf(dial >= count, "Invalid response index in locality probe.");
+      if( remap[dial] == std::numeric_limits<std::uint32_t>::max() ){
+        remap[dial] = static_cast<std::uint32_t>(next++);
+      }
+      ++references;
+    }
+  }
+  const std::size_t prefix = std::min(references, std::size_t(1000000));
+  const std::size_t offset = reinterpret_cast<std::uintptr_t>(_cachedDialResponses_.data()) % 4096;
+  out["events"] = model.eventWeights.size();
+  out["references"] = references;
+  out["referencedResponses"] = next;
+  out["responseSlots"] = count;
+  out["responseBasePageOffset"] = offset;
+  out["simulatedBasePageOffset"] = offset;
+  out["reusePrefixReferences"] = prefix;
+  auto analyze = [&](bool reordered) {
+    const std::size_t lineCount = (offset + count * sizeof(double) + 63) / 64;
+    std::vector<std::size_t> last(lineCount, unset);
+    // Fenwick tree of last access positions gives exact distinct-line stack
+    // distances on the bounded prefix, with O(prefix) temporary memory.
+    std::vector<int> tree(prefix + 1, 0);
+    auto add = [&](std::size_t index, int delta) {
+      for( ++index; index < tree.size(); index += index & -index ){ tree[index] += delta; }
+    };
+    auto sum = [&](std::size_t end) {
+      std::size_t total = 0;
+      for( ; end; end -= end & -end ){ total += tree[end]; }
+      return total;
+    };
+    const std::array<std::size_t, 4> capacities{{32768, 262144, 2097152, 33554432}};
+    std::array<std::size_t, 4> hits{};
+    std::array<std::size_t, 65> jumpBins{};
+    std::size_t position = 0, previous = 0, sameLine = 0, samePage = 0;
+    std::size_t uniqueLines = 0, uniquePrefixLines = 0, lineRuns = 0;
+    std::size_t windowUnique = 0, windowTotal = 0, windowMaximum = 0, windows = 0;
+    long double jumpTotal = 0;
+    for( const auto& event : model.eventWeights ){
+      for( std::size_t i = 0; i < event.dialCount; ++i ){
+        const auto dial = model.eventDialIndices[event.firstDial + i];
+        const std::size_t slot = reordered ? remap[dial] : dial;
+        const std::size_t address = offset + slot * sizeof(double), line = address / 64;
+        if( position ){
+          const auto delta = address > previous ? address - previous : previous - address;
+          jumpTotal += delta;
+          std::size_t bin = 0;
+          for( auto n = delta; n; n >>= 1 ){ ++bin; }
+          ++jumpBins[bin];
+          sameLine += line == previous / 64;
+          samePage += address / 4096 == previous / 4096;
+        }
+        if( position == 0 or line != previous / 64 ){ ++lineRuns; }
+        const auto prior = last[line];
+        if( prior == unset ){ ++uniqueLines; }
+        if( prior == unset or prior / 4096 != position / 4096 ){ ++windowUnique; }
+        if( position < prefix ){
+          if( prior == unset ){ ++uniquePrefixLines; }
+          else{
+            const auto distance = uniquePrefixLines - sum(prior + 1);
+            for( std::size_t c = 0; c < capacities.size(); ++c ){
+              hits[c] += distance < capacities[c] / 64;
+            }
+            add(prior, -1);
+          }
+          add(position, 1);
+        }
+        last[line] = position;
+        previous = address;
+        if( ++position % 4096 == 0 or position == references ){
+          windowTotal += windowUnique;
+          windowMaximum = std::max(windowMaximum, windowUnique);
+          ++windows;
+          windowUnique = 0;
+        }
+      }
+    }
+    Json result{{"distinctLines", uniqueLines}, {"lineRuns", lineRuns},
+        {"sameLineTransitions", sameLine}, {"samePageTransitions", samePage},
+        {"meanAddressJumpBytes", position > 1 ? double(jumpTotal / (position - 1)) : 0.},
+        {"addressJumpHistogram", jumpBins},
+        {"addressJumpHistogramMeaning", "bin 0: zero; bin k>0: [2^(k-1), 2^k) bytes"},
+        {"windowReferences", 4096}, {"windows", windows},
+        {"meanDistinctLinesPerWindow", windows ? double(windowTotal) / windows : 0.},
+        {"maxDistinctLinesPerWindow", windowMaximum},
+        {"prefixColdLines", uniquePrefixLines}, {"idealLru", Json::array()}};
+    for( std::size_t c = 0; c < capacities.size(); ++c ){
+      result["idealLru"].push_back({{"capacityBytes", capacities[c]}, {"hits", hits[c]},
+          {"misses", prefix - hits[c]}, {"hitFraction", prefix ? double(hits[c]) / prefix : 0.}});
+    }
+    return result;
+  };
+  out["current"] = analyze(false);
+  out["firstUse"] = analyze(true);
+  out["temporaryWorkingBytesEstimate"] = remap.size() * sizeof(std::uint32_t)
+      + ((offset + count * sizeof(double) + 63) / 64) * sizeof(std::size_t)
+      + (prefix + 1) * sizeof(int);
   return out;
 }
 

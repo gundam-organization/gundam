@@ -183,8 +183,20 @@ def main():
         subprocess.run([sys.executable, str(scaling), '--config', str(base / 'config-False.json'),
                         '--threads', '4', '--workers', '1', '2', '4', '--calls', '2',
                         '--warmup', '1', '--trials', '1', '--rounds', '2', '--probe-calls', '2', '--hardware-counters',
-                        '--output', str(scaling_output)], stdout=log, stderr=subprocess.STDOUT, check=True)
+                        '--locality-probe', '--output', str(scaling_output)],
+                       stdout=log, stderr=subprocess.STDOUT, check=True)
     assert (scaling_output / 'counter-preflight.json').exists()
+    locality = json.loads((scaling_output / 'locality.json').read_text())
+    assert locality['supported'] and locality['references'] > 0
+    assert locality['references'] == locality['reusePrefixReferences']
+    assert locality['current']['idealLru'][0]['misses'] >= locality['current']['prefixColdLines']
+    locality_output = base / f'locality-results-{os.getpid()}'
+    with (base / 'locality-benchmark.log').open('w') as log:
+        subprocess.run([sys.executable, str(scaling), '--config', str(base / 'config-False.json'),
+                        '--threads', '4', '--workers', '4', '--locality-only',
+                        '--output', str(locality_output)], stdout=log, stderr=subprocess.STDOUT, check=True)
+    assert (locality_output / 'locality.json').exists()
+    assert not (locality_output / 'summary.json').exists()
     scaling_summary = json.loads((scaling_output / 'summary.json').read_text())
     assert [r['workers'] for r in scaling_summary] == [1, 2, 4, 4, 2, 1]
     for result in scaling_summary:
