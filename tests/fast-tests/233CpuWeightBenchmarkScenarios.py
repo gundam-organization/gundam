@@ -49,7 +49,7 @@ def main():
 }
 '''.replace('OUTPUT', json.dumps(str(root))))
     subprocess.run(['root', '-n', '-l', '-b', '-q', str(macro)], check=True)
-    benchmark = Path(__file__).resolve().parents[1] / 'regular-tests' / '222CpuWeightSchedulingBenchmark.py'
+    benchmark = Path(__file__).resolve().parents[1] / 'benchmarks' / '222CpuWeightSchedulingBenchmark.py'
     for eigen in (False, True):
         definitions = [dict(name=f'p{i}', priorValue=1., stdDev=.1 * (i + 1),
                             dialSetDefinitions=[{'dialType': 'Graph', 'dialBranchData': 'graph'}]) for i in range(3)]
@@ -85,6 +85,7 @@ def main():
         assert {p['space'] for p in manifest} == {'eigen' if eigen else 'original'}
         signatures = {}
         for result in summary:
+            assert result['autoMaterializeDuringTiming'] is False
             scenario = result['scenario']
             assert result['callsPerTrial'] == (3 if scenario == 'global' else 7)
             assert result['histogramsAgree'] and result['likelihoodsAgree']
@@ -176,6 +177,29 @@ def main():
                         and json.loads(r.read_text())['inputEvaluation'] == result['inputEvaluation'])
             raw = json.loads(case.read_text())['raw'][0]
             assert {i for indices in raw['coordinateIndices'] for i in indices} == set(range(len(manifest)))
+    scaling = benchmark.with_name('223CpuWeightScalingBenchmark.py')
+    scaling_output = base / f'scaling-results-{os.getpid()}'
+    with (base / 'scaling-benchmark.log').open('w') as log:
+        subprocess.run([sys.executable, str(scaling), '--config', str(base / 'config-False.json'),
+                        '--threads', '4', '--workers', '1', '2', '4', '--calls', '2',
+                        '--warmup', '1', '--trials', '1', '--rounds', '2', '--probe-calls', '2',
+                        '--output', str(scaling_output)], stdout=log, stderr=subprocess.STDOUT, check=True)
+    scaling_summary = json.loads((scaling_output / 'summary.json').read_text())
+    assert [r['workers'] for r in scaling_summary] == [1, 2, 4, 4, 2, 1]
+    for result in scaling_summary:
+        assert result['likelihoodsAgree'] and result['histogramsExactlyAgree']
+        assert result['weightSpeedupVsOneWorker'] > 0
+        case = json.loads((scaling_output / f"round{result['round']}-w{result['workers']}.json").read_text())
+        assert case['layout']['weightWorkers'] == result['workers']
+        assert case['layout']['threads'] == 4
+        assert not case['layout']['workerTimingEnabled']
+        assert len(case['raw'][0]['weights']) == 2 and len(case['probes']) == 2
+        for probe in case['probes']:
+            assert len(probe['workers']) == result['workers']
+            assert sum(w['events'] for w in probe['workers']) == 180
+            assert sum(w['dialReferences'] for w in probe['workers']) == 720
+            assert all(w['wallSeconds'] >= 0 for w in probe['workers'])
+    assert not list(scaling_output.glob('*.partial.json'))
     print('SUCCESS: workload replay, traversals and shared input evaluations preserve predictions.')
 
 

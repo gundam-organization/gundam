@@ -66,6 +66,7 @@ ENUM_FIELD( Indexed )
     // Diagnostic API: call between synchronous propagations. Only the work
     // ranges/kernel selection change; model data and response caches are kept.
     void setDiagnosticWeightScheduling(CpuWeightScheduling scheduling_, std::size_t blocksPerThread_);
+    void setDiagnosticWeightWorkers(std::size_t workers_, bool timing_);
     void setDiagnosticCacheTraversal(CpuCacheTraversal traversal_);
     void setDiagnosticInputEvaluation(CpuInputEvaluation evaluation_);
     [[nodiscard]] CpuBackendProfiler::Json getWeightSchedulingDiagnostics() const;
@@ -151,16 +152,21 @@ ENUM_FIELD( Indexed )
     GenericToolbox::Time::Timer _eventWeightsStageTimer_{};
     GenericToolbox::Time::Timer _histogramStageTimer_{};
     GenericToolbox::Time::Timer _likelihoodHostTimer_{};
-    struct EventRange { std::size_t begin{0}; std::size_t end{0}; };
+    struct EventRange { std::size_t begin{0}; std::size_t end{0}; std::size_t dialReferences{0}; };
     std::vector<EventRange> _weightRanges_{};
     CpuWeightScheduling _weightScheduling_{CpuWeightScheduling::Dynamic};
     std::size_t _weightBlocksPerThread_{2};
     std::size_t _weightWork_{0};
+    std::size_t _diagnosticWeightWorkers_{0};
+    bool _diagnosticWeightTiming_{false};
     bool _allWeightResponsesCached_{false};
     bool _usesDynamicWeights_{false};
     std::vector<EventRange> _weightBlocks_{};
     alignas(64) std::atomic<std::size_t> _nextWeightBlock_{0};
-    struct alignas(64) WeightWorkerStats { std::size_t events{0}; std::size_t blocks{0}; };
+    struct alignas(64) WeightWorkerStats {
+      std::size_t events{0}, blocks{0}, dialReferences{0};
+      double wallSeconds{0};
+    };
     std::vector<WeightWorkerStats> _weightWorkerStats_{};
     using WeightJob = void (CpuBackend::*)(int);
     WeightJob _weightJob_{nullptr};

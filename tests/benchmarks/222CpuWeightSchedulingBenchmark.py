@@ -196,6 +196,9 @@ def measure_case(args, engine, metadata, tag, sequence, scenario):
             rows.append(row)
         coordinate_costs_file = f'{tag}-coordinate-costs.json'
         write_json(args.output / coordinate_costs_file, rows)
+    # The fit keeps resident outputs during Minuit/Hesse. Publish only the
+    # final histogram for correctness checks, outside all timed evaluations.
+    engine.getBackendsManager().materialize('Histograms')
     li = engine.getLikelihoodInterface()
     histogram = [(v.sumWeights, v.sqrtSumSqWeights)
                  for sample in li.getModelPropagator().getSampleSet().getSampleList()
@@ -203,7 +206,8 @@ def measure_case(args, engine, metadata, tag, sequence, scenario):
     return {'complete': True, 'scenario': scenario, 'seed': args.seed, 'stepScale': args.step_scale,
             'variableFitCoordinates': len(sequence.entries), 'testedFitCoordinates': len(covered),
             'coordinateCoverageComplete': len(covered) == len(sequence.entries),
-            'coordinateCostsFile': coordinate_costs_file, 'actualScheduling': metadata['weightScheduling'],
+            'coordinateCostsFile': coordinate_costs_file, 'autoMaterializeDuringTiming': False,
+            'actualScheduling': metadata['weightScheduling'],
             'workBlocks': metadata['weightBlockCount'], 'threads': metadata['threads'],
             'cacheInputGroups': metadata['cacheInputGroups'],
             'cacheInputStorageBytes': metadata['cacheInputStorageBytes'],
@@ -221,11 +225,8 @@ def measure_case(args, engine, metadata, tag, sequence, scenario):
             'histogramMedianMs': statistics.median(t['histogramMedianMs'] for t in trials)}
 
 
-def measure_suite(args):
+def load_engine(args, threads):
     import GUNDAM
-    threads = args.worker_threads
-    if not hasattr(GUNDAM.BackendManager, 'setDiagnosticCpuInputEvaluation') or not hasattr(GUNDAM.ParameterSet, 'getEffectiveParameterList'):
-        raise RuntimeError('Rebuild GUNDAM and select its Python module: runtime scheduling diagnostics are missing.')
     progress(f't{threads}: loading model once; GUNDAM module: {GUNDAM.__file__}')
     GUNDAM.setRuntimeWorkingDirectory(str(args.work_dir))
     GUNDAM.setLightOutputMode(True)
@@ -246,7 +247,18 @@ def measure_suite(args):
     engine.getLikelihoodInterface().setDataType(GUNDAM.LikelihoodInterface.DataType.Asimov)
     load_start = time.monotonic()
     engine.initialize()
+    engine.getBackendsManager().setEnableAutoMaterialize(False)
+    progress(f't{threads}: fit-style output policy: no automatic event/histogram copies during timing')
     progress(f't{threads}: initialization finished in {time.monotonic() - load_start:.1f} s; dataset retained for all cases')
+    return engine
+
+
+def measure_suite(args):
+    import GUNDAM
+    threads = args.worker_threads
+    if not hasattr(GUNDAM.BackendManager, 'setDiagnosticCpuInputEvaluation') or not hasattr(GUNDAM.ParameterSet, 'getEffectiveParameterList'):
+        raise RuntimeError('Rebuild GUNDAM and select its Python module: runtime scheduling diagnostics are missing.')
+    engine = load_engine(args, threads)
     summary_path = args.output / 'summary.json'
     results = json.loads(summary_path.read_text()) if summary_path.exists() else []
     sequence = ParameterSequence(engine, args.step_scale)

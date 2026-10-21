@@ -222,8 +222,15 @@ void Backends::CpuBackend::initializeThreads() {
   _threadPool_.addJob(
       "CpuBackend::calculateEventWeights",
       [this](int iThread_){
+        if( std::size_t(iThread_) >= _weightRanges_.size() ){ return; }
+        const auto start = _diagnosticWeightTiming_ ? std::chrono::steady_clock::now()
+                                                  : std::chrono::steady_clock::time_point{};
         CpuBackendProfiler::WorkerScope probe(_profiler_.get(), CpuBackendProfiler::Stage::Weights, iThread_);
         calculateEventWeightsThread(iThread_);
+        if( _diagnosticWeightTiming_ ){
+          _weightWorkerStats_[iThread_].wallSeconds =
+              std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count();
+        }
         if( auto* record = probe.get() ){
           record->weightEvents = _weightWorkerStats_[iThread_].events;
           record->weightBlocks = _weightWorkerStats_[iThread_].blocks;
@@ -613,9 +620,19 @@ void Backends::CpuBackend::setDiagnosticWeightScheduling(CpuWeightScheduling sch
   initializeProfiler();
 }
 
+void Backends::CpuBackend::setDiagnosticWeightWorkers(std::size_t workers_, bool timing_) {
+  LogThrowIf(not _isBuilt_, "Build the CPU backend before changing weight workers.");
+  LogThrowIf(workers_ == 0 or workers_ > std::size_t(_threadPool_.getNbThreads()),
+             "Weight workers must be between one and the resident pool size.");
+  _diagnosticWeightWorkers_ = workers_;
+  _diagnosticWeightTiming_ = timing_;
+  initializeWeightScheduling();
+}
+
 void Backends::CpuBackend::initializeWeightScheduling() {
   const auto& model = _engineView_->propagation;
-  const auto threads = std::size_t(_threadPool_.getNbThreads());
+  const auto threads = _diagnosticWeightWorkers_ != 0 ? _diagnosticWeightWorkers_
+                                                        : std::size_t(_threadPool_.getNbThreads());
   const auto work = _weightWork_;
   const auto blockTarget = _weightBlocksPerThread_ * threads;
   _usesDynamicWeights_ = _weightScheduling_ == CpuWeightScheduling::Dynamic
@@ -627,6 +644,7 @@ void Backends::CpuBackend::initializeWeightScheduling() {
     for( std::size_t part = 0; part < count_; ++part ){
       auto& range = ranges[part];
       range.begin = cursor;
+      const auto initialWork = completed;
       const auto target = (work / count_) * (part + 1) + (work % count_) * (part + 1) / count_;
       // A very expensive event cannot be split. Still leave at least one
       // event for every subsequent dynamic block, avoiding empty queue entries.
@@ -636,6 +654,7 @@ void Backends::CpuBackend::initializeWeightScheduling() {
         completed += 1 + model.eventWeights[cursor++].dialCount;
       }
       range.end = cursor;
+      range.dialReferences = completed - initialWork - (range.end - range.begin);
     }
     return ranges;
   };
@@ -698,6 +717,7 @@ void Backends::CpuBackend::calculateEventWeightsKernel(int iThread_) {
       const auto& range = _weightBlocks_[block];
       reweightRange(range.begin, range.end);
       stats.events += range.end - range.begin;
+      stats.dialReferences += range.dialReferences;
       ++stats.blocks;
     }
   }
@@ -705,6 +725,7 @@ void Backends::CpuBackend::calculateEventWeightsKernel(int iThread_) {
     const auto& range = _weightRanges_[iThread_];
     reweightRange(range.begin, range.end);
     stats.events = range.end - range.begin;
+    stats.dialReferences = range.dialReferences;
     stats.blocks = stats.events != 0;
   }
   _weightWorkerStats_[iThread_] = stats;

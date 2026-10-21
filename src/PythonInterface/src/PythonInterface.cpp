@@ -571,6 +571,17 @@ PYBIND11_MODULE(GUNDAM, module) {
     LogThrowIf(not manager_.hasBackend(), "No backend initialized.");
     return manager_.getBackend()->getLastTimingSummary();
   })
+  .def("getDiagnosticCpuWeightScheduling", [](const Backends::BackendManager& manager_){
+    const auto* cpu = dynamic_cast<const Backends::CpuBackend*>(manager_.getBackend());
+    LogThrowIf(cpu == nullptr, "Weight worker diagnostics require a CPU backend.");
+    return cpu->getWeightSchedulingDiagnostics().dump();
+  })
+  .def("setDiagnosticCpuWeightWorkers", [](Backends::BackendManager& manager_, std::size_t workers_, bool timing_){
+    auto* cpu = dynamic_cast<Backends::CpuBackend*>(manager_.getBackend());
+    LogThrowIf(cpu == nullptr, "Weight worker diagnostics require a CPU backend.");
+    cpu->setDiagnosticWeightWorkers(workers_, timing_);
+    return cpu->getWeightSchedulingDiagnostics().dump();
+  })
   .def("setDiagnosticCpuWeightScheduling", [](Backends::BackendManager& manager_, const std::string& mode_, std::size_t factor_){
     auto* cpu = dynamic_cast<Backends::CpuBackend*>(manager_.getBackend());
     LogThrowIf(cpu == nullptr, "CPU weight scheduling diagnostics require an initialized CPU backend.");

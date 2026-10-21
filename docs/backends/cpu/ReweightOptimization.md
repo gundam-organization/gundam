@@ -114,6 +114,13 @@ bit across the indexed and automatic response traversals, including sparse/dense
 transitions and mixed features. The numerical contract also preserves event
 product order and histogram reduction order across weight schedulers.
 
+Performance scripts live in `tests/benchmarks`; see the
+[benchmark instructions](../../../tests/benchmarks/README.md). The resident
+weight-scaling benchmark loads the model once and varies only active weight
+workers. It separates ordinary stage timings from per-worker wall-time probes,
+retains the histogram pool and checks likelihood/histogram agreement. These
+worker controls are diagnostic API calls; the default fit policy is unchanged.
+
 `222CpuWeightSchedulingBenchmark.py --benchmark cache` compares `Indexed` and
 `Auto` on the same loaded model with Dynamic x2 weights. It replays identical
 constant, local and global parameter sequences, checks likelihood/histogram
@@ -127,11 +134,20 @@ Auto traversal and Dynamic x2 weights. It loads the model once, replays the same
 sequences and retains the short global-call cap. For example:
 
 ```sh
-python3 /path/to/gundam/tests/regular-tests/222CpuWeightSchedulingBenchmark.py \
+python3 /path/to/gundam/tests/benchmarks/222CpuWeightSchedulingBenchmark.py \
   --benchmark inputs --config configOA2024.yaml --threads 8 \
   --scenarios local1 --calls 1 --warmup 3 --trials 1 --rounds 1 \
-  --override override/v12ProdRun45.yaml override/backendCpuTest.yaml
+  --override override/v13Prod.yaml override/backendCpuTest.yaml
 ```
+
+Timed evaluations use the same output policy as Migrad/HESSE: automatic
+copies into host event/histogram objects are disabled. The likelihood is still
+updated every call; the final histogram is explicitly published outside timing
+for comparison. Results record `autoMaterializeDuringTiming: false`. Older
+reports without that field included automatic host copies, so their complete
+evaluation times should not be compared directly with the fit loop. Cache and
+weight stage timings do not include those copies. The input override selects
+the dataset; the script adds no event-count limit.
 
 Local workloads automatically cover every variable fit coordinate: `local1`
 uses at least N calls per trial and `local2` at least ceil(N/2). `--calls` can

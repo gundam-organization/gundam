@@ -62,4 +62,4 @@ resident contributions. `DeviceWeightModel` retains the specialized static-bin
 weight path, using the same packer for every consumer.
 
 A reproducible end-to-end benchmark is provided by
-`tests/regular-tests/221BinningBackendBenchmark.py`.
+`tests/benchmarks/221BinningBackendBenchmark.py`.

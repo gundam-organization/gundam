@@ -1,5 +1,5 @@
 # Directories
-tests/output*
+tests/output**
 build/
 site/
 # inputs
@@ -55,3 +55,6 @@ work/
 
 # Benchmarks
 *benchmark*
+!tests/benchmarks/
+!tests/benchmarks/*.py
+!tests/benchmarks/README.md
