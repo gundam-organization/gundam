@@ -338,3 +338,53 @@ Counter semantics and Linux access restrictions are described in the
 - `210CpuBackendBenchmark.py` / `211MpsBackendBenchmark.py`: synthetic CPU/MPS
   comparisons.
 - `221BinningBackendBenchmark.py`: histogram binning and smoothing comparisons.
+
+## Production event rebinning (CPU and MPS)
+
+`226ProductionBinningProfiling.py` loads the same production configuration in a
+separate process for each backend and smoothing mode. Example:
+
+```sh
+env -u DYLD_LIBRARY_PATH \
+  PYTHONPATH="$PWD/cmake-build-release/src/PythonInterface" \
+  python3.15 tests/benchmarks/226ProductionBinningProfiling.py \
+  --work-dir /Users/nadrino/Documents/Work/Output/results/gundam/upgrade-cc-2026 \
+  --config ndUpCcInc.yaml --threads 4 \
+  --override override/datasetHighlandv5.27.1_CCLyon.yaml override/ebMigration.yaml \
+    override/binResponse.yaml override/backendMpsTest.yaml
+```
+
+The default parameter set is `Cross-Section Systematics Eb`; use
+`--parameter-set` to select another set. Constant, one-coordinate and
+all-coordinate sequences vary only that set, by 0.1 prior sigma with bounded,
+seeded proposals. Other parameters remain at their initialized values. These
+are timing workloads, not an actual MCMC chain. `--calls` controls evaluations
+per trial; choose a multiple of the parameter count to cover coordinates evenly.
+`--probe-calls` controls separate correctness/profiling passes; choose at least
+the parameter count to check every local coordinate. Defaults are 10 calls,
+two trials and five probe calls.
+
+The `smoothed` case preserves the configured binning response; `hard` removes
+sample `binningResponse` entries from the expanded configuration. Both use
+Asimov data initialized in their respective mode. Input files, event selections
+and external workers are preserved. No fit, HESSE, PCA, plotting or step scan is
+run. `--backends` and `--modes` select subsets of the four cases.
+
+Each case writes resolved configuration, effective parameter manifest, raw
+timings/counters, summary, separate reference/probe passes and a native log.
+MPS cases additionally write the GPU model and individual kernel durations.
+CPU timings distinguish variable updates, bin searches and histogram filling.
+`hostPreparationSeconds` includes dial-state preparation and any Python external
+worker evaluation; compare it to full evaluation time before attributing a
+bottleneck to the GPU. CPU wait overlaps GPU execution, and synchronized stage
+probes change scheduling: neither should be added to ordinary GPU timings.
+
+Correctness passes compare CPU/MPS likelihoods and every reference histogram
+(including smoothing mass outside the bins), with relative/absolute tolerances
+of 2e-5. Stage profiling is replayed against an ordinary MPS reference. All
+histogram materialization happens outside evaluation timers. Final hard MPS
+passes materialize event state separately to count actual hard-bin changes;
+these passes are excluded from performance statistics. Their
+`sameBinFractionAmongRebinned` estimates the opportunity to reuse the previous
+bin, rather than measuring an implemented optimization. Event readbacks are
+forbidden during the ordinary measurement passes.
