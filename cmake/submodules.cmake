@@ -26,20 +26,13 @@ checkSubmodule( simple-cpp-cmd-line-parser )
 
 ## Add the CmdLineParser
 # Reproduce needed parts of the simple-cpp-cmd-line-parser CMakeLists.txt
-include_directories(submodules/simple-cpp-cmd-line-parser/include)
-add_definitions( -D CMDLINEPARSER_YAML_CPP_ENABLED=1 )
+add_library( GundamCmdLineParser INTERFACE )
+target_include_directories( GundamCmdLineParser INTERFACE
+  ${CMAKE_SOURCE_DIR}/submodules/simple-cpp-cmd-line-parser/include )
+target_compile_definitions( GundamCmdLineParser INTERFACE CMDLINEPARSER_YAML_CPP_ENABLED=1 )
+target_link_libraries( GundamCmdLineParser INTERFACE yaml-cpp::yaml-cpp )
 
-## Add the GenericToolbox²
-# Reproduce needed parts of the cpp-generic-toolbox CMakeLists.txt.  This
-# needs the nlohmann library.
-include_directories(submodules/cpp-generic-toolbox/include)
-link_libraries(nlohmann_json::nlohmann_json)
-
-#file( GLOB CPP_GENERIC_TOOLBOX_HEADERS ${CMAKE_SOURCE_DIR}/submodules/cpp-generic-toolbox/include/*.h )
-#file( GLOB CPP_GENERIC_TOOLBOX_HEADERS_IMPL ${CMAKE_SOURCE_DIR}/submodules/cpp-generic-toolbox/include/implementation/*.h )
-#install(FILES ${CPP_GENERIC_TOOLBOX_HEADERS} DESTINATION include)
-#install(FILES ${CPP_GENERIC_TOOLBOX_HEADERS_IMPL} DESTINATION include/implementation)
-
+## Configure the GenericToolbox
 add_definitions( -D PROGRESS_BAR_FILL_TAG="\\\"GUNDAM"\\\" )
 if (ENABLE_COLOR_OUTPUT)
   add_definitions( -D PROGRESS_BAR_ENABLE_RAINBOW=1 )
@@ -52,8 +45,6 @@ if( ENABLE_BATCH_MODE )
 endif( ENABLE_BATCH_MODE )
 
 ## Add the Logger
-# Reproduce needed parts of the simple-cpp-logger CMakeLists.txt
-include_directories(submodules/simple-cpp-logger/include)
 add_definitions( -D LOGGER_TIME_FORMAT="\\\"%Y.%m.%d %H:%M:%S"\\\" )
 add_definitions( -D LOGGER_MAX_LOG_LEVEL_PRINTED=6 )
 add_definitions( -D LOGGER_PREFIX_LEVEL=3 )
@@ -75,3 +66,27 @@ else()
   add_definitions( -D LOGGER_ENABLE_COLORS_ON_USER_HEADER=1 )
 endif()
 
+
+# GUNDAM uses the compiled engine; the facade retains per-source-file settings.
+set(SIMPLE_CPP_LOGGER_COMPILED ON)
+if(USE_STATIC_LINKS)
+  set(SIMPLE_CPP_LOGGER_BUILD_SHARED OFF)
+else()
+  set(SIMPLE_CPP_LOGGER_BUILD_SHARED ON)
+endif()
+set(SIMPLE_CPP_LOGGER_BUILD_TESTS OFF)
+add_subdirectory(submodules/simple-cpp-logger)
+
+# Build independent toolbox modules and enable the extensions used by GUNDAM.
+set(GENERIC_TOOLBOX_COMPILED ON)
+set(GENERIC_TOOLBOX_BUILD_SHARED ON)
+if(USE_STATIC_LINKS)
+  set(GENERIC_TOOLBOX_BUILD_SHARED OFF)
+endif()
+set(GENERIC_TOOLBOX_WITH_ROOT ON)
+set(GENERIC_TOOLBOX_WITH_JSON ON)
+set(GENERIC_TOOLBOX_WITH_YAML ON)
+set(GENERIC_TOOLBOX_INSTALL_PACKAGE OFF)
+set(GENERIC_TOOLBOX_BUILD_EXAMPLES OFF)
+set(GENERIC_TOOLBOX_BUILD_TESTS OFF)
+add_subdirectory(submodules/cpp-generic-toolbox)
