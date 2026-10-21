@@ -155,9 +155,97 @@ def check_equal(reference, actual):
         raise RuntimeError('Stage profiling changed histogram contents')
 
 
+def check_exact(reference, actual):
+    # The packed path only changes which independent dial threads are launched;
+    # the response slots and event multiplication/reduction order stay identical.
+    if len(reference['rows']) != len(actual['rows']):
+        raise RuntimeError('A/B evaluation counts differ')
+    for left, right in zip(reference['rows'], actual['rows']):
+        if left['sequenceDigest'] != right['sequenceDigest'] or left['likelihood'] != right['likelihood']:
+            raise RuntimeError('A/B parameter sequences or likelihoods differ (exact comparison)')
+    if reference['histogram'] != actual['histogram']:
+        raise RuntimeError('A/B histograms differ (exact comparison)')
+
+
+def compare_cached_dials(args, engine):
+    manager = engine.getBackendsManager()
+    if not hasattr(manager, 'setDiagnosticMpsCompactCachedDials'):
+        raise RuntimeError('Rebuild GUNDAM: compact cached dial comparison is unavailable')
+    metadata = json.loads(manager.getDiagnosticMps())
+    if metadata['path'] != 'packedWeights' or not metadata['cachedDials']:
+        raise RuntimeError('Cached dial A/B comparison requires the packed weight path with cached dials')
+    sequence = scheduling.ParameterSequence(engine, args.step_scale)
+    write_json(args.output / 'parameters.json', sequence.manifest())
+    summary = {'complete': False, 'comparison': 'fullScan vs compactIndices',
+               'exactResultsMatch': True, 'scenarios': {}}
+    accumulated = {scenario: {mode: [] for mode in ('fullScan', 'compactIndices')}
+                   for scenario in args.scenarios}
+    for mode in ('fullScan', 'compactIndices'):
+        manager.setDiagnosticMpsCompactCachedDials(mode == 'compactIndices')
+        write_json(args.output / f'model-{mode}.json', json.loads(manager.getDiagnosticMps()))
+    try:
+        for round_index in range(args.comparison_rounds):
+            for scenario_index, scenario in enumerate(args.scenarios):
+                calls = scheduling.scenario_calls(args, scenario, len(sequence.entries))
+                for trial in range(args.trials):
+                    # Alternate A/B and B/A so one mode is not always measured first.
+                    modes = ['fullScan', 'compactIndices']
+                    if (round_index + trial + scenario_index) % 2:
+                        modes.reverse()
+                    pair = {}
+                    for mode in modes:
+                        manager.setDiagnosticMpsCompactCachedDials(mode == 'compactIndices')
+                        if args.warmup:
+                            evaluate_pass(args, engine, sequence, scenario, args.warmup,
+                                          args.seed + 1000000)
+                        tag = f'round{round_index + 1}-{scenario}-trial{trial + 1}-{mode}'
+                        progress(f'{tag}: {calls} ordinary evaluations')
+                        result = evaluate_pass(args, engine, sequence, scenario, calls, args.seed + trial)
+                        result.update(mode=mode, round=round_index + 1, trial=trial + 1,
+                                      scenario=scenario, calls=calls)
+                        write_json(args.output / f'{tag}.json', result)
+                        pair[mode] = result
+                        accumulated[scenario][mode].extend(result['rows'])
+                    check_exact(pair['fullScan'], pair['compactIndices'])
+                    entry = {'callsPerTrial': calls, 'completedPairs': (round_index * args.trials + trial + 1),
+                             'timings': {mode: summarize(rows) for mode, rows in accumulated[scenario].items()}}
+                    base, compact = (entry['timings'][mode] for mode in ('fullScan', 'compactIndices'))
+                    entry['evaluationSpeedup'] = base['evaluationSeconds']['medianMs'] / compact['evaluationSeconds']['medianMs']
+                    entry['gpuSpeedup'] = base['devicePropagationSeconds']['medianMs'] / compact['devicePropagationSeconds']['medianMs']
+                    summary['scenarios'][scenario] = entry
+                    write_json(args.output / 'summary.json', summary)
+                    progress(f"{scenario}: results identical; evaluation "
+                             f"{base['evaluationSeconds']['medianMs']:.3f} -> "
+                             f"{compact['evaluationSeconds']['medianMs']:.3f} ms")
+        # Synchronized stage probes run only after all ordinary A/B measurements.
+        if args.probe_calls:
+            for scenario in args.scenarios:
+                pair = {}
+                for mode in ('fullScan', 'compactIndices'):
+                    manager.setDiagnosticMpsCompactCachedDials(mode == 'compactIndices')
+                    progress(f'{scenario}-{mode}: separate GPU stage probes')
+                    result = evaluate_pass(args, engine, sequence, scenario, args.probe_calls,
+                                           args.seed, profiling=True, spread=True)
+                    write_json(args.output / f'{scenario}-{mode}-probes.json', result)
+                    pair[mode] = result
+                check_exact(pair['fullScan'], pair['compactIndices'])
+                summary['scenarios'][scenario]['probeTimings'] = {
+                    mode: {name: values for name, values in result['timings'].items() if name.startswith('gpu:')}
+                    for mode, result in pair.items()}
+                write_json(args.output / 'summary.json', summary)
+        summary['complete'] = True
+        write_json(args.output / 'summary.json', summary)
+    finally:
+        manager.setDiagnosticMpsCompactCachedDials(True)
+    progress(f'SUCCESS: A/B likelihoods and histograms exactly identical; results in {args.output}')
+
+
 def measure(args):
     import GUNDAM
     engine = load_engine(args)
+    if args.compare_cached_dials:
+        compare_cached_dials(args, engine)
+        return
     sequence = scheduling.ParameterSequence(engine, args.step_scale)
     write_json(args.output / 'parameters.json', sequence.manifest())
     summary = {'complete': False, 'scenarios': {}, 'pythonModule': GUNDAM.__file__,
@@ -203,6 +291,10 @@ def measure(args):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--compare-cached-dials', action='store_true',
+                        help='Compare full descriptor scans with compact cached indices on one resident model')
+    parser.add_argument('--comparison-rounds', type=int, default=2,
+                        help='A/B rounds; mode order alternates between rounds/trials')
     parser.add_argument('--config', type=Path, required=True)
     parser.add_argument('--override', nargs='*', default=[])
     parser.add_argument('--work-dir', type=Path, default=Path.cwd())
@@ -222,7 +314,7 @@ def main():
     args = parser.parse_args()
     if sys.platform != 'darwin':
         parser.error('MPS profiling requires macOS/Metal')
-    if min(args.threads, args.calls, args.global_calls, args.trials) <= 0 or min(args.warmup, args.probe_calls) < 0:
+    if min(args.threads, args.calls, args.global_calls, args.trials, args.comparison_rounds) <= 0 or min(args.warmup, args.probe_calls) < 0:
         parser.error('Counts must be positive (warmup/probe-calls may be zero)')
     if not math.isfinite(args.step_scale) or args.step_scale <= 0:
         parser.error('--step-scale must be finite and positive')

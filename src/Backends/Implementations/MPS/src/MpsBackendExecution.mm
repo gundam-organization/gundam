@@ -49,19 +49,25 @@ bool Backends::MpsBackendImpl::encodeCachedDialResponses(id<MTLComputeCommandEnc
                                                          id<MTLComputePipelineState> pipeline_,
                                                          id<MTLBuffer> cachedResponsesBuffer_,
                                                          id<MTLBuffer> descriptorsBuffer_,
-                                                         uint32_t descriptorCount_) {
+                                                         uint32_t descriptorCount_,
+                                                         id<MTLBuffer> cachedDialIndicesBuffer_,
+                                                         uint32_t cachedDialCount_) {
   if( not isWeightModelSupported ){ return false; }
-  if( descriptorCount_ == 0 ){ return true; }
+  uint32_t dispatchCount = useCompactCachedDialIndices ? cachedDialCount_ : descriptorCount_;
+  if( dispatchCount == 0 ){ return true; }
   [encoder setComputePipelineState:pipeline_];
   [encoder setBuffer:cachedResponsesBuffer_ offset:0 atIndex:0];
   [encoder setBuffer:descriptorsBuffer_ offset:0 atIndex:1];
   [encoder setBuffer:splineDataBuffer offset:0 atIndex:2];
   [encoder setBuffer:parametersBuffer offset:0 atIndex:3];
-  [encoder setBytes:&descriptorCount_ length:sizeof(descriptorCount_) atIndex:4];
+  [encoder setBytes:&dispatchCount length:sizeof(dispatchCount) atIndex:4];
+  [encoder setBuffer:cachedDialIndicesBuffer_ offset:0 atIndex:5];
+  uint32_t useCachedIndices = useCompactCachedDialIndices;
+  [encoder setBytes:&useCachedIndices length:sizeof(useCachedIndices) atIndex:6];
 
   NSUInteger width = std::min<NSUInteger>(pipeline_.maxTotalThreadsPerThreadgroup, 256);
   if( width == 0 ){ width = 1; }
-  [encoder dispatchThreads:MTLSizeMake(NSUInteger(descriptorCount_), 1, 1)
+  [encoder dispatchThreads:MTLSizeMake(NSUInteger(dispatchCount), 1, 1)
      threadsPerThreadgroup:MTLSizeMake(width, 1, 1)];
   return true;
 }
@@ -106,11 +112,11 @@ bool Backends::MpsBackendImpl::runWeightPropagation(const PropagationInputs& inp
 
   auto encodeAllCachedResponses = [&](id<MTLComputeCommandEncoder> encoder_) {
     if( not enableCachedDialResponses ){ return true; }
-    return encodeCachedDialResponses(encoder_, cachedCompactResponsesPipeline, compactCachedResponsesBuffer, compactDialDescriptorsBuffer, compactDialDescriptorCount)
-           and encodeCachedDialResponses(encoder_, cachedUniformResponsesPipeline, uniformCachedResponsesBuffer, uniformDialDescriptorsBuffer, uniformDialDescriptorCount)
-           and encodeCachedDialResponses(encoder_, cachedMonotonicResponsesPipeline, monotonicCachedResponsesBuffer, monotonicDialDescriptorsBuffer, monotonicDialDescriptorCount)
-           and encodeCachedDialResponses(encoder_, cachedGeneralResponsesPipeline, generalCachedResponsesBuffer, generalDialDescriptorsBuffer, generalDialDescriptorCount)
-           and encodeCachedDialResponses(encoder_, cachedGraphResponsesPipeline, graphCachedResponsesBuffer, graphDialDescriptorsBuffer, graphDialDescriptorCount);
+    return encodeCachedDialResponses(encoder_, cachedCompactResponsesPipeline, compactCachedResponsesBuffer, compactDialDescriptorsBuffer, compactDialDescriptorCount, compactCachedDialIndicesBuffer, compactCachedDialCount)
+           and encodeCachedDialResponses(encoder_, cachedUniformResponsesPipeline, uniformCachedResponsesBuffer, uniformDialDescriptorsBuffer, uniformDialDescriptorCount, uniformCachedDialIndicesBuffer, uniformCachedDialCount)
+           and encodeCachedDialResponses(encoder_, cachedMonotonicResponsesPipeline, monotonicCachedResponsesBuffer, monotonicDialDescriptorsBuffer, monotonicDialDescriptorCount, monotonicCachedDialIndicesBuffer, monotonicCachedDialCount)
+           and encodeCachedDialResponses(encoder_, cachedGeneralResponsesPipeline, generalCachedResponsesBuffer, generalDialDescriptorsBuffer, generalDialDescriptorCount, generalCachedDialIndicesBuffer, generalCachedDialCount)
+           and encodeCachedDialResponses(encoder_, cachedGraphResponsesPipeline, graphCachedResponsesBuffer, graphDialDescriptorsBuffer, graphDialDescriptorCount, graphCachedDialIndicesBuffer, graphCachedDialCount);
   };
 
   if( enableDiagnosticStageProfiling or GundamGlobals::isDebug() ){

@@ -252,6 +252,11 @@ std::string Backends::MpsBackend::getDiagnostics() const {
   out["variableDialReferences"] = impl.model.variableDialIndices.size();
   out["cachedDials"] = impl.cachedDialCount;
   out["cachedResponsesEnabled"] = impl.enableCachedDialResponses;
+  out["compactCachedDialIndices"] = impl.useCompactCachedDialIndices;
+  out["cachedDialDispatchCount"] = impl.enableCachedDialResponses ?
+      (impl.useCompactCachedDialIndices ? impl.cachedDialCount :
+       impl.compactDialDescriptorCount + impl.uniformDialDescriptorCount + impl.monotonicDialDescriptorCount
+       + impl.generalDialDescriptorCount + impl.graphDialDescriptorCount) : 0;
   out["histogramChunkSize"] = impl.histogramChunkSize;
   out["maxHistogramChunksPerBin"] = impl.maxHistogramChunksPerBin;
   out["lastStageGpuSeconds"] = impl.diagnosticStageGpuSeconds;
@@ -266,6 +271,8 @@ std::string Backends::MpsBackend::getDiagnostics() const {
     out["lastStageGpuSeconds"] = out["executor"]["lastStageGpuSeconds"];
     // These belong to the packed weight path, not the event propagation path.
     out.erase("cachedDials");
+    out.erase("compactCachedDialIndices");
+    out.erase("cachedDialDispatchCount");
     out.erase("maxHistogramChunksPerBin");
   }
   else{
@@ -290,10 +297,15 @@ std::string Backends::MpsBackend::getDiagnostics() const {
     buffer("generalDialDescriptorsBuffer", impl.generalDialDescriptorsBuffer);
     buffer("graphDialDescriptorsBuffer", impl.graphDialDescriptorsBuffer);
     buffer("compactCachedResponsesBuffer", impl.compactCachedResponsesBuffer);
+    buffer("compactCachedDialIndicesBuffer", impl.compactCachedDialIndicesBuffer);
     buffer("uniformCachedResponsesBuffer", impl.uniformCachedResponsesBuffer);
+    buffer("uniformCachedDialIndicesBuffer", impl.uniformCachedDialIndicesBuffer);
     buffer("monotonicCachedResponsesBuffer", impl.monotonicCachedResponsesBuffer);
+    buffer("monotonicCachedDialIndicesBuffer", impl.monotonicCachedDialIndicesBuffer);
     buffer("generalCachedResponsesBuffer", impl.generalCachedResponsesBuffer);
+    buffer("generalCachedDialIndicesBuffer", impl.generalCachedDialIndicesBuffer);
     buffer("graphCachedResponsesBuffer", impl.graphCachedResponsesBuffer);
+    buffer("graphCachedDialIndicesBuffer", impl.graphCachedDialIndicesBuffer);
     buffer("globalBinsBuffer", impl.globalBinsBuffer);
     buffer("binEventOffsetsBuffer", impl.binEventOffsetsBuffer);
     buffer("binEventIndicesBuffer", impl.binEventIndicesBuffer);
@@ -337,4 +349,10 @@ std::string Backends::MpsBackend::getDiagnosticStageGpuSeconds() const {
   const auto& timings = _impl_->useEventPropagation ? _impl_->eventPropagation->getDiagnosticStageGpuSeconds()
                                                   : _impl_->diagnosticStageGpuSeconds;
   return JsonType(timings).dump();
+}
+
+void Backends::MpsBackend::setDiagnosticCompactCachedDials(bool enabled_) {
+  LogThrowIf(not _impl_->isWeightModelSupported or _impl_->useEventPropagation,
+             "Compact cached dial diagnostics require the packed MPS weight path.");
+  _impl_->useCompactCachedDialIndices = enabled_;
 }

@@ -127,12 +127,15 @@ kernel void compute_cached_compact_responses(
     device const SplineDialDescriptor* descriptors [[buffer(1)]],
     device const float* splineData [[buffer(2)]],
     device const float* parameters [[buffer(3)]],
-    constant uint& descriptorCount [[buffer(4)]],
+    constant uint& dispatchCount [[buffer(4)]],
+    device const uint* cachedDialIndices [[buffer(5)]],
+    constant uint& useCachedIndices [[buffer(6)]],
     uint gid [[thread_position_in_grid]]) {
-  if( gid >= descriptorCount ){ return; }
-  SplineDialDescriptor descriptor = descriptors[gid];
+  if( gid >= dispatchCount ){ return; }
+  uint descriptorIndex = useCachedIndices ? cachedDialIndices[gid] : gid;
+  SplineDialDescriptor descriptor = descriptors[descriptorIndex];
   if( (descriptor.flags & kDialFlagCached) == 0 ){ return; }
-  cachedResponses[gid] = evaluate_compact_descriptor(descriptor, splineData, parameters);
+  cachedResponses[descriptorIndex] = evaluate_compact_descriptor(descriptor, splineData, parameters);
 }
 
 kernel void compute_cached_uniform_responses(
@@ -140,12 +143,15 @@ kernel void compute_cached_uniform_responses(
     device const SplineDialDescriptor* descriptors [[buffer(1)]],
     device const float* splineData [[buffer(2)]],
     device const float* parameters [[buffer(3)]],
-    constant uint& descriptorCount [[buffer(4)]],
+    constant uint& dispatchCount [[buffer(4)]],
+    device const uint* cachedDialIndices [[buffer(5)]],
+    constant uint& useCachedIndices [[buffer(6)]],
     uint gid [[thread_position_in_grid]]) {
-  if( gid >= descriptorCount ){ return; }
-  SplineDialDescriptor descriptor = descriptors[gid];
+  if( gid >= dispatchCount ){ return; }
+  uint descriptorIndex = useCachedIndices ? cachedDialIndices[gid] : gid;
+  SplineDialDescriptor descriptor = descriptors[descriptorIndex];
   if( (descriptor.flags & kDialFlagCached) == 0 ){ return; }
-  cachedResponses[gid] = evaluate_uniform_descriptor(descriptor, splineData, parameters);
+  cachedResponses[descriptorIndex] = evaluate_uniform_descriptor(descriptor, splineData, parameters);
 }
 
 kernel void compute_cached_monotonic_responses(
@@ -153,12 +159,15 @@ kernel void compute_cached_monotonic_responses(
     device const SplineDialDescriptor* descriptors [[buffer(1)]],
     device const float* splineData [[buffer(2)]],
     device const float* parameters [[buffer(3)]],
-    constant uint& descriptorCount [[buffer(4)]],
+    constant uint& dispatchCount [[buffer(4)]],
+    device const uint* cachedDialIndices [[buffer(5)]],
+    constant uint& useCachedIndices [[buffer(6)]],
     uint gid [[thread_position_in_grid]]) {
-  if( gid >= descriptorCount ){ return; }
-  SplineDialDescriptor descriptor = descriptors[gid];
+  if( gid >= dispatchCount ){ return; }
+  uint descriptorIndex = useCachedIndices ? cachedDialIndices[gid] : gid;
+  SplineDialDescriptor descriptor = descriptors[descriptorIndex];
   if( (descriptor.flags & kDialFlagCached) == 0 ){ return; }
-  cachedResponses[gid] = evaluate_monotonic_descriptor(descriptor, splineData, parameters);
+  cachedResponses[descriptorIndex] = evaluate_monotonic_descriptor(descriptor, splineData, parameters);
 }
 
 kernel void compute_cached_general_responses(
@@ -166,12 +175,15 @@ kernel void compute_cached_general_responses(
     device const SplineDialDescriptor* descriptors [[buffer(1)]],
     device const float* splineData [[buffer(2)]],
     device const float* parameters [[buffer(3)]],
-    constant uint& descriptorCount [[buffer(4)]],
+    constant uint& dispatchCount [[buffer(4)]],
+    device const uint* cachedDialIndices [[buffer(5)]],
+    constant uint& useCachedIndices [[buffer(6)]],
     uint gid [[thread_position_in_grid]]) {
-  if( gid >= descriptorCount ){ return; }
-  SplineDialDescriptor descriptor = descriptors[gid];
+  if( gid >= dispatchCount ){ return; }
+  uint descriptorIndex = useCachedIndices ? cachedDialIndices[gid] : gid;
+  SplineDialDescriptor descriptor = descriptors[descriptorIndex];
   if( (descriptor.flags & kDialFlagCached) == 0 ){ return; }
-  cachedResponses[gid] = evaluate_general_descriptor(descriptor, splineData, parameters);
+  cachedResponses[descriptorIndex] = evaluate_general_descriptor(descriptor, splineData, parameters);
 }
 
 kernel void compute_cached_graph_responses(
@@ -179,12 +191,15 @@ kernel void compute_cached_graph_responses(
     device const SplineDialDescriptor* descriptors [[buffer(1)]],
     device const float* splineData [[buffer(2)]],
     device const float* parameters [[buffer(3)]],
-    constant uint& descriptorCount [[buffer(4)]],
+    constant uint& dispatchCount [[buffer(4)]],
+    device const uint* cachedDialIndices [[buffer(5)]],
+    constant uint& useCachedIndices [[buffer(6)]],
     uint gid [[thread_position_in_grid]]) {
-  if( gid >= descriptorCount ){ return; }
-  SplineDialDescriptor descriptor = descriptors[gid];
+  if( gid >= dispatchCount ){ return; }
+  uint descriptorIndex = useCachedIndices ? cachedDialIndices[gid] : gid;
+  SplineDialDescriptor descriptor = descriptors[descriptorIndex];
   if( (descriptor.flags & kDialFlagCached) == 0 ){ return; }
-  cachedResponses[gid] = evaluate_graph_descriptor(descriptor, splineData, parameters);
+  cachedResponses[descriptorIndex] = evaluate_graph_descriptor(descriptor, splineData, parameters);
 }
 
 kernel void compute_event_weights(

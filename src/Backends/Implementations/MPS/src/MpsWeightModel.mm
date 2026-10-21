@@ -79,6 +79,23 @@ bool Backends::MpsBackendImpl::buildWeightModel() {
   binEventOffsetsBuffer = makePrivateBuffer(device, commandQueue, binEventOffsets);
   binEventIndicesBuffer = makePrivateBuffer(device, commandQueue, binEventIndices);
   splineDataBuffer = makePrivateBuffer(device, commandQueue, splineData);
+  // Keep the existing response-slot numbering. Only the dispatch list is
+  // compacted, so event references and floating-point operations are unchanged.
+  auto uploadCachedIndices = [&](const auto& descriptors_, uint32_t descriptorCount_, uint32_t cachedCount_){
+    std::vector<uint32_t> indices;
+    indices.reserve(std::max(uint32_t(1), cachedCount_));
+    for( uint32_t i = 0; i < descriptorCount_; ++i ){
+      if( descriptors_[i].flags & kDeviceDialFlagCached ){ indices.emplace_back(i); }
+    }
+    LogThrowIf(indices.size() != cachedCount_, "Inconsistent MPS cached dial count.");
+    if( indices.empty() ){ indices.emplace_back(0); } // Valid binding for empty/full-scan diagnostics.
+    return makePrivateBuffer(device, commandQueue, indices);
+  };
+  compactCachedDialIndicesBuffer = uploadCachedIndices(compactDialDescriptors, compactDialDescriptorCount, compactCachedDialCount);
+  uniformCachedDialIndicesBuffer = uploadCachedIndices(uniformDialDescriptors, uniformDialDescriptorCount, uniformCachedDialCount);
+  monotonicCachedDialIndicesBuffer = uploadCachedIndices(monotonicDialDescriptors, monotonicDialDescriptorCount, monotonicCachedDialCount);
+  generalCachedDialIndicesBuffer = uploadCachedIndices(generalDialDescriptors, generalDialDescriptorCount, generalCachedDialCount);
+  graphCachedDialIndicesBuffer = uploadCachedIndices(graphDialDescriptors, graphDialDescriptorCount, graphCachedDialCount);
   const auto cachedResponseBufferBytes = [this](std::size_t descriptorCount_){
     return (enableCachedDialResponses ? descriptorCount_ : std::size_t(1)) * sizeof(float);
   };
@@ -112,7 +129,8 @@ bool Backends::MpsBackendImpl::buildWeightModel() {
                                                  length:sizeof(chunkSize)
                                                 options:MTLResourceStorageModeShared];
 
-  if( externalWeightsBuffer == nil or externalDialOccurrencesBuffer == nil or baseWeightsBuffer == nil or eventDialRangesBuffer == nil or normDialOccurrencesBuffer == nil
+  if( compactCachedDialIndicesBuffer == nil or uniformCachedDialIndicesBuffer == nil or monotonicCachedDialIndicesBuffer == nil or generalCachedDialIndicesBuffer == nil or graphCachedDialIndicesBuffer == nil
+      or externalWeightsBuffer == nil or externalDialOccurrencesBuffer == nil or baseWeightsBuffer == nil or eventDialRangesBuffer == nil or normDialOccurrencesBuffer == nil
       or compactDialIndicesBuffer == nil or uniformDialIndicesBuffer == nil
       or monotonicDialIndicesBuffer == nil or generalDialIndicesBuffer == nil
       or graphDialIndicesBuffer == nil

@@ -183,5 +183,69 @@ TEST(BackendResponseSmoothingPacking, RejectsCollapsedFloatTransition) {
   EXPECT_NO_THROW(observable.build(view.propagation));
 }
 
+#ifdef __APPLE__
+TEST(MpsCachedDialDispatch, MixedCachedAndUncachedDescriptorsMatchFullScanExactly) {
+  for( bool cache : {false, true} ){
+    SCOPED_TRACE(cache);
+    MpsBackend backend;
+    if( backend.getCapabilities().deviceName == "Metal unavailable" ){ GTEST_SKIP(); }
+    backend.configure(ConfigReader(JsonType{{"enableCachedDialResponses", cache}}));
+    DialResponseSupervisor supervisor;
+    auto view = makeModel(supervisor, false, 1);
+    auto& model = view.propagation;
+    model.events.clear();
+    model.eventWeights.clear();
+    model.eventDialIndices.clear();
+    model.externalWeightBlocks.clear();
+    auto appendEvent = [&](uint32_t dial_){
+      EventView event;
+      event.sampleIndex = event.binIndex = event.globalBinIndex = 0;
+      event.resultIndex = model.events.size();
+      BackendEventWeightDescriptor weight;
+      weight.firstDial = model.eventDialIndices.size();
+      weight.dialCount = 1;
+      model.events.push_back(event);
+      model.eventWeights.push_back(weight);
+      model.eventDialIndices.push_back(dial_);
+    };
+    for( uint32_t family = 3; family < 8; ++family ){
+      // First-use packing puts the uncached descriptor before the cached one.
+      // This catches writing responses to the compact index instead of its slot.
+      auto oneOff = model.dials.at(family);
+      auto oneOffIndex = uint32_t(model.dials.size());
+      model.dials.push_back(oneOff);
+      appendEvent(oneOffIndex);
+      for( uint32_t i = 0; i < kDeviceCachedDialReuseThreshold; ++i ){ appendEvent(family); }
+    }
+    for( int rebuild = 0; rebuild < 2; ++rebuild ){
+      backend.build(view);
+      PropagationInputs inputs;
+      for( double value : {-.2, .5, 1.7} ){
+        inputs.parameters.values = {value};
+        std::vector<double> referenceWeights, referenceSums, referenceSquares;
+        for( bool compact : {false, true, false} ){
+          backend.setDiagnosticCompactCachedDials(compact);
+          auto token = backend.requestPropagation(inputs);
+          ASSERT_EQ(backend.getStatus(token).eventWeights, OutputState::ReadyOnDevice);
+          backend.materialize(token, OutputRequest::EventWeights);
+          backend.materialize(token, OutputRequest::Histograms);
+          EXPECT_EQ(backend.getLastTimingSummary().cachedDialCount, cache ? 5 : 0);
+          if( referenceWeights.empty() ){
+            referenceWeights = backend.getEventWeightsHostView(token);
+            referenceSums = backend.getHistogramSumsHostView(token);
+            referenceSquares = backend.getHistogramSumSquaresHostView(token);
+          }
+          else{
+            EXPECT_EQ(backend.getEventWeightsHostView(token), referenceWeights);
+            EXPECT_EQ(backend.getHistogramSumsHostView(token), referenceSums);
+            EXPECT_EQ(backend.getHistogramSumSquaresHostView(token), referenceSquares);
+          }
+        }
+      }
+    }
+  }
+}
+#endif
+
 INSTANTIATE_TEST_SUITE_P(CpuAndMetal, BackendResponseSmoothing,
                         testing::Combine(testing::Bool(), testing::Bool(), testing::Bool()));

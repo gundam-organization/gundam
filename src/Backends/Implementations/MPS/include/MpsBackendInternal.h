@@ -48,6 +48,8 @@ namespace Backends {
     bool useEventPropagation{false};
     bool isAvailable{false};
     bool enableCachedDialResponses{true};
+    // The full descriptor scan is retained only for controlled diagnostic A/B runs.
+    bool useCompactCachedDialIndices{true};
     bool enableDiagnosticStageProfiling{false};
     std::map<std::string, double> diagnosticStageGpuSeconds{};
 
@@ -69,10 +71,15 @@ namespace Backends {
     id<MTLBuffer> generalDialDescriptorsBuffer{nil};
     id<MTLBuffer> graphDialDescriptorsBuffer{nil};
     id<MTLBuffer> compactCachedResponsesBuffer{nil};
+    id<MTLBuffer> compactCachedDialIndicesBuffer{nil};
     id<MTLBuffer> uniformCachedResponsesBuffer{nil};
+    id<MTLBuffer> uniformCachedDialIndicesBuffer{nil};
     id<MTLBuffer> monotonicCachedResponsesBuffer{nil};
+    id<MTLBuffer> monotonicCachedDialIndicesBuffer{nil};
     id<MTLBuffer> generalCachedResponsesBuffer{nil};
+    id<MTLBuffer> generalCachedDialIndicesBuffer{nil};
     id<MTLBuffer> graphCachedResponsesBuffer{nil};
+    id<MTLBuffer> graphCachedDialIndicesBuffer{nil};
     id<MTLBuffer> globalBinsBuffer{nil};
     id<MTLBuffer> binEventOffsetsBuffer{nil};
     id<MTLBuffer> binEventIndicesBuffer{nil};
@@ -129,7 +136,9 @@ namespace Backends {
                                                  id<MTLComputePipelineState> pipeline_,
                                                  id<MTLBuffer> cachedResponsesBuffer_,
                                                  id<MTLBuffer> descriptorsBuffer_,
-                                                 uint32_t descriptorCount_);
+                                                 uint32_t descriptorCount_,
+                                                 id<MTLBuffer> cachedDialIndicesBuffer_,
+                                                 uint32_t cachedDialCount_);
     [[nodiscard]] bool encodeHistogramsFromDeviceWeights(id<MTLComputeCommandEncoder> encoder);
     [[nodiscard]] bool runWeightPropagation(const PropagationInputs& inputs_, bool needHistograms_);
     void copyDeviceEventWeightsToHostResult();

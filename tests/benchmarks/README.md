@@ -69,6 +69,29 @@ These probes report elapsed GPU time and layout, not hardware cache misses,
 achieved memory bandwidth, or occupancy. Summaries are checkpointed after each
 ordinary trial. `--probe-calls 0` disables the separate stage pass.
 
+### Comparing compact cached dial dispatches
+
+Add `--compare-cached-dials --comparison-rounds 2` to the MPS command above to
+compare the original full descriptor scan with dispatching only cached dial
+indices. Both modes reuse one loaded model and retain the same response slots,
+event order, and arithmetic. The compact mode is the production default; the
+full scan remains available through a diagnostic Python switch for A/B runs.
+
+Each round runs identical seeded sequences for both modes, alternating A/B and
+B/A order between trials/rounds. Every measured likelihood and each final
+histogram must match **exactly**. With the default scenarios and 842 effective
+coordinates, two rounds of two trials produce 10,424 ordinary evaluations.
+Synchronized GPU stage probes run after all ordinary A/B measurements and are
+also compared exactly. Input selection and cached-dial reuse thresholds stay
+fixed throughout the comparison.
+
+`model-fullScan.json` and `model-compactIndices.json` report selected modes,
+dispatched dial counts, and the extra cached-index buffer storage. Files named
+`round*-*-trial*-*.json` hold all raw ordinary passes. `summary.json` reports
+median/mean/p95 times by scenario/mode, speedup ratios, completion status, and
+exact comparison status. The diagnostic switch affects the packed-weight MPS
+path; the event-propagation path uses a different dial executor.
+
 ## Single-thread propagation and function sampling
 
 ```sh
