@@ -576,20 +576,6 @@ PYBIND11_MODULE(GUNDAM, module) {
     LogThrowIf(cpu == nullptr, "Weight worker diagnostics require a CPU backend.");
     return cpu->getWeightSchedulingDiagnostics().dump();
   })
-  .def("setDiagnosticCpuWeightInterleave", [](Backends::BackendManager& manager_, std::size_t lanes_){
-    auto* cpu = dynamic_cast<Backends::CpuBackend*>(manager_.getBackend());
-    LogThrowIf(cpu == nullptr, "Weight interleaving diagnostics require a CPU backend.");
-    cpu->setDiagnosticWeightInterleave(lanes_);
-    return cpu->getWeightSchedulingDiagnostics().dump();
-  })
-  .def("getDiagnosticCpuEventWeightChunk", [](const Backends::BackendManager& manager_, std::size_t offset_, std::size_t count_){
-    const auto* cpu = dynamic_cast<const Backends::CpuBackend*>(manager_.getBackend());
-    LogThrowIf(cpu == nullptr, "Weight inspection requires a CPU backend.");
-    const auto& weights = cpu->getDiagnosticEventWeights();
-    LogThrowIf(offset_ > weights.size() or count_ > weights.size() - offset_, "Invalid weight chunk range.");
-    if( count_ == 0 ){ return pybind11::bytes(); }
-    return pybind11::bytes(reinterpret_cast<const char*>(weights.data() + offset_), count_ * sizeof(double));
-  })
   .def("setDiagnosticCpuWeightWorkers", [](Backends::BackendManager& manager_, std::size_t workers_, bool timing_){
     auto* cpu = dynamic_cast<Backends::CpuBackend*>(manager_.getBackend());
     LogThrowIf(cpu == nullptr, "Weight worker diagnostics require a CPU backend.");

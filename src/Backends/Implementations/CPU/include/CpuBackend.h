@@ -66,8 +66,6 @@ ENUM_FIELD( Indexed )
     // Diagnostic API: call between synchronous propagations. Only the work
     // ranges/kernel selection change; model data and response caches are kept.
     void setDiagnosticWeightScheduling(CpuWeightScheduling scheduling_, std::size_t blocksPerThread_);
-    void setDiagnosticWeightInterleave(std::size_t lanes_);
-    [[nodiscard]] const std::vector<double>& getDiagnosticEventWeights() const;
     void setDiagnosticWeightWorkers(std::size_t workers_, bool timing_);
     void setDiagnosticCacheTraversal(CpuCacheTraversal traversal_);
     void setDiagnosticInputEvaluation(CpuInputEvaluation evaluation_);
@@ -87,8 +85,7 @@ ENUM_FIELD( Indexed )
     [[nodiscard]] std::size_t getCachedInputStorageBytes() const;
     void initializeWeightExecution();
     void initializeWeightScheduling();
-    template<std::size_t lanes> void selectWeightKernel();
-    template<bool allResponsesCached, bool useReweightCap, bool dynamicScheduling, std::size_t lanes = 1>
+    template<bool allResponsesCached, bool useReweightCap, bool dynamicScheduling>
     void calculateEventWeightsKernel(int iThread_);
     void resetResult();
     void updateCachedDialResponses(const PropagationInputs& inputs_);
@@ -162,7 +159,6 @@ ENUM_FIELD( Indexed )
     std::size_t _weightWork_{0};
     std::size_t _diagnosticWeightWorkers_{0};
     bool _diagnosticWeightTiming_{false};
-    std::size_t _diagnosticWeightInterleave_{1};
     bool _allWeightResponsesCached_{false};
     bool _usesDynamicWeights_{false};
     std::vector<EventRange> _weightBlocks_{};

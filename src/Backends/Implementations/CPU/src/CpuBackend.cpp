@@ -660,45 +660,14 @@ void Backends::CpuBackend::initializeWeightScheduling() {
   };
   _weightRanges_ = makeRanges(threads, false);
   _weightBlocks_ = _usesDynamicWeights_ ? makeRanges(blockTarget, true) : std::vector<EventRange>{};
-  switch( _diagnosticWeightInterleave_ ){
-    case 2: selectWeightKernel<2>(); break;
-    case 4: selectWeightKernel<4>(); break;
-    default: selectWeightKernel<1>(); break;
-  }
-  LogInfo << "CPU reweight layout: " << model.eventWeights.size() << " events, "
-          << model.eventWeights.size() * sizeof(BackendEventWeightDescriptor) << " hot descriptor bytes, "
-          << model.eventDialIndices.size() * sizeof(std::uint32_t) << " dial index bytes, "
-          << _cachedDialCount_ << "/" << model.dials.size() << " cached dials, "
-          << "all event responses cached=" << _allWeightResponsesCached_ << ", shared model owners=" << _engineView_.use_count()
-          << "." << std::endl;
-  LogInfo << "CPU weight scheduling: " << (_usesDynamicWeights_ ? "Dynamic" : "Fixed")
-          << " (requested " << _weightScheduling_ << ", " << _weightBlocks_.size()
-          << " automatic dynamic blocks)." << std::endl;
-}
-
-void Backends::CpuBackend::setDiagnosticWeightInterleave(std::size_t lanes_) {
-  LogThrowIf(not _isBuilt_, "Build the CPU backend before selecting a weight kernel.");
-  LogThrowIf(lanes_ != 1 and lanes_ != 2 and lanes_ != 4, "Interleave width must be 1, 2 or 4.");
-  _diagnosticWeightInterleave_ = lanes_;
-  initializeWeightScheduling();
-}
-
-const std::vector<double>& Backends::CpuBackend::getDiagnosticEventWeights() const {
-  LogThrowIf(not _lastResult_.token.isValid, "Evaluate the CPU backend before inspecting weights.");
-  return _lastResult_.eventWeights;
-}
-
-template<std::size_t lanes>
-void Backends::CpuBackend::selectWeightKernel() {
-  const auto& model = _engineView_->propagation;
   if( _allWeightResponsesCached_ ){
     if( _usesDynamicWeights_ ){
-      _weightJob_ = model.hasReweightCap ? &CpuBackend::calculateEventWeightsKernel<true, true, true, lanes>
-                                       : &CpuBackend::calculateEventWeightsKernel<true, false, true, lanes>;
+      _weightJob_ = model.hasReweightCap ? &CpuBackend::calculateEventWeightsKernel<true, true, true>
+                                       : &CpuBackend::calculateEventWeightsKernel<true, false, true>;
     }
     else{
-      _weightJob_ = model.hasReweightCap ? &CpuBackend::calculateEventWeightsKernel<true, true, false, lanes>
-                                       : &CpuBackend::calculateEventWeightsKernel<true, false, false, lanes>;
+      _weightJob_ = model.hasReweightCap ? &CpuBackend::calculateEventWeightsKernel<true, true, false>
+                                       : &CpuBackend::calculateEventWeightsKernel<true, false, false>;
     }
   }
   else{
@@ -711,31 +680,32 @@ void Backends::CpuBackend::selectWeightKernel() {
                                        : &CpuBackend::calculateEventWeightsKernel<false, false, false>;
     }
   }
+  LogInfo << "CPU reweight layout: " << model.eventWeights.size() << " events, "
+          << model.eventWeights.size() * sizeof(BackendEventWeightDescriptor) << " hot descriptor bytes, "
+          << model.eventDialIndices.size() * sizeof(std::uint32_t) << " dial index bytes, "
+          << _cachedDialCount_ << "/" << model.dials.size() << " cached dials, "
+          << "all event responses cached=" << _allWeightResponsesCached_ << ", shared model owners=" << _engineView_.use_count()
+          << "." << std::endl;
+  LogInfo << "CPU weight scheduling: " << (_usesDynamicWeights_ ? "Dynamic" : "Fixed")
+          << " (requested " << _weightScheduling_ << ", " << _weightBlocks_.size()
+          << " automatic dynamic blocks)." << std::endl;
 }
 
 void Backends::CpuBackend::calculateEventWeightsThread(int iThread_) {
   (this->*_weightJob_)(iThread_);
 }
 
-template<bool allResponsesCached, bool useReweightCap, bool dynamicScheduling, std::size_t lanes>
+template<bool allResponsesCached, bool useReweightCap, bool dynamicScheduling>
 void Backends::CpuBackend::calculateEventWeightsKernel(int iThread_) {
   const auto& model = _engineView_->propagation;
   auto reweightRange = [&](std::size_t begin_, std::size_t end_){
-    if constexpr( lanes > 1 ){
-      static_assert(allResponsesCached, "Interleaving requires cached responses.");
-      CpuWeightKernels::reweightInterleaved<lanes, useReweightCap>(
-          model.eventWeights.data(), model.eventDialIndices.data(), _cachedDialResponses_.data(),
-          _activeResult_->eventWeights.data(), begin_, end_, model.maxReweight);
-    }
-    else{
-      CpuWeightKernels::reweight<allResponsesCached, useReweightCap>(
-        model.eventWeights.data(), model.eventDialIndices.data(), _cachedDialResponses_.data(),
-        _activeResult_->eventWeights.data(), begin_, end_, model.maxReweight,
-        [this, &model](std::uint32_t dial_){
-          return _isCachedDial_[dial_] ? _cachedDialResponses_[dial_]
-              : Semantics::evalDialResponse(model, model.dials[dial_], *_activeInputs_);
-        });
-    }
+    CpuWeightKernels::reweight<allResponsesCached, useReweightCap>(
+      model.eventWeights.data(), model.eventDialIndices.data(), _cachedDialResponses_.data(),
+      _activeResult_->eventWeights.data(), begin_, end_, model.maxReweight,
+      [this, &model](std::uint32_t dial_){
+        return _isCachedDial_[dial_] ? _cachedDialResponses_[dial_]
+            : Semantics::evalDialResponse(model, model.dials[dial_], *_activeInputs_);
+      });
   };
   WeightWorkerStats stats;
   if constexpr( dynamicScheduling ){

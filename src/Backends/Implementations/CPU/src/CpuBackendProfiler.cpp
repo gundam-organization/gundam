@@ -370,9 +370,6 @@ Backends::CpuBackendProfiler::Json Backends::CpuBackend::getWeightSchedulingDiag
 #else
   out["compilerOptimizationEnabled"] = false;
 #endif
-  out["weightInterleaveRequested"] = _diagnosticWeightInterleave_;
-  out["weightInterleave"] = _allWeightResponsesCached_ ? _diagnosticWeightInterleave_ : 1;
-  out["allWeightResponsesCached"] = _allWeightResponsesCached_;
   out["weightWorkers"] = _weightRanges_.size();
   out["workerTimingEnabled"] = _diagnosticWeightTiming_;
   out["lastWeightWorkers"] = CpuBackendProfiler::Json::array();

@@ -1,5 +1,4 @@
 #include "CpuBackend.h"
-#include "CpuWeightKernels.h"
 #include "GundamGlobals.h"
 #include "CompactSpline.h"
 #include "UniformSpline.h"
@@ -14,7 +13,6 @@
 #include <cstring>
 #include <limits>
 #include <memory>
-#include <type_traits>
 #include <vector>
 
 namespace {
@@ -405,86 +403,5 @@ TEST(CpuCacheInputs, MirrorKeysNaNsAndRuntimeSwitchesPreserveBits) {
   EXPECT_FALSE(shared.getLastTimingSummary().sharedCacheInputs);
   EXPECT_EQ(shared.getLastTimingSummary().cacheInputTransformCount, 192);
   EXPECT_EQ(shared.getEventWeightsHostView(token).size(), 192);
-  GundamGlobals::setNumberOfThreads(previousThreads);
-}
-
-TEST(CpuWeightExecution, InterleavedKernelsPreserveEveryBitAndRangeBoundary) {
-  using namespace Backends;
-  std::vector<BackendEventWeightDescriptor> events;
-  std::vector<std::uint32_t> indices;
-  const std::vector<double> responses{1. + 1e-12, -1.2, 0., -0., 1e200, 1e-200,
-      std::numeric_limits<double>::infinity(), std::numeric_limits<double>::quiet_NaN()};
-  for( std::size_t i = 0; i < 39; ++i ){
-    const auto count = (i * 7) % 19;
-    events.push_back({i % 2 ? -2. : .5, indices.size(), count});
-    for( std::size_t j = 0; j < count; ++j ){ indices.push_back((i + j) % responses.size()); }
-  }
-  auto verify = [&](auto capped_){
-    constexpr bool capped = decltype(capped_)::value;
-    // Include empty/short ranges, nonzero starts and every remainder width.
-    for( std::size_t begin = 0; begin <= 5; ++begin ){
-      for( std::size_t end = begin; end <= events.size(); ++end ){
-        std::vector<double> scalar(events.size(), -123.), two = scalar, four = scalar;
-        CpuWeightKernels::reweight<true, capped>(events.data(), indices.data(), responses.data(),
-            scalar.data(), begin, end, 3., [](std::uint32_t){ return 0.; });
-        CpuWeightKernels::reweightInterleaved<2, capped>(events.data(), indices.data(), responses.data(),
-            two.data(), begin, end, 3.);
-        CpuWeightKernels::reweightInterleaved<4, capped>(events.data(), indices.data(), responses.data(),
-            four.data(), begin, end, 3.);
-        EXPECT_EQ(std::memcmp(scalar.data(), two.data(), scalar.size() * sizeof(double)), 0);
-        EXPECT_EQ(std::memcmp(scalar.data(), four.data(), scalar.size() * sizeof(double)), 0);
-      }
-    }
-  };
-  verify(std::true_type{});
-  verify(std::false_type{});
-}
-
-TEST(CpuWeightExecution, InterleaveSwitchesKeepCachedProductsAndMixedFallback) {
-  using namespace Backends;
-  const int previousThreads = GundamGlobals::getNbCpuThreads();
-  GundamGlobals::setNumberOfThreads(4);
-  for( bool mixed : {false, true} ){
-    for( bool capped : {false, true} ){
-      auto model = makeWeightModel(mixed, capped);
-      const auto prototypes = model.propagation.eventWeights;
-      model.propagation.events.clear();
-      model.propagation.eventWeights.clear();
-      for( std::size_t i = 0; i < 53; ++i ){
-        EventView event;
-        event.resultIndex = i;
-        event.globalBinIndex = 0;
-        model.propagation.events.push_back(event);
-        model.propagation.eventWeights.push_back(prototypes[i % prototypes.size()]);
-      }
-      CpuBackend backend;
-      backend.build(model);
-      EXPECT_EQ(backend.getWeightSchedulingDiagnostics().at("weightInterleave"), 1);
-      EXPECT_THROW(backend.setDiagnosticWeightInterleave(3), std::exception);
-      PropagationInputs inputs;
-      double external = 2.;
-      if( mixed ){ inputs.externalWeights = {{&external, 1, 0, 1}}; }
-      for( auto scheduling : {CpuWeightScheduling::Fixed, CpuWeightScheduling::Dynamic} ){
-        backend.setDiagnosticWeightScheduling(scheduling, 2);
-        for( double value : {1.1, 0., -1.3} ){
-          inputs.parameters.values = {value};
-          backend.setDiagnosticWeightInterleave(1);
-          auto token = backend.requestPropagation(inputs);
-          const auto expected = backend.getEventWeightsHostView(token);
-          const auto sums = backend.getHistogramSumsHostView(token);
-          const auto squares = backend.getHistogramSumSquaresHostView(token);
-          for( std::size_t lanes : {2, 4, 1, 4} ){
-            backend.setDiagnosticWeightInterleave(lanes);
-            token = backend.requestPropagation(inputs);
-            const auto& actual = backend.getEventWeightsHostView(token);
-            EXPECT_EQ(std::memcmp(expected.data(), actual.data(), actual.size() * sizeof(double)), 0);
-            EXPECT_EQ(backend.getHistogramSumsHostView(token), sums);
-            EXPECT_EQ(backend.getHistogramSumSquaresHostView(token), squares);
-            EXPECT_EQ(backend.getWeightSchedulingDiagnostics().at("weightInterleave"), mixed ? 1 : lanes);
-          }
-        }
-      }
-    }
-  }
   GundamGlobals::setNumberOfThreads(previousThreads);
 }
