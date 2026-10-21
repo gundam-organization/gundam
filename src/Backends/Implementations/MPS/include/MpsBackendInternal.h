@@ -22,6 +22,7 @@
 #include <cmath>
 #include <cstring>
 #include <limits>
+#include <map>
 #include <string>
 #include <unordered_map>
 #include <utility>
@@ -47,6 +48,8 @@ namespace Backends {
     bool useEventPropagation{false};
     bool isAvailable{false};
     bool enableCachedDialResponses{true};
+    bool enableDiagnosticStageProfiling{false};
+    std::map<std::string, double> diagnosticStageGpuSeconds{};
 
     bool isWeightModelSupported{false};
     static constexpr uint32_t histogramChunkSize{256};

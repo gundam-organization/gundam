@@ -8,6 +8,8 @@
 #import <Metal/Metal.h>
 
 #include <array>
+#include <map>
+#include <string>
 
 namespace Backends {
   // Metal executor for resident event observables and sparse contributions.
@@ -18,6 +20,9 @@ namespace Backends {
     ~MpsEventPropagation();
     MpsEventPropagation(const MpsEventPropagation&) = delete;
     MpsEventPropagation& operator=(const MpsEventPropagation&) = delete;
+    void setDiagnosticStageProfiling(bool enabled_){ _enableDiagnosticStageProfiling_ = enabled_; }
+    [[nodiscard]] std::string getDiagnostics() const;
+    [[nodiscard]] const std::map<std::string, double>& getDiagnosticStageGpuSeconds() const { return _diagnosticStageGpuSeconds_; }
     void build(const PropagationView& model_);
     void clear();
     void invalidate(){ _cache_.invalidate(); _valid_ = false; }
@@ -51,6 +56,8 @@ namespace Backends {
     std::vector<std::uint64_t> _externalGenerations_{};
     std::uint64_t _materializedRevision_{0};
     bool _valid_{false};
+    bool _enableDiagnosticStageProfiling_{false};
+    std::map<std::string, double> _diagnosticStageGpuSeconds_{};
   };
 }
 #endif

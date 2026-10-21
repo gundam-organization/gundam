@@ -19,6 +19,9 @@
 
 #ifdef GUNDAM_USING_BACKENDS
 #include "CpuBackend.h"
+#ifdef __APPLE__
+#include "MpsBackend.h"
+#endif
 #endif
 
 #include "GenericToolbox.Fs.h"
@@ -543,6 +546,13 @@ PYBIND11_MODULE(GUNDAM, module) {
     return probe.report().dump();
   });
   pybind11::class_<Backends::BackendTimingSummary>(module, "BackendTimingSummary")
+  .def_readonly("parameterUploadSeconds", &Backends::BackendTimingSummary::parameterUploadSeconds)
+  .def_readonly("commandEncodeSeconds", &Backends::BackendTimingSummary::commandEncodeSeconds)
+  .def_readonly("deviceWaitSeconds", &Backends::BackendTimingSummary::deviceWaitSeconds)
+  .def_readonly("histogramReadbackSeconds", &Backends::BackendTimingSummary::histogramReadbackSeconds)
+  .def_readonly("eventWeightReadbackSeconds", &Backends::BackendTimingSummary::eventWeightReadbackSeconds)
+  .def_readonly("eventStateReadbackSeconds", &Backends::BackendTimingSummary::eventStateReadbackSeconds)
+  .def_readonly("histogramReadbackBytes", &Backends::BackendTimingSummary::histogramReadbackBytes)
   .def_readonly("devicePropagationSeconds", &Backends::BackendTimingSummary::devicePropagationSeconds)
   .def_readonly("eventStateReadbackBytes", &Backends::BackendTimingSummary::eventStateReadbackBytes)
   .def_readonly("eventWeightReadbackBytes", &Backends::BackendTimingSummary::eventWeightReadbackBytes)
@@ -578,6 +588,23 @@ PYBIND11_MODULE(GUNDAM, module) {
     LogThrowIf(not manager_.hasBackend(), "No backend initialized.");
     return manager_.getBackend()->getLastTimingSummary();
   })
+#ifdef __APPLE__
+  .def("setDiagnosticMpsStageProfiling", [](Backends::BackendManager& manager_, bool enabled_){
+    auto* mps = dynamic_cast<Backends::MpsBackend*>(manager_.getBackend());
+    LogThrowIf(mps == nullptr, "MPS stage diagnostics require an MPS backend.");
+    mps->setDiagnosticStageProfiling(enabled_);
+  })
+  .def("getDiagnosticMpsStageGpuSeconds", [](const Backends::BackendManager& manager_){
+    const auto* mps = dynamic_cast<const Backends::MpsBackend*>(manager_.getBackend());
+    LogThrowIf(mps == nullptr, "MPS diagnostics require an MPS backend.");
+    return mps->getDiagnosticStageGpuSeconds();
+  })
+  .def("getDiagnosticMps", [](const Backends::BackendManager& manager_){
+    const auto* mps = dynamic_cast<const Backends::MpsBackend*>(manager_.getBackend());
+    LogThrowIf(mps == nullptr, "MPS diagnostics require an MPS backend.");
+    return mps->getDiagnostics();
+  })
+#endif
   .def("getDiagnosticCpuWeightLocality", [](const Backends::BackendManager& manager_){
     const auto* cpu = dynamic_cast<const Backends::CpuBackend*>(manager_.getBackend());
     LogThrowIf(cpu == nullptr, "Weight locality diagnostics require a CPU backend.");

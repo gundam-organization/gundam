@@ -4,6 +4,71 @@ These scripts measure performance; they are not part of the regular regression
 suite. Use a Release build with the Python interface enabled and select the
 matching installed `GUNDAM` Python module.
 
+## Resident MPS profiling with production inputs
+
+Build Release with `WITH_PYTHON_INTERFACE=ON`, then select that build's Python
+module and matching interpreter. Example from the repository root:
+
+```sh
+env -u DYLD_LIBRARY_PATH \
+  PYTHONPATH="$PWD/cmake-build-release/src/PythonInterface" \
+  python3.15 tests/benchmarks/225MpsBackendProfiling.py \
+  --work-dir /Users/nadrino/Documents/Work/Output/results/gundam/GundamInputOA2024 \
+  --config configOA2024.yaml --threads 4 \
+  --override override/v13ProdFewRuns.yaml override/noSimplex.yaml override/backendMpsTest.yaml
+```
+
+On macOS an existing `DYLD_LIBRARY_PATH` containing an installed GUNDAM can
+redirect loading even when Python reports a module path inside the build tree.
+Removing it for this invocation selects the local build with these diagnostics;
+other installations may need their own dependency search paths.
+
+This reproduces the Asimov input setup (`-a`) and overrides, then measures
+repeated likelihood evaluations without running a fit or HESSE. Plotting, PCA,
+and parameter-step scans are disabled. Input selections and event limits are
+preserved. MPS is explicitly selected while its backend options are retained.
+The data is loaded once, and event weights/histograms stay resident during
+measurements as in the fit loop. Four threads control host work/loading, not
+the number of GPU threads.
+
+Defaults run constant, one-coordinate, two-coordinate, and all-coordinate
+workloads, with two timed trials each. Local trials cover the complete effective
+fit-coordinate list (including eigen coordinates); their call count increases
+past `--calls 30` if needed. Global trials use at most `--global-calls 10`.
+`--probe-calls 8` adds separate reference/probe passes per workload; these short
+passes sample coordinates across the fit list. All proposals are seeded, bounded
+by the parameter domain, and use a standard deviation of 0.1 prior sigma.
+
+Output under `mps-profiling-<timestamp>-<PID>/` contains:
+
+- `settings.json`, `resolved-fitter-config.json`, `parameters.json`: invocation,
+  resolved configuration, and effective coordinate manifest.
+- `model.json`: selected GPU/path, buffer lengths and Shared/Private modes,
+  SIMD width, dispatch sizes, dial types and events grouped by dial count.
+- `summary.json`: ordinary evaluation, CPU preparation, GPU command, host wait,
+  upload, readback and likelihood statistics; separate GPU stage probe timings.
+- `*-trial*.json`: raw ordinary measurements, likelihoods, transfer volumes,
+  parameter-sequence digests and final histograms.
+- `*-probes.json`: separate synchronized GPU stage measurements, validated
+  against replaying the same sequence without profiling (2e-5 float tolerance).
+- `native.log`: complete native output, with supervisor heartbeats every 30 s.
+
+The packed-weight path probes cached responses, event weights and histogram
+reduction plus readback. The event-propagation path probes individual dispatched
+kernels, including binning/index construction when parameters trigger them.
+Stages not dispatched are absent. Probe passes split stages into commands and
+wait after each one: their durations include different scheduling/cache behavior
+and must not replace ordinary timings. The histogram/readback group on the
+packed path includes GPU buffer copies. `devicePropagationSeconds` in an ordinary
+trial measures the full command buffer, including GPU copies. CPU readback time
+measures subsequent host conversion, not those copies. CPU wait and GPU duration
+overlap; do not add all timers. Zero stage timers in ordinary packed-weight
+trials mean those stages were not separately timed.
+
+These probes report elapsed GPU time and layout, not hardware cache misses,
+achieved memory bandwidth, or occupancy. Summaries are checkpointed after each
+ordinary trial. `--probe-calls 0` disables the separate stage pass.
+
 ## Single-thread propagation and function sampling
 
 ```sh

@@ -100,6 +100,7 @@ bool Backends::MpsBackendImpl::encodeHistogramsFromDeviceWeights(id<MTLComputeCo
 
 bool Backends::MpsBackendImpl::runWeightPropagation(const PropagationInputs& inputs_, bool needHistograms_) {
   if( not isWeightModelSupported ){ return false; }
+  diagnosticStageGpuSeconds.clear();
   updateDeviceParameters(inputs_.parameters);
   updateExternalWeights(inputs_);
 
@@ -112,7 +113,7 @@ bool Backends::MpsBackendImpl::runWeightPropagation(const PropagationInputs& inp
            and encodeCachedDialResponses(encoder_, cachedGraphResponsesPipeline, graphCachedResponsesBuffer, graphDialDescriptorsBuffer, graphDialDescriptorCount);
   };
 
-  if( GundamGlobals::isDebug() ){
+  if( enableDiagnosticStageProfiling or GundamGlobals::isDebug() ){
     if( enableCachedDialResponses and cachedDialCount > 0 ){
       auto stageStart = std::chrono::steady_clock::now();
       auto encodeStart = std::chrono::steady_clock::now();
@@ -130,6 +131,10 @@ bool Backends::MpsBackendImpl::runWeightPropagation(const PropagationInputs& inp
       lastTiming.deviceWaitSeconds += secondsSince(waitStart);
       if( commandBuffer.status != MTLCommandBufferStatusCompleted ){
         return false;
+      }
+      lastTiming.devicePropagationSeconds += commandBuffer.GPUEndTime - commandBuffer.GPUStartTime;
+      if( enableDiagnosticStageProfiling ){
+        diagnosticStageGpuSeconds["cachedDials"] = commandBuffer.GPUEndTime - commandBuffer.GPUStartTime;
       }
       lastTiming.cachedDialStageSeconds += secondsSince(stageStart);
     }
@@ -151,6 +156,10 @@ bool Backends::MpsBackendImpl::runWeightPropagation(const PropagationInputs& inp
       lastTiming.deviceWaitSeconds += secondsSince(waitStart);
       if( commandBuffer.status != MTLCommandBufferStatusCompleted ){
         return false;
+      }
+      lastTiming.devicePropagationSeconds += commandBuffer.GPUEndTime - commandBuffer.GPUStartTime;
+      if( enableDiagnosticStageProfiling ){
+        diagnosticStageGpuSeconds["eventWeights"] = commandBuffer.GPUEndTime - commandBuffer.GPUStartTime;
       }
       lastTiming.eventWeightsStageSeconds += secondsSince(stageStart);
     }
@@ -178,6 +187,10 @@ bool Backends::MpsBackendImpl::runWeightPropagation(const PropagationInputs& inp
       lastTiming.deviceWaitSeconds += secondsSince(waitStart);
       if( commandBuffer.status != MTLCommandBufferStatusCompleted ){
         return false;
+      }
+      lastTiming.devicePropagationSeconds += commandBuffer.GPUEndTime - commandBuffer.GPUStartTime;
+      if( enableDiagnosticStageProfiling ){
+        diagnosticStageGpuSeconds["histogramsAndReadback"] = commandBuffer.GPUEndTime - commandBuffer.GPUStartTime;
       }
       lastTiming.histogramStageSeconds += secondsSince(stageStart);
 
@@ -225,6 +238,8 @@ bool Backends::MpsBackendImpl::runWeightPropagation(const PropagationInputs& inp
   auto waitStart = std::chrono::steady_clock::now();
   [commandBuffer waitUntilCompleted];
   lastTiming.deviceWaitSeconds += secondsSince(waitStart);
+
+  lastTiming.devicePropagationSeconds += commandBuffer.GPUEndTime - commandBuffer.GPUStartTime;
 
   if( commandBuffer.status != MTLCommandBufferStatusCompleted ){
     return false;

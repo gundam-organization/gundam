@@ -229,3 +229,112 @@ const std::vector<double>& Backends::MpsBackend::getOutsideSumSquaresHostView(co
   LogThrowIf(not _impl_->isCurrentToken(token_), "Invalid MpsBackend propagation token.");
   return _impl_->lastResult.outsideSumSquares;
 }
+
+void Backends::MpsBackend::setDiagnosticStageProfiling(bool enabled_) {
+  _impl_->enableDiagnosticStageProfiling = enabled_;
+  if( _impl_->eventPropagation ){ _impl_->eventPropagation->setDiagnosticStageProfiling(enabled_); }
+}
+
+std::string Backends::MpsBackend::getDiagnostics() const {
+  const auto& impl = *_impl_;
+  JsonType out;
+  out["device"] = getCapabilities().deviceName;
+  out["available"] = impl.isAvailable;
+  out["unifiedMemory"] = impl.isAvailable && impl.device.hasUnifiedMemory;
+  out["stageProfiling"] = impl.enableDiagnosticStageProfiling;
+  out["path"] = impl.useEventPropagation ? "eventPropagation" : (impl.isWeightModelSupported ? "packedWeights" : "hostFallback");
+  out["fallbackReason"] = impl.deviceModelFallbackReason;
+  out["events"] = impl.model.events.size();
+  out["bins"] = impl.model.totalBins;
+  out["parameters"] = impl.model.parameterCount;
+  out["uniqueDials"] = impl.model.dials.size();
+  out["weightDialReferences"] = impl.model.eventDialIndices.size();
+  out["variableDialReferences"] = impl.model.variableDialIndices.size();
+  out["cachedDials"] = impl.cachedDialCount;
+  out["cachedResponsesEnabled"] = impl.enableCachedDialResponses;
+  out["histogramChunkSize"] = impl.histogramChunkSize;
+  out["maxHistogramChunksPerBin"] = impl.maxHistogramChunksPerBin;
+  out["lastStageGpuSeconds"] = impl.diagnosticStageGpuSeconds;
+  std::map<std::string, std::size_t> dialCounts, types;
+  for( const auto& event : impl.model.eventWeights ){ ++dialCounts[std::to_string(event.dialCount)]; }
+  const char* dialTypeNames[]{"Norm", "Shift", "CompactSpline", "UniformSpline", "MonotonicSpline", "GeneralSpline", "Graph", "ExternalWeight"};
+  for( const auto& dial : impl.model.dials ){ ++types[dialTypeNames[std::size_t(dial.type)]]; }
+  out["eventsByWeightDialCount"] = dialCounts;
+  out["uniqueDialsByType"] = types;
+  if( impl.useEventPropagation ){
+    out["executor"] = JsonType::parse(impl.eventPropagation->getDiagnostics());
+    out["lastStageGpuSeconds"] = out["executor"]["lastStageGpuSeconds"];
+    // These belong to the packed weight path, not the event propagation path.
+    out.erase("cachedDials");
+    out.erase("maxHistogramChunksPerBin");
+  }
+  else{
+    out["buffers"] = JsonType::array();
+    auto buffer = [&](const char* name_, id<MTLBuffer> buffer_){
+      if( buffer_ == nil ){ return; }
+      out["buffers"].push_back({{"name", name_}, {"bytes", buffer_.length},
+        {"storage", buffer_.storageMode == MTLStorageModeShared ? "Shared" : "Private"}});
+    };
+    buffer("eventWeightsBuffer", impl.eventWeightsBuffer);
+    buffer("baseWeightsBuffer", impl.baseWeightsBuffer);
+    buffer("eventDialRangesBuffer", impl.eventDialRangesBuffer);
+    buffer("normDialOccurrencesBuffer", impl.normDialOccurrencesBuffer);
+    buffer("compactDialIndicesBuffer", impl.compactDialIndicesBuffer);
+    buffer("uniformDialIndicesBuffer", impl.uniformDialIndicesBuffer);
+    buffer("monotonicDialIndicesBuffer", impl.monotonicDialIndicesBuffer);
+    buffer("generalDialIndicesBuffer", impl.generalDialIndicesBuffer);
+    buffer("graphDialIndicesBuffer", impl.graphDialIndicesBuffer);
+    buffer("compactDialDescriptorsBuffer", impl.compactDialDescriptorsBuffer);
+    buffer("uniformDialDescriptorsBuffer", impl.uniformDialDescriptorsBuffer);
+    buffer("monotonicDialDescriptorsBuffer", impl.monotonicDialDescriptorsBuffer);
+    buffer("generalDialDescriptorsBuffer", impl.generalDialDescriptorsBuffer);
+    buffer("graphDialDescriptorsBuffer", impl.graphDialDescriptorsBuffer);
+    buffer("compactCachedResponsesBuffer", impl.compactCachedResponsesBuffer);
+    buffer("uniformCachedResponsesBuffer", impl.uniformCachedResponsesBuffer);
+    buffer("monotonicCachedResponsesBuffer", impl.monotonicCachedResponsesBuffer);
+    buffer("generalCachedResponsesBuffer", impl.generalCachedResponsesBuffer);
+    buffer("graphCachedResponsesBuffer", impl.graphCachedResponsesBuffer);
+    buffer("globalBinsBuffer", impl.globalBinsBuffer);
+    buffer("binEventOffsetsBuffer", impl.binEventOffsetsBuffer);
+    buffer("binEventIndicesBuffer", impl.binEventIndicesBuffer);
+    buffer("splineDataBuffer", impl.splineDataBuffer);
+    buffer("parametersBuffer", impl.parametersBuffer);
+    buffer("externalWeightsBuffer", impl.externalWeightsBuffer);
+    buffer("externalDialOccurrencesBuffer", impl.externalDialOccurrencesBuffer);
+    buffer("partialHistSumsBuffer", impl.partialHistSumsBuffer);
+    buffer("partialHistSumSquaresBuffer", impl.partialHistSumSquaresBuffer);
+    buffer("histSumsBuffer", impl.histSumsBuffer);
+    buffer("histSumSquaresBuffer", impl.histSumSquaresBuffer);
+    buffer("eventWeightsReadbackBuffer", impl.eventWeightsReadbackBuffer);
+    buffer("histSumsReadbackBuffer", impl.histSumsReadbackBuffer);
+    buffer("histSumSquaresReadbackBuffer", impl.histSumSquaresReadbackBuffer);
+    buffer("nEventsBuffer", impl.nEventsBuffer);
+    buffer("totalBinsBuffer", impl.totalBinsBuffer);
+    buffer("maxHistogramChunksPerBinBuffer", impl.maxHistogramChunksPerBinBuffer);
+    buffer("histogramChunkSizeBuffer", impl.histogramChunkSizeBuffer);
+    out["pipelines"] = JsonType::array();
+    auto pipeline = [&](const char* name_, id<MTLComputePipelineState> pipeline_){
+      if( pipeline_ == nil ){ return; }
+      out["pipelines"].push_back({{"name", name_}, {"simdWidth", pipeline_.threadExecutionWidth},
+        {"maxThreadsPerThreadgroup", pipeline_.maxTotalThreadsPerThreadgroup},
+        {"dispatchThreadsPerThreadgroup", std::min<NSUInteger>(256, pipeline_.maxTotalThreadsPerThreadgroup)},
+        {"staticThreadgroupMemoryBytes", pipeline_.staticThreadgroupMemoryLength}});
+    };
+    pipeline("eventWeightsPipeline", impl.eventWeightsPipeline);
+    pipeline("cachedCompactResponsesPipeline", impl.cachedCompactResponsesPipeline);
+    pipeline("cachedUniformResponsesPipeline", impl.cachedUniformResponsesPipeline);
+    pipeline("cachedMonotonicResponsesPipeline", impl.cachedMonotonicResponsesPipeline);
+    pipeline("cachedGeneralResponsesPipeline", impl.cachedGeneralResponsesPipeline);
+    pipeline("cachedGraphResponsesPipeline", impl.cachedGraphResponsesPipeline);
+    pipeline("histogramPipeline", impl.histogramPipeline);
+    pipeline("histogramPartialsPipeline", impl.histogramPartialsPipeline);
+    pipeline("histogramFinalizePipeline", impl.histogramFinalizePipeline);
+  }
+  return out.dump();
+}
+
+std::string Backends::MpsBackend::getDiagnosticStageGpuSeconds() const {
+  const auto& timings = _impl_->useEventPropagation ? _impl_->eventPropagation->getDiagnosticStageGpuSeconds()
+                                                  : _impl_->diagnosticStageGpuSeconds;
+  return JsonType(timings).dump();
+}

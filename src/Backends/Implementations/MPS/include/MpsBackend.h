@@ -26,6 +26,11 @@ namespace Backends {
     [[nodiscard]] PropagationStatus getStatus(const PropagationToken& token_) const override;
     [[nodiscard]] const EngineView& getEngineView() const override;
 
+    // Separate diagnostic passes split GPU stages into synchronized commands.
+    void setDiagnosticStageProfiling(bool enabled_);
+    [[nodiscard]] std::string getDiagnostics() const;
+    [[nodiscard]] std::string getDiagnosticStageGpuSeconds() const;
+
     void build(const EngineView& engineView_) override;
     PropagationToken requestPropagation(const PropagationInputs& inputs_) override;
 

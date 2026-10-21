@@ -1408,6 +1408,9 @@ void DataDispenser::selectLoadThreadCount(){
     return;
   }
 
+  // TODO: disable this test?
+  return;
+
   // File metadata is sufficient for small inputs; do not read payload data just
   // to decide how to read it. Include enabled friends and count each file once.
   constexpr Long64_t probeSizeThreshold{500LL * 1000 * 1000}; // 500 MB

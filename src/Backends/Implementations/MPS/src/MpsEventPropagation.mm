@@ -3,12 +3,16 @@
 
 #include <stdexcept>
 
+namespace {
+const char* const kDiagnosticKernelNames[]{"evaluate_propagation_dials", "propagate_event_state", "rebin_events", "clear_contribution_counts",
+    "count_bin_contributions", "index_histogram_chunks", "scatter_bin_contributions", "reduce_histogram_chunks", "finish_dynamic_histograms"};
+}
+
 Backends::MpsEventPropagation::MpsEventPropagation(id<MTLDevice> device_, id<MTLCommandQueue> queue_, id<MTLLibrary> library_)
     : _device_(device_), _queue_(queue_) {
-  const char* functions[]{"evaluate_propagation_dials", "propagate_event_state", "rebin_events", "clear_contribution_counts",
-    "count_bin_contributions", "index_histogram_chunks", "scatter_bin_contributions", "reduce_histogram_chunks", "finish_dynamic_histograms"};
+
   for( std::size_t i = 0; i < _pipelines_.size(); ++i ){
-    _pipelines_[i] = makePipeline(_device_, library_, [NSString stringWithUTF8String:functions[i]]);
+    _pipelines_[i] = makePipeline(_device_, library_, [NSString stringWithUTF8String:kDiagnosticKernelNames[i]]);
     if( _pipelines_[i] == nil ){
       for( auto pipeline : _pipelines_ ){ [pipeline release]; }
       throw std::runtime_error("Could not create Metal event propagation pipelines.");
@@ -104,12 +108,26 @@ void Backends::MpsEventPropagation::build(const PropagationView& model_) {
 void Backends::MpsEventPropagation::dispatch(id<MTLComputeCommandEncoder> encoder_, Kernel kernel_, std::size_t count_,
                                             std::initializer_list<Buffer> buffers_) {
   if( count_ == 0 ){ return; }
+  // Normal dispatches share one command buffer. Only diagnostic passes submit
+  // and wait once per kernel, making their GPU timestamps separately readable.
+  id<MTLCommandBuffer> probeCommand = nil;
+  if( _enableDiagnosticStageProfiling_ ){
+    probeCommand = [_queue_ commandBuffer];
+    encoder_ = [probeCommand computeCommandEncoder];
+  }
   auto pipeline = _pipelines_[std::size_t(kernel_)];
   [encoder_ setComputePipelineState:pipeline];
   NSUInteger index{0};
   for( auto slot : buffers_ ){ [encoder_ setBuffer:buffer(slot) offset:0 atIndex:index++]; }
   NSUInteger width = std::min<NSUInteger>(256, pipeline.maxTotalThreadsPerThreadgroup);
   [encoder_ dispatchThreads:MTLSizeMake(count_, 1, 1) threadsPerThreadgroup:MTLSizeMake(width, 1, 1)];
+  if( probeCommand != nil ){
+    [encoder_ endEncoding];
+    [probeCommand commit];
+    [probeCommand waitUntilCompleted];
+    LogThrowIf(probeCommand.status != MTLCommandBufferStatusCompleted, "MPS diagnostic kernel failed.");
+    _diagnosticStageGpuSeconds_[kDiagnosticKernelNames[std::size_t(kernel_)]] += probeCommand.GPUEndTime - probeCommand.GPUStartTime;
+  }
 }
 
 void Backends::MpsEventPropagation::copy(id<MTLBlitCommandEncoder> encoder_, Buffer source_, Buffer destination_, std::size_t bytes_) {
@@ -122,6 +140,7 @@ void Backends::MpsEventPropagation::copy(id<MTLBlitCommandEncoder> encoder_, Buf
 }
 
 void Backends::MpsEventPropagation::propagate(const PropagationInputs& inputs_, PropagationResult& result_, BackendTimingSummary& timing_) {
+  _diagnosticStageGpuSeconds_.clear();
   const auto& model = *_model_;
   inputs_.validate(model);
   _cache_.prepare(inputs_);
@@ -182,6 +201,7 @@ void Backends::MpsEventPropagation::propagate(const PropagationInputs& inputs_, 
   [command waitUntilCompleted];
   timing_.deviceWaitSeconds += secondsSince(waitStart);
   timing_.devicePropagationSeconds += command.GPUEndTime - command.GPUStartTime;
+  for( const auto& stage : _diagnosticStageGpuSeconds_ ){ timing_.devicePropagationSeconds += stage.second; }
   if( command.status != MTLCommandBufferStatusCompleted || control.error ){
     _cache_.invalidate();
     _valid_ = false;
@@ -281,4 +301,29 @@ Backends::BackendDeviceView Backends::MpsEventPropagation::getDeviceView() const
   view.histSumSquares = buffer(Buffer::HistogramSquares);
   view.histogramBytes = std::size_t(_model_->totalBins) * sizeof(float);
   return view;
+}
+
+std::string Backends::MpsEventPropagation::getDiagnostics() const {
+  JsonType out;
+  out["lastStageGpuSeconds"] = _diagnosticStageGpuSeconds_;
+  out["contributionCapacity"] = _packed_.contributionCapacity;
+  out["histogramChunkCapacity"] = _packed_.histogramChunkCapacity;
+  out["buffers"] = JsonType::array();
+  const char* names[]{"Events", "Samples", "Dials", "Targets", "Intervals", "Bins", "Nodes", "Bounds", "NodeBins", "WeightDialIndices", "VariableDialIndices", "Payloads", "Parameters", "ExternalWeights", "Responses", "Variables", "HostValues", "HostEdits", "DirtyEvents", "HardBins", "EventCounts", "Contributions", "ChangedSamples", "Control", "EventWeights", "BinCounts", "BinOffsets", "BinPositions", "BinContributions", "ChunkOffsets", "Chunks", "PartialSums", "PartialSquares", "HistogramSums", "HistogramSquares", "ReadbackSums", "ReadbackSquares", "ReadbackVariables", "ReadbackBins", "ReadbackCounts", "ReadbackContributions", "ReadbackWeights"};
+  static_assert(sizeof(names) / sizeof(*names) == std::size_t(Buffer::Count));
+  for( std::size_t i = 0; i < _buffers_.size(); ++i ){
+    auto value = _buffers_[i];
+    if( value == nil ){ continue; }
+    out["buffers"].push_back({{"name", names[i]}, {"bytes", value.length},
+      {"storage", value.storageMode == MTLStorageModeShared ? "Shared" : "Private"}});
+  }
+  out["pipelines"] = JsonType::array();
+  for( std::size_t i = 0; i < _pipelines_.size(); ++i ){
+    auto pipeline = _pipelines_[i];
+    out["pipelines"].push_back({{"name", kDiagnosticKernelNames[i]}, {"simdWidth", pipeline.threadExecutionWidth},
+      {"maxThreadsPerThreadgroup", pipeline.maxTotalThreadsPerThreadgroup},
+      {"dispatchThreadsPerThreadgroup", std::min<NSUInteger>(256, pipeline.maxTotalThreadsPerThreadgroup)},
+      {"staticThreadgroupMemoryBytes", pipeline.staticThreadgroupMemoryLength}});
+  }
+  return out.dump();
 }
