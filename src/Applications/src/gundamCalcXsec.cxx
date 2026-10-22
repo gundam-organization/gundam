@@ -624,10 +624,10 @@ int main(int argc, char** argv){
         for( auto& normData : xsec.normList ){
           if( not std::isnan( normData.normParameter.min ) ){
             double norm{normData.normParameter.min};
-            if( normData.normParameter.max != 0 ){
+            if( normData.normParameter.max != 0 && SmearNormPar){
               auto normThrow = normThrowList.find(normData.name);
               if( normThrow == normThrowList.end() ){ normThrow = normThrowList.emplace(normData.name, gRandom->Gaus()).first; }
-              norm += SmearNormPar ? normData.normParameter.max * normThrow->second : 0.;
+              norm += normData.normParameter.max * normThrow->second;
             }
             binData /= norm;
           }
