@@ -1,0 +1,94 @@
+# A test yaml file for GUNDAM.
+#
+# Run an iterative search on the tree_dt tree in 100NormalizationTree.root.
+# The (A,B) distribution has two normalization parameters:
+#
+#   Positive_C : Normalization for events where the C truth variable is >0
+#   Negative_C : Normalization for events where the C truth variable is <=0
+#
+# Positive_C is profiled over 0.6, 0.7, 0.8, 0.9 and 1.0, and Negative_C is
+# minimized at each point. The data tree was generated with Positive_C = 0.8
+# (4000 of 5000 events with C > 0) and Negative_C = 0.6 (3000 of 5000 events
+# with C <= 0), so the best point has to be 0.8 with Negative_C close to 0.6.
+#
+
+fit: true                    # can be disabled with -d
+scanParameters: false        # can be triggered with --scan
+generateOneSigmaPlots: false # can be enabled with --one-sigma
+
+fitterEngineConfig:
+
+  minimizerConfig:
+    type: IterativeSearch
+    minimizer: "Minuit2"
+    algorithm: "Migrad"
+    print_level: 2
+    tolerance: 1E-6
+    searchParameters:
+      - parameterSetName: Normalizations
+        parameterName: Positive_C
+        min: 0.6
+        max: 1.0
+        nSteps: 5
+
+  propagatorConfig:
+    throwAsimovFitParameters: false
+
+    dataSetList:
+      - name: "TestSample"
+        isEnabled: true
+        selectedDataEntry: "TestData"
+        mc:
+          tree: tree_mc
+          selectionCutFormula: "(1)"
+          nominalWeightFormula: "(1.0)"
+          filePathList:
+            - "${DATA_DIR}/100NormalizationTree.root"
+        data:
+          - name: "TestData"
+            tree: tree_dt
+            filePathList:
+              - "${DATA_DIR}/100NormalizationTree.root"
+
+
+    fitSampleSetConfig:
+      # LeastSquares is used for tests because it is mathematically simple
+      llhStatFunction: LeastSquares
+      dataEventType: TestData
+
+      llhConfig:
+        lsqPoissonianApproximation: true
+
+      fitSampleList:
+        - name: AB
+          isEnabled: true
+          binning: "${CONFIG_DIR}/200NormalizationIterativeSearch-binning.txt"
+          dataSets: [ "TestSample" ]
+
+    parameterSetListConfig:
+      - name: Normalizations
+        isEnabled: true
+        nominalStepSize: 0.1
+
+        parameterDefinitions:
+
+          - parameterName: "Positive_C"
+            isEnabled: true
+            priorValue: 1.0
+            priorType: Flat
+            dialSetDefinitions:
+              - dialsType: Normalization
+                applyCondition: "[C] > 0"
+
+          - parameterName: "Negative_C"
+            isEnabled: true
+            priorValue: 1.0
+            priorType: Flat
+            dialSetDefinitions:
+              - dialsType: Normalization
+                applyCondition: "[C] <= 0"
+
+# End of the yaml file
+# Local Variables:
+# mode:yaml
+# End:
