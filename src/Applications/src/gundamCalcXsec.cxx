@@ -610,7 +610,7 @@ int main(int argc, char** argv){
   enableStatThrowInToys = xsecCalcConfig.fetchValue("enableStatThrowInToys", enableStatThrowInToys);
   enableEventMcThrow    = xsecCalcConfig.fetchValue("enableEventMcThrow", enableEventMcThrow);
 
-  auto writeBinDataFct = std::function<void()>([&]{
+  auto writeBinDataFct = [&](bool SmearNormPar=true) {
     // one throw per normaliser per toy, shared by all bins
     std::map<std::string, double> normThrowList{};
 
@@ -624,7 +624,7 @@ int main(int argc, char** argv){
         for( auto& normData : xsec.normList ){
           if( not std::isnan( normData.normParameter.min ) ){
             double norm{normData.normParameter.min};
-            if( normData.normParameter.max != 0 ){
+            if( normData.normParameter.max != 0 && SmearNormPar){
               auto normThrow = normThrowList.find(normData.name);
               if( normThrow == normThrowList.end() ){ normThrow = normThrowList.emplace(normData.name, gRandom->Gaus()).first; }
               norm += normData.normParameter.max * normThrow->second;
@@ -682,13 +682,13 @@ int main(int argc, char** argv){
         xsec.branchBinsData.writeRawData( binData );
       }
     }
-  });
+  };
 
   {
     LogWarning << "Calculating weight at best-fit" << std::endl;
     for( auto& parSet : propagator.getParametersManager().getParameterSetsList() ){ parSet.moveParametersToPrior(); }
     propagator.propagateParameters();
-    writeBinDataFct();
+    writeBinDataFct(false);
     xsecAtBestFitTree->Fill();
     GenericToolbox::writeInTFileWithObjTypeExt( GenericToolbox::mkdirTFile(calcXsecDir, "throws"), xsecAtBestFitTree );
   }
