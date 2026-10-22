@@ -11,9 +11,22 @@ kernel void evaluate_propagation_dials(
     device const ObservableScalar* externalWeights [[buffer(3)]],
     device ObservableScalar* responses [[buffer(4)]],
     constant DevicePropagationControl& control [[buffer(5)]],
+    device const uint* dialIndices [[buffer(6)]],
+    device const DevicePropagationDialRange* ranges [[buffer(7)]],
     uint gid [[thread_position_in_grid]]) {
   if( gid >= control.dialCount ){ return; }
-  auto dial = dials[gid];
+  uint dialIndex = gid;
+  if( control.dialRangeCount ){
+    uint begin = 0, end = control.dialRangeCount;
+    while( begin + 1 < end ){
+      uint middle = (begin + end) / 2;
+      if( gid < ranges[middle].firstThread ){ end = middle; }
+      else{ begin = middle; }
+    }
+    auto range = ranges[begin];
+    dialIndex = dialIndices[range.firstDial + gid - range.firstThread];
+  }
+  auto dial = dials[dialIndex];
   auto kind = BackendDialType(dial.type);
   ObservableScalar value(0.f);
   if( kind != BackendDialType::Shift && kind != BackendDialType::ExternalWeight ){
@@ -48,7 +61,7 @@ kernel void evaluate_propagation_dials(
     case BackendDialType::Graph: value = GundamObservableMath::EvaluateGraph(value, lower, upper, data, dial.payloadSize); break;
     case BackendDialType::ExternalWeight: value = externalWeights[dial.externalIndex]; break;
   }
-  responses[gid] = Backends::Semantics::processResponse(value, dial);
+  responses[dialIndex] = Backends::Semantics::processResponse(value, dial);
 }
 
 struct PropagationResponses {
@@ -91,29 +104,38 @@ kernel void propagate_event_state(
     }
   }
   dirty[gid] = changed;
-  float weight = 1;
-  for( uint i = event.firstDial; i < event.firstDial + event.dialCount; ++i ){ weight *= float(responses[weightDialIndices[i]]); }
-  if( control.hasReweightCap && weight > control.maxReweight ){ weight = control.maxReweight; }
-  eventWeights[gid] = event.baseWeight * weight;
+  if( control.updateWeights ){
+    float weight = 1;
+    for( uint i = event.firstDial; i < event.firstDial + event.dialCount; ++i ){ weight *= float(responses[weightDialIndices[i]]); }
+    if( control.hasReweightCap && weight > control.maxReweight ){ weight = control.maxReweight; }
+    eventWeights[gid] = event.baseWeight * weight;
+  }
 }
 
-kernel void rebin_events(
-    device const DevicePropagationEvent* events [[buffer(0)]],
-    device const DeviceBinningSample* samples [[buffer(1)]],
-    device const DeviceBinningNode* nodes [[buffer(2)]],
-    device const DeviceBinningBounds* bounds [[buffer(3)]],
-    device const uint* nodeBins [[buffer(4)]],
-    device const DeviceBinningBin* bins [[buffer(5)]],
-    device const DeviceBinningInterval* intervals [[buffer(6)]],
-    device const ObservableScalar* variables [[buffer(7)]],
-    device const uint* dirty [[buffer(8)]],
-    device int* hardBins [[buffer(9)]],
-    device uint* eventCounts [[buffer(10)]],
-    device DeviceBinContribution* contributions [[buffer(11)]],
-    device uint* changedSamples [[buffer(12)]],
-    device DevicePropagationControl& control [[buffer(13)]],
-    device const uint* reusableBins [[buffer(14)]],
-    uint gid [[thread_position_in_grid]]) {
+struct RebinOutcome { uint rebinned, candidates, sample, rebuild; };
+
+void store_contribution(device DeviceBinContribution* contributions, uint first, uint slot, uint oldCount,
+                        DeviceBinContribution value, thread uint& rebuild) {
+  if( !rebuild && (slot >= oldCount || contributions[first + slot].binIndex != value.binIndex) ){ rebuild = 1; }
+  contributions[first + slot] = value;
+}
+
+void rebin_event(
+    device const DevicePropagationEvent* events,
+    device const DeviceBinningSample* samples,
+    device const DeviceBinningNode* nodes,
+    device const DeviceBinningBounds* bounds,
+    device const uint* nodeBins,
+    device const DeviceBinningBin* bins,
+    device const DeviceBinningInterval* intervals,
+    device const ObservableScalar* variables,
+    device const uint* dirty,
+    device int* hardBins,
+    device uint* eventCounts,
+    device DeviceBinContribution* contributions,
+    device DevicePropagationControl& control,
+    device const uint* reusableBins,
+    uint gid, thread RebinOutcome& outcome) {
   if( gid >= control.eventCount || !dirty[gid] ){ return; }
   auto event = events[gid];
   auto sample = samples[event.sample];
@@ -122,15 +144,16 @@ kernel void rebin_events(
     hardBins[gid] = event.fixedBin;
     eventCounts[gid] = event.fixedBin >= 0 ? 1 : 0;
     if( event.fixedBin >= 0 ){ contributions[event.firstContribution] = {gid, int(sample.binOffset) + event.fixedBin, 1}; }
-    atomic_store_explicit((device atomic_uint*)&control.rebuildIndex, 1, memory_order_relaxed);
+    outcome.rebuild = 1;
     return;
   }
   for( uint i = 0; i < sample.variableCount; ++i ){
     if( !isfinite(float(variables[event.firstVariable + i])) ){ propagation_error(control, 1); return; }
   }
-  atomic_fetch_add_explicit((device atomic_uint*)&control.rebinnedEvents, 1, memory_order_relaxed);
-  if( event.sample < control.sampleCount ){ atomic_store_explicit((device atomic_uint*)(changedSamples + event.sample), 1, memory_order_relaxed); }
-  atomic_store_explicit((device atomic_uint*)&control.rebuildIndex, 1, memory_order_relaxed);
+  outcome.rebinned = 1;
+  if( event.sample < control.sampleCount ){ outcome.sample = event.sample; }
+  outcome.rebuild = control.firstPropagation || !control.reuseContributionIndex;
+  uint oldCount = control.firstPropagation ? 0 : eventCounts[gid];
   uint count = 0, firstHardPosition = UINT_MAX, candidateCount = 0, largest = 0;
   // The build certifies that a reusable strict bin cannot hide an earlier bin.
   // HardBins is initialized by the first tree traversal, never by this shortcut.
@@ -152,8 +175,10 @@ kernel void rebin_events(
         }
         if( contains ){
           eventCounts[gid] = 1;
-          contributions[event.firstContribution] = {gid, int(sample.binOffset) + previousBin, 1};
-          atomic_fetch_add_explicit((device atomic_uint*)&control.candidates, 1, memory_order_relaxed);
+          store_contribution(contributions, event.firstContribution, 0, oldCount,
+                             {gid, int(sample.binOffset) + previousBin, 1}, outcome.rebuild);
+          if( oldCount != 1 ){ outcome.rebuild = 1; }
+          outcome.candidates = 1;
           return;
         }
       }
@@ -191,18 +216,20 @@ kernel void rebin_events(
       if( hardContains && bin.position < firstHardPosition ){ hardBin = bin.binIndex; firstHardPosition = bin.position; }
       if( !sample.isSmoothed || fraction == 0 ){ continue; }
       if( count + 1 >= event.contributionCapacity ){ propagation_error(control, 4); return; }
-      contributions[event.firstContribution + count] = {gid, int(sample.binOffset) + bin.binIndex, fraction};
+      store_contribution(contributions, event.firstContribution, count, oldCount,
+                         {gid, int(sample.binOffset) + bin.binIndex, fraction}, outcome.rebuild);
       if( fraction > largestFraction ){ largestFraction = fraction; largest = count; }
       ++count;
       total += fraction;
     }
     ++nodeIndex;
   }
-  atomic_fetch_add_explicit((device atomic_uint*)&control.candidates, candidateCount, memory_order_relaxed);
+  outcome.candidates = candidateCount;
   hardBins[gid] = hardBin;
   if( !sample.isSmoothed ){
     count = hardBin >= 0 ? 1 : 0;
-    if( count ){ contributions[event.firstContribution] = {gid, int(sample.binOffset) + hardBin, 1}; }
+    if( count ){ store_contribution(contributions, event.firstContribution, 0, oldCount,
+                                   {gid, int(sample.binOffset) + hardBin, 1}, outcome.rebuild); }
   }
   else{
     float tolerance = 64 * FLT_EPSILON * float(max(uint(1), count));
@@ -211,9 +238,53 @@ kernel void rebin_events(
       contributions[event.firstContribution + largest].fraction -= total - 1;
       total = 1;
     }
-    if( total < 1 ){ contributions[event.firstContribution + count++] = {gid, int(sample.outsideBin), 1 - total}; }
+    if( total < 1 ){
+      store_contribution(contributions, event.firstContribution, count, oldCount,
+                         {gid, int(sample.outsideBin), 1 - total}, outcome.rebuild);
+      ++count;
+    }
   }
+  if( count != oldCount ){ outcome.rebuild = 1; }
   eventCounts[gid] = count;
+}
+
+kernel void rebin_events(
+    device const DevicePropagationEvent* events [[buffer(0)]],
+    device const DeviceBinningSample* samples [[buffer(1)]],
+    device const DeviceBinningNode* nodes [[buffer(2)]],
+    device const DeviceBinningBounds* bounds [[buffer(3)]],
+    device const uint* nodeBins [[buffer(4)]],
+    device const DeviceBinningBin* bins [[buffer(5)]],
+    device const DeviceBinningInterval* intervals [[buffer(6)]],
+    device const ObservableScalar* variables [[buffer(7)]],
+    device const uint* dirty [[buffer(8)]],
+    device int* hardBins [[buffer(9)]],
+    device uint* eventCounts [[buffer(10)]],
+    device DeviceBinContribution* contributions [[buffer(11)]],
+    device uint* changedSamples [[buffer(12)]],
+    device DevicePropagationControl& control [[buffer(13)]],
+    device const uint* reusableBins [[buffer(14)]],
+    uint gid [[thread_position_in_grid]],
+    uint lane [[thread_index_in_simdgroup]]) {
+  RebinOutcome outcome{0, 0, UINT_MAX, 0};
+  rebin_event(events, samples, nodes, bounds, nodeBins, bins, intervals, variables, dirty,
+              hardBins, eventCounts, contributions, control, reusableBins, gid, outcome);
+  // All lanes reconverge after the event-local early returns before collectives.
+  uint rebinned = outcome.rebinned, candidates = outcome.candidates, rebuild = outcome.rebuild;
+  if( control.aggregateCounters ){
+    rebinned = simd_sum(rebinned);
+    candidates = simd_sum(candidates);
+    rebuild = simd_max(rebuild);
+  }
+  if( !control.aggregateCounters || lane == 0 ){
+    if( rebinned ){ atomic_fetch_add_explicit((device atomic_uint*)&control.rebinnedEvents, rebinned, memory_order_relaxed); }
+    if( candidates ){ atomic_fetch_add_explicit((device atomic_uint*)&control.candidates, candidates, memory_order_relaxed); }
+    if( rebuild ){ atomic_store_explicit((device atomic_uint*)&control.rebuildIndex, 1, memory_order_relaxed); }
+  }
+  uint firstSample = control.aggregateCounters ? simd_broadcast_first(outcome.sample) : UINT_MAX;
+  if( outcome.sample != UINT_MAX && (!control.aggregateCounters || lane == 0 || outcome.sample != firstSample) ){
+    atomic_store_explicit((device atomic_uint*)(changedSamples + outcome.sample), 1, memory_order_relaxed);
+  }
 }
 
 kernel void clear_contribution_counts(
@@ -305,4 +376,31 @@ kernel void finish_dynamic_histograms(
   }
   sums[gid] = sum;
   squares[gid] = square;
+}
+
+kernel void reduce_histogram_chunks_parallel(
+    device const DeviceHistogramChunk* chunks [[buffer(0)]], device const uint* indices [[buffer(1)]],
+    device const DeviceBinContribution* contributions [[buffer(2)]], device const float* weights [[buffer(3)]],
+    device float* sums [[buffer(4)]], device float* squares [[buffer(5)]],
+    device const DevicePropagationControl& control [[buffer(6)]], uint gid [[thread_position_in_grid]],
+    uint lane [[thread_index_in_simdgroup]]) {
+  uint chunkIndex = gid / 32;
+  if( chunkIndex >= control.chunkCount || control.error ){ return; }
+  auto chunk = chunks[chunkIndex];
+  ObservableScalar sum(0.f), square(0.f);
+  for( uint i = chunk.begin + lane; i < chunk.end; i += 32 ){
+    auto contribution = contributions[indices[i]];
+    float value = weights[contribution.event] * contribution.fraction;
+    sum += ObservableScalar(value);
+    square += ObservableScalar(value * value);
+  }
+  for( uint stride = 16; stride; stride /= 2 ){
+    ObservableScalar otherSum, otherSquare;
+    otherSum.high = simd_shuffle_down(sum.high, stride);
+    otherSum.low = simd_shuffle_down(sum.low, stride);
+    otherSquare.high = simd_shuffle_down(square.high, stride);
+    otherSquare.low = simd_shuffle_down(square.low, stride);
+    if( lane + stride < 32 ){ sum += otherSum; square += otherSquare; }
+  }
+  if( lane == 0 ){ sums[chunkIndex] = float(sum); squares[chunkIndex] = float(square); }
 }

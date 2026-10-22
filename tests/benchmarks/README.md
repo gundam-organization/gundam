@@ -447,3 +447,36 @@ raw row now includes `parameterValues` in parameter-manifest order, after the
 evaluation timer, so the actual proposal range can be inspected. Candidate
 counts describe bins visited, not individual interval operations; early
 interval rejection does not reduce these counts.
+
+
+### Comparing resident propagation optimizations
+
+Use `--compare-resident-stages` instead of the other comparison flags to rotate
+five variants on each resident MPS model:
+
+| Variant | Dial/weight cache | Contribution-index reuse | Parallel histogram chunks | SIMD counters |
+|---|---|---|---|---|
+| baseline | off | off | off | off |
+| cached | on | off | off | off |
+| indexed | on | on | off | off |
+| parallel | on | on | on | off |
+| aggregated | on | on | on | on |
+
+The baseline disables the new features in the current executable; it shares the
+refactored shader code, rather than loading an older binary. These controls do
+not disable previous-bin reuse or interval pruning. All five variants replay the
+same seeded coordinates, and the original default is restored afterwards.
+Results are in `resident-stages-comparison.json`, per-trial variant files and
+separate probes. Probe rows also include `executionState` (evaluated dials,
+weight-update flag, index-rebuild flag). This cheap state query and all histogram
+snapshots happen after the evaluation timer.
+
+Use the 1% or 50% command above with this flag. To isolate fraction changes while
+keeping support lists stable, use the original 1% override with
+`--step-scale 0.00001`. This deliberately tiny workload checks index reuse; it
+does not represent an ordinary full-sigma proposal. To exercise simultaneous
+weight and observable changes, `--parameter-set '*' --step-scale 0.1` selects
+all eligible effective fit coordinates. Quote the asterisk to prevent shell
+expansion. This mixed workload is useful for checking that dense updates retain
+the full dial scan efficiently. Model manifests record the actual coordinate
+count. CPU comparisons are performed only when CPU is included in `--backends`.

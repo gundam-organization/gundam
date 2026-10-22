@@ -15,6 +15,9 @@ void Backends::MpsBackend::configureImpl() {
   _config_.fillValue(_impl_->enableCachedDialResponses, "enableCachedDialResponses");
   _config_.fillValue(_impl_->enableDiagnosticDescriptorComparison, "enableDiagnosticDescriptorComparison");
   _config_.fillValue(_impl_->enableDiagnosticPayloadComparison, "enableDiagnosticPayloadComparison");
+  if( _impl_->eventPropagation ){
+    _impl_->eventPropagation->setDiagnosticOptions(_impl_->enableCachedDialResponses, true, true, true);
+  }
   LogThrowIf(_impl_->enableDiagnosticDescriptorComparison and _impl_->enableDiagnosticPayloadComparison,
              "Select one MPS layout comparison at a time.");
   _config_.printUnusedKeys();
@@ -241,6 +244,11 @@ void Backends::MpsBackend::setDiagnosticStageProfiling(bool enabled_) {
   if( _impl_->eventPropagation ){ _impl_->eventPropagation->setDiagnosticStageProfiling(enabled_); }
 }
 
+void Backends::MpsBackend::setDiagnosticEventPropagationOptions(bool cacheDials_, bool reuseIndex_, bool parallelHistograms_, bool aggregateCounters_) {
+  LogThrowIf(not _impl_->eventPropagation, "Metal event propagation is unavailable.");
+  _impl_->eventPropagation->setDiagnosticOptions(cacheDials_, reuseIndex_, parallelHistograms_, aggregateCounters_);
+}
+
 void Backends::MpsBackend::setDiagnosticPreviousBinReuse(bool enabled_) {
   LogThrowIf(not _impl_->eventPropagation, "Metal event propagation is unavailable.");
   _impl_->eventPropagation->setDiagnosticPreviousBinReuse(enabled_);
@@ -249,6 +257,11 @@ void Backends::MpsBackend::setDiagnosticPreviousBinReuse(bool enabled_) {
 void Backends::MpsBackend::setDiagnosticBinningIntervalPruning(bool enabled_) {
   LogThrowIf(not _impl_->eventPropagation, "Metal event propagation is unavailable.");
   _impl_->eventPropagation->setDiagnosticBinningIntervalPruning(enabled_);
+}
+
+std::string Backends::MpsBackend::getDiagnosticEventPropagationState() const {
+  LogThrowIf(not _impl_->useEventPropagation, "MPS event propagation is not active.");
+  return _impl_->eventPropagation->getExecutionState();
 }
 
 std::string Backends::MpsBackend::getDiagnostics() const {

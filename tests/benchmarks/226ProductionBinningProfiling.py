@@ -129,6 +129,8 @@ def measure(engine, sequence, scenario, calls, seed, probe=False, capture=False)
             rows.append({'seconds': seconds, 'likelihood': value,
                          'sequenceDigest': digest.hexdigest(), 'parameterValues': list(sequence.current),
                          'counts': {name: getattr(timing, name) for name in profiling.COUNT_FIELDS}})
+            if probe:
+                rows[-1]['executionState'] = json.loads(manager.getDiagnosticMpsEventPropagationState())
             # Correctness snapshots happen after the timer. Only separate
             # ordinary trials without snapshots contribute to timing summaries.
             if capture:
@@ -149,7 +151,7 @@ def worker(args):
     sequence = profiling.scheduling.ParameterSequence(engine, args.step_scale)
     sets = engine.getLikelihoodInterface().getModelPropagator().getParametersManager().getParameterSetsList()
     titles = {p.getFullTitle() for parameter_set in sets
-              if parameter_set.getName() == args.parameter_set
+              if args.parameter_set == '*' or parameter_set.getName() == args.parameter_set
               for p in parameter_set.getEffectiveParameterList()}
     sequence.entries = [entry for entry in sequence.entries if entry[0].getFullTitle() in titles]
     if not sequence.entries:
@@ -177,7 +179,7 @@ def worker(args):
             probe = measure(engine, sequence, scenario, args.probe_calls, args.seed, probe=True, capture=True)
             profiling.check_equal(reference, probe)
             write_json(output / f'{scenario}-probes.json', probe)
-    if (args.compare_previous_bin or args.compare_binning_intervals) and args.backend == 'MPS':
+    if (args.compare_previous_bin or args.compare_binning_intervals or args.compare_resident_stages) and args.backend == 'MPS':
         compare_binning(args, engine, sequence, output)
     if args.mode == 'hard' and args.backend == 'MPS':
         for scenario in args.scenarios:
@@ -189,12 +191,28 @@ def worker(args):
 
 def compare_binning(args, engine, sequence, output):
     manager = engine.getBackendsManager()
+    resident = args.compare_resident_stages
     interval_comparison = args.compare_binning_intervals
     variants = ('fullIntervals', 'prunedIntervals') if interval_comparison else ('treeSearch', 'previousBin')
     set_variant = (manager.setDiagnosticMpsBinningIntervalPruning if interval_comparison
                    else manager.setDiagnosticMpsPreviousBinReuse)
     summary_path = output / ('interval-pruning-comparison.json' if interval_comparison
                              else 'previous-bin-comparison.json')
+    stage_options = {
+        'baseline': (False, False, False, False),
+        'cached': (True, False, False, False),
+        'indexed': (True, True, False, False),
+        'parallel': (True, True, True, False),
+        'aggregated': (True, True, True, True),
+    }
+    if resident:
+        variants = tuple(stage_options)
+        summary_path = output / 'resident-stages-comparison.json'
+    def select_variant(variant):
+        if resident:
+            manager.setDiagnosticMpsEventPropagationOptions(*stage_options[variant])
+        else:
+            set_variant(variant == variants[1])
     results = {scenario: {variant: [] for variant in variants} for scenario in args.scenarios}
     summary = {'complete': False, 'scenarios': {}}
     try:
@@ -202,8 +220,11 @@ def compare_binning(args, engine, sequence, output):
             for trial in range(args.trials):
                 pair = {}
                 # Alternate A/B and B/A on one resident model.
-                for variant in (variants if trial % 2 == 0 else variants[::-1]):
-                    set_variant(variant == variants[1])
+                order = variants[trial % len(variants):] + variants[:trial % len(variants)]
+                if trial % 2:
+                    order = order[::-1]
+                for variant in order:
+                    select_variant(variant)
                     if args.warmup:
                         measure(engine, sequence, scenario, args.warmup, args.seed + 1000000)
                     progress(f'{args.mode}-{scenario}: {variant} A/B trial {trial + 1}')
@@ -211,24 +232,29 @@ def compare_binning(args, engine, sequence, output):
                     write_json(output / f'{scenario}-ab{trial + 1}-{variant}.json', result)
                     pair[variant] = result
                     results[scenario][variant].extend(result['rows'])
-                profiling.check_equal(pair[variants[0]], pair[variants[1]])
+                for variant in variants[1:]:
+                    profiling.check_equal(pair[variants[0]], pair[variant])
                 timings = {variant: profiling.summarize(rows)
                            for variant, rows in results[scenario].items()}
                 summary['scenarios'][scenario] = {'timings': timings,
                     'evaluationSpeedup': timings[variants[0]]['evaluationSeconds']['medianMs'] /
-                                         timings[variants[1]]['evaluationSeconds']['medianMs'],
+                                         timings[variants[-1]]['evaluationSeconds']['medianMs'],
                     'gpuSpeedup': timings[variants[0]]['devicePropagationSeconds']['medianMs'] /
-                                  timings[variants[1]]['devicePropagationSeconds']['medianMs']}
+                                  timings[variants[-1]]['devicePropagationSeconds']['medianMs']}
                 write_json(summary_path, summary)
             probes = {}
             for variant in variants:
-                set_variant(variant == variants[1])
+                select_variant(variant)
                 probes[variant] = measure(engine, sequence, scenario, args.probe_calls,
                                           args.seed, probe=True, capture=True)
                 write_json(output / f'{scenario}-ab-{variant}-probes.json', probes[variant])
-            profiling.check_equal(probes[variants[0]], probes[variants[1]])
+            for variant in variants[1:]:
+                profiling.check_equal(probes[variants[0]], probes[variant])
     finally:
-        set_variant(True)
+        if resident:
+            manager.setDiagnosticMpsEventPropagationOptions(True, True, True, True)
+        else:
+            set_variant(True)
     summary['complete'] = True
     write_json(summary_path, summary)
 
@@ -331,6 +357,8 @@ def main():
                         help='Alternate original tree search and previous-bin reuse on each resident MPS model')
     comparisons.add_argument('--compare-binning-intervals', action='store_true',
                         help='Alternate full interval scans and early rejection on each resident MPS model')
+    comparisons.add_argument('--compare-resident-stages', action='store_true',
+                        help='Compare dependency caching, contribution-index reuse, parallel histograms and SIMD counters')
     parser.add_argument('--worker', action='store_true', help=argparse.SUPPRESS)
     parser.add_argument('--backend', choices=['CPU', 'MPS'], help=argparse.SUPPRESS)
     parser.add_argument('--mode', choices=['hard', 'smoothed'], help=argparse.SUPPRESS)

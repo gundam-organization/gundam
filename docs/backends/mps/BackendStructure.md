@@ -6,9 +6,12 @@ retains GPU buffers for repeated evaluations. Parameters and other changing
 inputs are supplied at propagation time; model structure is prepared during
 the build.
 
-Metal kernels use single precision. Converting published results to host doubles
-does not recover precision lost during device calculations. This differs from
-the CPU backend's double-precision execution.
+Weights, contribution fractions and published histogram values use single
+precision. Event observables and interval arithmetic use compensated pairs of
+floats. Parallel event-propagation histogram reductions also accumulate in
+compensated pairs before publishing float partial sums. Converting published
+results to host doubles does not recover rounding at these float boundaries.
+This differs from the CPU backend's double-precision execution.
 
 The backend interface separates execution from host materialization, so callers
 can request the outputs they need. The shared model and manager responsibilities
@@ -94,3 +97,53 @@ for A/B measurements. `True` is the production default. The production benchmark
 accepts `--compare-binning-intervals` to compare both loops on the same resident
 model, independently of the previous-bin shortcut. The two comparison flags are
 mutually exclusive.
+
+
+The resident event-propagation path caches dial responses by their immutable
+parameter/external-block dependencies. Build-time lists group original response
+indices by parameter or external block. Each call selects changed groups from
+the host parameter snapshot and published external generations. Sparse updates
+upload a few range descriptors and dispatch only the affected response indices;
+updates affecting more than half the dials keep the direct full scan. Constant
+Shift responses are initialized by the first full pass. Rebuilds and failed
+propagations invalidate the whole cache. `enableCachedDialResponses: false`
+also disables this event-propagation response/weight cache.
+
+Weight dependencies are tracked separately from observable dependencies. If only
+observable inputs change, the event kernel updates variables and dirty flags
+while retaining resident event weights. When neither needs an update, the event
+kernel can be omitted. External blocks used by weights invalidate weights on a
+new published generation. This cache belongs to the event-propagation path; the
+packed weight-only executor keeps its existing implementation.
+
+Rebinning compares each new contribution destination against the old destination
+in that event's stable contribution slots, and compares the contribution count.
+An unchanged destination list can retain the histogram index even if fractions
+or the hard bin change. New/removed destinations, reordered slots, first
+propagation and recovery after failure require rebuilding. Outside-support
+contributions participate in this comparison. Variables, fractions and sample
+revisions are still published independently of index reuse. Any changed event
+list currently triggers a global rebuild; this is not a per-sample index.
+
+Rebinning returns event-local counters and flags before the kernel's SIMD
+collectives. This reconverges lanes after event-local early exits. Counts and the
+rebuild flag are combined per SIMD group, then published with fewer global
+atomics. Sample flags are combined for lanes sharing the first lane's sample;
+other samples retain explicit writes, including groups crossing sample boundaries.
+
+Histogram chunks contain up to 256 contributions. On pipelines with 32-wide SIMD
+groups, a parallel kernel assigns one group to a chunk. Each lane accumulates
+strided contributions, then a shuffle reduction combines compensated float pairs.
+The existing final per-bin reduction remains in place. Other SIMD widths use the
+serial compensated kernel. The parallel arithmetic is validated against CPU and
+reference histograms with float tolerances; binary identity is not required.
+
+`setDiagnosticMpsEventPropagationOptions(cacheDials, reuseIndex,
+parallelHistograms, aggregateCounters)` controls the four features for resident
+comparisons. All are enabled by default (subject to the cache configuration and
+SIMD-width fallback). `getDiagnosticMpsEventPropagationState()` returns the last
+evaluated-dial count, event-weight update flag and index-rebuild flag without
+scanning the model. `226ProductionBinningProfiling.py --compare-resident-stages`
+compares baseline, cached, indexed, parallel and aggregated variants, rotating
+trial order on a single loaded model. Separate stage probes report the actual
+kernels dispatched; skipped stages are absent.

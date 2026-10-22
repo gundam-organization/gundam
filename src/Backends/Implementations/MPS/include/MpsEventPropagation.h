@@ -23,7 +23,12 @@ namespace Backends {
     void setDiagnosticStageProfiling(bool enabled_){ _enableDiagnosticStageProfiling_ = enabled_; }
     void setDiagnosticPreviousBinReuse(bool enabled_){ _enablePreviousBinReuse_ = enabled_; }
     void setDiagnosticBinningIntervalPruning(bool enabled_){ _enableBinningIntervalPruning_ = enabled_; }
+    void setDiagnosticOptions(bool cacheDials_, bool reuseIndex_, bool parallelHistograms_, bool aggregateCounters_){
+      _enableDialCache_ = cacheDials_; _enableIndexReuse_ = reuseIndex_;
+      _enableParallelHistograms_ = parallelHistograms_; _enableAggregateCounters_ = aggregateCounters_;
+    }
     [[nodiscard]] std::string getDiagnostics() const;
+    [[nodiscard]] std::string getExecutionState() const;
     [[nodiscard]] const std::map<std::string, double>& getDiagnosticStageGpuSeconds() const { return _diagnosticStageGpuSeconds_; }
     void build(const PropagationView& model_);
     void clear();
@@ -36,14 +41,17 @@ namespace Backends {
   private:
     enum class Buffer {
       Events, Samples, Dials, Targets, Intervals, Bins, Nodes, Bounds, NodeBins, ReusableBins,
-      WeightDialIndices, VariableDialIndices, Payloads, Parameters, ExternalWeights, Responses,
+      WeightDialIndices, VariableDialIndices, Payloads, Parameters, ExternalWeights, Responses, DialIndices, DialRanges,
       Variables, HostValues, HostEdits, DirtyEvents, HardBins, EventCounts, Contributions, ChangedSamples, Control,
       EventWeights, BinCounts, BinOffsets, BinPositions, BinContributions, ChunkOffsets, Chunks,
       PartialSums, PartialSquares, HistogramSums, HistogramSquares, ReadbackSums, ReadbackSquares,
       ReadbackVariables, ReadbackBins, ReadbackCounts, ReadbackContributions, ReadbackWeights, Count
     };
-    enum class Kernel { Dials, Events, Binning, ClearCounts, CountContributions, IndexChunks, Scatter, Reduce, Finish, Count };
+    enum class Kernel { Dials, Events, Binning, ClearCounts, CountContributions, IndexChunks, Scatter, Reduce, Finish, ReduceParallel, Count };
     id<MTLBuffer> buffer(Buffer buffer_) const { return _buffers_[std::size_t(buffer_)]; }
+    struct DialGroup { std::size_t dependency, first, count; bool external; };
+    void buildDialCache();
+    std::size_t prepareDialCache(const PropagationInputs& inputs_, bool& updateWeights_);
     void clearBuffers();
     void dispatch(id<MTLComputeCommandEncoder> encoder_, Kernel kernel_, std::size_t count_, std::initializer_list<Buffer> buffers_);
     void copy(id<MTLBlitCommandEncoder> encoder_, Buffer source_, Buffer destination_, std::size_t bytes_);
@@ -61,6 +69,14 @@ namespace Backends {
     bool _enableDiagnosticStageProfiling_{false};
     bool _enablePreviousBinReuse_{true};
     bool _enableBinningIntervalPruning_{true};
+    bool _enableDialCache_{true}, _enableIndexReuse_{true};
+    bool _enableParallelHistograms_{true}, _enableAggregateCounters_{true};
+    std::vector<DialGroup> _dialGroups_{};
+    std::vector<double> _cachedParameters_{};
+    std::vector<std::uint64_t> _cachedExternalGenerations_{};
+    std::vector<std::size_t> _weightParameters_{}, _weightExternalBlocks_{};
+    std::size_t _lastEvaluatedDials_{0};
+    bool _lastUpdatedWeights_{true}, _lastRebuiltIndex_{true};
     std::map<std::string, double> _diagnosticStageGpuSeconds_{};
   };
 }

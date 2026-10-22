@@ -589,6 +589,11 @@ PYBIND11_MODULE(GUNDAM, module) {
     return manager_.getBackend()->getLastTimingSummary();
   })
 #ifdef __APPLE__
+  .def("setDiagnosticMpsEventPropagationOptions", [](Backends::BackendManager& manager_, bool cacheDials_, bool reuseIndex_, bool parallelHistograms_, bool aggregateCounters_){
+    auto* mps = dynamic_cast<Backends::MpsBackend*>(manager_.getBackend());
+    LogThrowIf(mps == nullptr, "Event propagation diagnostics require an MPS backend.");
+    mps->setDiagnosticEventPropagationOptions(cacheDials_, reuseIndex_, parallelHistograms_, aggregateCounters_);
+  })
   .def("setDiagnosticMpsBinningIntervalPruning", [](Backends::BackendManager& manager_, bool enabled_){
     auto* mps = dynamic_cast<Backends::MpsBackend*>(manager_.getBackend());
     LogThrowIf(mps == nullptr, "Binning interval diagnostics require an MPS backend.");
@@ -618,6 +623,11 @@ PYBIND11_MODULE(GUNDAM, module) {
     auto* mps = dynamic_cast<Backends::MpsBackend*>(manager_.getBackend());
     LogThrowIf(mps == nullptr, "Compact cached dial diagnostics require an MPS backend.");
     mps->setDiagnosticCompactCachedDials(enabled_);
+  })
+  .def("getDiagnosticMpsEventPropagationState", [](const Backends::BackendManager& manager_){
+    auto* mps = dynamic_cast<const Backends::MpsBackend*>(manager_.getBackend());
+    LogThrowIf(mps == nullptr, "Event propagation diagnostics require an MPS backend.");
+    return mps->getDiagnosticEventPropagationState();
   })
   .def("getDiagnosticMpsStageGpuSeconds", [](const Backends::BackendManager& manager_){
     const auto* mps = dynamic_cast<const Backends::MpsBackend*>(manager_.getBackend());

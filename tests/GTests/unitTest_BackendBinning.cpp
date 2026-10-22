@@ -668,3 +668,198 @@ TEST(MpsBinningIntervals, PrunedAndFullScansMatchHardAndSmoothedGeometry) {
   }
 }
 #endif
+
+#ifdef __APPLE__
+TEST(MpsResidentPropagation, SparseDialUpdatesPreserveWeightsAndRecoverAfterFailure) {
+  using namespace Backends;
+  BinningGeometry layout;
+  layout.variableNames = {"X"};
+  layout.intervals = {{0, 0., 1.}, {0, 2., 3.}};
+  layout.bins = {{0, 0, 1}, {1, 1, 1}};
+  auto view = makeStrictBinningView(layout);
+  auto& model = view.propagation;
+  model.samples[0].readHostVariables = false;
+  model.parameterCount = 2;
+  model.hasVariableResponses = true;
+  model.variableValues = {.25};
+  model.dialInputs = {{0}, {1}};
+  BackendDialDescriptor norm;
+  norm.inputCount = 1;
+  model.dials = {norm, norm, norm};
+  model.dials[1].firstInput = 1;
+  model.dials[2].type = BackendDialType::Shift;
+  model.dials[2].payloadSize = 1;
+  model.dialPayloads = {2.};
+  model.eventDialIndices = {0, 2};
+  model.eventWeights[0].dialCount = 2;
+  model.variableDialIndices = {1};
+  BackendVariableResponseDescriptor target;
+  target.referenceValue = .25;
+  target.multiplyDialCount = 1;
+  model.variableResponses = {target};
+  model.events[0].variableResponseCount = 1;
+  MpsBackend backend;
+  backend.build(view);
+  PropagationInputs inputs;
+  inputs.parameters.values = {1., 1.};
+  auto run = [&]{
+    auto token = backend.requestPropagation(inputs);
+    backend.wait(token);
+    return JsonType::parse(backend.getDiagnostics())["executor"];
+  };
+  auto first = run();
+  EXPECT_EQ(first["evaluatedDials"], 3);
+  inputs.parameters.values[1] = 1.1;
+  auto variableOnly = run();
+  EXPECT_EQ(variableOnly["evaluatedDials"], 1);
+  EXPECT_EQ(variableOnly["updatedEventWeights"], false);
+  EXPECT_EQ(variableOnly["rebuiltContributionIndex"], false);
+  EXPECT_EQ(backend.getHistogramSumsHostView(backend.requestPropagation(inputs))[0], -4.);
+  auto unchanged = run();
+  EXPECT_EQ(unchanged["evaluatedDials"], 0);
+  inputs.parameters.values[0] = 3.;
+  auto weightsOnly = run();
+  EXPECT_EQ(weightsOnly["evaluatedDials"], 1);
+  EXPECT_EQ(weightsOnly["updatedEventWeights"], true);
+  inputs.parameters.values[1] = 10.;
+  auto migrated = run();
+  EXPECT_EQ(migrated["rebuiltContributionIndex"], true);
+  auto token = backend.requestPropagation(inputs);
+  EXPECT_EQ(backend.getHistogramSumsHostView(token), (std::vector<double>{0., -12.}));
+  inputs.parameters.values[1] = std::numeric_limits<double>::quiet_NaN();
+  EXPECT_THROW(backend.requestPropagation(inputs), std::runtime_error);
+  inputs.parameters.values[1] = 1.1;
+  auto recovered = run();
+  EXPECT_EQ(recovered["evaluatedDials"], 3);
+  EXPECT_EQ(recovered["updatedEventWeights"], true);
+  EXPECT_EQ(recovered["rebuiltContributionIndex"], true);
+  backend.build(view);
+  EXPECT_EQ(run()["evaluatedDials"], 3);
+  backend.configure(ConfigReader(JsonType{{"enableCachedDialResponses", false}}));
+  backend.build(view);
+  run();
+  auto uncached = run();
+  EXPECT_EQ(uncached["evaluatedDials"], 3);
+  EXPECT_EQ(uncached["updatedEventWeights"], true);
+}
+
+TEST(MpsResidentPropagation, FractionsCanChangeWithoutRebuildingContributionDestinations) {
+  using namespace Backends;
+  BinningGeometry layout;
+  layout.variableNames = {"X"};
+  layout.isSmoothed = true;
+  layout.intervals = {{0, 0., 1., 5., 5.}, {0, 1., 2., 5., 5.}};
+  layout.bins = {{0, 0, 1}, {1, 1, 1}};
+  MpsBackend backend;
+  backend.build(makeStrictBinningView(layout));
+  PropagationInputs inputs;
+  inputs.hostVariables = {1.};
+  auto token = backend.requestPropagation(inputs);
+  EXPECT_EQ(backend.getHistogramSumsHostView(token), (std::vector<double>{-1., -1.}));
+  inputs.hostVariables = {.99};
+  token = backend.requestPropagation(inputs);
+  const auto changedSums = backend.getHistogramSumsHostView(token);
+  EXPECT_LT(changedSums[0], -1.);
+  EXPECT_GT(changedSums[1], -1.);
+  EXPECT_EQ(JsonType::parse(backend.getDiagnostics())["executor"]["rebuiltContributionIndex"], false);
+  inputs.hostVariables = {.5}; // The second bin drops out of the support.
+  token = backend.requestPropagation(inputs);
+  EXPECT_EQ(backend.getHistogramSumsHostView(token), (std::vector<double>{-2., 0.}));
+  EXPECT_EQ(JsonType::parse(backend.getDiagnostics())["executor"]["rebuiltContributionIndex"], true);
+  inputs.hostVariables = {-.1}; // A new outside-support destination appears.
+  token = backend.requestPropagation(inputs);
+  EXPECT_GT(backend.getOutsideSumSquaresHostView(token)[0], 0.);
+  EXPECT_EQ(JsonType::parse(backend.getDiagnostics())["executor"]["rebuiltContributionIndex"], true);
+}
+
+TEST(MpsResidentPropagation, ParallelReductionPreservesSmallTermsAndPartialSimdGroups) {
+  using namespace Backends;
+  BinningGeometry layout;
+  layout.variableNames = {"X"};
+  layout.intervals = {{0, 0., 2.}};
+  layout.bins = {{0, 0, 1}};
+  auto view = makeStrictBinningView(layout);
+  auto& model = view.propagation;
+  auto event = model.events.front();
+  auto weight = model.eventWeights.front();
+  model.events.clear();
+  model.eventWeights.clear();
+  model.variableValues.assign(257, 1.);
+  long double squareSum{0};
+  for( std::size_t i = 0; i < 257; ++i ){
+    event.resultIndex = event.firstVariable = i;
+    model.events.push_back(event);
+    const float values[]{1e8f, 1.f, -1e8f, 1.f};
+    float value = i == 256 ? 1.f : values[i % 4];
+    weight.baseWeight = value;
+    squareSum += float(value * value);
+    model.eventWeights.push_back(weight);
+  }
+  MpsBackend backend;
+  backend.build(view);
+  PropagationInputs inputs;
+  for( bool aggregate : {false, true} ){
+    backend.setDiagnosticEventPropagationOptions(true, true, true, aggregate);
+    inputs.hostVariables.assign(257, aggregate ? 1.1 : 1.);
+    auto token = backend.requestPropagation(inputs);
+    EXPECT_EQ(backend.getLastTimingSummary().rebinnedEventCount, 257);
+    EXPECT_EQ(backend.getLastTimingSummary().binCandidateCount, 257);
+    EXPECT_EQ(backend.getHistogramSumsHostView(token)[0], 129.);
+    EXPECT_NEAR(backend.getHistogramSumSquaresHostView(token)[0], double(squareSum), double(squareSum) * 1e-7);
+  }
+}
+#endif
+
+#ifdef __APPLE__
+TEST(MpsResidentPropagation, SparseRangesMapSeveralParametersToOriginalResponseSlots) {
+  using namespace Backends;
+  BinningGeometry layout;
+  layout.variableNames = {"X"};
+  layout.intervals = {{0, 0., 10.}};
+  layout.bins = {{0, 0, 1}};
+  auto view = makeStrictBinningView(layout);
+  auto& model = view.propagation;
+  model.samples[0].readHostVariables = false;
+  model.parameterCount = 10;
+  model.hasVariableResponses = true;
+  for( std::size_t i = 0; i < 10; ++i ){
+    BackendDialInputDescriptor input;
+    input.parameterIndex = i;
+    model.dialInputs.push_back(input);
+    BackendDialDescriptor dial;
+    dial.firstInput = i;
+    dial.inputCount = 1;
+    model.dials.push_back(dial);
+    if( i < 9 ){ model.eventDialIndices.push_back(i); }
+  }
+  model.eventWeights[0].dialCount = 9;
+  BackendVariableResponseDescriptor target;
+  target.overrideDial = 9;
+  model.variableResponses = {target};
+  model.events[0].variableResponseCount = 1;
+  MpsBackend backend;
+  backend.build(view);
+  PropagationInputs inputs;
+  inputs.parameters.values.assign(10, 1.);
+  backend.requestPropagation(inputs);
+  inputs.parameters.values[0] = 2.;
+  inputs.parameters.values[3] = 3.;
+  auto token = backend.requestPropagation(inputs);
+  EXPECT_EQ(JsonType::parse(backend.getDiagnosticEventPropagationState())["evaluatedDials"], 2);
+  EXPECT_EQ(backend.getHistogramSumsHostView(token)[0], -12.);
+  inputs.parameters.values[9] = 4.;
+  token = backend.requestPropagation(inputs);
+  auto state = JsonType::parse(backend.getDiagnosticEventPropagationState());
+  EXPECT_EQ(state["evaluatedDials"], 1);
+  EXPECT_EQ(state["updatedEventWeights"], false);
+  EXPECT_EQ(backend.getEventStateHostView(token).variables[0], 4.);
+  EXPECT_EQ(backend.getHistogramSumsHostView(token)[0], -12.);
+  inputs.parameters.values[7] = 5.;
+  inputs.parameters.values[8] = 7.;
+  inputs.parameters.values[9] = 8.;
+  token = backend.requestPropagation(inputs);
+  EXPECT_EQ(JsonType::parse(backend.getDiagnosticEventPropagationState())["evaluatedDials"], 3);
+  EXPECT_EQ(backend.getEventStateHostView(token).variables[0], 8.);
+  EXPECT_EQ(backend.getHistogramSumsHostView(token)[0], -420.);
+}
+#endif

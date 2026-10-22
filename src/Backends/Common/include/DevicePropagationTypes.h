@@ -91,11 +91,13 @@ namespace Backends {
   struct DeviceBinningBounds { float lower, upper; };
   struct DeviceBinContribution { DeviceIndex event; int binIndex; float fraction; };
   struct DeviceHistogramChunk { DeviceIndex bin, begin, end; };
+  struct DevicePropagationDialRange { DeviceIndex firstThread, firstDial, count; };
   struct DevicePropagationControl {
     DeviceIndex error, rebuildIndex, rebinnedEvents, candidates, chunkCount, contributionCount;
     DeviceIndex updateVariables, forceBinning, firstPropagation, editCount;
     DeviceIndex reusePreviousBin;
     DeviceIndex pruneBinningIntervals;
+    DeviceIndex updateWeights, dialRangeCount, reuseContributionIndex, aggregateCounters;
     DeviceIndex eventCount, histogramBins, dialCount, sampleCount;
     DeviceIndex hasReweightCap;
     float maxReweight;
