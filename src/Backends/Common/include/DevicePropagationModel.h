@@ -8,6 +8,8 @@ namespace Backends {
   struct DevicePropagationModel {
     std::vector<DevicePropagationEvent> events;
     std::vector<DevicePropagationDial> dials;
+    std::vector<DeviceDialInput> dialInputs;
+    std::vector<DeviceDialInputRange> dialInputRanges;
     std::vector<DeviceVariableResponse> variableResponses;
     std::vector<DeviceBinningSample> samples;
     std::vector<DeviceBinningInterval> intervals;

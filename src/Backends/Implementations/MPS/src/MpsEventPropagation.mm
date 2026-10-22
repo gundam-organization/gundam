@@ -65,6 +65,8 @@ void Backends::MpsEventPropagation::build(const PropagationView& model_) {
   upload(Buffer::Events, _packed_.events);
   upload(Buffer::Samples, _packed_.samples);
   upload(Buffer::Dials, _packed_.dials);
+  upload(Buffer::DialInputs, _packed_.dialInputs);
+  upload(Buffer::DialInputRanges, _packed_.dialInputRanges);
   upload(Buffer::Targets, _packed_.variableResponses);
   upload(Buffer::Intervals, _packed_.intervals);
   upload(Buffer::Bins, _packed_.bins);
@@ -113,6 +115,8 @@ void Backends::MpsEventPropagation::buildDialCache() {
   _cachedParameters_.clear();
   _cachedExternalGenerations_.clear();
   _dialGroups_.clear();
+  _multiDialGroups_.clear();
+  std::map<std::vector<std::size_t>, std::vector<DeviceIndex>> multiGroups;
   _weightParameters_.clear();
   _weightExternalBlocks_.clear();
   const auto parameterCount = model.parameterCount;
@@ -120,6 +124,16 @@ void Backends::MpsEventPropagation::buildDialCache() {
   for( std::size_t i = 0; i < model.dials.size(); ++i ){
     const auto& dial = model.dials[i];
     if( dial.type == BackendDialType::Shift ){ continue; }
+    if( dial.inputCount > 1 and dial.type != BackendDialType::ExternalWeight ){
+      std::vector<std::size_t> dependencies;
+      for( std::size_t input = 0; input < dial.inputCount; ++input ){
+        dependencies.push_back(model.dialInputs.at(dial.firstInput + input).parameterIndex);
+      }
+      std::sort(dependencies.begin(), dependencies.end());
+      dependencies.erase(std::unique(dependencies.begin(), dependencies.end()), dependencies.end());
+      multiGroups[dependencies].push_back(DeviceIndex(i));
+      continue;
+    }
     auto dependency = dial.type == BackendDialType::ExternalWeight
         ? parameterCount + dial.externalBlockIndex : std::size_t(_packed_.dials[i].parameterIndex);
     groups.at(dependency).push_back(DeviceIndex(i));
@@ -131,10 +145,14 @@ void Backends::MpsEventPropagation::buildDialCache() {
                            indices.size(), groups[i].size(), i >= parameterCount});
     indices.insert(indices.end(), groups[i].begin(), groups[i].end());
   }
+  for( const auto& group : multiGroups ){
+    _multiDialGroups_.push_back({group.first, indices.size(), group.second.size()});
+    indices.insert(indices.end(), group.second.begin(), group.second.end());
+  }
   _buffers_[std::size_t(Buffer::DialIndices)] = indices.empty() ? makePrivateEmptyBuffer(_device_, 4)
       : makePrivateBuffer(_device_, _queue_, indices);
   _buffers_[std::size_t(Buffer::DialRanges)] = makeSharedEmptyBuffer(_device_,
-      std::max(std::size_t(1), _dialGroups_.size()) * sizeof(DevicePropagationDialRange));
+      std::max(std::size_t(1), _dialGroups_.size() + _multiDialGroups_.size()) * sizeof(DevicePropagationDialRange));
   LogThrowIf(not buffer(Buffer::DialIndices) or not buffer(Buffer::DialRanges), "Metal dial cache allocation failed.");
   std::vector<bool> used(model.dials.size(), false);
   for( auto index : model.eventDialIndices ){ used.at(index) = true; }
@@ -142,7 +160,11 @@ void Backends::MpsEventPropagation::buildDialCache() {
     if( not used[i] ){ continue; }
     const auto& dial = model.dials[i];
     if( dial.type == BackendDialType::ExternalWeight ){ _weightExternalBlocks_.push_back(dial.externalBlockIndex); }
-    else if( dial.type != BackendDialType::Shift ){ _weightParameters_.push_back(_packed_.dials[i].parameterIndex); }
+    else if( dial.type != BackendDialType::Shift ){
+      for( std::size_t input = 0; input < dial.inputCount; ++input ){
+        _weightParameters_.push_back(model.dialInputs.at(dial.firstInput + input).parameterIndex);
+      }
+    }
   }
   auto unique = [](auto& values_){
     std::sort(values_.begin(), values_.end());
@@ -165,6 +187,11 @@ std::size_t Backends::MpsEventPropagation::prepareDialCache(const PropagationInp
   std::size_t count{0};
   for( const auto& group : _dialGroups_ ){
     if( not (group.external ? externalChanged(group.dependency) : parameterChanged(group.dependency)) ){ continue; }
+    ranges[control.dialRangeCount++] = {DeviceIndex(count), DeviceIndex(group.first), DeviceIndex(group.count)};
+    count += group.count;
+  }
+  for( const auto& group : _multiDialGroups_ ){
+    if( not std::any_of(group.parameters.begin(), group.parameters.end(), parameterChanged) ){ continue; }
     ranges[control.dialRangeCount++] = {DeviceIndex(count), DeviceIndex(group.first), DeviceIndex(group.count)};
     count += group.count;
   }
@@ -254,7 +281,7 @@ void Backends::MpsEventPropagation::propagate(const PropagationInputs& inputs_, 
   auto encodeStart = std::chrono::steady_clock::now();
   auto command = [_queue_ commandBuffer];
   auto encoder = [command computeCommandEncoder];
-  dispatch(encoder, Kernel::Dials, dialCount, {Buffer::Dials, Buffer::Parameters, Buffer::Payloads, Buffer::ExternalWeights, Buffer::Responses, Buffer::Control, Buffer::DialIndices, Buffer::DialRanges});
+  dispatch(encoder, Kernel::Dials, dialCount, {Buffer::Dials, Buffer::Parameters, Buffer::Payloads, Buffer::ExternalWeights, Buffer::Responses, Buffer::Control, Buffer::DialIndices, Buffer::DialRanges, Buffer::DialInputs, Buffer::DialInputRanges});
   if( updateWeights or _cache_.needsUpdate(inputs_) or not _valid_ ){
     dispatch(encoder, Kernel::Events, model.events.size(), {Buffer::Events, Buffer::Samples, Buffer::Targets, Buffer::WeightDialIndices,
     Buffer::VariableDialIndices, Buffer::Responses, Buffer::HostValues, Buffer::HostEdits, Buffer::Variables, Buffer::DirtyEvents, Buffer::EventWeights, Buffer::Control});
@@ -412,7 +439,7 @@ std::string Backends::MpsEventPropagation::getDiagnostics() const {
   out["contributionCapacity"] = _packed_.contributionCapacity;
   out["histogramChunkCapacity"] = _packed_.histogramChunkCapacity;
   out["buffers"] = JsonType::array();
-  const char* names[]{"Events", "Samples", "Dials", "Targets", "Intervals", "Bins", "Nodes", "Bounds", "NodeBins", "ReusableBins", "WeightDialIndices", "VariableDialIndices", "Payloads", "Parameters", "ExternalWeights", "Responses", "DialIndices", "DialRanges", "Variables", "HostValues", "HostEdits", "DirtyEvents", "HardBins", "EventCounts", "Contributions", "ChangedSamples", "Control", "EventWeights", "BinCounts", "BinOffsets", "BinPositions", "BinContributions", "ChunkOffsets", "Chunks", "PartialSums", "PartialSquares", "HistogramSums", "HistogramSquares", "ReadbackSums", "ReadbackSquares", "ReadbackVariables", "ReadbackBins", "ReadbackCounts", "ReadbackContributions", "ReadbackWeights"};
+  const char* names[]{"Events", "Samples", "Dials", "DialInputs", "DialInputRanges", "Targets", "Intervals", "Bins", "Nodes", "Bounds", "NodeBins", "ReusableBins", "WeightDialIndices", "VariableDialIndices", "Payloads", "Parameters", "ExternalWeights", "Responses", "DialIndices", "DialRanges", "Variables", "HostValues", "HostEdits", "DirtyEvents", "HardBins", "EventCounts", "Contributions", "ChangedSamples", "Control", "EventWeights", "BinCounts", "BinOffsets", "BinPositions", "BinContributions", "ChunkOffsets", "Chunks", "PartialSums", "PartialSquares", "HistogramSums", "HistogramSquares", "ReadbackSums", "ReadbackSquares", "ReadbackVariables", "ReadbackBins", "ReadbackCounts", "ReadbackContributions", "ReadbackWeights"};
   static_assert(sizeof(names) / sizeof(*names) == std::size_t(Buffer::Count));
   for( std::size_t i = 0; i < _buffers_.size(); ++i ){
     auto value = _buffers_[i];

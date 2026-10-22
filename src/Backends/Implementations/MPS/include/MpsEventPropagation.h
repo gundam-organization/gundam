@@ -40,7 +40,7 @@ namespace Backends {
 
   private:
     enum class Buffer {
-      Events, Samples, Dials, Targets, Intervals, Bins, Nodes, Bounds, NodeBins, ReusableBins,
+      Events, Samples, Dials, DialInputs, DialInputRanges, Targets, Intervals, Bins, Nodes, Bounds, NodeBins, ReusableBins,
       WeightDialIndices, VariableDialIndices, Payloads, Parameters, ExternalWeights, Responses, DialIndices, DialRanges,
       Variables, HostValues, HostEdits, DirtyEvents, HardBins, EventCounts, Contributions, ChangedSamples, Control,
       EventWeights, BinCounts, BinOffsets, BinPositions, BinContributions, ChunkOffsets, Chunks,
@@ -50,6 +50,8 @@ namespace Backends {
     enum class Kernel { Dials, Events, Binning, ClearCounts, CountContributions, IndexChunks, Scatter, Reduce, Finish, ReduceParallel, Count };
     id<MTLBuffer> buffer(Buffer buffer_) const { return _buffers_[std::size_t(buffer_)]; }
     struct DialGroup { std::size_t dependency, first, count; bool external; };
+    struct MultiDialGroup { std::vector<std::size_t> parameters; std::size_t first, count; };
+    std::vector<MultiDialGroup> _multiDialGroups_{};
     void buildDialCache();
     std::size_t prepareDialCache(const PropagationInputs& inputs_, bool& updateWeights_);
     void clearBuffers();

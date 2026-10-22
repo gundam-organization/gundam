@@ -265,6 +265,7 @@ void Backends::CpuBackend::initializeThreads() {
 void Backends::CpuBackend::initializeDialResponseCache() {
   const auto& propagation = _engineView_->propagation;
   _parameterDependentCachedDialCount_ = 0;
+  _multiInputCachedDials_.clear();
   _changedCacheParameters_.assign(propagation.parameterCount, false);
   _cachedDialsByParameter_.assign(propagation.parameterCount, {});
   _cachedDialResponses_.assign(propagation.dials.size(), 1.);
@@ -275,6 +276,7 @@ void Backends::CpuBackend::initializeDialResponseCache() {
 
   for( std::uint32_t iDial = 0 ; iDial < propagation.dials.size() ; iDial++ ){
     const auto& dial = propagation.dials[iDial];
+    Semantics::validateSurfaceDial(propagation, dial);
     if( dial.type == BackendDialType::Shift ){
       // Shift responses depend only on immutable payload and response bounds.
       // Keep their product position, but evaluate them only once per build.
@@ -284,6 +286,21 @@ void Backends::CpuBackend::initializeDialResponseCache() {
       _cachedDialResponses_[iDial] = Semantics::evalDialResponseFromInput(
           dial, 0., Semantics::getDialPayload(propagation.dialPayloads.data(), dial));
       _isCachedDialResponseValid_[iDial] = true;
+      continue;
+    }
+    if( dial.type == BackendDialType::ExternalWeight ){ continue; }
+    if( dial.firstInput > propagation.dialInputs.size()
+        or dial.inputCount > propagation.dialInputs.size() - dial.firstInput ){ continue; }
+    for( std::size_t i = 0; i < dial.inputCount; ++i ){
+      const auto& input = propagation.dialInputs.at(dial.firstInput + i);
+      LogThrowIf(input.source != DialInputSource::Parameter,
+                 "Event-variable dial inputs require an event-context evaluator.");
+      LogThrowIf(input.parameterIndex >= propagation.parameterCount, "Dial parameter input is out of range.");
+    }
+    if( dial.inputCount > 1 ){
+      _isCachedDial_[iDial] = true;
+      _multiInputCachedDials_.push_back(iDial);
+      ++_parameterDependentCachedDialCount_;
       continue;
     }
     const bool canCacheSingleInputResponse = dial.type != BackendDialType::Shift
@@ -332,7 +349,7 @@ void Backends::CpuBackend::initializeCachedInputGroups() {
   _cachedDialInputGroups_.assign(model.dials.size(), std::numeric_limits<std::uint32_t>::max());
   _cachedInputGroupsByParameter_.resize(model.parameterCount);
   for( std::size_t dial = 0; dial < model.dials.size(); ++dial ){
-    if( not _isCachedDial_[dial] or model.dials[dial].type == BackendDialType::Shift ){ continue; }
+    if( not _isCachedDial_[dial] or model.dials[dial].type == BackendDialType::Shift or model.dials[dial].inputCount != 1 ){ continue; }
     const auto firstInput = model.dials[dial].firstInput;
     const auto& input = model.dialInputs[firstInput];
     const Key key{std::uint64_t(input.parameterIndex), std::uint64_t(input.useMirror),
@@ -436,6 +453,27 @@ void Backends::CpuBackend::updateCachedDialResponses(const PropagationInputs& in
       }
     }
   }
+  std::size_t multiInputTransforms{0}, dirtyMultiInputDials{0};
+  if( initial ){
+    for( auto index : _multiInputCachedDials_ ){
+      multiInputTransforms += propagation.dials[index].inputCount;
+      ++dirtyMultiInputDials;
+    }
+  }
+  else{
+    for( auto index : _multiInputCachedDials_ ){
+      const auto& dial = propagation.dials[index];
+      for( std::size_t i = 0; i < dial.inputCount; ++i ){
+        if( _changedCacheParameters_[propagation.dialInputs[dial.firstInput + i].parameterIndex] ){
+          _dirtyCachedDialIndices_.push_back(index);
+          ++_dirtyCachedDialCount_;
+          ++dirtyMultiInputDials;
+          multiInputTransforms += dial.inputCount;
+          break;
+        }
+      }
+    }
+  }
   // Stream the model when at least half the descriptors need an update.
   // Keep the targeted path otherwise. This avoids scanning a huge
   // external-weight/constant-only model for a handful of changing responses.
@@ -472,7 +510,10 @@ void Backends::CpuBackend::updateCachedDialResponses(const PropagationInputs& in
       }
     }
   }
-  if( not _lastTiming_.sharedCacheInputs ){ _lastTiming_.cacheInputTransformCount += _dirtyCachedDialCount_; }
+  _lastTiming_.cacheInputTransformCount += multiInputTransforms;
+  if( not _lastTiming_.sharedCacheInputs ){
+    _lastTiming_.cacheInputTransformCount += _dirtyCachedDialCount_ - dirtyMultiInputDials;
+  }
   _lastParameterValues_ = values;
   _isDialResponseCachePrimed_ = true;
   _lastTiming_.cacheCandidateCount = _dirtyCachedDialCount_;
@@ -508,7 +549,7 @@ void Backends::CpuBackend::updateCachedDialResponsesThread(int iThread_) {
       _usesLinearCacheTraversal_ ? propagation.dials.size() : _dirtyCachedDialIndices_.size()
   );
   const double* parameterValues = _activeInputs_->parameters.values.data();
-  auto update = [&](auto sampled_, auto linear_, auto shared_, auto grouped_){
+  auto update = [&](auto sampled_, auto linear_, auto shared_, auto grouped_, auto multi_){
     for( std::size_t iDirtyDial = bounds.beginIndex ; iDirtyDial < bounds.endIndex ; iDirtyDial++ ){
       const auto dialIndex = [&](){
         if constexpr( decltype(linear_)::value ){ return iDirtyDial; }
@@ -518,6 +559,22 @@ void Backends::CpuBackend::updateCachedDialResponsesThread(int iThread_) {
         if( not _isCachedDial_[dialIndex] or propagation.dials[dialIndex].type == BackendDialType::Shift ){ continue; }
       }
       const auto& dial = propagation.dials[dialIndex];
+      if constexpr( decltype(multi_)::value ){
+        if( dial.inputCount > 1 ){
+          bool changed = not _isCachedDialResponseValid_[dialIndex];
+          for( std::size_t i = 0; i < dial.inputCount and not changed; ++i ){
+            changed = _changedCacheParameters_[propagation.dialInputs[dial.firstInput + i].parameterIndex];
+          }
+          if( not changed ){ continue; }
+          _cachedDialResponses_[dialIndex] = Semantics::evalDialResponse(propagation, dial, *_activeInputs_);
+          _isCachedDialResponseValid_[dialIndex] = true;
+          if constexpr( decltype(sampled_)::value ){
+            ++probe.get()->evaluatedDials;
+            ++probe.get()->evaluatedDialTypes[std::size_t(dial.type)];
+          }
+          continue;
+        }
+      }
       const auto* group = [&](){
         if constexpr( decltype(grouped_)::value ){ return &_cachedInputGroups_[_cachedDialInputGroups_[dialIndex]]; }
         else{ return static_cast<const CachedInputGroup*>(nullptr); }
@@ -559,8 +616,12 @@ void Backends::CpuBackend::updateCachedDialResponsesThread(int iThread_) {
     }
   };
   auto dispatch = [&](auto sampled_, auto shared_, auto grouped_){
-    if( _usesLinearCacheTraversal_ ){ update(sampled_, std::true_type{}, shared_, grouped_); }
-    else{ update(sampled_, std::false_type{}, shared_, grouped_); }
+    auto selectArity = [&](auto multi_){
+      if( _usesLinearCacheTraversal_ ){ update(sampled_, std::true_type{}, shared_, grouped_, multi_); }
+      else{ update(sampled_, std::false_type{}, shared_, grouped_, multi_); }
+    };
+    if( _multiInputCachedDials_.empty() ){ selectArity(std::false_type{}); }
+    else{ selectArity(std::true_type{}); }
   };
   auto select = [&](auto sampled_){
     if( _lastTiming_.sharedCacheInputs ){ dispatch(sampled_, std::true_type{}, std::true_type{}); }

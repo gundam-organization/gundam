@@ -5,17 +5,37 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <sstream>
+#include <string>
+#include <vector>
 
 namespace Backends {
+
+#define ENUM_NAME DialInputSource
+#define ENUM_FIELDS \
+ENUM_FIELD( Parameter, 0 ) \
+ENUM_FIELD( EventVariable )
+#include "GenericToolbox.MakeEnum.h"
 
   // POD descriptors shared by host propagation and device-capable semantics.
   // They intentionally contain no owning containers or host-only behaviour.
   struct BackendDialInputDescriptor {
     std::size_t parameterIndex{std::size_t(-1)};
     bool useMirror{false};
+    // EventVariable is reserved for a future event-context evaluator. Until
+    // then, builders reject it rather than treating its index as a parameter.
+    DialInputSource source{DialInputSource::Parameter};
     double mirrorMin{0};
     double mirrorRange{0};
+
+    BackendDialInputDescriptor() = default;
+    BackendDialInputDescriptor(std::size_t index_, bool useMirror_ = false,
+                               double mirrorMin_ = 0., double mirrorRange_ = 0.,
+                               DialInputSource source_ = DialInputSource::Parameter)
+        : parameterIndex(index_), useMirror(useMirror_), source(source_),
+          mirrorMin(mirrorMin_), mirrorRange(mirrorRange_) {}
   };
+  static_assert(sizeof(BackendDialInputDescriptor) == 32);
 
   struct BackendDialDescriptor {
     BackendDialType type{BackendDialType::Norm};

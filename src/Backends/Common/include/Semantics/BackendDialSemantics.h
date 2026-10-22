@@ -5,7 +5,44 @@
 #include "PropagationInputs.h"
 #include "Semantics/BackendDialSemanticsCore.h"
 
+#include <cmath>
+#include <stdexcept>
+
 namespace Backends::Semantics {
+  // Validate once while preparing the model, never in the evaluation loop.
+  inline void validateSurfaceDial(const PropagationView& model_, const BackendDialDescriptor& dial_) {
+    if( dial_.type != BackendDialType::Bilinear and dial_.type != BackendDialType::Bicubic ){ return; }
+    if( dial_.inputCount != 2 or dial_.firstInput > model_.dialInputs.size()
+        or dial_.inputCount > model_.dialInputs.size() - dial_.firstInput ){
+      throw std::runtime_error("Surface dials require exactly two valid inputs.");
+    }
+    if( dial_.payloadOffset > model_.dialPayloads.size()
+        or dial_.payloadSize > model_.dialPayloads.size() - dial_.payloadOffset or dial_.payloadSize < 10 ){
+      throw std::runtime_error("Surface dial payload is incomplete.");
+    }
+    const auto* data = model_.dialPayloads.data() + dial_.payloadOffset;
+    for( int axis = 0; axis < 2; ++axis ){
+      if( not std::isfinite(data[axis]) or data[axis] < 2. or data[axis] != std::floor(data[axis])
+          or data[axis] > double(dial_.payloadSize) ){
+        throw std::runtime_error("Surface axes require at least two knots and integer dimensions.");
+      }
+    }
+    const auto nx = std::size_t(data[0]), ny = std::size_t(data[1]);
+    // Guard the product as well as the subsequent coordinate reads.
+    if( nx > (dial_.payloadSize - 2) / ny or 2 + nx + ny + nx * ny != dial_.payloadSize ){
+      throw std::runtime_error("Surface dial dimensions do not match its payload.");
+    }
+    for( int axis = 0; axis < 2; ++axis ){
+      const auto* values = data + 2 + (axis == 0 ? 0 : nx);
+      const auto count = axis == 0 ? nx : ny;
+      for( std::size_t i = 0; i < count; ++i ){
+        if( not std::isfinite(values[i]) or (i != 0 and values[i] <= values[i - 1]) ){
+          throw std::runtime_error("Surface coordinates must be finite and strictly increasing.");
+        }
+      }
+    }
+  }
+
   inline const double* getParameterValues(const PropagationInputs& inputs_) {
     return inputs_.parameters.values.data();
   }

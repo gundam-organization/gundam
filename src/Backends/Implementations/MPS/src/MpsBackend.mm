@@ -42,6 +42,15 @@ void Backends::MpsBackend::build(const EngineView& engineView_) {
   _impl_->lastResult = MpsBackendImpl::Result();
   _impl_->buildTiming = BackendTimingSummary();
   _impl_->useEventPropagation = engineView_.propagation.requiresEventBinning() or engineView_.propagation.hasReweightCap;
+  for( const auto& dial : engineView_.propagation.dials ){
+    Semantics::validateSurfaceDial(engineView_.propagation, dial);
+    if( dial.type == BackendDialType::ExternalWeight ){ continue; }
+    if( dial.inputCount > 1 ){ _impl_->useEventPropagation = true; }
+    for( std::size_t i = 0; i < dial.inputCount and dial.firstInput + i < engineView_.propagation.dialInputs.size(); ++i ){
+      LogThrowIf(engineView_.propagation.dialInputs[dial.firstInput + i].source != DialInputSource::Parameter,
+                 "Event-variable dial inputs require an event-context evaluator.");
+    }
+  }
   if( _impl_->useEventPropagation ){
     LogThrowIf(not _impl_->isAvailable, "Metal is unavailable for event propagation.");
     _impl_->releaseDeviceBuffers();
@@ -296,7 +305,7 @@ std::string Backends::MpsBackend::getDiagnostics() const {
   out["lastStageGpuSeconds"] = impl.diagnosticStageGpuSeconds;
   std::map<std::string, std::size_t> dialCounts, types;
   for( const auto& event : impl.model.eventWeights ){ ++dialCounts[std::to_string(event.dialCount)]; }
-  const char* dialTypeNames[]{"Norm", "Shift", "CompactSpline", "UniformSpline", "MonotonicSpline", "GeneralSpline", "Graph", "ExternalWeight"};
+  const char* dialTypeNames[]{"Norm", "Shift", "CompactSpline", "UniformSpline", "MonotonicSpline", "GeneralSpline", "Graph", "ExternalWeight", "Bilinear", "Bicubic"};
   for( const auto& dial : impl.model.dials ){ ++types[dialTypeNames[std::size_t(dial.type)]]; }
   out["eventsByWeightDialCount"] = dialCounts;
   out["uniqueDialsByType"] = types;

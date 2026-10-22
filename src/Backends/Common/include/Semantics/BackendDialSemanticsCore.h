@@ -5,6 +5,7 @@
 
 #include "EngineDescriptors.h"
 
+#include "DeviceMath/SharedSurface.h"
 #include "CalculateCompactSpline.h"
 #include "CalculateGeneralSpline.h"
 #include "CalculateGraph.h"
@@ -53,6 +54,7 @@ namespace Backends::Semantics {
   GUNDAM_BACKEND_FORCE_INLINE GUNDAM_BACKEND_HOST_DEVICE
   double loadParameterValue(const BackendDialInputDescriptor& inputRef_, const double* parameterValues_) {
     GUNDAM_BACKEND_SEMANTICS_ASSERT(parameterValues_ != nullptr);
+    GUNDAM_BACKEND_SEMANTICS_ASSERT(inputRef_.source == DialInputSource::Parameter);
     return parameterValues_[inputRef_.parameterIndex];
   }
 
@@ -67,6 +69,8 @@ namespace Backends::Semantics {
                                    double inputValue_,
                                    const double* payload_) {
     switch( dialRef_.type ){
+      case BackendDialType::Bilinear:
+      case BackendDialType::Bicubic:
       case BackendDialType::ExternalWeight:
         GUNDAM_BACKEND_SEMANTICS_ASSERT(false);
         return 1.;
@@ -144,6 +148,13 @@ namespace Backends::Semantics {
     GUNDAM_BACKEND_SEMANTICS_ASSERT(dialRef_.inputCount >= 1);
     const auto& inputRef = dialInputs_[dialRef_.firstInput];
     const double inputValue = transformDialInput(inputRef, loadParameterValue(inputRef, parameterValues_));
+    if( dialRef_.type == BackendDialType::Bilinear or dialRef_.type == BackendDialType::Bicubic ){
+      GUNDAM_BACKEND_SEMANTICS_ASSERT(dialRef_.inputCount == 2);
+      const auto& secondInput = dialInputs_[dialRef_.firstInput + 1];
+      const double y = transformDialInput(secondInput, loadParameterValue(secondInput, parameterValues_));
+      return clampDialResponse(dialRef_, GundamDeviceMath::EvaluateSurface(
+          inputValue, y, payload, dialRef_.type == BackendDialType::Bicubic, dialRef_.allowExtrapolation));
+    }
     return evalDialResponseFromInput(dialRef_, inputValue, payload);
   }
 

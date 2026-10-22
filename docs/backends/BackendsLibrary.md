@@ -33,6 +33,7 @@ with each backend:
 
 - [CPU structure](cpu/BackendStructure.md) and [optimization choices](cpu/ReweightOptimization.md).
 - [MPS structure](mps/BackendStructure.md).
+- [Multi-input dials](MultiInputDials.md).
 
 ## Connection to the engine
 

@@ -480,3 +480,23 @@ all eligible effective fit coordinates. Quote the asterisk to prevent shell
 expansion. This mixed workload is useful for checking that dense updates retain
 the full dial scan efficiently. Model manifests record the actual coordinate
 count. CPU comparisons are performed only when CPU is included in `--backends`.
+
+## Original/CPU/MPS numerical comparison
+
+`227BackendComparison.py` replays the same parameter proposals on separate
+original, CPU and MPS models, validating every likelihood, histogram bin content
+and bin error. MPS runs on macOS; other platforms compare original and CPU.
+It also records evaluation timings, excluding explicit histogram materialization.
+For example:
+
+```sh
+env -u DYLD_LIBRARY_PATH \
+  PYTHONPATH="$PWD/cmake-build-release/src/PythonInterface" \
+  python3.15 tests/benchmarks/227BackendComparison.py \
+  --work-dir /path/to/inputs --config config.yaml --threads 4 \
+  --override override/dataset.yaml override/enableEb2d.yaml \
+  --output /tmp/gundam-backend-comparison
+```
+
+See [multi-input dials](../../docs/backends/MultiInputDials.md) for the surface
+implementation and test coverage. This benchmark does not run a fit or Hesse.

@@ -1,5 +1,7 @@
 #include "EngineLayout.h"
 
+#include "Bilinear.h"
+#include "Bicubic.h"
 #include "CompactSpline.h"
 #include "DialResponseSupervisor.h"
 #include "EventDialCache.h"
@@ -173,6 +175,14 @@ namespace {
         }
         else if( dynamic_cast<const GeneralSpline*>(dialBase) != nullptr ){
           dialRef.type = Backends::BackendDialType::GeneralSpline;
+          dialRef.allowExtrapolation = dialBase->getAllowExtrapolation();
+          const auto& data = dialBase->getDialData();
+          propagation.dialPayloads.insert(propagation.dialPayloads.end(), data.begin(), data.end());
+        }
+        else if( dynamic_cast<const Bilinear*>(dialBase) != nullptr or dynamic_cast<const Bicubic*>(dialBase) != nullptr ){
+          dialRef.type = dynamic_cast<const Bilinear*>(dialBase) != nullptr
+              ? Backends::BackendDialType::Bilinear : Backends::BackendDialType::Bicubic;
+          LogThrowIf(dialRef.inputCount != 2, "Surface dials require exactly two inputs.");
           dialRef.allowExtrapolation = dialBase->getAllowExtrapolation();
           const auto& data = dialBase->getDialData();
           propagation.dialPayloads.insert(propagation.dialPayloads.end(), data.begin(), data.end());

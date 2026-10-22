@@ -155,6 +155,11 @@ bool Backends::packDeviceWeightModel(const PropagationView& model_,
         return fail("at least one backend dial is not device-compatible because it does not have exactly one input parameter.");
       }
 
+      if( eventDial.firstInput >= model_.dialInputs.size()
+          or model_.dialInputs[eventDial.firstInput].source != DialInputSource::Parameter ){
+        return fail("device weight inputs require parameter references.");
+      }
+
       if( eventDial.type == BackendDialType::Norm ){
         normCount++;
         packedModel_.totalDynamicDialOccurrences++;

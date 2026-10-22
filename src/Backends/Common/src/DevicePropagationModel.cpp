@@ -1,5 +1,6 @@
 #include "DevicePropagationModel.h"
 #include "ResponseSmoothingPacking.h"
+#include "Semantics/BackendDialSemantics.h"
 
 #include <algorithm>
 #include <cmath>
@@ -57,8 +58,27 @@ void Backends::DevicePropagationModel::build(const PropagationView& model_) {
   for( double value : model_.dialPayloads ){ payloads.push_back(scalar(value)); }
   weightDialIndices = model_.eventDialIndices;
   variableDialIndices = model_.variableDialIndices;
+  const bool hasSurface = std::any_of(model_.dials.begin(), model_.dials.end(), [](const auto& dial_){
+    return dial_.type == BackendDialType::Bilinear or dial_.type == BackendDialType::Bicubic;
+  });
+  if( hasSurface ){ dialInputRanges.reserve(model_.dials.size()); }
   for( const auto& dial : model_.dials ){
+    Semantics::validateSurfaceDial(model_, dial);
     DevicePropagationDial packed{};
+    const bool surface = dial.type == BackendDialType::Bilinear or dial.type == BackendDialType::Bicubic;
+    DeviceDialInputRange range{index(dialInputs.size()), index(dial.inputCount)};
+    for( std::size_t i = 0; i < dial.inputCount and dial.type != BackendDialType::ExternalWeight; ++i ){
+      const auto& input = model_.dialInputs.at(dial.firstInput + i);
+      if( input.source != DialInputSource::Parameter ){
+        throw std::runtime_error("Event-variable dial inputs require an event-context evaluator.");
+      }
+      if( input.parameterIndex >= model_.parameterCount ){ throw std::runtime_error("Dial parameter input is out of range."); }
+      if( surface ){
+        dialInputs.push_back({DeviceIndex(DialInputSource::Parameter), index(input.parameterIndex), DeviceIndex(input.useMirror),
+                              scalar(input.mirrorMin), scalar(input.mirrorRange)});
+      }
+    }
+    if( hasSurface ){ dialInputRanges.push_back(surface ? range : DeviceDialInputRange{0, 0}); }
     packed.type = DeviceIndex(dial.type);
     packed.payloadOffset = index(dial.payloadOffset);
     packed.payloadSize = index(dial.payloadSize);
@@ -69,7 +89,7 @@ void Backends::DevicePropagationModel::build(const PropagationView& model_) {
       if( dial.externalWeightIndex >= block.count ){ throw std::runtime_error("Invalid external observable dial index."); }
       packed.externalIndex = index(block.offset + dial.externalWeightIndex);
     }
-    else if( dial.type != BackendDialType::Shift ){
+    else if( dial.type != BackendDialType::Shift and not surface ){
       if( dial.inputCount != 1 ){ throw std::runtime_error("Device observable dials require exactly one parameter input."); }
       const auto& input = model_.dialInputs.at(dial.firstInput);
       packed.parameterIndex = index(input.parameterIndex);

@@ -38,6 +38,7 @@ if(APPLE)
       ${CMAKE_SOURCE_DIR}/src/Utils/include/DeviceMath/SharedSplineUniform.h
       ${CMAKE_SOURCE_DIR}/src/Utils/include/DeviceMath/SharedSplineMonotonic.h
       ${CMAKE_SOURCE_DIR}/src/Utils/include/DeviceMath/SharedSplineGeneral.h
+      ${CMAKE_SOURCE_DIR}/src/Utils/include/DeviceMath/SharedSurface.h
       ${CMAKE_SOURCE_DIR}/src/Utils/include/DeviceMath/SharedGraph.h
       ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/MPS/src/MpsBackendKernels.metal
       ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/MPS/src/MpsBackendKernelSource.h.in
@@ -52,11 +53,12 @@ if(APPLE)
   file(READ ${CMAKE_SOURCE_DIR}/src/Utils/include/DeviceMath/SharedSplineUniform.h MPS_SHARED_SPLINE_UNIFORM)
   file(READ ${CMAKE_SOURCE_DIR}/src/Utils/include/DeviceMath/SharedSplineMonotonic.h MPS_SHARED_SPLINE_MONOTONIC)
   file(READ ${CMAKE_SOURCE_DIR}/src/Utils/include/DeviceMath/SharedSplineGeneral.h MPS_SHARED_SPLINE_GENERAL)
+  file(READ ${CMAKE_SOURCE_DIR}/src/Utils/include/DeviceMath/SharedSurface.h MPS_SHARED_SURFACE)
   file(READ ${CMAKE_SOURCE_DIR}/src/Utils/include/DeviceMath/SharedGraph.h MPS_SHARED_GRAPH)
   file(READ ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/MPS/include/MpsWeightTypes.h MPS_WEIGHT_TYPES)
   file(READ ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/MPS/src/MpsBackendKernels.metal MPS_BACKEND_KERNEL_SOURCE)
   file(READ ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/DeviceMath/DoubleFloat.h MPS_DOUBLE_FLOAT)
-  set(MPS_OBSERVABLE_SPLINES "${MPS_SHARED_SPLINE_COMMON}\n${MPS_SHARED_SPLINE_COMPACT}\n${MPS_SHARED_SPLINE_UNIFORM}\n${MPS_SHARED_SPLINE_MONOTONIC}\n${MPS_SHARED_SPLINE_GENERAL}\n${MPS_SHARED_GRAPH}")
+  set(MPS_OBSERVABLE_SPLINES "${MPS_SHARED_SPLINE_COMMON}\n${MPS_SHARED_SPLINE_COMPACT}\n${MPS_SHARED_SPLINE_UNIFORM}\n${MPS_SHARED_SPLINE_MONOTONIC}\n${MPS_SHARED_SPLINE_GENERAL}\n${MPS_SHARED_GRAPH}\n${MPS_SHARED_SURFACE}")
   string(REPLACE "GundamDeviceMath" "GundamObservableMath" MPS_OBSERVABLE_SPLINES "${MPS_OBSERVABLE_SPLINES}")
   string(REPLACE "SHARED_" "OBSERVABLE_SHARED_" MPS_OBSERVABLE_SPLINES "${MPS_OBSERVABLE_SPLINES}")
   configure_file(

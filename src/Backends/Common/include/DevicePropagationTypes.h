@@ -13,7 +13,7 @@ namespace Backends {
 #endif
   using ObservableScalar = GundamDeviceMath::DoubleFloat;
   enum class BackendDialType : DeviceIndex {
-    Norm, Shift, CompactSpline, UniformSpline, MonotonicSpline, GeneralSpline, Graph, ExternalWeight
+    Norm, Shift, CompactSpline, UniformSpline, MonotonicSpline, GeneralSpline, Graph, ExternalWeight, Bilinear, Bicubic
   };
   // Wire descriptors: shared definitions, fixed-width fields, no host ownership.
   struct DeviceEventDialRanges {
@@ -64,6 +64,11 @@ namespace Backends {
     ObservableScalar mirrorMin, mirrorRange, minResponse, maxResponse;
     ResponseSmoothing<ObservableScalar> smoothing{};
   };
+  struct DeviceDialInput {
+    DeviceIndex source, index, useMirror;
+    ObservableScalar mirrorMin, mirrorRange;
+  };
+  struct DeviceDialInputRange { DeviceIndex first, count; };
   struct DeviceVariableResponse {
     DeviceIndex variableIndex;
     ObservableScalar referenceValue;

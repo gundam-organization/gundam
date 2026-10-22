@@ -13,6 +13,8 @@ kernel void evaluate_propagation_dials(
     constant DevicePropagationControl& control [[buffer(5)]],
     device const uint* dialIndices [[buffer(6)]],
     device const DevicePropagationDialRange* ranges [[buffer(7)]],
+    device const DeviceDialInput* dialInputs [[buffer(8)]],
+    device const DeviceDialInputRange* inputRanges [[buffer(9)]],
     uint gid [[thread_position_in_grid]]) {
   if( gid >= control.dialCount ){ return; }
   uint dialIndex = gid;
@@ -28,8 +30,9 @@ kernel void evaluate_propagation_dials(
   }
   auto dial = dials[dialIndex];
   auto kind = BackendDialType(dial.type);
+  const bool surface = kind == BackendDialType::Bilinear || kind == BackendDialType::Bicubic;
   ObservableScalar value(0.f);
-  if( kind != BackendDialType::Shift && kind != BackendDialType::ExternalWeight ){
+  if( !surface && kind != BackendDialType::Shift && kind != BackendDialType::ExternalWeight ){
     value = parameters[dial.parameterIndex];
     if( dial.useMirror ){
       value = GundamDeviceMath::remainder(value - dial.mirrorMin, ObservableScalar(2.f) * dial.mirrorRange);
@@ -39,7 +42,7 @@ kernel void evaluate_propagation_dials(
     }
   }
   device const ObservableScalar* data = payloads + dial.payloadOffset;
-  if( !dial.allowExtrapolation && kind != BackendDialType::Norm && kind != BackendDialType::Shift && kind != BackendDialType::ExternalWeight ){
+  if( !surface && !dial.allowExtrapolation && kind != BackendDialType::Norm && kind != BackendDialType::Shift && kind != BackendDialType::ExternalWeight ){
     auto lower = kind == BackendDialType::Graph ? data[1] : data[0];
     ObservableScalar upper;
     if( kind == BackendDialType::Graph || kind == BackendDialType::GeneralSpline ){ upper = data[dial.payloadSize - 1]; }
@@ -52,6 +55,25 @@ kernel void evaluate_propagation_dials(
   }
   ObservableScalar lower(-INFINITY), upper(INFINITY);
   switch( kind ){
+    case BackendDialType::Bilinear:
+    case BackendDialType::Bicubic: {
+      auto range = inputRanges[dialIndex];
+      ObservableScalar values[2];
+      for( uint i = 0; i < 2; ++i ){
+        auto input = dialInputs[range.first + i];
+        auto raw = parameters[input.index];
+        if( input.useMirror ){
+          raw = GundamDeviceMath::remainder(raw - input.mirrorMin, ObservableScalar(2.f) * input.mirrorRange);
+          if( raw < ObservableScalar(0.f) ){ raw = -raw; }
+          if( raw > input.mirrorRange ){ raw = ObservableScalar(2.f) * input.mirrorRange - raw; }
+          raw += input.mirrorMin;
+        }
+        values[i] = raw;
+      }
+      value = GundamObservableMath::EvaluateSurface(values[0], values[1], data,
+                  kind == BackendDialType::Bicubic, dial.allowExtrapolation != 0);
+      break;
+    }
     case BackendDialType::Norm: break;
     case BackendDialType::Shift: value = data[0]; break;
     case BackendDialType::CompactSpline: value = GundamObservableMath::EvaluateCompactSpline(value, lower, upper, data, dial.payloadSize - 2); break;
