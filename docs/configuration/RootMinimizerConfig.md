@@ -62,3 +62,16 @@ errors. Increasing it allows larger differentiation steps, but does not restore
 double precision to GPU calculations. Check uncertainty stability against CPU
 and variations of this setting for the analysis being fitted. See the
 [MPS Hesse investigation](../guides/MpsHessePrecision.md) for measured limits.
+
+### SIMPLEX prefit
+
+`enableSimplexBeforeMinimize` creates a separate Minuit2 Simplex minimizer before
+the configured main algorithm. It inherits the main minimizer's options,
+including objective function precision, and uses `simplexStrategy`,
+`simplexMaxFcnCalls` and `tolerance * simplexToleranceLoose`.
+
+The prefit copies all variable definitions, fixed states and limits. Its best
+parameter values become the main minimizer's starting point. The main algorithm
+retains its configured step sizes, precision, strategy and tolerance; Simplex's
+error estimates are not used as a Migrad covariance. The original minimizer is
+also restored if the prefit throws an exception.
