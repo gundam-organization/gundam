@@ -1,4 +1,5 @@
 #include "CpuBackend.h"
+#include "CpuWeightKernels.h"
 #include "GundamGlobals.h"
 #include "CompactSpline.h"
 #include "UniformSpline.h"
@@ -13,6 +14,8 @@
 #include <cstring>
 #include <limits>
 #include <memory>
+#include <random>
+#include <type_traits>
 #include <vector>
 
 namespace {
@@ -58,6 +61,42 @@ namespace {
     std::reverse(model.events.begin(), model.events.end());
     return view;
   }
+}
+
+TEST(CpuWeightExecution, InterleavedKernelPreservesEveryProductBit) {
+  using namespace Backends;
+  std::mt19937 random(1729);
+  std::vector<double> responses(257);
+  for( auto& response : responses ){ response = .8 + double(random() % 4000) / 10000; }
+  responses[0] = 0.;
+  responses[1] = -1.25;
+  responses[2] = std::numeric_limits<double>::infinity();
+  responses[3] = std::numeric_limits<double>::quiet_NaN();
+  std::vector<BackendEventWeightDescriptor> events(131);
+  std::vector<std::uint32_t> indices;
+  for( std::size_t i = 0; i < events.size(); ++i ){
+    events[i].firstDial = indices.size();
+    events[i].dialCount = i % 33;
+    events[i].baseWeight = i % 2 == 0 ? -.5 : 1.25;
+    for( std::size_t j = 0; j < events[i].dialCount; ++j ){ indices.push_back(random() % responses.size()); }
+  }
+  auto check = [&](auto cached_, auto capped_){
+    for( std::size_t begin : {std::size_t(0), std::size_t(1), events.size()} ){
+      for( auto end : {begin, events.size() - (begin < events.size() ? 1 : 0), events.size()} ){
+        std::vector<double> serial(events.size(), -123.), paired = serial;
+        auto evaluate = [&](std::uint32_t dial_){ return responses[dial_]; };
+        CpuWeightKernels::reweight<decltype(cached_)::value, decltype(capped_)::value>(
+            events.data(), indices.data(), responses.data(), serial.data(), begin, end, 3., evaluate);
+        CpuWeightKernels::reweightInterleaved<decltype(cached_)::value, decltype(capped_)::value>(
+            events.data(), indices.data(), responses.data(), paired.data(), begin, end, 3., evaluate);
+        EXPECT_EQ(std::memcmp(serial.data(), paired.data(), serial.size() * sizeof(double)), 0);
+      }
+    }
+  };
+  check(std::true_type{}, std::false_type{});
+  check(std::true_type{}, std::true_type{});
+  check(std::false_type{}, std::false_type{});
+  check(std::false_type{}, std::true_type{});
 }
 
 TEST(CpuWeightExecution, CachedAndMixedPathsPreserveProductsAndCapOrder) {

@@ -773,13 +773,19 @@ template<bool allResponsesCached, bool useReweightCap, bool dynamicScheduling>
 void Backends::CpuBackend::calculateEventWeightsKernel(int iThread_) {
   const auto& model = _engineView_->propagation;
   auto reweightRange = [&](std::size_t begin_, std::size_t end_){
+    auto evaluate = [this, &model](std::uint32_t dial_){
+      return _isCachedDial_[dial_] ? _cachedDialResponses_[dial_]
+          : Semantics::evalDialResponse(model, model.dials[dial_], *_activeInputs_);
+    };
+    if( _useInterleavedWeights_ ){
+      CpuWeightKernels::reweightInterleaved<allResponsesCached, useReweightCap>(
+          model.eventWeights.data(), model.eventDialIndices.data(), _cachedDialResponses_.data(),
+          _activeResult_->eventWeights.data(), begin_, end_, model.maxReweight, evaluate);
+      return;
+    }
     CpuWeightKernels::reweight<allResponsesCached, useReweightCap>(
       model.eventWeights.data(), model.eventDialIndices.data(), _cachedDialResponses_.data(),
-      _activeResult_->eventWeights.data(), begin_, end_, model.maxReweight,
-      [this, &model](std::uint32_t dial_){
-        return _isCachedDial_[dial_] ? _cachedDialResponses_[dial_]
-            : Semantics::evalDialResponse(model, model.dials[dial_], *_activeInputs_);
-      });
+      _activeResult_->eventWeights.data(), begin_, end_, model.maxReweight, evaluate);
   };
   WeightWorkerStats stats;
   if constexpr( dynamicScheduling ){

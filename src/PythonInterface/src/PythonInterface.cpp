@@ -671,6 +671,11 @@ PYBIND11_MODULE(GUNDAM, module) {
     LogThrowIf(cpu == nullptr, "Weight locality diagnostics require a CPU backend.");
     return cpu->getWeightLocalityDiagnostics().dump();
   })
+  .def("setDiagnosticCpuWeightInterleaving", [](Backends::BackendManager& manager_, bool enabled_){
+    auto* cpu = dynamic_cast<Backends::CpuBackend*>(manager_.getBackend());
+    LogThrowIf(cpu == nullptr, "Weight interleaving diagnostics require a CPU backend.");
+    cpu->setDiagnosticWeightInterleaving(enabled_);
+  })
   .def("getDiagnosticCpuWeightScheduling", [](const Backends::BackendManager& manager_){
     const auto* cpu = dynamic_cast<const Backends::CpuBackend*>(manager_.getBackend());
     LogThrowIf(cpu == nullptr, "Weight worker diagnostics require a CPU backend.");

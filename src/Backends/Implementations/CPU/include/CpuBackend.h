@@ -63,6 +63,8 @@ ENUM_FIELD( Indexed )
     [[nodiscard]] const std::vector<double>& getOutsideSumsHostView(const PropagationToken& token_) const override;
     [[nodiscard]] const std::vector<double>& getOutsideSumSquaresHostView(const PropagationToken& token_) const override;
     [[nodiscard]] BackendTimingSummary getLastTimingSummary() const override { return _lastTiming_; }
+    // Diagnostic A/B switch; call only between synchronous propagations.
+    void setDiagnosticWeightInterleaving(bool enabled_) { _useInterleavedWeights_ = enabled_; }
     [[nodiscard]] BackendTimingTotals getTimingTotals() const override { return _timingTotals_; }
 
     // Diagnostic API: call between synchronous propagations. Only the work
@@ -171,6 +173,7 @@ ENUM_FIELD( Indexed )
     bool _diagnosticWeightCounters_{false};
     std::vector<std::unique_ptr<CpuWeightProbe>> _weightProbes_{};
     bool _allWeightResponsesCached_{false};
+    bool _useInterleavedWeights_{true};
     bool _usesDynamicWeights_{false};
     std::vector<EventRange> _weightBlocks_{};
     alignas(cpuDestructiveInterferenceSize) std::atomic<std::size_t> _nextWeightBlock_{0};
