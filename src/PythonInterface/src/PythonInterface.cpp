@@ -441,12 +441,30 @@ PYBIND11_MODULE(GUNDAM, module) {
   dataTypeClass.attr("Toy") = pybind11::cast(LikelihoodInterface::DataType(LikelihoodInterface::DataType::Toy));
   dataTypeClass.attr("RealData") = pybind11::cast(LikelihoodInterface::DataType(LikelihoodInterface::DataType::RealData));
 
+  pybind11::class_<GaussianConstraint>(module, "GaussianConstraint")
+  .def("getName", &GaussianConstraint::getName)
+  .def("isEnabled", &GaussianConstraint::isEnabled)
+  .def("getFormula", &GaussianConstraint::getFormula)
+  .def("getMean", &GaussianConstraint::getMean)
+  .def("getStdDev", &GaussianConstraint::getStdDev)
+  .def("evalFormula", &GaussianConstraint::evalFormula)
+  .def("evalResidual", &GaussianConstraint::evalResidual)
+  .def("eval", &GaussianConstraint::eval)
+  ;
+
+  pybind11::class_<ExternalConstraints>(module, "ExternalConstraints")
+  .def("isEnabled", &ExternalConstraints::isEnabled)
+  .def("getGaussianConstraintList", &ExternalConstraints::getGaussianConstraintList, pybind11::return_value_policy::reference_internal)
+  .def("eval", &ExternalConstraints::eval)
+  ;
+
   likelihoodInterfaceClass
   .def(pybind11::init())
   .def("getSummary", &LikelihoodInterface::getSummary, pybind11::call_guard<pybind11::gil_scoped_release>())
   .def("getSampleBreakdownTable", &LikelihoodInterface::getSampleBreakdownTable, pybind11::call_guard<pybind11::gil_scoped_release>())
   .def("getLastLikelihood", &LikelihoodInterface::getLastLikelihood, pybind11::call_guard<pybind11::gil_scoped_release>())
   .def("getLastPenaltyLikelihood", &LikelihoodInterface::getLastPenaltyLikelihood, pybind11::call_guard<pybind11::gil_scoped_release>())
+  .def("getExternalConstraints", &LikelihoodInterface::getExternalConstraints, pybind11::return_value_policy::reference_internal)
   .def("getLastStatLikelihood", &LikelihoodInterface::getLastStatLikelihood, pybind11::call_guard<pybind11::gil_scoped_release>())
   .def("propagateAndEvalLikelihood", &LikelihoodInterface::propagateAndEvalLikelihood, pybind11::call_guard<pybind11::gil_scoped_release>())
   .def("setForceAsimovData", &LikelihoodInterface::setForceAsimovData, pybind11::call_guard<pybind11::gil_scoped_release>())
