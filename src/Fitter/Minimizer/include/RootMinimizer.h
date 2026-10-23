@@ -52,6 +52,9 @@ public:
   [[nodiscard]] const std::unique_ptr<ROOT::Math::Minimizer> &getMinimizer() const{ return _rootMinimizer_; }
 
   // core
+  /// Synchronize existing minimizer parameters with their current values, steps,
+  /// limits and fixed states. The parameter list is established at initialization.
+  void updateFitParameterSettings();
   void saveMinimizerSettings(TDirectory* saveDir_) const;
 
 protected:
@@ -62,6 +65,7 @@ protected:
   void saveGradientSteps();
 
 private:
+  void updateFitParameterFixedStates();
 
   // Dump the Math::Minimizer table of parameter settings.  This is mostly
   // useful for debugging.
