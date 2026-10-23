@@ -21,7 +21,6 @@ namespace {
 void Backends::EngineBindings::clear() {
   events.clear();
   variables.clear();
-  eventDials.clear();
   variableInputBuffers.clear();
   samples.clear();
   parameters.clear();
@@ -44,7 +43,6 @@ void Backends::EngineBindings::build(LikelihoodInterface& likelihoodInterface_) 
   }
 
   events.reserve(eventDialCache.getCache().size());
-  eventDials.reserve(eventDialCache.getCache().size());
 
   for( const auto& cacheEntry : eventDialCache.getCache() ){
     if( cacheEntry.event == nullptr ){ continue; }
@@ -54,10 +52,6 @@ void Backends::EngineBindings::build(LikelihoodInterface& likelihoodInterface_) 
     events.emplace_back(eventBinding);
 
     for( const auto& dialResponse : cacheEntry.dialResponseCacheList ){
-      DialBinding dialBinding;
-      dialBinding.interface = dialResponse.dialInterface;
-      eventDials.emplace_back(dialBinding);
-
       const auto* inputBuffer = dialResponse.dialInterface->getInputBufferRef();
       if( inputBuffer != nullptr ){
         for( int iInput = 0 ; iInput < inputBuffer->getBufferSize() ; iInput++ ){

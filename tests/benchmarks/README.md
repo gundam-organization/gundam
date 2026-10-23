@@ -500,3 +500,32 @@ env -u DYLD_LIBRARY_PATH \
 
 See [multi-input dials](../../docs/backends/MultiInputDials.md) for the surface
 implementation and test coverage. This benchmark does not run a fit or Hesse.
+
+## CPU model memory
+
+`228CpuMemoryBenchmark.py` loads the full selected Asimov model, records current
+and peak RSS (plus malloc statistics on macOS), and exports CPU buffer sizes and
+capacities. It replays seeded constant, local and global parameter changes,
+without fitting or Hesse. Parameter setters, memory probes and histogram copies
+are outside the evaluation timers. PCA, step-response initialization and plots
+are disabled; input files and the event selection are preserved.
+
+Run each version in a fresh process, selecting the corresponding compiled Python
+module through `PYTHONPATH`. On macOS, sanitize `DYLD_LIBRARY_PATH` so that an
+installed module cannot replace the selected build. The script verifies the
+loaded module path and records its hash.
+
+```sh
+env -u DYLD_LIBRARY_PATH \
+  PYTHONPATH=/path/to/build/src/PythonInterface \
+  /path/to/venv/bin/python tests/benchmarks/228CpuMemoryBenchmark.py \
+  --work-dir /path/to/inputs --config configOA2024.yaml --threads 4 \
+  --override override/v13ProdFewRuns.yaml override/backendCpuTest.yaml \
+  --output /tmp/oa2024-memory-after --reference /tmp/oa2024-memory-before
+```
+
+Omit `--reference` for the first run. With a reference, the script checks the
+resolved configuration, parameter manifest, parameter-sequence digests, every
+likelihood and final histogram contents/errors exactly, and writes
+`comparison.json`. RSS depends on page residency and macOS compression; buffer
+capacity and allocator reservations must not be interpreted as resident bytes.

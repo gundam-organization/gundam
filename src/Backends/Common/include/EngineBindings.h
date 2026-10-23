@@ -5,7 +5,6 @@
 #include <memory>
 
 class ExternalWeightBuffer;
-class DialInterface;
 class DialInputBuffer;
 class Event;
 class Histogram;
@@ -27,10 +26,6 @@ namespace Backends {
     bool isDialTarget{false};
   };
 
-  struct DialBinding {
-    const DialInterface* interface{nullptr};
-  };
-
   struct SampleBinding {
     Histogram* histogram{nullptr};
     int sampleIndex{-1};
@@ -44,7 +39,6 @@ namespace Backends {
   struct EngineBindings {
     std::vector<EventBinding> events{};
     std::vector<VariableBinding> variables{};
-    std::vector<DialBinding> eventDials{};
     std::vector<const DialInputBuffer*> variableInputBuffers{};
     std::vector<SampleBinding> samples{};
     std::vector<ParameterBinding> parameters{};
@@ -54,7 +48,6 @@ namespace Backends {
     void build(LikelihoodInterface& likelihoodInterface_);
     [[nodiscard]] bool empty() const {
       return events.empty()
-             and eventDials.empty()
              and samples.empty()
              and parameters.empty();
     }

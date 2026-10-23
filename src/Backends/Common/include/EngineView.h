@@ -50,6 +50,7 @@ namespace Backends {
     // eventDialIndices, using EventWeightDescriptor::firstDial/dialCount.
     std::vector<BackendDialDescriptor> dials{};
     std::vector<std::uint32_t> eventDialIndices{};
+    // Several dials may share an input sequence, selected by firstInput/inputCount.
     std::vector<BackendDialInputDescriptor> dialInputs{};
     std::vector<double> dialPayloads{};
     std::vector<ExternalWeightBlockDescriptor> externalWeightBlocks{};

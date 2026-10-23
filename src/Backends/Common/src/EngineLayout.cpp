@@ -20,6 +20,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <limits>
 #include <map>
 #include <unordered_map>
 #include <unordered_set>
@@ -77,6 +78,35 @@ namespace {
       parameterIndexMap.emplace(bindings_.parameters[i].parameter, i);
     }
     std::unordered_map<const DialInterface*, std::uint32_t> dialIndexMap{};
+    // Count the flat buffers before filling them. Reuse this map during
+    // compilation, preserving the first-encounter order of the dial indices.
+    // This avoids geometric vector growth and its temporary payload copies.
+    constexpr auto uncompiledDial = std::numeric_limits<std::uint32_t>::max();
+    std::size_t payloadCount{0};
+    std::size_t eventDialCount{0};
+    for( const auto& entry : eventDialCache.getCache() ){
+      if( entry.event == nullptr ){ continue; }
+      for( const auto& response : entry.dialResponseCacheList ){
+        if( not response.appliesToVariable ){ ++eventDialCount; }
+        const auto* interface = response.dialInterface;
+        LogThrowIf(interface == nullptr, "Null DialInterface while building EngineView.");
+        if( not dialIndexMap.emplace(interface, uncompiledDial).second ){ continue; }
+        const auto* dial = interface->getDialBaseRef();
+        LogThrowIf(dial == nullptr, "Null DialBase while building EngineView.");
+        if( dynamic_cast<const Shift*>(dial) != nullptr ){ ++payloadCount; }
+        else if( dynamic_cast<const Norm*>(dial) == nullptr
+                 and dynamic_cast<const ExternalWeightDispatcher*>(dial) == nullptr ){
+          payloadCount += dial->getDialData().size();
+        }
+      }
+    }
+    LogThrowIf(dialIndexMap.size() >= uncompiledDial, "Too many dials for EngineView indices.");
+    propagation.dials.reserve(dialIndexMap.size());
+    propagation.dialPayloads.reserve(payloadCount);
+    propagation.eventDialIndices.reserve(eventDialCount);
+    // Dial collections share their input buffers. Keep each input sequence
+    // once, including its parameter order and mirror settings.
+    std::unordered_map<const DialInputBuffer*, std::size_t> inputOffsetMap{};
     std::unordered_map<const ExternalWeightBuffer*, std::size_t> externalSourceIndices{};
     std::size_t externalWeightCount{0};
     std::unordered_set<const DialInputBuffer*> variableInputBuffers;
@@ -107,7 +137,7 @@ namespace {
           }
         }
         auto cachedDialIt = dialIndexMap.find(interface);
-        if( cachedDialIt != dialIndexMap.end() ){
+        if( cachedDialIt->second != uncompiledDial ){
           allDialIndices.emplace_back(cachedDialIt->second);
           continue;
         }
@@ -116,7 +146,8 @@ namespace {
         const auto* dialBase = interface->getDialBaseRef();
         LogThrowIf(dialBase == nullptr, "Null DialBase while building EngineView.");
         const auto* inputBuffer = interface->getInputBufferRef();
-        dialRef.firstInput = propagation.dialInputs.size();
+        auto inputOffset = inputOffsetMap.emplace(inputBuffer, propagation.dialInputs.size());
+        dialRef.firstInput = inputOffset.first->second;
         dialRef.inputCount = inputBuffer == nullptr ? 0 : std::size_t(inputBuffer->getBufferSize());
         dialRef.payloadOffset = propagation.dialPayloads.size();
 
@@ -200,10 +231,10 @@ namespace {
         dialRef.payloadSize = propagation.dialPayloads.size() - dialRef.payloadOffset;
         const auto dialIndex = std::uint32_t(propagation.dials.size());
         propagation.dials.emplace_back(dialRef);
-        dialIndexMap.emplace(interface, dialIndex);
+        cachedDialIt->second = dialIndex;
         allDialIndices.emplace_back(dialIndex);
 
-        if( inputBuffer == nullptr ){ continue; }
+        if( inputBuffer == nullptr or not inputOffset.second ){ continue; }
 
         for( int iInput = 0 ; iInput < inputBuffer->getBufferSize() ; iInput++ ){
           const auto* parPtr = &inputBuffer->getParameter(iInput);
