@@ -466,7 +466,11 @@ PYBIND11_MODULE(GUNDAM, module) {
 
   // no CTOR here
   pybind11::class_<MinimizerBase>(module, "MinimizerBase")
+  .def("isRootMinimizer", [](const MinimizerBase& this_){
+    return dynamic_cast<const RootMinimizer*>(&this_) != nullptr;
+  })
   .def("minimize", &MinimizerBase::minimize)
+  .def("getMinimizerStatus", &MinimizerBase::getMinimizerStatus)
   .def("throwPostfitParameters", &MinimizerBase::throwPostfitParameters)
   .def("fetchNbDegreeOfFreedom", &MinimizerBase::fetchNbDegreeOfFreedom)
   .def("getMinimizerFitParameterPtr", pybind11::overload_cast<>(&MinimizerBase::getMinimizerFitParameterPtr),
@@ -474,6 +478,8 @@ PYBIND11_MODULE(GUNDAM, module) {
   ;
 
   pybind11::class_<RootMinimizer, MinimizerBase>(module, "RootMinimizer")
+  .def("hasConverged", &RootMinimizer::hasConverged)
+  .def("isMinimizeDone", &RootMinimizer::isMinimizeDone)
   .def("throwPostfitParameters", &RootMinimizer::throwPostfitParameters)
   ;
 
