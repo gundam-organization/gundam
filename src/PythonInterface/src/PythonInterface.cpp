@@ -280,6 +280,7 @@ PYBIND11_MODULE(GUNDAM, module) {
   .def("getParameterValue", &Parameter::getParameterValue)
   .def("getSummary", &Parameter::getSummary)
   .def("setParameterValue", &Parameter::setParameterValue, pybind11::arg("parameterValue"), pybind11::arg("force") = false)
+  .def("setIsFixed", &Parameter::setIsFixed)
   ;
 
   pybind11::class_<TMatrixDSym, std::shared_ptr<TMatrixDSym>>(module, "TMatrixDSym")
@@ -478,6 +479,7 @@ PYBIND11_MODULE(GUNDAM, module) {
   ;
 
   pybind11::class_<RootMinimizer, MinimizerBase>(module, "RootMinimizer")
+  .def("updateFitParameterSettings", &RootMinimizer::updateFitParameterSettings)
   .def("hasConverged", &RootMinimizer::hasConverged)
   .def("isMinimizeDone", &RootMinimizer::isMinimizeDone)
   .def("throwPostfitParameters", &RootMinimizer::throwPostfitParameters)
