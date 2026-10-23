@@ -188,6 +188,8 @@ namespace JointProbability{
 
     // The penalty from MC statistics
     double penalty = 0.0;
+    double stableResidual = 0.;
+    bool useStableResidual = false;
 
     // Barlow-Beeston uses fractional uncertainty on MC, so sqrt(sum[w^2])/mc
     // -b/2a in quadratic equation
@@ -204,19 +206,45 @@ namespace JointProbability{
       // all the way to zero.
       double fractional = std::min( std::sqrt(mcuncert) / predVal, fractionalErrorLimit);
 
-      double temp = predVal * fractional * fractional - 1;
-      // b^2 - 4ac in quadratic equation
-      double temp2 = temp * temp + 4 * dataVal * fractional * fractional;
-      if(temp2 < 0){
-        if( throwIfInfLlh ){ LogThrow("Negative square root in Barlow Beeston"); }
-        else{ return std::numeric_limits<double>::infinity(); }
-      }
+      const double relativeDifference = (dataVal - predVal) / predVal;
+      const double scaledVariance = predVal * fractional * fractional;
+      if( dataVal > std::numeric_limits<double>::epsilon() and predVal > 0.
+          and std::abs(relativeDifference) < 1.e-2 and fractional > 0.
+          and std::isfinite(scaledVariance) ){
+        // Write beta = 1 + delta. Its equation is
+        // delta^2 + (1 + pred*f^2)*delta - (data-pred)*f^2 = 0.
+        // Rationalize the root and scale by its linear coefficient: this
+        // preserves delta near zero without subtracting nearly equal numbers.
+        const double linear = 1. + scaledVariance;
+        const double scaledShift = relativeDifference * (scaledVariance / linear);
+        const double delta = 2. * scaledShift
+            / (1. + std::sqrt(1. + 4. * scaledShift / linear));
+        newmc = std::max(predVal * (1. + delta), std::numeric_limits<double>::min());
+        const double pull = delta / fractional;
+        penalty = .5 * pull * pull;
 
-      // Solve for the positive beta
-      double beta = (-1 * temp + sqrt(temp2)) / 2.;
-      newmc = std::max(predVal * beta, std::numeric_limits<double>::min());
-      // And penalise the movement in beta relative the mc uncertainty
-      penalty = (beta - 1) * (beta - 1) / (2 * fractional * fractional);
+        // The same quadratic gives newmc-data =
+        // (pred-data)*(1+delta)/(linear+delta). Keep this residual directly;
+        // forming newmc first would round away small changes near the minimum.
+        stableResidual = ((predVal - dataVal) / dataVal)
+            * ((1. + delta) / (linear + delta));
+        useStableResidual = true;
+      }
+      else{
+        double temp = predVal * fractional * fractional - 1;
+        // b^2 - 4ac in quadratic equation
+        double temp2 = temp * temp + 4 * dataVal * fractional * fractional;
+        if(temp2 < 0){
+          if( throwIfInfLlh ){ LogThrow("Negative square root in Barlow Beeston"); }
+          else{ return std::numeric_limits<double>::infinity(); }
+        }
+
+        // Solve for the positive beta
+        double beta = (-1 * temp + sqrt(temp2)) / 2.;
+        newmc = std::max(predVal * beta, std::numeric_limits<double>::min());
+        // And penalise the movement in beta relative the mc uncertainty
+        penalty = (beta - 1) * (beta - 1) / (2 * fractional * fractional);
+      }
     }
 
     // And calculate the new Poisson likelihood.  For Barlow-Beeston newmc is
@@ -231,7 +259,7 @@ namespace JointProbability{
       // The newMC value should not be a lot less than O(1), This protects
       // against small values (intentionally use epsilon() instead of min()
       // since this is relative to 1.0).
-      const double residual = (newmc - dataVal) / dataVal;
+      const double residual = useStableResidual ? stableResidual : (newmc - dataVal) / dataVal;
       if (std::abs(residual) < 1.e-2) {
         // data * (r - log1p(r)), expanded through r^10. Subtracting
         // logarithms loses the O(r^2) signal near an Asimov minimum and
