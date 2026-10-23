@@ -3,6 +3,8 @@ set( LIB_NAME GundamStatisticalInference )
 set(SRCFILES
     ${CMAKE_CURRENT_SOURCE_DIR}/JointProbability/src/JointProbability.cpp
 
+    ${CMAKE_CURRENT_SOURCE_DIR}/Likelihood/src/ExternalConstraints.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/Likelihood/src/GaussianConstraint.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/Likelihood/src/LikelihoodInterface.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/Likelihood/src/ParameterScanner.cpp
   )
