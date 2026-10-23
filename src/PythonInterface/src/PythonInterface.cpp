@@ -474,6 +474,7 @@ PYBIND11_MODULE(GUNDAM, module) {
   ;
 
   pybind11::class_<RootMinimizer, MinimizerBase>(module, "RootMinimizer")
+  .def("getFunctionPrecision", &RootMinimizer::getFunctionPrecision)
   .def("throwPostfitParameters", &RootMinimizer::throwPostfitParameters)
   ;
 
