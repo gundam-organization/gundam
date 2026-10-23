@@ -97,6 +97,7 @@ TEST_P(RootReaderCleanup, ClosesMainAndFriendFilesBeforePropagation){
     }
   })");
   config["datasetList"][0]["model"]["filePathList"] = JsonType::array({{
+    {"name", "main"},
     {"path", mainFile.path},
     {"friendList", JsonType::array({{{"name", "weights"}, {"path", friendFile.path + ":weights"}}})}
   }});
