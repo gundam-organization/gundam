@@ -96,6 +96,7 @@ set(HEADERS
     ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/Semantics/BackendHostPropagation.h
     ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/CPU/include/CpuWeightKernels.h
     ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/CPU/include/CpuBackend.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/CPU/include/CpuCacheAlignment.h
     ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/CPU/include/CpuBackendProfiler.h
     ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/CPU/include/CpuWeightProbe.h
     ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/MPS/include/MpsBackend.h

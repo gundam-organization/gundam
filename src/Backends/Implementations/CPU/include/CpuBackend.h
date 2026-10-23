@@ -7,6 +7,7 @@
 #include "BackendTypes.h"
 #include "Backend.h"
 #include "CpuBackendProfiler.h"
+#include "CpuCacheAlignment.h"
 #include "CpuWeightProbe.h"
 #include "PropagationInputs.h"
 #include "GenericToolbox.Time.h"
@@ -106,9 +107,8 @@ ENUM_FIELD( Indexed )
     void calculateHistogramsFromEvents(Result& result_, const PropagationInputs& inputs_);
     void calculateLikelihood(Result& result_);
 
-    // Workers mutate their scratch vectors and counters independently. Keep
-    // them apart even on CPUs with 128-byte cache lines.
-    struct alignas(128) BinningWorker {
+    // Each worker writes its own scratch vectors and counters independently.
+    struct alignas(cpuDestructiveInterferenceSize) BinningWorker {
       std::vector<std::size_t> candidates{};
       std::vector<std::uint8_t> changedSamples{};
       std::size_t rebinnedEvents{0};
@@ -173,8 +173,8 @@ ENUM_FIELD( Indexed )
     bool _allWeightResponsesCached_{false};
     bool _usesDynamicWeights_{false};
     std::vector<EventRange> _weightBlocks_{};
-    alignas(64) std::atomic<std::size_t> _nextWeightBlock_{0};
-    struct alignas(64) WeightWorkerStats {
+    alignas(cpuDestructiveInterferenceSize) std::atomic<std::size_t> _nextWeightBlock_{0};
+    struct alignas(cpuDestructiveInterferenceSize) WeightWorkerStats {
       std::size_t events{0}, blocks{0}, dialReferences{0};
       double wallSeconds{0};
     };

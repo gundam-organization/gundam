@@ -2,6 +2,7 @@
 #define GUNDAM_CPU_BACKEND_PROFILER_H
 
 #include "BackendTypes.h"
+#include "CpuCacheAlignment.h"
 #include "GenericToolbox.Json.h"
 
 #include <array>
@@ -25,7 +26,7 @@ namespace Backends {
       long minorFaults{-1}, majorFaults{-1}, voluntarySwitches{-1}, involuntarySwitches{-1};
       int cpu{-1};
     };
-    struct alignas(64) WorkerRecord {
+    struct alignas(cpuDestructiveInterferenceSize) WorkerRecord {
       Snapshot begin{}, end{};
       std::size_t evaluatedDials{0}, unchangedInputs{0};
       std::size_t weightEvents{0}, weightBlocks{0};
