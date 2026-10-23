@@ -106,11 +106,14 @@ ENUM_FIELD( Indexed )
     void calculateHistogramsFromEvents(Result& result_, const PropagationInputs& inputs_);
     void calculateLikelihood(Result& result_);
 
-    struct BinningWorker {
+    // Workers mutate their scratch vectors and counters independently. Keep
+    // them apart even on CPUs with 128-byte cache lines.
+    struct alignas(128) BinningWorker {
       std::vector<std::size_t> candidates{};
       std::vector<std::uint8_t> changedSamples{};
       std::size_t rebinnedEvents{0};
       std::size_t candidatesTested{0};
+      std::size_t contributionCount{0};
     };
     std::vector<std::exception_ptr> _workerErrors_{};
     EventState _eventState_{};

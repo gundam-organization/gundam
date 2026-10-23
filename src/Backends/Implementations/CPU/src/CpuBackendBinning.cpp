@@ -9,6 +9,19 @@
 #include <cmath>
 #include <limits>
 
+namespace {
+  bool containsStrictBin(const Backends::BinningGeometry& layout_, const Backends::BinningBin& bin_,
+                         const double* values_) {
+    for( std::size_t i = bin_.firstInterval; i < bin_.firstInterval + bin_.intervalCount; ++i ){
+      const auto& interval = layout_.intervals[i];
+      if( not GundamBinningMath::contains(interval.lowerBound, interval.upperBound, values_[interval.variableIndex]) ){
+        return false;
+      }
+    }
+    return true;
+  }
+}
+
 void Backends::CpuBackend::initializeBinning() {
   const auto& samples = _engineView_->propagation.samples;
   _binningIndices_.resize(samples.size());
@@ -50,8 +63,8 @@ void Backends::CpuBackend::updateEventState(const PropagationInputs& inputs_) {
   for( const auto& worker : _binningWorkers_ ){
     _lastTiming_.rebinnedEventCount += worker.rebinnedEvents;
     _lastTiming_.binCandidateCount += worker.candidatesTested;
+    _lastTiming_.binContributionCount += worker.contributionCount;
   }
-  for( const auto& contributions : _eventState_.contributions ){ _lastTiming_.binContributionCount += contributions.size(); }
   _cachedContributionCount_ = _lastTiming_.binContributionCount;
   std::vector<std::uint8_t> changedSamples(model.samples.size(), false);
   for( const auto& worker : _binningWorkers_ ){
@@ -94,7 +107,8 @@ void Backends::CpuBackend::updateEventVariablesThread(int iThread_) {
 void Backends::CpuBackend::updateEventBinningThread(int iThread_) {
   const auto& model = _engineView_->propagation;
   auto& worker = _binningWorkers_[iThread_];
-  worker.rebinnedEvents = worker.candidatesTested = 0;
+  worker.rebinnedEvents = worker.candidatesTested = worker.contributionCount = 0;
+  std::size_t contributionCount{0};
   worker.changedSamples.assign(model.samples.size(), false);
   auto bounds = GenericToolbox::ParallelWorker::getThreadBoundIndices(iThread_, _threadPool_.getNbThreads(), model.events.size());
   for( std::size_t iEvent = bounds.beginIndex; iEvent < bounds.endIndex; ++iEvent ){
@@ -108,7 +122,11 @@ void Backends::CpuBackend::updateEventBinningThread(int iThread_) {
       _eventState_.bins[event.resultIndex] = event.binIndex;
       continue;
     }
-    if( _validBinning_[event.resultIndex] and not sample.readHostVariables and not _activeInputs_->forceBinningUpdate ){ continue; }
+    if( _validBinning_[event.resultIndex] and not sample.readHostVariables and not _activeInputs_->forceBinningUpdate ){
+      contributionCount += sample.binning.isSmoothed ? _eventState_.contributions[event.resultIndex].size()
+          : std::size_t(_eventState_.bins[event.resultIndex] >= 0);
+      continue;
+    }
     ++worker.rebinnedEvents;
     worker.changedSamples[event.samplePosition] = true;
     const auto& layout = sample.binning;
@@ -118,7 +136,6 @@ void Backends::CpuBackend::updateEventBinningThread(int iThread_) {
         LogThrowIf(not std::isfinite(values[i]), "Nonfinite binning variable: " << layout.variableNames[i]);
       }
     }
-    auto& contributions = _eventState_.contributions[event.resultIndex];
     const auto& positions = _reusableBinPositions_[event.samplePosition];
     const int previousBin = _eventState_.bins[event.resultIndex];
     if( previousBin >= 0 and std::size_t(previousBin) < positions.size()
@@ -126,30 +143,26 @@ void Backends::CpuBackend::updateEventBinningThread(int iThread_) {
         and std::all_of(values, values + layout.variableNames.size(), [](double value_){ return std::isfinite(value_); }) ){
       ++worker.candidatesTested;
       const auto& bin = layout.bins[positions[previousBin]];
-      if( BinningSemantics::fraction(layout, bin, values) == 1 ){
-        contributions.assign(1, {previousBin, 1});
+      if( containsStrictBin(layout, bin, values) ){
+        // The strict assignment is unchanged; keep its existing contribution.
+        ++contributionCount;
         _validBinning_[event.resultIndex] = true;
         continue;
       }
     }
     _binningIndices_[event.samplePosition].findCandidates(values, worker.candidates);
     worker.candidatesTested += worker.candidates.size();
+    auto& contributions = _eventState_.contributions[event.resultIndex];
     contributions.clear();
     int hardBin{-1};
     double total{0};
     for( auto position : worker.candidates ){
       const auto& bin = layout.bins[position];
-      if( hardBin < 0 ){
-        bool contains{true};
-        for( std::size_t i = bin.firstInterval; i < bin.firstInterval + bin.intervalCount; ++i ){
-          const auto& interval = layout.intervals[i];
-          double value = values[interval.variableIndex];
-          if( interval.lowerBound == interval.upperBound ? value != interval.lowerBound
-              : value < interval.lowerBound or value >= interval.upperBound ){ contains = false; break; }
-        }
-        if( contains ){ hardBin = bin.binIndex; }
-      }
-      double fraction = BinningSemantics::fraction(layout, bin, values);
+      bool contains = hardBin < 0 and containsStrictBin(layout, bin, values);
+      if( contains ){ hardBin = bin.binIndex; }
+      // Strict membership already gives the complete response. Smoothed bins
+      // still need their fractional response, including outside the hard bin.
+      double fraction = layout.isSmoothed ? BinningSemantics::fraction(layout, bin, values) : double(contains);
       if( fraction == 0 ){ continue; }
       contributions.push_back({bin.binIndex, fraction});
       total += fraction;
@@ -166,8 +179,10 @@ void Backends::CpuBackend::updateEventBinningThread(int iThread_) {
       }
       if( total < 1 ){ contributions.push_back({-1, 1 - total}); }
     }
+    contributionCount += contributions.size();
     _validBinning_[event.resultIndex] = true;
   }
+  worker.contributionCount = contributionCount;
 }
 
 void Backends::CpuBackend::runEventStateJob(const std::string& jobName_) {

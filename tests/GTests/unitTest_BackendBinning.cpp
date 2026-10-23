@@ -112,6 +112,10 @@ namespace {
         hostEvent.getVariables().getVarList()[i].set(value);
       }
       auto token = backend.requestPropagation(inputs);
+      const auto& state = backend.getEventStateHostView(token);
+      std::size_t contributions{0};
+      for( const auto& list : state.contributions ){ contributions += list.size(); }
+      EXPECT_EQ(backend.getLastTimingSummary().binContributionCount, contributions);
       auto expected = histogram.evaluateEventBinningResponse(hostEvent);
       std::vector<double> sums(model.totalBins, 0.), squares(model.totalBins, 0.);
       for( const auto& fraction : expected.binFractions ){
@@ -297,6 +301,15 @@ TEST_P(BinningBackend, PreviousBinAvoidsSearchAndFallsBackOnMigration) {
     auto token = backend.requestPropagation(inputs);
     EXPECT_EQ(backend.getEventStateHostView(token).bins[0], expectedBin_);
     EXPECT_EQ(backend.getLastTimingSummary().binCandidateCount, expectedCandidates_);
+    if( not backend.getCapabilities().supportsGpu ){
+      const auto& contributions = backend.getEventStateHostView(token).contributions[0];
+      EXPECT_EQ(contributions.size(), expectedBin_ < 0 ? 0 : 1);
+      EXPECT_EQ(backend.getLastTimingSummary().binContributionCount, contributions.size());
+      if( expectedBin_ >= 0 ){
+        EXPECT_EQ(contributions[0].binIndex, expectedBin_);
+        EXPECT_DOUBLE_EQ(contributions[0].fraction, 1.);
+      }
+    }
     const auto& sums = backend.getHistogramSumsHostView(token);
     const auto& squares = backend.getHistogramSumSquaresHostView(token);
     for( std::size_t i = 0; i < sums.size(); ++i ){

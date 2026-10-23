@@ -864,6 +864,14 @@ void Backends::CpuBackend::calculateHistogramsThread(int iThread_) {
     if( event.samplePosition < propagation.samples.size() ){
       const auto& sample = propagation.samples[event.samplePosition];
       if( sample.useDynamicBinning or sample.binning.isSmoothed ){
+        if( not sample.binning.isSmoothed ){
+          const int bin = _eventState_.bins[event.resultIndex];
+          if( bin >= 0 ){
+            histSums[sample.binOffset + bin] += weight;
+            histSumSquares[sample.binOffset + bin] += weight * weight;
+          }
+          continue;
+        }
         for( const auto& contribution : _eventState_.contributions[event.resultIndex] ){
           const std::size_t bin = contribution.binIndex < 0 ? propagation.totalBins + event.samplePosition
               : sample.binOffset + contribution.binIndex;
