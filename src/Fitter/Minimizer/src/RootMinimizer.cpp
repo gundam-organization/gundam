@@ -130,6 +130,14 @@ void RootMinimizer::initializeImpl(){
   _rootMinimizer_->SetMaxIterations(_maxIterations_);
   _rootMinimizer_->SetMaxFunctionCalls(_maxFcnCalls_);
 
+  updateFitParameterSettings();
+
+  LogInfo << "RootMinimizer initialized." << std::endl;
+}
+
+void RootMinimizer::updateFitParameterSettings(){
+  LogThrowIf(_rootMinimizer_ == nullptr, "ROOT minimizer has not been created.");
+
   for( std::size_t iFitPar = 0 ; iFitPar < getMinimizerFitParameterPtr().size() ; iFitPar++ ){
     auto& fitPar = *(getMinimizerFitParameterPtr()[iFitPar]);
 
@@ -170,7 +178,24 @@ void RootMinimizer::initializeImpl(){
     }
   }
 
-  LogInfo << "RootMinimizer initialized." << std::endl;
+  updateFitParameterFixedStates();
+}
+
+void RootMinimizer::updateFitParameterFixedStates(){
+  /// Apply the frozen state to the root minimizer variable definitions
+  for( std::size_t iFitPar = 0 ; iFitPar < getMinimizerFitParameterPtr().size() ; iFitPar++ ){
+    auto& fitPar = *(getMinimizerFitParameterPtr()[iFitPar]);
+    if (fitPar.isFixed()) {
+      if (fitPar.isEigen()) {
+        LogAlert << "Eigen decomposed parameters cannot be frozen, and remain free"
+                 << std::endl;
+      }
+      getMinimizer()->FixVariable(iFitPar);
+    }
+    else {
+      getMinimizer()->ReleaseVariable(iFitPar);
+    }
+  }
 }
 
 void RootMinimizer::dumpFitParameterSettings() {
@@ -229,27 +254,13 @@ void RootMinimizer::dumpMinuit2State() {
 void RootMinimizer::minimize(){
   // calling the common routine
   this->MinimizerBase::minimize();
+  updateFitParameterFixedStates();
 
   GenericToolbox::Time::Timer minimizationStopWatch;
   minimizationStopWatch.start();
 
   int nbFitCallOffset = getMonitor().nbEvalLikelihoodCalls;
   LogInfo << "Fit call offset: " << nbFitCallOffset << std::endl;
-
-  /// Apply the frozen state to the root minimizer variable definitions
-  for( std::size_t iFitPar = 0 ; iFitPar < getMinimizerFitParameterPtr().size() ; iFitPar++ ){
-    auto& fitPar = *(getMinimizerFitParameterPtr()[iFitPar]);
-    if (fitPar.isFixed()) {
-      if (fitPar.isEigen()) {
-        LogAlert << "Eigen decomposed parameters cannot be frozen, and remain free"
-                 << std::endl;
-      }
-      getMinimizer()->FixVariable(iFitPar);
-    }
-    else {
-      getMinimizer()->ReleaseVariable(iFitPar);
-    }
-  }
 
   dumpFitParameterSettings();
 
