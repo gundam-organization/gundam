@@ -40,18 +40,18 @@ def evaluate(path, backend):
     content = li.getModelPropagator().getSampleSet().getSampleList()[0].getHistogram().getBinContentList()[0]
     mean, variance = content.sumWeights, content.sqrtSumSqWeights ** 2
     expected_curvature = 2 * mean * mean / (mean + variance)
-    engine.evaluateLikelihood()
+    li.propagateAndEvalLikelihood()
     nominal = li.getLastLikelihood()
     for step in (1e-5, 1e-6, 1e-7):
         values = []
         for value in (1. - step, 1. + step):
             parameter.setParameterValue(value)
-            engine.evaluateLikelihood()
+            li.propagateAndEvalLikelihood()
             values.append(li.getLastLikelihood())
         curvature = (sum(values) - 2 * nominal) / step ** 2
         assert math.isclose(curvature, expected_curvature, rel_tol=2e-6), (backend, step, curvature, expected_curvature)
     parameter.setParameterValue(1.)
-    engine.evaluateLikelihood()
+    li.propagateAndEvalLikelihood()
     output = Path.cwd() / f'230AsimovHesseStability-{backend}.root'
     app = GUNDAM.GundamApp('Asimov Hesse stability regression')
     app.openOutputFile(str(output))
