@@ -185,16 +185,16 @@ def main():
         residual = (amplitude - .87) / .02
         combination = ((positive - 2 * negative + 4.) / 2.) ** 2
         close(evaluate(engine, positive, negative), internal + residual ** 2 + combination)
-        close(constraints[0].evalFormula(manager), amplitude)
-        close(constraints[0].evalResidual(manager), residual)
-        close(li.getExternalConstraints().eval(manager), residual ** 2 + combination)
+        close(constraints[0].evalFormula(), amplitude)
+        close(constraints[0].evalResidual(), residual)
+        close(li.getExternalConstraints().eval(), residual ** 2 + combination)
         close(li.getLastLikelihood(), li.getLastStatLikelihood() + li.getLastPenaltyLikelihood())
 
     # Fixed status does not suppress external measurements.
     manager.getParameterSetsList()[0].getParameterList()[0].setIsFixed(True)
-    close(constraints[0].eval(manager), residual ** 2)
+    close(constraints[0].eval(), residual ** 2)
     li.setCurrentParameterValuesAsPrior()
-    close(constraints[0].eval(manager), residual ** 2)
+    close(constraints[0].eval(), residual ** 2)
 
     for config in [None, {'constraintsList': [constraint]},
                    {'isEnabled': False, 'constraintsList': [constraint]},

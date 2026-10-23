@@ -18,6 +18,7 @@ void GaussianConstraint::configureImpl(){
   _name_ = _config_.fetchValue<std::string>("name");
   _isEnabled_ = _config_.fetchValue<bool>("isEnabled", true);
   _parameterReferenceList_.clear();
+  _formula_.reset();
   if( not _isEnabled_ ){ return; }
 
   _formulaString_ = _config_.fetchValue<std::string>("formula");
@@ -72,6 +73,7 @@ void GaussianConstraint::initializeImpl(){
   LogThrowIf(_formula_->GetNpar() != int(_parameterReferenceList_.size()),
              "Formula inputs do not match declared aliases in external constraint " << _name_);
   for( auto& reference : _parameterReferenceList_ ){
+    reference.parameter = nullptr;
     reference.formulaIndex = _formula_->GetParNumber(reference.name.c_str());
     LogThrowIf(reference.formulaIndex < 0,
                "Unused parameter alias " << reference.name << " in external constraint " << _name_);
@@ -100,30 +102,31 @@ const Parameter& GaussianConstraint::resolveParameter(const ParametersManager& p
   return *selectedParameter;
 }
 
-void GaussianConstraint::validateParameters(const ParametersManager& parametersManager_) const{
+void GaussianConstraint::bindParameters(const ParametersManager& parametersManager_){
   if( not _isEnabled_ ){ return; }
-  for( const auto& reference : _parameterReferenceList_ ){
-    resolveParameter(parametersManager_, reference);
+  for( auto& reference : _parameterReferenceList_ ){
+    reference.parameter = &resolveParameter(parametersManager_, reference);
   }
 }
 
-double GaussianConstraint::evalFormula(const ParametersManager& parametersManager_) const{
+double GaussianConstraint::evalFormula() const{
   LogThrowIf(_formula_ == nullptr or not _formula_->IsValid(), "External constraint has no initialized formula: " << _name_);
   std::vector<double> values(_parameterReferenceList_.size());
   for( const auto& reference : _parameterReferenceList_ ){
     LogThrowIf(reference.formulaIndex < 0, "External constraint is not initialized: " << _name_);
-    values[reference.formulaIndex] = resolveParameter(parametersManager_, reference).getParameterValue();
+    LogThrowIf(reference.parameter == nullptr, "External constraint parameters are not bound: " << _name_);
+    values[reference.formulaIndex] = reference.parameter->getParameterValue();
   }
   return _formula_->EvalPar(nullptr, values.data());
 }
 
-double GaussianConstraint::evalResidual(const ParametersManager& parametersManager_) const{
-  return (evalFormula(parametersManager_) - _mean_) / _stdDev_;
+double GaussianConstraint::evalResidual() const{
+  return (evalFormula() - _mean_) / _stdDev_;
 }
 
-double GaussianConstraint::eval(const ParametersManager& parametersManager_) const{
+double GaussianConstraint::eval() const{
   if( not _isEnabled_ ){ return 0; }
-  double residual = evalResidual(parametersManager_);
+  double residual = evalResidual();
   if( not std::isfinite(residual) ){ return std::numeric_limits<double>::infinity(); }
   return residual * residual;
 }

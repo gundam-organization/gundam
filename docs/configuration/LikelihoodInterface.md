@@ -79,6 +79,10 @@ the same measurement both as an internal prior and an external constraint.
 `setCurrentParameterValuesAsPrior()` does not change external measurement means.
 
 The Python interface exposes `getExternalConstraints()` on `LikelihoodInterface`,
-then `getGaussianConstraintList()` and `eval(parametersManager)`. Each Gaussian
-constraint exposes its configuration getters, `evalFormula(parametersManager)`,
-`evalResidual(parametersManager)` and `eval(parametersManager)` for diagnostics.
+then `getGaussianConstraintList()` and `eval()`. Each Gaussian
+constraint exposes its configuration getters, `evalFormula()`,
+`evalResidual()` and `eval()` for diagnostics.
+
+Parameter references are resolved once during initialization. Evaluations read
+the current values through cached const pointers; parameter storage must remain
+alive and stable for the lifetime of the bound constraints.
