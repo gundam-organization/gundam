@@ -34,14 +34,14 @@ void ExternalConstraints::initializeImpl(){
   _config_.printUnusedKeys();
 }
 
-void ExternalConstraints::validateParameters(const ParametersManager& parametersManager_) const{
+void ExternalConstraints::bindParameters(const ParametersManager& parametersManager_){
   if( not _isEnabled_ ){ return; }
-  for( const auto& constraint : _gaussianConstraintList_ ){ constraint.validateParameters(parametersManager_); }
+  for( auto& constraint : _gaussianConstraintList_ ){ constraint.bindParameters(parametersManager_); }
 }
 
-double ExternalConstraints::eval(const ParametersManager& parametersManager_) const{
+double ExternalConstraints::eval() const{
   if( not _isEnabled_ ){ return 0; }
   double penalty{0};
-  for( const auto& constraint : _gaussianConstraintList_ ){ penalty += constraint.eval(parametersManager_); }
+  for( const auto& constraint : _gaussianConstraintList_ ){ penalty += constraint.eval(); }
   return penalty;
 }

@@ -21,10 +21,11 @@ public:
   [[nodiscard]] auto getMean() const{ return _mean_; }
   [[nodiscard]] auto getStdDev() const{ return _stdDev_; }
 
-  void validateParameters(const ParametersManager& parametersManager_) const;
-  [[nodiscard]] double evalFormula(const ParametersManager& parametersManager_) const;
-  [[nodiscard]] double evalResidual(const ParametersManager& parametersManager_) const;
-  [[nodiscard]] double eval(const ParametersManager& parametersManager_) const;
+  /// Bind after initialization; the manager and its parameter storage must remain alive and stable.
+  void bindParameters(const ParametersManager& parametersManager_);
+  [[nodiscard]] double evalFormula() const;
+  [[nodiscard]] double evalResidual() const;
+  [[nodiscard]] double eval() const;
 
 protected:
   void configureImpl() override;
@@ -37,6 +38,7 @@ private:
     std::string parameterName;
     int parameterIndex{-1};
     int formulaIndex{-1};
+    const Parameter* parameter{nullptr};
   };
 
   const Parameter& resolveParameter(const ParametersManager& parametersManager_, const ParameterReference& reference_) const;

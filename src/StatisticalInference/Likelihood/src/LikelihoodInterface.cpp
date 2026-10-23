@@ -100,7 +100,7 @@ void LikelihoodInterface::initializeImpl() {
   _modelPropagator_.printConfiguration();
 
   _externalConstraints_.initialize();
-  _externalConstraints_.validateParameters(_modelPropagator_.getParametersManager());
+  _externalConstraints_.bindParameters(_modelPropagator_.getParametersManager());
 
   _plotGenerator_.setModelSampleSetPtr( &_modelPropagator_.getSampleSet().getSampleList() );
   _plotGenerator_.setDataSampleSetPtr( &_dataPropagator_.getSampleSet().getSampleList() );
@@ -189,7 +189,7 @@ double LikelihoodInterface::evalPenaltyLikelihood() const {
   for( auto& parSet : _modelPropagator_.getParametersManager().getParameterSetsList() ){
     _buffer_.penaltyLikelihood += LikelihoodInterface::evalPenaltyLikelihood( parSet );
   }
-  _buffer_.penaltyLikelihood += _externalConstraints_.eval(_modelPropagator_.getParametersManager());
+  _buffer_.penaltyLikelihood += _externalConstraints_.eval();
   return _buffer_.penaltyLikelihood;
 }
 double LikelihoodInterface::evalPenaltyLikelihood(const ParameterSet& parSet_) const{
@@ -253,7 +253,7 @@ std::string LikelihoodInterface::getSummary() const {
       }
   );
   if( _externalConstraints_.isEnabled() ){
-    ss << "; external constraints: " << _externalConstraints_.eval(_modelPropagator_.getParametersManager());
+    ss << "; external constraints: " << _externalConstraints_.eval();
   }
   return ss.str();
 }

@@ -13,8 +13,8 @@ class ExternalConstraints : public JsonBaseClass {
 public:
   [[nodiscard]] auto isEnabled() const{ return _isEnabled_; }
   [[nodiscard]] auto& getGaussianConstraintList() const{ return _gaussianConstraintList_; }
-  void validateParameters(const ParametersManager& parametersManager_) const;
-  [[nodiscard]] double eval(const ParametersManager& parametersManager_) const;
+  void bindParameters(const ParametersManager& parametersManager_);
+  [[nodiscard]] double eval() const;
 
 protected:
   void configureImpl() override;
