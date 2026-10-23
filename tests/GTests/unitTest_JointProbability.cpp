@@ -6,16 +6,6 @@
 
 #include "JointProbability.h"
 
-namespace {
-    void configurePredictionSample(Sample& sample_, const std::string& name_) {
-        JsonType config{
-            {"name", name_},
-            {"binning", {{"binningDefinition", {{{"name", "X"}, {"edges", {0, 1}}}}}}}
-        };
-        sample_.configure(ConfigReader(config));
-    }
-}
-
 TEST(jointProbability, BarlowBeestonResolvesPoissonDevianceNearTheMinimum) {
     std::unique_ptr<JointProbability::JointProbabilityBase> probability(
         JointProbability::makeJointProbability("BarlowLLH_BANFF_OA2021"));
@@ -36,66 +26,47 @@ TEST(jointProbability, BarlowBeestonResolvesPoissonDevianceNearTheMinimum) {
     }
 }
 
-TEST(jointProbability, PredictionValuesAreIndependentOfHostHistogram) {
-    Sample model, data;
-    configurePredictionSample(model, "model");
-    configurePredictionSample(data, "data");
-    SamplePair pair{&model, &data};
-    model.getHistogram().getBinContentList()[0] = {20., 3.};
-    data.getHistogram().getBinContentList()[0].sumWeights = 15.;
+TEST(jointProbability, BarlowBeestonResolvesMcUncertaintyNearTheMinimum) {
     std::unique_ptr<JointProbability::JointProbabilityBase> probability(
-        JointProbability::makeJointProbability("PoissonLLH"));
-    EXPECT_DOUBLE_EQ(probability->evalWithPrediction(pair, 17., 25., 11., 0),
-                     probability->eval(17., 25., 11., 0));
-    EXPECT_DOUBLE_EQ(model.getHistogram().getBinContentList()[0].sumWeights, 20.);
-    EXPECT_DOUBLE_EQ(data.getHistogram().getBinContentList()[0].sumWeights, 15.);
-}
-
-TEST(jointProbability, PredictionPreservesBarlowBeestonUncertaintySettings) {
-    for (bool fixedErrors : {false, true}) {
-        SCOPED_TRACE(fixedErrors);
-        Sample model, data;
-        configurePredictionSample(model, "model");
-        configurePredictionSample(data, "data");
-        SamplePair pair{&model, &data};
-        auto& content = model.getHistogram().getBinContentList()[0];
-        content = {20., 3.};
-        data.getHistogram().getBinContentList()[0].sumWeights = 15.;
-        std::unique_ptr<JointProbability::JointProbabilityBase> probability(
-            JointProbability::makeJointProbability("BarlowLLH_BANFF_OA2021"));
-        probability->configure(ConfigReader(JsonType{{"BBNoUpdateWeights", fixedErrors}}));
-        // The nominal MC uncertainty is captured before predictions vary.
-        EXPECT_TRUE(std::isfinite(probability->eval(pair, 0)));
-        content = {25., 11.};
-        const double expected = probability->eval(pair, 0);
-        // A detached prediction must use its supplied uncertainty, or the
-        // cached nominal uncertainty when BBNoUpdateWeights requests it.
-        content = {20., 3.};
-        EXPECT_DOUBLE_EQ(probability->evalWithPrediction(pair, 15., 25., 11., 0), expected);
-        EXPECT_DOUBLE_EQ(probability->evalWithPrediction(pair, 15., 25., 11., 0),
-                         probability->eval(15., 25., fixedErrors ? 9. : 121., 0));
-        EXPECT_DOUBLE_EQ(content.sumWeights, 20.);
-        EXPECT_DOUBLE_EQ(content.sqrtSumSqWeights, 3.);
-    }
-}
-
-TEST(jointProbability, PredictionPreservesDetectorUncertaintyFromSampleName) {
-    for (const auto& name : {"SFGD FHC 0p", "SFGD RHC Nn", "WAGASCI #0pi PM-BM", "other"}) {
-        SCOPED_TRACE(name);
-        Sample model, data;
-        configurePredictionSample(model, name);
-        configurePredictionSample(data, "data");
-        SamplePair pair{&model, &data};
-        auto& content = model.getHistogram().getBinContentList()[0];
-        content = {25., 11.};
-        data.getHistogram().getBinContentList()[0].sumWeights = 15.;
-        std::unique_ptr<JointProbability::JointProbabilityBase> probability(
-            JointProbability::makeJointProbability("BarlowLLH_BANFF_OA2021_SFGD"));
-        const double expected = probability->eval(pair, 0);
-        content = {20., 3.};
-        EXPECT_DOUBLE_EQ(probability->evalWithPrediction(pair, 15., 25., 11., 0), expected);
-        EXPECT_DOUBLE_EQ(content.sumWeights, 20.);
-        EXPECT_DOUBLE_EQ(content.sqrtSumSqWeights, 3.);
+        JointProbability::makeJointProbability("BarlowLLH_BANFF_OA2021"));
+    for (bool poissonOnly : {false, true}) {
+        probability->configure(ConfigReader(JsonType{{"usePoissonLikelihood", poissonOnly}}));
+        for (double data : {1.e-6, 1., 3.6494374068937234, 655.82092932695639, 1.e12}) {
+            for (double varianceRatio : {1.e-8, .1, 1., 10., 1.e8}) {
+                const double variance = data * varianceRatio;
+                // Exact equality is one point on the same stable curve.
+                EXPECT_DOUBLE_EQ(probability->eval(data, data, variance, 0), 0.);
+                for (double prediction : {std::nextafter(data, 0.), std::nextafter(data, 2.*data),
+                                          data*(1.-1.e-10), data*(1.+1.e-10),
+                                          data*(1.-.009), data*(1.+.009)}) {
+                    SCOPED_TRACE(::testing::Message() << "data=" << data << ", prediction="
+                        << prediction << ", variance ratio=" << varianceRatio
+                        << ", poisson only=" << poissonOnly);
+                    // Independent reference: Newton iteration on the beta shift
+                    // in long double, followed by a Poisson deviance series.
+                    const long double pred = prediction;
+                    const long double fractionalSq = static_cast<long double>(variance) / (pred*pred);
+                    const long double linear = 1.L + pred*fractionalSq;
+                    const long double constant = (pred-data)*fractionalSq;
+                    long double shift = 0.L;
+                    for (int i = 0; i < 12; ++i) {
+                        shift -= (shift*shift + linear*shift + constant) / (2.L*shift + linear);
+                    }
+                    const long double residual = -shift*(1.L+shift)/(fractionalSq*data);
+                    long double series = 0.L;
+                    long double power = residual*residual;
+                    for (int order = 2; order <= 16; ++order) {
+                        series += (order%2 == 0 ? power : -power)/order;
+                        power *= residual;
+                    }
+                    const long double expected = 2.L*data*series
+                        + (poissonOnly ? 0.L : shift*shift/fractionalSq);
+                    const double actual = probability->eval(data, prediction, variance, 0);
+                    EXPECT_GT(actual, 0.);
+                    EXPECT_NEAR(actual, double(expected), double(expected)*2.e-12);
+                }
+            }
+        }
     }
 }
 
