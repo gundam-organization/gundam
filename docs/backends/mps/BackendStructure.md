@@ -53,6 +53,9 @@ It prepares a packed device model from the common backend representation and
 retains GPU buffers for repeated evaluations. Parameters and other changing
 inputs are supplied at propagation time; model structure is prepared during
 the build.
+Construction-only host copies of uploaded payloads, variables and binning tables
+are released after the uploads complete. Host metadata needed for cache lookup,
+event-state materialization and diagnostics remains available.
 
 Weights, contribution fractions and published histogram values use single
 precision. Event observables and interval arithmetic use compensated pairs of
