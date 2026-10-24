@@ -21,7 +21,7 @@ ENUM_FIELD( warpInterleaved )
 
   struct CudaBackendImpl;
 
-  // Resident native-double executor for 1D dials and fixed histogram bins.
+  // Resident native-double executor for scalar/Surface dials and fixed bins.
   // The public interface deliberately exposes no CUDA headers or runtime types.
   class CudaBackend : public Backend {
   public:

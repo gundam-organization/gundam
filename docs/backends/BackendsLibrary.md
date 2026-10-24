@@ -66,14 +66,23 @@ itself establish numerical validation on every model or device.
 | Small fit and full Hesse covariance regression | ✅ Original/CPU comparison and analytic covariance reference pass locally | — Not included in this regression | ✅ Both modes pass at CC, including the analytic covariance reference |
 | Standalone CUDA infrastructure test | — | — | ✅ FP64 kernel validated on CC-IN2P3 V100, interactive and Slurm batch |
 
-CUDA implements a first numerical executor for scalar dials and fixed bins.
+CUDA implements scalar and two-input Surface dials for event weights with fixed bins.
 Its defaults are `propagationMode: cachedResponses` and
 `weightLayout: warpInterleaved`. Index padding above 2x retains `eventMajor`.
-`cachedResponses` (default) retains dial responses until their transformed input
+`cachedResponses` (default) retains dial responses until any transformed input
 changes; `recomputeResponses` evaluates every unique dial on every propagation.
-Both modes recompute event weights and histograms, using native doubles. Surface
-dials, external weights, tables and event-state propagation are rejected during
+Both modes recompute event weights and histograms, using native doubles. External
+weights, tables and event-state propagation are rejected during
 model preparation. No CPU propagation fallback is performed.
+
+Bilinear/Bicubic surfaces use the shared interpolation and retain ordered x/y
+inputs, per-input mirroring, extrapolation, response bounds and smoothing.
+Disjoint dependency-pair groups prevent duplicate response writes when both
+parameters change. Scalar-only models retain the specialized scalar kernels;
+mixed models allocate the additional second-input cache only for surfaces.
+Host packing/validation tests pass locally. The new `cuda-backend-surfaces`
+device suite compares against native dials and CPU; CUDA compilation/execution
+of this extension remains to be validated at the CC.
 
 The host-side configuration/model tests pass locally without a toolkit. The
 full CUDA test executable passed all five tests on CC-IN2P3 V100 in Slurm job
@@ -127,8 +136,8 @@ the common layout can represent the dial. ❌ marks unsupported dial classes.
 | `Spline`: `MonotonicSpline` | ✅ | ✅ | ✅ |
 | `Spline`: `GeneralSpline` | ✅ | ✅ | ✅ |
 | `Graph` | ✅ | ✅ | ✅ |
-| `Surface` / `Bilinear` | ✅ | ✅ | 🚧 |
-| `Surface` / `Bicubic` | ✅ | ✅ | 🚧 |
+| `Surface` / `Bilinear` | ✅ | ✅ | ⚠️ Weights/fixed bins implemented; CUDA device validation pending |
+| `Surface` / `Bicubic` | ✅ | ✅ | ⚠️ Weights/fixed bins implemented; CUDA device validation pending |
 | `ExternalWeight` (`ExternalWeightDispatcher`) | ✅ | ✅ | 🚧 |
 | ROOT objects (`RootFormula`, `RootSpline`, `RootGraph`) | ❌ Heavy C++ objects, unsuitable for the flat backend model | ❌ Strictly incompatible with Metal device execution as C++ ROOT objects | ❌ Rejected by `EngineLayout` |
 | `Tabulated` | ⚠️ Table updated on host at each propagation | ❌ | 🚧 |
@@ -160,7 +169,7 @@ every stage runs on the GPU. MPS support applies to both `cachedResponses` and
 | Statistical likelihood | ⚠️ on host | ⚠️ on host | ⚠️ On host after histogram readback |
 | Separate `SampleLikelihoods` output | ❌ Only the total is stored | ❌ Only the total is stored | ❌ Only the total is stored |
 | Parameter inputs and per-input mirroring | ✅ | ✅ | ✅ Scalar dials / fixed bins |
-| Two-input surfaces (`Bilinear`, `Bicubic`) | ✅ | ✅ | 🚧 |
+| Two-input surfaces (`Bilinear`, `Bicubic`) | ✅ | ✅ | ⚠️ Weights/fixed bins implemented; CUDA device validation pending |
 | Dial extrapolation | ✅ | ✅ | ✅ Scalar dials / fixed bins |
 | Hard response limits and response smoothing | ✅ | ✅ | ✅ Scalar dials / fixed bins |
 | Event reweight cap | ✅ | ✅ | ✅ Scalar dials / fixed bins |

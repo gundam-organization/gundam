@@ -10,6 +10,7 @@
 
 #include <gtest/gtest.h>
 
+#include <algorithm>
 #include <limits>
 #include <stdexcept>
 
@@ -125,8 +126,7 @@ TEST(CudaWeightModel, RejectsUnsupportedFeaturesAndUnsafeLayouts) {
   view = {};
   view.propagation.samples.emplace_back().binning.isSmoothed = true;
   EXPECT_THROW((void)makeCudaWeightModel(view), std::runtime_error);
-  for( auto type : {BackendDialType::ExternalWeight, BackendDialType::Bilinear,
-                    BackendDialType::Bicubic, BackendDialType::Tabulated, BackendDialType::Kriged} ){
+  for( auto type : {BackendDialType::ExternalWeight, BackendDialType::Tabulated, BackendDialType::Kriged} ){
     view = {};
     view.propagation.dials.emplace_back().type = type;
     EXPECT_THROW((void)makeCudaWeightModel(view), std::runtime_error);
@@ -309,4 +309,108 @@ TEST(CudaWeightModel, InterleavedIndicesPreservePerEventOrderAndBoundPadding) {
   const auto fallback = makeCudaWeightModel(view, true);
   EXPECT_EQ(fallback.eventDialStride, 1);
   EXPECT_EQ(fallback.eventDialIndices, model.eventDialIndices);
+}
+
+TEST(CudaWeightModel, SurfaceDependenciesAreDisjointAndRemappedWithoutChangingProducts) {
+  using namespace Backends;
+  EngineView view;
+  auto& model = view.propagation;
+  model.parameterCount = 3;
+  model.dialInputs = {{0}, {0}, {1}, {1}, {0}, {1}, {1}, {2}};
+  model.dialPayloads = {2., 3., -1., 2., -2., 0., 3., .6, .8, 1.1, 1.2, 1.4, 1.7, 1.25};
+  for( std::size_t i = 0; i < 6; ++i ){
+    BackendDialDescriptor dial;
+    if( i == 0 or i == 2 or i == 5 ){
+      dial.type = i == 2 ? BackendDialType::Bicubic : BackendDialType::Bilinear;
+      dial.firstInput = i == 0 ? 1 : (i == 2 ? 3 : 5);
+      dial.inputCount = 2;
+      dial.payloadSize = 13;
+    }
+    else if( i == 4 ){
+      dial.type = BackendDialType::Shift;
+      dial.payloadOffset = 13;
+      dial.payloadSize = 1;
+    }
+    else{ dial.firstInput = i == 1 ? 0 : 7; dial.inputCount = 1; }
+    model.dials.push_back(dial);
+  }
+  const std::vector<std::uint32_t> references{5, 0, 2, 1, 4, 3, 0, 0};
+  const std::vector<std::uint32_t> mapped{5, 3, 4, 0, 2, 1, 3, 3};
+  model.events.resize(67);
+  for( std::size_t i = 0; i < model.events.size(); ++i ){
+    model.events[i].resultIndex = i;
+    model.eventWeights.push_back({.75, model.eventDialIndices.size(), references.size()});
+    model.eventDialIndices.insert(model.eventDialIndices.end(), references.begin(), references.end());
+  }
+  for( bool interleave : {false, true} ){
+    const auto packed = makeCudaWeightModel(view, interleave);
+    EXPECT_EQ(packed.surfaceOffset, 3);
+    EXPECT_EQ(packed.dials[0].type, BackendDialType::Norm);
+    EXPECT_EQ(packed.dials[2].type, BackendDialType::Shift);
+    EXPECT_EQ(packed.dials[3].type, BackendDialType::Bilinear);
+    EXPECT_EQ(packed.dials[4].type, BackendDialType::Bicubic);
+    EXPECT_EQ(packed.parameterDialOffsets, (std::vector<std::size_t>{0, 1, 1, 2}));
+    EXPECT_EQ(packed.parameterDialIndices, (std::vector<std::uint32_t>{0, 1, 3, 4, 5}));
+    ASSERT_EQ(packed.surfaceGroups.size(), 2);
+    EXPECT_EQ(packed.eventDialStride, interleave ? 32 : 1);
+    for( const auto& event : packed.events ){
+      for( std::size_t j = 0; j < event.dialCount; ++j ){
+        EXPECT_EQ(packed.eventDialIndices[event.firstDial + j * packed.eventDialStride], mapped[j]);
+      }
+    }
+    CudaResponseUpdatePlan plan;
+    const auto selected = [&](const std::vector<double>& values_){
+      plan.select(packed.parameterDialOffsets, {1., 1., 1.}, values_, packed.surfaceGroups);
+      std::vector<std::uint32_t> indices;
+      for( const auto& range : plan.ranges ){
+        indices.insert(indices.end(), packed.parameterDialIndices.begin() + range.firstDial,
+                       packed.parameterDialIndices.begin() + range.endDial);
+      }
+      std::sort(indices.begin(), indices.end());
+      EXPECT_EQ(indices.size(), plan.dialCount);
+      return indices;
+    };
+    EXPECT_EQ(selected({2., 1., 1.}), (std::vector<std::uint32_t>{0, 3, 4}));
+    EXPECT_EQ(selected({1., 2., 1.}), (std::vector<std::uint32_t>{3, 4, 5}));
+    EXPECT_EQ(selected({2., 2., 1.}), (std::vector<std::uint32_t>{0, 3, 4, 5}));
+    EXPECT_EQ(selected({1., 1., 2.}), (std::vector<std::uint32_t>{1}));
+    EXPECT_TRUE(selected({1., 1., 1.}).empty());
+  }
+}
+
+TEST(CudaWeightModel, RejectsMalformedSurfacesAndInvalidSecondInputs) {
+  using namespace Backends;
+  EngineView valid;
+  auto& model = valid.propagation;
+  model.parameterCount = 2;
+  model.dialInputs = {{0}, {1}};
+  model.dialPayloads = {2., 2., -1., 1., -2., 2., .5, 1., 1.5, 2.};
+  model.dials.resize(1);
+  model.dials[0].inputCount = 2;
+  model.dials[0].payloadSize = model.dialPayloads.size();
+  for( auto type : {BackendDialType::Bilinear, BackendDialType::Bicubic} ){
+    model.dials[0].type = type;
+    EXPECT_NO_THROW((void)makeCudaWeightModel(valid));
+    for( const auto& bad : std::vector<std::pair<std::size_t, double>>{
+        {0, 1.}, {0, 2.5}, {1, 3.}, {3, -1.}, {5, -2.}, {6, std::numeric_limits<double>::infinity()}} ){
+      auto view = valid;
+      view.propagation.dialPayloads[bad.first] = bad.second;
+      EXPECT_THROW((void)makeCudaWeightModel(view), std::runtime_error);
+    }
+    auto view = valid;
+    view.propagation.dialInputs[1].parameterIndex = 2;
+    EXPECT_THROW((void)makeCudaWeightModel(view), std::runtime_error);
+    view = valid;
+    view.propagation.dialInputs[1].source = DialInputSource::EventVariable;
+    EXPECT_THROW((void)makeCudaWeightModel(view), std::runtime_error);
+    view = valid;
+    view.propagation.dialInputs[1].useMirror = true;
+    EXPECT_THROW((void)makeCudaWeightModel(view), std::runtime_error);
+    view = valid;
+    view.propagation.dials[0].firstInput = 1;
+    EXPECT_THROW((void)makeCudaWeightModel(view), std::runtime_error);
+    view = valid;
+    view.propagation.dials[0].inputCount = 1;
+    EXPECT_THROW((void)makeCudaWeightModel(view), std::runtime_error);
+  }
 }

@@ -12,6 +12,7 @@
 #include <chrono>
 #include <limits>
 #include <stdexcept>
+#include <type_traits>
 
 namespace {
   constexpr unsigned int blockSize = Backends::cudaResponseBlockSize;
@@ -64,10 +65,12 @@ namespace {
     DeviceBuffer<Backends::BackendEventWeightDescriptor> events;
     DeviceBuffer<Backends::BackendDialDescriptor> dials;
     DeviceBuffer<Backends::BackendDialInputDescriptor> inputs;
-    DeviceBuffer<double> payloads, parameters, responses, previousInputs, weights, sums, sumSquares;
+    DeviceBuffer<double> payloads, parameters, responses, previousInputs, previousSecondInputs, weights, sums, sumSquares;
     DeviceBuffer<std::uint32_t> dialIndices, parameterDialIndices;
     DeviceBuffer<Backends::CudaResponseUpdate> responseUpdates;
     std::vector<std::size_t> parameterDialOffsets{};
+    std::vector<Backends::CudaSurfaceGroup> surfaceGroups{};
+    std::size_t surfaceOffset{0};
     std::vector<double> previousParameters{};
     Backends::CudaResponseUpdatePlan updatePlan{};
     DeviceBuffer<std::size_t> binOffsets, binEvents;
@@ -82,16 +85,35 @@ namespace {
     return static_cast<unsigned int>(std::min<std::size_t>((size_ - 1) / blockSize + 1, 65535));
   }
 
+  template<bool surfaces_>
   __device__ void evaluateResponse(std::size_t i, const Backends::BackendDialDescriptor* dials_,
                                   const Backends::BackendDialInputDescriptor* inputs_, const double* payloads_,
                                   const double* parameters_, double* responses_, double* previousInputs_,
-                                  bool reuse_, int* error_) {
+                                  bool reuse_, int* error_, double* previousSecondInputs_, std::size_t surfaceOffset_) {
     using namespace Backends;
     const auto& dial = dials_[i];
     double input = 0.;
     if( dial.type != BackendDialType::Shift ){
       const auto& descriptor = inputs_[dial.firstInput];
       input = Semantics::transformDialInput(descriptor, parameters_[descriptor.parameterIndex]);
+    }
+    if constexpr( surfaces_ ){
+      if( i >= surfaceOffset_ ){
+        const auto& second = inputs_[dial.firstInput + 1];
+        const double y = Semantics::transformDialInput(second, parameters_[second.parameterIndex]);
+        if( not ::isfinite(input) or not ::isfinite(y) ){
+          responses_[i] = 0.; atomicExch(error_, 1); return;
+        }
+        const auto slot = i - surfaceOffset_;
+        if( reuse_ and previousInputs_[i] == input and previousSecondInputs_[slot] == y ){ return; }
+        const double response = Semantics::clampDialResponse(dial, GundamDeviceMath::EvaluateSurface(
+            input, y, payloads_ + dial.payloadOffset, dial.type == BackendDialType::Bicubic, dial.allowExtrapolation));
+        if( not ::isfinite(response) ){ atomicExch(error_, 1); }
+        responses_[i] = ::isfinite(response) ? response : 0.;
+        previousInputs_[i] = input;
+        previousSecondInputs_[slot] = y;
+        return;
+      }
     }
     if( not ::isfinite(input) ){ responses_[i] = 0.; atomicExch(error_, 1); return; }
     if( reuse_ and previousInputs_[i] == input ){ return; }
@@ -115,20 +137,24 @@ namespace {
     previousInputs_[i] = input;
   }
 
+  template<bool surfaces_>
   __global__ void evaluateResponses(const Backends::BackendDialDescriptor* dials_, std::size_t count_,
                                     const Backends::BackendDialInputDescriptor* inputs_, const double* payloads_,
                                     const double* parameters_, double* responses_, double* previousInputs_,
-                                    bool reuse_, int* error_) {
+                                    bool reuse_, int* error_, double* previousSecondInputs_, std::size_t surfaceOffset_) {
     for( std::size_t i = std::size_t(blockIdx.x) * blockDim.x + threadIdx.x;
          i < count_; i += std::size_t(blockDim.x) * gridDim.x ){
-      evaluateResponse(i, dials_, inputs_, payloads_, parameters_, responses_, previousInputs_, reuse_, error_);
+      evaluateResponse<surfaces_>(i, dials_, inputs_, payloads_, parameters_, responses_, previousInputs_, reuse_, error_,
+                                  previousSecondInputs_, surfaceOffset_);
     }
   }
 
+  template<bool surfaces_>
   __global__ void evaluateSelectedResponses(const Backends::CudaResponseUpdate* updates_,
       std::size_t rangeCount_, std::size_t blockCount_, const std::uint32_t* indices_,
       const Backends::BackendDialDescriptor* dials_, const Backends::BackendDialInputDescriptor* inputs_,
-      const double* payloads_, const double* parameters_, double* responses_, double* previousInputs_, int* error_) {
+      const double* payloads_, const double* parameters_, double* responses_, double* previousInputs_, int* error_,
+      double* previousSecondInputs_, std::size_t surfaceOffset_) {
     __shared__ std::size_t first, end;
     for( std::size_t block = blockIdx.x; block < blockCount_; block += gridDim.x ){
       if( threadIdx.x == 0 ){
@@ -146,7 +172,8 @@ namespace {
       __syncthreads();
       const auto index = first + threadIdx.x;
       if( index < end ){
-        evaluateResponse(indices_[index], dials_, inputs_, payloads_, parameters_, responses_, previousInputs_, true, error_);
+        evaluateResponse<surfaces_>(indices_[index], dials_, inputs_, payloads_, parameters_, responses_, previousInputs_, true, error_,
+                                    previousSecondInputs_, surfaceOffset_);
       }
       __syncthreads(); // Shared bounds must survive until every thread finished.
     }
@@ -254,13 +281,16 @@ void Backends::CudaDeviceContext::build(const CudaWeightModel& model_) {
     b.parameterDialIndices.upload(model_.parameterDialIndices, _impl_->stream);
     b.parameterDialOffsets = model_.parameterDialOffsets;
     b.previousParameters.resize(model_.parameterCount);
-    b.updatePlan.ranges.reserve(model_.parameterCount);
-    b.responseUpdates.allocate(model_.parameterCount);
+    b.surfaceGroups = model_.surfaceGroups;
+    b.surfaceOffset = model_.surfaceOffset;
+    b.updatePlan.ranges.reserve(model_.parameterCount + b.surfaceGroups.size());
+    b.responseUpdates.allocate(model_.parameterCount + b.surfaceGroups.size());
     b.binOffsets.upload(model_.binOffsets, _impl_->stream);
     b.binEvents.upload(model_.binEvents, _impl_->stream);
     b.parameters.allocate(model_.parameterCount);
     b.responses.allocate(model_.dials.size());
     b.previousInputs.allocate(model_.dials.size());
+    b.previousSecondInputs.allocate(model_.dials.size() - model_.surfaceOffset);
     b.weights.allocate(model_.events.size());
     b.sums.allocate(model_.binOffsets.size() - 1);
     b.sumSquares.allocate(b.sums.size);
@@ -286,7 +316,7 @@ void Backends::CudaDeviceContext::propagate(const std::vector<double>& parameter
   try{
     const bool reuse = b.cachePrimed and not recomputeResponses_;
     const auto preparationStart = std::chrono::steady_clock::now();
-    if( reuse ){ b.updatePlan.select(b.parameterDialOffsets, b.previousParameters, parameters_); }
+    if( reuse ){ b.updatePlan.select(b.parameterDialOffsets, b.previousParameters, parameters_, b.surfaceGroups); }
     // Dense updates retain the original contiguous traversal. Sparse dispatch
     // avoids a full dial scan and uploads only one range per changed parameter.
     const bool sparse = reuse and b.updatePlan.dialCount <= b.dials.size / 2;
@@ -305,20 +335,25 @@ void Backends::CudaDeviceContext::propagate(const std::vector<double>& parameter
                                 cudaMemcpyHostToDevice, stream), "parameter upload");
     }
     record(1);
-    if( sparse and candidates ){
-      const auto blocks = static_cast<unsigned int>(std::min<std::size_t>(b.updatePlan.blockCount, 65535));
-      evaluateSelectedResponses<<<blocks, blockSize, 0, stream>>>(b.responseUpdates.data,
-          b.updatePlan.ranges.size(), b.updatePlan.blockCount, b.parameterDialIndices.data,
-          b.dials.data, b.inputs.data, b.payloads.data, b.parameters.data,
-          b.responses.data, b.previousInputs.data, b.error.data);
-      checkCuda(cudaGetLastError(), "selected dial response kernel launch");
-    }
-    else if( not sparse and b.dials.size ){
-      evaluateResponses<<<gridSize(b.dials.size), blockSize, 0, stream>>>(b.dials.data, b.dials.size,
-          b.inputs.data, b.payloads.data, b.parameters.data, b.responses.data, b.previousInputs.data,
-          reuse, b.error.data);
-      checkCuda(cudaGetLastError(), "dial response kernel launch");
-    }
+    auto launchResponses = [&](auto surfaceTag_){
+      constexpr bool withSurfaces = decltype(surfaceTag_)::value;
+      if( sparse and candidates ){
+        const auto blocks = static_cast<unsigned int>(std::min<std::size_t>(b.updatePlan.blockCount, 65535));
+        evaluateSelectedResponses<withSurfaces><<<blocks, blockSize, 0, stream>>>(b.responseUpdates.data,
+            b.updatePlan.ranges.size(), b.updatePlan.blockCount, b.parameterDialIndices.data,
+            b.dials.data, b.inputs.data, b.payloads.data, b.parameters.data,
+            b.responses.data, b.previousInputs.data, b.error.data, b.previousSecondInputs.data, b.surfaceOffset);
+        checkCuda(cudaGetLastError(), "selected dial response kernel launch");
+      }
+      else if( not sparse and b.dials.size ){
+        evaluateResponses<withSurfaces><<<gridSize(b.dials.size), blockSize, 0, stream>>>(b.dials.data, b.dials.size,
+            b.inputs.data, b.payloads.data, b.parameters.data, b.responses.data, b.previousInputs.data,
+            reuse, b.error.data, b.previousSecondInputs.data, b.surfaceOffset);
+        checkCuda(cudaGetLastError(), "dial response kernel launch");
+      }
+    };
+    if( b.surfaceOffset < b.dials.size ){ launchResponses(std::true_type{}); }
+    else{ launchResponses(std::false_type{}); }
     record(2);
     if( b.events.size ){
       if( b.interleavedEventDials ){

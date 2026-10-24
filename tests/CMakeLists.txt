@@ -119,7 +119,8 @@ if( WITH_GOOGLE_TEST )
   if(WITH_BACKENDS AND GUNDAM_CUDA_ENABLED)
     add_executable(gundamGTest_cudaBackend.exe
         GTests/unitTest_CudaBackendDevice.cpp
-        GTests/unitTest_CudaBackendPropagation.cpp)
+        GTests/unitTest_CudaBackendPropagation.cpp
+        GTests/unitTest_CudaBackendSurface.cpp)
     target_link_libraries(gundamGTest_cudaBackend.exe PRIVATE
         GTest::gtest_main GundamBackends CUDA::cudart)
     set_property(TARGET gundamGTest_cudaBackend.exe APPEND PROPERTY
@@ -127,7 +128,8 @@ if( WITH_GOOGLE_TEST )
     # Register without discovery: building must work without an allocated GPU.
     add_test(NAME cuda-backend-skeleton COMMAND gundamGTest_cudaBackend.exe --gtest_filter=CudaBackendDevice.*)
     add_test(NAME cuda-backend-propagation COMMAND gundamGTest_cudaBackend.exe --gtest_filter=CudaBackendPropagation.*)
-    set_tests_properties(cuda-backend-skeleton cuda-backend-propagation PROPERTIES LABELS "cuda;device" TIMEOUT 120)
+    add_test(NAME cuda-backend-surfaces COMMAND gundamGTest_cudaBackend.exe --gtest_filter=CudaBackendSurface.*)
+    set_tests_properties(cuda-backend-skeleton cuda-backend-propagation cuda-backend-surfaces PROPERTIES LABELS "cuda;device" TIMEOUT 120)
   endif()
 
   ## Create a list of all of the regular tests.  These are always

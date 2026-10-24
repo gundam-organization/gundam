@@ -126,6 +126,8 @@ void Backends::CudaBackend::buildShared(std::shared_ptr<const EngineView> engine
   _impl_->engineView = std::move(engineView_);
   _impl_->diagnostics = {
       {"available", true}, {"events", packed.events.size()}, {"uniqueDials", packed.dials.size()},
+      {"surfaceDials", packed.dials.size() - packed.surfaceOffset},
+      {"surfaceDependencyGroups", packed.surfaceGroups.size()},
       {"requestedWeightLayout", _weightLayout_.toString()},
       {"weightLayout", packed.eventDialStride == 32 ? "warpInterleaved" : "eventMajor"},
       {"originalEventDialIndices", getEngineView().propagation.eventDialIndices.size()},

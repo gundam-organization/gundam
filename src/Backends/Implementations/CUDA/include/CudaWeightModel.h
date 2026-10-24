@@ -8,6 +8,13 @@
 #include <vector>
 
 namespace Backends {
+  // Disjoint surface response slots sharing one unordered dependency pair.
+  // Ordered x/y input descriptors remain attached to each individual dial.
+  struct CudaSurfaceGroup {
+    std::size_t firstParameter{0}, secondParameter{0};
+    std::size_t firstDial{0}, endDial{0};
+  };
+
   // Native-double model. Events are in result-slot order; histogram lists retain
   // the original event traversal order, independently of those result slots.
   struct CudaWeightModel {
@@ -17,9 +24,13 @@ namespace Backends {
     std::vector<double> payloads{};
     std::vector<std::uint32_t> eventDialIndices{};
     std::size_t eventDialStride{1};
-    // CSR inverse index: constant Shift dials are initialized by the dense pass.
+    // Scalar CSR followed by disjoint surface groups in parameterDialIndices.
+    // Constant Shift dials are initialized by the dense pass.
     std::vector<std::size_t> parameterDialOffsets{};
     std::vector<std::uint32_t> parameterDialIndices{};
+    std::vector<CudaSurfaceGroup> surfaceGroups{};
+    // Surface dials form a suffix, allowing a compact cache of second inputs.
+    std::size_t surfaceOffset{0};
     std::vector<std::size_t> binOffsets{};
     std::vector<std::size_t> binEvents{};
     std::size_t parameterCount{0};
@@ -45,7 +56,7 @@ namespace Backends {
     std::size_t dialCount{0};
     std::size_t blockCount{0};
     void select(const std::vector<std::size_t>& offsets_, const std::vector<double>& previous_,
-                const std::vector<double>& current_);
+                const std::vector<double>& current_, const std::vector<CudaSurfaceGroup>& surfaceGroups_ = {});
   };
 }
 #endif

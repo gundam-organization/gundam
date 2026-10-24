@@ -1,9 +1,11 @@
 # Multi-input dials
 
-CPU and MPS support `Surface` dials with the `Bilinear` and `Bicubic`
+CPU, MPS and CUDA implement `Surface` dials with the `Bilinear` and `Bicubic`
 subtypes and two ordered parameter inputs. Existing configuration is used
 unchanged, including per-input mirroring, extrapolation and response limits.
-Surfaces can contribute to event weights or observable responses.
+Surfaces can contribute to event weights; CPU and MPS also support observable
+responses. CUDA currently requires fixed bins and parameter inputs. CUDA surface
+device compilation/execution is pending CC validation.
 
 `BackendDialDescriptor::firstInput/inputCount` addresses an ordered range in
 the common input table. Inputs carry a `DialInputSource`; `Parameter` is
@@ -35,6 +37,19 @@ parameter dependencies, preventing duplicate GPU writes on simultaneous changes.
 External-weight dials retain their generation-based invalidation even when their
 producer declares multiple parameter dependencies.
 
+CUDA keeps its scalar CSR index and appends disjoint groups keyed by an
+unordered pair of parameter dependencies. Each surface belongs to exactly one
+group, even when the two parameters change together or both input slots refer
+to the same parameter. Ordered input descriptors and their mirror transforms
+stay on the dial itself. The cached response is reused only when both
+transformed inputs match; `recomputeResponses` always evaluates all dials.
+
+The private CUDA model stores surface descriptors in a suffix and remaps dial
+references without changing each event's multiplication order or result slot.
+This allows a second-input cache sized only to the number of surfaces. A
+separate kernel specialization preserves the scalar-only evaluation path.
+Both event-major and warp-interleaved event-weight layouts are supported.
+
 In `recomputeResponses` mode, compatible scalar fixed-bin models use the
 packed-weight executor. Its 24-byte spline descriptors, 16-byte norm/external
 occurrences, kernels and payload layouts are unchanged. The common host input
@@ -49,6 +64,26 @@ coordinate reads. Payload shape and increasing finite coordinates are validated
 while preparing the backend.
 
 ## Validation
+
+CUDA host tests in `unitTest_CudaBackend.cpp` cover payload validation, invalid
+second inputs, disjoint dependency groups and event-reference remapping in
+both weight layouts. The dedicated GPU file `unitTest_CudaBackendSurface.cpp`
+covers native/CPU comparisons on asymmetric irregular axes, both propagation
+modes and weight layouts, x-only/y-only/simultaneous/repeated/unused changes,
+mirrors, limits, extrapolation, caps, outside events, repeated references,
+2-knot and greater-than-16-knot axes, numerical errors and cache recovery.
+It is registered as `cuda-backend-surfaces` only in CUDA-enabled builds and
+requires an allocated GPU, like the other explicitly labelled device tests.
+Its C++ syntax is checked locally; NVCC compilation and execution remain pending.
+
+After rebuilding the CUDA test executable in an allocation:
+
+```sh
+cmake --build /sps/t2k/ablanche/build/gundam \
+  --target gundamGTest_cudaBackend.exe -j4 &&
+ctest --test-dir /sps/t2k/ablanche/build/gundam \
+  -R '^cuda-backend-' --no-tests=error --output-on-failure
+```
 
 `unitTest_BackendSurface.cpp` compares both surface subtypes to the original
 `DialBase::evalResponse` on irregular axes. It covers scalar/surface mixtures,

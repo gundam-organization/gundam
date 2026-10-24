@@ -1,8 +1,10 @@
 #include "CudaWeightModel.h"
+#include "Semantics/BackendDialSemantics.h"
 
 #include <algorithm>
 #include <cmath>
 #include <limits>
+#include <map>
 #include <stdexcept>
 #include <string>
 #include <type_traits>
@@ -27,15 +29,21 @@ namespace {
       case BackendDialType::UniformSpline: require(size >= 6 and (size - 2) % 2 == 0, "invalid uniform spline payload."); break;
       case BackendDialType::GeneralSpline: require(size >= 8 and (size - 2) % 3 == 0, "invalid general spline payload."); break;
       case BackendDialType::Graph: require(size >= 2 and size % 2 == 0, "invalid graph payload."); break;
-      default: throw std::runtime_error("CudaBackend supports only Norm, Shift, 1D splines and Graph for now.");
+      case BackendDialType::Bilinear:
+      case BackendDialType::Bicubic: Semantics::validateSurfaceDial(model_, dial_); break;
+      default: throw std::runtime_error("CudaBackend supports Norm, Shift, 1D splines, Graph and 2D Surface dials.");
     }
     if( dial_.type != BackendDialType::Shift ){
-      require(dial_.inputCount == 1 and dial_.firstInput < model_.dialInputs.size(), "1D dials require one valid parameter input.");
-      const auto& input = model_.dialInputs[dial_.firstInput];
-      require(input.source == DialInputSource::Parameter and input.parameterIndex < model_.parameterCount,
-              "event-variable dial inputs are not supported; parameter index must be valid.");
-      require(not input.useMirror or (std::isfinite(input.mirrorMin) and std::isfinite(input.mirrorRange)
-              and input.mirrorRange > 0.), "mirror range must be finite and positive.");
+      const auto count = dial_.type == BackendDialType::Bilinear or dial_.type == BackendDialType::Bicubic ? 2u : 1u;
+      require(dial_.inputCount == count and dial_.firstInput <= model_.dialInputs.size()
+              and count <= model_.dialInputs.size() - dial_.firstInput, "invalid dial parameter input range.");
+      for( std::size_t i = 0; i < count; ++i ){
+        const auto& input = model_.dialInputs[dial_.firstInput + i];
+        require(input.source == DialInputSource::Parameter and input.parameterIndex < model_.parameterCount,
+                "event-variable dial inputs are not supported; parameter index must be valid.");
+        require(not input.useMirror or (std::isfinite(input.mirrorMin) and std::isfinite(input.mirrorRange)
+                and input.mirrorRange > 0.), "mirror range must be finite and positive.");
+      }
     }
     for( std::size_t i = 0; i < size; ++i ){
       require(std::isfinite(model_.dialPayloads[dial_.payloadOffset + i]), "dial payload must be finite.");
@@ -92,9 +100,26 @@ Backends::CudaWeightModel Backends::makeCudaWeightModel(const EngineView& view_,
   CudaWeightModel out;
   require(model.dials.size() <= std::numeric_limits<std::uint32_t>::max(), "too many CUDA dials.");
   require(model.parameterCount < std::numeric_limits<std::size_t>::max(), "parameter count overflow.");
+  auto isSurface = [](const auto& dial_){
+    return dial_.type == BackendDialType::Bilinear or dial_.type == BackendDialType::Bicubic;
+  };
+  out.surfaceOffset = std::count_if(model.dials.begin(), model.dials.end(),
+                                  [&](const auto& dial_){ return not isSurface(dial_); });
+  std::vector<std::uint32_t> dialSlots;
+  if( out.surfaceOffset != model.dials.size() ){
+    out.dials.resize(model.dials.size());
+    dialSlots.resize(model.dials.size());
+    std::size_t scalar = 0, surface = out.surfaceOffset;
+    for( std::size_t i = 0; i < model.dials.size(); ++i ){
+      const auto slot = isSurface(model.dials[i]) ? surface++ : scalar++;
+      out.dials[slot] = model.dials[i];
+      dialSlots[i] = static_cast<std::uint32_t>(slot);
+    }
+  }
+  else{ out.dials = model.dials; }
   out.parameterDialOffsets.assign(model.parameterCount + 1, 0);
-  for( const auto& dial : model.dials ){
-    if( dial.type != BackendDialType::Shift ){
+  for( const auto& dial : out.dials ){
+    if( dial.type != BackendDialType::Shift and not isSurface(dial) ){
       ++out.parameterDialOffsets[model.dialInputs[dial.firstInput].parameterIndex + 1];
     }
   }
@@ -103,12 +128,23 @@ Backends::CudaWeightModel Backends::makeCudaWeightModel(const EngineView& view_,
   }
   out.parameterDialIndices.resize(out.parameterDialOffsets.back());
   auto dialPositions = out.parameterDialOffsets;
-  for( std::size_t i = 0; i < model.dials.size(); ++i ){
-    const auto& dial = model.dials[i];
+  for( std::size_t i = 0; i < out.surfaceOffset; ++i ){
+    const auto& dial = out.dials[i];
     if( dial.type != BackendDialType::Shift ){
       out.parameterDialIndices[dialPositions[model.dialInputs[dial.firstInput].parameterIndex]++]
           = static_cast<std::uint32_t>(i);
     }
+  }
+  std::map<std::pair<std::size_t, std::size_t>, std::vector<std::uint32_t>> surfaceGroups;
+  for( std::size_t i = out.surfaceOffset; i < out.dials.size(); ++i ){
+    const auto first = model.dialInputs[out.dials[i].firstInput].parameterIndex;
+    const auto second = model.dialInputs[out.dials[i].firstInput + 1].parameterIndex;
+    surfaceGroups[{std::min(first, second), std::max(first, second)}].push_back(static_cast<std::uint32_t>(i));
+  }
+  for( const auto& group : surfaceGroups ){
+    const auto first = out.parameterDialIndices.size();
+    out.parameterDialIndices.insert(out.parameterDialIndices.end(), group.second.begin(), group.second.end());
+    out.surfaceGroups.push_back({group.first.first, group.first.second, first, out.parameterDialIndices.size()});
   }
   out.binOffsets.assign(std::size_t(model.totalBins) + 1, 0);
   std::vector<bool> seen(model.events.size(), false);
@@ -131,7 +167,6 @@ Backends::CudaWeightModel Backends::makeCudaWeightModel(const EngineView& view_,
     require(sample.dataSums.empty() or bool(sample.evalBin), "likelihood evaluator is missing.");
   }
   out.events = model.eventWeights;
-  out.dials = model.dials;
   out.inputs = model.dialInputs;
   out.payloads = model.dialPayloads;
   if( interleaveEventDials_ and not out.events.empty() ){
@@ -171,6 +206,9 @@ Backends::CudaWeightModel Backends::makeCudaWeightModel(const EngineView& view_,
     }
   }
   if( out.eventDialStride == 1 ){ out.eventDialIndices = model.eventDialIndices; }
+  if( not dialSlots.empty() ){
+    for( auto& index : out.eventDialIndices ){ index = dialSlots[index]; }
+  }
   out.parameterCount = model.parameterCount;
   out.hasReweightCap = model.hasReweightCap;
   out.maxReweight = model.maxReweight;
@@ -178,7 +216,8 @@ Backends::CudaWeightModel Backends::makeCudaWeightModel(const EngineView& view_,
 }
 
 void Backends::CudaResponseUpdatePlan::select(const std::vector<std::size_t>& offsets_,
-    const std::vector<double>& previous_, const std::vector<double>& current_) {
+    const std::vector<double>& previous_, const std::vector<double>& current_,
+    const std::vector<CudaSurfaceGroup>& surfaceGroups_) {
   require(previous_.size() == current_.size() and offsets_.size() == current_.size() + 1,
           "response update parameter layout mismatch.");
   ranges.clear();
@@ -187,6 +226,14 @@ void Backends::CudaResponseUpdatePlan::select(const std::vector<std::size_t>& of
     if( previous_[i] == current_[i] or offsets_[i] == offsets_[i + 1] ){ continue; }
     const auto count = offsets_[i + 1] - offsets_[i];
     ranges.push_back({offsets_[i], offsets_[i + 1], blockCount});
+    dialCount += count;
+    blockCount += (count - 1) / cudaResponseBlockSize + 1;
+  }
+  for( const auto& group : surfaceGroups_ ){
+    if( previous_[group.firstParameter] == current_[group.firstParameter]
+        and previous_[group.secondParameter] == current_[group.secondParameter] ){ continue; }
+    const auto count = group.endDial - group.firstDial;
+    ranges.push_back({group.firstDial, group.endDial, blockCount});
     dialCount += count;
     blockCount += (count - 1) / cudaResponseBlockSize + 1;
   }
