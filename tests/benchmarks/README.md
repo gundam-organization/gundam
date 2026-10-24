@@ -435,3 +435,74 @@ resolved configuration, parameter manifest, parameter-sequence digests, every
 likelihood and final histogram contents/errors exactly, and writes
 `comparison.json`. RSS depends on page residency and macOS compression; buffer
 capacity and allocator reservations must not be interpreted as resident bytes.
+## CUDA production profiling
+
+`229CudaBackendProfiling.py` profiles the full selected production model using
+Asimov data, without Migrad, Hesse, PCA, plots or step-response scans. It loads
+one model per case in a fresh process and keeps it resident across all trials.
+Default cases are CUDA `cachedResponses` and `recomputeResponses`; add `CPU`
+for a numerical and performance reference on the same machine and thread count.
+Backend-specific configuration is replaced for each case; input files, selections
+and dataset limits from the config/overrides are preserved.
+
+Build with `WITH_PYTHON_INTERFACE=ON`, `WITH_BACKENDS=ON` and `WITH_CUDA_LIB=ON`.
+Use the Python interpreter matching the compiled GUNDAM module and an allocated
+GPU at the CC. From the repository root, for example:
+
+```sh
+PYTHONPATH=/sps/t2k/ablanche/build/gundam/src/PythonInterface${PYTHONPATH:+:$PYTHONPATH} \
+python3 tests/benchmarks/229CudaBackendProfiling.py \
+  --work-dir /path/to/GundamInputOA2024 \
+  --config configOA2024.yaml \
+  --override override/v13Prod.yaml override/backendCudaTest.yaml \
+  --cases CUDA-cachedResponses CUDA-recomputeResponses CPU \
+  --threads 4 --calls 30 --global-calls 10 --trials 2 --warmup 5 \
+  --output /sps/t2k/ablanche/work/results/cuda-oa2024-profile
+```
+
+The output directory must be new. The same seeded proposals are replayed in
+each case. Scenarios are `constant`, `local1`, `local2`, and `global`. Local
+scenarios always cover all eligible fit coordinates, so `--calls 30` is a
+minimum: 842 coordinates require at least 842 local1 and 421 local2 calls per
+trial. The shared CPU/MPS proposal helper selects enabled, unfixed coordinates
+with enabled penalties, using effective eigen coordinates when configured.
+The default proposal scale is 0.1 prior sigma. This workload helps locate
+propagation costs; it does not reproduce the exact call distribution of Migrad.
+
+For a shorter first pass, use `--scenarios constant global --calls 10
+--global-calls 10 --trials 1 --warmup 2`; initialization still loads the full
+selected model. CPU is optional because it requires another full initialization.
+Use a second run with `--threads 8` if you want the eight-thread CPU reference;
+thread count applies to every selected case in a run.
+
+Read `report.md` first, then `summary.json` and each case's
+`local1-coordinate-costs.json`. Raw per-call measurements, resolved config,
+parameter manifest and native log are saved in each case directory. Hardware,
+Slurm environment, source commit and loaded module path/hash are recorded.
+An unavailable backend/device fails the benchmark, rather than producing a
+successful report without GPU measurements.
+
+CUDA uses existing stream events to time parameter upload/error reset, dial
+responses, event weights and histogram reduction. No extra stage synchronization
+is introduced by the script. It also measures full evaluation, parameter setters,
+host preparation, histogram readback and host statistical likelihood. Explicit
+histogram materialization is outside evaluation timers, and event readbacks are
+forbidden during measurements. Histogram readback needed by the host likelihood
+remains part of evaluation time.
+
+GPU total overlaps the synchronous host evaluation; do not add those timers.
+The host preparation includes propagation input preparation; the remaining
+evaluation time may include penalty evaluation, launches, synchronization and
+other fitter bookkeeping. CUDA `deviceWaitSeconds`/`commandEncodeSeconds` are
+not currently populated, so this script does not present them as measurements.
+The response timer covers both response modes despite its API name
+`cachedDialStageSeconds`. GPU stage rankings point to candidates for further
+profiling; they do not measure bandwidth, cache misses or occupancy.
+
+`comparison.json` checks every measured likelihood, proposal sequence and final
+histogram contents/errors of every trial (relative `1e-9`, absolute `1e-7`). It
+reports speedups against CPU when included, otherwise against the first case.
+It fails on a numerical mismatch and leaves raw results available for diagnosis.
+Timing differences are never a pass/fail criterion. CUDA execution of this new
+benchmark remains to be validated at the CC; its CPU path was exercised locally
+on a small two-parameter model.

@@ -118,5 +118,10 @@ the analytic reference. The maximum covariance difference divided by posterior
 standard-deviation products is about `2.7e-10`, with maximum absolute correlation
 difference about `2.3e-10`. The CPU/original comparison takes less than a second.
 The no-CUDA and no-backend skip paths, and the strict-CUDA failure path, have
-also been checked locally. The CUDA fit/covariance comparisons require execution
-at the CC; the earlier five CUDA device/propagation tests do not cover this fit.
+also been checked locally. The three `BackendFitCovariance_*.json` reports
+returned from the CC on 2026-10-24 all have `passed: true`. Both CUDA modes
+agree with CPU to `1.93e-10` in covariance entries normalized by posterior
+standard-deviation products and `1.14e-10` in absolute correlation difference.
+All fits have status 0, covariance status 3 and 92 calls. Both modes returned
+identical fit/covariance results. This small regression does not validate the
+full production OA2024 covariance.

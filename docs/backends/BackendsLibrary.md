@@ -36,6 +36,7 @@ with each backend:
 - [CUDA implementation and validation](../guides/CudaBackend.md).
 - [Multi-input dials](MultiInputDials.md).
 - [Small-fit and Hesse covariance regression](BackendFitCovariance.md).
+- [CUDA production profiling](../../tests/benchmarks/README.md#cuda-production-profiling).
 
 ## Compatibility
 
@@ -60,7 +61,7 @@ itself establish numerical validation on every model or device.
 | Host materialization | ✅ Event state, weights and histograms | ✅ Event state, weight and histogram readback | ⚠️ Lazy weight/histogram readback; no event-state output |
 | Dial-response and event-state caches | ✅ | ✅ Depends on propagation mode | ⚠️ GPU response cache by effective scalar input; no event-state cache |
 | Numerical regression tests | ✅ CPU comparisons | ✅ MPS comparisons | ✅ Both modes compared against CPU on CC V100; error/retry tests passed |
-| Small fit and full Hesse covariance regression | ✅ Original/CPU comparison and analytic covariance reference pass locally | — Not included in this regression | ⚠️ Both modes implemented in optional regular tests; CC execution pending |
+| Small fit and full Hesse covariance regression | ✅ Original/CPU comparison and analytic covariance reference pass locally | — Not included in this regression | ✅ Both modes pass at CC, including the analytic covariance reference |
 | Standalone CUDA infrastructure test | — | — | ✅ FP64 kernel validated on CC-IN2P3 V100, interactive and Slurm batch |
 
 CUDA implements a first numerical executor for scalar dials and fixed bins.
@@ -93,7 +94,12 @@ The optional [fit/covariance regular tests](BackendFitCovariance.md) generate
 Migrad and Hesse. They compare the original engine with CPU, then CPU with
 each CUDA mode, including full covariance/correlation matrices and eigenvalues.
 An independent analytic covariance anchors all fits. The original/CPU comparison
-passes locally in less than a second; the CUDA fit comparisons await CC execution.
+passes locally in less than a second. The three reports returned from the CC also
+pass: CUDA in both modes gives a maximum covariance difference normalized by
+posterior standard-deviation products of `1.93e-10` and a maximum absolute
+correlation difference of `1.14e-10`. All fits have status 0, covariance status 3,
+and take 92 calls. This validates the small regression model, not the full
+production OA2024 covariance.
 Unavailable backends or devices produce skips by default, while
 `GUNDAM_REQUIRE_CUDA_TESTS=1` requires GPU execution in a validation job.
 
