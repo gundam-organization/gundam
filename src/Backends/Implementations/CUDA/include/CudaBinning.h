@@ -23,6 +23,14 @@ namespace Backends {
   inline constexpr double cudaBinningEpsilon = std::numeric_limits<double>::epsilon();
 
   namespace Semantics {
+    GUNDAM_BACKEND_HOST_DEVICE inline bool cudaBinningIsFinite(double value_) {
+#ifdef __CUDA_ARCH__
+      return ::isfinite(value_);
+#else
+      return std::isfinite(value_);
+#endif
+    }
+
     GUNDAM_BACKEND_HOST_DEVICE inline double cudaBinFraction(
         const BinningBin& bin_, const BinningInterval* intervals_, const double* values_) {
       double fraction = 1.;
@@ -42,19 +50,19 @@ namespace Backends {
         const CudaBinningSample& sample_, const BinningBin* bins_, const BinningInterval* intervals_, const double* values_) {
       CudaBinningResult result;
       for( std::size_t j = 0; j < sample_.variableCount; ++j ){
-        if( not ::isfinite(values_[j]) ){ result.isValid = false; return result; }
+        if( not cudaBinningIsFinite(values_[j]) ){ result.isValid = false; return result; }
       }
       double largest = -1.;
       for( std::size_t j = sample_.firstBin; j < sample_.endBin; ++j ){
         const double fraction = cudaBinFraction(bins_[j], intervals_, values_);
-        if( not ::isfinite(fraction) or fraction < 0. ){ result.isValid = false; return result; }
+        if( not cudaBinningIsFinite(fraction) or fraction < 0. ){ result.isValid = false; return result; }
         if( fraction == 0. ){ continue; }
         ++result.count;
         result.total += fraction;
         if( fraction > largest ){ largest = fraction; result.largestBin = j; }
       }
       const double tolerance = 64. * cudaBinningEpsilon * double(result.count ? result.count : 1);
-      if( not ::isfinite(result.total) or result.total > 1. + tolerance ){
+      if( not cudaBinningIsFinite(result.total) or result.total > 1. + tolerance ){
         result.isValid = false;
         return result;
       }
