@@ -10,7 +10,7 @@ bool Backends::MpsBackendImpl::buildWeightModel() {
   deviceModelFallbackReason.clear();
   if( not isAvailable ){ deviceModelFallbackReason = "Metal is not available."; return false; }
   DeviceWeightModel packed;
-  if( not packDeviceWeightModel(model, enableCachedDialResponses, packed, buildTiming,
+  if( not packDeviceWeightModel(model, packed, buildTiming,
                                   deviceModelFallbackReason, "MPS backend") ){ return false; }
   MpsSplinePayloadLayout(packed).apply(packed);
   auto lastStageStart = std::chrono::steady_clock::now();
@@ -139,8 +139,8 @@ bool Backends::MpsBackendImpl::buildWeightModel() {
   monotonicCachedDialIndicesBuffer = uploadCachedIndices(monotonicDialDescriptors, monotonicDialDescriptorCount, monotonicCachedDialCount);
   generalCachedDialIndicesBuffer = uploadCachedIndices(generalDialDescriptors, generalDialDescriptorCount, generalCachedDialCount);
   graphCachedDialIndicesBuffer = uploadCachedIndices(graphDialDescriptors, graphDialDescriptorCount, graphCachedDialCount);
-  const auto cachedResponseBufferBytes = [this](std::size_t descriptorCount_){
-    return (enableCachedDialResponses ? descriptorCount_ : std::size_t(1)) * sizeof(float);
+  const auto cachedResponseBufferBytes = [](std::size_t descriptorCount_){
+    return descriptorCount_ * sizeof(float);
   };
   compactCachedResponsesBuffer = makePrivateEmptyBuffer(device, cachedResponseBufferBytes(compactDialDescriptors.size()));
   uniformCachedResponsesBuffer = makePrivateEmptyBuffer(device, cachedResponseBufferBytes(uniformDialDescriptors.size()));

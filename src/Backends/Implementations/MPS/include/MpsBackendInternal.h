@@ -49,7 +49,6 @@ namespace Backends {
     bool useEventPropagation{false};
     MpsPropagationMode propagationMode{MpsPropagationMode::cachedResponses};
     bool isAvailable{false};
-    bool enableCachedDialResponses{true};
     bool enableDiagnosticStageProfiling{false};
     std::map<std::string, double> diagnosticStageGpuSeconds{};
 

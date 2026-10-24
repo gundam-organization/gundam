@@ -29,7 +29,6 @@ std::uint32_t Backends::DeviceWeightModel::uniqueDialCount() const {
 }
 
 bool Backends::packDeviceWeightModel(const PropagationView& model_,
-                                      bool enableCachedDialResponses_,
                                       DeviceWeightModel& packedModel_,
                                       BackendTimingSummary& buildTiming_,
                                       std::string& fallbackReason_,
@@ -303,7 +302,7 @@ bool Backends::packDeviceWeightModel(const PropagationView& model_,
       descriptor.flags = eventDial.allowExtrapolation ? kDeviceDialFlagAllowExtrapolation : 0u;
       packResponseLimits(eventDial, descriptor, [](double value_){ return float(value_); });
 
-      if( enableCachedDialResponses_ and reuseCounts_[iUniqueDial] >= kDeviceCachedDialReuseThreshold ){
+      if( reuseCounts_[iUniqueDial] >= kDeviceCachedDialReuseThreshold ){
         descriptor.flags |= kDeviceDialFlagCached;
         cachedCount_++;
         packedModel_.cachedDialCount++;

@@ -66,7 +66,6 @@ namespace Backends {
   };
 
   [[nodiscard]] bool packDeviceWeightModel(const PropagationView& model_,
-                                            bool enableCachedDialResponses_,
                                             DeviceWeightModel& packedModel_,
                                             BackendTimingSummary& buildTiming_,
                                             std::string& fallbackReason_,

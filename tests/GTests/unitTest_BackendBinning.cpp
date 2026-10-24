@@ -246,7 +246,7 @@ TEST_P(BinningBackend, GridSearchAndCacheInvalidation) {
   DeviceWeightModel packed;
   BackendTimingSummary timing;
   std::string reason;
-  EXPECT_FALSE(packDeviceWeightModel(model, true, packed, timing, reason, "test"));
+  EXPECT_FALSE(packDeviceWeightModel(model, packed, timing, reason, "test"));
   EXPECT_FALSE(reason.empty());
 }
 
@@ -749,12 +749,17 @@ TEST(MpsResidentPropagation, SparseDialUpdatesPreserveWeightsAndRecoverAfterFail
   EXPECT_EQ(recovered["rebuiltContributionIndex"], true);
   backend.build(view);
   EXPECT_EQ(run()["evaluatedDials"], 3);
-  backend.configure(ConfigReader(JsonType{{"enableCachedDialResponses", false}}));
+  backend.configure(ConfigReader(JsonType{{"propagationMode", "recomputeResponses"}}));
   backend.build(view);
   run();
   auto uncached = run();
   EXPECT_EQ(uncached["evaluatedDials"], 3);
   EXPECT_EQ(uncached["updatedEventWeights"], true);
+  // Re-enabling caching must reuse responses after the first propagation.
+  backend.configure(ConfigReader(JsonType{{"propagationMode", "cachedResponses"}}));
+  backend.build(view);
+  EXPECT_EQ(run()["evaluatedDials"], 3);
+  EXPECT_EQ(run()["evaluatedDials"], 0);
 }
 
 TEST(MpsResidentPropagation, FractionsCanChangeWithoutRebuildingContributionDestinations) {

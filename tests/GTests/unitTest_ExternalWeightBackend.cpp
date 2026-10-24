@@ -167,7 +167,7 @@ TEST(ExternalWeightBackend, CommonPacking) {
   Backends::DeviceWeightModel packed;
   Backends::BackendTimingSummary timing;
   std::string reason;
-  ASSERT_TRUE(Backends::packDeviceWeightModel(view.propagation, true, packed, timing, reason, "test")) << reason;
+  ASSERT_TRUE(Backends::packDeviceWeightModel(view.propagation, packed, timing, reason, "test")) << reason;
   ASSERT_EQ(packed.externalDialOccurrences.size(), 4);
   EXPECT_EQ(packed.externalDialOccurrences[0].weightIndex, 1);
   EXPECT_EQ(packed.externalDialOccurrences[1].weightIndex, 2);

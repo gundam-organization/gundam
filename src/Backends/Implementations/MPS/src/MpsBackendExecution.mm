@@ -111,7 +111,6 @@ bool Backends::MpsBackendImpl::runWeightPropagation(const PropagationInputs& inp
   updateExternalWeights(inputs_);
 
   auto encodeAllCachedResponses = [&](id<MTLComputeCommandEncoder> encoder_) {
-    if( not enableCachedDialResponses ){ return true; }
     return encodeCachedDialResponses(encoder_, cachedCompactResponsesPipeline, compactCachedResponsesBuffer, compactDialDescriptorsBuffer, compactCachedDialIndicesBuffer, compactCachedDialCount)
            and encodeCachedDialResponses(encoder_, cachedUniformResponsesPipeline, uniformCachedResponsesBuffer, uniformDialDescriptorsBuffer, uniformCachedDialIndicesBuffer, uniformCachedDialCount)
            and encodeCachedDialResponses(encoder_, cachedMonotonicResponsesPipeline, monotonicCachedResponsesBuffer, monotonicDialDescriptorsBuffer, monotonicCachedDialIndicesBuffer, monotonicCachedDialCount)
@@ -120,7 +119,7 @@ bool Backends::MpsBackendImpl::runWeightPropagation(const PropagationInputs& inp
   };
 
   if( enableDiagnosticStageProfiling or GundamGlobals::isDebug() ){
-    if( enableCachedDialResponses and cachedDialCount > 0 ){
+    if( cachedDialCount > 0 ){
       auto stageStart = std::chrono::steady_clock::now();
       auto encodeStart = std::chrono::steady_clock::now();
       id<MTLCommandBuffer> commandBuffer = [commandQueue commandBuffer];

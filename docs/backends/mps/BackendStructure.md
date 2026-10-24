@@ -41,9 +41,10 @@ uses `eventPropagation`. Recompute mode uses `packedWeights` for compatible
 scalar fixed-bin models, and `eventPropagation` with its inter-evaluation
 response cache disabled for surfaces, migration and reweight caps. Thus a model
 requiring the general executor still honors the requested recomputation strategy.
-The older `enableCachedDialResponses` setting remains available: `false`
-disables response caching in cached mode, or within-evaluation sharing in the
-packed executor. Prefer `propagationMode` to select the inter-evaluation strategy.
+`propagationMode` is the only MPS backend configuration option. Within-evaluation
+sharing is automatic: the packed executor evaluates spline/graph responses used
+at least eight times once per propagation and shares them between events. This
+does not retain responses between propagations in `recomputeResponses` mode.
 
 ## Execution and storage
 
@@ -123,8 +124,8 @@ the host parameter snapshot and published external generations. Sparse updates
 upload a few range descriptors and dispatch only the affected response indices;
 updates affecting more than half the dials keep the direct full scan. Constant
 Shift responses are initialized by the first full pass. Rebuilds and failed
-propagations invalidate the whole cache. `enableCachedDialResponses: false`
-also disables this event-propagation response/weight cache.
+propagations invalidate the whole cache. `propagationMode: recomputeResponses`
+disables this inter-evaluation response/weight cache.
 
 Weight dependencies are tracked separately from observable dependencies. If only
 observable inputs change, the event kernel updates variables and dirty flags

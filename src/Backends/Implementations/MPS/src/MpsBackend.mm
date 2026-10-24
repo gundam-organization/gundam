@@ -10,17 +10,15 @@ void Backends::MpsBackend::configureImpl() {
   _config_.clearFields();
   _config_.defineFields({
       {"propagationMode"},
-      {"enableCachedDialResponses"},
   });
   _config_.checkConfiguration();
   _config_.fillEnum(_impl_->propagationMode, "propagationMode");
   LogThrowIf(_impl_->propagationMode != MpsPropagationMode::cachedResponses
              and _impl_->propagationMode != MpsPropagationMode::recomputeResponses,
              "Unknown MPS propagationMode. Expected cachedResponses or recomputeResponses.");
-  _config_.fillValue(_impl_->enableCachedDialResponses, "enableCachedDialResponses");
   if( _impl_->eventPropagation ){
     _impl_->eventPropagation->setEnableDialCache(
-        _impl_->propagationMode == MpsPropagationMode::cachedResponses and _impl_->enableCachedDialResponses);
+        _impl_->propagationMode == MpsPropagationMode::cachedResponses);
   }
   _config_.printUnusedKeys();
 }
@@ -285,13 +283,12 @@ std::string Backends::MpsBackend::getDiagnostics() const {
   out["weightDialReferences"] = impl.model.eventDialIndices.size();
   out["variableDialReferences"] = impl.model.variableDialIndices.size();
   out["cachedDials"] = impl.cachedDialCount;
-  out["cachedResponsesEnabled"] = impl.enableCachedDialResponses;
   out["compactDialDescriptors"] = true;
   out["orderedSplinePayloads"] = true;
   out["splineDescriptorBytes"] = sizeof(MpsSplineDialDescriptor);
   out["normOccurrenceBytes"] = sizeof(MpsNormDialOccurrence);
   out["compactCachedDialIndices"] = true;
-  out["cachedDialDispatchCount"] = impl.enableCachedDialResponses ? impl.cachedDialCount : 0;
+  out["cachedDialDispatchCount"] = impl.cachedDialCount;
   out["histogramChunkSize"] = impl.histogramChunkSize;
   out["maxHistogramChunksPerBin"] = impl.maxHistogramChunksPerBin;
   out["lastStageGpuSeconds"] = impl.diagnosticStageGpuSeconds;

@@ -105,10 +105,11 @@ every stage runs on the GPU. MPS support applies to both `cachedResponses` and
 | Numerical precision | Double (64-bit) | ⚠️ Float32 outputs; ~48 significant bits for observables and resident histogram accumulation (float pairs) |
 | Hardware requirements | ✅ Host CPU | ⚠️ Apple GPU with Metal |
 
-MPS chooses its executor automatically: surfaces, observable/binning propagation
-and reweight caps use `eventPropagation`; compatible scalar fixed-bin models can
-use `packedWeights` in `recomputeResponses` mode. These internal choices do not
-add support for dial classes rejected by `EngineLayout`. See
+The only MPS backend configuration option is `propagationMode`: `cachedResponses`
+reuses eligible responses between propagations, while `recomputeResponses`
+recalculates them at every propagation. Sharing responses within a propagation
+is automatic. MPS selects its internal executor according to the model; this
+does not add support for dial classes rejected by `EngineLayout`. See
 [MPS response propagation modes](mps/BackendStructure.md#response-propagation-mode).
 Compact GPU descriptors, ordered spline payloads and the resident binning
 optimizations are production behavior; temporary A/B comparison switches have
