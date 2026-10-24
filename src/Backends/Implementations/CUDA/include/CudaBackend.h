@@ -7,9 +7,15 @@
 
 namespace Backends {
 
+#define ENUM_NAME CudaPropagationMode
+#define ENUM_FIELDS \
+ENUM_FIELD( cachedResponses, 0 ) \
+ENUM_FIELD( recomputeResponses )
+#include "GenericToolbox.MakeEnum.h"
+
   struct CudaBackendImpl;
 
-  // Device lifecycle only. Propagation and all result access remain unsupported.
+  // Resident native-double executor for 1D dials and fixed histogram bins.
   // The public interface deliberately exposes no CUDA headers or runtime types.
   class CudaBackend : public Backend {
   public:
@@ -17,7 +23,7 @@ namespace Backends {
     ~CudaBackend() override;
 
     [[nodiscard]] static bool isCompiled();
-    [[nodiscard]] std::string getName() const override { return "CUDA"; }
+    [[nodiscard]] std::string getName() const override;
     [[nodiscard]] BackendCapabilities getCapabilities() const override;
     [[nodiscard]] PropagationStatus getStatus(const PropagationToken& token_) const override;
     [[nodiscard]] const EngineView& getEngineView() const override;
@@ -36,6 +42,8 @@ namespace Backends {
     [[nodiscard]] const std::vector<double>& getOutsideSumsHostView(const PropagationToken& token_) const override;
     [[nodiscard]] const std::vector<double>& getOutsideSumSquaresHostView(const PropagationToken& token_) const override;
     [[nodiscard]] BackendDeviceView getDeviceView(const PropagationToken& token_) const override;
+    [[nodiscard]] BackendTimingSummary getLastTimingSummary() const override;
+    [[nodiscard]] BackendTimingTotals getTimingTotals() const override;
 
   protected:
     void configureImpl() override;
@@ -43,9 +51,15 @@ namespace Backends {
 
   private:
     void initializeDevice();
-    [[noreturn]] static void throwNoResult();
+    [[nodiscard]] bool isCurrentToken(const PropagationToken& token_) const;
+    void requireToken(const PropagationToken& token_) const;
+    void readWeights() const;
+    void readHistograms() const;
+    void invalidateResult() const;
 
     int _deviceIndex_{0};
+    CudaPropagationMode _propagationMode_{CudaPropagationMode::cachedResponses};
+    std::uint64_t _nextTokenId_{1};
     std::unique_ptr<CudaBackendImpl> _impl_{};
   };
 }

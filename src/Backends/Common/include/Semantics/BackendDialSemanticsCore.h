@@ -5,12 +5,13 @@
 
 #include "EngineDescriptors.h"
 
-#include "DeviceMath/SharedSurface.h"
 #include "CalculateCompactSpline.h"
 #include "CalculateGeneralSpline.h"
 #include "CalculateGraph.h"
 #include "CalculateMonotonicSpline.h"
 #include "CalculateUniformSpline.h"
+// The Calculate headers establish CUDA qualifiers before SharedSplineCommon.
+#include "DeviceMath/SharedSurface.h"
 
 #include <cstddef>
 #include <cstdint>
@@ -54,7 +55,7 @@ namespace Backends::Semantics {
   GUNDAM_BACKEND_FORCE_INLINE GUNDAM_BACKEND_HOST_DEVICE
   double loadParameterValue(const BackendDialInputDescriptor& inputRef_, const double* parameterValues_) {
     GUNDAM_BACKEND_SEMANTICS_ASSERT(parameterValues_ != nullptr);
-    GUNDAM_BACKEND_SEMANTICS_ASSERT(inputRef_.source == DialInputSource::Parameter);
+    GUNDAM_BACKEND_SEMANTICS_ASSERT(inputRef_.source.value == DialInputSource::Parameter);
     return parameterValues_[inputRef_.parameterIndex];
   }
 

@@ -15,6 +15,7 @@ set(SRCFILES
     ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/CPU/src/CpuWeightProbe.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/CPU/src/CpuBackendBinning.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/CUDA/src/CudaBackend.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/CUDA/src/CudaWeightModel.cpp
 )
 
 if(GUNDAM_CUDA_ENABLED)
@@ -76,6 +77,7 @@ endif()
 
 set(HEADERS
     ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/CUDA/include/CudaBackend.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/CUDA/include/CudaWeightModel.h
     ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/Semantics/BackendResponseSmoothing.h
     ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/ResponseSmoothingPacking.h
     ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/Semantics/BackendVariableResponse.h

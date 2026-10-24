@@ -3,10 +3,14 @@
 
 #include <memory>
 #include <string>
+#include <vector>
 
 namespace Backends {
+  struct CudaWeightModel;
+  struct BackendTimingSummary;
+  struct BackendDeviceView;
 
-  // Private runtime boundary, compiled by nvcc without GUNDAM/ROOT headers.
+  // Private runtime boundary, compiled by nvcc without ROOT headers.
   class CudaDeviceContext {
   public:
     explicit CudaDeviceContext(int deviceIndex_);
@@ -15,6 +19,12 @@ namespace Backends {
     CudaDeviceContext& operator=(const CudaDeviceContext&) = delete;
 
     [[nodiscard]] const std::string& getDeviceName() const;
+    void build(const CudaWeightModel& model_);
+    void propagate(const std::vector<double>& parameters_, bool recomputeResponses_, BackendTimingSummary& timing_);
+    void readWeights(std::vector<double>& weights_);
+    void readHistograms(std::vector<double>& sums_, std::vector<double>& sumSquares_);
+    void invalidate();
+    [[nodiscard]] BackendDeviceView getDeviceView() const;
 
   private:
     struct Impl;

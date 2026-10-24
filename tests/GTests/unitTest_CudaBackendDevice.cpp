@@ -30,7 +30,7 @@ TEST(CudaBackendDevice, BuildsSharedModelAndRestoresDeviceSelection) {
     cudaDeviceProp properties{};
     ASSERT_EQ(cudaGetDeviceProperties(&properties, 0), cudaSuccess);
     EXPECT_EQ(backend.getCapabilities().deviceName, properties.name);
-    EXPECT_FALSE(backend.getCapabilities().supportsEventWeights);
+    EXPECT_TRUE(backend.getCapabilities().supportsEventWeights);
     int currentDevice = -1;
     ASSERT_EQ(cudaGetDevice(&currentDevice), cudaSuccess);
     EXPECT_EQ(currentDevice, deviceCount - 1);
