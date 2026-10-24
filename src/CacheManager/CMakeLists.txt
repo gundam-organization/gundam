@@ -29,10 +29,10 @@ set( SRCFILES
 )
 
 set( SRC_FILE_EXT "cpp" )       # The C++ extension
-if(CMAKE_CUDA_COMPILER)
+if(GUNDAM_CUDA_ENABLED)
   cmessage( STATUS "CUDA utilities being compiled.")
   set( SRC_FILE_EXT "cu" )      # Use this extension when using CUDA
-endif(CMAKE_CUDA_COMPILER)
+endif(GUNDAM_CUDA_ENABLED)
 
 # Add the files that are compiled using C++ for CPU and with CUDA
 # for GPU.
@@ -70,7 +70,7 @@ target_link_libraries( GundamCacheManager PUBLIC
 
 # Add extra compilation flags.  The commented flags are as reminders
 # for how to add specific debug flags.
-if(NOT CMAKE_CUDA_COMPILER)
+if(NOT GUNDAM_CUDA_ENABLED)
   # Specific definitions when not using the CUDA compiler, make sure
   # that HEMI_CUDA_DISABLE is set.  This is done since C++ can compile
   # everything except the actual kernel launches and so the CUDA
@@ -79,8 +79,8 @@ if(NOT CMAKE_CUDA_COMPILER)
   target_compile_definitions( GundamCacheManager PUBLIC
     HEMI_CUDA_DISABLE)
 else()
-  # Specific definitions when using a CUDA compiler (e.g. NVCC)
-  # Nothing yet!
-endif(NOT CMAKE_CUDA_COMPILER)
+  # Public HEMI headers also expose CUDA to C++ consumers.
+  target_link_libraries(GundamCacheManager PUBLIC CUDA::cudart)
+endif(NOT GUNDAM_CUDA_ENABLED)
 
 install(TARGETS GundamCacheManager DESTINATION lib)

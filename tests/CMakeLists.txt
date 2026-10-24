@@ -10,6 +10,11 @@
 cmessage( STATUS "Setting up tests..." )
 enable_testing()
 
+# Explicit CTest registration: configuration/build must not execute a GPU test.
+if(GUNDAM_CUDA_ENABLED)
+  add_subdirectory(cuda)
+endif()
+
 # Run the gundam-tests.sh script which runs scripted tests.  The
 # COMMAND is a little complicated since the testing script needs to
 # run in the source directory, but puts the output in a sub-directory
@@ -140,7 +145,7 @@ if( WITH_GOOGLE_TEST )
       gundam_discover_tests(gundamGTest_host.exe PROPERTIES LABELS host)
     endif(WITH_REGULAR_TEST)
 
-    if(CMAKE_CUDA_COMPILER)
+    if(GUNDAM_CUDA_ENABLED)
       # Setup the hemi test suite for the device.
       add_executable(gundamGTest_device.exe
         GTests/hemiArrayTest.cu
@@ -151,9 +156,9 @@ if( WITH_GOOGLE_TEST )
       target_link_libraries(gundamGTest_device.exe GTest::gtest_main)
       target_link_libraries(gundamGTest_device.exe GundamCacheManager)
       if(WITH_REGULAR_TEST)
-        gundam_discover_tests(gundamGTest_device.exe PROPERTIES LABELS device)
+        gundam_discover_tests(gundamGTest_device.exe DISCOVERY_MODE PRE_TEST PROPERTIES LABELS device)
       endif(WITH_REGULAR_TEST)
-    endif(CMAKE_CUDA_COMPILER)
+    endif(GUNDAM_CUDA_ENABLED)
 
   else( WITH_CACHE_MANAGER )
 

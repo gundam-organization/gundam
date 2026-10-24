@@ -130,6 +130,13 @@ target_link_libraries(
     GundamStatisticalInference
 )
 
+# CUDA infrastructure for future .cu implementation sources. This does not
+# register a CUDA backend with BackendFactory.
+if(GUNDAM_CUDA_ENABLED)
+  target_link_libraries(${LIB_NAME} PRIVATE CUDA::cudart)
+  target_compile_definitions(${LIB_NAME} PRIVATE GUNDAM_USING_CUDA)
+endif()
+
 if(APPLE)
   target_link_libraries(${LIB_NAME} PUBLIC "-framework Foundation" "-framework Metal")
 endif()
