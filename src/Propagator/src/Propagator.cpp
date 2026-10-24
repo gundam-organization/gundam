@@ -52,6 +52,7 @@ void Propagator::configureImpl(){
   // nested objects
   _config_.fillValue(_sampleSet_.getConfig(), "sampleSetConfig");
   _sampleSet_.configure();
+  _eventVariableResponseCache_ = EventVariableResponseCache();
 
   // relocated
   _config_.fillValue(_parManager_.getParameterSetListConfig(), "parameterSetListConfig");
@@ -63,6 +64,8 @@ void Propagator::configureImpl(){
 
   _dialManager_.setParametersManager(&_parManager_);
   _dialManager_.configure();
+
+  _eventVariableResponseCache_.prepare(_sampleSet_, _dialManager_.getDialCollectionList());
 
   // Monitoring parameters
   _config_.fillValue(_showNbEventParameterBreakdown_, "showNbEventParameterBreakdown");
@@ -82,6 +85,7 @@ void Propagator::initializeImpl(){
   _parManager_.initialize();
   _sampleSet_.initialize();
   _dialManager_.initialize();
+  _eventVariableResponseCache_.prepare(_sampleSet_, _dialManager_.getDialCollectionList());
 
   initializeThreads();
 
@@ -90,6 +94,7 @@ void Propagator::initializeImpl(){
 
 // core
 void Propagator::clearContent(){
+  _eventVariableResponseCache_.invalidate();
 
   // clearing events in MC containers
   _sampleSet_.clearEventLists();
@@ -99,15 +104,23 @@ void Propagator::clearContent(){
   _dialManager_.setParametersManager(&_parManager_);
   _dialManager_.configure();
   _dialManager_.initialize();
+  _eventVariableResponseCache_.prepare(_sampleSet_, _dialManager_.getDialCollectionList());
 
-  // reset the cache
+  // Reset event associations while preserving the configured weight cap.
+  auto reweightCap = _eventDialCache_.getGlobalEventReweightCap();
   _eventDialCache_ = EventDialCache();
+  _eventDialCache_.getGlobalEventReweightCap() = reweightCap;
 
 }
 void Propagator::buildDialCache(){
+  _eventVariableResponseCache_.invalidate();
   _eventDialCache_.shrinkIndexedCache();
   _eventDialCache_.buildReferenceCache(_sampleSet_, _dialManager_.getDialCollectionList());
   _dialManager_.invalidateInputBuffers();
+  _eventVariableResponseCache_.build(_dialManager_.getDialCollectionList());
+}
+void Propagator::updateEventSampleBinning(){
+  _sampleSet_.updateEventBinning(_threadPool_);
 }
 void Propagator::propagateParameters(){
   std::future<bool> result = applyParameters();
@@ -120,6 +133,7 @@ std::future<bool> Propagator::applyParameters(){
   // should be shared for both.
   if( _enableEigenToOrigInPropagate_ ){ _parManager_.convertEigenToOrig(); }
   _dialManager_.updateDialState();
+  _eventVariableResponseCache_.update(_eventDialCache_, _sampleSet_, _threadPool_);
 
 #ifdef GUNDAM_USING_CACHE_MANAGER
   // Trigger the reweight on the GPU.  This will fill the histograms, but most
@@ -162,6 +176,7 @@ void Propagator::reweightEvents(bool updateDials) {
     // isForceCpuCalculation is true.
     if( _enableEigenToOrigInPropagate_ ){ _parManager_.convertEigenToOrig(); }
     _dialManager_.updateDialState();
+    _eventVariableResponseCache_.update(_eventDialCache_, _sampleSet_, _threadPool_);
   }
 
   // timer start/stop after the dials are updated.
@@ -394,6 +409,7 @@ void Propagator::refillHistogramsFct( int iThread_){
     sample.getHistogram().refillHistogram(iThread_);
   }
 }
+
 
 //  A Lesser GNU Public License
 

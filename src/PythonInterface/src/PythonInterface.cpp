@@ -36,6 +36,7 @@
 #include <cstring>
 #include <iostream>
 #include <string>
+#include <type_traits>
 #include <unistd.h>
 
 PYBIND11_MAKE_OPAQUE(std::vector<EventDialCache::CacheEntry>);
@@ -179,6 +180,28 @@ PYBIND11_MODULE(GUNDAM, module) {
 
   pybind11::class_<VariableHolder>(module, "VariableHolder")
   .def("getVarAsDouble", &VariableHolder::getVarAsDouble)
+  .def("setValue", [](VariableHolder& this_, const pybind11::object& value_){
+    const auto& type = this_.get().getType();
+    // Preserve the stored type and refresh the double cache via VariableHolder::set.
+    if( type == typeid(bool) ){ this_.set(value_.cast<bool>()); }
+    else if( type == typeid(char) ){
+      using CharValue = std::conditional<std::is_signed<char>::value, signed char, unsigned char>::type;
+      this_.set(static_cast<char>(value_.cast<CharValue>()));
+    }
+    else if( type == typeid(signed char) ){ this_.set(value_.cast<signed char>()); }
+    else if( type == typeid(unsigned char) ){ this_.set(value_.cast<unsigned char>()); }
+    else if( type == typeid(short) ){ this_.set(value_.cast<short>()); }
+    else if( type == typeid(unsigned short) ){ this_.set(value_.cast<unsigned short>()); }
+    else if( type == typeid(int) ){ this_.set(value_.cast<int>()); }
+    else if( type == typeid(unsigned int) ){ this_.set(value_.cast<unsigned int>()); }
+    else if( type == typeid(long) ){ this_.set(value_.cast<long>()); }
+    else if( type == typeid(unsigned long) ){ this_.set(value_.cast<unsigned long>()); }
+    else if( type == typeid(long long) ){ this_.set(value_.cast<long long>()); }
+    else if( type == typeid(unsigned long long) ){ this_.set(value_.cast<unsigned long long>()); }
+    else if( type == typeid(float) ){ this_.set(value_.cast<float>()); }
+    else if( type == typeid(double) ){ this_.set(value_.cast<double>()); }
+    else { throw pybind11::type_error("setValue requires a stored scalar numeric variable."); }
+  }, pybind11::arg("value"), "Set a scalar variable, preserving its C++ type and refreshing its cached double.")
   .def("getValue", [](const VariableHolder& this_) -> pybind11::object {
     const auto& value = this_.get();
     const auto& type = value.getType();
@@ -348,6 +371,16 @@ PYBIND11_MODULE(GUNDAM, module) {
   .def("getSummary", &Bin::getSummary, pybind11::arg("shallow") = true)
   ;
 
+  pybind11::class_<BinningResponse::BinFraction>(module, "BinFraction")
+  .def_readonly("binIndex", &BinningResponse::BinFraction::binIndex)
+  .def_readonly("fraction", &BinningResponse::BinFraction::fraction)
+  ;
+
+  pybind11::class_<BinningResponse::EventResponse>(module, "EventBinningResponse")
+  .def_readonly("binFractions", &BinningResponse::EventResponse::binFractions)
+  .def_readonly("outsideFraction", &BinningResponse::EventResponse::outsideFraction)
+  ;
+
   pybind11::class_<Histogram::BinContent>(module, "HistogramBinContent")
   .def(pybind11::init())
   .def_readwrite("sumWeights", &Histogram::BinContent::sumWeights)
@@ -367,6 +400,11 @@ PYBIND11_MODULE(GUNDAM, module) {
 
   pybind11::class_<Histogram>(module, "Histogram")
   .def("getNbBins", &Histogram::getNbBins)
+  .def("isBinningResponseEnabled", &Histogram::isBinningResponseEnabled)
+  .def("evaluateBinningResponse", &Histogram::evaluateBinningResponse)
+  .def("evaluateEventBinningResponse", &Histogram::evaluateEventBinningResponse)
+  .def("getOutsideBinContent", &Histogram::getOutsideBinContent, pybind11::return_value_policy::reference_internal)
+  .def("refillHistogram", &Histogram::refillHistogram, pybind11::arg("iThread") = -1)
   .def("getBinContentList", pybind11::overload_cast<>(&Histogram::getBinContentList),
        pybind11::return_value_policy::reference_internal)
   .def("getBinContextList", pybind11::overload_cast<>(&Histogram::getBinContextList),
@@ -374,6 +412,10 @@ PYBIND11_MODULE(GUNDAM, module) {
   ;
 
   pybind11::class_<Sample>(module, "Sample")
+  .def("setUseDynamicBinning", &Sample::setUseDynamicBinning)
+  .def("isUseDynamicBinning", &Sample::isUseDynamicBinning)
+  .def("updateEventBinning", pybind11::overload_cast<>(&Sample::updateEventBinning),
+       "Reassign events in a dynamic sample; propagate afterwards to refill its histogram.")
   .def("isEnabled", &Sample::isEnabled)
   .def("isEventMcThrowDisabled", &Sample::isEventMcThrowDisabled)
   .def("getIndex", &Sample::getIndex)
@@ -401,6 +443,8 @@ PYBIND11_MODULE(GUNDAM, module) {
 
   pybind11::class_<Propagator>(module, "Propagator")
   .def(pybind11::init())
+  .def("updateEventSampleBinning", &Propagator::updateEventSampleBinning,
+       "Reassign events in all dynamic samples; propagate afterwards to refill histograms.")
   .def("initialize", pybind11::overload_cast<>(&Propagator::initialize), pybind11::return_value_policy::reference)
   .def("getSampleSet", pybind11::overload_cast<>(&Propagator::getSampleSet), pybind11::return_value_policy::reference_internal)
   .def("getEventDialCache", pybind11::overload_cast<>(&Propagator::getEventDialCache), pybind11::return_value_policy::reference_internal)
