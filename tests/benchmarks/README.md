@@ -526,14 +526,17 @@ your Python module is loaded from the installed prefix: the previous CC run
 used `/sps/t2k/ablanche/install/gundam/lib`, rather than the build tree. Keep
 the same inputs, proposal settings, four-thread allocation and GPU model.
 Compare numerical agreement first, then local/constant response timings and
-candidate counts; the sparse CUDA execution still needs validation at the CC.
+candidate counts. The completed isolated sparse CUDA passes returned from the
+CC match the prior CPU reference; see the [OA2024 results](../../docs/backends/CudaOa2024Benchmark.md#sparse-production-results).
+The received snapshot lacks the new CPU result, and resident CUDA replacement
+still needs CC validation.
 
 `comparison.json` checks every measured likelihood, proposal sequence and final
 histogram contents/errors of every trial (relative `1e-9`, absolute `1e-7`). It
 reports speedups against CPU when included, otherwise against the first case.
 It fails on a numerical mismatch and leaves raw results available for diagnosis.
-Timing differences are never a pass/fail criterion. CUDA execution of this new
-benchmark remains to be validated at the CC; its CPU path was exercised locally
+Timing differences are never a pass/fail criterion. The isolated CUDA passes
+have been exercised at the CC; the CPU path was exercised locally
 on a small two-parameter model. Resident CPU replacement was also checked
 through the Python driver and native tests, including repeated replacements
 after deleting the input file, stale deferred results, build failure and recovery.

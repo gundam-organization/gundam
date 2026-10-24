@@ -109,7 +109,8 @@ fit/covariance regressions before interpreting performance results.
 
 ## Follow-up implementation
 
-The first optimization is implemented, with CC execution pending. Model packing
+The first optimization is implemented and its production CUDA passes were
+returned from the CC (see below). Model packing
 builds a CSR index from original parameter indices to nonconstant dials. Cached
 propagation compares the current scalar parameters with the last successful
 inputs and sends one compact range per affected parameter to the device. GPU
@@ -123,5 +124,47 @@ The extra persistent device index uses four bytes per nonconstant dial. Host
 selection time and candidate counts are included in the benchmark output. The
 178 host fast tests and the CPU/original fit-covariance test pass locally; the
 new GPU test covers multiple ranges, block tails, dense/sparse transitions,
-constant/unused parameters, mirroring and rebuilds, but requires execution at
-the CC. No speedup is claimed before that run.
+constant/unused parameters, mirroring and rebuilds, but its execution log has
+not been included in the production-profile snapshot below.
+
+## Sparse production results
+
+The `cuda-oa2024-profile-sparse` snapshot contains completed runs for both CUDA
+modes, with the same V100, Slurm job, four-thread affinity and proposal settings
+as the original profile. Its checkout commit is
+`b76f2c5d70e71fc75f548233158fbf96e8abb226`. This used the original isolated
+process-per-case driver, not the newer resident replacement driver.
+
+The overall run is **incomplete in the received snapshot**: root `summary.json`
+says `complete: false`, the CPU log ends during dataset loading at 23%, and
+there is no root comparison or final report. There is no error at the end of
+that log; the snapshot alone cannot distinguish a still-running job from an
+interruption. No new CPU timing is available.
+
+Both CUDA case summaries say `complete: true`. Their resolved model configs
+match the previous run. Independent comparison against the **previous CPU
+reference** checked matching parameter manifests, model configuration (apart
+from backend selection), and all proposal digests. All 2,606 measured likelihoods
+per mode and all eight final trial histograms/errors pass the original
+`1e-9` relative / `1e-7` absolute tolerances. Maximum absolute differences are
+`1.25e-12` for likelihood and `1.25e-11` for histogram contents/errors. This is
+a comparison to the historical reference, not a completed same-run CPU check.
+
+| Scenario | Original cached ms | Sparse cached ms | Additional speedup | Median candidate dials |
+|---|---:|---:|---:|---:|
+| Constant | 5.792 | 3.075 | 1.884 | 0 |
+| One coordinate | 5.788 | 3.090 | 1.873 | 571 |
+| Two coordinates | 5.801 | 3.090 | 1.877 | 571 |
+| All coordinates | 14.568 | 14.581 | 0.999 | 20,340,421 |
+
+For one-coordinate changes the response stage drops from 2.729 to 0.0174 ms,
+while host selection costs about 0.0050 ms. The full-evaluation reduction is
+about 46.6%. Global updates retain the dense traversal, as intended. Recompute
+stays near 14.13 ms for local changes, effectively unchanged.
+
+Event reweighting is now the largest local stage: 1.908 ms, roughly 62% of
+the 3.090 ms evaluation. Histogram reduction remains 0.176 ms, and host input
+preparation about 0.455 ms. The next profiling target is the event-weight
+response-index access pattern and layout; these elapsed times do not by
+themselves prove a memory-bandwidth bottleneck. The resident backend replacement
+still needs its own CC validation; this isolated run does not exercise it.

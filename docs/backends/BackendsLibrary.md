@@ -60,7 +60,7 @@ itself establish numerical validation on every model or device.
 | Model preparation | ✅ Flat host model and numerical caches | ✅ Packed model and GPU uploads | ✅ Native-double descriptors, payloads and fixed-bin index uploaded once |
 | Propagation and result tokens | ✅ | ✅ | ✅ Synchronous CUDA executor and token invalidation |
 | Host materialization | ✅ Event state, weights and histograms | ✅ Event state, weight and histogram readback | ⚠️ Lazy weight/histogram readback; no event-state output |
-| Dial-response and event-state caches | ✅ | ✅ Depends on propagation mode | ⚠️ GPU response cache by effective scalar input; sparse parameter-indexed updates implemented, CC validation pending; no event-state cache |
+| Dial-response and event-state caches | ✅ | ✅ Depends on propagation mode | ⚠️ Sparse parameter-indexed response cache exercised on CC OA2024, matching the prior CPU reference; no event-state cache |
 | Numerical regression tests | ✅ CPU comparisons | ✅ MPS comparisons | ✅ Both modes compared against CPU on CC V100; error/retry tests passed |
 | Small fit and full Hesse covariance regression | ✅ Original/CPU comparison and analytic covariance reference pass locally | — Not included in this regression | ✅ Both modes pass at CC, including the analytic covariance reference |
 | Standalone CUDA infrastructure test | — | — | ✅ FP64 kernel validated on CC-IN2P3 V100, interactive and Slurm batch |
