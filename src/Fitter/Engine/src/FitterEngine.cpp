@@ -319,6 +319,14 @@ void FitterEngine::initializeImpl(){
 }
 
 // Core
+std::string FitterEngine::getPropagationMonitorTitle() const {
+  return "Propagator";
+}
+
+std::vector<std::pair<std::string, std::string>> FitterEngine::getMonitorColumns() const {
+  return _likelihoodInterface_.getModelPropagator().getMonitorColumns();
+}
+
 void FitterEngine::fit(){
   LogInfo << __METHOD_NAME__ << std::endl;
   LogThrowIf( not isInitialized() );
