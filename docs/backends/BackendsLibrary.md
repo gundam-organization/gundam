@@ -126,6 +126,20 @@ The compatibility rules are implemented in
 runtime inputs, requests propagation and materializes the outputs needed by the
 fitter or host-side consumers.
 
+## Fit monitor
+
+The monitor always displays the execution path, its iteration rate, the latest
+`Propagation + LLH` duration and the minimizer time. The duration measures the
+complete engine likelihood evaluation on the host, including propagation,
+required transfers and likelihood calculation; it is not GPU kernel time.
+
+Additional columns come from `getMonitorColumns()`, which returns title/value
+pairs. `FitterEngine` delegates to the active backend or the original `Propagator`.
+The base backend returns no additional columns. CPU provides its measured stage
+times; MPS uses the default aggregate display. The original propagator provides
+its own dial, reweighting and histogram or CacheManager timings. The table builder
+does not depend on individual backend types.
+
 ## Model, inputs and outputs
 
 `EngineLayout` separates a flat numerical model (`EngineView`) from bindings to

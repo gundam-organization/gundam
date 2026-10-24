@@ -375,10 +375,18 @@ void FitterEngine::evaluateLikelihood(){
 
 // Core
 std::string FitterEngine::getPropagationMonitorTitle() const {
+#ifdef GUNDAM_USING_BACKENDS
+  if( _backendsManager_.hasBackend() ){
+    return "Backend (" + _backendsManager_.getBackend()->getName() + ")";
+  }
+#endif
   return "Propagator";
 }
 
 std::vector<std::pair<std::string, std::string>> FitterEngine::getMonitorColumns() const {
+#ifdef GUNDAM_USING_BACKENDS
+  if( _backendsManager_.hasBackend() ){ return _backendsManager_.getBackend()->getMonitorColumns(); }
+#endif
   return _likelihoodInterface_.getModelPropagator().getMonitorColumns();
 }
 

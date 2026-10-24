@@ -44,6 +44,7 @@ ENUM_FIELD( Indexed )
     CpuBackend() = default;
 
     [[nodiscard]] std::string getName() const override { return "CPU"; }
+    [[nodiscard]] std::vector<std::pair<std::string, std::string>> getMonitorColumns() const override;
     [[nodiscard]] BackendCapabilities getCapabilities() const override;
     [[nodiscard]] PropagationStatus getStatus(const PropagationToken& token_) const override;
     [[nodiscard]] const EngineView& getEngineView() const override { return *_engineView_; }

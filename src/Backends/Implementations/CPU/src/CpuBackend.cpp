@@ -16,6 +16,17 @@
 #include <type_traits>
 #include <utility>
 
+std::vector<std::pair<std::string, std::string>> Backends::CpuBackend::getMonitorColumns() const {
+  const auto timing = getLastTimingSummary();
+  auto formatTime = [](double seconds_){ return GenericToolbox::parseTimeUnit(seconds_*1E6); };
+  return {
+      {"Dial cache", formatTime(timing.cachedDialStageSeconds)},
+      {"Event weights", formatTime(timing.eventWeightsStageSeconds)},
+      {"histograms fill", formatTime(timing.histogramStageSeconds)},
+      {"Stat LLH", formatTime(timing.likelihoodHostSeconds)},
+  };
+}
+
 void Backends::CpuBackend::configureImpl() {
   _config_.clearFields();
   _config_.defineFields({{"profileOutputPath"}, {"profileSampleInterval"}, {"profileMaxSamples"},

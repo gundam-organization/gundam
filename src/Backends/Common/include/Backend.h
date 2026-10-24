@@ -8,6 +8,8 @@
 
 #include <memory>
 #include <string>
+#include <utility>
+#include <vector>
 
 namespace Backends {
 
@@ -44,6 +46,8 @@ namespace Backends {
       return empty;
     }
     [[nodiscard]] virtual BackendDeviceView getDeviceView(const PropagationToken&) const { return {}; }
+    // Additional monitor columns as (title, formatted value). Empty hides the breakdown.
+    [[nodiscard]] virtual std::vector<std::pair<std::string, std::string>> getMonitorColumns() const { return {}; }
     [[nodiscard]] virtual BackendTimingSummary getLastTimingSummary() const { return {}; }
     [[nodiscard]] virtual BackendTimingTotals getTimingTotals() const { return {}; }
 
