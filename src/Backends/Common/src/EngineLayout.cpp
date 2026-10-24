@@ -97,7 +97,9 @@ namespace {
         LogThrowIf(dial == nullptr, "Null DialBase while building EngineView.");
         if( dynamic_cast<const Shift*>(dial) != nullptr ){ ++payloadCount; }
         else if( dynamic_cast<const Norm*>(dial) == nullptr
-                 and dynamic_cast<const ExternalWeightDispatcher*>(dial) == nullptr ){
+                 and dynamic_cast<const ExternalWeightDispatcher*>(dial) == nullptr
+                 and dynamic_cast<const Tabulated*>(dial) == nullptr
+                 and dynamic_cast<const Kriged*>(dial) == nullptr ){
           payloadCount += dial->getDialData().size();
         }
       }

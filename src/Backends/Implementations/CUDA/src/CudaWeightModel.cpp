@@ -14,6 +14,10 @@ namespace {
     if( not condition_ ){ throw std::runtime_error(std::string("CudaBackend: ") + message_); }
   }
 
+  bool isExternal(Backends::BackendDialType type_) {
+    return type_ == Backends::BackendDialType::ExternalWeight or Backends::isTableDial(type_);
+  }
+
   void validateDial(const Backends::PropagationView& model_, const Backends::BackendDialDescriptor& dial_) {
     using namespace Backends;
     require(dial_.payloadOffset <= model_.dialPayloads.size()
@@ -31,9 +35,16 @@ namespace {
       case BackendDialType::Graph: require(size >= 2 and size % 2 == 0, "invalid graph payload."); break;
       case BackendDialType::Bilinear:
       case BackendDialType::Bicubic: Semantics::validateSurfaceDial(model_, dial_); break;
-      default: throw std::runtime_error("CudaBackend supports Norm, Shift, 1D splines, Graph and 2D Surface dials.");
+      case BackendDialType::ExternalWeight:
+        require(dial_.externalBlockIndex < model_.externalWeightBlocks.size(), "invalid external block index.");
+        require(dial_.externalWeightIndex < model_.externalWeightBlocks[dial_.externalBlockIndex].count,
+                "invalid external weight index.");
+        break;
+      case BackendDialType::Tabulated:
+      case BackendDialType::Kriged: Semantics::validateTableDial(model_, dial_); break;
+      default: throw std::runtime_error("CudaBackend: unsupported dial type.");
     }
-    if( dial_.type != BackendDialType::Shift ){
+    if( dial_.type != BackendDialType::Shift and not isExternal(dial_.type) ){
       const auto count = dial_.type == BackendDialType::Bilinear or dial_.type == BackendDialType::Bicubic ? 2u : 1u;
       require(dial_.inputCount == count and dial_.firstInput <= model_.dialInputs.size()
               and count <= model_.dialInputs.size() - dial_.firstInput, "invalid dial parameter input range.");
@@ -83,10 +94,26 @@ Backends::CudaWeightModel Backends::makeCudaWeightModel(const EngineView& view_,
   static_assert(std::is_trivially_copyable<BackendDialInputDescriptor>::value);
   static_assert(std::is_trivially_copyable<BackendEventWeightDescriptor>::value);
   static_assert(std::is_trivially_copyable<CudaResponseUpdate>::value);
+  static_assert(std::is_trivially_copyable<BackendTableTerm>::value);
+  static_assert(std::is_trivially_copyable<ExternalWeightBlockDescriptor>::value);
   const auto& model = view_.propagation;
   require(not model.requiresEventBinning() and model.variableResponses.empty() and model.variableDialIndices.empty(),
           "observable responses, dynamic binning and smoothed binning are not implemented.");
-  require(model.externalWeightBlocks.empty(), "external weights and tables are not implemented.");
+  // Packed blocks may contain gaps, but must not overlap or overflow.
+  std::vector<std::pair<std::size_t, std::size_t>> externalIntervals;
+  std::size_t externalWeightCount = 0;
+  for( const auto& block : model.externalWeightBlocks ){
+    require(block.count <= std::numeric_limits<std::size_t>::max() - block.offset, "external block extent overflow.");
+    if( block.count ){
+      externalIntervals.emplace_back(block.offset, block.offset + block.count);
+      externalWeightCount = std::max(externalWeightCount, block.offset + block.count);
+    }
+  }
+  require(externalWeightCount <= std::numeric_limits<std::size_t>::max() / sizeof(double), "external buffer size overflow.");
+  std::sort(externalIntervals.begin(), externalIntervals.end());
+  for( std::size_t i = 1; i < externalIntervals.size(); ++i ){
+    require(externalIntervals[i - 1].second <= externalIntervals[i].first, "external blocks overlap.");
+  }
   require(model.totalBins >= 0, "totalBins must be nonnegative.");
   require(model.events.size() == model.eventWeights.size(), "event weight layout size mismatch.");
   require(not model.hasReweightCap or std::isfinite(model.maxReweight), "reweight cap must be finite.");
@@ -119,7 +146,7 @@ Backends::CudaWeightModel Backends::makeCudaWeightModel(const EngineView& view_,
   else{ out.dials = model.dials; }
   out.parameterDialOffsets.assign(model.parameterCount + 1, 0);
   for( const auto& dial : out.dials ){
-    if( dial.type != BackendDialType::Shift and not isSurface(dial) ){
+    if( dial.type != BackendDialType::Shift and not isSurface(dial) and not isExternal(dial.type) ){
       ++out.parameterDialOffsets[model.dialInputs[dial.firstInput].parameterIndex + 1];
     }
   }
@@ -130,7 +157,7 @@ Backends::CudaWeightModel Backends::makeCudaWeightModel(const EngineView& view_,
   auto dialPositions = out.parameterDialOffsets;
   for( std::size_t i = 0; i < out.surfaceOffset; ++i ){
     const auto& dial = out.dials[i];
-    if( dial.type != BackendDialType::Shift ){
+    if( dial.type != BackendDialType::Shift and not isExternal(dial.type) ){
       out.parameterDialIndices[dialPositions[model.dialInputs[dial.firstInput].parameterIndex]++]
           = static_cast<std::uint32_t>(i);
     }
@@ -146,6 +173,21 @@ Backends::CudaWeightModel Backends::makeCudaWeightModel(const EngineView& view_,
     out.parameterDialIndices.insert(out.parameterDialIndices.end(), group.second.begin(), group.second.end());
     out.surfaceGroups.push_back({group.first.first, group.first.second, first, out.parameterDialIndices.size()});
   }
+  std::map<std::size_t, std::vector<std::uint32_t>> externalGroups;
+  for( std::size_t i = 0; i < out.dials.size(); ++i ){
+    if( isExternal(out.dials[i].type) ){
+      externalGroups[out.dials[i].externalBlockIndex].push_back(static_cast<std::uint32_t>(i));
+      ++out.externalDialCount;
+    }
+  }
+  for( const auto& group : externalGroups ){
+    const auto first = out.parameterDialIndices.size();
+    out.parameterDialIndices.insert(out.parameterDialIndices.end(), group.second.begin(), group.second.end());
+    out.externalGroups.push_back({group.first, first, out.parameterDialIndices.size()});
+  }
+  out.externalWeightBlocks = model.externalWeightBlocks;
+  out.externalWeightCount = externalWeightCount;
+  out.tableTerms = model.tableTerms;
   out.binOffsets.assign(std::size_t(model.totalBins) + 1, 0);
   std::vector<bool> seen(model.events.size(), false);
   for( const auto& event : model.events ){
@@ -233,6 +275,22 @@ void Backends::CudaResponseUpdatePlan::select(const std::vector<std::size_t>& of
     if( previous_[group.firstParameter] == current_[group.firstParameter]
         and previous_[group.secondParameter] == current_[group.secondParameter] ){ continue; }
     const auto count = group.endDial - group.firstDial;
+    ranges.push_back({group.firstDial, group.endDial, blockCount});
+    dialCount += count;
+    blockCount += (count - 1) / cudaResponseBlockSize + 1;
+  }
+}
+
+void Backends::CudaResponseUpdatePlan::selectExternal(const std::vector<CudaExternalGroup>& groups_,
+    const std::vector<std::uint64_t>& previous_, const std::vector<std::uint64_t>& current_, bool force_) {
+  require(previous_.size() == current_.size(), "external generation layout mismatch.");
+  ranges.clear();
+  dialCount = blockCount = 0;
+  for( const auto& group : groups_ ){
+    require(group.blockIndex < current_.size(), "invalid external dependency block.");
+    if( not force_ and previous_[group.blockIndex] == current_[group.blockIndex] ){ continue; }
+    const auto count = group.endDial - group.firstDial;
+    if( count == 0 ){ continue; }
     ranges.push_back({group.firstDial, group.endDial, blockCount});
     dialCount += count;
     blockCount += (count - 1) / cudaResponseBlockSize + 1;

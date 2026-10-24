@@ -5,6 +5,8 @@
 #include "Graph.h"
 #include "Norm.h"
 #include "Shift.h"
+#include "Tabulated.h"
+#include "Kriged.h"
 
 #include <TH2D.h>
 #include <gtest/gtest.h>
@@ -114,5 +116,46 @@ TEST(EngineLayout, SharesInputSequencesAndPreservesWeightsAfterRebuild) {
         EXPECT_NEAR(weights[i], expected, std::abs(expected) * 1e-12);
       }
     }
+  }
+}
+
+TEST(EngineLayout, TableDialsShareSourcesWithoutRequestingScalarPayloads) {
+  LikelihoodInterface likelihood;
+  auto& model = likelihood.getModelPropagator();
+  auto& samples = model.getSampleSet().getSampleList();
+  samples.resize(1);
+  samples[0].setIndex(0);
+  samples[0].configure(ConfigReader(JsonType{
+      {"name", "sample"}, {"binning", {{"binningDefinition", {
+          {{"name", "X"}, {"edges", {0., 1.}}}}}}}}));
+  std::vector<double> first{1., 2., 3.}, second{4., 5.};
+  DialInputBuffer buffer;
+  std::array<DialInterface, 3> interfaces;
+  interfaces[0].setDial(DialBaseObject(Tabulated(&first, 1, .25)));
+  interfaces[1].setDial(DialBaseObject(Kriged(&first, 3, {2, 0, 2}, {-.25, .5, .75})));
+  interfaces[2].setDial(DialBaseObject(Kriged(&second, 1, {1}, {1.})));
+  Event event;
+  event.getIndices().sample = event.getIndices().bin = 0;
+  auto& cache = model.getEventDialCache().getCache();
+  cache.push_back({&event});
+  for( auto& interface : interfaces ){
+    interface.setInputBufferRef(&buffer);
+    cache.back().dialResponseCacheList.emplace_back(interface);
+  }
+  cache.back().dialResponseCacheList.emplace_back(interfaces[0]);
+  Backends::EngineLayout layout;
+  for( int rebuild = 0; rebuild < 2; ++rebuild ){
+    layout.build(likelihood);
+    const auto& propagation = layout.view.propagation;
+    EXPECT_TRUE(propagation.dialPayloads.empty());
+    ASSERT_EQ(propagation.dials.size(), 3);
+    ASSERT_EQ(propagation.externalWeightBlocks.size(), 2);
+    ASSERT_EQ(layout.bindings.externalWeights.size(), 2);
+    EXPECT_EQ(layout.bindings.externalWeights[0].table, &first);
+    EXPECT_EQ(layout.bindings.externalWeights[1].table, &second);
+    EXPECT_EQ(propagation.dials[0].externalBlockIndex, propagation.dials[1].externalBlockIndex);
+    EXPECT_NE(propagation.dials[0].externalBlockIndex, propagation.dials[2].externalBlockIndex);
+    EXPECT_EQ(propagation.tableTerms.size(), 6);
+    EXPECT_EQ(propagation.eventDialIndices, (std::vector<std::uint32_t>{0, 1, 2, 0}));
   }
 }

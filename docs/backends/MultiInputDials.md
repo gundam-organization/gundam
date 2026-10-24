@@ -5,7 +5,7 @@ subtypes and two ordered parameter inputs. Existing configuration is used
 unchanged, including per-input mirroring, extrapolation and response limits.
 Surfaces can contribute to event weights; CPU and MPS also support observable
 responses. CUDA currently requires fixed bins and parameter inputs. CUDA surface
-device compilation/execution is pending CC validation.
+device compilation/execution passed at CC-IN2P3 on 2026-10-24.
 
 `BackendDialDescriptor::firstInput/inputCount` addresses an ordered range in
 the common input table. Inputs carry a `DialInputSource`; `Parameter` is
@@ -74,7 +74,8 @@ mirrors, limits, extrapolation, caps, outside events, repeated references,
 2-knot and greater-than-16-knot axes, numerical errors and cache recovery.
 It is registered as `cuda-backend-surfaces` only in CUDA-enabled builds and
 requires an allocated GPU, like the other explicitly labelled device tests.
-Its C++ syntax is checked locally; NVCC compilation and execution remain pending.
+NVCC compilation and the surface, skeleton and propagation suites passed at
+CC-IN2P3 on 2026-10-24.
 
 After rebuilding the CUDA test executable in an allocation:
 

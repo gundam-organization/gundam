@@ -1,6 +1,7 @@
 #include "CudaDeviceContext.h"
 #include "CudaWeightModel.h"
 #include "BackendTypes.h"
+#include "PropagationInputs.h"
 
 #include <cuda_runtime.h>
 
@@ -67,7 +68,14 @@ namespace {
     DeviceBuffer<Backends::BackendDialInputDescriptor> inputs;
     DeviceBuffer<double> payloads, parameters, responses, previousInputs, previousSecondInputs, weights, sums, sumSquares;
     DeviceBuffer<std::uint32_t> dialIndices, parameterDialIndices;
-    DeviceBuffer<Backends::CudaResponseUpdate> responseUpdates;
+    DeviceBuffer<Backends::CudaResponseUpdate> responseUpdates, externalResponseUpdates;
+    DeviceBuffer<Backends::BackendTableTerm> tableTerms;
+    DeviceBuffer<Backends::ExternalWeightBlockDescriptor> externalBlocks;
+    DeviceBuffer<double> externalWeights;
+    std::vector<Backends::CudaExternalGroup> externalGroups{};
+    std::vector<std::uint64_t> externalGenerations{}, currentExternalGenerations{};
+    Backends::CudaResponseUpdatePlan externalUpdatePlan{};
+    std::size_t externalDialCount{0};
     std::vector<std::size_t> parameterDialOffsets{};
     std::vector<Backends::CudaSurfaceGroup> surfaceGroups{};
     std::size_t surfaceOffset{0};
@@ -92,6 +100,9 @@ namespace {
                                   bool reuse_, int* error_, double* previousSecondInputs_, std::size_t surfaceOffset_) {
     using namespace Backends;
     const auto& dial = dials_[i];
+    // External/table dials are evaluated by their generation-dependent kernel.
+    if( dial.type == BackendDialType::ExternalWeight or dial.type == BackendDialType::Tabulated
+        or dial.type == BackendDialType::Kriged ){ return; }
     double input = 0.;
     if( dial.type != BackendDialType::Shift ){
       const auto& descriptor = inputs_[dial.firstInput];
@@ -176,6 +187,49 @@ namespace {
                                     previousSecondInputs_, surfaceOffset_);
       }
       __syncthreads(); // Shared bounds must survive until every thread finished.
+    }
+  }
+
+  __global__ void evaluateExternalResponses(const Backends::CudaResponseUpdate* updates_,
+      std::size_t rangeCount_, std::size_t blockCount_, const std::uint32_t* indices_,
+      const Backends::BackendDialDescriptor* dials_, const Backends::ExternalWeightBlockDescriptor* blocks_,
+      const Backends::BackendTableTerm* terms_, const double* values_, double* responses_, int* error_) {
+    __shared__ std::size_t first, end;
+    for( std::size_t block = blockIdx.x; block < blockCount_; block += gridDim.x ){
+      if( threadIdx.x == 0 ){
+        std::size_t low = 0, high = rangeCount_;
+        while( low + 1 < high ){
+          const auto mid = low + (high - low) / 2;
+          if( updates_[mid].firstBlock <= block ){ low = mid; }
+          else{ high = mid; }
+        }
+        const auto range = updates_[low];
+        first = range.firstDial + (block - range.firstBlock) * blockSize;
+        end = range.endDial;
+      }
+      __syncthreads();
+      const auto index = first + threadIdx.x;
+      if( index < end ){
+        const auto slot = indices_[index];
+        const auto& dial = dials_[slot];
+        const auto* values = (dial.type == Backends::BackendDialType::ExternalWeight or dial.tableTermCount)
+            ? values_ + blocks_[dial.externalBlockIndex].offset : nullptr;
+        double response = 0.;
+        if( dial.type == Backends::BackendDialType::ExternalWeight ){
+          response = values[dial.externalWeightIndex];
+        }
+        else{
+          // Preserve the native table term order, including signed/repeated terms.
+          for( std::size_t j = 0; j < dial.tableTermCount; ++j ){
+            const auto& term = terms_[dial.firstTableTerm + j];
+            response += term.coefficient * values[term.index];
+          }
+        }
+        response = Backends::Semantics::clampDialResponse(dial, response);
+        if( not ::isfinite(response) ){ atomicExch(error_, 1); }
+        responses_[slot] = ::isfinite(response) ? response : 0.;
+      }
+      __syncthreads();
     }
   }
 
@@ -279,6 +333,15 @@ void Backends::CudaDeviceContext::build(const CudaWeightModel& model_) {
     b.payloads.upload(model_.payloads, _impl_->stream);
     b.dialIndices.upload(model_.eventDialIndices, _impl_->stream);
     b.parameterDialIndices.upload(model_.parameterDialIndices, _impl_->stream);
+    b.externalGroups = model_.externalGroups;
+    b.externalDialCount = model_.externalDialCount;
+    b.externalGenerations.assign(model_.externalWeightBlocks.size(), 0);
+    b.currentExternalGenerations.resize(model_.externalWeightBlocks.size());
+    b.externalUpdatePlan.ranges.reserve(b.externalGroups.size());
+    b.externalResponseUpdates.allocate(b.externalGroups.size());
+    b.externalBlocks.upload(model_.externalWeightBlocks, _impl_->stream);
+    b.tableTerms.upload(model_.tableTerms, _impl_->stream);
+    b.externalWeights.allocate(model_.externalWeightCount);
     b.parameterDialOffsets = model_.parameterDialOffsets;
     b.previousParameters.resize(model_.parameterCount);
     b.surfaceGroups = model_.surfaceGroups;
@@ -304,12 +367,14 @@ void Backends::CudaDeviceContext::build(const CudaWeightModel& model_) {
   _impl_->buffers = std::move(buffers);
 }
 
-void Backends::CudaDeviceContext::propagate(const std::vector<double>& parameters_, bool recomputeResponses_,
+void Backends::CudaDeviceContext::propagate(const std::vector<double>& parameters_,
+                                           const std::vector<ExternalWeightBlockView>& externalWeights_, bool recomputeResponses_,
                                            BackendTimingSummary& timing_) {
   DeviceScope scope(_impl_->deviceIndex);
   if( not _impl_->buffers ){ throw std::runtime_error("CudaBackend device model has not been built."); }
   auto& b = *_impl_->buffers;
   if( parameters_.size() != b.parameters.size ){ throw std::runtime_error("CUDA parameter count mismatch."); }
+  if( externalWeights_.size() != b.externalGenerations.size() ){ throw std::runtime_error("CUDA external block count mismatch."); }
   int error = 0;
   const auto stream = _impl_->stream;
   auto record = [&](std::size_t i_){ checkCuda(cudaEventRecord(_impl_->stages[i_], stream), "cudaEventRecord"); };
@@ -317,11 +382,15 @@ void Backends::CudaDeviceContext::propagate(const std::vector<double>& parameter
     const bool reuse = b.cachePrimed and not recomputeResponses_;
     const auto preparationStart = std::chrono::steady_clock::now();
     if( reuse ){ b.updatePlan.select(b.parameterDialOffsets, b.previousParameters, parameters_, b.surfaceGroups); }
+    for( std::size_t i = 0; i < externalWeights_.size(); ++i ){
+      b.currentExternalGenerations[i] = externalWeights_[i].generation;
+    }
+    b.externalUpdatePlan.selectExternal(b.externalGroups, b.externalGenerations, b.currentExternalGenerations, not reuse);
     // Dense updates retain the original contiguous traversal. Sparse dispatch
     // avoids a full dial scan and uploads only one range per changed parameter.
-    const bool sparse = reuse and b.updatePlan.dialCount <= b.dials.size / 2;
-    const auto candidates = sparse ? b.updatePlan.dialCount : b.dials.size;
-    timing_.cacheCandidateCount = candidates;
+    const bool sparse = reuse and b.updatePlan.dialCount <= (b.dials.size - b.externalDialCount) / 2;
+    const auto candidates = sparse ? b.updatePlan.dialCount : b.dials.size - b.externalDialCount;
+    timing_.cacheCandidateCount = candidates + b.externalUpdatePlan.dialCount;
     timing_.cachePreparationSeconds = std::chrono::duration<double>(
         std::chrono::steady_clock::now() - preparationStart).count();
     record(0);
@@ -329,6 +398,23 @@ void Backends::CudaDeviceContext::propagate(const std::vector<double>& parameter
       checkCuda(cudaMemcpyAsync(b.responseUpdates.data, b.updatePlan.ranges.data(),
           b.updatePlan.ranges.size() * sizeof(CudaResponseUpdate), cudaMemcpyHostToDevice, stream), "response update ranges");
     }
+    if( not b.externalUpdatePlan.ranges.empty() ){
+      checkCuda(cudaMemcpyAsync(b.externalResponseUpdates.data, b.externalUpdatePlan.ranges.data(),
+          b.externalUpdatePlan.ranges.size() * sizeof(CudaResponseUpdate), cudaMemcpyHostToDevice, stream), "external response ranges");
+    }
+    const auto externalUploadStart = std::chrono::steady_clock::now();
+    for( std::size_t i = 0; i < externalWeights_.size(); ++i ){
+      const auto& block = externalWeights_[i];
+      if( b.cachePrimed and b.externalGenerations[i] == block.generation ){ continue; }
+      if( block.count ){
+        checkCuda(cudaMemcpyAsync(b.externalWeights.data + block.destinationOffset, block.values,
+            block.count * sizeof(double), cudaMemcpyHostToDevice, stream), "external weight upload");
+      }
+      timing_.externalWeightUploadBytes += block.count * sizeof(double);
+      ++timing_.externalWeightUploadBlocks;
+    }
+    timing_.externalWeightUploadSeconds = std::chrono::duration<double>(
+        std::chrono::steady_clock::now() - externalUploadStart).count();
     checkCuda(cudaMemsetAsync(b.error.data, 0, sizeof(int), stream), "reset execution error");
     if( b.parameters.size ){
       checkCuda(cudaMemcpyAsync(b.parameters.data, parameters_.data(), b.parameters.size * sizeof(double),
@@ -345,7 +431,7 @@ void Backends::CudaDeviceContext::propagate(const std::vector<double>& parameter
             b.responses.data, b.previousInputs.data, b.error.data, b.previousSecondInputs.data, b.surfaceOffset);
         checkCuda(cudaGetLastError(), "selected dial response kernel launch");
       }
-      else if( not sparse and b.dials.size ){
+      else if( not sparse and candidates ){
         evaluateResponses<withSurfaces><<<gridSize(b.dials.size), blockSize, 0, stream>>>(b.dials.data, b.dials.size,
             b.inputs.data, b.payloads.data, b.parameters.data, b.responses.data, b.previousInputs.data,
             reuse, b.error.data, b.previousSecondInputs.data, b.surfaceOffset);
@@ -354,6 +440,13 @@ void Backends::CudaDeviceContext::propagate(const std::vector<double>& parameter
     };
     if( b.surfaceOffset < b.dials.size ){ launchResponses(std::true_type{}); }
     else{ launchResponses(std::false_type{}); }
+    if( b.externalUpdatePlan.dialCount ){
+      const auto blocks = static_cast<unsigned int>(std::min<std::size_t>(b.externalUpdatePlan.blockCount, 65535));
+      evaluateExternalResponses<<<blocks, blockSize, 0, stream>>>(b.externalResponseUpdates.data,
+          b.externalUpdatePlan.ranges.size(), b.externalUpdatePlan.blockCount, b.parameterDialIndices.data,
+          b.dials.data, b.externalBlocks.data, b.tableTerms.data, b.externalWeights.data, b.responses.data, b.error.data);
+      checkCuda(cudaGetLastError(), "external/table response kernel launch");
+    }
     record(2);
     if( b.events.size ){
       if( b.interleavedEventDials ){
@@ -378,6 +471,7 @@ void Backends::CudaDeviceContext::propagate(const std::vector<double>& parameter
     checkCuda(cudaStreamSynchronize(stream), "propagation completion");
     if( error ){ throw std::runtime_error("CudaBackend: nonfinite or out-of-range numerical result."); }
     std::copy(parameters_.begin(), parameters_.end(), b.previousParameters.begin());
+    b.externalGenerations = b.currentExternalGenerations;
     b.cachePrimed = true;
     auto elapsed = [&](std::size_t first_, std::size_t last_){
       float milliseconds = 0.;

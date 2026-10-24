@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
-"""Compare CPU table dials with native propagation and an analytic producer."""
+"""Compare CPU (and opt-in CUDA) table dials with native propagation and a producer."""
 import importlib.util
 import json
 import math
+import os
 from pathlib import Path
 import struct
 import subprocess
@@ -23,6 +24,8 @@ def main():
     import GUNDAM
 
     if not hasattr(GUNDAM.FitterEngine, 'getBackendsManager'):
+        if os.environ.get('GUNDAM_TEST_CUDA') == '1':
+            raise RuntimeError('CUDA validation requested but GUNDAM was built without backends')
         print('SKIP: GUNDAM was built without backends')
         return 0
     script_dir = Path(sys.argv[1]) if len(sys.argv) > 1 else Path(__file__).resolve().parent
@@ -81,15 +84,19 @@ extern "C" int weights(const char*, int, int, double values[], int, int index[],
               (.2, .03, .4, -.1, 1.), (.2, .03, .4, -.1, 2.),
               (-2., .01, .1, .03, 1.), (0., 0., 0., 0., 1.)]
 
-    def run(backend):
+    def run(backend, mode=None):
         config = json.loads(json.dumps(base_config))
         if backend:
-            config['likelihoodInterfaceConfig']['backendManagerConfig'] = dict(isEnabled=True, type=backend)
+            config['likelihoodInterfaceConfig']['backendManagerConfig'] = {
+                'isEnabled': True, 'type': backend,
+                'backendConfig': {'propagationMode': mode} if mode else {},
+            }
         engine = GUNDAM.FitterEngine()
         engine.configure(GUNDAM.ConfigUtils.ConfigReader(GUNDAM.JsonType(json.dumps(config))))
         engine.initialize()
-        if backend and not engine.getBackendsManager().hasBackend():
-            raise RuntimeError('CPU backend was not initialized')
+        if backend and (not engine.getBackendsManager().hasBackend()
+                        or engine.getBackendsManager().getType() != backend):
+            raise RuntimeError(f'{backend} backend was not initialized')
         li = engine.getLikelihoodInterface()
         parameters = li.getModelPropagator().getParametersManager().getParameterSetsList()
         sample = li.getModelPropagator().getSampleSet().getSampleList()[0]
@@ -121,12 +128,17 @@ extern "C" int weights(const char*, int, int, double values[], int, int index[],
         return results
 
     reference = run(None)
-    result = run('CPU')
-    for point, (actual, expected) in enumerate(zip(result, reference)):
-        for output, (a, b) in enumerate(zip(actual, expected)):
-            if not math.isclose(a, b, rel_tol=1e-11, abs_tol=1e-11):
-                raise RuntimeError(f'CPU point {point} output {output}: {a} != {b}')
-    print('SUCCESS: CPU Tabulated/Kriged weights, histograms and likelihood agree with native propagation')
+    backends = [('CPU', None)]
+    # Explicit GPU validation; the default fast test needs no CUDA toolkit/device.
+    if os.environ.get('GUNDAM_TEST_CUDA') == '1':
+        backends.extend(('CUDA', mode) for mode in ('cachedResponses', 'recomputeResponses'))
+    for backend, mode in backends:
+        result = run(backend, mode)
+        for point, (actual, expected) in enumerate(zip(result, reference)):
+            for output, (a, b) in enumerate(zip(actual, expected)):
+                if not math.isclose(a, b, rel_tol=1e-11, abs_tol=1e-11):
+                    raise RuntimeError(f'{backend}/{mode} point {point} output {output}: {a} != {b}')
+    print('SUCCESS: table weights, histograms and likelihood agree with native propagation')
     return 0
 
 

@@ -7,6 +7,7 @@
 
 namespace Backends {
   struct CudaWeightModel;
+  struct ExternalWeightBlockView;
   struct BackendTimingSummary;
   struct BackendDeviceView;
 
@@ -20,7 +21,8 @@ namespace Backends {
 
     [[nodiscard]] const std::string& getDeviceName() const;
     void build(const CudaWeightModel& model_);
-    void propagate(const std::vector<double>& parameters_, bool recomputeResponses_, BackendTimingSummary& timing_);
+    void propagate(const std::vector<double>& parameters_, const std::vector<ExternalWeightBlockView>& externalWeights_,
+                   bool recomputeResponses_, BackendTimingSummary& timing_);
     void readWeights(std::vector<double>& weights_);
     void readHistograms(std::vector<double>& sums_, std::vector<double>& sumSquares_);
     void invalidate();

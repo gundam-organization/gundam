@@ -128,6 +128,9 @@ void Backends::CudaBackend::buildShared(std::shared_ptr<const EngineView> engine
       {"available", true}, {"events", packed.events.size()}, {"uniqueDials", packed.dials.size()},
       {"surfaceDials", packed.dials.size() - packed.surfaceOffset},
       {"surfaceDependencyGroups", packed.surfaceGroups.size()},
+      {"externalDials", packed.externalDialCount},
+      {"externalWeightBlocks", packed.externalWeightBlocks.size()},
+      {"tableTerms", packed.tableTerms.size()},
       {"requestedWeightLayout", _weightLayout_.toString()},
       {"weightLayout", packed.eventDialStride == 32 ? "warpInterleaved" : "eventMajor"},
       {"originalEventDialIndices", getEngineView().propagation.eventDialIndices.size()},
@@ -164,7 +167,7 @@ Backends::PropagationToken Backends::CudaBackend::requestPropagation(const Propa
       if( not std::isfinite(value) ){ throw std::runtime_error("CudaBackend: parameter values must be finite."); }
     }
 #ifdef GUNDAM_USING_CUDA
-    _impl_->context->propagate(inputs_.parameters.values,
+    _impl_->context->propagate(inputs_.parameters.values, inputs_.externalWeights,
         _propagationMode_ == CudaPropagationMode::recomputeResponses, _impl_->timing);
 #else
     initializeDevice();

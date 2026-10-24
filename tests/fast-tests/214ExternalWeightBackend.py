@@ -4,6 +4,7 @@ import copy
 import importlib.util
 import json
 import math
+import os
 from pathlib import Path
 import sys
 
@@ -17,6 +18,8 @@ def main():
     import GUNDAM
 
     if not hasattr(GUNDAM.FitterEngine, "getBackendsManager"):
+        if os.environ.get('GUNDAM_TEST_CUDA') == '1':
+            raise RuntimeError('CUDA validation requested but GUNDAM was built without backends')
         print("SKIP: GUNDAM was built without backends")
         return 0
     script_dir = Path(sys.argv[1]) if len(sys.argv) > 1 else Path(__file__).resolve().parent
@@ -32,7 +35,7 @@ def main():
     GUNDAM.setLightOutputMode(True)
     GUNDAM.setNumberOfThreads(2)
 
-    def run(backend, binned):
+    def run(backend, binned, mode=None):
         builder = GUNDAM.ConfigUtils.ConfigBuilder()
         builder.setConfigFromYamlString(fixture.build_config_text(root_path, script_path, sys.executable, binned))
         config = json.loads(builder.getConfig().toString())['fitterEngineConfig']
@@ -40,7 +43,10 @@ def main():
                       generateSamplePlots=False, generateOneSigmaPlots=False)
         likelihood_config = config['likelihoodInterfaceConfig']
         if backend:
-            likelihood_config['backendManagerConfig'] = {'isEnabled': True, 'type': backend}
+            likelihood_config['backendManagerConfig'] = {
+                'isEnabled': True, 'type': backend,
+                'backendConfig': {'propagationMode': mode} if mode else {},
+            }
         sets = likelihood_config['propagatorConfig']['parametersManagerConfig']['parameterSetList']
         second = copy.deepcopy(sets[0])
         second['name'] = 'SecondExternalSource'
@@ -78,13 +84,13 @@ def main():
             sums = [float(b.sumWeights) for b in bins]
             squares = [float(b.sqrtSumSqWeights)**2 for b in bins]
             results.append(weights + sums + squares + [float(li.getLastLikelihood())])
-            if backend == 'MPS':
+            if backend in ('MPS', 'CUDA'):
                 timing = manager.getLastTimingSummary()
                 changed = 1 if i in (2, 4) else 0
-                # Default resident execution uploads each value as a float pair.
+                # MPS uses float pairs; CUDA uses doubles (8 bytes in either case).
                 count = 12 if binned else 6
                 if timing.externalWeightUploadBlocks != changed or timing.externalWeightUploadBytes != changed * count * 8:
-                    raise RuntimeError(f'Unexpected MPS transfers at point {i}: {timing.externalWeightUploadBlocks} blocks / {timing.externalWeightUploadBytes} bytes')
+                    raise RuntimeError(f'Unexpected {backend} transfers at point {i}: {timing.externalWeightUploadBlocks} blocks / {timing.externalWeightUploadBytes} bytes')
             # Validate against the analytic producer formula, independent of backends.
             energies = [0.6, 0.8, 1.2, 1.5, 2., 2.5]
             for j, energy in enumerate(energies):
@@ -96,16 +102,20 @@ def main():
             GUNDAM.flushOutput()
         return results
 
-    backends = ['CPU']
+    backends = [('CPU', None)]
     if sys.platform == 'darwin':
-        backends.append('MPS')
+        backends.append(('MPS', None))
+    # Explicit opt-in: a requested CUDA validation must fail if unavailable.
+    # Default fast tests stay runnable in builds without CUDA or GPU hardware.
+    if os.environ.get('GUNDAM_TEST_CUDA') == '1':
+        backends.extend(('CUDA', mode) for mode in ('cachedResponses', 'recomputeResponses'))
     for binned in (False, True):
         reference = run(None, binned)
-        for backend in backends:
-            result = run(backend, binned)
+        for backend, mode in backends:
+            result = run(backend, binned, mode)
             for point, (actual, expected) in enumerate(zip(result, reference)):
                 for index, (a, b) in enumerate(zip(actual, expected)):
-                    assert_close(f'{backend} binned={binned} point={point} output={index}', a, b,
+                    assert_close(f'{backend}/{mode} binned={binned} point={point} output={index}', a, b,
                                  2e-5 if backend == 'MPS' else 1e-10)
     print('SUCCESS: external weights, histograms, likelihood and selective block uploads agree')
     return 0

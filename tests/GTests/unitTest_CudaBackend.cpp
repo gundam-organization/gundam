@@ -119,7 +119,7 @@ TEST(CudaWeightModel, RejectsUnsupportedFeaturesAndUnsafeLayouts) {
   EXPECT_THROW((void)makeCudaWeightModel(view), std::runtime_error);
   view = {};
   view.propagation.externalWeightBlocks.push_back({0, 1});
-  EXPECT_THROW((void)makeCudaWeightModel(view), std::runtime_error);
+  EXPECT_NO_THROW((void)makeCudaWeightModel(view));
   view = {};
   view.propagation.samples.emplace_back().useDynamicBinning = true;
   EXPECT_THROW((void)makeCudaWeightModel(view), std::runtime_error);
@@ -413,4 +413,111 @@ TEST(CudaWeightModel, RejectsMalformedSurfacesAndInvalidSecondInputs) {
     view.propagation.dials[0].inputCount = 1;
     EXPECT_THROW((void)makeCudaWeightModel(view), std::runtime_error);
   }
+}
+
+TEST(CudaWeightModel, ExternalAndTableGroupsUseProducerGenerations) {
+  using namespace Backends;
+  EngineView view;
+  auto& model = view.propagation;
+  model.parameterCount = 1;
+  model.externalWeightBlocks = {{8, 3}, {0, 2}, {42, 0}}; // Gaps, reordered blocks, empty producer.
+  model.dialInputs = {{0}};
+  BackendDialDescriptor norm;
+  norm.inputCount = 1;
+  BackendDialDescriptor external;
+  external.type = BackendDialType::ExternalWeight;
+  external.externalWeightIndex = 2;
+  external.inputCount = 99; // Producer dependencies are not device parameter inputs.
+  BackendDialDescriptor tabulated;
+  tabulated.type = BackendDialType::Tabulated;
+  tabulated.externalBlockIndex = 1;
+  tabulated.tableTermCount = 2;
+  BackendDialDescriptor kriged;
+  kriged.type = BackendDialType::Kriged;
+  kriged.firstTableTerm = 2;
+  kriged.tableTermCount = 3;
+  BackendDialDescriptor empty = kriged;
+  empty.externalBlockIndex = 2;
+  empty.tableTermCount = 0;
+  model.tableTerms = {{0, .25}, {1, .75}, {2, -.25}, {0, .5}, {2, .75}};
+  model.dials = {external, norm, tabulated, kriged, empty};
+  model.events.resize(1);
+  model.eventWeights = {{2., 0, 6}};
+  model.eventDialIndices = {0, 1, 2, 3, 4, 0};
+  const auto packed = makeCudaWeightModel(view);
+  EXPECT_EQ(packed.externalWeightCount, 11);
+  EXPECT_EQ(packed.externalDialCount, 4);
+  EXPECT_EQ(packed.parameterDialOffsets, (std::vector<std::size_t>{0, 1}));
+  EXPECT_EQ(packed.parameterDialIndices, (std::vector<std::uint32_t>{1, 0, 3, 2, 4}));
+  EXPECT_EQ(packed.eventDialIndices, model.eventDialIndices);
+  ASSERT_EQ(packed.externalGroups.size(), 3);
+  EXPECT_EQ(packed.externalGroups[0].blockIndex, 0);
+  EXPECT_EQ(packed.externalGroups[0].firstDial, 1);
+  EXPECT_EQ(packed.externalGroups[0].endDial, 3);
+  CudaResponseUpdatePlan plan;
+  plan.selectExternal(packed.externalGroups, {0, 0, 0}, {1, 1, 1});
+  EXPECT_EQ(plan.dialCount, 4);
+  EXPECT_EQ(plan.blockCount, 3);
+  plan.selectExternal(packed.externalGroups, {1, 1, 1}, {2, 1, 1});
+  ASSERT_EQ(plan.ranges.size(), 1);
+  EXPECT_EQ(plan.dialCount, 2);
+  EXPECT_EQ(plan.ranges[0].firstDial, 1);
+  plan.selectExternal(packed.externalGroups, {2, 1, 1}, {2, 1, 1});
+  EXPECT_EQ(plan.dialCount, 0);
+  EXPECT_TRUE(plan.ranges.empty());
+  plan.selectExternal(packed.externalGroups, {2, 1, 1}, {2, 1, 1}, true);
+  EXPECT_EQ(plan.dialCount, 4);
+  // A decreasing but different revision still invalidates its producer block.
+  plan.selectExternal(packed.externalGroups, {2, 1, 1}, {1, 1, 1});
+  EXPECT_EQ(plan.dialCount, 2);
+  EXPECT_THROW(plan.selectExternal(packed.externalGroups, {1}, {1}), std::runtime_error);
+  EXPECT_THROW(plan.selectExternal(packed.externalGroups, {}, {1}), std::runtime_error);
+}
+
+TEST(CudaWeightModel, RejectsMalformedExternalBlocksAndTableTerms) {
+  using namespace Backends;
+  EngineView good;
+  auto& model = good.propagation;
+  model.externalWeightBlocks = {{0, 3}, {3, 2}};
+  BackendDialDescriptor external;
+  external.type = BackendDialType::ExternalWeight;
+  BackendDialDescriptor table;
+  table.type = BackendDialType::Tabulated;
+  table.externalBlockIndex = 1;
+  table.tableTermCount = 2;
+  model.dials = {external, table};
+  model.tableTerms = {{0, .25}, {1, .75}};
+  EXPECT_NO_THROW((void)makeCudaWeightModel(good));
+  auto bad = good;
+  bad.propagation.dials[0].externalBlockIndex = 2;
+  EXPECT_THROW((void)makeCudaWeightModel(bad), std::runtime_error);
+  bad = good;
+  bad.propagation.dials[0].externalWeightIndex = 3;
+  EXPECT_THROW((void)makeCudaWeightModel(bad), std::runtime_error);
+  bad = good;
+  bad.propagation.dials[1].externalBlockIndex = 2;
+  EXPECT_THROW((void)makeCudaWeightModel(bad), std::runtime_error);
+  bad = good;
+  bad.propagation.tableTerms.pop_back();
+  EXPECT_THROW((void)makeCudaWeightModel(bad), std::runtime_error);
+  bad = good;
+  bad.propagation.dials[1].tableTermCount = 1;
+  EXPECT_THROW((void)makeCudaWeightModel(bad), std::runtime_error);
+  bad = good;
+  bad.propagation.tableTerms[0].index = 2;
+  EXPECT_THROW((void)makeCudaWeightModel(bad), std::runtime_error);
+  for( auto invalid : {std::numeric_limits<double>::infinity(), std::numeric_limits<double>::quiet_NaN()} ){
+    bad = good;
+    bad.propagation.tableTerms[1].coefficient = invalid;
+    EXPECT_THROW((void)makeCudaWeightModel(bad), std::runtime_error);
+  }
+  bad = good;
+  bad.propagation.externalWeightBlocks[1].offset = 2;
+  EXPECT_THROW((void)makeCudaWeightModel(bad), std::runtime_error);
+  bad = good;
+  bad.propagation.externalWeightBlocks[1].offset = std::numeric_limits<std::size_t>::max();
+  EXPECT_THROW((void)makeCudaWeightModel(bad), std::runtime_error);
+  bad = good;
+  bad.propagation.externalWeightBlocks = {{0, std::numeric_limits<std::size_t>::max()}};
+  EXPECT_THROW((void)makeCudaWeightModel(bad), std::runtime_error);
 }

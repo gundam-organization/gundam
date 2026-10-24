@@ -71,18 +71,20 @@ Its defaults are `propagationMode: cachedResponses` and
 `weightLayout: warpInterleaved`. Index padding above 2x retains `eventMajor`.
 `cachedResponses` (default) retains dial responses until any transformed input
 changes; `recomputeResponses` evaluates every unique dial on every propagation.
-Both modes recompute event weights and histograms, using native doubles. External
-weights, tables and event-state propagation are rejected during
-model preparation. No CPU propagation fallback is performed.
+Both modes recompute event weights and histograms, using native doubles.
+`ExternalWeightDispatcher`, `Tabulated` and `Kriged` responses are implemented
+for event weights with fixed bins; their producers still run on the host.
+Event-state propagation is rejected during model preparation. No CPU propagation
+fallback is performed.
 
 Bilinear/Bicubic surfaces use the shared interpolation and retain ordered x/y
 inputs, per-input mirroring, extrapolation, response bounds and smoothing.
 Disjoint dependency-pair groups prevent duplicate response writes when both
 parameters change. Scalar-only models retain the specialized scalar kernels;
 mixed models allocate the additional second-input cache only for surfaces.
-Host packing/validation tests pass locally. The new `cuda-backend-surfaces`
-device suite compares against native dials and CPU; CUDA compilation/execution
-of this extension remains to be validated at the CC.
+Host packing/validation tests pass locally. `cuda-backend-surfaces` compares
+against native dials and CPU and passed at CC-IN2P3 on 2026-10-24 together with
+`cuda-backend-skeleton` and `cuda-backend-propagation` (3/3 CTest suites).
 
 The host-side configuration/model tests pass locally without a toolkit. The
 full CUDA test executable passed all five tests on CC-IN2P3 V100 in Slurm job
@@ -136,12 +138,12 @@ the common layout can represent the dial. ❌ marks unsupported dial classes.
 | `Spline`: `MonotonicSpline` | ✅ | ✅ | ✅ |
 | `Spline`: `GeneralSpline` | ✅ | ✅ | ✅ |
 | `Graph` | ✅ | ✅ | ✅ |
-| `Surface` / `Bilinear` | ✅ | ✅ | ⚠️ Weights/fixed bins implemented; CUDA device validation pending |
-| `Surface` / `Bicubic` | ✅ | ✅ | ⚠️ Weights/fixed bins implemented; CUDA device validation pending |
-| `ExternalWeight` (`ExternalWeightDispatcher`) | ✅ | ✅ | 🚧 |
+| `Surface` / `Bilinear` | ✅ | ✅ | ⚠️ Weights/fixed bins; validated at CC |
+| `Surface` / `Bicubic` | ✅ | ✅ | ⚠️ Weights/fixed bins; validated at CC |
+| `ExternalWeight` (`ExternalWeightDispatcher`) | ✅ | ✅ | ⚠️ Host producer, selective FP64 uploads; device validation pending |
 | ROOT objects (`RootFormula`, `RootSpline`, `RootGraph`) | ❌ Heavy C++ objects, unsuitable for the flat backend model | ❌ Strictly incompatible with Metal device execution as C++ ROOT objects | ❌ Rejected by `EngineLayout` |
-| `Tabulated` | ⚠️ Table updated on host at each propagation | ❌ | 🚧 |
-| `Kriged` | ⚠️ Table updated on host at each propagation | ❌ | 🚧 |
+| `Tabulated` | ⚠️ Table updated on host at each propagation | ❌ | ⚠️ Host table, GPU response; device validation pending |
+| `Kriged` | ⚠️ Table updated on host at each propagation | ❌ | ⚠️ Host table, GPU response; device validation pending |
 | `CompiledLibDial` | ❌ | ❌ | ❌ Rejected by `EngineLayout` |
 | `Polynomial` | ❌ | ❌ | ❌ Rejected by `EngineLayout` |
 
@@ -157,6 +159,22 @@ Responses are evaluated on each propagation, including when parameter values
 are unchanged. Each table publication advances its generation so observable
 and binning caches also see the update.
 
+CUDA now uses the same external block layout for dispatchers and tables.
+Only changed generations are uploaded (native doubles); disjoint per-block
+response groups are evaluated independently of parameter changes. Immutable
+indices and coefficients retain native term order, including negative, repeated
+and unsorted Kriged terms. `cachedResponses` reuses published responses;
+`recomputeResponses` reevaluates all responses while still avoiding unchanged
+block transfers. Errors and rebuilds force fresh uploads and responses.
+`BackendManager` republishes host tables at every propagation because these
+factories do not expose producer revisions; consequently those tables are
+uploaded every call, including at unchanged parameters.
+
+Host validation and native/CPU Python regressions pass locally. The dedicated
+`cuda-backend-external` suite and opt-in CUDA runs of
+`214ExternalWeightBackend.py` / `215CpuTableDials.py` still require validation
+at the CC. See [CUDA validation](../guides/CudaBackend.md).
+
 ### Engine features
 
 Here, ✅ means the backend can handle the feature; it does not imply that
@@ -169,14 +187,14 @@ every stage runs on the GPU. MPS support applies to both `cachedResponses` and
 | Statistical likelihood | ⚠️ on host | ⚠️ on host | ⚠️ On host after histogram readback |
 | Separate `SampleLikelihoods` output | ❌ Only the total is stored | ❌ Only the total is stored | ❌ Only the total is stored |
 | Parameter inputs and per-input mirroring | ✅ | ✅ | ✅ Scalar dials / fixed bins |
-| Two-input surfaces (`Bilinear`, `Bicubic`) | ✅ | ✅ | ⚠️ Weights/fixed bins implemented; CUDA device validation pending |
+| Two-input surfaces (`Bilinear`, `Bicubic`) | ✅ | ✅ | ⚠️ Weights/fixed bins; validated at CC |
 | Dial extrapolation | ✅ | ✅ | ✅ Scalar dials / fixed bins |
 | Hard response limits and response smoothing | ✅ | ✅ | ✅ Scalar dials / fixed bins |
 | Event reweight cap | ✅ | ✅ | ✅ Scalar dials / fixed bins |
 | Observable responses (`applyToVariable`) | ✅ | ✅ | 🚧 |
 | Dynamic binning / event migration | ✅ | ✅ | 🚧 |
 | Smoothed binning / fractional contributions | ✅ | ✅ | 🚧 |
-| External-weight updates | ⚠️ Produced on host | ⚠️ Produced on host, copied to GPU buffers | 🚧 |
+| External-weight updates | ⚠️ Produced on host | ⚠️ Produced on host, copied to GPU buffers | ⚠️ Produced on host; changed blocks copied as doubles; device validation pending |
 | Event variables as ordinary dial inputs (`DialInputSource::EventVariable`) | ❌ | ❌ | 🚧 |
 | Numerical precision | Double (64-bit) | ⚠️ ~48 significant bits in resident event propagation (float pairs); float32 weights / histograms in packed execution | Double (64-bit); CPU comparisons passed on V100 |
 | Hardware requirements | ✅ Host CPU | ⚠️ Apple GPU with Metal | ⚠️ NVIDIA GPU and CUDA toolkit; CC V100 smoke test uses CUDA 12.4 / `sm_70` |
