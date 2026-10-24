@@ -19,4 +19,6 @@ set -euo pipefail
 cd "${SLURM_SUBMIT_DIR:?Submit this script with sbatch}"
 buildDir="${1:-build-cuda-smoke}"
 nvidia-smi
-srun "${buildDir}/gundamCudaSmokeTest"
+# Do not reuse an interactive session's CPU mask on a different batch node.
+# This smoke test does not need CPU affinity.
+srun --cpu-bind=none "${buildDir}/gundamCudaSmokeTest"
