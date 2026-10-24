@@ -14,6 +14,8 @@ set -euo pipefail
 # sbatch tests/cuda/CcLyonSmoke.sbatch [absolute-or-relative-build-directory]
 # For an sm_90 build: sbatch -p gpu_h100 tests/cuda/CcLyonSmoke.sbatch ...
 # Load the same toolkit environment here if it is not installed system-wide.
+# The smoke test embeds its CUDA runtime path at link time; the toolkit must
+# remain accessible at that path from the batch node.
 cd "${SLURM_SUBMIT_DIR:?Submit this script with sbatch}"
 buildDir="${1:-build-cuda-smoke}"
 nvidia-smi

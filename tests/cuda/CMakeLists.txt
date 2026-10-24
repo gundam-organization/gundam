@@ -11,7 +11,13 @@ endif()
 
 add_executable(gundamCudaSmokeTest CudaSmokeTest.cu)
 set_target_properties(gundamCudaSmokeTest PROPERTIES
-    CUDA_STANDARD 17 CUDA_STANDARD_REQUIRED ON CUDA_EXTENSIONS OFF)
+    CUDA_STANDARD 17 CUDA_STANDARD_REQUIRED ON CUDA_EXTENSIONS OFF
+    CUDA_RUNTIME_LIBRARY Shared)
 target_link_libraries(gundamCudaSmokeTest PRIVATE CUDA::cudart)
+# CUDA library directories can be considered implicit by the linker, so CMake
+# may omit them from the automatic RPATH. Keep a user-installed runtime visible
+# when running this build on another node without LD_LIBRARY_PATH.
+set_property(TARGET gundamCudaSmokeTest APPEND PROPERTY
+    BUILD_RPATH "$<TARGET_FILE_DIR:CUDA::cudart>")
 add_test(NAME cuda-smoke COMMAND gundamCudaSmokeTest)
 set_tests_properties(cuda-smoke PROPERTIES LABELS "cuda;device" TIMEOUT 60)
