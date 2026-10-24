@@ -10,6 +10,14 @@ if(NOT gundamCudaMode STREQUAL "OFF")
     message(FATAL_ERROR "CUDA support requires CMake 3.18 or newer.")
   endif()
   cmake_policy(SET CMP0104 NEW)
+  # CheckLanguage trusts an explicitly supplied compiler and skips its probe.
+  if(IS_ABSOLUTE "${CMAKE_CUDA_COMPILER}" AND NOT EXISTS "${CMAKE_CUDA_COMPILER}")
+    message(FATAL_ERROR
+      "CUDA compiler does not exist: ${CMAKE_CUDA_COMPILER}. "
+      "Locate nvcc with 'command -v nvcc' after loading the toolkit, then "
+      "configure with its actual path. Use a new build directory or remove "
+      "the stale entry with cmake -U CMAKE_CUDA_COMPILER.")
+  endif()
   include(CheckLanguage)
   check_language(CUDA)
   if(CMAKE_CUDA_COMPILER)
