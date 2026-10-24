@@ -92,11 +92,10 @@ every stage runs on the GPU. MPS support applies to both `cachedResponses` and
 | Observable responses (`applyToVariable`) | ✅ | ✅ |
 | Dynamic binning / event migration | ✅ | ✅ |
 | Smoothed binning / fractional contributions | ✅ | ✅ |
-| External-weight updates | ✅ | ✅ |
+| External-weight updates | ⚠️ Produced on host | ⚠️ Produced on host, copied to GPU buffers |
 | Event variables as ordinary dial inputs (`DialInputSource::EventVariable`) | ❌ | ❌ |
-| Response caching between propagations | ✅ | ⚠️ `cachedResponses` mode only |
-| Numerical precision | Double | ⚠️ Float outputs |
-| Hardware | Host CPU | Apple GPU (Metal required) |
+| Numerical precision | Double (64-bit) | ⚠️ Float32 outputs; ~48 significant bits for observables and resident histogram accumulation (float pairs) |
+| Hardware requirements | ✅ Host CPU | ⚠️ Apple GPU with Metal |
 
 MPS chooses its executor automatically: surfaces, observable/binning propagation
 and reweight caps use `eventPropagation`; compatible scalar fixed-bin models can
