@@ -25,6 +25,7 @@
 #include <string>
 #include <vector>
 #include <memory>
+#include <utility>
 
 
 class FitterEngine : public JsonBaseClass {
@@ -92,6 +93,9 @@ public:
   Backends::BackendManager& getBackendsManager(){ return _backendsManager_; }
   [[nodiscard]] const Backends::BackendManager& getBackendsManager() const { return _backendsManager_; }
 #endif
+
+  [[nodiscard]] std::string getPropagationMonitorTitle() const;
+  [[nodiscard]] std::vector<std::pair<std::string, std::string>> getMonitorColumns() const;
 
   // Core
   void fit();

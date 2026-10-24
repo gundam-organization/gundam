@@ -2,10 +2,6 @@
 #include "FitterEngine.h"
 #include "GundamUtils.h"
 
-#ifdef GUNDAM_USING_CACHE_MANAGER
-#include "CacheManager.h"
-#endif
-
 #include "Logger.h"
 
 void MinimizerBase::configureImpl(){
@@ -194,7 +190,10 @@ double MinimizerBase::evalFit( const double* parArray_ ){
   }
 
   // Propagate the parameters
-  getOwner().evaluateLikelihood();
+  {
+    auto propagationTime = _monitor_.propagationTimer.scopeTime();
+    getOwner().evaluateLikelihood();
+  }
   _monitor_.evalLlhTimer.stop();
 
   // Monitor if enabled
@@ -220,77 +219,23 @@ double MinimizerBase::evalFit( const double* parArray_ ){
       ssHeader << std::endl << "Avg log-likelihood computation time: " << _monitor_.evalLlhTimer;
       ssHeader << std::endl;
 
+      const auto additionalColumns = getOwner().getMonitorColumns();
       GenericToolbox::TablePrinter t;
-      auto formatBackendTime = [](double seconds_){
-        if( seconds_ <= 0 ){ return std::string{"not-mon."}; }
-        return GenericToolbox::parseTimeUnit(seconds_*1E6);
-      };
-
       t << "" << GenericToolbox::TablePrinter::NextColumn;
-
-#ifdef GUNDAM_USING_BACKENDS
-      const bool isBackendActive = getOwner().getBackendsManager().hasBackend();
-      if( isBackendActive ){
-        const auto& backendManager = getOwner().getBackendsManager();
-        const auto* backend = backendManager.getBackend();
-        const std::string backendName = backend != nullptr ? backend->getName() : std::string{"unknown"};
-        const bool hasCpuBackendTiming = backend != nullptr and backendManager.getType() == "CPU";
-        const auto timing = hasCpuBackendTiming ? backend->getLastTimingSummary() : Backends::BackendTimingSummary();
-
-        t << "Backend (" << backendName << ")" << GenericToolbox::TablePrinter::NextColumn;
-        t << "Dial cache" << GenericToolbox::TablePrinter::NextColumn;
-        t << "Event weights" << GenericToolbox::TablePrinter::NextColumn;
-        t << "histograms fill" << GenericToolbox::TablePrinter::NextColumn;
-        t << "Stat LLH" << GenericToolbox::TablePrinter::NextColumn;
-        t << _monitor_.minimizerTitle << GenericToolbox::TablePrinter::NextLine;
-
-        t << "Speed" << GenericToolbox::TablePrinter::NextColumn;
-        t << _monitor_.iterationCounterClock.evalTickSpeed() << " it/s" << GenericToolbox::TablePrinter::NextColumn;
-        t << (hasCpuBackendTiming ? formatBackendTime(timing.cachedDialStageSeconds) : std::string{"NM"}) << GenericToolbox::TablePrinter::NextColumn;
-        t << (hasCpuBackendTiming ? formatBackendTime(timing.eventWeightsStageSeconds) : std::string{"NM"}) << GenericToolbox::TablePrinter::NextColumn;
-        t << (hasCpuBackendTiming ? formatBackendTime(timing.histogramStageSeconds) : std::string{"NM"}) << GenericToolbox::TablePrinter::NextColumn;
-        t << (hasCpuBackendTiming ? formatBackendTime(timing.likelihoodHostSeconds) : std::string{"NM"}) << GenericToolbox::TablePrinter::NextColumn;
-        t << _monitor_.externalTimer << GenericToolbox::TablePrinter::NextLine;
+      t << getOwner().getPropagationMonitorTitle() << GenericToolbox::TablePrinter::NextColumn;
+      t << "Propagation + LLH" << GenericToolbox::TablePrinter::NextColumn;
+      for( const auto& column : additionalColumns ){
+        t << column.first << GenericToolbox::TablePrinter::NextColumn;
       }
-      else{
-#endif
-      t << "Propagator" << GenericToolbox::TablePrinter::NextColumn;
-      t << "Dial Update" << GenericToolbox::TablePrinter::NextColumn;
-#ifdef GUNDAM_USING_CACHE_MANAGER
-      if( Cache::Manager::Get() != nullptr ){
-        t << "Cache::Fill" << GenericToolbox::TablePrinter::NextColumn;
-        t << "Pull from device" << GenericToolbox::TablePrinter::NextColumn;
-      }
-      else{
-#endif
-        t << "Re-weight" << GenericToolbox::TablePrinter::NextColumn;
-        t << "histograms fill" << GenericToolbox::TablePrinter::NextColumn;
-#ifdef GUNDAM_USING_CACHE_MANAGER
-      }
-#endif
       t << _monitor_.minimizerTitle << GenericToolbox::TablePrinter::NextLine;
 
       t << "Speed" << GenericToolbox::TablePrinter::NextColumn;
       t << _monitor_.iterationCounterClock.evalTickSpeed() << " it/s" << GenericToolbox::TablePrinter::NextColumn;
-
-      t << getModelPropagator().getDialManager().getUpdateTimer() << GenericToolbox::TablePrinter::NextColumn;
-
-#ifdef GUNDAM_USING_CACHE_MANAGER
-      if( Cache::Manager::Get() != nullptr ){
-        t << Cache::Manager::GetCacheFillTimer() << GenericToolbox::TablePrinter::NextColumn;
-        t << Cache::Manager::GetPullFromDeviceTimer() << GenericToolbox::TablePrinter::NextColumn;
+      t << _monitor_.propagationTimer << GenericToolbox::TablePrinter::NextColumn;
+      for( const auto& column : additionalColumns ){
+        t << column.second << GenericToolbox::TablePrinter::NextColumn;
       }
-      else{
-#endif
-        t << getModelPropagator().reweightTimer << GenericToolbox::TablePrinter::NextColumn;
-        t << getModelPropagator().refillHistogramTimer << GenericToolbox::TablePrinter::NextColumn;
-#ifdef GUNDAM_USING_CACHE_MANAGER
-      }
-#endif
       t << _monitor_.externalTimer << GenericToolbox::TablePrinter::NextLine;
-#ifdef GUNDAM_USING_BACKENDS
-      }
-#endif
 
       ssHeader << t.generateTableString();
 
