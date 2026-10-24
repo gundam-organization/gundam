@@ -30,7 +30,6 @@ bool Backends::MpsBackendImpl::buildWeightModel() {
   auto& monotonicDialDescriptors = packed.monotonicDialDescriptors;
   auto& generalDialDescriptors = packed.generalDialDescriptors;
   auto& graphDialDescriptors = packed.graphDialDescriptors;
-  auto& globalBins = packed.globalBins;
   auto& binEventOffsets = packed.binEventOffsets;
   auto& binEventIndices = packed.binEventIndices;
   auto& splineData = packed.splineData;
@@ -118,7 +117,6 @@ bool Backends::MpsBackendImpl::buildWeightModel() {
   monotonicDialIndicesBuffer = makePrivateBuffer(device, commandQueue, monotonicDialIndices);
   generalDialIndicesBuffer = makePrivateBuffer(device, commandQueue, generalDialIndices);
   graphDialIndicesBuffer = makePrivateBuffer(device, commandQueue, graphDialIndices);
-  globalBinsBuffer = makePrivateBuffer(device, commandQueue, globalBins);
   binEventOffsetsBuffer = makePrivateBuffer(device, commandQueue, binEventOffsets);
   binEventIndicesBuffer = makePrivateBuffer(device, commandQueue, binEventIndices);
   splineDataBuffer = makePrivateBuffer(device, commandQueue, splineData);
@@ -181,7 +179,7 @@ bool Backends::MpsBackendImpl::buildWeightModel() {
       or compactCachedResponsesBuffer == nil or uniformCachedResponsesBuffer == nil
       or monotonicCachedResponsesBuffer == nil or generalCachedResponsesBuffer == nil
       or graphCachedResponsesBuffer == nil
-      or globalBinsBuffer == nil or binEventOffsetsBuffer == nil or binEventIndicesBuffer == nil
+      or binEventOffsetsBuffer == nil or binEventIndicesBuffer == nil
       or splineDataBuffer == nil
       or eventWeightsBuffer == nil or parametersBuffer == nil
       or partialHistSumsBuffer == nil or partialHistSumSquaresBuffer == nil

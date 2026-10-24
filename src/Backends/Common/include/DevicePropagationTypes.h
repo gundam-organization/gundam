@@ -95,7 +95,7 @@ namespace Backends {
   struct DeviceBinningNode { DeviceIndex firstBounds, firstBin, binCount, skip; };
   struct DeviceBinningBounds { float lower, upper; };
   struct DeviceBinContribution { DeviceIndex event; int binIndex; float fraction; };
-  struct DeviceHistogramChunk { DeviceIndex bin, begin, end; };
+  struct DeviceHistogramChunk { DeviceIndex begin, end; };
   struct DevicePropagationDialRange { DeviceIndex firstThread, firstDial, count; };
   struct DevicePropagationControl {
     DeviceIndex error, rebuildIndex, rebinnedEvents, candidates, chunkCount, contributionCount;

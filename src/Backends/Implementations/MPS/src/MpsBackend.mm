@@ -112,16 +112,10 @@ Backends::PropagationToken Backends::MpsBackend::requestPropagation(const Propag
     return _impl_->lastResult.token;
   }
 
-  const bool needsEventWeights = true;
-  const bool needsHistograms = true;
-  bool usedDevicePropagation = false;
-
-  if( needsEventWeights or needsHistograms ){
-    usedDevicePropagation = _impl_->runWeightPropagation(inputs_, needsHistograms);
-    if( usedDevicePropagation ){
-      _impl_->lastResult.status.eventWeights = OutputState::ReadyOnDevice;
-      _impl_->lastResult.status.histograms = OutputState::ReadyOnDevice;
-    }
+  const bool usedDevicePropagation = _impl_->runWeightPropagation(inputs_);
+  if( usedDevicePropagation ){
+    _impl_->lastResult.status.eventWeights = OutputState::ReadyOnDevice;
+    _impl_->lastResult.status.histograms = OutputState::ReadyOnDevice;
   }
 
   if( not usedDevicePropagation ){
@@ -129,7 +123,7 @@ Backends::PropagationToken Backends::MpsBackend::requestPropagation(const Propag
     _impl_->lastResult.status.eventWeights = OutputState::ReadyOnHost;
   }
 
-  if( needsHistograms and not usedDevicePropagation ){
+  if( not usedDevicePropagation ){
     if( not _impl_->calculateHistogramsOnDevice() ){
       _impl_->lastResult.status.backend = BackendStatus::Failed;
       _impl_->lastResult.status.histograms = OutputState::Failed;
@@ -283,11 +277,8 @@ std::string Backends::MpsBackend::getDiagnostics() const {
   out["weightDialReferences"] = impl.model.eventDialIndices.size();
   out["variableDialReferences"] = impl.model.variableDialIndices.size();
   out["cachedDials"] = impl.cachedDialCount;
-  out["compactDialDescriptors"] = true;
-  out["orderedSplinePayloads"] = true;
   out["splineDescriptorBytes"] = sizeof(MpsSplineDialDescriptor);
   out["normOccurrenceBytes"] = sizeof(MpsNormDialOccurrence);
-  out["compactCachedDialIndices"] = true;
   out["cachedDialDispatchCount"] = impl.cachedDialCount;
   out["histogramChunkSize"] = impl.histogramChunkSize;
   out["maxHistogramChunksPerBin"] = impl.maxHistogramChunksPerBin;
@@ -303,11 +294,8 @@ std::string Backends::MpsBackend::getDiagnostics() const {
     out["lastStageGpuSeconds"] = out["executor"]["lastStageGpuSeconds"];
     // These belong to the packed weight path, not the event propagation path.
     out.erase("cachedDials");
-    out.erase("compactDialDescriptors");
-    out.erase("orderedSplinePayloads");
     out.erase("splineDescriptorBytes");
     out.erase("normOccurrenceBytes");
-    out.erase("compactCachedDialIndices");
     out.erase("cachedDialDispatchCount");
     out.erase("maxHistogramChunksPerBin");
   }
@@ -342,7 +330,6 @@ std::string Backends::MpsBackend::getDiagnostics() const {
     buffer("generalCachedDialIndicesBuffer", impl.generalCachedDialIndicesBuffer);
     buffer("graphCachedResponsesBuffer", impl.graphCachedResponsesBuffer);
     buffer("graphCachedDialIndicesBuffer", impl.graphCachedDialIndicesBuffer);
-    buffer("globalBinsBuffer", impl.globalBinsBuffer);
     buffer("binEventOffsetsBuffer", impl.binEventOffsetsBuffer);
     buffer("binEventIndicesBuffer", impl.binEventIndicesBuffer);
     buffer("splineDataBuffer", impl.splineDataBuffer);

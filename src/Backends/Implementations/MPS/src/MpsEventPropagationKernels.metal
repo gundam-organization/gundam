@@ -323,23 +323,22 @@ kernel void count_bin_contributions(
 }
 
 kernel void index_histogram_chunks(
-    device const uint* counts [[buffer(0)]], device uint* offsets [[buffer(1)]],
-    device uint* positions [[buffer(2)]], device uint* chunkOffsets [[buffer(3)]],
-    device DeviceHistogramChunk* chunks [[buffer(4)]], device DevicePropagationControl& control [[buffer(5)]],
+    device const uint* counts [[buffer(0)]], device uint* positions [[buffer(1)]],
+    device uint* chunkOffsets [[buffer(2)]], device DeviceHistogramChunk* chunks [[buffer(3)]],
+    device DevicePropagationControl& control [[buffer(4)]],
     uint gid [[thread_position_in_grid]]) {
   if( gid || !control.rebuildIndex || control.error ){ return; }
   uint offset = 0, chunk = 0;
   for( uint bin = 0; bin < control.histogramBins; ++bin ){
-    offsets[bin] = positions[bin] = offset;
+    positions[bin] = offset;
     chunkOffsets[bin] = chunk;
     uint end = offset + counts[bin];
     while( offset < end ){
       uint next = min(offset + 256, end);
-      chunks[chunk++] = {bin, offset, next};
+      chunks[chunk++] = {offset, next};
       offset = next;
     }
   }
-  offsets[control.histogramBins] = offset;
   chunkOffsets[control.histogramBins] = chunk;
   control.chunkCount = chunk;
   control.contributionCount = offset;

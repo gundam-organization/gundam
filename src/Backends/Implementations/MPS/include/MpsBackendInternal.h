@@ -79,7 +79,6 @@ namespace Backends {
     id<MTLBuffer> generalCachedDialIndicesBuffer{nil};
     id<MTLBuffer> graphCachedResponsesBuffer{nil};
     id<MTLBuffer> graphCachedDialIndicesBuffer{nil};
-    id<MTLBuffer> globalBinsBuffer{nil};
     id<MTLBuffer> binEventOffsetsBuffer{nil};
     id<MTLBuffer> binEventIndicesBuffer{nil};
     id<MTLBuffer> splineDataBuffer{nil};
@@ -139,7 +138,7 @@ namespace Backends {
                                                  id<MTLBuffer> cachedDialIndicesBuffer_,
                                                  uint32_t cachedDialCount_);
     [[nodiscard]] bool encodeHistogramsFromDeviceWeights(id<MTLComputeCommandEncoder> encoder);
-    [[nodiscard]] bool runWeightPropagation(const PropagationInputs& inputs_, bool needHistograms_);
+    [[nodiscard]] bool runWeightPropagation(const PropagationInputs& inputs_);
     void copyDeviceEventWeightsToHostResult();
     [[nodiscard]] bool calculateHistogramsOnDevice();
     void calculateLikelihood();

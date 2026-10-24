@@ -3,6 +3,7 @@
 
 #include <algorithm>
 #include <stdexcept>
+#include <type_traits>
 
 namespace {
 const char* const kDiagnosticKernelNames[]{"evaluate_propagation_dials", "propagate_event_state", "rebin_events", "clear_contribution_counts",
@@ -90,7 +91,7 @@ void Backends::MpsEventPropagation::build(const PropagationView& model_) {
   for( auto slot : {Buffer::DirtyEvents, Buffer::HardBins, Buffer::EventCounts} ){ allocate(slot, model_.events.size() * sizeof(DeviceIndex)); }
   allocate(Buffer::Contributions, std::max(std::size_t(1), std::size_t(_packed_.contributionCapacity)) * sizeof(DeviceBinContribution));
   allocate(Buffer::EventWeights, model_.events.size() * sizeof(float));
-  for( auto slot : {Buffer::BinCounts, Buffer::BinOffsets, Buffer::BinPositions, Buffer::ChunkOffsets} ){
+  for( auto slot : {Buffer::BinCounts, Buffer::BinPositions, Buffer::ChunkOffsets} ){
     allocate(slot, (std::size_t(_packed_.histogramBins) + 1) * sizeof(DeviceIndex));
   }
   allocate(Buffer::BinContributions, std::size_t(_packed_.contributionCapacity) * sizeof(DeviceIndex));
@@ -108,6 +109,20 @@ void Backends::MpsEventPropagation::build(const PropagationView& model_) {
   }
   std::memset(buffer(Buffer::Control).contents, 0, sizeof(DevicePropagationControl));
   buildDialCache();
+  // Uploads have completed. Retain only the host metadata used at runtime.
+  auto releaseHostStorage = [](auto& values_){ std::decay_t<decltype(values_)>().swap(values_); };
+  releaseHostStorage(_packed_.dialInputs);
+  releaseHostStorage(_packed_.dialInputRanges);
+  releaseHostStorage(_packed_.variableResponses);
+  releaseHostStorage(_packed_.intervals);
+  releaseHostStorage(_packed_.bins);
+  releaseHostStorage(_packed_.nodes);
+  releaseHostStorage(_packed_.bounds);
+  releaseHostStorage(_packed_.nodeBins);
+  releaseHostStorage(_packed_.weightDialIndices);
+  releaseHostStorage(_packed_.variableDialIndices);
+  releaseHostStorage(_packed_.variables);
+  releaseHostStorage(_packed_.payloads);
 }
 
 void Backends::MpsEventPropagation::buildDialCache() {
@@ -287,7 +302,7 @@ void Backends::MpsEventPropagation::propagate(const PropagationInputs& inputs_, 
       Buffer::Bins, Buffer::Intervals, Buffer::Variables, Buffer::DirtyEvents, Buffer::HardBins, Buffer::EventCounts, Buffer::Contributions, Buffer::ChangedSamples, Buffer::Control, Buffer::ReusableBins});
     dispatch(encoder, Kernel::ClearCounts, _packed_.histogramBins, {Buffer::BinCounts, Buffer::Control});
     dispatch(encoder, Kernel::CountContributions, model.events.size(), {Buffer::Events, Buffer::EventCounts, Buffer::Contributions, Buffer::BinCounts, Buffer::Control});
-    dispatch(encoder, Kernel::IndexChunks, 1, {Buffer::BinCounts, Buffer::BinOffsets, Buffer::BinPositions, Buffer::ChunkOffsets, Buffer::Chunks, Buffer::Control});
+    dispatch(encoder, Kernel::IndexChunks, 1, {Buffer::BinCounts, Buffer::BinPositions, Buffer::ChunkOffsets, Buffer::Chunks, Buffer::Control});
     dispatch(encoder, Kernel::Scatter, model.events.size(), {Buffer::Events, Buffer::EventCounts, Buffer::Contributions, Buffer::BinPositions, Buffer::BinContributions, Buffer::Control});
   }
   const bool parallel = _pipelines_[std::size_t(Kernel::ReduceParallel)].threadExecutionWidth == 32;
@@ -424,18 +439,14 @@ std::string Backends::MpsEventPropagation::getDiagnostics() const {
   out["updatedEventWeights"] = _lastUpdatedWeights_;
   out["rebuiltContributionIndex"] = _lastRebuiltIndex_;
   out["dialCacheEnabled"] = _enableDialCache_;
-  out["indexReuseEnabled"] = true;
   out["parallelHistogramsEnabled"] = _pipelines_[std::size_t(Kernel::ReduceParallel)].threadExecutionWidth == 32;
-  out["aggregateCountersEnabled"] = true;
   out["lastStageGpuSeconds"] = _diagnosticStageGpuSeconds_;
-  out["previousBinReuseEnabled"] = true;
-  out["binningIntervalPruningEnabled"] = true;
   out["reusableBins"] = std::count_if(_packed_.reusableBins.begin(), _packed_.reusableBins.end(),
       [](DeviceIndex position_){ return position_ != DeviceIndex(-1); });
   out["contributionCapacity"] = _packed_.contributionCapacity;
   out["histogramChunkCapacity"] = _packed_.histogramChunkCapacity;
   out["buffers"] = JsonType::array();
-  const char* names[]{"Events", "Samples", "Dials", "DialInputs", "DialInputRanges", "Targets", "Intervals", "Bins", "Nodes", "Bounds", "NodeBins", "ReusableBins", "WeightDialIndices", "VariableDialIndices", "Payloads", "Parameters", "ExternalWeights", "Responses", "DialIndices", "DialRanges", "Variables", "HostValues", "HostEdits", "DirtyEvents", "HardBins", "EventCounts", "Contributions", "ChangedSamples", "Control", "EventWeights", "BinCounts", "BinOffsets", "BinPositions", "BinContributions", "ChunkOffsets", "Chunks", "PartialSums", "PartialSquares", "HistogramSums", "HistogramSquares", "ReadbackSums", "ReadbackSquares", "ReadbackVariables", "ReadbackBins", "ReadbackCounts", "ReadbackContributions", "ReadbackWeights"};
+  const char* names[]{"Events", "Samples", "Dials", "DialInputs", "DialInputRanges", "Targets", "Intervals", "Bins", "Nodes", "Bounds", "NodeBins", "ReusableBins", "WeightDialIndices", "VariableDialIndices", "Payloads", "Parameters", "ExternalWeights", "Responses", "DialIndices", "DialRanges", "Variables", "HostValues", "HostEdits", "DirtyEvents", "HardBins", "EventCounts", "Contributions", "ChangedSamples", "Control", "EventWeights", "BinCounts", "BinPositions", "BinContributions", "ChunkOffsets", "Chunks", "PartialSums", "PartialSquares", "HistogramSums", "HistogramSquares", "ReadbackSums", "ReadbackSquares", "ReadbackVariables", "ReadbackBins", "ReadbackCounts", "ReadbackContributions", "ReadbackWeights"};
   static_assert(sizeof(names) / sizeof(*names) == std::size_t(Buffer::Count));
   for( std::size_t i = 0; i < _buffers_.size(); ++i ){
     auto value = _buffers_[i];

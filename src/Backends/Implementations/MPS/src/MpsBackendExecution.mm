@@ -104,7 +104,7 @@ bool Backends::MpsBackendImpl::encodeHistogramsFromDeviceWeights(id<MTLComputeCo
   return true;
 }
 
-bool Backends::MpsBackendImpl::runWeightPropagation(const PropagationInputs& inputs_, bool needHistograms_) {
+bool Backends::MpsBackendImpl::runWeightPropagation(const PropagationInputs& inputs_) {
   if( not isWeightModelSupported ){ return false; }
   diagnosticStageGpuSeconds.clear();
   updateDeviceParameters(inputs_.parameters);
@@ -169,7 +169,7 @@ bool Backends::MpsBackendImpl::runWeightPropagation(const PropagationInputs& inp
       lastTiming.eventWeightsStageSeconds += secondsSince(stageStart);
     }
 
-    if( needHistograms_ ){
+    {
       auto stageStart = std::chrono::steady_clock::now();
       auto encodeStart = std::chrono::steady_clock::now();
       id<MTLCommandBuffer> commandBuffer = [commandQueue commandBuffer];
@@ -225,19 +225,17 @@ bool Backends::MpsBackendImpl::runWeightPropagation(const PropagationInputs& inp
     [encoder endEncoding];
     return false;
   }
-  if( needHistograms_ and not encodeHistogramsFromDeviceWeights(encoder) ){
+  if( not encodeHistogramsFromDeviceWeights(encoder) ){
     [encoder endEncoding];
     return false;
   }
   [encoder endEncoding];
-  if( needHistograms_ ){
-    id<MTLBlitCommandEncoder> blitEncoder = [commandBuffer blitCommandEncoder];
-    std::size_t histogramBytes = std::size_t(model.totalBins) * sizeof(float);
-    [blitEncoder copyFromBuffer:histSumsBuffer sourceOffset:0 toBuffer:histSumsReadbackBuffer destinationOffset:0 size:histogramBytes];
-    [blitEncoder copyFromBuffer:histSumSquaresBuffer sourceOffset:0 toBuffer:histSumSquaresReadbackBuffer destinationOffset:0 size:histogramBytes];
-    [blitEncoder endEncoding];
-    lastTiming.histogramReadbackBytes += 2 * histogramBytes;
-  }
+  id<MTLBlitCommandEncoder> blitEncoder = [commandBuffer blitCommandEncoder];
+  std::size_t histogramBytes = std::size_t(model.totalBins) * sizeof(float);
+  [blitEncoder copyFromBuffer:histSumsBuffer sourceOffset:0 toBuffer:histSumsReadbackBuffer destinationOffset:0 size:histogramBytes];
+  [blitEncoder copyFromBuffer:histSumSquaresBuffer sourceOffset:0 toBuffer:histSumSquaresReadbackBuffer destinationOffset:0 size:histogramBytes];
+  [blitEncoder endEncoding];
+  lastTiming.histogramReadbackBytes += 2 * histogramBytes;
   [commandBuffer commit];
   lastTiming.commandEncodeSeconds += secondsSince(encodeStart);
   auto waitStart = std::chrono::steady_clock::now();
@@ -250,18 +248,16 @@ bool Backends::MpsBackendImpl::runWeightPropagation(const PropagationInputs& inp
     return false;
   }
 
-  if( needHistograms_ ){
-    auto readbackStart = std::chrono::steady_clock::now();
-    auto* histSums = static_cast<float*>(histSumsReadbackBuffer.contents);
-    auto* histSumSquares = static_cast<float*>(histSumSquaresReadbackBuffer.contents);
-    lastResult.histSums.resize(model.totalBins);
-    lastResult.histSumSquares.resize(model.totalBins);
-    for( int iBin = 0 ; iBin < model.totalBins ; iBin++ ){
-      lastResult.histSums[iBin] = histSums[iBin];
-      lastResult.histSumSquares[iBin] = histSumSquares[iBin];
-    }
-    lastTiming.histogramReadbackSeconds += secondsSince(readbackStart);
+  auto readbackStart = std::chrono::steady_clock::now();
+  auto* histSums = static_cast<float*>(histSumsReadbackBuffer.contents);
+  auto* histSumSquares = static_cast<float*>(histSumSquaresReadbackBuffer.contents);
+  lastResult.histSums.resize(model.totalBins);
+  lastResult.histSumSquares.resize(model.totalBins);
+  for( int iBin = 0 ; iBin < model.totalBins ; iBin++ ){
+    lastResult.histSums[iBin] = histSums[iBin];
+    lastResult.histSumSquares[iBin] = histSumSquares[iBin];
   }
+  lastTiming.histogramReadbackSeconds += secondsSince(readbackStart);
 
   return true;
 }

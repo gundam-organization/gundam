@@ -96,7 +96,6 @@ void Backends::MpsBackendImpl::releaseDeviceBuffers() {
   releaseBuffer(generalCachedDialIndicesBuffer);
   releaseBuffer(graphCachedResponsesBuffer);
   releaseBuffer(graphCachedDialIndicesBuffer);
-  releaseBuffer(globalBinsBuffer);
   releaseBuffer(binEventOffsetsBuffer);
   releaseBuffer(binEventIndicesBuffer);
   releaseBuffer(splineDataBuffer);

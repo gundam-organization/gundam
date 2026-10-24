@@ -38,7 +38,7 @@ namespace Backends {
       Events, Samples, Dials, DialInputs, DialInputRanges, Targets, Intervals, Bins, Nodes, Bounds, NodeBins, ReusableBins,
       WeightDialIndices, VariableDialIndices, Payloads, Parameters, ExternalWeights, Responses, DialIndices, DialRanges,
       Variables, HostValues, HostEdits, DirtyEvents, HardBins, EventCounts, Contributions, ChangedSamples, Control,
-      EventWeights, BinCounts, BinOffsets, BinPositions, BinContributions, ChunkOffsets, Chunks,
+      EventWeights, BinCounts, BinPositions, BinContributions, ChunkOffsets, Chunks,
       PartialSums, PartialSquares, HistogramSums, HistogramSquares, ReadbackSums, ReadbackSquares,
       ReadbackVariables, ReadbackBins, ReadbackCounts, ReadbackContributions, ReadbackWeights, Count
     };
