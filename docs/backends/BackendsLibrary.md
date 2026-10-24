@@ -33,42 +33,69 @@ with each backend:
 
 - [CPU structure](cpu/BackendStructure.md) and [optimization choices](cpu/ReweightOptimization.md).
 - [MPS structure](mps/BackendStructure.md).
+- [CUDA skeleton and validation](../guides/CudaBackend.md).
 - [Multi-input dials](MultiInputDials.md).
 
 ## Compatibility
 
-These tables describe the `CPU` and `MPS` backends selected through
+These tables describe the `CPU`, `MPS` and `CUDA` backends selected through
 `backendManagerConfig.type`. The original propagation path and the legacy
 `CacheManager` (including its CUDA implementation) are separate execution paths;
 their capabilities must not be inferred from these tables.
 
-Legend: ✅ supported; ❌ unsupported; ⚠️ supported with the stated restriction.
+Status as of 2026-10-24. Legend: ✅ implemented/supported; ❌ unsupported;
+⚠️ implemented with the stated restriction or validation pending;
+🚧 not implemented yet; — not applicable. Implementation status does not by
+itself establish numerical validation on every model or device.
+
+### Implementation progress
+
+| Stage | CPU | MPS | CUDA |
+|---|---|---|---|
+| Factory selection and backend configuration | ✅ `CPU` / `cpu` | ✅ `MPS` / `mps`, `propagationMode` | ✅ `CUDA` / `cuda`, `deviceIndex` |
+| Execution resources | ✅ Host worker pool | ✅ Metal device, buffers and command execution | ⚠️ Device selection and private stream implemented; backend GPU test pending |
+| Model preparation | ✅ Flat host model and numerical caches | ✅ Packed model and GPU uploads | ⚠️ Retains the shared host model; device packing and uploads not implemented |
+| Propagation and result tokens | ✅ | ✅ | 🚧 No executor or valid propagation tokens |
+| Host materialization | ✅ Event state, weights and histograms | ✅ Event state, weight and histogram readback | 🚧 All result access throws |
+| Dial-response and event-state caches | ✅ | ✅ Depends on propagation mode | 🚧 |
+| Numerical regression tests | ✅ CPU comparisons | ✅ MPS comparisons | 🚧 No backend numerical execution to compare |
+| Standalone CUDA infrastructure test | — | — | ✅ FP64 kernel validated on CC-IN2P3 V100, interactive and Slurm batch |
+
+CUDA is currently a lifecycle skeleton, not a working fit backend. Its four
+host-side `CudaBackend.*` tests pass locally without a toolkit. The separate
+`cuda-backend-skeleton` test exercises the real device context and shared model;
+its CC validation is pending. The successful standalone `cuda-smoke` test proves
+the compiler/runtime/kernel chain, not CUDA backend propagation. Selecting CUDA
+can initialize its resources and retain a model, but `requestPropagation()`
+throws explicitly; no CPU fallback is performed.
 
 ### Dial types
 
-Compatibility depends on the concrete dial produced by the loader. Both backends
+Compatibility depends on the concrete dial produced by the loader. All three backends
 use the same `EngineLayout` conversion, which rejects unsupported dial classes
 with `Unsupported dial type for EngineView`. MPS additionally rejects
 `Tabulated` and `Kriged` during backend construction. There is no automatic fallback to
-the original engine for these classes.
+the original engine for these classes. CUDA has no dial evaluator yet: 🚧 below
+means execution is missing even when the common layout can represent the dial;
+❌ marks classes already rejected by the common conversion.
 
-| Configuration or concrete dial | CPU | MPS |
-|---|---|---|
-| `Normalization` (`Norm`) | ✅ | ✅ |
-| Constant response (`Shift`) | ✅ | ✅ |
-| `Spline`: `CompactSpline` | ✅ | ✅ |
-| `Spline`: `UniformSpline` | ✅ | ✅ |
-| `Spline`: `MonotonicSpline` | ✅ | ✅ |
-| `Spline`: `GeneralSpline` | ✅ | ✅ |
-| `Graph` | ✅ | ✅ |
-| `Surface` / `Bilinear` | ✅ | ✅ |
-| `Surface` / `Bicubic` | ✅ | ✅ |
-| `ExternalWeight` (`ExternalWeightDispatcher`) | ✅ | ✅ |
-| ROOT objects (`RootFormula`, `RootSpline`, `RootGraph`) | ❌ Heavy C++ objects, unsuitable for the flat backend model | ❌ Strictly incompatible with Metal device execution as C++ ROOT objects |
-| `Tabulated` | ⚠️ Table updated on host at each propagation | ❌ |
-| `Kriged` | ⚠️ Table updated on host at each propagation | ❌ |
-| `CompiledLibDial` | ❌ | ❌ |
-| `Polynomial` | ❌ | ❌ |
+| Configuration or concrete dial | CPU | MPS | CUDA |
+|---|---|---|---|
+| `Normalization` (`Norm`) | ✅ | ✅ | 🚧 |
+| Constant response (`Shift`) | ✅ | ✅ | 🚧 |
+| `Spline`: `CompactSpline` | ✅ | ✅ | 🚧 |
+| `Spline`: `UniformSpline` | ✅ | ✅ | 🚧 |
+| `Spline`: `MonotonicSpline` | ✅ | ✅ | 🚧 |
+| `Spline`: `GeneralSpline` | ✅ | ✅ | 🚧 |
+| `Graph` | ✅ | ✅ | 🚧 |
+| `Surface` / `Bilinear` | ✅ | ✅ | 🚧 |
+| `Surface` / `Bicubic` | ✅ | ✅ | 🚧 |
+| `ExternalWeight` (`ExternalWeightDispatcher`) | ✅ | ✅ | 🚧 |
+| ROOT objects (`RootFormula`, `RootSpline`, `RootGraph`) | ❌ Heavy C++ objects, unsuitable for the flat backend model | ❌ Strictly incompatible with Metal device execution as C++ ROOT objects | ❌ Rejected by `EngineLayout` |
+| `Tabulated` | ⚠️ Table updated on host at each propagation | ❌ | 🚧 |
+| `Kriged` | ⚠️ Table updated on host at each propagation | ❌ | 🚧 |
+| `CompiledLibDial` | ❌ | ❌ | ❌ Rejected by `EngineLayout` |
+| `Polynomial` | ❌ | ❌ | ❌ Rejected by `EngineLayout` |
 
 ROOT input objects (`TGraph`, `TSpline3`, `TH2`) and supported TArray branch pairs
 are loading formats, not backend dial types. Their compatibility follows the
@@ -88,22 +115,23 @@ Here, ✅ means the backend can handle the feature; it does not imply that
 every stage runs on the GPU. MPS support applies to both `cachedResponses` and
 `recomputeResponses` unless indicated otherwise.
 
-| Feature | CPU | MPS |
-|---|---|---|
-| Event weights and histogram sums / squared sums | ✅ | ✅ |
-| Statistical likelihood | ⚠️ on host | ⚠️ on host |
-| Separate `SampleLikelihoods` output | ❌ Only the total is stored | ❌ Only the total is stored |
-| Parameter inputs and per-input mirroring | ✅ | ✅ |
-| Dial extrapolation | ✅ | ✅ |
-| Hard response limits and response smoothing | ✅ | ✅ |
-| Event reweight cap | ✅ | ✅ |
-| Observable responses (`applyToVariable`) | ✅ | ✅ |
-| Dynamic binning / event migration | ✅ | ✅ |
-| Smoothed binning / fractional contributions | ✅ | ✅ |
-| External-weight updates | ⚠️ Produced on host | ⚠️ Produced on host, copied to GPU buffers |
-| Event variables as ordinary dial inputs (`DialInputSource::EventVariable`) | ❌ | ❌ |
-| Numerical precision | Double (64-bit) | ⚠️ ~48 significant bits in resident event propagation (float pairs); float32 weights / histograms in packed execution |
-| Hardware requirements | ✅ Host CPU | ⚠️ Apple GPU with Metal |
+| Feature | CPU | MPS | CUDA |
+|---|---|---|---|
+| Event weights and histogram sums / squared sums | ✅ | ✅ | 🚧 |
+| Statistical likelihood | ⚠️ on host | ⚠️ on host | 🚧 |
+| Separate `SampleLikelihoods` output | ❌ Only the total is stored | ❌ Only the total is stored | 🚧 |
+| Parameter inputs and per-input mirroring | ✅ | ✅ | 🚧 |
+| Two-input surfaces (`Bilinear`, `Bicubic`) | ✅ | ✅ | 🚧 |
+| Dial extrapolation | ✅ | ✅ | 🚧 |
+| Hard response limits and response smoothing | ✅ | ✅ | 🚧 |
+| Event reweight cap | ✅ | ✅ | 🚧 |
+| Observable responses (`applyToVariable`) | ✅ | ✅ | 🚧 |
+| Dynamic binning / event migration | ✅ | ✅ | 🚧 |
+| Smoothed binning / fractional contributions | ✅ | ✅ | 🚧 |
+| External-weight updates | ⚠️ Produced on host | ⚠️ Produced on host, copied to GPU buffers | 🚧 |
+| Event variables as ordinary dial inputs (`DialInputSource::EventVariable`) | ❌ | ❌ | 🚧 |
+| Numerical precision | Double (64-bit) | ⚠️ ~48 significant bits in resident event propagation (float pairs); float32 weights / histograms in packed execution | 🚧 Backend arithmetic not implemented; only the standalone FP64 smoke test is validated |
+| Hardware requirements | ✅ Host CPU | ⚠️ Apple GPU with Metal | ⚠️ NVIDIA GPU and CUDA toolkit; CC V100 smoke test uses CUDA 12.4 / `sm_70` |
 
 The only MPS backend configuration option is `propagationMode`: `cachedResponses`
 reuses eligible responses between propagations, while `recomputeResponses`
@@ -117,8 +145,13 @@ been removed. GPU stage profiling remains available for performance analysis.
 
 The compatibility rules are implemented in
 [`EngineLayout.cpp`](../../src/Backends/Common/src/EngineLayout.cpp),
-[`CpuBackend.cpp`](../../src/Backends/Implementations/CPU/src/CpuBackend.cpp) and
-[`MpsBackend.mm`](../../src/Backends/Implementations/MPS/src/MpsBackend.mm).
+[`CpuBackend.cpp`](../../src/Backends/Implementations/CPU/src/CpuBackend.cpp),
+[`MpsBackend.mm`](../../src/Backends/Implementations/MPS/src/MpsBackend.mm) and
+[`CudaBackend.cpp`](../../src/Backends/Implementations/CUDA/src/CudaBackend.cpp).
+CUDA resource management is isolated in
+[`CudaDeviceContext.cu`](../../src/Backends/Implementations/CUDA/src/CudaDeviceContext.cu).
+Common descriptor and numerical-semantics code is available for future CUDA
+kernels, but its presence does not constitute CUDA execution support.
 
 ## Connection to the engine
 
