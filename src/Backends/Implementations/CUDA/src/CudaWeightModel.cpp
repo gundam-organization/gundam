@@ -73,6 +73,7 @@ Backends::CudaWeightModel Backends::makeCudaWeightModel(const EngineView& view_)
   static_assert(std::is_trivially_copyable<BackendDialDescriptor>::value);
   static_assert(std::is_trivially_copyable<BackendDialInputDescriptor>::value);
   static_assert(std::is_trivially_copyable<BackendEventWeightDescriptor>::value);
+  static_assert(std::is_trivially_copyable<CudaResponseUpdate>::value);
   const auto& model = view_.propagation;
   require(not model.requiresEventBinning() and model.variableResponses.empty() and model.variableDialIndices.empty(),
           "observable responses, dynamic binning and smoothed binning are not implemented.");
@@ -88,6 +89,26 @@ Backends::CudaWeightModel Backends::makeCudaWeightModel(const EngineView& view_)
             and event.dialCount <= model.eventDialIndices.size() - event.firstDial, "event dial range is invalid.");
   }
   CudaWeightModel out;
+  require(model.dials.size() <= std::numeric_limits<std::uint32_t>::max(), "too many CUDA dials.");
+  require(model.parameterCount < std::numeric_limits<std::size_t>::max(), "parameter count overflow.");
+  out.parameterDialOffsets.assign(model.parameterCount + 1, 0);
+  for( const auto& dial : model.dials ){
+    if( dial.type != BackendDialType::Shift ){
+      ++out.parameterDialOffsets[model.dialInputs[dial.firstInput].parameterIndex + 1];
+    }
+  }
+  for( std::size_t i = 1; i < out.parameterDialOffsets.size(); ++i ){
+    out.parameterDialOffsets[i] += out.parameterDialOffsets[i - 1];
+  }
+  out.parameterDialIndices.resize(out.parameterDialOffsets.back());
+  auto dialPositions = out.parameterDialOffsets;
+  for( std::size_t i = 0; i < model.dials.size(); ++i ){
+    const auto& dial = model.dials[i];
+    if( dial.type != BackendDialType::Shift ){
+      out.parameterDialIndices[dialPositions[model.dialInputs[dial.firstInput].parameterIndex]++]
+          = static_cast<std::uint32_t>(i);
+    }
+  }
   out.binOffsets.assign(std::size_t(model.totalBins) + 1, 0);
   std::vector<bool> seen(model.events.size(), false);
   for( const auto& event : model.events ){
@@ -117,4 +138,19 @@ Backends::CudaWeightModel Backends::makeCudaWeightModel(const EngineView& view_)
   out.hasReweightCap = model.hasReweightCap;
   out.maxReweight = model.maxReweight;
   return out;
+}
+
+void Backends::CudaResponseUpdatePlan::select(const std::vector<std::size_t>& offsets_,
+    const std::vector<double>& previous_, const std::vector<double>& current_) {
+  require(previous_.size() == current_.size() and offsets_.size() == current_.size() + 1,
+          "response update parameter layout mismatch.");
+  ranges.clear();
+  dialCount = blockCount = 0;
+  for( std::size_t i = 0; i < current_.size(); ++i ){
+    if( previous_[i] == current_[i] or offsets_[i] == offsets_[i + 1] ){ continue; }
+    const auto count = offsets_[i + 1] - offsets_[i];
+    ranges.push_back({offsets_[i], offsets_[i + 1], blockCount});
+    dialCount += count;
+    blockCount += (count - 1) / cudaResponseBlockSize + 1;
+  }
 }

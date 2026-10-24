@@ -27,10 +27,12 @@ spec.loader.exec_module(scheduling)
 progress, write_json = scheduling.progress, scheduling.write_json
 CASES = ('CUDA-cachedResponses', 'CUDA-recomputeResponses', 'CPU')
 SECONDS_FIELDS = ('parameterUploadSeconds', 'cachedDialStageSeconds',
+                  'cachePreparationSeconds',
                   'eventWeightsStageSeconds', 'histogramStageSeconds',
                   'devicePropagationSeconds', 'histogramReadbackSeconds',
                   'likelihoodHostSeconds', 'eventWeightReadbackSeconds')
-COUNT_FIELDS = ('histogramReadbackBytes', 'eventWeightReadbackBytes', 'eventStateReadbackBytes')
+COUNT_FIELDS = ('histogramReadbackBytes', 'eventWeightReadbackBytes', 'eventStateReadbackBytes',
+                'cacheCandidateCount')
 
 
 def stats(values):
@@ -154,6 +156,7 @@ def measure(args):
                        'eventWeightsStageSeconds', 'histogramStageSeconds')
         gpu_ranking = sorted(cuda_stages, key=lambda key: timings[key]['medianMs'], reverse=True)
         entry = {'callsPerTrial': calls, 'trials': args.trials, 'timings': timings,
+                 'medianResponseCandidates': statistics.median(row['counts']['cacheCandidateCount'] for row in rows),
                  'gpuStageRanking': gpu_ranking if args.worker != 'CPU' else [],
                  'coordinateCostsFile': None}
         if scenario == 'local1':
@@ -161,6 +164,7 @@ def measure(args):
             for row in rows:
                 grouped[row['coordinateIndices'][0]].append(row)
             costs = [{**manifest[index], 'samples': len(group),
+                      'medianResponseCandidates': statistics.median(row['counts']['cacheCandidateCount'] for row in group),
                       'timings': summarize(group)} for index, group in enumerate(grouped)]
             costs.sort(key=lambda row: row['timings']['evaluationSeconds']['medianMs'], reverse=True)
             entry['coordinateCostsFile'] = 'local1-coordinate-costs.json'
@@ -169,7 +173,8 @@ def measure(args):
         write_json(args.output / 'summary.json', result)
         progress(f"{args.worker}/{scenario}: evaluation {timings['evaluationSeconds']['medianMs']:.3f} ms; "
                  f"preparation {timings['hostPreparationSeconds']['medianMs']:.3f} ms; "
-                 f"GPU {timings['devicePropagationSeconds']['medianMs']:.3f} ms")
+                 f"GPU {timings['devicePropagationSeconds']['medianMs']:.3f} ms; "
+                 f"response candidates {entry['medianResponseCandidates']}")
     result['complete'] = True
     write_json(args.output / 'summary.json', result)
 
@@ -232,6 +237,10 @@ def write_report(output, cases):
             lines.append('| ' + ' | '.join([case, scenario, *cells]) + ' |')
     lines.extend(['', 'CPU stage durations in the responses/weights/histograms columns are host durations.',
                   'GPU total is zero for CPU. CUDA upload/reset duration is in the JSON reports.', '',
+                  'Case summaries and coordinate costs include `medianResponseCandidates`.',
+                  'For CUDA this counts dials visited by the response kernels, before transformed-input reuse.',
+                  'Primed constant cached evaluations should have zero candidates.',
+                  'Host sparse-selection time is `cachePreparationSeconds`, inside full evaluation time.', '',
                   'Inspect `local1-coordinate-costs.json` for the most expensive parameter changes.',
                   'Each case summary ranks CUDA stages in `gpuStageRanking`.',
                   '`comparison.json` checks every measured likelihood and each trial\'s final histogram',

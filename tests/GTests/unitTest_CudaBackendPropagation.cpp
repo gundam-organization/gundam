@@ -164,6 +164,65 @@ TEST(CudaBackendPropagation, EmptyModelsAndUndialedEventsNeedNoParameters) {
   }
 }
 
+TEST(CudaBackendPropagation, SparseUpdatesHandleMultipleBlocksRangesAndUnusedParameters) {
+  EngineView view;
+  auto& model = view.propagation;
+  model.parameterCount = 5;
+  model.totalBins = 17;
+  constexpr std::size_t scalarCount = 2052;
+  for( std::size_t i = 0; i < scalarCount; ++i ){
+    model.dialInputs.push_back({i % 4, i % 3 == 0, 0., 4.});
+    BackendDialDescriptor dial;
+    dial.firstInput = i;
+    dial.inputCount = 1;
+    model.dials.push_back(dial);
+    model.eventWeights.push_back({.25, 2 * i, 2});
+    EventView event;
+    event.resultIndex = i;
+    event.globalBinIndex = i % 17;
+    model.events.push_back(event);
+    model.eventDialIndices.push_back(i);
+    model.eventDialIndices.push_back(scalarCount);
+  }
+  BackendDialDescriptor shift;
+  shift.type = BackendDialType::Shift;
+  shift.payloadSize = 1;
+  model.dialPayloads = {.8};
+  model.dials.push_back(shift);
+  for( const auto* mode : {"cachedResponses", "recomputeResponses"} ){
+    CudaBackend cuda;
+    CpuBackend cpu;
+    cuda.configure(ConfigReader(JsonType{{"propagationMode", mode}}));
+    cuda.build(view);
+    cpu.build(view);
+    const std::vector<std::vector<double>> points{
+        {1., 1., 1., 1., 0.}, {1., 1., 1., 1., 0.}, {1.2, 1., 1., 1., 0.},
+        {1.2, 1.1, 1., 1.3, 0.}, {1.5, 1.4, 1.2, 1.3, 0.},
+        {1.5, 1.4, 1.2, 1.3, 9.}, {6.5, 1.4, 1.2, 1.3, 9.},
+        {1.5, 1.4, 1.2, 1.3, 9.}};
+    const std::vector<std::size_t> candidates{2053, 0, 513, 1026, 2053, 0, 513, 513};
+    for( std::size_t i = 0; i < points.size(); ++i ){
+      SCOPED_TRACE(::testing::Message() << mode << " point=" << i);
+      PropagationInputs inputs;
+      inputs.parameters.values = points[i];
+      const auto token = cuda.requestPropagation(inputs);
+      const auto reference = cpu.requestPropagation(inputs);
+      EXPECT_EQ(cuda.getLastTimingSummary().cacheCandidateCount,
+                std::string(mode) == "cachedResponses" ? candidates[i] : model.dials.size());
+      expectClose(cuda.getEventWeightsHostView(token), cpu.getEventWeightsHostView(reference));
+      expectClose(cuda.getHistogramSumsHostView(token), cpu.getHistogramSumsHostView(reference));
+      expectClose(cuda.getHistogramSumSquaresHostView(token), cpu.getHistogramSumSquaresHostView(reference));
+    }
+    cuda.build(view); // Rebuild must prime every response, including Shift.
+    PropagationInputs inputs;
+    inputs.parameters.values = points.back();
+    const auto token = cuda.requestPropagation(inputs);
+    const auto reference = cpu.requestPropagation(inputs);
+    EXPECT_EQ(cuda.getLastTimingSummary().cacheCandidateCount, model.dials.size());
+    expectClose(cuda.getEventWeightsHostView(token), cpu.getEventWeightsHostView(reference));
+  }
+}
+
 TEST(CudaBackendPropagation, FailureInvalidatesTokensAndRetryRecomputesResponses) {
   for( const auto* mode : {"cachedResponses", "recomputeResponses"} ){
     CudaBackend backend;
@@ -186,6 +245,7 @@ TEST(CudaBackendPropagation, FailureInvalidatesTokensAndRetryRecomputesResponses
     EXPECT_THROW((void)backend.getEventWeightsHostView(token), std::runtime_error);
     *failLikelihood = false;
     token = backend.requestPropagation(inputs);
+    EXPECT_EQ(backend.getLastTimingSummary().cacheCandidateCount, view.propagation.dials.size());
     expectClose(backend.getEventWeightsHostView(token), reference);
     inputs.parameters.values.pop_back();
     EXPECT_THROW((void)backend.requestPropagation(inputs), std::runtime_error);

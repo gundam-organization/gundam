@@ -212,3 +212,59 @@ TEST(CudaWeightModel, AcceptsPayloadsBuiltByNativeScalarDials) {
     EXPECT_NO_THROW((void)makeCudaWeightModel(view));
   }
 }
+
+TEST(CudaWeightModel, GroupsScalarDialsByOriginalParameterAndExcludesConstants) {
+  using namespace Backends;
+  EngineView view;
+  auto& model = view.propagation;
+  model.parameterCount = 4;
+  model.dialInputs = {{2}, {0}, {2}, {1}};
+  for( auto input : {0, 1, 2, 3, 0} ){
+    BackendDialDescriptor dial;
+    dial.firstInput = input;
+    dial.inputCount = 1;
+    model.dials.push_back(dial);
+  }
+  BackendDialDescriptor constant;
+  constant.type = BackendDialType::Shift;
+  constant.payloadSize = 1;
+  model.dialPayloads = {.75};
+  model.dials.insert(model.dials.begin() + 2, constant);
+  const auto packed = makeCudaWeightModel(view);
+  EXPECT_EQ(packed.parameterDialOffsets, (std::vector<std::size_t>{0, 1, 2, 5, 5}));
+  EXPECT_EQ(packed.parameterDialIndices, (std::vector<std::uint32_t>{1, 4, 0, 3, 5}));
+  CudaResponseUpdatePlan plan;
+  plan.select(packed.parameterDialOffsets, {1., 2., 3., 4.}, {1., 2., 7., 9.});
+  ASSERT_EQ(plan.ranges.size(), 1);
+  EXPECT_EQ(plan.ranges[0].firstDial, 2);
+  EXPECT_EQ(plan.ranges[0].endDial, 5);
+  EXPECT_EQ(plan.dialCount, 3);
+}
+
+TEST(CudaWeightModel, SparseDispatchTilesMultipleRangesAndClearsPreviousWork) {
+  using namespace Backends;
+  CudaResponseUpdatePlan plan;
+  // An unused parameter and ranges straddling the 256-thread block boundary.
+  const std::vector<std::size_t> offsets{0, 0, 257, 513, 514, 1027};
+  const std::vector<double> previous{0., 1., 2., 3., 4.};
+  plan.select(offsets, previous, {9., 5., 2., 7., 8.});
+  ASSERT_EQ(plan.ranges.size(), 3);
+  EXPECT_EQ(plan.dialCount, 771);
+  EXPECT_EQ(plan.blockCount, 6);
+  EXPECT_EQ(plan.ranges[0].firstDial, 0);
+  EXPECT_EQ(plan.ranges[0].endDial, 257);
+  EXPECT_EQ(plan.ranges[0].firstBlock, 0);
+  EXPECT_EQ(plan.ranges[1].firstDial, 513);
+  EXPECT_EQ(plan.ranges[1].endDial, 514);
+  EXPECT_EQ(plan.ranges[1].firstBlock, 2);
+  EXPECT_EQ(plan.ranges[2].firstDial, 514);
+  EXPECT_EQ(plan.ranges[2].endDial, 1027);
+  EXPECT_EQ(plan.ranges[2].firstBlock, 3);
+  plan.select(offsets, previous, {-0., 1., 2., 3., 4.});
+  EXPECT_TRUE(plan.ranges.empty());
+  EXPECT_EQ(plan.dialCount, 0);
+  EXPECT_EQ(plan.blockCount, 0);
+  EXPECT_THROW(plan.select(offsets, {}, previous), std::runtime_error);
+  plan.select({0}, {}, {});
+  EXPECT_TRUE(plan.ranges.empty());
+}

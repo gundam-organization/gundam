@@ -9,11 +9,12 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <chrono>
 #include <limits>
 #include <stdexcept>
 
 namespace {
-  constexpr unsigned int blockSize = 256;
+  constexpr unsigned int blockSize = Backends::cudaResponseBlockSize;
 
   void checkCuda(cudaError_t status_, const char* operation_) {
     if( status_ != cudaSuccess ){
@@ -64,7 +65,11 @@ namespace {
     DeviceBuffer<Backends::BackendDialDescriptor> dials;
     DeviceBuffer<Backends::BackendDialInputDescriptor> inputs;
     DeviceBuffer<double> payloads, parameters, responses, previousInputs, weights, sums, sumSquares;
-    DeviceBuffer<std::uint32_t> dialIndices;
+    DeviceBuffer<std::uint32_t> dialIndices, parameterDialIndices;
+    DeviceBuffer<Backends::CudaResponseUpdate> responseUpdates;
+    std::vector<std::size_t> parameterDialOffsets{};
+    std::vector<double> previousParameters{};
+    Backends::CudaResponseUpdatePlan updatePlan{};
     DeviceBuffer<std::size_t> binOffsets, binEvents;
     DeviceBuffer<int> error;
     bool cachePrimed{false};
@@ -76,39 +81,73 @@ namespace {
     return static_cast<unsigned int>(std::min<std::size_t>((size_ - 1) / blockSize + 1, 65535));
   }
 
+  __device__ void evaluateResponse(std::size_t i, const Backends::BackendDialDescriptor* dials_,
+                                  const Backends::BackendDialInputDescriptor* inputs_, const double* payloads_,
+                                  const double* parameters_, double* responses_, double* previousInputs_,
+                                  bool reuse_, int* error_) {
+    using namespace Backends;
+    const auto& dial = dials_[i];
+    double input = 0.;
+    if( dial.type != BackendDialType::Shift ){
+      const auto& descriptor = inputs_[dial.firstInput];
+      input = Semantics::transformDialInput(descriptor, parameters_[descriptor.parameterIndex]);
+    }
+    if( not ::isfinite(input) ){ responses_[i] = 0.; atomicExch(error_, 1); return; }
+    if( reuse_ and previousInputs_[i] == input ){ return; }
+    const double* payload = dial.payloadSize == 0 ? nullptr : payloads_ + dial.payloadOffset;
+    // These interpolation routines select a uniform segment through an int.
+    if( dial.type == BackendDialType::CompactSpline or dial.type == BackendDialType::MonotonicSpline
+        or dial.type == BackendDialType::UniformSpline ){
+      const auto knots = dial.type == BackendDialType::UniformSpline ? (dial.payloadSize - 2) / 2 : dial.payloadSize - 2;
+      const double x = dial.allowExtrapolation ? input
+          : Semantics::clampValue(input, payload[0], payload[0] + payload[1] * double(knots - 1));
+      const double position = (x - payload[0]) / payload[1];
+      // UniformSpline also forms 2*ix+7 before clamping the segment index.
+      const double limit = dial.type == BackendDialType::UniformSpline ? 1073741800. : 2147483000.;
+      if( not ::isfinite(position) or ::fabs(position) > limit ){
+        responses_[i] = 0.; atomicExch(error_, 1); return;
+      }
+    }
+    const double response = Semantics::evalDialResponseFromInput(dial, input, payload);
+    if( not ::isfinite(response) ){ atomicExch(error_, 1); }
+    responses_[i] = ::isfinite(response) ? response : 0.;
+    previousInputs_[i] = input;
+  }
+
   __global__ void evaluateResponses(const Backends::BackendDialDescriptor* dials_, std::size_t count_,
                                     const Backends::BackendDialInputDescriptor* inputs_, const double* payloads_,
                                     const double* parameters_, double* responses_, double* previousInputs_,
                                     bool reuse_, int* error_) {
-    using namespace Backends;
     for( std::size_t i = std::size_t(blockIdx.x) * blockDim.x + threadIdx.x;
          i < count_; i += std::size_t(blockDim.x) * gridDim.x ){
-      const auto& dial = dials_[i];
-      double input = 0.;
-      if( dial.type != BackendDialType::Shift ){
-        const auto& descriptor = inputs_[dial.firstInput];
-        input = Semantics::transformDialInput(descriptor, parameters_[descriptor.parameterIndex]);
-      }
-      if( not ::isfinite(input) ){ responses_[i] = 0.; atomicExch(error_, 1); continue; }
-      if( reuse_ and previousInputs_[i] == input ){ continue; }
-      const double* payload = dial.payloadSize == 0 ? nullptr : payloads_ + dial.payloadOffset;
-      // These interpolation routines select a uniform segment through an int.
-      if( dial.type == BackendDialType::CompactSpline or dial.type == BackendDialType::MonotonicSpline
-          or dial.type == BackendDialType::UniformSpline ){
-        const auto knots = dial.type == BackendDialType::UniformSpline ? (dial.payloadSize - 2) / 2 : dial.payloadSize - 2;
-        const double x = dial.allowExtrapolation ? input
-            : Semantics::clampValue(input, payload[0], payload[0] + payload[1] * double(knots - 1));
-        const double position = (x - payload[0]) / payload[1];
-        // UniformSpline also forms 2*ix+7 before clamping the segment index.
-        const double limit = dial.type == BackendDialType::UniformSpline ? 1073741800. : 2147483000.;
-        if( not ::isfinite(position) or ::fabs(position) > limit ){
-          responses_[i] = 0.; atomicExch(error_, 1); continue;
+      evaluateResponse(i, dials_, inputs_, payloads_, parameters_, responses_, previousInputs_, reuse_, error_);
+    }
+  }
+
+  __global__ void evaluateSelectedResponses(const Backends::CudaResponseUpdate* updates_,
+      std::size_t rangeCount_, std::size_t blockCount_, const std::uint32_t* indices_,
+      const Backends::BackendDialDescriptor* dials_, const Backends::BackendDialInputDescriptor* inputs_,
+      const double* payloads_, const double* parameters_, double* responses_, double* previousInputs_, int* error_) {
+    __shared__ std::size_t first, end;
+    for( std::size_t block = blockIdx.x; block < blockCount_; block += gridDim.x ){
+      if( threadIdx.x == 0 ){
+        // One binary search per block, rather than per dial/thread.
+        std::size_t low = 0, high = rangeCount_;
+        while( low + 1 < high ){
+          const auto mid = low + (high - low) / 2;
+          if( updates_[mid].firstBlock <= block ){ low = mid; }
+          else{ high = mid; }
         }
+        const auto range = updates_[low];
+        first = range.firstDial + (block - range.firstBlock) * blockSize;
+        end = range.endDial;
       }
-      const double response = Semantics::evalDialResponseFromInput(dial, input, payload);
-      if( not ::isfinite(response) ){ atomicExch(error_, 1); }
-      responses_[i] = ::isfinite(response) ? response : 0.;
-      previousInputs_[i] = input;
+      __syncthreads();
+      const auto index = first + threadIdx.x;
+      if( index < end ){
+        evaluateResponse(indices_[index], dials_, inputs_, payloads_, parameters_, responses_, previousInputs_, true, error_);
+      }
+      __syncthreads(); // Shared bounds must survive until every thread finished.
     }
   }
 
@@ -208,6 +247,11 @@ void Backends::CudaDeviceContext::build(const CudaWeightModel& model_) {
     b.inputs.upload(model_.inputs, _impl_->stream);
     b.payloads.upload(model_.payloads, _impl_->stream);
     b.dialIndices.upload(model_.eventDialIndices, _impl_->stream);
+    b.parameterDialIndices.upload(model_.parameterDialIndices, _impl_->stream);
+    b.parameterDialOffsets = model_.parameterDialOffsets;
+    b.previousParameters.resize(model_.parameterCount);
+    b.updatePlan.ranges.reserve(model_.parameterCount);
+    b.responseUpdates.allocate(model_.parameterCount);
     b.binOffsets.upload(model_.binOffsets, _impl_->stream);
     b.binEvents.upload(model_.binEvents, _impl_->stream);
     b.parameters.allocate(model_.parameterCount);
@@ -235,17 +279,39 @@ void Backends::CudaDeviceContext::propagate(const std::vector<double>& parameter
   const auto stream = _impl_->stream;
   auto record = [&](std::size_t i_){ checkCuda(cudaEventRecord(_impl_->stages[i_], stream), "cudaEventRecord"); };
   try{
+    const bool reuse = b.cachePrimed and not recomputeResponses_;
+    const auto preparationStart = std::chrono::steady_clock::now();
+    if( reuse ){ b.updatePlan.select(b.parameterDialOffsets, b.previousParameters, parameters_); }
+    // Dense updates retain the original contiguous traversal. Sparse dispatch
+    // avoids a full dial scan and uploads only one range per changed parameter.
+    const bool sparse = reuse and b.updatePlan.dialCount <= b.dials.size / 2;
+    const auto candidates = sparse ? b.updatePlan.dialCount : b.dials.size;
+    timing_.cacheCandidateCount = candidates;
+    timing_.cachePreparationSeconds = std::chrono::duration<double>(
+        std::chrono::steady_clock::now() - preparationStart).count();
     record(0);
+    if( sparse and not b.updatePlan.ranges.empty() ){
+      checkCuda(cudaMemcpyAsync(b.responseUpdates.data, b.updatePlan.ranges.data(),
+          b.updatePlan.ranges.size() * sizeof(CudaResponseUpdate), cudaMemcpyHostToDevice, stream), "response update ranges");
+    }
     checkCuda(cudaMemsetAsync(b.error.data, 0, sizeof(int), stream), "reset execution error");
     if( b.parameters.size ){
       checkCuda(cudaMemcpyAsync(b.parameters.data, parameters_.data(), b.parameters.size * sizeof(double),
                                 cudaMemcpyHostToDevice, stream), "parameter upload");
     }
     record(1);
-    if( b.dials.size ){
+    if( sparse and candidates ){
+      const auto blocks = static_cast<unsigned int>(std::min<std::size_t>(b.updatePlan.blockCount, 65535));
+      evaluateSelectedResponses<<<blocks, blockSize, 0, stream>>>(b.responseUpdates.data,
+          b.updatePlan.ranges.size(), b.updatePlan.blockCount, b.parameterDialIndices.data,
+          b.dials.data, b.inputs.data, b.payloads.data, b.parameters.data,
+          b.responses.data, b.previousInputs.data, b.error.data);
+      checkCuda(cudaGetLastError(), "selected dial response kernel launch");
+    }
+    else if( not sparse and b.dials.size ){
       evaluateResponses<<<gridSize(b.dials.size), blockSize, 0, stream>>>(b.dials.data, b.dials.size,
           b.inputs.data, b.payloads.data, b.parameters.data, b.responses.data, b.previousInputs.data,
-          b.cachePrimed and not recomputeResponses_, b.error.data);
+          reuse, b.error.data);
       checkCuda(cudaGetLastError(), "dial response kernel launch");
     }
     record(2);
@@ -265,6 +331,7 @@ void Backends::CudaDeviceContext::propagate(const std::vector<double>& parameter
     checkCuda(cudaMemcpyAsync(&error, b.error.data, sizeof(int), cudaMemcpyDeviceToHost, stream), "execution error readback");
     checkCuda(cudaStreamSynchronize(stream), "propagation completion");
     if( error ){ throw std::runtime_error("CudaBackend: nonfinite or out-of-range numerical result."); }
+    std::copy(parameters_.begin(), parameters_.end(), b.previousParameters.begin());
     b.cachePrimed = true;
     auto elapsed = [&](std::size_t first_, std::size_t last_){
       float milliseconds = 0.;
