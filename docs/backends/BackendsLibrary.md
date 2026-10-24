@@ -35,6 +35,7 @@ with each backend:
 - [MPS structure](mps/BackendStructure.md).
 - [CUDA implementation and validation](../guides/CudaBackend.md).
 - [Multi-input dials](MultiInputDials.md).
+- [Small-fit and Hesse covariance regression](BackendFitCovariance.md).
 
 ## Compatibility
 
@@ -53,12 +54,13 @@ itself establish numerical validation on every model or device.
 | Stage | CPU | MPS | CUDA |
 |---|---|---|---|
 | Factory selection and backend configuration | ✅ `CPU` / `cpu` | ✅ `MPS` / `mps`, `propagationMode` | ✅ `CUDA` / `cuda`, `deviceIndex`, `propagationMode` |
-| Execution resources | ✅ Host worker pool | ✅ Metal device, buffers and command execution | ⚠️ Device/stream lifecycle validated on CC V100; new resident buffers and timing events pending CC validation |
-| Model preparation | ✅ Flat host model and numerical caches | ✅ Packed model and GPU uploads | ⚠️ Native-double descriptors, payloads and fixed-bin index uploaded once; CC validation pending |
-| Propagation and result tokens | ✅ | ✅ | ⚠️ Synchronous CUDA executor and token invalidation implemented; CC validation pending |
-| Host materialization | ✅ Event state, weights and histograms | ✅ Event state, weight and histogram readback | ⚠️ Lazy weight/histogram readback; no event-state output; CC validation pending |
-| Dial-response and event-state caches | ✅ | ✅ Depends on propagation mode | ⚠️ GPU response cache by effective scalar input; no event-state cache; CC validation pending |
-| Numerical regression tests | ✅ CPU comparisons | ✅ MPS comparisons | ⚠️ CPU comparison tests written for both modes; GPU execution pending |
+| Execution resources | ✅ Host worker pool | ✅ Metal device, buffers and command execution | ✅ Device, stream, resident buffers and timing events exercised on CC V100 |
+| Model preparation | ✅ Flat host model and numerical caches | ✅ Packed model and GPU uploads | ✅ Native-double descriptors, payloads and fixed-bin index uploaded once |
+| Propagation and result tokens | ✅ | ✅ | ✅ Synchronous CUDA executor and token invalidation |
+| Host materialization | ✅ Event state, weights and histograms | ✅ Event state, weight and histogram readback | ⚠️ Lazy weight/histogram readback; no event-state output |
+| Dial-response and event-state caches | ✅ | ✅ Depends on propagation mode | ⚠️ GPU response cache by effective scalar input; no event-state cache |
+| Numerical regression tests | ✅ CPU comparisons | ✅ MPS comparisons | ✅ Both modes compared against CPU on CC V100; error/retry tests passed |
+| Small fit and full Hesse covariance regression | ✅ Original/CPU comparison and analytic covariance reference pass locally | — Not included in this regression | ⚠️ Both modes implemented in optional regular tests; CC execution pending |
 | Standalone CUDA infrastructure test | — | — | ✅ FP64 kernel validated on CC-IN2P3 V100, interactive and Slurm batch |
 
 CUDA implements a first numerical executor for scalar dials and fixed bins.
@@ -69,14 +71,31 @@ dials, external weights, tables and event-state propagation are rejected during
 model preparation. No CPU propagation fallback is performed.
 
 The host-side configuration/model tests pass locally without a toolkit. The
-original `cuda-backend-skeleton` lifecycle test passed on CC-IN2P3 V100 in Slurm
-job `62373853` on 2026-10-24 (142 ms), before numerical execution was added.
-Only one GPU was visible, so switching between distinct devices remains
-unvalidated. The standalone `cuda-smoke` test also passed in interactive and
-batch use. Compilation and GPU validation of the new executor are still pending;
-`cuda-backend-propagation` compares both modes against CPU and exercises errors,
-retries, token invalidation and materialization. These earlier successful tests
-do not establish numerical correctness of the new kernels.
+full CUDA test executable passed all five tests on CC-IN2P3 V100 in Slurm job
+`62374030` on 2026-10-24: one device-lifecycle test and four propagation tests
+(184 ms for the whole suite, not a performance benchmark). The scalar comparison
+test checks both modes, with and without extrapolation/caps, at eight parameter
+points per combination, using 521 events and all seven scalar dial types.
+Weights, histogram sums/squared sums and host likelihoods agree with CPU within
+the tests' tolerances: `2e-12 * max(1, abs(reference))` for weights/histograms
+and `2e-11 * max(1, abs(reference))` for likelihoods. See
+[`unitTest_CudaBackendPropagation.cpp`](../../tests/GTests/unitTest_CudaBackendPropagation.cpp).
+
+Empty models, undialed events, lazy readback, obsolete tokens, numerical overflow
+and recovery after errors also pass. This validates the synthetic test models,
+not a complete fit or production-scale model. Only one GPU was visible;
+switching between distinct devices and H100 execution remain unvalidated.
+The standalone FP64 `cuda-smoke` test previously passed in interactive and batch
+use as well.
+
+The optional [fit/covariance regular tests](BackendFitCovariance.md) generate
+540 weighted events in eight bins and fit three correlated parameters using
+Migrad and Hesse. They compare the original engine with CPU, then CPU with
+each CUDA mode, including full covariance/correlation matrices and eigenvalues.
+An independent analytic covariance anchors all fits. The original/CPU comparison
+passes locally in less than a second; the CUDA fit comparisons await CC execution.
+Unavailable backends or devices produce skips by default, while
+`GUNDAM_REQUIRE_CUDA_TESTS=1` requires GPU execution in a validation job.
 
 ### Dial types
 
@@ -85,19 +104,19 @@ use the same `EngineLayout` conversion, which rejects unsupported dial classes
 with `Unsupported dial type for EngineView`. MPS additionally rejects
 `Tabulated` and `Kriged` during backend construction. There is no automatic fallback to
 the original engine for these classes. CUDA's scalar evaluator reuses common
-numerical semantics; its ⚠️ entries require compilation and GPU validation at
-the CC. 🚧 marks missing CUDA implementations, rejected at build time even when
+numerical semantics; its scalar dial types passed the V100 comparison tests in
+both propagation modes. 🚧 marks missing CUDA implementations, rejected at build time even when
 the common layout can represent the dial. ❌ marks unsupported dial classes.
 
 | Configuration or concrete dial | CPU | MPS | CUDA |
 |---|---|---|---|
-| `Normalization` (`Norm`) | ✅ | ✅ | ⚠️ Implemented; CC validation pending |
-| Constant response (`Shift`) | ✅ | ✅ | ⚠️ Implemented; CC validation pending |
-| `Spline`: `CompactSpline` | ✅ | ✅ | ⚠️ Implemented; CC validation pending |
-| `Spline`: `UniformSpline` | ✅ | ✅ | ⚠️ Implemented; CC validation pending |
-| `Spline`: `MonotonicSpline` | ✅ | ✅ | ⚠️ Implemented; CC validation pending |
-| `Spline`: `GeneralSpline` | ✅ | ✅ | ⚠️ Implemented; CC validation pending |
-| `Graph` | ✅ | ✅ | ⚠️ Implemented; CC validation pending |
+| `Normalization` (`Norm`) | ✅ | ✅ | ✅ |
+| Constant response (`Shift`) | ✅ | ✅ | ✅ |
+| `Spline`: `CompactSpline` | ✅ | ✅ | ✅ |
+| `Spline`: `UniformSpline` | ✅ | ✅ | ✅ |
+| `Spline`: `MonotonicSpline` | ✅ | ✅ | ✅ |
+| `Spline`: `GeneralSpline` | ✅ | ✅ | ✅ |
+| `Graph` | ✅ | ✅ | ✅ |
 | `Surface` / `Bilinear` | ✅ | ✅ | 🚧 |
 | `Surface` / `Bicubic` | ✅ | ✅ | 🚧 |
 | `ExternalWeight` (`ExternalWeightDispatcher`) | ✅ | ✅ | 🚧 |
@@ -127,20 +146,20 @@ every stage runs on the GPU. MPS support applies to both `cachedResponses` and
 
 | Feature | CPU | MPS | CUDA |
 |---|---|---|---|
-| Event weights and histogram sums / squared sums | ✅ | ✅ | ⚠️ Implemented for scalar dials / fixed bins; CC validation pending |
-| Statistical likelihood | ⚠️ on host | ⚠️ on host | ⚠️ On host after histogram readback; CC validation pending |
+| Event weights and histogram sums / squared sums | ✅ | ✅ | ✅ Scalar dials / fixed bins |
+| Statistical likelihood | ⚠️ on host | ⚠️ on host | ⚠️ On host after histogram readback |
 | Separate `SampleLikelihoods` output | ❌ Only the total is stored | ❌ Only the total is stored | ❌ Only the total is stored |
-| Parameter inputs and per-input mirroring | ✅ | ✅ | ⚠️ Implemented for scalar dials / fixed bins; CC validation pending |
+| Parameter inputs and per-input mirroring | ✅ | ✅ | ✅ Scalar dials / fixed bins |
 | Two-input surfaces (`Bilinear`, `Bicubic`) | ✅ | ✅ | 🚧 |
-| Dial extrapolation | ✅ | ✅ | ⚠️ Implemented for scalar dials / fixed bins; CC validation pending |
-| Hard response limits and response smoothing | ✅ | ✅ | ⚠️ Implemented for scalar dials / fixed bins; CC validation pending |
-| Event reweight cap | ✅ | ✅ | ⚠️ Implemented for scalar dials / fixed bins; CC validation pending |
+| Dial extrapolation | ✅ | ✅ | ✅ Scalar dials / fixed bins |
+| Hard response limits and response smoothing | ✅ | ✅ | ✅ Scalar dials / fixed bins |
+| Event reweight cap | ✅ | ✅ | ✅ Scalar dials / fixed bins |
 | Observable responses (`applyToVariable`) | ✅ | ✅ | 🚧 |
 | Dynamic binning / event migration | ✅ | ✅ | 🚧 |
 | Smoothed binning / fractional contributions | ✅ | ✅ | 🚧 |
 | External-weight updates | ⚠️ Produced on host | ⚠️ Produced on host, copied to GPU buffers | 🚧 |
 | Event variables as ordinary dial inputs (`DialInputSource::EventVariable`) | ❌ | ❌ | 🚧 |
-| Numerical precision | Double (64-bit) | ⚠️ ~48 significant bits in resident event propagation (float pairs); float32 weights / histograms in packed execution | ⚠️ Native double (64-bit); new executor validation pending |
+| Numerical precision | Double (64-bit) | ⚠️ ~48 significant bits in resident event propagation (float pairs); float32 weights / histograms in packed execution | Double (64-bit); CPU comparisons passed on V100 |
 | Hardware requirements | ✅ Host CPU | ⚠️ Apple GPU with Metal | ⚠️ NVIDIA GPU and CUDA toolkit; CC V100 smoke test uses CUDA 12.4 / `sm_70` |
 
 The only MPS backend configuration option is `propagationMode`: `cachedResponses`

@@ -133,6 +133,7 @@ if( WITH_GOOGLE_TEST )
   ## Create a list of all of the regular tests.  These are always
   ## compiled and are run when WITH_REGULAR_TEST is on.
   list(APPEND REGULAR_TESTS "")
+  list(APPEND REGULAR_TESTS GTests/unitTest_BackendFitCovariance.cpp)
 
   # Compile the regular test executable, but only add them to ctest if
   # WITH_REGULAR_TEST is on. This should NOT be "optimized" to skip
@@ -141,8 +142,17 @@ if( WITH_GOOGLE_TEST )
     add_executable(gundamGTest_regularTest.exe ${REGULAR_TESTS})
     target_link_libraries(gundamGTest_regularTest.exe GTest::gtest_main)
     target_link_libraries(gundamGTest_regularTest.exe GundamFitter)
+    if(WITH_BACKENDS AND GUNDAM_CUDA_ENABLED)
+      target_compile_definitions(gundamGTest_regularTest.exe PRIVATE GUNDAM_TEST_HAS_CUDA)
+      target_link_libraries(gundamGTest_regularTest.exe CUDA::cudart)
+      set_property(TARGET gundamGTest_regularTest.exe APPEND PROPERTY
+          BUILD_RPATH "$<TARGET_FILE_DIR:CUDA::cudart>")
+    endif()
     if(WITH_REGULAR_TEST)
-      gundam_discover_tests(gundamGTest_regularTest.exe PROPERTIES LABELS unit)
+      file(MAKE_DIRECTORY "${CMAKE_BINARY_DIR}/Testing/BackendFitCovariance")
+      gundam_discover_tests(gundamGTest_regularTest.exe
+          WORKING_DIRECTORY "${CMAKE_BINARY_DIR}/Testing/BackendFitCovariance"
+          PROPERTIES LABELS regular TIMEOUT 120)
     endif(WITH_REGULAR_TEST)
   endif(REGULAR_TESTS)
 
