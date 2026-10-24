@@ -11,14 +11,17 @@
 set -euo pipefail
 
 # Submit from the repository root after compiling on an interactive GPU node:
-# sbatch tests/cuda/CcLyonSmoke.sbatch [absolute-or-relative-build-directory]
+# sbatch tests/cuda/CcLyonSmoke.sbatch [build-directory] [test-executable]
+# Backend lifecycle test from a full GUNDAM build:
+# sbatch tests/cuda/CcLyonSmoke.sbatch build-cuda/tests gundamGTest_cudaBackend.exe
 # For an sm_90 build: sbatch -p gpu_h100 tests/cuda/CcLyonSmoke.sbatch ...
 # Load the same toolkit environment here if it is not installed system-wide.
 # The smoke test embeds its CUDA runtime path at link time; the toolkit must
 # remain accessible at that path from the batch node.
 cd "${SLURM_SUBMIT_DIR:?Submit this script with sbatch}"
 buildDir="${1:-build-cuda-smoke}"
+testExecutable="${2:-gundamCudaSmokeTest}"
 nvidia-smi
 # Do not reuse an interactive session's CPU mask on a different batch node.
 # This smoke test does not need CPU affinity.
-srun --cpu-bind=none "${buildDir}/gundamCudaSmokeTest"
+srun --cpu-bind=none "${buildDir}/${testExecutable}"

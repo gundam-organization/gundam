@@ -14,7 +14,12 @@ set(SRCFILES
     ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/CPU/src/CpuBackendProfiler.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/CPU/src/CpuWeightProbe.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/CPU/src/CpuBackendBinning.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/CUDA/src/CudaBackend.cpp
 )
+
+if(GUNDAM_CUDA_ENABLED)
+  list(APPEND SRCFILES ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/CUDA/src/CudaDeviceContext.cu)
+endif()
 
 if(APPLE)
   enable_language(OBJCXX)
@@ -70,6 +75,7 @@ if(APPLE)
 endif()
 
 set(HEADERS
+    ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/CUDA/include/CudaBackend.h
     ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/Semantics/BackendResponseSmoothing.h
     ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/ResponseSmoothingPacking.h
     ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/Semantics/BackendVariableResponse.h
@@ -118,6 +124,7 @@ target_include_directories(
     PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/Common/include
     ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/CPU/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/CUDA/include
     ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/MPS/include
     PRIVATE
     ${CMAKE_CURRENT_BINARY_DIR}/generated
@@ -130,11 +137,12 @@ target_link_libraries(
     GundamStatisticalInference
 )
 
-# CUDA infrastructure for future .cu implementation sources. This does not
-# register a CUDA backend with BackendFactory.
 if(GUNDAM_CUDA_ENABLED)
   target_link_libraries(${LIB_NAME} PRIVATE CUDA::cudart)
   target_compile_definitions(${LIB_NAME} PRIVATE GUNDAM_USING_CUDA)
+  set_target_properties(${LIB_NAME} PROPERTIES CUDA_RUNTIME_LIBRARY Shared)
+  set_property(TARGET ${LIB_NAME} APPEND PROPERTY
+      BUILD_RPATH "$<TARGET_FILE_DIR:CUDA::cudart>")
 endif()
 
 if(APPLE)

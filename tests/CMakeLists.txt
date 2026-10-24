@@ -94,6 +94,7 @@ if( WITH_GOOGLE_TEST )
   list(APPEND FAST_TESTS GTests/unitTest_DataDispenser.cpp)
   list(APPEND FAST_TESTS GTests/unitTest_RootMinimizerSimplex.cpp)
   if(WITH_BACKENDS)
+    list(APPEND FAST_TESTS GTests/unitTest_CudaBackend.cpp)
     list(APPEND FAST_TESTS GTests/unitTest_EngineLayout.cpp)
     list(APPEND FAST_TESTS GTests/unitTest_CpuWeightExecution.cpp)
     list(APPEND FAST_TESTS GTests/unitTest_ExternalWeightBackend.cpp)
@@ -114,6 +115,17 @@ if( WITH_GOOGLE_TEST )
       gundam_discover_tests(gundamGTest_fastTest.exe PROPERTIES LABELS unit)
     endif(WITH_FAST_TEST)
   endif(FAST_TESTS)
+
+  if(WITH_BACKENDS AND GUNDAM_CUDA_ENABLED)
+    add_executable(gundamGTest_cudaBackend.exe GTests/unitTest_CudaBackendDevice.cpp)
+    target_link_libraries(gundamGTest_cudaBackend.exe PRIVATE
+        GTest::gtest_main GundamBackends CUDA::cudart)
+    set_property(TARGET gundamGTest_cudaBackend.exe APPEND PROPERTY
+        BUILD_RPATH "$<TARGET_FILE_DIR:CUDA::cudart>")
+    # Register without discovery: building must work without an allocated GPU.
+    add_test(NAME cuda-backend-skeleton COMMAND gundamGTest_cudaBackend.exe)
+    set_tests_properties(cuda-backend-skeleton PROPERTIES LABELS "cuda;device" TIMEOUT 60)
+  endif()
 
   ## Create a list of all of the regular tests.  These are always
   ## compiled and are run when WITH_REGULAR_TEST is on.

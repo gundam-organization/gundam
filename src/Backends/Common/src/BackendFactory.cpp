@@ -2,6 +2,7 @@
 
 #include "BackendManager.h"
 #include "CpuBackend.h"
+#include "CudaBackend.h"
 #ifdef __APPLE__
 #include "MpsBackend.h"
 #endif
@@ -11,6 +12,9 @@
 std::unique_ptr<Backends::Backend> Backends::makeBackend(const BackendManager& config_) {
   if( config_.getType() == "CPU" or config_.getType() == "cpu" ){
     return std::make_unique<CpuBackend>();
+  }
+  if( config_.getType() == "CUDA" or config_.getType() == "cuda" ){
+    return std::make_unique<CudaBackend>();
   }
   if( config_.getType() == "MPS" or config_.getType() == "mps" ){
 #ifdef __APPLE__
