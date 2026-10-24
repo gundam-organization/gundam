@@ -5,6 +5,8 @@ is read-only; response caches, observable state and results belong to the backen
 This page describes the execution architecture. See
 [Reweight optimization](ReweightOptimization.md) for the benchmark evidence and
 [Backends library](../BackendsLibrary.md) for the manager/backend interface.
+Supported dial types and engine features are listed in the
+[compatibility tables](../BackendsLibrary.md#compatibility).
 
 ## Model and ownership
 

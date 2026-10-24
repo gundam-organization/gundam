@@ -1,5 +1,8 @@
 # MPS backend structure
 
+Supported dial types and engine features are listed in the
+[compatibility tables](../BackendsLibrary.md#compatibility).
+
 ## Response propagation mode
 
 Select the response strategy in the MPS backend configuration:
