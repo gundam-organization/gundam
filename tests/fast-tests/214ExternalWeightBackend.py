@@ -81,8 +81,9 @@ def main():
             if backend == 'MPS':
                 timing = manager.getLastTimingSummary()
                 changed = 1 if i in (2, 4) else 0
+                # Default resident execution uploads each value as a float pair.
                 count = 12 if binned else 6
-                if timing.externalWeightUploadBlocks != changed or timing.externalWeightUploadBytes != changed * count * 4:
+                if timing.externalWeightUploadBlocks != changed or timing.externalWeightUploadBytes != changed * count * 8:
                     raise RuntimeError(f'Unexpected MPS transfers at point {i}: {timing.externalWeightUploadBlocks} blocks / {timing.externalWeightUploadBytes} bytes')
             # Validate against the analytic producer formula, independent of backends.
             energies = [0.6, 0.8, 1.2, 1.5, 2., 2.5]

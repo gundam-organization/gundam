@@ -90,22 +90,22 @@ void Backends::MpsEventPropagation::build(const PropagationView& model_) {
   allocate(Buffer::Control, sizeof(DevicePropagationControl), true);
   for( auto slot : {Buffer::DirtyEvents, Buffer::HardBins, Buffer::EventCounts} ){ allocate(slot, model_.events.size() * sizeof(DeviceIndex)); }
   allocate(Buffer::Contributions, std::max(std::size_t(1), std::size_t(_packed_.contributionCapacity)) * sizeof(DeviceBinContribution));
-  allocate(Buffer::EventWeights, model_.events.size() * sizeof(float));
+  allocate(Buffer::EventWeights, model_.events.size() * sizeof(ObservableScalar));
   for( auto slot : {Buffer::BinCounts, Buffer::BinPositions, Buffer::ChunkOffsets} ){
     allocate(slot, (std::size_t(_packed_.histogramBins) + 1) * sizeof(DeviceIndex));
   }
   allocate(Buffer::BinContributions, std::size_t(_packed_.contributionCapacity) * sizeof(DeviceIndex));
   allocate(Buffer::Chunks, std::size_t(_packed_.histogramChunkCapacity) * sizeof(DeviceHistogramChunk));
   for( auto slot : {Buffer::PartialSums, Buffer::PartialSquares} ){
-    allocate(slot, std::size_t(_packed_.histogramChunkCapacity) * sizeof(float));
+    allocate(slot, std::size_t(_packed_.histogramChunkCapacity) * sizeof(ObservableScalar));
   }
   for( auto slot : {Buffer::HistogramSums, Buffer::HistogramSquares} ){
-    allocate(slot, std::size_t(_packed_.histogramBins) * sizeof(float));
+    allocate(slot, std::size_t(_packed_.histogramBins) * sizeof(ObservableScalar));
   }
   // Readback buffers are created lazily for EventState/EventWeights, which fits
   // usually leave resident. Histogram readback remains necessary for host LLH.
   for( auto slot : {Buffer::ReadbackSums, Buffer::ReadbackSquares} ){
-    allocate(slot, std::size_t(_packed_.histogramBins) * sizeof(float), true);
+    allocate(slot, std::size_t(_packed_.histogramBins) * sizeof(ObservableScalar), true);
   }
   std::memset(buffer(Buffer::Control).contents, 0, sizeof(DevicePropagationControl));
   buildDialCache();
@@ -275,7 +275,7 @@ void Backends::MpsEventPropagation::propagate(const PropagationInputs& inputs_, 
   control.dialCount = DeviceIndex(dialCount);
   control.sampleCount = DeviceIndex(model.samples.size());
   control.hasReweightCap = model.hasReweightCap;
-  control.maxReweight = float(model.maxReweight);
+  control.maxReweight = ObservableScalar(model.maxReweight);
   std::memset(buffer(Buffer::ChangedSamples).contents, 0, std::max(std::size_t(1), model.samples.size()) * sizeof(DeviceIndex));
   if( not inputs_.hostVariables.empty() ){
     auto* flags = static_cast<DeviceIndex*>(buffer(Buffer::HostEdits).contents);
@@ -312,7 +312,7 @@ void Backends::MpsEventPropagation::propagate(const PropagationInputs& inputs_, 
     Buffer::HistogramSums, Buffer::HistogramSquares, Buffer::Control});
   [encoder endEncoding];
   auto blit = [command blitCommandEncoder];
-  std::size_t histogramBytes = std::size_t(_packed_.histogramBins) * sizeof(float);
+  std::size_t histogramBytes = std::size_t(_packed_.histogramBins) * sizeof(ObservableScalar);
   copy(blit, Buffer::HistogramSums, Buffer::ReadbackSums, histogramBytes);
   copy(blit, Buffer::HistogramSquares, Buffer::ReadbackSquares, histogramBytes);
   [blit endEncoding];
@@ -334,12 +334,16 @@ void Backends::MpsEventPropagation::propagate(const PropagationInputs& inputs_, 
   _lastRebuiltIndex_ = control.rebuildIndex != 0;
   _valid_ = true;
   auto readbackStart = std::chrono::steady_clock::now();
-  const auto* sums = static_cast<const float*>(buffer(Buffer::ReadbackSums).contents);
-  const auto* squares = static_cast<const float*>(buffer(Buffer::ReadbackSquares).contents);
-  result_.histSums.assign(sums, sums + model.totalBins);
-  result_.histSumSquares.assign(squares, squares + model.totalBins);
-  result_.outsideSums.assign(sums + model.totalBins, sums + _packed_.histogramBins);
-  result_.outsideSumSquares.assign(squares + model.totalBins, squares + _packed_.histogramBins);
+  const auto* sums = static_cast<const ObservableScalar*>(buffer(Buffer::ReadbackSums).contents);
+  const auto* squares = static_cast<const ObservableScalar*>(buffer(Buffer::ReadbackSquares).contents);
+  auto readValues = [](const ObservableScalar* values_, std::size_t count_, std::vector<double>& output_){
+    output_.resize(count_);
+    for( std::size_t i = 0; i < count_; ++i ){ output_[i] = double(values_[i].high) + values_[i].low; }
+  };
+  readValues(sums, model.totalBins, result_.histSums);
+  readValues(squares, model.totalBins, result_.histSumSquares);
+  readValues(sums + model.totalBins, _packed_.histogramBins - model.totalBins, result_.outsideSums);
+  readValues(squares + model.totalBins, _packed_.histogramBins - model.totalBins, result_.outsideSumSquares);
   timing_.histogramReadbackBytes += 2 * histogramBytes;
   timing_.histogramReadbackSeconds += secondsSince(readbackStart);
   timing_.rebinnedEventCount = control.rebinnedEvents;
@@ -359,14 +363,17 @@ void Backends::MpsEventPropagation::materializeWeights(PropagationResult& result
   auto start = std::chrono::steady_clock::now();
   auto command = [_queue_ commandBuffer];
   auto encoder = [command blitCommandEncoder];
-  std::size_t bytes = _model_->events.size() * sizeof(float);
+  std::size_t bytes = _model_->events.size() * sizeof(ObservableScalar);
   copy(encoder, Buffer::EventWeights, Buffer::ReadbackWeights, bytes);
   [encoder endEncoding];
   [command commit];
   [command waitUntilCompleted];
   LogThrowIf(command.status != MTLCommandBufferStatusCompleted, "Metal event weight readback failed.");
-  auto* values = static_cast<float*>(buffer(Buffer::ReadbackWeights).contents);
-  result_.eventWeights.assign(values, values + _model_->events.size());
+  auto* values = static_cast<ObservableScalar*>(buffer(Buffer::ReadbackWeights).contents);
+  result_.eventWeights.resize(_model_->events.size());
+  for( std::size_t i = 0; i < result_.eventWeights.size(); ++i ){
+    result_.eventWeights[i] = double(values[i].high) + values[i].low;
+  }
   timing_.eventWeightReadbackBytes += bytes;
   timing_.eventWeightReadbackSeconds += secondsSince(start);
 }
@@ -408,7 +415,7 @@ const Backends::EventState& Backends::MpsEventPropagation::materializeState(Back
     for( std::size_t j = 0; j < counts[i]; ++j ){
       const auto& contribution = contributions[event.firstContribution + j];
       int bin = contribution.binIndex >= model.totalBins ? -1 : contribution.binIndex - int(sample.binOffset);
-      _state_.contributions[i].push_back({bin, contribution.fraction});
+      _state_.contributions[i].push_back({bin, double(contribution.fraction.high) + contribution.fraction.low});
     }
   }
   _materializedRevision_ = _state_.revision;
@@ -421,10 +428,10 @@ Backends::BackendDeviceView Backends::MpsEventPropagation::getDeviceView() const
   BackendDeviceView view;
   view.device = _device_;
   view.eventWeights = buffer(Buffer::EventWeights);
-  view.eventWeightsBytes = _model_->events.size() * sizeof(float);
+  view.eventWeightsBytes = _model_->events.size() * sizeof(ObservableScalar);
   view.histSums = buffer(Buffer::HistogramSums);
   view.histSumSquares = buffer(Buffer::HistogramSquares);
-  view.histogramBytes = std::size_t(_model_->totalBins) * sizeof(float);
+  view.histogramBytes = std::size_t(_model_->totalBins) * sizeof(ObservableScalar);
   return view;
 }
 

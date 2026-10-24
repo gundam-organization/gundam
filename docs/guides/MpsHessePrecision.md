@@ -1,5 +1,11 @@
 # MPS Hesse precision — October 20, 2026
 
+The float32 implementation and recommendation described below are historical.
+The resident executor now preserves float pairs through weights, smoothed
+contributions and histogram readback and recommends `1e-12`; see
+[MPS toy precision](MpsToyPrecision.md). Packed execution retains the float32
+recommendation.
+
 ## Diagnosis
 
 The Upgrade CC 2026 Asimov comparison exposed a numerical differentiation

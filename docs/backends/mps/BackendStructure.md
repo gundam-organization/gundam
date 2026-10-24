@@ -57,12 +57,21 @@ Construction-only host copies of uploaded payloads, variables and binning tables
 are released after the uploads complete. Host metadata needed for cache lookup,
 event-state materialization and diagnostics remains available.
 
-Weights, contribution fractions and published histogram values use single
-precision. Event observables and interval arithmetic use compensated pairs of
-floats. Parallel event-propagation histogram reductions also accumulate in
-compensated pairs before publishing float partial sums. Converting published
-results to host doubles does not recover rounding at these float boundaries.
-This differs from the CPU backend's double-precision execution.
+The resident `eventPropagation` executor uses compensated pairs of floats
+(about 48 significant bits) for parameters, dial responses, event-weight
+products, contribution fractions and histogram sums / squared sums. Both
+reduction stages preserve the pairs, and host readback reconstructs doubles
+from both components. This avoids float32 rounding noise in the finite
+differences used by Migrad and Hesse. It doubles the corresponding numerical
+buffers relative to float32; it is not native double-precision GPU arithmetic.
+
+The scalar fixed-bin `packedWeights` executor selected by `recomputeResponses`
+still uses float32 weights and histogram outputs. Its numerical precision is
+unchanged. The minimizer receives a recommended relative function precision of
+`1e-12` for the resident executor and float epsilon (`1.1920928955078125e-7`)
+for the packed executor. These are numerical differentiation defaults, not
+universal error bounds; an explicit `minimizerConfig.functionPrecision` takes
+precedence. See [toy precision validation](../../guides/MpsToyPrecision.md).
 
 The backend interface separates execution from host materialization, so callers
 can request the outputs they need. The shared model and manager responsibilities
@@ -155,9 +164,9 @@ other samples retain explicit writes, including groups crossing sample boundarie
 Histogram chunks contain up to 256 contributions. On pipelines with 32-wide SIMD
 groups, a parallel kernel assigns one group to a chunk. Each lane accumulates
 strided contributions, then a shuffle reduction combines compensated float pairs.
-The existing final per-bin reduction remains in place. Other SIMD widths use the
-serial compensated kernel. The parallel arithmetic is validated against CPU and
-reference histograms with float tolerances; binary identity is not required.
+The final per-bin reduction also preserves compensated pairs. Other SIMD widths
+use the serial compensated kernel. The arithmetic is validated against CPU and
+reference histograms; binary identity is not required.
 
 These optimizations are part of the production implementation.
 

@@ -35,7 +35,9 @@ Backends::BackendCapabilities Backends::MpsBackend::getCapabilities() const {
   out.supportsEventWeights = true;
   out.supportsHistograms = true;
   out.supportsLikelihood = true;
-  out.recommendedFunctionPrecision = std::numeric_limits<float>::epsilon();
+  // The resident executor preserves float pairs through event products and
+  // histogram readback. The packed weight executor still publishes float32.
+  out.recommendedFunctionPrecision = _impl_->useEventPropagation ? 1.e-12 : std::numeric_limits<float>::epsilon();
   out.deviceName = _impl_->isAvailable ? [[_impl_->device name] UTF8String] : "Metal unavailable";
   return out;
 }

@@ -42,7 +42,7 @@ def evaluate(path, precision=None):
     app.openOutputFile(str(output))
     engine.setSaveDir(app, 'FitterEngine')
     engine.initialize()
-    expected_precision = precision if precision is not None else 2 ** -23
+    expected_precision = precision if precision is not None else 1e-12
     assert engine.getMinimizer().getFunctionPrecision() == expected_precision
     parameter = li.getModelPropagator().getParametersManager().getParameterSetsList()[0].getParameterList()[0]
     content = li.getModelPropagator().getSampleSet().getSampleList()[0].getHistogram().getBinContentList()[0]

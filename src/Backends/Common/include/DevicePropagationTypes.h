@@ -78,7 +78,7 @@ namespace Backends {
     DeviceIndex firstDial, dialCount, firstVariable, variableCount, firstResponse, responseCount;
     DeviceIndex sample, firstContribution, contributionCapacity;
     int fixedBin;
-    float baseWeight;
+    ObservableScalar baseWeight;
   };
   struct DeviceBinningSample {
     DeviceIndex binOffset, binCount, firstNode, nodeCount, variableCount;
@@ -94,7 +94,7 @@ namespace Backends {
   };
   struct DeviceBinningNode { DeviceIndex firstBounds, firstBin, binCount, skip; };
   struct DeviceBinningBounds { float lower, upper; };
-  struct DeviceBinContribution { DeviceIndex event; int binIndex; float fraction; };
+  struct DeviceBinContribution { DeviceIndex event; int binIndex; ObservableScalar fraction; };
   struct DeviceHistogramChunk { DeviceIndex begin, end; };
   struct DevicePropagationDialRange { DeviceIndex firstThread, firstDial, count; };
   struct DevicePropagationControl {
@@ -103,7 +103,7 @@ namespace Backends {
     DeviceIndex updateWeights, dialRangeCount;
     DeviceIndex eventCount, histogramBins, dialCount, sampleCount;
     DeviceIndex hasReweightCap;
-    float maxReweight;
+    ObservableScalar maxReweight;
   };
 }
 #endif

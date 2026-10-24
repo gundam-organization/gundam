@@ -102,7 +102,7 @@ every stage runs on the GPU. MPS support applies to both `cachedResponses` and
 | Smoothed binning / fractional contributions | ✅ | ✅ |
 | External-weight updates | ⚠️ Produced on host | ⚠️ Produced on host, copied to GPU buffers |
 | Event variables as ordinary dial inputs (`DialInputSource::EventVariable`) | ❌ | ❌ |
-| Numerical precision | Double (64-bit) | ⚠️ Float32 outputs; ~48 significant bits for observables and resident histogram accumulation (float pairs) |
+| Numerical precision | Double (64-bit) | ⚠️ ~48 significant bits in resident event propagation (float pairs); float32 weights / histograms in packed execution |
 | Hardware requirements | ✅ Host CPU | ⚠️ Apple GPU with Metal |
 
 The only MPS backend configuration option is `propagationMode`: `cachedResponses`

@@ -102,7 +102,7 @@ kernel void propagate_event_state(
     device const uint* hostEdits [[buffer(7)]],
     device ObservableScalar* variables [[buffer(8)]],
     device uint* dirty [[buffer(9)]],
-    device float* eventWeights [[buffer(10)]],
+    device ObservableScalar* eventWeights [[buffer(10)]],
     constant DevicePropagationControl& control [[buffer(11)]],
     uint gid [[thread_position_in_grid]]) {
   if( gid >= control.eventCount ){ return; }
@@ -127,8 +127,10 @@ kernel void propagate_event_state(
   }
   dirty[gid] = changed;
   if( control.updateWeights ){
-    float weight = 1;
-    for( uint i = event.firstDial; i < event.firstDial + event.dialCount; ++i ){ weight *= float(responses[weightDialIndices[i]]); }
+    // Keep response residuals through the product: float32 rounding here
+    // contaminates the finite differences of a nonzero likelihood.
+    ObservableScalar weight(1.f);
+    for( uint i = event.firstDial; i < event.firstDial + event.dialCount; ++i ){ weight *= responses[weightDialIndices[i]]; }
     if( control.hasReweightCap && weight > control.maxReweight ){ weight = control.maxReweight; }
     eventWeights[gid] = event.baseWeight * weight;
   }
@@ -206,7 +208,7 @@ void rebin_event(
       }
     }
   }
-  float total = 0, largestFraction = 0;
+  ObservableScalar total(0.f), largestFraction(0.f);
   int hardBin = -1;
   uint nodeIndex = sample.firstNode;
   while( nodeIndex < sample.firstNode + sample.nodeCount ){
@@ -222,14 +224,14 @@ void rebin_event(
       auto bin = bins[nodeBins[node.firstBin + j]];
       ++candidateCount;
       bool hardContains = true;
-      float fraction = 1;
+      ObservableScalar fraction(1.f);
       for( uint i = bin.firstInterval; i < bin.firstInterval + bin.intervalCount; ++i ){
         auto interval = intervals[i];
         auto value = variables[event.firstVariable + interval.variableIndex];
         hardContains = hardContains && GundamBinningMath::contains(interval.lowerBound, interval.upperBound, value);
         if( sample.isSmoothed ){
-          fraction *= float(GundamBinningMath::intervalFraction(interval.lowerBound, interval.upperBound,
-                          interval.lowerInverseWidth, interval.upperInverseWidth, value));
+          fraction *= GundamBinningMath::intervalFraction(interval.lowerBound, interval.upperBound,
+                          interval.lowerInverseWidth, interval.upperInverseWidth, value);
         }
         // A strict miss rejects the bin immediately. Smoothed support can
         // extend outside the hard bin, so both tests must reject before pruning.
@@ -255,14 +257,14 @@ void rebin_event(
   }
   else{
     float tolerance = 64 * FLT_EPSILON * float(max(uint(1), count));
-    if( !isfinite(total) || total > 1 + tolerance ){ propagation_error(control, 2); return; }
+    if( !isfinite(float(total)) || total > 1 + tolerance ){ propagation_error(control, 2); return; }
     if( total > 1 ){
       contributions[event.firstContribution + largest].fraction -= total - 1;
       total = 1;
     }
     if( total < 1 ){
       store_contribution(contributions, event.firstContribution, count, oldCount,
-                         {gid, int(sample.outsideBin), 1 - total}, outcome.rebuild);
+                         {gid, int(sample.outsideBin), ObservableScalar(1.f) - total}, outcome.rebuild);
       ++count;
     }
   }
@@ -358,40 +360,33 @@ kernel void scatter_bin_contributions(
   }
 }
 
-void compensated_add(float value, thread float& sum, thread float& compensation) {
-  float corrected = value - compensation;
-  float next = sum + corrected;
-  compensation = (next - sum) - corrected;
-  sum = next;
-}
-
 kernel void reduce_histogram_chunks(
     device const DeviceHistogramChunk* chunks [[buffer(0)]], device const uint* indices [[buffer(1)]],
-    device const DeviceBinContribution* contributions [[buffer(2)]], device const float* weights [[buffer(3)]],
-    device float* sums [[buffer(4)]], device float* squares [[buffer(5)]],
+    device const DeviceBinContribution* contributions [[buffer(2)]], device const ObservableScalar* weights [[buffer(3)]],
+    device ObservableScalar* sums [[buffer(4)]], device ObservableScalar* squares [[buffer(5)]],
     device const DevicePropagationControl& control [[buffer(6)]], uint gid [[thread_position_in_grid]]) {
   if( gid >= control.chunkCount || control.error ){ return; }
   auto chunk = chunks[gid];
-  float sum = 0, compensation = 0, square = 0, squareCompensation = 0;
+  ObservableScalar sum(0.f), square(0.f);
   for( uint i = chunk.begin; i < chunk.end; ++i ){
     auto contribution = contributions[indices[i]];
-    float value = weights[contribution.event] * contribution.fraction;
-    compensated_add(value, sum, compensation);
-    compensated_add(value * value, square, squareCompensation);
+    auto value = weights[contribution.event] * contribution.fraction;
+    sum += value;
+    square += value * value;
   }
   sums[gid] = sum;
   squares[gid] = square;
 }
 
 kernel void finish_dynamic_histograms(
-    device const uint* chunkOffsets [[buffer(0)]], device const float* partialSums [[buffer(1)]],
-    device const float* partialSquares [[buffer(2)]], device float* sums [[buffer(3)]], device float* squares [[buffer(4)]],
+    device const uint* chunkOffsets [[buffer(0)]], device const ObservableScalar* partialSums [[buffer(1)]],
+    device const ObservableScalar* partialSquares [[buffer(2)]], device ObservableScalar* sums [[buffer(3)]], device ObservableScalar* squares [[buffer(4)]],
     device const DevicePropagationControl& control [[buffer(5)]], uint gid [[thread_position_in_grid]]) {
   if( gid >= control.histogramBins || control.error ){ return; }
-  float sum = 0, compensation = 0, square = 0, squareCompensation = 0;
+  ObservableScalar sum(0.f), square(0.f);
   for( uint i = chunkOffsets[gid]; i < chunkOffsets[gid + 1]; ++i ){
-    compensated_add(partialSums[i], sum, compensation);
-    compensated_add(partialSquares[i], square, squareCompensation);
+    sum += partialSums[i];
+    square += partialSquares[i];
   }
   sums[gid] = sum;
   squares[gid] = square;
@@ -399,8 +394,8 @@ kernel void finish_dynamic_histograms(
 
 kernel void reduce_histogram_chunks_parallel(
     device const DeviceHistogramChunk* chunks [[buffer(0)]], device const uint* indices [[buffer(1)]],
-    device const DeviceBinContribution* contributions [[buffer(2)]], device const float* weights [[buffer(3)]],
-    device float* sums [[buffer(4)]], device float* squares [[buffer(5)]],
+    device const DeviceBinContribution* contributions [[buffer(2)]], device const ObservableScalar* weights [[buffer(3)]],
+    device ObservableScalar* sums [[buffer(4)]], device ObservableScalar* squares [[buffer(5)]],
     device const DevicePropagationControl& control [[buffer(6)]], uint gid [[thread_position_in_grid]],
     uint lane [[thread_index_in_simdgroup]]) {
   uint chunkIndex = gid / 32;
@@ -409,9 +404,9 @@ kernel void reduce_histogram_chunks_parallel(
   ObservableScalar sum(0.f), square(0.f);
   for( uint i = chunk.begin + lane; i < chunk.end; i += 32 ){
     auto contribution = contributions[indices[i]];
-    float value = weights[contribution.event] * contribution.fraction;
-    sum += ObservableScalar(value);
-    square += ObservableScalar(value * value);
+    auto value = weights[contribution.event] * contribution.fraction;
+    sum += value;
+    square += value * value;
   }
   for( uint stride = 16; stride; stride /= 2 ){
     ObservableScalar otherSum, otherSquare;
@@ -421,5 +416,5 @@ kernel void reduce_histogram_chunks_parallel(
     otherSquare.low = simd_shuffle_down(square.low, stride);
     if( lane + stride < 32 ){ sum += otherSum; square += otherSquare; }
   }
-  if( lane == 0 ){ sums[chunkIndex] = float(sum); squares[chunkIndex] = float(square); }
+  if( lane == 0 ){ sums[chunkIndex] = sum; squares[chunkIndex] = square; }
 }
