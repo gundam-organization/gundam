@@ -51,24 +51,23 @@ use the same `EngineLayout` conversion, which rejects unsupported dial classes
 with `Unsupported dial type for EngineView`. There is no automatic fallback to
 the original engine for these classes.
 
-| Configuration or concrete dial | CPU | MPS | Conditions / notes |
-|---|---|---|---|
-| `Normalization` (`Norm`) | ✅ | ✅ | One parameter input. |
-| Constant response (`Shift`) | ✅ | ✅ | Constant payload; no parameter evaluation. |
-| `Spline`: `CompactSpline` | ✅ | ✅ | One parameter input. |
-| `Spline`: `UniformSpline` | ✅ | ✅ | One parameter input. |
-| `Spline`: `MonotonicSpline` | ✅ | ✅ | One parameter input. |
-| `Spline`: `GeneralSpline` | ✅ | ✅ | One parameter input. |
-| `Graph` | ✅ | ✅ | Piecewise linear response, one parameter input. |
-| `Surface` / `Bilinear` | ✅ | ✅ | Exactly two ordered parameter inputs; see [multi-input dials](MultiInputDials.md). |
-| `Surface` / `Bicubic` | ✅ | ✅ | Exactly two ordered parameter inputs; see [multi-input dials](MultiInputDials.md). |
-| `ExternalWeight` (`ExternalWeightDispatcher`) | ✅ | ✅ | Worker computes the weights outside the backend; buffers and generations supply updates. See [external weights](../configuration/ExternalWeightDials.md). |
-| `Formula` (`RootFormula`) | ❌ | ❌ | Not represented in the common backend model. |
-| `Tabulated` | ❌ | ❌ | Not represented in the common backend model. |
-| `Kriged` | ❌ | ❌ | Not represented in the common backend model. |
-| `CompiledLibDial` | ❌ | ❌ | Direct compiled-library calls are not represented in the common backend model. |
-| `RootSpline`, `RootGraph` | ❌ | ❌ | ROOT evaluator classes; distinct from supported spline/graph dials built from ROOT input objects. |
-| `Polynomial` | ❌ | ❌ | Not represented in the common backend model. |
+| Configuration or concrete dial | CPU | MPS |
+|---|---|---|
+| `Normalization` (`Norm`) | ✅ | ✅ |
+| Constant response (`Shift`) | ✅ | ✅ |
+| `Spline`: `CompactSpline` | ✅ | ✅ |
+| `Spline`: `UniformSpline` | ✅ | ✅ |
+| `Spline`: `MonotonicSpline` | ✅ | ✅ |
+| `Spline`: `GeneralSpline` | ✅ | ✅ |
+| `Graph` | ✅ | ✅ |
+| `Surface` / `Bilinear` | ✅ | ✅ |
+| `Surface` / `Bicubic` | ✅ | ✅ |
+| `ExternalWeight` (`ExternalWeightDispatcher`) | ✅ | ✅ |
+| ROOT objects (`RootFormula`, `RootSpline`, `RootGraph`) | ❌ Heavy C++ objects, unsuitable for the flat backend model | ❌ Strictly incompatible with Metal device execution as C++ ROOT objects |
+| `Tabulated` | ❌ | ❌ |
+| `Kriged` | ❌ | ❌ |
+| `CompiledLibDial` | ❌ | ❌ |
+| `Polynomial` | ❌ | ❌ |
 
 ROOT input objects (`TGraph`, `TSpline3`, `TH2`) and supported TArray branch pairs
 are loading formats, not backend dial types. Their compatibility follows the
@@ -81,23 +80,23 @@ Here, ✅ means the backend can handle the feature; it does not imply that
 every stage runs on the GPU. MPS support applies to both `cachedResponses` and
 `recomputeResponses` unless indicated otherwise.
 
-| Feature | CPU | MPS | Conditions / notes |
-|---|---|---|---|
-| Event weights and histogram sums / squared sums | ✅ | ✅ | Host materialization is available through the manager. |
-| Statistical likelihood | ✅ on host | ✅ on host | Uses the engine's bin-likelihood callback; MPS reads back histogram values. |
-| Separate `SampleLikelihoods` output | ❌ | ❌ | Materialization is not implemented. |
-| Parameter inputs and per-input mirroring | ✅ | ✅ | Includes both inputs of supported surfaces. |
-| Dial extrapolation | ✅ | ✅ | For supported interpolating dials, according to their extrapolation policy. |
-| Hard response limits and response smoothing | ✅ | ✅ | Shared response semantics; see [dial configuration](../configuration/Dial.md#smooth-response-limits). |
-| Event reweight cap | ✅ | ✅ | Applies to the weight-dial product, before multiplying the base weight; excludes observable responses. |
-| Observable responses (`applyToVariable`) | ✅ | ✅ | `Multiply`, `Add`, `Override`, using supported dial types. |
-| Dynamic binning / event migration | ✅ | ✅ | Uses updated observables; sample selections and event-to-dial associations remain fixed after loading. |
-| Smoothed binning / fractional contributions | ✅ | ✅ | Requires explicit `binningResponse` configuration. |
-| External-weight updates | ✅ | ✅ | Producers must publish changed generations. |
-| Event variables as ordinary dial inputs (`DialInputSource::EventVariable`) | ❌ | ❌ | Explicitly rejected; distinct from writing an observable or supplying event variables to an external worker. |
-| Response caching between propagations | ✅ | ⚠️ `cachedResponses` mode only | MPS `recomputeResponses` disables caching between evaluations. |
-| Numerical precision | Double | ⚠️ Float outputs; compensated float pairs for observables and resident histogram accumulation | MPS results need float tolerances; see [MPS structure](mps/BackendStructure.md) and [Hesse precision](../guides/MpsHessePrecision.md). |
-| Hardware | Host CPU | Apple GPU through Metal | MPS requires an Apple build and an available Metal device. |
+| Feature | CPU | MPS |
+|---|---|---|
+| Event weights and histogram sums / squared sums | ✅ | ✅ |
+| Statistical likelihood | ⚠️ on host | ⚠️ on host |
+| Separate `SampleLikelihoods` output | ❌ Only the total is stored | ❌ Only the total is stored |
+| Parameter inputs and per-input mirroring | ✅ | ✅ |
+| Dial extrapolation | ✅ | ✅ |
+| Hard response limits and response smoothing | ✅ | ✅ |
+| Event reweight cap | ✅ | ✅ |
+| Observable responses (`applyToVariable`) | ✅ | ✅ |
+| Dynamic binning / event migration | ✅ | ✅ |
+| Smoothed binning / fractional contributions | ✅ | ✅ |
+| External-weight updates | ✅ | ✅ |
+| Event variables as ordinary dial inputs (`DialInputSource::EventVariable`) | ❌ | ❌ |
+| Response caching between propagations | ✅ | ⚠️ `cachedResponses` mode only |
+| Numerical precision | Double | ⚠️ Float outputs |
+| Hardware | Host CPU | Apple GPU (Metal required) |
 
 MPS chooses its executor automatically: surfaces, observable/binning propagation
 and reweight caps use `eventPropagation`; compatible scalar fixed-bin models can
