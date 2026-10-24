@@ -27,6 +27,10 @@ This reproduces the Asimov input setup (`-a`) and overrides, then measures
 repeated likelihood evaluations without running a fit or HESSE. Plotting, PCA,
 and parameter-step scans are disabled. Input selections and event limits are
 preserved. MPS is explicitly selected while its backend options are retained.
+`--propagation-mode cachedResponses` or `--propagation-mode recomputeResponses`
+overrides the configured response strategy. The backend default is
+`cachedResponses`; packed-layout comparisons explicitly select
+`recomputeResponses`, because their diagnostic switches belong to that executor.
 The data is loaded once, and event weights/histograms stay resident during
 measurements as in the fit loop. Four threads control host work/loading, not
 the number of GPU threads.

@@ -19,10 +19,12 @@ def load_cpu_backend_test_module():
     return module
 
 
-def build_mps_config_text(cpu_test_module, root_path: Path, enable_backend: bool) -> str:
+def build_mps_config_text(cpu_test_module, root_path: Path, enable_backend: bool, mode=None) -> str:
     config_text = cpu_test_module.build_config_text(root_path, enable_backend)
     if enable_backend:
         config_text = config_text.replace("type: CPU", "type: MPS")
+        if mode is not None:
+            config_text = config_text.replace("type: MPS", f"type: MPS\n      backendConfig:\n        propagationMode: {mode}")
     return config_text
 
 
@@ -91,6 +93,18 @@ def main() -> int:
 
     if math.isclose(standard_llh, 0.0, rel_tol=0.0, abs_tol=1e-12):
         raise RuntimeError("Shifted LLH is unexpectedly zero.")
+
+    for mode in ("cachedResponses", "recomputeResponses"):
+        for point, expected_llh, expected_sums, expected_errors in (
+                (None, prior_standard_llh, prior_standard_sums, prior_standard_errors),
+                (systematic_point, standard_llh, standard_sums, standard_errors)):
+            value, sums, errors = cpu_test.evaluate_config(
+                build_mps_config_text(cpu_test, root_path, True, mode), work_dir,
+                point, backend_type="MPS")
+            assert_mps_close_list(f"{mode} sums", sums, expected_sums)
+            assert_mps_close_list(f"{mode} errors", errors, expected_errors)
+            if not math.isclose(value, expected_llh, rel_tol=1e-5, abs_tol=1e-5):
+                raise RuntimeError(f"{mode}: LLH mismatch {value} != {expected_llh}")
 
     print("Prior standard bin sums:", prior_standard_sums)
     print("Prior MPS bin sums:", prior_backend_sums)

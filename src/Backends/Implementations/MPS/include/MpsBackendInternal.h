@@ -53,6 +53,7 @@ namespace Backends {
     id<MTLComputePipelineState> histogramFinalizePipeline{nil};
     std::unique_ptr<MpsEventPropagation> eventPropagation{};
     bool useEventPropagation{false};
+    MpsPropagationMode propagationMode{MpsPropagationMode::cachedResponses};
     bool isAvailable{false};
     bool enableCachedDialResponses{true};
     // The full descriptor scan is retained only for controlled diagnostic A/B runs.

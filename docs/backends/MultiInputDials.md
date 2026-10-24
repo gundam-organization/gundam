@@ -24,7 +24,10 @@ if several inputs change, or the same parameter occupies several input slots.
 Shared scalar-input groups remain available in mixed models.
 
 MPS selects its executor in `MpsBackend::build`, during runtime model preparation.
-Models with surfaces use the resident event-propagation executor. Their ordered
+The default `propagationMode: cachedResponses` uses the resident event-propagation
+executor for scalar and surface dials alike. Surface models also use this executor
+in `recomputeResponses` mode, with the response cache between evaluations disabled.
+Their ordered
 input ranges and references are uploaded in side buffers. The interpolation
 loads two local scalar values, with no allocation or variable-sized temporary.
 Dependency groups contain disjoint response slots and the set of all their
@@ -32,7 +35,7 @@ parameter dependencies, preventing duplicate GPU writes on simultaneous changes.
 External-weight dials retain their generation-based invalidation even when their
 producer declares multiple parameter dependencies.
 
-Models using only the previously supported scalar dials retain the existing
+In `recomputeResponses` mode, compatible scalar fixed-bin models use the
 packed-weight executor. Its 24-byte spline descriptors, 16-byte norm/external
 occurrences, kernels and payload layouts are unchanged. The common host input
 descriptor remains 32 bytes on 64-bit platforms. The input-range side table is

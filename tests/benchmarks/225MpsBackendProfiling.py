@@ -78,6 +78,10 @@ def load_engine(args):
                   generateSamplePlots=False, generateOneSigmaPlots=False)
     backend = config['likelihoodInterfaceConfig'].setdefault('backendManagerConfig', {})
     backend.update(isEnabled=True, type='MPS')
+    if args.propagation_mode:
+        backend.setdefault('backendConfig', {})['propagationMode'] = args.propagation_mode
+    if args.compare_cached_dials or args.compare_descriptors or args.compare_payloads:
+        backend.setdefault('backendConfig', {})['propagationMode'] = 'recomputeResponses'
     if args.compare_descriptors:
         backend.setdefault('backendConfig', {})['enableDiagnosticDescriptorComparison'] = True
     if args.compare_payloads:
@@ -314,6 +318,8 @@ def main():
     parser.add_argument('--config', type=Path, required=True)
     parser.add_argument('--override', nargs='*', default=[])
     parser.add_argument('--work-dir', type=Path, default=Path.cwd())
+    parser.add_argument('--propagation-mode', choices=['cachedResponses', 'recomputeResponses'],
+                        help='Override the MPS response strategy (default comes from the configuration)')
     parser.add_argument('--threads', type=int, default=4)
     parser.add_argument('--calls', type=int, default=30)
     parser.add_argument('--global-calls', type=int, default=10)

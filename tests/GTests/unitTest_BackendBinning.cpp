@@ -20,6 +20,7 @@
 #include <limits>
 #include <random>
 #include <sstream>
+#include <tuple>
 
 namespace {
   Backends::EngineView makeStrictBinningView(const Backends::BinningGeometry& layout_) {
@@ -138,20 +139,23 @@ namespace {
   }
 }
 
-class BinningBackend : public testing::TestWithParam<bool> {
+class BinningBackend : public testing::TestWithParam<std::tuple<bool, bool>> {
 protected:
   std::unique_ptr<Backends::Backend> backend;
   void SetUp() override {
 #ifdef __APPLE__
-    if( GetParam() ){ backend = std::make_unique<Backends::MpsBackend>(); }
+    if( std::get<0>(GetParam()) ){
+      backend = std::make_unique<Backends::MpsBackend>();
+      backend->configure(ConfigReader(JsonType{{"propagationMode", std::get<1>(GetParam()) ? "cachedResponses" : "recomputeResponses"}}));
+    }
     else
 #endif
     { backend = std::make_unique<Backends::CpuBackend>(); }
   }
 };
-INSTANTIATE_TEST_SUITE_P(Cpu, BinningBackend, testing::Values(false));
+INSTANTIATE_TEST_SUITE_P(Cpu, BinningBackend, testing::Values(std::make_tuple(false, true)));
 #ifdef __APPLE__
-INSTANTIATE_TEST_SUITE_P(Metal, BinningBackend, testing::Values(true));
+INSTANTIATE_TEST_SUITE_P(Metal, BinningBackend, testing::Values(std::make_tuple(true, true), std::make_tuple(true, false)));
 #endif
 
 TEST_P(BinningBackend, MatchesLegacyGeometryAndResponse) {

@@ -72,7 +72,13 @@ namespace {
       ASSERT_EQ(backend_.getStatus(token).eventWeights, OutputState::ReadyOnDevice);
       const auto timing = backend_.getLastTimingSummary();
       EXPECT_EQ(timing.externalWeightUploadBlocks, blocks_);
-      EXPECT_EQ(timing.externalWeightUploadBytes, values_ * sizeof(float));
+      std::size_t scalarBytes = sizeof(float);
+#ifdef __APPLE__
+      if( JsonType::parse(static_cast<MpsBackend&>(backend_).getDiagnostics())["path"] == "eventPropagation" ){
+        scalarBytes = 2 * sizeof(float); // Compensated observable scalars.
+      }
+#endif
+      EXPECT_EQ(timing.externalWeightUploadBytes, values_ * scalarBytes);
     }
     backend_.materialize(token, OutputRequest::EventWeights);
     const auto& weights = backend_.getEventWeightsHostView(token);
@@ -117,7 +123,8 @@ namespace {
     // External-only models need no device parameter buffer contents.
     model.propagation.parameterCount = 0;
     model.propagation.dialInputs.clear();
-    model.propagation.eventDialIndices = {1, 2, 1, 3};
+    model.propagation.dials.erase(model.propagation.dials.begin()); // Remove the now unused parameter dial.
+    model.propagation.eventDialIndices = {0, 1, 0, 2};
     model.propagation.eventWeights[0].firstDial = 0;
     model.propagation.eventWeights[0].dialCount = 2;
     model.propagation.eventWeights[1].firstDial = 2;

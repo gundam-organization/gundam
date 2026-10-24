@@ -1,5 +1,49 @@
 # MPS backend structure
 
+## Response propagation mode
+
+Select the response strategy in the MPS backend configuration:
+
+```yaml
+fitterEngineConfig:
+  likelihoodInterfaceConfig:
+    backendManagerConfig:
+      isEnabled: true
+      type: MPS
+      backendConfig:
+        propagationMode: cachedResponses
+```
+
+`cachedResponses` is the default, including for scalar dials and fixed bins.
+It retains dial responses between evaluations and updates only responses whose
+parameter inputs or external-weight generations changed. It can also skip event
+weight updates when their dependencies are unchanged. This usually favors local
+parameter changes. Existing scalar configurations that omitted this option now
+use this strategy instead of the previous packed weight executor.
+
+`recomputeResponses` recalculates responses and event weights on every evaluation.
+Responses shared by events may still be evaluated once within an evaluation.
+This strategy can be faster when many parameters change together; benchmark the
+actual model before selecting it. Neither mode depends on the minimizer.
+
+Both modes support scalar and two-input surface dials, observable propagation,
+dynamic binning, external weights and event reweight caps. These are response
+strategies, not switches that enable or disable event migration. The CPU backend
+does not expose this option; it already caches responses and adapts its cache
+traversal to the number of changed dependencies.
+
+The monitor displays `MPS/cachedResponses` or `MPS/recomputeResponses`. Startup
+logs and `getDiagnosticMps()` also identify the internal executor. Cached mode
+uses `eventPropagation`. Recompute mode uses `packedWeights` for compatible
+scalar fixed-bin models, and `eventPropagation` with its inter-evaluation
+response cache disabled for surfaces, migration and reweight caps. Thus a model
+requiring the general executor still honors the requested recomputation strategy.
+The older `enableCachedDialResponses` setting remains available: `false`
+disables response caching in cached mode, or within-evaluation sharing in the
+packed executor. Prefer `propagationMode` to select the inter-evaluation strategy.
+
+## Execution and storage
+
 The MPS backend executes numerical propagation on an Apple GPU through Metal.
 It prepares a packed device model from the common backend representation and
 retains GPU buffers for repeated evaluations. Parameters and other changing

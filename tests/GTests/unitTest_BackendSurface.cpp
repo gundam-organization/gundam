@@ -90,7 +90,7 @@ TEST_P(BackendSurface, MatchesNativeAndInvalidatesEveryInput) {
 #ifdef __APPLE__
     backend = std::make_unique<MpsBackend>();
     ASSERT_NE(backend->getCapabilities().deviceName, "Metal unavailable");
-    backend->configure(ConfigReader(JsonType{{"enableCachedDialResponses", cache}}));
+    backend->configure(ConfigReader(JsonType{{"propagationMode", cache ? "cachedResponses" : "recomputeResponses"}}));
 #else
     GTEST_SKIP();
 #endif
@@ -183,7 +183,7 @@ TEST_P(BackendSurface, ReorderedAndRepeatedParametersUseDisjointCacheSlots) {
 #ifdef __APPLE__
     backend = std::make_unique<MpsBackend>();
     ASSERT_NE(backend->getCapabilities().deviceName, "Metal unavailable");
-    backend->configure(ConfigReader(JsonType{{"enableCachedDialResponses", cache}}));
+    backend->configure(ConfigReader(JsonType{{"propagationMode", cache ? "cachedResponses" : "recomputeResponses"}}));
 #else
     GTEST_SKIP();
 #endif
@@ -225,9 +225,9 @@ TEST_P(BackendSurface, ReorderedAndRepeatedParametersUseDisjointCacheSlots) {
       EXPECT_NEAR(weights[i], expected, gpu ? 2e-6 : 1e-12);
     }
 #ifdef __APPLE__
-    if( gpu and cache ){
+    if( gpu ){
       const auto state = JsonType::parse(static_cast<MpsBackend&>(*backend).getDiagnosticEventPropagationState());
-      EXPECT_EQ(state.at("evaluatedDials").get<std::size_t>(), expectedUpdates[pointIndex]);
+      EXPECT_EQ(state.at("evaluatedDials").get<std::size_t>(), cache ? expectedUpdates[pointIndex] : model.dials.size());
     }
 #endif
     if( not gpu ){

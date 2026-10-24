@@ -11,6 +11,12 @@
 
 namespace Backends {
 
+#define ENUM_NAME MpsPropagationMode
+#define ENUM_FIELDS \
+ENUM_FIELD( cachedResponses, 0 ) \
+ENUM_FIELD( recomputeResponses )
+#include "GenericToolbox.MakeEnum.h"
+
   struct MpsBackendImpl;
 
   class MpsBackend : public Backend {
@@ -21,7 +27,7 @@ namespace Backends {
     MpsBackend();
     ~MpsBackend() override;
 
-    [[nodiscard]] std::string getName() const override { return "MPS"; }
+    [[nodiscard]] std::string getName() const override;
     [[nodiscard]] BackendCapabilities getCapabilities() const override;
     [[nodiscard]] PropagationStatus getStatus(const PropagationToken& token_) const override;
     [[nodiscard]] const EngineView& getEngineView() const override;

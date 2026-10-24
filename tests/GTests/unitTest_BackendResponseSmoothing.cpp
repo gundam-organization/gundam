@@ -116,7 +116,7 @@ TEST_P(BackendResponseSmoothing, MatchesOriginalSupervisor) {
 #endif
   }
   else{ backend = std::make_unique<CpuBackend>(); }
-  if( gpu ){ backend->configure(ConfigReader(JsonType{{"enableCachedDialResponses", cache}})); }
+  if( gpu ){ backend->configure(ConfigReader(JsonType{{"propagationMode", cache ? "cachedResponses" : "recomputeResponses"}})); }
   const int repeats = kDeviceCachedDialReuseThreshold;
   for( int limits = 0; limits < 5; ++limits ){
     SCOPED_TRACE(limits);
@@ -158,8 +158,8 @@ TEST_P(BackendResponseSmoothing, MatchesOriginalSupervisor) {
         }
         EXPECT_NEAR(backend->getHistogramSumsHostView(token)[0], sum, gpu ? 2e-4 : 1e-10);
         EXPECT_NEAR(backend->getHistogramSumSquaresHostView(token)[0], sumSquares, gpu ? 4e-4 : 1e-10);
-        if( gpu and not variables ){
-          EXPECT_EQ(backend->getLastTimingSummary().cachedDialCount, cache ? 5 : 0);
+        if( gpu and not variables and not cache ){
+          EXPECT_EQ(backend->getLastTimingSummary().cachedDialCount, 5);
         }
       }
     }
@@ -184,10 +184,48 @@ TEST(BackendResponseSmoothingPacking, RejectsCollapsedFloatTransition) {
 }
 
 #ifdef __APPLE__
+TEST(MpsPropagationMode, DefaultCachesScalarResponsesAndExplicitModeRecomputes) {
+  DialResponseSupervisor supervisor;
+  auto view = makeModel(supervisor, false, kDeviceCachedDialReuseThreshold);
+  for( const std::string mode : {"", "cachedResponses", "recomputeResponses"} ){
+    SCOPED_TRACE(mode);
+    MpsBackend backend;
+    if( backend.getCapabilities().deviceName == "Metal unavailable" ){ GTEST_SKIP(); }
+    if( not mode.empty() ){ backend.configure(ConfigReader(JsonType{{"propagationMode", mode}})); }
+    backend.build(view);
+    auto diagnostic = JsonType::parse(backend.getDiagnostics());
+    const bool cached = mode != "recomputeResponses";
+    EXPECT_EQ(diagnostic["propagationMode"], cached ? "cachedResponses" : "recomputeResponses");
+    EXPECT_EQ(diagnostic["path"], cached ? "eventPropagation" : "packedWeights");
+    double external{.8};
+    PropagationInputs inputs;
+    inputs.parameters.values = {.8};
+    inputs.externalWeights = {{&external, 1, 0, 1}};
+    std::vector<double> previous;
+    for( int repeat = 0; repeat < 2; ++repeat ){
+      auto token = backend.requestPropagation(inputs);
+      backend.materialize(token, OutputRequest::EventWeights);
+      const auto& weights = backend.getEventWeightsHostView(token);
+      if( repeat ){ EXPECT_EQ(weights, previous); }
+      previous = weights;
+    }
+    if( cached ){
+      auto state = JsonType::parse(backend.getDiagnosticEventPropagationState());
+      EXPECT_EQ(state["evaluatedDials"], 0);
+      EXPECT_EQ(state["updatedEventWeights"], false);
+    }
+  }
+}
+
+TEST(MpsPropagationMode, RejectsUnknownModes) {
+  MpsBackend backend;
+  EXPECT_ANY_THROW(backend.configure(ConfigReader(JsonType{{"propagationMode", "auto"}})));
+}
+
 TEST(MpsOrderedSplinePayloads, PreservesRaggedEventsAndDistinctPayloadsExactly) {
   MpsBackend backend;
   if( backend.getCapabilities().deviceName == "Metal unavailable" ){ GTEST_SKIP(); }
-  backend.configure(ConfigReader(JsonType{{"enableDiagnosticPayloadComparison", true}}));
+  backend.configure(ConfigReader(JsonType{{"propagationMode", "recomputeResponses"}, {"enableDiagnosticPayloadComparison", true}}));
   DialResponseSupervisor supervisor;
   supervisor.setMinResponse(0.);
   supervisor.setMaxResponse(2.);
@@ -248,7 +286,7 @@ TEST(MpsCompactDialDescriptors, MatchesLegacyWithBoundsSmoothingAndExternalWeigh
   for( int repeats : {1, int(kDeviceCachedDialReuseThreshold)} ){
     MpsBackend backend;
     if( backend.getCapabilities().deviceName == "Metal unavailable" ){ GTEST_SKIP(); }
-    backend.configure(ConfigReader(JsonType{{"enableDiagnosticDescriptorComparison", true}}));
+    backend.configure(ConfigReader(JsonType{{"propagationMode", "recomputeResponses"}, {"enableDiagnosticDescriptorComparison", true}}));
     for( int limits = 0; limits < 5; ++limits ){
       DialResponseSupervisor supervisor;
       if( limits != 2 ){ supervisor.setMinResponse(0.); }
@@ -303,7 +341,7 @@ TEST(MpsCachedDialDispatch, MixedCachedAndUncachedDescriptorsMatchFullScanExactl
     SCOPED_TRACE(cache);
     MpsBackend backend;
     if( backend.getCapabilities().deviceName == "Metal unavailable" ){ GTEST_SKIP(); }
-    backend.configure(ConfigReader(JsonType{{"enableCachedDialResponses", cache}}));
+    backend.configure(ConfigReader(JsonType{{"propagationMode", "recomputeResponses"}, {"enableCachedDialResponses", cache}}));
     DialResponseSupervisor supervisor;
     auto view = makeModel(supervisor, false, 1);
     auto& model = view.propagation;

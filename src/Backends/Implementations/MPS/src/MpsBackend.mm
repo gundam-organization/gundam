@@ -7,20 +7,33 @@ Backends::MpsBackend::MpsBackend() : _impl_(std::make_unique<MpsBackendImpl>()) 
 Backends::MpsBackend::~MpsBackend() = default;
 
 void Backends::MpsBackend::configureImpl() {
+  _config_.clearFields();
   _config_.defineFields({
+      {"propagationMode"},
       {"enableCachedDialResponses"},
       {"enableDiagnosticDescriptorComparison"},
       {"enableDiagnosticPayloadComparison"},
   });
+  _config_.checkConfiguration();
+  _config_.fillEnum(_impl_->propagationMode, "propagationMode");
+  LogThrowIf(_impl_->propagationMode != MpsPropagationMode::cachedResponses
+             and _impl_->propagationMode != MpsPropagationMode::recomputeResponses,
+             "Unknown MPS propagationMode. Expected cachedResponses or recomputeResponses.");
   _config_.fillValue(_impl_->enableCachedDialResponses, "enableCachedDialResponses");
   _config_.fillValue(_impl_->enableDiagnosticDescriptorComparison, "enableDiagnosticDescriptorComparison");
   _config_.fillValue(_impl_->enableDiagnosticPayloadComparison, "enableDiagnosticPayloadComparison");
   if( _impl_->eventPropagation ){
-    _impl_->eventPropagation->setDiagnosticOptions(_impl_->enableCachedDialResponses, true, true, true);
+    _impl_->eventPropagation->setDiagnosticOptions(
+        _impl_->propagationMode == MpsPropagationMode::cachedResponses and _impl_->enableCachedDialResponses,
+        true, true, true);
   }
   LogThrowIf(_impl_->enableDiagnosticDescriptorComparison and _impl_->enableDiagnosticPayloadComparison,
              "Select one MPS layout comparison at a time.");
   _config_.printUnusedKeys();
+}
+
+std::string Backends::MpsBackend::getName() const {
+  return "MPS/" + _impl_->propagationMode.toString();
 }
 
 Backends::BackendCapabilities Backends::MpsBackend::getCapabilities() const {
@@ -41,7 +54,8 @@ void Backends::MpsBackend::build(const EngineView& engineView_) {
   _impl_->engineView = engineView_;
   _impl_->lastResult = MpsBackendImpl::Result();
   _impl_->buildTiming = BackendTimingSummary();
-  _impl_->useEventPropagation = engineView_.propagation.requiresEventBinning() or engineView_.propagation.hasReweightCap;
+  _impl_->useEventPropagation = _impl_->propagationMode == MpsPropagationMode::cachedResponses
+      or engineView_.propagation.requiresEventBinning() or engineView_.propagation.hasReweightCap;
   for( const auto& dial : engineView_.propagation.dials ){
     Semantics::validateSurfaceDial(engineView_.propagation, dial);
     if( dial.type == BackendDialType::ExternalWeight ){ continue; }
@@ -51,6 +65,10 @@ void Backends::MpsBackend::build(const EngineView& engineView_) {
                  "Event-variable dial inputs require an event-context evaluator.");
     }
   }
+  LogThrowIf(_impl_->useEventPropagation and (_impl_->enableDiagnosticDescriptorComparison or _impl_->enableDiagnosticPayloadComparison),
+             "MPS layout comparisons require propagationMode: recomputeResponses and a scalar, fixed-bin model without a reweight cap.");
+  LogInfo << "MPS propagation mode: " << _impl_->propagationMode
+          << "; executor: " << (_impl_->useEventPropagation ? "eventPropagation" : "packedWeights") << std::endl;
   if( _impl_->useEventPropagation ){
     LogThrowIf(not _impl_->isAvailable, "Metal is unavailable for event propagation.");
     _impl_->releaseDeviceBuffers();
@@ -280,6 +298,7 @@ std::string Backends::MpsBackend::getDiagnostics() const {
   out["available"] = impl.isAvailable;
   out["unifiedMemory"] = impl.isAvailable && impl.device.hasUnifiedMemory;
   out["stageProfiling"] = impl.enableDiagnosticStageProfiling;
+  out["propagationMode"] = impl.propagationMode.toString();
   out["path"] = impl.useEventPropagation ? "eventPropagation" : (impl.isWeightModelSupported ? "packedWeights" : "hostFallback");
   out["fallbackReason"] = impl.deviceModelFallbackReason;
   out["events"] = impl.model.events.size();
