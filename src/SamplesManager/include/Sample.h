@@ -17,6 +17,8 @@
 #include <vector>
 #include <string>
 
+namespace GenericToolbox { class ParallelWorker; }
+
 class Sample : public JsonBaseClass {
 
 public:
@@ -38,9 +40,11 @@ public:
   void setIndex(int index){ _index_ = index; }
   void setName(const std::string &name){ _name_ = name; }
   void setBinningFilePath(const ConfigReader &binningFilePath_){ _binningConfig_ = binningFilePath_; }
+  void setUseDynamicBinning(bool useDynamicBinning_){ _useDynamicBinning_ = useDynamicBinning_; }
 
   // const getters
   [[nodiscard]] auto isEnabled() const{ return _isEnabled_; }
+  [[nodiscard]] auto isUseDynamicBinning() const{ return _useDynamicBinning_; }
   [[nodiscard]] auto isEventMcThrowDisabled() const{ return _disableEventMcThrow_; }
   [[nodiscard]] auto getIndex() const{ return _index_; }
   [[nodiscard]] auto& getName() const{ return _name_; }
@@ -63,6 +67,8 @@ public:
   // core
   void reserveEventMemory(size_t dataSetIndex_, size_t nEvents, const Event &eventBuffer_);
   void shrinkEventList(size_t newTotalSize_);
+  void updateEventBinning();
+  void updateEventBinning(GenericToolbox::ParallelWorker& threadPool_);
 
   // printouts
   void printConfiguration() const;
@@ -71,10 +77,12 @@ public:
 
   // multi-thread
   void indexEventInHistogramBin( int iThread_ = -1);
+  void indexEventInHistogramBin(GenericToolbox::ParallelWorker& threadPool_);
 
 private:
   // configuration
   bool _isEnabled_{true};
+  bool _useDynamicBinning_{false};
   bool _disableEventMcThrow_{false};
   int _index_{-1};
   std::string _name_;
