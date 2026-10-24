@@ -531,7 +531,7 @@ void Backends::CpuBackend::initializeProfiler() {
       {"dynamicBlockTarget", _weightBlocksPerThread_ * _threadPool_.getNbThreads()},
       {"weightRangesRole", _usesDynamicWeights_ ? "fixedReference" : "executed"},
       {"histogramBins", model.totalBins}, {"dialTypes", {"Norm", "Shift", "CompactSpline", "UniformSpline",
-        "MonotonicSpline", "GeneralSpline", "Graph", "ExternalWeight", "Bilinear", "Bicubic"}}};
+        "MonotonicSpline", "GeneralSpline", "Graph", "ExternalWeight", "Bilinear", "Bicubic", "Tabulated", "Kriged"}}};
 #ifdef __OPTIMIZE__
   metadata["compilerOptimizationEnabled"] = true;
 #else
@@ -555,6 +555,7 @@ void Backends::CpuBackend::initializeProfiler() {
   buffer("dialDescriptors", model.dials);
   buffer("dialInputs", model.dialInputs);
   buffer("dialPayloads", model.dialPayloads);
+  buffer("tableTerms", model.tableTerms);
   buffer("cachedResponses", _cachedDialResponses_);
   buffer("cachedInputs", _cachedDialInputs_);
   buffer("cachedInputGroups", _cachedInputGroups_);
@@ -566,7 +567,7 @@ void Backends::CpuBackend::initializeProfiler() {
   metadata["eventWeightOutputBytes"] = model.events.size() * sizeof(double);
   metadata["threadHistogramBytes"] = 2 * _threadPool_.getNbThreads()
       * (model.totalBins + model.samples.size()) * sizeof(double);
-  std::array<std::size_t, 10> types{}, cachedTypes{}, referencedTypes{};
+  std::array<std::size_t, 12> types{}, cachedTypes{}, referencedTypes{};
   for( std::size_t i = 0; i < model.dials.size(); ++i ){
     ++types[std::size_t(model.dials[i].type)];
     if( _isCachedDial_[i] ){ ++cachedTypes[std::size_t(model.dials[i].type)]; }

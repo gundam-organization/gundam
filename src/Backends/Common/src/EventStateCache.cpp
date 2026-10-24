@@ -20,7 +20,7 @@ void Backends::EventStateCache::build(const PropagationView& model_) {
     for( std::size_t i = dial.firstInput; i < dial.firstInput + dial.inputCount; ++i ){
       _parameterIndices_.push_back(model_.dialInputs.at(i).parameterIndex);
     }
-    if( dial.type == BackendDialType::ExternalWeight ){ _externalBlockIndices_.push_back(dial.externalBlockIndex); }
+    if( dial.type == BackendDialType::ExternalWeight or isTableDial(dial.type) ){ _externalBlockIndices_.push_back(dial.externalBlockIndex); }
   }
   unique(_parameterIndices_);
   unique(_externalBlockIndices_);

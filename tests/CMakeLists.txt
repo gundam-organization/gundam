@@ -95,6 +95,7 @@ if( WITH_GOOGLE_TEST )
     list(APPEND FAST_TESTS GTests/unitTest_BackendBinning.cpp)
     list(APPEND FAST_TESTS GTests/unitTest_BackendResponseSmoothing.cpp)
     list(APPEND FAST_TESTS GTests/unitTest_BackendSurface.cpp)
+    list(APPEND FAST_TESTS GTests/unitTest_BackendTable.cpp)
   endif()
 
   # Compile the fast test executable, but only add them to ctest if

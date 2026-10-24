@@ -53,6 +53,7 @@ namespace Backends {
     // Several dials may share an input sequence, selected by firstInput/inputCount.
     std::vector<BackendDialInputDescriptor> dialInputs{};
     std::vector<double> dialPayloads{};
+    std::vector<BackendTableTerm> tableTerms{};
     std::vector<ExternalWeightBlockDescriptor> externalWeightBlocks{};
     std::vector<SampleView> samples{};
     std::size_t parameterCount{0};
@@ -80,6 +81,7 @@ namespace Backends {
       eventDialIndices.clear();
       dialInputs.clear();
       dialPayloads.clear();
+      tableTerms.clear();
       externalWeightBlocks.clear();
       samples.clear();
       parameterCount = 0;

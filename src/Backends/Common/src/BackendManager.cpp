@@ -274,9 +274,15 @@ std::future<Backends::BackendPropagationResult> Backends::BackendManager::propag
 
   inputs.externalWeights.reserve(_backendEngineLayout_->bindings.externalWeights.size());
   for( std::size_t iBlock = 0; iBlock < _backendEngineLayout_->bindings.externalWeights.size(); ++iBlock ){
-    const auto& source = _backendEngineLayout_->bindings.externalWeights[iBlock];
+    auto& binding = _backendEngineLayout_->bindings.externalWeights[iBlock];
+    const auto& source = binding.source;
     const auto& layout = _backendEngineLayout_->view.propagation.externalWeightBlocks[iBlock];
-    inputs.externalWeights.push_back({source->data(), source->size(), layout.offset, source->getGeneration()});
+    if( binding.table != nullptr ){
+      inputs.externalWeights.push_back({binding.table->data(), binding.table->size(), layout.offset, ++binding.generation});
+    }
+    else{
+      inputs.externalWeights.push_back({source->data(), source->size(), layout.offset, source->getGeneration()});
+    }
   }
   const auto& model = _backendEngineLayout_->view.propagation;
   inputs.forceBinningUpdate = *_hostBinningChanged_;

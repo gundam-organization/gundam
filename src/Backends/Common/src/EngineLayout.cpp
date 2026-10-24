@@ -6,6 +6,8 @@
 #include "DialResponseSupervisor.h"
 #include "EventDialCache.h"
 #include "ExternalWeightDispatcher.h"
+#include "Tabulated.h"
+#include "Kriged.h"
 #include "GeneralSpline.h"
 #include "Graph.h"
 #include "Histogram.h"
@@ -108,6 +110,7 @@ namespace {
     // once, including its parameter order and mirror settings.
     std::unordered_map<const DialInputBuffer*, std::size_t> inputOffsetMap{};
     std::unordered_map<const ExternalWeightBuffer*, std::size_t> externalSourceIndices{};
+    std::unordered_map<const std::vector<double>*, std::size_t> tableSourceIndices{};
     std::size_t externalWeightCount{0};
     std::unordered_set<const DialInputBuffer*> variableInputBuffers;
 
@@ -171,13 +174,46 @@ namespace {
                      "Invalid external weight source while building EngineView.");
           auto inserted = externalSourceIndices.emplace(source.get(), bindings_.externalWeights.size());
           if( inserted.second ){
-            bindings_.externalWeights.emplace_back(source);
+            bindings_.externalWeights.push_back({source});
             propagation.externalWeightBlocks.push_back({externalWeightCount, source->size()});
             externalWeightCount += source->size();
           }
           dialRef.type = Backends::BackendDialType::ExternalWeight;
           dialRef.externalBlockIndex = inserted.first->second;
           dialRef.externalWeightIndex = external->getWeightIndex();
+        }
+        else if( dynamic_cast<const Tabulated*>(dialBase) != nullptr
+                 or dynamic_cast<const Kriged*>(dialBase) != nullptr ){
+          const auto* tabulated = dynamic_cast<const Tabulated*>(dialBase);
+          const auto* kriged = dynamic_cast<const Kriged*>(dialBase);
+          const auto* table = tabulated != nullptr ? tabulated->getTable() : kriged->getTable();
+          LogThrowIf(table == nullptr, "Null table while building EngineView.");
+          auto inserted = tableSourceIndices.emplace(table, bindings_.externalWeights.size());
+          if( inserted.second ){
+            bindings_.externalWeights.push_back({nullptr, table});
+            propagation.externalWeightBlocks.push_back({externalWeightCount, table->size()});
+            externalWeightCount += table->size();
+          }
+          dialRef.externalBlockIndex = inserted.first->second;
+          dialRef.firstTableTerm = propagation.tableTerms.size();
+          if( tabulated != nullptr ){
+            dialRef.type = Backends::BackendDialType::Tabulated;
+            LogThrowIf(tabulated->getIndex() < 0 or table->size() < 2
+                       or std::size_t(tabulated->getIndex()) >= table->size() - 1,
+                       "Invalid Tabulated table index.");
+            const auto index = std::size_t(tabulated->getIndex());
+            propagation.tableTerms.push_back({index, tabulated->getFraction()});
+            propagation.tableTerms.push_back({index + 1, 1. - tabulated->getFraction()});
+          }
+          else{
+            dialRef.type = Backends::BackendDialType::Kriged;
+            for( const auto& weight : kriged->getWeights() ){
+              LogThrowIf(weight.first < 0 or std::size_t(weight.first) >= table->size(),
+                         "Invalid Kriged table index.");
+              propagation.tableTerms.push_back({std::size_t(weight.first), weight.second});
+            }
+          }
+          dialRef.tableTermCount = propagation.tableTerms.size() - dialRef.firstTableTerm;
         }
         else if( dynamic_cast<const Norm*>(dialBase) != nullptr ){
           dialRef.type = Backends::BackendDialType::Norm;

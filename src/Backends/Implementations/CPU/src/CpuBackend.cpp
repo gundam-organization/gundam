@@ -277,6 +277,7 @@ void Backends::CpuBackend::initializeDialResponseCache() {
   for( std::uint32_t iDial = 0 ; iDial < propagation.dials.size() ; iDial++ ){
     const auto& dial = propagation.dials[iDial];
     Semantics::validateSurfaceDial(propagation, dial);
+    Semantics::validateTableDial(propagation, dial);
     if( dial.type == BackendDialType::Shift ){
       // Shift responses depend only on immutable payload and response bounds.
       // Keep their product position, but evaluate them only once per build.
@@ -288,7 +289,7 @@ void Backends::CpuBackend::initializeDialResponseCache() {
       _isCachedDialResponseValid_[iDial] = true;
       continue;
     }
-    if( dial.type == BackendDialType::ExternalWeight ){ continue; }
+    if( dial.type == BackendDialType::ExternalWeight or isTableDial(dial.type) ){ continue; }
     if( dial.firstInput > propagation.dialInputs.size()
         or dial.inputCount > propagation.dialInputs.size() - dial.firstInput ){ continue; }
     for( std::size_t i = 0; i < dial.inputCount; ++i ){

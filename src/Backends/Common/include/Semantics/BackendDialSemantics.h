@@ -43,6 +43,23 @@ namespace Backends::Semantics {
     }
   }
 
+  inline void validateTableDial(const PropagationView& model_, const BackendDialDescriptor& dial_) {
+    if( not isTableDial(dial_.type) ){ return; }
+    if( dial_.externalBlockIndex >= model_.externalWeightBlocks.size()
+        or dial_.firstTableTerm > model_.tableTerms.size()
+        or dial_.tableTermCount > model_.tableTerms.size() - dial_.firstTableTerm
+        or (dial_.type == BackendDialType::Tabulated and dial_.tableTermCount != 2) ){
+      throw std::runtime_error("Invalid backend table dial descriptor.");
+    }
+    const auto count = model_.externalWeightBlocks[dial_.externalBlockIndex].count;
+    for( std::size_t i = 0; i < dial_.tableTermCount; ++i ){
+      const auto& term = model_.tableTerms[dial_.firstTableTerm + i];
+      if( term.index >= count or not std::isfinite(term.coefficient) ){
+        throw std::runtime_error("Invalid backend table dial term.");
+      }
+    }
+  }
+
   inline const double* getParameterValues(const PropagationInputs& inputs_) {
     return inputs_.parameters.values.data();
   }
@@ -50,6 +67,15 @@ namespace Backends::Semantics {
   inline double evalDialResponse(const PropagationView& propagation_,
                                  const BackendDialDescriptor& dialRef_,
                                  const PropagationInputs& inputs_) {
+    if( isTableDial(dialRef_.type) ){
+      const auto* table = inputs_.externalWeights[dialRef_.externalBlockIndex].values;
+      double response{0.};
+      for( std::size_t i = 0; i < dialRef_.tableTermCount; ++i ){
+        const auto& term = propagation_.tableTerms[dialRef_.firstTableTerm + i];
+        response += term.coefficient * table[term.index];
+      }
+      return clampDialResponse(dialRef_, response);
+    }
     if( dialRef_.type == BackendDialType::ExternalWeight ){
       const auto& block = inputs_.externalWeights[dialRef_.externalBlockIndex];
       return clampDialResponse(dialRef_, block.values[dialRef_.externalWeightIndex]);

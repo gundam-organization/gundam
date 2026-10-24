@@ -48,7 +48,8 @@ Legend: ✅ supported; ❌ unsupported; ⚠️ supported with the stated restric
 
 Compatibility depends on the concrete dial produced by the loader. Both backends
 use the same `EngineLayout` conversion, which rejects unsupported dial classes
-with `Unsupported dial type for EngineView`. There is no automatic fallback to
+with `Unsupported dial type for EngineView`. MPS additionally rejects
+`Tabulated` and `Kriged` during backend construction. There is no automatic fallback to
 the original engine for these classes.
 
 | Configuration or concrete dial | CPU | MPS |
@@ -64,8 +65,8 @@ the original engine for these classes.
 | `Surface` / `Bicubic` | ✅ | ✅ |
 | `ExternalWeight` (`ExternalWeightDispatcher`) | ✅ | ✅ |
 | ROOT objects (`RootFormula`, `RootSpline`, `RootGraph`) | ❌ Heavy C++ objects, unsuitable for the flat backend model | ❌ Strictly incompatible with Metal device execution as C++ ROOT objects |
-| `Tabulated` | ❌ | ❌ |
-| `Kriged` | ❌ | ❌ |
+| `Tabulated` | ⚠️ Table updated on host at each propagation | ❌ |
+| `Kriged` | ⚠️ Table updated on host at each propagation | ❌ |
 | `CompiledLibDial` | ❌ | ❌ |
 | `Polynomial` | ❌ | ❌ |
 
@@ -73,6 +74,13 @@ ROOT input objects (`TGraph`, `TSpline3`, `TH2`) and supported TArray branch pai
 are loading formats, not backend dial types. Their compatibility follows the
 concrete dial constructed from them. Spline slope options are also resolved
 during construction, before backend execution.
+
+The CPU backend reads shared `Tabulated` and `Kriged` tables after the host
+factories update them during propagation preparation. Fixed indices and
+coefficients are flattened once; table values are supplied as dynamic blocks.
+Responses are evaluated on each propagation, including when parameter values
+are unchanged. Each table publication advances its generation so observable
+and binning caches also see the update.
 
 ### Engine features
 

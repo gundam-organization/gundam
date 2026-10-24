@@ -71,6 +71,8 @@ namespace Backends::Semantics {
     switch( dialRef_.type ){
       case BackendDialType::Bilinear:
       case BackendDialType::Bicubic:
+      case BackendDialType::Tabulated:
+      case BackendDialType::Kriged:
       case BackendDialType::ExternalWeight:
         GUNDAM_BACKEND_SEMANTICS_ASSERT(false);
         return 1.;

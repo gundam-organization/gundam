@@ -1,6 +1,7 @@
 #ifndef GUNDAM_BACKEND_ENGINE_BINDINGS_H
 #define GUNDAM_BACKEND_ENGINE_BINDINGS_H
 
+#include <cstdint>
 #include <vector>
 #include <memory>
 
@@ -36,13 +37,21 @@ namespace Backends {
     Parameter* parameter{nullptr};
   };
 
+  // Tables are owned by dial factories, whose lifetime covers the engine layout.
+  // Each preparation refills them, so each published snapshot gets a new generation.
+  struct ExternalWeightBinding {
+    std::shared_ptr<const ExternalWeightBuffer> source{};
+    const std::vector<double>* table{nullptr};
+    std::uint64_t generation{0};
+  };
+
   struct EngineBindings {
     std::vector<EventBinding> events{};
     std::vector<VariableBinding> variables{};
     std::vector<const DialInputBuffer*> variableInputBuffers{};
     std::vector<SampleBinding> samples{};
     std::vector<ParameterBinding> parameters{};
-    std::vector<std::shared_ptr<const ExternalWeightBuffer>> externalWeights{};
+    std::vector<ExternalWeightBinding> externalWeights{};
 
     void clear();
     void build(LikelihoodInterface& likelihoodInterface_);

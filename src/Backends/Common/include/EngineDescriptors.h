@@ -45,6 +45,8 @@ ENUM_FIELD( EventVariable )
     std::size_t payloadSize{0};
     std::size_t externalBlockIndex{0};
     std::size_t externalWeightIndex{0};
+    std::size_t firstTableTerm{0};
+    std::size_t tableTermCount{0};
     bool allowExtrapolation{false};
     ResponseSmoothing<double> smoothing{};
     // Inner transition thresholds; identical to the hard bounds when disabled.
@@ -53,6 +55,15 @@ ENUM_FIELD( EventVariable )
     bool hasMinResponse{false};
     bool hasMaxResponse{false};
   };
+
+  struct BackendTableTerm {
+    std::size_t index{0};
+    double coefficient{0};
+  };
+
+  inline bool isTableDial(BackendDialType type_) {
+    return type_ == BackendDialType::Tabulated or type_ == BackendDialType::Kriged;
+  }
 
   struct ExternalWeightBlockDescriptor {
     std::size_t offset{0};
