@@ -254,7 +254,7 @@ TEST(CudaBackendPropagation, FailureInvalidatesTokensAndRetryRecomputesResponses
     EXPECT_THROW((void)backend.requestPropagation(inputs), std::runtime_error);
     inputs.parameters.values = {.8, 1.2, 2.3};
     inputs.forceBinningUpdate = true;
-    EXPECT_THROW((void)backend.requestPropagation(inputs), std::runtime_error);
+    EXPECT_NO_THROW((void)backend.requestPropagation(inputs));
     inputs.forceBinningUpdate = false;
     token = backend.requestPropagation(inputs);
     expectClose(backend.getEventWeightsHostView(token), reference);

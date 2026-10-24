@@ -20,6 +20,12 @@ namespace Backends {
     std::size_t firstDial{0}, endDial{0};
   };
 
+  struct CudaBinningSample {
+    int binOffset{0}, binCount{0};
+    std::size_t firstBin{0}, endBin{0}, variableCount{0};
+    bool isDynamic{false}, readHostVariables{false};
+  };
+
   // Native-double model. Events are in result-slot order; histogram lists retain
   // the original event traversal order, independently of those result slots.
   struct CudaWeightModel {
@@ -44,6 +50,14 @@ namespace Backends {
     std::size_t surfaceOffset{0};
     std::vector<std::size_t> binOffsets{};
     std::vector<std::size_t> binEvents{};
+    bool hasEventState{false};
+    std::vector<EventView> stateEvents{};
+    std::vector<CudaBinningSample> samples{};
+    std::vector<BinningBin> bins{};
+    std::vector<BinningInterval> intervals{};
+    std::vector<double> variableValues{};
+    std::vector<BackendVariableResponseDescriptor> variableResponses{};
+    std::vector<std::uint32_t> variableDialIndices{};
     std::size_t parameterCount{0};
     bool hasReweightCap{false};
     double maxReweight{0};

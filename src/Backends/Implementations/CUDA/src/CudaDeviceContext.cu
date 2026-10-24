@@ -2,8 +2,12 @@
 #include "CudaWeightModel.h"
 #include "BackendTypes.h"
 #include "PropagationInputs.h"
+#include "EventStateCache.h"
+#include "Semantics/BackendVariableResponse.h"
 
 #include <cuda_runtime.h>
+#include <thrust/sort.h>
+#include <thrust/system/cuda/execution_policy.h>
 
 #include "Semantics/BackendDialSemanticsCore.h"
 
@@ -83,6 +87,23 @@ namespace {
     Backends::CudaResponseUpdatePlan updatePlan{};
     DeviceBuffer<std::size_t> binOffsets, binEvents;
     DeviceBuffer<int> error;
+    DeviceBuffer<Backends::EventView> stateEvents;
+    DeviceBuffer<Backends::CudaBinningSample> samples;
+    DeviceBuffer<Backends::BinningBin> bins;
+    DeviceBuffer<Backends::BinningInterval> intervals;
+    DeviceBuffer<Backends::BackendVariableResponseDescriptor> variableResponses;
+    DeviceBuffer<std::uint32_t> variableDialIndices;
+    DeviceBuffer<double> variables, nextVariables, hostVariables;
+    DeviceBuffer<std::uint8_t> hostEdits;
+    DeviceBuffer<int> stateBins, nextStateBins, histogramKeys, changedSamples;
+    DeviceBuffer<unsigned long long> stateCounters;
+    std::size_t cachedContributionCount{0};
+    std::vector<std::uint8_t> hostEditFlags{}, changedSampleFlags{};
+    std::vector<int> sampleChanges{};
+    Backends::EventStateCache stateCache{};
+    // EventStateCache borrows the original model owned by CudaBackend.
+    const Backends::PropagationView* originalModel{nullptr};
+    bool hasEventState{false};
     bool cachePrimed{false};
     bool hasReweightCap{false};
     bool interleavedEventDials{false};
@@ -233,6 +254,90 @@ namespace {
     }
   }
 
+  struct CachedResponses {
+    const double* values;
+    __host__ __device__ double operator()(std::size_t dial_) const { return values[dial_]; }
+  };
+
+  __global__ void updateEventState(const Backends::EventView* events_, std::size_t count_,
+      const Backends::CudaBinningSample* samples_, std::size_t sampleCount_,
+      const Backends::BinningBin* bins_, const Backends::BinningInterval* intervals_,
+      const Backends::BackendVariableResponseDescriptor* targets_, const std::uint32_t* indices_,
+      const double* responses_, double* variables_, const double* hostValues_, const std::uint8_t* hostEdits_,
+      int* stateBins_, int* keys_, std::size_t* eventSlots_, int* changedSamples_, unsigned long long* counters_,
+      int totalBins_, bool updateVariables_, bool force_, bool first_, int* error_) {
+    using namespace Backends;
+    for( std::size_t i = std::size_t(blockIdx.x) * blockDim.x + threadIdx.x;
+         i < count_; i += std::size_t(blockDim.x) * gridDim.x ){
+      const auto& event = events_[i];
+      const auto slot = event.resultIndex;
+      int localBin = event.binIndex, globalBin = event.globalBinIndex;
+      if( event.samplePosition < sampleCount_ ){
+        const auto& sample = samples_[event.samplePosition];
+        bool changed = false;
+        if( sample.readHostVariables or force_ ){
+          for( std::size_t j = event.firstVariable; j < event.firstVariable + event.variableCount; ++j ){
+            if( hostEdits_[j] ){
+              changed |= j - event.firstVariable < sample.variableCount and variables_[j] != hostValues_[j];
+              variables_[j] = hostValues_[j];
+            }
+          }
+        }
+        if( updateVariables_ ){
+          for( std::size_t j = event.firstVariableResponse; j < event.firstVariableResponse + event.variableResponseCount; ++j ){
+            const auto& target = targets_[j];
+            const double value = Semantics::evalVariableResponse(target, indices_, CachedResponses{responses_});
+            if( not ::isfinite(value) ){ atomicExch(error_, 1); }
+            changed |= target.variableIndex - event.firstVariable < sample.variableCount
+                and variables_[target.variableIndex] != value;
+            variables_[target.variableIndex] = value;
+          }
+        }
+        if( sample.isDynamic ){
+          localBin = stateBins_[slot];
+          if( first_ or force_ or changed or sample.readHostVariables ){
+            localBin = -1;
+            const double* values = event.variableCount ? variables_ + event.firstVariable : nullptr;
+            for( std::size_t j = sample.firstBin; j < sample.endBin; ++j ){
+              const auto& bin = bins_[j];
+              bool contains = true;
+              atomicAdd(counters_ + 1, 1ull);
+              for( std::size_t k = bin.firstInterval; k < bin.firstInterval + bin.intervalCount; ++k ){
+                const auto& interval = intervals_[k];
+                if( not GundamBinningMath::contains(interval.lowerBound, interval.upperBound, values[interval.variableIndex]) ){
+                  contains = false; break;
+                }
+              }
+              if( contains ){ localBin = bin.binIndex; break; }
+            }
+            atomicExch(changedSamples_ + event.samplePosition, 1);
+            atomicAdd(counters_, 1ull);
+          }
+          globalBin = localBin < 0 ? -1 : sample.binOffset + localBin;
+          if( localBin >= 0 ){ atomicAdd(counters_ + 2, 1ull); }
+        }
+      }
+      stateBins_[slot] = localBin;
+      // Reinitialize in original event order before the stable sort. This keeps
+      // each histogram's reduction deterministic, independently of result slots.
+      keys_[i] = globalBin < 0 ? totalBins_ : globalBin;
+      eventSlots_[i] = slot;
+    }
+  }
+
+  __global__ void findBinOffsets(const int* keys_, std::size_t count_, std::size_t* offsets_, std::size_t bins_) {
+    for( std::size_t bin = std::size_t(blockIdx.x) * blockDim.x + threadIdx.x;
+         bin <= bins_; bin += std::size_t(blockDim.x) * gridDim.x ){
+      std::size_t low = 0, high = count_;
+      while( low < high ){
+        const auto mid = low + (high - low) / 2;
+        if( keys_[mid] < int(bin) ){ low = mid + 1; }
+        else{ high = mid; }
+      }
+      offsets_[bin] = low;
+    }
+  }
+
   template<bool interleaved_>
   __global__ void reweightEvents(const Backends::BackendEventWeightDescriptor* events_, std::size_t count_,
                                  const std::uint32_t* indices_, const double* responses_, double* weights_,
@@ -287,7 +392,7 @@ struct Backends::CudaDeviceContext::Impl {
   int deviceIndex{0};
   std::string deviceName{};
   cudaStream_t stream{nullptr};
-  std::array<cudaEvent_t, 5> stages{};
+  std::array<cudaEvent_t, 7> stages{};
   std::unique_ptr<WeightBuffers> buffers{};
 
   ~Impl() {
@@ -321,7 +426,7 @@ Backends::CudaDeviceContext::CudaDeviceContext(int deviceIndex_) : _impl_(std::m
 Backends::CudaDeviceContext::~CudaDeviceContext() = default;
 const std::string& Backends::CudaDeviceContext::getDeviceName() const { return _impl_->deviceName; }
 
-void Backends::CudaDeviceContext::build(const CudaWeightModel& model_) {
+void Backends::CudaDeviceContext::build(const CudaWeightModel& model_, const PropagationView& original_) {
   DeviceScope scope(_impl_->deviceIndex);
   _impl_->buffers.reset();
   auto buffers = std::make_unique<WeightBuffers>();
@@ -349,7 +454,32 @@ void Backends::CudaDeviceContext::build(const CudaWeightModel& model_) {
     b.updatePlan.ranges.reserve(model_.parameterCount + b.surfaceGroups.size());
     b.responseUpdates.allocate(model_.parameterCount + b.surfaceGroups.size());
     b.binOffsets.upload(model_.binOffsets, _impl_->stream);
-    b.binEvents.upload(model_.binEvents, _impl_->stream);
+    b.hasEventState = model_.hasEventState;
+    if( b.hasEventState ){
+      b.originalModel = &original_;
+      b.stateCache.build(original_);
+      b.stateEvents.upload(model_.stateEvents, _impl_->stream);
+      b.samples.upload(model_.samples, _impl_->stream);
+      b.bins.upload(model_.bins, _impl_->stream);
+      b.intervals.upload(model_.intervals, _impl_->stream);
+      b.variableResponses.upload(model_.variableResponses, _impl_->stream);
+      b.variableDialIndices.upload(model_.variableDialIndices, _impl_->stream);
+      b.variables.upload(model_.variableValues, _impl_->stream);
+      b.nextVariables.allocate(model_.variableValues.size());
+      b.hostVariables.allocate(model_.variableValues.size());
+      b.hostEdits.allocate(model_.variableValues.size());
+      b.hostEditFlags.resize(model_.variableValues.size());
+      b.stateBins.allocate(model_.events.size());
+      b.nextStateBins.allocate(model_.events.size());
+      if( b.stateBins.size ){ checkCuda(cudaMemsetAsync(b.stateBins.data, 0xff, b.stateBins.size * sizeof(int), _impl_->stream), "initialize event bins"); }
+      b.histogramKeys.allocate(model_.events.size());
+      b.binEvents.allocate(model_.events.size());
+      b.changedSamples.allocate(model_.samples.size());
+      b.sampleChanges.resize(model_.samples.size());
+      b.changedSampleFlags.resize(model_.samples.size());
+      b.stateCounters.allocate(3);
+    }
+    else{ b.binEvents.upload(model_.binEvents, _impl_->stream); }
     b.parameters.allocate(model_.parameterCount);
     b.responses.allocate(model_.dials.size());
     b.previousInputs.allocate(model_.dials.size());
@@ -367,19 +497,23 @@ void Backends::CudaDeviceContext::build(const CudaWeightModel& model_) {
   _impl_->buffers = std::move(buffers);
 }
 
-void Backends::CudaDeviceContext::propagate(const std::vector<double>& parameters_,
-                                           const std::vector<ExternalWeightBlockView>& externalWeights_, bool recomputeResponses_,
+void Backends::CudaDeviceContext::propagate(const PropagationInputs& inputs_, bool recomputeResponses_,
                                            BackendTimingSummary& timing_) {
   DeviceScope scope(_impl_->deviceIndex);
   if( not _impl_->buffers ){ throw std::runtime_error("CudaBackend device model has not been built."); }
   auto& b = *_impl_->buffers;
+  const auto& parameters_ = inputs_.parameters.values;
+  const auto& externalWeights_ = inputs_.externalWeights;
   if( parameters_.size() != b.parameters.size ){ throw std::runtime_error("CUDA parameter count mismatch."); }
   if( externalWeights_.size() != b.externalGenerations.size() ){ throw std::runtime_error("CUDA external block count mismatch."); }
   int error = 0;
+  std::array<unsigned long long, 3> stateCounters{};
   const auto stream = _impl_->stream;
   auto record = [&](std::size_t i_){ checkCuda(cudaEventRecord(_impl_->stages[i_], stream), "cudaEventRecord"); };
   try{
     const bool reuse = b.cachePrimed and not recomputeResponses_;
+    if( b.hasEventState ){ b.stateCache.prepare(inputs_); }
+    const bool updateState = b.hasEventState and b.stateCache.needsUpdate(inputs_);
     const auto preparationStart = std::chrono::steady_clock::now();
     if( reuse ){ b.updatePlan.select(b.parameterDialOffsets, b.previousParameters, parameters_, b.surfaceGroups); }
     for( std::size_t i = 0; i < externalWeights_.size(); ++i ){
@@ -460,16 +594,79 @@ void Backends::CudaDeviceContext::propagate(const std::vector<double>& parameter
       checkCuda(cudaGetLastError(), "event weight kernel launch");
     }
     record(3);
+    if( updateState ){
+      // Publish observable state only after the whole propagation succeeds.
+      if( b.variables.size ){
+        checkCuda(cudaMemcpyAsync(b.nextVariables.data, b.variables.data, b.variables.size * sizeof(double),
+                                  cudaMemcpyDeviceToDevice, stream), "stage observable values");
+      }
+      if( b.stateBins.size ){
+        checkCuda(cudaMemcpyAsync(b.nextStateBins.data, b.stateBins.data, b.stateBins.size * sizeof(int),
+                                  cudaMemcpyDeviceToDevice, stream), "stage event bins");
+      }
+      std::fill(b.hostEditFlags.begin(), b.hostEditFlags.end(), 0);
+      if( not inputs_.hostVariables.empty() ){
+        for( std::size_t i = 0; i < b.hostEditFlags.size(); ++i ){
+          b.hostEditFlags[i] = b.stateCache.hostVariableChanged(i, inputs_);
+        }
+        if( b.hostVariables.size ){
+          checkCuda(cudaMemcpyAsync(b.hostVariables.data, inputs_.hostVariables.data(),
+              b.hostVariables.size * sizeof(double), cudaMemcpyHostToDevice, stream), "host observable upload");
+        }
+      }
+      if( b.hostEdits.size ){
+        checkCuda(cudaMemcpyAsync(b.hostEdits.data, b.hostEditFlags.data(), b.hostEdits.size,
+                                  cudaMemcpyHostToDevice, stream), "host observable edit mask");
+      }
+      if( b.changedSamples.size ){ checkCuda(cudaMemsetAsync(b.changedSamples.data, 0, b.changedSamples.size * sizeof(int), stream), "reset sample changes"); }
+      checkCuda(cudaMemsetAsync(b.stateCounters.data, 0, 3 * sizeof(unsigned long long), stream), "reset state counters");
+      if( b.events.size ){
+        updateEventState<<<gridSize(b.events.size), blockSize, 0, stream>>>(b.stateEvents.data, b.events.size,
+            b.samples.data, b.samples.size, b.bins.data, b.intervals.data, b.variableResponses.data,
+            b.variableDialIndices.data, b.responses.data, b.nextVariables.data, b.hostVariables.data, b.hostEdits.data,
+            b.nextStateBins.data, b.histogramKeys.data, b.binEvents.data, b.changedSamples.data, b.stateCounters.data,
+            int(b.sums.size), b.stateCache.variableInputsChanged(), inputs_.forceBinningUpdate, not b.cachePrimed, b.error.data);
+        checkCuda(cudaGetLastError(), "observable response and strict binning kernel launch");
+      }
+    }
+    record(4);
+    if( updateState ){
+      if( b.events.size ){
+        thrust::stable_sort_by_key(thrust::cuda::par.on(stream), b.histogramKeys.data,
+            b.histogramKeys.data + b.events.size, b.binEvents.data);
+      }
+      findBinOffsets<<<gridSize(b.sums.size + 1), blockSize, 0, stream>>>(
+          b.histogramKeys.data, b.events.size, b.binOffsets.data, b.sums.size);
+      checkCuda(cudaGetLastError(), "dynamic histogram index kernel launch");
+    }
+    record(5);
     if( b.sums.size ){
       const auto blocks = static_cast<unsigned int>(std::min<std::size_t>(b.sums.size, 65535));
       reduceHistograms<<<blocks, blockSize, 0, stream>>>(b.binOffsets.data, b.binEvents.data,
           b.sums.size, b.weights.data, b.sums.data, b.sumSquares.data, b.error.data);
       checkCuda(cudaGetLastError(), "histogram kernel launch");
     }
-    record(4);
+    record(6);
     checkCuda(cudaMemcpyAsync(&error, b.error.data, sizeof(int), cudaMemcpyDeviceToHost, stream), "execution error readback");
+    if( updateState ){
+      if( b.changedSamples.size ){
+        checkCuda(cudaMemcpyAsync(b.sampleChanges.data(), b.changedSamples.data,
+            b.sampleChanges.size() * sizeof(int), cudaMemcpyDeviceToHost, stream), "sample changes readback");
+      }
+      checkCuda(cudaMemcpyAsync(stateCounters.data(), b.stateCounters.data, 3 * sizeof(unsigned long long),
+                                cudaMemcpyDeviceToHost, stream), "event state counters readback");
+    }
     checkCuda(cudaStreamSynchronize(stream), "propagation completion");
     if( error ){ throw std::runtime_error("CudaBackend: nonfinite or out-of-range numerical result."); }
+    if( updateState ){
+      for( std::size_t i = 0; i < b.sampleChanges.size(); ++i ){ b.changedSampleFlags[i] = b.sampleChanges[i] != 0; }
+      b.stateCache.commit(inputs_, b.changedSampleFlags);
+      std::swap(b.variables.data, b.nextVariables.data);
+      std::swap(b.stateBins.data, b.nextStateBins.data);
+      timing_.rebinnedEventCount = stateCounters[0];
+      timing_.binCandidateCount = stateCounters[1];
+      b.cachedContributionCount = stateCounters[2];
+    }
     std::copy(parameters_.begin(), parameters_.end(), b.previousParameters.begin());
     b.externalGenerations = b.currentExternalGenerations;
     b.cachePrimed = true;
@@ -478,13 +675,16 @@ void Backends::CudaDeviceContext::propagate(const std::vector<double>& parameter
       checkCuda(cudaEventElapsedTime(&milliseconds, _impl_->stages[first_], _impl_->stages[last_]), "CUDA stage timing");
       return double(milliseconds) * 1.e-3;
     };
+    timing_.binContributionCount = b.cachedContributionCount;
     timing_.parameterUploadSeconds = elapsed(0, 1);
     timing_.cachedDialStageSeconds = elapsed(1, 2);
     timing_.eventWeightsStageSeconds = elapsed(2, 3);
-    timing_.histogramStageSeconds = elapsed(3, 4);
-    timing_.devicePropagationSeconds = elapsed(0, 4);
+    timing_.variableStageSeconds = updateState ? elapsed(3, 4) : 0.;
+    timing_.binningStageSeconds = updateState ? elapsed(4, 5) : 0.;
+    timing_.histogramStageSeconds = elapsed(5, 6);
+    timing_.devicePropagationSeconds = elapsed(0, 6);
   }
-  catch(...){ b.cachePrimed = false; cudaStreamSynchronize(stream); throw; }
+  catch(...){ b.cachePrimed = false; b.stateCache.invalidate(); cudaStreamSynchronize(stream); throw; }
 }
 
 void Backends::CudaDeviceContext::readWeights(std::vector<double>& weights_) {
@@ -506,7 +706,33 @@ void Backends::CudaDeviceContext::readHistograms(std::vector<double>& sums_, std
   catch(...){ cudaStreamSynchronize(_impl_->stream); throw; }
 }
 
-void Backends::CudaDeviceContext::invalidate() { if( _impl_->buffers ){ _impl_->buffers->cachePrimed = false; } }
+void Backends::CudaDeviceContext::readEventState(EventState& state_) {
+  DeviceScope scope(_impl_->deviceIndex);
+  auto& b = *_impl_->buffers;
+  try{
+    b.variables.read(state_.variables, _impl_->stream);
+    b.stateBins.read(state_.bins, _impl_->stream);
+    checkCuda(cudaStreamSynchronize(_impl_->stream), "event state readback completion");
+    state_.contributions.assign(b.events.size, {});
+    // Strict dynamic events have either one complete contribution or none.
+    const auto& model = *b.originalModel;
+    for( const auto& event : model.events ){
+      if( event.samplePosition < model.samples.size() and model.samples[event.samplePosition].useDynamicBinning
+          and state_.bins[event.resultIndex] >= 0 ){
+        state_.contributions[event.resultIndex].push_back({state_.bins[event.resultIndex], 1.});
+      }
+    }
+    b.stateCache.publishRevisions(state_);
+  }
+  catch(...){ cudaStreamSynchronize(_impl_->stream); throw; }
+}
+
+void Backends::CudaDeviceContext::invalidate() {
+  if( _impl_->buffers ){
+    _impl_->buffers->cachePrimed = false;
+    _impl_->buffers->stateCache.invalidate();
+  }
+}
 
 Backends::BackendDeviceView Backends::CudaDeviceContext::getDeviceView() const {
   BackendDeviceView out;

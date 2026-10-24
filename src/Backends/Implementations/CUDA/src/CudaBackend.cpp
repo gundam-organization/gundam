@@ -21,6 +21,8 @@ namespace {
 struct Backends::CudaBackendImpl {
   std::shared_ptr<const EngineView> engineView{};
   PropagationResult result{};
+  EventState eventState{};
+  bool hasEventState{false};
   BackendTimingSummary timing{};
   BackendTimingSummary buildTiming{};
   BackendTimingTotals totals{};
@@ -92,6 +94,8 @@ Backends::BackendCapabilities Backends::CudaBackend::getCapabilities() const {
   out.supportsEventWeights = isCompiled();
   out.supportsHistograms = isCompiled();
   out.supportsLikelihood = isCompiled();
+  out.supportsObservableTransforms = isCompiled();
+  out.supportsDynamicBinning = isCompiled();
   out.deviceName = isCompiled() ? "CUDA not initialized" : "CUDA support not compiled";
 #ifdef GUNDAM_USING_CUDA
   if( _impl_->context ){ out.deviceName = _impl_->context->getDeviceName(); }
@@ -109,6 +113,8 @@ void Backends::CudaBackend::build(const EngineView& engineView_) { buildShared(s
 void Backends::CudaBackend::buildShared(std::shared_ptr<const EngineView> engineView_) {
   invalidateResult();
   _impl_->engineView.reset();
+  _impl_->hasEventState = false;
+  _impl_->eventState = {};
   _impl_->buildTiming = {};
   _impl_->timing = {};
   _impl_->totals = {};
@@ -120,13 +126,18 @@ void Backends::CudaBackend::buildShared(std::shared_ptr<const EngineView> engine
   initializeDevice();
 #ifdef GUNDAM_USING_CUDA
   const auto uploadStart = Clock::now();
-  _impl_->context->build(packed);
+  _impl_->context->build(packed, engineView_->propagation);
   _impl_->buildTiming.buildBufferUploadSeconds = elapsed(uploadStart);
 #endif
   _impl_->engineView = std::move(engineView_);
+  _impl_->hasEventState = packed.hasEventState;
+  _impl_->result.outsideSums.assign(packed.samples.size(), 0.);
+  _impl_->result.outsideSumSquares.assign(packed.samples.size(), 0.);
   _impl_->diagnostics = {
       {"available", true}, {"events", packed.events.size()}, {"uniqueDials", packed.dials.size()},
       {"surfaceDials", packed.dials.size() - packed.surfaceOffset},
+      {"observableResponses", packed.variableResponses.size()},
+      {"hasEventState", packed.hasEventState},
       {"surfaceDependencyGroups", packed.surfaceGroups.size()},
       {"externalDials", packed.externalDialCount},
       {"externalWeightBlocks", packed.externalWeightBlocks.size()},
@@ -160,14 +171,14 @@ Backends::PropagationToken Backends::CudaBackend::requestPropagation(const Propa
   try{
     const auto& view = getEngineView();
     inputs_.validate(view.propagation);
-    if( inputs_.forceBinningUpdate or not inputs_.hostVariables.empty() or not inputs_.variableInputRevisions.empty() ){
-      throw std::runtime_error("CudaBackend: host observable updates and dynamic binning are not implemented.");
+    for( double value : inputs_.hostVariables ){
+      if( not std::isfinite(value) ){ throw std::runtime_error("CudaBackend: host observables must be finite."); }
     }
     for( double value : inputs_.parameters.values ){
       if( not std::isfinite(value) ){ throw std::runtime_error("CudaBackend: parameter values must be finite."); }
     }
 #ifdef GUNDAM_USING_CUDA
-    _impl_->context->propagate(inputs_.parameters.values, inputs_.externalWeights,
+    _impl_->context->propagate(inputs_,
         _propagationMode_ == CudaPropagationMode::recomputeResponses, _impl_->timing);
 #else
     initializeDevice();
@@ -176,6 +187,7 @@ Backends::PropagationToken Backends::CudaBackend::requestPropagation(const Propa
     result.status.backend = BackendStatus::Ready;
     result.status.eventWeights = OutputState::ReadyOnDevice;
     result.status.histograms = OutputState::ReadyOnDevice;
+    result.status.eventState = _impl_->hasEventState ? OutputState::ReadyOnDevice : OutputState::NotRequested;
     result.status.sampleLikelihoods = OutputState::Failed;
     result.status.statLikelihood = OutputState::Failed;
     if( not view.likelihood.empty() ){
@@ -251,9 +263,26 @@ void Backends::CudaBackend::readHistograms() const {
 #endif
 }
 
+void Backends::CudaBackend::readEventState() const {
+  if( not _impl_->hasEventState ){ throw std::runtime_error("CudaBackend: no observable state in this model."); }
+  if( _impl_->result.status.eventState == OutputState::ReadyOnHost ){ return; }
+#ifdef GUNDAM_USING_CUDA
+  const auto start = Clock::now();
+  try{ _impl_->context->readEventState(_impl_->eventState); }
+  catch(...){ invalidateResult(); throw; }
+  _impl_->timing.eventStateReadbackSeconds += elapsed(start);
+  _impl_->timing.eventStateReadbackBytes += _impl_->eventState.variables.size() * sizeof(double)
+      + _impl_->eventState.bins.size() * sizeof(int);
+  _impl_->result.status.eventState = OutputState::ReadyOnHost;
+#else
+  throw std::runtime_error("CUDA support not compiled.");
+#endif
+}
+
 void Backends::CudaBackend::materialize(const PropagationToken& token_, OutputRequest output_) {
   requireToken(token_);
-  if( output_ == OutputRequest::EventWeights ){ readWeights(); }
+  if( output_ == OutputRequest::EventState ){ readEventState(); }
+  else if( output_ == OutputRequest::EventWeights ){ readWeights(); }
   else if( output_ == OutputRequest::Histograms ){ readHistograms(); }
   else if( output_ == OutputRequest::StatLikelihood ){ (void)getLikelihood(token_); }
   else{ throw std::runtime_error("CudaBackend: requested output is not supported."); }
@@ -277,7 +306,7 @@ const std::vector<double>& Backends::CudaBackend::getHistogramSumSquaresHostView
   requireToken(token_); readHistograms(); return _impl_->result.histSumSquares;
 }
 const Backends::EventState& Backends::CudaBackend::getEventStateHostView(const PropagationToken& token_) const {
-  requireToken(token_); throw std::runtime_error("CudaBackend: event state output is not implemented.");
+  requireToken(token_); readEventState(); return _impl_->eventState;
 }
 const std::vector<double>& Backends::CudaBackend::getOutsideSumsHostView(const PropagationToken& token_) const {
   requireToken(token_); return _impl_->result.outsideSums;

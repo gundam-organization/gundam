@@ -96,9 +96,11 @@ Backends::CudaWeightModel Backends::makeCudaWeightModel(const EngineView& view_,
   static_assert(std::is_trivially_copyable<CudaResponseUpdate>::value);
   static_assert(std::is_trivially_copyable<BackendTableTerm>::value);
   static_assert(std::is_trivially_copyable<ExternalWeightBlockDescriptor>::value);
+  static_assert(std::is_trivially_copyable<EventView>::value);
+  static_assert(std::is_trivially_copyable<CudaBinningSample>::value);
+  static_assert(std::is_trivially_copyable<BackendVariableResponseDescriptor>::value);
   const auto& model = view_.propagation;
-  require(not model.requiresEventBinning() and model.variableResponses.empty() and model.variableDialIndices.empty(),
-          "observable responses, dynamic binning and smoothed binning are not implemented.");
+
   // Packed blocks may contain gaps, but must not overlap or overflow.
   std::vector<std::pair<std::size_t, std::size_t>> externalIntervals;
   std::size_t externalWeightCount = 0;
@@ -188,6 +190,86 @@ Backends::CudaWeightModel Backends::makeCudaWeightModel(const EngineView& view_,
   out.externalWeightBlocks = model.externalWeightBlocks;
   out.externalWeightCount = externalWeightCount;
   out.tableTerms = model.tableTerms;
+  out.hasEventState = model.requiresEventBinning() or not model.variableResponses.empty() or not model.variableDialIndices.empty();
+  if( out.hasEventState ){
+    out.stateEvents = model.events;
+    out.variableValues = model.variableValues;
+    for( double value : out.variableValues ){ require(std::isfinite(value), "initial observables must be finite."); }
+    out.variableResponses = model.variableResponses;
+    out.variableDialIndices = model.variableDialIndices;
+    auto remap = [&](std::size_t dial_){
+      require(dial_ < model.dials.size(), "observable dial index is out of range.");
+      return dialSlots.empty() ? dial_ : std::size_t(dialSlots[dial_]);
+    };
+    for( auto& index : out.variableDialIndices ){ index = static_cast<std::uint32_t>(remap(index)); }
+    for( auto& target : out.variableResponses ){
+      require(target.variableIndex < model.variableValues.size() and std::isfinite(target.referenceValue),
+              "invalid observable target or reference value.");
+      if( target.overrideDial != std::size_t(-1) ){ target.overrideDial = remap(target.overrideDial); }
+      require(target.firstMultiplyDial <= out.variableDialIndices.size()
+              and target.multiplyDialCount <= out.variableDialIndices.size() - target.firstMultiplyDial
+              and target.firstAddDial <= out.variableDialIndices.size()
+              and target.addDialCount <= out.variableDialIndices.size() - target.firstAddDial,
+              "observable dial range is out of bounds.");
+    }
+    for( const auto& sample : model.samples ){
+      require(not sample.binning.isSmoothed, "smoothed binning is not implemented.");
+      require(sample.binOffset >= 0 and sample.binCount >= 0 and sample.binOffset <= model.totalBins
+              and sample.binCount <= model.totalBins - sample.binOffset, "sample bin range is out of bounds.");
+      CudaBinningSample packed;
+      packed.binOffset = sample.binOffset;
+      packed.binCount = sample.binCount;
+      packed.firstBin = out.bins.size();
+      packed.variableCount = sample.binning.variableNames.size();
+      packed.isDynamic = sample.useDynamicBinning;
+      packed.readHostVariables = sample.readHostVariables;
+      for( auto bin : sample.binning.bins ){
+        require(bin.binIndex >= 0 and bin.binIndex < sample.binCount
+                and bin.firstInterval <= sample.binning.intervals.size()
+                and bin.intervalCount <= sample.binning.intervals.size() - bin.firstInterval,
+                "invalid strict bin descriptor.");
+        const auto first = bin.firstInterval;
+        bin.firstInterval = out.intervals.size();
+        for( std::size_t j = 0; j < bin.intervalCount; ++j ){
+          const auto& interval = sample.binning.intervals[first + j];
+          require(interval.variableIndex < packed.variableCount and interval.lowerBound <= interval.upperBound
+                  and interval.lowerInverseWidth == 0. and interval.upperInverseWidth == 0., "invalid strict bin interval.");
+          out.intervals.push_back(interval);
+        }
+        out.bins.push_back(bin);
+      }
+      packed.endBin = out.bins.size();
+      out.samples.push_back(packed);
+    }
+    std::vector<std::pair<std::size_t, std::size_t>> variableRanges;
+    std::vector<bool> targets(model.variableValues.size(), false);
+    for( const auto& event : model.events ){
+      require(event.firstVariable <= model.variableValues.size()
+              and event.variableCount <= model.variableValues.size() - event.firstVariable
+              and event.firstVariableResponse <= model.variableResponses.size()
+              and event.variableResponseCount <= model.variableResponses.size() - event.firstVariableResponse,
+              "invalid event observable range.");
+      if( event.samplePosition >= out.samples.size() ){
+        require(event.variableCount == 0 and event.variableResponseCount == 0, "observable event requires a valid sample.");
+        continue;
+      }
+      const auto& sample = out.samples[event.samplePosition];
+      require(not sample.isDynamic or event.variableCount >= sample.variableCount, "missing binning variables.");
+      require(event.binIndex >= -1 and event.binIndex < sample.binCount, "fixed local bin is out of bounds.");
+      if( event.variableCount ){ variableRanges.emplace_back(event.firstVariable, event.firstVariable + event.variableCount); }
+      for( std::size_t j = 0; j < event.variableResponseCount; ++j ){
+        const auto index = model.variableResponses[event.firstVariableResponse + j].variableIndex;
+        require(index >= event.firstVariable and index - event.firstVariable < event.variableCount,
+                "observable response targets another event.");
+        require(not targets[index], "observable target has multiple writers.");
+        targets[index] = true;
+      }
+    }
+    std::sort(variableRanges.begin(), variableRanges.end());
+    for( std::size_t i = 1; i < variableRanges.size(); ++i ){
+      require(variableRanges[i - 1].second <= variableRanges[i].first, "event observable ranges overlap.");
+    }
+  }
   out.binOffsets.assign(std::size_t(model.totalBins) + 1, 0);
   std::vector<bool> seen(model.events.size(), false);
   for( const auto& event : model.events ){

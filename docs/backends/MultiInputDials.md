@@ -4,7 +4,8 @@ CPU, MPS and CUDA implement `Surface` dials with the `Bilinear` and `Bicubic`
 subtypes and two ordered parameter inputs. Existing configuration is used
 unchanged, including per-input mirroring, extrapolation and response limits.
 Surfaces can contribute to event weights; CPU and MPS also support observable
-responses. CUDA currently requires fixed bins and parameter inputs. CUDA surface
+responses. CUDA also implements observable responses with strict binning
+(pending CC validation) and requires parameter inputs. CUDA surface
 device compilation/execution passed at CC-IN2P3 on 2026-10-24.
 
 `BackendDialDescriptor::firstInput/inputCount` addresses an ordered range in

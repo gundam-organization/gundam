@@ -21,7 +21,7 @@ ENUM_FIELD( warpInterleaved )
 
   struct CudaBackendImpl;
 
-  // Resident native-double executor for weight dials and fixed bins.
+  // Resident native-double executor for weight/observable dials and strict bins.
   // The public interface deliberately exposes no CUDA headers or runtime types.
   class CudaBackend : public Backend {
   public:
@@ -62,6 +62,7 @@ ENUM_FIELD( warpInterleaved )
     void requireToken(const PropagationToken& token_) const;
     void readWeights() const;
     void readHistograms() const;
+    void readEventState() const;
     void invalidateResult() const;
 
     int _deviceIndex_{0};

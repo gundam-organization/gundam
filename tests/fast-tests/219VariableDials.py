@@ -14,7 +14,8 @@ import_module("005PythonSetup-utils").requireVenv(__file__)
 RAW = [-0.25, 0.25, 1.25, 2.25]
 
 
-def make_engine(path, conflict=False, disjoint=False, reverse=False, bad_mode=None, explicit_dynamic=False, backend=None):
+def make_engine(path, conflict=False, disjoint=False, reverse=False, bad_mode=None, explicit_dynamic=False,
+                backend=None, strict_only=False, backend_mode=None):
     import GUNDAM
 
     def dial(mode=None, variable="X", condition=None):
@@ -54,6 +55,8 @@ def make_engine(path, conflict=False, disjoint=False, reverse=False, bad_mode=No
         {"name": "static", "useDynamicBinning": explicit_dynamic,
          "binning": {"binningDefinition": [{"name": "Y", "edges": [0, 1]}]}},
     ]
+    if strict_only:
+        samples[1].pop("binningResponse")
     config = {"likelihoodInterfaceConfig": {
         "jointProbabilityConfig": {"type": "LeastSquares", "lsqPoissonianApproximation": True},
         "dataSetList": [{"name": "inputs", "model": {
@@ -67,7 +70,10 @@ def make_engine(path, conflict=False, disjoint=False, reverse=False, bad_mode=No
                 "name": "response", "isEnabled": True, "nominalStepSize": 0.1, "parameterDefinitions": parameters}]}},
     }}
     if backend:
-        config["likelihoodInterfaceConfig"]["backendManagerConfig"] = {"isEnabled": True, "type": backend}
+        config["likelihoodInterfaceConfig"]["backendManagerConfig"] = {
+            "isEnabled": True, "type": backend,
+            "backendConfig": {"propagationMode": backend_mode} if backend_mode else {},
+        }
     config.update(enablePca=False, scaleParStepWithChi2Response=False,
                   generateSamplePlots=False, generateOneSigmaPlots=False)
     builder = GUNDAM.ConfigUtils.ConfigBuilder()

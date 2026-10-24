@@ -2,6 +2,7 @@
 """Keep Python migration responses and binning cached until their inputs change."""
 import json
 import math
+import os
 import sys
 from importlib import import_module
 from pathlib import Path
@@ -17,6 +18,8 @@ def main():
     import uproot
 
     if not hasattr(GUNDAM.FitterEngine, 'getBackendsManager'):
+        if os.environ.get('GUNDAM_TEST_CUDA') == '1':
+            raise RuntimeError('CUDA validation requested but backends are unavailable')
         print('SKIP: built without backends')
         return
     GUNDAM.setLightOutputMode(True)
@@ -26,8 +29,8 @@ def main():
         tree = output.mktree('events', {'X': 'float64'})
         tree.extend({'X': np.array([.25, .75, 1.25, 1.75])})
 
-    def run(backend):
-        calls = Path.cwd() / f'222VariableResponseDependencies_{backend}.calls'
+    def run(backend, mode=None, strict=False):
+        calls = Path.cwd() / f'222VariableResponseDependencies_{backend}_{mode}_{strict}.calls'
         calls.write_text('')
         script = calls.with_suffix('.py')
         script.write_text(f'''from pathlib import Path
@@ -41,6 +44,8 @@ def run(command):
         sample = {'name': 'sample', 'binning': {'binningDefinition': [
             {'name': 'X', 'edges': [0., 1., 2.]}]},
             'binningResponse': {'isEnabled': True, 'variables': [{'name': 'X', 'width': .2}]}}
+        if strict:
+            sample.pop('binningResponse')
         migration = {'dialType': 'ExternalWeight', 'applyToVariable': 'X',
                      'variableResponseMode': 'Override', 'dialInputList': [{'name': 'shift'}],
                      'options': {'type': 'PythonWorker', 'inputEventVarList': ['X'],
@@ -56,7 +61,8 @@ def run(command):
                                           {'name': 'weight', 'priorValue': 1., 'priorType': 'Flat',
                                            'dialSetDefinitions': [{'dialType': 'Normalization'}]}]}]}}}
         if backend != 'standard':
-            li['backendManagerConfig'] = {'isEnabled': True, 'type': backend}
+            li['backendManagerConfig'] = {'isEnabled': True, 'type': backend,
+                                          'backendConfig': {'propagationMode': mode} if mode else {}}
         config = {'likelihoodInterfaceConfig': li, 'enablePca': False,
                   'scaleParStepWithChi2Response': False, 'generateSamplePlots': False,
                   'generateOneSigmaPlots': False}
@@ -78,7 +84,7 @@ def run(command):
             if manager:
                 timing = manager.getLastTimingSummary()
                 assert (timing.rebinnedEventCount > 0) == expect_rebin, backend
-                if backend == 'MPS':
+                if backend in ('MPS', 'CUDA'):
                     assert timing.externalWeightUploadBlocks == expected_calls
                 manager.materialize('Histograms')
             histogram = propagator.getSampleSet().getSampleList()[0].getHistogram()
@@ -107,7 +113,14 @@ def run(command):
         for row, expected in zip(actual, reference):
             assert all(math.isclose(a, b, rel_tol=tolerance, abs_tol=tolerance)
                        for a, b in zip(row, expected)), (backend, row, expected)
-    print('SUCCESS: worker calls, cached binning and explicit invalidation agree across standard/CPU/MPS')
+    if os.environ.get('GUNDAM_TEST_CUDA') == '1':
+        reference = run('standard', strict=True)
+        for mode in ('cachedResponses', 'recomputeResponses'):
+            actual = run('CUDA', mode=mode, strict=True)
+            for row, expected in zip(actual, reference):
+                assert all(math.isclose(a, b, rel_tol=1e-10, abs_tol=1e-10)
+                           for a, b in zip(row, expected)), (mode, row, expected)
+    print('SUCCESS: observable producer calls, cached binning and explicit invalidation agree')
 
 
 if __name__ == '__main__':

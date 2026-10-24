@@ -2,6 +2,7 @@
 #include "BackendFactory.h"
 #include "BackendManager.h"
 #include "CudaWeightModel.h"
+#include "EventStateCache.h"
 #include "CompactSpline.h"
 #include "UniformSpline.h"
 #include "MonotonicSpline.h"
@@ -27,8 +28,8 @@ TEST(CudaBackend, FactoryDoesNotRequireADevice) {
     EXPECT_EQ(capabilities.supportsEventWeights, Backends::CudaBackend::isCompiled());
     EXPECT_EQ(capabilities.supportsHistograms, Backends::CudaBackend::isCompiled());
     EXPECT_EQ(capabilities.supportsLikelihood, Backends::CudaBackend::isCompiled());
-    EXPECT_FALSE(capabilities.supportsDynamicBinning);
-    EXPECT_FALSE(capabilities.supportsObservableTransforms);
+    EXPECT_EQ(capabilities.supportsDynamicBinning, Backends::CudaBackend::isCompiled());
+    EXPECT_EQ(capabilities.supportsObservableTransforms, Backends::CudaBackend::isCompiled());
   }
 }
 
@@ -116,13 +117,13 @@ TEST(CudaWeightModel, RejectsUnsupportedFeaturesAndUnsafeLayouts) {
   EXPECT_THROW((void)makeCudaWeightModel(view), std::runtime_error);
   view = {};
   view.propagation.hasVariableResponses = true;
-  EXPECT_THROW((void)makeCudaWeightModel(view), std::runtime_error);
+  EXPECT_NO_THROW((void)makeCudaWeightModel(view));
   view = {};
   view.propagation.externalWeightBlocks.push_back({0, 1});
   EXPECT_NO_THROW((void)makeCudaWeightModel(view));
   view = {};
   view.propagation.samples.emplace_back().useDynamicBinning = true;
-  EXPECT_THROW((void)makeCudaWeightModel(view), std::runtime_error);
+  EXPECT_NO_THROW((void)makeCudaWeightModel(view));
   view = {};
   view.propagation.samples.emplace_back().binning.isSmoothed = true;
   EXPECT_THROW((void)makeCudaWeightModel(view), std::runtime_error);
@@ -520,4 +521,109 @@ TEST(CudaWeightModel, RejectsMalformedExternalBlocksAndTableTerms) {
   bad = good;
   bad.propagation.externalWeightBlocks = {{0, std::numeric_limits<std::size_t>::max()}};
   EXPECT_THROW((void)makeCudaWeightModel(bad), std::runtime_error);
+}
+
+TEST(CudaWeightModel, ObservableReferencesAreRemappedAndUnsafeLayoutsRejected) {
+  using namespace Backends;
+  EngineView good;
+  auto& model = good.propagation;
+  model.parameterCount = 2;
+  model.totalBins = 1;
+  model.hasVariableResponses = true;
+  model.dialInputs = {{0}, {1}};
+  model.dialPayloads = {2., 2., -1., 1., -1., 1., 1., 2., 3., 4.};
+  BackendDialDescriptor surface;
+  surface.type = BackendDialType::Bilinear;
+  surface.inputCount = 2;
+  surface.payloadSize = 10;
+  BackendDialDescriptor norm;
+  norm.inputCount = 1;
+  model.dials = {surface, norm};
+  model.variableValues = {.2, .3, .4, .5};
+  model.variableDialIndices = {0, 1};
+  BackendVariableResponseDescriptor target;
+  target.overrideDial = 0;
+  target.firstAddDial = 1;
+  target.addDialCount = 1;
+  model.variableResponses = {target, target};
+  model.variableResponses[1].variableIndex = 2;
+  SampleView sample;
+  sample.useDynamicBinning = true;
+  sample.binCount = 1;
+  sample.binning.variableNames = {"X"};
+  sample.binning.bins = {{0, 0, 1}};
+  sample.binning.intervals = {{0, 0., 1.}};
+  model.samples = {sample};
+  model.events.resize(2);
+  model.eventWeights.resize(2);
+  for( std::size_t i = 0; i < 2; ++i ){
+    auto& event = model.events[i];
+    event.resultIndex = i;
+    event.binIndex = event.globalBinIndex = 0;
+    event.samplePosition = 0;
+    event.firstVariable = 2 * i;
+    event.variableCount = 2;
+    event.firstVariableResponse = i;
+    event.variableResponseCount = 1;
+  }
+  for( bool interleaved : {false, true} ){
+    const auto packed = makeCudaWeightModel(good, interleaved);
+    EXPECT_TRUE(packed.hasEventState);
+    EXPECT_EQ(packed.variableDialIndices, (std::vector<std::uint32_t>{1, 0}));
+    EXPECT_EQ(packed.variableResponses[0].overrideDial, 1);
+    EXPECT_EQ(packed.variableResponses[1].overrideDial, 1);
+    EXPECT_EQ(packed.variableValues, model.variableValues);
+    EXPECT_EQ(packed.samples.size(), 1);
+    EXPECT_EQ(packed.stateEvents.size(), 2);
+  }
+  for( int error = 0; error < 16; ++error ){
+    auto bad = good;
+    auto& m = bad.propagation;
+    switch( error ){
+      case 0: m.variableResponses[0].variableIndex = 2; break;
+      case 1: m.variableResponses[0].referenceValue = std::numeric_limits<double>::quiet_NaN(); break;
+      case 2: m.variableResponses[0].overrideDial = 2; break;
+      case 3: m.variableResponses[0].firstAddDial = 3; break;
+      case 4: m.variableResponses[0].multiplyDialCount = 3; break;
+      case 5: m.variableDialIndices[0] = 2; break;
+      case 6: m.events[0].variableCount = 5; break;
+      case 7: m.events[0].variableResponseCount = 3; break;
+      case 8: m.events[0].samplePosition = 2; break;
+      case 9: m.events[1].firstVariable = 0; m.variableResponses[1].variableIndex = 0; break;
+      case 10: m.samples[0].binning.intervals[0].variableIndex = 1; break;
+      case 11: m.samples[0].binning.intervals[0].lowerBound = std::numeric_limits<double>::quiet_NaN(); break;
+      case 12: m.samples[0].binning.isSmoothed = true; break;
+      case 13: m.samples[0].binning.bins[0].binIndex = 1; break;
+      case 14: m.samples[0].binOffset = -1; break;
+      case 15: m.variableValues[0] = std::numeric_limits<double>::infinity(); break;
+    }
+    SCOPED_TRACE(error);
+    EXPECT_THROW((void)makeCudaWeightModel(bad), std::runtime_error);
+  }
+}
+
+TEST(CudaWeightModel, ExternalObservableCacheUsesPublicationRatherThanProducerInputs) {
+  using namespace Backends;
+  PropagationView model;
+  model.externalWeightBlocks = {{0, 1}};
+  BackendDialDescriptor external;
+  external.type = BackendDialType::ExternalWeight;
+  external.inputCount = 99; // No evaluator inputs; producer metadata is ignored.
+  model.dials = {external};
+  BackendVariableResponseDescriptor target;
+  target.overrideDial = 0;
+  model.variableResponses = {target};
+  EventStateCache cache;
+  EXPECT_NO_THROW(cache.build(model));
+  double value = 1.;
+  PropagationInputs inputs;
+  inputs.externalWeights = {{&value, 1, 0, 1}};
+  cache.prepare(inputs);
+  EXPECT_TRUE(cache.variableInputsChanged());
+  cache.commit(inputs, {});
+  cache.prepare(inputs);
+  EXPECT_FALSE(cache.needsUpdate(inputs));
+  ++inputs.externalWeights[0].generation;
+  cache.prepare(inputs);
+  EXPECT_TRUE(cache.variableInputsChanged());
 }
