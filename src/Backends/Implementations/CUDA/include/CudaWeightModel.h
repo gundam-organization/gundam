@@ -16,6 +16,7 @@ namespace Backends {
     std::vector<BackendDialInputDescriptor> inputs{};
     std::vector<double> payloads{};
     std::vector<std::uint32_t> eventDialIndices{};
+    std::size_t eventDialStride{1};
     // CSR inverse index: constant Shift dials are initialized by the dense pass.
     std::vector<std::size_t> parameterDialOffsets{};
     std::vector<std::uint32_t> parameterDialIndices{};
@@ -28,7 +29,7 @@ namespace Backends {
 
   // Reject unsupported features and malformed layouts before allocating CUDA
   // buffers. This also makes model validation testable without a toolkit.
-  [[nodiscard]] CudaWeightModel makeCudaWeightModel(const EngineView& view_);
+  [[nodiscard]] CudaWeightModel makeCudaWeightModel(const EngineView& view_, bool interleaveEventDials_ = false);
 
   inline constexpr std::size_t cudaResponseBlockSize = 256;
   struct CudaResponseUpdate {

@@ -13,6 +13,12 @@ ENUM_FIELD( cachedResponses, 0 ) \
 ENUM_FIELD( recomputeResponses )
 #include "GenericToolbox.MakeEnum.h"
 
+#define ENUM_NAME CudaWeightLayout
+#define ENUM_FIELDS \
+ENUM_FIELD( eventMajor, 0 ) \
+ENUM_FIELD( warpInterleaved )
+#include "GenericToolbox.MakeEnum.h"
+
   struct CudaBackendImpl;
 
   // Resident native-double executor for 1D dials and fixed histogram bins.
@@ -44,6 +50,7 @@ ENUM_FIELD( recomputeResponses )
     [[nodiscard]] BackendDeviceView getDeviceView(const PropagationToken& token_) const override;
     [[nodiscard]] BackendTimingSummary getLastTimingSummary() const override;
     [[nodiscard]] BackendTimingTotals getTimingTotals() const override;
+    [[nodiscard]] std::string getDiagnostics() const;
 
   protected:
     void configureImpl() override;
@@ -59,6 +66,7 @@ ENUM_FIELD( recomputeResponses )
 
     int _deviceIndex_{0};
     CudaPropagationMode _propagationMode_{CudaPropagationMode::cachedResponses};
+    CudaWeightLayout _weightLayout_{CudaWeightLayout::eventMajor};
     std::uint64_t _nextTokenId_{1};
     std::unique_ptr<CudaBackendImpl> _impl_{};
   };

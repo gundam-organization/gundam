@@ -24,6 +24,7 @@ struct Backends::CudaBackendImpl {
   BackendTimingSummary timing{};
   BackendTimingSummary buildTiming{};
   BackendTimingTotals totals{};
+  JsonType diagnostics{{"available", false}};
 #ifdef GUNDAM_USING_CUDA
   std::unique_ptr<CudaDeviceContext> context{};
 #endif
@@ -46,8 +47,9 @@ void Backends::CudaBackend::configureImpl() {
   _impl_ = std::make_unique<CudaBackendImpl>();
   _deviceIndex_ = 0;
   _propagationMode_ = CudaPropagationMode::cachedResponses;
+  _weightLayout_ = CudaWeightLayout::eventMajor;
   _config_.clearFields();
-  _config_.defineFields({{"name"}, {"deviceIndex"}, {"propagationMode"}});
+  _config_.defineFields({{"name"}, {"deviceIndex"}, {"propagationMode"}, {"weightLayout"}});
   _config_.checkConfiguration();
   // fillValue tolerates conversion errors; explicit device/mode selections must
   // not silently fall back to defaults when they are malformed.
@@ -62,6 +64,13 @@ void Backends::CudaBackend::configureImpl() {
   }
   _config_.fillValue(_deviceIndex_, "deviceIndex");
   _config_.fillEnum(_propagationMode_, "propagationMode");
+  if( const auto* layout = _config_.getJsonEntry("weightLayout") ){
+    if( not layout->is_string() ){ throw std::runtime_error("CudaBackend: weightLayout must be a string."); }
+  }
+  _config_.fillEnum(_weightLayout_, "weightLayout");
+  if( _weightLayout_ != CudaWeightLayout::eventMajor and _weightLayout_ != CudaWeightLayout::warpInterleaved ){
+    throw std::runtime_error("CudaBackend: weightLayout must be eventMajor or warpInterleaved.");
+  }
   if( _propagationMode_ != CudaPropagationMode::cachedResponses and _propagationMode_ != CudaPropagationMode::recomputeResponses ){
     throw std::runtime_error("CudaBackend: propagationMode must be cachedResponses or recomputeResponses.");
   }
@@ -103,9 +112,10 @@ void Backends::CudaBackend::buildShared(std::shared_ptr<const EngineView> engine
   _impl_->buildTiming = {};
   _impl_->timing = {};
   _impl_->totals = {};
+  _impl_->diagnostics = {{"available", false}};
   if( not engineView_ ){ throw std::runtime_error("CudaBackend requires a model."); }
   const auto start = Clock::now();
-  const auto packed = makeCudaWeightModel(*engineView_);
+  const auto packed = makeCudaWeightModel(*engineView_, _weightLayout_ == CudaWeightLayout::warpInterleaved);
   _impl_->buildTiming.buildCompatibilityScanSeconds = elapsed(start);
   initializeDevice();
 #ifdef GUNDAM_USING_CUDA
@@ -114,8 +124,18 @@ void Backends::CudaBackend::buildShared(std::shared_ptr<const EngineView> engine
   _impl_->buildTiming.buildBufferUploadSeconds = elapsed(uploadStart);
 #endif
   _impl_->engineView = std::move(engineView_);
+  _impl_->diagnostics = {
+      {"available", true}, {"events", packed.events.size()}, {"uniqueDials", packed.dials.size()},
+      {"requestedWeightLayout", _weightLayout_.toString()},
+      {"weightLayout", packed.eventDialStride == 32 ? "warpInterleaved" : "eventMajor"},
+      {"originalEventDialIndices", getEngineView().propagation.eventDialIndices.size()},
+      {"packedEventDialIndices", packed.eventDialIndices.size()},
+      {"packedEventDialIndexBytes", packed.eventDialIndices.size() * sizeof(std::uint32_t)},
+      {"device", getCapabilities().deviceName}};
   _impl_->timing = _impl_->buildTiming;
 }
+
+std::string Backends::CudaBackend::getDiagnostics() const { return _impl_->diagnostics.dump(); }
 
 void Backends::CudaBackend::invalidateResult() const {
   _impl_->result.token.isValid = false;

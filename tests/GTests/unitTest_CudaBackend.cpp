@@ -41,6 +41,9 @@ TEST(CudaBackend, ConfigurationValidatesDeviceIndexWithoutADevice) {
   EXPECT_THROW(backend.configure(ConfigReader(JsonType{{"deviceIndex", -1}})), std::runtime_error);
   EXPECT_THROW(backend.configure(ConfigReader(JsonType{{"deviceIndex", "invalid"}})), std::exception);
   EXPECT_THROW(backend.configure(ConfigReader(JsonType{{"deviceIndex", 0.5}})), std::runtime_error);
+  EXPECT_NO_THROW(backend.configure(ConfigReader(JsonType{{"weightLayout", "warpInterleaved"}})));
+  EXPECT_THROW(backend.configure(ConfigReader(JsonType{{"weightLayout", "invalid"}})), std::exception);
+  EXPECT_THROW(backend.configure(ConfigReader(JsonType{{"weightLayout", 1}})), std::exception);
   EXPECT_THROW(backend.configure(ConfigReader(JsonType{{"deviceIndex",
       static_cast<unsigned long long>(std::numeric_limits<int>::max()) + 1}})), std::runtime_error);
 }
@@ -267,4 +270,43 @@ TEST(CudaWeightModel, SparseDispatchTilesMultipleRangesAndClearsPreviousWork) {
   EXPECT_THROW(plan.select(offsets, {}, previous), std::runtime_error);
   plan.select({0}, {}, {});
   EXPECT_TRUE(plan.ranges.empty());
+}
+
+TEST(CudaWeightModel, InterleavedIndicesPreservePerEventOrderAndBoundPadding) {
+  using namespace Backends;
+  EngineView view;
+  auto& model = view.propagation;
+  model.parameterCount = 1;
+  model.dialInputs = {{0}};
+  model.dials.resize(7);
+  for( auto& dial : model.dials ){ dial.inputCount = 1; }
+  model.events.resize(67);
+  for( std::size_t i = 0; i < model.events.size(); ++i ){
+    model.events[i].resultIndex = i;
+    BackendEventWeightDescriptor event;
+    event.baseWeight = .125 * i;
+    event.firstDial = model.eventDialIndices.size();
+    event.dialCount = i % 11 == 0 ? 0 : 5 + i % 4;
+    for( std::size_t j = 0; j < event.dialCount; ++j ){ model.eventDialIndices.push_back((i + 3 * j) % 7); }
+    model.eventWeights.push_back(event);
+  }
+  const auto packed = makeCudaWeightModel(view, true);
+  ASSERT_EQ(packed.eventDialStride, 32);
+  EXPECT_LE(packed.eventDialIndices.size(), 2 * model.eventDialIndices.size());
+  for( std::size_t i = 0; i < packed.events.size(); ++i ){
+    const auto& before = model.eventWeights[i];
+    const auto& after = packed.events[i];
+    EXPECT_EQ(before.baseWeight, after.baseWeight);
+    EXPECT_EQ(before.dialCount, after.dialCount);
+    for( std::size_t j = 0; j < before.dialCount; ++j ){
+      EXPECT_EQ(model.eventDialIndices[before.firstDial + j], packed.eventDialIndices[after.firstDial + 32 * j]);
+    }
+  }
+  // A single long event per warp must not inflate the index storage 32-fold.
+  for( auto& event : model.eventWeights ){ event.dialCount = 0; }
+  model.eventWeights[0].dialCount = model.eventDialIndices.size();
+  model.eventWeights[0].firstDial = 0;
+  const auto fallback = makeCudaWeightModel(view, true);
+  EXPECT_EQ(fallback.eventDialStride, 1);
+  EXPECT_EQ(fallback.eventDialIndices, model.eventDialIndices);
 }

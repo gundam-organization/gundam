@@ -19,6 +19,7 @@
 
 #ifdef GUNDAM_USING_BACKENDS
 #include "CpuBackend.h"
+#include "CudaBackend.h"
 #ifdef __APPLE__
 #include "MpsBackend.h"
 #endif
@@ -607,6 +608,11 @@ PYBIND11_MODULE(GUNDAM, module) {
   .def("getType", &Backends::BackendManager::getType)
   .def("getLastPreparationSeconds", &Backends::BackendManager::getLastPreparationSeconds)
   .def("setEnableAutoMaterialize", &Backends::BackendManager::setEnableAutoMaterialize)
+  .def("getDiagnosticCuda", [](const Backends::BackendManager& manager_){
+    auto* cuda = dynamic_cast<const Backends::CudaBackend*>(manager_.getBackend());
+    LogThrowIf(cuda == nullptr, "CUDA diagnostics require a CUDA backend.");
+    return cuda->getDiagnostics();
+  })
   .def("replaceBackend", [](Backends::BackendManager& manager_, const std::string& type_, const JsonType& config_){
     manager_.replaceBackend(type_, ConfigReader(config_));
   }, pybind11::arg("type"), pybind11::arg("backendConfig") = JsonType::object())

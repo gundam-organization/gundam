@@ -541,3 +541,39 @@ on a small two-parameter model. Resident CPU replacement was also checked
 through the Python driver and native tests, including repeated replacements
 after deleting the input file, stale deferred results, build failure and recovery.
 Optional CUDA regular tests cover CPU/CUDA/CPU/CUDA replacement in both modes.
+
+### Event-weight index layout experiment
+
+CUDA `backendConfig.weightLayout` accepts `eventMajor` (default) and
+`warpInterleaved` (opt-in). The latter stores the first dial index of 32 events
+together, followed by their second index, and so on. Adjacent GPU threads can
+load adjacent index locations. Each event still multiplies responses in its
+original order; base weights, reweight caps, result slots and bin membership
+are preserved. This targets index-load locality without changing reductions.
+The response values themselves may still require scattered accesses.
+
+Padding is capped at twice the original event-dial index count. Models exceeding
+that cap retain `eventMajor`. `model.json` reports requested and actual layouts,
+original/packed counts and packed index bytes. The cap applies to this one
+buffer, not total device memory. Keep the default until a production A/B run
+establishes a benefit for the selected model/device.
+
+The extra cases select this option without changing response propagation mode:
+
+```sh
+python3 tests/benchmarks/229CudaBackendProfiling.py \
+  --work-dir /sps/t2k/ablanche/work/results/gundam/GundamInputOA2024 \
+  --config configOA2024.yaml \
+  --override override/v13Prod.yaml override/backendCudaTest.yaml \
+  --cases CUDA-cachedResponses CUDA-cachedResponses-interleaved \
+    CUDA-recomputeResponses CUDA-recomputeResponses-interleaved CPU \
+  --threads 4 --execution-mode resident \
+  --output ./cuda-oa2024-profile-weight-layout
+```
+
+All five cases share the loaded model. Compare event-weight stage and complete
+evaluation durations alongside actual layout/index bytes in `report.md` and
+numerical checks in `comparison.json`. A faster response stage is not expected
+from this change. GPU tests check equality with the original layout for ordered
+products, histogram sums/errors and likelihood, and optional regular tests
+compare both propagation modes against the CPU fit/Hesse covariance reference.

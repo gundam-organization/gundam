@@ -168,3 +168,9 @@ preparation about 0.455 ms. The next profiling target is the event-weight
 response-index access pattern and layout; these elapsed times do not by
 themselves prove a memory-bandwidth bottleneck. The resident backend replacement
 still needs its own CC validation; this isolated run does not exercise it.
+
+An opt-in [event-weight index layout experiment](../../tests/benchmarks/README.md#event-weight-index-layout-experiment)
+now implements the next target. It transposes event-dial indices within groups
+of 32 events, preserves ordered multiplication, and caps index-buffer padding
+at 2x. The benchmark has additional `-interleaved` cases for A/B measurements
+in each response mode. No production speedup is claimed for this variant yet.

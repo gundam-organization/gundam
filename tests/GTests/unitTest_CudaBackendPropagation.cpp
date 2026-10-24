@@ -295,3 +295,41 @@ TEST(CudaBackendPropagation, DeviceOverflowCannotPublishResultsAndCanBeRetried) 
     EXPECT_EQ(backend.getHistogramSumSquaresHostView(retry), (std::vector<double>{81.}));
   }
 }
+
+TEST(CudaBackendPropagation, InterleavedIndicesPreserveOrderedWeightsAndHistogramResults) {
+  for( const auto* mode : {"cachedResponses", "recomputeResponses"} ){
+    for( bool capped : {false, true} ){
+      auto view = makeModel(capped, true);
+      auto& model = view.propagation;
+      model.eventDialIndices.clear();
+      for( std::size_t i = 0; i < model.eventWeights.size(); ++i ){
+        auto& event = model.eventWeights[i];
+        event.firstDial = model.eventDialIndices.size();
+        event.dialCount = i % 13 == 0 ? 0 : 5 + i % 4;
+        for( std::size_t j = 0; j < event.dialCount; ++j ){ model.eventDialIndices.push_back((i + j) % model.dials.size()); }
+      }
+      CudaBackend original, interleaved;
+      CpuBackend cpu;
+      original.configure(ConfigReader(JsonType{{"propagationMode", mode}}));
+      interleaved.configure(ConfigReader(JsonType{{"propagationMode", mode}, {"weightLayout", "warpInterleaved"}}));
+      original.build(view);
+      interleaved.build(view);
+      cpu.build(view);
+      ASSERT_EQ(JsonType::parse(interleaved.getDiagnostics())["weightLayout"], "warpInterleaved");
+      for( const auto& values : std::vector<std::vector<double>>{
+          {.8, 1.2, 2.3}, {.8, 1.2, 2.3}, {1., 1.2, 2.3}, {9., 8., 7.}} ){
+        SCOPED_TRACE(::testing::Message() << mode << " capped=" << capped);
+        PropagationInputs inputs;
+        inputs.parameters.values = values;
+        const auto reference = original.requestPropagation(inputs);
+        const auto token = interleaved.requestPropagation(inputs);
+        const auto cpuToken = cpu.requestPropagation(inputs);
+        EXPECT_EQ(interleaved.getEventWeightsHostView(token), original.getEventWeightsHostView(reference));
+        EXPECT_EQ(interleaved.getHistogramSumsHostView(token), original.getHistogramSumsHostView(reference));
+        EXPECT_EQ(interleaved.getHistogramSumSquaresHostView(token), original.getHistogramSumSquaresHostView(reference));
+        expectClose(interleaved.getEventWeightsHostView(token), cpu.getEventWeightsHostView(cpuToken));
+        EXPECT_DOUBLE_EQ(interleaved.getLikelihood(token), original.getLikelihood(reference));
+      }
+    }
+  }
+}

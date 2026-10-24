@@ -26,7 +26,8 @@ spec = importlib.util.spec_from_file_location(
 scheduling = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(scheduling)
 progress, write_json = scheduling.progress, scheduling.write_json
-CASES = ('CUDA-cachedResponses', 'CUDA-recomputeResponses', 'CPU')
+CASES = ('CUDA-cachedResponses', 'CUDA-recomputeResponses', 'CPU',
+         'CUDA-cachedResponses-interleaved', 'CUDA-recomputeResponses-interleaved')
 SECONDS_FIELDS = ('parameterUploadSeconds', 'cachedDialStageSeconds',
                   'cachePreparationSeconds',
                   'eventWeightsStageSeconds', 'histogramStageSeconds',
@@ -58,7 +59,8 @@ def backend_config(args):
     backend_type = 'CPU' if args.worker == 'CPU' else 'CUDA'
     return {'isEnabled': True, 'type': backend_type,
             'backendConfig': {} if backend_type == 'CPU' else {
-                'deviceIndex': args.device_index, 'propagationMode': args.worker.split('-', 1)[1]}}
+                'deviceIndex': args.device_index, 'propagationMode': args.worker.split('-')[1],
+                'weightLayout': 'warpInterleaved' if args.worker.endswith('-interleaved') else 'eventMajor'}}
 
 
 def load_engine(args):
@@ -147,6 +149,11 @@ def measure(args, engine=None, sequence=None):
               'pythonModuleSha256': hashlib.sha256(Path(GUNDAM.__file__).read_bytes()).hexdigest(),
               'parameters': manifest, 'executionMode': args.execution_mode, 'pid': os.getpid(),
               'scenarios': {}}
+    if args.worker != 'CPU':
+        result['model'] = json.loads(engine.getBackendsManager().getDiagnosticCuda())
+        write_json(args.output / 'model.json', result['model'])
+        progress(f"{args.worker}: weight layout {result['model']['weightLayout']}, "
+                 f"{result['model']['packedEventDialIndexBytes']} index bytes")
     for scenario in args.scenarios:
         calls = scheduling.scenario_calls(args, scenario, len(sequence.entries))
         if args.warmup:
@@ -290,6 +297,13 @@ def write_report(output, cases):
                   'The gap between evaluation and GPU time also contains host preparation, transfers,',
                   'likelihood/penalty work, launch overhead and synchronization. It is not all GPU wait.',
                   'No bandwidth, occupancy or hardware-counter claims are inferred from these timers.', ''])
+    lines.extend(['| CUDA case | Requested layout | Actual layout | Index bytes |',
+                  '|---|---|---|---:|'])
+    for case in cases:
+        model = json.loads((output / case / 'summary.json').read_text()).get('model')
+        if model:
+            lines.append(f"| {case} | {model['requestedWeightLayout']} | {model['weightLayout']} | "
+                         f"{model['packedEventDialIndexBytes']} |")
     (output / 'report.md').write_text('\n'.join(lines))
 
 

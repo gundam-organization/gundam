@@ -74,6 +74,7 @@ namespace {
     DeviceBuffer<int> error;
     bool cachePrimed{false};
     bool hasReweightCap{false};
+    bool interleavedEventDials{false};
     double maxReweight{0};
   };
 
@@ -151,6 +152,7 @@ namespace {
     }
   }
 
+  template<bool interleaved_>
   __global__ void reweightEvents(const Backends::BackendEventWeightDescriptor* events_, std::size_t count_,
                                  const std::uint32_t* indices_, const double* responses_, double* weights_,
                                  bool capped_, double cap_, int* error_) {
@@ -158,7 +160,9 @@ namespace {
          i < count_; i += std::size_t(blockDim.x) * gridDim.x ){
       const auto& event = events_[i];
       double response = 1.;
-      for( std::size_t j = 0; j < event.dialCount; ++j ){ response *= responses_[indices_[event.firstDial + j]]; }
+      for( std::size_t j = 0; j < event.dialCount; ++j ){
+        response *= responses_[indices_[event.firstDial + j * (interleaved_ ? 32 : 1)]];
+      }
       if( capped_ and response > cap_ ){ response = cap_; }
       weights_[i] = event.baseWeight * response;
       if( not ::isfinite(weights_[i]) ){ atomicExch(error_, 1); }
@@ -263,6 +267,7 @@ void Backends::CudaDeviceContext::build(const CudaWeightModel& model_) {
     b.error.allocate(1);
     b.hasReweightCap = model_.hasReweightCap;
     b.maxReweight = model_.maxReweight;
+    b.interleavedEventDials = model_.eventDialStride == 32;
     checkCuda(cudaStreamSynchronize(_impl_->stream), "model upload completion");
   }
   catch(...){ cudaStreamSynchronize(_impl_->stream); throw; }
@@ -316,8 +321,14 @@ void Backends::CudaDeviceContext::propagate(const std::vector<double>& parameter
     }
     record(2);
     if( b.events.size ){
-      reweightEvents<<<gridSize(b.events.size), blockSize, 0, stream>>>(b.events.data, b.events.size,
-          b.dialIndices.data, b.responses.data, b.weights.data, b.hasReweightCap, b.maxReweight, b.error.data);
+      if( b.interleavedEventDials ){
+        reweightEvents<true><<<gridSize(b.events.size), blockSize, 0, stream>>>(b.events.data, b.events.size,
+            b.dialIndices.data, b.responses.data, b.weights.data, b.hasReweightCap, b.maxReweight, b.error.data);
+      }
+      else{
+        reweightEvents<false><<<gridSize(b.events.size), blockSize, 0, stream>>>(b.events.data, b.events.size,
+            b.dialIndices.data, b.responses.data, b.weights.data, b.hasReweightCap, b.maxReweight, b.error.data);
+      }
       checkCuda(cudaGetLastError(), "event weight kernel launch");
     }
     record(3);

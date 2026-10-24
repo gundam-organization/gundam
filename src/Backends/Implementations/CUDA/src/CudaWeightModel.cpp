@@ -1,5 +1,6 @@
 #include "CudaWeightModel.h"
 
+#include <algorithm>
 #include <cmath>
 #include <limits>
 #include <stdexcept>
@@ -69,7 +70,7 @@ namespace {
   }
 }
 
-Backends::CudaWeightModel Backends::makeCudaWeightModel(const EngineView& view_) {
+Backends::CudaWeightModel Backends::makeCudaWeightModel(const EngineView& view_, bool interleaveEventDials_) {
   static_assert(std::is_trivially_copyable<BackendDialDescriptor>::value);
   static_assert(std::is_trivially_copyable<BackendDialInputDescriptor>::value);
   static_assert(std::is_trivially_copyable<BackendEventWeightDescriptor>::value);
@@ -133,7 +134,43 @@ Backends::CudaWeightModel Backends::makeCudaWeightModel(const EngineView& view_)
   out.dials = model.dials;
   out.inputs = model.dialInputs;
   out.payloads = model.dialPayloads;
-  out.eventDialIndices = model.eventDialIndices;
+  if( interleaveEventDials_ and not out.events.empty() ){
+    // Adjacent warp lanes read adjacent indices at every multiplication step.
+    // Cap padding at twice the original index storage; highly ragged models
+    // retain the event-major layout instead of inflating device memory.
+    constexpr std::size_t width = 32;
+    const auto originalSize = model.eventDialIndices.size();
+    const auto budget = originalSize > std::numeric_limits<std::size_t>::max() / 2
+        ? std::numeric_limits<std::size_t>::max() : 2 * originalSize;
+    std::size_t packedSize = 0;
+    bool fits = true;
+    for( std::size_t first = 0; first < out.events.size(); first += width ){
+      std::size_t maxDials = 0;
+      for( std::size_t i = first; i < std::min(first + width, out.events.size()); ++i ){
+        maxDials = std::max(maxDials, out.events[i].dialCount);
+      }
+      if( maxDials > (budget - packedSize) / width ){ fits = false; break; }
+      packedSize += width * maxDials;
+    }
+    if( fits and packedSize ){
+      out.eventDialIndices.resize(packedSize);
+      out.eventDialStride = width;
+      std::size_t offset = 0;
+      for( std::size_t first = 0; first < out.events.size(); first += width ){
+        std::size_t maxDials = 0;
+        for( std::size_t i = first; i < std::min(first + width, out.events.size()); ++i ){
+          auto& event = out.events[i];
+          maxDials = std::max(maxDials, event.dialCount);
+          for( std::size_t j = 0; j < event.dialCount; ++j ){
+            out.eventDialIndices[offset + width * j + i - first] = model.eventDialIndices[event.firstDial + j];
+          }
+          event.firstDial = offset + i - first;
+        }
+        offset += width * maxDials;
+      }
+    }
+  }
+  if( out.eventDialStride == 1 ){ out.eventDialIndices = model.eventDialIndices; }
   out.parameterCount = model.parameterCount;
   out.hasReweightCap = model.hasReweightCap;
   out.maxReweight = model.maxReweight;

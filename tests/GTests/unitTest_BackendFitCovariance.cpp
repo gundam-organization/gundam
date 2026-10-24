@@ -142,7 +142,8 @@ namespace {
     }
   };
 
-  JsonType makeConfig(const FitInput& input_, const std::string& backend_, const std::string& mode_) {
+  JsonType makeConfig(const FitInput& input_, const std::string& backend_, const std::string& mode_,
+                      const std::string& layout_ = "eventMajor") {
     auto config = JsonType::parse(R"({
       "enablePca": false, "scaleParStepWithChi2Response": false,
       "generateSamplePlots": false, "generateOneSigmaPlots": false,
@@ -175,7 +176,7 @@ namespace {
     if( backend_ != "Original" ){
       likelihood["backendManagerConfig"] = {{"isEnabled", true}, {"type", backend_}};
       if( backend_ == "CUDA" ){
-        likelihood["backendManagerConfig"]["backendConfig"] = {{"propagationMode", mode_}};
+        likelihood["backendManagerConfig"]["backendConfig"] = {{"propagationMode", mode_}, {"weightLayout", layout_}};
       }
     }
     return config;
@@ -211,9 +212,10 @@ namespace {
     }
   };
 
-  FitResult fit(const FitInput& input_, const std::string& backend_, const std::string& mode_) {
+  FitResult fit(const FitInput& input_, const std::string& backend_, const std::string& mode_,
+                const std::string& layout_ = "eventMajor") {
     FitterEngine engine;
-    engine.configure(ConfigReader(makeConfig(input_, backend_, mode_)));
+    engine.configure(ConfigReader(makeConfig(input_, backend_, mode_, layout_)));
     engine.getLikelihoodInterface().setDataType(LikelihoodInterface::DataType::Asimov);
     engine.initialize();
     if( backend_ != "Original" and (not engine.getBackendsManager().hasBackend()
@@ -282,14 +284,16 @@ namespace {
     }
   }
 
-  void compareFits(const std::string& reference_, const std::string& candidate_, const std::string& mode_) {
+  void compareFits(const std::string& reference_, const std::string& candidate_, const std::string& mode_,
+                    const std::string& layout_ = "eventMajor") {
     FitEnvironment environment;
     FitInput input;
     const auto reference = fit(input, reference_, mode_);
-    const auto candidate = fit(input, candidate_, mode_);
+    const auto candidate = fit(input, candidate_, mode_, layout_);
     const auto expected = input.expectedCovariance();
     // Write the full matrices and all diagnostics even when comparisons fail.
     JsonType report{{"referenceBackend", reference_}, {"candidateBackend", candidate_}, {"mode", mode_},
+                    {"weightLayout", layout_},
                     {"eventCount", input.eventCount}, {"binCount", binCount},
                     {"reference", reference.toJson()}, {"candidate", candidate.toJson()}};
     report["analyticCovariance"] = JsonType::array();
@@ -333,7 +337,8 @@ namespace {
     report["maxCovarianceDifferenceInSigmaProducts"] = maxCovarianceDifference;
     report["maxAbsoluteCorrelationDifference"] = maxCorrelationDifference;
     report["passed"] = not testing::Test::HasFailure();
-    const auto path = "BackendFitCovariance_" + candidate_ + "_" + mode_ + ".json";
+    const auto path = "BackendFitCovariance_" + candidate_ + "_" + mode_
+        + (layout_ == "eventMajor" ? "" : "_" + layout_) + ".json";
     std::ofstream output(path);
     ASSERT_TRUE(output.good()) << path;
     output << report.dump(2) << std::endl;
@@ -422,6 +427,12 @@ TEST(BackendFitCovariance, ResidentReplacementPreservesLoadedModelAndRejectsStal
 TEST_P(CudaFitCovariance, MatchesCpuFitAndCovariance) {
 #ifdef GUNDAM_USING_BACKENDS
   compareFits("CPU", "CUDA", GetParam());
+#endif
+}
+
+TEST_P(CudaFitCovariance, InterleavedMatchesCpuFitAndCovariance) {
+#ifdef GUNDAM_USING_BACKENDS
+  compareFits("CPU", "CUDA", GetParam(), "warpInterleaved");
 #endif
 }
 
