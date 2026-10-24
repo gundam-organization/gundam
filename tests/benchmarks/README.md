@@ -73,65 +73,11 @@ These probes report elapsed GPU time and layout, not hardware cache misses,
 achieved memory bandwidth, or occupancy. Summaries are checkpointed after each
 ordinary trial. `--probe-calls 0` disables the separate stage pass.
 
-### Comparing compact cached dial dispatches
-
-Add `--compare-cached-dials --comparison-rounds 2` to the MPS command above to
-compare the original full descriptor scan with dispatching only cached dial
-indices. Both modes reuse one loaded model and retain the same response slots,
-event order, and arithmetic. The compact mode is the production default; the
-full scan remains available through a diagnostic Python switch for A/B runs.
-
-Each round runs identical seeded sequences for both modes, alternating A/B and
-B/A order between trials/rounds. Every measured likelihood and each final
-histogram must match **exactly**. With the default scenarios and 842 effective
-coordinates, two rounds of two trials produce 10,424 ordinary evaluations.
-Synchronized GPU stage probes run after all ordinary A/B measurements and are
-also compared exactly. Input selection and cached-dial reuse thresholds stay
-fixed throughout the comparison.
-
-`model-fullScan.json` and `model-compactIndices.json` report selected modes,
-dispatched dial counts, and the extra cached-index buffer storage. Files named
-`round*-*-trial*-*.json` hold all raw ordinary passes. `summary.json` reports
-median/mean/p95 times by scenario/mode, speedup ratios, completion status, and
-exact comparison status. The diagnostic switch affects the packed-weight MPS
-path; the event-propagation path uses a different dial executor.
-
-### Comparing compact dial descriptors
-
-Use `--compare-descriptors --comparison-rounds 2` in place of
-`--compare-cached-dials` to compare the legacy 48-byte spline / 36-byte
-normalization and external-weight descriptors against compact 24-byte / 16-byte
-records with a separate smoothing table. Both modes retain compact cached dial
-dispatches from the previous optimization. Model loading enables
-`backendConfig.enableDiagnosticDescriptorComparison` so both layouts are
-available; normal runs allocate only the compact layout.
-
-Descriptor comparisons use the original payload order in both modes to isolate
-the descriptor-size experiment. The same alternating order, parameter sequences,
-ordinary timing passes, separate stage probes, and exact comparisons apply. Modes are called
-`legacyDescriptors` and `compactDescriptors` in the JSON files. A/B allocation
-contains both layouts: subtract the inactive descriptor buffers when comparing
-normal production memory requirements. The smoothing table belongs only to the
-compact representation. No event, coefficient or reference reordering is
-performed by this experiment.
-
-### Comparing spline payload order
-
-Use `--compare-payloads --comparison-rounds 2` to compare the original payload
-order with first-use order across logical 32-event GPU tiles. Both modes use
-compact descriptors and compact cached-dial lists. Payload values, descriptor
-IDs, response slots, event references, and multiplication order are preserved;
-only payload offsets and placement differ.
-
-The script sets `backendConfig.enableDiagnosticPayloadComparison` before model
-initialization. The A/B model retains both payload buffers and both sets of
-compact descriptors so mode changes do not reload the dataset. Production uses
-the reordered payloads by default and allocates only one layout.
-
-JSON mode names are `originalPayloads` and `orderedPayloads`. Ordinary timing
-trials alternate A/B order; every likelihood and final histogram must match
-exactly. Separate GPU stage probes follow all ordinary trials. Do not interpret
-the dual A/B allocation as production GPU memory consumption.
+The MPS benchmarks measure the production implementation: compact cached-dial
+indices and descriptors, ordered spline payloads and resident propagation
+optimizations. Temporary switches comparing these algorithms with their older
+implementations have been removed. Ordinary timing passes and separate GPU
+stage probes remain available.
 
 ## Single-thread propagation and function sampling
 
@@ -393,7 +339,7 @@ these passes are excluded from performance statistics. Their
 bin, rather than measuring an implemented optimization. Event readbacks are
 forbidden during the ordinary measurement passes.
 
-### Comparing previous-bin reuse without an external worker
+### Production binning with Pmu variations
 
 For the upgrade inputs, `override/pmuScaleBinningTest.yaml` defines the
 `Pmu scale binning test` parameter set, with a unit normalization on `Pmu` and
@@ -412,20 +358,12 @@ env -u DYLD_LIBRARY_PATH \
     override/pmuScaleBinningTest.yaml override/binResponse.yaml override/backendMpsTest.yaml \
   --parameter-set 'Pmu scale binning test' --step-scale 1 \
   --scenarios constant global --calls 150 --trials 4 --warmup 20 \
-  --probe-calls 12 --compare-previous-bin
+  --probe-calls 12
 ```
 
 `--step-scale 1` proposes at one prior sigma (1% here). The override resides in
-the external input directory. `--compare-previous-bin` adds alternating A/B and
-B/A trials on each resident MPS model. The reference disables the shortcut; the
-other mode restores the enabled production default. Each trial replays the same
-seeded proposals from the initialized point. Results are written to
-`previous-bin-comparison.json`, `*-ab*-treeSearch.json`,
-`*-ab*-previousBin.json` and separate `*-ab-*-probes.json` files. A/B checks cover
-every likelihood and each final histogram with the existing 2e-5 tolerances.
-Counter differences are expected: a failed previous-bin check counts as an
-additional candidate before the fallback tree search. Smoothed cases keep the
-same binning algorithm in both diagnostic modes.
+the external input directory. Previous-bin reuse is always active for certified
+strict bins; smoothed cases use the full binning algorithm.
 
 ### Large Pmu variations and interval rejection
 
@@ -437,53 +375,17 @@ the positive domain, so the accepted distribution is a truncated Gaussian.
 Simply setting `--step-scale 50` with the original `[0.8, 1.2]` bounds would not
 exercise large migrations.
 
-Use the command above with the additional stress override and
-`--compare-binning-intervals` in place of `--compare-previous-bin`. For example,
+Use the command above with the additional stress override. For example,
 `--scenarios global --calls 200 --trials 6 --warmup 30 --probe-calls 16` gives
-1,200 ordinary evaluations per backend/mode plus six alternating A/B pairs on
-each MPS model. The previous-bin optimization stays enabled in both variants.
+1,200 ordinary evaluations per backend/mode, followed by separate GPU stage
+probes. Interval pruning and contribution-index reuse are always active.
+Candidate counts describe bins visited, rather than individual intervals.
 
-This comparison writes `interval-pruning-comparison.json`,
-`*-ab*-fullIntervals.json`, `*-ab*-prunedIntervals.json` and corresponding
-separate stage probes. `fullIntervals` executes the original complete interval
-loop; `prunedIntervals` stops once a candidate cannot match or contribute. Each
-raw row now includes `parameterValues` in parameter-manifest order, after the
-evaluation timer, so the actual proposal range can be inspected. Candidate
-counts describe bins visited, not individual interval operations; early
-interval rejection does not reduce these counts.
-
-
-### Comparing resident propagation optimizations
-
-Use `--compare-resident-stages` instead of the other comparison flags to rotate
-five variants on each resident MPS model:
-
-| Variant | Dial/weight cache | Contribution-index reuse | Parallel histogram chunks | SIMD counters |
-|---|---|---|---|---|
-| baseline | off | off | off | off |
-| cached | on | off | off | off |
-| indexed | on | on | off | off |
-| parallel | on | on | on | off |
-| aggregated | on | on | on | on |
-
-The baseline disables the new features in the current executable; it shares the
-refactored shader code, rather than loading an older binary. These controls do
-not disable previous-bin reuse or interval pruning. All five variants replay the
-same seeded coordinates, and the original default is restored afterwards.
-Results are in `resident-stages-comparison.json`, per-trial variant files and
-separate probes. Probe rows also include `executionState` (evaluated dials,
-weight-update flag, index-rebuild flag). This cheap state query and all histogram
-snapshots happen after the evaluation timer.
-
-Use the 1% or 50% command above with this flag. To isolate fraction changes while
-keeping support lists stable, use the original 1% override with
-`--step-scale 0.00001`. This deliberately tiny workload checks index reuse; it
-does not represent an ordinary full-sigma proposal. To exercise simultaneous
-weight and observable changes, `--parameter-set '*' --step-scale 0.1` selects
-all eligible effective fit coordinates. Quote the asterisk to prevent shell
-expansion. This mixed workload is useful for checking that dense updates retain
-the full dial scan efficiently. Model manifests record the actual coordinate
-count. CPU comparisons are performed only when CPU is included in `--backends`.
+To exercise simultaneous weight and observable changes,
+`--parameter-set '*' --step-scale 0.1` selects all eligible effective fit
+coordinates. Quote the asterisk to prevent shell expansion. This mixed workload
+also exercises the full dial scan for dense updates. CPU comparisons are
+performed when CPU is included in `--backends`.
 
 ## Original/CPU/MPS numerical comparison
 

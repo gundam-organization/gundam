@@ -21,12 +21,7 @@ namespace Backends {
     MpsEventPropagation(const MpsEventPropagation&) = delete;
     MpsEventPropagation& operator=(const MpsEventPropagation&) = delete;
     void setDiagnosticStageProfiling(bool enabled_){ _enableDiagnosticStageProfiling_ = enabled_; }
-    void setDiagnosticPreviousBinReuse(bool enabled_){ _enablePreviousBinReuse_ = enabled_; }
-    void setDiagnosticBinningIntervalPruning(bool enabled_){ _enableBinningIntervalPruning_ = enabled_; }
-    void setDiagnosticOptions(bool cacheDials_, bool reuseIndex_, bool parallelHistograms_, bool aggregateCounters_){
-      _enableDialCache_ = cacheDials_; _enableIndexReuse_ = reuseIndex_;
-      _enableParallelHistograms_ = parallelHistograms_; _enableAggregateCounters_ = aggregateCounters_;
-    }
+    void setEnableDialCache(bool enabled_){ _enableDialCache_ = enabled_; }
     [[nodiscard]] std::string getDiagnostics() const;
     [[nodiscard]] std::string getExecutionState() const;
     [[nodiscard]] const std::map<std::string, double>& getDiagnosticStageGpuSeconds() const { return _diagnosticStageGpuSeconds_; }
@@ -69,10 +64,7 @@ namespace Backends {
     std::uint64_t _materializedRevision_{0};
     bool _valid_{false};
     bool _enableDiagnosticStageProfiling_{false};
-    bool _enablePreviousBinReuse_{true};
-    bool _enableBinningIntervalPruning_{true};
-    bool _enableDialCache_{true}, _enableIndexReuse_{true};
-    bool _enableParallelHistograms_{true}, _enableAggregateCounters_{true};
+    bool _enableDialCache_{true};
     std::vector<DialGroup> _dialGroups_{};
     std::vector<double> _cachedParameters_{};
     std::vector<std::uint64_t> _cachedExternalGenerations_{};

@@ -2,9 +2,6 @@ constant uint kDialFlagAllowExtrapolation = 1u << 0;
 constant uint kDialFlagCached = 1u << 1;
 
 using EventDialRanges = Backends::DeviceEventDialRanges;
-using ExternalDialOccurrence = Backends::DeviceExternalDialOccurrence;
-using NormDialOccurrence = Backends::DeviceNormDialOccurrence;
-using SplineDialDescriptor = Backends::DeviceSplineDialDescriptor;
 
 float evaluate_compact_spline(float x, bool allowExtrapolation, device const float* data, uint dim) {
   if( !allowExtrapolation ){
@@ -69,11 +66,6 @@ float process_reduced_response(float value, float lower, float upper, uint smoot
     return Backends::Semantics::processUpperResponse(value, upper, smoothings[smoothingIndex]);
   }
   return value;
-}
-template<typename Descriptor>
-float process_descriptor_response(float value, Descriptor descriptor,
-                                   device const Backends::ResponseSmoothing<float>* smoothings) {
-  return Backends::Semantics::processResponse(value, descriptor);
 }
 float process_descriptor_response(float value, Backends::MpsSplineDialDescriptor descriptor,
                                    device const Backends::ResponseSmoothing<float>* smoothings) {
@@ -279,213 +271,85 @@ inline void compute_event_weights_impl(
 
 kernel void compute_cached_compact_responses(
     device float* cachedResponses [[buffer(0)]],
-    device const SplineDialDescriptor* descriptors [[buffer(1)]],
+    device const Backends::MpsSplineDialDescriptor* descriptors [[buffer(1)]],
     device const float* splineData [[buffer(2)]],
     device const float* parameters [[buffer(3)]],
     constant uint& dispatchCount [[buffer(4)]],
     device const uint* cachedDialIndices [[buffer(5)]],
-    constant uint& useCachedIndices [[buffer(6)]],
-    device const Backends::ResponseSmoothing<float>* smoothings [[buffer(7)]],
+    device const Backends::ResponseSmoothing<float>* smoothings [[buffer(6)]],
     uint gid [[thread_position_in_grid]]) {
   if( gid >= dispatchCount ){ return; }
-  uint descriptorIndex = useCachedIndices ? cachedDialIndices[gid] : gid;
-  SplineDialDescriptor descriptor = descriptors[descriptorIndex];
+  uint descriptorIndex = cachedDialIndices[gid];
+  Backends::MpsSplineDialDescriptor descriptor = descriptors[descriptorIndex];
   if( (descriptor.flags & kDialFlagCached) == 0 ){ return; }
   cachedResponses[descriptorIndex] = evaluate_compact_descriptor(descriptor, splineData, parameters, smoothings);
 }
 
 kernel void compute_cached_uniform_responses(
     device float* cachedResponses [[buffer(0)]],
-    device const SplineDialDescriptor* descriptors [[buffer(1)]],
+    device const Backends::MpsSplineDialDescriptor* descriptors [[buffer(1)]],
     device const float* splineData [[buffer(2)]],
     device const float* parameters [[buffer(3)]],
     constant uint& dispatchCount [[buffer(4)]],
     device const uint* cachedDialIndices [[buffer(5)]],
-    constant uint& useCachedIndices [[buffer(6)]],
-    device const Backends::ResponseSmoothing<float>* smoothings [[buffer(7)]],
+    device const Backends::ResponseSmoothing<float>* smoothings [[buffer(6)]],
     uint gid [[thread_position_in_grid]]) {
   if( gid >= dispatchCount ){ return; }
-  uint descriptorIndex = useCachedIndices ? cachedDialIndices[gid] : gid;
-  SplineDialDescriptor descriptor = descriptors[descriptorIndex];
+  uint descriptorIndex = cachedDialIndices[gid];
+  Backends::MpsSplineDialDescriptor descriptor = descriptors[descriptorIndex];
   if( (descriptor.flags & kDialFlagCached) == 0 ){ return; }
   cachedResponses[descriptorIndex] = evaluate_uniform_descriptor(descriptor, splineData, parameters, smoothings);
 }
 
 kernel void compute_cached_monotonic_responses(
     device float* cachedResponses [[buffer(0)]],
-    device const SplineDialDescriptor* descriptors [[buffer(1)]],
+    device const Backends::MpsSplineDialDescriptor* descriptors [[buffer(1)]],
     device const float* splineData [[buffer(2)]],
     device const float* parameters [[buffer(3)]],
     constant uint& dispatchCount [[buffer(4)]],
     device const uint* cachedDialIndices [[buffer(5)]],
-    constant uint& useCachedIndices [[buffer(6)]],
-    device const Backends::ResponseSmoothing<float>* smoothings [[buffer(7)]],
+    device const Backends::ResponseSmoothing<float>* smoothings [[buffer(6)]],
     uint gid [[thread_position_in_grid]]) {
   if( gid >= dispatchCount ){ return; }
-  uint descriptorIndex = useCachedIndices ? cachedDialIndices[gid] : gid;
-  SplineDialDescriptor descriptor = descriptors[descriptorIndex];
+  uint descriptorIndex = cachedDialIndices[gid];
+  Backends::MpsSplineDialDescriptor descriptor = descriptors[descriptorIndex];
   if( (descriptor.flags & kDialFlagCached) == 0 ){ return; }
   cachedResponses[descriptorIndex] = evaluate_monotonic_descriptor(descriptor, splineData, parameters, smoothings);
 }
 
 kernel void compute_cached_general_responses(
     device float* cachedResponses [[buffer(0)]],
-    device const SplineDialDescriptor* descriptors [[buffer(1)]],
+    device const Backends::MpsSplineDialDescriptor* descriptors [[buffer(1)]],
     device const float* splineData [[buffer(2)]],
     device const float* parameters [[buffer(3)]],
     constant uint& dispatchCount [[buffer(4)]],
     device const uint* cachedDialIndices [[buffer(5)]],
-    constant uint& useCachedIndices [[buffer(6)]],
-    device const Backends::ResponseSmoothing<float>* smoothings [[buffer(7)]],
+    device const Backends::ResponseSmoothing<float>* smoothings [[buffer(6)]],
     uint gid [[thread_position_in_grid]]) {
   if( gid >= dispatchCount ){ return; }
-  uint descriptorIndex = useCachedIndices ? cachedDialIndices[gid] : gid;
-  SplineDialDescriptor descriptor = descriptors[descriptorIndex];
+  uint descriptorIndex = cachedDialIndices[gid];
+  Backends::MpsSplineDialDescriptor descriptor = descriptors[descriptorIndex];
   if( (descriptor.flags & kDialFlagCached) == 0 ){ return; }
   cachedResponses[descriptorIndex] = evaluate_general_descriptor(descriptor, splineData, parameters, smoothings);
 }
 
 kernel void compute_cached_graph_responses(
     device float* cachedResponses [[buffer(0)]],
-    device const SplineDialDescriptor* descriptors [[buffer(1)]],
+    device const Backends::MpsSplineDialDescriptor* descriptors [[buffer(1)]],
     device const float* splineData [[buffer(2)]],
     device const float* parameters [[buffer(3)]],
     constant uint& dispatchCount [[buffer(4)]],
     device const uint* cachedDialIndices [[buffer(5)]],
-    constant uint& useCachedIndices [[buffer(6)]],
-    device const Backends::ResponseSmoothing<float>* smoothings [[buffer(7)]],
+    device const Backends::ResponseSmoothing<float>* smoothings [[buffer(6)]],
     uint gid [[thread_position_in_grid]]) {
   if( gid >= dispatchCount ){ return; }
-  uint descriptorIndex = useCachedIndices ? cachedDialIndices[gid] : gid;
-  SplineDialDescriptor descriptor = descriptors[descriptorIndex];
+  uint descriptorIndex = cachedDialIndices[gid];
+  Backends::MpsSplineDialDescriptor descriptor = descriptors[descriptorIndex];
   if( (descriptor.flags & kDialFlagCached) == 0 ){ return; }
   cachedResponses[descriptorIndex] = evaluate_graph_descriptor(descriptor, splineData, parameters, smoothings);
 }
 
 kernel void compute_event_weights(
-    device float* eventWeights [[buffer(0)]],
-    device const float* baseWeights [[buffer(1)]],
-    device const EventDialRanges* eventDialRanges [[buffer(2)]],
-    device const NormDialOccurrence* normDialOccurrences [[buffer(3)]],
-    device const float* parameters [[buffer(4)]],
-    device const uint* compactDialIndices [[buffer(5)]],
-    device const SplineDialDescriptor* compactDialDescriptors [[buffer(6)]],
-    device const float* compactCachedResponses [[buffer(7)]],
-    device const uint* uniformDialIndices [[buffer(8)]],
-    device const SplineDialDescriptor* uniformDialDescriptors [[buffer(9)]],
-    device const float* uniformCachedResponses [[buffer(10)]],
-    device const uint* monotonicDialIndices [[buffer(11)]],
-    device const SplineDialDescriptor* monotonicDialDescriptors [[buffer(12)]],
-    device const float* monotonicCachedResponses [[buffer(13)]],
-    device const uint* generalDialIndices [[buffer(14)]],
-    device const SplineDialDescriptor* generalDialDescriptors [[buffer(15)]],
-    device const float* generalCachedResponses [[buffer(16)]],
-    device const uint* graphDialIndices [[buffer(17)]],
-    device const SplineDialDescriptor* graphDialDescriptors [[buffer(18)]],
-    device const float* graphCachedResponses [[buffer(19)]],
-    device const float* splineData [[buffer(20)]],
-    constant uint& nEvents [[buffer(21)]],
-    device const float* externalWeights [[buffer(22)]],
-    device const ExternalDialOccurrence* externalDialOccurrences [[buffer(23)]],
-    device const Backends::ResponseSmoothing<float>* smoothings [[buffer(24)]],
-    uint gid [[thread_position_in_grid]]) {
-  compute_event_weights_impl(
-      eventWeights, baseWeights, eventDialRanges, normDialOccurrences,
-      parameters, compactDialIndices, compactDialDescriptors, compactCachedResponses,
-      uniformDialIndices, uniformDialDescriptors, uniformCachedResponses, monotonicDialIndices,
-      monotonicDialDescriptors, monotonicCachedResponses, generalDialIndices, generalDialDescriptors,
-      generalCachedResponses, graphDialIndices, graphDialDescriptors, graphCachedResponses,
-      splineData, nEvents, externalWeights, externalDialOccurrences,
-      smoothings, gid);
-}
-
-// Compact descriptor entry points share scalar evaluation with the legacy diagnostics.
-kernel void compute_cached_compact_responses_reduced(
-    device float* cachedResponses [[buffer(0)]],
-    device const Backends::MpsSplineDialDescriptor* descriptors [[buffer(1)]],
-    device const float* splineData [[buffer(2)]],
-    device const float* parameters [[buffer(3)]],
-    constant uint& dispatchCount [[buffer(4)]],
-    device const uint* cachedDialIndices [[buffer(5)]],
-    constant uint& useCachedIndices [[buffer(6)]],
-    device const Backends::ResponseSmoothing<float>* smoothings [[buffer(7)]],
-    uint gid [[thread_position_in_grid]]) {
-  if( gid >= dispatchCount ){ return; }
-  uint descriptorIndex = useCachedIndices ? cachedDialIndices[gid] : gid;
-  Backends::MpsSplineDialDescriptor descriptor = descriptors[descriptorIndex];
-  if( (descriptor.flags & kDialFlagCached) == 0 ){ return; }
-  cachedResponses[descriptorIndex] = evaluate_compact_descriptor(descriptor, splineData, parameters, smoothings);
-}
-
-kernel void compute_cached_uniform_responses_reduced(
-    device float* cachedResponses [[buffer(0)]],
-    device const Backends::MpsSplineDialDescriptor* descriptors [[buffer(1)]],
-    device const float* splineData [[buffer(2)]],
-    device const float* parameters [[buffer(3)]],
-    constant uint& dispatchCount [[buffer(4)]],
-    device const uint* cachedDialIndices [[buffer(5)]],
-    constant uint& useCachedIndices [[buffer(6)]],
-    device const Backends::ResponseSmoothing<float>* smoothings [[buffer(7)]],
-    uint gid [[thread_position_in_grid]]) {
-  if( gid >= dispatchCount ){ return; }
-  uint descriptorIndex = useCachedIndices ? cachedDialIndices[gid] : gid;
-  Backends::MpsSplineDialDescriptor descriptor = descriptors[descriptorIndex];
-  if( (descriptor.flags & kDialFlagCached) == 0 ){ return; }
-  cachedResponses[descriptorIndex] = evaluate_uniform_descriptor(descriptor, splineData, parameters, smoothings);
-}
-
-kernel void compute_cached_monotonic_responses_reduced(
-    device float* cachedResponses [[buffer(0)]],
-    device const Backends::MpsSplineDialDescriptor* descriptors [[buffer(1)]],
-    device const float* splineData [[buffer(2)]],
-    device const float* parameters [[buffer(3)]],
-    constant uint& dispatchCount [[buffer(4)]],
-    device const uint* cachedDialIndices [[buffer(5)]],
-    constant uint& useCachedIndices [[buffer(6)]],
-    device const Backends::ResponseSmoothing<float>* smoothings [[buffer(7)]],
-    uint gid [[thread_position_in_grid]]) {
-  if( gid >= dispatchCount ){ return; }
-  uint descriptorIndex = useCachedIndices ? cachedDialIndices[gid] : gid;
-  Backends::MpsSplineDialDescriptor descriptor = descriptors[descriptorIndex];
-  if( (descriptor.flags & kDialFlagCached) == 0 ){ return; }
-  cachedResponses[descriptorIndex] = evaluate_monotonic_descriptor(descriptor, splineData, parameters, smoothings);
-}
-
-kernel void compute_cached_general_responses_reduced(
-    device float* cachedResponses [[buffer(0)]],
-    device const Backends::MpsSplineDialDescriptor* descriptors [[buffer(1)]],
-    device const float* splineData [[buffer(2)]],
-    device const float* parameters [[buffer(3)]],
-    constant uint& dispatchCount [[buffer(4)]],
-    device const uint* cachedDialIndices [[buffer(5)]],
-    constant uint& useCachedIndices [[buffer(6)]],
-    device const Backends::ResponseSmoothing<float>* smoothings [[buffer(7)]],
-    uint gid [[thread_position_in_grid]]) {
-  if( gid >= dispatchCount ){ return; }
-  uint descriptorIndex = useCachedIndices ? cachedDialIndices[gid] : gid;
-  Backends::MpsSplineDialDescriptor descriptor = descriptors[descriptorIndex];
-  if( (descriptor.flags & kDialFlagCached) == 0 ){ return; }
-  cachedResponses[descriptorIndex] = evaluate_general_descriptor(descriptor, splineData, parameters, smoothings);
-}
-
-kernel void compute_cached_graph_responses_reduced(
-    device float* cachedResponses [[buffer(0)]],
-    device const Backends::MpsSplineDialDescriptor* descriptors [[buffer(1)]],
-    device const float* splineData [[buffer(2)]],
-    device const float* parameters [[buffer(3)]],
-    constant uint& dispatchCount [[buffer(4)]],
-    device const uint* cachedDialIndices [[buffer(5)]],
-    constant uint& useCachedIndices [[buffer(6)]],
-    device const Backends::ResponseSmoothing<float>* smoothings [[buffer(7)]],
-    uint gid [[thread_position_in_grid]]) {
-  if( gid >= dispatchCount ){ return; }
-  uint descriptorIndex = useCachedIndices ? cachedDialIndices[gid] : gid;
-  Backends::MpsSplineDialDescriptor descriptor = descriptors[descriptorIndex];
-  if( (descriptor.flags & kDialFlagCached) == 0 ){ return; }
-  cachedResponses[descriptorIndex] = evaluate_graph_descriptor(descriptor, splineData, parameters, smoothings);
-}
-
-kernel void compute_event_weights_reduced(
     device float* eventWeights [[buffer(0)]],
     device const float* baseWeights [[buffer(1)]],
     device const EventDialRanges* eventDialRanges [[buffer(2)]],

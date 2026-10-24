@@ -14,6 +14,7 @@
 
 #include <gtest/gtest.h>
 
+#include <algorithm>
 #include <cmath>
 #include <limits>
 #include <memory>
@@ -222,10 +223,30 @@ TEST(MpsPropagationMode, RejectsUnknownModes) {
   EXPECT_ANY_THROW(backend.configure(ConfigReader(JsonType{{"propagationMode", "auto"}})));
 }
 
-TEST(MpsOrderedSplinePayloads, PreservesRaggedEventsAndDistinctPayloadsExactly) {
+namespace {
+  void compareMpsWithCpu(MpsBackend& backend_, CpuBackend& reference_, const PropagationInputs& inputs_) {
+    auto token = backend_.requestPropagation(inputs_);
+    ASSERT_EQ(backend_.getStatus(token).eventWeights, OutputState::ReadyOnDevice);
+    backend_.materialize(token, OutputRequest::EventWeights);
+    backend_.materialize(token, OutputRequest::Histograms);
+    auto referenceToken = reference_.requestPropagation(inputs_);
+    auto compare = [](const std::vector<double>& actual_, const std::vector<double>& expected_){
+      ASSERT_EQ(actual_.size(), expected_.size());
+      for( std::size_t i = 0; i < actual_.size(); ++i ){
+        EXPECT_NEAR(actual_[i], expected_[i], 3e-6 * std::max(1., std::abs(expected_[i]))) << "index " << i;
+      }
+    };
+    compare(backend_.getEventWeightsHostView(token), reference_.getEventWeightsHostView(referenceToken));
+    compare(backend_.getHistogramSumsHostView(token), reference_.getHistogramSumsHostView(referenceToken));
+    compare(backend_.getHistogramSumSquaresHostView(token), reference_.getHistogramSumSquaresHostView(referenceToken));
+  }
+}
+
+TEST(MpsOrderedSplinePayloads, PreservesRaggedEventsAndDistinctPayloads) {
   MpsBackend backend;
+  CpuBackend reference;
   if( backend.getCapabilities().deviceName == "Metal unavailable" ){ GTEST_SKIP(); }
-  backend.configure(ConfigReader(JsonType{{"propagationMode", "recomputeResponses"}, {"enableDiagnosticPayloadComparison", true}}));
+  backend.configure(ConfigReader(JsonType{{"propagationMode", "recomputeResponses"}}));
   DialResponseSupervisor supervisor;
   supervisor.setMinResponse(0.);
   supervisor.setMaxResponse(2.);
@@ -253,6 +274,7 @@ TEST(MpsOrderedSplinePayloads, PreservesRaggedEventsAndDistinctPayloadsExactly) 
   }
   for( int rebuild = 0; rebuild < 2; ++rebuild ){
     backend.build(view);
+    reference.build(view);
     double external = 0;
     PropagationInputs inputs;
     inputs.externalWeights = {{&external, 1, 0, 1}};
@@ -260,33 +282,17 @@ TEST(MpsOrderedSplinePayloads, PreservesRaggedEventsAndDistinctPayloadsExactly) 
       inputs.parameters.values = {value};
       external = value;
       ++inputs.externalWeights[0].generation;
-      std::vector<double> weights, sums, squares;
-      for( bool ordered : {false, true, false} ){
-        backend.setDiagnosticOrderedSplinePayloads(ordered);
-        auto token = backend.requestPropagation(inputs);
-        ASSERT_EQ(backend.getStatus(token).eventWeights, OutputState::ReadyOnDevice);
-        backend.materialize(token, OutputRequest::EventWeights);
-        backend.materialize(token, OutputRequest::Histograms);
-        if( weights.empty() ){
-          weights = backend.getEventWeightsHostView(token);
-          sums = backend.getHistogramSumsHostView(token);
-          squares = backend.getHistogramSumSquaresHostView(token);
-        }
-        else{
-          EXPECT_EQ(backend.getEventWeightsHostView(token), weights);
-          EXPECT_EQ(backend.getHistogramSumsHostView(token), sums);
-          EXPECT_EQ(backend.getHistogramSumSquaresHostView(token), squares);
-        }
-      }
+      for( int repeat = 0; repeat < 3; ++repeat ){ compareMpsWithCpu(backend, reference, inputs); }
     }
   }
 }
 
-TEST(MpsCompactDialDescriptors, MatchesLegacyWithBoundsSmoothingAndExternalWeights) {
+TEST(MpsCompactDialDescriptors, MatchesCpuWithBoundsSmoothingAndExternalWeights) {
   for( int repeats : {1, int(kDeviceCachedDialReuseThreshold)} ){
     MpsBackend backend;
+    CpuBackend reference;
     if( backend.getCapabilities().deviceName == "Metal unavailable" ){ GTEST_SKIP(); }
-    backend.configure(ConfigReader(JsonType{{"propagationMode", "recomputeResponses"}, {"enableDiagnosticDescriptorComparison", true}}));
+    backend.configure(ConfigReader(JsonType{{"propagationMode", "recomputeResponses"}}));
     for( int limits = 0; limits < 5; ++limits ){
       DialResponseSupervisor supervisor;
       if( limits != 2 ){ supervisor.setMinResponse(0.); }
@@ -305,6 +311,7 @@ TEST(MpsCompactDialDescriptors, MatchesLegacyWithBoundsSmoothingAndExternalWeigh
         }
       }
       backend.build(view);
+      reference.build(view);
       double external = 0;
       PropagationInputs inputs;
       inputs.externalWeights = {{&external, 1, 0, 1}};
@@ -313,33 +320,17 @@ TEST(MpsCompactDialDescriptors, MatchesLegacyWithBoundsSmoothingAndExternalWeigh
         inputs.parameters.values = {value};
         external = value;
         ++inputs.externalWeights[0].generation;
-        std::vector<double> weights, sums, squares;
-        for( bool compact : {false, true, false} ){
-          backend.setDiagnosticCompactDialDescriptors(compact);
-          auto token = backend.requestPropagation(inputs);
-          ASSERT_EQ(backend.getStatus(token).eventWeights, OutputState::ReadyOnDevice);
-          backend.materialize(token, OutputRequest::EventWeights);
-          backend.materialize(token, OutputRequest::Histograms);
-          if( weights.empty() ){
-            weights = backend.getEventWeightsHostView(token);
-            sums = backend.getHistogramSumsHostView(token);
-            squares = backend.getHistogramSumSquaresHostView(token);
-          }
-          else{
-            EXPECT_EQ(backend.getEventWeightsHostView(token), weights);
-            EXPECT_EQ(backend.getHistogramSumsHostView(token), sums);
-            EXPECT_EQ(backend.getHistogramSumSquaresHostView(token), squares);
-          }
-        }
+        for( int repeat = 0; repeat < 3; ++repeat ){ compareMpsWithCpu(backend, reference, inputs); }
       }
     }
   }
 }
 
-TEST(MpsCachedDialDispatch, MixedCachedAndUncachedDescriptorsMatchFullScanExactly) {
+TEST(MpsCachedDialDispatch, MixedCachedAndUncachedDescriptorsMatchCpu) {
   for( bool cache : {false, true} ){
     SCOPED_TRACE(cache);
     MpsBackend backend;
+    CpuBackend reference;
     if( backend.getCapabilities().deviceName == "Metal unavailable" ){ GTEST_SKIP(); }
     backend.configure(ConfigReader(JsonType{{"propagationMode", "recomputeResponses"}, {"enableCachedDialResponses", cache}}));
     DialResponseSupervisor supervisor;
@@ -371,27 +362,13 @@ TEST(MpsCachedDialDispatch, MixedCachedAndUncachedDescriptorsMatchFullScanExactl
     }
     for( int rebuild = 0; rebuild < 2; ++rebuild ){
       backend.build(view);
+      reference.build(view);
       PropagationInputs inputs;
       for( double value : {-.2, .5, 1.7} ){
         inputs.parameters.values = {value};
-        std::vector<double> referenceWeights, referenceSums, referenceSquares;
-        for( bool compact : {false, true, false} ){
-          backend.setDiagnosticCompactCachedDials(compact);
-          auto token = backend.requestPropagation(inputs);
-          ASSERT_EQ(backend.getStatus(token).eventWeights, OutputState::ReadyOnDevice);
-          backend.materialize(token, OutputRequest::EventWeights);
-          backend.materialize(token, OutputRequest::Histograms);
+        for( int repeat = 0; repeat < 3; ++repeat ){
+          compareMpsWithCpu(backend, reference, inputs);
           EXPECT_EQ(backend.getLastTimingSummary().cachedDialCount, cache ? 5 : 0);
-          if( referenceWeights.empty() ){
-            referenceWeights = backend.getEventWeightsHostView(token);
-            referenceSums = backend.getHistogramSumsHostView(token);
-            referenceSquares = backend.getHistogramSumSquaresHostView(token);
-          }
-          else{
-            EXPECT_EQ(backend.getEventWeightsHostView(token), referenceWeights);
-            EXPECT_EQ(backend.getHistogramSumsHostView(token), referenceSums);
-            EXPECT_EQ(backend.getHistogramSumSquaresHostView(token), referenceSquares);
-          }
         }
       }
     }

@@ -615,40 +615,10 @@ PYBIND11_MODULE(GUNDAM, module) {
     return manager_.getBackend()->getLastTimingSummary();
   })
 #ifdef __APPLE__
-  .def("setDiagnosticMpsEventPropagationOptions", [](Backends::BackendManager& manager_, bool cacheDials_, bool reuseIndex_, bool parallelHistograms_, bool aggregateCounters_){
-    auto* mps = dynamic_cast<Backends::MpsBackend*>(manager_.getBackend());
-    LogThrowIf(mps == nullptr, "Event propagation diagnostics require an MPS backend.");
-    mps->setDiagnosticEventPropagationOptions(cacheDials_, reuseIndex_, parallelHistograms_, aggregateCounters_);
-  })
-  .def("setDiagnosticMpsBinningIntervalPruning", [](Backends::BackendManager& manager_, bool enabled_){
-    auto* mps = dynamic_cast<Backends::MpsBackend*>(manager_.getBackend());
-    LogThrowIf(mps == nullptr, "Binning interval diagnostics require an MPS backend.");
-    mps->setDiagnosticBinningIntervalPruning(enabled_);
-  })
-  .def("setDiagnosticMpsPreviousBinReuse", [](Backends::BackendManager& manager_, bool enabled_){
-    auto* mps = dynamic_cast<Backends::MpsBackend*>(manager_.getBackend());
-    LogThrowIf(mps == nullptr, "Previous-bin diagnostics require an MPS backend.");
-    mps->setDiagnosticPreviousBinReuse(enabled_);
-  })
   .def("setDiagnosticMpsStageProfiling", [](Backends::BackendManager& manager_, bool enabled_){
     auto* mps = dynamic_cast<Backends::MpsBackend*>(manager_.getBackend());
     LogThrowIf(mps == nullptr, "MPS stage diagnostics require an MPS backend.");
     mps->setDiagnosticStageProfiling(enabled_);
-  })
-  .def("setDiagnosticMpsOrderedSplinePayloads", [](Backends::BackendManager& manager_, bool enabled_){
-    auto* mps = dynamic_cast<Backends::MpsBackend*>(manager_.getBackend());
-    LogThrowIf(mps == nullptr, "Payload diagnostics require an MPS backend.");
-    mps->setDiagnosticOrderedSplinePayloads(enabled_);
-  })
-  .def("setDiagnosticMpsCompactDialDescriptors", [](Backends::BackendManager& manager_, bool enabled_){
-    auto* mps = dynamic_cast<Backends::MpsBackend*>(manager_.getBackend());
-    LogThrowIf(mps == nullptr, "Descriptor diagnostics require an MPS backend.");
-    mps->setDiagnosticCompactDialDescriptors(enabled_);
-  })
-  .def("setDiagnosticMpsCompactCachedDials", [](Backends::BackendManager& manager_, bool enabled_){
-    auto* mps = dynamic_cast<Backends::MpsBackend*>(manager_.getBackend());
-    LogThrowIf(mps == nullptr, "Compact cached dial diagnostics require an MPS backend.");
-    mps->setDiagnosticCompactCachedDials(enabled_);
   })
   .def("getDiagnosticMpsEventPropagationState", [](const Backends::BackendManager& manager_){
     auto* mps = dynamic_cast<const Backends::MpsBackend*>(manager_.getBackend());

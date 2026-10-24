@@ -110,6 +110,9 @@ and reweight caps use `eventPropagation`; compatible scalar fixed-bin models can
 use `packedWeights` in `recomputeResponses` mode. These internal choices do not
 add support for dial classes rejected by `EngineLayout`. See
 [MPS response propagation modes](mps/BackendStructure.md#response-propagation-mode).
+Compact GPU descriptors, ordered spline payloads and the resident binning
+optimizations are production behavior; temporary A/B comparison switches have
+been removed. GPU stage profiling remains available for performance analysis.
 
 The compatibility rules are implemented in
 [`EngineLayout.cpp`](../../src/Backends/Common/src/EngineLayout.cpp),

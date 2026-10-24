@@ -174,12 +174,12 @@ void rebin_event(
   }
   outcome.rebinned = 1;
   if( event.sample < control.sampleCount ){ outcome.sample = event.sample; }
-  outcome.rebuild = control.firstPropagation || !control.reuseContributionIndex;
+  outcome.rebuild = control.firstPropagation;
   uint oldCount = control.firstPropagation ? 0 : eventCounts[gid];
   uint count = 0, firstHardPosition = UINT_MAX, candidateCount = 0, largest = 0;
   // The build certifies that a reusable strict bin cannot hide an earlier bin.
   // HardBins is initialized by the first tree traversal, never by this shortcut.
-  if( control.reusePreviousBin && !control.firstPropagation && !sample.isSmoothed ){
+  if( !control.firstPropagation && !sample.isSmoothed ){
     int previousBin = hardBins[gid];
     if( previousBin >= 0 && uint(previousBin) < sample.binCount ){
       uint position = reusableBins[sample.binOffset + uint(previousBin)];
@@ -227,13 +227,13 @@ void rebin_event(
         auto interval = intervals[i];
         auto value = variables[event.firstVariable + interval.variableIndex];
         hardContains = hardContains && GundamBinningMath::contains(interval.lowerBound, interval.upperBound, value);
-        if( sample.isSmoothed || !control.pruneBinningIntervals ){
+        if( sample.isSmoothed ){
           fraction *= float(GundamBinningMath::intervalFraction(interval.lowerBound, interval.upperBound,
                           interval.lowerInverseWidth, interval.upperInverseWidth, value));
         }
         // A strict miss rejects the bin immediately. Smoothed support can
         // extend outside the hard bin, so both tests must reject before pruning.
-        if( control.pruneBinningIntervals && !hardContains && (!sample.isSmoothed || fraction == 0) ){ break; }
+        if( !hardContains && (!sample.isSmoothed || fraction == 0) ){ break; }
       }
       if( hardContains && bin.position < firstHardPosition ){ hardBin = bin.binIndex; firstHardPosition = bin.position; }
       if( !sample.isSmoothed || fraction == 0 ){ continue; }
@@ -293,18 +293,16 @@ kernel void rebin_events(
               hardBins, eventCounts, contributions, control, reusableBins, gid, outcome);
   // All lanes reconverge after the event-local early returns before collectives.
   uint rebinned = outcome.rebinned, candidates = outcome.candidates, rebuild = outcome.rebuild;
-  if( control.aggregateCounters ){
-    rebinned = simd_sum(rebinned);
-    candidates = simd_sum(candidates);
-    rebuild = simd_max(rebuild);
-  }
-  if( !control.aggregateCounters || lane == 0 ){
+  rebinned = simd_sum(rebinned);
+  candidates = simd_sum(candidates);
+  rebuild = simd_max(rebuild);
+  if( lane == 0 ){
     if( rebinned ){ atomic_fetch_add_explicit((device atomic_uint*)&control.rebinnedEvents, rebinned, memory_order_relaxed); }
     if( candidates ){ atomic_fetch_add_explicit((device atomic_uint*)&control.candidates, candidates, memory_order_relaxed); }
     if( rebuild ){ atomic_store_explicit((device atomic_uint*)&control.rebuildIndex, 1, memory_order_relaxed); }
   }
-  uint firstSample = control.aggregateCounters ? simd_broadcast_first(outcome.sample) : UINT_MAX;
-  if( outcome.sample != UINT_MAX && (!control.aggregateCounters || lane == 0 || outcome.sample != firstSample) ){
+  uint firstSample = simd_broadcast_first(outcome.sample);
+  if( outcome.sample != UINT_MAX && (lane == 0 || outcome.sample != firstSample) ){
     atomic_store_explicit((device atomic_uint*)(changedSamples + outcome.sample), 1, memory_order_relaxed);
   }
 }

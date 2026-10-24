@@ -248,10 +248,6 @@ void Backends::MpsEventPropagation::propagate(const PropagationInputs& inputs_, 
   control.error = control.rebinnedEvents = control.candidates = control.editCount = 0;
   control.rebuildIndex = not _valid_;
   control.firstPropagation = not _valid_;
-  control.reusePreviousBin = _enablePreviousBinReuse_;
-  control.pruneBinningIntervals = _enableBinningIntervalPruning_;
-  control.reuseContributionIndex = _enableIndexReuse_;
-  control.aggregateCounters = _enableAggregateCounters_;
   bool updateWeights{true};
   auto dialCount = prepareDialCache(inputs_, updateWeights);
   control.updateWeights = updateWeights;
@@ -294,7 +290,7 @@ void Backends::MpsEventPropagation::propagate(const PropagationInputs& inputs_, 
     dispatch(encoder, Kernel::IndexChunks, 1, {Buffer::BinCounts, Buffer::BinOffsets, Buffer::BinPositions, Buffer::ChunkOffsets, Buffer::Chunks, Buffer::Control});
     dispatch(encoder, Kernel::Scatter, model.events.size(), {Buffer::Events, Buffer::EventCounts, Buffer::Contributions, Buffer::BinPositions, Buffer::BinContributions, Buffer::Control});
   }
-  const bool parallel = _enableParallelHistograms_ and _pipelines_[std::size_t(Kernel::ReduceParallel)].threadExecutionWidth == 32;
+  const bool parallel = _pipelines_[std::size_t(Kernel::ReduceParallel)].threadExecutionWidth == 32;
   dispatch(encoder, parallel ? Kernel::ReduceParallel : Kernel::Reduce, std::size_t(_packed_.histogramChunkCapacity) * (parallel ? 32 : 1), {Buffer::Chunks, Buffer::BinContributions, Buffer::Contributions,
     Buffer::EventWeights, Buffer::PartialSums, Buffer::PartialSquares, Buffer::Control});
   dispatch(encoder, Kernel::Finish, _packed_.histogramBins, {Buffer::ChunkOffsets, Buffer::PartialSums, Buffer::PartialSquares,
@@ -428,12 +424,12 @@ std::string Backends::MpsEventPropagation::getDiagnostics() const {
   out["updatedEventWeights"] = _lastUpdatedWeights_;
   out["rebuiltContributionIndex"] = _lastRebuiltIndex_;
   out["dialCacheEnabled"] = _enableDialCache_;
-  out["indexReuseEnabled"] = _enableIndexReuse_;
-  out["parallelHistogramsEnabled"] = _enableParallelHistograms_;
-  out["aggregateCountersEnabled"] = _enableAggregateCounters_;
+  out["indexReuseEnabled"] = true;
+  out["parallelHistogramsEnabled"] = _pipelines_[std::size_t(Kernel::ReduceParallel)].threadExecutionWidth == 32;
+  out["aggregateCountersEnabled"] = true;
   out["lastStageGpuSeconds"] = _diagnosticStageGpuSeconds_;
-  out["previousBinReuseEnabled"] = _enablePreviousBinReuse_;
-  out["binningIntervalPruningEnabled"] = _enableBinningIntervalPruning_;
+  out["previousBinReuseEnabled"] = true;
+  out["binningIntervalPruningEnabled"] = true;
   out["reusableBins"] = std::count_if(_packed_.reusableBins.begin(), _packed_.reusableBins.end(),
       [](DeviceIndex position_){ return position_ != DeviceIndex(-1); });
   out["contributionCapacity"] = _packed_.contributionCapacity;

@@ -76,16 +76,7 @@ retain their existing numbering and semantics.
 The common 48-byte spline descriptors and 36-byte normalization/external
 occurrences remain the backend-independent packing representation. MPS converts
 them during model construction, then releases these temporary host arrays.
-Legacy GPU descriptor buffers are allocated only when
-`enableDiagnosticDescriptorComparison` is enabled. This diagnostic option allows
-repeated A/B trials without reloading inputs; it is disabled by default.
-
-`tests/benchmarks/225MpsBackendProfiling.py --compare-descriptors` enables that
-option and alternates the legacy and compact layouts on one resident model.
-The shared event loop is instantiated for both wire formats; interpolation and
-response-smoothing arithmetic are shared as well. Each measured likelihood and
-all final histogram bins must match exactly. Separate GPU stage probes run after
-the ordinary trials. See [benchmark instructions](../../../tests/benchmarks/README.md).
+Only the compact descriptors are uploaded to the GPU.
 
 Spline payloads are placed in first-use order across logical groups of 32 event
 threads. Within each group, families and dial ordinals are visited in kernel
@@ -93,13 +84,6 @@ order before advancing across the event lanes. A payload is copied only once;
 its descriptor receives the new offset. Payload values, knot ordering and spline
 evaluation are unchanged. Shared dials retain one payload and the same response
 slot. This layout requires no extra resident GPU storage in normal runs.
-
-`tests/benchmarks/225MpsBackendProfiling.py --compare-payloads` retains both
-payload layouts and their compact descriptors for exact A/B measurements. It
-sets `enableDiagnosticPayloadComparison`, which is disabled in normal runs.
-The benchmark switches both descriptor offsets and the payload buffer together,
-including cached-response kernels. It alternates trial order and validates
-every likelihood and all final histogram bins exactly.
 
 Two additional arrangements were measured on OA2024 and discarded: interleaving
 dial references across 32-event tiles, and sorting events by dial-count profiles
@@ -123,13 +107,6 @@ sample revision and reconstructs contribution indices as before. It is disabled
 for smoothed binning, whose fractions and neighboring contributions can change
 while the hard bin remains the same.
 
-`setDiagnosticMpsPreviousBinReuse(False)` selects the original tree search on an
-initialized model; `True` restores the production default. The production
-binning benchmark's `--compare-previous-bin` alternates the two modes on one
-resident model, compares likelihoods and final histograms, then records separate
-GPU stage probes. With smoothing enabled this flag leaves bin selection on the
-existing path.
-
 The bin search also rejects a candidate as soon as its remaining intervals cannot
 change the result. Strict binning only evaluates hard containment and stops at
 the first miss; it does not calculate unused smoothing fractions. For smoothed
@@ -138,13 +115,6 @@ accumulated fraction. A point outside the hard bin may still contribute through
 the smoothing support, and a hard match must still be recorded even when its
 fraction rounds to zero. The order of nonzero fractional products and bin
 priority are preserved.
-
-`setDiagnosticMpsBinningIntervalPruning(False)` restores the full interval loop
-for A/B measurements. `True` is the production default. The production benchmark
-accepts `--compare-binning-intervals` to compare both loops on the same resident
-model, independently of the previous-bin shortcut. The two comparison flags are
-mutually exclusive.
-
 
 The resident event-propagation path caches dial responses by their immutable
 parameter/external-block dependencies. Build-time lists group original response
@@ -185,12 +155,10 @@ The existing final per-bin reduction remains in place. Other SIMD widths use the
 serial compensated kernel. The parallel arithmetic is validated against CPU and
 reference histograms with float tolerances; binary identity is not required.
 
-`setDiagnosticMpsEventPropagationOptions(cacheDials, reuseIndex,
-parallelHistograms, aggregateCounters)` controls the four features for resident
-comparisons. All are enabled by default (subject to the cache configuration and
-SIMD-width fallback). `getDiagnosticMpsEventPropagationState()` returns the last
-evaluated-dial count, event-weight update flag and index-rebuild flag without
-scanning the model. `226ProductionBinningProfiling.py --compare-resident-stages`
-compares baseline, cached, indexed, parallel and aggregated variants, rotating
-trial order on a single loaded model. Separate stage probes report the actual
-kernels dispatched; skipped stages are absent.
+These optimizations are part of the production implementation.
+
+`getDiagnosticMpsEventPropagationState()` returns the last evaluated-dial count,
+event-weight update flag and index-rebuild flag without scanning the model.
+`setDiagnosticMpsStageProfiling(True)` enables separate synchronized GPU stage
+probes; `False` restores ordinary execution. The profiling benchmarks retain
+ordinary timing passes and separate probes for the production implementation.

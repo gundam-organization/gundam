@@ -674,15 +674,12 @@ TEST(BinningIndex, PreviousBinCertificationExcludesSmoothingAndEarlierOverlaps) 
 }
 
 #ifdef __APPLE__
-TEST(MpsBinningIntervals, PrunedAndFullScansMatchHardAndSmoothedGeometry) {
+TEST(MpsBinningIntervals, MatchesHardAndSmoothedGeometry) {
   Backends::MpsBackend backend;
-  for( bool enabled : {false, true} ){
-    backend.setDiagnosticBinningIntervalPruning(enabled);
-    compareWithHistogram(backend, false, false, true, false);
-    compareWithHistogram(backend, true, false, true, false);
-    compareWithHistogram(backend, true, true, true, false);
-    compareWithHistogram(backend, true, false, true, true);
-  }
+  compareWithHistogram(backend, false, false, true, false);
+  compareWithHistogram(backend, true, false, true, false);
+  compareWithHistogram(backend, true, true, true, false);
+  compareWithHistogram(backend, true, false, true, true);
 }
 #endif
 
@@ -815,9 +812,8 @@ TEST(MpsResidentPropagation, ParallelReductionPreservesSmallTermsAndPartialSimdG
   MpsBackend backend;
   backend.build(view);
   PropagationInputs inputs;
-  for( bool aggregate : {false, true} ){
-    backend.setDiagnosticEventPropagationOptions(true, true, true, aggregate);
-    inputs.hostVariables.assign(257, aggregate ? 1.1 : 1.);
+  for( double value : {1., 1.1} ){
+    inputs.hostVariables.assign(257, value);
     auto token = backend.requestPropagation(inputs);
     EXPECT_EQ(backend.getLastTimingSummary().rebinnedEventCount, 257);
     EXPECT_EQ(backend.getLastTimingSummary().binCandidateCount, 257);

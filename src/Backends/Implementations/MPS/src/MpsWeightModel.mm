@@ -12,15 +12,7 @@ bool Backends::MpsBackendImpl::buildWeightModel() {
   DeviceWeightModel packed;
   if( not packDeviceWeightModel(model, enableCachedDialResponses, packed, buildTiming,
                                   deviceModelFallbackReason, "MPS backend") ){ return false; }
-  if( enableDiagnosticDescriptorComparison ){ useOrderedSplinePayloads = false; }
-  std::unique_ptr<MpsSplinePayloadLayout> ordered;
-  if( useOrderedSplinePayloads or enableDiagnosticPayloadComparison ){
-    ordered = std::make_unique<MpsSplinePayloadLayout>(packed);
-    if( not enableDiagnosticPayloadComparison ){
-      ordered->apply(packed);
-      ordered.reset();
-    }
-  }
+  MpsSplinePayloadLayout(packed).apply(packed);
   auto lastStageStart = std::chrono::steady_clock::now();
   auto buildStart = lastStageStart;
   auto fail = [this](std::string reason_){ deviceModelFallbackReason = std::move(reason_); return false; };
@@ -104,42 +96,28 @@ bool Backends::MpsBackendImpl::buildWeightModel() {
     reducedNorms.push_back({occurrence.parameterIndex, occurrence.minResponse, occurrence.maxResponse,
                             smoothingIndex(occurrence.smoothing)});
   }
-  reducedNormDialOccurrencesBuffer = makePrivateBuffer(device, commandQueue, reducedNorms);
+  normDialOccurrencesBuffer = makePrivateBuffer(device, commandQueue, reducedNorms);
   std::vector<MpsExternalDialOccurrence> reducedExternals;
   reducedExternals.reserve(externalDialOccurrences.size());
   for( const auto& occurrence : externalDialOccurrences ){
     reducedExternals.push_back({occurrence.weightIndex, occurrence.minResponse, occurrence.maxResponse,
                                 smoothingIndex(occurrence.smoothing)});
   }
-  reducedExternalDialOccurrencesBuffer = makePrivateBuffer(device, commandQueue, reducedExternals);
-  reducedCompactDialDescriptorsBuffer = uploadSplineDescriptors(compactDialDescriptors);
-  reducedUniformDialDescriptorsBuffer = uploadSplineDescriptors(uniformDialDescriptors);
-  reducedMonotonicDialDescriptorsBuffer = uploadSplineDescriptors(monotonicDialDescriptors);
-  reducedGeneralDialDescriptorsBuffer = uploadSplineDescriptors(generalDialDescriptors);
-  reducedGraphDialDescriptorsBuffer = uploadSplineDescriptors(graphDialDescriptors);
-  if( ordered ){
-    orderedReducedCompactDialDescriptorsBuffer = uploadSplineDescriptors(ordered->compact);
-    orderedReducedUniformDialDescriptorsBuffer = uploadSplineDescriptors(ordered->uniform);
-    orderedReducedMonotonicDialDescriptorsBuffer = uploadSplineDescriptors(ordered->monotonic);
-    orderedReducedGeneralDialDescriptorsBuffer = uploadSplineDescriptors(ordered->general);
-    orderedReducedGraphDialDescriptorsBuffer = uploadSplineDescriptors(ordered->graph);
-    orderedSplineDataBuffer = makePrivateBuffer(device, commandQueue, ordered->data);
-  }
+  externalDialOccurrencesBuffer = makePrivateBuffer(device, commandQueue, reducedExternals);
+  compactDialDescriptorsBuffer = uploadSplineDescriptors(compactDialDescriptors);
+  uniformDialDescriptorsBuffer = uploadSplineDescriptors(uniformDialDescriptors);
+  monotonicDialDescriptorsBuffer = uploadSplineDescriptors(monotonicDialDescriptors);
+  generalDialDescriptorsBuffer = uploadSplineDescriptors(generalDialDescriptors);
+  graphDialDescriptorsBuffer = uploadSplineDescriptors(graphDialDescriptors);
   responseSmoothingBuffer = makePrivateBuffer(device, commandQueue, smoothings);
 
   baseWeightsBuffer = makePrivateBuffer(device, commandQueue, baseWeights);
   eventDialRangesBuffer = makePrivateBuffer(device, commandQueue, eventDialRanges);
-  if( enableDiagnosticDescriptorComparison ){ normDialOccurrencesBuffer = makePrivateBuffer(device, commandQueue, normDialOccurrences); }
   compactDialIndicesBuffer = makePrivateBuffer(device, commandQueue, compactDialIndices);
   uniformDialIndicesBuffer = makePrivateBuffer(device, commandQueue, uniformDialIndices);
   monotonicDialIndicesBuffer = makePrivateBuffer(device, commandQueue, monotonicDialIndices);
   generalDialIndicesBuffer = makePrivateBuffer(device, commandQueue, generalDialIndices);
   graphDialIndicesBuffer = makePrivateBuffer(device, commandQueue, graphDialIndices);
-  if( enableDiagnosticDescriptorComparison ){ compactDialDescriptorsBuffer = makePrivateBuffer(device, commandQueue, compactDialDescriptors); }
-  if( enableDiagnosticDescriptorComparison ){ uniformDialDescriptorsBuffer = makePrivateBuffer(device, commandQueue, uniformDialDescriptors); }
-  if( enableDiagnosticDescriptorComparison ){ monotonicDialDescriptorsBuffer = makePrivateBuffer(device, commandQueue, monotonicDialDescriptors); }
-  if( enableDiagnosticDescriptorComparison ){ generalDialDescriptorsBuffer = makePrivateBuffer(device, commandQueue, generalDialDescriptors); }
-  if( enableDiagnosticDescriptorComparison ){ graphDialDescriptorsBuffer = makePrivateBuffer(device, commandQueue, graphDialDescriptors); }
   globalBinsBuffer = makePrivateBuffer(device, commandQueue, globalBins);
   binEventOffsetsBuffer = makePrivateBuffer(device, commandQueue, binEventOffsets);
   binEventIndicesBuffer = makePrivateBuffer(device, commandQueue, binEventIndices);
@@ -153,7 +131,7 @@ bool Backends::MpsBackendImpl::buildWeightModel() {
       if( descriptors_[i].flags & kDeviceDialFlagCached ){ indices.emplace_back(i); }
     }
     LogThrowIf(indices.size() != cachedCount_, "Inconsistent MPS cached dial count.");
-    if( indices.empty() ){ indices.emplace_back(0); } // Valid binding for empty/full-scan diagnostics.
+    if( indices.empty() ){ indices.emplace_back(0); } // Keep a valid binding for empty cached-index lists.
     return makePrivateBuffer(device, commandQueue, indices);
   };
   compactCachedDialIndicesBuffer = uploadCachedIndices(compactDialDescriptors, compactDialDescriptorCount, compactCachedDialCount);
@@ -176,7 +154,6 @@ bool Backends::MpsBackendImpl::buildWeightModel() {
     externalWeightCount = std::max(externalWeightCount, block.offset + block.count);
   }
   externalWeightsBuffer = makeSharedEmptyBuffer(device, std::max<std::size_t>(1, externalWeightCount) * sizeof(float));
-  if( enableDiagnosticDescriptorComparison ){ externalDialOccurrencesBuffer = makePrivateBuffer(device, commandQueue, externalDialOccurrences); }
   externalWeightGenerations.assign(model.externalWeightBlocks.size(), 0);
   parametersBuffer = makeSharedEmptyBuffer(device, std::max<std::size_t>(1, model.parameterCount) * sizeof(float));
   partialHistSumsBuffer = makePrivateEmptyBuffer(device, std::size_t(totalPartials) * sizeof(float));
@@ -194,22 +171,13 @@ bool Backends::MpsBackendImpl::buildWeightModel() {
                                                  length:sizeof(chunkSize)
                                                 options:MTLResourceStorageModeShared];
 
-  if( enableDiagnosticPayloadComparison and
-      (orderedSplineDataBuffer == nil or orderedReducedCompactDialDescriptorsBuffer == nil or orderedReducedUniformDialDescriptorsBuffer == nil
-       or orderedReducedMonotonicDialDescriptorsBuffer == nil or orderedReducedGeneralDialDescriptorsBuffer == nil or orderedReducedGraphDialDescriptorsBuffer == nil) ){
-    releaseDeviceBuffers();
-    return fail("Ordered MPS payload allocation failed.");
-  }
-  if( reducedNormDialOccurrencesBuffer == nil or reducedExternalDialOccurrencesBuffer == nil or reducedCompactDialDescriptorsBuffer == nil or reducedUniformDialDescriptorsBuffer == nil or reducedMonotonicDialDescriptorsBuffer == nil or reducedGeneralDialDescriptorsBuffer == nil or reducedGraphDialDescriptorsBuffer == nil
+  if( normDialOccurrencesBuffer == nil or externalDialOccurrencesBuffer == nil or compactDialDescriptorsBuffer == nil or uniformDialDescriptorsBuffer == nil or monotonicDialDescriptorsBuffer == nil or generalDialDescriptorsBuffer == nil or graphDialDescriptorsBuffer == nil
       or responseSmoothingBuffer == nil
       or compactCachedDialIndicesBuffer == nil or uniformCachedDialIndicesBuffer == nil or monotonicCachedDialIndicesBuffer == nil or generalCachedDialIndicesBuffer == nil or graphCachedDialIndicesBuffer == nil
-      or externalWeightsBuffer == nil or (enableDiagnosticDescriptorComparison and externalDialOccurrencesBuffer == nil) or baseWeightsBuffer == nil or eventDialRangesBuffer == nil or (enableDiagnosticDescriptorComparison and normDialOccurrencesBuffer == nil)
+      or externalWeightsBuffer == nil or baseWeightsBuffer == nil or eventDialRangesBuffer == nil
       or compactDialIndicesBuffer == nil or uniformDialIndicesBuffer == nil
       or monotonicDialIndicesBuffer == nil or generalDialIndicesBuffer == nil
       or graphDialIndicesBuffer == nil
-      or (enableDiagnosticDescriptorComparison and compactDialDescriptorsBuffer == nil) or (enableDiagnosticDescriptorComparison and uniformDialDescriptorsBuffer == nil)
-      or (enableDiagnosticDescriptorComparison and monotonicDialDescriptorsBuffer == nil) or (enableDiagnosticDescriptorComparison and generalDialDescriptorsBuffer == nil)
-      or (enableDiagnosticDescriptorComparison and graphDialDescriptorsBuffer == nil)
       or compactCachedResponsesBuffer == nil or uniformCachedResponsesBuffer == nil
       or monotonicCachedResponsesBuffer == nil or generalCachedResponsesBuffer == nil
       or graphCachedResponsesBuffer == nil
