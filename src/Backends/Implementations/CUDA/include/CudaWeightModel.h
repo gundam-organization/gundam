@@ -23,7 +23,7 @@ namespace Backends {
   struct CudaBinningSample {
     int binOffset{0}, binCount{0};
     std::size_t firstBin{0}, endBin{0}, variableCount{0};
-    bool isDynamic{false}, readHostVariables{false};
+    bool isDynamic{false}, readHostVariables{false}, isSmoothed{false};
   };
 
   // Native-double model. Events are in result-slot order; histogram lists retain
@@ -51,6 +51,7 @@ namespace Backends {
     std::vector<std::size_t> binOffsets{};
     std::vector<std::size_t> binEvents{};
     bool hasEventState{false};
+    bool hasSmoothedBinning{false};
     std::vector<EventView> stateEvents{};
     std::vector<CudaBinningSample> samples{};
     std::vector<BinningBin> bins{};

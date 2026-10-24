@@ -1,6 +1,7 @@
 #ifndef GUNDAM_CUDA_DEVICE_CONTEXT_H
 #define GUNDAM_CUDA_DEVICE_CONTEXT_H
 
+#include <cstddef>
 #include <memory>
 #include <string>
 #include <vector>
@@ -25,8 +26,9 @@ namespace Backends {
     void build(const CudaWeightModel& model_, const PropagationView& original_);
     void propagate(const PropagationInputs& inputs_, bool recomputeResponses_, BackendTimingSummary& timing_);
     void readWeights(std::vector<double>& weights_);
-    void readHistograms(std::vector<double>& sums_, std::vector<double>& sumSquares_);
-    void readEventState(EventState& state_);
+    void readHistograms(std::vector<double>& sums_, std::vector<double>& sumSquares_,
+                        std::vector<double>& outsideSums_, std::vector<double>& outsideSquares_);
+    std::size_t readEventState(EventState& state_);
     void invalidate();
     [[nodiscard]] BackendDeviceView getDeviceView() const;
 

@@ -23,6 +23,7 @@ struct Backends::CudaBackendImpl {
   PropagationResult result{};
   EventState eventState{};
   bool hasEventState{false};
+  bool hasSmoothedBinning{false};
   BackendTimingSummary timing{};
   BackendTimingSummary buildTiming{};
   BackendTimingTotals totals{};
@@ -114,6 +115,7 @@ void Backends::CudaBackend::buildShared(std::shared_ptr<const EngineView> engine
   invalidateResult();
   _impl_->engineView.reset();
   _impl_->hasEventState = false;
+  _impl_->hasSmoothedBinning = false;
   _impl_->eventState = {};
   _impl_->buildTiming = {};
   _impl_->timing = {};
@@ -131,6 +133,7 @@ void Backends::CudaBackend::buildShared(std::shared_ptr<const EngineView> engine
 #endif
   _impl_->engineView = std::move(engineView_);
   _impl_->hasEventState = packed.hasEventState;
+  _impl_->hasSmoothedBinning = packed.hasSmoothedBinning;
   _impl_->result.outsideSums.assign(packed.samples.size(), 0.);
   _impl_->result.outsideSumSquares.assign(packed.samples.size(), 0.);
   _impl_->diagnostics = {
@@ -138,6 +141,7 @@ void Backends::CudaBackend::buildShared(std::shared_ptr<const EngineView> engine
       {"surfaceDials", packed.dials.size() - packed.surfaceOffset},
       {"observableResponses", packed.variableResponses.size()},
       {"hasEventState", packed.hasEventState},
+      {"hasSmoothedBinning", packed.hasSmoothedBinning},
       {"surfaceDependencyGroups", packed.surfaceGroups.size()},
       {"externalDials", packed.externalDialCount},
       {"externalWeightBlocks", packed.externalWeightBlocks.size()},
@@ -253,10 +257,12 @@ void Backends::CudaBackend::readHistograms() const {
   if( _impl_->result.status.histograms == OutputState::ReadyOnHost ){ return; }
 #ifdef GUNDAM_USING_CUDA
   const auto start = Clock::now();
-  try{ _impl_->context->readHistograms(_impl_->result.histSums, _impl_->result.histSumSquares); }
+  try{ _impl_->context->readHistograms(_impl_->result.histSums, _impl_->result.histSumSquares,
+                                         _impl_->result.outsideSums, _impl_->result.outsideSumSquares); }
   catch(...){ invalidateResult(); throw; }
   _impl_->timing.histogramReadbackSeconds += elapsed(start);
-  _impl_->timing.histogramReadbackBytes += 2 * _impl_->result.histSums.size() * sizeof(double);
+  _impl_->timing.histogramReadbackBytes += 2 * (_impl_->result.histSums.size()
+      + (_impl_->hasSmoothedBinning ? _impl_->result.outsideSums.size() : 0)) * sizeof(double);
   _impl_->result.status.histograms = OutputState::ReadyOnHost;
 #else
   throw std::runtime_error("CUDA support not compiled.");
@@ -268,11 +274,9 @@ void Backends::CudaBackend::readEventState() const {
   if( _impl_->result.status.eventState == OutputState::ReadyOnHost ){ return; }
 #ifdef GUNDAM_USING_CUDA
   const auto start = Clock::now();
-  try{ _impl_->context->readEventState(_impl_->eventState); }
+  try{ _impl_->timing.eventStateReadbackBytes += _impl_->context->readEventState(_impl_->eventState); }
   catch(...){ invalidateResult(); throw; }
   _impl_->timing.eventStateReadbackSeconds += elapsed(start);
-  _impl_->timing.eventStateReadbackBytes += _impl_->eventState.variables.size() * sizeof(double)
-      + _impl_->eventState.bins.size() * sizeof(int);
   _impl_->result.status.eventState = OutputState::ReadyOnHost;
 #else
   throw std::runtime_error("CUDA support not compiled.");
@@ -309,10 +313,10 @@ const Backends::EventState& Backends::CudaBackend::getEventStateHostView(const P
   requireToken(token_); readEventState(); return _impl_->eventState;
 }
 const std::vector<double>& Backends::CudaBackend::getOutsideSumsHostView(const PropagationToken& token_) const {
-  requireToken(token_); return _impl_->result.outsideSums;
+  requireToken(token_); readHistograms(); return _impl_->result.outsideSums;
 }
 const std::vector<double>& Backends::CudaBackend::getOutsideSumSquaresHostView(const PropagationToken& token_) const {
-  requireToken(token_); return _impl_->result.outsideSumSquares;
+  requireToken(token_); readHistograms(); return _impl_->result.outsideSumSquares;
 }
 Backends::BackendDeviceView Backends::CudaBackend::getDeviceView(const PropagationToken& token_) const {
   requireToken(token_);

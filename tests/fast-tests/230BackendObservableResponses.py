@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Strict observable composition through BackendManager; CUDA opt-in in a GPU job."""
+"""Strict/smoothed observable composition through BackendManager; CUDA opt-in."""
 import math
 import os
 import sys
@@ -9,7 +9,8 @@ from pathlib import Path
 sys.dont_write_bytecode = True
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 fixture = import_module('219VariableDials')
-capture = import_module('220CpuDynamicBinning').capture
+binning_fixture = import_module('220CpuDynamicBinning')
+capture = binning_fixture.capture
 
 
 def main():
@@ -25,8 +26,8 @@ def main():
     path = Path.cwd() / '230BackendObservableResponses.root'
     fixture.write_input(path)
 
-    def run(backend, mode=None):
-        engine = fixture.make_engine(path, backend=backend, strict_only=True, backend_mode=mode)
+    def run(backend, mode=None, strict=True):
+        engine = fixture.make_engine(path, backend=backend, strict_only=strict, backend_mode=mode)
         li = engine.getLikelihoodInterface()
         propagator = li.getModelPropagator()
         parameters = {p.getName(): p for p in
@@ -55,17 +56,20 @@ def main():
                 rows.append(capture(engine))
         return rows
 
-    reference = run(None)
     backends = [('CPU', None)]
     if os.environ.get('GUNDAM_TEST_CUDA') == '1':
         backends.extend(('CUDA', mode) for mode in ('cachedResponses', 'recomputeResponses'))
+    for strict in (True, False):
+        reference = run(None, strict=strict)
+        for backend, mode in backends:
+            actual = run(backend, mode, strict=strict)
+            for point, (row, expected) in enumerate(zip(actual, reference)):
+                assert len(row) == len(expected)
+                for output, (a, b) in enumerate(zip(row, expected)):
+                    assert math.isclose(a, b, rel_tol=1e-10, abs_tol=1e-10), (backend, mode, strict, point, output, a, b)
     for backend, mode in backends:
-        actual = run(backend, mode)
-        for point, (row, expected) in enumerate(zip(actual, reference)):
-            assert len(row) == len(expected)
-            for output, (a, b) in enumerate(zip(row, expected)):
-                assert math.isclose(a, b, rel_tol=1e-10, abs_tol=1e-10), (backend, mode, point, output, a, b)
-    print('SUCCESS: strict observable composition, migrations, materialization and Asimov copies agree')
+        binning_fixture.exercise_manual_binning(path, backend_name=backend, backend_mode=mode)
+    print('SUCCESS: strict/smoothed composition, widthFraction, migrations, materialization and Asimov copies agree')
     return 0
 
 

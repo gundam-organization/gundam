@@ -1,5 +1,6 @@
 #include "CudaDeviceContext.h"
 #include "CudaWeightModel.h"
+#include "CudaBinning.h"
 #include "BackendTypes.h"
 #include "PropagationInputs.h"
 #include "EventStateCache.h"
@@ -7,6 +8,7 @@
 
 #include <cuda_runtime.h>
 #include <thrust/sort.h>
+#include <thrust/scan.h>
 #include <thrust/system/cuda/execution_policy.h>
 
 #include "Semantics/BackendDialSemanticsCore.h"
@@ -56,6 +58,15 @@ namespace {
       size = size_;
       if( size ){ checkCuda(cudaMalloc(reinterpret_cast<void**>(&data), size * sizeof(T)), "cudaMalloc"); }
     }
+    // Scratch/unpublished buffers: growing discards contents after synchronizing
+    // their previous use. Callers write the complete active range afterward.
+    void ensureCapacity(std::size_t size_) {
+      if( size_ <= size ){ return; }
+      DeviceBuffer replacement;
+      replacement.allocate(size_);
+      std::swap(data, replacement.data);
+      std::swap(size, replacement.size);
+    }
     void upload(const std::vector<T>& values_, cudaStream_t stream_) {
       allocate(values_.size());
       if( size ){ checkCuda(cudaMemcpyAsync(data, values_.data(), size * sizeof(T), cudaMemcpyHostToDevice, stream_), "model upload"); }
@@ -103,6 +114,11 @@ namespace {
     Backends::EventStateCache stateCache{};
     // EventStateCache borrows the original model owned by CudaBackend.
     const Backends::PropagationView* originalModel{nullptr};
+    DeviceBuffer<std::size_t> contributionCounts, contributionOffsets, nextContributionOffsets;
+    DeviceBuffer<Backends::CudaBinningResult> binningResults;
+    DeviceBuffer<Backends::CudaBinContribution> contributions, nextContributions, sortedContributions;
+    std::size_t contributionCount{0}, histogramBins{0};
+    bool hasSmoothedBinning{false};
     bool hasEventState{false};
     bool cachePrimed{false};
     bool hasReweightCap{false};
@@ -293,7 +309,7 @@ namespace {
             variables_[target.variableIndex] = value;
           }
         }
-        if( sample.isDynamic ){
+        if( sample.isDynamic or sample.isSmoothed ){
           localBin = stateBins_[slot];
           if( first_ or force_ or changed or sample.readHostVariables ){
             localBin = -1;
@@ -314,14 +330,16 @@ namespace {
             atomicAdd(counters_, 1ull);
           }
           globalBin = localBin < 0 ? -1 : sample.binOffset + localBin;
-          if( localBin >= 0 ){ atomicAdd(counters_ + 2, 1ull); }
+          if( localBin >= 0 and not sample.isSmoothed ){ atomicAdd(counters_ + 2, 1ull); }
         }
       }
       stateBins_[slot] = localBin;
       // Reinitialize in original event order before the stable sort. This keeps
       // each histogram's reduction deterministic, independently of result slots.
-      keys_[i] = globalBin < 0 ? totalBins_ : globalBin;
-      eventSlots_[i] = slot;
+      if( keys_ ){
+        keys_[i] = globalBin < 0 ? totalBins_ : globalBin;
+        eventSlots_[i] = slot;
+      }
     }
   }
 
@@ -332,6 +350,75 @@ namespace {
       while( low < high ){
         const auto mid = low + (high - low) / 2;
         if( keys_[mid] < int(bin) ){ low = mid + 1; }
+        else{ high = mid; }
+      }
+      offsets_[bin] = low;
+    }
+  }
+
+  __global__ void countContributions(const Backends::EventView* events_, std::size_t count_,
+      const Backends::CudaBinningSample* samples_, std::size_t sampleCount_, const Backends::BinningBin* bins_,
+      const Backends::BinningInterval* intervals_, const double* variables_, const int* stateBins_,
+      Backends::CudaBinningResult* results_, std::size_t* counts_, unsigned long long* counters_, int* error_) {
+    for( std::size_t i = std::size_t(blockIdx.x) * blockDim.x + threadIdx.x;
+         i < count_; i += std::size_t(blockDim.x) * gridDim.x ){
+      const auto& event = events_[i];
+      std::size_t count = event.globalBinIndex >= 0 ? 1 : 0;
+      if( event.samplePosition < sampleCount_ ){
+        const auto& sample = samples_[event.samplePosition];
+        if( sample.isSmoothed ){
+          const auto result = Backends::Semantics::analyzeCudaBinning(sample, bins_, intervals_,
+              event.variableCount ? variables_ + event.firstVariable : nullptr);
+          results_[i] = result;
+          count = result.isValid ? result.count : 0;
+          if( not result.isValid ){ atomicExch(error_, 1); }
+          atomicAdd(counters_ + 2, static_cast<unsigned long long>(count));
+        }
+        else if( sample.isDynamic ){ count = stateBins_[event.resultIndex] >= 0 ? 1 : 0; }
+      }
+      counts_[i] = count;
+    }
+  }
+
+  __global__ void writeContributions(const Backends::EventView* events_, std::size_t count_,
+      const Backends::CudaBinningSample* samples_, std::size_t sampleCount_, const Backends::BinningBin* bins_,
+      const Backends::BinningInterval* intervals_, const double* variables_, const int* stateBins_,
+      const Backends::CudaBinningResult* results_, const std::size_t* offsets_,
+      Backends::CudaBinContribution* contributions_, int histogramBins_, int* error_) {
+    for( std::size_t i = std::size_t(blockIdx.x) * blockDim.x + threadIdx.x;
+         i < count_; i += std::size_t(blockDim.x) * gridDim.x ){
+      const auto first = offsets_[i], count = offsets_[i + 1] - first;
+      if( count == 0 ){ continue; }
+      const auto& event = events_[i];
+      int bin = event.globalBinIndex;
+      if( event.samplePosition < sampleCount_ ){
+        const auto& sample = samples_[event.samplePosition];
+        if( sample.isSmoothed ){
+          if( not Backends::Semantics::writeCudaBinning(sample, bins_, intervals_,
+              event.variableCount ? variables_ + event.firstVariable : nullptr, results_[i], event.resultIndex,
+              histogramBins_ + int(event.samplePosition), contributions_ + first, count) ){ atomicExch(error_, 1); }
+          continue;
+        }
+        if( sample.isDynamic ){ bin = sample.binOffset + stateBins_[event.resultIndex]; }
+      }
+      contributions_[first] = {event.resultIndex, bin, 1.};
+    }
+  }
+
+  struct ContributionLess {
+    __host__ __device__ bool operator()(const Backends::CudaBinContribution& first_, const Backends::CudaBinContribution& second_) const {
+      return first_.bin < second_.bin;
+    }
+  };
+
+  __global__ void findContributionOffsets(const Backends::CudaBinContribution* contributions_, std::size_t count_,
+      std::size_t* offsets_, std::size_t bins_) {
+    for( std::size_t bin = std::size_t(blockIdx.x) * blockDim.x + threadIdx.x;
+         bin <= bins_; bin += std::size_t(blockDim.x) * gridDim.x ){
+      std::size_t low = 0, high = count_;
+      while( low < high ){
+        const auto mid = low + (high - low) / 2;
+        if( contributions_[mid].bin < int(bin) ){ low = mid + 1; }
         else{ high = mid; }
       }
       offsets_[bin] = low;
@@ -355,16 +442,22 @@ namespace {
     }
   }
 
+  template<bool fractional_>
   __global__ void reduceHistograms(const std::size_t* offsets_, const std::size_t* events_,
                                    std::size_t bins_, const double* weights_, double* sums_,
-                                   double* squares_, int* error_) {
+                                   double* squares_, int* error_, const Backends::CudaBinContribution* contributions_) {
     __shared__ double sum[blockSize];
     __shared__ double square[blockSize];
     // No floating-point atomics: each bin has one deterministic reduction tree.
     for( std::size_t bin = blockIdx.x; bin < bins_; bin += gridDim.x ){
       double value = 0., valueSquared = 0.;
       for( std::size_t j = offsets_[bin] + threadIdx.x; j < offsets_[bin + 1]; j += blockDim.x ){
-        const double weight = weights_[events_[j]];
+        double weight;
+        if constexpr( fractional_ ){
+          const auto& contribution = contributions_[j];
+          weight = weights_[contribution.event] * contribution.fraction;
+        }
+        else{ weight = weights_[events_[j]]; }
         value += weight;
         valueSquared += weight * weight;
       }
@@ -453,7 +546,11 @@ void Backends::CudaDeviceContext::build(const CudaWeightModel& model_, const Pro
     b.surfaceOffset = model_.surfaceOffset;
     b.updatePlan.ranges.reserve(model_.parameterCount + b.surfaceGroups.size());
     b.responseUpdates.allocate(model_.parameterCount + b.surfaceGroups.size());
-    b.binOffsets.upload(model_.binOffsets, _impl_->stream);
+    b.histogramBins = model_.binOffsets.size() - 1;
+    b.hasSmoothedBinning = model_.hasSmoothedBinning;
+    const auto histogramCount = b.histogramBins + (b.hasSmoothedBinning ? model_.samples.size() : 0);
+    if( b.hasSmoothedBinning ){ b.binOffsets.allocate(histogramCount + 1); }
+    else{ b.binOffsets.upload(model_.binOffsets, _impl_->stream); }
     b.hasEventState = model_.hasEventState;
     if( b.hasEventState ){
       b.originalModel = &original_;
@@ -472,8 +569,16 @@ void Backends::CudaDeviceContext::build(const CudaWeightModel& model_, const Pro
       b.stateBins.allocate(model_.events.size());
       b.nextStateBins.allocate(model_.events.size());
       if( b.stateBins.size ){ checkCuda(cudaMemsetAsync(b.stateBins.data, 0xff, b.stateBins.size * sizeof(int), _impl_->stream), "initialize event bins"); }
-      b.histogramKeys.allocate(model_.events.size());
-      b.binEvents.allocate(model_.events.size());
+      if( b.hasSmoothedBinning ){
+        b.contributionCounts.allocate(model_.events.size() + 1);
+        b.contributionOffsets.allocate(model_.events.size() + 1);
+        b.nextContributionOffsets.allocate(model_.events.size() + 1);
+        b.binningResults.allocate(model_.events.size());
+      }
+      else{
+        b.histogramKeys.allocate(model_.events.size());
+        b.binEvents.allocate(model_.events.size());
+      }
       b.changedSamples.allocate(model_.samples.size());
       b.sampleChanges.resize(model_.samples.size());
       b.changedSampleFlags.resize(model_.samples.size());
@@ -485,7 +590,7 @@ void Backends::CudaDeviceContext::build(const CudaWeightModel& model_, const Pro
     b.previousInputs.allocate(model_.dials.size());
     b.previousSecondInputs.allocate(model_.dials.size() - model_.surfaceOffset);
     b.weights.allocate(model_.events.size());
-    b.sums.allocate(model_.binOffsets.size() - 1);
+    b.sums.allocate(histogramCount);
     b.sumSquares.allocate(b.sums.size);
     b.error.allocate(1);
     b.hasReweightCap = model_.hasReweightCap;
@@ -508,6 +613,7 @@ void Backends::CudaDeviceContext::propagate(const PropagationInputs& inputs_, bo
   if( externalWeights_.size() != b.externalGenerations.size() ){ throw std::runtime_error("CUDA external block count mismatch."); }
   int error = 0;
   std::array<unsigned long long, 3> stateCounters{};
+  std::size_t stagedContributionCount = 0;
   const auto stream = _impl_->stream;
   auto record = [&](std::size_t i_){ checkCuda(cudaEventRecord(_impl_->stages[i_], stream), "cudaEventRecord"); };
   try{
@@ -625,12 +731,45 @@ void Backends::CudaDeviceContext::propagate(const PropagationInputs& inputs_, bo
             b.samples.data, b.samples.size, b.bins.data, b.intervals.data, b.variableResponses.data,
             b.variableDialIndices.data, b.responses.data, b.nextVariables.data, b.hostVariables.data, b.hostEdits.data,
             b.nextStateBins.data, b.histogramKeys.data, b.binEvents.data, b.changedSamples.data, b.stateCounters.data,
-            int(b.sums.size), b.stateCache.variableInputsChanged(), inputs_.forceBinningUpdate, not b.cachePrimed, b.error.data);
+            int(b.histogramBins), b.stateCache.variableInputsChanged(), inputs_.forceBinningUpdate, not b.cachePrimed, b.error.data);
         checkCuda(cudaGetLastError(), "observable response and strict binning kernel launch");
       }
     }
     record(4);
-    if( updateState ){
+    if( updateState and b.hasSmoothedBinning ){
+      if( b.events.size ){
+        countContributions<<<gridSize(b.events.size), blockSize, 0, stream>>>(b.stateEvents.data, b.events.size,
+            b.samples.data, b.samples.size, b.bins.data, b.intervals.data, b.nextVariables.data, b.nextStateBins.data,
+            b.binningResults.data, b.contributionCounts.data, b.stateCounters.data, b.error.data);
+        checkCuda(cudaGetLastError(), "fractional contribution count kernel launch");
+      }
+      checkCuda(cudaMemsetAsync(b.contributionCounts.data + b.events.size, 0, sizeof(std::size_t), stream), "contribution count sentinel");
+      thrust::exclusive_scan(thrust::cuda::par.on(stream), b.contributionCounts.data,
+          b.contributionCounts.data + b.events.size + 1, b.nextContributionOffsets.data);
+      checkCuda(cudaMemcpyAsync(&stagedContributionCount, b.nextContributionOffsets.data + b.events.size,
+                                sizeof(std::size_t), cudaMemcpyDeviceToHost, stream), "contribution extent readback");
+      checkCuda(cudaMemcpyAsync(&error, b.error.data, sizeof(int), cudaMemcpyDeviceToHost, stream), "binning validation readback");
+      checkCuda(cudaStreamSynchronize(stream), "contribution count completion");
+      if( error ){ throw std::runtime_error("CudaBackend: invalid fractional binning response or nonfinite result."); }
+      b.nextContributions.ensureCapacity(stagedContributionCount);
+      b.sortedContributions.ensureCapacity(stagedContributionCount);
+      if( b.events.size ){
+        writeContributions<<<gridSize(b.events.size), blockSize, 0, stream>>>(b.stateEvents.data, b.events.size,
+            b.samples.data, b.samples.size, b.bins.data, b.intervals.data, b.nextVariables.data, b.nextStateBins.data,
+            b.binningResults.data, b.nextContributionOffsets.data, b.nextContributions.data, int(b.histogramBins), b.error.data);
+        checkCuda(cudaGetLastError(), "fractional contribution write kernel launch");
+      }
+      if( stagedContributionCount ){
+        checkCuda(cudaMemcpyAsync(b.sortedContributions.data, b.nextContributions.data,
+            stagedContributionCount * sizeof(CudaBinContribution), cudaMemcpyDeviceToDevice, stream), "contribution index staging");
+        thrust::stable_sort(thrust::cuda::par.on(stream), b.sortedContributions.data,
+            b.sortedContributions.data + stagedContributionCount, ContributionLess{});
+      }
+      findContributionOffsets<<<gridSize(b.sums.size + 1), blockSize, 0, stream>>>(
+          b.sortedContributions.data, stagedContributionCount, b.binOffsets.data, b.sums.size);
+      checkCuda(cudaGetLastError(), "fractional histogram index kernel launch");
+    }
+    else if( updateState ){
       if( b.events.size ){
         thrust::stable_sort_by_key(thrust::cuda::par.on(stream), b.histogramKeys.data,
             b.histogramKeys.data + b.events.size, b.binEvents.data);
@@ -642,8 +781,14 @@ void Backends::CudaDeviceContext::propagate(const PropagationInputs& inputs_, bo
     record(5);
     if( b.sums.size ){
       const auto blocks = static_cast<unsigned int>(std::min<std::size_t>(b.sums.size, 65535));
-      reduceHistograms<<<blocks, blockSize, 0, stream>>>(b.binOffsets.data, b.binEvents.data,
-          b.sums.size, b.weights.data, b.sums.data, b.sumSquares.data, b.error.data);
+      if( b.hasSmoothedBinning ){
+        reduceHistograms<true><<<blocks, blockSize, 0, stream>>>(b.binOffsets.data, nullptr,
+            b.sums.size, b.weights.data, b.sums.data, b.sumSquares.data, b.error.data, b.sortedContributions.data);
+      }
+      else{
+        reduceHistograms<false><<<blocks, blockSize, 0, stream>>>(b.binOffsets.data, b.binEvents.data,
+            b.sums.size, b.weights.data, b.sums.data, b.sumSquares.data, b.error.data, nullptr);
+      }
       checkCuda(cudaGetLastError(), "histogram kernel launch");
     }
     record(6);
@@ -663,6 +808,12 @@ void Backends::CudaDeviceContext::propagate(const PropagationInputs& inputs_, bo
       b.stateCache.commit(inputs_, b.changedSampleFlags);
       std::swap(b.variables.data, b.nextVariables.data);
       std::swap(b.stateBins.data, b.nextStateBins.data);
+      if( b.hasSmoothedBinning ){
+        std::swap(b.contributions.data, b.nextContributions.data);
+        std::swap(b.contributions.size, b.nextContributions.size);
+        std::swap(b.contributionOffsets.data, b.nextContributionOffsets.data);
+        b.contributionCount = stagedContributionCount;
+      }
       timing_.rebinnedEventCount = stateCounters[0];
       timing_.binCandidateCount = stateCounters[1];
       b.cachedContributionCount = stateCounters[2];
@@ -676,6 +827,8 @@ void Backends::CudaDeviceContext::propagate(const PropagationInputs& inputs_, bo
       return double(milliseconds) * 1.e-3;
     };
     timing_.binContributionCount = b.cachedContributionCount;
+    timing_.contributionBufferBytes = (b.contributions.size + b.nextContributions.size + b.sortedContributions.size)
+        * sizeof(CudaBinContribution);
     timing_.parameterUploadSeconds = elapsed(0, 1);
     timing_.cachedDialStageSeconds = elapsed(1, 2);
     timing_.eventWeightsStageSeconds = elapsed(2, 3);
@@ -696,33 +849,70 @@ void Backends::CudaDeviceContext::readWeights(std::vector<double>& weights_) {
   catch(...){ cudaStreamSynchronize(_impl_->stream); throw; }
 }
 
-void Backends::CudaDeviceContext::readHistograms(std::vector<double>& sums_, std::vector<double>& sumSquares_) {
+void Backends::CudaDeviceContext::readHistograms(std::vector<double>& sums_, std::vector<double>& sumSquares_,
+    std::vector<double>& outsideSums_, std::vector<double>& outsideSquares_) {
   DeviceScope scope(_impl_->deviceIndex);
+  const auto& b = *_impl_->buffers;
   try{
-    _impl_->buffers->sums.read(sums_, _impl_->stream);
-    _impl_->buffers->sumSquares.read(sumSquares_, _impl_->stream);
+    sums_.resize(b.histogramBins);
+    sumSquares_.resize(b.histogramBins);
+    outsideSums_.assign(b.samples.size, 0.);
+    outsideSquares_.assign(b.samples.size, 0.);
+    if( b.histogramBins ){
+      checkCuda(cudaMemcpyAsync(sums_.data(), b.sums.data, b.histogramBins * sizeof(double),
+                                cudaMemcpyDeviceToHost, _impl_->stream), "histogram readback");
+      checkCuda(cudaMemcpyAsync(sumSquares_.data(), b.sumSquares.data, b.histogramBins * sizeof(double),
+                                cudaMemcpyDeviceToHost, _impl_->stream), "histogram squares readback");
+    }
+    if( b.hasSmoothedBinning and b.samples.size ){
+      checkCuda(cudaMemcpyAsync(outsideSums_.data(), b.sums.data + b.histogramBins, b.samples.size * sizeof(double),
+                                cudaMemcpyDeviceToHost, _impl_->stream), "outside histogram readback");
+      checkCuda(cudaMemcpyAsync(outsideSquares_.data(), b.sumSquares.data + b.histogramBins, b.samples.size * sizeof(double),
+                                cudaMemcpyDeviceToHost, _impl_->stream), "outside histogram squares readback");
+    }
     checkCuda(cudaStreamSynchronize(_impl_->stream), "histogram readback completion");
   }
   catch(...){ cudaStreamSynchronize(_impl_->stream); throw; }
 }
 
-void Backends::CudaDeviceContext::readEventState(EventState& state_) {
+std::size_t Backends::CudaDeviceContext::readEventState(EventState& state_) {
   DeviceScope scope(_impl_->deviceIndex);
   auto& b = *_impl_->buffers;
+  std::vector<std::size_t> offsets;
+  std::vector<CudaBinContribution> contributions;
   try{
     b.variables.read(state_.variables, _impl_->stream);
     b.stateBins.read(state_.bins, _impl_->stream);
+    if( b.hasSmoothedBinning ){
+      b.contributionOffsets.read(offsets, _impl_->stream);
+      contributions.resize(b.contributionCount);
+      if( b.contributionCount ){
+        checkCuda(cudaMemcpyAsync(contributions.data(), b.contributions.data,
+            b.contributionCount * sizeof(CudaBinContribution), cudaMemcpyDeviceToHost, _impl_->stream), "fractional event state readback");
+      }
+    }
     checkCuda(cudaStreamSynchronize(_impl_->stream), "event state readback completion");
     state_.contributions.assign(b.events.size, {});
-    // Strict dynamic events have either one complete contribution or none.
     const auto& model = *b.originalModel;
-    for( const auto& event : model.events ){
-      if( event.samplePosition < model.samples.size() and model.samples[event.samplePosition].useDynamicBinning
-          and state_.bins[event.resultIndex] >= 0 ){
-        state_.contributions[event.resultIndex].push_back({state_.bins[event.resultIndex], 1.});
+    for( std::size_t i = 0; i < model.events.size(); ++i ){
+      const auto& event = model.events[i];
+      if( event.samplePosition >= model.samples.size() ){ continue; }
+      const auto& sample = model.samples[event.samplePosition];
+      if( not sample.useDynamicBinning and not sample.binning.isSmoothed ){ continue; }
+      auto& target = state_.contributions[event.resultIndex];
+      if( b.hasSmoothedBinning ){
+        for( std::size_t j = offsets[i]; j < offsets[i + 1]; ++j ){
+          const auto& source = contributions[j];
+          target.push_back({source.bin >= int(b.histogramBins) ? -1 : source.bin - sample.binOffset, source.fraction});
+        }
+      }
+      else if( state_.bins[event.resultIndex] >= 0 ){
+        target.push_back({state_.bins[event.resultIndex], 1.});
       }
     }
     b.stateCache.publishRevisions(state_);
+    return state_.variables.size() * sizeof(double) + state_.bins.size() * sizeof(int)
+        + offsets.size() * sizeof(std::size_t) + contributions.size() * sizeof(CudaBinContribution);
   }
   catch(...){ cudaStreamSynchronize(_impl_->stream); throw; }
 }
@@ -742,6 +932,6 @@ Backends::BackendDeviceView Backends::CudaDeviceContext::getDeviceView() const {
   out.eventWeightsBytes = b.weights.size * sizeof(double);
   out.histSums = b.sums.data;
   out.histSumSquares = b.sumSquares.data;
-  out.histogramBytes = b.sums.size * sizeof(double);
+  out.histogramBytes = b.histogramBins * sizeof(double);
   return out;
 }

@@ -2,6 +2,7 @@
 #include "BackendFactory.h"
 #include "BackendManager.h"
 #include "CudaWeightModel.h"
+#include "CudaBinning.h"
 #include "EventStateCache.h"
 #include "CompactSpline.h"
 #include "UniformSpline.h"
@@ -126,7 +127,7 @@ TEST(CudaWeightModel, RejectsUnsupportedFeaturesAndUnsafeLayouts) {
   EXPECT_NO_THROW((void)makeCudaWeightModel(view));
   view = {};
   view.propagation.samples.emplace_back().binning.isSmoothed = true;
-  EXPECT_THROW((void)makeCudaWeightModel(view), std::runtime_error);
+  EXPECT_NO_THROW((void)makeCudaWeightModel(view));
   for( auto type : {BackendDialType::ExternalWeight, BackendDialType::Tabulated, BackendDialType::Kriged} ){
     view = {};
     view.propagation.dials.emplace_back().type = type;
@@ -592,7 +593,7 @@ TEST(CudaWeightModel, ObservableReferencesAreRemappedAndUnsafeLayoutsRejected) {
       case 9: m.events[1].firstVariable = 0; m.variableResponses[1].variableIndex = 0; break;
       case 10: m.samples[0].binning.intervals[0].variableIndex = 1; break;
       case 11: m.samples[0].binning.intervals[0].lowerBound = std::numeric_limits<double>::quiet_NaN(); break;
-      case 12: m.samples[0].binning.isSmoothed = true; break;
+      case 12: m.samples[0].binning.intervals[0].lowerInverseWidth = -1.; break;
       case 13: m.samples[0].binning.bins[0].binIndex = 1; break;
       case 14: m.samples[0].binOffset = -1; break;
       case 15: m.variableValues[0] = std::numeric_limits<double>::infinity(); break;
@@ -626,4 +627,99 @@ TEST(CudaWeightModel, ExternalObservableCacheUsesPublicationRatherThanProducerIn
   ++inputs.externalWeights[0].generation;
   cache.prepare(inputs);
   EXPECT_TRUE(cache.variableInputsChanged());
+}
+
+TEST(CudaBinning, AnalyticFractionsOutsideAndRoundoffNormalization) {
+  using namespace Backends;
+  CudaBinningSample sample;
+  sample.isSmoothed = true;
+  sample.variableCount = 1;
+  sample.endBin = 2;
+  std::vector<BinningBin> bins{{0, 0, 1}, {1, 1, 1}};
+  std::vector<BinningInterval> intervals{{0, 0., 1., 5., 5.}, {0, 1., 2., 5., 5.}};
+  double x = 1.;
+  auto result = Semantics::analyzeCudaBinning(sample, bins.data(), intervals.data(), &x);
+  ASSERT_TRUE(result.isValid);
+  ASSERT_EQ(result.count, 2);
+  EXPECT_DOUBLE_EQ(result.total, 1.);
+  std::vector<CudaBinContribution> values(3);
+  ASSERT_TRUE(Semantics::writeCudaBinning(sample, bins.data(), intervals.data(), &x, result, 42, 2, values.data(), result.count));
+  EXPECT_EQ(values[0].event, 42);
+  EXPECT_EQ(values[0].bin, 0);
+  EXPECT_EQ(values[1].bin, 1);
+  EXPECT_DOUBLE_EQ(values[0].fraction, .5);
+  EXPECT_DOUBLE_EQ(values[1].fraction, .5);
+  x = 0.;
+  result = Semantics::analyzeCudaBinning(sample, bins.data(), intervals.data(), &x);
+  ASSERT_TRUE(result.isValid);
+  ASSERT_EQ(result.count, 2);
+  ASSERT_TRUE(Semantics::writeCudaBinning(sample, bins.data(), intervals.data(), &x, result, 42, 2, values.data(), result.count));
+  EXPECT_EQ(values[1].bin, 2);
+  EXPECT_DOUBLE_EQ(values[0].fraction, .5);
+  EXPECT_DOUBLE_EQ(values[1].fraction, .5);
+  x = -10.;
+  result = Semantics::analyzeCudaBinning(sample, bins.data(), intervals.data(), &x);
+  ASSERT_TRUE(result.isValid);
+  EXPECT_EQ(result.count, 1);
+  EXPECT_DOUBLE_EQ(result.total, 0.);
+  intervals = {{0, 0., 1., 1., 1.}, {0, -1e-14, 1., 1., 1.}};
+  x = 0.;
+  result = Semantics::analyzeCudaBinning(sample, bins.data(), intervals.data(), &x);
+  ASSERT_TRUE(result.isValid);
+  EXPECT_GT(result.excess, 0.);
+  EXPECT_DOUBLE_EQ(result.total, 1.);
+  ASSERT_TRUE(Semantics::writeCudaBinning(sample, bins.data(), intervals.data(), &x, result, 42, 2, values.data(), result.count));
+  EXPECT_DOUBLE_EQ(values[0].fraction + values[1].fraction, 1.);
+  EXPECT_FALSE(Semantics::writeCudaBinning(sample, bins.data(), intervals.data(), &x, result, 42, 2, values.data(), 1));
+  intervals = {{0, -1., 1.}, {0, -1., 1.}};
+  EXPECT_FALSE(Semantics::analyzeCudaBinning(sample, bins.data(), intervals.data(), &x).isValid);
+  x = std::numeric_limits<double>::quiet_NaN();
+  EXPECT_FALSE(Semantics::analyzeCudaBinning(sample, bins.data(), intervals.data(), &x).isValid);
+}
+
+TEST(CudaBinning, TensorProductAndSmoothingDescriptorValidation) {
+  using namespace Backends;
+  CudaBinningSample sample;
+  sample.isSmoothed = true;
+  sample.variableCount = 2;
+  sample.endBin = 4;
+  std::vector<BinningBin> bins;
+  std::vector<BinningInterval> intervals;
+  for( int x = 0; x < 2; ++x ){
+    for( int y = 0; y < 2; ++y ){
+      bins.push_back({int(bins.size()), intervals.size(), 2});
+      intervals.push_back({0, double(x), double(x + 1), 5., 5.});
+      intervals.push_back({1, double(y), double(y + 1), 5., 5.});
+    }
+  }
+  const double point[]{1., 1.};
+  auto result = Semantics::analyzeCudaBinning(sample, bins.data(), intervals.data(), point);
+  ASSERT_TRUE(result.isValid);
+  ASSERT_EQ(result.count, 4);
+  std::vector<CudaBinContribution> values(result.count);
+  ASSERT_TRUE(Semantics::writeCudaBinning(sample, bins.data(), intervals.data(), point, result, 0, 4, values.data(), result.count));
+  for( const auto& value : values ){ EXPECT_DOUBLE_EQ(value.fraction, .25); }
+  EngineView view;
+  SampleView smoothed;
+  smoothed.binning.isSmoothed = true;
+  smoothed.binCount = view.propagation.totalBins = 4;
+  smoothed.binning.variableNames = {"X", "Y"};
+  smoothed.binning.bins = bins;
+  smoothed.binning.intervals = intervals;
+  view.propagation.samples = {smoothed};
+  const auto packed = makeCudaWeightModel(view);
+  EXPECT_TRUE(packed.hasSmoothedBinning);
+  EXPECT_TRUE(packed.samples[0].isSmoothed);
+  EXPECT_DOUBLE_EQ(packed.intervals[0].lowerInverseWidth, 5.);
+  for( double invalid : {-1., std::numeric_limits<double>::infinity(), std::numeric_limits<double>::quiet_NaN()} ){
+    auto bad = view;
+    bad.propagation.samples[0].binning.intervals[0].lowerInverseWidth = invalid;
+    EXPECT_THROW((void)makeCudaWeightModel(bad), std::runtime_error);
+  }
+  auto bad = view;
+  bad.propagation.samples[0].binning.intervals[0].upperInverseWidth = 0.;
+  EXPECT_THROW((void)makeCudaWeightModel(bad), std::runtime_error);
+  bad = view;
+  bad.propagation.totalBins = std::numeric_limits<int>::max();
+  EXPECT_THROW((void)makeCudaWeightModel(bad), std::runtime_error);
 }

@@ -78,6 +78,7 @@ endif()
 set(HEADERS
     ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/CUDA/include/CudaBackend.h
     ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/CUDA/include/CudaWeightModel.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/CUDA/include/CudaBinning.h
     ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/Semantics/BackendResponseSmoothing.h
     ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/ResponseSmoothingPacking.h
     ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/Semantics/BackendVariableResponse.h

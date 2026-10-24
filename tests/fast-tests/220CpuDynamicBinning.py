@@ -36,7 +36,7 @@ def capture(engine):
     return result
 
 
-def exercise_manual_binning(path, backend_name="CPU"):
+def exercise_manual_binning(path, backend_name="CPU", backend_mode=None):
     import GUNDAM
     engines = []
     for backend in (False, True):
@@ -52,7 +52,8 @@ def exercise_manual_binning(path, backend_name="CPU"):
             }]}},
         }
         if backend:
-            li['backendManagerConfig'] = {'isEnabled': True, 'type': backend_name}
+            li['backendManagerConfig'] = {'isEnabled': True, 'type': backend_name,
+                                          'backendConfig': {'propagationMode': backend_mode} if backend_mode else {}}
         config = {'likelihoodInterfaceConfig': li, 'enablePca': False, 'scaleParStepWithChi2Response': False,
                   'generateSamplePlots': False, 'generateOneSigmaPlots': False}
         engine = GUNDAM.FitterEngine()

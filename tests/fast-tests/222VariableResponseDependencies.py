@@ -114,12 +114,13 @@ def run(command):
             assert all(math.isclose(a, b, rel_tol=tolerance, abs_tol=tolerance)
                        for a, b in zip(row, expected)), (backend, row, expected)
     if os.environ.get('GUNDAM_TEST_CUDA') == '1':
-        reference = run('standard', strict=True)
-        for mode in ('cachedResponses', 'recomputeResponses'):
-            actual = run('CUDA', mode=mode, strict=True)
-            for row, expected in zip(actual, reference):
-                assert all(math.isclose(a, b, rel_tol=1e-10, abs_tol=1e-10)
-                           for a, b in zip(row, expected)), (mode, row, expected)
+        for strict in (True, False):
+            reference = run('standard', strict=strict)
+            for mode in ('cachedResponses', 'recomputeResponses'):
+                actual = run('CUDA', mode=mode, strict=strict)
+                for row, expected in zip(actual, reference):
+                    assert all(math.isclose(a, b, rel_tol=1e-10, abs_tol=1e-10)
+                               for a, b in zip(row, expected)), (mode, strict, row, expected)
     print('SUCCESS: observable producer calls, cached binning and explicit invalidation agree')
 
 

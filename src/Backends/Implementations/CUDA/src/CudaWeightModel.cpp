@@ -1,4 +1,5 @@
 #include "CudaWeightModel.h"
+#include "CudaBinning.h"
 #include "Semantics/BackendDialSemantics.h"
 
 #include <algorithm>
@@ -96,6 +97,8 @@ Backends::CudaWeightModel Backends::makeCudaWeightModel(const EngineView& view_,
   static_assert(std::is_trivially_copyable<CudaResponseUpdate>::value);
   static_assert(std::is_trivially_copyable<BackendTableTerm>::value);
   static_assert(std::is_trivially_copyable<ExternalWeightBlockDescriptor>::value);
+  static_assert(std::is_trivially_copyable<CudaBinContribution>::value);
+  static_assert(std::is_trivially_copyable<CudaBinningResult>::value);
   static_assert(std::is_trivially_copyable<EventView>::value);
   static_assert(std::is_trivially_copyable<CudaBinningSample>::value);
   static_assert(std::is_trivially_copyable<BackendVariableResponseDescriptor>::value);
@@ -213,7 +216,7 @@ Backends::CudaWeightModel Backends::makeCudaWeightModel(const EngineView& view_,
               "observable dial range is out of bounds.");
     }
     for( const auto& sample : model.samples ){
-      require(not sample.binning.isSmoothed, "smoothed binning is not implemented.");
+
       require(sample.binOffset >= 0 and sample.binCount >= 0 and sample.binOffset <= model.totalBins
               and sample.binCount <= model.totalBins - sample.binOffset, "sample bin range is out of bounds.");
       CudaBinningSample packed;
@@ -222,6 +225,8 @@ Backends::CudaWeightModel Backends::makeCudaWeightModel(const EngineView& view_,
       packed.firstBin = out.bins.size();
       packed.variableCount = sample.binning.variableNames.size();
       packed.isDynamic = sample.useDynamicBinning;
+      packed.isSmoothed = sample.binning.isSmoothed;
+      out.hasSmoothedBinning |= packed.isSmoothed;
       packed.readHostVariables = sample.readHostVariables;
       for( auto bin : sample.binning.bins ){
         require(bin.binIndex >= 0 and bin.binIndex < sample.binCount
@@ -233,7 +238,10 @@ Backends::CudaWeightModel Backends::makeCudaWeightModel(const EngineView& view_,
         for( std::size_t j = 0; j < bin.intervalCount; ++j ){
           const auto& interval = sample.binning.intervals[first + j];
           require(interval.variableIndex < packed.variableCount and interval.lowerBound <= interval.upperBound
-                  and interval.lowerInverseWidth == 0. and interval.upperInverseWidth == 0., "invalid strict bin interval.");
+                  and std::isfinite(interval.lowerInverseWidth) and std::isfinite(interval.upperInverseWidth)
+                  and interval.lowerInverseWidth >= 0. and interval.upperInverseWidth >= 0.
+                  and (interval.lowerInverseWidth == 0.) == (interval.upperInverseWidth == 0.)
+                  and (packed.isSmoothed or interval.lowerInverseWidth == 0.), "invalid bin interval or smoothing widths.");
           out.intervals.push_back(interval);
         }
         out.bins.push_back(bin);
@@ -254,7 +262,7 @@ Backends::CudaWeightModel Backends::makeCudaWeightModel(const EngineView& view_,
         continue;
       }
       const auto& sample = out.samples[event.samplePosition];
-      require(not sample.isDynamic or event.variableCount >= sample.variableCount, "missing binning variables.");
+      require(not (sample.isDynamic or sample.isSmoothed) or event.variableCount >= sample.variableCount, "missing binning variables.");
       require(event.binIndex >= -1 and event.binIndex < sample.binCount, "fixed local bin is out of bounds.");
       if( event.variableCount ){ variableRanges.emplace_back(event.firstVariable, event.firstVariable + event.variableCount); }
       for( std::size_t j = 0; j < event.variableResponseCount; ++j ){
@@ -263,6 +271,22 @@ Backends::CudaWeightModel Backends::makeCudaWeightModel(const EngineView& view_,
                 "observable response targets another event.");
         require(not targets[index], "observable target has multiple writers.");
         targets[index] = true;
+      }
+    }
+    if( out.hasSmoothedBinning ){
+      require(model.samples.size() <= std::size_t(std::numeric_limits<int>::max() - model.totalBins),
+              "outside bins exceed the CUDA index range.");
+      require(model.events.size() < std::numeric_limits<std::size_t>::max() / sizeof(std::size_t), "contribution offsets overflow.");
+      std::size_t maximumContributions = 0;
+      for( const auto& event : model.events ){
+        std::size_t capacity = 1;
+        if( event.samplePosition < out.samples.size() and out.samples[event.samplePosition].isSmoothed ){
+          const auto& sample = out.samples[event.samplePosition];
+          capacity += sample.endBin - sample.firstBin;
+        }
+        require(capacity <= std::numeric_limits<std::size_t>::max() / sizeof(CudaBinContribution) - maximumContributions,
+                "contribution buffer size overflow.");
+        maximumContributions += capacity;
       }
     }
     std::sort(variableRanges.begin(), variableRanges.end());

@@ -59,15 +59,17 @@ itself establish numerical validation on every model or device.
 | Execution resources | ✅ Host worker pool | ✅ Metal device, buffers and command execution | ✅ Device, stream, resident buffers and timing events exercised on CC V100 |
 | Model preparation | ✅ Flat host model and numerical caches | ✅ Packed model and GPU uploads | ✅ Native-double descriptors, payloads and fixed-bin index uploaded once |
 | Propagation and result tokens | ✅ | ✅ | ✅ Synchronous CUDA executor and token invalidation |
-| Host materialization | ✅ Event state, weights and histograms | ✅ Event state, weight and histogram readback | ⚠️ Lazy weight/histogram readback validated; event-state readback pending CC validation |
-| Dial-response and event-state caches | ✅ | ✅ Depends on propagation mode | ⚠️ Sparse response cache validated on CC OA2024; observable dependency/revision cache pending CC validation |
+| Host materialization | ✅ Event state, weights and histograms | ✅ Event state, weight and histogram readback | ✅ Lazy weight, histogram and event-state readback; strict path validated at CC |
+| Dial-response and event-state caches | ✅ | ✅ Depends on propagation mode | ✅ Sparse response cache validated on CC OA2024; strict observable dependency/revision cache validated at CC |
 | Resident backend replacement | ✅ Unchanged fixed-bin model | ⚠️ Fixed-bin API available; MPS replacement not validated here | ✅ Both response modes and index layouts exercised with CPU in one OA2024 process on CC V100 |
 | Numerical regression tests | ✅ CPU comparisons | ✅ MPS comparisons | ✅ Both modes compared against CPU on CC V100; error/retry tests passed |
 | Small fit and full Hesse covariance regression | ✅ Original/CPU comparison and analytic covariance reference pass locally | — Not included in this regression | ✅ Both modes pass at CC, including the analytic covariance reference |
 | Standalone CUDA infrastructure test | — | — | ✅ FP64 kernel validated on CC-IN2P3 V100, interactive and Slurm batch |
 
 CUDA implements scalar, Surface, external and table dials for event weights.
-Observable responses and strict event migration are implemented, pending CC validation.
+Observable responses and strict event migration passed CC validation on 2026-10-25
+(five CUDA CTest suites, 1.53 s total). Smoothed binning is implemented and
+awaits its device validation.
 Its defaults are `propagationMode: cachedResponses` and
 `weightLayout: warpInterleaved`. Index padding above 2x retains `eventMajor`.
 `cachedResponses` (default) retains dial responses until any transformed input
@@ -76,8 +78,9 @@ Both modes recompute event weights and histograms, using native doubles.
 `ExternalWeightDispatcher`, `Tabulated` and `Kriged` responses are implemented
 for event weights with fixed bins; their producers still run on the host.
 Observable responses compose Override, Multiply and Add on device and expose
-lazy event-state readback. Smoothed binning and event-variable dial inputs are
-rejected during model preparation. No CPU propagation fallback is performed.
+lazy event-state readback. Smoothed binning adds fractional and outside
+contributions on device; ordinary event-variable dial inputs remain rejected
+during model preparation. No CPU propagation fallback is performed.
 
 Bilinear/Bicubic surfaces use the shared interpolation and retain ordered x/y
 inputs, per-input mirroring, extrapolation, response bounds and smoothing.
@@ -193,9 +196,9 @@ every stage runs on the GPU. MPS support applies to both `cachedResponses` and
 | Dial extrapolation | ✅ | ✅ | ✅ Scalar dials / fixed bins |
 | Hard response limits and response smoothing | ✅ | ✅ | ✅ Scalar dials / fixed bins |
 | Event reweight cap | ✅ | ✅ | ✅ Scalar dials / fixed bins |
-| Observable responses (`applyToVariable`) | ✅ | ✅ | ⚠️ Override/Multiply/Add implemented; device validation pending |
-| Dynamic binning / event migration | ✅ | ✅ | ⚠️ Strict bins implemented; device validation pending |
-| Smoothed binning / fractional contributions | ✅ | ✅ | 🚧 |
+| Observable responses (`applyToVariable`) | ✅ | ✅ | ✅ Override/Multiply/Add; strict path validated at CC |
+| Dynamic binning / event migration | ✅ | ✅ | ✅ Strict bins validated at CC |
+| Smoothed binning / fractional contributions | ✅ | ✅ | ⚠️ FP64 sparse contributions, outside sums and squared sums implemented; device validation pending |
 | External-weight updates | ⚠️ Produced on host | ⚠️ Produced on host, copied to GPU buffers | ⚠️ Produced on host; changed blocks copied as doubles; weights validated at CC |
 | Event variables as ordinary dial inputs (`DialInputSource::EventVariable`) | ❌ | ❌ | 🚧 |
 | Numerical precision | Double (64-bit) | ⚠️ ~48 significant bits in resident event propagation (float pairs); float32 weights / histograms in packed execution | Double (64-bit); CPU comparisons passed on V100 |
@@ -207,8 +210,14 @@ by relevant parameter values, producer generations, input revisions or host edit
 The current strict bin search preserves the first matching bin (including
 zero-width selections), then a stable GPU sort rebuilds the histogram index in
 original event order. Weight-only changes retain the resident observable state
-and index. Smoothed/fractional binning remains rejected. Device and Python
-regressions are described in [CUDA observable responses](CudaObservableResponses.md).
+and index. The smoothed path counts and emits compact per-event contributions,
+including the outside remainder, then stably groups them by global bin. Histogram
+squared sums use `(weight * fraction)^2`. Its buffers grow with actual
+contributions rather than an events-by-bins matrix. Revisions and fractional
+state are exposed through `EventState`; weight-only changes reuse this index.
+Host math/validation and CPU/MPS regressions pass; the new GPU path is pending
+CC execution. See [CUDA observable responses](CudaObservableResponses.md) and
+[smoothed binning validation](CudaSmoothedBinning.md).
 
 The only MPS backend configuration option is `propagationMode`: `cachedResponses`
 reuses eligible responses between propagations, while `recomputeResponses`
