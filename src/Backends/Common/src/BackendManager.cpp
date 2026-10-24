@@ -219,6 +219,8 @@ void Backends::BackendManager::materialize(OutputRequest outputRequest_) {
 }
 
 void Backends::BackendManager::initializeImpl() {
+  ++_backendGeneration_;
+  _lastPropagationToken_ = {};
   if( not _isEnabled_ ){
     _binningUpdateListeners_.clear();
     _hostBinningChanged_.reset();
@@ -251,6 +253,28 @@ void Backends::BackendManager::initializeImpl() {
   _backend_ = makeBackend(*this);
   LogThrowIf(_backend_ == nullptr, "Could not create propagation backend.");
   _backend_->configure(_backendConfig_);
+  _backend_->buildShared(std::shared_ptr<const EngineView>(_backendEngineLayout_, &_backendEngineLayout_->view));
+}
+
+void Backends::BackendManager::replaceBackend(const std::string& type_, const ConfigReader& backendConfig_) {
+  LogThrowIf(not isInitialized() or not hasBackend(), "Backend replacement requires an initialized backend.");
+  LogThrowIf(_backendEngineLayout_->view.propagation.requiresEventBinning()
+             or (_hostBinningChanged_ and *_hostBinningChanged_),
+             "Backend replacement requires unchanged fixed binning and no observable responses.");
+  // Validate type/configuration while the old backend is still usable.
+  auto replacement = makeBackend(type_);
+  replacement->configure(backendConfig_);
+  ++_backendGeneration_;
+  _lastPropagationToken_ = {};
+  _lastPreparationSeconds_ = 0.;
+  _lastMaterializedStateRevision_ = _lastMaterializedVariableRevision_ = 0;
+  _lastMaterializedSampleRevisions_.clear();
+  _backend_.reset(); // Never keep two production device models allocated.
+  _type_ = type_;
+  _backendConfig_ = backendConfig_;
+  _backend_ = std::move(replacement);
+  // Install before building: failure leaves an unbuilt backend that throws on
+  // propagation, rather than silently falling back to the original engine.
   _backend_->buildShared(std::shared_ptr<const EngineView>(_backendEngineLayout_, &_backendEngineLayout_->view));
 }
 
@@ -312,7 +336,8 @@ std::future<Backends::BackendPropagationResult> Backends::BackendManager::propag
     });
   }
 
-  return std::async(std::launch::deferred, [this, token]{
+  return std::async(std::launch::deferred, [this, token, generation = _backendGeneration_]{
+    LogThrowIf(generation != _backendGeneration_, "Propagation result belongs to a replaced backend.");
     BackendPropagationResult result;
     auto* backend = getBackend();
     backend->wait(token);

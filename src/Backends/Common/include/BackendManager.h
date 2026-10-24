@@ -51,6 +51,7 @@ namespace Backends {
     void setMaterializeOutputList(std::initializer_list<OutputRequest> materializeOutputList_);
     void materialize(OutputRequest outputRequest_);
     std::future<BackendPropagationResult> propagate();
+    void replaceBackend(const std::string& type_, const ConfigReader& backendConfig_);
 
 
   private:
@@ -74,6 +75,7 @@ namespace Backends {
     std::shared_ptr<EngineLayout> _backendEngineLayout_{std::make_shared<EngineLayout>()};
     std::unique_ptr<Backend> _backend_{nullptr};
     PropagationToken _lastPropagationToken_{};
+    std::uint64_t _backendGeneration_{0};
     std::shared_ptr<bool> _hostBinningChanged_{};
     std::vector<std::shared_ptr<std::function<void()>>> _binningUpdateListeners_{};
     std::uint64_t _lastMaterializedStateRevision_{0};

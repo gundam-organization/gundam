@@ -2,6 +2,7 @@
 #define GUNDAM_BACKEND_FACTORY_H
 
 #include <memory>
+#include <string>
 
 namespace Backends {
 
@@ -9,6 +10,7 @@ namespace Backends {
   class Backend;
 
   std::unique_ptr<Backend> makeBackend(const BackendManager& config_);
+  std::unique_ptr<Backend> makeBackend(const std::string& type_);
 
 }
 

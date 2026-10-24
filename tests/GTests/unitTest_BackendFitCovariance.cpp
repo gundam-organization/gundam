@@ -362,9 +362,93 @@ TEST(BackendFitCovariance, CpuMatchesOriginalFitAndCovariance) {
 #endif
 }
 
+TEST(BackendFitCovariance, ResidentReplacementPreservesLoadedModelAndRejectsStaleResults) {
+#ifdef GUNDAM_USING_BACKENDS
+  FitEnvironment environment;
+  FitInput input;
+  FitterEngine engine;
+  engine.configure(ConfigReader(makeConfig(input, "CPU", "")));
+  engine.getLikelihoodInterface().setDataType(LikelihoodInterface::DataType::Asimov);
+  engine.initialize();
+  auto& manager = engine.getBackendsManager();
+  manager.setEnableAutoMaterialize(false);
+  const auto* layout = &manager.getEngineLayout();
+  auto& parameters = engine.getLikelihoodInterface().getModelPropagator()
+      .getParametersManager().getParameterSetsList()[0].getParameterList();
+  const auto* parameter = &parameters[0];
+  auto& histogram = engine.getLikelihoodInterface().getModelPropagator().getSampleSet()
+      .getSampleList()[0].getHistogram();
+  std::remove(input.path.c_str()); // Replacement must not reopen the input tree.
+  for( std::size_t i = 0; i < parameterCount; ++i ){ parameters[i].setParameterValue(startValues[i]); }
+  engine.evaluateLikelihood();
+  const double reference = engine.getLikelihoodInterface().getLastLikelihood();
+  manager.materialize(Backends::OutputRequest::Histograms);
+  std::vector<double> sums;
+  for( const auto& bin : histogram.getBinContentList() ){ sums.push_back(bin.sumWeights); }
+  for( int iteration = 0; iteration < 3; ++iteration ){
+    auto pending = manager.propagate();
+    manager.replaceBackend("CPU", ConfigReader(JsonType::object()));
+    EXPECT_THROW((void)pending.get(), std::exception);
+    EXPECT_THROW(manager.materialize(Backends::OutputRequest::Histograms), std::exception);
+    EXPECT_EQ(&manager.getEngineLayout(), layout);
+    EXPECT_EQ(&parameters[0], parameter);
+    EXPECT_FALSE(manager.isAutoMaterializeEnabled());
+    engine.evaluateLikelihood();
+    EXPECT_NEAR(engine.getLikelihoodInterface().getLastLikelihood(), reference, 1.e-12);
+    manager.materialize(Backends::OutputRequest::Histograms);
+    for( std::size_t i = 0; i < sums.size(); ++i ){
+      EXPECT_NEAR(histogram.getBinContentList()[i].sumWeights, sums[i], 1.e-12);
+    }
+  }
+  const auto* backend = manager.getBackend();
+  EXPECT_THROW(manager.replaceBackend("invalid", ConfigReader(JsonType::object())), std::exception);
+  EXPECT_EQ(manager.getBackend(), backend);
+  EXPECT_THROW(manager.replaceBackend("CUDA", ConfigReader(JsonType{{"deviceIndex", -1}})), std::exception);
+  EXPECT_EQ(manager.getBackend(), backend);
+  engine.evaluateLikelihood();
+  EXPECT_NEAR(engine.getLikelihoodInterface().getLastLikelihood(), reference, 1.e-12);
+  if( not Backends::CudaBackend::isCompiled() ){
+    EXPECT_THROW(manager.replaceBackend("CUDA", ConfigReader(JsonType::object())), std::exception);
+    EXPECT_THROW(engine.evaluateLikelihood(), std::exception);
+    manager.replaceBackend("CPU", ConfigReader(JsonType::object()));
+    engine.evaluateLikelihood();
+    EXPECT_NEAR(engine.getLikelihoodInterface().getLastLikelihood(), reference, 1.e-12);
+  }
+#else
+  GTEST_SKIP() << "GUNDAM was built without the backend library";
+#endif
+}
+
 TEST_P(CudaFitCovariance, MatchesCpuFitAndCovariance) {
 #ifdef GUNDAM_USING_BACKENDS
   compareFits("CPU", "CUDA", GetParam());
+#endif
+}
+
+TEST_P(CudaFitCovariance, ResidentSwitchMatchesCpu) {
+#ifdef GUNDAM_USING_BACKENDS
+  FitEnvironment environment;
+  FitInput input;
+  FitterEngine engine;
+  engine.configure(ConfigReader(makeConfig(input, "CPU", "")));
+  engine.getLikelihoodInterface().setDataType(LikelihoodInterface::DataType::Asimov);
+  engine.initialize();
+  auto& manager = engine.getBackendsManager();
+  manager.setEnableAutoMaterialize(false);
+  const auto* layout = &manager.getEngineLayout();
+  auto& parameters = engine.getLikelihoodInterface().getModelPropagator()
+      .getParametersManager().getParameterSetsList()[0].getParameterList();
+  for( std::size_t i = 0; i < parameterCount; ++i ){ parameters[i].setParameterValue(startValues[i]); }
+  engine.evaluateLikelihood();
+  const auto reference = engine.getLikelihoodInterface().getLastLikelihood();
+  std::remove(input.path.c_str());
+  for( const auto* type : {"CUDA", "CPU", "CUDA"} ){
+    manager.replaceBackend(type, ConfigReader(std::string(type) == "CUDA"
+        ? JsonType{{"propagationMode", GetParam()}} : JsonType::object()));
+    EXPECT_EQ(&manager.getEngineLayout(), layout);
+    engine.evaluateLikelihood();
+    EXPECT_NEAR(engine.getLikelihoodInterface().getLastLikelihood(), reference, 1.e-10);
+  }
 #endif
 }
 

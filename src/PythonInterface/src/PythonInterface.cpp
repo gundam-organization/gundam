@@ -607,6 +607,9 @@ PYBIND11_MODULE(GUNDAM, module) {
   .def("getType", &Backends::BackendManager::getType)
   .def("getLastPreparationSeconds", &Backends::BackendManager::getLastPreparationSeconds)
   .def("setEnableAutoMaterialize", &Backends::BackendManager::setEnableAutoMaterialize)
+  .def("replaceBackend", [](Backends::BackendManager& manager_, const std::string& type_, const JsonType& config_){
+    manager_.replaceBackend(type_, ConfigReader(config_));
+  }, pybind11::arg("type"), pybind11::arg("backendConfig") = JsonType::object())
   .def("materialize", [](Backends::BackendManager& manager_, const std::string& output_){
     manager_.materialize(Backends::OutputRequest::toEnum(output_));
   })

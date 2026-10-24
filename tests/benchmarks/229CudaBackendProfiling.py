@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Profile resident production CUDA likelihood evaluations and compare response modes.
 
-Each case loads one Asimov model in a fresh process. No fit/Hesse is performed.
+By default cases share one loaded Asimov model. No fit/Hesse is performed.
+Use --execution-mode isolated for a fresh process/model per case.
 CUDA stages use the backend's existing stream events, without extra stage fences.
 """
 import argparse
@@ -53,6 +54,13 @@ def histogram(engine):
             for b in sample.getHistogram().getBinContentList()]
 
 
+def backend_config(args):
+    backend_type = 'CPU' if args.worker == 'CPU' else 'CUDA'
+    return {'isEnabled': True, 'type': backend_type,
+            'backendConfig': {} if backend_type == 'CPU' else {
+                'deviceIndex': args.device_index, 'propagationMode': args.worker.split('-', 1)[1]}}
+
+
 def load_engine(args):
     import GUNDAM
     progress(f'{args.worker}: Python module {GUNDAM.__file__}')
@@ -72,11 +80,9 @@ def load_engine(args):
     config.update(enablePca=False, scaleParStepWithChi2Response=False,
                   generateSamplePlots=False, generateOneSigmaPlots=False)
     # Replace backend-specific overrides so CPU never inherits CUDA-only keys.
-    backend_type = 'CPU' if args.worker == 'CPU' else 'CUDA'
-    config['likelihoodInterfaceConfig']['backendManagerConfig'] = {
-        'isEnabled': True, 'type': backend_type,
-        'backendConfig': {} if backend_type == 'CPU' else {
-            'deviceIndex': args.device_index, 'propagationMode': args.worker.split('-', 1)[1]}}
+    backend = backend_config(args)
+    backend_type = backend['type']
+    config['likelihoodInterfaceConfig']['backendManagerConfig'] = backend
     write_json(args.output / 'resolved-fitter-config.json', config)
     engine = GUNDAM.FitterEngine()
     engine.configure(GUNDAM.ConfigUtils.ConfigReader(GUNDAM.JsonType(json.dumps(config))))
@@ -129,15 +135,18 @@ def evaluate_pass(args, engine, sequence, scenario, calls, seed):
     return {'rows': rows, 'timings': summarize(rows), 'histogram': bins}
 
 
-def measure(args):
+def measure(args, engine=None, sequence=None):
     import GUNDAM
-    engine = load_engine(args)
-    sequence = scheduling.ParameterSequence(engine, args.step_scale)
+    if engine is None:
+        engine = load_engine(args)
+    if sequence is None:
+        sequence = scheduling.ParameterSequence(engine, args.step_scale)
     manifest = sequence.manifest()
     write_json(args.output / 'parameters.json', manifest)
     result = {'complete': False, 'case': args.worker, 'pythonModule': GUNDAM.__file__,
               'pythonModuleSha256': hashlib.sha256(Path(GUNDAM.__file__).read_bytes()).hexdigest(),
-              'parameters': manifest, 'scenarios': {}}
+              'parameters': manifest, 'executionMode': args.execution_mode, 'pid': os.getpid(),
+              'scenarios': {}}
     for scenario in args.scenarios:
         calls = scheduling.scenario_calls(args, scenario, len(sequence.entries))
         if args.warmup:
@@ -177,6 +186,37 @@ def measure(args):
                  f"response candidates {entry['medianResponseCandidates']}")
     result['complete'] = True
     write_json(args.output / 'summary.json', result)
+
+
+def measure_resident(args):
+    import GUNDAM
+    if not hasattr(GUNDAM.BackendManager, 'replaceBackend'):
+        raise RuntimeError('Rebuild/reinstall the Python interface: replaceBackend is unavailable')
+    root = args.output
+    engine = sequence = config = None
+    for case in args.cases:
+        args.worker = case
+        args.output = root / case
+        args.output.mkdir()
+        start = time.monotonic()
+        if engine is None:
+            engine = load_engine(args)
+            sequence = scheduling.ParameterSequence(engine, args.step_scale)
+            config = json.loads((args.output / 'resolved-fitter-config.json').read_text())
+        else:
+            sequence.reset()
+            backend = backend_config(args)
+            progress(f'{case}: replacing backend; keeping loaded events, dials and Asimov data')
+            engine.getBackendsManager().replaceBackend(
+                backend['type'], GUNDAM.JsonType(json.dumps(backend['backendConfig'])))
+            config['likelihoodInterfaceConfig']['backendManagerConfig'] = backend
+            write_json(args.output / 'resolved-fitter-config.json', config)
+            engine.evaluateLikelihood()  # Prime new buffers outside measurements.
+        write_json(args.output / 'setup.json', {
+            'seconds': time.monotonic() - start, 'includesDatasetLoading': case == args.cases[0],
+            'executionMode': 'resident', 'pid': os.getpid()})
+        measure(args, engine, sequence)
+    args.output = root
 
 
 def compare(output, cases, scenarios, trials, relative, absolute):
@@ -222,6 +262,7 @@ def compare(output, cases, scenarios, trials, relative, absolute):
 
 def write_report(output, cases):
     lines = ['# Resident likelihood profiling', '',
+             'Execution mode: ' + json.loads((output / 'settings.json').read_text())['execution_mode'] + '.', '',
              'All durations below are medians in milliseconds. GPU event intervals overlap',
              'host evaluation time. Do not add these columns together.', '',
              '| Case | Scenario | Evaluation | Host preparation | GPU total | Dial responses | Event weights | Histograms | Histogram readback | Host likelihood |',
@@ -253,8 +294,9 @@ def write_report(output, cases):
 
 
 def run_worker(args, case):
-    directory = args.output / case
-    directory.mkdir()
+    directory = args.output if case == 'resident' else args.output / case
+    if case != 'resident':
+        directory.mkdir()
     log_path = directory / 'native.log'
     command = [sys.executable, '-u', str(Path(__file__).resolve()), *sys.argv[1:],
                '--worker', case, '--output', str(directory)]
@@ -305,7 +347,8 @@ def main():
     parser.add_argument('--absolute-tolerance', type=float, default=1e-7)
     parser.add_argument('--output', type=Path,
                         default=Path(time.strftime('cuda-profiling-%Y%m%d-%H%M%S-') + str(os.getpid())))
-    parser.add_argument('--worker', choices=CASES, help=argparse.SUPPRESS)
+    parser.add_argument('--execution-mode', choices=['resident', 'isolated'], default='resident')
+    parser.add_argument('--worker', choices=(*CASES, 'resident'), help=argparse.SUPPRESS)
     args = parser.parse_args()
     if min(args.threads, args.calls, args.global_calls, args.trials) <= 0 or min(args.warmup, args.device_index) < 0:
         parser.error('Counts must be positive; warmup and device-index may be zero')
@@ -318,7 +361,10 @@ def main():
     args.config = (args.work_dir / args.config).resolve()
     args.output = args.output.resolve()
     if args.worker:
-        measure(args)
+        if args.worker == 'resident':
+            measure_resident(args)
+        else:
+            measure(args)
         return
     if not args.config.is_file():
         parser.error(f'Configuration does not exist: {args.config}')
@@ -338,8 +384,11 @@ def main():
         settings['nvidiaSmi'] = None
     write_json(args.output / 'settings.json', settings)
     write_json(args.output / 'summary.json', {'complete': False})
-    for case in args.cases:
-        run_worker(args, case)
+    if args.execution_mode == 'resident':
+        run_worker(args, 'resident')
+    else:
+        for case in args.cases:
+            run_worker(args, case)
     compare(args.output, args.cases, args.scenarios, args.trials,
             args.relative_tolerance, args.absolute_tolerance)
     write_report(args.output, args.cases)

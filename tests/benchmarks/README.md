@@ -438,8 +438,12 @@ capacity and allocator reservations must not be interpreted as resident bytes.
 ## CUDA production profiling
 
 `229CudaBackendProfiling.py` profiles the full selected production model using
-Asimov data, without Migrad, Hesse, PCA, plots or step-response scans. It loads
-one model per case in a fresh process and keeps it resident across all trials.
+Asimov data, without Migrad, Hesse, PCA, plots or step-response scans. By default
+(`--execution-mode resident`) it loads the model once in one worker process,
+then replaces only the backend between cases, reusing the immutable layout,
+events, dials and Asimov data. The previous backend's buffers are released before
+the next backend is built. Parameters are restored to their initial effective
+fit coordinates; each new backend is primed and warmed up outside measurements.
 Default cases are CUDA `cachedResponses` and `recomputeResponses`; add `CPU`
 for a numerical and performance reference on the same machine and thread count.
 Backend-specific configuration is replaced for each case; input files, selections
@@ -471,13 +475,20 @@ propagation costs; it does not reproduce the exact call distribution of Migrad.
 
 For a shorter first pass, use `--scenarios constant global --calls 10
 --global-calls 10 --trials 1 --warmup 2`; initialization still loads the full
-selected model. CPU is optional because it requires another full initialization.
+selected model. CPU is optional and requires building its own buffers, but does
+not reread the dataset in resident mode. Use `--execution-mode isolated` for
+one fresh process and dataset load per case, as in the initial OA2024 benchmark.
+The mode is recorded in settings and reports; allocator and OS/device cache
+state may differ between modes. The order is the supplied `--cases` order.
 Use a second run with `--threads 8` if you want the eight-thread CPU reference;
 thread count applies to every selected case in a run.
 
 Read `report.md` first, then `summary.json` and each case's
 `local1-coordinate-costs.json`. Raw per-call measurements, resolved config,
-parameter manifest and native log are saved in each case directory. Hardware,
+parameter manifest are saved in each case directory. Resident mode writes one
+shared `native.log` at the output root, plus per-case `setup.json` recording
+setup time, PID and whether dataset loading was included. Isolated mode keeps
+one native log per case. Hardware,
 Slurm environment, source commit and loaded module path/hash are recorded.
 An unavailable backend/device fails the benchmark, rather than producing a
 successful report without GPU measurements.
@@ -523,4 +534,7 @@ reports speedups against CPU when included, otherwise against the first case.
 It fails on a numerical mismatch and leaves raw results available for diagnosis.
 Timing differences are never a pass/fail criterion. CUDA execution of this new
 benchmark remains to be validated at the CC; its CPU path was exercised locally
-on a small two-parameter model.
+on a small two-parameter model. Resident CPU replacement was also checked
+through the Python driver and native tests, including repeated replacements
+after deleting the input file, stale deferred results, build failure and recovery.
+Optional CUDA regular tests cover CPU/CUDA/CPU/CUDA replacement in both modes.

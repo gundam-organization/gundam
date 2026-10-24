@@ -10,13 +10,17 @@
 #include "Logger.h"
 
 std::unique_ptr<Backends::Backend> Backends::makeBackend(const BackendManager& config_) {
-  if( config_.getType() == "CPU" or config_.getType() == "cpu" ){
+  return makeBackend(config_.getType());
+}
+
+std::unique_ptr<Backends::Backend> Backends::makeBackend(const std::string& type_) {
+  if( type_ == "CPU" or type_ == "cpu" ){
     return std::make_unique<CpuBackend>();
   }
-  if( config_.getType() == "CUDA" or config_.getType() == "cuda" ){
+  if( type_ == "CUDA" or type_ == "cuda" ){
     return std::make_unique<CudaBackend>();
   }
-  if( config_.getType() == "MPS" or config_.getType() == "mps" ){
+  if( type_ == "MPS" or type_ == "mps" ){
 #ifdef __APPLE__
     return std::make_unique<MpsBackend>();
 #else
@@ -24,6 +28,6 @@ std::unique_ptr<Backends::Backend> Backends::makeBackend(const BackendManager& c
 #endif
   }
 
-  LogThrow("Unknown backend type: " << config_.getType());
+  LogThrow("Unknown backend type: " << type_);
   return nullptr;
 }
