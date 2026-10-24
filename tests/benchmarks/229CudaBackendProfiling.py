@@ -346,7 +346,8 @@ def main():
     parser.add_argument('--config', type=Path, required=True)
     parser.add_argument('--override', nargs='*', default=[])
     parser.add_argument('--work-dir', type=Path, default=Path.cwd())
-    parser.add_argument('--cases', nargs='+', choices=CASES, default=list(CASES[:2]))
+    parser.add_argument('--cases', nargs='+', choices=CASES,
+                        default=['CUDA-cachedResponses-interleaved', 'CUDA-recomputeResponses-interleaved'])
     parser.add_argument('--device-index', type=int, default=0)
     parser.add_argument('--threads', type=int, default=4)
     parser.add_argument('--calls', type=int, default=30)

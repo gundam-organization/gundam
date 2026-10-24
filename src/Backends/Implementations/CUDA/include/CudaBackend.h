@@ -66,7 +66,7 @@ ENUM_FIELD( warpInterleaved )
 
     int _deviceIndex_{0};
     CudaPropagationMode _propagationMode_{CudaPropagationMode::cachedResponses};
-    CudaWeightLayout _weightLayout_{CudaWeightLayout::eventMajor};
+    CudaWeightLayout _weightLayout_{CudaWeightLayout::warpInterleaved};
     std::uint64_t _nextTokenId_{1};
     std::unique_ptr<CudaBackendImpl> _impl_{};
   };

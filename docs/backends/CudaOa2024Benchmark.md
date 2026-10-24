@@ -166,11 +166,85 @@ Event reweighting is now the largest local stage: 1.908 ms, roughly 62% of
 the 3.090 ms evaluation. Histogram reduction remains 0.176 ms, and host input
 preparation about 0.455 ms. The next profiling target is the event-weight
 response-index access pattern and layout; these elapsed times do not by
-themselves prove a memory-bandwidth bottleneck. The resident backend replacement
-still needs its own CC validation; this isolated run does not exercise it.
+themselves prove a memory-bandwidth bottleneck. This isolated run does not
+exercise resident replacement; that is covered by the later run below.
 
 An opt-in [event-weight index layout experiment](../../tests/benchmarks/README.md#event-weight-index-layout-experiment)
 now implements the next target. It transposes event-dial indices within groups
 of 32 events, preserves ordered multiplication, and caps index-buffer padding
 at 2x. The benchmark has additional `-interleaved` cases for A/B measurements
-in each response mode. No production speedup is claimed for this variant yet.
+in each response mode. The production measurements follow below.
+
+## Resident production run with interleaved indices
+
+The complete `cuda-oa2024-event-interleave` run uses Slurm job `62376465`, the
+same V100 and four-thread affinity, and all five cases in resident mode. It
+contains 2,406,926 events, 20,340,421 unique dials and 842 proposal coordinates.
+The recorded checkout is `90982f9856ba3e42f85174c2a304ded7d5b3384a`; the
+interleaving changes were applied to its working tree before the run. All
+cases load the build-tree Python module, SHA-256
+`0594b8766125a2665ec985e3f3ee207a116cfc1795734bd3cd1ace04f200cf8a`.
+
+Root `summary.json` has `complete: true` and `comparison.json` has `passed: true`.
+All four CUDA cases agree with this run's CPU reference at the configured
+tolerances. The largest absolute differences remain `1.25e-12` in likelihood
+and `1.25e-11` in histogram contents/errors. Independent comparison of both
+layouts within each CUDA mode finds exactly equal recorded likelihoods and
+final histograms/errors, across all 2,606 evaluations and eight trial outputs
+per case. This comparison does not include production fit covariance.
+
+| Scenario | Cached event-major ms | Cached interleaved ms | Additional speedup | CPU / interleaved |
+|---|---:|---:|---:|---:|
+| Constant | 3.067 | 2.382 | 1.288 | 12.08 |
+| One coordinate | 3.080 | 2.399 | 1.284 | 12.02 |
+| Two coordinates | 3.081 | 2.400 | 1.284 | 12.00 |
+| All coordinates | 14.576 | 13.882 | 1.050 | 14.90 |
+
+For one-coordinate changes, the event-weight stage drops from 1.908 to
+1.225 ms (35.8% less stage time). Full evaluation is 22.1% shorter. Recompute
+also benefits in its weight stage, with full local evaluation decreasing from
+14.129 to 13.436 ms; response computation still dominates that mode.
+
+The actual requested `warpInterleaved` layout is used in both interleaved cases.
+Index storage rises from 150,896,384 to 221,107,328 bytes: an additional
+70,210,944 bytes (66.96 MiB), or 46.5% for this buffer. This is not a 46.5%
+increase in total GPU memory. The event-weight result justifies opting into
+`weightLayout: warpInterleaved` with `propagationMode: cachedResponses` for this
+OA2024/V100 workload. CUDA now uses `warpInterleaved` by default, together
+with `cachedResponses`; highly ragged index layouts still fall back to
+`eventMajor` at the 2x padding cap.
+
+Resident execution is confirmed by the shared PID `2647080` and `setup.json`
+records: the first case loads the dataset in 872.50 seconds, followed by
+backend replacements taking 5.23, 5.00, 6.04 and 2.52 seconds. No later case
+reloads the dataset. These setup times are excluded from evaluation statistics.
+
+After both optimizations, event weighting remains the largest local stage at
+about 51% of evaluation time. Host preparation and statistical likelihood cost
+about 0.454 and 0.418 ms respectively. Further improvements should be measured
+against this complete five-case run; these results establish elapsed-time gains
+on this workload, not a specific bandwidth/occupancy mechanism or whole-fit speedup.
+
+## Next optimization candidates
+
+1. **Cache event weights for sparse updates.** The current kernel still visits
+   all 2,406,926 events for every evaluation, costing about 1.225 ms even when
+   parameters are unchanged. First measure how many events the changed original
+   parameters affect. A parameter-to-event index could select only those events,
+   deduplicate overlapping selections, and retain a dense path for broad updates.
+   Preserve each event's ordered product, include events outside histogram bins,
+   and fully invalidate weights after errors/rebuilds. Histogram reductions can
+   initially remain unchanged, avoiding incremental floating-point sum drift.
+2. **Split host preparation timings.** About 0.454 ms currently includes
+   eigen-to-original conversion, dial-state updates and observable preparation.
+   Measure those components before introducing dependency tracking or bypassing
+   host work for models whose backend consumes parameters directly.
+3. **Evaluate supported statistical likelihoods on device.** The current host
+   callback loop costs about 0.418 ms plus 0.027 ms histogram readback. Moving
+   selected probability formulas to the device could avoid that transfer for
+   resident evaluations, while retaining host materialization on request. The
+   generic callback API cannot be copied directly to CUDA; this requires explicit
+   device likelihood descriptors and renewed fit/covariance comparisons.
+
+These are opportunities, not measured additional gains. Changed-event coverage
+is the next useful diagnostic for the largest remaining local stage.

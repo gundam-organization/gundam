@@ -444,7 +444,8 @@ then replaces only the backend between cases, reusing the immutable layout,
 events, dials and Asimov data. The previous backend's buffers are released before
 the next backend is built. Parameters are restored to their initial effective
 fit coordinates; each new backend is primed and warmed up outside measurements.
-Default cases are CUDA `cachedResponses` and `recomputeResponses`; add `CPU`
+Default cases are CUDA `cachedResponses` and `recomputeResponses`, both with
+interleaved indices (`-interleaved` case names); add `CPU`
 for a numerical and performance reference on the same machine and thread count.
 Backend-specific configuration is replaced for each case; input files, selections
 and dataset limits from the config/overrides are preserved.
@@ -528,8 +529,9 @@ the same inputs, proposal settings, four-thread allocation and GPU model.
 Compare numerical agreement first, then local/constant response timings and
 candidate counts. The completed isolated sparse CUDA passes returned from the
 CC match the prior CPU reference; see the [OA2024 results](../../docs/backends/CudaOa2024Benchmark.md#sparse-production-results).
-The received snapshot lacks the new CPU result, and resident CUDA replacement
-still needs CC validation.
+The sparse snapshot lacks its new CPU result. The later complete
+[`cuda-oa2024-event-interleave` run](../../docs/backends/CudaOa2024Benchmark.md#resident-production-run-with-interleaved-indices)
+validates all five cases, including CPU, and resident replacement on the CC V100.
 
 `comparison.json` checks every measured likelihood, proposal sequence and final
 histogram contents/errors of every trial (relative `1e-9`, absolute `1e-7`). It
@@ -544,8 +546,8 @@ Optional CUDA regular tests cover CPU/CUDA/CPU/CUDA replacement in both modes.
 
 ### Event-weight index layout experiment
 
-CUDA `backendConfig.weightLayout` accepts `eventMajor` (default) and
-`warpInterleaved` (opt-in). The latter stores the first dial index of 32 events
+CUDA `backendConfig.weightLayout` accepts `eventMajor` and
+`warpInterleaved` (default). The latter stores the first dial index of 32 events
 together, followed by their second index, and so on. Adjacent GPU threads can
 load adjacent index locations. Each event still multiplies responses in its
 original order; base weights, reweight caps, result slots and bin membership
@@ -555,8 +557,15 @@ The response values themselves may still require scattered accesses.
 Padding is capped at twice the original event-dial index count. Models exceeding
 that cap retain `eventMajor`. `model.json` reports requested and actual layouts,
 original/packed counts and packed index bytes. The cap applies to this one
-buffer, not total device memory. Keep the default until a production A/B run
-establishes a benefit for the selected model/device.
+buffer, not total device memory. The completed OA2024/V100 A/B run measures
+about 22% less cached local evaluation time (3.080 to 2.399 ms) and 66.96 MiB
+additional index storage, with identical recorded CUDA likelihoods/histograms
+between layouts. CUDA defaults to `cachedResponses` with `warpInterleaved`.
+Explicit `eventMajor` remains available for comparisons, and the memory cap
+still falls back automatically to that layout for highly ragged models.
+The benchmark preserves historical case meanings: names without `-interleaved`
+explicitly select `eventMajor`, while names with that suffix select
+`warpInterleaved`. With no `--cases`, both interleaved response modes are selected.
 
 The extra cases select this option without changing response propagation mode:
 

@@ -310,11 +310,13 @@ TEST(CudaBackendPropagation, InterleavedIndicesPreserveOrderedWeightsAndHistogra
       }
       CudaBackend original, interleaved;
       CpuBackend cpu;
-      original.configure(ConfigReader(JsonType{{"propagationMode", mode}}));
-      interleaved.configure(ConfigReader(JsonType{{"propagationMode", mode}, {"weightLayout", "warpInterleaved"}}));
+      original.configure(ConfigReader(JsonType{{"propagationMode", mode}, {"weightLayout", "eventMajor"}}));
+      interleaved.configure(ConfigReader(JsonType{{"weightLayout", "eventMajor"}}));
+      interleaved.configure(ConfigReader(JsonType{{"propagationMode", mode}})); // Reset to the default layout.
       original.build(view);
       interleaved.build(view);
       cpu.build(view);
+      ASSERT_EQ(JsonType::parse(interleaved.getDiagnostics())["requestedWeightLayout"], "warpInterleaved");
       ASSERT_EQ(JsonType::parse(interleaved.getDiagnostics())["weightLayout"], "warpInterleaved");
       for( const auto& values : std::vector<std::vector<double>>{
           {.8, 1.2, 2.3}, {.8, 1.2, 2.3}, {1., 1.2, 2.3}, {9., 8., 7.}} ){

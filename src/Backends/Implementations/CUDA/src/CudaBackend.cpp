@@ -47,7 +47,7 @@ void Backends::CudaBackend::configureImpl() {
   _impl_ = std::make_unique<CudaBackendImpl>();
   _deviceIndex_ = 0;
   _propagationMode_ = CudaPropagationMode::cachedResponses;
-  _weightLayout_ = CudaWeightLayout::eventMajor;
+  _weightLayout_ = CudaWeightLayout::warpInterleaved;
   _config_.clearFields();
   _config_.defineFields({{"name"}, {"deviceIndex"}, {"propagationMode"}, {"weightLayout"}});
   _config_.checkConfiguration();

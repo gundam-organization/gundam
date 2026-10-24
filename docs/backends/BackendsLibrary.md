@@ -61,11 +61,14 @@ itself establish numerical validation on every model or device.
 | Propagation and result tokens | ✅ | ✅ | ✅ Synchronous CUDA executor and token invalidation |
 | Host materialization | ✅ Event state, weights and histograms | ✅ Event state, weight and histogram readback | ⚠️ Lazy weight/histogram readback; no event-state output |
 | Dial-response and event-state caches | ✅ | ✅ Depends on propagation mode | ⚠️ Sparse parameter-indexed response cache exercised on CC OA2024, matching the prior CPU reference; no event-state cache |
+| Resident backend replacement | ✅ Unchanged fixed-bin model | ⚠️ Fixed-bin API available; MPS replacement not validated here | ✅ Both response modes and index layouts exercised with CPU in one OA2024 process on CC V100 |
 | Numerical regression tests | ✅ CPU comparisons | ✅ MPS comparisons | ✅ Both modes compared against CPU on CC V100; error/retry tests passed |
 | Small fit and full Hesse covariance regression | ✅ Original/CPU comparison and analytic covariance reference pass locally | — Not included in this regression | ✅ Both modes pass at CC, including the analytic covariance reference |
 | Standalone CUDA infrastructure test | — | — | ✅ FP64 kernel validated on CC-IN2P3 V100, interactive and Slurm batch |
 
 CUDA implements a first numerical executor for scalar dials and fixed bins.
+Its defaults are `propagationMode: cachedResponses` and
+`weightLayout: warpInterleaved`. Index padding above 2x retains `eventMajor`.
 `cachedResponses` (default) retains dial responses until their transformed input
 changes; `recomputeResponses` evaluates every unique dial on every propagation.
 Both modes recompute event weights and histograms, using native doubles. Surface
