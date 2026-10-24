@@ -53,7 +53,7 @@ itself establish numerical validation on every model or device.
 | Stage | CPU | MPS | CUDA |
 |---|---|---|---|
 | Factory selection and backend configuration | ✅ `CPU` / `cpu` | ✅ `MPS` / `mps`, `propagationMode` | ✅ `CUDA` / `cuda`, `deviceIndex` |
-| Execution resources | ✅ Host worker pool | ✅ Metal device, buffers and command execution | ⚠️ Device selection and private stream implemented; backend GPU test pending |
+| Execution resources | ✅ Host worker pool | ✅ Metal device, buffers and command execution | ✅ Device selection and private stream; lifecycle test passed on CC V100 |
 | Model preparation | ✅ Flat host model and numerical caches | ✅ Packed model and GPU uploads | ⚠️ Retains the shared host model; device packing and uploads not implemented |
 | Propagation and result tokens | ✅ | ✅ | 🚧 No executor or valid propagation tokens |
 | Host materialization | ✅ Event state, weights and histograms | ✅ Event state, weight and histogram readback | 🚧 All result access throws |
@@ -63,8 +63,11 @@ itself establish numerical validation on every model or device.
 
 CUDA is currently a lifecycle skeleton, not a working fit backend. Its four
 host-side `CudaBackend.*` tests pass locally without a toolkit. The separate
-`cuda-backend-skeleton` test exercises the real device context and shared model;
-its CC validation is pending. The successful standalone `cuda-smoke` test proves
+`cuda-backend-skeleton` test passed on a CC-IN2P3 V100 in Slurm job `62373853`
+on 2026-10-24 (142 ms). It exercises the real device context, shared model,
+invalid-device rejection and current-device preservation. Only one GPU was
+visible, so switching between distinct devices remains unvalidated.
+The successful standalone `cuda-smoke` test proves
 the compiler/runtime/kernel chain, not CUDA backend propagation. Selecting CUDA
 can initialize its resources and retain a model, but `requestPropagation()`
 throws explicitly; no CPU fallback is performed.
