@@ -2,7 +2,8 @@
 """Profile resident production CUDA likelihood evaluations and compare response modes.
 
 By default cases share one loaded Asimov model. No fit/Hesse is performed.
-Use --execution-mode isolated for a fresh process/model per case.
+Use --execution-mode isolated for observable/dynamic/smoothed models: backend
+replacement currently requires fixed bins and no observable responses.
 CUDA stages use the backend's existing stream events, without extra stage fences.
 """
 import argparse
@@ -13,6 +14,7 @@ import math
 import os
 import platform
 import random
+import re
 import statistics
 import subprocess
 import sys
@@ -30,11 +32,14 @@ CASES = ('CUDA-cachedResponses', 'CUDA-recomputeResponses', 'CPU',
          'CUDA-cachedResponses-interleaved', 'CUDA-recomputeResponses-interleaved')
 SECONDS_FIELDS = ('parameterUploadSeconds', 'cachedDialStageSeconds',
                   'cachePreparationSeconds',
-                  'eventWeightsStageSeconds', 'histogramStageSeconds',
+                  'eventWeightsStageSeconds', 'variableStageSeconds', 'binningStageSeconds',
+                  'histogramStageSeconds', 'externalWeightUploadSeconds',
                   'devicePropagationSeconds', 'histogramReadbackSeconds',
                   'likelihoodHostSeconds', 'eventWeightReadbackSeconds')
 COUNT_FIELDS = ('histogramReadbackBytes', 'eventWeightReadbackBytes', 'eventStateReadbackBytes',
-                'cacheCandidateCount')
+                'cacheCandidateCount', 'rebinnedEventCount', 'binCandidateCount',
+                'binContributionCount', 'contributionBufferBytes', 'externalWeightUploadBytes',
+                'externalWeightUploadBlocks')
 
 
 def stats(values):
@@ -53,6 +58,35 @@ def histogram(engine):
     return [(b.sumWeights, b.sqrtSumSqWeights)
             for sample in engine.getLikelihoodInterface().getModelPropagator().getSampleSet().getSampleList()
             for b in sample.getHistogram().getBinContentList()]
+
+
+def outside_histogram(engine):
+    return [(sample.getHistogram().getOutsideBinContent().sumWeights,
+             sample.getHistogram().getOutsideBinContent().sqrtSumSqWeights)
+            for sample in engine.getLikelihoodInterface().getModelPropagator().getSampleSet().getSampleList()
+            if sample.getHistogram().isBinningResponseEnabled()]
+
+
+def parameter_sequence(args, engine):
+    sequence = scheduling.ParameterSequence(engine, args.step_scale)
+    if args.parameter_match:
+        pattern = re.compile(args.parameter_match)
+        sequence.entries = [entry for entry in sequence.entries if pattern.search(entry[0].getFullTitle())]
+        if not sequence.entries:
+            raise RuntimeError(f'No eligible effective fit coordinate matches {args.parameter_match!r}')
+        sequence.current = [center for _, center, _, _ in sequence.entries]
+    if 'local2' in args.scenarios and len(sequence.entries) < 2:
+        raise RuntimeError('local2 needs two coordinates; use --scenarios constant local1 for a single parameter')
+    progress(f'{args.worker}: {len(sequence.entries)} selected fit coordinates')
+    if args.parameter_match:
+        for entry in sequence.manifest():
+            progress(f"  {entry['name']}: center {entry['center']}, proposal sigma {entry['proposalStdDev']}")
+    return sequence
+
+
+def count_summary(rows):
+    return {name: {'median': statistics.median(row['counts'][name] for row in rows),
+                   'max': max(row['counts'][name] for row in rows)} for name in COUNT_FIELDS}
 
 
 def backend_config(args):
@@ -132,17 +166,22 @@ def evaluate_pass(args, engine, sequence, scenario, calls, seed):
             progress(f'{args.worker}/{scenario}: {call + 1}/{calls} evaluations')
             last_progress = time.monotonic()
     bins = histogram(engine)  # Explicit materialization is outside all evaluation timers.
-    if any(not math.isfinite(v) for pair in bins for v in pair):
+    outside = outside_histogram(engine)
+    if any(not math.isfinite(v) for pair in bins + outside for v in pair):
         raise RuntimeError('Nonfinite materialized histogram')
-    return {'rows': rows, 'timings': summarize(rows), 'histogram': bins}
+    return {'rows': rows, 'timings': summarize(rows), 'histogram': bins, 'outsideHistogram': outside}
 
 
 def measure(args, engine=None, sequence=None):
     import GUNDAM
     if engine is None:
+        start = time.monotonic()
         engine = load_engine(args)
+        write_json(args.output / 'setup.json', {
+            'seconds': time.monotonic() - start, 'includesDatasetLoading': True,
+            'executionMode': args.execution_mode, 'pid': os.getpid()})
     if sequence is None:
-        sequence = scheduling.ParameterSequence(engine, args.step_scale)
+        sequence = parameter_sequence(args, engine)
     manifest = sequence.manifest()
     write_json(args.output / 'parameters.json', manifest)
     result = {'complete': False, 'case': args.worker, 'pythonModule': GUNDAM.__file__,
@@ -151,6 +190,8 @@ def measure(args, engine=None, sequence=None):
               'scenarios': {}}
     if args.worker != 'CPU':
         result['model'] = json.loads(engine.getBackendsManager().getDiagnosticCuda())
+        if args.execution_mode == 'resident' and len(args.cases) > 1 and result['model'].get('hasEventState'):
+            raise RuntimeError('Observable/binning models require --execution-mode isolated for multiple backend cases')
         write_json(args.output / 'model.json', result['model'])
         progress(f"{args.worker}: weight layout {result['model']['weightLayout']}, "
                  f"{result['model']['packedEventDialIndexBytes']} index bytes")
@@ -169,11 +210,13 @@ def measure(args, engine=None, sequence=None):
         # CUDA event durations overlap the synchronous host evaluation. Rank stages
         # within each clock domain; never add GPU time to host wait/evaluation.
         cuda_stages = ('parameterUploadSeconds', 'cachedDialStageSeconds',
-                       'eventWeightsStageSeconds', 'histogramStageSeconds')
+                       'eventWeightsStageSeconds', 'variableStageSeconds',
+                       'binningStageSeconds', 'histogramStageSeconds')
         gpu_ranking = sorted(cuda_stages, key=lambda key: timings[key]['medianMs'], reverse=True)
         entry = {'callsPerTrial': calls, 'trials': args.trials, 'timings': timings,
                  'medianResponseCandidates': statistics.median(row['counts']['cacheCandidateCount'] for row in rows),
                  'gpuStageRanking': gpu_ranking if args.worker != 'CPU' else [],
+                 'counts': count_summary(rows),
                  'coordinateCostsFile': None}
         if scenario == 'local1':
             grouped = [[] for _ in sequence.entries]
@@ -181,16 +224,21 @@ def measure(args, engine=None, sequence=None):
                 grouped[row['coordinateIndices'][0]].append(row)
             costs = [{**manifest[index], 'samples': len(group),
                       'medianResponseCandidates': statistics.median(row['counts']['cacheCandidateCount'] for row in group),
-                      'timings': summarize(group)} for index, group in enumerate(grouped)]
+                      'timings': summarize(group), 'counts': count_summary(group)} for index, group in enumerate(grouped)]
             costs.sort(key=lambda row: row['timings']['evaluationSeconds']['medianMs'], reverse=True)
             entry['coordinateCostsFile'] = 'local1-coordinate-costs.json'
             write_json(args.output / entry['coordinateCostsFile'], costs)
+        if args.require_rebinning and scenario != 'constant' and not any(
+                row['counts']['rebinnedEventCount'] > 0 for row in rows):
+            raise RuntimeError(f'{args.worker}/{scenario}: no event was rebinned; check parameter selection and observable dials')
         result['scenarios'][scenario] = entry
         write_json(args.output / 'summary.json', result)
         progress(f"{args.worker}/{scenario}: evaluation {timings['evaluationSeconds']['medianMs']:.3f} ms; "
                  f"preparation {timings['hostPreparationSeconds']['medianMs']:.3f} ms; "
                  f"GPU {timings['devicePropagationSeconds']['medianMs']:.3f} ms; "
-                 f"response candidates {entry['medianResponseCandidates']}")
+                 f"response candidates {entry['medianResponseCandidates']}; "
+                 f"rebinned {entry['counts']['rebinnedEventCount']['median']}; "
+                 f"contributions {entry['counts']['binContributionCount']['median']}")
     result['complete'] = True
     write_json(args.output / 'summary.json', result)
 
@@ -208,7 +256,7 @@ def measure_resident(args):
         start = time.monotonic()
         if engine is None:
             engine = load_engine(args)
-            sequence = scheduling.ParameterSequence(engine, args.step_scale)
+            sequence = parameter_sequence(args, engine)
             config = json.loads((args.output / 'resolved-fitter-config.json').read_text())
         else:
             sequence.reset()
@@ -236,7 +284,7 @@ def compare(output, cases, scenarios, trials, relative, absolute):
             raise RuntimeError(f'{case}: parameter manifests differ')
         entries = {}
         for scenario in scenarios:
-            max_llh, max_bin, passed = 0., 0., True
+            max_llh, max_bin, max_outside, passed = 0., 0., 0., True
             for trial in range(1, trials + 1):
                 name = f'{scenario}-trial{trial}.json'
                 left = json.loads((output / reference / name).read_text())
@@ -254,11 +302,19 @@ def compare(output, cases, scenarios, trials, relative, absolute):
                     for x, y in zip(a, b):
                         max_bin = max(max_bin, abs(x - y))
                         passed &= math.isclose(x, y, rel_tol=relative, abs_tol=absolute)
+                left_outside, right_outside = left.get('outsideHistogram', []), right.get('outsideHistogram', [])
+                if len(left_outside) != len(right_outside):
+                    raise RuntimeError('Outside histogram sizes differ')
+                for a, b in zip(left_outside, right_outside):
+                    for x, y in zip(a, b):
+                        max_outside = max(max_outside, abs(x - y))
+                        passed &= math.isclose(x, y, rel_tol=relative, abs_tol=absolute)
             def median(case_name):
                 summary = json.loads((output / case_name / 'summary.json').read_text())
                 return summary['scenarios'][scenario]['timings']['evaluationSeconds']['medianMs']
             entries[scenario] = {'passed': passed, 'maxAbsoluteLikelihoodDifference': max_llh,
                                  'maxAbsoluteHistogramOrErrorDifference': max_bin,
+                                 'maxAbsoluteOutsideOrErrorDifference': max_outside,
                                  'speedupOverReference': median(reference) / median(case)}
             comparison['passed'] &= passed
         comparison['cases'][case] = entries
@@ -268,14 +324,15 @@ def compare(output, cases, scenarios, trials, relative, absolute):
 
 
 def write_report(output, cases):
-    lines = ['# Resident likelihood profiling', '',
+    lines = ['# Likelihood profiling', '',
              'Execution mode: ' + json.loads((output / 'settings.json').read_text())['execution_mode'] + '.', '',
              'All durations below are medians in milliseconds. GPU event intervals overlap',
              'host evaluation time. Do not add these columns together.', '',
-             '| Case | Scenario | Evaluation | Host preparation | GPU total | Dial responses | Event weights | Histograms | Histogram readback | Host likelihood |',
-             '|---|---|---:|---:|---:|---:|---:|---:|---:|---:|']
+             '| Case | Scenario | Evaluation | Host preparation | GPU total | Dial responses | Event weights | Observables + search | Bin index | Histograms | Histogram readback | Host likelihood |',
+             '|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|']
     fields = ('evaluationSeconds', 'hostPreparationSeconds', 'devicePropagationSeconds',
-              'cachedDialStageSeconds', 'eventWeightsStageSeconds', 'histogramStageSeconds',
+              'cachedDialStageSeconds', 'eventWeightsStageSeconds', 'variableStageSeconds',
+              'binningStageSeconds', 'histogramStageSeconds',
               'histogramReadbackSeconds', 'likelihoodHostSeconds')
     for case in cases:
         summary = json.loads((output / case / 'summary.json').read_text())
@@ -283,7 +340,21 @@ def write_report(output, cases):
             times = entry['timings']
             cells = [f'{times[key]["medianMs"]:.4f}' for key in fields]
             lines.append('| ' + ' | '.join([case, scenario, *cells]) + ' |')
-    lines.extend(['', 'CPU stage durations in the responses/weights/histograms columns are host durations.',
+    lines.extend(['', '| Case | Scenario | Rebin events (median/max) | Contributions (median) | Contribution capacity MiB (max) |',
+                  '|---|---|---:|---:|---:|'])
+    for case in cases:
+        summary = json.loads((output / case / 'summary.json').read_text())
+        for scenario, entry in summary['scenarios'].items():
+            counts = entry['counts']
+            rebin = counts['rebinnedEventCount']
+            lines.append(f"| {case} | {scenario} | {rebin['median']}/{rebin['max']} | "
+                         f"{counts['binContributionCount']['median']} | "
+                         f"{counts['contributionBufferBytes']['max'] / 2**20:.2f} |")
+    lines.extend(['', 'CUDA observables/search is the fused variable/hard-bin stage; bin index includes',
+                  'fraction counting, prefix scan, allocation synchronization and contribution sorting.',
+                  'CPU variable/binning stages have different boundaries. Compare total evaluations first.',
+                  'Rebin events count a binning pass, not necessarily a change of hard bin.', '',
+                  'CPU stage durations in the responses/weights/histograms columns are host durations.',
                   'GPU total is zero for CPU. CUDA upload/reset duration is in the JSON reports.', '',
                   'Case summaries and coordinate costs include `medianResponseCandidates`.',
                   'For CUDA this counts dials visited by the response kernels, before transformed-input reuse.',
@@ -292,7 +363,7 @@ def write_report(output, cases):
                   'Inspect `local1-coordinate-costs.json` for the most expensive parameter changes.',
                   'Each case summary ranks CUDA stages in `gpuStageRanking`.',
                   '`comparison.json` checks every measured likelihood and each trial\'s final histogram',
-                  '(contents and errors), and reports speedups against CPU when selected.', '',
+                  '(contents, errors and smoothed outside bins), and reports speedups against CPU when selected.', '',
                   'These are seeded propagation workloads, not the distribution of calls in a real fit.',
                   'The gap between evaluation and GPU time also contains host preparation, transfers,',
                   'likelihood/penalty work, launch overhead and synchronization. It is not all GPU wait.',
@@ -314,8 +385,9 @@ def run_worker(args, case):
     log_path = directory / 'native.log'
     command = [sys.executable, '-u', str(Path(__file__).resolve()), *sys.argv[1:],
                '--worker', case, '--output', str(directory)]
-    with log_path.open('w') as log:
-        child = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+    with log_path.open('w', encoding='utf-8') as log:
+        child = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                                 text=True, encoding='utf-8', errors='replace')
         def forward():
             for line in child.stdout:
                 log.write(line)
@@ -356,6 +428,9 @@ def main():
     parser.add_argument('--warmup', type=int, default=5)
     parser.add_argument('--seed', type=int, default=12345)
     parser.add_argument('--step-scale', type=float, default=.1)
+    parser.add_argument('--parameter-match', help='Regex selecting effective fit coordinates by full title')
+    parser.add_argument('--require-rebinning', action='store_true',
+                        help='Require at least one measured rebin in every nonconstant scenario/case')
     parser.add_argument('--scenarios', nargs='+', choices=['constant', 'local1', 'local2', 'global'],
                         default=['constant', 'local1', 'local2', 'global'])
     parser.add_argument('--relative-tolerance', type=float, default=1e-9)
@@ -370,6 +445,13 @@ def main():
     for name in ('step_scale', 'relative_tolerance', 'absolute_tolerance'):
         if not math.isfinite(getattr(args, name)) or getattr(args, name) <= 0:
             parser.error(f'{name} must be finite and positive')
+    if args.parameter_match:
+        try:
+            re.compile(args.parameter_match)
+        except re.error as error:
+            parser.error(f'Invalid --parameter-match: {error}')
+    if args.require_rebinning and args.execution_mode != 'isolated':
+        parser.error('--require-rebinning needs --execution-mode isolated; resident replacement requires fixed bins')
     args.cases = list(dict.fromkeys(args.cases))
     args.scenarios = list(dict.fromkeys(args.scenarios))
     args.work_dir = args.work_dir.resolve()

@@ -2,7 +2,8 @@
 
 CUDA implements smoothed/fractional binning in native doubles, with host
 math/validation tests and CPU/MPS/Python regressions passing locally. NVCC
-compilation and execution of the new GPU path remain pending CC validation.
+compilation and execution of the smoothed GPU path were confirmed working at
+CC-IN2P3 on 2026-10-25.
 The previous five CUDA suites, including observable responses and strict
 migration, passed at CC-IN2P3 on 2026-10-25 (1.53 s total).
 
@@ -76,7 +77,7 @@ The host `CudaBinning` tests check analytic halves/quarters, outside fractions,
 roundoff normalization, invalid overlaps/widths and bounded contribution writes.
 Locally, the 92 selected native regressions and both Python engine/producer tests
 pass. CUDA test C++ and the CUDA-facing backend call signatures are syntax-checked
-locally; GPU kernel compilation/execution requires the CC.
+locally; GPU kernel compilation/execution was confirmed at the CC.
 
 For the full engine, build `GUNDAM` with `WITH_PYTHON_INTERFACE=ON`, then use the
 matching Python interpreter and the existing test dependencies:

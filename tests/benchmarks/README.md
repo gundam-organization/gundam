@@ -441,7 +441,9 @@ capacity and allocator reservations must not be interpreted as resident bytes.
 Asimov data, without Migrad, Hesse, PCA, plots or step-response scans. By default
 (`--execution-mode resident`) it loads the model once in one worker process,
 then replaces only the backend between cases, reusing the immutable layout,
-events, dials and Asimov data. The previous backend's buffers are released before
+events, dials and Asimov data. This replacement requires fixed bins and no
+observable responses; use `--execution-mode isolated` for migration or smoothing.
+The previous backend's buffers are released before
 the next backend is built. Parameters are restored to their initial effective
 fit coordinates; each new backend is primed and warmed up outside measurements.
 Default cases are CUDA `cachedResponses` and `recomputeResponses`, both with
@@ -464,6 +466,70 @@ python3 tests/benchmarks/229CudaBackendProfiling.py \
   --threads 4 --calls 30 --global-calls 10 --trials 2 --warmup 5 \
   --output /sps/t2k/ablanche/work/results/cuda-oa2024-profile
 ```
+
+### CUDA migration and smoothing on upgrade-cc-2026
+
+Use the same script with `--execution-mode isolated`: dynamic/observable models
+cannot currently use resident backend replacement. Each case loads the model
+once; loading and warmup are outside evaluation timings and `setup.json` records
+initialization separately. This benchmark uses Asimov data (the fitter's `-a`)
+without running a fit or Hesse, with all input selections/limits preserved.
+
+For the supplied upgrade configuration, `pmuScaleBinningTest.yaml` defines
+`Pmu -> pmuScale * Pmu`, with prior 1 and sigma 0.01. Applied after
+`enableEb2d.yaml`, it disables `Cross-Section Systematics Eb`. `binResponse.yaml`
+smooths Pmu with fixed width **1 MeV**, not a fractional width. Therefore the
+following workload targets Pmu scaling and smoothing; it does not activate Eb
+migration. Other fit parameters stay at their initial values.
+
+From the repository root in a GPU allocation, adapt `--work-dir` to the CC input
+location if needed. Use the Python matching the compiled module:
+
+```sh
+PYTHONPATH=/sps/t2k/ablanche/build/gundam/src/PythonInterface${PYTHONPATH:+:$PYTHONPATH} \
+python3 tests/benchmarks/229CudaBackendProfiling.py \
+  --work-dir /sps/t2k/ablanche/work/results/gundam/upgrade-cc-2026 \
+  --config ndUpCcInc.yaml \
+  --override override/datasetHighlandv5.27.1_CCLyon.yaml \
+    override/disable2p2hNormNuBar.yaml override/enableEb2d.yaml \
+    override/pmuScaleBinningTest.yaml override/binResponse.yaml \
+    override/backendCudaTest.yaml \
+  --cases CUDA-cachedResponses-interleaved CUDA-recomputeResponses-interleaved CPU \
+  --threads 4 --execution-mode isolated \
+  --parameter-match pmuScale --scenarios constant local1 \
+  --step-scale 1 --calls 30 --trials 3 --warmup 5 --require-rebinning \
+  --output ./cuda-upgrade-binning-profile
+```
+
+`--parameter-match` is a regex over eligible effective parameter full titles;
+no match is an error, and the selected coordinates are recorded in `parameters.json`.
+`--step-scale 1` proposes a seeded Gaussian displacement of one prior sigma:
+`pmuScale = 1 + N(0, 0.01)`, respecting its domain, without a random walk.
+`constant` repeats identical parameters; `local1` changes only the selected
+coordinate. `--require-rebinning` rejects a nonconstant scenario if no measured
+call ran event binning. This checks activity, not a count of actual hard-bin
+crossings. With only one selected coordinate, do not request `local2`.
+
+Start with `report.md`: it includes observables/search, bin index, histogram,
+readback and total evaluation times, plus rebin/contribution counters and CUDA
+contribution-buffer capacity. CUDA's variable stage includes the fused hard-bin
+search, while its bin-index stage includes fractional evaluation, prefix scans,
+allocation synchronization and stable sorting. CPU stage boundaries differ;
+compare total evaluations first. GPU times overlap host evaluation, so they
+must not be added together. Event state/weight readbacks are rejected during
+measurement; final histogram/outside materialization is outside the timers.
+
+`comparison.json` checks every likelihood and each trial's final normal and
+outside histogram sums/errors against CPU. Input proposals/digests are identical
+across cases. This is propagation performance, not full-fit throughput, and the
+comparison does not validate covariance matrices. The output directory must be new.
+
+For a first quick pass, use `--calls 10 --trials 1 --warmup 2`; each selected case
+still pays the complete dataset loading cost. To locate expensive coordinates
+across the full model afterward, omit `--parameter-match` and use
+`--scenarios constant local1 global` (local1 covers all eligible coordinates).
+
+### General profiling settings
 
 The output directory must be new. The same seeded proposals are replayed in
 each case. Scenarios are `constant`, `local1`, `local2`, and `global`. Local
