@@ -3,7 +3,40 @@
 
 #include "EngineView.h"
 
+#include <cmath>
+#include <limits>
+
 namespace Backends::Testing {
+// Fused polynomial evaluation can round a transition to one while the host
+// retains an epsilon-sized neighbouring/outside contribution. Preserve order
+// and bin identities for all significant records and bound total missing mass.
+inline bool binningContributionsAgree(const std::vector<EventBinContribution>& first_,
+                                     const std::vector<EventBinContribution>& second_) {
+  constexpr double tolerance = 64. * std::numeric_limits<double>::epsilon();
+  double firstTotal = 0., secondTotal = 0., missing = 0.;
+  for( const auto& value : first_ ){
+    if( not std::isfinite(value.fraction) or value.fraction < 0. ){ return false; }
+    firstTotal += value.fraction;
+  }
+  for( const auto& value : second_ ){
+    if( not std::isfinite(value.fraction) or value.fraction < 0. ){ return false; }
+    secondTotal += value.fraction;
+  }
+  if( std::abs(firstTotal - secondTotal) > tolerance ){ return false; }
+  std::size_t i = 0, j = 0;
+  while( i < first_.size() or j < second_.size() ){
+    if( i < first_.size() and j < second_.size() and first_[i].binIndex == second_[j].binIndex ){
+      if( std::abs(first_[i].fraction - second_[j].fraction) > tolerance ){ return false; }
+      ++i; ++j;
+    }
+    else if( i < first_.size() and first_[i].fraction <= tolerance ){ missing += first_[i++].fraction; }
+    else if( j < second_.size() and second_[j].fraction <= tolerance ){ missing += second_[j++].fraction; }
+    else{ return false; }
+    if( missing > tolerance ){ return false; }
+  }
+  return true;
+}
+
 inline EngineView makeCudaBinningHierarchyTestModel() {
   EngineView view;
   auto& model = view.propagation;

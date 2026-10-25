@@ -1,5 +1,6 @@
 #include "CudaBinningTestModel.h"
 #include "CudaBackend.h"
+#include "CpuBackend.h"
 #include "BackendFactory.h"
 #include "BackendManager.h"
 #include "CudaWeightModel.h"
@@ -684,8 +685,15 @@ TEST(CudaBinning, HierarchyFixtureHasValidFractionsForLargeDisplacements) {
   const auto view = Testing::makeCudaBinningHierarchyTestModel();
   const auto model = makeCudaWeightModel(view);
   ASSERT_EQ(model.stateEvents.size(), 521);
+  CpuBackend cpu;
+  cpu.build(view);
   for( double scale : {1., .01, .5, 1., 2.5, 100., 1.} ){
     SCOPED_TRACE(scale);
+    PropagationInputs inputs;
+    inputs.hostVariables = view.propagation.variableValues;
+    for( const auto& event : model.stateEvents ){ inputs.hostVariables[event.firstVariable] *= scale; }
+    const auto token = cpu.requestPropagation(inputs);
+    const auto& reference = cpu.getEventStateHostView(token);
     for( const auto& event : model.stateEvents ){
       SCOPED_TRACE(event.resultIndex);
       const double point[]{scale * model.variableValues[event.firstVariable],
@@ -708,8 +716,59 @@ TEST(CudaBinning, HierarchyFixtureHasValidFractionsForLargeDisplacements) {
         EXPECT_EQ(a[i].bin, b[i].bin);
         EXPECT_DOUBLE_EQ(a[i].fraction, b[i].fraction);
       }
+      if( sample.isSmoothed ){
+        const auto& expected = reference.contributions[event.resultIndex];
+        std::vector<EventBinContribution> actual, fused;
+        for( const auto& value : b ){
+          actual.push_back({value.bin >= 128 ? -1 : value.bin - sample.binOffset, value.fraction});
+        }
+        ASSERT_TRUE(Testing::binningContributionsAgree(actual, expected));
+        // Reproduce CUDA's fused polynomial rounding on a machine without a
+        // GPU, then compare the complete records with the real CPU backend.
+        auto kernel = [](double value_){
+          if( value_ <= -1. ){ return 0.; }
+          if( value_ >= 1. ){ return 1.; }
+          const double t = (value_ + 1.) / 2.;
+          return t*t*t*std::fma(t, std::fma(t, 6., -15.), 10.);
+        };
+        double total = 0.;
+        for( std::size_t i = sample.firstBin; i < sample.endBin; ++i ){
+          const auto& bin = model.bins[i];
+          double fraction = 1.;
+          for( std::size_t j = bin.firstInterval; j < bin.firstInterval + bin.intervalCount; ++j ){
+            const auto& interval = model.intervals[j];
+            const double value = point[interval.variableIndex];
+            fraction *= interval.lowerInverseWidth == 0.
+                ? double(GundamBinningMath::contains(interval.lowerBound, interval.upperBound, value))
+                : std::max(0., kernel((interval.upperBound - value) * interval.upperInverseWidth)
+                               - kernel((interval.lowerBound - value) * interval.lowerInverseWidth));
+          }
+          if( fraction == 0. ){ continue; }
+          fused.push_back({bin.binIndex, fraction});
+          total += fraction;
+        }
+        if( total > 1. ){
+          ASSERT_LE(total - 1., 64. * cudaBinningEpsilon * fused.size());
+          auto largest = std::max_element(fused.begin(), fused.end(), [](const auto& a_, const auto& b_){ return a_.fraction < b_.fraction; });
+          largest->fraction -= total - 1.;
+        }
+        else if( total < 1. ){ fused.push_back({-1, 1. - total}); }
+        ASSERT_TRUE(Testing::binningContributionsAgree(fused, expected)) << "x=" << point[0] << " y=" << point[1];
+      }
     }
   }
+}
+
+TEST(CudaBinning, ContributionComparisonOnlyAllowsRoundoffSizedMissingMass) {
+  using namespace Backends::Testing;
+  const double epsilon = std::numeric_limits<double>::epsilon();
+  EXPECT_TRUE(binningContributionsAgree({{2, 1.}}, {{2, 1. - epsilon}, {-1, epsilon}}));
+  EXPECT_TRUE(binningContributionsAgree({{1, epsilon}, {2, 1. - epsilon}}, {{2, 1.}}));
+  EXPECT_FALSE(binningContributionsAgree({{2, 1.}}, {{2, .999999}, {-1, .000001}}));
+  EXPECT_FALSE(binningContributionsAgree({{2, 1.}}, {{3, 1.}}));
+  EXPECT_FALSE(binningContributionsAgree({{2, 1.}}, {{2, std::numeric_limits<double>::quiet_NaN()}}));
+  EXPECT_FALSE(binningContributionsAgree({{2, 1.}, {-1, -epsilon}}, {{2, 1.}}));
+  EXPECT_FALSE(binningContributionsAgree({{2, 1.}, {3, 40*epsilon}, {4, 40*epsilon}}, {{2, 1.}}));
 }
 
 TEST(CudaBinning, OrderedHierarchyMatchesExhaustiveSearchAndFractions) {

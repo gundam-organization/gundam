@@ -116,15 +116,18 @@ namespace {
     ASSERT_EQ(a.variables.size(), b.variables.size());
     for( std::size_t i = 0; i < a.variables.size(); ++i ){ close(a.variables[i], b.variables[i]); }
     ASSERT_EQ(a.contributions.size(), b.contributions.size());
+    std::size_t cudaContributionCount = 0, cpuContributionCount = 0;
     for( std::size_t i = 0; i < a.contributions.size(); ++i ){
-      ASSERT_EQ(a.contributions[i].size(), b.contributions[i].size());
-      double total = 0.;
-      for( std::size_t j = 0; j < a.contributions[i].size(); ++j ){
-        EXPECT_EQ(a.contributions[i][j].binIndex, b.contributions[i][j].binIndex);
-        close(a.contributions[i][j].fraction, b.contributions[i][j].fraction);
-        total += a.contributions[i][j].fraction;
+      SCOPED_TRACE(i);
+      ASSERT_TRUE(Testing::binningContributionsAgree(a.contributions[i], b.contributions[i]))
+          << "CUDA records=" << a.contributions[i].size() << "; CPU records=" << b.contributions[i].size();
+      for( const auto* contributions : {&a.contributions[i], &b.contributions[i]} ){
+        double total = 0.;
+        for( const auto& value : *contributions ){ total += value.fraction; }
+        if( not contributions->empty() ){ close(total, 1.); }
       }
-      if( not a.contributions[i].empty() ){ close(total, 1.); }
+      cudaContributionCount += a.contributions[i].size();
+      cpuContributionCount += b.contributions[i].size();
     }
     const auto& weights = cuda_.getEventWeightsHostView(token);
     const auto& cpuWeights = cpu_.getEventWeightsHostView(reference);
@@ -142,7 +145,10 @@ namespace {
       close(outside[i], cpu_.getOutsideSumsHostView(reference)[i]);
       close(outsideSquares[i], cpu_.getOutsideSumSquaresHostView(reference)[i]);
     }
-    EXPECT_EQ(cuda_.getLastTimingSummary().binContributionCount, cpu_.getLastTimingSummary().binContributionCount);
+    // Each counter describes its own stored records, including roundoff-sized
+    // tails whose presence can differ with fused arithmetic.
+    EXPECT_EQ(cuda_.getLastTimingSummary().binContributionCount, cudaContributionCount);
+    EXPECT_EQ(cpu_.getLastTimingSummary().binContributionCount, cpuContributionCount);
     if( not cuda_.getEngineView().likelihood.empty() ){ close(cuda_.getLikelihood(token), cpu_.getLikelihood(reference)); }
   }
 }

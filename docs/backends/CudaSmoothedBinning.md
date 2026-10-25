@@ -95,10 +95,20 @@ They also compare indexed and exhaustive hard bins and fractional records across
 multiple samples, overlaps, asymmetric smoothing boundaries and adjacent
 representable coordinates. The GPU suite adds a 128-bin mixed strict/smoothed
 model with large displacements, permuted result slots and a partial final warp.
-For the hierarchy change, 108 selected native regressions pass locally, and the
+For the hierarchy change, 109 selected native regressions pass locally, and the
 new GPU test C++ is syntax-checked. The original smoothing implementation also
 passed the Python engine/producer tests and GPU execution at the CC; those GPU
 results predate the hierarchy optimization.
+
+The shared hierarchy fixture is also checked against the real CPU backend and
+an explicit fused-polynomial evaluation on host. Fused arithmetic can round a
+transition to one while another evaluation retains an epsilon-sized neighbouring
+or outside contribution. CPU/GPU tests therefore compare ordered significant
+records with a total unmatched-mass budget of `64 * epsilon(double)`, rather than
+requiring identical record counts. Fractions must remain finite and nonnegative;
+wrong significant bins and missing mass above that budget fail. Each backend's
+contribution counter is checked against its own materialized records. Histogram,
+outside, squared-sum and hard-bin comparisons are retained unchanged.
 
 For the full engine, build `GUNDAM` with `WITH_PYTHON_INTERFACE=ON`, then use the
 matching Python interpreter and the existing test dependencies:
