@@ -1,5 +1,6 @@
 #include "CpuBackend.h"
 #include "CpuWeightKernels.h"
+#include "DialDependencies.h"
 
 #include "Semantics/BackendHostPropagation.h"
 #include "GundamGlobals.h"
@@ -303,12 +304,11 @@ void Backends::CpuBackend::initializeDialResponseCache() {
     if( dial.type == BackendDialType::ExternalWeight or isTableDial(dial.type) ){ continue; }
     if( dial.firstInput > propagation.dialInputs.size()
         or dial.inputCount > propagation.dialInputs.size() - dial.firstInput ){ continue; }
-    for( std::size_t i = 0; i < dial.inputCount; ++i ){
-      const auto& input = propagation.dialInputs.at(dial.firstInput + i);
-      LogThrowIf(input.source != DialInputSource::Parameter,
+    visitDialDependencies(propagation, dial, [&](const auto& input_){
+      LogThrowIf(input_.source != DialInputSource::Parameter,
                  "Event-variable dial inputs require an event-context evaluator.");
-      LogThrowIf(input.parameterIndex >= propagation.parameterCount, "Dial parameter input is out of range.");
-    }
+      LogThrowIf(input_.parameterIndex >= propagation.parameterCount, "Dial parameter input is out of range.");
+    }, [](std::size_t){});
     if( dial.inputCount > 1 ){
       _isCachedDial_[iDial] = true;
       _multiInputCachedDials_.push_back(iDial);

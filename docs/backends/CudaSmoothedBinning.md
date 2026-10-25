@@ -59,9 +59,12 @@ The hierarchy/counter optimization compiled with NVCC at the CC; the four
 previous smoothing tests pass. The new large-displacement fixture initially
 used inconsistent widths at shared edges and was correctly rejected. Its widths
 are now matched per edge, with the same fixture validated exhaustively on host.
-GPU execution of the corrected fixture and production performance remain to be
-checked at the CC. The following times
-describe the previous exhaustive-search implementation.
+The indexed stress production run passes CPU numerical comparisons at the CC:
+cached evaluation takes 2.92 ms versus 4.08 ms before indexing and 30.04 ms on
+four CPU threads. The contribution/index stage takes 1.04 ms; hard-search
+candidates fall by 93.2%. See the
+[indexed stress results](CudaUpgradeBinningBenchmark.md#stress-baseline-and-indexed-search-retest).
+The following times describe the previous exhaustive-search implementation.
 The [upgrade-cc-2026 production profile](CudaUpgradeBinningBenchmark.md) validates
 Pmu migration with 1 MeV smoothing against CPU and measures 4.10 ms per evaluation
 with cached CUDA versus 29.93 ms on four CPU threads. State updates require a count

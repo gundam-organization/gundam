@@ -9,19 +9,6 @@
 #include <cmath>
 #include <limits>
 
-namespace {
-  bool containsStrictBin(const Backends::BinningGeometry& layout_, const Backends::BinningBin& bin_,
-                         const double* values_) {
-    for( std::size_t i = bin_.firstInterval; i < bin_.firstInterval + bin_.intervalCount; ++i ){
-      const auto& interval = layout_.intervals[i];
-      if( not GundamBinningMath::contains(interval.lowerBound, interval.upperBound, values_[interval.variableIndex]) ){
-        return false;
-      }
-    }
-    return true;
-  }
-}
-
 void Backends::CpuBackend::initializeBinning() {
   const auto& samples = _engineView_->propagation.samples;
   _binningIndices_.resize(samples.size());
@@ -143,7 +130,7 @@ void Backends::CpuBackend::updateEventBinningThread(int iThread_) {
         and std::all_of(values, values + layout.variableNames.size(), [](double value_){ return std::isfinite(value_); }) ){
       ++worker.candidatesTested;
       const auto& bin = layout.bins[positions[previousBin]];
-      if( containsStrictBin(layout, bin, values) ){
+      if( BinningSemantics::containsStrictBin(bin, layout.intervals.data(), values) ){
         // The strict assignment is unchanged; keep its existing contribution.
         ++contributionCount;
         _validBinning_[event.resultIndex] = true;
@@ -158,7 +145,7 @@ void Backends::CpuBackend::updateEventBinningThread(int iThread_) {
     double total{0};
     for( auto position : worker.candidates ){
       const auto& bin = layout.bins[position];
-      bool contains = hardBin < 0 and containsStrictBin(layout, bin, values);
+      bool contains = hardBin < 0 and BinningSemantics::containsStrictBin(bin, layout.intervals.data(), values);
       if( contains ){ hardBin = bin.binIndex; }
       // Strict membership already gives the complete response. Smoothed bins
       // still need their fractional response, including outside the hard bin.
@@ -171,11 +158,12 @@ void Backends::CpuBackend::updateEventBinningThread(int iThread_) {
     _eventState_.bins[event.resultIndex] = hardBin;
     if( layout.isSmoothed ){
       double tolerance = 64 * std::numeric_limits<double>::epsilon() * std::max(std::size_t(1), contributions.size());
-      LogThrowIf(not std::isfinite(total) or total > 1 + tolerance, "Total binning response exceeds one: " << total);
+      const auto finalized = BinningSemantics::finalizeBinningTotal(total, tolerance, std::isfinite(total));
+      LogThrowIf(not finalized.isValid, "Total binning response exceeds one: " << total);
       if( total > 1 ){
         auto largest = std::max_element(contributions.begin(), contributions.end(), [](const auto& a_, const auto& b_){ return a_.fraction < b_.fraction; });
-        largest->fraction -= total - 1;
-        total = 1;
+        largest->fraction -= finalized.excess;
+        total = finalized.total;
       }
       if( total < 1 ){ contributions.push_back({-1, 1 - total}); }
     }

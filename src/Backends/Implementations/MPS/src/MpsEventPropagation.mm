@@ -1,5 +1,6 @@
 #include "MpsEventPropagation.h"
 #include "MpsBackendInternal.h"
+#include "DialDependencies.h"
 
 #include <algorithm>
 #include <stdexcept>
@@ -141,9 +142,8 @@ void Backends::MpsEventPropagation::buildDialCache() {
     if( dial.type == BackendDialType::Shift ){ continue; }
     if( dial.inputCount > 1 and dial.type != BackendDialType::ExternalWeight ){
       std::vector<std::size_t> dependencies;
-      for( std::size_t input = 0; input < dial.inputCount; ++input ){
-        dependencies.push_back(model.dialInputs.at(dial.firstInput + input).parameterIndex);
-      }
+      visitDialDependencies(model, dial,
+          [&](const auto& input_){ dependencies.push_back(input_.parameterIndex); }, [](std::size_t){});
       std::sort(dependencies.begin(), dependencies.end());
       dependencies.erase(std::unique(dependencies.begin(), dependencies.end()), dependencies.end());
       multiGroups[dependencies].push_back(DeviceIndex(i));
@@ -174,12 +174,10 @@ void Backends::MpsEventPropagation::buildDialCache() {
   for( std::size_t i = 0; i < used.size(); ++i ){
     if( not used[i] ){ continue; }
     const auto& dial = model.dials[i];
-    if( dial.type == BackendDialType::ExternalWeight ){ _weightExternalBlocks_.push_back(dial.externalBlockIndex); }
-    else if( dial.type != BackendDialType::Shift ){
-      for( std::size_t input = 0; input < dial.inputCount; ++input ){
-        _weightParameters_.push_back(model.dialInputs.at(dial.firstInput + input).parameterIndex);
-      }
-    }
+    if( dial.type == BackendDialType::Shift ){ continue; }
+    visitDialDependencies(model, dial,
+        [this](const auto& input_){ _weightParameters_.push_back(input_.parameterIndex); },
+        [this](std::size_t block_){ _weightExternalBlocks_.push_back(block_); });
   }
   auto unique = [](auto& values_){
     std::sort(values_.begin(), values_.end());

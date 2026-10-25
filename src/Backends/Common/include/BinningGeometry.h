@@ -1,7 +1,7 @@
 #ifndef GUNDAM_BACKEND_BINNING_GEOMETRY_H
 #define GUNDAM_BACKEND_BINNING_GEOMETRY_H
 
-#include "DeviceMath/SharedBinningMath.h"
+#include "Semantics/BackendBinningSemantics.h"
 
 #include <algorithm>
 #include <cmath>
@@ -45,15 +45,7 @@ namespace BinningSemantics {
   }
 
   inline double fraction(const BinningGeometry& layout_, const BinningBin& bin_, const double* values_) {
-    double result{1};
-    for( std::size_t i = bin_.firstInterval; i < bin_.firstInterval + bin_.intervalCount; ++i ){
-      const auto& interval = layout_.intervals[i];
-      double value = values_[interval.variableIndex];
-      result *= GundamBinningMath::intervalFraction(interval.lowerBound, interval.upperBound,
-                                                    interval.lowerInverseWidth, interval.upperInverseWidth, value);
-      if( result == 0 ){ return 0; }
-    }
-    return result;
+    return binFraction(bin_, layout_.intervals.data(), values_);
   }
 }
 

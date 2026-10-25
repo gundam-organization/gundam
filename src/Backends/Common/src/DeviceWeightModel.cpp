@@ -1,4 +1,5 @@
 #include "DeviceWeightModel.h"
+#include "HistogramEventIndex.h"
 #include "ResponseSmoothingPacking.h"
 #include "Semantics/BackendDialSemanticsCore.h"
 
@@ -433,14 +434,9 @@ bool Backends::packDeviceWeightModel(const PropagationView& model_,
 
   packedModel_.binEventOffsets.assign(model_.totalBins + 1, 0);
   for( int iBin = 0 ; iBin < model_.totalBins ; iBin++ ){
-    packedModel_.binEventOffsets[iBin + 1] = packedModel_.binEventOffsets[iBin] + eventsPerBin[iBin];
+    packedModel_.binEventOffsets[iBin + 1] = eventsPerBin[iBin];
   }
-  std::vector<std::uint32_t> binEventFill = packedModel_.binEventOffsets;
-  packedModel_.binEventIndices.resize(model_.events.size());
-  for( const auto& event : model_.events ){
-    auto& fillIndex = binEventFill[event.globalBinIndex];
-    packedModel_.binEventIndices[fillIndex++] = std::uint32_t(event.resultIndex);
-  }
+  buildHistogramEventIndex(model_.events, packedModel_.binEventOffsets, packedModel_.binEventIndices);
 
   for( auto count : eventsPerBin ){
     packedModel_.maxEventsPerBin = std::max(packedModel_.maxEventsPerBin, count);

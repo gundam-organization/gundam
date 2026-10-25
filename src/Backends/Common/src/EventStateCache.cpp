@@ -1,4 +1,5 @@
 #include "EventStateCache.h"
+#include "DialDependencies.h"
 
 #include <algorithm>
 
@@ -17,15 +18,9 @@ void Backends::EventStateCache::build(const PropagationView& model_) {
   unique(variableDials);
   for( auto index : variableDials ){
     const auto& dial = model_.dials.at(index);
-    // Producer inputs are not evaluator inputs. Their publication generation
-    // is the dependency, including producers without backend parameter inputs.
-    if( dial.type == BackendDialType::ExternalWeight or isTableDial(dial.type) ){
-      _externalBlockIndices_.push_back(dial.externalBlockIndex);
-      continue;
-    }
-    for( std::size_t i = dial.firstInput; i < dial.firstInput + dial.inputCount; ++i ){
-      _parameterIndices_.push_back(model_.dialInputs.at(i).parameterIndex);
-    }
+    visitDialDependencies(model_, dial,
+        [this](const auto& input_){ _parameterIndices_.push_back(input_.parameterIndex); },
+        [this](std::size_t block_){ _externalBlockIndices_.push_back(block_); });
   }
   unique(_parameterIndices_);
   unique(_externalBlockIndices_);

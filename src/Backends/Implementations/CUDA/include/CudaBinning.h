@@ -64,14 +64,7 @@ namespace Backends {
       for( auto j = candidates.next(); j < sample_.endBin; j = candidates.next() ){
         ++candidates_;
         const auto& bin = bins_[j];
-        bool contains = true;
-        for( std::size_t k = bin.firstInterval; k < bin.firstInterval + bin.intervalCount; ++k ){
-          const auto& interval = intervals_[k];
-          if( not GundamBinningMath::contains(interval.lowerBound, interval.upperBound, values_[interval.variableIndex]) ){
-            contains = false; break;
-          }
-        }
-        if( contains ){ return bin.binIndex; }
+        if( BinningSemantics::containsStrictBin(bin, intervals_, values_) ){ return bin.binIndex; }
       }
       return -1;
     }
@@ -86,14 +79,7 @@ namespace Backends {
 
     GUNDAM_BACKEND_HOST_DEVICE inline double cudaBinFraction(
         const BinningBin& bin_, const BinningInterval* intervals_, const double* values_) {
-      double fraction = 1.;
-      for( std::size_t j = bin_.firstInterval; j < bin_.firstInterval + bin_.intervalCount; ++j ){
-        const auto& interval = intervals_[j];
-        fraction *= GundamBinningMath::intervalFraction(interval.lowerBound, interval.upperBound,
-            interval.lowerInverseWidth, interval.upperInverseWidth, values_[interval.variableIndex]);
-        if( fraction == 0. ){ break; }
-      }
-      return fraction;
+      return BinningSemantics::binFraction(bin_, intervals_, values_);
     }
 
     // Same event-level normalization rule as CPU: tolerate only roundoff above
@@ -117,14 +103,13 @@ namespace Backends {
         if( fraction > largest ){ largest = fraction; result.largestBin = j; }
       }
       const double tolerance = 64. * cudaBinningEpsilon * double(result.count ? result.count : 1);
-      if( not cudaBinningIsFinite(result.total) or result.total > 1. + tolerance ){
+      const auto finalized = BinningSemantics::finalizeBinningTotal(result.total, tolerance, cudaBinningIsFinite(result.total));
+      if( not finalized.isValid ){
         result.isValid = false;
         return result;
       }
-      if( result.total > 1. ){
-        result.excess = result.total - 1.;
-        result.total = 1.;
-      }
+      result.excess = finalized.excess;
+      result.total = finalized.total;
       if( result.total < 1. ){ ++result.count; }
       return result;
     }

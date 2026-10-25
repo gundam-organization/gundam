@@ -188,15 +188,7 @@ void rebin_event(
       if( position != UINT_MAX ){
         auto bin = bins[position];
         ++candidateCount;
-        bool contains = true;
-        for( uint i = bin.firstInterval; i < bin.firstInterval + bin.intervalCount; ++i ){
-          auto interval = intervals[i];
-          if( !GundamBinningMath::contains(interval.lowerBound, interval.upperBound,
-                                         variables[event.firstVariable + interval.variableIndex]) ){
-            contains = false;
-            break;
-          }
-        }
+        bool contains = BinningSemantics::containsStrictBin(bin, intervals, variables + event.firstVariable);
         if( contains ){
           eventCounts[gid] = 1;
           store_contribution(contributions, event.firstContribution, 0, oldCount,
@@ -257,10 +249,11 @@ void rebin_event(
   }
   else{
     float tolerance = 64 * FLT_EPSILON * float(max(uint(1), count));
-    if( !isfinite(float(total)) || total > 1 + tolerance ){ propagation_error(control, 2); return; }
+    auto finalized = BinningSemantics::finalizeBinningTotal(total, tolerance, isfinite(float(total)));
+    if( !finalized.isValid ){ propagation_error(control, 2); return; }
     if( total > 1 ){
-      contributions[event.firstContribution + largest].fraction -= total - 1;
-      total = 1;
+      contributions[event.firstContribution + largest].fraction -= finalized.excess;
+      total = finalized.total;
     }
     if( total < 1 ){
       store_contribution(contributions, event.firstContribution, count, oldCount,

@@ -119,12 +119,54 @@ index construction, close to the 1% baseline despite much larger proposals.
 All 277,534 events undergo rebinning per variation. Large displacements therefore
 do not remove the dominant cost of the exhaustive implementation.
 
-The next implementation adds an ordered conservative bin hierarchy to all three
-search passes and aggregates diagnostic counters per warp. It retains the stable
-contribution sort and count/allocation synchronization. Local host regressions
-pass; GPU compilation, numerical agreement and speedup require a new CC run.
-Repeat both baseline and stress commands with fresh output directories such as
-`cuda-upgrade-binning-indexed-profile` and
-`cuda-upgrade-binning-stress-indexed-profile`. Retain CPU and both CUDA cases for
-numerical comparison. Candidate counts now measure bins surviving tree pruning,
-so they intentionally differ from the exhaustive baseline.
+The indexed implementation adds an ordered conservative bin hierarchy to all
+three search passes and aggregates diagnostic counters per warp. It retains the
+stable contribution sort and count/allocation synchronization.
+
+The returned run `cuda-tests-ccl/cuda-upgrade-binning-stress-indexed-profile`
+uses the same V100 allocation (`62385404`), four host threads, overrides,
+proposal sigma, seed and 3 x 30 evaluations per scenario. The checkout commit is
+`e8feac0ea82efdf82a8da361e6b50a9947d4ecf4`. Its three cases report the same
+build-tree Python module fingerprint as the baseline; that fingerprint does not
+identify the separately loaded backend libraries. Comparing raw trials confirms
+identical proposal digests and active contribution counts between old and new
+runs for every measured local call.
+
+Both CUDA modes pass all benchmark numerical comparisons with CPU. The maximum
+likelihood, histogram/error and outside/error discrepancies are unchanged from
+the stress baseline above. This is production propagation validation, not a
+report of the dedicated GPU unit-test suite or a fit/covariance validation.
+
+| Varying pmuScale, cached CUDA | Exhaustive ms | Indexed ms | Time reduction |
+|---|---:|---:|---:|
+| Complete evaluation | 4.0760 | 2.9213 | 28.3% |
+| GPU propagation | 2.8236 | 1.6429 | 41.8% |
+| Observables and hard-bin search | 1.0061 | 0.4116 | 59.1% |
+| Fractional contributions and bin index | 1.6364 | 1.0409 | 36.4% |
+
+These are separate stage medians, not additive components of host wall time.
+The combined hierarchy/counter change gives 1.40 times the evaluation throughput;
+this run does not separate the benefits of pruning and counter aggregation.
+
+| Indexed evaluation | CPU ms | CUDA cached ms | CUDA recompute ms |
+|---|---:|---:|---:|
+| Constant parameters | 10.5424 | 1.3417 | 2.2194 |
+| Varying pmuScale | 30.0440 | 2.9213 | 3.7983 |
+
+Cached CUDA is 10.28 times faster than the current four-thread CPU reference
+for varying pmuScale; recompute is 7.91 times faster. Cached local trial medians
+are 2.926, 2.919 and 2.913 ms. CPU timings remain close to the previous run.
+The constant cached median rises from 1.2912 to 1.3417 ms (3.9%), while its GPU
+time stays approximately 0.174 ms; those calls do not execute rebinning.
+
+Median hard-search candidate counts fall from 12,277,417.5 to 840,492.5 per
+evaluation, 93.2% fewer (14.61 times fewer). This counter excludes fractional
+count/write searches and tree-bound tests. All 277,534 events are still rebinned
+per variation. Contribution capacity stays at 19.24 MiB, with identical median
+active contribution count 279,916.5, including outside remainders.
+
+The contribution/index interval remains the largest cached GPU stage: 1.04 ms,
+or a median 63.5% of GPU propagation time measured per call. A finer breakdown
+of fraction counting, writing, scans, allocation synchronization and sorting is
+needed before assigning this remaining cost to any one operation. The normal
+1% proposal workload still needs its own indexed benchmark for comparison.

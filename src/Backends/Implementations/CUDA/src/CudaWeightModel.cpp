@@ -1,5 +1,7 @@
 #include "CudaWeightModel.h"
 #include "CudaBinning.h"
+#include "DialDependencies.h"
+#include "HistogramEventIndex.h"
 #include "Semantics/BackendDialSemantics.h"
 
 #include <algorithm>
@@ -154,7 +156,8 @@ Backends::CudaWeightModel Backends::makeCudaWeightModel(const EngineView& view_,
   out.parameterDialOffsets.assign(model.parameterCount + 1, 0);
   for( const auto& dial : out.dials ){
     if( dial.type != BackendDialType::Shift and not isSurface(dial) and not isExternal(dial.type) ){
-      ++out.parameterDialOffsets[model.dialInputs[dial.firstInput].parameterIndex + 1];
+      visitDialDependencies(model, dial,
+          [&](const auto& input_){ ++out.parameterDialOffsets[input_.parameterIndex + 1]; }, [](std::size_t){});
     }
   }
   for( std::size_t i = 1; i < out.parameterDialOffsets.size(); ++i ){
@@ -165,8 +168,9 @@ Backends::CudaWeightModel Backends::makeCudaWeightModel(const EngineView& view_,
   for( std::size_t i = 0; i < out.surfaceOffset; ++i ){
     const auto& dial = out.dials[i];
     if( dial.type != BackendDialType::Shift and not isExternal(dial.type) ){
-      out.parameterDialIndices[dialPositions[model.dialInputs[dial.firstInput].parameterIndex]++]
-          = static_cast<std::uint32_t>(i);
+      visitDialDependencies(model, dial, [&](const auto& input_){
+        out.parameterDialIndices[dialPositions[input_.parameterIndex]++] = static_cast<std::uint32_t>(i);
+      }, [](std::size_t){});
     }
   }
   std::map<std::pair<std::size_t, std::size_t>, std::vector<std::uint32_t>> surfaceGroups;
@@ -183,8 +187,10 @@ Backends::CudaWeightModel Backends::makeCudaWeightModel(const EngineView& view_,
   std::map<std::size_t, std::vector<std::uint32_t>> externalGroups;
   for( std::size_t i = 0; i < out.dials.size(); ++i ){
     if( isExternal(out.dials[i].type) ){
-      externalGroups[out.dials[i].externalBlockIndex].push_back(static_cast<std::uint32_t>(i));
-      ++out.externalDialCount;
+      visitDialDependencies(model, out.dials[i], [](const auto&){}, [&](std::size_t block_){
+        externalGroups[block_].push_back(static_cast<std::uint32_t>(i));
+        ++out.externalDialCount;
+      });
     }
   }
   for( const auto& group : externalGroups ){
@@ -345,12 +351,7 @@ Backends::CudaWeightModel Backends::makeCudaWeightModel(const EngineView& view_,
     require(event.globalBinIndex < model.totalBins, "event global bin is out of range.");
     if( event.globalBinIndex >= 0 ){ ++out.binOffsets[std::size_t(event.globalBinIndex) + 1]; }
   }
-  for( std::size_t i = 1; i < out.binOffsets.size(); ++i ){ out.binOffsets[i] += out.binOffsets[i - 1]; }
-  out.binEvents.resize(out.binOffsets.back());
-  auto positions = out.binOffsets;
-  for( const auto& event : model.events ){
-    if( event.globalBinIndex >= 0 ){ out.binEvents[positions[event.globalBinIndex]++] = event.resultIndex; }
-  }
+  buildHistogramEventIndex(model.events, out.binOffsets, out.binEvents);
   for( const auto& sample : view_.likelihood.samples ){
     require(sample.binOffset >= 0 and std::size_t(sample.binOffset) <= std::size_t(model.totalBins)
             and sample.dataSums.size() <= std::size_t(model.totalBins) - std::size_t(sample.binOffset),

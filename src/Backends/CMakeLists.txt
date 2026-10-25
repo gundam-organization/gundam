@@ -33,6 +33,7 @@ if(APPLE)
   set_property(
       DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
       ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/DeviceMath/DoubleFloat.h
+      ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/Semantics/BackendBinningSemantics.h
       ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/Semantics/BackendVariableResponse.h
       ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/Semantics/BackendResponseSmoothing.h
       ${CMAKE_SOURCE_DIR}/src/Utils/include/DeviceMath/SharedBinningMath.h
@@ -50,6 +51,7 @@ if(APPLE)
       ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/MPS/src/MpsBackendKernelSource.h.in
   )
   file(READ ${CMAKE_SOURCE_DIR}/src/Utils/include/DeviceMath/SharedBinningMath.h MPS_SHARED_BINNING_MATH)
+  file(READ ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/Semantics/BackendBinningSemantics.h MPS_BINNING_SEMANTICS)
   file(READ ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/Semantics/BackendVariableResponse.h MPS_SHARED_VARIABLE_RESPONSE)
   file(READ ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/Semantics/BackendResponseSmoothing.h MPS_RESPONSE_SMOOTHING)
   file(READ ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/DevicePropagationTypes.h MPS_PROPAGATION_TYPES)
@@ -76,11 +78,14 @@ if(APPLE)
 endif()
 
 set(HEADERS
+    ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/DialDependencies.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/HistogramEventIndex.h
     ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/CUDA/include/CudaBackend.h
     ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/CUDA/include/CudaWeightModel.h
     ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/CUDA/include/CudaBinning.h
     ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/Semantics/BackendResponseSmoothing.h
     ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/ResponseSmoothingPacking.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/Semantics/BackendBinningSemantics.h
     ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/Semantics/BackendVariableResponse.h
     ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/DeviceMath/DoubleFloat.h
     ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/BinningGeometry.h

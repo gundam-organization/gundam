@@ -225,9 +225,10 @@ CPU comparisons for Pmu migration with 1 MeV smoothing: cached CUDA takes
 (7.30 times faster). Observable/search and fractional index construction account
 for 93.3% of GPU propagation time in that workload.
 An ordered bin hierarchy now prunes hard/fractional searches, and diagnostic
-counters aggregate per warp. Host equivalence tests pass; GPU validation and
-production timings for this optimization are pending (see the
-[stress baseline and retest](CudaUpgradeBinningBenchmark.md#stress-baseline-and-indexed-search-retest)).
+counters aggregate per warp. The CC stress production run passes CPU comparisons
+and reduces cached evaluations from 4.08 to 2.92 ms (28.3% less time), versus
+30.04 ms on four CPU threads (10.28 times faster). See the
+[stress baseline and indexed results](CudaUpgradeBinningBenchmark.md#stress-baseline-and-indexed-search-retest).
 
 The only MPS backend configuration option is `propagationMode`: `cachedResponses`
 reuses eligible responses between propagations, while `recomputeResponses`
