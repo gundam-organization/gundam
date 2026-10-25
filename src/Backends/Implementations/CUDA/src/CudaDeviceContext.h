@@ -12,6 +12,7 @@ namespace Backends {
   struct PropagationInputs;
   struct EventState;
   struct BackendTimingSummary;
+  struct BackendResourceUsage;
   struct BackendDeviceView;
 
   // Private runtime boundary, compiled by nvcc without ROOT headers.
@@ -31,6 +32,7 @@ namespace Backends {
     std::size_t readEventState(EventState& state_);
     void invalidate();
     [[nodiscard]] BackendDeviceView getDeviceView() const;
+    [[nodiscard]] BackendResourceUsage getResourceUsage() const;
 
   private:
     struct Impl;

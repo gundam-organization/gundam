@@ -84,6 +84,7 @@ Backends::PropagationToken Backends::MpsBackend::requestPropagation(const Propag
   inputs_.validate(_impl_->model);
 
   _impl_->resetResult();
+  const auto propagationStart = std::chrono::steady_clock::now();
 
   if( not _impl_->isAvailable ){
     _impl_->lastResult.status.backend = BackendStatus::Unavailable;
@@ -111,6 +112,7 @@ Backends::PropagationToken Backends::MpsBackend::requestPropagation(const Propag
     if( _impl_->likelihoodModel.empty() ){ status.statLikelihood = OutputState::Failed; }
     else{ _impl_->calculateLikelihood(); status.statLikelihood = OutputState::ReadyOnHost; }
     status.backend = BackendStatus::Ready;
+    _impl_->lastTiming.propagationWallSeconds = secondsSince(propagationStart);
     return _impl_->lastResult.token;
   }
 
@@ -145,6 +147,7 @@ Backends::PropagationToken Backends::MpsBackend::requestPropagation(const Propag
   }
 
   _impl_->lastResult.status.backend = BackendStatus::Ready;
+  _impl_->lastTiming.propagationWallSeconds = secondsSince(propagationStart);
   return _impl_->lastResult.token;
 }
 
@@ -375,4 +378,16 @@ std::string Backends::MpsBackend::getDiagnosticStageGpuSeconds() const {
   const auto& timings = _impl_->useEventPropagation ? _impl_->eventPropagation->getDiagnosticStageGpuSeconds()
                                                   : _impl_->diagnosticStageGpuSeconds;
   return JsonType(timings).dump();
+}
+
+Backends::BackendResourceUsage Backends::MpsBackend::getResourceUsage() const {
+  BackendResourceUsage usage;
+  if( not _impl_->isAvailable or not _impl_->isBuilt ){ return usage; }
+  usage.available = true;
+  usage.deviceName = [[_impl_->device name] UTF8String];
+  usage.processMemory = true;
+  usage.unifiedMemory = _impl_->device.hasUnifiedMemory;
+  usage.allocatedBytes = _impl_->device.currentAllocatedSize;
+  usage.recommendedDeviceBytes = _impl_->device.recommendedMaxWorkingSetSize;
+  return usage;
 }

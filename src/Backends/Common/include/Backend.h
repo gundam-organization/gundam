@@ -46,6 +46,10 @@ namespace Backends {
       return empty;
     }
     [[nodiscard]] virtual BackendDeviceView getDeviceView(const PropagationToken&) const { return {}; }
+    [[nodiscard]] virtual BackendResourceUsage getResourceUsage() const { return {}; }
+    [[nodiscard]] std::string getMonitorLine() const {
+      return formatBackendMonitorLine(getName(), getResourceUsage(), getLastTimingSummary());
+    }
     // Additional monitor columns as (title, formatted value). Empty hides the breakdown.
     [[nodiscard]] virtual std::vector<std::pair<std::string, std::string>> getMonitorColumns() const { return {}; }
     [[nodiscard]] virtual BackendTimingSummary getLastTimingSummary() const { return {}; }

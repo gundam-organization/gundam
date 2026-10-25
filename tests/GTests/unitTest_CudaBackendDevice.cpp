@@ -31,6 +31,15 @@ TEST(CudaBackendDevice, BuildsSharedModelAndRestoresDeviceSelection) {
     ASSERT_EQ(cudaGetDeviceProperties(&properties, 0), cudaSuccess);
     EXPECT_EQ(backend.getCapabilities().deviceName, properties.name);
     EXPECT_TRUE(backend.getCapabilities().supportsEventWeights);
+    const auto resources = backend.getResourceUsage();
+    EXPECT_TRUE(resources.available);
+    EXPECT_FALSE(resources.processMemory);
+    EXPECT_GT(resources.allocatedBytes, 0);
+    EXPECT_TRUE(resources.hasDeviceMemoryInfo);
+    EXPECT_GT(resources.totalDeviceBytes, 0);
+    EXPECT_LE(resources.freeDeviceBytes, resources.totalDeviceBytes);
+    EXPECT_EQ(resources.deviceName, properties.name);
+    EXPECT_NE(backend.getMonitorLine().find("Memory:"), std::string::npos);
     int currentDevice = -1;
     ASSERT_EQ(cudaGetDevice(&currentDevice), cudaSuccess);
     EXPECT_EQ(currentDevice, deviceCount - 1);

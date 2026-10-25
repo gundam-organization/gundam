@@ -95,6 +95,7 @@ public:
 #endif
 
   [[nodiscard]] std::string getPropagationMonitorTitle() const;
+  [[nodiscard]] std::string getBackendMonitorLine() const;
   [[nodiscard]] std::vector<std::pair<std::string, std::string>> getMonitorColumns() const;
 
   // Core

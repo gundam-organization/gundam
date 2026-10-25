@@ -210,7 +210,8 @@ Backends::PropagationToken Backends::CudaBackend::requestPropagation(const Propa
     _impl_->timing.splineScalarCount = view.propagation.dialPayloads.size();
     auto& totals = _impl_->totals;
     ++totals.propagationCount;
-    totals.propagationSeconds += elapsed(start);
+    _impl_->timing.propagationWallSeconds = elapsed(start);
+    totals.propagationSeconds += _impl_->timing.propagationWallSeconds;
     totals.cachedDialSeconds += _impl_->timing.cachedDialStageSeconds;
     totals.eventWeightsSeconds += _impl_->timing.eventWeightsStageSeconds;
     totals.histogramSeconds += _impl_->timing.histogramStageSeconds;
@@ -328,3 +329,10 @@ Backends::BackendDeviceView Backends::CudaBackend::getDeviceView(const Propagati
 }
 Backends::BackendTimingSummary Backends::CudaBackend::getLastTimingSummary() const { return _impl_->timing; }
 Backends::BackendTimingTotals Backends::CudaBackend::getTimingTotals() const { return _impl_->totals; }
+
+Backends::BackendResourceUsage Backends::CudaBackend::getResourceUsage() const {
+#ifdef GUNDAM_USING_CUDA
+  if( _impl_->context ){ return _impl_->context->getResourceUsage(); }
+#endif
+  return {};
+}

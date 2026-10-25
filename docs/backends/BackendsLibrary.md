@@ -270,6 +270,19 @@ times; MPS uses the default aggregate display. The original propagator provides
 its own dial, reweighting and histogram or CacheManager timings. The table builder
 does not depend on individual backend types.
 
+GPU backends add a compact line immediately before the timing table:
+`Backend MPS (Apple M4 Max) / Memory: 851MB / On-device time: 51.5%`.
+`Memory` reports CUDA backend buffer capacities, or Metal resources allocated
+through the device in this process (including CPU/GPU shared buffers). It is
+not a measurement of physical GPU residency. Memory queries run only on monitor
+refresh. Free-memory and recommended-budget details are omitted from this line.
+
+`On-device time` is the last GPU command/stream interval as a percentage of the
+last backend request's wall time (including host likelihood). These intervals
+include transfers and can contain idle gaps; the percentage is not hardware
+utilization, occupancy, or computational efficiency. No extra GPU profiling
+passes or explicit synchronization are introduced for the monitor.
+
 ## Model, inputs and outputs
 
 `EngineLayout` separates a flat numerical model (`EngineView`) from bindings to

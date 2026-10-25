@@ -581,6 +581,7 @@ PYBIND11_MODULE(GUNDAM, module) {
   .def_readonly("eventStateReadbackSeconds", &Backends::BackendTimingSummary::eventStateReadbackSeconds)
   .def_readonly("histogramReadbackBytes", &Backends::BackendTimingSummary::histogramReadbackBytes)
   .def_readonly("devicePropagationSeconds", &Backends::BackendTimingSummary::devicePropagationSeconds)
+  .def_readonly("propagationWallSeconds", &Backends::BackendTimingSummary::propagationWallSeconds)
   .def_readonly("eventStateReadbackBytes", &Backends::BackendTimingSummary::eventStateReadbackBytes)
   .def_readonly("eventWeightReadbackBytes", &Backends::BackendTimingSummary::eventWeightReadbackBytes)
   .def_readonly("contributionBufferBytes", &Backends::BackendTimingSummary::contributionBufferBytes)
@@ -618,6 +619,9 @@ PYBIND11_MODULE(GUNDAM, module) {
   }, pybind11::arg("type"), pybind11::arg("backendConfig") = JsonType::object())
   .def("materialize", [](Backends::BackendManager& manager_, const std::string& output_){
     manager_.materialize(Backends::OutputRequest::toEnum(output_));
+  })
+  .def("getMonitorLine", [](const Backends::BackendManager& manager_){
+    return manager_.hasBackend() ? manager_.getBackend()->getMonitorLine() : std::string{};
   })
   .def("getLastTimingSummary", [](const Backends::BackendManager& manager_){
     LogThrowIf(not manager_.hasBackend(), "No backend initialized.");

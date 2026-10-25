@@ -216,6 +216,8 @@ double MinimizerBase::evalFit( const double* parArray_ ){
       ssHeader << std::endl << "RAM: " << GundamUtils::getProcessMemoryUsageSummary();
       double cpuPercent = GenericToolbox::getCpuUsageByProcess();
       ssHeader << " / CPU: " << cpuPercent << "% / " << cpuPercent / GundamGlobals::getNbCpuThreads() << "% efficiency";
+      const auto backendLine = getOwner().getBackendMonitorLine();
+      if( not backendLine.empty() ){ ssHeader << std::endl << backendLine; }
       ssHeader << std::endl << "Avg log-likelihood computation time: " << _monitor_.evalLlhTimer;
       ssHeader << std::endl;
 

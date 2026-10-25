@@ -383,6 +383,13 @@ std::string FitterEngine::getPropagationMonitorTitle() const {
   return "Propagator";
 }
 
+std::string FitterEngine::getBackendMonitorLine() const {
+#ifdef GUNDAM_USING_BACKENDS
+  if( _backendsManager_.hasBackend() ){ return _backendsManager_.getBackend()->getMonitorLine(); }
+#endif
+  return {};
+}
+
 std::vector<std::pair<std::string, std::string>> FitterEngine::getMonitorColumns() const {
 #ifdef GUNDAM_USING_BACKENDS
   if( _backendsManager_.hasBackend() ){ return _backendsManager_.getBackend()->getMonitorColumns(); }

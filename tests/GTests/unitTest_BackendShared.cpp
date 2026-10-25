@@ -2,6 +2,9 @@
 #include "DialDependencies.h"
 #include "DialDependencyGroups.h"
 #include "HistogramEventIndex.h"
+#ifdef __APPLE__
+#include "MpsBackend.h"
+#endif
 
 #include <gtest/gtest.h>
 
@@ -182,3 +185,64 @@ TEST(BackendSharedDependencies, EmptyAndConstantModelsHaveEmptyGroups) {
   EXPECT_TRUE(groups.multiParameterDials.empty());
   EXPECT_TRUE(groups.externalDials.empty());
 }
+
+TEST(BackendMonitor, LabelsMemoryScopeAndGpuTimeShare) {
+  using namespace Backends;
+  BackendTimingSummary timing;
+  EXPECT_TRUE(formatBackendMonitorLine("CPU", {}, timing).empty());
+  BackendResourceUsage usage;
+  usage.available = true;
+  usage.deviceName = "Test device";
+  usage.allocatedBytes = 1024 * 1024;
+  usage.hasDeviceMemoryInfo = true;
+  usage.freeDeviceBytes = 3 * 1024 * 1024;
+  usage.totalDeviceBytes = 4 * 1024 * 1024;
+  timing.devicePropagationSeconds = .002;
+  timing.propagationWallSeconds = .008;
+  const auto cuda = formatBackendMonitorLine("CUDA/cachedResponses", usage, timing);
+  EXPECT_EQ(cuda, "Backend CUDA (Test device) / Memory: 1.05MB / On-device time: 25.0%");
+
+  usage.processMemory = usage.unifiedMemory = true;
+  usage.hasDeviceMemoryInfo = false;
+  usage.recommendedDeviceBytes = 4 * 1024 * 1024;
+  const auto mps = formatBackendMonitorLine("MPS/cachedResponses", usage, {});
+  EXPECT_EQ(mps, "Backend MPS (Test device) / Memory: 1.05MB");
+
+  timing.devicePropagationSeconds = .02;
+  EXPECT_NE(formatBackendMonitorLine("MPS", usage, timing).find("On-device time: n/a"), std::string::npos);
+  timing.devicePropagationSeconds = std::numeric_limits<double>::quiet_NaN();
+  EXPECT_EQ(formatBackendMonitorLine("MPS", usage, timing).find("On-device time:"), std::string::npos);
+}
+
+#ifdef __APPLE__
+TEST(BackendMonitor, MetalResourceQueriesPreservePropagationResultsInBothModes) {
+  using namespace Backends;
+  for( const auto* mode : {"cachedResponses", "recomputeResponses"} ){
+    MpsBackend backend;
+    if( backend.getCapabilities().deviceName == "Metal unavailable" ){ GTEST_SKIP() << "Metal unavailable"; }
+    EXPECT_TRUE(backend.getMonitorLine().empty());
+    backend.configure(ConfigReader(JsonType{{"propagationMode", mode}}));
+    EngineView view;
+    view.propagation.totalBins = 1;
+    EventView event;
+    event.globalBinIndex = event.binIndex = 0;
+    view.propagation.events = {event};
+    view.propagation.eventWeights = {{2., 0, 0}};
+    backend.build(view);
+    auto usage = backend.getResourceUsage();
+    ASSERT_TRUE(usage.available);
+    EXPECT_TRUE(usage.processMemory);
+    EXPECT_GT(usage.allocatedBytes, 0);
+    EXPECT_GT(usage.recommendedDeviceBytes, 0);
+    EXPECT_FALSE(usage.deviceName.empty());
+    EXPECT_EQ(backend.getMonitorLine().find("On-device time:"), std::string::npos);
+    const auto token = backend.requestPropagation({});
+    EXPECT_TRUE(backend.isReady(token));
+    EXPECT_GT(backend.getLastTimingSummary().propagationWallSeconds, 0.);
+    EXPECT_NE(backend.getMonitorLine().find("On-device time:"), std::string::npos);
+    EXPECT_TRUE(backend.isReady(token));
+    backend.materialize(token, OutputRequest::EventWeights);
+    EXPECT_EQ(backend.getEventWeightsHostView(token), (std::vector<double>{2.}));
+  }
+}
+#endif

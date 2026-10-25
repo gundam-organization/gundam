@@ -88,6 +88,8 @@ ENUM_FIELD( Unavailable )
     double commandEncodeSeconds{0};
     double deviceWaitSeconds{0};
     double devicePropagationSeconds{0};
+    // Wall time of the last successful request, including host likelihood.
+    double propagationWallSeconds{0};
     double eventStateReadbackSeconds{0};
     std::size_t eventStateReadbackBytes{0};
     std::size_t contributionBufferBytes{0};
@@ -113,6 +115,21 @@ ENUM_FIELD( Unavailable )
     double histogramSeconds{0};
     double likelihoodSeconds{0};
   };
+
+  // Collected only when the fit monitor refreshes, never in GPU kernels.
+  struct BackendResourceUsage {
+    bool available{false};
+    bool unifiedMemory{false};
+    bool processMemory{false}; // Metal reports all allocations made through this device.
+    std::string deviceName{};
+    std::size_t allocatedBytes{0}; // CUDA backend buffers, or Metal device allocations in this process.
+    bool hasDeviceMemoryInfo{false};
+    std::size_t freeDeviceBytes{0}, totalDeviceBytes{0}; // Device-wide CUDA snapshot.
+    std::size_t recommendedDeviceBytes{0}; // Metal working-set recommendation, not free VRAM.
+  };
+
+  [[nodiscard]] std::string formatBackendMonitorLine(const std::string& backend_,
+      const BackendResourceUsage& usage_, const BackendTimingSummary& timing_);
 
   struct PropagationToken {
     std::uint64_t id{0};

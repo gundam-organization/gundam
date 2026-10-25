@@ -77,6 +77,11 @@ namespace {
     }
   };
 
+  template<typename... Buffers>
+  std::size_t allocatedBufferBytes(const Buffers&... buffers_) {
+    return (std::size_t(0) + ... + (buffers_.size * sizeof(*buffers_.data)));
+  }
+
   struct WeightBuffers {
     DeviceBuffer<Backends::BackendEventWeightDescriptor> events;
     DeviceBuffer<Backends::BackendDialDescriptor> dials;
@@ -948,4 +953,29 @@ Backends::BackendDeviceView Backends::CudaDeviceContext::getDeviceView() const {
   out.histSumSquares = b.sumSquares.data;
   out.histogramBytes = b.histogramBins * sizeof(double);
   return out;
+}
+
+Backends::BackendResourceUsage Backends::CudaDeviceContext::getResourceUsage() const {
+  BackendResourceUsage usage;
+  if( not _impl_->buffers ){ return usage; }
+  usage.available = true;
+  usage.deviceName = _impl_->deviceName;
+  const auto& b = *_impl_->buffers;
+  usage.allocatedBytes = allocatedBufferBytes(
+      b.events, b.dials, b.inputs, b.payloads, b.parameters,
+      b.responses, b.previousInputs, b.previousSecondInputs, b.weights, b.sums,
+      b.sumSquares, b.dialIndices, b.parameterDialIndices, b.responseUpdates, b.externalResponseUpdates,
+      b.tableTerms, b.externalBlocks, b.externalWeights, b.binOffsets, b.binEvents,
+      b.error, b.stateEvents, b.samples, b.bins, b.intervals,
+      b.binningNodes, b.binningBounds, b.variableResponses, b.variableDialIndices, b.variables,
+      b.nextVariables, b.hostVariables, b.hostEdits, b.stateBins, b.nextStateBins,
+      b.histogramKeys, b.changedSamples, b.stateCounters, b.contributionCounts, b.contributionOffsets,
+      b.nextContributionOffsets, b.binningResults, b.contributions, b.nextContributions, b.sortedContributions);
+  // Monitoring is best effort: a telemetry query must not abort a fit.
+  try{
+    DeviceScope scope(_impl_->deviceIndex);
+    usage.hasDeviceMemoryInfo = cudaMemGetInfo(&usage.freeDeviceBytes, &usage.totalDeviceBytes) == cudaSuccess;
+  }
+  catch( const std::runtime_error& ){}
+  return usage;
 }

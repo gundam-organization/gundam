@@ -52,6 +52,7 @@ ENUM_FIELD( recomputeResponses )
     [[nodiscard]] const std::vector<double>& getOutsideSumsHostView(const PropagationToken& token_) const override;
     [[nodiscard]] const std::vector<double>& getOutsideSumSquaresHostView(const PropagationToken& token_) const override;
     [[nodiscard]] BackendDeviceView getDeviceView(const PropagationToken& token_) const override;
+    [[nodiscard]] BackendResourceUsage getResourceUsage() const override;
     [[nodiscard]] BackendTimingSummary getLastTimingSummary() const override;
 
   private:
