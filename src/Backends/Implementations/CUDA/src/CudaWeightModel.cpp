@@ -1,16 +1,16 @@
 #include "CudaWeightModel.h"
 #include "CudaBinning.h"
-#include "DialDependencies.h"
+#include "DialDependencyGroups.h"
 #include "HistogramEventIndex.h"
 #include "Semantics/BackendDialSemantics.h"
 
 #include <algorithm>
 #include <cmath>
 #include <limits>
-#include <map>
 #include <stdexcept>
 #include <string>
 #include <type_traits>
+#include <utility>
 
 namespace {
   void require(bool condition_, const char* message_) {
@@ -153,50 +153,19 @@ Backends::CudaWeightModel Backends::makeCudaWeightModel(const EngineView& view_,
     }
   }
   else{ out.dials = model.dials; }
-  out.parameterDialOffsets.assign(model.parameterCount + 1, 0);
-  for( const auto& dial : out.dials ){
-    if( dial.type != BackendDialType::Shift and not isSurface(dial) and not isExternal(dial.type) ){
-      visitDialDependencies(model, dial,
-          [&](const auto& input_){ ++out.parameterDialOffsets[input_.parameterIndex + 1]; }, [](std::size_t){});
-    }
-  }
-  for( std::size_t i = 1; i < out.parameterDialOffsets.size(); ++i ){
-    out.parameterDialOffsets[i] += out.parameterDialOffsets[i - 1];
-  }
-  out.parameterDialIndices.resize(out.parameterDialOffsets.back());
-  auto dialPositions = out.parameterDialOffsets;
-  for( std::size_t i = 0; i < out.surfaceOffset; ++i ){
-    const auto& dial = out.dials[i];
-    if( dial.type != BackendDialType::Shift and not isExternal(dial.type) ){
-      visitDialDependencies(model, dial, [&](const auto& input_){
-        out.parameterDialIndices[dialPositions[input_.parameterIndex]++] = static_cast<std::uint32_t>(i);
-      }, [](std::size_t){});
-    }
-  }
-  std::map<std::pair<std::size_t, std::size_t>, std::vector<std::uint32_t>> surfaceGroups;
-  for( std::size_t i = out.surfaceOffset; i < out.dials.size(); ++i ){
-    const auto first = model.dialInputs[out.dials[i].firstInput].parameterIndex;
-    const auto second = model.dialInputs[out.dials[i].firstInput + 1].parameterIndex;
-    surfaceGroups[{std::min(first, second), std::max(first, second)}].push_back(static_cast<std::uint32_t>(i));
-  }
-  for( const auto& group : surfaceGroups ){
+  auto groups = buildDialDependencyGroups</*uniqueMultiParameters=*/false>(model, out.dials);
+  out.parameterDialOffsets = std::move(groups.parameterOffsets);
+  out.parameterDialIndices = std::move(groups.parameterDialIndices);
+  for( const auto& group : groups.multiParameterDials ){
     const auto first = out.parameterDialIndices.size();
     out.parameterDialIndices.insert(out.parameterDialIndices.end(), group.second.begin(), group.second.end());
-    out.surfaceGroups.push_back({group.first.first, group.first.second, first, out.parameterDialIndices.size()});
+    out.surfaceGroups.push_back({group.first[0], group.first[1], first, out.parameterDialIndices.size()});
   }
-  std::map<std::size_t, std::vector<std::uint32_t>> externalGroups;
-  for( std::size_t i = 0; i < out.dials.size(); ++i ){
-    if( isExternal(out.dials[i].type) ){
-      visitDialDependencies(model, out.dials[i], [](const auto&){}, [&](std::size_t block_){
-        externalGroups[block_].push_back(static_cast<std::uint32_t>(i));
-        ++out.externalDialCount;
-      });
-    }
-  }
-  for( const auto& group : externalGroups ){
+  for( const auto& group : groups.externalDials ){
     const auto first = out.parameterDialIndices.size();
     out.parameterDialIndices.insert(out.parameterDialIndices.end(), group.second.begin(), group.second.end());
     out.externalGroups.push_back({group.first, first, out.parameterDialIndices.size()});
+    out.externalDialCount += group.second.size();
   }
   out.externalWeightBlocks = model.externalWeightBlocks;
   out.externalWeightCount = externalWeightCount;

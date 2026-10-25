@@ -1,10 +1,11 @@
 #include "MpsEventPropagation.h"
 #include "MpsBackendInternal.h"
-#include "DialDependencies.h"
+#include "DialDependencyGroups.h"
 
 #include <algorithm>
 #include <stdexcept>
 #include <type_traits>
+#include <utility>
 
 namespace {
 const char* const kDiagnosticKernelNames[]{"evaluate_propagation_dials", "propagate_event_state", "rebin_events", "clear_contribution_counts",
@@ -132,35 +133,21 @@ void Backends::MpsEventPropagation::buildDialCache() {
   _cachedExternalGenerations_.clear();
   _dialGroups_.clear();
   _multiDialGroups_.clear();
-  std::map<std::vector<std::size_t>, std::vector<DeviceIndex>> multiGroups;
   _weightParameters_.clear();
   _weightExternalBlocks_.clear();
-  const auto parameterCount = model.parameterCount;
-  std::vector<std::vector<DeviceIndex>> groups(parameterCount + model.externalWeightBlocks.size());
-  for( std::size_t i = 0; i < model.dials.size(); ++i ){
-    const auto& dial = model.dials[i];
-    if( dial.type == BackendDialType::Shift ){ continue; }
-    if( dial.inputCount > 1 and dial.type != BackendDialType::ExternalWeight ){
-      std::vector<std::size_t> dependencies;
-      visitDialDependencies(model, dial,
-          [&](const auto& input_){ dependencies.push_back(input_.parameterIndex); }, [](std::size_t){});
-      std::sort(dependencies.begin(), dependencies.end());
-      dependencies.erase(std::unique(dependencies.begin(), dependencies.end()), dependencies.end());
-      multiGroups[dependencies].push_back(DeviceIndex(i));
-      continue;
-    }
-    auto dependency = dial.type == BackendDialType::ExternalWeight
-        ? parameterCount + dial.externalBlockIndex : std::size_t(_packed_.dials[i].parameterIndex);
-    groups.at(dependency).push_back(DeviceIndex(i));
+  auto groups = buildDialDependencyGroups</*uniqueMultiParameters=*/true, DeviceIndex>(model, model.dials);
+  std::vector<DeviceIndex> indices = std::move(groups.parameterDialIndices);
+  for( std::size_t parameter = 0; parameter < model.parameterCount; ++parameter ){
+    const auto first = groups.parameterOffsets[parameter];
+    const auto count = groups.parameterOffsets[parameter + 1] - first;
+    if( count == 0 ){ continue; }
+    _dialGroups_.push_back({parameter, first, count, false});
   }
-  std::vector<DeviceIndex> indices;
-  for( std::size_t i = 0; i < groups.size(); ++i ){
-    if( groups[i].empty() ){ continue; }
-    _dialGroups_.push_back({i < parameterCount ? i : i - parameterCount,
-                           indices.size(), groups[i].size(), i >= parameterCount});
-    indices.insert(indices.end(), groups[i].begin(), groups[i].end());
+  for( const auto& group : groups.externalDials ){
+    _dialGroups_.push_back({group.first, indices.size(), group.second.size(), true});
+    indices.insert(indices.end(), group.second.begin(), group.second.end());
   }
-  for( const auto& group : multiGroups ){
+  for( const auto& group : groups.multiParameterDials ){
     _multiDialGroups_.push_back({group.first, indices.size(), group.second.size()});
     indices.insert(indices.end(), group.second.begin(), group.second.end());
   }

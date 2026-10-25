@@ -1,5 +1,6 @@
 #include "BinningGeometry.h"
 #include "DialDependencies.h"
+#include "DialDependencyGroups.h"
 #include "HistogramEventIndex.h"
 
 #include <gtest/gtest.h>
@@ -112,4 +113,79 @@ void checkStableHistogramIndex() {
 TEST(BackendSharedHistogramIndex, PreservesTraversalOrderForBothIndexWidths) {
   checkStableHistogramIndex<std::uint32_t>();
   checkStableHistogramIndex<std::size_t>();
+}
+
+TEST(BackendSharedDependencies, GroupsPreserveSlotsAndBackendSpecificRepeatedParameters) {
+  using namespace Backends;
+  PropagationView model;
+  model.parameterCount = 5;
+  model.dialInputs = {{3}, {1}, {1}, {3}, {2}, {2}, {0}, {2}};
+  auto add = [&](BackendDialType type_, std::size_t first_, std::size_t count_, std::size_t block_ = 0){
+    BackendDialDescriptor dial;
+    dial.type = type_;
+    dial.firstInput = first_;
+    dial.inputCount = count_;
+    dial.externalBlockIndex = block_;
+    model.dials.push_back(dial);
+  };
+  add(BackendDialType::Bilinear, 0, 2);
+  add(BackendDialType::Norm, 0, 1);
+  add(BackendDialType::ExternalWeight, 0, 2, 2);
+  add(BackendDialType::Bicubic, 2, 2); // Same dependency pair, reversed input order.
+  add(BackendDialType::Shift, 99, 1); // Constant payloads have no input dependency.
+  add(BackendDialType::Bilinear, 4, 2); // Repeated parameter remains a multi-input group.
+  add(BackendDialType::Norm, 6, 1);
+  add(BackendDialType::Tabulated, 4, 2, 0); // Producer inputs must not enter parameter groups.
+  add(BackendDialType::Norm, 7, 1);
+  add(BackendDialType::ExternalWeight, 0, 0, 2);
+  add(BackendDialType::Bicubic, 4, 2);
+
+  const auto cuda = buildDialDependencyGroups<false>(model, model.dials);
+  const auto mps = buildDialDependencyGroups<true>(model, model.dials);
+  auto checkCommonGroups = [](const auto& value_){
+    const auto* groups = &value_;
+    EXPECT_EQ(groups->parameterOffsets, (std::vector<std::size_t>{0, 1, 1, 2, 3, 3}));
+    EXPECT_EQ(groups->parameterDialIndices, (std::vector<std::uint32_t>{6, 8, 1}));
+    ASSERT_EQ(groups->externalDials.size(), 2);
+    EXPECT_EQ(groups->externalDials.at(0), (std::vector<std::uint32_t>{7}));
+    EXPECT_EQ(groups->externalDials.at(2), (std::vector<std::uint32_t>{2, 9}));
+    ASSERT_EQ(groups->multiParameterDials.size(), 2);
+    EXPECT_EQ(groups->multiParameterDials.at({1, 3}), (std::vector<std::uint32_t>{0, 3}));
+  };
+  checkCommonGroups(cuda);
+  checkCommonGroups(mps);
+  EXPECT_EQ(cuda.multiParameterDials.at({2, 2}), (std::vector<std::uint32_t>{5, 10}));
+  EXPECT_EQ(mps.multiParameterDials.at({2}), (std::vector<std::uint32_t>{5, 10}));
+  EXPECT_EQ(model.dialInputs[0].parameterIndex, 3);
+  EXPECT_EQ(model.dialInputs[1].parameterIndex, 1);
+
+  // Packing may reorder descriptors before grouping; slots must refer to the
+  // supplied descriptors, independently of their position in the source model.
+  const std::vector<BackendDialDescriptor> reordered{
+      model.dials[9], model.dials[6], model.dials[5], model.dials[0], model.dials[3]};
+  const auto remapped = buildDialDependencyGroups<false, std::size_t>(model, reordered);
+  EXPECT_EQ(remapped.parameterOffsets, (std::vector<std::size_t>{0, 1, 1, 1, 1, 1}));
+  EXPECT_EQ(remapped.parameterDialIndices, (std::vector<std::size_t>{1}));
+  EXPECT_EQ(remapped.externalDials.at(2), (std::vector<std::size_t>{0}));
+  EXPECT_EQ(remapped.multiParameterDials.at({2, 2}), (std::vector<std::size_t>{2}));
+  EXPECT_EQ(remapped.multiParameterDials.at({1, 3}), (std::vector<std::size_t>{3, 4}));
+}
+
+TEST(BackendSharedDependencies, EmptyAndConstantModelsHaveEmptyGroups) {
+  using namespace Backends;
+  PropagationView model;
+  const auto empty = buildDialDependencyGroups<true>(model, model.dials);
+  EXPECT_EQ(empty.parameterOffsets, (std::vector<std::size_t>{0}));
+  EXPECT_TRUE(empty.parameterDialIndices.empty());
+  EXPECT_TRUE(empty.multiParameterDials.empty());
+  EXPECT_TRUE(empty.externalDials.empty());
+  model.parameterCount = 3;
+  BackendDialDescriptor constant;
+  constant.type = BackendDialType::Shift;
+  model.dials.push_back(constant);
+  const auto groups = buildDialDependencyGroups<false>(model, model.dials);
+  EXPECT_EQ(groups.parameterOffsets, (std::vector<std::size_t>{0, 0, 0, 0}));
+  EXPECT_TRUE(groups.parameterDialIndices.empty());
+  EXPECT_TRUE(groups.multiParameterDials.empty());
+  EXPECT_TRUE(groups.externalDials.empty());
 }
