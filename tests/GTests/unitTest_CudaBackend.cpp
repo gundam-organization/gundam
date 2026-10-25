@@ -1,3 +1,4 @@
+#include "CudaBinningTestModel.h"
 #include "CudaBackend.h"
 #include "BackendFactory.h"
 #include "BackendManager.h"
@@ -676,6 +677,39 @@ TEST(CudaBinning, AnalyticFractionsOutsideAndRoundoffNormalization) {
   EXPECT_FALSE(Semantics::analyzeCudaBinning(sample, bins.data(), intervals.data(), &x).isValid);
   x = std::numeric_limits<double>::quiet_NaN();
   EXPECT_FALSE(Semantics::analyzeCudaBinning(sample, bins.data(), intervals.data(), &x).isValid);
+}
+
+TEST(CudaBinning, HierarchyFixtureHasValidFractionsForLargeDisplacements) {
+  using namespace Backends;
+  const auto view = Testing::makeCudaBinningHierarchyTestModel();
+  const auto model = makeCudaWeightModel(view);
+  ASSERT_EQ(model.stateEvents.size(), 521);
+  for( double scale : {1., .01, .5, 1., 2.5, 100., 1.} ){
+    SCOPED_TRACE(scale);
+    for( const auto& event : model.stateEvents ){
+      SCOPED_TRACE(event.resultIndex);
+      const double point[]{scale * model.variableValues[event.firstVariable],
+                           model.variableValues[event.firstVariable + 1]};
+      const auto& sample = model.samples[event.samplePosition];
+      const auto dense = Semantics::analyzeCudaBinning(sample, model.bins.data(), model.intervals.data(), point);
+      ASSERT_TRUE(dense.isValid) << "total=" << dense.total;
+      const auto indexed = Semantics::analyzeCudaBinning(sample, model.bins.data(), model.intervals.data(), point,
+          model.binningNodes.data(), model.binningBounds.data());
+      ASSERT_TRUE(indexed.isValid) << "total=" << indexed.total;
+      EXPECT_EQ(indexed.count, dense.count);
+      EXPECT_DOUBLE_EQ(indexed.total, dense.total);
+      std::vector<CudaBinContribution> a(dense.count), b(dense.count);
+      ASSERT_TRUE(Semantics::writeCudaBinning(sample, model.bins.data(), model.intervals.data(), point,
+          dense, event.resultIndex, 128 + event.samplePosition, a.data(), a.size()));
+      ASSERT_TRUE(Semantics::writeCudaBinning(sample, model.bins.data(), model.intervals.data(), point,
+          indexed, event.resultIndex, 128 + event.samplePosition, b.data(), b.size(),
+          model.binningNodes.data(), model.binningBounds.data()));
+      for( std::size_t i = 0; i < a.size(); ++i ){
+        EXPECT_EQ(a[i].bin, b[i].bin);
+        EXPECT_DOUBLE_EQ(a[i].fraction, b[i].fraction);
+      }
+    }
+  }
 }
 
 TEST(CudaBinning, OrderedHierarchyMatchesExhaustiveSearchAndFractions) {

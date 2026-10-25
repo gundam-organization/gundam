@@ -55,8 +55,12 @@ order, preserving first-match selection, fraction summation, normalization and
 largest-fraction tie breaking. Diagnostic counters accumulate per thread and
 are aggregated per warp before integer atomic updates.
 
-The hierarchy/counter optimization passes local host regressions; NVCC execution
-and production performance remain to be checked at the CC. The following times
+The hierarchy/counter optimization compiled with NVCC at the CC; the four
+previous smoothing tests pass. The new large-displacement fixture initially
+used inconsistent widths at shared edges and was correctly rejected. Its widths
+are now matched per edge, with the same fixture validated exhaustively on host.
+GPU execution of the corrected fixture and production performance remain to be
+checked at the CC. The following times
 describe the previous exhaustive-search implementation.
 The [upgrade-cc-2026 production profile](CudaUpgradeBinningBenchmark.md) validates
 Pmu migration with 1 MeV smoothing against CPU and measures 4.10 ms per evaluation
@@ -91,7 +95,7 @@ They also compare indexed and exhaustive hard bins and fractional records across
 multiple samples, overlaps, asymmetric smoothing boundaries and adjacent
 representable coordinates. The GPU suite adds a 128-bin mixed strict/smoothed
 model with large displacements, permuted result slots and a partial final warp.
-For the hierarchy change, 107 selected native regressions pass locally, and the
+For the hierarchy change, 108 selected native regressions pass locally, and the
 new GPU test C++ is syntax-checked. The original smoothing implementation also
 passed the Python engine/producer tests and GPU execution at the CC; those GPU
 results predate the hierarchy optimization.
