@@ -115,7 +115,7 @@ TEST(BackendSharedHistogramIndex, PreservesTraversalOrderForBothIndexWidths) {
   checkStableHistogramIndex<std::size_t>();
 }
 
-TEST(BackendSharedDependencies, GroupsPreserveSlotsAndBackendSpecificRepeatedParameters) {
+TEST(BackendSharedDependencies, GroupsPreserveSlotsAndSortedInputPairs) {
   using namespace Backends;
   PropagationView model;
   model.parameterCount = 5;
@@ -140,22 +140,15 @@ TEST(BackendSharedDependencies, GroupsPreserveSlotsAndBackendSpecificRepeatedPar
   add(BackendDialType::ExternalWeight, 0, 0, 2);
   add(BackendDialType::Bicubic, 4, 2);
 
-  const auto cuda = buildDialDependencyGroups<false>(model, model.dials);
-  const auto mps = buildDialDependencyGroups<true>(model, model.dials);
-  auto checkCommonGroups = [](const auto& value_){
-    const auto* groups = &value_;
-    EXPECT_EQ(groups->parameterOffsets, (std::vector<std::size_t>{0, 1, 1, 2, 3, 3}));
-    EXPECT_EQ(groups->parameterDialIndices, (std::vector<std::uint32_t>{6, 8, 1}));
-    ASSERT_EQ(groups->externalDials.size(), 2);
-    EXPECT_EQ(groups->externalDials.at(0), (std::vector<std::uint32_t>{7}));
-    EXPECT_EQ(groups->externalDials.at(2), (std::vector<std::uint32_t>{2, 9}));
-    ASSERT_EQ(groups->multiParameterDials.size(), 2);
-    EXPECT_EQ(groups->multiParameterDials.at({1, 3}), (std::vector<std::uint32_t>{0, 3}));
-  };
-  checkCommonGroups(cuda);
-  checkCommonGroups(mps);
-  EXPECT_EQ(cuda.multiParameterDials.at({2, 2}), (std::vector<std::uint32_t>{5, 10}));
-  EXPECT_EQ(mps.multiParameterDials.at({2}), (std::vector<std::uint32_t>{5, 10}));
+  const auto groups = buildDialDependencyGroups(model, model.dials);
+  EXPECT_EQ(groups.parameterOffsets, (std::vector<std::size_t>{0, 1, 1, 2, 3, 3}));
+  EXPECT_EQ(groups.parameterDialIndices, (std::vector<std::uint32_t>{6, 8, 1}));
+  ASSERT_EQ(groups.externalDials.size(), 2);
+  EXPECT_EQ(groups.externalDials.at(0), (std::vector<std::uint32_t>{7}));
+  EXPECT_EQ(groups.externalDials.at(2), (std::vector<std::uint32_t>{2, 9}));
+  ASSERT_EQ(groups.multiParameterDials.size(), 2);
+  EXPECT_EQ(groups.multiParameterDials.at({1, 3}), (std::vector<std::uint32_t>{0, 3}));
+  EXPECT_EQ(groups.multiParameterDials.at({2, 2}), (std::vector<std::uint32_t>{5, 10}));
   EXPECT_EQ(model.dialInputs[0].parameterIndex, 3);
   EXPECT_EQ(model.dialInputs[1].parameterIndex, 1);
 
@@ -163,7 +156,7 @@ TEST(BackendSharedDependencies, GroupsPreserveSlotsAndBackendSpecificRepeatedPar
   // supplied descriptors, independently of their position in the source model.
   const std::vector<BackendDialDescriptor> reordered{
       model.dials[9], model.dials[6], model.dials[5], model.dials[0], model.dials[3]};
-  const auto remapped = buildDialDependencyGroups<false, std::size_t>(model, reordered);
+  const auto remapped = buildDialDependencyGroups<std::size_t>(model, reordered);
   EXPECT_EQ(remapped.parameterOffsets, (std::vector<std::size_t>{0, 1, 1, 1, 1, 1}));
   EXPECT_EQ(remapped.parameterDialIndices, (std::vector<std::size_t>{1}));
   EXPECT_EQ(remapped.externalDials.at(2), (std::vector<std::size_t>{0}));
@@ -174,7 +167,7 @@ TEST(BackendSharedDependencies, GroupsPreserveSlotsAndBackendSpecificRepeatedPar
 TEST(BackendSharedDependencies, EmptyAndConstantModelsHaveEmptyGroups) {
   using namespace Backends;
   PropagationView model;
-  const auto empty = buildDialDependencyGroups<true>(model, model.dials);
+  const auto empty = buildDialDependencyGroups(model, model.dials);
   EXPECT_EQ(empty.parameterOffsets, (std::vector<std::size_t>{0}));
   EXPECT_TRUE(empty.parameterDialIndices.empty());
   EXPECT_TRUE(empty.multiParameterDials.empty());
@@ -183,7 +176,7 @@ TEST(BackendSharedDependencies, EmptyAndConstantModelsHaveEmptyGroups) {
   BackendDialDescriptor constant;
   constant.type = BackendDialType::Shift;
   model.dials.push_back(constant);
-  const auto groups = buildDialDependencyGroups<false>(model, model.dials);
+  const auto groups = buildDialDependencyGroups(model, model.dials);
   EXPECT_EQ(groups.parameterOffsets, (std::vector<std::size_t>{0, 0, 0, 0}));
   EXPECT_TRUE(groups.parameterDialIndices.empty());
   EXPECT_TRUE(groups.multiParameterDials.empty());

@@ -153,7 +153,7 @@ Backends::CudaWeightModel Backends::makeCudaWeightModel(const EngineView& view_,
     }
   }
   else{ out.dials = model.dials; }
-  auto groups = buildDialDependencyGroups</*uniqueMultiParameters=*/false>(model, out.dials);
+  auto groups = buildDialDependencyGroups(model, out.dials);
   out.parameterDialOffsets = std::move(groups.parameterOffsets);
   out.parameterDialIndices = std::move(groups.parameterDialIndices);
   for( const auto& group : groups.multiParameterDials ){

@@ -135,7 +135,7 @@ void Backends::MpsEventPropagation::buildDialCache() {
   _multiDialGroups_.clear();
   _weightParameters_.clear();
   _weightExternalBlocks_.clear();
-  auto groups = buildDialDependencyGroups</*uniqueMultiParameters=*/true, DeviceIndex>(model, model.dials);
+  auto groups = buildDialDependencyGroups<DeviceIndex>(model, model.dials);
   std::vector<DeviceIndex> indices = std::move(groups.parameterDialIndices);
   for( std::size_t parameter = 0; parameter < model.parameterCount; ++parameter ){
     const auto first = groups.parameterOffsets[parameter];
