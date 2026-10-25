@@ -101,6 +101,8 @@ Backends::CudaWeightModel Backends::makeCudaWeightModel(const EngineView& view_,
   static_assert(std::is_trivially_copyable<CudaBinningResult>::value);
   static_assert(std::is_trivially_copyable<EventView>::value);
   static_assert(std::is_trivially_copyable<CudaBinningSample>::value);
+  static_assert(std::is_trivially_copyable<CudaBinningNode>::value);
+  static_assert(std::is_trivially_copyable<CudaBinningBound>::value);
   static_assert(std::is_trivially_copyable<BackendVariableResponseDescriptor>::value);
   const auto& model = view_.propagation;
 
@@ -247,6 +249,47 @@ Backends::CudaWeightModel Backends::makeCudaWeightModel(const EngineView& view_,
         out.bins.push_back(bin);
       }
       packed.endBin = out.bins.size();
+      packed.firstNode = out.binningNodes.size();
+      if( packed.isDynamic or packed.isSmoothed ){
+        // Keep original bin order, including overlapping selections. Bounds
+        // include both smoothing shoulders and are rounded outwards.
+        const double infinity = std::numeric_limits<double>::infinity();
+        auto buildNode = [&](auto&& self_, std::size_t first_, std::size_t end_) -> void {
+          const auto nodeIndex = out.binningNodes.size();
+          const auto firstBound = out.binningBounds.size();
+          out.binningNodes.push_back({first_, end_, firstBound, 0});
+          out.binningBounds.resize(firstBound + packed.variableCount, {infinity, -infinity});
+          for( std::size_t binIndex = first_; binIndex < end_; ++binIndex ){
+            std::vector<CudaBinningBound> bounds(packed.variableCount, {-infinity, infinity});
+            const auto& bin = out.bins[binIndex];
+            for( std::size_t j = bin.firstInterval; j < bin.firstInterval + bin.intervalCount; ++j ){
+              const auto& interval = out.intervals[j];
+              double lower = interval.lowerBound, upper = interval.upperBound;
+              if( interval.lowerInverseWidth != 0. ){
+                lower -= 1. / interval.lowerInverseWidth;
+                upper += 1. / interval.upperInverseWidth;
+              }
+              auto& bound = bounds[interval.variableIndex];
+              bound.lower = std::max(bound.lower, std::nextafter(lower, -infinity));
+              bound.upper = std::min(bound.upper, std::nextafter(upper, infinity));
+            }
+            for( std::size_t axis = 0; axis < packed.variableCount; ++axis ){
+              auto& bound = out.binningBounds[firstBound + axis];
+              bound.lower = std::min(bound.lower, bounds[axis].lower);
+              bound.upper = std::max(bound.upper, bounds[axis].upper);
+            }
+          }
+          if( end_ - first_ > 4 ){
+            const auto middle = first_ + (end_ - first_) / 2;
+            self_(self_, first_, middle);
+            self_(self_, middle, end_);
+            out.binningNodes[nodeIndex].endBin = first_; // Internal node.
+          }
+          out.binningNodes[nodeIndex].skip = out.binningNodes.size();
+        };
+        if( packed.firstBin != packed.endBin ){ buildNode(buildNode, packed.firstBin, packed.endBin); }
+      }
+      packed.endNode = out.binningNodes.size();
       out.samples.push_back(packed);
     }
     std::vector<std::pair<std::size_t, std::size_t>> variableRanges;

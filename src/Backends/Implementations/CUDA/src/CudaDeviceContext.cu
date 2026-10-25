@@ -102,6 +102,8 @@ namespace {
     DeviceBuffer<Backends::CudaBinningSample> samples;
     DeviceBuffer<Backends::BinningBin> bins;
     DeviceBuffer<Backends::BinningInterval> intervals;
+    DeviceBuffer<Backends::CudaBinningNode> binningNodes;
+    DeviceBuffer<Backends::CudaBinningBound> binningBounds;
     DeviceBuffer<Backends::BackendVariableResponseDescriptor> variableResponses;
     DeviceBuffer<std::uint32_t> variableDialIndices;
     DeviceBuffer<double> variables, nextVariables, hostVariables;
@@ -275,14 +277,25 @@ namespace {
     __host__ __device__ double operator()(std::size_t dial_) const { return values[dial_]; }
   };
 
+  // All lanes participate, including threads with no events. Keep diagnostic
+  // counters off the inner bin-search loop and aggregate before global atomics.
+  __device__ void addWarpCounter(unsigned long long* counter_, unsigned long long value_) {
+    for( int offset = 16; offset; offset /= 2 ){
+      value_ += __shfl_down_sync(0xffffffffu, value_, offset);
+    }
+    if( (threadIdx.x & 31) == 0 and value_ ){ atomicAdd(counter_, value_); }
+  }
+
   __global__ void updateEventState(const Backends::EventView* events_, std::size_t count_,
       const Backends::CudaBinningSample* samples_, std::size_t sampleCount_,
       const Backends::BinningBin* bins_, const Backends::BinningInterval* intervals_,
+      const Backends::CudaBinningNode* nodes_, const Backends::CudaBinningBound* bounds_,
       const Backends::BackendVariableResponseDescriptor* targets_, const std::uint32_t* indices_,
       const double* responses_, double* variables_, const double* hostValues_, const std::uint8_t* hostEdits_,
       int* stateBins_, int* keys_, std::size_t* eventSlots_, int* changedSamples_, unsigned long long* counters_,
       int totalBins_, bool updateVariables_, bool force_, bool first_, int* error_) {
     using namespace Backends;
+    unsigned long long candidates = 0, rebinned = 0, contributions = 0;
     for( std::size_t i = std::size_t(blockIdx.x) * blockDim.x + threadIdx.x;
          i < count_; i += std::size_t(blockDim.x) * gridDim.x ){
       const auto& event = events_[i];
@@ -312,25 +325,14 @@ namespace {
         if( sample.isDynamic or sample.isSmoothed ){
           localBin = stateBins_[slot];
           if( first_ or force_ or changed or sample.readHostVariables ){
-            localBin = -1;
             const double* values = event.variableCount ? variables_ + event.firstVariable : nullptr;
-            for( std::size_t j = sample.firstBin; j < sample.endBin; ++j ){
-              const auto& bin = bins_[j];
-              bool contains = true;
-              atomicAdd(counters_ + 1, 1ull);
-              for( std::size_t k = bin.firstInterval; k < bin.firstInterval + bin.intervalCount; ++k ){
-                const auto& interval = intervals_[k];
-                if( not GundamBinningMath::contains(interval.lowerBound, interval.upperBound, values[interval.variableIndex]) ){
-                  contains = false; break;
-                }
-              }
-              if( contains ){ localBin = bin.binIndex; break; }
-            }
+            localBin = Semantics::findCudaBin(sample, bins_, intervals_, values,
+                candidates, nodes_, bounds_);
             atomicExch(changedSamples_ + event.samplePosition, 1);
-            atomicAdd(counters_, 1ull);
+            ++rebinned;
           }
           globalBin = localBin < 0 ? -1 : sample.binOffset + localBin;
-          if( localBin >= 0 and not sample.isSmoothed ){ atomicAdd(counters_ + 2, 1ull); }
+          if( localBin >= 0 and not sample.isSmoothed ){ ++contributions; }
         }
       }
       stateBins_[slot] = localBin;
@@ -341,6 +343,9 @@ namespace {
         eventSlots_[i] = slot;
       }
     }
+    addWarpCounter(counters_, rebinned);
+    addWarpCounter(counters_ + 1, candidates);
+    addWarpCounter(counters_ + 2, contributions);
   }
 
   __global__ void findBinOffsets(const int* keys_, std::size_t count_, std::size_t* offsets_, std::size_t bins_) {
@@ -358,8 +363,10 @@ namespace {
 
   __global__ void countContributions(const Backends::EventView* events_, std::size_t count_,
       const Backends::CudaBinningSample* samples_, std::size_t sampleCount_, const Backends::BinningBin* bins_,
-      const Backends::BinningInterval* intervals_, const double* variables_, const int* stateBins_,
+      const Backends::BinningInterval* intervals_, const Backends::CudaBinningNode* nodes_,
+      const Backends::CudaBinningBound* bounds_, const double* variables_, const int* stateBins_,
       Backends::CudaBinningResult* results_, std::size_t* counts_, unsigned long long* counters_, int* error_) {
+    unsigned long long contributions = 0;
     for( std::size_t i = std::size_t(blockIdx.x) * blockDim.x + threadIdx.x;
          i < count_; i += std::size_t(blockDim.x) * gridDim.x ){
       const auto& event = events_[i];
@@ -368,21 +375,23 @@ namespace {
         const auto& sample = samples_[event.samplePosition];
         if( sample.isSmoothed ){
           const auto result = Backends::Semantics::analyzeCudaBinning(sample, bins_, intervals_,
-              event.variableCount ? variables_ + event.firstVariable : nullptr);
+              event.variableCount ? variables_ + event.firstVariable : nullptr, nodes_, bounds_);
           results_[i] = result;
           count = result.isValid ? result.count : 0;
           if( not result.isValid ){ atomicExch(error_, 1); }
-          atomicAdd(counters_ + 2, static_cast<unsigned long long>(count));
+          contributions += count;
         }
         else if( sample.isDynamic ){ count = stateBins_[event.resultIndex] >= 0 ? 1 : 0; }
       }
       counts_[i] = count;
     }
+    addWarpCounter(counters_ + 2, contributions);
   }
 
   __global__ void writeContributions(const Backends::EventView* events_, std::size_t count_,
       const Backends::CudaBinningSample* samples_, std::size_t sampleCount_, const Backends::BinningBin* bins_,
-      const Backends::BinningInterval* intervals_, const double* variables_, const int* stateBins_,
+      const Backends::BinningInterval* intervals_, const Backends::CudaBinningNode* nodes_,
+      const Backends::CudaBinningBound* bounds_, const double* variables_, const int* stateBins_,
       const Backends::CudaBinningResult* results_, const std::size_t* offsets_,
       Backends::CudaBinContribution* contributions_, int histogramBins_, int* error_) {
     for( std::size_t i = std::size_t(blockIdx.x) * blockDim.x + threadIdx.x;
@@ -396,7 +405,7 @@ namespace {
         if( sample.isSmoothed ){
           if( not Backends::Semantics::writeCudaBinning(sample, bins_, intervals_,
               event.variableCount ? variables_ + event.firstVariable : nullptr, results_[i], event.resultIndex,
-              histogramBins_ + int(event.samplePosition), contributions_ + first, count) ){ atomicExch(error_, 1); }
+              histogramBins_ + int(event.samplePosition), contributions_ + first, count, nodes_, bounds_) ){ atomicExch(error_, 1); }
           continue;
         }
         if( sample.isDynamic ){ bin = sample.binOffset + stateBins_[event.resultIndex]; }
@@ -559,6 +568,8 @@ void Backends::CudaDeviceContext::build(const CudaWeightModel& model_, const Pro
       b.samples.upload(model_.samples, _impl_->stream);
       b.bins.upload(model_.bins, _impl_->stream);
       b.intervals.upload(model_.intervals, _impl_->stream);
+      b.binningNodes.upload(model_.binningNodes, _impl_->stream);
+      b.binningBounds.upload(model_.binningBounds, _impl_->stream);
       b.variableResponses.upload(model_.variableResponses, _impl_->stream);
       b.variableDialIndices.upload(model_.variableDialIndices, _impl_->stream);
       b.variables.upload(model_.variableValues, _impl_->stream);
@@ -728,7 +739,8 @@ void Backends::CudaDeviceContext::propagate(const PropagationInputs& inputs_, bo
       checkCuda(cudaMemsetAsync(b.stateCounters.data, 0, 3 * sizeof(unsigned long long), stream), "reset state counters");
       if( b.events.size ){
         updateEventState<<<gridSize(b.events.size), blockSize, 0, stream>>>(b.stateEvents.data, b.events.size,
-            b.samples.data, b.samples.size, b.bins.data, b.intervals.data, b.variableResponses.data,
+            b.samples.data, b.samples.size, b.bins.data, b.intervals.data,
+            b.binningNodes.data, b.binningBounds.data, b.variableResponses.data,
             b.variableDialIndices.data, b.responses.data, b.nextVariables.data, b.hostVariables.data, b.hostEdits.data,
             b.nextStateBins.data, b.histogramKeys.data, b.binEvents.data, b.changedSamples.data, b.stateCounters.data,
             int(b.histogramBins), b.stateCache.variableInputsChanged(), inputs_.forceBinningUpdate, not b.cachePrimed, b.error.data);
@@ -739,7 +751,8 @@ void Backends::CudaDeviceContext::propagate(const PropagationInputs& inputs_, bo
     if( updateState and b.hasSmoothedBinning ){
       if( b.events.size ){
         countContributions<<<gridSize(b.events.size), blockSize, 0, stream>>>(b.stateEvents.data, b.events.size,
-            b.samples.data, b.samples.size, b.bins.data, b.intervals.data, b.nextVariables.data, b.nextStateBins.data,
+            b.samples.data, b.samples.size, b.bins.data, b.intervals.data,
+            b.binningNodes.data, b.binningBounds.data, b.nextVariables.data, b.nextStateBins.data,
             b.binningResults.data, b.contributionCounts.data, b.stateCounters.data, b.error.data);
         checkCuda(cudaGetLastError(), "fractional contribution count kernel launch");
       }
@@ -755,7 +768,8 @@ void Backends::CudaDeviceContext::propagate(const PropagationInputs& inputs_, bo
       b.sortedContributions.ensureCapacity(stagedContributionCount);
       if( b.events.size ){
         writeContributions<<<gridSize(b.events.size), blockSize, 0, stream>>>(b.stateEvents.data, b.events.size,
-            b.samples.data, b.samples.size, b.bins.data, b.intervals.data, b.nextVariables.data, b.nextStateBins.data,
+            b.samples.data, b.samples.size, b.bins.data, b.intervals.data,
+            b.binningNodes.data, b.binningBounds.data, b.nextVariables.data, b.nextStateBins.data,
             b.binningResults.data, b.nextContributionOffsets.data, b.nextContributions.data, int(b.histogramBins), b.error.data);
         checkCuda(cudaGetLastError(), "fractional contribution write kernel launch");
       }

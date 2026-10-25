@@ -524,6 +524,19 @@ outside histogram sums/errors against CPU. Input proposals/digests are identical
 across cases. This is propagation performance, not full-fit throughput, and the
 comparison does not validate covariance matrices. The output directory must be new.
 
+The [CC production results from 2026-10-25](../../docs/backends/CudaUpgradeBinningBenchmark.md)
+pass both CUDA comparisons against CPU. Varying pmuScale takes 4.10 ms with
+cached CUDA, 5.09 ms with recompute CUDA and 29.93 ms on four CPU threads.
+
+For large Pmu displacements, insert `override/pmuScaleBinningStressTest.yaml`
+immediately after `override/pmuScaleBinningTest.yaml`. This changes the proposal
+sigma to 0.5 and domain to `[0.01, 3]`, preserving the 1 MeV smoothing width.
+Use a fresh output directory. To evaluate the ordered CUDA bin hierarchy,
+repeat the normal and stress workloads with outputs
+`cuda-upgrade-binning-indexed-profile` and
+`cuda-upgrade-binning-stress-indexed-profile`; both previous runs are documented
+in the [production results](../../docs/backends/CudaUpgradeBinningBenchmark.md).
+
 For a first quick pass, use `--calls 10 --trials 1 --warmup 2`; each selected case
 still pays the complete dataset loading cost. To locate expensive coordinates
 across the full model afterward, omit `--parameter-match` and use

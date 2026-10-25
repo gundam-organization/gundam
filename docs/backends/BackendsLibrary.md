@@ -143,9 +143,9 @@ the common layout can represent the dial. ❌ marks unsupported dial classes.
 | `Spline`: `MonotonicSpline` | ✅ | ✅ | ✅ |
 | `Spline`: `GeneralSpline` | ✅ | ✅ | ✅ |
 | `Graph` | ✅ | ✅ | ✅ |
-| `Surface` / `Bilinear` | ✅ | ✅ | ⚠️ Weights/fixed bins; validated at CC |
-| `Surface` / `Bicubic` | ✅ | ✅ | ⚠️ Weights/fixed bins; validated at CC |
-| `ExternalWeight` (`ExternalWeightDispatcher`) | ✅ | ✅ | ⚠️ Host producer, selective FP64 uploads; weights validated at CC |
+| `Surface` / `Bilinear` | ✅ | ✅ | ✅ |
+| `Surface` / `Bicubic` | ✅ | ✅ | ✅ |
+| `ExternalWeight` (`ExternalWeightDispatcher`) | ✅ | ✅ | ✅ |
 | ROOT objects (`RootFormula`, `RootSpline`, `RootGraph`) | ❌ Heavy C++ objects, unsuitable for the flat backend model | ❌ Strictly incompatible with Metal device execution as C++ ROOT objects | ❌ Rejected by `EngineLayout` |
 | `Tabulated` | ⚠️ Table updated on host at each propagation | ❌ | ⚠️ Host table, GPU response; weights validated at CC |
 | `Kriged` | ⚠️ Table updated on host at each propagation | ❌ | ⚠️ Host table, GPU response; weights validated at CC |
@@ -219,6 +219,15 @@ Host math/validation and CPU/MPS regressions pass; GPU execution was confirmed
 at the CC on 2026-10-25. See [CUDA observable responses](CudaObservableResponses.md) and
 [smoothed binning validation](CudaSmoothedBinning.md). Production workload commands
 are in the [CUDA migration/smoothing benchmark](../../tests/benchmarks/README.md#cuda-migration-and-smoothing-on-upgrade-cc-2026).
+The [upgrade-cc-2026 production results](CudaUpgradeBinningBenchmark.md) pass
+CPU comparisons for Pmu migration with 1 MeV smoothing: cached CUDA takes
+4.10 ms per varying-parameter evaluation versus 29.93 ms on four CPU threads
+(7.30 times faster). Observable/search and fractional index construction account
+for 93.3% of GPU propagation time in that workload.
+An ordered bin hierarchy now prunes hard/fractional searches, and diagnostic
+counters aggregate per warp. Host equivalence tests pass; GPU validation and
+production timings for this optimization are pending (see the
+[stress baseline and retest](CudaUpgradeBinningBenchmark.md#stress-baseline-and-indexed-search-retest)).
 
 The only MPS backend configuration option is `propagationMode`: `cachedResponses`
 reuses eligible responses between propagations, while `recomputeResponses`

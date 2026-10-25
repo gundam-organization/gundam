@@ -23,8 +23,16 @@ namespace Backends {
   struct CudaBinningSample {
     int binOffset{0}, binCount{0};
     std::size_t firstBin{0}, endBin{0}, variableCount{0};
+    std::size_t firstNode{0}, endNode{0};
     bool isDynamic{false}, readHostVariables{false}, isSmoothed{false};
   };
+
+  // Preorder hierarchy over contiguous original bin ranges. A miss skips a
+  // whole subtree; leaves preserve first-match and fractional summation order.
+  struct CudaBinningNode {
+    std::size_t firstBin{0}, endBin{0}, firstBound{0}, skip{0};
+  };
+  struct CudaBinningBound { double lower{0}, upper{0}; };
 
   // Native-double model. Events are in result-slot order; histogram lists retain
   // the original event traversal order, independently of those result slots.
@@ -56,6 +64,8 @@ namespace Backends {
     std::vector<CudaBinningSample> samples{};
     std::vector<BinningBin> bins{};
     std::vector<BinningInterval> intervals{};
+    std::vector<CudaBinningNode> binningNodes{};
+    std::vector<CudaBinningBound> binningBounds{};
     std::vector<double> variableValues{};
     std::vector<BackendVariableResponseDescriptor> variableResponses{};
     std::vector<std::uint32_t> variableDialIndices{};

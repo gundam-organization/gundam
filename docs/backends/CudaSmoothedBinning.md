@@ -47,8 +47,20 @@ edits trigger a state/index update. New variables, hard bins, offsets and
 contributions are published after successful device execution. Errors/rebuilds
 invalidate caches and retries rebuild the complete state.
 
-The initial implementation scans each sample's bins to count/write fractions;
-production performance has not been benchmarked. State updates require a count
+The current implementation builds a stackless hierarchy over contiguous ranges
+of bins, with at most four bins per leaf. Conservative per-axis bounds include
+both smoothing shoulders and round outwards. Hard-bin search and fractional
+count/write passes skip incompatible subtrees. Traversal retains declaration
+order, preserving first-match selection, fraction summation, normalization and
+largest-fraction tie breaking. Diagnostic counters accumulate per thread and
+are aggregated per warp before integer atomic updates.
+
+The hierarchy/counter optimization passes local host regressions; NVCC execution
+and production performance remain to be checked at the CC. The following times
+describe the previous exhaustive-search implementation.
+The [upgrade-cc-2026 production profile](CudaUpgradeBinningBenchmark.md) validates
+Pmu migration with 1 MeV smoothing against CPU and measures 4.10 ms per evaluation
+with cached CUDA versus 29.93 ms on four CPU threads. State updates require a count
 synchronization and may temporarily retain committed, staging and sorted lists.
 `contributionBufferBytes` reports those record buffers' allocated capacities;
 `binContributionCount` reports active dynamic/smoothed event-state contributions.
@@ -75,9 +87,14 @@ weighted fractions from fractions of squared weights.
 
 The host `CudaBinning` tests check analytic halves/quarters, outside fractions,
 roundoff normalization, invalid overlaps/widths and bounded contribution writes.
-Locally, the 92 selected native regressions and both Python engine/producer tests
-pass. CUDA test C++ and the CUDA-facing backend call signatures are syntax-checked
-locally; GPU kernel compilation/execution was confirmed at the CC.
+They also compare indexed and exhaustive hard bins and fractional records across
+multiple samples, overlaps, asymmetric smoothing boundaries and adjacent
+representable coordinates. The GPU suite adds a 128-bin mixed strict/smoothed
+model with large displacements, permuted result slots and a partial final warp.
+For the hierarchy change, 107 selected native regressions pass locally, and the
+new GPU test C++ is syntax-checked. The original smoothing implementation also
+passed the Python engine/producer tests and GPU execution at the CC; those GPU
+results predate the hierarchy optimization.
 
 For the full engine, build `GUNDAM` with `WITH_PYTHON_INTERFACE=ON`, then use the
 matching Python interpreter and the existing test dependencies:

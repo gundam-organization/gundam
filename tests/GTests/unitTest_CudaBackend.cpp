@@ -13,6 +13,7 @@
 #include <gtest/gtest.h>
 
 #include <algorithm>
+#include <cmath>
 #include <limits>
 #include <stdexcept>
 
@@ -675,6 +676,81 @@ TEST(CudaBinning, AnalyticFractionsOutsideAndRoundoffNormalization) {
   EXPECT_FALSE(Semantics::analyzeCudaBinning(sample, bins.data(), intervals.data(), &x).isValid);
   x = std::numeric_limits<double>::quiet_NaN();
   EXPECT_FALSE(Semantics::analyzeCudaBinning(sample, bins.data(), intervals.data(), &x).isValid);
+}
+
+TEST(CudaBinning, OrderedHierarchyMatchesExhaustiveSearchAndFractions) {
+  using namespace Backends;
+  for( bool smoothed : {false, true} ){
+    EngineView view;
+    // Two samples exercise nonzero global node, bound, interval and bin offsets.
+    for( int sampleIndex = 0; sampleIndex < 2; ++sampleIndex ){
+      SampleView sample;
+      sample.binOffset = sampleIndex * 64;
+      sample.binCount = 64;
+      sample.useDynamicBinning = true;
+      sample.binning.isSmoothed = smoothed;
+      sample.binning.variableNames = {"X", "Y"};
+      for( int i = 0; i < 64; ++i ){
+        // Permute identifiers independently from original selection order.
+        sample.binning.bins.push_back({(i * 17) % 64, sample.binning.intervals.size(), 2});
+        const double x = i % 8, y = i / 8;
+        sample.binning.intervals.push_back({0, x, x + 1., smoothed ? 5. : 0., smoothed ? 2.5 : 0.});
+        sample.binning.intervals.push_back({1, y, y + 1.});
+      }
+      // Strict overlap: the earlier bin must win. Smoothed overlap must still
+      // be rejected by normalization rather than hidden by the hierarchy.
+      sample.binning.intervals[126] = sample.binning.intervals[0];
+      sample.binning.intervals[127] = sample.binning.intervals[1];
+      view.propagation.samples.push_back(sample);
+    }
+    view.propagation.totalBins = 128;
+    const auto model = makeCudaWeightModel(view);
+    for( const auto& sample : model.samples ){
+      ASSERT_GT(sample.endNode - sample.firstNode, 1);
+      std::vector<double> positions{-100., -.4, -.2, 0., .1, .8, 1., 1.4, 4.5, 7.9, 8.4, 100.};
+      for( int i = 0; i <= 8; ++i ){
+        for( double edge : {double(i), double(i) - .2, double(i) + .4} ){
+          positions.push_back(edge);
+          positions.push_back(std::nextafter(edge, -std::numeric_limits<double>::infinity()));
+          positions.push_back(std::nextafter(edge, std::numeric_limits<double>::infinity()));
+        }
+      }
+      for( double x : positions ){
+        for( double y : {-1., 0., .5, 1., 3.5, 7.9, 8.} ){
+          const double values[]{x, y};
+          unsigned long long denseCount = 0, indexedCount = 0;
+          const auto expectedBin = Semantics::findCudaBin(sample, model.bins.data(), model.intervals.data(), values, denseCount);
+          EXPECT_EQ(Semantics::findCudaBin(sample, model.bins.data(), model.intervals.data(), values,
+              indexedCount, model.binningNodes.data(), model.binningBounds.data()), expectedBin);
+          EXPECT_LE(indexedCount, denseCount);
+          const auto dense = Semantics::analyzeCudaBinning(sample, model.bins.data(), model.intervals.data(), values);
+          const auto indexed = Semantics::analyzeCudaBinning(sample, model.bins.data(), model.intervals.data(), values,
+              model.binningNodes.data(), model.binningBounds.data());
+          EXPECT_EQ(indexed.isValid, dense.isValid);
+          EXPECT_EQ(indexed.count, dense.count);
+          EXPECT_EQ(indexed.largestBin, dense.largestBin);
+          EXPECT_DOUBLE_EQ(indexed.total, dense.total);
+          EXPECT_DOUBLE_EQ(indexed.excess, dense.excess);
+          if( not dense.isValid ){ continue; }
+          std::vector<CudaBinContribution> a(dense.count), b(dense.count);
+          ASSERT_TRUE(Semantics::writeCudaBinning(sample, model.bins.data(), model.intervals.data(), values,
+              dense, 12, 128, a.data(), a.size()));
+          ASSERT_TRUE(Semantics::writeCudaBinning(sample, model.bins.data(), model.intervals.data(), values,
+              indexed, 12, 128, b.data(), b.size(), model.binningNodes.data(), model.binningBounds.data()));
+          for( std::size_t i = 0; i < a.size(); ++i ){
+            EXPECT_EQ(a[i].bin, b[i].bin);
+            EXPECT_EQ(a[i].event, b[i].event);
+            EXPECT_DOUBLE_EQ(a[i].fraction, b[i].fraction);
+          }
+        }
+      }
+      const double outside[]{100., 100.};
+      unsigned long long count = 0;
+      EXPECT_EQ(Semantics::findCudaBin(sample, model.bins.data(), model.intervals.data(), outside,
+          count, model.binningNodes.data(), model.binningBounds.data()), -1);
+      EXPECT_EQ(count, 0); // Root rejects without visiting any individual bin.
+    }
+  }
 }
 
 TEST(CudaBinning, TensorProductAndSmoothingDescriptorValidation) {
