@@ -280,6 +280,7 @@ PYBIND11_MODULE(GUNDAM, module) {
   .def("getParameterValue", &Parameter::getParameterValue)
   .def("getSummary", &Parameter::getSummary)
   .def("setParameterValue", &Parameter::setParameterValue, pybind11::arg("parameterValue"), pybind11::arg("force") = false)
+  .def("setIsFixed", &Parameter::setIsFixed)
   ;
 
   pybind11::class_<TMatrixDSym, std::shared_ptr<TMatrixDSym>>(module, "TMatrixDSym")
@@ -466,7 +467,11 @@ PYBIND11_MODULE(GUNDAM, module) {
 
   // no CTOR here
   pybind11::class_<MinimizerBase>(module, "MinimizerBase")
+  .def("isRootMinimizer", [](const MinimizerBase& this_){
+    return dynamic_cast<const RootMinimizer*>(&this_) != nullptr;
+  })
   .def("minimize", &MinimizerBase::minimize)
+  .def("getMinimizerStatus", &MinimizerBase::getMinimizerStatus)
   .def("throwPostfitParameters", &MinimizerBase::throwPostfitParameters)
   .def("fetchNbDegreeOfFreedom", &MinimizerBase::fetchNbDegreeOfFreedom)
   .def("getMinimizerFitParameterPtr", pybind11::overload_cast<>(&MinimizerBase::getMinimizerFitParameterPtr),
@@ -474,6 +479,9 @@ PYBIND11_MODULE(GUNDAM, module) {
   ;
 
   pybind11::class_<RootMinimizer, MinimizerBase>(module, "RootMinimizer")
+  .def("updateFitParameterSettings", &RootMinimizer::updateFitParameterSettings)
+  .def("hasConverged", &RootMinimizer::hasConverged)
+  .def("isMinimizeDone", &RootMinimizer::isMinimizeDone)
   .def("throwPostfitParameters", &RootMinimizer::throwPostfitParameters)
   ;
 
