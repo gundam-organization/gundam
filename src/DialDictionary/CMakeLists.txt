@@ -12,6 +12,7 @@ set( SRCFILES
     # DialDefinitions
     DialDefinitions/src/DialUtils.cpp
     DialDefinitions/src/DialBase.cpp
+    DialDefinitions/src/CompositeDial.cpp
 
     DialDefinitions/src/Kriged.cpp
 
@@ -47,6 +48,7 @@ set( HEADERS
 
     # DialDefinitions
     DialDefinitions/include/DialBase.h
+    DialDefinitions/include/CompositeDial.h
 
     DialDefinitions/include/Norm.h
     DialDefinitions/include/Shift.h

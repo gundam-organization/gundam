@@ -7,6 +7,7 @@
 #include "TabulatedDialFactory.h"
 #include "KrigedDialFactory.h"
 #include "ExternalWeightDialFactory.h"
+#include "CompositeDial.h"
 
 #include "RootFormula.h"
 #include "Shift.h"
@@ -38,7 +39,7 @@ void DialCollection::prepareConfig(ConfigReader &config_){
       {"dialInputList"},
       {"printDialSummary", {"printDialsSummary"}},
       {"dialType", {"type", "dialsType"}},
-      {"options", {"dialSubType"}},
+      {"options", {"dialSubType", "dialConfig"}},
       {"dialBranchData", {"dialLeafName", "treeExpression"}},
       {"minDialResponse", {"minimumSplineResponse"}},
       {"maxDialResponse"},
@@ -322,7 +323,8 @@ void DialCollection::readParametersFromConfig(const ConfigReader &config_) {
   // globals for the dialSet
   config_.fillValue(_enableDialsSummary_, "printDialSummary");
   config_.fillValue(_dialType_, "dialType");
-  if( _dialType_ != DialType::ExternalWeight ){
+  if( _dialType_ != DialType::ExternalWeight and _dialType_ != DialType::Formula
+      and _dialType_ != DialType::CompiledLibDial and _dialType_ != DialType::Composite ){
     config_.fillValue(_dialOptions_, "options");
   }
   if( config_.hasField("dialBranchData") ){
@@ -347,7 +349,7 @@ void DialCollection::readParametersFromConfig(const ConfigReader &config_) {
                  "TArray dialBranchData requires dialType Spline or Graph");
     }
   }
-  _minDialResponse_ = _applyToVariable_.empty() or _variableResponseMode_ == VariableResponseMode::Multiply
+  _minDialResponse_ = not _isCompositeNode_ and (_applyToVariable_.empty() or _variableResponseMode_ == VariableResponseMode::Multiply)
       ? 0. : std::nan("unset");
   config_.fillValue(_minDialResponse_, "minDialResponse");
   config_.fillValue(_maxDialResponse_, "maxDialResponse");
@@ -924,7 +926,20 @@ bool DialCollection::initializeDialsWithDefinition() {
 
   this->readParametersFromConfig( ConfigReader(dialsDefinition) );
 
-  if     ( _dialType_ == DialType::Norm ) {
+  if( _dialType_ == DialType::Composite ){
+    LogThrowIf(dialsDefinition.hasField("binning") or hasDialBranchData(),
+               "Composite: put binning and dialBranchData on individual nodes");
+    const int inputCount = _config_.hasField("dialInputList")
+        ? int(_config_.fetchValue<JsonType>("dialInputList").size()) : 1;
+    LogThrowIf(inputCount == 0, "Composite requires at least one input");
+    LogThrowIf(not _config_.hasField("dialInputList") and _supervisedParameterIndex_ < 0,
+               "Composite at parameter-set level requires an explicit dialInputList");
+    _isEventByEvent_ = false;
+    _dialInterfaceList_.emplace_back();
+    _dialInterfaceList_.back().setDial(DialBaseObject(std::make_unique<CompositeDial>(
+        dialsDefinition.fetchValue<ConfigReader>("options"), inputCount)));
+  }
+  else if( _dialType_ == DialType::Norm ) {
     // This dial collection is a normalization, so there is a single dial.
     // Create it here.
     _isEventByEvent_ = false;
@@ -1092,14 +1107,14 @@ std::unique_ptr<DialBase> DialCollection::makeDial(const ConfigReader& config_) 
   if( dialType == "Formula" or dialType == "RootFormula" ){
     dialBase = std::make_unique<RootFormula>();
     auto* rootFormulaPtr{(RootFormula*) dialBase.get()};
-    auto formulaConfig = config_.fetchValue("dialConfig", JsonType());
+    auto formulaConfig = config_.fetchValue("options", JsonType());
     rootFormulaPtr->setFormulaStr( GenericToolbox::Json::fetchValue<std::string>(formulaConfig, "formulaStr") );
   }
   else if( dialType == "CompiledLibDial" ){
     dialBase = std::make_unique<CompiledLibDial>();
     auto* compiledLibDialPtr{(CompiledLibDial*) dialBase.get()};
 
-    auto formulaConfig(config_.fetchValue<JsonType>("dialConfig"));
+    auto formulaConfig(config_.fetchValue<JsonType>("options"));
 
     bool success = compiledLibDialPtr->loadLibrary( GenericToolbox::Json::fetchValue<std::string>(formulaConfig, "libraryFile") );
     if( not success ){
@@ -1367,7 +1382,7 @@ bool DialCollection::makeDialShortCircuit(const std::vector<DialUtils::DialPoint
   if( pointList_.size() == 1 or DialUtils::isFlat(pointList_) ){
     // it's flat, let's shortcut
 
-    if( std::abs( pointList_[0].y - 1.0 ) < 2 * std::numeric_limits<float>::epsilon() ){
+    if( not _isCompositeNode_ and std::abs( pointList_[0].y - 1.0 ) < 2 * std::numeric_limits<float>::epsilon() ){
       // one! no need for a dial
       if(_verboseShortCircuit_){ _verboseShortCircuitStr_ = "No dial: response is always 1."; }
       return true;

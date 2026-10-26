@@ -11,7 +11,9 @@ double RootFormula::evalResponse(const DialInputBuffer& input_) const {
 
 
 void RootFormula::setFormulaStr(const std::string& formulaStr_){
-  _formula_ = TFormula(formulaStr_.c_str(), formulaStr_.c_str());
+  // Dial formulas are independent. Registering an expression such as x[0]
+  // as a global formula name can make later nodes recursively expand it.
+  _formula_ = TFormula(formulaStr_.c_str(), formulaStr_.c_str(), false);
   LogThrowIf(not _formula_.IsValid(), "\"" << formulaStr_ << "\": could not be parsed as formula expression.");
 }
 

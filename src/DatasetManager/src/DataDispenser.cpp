@@ -965,6 +965,16 @@ void DataDispenser::fetchRequestedLeaves(){
     for( auto& dialCollection : _cache_.propagatorPtr->getDialCollectionList() ){
       if( not dialCollection.isEnabled() ){ continue; }
       if( not dialCollection.isDatasetValid( _owner_->getName() ) ){ continue; }
+      bool parentValid = true;
+      for( int parent = dialCollection.getCompositeParentIndex() ; parent >= 0 ; ){
+        const auto& parentCollection = _cache_.propagatorPtr->getDialCollectionList().at(parent);
+        if( not parentCollection.isEnabled() or not parentCollection.isDatasetValid(_owner_->getName()) ){
+          parentValid = false;
+          break;
+        }
+        parent = parentCollection.getCompositeParentIndex();
+      }
+      if( not parentValid ){ continue; }
       _cache_.dialCollectionsRefList.emplace_back( &dialCollection );
     }
   }
