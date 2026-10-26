@@ -22,6 +22,7 @@
 #include <string>
 #include <vector>
 #include <memory>
+#include <utility>
 
 
 class FitterEngine : public JsonBaseClass {
@@ -85,6 +86,9 @@ public:
   GenericToolbox::TFilePath getTFilePath(){ return GenericToolbox::TFilePath(_saveDir_); }
   bool& getGenerateSamplePlots(){ return _generateSamplePlots_; }
   bool& getDoAllParamVariations(){ return _doAllParamVariations_; }
+
+  [[nodiscard]] std::string getPropagationMonitorTitle() const;
+  [[nodiscard]] std::vector<std::pair<std::string, std::string>> getMonitorColumns() const;
 
   // Core
   void fit();
