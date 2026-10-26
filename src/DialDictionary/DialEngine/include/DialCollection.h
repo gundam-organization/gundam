@@ -186,6 +186,7 @@ protected:
   bool initializeDialsWithKriging(const ConfigReader& dialsDefinition);
   bool initializeDialsWithExternalWeight(const ConfigReader& dialsDefinition);
 
+  void readResponseSupervisorConfig(const ConfigReader& config_);
   void readParametersFromConfig(const ConfigReader &config_);
   ConfigReader fetchDialsDefinition(const ConfigReader &definitionsList_) const;
 
@@ -206,8 +207,7 @@ private:
   bool _enableDialsSummary_{false};
   bool _allowDialExtrapolation_{true};
   int _index_{-1};
-  double _minDialResponse_{std::nan("unset")};
-  double _maxDialResponse_{std::nan("unset")};
+  DialResponseSupervisor _responseSupervisor_{};
   double _mirrorLowEdge_{std::nan("unset")};
   double _mirrorHighEdge_{std::nan("unset")};
   double _mirrorRange_{std::nan("unset")};
