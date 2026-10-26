@@ -90,13 +90,14 @@ TEST_P(RootReaderCleanup, ClosesMainAndFriendFilesBeforePropagation){
       }}]},
       "parametersManagerConfig": {"parameterSetList": [{
         "name": "shape", "isEnabled": true, "nominalStepSize": 0.1,
-        "parameterDefinitions": [{"parameterName": "p", "priorValue": 0.5, "priorType": "Flat"}],
+        "parameterDefinitions": [{"name": "p", "priorValue": 0.5, "priorType": "Flat"}],
         "dialSetDefinitions": [{"dialType": "Spline", "dialBranchData": "graph",
                                 "dialInputList": [{"name": "p"}]}]
       }]}
     }
   })");
   config["datasetList"][0]["model"]["filePathList"] = JsonType::array({{
+    {"name", "main"},
     {"path", mainFile.path},
     {"friendList", JsonType::array({{{"name", "weights"}, {"path", friendFile.path + ":weights"}}})}
   }});
