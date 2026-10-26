@@ -29,6 +29,19 @@ void Histogram::build(const ConfigReader& binningConfig_){
   }
 
 }
+int Histogram::findBinIndex(const Event& event_, int previousBinIndex_) const{
+  // BinSet rejects overlapping bins, so a valid previous bin is unambiguous.
+  if( previousBinIndex_ >= 0 and size_t(previousBinIndex_) < binContextList.size() ){
+    const auto& bin = binContextList[previousBinIndex_].bin;
+    if( event_.getVariables().isInBin(bin) ){ return bin.getIndex(); }
+  }
+  for( const auto& binContext : binContextList ){
+    if( event_.getVariables().isInBin(binContext.bin) ){
+      return binContext.bin.getIndex();
+    }
+  }
+  return -1;
+}
 void Histogram::throwEventMcError(){
   // event by event poisson throw -> takes into account the finite amount of stat in MC
 
@@ -78,22 +91,24 @@ void Histogram::throwStatError(bool useGaussThrow_){
   }
 }
 
-void Histogram::updateBinEventList(std::vector<Event>& eventList_, int iThread_) {
+void Histogram::updateBinEventList(std::vector<Event>& eventList_, int iThread_, int nThreads_) {
 
   auto bounds = GenericToolbox::ParallelWorker::getThreadBoundIndices(
-      iThread_, GundamGlobals::getNbCpuThreads(), getNbBins()
+      iThread_, nThreads_ == -1 ? GundamGlobals::getNbCpuThreads() : nThreads_, getNbBins()
   );
 
   for( int iBin = bounds.beginIndex ; iBin < bounds.endIndex ; iBin++ ){
-    size_t count = std::count_if(eventList_.begin(), eventList_.end(), [&]( auto& e) {return e.getIndices().bin == iBin;});
     getBinContextList()[iBin].eventPtrList.clear();
-    getBinContextList()[iBin].eventPtrList.resize(count, nullptr);
+  }
+  if( bounds.beginIndex == bounds.endIndex ){ return; }
 
-    // Now filling the event indexes
-    size_t index = 0;
-    std::for_each(eventList_.begin(), eventList_.end(), [&]( auto& e){
-      if( e.getIndices().bin == iBin){ getBinContextList()[iBin].eventPtrList[index++] = &e; }
-    });
+  // Scan the events once per worker, rather than twice per bin. Each bin list
+  // has a single writer and retains its capacity and event order across calls.
+  for( auto& event : eventList_ ){
+    int iBin = event.getIndices().bin;
+    if( iBin >= bounds.beginIndex and iBin < bounds.endIndex ){
+      getBinContextList()[iBin].eventPtrList.emplace_back(&event);
+    }
   }
 }
 void Histogram::refillHistogram(int iThread_){
