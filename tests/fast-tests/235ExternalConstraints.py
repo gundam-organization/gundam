@@ -226,6 +226,12 @@ def main():
     rejected(lambda c: c.update(formula='[unknown]'), 'Unused')
     rejected(lambda c: c.update(formula='[thetaValue] + x'), 'declared')
     rejected(lambda c: c.update(formula='sin('), 'Invalid formula')
+    rejected(lambda c: c.update(formula='sin([thetaValue]'), 'unbalanced delimiters')
+    rejected(lambda c: c.update(formula='[thetaValue'), 'unbalanced delimiters')
+    rejected(lambda c: c.update(formula=')[thetaValue]('), 'unbalanced delimiters')
+    rejected(lambda c: c.update(formula='([thetaValue)]'), 'unbalanced delimiters')
+    # Balanced syntax errors must still be rejected by ROOT's formula compiler.
+    rejected(lambda c: c.update(formula='[thetaValue] + * 2'), 'Invalid formula')
 
     singular = copy.deepcopy(constraint)
     singular['formula'] = 'sqrt([thetaValue]-10)'
