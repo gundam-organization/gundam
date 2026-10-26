@@ -13,8 +13,12 @@
 #include <functional>
 #include <string>
 
+class TCanvas;
 
 namespace RootUtils{
+
+  // Use the destination file name as the saved canvas window title.
+  void writeCanvas(TDirectory* dir_, TCanvas* canvas_, const std::string& saveName_ = "", bool forceWriteFile_ = false);
 
   class ObjectReader{
 
