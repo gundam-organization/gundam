@@ -6,7 +6,6 @@
 #include "BinSet.h"
 
 #include "GundamGlobals.h"
-#include "ParameterThrowerMarkHarz.h"
 #include "ConfigUtils.h"
 
 #include "GenericToolbox.Root.h"
@@ -42,7 +41,6 @@ void ParameterSet::configureImpl(){
     {"dialSetDefinitions"},
     {"enableOnlyParameters"},
     {"disableParameters"},
-    {"useMarkGenerator"},
     {"useEigenDecompForThrows"},
     {"enableEigenDecomp",{"useEigenDecompInFit"}},
     {"allowEigenDecompWithBounds"},
@@ -103,7 +101,6 @@ void ParameterSet::configureImpl(){
   _config_.fillValue(_disableParameters_, "disableParameters");
 
   // throw options
-  _config_.fillValue(_useMarkGenerator_, "useMarkGenerator");
   _config_.fillValue(_useEigenDecompForThrows_, "useEigenDecompForThrows");
 
   // eigen related parameters
@@ -670,39 +667,7 @@ void ParameterSet::throwParameters(bool rethrowIfNotInPhysical_, double gain_){
         }
       }; // End of generic function handling multiple throws
 
-  if( _useMarkGenerator_ ){
-    // Throw using an alternative method that was copied from BANFF
-    LogAlert << "Throwing parameters for " << _name_
-             << " using alternate generator: Mark Hartz Generator"
-             << std::endl;
-
-    for( int iPar = 0 ; iPar < _nCorrelatedParams_ ; iPar++ ) {
-      throwsList[iPar] = 0; // this will be used as a shift on the thrown value
-    }
-
-    if( _markHartzGen_ == nullptr ){
-      LogInfo << "Generating Cholesky matrix in set: " << getName() << std::endl;
-      _markHartzGen_ = std::make_shared<ParameterThrowerMarkHarz>(throwsList, *_priorCorrelationMatrix_);
-    }
-    // TVectorD throws(_priorCovarianceMatrix_->GetNrows());
-
-    std::vector<double> throwPars;
-    std::function<void()> markScottThrowFct = [&](){
-      if ( _markHartzGen_ == nullptr) return;
-
-      throwPars.resize(_nCorrelatedParams_);
-
-      _markHartzGen_->ThrowSet(throwPars);
-
-      // convert to TVectorD
-      for( int iPar = 0 ; iPar < _nCorrelatedParams_ ; iPar++ ) {
-        throwsList[iPar] = throwPars[iPar] * _correlatedParameterList_[iPar]->getStdDevValue();
-      }
-    };
-
-    throwParsFct( markScottThrowFct );
-  }
-  else if( _useEigenDecompForThrows_ and isEnableEigenDecomp() ){
+  if( _useEigenDecompForThrows_ and isEnableEigenDecomp() ){
     // Throw using eigen value decomposition.  This will work with degenerate
     // "covariance matrices", even if they are not positive definite (ouch),
     // so it provides an alternative to Cholesky decomposition, but is not the

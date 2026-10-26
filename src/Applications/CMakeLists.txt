@@ -51,7 +51,7 @@ if( WITH_GUNDAM_ROOT_APP AND WITH_ROOT_DICT_BUILD )
     )
     #target_compile_features(GundamRootDict PRIVATE cxx_std_17)
 
-    target_link_libraries( GundamRootDict PRIVATE ${ROOT_LIBRARIES} )
+    target_link_libraries( GundamRootDict PRIVATE GenericToolbox::GenericToolbox SimpleCppLogger ${ROOT_LIBRARIES} )
     install(TARGETS GundamRootDict DESTINATION lib)
 
     # Also need to install dict files
