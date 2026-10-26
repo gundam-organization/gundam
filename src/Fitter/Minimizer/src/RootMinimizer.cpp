@@ -8,6 +8,7 @@
 
 #include "GundamGlobals.h"
 #include "GundamUtils.h"
+#include "RootUtils.h"
 
 #include "GenericToolbox.Root.h"
 #include "Logger.h"
@@ -908,7 +909,7 @@ void RootMinimizer::writePostFitData( TDirectory* saveDir_) {
 
         if( not GundamGlobals::isLightOutputMode() ) {
           GenericToolbox::cleanupForDisplay(&accumPlot);
-          GenericToolbox::writeInTFileWithObjTypeExt(GenericToolbox::mkdirTFile(outDir_, "eigenDecomposition"), &accumPlot, "eigenBreakdown");
+          RootUtils::writeCanvas(GenericToolbox::mkdirTFile(outDir_, "eigenDecomposition"), &accumPlot, "eigenBreakdown");
         }
       }
 
@@ -956,7 +957,7 @@ void RootMinimizer::writePostFitData( TDirectory* saveDir_) {
 
         if( not GundamGlobals::isLightOutputMode() ) {
           GenericToolbox::cleanupForDisplay(&accumPlot);
-          GenericToolbox::writeInTFileWithObjTypeExt(
+          RootUtils::writeCanvas(
               GenericToolbox::mkdirTFile(outDir_, "eigenDecomposition"),
               &accumPlot, "parBreakdown"
           );
@@ -1156,7 +1157,7 @@ void RootMinimizer::writePostFitData( TDirectory* saveDir_) {
         GenericToolbox::writeInTFileWithObjTypeExt(GenericToolbox::mkdirTFile(saveSubdir_, "matrices"), corMatrix, "Correlation");
 
         GenericToolbox::cleanupForDisplay(corMatrixCanvas.get());
-        GenericToolbox::writeInTFileWithObjTypeExt(GenericToolbox::mkdirTFile(saveSubdir_, "matrices"), corMatrixCanvas.get(), "Correlation");
+        RootUtils::writeCanvas(GenericToolbox::mkdirTFile(saveSubdir_, "matrices"), corMatrixCanvas.get(), "Correlation");
 
         // Table printout
         GenericToolbox::TablePrinter t;
@@ -1371,7 +1372,7 @@ void RootMinimizer::writePostFitData( TDirectory* saveDir_) {
           if( not isNorm_ ){ preFitErrorHist->SetTitle(Form("Pre-fit/Post-fit comparison for %s", parSet_.getName().c_str())); }
           else             { preFitErrorHist->SetTitle(Form("Pre-fit/Post-fit comparison for %s (normalized)", parSet_.getName().c_str())); }
           GenericToolbox::cleanupForDisplay(errorsCanvas.get());
-          GenericToolbox::writeInTFileWithObjTypeExt(saveDir_, errorsCanvas.get(), "fitConstraints");
+          RootUtils::writeCanvas(saveDir_, errorsCanvas.get(), "fitConstraints");
 
         }; // makePrePostFitCompPlot
 
