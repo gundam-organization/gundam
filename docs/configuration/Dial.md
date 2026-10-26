@@ -45,6 +45,23 @@ external libraries to calculate weights.
 | dialsFilePath          | string       | root file containing the set of dials                                  |         |
 | dialsList              | string       | path within root file to the list of dials                             |         |
 | tableConfig            | json         | Definition of functions to call for Tabular dials                      | empty   |
+| knotResponseLimits     | range        | Clamp knot responses before building Graph and Spline dials (see below) | unbounded |
+
+`knotResponseLimits` bounds the knot ordinates when constructing a Graph or
+Spline dial, before constant and two-point optimizations. Use `[0.5, 2.0]`
+for both bounds, `{min: 0.5}` for a lower bound only, or `{max: 2.0}` for an
+upper bound only. For example:
+
+```yaml
+dialType: Spline
+dialBranchData: graph
+knotResponseLimits: {max: 2.0}
+```
+
+Spline slopes are recalculated if knots change. Interpolation and extrapolation
+can still exceed these bounds between or beyond knots; `minDialResponse` and
+`maxDialResponse` bound the evaluated response. Omitting `knotResponseLimits`
+leaves the input knots unchanged.
 
 ### Configuration for different dial types
 

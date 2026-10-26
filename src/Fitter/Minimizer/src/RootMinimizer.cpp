@@ -8,6 +8,7 @@
 
 #include "GundamGlobals.h"
 #include "GundamUtils.h"
+#include "RootUtils.h"
 
 #include "GenericToolbox.Root.h"
 #include "Logger.h"
@@ -35,6 +36,7 @@ void RootMinimizer::configureImpl(){
     {"strategy"},
     {"print_level"},
     {"tolerance"},
+    {"functionPrecision"},
     {"tolerancePerDegreeOfFreedom"},
     {"maxIterations", {"max_iter"}},
     {"maxFcnCalls", {"max_fcn"}},
@@ -57,6 +59,10 @@ void RootMinimizer::configureImpl(){
   _config_.fillValue(_strategy_, "strategy");
   _config_.fillValue(_printLevel_, "print_level");
   _config_.fillValue(_tolerance_, "tolerance");
+  _config_.fillValue(_functionPrecision_, "functionPrecision");
+  LogThrowIf(_config_.hasField("functionPrecision")
+             and (not std::isfinite(_functionPrecision_) or _functionPrecision_ <= 0.),
+             "functionPrecision must be finite and strictly positive.");
   _config_.fillValue(_tolerancePerDegreeOfFreedom_, "tolerancePerDegreeOfFreedom");
   _config_.fillValue(_maxIterations_, "maxIterations");
   _config_.fillValue(_maxFcnCalls_, "maxFcnCalls");
@@ -127,8 +133,28 @@ void RootMinimizer::initializeImpl(){
   _rootMinimizer_->SetStrategy(_strategy_);
   _rootMinimizer_->SetPrintLevel(_printLevel_);
   _rootMinimizer_->SetTolerance(_tolerance_);
+  double functionPrecision = _functionPrecision_;
+#ifdef GUNDAM_USING_BACKENDS
+  if( std::isnan(functionPrecision) and getOwner().getBackendsManager().hasBackend() ){
+    functionPrecision = getOwner().getBackendsManager().getBackend()->getCapabilities().recommendedFunctionPrecision;
+  }
+#endif
+  if( std::isfinite(functionPrecision) and functionPrecision > 0. ){
+    _rootMinimizer_->SetPrecision(functionPrecision);
+    LogInfo << "Objective function precision: " << functionPrecision
+            << (std::isnan(_functionPrecision_) ? " (backend recommendation)" : " (functionPrecision)")
+            << std::endl;
+  }
   _rootMinimizer_->SetMaxIterations(_maxIterations_);
   _rootMinimizer_->SetMaxFunctionCalls(_maxFcnCalls_);
+
+  updateFitParameterSettings();
+
+  LogInfo << "RootMinimizer initialized." << std::endl;
+}
+
+void RootMinimizer::updateFitParameterSettings(){
+  LogThrowIf(_rootMinimizer_ == nullptr, "ROOT minimizer has not been created.");
 
   for( std::size_t iFitPar = 0 ; iFitPar < getMinimizerFitParameterPtr().size() ; iFitPar++ ){
     auto& fitPar = *(getMinimizerFitParameterPtr()[iFitPar]);
@@ -170,7 +196,24 @@ void RootMinimizer::initializeImpl(){
     }
   }
 
-  LogInfo << "RootMinimizer initialized." << std::endl;
+  updateFitParameterFixedStates();
+}
+
+void RootMinimizer::updateFitParameterFixedStates(){
+  /// Apply the frozen state to the root minimizer variable definitions
+  for( std::size_t iFitPar = 0 ; iFitPar < getMinimizerFitParameterPtr().size() ; iFitPar++ ){
+    auto& fitPar = *(getMinimizerFitParameterPtr()[iFitPar]);
+    if (fitPar.isFixed()) {
+      if (fitPar.isEigen()) {
+        LogAlert << "Eigen decomposed parameters cannot be frozen, and remain free"
+                 << std::endl;
+      }
+      getMinimizer()->FixVariable(iFitPar);
+    }
+    else {
+      getMinimizer()->ReleaseVariable(iFitPar);
+    }
+  }
 }
 
 void RootMinimizer::dumpFitParameterSettings() {
@@ -229,6 +272,7 @@ void RootMinimizer::dumpMinuit2State() {
 void RootMinimizer::minimize(){
   // calling the common routine
   this->MinimizerBase::minimize();
+  updateFitParameterFixedStates();
 
   GenericToolbox::Time::Timer minimizationStopWatch;
   minimizationStopWatch.start();
@@ -236,33 +280,38 @@ void RootMinimizer::minimize(){
   int nbFitCallOffset = getMonitor().nbEvalLikelihoodCalls;
   LogInfo << "Fit call offset: " << nbFitCallOffset << std::endl;
 
-  /// Apply the frozen state to the root minimizer variable definitions
-  for( std::size_t iFitPar = 0 ; iFitPar < getMinimizerFitParameterPtr().size() ; iFitPar++ ){
-    auto& fitPar = *(getMinimizerFitParameterPtr()[iFitPar]);
-    if (fitPar.isFixed()) {
-      if (fitPar.isEigen()) {
-        LogAlert << "Eigen decomposed parameters cannot be frozen, and remain free"
-                 << std::endl;
-      }
-      getMinimizer()->FixVariable(iFitPar);
-    }
-    else {
-      getMinimizer()->ReleaseVariable(iFitPar);
-    }
-  }
-
   dumpFitParameterSettings();
 
   if( _preFitWithSimplex_ ){
     LogInfo << "Running simplex algo before the minimizer" << std::endl;
     LogThrowIf(_minimizerType_ != "Minuit2", "Can't launch simplex with " << _minimizerType_);
 
-    std::string originalAlgo = _rootMinimizer_->Options().MinimizerAlgorithm();
-
-    _rootMinimizer_->Options().SetMinimizerAlgorithm( "Simplex" );
+    // Options() returns a copy, and changing its algorithm does not replace
+    // Minuit2's internal minimizer. Use a separate Simplex instance, keeping
+    // the main minimizer's step sizes and covariance state independent.
+    auto originalMinimizer = std::move(_rootMinimizer_);
+    GenericToolbox::ScopedGuard restoreMinimizer{
+        [](){}, [&](){ _rootMinimizer_ = std::move(originalMinimizer); }
+    };
+    _rootMinimizer_.reset(ROOT::Math::Factory::CreateMinimizer(_minimizerType_, "Simplex"));
+    LogThrowIf(_rootMinimizer_ == nullptr, "Could not create the Simplex minimizer.");
+    auto simplexOptions = originalMinimizer->Options();
+    simplexOptions.SetMinimizerType(_minimizerType_.c_str());
+    simplexOptions.SetMinimizerAlgorithm("Simplex");
+    _rootMinimizer_->SetOptions(simplexOptions); // Includes objective function precision.
+    _rootMinimizer_->SetFunction(_functor_);
     _rootMinimizer_->SetMaxFunctionCalls(_simplexMaxFcnCalls_);
-    _rootMinimizer_->SetTolerance(_tolerance_ * _simplexToleranceLoose_ );
-    _rootMinimizer_->SetStrategy(0);
+    _rootMinimizer_->SetTolerance(_tolerance_ * _simplexToleranceLoose_);
+    _rootMinimizer_->SetStrategy(_simplexStrategy_);
+
+    std::vector<ROOT::Fit::ParameterSettings> variables(originalMinimizer->NDim());
+    for( std::size_t i = 0; i < variables.size(); ++i ){
+      LogThrowIf(not originalMinimizer->GetVariableSettings(i, variables[i]),
+                 "Could not copy Simplex variable settings for parameter " << i);
+    }
+    LogThrowIf(_rootMinimizer_->SetVariables(variables.begin(), variables.end()) != variables.size(),
+               "Could not initialize Simplex variables.");
+    LogInfo << "Simplex objective function precision: " << _rootMinimizer_->Precision() << std::endl;
 
     getMonitor().minimizerTitle = _minimizerType_ + "/" + "Simplex";
     getMonitor().stateTitleMonitor = "Running Simplex";
@@ -288,11 +337,12 @@ void RootMinimizer::minimize(){
       );
     }
 
-    // Back to original
-    _rootMinimizer_->Options().SetMinimizerAlgorithm(originalAlgo.c_str());
-    _rootMinimizer_->SetMaxFunctionCalls(_maxFcnCalls_);
-    _rootMinimizer_->SetTolerance(_tolerance_);
-    _rootMinimizer_->SetStrategy(_strategy_);
+    // Transfer the best point only. Simplex errors are not a Migrad covariance
+    // or suitable replacements for the configured parameter step sizes.
+    for( std::size_t i = 0; i < postfitCache.bestfitPoint.size(); ++i ){
+      LogThrowIf(not originalMinimizer->SetVariableValue(i, postfitCache.bestfitPoint[i]),
+                 "Could not transfer the Simplex best-fit value for parameter " << i);
+    }
 
     LogInfo << getMonitor().convergenceMonitor.generateMonitorString(); // lasting printout
     LogInfo << "Simplex ended after " << getMonitor().nbEvalLikelihoodCalls - nbFitCallOffset << " calls." << std::endl;
@@ -685,6 +735,9 @@ void RootMinimizer::saveMinimizerSettings( TDirectory* saveDir_) const {
   GenericToolbox::writeInTFileWithObjTypeExt( saveDir_, TNamed("maxIterations", std::to_string(_maxIterations_).c_str()) );
   GenericToolbox::writeInTFileWithObjTypeExt( saveDir_, TNamed("maxFcnCalls", std::to_string(_maxFcnCalls_).c_str()) );
   GenericToolbox::writeInTFileWithObjTypeExt( saveDir_, TNamed("tolerance", std::to_string(_tolerance_).c_str()) );
+  std::ostringstream precision;
+  precision << std::setprecision(std::numeric_limits<double>::max_digits10) << getFunctionPrecision();
+  GenericToolbox::writeInTFileWithObjTypeExt( saveDir_, TNamed("functionPrecision", precision.str().c_str()) );
   GenericToolbox::writeInTFileWithObjTypeExt( saveDir_, TNamed("stepSizeScaling", std::to_string(_stepSizeScaling_).c_str()) );
   GenericToolbox::writeInTFileWithObjTypeExt( saveDir_, TNamed("useNormalizedFitSpace", std::to_string(useNormalizedFitSpace()).c_str()) );
 
@@ -897,7 +950,7 @@ void RootMinimizer::writePostFitData( TDirectory* saveDir_) {
 
         if( not GundamGlobals::isLightOutputMode() ) {
           GenericToolbox::cleanupForDisplay(&accumPlot);
-          GenericToolbox::writeInTFileWithObjTypeExt(GenericToolbox::mkdirTFile(outDir_, "eigenDecomposition"), &accumPlot, "eigenBreakdown");
+          RootUtils::writeCanvas(GenericToolbox::mkdirTFile(outDir_, "eigenDecomposition"), &accumPlot, "eigenBreakdown");
         }
       }
 
@@ -945,7 +998,7 @@ void RootMinimizer::writePostFitData( TDirectory* saveDir_) {
 
         if( not GundamGlobals::isLightOutputMode() ) {
           GenericToolbox::cleanupForDisplay(&accumPlot);
-          GenericToolbox::writeInTFileWithObjTypeExt(
+          RootUtils::writeCanvas(
               GenericToolbox::mkdirTFile(outDir_, "eigenDecomposition"),
               &accumPlot, "parBreakdown"
           );
@@ -1149,7 +1202,7 @@ void RootMinimizer::writePostFitData( TDirectory* saveDir_) {
         GenericToolbox::writeInTFileWithObjTypeExt(GenericToolbox::mkdirTFile(saveSubdir_, "matrices"), corMatrix, "Correlation");
 
         GenericToolbox::cleanupForDisplay(corMatrixCanvas.get());
-        GenericToolbox::writeInTFileWithObjTypeExt(GenericToolbox::mkdirTFile(saveSubdir_, "matrices"), corMatrixCanvas.get(), "Correlation");
+        RootUtils::writeCanvas(GenericToolbox::mkdirTFile(saveSubdir_, "matrices"), corMatrixCanvas.get(), "Correlation");
 
         // Table printout
         GenericToolbox::TablePrinter t;
@@ -1364,7 +1417,7 @@ void RootMinimizer::writePostFitData( TDirectory* saveDir_) {
           if( not isNorm_ ){ preFitErrorHist->SetTitle(Form("Pre-fit/Post-fit comparison for %s", parSet_.getName().c_str())); }
           else             { preFitErrorHist->SetTitle(Form("Pre-fit/Post-fit comparison for %s (normalized)", parSet_.getName().c_str())); }
           GenericToolbox::cleanupForDisplay(errorsCanvas.get());
-          GenericToolbox::writeInTFileWithObjTypeExt(saveDir_, errorsCanvas.get(), "fitConstraints");
+          RootUtils::writeCanvas(saveDir_, errorsCanvas.get(), "fitConstraints");
 
         }; // makePrePostFitCompPlot
 

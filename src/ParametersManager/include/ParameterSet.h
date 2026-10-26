@@ -6,7 +6,6 @@
 #define GUNDAM_PARAMETERSET_H
 
 #include "Parameter.h"
-#include "ParameterThrowerMarkHarz.h"
 
 #include "Logger.h"
 #include "GenericToolbox.Root.h"
@@ -198,7 +197,6 @@ private:
   // configuration
   bool _isEnabled_{false};
   bool _isScanEnabled_{true};
-  bool _useMarkGenerator_{false};
   bool _useEigenDecompForThrows_{false};
   bool _printDialSetsSummary_{false};
   bool _printParametersSummary_{false};
@@ -278,7 +276,6 @@ private:
 
   std::shared_ptr<TMatrixD> _choleskyMatrix_{nullptr};
   GenericToolbox::CorrelatedVariablesSampler _correlatedVariableThrower_{};
-  std::shared_ptr<ParameterThrowerMarkHarz> _markHartzGen_{nullptr};
 
 };
 
