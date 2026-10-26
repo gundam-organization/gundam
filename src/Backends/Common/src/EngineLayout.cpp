@@ -3,6 +3,7 @@
 #include "Bilinear.h"
 #include "Bicubic.h"
 #include "CompactSpline.h"
+#include "CompositeDial.h"
 #include "DialResponseSupervisor.h"
 #include "EventDialCache.h"
 #include "ExternalWeightDispatcher.h"
@@ -95,6 +96,8 @@ namespace {
         if( not dialIndexMap.emplace(interface, uncompiledDial).second ){ continue; }
         const auto* dial = interface->getDialBaseRef();
         LogThrowIf(dial == nullptr, "Null DialBase while building EngineView.");
+        LogThrowIf(dynamic_cast<const CompositeDial*>(dial) != nullptr,
+                   "Composite dials currently require the standard propagation engine; disable backendManagerConfig.isEnabled");
         if( dynamic_cast<const Shift*>(dial) != nullptr ){ ++payloadCount; }
         else if( dynamic_cast<const Norm*>(dial) == nullptr
                  and dynamic_cast<const ExternalWeightDispatcher*>(dial) == nullptr

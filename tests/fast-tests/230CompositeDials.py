@@ -348,6 +348,10 @@ extern "C" int weights(const char*, int, int, double*, int, int* indices, double
         child.update(name='output', dialInputList=[upstream, second])
         graph['nodes'][1] = child
         reject(config, 'requires parameter inputs')
+    if hasattr(GUNDAM.FitterEngine, 'getBackendsManager'):
+        config = copy.deepcopy(good)
+        config['likelihoodInterfaceConfig']['backendManagerConfig'] = {'isEnabled': True, 'type': 'CPU'}
+        reject(config, 'standard propagation engine')
     print('SUCCESS: composite dial graphs, event/bin binding, observables and validation.')
 
 
