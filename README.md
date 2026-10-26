@@ -37,10 +37,10 @@ GUNDAM [User Documentation](https://gundam-organization.github.io/gundam/) is gr
 ## There are several requirements for building the fitter:
 
 - CMake 3.12+
-- A C++14 enabled compiler (C++17 is preferred)
-  - Recommended GCC 8+ ( GCC 5 minimum )
-  - Recommended Clang 9+ ( Clang 3.4 minimum )
-- [ROOT 6, compiled with C++14 or later](https://github.com/root-project/root)
+- A compiler supporting C++17 or later
+  - Recommended GCC 8+
+  - Recommended Clang 9+
+- [ROOT 6, compiled with C++17 or later](https://github.com/root-project/root)
 
 ![Clone & Update banner](resources/images/README/sections/sections.002.png)
 
