@@ -54,6 +54,7 @@ public:
   [[nodiscard]] BinningResponse::EventResponse evaluateEventBinningResponse(const Event& event_) const;
   [[nodiscard]] std::vector<BinningResponse::BinFraction> evaluateBinningResponse(const Event& event_) const;
   void throwEventMcError();
+  // With a binning response, fluctuates bin contents only; refilling discards the throw.
   void throwStatError(bool useGaussThrow_ = false);
 
   // multi-thread

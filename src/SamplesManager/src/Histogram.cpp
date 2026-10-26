@@ -105,11 +105,7 @@ void Histogram::throwEventMcError(){
 
   // event by event poisson throw -> takes into account the finite amount of stat in MC
 
-#if HAS_CPP_17
   for( auto [binContent, binContext] : loop() ){
-#else
-  for( auto element : loop() ){ auto& binContent = std::get<0>(element); auto& binContext = std::get<1>(element);
-#endif
     binContent.sumWeights = 0;
     binContent.sqrtSumSqWeights = 0;
     for (auto *eventPtr: binContext.eventPtrList) {
@@ -126,19 +122,12 @@ void Histogram::throwEventMcError(){
 
 }
 void Histogram::throwStatError(bool useGaussThrow_){
-  LogThrowIf(isBinningResponseEnabled(),
-             "Bin-wise statistical throws cannot be represented by shared event weights with a binning response.");
-
   /*
    * This is to convert "Asimov" histogram to toy-experiment (pseudo-data), i.e. with statistical fluctuations
    * */
   double nCounts;
 
-#if HAS_CPP_17
   for( auto [binContent, binContext] : loop() ){
-#else
-  for( auto element : loop() ){ auto& binContent = std::get<0>(element); auto& binContext = std::get<1>(element);
-#endif
     if( binContent.sumWeights == 0 ){
       // this should not happen.
       continue;
@@ -153,11 +142,15 @@ void Histogram::throwStatError(bool useGaussThrow_){
           , 0 // if the throw is negative, cap it to 0
       ) );
     }
-    for (auto *eventPtr: binContext.eventPtrList) {
-      // make sure refill of the histogram will produce the same hist
-      if( binContent.sumWeights == 0 ){ eventPtr->getWeights().current = 0; }
-      else{ eventPtr->getWeights().current *= (double) nCounts / binContent.sumWeights; }
+    if( not isBinningResponseEnabled() ){
+      // With exclusive bins, back propagation on event weight is possible
+      // keep event weights consistent with the thrown contents.
+      for( auto* eventPtr : binContext.eventPtrList ){
+        eventPtr->getWeights().current *= nCounts / binContent.sumWeights;
+      }
     }
+    // With a binning response, events contribute to several bins: independent
+    // data throws live only in the histogram and are overwritten by a refill.
     binContent.sumWeights = nCounts;
   }
 }
@@ -332,11 +325,7 @@ void Histogram::refillHistogram(int iThread_){
   // avoid using [] operator for each access. Use the memory address directly
   double weightBuffer;
 
-#if HAS_CPP_17
   for( auto [binContent, binContext] : loop(bounds.beginIndex, bounds.endIndex) ){
-#else
-  for( auto element : loop(bounds.beginIndex, bounds.endIndex) ){ auto& binContent = std::get<0>(element); auto& binContext = std::get<1>(element);
-#endif
 
     // reset
     binContent.sumWeights = 0;
