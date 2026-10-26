@@ -124,6 +124,12 @@ void Propagator::buildDialCache(){
   _eventDialCache_.buildReferenceCache(_sampleSet_, _dialManager_.getDialCollectionList());
   _dialManager_.invalidateInputBuffers();
 }
+void Propagator::updateEventSampleBinning(){
+  for( auto& sample : _sampleSet_.getSampleList() ){
+    if( not sample.isUseDynamicBinning() ){ continue; }
+    sample.updateEventBinning(_threadPool_);
+  }
+}
 void Propagator::propagateParameters(){
   std::future<bool> result = applyParameters();
   static_cast<void>(result.get());

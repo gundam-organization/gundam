@@ -64,6 +64,10 @@ public:
   // Core
   void clearContent();
   void buildDialCache();
+  /// Reassign events in dynamic samples using their current stored variables.
+  /// Rebuild bin event lists; the next propagation refills the histograms.
+  /// Event-to-dial associations are preserved.
+  void updateEventSampleBinning();
 
   /// Apply the current parameters and wait for it to finish.  This reweights
   /// the events, and refills the histograms.  This is a convenience wrapper
