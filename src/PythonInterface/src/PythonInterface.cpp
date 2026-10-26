@@ -303,6 +303,7 @@ PYBIND11_MODULE(GUNDAM, module) {
   .def("getParameterValue", &Parameter::getParameterValue)
   .def("getSummary", &Parameter::getSummary)
   .def("setParameterValue", &Parameter::setParameterValue, pybind11::arg("parameterValue"), pybind11::arg("force") = false)
+  .def("setIsFixed", &Parameter::setIsFixed)
   ;
 
   pybind11::class_<TMatrixDSym, std::shared_ptr<TMatrixDSym>>(module, "TMatrixDSym")
@@ -324,6 +325,7 @@ PYBIND11_MODULE(GUNDAM, module) {
   pybind11::class_<ParameterSet>(module, "ParameterSet")
   .def(pybind11::init())
   .def("isEnableEigenDecomp", &ParameterSet::isEnableEigenDecomp)
+  .def("getName", &ParameterSet::getName)
   .def("getParameterList", pybind11::overload_cast<>(&ParameterSet::getParameterList), pybind11::return_value_policy::reference_internal)
   .def("getEigenParameterList", pybind11::overload_cast<>(&ParameterSet::getEigenParameterList), pybind11::return_value_policy::reference_internal)
   .def("getPriorCovarianceMatrix", pybind11::overload_cast<>(&ParameterSet::getPriorCovarianceMatrix, pybind11::const_))
@@ -486,7 +488,10 @@ PYBIND11_MODULE(GUNDAM, module) {
   likelihoodInterfaceClass
   .def(pybind11::init())
   .def("getSummary", &LikelihoodInterface::getSummary, pybind11::call_guard<pybind11::gil_scoped_release>())
+  .def("getSampleBreakdownTable", &LikelihoodInterface::getSampleBreakdownTable, pybind11::call_guard<pybind11::gil_scoped_release>())
   .def("getLastLikelihood", &LikelihoodInterface::getLastLikelihood, pybind11::call_guard<pybind11::gil_scoped_release>())
+  .def("getLastPenaltyLikelihood", &LikelihoodInterface::getLastPenaltyLikelihood, pybind11::call_guard<pybind11::gil_scoped_release>())
+  .def("getLastStatLikelihood", &LikelihoodInterface::getLastStatLikelihood, pybind11::call_guard<pybind11::gil_scoped_release>())
   .def("propagateAndEvalLikelihood", &LikelihoodInterface::propagateAndEvalLikelihood, pybind11::call_guard<pybind11::gil_scoped_release>())
   .def("setForceAsimovData", &LikelihoodInterface::setForceAsimovData, pybind11::call_guard<pybind11::gil_scoped_release>())
   .def("throwToyParameters", &LikelihoodInterface::throwToyParameters, pybind11::call_guard<pybind11::gil_scoped_release>())
@@ -506,7 +511,11 @@ PYBIND11_MODULE(GUNDAM, module) {
 
   // no CTOR here
   pybind11::class_<MinimizerBase>(module, "MinimizerBase")
+  .def("isRootMinimizer", [](const MinimizerBase& this_){
+    return dynamic_cast<const RootMinimizer*>(&this_) != nullptr;
+  })
   .def("minimize", &MinimizerBase::minimize)
+  .def("getMinimizerStatus", &MinimizerBase::getMinimizerStatus)
   .def("throwPostfitParameters", &MinimizerBase::throwPostfitParameters)
   .def("fetchNbDegreeOfFreedom", &MinimizerBase::fetchNbDegreeOfFreedom)
   .def("getMinimizerFitParameterPtr", pybind11::overload_cast<>(&MinimizerBase::getMinimizerFitParameterPtr),
@@ -514,6 +523,10 @@ PYBIND11_MODULE(GUNDAM, module) {
   ;
 
   pybind11::class_<RootMinimizer, MinimizerBase>(module, "RootMinimizer")
+  .def("getFunctionPrecision", &RootMinimizer::getFunctionPrecision)
+  .def("updateFitParameterSettings", &RootMinimizer::updateFitParameterSettings)
+  .def("hasConverged", &RootMinimizer::hasConverged)
+  .def("isMinimizeDone", &RootMinimizer::isMinimizeDone)
   .def("throwPostfitParameters", &RootMinimizer::throwPostfitParameters)
   ;
 
