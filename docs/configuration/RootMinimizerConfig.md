@@ -26,6 +26,7 @@ the minimizer type is set to `RootMinimizer`.
 | algorithm                       | string | algorithm name                                                               | default from engine |
 | errors                          | string | algorithm to run after the fit (HESSE or MINOS)                              | Hesse               |
 | tolerance                       | double | defines the required Estimated Distance from the Minimum stopping the fit    | 1E-4                |
+| functionPrecision               | double | Relative numerical precision of the objective; must be finite and positive   | ROOT (double)       |
 | maxFcnCalls                     | int    | maximum number of function calls before stopping fit                         | 1E9                 |
 | maxIterations                   | int    | maximum number of minimizer iterations before stopping fit                   | 500                 |
 | strategy                        | int    | [fitter strategy (sec. 1.3)](https://root.cern.ch/download/minuit.pdf)       | 1                   |
@@ -41,6 +42,26 @@ the minimizer type is set to `RootMinimizer`.
 | monitorGradientDescent          | bool   |                                                                              |                     |
 | tolerancePerDegreeOfFreedome    | int    |                                                                              |                     |
 
+### Objective function precision
+
+`functionPrecision` is passed to the numerical minimizer through `SetPrecision()`.
+It describes the precision of likelihood evaluations and affects numerical
+derivatives, including Hesse. It is distinct from `tolerance`, which controls
+convergence through the estimated distance from the minimum.
+
+When omitted, GUNDAM uses the active backend's recommendation if available.
+MPS recommends float epsilon (`1.1920928955078125e-7`) because its event weights
+and histogram outputs use float. CPU and reference propagation leave ROOT's
+precision default unchanged. An explicit `functionPrecision` takes precedence.
+The selected recommendation or override is printed during initialization; the
+minimizer precision is also saved as `fit/minimizer/functionPrecision_TNamed`
+under the fitter output directory.
+
+A value smaller than the actual numerical noise can produce unreliable Hesse
+errors. Increasing it allows larger differentiation steps, but does not restore
+double precision to GPU calculations. Check uncertainty stability against CPU
+and variations of this setting for the analysis being fitted. See the
+[MPS Hesse investigation](../guides/MpsHessePrecision.md) for measured limits.
 
 ### SIMPLEX prefit
 
