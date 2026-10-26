@@ -36,6 +36,7 @@ void RootMinimizer::configureImpl(){
     {"strategy"},
     {"print_level"},
     {"tolerance"},
+    {"functionPrecision"},
     {"tolerancePerDegreeOfFreedom"},
     {"maxIterations", {"max_iter"}},
     {"maxFcnCalls", {"max_fcn"}},
@@ -58,6 +59,10 @@ void RootMinimizer::configureImpl(){
   _config_.fillValue(_strategy_, "strategy");
   _config_.fillValue(_printLevel_, "print_level");
   _config_.fillValue(_tolerance_, "tolerance");
+  _config_.fillValue(_functionPrecision_, "functionPrecision");
+  LogThrowIf(_config_.hasField("functionPrecision")
+             and (not std::isfinite(_functionPrecision_) or _functionPrecision_ <= 0.),
+             "functionPrecision must be finite and strictly positive.");
   _config_.fillValue(_tolerancePerDegreeOfFreedom_, "tolerancePerDegreeOfFreedom");
   _config_.fillValue(_maxIterations_, "maxIterations");
   _config_.fillValue(_maxFcnCalls_, "maxFcnCalls");
@@ -128,6 +133,18 @@ void RootMinimizer::initializeImpl(){
   _rootMinimizer_->SetStrategy(_strategy_);
   _rootMinimizer_->SetPrintLevel(_printLevel_);
   _rootMinimizer_->SetTolerance(_tolerance_);
+  double functionPrecision = _functionPrecision_;
+#ifdef GUNDAM_USING_BACKENDS
+  if( std::isnan(functionPrecision) and getOwner().getBackendsManager().hasBackend() ){
+    functionPrecision = getOwner().getBackendsManager().getBackend()->getCapabilities().recommendedFunctionPrecision;
+  }
+#endif
+  if( std::isfinite(functionPrecision) and functionPrecision > 0. ){
+    _rootMinimizer_->SetPrecision(functionPrecision);
+    LogInfo << "Objective function precision: " << functionPrecision
+            << (std::isnan(_functionPrecision_) ? " (backend recommendation)" : " (functionPrecision)")
+            << std::endl;
+  }
   _rootMinimizer_->SetMaxIterations(_maxIterations_);
   _rootMinimizer_->SetMaxFunctionCalls(_maxFcnCalls_);
 
@@ -718,6 +735,9 @@ void RootMinimizer::saveMinimizerSettings( TDirectory* saveDir_) const {
   GenericToolbox::writeInTFileWithObjTypeExt( saveDir_, TNamed("maxIterations", std::to_string(_maxIterations_).c_str()) );
   GenericToolbox::writeInTFileWithObjTypeExt( saveDir_, TNamed("maxFcnCalls", std::to_string(_maxFcnCalls_).c_str()) );
   GenericToolbox::writeInTFileWithObjTypeExt( saveDir_, TNamed("tolerance", std::to_string(_tolerance_).c_str()) );
+  std::ostringstream precision;
+  precision << std::setprecision(std::numeric_limits<double>::max_digits10) << getFunctionPrecision();
+  GenericToolbox::writeInTFileWithObjTypeExt( saveDir_, TNamed("functionPrecision", precision.str().c_str()) );
   GenericToolbox::writeInTFileWithObjTypeExt( saveDir_, TNamed("stepSizeScaling", std::to_string(_stepSizeScaling_).c_str()) );
   GenericToolbox::writeInTFileWithObjTypeExt( saveDir_, TNamed("useNormalizedFitSpace", std::to_string(useNormalizedFitSpace()).c_str()) );
 
