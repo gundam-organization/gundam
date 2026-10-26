@@ -997,13 +997,16 @@ void DataDispenser::fetchRequestedLeaves(){
     }
   }
 
-  // sample binning -> indexing only
+  // Sample binning variables are also stored when dynamic binning is enabled.
   {
     std::vector<std::string> varForIndexingListBuffer{};
     for (const auto& sample : _cache_.propagatorPtr->getSampleSet().getSampleList()) {
       for (const auto& binContext : sample.getHistogram().getBinContextList()) {
         for (const auto& edges : binContext.bin.getEdgesList()) {
           GenericToolbox::addIfNotInVector(edges.varName, varForIndexingListBuffer);
+          if( sample.isUseDynamicBinning() ){
+            GenericToolbox::addIfNotInVector(edges.varName, _cache_.propagatorPtr->getSampleSet().getEventVariableNameList());
+          }
         }
       }
       if( not sample.getSelectionCutsStr().empty() ){
@@ -2106,15 +2109,15 @@ void DataDispenser::loadEvent(int iThread_){
       sampleWeightList.clear(); sampleWeightList.reserve(sampleIdxList.size());
 
 
-      bool hasValidBin{false};
+      bool hasSampleToFill{false};
       for( auto& sampleIdx : sampleIdxList ) {
         Sample& eventSample{*_cache_.samplesToFillList[sampleIdx]};
         // look for the bin index
-        LoaderUtils::fillBinIndex(eventIndexingBuffer, eventSample.getHistogram().getBinContextList());
+        eventIndexingBuffer.getIndices().bin = eventSample.getHistogram().findBinIndex(eventIndexingBuffer);
         sampleBinIdxList.emplace_back(eventIndexingBuffer.getIndices().bin);
 
         // No bin found -> warning
-        if( sampleBinIdxList.back() == -1 ){
+        if( sampleBinIdxList.back() == -1 and not eventSample.isUseDynamicBinning() ){
           const int unbinnedEventThrottle = 5;
           if( this->_unbinnedEvents_++ < unbinnedEventThrottle ){
 
@@ -2149,10 +2152,12 @@ void DataDispenser::loadEvent(int iThread_){
           sampleWeightList.back() *= sampleWeight;
         }
 
-        hasValidBin = hasValidBin or ( sampleBinIdxList.back() != -1 and sampleWeightList.back() != 0 );
+        hasSampleToFill = hasSampleToFill or (
+            (sampleBinIdxList.back() != -1 or eventSample.isUseDynamicBinning())
+            and sampleWeightList.back() != 0 );
       }
 
-      if( not hasValidBin ){ continue; }
+      if( not hasSampleToFill ){ continue; }
 
       // now we are sure the entry should be read till the end
 
@@ -2220,7 +2225,9 @@ void DataDispenser::loadEvent(int iThread_){
 
     const auto& sampleIdxList = _cache_.entrySampleIndexList[eventIndexingBuffer.getIndices().entry];
     for( int iSample = 0 ; iSample < int(sampleIdxList.size()) ; iSample++ ){
-      if( sampleBinIdxList[iSample] == -1 or sampleWeightList[iSample] == 0. ){ continue; }
+      if( sampleWeightList[iSample] == 0. ){ continue; }
+      if( sampleBinIdxList[iSample] == -1
+          and not _cache_.samplesToFillList[sampleIdxList[iSample]]->isUseDynamicBinning() ){ continue; }
 
       // update for this specific sample
       eventIndexingBuffer.getIndices().sample = _cache_.samplesToFillList[sampleIdxList[iSample]]->getIndex();
