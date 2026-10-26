@@ -40,7 +40,8 @@ def write_input(path, offset, variant="regular"):
         tree.Write()
 
 
-def evaluate(paths, branch_data, backend):
+def evaluate(paths, branch_data, backend, dial_type="Spline", options="", knot_limits=None):
+    import json
     import GUNDAM
     print("Testing module:", GUNDAM.__file__, flush=True)
     GUNDAM.setLightOutputMode(True)
@@ -75,7 +76,9 @@ likelihoodInterfaceConfig:
               priorValue: 0.0
               priorType: Flat
           dialSetDefinitions:
-            - dialType: Spline
+            - dialType: {dial_type}
+              options: {json.dumps(options)}
+              {"knotResponseLimits: " + json.dumps(knot_limits) if knot_limits is not None else ""}
               {branch_data}
               dialInputList: [{{name: p}}]
 """)
