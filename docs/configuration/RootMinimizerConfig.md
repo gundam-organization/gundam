@@ -40,3 +40,17 @@ the minimizer type is set to `RootMinimizer`.
 | monitorRefreshRateInMs          | int    | Max refresh rate for the fit monitor in milliseconds                         | 5000                |
 | monitorGradientDescent          | bool   |                                                                              |                     |
 | tolerancePerDegreeOfFreedome    | int    |                                                                              |                     |
+
+
+### SIMPLEX prefit
+
+`enableSimplexBeforeMinimize` creates a separate Minuit2 Simplex minimizer before
+the configured main algorithm. It inherits the main minimizer's options,
+including objective function precision, and uses `simplexStrategy`,
+`simplexMaxFcnCalls` and `tolerance * simplexToleranceLoose`.
+
+The prefit copies all variable definitions, fixed states and limits. Its best
+parameter values become the main minimizer's starting point. The main algorithm
+retains its configured step sizes, precision, strategy and tolerance; Simplex's
+error estimates are not used as a Migrad covariance. The original minimizer is
+also restored if the prefit throws an exception.
