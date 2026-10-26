@@ -1,3 +1,4 @@
+#include "BackendTypes.h"
 #include "BinningGeometry.h"
 #include "DialDependencies.h"
 #include "DialDependencyGroups.h"
