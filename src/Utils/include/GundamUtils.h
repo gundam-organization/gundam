@@ -17,7 +17,7 @@
 #include <functional>
 
 // compiler flags
-#if HAS_CPP_17
+#if __cplusplus >= 202002L
 #define GUNDAM_LIKELY_COMPILER_FLAG [[likely]]
 #define GUNDAM_UNLIKELY_COMPILER_FLAG [[unlikely]]
 #else
@@ -44,7 +44,7 @@ namespace GundamUtils {
   std::string generateFileName(const CmdLineParser& clp_, const std::vector<AppendixEntry>& appendixDict_);
 
   // dicts
-  static const std::map<int, std::string> minuitStatusCodeStr{
+  inline const std::map<int, std::string> minuitStatusCodeStr{
       { 0 , "status = 0    : OK" },
       { 1 , "status = 1    : Covariance was mad! Thus made pos defined"},
       { 2 , "status = 2    : Hesse is invalid"},
@@ -53,14 +53,14 @@ namespace GundamUtils {
       { 5 , "status = 5    : Any other failure"},
       { -1, "status = -1   : We don't even know what happened"}
   };
-  static const std::map<int, std::string> hesseStatusCodeStr{
+  inline const std::map<int, std::string> hesseStatusCodeStr{
       { 0, "status = 0    : OK" },
       { 1, "status = 1    : Hesse failed"},
       { 2, "status = 2    : Matrix inversion failed"},
       { 3, "status = 3    : Matrix is not pos defined"},
       { -1, "status = -1    : Minimize wasn't called before"}
   };
-  static const std::map<int, std::string> minosStatusCodeStr{
+  inline const std::map<int, std::string> minosStatusCodeStr{
       { 0, "status = 0    : last MINOS run was succesfull" },
       { 1, "status = 1    : Maximum number of function calls exceeded when running for lower error"},
       { 2, "status = 2    : maximum number of function calls exceeded when running for upper error"},
@@ -71,7 +71,7 @@ namespace GundamUtils {
   };
 
   // 0 not calculated 1 approximated 2 made pos def , 3 accurate
-  static const std::map<int, std::string> covMatrixStatusCodeStr{
+  inline const std::map<int, std::string> covMatrixStatusCodeStr{
       { -1, "status = -1   : not available (Hesse or matrix inversion failed)" },
       { 0, "status = 0    : not calculated" },
       { 1, "status = 1    : approximated"},
