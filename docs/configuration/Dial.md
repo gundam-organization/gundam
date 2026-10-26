@@ -218,3 +218,43 @@ dialBranchData: spline_graph
 Existing configurations using `dialLeafName: spline_graph` or
 `treeExpression: spline_graph` remain supported. The array-pair form is limited
 to `Spline` and `Graph` dials; it does not use the TClonesArray dial index.
+
+### Applying a dial to an event variable
+
+Any dial can target a stored event variable instead of the event weight:
+
+```yaml
+dialType: Normalization
+applyToVariable: recoEnergy
+variableResponseMode: Multiply
+```
+
+`variableResponseMode` accepts `Multiply` (the default), `Add`, or `Override`.
+For each event and target variable, responses are composed as:
+
+```text
+value = (Override response, or loaded value) * product(Multiply responses) + sum(Add responses)
+```
+
+Multiple `Override` dials targeting the same variable of the same event are an
+error. Disjoint application conditions may select different override dials.
+Every propagation starts from the loaded reference value, so shifts do not
+accumulate. Target variables hold double precision responses; other variables
+retain their stored types. The reference is captured when the dial cache is built,
+before the first propagation.
+
+The loader stores target variables automatically and retains out-of-bin events
+in samples binned with those variables by enabling `useDynamicBinning`. Initial
+loading assigns bins using the loaded values. Propagation updates variables,
+rebuilds bin contributions, computes event weights, and fills histograms.
+Smoothing is enabled only through an explicit `binningResponse` configuration;
+its fractions are recomputed using the updated variables.
+
+`Add` and `Override` allow negative responses by default. Explicit
+`minDialResponse` and `maxDialResponse` limits still apply. Variable responses
+are excluded from the event weight and its global reweight cap. Sample selections
+and event-to-dial associations remain those established at loading; derived
+variables are not automatically recalculated after a target variable changes.
+This feature currently requires the CPU propagation path. Leave CacheManager
+disabled (`--cache-manager off` with `gundamFitter`); its support is outside this
+implementation.
