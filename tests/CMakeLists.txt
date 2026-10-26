@@ -93,6 +93,8 @@ if( WITH_GOOGLE_TEST )
   list(APPEND FAST_TESTS GTests/unitTest_DialResponseSupervisor.cpp)
   list(APPEND FAST_TESTS GTests/unitTest_DataDispenser.cpp)
   list(APPEND FAST_TESTS GTests/unitTest_RootMinimizerSimplex.cpp)
+  list(APPEND FAST_TESTS GTests/unitTest_DialResponseSupervisor.cpp)
+
   if(WITH_BACKENDS)
     list(APPEND FAST_TESTS GTests/unitTest_CudaBackend.cpp)
     list(APPEND FAST_TESTS GTests/unitTest_EngineLayout.cpp)
