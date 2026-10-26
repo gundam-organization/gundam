@@ -9,6 +9,35 @@
 #include <limits>
 #include <regex>
 #include <set>
+#include <vector>
+
+namespace {
+  bool hasBalancedDelimiters(const std::string& formula_){
+    std::vector<char> delimiters;
+    char quote{0};
+    bool escaped{false};
+    for( char character : formula_ ){
+      if( quote != 0 ){
+        if( escaped ){ escaped = false; }
+        else if( character == '\\' ){ escaped = true; }
+        else if( character == quote ){ quote = 0; }
+        continue;
+      }
+      if( character == '"' or character == '\'' ){
+        quote = character;
+      }
+      else if( character == '(' or character == '[' or character == '{' ){
+        delimiters.push_back(character);
+      }
+      else if( character == ')' or character == ']' or character == '}' ){
+        const char opening = character == ')' ? '(' : character == ']' ? '[' : '{';
+        if( delimiters.empty() or delimiters.back() != opening ){ return false; }
+        delimiters.pop_back();
+      }
+    }
+    return quote == 0 and delimiters.empty();
+  }
+}
 
 void GaussianConstraint::configureImpl(){
   _config_.clearFields();
@@ -65,6 +94,10 @@ void GaussianConstraint::configureImpl(){
 
 void GaussianConstraint::initializeImpl(){
   if( not _isEnabled_ ){ return; }
+  // Older ROOT parsers can hang on unterminated function calls or parameter aliases.
+  LogThrowIf(not hasBalancedDelimiters(_formulaString_),
+             "Invalid formula in external constraint " << _name_ << ": " << _formulaString_
+             << " (unbalanced delimiters)");
   // Keep formulas out of ROOT's global registry. Evaluation uses local parameter arrays.
   _formula_ = std::make_shared<TFormula>(_name_.c_str(), _formulaString_.c_str(), false);
   LogThrowIf(not _formula_->IsValid(), "Invalid formula in external constraint " << _name_ << ": " << _formulaString_);
