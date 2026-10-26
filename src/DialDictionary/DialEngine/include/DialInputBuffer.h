@@ -18,8 +18,9 @@ class DialInputBuffer {
   /// for the evaluation of a collection of dials.
 
   /// The buffer is updated in single thread before the evaluation of
-  /// individual dials is done. This means DialInputBuffer is only meant
-  /// to handle Parameters. Not Event variables.
+  /// individual dials is done. Collection buffers only reference Parameters,
+  /// not Event variables. Composite evaluations use separate call-local
+  /// buffers populated with intermediate values via setInputValues().
 
 public:
   /// definition of data structs
@@ -54,7 +55,7 @@ public:
   [[nodiscard]] const std::uint64_t* getRevisionPtr() const{ return &_revision_; }
   [[nodiscard]] auto isDialUpdateRequestedPtr() const{ return &_isDialUpdateRequested_; }
   [[nodiscard]] auto getBufferSize() const{ return _inputArraySize_; }
-  [[nodiscard]] auto getInputSize() const{ return _inputParameterReferenceList_.size(); }
+  [[nodiscard]] auto getInputSize() const{ return _isInitialized_ ? size_t(_inputArraySize_) : _inputParameterReferenceList_.size(); }
   [[nodiscard]] auto& getInputBuffer() const { return _inputBuffer_; }
   [[nodiscard]] auto& getInputParameterIndicesList() const{ return _inputParameterReferenceList_; }
 
@@ -74,6 +75,9 @@ public:
   /// Update the buffer to flag if any parameter has changed, and apply any
   /// mirroring to the parameter values.
   void update();
+
+  // Call-local inputs for composed evaluations; no parameter references.
+  void setInputValues(std::vector<double> values_);
 
   // nested getters
   [[nodiscard]] auto& getParameterSet(int iInput_) const{ return _inputParameterReferenceList_[iInput_].getParameterSet(_parSetListPtr_); }

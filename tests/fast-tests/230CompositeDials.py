@@ -1,0 +1,355 @@
+#!/usr/bin/env python3
+"""Composite DAGs reuse ordinary global, binned and event-by-event dials."""
+import copy
+import json
+import math
+import subprocess
+import sys
+from importlib import import_module
+from pathlib import Path
+
+sys.dont_write_bytecode = True
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import_module('005PythonSetup-utils').requireVenv(__file__)
+
+
+def write_input(path):
+    macro = Path.cwd() / '230CompositeDials-input.C'
+    macro.write_text(r'''#include <TFile.h>
+#include <TTree.h>
+#include <TGraph.h>
+#include <TH2D.h>
+#include <TObjArray.h>
+#include <TSystem.h>
+{
+ {
+  TFile output(OUTPUT_PATH, "RECREATE");
+  TTree tree("events", "events");
+  double coordinate = 0.;
+  TGraph curve, flatCurve;
+  TGraph *graph = &curve, *flat = &flatCurve;
+  tree.Branch("X", &coordinate, "X/D");
+  tree.Branch("graph", "TGraph", &graph, 32000, 0);
+  tree.Branch("flat", "TGraph", &flat, 32000, 0);
+  for (int event = 0; event < 6; ++event) {
+    coordinate = .25 + .5*event;
+    for (int knot = 0; knot < 5; ++knot) {
+      double x = knot - 2.;
+      graph->SetPoint(knot, x, 1. + .1*(event + 1)*x*x);
+      flat->SetPoint(knot, x, 1.);
+    }
+    tree.Fill();
+  }
+  tree.Write();
+  TObjArray curves, surfaces;
+  curves.SetOwner(true); surfaces.SetOwner(true);
+  for (int bin = 0; bin < 3; ++bin) {
+    auto* curve = new TGraph(5);
+    for (int knot = 0; knot < 5; ++knot) {
+      double x = knot - 2.;
+      curve->SetPoint(knot, x, 1. + .2*(bin + 1)*x);
+    }
+    curves.Add(curve);
+    auto* surface = new TH2D(("surface" + std::to_string(bin)).c_str(), "", 5, -2.5, 2.5, 5, -2.5, 2.5);
+    surface->SetDirectory(nullptr);
+    for (int ix = 1; ix <= 5; ++ix) for (int iy = 1; iy <= 5; ++iy) {
+      surface->SetBinContent(ix, iy, 2. + .1*(bin + 1)*surface->GetXaxis()->GetBinCenter(ix)
+                                             + .2*surface->GetYaxis()->GetBinCenter(iy));
+    }
+    surfaces.Add(surface);
+  }
+  curves.Write("curves", TObject::kSingleKey);
+  surfaces.Write("surfaces", TObject::kSingleKey);
+ }
+ gSystem->Exit(0);
+}
+'''.replace('OUTPUT_PATH', json.dumps(str(path))))
+    subprocess.run(['root', '-n', '-l', '-b', '-q', str(macro)], check=True)
+
+
+def formula(name, expression, *inputs, **options):
+    return dict(name=name, dialType='Formula', dialInputList=list(inputs),
+                options={'formulaStr': expression}, **options)
+
+
+def composite(nodes, output, **options):
+    return dict(name='graph', dialType='Composite', dialInputList=[{'name': 'p'}, {'name': 'q'}],
+                options=dict(nodes=nodes, output=output), **options)
+
+
+def legacy_options(dial):
+    result = copy.deepcopy(dial)
+    if result['dialType'] == 'Composite':
+        result['options']['nodes'] = [legacy_options(node) for node in result['options']['nodes']]
+    if result['dialType'] in ('Composite', 'Formula', 'CompiledLibDial'):
+        result['dialConfig'] = result.pop('options')
+    return result
+
+
+def make_config(path, dial):
+    binning = {'binningDefinition': [{'name': 'X', 'edges': [0, 1, 2, 3]}]}
+    return {'enablePca': False, 'scaleParStepWithChi2Response': False,
+            'generateSamplePlots': False, 'generateOneSigmaPlots': False,
+            'likelihoodInterfaceConfig': {
+                'jointProbabilityConfig': {'type': 'LeastSquares', 'lsqPoissonianApproximation': True},
+                'dataSetList': [{'name': 'input', 'model': {'tree': 'events', 'filePathList': [str(path)]}}],
+                'propagatorConfig': {'sampleSetConfig': {'sampleList': [{'name': 'sample', 'binning': binning}]},
+                    'parametersManagerConfig': {'parameterSetList': [{
+                        'name': 'parameters', 'isEnabled': True, 'nominalStepSize': .1,
+                        'parameterDefinitions': [dict(name=name, priorValue=value, priorType='Flat')
+                                                 for name, value in [('p', .5), ('q', .25)]],
+                        'dialSetDefinitions': [dial]}]}}}}
+
+
+def build(config):
+    import GUNDAM
+    engine = GUNDAM.FitterEngine()
+    engine.configure(GUNDAM.ConfigUtils.ConfigReader(GUNDAM.JsonType(json.dumps(config))))
+    engine.initialize()
+    return engine
+
+
+def close(actual, expected):
+    assert math.isclose(actual, expected, rel_tol=1e-10, abs_tol=1e-11), (actual, expected)
+
+
+def exercise(path, dial, expected, observable=False, points=None):
+    engine = build(make_config(path, dial))
+    likelihood = engine.getLikelihoodInterface()
+    model = likelihood.getModelPropagator()
+    parameters = model.getParametersManager().getParameterSetsList()[0].getParameterList()
+    sample = model.getSampleSet().getSampleList()[0]
+    if points is None:
+        points = [(.5, .25), (.5, .25), (-.5, .25), (-.5, .75), (1.2, -.25), (.5, .25)]
+    for p, q in points:
+        parameters[0].setParameterValue(p)
+        parameters[1].setParameterValue(q)
+        for _ in range(2):
+            likelihood.propagateAndEvalLikelihood()
+            sums = [0., 0., 0.]
+            for event in sample.getEventList():
+                index = event.getIndices().treeEntry
+                value = expected(p, q, index)
+                if observable:
+                    close(event.getEventWeight(), 1.)
+                    close(event.getVariables().fetchVariable('X').getVarAsDouble(), value)
+                    bin_index = int(value) if 0 <= value < 3 else -1
+                    assert event.getIndices().bin == bin_index
+                    if bin_index >= 0:
+                        sums[bin_index] += 1.
+                else:
+                    close(event.getEventWeight(), value)
+                    sums[index // 2] += value
+            for content, expected_sum in zip(sample.getHistogram().getBinContentList(), sums):
+                close(content.sumWeights, expected_sum)
+            # The Asimov copy must retain the graph and its original inputs.
+            data = likelihood.getDataPropagator().getSampleSet().getSampleList()[0]
+            for event in data.getEventList():
+                prior = expected(.5, .25, event.getIndices().treeEntry)
+                if observable:
+                    close(event.getVariables().fetchVariable('X').getVarAsDouble(), prior)
+                else:
+                    close(event.getEventWeight(), prior)
+
+
+def reject(config, message):
+    try:
+        build(config)
+    except Exception as error:
+        assert message.lower() in str(error).lower(), (message, str(error))
+    else:
+        raise AssertionError('Invalid composite accepted: ' + message)
+
+
+def main():
+    import GUNDAM
+    GUNDAM.setLightOutputMode(True)
+    path = Path.cwd() / '230CompositeDials.root'
+    write_input(path)
+    first = {'inputIndex': 0}
+    second = {'inputIndex': 1}
+    upstream = {'dialResponse': 'source'}
+    binning = {'binningDefinition': [{'name': 'X', 'edges': [0, 1, 2, 3]}]}
+    for threads in (1, 2):
+        GUNDAM.setNumberOfThreads(threads)
+        # Forward references, shared subgraph, signed intermediates, mixed inputs.
+        dag = composite([
+            formula('output', '2+x[0]+x[1]+x[2]', {'dialResponse': 'left'}, {'dialResponse': 'right'}, second),
+            formula('right', 'x[0]*x[0]', upstream),
+            formula('source', 'x[0]', first),
+            formula('left', '2*x[0]', upstream)], 'output')
+        exercise(path, dag, lambda p, q, i: max(0., 2 + 2*p + p*p + q))
+        if threads == 1:
+            exercise(path, legacy_options(dag), lambda p, q, i: max(0., 2 + 2*p + p*p + q))
+
+        # A nested composite consumes an intermediate and a direct parameter.
+        nested = composite([formula('sum', '2+x[0]+x[1]', first, second)], 'sum')
+        nested.update(name='nested', dialInputList=[upstream, second])
+        exercise(path, composite([formula('source', 'x[0]*x[0]', first), nested], 'nested'),
+                 lambda p, q, i: 2 + p*p + q)
+
+        # Use ordinary branch dials, including the constant-one shortcut.
+        for dial_type in ('Spline', 'Graph'):
+            node = dict(name='curve', dialType=dial_type, dialBranchData='graph', dialInputList=[upstream])
+            curve_dial = composite([formula('source', 'x[0]', first), node], 'curve')
+            if dial_type == 'Spline':
+                reference = lambda p, q, i: 1 + .1*(i + 1)*p*p
+            else:
+                reference = lambda p, q, i: 1 + .1*(i + 1)*(abs(p) if abs(p) <= 1 else 3*abs(p)-2)
+            exercise(path, curve_dial, reference)
+        exercise(path, composite([dict(name='one', dialType='Spline', dialBranchData='flat',
+                                      dialInputList=[first]), formula('output', '2*x[0]', {'dialResponse': 'one'})],
+                                 'output'), lambda p, q, i: 2.)
+
+        # Per-bin selection is delegated to the existing collection loader.
+        for dial_type, objects, inputs in [('Graph', 'curves', [upstream]),
+                                            ('Surface', 'surfaces', [upstream, second])]:
+            node = dict(name='curve', dialType=dial_type, binning=binning, dialsFilePath=str(path),
+                        dialsList=objects, dialInputList=inputs)
+            if dial_type == 'Surface':
+                node['options'] = 'Bilinear'
+                reference = lambda p, q, i: 2 + .1*(i//2 + 1)*p + .2*q
+            else:
+                reference = lambda p, q, i: 1 + .2*(i//2 + 1)*p
+            exercise(path, composite([formula('source', 'x[0]', first), node], 'curve'), reference)
+
+        # Limits act at each node, then separately at the graph output.
+        limited = composite([formula('source', 'x[0]', first, dialResponseLimits=[-.2, .8]),
+                             formula('output', '1+x[0]', upstream)], 'output', dialResponseLimits=[0., 1.5])
+        exercise(path, limited, lambda p, q, i: min(1.5, 1 + min(.8, max(-.2, p))))
+        mirrored = composite([dict(name='source', dialType='Normalization', dialInputList=[first],
+                                   useMirrorDial=True, mirrorLowEdge=0., mirrorHighEdge=1.),
+                              formula('output', '1+x[0]', upstream)], 'output')
+        exercise(path, mirrored, lambda p, q, i: 1 + (abs(p) if abs(p) <= 1 else 2-abs(p)))
+        smoothed = composite([dict(name='source', dialType='Normalization', dialInputList=[first],
+                                   dialResponseLimits={'min': 0.}, enableResponseSmoothing=True,
+                                   dialResponseSmoothingWidth=.2),
+                              formula('output', '1+x[0]', upstream)], 'output')
+        def smooth_reference(p, q, i):
+            t = (p + .2)/.4
+            return 1 + (0. if p <= -.2 else p if p >= .2 else .2*(2*t**3-t**4))
+        exercise(path, smoothed, smooth_reference, points=[(.5, .25), (0., .25), (-.1, .25), (.1, .25)])
+        observable = composite([formula('source', 'x[0]+x[1]', first, second)], 'source',
+                               applyToVariable='X', variableResponseMode='Override')
+        exercise(path, observable, lambda p, q, i: p + q, observable=True)
+
+    # Compiled functions can consume intermediate responses through DialInputBuffer.
+    source = Path.cwd() / '230CompositeDials-library.cpp'
+    library = source.with_suffix('.so')
+    source.write_text('extern "C" double evalVariable(double* x) { return 2 + x[0] + 3*x[1]; }\n')
+    subprocess.run(['c++', '-shared', '-fPIC', str(source), '-o', str(library)], check=True)
+    compiled = dict(name='compiled', dialType='CompiledLibDial', dialInputList=[upstream, second],
+                    options={'libraryFile': str(library)})
+    exercise(path, composite([formula('source', 'x[0]*x[0]', first), compiled], 'compiled'),
+             lambda p, q, i: 2 + p*p + 3*q)
+    exercise(path, legacy_options(composite([formula('source', 'x[0]*x[0]', first), compiled], 'compiled')),
+             lambda p, q, i: 2 + p*p + 3*q)
+
+    # Prepared factories remain usable as sources driven by graph parameters.
+    source.write_text(r'''
+extern "C" int initialize(const char*, int, const char*[], int) { return 4; }
+extern "C" int update(const char*, double* table, int bins, const double* par, int) {
+  for (int i = 0; i < bins; ++i) table[i] = 1 + par[0] + 2*par[1];
+  return 0;
+}
+extern "C" double bin(const char*, int, double*, int) { return .5; }
+extern "C" int weights(const char*, int, int, double*, int, int* indices, double* weights) {
+  indices[0] = 0; weights[0] = 1.; return 1;
+}
+''')
+    table_library = source.with_name('230CompositeDials-table.so')
+    subprocess.run(['c++', '-shared', '-fPIC', str(source), '-o', str(table_library)], check=True)
+    for dial_type in ('Tabulated', 'Kriged'):
+        table_config = dict(name=dial_type, libraryPath=str(table_library), initFunction='initialize',
+                            initArguments=[], updateFunction='update')
+        if dial_type == 'Tabulated':
+            table_config.update(binningFunction='bin', binningVariables=['X'])
+        else:
+            table_config.update(weightFunction='weights', weightVariables=['X'], weightNormalization=0.)
+        table = dict(name='source', dialType=dial_type, dialInputList=[first, second], tableConfig=table_config)
+        exercise(path, composite([table, formula('output', 'x[0]*x[0]', upstream)], 'output'),
+                 lambda p, q, i: (1+p+2*q)**2)
+
+    worker = Path.cwd() / '230CompositeDials-worker.py'
+    worker.write_text("""def run(command):
+    if command['command'] == 'evaluate':
+        command['weights'][:] = 1 + command['parameters']['p'] + 2*command['parameters']['q']
+    return {'status': 'ok'}
+""")
+    external = dict(name='source', dialType='ExternalWeight', dialInputList=[first, second], options={
+        'type': 'PythonWorker', 'inputEventVarList': ['X'],
+        'workerConfig': {'pythonExecutable': sys.executable, 'evalScript': str(worker)}})
+    exercise(path, composite([external, formula('output', 'x[0]*x[0]', upstream)], 'output'),
+             lambda p, q, i: (1+p+2*q)**2)
+
+    # Parameter-attached composites expose the owning parameter as input 0.
+    implicit = composite([formula('output', '1+x[0]', first)], 'output')
+    implicit.pop('dialInputList')
+    config = make_config(path, implicit)
+    parameter_set = config['likelihoodInterfaceConfig']['propagatorConfig']['parametersManagerConfig']['parameterSetList'][0]
+    parameter_set.pop('dialSetDefinitions')
+    parameter_set['parameterDefinitions'] = [dict(name='p', priorValue=.5, priorType='Flat',
+                                                 dialSetDefinitions=[implicit])]
+    engine = build(config)
+    likelihood = engine.getLikelihoodInterface()
+    model = likelihood.getModelPropagator()
+    model.getParametersManager().getParameterSetsList()[0].getParameterList()[0].setParameterValue(1.2)
+    likelihood.propagateAndEvalLikelihood()
+    for event in model.getSampleSet().getSampleList()[0].getEventList():
+        close(event.getEventWeight(), 2.2)
+
+    good = make_config(path, composite([formula('source', 'x[0]', first),
+                                       formula('output', '1+x[0]', upstream)], 'output'))
+    def changed_graph():
+        result = copy.deepcopy(good)
+        graph = result['likelihoodInterfaceConfig']['propagatorConfig']['parametersManagerConfig'][
+            'parameterSetList'][0]['dialSetDefinitions'][0]['options']
+        return result, graph
+
+    config, graph = changed_graph()
+    graph['nodes'][0]['dialInputList'] = [{'dialResponse': 'output'}]
+    reject(config, 'cycle')
+    config, graph = changed_graph()
+    graph['nodes'][0]['name'] = 'output'
+    reject(config, 'duplicate')
+    config, graph = changed_graph()
+    graph['output'] = 'missing'
+    reject(config, 'unknown output')
+    config, graph = changed_graph()
+    graph['nodes'][0]['dialInputList'] = [{'inputIndex': 2}]
+    reject(config, 'inputIndex')
+    config, graph = changed_graph()
+    graph['nodes'][0]['dialInputList'] = [{'inputIndex': .5}]
+    reject(config, 'inputIndex')
+    config, graph = changed_graph()
+    graph['nodes'][0]['dialInputList'] = [{'inputIndex': 0, 'dialResponse': 'output'}]
+    reject(config, 'exactly one of')
+    config, graph = changed_graph()
+    graph['nodes'][1]['dialInputList'] = [{'dialResponse': 'missing'}]
+    reject(config, 'unknown dialResponse')
+    config, graph = changed_graph()
+    graph['nodes'][1]['applyCondition'] = 'X < 1'
+    reject(config, 'missing node')
+    config, graph = changed_graph()
+    graph['nodes'][1] = dict(name='output', dialType='Normalization', dialInputList=[upstream, second])
+    reject(config, 'exactly one input')
+    config, graph = changed_graph()
+    graph['nodes'][1]['options']['formulaStr'] = 'x[2]'
+    reject(config, 'too few inputs')
+    config, graph = changed_graph()
+    graph['nodes'].append(formula('unused', 'x[0]', first))
+    reject(config, 'every node')
+    for dial_type in ('Tabulated', 'Kriged', 'ExternalWeight'):
+        config, graph = changed_graph()
+        graph['nodes'][1] = dict(name='output', dialType=dial_type, dialInputList=[upstream])
+        reject(config, 'requires parameter inputs')
+        config, graph = changed_graph()
+        child = composite([dict(name='prepared', dialType=dial_type, dialInputList=[first])], 'prepared')
+        child.update(name='output', dialInputList=[upstream, second])
+        graph['nodes'][1] = child
+        reject(config, 'requires parameter inputs')
+    print('SUCCESS: composite dial graphs, event/bin binding, observables and validation.')
+
+
+if __name__ == '__main__':
+    main()

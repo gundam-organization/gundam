@@ -3,6 +3,7 @@
 //
 
 #include "DialInterface.h"
+#include "CompositeDial.h"
 #include "GundamGlobals.h"
 
 #include "Logger.h"
@@ -25,7 +26,8 @@ std::string DialInterface::getSummary(bool shallow_) const {
     ss << " supervisor(" << _responseSupervisorPtr_->getSummary(shallow_) << ")";
   }
 
-  ss << " response=" << this->evalResponse();
+  const auto* composite = dynamic_cast<const CompositeDial*>(_dial_.get());
+  if( composite == nullptr or composite->isBound() ){ ss << " response=" << this->evalResponse(); }
 
   if( not shallow_ ){
     ss << std::endl;

@@ -3,6 +3,7 @@
 //
 
 #include "EventDialCache.h"
+#include "CompositeDial.h"
 
 #include "Logger.h"
 
@@ -99,6 +100,7 @@ void EventDialCache::buildReferenceCache( SampleSet& sampleSet_, std::vector<Dia
       // filling up the dial references
       for( auto& dialIndex : indexCache.dials ){
         if( dialIndex.collectionIndex == size_t(-1) or dialIndex.interfaceIndex == size_t(-1) ){ continue; }
+        if( dialCollectionList_.at(dialIndex.collectionIndex).isCompositeNode() ){ continue; }
 
         if( dialIndex.interfaceIndex >= dialCollectionList_.at(dialIndex.collectionIndex).getDialInterfaceList().size() ){
           LogError << "BAD: dialIndex.interfaceIndex >= dialCollectionList_.at(dialIndex.collectionIndex).getDialInterfaceList().size()" << std::endl;
@@ -114,10 +116,27 @@ void EventDialCache::buildReferenceCache( SampleSet& sampleSet_, std::vector<Dia
           LogThrow("DEV ERROR: Please report this issue to github!! This should not happen");
         }
 
-        cacheEntry.dialResponseCacheList.emplace_back(
-            dialCollectionList_.at(dialIndex.collectionIndex)
-            .getDialInterfaceList().at(dialIndex.interfaceIndex)
-        );
+        auto* interface = &dialCollectionList_.at(dialIndex.collectionIndex)
+            .getDialInterfaceList().at(dialIndex.interfaceIndex);
+        if( const auto* composite = dynamic_cast<const CompositeDial*>(interface->getDialBaseRef()) ){
+          auto bound = std::make_unique<CompositeDial>(*composite);
+          bound->bind([&](int collectionIndex_) -> const DialInterface* {
+            const auto found = std::find_if(indexCache.dials.begin(), indexCache.dials.end(),
+                [&](const DialIndexCacheEntry& entry_){ return entry_.collectionIndex == size_t(collectionIndex_); });
+            LogThrowIf(found == indexCache.dials.end(),
+                       "Composite: missing node " << dialCollectionList_.at(collectionIndex_)
+                           .getConfig().fetchValue<std::string>("name") << " (collection " << collectionIndex_
+                       << ") on event " << *cacheEntry.event);
+            return &dialCollectionList_.at(collectionIndex_).getDialInterfaceList().at(found->interfaceIndex);
+          });
+          auto eventInterface = std::make_shared<DialInterface>();
+          eventInterface->setDial(DialBaseObject(std::move(bound)));
+          eventInterface->setInputBufferRef(interface->getInputBufferRef());
+          eventInterface->setResponseSupervisorRef(interface->getResponseSupervisorRef());
+          interface = eventInterface.get();
+          cacheEntry.compositeInterfaces.emplace_back(std::move(eventInterface));
+        }
+        cacheEntry.dialResponseCacheList.emplace_back(*interface);
         const auto& collection = dialCollectionList_.at(dialIndex.collectionIndex);
         if( collection.getApplyToVariable().empty() ){ continue; }
         _hasVariableResponses_ = true;
