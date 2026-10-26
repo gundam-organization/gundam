@@ -44,10 +44,15 @@ public:
   void setEnableSimplexBeforeMinimize(bool enableSimplexBeforeMinimize_){ _preFitWithSimplex_ = enableSimplexBeforeMinimize_; }
 
   // const getters
+  [[nodiscard]] bool hasConverged() const { return _fitHasConverged_; }
+  [[nodiscard]] bool isMinimizeDone() const { return _minimizeDone_; }
   [[nodiscard]] double getTargetEdm() const;
   [[nodiscard]] const std::unique_ptr<ROOT::Math::Minimizer> &getMinimizer() const{ return _rootMinimizer_; }
 
   // core
+  /// Synchronize existing minimizer parameters with their current values, steps,
+  /// limits and fixed states. The parameter list is established at initialization.
+  void updateFitParameterSettings();
   void saveMinimizerSettings(TDirectory* saveDir_) const;
 
 protected:
@@ -58,6 +63,7 @@ protected:
   void saveGradientSteps();
 
 private:
+  void updateFitParameterFixedStates();
 
   // Dump the Math::Minimizer table of parameter settings.  This is mostly
   // useful for debugging.
