@@ -25,6 +25,7 @@ public:
   void setFormulaStr(const std::string& formulaStr_);
 
   TFormula& getFormula(){ return _formula_; }
+  const TFormula& getFormula() const{ return _formula_; }
 
 
 private:

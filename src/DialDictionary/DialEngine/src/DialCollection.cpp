@@ -38,7 +38,7 @@ void DialCollection::prepareConfig(ConfigReader &config_){
       {"dialInputList"},
       {"printDialSummary", {"printDialsSummary"}},
       {"dialType", {"type", "dialsType"}},
-      {"options", {"dialSubType"}},
+      {"options", {"dialSubType", "dialConfig"}},
       {"dialBranchData", {"dialLeafName", "treeExpression"}},
       {"minDialResponse", {"minimumSplineResponse"}},
       {"maxDialResponse"},
@@ -86,8 +86,27 @@ void DialCollection::configureImpl() {
     _dialInputBufferList_.emplace_back();
     _dialInputBufferList_.back().setParSetRef( _parameterSetListPtr_ );
 
+    auto formulaDefinition = std::make_shared<EventFormula::Definition>();
+
     // add the ref of each selected parameter
     for( auto& dialInput : dialInputList.getConfig() ){
+      EventFormula::Input source;
+      if( GenericToolbox::Json::doKeyExist(dialInput, "eventVariable") ){
+        LogThrowIf(_dialType_ != DialType::Formula, "eventVariable inputs are only supported by Formula dials");
+        LogThrowIf(dialInput.size() != 1, "Formula input must specify exactly one of name and eventVariable");
+        auto name = GenericToolbox::Json::fetchValue<std::string>(dialInput, "eventVariable");
+        name = GenericToolbox::trimString(name, " ");
+        if( name.size() >= 2 and name.front() == '[' and name.back() == ']' ){
+          name = name.substr(1, name.size() - 2);
+        }
+        LogThrowIf(name.empty(), "Formula eventVariable must not be empty");
+        GenericToolbox::addIfNotInVector(name, formulaDefinition->eventVariables);
+        source.eventIndex = GenericToolbox::findElementIndex(name, formulaDefinition->eventVariables);
+        formulaDefinition->inputs.emplace_back(source);
+        continue;
+      }
+      source.parameterIndex = int(_dialInputBufferList_.back().getInputSize());
+      formulaDefinition->inputs.emplace_back(source);
       DialInputBuffer::ParameterReference p;
       p.parSetIndex = _supervisedParameterSetIndex_;
 
@@ -100,6 +119,7 @@ void DialCollection::configureImpl() {
 
       _dialInputBufferList_.back().addParameterReference( p );
     }
+    if( not formulaDefinition->eventVariables.empty() ){ _eventFormulaDefinition_ = std::move(formulaDefinition); }
 
   }
 
@@ -299,7 +319,8 @@ void DialCollection::readParametersFromConfig(const ConfigReader &config_) {
   // globals for the dialSet
   config_.fillValue(_enableDialsSummary_, "printDialSummary");
   config_.fillValue(_dialType_, "dialType");
-  if( _dialType_ != DialType::ExternalWeight ){
+  if( _dialType_ != DialType::ExternalWeight and _dialType_ != DialType::Formula
+      and _dialType_ != DialType::CompiledLibDial ){
     config_.fillValue(_dialOptions_, "options");
   }
   if( config_.hasField("dialBranchData") ){
@@ -1067,14 +1088,14 @@ std::unique_ptr<DialBase> DialCollection::makeDial(const ConfigReader& config_) 
   if( dialType == "Formula" or dialType == "RootFormula" ){
     dialBase = std::make_unique<RootFormula>();
     auto* rootFormulaPtr{(RootFormula*) dialBase.get()};
-    auto formulaConfig = config_.fetchValue("dialConfig", JsonType());
+    auto formulaConfig = config_.fetchValue("options", JsonType());
     rootFormulaPtr->setFormulaStr( GenericToolbox::Json::fetchValue<std::string>(formulaConfig, "formulaStr") );
   }
   else if( dialType == "CompiledLibDial" ){
     dialBase = std::make_unique<CompiledLibDial>();
     auto* compiledLibDialPtr{(CompiledLibDial*) dialBase.get()};
 
-    auto formulaConfig(config_.fetchValue<JsonType>("dialConfig"));
+    auto formulaConfig(config_.fetchValue<JsonType>("options"));
 
     bool success = compiledLibDialPtr->loadLibrary( GenericToolbox::Json::fetchValue<std::string>(formulaConfig, "libraryFile") );
     if( not success ){

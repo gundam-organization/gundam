@@ -6,12 +6,15 @@
 
 
 double RootFormula::evalResponse(const DialInputBuffer& input_) const {
-  return _formula_.EvalPar(&input_.getInputBuffer()[0]);
+  LogThrowIf(_formula_.GetNdim() > input_.getInputBuffer().size(), "Formula: too few inputs for evaluation");
+  return _formula_.EvalPar(input_.getInputBuffer().data());
 }
 
 
 void RootFormula::setFormulaStr(const std::string& formulaStr_){
-  _formula_ = TFormula(formulaStr_.c_str(), formulaStr_.c_str());
+  // Dial formulas are independent. Registering an expression such as x[0]
+  // as a global formula name can make later nodes recursively expand it.
+  _formula_ = TFormula(formulaStr_.c_str(), formulaStr_.c_str(), false);
   LogThrowIf(not _formula_.IsValid(), "\"" << formulaStr_ << "\": could not be parsed as formula expression.");
 }
 

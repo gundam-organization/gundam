@@ -3,6 +3,7 @@
 //
 
 #include "DialInterface.h"
+#include "RootFormula.h"
 #include "GundamGlobals.h"
 
 #include "Logger.h"
@@ -25,7 +26,11 @@ std::string DialInterface::getSummary(bool shallow_) const {
     ss << " supervisor(" << _responseSupervisorPtr_->getSummary(shallow_) << ")";
   }
 
-  ss << " response=" << this->evalResponse();
+  const auto* formula = dynamic_cast<const RootFormula*>(_dial_.get());
+  if( _inputBufferPtr_ != nullptr and _responseSupervisorPtr_ != nullptr
+      and (formula == nullptr or formula->getFormula().GetNdim() <= _inputBufferPtr_->getInputBuffer().size()) ){
+    ss << " response=" << this->evalResponse();
+  }
 
   if( not shallow_ ){
     ss << std::endl;

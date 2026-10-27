@@ -49,7 +49,7 @@ public:
     bool *updateRequested{nullptr};
     void update(){
       // Reevaluate the dial if an update has been requested
-      if( *(this->updateRequested) ) {
+      if( *(this->updateRequested) or std::isnan(response) ) {
         response = dialInterface->evalResponse();
       }
     }
@@ -64,6 +64,8 @@ public:
   struct CacheEntry {
     Event* event;
     std::vector<DialResponseCache> dialResponseCacheList{};
+    // Stable ownership for event-specific formula interfaces.
+    std::vector<std::shared_ptr<DialInterface>> boundDialInterfaces{};
 
     [[nodiscard]] std::string getSummary(bool shallow_ = true) const {
       std::stringstream ss;

@@ -3,6 +3,7 @@
 //
 
 #include "EventDialCache.h"
+#include "EventFormula.h"
 
 #include "Logger.h"
 
@@ -112,10 +113,20 @@ void EventDialCache::buildReferenceCache( SampleSet& sampleSet_, std::vector<Dia
           LogThrow("DEV ERROR: Please report this issue to github!! This should not happen");
         }
 
-        cacheEntry.dialResponseCacheList.emplace_back(
-            dialCollectionList_.at(dialIndex.collectionIndex)
-            .getDialInterfaceList().at(dialIndex.interfaceIndex)
-        );
+        const auto& collection = dialCollectionList_.at(dialIndex.collectionIndex);
+        auto* interface = &dialCollectionList_.at(dialIndex.collectionIndex)
+            .getDialInterfaceList().at(dialIndex.interfaceIndex);
+        if( const auto& definition = collection.getEventFormulaDefinition() ){
+          auto eventInterface = std::make_shared<DialInterface>();
+          eventInterface->setDial(DialBaseObject(std::make_unique<EventFormula>(
+              interface->getDialBaseRef(), definition, *cacheEntry.event, collection.getEventInputMirrorEdges())));
+          eventInterface->setInputBufferRef(interface->getInputBufferRef());
+          eventInterface->setResponseSupervisorRef(interface->getResponseSupervisorRef());
+          eventInterface->setDialBinRef(interface->getDialBinRef());
+          interface = eventInterface.get();
+          cacheEntry.boundDialInterfaces.emplace_back(std::move(eventInterface));
+        }
+        cacheEntry.dialResponseCacheList.emplace_back(*interface);
       }
     }
   }
